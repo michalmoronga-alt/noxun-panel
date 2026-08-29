@@ -301,8 +301,9 @@ nezáväzný koncept [zdroje/next_sessions/03_KOVANIE_FAZA3.md](zdroje/next_sess
   **Scope IN:** čistý TROJSTAVOVÝ selektor `Materials.texture_state_for(material_id)` (headless — vzor `color_of`).
   POZOR (nález GLM review po #254, overený v kóde): `:none` sa NESMIE odvodzovať z neprítomnosti `image_url` —
   duplák URL DEDÍ zo zdroja (`duplak_record_from` ju nereject-uje) a `finalize_create` ju rozkopíruje na všetky
-  sheet záznamy vrátane zásten. Selektor rozhoduje podľa TYPU záznamu: `[:none]` = UNI (`uni: true`) a legacy
-  bez URL → farba · duplák a zástena fotku LEGITÍMNE MAJÚ (duplák = ten istý dekor, fotka je vizuálne správna;
+  sheet záznamy vrátane zásten. Selektor rozhoduje HIERARCHICKY: (1) UNI (`uni: true`) → `[:none]` bez ohľadu na URL · (2) záznam BEZ
+  `image_url` (legacy, alebo bežný materiál, ktorému URL z katalógu UBUDLA) → `[:none]` — toto je cesta, ktorou
+  párové pravidlo odstránenia textúry reálne funguje · (3) duplák a zástena fotku LEGITÍMNE MAJÚ (URL dedia) (duplák = ten istý dekor, fotka je vizuálne správna;
   zástena = fotka predného dekoru, rub je priznané obmedzenie fázy 2) · `[:missing]` = URL áno, lokálny súbor
   chýba/nevalidný → existujúca textúra v modeli sa DRŽÍ · `[:path, cesta]` = aplikuj/over kľúč (apply/verify
   je NOVÁ práca dávky — `image_cache` má dnes len fetch/validáciu/uloženie) (`core/demos/image_cache.rb`; `image_url` žije na SHEET zázname — SCHEMA_IMAGE, `family.rb` ho rozkopíruje
@@ -327,8 +328,8 @@ nezáväzný koncept [zdroje/next_sessions/03_KOVANIE_FAZA3.md](zdroje/next_sess
   **Audit: ÁNO (úzky rozsah)** — škrt poľa zo STANDARDU (kontraktová zmena, hoci mŕtva) + dotyk cesty volanej
   builderami; codex-audit pred implementáciou spustiť presne s týmto rozsahom.
   **Testy a DoD:** headless — `texture_state_for` (`:path` s fotkou vrátane DUPLÁKU so zdedenou URL a zásteny
-  · `:missing` pri poškodenom/chýbajúcom súbore · `:none` pre UNI a legacy bez URL — rozhoduje TYP záznamu,
-  nie prítomnosť URL) + kľúč identity textúry; **in-SU sekcia POVINNÁ** (cesta sa volá z builderov): rebuild s textúrou nevyrába
+  · `:missing` pri poškodenom/chýbajúcom súbore · `:none` pre UNI aj pri zdedenej URL · `:none` pre bežný záznam
+  po STRATE URL — hierarchia typ→URL, nikdy len URL) + kľúč identity textúry; **in-SU sekcia POVINNÁ** (cesta sa volá z builderov): rebuild s textúrou nevyrába
   extra Undo, nemení BOM, neprepisuje textúru pri nezmenenom kľúči, model bez cache textúry DRŽÍ; mutácie min. 3
   (texture vždy/nikdy · prepis pri chýbajúcej cache · color na textúre). VEPO/kusovník/rozpočet BAJTOVO nezmenené.
   **Riziká:** veľkosť .skp (textúry sa vkladajú — smoke porovná na zákazke KLINIKA) · výkon pri mnohých
