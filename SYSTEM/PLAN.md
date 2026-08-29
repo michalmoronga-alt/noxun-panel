@@ -121,67 +121,85 @@ roztriediť do **kódových a logických blokov** → každému určiť **priori
 audit áno/nie · testy a DoD · riziká · smoke checklist pre Michala · checklist uzáveru. Každý package si na štarte
 spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom packages preberajú sekvenčne bez ďalšieho plánovania.
 
-### GHOST VKLADANIE (V1-04) — TASK PACKAGE (1e, zapísané 29.8.2026; štart na Michalovo „štartuj")
+### GHOST VKLADANIE (V1-04) — TASK PACKAGE (1e, zapísané 29.8.2026, rev. po slepom review #254; štart na Michalovo „štartuj")
 
 **Cieľ:** vloženie skrinky tam, kde sa používateľ pozerá — po „Vložiť" visí ghost skrinky na kurzore,
 klik ju položí ako jednu reálnu CAB v jednom Undo kroku. Koniec hľadania skriniek položených cez `next_x`
 mimo pohľadu. Podklady: koncepty [09](zdroje/next_sessions/09_GHOST_VKLADANIE.md) + [09A](zdroje/next_sessions/09A_GHOST_EXTERNY_SKETCHUP_AUDIT.md)
-(externý SketchUp audit) — package z nich preberá SCHVÁLENÝ kontrakt a uzatvára otvorené voľby nižšie.
+— package z nich preberá SCHVÁLENÝ kontrakt a uzatvára otvorené voľby nižšie.
 
-**Predpoklady (PRED štartom, poradie z [AUDIT_REGISTER.md](AUDIT_REGISTER.md)):** dávky **R-01+R-04**
-(multi-model observer) → **R-02** (model_guid guard zapisovacích handlerov vrátane insertu) → **R-03**
-(šev `prepare_insert` + `build(..., transform:)` — najväčšia prípravná dávka, odhad L). Bez R-03 package neštartuje.
+**Predpoklady ([AUDIT_REGISTER.md](AUDIT_REGISTER.md)):** TVRDÝ blocker je **R-03** (šev `prepare_insert` +
+`build(..., transform:)` — najväčšia prípravná dávka, odhad L; bez nej package neštartuje). **R-01+R-04** a
+**R-02** sú macOS-vetvové: odporúčané pred štartom, pre Windows-only prevádzku neblokujú — guard identity
+dokumentu pre INSERT cestu je aj tak scope IN tejto dávky (session na `model_guid`).
 
-**Scope IN:** SketchUp `Tool` (ghost = čistá viewport grafika cez `draw(view)`, `InputPoint` inference,
-`getExtents` pre kreslenie mimo bounds) · PlacementSession viazaná na `model_guid` (prepnutie dokumentu = cancel,
+**Scope IN:** SketchUp `Tool` — ghost = čistá viewport grafika cez `draw(view)` s **čitateľnou prednou stranou
+a VIDITEĽNÝM aktívnym anchorom** (bez toho sa prepínanie kotiev nedá kontrolovať), `InputPoint` inference,
+`getExtents` pre kreslenie mimo bounds · PlacementSession viazaná na `model_guid` (prepnutie dokumentu = cancel,
 NIKDY cross-document insert) · rotácia ←/→ o 90° okolo aktívneho anchoru · 4 anchory na PREDNEJ rovine KORPUSU
-(nie čiel; presné súradnice per konštrukčný variant určí implementačný audit proti BuildPlanu) · Z režimy:
-↓ floor lock = world Z=0 v koreňovom ráme (nie drawing axes, nie face pod kurzorom — funguje aj v prázdnom modeli
-cez ray×rovina) a ↑ free Z (plný inference point) · commit = `prepare_insert` snapshot → `build(transform:)`
-+ hardware freeze v TEJ ISTEJ operácii → select novej CAB → push → template usage stamp až PO úspechu ·
-Escape/onCancel/Undo počas ghostu = 0 mutácií modelu, 0 Undo krokov · Orbit/Pan suspend/resume drží session ·
-`Sketchup.focus` po štarte z HtmlDialogu (klávesy fungujú bez extra kliku) · status bar nápoveda · po vložení
-tool KONČÍ (žiadny repeat) a Inspector pokračuje editáciou novej CAB.
+(nie čiel; presné súradnice per konštrukčný variant určí implementačný audit proti BuildPlanu) · **Z režimy:
+↓ = VÝŠKOVÝ ZÁMOK TYPU** (dolný korpus: základňa na world Z=0; horný korpus: základňa na `UPPER_HANG_Z` —
+zámok drží Z bez ohľadu na inference; world rám, nie drawing axes; funguje aj v prázdnom modeli cez ray×rovina)
+**a ↑ = free Z** (plný inference point) — **oba typy ŠTARTUJÚ v zámku svojej domácej výšky** (zachováva dnešné
+správanie: horná pristane na 1400, kým používateľ vedome nestlačí ↑) · commit VŽDY top-level v koreňovom ráme
+(`ensure_root_context` vzor buildera — aj keď je používateľ v nested edit kontexte; in-SU scenár povinný) ·
+commit = `prepare_insert` snapshot → `build(transform:)` + hardware freeze v TEJ ISTEJ operácii → select novej
+CAB → push → template usage stamp až PO úspechu · **preflighty sa NEduplikujú do Tool triedy** (Tool rieši
+polohu, nie výrobné pravidlá — 09 §3) · Escape/onCancel/Undo počas ghostu = 0 mutácií modelu, 0 Undo krokov ·
+Orbit/Pan suspend/resume drží session · `Sketchup.focus` po štarte z HtmlDialogu (klávesy fungujú bez extra
+kliku) · status bar nápoveda · po vložení tool KONČÍ cez štandardný tool stack (návrat do bežného SketchUp
+workflow) a Inspector pokračuje editáciou novej CAB; po commite sa notifikuje aj StudioModelWatch (stale
+signalizácia) — nielen ScaleWatch/dedup.
+
+**Správanie Inspectora POČAS aktívnej session (uzavreté):** snapshot je zmrazený v `prepare_insert` — zmeny
+vo vkladacej karte sa do bežiacej session NEPREMIETAJÚ (status to prizná) · druhý klik na „Vložiť" zruší starú
+session a založí novú s čerstvým snapshotom · zavretie Inspectora session ZRUŠÍ (cancel, 0 mutácií).
 
 **Scope OUT (vedome NErobí):** „vložiť vedľa vybranej" · snap k NOXUN korpusom · attachment/segmenty ·
 auto-orientácia podľa steny · repeat-placement · ďalšie anchor body · 2D HUD/overlay framework ·
 zmena `insert_copy` a board placementu · náhrada `Placement.next_x` (ostáva fallback pre programatické cesty).
 
 **UZAVRETÉ VOĽBY package (Michal potvrdí pri „štartuj", inak platia tieto):** (1) cyklovanie anchorov =
-**Alt/Option** (odporúčanie externého auditu 09A — konvencia SketchUp Move gripov; TAB má verziové/fokusové pasce);
-status bar text sa prispôsobí. (2) Počiatočný Z režim: **dolný korpus štartuje vo floor lock; horný korpus
-štartuje vo free Z s ghost predvýškou `UPPER_HANG_Z`** (dnešných 1400 sa nezachováva potichu — je to len
-štartovacia poloha ghostu, klik rozhodne). (3) Klávesy ← → ↑ ↓ Tool vedome preberá od inference locku POČAS
-aktívneho ghostu; spotrebúvajú sa LEN klávesy, ktoré ghost vlastní.
+**Alt/Option** (odporúčanie 09A — konvencia SketchUp Move gripov; TAB má verziové/fokusové pasce). POZOR:
+Alt je na Windows systémová klávesa — **implementačný audit MUSÍ Alt overiť** (spolu s onCancel reasons a
+arrow ownership) a in-SU sada ho testuje; zapísaný fallback = TAB, ak Alt neprejde. (2) Z režimy a štart podľa
+Scope IN (výškový zámok typu; horná NIKDY neštartuje vo free Z). (3) Klávesy ← → ↑ ↓ Tool vedome preberá od
+inference locku POČAS aktívneho ghostu; spotrebúvajú sa LEN klávesy, ktoré ghost vlastní.
 
 **Dotknuté dáta/kontrakt → AUDIT: ÁNO (codex-audit pred implementáciou povinný).** Nový modul (Tool) + zásah
 do insert lifecycle; dátový kontrakt entít sa NEMENÍ (CAB vzniká štandardným builderom), ale Tool lifecycle
 je observer-citlivá oblasť. Implementačný audit navyše MUSÍ uzavrieť: presné anchor súradnice pre
-under_sides/between_sides/upper a atypy · `onCancel` reasons pre podporované SU verzie · arrow-key ownership.
+under_sides/between_sides/upper a atypy · `onCancel` reasons pre podporované SU verzie · arrow-key ownership ·
+funkčnosť Alt na Windows.
 
 **Testy a DoD:** headless — čistá transform matematika (4 rotácie × 4 anchory; anchor ostáva na inference bode
-po rotácii; floor/free prechody nemenia X/Y; Escape v každom stave = nulový zápis). **In-SU POVINNÉ** (sekcia
+po rotácii; zámok/free prechody nemenia X/Y; Escape v každom stave = nulový zápis). **In-SU POVINNÉ** (sekcia
 `run_ghost`): pred klikom 0 NOXUN entít · klik = presne 1 CAB na očakávanom transforme · 1× Ctrl+Z vráti celé ·
-nová CAB označená v Inspectore · lower aj upper · šablóna s materiálmi/kovaním + zámky karty · usage stamp len
-po úspechu · floor na Z=0 aj pri otočených axes · free Z na bode s nenulovým Z · ghost ďaleko mimo bounds
-(getExtents) · prázdny model bez podlahovej face · Undo počas ghostu · prepnutie dokumentu = bezpečný cancel ·
-regresie: programatický `build` cez fallback, ScaleWatch/dedup nevyrobí druhú CAB ani extra Undo. Mutačné
-overenie štandard. DoD = všetky scenáre zelené + smoke checklist Michala prejde.
+nová CAB označená v Inspectore · lower (Z=0) aj upper (`UPPER_HANG_Z` pri zámku) · free Z na bode s nenulovým
+Z · šablóna s materiálmi/kovaním + zámky karty · usage stamp len po úspechu · zámok pri otočených axes · ghost
+ďaleko mimo bounds (getExtents) · prázdny model bez podlahovej face · Undo počas ghostu · prepnutie dokumentu =
+bezpečný cancel · **nested edit context → commit top-level so správnym transformom** · Alt cyklovanie · druhé
+„Vložiť" počas session · regresie: programatický `build` cez fallback, ScaleWatch/dedup nevyrobí druhú CAB ani
+extra Undo. Mutačné overenie štandard. DoD = všetky scenáre zelené + smoke checklist Michala prejde.
 
 **Riziká:** Tool lifecycle (focus z CEF, onCancel/Undo, suspend/resume) — najväčšie, kryté in-SU scenármi ·
-arrow-key ownership vs natívny inference · geometria anchorov pri atypických konštrukciách (uzavrie audit) ·
+Alt na Windows (overí audit, fallback TAB) · geometria anchorov pri atypických konštrukciách (uzavrie audit) ·
 SU verzie (pixely/klávesy — držať ghost čisto 3D). Rez dávky: Tool + session v JEDNEJ dávke, R-03 šev PREDTÝM
 samostatne — nikdy nie jeden obrí PR.
 
-**Smoke checklist pre Michala (po nasadení):** 1) „Vložiť" → ghost visí na kurzore a šípky fungujú HNEĎ (bez
-kliku do modelu). 2) ←/→ točí okolo kotvy, Alt prepína kotvy, ↓ drží skrinku na zemi, ↑ ju pustí do výšky.
-3) Klik položí skrinku presne tam, kde bol ghost; jeden Ctrl+Z ju celú vráti. 4) Esc nič nevloží a nič nepribudne
-v Undo. 5) Počas ghostu si zorbituj pohľad kolieskom — ghost prežije. 6) Skús aj horný korpus a šablónu s kovaním.
+**Smoke checklist pre Michala (po nasadení):** 1) „Vložiť" → ghost visí na kurzore, vidno prednú stranu aj
+aktívnu kotvu, šípky fungujú HNEĎ (bez kliku do modelu). 2) ←/→ točí okolo kotvy, Alt prepína kotvy (a vidno
+ktorá je aktívna), ↓ drží skrinku na domácej výške (dolná na zemi, horná na 1400), ↑ ju pustí do voľnej výšky.
+3) Klik položí skrinku presne tam, kde bol ghost; jeden Ctrl+Z ju celú vráti. 4) Esc nič nevloží a nič
+nepribudne v Undo. 5) Počas ghostu si zorbituj pohľad — ghost prežije. 6) Skús horný korpus, šablónu s kovaním
+a vloženie, keď si v editácii skupiny (skrinka musí skončiť top-level).
 
-**Checklist uzáveru:** bump patch + `?v=` → testy (headless + JS ak UI + **plný in-SU beh**) → docs
-(`construction.md` odsek Tool/PlacementSession + `ui-lifecycle.md` insert cesta + ARCHITEKTURA router riadok) →
-STAV/KRONIKA/PLAN (package sa preklopí na ✅ s výsledkom) → D-čísla: žiadne (V1-04 je z V1_VIZIA checklistu —
-odškrtnúť bod 4).
+**Checklist uzáveru (blok GHOST sa uzatvára CELÝ):** **bump MINOR** (uzáver bloku podľa CLAUDE.md) + `?v=` →
+testy (headless + JS ak UI + **plný in-SU beh**) → docs (`construction.md` odsek Tool/PlacementSession +
+`ui-lifecycle.md` insert cesta + ARCHITEKTURA router riadok) → STAV/KRONIKA → **blok presunúť plným textom do
+[archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md)** (v PLANe neostáva) → V1_VIZIA **bod 1**:
+odškrtnúť LEN pod-položku „vloženie skriniek na klik" — bod sa celý NEodškrtáva (V1 rozsah bodu ešte nie je
+v PLANe prázdny).
 
 ### KOVANIE (zaradené Michalom 26.8.2026, po bloku GHOST VKLADANIE)
 
@@ -237,31 +255,41 @@ nezáväzný koncept [zdroje/next_sessions/03_KOVANIE_FAZA3.md](zdroje/next_sess
 
 **Cieľ:** materiál vyzerá v modeli ako v skutočnosti — Luciin nástroj na vizualizácie.
 
-- **V1 rozsah — quick-win = TASK PACKAGE „M-R FOTO" (1e, zapísané 29.8.2026; štart na „štartuj"):**
-  **Cieľ:** dielce v modeli nesú REÁLNU fotku dekoru namiesto plnej farby — Luciine vizualizácie bez exportu.
-  Presne bod 7 checklistu [V1_VIZIA.md](V1_VIZIA.md).
-  **Scope IN:** `Materials.ensure_su_material` — keď má dekorová skupina záznamu lokálne CACHOVANÚ Demos fotku
-  (`core/demos/image_cache.rb`; `image_url` na skupine), SU materiál dostane `texture` z cache súboru
-  + rozumnú mierku rapportu (fixná, napr. šírka textúry ≈ 600 mm — presné číslo určí vizuálny test);
-  bez fotky ostáva dnešná farba (fallback nezmenený). Prepis textúry LEN pri reálnej zmene (vzor
-  `ensure_su_edge_material` — rebuild nesmie špiniť model). ABS pásky OSTÁVAJÚ farbou (D-88 namespace sa nemení).
-  Nový prepínač netreba — fotka je lepší default; ak vizuálny test ukáže rušivosť, doplní sa vypínač
-  v Nastaveniach (rozhodne sa pri smoke).
-  **Scope OUT:** PBR/appearance vrstva · knižnica vzhľadov („Uložiť vzhľad") · orientácia textúry podľa smeru
-  dekoru dielca (fáza 2 D-28) · pixla (V1-06) · sťahovanie nových fotiek (používa sa výhradne existujúca cache
-  + existujúci Demos flow) · zmena dátového kontraktu (žiadne nové polia na entitách).
-  **Audit:** NIE (nemení kontrakt/schému/observery — číta cache, píše SU materiál; SU materiály sú vizuál).
-  **Testy a DoD:** headless — výber zdroja textúry (skupina s fotkou/bez, poškodený súbor cache = fallback farba,
-  žiadny prepis pri nezmenenej textúre); in-SU smoke — rebuild s textúrou nevyrába extra Undo ani nemení BOM;
-  mutácie min. 2 (texture sa aplikuje vždy/nikdy). VEPO/kusovník/rozpočet BAJTOVO nezmenené (výstupy fotku nečítajú).
-  **Riziká:** veľkosť .skp (textúry sa vkladajú do modelu — smoke na reálnej zákazke KLINIKA veľkosť porovná) ·
-  CEF/SU výkon pri mnohých materiáloch (merať, nie predpokladať) · mierka rapportu (vizuálne doladiť).
-  **Smoke pre Michala/Luciu:** otvor zákazku s Demos materiálmi → dielce majú fotku dekoru; skrinka bez Demos
-  materiálu vyzerá ako doteraz; VEPO/rozpočet čísla identické; veľkosť súboru porovnať pred/po.
-  **Checklist uzáveru:** bump + `?v=` → testy → `docs/architecture/materials.md` odsek `ensure_su_material`
-  na mieste → STAV/KRONIKA/PLAN (package → ✅) → V1_VIZIA bod 7 odškrtnúť.
-  Všetko ostatné v tomto bloku je **mimo V1** (zásobník; plná appearance vrstva + pixla).
-
+- **V1 rozsah — quick-win = TASK PACKAGE „M-R FOTO" (1e, zapísané 29.8.2026, rev. po slepom review #254; štart na „štartuj"):**
+  **Cieľ:** dielce v modeli nesú REÁLNU fotku dekoru namiesto plnej farby — vizualizácie bez exportu (V1_VIZIA bod 7).
+  **Scope IN:** čistý selektor `Materials.texture_path_for(material_id)` (headless testovateľný — vzor `color_of`):
+  vráti lokálnu cache cestu fotky dekoru, ak existuje a je validná (`core/demos/image_cache.rb`; `image_url` žije
+  na SHEET zázname — SCHEMA_IMAGE, `family.rb` ho rozkopíruje zo skupinovej URL; ŽIADNY „group" objekt neexistuje).
+  `ensure_su_material`: pri dostupnej cache textúra + fixná mierka rapportu (šírka ≈ 600 mm, doladí vizuálny test);
+  **identita textúry sa pamätá vlastným kľúčom** (napr. attribute na SU materiáli: basename+veľkosť súboru —
+  `Texture#filename` po reopene NIE JE stabilný) a prepis sa robí LEN pri zmene kľúča; **farba sa pri materiáli
+  s textúrou NENASTAVUJE** (color na textúre = tónovanie fotky!) a color write aj bez textúry len pri reálnej
+  zmene (dnešný bezpodmienečný `mt.color=` sa guarduje — rebuild nesmie špiniť model).
+  **KĽÚČOVÉ pravidlo pre stroj BEZ cache (Lucia): textúra sa NIKDY neprepisuje na farbu len preto, že cache
+  chýba** — existujúca textúra v uloženom modeli sa DRŽÍ (fallback na farbu platí len pre materiál, ktorý textúru
+  nikdy nemal). Bez tohto by prestavba na druhom PC ticho vyzliekla model z fotiek.
+  **STANDARD §7.1:** mŕtve pole `texture` na zázname variantu (deklarované, nikde neimplementované — zrkadlo
+  R-13) sa touto dávkou zo STANDARDU VYŠKRTNE; zdroj textúry je runtime cache z `image_url`, žiadne nové pole.
+  **Scope OUT:** PBR/appearance vrstva · knižnica vzhľadov · orientácia textúry podľa smeru dekoru dielca
+  (fáza 2 D-28) · pixla (V1-06) · sťahovanie fotiek (lazy re-fetch pre druhé PC = kandidát k D-48/zásobník;
+  dovtedy Lucia fotky NEuvidí pri dekoroch zakladaných u Michala — PRIZNANÉ obmedzenie, nie chyba) · UNI,
+  dupláky (36 z 2×18), zásteny s `back_decor` a legacy záznamy = fallback farba (priznať v smoke, model bude
+  zmiešaný fotka/farba).
+  **Audit: ÁNO-lite** — dávka škrtá pole zo STANDARDU (kontraktová zmena, hoci mŕtva) a dotýka sa cesty volanej
+  builderami; codex-audit pred implementáciou spustiť s týmto úzkym rozsahom.
+  **Testy a DoD:** headless — `texture_path_for` (s fotkou/bez, poškodený súbor = nil, UNI/duplák/zástena = nil)
+  + kľúč identity textúry; **in-SU sekcia POVINNÁ** (cesta sa volá z builderov): rebuild s textúrou nevyrába
+  extra Undo, nemení BOM, neprepisuje textúru pri nezmenenom kľúči, model bez cache textúry DRŽÍ; mutácie min. 3
+  (texture vždy/nikdy · prepis pri chýbajúcej cache · color na textúre). VEPO/kusovník/rozpočet BAJTOVO nezmenené.
+  **Riziká:** veľkosť .skp (textúry sa vkladajú — smoke porovná na zákazke KLINIKA) · výkon pri mnohých
+  materiáloch (merať) · mierka rapportu (vizuálne doladiť; prípadný vypínač v Nastaveniach rozhodne smoke).
+  **Smoke pre Michala/Luciu:** zákazka s Demos materiálmi → dielce majú fotku; skrinka bez Demos materiálu ako
+  doteraz; ulož model, otvor na druhom PC bez cache a prestav skrinku — **fotky NESMÚ zmiznúť**; VEPO/rozpočet
+  čísla identické; veľkosť súboru pred/po.
+  **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `docs/architecture/materials.md` — odsek
+  o SU vizuálnych materiáloch sa ZAKLADÁ (dnes neexistuje; R-32 vzor: overiť proti kódu) → STANDARD §7.1 škrt →
+  STAV/KRONIKA/PLAN (package → ✅; blok 5 POKRAČUJE — bod 7 V1_VIZIA sa NEodškrtáva, kým je v bloku updater
+  a zásobník).
 - **D-28 · Textúry materiálov = M-R knižnica vzhľadov** (D-28 je do M-R zlúčená, samostatne sa nerieši): `texture_path` + render vlastnosti PBR + „Uložiť vzhľad do knižnice" + mierka rapportu; fáza 2 = orientácia textúry podľa smeru dekoru dielca. Zdroj JPG knižnica na firemnom Disku; väzba na D-48.
   *(**D-87** — overlay čiar v smere dekoru — je **HOTOVÝ** v bloku KRESBA (K2, PR #188, v0.7.26); tu ostáva len **orientácia textúry** podľa smeru dekoru ako fáza 2 D-28. Overlay je kontrola, textúra je render — dve rôzne veci.)*
 - **Nástroj „pixla"** (V1-06) — ikonka na dlaždici materiálu, klik prefarbuje dielce cez `part_override` cestu (1 klik = 1 undo).
