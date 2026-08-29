@@ -118,6 +118,24 @@ v0.8.16, 30.8.; zvyšok „úplná náhrada bez revízie" (globálne pravidlá k
 
 ### 1e · PLÁNOVACIA DÁVKA — task packages (po 1c, súbežne s 1d — revízia poradia 27.8.2026)
 
+**STAV 1e (30.8.2026): packages hotové pre GHOST · M-R FOTO · D-94 · D-52 (PR #254/#255/#257 — každý cez dve
+slepé kolá + GLM follow-up); TRIÁŽ konceptov 01–09A je HOTOVÁ (tabuľka nižšie). Z 1e ostáva JEDINÉ:
+package KOVANIE — vznikne po USER-debate o setoch (Michal).** Packages pre bloky 2/4 sa píšu pri ŠTARTE
+príslušného bloku z konceptov nižšie (koncept je podklad, nie zadanie — README zdrojov platí).
+
+| Koncept | Verdikt triáže (30.8.2026) |
+|---|---|
+| 01 D-95 plošná kontrola | podklad pre package pri štarte bloku 2; stavia na garancii 1b-3 („Obnoviť" číta); čaká aj rozhodnutie R-30 |
+| 02 zostavy/segmenty | PO V1 (vyradené 26.8., attachment kontrakt v zásobníku) — koncept sa teraz NEspracúva |
+| 03 kovanie fáza 3 | blok KOVANIE — package po USER-debate o setoch; dáta SEED_KATALOG §2 |
+| 04 + 04A spotrebiče S1 | podklad pre package pri štarte bloku 4 (V1-02); externý audit 04A platný |
+| 05 shared library + updater | D-52 SPRACOVANÉ do package (#255); D-48 sync = PO V1 zásobník |
+| 06 render M-R | quick-win SPRACOVANÝ do package M-R FOTO (#254/#257); plná appearance vrstva PO V1 (D-28 odrážka bloku 5) |
+| 07 konštrukcia V1 | podklad pre package(y) pri štarte bloku 4 (V1-01 komín · V1-07 čelá cenovo · balík V0.4.8); patrí sem aj výklop=rola flap (F) |
+| 08 ponuka/dokumenty/ceny | V1 časť = zvyšok V1-03 v bloku 4; DOCX/PDF rodina dokumentov PO V1 zásobník |
+| 09 + 09A GHOST | SPRACOVANÉ do záväzného package (#254 + #257) |
+
+
 Zliať koncepty [zdroje/next_sessions/](zdroje/next_sessions/) 01–09A + zvyšné bloky PLANu do jedného backlogu →
 roztriediť do **kódových a logických blokov** → každému určiť **prioritu · náročnosť · závislosti · či mení dátový kontrakt**
 (→ audit-povinnosť) → z blokov spraviť **task packages**. Package = plný blok v PLANe (autorita); koncept ostáva podkladom.
