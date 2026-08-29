@@ -237,8 +237,30 @@ nezáväzný koncept [zdroje/next_sessions/03_KOVANIE_FAZA3.md](zdroje/next_sess
 
 **Cieľ:** materiál vyzerá v modeli ako v skutočnosti — Luciin nástroj na vizualizácie.
 
-- **V1 rozsah — quick-win:** Demos fotka dekoru ako textúra SU materiálu (bez PBR, bez knižnice vzhľadov) — presne to, čo žiada bod 7
-  checklistu [V1_VIZIA.md](V1_VIZIA.md). Všetko ostatné v tomto bloku je **mimo V1** (zásobník; plná appearance vrstva + pixla).
+- **V1 rozsah — quick-win = TASK PACKAGE „M-R FOTO" (1e, zapísané 29.8.2026; štart na „štartuj"):**
+  **Cieľ:** dielce v modeli nesú REÁLNU fotku dekoru namiesto plnej farby — Luciine vizualizácie bez exportu.
+  Presne bod 7 checklistu [V1_VIZIA.md](V1_VIZIA.md).
+  **Scope IN:** `Materials.ensure_su_material` — keď má dekorová skupina záznamu lokálne CACHOVANÚ Demos fotku
+  (`core/demos/image_cache.rb`; `image_url` na skupine), SU materiál dostane `texture` z cache súboru
+  + rozumnú mierku rapportu (fixná, napr. šírka textúry ≈ 600 mm — presné číslo určí vizuálny test);
+  bez fotky ostáva dnešná farba (fallback nezmenený). Prepis textúry LEN pri reálnej zmene (vzor
+  `ensure_su_edge_material` — rebuild nesmie špiniť model). ABS pásky OSTÁVAJÚ farbou (D-88 namespace sa nemení).
+  Nový prepínač netreba — fotka je lepší default; ak vizuálny test ukáže rušivosť, doplní sa vypínač
+  v Nastaveniach (rozhodne sa pri smoke).
+  **Scope OUT:** PBR/appearance vrstva · knižnica vzhľadov („Uložiť vzhľad") · orientácia textúry podľa smeru
+  dekoru dielca (fáza 2 D-28) · pixla (V1-06) · sťahovanie nových fotiek (používa sa výhradne existujúca cache
+  + existujúci Demos flow) · zmena dátového kontraktu (žiadne nové polia na entitách).
+  **Audit:** NIE (nemení kontrakt/schému/observery — číta cache, píše SU materiál; SU materiály sú vizuál).
+  **Testy a DoD:** headless — výber zdroja textúry (skupina s fotkou/bez, poškodený súbor cache = fallback farba,
+  žiadny prepis pri nezmenenej textúre); in-SU smoke — rebuild s textúrou nevyrába extra Undo ani nemení BOM;
+  mutácie min. 2 (texture sa aplikuje vždy/nikdy). VEPO/kusovník/rozpočet BAJTOVO nezmenené (výstupy fotku nečítajú).
+  **Riziká:** veľkosť .skp (textúry sa vkladajú do modelu — smoke na reálnej zákazke KLINIKA veľkosť porovná) ·
+  CEF/SU výkon pri mnohých materiáloch (merať, nie predpokladať) · mierka rapportu (vizuálne doladiť).
+  **Smoke pre Michala/Luciu:** otvor zákazku s Demos materiálmi → dielce majú fotku dekoru; skrinka bez Demos
+  materiálu vyzerá ako doteraz; VEPO/rozpočet čísla identické; veľkosť súboru porovnať pred/po.
+  **Checklist uzáveru:** bump + `?v=` → testy → `docs/architecture/materials.md` odsek `ensure_su_material`
+  na mieste → STAV/KRONIKA/PLAN (package → ✅) → V1_VIZIA bod 7 odškrtnúť.
+  Všetko ostatné v tomto bloku je **mimo V1** (zásobník; plná appearance vrstva + pixla).
 
 - **D-28 · Textúry materiálov = M-R knižnica vzhľadov** (D-28 je do M-R zlúčená, samostatne sa nerieši): `texture_path` + render vlastnosti PBR + „Uložiť vzhľad do knižnice" + mierka rapportu; fáza 2 = orientácia textúry podľa smeru dekoru dielca. Zdroj JPG knižnica na firemnom Disku; väzba na D-48.
   *(**D-87** — overlay čiar v smere dekoru — je **HOTOVÝ** v bloku KRESBA (K2, PR #188, v0.7.26); tu ostáva len **orientácia textúry** podľa smeru dekoru ako fáza 2 D-28. Overlay je kontrola, textúra je render — dve rôzne veci.)*
