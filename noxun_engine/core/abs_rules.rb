@@ -115,13 +115,26 @@ module Noxun
 
       # --- cesty / perzistencia (pattern templates.rb) -------------------------
 
+      # R-08 (audit 1d #1): zdielany %APPDATA%/NOXUN/Engine — TA ISTA cesta,
+      # akou ju pocita Materials (+ test_dir_override). Kym si ju modul ratal
+      # sam, izolovany in-SU test upravoval ZIVE ABS pravidla pouzivatela
+      # a zamok v sandboxe by nechranil nic. Produkcia sa nemeni.
       def dir
+        return Materials.dir if defined?(Materials) && Materials.respond_to?(:dir)
+
         base = ENV['APPDATA'] || Dir.tmpdir
         File.join(base, 'NOXUN', 'Engine')
       end
 
       def path
         File.join(dir, FILE)
+      end
+
+      # R-08: jeden sidecar zamok (`materials.lock`) pre vsetky katalogy
+      # priecinka — vzor 1b-6c, reentrantny, zlyhanie = IOError (nikdy tichy
+      # beh bez zamku). Citanie bez zapisu sa nezamyka.
+      def with_catalog_lock(&blk)
+        Materials.with_catalog_lock(&blk)
       end
 
       # Nacita pravidla { role => {L1:th,...} }. Pri prvom spusteni seedne SEED_RULES.
@@ -134,23 +147,44 @@ module Noxun
       # default roly; existujuce roly (aj vedome prazdne = "bez ABS") sa nikdy neprepisu.
       def rules
         ensure_seeded
-        data = JsonFileStore.read(path, copy: false)
-        value = data['rules']
-        return deep_copy(SEED_RULES) unless value.is_a?(Hash)
-
-        normalized = normalize_rules(value)
-        merged, seed_stale = merge_seed_roles(normalized, data['seed_version'].to_i, value)
-        if merged != value || seed_stale
-          if write(merged)
-            Engine.log('abs rules: pravidla znormalizovane / doplnene nove default roly') if defined?(Engine)
-            return JsonFileStore.read(path, copy: false)['rules']
-          end
-          return merged
-        end
-        value
+        value, merged, changed = read_rules
+        return value unless changed
+        persist_seed_merge!(merged)
       rescue StandardError => e
         Engine.log_error(e, 'AbsRules.load') if defined?(Engine)
         deep_copy(SEED_RULES)
+      end
+
+      # CISTE citanie + normalizacia + seed-merge BEZ zapisu ->
+      # [surova hodnota zo suboru, zlucene pravidla, changed].
+      def read_rules
+        data = JsonFileStore.read(path, copy: false)
+        value = data['rules']
+        return [deep_copy(SEED_RULES), nil, false] unless value.is_a?(Hash)
+
+        normalized = normalize_rules(value)
+        merged, seed_stale = merge_seed_roles(normalized, data['seed_version'].to_i, value)
+        [value, merged, (merged != value || seed_stale)]
+      end
+
+      # R-08 (audit 1d #2/#10): normalizacia aj seed-merge su READ-MODIFY-WRITE.
+      # Pod zamkom sa cita NANOVO (cache JsonFileStore ma 1 s okno) a merge sa
+      # PREPOCITA; ked to medzitym stihla druha instancia, `changed` je false
+      # a nezapisuje sa. Zlyhany zamok/citanie vrati predzamkovy kandidat.
+      def persist_seed_merge!(fallback)
+        with_catalog_lock do
+          JsonFileStore.reload!(path)
+          value, merged, changed = read_rules
+          next value unless changed
+          if write(merged)
+            Engine.log('abs rules: pravidla znormalizovane / doplnene nove default roly') if defined?(Engine)
+            next JsonFileStore.read(path, copy: false)['rules']
+          end
+          merged
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'AbsRules.persist_seed_merge!') if defined?(Engine)
+        fallback
       end
 
       # Dopln CHYBAJUCE roly zo SEED_RULES, ak subor vznikol pod starsim SEED_VERSION.
@@ -183,13 +217,24 @@ module Noxun
         [out, true]
       end
 
+      # R-08 (audit 1d #1): rychly check ostava, ZAPIS seedu az po DRUHOM
+      # checku POD zamkom — oneskoreny seeder inak prepise realnu zmenu, ktoru
+      # medzitym ulozila druha instancia.
       def ensure_seeded
         return if JsonFileStore.available?(path)
-        write(deep_copy(SEED_RULES))
+        with_catalog_lock do
+          next true if JsonFileStore.available?(path)
+          write(deep_copy(SEED_RULES))
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'AbsRules.ensure_seeded') if defined?(Engine)
+        false
       end
 
       def write(rules)
-        JsonFileStore.write(path, { 'std' => STD, 'seed_version' => SEED_VERSION, 'rules' => rules })
+        with_catalog_lock do
+          JsonFileStore.write(path, { 'std' => STD, 'seed_version' => SEED_VERSION, 'rules' => rules })
+        end
       rescue StandardError => e
         Engine.log_error(e, 'AbsRules.write') if defined?(Engine)
         false

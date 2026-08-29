@@ -933,7 +933,10 @@
   // Hash; ui_key je len echo pre zatvorenie editora po ÚSPECHU.
   function hwsSendMap(action, gt, value, key){
     if (action === 'hws-map-global'){
-      hwsSend('hws_map_global', { generic_type: gt, value: value, ui_key: key || '' });
+      // R-08: globálna predvoľba nesie REVÍZIU knižnice (rovnako ako uloženie
+      // a mazanie setu) — dve otvorené okná si ju inak ticho prepíšu.
+      hwsSend('hws_map_global', { generic_type: gt, value: value, ui_key: key || '',
+                                  revision: (HWS_DATA && HWS_DATA.revision) || '' });
     } else {
       hwsSend('hws_map_project', { generic_type: gt, value: value, ui_key: key || '',
                                    model_guid: (HWS_DATA && HWS_DATA.model_guid) || '' });

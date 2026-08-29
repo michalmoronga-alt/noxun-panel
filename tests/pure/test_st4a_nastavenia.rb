@@ -138,11 +138,17 @@ end
 
 NxTest.test('ŠT-4a: BASELINE REVIZIA prezila presun do sekcie') do
   save = st4a_body('handle_save')
-  NxTest.assert(save.include?("data['revision'].to_s != current"),
+  NxTest.assert(save.include?('rev != SupplierSettings.revision(SupplierSettings.active)'),
                 'zapis sa porovnava s CERSTVOU reviziou skladu')
   NxTest.assert(save.index('revision') < save.index('patch_active!'),
                 'guard bezi PRED zapisom')
-  NxTest.assert(save.include?('Nastavenia sa medzitým zmenili'),
+  # 1d/R-08: lacna kontrola tu NESTACI — revizia ide aj DO jadra, kde sa
+  # porovnava pod medziprocesovym zamkom nad cerstvym suborom.
+  NxTest.assert(save.include?('patch_active!(patch, rev)'),
+                'revizia ide aj do zamknutej kontroly v jadre')
+  NxTest.assert(save.include?('status == :conflict'),
+                'a konflikt spod zamku ma vlastnu vetvu')
+  NxTest.assert(st4a_body('reject_stale').include?('Nastavenia sa medzitým zmenili'),
                 'a odmietnutie povie PRECO')
   pay = st4a_body('settings_payload')
   NxTest.assert(pay.include?('@baseline_revision = rev'), 'payload obnovuje baseline')

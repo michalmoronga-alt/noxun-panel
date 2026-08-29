@@ -25,6 +25,13 @@ rovnosť stráži headless sada aj in-SU runner).
 **Uloženie = zápis snapshotu + prestavba VŠETKÝCH korpusov v JEDNEJ operácii** (`rebuild_many` s blokom) — jeden krok Späť vráti pravidlá aj geometriu naraz; „aj ako globálnu
 predvoľbu" navýše zapíše `%APPDATA%` knižnicu (preferencia, NIE súčasť undo).
 
+**Globálna knižnica pod medziprocesovým zámkom (1d/R-08).** `write` aj seed-merge v `load` bežia pod zdieľaným sidecar zámkom `materials.lock`
+(`Materials.with_catalog_lock` — mechanika a dôvody sú v odseku `hardware_sets.rb` nižšie), seed-merge navyše pod ním číta súbor NANOVO a merge prepočíta; `ensure_seeded` má
+dvojitý check. `dir` sa od tejto dávky pýta `Materials.dir` — kým si ho modul rátal sám, `test_dir_override` presmeroval zámok do sandboxu, ale zápis ostal v ŽIVOM `%APPDATA%`
+(izolovaný in-SketchUp test tak upravoval reálne pravidlá používateľa). **Priznaný zvyšok:** `write(rules)` je ÚPLNÁ NÁHRADA obsahu — okno posiela celé pole a globálna knižnica
+nemá revíziu, takže dve súbežne otvorené okná sa nad ňou stále prebíjajú „posledný vyhráva". Zámok ich zápisy serializuje, nič viac; doriešenie vedie
+[AUDIT_REGISTER.md](../../SYSTEM/AUDIT_REGISTER.md) ako **R-35**.
+
 **BASELINE guard formulára stojí na `model.guid`** (ŠT-3b-1; predtým `model.path`, ktorý dva NEULOŽENÉ modely nerozlíši — oba majú prázdny path) **+ zhoda aktuálnych pravidiel
 modelu s baseline** (chytí undo snapshotu aj súbežnú zmenu inou cestou); baseline sa obnovuje pri KAžDOM zostavení payloadu. Odmietnutý zápis NIC nezapíše; **od ŠT-3b-2c1 sa
 formulár načíta nanovo LACNÝM ECHOM sekcie** (`push_section_echo(force: true)`), nie plným `bump: false` pushom. *(Pôvodný dôvod — plný push deduplikoval ID kópií, takže odmietnutie
@@ -152,6 +159,24 @@ _(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
 
 Sety kovania + projektový snapshot predvolieb na modeli; zmienky sú v odsekoch `hardware_rules.rb` a `hardware_catalog.rb` a v [ui-lifecycle.md](ui-lifecycle.md) (sekcia `hw`
 Štúdia).
+
+**Globálna knižnica žije pod medziprocesovým zámkom (1d/R-08).** Súbor `%APPDATA%\NOXUN\Engine\hardware_sets.json` menili DVE inštancie SketchUpu naraz a robili to štýlom
+„prečítaj → uprav → zapíš" **bez zámku** — set uložený v jednom okne zmizol bez slova, keď to druhé okno o chvíľu niečo uložilo. Od tejto dávky ide **každý** zápis
+(`write` · `save_set!` · `delete_set!` · `set_global_mapping!` · seed-merge v `load` · `ensure_seeded`) cez `lock → čerstvé čítanie → kontrola revízie → atomický zápis`, kde
+zámok je **jeden zdieľaný sidecar** `materials.lock` pre celý priečinok (`Materials.with_catalog_lock`, vzor 1b-6c — vlastný `.lock` na súbor by vyrobil poradie zámkov a s ním
+riziko zaseknutia). Čítanie bez zápisu sa **nezamyká** (hot cesty `expand`/`explain`/payloadov); seed-merge zámok berie len vtedy, keď naozaj ide zapisovať, a **pod ním merge
+prepočíta** — keď ho medzitým urobila druhá inštancia, nezapisuje sa nič.
+
+Tri veci, ktoré samotné obalenie zámkom NEVYRIEŠILO a preto majú vlastnú mechaniku:
+- **kontrola revízie je AŽ POD zámkom** — kým sedela pred ním, druhá inštancia stihla medzi ňou a zápisom uložiť svoje a my sme to zmazali s hláškou „uložené";
+- **`load_with_revision`** — payload sekcie berie knižnicu aj jej revíziu z JEDNÉHO stavu súboru; kým to boli dve volania, cudzí zápis medzi nimi vyrobil payload so STARÝMI
+  setmi a NOVOU revíziou, taký formulár prešiel guardom a prepísal zmenu, ktorú používateľ nikdy nevidel;
+- **`set_global_mapping!` má odteraz tiež revíziu** (`:ok` / `:conflict` / `false`) — dve otvorené okná meniace ten istý typ kovania si predvoľbu inak ticho prepísali;
+- **`ensure_seeded` kontroluje dvakrát** (rýchlo, a potom ešte raz pod zámkom) — oneskorený seeder by inak naslepo prepísal seedom reálnu zmenu, ktorú medzitým niekto uložil.
+
+Zámok, ktorý sa nepodarí vziať, je **IOError** — každá zapisovacia cesta ho premení na svoj NEÚSPEŠNÝ výsledok (`false` / `:write_failed`), nikdy na tichý úspech, a seed-merge
+vetva pri ňom vráti **skutočnú knižnicu** (nikdy seed — inak by používateľ videl cudzie defaulty a prvý úspešný zápis by ich zvečnil). Testy: `tests/pure/test_r08_zamky.rb`
+(vrátane REÁLNEHO dvojprocesového `flock` scenára).
 
 **Člen účtovaný na vlastníka a jeho stopa v riadku (P0-HF, review #252 P2).** `expand_members` počíta člena `per: 'unit'` ako `quantity × qty`, ale člena **`per: 'owner'`** len
 **raz na `[owner_id, owner_part_key, set_id, code]`** (audit B3: druhé pravidlo s tým istým vlastníkom TipOn nezdvojí). Práve tento dedup je **jediný mechanizmus, ktorým dve

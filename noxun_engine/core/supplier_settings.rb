@@ -136,7 +136,12 @@ module Noxun
 
       # --- ulozisko ------------------------------------------------------------
 
+      # R-08 (audit 1d #1): zdielany %APPDATA%/NOXUN/Engine — TA ISTA cesta,
+      # akou ju pocita Materials (+ test_dir_override), aby zamok a data vzdy
+      # sedeli v jednom priecinku. Produkcia sa nemeni.
       def dir
+        return Materials.dir if defined?(Materials) && Materials.respond_to?(:dir)
+
         base = ENV['APPDATA'] || Dir.tmpdir
         File.join(base, 'NOXUN', 'Engine')
       end
@@ -145,17 +150,43 @@ module Noxun
         File.join(dir, FILE)
       end
 
+      # R-08: jeden sidecar zamok (`materials.lock`) pre vsetky katalogy
+      # priecinka — vzor 1b-6c, reentrantny, zlyhanie = IOError.
+      def with_catalog_lock(&blk)
+        Materials.with_catalog_lock(&blk)
+      end
+
       # Cely dokument (normalizovany, po seed-merge). Poskodeny/chybajuci subor
       # = seed (vzor HardwareRules.load — fallback NIKDY nevrati nil).
       def load
         ensure_seeded
-        doc = JsonFileStore.read(path, copy: true)
-        merged, changed = merge_seed(normalize(doc))
-        write(merged) if changed
-        merged
+        merged, changed = read_doc
+        return merged unless changed
+        persist_seed_merge!(merged)
       rescue StandardError => e
         Engine.log_error(e, 'SupplierSettings.load') if defined?(Engine)
         seed_doc
+      end
+
+      # CISTE citanie + seed-merge BEZ zapisu -> [dokument, changed].
+      def read_doc
+        merge_seed(normalize(JsonFileStore.read(path, copy: true)))
+      end
+
+      # R-08 (audit 1d #2/#10): seed-merge je READ-MODIFY-WRITE. Pod zamkom sa
+      # cita NANOVO a merge sa PREPOCITA; ked ho medzitym urobila druha
+      # instancia, `changed` je false a nezapisuje sa. Zlyhany zamok/citanie
+      # vrati predzamkovy kandidat.
+      def persist_seed_merge!(fallback)
+        with_catalog_lock do
+          JsonFileStore.reload!(path)
+          fresh, changed = read_doc
+          write(fresh) if changed
+          fresh
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'SupplierSettings.persist_seed_merge!') if defined?(Engine)
+        fallback
       end
 
       # Nastavenia AKTIVNEHO dodavatela — jediny vstup pre Budget.
@@ -168,14 +199,26 @@ module Noxun
         Array(doc['suppliers']).find { |s| s['id'].to_s == id.to_s }
       end
 
+      # R-08 (audit 1d #1): rychly check ostava, ZAPIS seedu az po DRUHOM
+      # checku POD zamkom — oneskoreny seeder inak prepise realnu zmenu druhej
+      # instancie.
       def ensure_seeded
         return if JsonFileStore.available?(path)
-        write(seed_doc)
+        with_catalog_lock do
+          next true if JsonFileStore.available?(path)
+          write(seed_doc)
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'SupplierSettings.ensure_seeded') if defined?(Engine)
+        false
       end
 
+      # R-08 (audit 1d #7): vracia sa PRESNY vysledok zapisu, nie bezpodmienecne
+      # `true`. Dnesny `JsonFileStore.write` bud vrati true, alebo vyhodi — ale
+      # R-11 ma pridat write guard, ktory zapis ODMIETNE bez vynimky; s
+      # bezpodmienecnym `true` by sa odmietnutie hlasilo ako ulozene.
       def write(doc)
-        JsonFileStore.write(path, normalize(doc))
-        true
+        with_catalog_lock { JsonFileStore.write(path, normalize(doc)) }
       rescue StandardError => e
         Engine.log_error(e, 'SupplierSettings.write') if defined?(Engine)
         false
@@ -409,12 +452,41 @@ module Noxun
       #          'montaz_m2_per_plate', 'rates' => {key=>val},
       #          'standard_rows' => {key=>{'name','rate','default_multiplier'}},
       #          'mode_values' => {key=>{mode=>val|null}} }
-      # -> [true, []] | [false, [chyby]]
-      def patch_active!(patch)
-        return [false, ['nastavenia musia byť objekt']] unless patch.is_a?(Hash)
+      #
+      # R-08 (audit 1d #9): cele citanie, kontrola REVIZIE aj zapis beziu pod
+      # JEDNYM medziprocesovym zamkom nad CERSTVYM suborom. Kym revizia sedela
+      # len v okne (`supplier_settings_dialog.handle_save`), medzi jej
+      # kontrolou a nasim zapisom stihla druha instancia ulozit svoje sadzby
+      # a nas `load -> mutuj -> write` ich zmazal — pricom okno hlasilo
+      # „Nastavenia uložené".
+      #
+      # -> [ok, [chyby], status] kde status = :ok | :invalid | :conflict |
+      # :write_failed. Tretí prvok je ADITIVNY — dnesne `ok, errors = ...`
+      # destructuring ostava funkcny.
+      #
+      # `revision` je POZICNY (nie kluc): metoda sa bezne vola s BEZZATVORKOVYM
+      # hashom (`patch_active!('rates' => {...})`) a Ruby 3 by taky hash pri
+      # existencii kwargs poslal DO NICH — z volania by zmizol povinny `patch`.
+      def patch_active!(patch, revision = nil)
+        return [false, ['nastavenia musia byť objekt'], :invalid] unless patch.is_a?(Hash)
+        with_catalog_lock do
+          JsonFileStore.reload!(path)
+          patch_active_locked!(patch, revision)
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'SupplierSettings.patch_active!') if defined?(Engine)
+        [false, ['nastavenia sa nepodarilo uložiť'], :write_failed]
+      end
+
+      # Telo patchu BEZ zamku — volat VYHRADNE zvnutra `patch_active!`
+      # (vzor `Materials.write_unlocked`).
+      def patch_active_locked!(patch, revision = nil)
         doc = load
         sup = supplier_by_id(doc, doc['active'])
-        return [false, ['aktívny dodávateľ sa nenašiel']] unless sup
+        return [false, ['aktívny dodávateľ sa nenašiel'], :invalid] unless sup
+        if revision && revision.to_s != self.revision(sup)
+          return [false, ['nastavenia sa medzitým zmenili'], :conflict]
+        end
         errors = []
         p = stringify(patch)
 
@@ -497,7 +569,7 @@ module Noxun
             errors << 'mode_values musí byť objekt'
           end
         end
-        return [false, errors.uniq] unless errors.empty?
+        return [false, errors.uniq, :invalid] unless errors.empty?
 
         sup['name'] = p['name'].to_s.strip unless p['name'].nil?
         SCALAR_RANGES.each_key do |key|
@@ -532,11 +604,8 @@ module Noxun
             sup['mode_values'].delete(k.to_s) if cur.empty?
           end
         end
-        return [false, ['nastavenia sa nepodarilo uložiť']] unless write(doc)
-        [true, []]
-      rescue StandardError => e
-        Engine.log_error(e, 'SupplierSettings.patch_active!') if defined?(Engine)
-        [false, ['nastavenia sa nepodarilo uložiť']]
+        return [false, ['nastavenia sa nepodarilo uložiť'], :write_failed] unless write(doc)
+        [true, [], :ok]
       end
 
       # --- pomocne -------------------------------------------------------------

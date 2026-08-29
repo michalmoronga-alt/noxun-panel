@@ -199,6 +199,13 @@ používateľ to vidí hneď.
 
 **Pozor:** `AbsRules.rules` má vedľajší efekt zápisu (`ensure_seeded`) — volať LEN mimo `model.start_operation`.
 
+**Zápis pod medziprocesovým zámkom (1d/R-08).** Modul nemá používateľský editor, ale zapisuje sám: `ensure_seeded` a **self-heal** v `rules` (normalizácia + doplnenie nových
+default rolí). Aj to je „prečítaj → uprav → zapíš", takže dve inštancie SketchUpu si vedeli prepísať rolu navzájom. Od tejto dávky beží `write` pod zdieľaným sidecar zámkom
+`materials.lock` (`Materials.with_catalog_lock` — mechanika a dôvody v [hardware.md](hardware.md), odsek `hardware_sets.rb`), self-heal pod ním číta súbor NANOVO a merge
+prepočíta (keď ho medzitým urobila druhá inštancia, nezapisuje sa nič), a `ensure_seeded` kontroluje existenciu súboru dvakrát — rýchlo a ešte raz pod zámkom. `dir` sa od tejto
+dávky pýta `Materials.dir`, takže zámok a dáta sú VŽDY v jednom priečinku aj pod `test_dir_override` (dovtedy izolovaný in-SketchUp test menil ŽIVÉ ABS pravidlá používateľa).
+Zlyhaný zámok = `false`, nikdy tichý úspech. Testy: `tests/pure/test_r08_zamky.rb`.
+
 ### demos/ — Demos konektor (core/demos/*.rb)
 
 Demos konektor (V0.6 dávky B + M-A). Jednotlivé moduly konektora majú vlastné odseky nižšie.

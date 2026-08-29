@@ -17,6 +17,35 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1d/R-08 · DVE OKNÁ SKETCHUPU SI UŽ NEPREPÍŠU KATALÓGY (30.8.2026, v0.8.16):** druhá vybavená položka registra bloku 1d (**R-08**, P1, externý Codex E:R-06). Päť globálnych
+  súborov v `%APPDATA%\NOXUN\Engine` — **sety kovania · pravidlá kovania · ABS pravidlá · rozmerové rady · nastavenia dodávateľa** — sa menilo štýlom „prečítaj → uprav → zapíš"
+  **bez medziprocesového zámku**, a kontrola revízie (kde vôbec bola) sedela MIMO neho. Kto pracoval v dvoch oknách SketchUpu naraz, prišiel o zmenu z toho prvého bez akejkoľvek
+  hlášky — a formulár pritom hlásil „uložené". Materiály, šablóny a `vepo_settings` ten vzor mali od 1b-6c (#248); táto dávka ho dotiahla na zvyšok.
+  **Riešenie:** každý zápis (vrátane `ensure_seeded` a seed-merge v `load`) ide cez `lock → čerstvé čítanie → kontrola revízie/merge → atomický zápis`, kde zámok je **jeden
+  zdieľaný sidecar** `materials.lock` pre celý priečinok (`Materials.with_catalog_lock`, reentrantný). Tretí zámok by vyrobil len poradie zámkov a s ním riziko zaseknutia
+  (rovnaké zdôvodnenie ako 1b-6c). Čítanie bez zápisu sa **nezamyká** — hot cesty `expand`/`explain`/payloadov ostávajú bez zmeny; seed-merge berie zámok len keď naozaj ide
+  zapisovať, a **pod ním merge prepočíta** (keď ho medzitým urobila druhá inštancia, nezapíše sa nič a nič sa nelogovalo ako úspech).
+  **Codex audit návrhu vrátil 5 BLOCKEROV — všetkých päť je v kóde, a bez nich by dávka bola kozmetika:** (1) `hardware_rules.dir`, `abs_rules.dir` a `supplier_settings.dir` si
+  cestu rátali SAMY, takže pod `test_dir_override` by zámok sedel v sandboxe a zápis v ŽIVOM `%APPDATA%` — izolovaný in-SketchUp test dovtedy reálne prepisoval používateľove ABS
+  pravidlá; všetkých päť modulov sa odteraz pýta `Materials.dir`. (2) `ensure_seeded` bol check-before-lock: inštancia B zistí „súbor chýba", A medzitým seedne a uloží REÁLNU
+  zmenu, B ju potom naslepo prepíše seedom — pribudol **druhý check pod zámkom**. (3) payload sekcie čítal knižnicu a jej revíziu DVOMA volaniami, takže cudzí zápis medzi nimi
+  vyrobil formulár so STARÝMI setmi a NOVOU revíziou — ten prešiel guardom a prepísal zmenu, ktorú používateľ nikdy nevidel; pribudlo `HardwareSets.load_with_revision` (oboje
+  z jedného stavu súboru, pod jedným zámkom). (4) globálne mapovanie setov nemalo konfliktový guard vôbec — dve okná meniace ten istý typ kovania si predvoľbu ticho prepísali;
+  `set_global_mapping!` odteraz berie revíziu a vracia `:ok`/`:conflict`/`false` (klient ju už mal, len ju neposielal). (5) `SupplierSettings.write` vracal bezpodmienečné `true`
+  — vracia presný výsledok zápisu, aby write guard z **R-11** nemohol byť ohlásený ako uložené.
+  **Kontrakt, ktorý sa rozšíril:** `patch_active!` vracia `[ok, chyby, status]` (`:ok`/`:invalid`/`:conflict`/`:write_failed`; tretí prvok je ADITÍVNY, doterajšie
+  `ok, errors = ...` funguje ďalej) a berie revíziu **pozičným** parametrom — kľúčový by v Ruby 3 pohltil bezzátvorkový hash (`patch_active!('rates' => {...})`) a z volania by
+  zmizol povinný `patch`. Okno kontroluje revíziu naďalej aj u seba (lacno, kvôli hláške a rozpísanému formuláru); obe vetvy konfliktu končia v jednej obsluhe `reject_stale`.
+  **Priznaný zvyšok — nová položka registra R-35:** globálne pravidlá kovania a rozmerové rady sa zapisujú ako ÚPLNÁ NÁHRADA obsahu a **nemajú revíziu**, takže dve otvorené okná
+  sa nad nimi ďalej prebíjajú „posledný vyhráva". Zámok ich zápisy len serializuje. Nie je to diera v zámku, ale chýbajúci optimistický zámok v UI kontrakte (payload + klient +
+  konfliktová vetva) — vedomé narezanie PR, nie prehliadnutie; testy to preto pri nich NETVRDIA.
+  **Testy:** nová sada `tests/pure/test_r08_zamky.rb` (16 scenárov) — pre každý z 5 súborov závod „zápis druhej inštancie medzi naším čítaním a zápisom sa nestratí" (druhá
+  inštancia píše PRIAMO na disk a cache `JsonFileStore` **zámerne neinvaliduje** — presne ako reálny druhý proces, takže bez `reload!` pod zámkom by sme ju nevideli), revízia pod
+  zámkom, dvojitý seed check, „nezískaný zámok NIKDY nehlási úspech a nikdy nevráti seed" a **reálny dvojprocesový `flock`** (druhý OS proces drží `materials.lock`, zapíše a až
+  potom pustí). Overených **9 mutácií** (zámok odstránený · chýbajúci `reload!` · revízia pred zámkom · `ensure_seeded` bez druhého checku · rescue hlásiaci úspech · `dir` mimo
+  Materials · skew v `load_with_revision`) — každú chytila aspoň jedna assercia. Headless **2054 PASS / 0 FAIL**, 72 JS sád zelených. In-SketchUp beh nebol potrebný (žiadny
+  builder, observer ani geometria).
+
 - **1d/R-06a · BRÁNA: DĹŽKOVÉ KOVANIE SA UŽ NENACENÍ AKO KUSY (29.8.2026, v0.8.15):** prvá vybavená položka registra bloku 1d (**R-06**, P1, slepý subagent S-05). Expanzia setov
   vedela vždy len **kusy** — `subtotal = cena × počet` — ale úchytkový profil (D-90) sa **reže na dĺžku** a jeho katalógová cena je **za meter**; `cut_length_mm` sa v
   `hardware_sets.rb` nečítalo nikde. Držal to len seed (typ `handle` nemapovaný), pričom editor setov typ `handle` ponúka a katalóg pozná MJ „m" — **prvé uloženie takého setu by

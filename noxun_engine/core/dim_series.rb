@@ -116,13 +116,28 @@ module Noxun
       # Codex audit FIX 6: zlyhanie zapisu (disk, prava) vracia NIL — volajuci
       # to MUSI povedat nahlas. Tichy fallback na stare hodnoty by pouzivatelovi
       # ohlasil uspech, ktory sa nestal.
+      # R-08: zapis bezi pod tym istym medziprocesovym zamkom ako ostatne
+      # katalogy priecinka (`Materials.with_catalog_lock`, sidecar
+      # `materials.lock`, vzor 1b-6c). Zamok, ktory sa nepodari vziat, vyhodi
+      # IOError — rescue nizsie z neho spravi NIL, takze zlyhanie sa nikdy
+      # nevydava za uspech.
+      #
+      # PRIZNANY ZVYSOK (audit 1d #6): rad je UPLNA NAHRADA — panel posiela
+      # cely objekt a subor ziadnu reviziu nema, takze dve otvorene okna sa
+      # stale prebijaju „posledny vyhrava". Zamok tu teda zapisy len
+      # SERIALIZUJE. Doriesenie vedie register ako R-35 (revizia + konfliktova
+      # vetva su UI kontrakt, nie zamok).
       def set(raw)
         series = normalize(raw)
-        JsonFileStore.write(path, 'std' => STD, 'series' => series)
+        with_catalog_lock { JsonFileStore.write(path, 'std' => STD, 'series' => series) }
         series
       rescue StandardError => e
         Engine.log_error(e, 'DimSeries.set')
         nil
+      end
+
+      def with_catalog_lock(&blk)
+        Materials.with_catalog_lock(&blk)
       end
     end
   end

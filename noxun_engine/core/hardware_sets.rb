@@ -238,6 +238,21 @@ module Noxun
         File.join(dir, FILE)
       end
 
+      # --- 1d/R-08: medziprocesovy zamok globalnych katalogov -----------------
+      #
+      # JEDEN sidecar zamok (`materials.lock`) pre VSETKY katalogy v
+      # %APPDATA%\NOXUN\Engine — vzor 1b-6c. Vlastny `.lock` per subor by
+      # vyrobil PORADIE zamkov a s nim riziko zaseknutia; zdielany zamok
+      # ziadne poradie nema. Je REENTRANTNY, takze vnoreny `write` pod uz
+      # drzanym zamkom len zvysi hlbku. `flock`, ktory sa nepodari vziat,
+      # vyhodi IOError — kazda zapisova cesta ho rescue-uje do svojho
+      # NEUSPESNEHO vysledku, nikdy do ticheho uspechu.
+      #
+      # CITANIE bez zapisu sa NEZAMYKA (hot cesty expand/explain/payloadov).
+      def with_catalog_lock(&blk)
+        Materials.with_catalog_lock(&blk)
+      end
+
       # Nacita globalnu kniznicu { 'sets' => [], 'mapping' => {} }. Poskodeny/
       # chybajuci subor -> seed (fallback nikdy nevrati nil). Seed-merge ako
       # HardwareRules: novsi SEED_VERSION doplni CHYBAJUCE set_id (bez prepisu
@@ -245,18 +260,46 @@ module Noxun
       # NIKDY nemeni sam.
       def load
         ensure_seeded
+        lib, changed = read_library
+        return lib unless changed
+        persist_seed_merge!(lib)
+      rescue StandardError => e
+        Engine.log_error(e, 'HardwareSets.load') if defined?(Engine)
+        seed_library
+      end
+
+      def seed_library
+        { 'sets' => deep_copy(SEED_SETS), 'mapping' => SEED_MAPPING.dup }
+      end
+
+      # CISTE citanie + seed-merge BEZ zapisu -> [kniznica, changed].
+      def read_library
         doc = JsonFileStore.read(path, copy: false)
         sets = doc.is_a?(Hash) ? normalize_sets(doc['sets']) : []
         mapping = doc.is_a?(Hash) ? normalize_mapping(doc['mapping'], sets) : {}
-        return { 'sets' => deep_copy(SEED_SETS), 'mapping' => SEED_MAPPING.dup } if sets.empty?
+        return [seed_library, false] if sets.empty?
         merged, merged_map, changed = merge_seed(sets, mapping, doc['seed_version'].to_i)
-        if changed && write(merged, merged_map)
-          Engine.log('hardware sets: globalna kniznica doplnena o nove default sety') if defined?(Engine)
+        [{ 'sets' => merged, 'mapping' => merged_map }, changed]
+      end
+
+      # R-08 (audit 1d #2/#10): seed-merge je READ-MODIFY-WRITE. Pod zamkom sa
+      # subor cita NANOVO (cache JsonFileStore ma 1 s okno) a merge sa
+      # PREPOCITA — inak by sa zapisal odtlacok spred zamku a zmena druhej
+      # instancie by zanikla. Ked medzitym seed doplnila uz ona, `changed` je
+      # false a nezapisuje sa ani nelogujeme uspech. Zlyhany zamok/citanie =
+      # vratime predzamkovy kandidat (kniznica sa NIKDY nezmeni na seed).
+      def persist_seed_merge!(fallback)
+        with_catalog_lock do
+          JsonFileStore.reload!(path)
+          fresh, changed = read_library
+          if changed && write(fresh['sets'], fresh['mapping']) && defined?(Engine)
+            Engine.log('hardware sets: globalna kniznica doplnena o nove default sety')
+          end
+          fresh
         end
-        { 'sets' => merged, 'mapping' => merged_map }
       rescue StandardError => e
-        Engine.log_error(e, 'HardwareSets.load') if defined?(Engine)
-        { 'sets' => deep_copy(SEED_SETS), 'mapping' => SEED_MAPPING.dup }
+        Engine.log_error(e, 'HardwareSets.persist_seed_merge!') if defined?(Engine)
+        fallback
       end
 
       # Seed-merge globalnej kniznice: doplni CHYBAJUCE seed sety (podla
@@ -306,9 +349,19 @@ module Noxun
         shapes.any? { |s| normalize_sets([s]).first == norm }
       end
 
+      # R-08 (audit 1d #1): CHECK-BEFORE-LOCK by sa dal predbehnut — instancia
+      # B zisti „subor chyba", zastavi sa, instancia A medzitym seedne a ulozi
+      # REALNU zmenu, a B ju potom naslepo prepise seedom. Rychly check ostava
+      # (hot cesta), ale ZAPIS ide az po DRUHOM checku POD zamkom.
       def ensure_seeded
         return if JsonFileStore.available?(path)
-        write(deep_copy(SEED_SETS), SEED_MAPPING.dup)
+        with_catalog_lock do
+          next true if JsonFileStore.available?(path)
+          write(deep_copy(SEED_SETS), SEED_MAPPING.dup)
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'HardwareSets.ensure_seeded') if defined?(Engine)
+        false
       end
 
       # ZAPISOVA cesta (H1a): tvar setov aj mapovania sa validuje PRISNE —
@@ -327,8 +380,13 @@ module Noxun
           Engine.log("hardware sets: zapis mapovania odmietnuty — #{map_errors.first}") if defined?(Engine)
           return false
         end
-        JsonFileStore.write(path, { 'std' => STD, 'seed_version' => SEED_VERSION,
-                                    'sets' => norm, 'mapping' => map })
+        # R-08: samotny zapis bezi pod medziprocesovym zamkom. Zamok, ktory sa
+        # nepodari vziat, vyhodi IOError — rescue nizsie z neho spravi FALSE,
+        # takze volajuci sa o neuspechu dozvie (nikdy tichy uspech).
+        with_catalog_lock do
+          JsonFileStore.write(path, { 'std' => STD, 'seed_version' => SEED_VERSION,
+                                      'sets' => norm, 'mapping' => map })
+        end
       rescue StandardError => e
         Engine.log_error(e, 'HardwareSets.write') if defined?(Engine)
         false
@@ -350,32 +408,63 @@ module Noxun
         Digest::SHA1.hexdigest(raw)[0, 12]
       end
 
+      # R-08 (audit 1d #4): KOHERENTNA dvojica pre payload okna. Kym sa
+      # kniznica citala jednym volanim a revizia druhym, cudzi zapis medzi
+      # nimi vyrobil payload so STARYMI setmi a NOVOU reviziou — formular
+      # potom prosiel guardom a prepisal cudziu zmenu, ktoru pouzivatel
+      # nikdy nevidel. Oboje sa preto berie pod JEDNYM zamkom nad cerstvym
+      # suborom. Zlyhany zamok = revizia sa berie PRED kniznicou: neskorsi
+      # nesulad tak vyrobi nanajvys FALOSNY konflikt (formular sa nacita
+      # nanovo), nikdy tichy prepis.
+      def load_with_revision
+        with_catalog_lock do
+          JsonFileStore.reload!(path)
+          lib = load
+          [lib, revision]
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'HardwareSets.load_with_revision') if defined?(Engine)
+        rev = revision
+        [load, rev]
+      end
+
       # Ulozi/nahradi JEDEN set v globalnej kniznici (D1b editor). Identita =
       # set_id; revision = baseline z casu nacitania okna (cudzia zmena
       # medzitym = :conflict, okno sa obnovi). generic_type existujuceho setu
       # sa NEMENI (mapovania by ticho zmenili vyznam). create: true = NOVY set
       # nesmie trafit existujucu identitu (GH #127 P2 — slug z nazvu moze
       # kolidovat a "Novy set" by ticho prepisal globalnu definiciu).
+      #
+      # R-08: revizia sa porovnava a kniznica cita AZ POD ZAMKOM nad cerstvym
+      # suborom. Kym check sedel MIMO zamku, druha instancia stihla medzi
+      # kontrolou a zapisom ulozit svoju zmenu a nas zapis ju zmazal (guard
+      # pritom hlasil uspech). Zlyhany zamok konci ako `:write_failed`.
       def save_set!(set_def, revision: nil, create: false)
         norm, errors = validate_set(set_def)
         if norm.nil?
           return [:invalid, errors.first || 'set sa nedá uložiť — skontroluj kódy a členov']
         end
-        return [:conflict, nil] if revision && revision != self.revision
-        lib = load
-        sets = lib['sets']
-        idx = sets.index { |s| s['set_id'] == norm['set_id'] }
-        return [:exists, norm['set_id']] if create && idx
-        if idx
-          if sets[idx]['generic_type'] != norm['generic_type']
-            return [:invalid, 'typ kovania existujúceho setu sa nemení — vytvor nový set']
+        with_catalog_lock do
+          JsonFileStore.reload!(path)
+          next [:conflict, nil] if revision && revision != self.revision
+          lib = load
+          sets = lib['sets']
+          idx = sets.index { |s| s['set_id'] == norm['set_id'] }
+          next [:exists, norm['set_id']] if create && idx
+          if idx
+            if sets[idx]['generic_type'] != norm['generic_type']
+              next [:invalid, 'typ kovania existujúceho setu sa nemení — vytvor nový set']
+            end
+            sets[idx] = norm
+          else
+            sets << norm
           end
-          sets[idx] = norm
-        else
-          sets << norm
+          next [:write_failed, nil] unless write(sets, lib['mapping'])
+          [:ok, norm]
         end
-        return [:write_failed, nil] unless write(sets, lib['mapping'])
-        [:ok, norm]
+      rescue StandardError => e
+        Engine.log_error(e, 'HardwareSets.save_set!') if defined?(Engine)
+        [:write_failed, nil]
       end
 
       # Zmaze set z globalnej kniznice; mapovanie globalu sa ocisti (write ho
@@ -384,32 +473,51 @@ module Noxun
       def delete_set!(set_id, revision: nil)
         sid = set_id.to_s.strip
         return [:not_found, nil] if sid.empty?
-        return [:conflict, nil] if revision && revision != self.revision
-        lib = load
-        sets = lib['sets'].reject { |s| s['set_id'] == sid }
-        return [:not_found, nil] if sets.length == lib['sets'].length
-        return [:write_failed, nil] unless write(sets, lib['mapping'])
-        [:ok, sid]
+        with_catalog_lock do
+          JsonFileStore.reload!(path)
+          next [:conflict, nil] if revision && revision != self.revision
+          lib = load
+          sets = lib['sets'].reject { |s| s['set_id'] == sid }
+          next [:not_found, nil] if sets.length == lib['sets'].length
+          next [:write_failed, nil] unless write(sets, lib['mapping'])
+          [:ok, sid]
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'HardwareSets.delete_set!') if defined?(Engine)
+        [:write_failed, nil]
       end
 
       # Nastavi mapovanie GLOBALNEJ kniznice (default novych projektov).
       # value = set_id String | selector Hash | nil/'' (odmapovanie).
-      def set_global_mapping!(generic_type, value)
+      #
+      # R-08 (audit 1d #5): cerstve citanie pod zamkom zachrani zmeny INYCH
+      # klucov, ale dve otvorene okna menajuce TEN ISTY generic_type by si
+      # ticho prepisali predvolbu. Okno preto posiela reviziu kniznice (tu
+      # istu, ktoru uz pouzivaju save/delete) a nesulad konci `:conflict`.
+      # Vrati :ok | :conflict | false (neplatny typ/hodnota, zlyhany zapis).
+      def set_global_mapping!(generic_type, value, revision: nil)
         gt = generic_type.to_s.strip
         return false unless BuildPlan::GENERIC_TYPES.include?(gt)
-        lib = load
-        mapping = lib['mapping']
-        if value.nil? || (value.is_a?(String) && value.strip.empty?)
-          mapping.delete(gt)
-        else
-          status, norm, refs = parse_mapping_value(value)
-          return false unless status == :ok
-          return false unless refs.all? do |sid|
-            lib['sets'].any? { |s| s['set_id'] == sid && s['generic_type'] == gt }
+        with_catalog_lock do
+          JsonFileStore.reload!(path)
+          next :conflict if revision && revision != self.revision
+          lib = load
+          mapping = lib['mapping']
+          if value.nil? || (value.is_a?(String) && value.strip.empty?)
+            mapping.delete(gt)
+          else
+            status, norm, refs = parse_mapping_value(value)
+            next false unless status == :ok
+            next false unless refs.all? do |sid|
+              lib['sets'].any? { |s| s['set_id'] == sid && s['generic_type'] == gt }
+            end
+            mapping[gt] = norm
           end
-          mapping[gt] = norm
+          write(lib['sets'], mapping) ? :ok : false
         end
-        write(lib['sets'], mapping)
+      rescue StandardError => e
+        Engine.log_error(e, 'HardwareSets.set_global_mapping!') if defined?(Engine)
+        false
       end
 
       # --- nakupny CSV (D1b, audit N11) ----------------------------------------
