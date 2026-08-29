@@ -11,15 +11,17 @@
 > a pri uzávere bloku sa presunie do sekcie „Vyriešené" na konci. Pravidlo 1d: rieši sa LEN výrobné riziko alebo
 > ponechaný V1 rozsah; dávka bez menovanej funkcie/dlhu sa nerobí. Čísla riadkov = stav k `dc2d53f`.
 
-## P0 — eskalované mimo registra (hotfix dávka beží od 29.8. večer)
+## P0 — eskalované mimo registra · **✅ OBA HOTOVÉ dávkou P0-HF (PR #252, v0.8.14, 29.8.)**
 
 - **P0-1 · Exporty sa zapíšu pred cenovou bránou** (rozpočet/ponuka XLSX so známou chybnou cenou) — [E:P0-HF-01].
   **Korekcia z review #250:** brána je dvojvrstvová — TVRDÝ blok len pre vždy-chybné stavy (záporná zostava, nesúlad súm),
   CHÝBAJÚCA CENA = explicitné potvrdenie („Exportovať aj tak — N riadkov bez ceny"), lebo STANDARD §11.3 drží rozpracovaný
-  rozpočet exportovateľný. → *pointer: hotfix dávka `fix/p0-exportne-brany`, výsledok sa doplní.*
+  rozpočet exportovateľný. → *✅ PR #252: tvrdá vetva (záporná zostava, nesúlad súm) + potvrdzovaná vetva
+  (riadky bez ceny — druhý klik viazaný na počet, ktorý používateľ videl).*
 - **P0-2 · Export s duplicitnou identitou dobehne s podpočítaným kovaním** (CSV kovania/rozpočet/ponuka; `per: owner`
   dedup na `owner_id`) — [E:P0-HF-02 ≡ A3]; prevracia vedomý kompromis 1b-3 (#240). Tvrdý blok; predikát rozlišuje
-  skrinku od dosky; VEPO sa neblokuje. → *ten istý hotfix.*
+  skrinku od dosky; VEPO sa neblokuje. → *✅ PR #252 (`dup_partition` — blokuje len ID, ktorých sety majú
+  reálne `per: 'owner'` člena). Zvyšná presnosť predikátu = **R-34**.*
 
 ## Os GHOST — observery · undo · vkladanie (blok 1d PRED blokom GHOST)
 
@@ -235,6 +237,13 @@ testové dlhy CHAR/st1b: zapamätaný grain prepínač po `run_st1b`, komentár 
 walk rescue, CH4c východiskový assert, CH2 `valid?` guard [B18 + C2 + C3 + C8 + C9].
 **Návrh:** jedna docs + jedna test-only dávka. **S.**
 
+### R-34 · P3 · core · `core/hardware_sets.rb` (expanzia, príznak `per_owner`)
+Presnosť predikátu P0-2 brány (z review #252, kolo 3): `per_owner` sa označuje pri KAŽDOM vydanom owner členovi,
+nie až vo vetve, kde `owner_seen[key]` reálne preskočí duplikát — dve inštancie so zdieľaným `cabinet_id` ale
+rôznym `owner_part_key` majú správne množstvá a brána ich napriek tomu zastaví. Zlyháva výhradne bezpečným smerom
+(falošne pozitívne, len v už ORANGE-označenom stave). Návrh opravy je v threade #252.
+**Návrh:** označovať `owner_id` až pri reálnom preskoku duplikátu. **S.**
+
 ## Vyriešené počas bloku 1b/1c (záznam — nevybavovať)
 
 B1 názov projektu (1b-6a, #244) · B2 hlavičky materiálov (1b-6b, #247) · A1/A2 tichý návrat ceny dekoru
@@ -247,5 +256,6 @@ R-07 · R-08 · potom R-05 (+R-06 plný) ako D-109 šev → 4. **pred D-95/VÝRO
 5. **perzistencia:** R-11 → R-12 → R-14 (R-13 po rozhodnutí Michala) → 6. **UI/hygiena:** R-23.1 Escape (S,
 hocikedy) · R-18 · zvyšok podľa kapacity. R-32 kostry priebežne pred každým zásahom.
 
-**Otvorené rozhodnutia Michala:** R-13 (`std` na entite: čítať vs vypustiť) · R-30 (jantárové riadky vs ručný
-refresh — pri D-95).
+**Otvorené rozhodnutia Michala:** R-05 (rozsah zaokrúhľovania pomeru per zákazka vs per skrinka — rozhodne
+USER-debata o setoch, PRED implementáciou D-109) · R-13 (`std` na entite: čítať vs vypustiť) · R-30 (jantárové
+riadky vs ručný refresh — pri D-95).
