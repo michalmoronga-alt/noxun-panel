@@ -1515,14 +1515,23 @@
   // takže starý DOM ani cudzí volajúci nemajú ako podhodnotený súbor vyrobiť
   // ticho. Ozbrojenie sa ruší pri každom čerstvom payloade (`budDisarm`):
   // potvrdenie platí pre čísla, ktoré používateľ videl, nie navždy.
-  var BUD_CONFIRM = { xlsx: false, cp: false };
+  //
+  // POSIELA SA POČET, NIE `true` (review #252 P1). Export medzi prvým a druhým
+  // klikom flushne rozpísaný edit Inspectora a rozpočet PREPOČÍTA z čerstvého
+  // modelu — neviazaný boolean by potvrdil aj iný, možno horšie podhodnotený
+  // dokument. Server prijme len presnú zhodu s vlastným čerstvým počtom; keď
+  // sa čísla rozídu, export zastaví a okno OBNOVÍ (payload zároveň potvrdenie
+  // odzbrojí, takže ďalší klik varuje už správnym číslom).
+  var BUD_CONFIRM = { xlsx: 0, cp: 0 };
 
   function budDisarm(){
-    BUD_CONFIRM = { xlsx: false, cp: false };
+    BUD_CONFIRM = { xlsx: 0, cp: 0 };
   }
 
+  // Počet, ktorý používateľ potvrdil (0 = nič nepotvrdil).
   function budArmed(key){
-    return BUD_CONFIRM[key] === true;
+    var n = BUD_CONFIRM[key];
+    return (typeof n === 'number' && n > 0) ? n : 0;
   }
 
   // Čisté: koľko riadkov súčtu nemá cenu (0 = niet čo potvrdzovať).
@@ -1541,11 +1550,14 @@
   }
 
   // true = klik sa SPOTREBOVAL na varovanie a export sa neposlal.
+  // Ozbrojuje sa PRESNÝM POČTOM, ktorý sa v hláške ukázal — keď sa payload
+  // medzitým zmenil, nové číslo staré potvrdenie prepíše a používateľ musí
+  // potvrdiť znova (potvrdil predsa iný dokument).
   function budNeedsConfirm(key, st){
     var n = budUnpricedCount(st);
-    if (n === 0){ BUD_CONFIRM[key] = false; return false; }
-    if (budArmed(key)) return false;
-    BUD_CONFIRM[key] = true;
+    if (n === 0){ BUD_CONFIRM[key] = 0; return false; }
+    if (budArmed(key) === n) return false;
+    BUD_CONFIRM[key] = n;
     NX.setStatus(budConfirmText(n, key), true);
     return true;
   }

@@ -6,8 +6,10 @@
 //      ticho vyrobit podhodnoteny subor, ani pouzivatelovi vystup upriet —
 //      a presne tato dvojica sa klikanim overuje najhorsie.
 //   2. PRVY klik export ZASTAVI a povie preco; DRUHY ho pusti s prihlaskou
-//      `confirm_unpriced: true`. Bez nej server (`export_confirmed?`) zapis
-//      odmietne, takze chybajuca prihlaska = ticho nefunkcny export.
+//      `confirm_unpriced: <pocet>`. Je to POCET, nie `true` (review #252 P1):
+//      export medzi klikmi flushne edit Inspectora a rozpocet prepocita, takze
+//      neviazany boolean by potvrdil aj INY dokument. Server prijme len presnu
+//      zhodu so svojim cerstvym poctom.
 //   3. OZBROJENIE plati pre CISLA, KTORE POUZIVATEL VIDEL. Cerstvy payload ho
 //      musi zrusit (`NX.setStudio` -> `budDisarm`), inak by potvrdenie z inej
 //      sumy pustilo export nad novymi cislami.
@@ -86,7 +88,7 @@ function push(miss){
   B.budXlsx();
   eq(SENT.length, 1, 'bez riadkov bez ceny sa export posle HNED');
   eq(SENT[0][0], 'budget_xlsx');
-  eq(SENT[0][1].confirm_unpriced, false, 'a bez potvrdenia — netreba ho');
+  eq(SENT[0][1].confirm_unpriced, 0, 'a bez potvrdenia — netreba ho');
   eq(SENT[0][1].gen, 7, 'gen ide zo servera, nie z DOM');
 })();
 
@@ -95,15 +97,17 @@ function push(miss){
   B.budXlsx();
   eq(SENT.length, 0, 'PRVY klik subor nezacne — na server sa nic neposlalo');
   ok(String(STATUS.textContent).indexOf('2 riadky') > -1, 'a povie kolko: ' + STATUS.textContent);
-  ok(B.budArmed('xlsx'), 'export je ozbrojeny na druhy klik');
-  ok(!B.budArmed('cp'), 'potvrdenie rozpoctu NEODOMYKA ponuku');
+  eq(B.budArmed('xlsx'), 2, 'ozbrojene PRESNE tym poctom, ktory sa ukazal');
+  eq(B.budArmed('cp'), 0, 'potvrdenie rozpoctu NEODOMYKA ponuku');
 })();
 
 (function secondClickSends(){
   // pokracuje po `firstClickStops` — ZAMERNE bez noveho pushu
   B.budXlsx();
   eq(SENT.length, 1, 'DRUHY klik export posle');
-  eq(SENT[0][1].confirm_unpriced, true, 'a nesie VYSLOVNE potvrdenie pre server');
+  // review #252 P1: posiela sa POCET, nie `true` — server prijme len presnu
+  // zhodu so svojim cerstvym poctom, takze potvrdenie neplati na iny dokument.
+  eq(SENT[0][1].confirm_unpriced, 2, 'a nesie POCET, ktory pouzivatel potvrdil');
 })();
 
 (function freshPayloadDisarms(){
@@ -111,31 +115,63 @@ function push(miss){
   B.budXlsx();
   eq(SENT.length, 0, 'prvy klik zastavi');
   push(2); // cerstvy payload zo servera = ine cisla, potvrdenie padá
-  ok(!B.budArmed('xlsx'), 'ozbrojenie neprezije cerstvy payload');
+  eq(B.budArmed('xlsx'), 0, 'ozbrojenie neprezije cerstvy payload');
   B.budXlsx();
   eq(SENT.length, 0, 'takze prvy klik po pushi znova ZASTAVI');
+})();
+
+(function armIsBoundToTheCount(){
+  // Priamo na `budNeedsConfirm`, bez pushu: ozbrojenie NIE JE „už raz klikol",
+  // ale „potvrdil PRÁVE TOTO číslo". Keby stačil truthy príznak, iné číslo by
+  // sa poslalo ako potvrdené bez toho, aby ho používateľ videl.
+  B.budDisarm();
+  const st2 = { budget: { totals: { unknown_count_in_total: 2 } } };
+  const st5 = { budget: { totals: { unknown_count_in_total: 5 } } };
+  ok(B.budNeedsConfirm('xlsx', st2), 'prvy klik nad 2 zastavi');
+  eq(B.budArmed('xlsx'), 2);
+  ok(!B.budNeedsConfirm('xlsx', st2), 'druhy klik nad TYM ISTYM cislom prejde');
+  ok(B.budNeedsConfirm('xlsx', st5), 'ale INE cislo sa musi potvrdit ZNOVA');
+  eq(B.budArmed('xlsx'), 5, 'a ozbrojenie sa prepise na nove cislo');
+  ok(!B.budNeedsConfirm('xlsx', st5));
+  B.budDisarm();
+})();
+
+(function changedCountReArms(){
+  // Server pri rozidenych cislach export zastavi A OKNO OBNOVI. Nový payload
+  // nesie INY pocet — potvrdenie sa musi pytat ZNOVA, a novym cislom.
+  push(2);
+  B.budXlsx();               // ozbroji na 2
+  eq(B.budArmed('xlsx'), 2);
+  push(5);                   // obnova zo servera: v skutocnosti ich je 5
+  B.budXlsx();
+  eq(SENT.length, 0, 'iny pocet = iny dokument, klik sa spotrebuje na varovanie');
+  ok(String(STATUS.textContent).indexOf('5 riadkov') > -1, STATUS.textContent);
+  eq(B.budArmed('xlsx'), 5, 'a ozbroji sa uz NOVYM cislom');
+  B.budXlsx();
+  eq(SENT.length, 1);
+  eq(SENT[0][1].confirm_unpriced, 5);
 })();
 
 (function offerHasOwnKey(){
   push(1);
   B.budCpExport();
   eq(SENT.length, 0, 'ponuka ma vlastny prvy klik');
-  ok(B.budArmed('cp'));
-  ok(!B.budArmed('xlsx'), 'a rozpocet ostava zamknuty');
+  eq(B.budArmed('cp'), 1);
+  eq(B.budArmed('xlsx'), 0, 'a rozpocet ostava zamknuty');
   B.budCpExport();
   eq(SENT.length, 1);
   eq(SENT[0][0], 'cp_xlsx');
-  eq(SENT[0][1].confirm_unpriced, true);
+  eq(SENT[0][1].confirm_unpriced, 1);
 })();
 
 (function armingClearsWhenPriced(){
   push(1);
   B.budXlsx();               // ozbroji
-  ok(B.budArmed('xlsx'));
+  eq(B.budArmed('xlsx'), 1);
   push(0);                   // ceny doplnene
   B.budXlsx();
   eq(SENT.length, 1, 'cisty rozpocet ide priamo');
-  eq(SENT[0][1].confirm_unpriced, false, 'a uz NIC nepotvrdzuje');
+  eq(SENT[0][1].confirm_unpriced, 0, 'a uz NIC nepotvrdzuje');
 })();
 
 console.log('OK test_p0hf_potvrdenie.js — ' + n + ' kontrol');

@@ -118,7 +118,9 @@ module NxP0
 
   # Jedno spustenie exportu nad prazdnym priecinkom.
   # -> [status_sprava, chyba?, [subory v priecinku], [volania pickera]]
-  def run_export(method, stubs, dir, file_name, data = {})
+  # `repushes` (nepovinny out parameter) zbiera, kolkokrat si telo vyziadalo
+  # obnovu okna — brana potvrdenia to pri rozidenych cislach robit MUSI.
+  def run_export(method, stubs, dir, file_name, data = {}, repushes = [])
     msg = nil
     err = nil
     calls = []
@@ -127,7 +129,7 @@ module NxP0
       with_ui(target, calls) do
         PC.send(method, :model, { 'gen' => 1 }.merge(data), generation: 1,
                                                             status: ->(m, e = false) { msg = m; err = e },
-                                                            repush: -> {})
+                                                            repush: -> { repushes << :repush })
       end
     end
     [msg, err, Dir.children(dir).sort, calls]
@@ -222,13 +224,22 @@ NxTest.test('P0-HF-01: hlaska POTVRDITELNEJ brany ponuka aj CESTU VON') do
   NxTest.assert(msg.include?('ešte raz'), "bez cesty von by to bol tvrdy blok: #{msg}")
 end
 
-NxTest.test('P0-HF-01: potvrdenie sa overuje NA SERVERI (klient nie je ochrana)') do
+NxTest.test('P0-HF-01: potvrdenie je VIAZANE NA POCET, ktory pouzivatel videl (review #252 P1)') do
   pc = NxP0::PC
-  NxTest.assert(pc.export_confirmed?('confirm_unpriced' => true))
-  NxTest.refute(pc.export_confirmed?('confirm_unpriced' => 'true'), 'retazec nie je potvrdenie')
-  NxTest.refute(pc.export_confirmed?('confirm_unpriced' => false))
-  NxTest.refute(pc.export_confirmed?({}))
-  NxTest.refute(pc.export_confirmed?(nil))
+  NxTest.assert(pc.export_confirmed?({ 'confirm_unpriced' => 2 }, 2), 'presna zhoda potvrdzuje')
+  # HOLY BOOLEAN UZ NIE JE POTVRDENIE: export medzi prvym a druhym klikom
+  # flushne edit Inspectora a rozpocet prepocita — neviazany `true` by potvrdil
+  # INY, klidne horsie podhodnoteny dokument.
+  NxTest.refute(pc.export_confirmed?({ 'confirm_unpriced' => true }, 2), 'true nie je cislo')
+  NxTest.refute(pc.export_confirmed?({ 'confirm_unpriced' => '2' }, 2), 'retazec nie je cislo')
+  NxTest.refute(pc.export_confirmed?({ 'confirm_unpriced' => 1 }, 2), 'iny pocet = iny dokument')
+  NxTest.refute(pc.export_confirmed?({ 'confirm_unpriced' => 3 }, 2), 'ani vyssi pocet neprejde')
+  NxTest.refute(pc.export_confirmed?({ 'confirm_unpriced' => 0 }, 0), 'nula nie je co potvrdzovat')
+  NxTest.refute(pc.export_confirmed?({}, 2))
+  NxTest.refute(pc.export_confirmed?(nil, 2))
+  # pocet berie server z CERSTVEHO rozpoctu, nie z DOM
+  NxTest.assert_equal(3, pc.unpriced_count(NxP0.budget(miss: 3)))
+  NxTest.assert_equal(0, pc.unpriced_count(nil))
   # a potvrdeny export to musi PRIZNAT v statuse
   NxTest.assert(pc.export_confirmed_notes(['x']).first.include?('potvrdil'))
   NxTest.assert_equal([], pc.export_confirmed_notes(nil))
@@ -262,12 +273,63 @@ if NxTest.headless?
     NxP0.in_tmp do |dir|
       msg, err, files, calls = NxP0.run_export(
         :do_budget_xlsx, NxP0.base_stubs(NxP0.collected, NxP0.budget(miss: 2)), dir, 'rozpocet.xlsx',
-        { 'confirm_unpriced' => true }
+        { 'confirm_unpriced' => 2 }
       )
       NxTest.assert_equal(['rozpocet.xlsx'], files, 'STANDARD §11.3: rozpracovany rozpocet sa exportovat DA')
       NxTest.assert_equal([:savepanel], calls)
       NxTest.assert(err, 'ale status ostava cerveny — tiche zelene „uložené" je presne to, co P0-HF rusi')
       NxTest.assert(msg.include?('2 riadkov') && msg.include?('potvrdil'), msg)
+    end
+  end
+
+  # --- review #252 P1: potvrdenie viazane na POCET --------------------------
+  #
+  # Export medzi prvym a druhym klikom FLUSHNE rozpisany edit Inspectora a
+  # rozpocet PREPOCITA z cerstveho modelu. Klient teda mohol potvrdzovat INE
+  # cislo, nez ma server — a vtedy sa zapisat NESMIE.
+
+  NxTest.test('P0-HF-01: potvrdenie na INY pocet subor NEVYROBI — a okno sa OBNOVI') do
+    NxP0.in_tmp do |dir|
+      repushes = []
+      # pouzivatel potvrdil 2 riadky bez ceny, cerstvy rozpocet ich ma 5
+      msg, err, files, calls = NxP0.run_export(
+        :do_budget_xlsx, NxP0.base_stubs(NxP0.collected, NxP0.budget(miss: 5)), dir, 'rozpocet.xlsx',
+        { 'confirm_unpriced' => 2 }, repushes
+      )
+      NxTest.assert_equal([], files, 'potvrdil INY dokument — tento vzniknut nesmie')
+      NxTest.assert_equal([], calls)
+      NxTest.assert(err && msg.include?('5 riadkov'), "a hlaska nesie NOVE cislo: #{msg}")
+      NxTest.assert_equal([:repush], repushes, 'okno musi dostat cerstve cisla, inak by sa klikalo naslepo')
+    end
+  end
+
+  NxTest.test('P0-HF-01: zastarany DOM („0 bez ceny") export NEZASEKNE — obnova ho odblokuje') do
+    NxP0.in_tmp do |dir|
+      repushes = []
+      # klient si mysli, ze je cisto, takze potvrdenie vobec neposiela
+      _msg, _err, files, = NxP0.run_export(
+        :do_budget_xlsx, NxP0.base_stubs(NxP0.collected, NxP0.budget(miss: 3)), dir, 'rozpocet.xlsx',
+        {}, repushes
+      )
+      NxTest.assert_equal([], files)
+      NxTest.assert_equal([:repush], repushes,
+                          'bez obnovy by okno potvrdenie NIKDY neozbrojilo a export by sa zasekol navzdy')
+      # po obnove uz klient pozna spravne cislo a potvrdenie prejde
+      _m2, _e2, files2, = NxP0.run_export(
+        :do_budget_xlsx, NxP0.base_stubs(NxP0.collected, NxP0.budget(miss: 3)), dir, 'rozpocet.xlsx',
+        { 'confirm_unpriced' => 3 }
+      )
+      NxTest.assert_equal(['rozpocet.xlsx'], files2)
+    end
+  end
+
+  NxTest.test('P0-HF-01: cisty export si obnovu NEPYTA (ziadna reziu navyse)') do
+    NxP0.in_tmp do |dir|
+      repushes = []
+      _msg, _err, files, = NxP0.run_export(:do_budget_xlsx, NxP0.base_stubs(NxP0.collected, NxP0.budget),
+                                           dir, 'rozpocet.xlsx', {}, repushes)
+      NxTest.assert_equal(['rozpocet.xlsx'], files)
+      NxTest.assert_equal([], repushes)
     end
   end
 
@@ -314,7 +376,7 @@ if NxTest.headless?
       NxTest.assert(err && msg.include?('Nábytková zostava'), msg)
       # TVRDY dovod: `confirm_unpriced` ho NEPUSTI (na rozdiel od chybajucej ceny)
       _m2, _e2, files2, = NxP0.run_export(:do_cp_xlsx, NxP0.base_stubs(NxP0.collected, bud),
-                                          dir, 'ponuka.xlsx', { 'confirm_unpriced' => true })
+                                          dir, 'ponuka.xlsx', { 'confirm_unpriced' => 1 })
       NxTest.assert_equal([], files2, 'zaporna zostava je VZDY chyba — potvrdenie na nu neplati')
     end
   end
@@ -323,7 +385,7 @@ if NxTest.headless?
     NxP0.in_tmp do |dir|
       bud = NxP0.budget(cp_over: { 'consistent' => false, 'diff' => 41.0 })
       msg, err, files, = NxP0.run_export(:do_cp_xlsx, NxP0.base_stubs(NxP0.collected, bud),
-                                         dir, 'ponuka.xlsx', { 'confirm_unpriced' => true })
+                                         dir, 'ponuka.xlsx', { 'confirm_unpriced' => 1 })
       NxTest.assert_equal([], files, 'ani potvrdenie tvrdy dovod neprejde')
       NxTest.assert(err && msg.include?('nesedí s rozpočtom'), msg)
     end
@@ -333,7 +395,7 @@ if NxTest.headless?
     NxP0.in_tmp do |dir|
       stubs = NxP0.base_stubs(NxP0.collected(NxP0.ident('CAB-009')), NxP0.budget(miss: 1))
       msg, _err, files, = NxP0.run_export(:do_cp_xlsx, stubs, dir, 'ponuka.xlsx',
-                                          { 'confirm_unpriced' => true })
+                                          { 'confirm_unpriced' => 1 })
       NxTest.assert_equal([], files)
       NxTest.assert(msg.include?('CAB-009'), "tvrdy dovod ide prvy: #{msg}")
     end
@@ -343,7 +405,7 @@ if NxTest.headless?
     NxP0.in_tmp do |dir|
       stubs = NxP0.base_stubs(NxP0.collected, NxP0.budget(miss: 1))
       msg, err, files, = NxP0.run_export(:do_cp_xlsx, stubs, dir, 'ponuka.xlsx',
-                                         { 'confirm_unpriced' => true })
+                                         { 'confirm_unpriced' => 1 })
       NxTest.assert_equal(['ponuka.xlsx'], files, 'STANDARD §11.3: rozpracovana ponuka sa exportovat DA')
       NxTest.assert(err, 'status ostava cerveny')
       NxTest.assert(msg.include?('1 riadkov') && msg.include?('potvrdil'), msg)

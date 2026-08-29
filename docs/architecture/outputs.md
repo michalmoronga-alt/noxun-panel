@@ -75,9 +75,15 @@ záporná „Nábytková zostava" a nesúlad ponuky s rozpočtom (`cp:` — len 
 *(2) POTVRDITEĽNÁ — `export_confirmations(budget:)`.* Dnes jediný dôvod: **riadky bez ceny**. STANDARD §11.3 hovorí, že neznáma cena sa NIKDY nenahradí nulou, ale má sa **priznať**
 („medzisúčet je len zo známych cien a súhrn nahlas povie, že nie je úplný") — **rozpracovaný rozpočet je legitímny stav zákazky** a plošný tvrdý blok by používateľovi bral výstup,
 na ktorý má právo (nález Codex review PR #250 proti auditu). Default je teda zastavené, ale **cesta von existuje**: `export_confirm_status` ponúkne druhý klik, ten pošle
-`confirm_unpriced` a hotový súbor podhodnotenie **prizná v statuse** (`export_confirmed_notes`; status ostáva červený). **Potvrdenie overuje SERVER** (`export_confirmed?` — presne
-`true`, nie „true"), takže starý DOM ani cudzí volajúci nemajú ako podhodnotený súbor vyrobiť ticho; klient (`budNeedsConfirm` v `js/budget.js`, dva nezávislé kľúče pre rozpočet
-a ponuku) je len UX a jeho ozbrojenie **ruší každý čerstvý payload** (`NX.setStudio` → `budDisarm`) — potvrdenie platí pre čísla, ktoré používateľ videl.
+`confirm_unpriced` a hotový súbor podhodnotenie **prizná v statuse** (`export_confirmed_notes`; status ostáva červený). **Potvrdenie overuje SERVER** (`export_confirmed?`), takže
+starý DOM ani cudzí volajúci nemajú ako podhodnotený súbor vyrobiť ticho; klient (`budNeedsConfirm` v `js/budget.js`, dva nezávislé kľúče pre rozpočet a ponuku) je len UX a jeho
+ozbrojenie **ruší každý čerstvý payload** (`NX.setStudio` → `budDisarm`).
+
+**`confirm_unpriced` je POČET, nie boolean (review #252 P1)** — a to je celý bod. Export medzi prvým a druhým klikom **flushne rozpísaný edit Inspectora a rozpočet prepočíta
+z čerstvého modelu**, takže neviazaný `true` by autorizoval **iný, možno horšie podhodnotený dokument** a rozdiel by sa priznal až v statuse pod hotovým súborom — presne to, čo
+P0-HF ruší. Server preto prijme len **presnú zhodu** s vlastným čerstvým `unpriced_count` (`true`, reťazec ani nula potvrdením nie sú). Keď sa čísla rozídu, export sa zastaví
+a **okno sa OBNOVÍ** (`stop_for_confirmation` → `repush`): bez toho by opačný nesúlad — cachovaný payload tvrdí „0 bez ceny", čerstvý rozpočet ich má — potvrdenie nikdy neozbrojil
+a export by sa zasekol navždy. Obnova zároveň potvrdenie odzbrojí, takže ďalší klik varuje už správnym číslom. Čistý export si obnovu nepýta (žiadna réžia navyše).
 
 **Je to VEDOMÉ PREVRÁTENIE rozhodnutia dávky 1b-3** („export dobehne + červený status"), ktoré charakterizoval `tests/pure/test_1b3_citanie.rb`. Rozdiel je v predmete: 1b-3 riešila
 **nález Kontroly** (varovanie o modeli), táto brána **číslo v hotovom platnom dokumente**. Semafor sa nemení — **KONTROLA naďalej len varuje a nikdy neblokuje** (RED nezastaví ani

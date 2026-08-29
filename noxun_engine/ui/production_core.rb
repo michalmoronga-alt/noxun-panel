@@ -870,12 +870,17 @@ module Noxun
         out
       end
 
+      # Kolko riadkov suctu nema cenu — z CERSTVEHO rozpoctu, nie z DOM.
+      def unpriced_count(budget)
+        totals = budget.is_a?(Hash) && budget['totals'].is_a?(Hash) ? budget['totals'] : {}
+        totals['unknown_count_in_total'].to_i
+      end
+
       # POTVRDITELNA vetva brany (STANDARD §11.3). Vracia dovody, ktore export
       # ZASTAVIA len PRVYKRAT — druhy klik ich s `confirm_unpriced` prejde.
       # Dnes je tam jediny: riadky rozpoctu bez ceny.
       def export_confirmations(budget: nil)
-        totals = budget.is_a?(Hash) && budget['totals'].is_a?(Hash) ? budget['totals'] : {}
-        miss = totals['unknown_count_in_total'].to_i
+        miss = unpriced_count(budget)
         return [] unless miss.positive?
 
         ["#{miss} riadkov rozpočtu nemá cenu — suma je PODHODNOTENÁ (položky v dokumente sú, v cene nie)"]
@@ -884,8 +889,19 @@ module Noxun
       # Klient nie je ochrana: `confirm_unpriced` sa ZO SERVERA overuje pri
       # KAZDOM exporte. Stary DOM ani cudzi volajuci tak nemaju ako podhodnoteny
       # subor vyrobit ticho — bez vyslovneho potvrdenia sa nezapise.
-      def export_confirmed?(data)
-        data.is_a?(Hash) && data['confirm_unpriced'] == true
+      #
+      # POTVRDENIE JE VIAZANE NA POCET, KTORY POUZIVATEL NAOZAJ VIDEL (review
+      # #252 P1), nie na holy `true`. Export totiz medzi prvym a druhym klikom
+      # FLUSHNE rozpisany edit Inspectora a rozpocet PREPOCITA z cerstveho
+      # modelu: neviazany boolean by tak potvrdil INY, klidne HORSIE
+      # podhodnoteny dokument — a rozdiel by sa priznal az v statuse POD hotovym
+      # suborom, teda presne to, co P0-HF rusi. Cislo sa musi zhodovat presne;
+      # `true`, retazec ani nula potvrdenim nie su.
+      def export_confirmed?(data, count)
+        return false unless data.is_a?(Hash) && count.to_i.positive?
+
+        v = data['confirm_unpriced']
+        v.is_a?(Numeric) && v.to_i == count.to_i
       end
 
       # Hlaska TVRDEJ brany. MUSI povedat OBOJE: ze subor NEVZNIKOL (inak ho
@@ -899,6 +915,16 @@ module Noxun
       def export_confirm_status(reasons)
         "Export sa zastavil — súbor sa zatiaľ nevytvoril. #{Array(reasons).join(' · ')}. " \
           'Doplň ceny v sekcii Rozpočet — alebo klikni na export ešte raz a potvrď, že chceš exportovať aj tak.'
+      end
+
+      # Zastavenie potvrditelnej vetvy MUSI okno OBNOVIT (review #252 P1).
+      # Sem sa dostaneme len vtedy, ked klient poslal INE cislo, nez ma cerstvy
+      # rozpocet — teda ked mal zastarane data. Bez obnovy by okno v kraselnom
+      # pripade („DOM tvrdi 0 bez ceny, cerstvy rozpocet ich ma") potvrdenie
+      # NIKDY neozbrojilo a export by sa zasekol navzdy.
+      def stop_for_confirmation(reasons, status:, repush:)
+        repush.call
+        status.call(export_confirm_status(reasons), true)
       end
 
       # Po POTVRDENOM exporte to hotovy subor musi PRIZNAT (STANDARD §11.3:
@@ -1738,8 +1764,8 @@ module Noxun
         return status.call(export_blocked_status(blockers), true) unless blockers.empty?
 
         unpriced = export_confirmations(budget: budget)
-        unless unpriced.empty? || export_confirmed?(data)
-          return status.call(export_confirm_status(unpriced), true)
+        unless unpriced.empty? || export_confirmed?(data, unpriced_count(budget))
+          return stop_for_confirmation(unpriced, status: status, repush: repush)
         end
 
         project = project_name(model) # audit #1: server je autorita nazvu
@@ -1808,8 +1834,8 @@ module Noxun
         return status.call(export_blocked_status(blockers), true) unless blockers.empty?
 
         unpriced = export_confirmations(budget: budget)
-        unless unpriced.empty? || export_confirmed?(data)
-          return status.call(export_confirm_status(unpriced), true)
+        unless unpriced.empty? || export_confirmed?(data, unpriced_count(budget))
+          return stop_for_confirmation(unpriced, status: status, repush: repush)
         end
 
         project = project_name(model) # audit #1: server je autorita nazvu

@@ -32,9 +32,14 @@
   STANDARD §11.3 hovorí, že neznáma cena sa NIKDY nenahradí nulou, ale má sa **priznať** — rozpracovaný rozpočet je legitímny stav zákazky a plošný tvrdý blok by používateľovi
   bral výstup, na ktorý má právo. Preto: *(1) TVRDÉ dôvody* (`export_blockers`) — duplicitné ID **skrinky**, záporná „Nábytková zostava", nesúlad ponuky s rozpočtom — sa potvrdiť
   **nedajú** (nedáva zmysel poslať objednávku, o ktorej vieme, že je podpočítaná). *(2) POTVRDITEĽNÝ dôvod* (`export_confirmations`) — riadky bez ceny — export **zastaví prvý raz**,
-  hláška vymenuje riadky a ponúkne cestu von; druhý klik pošle `confirm_unpriced` a hotový súbor podhodnotenie **prizná v statuse** (červenom). Potvrdenie overuje **server**
-  (`export_confirmed?` — presne `true`), takže starý DOM ani cudzí volajúci nemajú ako podhodnotený súbor vyrobiť ticho; klient je len UX a jeho ozbrojenie **ruší každý čerstvý
-  payload** — potvrdenie platí pre čísla, ktoré používateľ videl. **Firewall interných pojmov sa nedotkla** (STANDARD §11.3: hlási a neblokuje).
+  hláška vymenuje riadky a ponúkne cestu von; druhý klik pošle `confirm_unpriced` a hotový súbor podhodnotenie **prizná v statuse** (červenom). Potvrdenie overuje **server**,
+  takže starý DOM ani cudzí volajúci nemajú ako podhodnotený súbor vyrobiť ticho. **Firewall interných pojmov sa nedotkla** (STANDARD §11.3: hlási a neblokuje).
+
+  **Kolo 1 review (#252 P1) opravilo dieru v tom potvrdení:** `confirm_unpriced` bol holý boolean, hoci export medzi prvým a druhým klikom **flushne rozpísaný edit Inspectora
+  a rozpočet prepočíta z čerstvého modelu** — neviazané „áno" tak vedelo autorizovať **iný, možno horšie podhodnotený dokument**, a rozdiel by sa priznal až v statuse pod hotovým
+  súborom. Odvtedy je potvrdenie **počet**, ktorý používateľ naozaj videl, a server prijme len presnú zhodu so svojím čerstvým číslom. Opačný nesúlad (cachovaný payload tvrdí
+  „0 bez ceny", čerstvý rozpočet ich má) by zas export **zasekol navždy**, lebo klient by potvrdenie nikdy neozbrojil — preto zastavenie potvrdzovacej vetvy **okno obnoví**
+  (`stop_for_confirmation` → `repush`), obnova potvrdenie odzbrojí a ďalší klik varuje už správnym číslom. Čistý export si obnovu nepýta.
 
   **VEPO bránu nedostáva** — audit ho výslovne vyníma: je to rezací výstup, nie cena ani objednávka, duplicitná identita jeho čísla neskresľuje a chybné riadky vyhadzuje sám do
   LOGu. Blokovať ho bez samostatného dôkazu by len zastavilo výrobu.
@@ -45,9 +50,9 @@
   sú dva pohľady na tú istú `duplicate_identities` a tá istá podmienka rozhoduje aj o znení nálezu Kontroly.
 
   **Testovanie:** nová sada `tests/pure/test_p0hf_brany.rb` meria pri každom dôvode **prázdny priečinok** (nie text statusu) a zároveň to, že sa `savepanel` ani neotvoril; nová JS
-  sada `tests/js/test_p0hf_potvrdenie.js` stráži dvojkrokový klik a zrušenie potvrdenia pri čerstvom payloade. Mutačné overenie: vypnutie brány pre CSV · pre ponuku · potvrdzovacia
-  vetva, ktorá nikdy nezastaví · predikát nerozlišujúci dosku — každá zhodila práve svoje testy. **2023 headless · 72 JS sád.** In-SketchUp beh netreba (žiadne buildery ani
-  observery). PR **#252**.
+  sada `tests/js/test_p0hf_potvrdenie.js` stráži dvojkrokový klik, viazanie potvrdenia na počet a zrušenie potvrdenia pri čerstvom payloade. Mutačné overenie: vypnutie brány pre
+  CSV · pre ponuku · potvrdzovacia vetva, ktorá nikdy nezastaví · predikát nerozlišujúci dosku — každá zhodila práve svoje testy. **2026 headless · 72 JS sád.** In-SketchUp beh
+  netreba (žiadne buildery ani observery). PR **#252**, jedno kolo review (1× P1).
 
 - **F/D-27 · TAGY MODELU SA PREPÍNAJÚ Z PANELA (28.8.2026, v0.8.13):** odrážka **F** bloku 1b, postreh **D-27** (Michal 19.7.). V raile Inspectora pribudla **ikona oka**, ktorá
   otvorí zoznam NOXUN tagov modelu (Korpus · Chrbát · Čelá · Vnútro · Kovanie · Dosky · Zóny) a jedným klikom ich zobrazí alebo skryje — bez chodenia do natívneho okna Tags.
