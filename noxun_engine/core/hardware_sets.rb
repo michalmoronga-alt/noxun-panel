@@ -411,7 +411,7 @@ module Noxun
       # R-08 (audit 1d #4): KOHERENTNA dvojica pre payload okna. Kym sa
       # kniznica citala jednym volanim a revizia druhym, cudzi zapis medzi
       # nimi vyrobil payload so STARYMI setmi a NOVOU reviziou — formular
-      # potom prosiel guardom a prepisal cudziu zmenu, ktoru pouzivatel
+      # potom presiel guardom a prepisal cudziu zmenu, ktoru pouzivatel
       # nikdy nevidel. Oboje sa preto berie pod JEDNYM zamkom nad cerstvym
       # suborom. Zlyhany zamok = revizia sa berie PRED kniznicou: neskorsi
       # nesulad tak vyrobi nanajvys FALOSNY konflikt (formular sa nacita

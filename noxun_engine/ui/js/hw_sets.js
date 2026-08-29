@@ -814,8 +814,9 @@
         // --- výber setu podľa parametra (selector mapovania) ---
         if (a === 'hws-sel-edit'){
           var ekey = t.getAttribute('data-hws-key');
-          HWS_SEL[ekey] = hwsSelectorFrom(hwsMappingValue(ekey)) ||
-                          { param: hwsDefaultParam(hwsGtOfKey(ekey)), rows: [{ min: '', max: '', set_id: '' }] };
+          HWS_SEL[ekey] = hwsPinRev(hwsSelectorFrom(hwsMappingValue(ekey)) ||
+                                    { param: hwsDefaultParam(hwsGtOfKey(ekey)), rows: [{ min: '', max: '', set_id: '' }] },
+                                    hwsCurrentRev());
           hwsRenderProj();
           return;
         }
@@ -843,8 +844,12 @@
           if (st){
             // Editor sa NEZATVÁRA tu — až echom HWSETS.mapSaved po ÚSPEŠNOM
             // zápise. Tvar aj prekryvy pásiem posudzuje VÝHRADNE server.
+            // R-08 (review #258 P1): posiela sa revízia PRIPNUTÁ pri otvorení
+            // editora, nie aktuálna — rozpísaný draft plný push ZÁMERNE
+            // prežíva, takže čerstvá revízia by guard urobila slepým presne
+            // v scenári, na ktorý je (vzor #227 P1 v Nastaveniach).
             hwsSendMap(t.getAttribute('data-hws-act'), t.getAttribute('data-hws-gt'),
-                       hwsBuildSelector(st), savKey);
+                       hwsBuildSelector(st), savKey, st.rev);
           }
           return;
         }
@@ -870,8 +875,9 @@
         if (t.value === HWS_PARAM_OPT){
           // „podľa parametra…" NIE JE hodnota — otvorí editor pásiem;
           // na server ide až Uložiť výber.
-          HWS_SEL[key] = HWS_SEL[key] || hwsSelectorFrom(hwsMappingValue(key)) ||
-                         { param: hwsDefaultParam(gt), rows: [{ min: '', max: '', set_id: '' }] };
+          HWS_SEL[key] = HWS_SEL[key] || hwsPinRev(hwsSelectorFrom(hwsMappingValue(key)) ||
+                         { param: hwsDefaultParam(gt), rows: [{ min: '', max: '', set_id: '' }] },
+                         hwsCurrentRev());
           hwsRenderProj();
           return;
         }
@@ -931,12 +937,33 @@
 
   // Odoslanie mapovania. value = set_id String ('' = bez setu) alebo selector
   // Hash; ui_key je len echo pre zatvorenie editora po ÚSPECHU.
-  function hwsSendMap(action, gt, value, key){
+  // R-08 (review #258 P1): draft editora pásiem si PRIPNE revíziu knižnice
+  // z chvíle, keď ho používateľ otvoril. Draft plný push ZÁMERNE prežíva
+  // (rozpísané hodnoty sa nesmú stratiť), takže keby sa pri Uložiť poslala
+  // ČERSTVÁ revízia, guard by prešiel nad stavom, ktorý používateľ nikdy
+  // nevidel — a cudzie mapovanie toho istého typu by ticho zmizlo.
+  // (Rovnaká lekcia ako #227 P1 v Nastaveniach.)
+  function hwsPinRev(state, rev){
+    if (state) state.rev = rev || '';
+    return state;
+  }
+
+  // Revízia do payloadu: PRIPNUTÁ z draftu vyhráva. Chýbajúci draft (priamy
+  // výber zo selectu) = aktuálna revízia — select prekreslí každý push
+  // SPOLU s ňou, takže je to presne stav, nad ktorým sa klikalo. Pripnutá
+  // PRÁZDNA hodnota sa NEDOPĹŇA čerstvou (bola by to tá istá slepota).
+  function hwsMapRev(pinned, current){
+    return (pinned === undefined || pinned === null) ? (current || '') : pinned;
+  }
+
+  function hwsCurrentRev(){ return (HWS_DATA && HWS_DATA.revision) || ''; }
+
+  function hwsSendMap(action, gt, value, key, pinnedRev){
     if (action === 'hws-map-global'){
       // R-08: globálna predvoľba nesie REVÍZIU knižnice (rovnako ako uloženie
       // a mazanie setu) — dve otvorené okná si ju inak ticho prepíšu.
       hwsSend('hws_map_global', { generic_type: gt, value: value, ui_key: key || '',
-                                  revision: (HWS_DATA && HWS_DATA.revision) || '' });
+                                  revision: hwsMapRev(pinnedRev, hwsCurrentRev()) });
     } else {
       hwsSend('hws_map_project', { generic_type: gt, value: value, ui_key: key || '',
                                    model_guid: (HWS_DATA && HWS_DATA.model_guid) || '' });
@@ -962,6 +989,8 @@
       hwsNum: hwsNum, hwsParamLabel: hwsParamLabel, hwsBandsSummary: hwsBandsSummary,
       hwsBuildBands: hwsBuildBands, hwsSelectorFrom: hwsSelectorFrom,
       hwsBuildSelector: hwsBuildSelector, hwsProjDraftKeys: hwsProjDraftKeys,
+      // R-08 (review #258 P1): pripnutie revízie do draftu editora pásiem
+      hwsPinRev: hwsPinRev, hwsMapRev: hwsMapRev,
       // ŠT-3a-3: `HWSETS` a helpery fokusu potrebuju DOM a exportuju sa
       // ZAMERNE — kontrakty „setData NEKRESLI" a „fokus prezije prekreslenie"
       // sa inak nedaju overit nicim nez klikanim (tests/js/test_st3a_hw.js).
