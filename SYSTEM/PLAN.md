@@ -130,7 +130,7 @@ mimo pohľadu. Podklady: koncepty [09](zdroje/next_sessions/09_GHOST_VKLADANIE.m
 
 **Predpoklady (PRED štartom, poradie z [AUDIT_REGISTER.md](AUDIT_REGISTER.md)):** dávky **R-01+R-04**
 (multi-model observer) → **R-02** (model_guid guard zapisovacích handlerov vrátane insertu) → **R-03**
-(šev `prepare_insert` + `build(..., transform:)` — NAJVÄČŠIA prípravná dávka, odhad L). Bez R-03 package neštartuje.
+(šev `prepare_insert` + `build(..., transform:)` — najväčšia prípravná dávka, odhad L). Bez R-03 package neštartuje.
 
 **Scope IN:** SketchUp `Tool` (ghost = čistá viewport grafika cez `draw(view)`, `InputPoint` inference,
 `getExtents` pre kreslenie mimo bounds) · PlacementSession viazaná na `model_guid` (prepnutie dokumentu = cancel,
