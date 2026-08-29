@@ -17,7 +17,17 @@ GitHub Codex review beží automaticky na každý PR. **Nálezy sú v REVIEW THR
      gh api graphql -f query='query { repository(owner:"michalmoronga-alt", name:"noxun-panel") { pullRequest(number:<N>) { reviewThreads(first:50) { nodes { isResolved path line comments(first:10) { nodes { databaseId author { login } body } } } } } } }'
      ```
 3. **Každý nález:** posúď závažnosť (P1/P2/P3), oprav vo vetve PR, commit + push. Over testy: headless `ruby tests/run_all.rb` vždy; `scripts/run_su_tests.ps1` pri zmenách builderov/observerov (výsledkový grep až PO dobehu — output sa dopisuje). Pri zmene css/js bumpni `?v=` cache-bust.
-   **Fix push review NEREŠTARTUJE** (zistenie K1, PR #185): Codex sa po pushi opráv sám neozve — nové kolo treba **VYŽIADAŤ**:
+   **Pravidlo delta-verifikácie (Michal 29.8.2026 — šetrenie Codex limitov; každé GH kolo číta celý PR nanovo):**
+   ak kolo vrátilo **LEN P2/P3 nálezy**, nové GH kolo sa NEvyžiada. Namiesto toho: fix push → reply s hashom
+   v threadoch → **interná verifikácia delty**: orchestrátor alebo slepý subagent overí VÝHRADNE fix commity
+   (`git diff <pred>..<po>`) — správnosť opravy, žiadne vedľajšie zmeny, testy pre opravu; pri cenových miestach
+   môže deltu overiť aj agy Opus 4.6 (oddelený pool). Po čistej delta-verifikácii je review brána uzavretá → merge.
+   **Nové PLNÉ GH kolo (`@codex review`) sa vyžiada LEN pri:** P1/P0 náleze · oprave, ktorá mení KONCEPT riešenia
+   (nie len riadok) · dávke audit-povinnej alebo výrobnej/cenovej (tam plná brána platí vždy). Precedens úspory:
+   PR #251 mal 3 plné kolá na docs opravy pár riadkov — pod týmto pravidlom by kolá 2–3 boli interné delty.
+
+   **Fix push review NEREŠTARTUJE** (zistenie K1, PR #185): Codex sa po pushi opráv sám neozve — ak podľa pravidla
+   vyššie nové kolo TREBA, treba ho **VYŽIADAŤ**:
    ```
    gh pr comment <N> --body "@codex review"
    ```
@@ -28,7 +38,7 @@ GitHub Codex review beží automaticky na každý PR. **Nálezy sú v REVIEW THR
    ```
    Ak nález vedome neopravuješ, odpovedz prečo.
 5. **Merge robí Claude (od RETRO 12.8.)** — až keď AKTUÁLNA hlava vetvy prešla oboma bránami:
-   - **Review kolo uzavreté pre aktuálny head:** po KAŽDOM fix pushi kolo **vyžiadaj** (`gh pr comment <N> --body "@codex review"`, krok 3) a až potom nastav budík ~10 min + skontroluj thready — nové kolo môže nájsť ďalšie nálezy a CI býva hotové skôr než Codex, takže „CI zelené po pushi opráv" NIKDY nestačí na merge. Kolo je uzavreté, keď head dostal 👍, alebo keď po budíku **z vyžiadaného kola** nepribudli žiadne nové thready a všetky existujúce majú reply (oprava s hashom / zdôvodnenie). **Brána „žiadne nové thready" platí LEN pre reálne vyžiadané kolo** — ticho po nevyžiadanom kole je ticho Codexu, nie súhlas.
+   - **Review kolo uzavreté pre aktuálny head:** buď (a) head dostal 👍 / po budíku **z vyžiadaného kola** nepribudli nové thready a všetky existujúce majú reply (oprava s hashom / zdôvodnenie), alebo (b) predchádzajúce kolo malo LEN P2/P3 a fix delta prešla **internou verifikáciou** (pravidlo delta-verifikácie, krok 3). CI býva hotové skôr než review, takže „CI zelené po pushi opráv" samo osebe NIKDY nestačí na merge. **Brána „žiadne nové thready" platí LEN pre reálne vyžiadané kolo** — ticho po nevyžiadanom kole je ticho Codexu, nie súhlas.
    - **CI zelené** na aktuálnom head commite (`gh pr checks <N>`).
    Merge s pripnutou odrevidovanou hlavou (ochrana pred pretekom s cudzím pushom): `sha=$(git rev-parse HEAD)` → `gh pr merge <N> --merge --match-head-commit "$sha"` (vetvu na GitHube maže repo automaticky). Potom **návrat na čerstvý main**: `git checkout main && git pull && git branch -d <vetva>` — ďalšia dávka štartuje výhradne odtiaľto. Over `git log origin/main --oneline -3`, že merge commit v maine naozaj je.
 6. **Záznam do denného reportu** (nahrádza niekdajšie hlásenie „môžeš mergovať"): čo PR mení z pohľadu používateľa · stav testov · výsledok Codex review (počet nálezov + ako vyriešené). Report sa Michalovi posiela súhrnne na konci bloku, zrozumiteľný z mobilu bez čítania diffu.
