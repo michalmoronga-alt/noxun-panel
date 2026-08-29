@@ -17,6 +17,46 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **P0-HF · FINÁLNE BRÁNY PRED ZÁPISOM CENOVÝCH A NÁKUPNÝCH EXPORTOV (29.8.2026, v0.8.14):** dva **P0** nálezy externého Codex auditu bloku 1c
+  (`SYSTEM/zdroje/AUDIT_2026-08_externy_codex.md`, P0-HF-01 a P0-HF-02) mali jeden spoločný koreň: **systém poznal chybný finálny výstup a napriek tomu ho uložil.** XLSX rozpočtu
+  aj cenovej ponuky sa zapísali na disk a AŽ POTOM sa vyhodnotilo, že riadky nemajú cenu, že „Nábytková zostava" vyšla záporná alebo že suma nesedí s rozpočtom; nákupný CSV
+  kovania rovnako vznikol aj vtedy, keď dve fyzické skrinky zdieľali `cabinet_id` a člen setu `per: 'owner'` (napr. TipOn) sa započítal len raz. Súbor, ktorý už existuje, sa dá
+  odoslať dodávateľovi aj zákazníkovi — červený status pod ním prišiel neskoro. Produkcia je od 20.8. naostro, preto P0 mimo registra 1c.
+
+  **ZMENA SPRÁVANIA — vedomé prevrátenie rozhodnutia dávky 1b-3.** Dávka 1b-3 (#240) zvolila „export dobehne + červený status" a `tests/pure/test_1b3_citanie.rb` to charakterizoval
+  ako kontrakt. Rozdiel je v predmete: 1b-3 riešila **nález KONTROLY**, čo je varovanie o modeli — tu ide o **číslo v hotovom platnom dokumente**. Semafor sa nemení, naďalej len
+  varuje a nikdy neblokuje (RED nezastaví ani VEPO); výnimka platí **výhradne pre finálny zápis súboru s cenou alebo objednávkou**. Charakterizačný test bol prepísaný na nové
+  správanie a nesie o tom poznámku.
+
+  **Brána má DVE VETVY a ich rozdiel je záväzný.** Prvý návrh dávky blokoval tvrdo aj chýbajúcu cenu; **Codex review PR #250 oponoval auditu a mal pravdu v kontrakte**:
+  STANDARD §11.3 hovorí, že neznáma cena sa NIKDY nenahradí nulou, ale má sa **priznať** — rozpracovaný rozpočet je legitímny stav zákazky a plošný tvrdý blok by používateľovi
+  bral výstup, na ktorý má právo. Preto: *(1) TVRDÉ dôvody* (`export_blockers`) — duplicitné ID **skrinky**, záporná „Nábytková zostava", nesúlad ponuky s rozpočtom — sa potvrdiť
+  **nedajú** (nedáva zmysel poslať objednávku, o ktorej vieme, že je podpočítaná). *(2) POTVRDITEĽNÝ dôvod* (`export_confirmations`) — riadky bez ceny — export **zastaví prvý raz**,
+  hláška vymenuje riadky a ponúkne cestu von; druhý klik pošle `confirm_unpriced` a hotový súbor podhodnotenie **prizná v statuse** (červenom). Potvrdenie overuje **server**,
+  takže starý DOM ani cudzí volajúci nemajú ako podhodnotený súbor vyrobiť ticho. **Firewall interných pojmov sa nedotkla** (STANDARD §11.3: hlási a neblokuje).
+
+  **Kolo 1 review (#252 P1) opravilo dieru v tom potvrdení:** `confirm_unpriced` bol holý boolean, hoci export medzi prvým a druhým klikom **flushne rozpísaný edit Inspectora
+  a rozpočet prepočíta z čerstvého modelu** — neviazané „áno" tak vedelo autorizovať **iný, možno horšie podhodnotený dokument**, a rozdiel by sa priznal až v statuse pod hotovým
+  súborom. Odvtedy je potvrdenie **počet**, ktorý používateľ naozaj videl, a server prijme len presnú zhodu so svojím čerstvým číslom. Opačný nesúlad (cachovaný payload tvrdí
+  „0 bez ceny", čerstvý rozpočet ich má) by zas export **zasekol navždy**, lebo klient by potvrdenie nikdy neozbrojil — preto zastavenie potvrdzovacej vetvy **okno obnoví**
+  (`stop_for_confirmation` → `repush`), obnova potvrdenie odzbrojí a ďalší klik varuje už správnym číslom. Čistý export si obnovu nepýta.
+
+  **VEPO bránu nedostáva** — audit ho výslovne vyníma: je to rezací výstup, nie cena ani objednávka, duplicitná identita jeho čísla neskresľuje a chybné riadky vyhadzuje sám do
+  LOGu. Blokovať ho bez samostatného dôkazu by len zastavilo výrobu.
+
+  **Zastaviť smie len SKUTOČNÁ kolízia.** Objednávku podpočíta výhradne dedup člena `per: 'owner'`, takže blokovať sa smie len duplicitné ID **skrinky, ktorej sety taký člen
+  naozaj pridelili**. Doska kovanie nemá a skrinka so samými `per: 'unit'` členmi (klasický záves) sa spočíta správne aj pri zdieľanom ID — obe idú len do neblokujúceho varovania
+  („kusovník ich zlieva do jedného vlastníka"), nikdy s vetou o kovaní. Do 29.8. `dup_id_suffix` aj `cp_warnings` `kind` zahadzovali a vetu o kovaní tvrdili aj nad doskou (seedy
+  **A7** a **C6** sweepu — oba touto dávkou vyriešené, rovnako ako **A3**). *Prvé kolo blokovalo každú duplicitnú skrinku a **review #252 P2** na to upozornilo: dôsledok je podľa
+  vlastnej dokumentácie PODMIENENÝ. Odvtedy podklad nesie expanzia sama (`add_row` značí zdroj príznakom `per_owner`) a `dup_partition` z nej rozdelí duplicity na blokujúce
+  a varovacie; **neznáma expanzia blokuje** — kolíziu nemožno ani dokázať, ani vyvrátiť, a pri objednávke je bezpečnejšie zastaviť.*
+
+  **Testovanie:** nová sada `tests/pure/test_p0hf_brany.rb` meria pri každom dôvode **prázdny priečinok** (nie text statusu) a zároveň to, že sa `savepanel` ani neotvoril; nová JS
+  sada `tests/js/test_p0hf_potvrdenie.js` stráži dvojkrokový klik, viazanie potvrdenia na počet a zrušenie potvrdenia pri čerstvom payloade. Mutačné overenie: vypnutie brány pre
+  CSV · pre ponuku · potvrdzovacia vetva, ktorá nikdy nezastaví · predikát nerozlišujúci dosku · neviazané potvrdenie · chýbajúci repush · brána blokujúca každú duplicitnú skrinku ·
+  expanzia bez `per_owner` — každá zhodila práve svoje testy. **2031 headless · 72 JS sád.** In-SketchUp beh netreba (žiadne buildery ani observery). PR **#252**, dve kolá review
+  (1× P1, 1× P2).
+
 - **F/D-27 · TAGY MODELU SA PREPÍNAJÚ Z PANELA (28.8.2026, v0.8.13):** odrážka **F** bloku 1b, postreh **D-27** (Michal 19.7.). V raile Inspectora pribudla **ikona oka**, ktorá
   otvorí zoznam NOXUN tagov modelu (Korpus · Chrbát · Čelá · Vnútro · Kovanie · Dosky · Zóny) a jedným klikom ich zobrazí alebo skryje — bez chodenia do natívneho okna Tags.
 

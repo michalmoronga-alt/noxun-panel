@@ -688,6 +688,10 @@
       // Zhadzuje ho VYHRADNE tento push: echa nizsie (lista VEPO, prepinace,
       // vysledok zapisu rozpoctu) cisla NENESU.
       staleFlag = false;
+      // P0-HF: ozbrojené potvrdenie „exportuj aj tak" platí pre ČÍSLA, ktoré
+      // používateľ videl — čerstvý payload ho preto ruší. Inak by potvrdenie
+      // z minulého stavu ticho pustilo export nad inými sumami.
+      if (typeof budDisarm === 'function') budDisarm();
       // Š10: stav prepínačov chodí v KAŽDOM pushi (a medzitým aj samostatným
       // echom nižšie) — klient si ho nikdy neodvodzuje.
       EDGE = (ST && ST.edge_check) ? ST.edge_check : null;

@@ -71,6 +71,12 @@ module Noxun
       # PRIZNA a opravu spusti az realna akcia zapisu (observer / zapis z panela).
       CAT_DUP_ID      = 'duplicate_identity'
 
+      # Druh top-level kusu, ktory MA KOVANIE. Zdielana konstanta preto, ze
+      # „skrinka vs. doska" nie je kozmetika textu: len pri skrinke zliatie
+      # vlastnikov podpocita kovanie uctovane na vlastnika (`per: 'owner'`),
+      # a prave to je od P0-HF-02 dovod ZASTAVIT nakupny/cenovy export.
+      KIND_CABINET    = 'cabinet'
+
       # Tolerancie zhody umiestnenia. Artefakt nasobenia lezi PRESNE na tom istom
       # mieste (rovnaka transformacia), preto su prahy tesne — cielom je NULA
       # falosnych poplachov, nie odhalenie „skoro rovnakych" polôh.
@@ -481,6 +487,31 @@ module Noxun
               .map { |(kind, id), n| [kind, id, n] }
       end
 
+      # --- P0-HF-02: ktore duplicity ZLIEVAJU VLASTNIKOV KOVANIA ------------
+      #
+      # Podmnozina `duplicate_identities`, ktora sa tyka VYHRADNE SKRINIEK.
+      # Expanzia setov deduplikuje clena `per: 'owner'` klucom z `owner_id`
+      # (`HardwareSets.expand_members`), takze dve fyzicke skrinky so spolocnym
+      # ID dostanu napr. TipOn LEN RAZ — nakupny zoznam, rozpocet aj cenova
+      # ponuka by niesli ZNAMY PODPOCET. Doska taky dosledok nema (kovanie
+      # nemá), preto do tejto mnoziny NEPATRI a export neblokuje.
+      #
+      # VEREJNE a je to JEDINY zdroj kriteria „blokuje zapis suboru" — cita ho
+      # brana exportov `ProductionCore.export_blockers`. Rovnaka podmienka
+      # rozhoduje aj o zneni nalezu v Kontrole (`duplicate_id_item`), takze
+      # sa hlaska a brana nemozu rozist.
+      def duplicate_owner_ids(identities)
+        duplicate_identities(identities).select { |kind, _id, _n| kind == KIND_CABINET }
+      end
+
+      # Doplnok predchadzajucej: duplicity BEZ dosledku na kovanie (dosky).
+      # Export ich neblokuje, ale kusovnik ich zlieva do jedneho vlastnika,
+      # takze sa musia PRIZNAT — a nikdy nie textom o kovani (hlaska, ktora raz
+      # klamala, sa prestane citat).
+      def duplicate_plain_ids(identities)
+        duplicate_identities(identities).reject { |kind, _id, _n| kind == KIND_CABINET }
+      end
+
       # Adresa klik-selectu je TA ISTA ako pri D-103 (`dup_kind` + `dup_owner_ids`),
       # takze `pids_for_duplicate` sa znovupouziva bez jedineho riadku navyse —
       # klik oznaci VSETKY kusy, ktore si ID delia.
@@ -490,7 +521,7 @@ module Noxun
       # by pri sete bez takeho clena klamalo — a hlaska, ktora raz klamala, sa
       # prestane citat.
       def duplicate_id_item(kind, id, count)
-        cab = kind == 'cabinet'
+        cab = kind == KIND_CABINET
         noun = cab ? 'Skrinky' : 'Dosky'
         follow = if cab
                    'Kusovník ich zlieva do jedného vlastníka a kovanie účtované na vlastníka ' \

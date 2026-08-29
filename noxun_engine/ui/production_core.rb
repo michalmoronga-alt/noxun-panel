@@ -764,10 +764,16 @@ module Noxun
 
       # 1b-3 (review P2-1): VAROVANIE O DUPLICITNEJ IDENTITE do statusu exportov,
       # ktore `Validation.run` NEVOLAJU — nakupny zoznam kovania a XLSX rozpoctu.
-      # Prave ich cisla su duplicitou skreslene (zaznamy oboch kusov maju rovnaky
-      # `owner_id`, takze clen setu uctovany na vlastnika sa zapocita raz), takze
-      # pouzivatel by inak odoslal objednavku BEZ SLOVA — nalez by svietil len
-      # v Kontrole, kam sa pri exporte nepozera.
+      # Nalez v Kontrole nestaci: kto klikne „Nákupný zoznam kovania", sa do
+      # Kontroly nepozera — a prave to CSV ide dodavatelovi.
+      #
+      # P0-HF-02 ZUZILA TENTO SUFIX NA DOSKY. Duplicitna SKRINKA uz sem nedojde:
+      # zliava vlastnikov kovania, takze cislo vystupu je preukazatelne zle a
+      # `export_blockers` zapis suboru ZASTAVI (varovanie pod hotovym CSV bolo
+      # neskoro). Ostava duplicitna DOSKA — kovanie nema, cize podpocet objednavky
+      # nehrozi, ale kusovnik ju s dvojnickou zlieva do jedneho vlastnika, a to sa
+      # priznat musi. Text preto o kovani MLCI (vzor `duplicate_id_item`: hlaska,
+      # ktora raz klamala, sa prestane citat).
       #
       # KDE SUFIX NIE JE a preco:
       #   * VEPO export — `Validation.run` vola, takze nalez uz ide do
@@ -779,15 +785,197 @@ module Noxun
       #
       # Strop na tri ID + „a ďalšie N" (vzor hlasky validacie pravidiel): stavovy
       # riadok nie je odsek.
-      def dup_id_suffix(collected)
-        dups = Validation.duplicate_identities(Array(collected.is_a?(Hash) ? collected[:identities] : nil))
-        return '' if dups.empty?
+      def dup_id_suffix(dups)
+        return '' if Array(dups).empty?
 
+        " · POZOR: v modeli sú kusy so spoločným ID (#{dup_ids_text(dups)}) — kusovník ich " \
+          'zlieva do jedného vlastníka; pozri Kontrolu.'
+      end
+
+      # --- review #252 P2: BLOKUJE LEN SKUTOCNA KOLIZIA -----------------------
+      #
+      # Duplicitne ID skrinky podpocita objednavku IBA vtedy, ked ma jej set
+      # clena `per: 'owner'` — ten sa deduplikuje klucom z `owner_id`
+      # (`HardwareSets.expand_members`), takze dve fyzicke skrinky dostanu napr.
+      # TipOn raz. Skrinka, ktorej sety maju len cleny `per: 'unit'` (napr.
+      # klasicky zaves), sa spocita SPRAVNE aj pri zdielanom ID — zastavit jej
+      # export by znamenalo brat pouzivatelovi platny vystup bez dovodu.
+      # Dosledok je teda PODMIENENY presne tak, ako ho popisuje odsek
+      # `validation.rb` v docs/architecture/outputs.md.
+      #
+      # -> [blokujuce, varovacie] — obe v tvare `Validation.duplicate_identities`.
+      # Do varovacich patri VSETKO ostatne (dosky aj skrinky bez owner clena):
+      # kusovnik ich zlieva do jedneho vlastnika, takze sa musia priznat, ale
+      # zapis suboru nezastavia a NIKDY nedostanu vetu o kovani.
+      #
+      # NEZNAMA EXPANZIA = BLOKUJE. Ked sa expanzia nedala zostavit, kolizia sa
+      # nedokaze ani vyvratit — pri objednavke je bezpecnejsie zastavit.
+      def dup_partition(collected, expansion)
+        ident = identities_of(collected)
+        cabs = Validation.duplicate_owner_ids(ident)
+        others = Validation.duplicate_plain_ids(ident)
+        return [[], others] if cabs.empty?
+
+        merged = owner_scoped_cabinet_ids(expansion)
+        blocking, harmless = cabs.partition { |_kind, id, _n| merged.nil? || merged[id] }
+        [blocking, (harmless + others).sort_by { |kind, id, _n| [kind, id] }]
+      end
+
+      # ID skriniek, ktorym expanzia pridelila aspon jedneho clena uctovaneho
+      # na vlastnika. `nil` = expanziu nemame (chyba katalogu/setov).
+      def owner_scoped_cabinet_ids(expansion)
+        return nil unless expansion.is_a?(Hash)
+
+        out = {}
+        Array(expansion['rows']).each do |row|
+          next unless row.is_a?(Hash)
+
+          Array(row['sources']).each do |src|
+            out[src['cabinet_id'].to_s] = true if src.is_a?(Hash) && src['per_owner']
+          end
+        end
+        out
+      end
+
+      # Jedno citanie `identities` zo zberu pre vsetkych, co kriterium duplicit
+      # potrebuju (sufix, zoznam dovodov CP aj brana exportov).
+      def identities_of(collected)
+        Array(collected.is_a?(Hash) ? collected[:identities] : nil)
+      end
+
+      # Strop na tri ID + „a ďalšie N" — jedno znenie pre sufix, zoznam dovodov
+      # aj branu, aby sa tri texty o tej istej veci nemohli rozist.
+      def dup_ids_text(dups)
         ids = dups.map { |_kind, id, _n| id }
-        shown = ids.first(3).join(', ')
         more = ids.length > 3 ? " a ďalšie #{ids.length - 3}" : ''
-        " · POZOR: v modeli sú kusy so spoločným ID (#{shown}#{more}) — kovanie účtované na " \
-          'vlastníka (napr. TipOn) sa započíta len raz; pozri Kontrolu.'
+        "#{ids.first(3).join(', ')}#{more}"
+      end
+
+      # --- P0-HF (externy audit 29.8.2026): FINALNA BRANA PRED ZAPISOM ------
+      #
+      # CO BOLO ZLE: system poznal chybny finalny vystup a NAPRIEK TOMU HO ULOZIL.
+      # Rozpocet aj cenova ponuka sa zapisali na disk a az POTOM sa vyhodnotilo,
+      # ze riadky nemaju cenu, ze „Nábytková zostava" vysla zaporna alebo ze suma
+      # nesedi s rozpoctom; nakupny CSV rovnako vzniknul aj nad zliatymi
+      # vlastnikmi kovania. Vysledkom bol normalne otvoritelny dokument so ZNAMOU
+      # chybou a cerveny status AZ POD NIM — a subor, ktory uz existuje, sa da
+      # odoslat dodavatelovi aj zakaznikovi.
+      #
+      # CO PLATI TERAZ: brana ma DVE VETVY a rozdiel medzi nimi je zavazny.
+      #
+      #  (1) TVRDE DOVODY (`export_blockers`) — stavy, ktore su VZDY chyba
+      #      a nedaju sa potvrdit: zaporna „Nábytková zostava", nesulad ponuky
+      #      s rozpoctom a duplicitne ID SKRINIEK (zliate vlastnictvo kovania).
+      #      Ziadny „exportuj aj tak" pre ne neexistuje — nedava zmysel poslat
+      #      dodavatelovi objednavku, o ktorej vieme, ze je podpocitana.
+      #
+      #  (2) POTVRDITELNY DOVOD (`export_confirmations`) — riadky BEZ CENY.
+      #      STANDARD §11.3 hovori, ze neznama cena sa NIKDY nenahradi nulou,
+      #      ale ma sa PRIZNAT: „medzisucet je len zo znamych cien a suhrn
+      #      nahlas povie, ze nie je uplny". Rozpracovany rozpocet je legitimny
+      #      stav zakazky, takze plosny tvrdy blok by bral pouzivatelovi vystup,
+      #      na ktory ma pravo (nalez Codex review PR #250 proti auditu — a ma
+      #      pravdu v kontrakte). Preto: default je ZASTAVENE, ale cesta von
+      #      existuje — druhy klik s `confirm_unpriced` export pusti a status
+      #      hotoveho suboru podhodnotenie PRIZNA.
+      #
+      # Je to VEDOME PREVRATENIE rozhodnutia davky 1b-3 („export dobehne
+      # + cerveny status") — to platilo pre nalez KONTROLY, ktory je varovanie
+      # o modeli. Tu ide o nieco ine: o cislo v hotovom PLATNOM dokumente.
+      # Semafor v tomto repe stale VARUJE a NIKDY neblokuje (RED neblokuje VEPO
+      # ani nic ine) — vynimka plati VYHRADNE pre finalny zapis suboru s cenou
+      # alebo objednavkou.
+      #
+      # PRECO VEPO BRANU NEDOSTAVA: je to rezaci vystup, nie cena ani objednavka;
+      # jeho cisla duplicitna identita neskresluje a chybne riadky uz vyhadzuje
+      # sam (a hovori to v LOGu). Blokovat ho bez samostatneho dokazu by len
+      # zastavilo vyrobu (audit to hovori vyslovne).
+      #
+      # Volajuci posiela LEN to, co sa jeho vystupu tyka:
+      #   `dups:` — BLOKUJUCA polovica `dup_partition` (nakupny CSV, rozpocet
+      #             aj ponuka); varovacia polovica sem NEPATRI,
+      #   `cp:`   — LEN ponuka (zaporna zostava, nesulad s rozpoctom).
+      # -> [dovod, ...]; prazdne pole = zapis smie prebehnut.
+      def export_blockers(dups: [], cp: nil)
+        out = []
+        unless Array(dups).empty?
+          out << "v modeli sú skrinky so spoločným ID (#{dup_ids_text(dups)}) — kovanie účtované " \
+                 'na vlastníka (napr. TipOn) by sa započítalo len raz; oprav ich v sekcii Kontrola'
+        end
+        c = cp.is_a?(Hash) ? cp : {}
+        if c['assembly_negative']
+          out << "„Nábytková zostava“ vyšla záporná (#{fmt_eur(c['assembly'])}) — samostatné riadky " \
+                 'prevyšujú rozpočet; uprav zaradenie riadkov v sekcii Cenová ponuka'
+        end
+        if c['consistent'] == false
+          out << "cenová ponuka nesedí s rozpočtom o #{fmt_eur(c['diff'])} — " \
+                 'skontroluj prepísané sumy a násobky v sekcii Rozpočet'
+        end
+        out
+      end
+
+      # Kolko riadkov suctu nema cenu — z CERSTVEHO rozpoctu, nie z DOM.
+      def unpriced_count(budget)
+        totals = budget.is_a?(Hash) && budget['totals'].is_a?(Hash) ? budget['totals'] : {}
+        totals['unknown_count_in_total'].to_i
+      end
+
+      # POTVRDITELNA vetva brany (STANDARD §11.3). Vracia dovody, ktore export
+      # ZASTAVIA len PRVYKRAT — druhy klik ich s `confirm_unpriced` prejde.
+      # Dnes je tam jediny: riadky rozpoctu bez ceny.
+      def export_confirmations(budget: nil)
+        miss = unpriced_count(budget)
+        return [] unless miss.positive?
+
+        ["#{miss} riadkov rozpočtu nemá cenu — suma je PODHODNOTENÁ (položky v dokumente sú, v cene nie)"]
+      end
+
+      # Klient nie je ochrana: `confirm_unpriced` sa ZO SERVERA overuje pri
+      # KAZDOM exporte. Stary DOM ani cudzi volajuci tak nemaju ako podhodnoteny
+      # subor vyrobit ticho — bez vyslovneho potvrdenia sa nezapise.
+      #
+      # POTVRDENIE JE VIAZANE NA POCET, KTORY POUZIVATEL NAOZAJ VIDEL (review
+      # #252 P1), nie na holy `true`. Export totiz medzi prvym a druhym klikom
+      # FLUSHNE rozpisany edit Inspectora a rozpocet PREPOCITA z cerstveho
+      # modelu: neviazany boolean by tak potvrdil INY, klidne HORSIE
+      # podhodnoteny dokument — a rozdiel by sa priznal az v statuse POD hotovym
+      # suborom, teda presne to, co P0-HF rusi. Cislo sa musi zhodovat presne;
+      # `true`, retazec ani nula potvrdenim nie su.
+      def export_confirmed?(data, count)
+        return false unless data.is_a?(Hash) && count.to_i.positive?
+
+        v = data['confirm_unpriced']
+        v.is_a?(Numeric) && v.to_i == count.to_i
+      end
+
+      # Hlaska TVRDEJ brany. MUSI povedat OBOJE: ze subor NEVZNIKOL (inak ho
+      # pouzivatel ide hladat na disk) a PRECO + KDE to opravit.
+      def export_blocked_status(blockers)
+        "Export sa NEVYKONAL — súbor sa nevytvoril. Dôvody: #{Array(blockers).join(' · ')}."
+      end
+
+      # Hlaska POTVRDITELNEJ brany — musi ponuknut aj cestu von, inak by
+      # vyzerala ako tvrdy blok a pouzivatel by rozpracovany rozpocet nedostal.
+      def export_confirm_status(reasons)
+        "Export sa zastavil — súbor sa zatiaľ nevytvoril. #{Array(reasons).join(' · ')}. " \
+          'Doplň ceny v sekcii Rozpočet — alebo klikni na export ešte raz a potvrď, že chceš exportovať aj tak.'
+      end
+
+      # Zastavenie potvrditelnej vetvy MUSI okno OBNOVIT (review #252 P1).
+      # Sem sa dostaneme len vtedy, ked klient poslal INE cislo, nez ma cerstvy
+      # rozpocet — teda ked mal zastarane data. Bez obnovy by okno v kraselnom
+      # pripade („DOM tvrdi 0 bez ceny, cerstvy rozpocet ich ma") potvrdenie
+      # NIKDY neozbrojilo a export by sa zasekol navzdy.
+      def stop_for_confirmation(reasons, status:, repush:)
+        repush.call
+        status.call(export_confirm_status(reasons), true)
+      end
+
+      # Po POTVRDENOM exporte to hotovy subor musi PRIZNAT (STANDARD §11.3:
+      # suhrn nahlas povie, ze nie je uplny) — tiche zelene „uložené" nad
+      # podhodnotenou sumou je presne to, co P0-HF rusi.
+      def export_confirmed_notes(reasons)
+        Array(reasons).map { |r| "#{r} — export si potvrdil" }
       end
 
       # Suhrn KONTROLY do statusu okna/exportu (nalez 6: RED neblokuje export).
@@ -1140,6 +1328,13 @@ module Noxun
           return status.call('Model nemá žiadne kovanie — niet čo exportovať.', true)
         end
 
+        # P0-HF-02: FINALNA BRANA PRED VYBEROM SUBORU. Zliati vlastnici =
+        # podpocitane kovanie; toto CSV ide dodavatelovi, takze nesmie vzniknut.
+        # Blokuje LEN skutocna kolizia (review #252 P2) — rozhoduje expanzia.
+        blocking_dups, warn_dups = dup_partition(collected, exp)
+        blockers = export_blockers(dups: blocking_dups)
+        return status.call(export_blocked_status(blockers), true) unless blockers.empty?
+
         # audit #1: nazov projektu je SERVEROVA autorita (jeden nazov pre
         # VSETKY styri exporty) — z DOM uz nechodi.
         project = project_name(model)
@@ -1153,7 +1348,7 @@ module Noxun
         save_vepo_settings('last_dir' => File.dirname(target))
         n = Array(exp['rows']).length
         un = Array(exp['unmapped']).length
-        dup = dup_id_suffix(collected)
+        dup = dup_id_suffix(warn_dups)
         status.call("Nákupný zoznam: #{n} položiek" \
                     "#{un.positive? ? " + #{un} nemapovaných (v CSV aj KONTROLE)" : ''} → #{target}#{dup}",
                     un.positive? || !dup.empty?)
@@ -1604,8 +1799,24 @@ module Noxun
         refresh_vepo_settings # 1b-6c: nazov zakazky z CERSTVEHO suboru
         collected = fresh_collect(model)
         bom = Bom.compute(collected)
-        budget = budget_payload(model, bom, collected)
+        # Expanzia sa pocita RAZ a odovzda sa rozpoctu (inak by ju zostavil
+        # sam) — brana z nej cita, ci duplicitne ID naozaj zlieva vlastnikov.
+        hw_exp = hardware_expansion(model, collected)
+        budget = budget_payload(model, bom, collected, nil, hw_exp)
         return status.call('Rozpočet sa nepodarilo zostaviť (pozri Ruby konzolu).', true) if budget.nil?
+
+        # P0-HF-01/02: FINALNA CENOVA BRANA PRED VYBEROM SUBORU — dve vetvy.
+        # TVRDA (zliati vlastnici kovania) zapis nepusti nikdy; POTVRDITELNA
+        # (riadky bez ceny) ho zastavi prvykrat a druhy klik ju s potvrdenim
+        # prejde. Varovanie pod hotovym harkom bolo v oboch pripadoch neskoro.
+        blocking_dups, warn_dups = dup_partition(collected, hw_exp)
+        blockers = export_blockers(dups: blocking_dups)
+        return status.call(export_blocked_status(blockers), true) unless blockers.empty?
+
+        unpriced = export_confirmations(budget: budget)
+        unless unpriced.empty? || export_confirmed?(data, unpriced_count(budget))
+          return stop_for_confirmation(unpriced, status: status, repush: repush)
+        end
 
         project = project_name(model) # audit #1: server je autorita nazvu
         now = Time.now
@@ -1619,11 +1830,13 @@ module Noxun
         XlsxWriter.write(target, BudgetXlsx.sheet(budget, project: project, now: now), now: now)
         save_vepo_settings('last_dir' => File.dirname(target))
         totals = budget['totals'] || {}
-        miss = totals['unknown_count_in_total'].to_i
-        dup = dup_id_suffix(collected)
-        status.call("Rozpočet uložený: #{fmt_eur(totals['total'])} → #{target}" \
-                    "#{miss.positive? ? " · #{miss} riadkov bez ceny sa nezapočítalo" : ''}#{dup}",
-                    miss.positive? || !dup.empty?)
+        # P0-HF-01: ked pouzivatel podhodnotenie POTVRDIL, hotovy subor to musi
+        # priznat (STANDARD §11.3) — a status ostava cerveny.
+        note = export_confirmed_notes(unpriced)
+        warn = note.empty? ? '' : " · POZOR: #{note.join(' · ')}"
+        dup = dup_id_suffix(warn_dups)
+        status.call("Rozpočet uložený: #{fmt_eur(totals['total'])} → #{target}#{warn}#{dup}",
+                    !warn.empty? || !dup.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_budget_xlsx')
         status.call("Export rozpočtu zlyhal: #{e.message}", true)
@@ -1659,6 +1872,23 @@ module Noxun
         spec = CpExport.specification(collected[:records], sheets: smap,
                                                            hardware_expansion: hw_exp, budget: budget)
 
+        # P0-HF-01/02: FINALNA CENOVA BRANA PRED VYBEROM SUBORU — dve vetvy.
+        # TVRDA: zaporna „Nábytková zostava", nesulad s rozpoctom a zliati
+        # vlastnici kovania su VZDY chyba, taky dokument zakaznikovi nejde.
+        # POTVRDITELNA: riadky bez ceny (rozpracovany rozpocet je legitimny,
+        # STANDARD §11.3) — prvy klik zastavi, druhy s potvrdenim prejde.
+        # FIREWALL interných pojmov branou NIE JE (STANDARD §11.3: hlasi
+        # a neblokuje) — vyhodnocuje sa az nad hotovym harkom a ide do
+        # `cp_warnings`.
+        blocking_dups, warn_dups = dup_partition(collected, hw_exp)
+        blockers = export_blockers(dups: blocking_dups, cp: cp)
+        return status.call(export_blocked_status(blockers), true) unless blockers.empty?
+
+        unpriced = export_confirmations(budget: budget)
+        unless unpriced.empty? || export_confirmed?(data, unpriced_count(budget))
+          return stop_for_confirmation(unpriced, status: status, repush: repush)
+        end
+
         project = project_name(model) # audit #1: server je autorita nazvu
         now = Time.now
         target = UI.savepanel('Uložiť cenovú ponuku (XLSX)', vepo_settings['last_dir'],
@@ -1670,7 +1900,7 @@ module Noxun
         hits = CpExport.firewall_hits(CpXlsx.text_cells(sheets))
         XlsxWriter.write_book(target, sheets, now: now)
         save_vepo_settings('last_dir' => File.dirname(target))
-        warnings = cp_warnings(cp, budget, hits, collected)
+        warnings = cp_warnings(hits, warn_dups, unpriced)
         status.call(cp_status(cp, spec, target, warnings), !warnings.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_cp_xlsx')
@@ -1679,33 +1909,29 @@ module Noxun
 
       # GH #139 P1/P2: JEDEN zoznam dovodov, preco zakaznicky dokument NIE JE
       # v poriadku — rozhoduje aj o farbe statusu, aby sa zelene „uložené"
-      # nikdy neobjavilo nad podhodnotenou alebo zápornou sumou.
-      # 1b-3 (review P2-1): `collected` je nepovinne — duplicitna identita je
-      # dalsi dovod, preco cena ponuky nemusi sediet (kovanie uctovane na
-      # vlastnika sa zapocita raz), takze patri do TOHO ISTEHO zoznamu, nie do
-      # zvlastneho sufixu: rozhoduje aj o farbe statusu.
-      def cp_warnings(cp, budget, hits, collected = nil)
-        c = cp.is_a?(Hash) ? cp : {}
-        totals = budget.is_a?(Hash) && budget['totals'].is_a?(Hash) ? budget['totals'] : {}
-        out = []
-        dups = Validation.duplicate_identities(Array(collected.is_a?(Hash) ? collected[:identities] : nil))
-        unless dups.empty?
-          ids = dups.map { |_kind, id, _n| id }
-          shown = ids.first(3).join(', ')
-          more = ids.length > 3 ? " a ďalšie #{ids.length - 3}" : ''
-          out << "v modeli sú kusy so spoločným ID (#{shown}#{more}) — kovanie účtované na " \
-                 'vlastníka (napr. TipOn) sa započíta len raz; pozri Kontrolu'
+      # nikdy neobjavilo nad dokumentom s vyhradou.
+      #
+      # P0-HF-01/02 z neho VYBRALA TVRDE DOVODY. Zaporna „Nábytková zostava"
+      # a nesulad s rozpoctom uz zapis ZASTAVIA — su v `export_blockers` a sem
+      # sa preto uz nikdy nedostanu (jeden dovod zije v JEDNOM zozname; dva
+      # zoznamy o tej istej veci by sa casom rozisli). Ostavaju tri dovody,
+      # ktore hotovy subor pripustaju:
+      #   * POTVRDENE riadky bez ceny (`confirmed`) — pouzivatel vedome pustil
+      #     export rozpracovaneho rozpoctu, takze suhrn to musi PRIZNAT
+      #     (STANDARD §11.3), nie zamlcat,
+      #   * INTERNE POJMY z firewallu — STANDARD §11.3 to ma vyslovne ako
+      #     „hlasi a neblokuje" (rucne napisany text sa da opravit a exportovat
+      #     znova, cena tym nie je zla),
+      #   * NEBLOKUJUCA duplicita — doska (kovanie nema) alebo skrinka, ktorej
+      #     sety nemaju clena uctovaneho na vlastnika (review #252 P2): cena
+      #     ponuky sedi, ale kusovnik ich s dvojnickou zlieva, takze sa to
+      #     prizna — nikdy textom o kovani.
+      def cp_warnings(hits, dups = [], confirmed = [])
+        out = export_confirmed_notes(confirmed)
+        unless Array(dups).empty?
+          out << "v modeli sú kusy so spoločným ID (#{dup_ids_text(dups)}) — kusovník ich " \
+                 'zlieva do jedného vlastníka; pozri Kontrolu'
         end
-        miss = totals['unknown_count_in_total'].to_i
-        if miss.positive?
-          out << "#{miss} riadkov rozpočtu nemá cenu — suma ponuky je PODHODNOTENÁ " \
-                 '(položky v špecifikácii sú, v cene nie)'
-        end
-        if c['assembly_negative']
-          out << "„Nábytková zostava“ vyšla záporná (#{fmt_eur(c['assembly'])}) — " \
-                 'samostatné riadky prevyšujú rozpočet'
-        end
-        out << "CP nesedí s rozpočtom o #{fmt_eur(c['diff'])}" if c['consistent'] == false
         unless Array(hits).empty?
           terms = hits.map { |h| h['term'] }.uniq.first(5).join(', ')
           out << "v dokumente ostali interné pojmy (#{terms}) — oprav názvy a exportuj znova"

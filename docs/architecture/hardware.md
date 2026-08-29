@@ -152,3 +152,9 @@ _(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
 
 Sety kovania + projektový snapshot predvolieb na modeli; zmienky sú v odsekoch `hardware_rules.rb` a `hardware_catalog.rb` a v [ui-lifecycle.md](ui-lifecycle.md) (sekcia `hw`
 Štúdia).
+
+**Člen účtovaný na vlastníka a jeho stopa v riadku (P0-HF, review #252 P2).** `expand_members` počíta člena `per: 'unit'` ako `quantity × qty`, ale člena **`per: 'owner'`** len
+**raz na `[owner_id, owner_part_key, set_id, code]`** (audit B3: druhé pravidlo s tým istým vlastníkom TipOn nezdvojí). Práve tento dedup je **jediný mechanizmus, ktorým dve
+fyzické skrinky so zdieľaným `cabinet_id` dostanú položku raz namiesto dvakrát** — a teda jediný dôvod, prečo duplicitná identita smie zastaviť nákupný/cenový export. Aby to brána
+vedela rozhodnúť namiesto hádania, `add_row` značí zdroj riadku príznakom **`per_owner`**: kľúč je **aditívny**, zapisuje sa **len keď je pravdivý**, a má presne jedného čitateľa —
+`ProductionCore.dup_partition` ([outputs.md](outputs.md)). Bez neho by sa blokoval aj export zákazky, ktorá má samé `per: 'unit'` členy a spočíta sa správne aj so zdieľaným ID.

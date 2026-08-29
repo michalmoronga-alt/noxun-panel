@@ -1062,10 +1062,11 @@
   function budCpExport(){
     var st = budData();
     if (!st || !window.sketchup || !sketchup.cp_xlsx) return;
+    if (budNeedsConfirm('cp', st)) return; // P0-HF: riadky bez ceny = dvojkrokový export
     NX.setStatus('Pripravujem cenovú ponuku…', false);
     // ST-1a (audit #1): nazov projektu je SERVEROVY udaj — z DOM sa uz
     // neposiela (input zije v liste Kusovnika v okne Studio).
-    sketchup.cp_xlsx(JSON.stringify({ gen: st.gen }));
+    sketchup.cp_xlsx(JSON.stringify({ gen: st.gen, confirm_unpriced: budArmed('cp') }));
   }
 
   // --- E-c: PREPOČÍTAŤ CENY ------------------------------------------------
@@ -1496,9 +1497,69 @@
   function budXlsx(){
     var st = budData();
     if (!st || !window.sketchup || !sketchup.budget_xlsx) return;
+    if (budNeedsConfirm('xlsx', st)) return;
     NX.setStatus('Pripravujem XLSX rozpočet…', false);
     // ST-1a (audit #1): nazov projektu cita SERVER — z DOM uz nechodi.
-    sketchup.budget_xlsx(JSON.stringify({ gen: st.gen }));
+    sketchup.budget_xlsx(JSON.stringify({ gen: st.gen, confirm_unpriced: budArmed('xlsx') }));
+  }
+
+  // --- P0-HF: DVOJKROKOVÝ EXPORT PRI RIADKOCH BEZ CENY ----------------------
+  //
+  // STANDARD §11.3: neznáma cena sa NIKDY nenahradí nulou, ale rozpracovaný
+  // rozpočet ostáva legitímnym stavom zákazky — plošný tvrdý blok by bral
+  // používateľovi výstup, na ktorý má právo. Prvý klik preto export ZASTAVÍ
+  // a povie prečo; druhý klik ho pustí s `confirm_unpriced` a hotový súbor
+  // podhodnotenie prizná v statuse.
+  //
+  // Klient je tu LEN UX — potvrdenie overuje aj SERVER (`export_confirmed?`),
+  // takže starý DOM ani cudzí volajúci nemajú ako podhodnotený súbor vyrobiť
+  // ticho. Ozbrojenie sa ruší pri každom čerstvom payloade (`budDisarm`):
+  // potvrdenie platí pre čísla, ktoré používateľ videl, nie navždy.
+  //
+  // POSIELA SA POČET, NIE `true` (review #252 P1). Export medzi prvým a druhým
+  // klikom flushne rozpísaný edit Inspectora a rozpočet PREPOČÍTA z čerstvého
+  // modelu — neviazaný boolean by potvrdil aj iný, možno horšie podhodnotený
+  // dokument. Server prijme len presnú zhodu s vlastným čerstvým počtom; keď
+  // sa čísla rozídu, export zastaví a okno OBNOVÍ (payload zároveň potvrdenie
+  // odzbrojí, takže ďalší klik varuje už správnym číslom).
+  var BUD_CONFIRM = { xlsx: 0, cp: 0 };
+
+  function budDisarm(){
+    BUD_CONFIRM = { xlsx: 0, cp: 0 };
+  }
+
+  // Počet, ktorý používateľ potvrdil (0 = nič nepotvrdil).
+  function budArmed(key){
+    var n = BUD_CONFIRM[key];
+    return (typeof n === 'number' && n > 0) ? n : 0;
+  }
+
+  // Čisté: koľko riadkov súčtu nemá cenu (0 = niet čo potvrdzovať).
+  function budUnpricedCount(st){
+    var b = (st && st.budget) ? st.budget : null;
+    var t = (b && b.totals) ? b.totals : null;
+    var n = t ? parseInt(t.unknown_count_in_total, 10) : 0;
+    return (isFinite(n) && n > 0) ? n : 0;
+  }
+
+  // Čisté: text prvého (zastavujúceho) kliku.
+  function budConfirmText(n, what){
+    return n + ' ' + budPluralSk(n, ['riadok', 'riadky', 'riadkov']) + ' nemá cenu — ' +
+      (what === 'cp' ? 'suma ponuky' : 'suma rozpočtu') + ' bude PODHODNOTENÁ. ' +
+      'Doplň ceny v Rozpočte, alebo klikni na export ešte raz a exportuj aj tak.';
+  }
+
+  // true = klik sa SPOTREBOVAL na varovanie a export sa neposlal.
+  // Ozbrojuje sa PRESNÝM POČTOM, ktorý sa v hláške ukázal — keď sa payload
+  // medzitým zmenil, nové číslo staré potvrdenie prepíše a používateľ musí
+  // potvrdiť znova (potvrdil predsa iný dokument).
+  function budNeedsConfirm(key, st){
+    var n = budUnpricedCount(st);
+    if (n === 0){ BUD_CONFIRM[key] = 0; return false; }
+    if (budArmed(key) === n) return false;
+    BUD_CONFIRM[key] = n;
+    NX.setStatus(budConfirmText(n, key), true);
+    return true;
   }
 
   // GH #138 P2 + audit #10: modal sa NEZAVIERA pri odoslani. Server moze zapis
@@ -1748,5 +1809,11 @@
       // a exportuje sa ZAMERNE — kontrakty „bez pamate konceptu",
       // „odmietnutie nezatvara" a „busy zamok" sa inak overit nedaju.
       budMoreFields: budMoreFields, budMoreAttrs: budMoreAttrs,
-      budOpenMore: budOpenMore };
+      budOpenMore: budOpenMore,
+      // P0-HF: dvojkrokový export pri riadkoch bez ceny (tests/js/test_p0hf_potvrdenie.js).
+      // `budXlsx`/`budCpExport` sa exportujú ZÁMERNE — kontrakt „prvý klik
+      // zastaví, druhý pošle `confirm_unpriced`" sa inak overiť nedá.
+      budUnpricedCount: budUnpricedCount, budConfirmText: budConfirmText,
+      budNeedsConfirm: budNeedsConfirm, budArmed: budArmed, budDisarm: budDisarm,
+      budXlsx: budXlsx, budCpExport: budCpExport };
   }
