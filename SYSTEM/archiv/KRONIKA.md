@@ -47,7 +47,7 @@
   **Testovanie:** nová sada `tests/pure/test_p0hf_brany.rb` meria pri každom dôvode **prázdny priečinok** (nie text statusu) a zároveň to, že sa `savepanel` ani neotvoril; nová JS
   sada `tests/js/test_p0hf_potvrdenie.js` stráži dvojkrokový klik a zrušenie potvrdenia pri čerstvom payloade. Mutačné overenie: vypnutie brány pre CSV · pre ponuku · potvrdzovacia
   vetva, ktorá nikdy nezastaví · predikát nerozlišujúci dosku — každá zhodila práve svoje testy. **2023 headless · 72 JS sád.** In-SketchUp beh netreba (žiadne buildery ani
-  observery). PR **#251**.
+  observery). PR **#252**.
 
 - **F/D-27 · TAGY MODELU SA PREPÍNAJÚ Z PANELA (28.8.2026, v0.8.13):** odrážka **F** bloku 1b, postreh **D-27** (Michal 19.7.). V raile Inspectora pribudla **ikona oka**, ktorá
   otvorí zoznam NOXUN tagov modelu (Korpus · Chrbát · Čelá · Vnútro · Kovanie · Dosky · Zóny) a jedným klikom ich zobrazí alebo skryje — bez chodenia do natívneho okna Tags.
