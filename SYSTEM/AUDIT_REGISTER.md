@@ -60,9 +60,11 @@ položka — per-skrinka zaokrúhlenie by dalo zlé počty), rozsah zaokrúhľov
 zákazka, ceil) a `ceil` rozbije invariant `Σ sources.quantity == row.quantity`, na ktorom stojí D-94 aj ORANGE
 `validation.rb:588`. `explain` (panel) by ukázal číslo, ktoré v nákupe nevznikne. [E:R-04 + S-01 + S-02 + S-04]
 **Návrh:** rozdeliť `expand` na zbernú (emisné deskriptory + akumulácia bázy) a materializačnú fázu bez zmeny
-podpisu; rozsah per zákazka zapísať do hardware.md; pomerový zdroj vlastný tvar (`basis_quantity` + `ratio`),
-invariant priznať „len unit/owner"; `explain` pri pomere číslo NEUVÁDZA („1 ks na 4 nohy — počet určí súpis").
-Žiadne desatinné qty. **Odhad: M.**
+podpisu; pomerový zdroj vlastný tvar (`basis_quantity` + `ratio`), invariant priznať „len unit/owner"; `explain`
+pri pomere číslo NEUVÁDZA („1 ks na 4 nohy — počet určí súpis"). Žiadne desatinné qty.
+**POZOR (review #251 kolo 2): rozsah zaokrúhľovania (per zákazka vs per skrinka) je pri viacerých skrinkách
+materiálne pozorovateľné rozhodnutie, ktoré znenie D-109 necháva OTVORENÉ — register ho NEPREDROZHODUJE.
+Rozhodne USER-debata o setoch (agenda KOVANIE); do zadania D-109 vstúpi až jej výsledok.** **Odhad: M.**
 
 ### R-06 · P1 · core · `core/hardware_sets.rb:1196-1210` + `hardware_rules.rb:20-22, 520-530` + `hardware_catalog_dialog.rb:432`
 Dĺžkové kovanie sa dá namapovať na set a nacení sa ako KUSY: `cut_length_mm` sa v hardware_sets NIKDY nečíta,
@@ -110,7 +112,10 @@ dim_series a supplier ho nemajú. [S-07] **Návrh:** `JsonFileStore.degraded?(pa
 Prestavba zákazky z NOVŠIEHO pluginu ticho stratí dáta: configy sú uzavreté whitelisty a dopredný guard existuje
 len pre kovanie (`guard_unknown_hardware!`); `plan_schema`/`part_key_schema` sa na „novšie než moje" nekontrolujú.
 Blokuje aj rolu `flap` (nová rola v snapshote = presne tento prípad). [S-09; súvisí E:R-07]
-**Návrh:** zovšeobecniť na `guard_newer_config!` (odmietne prestavbu, čítanie/export beží). **S/M.**
+**Návrh (spresnené review #251 kolo 2):** zovšeobecniť na `guard_newer_config!` (odmietne prestavbu,
+čítanie/export beží) — ale existujúce markery kompatibilitu configu NEDOKÁŽU (`BuildPlan::SCHEMA` verzuje
+tranzientný tvar plánu, `part_key_schema` len kľúče dielcov): builder musí začať zapisovať VLASTNÝ
+`config_schema` marker a guard porovnáva ten. **S/M.**
 
 ### R-13 · P2 · core · `core/store.rb:9-10, 28-49` + STANDARD §2.1
 `NOXUN/std` na entite sa VŠADE píše a NIKDE nečíta — záväzný bod štandardu bez implementácie; čítacia vrstva
@@ -142,7 +147,10 @@ nedostane). [E:R-09 + C14 + #250]
 ### R-17 · P2 · core · `core/validation.rb:690-719`
 Zelené číslo semaforu nadhodnocuje čistý stav: `dirty` sa počíta cez množinu `cabinet_id` — dve skrinky so
 spoločným ID / skrinka bez ID nemajú vlastnú identitu; skrinka bez placementu je vždy „čistá". [E:R-11 + A5/B10]
-**Návrh:** clean cez per-instance token z placementov; test dvoch kópií s jedným ID + entity bez ID. **M.**
+**Návrh (spresnené review #251 kolo 2):** per-instance token NIE z placements — `Bom.add_placement` skrinku
+s prázdnym ID/degenerovanými rozmermi zámerne vynecháva, čiže presne chybný scenár by v zdroji chýbal.
+Token brať priamo zo zberu inštancií (`Bom.collect` entita / persistent id); test dvoch kópií s jedným ID +
+entity bez ID. **M.**
 
 ### R-18 · P2/P3 · ui · `ui/js/budget.js:1392-1397, 1441-1472, 1557-1568`
 `BUD_MORE.sent = true` pred reálnym odoslaním + korelácia výsledku len podľa MENA operácie → skorší inline zápis
