@@ -560,6 +560,125 @@ NxTest.test('R-07 (P2-3): panel dáva ROVNAKÝ dôvod ako súpis (žiadne „pri
                 'a posiela `no_set_reason` do explain')
 end
 
+NxTest.test('R-07 (Codex P1): známy kľúč s NEZNÁMYM TYPOM hodnoty = read-only') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  r = NxR07
+  # Jadro nalezu: novsia verzia da `code_by_nl` STRUKTUROVANY tvar vedla
+  # fallback kodu. Kluc je znamy, takze whitelist mlcal — a `members_lost?`
+  # ratal ne-mapu ako „nula poloziek", takze aj round-trip presiel. Normalizacia
+  # pritom vybrala `code` a rad zahodila BEZ STOPY.
+  [['pole', ['future']],
+   ['string', 'future'],
+   ['cislo', 7]].each do |what, value|
+    r.with_library do
+      r.install(r.doc([r.plain_set.merge(
+        'members' => [{ 'code' => 'X', 'code_by_nl' => value }]
+      )]))
+      NxTest.assert(r::HWS.library_read_only?, "code_by_nl ako #{what} musi byt read-only")
+      NxTest.assert_equal(:write_failed, r::HWS.save_set!(r.plain_set('novy'))[0],
+                          "#{what}: a zapis stratu NEZVECNI")
+    end
+  end
+  # Ta ista trieda diery pre ostatne polia: hodnota by sa `to_s`-ovala na
+  # nezmysel („[\"a\"]" ako KOD, ktory by sa objednal), nie zahodila.
+  {
+    'code ako pole' => { 'code' => ['A'], 'per' => 'unit', 'qty' => 1 },
+    'qty ako objekt' => { 'code' => 'A', 'qty' => { 'v' => 2 } },
+    'per ako pole' => { 'code' => 'A', 'per' => ['unit'] },
+    'label ako objekt' => { 'code' => 'A', 'label' => { 'sk' => 'noha' } },
+    'param_bands ako pole' => { 'param_bands' => [{ 'min' => 1, 'max' => 2, 'code' => 'A' }] }
+  }.each do |what, member|
+    r.with_library do
+      r.install(r.doc([r.plain_set.merge('members' => [member])]))
+      NxTest.assert(r::HWS.library_read_only?, "#{what} musi byt read-only")
+    end
+  end
+  # Set aj pasma: neznamy TYP hodnoty znameho kluca.
+  r.with_library do
+    r.install(r.doc([r.plain_set.merge('name' => { 'sk' => 'Záves' })]))
+    NxTest.assert(r::HWS.library_read_only?, 'name ako objekt')
+  end
+  r.with_library do
+    r.install(r.doc([r.plain_set.merge(
+      'members' => [{ 'per' => 'unit', 'qty' => 1,
+                      'param_bands' => { 'param' => 'height',
+                                         'bands' => [{ 'min' => 1, 'max' => 2, 'code' => ['A'] }] } }]
+    )]))
+    NxTest.assert(r::HWS.library_read_only?, 'hodnota pásma ako pole')
+  end
+  # NEGATIVNA kontrola: legacy skalare (cislo ako kod aj ako pocet) prejdu.
+  r.with_library do
+    r.install(r.doc([r.plain_set.merge(
+      'members' => [{ 'code' => 104_717, 'qty' => '2', 'per' => 'unit' }]
+    )]))
+    NxTest.assert_equal(:ok, r::HWS.library_state, 'cislo/string ostavaju legitimne')
+  end
+end
+
+NxTest.test('R-07 (Codex P2): neznámy typ `qty` bránu NEROZBIJE — read-only + ORANGE súpis') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  r = NxR07
+  [['true', true], ['pole', [2]], ['objekt', { 'v' => 2 }]].each do |what, value|
+    r.with_library do
+      r.install(r.doc([r.plain_set.merge(
+        'members' => [{ 'code' => 'X', 'qty' => value }]
+      )], { 'hinge' => 'zaves-a' }))
+      # 1) brana sa NESMIE rozbit (dovtedy: NoMethodError v `qty.to_i`, ktory
+      #    `load` rescue-ol a `library_read_only?` vyvolal ZNOVA)
+      NxTest.assert_equal(:read_only, r::HWS.library_state, "qty ako #{what}")
+      NxTest.assert_equal({ 'sets' => [], 'mapping' => {} }, r::HWS.load, what)
+      # 2) a supis skonci ORANGE, nie ako nil (nil = sekcia Nakup bez obsahu)
+      exp = r::PC.hardware_expansion(r.model_with, r.collected([r.hinge_item]))
+      NxTest.assert(exp.is_a?(Hash), "#{what}: expanzia musi vratit vysledok, nie nil")
+      NxTest.assert_equal('library_incompatible', exp['unmapped'][0]['reason'], what)
+    end
+  end
+  # Citacia cesta (cudzi snapshot v .skp) sa tym istym zaznamom tiez NEZHODI —
+  # `validate_member` je spolocna a bezi pri KAZDEJ prestavbe.
+  lossy = { 'std' => 1, 'mapping' => {},
+            'sets' => { 'zaves-a' => r.plain_set.merge(
+              'members' => [{ 'code' => 'X', 'qty' => true }]
+            ) } }
+  NxTest.assert_equal(:invalid, r::HWS.project_state_status(r.model_with(lossy))[0],
+                      'snapshot s neznamym typom = :invalid, NIE vynimka')
+
+  # DRUHA VRSTVA OBRANY, pripnuta samostatne: `validate_member` je spolocne
+  # telo VSETKYCH citacich ciest (cabinet override v configu, definicie zo
+  # sablony, `normalize_members` pri kazdej prestavbe) a tie cez branu
+  # kniznice NEIDU. Musi teda vratit CHYBU, nie vyhodit vynimku — inak by
+  # jeden zaznam z novsej verzie zhodil stavbu skrinky.
+  [true, [2], { 'v' => 2 }].each do |bad|
+    norm, errs = r::HWS.validate_member({ 'code' => 'X', 'qty' => bad })
+    NxTest.assert_equal(nil, norm, "qty #{bad.class}: clen sa neprijme")
+    NxTest.assert(errs.any?, "qty #{bad.class}: a dovod sa vrati ako CHYBA, nie vynimka")
+    NxTest.assert_equal([], r::HWS.normalize_members([{ 'code' => 'X', 'qty' => bad }]),
+                        "qty #{bad.class}: citacia normalizacia clena zahodi bez padu")
+  end
+end
+
+NxTest.test('R-07 (Codex P2): brána ZLYHÁVA ZATVORENE — výnimka v detektore = read-only') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  r = NxR07
+  r.with_library do
+    r.install(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }))
+    NxTest.assert_equal(:ok, r::HWS.library_state, 'fixture: zdrava kniznica')
+    # Druha vrstva detektora pusta CUDZI obsah cez normalizaciu — hocijaka
+    # nova hodnota v nej moze vyhodit vynimku. Ked vyletí, stav MUSI byt
+    # read-only (nie vynimka az do volajuceho, ktory by skoncil s nil supisom).
+    orig = r::HWS.method(:normalize_sets)
+    r::HWS.define_singleton_method(:normalize_sets) { |_sets| raise 'vybuch v normalizacii' }
+    begin
+      NxTest.assert_equal(:read_only, r::HWS.library_state, 'brana zlyhava ZATVORENE')
+      NxTest.assert_equal(:unreadable, r::HWS.library_state_code)
+      NxTest.assert_equal({ 'sets' => [], 'mapping' => {} }, r::HWS.load,
+                          'a `load` z nej nic nevyda')
+    ensure
+      r::HWS.define_singleton_method(:normalize_sets, orig)
+    end
+    NxTest.assert_equal(:ok, r::HWS.library_state, 'po odstraneni chyby je stav zase zdravy')
+  end
+end
+
 NxTest.test('R-07 (P3-2): vyhodnotenie brány NEZAPLAVÍ log — dôvod ide do konzoly RAZ') do
   NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
   r = NxR07

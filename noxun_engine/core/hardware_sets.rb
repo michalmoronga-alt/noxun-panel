@@ -414,6 +414,16 @@ module Noxun
           return [:read_only, :unknown_shape, unknown_mapping_sk] unless map_errors.empty?
         end
         [:ok, nil, '']
+      rescue StandardError => e
+        # BRANA MUSI ZLYHAT ZATVORENE (review P2). Druha vrstva detektora
+        # pusta CUDZI obsah cez normalizacne a parsovacie cesty — hocijaka
+        # nova hodnota v nich moze vyhodit vynimku (`qty: true` -> NoMethodError).
+        # Keby vyletela odtialto, `load` by ju rescue-ol, zavolal
+        # `library_read_only?` a ta by ju vyvolala ZNOVA: ziadny stav, ziadny
+        # dovod a nakupny supis by skoncil ako nil — teda BEZ oranzoveho
+        # priznania. Nezrozumitelny dokument je preto read-only, nie vynimka.
+        Engine.log_error(e, 'HardwareSets.assess_library_doc') if defined?(Engine)
+        [:read_only, :unreadable, unreadable_sk]
       end
 
       # SK dovody — jedno znenie pre banner, status aj log.
@@ -434,10 +444,32 @@ module Noxun
       # zahodil clen ci pole clena. Legacy KONVERZIE hodnot (dopĺňany `per`,
       # chybajuce `qty`, cislo namiesto stringu) su kompatibilne — tie tvar
       # nemenia, len ho normalizuju.
+      # TYPY hodnôt známych kľúčov (review P1). Whitelist KĽÚČA nestačí: novšia
+      # verzia dá známemu kľúču iný TVAR — `code_by_nl` ako pole (štruktúrovaný
+      # rad popri fallback kóde), `qty` ako objekt — a čítacia normalizácia ho
+      # buď ticho zahodí, alebo (horšie) pretypuje na nezmysel: `['future'].to_s`
+      # by sa stalo „kódom", ktorý sa objedná. Skalár = String alebo Numeric
+      # (číslo v JSONe je legitímna legacy podoba kódu aj počtu); `true`/`false`,
+      # pole a objekt skalár NIE SÚ.
+      def scalar_value?(value)
+        value.is_a?(String) || value.is_a?(Numeric)
+      end
+
+      # nil = kľúč chýba (legitímne). Inak musí sedieť TYP.
+      def bad_type?(value, kind)
+        return false if value.nil?
+        case kind
+        when :scalar then !scalar_value?(value)
+        when :hash   then !value.is_a?(Hash)
+        else true
+        end
+      end
+
       def incompatible_set?(set)
         return true unless set.is_a?(Hash)
         s = stringify(set)
         return true unless (s.keys - SET_KEYS).empty?
+        return true if %w[set_id name generic_type].any? { |k| bad_type?(s[k], :scalar) }
         # Neznamy generic_type = typ kovania novsej verzie; `normalize_sets` by
         # cely set ticho zahodil.
         return true unless BuildPlan::GENERIC_TYPES.include?(s['generic_type'].to_s.strip)
@@ -450,8 +482,14 @@ module Noxun
         return true unless member.is_a?(Hash)
         m = stringify(member)
         return true unless (m.keys - MEMBER_KEYS).empty?
+        return true if %w[per qty label code].any? { |k| bad_type?(m[k], :scalar) }
+        # `code_by_nl` a `param_bands` su MAPY. Coko0lvek ine (pole, string,
+        # cislo) je tvar novsej verzie — nie „nula poloziek", ale NEZNAMY OBSAH:
+        # normalizacia by ho zahodila BEZ STOPY a najblizsi zapis by stratu
+        # zvecnil (review P1 — `members_lost?` ho ako nulu prehliadol).
+        return true if %w[code_by_nl param_bands].any? { |k| bad_type?(m[k], :hash) }
         nl = m['code_by_nl']
-        return true if nl.is_a?(Hash) && nl.each_value.any? { |v| !(v.is_a?(String) || v.is_a?(Numeric)) }
+        return true if nl.is_a?(Hash) && nl.each_value.any? { |v| !scalar_value?(v) }
         pb = m['param_bands']
         return incompatible_bands?(pb, 'code') unless pb.nil?
         false
@@ -461,10 +499,14 @@ module Noxun
         return true unless raw.is_a?(Hash)
         h = stringify(raw)
         return true unless (h.keys - PARAM_BANDS_KEYS).empty?
+        return true if bad_type?(h['param'], :scalar)
         list = h['bands']
         return true unless list.is_a?(Array)
         list.any? do |b|
-          !b.is_a?(Hash) || !(stringify(b).keys - BAND_KEYS - [value_key]).empty?
+          next true unless b.is_a?(Hash)
+          bb = stringify(b)
+          next true unless (bb.keys - BAND_KEYS - [value_key]).empty?
+          (BAND_KEYS + [value_key]).any? { |k| bad_type?(bb[k], :scalar) }
         end
       end
 
@@ -980,8 +1022,14 @@ module Noxun
       end
 
       def nl_entries(member)
-        nl = member.is_a?(Hash) ? member['code_by_nl'] : nil
-        nl.is_a?(Hash) ? nl.length : 0
+        return 0 unless member.is_a?(Hash)
+        nl = member['code_by_nl']
+        return 0 if nl.nil?
+        # Rad, ktory NIE JE mapa, je NEZNAMY TVAR — nie „nula poloziek"
+        # (review P1). Sentinel sa s normalizovanym clenom nikdy nezhoduje,
+        # takze strata vyjde najavo aj tu, nielen vo whitelistoch.
+        return -1 unless nl.is_a?(Hash)
+        nl.length
       end
 
       # Snapshot projektu alebo nil (missing AJ invalid — na rozlisenie sluzi
@@ -1941,7 +1989,17 @@ module Noxun
         per = mm['per'].to_s.strip
         per = 'unit' if per.empty?
         return [nil, ["#{pos} má neznáme „per“ (#{per})"]] unless PER_KINDS.include?(per)
-        qty = mm['qty'].nil? ? 1 : mm['qty'].to_i
+        # R-07 (review P2): TYPOVA OCHRANA. `to_i` na `true`, poli ci objekte
+        # vyhodi NoMethodError — a tato metoda bezi aj v CITACEJ ceste
+        # (`normalize_members` nad cudzim suborom aj nad snapshotom v .skp),
+        # takze by taky zaznam zhodil prestavbu, nie ju odmietol. Cislo aj
+        # cislo v stringu su legitimne (legacy tvary); cokolvek ine = neplatny
+        # pocet, teda chyba clena, ktoru vyssie vrstvy uz vedia spracovat.
+        raw_qty = mm['qty']
+        unless raw_qty.nil? || raw_qty.is_a?(Numeric) || raw_qty.is_a?(String)
+          return [nil, ["#{pos} má neplatný počet"]]
+        end
+        qty = raw_qty.nil? ? 1 : raw_qty.to_i
         return [nil, ["#{pos} má neplatný počet"]] if qty < 1
         qty = [qty, BuildPlan::MAX_HW_QUANTITY].min
 
