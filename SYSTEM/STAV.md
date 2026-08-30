@@ -18,8 +18,8 @@ Nálezy z reálnej výroby a chyby v cenách majú preto **najvyššiu prioritu 
 (okno zaniká — modul žije · uzavretý whitelist akcií · session token · echo vs. plný push · optimistický zámok) sú v [archiv/KRONIKA.md](archiv/KRONIKA.md),
 vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
-**Testy k v0.8.17:** **2063 headless** · 72 JS sád · posledný plný in-SketchUp beh **1057 PASS / 2 FAIL** (dávka **1d/R-01+R-04**, +2 asserty v `CH6`). **Tie 2 FAIL nie sú
-regresia:** `ŠT-1c B2` padá rovnako na čistom `main` (1055 PASS / 2 FAIL) — zastaraný scenár po cenovej bráne **P0-HF** (#252); oprava ide vlastnou test-only dávkou.
+**Testy k v0.8.17:** **2063 headless** · 72 JS sád · posledný plný in-SketchUp beh **1061 PASS / 0 FAIL** (test-only dávka `fix/st1c-b2-cenova-brana`: scenár `ŠT-1c B2`
+zosúladený s cenovou bránou **P0-HF** (#252) — dokazuje poradie gen guard → cenová brána → savepanel; 2 dovtedy známe FAILy boli zastaraný test, nie regresia).
 
 > **Poznámka k procesu:** Codex review bol 21.–24.8. **nedostupný** — PR **#186–#226** prešli bránou so slepým subagentom. **Post-hoc sweep je od 27.8. HOTOVÝ** (34 PR cez Codex CLI + triáž 54 nezodpovedaných threadov): dve reálne P1 slepým kolám ušli a týždeň žili v `main`, obe sú dávno opravené — [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-E**.
 

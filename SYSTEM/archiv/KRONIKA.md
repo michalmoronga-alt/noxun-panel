@@ -17,6 +17,15 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **FIX · ŠT-1c B2 DOBEHOL CENOVÚ BRÁNU (30.8.2026, test-only, bez bump verzie):** dva in-SU FAILy známe od dávky 1d/R-01+R-04 boli ZASTARANÝ TEST, nie chyba pluginu — dávka
+  **P0-HF** (#252, v0.8.14) postavila medzi gen guard a `savepanel` FINÁLNU CENOVÚ BRÁNU a scenár exportu cenovej ponuky s ňou nepočítal: skrinka scenára má 3 riadky bez ceny
+  (materiál bez cenníka v izolovanom APPDATA behu), takže čerstvá generácia končila na potvrditeľnej vetve brány a k stubovanému savepanelu sa nikdy nedostala. Scenár je
+  prepísaný tak, že pôvodný dôkaz NEZOSLABOL, ale zosilnel — dokazuje celé PORADIE na živom modeli: **gen guard → cenová brána → savepanel**. Stará generácia sa odmietne pred
+  všetkým; čerstvá BEZ potvrdenia skončí na bráne (dialóg sa neotvorí, status „Export sa zastavil"); počet riadkov bez ceny sa číta zo SERVEROVÉHO payloadu (potvrdenie je viazané
+  na presné číslo, review #252 P1) a čerstvá generácia s `confirm_unpriced` dôjde až k výberu súboru — guard teda nie je natvrdo zavretý, čo bol pôvodný zmysel oboch assertov.
+  Logika brány samotnej (tvrdé vs. potvrditeľné dôvody) ostáva pokrytá headless sadou `tests/pure/test_p0hf_brany.rb` — in-SU scenár ju nedubluje, drží integračné poradie.
+  Plný in-SU beh po oprave: **1061 PASS / 0 FAIL**.
+
 - **1d/R-01+R-04 · OBSERVER VEĽKOSTI VIE, V KTOROM DOKUMENTE PRACUJE (30.8.2026, v0.8.17):** tretia vybavená položka registra bloku 1d — dve položky naraz, lebo register ich tak
   spája (**R-01** P1 + **R-04** P3). `ScaleWatch` je jediný observer, ktorý reaguje na zmenu veľkosti, presun a mazanie skriniek a dosiek; jeho vnútorné fronty boli kľúčované
   **holým `entityID`**, ktoré je ale LOKÁLNE pre dokument. Na macOS (viac otvorených dokumentov naraz) si tak dve inštancie s rovnakým ID v jednom 0,2 s okne udalosť prepísali

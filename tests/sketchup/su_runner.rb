@@ -6513,6 +6513,13 @@ module NoxunSuRunner
          scripts.none? { |s| s.include?('NX.budgetResult("custom_add", true)') })
 
       # --- 4) export cenovej ponuky: gen guard PRED dialogom -----------------
+      # P0-HF (PR #252, v0.8.14): medzi gen guardom a savepanelom stoji odvtedy
+      # FINALNA CENOVA BRANA. Jej logika (tvrde vs potvrditelne dovody, vazba
+      # potvrdenia na presny pocet) je pokryta headless sadou
+      # tests/pure/test_p0hf_brany.rb — TU sa dokazuje PORADIE na zivom modeli:
+      # gen guard -> cenova brana -> savepanel. Skrinka scenara ma riadky bez
+      # ceny (material bez cennika), takze branou sa prechadza potvrdenim
+      # poctu (`confirm_unpriced`), presne ako druhym klikom v UI.
       st1c_without_savepanel do |calls|
         scripts = st1c_capture(e::StudioDialog) do
           e::StudioDialog.do_cp_xlsx({ 'gen' => st1c_gen - 99 }.to_json)
@@ -6521,11 +6528,28 @@ module NoxunSuRunner
            calls[0].zero?)
         ok('ŠT-1c B2: a odmietnutie povie prečo',
            scripts.any? { |s| s.include?('Dáta okna sa medzitým zmenili') })
+
+        # Pocet riadkov bez ceny sa cita zo SERVEROVEHO payloadu (ako klient) —
+        # potvrdenie brany je viazane na presne cislo (review #252 P1).
+        payload = st1c_studio_payload(st1c_capture(e::StudioDialog) { e::StudioDialog.send(:push_state) })
+        miss = payload ? ((payload['budget'] || {})['totals'] || {})['unknown_count_in_total'].to_i : -1
+        ok("ŠT-1c B2 (P0-HF): zákazka scenára má riadky bez ceny (#{miss}) — cenová brána má čo zastaviť",
+           miss.positive?)
+
         before_calls = calls[0]
         scripts = st1c_capture(e::StudioDialog) do
           e::StudioDialog.do_cp_xlsx({ 'gen' => st1c_gen }.to_json)
         end
-        ok('ŠT-1c B2: s ČERSTVOU generáciou dobehne až k výberu súboru (guard nie je natvrdo zavretý)',
+        ok('ŠT-1c B2 (P0-HF): čerstvá generácia BEZ potvrdenia končí na cenovej bráne — dialóg sa NEOTVORÍ',
+           calls[0] == before_calls && scripts.any? { |s| s.include?('Export sa zastavil') })
+
+        # Zastavenie okno OBNOVILO (repush zdvihol generaciu) — druhy pokus ide
+        # s CERSTVOU generaciou a potvrdenym poctom, presne ako druhy klik v UI.
+        scripts = st1c_capture(e::StudioDialog) do
+          e::StudioDialog.do_cp_xlsx({ 'gen' => st1c_gen, 'confirm_unpriced' => miss }.to_json)
+        end
+        ok('ŠT-1c B2: s ČERSTVOU generáciou (a potvrdenou cenovou bránou) dobehne až k výberu súboru ' \
+           '(guard nie je natvrdo zavretý)',
            calls[0] == before_calls + 1)
         ok('ŠT-1c B2: zrušený export nič nezapísal a povedal to',
            scripts.any? { |s| s.include?('Export zrušený') })
