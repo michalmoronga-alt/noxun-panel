@@ -75,6 +75,16 @@ bezpečne držať pred klikom (žiadny čistý pripravený objekt) ani ako polo�
 [E:R-03 + F-03 potvrdené]
 **Návrh:** šev `prepare_insert` (čisté preflighty, nemenný snapshot, bez ID/entít/undo) + `build(..., transform:)`
 / `commit_insert`; hardware freeze ostáva v commit operácii. **Odhad: L.**
+**✅ dávkou 1d/R-03 (PR #265, v0.8.20)** — `prepare_insert` vydá **zmrazený `InsertPlan`** (rekurzívny freeze vrátane vnorených hashov, polí aj stringov — a **až po hlbokej kópii**,
+lebo `enum_val` vracia pri Stringu ten istý objekt ako vstup a priamy freeze by zmrazil `params` volajúceho); plán si drží **referenciu na `Sketchup::Model`**, nie `guid` (ten sa mení
+pri každom uložení — lekcia #261/#264). `commit_insert` má **záväzné poradie**: guard dokumentu → validácia RIGIDNÉHO transformu → `ensure_root_context` **s kontrolou postcondition**
+(helper po 20 iteráciách ticho vracia nil) → ID a `next_x` → operácia; **scale-lock ostal VNÚTRI `guarded`** bloku (mimo neho by zápis DC atribútov cez `onElementModified` založil
+oneskorený dirty tik). Validátor `rigid_matrix?` je čistá funkcia nad 16 číslami z `to_a`; kontrola prvku `[15]` chytá **nekanonickú/legacy maticu**, ktorá nesie mierku tam (moderný SketchUp `[15]` drží
+kanonický a `scaling(2)` padne už na jednotkovosti osí). `Geom::Transformation` je **mutovateľná** (`set!`), preto sa hneď po validácii robí **snapshot** z tých istých overených
+čísel a ďalej sa pracuje len s ním — inak by sprievodný blok mohol transform po validácii prepísať na mierku a korpus by vznikol zväčšený pod `guarded` guardom.
+Do stavby ide **pracovná nezmrazená kópia** plánu — `resolve_part` upratuje sticky `edge_warnings` in-place. `actions_cabinet.rb` sa nedotkla, správanie volajúcich je nezmenené
+(vrátane volania `build(model, type:, width:)`, ktoré Ruby prevádza na pozičný hash — signatúra ho drží cez `params = nil` + `**kw`);
+`bounds_mm` plán zámerne nenesie (uzavrie ho GHOST dávka). **Tvrdý blocker GHOST tým padol.**
 
 ### R-04 · P3 · core · `core/scale_observer.rb:500-513`
 `@stable_transforms` bez delete cesty — rastie cez erase aj zánik dokumentov (in-SU test rast charakterizuje).
@@ -331,7 +341,7 @@ B1 názov projektu (1b-6a, #244) · B2 hlavičky materiálov (1b-6b, #247) · A1
 
 ## Odporúčané poradie pre 1d (zhoda [E] aj [F/S])
 
-1. **P0 hotfix** (✅ #252) → 2. **pred GHOST:** ~~R-01+R-04~~ (✅ #261) → ~~R-02~~ (✅ #264) → R-03 *(GHOST package upresňuje: tvrdý
+1. **P0 hotfix** (✅ #252) → 2. **pred GHOST:** ~~R-01+R-04~~ (✅ #261) → ~~R-02~~ (✅ #264) → ~~R-03~~ (✅ #265 — **tvrdý blocker GHOST padol**) *(GHOST package upresňuje: tvrdý
 blocker je len R-03 — GHOST smie na Windows štartovať hneď po ňom; R-01 je macOS vetva, R-02 je na Windows P3
 a R-04 je platformovo nezávislá hygiena — všetky tri sa dorobia v 1d nezávisle od GHOST štartu)* → 3. **pred KOVANÍM:** ~~R-06 brána~~ (✅) ·
 R-07 · ~~R-08~~ (✅) · potom R-05 (+R-06 plný) ako D-109 šev → 4. **pred D-95/VÝROBOU:** R-17, R-16, R-22, po etapách R-15 →

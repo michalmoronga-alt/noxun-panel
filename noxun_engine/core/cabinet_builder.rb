@@ -94,6 +94,41 @@ module Noxun
       # pod toleranciou SketchUpu (0,0254 mm).
       PROFILE_LENGTH_STEP = 0.01
 
+      # R-03 (blok 1d): tolerancia kontroly RIGIDNEHO vkladacieho transformu.
+      # 1e-6 na skalarnych sucinoch je rádovo 1e-3 stupna skosenia — pod
+      # rozlisenim SketchUpu, ale nad numerickym sumom skladania rotacii.
+      RIGID_TOL = 1e-6
+
+      # R-03: ZMRAZENY snapshot vkladu (prepare_insert -> commit_insert).
+      # Drzi ho GHOST Tool medzi pohybom mysi a klikom, preto:
+      #   * `config` je hlboka kopia s REKURZIVNYM freeze (vratane vnorenych
+      #     hashov, poli aj stringov) — nikto ho po ceste ticho nezmeni,
+      #   * plan si pamata DOKUMENT, z ktoreho vznikol, ako REFERENCIU na
+      #     `Sketchup::Model` (nie `guid` — ten sa meni pri kazdom ulozeni,
+      #     lekcia PR #261/#264), takze cross-document vklad sa da odmietnut,
+      #   * ziadne ID, ziadna entita, ziadny Undo krok — tie vznikaju az v commite.
+      class InsertPlan
+        attr_reader :config, :home_z
+
+        def initialize(model, config, home_z)
+          @model = model
+          @config = config
+          @home_z = home_z
+          freeze
+        end
+
+        # Patri plan TOMUTO dokumentu? Porovnava sa objekt modelu (identita
+        # dokumentu v behu), nie jeho guid.
+        def for_model?(model)
+          !model.nil? && @model.equal?(model)
+        end
+
+        # Referencia na dokument planu (diagnostika; commit ju necita).
+        def model_ref
+          @model
+        end
+      end
+
       class << self
         # --- verejne API ----------------------------------------------------
 
@@ -104,12 +139,96 @@ module Noxun
         # rebuild_many) — zapis dat, ktore k novej skrinke patria (zmrazenie setov
         # kovania zo sablony). Vynimka v bloku zrusi CELU operaciu: ziadna skrinka,
         # ziadny zapis.
-        def build(model, params)
+        # R-03: KOMPOZICIA sevu — spravanie vsetkych dnesnych volajucich je
+        # NEZMENENE. `ensure_root_context` je PRVY krok (dnesne poradie: najprv
+        # sa zavrie edit kontext, az potom sa normalizuje) — pri vynimke
+        # z `normalize` musi pouzivatel skoncit v roote presne ako doteraz.
+        # `commit_insert` si root este raz idempotentne overi.
+        # `transform:` = FINALNA transformacia instancie (GHOST Tool poloha);
+        # nil = dnesna cesta „vedla existujucich" (`next_x` + `home_z`).
+        #
+        # KOMPATIBILITA VOLANIA (review P2): pred R-03 nemal `build` ZIADNY
+        # keyword parameter, takze Ruby 3 prevadzalo `build(model, type: 'lower',
+        # width: 600)` na POZICNY hash. Holy `transform:` by taketo volania
+        # rozbil (ArgumentError: unknown keyword). Preto je `params` VOLITELNY
+        # a zvysne keywordy sa zbieraju do `**kw`: ked `params` chyba, pouziju
+        # sa ONE ako parametre skrinky. Jedine REZERVOVANE meno je `transform`
+        # — nie je to parameter korpusu (`normalize` ho nepozna), ale kto by ho
+        # v params predsa len chcel, musi params poslat POZICNE. Params dvakrat
+        # (pozicne AJ keywordmi) je chyba volajuceho, nie tiche zliatie.
+        def build(model, params = nil, transform: nil, **kw, &block)
+          if params.nil?
+            params = kw
+          elsif !kw.empty?
+            raise ArgumentError,
+                  "build: parametre skrinky prisli dvakrat — pozicne aj ako keywordy (#{kw.keys.join(', ')})"
+          end
           ensure_root_context(model)
-          cfg = normalize(params)
+          commit_insert(model, prepare_insert(model, params), transform: transform, &block)
+        end
+
+        # R-03 FAZA 1: ciste PRIPRAVENIE vkladu. Vrati zmrazeny `InsertPlan`.
+        #
+        # KONTRAKT CISTOTY je uzko formulovany: ZIADNA mutacia modelu, entit,
+        # ID ani Undo stacku. NIE je to vseobecna cistota — `normalize` cez
+        # `Materials.normalized_abs_id` moze siahnut na KATALOG na disku
+        # (seed pri prvom dotyku) a logovat; to je vedoma hranica R-03
+        # (audit NOTE 7), nie sluby tohto sevu.
+        # `ensure_root_context` sa TU NEVOLA — ghost hover nesmie pouzivatelovi
+        # zatvarat otvoreny komponent (audit c).
+        # `Construction.build_plan` sa sem NEPRESUVA: validacne chyby by sa
+        # zobrazili pred hardware blokom a pred commit-time snapshotmi (audit e).
+        # Opakovane volatelna — druhe „Vloz" je novy snapshot.
+        def prepare_insert(model, params)
+          cfg = deep_copy_cfg(normalize(params), freeze_result: true)
+          home_z = cfg[:type] == 'upper' ? UPPER_HANG_Z : 0.0
+          InsertPlan.new(model, cfg, home_z)
+        end
+
+        # R-03 FAZA 2: JEDINE miesto, kde vklad meni model. Poradie krokov je
+        # sucastou kontraktu (audit BLOCKER 1, FIX 4, NOTE 9):
+        #   1. guard identity DOKUMENTU — plan z ineho okna sa odmieta EST PRED
+        #      zatvorenim edit kontextu (cross-document vklad nikdy),
+        #   2. validacia explicitneho transformu — prijme sa LEN konecna
+        #      pravotociva RIGIDNA transformacia; scale/skos/zrkadlo by
+        #      vyrobili korpus, ktoreho geometria nezodpoveda configu, a scale
+        #      observer by ho pod guardom ani nezachytil (ticha vyrobna chyba),
+        #   3. `ensure_root_context` + KONTROLA postcondition — helper po
+        #      vynimke/20 iteraciach vracia nil a pokracuje; bez kontroly by
+        #      korpus skoncil v cudzom komponente,
+        #   4. az teraz ID a poloha (`next_x`),
+        #   5. jedna operacia + transparentny scale-lock follow-up, OBOJE vnutri
+        #      `guarded` (BLOCKER 2 — zapis scale-lock atributov mimo guardu by
+        #      cez `EntitiesObserver#onElementModified` zalozil oneskoreny dirty
+        #      tik a transparentny presun ghost zon by zasiahol Undo).
+        # H2 (D-76): volitelny blok bezi v TEJ ISTEJ operacii PRED stavbou
+        # (zmrazenie setov kovania zo sablony). Vynimka v bloku rusi CELU
+        # operaciu: ziadna skrinka, ziadny zapis.
+        def commit_insert(model, plan, transform: nil)
+          unless plan.is_a?(InsertPlan) && plan.for_model?(model)
+            raise 'Pripravený vklad patrí inému dokumentu — skrinku vlož v okne, v ktorom si ju pripravil.'
+          end
+          # Review P1: `Geom::Transformation` je MUTOVATELNA (`set!`). Overit
+          # objekt volajuceho a potom ho pouzit by bola diera medzi kontrolou
+          # a pouzitim — sprievodny blok (H2) bezi v tej istej operacii a mohol
+          # by transform prepisat na mierku UZ PO validacii; korpus by vznikol
+          # zvacseny POD `guarded` guardom, takze by ho scale observer ani
+          # nezachytil. Preto sa hned pri validacii vyrobi KANONICKY SNAPSHOT
+          # z tych istych overenych 16 cisel a dalej sa pracuje VYHRADNE s nim.
+          placement = transform.nil? ? nil : snapshot_insert_transform!(transform)
+
+          ensure_root_context(model)
+          unless root_context?(model)
+            raise 'Nepodarilo sa zavrieť otvorený komponent — korpus by sa vložil doň. Ukonči editáciu (Esc) a skús znova.'
+          end
+
+          # Do stavby ide PRACOVNA (nezmrazena) kopia configu: `build_into`
+          # cez `PartKeys.migrate_overrides` zdiela vnorene hashe overridov
+          # a `resolve_part` v nich upratuje sticky `edge_warnings` in-place.
+          # Plan musi ostat nemenny, dnesne spravanie stavby nezmenene.
+          cfg = deep_copy_cfg(plan.config)
           cid = Ids.next_cabinet_id(model)
-          x = next_x(model)
-          z = cfg[:type] == 'upper' ? UPPER_HANG_Z : 0.0
+          tr = placement || Geom::Transformation.translation(Units.point(next_x(model), 0, plan.home_z))
           inst = nil
           # guarded: vlozenie je vlastna zmena pluginu. EntitiesObserver.onElementAdded (davkovany
           # na commit) tak vidi @rebuilding=true a novy korpus nepovazuje za kopiu (ziadny extra tick).
@@ -120,7 +239,6 @@ module Noxun
               cdef = model.definitions.add("NOXUN Korpus #{cid}")
               cdef.entities.clear!
               final = build_into(model, cdef, cfg, cid)
-              tr = Geom::Transformation.translation(Units.point(x, 0, z))
               inst = model.entities.add_instance(cdef, tr)
               write_cabinet_attrs(inst, cid, final)
               Zones.sync_ghost(model, inst) if defined?(Zones)
@@ -137,6 +255,112 @@ module Noxun
           end
           ScaleWatch.attach_one(inst) if inst && defined?(ScaleWatch)
           inst
+        end
+
+        # R-03: hlboka kopia configu. `freeze_result: true` navyse REKURZIVNE
+        # mrazi vysledok. Poradie je podstatne (audit FIX 3): najprv KOPIA,
+        # az potom freeze — `enum_val` vracia `v.to_s`, co je pri Stringu TEN
+        # ISTY objekt ako vstup volajuceho, takze priamy freeze by zmrazil
+        # params volajuceho. Cudzie objekty (mimo Hash/Array/String) sa
+        # nekopiruju ani nemrazia — Symbol, Numeric, nil a boolean su uz
+        # nemenne a nic ine sa v configu nevyskytuje.
+        def deep_copy_cfg(obj, freeze_result: false)
+          case obj
+          when Hash
+            out = {}
+            obj.each do |k, v|
+              key = k.is_a?(String) ? k.dup : k
+              key.freeze if freeze_result && key.is_a?(String)
+              out[key] = deep_copy_cfg(v, freeze_result: freeze_result)
+            end
+            freeze_result ? out.freeze : out
+          when Array
+            out = obj.map { |v| deep_copy_cfg(v, freeze_result: freeze_result) }
+            freeze_result ? out.freeze : out
+          when String
+            s = obj.dup
+            freeze_result ? s.freeze : s
+          else
+            obj
+          end
+        end
+
+        # R-03: je model naozaj v ROOT kontexte? `ensure_root_context` po
+        # vynimke alebo po 20 iteraciach ticho vracia nil — commit sa na jeho
+        # navratovu hodnotu nesmie spoliehat.
+        def root_context?(model)
+          path = model.active_path
+          path.nil? || path.length.zero?
+        rescue StandardError
+          false
+        end
+
+        # R-03 (audit BLOCKER 1): prijmeme LEN konecnu pravotocivu RIGIDNU
+        # transformaciu (rotacia + posun). Hlaska navadza — pri odmietnuti sa
+        # NIC v modeli nezmenilo.
+        def validate_insert_transform!(tr)
+          return if rigid_transform?(tr)
+          raise_bad_insert_transform!
+        end
+
+        # R-03 + review P1: validacia a SNAPSHOT v jednom kroku. `to_a` sa cita
+        # PRAVE RAZ a kanonicka matica sa postavi z TYCH ISTYCH overenych cisel
+        # — medzi kontrolou a pouzitim tak nie je zadna medzera, ktorou by sa
+        # dala podstrcit ina hodnota (`Geom::Transformation#set!`).
+        def snapshot_insert_transform!(tr)
+          vals = tr.respond_to?(:to_a) ? Array(tr.to_a) : nil
+          raise_bad_insert_transform! unless rigid_matrix?(vals)
+          Geom::Transformation.new(vals.map(&:to_f))
+        end
+
+        def raise_bad_insert_transform!
+          raise 'Poloha vkladu nie je platná — korpus sa smie položiť len otočením a posunutím ' \
+                '(mierka, skosenie ani zrkadlenie nie sú povolené).'
+        end
+
+        # R-03: kontrola rigidity nad OBJEKTOM (duck-type — staci `to_a`).
+        def rigid_transform?(tr)
+          rigid_matrix?(tr.respond_to?(:to_a) ? Array(tr.to_a) : nil)
+        end
+
+        # R-03: CISTA kontrola rigidity nad 16 cislami. SketchUp uklada maticu
+        # po STLPCOCH:
+        #   [0..2] os X · [4..6] os Y · [8..10] os Z · [12..14] posun
+        #   [3],[7],[11] perspektiva · [15] uniformny mierkovy DELITEL
+        # Rigidita = jednotkove a navzajom kolme osi + determinant +1 (zaporny
+        # = zrkadlo) + nulova perspektiva.
+        # POZNAMKA k [15] (review P3a): moderny SketchUp drzi tento prvok
+        # KANONICKY (1.0) a rovnomernu mierku premieta rovno do osi — na
+        # `scaling(2)` staci kontrola jednotkovosti osi. Kontrola [15] je tu
+        # ako ochrana pred NEKANONICKOU / legacy maticou (surove pole zostavene
+        # rucne, matica zo starsieho suboru), ktora mierku nesie prave tam;
+        # bez nej by taka matica presla ako „rigidna".
+        def rigid_matrix?(m)
+          return false unless m.is_a?(Array) && m.length == 16
+          return false unless m.all? { |v| v.is_a?(Numeric) && v.to_f.finite? }
+          m = m.map(&:to_f)
+          return false unless (m[15] - 1.0).abs <= RIGID_TOL
+          return false unless [m[3], m[7], m[11]].all? { |v| v.abs <= RIGID_TOL }
+
+          ax = [m[0], m[1], m[2]]
+          ay = [m[4], m[5], m[6]]
+          az = [m[8], m[9], m[10]]
+          return false unless [ax, ay, az].all? { |v| (vec_dot(v, v) - 1.0).abs <= RIGID_TOL }
+          return false unless vec_dot(ax, ay).abs <= RIGID_TOL &&
+                              vec_dot(ax, az).abs <= RIGID_TOL &&
+                              vec_dot(ay, az).abs <= RIGID_TOL
+
+          (vec_dot(ax, vec_cross(ay, az)) - 1.0).abs <= RIGID_TOL
+        end
+
+        def vec_dot(a, b)
+          (a[0] * b[0]) + (a[1] * b[1]) + (a[2] * b[2])
+        end
+
+        def vec_cross(a, b)
+          [(a[1] * b[2]) - (a[2] * b[1]),
+           (a[2] * b[0]) - (a[0] * b[2]),
+           (a[0] * b[1]) - (a[1] * b[0])]
         end
 
         # Prestavia existujuci korpus. transform: volitelne nova cista transformacia (scale absorpcia).

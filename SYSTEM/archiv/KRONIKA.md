@@ -17,6 +17,38 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1d/R-03 · ŠEV `prepare_insert` / `commit_insert` V BUILDERI (v0.8.20, 30.8.2026, PR #265):** `CabinetBuilder.build` zlievalo normalizáciu, pridelenie ID, výpočet polohy,
+  otvorenie operácie a stavbu geometrie do jedného toku. GHOST Tool (vkladanie na klik) tak nemal **čo bezpečne držať pred klikom** — žiadny pripravený objekt, ktorý sa dá
+  nakresliť ako duch bez toho, aby už zasiahol model — a ani **ako položiť skrinku na finálnu polohu**: `transform:` mal len `rebuild`. Register to viedol ako **TVRDÝ blocker
+  bloku GHOST VKLADANIE** (R-03, P1, core). Dávka je štrukturálna: **správanie všetkých dnešných volajúcich sa nemení**, `actions_cabinet.rb` ani UI sa nedotkli.
+  **Čo vzniklo:** `prepare_insert(model, params)` vydá zmrazený `InsertPlan` (config + `home_z`) bez jedinej mutácie modelu, entít, ID či Undo stacku, a **zámerne bez**
+  `ensure_root_context` — ghost hover nesmie používateľovi zatvárať otvorený komponent. `commit_insert(model, plan, transform:, &block)` je jediné miesto, kde vklad mení model.
+  `build` je ich kompozícia so zachovaným poradím (`ensure_root_context` PRED normalizáciou, aby pri chybe validácie používateľ skončil v roote presne ako doteraz).
+  **Čo do návrhu pridal povinný Codex audit (2 BLOCKER + 4 FIX + 3 NOTE, session 01a05242):** (1) *validácia rigidného transformu* — pôvodný návrh prijímal `transform:` bez
+  kontroly; scale/skos/zrkadlo by postavili korpus, ktorého geometria nesedí s configom, a scale observer by ho pod `guarded` ani nezachytil, takže by chyba prešla ticho až do
+  výroby. Validátor je čistá funkcia nad 16 číslami z `to_a`; kontrola prvku `[15]` (uniformný mierkový deliteľ) je pritom ochrana pred **nekanonickou/legacy maticou** — moderný
+  SketchUp `[15]` drží kanonický a rovnomernú mierku premieta do osí, takže `scaling(2)` padne už na jednotkovosti osí. (2) *scale-lock OSTÁVA vnútri `guarded`* — presunúť transparentný follow-up von zo strážneho
+  okna vyzeralo ako čistejší rez, ale zápis DC atribútov mimo guardu by cez `EntitiesObserver#onElementModified` založil oneskorený dirty tik a transparentný presun ghost zón by
+  zasiahol Undo po dokončenom vložení (D-40). (3) *plytký freeze nestačí* — `zone_tree`, čelá, overridy aj sety sú vnorené, takže mrazí sa **rekurzívne**; a **až po hlbokej kópii**,
+  lebo `enum_val` vracia `v.to_s`, čo je pri Stringu ten istý objekt ako vstup — priamy freeze by zmrazil `params` volajúceho. (4) *identita dokumentu je referencia na `Model`*,
+  nie `guid`: ten sa mení pri každom uložení (rovnaká lekcia ako v #261 a #264). (5) *`ensure_root_context` sa musí OVERIŤ* — helper po výnimke alebo po 20 iteráciách ticho vracia
+  nil a pokračuje, takže bez kontroly postcondition by korpus skončil v cudzom komponente. **Priznaný zvyšok (vedomé hranice, nie dlh na skrytie):** kontrakt čistoty
+  `prepare_insert` je uzko formulovaný na *model, entity, ID a Undo* — `normalize` cez `Materials.normalized_abs_id` môže siahnuť na katalóg na disku a logovať (rieši sa inde);
+  `Construction.build_plan` sa do prepare **nepresúva**, lebo by sa validačné chyby zobrazili pred hardware blokom a pred commit-time snapshotmi; a `bounds_mm` plán zámerne
+  **nenesie** — envelope a kotvy si uzavrie až GHOST dávka proti `BuildPlan`u (YAGNI). Do stavby ide **pracovná nezmrazená kópia** plánu, lebo `PartKeys.migrate_overrides` zdieľa
+  vnorené hashe overridov a `resolve_part` v nich in-place upratuje sticky `edge_warnings` — plán tak ostáva nemenný a stavba sa nezmenila ani o riadok.
+  **Čo pridalo review kolo (Codex CLI, 4 nálezy, opravené pred mergom):** (P1) *validovaná transformácia sa musí SNAPSHOTNÚŤ* — `Geom::Transformation` je mutovateľná cez `set!`,
+  takže medzi validáciou a použitím bola diera: sprievodný blok beží v tej istej operácii **až po** validácii a mohol transform prepísať na mierku; korpus by vznikol zväčšený pod
+  `guarded` guardom, kde ho observer nezachytí. Fix: `to_a` sa číta **práve raz** a z tých istých overených čísel sa postaví kanonický snapshot, s ktorým sa ďalej pracuje výhradne.
+  (P2) *nová signatúra rozbíjala keyword-hash volanie* — pred R-03 nemal `build` žiadny keyword parameter, takže Ruby 3 prevádzalo `build(model, type: 'lower', width: 600)` na
+  pozičný hash; holý `transform:` by také volania zhodil na `unknown keyword`. Fix: `build(model, params = nil, transform: nil, **kw, &block)` — chýbajúce `params` sa doplnia z
+  `**kw`, `transform` je jediné rezervované meno a params dvakrat je `ArgumentError`, nie tiché zliatie. (P3) upresnená semantika prvku `[15]` v textoch (viď vyššie) a doplnené
+  mutačné vetvy freeze testov (rozdelené zóny s `cuts`, `hardware_overrides`, `hardware_sets` vrátane selectora a jeho pásiem, vnorené `edge_warnings`, stringový kľúč).
+  **Testy:** 2112 headless (nová sada `test_r03_insert_sev` — mrazenie sa dokazuje **pokusmi o mutáciu** vnorených štruktúr, nie holým `frozen?`, a odmietnutia sa merajú
+  model-stubom, ktorý pri akomkoľvek dotyku vyhodí výnimku) · 73 JS sád · in-SU **1088 PASS / 0 FAIL** (nová sekcia `run_r03` + `run_r03_async`: vklad na vlastný rigidný transform
+  sadne presne a 1× Späť ho vráti celý, vklad z otvoreného komponentu skončí top-level, odmietnutia nevyrobia korpus ani krok Späť, a výnimka v sprievodnom bloku vráti geometriu
+  **aj modelový zápis**). **Tvrdý blocker GHOST tým padol** — package smie na Windows štartovať.
+
 - **1d/R-02 · GUARD IDENTITY DOKUMENTU V ZAPISOVACÍCH HANDLEROCH PANELA (v0.8.19, 30.8.2026, PR #264):** panel je JEDEN pre všetky otvorené dokumenty a callback HtmlDialogu je
   asynchrónny — 14 zapisovacích handlerov (cabinet 6 · hardware 2 · board 6) pritom brali cieľ z `Sketchup.active_model` a payload identitu dokumentu vôbec nenieslo. Echo
   `cabinet_id`/`board_id`, ktoré tie cesty už mali, prepnutie dokumentu **nezachytí**: ID sú jedinečné len v rámci modelu, takže `CAB-001` aj `BRD-001` sú v každej zákazke —
