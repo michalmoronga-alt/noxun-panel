@@ -79,12 +79,34 @@ module NxR03
     Tr.new([0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1, 0, 100, 0, 0, 1])
   end
 
+  # FIXTURE pokryva VSETKY vetvy `normalize`, ktore stavaju vnorene struktury:
+  # rozdelene zony s `cuts`, cela, ABS overridy vratane sticky `edge_warnings`,
+  # rucne zasahy do kovania (pole) a sety kovania vratane SELECTORA (pasma).
   def params
     { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0,
       'bottom_mode' => +'under_sides',
-      'zone_tree' => { 'id' => 'Z1', 'shelves' => 2, 'children' => [] },
+      'zone_tree' => { 'id' => 'Z1', 'shelves' => 0,
+                       'split' => { 'axis' => 'v', 'count' => 2,
+                                    'cuts' => [{ 'size' => 280.0, 'locked' => true },
+                                               { 'size' => nil, 'locked' => false }] },
+                       'children' => [{ 'id' => 'Z1.1', 'shelves' => 1, 'children' => [] },
+                                      { 'id' => 'Z1.2', 'shelves' => 0, 'children' => [] }] },
       'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'wings' => '1' }] },
-      'part_overrides' => { 'cabinet/side:left' => { 'material_id' => 'K009_PW_DTDL_18' } } }
+      'part_overrides' => {
+        +'cabinet/side:left' => {
+          'material_id' => 'K009_PW_DTDL_18',
+          'edges' => { 'L1' => nil },
+          'edge_warnings' => { 'L1' => { 'reason' => 'abs_04_manual', 'abs_id' => nil } }
+        }
+      },
+      'hardware_overrides' => [{ 'owner_part_key' => nil, 'generic_type' => 'leg',
+                                 'rule_id' => 'legs_default', 'quantity' => 6 }],
+      'hardware_sets' => {
+        'leg' => 'SET_NOHY',
+        'hinge' => { 'param' => 'width',
+                     'bands' => [{ 'min' => 0.0, 'max' => 600.0, 'set_id' => 'SET_A' },
+                                 { 'min' => 601.0, 'max' => 1200.0, 'set_id' => 'SET_B' }] }
+      } }
   end
 end
 
@@ -117,6 +139,19 @@ NxTest.test('R-03: plan je zmrazeny AJ VO VNUTRI — zone_tree sa neda zmenit') 
   NxTest.assert(plan.config.frozen?, 'config ma byt zmrazeny')
   NxTest.assert_raise('frozen') { plan.config[:zone_tree]['shelves'] = 9 }
   NxTest.assert_raise('frozen') { plan.config[:zone_tree]['children'] << { 'id' => 'X' } }
+  NxTest.assert_raise('frozen') { plan.config[:zone_tree]['children'].first['shelves'] = 5 }
+end
+
+NxTest.test('R-03: zmrazenie plati na ROZDELENE zony — split aj pole cuts') do
+  plan = NxR03::CB.prepare_insert(NxR03::TrapModel.new, NxR03.params)
+  split = plan.config[:zone_tree]['split']
+  NxTest.assert(split.is_a?(Hash), 'fixture ma niest rozdelenu korenovu zonu')
+  cuts = split['cuts']
+  NxTest.assert_equal(2, cuts.length)
+  NxTest.assert_raise('frozen') { split['count'] = 3 }
+  NxTest.assert_raise('frozen') { cuts << { 'size' => nil, 'locked' => false } }
+  NxTest.assert_raise('frozen') { cuts.first['size'] = 999.0 }
+  NxTest.assert_raise('frozen') { cuts.first['locked'] = false }
 end
 
 NxTest.test('R-03: zmrazenie plati na cela (pole items aj jeho zaznamy)') do
@@ -130,10 +165,49 @@ end
 NxTest.test('R-03: zmrazenie plati na part_overrides aj na stringove hodnoty enumov') do
   plan = NxR03::CB.prepare_insert(NxR03::TrapModel.new, NxR03.params)
   ov = plan.config[:part_overrides]
+  rec = ov['cabinet/side:left']
   NxTest.assert_raise('frozen') { ov['cabinet/side:left']['material_id'] = 'INE' }
   NxTest.assert_raise('frozen') { ov['nova/rola'] = {} }
+  NxTest.assert_raise('frozen') { rec['edges']['L1'] = 'ABS_X' }
+  # sticky remapove dovody su este o uroven hlbsie (resolve_part ich in-place
+  # upratuje — o to viac musi PLAN ostat nedotknutelny)
+  NxTest.assert_raise('frozen') { rec['edge_warnings']['L1']['reason'] = 'ine' }
+  NxTest.assert_raise('frozen') { rec['edge_warnings']['L2'] = { 'reason' => 'x' } }
   NxTest.assert(plan.config[:bottom_mode].frozen?, 'stringovy enum ma byt zmrazeny')
   NxTest.assert_raise('frozen') { plan.config[:bottom_mode] << 'x' }
+end
+
+NxTest.test('R-03: kluc hasha je VLASTNA zmrazena kopia (part_key sa neda prepisat na mieste)') do
+  p = NxR03.params
+  plan = NxR03::CB.prepare_insert(NxR03::TrapModel.new, p)
+  key = plan.config[:part_overrides].keys.first
+  NxTest.assert_equal('cabinet/side:left', key)
+  NxTest.assert(key.frozen?, 'stringovy kluc ma byt zmrazeny')
+  NxTest.assert_raise('frozen') { key << '/hacknute' }
+  NxTest.refute(key.equal?(p['part_overrides'].keys.first), 'plan ma drzat VLASTNU kopiu kluca')
+end
+
+NxTest.test('R-03: zmrazenie plati na hardware_overrides (pole aj jeho zaznamy)') do
+  plan = NxR03::CB.prepare_insert(NxR03::TrapModel.new, NxR03.params)
+  hw = plan.config[:hardware_overrides]
+  NxTest.assert(hw.is_a?(Array) && hw.length == 1, "fixture ma niest rucny zasah: #{hw.inspect}")
+  NxTest.assert_raise('frozen') { hw << { 'generic_type' => 'leg' } }
+  NxTest.assert_raise('frozen') { hw.first['quantity'] = 99 }
+  NxTest.assert_raise('frozen') { hw.first['rule_id'] << 'x' }
+end
+
+NxTest.test('R-03: zmrazenie plati na hardware_sets VRATANE selectora (pasma)') do
+  plan = NxR03::CB.prepare_insert(NxR03::TrapModel.new, NxR03.params)
+  sets = plan.config[:hardware_sets]
+  NxTest.assert_equal('SET_NOHY', sets['leg'])
+  sel = sets['hinge']
+  NxTest.assert(sel.is_a?(Hash) && sel['bands'].length == 2, "fixture ma niest selector: #{sel.inspect}")
+  NxTest.assert_raise('frozen') { sets['leg'] = 'INY_SET' }
+  NxTest.assert_raise('frozen') { sets['drawer'] = 'SET_X' }
+  NxTest.assert_raise('frozen') { sel['param'] = 'height' }
+  NxTest.assert_raise('frozen') { sel['bands'] << { 'min' => 0.0, 'max' => 1.0, 'set_id' => 'X' } }
+  NxTest.assert_raise('frozen') { sel['bands'].first['set_id'] = 'SET_PODVRHNUTY' }
+  NxTest.assert_raise('frozen') { sel['bands'].first['max'] = 5000.0 }
 end
 
 NxTest.test('R-03: params volajuceho ostanu NEMRAZENE a nezmenene (deep copy pred freeze)') do
@@ -143,6 +217,11 @@ NxTest.test('R-03: params volajuceho ostanu NEMRAZENE a nezmenene (deep copy pre
   NxTest.refute(p['bottom_mode'].frozen?, 'string volajuceho sa NESMIE zmrazit')
   NxTest.refute(p['zone_tree'].frozen?, 'hash volajuceho sa NESMIE zmrazit')
   NxTest.refute(p['fronts']['items'].frozen?, 'pole volajuceho sa NESMIE zmrazit')
+  NxTest.refute(p['hardware_overrides'].frozen?, 'pole kovania volajuceho sa NESMIE zmrazit')
+  NxTest.refute(p['hardware_sets']['hinge']['bands'].frozen?, 'pasma selectora volajuceho sa NESMU zmrazit')
+  # POZOR: stringove kluce hasha mrazi SAM Ruby (`Hash#[]=` ich dedupuje),
+  # takze na strane volajuceho sa kluce netestuju — testuje sa, ze plan drzi
+  # VLASTNU kopiu kluca (test nizsie), nie ten isty objekt.
   NxTest.assert_equal(before, p)
 end
 
@@ -171,11 +250,25 @@ NxTest.test('R-03: MIERKA v osi sa odmieta') do
                 ))
 end
 
-NxTest.test('R-03: ROVNOMERNA mierka schovana v prvku [15] sa odmieta') do
-  # Geom::Transformation.scaling(2) necha osi jednotkove a mierku da sem.
+NxTest.test('R-03: NEKANONICKA matica s mierkou v prvku [15] sa odmieta') do
+  # [15] je uniformny mierkovy DELITEL. Moderny SketchUp ho drzi kanonicky (1.0)
+  # a rovnomernu mierku premieta rovno do osi — `scaling(2)` teda padne uz na
+  # jednotkovosti osi. Tato kontrola je ochrana pred NEKANONICKOU / legacy
+  # maticou (surove pole, matica zo starsieho suboru), ktora mierku nesie tam.
   NxTest.refute(NxR03::CB.rigid_transform?(
                   NxR03::Tr.new([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0.5])
                 ))
+  # a kanonicky zapis toho isteho zvacsenia (mierka v osiach) tiez neprejde
+  NxTest.refute(NxR03::CB.rigid_transform?(
+                  NxR03::Tr.new([2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1])
+                ))
+end
+
+NxTest.test('R-03: rigid_matrix? je cista funkcia nad 16 cislami (bez objektu)') do
+  NxTest.assert(NxR03::CB.rigid_matrix?([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 5, 6, 7, 1]))
+  NxTest.refute(NxR03::CB.rigid_matrix?(nil))
+  NxTest.refute(NxR03::CB.rigid_matrix?([1, 0, 0]))
+  NxTest.refute(NxR03::CB.rigid_matrix?(Array.new(16) { 'x' }))
 end
 
 NxTest.test('R-03: SKOSENIE (jednotkove, ale nekolme osi) sa odmieta') do
@@ -239,6 +332,35 @@ NxTest.test('R-03: neregidny transform sa odmietne PRED zatvorenim edit kontextu
   NxTest.assert_equal([], m.touched) # ziadny close_active, ziadna operacia
 end
 
+NxTest.test('R-03/P1: snapshot transformu odmietne neregidnu maticu skor, nez cokolvek postavi') do
+  # `Geom::Transformation` headless neexistuje — testujeme ODMIETACIU vetvu,
+  # ktora bezi PRED zostavenim snapshotu. Kanonicka vetva je in-SU (`run_r03`).
+  bad = NxR03::Tr.new([1, 0, 0, 0, 0.6, 0.8, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
+  NxTest.assert_raise('Poloha vkladu') { NxR03::CB.snapshot_insert_transform!(bad) }
+  NxTest.assert_raise('Poloha vkladu') { NxR03::CB.snapshot_insert_transform!(nil) }
+end
+
+NxTest.test('R-03/P2: keyword-hash volanie build(model, type:, width:) ostava platne') do
+  # Pred R-03 nemal `build` ziadny keyword parameter, takze Ruby 3 taketo
+  # volanie prevadzalo na POZICNY hash. Ked sa beh dostane az k zatvaraniu
+  # edit kontextu, znamena to, ze keywordy sa spracovali ako params
+  # (a NIE ako „unknown keyword" ArgumentError).
+  m = NxR03::StuckModel.new
+  NxTest.assert_raise('zavrieť otvorený komponent') do
+    NxR03::CB.build(m, type: 'lower', width: 600.0, height: 720.0)
+  end
+  NxTest.assert(m.closes.positive?, 'build sa mal dostat az k zatvaraniu edit kontextu')
+end
+
+NxTest.test('R-03/P2: pozicny hash funguje dalej; params dvakrat = chyba volajuceho') do
+  m = NxR03::StuckModel.new
+  NxTest.assert_raise('zavrieť otvorený komponent') { NxR03::CB.build(m, NxR03.params) }
+  m2 = NxR03::StuckModel.new
+  err = NxTest.assert_raise('dvakrat') { NxR03::CB.build(m2, NxR03.params, width: 500.0) }
+  NxTest.assert(err.is_a?(ArgumentError), "ocakavany ArgumentError, dostal #{err.class}")
+  NxTest.assert_equal(0, m2.closes) # chyba padne PRED akymkolvek dotykom modelu
+end
+
 NxTest.test('R-03: zlyhane zatvorenie edit kontextu zastavi vklad PRED operaciou') do
   m = NxR03::StuckModel.new
   plan = NxR03::CB.prepare_insert(m, NxR03.params)
@@ -271,10 +393,26 @@ end
 
 NxTest.test('R-03: build zatvara edit kontext PRED prepare_insert (dnesne poradie chyb)') do
   src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'cabinet_builder.rb'))
-  body = src[/def build\(model, params, transform:.*?\n        end/m].to_s
+  body = src[/def build\(model, params = nil.*?\n        end/m].to_s
   NxTest.assert(!body.empty?, 'telo build sa nenaslo')
   NxTest.assert(body.index('ensure_root_context') < body.index('prepare_insert'),
                 "ensure_root_context ma byt PRED prepare_insert: #{body}")
+end
+
+NxTest.test('R-03/P1: commit_insert pouziva SNAPSHOT, nie objekt volajuceho') do
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'cabinet_builder.rb'))
+  body = src[/def commit_insert\(model, plan.*?\n          inst\n        end/m].to_s
+  NxTest.assert(!body.empty?, 'telo commit_insert sa nenaslo')
+  NxTest.assert(body.include?('snapshot_insert_transform!'), 'commit ma robit snapshot transformu')
+  # Za snapshotom uz `transform` (objekt volajuceho) nesmie nikam vstupovat —
+  # jediny KODOVY riadok s nim je prave vyroba snapshotu (komentare sa nepocitaju).
+  code = body.lines.reject { |l| l.strip.start_with?('#') }
+  uses = code.select { |l| l =~ /\btransform\b/ }
+  NxTest.assert_equal(2, uses.length, # signatura + riadok snapshotu
+                      "objekt volajuceho sa smie pouzit LEN pri snapshote: #{uses.inspect}")
+  NxTest.assert(uses.last.include?('snapshot_insert_transform!'),
+                "posledne pouzitie `transform` ma byt snapshot: #{uses.last}")
+  NxTest.assert(body.include?('placement ||'), 'dalej sa ma pouzivat VYHRADNE snapshot (placement)')
 end
 
 NxTest.test('R-03: scale-lock ostava VNUTRI guarded bloku, attach_one az mimo neho') do

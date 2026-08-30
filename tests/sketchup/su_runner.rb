@@ -33,7 +33,9 @@
 #     abs_missing, remap; realny %APPDATA% katalog sa necita ani nezapisuje).
 #   R-03 sekcia (blok 1d) — SEV prepare_insert / commit_insert: ciste
 #     pripravenie planu (ziadny korpus, ziadny krok Spat), vklad na EXPLICITNY
-#     rigidny transform (poloha + otocenie, 1x Spat vrati cely vklad), legacy
+#     rigidny transform (poloha + otocenie, 1x Spat vrati cely vklad), SNAPSHOT
+#     transformu (mutacia `set!` v sprievodnom bloku uz polohu neovplyvni),
+#     kompatibilita keyword-hash volania `build(model, type:, width:)`, legacy
 #     cesta bez transformu (vedla existujucich, horna na UPPER_HANG_Z), vklad
 #     z otvoreneho edit kontextu (korpus ostava TOP-LEVEL) a ODMIETNUTIA
 #     (mierka, rovnomerna mierka, zrkadlo, plan z ineho dokumentu) bez jedinej
@@ -1372,6 +1374,41 @@ module NoxunSuRunner
     Sketchup.undo
     ok('R-03: 1x Spat vratil CELY vklad na vlastnom transforme',
        !inst.valid? && cabinets(model).length == before)
+
+    # 2b) P1: transformacia volajuceho je MUTOVATELNA (`set!`). Sprievodny blok
+    #     bezi UZ PO validacii — keby commit pracoval s objektom volajuceho,
+    #     skrinka by vznikla podla PODVRHNUTEJ matice (zvacsena) a to POD
+    #     `guarded` guardom, takze by to scale observer ani nezachytil.
+    #     Snapshot to musi utnut: poloha z POVODNEJ (overenej) matice, ziadna mierka.
+    mut = Geom::Transformation.translation(e::Units.point(2400.0, 0.0, 0.0))
+    inst_m = e::CabinetBuilder.commit_insert(model, e::CabinetBuilder.prepare_insert(model, params),
+                                            transform: mut) do
+      mut.set!(Geom::Transformation.scaling(ORIGIN, 3.0, 3.0, 3.0))
+    end
+    om = inst_m.transformation.origin
+    clean = e::ScaleWatch.scale_factors(inst_m.transformation).nil?
+    ok("R-03 P1: mutacia transformu v sprievodnom bloku NEOVPLYVNILA polohu (#{mm(om.x).round(1)}, #{mm(om.y).round(1)}, #{mm(om.z).round(1)})",
+       (mm(om.x) - 2400.0).abs <= TOL && mm(om.y).abs <= TOL && mm(om.z).abs <= TOL)
+    ok("R-03 P1: vlozeny korpus NIE JE zvacseny (transformacia je cista: #{clean})", clean)
+    dw = inst_m.definition.bounds.width
+    ok("R-03 P1: geometria sedi s configom (sirka #{mm(dw).round(1)} mm)", (mm(dw) - 600.0).abs <= TOL)
+    cleanup(model)
+
+    # 2c) P2: keyword-hash volanie `build(model, type:, width:)` musi ostat
+    #     platne — pred R-03 ho Ruby prevadzalo na pozicny hash a panel aj
+    #     starsie testy ho takto pouzivaju.
+    kw = e::CabinetBuilder.build(model, type: 'lower', width: 555.0, height: 700.0, depth: 500.0)
+    kwcfg = e::Store.config(kw) || {}
+    ok("R-03 P2: keyword-hash volanie build(...) prislo ako parametre skrinky (sirka #{kwcfg['width']})",
+       (kwcfg['width'].to_f - 555.0).abs < 0.01 && (kwcfg['height'].to_f - 700.0).abs < 0.01)
+    dvakrat = begin
+      e::CabinetBuilder.build(model, params, width: 500.0)
+      false
+    rescue ArgumentError => ex
+      ex.message.include?('dvakrat')
+    end
+    ok('R-03 P2: parametre dvakrat (pozicne aj keywordmi) = jasna chyba volajuceho', dvakrat)
+    cleanup(model)
 
     # 3) legacy cesta (transform: nil) vklada VEDLA existujucich, Z podla typu.
     a = e::CabinetBuilder.build(model, params)

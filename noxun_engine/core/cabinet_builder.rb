@@ -146,7 +146,23 @@ module Noxun
         # `commit_insert` si root este raz idempotentne overi.
         # `transform:` = FINALNA transformacia instancie (GHOST Tool poloha);
         # nil = dnesna cesta „vedla existujucich" (`next_x` + `home_z`).
-        def build(model, params, transform: nil, &block)
+        #
+        # KOMPATIBILITA VOLANIA (review P2): pred R-03 nemal `build` ZIADNY
+        # keyword parameter, takze Ruby 3 prevadzalo `build(model, type: 'lower',
+        # width: 600)` na POZICNY hash. Holy `transform:` by taketo volania
+        # rozbil (ArgumentError: unknown keyword). Preto je `params` VOLITELNY
+        # a zvysne keywordy sa zbieraju do `**kw`: ked `params` chyba, pouziju
+        # sa ONE ako parametre skrinky. Jedine REZERVOVANE meno je `transform`
+        # — nie je to parameter korpusu (`normalize` ho nepozna), ale kto by ho
+        # v params predsa len chcel, musi params poslat POZICNE. Params dvakrat
+        # (pozicne AJ keywordmi) je chyba volajuceho, nie tiche zliatie.
+        def build(model, params = nil, transform: nil, **kw, &block)
+          if params.nil?
+            params = kw
+          elsif !kw.empty?
+            raise ArgumentError,
+                  "build: parametre skrinky prisli dvakrat — pozicne aj ako keywordy (#{kw.keys.join(', ')})"
+          end
           ensure_root_context(model)
           commit_insert(model, prepare_insert(model, params), transform: transform, &block)
         end
@@ -192,7 +208,14 @@ module Noxun
           unless plan.is_a?(InsertPlan) && plan.for_model?(model)
             raise 'Pripravený vklad patrí inému dokumentu — skrinku vlož v okne, v ktorom si ju pripravil.'
           end
-          validate_insert_transform!(transform) unless transform.nil?
+          # Review P1: `Geom::Transformation` je MUTOVATELNA (`set!`). Overit
+          # objekt volajuceho a potom ho pouzit by bola diera medzi kontrolou
+          # a pouzitim — sprievodny blok (H2) bezi v tej istej operacii a mohol
+          # by transform prepisat na mierku UZ PO validacii; korpus by vznikol
+          # zvacseny POD `guarded` guardom, takze by ho scale observer ani
+          # nezachytil. Preto sa hned pri validacii vyrobi KANONICKY SNAPSHOT
+          # z tych istych overenych 16 cisel a dalej sa pracuje VYHRADNE s nim.
+          placement = transform.nil? ? nil : snapshot_insert_transform!(transform)
 
           ensure_root_context(model)
           unless root_context?(model)
@@ -205,7 +228,7 @@ module Noxun
           # Plan musi ostat nemenny, dnesne spravanie stavby nezmenene.
           cfg = deep_copy_cfg(plan.config)
           cid = Ids.next_cabinet_id(model)
-          tr = transform || Geom::Transformation.translation(Units.point(next_x(model), 0, plan.home_z))
+          tr = placement || Geom::Transformation.translation(Units.point(next_x(model), 0, plan.home_z))
           inst = nil
           # guarded: vlozenie je vlastna zmena pluginu. EntitiesObserver.onElementAdded (davkovany
           # na commit) tak vidi @rebuilding=true a novy korpus nepovazuje za kopiu (ziadny extra tick).
@@ -277,22 +300,43 @@ module Noxun
         # NIC v modeli nezmenilo.
         def validate_insert_transform!(tr)
           return if rigid_transform?(tr)
+          raise_bad_insert_transform!
+        end
+
+        # R-03 + review P1: validacia a SNAPSHOT v jednom kroku. `to_a` sa cita
+        # PRAVE RAZ a kanonicka matica sa postavi z TYCH ISTYCH overenych cisel
+        # — medzi kontrolou a pouzitim tak nie je zadna medzera, ktorou by sa
+        # dala podstrcit ina hodnota (`Geom::Transformation#set!`).
+        def snapshot_insert_transform!(tr)
+          vals = tr.respond_to?(:to_a) ? Array(tr.to_a) : nil
+          raise_bad_insert_transform! unless rigid_matrix?(vals)
+          Geom::Transformation.new(vals.map(&:to_f))
+        end
+
+        def raise_bad_insert_transform!
           raise 'Poloha vkladu nie je platná — korpus sa smie položiť len otočením a posunutím ' \
                 '(mierka, skosenie ani zrkadlenie nie sú povolené).'
         end
 
-        # R-03: CISTA kontrola rigidity (ziadny SketchUp objekt netreba — cita sa
-        # `to_a`, teda 16 cisel). SketchUp uklada maticu po STLPCOCH:
-        #   [0..2] os X · [4..6] os Y · [8..10] os Z · [12..14] posun
-        #   [3],[7],[11] perspektiva · [15] UNIFORMNA mierka
-        # POZOR na [15]: `Geom::Transformation.scaling(2)` necha osi jednotkove
-        # a mierku ulozi prave sem (hodnota 0.5) — bez tejto kontroly by
-        # rovnomerne zvacsenie preslo ako „rigidne".
-        # Rigidita = jednotkove a navzajom kolme osi + kladny determinant
-        # (zaporny = zrkadlo).
+        # R-03: kontrola rigidity nad OBJEKTOM (duck-type — staci `to_a`).
         def rigid_transform?(tr)
-          m = tr.respond_to?(:to_a) ? Array(tr.to_a) : nil
-          return false unless m && m.length == 16
+          rigid_matrix?(tr.respond_to?(:to_a) ? Array(tr.to_a) : nil)
+        end
+
+        # R-03: CISTA kontrola rigidity nad 16 cislami. SketchUp uklada maticu
+        # po STLPCOCH:
+        #   [0..2] os X · [4..6] os Y · [8..10] os Z · [12..14] posun
+        #   [3],[7],[11] perspektiva · [15] uniformny mierkovy DELITEL
+        # Rigidita = jednotkove a navzajom kolme osi + determinant +1 (zaporny
+        # = zrkadlo) + nulova perspektiva.
+        # POZNAMKA k [15] (review P3a): moderny SketchUp drzi tento prvok
+        # KANONICKY (1.0) a rovnomernu mierku premieta rovno do osi — na
+        # `scaling(2)` staci kontrola jednotkovosti osi. Kontrola [15] je tu
+        # ako ochrana pred NEKANONICKOU / legacy maticou (surove pole zostavene
+        # rucne, matica zo starsieho suboru), ktora mierku nesie prave tam;
+        # bez nej by taka matica presla ako „rigidna".
+        def rigid_matrix?(m)
+          return false unless m.is_a?(Array) && m.length == 16
           return false unless m.all? { |v| v.is_a?(Numeric) && v.to_f.finite? }
           m = m.map(&:to_f)
           return false unless (m[15] - 1.0).abs <= RIGID_TOL
