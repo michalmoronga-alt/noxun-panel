@@ -670,6 +670,21 @@
     if (typeof absModalCloseSilent === 'function') absModalCloseSilent(); // modal chybajucej ABS
     if (typeof closeSaveTemplateModal === 'function') closeSaveTemplateModal();
     if (typeof closeSimilarModal === 'function') closeSimilarModal();     // „Použiť na podobné"
+    // Zatvarka „apply odoslany, echo este nedoslo" je DRUHA polovica podmienky
+    // `keepGaps`. Nuluje sa VYHRADNE tu, nie v `cancelCabinetEdits` (interne
+    // review kola 4, P2): tam bezi aj jednodokumentove flow — zruseny okamzity
+    // flush a rozpisany vyraz v poli — a zhodena zatvarka by nechala najblizsie
+    // echo zmazat prave pridane celo. Tu bezi len pri REALNEJ zmene dokumentu.
+    if (typeof cabEditsInFlight !== 'undefined') cabEditsInFlight = false;
+    // Fokus: CEF drzi `document.activeElement` aj po strate fokusu okna, takze
+    // `bset` (karta dosky) by po prepnuti dokumentu pole s kurzorom PRESKOCILO
+    // a nechalo v nom hodnotu zo starej zakazky — Enter by ju poslal do novej.
+    // Blur pred prekreslenim to zavrie; fokus nie je nikdy dovod, aby zahodenie
+    // stavu zlyhalo, preto try/catch.
+    try {
+      if (typeof document !== 'undefined' && document.activeElement &&
+          typeof document.activeElement.blur === 'function') document.activeElement.blur();
+    } catch (e) { /* fokus sa nepodarilo zhodit — stav je aj tak uz zahodeny */ }
   }
 
   // R-02: JEDNO miesto, kde ZAPISOVY payload panela dostane identitu dokumentu.

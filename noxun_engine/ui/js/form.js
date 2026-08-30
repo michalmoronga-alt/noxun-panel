@@ -189,14 +189,18 @@
 
   // Zahodenie rozpisanych editov BEZ odoslania. Vola sa aj centralne pri zmene
   // dokumentu (`nxDropDocState` v shell.js) — pending patri starej zakazke.
+  //
+  // `cabEditsInFlight` sa TU VEDOME NENULUJE (interne review kola 4, P2):
+  // tato funkcia bezi aj v JEDNODOKUMENTOVOM flow — pri zrusenom okamzitom
+  // flushi (cervene pole zastavi validacia) a pri rozpisanom vyraze v poli.
+  // Zhodenim zatvarky by najblizsie echo dostalo `keepGaps = false` a zmazalo
+  // by prave pridane celo aj rozpisane gap hodnoty. Pre prepnutie dokumentu je
+  // to zbytocne (`sameDoc` v `keepGaps` + bezpodmienecne nulovanie v `bridge.js`
+  // to kryju) — zatvarku preto nuluje `nxDropDocState`, ktore bezi VYHRADNE
+  // pri realnej zmene dokumentu.
   function cancelCabinetEdits(){
     if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; }
     applyPendingGuid = null;
-    // R-02 (review #264 kolo 3): zatvarka „apply odoslany, echo este nedoslo"
-    // je DRUHA polovica podmienky `keepGaps`. Sama o sebe prezije prepnutie
-    // dokumentu, takze bez jej vynulovania by prvy push v novom dokumente
-    // zachoval rozpisane riadky ciel zo stareho.
-    cabEditsInFlight = false;
   }
 
   function updateAvailable(){
