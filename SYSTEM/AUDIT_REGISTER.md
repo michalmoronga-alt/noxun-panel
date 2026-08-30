@@ -139,17 +139,23 @@ SETOV a mapovaní (členov nie) → starší plugin knižnicu prečíta, oreže 
 `:newer`/`:foreign`/`:unknown_shape`/`:unreadable`), maticu počíta čistá `assess_library_doc`. Codex audit návrhu pridal
 2 BLOCKERY a 3 FIXy, všetky zapracované: **(B2)** brána sa vyhodnocuje **pod zámkom nad čerstvo prečítaným súborom pred
 KAŽDÝM zápisom** — cachované `:ok` nie je dôkaz (druhá inštancia môže súbor medzitým nahradiť); jedno miesto v `write`
-kryje všetky zapisovacie cesty. **(B1)** read-only knižnica sa nesmie ani POUŽIŤ: `usable_library` vracia prázdno,
-`global_default_state` **nil** (odmietnu `ensure_project_state!`/`set_project_mapping!`/`add_project_sets!`/
-`freeze_template_sets!`/global fallback `resolve_set_def`), `merge_project_sets_seed!` má `:blocked` a súpis bez snapshotu
-skončí ORANGE **`library_incompatible`** (nový kód v `UNMAPPED_REASONS`; panel ide cez tú istú bránu, aby sa so súpisom
-nerozišiel). Platný projektový snapshot beží ďalej. **(F3)** seed-merge sa nad read-only knižnicou nerobí a nikdy sa
-nevracia SEED. **(F4)** detektor straty je **whitelist kľúčov** (set/člen/pásma/selector) + počet ČLENOV per set, ten istý
-pre knižnicu aj `project_state_status`; legacy konverzie hodnôt prejdú. **(F5)** `sets_payload` nesie `library_state` +
+kryje všetky zapisovacie cesty. **(B1)** read-only knižnica sa nesmie ani POUŽIŤ:
+`global_default_state` vracia **nil** (odmietnu `ensure_project_state!`/`set_project_mapping!`/`add_project_sets!`/global
+fallback `resolve_set_def`), `merge_project_sets_seed!` aj `freeze_template_sets!` majú `:blocked`, `template_set_defs` nil,
+a súpis bez snapshotu skončí ORANGE **`library_incompatible`** (nový kód v `UNMAPPED_REASONS`; panel ide cez tú istú bránu
+vrátane **neuplatnenia overridu skrinky**, aby sa so súpisom nerozišiel). Platný projektový snapshot beží ďalej.
+**(F3)** seed-merge sa nad read-only knižnicou nerobí a nikdy sa nevracia SEED. **(F4)** detektor straty má DVE vrstvy —
+**whitelist kľúčov** (nové pole) + **round-trip `normalize_sets`/`members_lost?`** (nová HODNOTA známeho kľúča, napr.
+`per: 'length'`, vrátane počtu položiek radu `code_by_nl`); mapovanie cez `parse_mapping` bez `set_ids` (odkaz na zmazaný
+set nie je strata). Obe vrstvy používa aj `project_state_status`. **(F5)** `sets_payload` nesie `library_state` +
 `library_reason`, sekcia `hw` ukazuje dôvod bannerom a vypína globálne mutácie. `write` stampuje `std` podľa OBSAHU;
 **priznané (NOTE 7):** historický `std: 1` s novým obsahom sa neopravuje sám — marker sa povýši prvým legitímnym zápisom.
-Degraded/`.bak` (R-11) sa **nerieši**, len sa mu nezavadzia (nový dôvod patrí do tej istej matice s vlastným kódom).
-Testy `tests/pure/test_r07_kniznica_brana.rb` (14 scenárov vrátane dvojinštančného) + `tests/js/test_r07_kniznica_ui.js`.
+**Interné slepé review (2×P1, 3×P2, 2×P3)** doplnilo: stav sa **NECACHUJE** a `read_library` pri read-only vracia **prázdno**
+(`load` je bezpečný z princípu; samostatná „bezpečná" metóda zanikla — stačilo raz siahnuť na `load`); poškodený primár
+**bez zálohy** ostáva **samoopravný ako na maine** (read-only s cestou v hláške až keď sa nedá prečítať ani `.bak`).
+Degraded/`.bak` (**R-11**) sa **nerieši**, len sa mu nezavadzia (nový dôvod patrí do tej istej matice s vlastným kódom).
+Testy `tests/pure/test_r07_kniznica_brana.rb` (19 scenárov: dvojinštančný + reprodukcie všetkých nálezov review) +
+`tests/js/test_r07_kniznica_ui.js`.
 
 ### R-08 · P1 · core · `core/json_file_store.rb:36-43` + sets/rules/abs_rules/dim_series/supplier_settings
 Read-modify-write globálnych katalógov bez medziprocesového zámku (revision check mimo zámku; globálne mapovanie

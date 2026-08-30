@@ -187,27 +187,39 @@ marker `std`, neznámy tvar člena ticho zahodila a prvým zápisom stratu **zve
 Od tejto dávky má knižnica **STAV** (vzor `HardwareCatalog.assess!`): `library_state` = `:ok` | `:read_only`, `library_state_reason` (hotová SK veta pre používateľa) a `library_state_code`
 (`:newer` · `:foreign` · `:unknown_shape` · `:unreadable`). Maticu počíta ČISTÁ `assess_library_doc(doc)` nad dokumentom — bez IO, takže sa dá vyhodnotiť aj nad súborom čerstvo prečítaným pod zámkom.
 
-Tri veci, ktoré rozhodujú, či je brána naozaj brána:
-- **Kontrola beží POD ZÁMKOM pred KAŽDÝM zápisom.** Cachované `:ok` nie je dôkaz: druhá inštancia (novší plugin) mohla súbor medzitým nahradiť a náš zápis by ho zhodil na tvar, ktorému rozumieme my.
-  Brána preto sedí v `write` — pod `Materials.with_catalog_lock` (R-08), po `JsonFileStore.reload!`, nad **čerstvo prečítaným** dokumentom. Jedno miesto kryje všetky zapisovacie cesty
-  (`save_set!` · `delete_set!` · `set_global_mapping!` · seed-merge · `ensure_seeded`), lebo všetky končia tu; odmietnutie je ich vlastný NEÚSPEŠNÝ výsledok (`false` / `:write_failed`), nikdy tichý úspech.
-- **Read-only knižnica sa nesmie ani POUŽIŤ.** Zákaz zápisu sám o sebe nechráni: nákup by sa ďalej počítal z **orezaných** dát. Čítacie cesty preto berú `usable_library` (pri `:read_only` **prázdno**),
-  `global_default_state` vracia **nil** (a s ňou odmietnu `ensure_project_state!` · `set_project_mapping!` · `add_project_sets!` · `freeze_template_sets!` · `resolve_set_def` fallback na global),
-  `merge_project_sets_seed!` vracia vlastné `:blocked`. Súpis bez projektového snapshotu skončí ORANGE **`library_incompatible`** (`expand(..., no_set_reason:)`; ostatné dôvody sa nemenia) — a **panel
-  hovorí to isté** (`Panel.hardware_read_state` ide cez tú istú `usable_library`; panel a súpis sa rozísť nesmú, lekcia R-06a). **PLATNÝ projektový snapshot funguje ďalej** — jeho zdrojom je .skp, nie knižnica.
+Štyri veci, ktoré rozhodujú, či je brána naozaj brána:
+- **Stav sa NECACHUJE a `load` je bezpečný z princípu.** Zapamätané `:ok` je presne tá pasca, ktorú brána rieši: súbor mohol medzitým vymeniť iný proces, takže volajúci by sa rozhodol podľa STARŠIEHO
+  verdiktu nad NOVŠÍM obsahom. `library_state` preto vyhodnocuje pri každom použití (súbor pod tým drží sekundová cache `JsonFileStore`, takže **verdikt aj obsah pochádzajú z jedného dokumentu** — to je
+  invariant, na ktorom celá brána stojí), a **`read_library` pri `:read_only` vracia PRÁZDNO**. Skorší návrh vydával „parsovateľný obsah" a mal na bezpečné čítanie druhú metódu (`usable_library`) —
+  stačilo raz siahnuť na `load` a pracovalo sa s orezanými dátami. **Jedna cesta = jedna pravda:** poradie u volajúcich je vždy *najprv `load`, potom rozhodnutie*.
+- **Kontrola beží POD ZÁMKOM pred KAŽDÝM zápisom.** Brána sedí v `write` — pod `Materials.with_catalog_lock` (R-08), po `JsonFileStore.reload!`, nad **čerstvo prečítaným** dokumentom. Jedno miesto kryje
+  všetky zapisovacie cesty (`save_set!` · `delete_set!` · `set_global_mapping!` · seed-merge · `ensure_seeded`), lebo všetky končia tu; tri mutátory majú navyše **vlastnú bránu hneď po zámku** — bez nej
+  by sa rozhodovali nad prázdnou knižnicou a `delete_set!` by hlásil zavádzajúce `:not_found` namiesto zlyhania. Odmietnutie je vždy ich NEÚSPEŠNÝ výsledok (`false` / `:write_failed`), nikdy tichý úspech.
+- **Read-only knižnica sa nesmie ani POUŽIŤ.** Zákaz zápisu sám o sebe nechráni: nákup by sa ďalej počítal z **orezaných** dát. `global_default_state` vracia **nil** (a s ňou odmietnu
+  `ensure_project_state!` · `set_project_mapping!` · `add_project_sets!` · `resolve_set_def` fallback na global), `merge_project_sets_seed!` aj `freeze_template_sets!` vracajú vlastné **`:blocked`**
+  a `template_set_defs` **nil**. Súpis bez projektového snapshotu skončí ORANGE **`library_incompatible`** (`expand(..., no_set_reason:)`; ostatné dôvody sa nemenia) — a **panel hovorí to isté**:
+  `Panel.decorate_hardware_purchase` pri blokovanej knižnici **neuplatní ani override skrinky** (ukazuje na set_id, ktorého definícia by musela prísť práve z nej) a ten istý kód posiela do `explain`
+  (`no_set_reason:`). Bez toho by panel radil „priraď set" tam, kde je príčina úplne iná (panel a súpis sa rozísť nesmú, lekcia R-06a). **PLATNÝ projektový snapshot funguje ďalej** — jeho zdrojom je .skp.
 - **Seed-merge sa nad read-only knižnicou NEROBÍ** (`read_library` posudzuje stav PRED mergom): do novšieho súboru by sme primiešali svoje default sety a migrácie mapovania, teda presne tú tichú zmenu,
-  pred ktorou brána chráni. V tej istej vetve sa **nikdy nevracia SEED** (aj keď z obsahu nevyjde ani jeden použiteľný set) — inak by používateľ videl cudzie defaulty a prvý zápis by ich zvečnil.
+  pred ktorou brána chráni. V tej istej vetve sa **nikdy nevracia SEED** — inak by používateľ videl cudzie defaulty a prvý zápis by ich zvečnil (platí aj pre `rescue` vetvu `load`).
 
-**Detektor straty je WHITELIST kľúčov, nie počty** (`SET_KEYS` · `MEMBER_KEYS` · `PARAM_BANDS_KEYS` · `BAND_KEYS`): počet setov sedí aj vtedy, keď sa zo setu stratil ČLEN alebo pole člena. Legacy
-**konverzie hodnôt** (dopĺňaný `per`, chýbajúce `qty`, číslo namiesto stringu) prejdú — tvar nemenia, len ho normalizujú. Whitelisty sú **kontrakt**: každé nové pole člena/pásma sa musí doplniť do nich,
-inak si vlastný zápis vyrobí read-only stav. **Ten istý detektor používa aj `project_state_status`** (+ kontrola **počtu členov** per set), takže snapshot a knižnica sa v tom, čo považujú za stratu, nerozídu.
+**Detektor straty má DVE vrstvy, lebo whitelist sám nestačí.** (1) **Whitelist kľúčov** (`SET_KEYS` · `MEMBER_KEYS` · `PARAM_BANDS_KEYS` · `BAND_KEYS`) chytí NOVÉ POLE novšej verzie. (2) **Round-trip
+porovnanie** (`normalize_sets` + `members_lost?`) chytí novú HODNOTU známeho kľúča — novšia verzia typicky pridá najprv ju (`per: 'length'`), whitelist ju prepustí a normalizácia člena ho ticho zahodí.
+Porovnáva sa počet setov, počet členov a **počet položiek radu `code_by_nl`** (nečíselný kľúč radu sa zahadzuje po jednom, takže samotný počet členov to nechytí). Mapovanie ide cez `parse_mapping`
+**bez `set_ids`** — chyby tvaru sú strata, ale odkaz na už zmazaný set NIE (`delete_set!` mapovanie čistí zámerne). Legacy **konverzie hodnôt** (dopĺňaný `per`, chýbajúce `qty`, číslo namiesto stringu)
+prejdú. Whitelisty sú **kontrakt**: každé nové pole člena/pásma sa musí doplniť do nich, inak si vlastný zápis vyrobí read-only stav. **Obe vrstvy používa aj `project_state_status`**, takže snapshot
+a knižnica sa v tom, čo považujú za stratu, nerozídu.
 
 `write` stampuje `std` podľa **OBSAHU** (`snapshot_std`, tá istá funkcia ako pre snapshot — marker musí hovoriť o obsahu rovnako v .skp aj v `%APPDATA%`). **Priznané:** historický súbor so `std: 1` a obsahom,
 ktorý už vyžaduje 2, sa **neopravuje sám** — čítať sa dá ďalej (std 1 je podporovaná hodnota) a marker sa povýši prirodzene prvým legitímnym zápisom; bez mutácie sa súboru nikto nedotkne.
-Poškodený primár s platnou `.bak` (degraded) je **R-11** a táto dávka mu nezavadzia: nový dôvod tam patrí ako ĎALŠIA kontrola v tej istej matici s vlastným kódom, nikdy ako druhý stavový príznak
-(inak by `:read_only` mohla vrátiť na `:ok` kontrola, ktorá nič nenašla). UI: `sets_payload` nesie `library_state` + `library_reason`, sekcia `hw` Štúdia pri read-only **knižnicu nevykreslí vôbec**
-(zobrazený obsah by už bol orezaný), namiesto zavádzajúceho „Knižnica setov je prázdna." ukáže **dôvod** a vypne globálne mutácie; odmietnutie na serveri mapuje `library_blocked_txt` na konkrétnu hlášku.
-Testy: `tests/pure/test_r07_kniznica_brana.rb` (vrátane dvojinštančného scenára a charakterizácie zdravej std-1 knižnice) a `tests/js/test_r07_kniznica_ui.js`.
+**Poškodený súbor:** primár BEZ zálohy je **čistý stav** (`read_library_doc` vráti nil) — nie je z čoho čo stratiť a `main` sa tak správal odjakživa (`load` spadne do seedu a prvý zápis súbor
+**samoopraví**). Zavrieť ho do read-only by používateľa poslalo do slepej uličky: zápis odmietnutý, seed nedostupný a nič mu nepovie, že stačí zmazať jeden súbor. Keď sa nedá prečítať **ani záloha**,
+ostáva `:read_only` s dôvodom, ktorý **menuje celú cestu k súboru**. Poškodený primár s **platnou** `.bak` (degraded) je **R-11** a sem vôbec nepadne (čítanie zo zálohy uspeje) — táto dávka mu nezavadzia:
+nový dôvod tam patrí ako ĎALŠIA kontrola v tej istej matici s vlastným kódom, nikdy ako druhý stavový príznak (inak by `:read_only` mohla vrátiť na `:ok` kontrola, ktorá nič nenašla).
+UI: `sets_payload` nesie `library_state` + `library_reason`, sekcia `hw` Štúdia pri read-only **knižnicu nevykreslí vôbec**
+(zobrazený obsah by už bol orezaný), namiesto zavádzajúceho „Knižnica setov je prázdna." ukáže **dôvod** a vypne globálne mutácie; odmietnutie na serveri mapuje `library_blocked_txt` na konkrétnu hlášku
+a rovnaký dôvod dostane aj výber setu v paneli, poznámka pri ukladaní šablóny a aplikácia šablóny — tá **nesmie vyhodiť výnimku** (zhodila by celé vkladanie skrinky; kontrakt znie „stavba beží ďalej,
+len bez snapshotu"). Testy: `tests/pure/test_r07_kniznica_brana.rb` (dvojinštančný scenár, reprodukcie interného review a charakterizácia zdravej std-1 knižnice) a `tests/js/test_r07_kniznica_ui.js`.
 
 **Člen účtovaný na vlastníka a stopa REÁLNEHO zliatia (P0-HF, review #252 P2; spresnené 1d/R-34).** `expand_members` počíta člena `per: 'unit'` ako `quantity × qty`, ale člena
 **`per: 'owner'`** len **raz na `[owner_id, owner_part_key, set_id, code]`** (audit B3: druhé pravidlo s tým istým vlastníkom TipOn nezdvojí). Práve tento dedup je **jediný
