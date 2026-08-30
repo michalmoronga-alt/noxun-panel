@@ -77,7 +77,7 @@ try {
   $sentinel = Join-Path $workRoot 'last_run.txt'
   if (Test-Path $sentinel) {
     $prev = @{}
-    Get-Content $sentinel | ForEach-Object {
+    Get-Content $sentinel -Encoding UTF8 | ForEach-Object {
       $k, $v = $_ -split '=', 2
       if ($k) { $prev[$k] = $v }
     }
@@ -87,8 +87,10 @@ try {
     $prevAlive = $false
     if ($prevSuPid -gt 0) {
       $p = Get-Process -Id $prevSuPid -ErrorAction SilentlyContinue
-      # Kontrola mena chrani pred recyklovanym PID (iny proces s tym istym cislom).
-      if ($p -and ($p.ProcessName -like 'SketchUp*')) { $prevAlive = $true }
+      # Kontrola mena chrani pred recyklovanym PID (iny proces s tym istym
+      # cislom). Presne -eq, nie -like 'SketchUp*': wildcard by matchol aj
+      # kratkovezke sketchup_webhelper procesy, ktore PID recykluju najviac.
+      if ($p -and ($p.ProcessName -eq 'SketchUp')) { $prevAlive = $true }
     }
     $prevDone = $prevOut -and (Test-Path $prevOut) -and (Select-String -Path $prevOut -Pattern 'KONIEC SUBORU' -Quiet)
     if ($prevAlive -and -not $prevDone) {
@@ -165,6 +167,10 @@ try {
     Start-Sleep -Seconds 5
   }
   if ($finished) {
+    # Testy dobehli (marker je v $out) — sentinel uz nema co chranit. Zmazanie
+    # brani falosnemu bloku, keby $out neskor zmizol (napr. cistenie %TEMP%)
+    # a idle okno este zilo.
+    Remove-Item $sentinel -Force -ErrorAction SilentlyContinue -Confirm:$false
     Write-Host ''
     Get-Content $out -Encoding UTF8 | Write-Host
     # SKIP alebo nula PASS = zlyhanie (Codex review PR #20): beh bez testov nesmie byt zeleny.
@@ -178,9 +184,9 @@ try {
   } else {
     Write-Host 'TIMEOUT po 8 min.'
     if (Test-Path $out) { Get-Content $out | Write-Host }
-    # Zamok drzi tento skript, nie SketchUp — jeho ukoncenim sa uvolni, hoci
-    # instancia s testami mozno stale bezi. Dalsi beh by jej prepisal Plugins.
-    Write-Host 'POZOR: instancia SketchUpu pravdepodobne STALE BEZI a deploy lock sa ukoncenim tohto skriptu uvolni - pred dalsim behom visiacu instanciu zavri.'
+    # Zamok drzi tento skript, nie SketchUp — jeho ukoncenim sa uvolni. Kym
+    # instancia zije bez koncoveho markera, dalsi beh odmietne SENTINEL.
+    Write-Host 'POZOR: instancia SketchUpu pravdepodobne STALE BEZI - dalsi beh sa sam odmietne, kym nedobehne alebo ju nezavries.'
   }
 } finally {
   # Zamok sa uvolnuje az PO vyhodnoteni — SketchUp nacitava plugin pocas celeho
