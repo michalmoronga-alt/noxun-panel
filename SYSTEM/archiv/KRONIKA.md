@@ -104,7 +104,7 @@
   (mení sa orchestrácia, nie runner): parse check + simulácia kolízie v samostatných procesoch — odmietnutie počas držania, prevzatie po dobehu, prevzatie stale locku po
   `Stop-Process -Force`. Poznámka o vylučovaní behov pridaná do `CLAUDE.md` (Testovanie).
 
-- **GHOST VKLADANIE (V1-04) · IMPLEMENTAČNÁ DÁVKA (v0.8.21, 30.8.2026):** skrinka sa odteraz kladie **klikom tam, kam sa používateľ pozerá**. Tlačidlo „Vložiť" už nevkladá —
+- **GHOST VKLADANIE (V1-04) · IMPLEMENTAČNÁ DÁVKA (v0.8.22, 30.8.2026):** skrinka sa odteraz kladie **klikom tam, kam sa používateľ pozerá**. Tlačidlo „Vložiť" už nevkladá —
   pripraví **zmrazený plán** (R-03 `prepare_insert`) a zavesí ghost na kurzor; skrinka vznikne až klikom cez `commit_insert`. Koniec hľadania skriniek, ktoré `Placement.next_x`
   položil mimo pohľadu (tá cesta ostáva **fallbackom pre programatické volania a nedotknutá**, rovnako ako „Vložiť kópiu" a vkladanie dosky).
   **Čo vzniklo:** nový modul `core/ghost_tool.rb` so štyrmi vrstvami — `GhostTool` (vlastník najviac JEDNEJ session), `Calc` (čistá matematika bez SketchUpu: kotvy, obálka,
@@ -154,7 +154,7 @@
   pri ďalšom `resume`. Nový ghost sa tým nedotkne ani registrácie, ani stacku. Rovnakou logikou je nástroj **viazaný na svoju session** (`live_session`) — nástroj bez vlastnej
   živej session nekreslí, nevlastní klávesy a klik ignoruje, takže starý ghost nikdy neobsluhuje session nového (koniec „mŕtvej kresby"). Dôkaz: headless mutácia (návrat na
   globálne `end_tool` test **zhodí**) + in-SU async reťaz `GHOST suspend` s reálnym cudzím nástrojom na stacku — po jeho skončení sa starý ghost odstráni **sám** a aktívnym
-  nástrojom je zase `SelectionTool`. Plný in-SU beh po opravách **1183 PASS / 0 FAIL**, headless **2147**, JS 73 sád.
+  nástrojom je zase `SelectionTool`. Plný in-SU beh po opravách **1183 PASS / 0 FAIL**, headless **2173**, JS 74 sád.
   **Blok GHOST sa touto dávkou NEUZATVÁRA** — uzáver (minor 0.9.0, presun bloku do archívu) príde samostatným malým PR po Michalovom smoke.
 - **1d/R-03 · ŠEV `prepare_insert` / `commit_insert` V BUILDERI (v0.8.20, 30.8.2026, PR #265):** `CabinetBuilder.build` zlievalo normalizáciu, pridelenie ID, výpočet polohy,
   otvorenie operácie a stavbu geometrie do jedného toku. GHOST Tool (vkladanie na klik) tak nemal **čo bezpečne držať pred klikom** — žiadny pripravený objekt, ktorý sa dá
