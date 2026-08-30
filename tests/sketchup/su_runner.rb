@@ -31,6 +31,14 @@
 #     2A-2 sekcia (migracia katalogu na SCHEMA 2 nad IZOLOVANYM katalogom cez
 #     Materials.test_dir_override — dry_run/ostry beh, rebuild, BOM, semafor
 #     abs_missing, remap; realny %APPDATA% katalog sa necita ani nezapisuje).
+#   R-03 sekcia (blok 1d) — SEV prepare_insert / commit_insert: ciste
+#     pripravenie planu (ziadny korpus, ziadny krok Spat), vklad na EXPLICITNY
+#     rigidny transform (poloha + otocenie, 1x Spat vrati cely vklad), legacy
+#     cesta bez transformu (vedla existujucich, horna na UPPER_HANG_Z), vklad
+#     z otvoreneho edit kontextu (korpus ostava TOP-LEVEL) a ODMIETNUTIA
+#     (mierka, rovnomerna mierka, zrkadlo, plan z ineho dokumentu) bez jedinej
+#     mutacie a bez kroku Spat. Rollback vynimky v sprievodnom bloku je v ASYNC
+#     retazi (run_r03_async) — dokazuje sa az PO ustaleni observer debounce.
 #   UI-C1c sekcia — ORIENTACIA DOSKY (leziaca/stojaca/na_stenu): svetove osi,
 #     normala dekorovej plochy a kotviace roviny pre kazdu hodnotu, zhodnost
 #     matic stojaca/na_stenu (lisi sa POLE, nie bbox), zmena orientacie ako
@@ -1300,6 +1308,179 @@ module NoxunSuRunner
     remove_js_recorder
     cleanup(model)
     sync_cleanup_decors(vklad_res) if defined?(vklad_res) && vklad_res
+  end
+
+  # --- SYNC-R03: sev prepare_insert / commit_insert (blok 1d) ----------------
+  # Pripravna davka pre GHOST vkladanie na klik. Headless sada dokaze overit
+  # cistotu a zmrazenie planu, ale NIE geometriu, polohu ani Undo — to je
+  # uloha tejto sekcie. Marker = construction point (prazdna skupina sa v
+  # SketchUpe cisti sama a `valid?` by klamalo — lekcia D-27).
+
+  R03_PARAMS = { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0 }.freeze
+
+  def r03_marker(model, bag)
+    model.start_operation('R-03 marker', true)
+    cp = model.entities.add_cpoint(ORIGIN)
+    model.commit_operation
+    bag << cp
+    cp
+  end
+
+  def r03_clear_markers(model, bag)
+    live = bag.select { |c| c.respond_to?(:valid?) && c.valid? }
+    return if live.empty?
+
+    model.start_operation('R-03 cleanup markers', true)
+    live.each(&:erase!)
+    model.commit_operation
+  rescue StandardError
+    nil
+  end
+
+  def run_r03(model)
+    cleanup(model)
+    markers = []
+    params = R03_PARAMS.dup
+
+    # 1) prepare_insert je CISTE pripravenie: ziadny korpus, ziadny krok Spat.
+    before = cabinets(model).length
+    m1 = r03_marker(model, markers)
+    plan = e::CabinetBuilder.prepare_insert(model, params)
+    ok('R-03: prepare_insert nevytvoril ziadny korpus (ciste pripravenie)',
+       cabinets(model).length == before)
+    ok('R-03: plan je zmrazeny a viazany na TENTO dokument',
+       plan.config.frozen? && plan.for_model?(model))
+    Sketchup.undo
+    ok('R-03: prepare_insert nezalozil ZIADEN krok Spat (1x Spat vratil marker)', !m1.valid?)
+
+    # 2) commit_insert na EXPLICITNY rigidny transform: otocenie 30 st. okolo Z
+    #    + posun. Poloha aj otocenie musia sediet a 1x Spat vrati CELY vklad
+    #    (vratane transparentneho scale-lock follow-upu, D-40).
+    ang = 30.degrees
+    target = Geom::Transformation.translation(e::Units.point(1500.0, 250.0, 100.0)) *
+             Geom::Transformation.rotation(ORIGIN, Z_AXIS, ang)
+    inst = e::CabinetBuilder.commit_insert(model, e::CabinetBuilder.prepare_insert(model, params),
+                                           transform: target)
+    o = inst.transformation.origin
+    xa = inst.transformation.xaxis
+    ok("R-03: vklad sadol PRESNE na zadany transform (#{mm(o.x).round(1)}, #{mm(o.y).round(1)}, #{mm(o.z).round(1)})",
+       (mm(o.x) - 1500.0).abs <= TOL && (mm(o.y) - 250.0).abs <= TOL && (mm(o.z) - 100.0).abs <= TOL)
+    ok("R-03: otocenie prezilo vklad (os X = #{(Math.atan2(xa.y, xa.x) * 180 / Math::PI).round(2)} st.)",
+       (xa.x - Math.cos(ang)).abs < 0.001 && (xa.y - Math.sin(ang)).abs < 0.001)
+    ok('R-03: korpus je TOP-LEVEL aj pri vlastnom transforme',
+       inst.parent.is_a?(Sketchup::Model))
+    Sketchup.undo
+    ok('R-03: 1x Spat vratil CELY vklad na vlastnom transforme',
+       !inst.valid? && cabinets(model).length == before)
+
+    # 3) legacy cesta (transform: nil) vklada VEDLA existujucich, Z podla typu.
+    a = e::CabinetBuilder.build(model, params)
+    b = e::CabinetBuilder.build(model, params)
+    up = e::CabinetBuilder.build(model, params.merge('type' => 'upper'))
+    ok("R-03: bez transformu sa druha skrinka polozila VEDLA prvej (#{mm(a.transformation.origin.x).round(1)} -> #{mm(b.transformation.origin.x).round(1)})",
+       mm(b.transformation.origin.x) > mm(a.transformation.origin.x) + 500.0)
+    ok("R-03: horna skrinka visi na UPPER_HANG_Z (#{mm(up.transformation.origin.z).round(1)})",
+       (mm(up.transformation.origin.z) - e::CabinetBuilder::UPPER_HANG_Z).abs <= TOL)
+    cleanup(model)
+
+    # 4) vklad z OTVORENEHO edit kontextu konci TOP-LEVEL (nikdy v komponente).
+    model.start_operation('R-03 kontext', true)
+    grp = model.entities.add_group
+    grp.entities.add_cpoint(ORIGIN)
+    model.commit_operation
+    opened = begin
+      model.active_path = [grp]
+      model.active_path && model.active_path.length.positive?
+    rescue StandardError => ex
+      info("R-03: active_path= nedostupne (#{ex.class}) — kontextovy scenar preskoceny")
+      false
+    end
+    if opened
+      inst2 = e::CabinetBuilder.build(model, params)
+      ok('R-03: vklad z otvoreneho komponentu skoncil TOP-LEVEL', inst2.parent.is_a?(Sketchup::Model))
+      ok('R-03: po vklade je model v ROOT kontexte',
+         model.active_path.nil? || model.active_path.length.zero?)
+    end
+    cleanup(model)
+    if grp.valid?
+      model.start_operation('R-03 kontext cleanup', true)
+      grp.erase!
+      model.commit_operation
+    end
+
+    # 5) ODMIETNUTIA: mierka, rovnomerna mierka, zrkadlo a plan z INEHO
+    #    dokumentu. Ziadna mutacia, ziadny krok Spat — hlaska pouzivatelovi.
+    before5 = cabinets(model).length
+    m2 = r03_marker(model, markers)
+    bad = [['mierka v osi', Geom::Transformation.scaling(ORIGIN, 2.0, 1.0, 1.0)],
+           ['rovnomerna mierka', Geom::Transformation.scaling(2.0)],
+           ['zrkadlo', Geom::Transformation.scaling(ORIGIN, -1.0, 1.0, 1.0)]]
+    msgs = []
+    rejected = bad.map do |_name, t|
+      begin
+        e::CabinetBuilder.commit_insert(model, e::CabinetBuilder.prepare_insert(model, params), transform: t)
+        false
+      rescue StandardError => ex
+        msgs << ex.message
+        true
+      end
+    end
+    ok("R-03: mierka / rovnomerna mierka / zrkadlo ODMIETNUTE (#{rejected.inspect})", rejected.all?)
+    ok('R-03: hlaska odmietnutia navadza (poloha vkladu)',
+       msgs.all? { |s| s.include?('Poloha vkladu') })
+    foreign = begin
+      e::CabinetBuilder.commit_insert(model, e::CabinetBuilder.prepare_insert(Object.new, params))
+      false
+    rescue StandardError => ex
+      ex.message.include?('inému dokumentu')
+    end
+    ok('R-03: plan z INEHO dokumentu odmietnuty (cross-document vklad nikdy)', foreign)
+    ok('R-03: ziadne z odmietnuti nevytvorilo korpus', cabinets(model).length == before5)
+    Sketchup.undo
+    ok('R-03: odmietnutia nezalozili ZIADEN krok Spat (1x Spat vratil marker)', !m2.valid?)
+
+    r03_clear_markers(model, markers)
+    cleanup(model)
+    ok('R-03: cleanup (0 korpusov, markery prec)',
+       cabinets(model).empty? && markers.none? { |c| c.valid? })
+  rescue StandardError => ex
+    log_line("FAIL: R-03 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    r03_clear_markers(model, markers) if defined?(markers) && markers
+    cleanup(model)
+  end
+
+  # R-03 rollback: vynimka v SPRIEVODNOM bloku (H2/D-76) rusi CELU operaciu —
+  # geometriu AJ modelovy zapis. Bezi v ASYNC retazi, aby sa po ustaleni
+  # observer debounce dokazalo, ze zlyhany vklad nedorobil ziadny krok Spat.
+  def run_r03_async(model, state, steps)
+    steps << [0.5, lambda do
+      cleanup(model)
+      state[:r03_before] = cabinets(model).length
+      model.start_operation('R-03 rollback marker', true)
+      state[:r03_marker] = model.entities.add_cpoint(ORIGIN)
+      model.commit_operation
+      state[:r03_raised] = begin
+        e::CabinetBuilder.build(model, R03_PARAMS.dup) do
+          model.set_attribute('NOXUN_TEST_R03', 'sprievodny_zapis', 'ano')
+          raise 'R-03 sonda: vynimka v sprievodnom bloku'
+        end
+        false
+      rescue StandardError
+        true
+      end
+    end]
+    steps << [SETTLE, lambda do
+      ok('R-03 rollback: vynimka v sprievodnom bloku sa NEPREHLTA', state[:r03_raised] == true)
+      ok('R-03 rollback: sprievodny modelovy zapis je PREC (zrusena cela operacia)',
+         model.get_attribute('NOXUN_TEST_R03', 'sprievodny_zapis').nil?)
+      ok('R-03 rollback: ziadna skrinka nevznikla', cabinets(model).length == state[:r03_before])
+      orphan = model.definitions.any? { |d| d.name.to_s.start_with?('NOXUN Korpus') && d.instances.empty? }
+      ok('R-03 rollback: ziadna osirotena definicia korpusu', !orphan)
+      Sketchup.undo
+      ok('R-03 rollback: zlyhany vklad nenechal ZIADEN krok Spat (1x Spat vratil marker)',
+         !state[:r03_marker].valid?)
+      cleanup(model)
+    end]
   end
 
   # --- SYNC-D45: hrubka <-> material tela (deadlock 18,6 mm) -----------------
@@ -10042,6 +10223,9 @@ module NoxunSuRunner
     # scenare bezali cez realny debounce tick, nie cez priame volanie dedupu.
     run_char(model, state, steps)
 
+    # R-03: rollback zlyhaneho vkladu cez REALNY debounce tick (nie priame volanie).
+    run_r03_async(model, state, steps)
+
     # S6b: zachytna siet v KONTROLE — ked uz dva kusy na jednom mieste vzniknu
     # (starsi projekt, paste-in-place), semafor ich MUSI ukazat. Overuje CELU
     # retaz Bom.collect -> Validation.run(placements:), nielen cistu funkciu.
@@ -10128,6 +10312,7 @@ module NoxunSuRunner
     run_sync_back(model)     # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18
     run_sync_rails(model)    # H3/D-80: vnutro pod vystuhami (odsadenie, upright, chrbat, odmietnutie)
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
+    run_r03(model)           # R-03: sev prepare_insert/commit_insert — ciste pripravenie, vlastny rigidny transform, odmietnutia, edit kontext
     run_d45(model)           # D-45: hrubka <-> material tela (18,6 mm deadlock)
     run_d46(model)           # D-46: projektova predvolba korpusu s inou hrubkou (potvrdenie)
     # ŠT-2b bezi ESTE PRED sekciami 2A: `run_2a4` konci ROLLBACKOM katalogu na
