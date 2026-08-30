@@ -171,8 +171,14 @@ delete global.cancelCabinetEdits;
 // bez neho by sa riadky ciel z jedneho dokumentu zachovali v druhom a prvy
 // dalsi edit by ich odoslal s NOVYM guidom (server by ich prijal do zlej
 // zakazky). Presne toto je nalez kola 3.
+// POZOR — normalizacia musi sediet s produkciou DO PISMENA (interne review
+// kola 4, P3): `bridge.js` pise `String(c.model_guid || '') === nxDocGuid()`,
+// takze chybajuci guid je '' a NIE 'undefined'. Zrkadlo s `String(pushGuid)`
+// by na chybajucej hodnote vyslo inak nez produkcia a regresiu normalizacie
+// by sada prehliadla.
 function keepGaps(pushGuid, curGuid, pushCab, curCab, pending){
-  return (String(pushGuid) === String(curGuid)) && !!(pushCab && pushCab === curCab) && !!pending;
+  return (String(pushGuid || '') === String(curGuid || '')) &&
+         !!(pushCab && pushCab === curCab) && !!pending;
 }
 eq(keepGaps('doc-A', 'doc-A', 'CAB-001', 'CAB-001', true), true,
    'echo push toho isteho dokumentu a skrinky: rozpisane riadky PREZIJU');
@@ -182,5 +188,43 @@ eq(keepGaps('doc-A', 'doc-A', 'CAB-002', 'CAB-001', true), false,
    'ina skrinka v tom istom dokumente: riadky NEPREZIJU');
 eq(keepGaps('doc-A', 'doc-A', 'CAB-001', 'CAB-001', false), false,
    'bez rozpisanych editov niet co zachovavat');
+// Normalizacia chybajuceho guidu: '' === '' (nie 'undefined' === 'doc-A').
+eq(keepGaps(undefined, '', 'CAB-001', 'CAB-001', true), true,
+   'chybajuci guid v payloade sa normalizuje na prazdny retazec ako v produkcii');
+eq(keepGaps(undefined, 'doc-A', 'CAB-001', 'CAB-001', true), false,
+   'chybajuci guid proti realnemu dokumentu riadky NEZACHOVA');
+
+// --- 11) JEDNODOKUMENTOVE FLOW SA NESMIE POSKODIT (kolo 4, P2-1) -----------
+// `cabEditsInFlight` („apply odoslany, echo este nedoslo") je druha polovica
+// `keepGaps`. Zhodit ju smie VYHRADNE zmena dokumentu — nie zruseny okamzity
+// flush (cervene pole) ani rozpisany vyraz v poli, lebo tie beziu aj v jednom
+// dokumente a najblizsie echo by potom zmazalo prave pridane celo.
+global.cabEditsInFlight = true;
+nxSetModelGuid('doc-2');                       // echo TOHO ISTEHO dokumentu
+eq(global.cabEditsInFlight, true, 'echo push zatvarku NEZHADZUJE (celo prezije)');
+eq(keepGaps('doc-2', nxDocGuid(), 'CAB-001', 'CAB-001', global.cabEditsInFlight), true,
+   'echo v tom istom dokumente rozpisane riadky ciel ZACHOVA');
+nxSetModelGuid('doc-3');                       // realne prepnutie dokumentu
+eq(global.cabEditsInFlight, false, 'zmena dokumentu zatvarku zhodi');
+delete global.cabEditsInFlight;
+
+// --- 12) DROP ZHADZUJE FOKUS (kolo 4, P2-2) --------------------------------
+// CEF drzi `document.activeElement` aj po strate fokusu okna, takze `bset`
+// (karta dosky) by pole s kurzorom preskocilo a nechalo v nom hodnotu zo
+// starej zakazky — Enter by ju poslal do novej.
+let blurred = 0;
+global.document = { activeElement: { blur: function(){ blurred++; } } };
+nxSetModelGuid('doc-4');
+eq(blurred, 1, 'zmena dokumentu zhodi fokus, aby render prepisal vsetky polia');
+nxSetModelGuid('doc-4');
+eq(blurred, 1, 'echo push fokus nezhadzuje (rozpisana praca musi prezit)');
+// Zlyhanie blur nesmie zhodit zahodenie stavu.
+global.document = { activeElement: { blur: function(){ throw new Error('CEF'); } } };
+nxSetModelGuid('doc-5');
+eq(nxDocGuid(), 'doc-5', 'vynimka pri blur nezastavi zahodenie stavu');
+global.document = { activeElement: null };
+nxSetModelGuid('doc-6');
+eq(nxDocGuid(), 'doc-6', 'chybajuci activeElement je bezpecny');
+delete global.document;
 
 console.log(`OK test_r02_doc_guard.js — ${n} kontrol`);

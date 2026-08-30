@@ -980,8 +980,11 @@ správne).
 **PORADIE V PUSHI je súčasť kontraktu** (review #264 kolo 3): centrálne zahodenie je užitočné len vtedy, keď beží PRED stavovými rozhodnutiami pushu. `nxSetModelGuid` je preto
 **prvý príkaz** `loadSelected` aj `loadBoard` (v `clearSelected` a `init` bol prvý už predtým), nie až vedľajší efekt `setUiMode` na konci. Dve rozhodnutia, ktoré na tom stoja:
 `keepGaps` v `loadSelected` (zachovanie rozpísaných riadkov čiel — `CAB-001` je v každej zákazke, takže identita dokumentu je aj priamou súčasťou podmienky) a test „iná doska"
-v `loadBoard` (zahadzuje pending batch podľa samotného `board_id`). Do `keepGaps` patrí aj závierka `cabEditsInFlight`, ktorú preto nuluje `cancelCabinetEdits`. Volanie
-`nxSetModelGuid` v `setUiMode` zostáva ako poistka — echo je v ňom lacný early return.
+v `loadBoard` (zahadzuje pending batch podľa samotného `board_id`). Volanie `nxSetModelGuid` v `setUiMode` zostáva ako poistka — echo je v ňom lacný early return.
+Do `keepGaps` patrí aj závierka `cabEditsInFlight`, a tú nuluje **výhradne `nxDropDocState`**, nie `cancelCabinetEdits`: rušenie rozpísaných editov beží aj
+v **jednodokumentovom** flow (zastavený okamžitý flush pri červenom poli, rozpísaný výraz v poli) a zhodená závierka by tam nechala najbližšie echo zmazať práve pridané čelo
+aj rozpísané gap hodnoty. `nxDropDocState` navyše **zhodí fokus** (`document.activeElement.blur()` v `try/catch`) — CEF drží `activeElement` aj po strate fokusu okna, takže
+`bset` na karte dosky by pole s kurzorom preskočilo a nechalo v ňom hodnotu zo starej zákazky.
 
 ### actions_board.rb
 

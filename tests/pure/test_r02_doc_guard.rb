@@ -300,10 +300,24 @@ NxTest.test('R-02: identita dokumentu sa vyhodnocuje PRVA v celom push flow') do
 
   # Zatvarka „apply odoslany, echo este nedoslo" je DRUHA polovica keepGaps —
   # sama o sebe prezije prepnutie dokumentu, takze ju musi nulovat cleanup.
+  # ALE VYHRADNE ten centralny (interne review kola 4, P2): `cancelCabinetEdits`
+  # bezi aj v JEDNODOKUMENTOVOM flow (zruseny okamzity flush pri cervenom poli,
+  # rozpisany vyraz v poli) a zhodena zatvarka by tam nechala najblizsie echo
+  # zmazat prave pridane celo aj rozpisane gap hodnoty.
   form = File.read(File.join(R02_JS_DIR, 'form.js'), encoding: 'UTF-8')
+  shell = File.read(File.join(R02_JS_DIR, 'shell.js'), encoding: 'UTF-8')
   cancel = form[/function cancelCabinetEdits\(\)\{.*?\n  \}/m].to_s
-  NxTest.assert(cancel.include?('cabEditsInFlight = false;'),
-                'zahodenie editov nuluje aj zatvarku cabEditsInFlight')
+  NxTest.refute(cancel.include?('cabEditsInFlight = false'),
+                'zrusenie editov NESMIE zhodit zatvarku — rozbilo by jednodokumentove flow')
+  drop = shell[/function nxDropDocState\(\)\{.*?\n  \}/m].to_s
+  NxTest.assert(drop.include?('cabEditsInFlight = false;'),
+                'zatvarku nuluje centralne zahodenie (bezi len pri realnej zmene dokumentu)')
+  # Fokus: CEF drzi `activeElement` aj po strate fokusu okna, takze `bset` by
+  # pole s kurzorom preskocilo a nechalo v nom hodnotu zo starej zakazky.
+  NxTest.assert(drop.include?('document.activeElement.blur()'),
+                'centralne zahodenie zhadzuje fokus, aby render prepisal vsetky polia')
+  NxTest.assert(drop.include?('try {') && drop.include?('catch (e)'),
+                'blur je v try/catch — fokus nesmie zhodit zahodenie stavu')
 end
 
 NxTest.test('R-02: in-SketchUp runner posiela identitu dokumentu ako panel') do

@@ -64,6 +64,13 @@
   **VEDOMÁ ODCHÝLKA OD PRAVIDLA 3 KÔL** (rozhodnutie orchestrátora, precedens **UI-B1** — 5 kôl, záznam nižšie v tejto kronike): dávka išla na **4 kolá review** namiesto
   rozdelenia PR. Dôvod: nálezy **konvergujú** (2 → 4 zo sweepu → 1 reziduál poradia) a celý PR je JEDEN mechanizmus — rozdelenie by tú istú prácu len rozsekalo na časti,
   z ktorých ani jedna nie je samostatne zmysluplná, a hranicu medzi nimi by nemal kto strážiť. Po kole 3: **2081 headless · 73 JS sád**.
+  **Kolo 4 = INTERNÉ SLEPÉ REVIEW** (GH Codex vyčerpal denný limit — vzor pri výpadku): **žiadny P1**, 2× P2 + 1× P3, všetky opravené. **P2-1 bola REGRESIA z kola 3:**
+  nulovanie závierky `cabEditsInFlight` v `cancelCabinetEdits` je pre prepnutie dokumentu zbytočné (kryje ho `sameDoc` v `keepGaps`), ale rozbíjalo **jednodokumentové** flow —
+  tá funkcia beží aj pri zastavenom okamžitom flushi (červené pole) a pri rozpísanom výraze v poli, takže najbližšie echo by zmazalo práve pridané čelo aj rozpísané gap
+  hodnoty. Nulovanie sa presunulo do `nxDropDocState`, ktoré beží výhradne pri reálnej zmene dokumentu. **P2-2:** CEF drží `document.activeElement` aj po strate fokusu okna,
+  takže `bset` na karte dosky pole s kurzorom preskočilo a po prepnutí A → B (obe `BRD-001`) v ňom nechalo hodnotu z A — `nxDropDocState` preto fokus zhadzuje. **P3:**
+  zrkadlo `keepGaps` v JS sade normalizovalo prázdny guid inak než produkcia, takže by regresiu normalizácie neodhalilo. Po kole 4: **2081 headless · 73 JS sád**
+  (sada R-02 má 45 kontrol).
 
 - **FIX · ŠT-1c B2 DOBEHOL CENOVÚ BRÁNU (30.8.2026, test-only, bez bump verzie):** dva in-SU FAILy známe od dávky 1d/R-01+R-04 boli ZASTARANÝ TEST, nie chyba pluginu — dávka
   **P0-HF** (#252, v0.8.14) postavila medzi gen guard a `savepanel` FINÁLNU CENOVÚ BRÁNU a scenár exportu cenovej ponuky s ňou nepočítal: skrinka scenára má 3 riadky bez ceny
