@@ -9,9 +9,10 @@
 >
 > **Údržba:** položky sa vybavujú dávkami bloku 1d ([PLAN.md](PLAN.md)) — vyriešená položka dostane riadok „✅ dávka/PR"
 > a pri uzávere bloku sa presunie do sekcie „Vyriešené" na konci. Pravidlo 1d: rieši sa LEN výrobné riziko alebo
-> ponechaný V1 rozsah; dávka bez menovanej funkcie/dlhu sa nerobí. Čísla riadkov = stav k `dc2d53f`.
+> ponechaný V1 rozsah; dávka bez menovanej funkcie/dlhu sa nerobí. Čísla riadkov = stav k `dc2d53f`
+> (kód sa odvtedy hýbe — pri práci sa orientuj podľa MIEN metód; nové položky citujú mená, nie čísla).
 
-## P0 — eskalované mimo registra · **✅ OBA HOTOVÉ dávkou P0-HF (PR #252, v0.8.14, 29.8.)**
+## P0 — eskalované ako okamžité hotfix dávky · **✅ OBA HOTOVÉ dávkou P0-HF (PR #252, v0.8.14, 29.8.)**
 
 - **P0-1 · Exporty sa zapíšu pred cenovou bránou** (rozpočet/ponuka XLSX so známou chybnou cenou) — [E:P0-HF-01].
   **Korekcia z review #250:** brána je dvojvrstvová — TVRDÝ blok len pre vždy-chybné stavy (záporná zostava, nesúlad súm),
@@ -58,9 +59,10 @@ počiatočný Z režim, Orbit suspend/resume, onCancel, getExtents) — idú do 
 
 ### R-05 · P1 · core · `core/hardware_sets.rb:1042-1117, 1188-1220` + `core/validation.rb:585-601`
 Pomer „1 ks na N nôh" (D-109) sa do schémy nezmestí: `expand` nemá agregačnú fázu (člen sa materializuje per
-položka, pomer sa z jednej položky vyčísliť nedá), rozsah zaokrúhľovania nie je nikde definovaný a zaokrúhlenie
-(`ceil`) rozbije invariant `Σ sources.quantity == row.quantity`, na ktorom stojí D-94 aj ORANGE
-`validation.rb:588`. `explain` (panel) by ukázal číslo, ktoré v nákupe nevznikne. [E:R-04 + S-01 + S-02 + S-04]
+položka, pomer sa z jednej položky vyčísliť nedá), rozsah zaokrúhľovania nie je nikde definovaný a BUDÚCE zaokrúhlenie
+(dnes v `expand` žiadne nie je — hrozba je prospektívna) by rozbilo invariant `Σ sources.quantity ==
+row.quantity`, na ktorom BUDE stáť rozklik D-94 (invariant sa dnes nikde nekontroluje; ORANGE na
+`validation.rb:~624` kontroluje chýbajúce kódy, nie súčty — spresnenie GLM review 30.8.). `explain` (panel) by ukázal číslo, ktoré v nákupe nevznikne. [E:R-04 + S-01 + S-02 + S-04]
 **Návrh:** rozdeliť `expand` na zbernú (emisné deskriptory + akumulácia bázy) a materializačnú fázu bez zmeny
 podpisu; pomerový zdroj vlastný tvar (`basis_quantity` + `ratio`), invariant priznať „len unit/owner"; `explain`
 pri pomere číslo NEUVÁDZA („1 ks na 4 nohy — počet určí súpis"). Žiadne desatinné qty.
@@ -83,7 +85,7 @@ stlmiť až tá istá dávka, ktorá prinesie dĺžkovú materializáciu.
 ### R-07 · P1 · core · `core/hardware_sets.rb:96-97, 241-255, 314-330, 536-537, 611-629, 1388-1408, 1529-1535`
 Globálna knižnica setov: `load` `std` NEČÍTA, `write` stampuje vždy `std: 1` aj pri obsahu vyžadujúcom 2 (marker
 klame); `normalize_members` člena s neznámym tvarom TICHO zahodí a `project_state_status` porovnáva len počet
-SETOV → starší plugin knižnicu prečíta, oreže a prvý zápis stratu zvecní. Snapshot na modeli má oboje správne.
+SETOV a mapovaní (členov nie) → starší plugin knižnicu prečíta, oreže a prvý zápis stratu zvecní. Snapshot na modeli má oboje správne.
 [E:R-05 + S-08 + S-03]
 **Návrh:** prevziať `HardwareCatalog.assess!` vzor 1:1 (novší std = read-only s hláškou; std z obsahu cez
 `snapshot_std`); + kontrola počtu ČLENOV v `project_state_status` (2 riadky). D-109 pridá `STD_RATIO` do
@@ -107,7 +109,7 @@ rady). Testy `tests/pure/test_r08_zamky.rb` (16 scenárov vrátane reálneho dvo
 
 ### R-09 · P3 · core · `hardware_sets.rb:325` · `hardware_rules.rb:216`
 `seed_version` sa stampuje konštantou → starší plugin ju ZNÍŽI a novší znova doseje zámerne zmazané seed
-sety/pravidlá. Katalóg má F8 vzor (`max`). [S-11] **Návrh:** prevziať F8 vzor. **S.**
+sety/pravidlá. Katalóg má F8 vzor (zachovať uloženú hodnotu, bump len nahor). [S-11] **Návrh:** prevziať F8 vzor. **S.**
 
 ### R-10 · P3 · ui · `ui/js/hw_sets.js:39-43, 754`
 `set_id` (zamŕza do snapshotov v .skp) vzniká na klientovi slugom s try/catch okolo `normalize` → ten istý názov
@@ -126,7 +128,8 @@ dim_series a supplier ho nemajú. [S-07] **Návrh:** `JsonFileStore.degraded?(pa
 ### R-12 · P2 · core · `core/cabinet_builder.rb:227-233, 1241-1289, 1560-1610`
 Prestavba zákazky z NOVŠIEHO pluginu ticho stratí dáta: configy sú uzavreté whitelisty a dopredný guard existuje
 len pre kovanie (`guard_unknown_hardware!`); `plan_schema`/`part_key_schema` sa na „novšie než moje" nekontrolujú.
-Blokuje aj rolu `flap` (nová rola v snapshote = presne tento prípad). [S-09; súvisí E:R-07]
+Riziko pre rolu `flap`: rola v `BuildPlan::ROLES` JE, ale neznámy typ čela sa pretypuje na `door`
+(`fronts.rb:313`) a whitelisty ostatné nové polia ticho stratia (spresnenie GLM 30.8.). [S-09; súvisí E:R-07]
 **Návrh (spresnené review #251 kolo 2):** zovšeobecniť na `guard_newer_config!` (odmietne prestavbu,
 čítanie/export beží) — ale existujúce markery kompatibilitu configu NEDOKÁŽU (`BuildPlan::SCHEMA` verzuje
 tranzientný tvar plánu, `part_key_schema` len kľúče dielcov): builder musí začať zapisovať VLASTNÝ
@@ -174,11 +177,12 @@ zavrie ⋯ modal ako „uložené"; odmietnutý zaradený zápis stratí hodnoty
 prvá odpoveď modal nezavrie". **S.**
 
 ### R-19 · P3 · ui/core · `ui/production_core.rb` → `dup_id_suffix` / `cp_warnings`
-Varovanie o duplicite zahadzuje `kind` — duplicitné DOSKY dostanú nepravdivý text o kovaní; znenie je 2×
-(zjednotiť). Tvrdú bránu rieši P0-2 — tu ostáva text/kind + dedup znenia. [A7 + C6]
+Varovanie o duplicite zahadzovalo `kind`. **✅ ČIASTOČNE dávkou P0-HF (#252)** — znenie je odvtedy neutrálne
+(„zlieva do jedného vlastníka"), nepravdivý text o kovaní pre dosky už neexistuje (spresnenie GLM 30.8.).
+OSTÁVA: rozlíšiť `kind` v texte + zjednotiť fyzicky duplicitnú vetu do jednej privátnej metódy. [A7 + C6]
 **Návrh:** jedna privátna metóda s rozlíšeným `kind`. **S.**
 
-### R-20 · P3 · ui · `ui/production_core.rb:574-586` · `ui/js/studio.js:1147-1268`
+### R-20 · P3 · ui · `ui/production_core.rb` → `materials_meta` (~:811 na dc2d53f) · `ui/js/studio.js:1147-1268`
 UNI katalógová hrúbka sa kreslí ako hrúbka skupiny/nákupného riadku (je len default roly); zdroj duplákov zo
 `sheet_estimate` sa v Platniach kreslí ako holé ID bez hrúbky/farby. [B4 + B5]
 **Návrh:** `materials_meta` doplniť o sheet_estimate zdroje; hlavičku značiť poctivo. **S.**
@@ -187,21 +191,21 @@ UNI katalógová hrúbka sa kreslí ako hrúbka skupiny/nákupného riadku (je l
 Súhrny Platní/ABS (a hlavičky skupín pri hľadaní) ignorujú filter — hlásia celoprojektové čísla bez označenia.
 [E:R-14 + A4/B6] **Návrh:** medzisúčet z filtrovaných riadkov alebo explicitné „celkom". **S.**
 
-### R-22 · P3 · ui/docs · `core/cp_export.rb:8-16` + `ui/production_core.rb`
-Firewall CP: kontrakt OSTÁVA report-only (STANDARD §11.3; dispozícia #250) — ale vyhodnotenie má bežať PRED
-zápisom (hlásiť pred vznikom súboru) a blokový komentár „ide do statusu aj do logu" klame (log nevzniká; známy
-dlh Docs cleanup C). [E:R-12 korigované #250]
-**Návrh:** vyhodnotiť pred zápisom, hlásiť, nezastavovať; opraviť komentár. **S.**
+### R-22 · P3 · ui/docs · `ui/production_core.rb` (komentár ~:1851; `firewall_hits` už beží pred zápisom)
+Firewall CP: kontrakt OSTÁVA report-only (STANDARD §11.3; dispozícia #250). Vyhodnotenie `firewall_hits` UŽ
+beží pred `XlsxWriter.write_book` (spresnenie GLM 30.8.) — OSTÁVA: HLÁSIŤ používateľovi pred vznikom súboru
+(dnes status príde až po ňom) + opraviť klamlivý blokový komentár „ide do statusu aj do logu" v
+`production_core.rb` (log nevzniká; známy dlh Docs cleanup C). [E:R-12 korigované #250]
+**Návrh:** hlásenie pred vznikom súboru, nezastavovať; opraviť komentár. **S.**
 
 ## Os UI VZORY a drobné dlhy
 
 ### R-23 · P2 · ui · `panel.html` / `studio.html` (10 modálov) vs `nx_modal.js`
-10 ručných modálov mimo kostry; Escape reťaz Štúdia pozná len NXModal → nad 5 modálmi Escape zatvorí ponuku POD
-nimi; `absModal` bez Escape; Tab-trap 3× skopírovaný. [S-13]
+10 ručných modálov mimo kostry; 5 štúdiových nemá VLASTNÝ Escape (dokumentový handler pozná len NXModal — reprodukcia úzka, ale kontrakt „Escape zatvára modál" neplatí); `absModal` bez Escape; Tab-trap 3× skopírovaný. [S-13]
 **Návrh:** (1) Escape reťaz hneď (**S**) · (2) `confirm` tvar v nx_modal + zrušiť kópie Tab-trapu (**M**) ·
 (3) kostru prevziať pri D-110.
 
-### R-24 · P3 · ui · 11× `esc()` · 2× cssEscape · 4× normText
+### R-24 · P3 · ui · 11× HTML-escaper (5× `esc` + 6 premenovaných klonov) · 2× cssEscape · 4× normText
 Trojica elementárnych pomocníkov naklonovaná po moduloch; normalizácie sa už rozišli; v `hw_sets.js:41` sú
 kombinujúce znaky U+0300–U+036F vložené v regexe SUROVO (NFC nástroj ho ticho pokazí). [S-14 + S-15]
 **Návrh:** `ui/js/nx_text.js` + tenké aliasy; surový regex prepísať na escapovaný zápis
@@ -224,7 +228,7 @@ Mŕtvy hardware override sa kreslí ako aktívne rozhodnutie (filter len na exis
 pravidlom — kontrast `apply_overrides`). [B3] **Návrh:** párovať proti vyhodnoteným položkám. **S.**
 
 ### R-29 · P3 · ui · `ui/js/studio.js`
-Scroll sekcie neprežije prepnutie (kontrakt §67). [B15] **Návrh:** scrollTop per sekcia. **S.**
+Scroll sekcie neprežije prepnutie (UI20_KONTRAKT riadok 67 — súbor nemá §-číslovanie). [B15] **Návrh:** scrollTop per sekcia. **S.**
 
 ### R-30 · P3 · ui · `actions_parts.rb` / `actions_hardware.rb`
 Jantárové riadky sa po zápise z Inspectora neobnovia — KOLÍZIA so zámerným ručným refreshom Štúdia: rozhodnutie
@@ -267,7 +271,7 @@ pred preplietaním so seed-merge cestou), ale dve súbežne otvorené okná sa n
 sekcie → klient ju posiela späť → porovnanie POD zámkom → `:conflict` a načítanie formulára nanovo. Pri rozmerových
 radoch je alternatíva zápis PO KĽÚČOCH (rad je nezávislý per rozmer), ktorý revíziu nepotrebuje. **Odhad: S/M.**
 
-## Vyriešené počas bloku 1b/1c (záznam — nevybavovať)
+## Vyriešené počas blokov 1b/1c/1d (záznam — nevybavovať; sem sa presúvajú aj ✅ položky pri uzávere 1d)
 
 B1 názov projektu (1b-6a, #244) · B2 hlavičky materiálov (1b-6b, #247) · A1/A2 tichý návrat ceny dekoru
 (1b-7, #246) · B14/C13 zámok vepo_settings (1b-6c, #248) · C4/C5 (#187, commit e83abe4) · D-27 tagy z panela (#249).
@@ -278,8 +282,8 @@ B1 názov projektu (1b-6a, #244) · B2 hlavičky materiálov (1b-6b, #247) · A1
 blocker je len R-03 — GHOST smie na Windows štartovať hneď po ňom; R-01 je macOS vetva, R-02 je na Windows P3
 a R-04 je platformovo nezávislá hygiena — všetky tri sa dorobia v 1d nezávisle od GHOST štartu)* → 3. **pred KOVANÍM:** ~~R-06 brána~~ (✅) ·
 R-07 · ~~R-08~~ (✅) · potom R-05 (+R-06 plný) ako D-109 šev → 4. **pred D-95/VÝROBOU:** R-17, R-16, R-22, po etapách R-15 →
-5. **perzistencia:** R-11 → R-12 → R-14 (R-13 po rozhodnutí Michala) → 6. **UI/hygiena:** R-23.1 Escape (S,
-hocikedy) · R-18 · zvyšok podľa kapacity. R-32 kostry priebežne pred každým zásahom.
+5. **perzistencia:** R-11 → R-12 → R-14 (R-13 po rozhodnutí Michala) → 6. **UI/hygiena:** **R-34 (S — najrýchlejší
+win: dovytrieženie už nasadenej P0-2 brány, falošné pozitíva blokujú export)** · R-23.1 Escape (S, hocikedy) · R-18 · zvyšok podľa kapacity. R-32 kostry priebežne pred každým zásahom.
 
 **Otvorené rozhodnutia Michala:** R-05 (rozsah zaokrúhľovania pomeru per zákazka vs per skrinka — rozhodne
 USER-debata o setoch, PRED implementáciou D-109) · R-13 (`std` na entite: čítať vs vypustiť) · R-30 (jantárové
