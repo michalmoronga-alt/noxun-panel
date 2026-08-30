@@ -467,6 +467,16 @@
       if (typeof refreshHardwarePurchase === 'function') refreshHardwarePurchase(d.items || []);
     },
     loadSelected: function(c){
+      // R-02 (review #264 kolo 3): IDENTITA DOKUMENTU JE PRVA VEC V PUSHI.
+      // Dovod je poradie: nizsie sa rozhoduje `keepGaps` (ci sa ZACHOVAJU
+      // rozpisane riadky ciel) a to rozhodnutie musi vidiet UZ vycisteny stav.
+      // Kym `nxSetModelGuid` sedel az v `setUiMode` na konci pushu, prepnutie
+      // dokumentu A -> B s rovnakym CAB id nechalo riadky z A zit; centralny
+      // reset potom zrusil uz len timer a ponechane riadky pozbieral prvy edit
+      // v B a odoslal ich s guidom B — server ich prijal do NESPRAVNEJ zakazky.
+      // `setUiMode` volanie nizsie ostava ako poistka (echo = early return).
+      var sameDoc = (String(c.model_guid || '') === nxDocGuid());
+      if (typeof nxSetModelGuid === 'function') nxSetModelGuid(c.model_guid);
       // V0.4.7c: odchod z kontextu dosky — zrus cakajuce board edity + kartu
       cancelBoardEdits();
       renderBoardCard(null);
@@ -484,7 +494,13 @@
       // D-22: pod tym istym guardom je aj zamok presahov (edge_limit_off) —
       // starsie echo nesmie vratit novsi klik na zamok (renderFronts vo form.js).
       // D-23: a aj riadky ciel — pri keepGaps sa NEprestavaju (light-update).
-      var keepGaps = (c.cabinet_id && c.cabinet_id === selectedCabId) && !!(applyTimer || cabEditsInFlight);
+      // R-02 (review #264 kolo 3): `cabinet_id` NESTACI — `CAB-001` je v kazdej
+      // zakazke, takze bez `sameDoc` by sa riadky ciel z jedneho dokumentu
+      // zachovali v druhom. Identita dokumentu je preto SUCASTOU podmienky
+      // (a vycistenie stavu uz aj tak prebehlo hore — su to dve nezavisle
+      // poistky toho isteho).
+      var keepGaps = sameDoc && (c.cabinet_id && c.cabinet_id === selectedCabId) &&
+                     !!(applyTimer || cabEditsInFlight);
       cabEditsInFlight = false;
       renderFronts(c.fronts, keepGaps);
       currentZoneTree = c.zone_tree ? sanitizeTree(c.zone_tree) : defaultTree();
@@ -532,6 +548,11 @@
     // V0.4.7c: karta dosky. VYCISTI cely korpusovy stav (Codex audit c) — zonove
     // akcie a preview sa rozhoduju podla selectedCabId aj ked su skryte CSS.
     loadBoard: function(b){
+      // R-02 (review #264 kolo 3): TA ISTA PASCA ako v `loadSelected` — riadok
+      // nizsie rozhoduje o zachovani pending batchu podla SAMOTNEHO `board_id`,
+      // a `BRD-001` je v kazdej zakazke. Identita dokumentu preto ide PRVA;
+      // pri jej zmene `nxDropDocState` batch zahodi este pred tymto testom.
+      if (typeof nxSetModelGuid === 'function') nxSetModelGuid(b && b.model_guid);
       if (boardCard && b && boardCard.board_id !== b.board_id) cancelBoardEdits(); // ina doska
       cancelCabinetEdits(); // korpusovy debounce nesmie strielat v kontexte dosky (R-02: aj zachyteny guid)
       // R-02 (review #264 kolo 2): karta dosky sa prekresluje aj pri prepnuti

@@ -192,6 +192,11 @@
   function cancelCabinetEdits(){
     if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; }
     applyPendingGuid = null;
+    // R-02 (review #264 kolo 3): zatvarka „apply odoslany, echo este nedoslo"
+    // je DRUHA polovica podmienky `keepGaps`. Sama o sebe prezije prepnutie
+    // dokumentu, takze bez jej vynulovania by prvy push v novom dokumente
+    // zachoval rozpisane riadky ciel zo stareho.
+    cabEditsInFlight = false;
   }
 
   function updateAvailable(){
