@@ -70,6 +70,14 @@ module NxR07
     JSON.parse(File.binread(HWS.path))
   end
 
+  # Telo jednej metody zo zdroja (vzor `test_r08_zamky.rb`) — pre kontrakty
+  # UI ciest, ktore sa headless zavolat nedaju (`Sketchup.active_model`).
+  def method_src(rel, name, indent = 8)
+    src = File.binread(File.join(NxTest::ROOT, 'noxun_engine', rel))
+              .force_encoding(Encoding::UTF_8).gsub("\r\n", "\n")
+    src[/^#{' ' * indent}def #{Regexp.escape(name)}(?![\w!?]).*?\n#{' ' * indent}end\n/m].to_s
+  end
+
   def bytes
     File.binread(HWS.path)
   end
@@ -203,9 +211,12 @@ NxTest.test('R-07 (FIX 3): nad read-only knižnicou sa seed-merge NEROBÍ — s�
     r.install(r.doc([r.plain_set('cudzi')], {}, 'std' => 3, 'seed_version' => 0))
     before = r.bytes
     lib = r::HWS.load
-    NxTest.assert_equal(['cudzi'], lib['sets'].map { |s| s['set_id'] },
-                        'vratene data nesmu niest doplnene seed sety')
-    NxTest.assert_equal(before, r.bytes, 'a subor sa nedotkol')
+    # Review P1-1: `load` z nekompatibilnej kniznice nevydá NIC — ani seed
+    # (cudzie defaulty), ani orezany obsah suboru (na tom by sa volajuci
+    # rozhodovali a prvy zapis by stratu zvecnil).
+    NxTest.assert_equal({ 'sets' => [], 'mapping' => {} }, lib,
+                        'load vracia PRAZDNO, nie seed ani orezany obsah')
+    NxTest.assert_equal(before, r.bytes, 'a subor sa nedotkol (ziadny seed-merge)')
   end
 end
 
@@ -331,8 +342,8 @@ NxTest.test('R-07 (BLOCKER 1): z read-only knižnice sa do modelu NEKOPÍRUJE ni
   r = NxR07
   r.with_library do
     r.install(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }, 'std' => 3))
-    NxTest.assert_equal({ 'sets' => [], 'mapping' => {} }, r::HWS.usable_library,
-                        'kniznica NA POUZITIE je prazdna')
+    NxTest.assert_equal({ 'sets' => [], 'mapping' => {} }, r::HWS.load,
+                        'load z nekompatibilnej kniznice nevydá nic')
     NxTest.assert_equal(nil, r::HWS.global_default_state, 'global_default_state = nil')
 
     m = r.model_with
@@ -387,6 +398,159 @@ NxTest.test('R-07: PLATNÝ projektový snapshot funguje aj pri read-only knižni
   end
 end
 
+# --- 6b) REPRODUKCIE INTERNEHO REVIEW ---------------------------------------
+
+NxTest.test('R-07 (P1-1): stav sa NECACHUJE — súbor vymenený po zdravom loade zastaví zápis do modelu') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  r = NxR07
+  r.with_library do
+    # 1) zdravy load — modul aj volajuci videli `:ok`
+    r.install(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }))
+    NxTest.assert_equal(:ok, r::HWS.library_state)
+    NxTest.assert_equal(['zaves-a'], r::HWS.load['sets'].map { |s| s['set_id'] })
+
+    # 2) subor medzitym nahradi novsia verzia (clen nesie pole, ktore nepozname)
+    novsi = r.doc([r.plain_set.merge(
+      'members' => [{ 'code' => 'KOD-1', 'per' => 'unit', 'qty' => 1, 'per_length_mm' => 100 }]
+    )], { 'hinge' => 'zaves-a' })
+    r.install(novsi)
+
+    # 3) prva stavba skrinky: NESMIE zmrazit orezany stav do .skp
+    m = r.model_with
+    NxTest.assert_equal(nil, r::HWS.ensure_project_state!(m),
+                        'zapamatane :ok sa NESMIE pouzit — kontrola je nad cerstvym suborom')
+    NxTest.assert_equal(nil, m.get_attribute(r::E::Store::DICT, r::HWS::MODEL_KEY),
+                        'do modelu sa NIC nezapisalo (inak by `per_length_mm` zmizlo navzdy)')
+
+    # 4) a supis to prizna ORANGE, nie nacenenim orezanych dat
+    exp = r::PC.hardware_expansion(m, r.collected([r.hinge_item]))
+    NxTest.assert_equal([], exp['rows'])
+    NxTest.assert_equal('library_incompatible', exp['unmapped'][0]['reason'])
+  end
+end
+
+NxTest.test('R-07 (P1-2): strata ČLENA bez nového kľúča (novšia HODNOTA `per`) = read-only') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  r = NxR07
+  # `per: 'length'` je ZNAMY kluc s NEZNAMOU hodnotou — whitelist ju prepusti,
+  # citacia normalizacia clena zahodi. Chyti to az round-trip porovnanie.
+  r.with_library do
+    r.install(r.doc([r.plain_set.merge(
+      'members' => [{ 'code' => 'KOD-1', 'per' => 'unit', 'qty' => 1 },
+                    { 'code' => 'KOD-2', 'per' => 'length', 'qty' => 1 }]
+    )]))
+    NxTest.assert(r::HWS.library_read_only?, 'stratený člen = read-only')
+    NxTest.assert_equal(:unknown_shape, r::HWS.library_state_code)
+    NxTest.assert_equal(:write_failed, r::HWS.save_set!(r.plain_set('novy'))[0],
+                        'a save_set! stratu NEZVECNI')
+  end
+  # P3-7a: necislny kluc RADU — clen prezije s KRATSIM radom, takze pocet
+  # clenov sedi; strata je vidno az na pocte poloziek radu.
+  r.with_library do
+    r.install(r.doc([r.plain_set.merge(
+      'members' => [{ 'per' => 'unit', 'qty' => 1,
+                      'code_by_nl' => { '420' => 'A', 'stred' => 'B' } }]
+    )]))
+    NxTest.assert(r::HWS.library_read_only?, 'orezany rad NL = read-only')
+  end
+  # P3-7b: mapovanie s prazdnou hodnotou — parser hlasi chybu TVARU.
+  r.with_library do
+    r.install(r.doc([r.plain_set], { 'hinge' => '' }))
+    NxTest.assert(r::HWS.library_read_only?, 'prazdne set_id v mapovani = read-only')
+  end
+  # NEGATIVNA kontrola: mapovanie na UZ ZMAZANY set nie je strata (delete_set!
+  # mapovanie ocistuje zamerne) — kniznica musi ostat pouzitelna.
+  r.with_library do
+    r.install(r.doc([r.plain_set], { 'leg' => 'davno-zmazany' }))
+    NxTest.assert_equal(:ok, r::HWS.library_state,
+                        'referencia na zmazany set NIE JE nekompatibilita')
+  end
+end
+
+NxTest.test('R-07 (P2-3): panel dáva ROVNAKÝ dôvod ako súpis (žiadne „priraď set")') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  r = NxR07
+  r.with_library do
+    r.install(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }, 'std' => 3))
+    # Skrinka MA override na set — panel ho pri read-only kniznici NEUPLATNI
+    # (definicia by musela prist prave z tej kniznice), takze `explain` dostane
+    # prazdne overridy a dovod `library_incompatible`. Presne to robi
+    # `Panel.decorate_hardware_purchase` (struktura overena nizsie).
+    ex = r::HWS.explain(r.hinge_item, nil, overrides: {},
+                                           no_set_reason: 'library_incompatible')
+    NxTest.assert_equal([], ex['members'])
+
+    # Kontrolna vzorka: keby override ostal, panel by radil „set v projekte
+    # chyba" — teda uplne inu pricinu nez supis.
+    zle = r::HWS.explain(r.hinge_item, nil, overrides: { 'hinge' => 'zaves-a' })
+    NxTest.assert(zle['problems'][0].include?('chýba'),
+                  'fixture: neuplatneny override je jediny rozdiel')
+    NxTest.assert(ex['problems'][0].include?('knižnica setov'),
+                  "panel hovori o KNIZNICI, nie o chybajucom sete: #{ex['problems'].inspect}")
+    exp = r::PC.hardware_expansion(r.model_with, r.collected([r.hinge_item]))
+    NxTest.assert_equal(exp['unmapped'][0]['reason_sk'], ex['problems'][0],
+                        'panel a supis maju DOSLOVA rovnaky text')
+  end
+  # Panelova cesta `decorate_hardware_purchase` pouziva `Sketchup.active_model`,
+  # takze sa headless zavolat neda — jej KONTRAKT sa preto strazi nad zdrojom
+  # (vzor `test_r08_zamky.rb`): overidy sa pri blokovanej kniznici NULUJU
+  # a dovod sa posiela dalej.
+  body = r.method_src('ui/panel/payloads.rb', 'decorate_hardware_purchase')
+  NxTest.assert(body.include?('library_read_only?') && body.include?('blocked ? {} :'),
+                'panel pri read-only kniznici override skrinky NEUPLATNI')
+  ip = r.method_src('ui/panel/payloads.rb', 'item_purchase')
+  NxTest.assert(ip.include?('library_incompatible'),
+                'a posiela `no_set_reason` do explain')
+end
+
+NxTest.test('R-07 (P2-4): šablóna pri read-only knižnici — bez kovania a BEZ pádu vkladania') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  r = NxR07
+  r.with_library do
+    r.install(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }, 'std' => 3))
+    m = r.model_with
+    # Ukladanie sablony: mapovanie BEZ definicii sa ulozit NESMIE.
+    NxTest.assert_equal(nil, r::HWS.template_set_defs(m, { 'hinge' => 'zaves-a' }),
+                        'nil = volajuci ulozi sablonu BEZ kovania a nahlasi to')
+    # Aplikacia sablony: vlastny stav, nie :failed (ten volajuci meni na vynimku
+    # a zhodil by cele vkladanie skrinky).
+    res = r::HWS.freeze_template_sets!(m, { 'hinge' => 'zaves-a' },
+                                       { 'zaves-a' => r.plain_set })
+    NxTest.assert_equal(:blocked, res['status'])
+  end
+end
+
+NxTest.test('R-07 (P2-5): poškodený súbor BEZ zálohy ostáva SAMOOPRAVNÝ (ako na maine)') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  r = NxR07
+  r.with_library do |path|
+    FileUtils.mkdir_p(File.dirname(path))
+    File.binwrite(path, '{ toto nie je JSON')
+    FileUtils.rm_f("#{path}.bak")
+    r::STORE.invalidate(path)
+    r::HWS.reset_library_state!
+    NxTest.assert_equal(:ok, r::HWS.library_state,
+                        'bez zalohy nie je co stratit — ziadna slepa ulicka')
+    NxTest.assert(r::HWS.load['sets'].any?, 'load vrati seed (spravanie mainu)')
+    NxTest.assert_equal(:ok, r::HWS.save_set!(r.plain_set('novy'))[0],
+                        'a prvy zapis subor SAMOOPRAVI')
+    NxTest.assert(r.raw['sets'].any?, 'subor je zase platny JSON')
+  end
+  # So ZALOHOU, ktora sa tiez neda precitat, ostava read-only — a dovod menuje
+  # CESTU, takze pouzivatel vie, co zmazat.
+  r.with_library do |path|
+    FileUtils.mkdir_p(File.dirname(path))
+    File.binwrite(path, '{ zle')
+    File.binwrite("#{path}.bak", '{ tiez zle')
+    r::STORE.invalidate(path)
+    r::HWS.reset_library_state!
+    NxTest.assert(r::HWS.library_read_only?)
+    NxTest.assert_equal(:unreadable, r::HWS.library_state_code)
+    NxTest.assert(r::HWS.library_state_reason.include?(path),
+                  "dovod menuje subor: #{r::HWS.library_state_reason}")
+  end
+end
+
 # --- 7) CHARAKTERIZACIA: zdrava kniznica sa sprava ako dnes -----------------
 
 NxTest.test('R-07 charakterizácia: zdravá std-1 knižnica bez nových tvarov = správanie ako dnes') do
@@ -396,7 +560,8 @@ NxTest.test('R-07 charakterizácia: zdravá std-1 knižnica bez nových tvarov =
     r.install(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }))
     NxTest.assert_equal(:ok, r::HWS.library_state)
     NxTest.assert_equal('', r::HWS.library_state_reason)
-    NxTest.assert_equal(r::HWS.load, r::HWS.usable_library, 'kniznica na pouzitie = cela kniznica')
+    NxTest.assert_equal(['zaves-a'], r::HWS.load['sets'].map { |s| s['set_id'] },
+                        'zdrava kniznica sa cita cela')
     state = r::HWS.global_default_state
     NxTest.assert_equal({ 'hinge' => 'zaves-a' }, state['mapping'])
     NxTest.assert_equal(['zaves-a'], state['sets'].keys)

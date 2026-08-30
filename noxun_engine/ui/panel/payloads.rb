@@ -171,7 +171,14 @@ module Noxun
 
           fronts = payload_fronts(cfg)
           status, state = hardware_read_state
-          overrides = cabinet_set_overrides(cfg)
+          # R-07 (review P2-3): pri nekompatibilnej kniznici a projekte BEZ
+          # snapshotu sa musi panel spravat PRESNE ako supis (ProductionCore.
+          # hardware_expansion): override skrinky sa NEUPLATNI (ukazuje na
+          # set_id, ktoreho definicia by musela prist prave z tej kniznice)
+          # a dovod je `library_incompatible`. Inak by panel radil „priraď
+          # set", hoci pricina je uplne ina a set uz priradeny je.
+          blocked = status == :missing && HardwareSets.library_read_only?
+          overrides = blocked ? {} : cabinet_set_overrides(cfg)
           # Katalog sa cita LEN ked skrinka nejake kovanie ma (guard vyssie) a
           # mapa kod=>polozka sa stavia RAZ pre cely payload (audit D-92 FIX 3).
           # HardwareCatalog.items pritom moze pri PRVOM citani v sedeni zaseedovat
@@ -184,7 +191,8 @@ module Noxun
             next h unless h.is_a?(Hash)
 
             h.merge('owner_label' => PartKeys.human_label(h['owner_part_key'], fronts: fronts),
-                    'purchase' => item_purchase(h, status, state, overrides, lookup))
+                    'purchase' => item_purchase(h, status, state, overrides, lookup,
+                                                blocked: blocked))
           end
         rescue StandardError => e
           Engine.log_error(e, 'Panel.decorate_hardware_purchase')
@@ -196,12 +204,13 @@ module Noxun
         # pravdu a poslat pouzivatela tam, kde sa to da opravit.
         INVALID_SETS_SK = 'sety projektu sú poškodené — obnov ich v Katalógu kovania (Predvoľby projektu)'
 
-        def item_purchase(item, status, state, overrides, lookup)
+        def item_purchase(item, status, state, overrides, lookup, blocked: false)
           if status == :invalid
             return { 'set_id' => nil, 'set_name' => nil, 'members' => [],
                      'problems' => [INVALID_SETS_SK] }
           end
-          HardwareSets.explain(item, state, overrides: overrides, lookup: lookup)
+          HardwareSets.explain(item, state, overrides: overrides, lookup: lookup,
+                                            no_set_reason: (blocked ? 'library_incompatible' : 'no_set'))
         end
 
         # Override mapa setov TEJTO skrinky (moze mat composite kluce gt@owner
@@ -224,10 +233,10 @@ module Noxun
           return [status, state] if status == :ok && state
           if status == :missing
             # R-07 (audit BLOCKER 1): nekompatibilna kniznica sa NEPOUZIVA ani
-            # tu — `usable_library` vtedy vracia prazdno, takze rozklik polozky
-            # v paneli nerozpise kody, ktore v supise (ProductionCore) vzniknut
-            # nemozu. Panel a supis sa rozist NESMU (lekcia R-06a).
-            lib = HardwareSets.usable_library
+            # tu — `load` z nej nic nevyda, takze rozklik polozky v paneli
+            # nerozpise kody, ktore v supise (ProductionCore) vzniknut nemozu.
+            # Panel a supis sa rozist NESMU (lekcia R-06a).
+            lib = HardwareSets.load
             sets = {}
             lib['sets'].each { |s| sets[s['set_id']] = s }
             return [status, { 'mapping' => lib['mapping'], 'sets' => sets }]
@@ -244,8 +253,9 @@ module Noxun
           snap_sets = state['sets']
           proj_map = state['mapping']
           # R-07: ponuka setov v paneli nesmie ponukat definicie z kniznice,
-          # ktoru sa nesmie POUZIT (vyber by ju skopiroval do .skp).
-          globals = HardwareSets.usable_library['sets']
+          # ktoru sa nesmie POUZIT (vyber by ju skopiroval do .skp) — `load`
+          # z nej nic nevyda.
+          globals = HardwareSets.load['sets']
           # H1a: override mapa moze mat composite kluce (gt@owner) a hodnota
           # moze byt selector — parser je jedina autorita tvaru; ponuku setov
           # sklada HardwareSets.set_options (definicia zo SNAPSHOTU vyhrava nad
@@ -390,6 +400,14 @@ module Noxun
           return '' if HardwareSets.normalize_mapping(cfg['hardware_sets'], nil,
                                                       allow_owner: false).empty?
 
+          # R-07 (review P2-4): dôvod môže byť aj nekompatibilná globálna
+          # knižnica — vtedy sa definície setov nedajú rozložiť a šablóna by
+          # niesla mapovanie BEZ definícií. Hláška musí poslať používateľa
+          # tam, kde sa to naozaj opravuje.
+          if HardwareSets.library_read_only?
+            return " Kovanie sa do šablóny NEULOŽILO — #{HardwareSets.library_state_reason}."
+          end
+
           ' Kovanie sa do šablóny NEULOŽILO — sety projektu sú poškodené ' \
             '(obnov ich v Katalógu kovania, Predvoľby projektu).'
         rescue StandardError => e
@@ -408,6 +426,13 @@ module Noxun
           when :invalid
             raise 'Sety kovania projektu sú poškodené — obnov ich v Katalógu kovania ' \
                   '(Predvoľby projektu), potom šablónu použi znova.'
+          when :blocked
+            # R-07 (review P2-4): nekompatibilna kniznica NESMIE zhodit vkladanie
+            # skrinky — kontrakt davky znie „stavba bezi dalej, len bez
+            # snapshotu" (cabinet_builder). Skrinka teda vznikne, kovanie sa
+            # nezmrazi a hlaska povie SKUTOCNY dovod (nie „sety projektu su
+            # poskodene", ktore by poslalo pouzivatela opravovat zdravy .skp).
+            return " · kovanie zo šablóny sa nepriradilo: #{HardwareSets.library_state_reason}"
           when :failed
             raise 'Sety kovania zo šablóny sa nepodarilo zapísať do projektu — nič sa nezmenilo.'
           end

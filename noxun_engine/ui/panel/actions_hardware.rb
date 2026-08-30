@@ -183,7 +183,14 @@ module Noxun
             # nakupuje), global je len fallback pre nereferencovane.
             cand = HardwareSets.resolve_set_def(model, sid)
             set_def = cand if cand && cand['generic_type'] == gt
-            return set_status('Set sa nenašiel — otvor Katalóg kovania a skús znova.', true) if set_def.nil?
+            if set_def.nil?
+              # R-07 (review P3-6): pri nekompatibilnej kniznici resolver
+              # zamerne nic nevyda — „otvor Katalóg kovania a skús znova"
+              # by pouzivatela poslalo tam, kde sa to opravit NEDA.
+              return set_status(HardwareSets.library_read_only? ?
+                                  "#{HardwareSets.library_state_reason} — set sa nedá vybrať." :
+                                  'Set sa nenašiel — otvor Katalóg kovania a skús znova.', true)
+            end
           end
 
           cfg = Store.config(cab) || {}

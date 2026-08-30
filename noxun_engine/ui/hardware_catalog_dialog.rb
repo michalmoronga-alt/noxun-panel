@@ -416,10 +416,9 @@ module Noxun
           status, state = HardwareSets.project_state_status(model)
           # R-07 (audit BLOCKER 1 + FIX 5): nekompatibilna kniznica sa nesmie
           # ANI ZOBRAZIT ako ponuka — to, co by sme vykreslili, je uz OREZANY
-          # obsah (normalizacia zahodila, comu nerozumieme) a jeden klik by
-          # taku definiciu skopiroval do .skp. Sekcia preto dostane PRAZDNU
-          # kniznicu + dovod, ktory vysvetli, preco je prazdna.
-          lib = { 'sets' => [], 'mapping' => {} } if HardwareSets.library_read_only?
+          # obsah a jeden klik by taku definiciu skopiroval do .skp. `load`
+          # z nej po oprave P1-1 nic nevyda, takze `lib` je uz prazdna; sekcia
+          # k nej dostane DOVOD, ktory vysvetli, preco je prazdna.
           {
             'sets' => lib['sets'],
             'global_mapping' => lib['mapping'],
