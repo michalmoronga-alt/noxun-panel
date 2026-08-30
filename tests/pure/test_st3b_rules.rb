@@ -184,16 +184,16 @@ NxTest.test('ŠT-3b-1 (review P2): SERVER overuje `model_guid` Z PAYLOADU') do
   # Druha vrstva k baseline: klient posiela guid z TOHO ISTEHO payloadu,
   # ktorym bol formular naplneny. Kym ho server necital, bolo to MRTVE pole.
   save = ST3B_RULES_RB[/def handle_save\(payload\).*?\n        end\n/m].to_s
-  NxTest.assert(save.include?("guid = data['model_guid'].to_s"),
+  NxTest.assert(save.include?(%q<DocKey.foreign?(data['model_guid'], model>),
                 'guid z payloadu sa naozaj cita')
-  NxTest.assert(save.include?('!guid.empty? && guid != model_guid(model)'),
+  NxTest.assert(save.include?(%q<DocKey.foreign?(data['model_guid'], model, tolerate_blank_client: true)>),
                 'a porovnava sa s modelom — TOLERANTNE (prazdny udaj guard neblokuje)')
-  guard = save[/if !guid\.empty\?.*?\n          end\n/m].to_s
+  guard = save[/if DocKey\.foreign\?.*?\n          end\n/m].to_s
   NxTest.assert(guard.include?('refresh_studio(bump: false)'),
                 'PREPNUTY DOKUMENT je cudzi pre VSETKY sekcie — tu ZAMERNE ostava PLNY push ' \
                 '(echo jednej sekcie by nechalo kusovnik a rozpocet na cislach ineho projektu); ' \
                 'BEZ zdvihu generacie, lebo sa nic nezapisalo')
-  NxTest.assert(save.index('guid != model_guid(model)') < save.index('rebuild_many'),
+  NxTest.assert(save.index('DocKey.foreign?') < save.index('rebuild_many'),
                 'guard je PRED prestavbou skriniek')
 end
 
@@ -940,7 +940,7 @@ NxTest.test('ŠT-3b-2b (B3): guardy stoja PRED zapisom — a nejednoznacna adres
   NxTest.assert(!ctx.empty?, 'spolocny guard existuje (jedno miesto pre obe akcie)')
   NxTest.assert(ctx.include?("data['gen'].to_i != gen"),
                 'generacia okna — klik zo zastaraneho zoznamu sa nevykona')
-  NxTest.assert(ctx.include?('guid != model_guid(model)') && ctx.include?('!guid.empty?'),
+  NxTest.assert(ctx.include?(%q<DocKey.foreign?(data['model_guid'], model, tolerate_blank_client: true)>),
                 'identita dokumentu, TOLERANTNE na prazdny udaj (starsi cachovany DOM)')
   NxTest.assert(ctx.include?('cands.length > 1'), 'viac kandidatov na `cabinet_id` je vetva')
   NxTest.assert(ctx.include?('viac kusov'), 'a povie sa to slovami, nie tichym no-op')

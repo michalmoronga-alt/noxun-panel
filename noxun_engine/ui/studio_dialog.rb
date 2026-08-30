@@ -499,10 +499,9 @@ module Noxun
             push_state if @dialog && @dialog.visible?
             return set_status('Okno sa medzitým prepočítalo — obnovené, skús znova.', true)
           end
-          guid = data['model_guid'].to_s
           # Tolerantne ako `ProductionCore.do_budget`: prazdny udaj z klienta
           # (starsi cachovany DOM) guard neblokuje, nezhodne ID ano.
-          if !guid.empty? && guid != ProductionCore.model_guid(model)
+          if DocKey.foreign?(data['model_guid'], model, tolerate_blank_client: true)
             push_state
             return set_status('Model sa medzitým prepol — obnovené, skús znova.', true)
           end

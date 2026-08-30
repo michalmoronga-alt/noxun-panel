@@ -1576,8 +1576,7 @@ module Noxun
           repush.call
           return status.call('Kontrola sa medzitým zmenila — obnovené, klikni znova.', true)
         end
-        guid = data['model_guid'].to_s
-        if !guid.empty? && guid != model_guid(model)
+        if DocKey.foreign?(data['model_guid'], model, tolerate_blank_client: true)
           repush.call
           return status.call('Model sa medzitým prepol — obnovené, klikni znova.', true)
         end
@@ -1629,7 +1628,7 @@ module Noxun
           status.call('Okno sa medzitým prepočítalo — obnovené, klikni znova.', true)
           return false
         end
-        unless data['model_guid'].to_s == model_guid(model)
+        if DocKey.foreign?(data['model_guid'], model)
           repush.call
           status.call('Model sa medzitým prepol — obnovené, klikni znova.', true)
           return false
@@ -1767,10 +1766,9 @@ module Noxun
           repush.call
           return status.call('Rozpočet sa medzitým prepočítal — obnovené, skús znova.', true)
         end
-        guid = data['model_guid'].to_s
         # Tolerantne: prazdny udaj z klienta (starsi cachovany DOM) guard
         # neblokuje, NEZHODNE ID ano.
-        if !guid.empty? && guid != model_guid(model)
+        if DocKey.foreign?(data['model_guid'], model, tolerate_blank_client: true)
           repush.call
           return status.call('Model sa medzitým prepol — obnovené, skús znova.', true)
         end
@@ -2036,8 +2034,7 @@ module Noxun
           repush.call
           return reject.call('Rozpočet sa medzitým prepočítal — obnovené, skús znova.')
         end
-        guid = data['model_guid'].to_s
-        if !guid.empty? && guid != model_guid(model)
+        if DocKey.foreign?(data['model_guid'], model, tolerate_blank_client: true)
           repush.call
           return reject.call('Model sa medzitým prepol — obnovené, skús znova.')
         end

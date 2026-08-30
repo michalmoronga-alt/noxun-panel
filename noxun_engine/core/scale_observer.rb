@@ -698,14 +698,28 @@ module Noxun
       # Navyse notifikuje moduly viazane na model — sekcie Studia sa nad novym
       # aktivnym modelom nacitaju nanovo (Codex review PR #26, P1).
       class EngineAppObserver < Sketchup::AppObserver
+        # 1d/R-02b (review #267 P1-1): identita dokumentu rotuje UDALOSTOU,
+        # lebo Windows smie pri File > Open RECYKLOVAT ten isty `Model` objekt
+        # (auditovane pri GHOST vkladani, review #268 P2-2) — cache viazana na
+        # objekt by novemu dokumentu vratila STARY token. Rotuje sa tu aj v
+        # `PanelAppObserver`: tento observer je nainstalovany VZDY (aj bez
+        # Inspectora, teda kryje Studio a dialogy), ten druhy zas garantuje
+        # poradie voci pushu do panela. Dvojita rotacia je neskodna — obe
+        # callbacky jedneho eventu bezia v jednom Ruby ticku, este pred tym,
+        # nez sa CEF klient dostane k slovu. Musi bezat PRED notifikaciou
+        # okien nizsie, aby uz hlasili CERSTVU identitu.
         def onNewModel(model)
+          DocKey.invalidate(model) if defined?(DocKey)
           model_switched(model)
         end
 
         def onOpenModel(model)
+          DocKey.invalidate(model) if defined?(DocKey)
           model_switched(model)
         end
 
+        # BEZ rotacie identity — macOS prepnutie medzi UZ otvorenymi
+        # dokumentmi; kazdy ma vlastny objekt a svoj token si drzi.
         def onActivateModel(model)
           model_switched(model)
         end

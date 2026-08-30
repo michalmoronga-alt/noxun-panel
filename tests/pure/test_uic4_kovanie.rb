@@ -104,7 +104,7 @@ NxTest.test('UI-C4: oznacenie vlastnika je CISTE CITANIE — ziadna operacia, zi
 end
 
 NxTest.test('UI-C4: guard dokumentu aj skrinky je PRISNY (callback je asynchronny)') do
-  NxTest.assert(UIC4_HANDLER.include?("data['model_guid'].to_s != model_guid(model)"),
+  NxTest.assert(UIC4_HANDLER.include?(%q<DocKey.foreign?(data['model_guid'], model)>),
                 'cudzi dokument sa odmietne (ID skriniek sa naprie dokumentmi opakuju)')
   NxTest.assert(UIC4_HANDLER.include?("Store.get(cab, 'cabinet_id').to_s != data['cabinet_id'].to_s"),
                 'medzitym oznacena INA skrinka = panel sa len zosuladi')

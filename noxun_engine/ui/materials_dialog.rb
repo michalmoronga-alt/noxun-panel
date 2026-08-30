@@ -807,7 +807,7 @@ module Noxun
 
           @pending_replace_uni = nil # jednorazova aj vo vetve odmietnutia
           model = Sketchup.active_model
-          if req['model_guid'].to_s != model_guid(model)
+          if DocKey.foreign?(req['model_guid'], model)
             return set_status('Model sa medzitým prepol — „Nahradiť UNI…“ sa nespustilo.', true)
           end
           uni = Materials.sheet(req['uni_id'].to_s)
@@ -921,8 +921,7 @@ module Noxun
         end
 
         def ru_stale_model?(data, model)
-          data.key?('model_guid') && !data['model_guid'].to_s.empty? &&
-            data['model_guid'].to_s != model_guid(model)
+          DocKey.foreign?(data['model_guid'], model, tolerate_blank_client: true)
         end
 
         def ru_pending(model, data, plan)
@@ -958,8 +957,7 @@ module Noxun
           # D-42 (audit BLOCKER 4): predvolba patri modelu, z ktoreho ju pouzivatel
           # vybral. Ak sa medzitym prepol dokument, echo s cudzim guidom sa zahodi
           # (UI sa uz obnovilo cez on_model_changed) — nie ticho do zleho modelu.
-          if data.key?('model_guid') && !data['model_guid'].to_s.empty? &&
-             data['model_guid'].to_s != model_guid(model)
+          if DocKey.foreign?(data['model_guid'], model, tolerate_blank_client: true)
             Engine.log("projektova predvolba zahodena — echo modelu #{data['model_guid']} nesedi s aktivnym")
             return push_catalog
           end

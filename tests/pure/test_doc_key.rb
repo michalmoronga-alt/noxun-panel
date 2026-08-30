@@ -13,6 +13,12 @@
 # zmenou tychto poli. K tomu zdrojove kontrakty: vsetci serverovi producenti
 # `model_guid` beru hodnotu z DocKey (ziadne priame `model.guid` v identity
 # cestach).
+#
+# ROTACIA JE UDALOSTNA (review #267 P1-1): povodna verzia stavila na „novy
+# dokument = novy Ruby objekt", lenze Windows smie pri File > Open ten isty
+# `Model` objekt RECYKLOVAT (auditovane pri GHOST vkladani, review #268 P2-2).
+# Preto identitu rotuje `DocKey.invalidate` volany z `onNewModel`/`onOpenModel`
+# — nikdy z `onActivateModel` a nikdy pri ulozeni.
 require_relative '../helper' unless defined?(NxTest)
 
 DK = Noxun::Engine::DocKey
@@ -41,6 +47,121 @@ NxTest.test('DocKey: obycajne ulozenie (Ctrl+S) identitu NEMENI') do
   t2 = DK.key(m)
   NxTest.assert(!t1.empty?, 'token nie je prazdny')
   NxTest.assert_equal(t1, t2, 'save nesmie zmenit identitu dokumentu (cela oprava R-02b)')
+end
+
+# --- Udalostna rotacia (review #267 P1-1) ------------------------------------
+
+NxTest.test('DocKey: onOpenModel nad TYM ISTYM objektom vyda NOVU identitu (Windows recyklacia)') do
+  # JADRO nalezu P1-1: Windows drzi jeden dokument na proces a pri File > Open
+  # smie vratit ten isty `Model` objekt. Bez udalostnej rotacie by novy dokument
+  # zdedil token stareho — `nxSetModelGuid` by zmenu nezbadal, zachytena identita
+  # v bufferi by sedela a `foreign_document?` by zapis PUSTIL do cudzej zakazky.
+  DK.reset!
+  m = DkFakeModel.new(path: 'C:/Zakazky/Stara.skp', guid: 'G-1')
+  stary = DK.key(m)
+  DK.invalidate(m) # presne to, co robi PanelAppObserver#onOpenModel
+  m.path = 'C:/Zakazky/Otvorena_ina.skp'
+  novy = DK.key(m)
+  NxTest.assert(!novy.empty?, 'novy token nie je prazdny')
+  NxTest.refute(stary == novy, 'RECYKLOVANY objekt NESMIE zdedit identitu predosleho dokumentu')
+end
+
+NxTest.test('DocKey: invalidate je idempotentny — dva observery jedneho eventu = JEDEN novy token') do
+  # `PanelAppObserver` aj `ScaleWatch::EngineAppObserver` rotuju; poradie
+  # SketchUp negarantuje. Dve volania bez citania medzi nimi musia dat JEDEN
+  # token — inak by druhy observer prekrstil dokument, ktory prvy prave pomenoval.
+  DK.reset!
+  m = DkFakeModel.new(path: 'C:/Zakazky/A.skp')
+  DK.key(m)
+  DK.invalidate(m)
+  DK.invalidate(m)
+  NxTest.assert_equal(DK.key(m), DK.key(m), 'po dvoch invalidate je identita stabilna')
+end
+
+NxTest.test('DocKey: invalidate NEROTUJE identitu iných otvorených dokumentov') do
+  # macOS multi-dokument: File > Open noveho okna nesmie prekrstit dokument,
+  # ktory uz bezi (klient nad nim moze mat rozpisanu pracu).
+  DK.reset!
+  a = DkFakeModel.new(path: 'C:/Zakazky/A.skp')
+  b = DkFakeModel.new(path: 'C:/Zakazky/B.skp')
+  ta = DK.key(a)
+  tb = DK.key(b)
+  DK.invalidate(b)
+  NxTest.assert_equal(ta, DK.key(a), 'cudzi dokument si identitu drzi')
+  NxTest.refute(tb == DK.key(b), 'invalidovany dokument dostal novy token')
+end
+
+NxTest.test('DocKey: invalidate na nil je bezpecny no-op') do
+  DK.reset!
+  NxTest.refute(DK.invalidate(nil), 'nil nema co invalidovat')
+end
+
+NxTest.test('DocKey: ulozenie NEROTUJE — rotuje VYHRADNE udalost') do
+  # Poistka proti regresii opacnym smerom: keby niekto zavolal invalidate aj
+  # z onActivateModel alebo z ulozenia, vratili by sme sa presne k chybe,
+  # ktoru cela davka R-02b odstranuje.
+  DK.reset!
+  m = DkFakeModel.new(path: 'C:/Zakazky/Klinika.skp', guid: 'G-1')
+  t1 = DK.key(m)
+  m.guid = 'G-2' # Ctrl+S
+  m.path = 'C:/Zakazky/Klinika v2.skp' # Save As
+  NxTest.assert_equal(t1, DK.key(m), 'bez udalosti sa identita nemeni')
+end
+
+NxTest.test('DocKey: onActivateModel identitu NEROTUJE (zdrojovy kontrakt observerov)') do
+  # Rotacia sa smie diat LEN v New/Open vetvach. Kontrakt sa overuje na zdrojaku,
+  # lebo observer callbacky bez SketchUpu spustit nevieme.
+  %w[noxun_engine/ui/panel/selection.rb noxun_engine/core/scale_observer.rb].each do |rel|
+    src = File.read(File.join(NxTest::ROOT, rel), encoding: 'UTF-8')
+    act = src[/def onActivateModel.*?\n        end\n/m].to_s
+    NxTest.refute(act.empty?, "#{rel}: onActivateModel sa nasiel")
+    NxTest.refute(act.include?('DocKey.invalidate'),
+                  "#{rel}: onActivateModel NESMIE rotovat identitu (macOS prepnutie medzi oknami)")
+    %w[onNewModel onOpenModel].each do |cb|
+      body = src[/def #{cb}\(model\).*?\n        end\n/m].to_s
+      NxTest.assert(body.include?('DocKey.invalidate'),
+                    "#{rel}: #{cb} musi rotovat identitu dokumentu")
+    end
+  end
+end
+
+NxTest.test('DocKey: rotacia bezi PRED notifikaciou klientov') do
+  # Keby sa rotovalo az po `Panel.on_model_switched` / `model_switched`, stihol
+  # by odist push so STARYM tokenom a klient by prepnutie dokumentu nezbadal.
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'selection.rb'),
+                  encoding: 'UTF-8')
+  body = src[/def onOpenModel\(model\).*?\n        end\n/m].to_s
+  NxTest.assert(body.index('DocKey.invalidate') < body.index('Panel.on_model_switched'),
+                'invalidate musi predchadzat pushu do panela')
+  sw = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'scale_observer.rb'),
+                 encoding: 'UTF-8')
+  swb = sw[/def onOpenModel\(model\).*?\n        end\n/m].to_s
+  NxTest.assert(swb.index('DocKey.invalidate') < swb.index('model_switched'),
+                'invalidate musi predchadzat notifikacii Studia a dialogov')
+end
+
+# --- Fail-closed porovnavac (review #267 P3-2) -------------------------------
+
+NxTest.test('DocKey.foreign?: PRAZDNY kluc SERVERA zastavi zapis vzdy') do
+  DK.reset!
+  NxTest.assert(DK.foreign?('', nil), 'bez modelu sa nezapisuje')
+  NxTest.assert(DK.foreign?('nxdoc-cokolvek', nil), 'bez modelu nepomoze ani platny token klienta')
+  NxTest.assert(DK.foreign?('', nil, tolerate_blank_client: true),
+                'tolerancia klienta NESMIE zmiernit prazdny kluc servera')
+end
+
+NxTest.test('DocKey.foreign?: prisny vs tolerantny rezim sa lisi LEN v prazdnom kliente') do
+  DK.reset!
+  m = DkFakeModel.new(path: 'C:/Zakazky/A.skp')
+  mine = DK.key(m)
+  NxTest.refute(DK.foreign?(mine, m), 'zhodna identita prejde')
+  NxTest.assert(DK.foreign?('nxdoc-cudzi', m), 'cudzia identita neprejde ani tolerantne')
+  NxTest.assert(DK.foreign?('nxdoc-cudzi', m, tolerate_blank_client: true),
+                'tolerancia sa NETYKA nezhodnej identity')
+  NxTest.assert(DK.foreign?('', m), 'PRISNY rezim: okno bez NX.init nezapisuje')
+  NxTest.refute(DK.foreign?('', m, tolerate_blank_client: true),
+                'TOLERANTNY rezim: starsi cachovany DOM bez identity prejde (kryje ho generacny zamok)')
+  NxTest.refute(DK.foreign?(nil, m, tolerate_blank_client: true), 'nil == prazdny klient')
 end
 
 NxTest.test('DocKey: prve ulozenie ani Save As identitu NEMENIA (zivot objektu)') do
@@ -146,15 +267,39 @@ NX_DK_PRODUCERS = %w[
   noxun_engine/core/materials_replace_uni.rb
 ].freeze
 
+# Pocet CITANI `.guid` v zdrojaku. Vynechavaju sa VYHRADNE riadky, ktore su
+# CELE komentarom — vsetko ostatne sa skenuje vratane retazcov a interpolacie.
+#
+# POZOR na povodnu verziu (review #267 P2-1): strihala komentare cez
+# `l.sub(/#.*$/, '')`, cim zmazala aj `"#{model.guid}"` — interpolacia zacina
+# znakom `#`, takze cely riadok zmizol a mutacia s interpolovanym `model.guid`
+# testom PRESLA. Radsej par falosnych poplachov z komentarov ZA kodom (tie sa
+# preformuluju) nez diera, ktorou prejde skutocne citanie guidu.
+def nx_dk_guid_hits(src)
+  src.lines.reject { |l| l =~ /\A\s*#/ }.join.scan(/\.guid\b/).size
+end
+
 NxTest.test('DocKey: vsetci producenti model_guid beru hodnotu z DocKey') do
   NX_DK_PRODUCERS.each do |rel|
     src = File.read(File.join(NxTest::ROOT, rel), encoding: 'UTF-8')
-    NxTest.assert(src.include?('DocKey.key('),
+    NxTest.assert(src.include?('DocKey.'),
                   "#{rel} musi brat identitu dokumentu z DocKey")
-    code = src.lines.map { |l| l.sub(/#.*$/, '') }.join
-    NxTest.refute(code =~ /\bmodel\.guid\b|\bm\.guid\b/,
+    NxTest.assert(nx_dk_guid_hits(src).zero?,
                   "#{rel} uz nesmie citat model.guid priamo (meni sa pri kazdom ulozeni)")
   end
+end
+
+NxTest.test('DocKey: sken chyta aj INTERPOLOVANY model.guid (mutacia review #267 P2-1)') do
+  NxTest.assert(nx_dk_guid_hits("x = model.guid\n").positive?,
+                'holy `model.guid` sa musi najst')
+  NxTest.assert(nx_dk_guid_hits('  log("dokument #{model.guid} sa prepol")' + "\n").positive?,
+                'INTERPOLOVANY `model.guid` v retazci sa musi najst (povodna diera)')
+  NxTest.assert(nx_dk_guid_hits('  key = "#{m.guid}-#{n}"' + "\n").positive?,
+                'interpolacia s viacerymi vyrazmi na riadku')
+  NxTest.assert(nx_dk_guid_hits("  # historicky sme tu citali model.guid\n").zero?,
+                'riadok, ktory je CELY komentarom, sa nepocita')
+  NxTest.assert(nx_dk_guid_hits("      # `model.guid` sa meni pri ulozeni\n").zero?,
+                'odsadeny cely komentar sa nepocita')
 end
 
 # Zoznam vyssie stráži, že SÚČASNÍ producenti berú hodnotu z DocKey. Sám o sebe
@@ -181,8 +326,7 @@ NxTest.test('DocKey: v celom plugine uz nie je NEPRIZNANY `model.guid`') do
   found = {}
   Dir.glob(File.join(root, '**', '*.rb')).sort.each do |abs|
     rel = abs.sub("#{NxTest::ROOT}/", '').tr('\\', '/')
-    code = File.read(abs, encoding: 'UTF-8').lines.map { |l| l.sub(/#.*$/, '') }.join
-    n = code.scan(/\.guid\b/).size
+    n = nx_dk_guid_hits(File.read(abs, encoding: 'UTF-8'))
     found[rel] = n if n.positive?
   end
   found.each do |rel, n|
@@ -200,15 +344,38 @@ NxTest.test('DocKey: v celom plugine uz nie je NEPRIZNANY `model.guid`') do
   end
 end
 
-NxTest.test('DocKey: prisny guard odmieta aj PRAZDNY kluc servera (fail-closed)') do
+NxTest.test('DocKey: fail-closed zije v JEDNOM porovnavaci, nie v jednej ceste') do
   # Codex audit R-02b BLOCKER 1: '' == '' by pustilo zapis okna bez identity
   # do dokumentu, ktoremu sa identita nepodarila precitat.
-  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'sync.rb'),
-                  encoding: 'UTF-8')
-  body = src[/def foreign_document\?\(.*?\n        end\n/m].to_s
-  NxTest.refute(body.empty?, 'foreign_document? sa nasiel')
-  NxTest.assert(body.include?('!current.empty?'),
+  # Review #267 P3-2: poistka musi byt v `DocKey.foreign?`, cez ktory idu VSETKY
+  # guardy — nie v tele `foreign_document?`, ktore kryje len panelove zapisy.
+  dk = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'doc_key.rb'), encoding: 'UTF-8')
+  body = dk[/def foreign\?\(.*?\n        end\n/m].to_s
+  NxTest.refute(body.empty?, 'DocKey.foreign? sa nasiel')
+  NxTest.assert(body.include?('return true if current.empty?'),
                 'prazdny kluc SERVERA nesmie prejst (fail-closed aj na strane servera)')
+  NxTest.assert(body.index('return true if current.empty?') <
+                body.index('return false if tolerate_blank_client'),
+                'fail-closed servera sa vyhodnocuje PRED toleranciou klienta')
+
+  sync = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'sync.rb'), encoding: 'UTF-8')
+  fd = sync[/def foreign_document\?\(.*?\n        end\n/m].to_s
+  NxTest.assert(fd.include?('DocKey.foreign?'), 'panelovy guard deleguje na zdielany porovnavac')
+end
+
+NxTest.test('DocKey: ZIADNY guard uz neporovnava identitu na vlastnu past') do
+  # Plosna poistka proti navratu dvoch tried guardov: v celom plugine nesmie
+  # ostat rucne porovnanie `model_guid` — take miesto by fail-closed obislo.
+  offenders = []
+  Dir.glob(File.join(NxTest::ROOT, 'noxun_engine', '**', '*.rb')).sort.each do |abs|
+    code = File.read(abs, encoding: 'UTF-8').lines.reject { |l| l =~ /\A\s*#/ }.join
+    next unless code =~ /model_guid'\]\.to_s\s*[!=]=|guid\s*!=\s*(?:ProductionCore\.)?model_guid\(/
+
+    offenders << abs.sub("#{NxTest::ROOT}/", '').tr('\\', '/')
+  end
+  NxTest.assert(offenders.empty?,
+                "rucne porovnanie identity ostalo v: #{offenders.join(', ')} — " \
+                'pouzi DocKey.foreign? (fail-closed pre vsetkych rovnako)')
 end
 
 NxTest.test('DocKey: loader aj headless harness nacitavaju doc_key pred pouzivatelmi') do

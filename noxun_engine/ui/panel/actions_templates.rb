@@ -29,7 +29,7 @@ module Noxun
           key = data['key'].to_s
           value = data['value']
 
-          unless data['model_guid'].to_s == model_guid(model)
+          if DocKey.foreign?(data['model_guid'], model)
             push_tags
             return set_status('Model sa medzitým prepol — stav obnovený, klikni znova.', true)
           end
@@ -98,7 +98,7 @@ module Noxun
           # otvoreny nad jednym dokumentom by po prepnuti ulozil skrinku z ineho.
           # Prazdny guid = okno bez dobehnuteho NX.init, nie „stary klient"
           # (rovnaka zasada ako handle_clear_selection).
-          if data['model_guid'].to_s != model_guid(model)
+          if DocKey.foreign?(data['model_guid'], model)
             return set_status('Šablóna neuložená — panel patrí inému dokumentu.', true)
           end
 

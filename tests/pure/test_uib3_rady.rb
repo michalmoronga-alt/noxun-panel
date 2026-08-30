@@ -152,7 +152,7 @@ NxTest.test('UI-B3: sablona sa neulozi z CUDZIEHO dokumentu ani s cudzim typom')
   NxTest.refute(body.empty?, 'handler handle_save_template_as sa nenasiel')
   # ID skriniek sa naprie dokumentmi OPAKUJU — modal otvoreny nad jednym
   # dokumentom by po prepnuti ulozil skrinku z ineho (Codex audit BLOCKER 2).
-  NxTest.assert(body.include?("data['model_guid'].to_s != model_guid(model)"),
+  NxTest.assert(body.include?(%q<DocKey.foreign?(data['model_guid'], model)>),
                 'chyba PRISNY guard dokumentu')
   # Typ je jedina vec, ktoru modal nastavuje — whitelist patri na server.
   NxTest.assert(src.include?("%w[lower upper].include?(want)"), 'typ sablony musi prejst whitelistom')

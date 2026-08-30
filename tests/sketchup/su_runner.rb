@@ -1653,6 +1653,59 @@ module NoxunSuRunner
     [mm(o.x), mm(o.y), mm(o.z)]
   end
 
+  # --- DOCKEY (1d/R-02b, review #267 P1-1) ----------------------------------
+  # Identita dokumentu v REALNOM SketchUpe. Headless sada bezi nad stub modelom,
+  # takze tieto dve otazky vie zodpovedat len skutocna aplikacia:
+  #   1) MA `Sketchup::Model` metodu `valid?` (od nej zavisi upratovanie registry)?
+  #   2) Rotuje identita pri `onOpenModel` aj vtedy, ked SketchUp podá TEN ISTY
+  #      `Model` objekt (Windows recyklacia — vzor scenara GHOST 10)?
+  def run_dockey(model)
+    cleanup(model)
+
+    # 1) PROBE `valid?` — nie je to assert o spravnosti pluginu, ale ZISTENIE
+    #    o API, ktore riadi navrh `prune_dead`. Vysledok ide do vypisu, nech je
+    #    priznanie v hlavicke doc_key.rb podlozene, nie odhadnute.
+    has_valid = model.respond_to?(:valid?)
+    val = has_valid ? (begin; model.valid?; rescue StandardError => ex; "vynimka #{ex.class}"; end) : 'N/A'
+    info("DOCKEY probe: Sketchup::Model#valid? dostupne=#{has_valid}, hodnota nad zivym modelom=#{val.inspect}")
+    ok('DOCKEY: registry sa upratuje fail-safe (chybajuce `valid?` zaznam PODRZI, nie zmaze)',
+       has_valid ? val == true : true)
+
+    # 2) Ulozenie identitu NEMENI (jadro celej davky).
+    t0 = e::Panel.model_guid(model)
+    ok('DOCKEY: identita nie je prazdna', !t0.to_s.empty?)
+    ok('DOCKEY: opakovane citanie vrati TU ISTU identitu', e::Panel.model_guid(model) == t0)
+
+    # 3) REPRODUKCIA nalezu P1-1 (vzor GHOST 10): realny `onOpenModel` s TYM
+    #    ISTYM `Model` objektom. Bez udalostnej rotacie by identita ostala
+    #    rovnaka a zapis so STARYM tokenom by presiel do cudzej zakazky.
+    e::Panel.push_selected(model)
+    obs = e::Panel::PanelAppObserver.new
+    obs.onOpenModel(model)
+    t1 = e::Panel.model_guid(model)
+    ok('DOCKEY: onOpenModel nad TYM ISTYM objektom vydal NOVU identitu (Windows recyklacia)',
+       !t1.to_s.empty? && t1 != t0)
+    ok('DOCKEY: STARY token uz zapis do dokumentu NEPUSTI (foreign_document? odmietne)',
+       e::DocKey.foreign?(t0, model) == true)
+    ok('DOCKEY: CERSTVY token zapis pusti', e::DocKey.foreign?(t1, model) == false)
+
+    # 4) `onActivateModel` identitu NEROTUJE — macOS prepnutie medzi uz
+    #    otvorenymi dokumentmi; rotacia by klientovi zahodila rozpisanu pracu.
+    obs.onActivateModel(model)
+    ok('DOCKEY: onActivateModel identitu NEROTUJE', e::Panel.model_guid(model) == t1)
+
+    # 5) Fail-closed: bez modelu sa nezapisuje ani s platne vyzerajucim tokenom.
+    ok('DOCKEY: prazdny kluc servera zastavi zapis (fail-closed)',
+       e::DocKey.foreign?(t1, nil) == true)
+
+    # 6) Ten isty mechanizmus cez DRUHY observer (Studio a dialogy bez Inspectora).
+    t2 = e::Panel.model_guid(model)
+    e::ScaleWatch::EngineAppObserver.new.onOpenModel(model)
+    ok('DOCKEY: rotuje aj ScaleWatch observer (kryje Studio bez otvoreneho Inspectora)',
+       e::Panel.model_guid(model) != t2)
+    cleanup(model)
+  end
+
   def run_ghost(model)
     cleanup(model)
     markers = []
@@ -11073,6 +11126,7 @@ module NoxunSuRunner
     run_sync_rails(model)    # H3/D-80: vnutro pod vystuhami (odsadenie, upright, chrbat, odmietnutie)
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
     run_r03(model)           # R-03: sev prepare_insert/commit_insert — ciste pripravenie, vlastny rigidny transform, odmietnutia, edit kontext
+    run_dockey(model)        # 1d/R-02b: identita dokumentu — `valid?` probe, rotacia pri onOpenModel nad RECYKLOVANYM objektom, onActivateModel nerotuje, fail-closed
     run_ghost(model)         # GHOST V1-04: vkladanie na klik — 0 mutacii pred klikom, zamok/free vyska, rotacia a kotvy, degenerovany luc, undo/prepnutie/druhe „Vlozit", sablona a peciatka
     run_d45(model)           # D-45: hrubka <-> material tela (18,6 mm deadlock)
     run_d46(model)           # D-46: projektova predvolba korpusu s inou hrubkou (potvrdenie)

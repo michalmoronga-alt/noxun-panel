@@ -175,7 +175,7 @@ NxTest.test('D-27: panel prijima LEN whitelistovany kluc a VYSLOVNY boolean') do
   NxTest.assert(h.include?('Tags::KEYS.include?(key)'), 'kluc musi prejst whitelistom servera')
   NxTest.assert(h.include?('(value == true || value == false)'),
                 'hodnota musi byt VYSLOVNE boolean (retazec "false" je v Ruby pravdivy)')
-  NxTest.assert(h.include?("data['model_guid'].to_s == model_guid(model)"),
+  NxTest.assert(h.include?(%q<DocKey.foreign?(data['model_guid'], model)>),
                 'PRISNA zhoda dokumentu (callback HtmlDialogu je asynchronny)')
   NxTest.assert_equal(2, h.scan(/push_tags/).length)
   NxTest.assert(h.include?('set_status'), 'odmietnutie sa povie nahlas')
@@ -186,7 +186,7 @@ NxTest.test('D-27: odmietnuty klik do modelu NEZAPISUJE') do
   # Guardy stoja PRED jedinym volanim zapisovej cesty.
   guards = h.index('Engine.set_tag_visible')
   NxTest.assert(guards, 'zapisova cesta sa v handleri nenasla')
-  NxTest.assert(h.index('model_guid(model)') < guards, 'guard dokumentu je PRED zapisom')
+  NxTest.assert(h.index('DocKey.foreign?') < guards, 'guard dokumentu je PRED zapisom')
   NxTest.assert(h.index('Tags::KEYS.include?') < guards, 'whitelist je PRED zapisom')
   %w[start_operation commit_operation layers.add].each do |forbidden|
     NxTest.refute(h.include?(forbidden), "handler nesmie volat #{forbidden} — zapis patri do Tags")

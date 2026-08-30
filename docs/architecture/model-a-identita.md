@@ -24,11 +24,18 @@ NEOPRAVUJÚ: duplicitu zbiera `Bom.collect` do kľúča `identities` a Kontrola 
 
 ### doc_key.rb
 
-**STABILNÁ identita dokumentu pre identity guardy** (1d/R-02b). `DocKey.key(model)` vydá token `nxdoc-<random>` viazaný na **objekt** modelu: File > New/Open = nový objekt = nový
-token (Windows SketchUp starý objekt ničí — overené mostom SESSION_KEY_BRIDGE; macOS má objekt per dokument); **uloženie, prvé uloženie aj Save As identitu NEMENIA**. Je to JEDINÝ
+**STABILNÁ identita dokumentu pre identity guardy** (1d/R-02b). `DocKey.key(model)` vydá token `nxdoc-<random>`; **rotuje ho UDALOSŤ výmeny dokumentu, nie život Ruby objektu** —
+`DocKey.invalidate(model)` volajú `PanelAppObserver#onNewModel`/`#onOpenModel` **aj** `ScaleWatch::EngineAppObserver` (prvý garantuje poradie voči pushu do panela, druhý je
+nainštalovaný vždy a kryje Štúdio a dialógy bez Inspectora; dvojitá rotácia je neškodná — obe callbacky jedného eventu bežia v jednom Ruby ticku, pred tým, než sa CEF klient
+dostane k slovu). **`onActivateModel` NEROTUJE** (macOS prepnutie medzi už otvorenými dokumentmi) a **uloženie, prvé uloženie ani Save As identitu NEMENIA**. Je to JEDINÝ
 zdroj hodnoty poľa `model_guid` v payloadoch — meno poľa na drôte je historické (kontrakt R-02 sa nemenil), no hodnotou už NIE JE `Sketchup::Model#guid`, lebo ten sa mení pri
 KAŽDOM uložení a Ctrl+S do 400 ms po úprave poľa panela vyzeral ako prepnutie dokumentu (edit sa zahodil, `nxDropDocState` zmazal rozpísaný stav; rovnako trpel baseline Pravidiel,
 guardy Štúdia aj okno Materiály).
+
+**PREČO udalosťou a nie životom objektu (review #267 P1-1):** prvá verzia stavila na „nový dokument = nový `Model` objekt". **Windows drží jeden dokument na proces a pri
+File > Open smie ten istý objekt RECYKLOVAŤ** — to je v repe auditované už pri GHOST vkladaní (`construction.md` nižšie, `PanelAppObserver`, review #268 P2-2, in-SU GHOST 10).
+Na recyklovanom objekte by nový dokument zdedil starý token a **padli by všetky tri obrany R-02 naraz**: `nxSetModelGuid` by zmenu nezbadal (rovnaká hodnota = žiadne
+`nxDropDocState`), zachytená identita v bufferi by sedela a `foreign_document?` by zápis pustil — oneskorený apply by ticho pristál v cudzej zákazke.
 
 **Pasce, ktoré tvar modulu určili:** (1) token sa NIKDY nezapisuje do modelu/.skp — zápis pri otvorení panela by špinil čistý dokument (dirty + undo + zákaz zápisov z push ciest,
 lekcia D-103) a token v súbore by prežil kópiu zákazky (dve kópie = jedna identita); kópia .skp nie je hrozba, jej otvorenie vytvorí nový objekt. (2) Rotácia tokenu počas života
@@ -36,18 +43,28 @@ okna je zakázaná (Codex audit R-02b, BLOCKER 3): klient držiaci identitu do p
 objektu, žiadna zmena pri Save As. (3) Registry drží SILNÚ referenciu + `equal?` (recyklácia `object_id` po GC) a **živý dokument sa NIKDY nevyhadzuje** (BLOCKER 2 — vytlačený
 živý by po návrate dostal nový token a klient by zahodil drafty); upratuje sa len `valid? == false` záznam, pri vzniku nového tokenu. (4) Chyba/ne-model = `''` — **fail-closed
 obojsmerne**: `Panel.foreign_document?` odmieta aj prázdny kľúč SERVERA (BLOCKER 1, `'' == ''` by pustilo zápis bez identity). (5) Token je náhodný (unikátny naprieč sedeniami),
-lebo `ProductionCore#project_session_key` persistuje `guid:<hodnota>` do `vepo_settings.json` — deterministický čítač by po reštarte kolidoval. Konzumenti: `Panel.model_guid`,
+lebo `ProductionCore#project_session_key` persistuje `guid:<hodnota>` do `vepo_settings.json` — deterministický čítač by po reštarte kolidoval.
+
+**`DocKey.foreign?(claimed, model, tolerate_blank_client: false)` je JEDINÝ porovnávač identity** (review #267 P3-2) — cezeň idú VŠETKY guardy: `Panel.foreign_document?`, zóny,
+tagy, karty dielca a dosky, šablóny, Štúdio, Pravidlá, Materiály aj okno katalógu kovania. **Fail-closed na strane servera platí bez výnimky**: keď sa identita aktívneho dokumentu
+nedá prečítať (`key` vráti `''`), zápis končí — predtým mala túto poistku len `foreign_document?` a ~20 priamych porovnaní ju obchádzalo. Jediný povolený rozdiel medzi guardmi je
+pomenovaný `tolerate_blank_client:` (prázdny údaj z klienta = starší cachovaný DOM Štúdia/Materiálov, kryje ho generačný zámok) — vedomé rozhodnutie, nie vedľajší produkt tvaru
+výrazu. Plošný test stráži, že sa ručné porovnanie identity do pluginu nevráti. Producenti hodnoty: `Panel.model_guid`,
 `ProductionCore#model_guid`, `MaterialsDialog#model_guid`, `RulesDialog#model_guid`, okno katalógu kovania, `Materials.replace_uni_scan`. `core/scale_observer.rb` používa surový
 guid ďalej — je to detektor zmeny dokumentu v ceste, ktorá pri ukladaní nebeží (rozhodnutie R-04); to isté platí pre `same_model?` v `edge_check`/`grain_check`/`hover_edge`, ktoré
 porovnáva dve **súčasne držané** referencie v jednom okamihu (`equal?` má prednosť, guid je len záloha pre nový Ruby obal toho istého dokumentu).
 
-**GHOST vkladanie sa tohto mechanizmu netýka:** `GhostTool` session drží priamo objekt modelu (`@model`, porovnania cez `equal?`) a ruší sa cez `onNewModel`/`onOpenModel`, takže
-s guidom nikdy nepracovala; prípravná fáza `Panel.handle_insert` ide cez ten istý `foreign_document?` ako všetky ostatné zapisovacie handlery. Pod starým guidom by ju naopak
+**GHOST vkladanie stojí na tom istom fakte o Windows:** `GhostTool` session drží priamo objekt modelu (`@model`, porovnania cez `equal?`) a ruší sa cez `onNewModel`/`onOpenModel`
+**bezpodmienečne** — práve preto, že porovnanie identity by pri recyklovanom objekte session omylom nechalo žiť. DocKey rotuje v tých istých dvoch callbackoch a z toho istého dôvodu.
+S guidom ghost nikdy nepracoval; prípravná fáza `Panel.handle_insert` ide cez ten istý `foreign_document?` ako všetky ostatné zapisovacie handlery. Pod starým guidom by ju naopak
 Ctrl+S medzi otvorením panela a stlačením „Vložiť" **odmietol** hláškou „panel patrí inému dokumentu" — DocKey to rieši spolu so zvyškom guardov.
 
-**Testy:** `tests/pure/test_doc_key.rb` — behaviorálna sada nad stub modelmi + zdrojové kontrakty producentov + **plošný sken celého `noxun_engine/**/*.rb`**: každý nový výskyt
-`.guid` musí buď test zhodiť, alebo si ho autor vedome dopíše do `NX_DK_GUID_ALLOWED` (zoznam nesmie klamať ani opačným smerom — odstránený výskyt test tiež nahlási). Polovičná
-migrácia identity je horšia než žiadna: časť guardov by Ctrl+S rozhodilo a časť nie.
+**Testy:** `tests/pure/test_doc_key.rb` — behaviorálna sada nad stub modelmi (vrátane rotácie nad **recyklovaným** objektom a idempotencie dvoch observerov) + zdrojové kontrakty
+producentov a observerov (`onActivateModel` nesmie rotovať; `invalidate` musí byť PRED pushom) + **plošný sken celého `noxun_engine/**/*.rb`**: každý nový výskyt `.guid` musí buď
+test zhodiť, alebo si ho autor vedome dopíše do `NX_DK_GUID_ALLOWED` (zoznam nesmie klamať ani opačným smerom — odstránený výskyt test tiež nahlási). Sken vynecháva len riadky,
+ktoré sú CELÉ komentárom: pôvodné strihanie `#` až do konca riadku prepúšťalo `"#{model.guid}"` (interpolácia začína `#`), čo je podchytené mutačným testcasom. Polovičná migrácia
+identity je horšia než žiadna: časť guardov by Ctrl+S rozhodilo a časť nie. **In-SU sekcia `run_dockey`** overuje to isté v reálnom SketchUpe — vrátane probe `Model#valid?`
+a reprodukcie recyklácie cez skutočný `PanelAppObserver#onOpenModel` (vzor scenára GHOST 10).
 
 ### store.rb
 

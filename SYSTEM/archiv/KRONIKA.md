@@ -17,6 +17,54 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1d/R-02b · STABILNÝ KĽÚČ DOKUMENTU (DocKey) NAMIESTO `Model#guid` (v0.8.23, 30.8.2026, PR #267):** priznaný zvyšok dávky R-02 (#264) — VŠETKY identity guardy (server
+  `Panel.foreign_document?`, zóny, tagy, Štúdio, baseline Pravidiel, okno Materiály, katalóg kovania, `replace_uni_scan`) aj JS zrkadlo (`nxModelGuid`) stáli na
+  `Sketchup::Model#guid`, ktorý SketchUp **mení pri KAŽDOM uložení**. Ctrl+S do ~400 ms po úprave debounced poľa tak vyzeral ako prepnutie dokumentu: edit sa zahodil
+  a `nxDropDocState` zmazal všetok rozpísaný stav. Nový modul **`core/doc_key.rb`**: náhodný token viazaný na **OBJEKT** modelu, registry so silnou referenciou + `equal?`
+  (vzor `SESSION_KEY_BRIDGE`; kryje recykláciu `object_id` po GC), nikdy sa nezapisuje do modelu/.skp. Pole `model_guid` na drôte ostáva — zmenila sa LEN hodnota zo
+  6 serverových producentov; **JS sa nemenilo ani o riadok** (hodnotu vždy len echovalo) a mechanizmus R-02 beží nezmenený.
+  **Tri rozhodnutia z povinného Codex auditu (3 BLOCKERy + 2 FIXy, session 01a052db, všetky zapracované PRED implementáciou):** (1) *fail-closed obojsmerne* —
+  `foreign_document?` odmieta aj **prázdny kľúč SERVERA** (`'' == ''` by pustilo zápis okna bez identity do dokumentu, ktorý sa nedal prečítať) a DocKey pri chybe NIKDY
+  nevyrobí platný token; zámerne tolerantné guardy Štúdia/Materiálov (prázdny údaj z klienta neblokuje — starší cachovaný DOM) sa **nemenili**: proti chybe servera sú kryté
+  (neprázdny payload ≠ prázdny kľúč sa odmietne) a ich tolerancia je predošlé vedomé rozhodnutie. (2) *žiadny strop na živé dokumenty* — pôvodný návrh mal FIFO strop 32
+  s LRU dotykom; na macOS by 33 otvorených dokumentov vytlačilo živý záznam, ten by po návrate dostal nový token a `nxSetModelGuid` by zahodil drafty. Registry teraz
+  uprace VÝHRADNE `valid? == false` záznamy, pri vzniku nového tokenu. (3) **ROTÁCIA IDENTITY POČAS ŽIVOTA OKNA JE ZAKÁZANÁ** — pôvodný návrh menil token pri zmene cesty
+  (Save As, prvé uloženie; zadanie to pripúšťalo ako „token sa MÁ zmeniť alebo doriešiť vedome"). Codex ukázal, že rotácia nemá spoľahlivú resync cestu: sekcia Materiály
+  drží identitu až do plného payloadu a po nezhode server pošle len katalóg bez novej identity — klient by sa odmietal donekonečna. **Vedomé doriešenie: identita = život
+  objektu modelu.** Save As nebezpečný nie je, lebo token nikdy neleží v súbore — kópia/premenovaná zákazka dostane pri otvorení nový objekt = novú identitu; presne preto
+  bola zamietnutá aj alternatíva „token v NOXUN dictionary" (dirty flag + undo krok pri otvorení panela, zákaz zápisov z push ciest D-103, a token v súbore by prežil kópiu).
+  Token je náhodný (nie čítač), lebo `project_session_key` ho persistuje ako `guid:<hodnota>` do `vepo_settings.json` — čítač by po reštarte kolidoval a mená neuložených
+  zákaziek by sa pomiešali. **Vedľajšok:** kľúč sedenia mena zákazky prežije prvé uloženie priamo, most 1b-6a ostáva už len ako poistka. `core/scale_observer.rb` používa
+  surový guid ďalej — je to detektor zmeny dokumentu v ceste, ktorá pri ukladaní nebeží (rozhodnutie R-04). **Testy:** nová sada `test_doc_key.rb` (behaviorálna nad stub
+  modelmi + zdrojové kontrakty producentov) · migrácia sád st1a/st1a-studio/st3a/st3b a **13 priamych `model.guid` miest v in-SU runneri** na `ProductionCore.model_guid`
+  (FIX 5 auditu — `pg` helper nepokrýval katalóg kovania ani Pravidlá). 2197 headless · 74 JS sád · plný in-SU beh **1193 PASS / 0 FAIL** (+9 nová in-SU sekcia DOCKEY).
+  **Rebase na `main` po #266/#269/#268 (GHOST vkladanie, v0.8.22 → táto dávka je v0.8.23):** GHOST session sa viaže na OBJEKT modelu (`@model`, `equal?`) a ruší sa cez
+  `onNewModel`/`onOpenModel` — s guidom nikdy nepracovala, takže zmena kľúča ju neláme. Prepočítaný sken potvrdil, že tri zmergované dávky **nepridali ani jeden nový
+  producent `model.guid`** (jediný prírastok je hodnotovo agnostická JS fixture `'GUID-1'`), a `handle_insert` — prípravná fáza ghostu — ide cez ten istý `foreign_document?`
+  ako všetky ostatné handlery. **Ghost tým naopak dostal opravu, ktorú by inak potreboval:** pod starým guidom by Ctrl+S medzi otvorením panela a stlačením „Vložiť"
+  vklad **odmietol** hláškou „panel patrí inému dokumentu". Guard test bol pri rebase **zosterých z menného zoznamu na plošný sken** `noxun_engine/**/*.rb` s vymenovanými
+  vedomými výnimkami (`scale_observer` — detektor zmeny dokumentu v ceste, ktorá pri uložení nebeží; `same_model?` v `edge_check`/`grain_check`/`hover_edge` — porovnanie
+  dvoch súčasne držaných referencií v jednom okamihu), takže nový výskyt `.guid` budúcá dávka buď zhodí testom, alebo musí vedome priznať v zozname.
+  **Čo pridalo slepé review #267 (1×P1, 1×P2, 6×P3) — a je to POSUN V KONCEPTE, nie kozmetika:** **(P1-1)** pôvodný návrh viazal identitu na ŽIVOT RUBY OBJEKTU
+  a hlavička modulu tvrdila, že „Windows starý `Model` objekt zničí". **To je nepravda a repo to už vedelo na inom mieste** — pri GHOST vkladaní je auditované, že
+  **Windows drží jeden dokument na proces a pri File > Open smie ten istý `Model` objekt RECYKLOVAŤ** (`selection.rb`, `docs/architecture/construction.md`, review #268
+  P2-2, in-SU scenár GHOST 10). Na recyklovanom objekte by nový dokument zdedil STARÝ token a **padli by všetky tri obrany R-02 naraz**: `nxSetModelGuid` by zmenu
+  nezbadal (rovnaká hodnota = žiadne `nxDropDocState`), zachytená identita v bufferi by sedela a `foreign_document?` by zápis PUSTIL — oneskorený apply by ticho
+  pristál v práve otvorenej cudzej zákazke. Identita preto rotuje **UDALOSŤOU**: `DocKey.invalidate` z `onNewModel`/`onOpenModel`, **nikdy** z `onActivateModel`
+  (macOS prepnutie medzi už otvorenými oknami) a **nikdy pri uložení** — to je stále celá pointa dávky. Rotujú **oba** AppObservery: `PanelAppObserver` garantuje
+  poradie voči pushu do panela, `ScaleWatch::EngineAppObserver` je nainštalovaný vždy (kryje Štúdio a dialógy bez Inspectora). **Dvojitá rotácia je neškodná** —
+  obe callbacky jedného eventu bežia v JEDNOM Ruby ticku, teda skôr než sa CEF klient dostane k slovu; hookovať len jeden observer by naopak nechalo dieru.
+  **(P2-1)** plošný guard test sa dal obísť **interpoláciou**: strihanie komentárov cez `l.sub(/#.*$/,'')` zmazalo aj `"#{model.guid}"`, lebo interpolácia začína
+  znakom `#` — mutácia s interpoláciou testom PREŠLA. Sken teraz vynecháva len riadky, ktoré sú CELÉ komentárom, a mutačné prípady (holý · interpolovaný · v komentári)
+  sú v sade. **(P3-2)** fail-closed bola výsada JEDNEJ cesty (`foreign_document?`), kým ~20 priamych porovnaní v dialógoch a handleroch ju obchádzalo. Pribudol
+  **jediný porovnávač `DocKey.foreign?`**, ktorým idú VŠETKY guardy; prísny a tolerantný režim odlišuje pomenovaný `tolerate_blank_client:` (vedomé rozhodnutie,
+  nie vedľajší produkt tvaru výrazu) a prázdny kľúč SERVERA zastaví zápis v oboch. Stráži to plošný test — ručné porovnanie identity sa už do pluginu nevráti.
+  **(P3-1)** `Model#valid?` nie je v SketchUp API zaručené; `prune_dead` je preto fail-safe (chýbajúca metóda = záznam sa PODRŽÍ) a **priznaný dopad** je v hlavičke
+  modulu: na takom SketchUpe registry cez sedenie iba rastie (desiatky bajtov na výmenu dokumentu, mizne s procesom). `WeakRef` bol zamietnutý — `equal?` nad
+  odzbrojeným WeakRef hádže `RefError` v najkritickejšej ceste a GC by mohol záznam vziať POČAS života dokumentu. **Odpoveď z reálneho SketchUpu 2026 dáva in-SU
+  sekcia DOCKEY**, ktorá `respond_to?(:valid?)` priamo skúša a výsledok vypisuje. **(P3-4/5/6)** STAV: vrátené plné znenia cudzích buletov (R-06a, F/D-27) — miesto
+  sa škrtlo vo VLASTNOM texte a najstarší bulet (1b-7) sa zložil do už existujúceho zhrnutia „Staršie uzávery", riadky sú pod 400 znakmi a záznam KRONIKY je navrchu.
+
 - **1d/R-07 · KOMPATIBILITNÁ BRÁNA GLOBÁLNEJ KNIŽNICE SETOV KOVANIA (v0.8.21, 30.8.2026, PR #266):** knižnica setov žije v `%APPDATA%`, takže ju na jednom profile zdieľajú
   **všetky verzie pluginu**. Staršia verzia ju čítala **bez pohľadu na marker `std`**, neznámy tvar člena ticho zahodila (`normalize_members` je tolerantná — čítanie nesmie zhodiť
   prestavbu) a **prvým zápisom stratu zvečnila**; `write` navyše stampoval `std: 1` aj nad obsahom, ktorý bez novších tvarov čítať nejde, takže marker klamal aj dopredu. Register to
@@ -156,35 +204,6 @@
   globálne `end_tool` test **zhodí**) + in-SU async reťaz `GHOST suspend` s reálnym cudzím nástrojom na stacku — po jeho skončení sa starý ghost odstráni **sám** a aktívnym
   nástrojom je zase `SelectionTool`. Plný in-SU beh po opravách **1184 PASS / 0 FAIL**, headless **2173**, JS 74 sád.
   **Blok GHOST sa touto dávkou NEUZATVÁRA** — uzáver (minor 0.9.0, presun bloku do archívu) príde samostatným malým PR po Michalovom smoke.
-- **1d/R-02b · STABILNÝ KĽÚČ DOKUMENTU (DocKey) NAMIESTO `Model#guid` (v0.8.23, 30.8.2026, PR #267):** priznaný zvyšok dávky R-02 (#264) — VŠETKY identity guardy (server
-  `Panel.foreign_document?`, zóny, tagy, Štúdio, baseline Pravidiel, okno Materiály, katalóg kovania, `replace_uni_scan`) aj JS zrkadlo (`nxModelGuid`) stáli na
-  `Sketchup::Model#guid`, ktorý SketchUp **mení pri KAŽDOM uložení**. Ctrl+S do ~400 ms po úprave debounced poľa tak vyzeral ako prepnutie dokumentu: edit sa zahodil
-  a `nxDropDocState` zmazal všetok rozpísaný stav. Nový modul **`core/doc_key.rb`**: náhodný token viazaný na **OBJEKT** modelu, registry so silnou referenciou + `equal?`
-  (vzor `SESSION_KEY_BRIDGE`; kryje recykláciu `object_id` po GC), nikdy sa nezapisuje do modelu/.skp. Pole `model_guid` na drôte ostáva — zmenila sa LEN hodnota zo
-  6 serverových producentov; **JS sa nemenilo ani o riadok** (hodnotu vždy len echovalo) a mechanizmus R-02 beží nezmenený.
-  **Tri rozhodnutia z povinného Codex auditu (3 BLOCKERy + 2 FIXy, session 01a052db, všetky zapracované PRED implementáciou):** (1) *fail-closed obojsmerne* —
-  `foreign_document?` odmieta aj **prázdny kľúč SERVERA** (`'' == ''` by pustilo zápis okna bez identity do dokumentu, ktorý sa nedal prečítať) a DocKey pri chybe NIKDY
-  nevyrobí platný token; zámerne tolerantné guardy Štúdia/Materiálov (prázdny údaj z klienta neblokuje — starší cachovaný DOM) sa **nemenili**: proti chybe servera sú kryté
-  (neprázdny payload ≠ prázdny kľúč sa odmietne) a ich tolerancia je predošlé vedomé rozhodnutie. (2) *žiadny strop na živé dokumenty* — pôvodný návrh mal FIFO strop 32
-  s LRU dotykom; na macOS by 33 otvorených dokumentov vytlačilo živý záznam, ten by po návrate dostal nový token a `nxSetModelGuid` by zahodil drafty. Registry teraz
-  uprace VÝHRADNE `valid? == false` záznamy, pri vzniku nového tokenu. (3) **ROTÁCIA IDENTITY POČAS ŽIVOTA OKNA JE ZAKÁZANÁ** — pôvodný návrh menil token pri zmene cesty
-  (Save As, prvé uloženie; zadanie to pripúšťalo ako „token sa MÁ zmeniť alebo doriešiť vedome"). Codex ukázal, že rotácia nemá spoľahlivú resync cestu: sekcia Materiály
-  drží identitu až do plného payloadu a po nezhode server pošle len katalóg bez novej identity — klient by sa odmietal donekonečna. **Vedomé doriešenie: identita = život
-  objektu modelu.** Save As nebezpečný nie je, lebo token nikdy neleží v súbore — kópia/premenovaná zákazka dostane pri otvorení nový objekt = novú identitu; presne preto
-  bola zamietnutá aj alternatíva „token v NOXUN dictionary" (dirty flag + undo krok pri otvorení panela, zákaz zápisov z push ciest D-103, a token v súbore by prežil kópiu).
-  Token je náhodný (nie čítač), lebo `project_session_key` ho persistuje ako `guid:<hodnota>` do `vepo_settings.json` — čítač by po reštarte kolidoval a mená neuložených
-  zákaziek by sa pomiešali. **Vedľajšok:** kľúč sedenia mena zákazky prežije prvé uloženie priamo, most 1b-6a ostáva už len ako poistka. `core/scale_observer.rb` používa
-  surový guid ďalej — je to detektor zmeny dokumentu v ceste, ktorá pri ukladaní nebeží (rozhodnutie R-04). **Testy:** nová sada `test_doc_key.rb` (behaviorálna nad stub
-  modelmi + zdrojové kontrakty producentov) · migrácia sád st1a/st1a-studio/st3a/st3b a **13 priamych `model.guid` miest v in-SU runneri** na `ProductionCore.model_guid`
-  (FIX 5 auditu — `pg` helper nepokrýval katalóg kovania ani Pravidlá). 2186 headless · 74 JS sád · plný in-SU beh **1184 PASS / 0 FAIL**.
-  **Rebase na `main` po #266/#269/#268 (GHOST vkladanie, v0.8.22 → táto dávka je v0.8.23):** GHOST session sa viaže na OBJEKT modelu (`@model`, `equal?`) a ruší sa cez
-  `onNewModel`/`onOpenModel` — s guidom nikdy nepracovala, takže zmena kľúča ju neláme. Prepočítaný sken potvrdil, že tri zmergované dávky **nepridali ani jeden nový
-  producent `model.guid`** (jediný prírastok je hodnotovo agnostická JS fixture `'GUID-1'`), a `handle_insert` — prípravná fáza ghostu — ide cez ten istý `foreign_document?`
-  ako všetky ostatné handlery. **Ghost tým naopak dostal opravu, ktorú by inak potreboval:** pod starým guidom by Ctrl+S medzi otvorením panela a stlačením „Vložiť"
-  vklad **odmietol** hláškou „panel patrí inému dokumentu". Guard test bol pri rebase **zosterých z menného zoznamu na plošný sken** `noxun_engine/**/*.rb` s vymenovanými
-  vedomými výnimkami (`scale_observer` — detektor zmeny dokumentu v ceste, ktorá pri uložení nebeží; `same_model?` v `edge_check`/`grain_check`/`hover_edge` — porovnanie
-  dvoch súčasne držaných referencií v jednom okamihu), takže nový výskyt `.guid` budúcá dávka buď zhodí testom, alebo musí vedome priznať v zozname.
-
 - **1d/R-03 · ŠEV `prepare_insert` / `commit_insert` V BUILDERI (v0.8.20, 30.8.2026, PR #265):** `CabinetBuilder.build` zlievalo normalizáciu, pridelenie ID, výpočet polohy,
   otvorenie operácie a stavbu geometrie do jedného toku. GHOST Tool (vkladanie na klik) tak nemal **čo bezpečne držať pred klikom** — žiadny pripravený objekt, ktorý sa dá
   nakresliť ako duch bez toho, aby už zasiahol model — a ani **ako položiť skrinku na finálnu polohu**: `transform:` mal len `rebuild`. Register to viedol ako **TVRDÝ blocker

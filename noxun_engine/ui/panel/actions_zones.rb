@@ -149,7 +149,7 @@ module Noxun
           return if model.nil?
 
           data = parse(payload)
-          return if data['model_guid'].to_s != model_guid(model)
+          return if DocKey.foreign?(data['model_guid'], model)
 
           zid = data['zone_id'].to_s
           if zid.empty?
@@ -200,7 +200,7 @@ module Noxun
           # F9: PRISNE porovnanie identity dokumentu (vzor `handle_clear_selection`).
           # Prazdny guid nie je starsi klient — je to okno bez dobehnuteho NX.init,
           # a to nesmie stavat v cudzom modeli.
-          if data['model_guid'].to_s != model_guid(model)
+          if DocKey.foreign?(data['model_guid'], model)
             set_status("#{what} — panel patrí inému dokumentu.", true)
             return nil
           end

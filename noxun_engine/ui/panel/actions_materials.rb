@@ -116,7 +116,7 @@ module Noxun
           # takze prazdna hodnota nie je spatna kompatibilita, ale diera: klik
           # z okna, ktoremu este nedosiel NX.init, by prepol PRAVE AKTIVNY model.
           # Rovnaky tvar guardu ma ProductionCore#edge_check_guard.
-          unless (payload ? parse(payload)['model_guid'].to_s : '') == model_guid(model)
+          if DocKey.foreign?(payload ? parse(payload)['model_guid'] : nil, model)
             push_edge_check
             return set_status('Model sa medzitým prepol — stav obnovený, klikni znova.', true)
           end
@@ -155,7 +155,7 @@ module Noxun
             return set_status('Zvýraznenie hrán vyžaduje SketchUp 2023 alebo novší.', true)
           end
 
-          unless data['model_guid'].to_s == model_guid(model)
+          if DocKey.foreign?(data['model_guid'], model)
             push_edge_check
             return set_status('Model sa medzitým prepol — stav obnovený, klikni znova.', true)
           end
@@ -200,7 +200,7 @@ module Noxun
 
           # PRISNE porovnanie (rovnaky tvar ako `nx_edge_toggle`) — prazdna
           # hodnota nie je spatna kompatibilita, ale diera.
-          unless (payload ? parse(payload)['model_guid'].to_s : '') == model_guid(model)
+          if DocKey.foreign?(payload ? parse(payload)['model_guid'] : nil, model)
             push_grain_check
             return set_status('Model sa medzitým prepol — stav obnovený, klikni znova.', true)
           end

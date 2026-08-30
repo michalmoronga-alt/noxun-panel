@@ -141,7 +141,7 @@ NxTest.test('D-89a: zvyraznenie hrany je POHLAD — ziadna operacia, ziadny zapi
 end
 
 NxTest.test('D-89a: hover ma guard dokumentu a vzdy zhasina') do
-  NxTest.assert(UIC3_PARTS_RB.include?("data['model_guid'].to_s != model_guid(model)"),
+  NxTest.assert(UIC3_PARTS_RB.include?(%q<DocKey.foreign?(data['model_guid'], model)>),
                 'callback je asynchronny — dokument sa overuje (vzor nx_edge_toggle)')
   NxTest.assert(UIC3_PANEL_RB.include?("cb(dlg, 'nx_hover_edge')"), 'callback je zaregistrovany')
   NxTest.assert(UIC3_PANEL_RB.include?('HoverEdge.release if defined?(HoverEdge)'),

@@ -257,7 +257,7 @@ NxTest.test('K2: rail ma identity guard dokumentu a NEZAPISUJE do modelu') do
   NxTest.refute(h.empty?, 'handler raily musi existovat')
   NxTest.assert(h.include?('GrainCheck.available?(model)'),
                 'starsi SketchUp bez Overlay API sa hlasi nahlas, nie tichym mrtvym tlacidlom')
-  NxTest.assert(h.include?("== model_guid(model)"),
+  NxTest.assert(h.include?(%q<DocKey.foreign?(payload ? parse(payload)['model_guid'] : nil, model)>),
                 'PRISNY guard dokumentu (asynchronny callback by zapol kresbu v cudzom modeli)')
   NxTest.refute(h.include?('start_operation'), 'kresba je overlay NAD modelom — ziadna operacia')
   NxTest.refute(h.include?('Store.set'), 'rail nesmie nic zapisat do modelu')

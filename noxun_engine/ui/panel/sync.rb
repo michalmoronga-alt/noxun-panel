@@ -271,12 +271,14 @@ module Noxun
         # A rovnako PRAZDNY KLUC SERVERA (DocKey nevedel dokument precitat)
         # zapis zastavi — '' == '' by inak pustilo zapis bez identity na oboch
         # stranach (Codex audit R-02b, BLOCKER 1: fail-closed plati obojsmerne).
+        # Samotne porovnanie robi `DocKey.foreign?` — TEN ISTY porovnavac ako
+        # vsetky ostatne guardy (review #267 P3-2), aby fail-closed nebolo
+        # vysadou tejto jednej cesty.
         # Hlaska je NAHLAS (nie tiche zahodenie ako pri echu vyberu): prepnutie
         # dokumentu je zriedkave a pouzivatel musi vediet, ze sa zmena neulozila.
         # `what` = co sa NEstalo, v 1. pade ('Skrinka sa nevložila').
         def foreign_document?(data, model, what)
-          current = model_guid(model)
-          return false if model && !current.empty? && data['model_guid'].to_s == current
+          return false if model && !DocKey.foreign?(data['model_guid'], model)
 
           Engine.log("#{what}: model_guid #{data['model_guid'].inspect} nesedi s aktivnym dokumentom — zapis zahodeny")
           set_status("#{what} — panel patrí inému dokumentu. Klikni do okna zákazky a skús znova.", true)

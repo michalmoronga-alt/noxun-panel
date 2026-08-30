@@ -92,7 +92,7 @@ NxTest.test('UI-B2: kamera nesie identitu dokumentu aj skrinky (asynchronny call
   NxTest.assert(js.include?('cabinet_id') && js.include?('model_guid'),
                 'payload kamery musi niest cabinet_id aj model_guid')
   rb = UIB2_SEL_CODE[/def handle_camera_focus.*?\n        end\n/m].to_s
-  NxTest.assert(rb.include?("data['model_guid']") && rb.include?('model_guid(model)'),
+  NxTest.assert(rb.include?(%q<DocKey.foreign?(data['model_guid'], model)>),
                 'server musi porovnat dokument payloadu s aktivnym')
   NxTest.assert(rb.include?("data['cabinet_id']"), 'server musi hladat skrinku podla ID z payloadu')
 end

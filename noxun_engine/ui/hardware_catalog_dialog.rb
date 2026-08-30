@@ -595,7 +595,7 @@ module Noxun
           data = JSON.parse(payload.to_s)
           model = Sketchup.active_model
           return set_status('Žiadny aktívny model.', true) if model.nil?
-          if data['model_guid'].to_s != DocKey.key(model)
+          if DocKey.foreign?(data['model_guid'], model)
             resync_sets
             return set_status('Model sa medzitým prepol — predvoľby sa obnovili, vyber znova.', true)
           end
@@ -694,7 +694,7 @@ module Noxun
           data = JSON.parse(payload.to_s)
           model = Sketchup.active_model
           return set_status('Žiadny aktívny model.', true) if model.nil?
-          if data['model_guid'].to_s != DocKey.key(model)
+          if DocKey.foreign?(data['model_guid'], model)
             resync_sets
             return set_status('Model sa medzitým prepol — obnovené.', true)
           end
@@ -751,7 +751,7 @@ module Noxun
           data = JSON.parse(payload.to_s)
           model = Sketchup.active_model
           return set_status('Žiadny aktívny model.', true) if model.nil?
-          if data['model_guid'].to_s != DocKey.key(model)
+          if DocKey.foreign?(data['model_guid'], model)
             resync_sets
             return set_status('Model sa medzitým prepol — obnovené.', true)
           end

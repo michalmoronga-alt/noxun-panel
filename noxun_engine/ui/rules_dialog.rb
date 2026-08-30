@@ -552,8 +552,7 @@ module Noxun
           # a kryje aj prípad, keď by baseline z akéhokoľvek dôvodu prešiel.
           # Tolerantne (vzor `do_budget`): PRAZDNY udaj zo starsieho cachovaneho
           # DOM guard neblokuje, NEZHODNE ID ano.
-          guid = data['model_guid'].to_s
-          if !guid.empty? && guid != model_guid(model)
+          if DocKey.foreign?(data['model_guid'], model, tolerate_blank_client: true)
             # Tu ZAMERNE ostava PLNY push (na rozdiel od baseline vetvy vyssie):
             # prepnuty dokument je cudzi pre VSETKY sekcie okna, nielen pre
             # pravidla — echo jednej sekcie by nechalo kusovnik, kontrolu aj
@@ -663,8 +662,7 @@ module Noxun
 
           # (2) DOKUMENT — tolerantne na PRAZDNY udaj (starsi cachovany DOM),
           #     nezhodne id odmietame (vzor `handle_save`).
-          guid = data['model_guid'].to_s
-          if !guid.empty? && guid != model_guid(model)
+          if DocKey.foreign?(data['model_guid'], model, tolerate_blank_client: true)
             return reject_reset('Model sa medzitým prepol — sekcia je načítaná z tohto modelu.', model)
           end
 

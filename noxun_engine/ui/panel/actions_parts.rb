@@ -215,7 +215,7 @@ module Noxun
           # rovnomennu skrinku v tom, ktory je prave aktivny. Vzor
           # `handle_select_part` / `handle_apply_edges_similar`.
           return set_status('Smer dekoru sa nezmenil — panel patrí inému dokumentu.', true) if
-            data['model_guid'].to_s != model_guid(model)
+            DocKey.foreign?(data['model_guid'], model)
           cab = find_cabinet(model)
           return set_status('Najprv označ dielec v korpuse.', true) if cab.nil?
           return if stale_cabinet_echo?(cab, data, 'smer dekoru dielca')
@@ -479,7 +479,7 @@ module Noxun
           return if model.nil?
 
           data = payload ? parse(payload) : {}
-          return HoverEdge.hide(model) if data['model_guid'].to_s != model_guid(model)
+          return HoverEdge.hide(model) if DocKey.foreign?(data['model_guid'], model)
 
           HoverEdge.show(model, data['code'].to_s)
         end
@@ -500,7 +500,7 @@ module Noxun
 
           data = payload ? parse(payload) : {}
           return set_status('Dielec sa neoznačil — panel patrí inému dokumentu.', true) if
-            data['model_guid'].to_s != model_guid(model)
+            DocKey.foreign?(data['model_guid'], model)
 
           cab = find_cabinet(model)
           return refresh_after_stale(model) if cab.nil? ||
@@ -658,7 +658,7 @@ module Noxun
 
           begin
             return push_similar_count(scope, nil, 'Panel patrí inému dokumentu.', req) if
-              data['model_guid'].to_s != model_guid(model)
+              DocKey.foreign?(data['model_guid'], model)
 
             cab, part, _scope, err = similar_context(model, data)
             return push_similar_count(scope, nil, err, req) if err
@@ -692,7 +692,7 @@ module Noxun
 
           data = payload ? parse(payload) : {}
           return set_status('ABS sa nepoužilo — panel patrí inému dokumentu.', true) if
-            data['model_guid'].to_s != model_guid(model)
+            DocKey.foreign?(data['model_guid'], model)
 
           cab, part, scope, err = similar_context(model, data)
           return set_status("ABS sa nepoužilo — #{err}", true) if err
