@@ -276,8 +276,8 @@ module Noxun
       #                nevyda — viz jeho odsek).
       #
       # Dovod je SK veta pre pouzivatela (`library_state_reason`) a KOD
-      # (`library_state_code`) pre kod. Kody kompatibility su `:newer` ·
-      # `:foreign` · `:unknown_shape` · `:unreadable`.
+      # (`library_state_code`) pre kod. Kody su `:newer` · `:foreign` ·
+      # `:unknown_shape` · `:duplicate` · `:unreadable`.
       #
       # ROZSIROVANIE (R-11, poskodeny primar s platnou zalohou): novy dovod
       # patri DOVNUTRA `assess_library_doc` (alebo pred nu do `library_assess!`)
@@ -379,6 +379,14 @@ module Noxun
           return [:read_only, :unreadable, unreadable_sk]
         end
         raw_sets = Array(sets)
+        # (0) DUPLICITNA IDENTITA (vzor katalogu, GH #99 P2): normalizacia druhy
+        #     zaznam ticho zahodi, ale „aktualizuj plugin" by tu nepomohlo —
+        #     s verziou to nesuvisi a spravit sa s tym da nieco ine.
+        ids = raw_sets.filter_map { |s| s['set_id'].to_s.strip if s.is_a?(Hash) }
+        if ids.length != ids.uniq.length
+          return [:read_only, :duplicate,
+                  'Knižnica setov kovania má duplicitné set_id — oprav súbor']
+        end
         # (1) WHITELIST klucov — chyti NOVE POLE (novsia verzia pridala kluc,
         #     ktoremu nerozumieme a normalizacia by ho zahodila).
         if raw_sets.any? { |s| incompatible_set?(s) }
@@ -390,7 +398,7 @@ module Noxun
         #     clena ticho zahodi. Porovnavame preto, ci citacia normalizacia
         #     nic NESTRATILA: pocet setov, pocet clenov a pocet poloziek radu.
         #     Je to TEN ISTY detektor, aky pouziva `project_state_status`.
-        norm_sets = normalize_sets(raw_sets)
+        norm_sets = without_skip_log { normalize_sets(raw_sets) }
         if norm_sets.length != raw_sets.length || members_lost?(raw_sets, norm_sets)
           return [:read_only, :unknown_shape, unknown_set_sk]
         end
@@ -1291,26 +1299,31 @@ module Noxun
       # spadol na globalnu kniznicu a sablona by niesla kody, ktore zdrojovy
       # model NEPOUZIVA (expanzia pri :invalid vedome nemapuje nic). Volajuci
       # vtedy ulozi sablonu BEZ kovania a nahlasi to.
-      # R-07 (review P2-4): pri NEKOMPATIBILNEJ kniznici vracia takisto nil —
-      # z tej istej pricinky ako pri :invalid snapshote. Cast definicii by sa
-      # nedala rozlozit (`resolve_set_def` z takej kniznice nic nevyda), takze
-      # by sablona niesla MAPOVANIE BEZ DEFINICII — a to je horsie nez ziadne
-      # kovanie: pri aplikacii by ticho prepisalo vyber cieloveho korpusu
-      # a skoncilo ORANGE `set_missing`. Kontrakt GH #133 P2 znie „radsej
-      # sablona BEZ kovania a hlaska".
+      # R-07 (review P2-4, zuzene v P2-1): nil vracia PRESNE V DVOCH stavoch,
+      # kde sa definicie nedaju dobrat ZO SPRAVNEHO ZDROJA —
+      #   * :invalid snapshot (GH #133 P2, viz vyssie),
+      #   * NEKOMPATIBILNA globalna kniznica: `resolve_set_def` z nej nic
+      #     nevyda, takze by sablona niesla MAPOVANIE BEZ DEFINICII a pri
+      #     aplikacii by ticho prepisala vyber cieloveho korpusu.
+      # CHYBAJUCA JEDNOTLIVA referencia nad ZDRAVYMI zdrojmi nil NIE JE (P2-1):
+      # mapovanie skrinky moze ukazovat na set, ktory uz v projekte ani
+      # v kniznici nie je (kopia z ineho modelu, medzitym zmazany set) — vtedy
+      # sa ta jedna referencia vynecha, sablona ju nenesie a pri aplikacii
+      # skonci ORANGE `set_missing`. Zahodit kvoli nej CELE kovanie sablony by
+      # bola strata bez dovodu, a hlaska volajuceho by navyse klamala („sety
+      # projektu su poskodene" nad zdravym projektom).
       def template_set_defs(model, mapping)
         map = mapping.is_a?(Hash) ? mapping : {}
         refs = referenced_set_ids(map)
         return {} if refs.empty?
         return nil if project_state_status(model)[0] == :invalid
+        return nil if library_read_only?
         as_override = { 'template' => map }
         out = {}
         refs.each do |sid|
           d = resolve_set_def(model, sid, cabinet_overrides: as_override)
           out[sid] = deep_copy(d) if d
         end
-        # Ani jedna referencia sa nesmie stratit — inak mapovanie bez definicie.
-        return nil if out.length != refs.length
         out
       end
 
@@ -2148,7 +2161,22 @@ module Noxun
       end
 
       def log_skip(msg)
+        return if @skip_log_muted
         Engine.log("hardware sets: #{msg}") if defined?(Engine) && Engine.respond_to?(:log)
+      end
+
+      # R-07 (review P3-2): brana sa vyhodnocuje pri KAZDOM pouziti kniznice
+      # a jej round-trip kontrola pusta obsah cez `normalize_sets` — ta pri
+      # kazdom preskocenom clene loguje. Bez stlmenia by nekompatibilna
+      # kniznica zaplavila konzolu tou istou vetou pri kazdom payloade.
+      # Stlmuje sa VYHRADNE diagnosticky prechod brany; skutocne citanie
+      # (`read_library`) loguje dalej — tam je to jednorazova informacia.
+      def without_skip_log
+        prev = @skip_log_muted
+        @skip_log_muted = true
+        yield
+      ensure
+        @skip_log_muted = prev
       end
 
       def stringify(h)

@@ -59,15 +59,33 @@ module NxR07
 
   # Zapise dokument PRIAMO na disk (obide brany) a zhodi cache aj stav.
   def install(doc)
+    install_raw(doc)
+    HWS.reset_library_state!
+    true
+  end
+
+  # To iste, ale stav modulu NECHAVA TAK — presne tak, ako to vidi bezici
+  # plugin, ked subor vymeni druha instancia. Testy necachovania (P1-1) musia
+  # ist touto cestou; `install` by im stav vynuloval a nic by nestrazili.
+  def install_raw(doc)
     FileUtils.mkdir_p(File.dirname(HWS.path))
     File.binwrite(HWS.path, JSON.pretty_generate(doc))
     STORE.invalidate(HWS.path)
-    HWS.reset_library_state!
     true
   end
 
   def raw
     JSON.parse(File.binread(HWS.path))
+  end
+
+  # Odchyti, co by islo do konzoly SketchUpu (Engine.log je v harnesse stub).
+  def with_log_capture
+    msgs = []
+    orig = E.method(:log)
+    E.define_singleton_method(:log) { |m| msgs << m.to_s; nil }
+    yield msgs
+  ensure
+    E.define_singleton_method(:log, orig)
   end
 
   # Telo jednej metody zo zdroja (vzor `test_r08_zamky.rb`) — pre kontrakty
@@ -288,6 +306,15 @@ NxTest.test('R-07 detektor: neznámy kľúč člena/setu = read-only (nie tiché
     r.install(r.doc([r.plain_set('novy-typ', 'flap_stay')]))
     NxTest.assert(r::HWS.library_read_only?, 'neznamy generic_type (typ kovania novsej verzie)')
   end
+  # Duplicitna identita ma VLASTNY dovod — „aktualizuj plugin" by nepomohlo,
+  # s verziou to nesuvisi (vzor katalogu, GH #99 P2).
+  r.with_library do
+    r.install(r.doc([r.plain_set, r.plain_set]))
+    NxTest.assert(r::HWS.library_read_only?, 'duplicitna identita = read-only')
+    NxTest.assert_equal(:duplicate, r::HWS.library_state_code)
+    NxTest.assert(r::HWS.library_state_reason.include?('oprav súbor'),
+                  r::HWS.library_state_reason)
+  end
   r.with_library do
     r.install(r.doc([r.plain_set], { 'hinge' => { 'param' => 'front_height',
                                                   'bands' => [{ 'min' => 0.0, 'max' => 9.0,
@@ -429,6 +456,36 @@ NxTest.test('R-07 (P1-1): stav sa NECACHUJE — súbor vymenený po zdravom load
   end
 end
 
+NxTest.test('R-07 (P1-1 pripnutie): `library_state` sa NECACHUJE — výmena súboru zmení verdikt') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  r = NxR07
+  r.with_library do
+    r.install(r.doc([r.plain_set]))
+    NxTest.assert_equal(:ok, r::HWS.library_state, 'prvy verdikt naplni modulovy stav')
+    # Vymena BEZ `reset_library_state!` — presne to, co spravi druha instancia.
+    r.install_raw(r.doc([r.plain_set('od-novsej')], {}, 'std' => 3))
+    NxTest.assert_equal(:read_only, r::HWS.library_state,
+                        'zapamatany verdikt sa NESMIE pouzit nad novym obsahom')
+    NxTest.assert_equal(:newer, r::HWS.library_state_code, 'a dovod je z NOVEHO suboru')
+    # Cesta spat je rovnako ziva (stav nie je jednosmerka).
+    r.install_raw(r.doc([r.plain_set]))
+    NxTest.assert_equal(:ok, r::HWS.library_state, 'opraveny subor sa hned zase pouziva')
+  end
+end
+
+NxTest.test('R-07 (P1-1 pripnutie): global_default_state po výmene za std 3 vráti nil') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  r = NxR07
+  r.with_library do
+    r.install(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }))
+    NxTest.assert(r::HWS.global_default_state['sets'].any?, 'zdravy stav sa zmrazit da')
+    # Zdravy load uz prebehol (riadok vyssie) — teraz subor vymeni novsi plugin.
+    r.install_raw(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }, 'std' => 3))
+    NxTest.assert_equal(nil, r::HWS.global_default_state,
+                        'do .skp sa uz nesmie zmrazit NIC (verdikt nesmie byt zastarany)')
+  end
+end
+
 NxTest.test('R-07 (P1-2): strata ČLENA bez nového kľúča (novšia HODNOTA `per`) = read-only') do
   NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
   r = NxR07
@@ -501,6 +558,49 @@ NxTest.test('R-07 (P2-3): panel dáva ROVNAKÝ dôvod ako súpis (žiadne „pri
   ip = r.method_src('ui/panel/payloads.rb', 'item_purchase')
   NxTest.assert(ip.include?('library_incompatible'),
                 'a posiela `no_set_reason` do explain')
+end
+
+NxTest.test('R-07 (P3-2): vyhodnotenie brány NEZAPLAVÍ log — dôvod ide do konzoly RAZ') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  r = NxR07
+  r.with_library do
+    # Kniznica, ktorej normalizacia zahadzuje clena — bez stlmenia by kazde
+    # vyhodnotenie brany (a to je KAZDE pouzitie kniznice) zapisalo tu istu vetu.
+    r.install(r.doc([r.plain_set.merge(
+      'members' => [{ 'code' => 'KOD-1', 'per' => 'unit', 'qty' => 1 },
+                    { 'code' => 'KOD-2', 'per' => 'length', 'qty' => 1 }]
+    )]))
+    r.with_log_capture do |msgs|
+      3.times { r::HWS.library_state }
+      noise = msgs.select { |m| m.include?('preskoceny') || m.include?('neznáme') }
+      NxTest.assert_equal([], noise, "brana pri vyhodnoteni NELOGUJE preskoceny obsah: #{noise.inspect}")
+      ro = msgs.select { |m| m.include?('READ-ONLY') }
+      NxTest.assert_equal(1, ro.length,
+                          "dovod sa zaloguje RAZ (pri zmene stavu), nie 3x: #{msgs.inspect}")
+    end
+  end
+end
+
+NxTest.test('R-07 (P2-1): ZDRAVÁ knižnica s mŕtvou referenciou šablónu NEBLOKUJE') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  r = NxR07
+  r.with_library do
+    # Zdrava kniznica aj zdravy snapshot; mapovanie skrinky vsak ukazuje AJ na
+    # set, ktory uz nikde nie je (kopia korpusu z ineho modelu, zmazany set).
+    r.install(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }))
+    snap = { 'std' => 1, 'mapping' => { 'hinge' => 'zaves-a' },
+             'sets' => { 'zaves-a' => r.plain_set } }
+    m = r.model_with(snap)
+    defs = r::HWS.template_set_defs(m, { 'hinge' => 'zaves-a', 'leg' => 'davno-zmazany' })
+    NxTest.assert(defs.is_a?(Hash), 'sablona sa ULOZI — nil je vyhradene pre pokazene ZDROJE')
+    NxTest.assert_equal(['zaves-a'], defs.keys,
+                        'nesie rozlozitelne definicie; mrtva referencia sa vynecha')
+    # Pri aplikacii z nej vznikne ORANGE `set_missing` — presne ako slubuje
+    # kontrakt (a NIE tichy iny hardver).
+    res = r::HWS.freeze_template_sets!(m, { 'hinge' => 'zaves-a', 'leg' => 'davno-zmazany' }, defs)
+    NxTest.assert_equal(:ok, res['status'])
+    NxTest.assert_equal(['davno-zmazany'], res['missing'])
+  end
 end
 
 NxTest.test('R-07 (P2-4): šablóna pri read-only knižnici — bez kovania a BEZ pádu vkladania') do
