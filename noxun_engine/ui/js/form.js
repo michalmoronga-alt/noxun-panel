@@ -164,7 +164,7 @@
     var payload = collectAll();
     payload.cabinet_id = cabSnapshot || selectedCabId;
     cabEditsInFlight = true; // D-07 Codex B2: echo tohto apply nesmie prepisat novsi vstup
-    if (window.sketchup && sketchup.apply_all) sketchup.apply_all(JSON.stringify(payload));
+    if (window.sketchup && sketchup.apply_all) sketchup.apply_all(nxDocPayload(payload)); // R-02
   }
   function flushCabinetEditsNow(){
     if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; }

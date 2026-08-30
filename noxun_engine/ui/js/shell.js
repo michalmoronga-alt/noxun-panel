@@ -363,6 +363,12 @@
   // DOM cast nizsie bezi normalne (rovnaky vzor ako insert_state.js/usage.js).
   if (typeof module !== 'undefined' && module.exports){
     module.exports = NXShell;
+    // R-02 (tests/js/test_r02_doc_guard.js): zapisovy payload panela zije MIMO
+    // NXShell namespace — pouziva modulovy `nxModelGuid`, ktory nie je sucastou
+    // kostry Inspectora. Deklaracie funkcii su hoistovane, takze referencia tu
+    // plati aj ked su definovane nizsie.
+    module.exports.nxDocPayload = nxDocPayload;
+    module.exports.nxSetModelGuid = nxSetModelGuid;
   }
 
   // ===== DOM: rail ==========================================================
@@ -627,6 +633,22 @@
   // Hodnota sa prepisuje LEN ked ju volajuci naozaj poslal — payload bez tohto
   // pola (starsi push, vnoreny objekt) nesmie zmazat platnu identitu.
   function nxSetModelGuid(g){ if (g !== undefined && g !== null) nxModelGuid = String(g); }
+
+  // R-02: JEDNO miesto, kde ZAPISOVY payload panela dostane identitu dokumentu.
+  // Vzor `nxZonePayload` (zone_tree.js) — ten navyse pridava `cabinet_id`, tento
+  // je pre cesty, ktoré si svoju vlastnú identitu (cabinet_id / board_id) nesú
+  // samy alebo ju nemajú vôbec (vkladanie).
+  //
+  // PRECO: callback HtmlDialogu je asynchrónny a panel je JEDEN pre všetky
+  // otvorené dokumenty. ID objektov sú jedinečné LEN v rámci modelu, takže echo
+  // `cabinet_id` prepnutie dokumentu NEZACHYTÍ. Server payload bez zhodného
+  // guidu ODMIETNE — prázdny guid je okno bez dobehnutého NX.init a to nesmie
+  // zapisovať nikam.
+  function nxDocPayload(obj){
+    var o = obj || {};
+    o.model_guid = (typeof nxModelGuid === 'string') ? nxModelGuid : '';
+    return JSON.stringify(o);
+  }
 
   // Posledny STAV zo servera. Drzi sa LEN preto, aby sa dalo rohove nastavenie
   // prekreslit s cerstvymi poctami — panel si z neho nic neodvodzuje ani nic

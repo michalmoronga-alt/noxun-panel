@@ -408,7 +408,8 @@
       p.template_kind = ref.kind;
       p.template_name = ref.name;
     }
-    if (window.sketchup && sketchup.insert_cabinet) sketchup.insert_cabinet(JSON.stringify(p));
+    // R-02: identita dokumentu ide s KAZDYM zapisovym payloadom (nxDocPayload).
+    if (window.sketchup && sketchup.insert_cabinet) sketchup.insert_cabinet(nxDocPayload(p));
   }
   // B3 „Vlozit kopiu": PRESNA SERVEROVA kopia oznacenej skrinky — config sa cita
   // z modelu (nie z DOM formulara), takze kopia nesie aj materialy, part_overrides,
@@ -425,7 +426,7 @@
     }
     if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
     if (window.sketchup && sketchup.insert_copy)
-      sketchup.insert_copy(JSON.stringify({ cabinet_id: selectedCabId }));
+      sketchup.insert_copy(nxDocPayload({ cabinet_id: selectedCabId }));
   }
   // D-27: ghost zony su TAG ako kazdy iny (`Noxun/Zóny`) — checkbox preto ide
   // TOU ISTOU cestou ako okno tagov v raile. Stary callback `toggle_zones`

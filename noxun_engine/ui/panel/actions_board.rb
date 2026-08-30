@@ -2,11 +2,13 @@
 # Noxun Engine - Panel: samostatna doska (V0.4.7c) — vlozenie + editacia karty.
 # Cast modulu Panel (reopen) - zdiela ivary (dialog, suspend guard) cez class << self.
 #
-# GUARD proti oneskorenym zapisom (Codex audit c, blocker A): kazdy edit callback
-# nesie echo board_id z karty. Zapis prejde LEN ked (1) v Inspectore nevyhrala
+# GUARD proti oneskorenym zapisom (Codex audit c, blocker A; R-02): kazdy edit
+# callback nesie `model_guid` DOKUMENTU aj echo board_id z karty. Zapis prejde
+# LEN ked (0) payload patri AKTIVNEMU dokumentu, (1) v Inspectore nevyhrala
 # skrinka (find_cabinet nil), (2) vo vybere JE doska a (3) jej Store id sedi
-# s echom. Inak sa zapis TICHO zahodi (len log) — pouzivatel uz medzitym robi
-# nieco ine, chybova hlaska by matla.
+# s echom. Nezhoda dokumentu je HLASKA (prepnutie zakazky je zriedkave a
+# uzivatel musi vediet, ze sa zmena neulozila); zvysne tri sa TICHO zahodia
+# (len log) — pouzivatel uz medzitym robi nieco ine, hlaska by matla.
 module Noxun
   module Engine
     module Panel
@@ -26,6 +28,7 @@ module Noxun
         def handle_insert_board(payload)
           model = Sketchup.active_model
           data = parse(payload)
+          return if foreign_document?(data, model, 'Doska sa nevložila') # R-02
           # UI-C1a: metadata sablony (`template_kind`/`template_name`) su MIMO
           # whitelistu poli, takze sa do buildera nedostanu tak ci tak — vyberu
           # sa vsak vyslovne, aby bolo jasne, ze ide o identitu na peciatku.
@@ -258,8 +261,18 @@ module Noxun
         end
 
         # Guard identity (viz hlavicka). Vracia [model, board] alebo [nil, nil].
+        #
+        # R-02: DVE urovne identity, ZAMERNE s roznou hlasnostou.
+        #   * DOKUMENT (`model_guid`) — NAHLAS. Prepnutie zakazky je zriedkave,
+        #     `board_id` ho nezachyti (BRD-001 je v kazdom projekte) a tichy
+        #     zapis by skoncil v cudzej zakazke. Pouzivatel musi vediet, ze sa
+        #     zmena neulozila.
+        #   * ECHO board_id / vyber — TICHO (len log), ako doteraz: pouzivatel
+        #     uz medzitym robi nieco ine a hlaska by ho len mylila.
         def guarded_board(data)
           model = Sketchup.active_model
+          return [nil, nil] if foreign_document?(data, model, 'Doska sa nezmenila')
+
           unless find_cabinet(model).nil?
             Engine.log('board edit zahodeny — v Inspectore vyhrala skrinka')
             return [nil, nil]

@@ -96,7 +96,7 @@
     // Identity guard aj na klientovi (server ma svoj vlastny, prisnejsi):
     // ak sa vyber medzitym presunul, zapis sa neposiela vobec.
     if (cid && cid === selectedCabId && window.sketchup && sketchup.rename_cabinet){
-      sketchup.rename_cabinet(JSON.stringify({ cabinet_id: cid, name: name }));
+      sketchup.rename_cabinet(nxDocPayload({ cabinet_id: cid, name: name })); // R-02
     }
   }
 

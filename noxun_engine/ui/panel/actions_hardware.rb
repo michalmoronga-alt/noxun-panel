@@ -20,10 +20,14 @@ module Noxun
 
         def handle_set_hardware_override(payload)
           model = Sketchup.active_model
+          data = parse(payload)
+          # R-02: identita DOKUMENTU pred identitou skrinky — `cabinet_id` nizsie
+          # prepnutie dokumentu nezachyti (CAB-001 je v kazdej zakazke).
+          return if foreign_document?(data, model, 'Kovanie sa nezmenilo')
+
           cab = find_cabinet(model)
           return set_status('Najprv označ NOXUN korpus.', true) if cab.nil?
 
-          data = parse(payload)
           gt = data['generic_type'].to_s
           rid = data['rule_id'].to_s
           return set_status('Neznáma položka kovania.', true) if gt.empty? || rid.empty?
@@ -148,10 +152,12 @@ module Noxun
         # pripady, ziadne skladanie klucov v paneli.
         def handle_set_hardware_set(payload)
           model = Sketchup.active_model
+          data = parse(payload)
+          return if foreign_document?(data, model, 'Set kovania sa nezmenil') # R-02
+
           cab = find_cabinet(model)
           return set_status('Najprv označ NOXUN korpus.', true) if cab.nil?
 
-          data = parse(payload)
           gt = data['generic_type'].to_s
           return set_status('Neznámy typ kovania.', true) unless BuildPlan::GENERIC_TYPES.include?(gt)
 
