@@ -537,6 +537,10 @@ module Noxun
           # D1b: rovnaka mechanika pre SETY kovania — prva stavba zmrazi
           # mapping + definicie z globalu (audit B2/F9; :invalid sa NEOPRAVUJE
           # ticho — ensure vtedy vrati nil a nic nezapise).
+          # R-07: to iste plati pre NEKOMPATIBILNU globalnu kniznicu (novsia
+          # verzia / neznamy tvar) — `ensure_project_state!` vtedy vrati nil,
+          # takze sa do .skp NEZMRAZI orezany stav. Stavba bezi dalej, len bez
+          # snapshotu; supis kovania to prizna ORANGE `library_incompatible`.
           HardwareSets.ensure_project_state!(model) if defined?(HardwareSets)
           plan = Construction.build_plan(cfg, cid, hardware_rules: rules) # validuje interne
           ents = cdef.entities

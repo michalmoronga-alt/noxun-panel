@@ -112,7 +112,19 @@ module Noxun
       # semaforu mapuje Validation.check_hardware_expansion.
       UNMAPPED_REASONS = %w[no_set set_missing set_type_mismatch nl_missing
                             param_band_missing selector_unresolved
-                            length_unsupported].freeze
+                            length_unsupported library_incompatible].freeze
+
+      # --- 1d/R-07: whitelist ZNAMYCH klucov (detektor straty) ----------------
+      # Normalizacia je TOLERANTNA (citanie nesmie zhodit prestavbu), takze
+      # kluc, ktory tato verzia NEPOZNA, ticho zmizne — a prvy zapis stratu
+      # ZVECNI. Zoznamy su preto UZAVRETE: cokolvek mimo nich = obsah novsej
+      # (alebo cudzej) verzie a kniznica/snapshot sa smie uz len CITAT.
+      # POZOR: whitelisty su KONTRAKT — kazde nove pole clena/pasma sa musi
+      # doplnit SEM, inak vlastny zapis vyrobi read-only stav.
+      SET_KEYS         = %w[set_id name generic_type members].freeze
+      MEMBER_KEYS      = %w[per qty label code code_by_nl param_bands].freeze
+      PARAM_BANDS_KEYS = %w[param bands].freeze
+      BAND_KEYS        = %w[min max].freeze # + hodnota (code / set_id)
 
       # H1b: parametre, podla ktorych sa daju stavat pasma clena (param_bands)
       # a selector mapovania. JEDINA autorita ponuky pre UI — okno Katalog
@@ -253,11 +265,290 @@ module Noxun
         Materials.with_catalog_lock(&blk)
       end
 
-      # Nacita globalnu kniznicu { 'sets' => [], 'mapping' => {} }. Poskodeny/
-      # chybajuci subor -> seed (fallback nikdy nevrati nil). Seed-merge ako
-      # HardwareRules: novsi SEED_VERSION doplni CHYBAJUCE set_id (bez prepisu
-      # pouzivatelskych uprav) — plati LEN pre global; projektovy snapshot sa
-      # NIKDY nemeni sam.
+      # --- 1d/R-07: kompatibilitna BRANA globalnej kniznice -------------------
+      #
+      # Kniznica setov je GLOBALNA (%APPDATA%), takze ju zdielaju vsetky verzie
+      # pluginu na tom istom profile. Starsia verzia novsi subor precitala,
+      # neznamy obsah TICHO orezala a prvym zapisom stratu ZVECNILA. Od tejto
+      # davky ma kniznica STAV (vzor `HardwareCatalog.assess!`):
+      #   :ok        — subor je tejto verzii cely zrozumitelny,
+      #   :read_only — nesmie sa ANI zapisat, ANI POUZIT (`load` z nej nic
+      #                nevyda — viz jeho odsek).
+      #
+      # Dovod je SK veta pre pouzivatela (`library_state_reason`) a KOD
+      # (`library_state_code`) pre kod. Kody su `:newer` · `:foreign` ·
+      # `:unknown_shape` · `:duplicate` · `:unreadable` · `:unexpected_shape`
+      # (posledny = fail-closed vetva, moze ho sposobit aj chyba pluginu nad
+      # zdravym suborom, preto jeho hlaska NENAVADZA subor mazat).
+      #
+      # ROZSIROVANIE (R-11, poskodeny primar s platnou zalohou): novy dovod
+      # patri DOVNUTRA `assess_library_doc` (alebo pred nu do `library_assess!`)
+      # ako DALSIA kontrola s vlastnym kodom — nikdy ako druhy, samostatny
+      # stavovy priznak. `apply_library_state` zapisuje VYSLEDOK jednej matice,
+      # takze sa dva dovody nemozu prebijat a `:read_only` sa nemoze vratit
+      # na `:ok` len preto, ze druha kontrola nic nenasla.
+      #
+      # STAV SA NECACHUJE (review P1-1). Zapamatane `:ok` je presne ta pasca,
+      # ktoru brana riesi: subor mohol medzitym nahradit iny proces, takze
+      # volajuci by sa rozhodol podla STARSIEHO verdiktu nad NOVSIM obsahom.
+      # `@lib_*` su len VYSLEDOK poslednej kontroly (dovod pre volajuceho, ktory
+      # sa uz spytal). Citanie suboru pod tym drzi sekundovu cache
+      # `JsonFileStore`, takze verdikt aj obsah pochadzaju z TOHO ISTEHO
+      # dokumentu — to je invariant, na ktorom cela brana stoji.
+      def library_state
+        library_assess!
+      end
+
+      def library_state_reason
+        @lib_state_reason.to_s
+      end
+
+      def library_state_code
+        @lib_state_code
+      end
+
+      def library_read_only?
+        library_state == :read_only
+      end
+
+      # Test-only reset (stav je modulova cache nad globalnym suborom).
+      def reset_library_state!
+        @lib_state = nil
+        @lib_state_code = nil
+        @lib_state_reason = ''
+        true
+      end
+
+      # Vyhodnoti stav nad AKTUALNYM obsahom suboru. Bez zamku — je to hot
+      # cesta (payloady, expanzia). Pred ZAPISOM sa brana vyhodnocuje ZNOVA
+      # a pod zamkom (`write`) nad suborom po `reload!`.
+      def library_assess!
+        apply_library_state(*assess_library_doc(read_library_doc))
+      end
+
+      # Dokument kniznice na posudenie. Chybajuci subor = CISTY stav (nil).
+      #
+      # P2-5 (review): poskodeny primar BEZ zalohy je tiez cisty stav —
+      # nie je z coho co stratit a `main` sa tak spraval odjakziva (`load`
+      # spadne do seedu a prvy zapis subor SAMOOPRAVI). Keby sme ho zavreli do
+      # read-only, pouzivatel by skoncil v slepej ulicke: zapis odmietnuty,
+      # seed nedostupny, a nic mu nepovie, ze staci zmazat jeden subor.
+      # Ked zaloha EXISTUJE, citanie sa jej drzi (`JsonFileStore` recovery) —
+      # a ked sa neda precitat ani ona, ostava `:read_only` s dovodom, ktory
+      # menuje CESTU. Rozhranie s R-11 (poskodeny primar s PLATNOU zalohou) je
+      # tym ostre: ten pripad sem vobec nepadne (citanie zo zalohy uspeje).
+      def read_library_doc
+        return nil unless JsonFileStore.available?(path)
+        JsonFileStore.read(path, copy: false)
+      rescue StandardError
+        File.exist?("#{path}.bak") ? :unreadable : nil
+      end
+
+      def apply_library_state(state, code, reason)
+        changed = @lib_state != state || @lib_state_code != code
+        @lib_state = state
+        @lib_state_code = code
+        @lib_state_reason = reason.to_s
+        # Log LEN pri zmene — stav sa vyhodnocuje pri kazdom pouziti, takze
+        # bezpodmienecny zapis by pri read-only kniznici zaplavil konzolu.
+        if changed && state == :read_only && defined?(Engine) && Engine.respond_to?(:log)
+          Engine.log("hardware sets: kniznica READ-ONLY — #{reason}")
+        end
+        state
+      end
+
+      # CISTA matica stavu nad dokumentom kniznice (ziadne IO).
+      # doc = nil (subor este neexistuje = cisty stav, seed) | Hash | cokolvek.
+      # -> [:ok, nil, ''] | [:read_only, kod, SK dovod]
+      def assess_library_doc(doc)
+        return [:ok, nil, ''] if doc.nil?
+        unless doc.is_a?(Hash)
+          return [:read_only, :unreadable, unreadable_sk]
+        end
+        std = doc['std'].to_i
+        if doc.key?('std') && !STD_SUPPORTED.include?(std)
+          # Marker je LAZY podla obsahu (GH #131 P2): vyssi std = tvary, ktore
+          # tato verzia nepozna; nizsi/nezmyselny = cudzi subor.
+          return [:read_only, :newer,
+                  'Knižnica setov kovania je z novšej verzie Noxun — aktualizuj plugin'] if std > STD_SUPPORTED.max
+
+          return [:read_only, :foreign,
+                  'Knižnica setov kovania patrí inému systému (marker std)']
+        end
+        sets = doc['sets']
+        mapping = doc['mapping']
+        unless (sets.nil? || sets.is_a?(Array)) && (mapping.nil? || mapping.is_a?(Hash))
+          return [:read_only, :unreadable, unreadable_sk]
+        end
+        raw_sets = Array(sets)
+        # (0) DUPLICITNA IDENTITA (vzor katalogu, GH #99 P2): normalizacia druhy
+        #     zaznam ticho zahodi, ale „aktualizuj plugin" by tu nepomohlo —
+        #     s verziou to nesuvisi a spravit sa s tym da nieco ine.
+        ids = raw_sets.filter_map { |s| s['set_id'].to_s.strip if s.is_a?(Hash) }
+        if ids.length != ids.uniq.length
+          return [:read_only, :duplicate,
+                  'Knižnica setov kovania má duplicitné set_id — oprav súbor']
+        end
+        # (1) WHITELIST klucov — chyti NOVE POLE (novsia verzia pridala kluc,
+        #     ktoremu nerozumieme a normalizacia by ho zahodila).
+        if raw_sets.any? { |s| incompatible_set?(s) }
+          return [:read_only, :unknown_shape, unknown_set_sk]
+        end
+        # (2) ROUND-TRIP (review P1-2): whitelist NESTACI. Novsia verzia pridava
+        #     najprv NOVU HODNOTU existujuceho kluca (`per: 'length'`, necislny
+        #     kluc radu) — kluc je znamy, whitelist ju prepusti, a normalizacia
+        #     clena ticho zahodi. Porovnavame preto, ci citacia normalizacia
+        #     nic NESTRATILA: pocet setov, pocet clenov a pocet poloziek radu.
+        #     Je to TEN ISTY detektor, aky pouziva `project_state_status`.
+        norm_sets = without_skip_log { normalize_sets(raw_sets) }
+        if norm_sets.length != raw_sets.length || members_lost?(raw_sets, norm_sets)
+          return [:read_only, :unknown_shape, unknown_set_sk]
+        end
+        if mapping.is_a?(Hash)
+          if mapping.any? { |k, v| incompatible_mapping_entry?(k, v) }
+            return [:read_only, :unknown_shape, unknown_mapping_sk]
+          end
+          # Tvar mapovania cez JEDINY parser. ZAMERNE BEZ `set_ids`: polozka
+          # ukazujuca na zmazany set sa vyhadzuje LEGITIMNE (`delete_set!`
+          # ocisti mapovanie), takze to strata nie je — chyby TVARU (prazdne
+          # set_id, composite kluc, neplatna hodnota) ano.
+          _norm_map, map_errors = parse_mapping(mapping)
+          return [:read_only, :unknown_shape, unknown_mapping_sk] unless map_errors.empty?
+        end
+        [:ok, nil, '']
+      rescue StandardError => e
+        # BRANA MUSI ZLYHAT ZATVORENE (review P2). Druha vrstva detektora
+        # pusta CUDZI obsah cez normalizacne a parsovacie cesty — hocijaka
+        # nova hodnota v nich moze vyhodit vynimku (`qty: true` -> NoMethodError).
+        # Keby vyletela odtialto, `load` by ju rescue-ol, zavolal
+        # `library_read_only?` a ta by ju vyvolala ZNOVA: ziadny stav, ziadny
+        # dovod a nakupny supis by skoncil ako nil — teda BEZ oranzoveho
+        # priznania. Nezrozumitelny dokument je preto read-only, nie vynimka.
+        #
+        # VLASTNY KOD, nie `:unreadable` (Codex P3): sem padne aj PROGRAMATORSKA
+        # chyba nad uplne zdravym suborom. Hlaska „oprav alebo zmaz subor" by
+        # vtedy navadzala zmazat funkcnu kniznicu kvoli chybe v pluginu —
+        # dovod preto hovori „nemaz, nahlas".
+        Engine.log_error(e, 'HardwareSets.assess_library_doc') if defined?(Engine)
+        [:read_only, :unexpected_shape, unexpected_sk]
+      end
+
+      # SK dovody — jedno znenie pre banner, status aj log.
+      def unreadable_sk
+        "Knižnica setov kovania sa nedá prečítať — oprav alebo zmaž súbor #{path}"
+      end
+
+      def unexpected_sk
+        'Knižnica setov kovania má neočakávaný tvar alebo nastala interná chyba — ' \
+          'nič sa nezapisuje. Súbor NEMAŽ, nahlás problém.'
+      end
+
+      def unknown_set_sk
+        'Knižnica setov kovania obsahuje set s údajmi, ktoré táto verzia Noxun nepozná — aktualizuj plugin'
+      end
+
+      def unknown_mapping_sk
+        'Knižnica setov kovania obsahuje predvoľbu, ktorú táto verzia Noxun nepozná — aktualizuj plugin'
+      end
+
+      # --- detektor STRATY (audit R-07 FIX 4) ---------------------------------
+      # Nie POCTY, ale WHITELIST klucov: pocet setov sedi aj vtedy, ked sa
+      # zahodil clen ci pole clena. Legacy KONVERZIE hodnot (dopĺňany `per`,
+      # chybajuce `qty`, cislo namiesto stringu) su kompatibilne — tie tvar
+      # nemenia, len ho normalizuju.
+      # TYPY hodnôt známych kľúčov (review P1). Whitelist KĽÚČA nestačí: novšia
+      # verzia dá známemu kľúču iný TVAR — `code_by_nl` ako pole (štruktúrovaný
+      # rad popri fallback kóde), `qty` ako objekt — a čítacia normalizácia ho
+      # buď ticho zahodí, alebo (horšie) pretypuje na nezmysel: `['future'].to_s`
+      # by sa stalo „kódom", ktorý sa objedná. Skalár = String alebo Numeric
+      # (číslo v JSONe je legitímna legacy podoba kódu aj počtu); `true`/`false`,
+      # pole a objekt skalár NIE SÚ.
+      def scalar_value?(value)
+        value.is_a?(String) || value.is_a?(Numeric)
+      end
+
+      # nil = kľúč chýba (legitímne). Inak musí sedieť TYP.
+      def bad_type?(value, kind)
+        return false if value.nil?
+        case kind
+        when :scalar then !scalar_value?(value)
+        when :hash   then !value.is_a?(Hash)
+        else true
+        end
+      end
+
+      def incompatible_set?(set)
+        return true unless set.is_a?(Hash)
+        s = stringify(set)
+        return true unless (s.keys - SET_KEYS).empty?
+        return true if %w[set_id name generic_type].any? { |k| bad_type?(s[k], :scalar) }
+        # Neznamy generic_type = typ kovania novsej verzie; `normalize_sets` by
+        # cely set ticho zahodil.
+        return true unless BuildPlan::GENERIC_TYPES.include?(s['generic_type'].to_s.strip)
+        members = s['members']
+        return true unless members.is_a?(Array) && !members.empty?
+        members.any? { |m| incompatible_member?(m) }
+      end
+
+      def incompatible_member?(member)
+        return true unless member.is_a?(Hash)
+        m = stringify(member)
+        return true unless (m.keys - MEMBER_KEYS).empty?
+        return true if %w[per qty label code].any? { |k| bad_type?(m[k], :scalar) }
+        # `code_by_nl` a `param_bands` su MAPY. Coko0lvek ine (pole, string,
+        # cislo) je tvar novsej verzie — nie „nula poloziek", ale NEZNAMY OBSAH:
+        # normalizacia by ho zahodila BEZ STOPY a najblizsi zapis by stratu
+        # zvecnil (review P1 — `members_lost?` ho ako nulu prehliadol).
+        return true if %w[code_by_nl param_bands].any? { |k| bad_type?(m[k], :hash) }
+        nl = m['code_by_nl']
+        return true if nl.is_a?(Hash) && nl.each_value.any? { |v| !scalar_value?(v) }
+        pb = m['param_bands']
+        return incompatible_bands?(pb, 'code') unless pb.nil?
+        false
+      end
+
+      def incompatible_bands?(raw, value_key)
+        return true unless raw.is_a?(Hash)
+        h = stringify(raw)
+        return true unless (h.keys - PARAM_BANDS_KEYS).empty?
+        return true if bad_type?(h['param'], :scalar)
+        list = h['bands']
+        return true unless list.is_a?(Array)
+        list.any? do |b|
+          next true unless b.is_a?(Hash)
+          bb = stringify(b)
+          next true unless (bb.keys - BAND_KEYS - [value_key]).empty?
+          (BAND_KEYS + [value_key]).any? { |k| bad_type?(bb[k], :scalar) }
+        end
+      end
+
+      # Polozka GLOBALNEHO mapovania: kluc musi byt zname `generic_type` (bez
+      # composite `gt@owner` — ten patri LEN cabinet override mape) a hodnota
+      # set_id alebo selector zo znamych klucov.
+      def incompatible_mapping_entry?(key, value)
+        parsed = BuildPlan.parse_hardware_set_key(key)
+        return true if parsed.nil? || parsed[1]
+        return false if value.is_a?(String) || value.is_a?(Symbol)
+        incompatible_bands?(value, 'set_id')
+      end
+
+      # Prazdna kniznica — jediny tvar, ktory sa vracia namiesto obsahu, ktory
+      # sa NESMIE pouzit (audit BLOCKER 1).
+      def blank_library
+        { 'sets' => [], 'mapping' => {} }
+      end
+
+      # Nacita globalnu kniznicu { 'sets' => [], 'mapping' => {} }. Chybajuci
+      # (alebo poskodeny bez zalohy) subor -> seed; NEKOMPATIBILNY subor ->
+      # PRAZDNO (fallback nikdy nevrati nil). Seed-merge ako HardwareRules:
+      # novsi SEED_VERSION doplni CHYBAJUCE set_id (bez prepisu pouzivatelskych
+      # uprav) — plati LEN pre global; projektovy snapshot sa NIKDY nemeni sam.
+      #
+      # R-07 (review P1-1): `load` je BEZPECNY Z PRINCIPU — z nekompatibilnej
+      # kniznice NIKDY nevydá obsah. Skorsi navrh mal na to samostatnu
+      # `usable_library` a volajuci sa medzi nou a `load` museli rozhodovat
+      # podla ZAPAMATANEHO stavu; stacilo raz siahnut na `load` a uz sa
+      # pracovalo s orezanymi datami. Jedna cesta = jedna pravda.
       def load
         ensure_seeded
         lib, changed = read_library
@@ -265,7 +556,9 @@ module Noxun
         persist_seed_merge!(lib)
       rescue StandardError => e
         Engine.log_error(e, 'HardwareSets.load') if defined?(Engine)
-        seed_library
+        # Aj zlyhanie musi respektovat branu: seed nad NEKOMPATIBILNYM suborom
+        # by ukazal cudzie defaulty (a prvy zapis by ich zvecnil).
+        library_read_only? ? blank_library : seed_library
       end
 
       def seed_library
@@ -273,8 +566,23 @@ module Noxun
       end
 
       # CISTE citanie + seed-merge BEZ zapisu -> [kniznica, changed].
+      #
+      # R-07 (audit FIX 3): brana sa vyhodnocuje nad PRAVE precitanym
+      # dokumentom (verdikt a obsah tak pochadzaju z JEDNEHO stavu suboru) a to
+      # PRED seed-mergom. Nad nekompatibilnou kniznicou sa seed NEDOPLNA — do
+      # novsieho suboru by sme primiesali svoje default sety a migracie
+      # mapovania, teda presne tu tichu zmenu, pred ktorou brana chrani.
+      #
+      # Review P1-1: vracia sa PRAZDNO, nie „parsovatelny obsah". Orezany obsah
+      # bol jedom celej davky — kazdy volajuci `load` by ho dostal a rozhodoval
+      # by sa uz podla neho (`ensure_project_state!` by ho zmrazil do .skp,
+      # expanzia nacenila BEZ oranzoveho dovodu). Prazdno tie cesty zastavi
+      # samo; SEED sa tu nesmie objavit tiez (cudzie defaulty by prvy zapis
+      # zvecnil — rovnaka lekcia ako zlyhany zamok v R-08).
       def read_library
         doc = JsonFileStore.read(path, copy: false)
+        read_only = apply_library_state(*assess_library_doc(doc)) == :read_only
+        return [blank_library, false] if read_only
         sets = doc.is_a?(Hash) ? normalize_sets(doc['sets']) : []
         mapping = doc.is_a?(Hash) ? normalize_mapping(doc['mapping'], sets) : {}
         return [seed_library, false] if sets.empty?
@@ -384,7 +692,25 @@ module Noxun
         # nepodari vziat, vyhodi IOError — rescue nizsie z neho spravi FALSE,
         # takze volajuci sa o neuspechu dozvie (nikdy tichy uspech).
         with_catalog_lock do
-          JsonFileStore.write(path, { 'std' => STD, 'seed_version' => SEED_VERSION,
+          # R-07 (audit BLOCKER 2): CACHOVANE `:ok` NIE JE DOKAZ. Kym sa brana
+          # vyhodnocovala len pri citani, druha instancia (novsi plugin) stihla
+          # medzitym subor nahradit — a nas zapis by ho zhodil na tvar, ktoremu
+          # rozumieme my. Marker aj tvar sa preto citaju CERSTVO Z DISKU POD
+          # ZAMKOM pred KAZDYM zapisom; tato jedna brana kryje vsetky zapisove
+          # cesty (`save_set!` · `delete_set!` · `set_global_mapping!` ·
+          # seed-merge · `ensure_seeded`), lebo vsetky koncia tu.
+          JsonFileStore.reload!(path)
+          if apply_library_state(*assess_library_doc(read_library_doc)) == :read_only
+            Engine.log("hardware sets: zapis kniznice odmietnuty — #{library_state_reason}") if defined?(Engine)
+            next false
+          end
+          # R-07 (bod 7): marker sa stampuje podla OBSAHU (`snapshot_std`), nie
+          # konstantou. `std: 1` nad setmi s pasmami klamal — starsi plugin taky
+          # subor pustil dnu a clena s pasmami ticho zahodil. Historicky subor
+          # so std 1 a novym obsahom sa marker povysi PRIRODZENE prvym
+          # legitimnym zapisom; bez mutacie sa subor nedotyka.
+          JsonFileStore.write(path, { 'std' => snapshot_std(map, norm),
+                                      'seed_version' => SEED_VERSION,
                                       'sets' => norm, 'mapping' => map })
         end
       rescue StandardError => e
@@ -446,6 +772,10 @@ module Noxun
         end
         with_catalog_lock do
           JsonFileStore.reload!(path)
+          # R-07: brana PRED reviziou — nad nekompatibilnou kniznicou nie je
+          # o com hovorit (a `load` z nej nic nevyda, takze bez tejto vetvy by
+          # sa mutacia rozhodovala nad PRAZDNOM a hlasila nezmysly).
+          next [:write_failed, library_state_reason] if library_read_only?
           next [:conflict, nil] if revision && revision != self.revision
           lib = load
           sets = lib['sets']
@@ -475,6 +805,7 @@ module Noxun
         return [:not_found, nil] if sid.empty?
         with_catalog_lock do
           JsonFileStore.reload!(path)
+          next [:write_failed, library_state_reason] if library_read_only? # R-07
           next [:conflict, nil] if revision && revision != self.revision
           lib = load
           sets = lib['sets'].reject { |s| s['set_id'] == sid }
@@ -500,6 +831,7 @@ module Noxun
         return false unless BuildPlan::GENERIC_TYPES.include?(gt)
         with_catalog_lock do
           JsonFileStore.reload!(path)
+          next false if library_read_only? # R-07
           next :conflict if revision && revision != self.revision
           lib = load
           mapping = lib['mapping']
@@ -603,6 +935,11 @@ module Noxun
           base = "set „#{sid}“ počíta kusy, ale položka sa reže na dĺžku"
           base += " (#{cut})" unless cut.empty?
           "#{base} — dĺžkové kovanie sa zatiaľ do setu mapovať nedá"
+        when 'library_incompatible'
+          # R-07: projekt este nema vlastne predvolby a globalna kniznica sa
+          # POUZIT nesmie — radsej NIC nez nakup z orezanych dat.
+          'knižnica setov kovania sa nedá bezpečne prečítať a projekt vlastné ' \
+            'predvoľby ešte nemá — nemapuje sa nič'
         else
           'typ nemá priradený set'
         end
@@ -654,8 +991,15 @@ module Noxun
         sets_map = doc['sets'].is_a?(Hash) ? doc['sets'] : nil
         mapping  = doc['mapping'].is_a?(Hash) ? doc['mapping'] : nil
         return [:invalid, nil] if sets_map.nil? || mapping.nil?
+        # R-07 (audit FIX 4): pocty setov nestacia — set sa da precitat aj
+        # vtedy, ked sa z neho stratil CLEN (pole clena, cely clen, nove pole
+        # novsej verzie). Kontroluje sa preto (a) whitelist znamych klucov
+        # a (b) POCET CLENOV per set. Detektor je TEN ISTY, ktory pouziva
+        # brana globalnej kniznice — snapshot a kniznica sa nesmu rozist.
+        return [:invalid, nil] if sets_map.each_value.any? { |s| incompatible_set?(s) }
         sets = normalize_sets(sets_map.values)
         return [:invalid, nil] if sets.length != sets_map.length
+        return [:invalid, nil] if members_lost?(sets_map.values, sets)
         by_id = {}
         sets.each { |s| by_id[s['set_id']] = s }
         norm_map = normalize_mapping(mapping, sets)
@@ -664,6 +1008,40 @@ module Noxun
       rescue StandardError => e
         Engine.log_error(e, 'HardwareSets.project_state_status') if defined?(Engine)
         [:invalid, nil]
+      end
+
+      # R-07: zahodila citacia normalizacia CAST setu? Porovnava RAW definicie
+      # (pole hashov) s vysledkom `normalize_sets`. Pouziva ho kniznica aj
+      # projektovy snapshot — obe cesty musia stratu vidiet rovnako.
+      #
+      # Co sa porovnava a preco prave to:
+      #   * POCET CLENOV — clen s hodnotou, ktorej nerozumieme (`per: 'length'`
+      #     novsej verzie, pokazene pasma), z citania ticho vypadne;
+      #   * POCET POLOZIEK RADU `code_by_nl` — necislny kluc radu sa v citacej
+      #     ceste zahadzuje po JEDNOM (member prezije s kratsim radom), takze
+      #     samotny pocet clenov to nechyti (review P3-7).
+      def members_lost?(raw_sets, normalized)
+        raw = {}
+        Array(raw_sets).each { |s| raw[s['set_id'].to_s] = s if s.is_a?(Hash) }
+        normalized.any? do |norm|
+          src = raw[norm['set_id'].to_s]
+          next true if src.nil?
+          rm = Array(src['members'])
+          nm = Array(norm['members'])
+          next true if rm.length != nm.length
+          rm.each_with_index.any? { |m, i| nl_entries(m) != nl_entries(nm[i]) }
+        end
+      end
+
+      def nl_entries(member)
+        return 0 unless member.is_a?(Hash)
+        nl = member['code_by_nl']
+        return 0 if nl.nil?
+        # Rad, ktory NIE JE mapa, je NEZNAMY TVAR — nie „nula poloziek"
+        # (review P1). Sentinel sa s normalizovanym clenom nikdy nezhoduje,
+        # takze strata vyjde najavo aj tu, nielen vo whitelistoch.
+        return -1 unless nl.is_a?(Hash)
+        nl.length
       end
 
       # Snapshot projektu alebo nil (missing AJ invalid — na rozlisenie sluzi
@@ -675,8 +1053,21 @@ module Noxun
 
       # Globalne predvolby ako projektovy stav (mapping + kopie namapovanych
       # setov) — default noveho snapshotu (ensure, prva zmena, vedoma obnova).
+      #
+      # R-07 (audit BLOCKER 1): TOTO je hlavna cesta, ktorou sa globalne
+      # definicie KOPIRUJU DO MODELU. Z nekompatibilnej kniznice sa nekopiruje
+      # NIC — zmrazil by sa orezany stav a .skp by uz stratu niesol navzdy.
+      # Vrati NIL a volajuci zapis odmietne (stavba bezi dalej, len bez
+      # snapshotu: expanzia to prizna ORANGE).
+      #
+      # Review P1-1: poradie je zavazne — najprv `load` (ten branu vyhodnoti
+      # nad cerstvym dokumentom), az POTOM rozhodnutie. Opacne poradie citalo
+      # ZAPAMATANY verdikt a nad medzitym vymenenym suborom vratilo orezany
+      # stav, ktory sa zmrazil do .skp.
       def global_default_state
         lib = load
+        return nil if library_read_only?
+
         by_id = {}
         lib['sets'].each { |s| by_id[s['set_id']] = s }
         mapping = {}
@@ -701,6 +1092,7 @@ module Noxun
         return state if status == :ok
         return nil if status == :invalid
         state = global_default_state
+        return nil if state.nil? # R-07: nekompatibilna kniznica sa nezmrazi
         write_project_state(model, state) if model
         state
       end
@@ -740,6 +1132,9 @@ module Noxun
       # GH #131 P2: marker tvarov podla OBSAHU snapshotu. std 2 dostane len
       # snapshot, ktory bez novych tvarov necita spravne — ostatne ostavaju
       # std 1 (spatna citatelnost starsimi verziami sa zbytocne neblokuje).
+      # R-07: TU ISTU logiku pouziva aj zapis GLOBALNEJ kniznice (`write`) —
+      # marker musi hovorit o obsahu rovnako v .skp aj v %APPDATA%, inak
+      # jedna z dvoch ciest starsiemu pluginu klame.
       def snapshot_std(mapping, sets)
         new_forms =
           Array(sets).any? do |s|
@@ -766,6 +1161,7 @@ module Noxun
         # globalne predvolby (UI ich prave ukazovalo ako platne) a az nad nimi
         # meni jeden typ — start z prazdna by ostatne typy ticho odmapoval.
         state ||= global_default_state
+        return false if state.nil? # R-07: bez snapshotu a s nekompatibilnou kniznicou niet z coho zmrazit
         gt = generic_type.to_s
         return false unless BuildPlan::GENERIC_TYPES.include?(gt)
         if value.nil? || (value.is_a?(String) && value.strip.empty?)
@@ -790,6 +1186,7 @@ module Noxun
         status, state = project_state_status(model)
         return false unless status == :ok || status == :missing
         state ||= global_default_state # GH #127 P1 — prvy zapis mrazi vsetko
+        return false if state.nil? # R-07: nekompatibilna kniznica sa nekopiruje do modelu
         defs = collect_set_defs(set_defs)
         return false if defs.empty?
         defs.each { |sid, d| state['sets'][sid] = d }
@@ -833,6 +1230,10 @@ module Noxun
           snap = state['sets'][sid]
           return snap if snap && refs.include?(sid)
         end
+        # R-07 (BLOCKER 1): fallback na GLOBAL je kopirovanie kniznicnej
+        # definicie do modelu (volajuci ju vzapati zmrazi do snapshotu) —
+        # z nekompatibilnej kniznice `load` nic nevyda, takze volajuci skonci
+        # „set sa nenasiel" a hlasku doplni podla `library_read_only?`.
         global = load['sets'].find { |s| s['set_id'] == sid }
         return global if global
         state ? state['sets'][sid] : nil
@@ -912,11 +1313,17 @@ module Noxun
       # globalne mapovania (+ definicie setov, na ktore ukazuju). EXISTUJUCE
       # mapovania sa NEPREPISUJU a ziadna snapshot definicia sa NEODSTRANUJE
       # (mohol by na nu ukazovat cabinet override). Volat VNUTRI operacie.
-      # -> [:none|:updated, added_set_ids, added_mapping_keys]
+      # -> [:none|:updated|:blocked, added_set_ids, added_mapping_keys]
       def merge_project_sets_seed!(model)
         status, state = project_state_status(model)
         return [:none, [], []] unless status == :ok # bez snapshotu berie projekt global sam
+        # R-07 (BLOCKER 1): doplnanie je kopirovanie globalnych definicii do
+        # modelu — z nekompatibilnej kniznice sa NEROBI. Vlastny vysledok
+        # (`:blocked`), aby okno vedelo povedat PRECO (nie „uz mas vsetko").
+        # Poradie ako v `global_default_state` (P1-1): najprv citanie, potom
+        # rozhodnutie nad stavom, ktory z neho vysiel.
         lib = load
+        return [:blocked, [], []] if library_read_only?
         by_id = {}
         lib['sets'].each { |s| by_id[s['set_id']] = s }
         added_sets = []
@@ -952,11 +1359,25 @@ module Noxun
       # spadol na globalnu kniznicu a sablona by niesla kody, ktore zdrojovy
       # model NEPOUZIVA (expanzia pri :invalid vedome nemapuje nic). Volajuci
       # vtedy ulozi sablonu BEZ kovania a nahlasi to.
+      # R-07 (review P2-4, zuzene v P2-1): nil vracia PRESNE V DVOCH stavoch,
+      # kde sa definicie nedaju dobrat ZO SPRAVNEHO ZDROJA —
+      #   * :invalid snapshot (GH #133 P2, viz vyssie),
+      #   * NEKOMPATIBILNA globalna kniznica: `resolve_set_def` z nej nic
+      #     nevyda, takze by sablona niesla MAPOVANIE BEZ DEFINICII a pri
+      #     aplikacii by ticho prepisala vyber cieloveho korpusu.
+      # CHYBAJUCA JEDNOTLIVA referencia nad ZDRAVYMI zdrojmi nil NIE JE (P2-1):
+      # mapovanie skrinky moze ukazovat na set, ktory uz v projekte ani
+      # v kniznici nie je (kopia z ineho modelu, medzitym zmazany set) — vtedy
+      # sa ta jedna referencia vynecha, sablona ju nenesie a pri aplikacii
+      # skonci ORANGE `set_missing`. Zahodit kvoli nej CELE kovanie sablony by
+      # bola strata bez dovodu, a hlaska volajuceho by navyse klamala („sety
+      # projektu su poskodene" nad zdravym projektom).
       def template_set_defs(model, mapping)
         map = mapping.is_a?(Hash) ? mapping : {}
         refs = referenced_set_ids(map)
         return {} if refs.empty?
         return nil if project_state_status(model)[0] == :invalid
+        return nil if library_read_only?
         as_override = { 'template' => map }
         out = {}
         refs.each do |sid|
@@ -1021,7 +1442,7 @@ module Noxun
       #                                    to ohlasi v statuse
       #   generic_type nesedi s klucom  -> definicia sa NEZMRAZI; mapovanie sa
       #                                    aplikuje a expanzia skonci ORANGE
-      # -> { 'status' => :ok | :invalid | :failed, 'added' => [], 'kept' => [],
+      # -> { 'status' => :ok | :invalid | :blocked | :failed, 'added' => [], 'kept' => [],
       #      'type_mismatch' => [], 'missing' => [] }
       def freeze_template_sets!(model, mapping, defs)
         res = { 'status' => :ok, 'added' => [], 'kept' => [], 'type_mismatch' => [], 'missing' => [] }
@@ -1032,6 +1453,12 @@ module Noxun
         # Bez snapshotu zmrazi prvy zapis najprv globalne predvolby (GH #127 P1)
         # — porovnavame teda proti TOMU, co v projekte naozaj vznikne.
         state ||= global_default_state
+        # R-07 (review P2-4): bez snapshotu a s nekompatibilnou kniznicou
+        # nevieme povedat, co v projekte vznikne. Je to VLASTNY stav `:blocked`,
+        # nie `:failed` — `:failed` znamena „zapis zlyhal" a volajuci ho meni na
+        # VYNIMKU, ktora by zhodila cele vkladanie skrinky. To by odporovalo
+        # kontraktu „stavba bezi dalej, len bez snapshotu" (cabinet_builder).
+        return res.merge('status' => :blocked) if state.nil?
         have = state['sets'].is_a?(Hash) ? state['sets'] : {}
         pool = collect_set_defs(defs)
         to_add = {}
@@ -1068,7 +1495,13 @@ module Noxun
       # Vrati { 'rows' => [...], 'unmapped' => [...], 'summary' => {...} } —
       # deterministicke poradie (kategoria podla HardwareCatalog::CATEGORIES,
       # potom kod); ceny s DPH; nil cena = nezadana, subtotal nil, NIKDY 0.
-      def expand(hardware_items, state, cabinet_overrides: {}, catalog: nil)
+      # no_set_reason: ORANGE kod pre polozku, ktora nema ZIADNE mapovanie.
+      #   Default `no_set` = „typ nema priradeny set". Volajuci ho zmeni, ked
+      #   je pricina INA a konkretnejsia — R-07: `library_incompatible`, teda
+      #   „projekt nema vlastne predvolby a globalna kniznica sa nesmie
+      #   pouzit". Ostatne dovody (chybajuci set, pasma, dlzka) sa NEMENIA.
+      def expand(hardware_items, state, cabinet_overrides: {}, catalog: nil,
+                 no_set_reason: 'no_set')
         mapping = state.is_a?(Hash) && state['mapping'].is_a?(Hash) ? state['mapping'] : {}
         sets    = state.is_a?(Hash) && state['sets'].is_a?(Hash) ? state['sets'] : {}
         # Cabinet override mapy prechadzaju TYM ISTYM parserom (citacia cesta —
@@ -1087,6 +1520,7 @@ module Noxun
           next if gt.empty? || qty < 1
           sid, reason, info = resolve_set_id(gt, it, overrides, mapping)
           if sid.nil?
+            reason = no_set_reason if reason == 'no_set'
             unmapped << unmapped_entry(it, nil, reason, info)
             next
           end
@@ -1428,7 +1862,11 @@ module Noxun
       #
       # Cista funkcia: ziadne IO, ziadny SketchUp, vstup sa NEMENI.
       # -> { 'set_id', 'set_name', 'members' => [...], 'problems' => [SK texty] }
-      def explain(item, state, overrides: {}, catalog: nil, lookup: nil)
+      # no_set_reason: ako v `expand` — volajuci ho posiela, ked je pricina
+      # „bez mapovania" INA a konkretnejsia (R-07: `library_incompatible`).
+      # Panel a supis musia dat TEN ISTY dovod (review P2-3).
+      def explain(item, state, overrides: {}, catalog: nil, lookup: nil,
+                  no_set_reason: 'no_set')
         out = { 'set_id' => nil, 'set_name' => nil, 'members' => [], 'problems' => [] }
         return out unless item.is_a?(Hash)
         gt = item['generic_type'].to_s
@@ -1442,6 +1880,7 @@ module Noxun
 
         sid, reason, info = resolve_set_id(gt, it, ovr, mapping)
         if sid.nil?
+          reason = no_set_reason if reason == 'no_set'
           out['problems'] << unmapped_reason_sk(unmapped_entry(it, nil, reason, info))
           return out
         end
@@ -1562,7 +2001,17 @@ module Noxun
         per = mm['per'].to_s.strip
         per = 'unit' if per.empty?
         return [nil, ["#{pos} má neznáme „per“ (#{per})"]] unless PER_KINDS.include?(per)
-        qty = mm['qty'].nil? ? 1 : mm['qty'].to_i
+        # R-07 (review P2): TYPOVA OCHRANA. `to_i` na `true`, poli ci objekte
+        # vyhodi NoMethodError — a tato metoda bezi aj v CITACEJ ceste
+        # (`normalize_members` nad cudzim suborom aj nad snapshotom v .skp),
+        # takze by taky zaznam zhodil prestavbu, nie ju odmietol. Cislo aj
+        # cislo v stringu su legitimne (legacy tvary); cokolvek ine = neplatny
+        # pocet, teda chyba clena, ktoru vyssie vrstvy uz vedia spracovat.
+        raw_qty = mm['qty']
+        unless raw_qty.nil? || raw_qty.is_a?(Numeric) || raw_qty.is_a?(String)
+          return [nil, ["#{pos} má neplatný počet"]]
+        end
+        qty = raw_qty.nil? ? 1 : raw_qty.to_i
         return [nil, ["#{pos} má neplatný počet"]] if qty < 1
         qty = [qty, BuildPlan::MAX_HW_QUANTITY].min
 
@@ -1782,7 +2231,22 @@ module Noxun
       end
 
       def log_skip(msg)
+        return if @skip_log_muted
         Engine.log("hardware sets: #{msg}") if defined?(Engine) && Engine.respond_to?(:log)
+      end
+
+      # R-07 (review P3-2): brana sa vyhodnocuje pri KAZDOM pouziti kniznice
+      # a jej round-trip kontrola pusta obsah cez `normalize_sets` — ta pri
+      # kazdom preskocenom clene loguje. Bez stlmenia by nekompatibilna
+      # kniznica zaplavila konzolu tou istou vetou pri kazdom payloade.
+      # Stlmuje sa VYHRADNE diagnosticky prechod brany; skutocne citanie
+      # (`read_library`) loguje dalej — tam je to jednorazova informacia.
+      def without_skip_log
+        prev = @skip_log_muted
+        @skip_log_muted = true
+        yield
+      ensure
+        @skip_log_muted = prev
       end
 
       def stringify(h)

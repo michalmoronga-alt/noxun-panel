@@ -720,16 +720,34 @@ module Noxun
       # ORANGE) + banner, NIKDY tichy fallback na dnesny global.
       def hardware_expansion(model, collected)
         status, state = HardwareSets.project_state_status(model)
+        overrides = collected[:cabinet_sets].is_a?(Hash) ? collected[:cabinet_sets] : {}
+        no_set_reason = 'no_set'
         if status == :missing
+          # Poradie (review P1-1): najprv CITANIE, ktore branu vyhodnoti nad
+          # cerstvym suborom, az potom rozhodnutie — inak by sa rozhodovalo
+          # podla zapamataneho verdiktu nad medzitym vymenenym obsahom.
           lib = HardwareSets.load
-          by_id = {}
-          lib['sets'].each { |s| by_id[s['set_id']] = s }
-          state = { 'mapping' => lib['mapping'], 'sets' => by_id }
+          if HardwareSets.library_read_only?
+            # R-07 (audit BLOCKER 1): bez snapshotu je JEDINY zdroj definicii
+            # globalna kniznica. Ked je nekompatibilna (novsia verzia / neznamy
+            # tvar), NEPOCITA sa z orezanych dat — vsetko ide do ORANGE
+            # `library_incompatible`. Aj overridy skrinky sa vypnu: ukazuju na
+            # set_id, ktorych definicie by museli prist prave z tej kniznice,
+            # takze by z nich vysiel menej presny dovod („set chyba").
+            state = nil
+            overrides = {}
+            no_set_reason = 'library_incompatible'
+          else
+            by_id = {}
+            lib['sets'].each { |s| by_id[s['set_id']] = s }
+            state = { 'mapping' => lib['mapping'], 'sets' => by_id }
+          end
         end
         exp = HardwareSets.expand(
           Array(collected[:hardware]), state,
-          cabinet_overrides: collected[:cabinet_sets].is_a?(Hash) ? collected[:cabinet_sets] : {},
-          catalog: HardwareCatalog.items
+          cabinet_overrides: overrides,
+          catalog: HardwareCatalog.items,
+          no_set_reason: no_set_reason
         )
         # H1b (audit FIX 9 UI): dovod dostane SK text uz na SERVERI — tab
         # Kovanie aj CSV citaju to iste 'reason_sk' (JS ziadny vlastny preklad

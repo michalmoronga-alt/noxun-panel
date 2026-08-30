@@ -47,6 +47,20 @@
     return (sets || []).filter(function(s){ return s.generic_type === gt; });
   }
   function hwsTrim(v){ return String(v == null ? '' : v).trim(); }
+  // R-07: kompatibilitná brána GLOBÁLNEJ knižnice. Server posiela
+  // `library_state` ('ok' | 'read_only') a `library_reason` (hotová SK veta —
+  // JS si žiadny vlastný preklad neskladá). Knižnica z novšej verzie sa nesmie
+  // ani meniť, ani potichu používať: sekcia vypne GLOBÁLNE mutácie a dôvod
+  // povie bannerom. PROJEKTOVÉ predvoľby nad zdravým snapshotom fungujú ďalej
+  // — ich zdrojom je .skp, nie knižnica.
+  function hwsLibBlocked(data){ return !!(data && data.library_state === 'read_only'); }
+  // Akcie, ktoré menia knižnicu alebo z nej kopírujú do .skp (`hws-merge-seed`
+  // a `hws-reset-proj` zapisujú do modelu, ale ich ZDROJOM je knižnica).
+  var HWS_LIB_ACTIONS = ['hws-new', 'hws-edit', 'hws-del', 'hws-save',
+                         'hws-merge-seed', 'hws-reset-proj'];
+  function hwsLibReason(data){
+    return (data && data.library_reason) || 'Knižnica setov kovania sa nedá bezpečne prečítať';
+  }
   function hwsBlank(v){ return hwsTrim(v) === ''; }
   // Cislo pre ZOBRAZENIE: 17 -> "17", 17.5 -> "17,5" (zrkadlo Ruby fmt_mm).
   // GH #132 P2: hodnota sa NEZAOKRUHLUJE — cez tuto funkciu ide aj hranica
@@ -326,6 +340,16 @@
     var hint = hwsMk('span', 'hint', 'Set = kódy, ktoré sa objednajú za 1 kus kovania. Zmena knižnice nemení staré zákazky (projekt drží kópiu).');
     bar.appendChild(hint);
     box.appendChild(bar);
+    // R-07: nekompatibilná knižnica sa NEZOBRAZUJE (server posiela prázdny
+    // zoznam) — vykreslený obsah by bol už orezaný o to, čomu táto verzia
+    // nerozumie. Namiesto zavádzajúceho „Knižnica setov je prázdna." ide na
+    // to isté miesto DÔVOD a všetky globálne mutácie sú vypnuté.
+    if (hwsLibBlocked(HWS_DATA)){
+      nb.disabled = true;
+      box.appendChild(hwsMk('div', 'hwbanner', hwsLibReason(HWS_DATA) +
+        '. Sety sa zatiaľ nedajú zobraziť ani meniť — predvoľby projektu nižšie fungujú ďalej.'));
+      return;
+    }
     if (HWS_EDIT){ box.appendChild(hwsEditorNode()); }
     var sets = HWS_DATA.sets || [];
     if (!sets.length && !HWS_EDIT){
@@ -589,6 +613,10 @@
     var mb = hwsMk('button', 'ghostbtn', 'Doplniť nové predvoľby');
     mb.setAttribute('data-action', 'hws-merge-seed');
     mb.title = 'Doplní do projektu globálne predvoľby, ktoré tu ešte nie sú (napr. nový typ kovania). Existujúce výbery nechá tak.';
+    // R-07: doplnenie aj obnova KOPÍRUJÚ globálne definície do .skp — z
+    // nekompatibilnej knižnice sa nerobia.
+    var libBlocked = hwsLibBlocked(HWS_DATA);
+    if (libBlocked) mb.disabled = true;
     head.appendChild(mb);
     box.appendChild(head);
     if (proj.status === 'invalid'){
@@ -596,11 +624,21 @@
         'Predvoľby setov v tomto projekte sú poškodené — súpis kovania sa nemapuje. ');
       var rb = hwsMk('button', 'ghostbtn', 'Obnoviť z globálnych predvolieb');
       rb.setAttribute('data-action', 'hws-reset-proj');
+      if (libBlocked) rb.disabled = true;
       ban.appendChild(rb);
+      if (libBlocked) box.appendChild(hwsMk('div', 'hwbanner', hwsLibReason(HWS_DATA) + '.'));
       box.appendChild(ban);
       return;
     }
     if (proj.status === 'missing'){
+      // Bez snapshotu je jediným zdrojom globálna knižnica — keď sa nesmie
+      // použiť, kovanie sa NENAMAPUJE (ORANGE v Kontrole aj v súpise) a výber
+      // tu nemá z čoho stavať. Radšej to povedať rovno než ponúkať prázdny select.
+      if (libBlocked){
+        box.appendChild(hwsMk('div', 'hwbanner', hwsLibReason(HWS_DATA) +
+          '. Projekt vlastné predvoľby ešte nemá, takže sa kovanie nenamapuje — v súpise bude oranžové.'));
+        return;
+      }
       box.appendChild(hwsMk('div', 'hint',
         'Projekt zatiaľ preberá globálne predvoľby — zmrazia sa doň pri prvej stavbe skrinky alebo prvej zmene tu.'));
     }
@@ -615,7 +653,12 @@
     det.open = HWS_GLOBAL_OPEN; // prerender (napr. + pásmo) nesmie zavrieť sekciu
     det.setAttribute('data-hws-det', 'global');
     det.appendChild(hwsMk('summary', null, 'Predvoľby nových projektov (globálne)'));
-    det.appendChild(hwsMappingTable(HWS_DATA.global_mapping || {}, 'hws-map-global', hwsGlobalOptions));
+    if (libBlocked){
+      det.appendChild(hwsMk('div', 'hwbanner', hwsLibReason(HWS_DATA) +
+        '. Globálne predvoľby sa zatiaľ nedajú meniť.'));
+    } else {
+      det.appendChild(hwsMappingTable(HWS_DATA.global_mapping || {}, 'hws-map-global', hwsGlobalOptions));
+    }
     box.appendChild(det);
   }
 
@@ -738,6 +781,11 @@
       var t = ev.target && ev.target.closest ? ev.target.closest('[data-action]') : null;
       if (t){
         var a = t.getAttribute('data-action');
+        // R-07: druhá poistka k `disabled` — akcie, ktoré MENIA globálnu
+        // knižnicu alebo z nej kopírujú do .skp, sa pri nekompatibilnej
+        // knižnici nesmú odoslať ani zo zastaraného DOM-u (server ich aj tak
+        // odmietne, ale používateľ by dostal zbytočnú chybovú hlášku).
+        if (hwsLibBlocked(HWS_DATA) && HWS_LIB_ACTIONS.indexOf(a) !== -1) return;
         if (a === 'hws-new'){
           HWS_EDIT = { set_id: '', name: '', generic_type: 'hinge', existing: false,
                        members: [{ is_series: false, per: 'unit', qty: 1, code: '', label: '' }] };
@@ -971,6 +1019,10 @@
   function hwsCurrentRev(){ return (HWS_DATA && HWS_DATA.revision) || ''; }
 
   function hwsSendMap(action, gt, value, key, pinnedRev){
+    // R-07: globálna predvoľba je zápis do knižnice — pri nekompatibilnej sa
+    // neodosiela (select ju ani nevykreslí, toto je poistka pre zmenu selectu
+    // zo zastaraného DOM-u).
+    if (action === 'hws-map-global' && hwsLibBlocked(HWS_DATA)) return;
     if (action === 'hws-map-global'){
       // R-08: globálna predvoľba nesie REVÍZIU knižnice (rovnako ako uloženie
       // a mazanie setu) — dve otvorené okná si ju inak ticho prepíšu.
@@ -1003,6 +1055,9 @@
       hwsBuildSelector: hwsBuildSelector, hwsProjDraftKeys: hwsProjDraftKeys,
       // R-08 (review #258 P1): pripnutie revízie do draftu editora pásiem
       hwsPinRev: hwsPinRev, hwsMapRev: hwsMapRev,
+      // R-07: kompatibilitná brána knižnice (banner + vypnuté globálne mutácie)
+      hwsLibBlocked: hwsLibBlocked, hwsLibReason: hwsLibReason,
+      HWS_LIB_ACTIONS: HWS_LIB_ACTIONS,
       // ŠT-3a-3: `HWSETS` a helpery fokusu potrebuju DOM a exportuju sa
       // ZAMERNE — kontrakty „setData NEKRESLI" a „fokus prezije prekreslenie"
       // sa inak nedaju overit nicim nez klikanim (tests/js/test_st3a_hw.js).

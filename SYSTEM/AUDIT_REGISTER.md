@@ -135,6 +135,38 @@ SETOV a mapovaní (členov nie) → starší plugin knižnicu prečíta, oreže 
 **Návrh:** prevziať `HardwareCatalog.assess!` vzor 1:1 (novší std = read-only s hláškou; std z obsahu cez
 `snapshot_std`); + kontrola počtu ČLENOV v `project_state_status` (2 riadky). D-109 pridá `STD_RATIO` do
 `STD_SUPPORTED` + obsahovú detekciu. Round-trip a downgrade-gate testy. **Odhad: M.**
+**✅ dávkou 1d/R-07 (PR #266, v0.8.21)** — knižnica má STAV (`library_state` `:ok`/`:read_only` + SK dôvod a kód
+`:newer`/`:foreign`/`:unknown_shape`/`:duplicate`/`:unreadable`/`:unexpected_shape`), maticu počíta čistá **fail-closed**
+`assess_library_doc` (jej vetva má vlastný kód a hláška „súbor NEMAŽ, nahlás problém" — padne do nej aj chyba pluginu nad
+zdravým súborom). Codex audit návrhu pridal
+2 BLOCKERY a 3 FIXy, všetky zapracované: **(B2)** brána sa vyhodnocuje **pod zámkom nad čerstvo prečítaným súborom pred
+KAŽDÝM zápisom** — cachované `:ok` nie je dôkaz (druhá inštancia môže súbor medzitým nahradiť); jedno miesto v `write`
+kryje všetky zapisovacie cesty. **(B1)** read-only knižnica sa nesmie ani POUŽIŤ:
+`global_default_state` vracia **nil** (odmietnu `ensure_project_state!`/`set_project_mapping!`/`add_project_sets!`/global
+fallback `resolve_set_def`), `merge_project_sets_seed!` aj `freeze_template_sets!` majú `:blocked`, `template_set_defs` nil,
+a súpis bez snapshotu skončí ORANGE **`library_incompatible`** (nový kód v `UNMAPPED_REASONS`; panel ide cez tú istú bránu
+vrátane **neuplatnenia overridu skrinky**, aby sa so súpisom nerozišiel). Platný projektový snapshot beží ďalej.
+**(F3)** seed-merge sa nad read-only knižnicou nerobí a nikdy sa nevracia SEED. **(F4)** detektor straty má DVE vrstvy —
+**whitelist kľúčov** (nové pole) + **round-trip `normalize_sets`/`members_lost?`** (nová HODNOTA známeho kľúča, napr.
+`per: 'length'`, vrátane počtu položiek radu `code_by_nl`); mapovanie cez `parse_mapping` bez `set_ids` (odkaz na zmazaný
+set nie je strata). Obe vrstvy používa aj `project_state_status`. **(F5)** `sets_payload` nesie `library_state` +
+`library_reason`, sekcia `hw` ukazuje dôvod bannerom a vypína globálne mutácie. `write` stampuje `std` podľa OBSAHU;
+**priznané (NOTE 7):** historický `std: 1` s novým obsahom sa neopravuje sám — marker sa povýši prvým legitímnym zápisom.
+**Interné slepé review (2×P1, 3×P2, 2×P3)** doplnilo: stav sa **NECACHUJE** a `read_library` pri read-only vracia **prázdno**
+(`load` je bezpečný z princípu; samostatná „bezpečná" metóda zanikla — stačilo raz siahnuť na `load`); poškodený primár
+**bez zálohy** ostáva **samoopravný ako na maine** (read-only s cestou v hláške až keď sa nedá prečítať ani `.bak`).
+**Verifikácia delty** našla ďalšie 1×P2 + 2×P3: guard šablón bol príliš široký (jedna mŕtva referencia brala kovanie
+šablóne aj nad ZDRAVOU knižnicou a hláška klamala) — zúžený na pokazený ZDROJ; zrušená cache rozbehla záplavu logu —
+`log_skip` je počas brány stíšený a dôvod ide do konzoly len pri ZMENE stavu; duplicitné `set_id` dostalo vlastný dôvod
+„oprav súbor". **Codex potvrdzovacie kolo** (1×P1 + 1×P2 + 1×P3) pridalo TRETIU vrstvu detektora — **typy hodnôt známych
+kľúčov** (`code_by_nl` ako pole prešlo whitelistom aj round-tripom, lebo ne-mapa sa počítala ako „nula položiek";
+`['future'].to_s` by sa pritom stalo objednaným „kódom") — a **fail-closed** bránu: výnimka v detektore (`qty: true` →
+`NoMethodError`) končí ako `:read_only`, nie ako výnimka, ktorú by `load` zachytil a `library_read_only?` vyvolala znova
+(súpis by skončil ako `nil`, teda BEZ oranžového priznania). Typová ochrana je aj vo `validate_member` — spoločnom tele
+čítacích ciest, ktoré cez bránu nejdú. Degraded/`.bak` (**R-11**) sa **nerieši**, len sa mu nezavadzia (nový dôvod patrí
+do tej istej matice s vlastným kódom). Testy `tests/pure/test_r07_kniznica_brana.rb` (26 scenárov: dvojinštančný +
+reprodukcie nálezov review; mutačne overené, že padnú na regresii — okrem poradia *čítanie → rozhodnutie*, ktoré je pri
+necachovanom stave nepozorovateľné a ostáva obranou do hĺbky) + `tests/js/test_r07_kniznica_ui.js`.
 
 ### R-08 · P1 · core · `core/json_file_store.rb:36-43` + sets/rules/abs_rules/dim_series/supplier_settings
 Read-modify-write globálnych katalógov bez medziprocesového zámku (revision check mimo zámku; globálne mapovanie
@@ -344,7 +376,7 @@ B1 názov projektu (1b-6a, #244) · B2 hlavičky materiálov (1b-6b, #247) · A1
 1. **P0 hotfix** (✅ #252) → 2. **pred GHOST:** ~~R-01+R-04~~ (✅ #261) → ~~R-02~~ (✅ #264) → ~~R-03~~ (✅ #265 — **tvrdý blocker GHOST padol**) *(GHOST package upresňuje: tvrdý
 blocker je len R-03 — GHOST smie na Windows štartovať hneď po ňom; R-01 je macOS vetva, R-02 je na Windows P3
 a R-04 je platformovo nezávislá hygiena — všetky tri sa dorobia v 1d nezávisle od GHOST štartu)* → 3. **pred KOVANÍM:** ~~R-06 brána~~ (✅) ·
-R-07 · ~~R-08~~ (✅) · potom R-05 (+R-06 plný) ako D-109 šev → 4. **pred D-95/VÝROBOU:** R-17, R-16, R-22, po etapách R-15 →
+~~R-07~~ (✅ #266) · ~~R-08~~ (✅) · potom R-05 (+R-06 plný) ako D-109 šev → 4. **pred D-95/VÝROBOU:** R-17, R-16, R-22, po etapách R-15 →
 5. **perzistencia:** R-11 → R-12 → R-14 (R-13 po rozhodnutí Michala) → 6. **UI/hygiena:** ~~R-34~~ (✅ #262) ·
 R-23.1 Escape (S, hocikedy) · R-18 · zvyšok podľa kapacity. R-32 kostry priebežne pred každým zásahom.
 

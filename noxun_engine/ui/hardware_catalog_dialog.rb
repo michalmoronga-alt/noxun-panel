@@ -414,10 +414,19 @@ module Noxun
           # nikdy nevidel.
           lib, revision = HardwareSets.load_with_revision
           status, state = HardwareSets.project_state_status(model)
+          # R-07 (audit BLOCKER 1 + FIX 5): nekompatibilna kniznica sa nesmie
+          # ANI ZOBRAZIT ako ponuka — to, co by sme vykreslili, je uz OREZANY
+          # obsah a jeden klik by taku definiciu skopiroval do .skp. `load`
+          # z nej po oprave P1-1 nic nevyda, takze `lib` je uz prazdna; sekcia
+          # k nej dostane DOVOD, ktory vysvetli, preco je prazdna.
           {
             'sets' => lib['sets'],
             'global_mapping' => lib['mapping'],
             'revision' => revision,
+            # Stav globalnej kniznice pre banner a vypnutie GLOBALNYCH mutacii
+            # (projektove predvolby nad zdravym snapshotom bezia dalej).
+            'library_state' => HardwareSets.library_state.to_s,
+            'library_reason' => HardwareSets.library_state_reason,
             # H1b (audit BLOCKER 1): ponuku per typ sklada SERVER cez
             # HardwareSets.set_options — pre set_id, ktore projekt uz pouziva,
             # vyhrava definicia zo SNAPSHOTU (podla nej sa nakupuje), takze
@@ -523,7 +532,17 @@ module Noxun
           s.empty? ? nil : s
         end
 
+        # R-07: odmietnutie kompatibilitnej brany ma povedat PRECO. Bez tohto
+        # by kazda globalna mutacia skoncila na vseobecnom „zlyhalo" (brana
+        # vracia :write_failed / false) a pouzivatel by netusil, ze staci
+        # aktualizovat plugin. Dovod je JEDEN — ten isty, ktory nesie banner.
+        def library_blocked_txt
+          "#{HardwareSets.library_state_reason} — zmena sa neuložila."
+        end
+
         def handle_set_save(payload)
+          return set_status(library_blocked_txt, true) if HardwareSets.library_read_only?
+
           data = JSON.parse(payload.to_s)
           status, info = HardwareSets.save_set!(data['set'].is_a?(Hash) ? data['set'] : {},
                                                 revision: data['revision'].to_s,
@@ -549,6 +568,8 @@ module Noxun
         end
 
         def handle_set_delete(payload)
+          return set_status(library_blocked_txt, true) if HardwareSets.library_read_only?
+
           data = JSON.parse(payload.to_s)
           status, = HardwareSets.delete_set!(data['set_id'].to_s, revision: data['revision'].to_s)
           case status
@@ -590,7 +611,9 @@ module Noxun
             set_defs = refs.map { |sid| HardwareSets.resolve_set_def(model, sid) }
             if set_defs.any?(&:nil?)
               resync_sets
-              return set_status('Set sa v knižnici nenašiel — obnovené.', true)
+              # R-07: resolver berie z kniznice LEN ked sa smie pouzit; pri
+              # nekompatibilnej vrati nil a hlaska musi povedat skutocny dovod.
+              return set_status(HardwareSets.library_read_only? ? library_blocked_txt : 'Set sa v knižnici nenašiel — obnovené.', true)
             end
             bad = set_defs.find { |d| d['generic_type'] != gt }
             return set_status("Set „#{bad['name']}“ je iného typu kovania.", true) if bad
@@ -611,7 +634,10 @@ module Noxun
           else
             abort_open_operation(model, op)
             resync_sets
-            set_status('Predvoľba sa nedá uložiť — sety projektu sú poškodené (tlačidlo Obnoviť).', true)
+            # R-07: projekt bez snapshotu si ho zmrazuje z globalu — pri
+            # nekompatibilnej kniznici sa to odmietne a dovod je INY nez
+            # „sety projektu su poskodene".
+            set_status(HardwareSets.library_read_only? ? library_blocked_txt : 'Predvoľba sa nedá uložiť — sety projektu sú poškodené (tlačidlo Obnoviť).', true)
           end
         rescue StandardError => e
           abort_open_operation(model, op)
@@ -642,6 +668,8 @@ module Noxun
         # vyber znova". Po zahodeni sa editor otvori nad CERSTVOU kniznicou
         # a pripne si jej reviziu.
         def handle_map_global(payload)
+          return set_status(library_blocked_txt, true) if HardwareSets.library_read_only?
+
           data = JSON.parse(payload.to_s)
           status = HardwareSets.set_global_mapping!(data['generic_type'].to_s, mapping_value(data),
                                                     revision: data['revision'].to_s)
@@ -680,6 +708,12 @@ module Noxun
           model.start_operation('NOXUN: Doplnenie predvolieb setov', true)
           op[:open] = true
           res, added_sets, added_map = HardwareSets.merge_project_sets_seed!(model)
+          if res == :blocked
+            # R-07: doplnanie kopiruje globalne definicie do .skp — z
+            # nekompatibilnej kniznice sa nerobi (a hlaska to povie).
+            abort_open_operation(model, op)
+            return set_status(library_blocked_txt, true)
+          end
           if res == :updated
             model.commit_operation
             op[:open] = false
@@ -721,7 +755,11 @@ module Noxun
           end
           # H1a: skladanie globalneho defaultu je JEDNA autorita v core
           # (global_default_state) — zvlada aj vyber setu podla parametra.
+          # R-07: pri nekompatibilnej kniznici vrati NIL (do .skp sa nekopiruje
+          # orezany stav) — obnova sa vtedy vobec nespusti.
           state = HardwareSets.global_default_state
+          return set_status(library_blocked_txt, true) if state.nil?
+
           op = { open: false }
           model.start_operation('NOXUN: Obnova predvolieb setov', true)
           op[:open] = true
