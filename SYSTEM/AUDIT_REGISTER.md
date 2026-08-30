@@ -68,13 +68,19 @@ a to nesmie zapisovať nikam. Nezhoda je **hláška**, nie tiché zahodenie — 
 ďalej zahadzuje ticho (prepnutie dokumentu je zriedkavé, presun výberu bežný). Poradie je súčasť opravy: dokument
 sa overuje PRED echom `cabinet_id`/`board_id`, lebo `CAB-001` je v každej zákazke. In-SU runner posiela ten istý
 tvar payloadu (helper `pg(model, hash)`), takže sada testuje reálnu cestu, nie výnimku.
-**✅ priznaný zvyšok dávkou 1d/R-02b (PR #267, v0.8.21)** — hodnota `model_guid` už nie je `Model#guid` (menil sa
+**✅ priznaný zvyšok dávkou 1d/R-02b (PR #267, v0.8.23)** — hodnota `model_guid` už nie je `Model#guid` (menil sa
 pri KAŽDOM uložení → Ctrl+S do 400 ms po úprave poľa vyzeral ako prepnutie dokumentu a edit sa zahodil), ale token
 nového `core/doc_key.rb` viazaný na OBJEKT modelu: New/Open = nová identita, uloženie/prvé uloženie/Save As ju
 NEMENIA. Nič sa nezapisuje do modelu/.skp; JS aj tvar payloadov nezmenené. Codex audit návrhu: 3 BLOCKERy
 (fail-closed obojsmerne · žiadne vytláčanie živých dokumentov z registry · žiadna rotácia identity počas života
 okna — preto Save As identitu drží) + 2 FIXy (headless load, migrácia priamych `model.guid` miest v runneri
 a sadách). Detail v `docs/architecture/model-a-identita.md` (### doc_key.rb) a KRONIKE.
+Guard test (`tests/pure/test_doc_key.rb`) skenuje **celé** `noxun_engine/**/*.rb`: nový výskyt `.guid` musí buď test
+zhodiť, alebo si ho autor vedome dopíše do `NX_DK_GUID_ALLOWED` — polovičná migrácia identity je horšia než žiadna.
+Vedomé výnimky v zozname: `scale_observer` (detektor zmeny dokumentu v ceste, ktorá pri ukladaní nebeží — R-04)
+a `same_model?` v `edge_check`/`grain_check`/`hover_edge` (porovnanie dvoch súčasne držaných referencií v jednom
+okamihu, `equal?` má prednosť). **GHOST vkladanie (#268) sa mechanizmu netýka** — session sa viaže na objekt modelu
+a ruší cez `onNewModel`/`onOpenModel`; prípravná fáza `handle_insert` ide cez ten istý `foreign_document?`.
 
 ### R-03 · P1 · core · `core/cabinet_builder.rb:107-138` + `ui/panel/actions_cabinet.rb:286-324`
 `build` zlieva normalize → ID → `next_x` → operáciu → geometriu; `transform:` má len `rebuild`. Tool nemá čo

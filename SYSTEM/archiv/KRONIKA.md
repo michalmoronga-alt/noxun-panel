@@ -176,7 +176,14 @@
   zákaziek by sa pomiešali. **Vedľajšok:** kľúč sedenia mena zákazky prežije prvé uloženie priamo, most 1b-6a ostáva už len ako poistka. `core/scale_observer.rb` používa
   surový guid ďalej — je to detektor zmeny dokumentu v ceste, ktorá pri ukladaní nebeží (rozhodnutie R-04). **Testy:** nová sada `test_doc_key.rb` (behaviorálna nad stub
   modelmi + zdrojové kontrakty producentov) · migrácia sád st1a/st1a-studio/st3a/st3b a **13 priamych `model.guid` miest v in-SU runneri** na `ProductionCore.model_guid`
-  (FIX 5 auditu — `pg` helper nepokrýval katalóg kovania ani Pravidlá). 2124 headless · 73 JS sád · plný in-SU beh **1088 PASS / 0 FAIL**.
+  (FIX 5 auditu — `pg` helper nepokrýval katalóg kovania ani Pravidlá). 2186 headless · 74 JS sád · plný in-SU beh **1184 PASS / 0 FAIL**.
+  **Rebase na `main` po #266/#269/#268 (GHOST vkladanie, v0.8.22 → táto dávka je v0.8.23):** GHOST session sa viaže na OBJEKT modelu (`@model`, `equal?`) a ruší sa cez
+  `onNewModel`/`onOpenModel` — s guidom nikdy nepracovala, takže zmena kľúča ju neláme. Prepočítaný sken potvrdil, že tri zmergované dávky **nepridali ani jeden nový
+  producent `model.guid`** (jediný prírastok je hodnotovo agnostická JS fixture `'GUID-1'`), a `handle_insert` — prípravná fáza ghostu — ide cez ten istý `foreign_document?`
+  ako všetky ostatné handlery. **Ghost tým naopak dostal opravu, ktorú by inak potreboval:** pod starým guidom by Ctrl+S medzi otvorením panela a stlačením „Vložiť"
+  vklad **odmietol** hláškou „panel patrí inému dokumentu". Guard test bol pri rebase **zosterých z menného zoznamu na plošný sken** `noxun_engine/**/*.rb` s vymenovanými
+  vedomými výnimkami (`scale_observer` — detektor zmeny dokumentu v ceste, ktorá pri uložení nebeží; `same_model?` v `edge_check`/`grain_check`/`hover_edge` — porovnanie
+  dvoch súčasne držaných referencií v jednom okamihu), takže nový výskyt `.guid` budúcá dávka buď zhodí testom, alebo musí vedome priznať v zozname.
 
 - **1d/R-03 · ŠEV `prepare_insert` / `commit_insert` V BUILDERI (v0.8.20, 30.8.2026, PR #265):** `CabinetBuilder.build` zlievalo normalizáciu, pridelenie ID, výpočet polohy,
   otvorenie operácie a stavbu geometrie do jedného toku. GHOST Tool (vkladanie na klik) tak nemal **čo bezpečne držať pred klikom** — žiadny pripravený objekt, ktorý sa dá

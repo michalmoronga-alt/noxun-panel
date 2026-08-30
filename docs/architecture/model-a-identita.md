@@ -38,7 +38,16 @@ objektu, žiadna zmena pri Save As. (3) Registry drží SILNÚ referenciu + `equ
 obojsmerne**: `Panel.foreign_document?` odmieta aj prázdny kľúč SERVERA (BLOCKER 1, `'' == ''` by pustilo zápis bez identity). (5) Token je náhodný (unikátny naprieč sedeniami),
 lebo `ProductionCore#project_session_key` persistuje `guid:<hodnota>` do `vepo_settings.json` — deterministický čítač by po reštarte kolidoval. Konzumenti: `Panel.model_guid`,
 `ProductionCore#model_guid`, `MaterialsDialog#model_guid`, `RulesDialog#model_guid`, okno katalógu kovania, `Materials.replace_uni_scan`. `core/scale_observer.rb` používa surový
-guid ďalej — je to detektor zmeny dokumentu v ceste, ktorá pri ukladaní nebeží (rozhodnutie R-04). Testy: `tests/pure/test_doc_key.rb`.
+guid ďalej — je to detektor zmeny dokumentu v ceste, ktorá pri ukladaní nebeží (rozhodnutie R-04); to isté platí pre `same_model?` v `edge_check`/`grain_check`/`hover_edge`, ktoré
+porovnáva dve **súčasne držané** referencie v jednom okamihu (`equal?` má prednosť, guid je len záloha pre nový Ruby obal toho istého dokumentu).
+
+**GHOST vkladanie sa tohto mechanizmu netýka:** `GhostTool` session drží priamo objekt modelu (`@model`, porovnania cez `equal?`) a ruší sa cez `onNewModel`/`onOpenModel`, takže
+s guidom nikdy nepracovala; prípravná fáza `Panel.handle_insert` ide cez ten istý `foreign_document?` ako všetky ostatné zapisovacie handlery. Pod starým guidom by ju naopak
+Ctrl+S medzi otvorením panela a stlačením „Vložiť" **odmietol** hláškou „panel patrí inému dokumentu" — DocKey to rieši spolu so zvyškom guardov.
+
+**Testy:** `tests/pure/test_doc_key.rb` — behaviorálna sada nad stub modelmi + zdrojové kontrakty producentov + **plošný sken celého `noxun_engine/**/*.rb`**: každý nový výskyt
+`.guid` musí buď test zhodiť, alebo si ho autor vedome dopíše do `NX_DK_GUID_ALLOWED` (zoznam nesmie klamať ani opačným smerom — odstránený výskyt test tiež nahlási). Polovičná
+migrácia identity je horšia než žiadna: časť guardov by Ctrl+S rozhodilo a časť nie.
 
 ### store.rb
 

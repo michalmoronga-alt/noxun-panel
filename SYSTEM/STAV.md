@@ -18,8 +18,7 @@ Nálezy z reálnej výroby a chyby v cenách majú preto **najvyššiu prioritu 
 (okno zaniká — modul žije · uzavretý whitelist akcií · session token · echo vs. plný push · optimistický zámok) sú v [archiv/KRONIKA.md](archiv/KRONIKA.md),
 vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
-**Testy k v0.8.23:** **@HEADLESS@ headless** · @JS@ JS sád · posledný plný in-SketchUp beh **@SU@** (dávka 1d/R-02b — celá sada beží nad novou stabilnou identitou
-dokumentu DocKey; 13 priamych `model.guid` miest runnera zmigrovaných na `ProductionCore.model_guid`).
+**Testy k v0.8.23:** **2186 headless** · 74 JS sád · posledný plný in-SketchUp beh **1184 PASS / 0 FAIL** (dávka 1d/R-02b — celá sada beží nad stabilnou identitou dokumentu DocKey).
 
 > **Poznámka k procesu:** Codex review bol 21.–24.8. **nedostupný** — PR **#186–#226** prešli bránou so slepým subagentom. **Post-hoc sweep je od 27.8. HOTOVÝ** (34 PR cez Codex CLI + triáž 54 nezodpovedaných threadov): dve reálne P1 slepým kolám ušli a týždeň žili v `main`, obe sú dávno opravené — [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-E**.
 
@@ -42,9 +41,8 @@ dokumentu DocKey; 13 priamych `model.guid` miest runnera zmigrovaných na `Produ
 - **GHOST VKLADANIE — skrinka sa kladie KLIKOM tam, kam sa pozeráš** (po „Vložiť" visí ghost na kurzore: ←/→ točia po 90°, Alt prepína kotvu, ↓ drží domácu výšku a ↑ ju pustí, klik položí, Esc zruší; do kliku nevznikne nič a v Späť nepribudne žiadny krok) — v0.8.22 (30.8.) · **Michal večer: SMOKE — 6 bodov v [PLAN.md](PLAN.md), sekcia GHOST.**
 - **1d/R-07 — starší a novší plugin si už nepoškodia knižnicu setov kovania** (knižnica z novšej verzie sa nedá ani zapísať, ani použiť: namiesto tichého orezania
   ju súpis prizná oranžovým riadkom a Štúdio bannerom) — v0.8.21 (30.8.) · **Michal večer:** Štúdio → Kovanie → Sety musí vyzerať a fungovať presne ako doteraz (banner sa NESMIE ukázať).
-- **1d/R-02b — Ctrl+S už nezahadzuje rozpísanú prácu** (identity guardy stoja na novom stabilnom kľúči dokumentu namiesto `Model#guid`, ktorý SketchUp mení pri každom uložení;
-  ochrana New/Open pred zápisom do cudzej zákazky ostáva, Save As identitu vedome drží) — v0.8.23 (30.8.) · **Michal večer:** uprav šírku skrinky v paneli a do sekundy stlač
-  **Ctrl+S** — zmena sa musí uložiť a rozpísané polia nesmú zmiznúť.
+- **1d/R-02b — Ctrl+S už nezahadzuje rozpísanú prácu** (identity guardy stoja na stabilnom kľúči dokumentu namiesto `Model#guid`, ktorý SketchUp mení pri každom uložení;
+  New/Open chráni ďalej, Save As identitu vedome drží) — v0.8.23 (30.8.) · **Michal večer:** uprav šírku skrinky a do sekundy daj **Ctrl+S** — zmena sa musí uložiť a rozpísané polia ostať.
 - **1d/R-03 — skrinka sa dá pripraviť BEZ zásahu do modelu a položiť na presnú polohu** (prípravná dávka pre GHOST vkladanie na klik — **tvrdý blocker tým padol**; z pohľadu používateľa sa dnes nemení NIČ) — v0.8.20 (30.8.) · **Michal večer:** netreba, bez UI zmeny.
 - **1d/R-02 — panel už nezapíše do nesprávneho dokumentu** (oneskorená akcia po prepnutí okna SketchUpu skončí hláškou „patrí inému dokumentu", nie tichým zápisom do cudzej zákazky — vkladanie, apply, premenovanie, kovanie, materiály aj karty dielca a dosky) — v0.8.19 (30.8.) · **Michal večer:** v dvoch oknách prepíš šírku skrinky a HNEĎ preklikni do druhého — zmena sa tam nesmie prejaviť.
 - **1d/R-34 — brána exportov už nezastaví zákazku, ktorá je v poriadku** (zdieľané ID skriniek zastaví nákup/rozpočet/ponuku len vtedy, keď sa kovanie NAOZAJ pomieša — účtované na vlastníka započítané raz, alebo rozídené sety dvoch skriniek s jedným ID; inak export prejde a ostáva len oranžový nález Kontroly) — v0.8.18 (30.8.) · **Michal večer:** netreba, bez UI zmeny.

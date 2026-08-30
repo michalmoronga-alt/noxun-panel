@@ -157,6 +157,49 @@ NxTest.test('DocKey: vsetci producenti model_guid beru hodnotu z DocKey') do
   end
 end
 
+# Zoznam vyssie stráži, že SÚČASNÍ producenti berú hodnotu z DocKey. Sám o sebe
+# ale nechytí NOVÉ miesto, ktoré si `model.guid` privedie znova (polovičná
+# migrácia je horšia než žiadna — časť guardov by Ctrl+S rozhodila a časť nie).
+# Preto ešte plošný sken CELÉHO pluginu s VYMENOVANÝMI vedomými výnimkami:
+# nový výskyt `guid` v `noxun_engine/` musí test buď zhodiť, alebo si autor
+# musí vedome dopísať riadok sem (a tým rozhodnutie priznať).
+NX_DK_GUID_ALLOWED = {
+  # Cache stabilnych transformacii — guid je tu DETEKTOR zmeny dokumentu
+  # v ceste (`forget_detached_models`), ktora pri ULOZENI vobec nebezi;
+  # klucom cache je `object_id`, nie guid. Vedome (R-04, review #261 P1).
+  'noxun_engine/core/scale_observer.rb' => 1,
+  # `same_model?` porovnava DVE SUCASNE drzane referencie v tom istom
+  # okamihu (`equal?` najprv, guid len ako zaloha pre novy Ruby obal toho
+  # isteho dokumentu) — ulozenie medzi dvoma citaniami sa tam stat nemoze.
+  'noxun_engine/core/edge_check.rb' => 2,
+  'noxun_engine/core/grain_check.rb' => 2,
+  'noxun_engine/core/hover_edge.rb' => 2
+}.freeze
+
+NxTest.test('DocKey: v celom plugine uz nie je NEPRIZNANY `model.guid`') do
+  root = File.join(NxTest::ROOT, 'noxun_engine')
+  found = {}
+  Dir.glob(File.join(root, '**', '*.rb')).sort.each do |abs|
+    rel = abs.sub("#{NxTest::ROOT}/", '').tr('\\', '/')
+    code = File.read(abs, encoding: 'UTF-8').lines.map { |l| l.sub(/#.*$/, '') }.join
+    n = code.scan(/\.guid\b/).size
+    found[rel] = n if n.positive?
+  end
+  found.each do |rel, n|
+    allowed = NX_DK_GUID_ALLOWED[rel]
+    NxTest.assert(allowed,
+                  "#{rel} cita `.guid` (#{n}x) — identita dokumentu patri DocKey; " \
+                  'ak je to vedoma vynimka, dopis ju do NX_DK_GUID_ALLOWED aj s dovodom')
+    NxTest.assert(allowed == n,
+                  "#{rel}: ocakavanych #{allowed} vedomych `.guid`, naslo sa #{n} — " \
+                  'novy vyskyt treba posudit (Ctrl+S meni guid)')
+  end
+  NX_DK_GUID_ALLOWED.each_key do |rel|
+    NxTest.assert(found.key?(rel),
+                  "#{rel} uz `.guid` necita — vyhod ho z NX_DK_GUID_ALLOWED (zoznam nesmie klamat)")
+  end
+end
+
 NxTest.test('DocKey: prisny guard odmieta aj PRAZDNY kluc servera (fail-closed)') do
   # Codex audit R-02b BLOCKER 1: '' == '' by pustilo zapis okna bez identity
   # do dokumentu, ktoremu sa identita nepodarila precitat.
