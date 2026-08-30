@@ -50,6 +50,37 @@ module NxGhost
     gt::PlacementSession.new(model: Object.new, plan: plan(config, home_z), **kw)
   end
 
+  # Fake tool stack — `pop_tool` len POCITA. Realny SketchUp odoberie VRCH
+  # stacku bez ohladu na to, kto o to ziada; presne to sa tu meria.
+  class FakeTools
+    attr_reader :pops
+
+    def initialize
+      @pops = 0
+    end
+
+    def pop_tool
+      @pops += 1
+    end
+  end
+
+  class FakeModel
+    attr_reader :tools
+
+    def initialize
+      @tools = FakeTools.new
+    end
+  end
+
+  # Tool bez SketchUpu: nastavime len priznaky, ktore `pop_tool` cita.
+  def fake_tool(model, attached: true, on_top: true)
+    t = gt::Tool.new
+    t.instance_variable_set(:@model_ref, model)
+    t.instance_variable_set(:@attached, attached)
+    t.instance_variable_set(:@on_top, on_top)
+    t
+  end
+
   # Aplikuje 16-cislovu maticu na lokalny bod (stlpcove poradie SketchUpu).
   def apply(m, pt)
     x = pt[0].to_f
@@ -395,6 +426,53 @@ NxTest.test('ghost: File>New / File>Open rusia session BEZPODMIENECNE (Windows r
   ensure
     gt.instance_variable_set(:@session, s)
   end
+end
+
+NxTest.test('ghost tool: pop NEODOBERIE cudzi nastroj, ked nie sme vrch stacku') do
+  gt = NxGhost.gt
+  model = NxGhost::FakeModel.new
+  # Situacia: pocas ghostu pushol nad nas nastroj niekto iny (iny extension
+  # v `onTransactionCommit`). `pop_tool` SketchUpu odoberie VRCH — slepy pop by
+  # zhodil JEHO a ghost by ostal visiet aktivny bez session.
+  t = NxGhost.fake_tool(model, attached: true, on_top: false)
+  prev = gt.instance_variable_get(:@active_tool)
+  begin
+    gt.instance_variable_set(:@active_tool, t)
+    NxTest.assert(gt.pop_tool(t) == false, 'pop nesmie prejst, kym nie sme navrchu')
+    NxTest.assert_equal(0, model.tools.pops, 'cudzi nastroj sa NESMIE odobrat')
+    NxTest.assert(t.attached?, 'nas nastroj ostava na stacku')
+    NxTest.assert(t.finish_pending?, 'ukoncenie sa ma ODLOZIT, nie zahodit')
+    NxTest.assert(gt.instance_variable_get(:@active_tool).equal?(t),
+                  'nastroj sa nesmie odregistrovat, kym naozaj neskoncil')
+    # Vrch stacku sa vratil k nam -> pop uz prejde a odoberie PRAVE JEDEN.
+    t.instance_variable_set(:@on_top, true)
+    NxTest.assert(gt.pop_tool(t) == true)
+    NxTest.assert_equal(1, model.tools.pops)
+    NxTest.assert(!t.attached? && !t.on_top?, 'po pope uz nie sme na stacku')
+    NxTest.assert(gt.instance_variable_get(:@active_tool).nil?)
+    # Idempotencia: druhy pop toho isteho nastroja uz nic neodoberie.
+    NxTest.assert(gt.pop_tool(t) == false)
+    NxTest.assert_equal(1, model.tools.pops)
+  ensure
+    gt.instance_variable_set(:@active_tool, prev)
+  end
+end
+
+NxTest.test('ghost tool: suspend/resume drzia priznak „som navrchu"') do
+  gt = NxGhost.gt
+  t = NxGhost.fake_tool(NxGhost::FakeModel.new)
+  NxTest.assert(t.on_top?)
+  t.suspend(nil)
+  NxTest.assert(!t.on_top?, 'suspend (Orbit/Pan alebo cudzi push_tool) nas zhodi z vrchu')
+  t.request_finish!
+  t.resume(nil)
+  NxTest.assert(t.on_top?, 'resume nas vracia na vrch')
+  NxTest.assert(!t.finish_pending?, 'odlozene ukoncenie sa pri resume spotrebuje')
+  # `deactivate` odlozene ukoncenie zahadzuje — nastroj uz odchadza sam.
+  t2 = NxGhost.fake_tool(NxGhost::FakeModel.new)
+  t2.request_finish!
+  t2.deactivate(nil)
+  NxTest.assert(!t2.attached? && !t2.on_top? && !t2.finish_pending?)
 end
 
 NxTest.test('ghost session: slot sa uvolni aj nad rozrobenym commitom') do

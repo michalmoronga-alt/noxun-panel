@@ -159,7 +159,8 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 ### GHOST VKLADANIE (V1-04) — TASK PACKAGE (1e, zapísané 29.8.2026, rev. po slepom review #254; štart na Michalovo „štartuj")
 
 **STAV BLOKU (30.8.2026): implementačná dávka je ✅ HOTOVÁ — v0.8.21.** Modul `core/ghost_tool.rb` (GhostTool + Calc + PlacementSession + Tool), šev v `handle_insert`,
-cancel pri zavretí Inspectora aj pri prepnutí dokumentu; 25 headless testov novej sady + in-SU sekcie `run_ghost` (15 scenárov) a `run_ghost_async`, plný beh **1155 PASS / 0 FAIL**.
+cancel pri zavretí Inspectora aj pri prepnutí dokumentu; **33 headless testov** novej sady + in-SU sekcie `run_ghost` (17 scenárov) a `run_ghost_async`,
+plný beh **1173 PASS / 0 FAIL** (headless celkovo 2145, 73 JS sád).
 Plný záznam — čo pridal implementačný audit (4 BLOCKER + 5 FIX), vedomý posun F8 hlášky na klik a ako je nástroj simulovaný v testoch: [archiv/KRONIKA.md](archiv/KRONIKA.md),
 záznam **GHOST VKLADANIE**. **Blok ostáva OTVORENÝ do Michalovho smoke** (6 bodov nižšie); uzáver = samostatný malý PR s **minor bumpom 0.9.0** a presunom bloku do archívu.
 
@@ -237,8 +238,9 @@ SU verzie (pixely/klávesy — držať ghost čisto 3D). Rez dávky: Tool + sess
 samostatne — nikdy nie jeden obrí PR.
 
 **Smoke checklist pre Michala (po nasadení):** 1) „Vložiť" → ghost visí na kurzore, vidno prednú stranu aj
-aktívnu kotvu, šípky fungujú HNEĎ (bez kliku do modelu). 2) ←/→ točí okolo kotvy, Alt prepína kotvy (a vidno
-ktorá je aktívna), ↓ drží skrinku na domácej výške (dolná na zemi, horná na 1400), ↑ ju pustí do voľnej výšky.
+aktívnu kotvu, šípky fungujú HNEĎ (bez kliku do modelu). 2) ←/→ točí okolo kotvy, ↓ drží skrinku na domácej výške
+(dolná na zemi, horná na 1400), ↑ ju pustí do voľnej výšky. **2b) Alt prepína kotvy (a vidno, ktorá je aktívna) — a menu lišta SketchUpu sa pritom NEAKTIVUJE.**
+*(Systémové doručenie Alt sa programovo overiť nedá — testy overujú len handler, tento bod je jediný dôkaz; ak Alt neprejde, zapísaný fallback je TAB.)*
 3) Klik položí skrinku presne tam, kde bol ghost; jeden Ctrl+Z ju celú vráti. 4) Esc nič nevloží a nič
 nepribudne v Undo. 5) Počas ghostu si zorbituj pohľad — ghost prežije. 6) Skús horný korpus, šablónu s kovaním
 a vloženie, keď si v editácii skupiny (skrinka musí skončiť top-level).

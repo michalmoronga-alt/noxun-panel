@@ -123,8 +123,8 @@
   **Vedomý posun oproti stavu pred ghostom:** guardy STAVBY (`Fronts.validate_layout!`, interior validácie) bežia až v commite, takže konflikt „zámok × šablóna" (F8) sa ohlási
   pri **kliku**, nie pri stlačení „Vložiť" — hláška je tá istá vrátane výpisu aktívnych zámkov, v modeli sa nič nezmení a session končí (opakovaný klik by zlyhal rovnako).
   Vyplýva to z hranice R-03, ktorá `build_plan` do `prepare_insert` zámerne nepresúva. **Odložený `pop_tool` si drží KONKRÉTNU inštanciu nástroja**, nie `@active_tool` — inak
-  by timer založený starou session zhodil nástroj, ktorý medzitým pushlo druhé „Vložiť" (nájdené pri návrhu, nie testom). **Dôkazy:** 25 headless testov novej sady
-  `test_ghost_vkladanie.rb` (matika + automat + zdrojové invarianty švu) a **in-SU sekcie `run_ghost` (15 scenárov) + `run_ghost_async`**; nástroj sa v nich simuluje
+  by timer založený starou session zhodil nástroj, ktorý medzitým pushlo druhé „Vložiť" (nájdené pri návrhu, nie testom). **Dôkazy:** **33 headless testov** novej sady
+  `test_ghost_vkladanie.rb` (matika + automat + tool stack + zdrojové invarianty švu) a **in-SU sekcie `run_ghost` (17 scenárov) + `run_ghost_async`**; nástroj sa v nich simuluje
   **programovo, ale verne** — cez reálne `onMouseMove`/`onLButtonDown`/`onKeyDown`/`onCancel` nad živým `view`, kde cieľový bod ide cez `view.screen_coords` do `pickray`.
   Scenáre preto oddeľujú **presnosť myši** (pixelová tolerancia) od **presnosti transformu** (0,1 mm proti bodu, ktorý si ghost z lúča naozaj vzal).
   **Čo pridalo review PR #268 (bez P1; dve P2 a desať P3):** (P2-1) *strážca degenerovaných lúčov bol MŔTVY* — `EPS` 1e-9 na zložke smeru prepustí pri normalizovanom vektore aj
@@ -138,7 +138,16 @@
   (`onActivateModel` — tam musí platiť opak: aktivácia toho istého dokumentu ghost rušiť nesmie). Z P3: `handle_insert_copy` aj `handle_insert_board` sú nové konce životného
   cyklu · `start` po výnimke popne nástroj (a `activate` sa registruje ako **prvé**, nech je čo popnúť aj pri chybe uprostred nej) · `Tool` berie model **zo session**, nie
   z `Sketchup.active_model` · `onKeyUp` vlastní klávesu len so **živou** session · poznámka preflightov ide do statusu **práve raz** (až po vložení) · `cancel_session` uvoľní slot
-  aj nad `:committing` (commit prerušený výnimkou mimo `StandardError`). Plný in-SU beh po opravách **1166 PASS / 0 FAIL**, headless **2143**.
+  aj nad `:committing` (commit prerušený výnimkou mimo `StandardError`).
+  **Potvrdzujúce Codex kolo (1×P2 + 5×P3, bez P1)** našlo poslednú a najzákernejšiu vec: **`pop_tool` odoberá VRCH STACKU, nie našu inštanciu.** Držať referenciu na vlastný
+  nástroj nestačí — keby počas ghostu pushol nástroj **nad** nás iný extension (napr. z `onTransactionCommit`), odložený pop by zhodil **jeho** a ghost by ostal visieť aktívny
+  bez session. Nástroj si preto drží vlastný príznak **„som vrch stacku"** (`activate`/`resume` → true, `suspend`/`deactivate` → false) a bez neho `pop_tool` **nepopne nič**:
+  ukončenie sa **odloží** (`request_finish!`) a dokoná pri najbližšom `resume`. `active_tool_id` sa nepoužíva — na inštanciu sa spoľahlivo nemapuje. Z P3 toho kola: in-SU walk
+  scenár je sprísnený na **paralelnú projekciu** (každý pixel má rovnaký smer lúča, takže test nezávisí od trafenia riadku horizontu) a žiada `placeable == false` + nulový vklad ·
+  scenár kovania ide na **reálnom sete z knižnice mimo default mapovania** (`zaves-p2o`) a overuje zmrazenú definíciu v projektovom snapshote, mapovanie na skrinke aj obsah
+  hlášky, pričom výnimková sonda **najprv zapíše** modelový atribút a až potom padne (dôkaz rollbacku vykonanej zmeny) · cross-doc scenár ide **reálnym `PanelAppObserver#onOpenModel`**
+  nad TÝM ISTÝM `Model` objektom · systémové doručenie **Alt** sa programovo overiť nedá — je to priznaná hranica testu a overuje ho **smoke bod 2b** (fallback TAB).
+  Plný in-SU beh po opravách **1173 PASS / 0 FAIL**, headless **2145**, JS 73 sád.
   **Blok GHOST sa touto dávkou NEUZATVÁRA** — uzáver (minor 0.9.0, presun bloku do archívu) príde samostatným malým PR po Michalovom smoke.
 - **1d/R-03 · ŠEV `prepare_insert` / `commit_insert` V BUILDERI (v0.8.20, 30.8.2026, PR #265):** `CabinetBuilder.build` zlievalo normalizáciu, pridelenie ID, výpočet polohy,
   otvorenie operácie a stavbu geometrie do jedného toku. GHOST Tool (vkladanie na klik) tak nemal **čo bezpečne držať pred klikom** — žiadny pripravený objekt, ktorý sa dá

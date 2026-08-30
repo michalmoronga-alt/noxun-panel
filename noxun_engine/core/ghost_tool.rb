@@ -127,8 +127,23 @@ module Noxun
           false
         end
 
+        # `Sketchup::Tools#pop_tool` odoberie VRCH STACKU — nie konkretnu
+        # instanciu. Ked medzitym niekto (iny extension, natívny nastroj)
+        # pushol nastroj NAD nas, slepy pop by zhodil JEHO a ghost by ostal
+        # visiet aktivny bez session (review #268 kolo 2, P2).
+        # Preto sa pop vykona LEN ked sme naozaj navrchu; inak sa ukoncenie
+        # ODLOZI (`request_finish!`) a dokona sa pri najblizsom `resume`
+        # — teda presne vtedy, ked sa vrch stacku vrati k nam — alebo zanikne
+        # s `deactivate`. `active_tool_id` sa na rozhodovanie NEPOUZIVA:
+        # nemapuje sa spolahlivo na instanciu; „som navrchu" si drzime sami
+        # z `activate` / `suspend` / `resume` / `deactivate`.
         def pop_tool(tool)
           return false unless tool && tool.attached?
+
+          unless tool.on_top?
+            tool.request_finish!
+            return false
+          end
 
           model = tool.model_ref || Sketchup.active_model
           @active_tool = nil if @active_tool.equal?(tool)
@@ -623,6 +638,8 @@ module Noxun
         def initialize
           @ip = nil
           @attached = false
+          @on_top = false
+          @finish_pending = false
           @model_ref = nil
         end
 
@@ -630,10 +647,29 @@ module Noxun
           @attached
         end
 
+        # Sme VRCH tool stacku? Drzime si to sami z `activate` / `suspend` /
+        # `resume` / `deactivate` — SketchUp „ktory nastroj je navrchu"
+        # spolahlivo neprezradi (`active_tool_id` sa na instanciu nemapuje)
+        # a `pop_tool` odoberie vrch bez ohladu na to, kto o neho ziada.
+        def on_top?
+          @attached && @on_top
+        end
+
+        # Ukoncenie sa nedalo vykonat teraz (nie sme navrchu) — dokoncime ho
+        # pri najblizsom `resume`.
+        def request_finish!
+          @finish_pending = true
+        end
+
+        def finish_pending?
+          @finish_pending
+        end
+
         # Nastroj uz nie je (alebo prave prestava byt) na stacku — dalsi
         # `pop_tool` z nasej strany je zakazany.
         def detach!
           @attached = false
+          @on_top = false
         end
 
         # --- lifecycle ------------------------------------------------------
@@ -647,6 +683,7 @@ module Noxun
             s = GhostTool.session
             @model_ref = (s && s.model) || Sketchup.active_model
             @attached = true
+            @on_top = true
             GhostTool.register_tool(self)
             @ip = Sketchup::InputPoint.new
             refresh_status
@@ -661,6 +698,8 @@ module Noxun
         def deactivate(view)
           guarded('deactivate') do
             @attached = false
+            @on_top = false
+            @finish_pending = false
             GhostTool.unregister_tool(self)
             GhostTool.cancel_session('nástroj skončil')
             Sketchup.status_text = ''
@@ -678,14 +717,27 @@ module Noxun
           true
         end
 
-        # Orbit / Pan — session DRZI, len prestaneme kreslit.
+        # Orbit / Pan (aj cudzi `push_tool` nad nas) — session DRZI, len uz
+        # NIE SME VRCH stacku a nesmieme z neho nic odoberat.
         def suspend(view)
-          guarded('suspend') { view.invalidate if view }
+          guarded('suspend') do
+            @on_top = false
+            view.invalidate if view
+          end
         end
 
+        # Vrch stacku sa vratil k nam. Ak sme medzitym mali skoncit (session
+        # zanikla, kym nad nami visel iny nastroj), dokoncime to TERAZ —
+        # odlozene timerom, aby sa `pop_tool` nevolal z Tool callbacku.
         def resume(view)
           guarded('resume') do
-            refresh_status
+            @on_top = true
+            if @finish_pending
+              @finish_pending = false
+              GhostTool.end_tool(deferred: true)
+            else
+              refresh_status
+            end
             view.invalidate if view
           end
         end

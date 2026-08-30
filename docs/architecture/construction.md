@@ -112,11 +112,21 @@ Platí aj pre hornú rovinu `UPPER_HANG_Z` s kamerou nad ňou.
 
 **Tool lifecycle.** Aktivácia `model.tools.push_tool` (NIE `select_tool` — pôvodný nástroj sa zachová) + `UI.start_timer(0) { Sketchup.focus }` (CEF by si po HtmlDialog callbacku
 vzal fokus späť a klávesy by nefungovali). Koniec = **presne jedno `pop_tool`** cez `GhostTool.end_tool`; z Tool callbackov **odložené** timerom, z panela (`start`) **synchrónne** —
-inak by odložený pop zhodil práve pushnutý nový nástroj. `Tool#detach!`/`attached?` robia pop idempotentným. Prepnutie na iný nástroj chodí cez `deactivate` (nie `onCancel`)
-a **nepopuje**; `suspend`/`resume` (Orbit/Pan) session DRŽÍ. `getExtents` vracia obálku ghostu (bez nej by ho SketchUp orezal mimo bounds).
+inak by odložený pop zhodil práve pushnutý nový nástroj. Prepnutie na iný nástroj chodí cez `deactivate` (nie `onCancel`) a **nepopuje**; `suspend`/`resume` (Orbit/Pan) session
+DRŽÍ. `getExtents` vracia obálku ghostu (bez nej by ho SketchUp orezal mimo bounds).
+
+**`pop_tool` odoberá VRCH STACKU, nie našu inštanciu** — preto nestačí držať referenciu na vlastný nástroj. Keby medzitým niekto (iný extension v `onTransactionCommit`, natívny
+nástroj) pushol nástroj **nad** nás, slepý pop by zhodil **jeho** a ghost by ostal visieť aktívny bez session. Nástroj si preto sám drží príznak **„som vrch stacku"**
+(`on_top?`: `activate`/`resume` → true, `suspend`/`deactivate` → false) a `pop_tool` bez neho **nepopne nič** — ukončenie sa **odloží** (`request_finish!`) a dokoná sa pri
+najbližšom `resume`, teda presne keď sa vrch stacku vráti k nám. `active_tool_id` sa na rozhodovanie **nepoužíva** (nemapuje sa spoľahlivo na inštanciu). `detach!`/`attached?`
+robia pop navyše idempotentným.
+
 **Klávesy:** ←/→ rotácia ∓90° (na PRVÝ down; `repeat > 1` vracia true bez zmeny), ↓ zámok, ↑ voľná výška, **Alt (`VK_MENU`/`VK_ALT`) cykluje kotvy** — zachytáva sa down AJ up
-a vracia true (minimalizuje aktiváciu menu-baru Windows). Vlastnené klávesy vracajú `true`, ostatné `false`. **Každý Tool callback je obalený** (`guarded`) — výnimka v callbacku
-sa inak ticho prehltne a nástroj „záhadne" prestane kresliť. **V `draw` sa NIKDY nevolá `Construction.build_plan`** — obálka je 8 bodov spočítaných RAZ zo zmrazeného configu.
+a vracia true (minimalizuje aktiváciu menu-baru Windows). Klávesu vlastníme len so **živou** session; ostatné vracajú `false`. **Hranica testovania:** headless ani in-SU sada
+nedokáže overiť, či Windows Alt do Toolu naozaj **doručí** a či sa pritom neaktivuje menu lišta — testy overujú len správanie handlera. Systémové doručenie Alt patrí
+**Michalovmu smoke checklistu** (`SYSTEM/PLAN.md`, sekcia GHOST, bod 2); zapísaný fallback pri zlyhaní je **TAB** (Scope OUT dávky, cyklovanie kotiev je preto jedna volateľná
+metóda `PlacementSession#cycle_anchor!`). **Každý Tool callback je obalený** (`guarded`) — výnimka v callbacku sa inak ticho prehltne a nástroj „záhadne" prestane kresliť.
+**V `draw` sa NIKDY nevolá `Construction.build_plan`** — obálka je 8 bodov spočítaných RAZ zo zmrazeného configu.
 
 **Commit ide výhradne cez šev R-03** `CabinetBuilder.commit_insert(model, plan, transform:)` so sprievodným blokom (H2/D-76 zmrazenie setov kovania) — žiadny vlastný zápis do
 modelu, žiadny nový selection mechanizmus. Po úspechu `Panel.ghost_after_commit` (výber, status, `push_selected`, pečiatka šablóny cez `stamp_once!`) beží **mimo operácie**

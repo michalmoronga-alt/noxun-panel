@@ -1714,6 +1714,11 @@ module NoxunSuRunner
     ok("GHOST 4: sipka vpravo otocila o +90° (index #{s.rotation_index})", s.rotation_index == 1)
     ok('GHOST 4: drzana klavesa (repeat) stav NEMENI, ale ostava vlastnena',
        ghost_key!(model, VK_RIGHT, 3) == true && s.rotation_index == 1)
+    # HRANICA TESTU (review #268 kolo 2, P3-4): tu sa overuje LEN to, ze
+    # handler na Alt reaguje spravne a klavesu vlastni. Ci SketchUp na Windows
+    # Alt do Toolu vobec DORUCI (a ci sa pritom neaktivuje menu lista), sa
+    # programovo dokazat neda — overuje to Michalov smoke checklist (PLAN.md,
+    # sekcia GHOST, bod 2). Zapisany fallback pri zlyhani je TAB (Scope OUT).
     alt_key = defined?(VK_MENU) ? VK_MENU : VK_ALT
     ok('GHOST 4: Alt cykluje kotvy (a je vlastneny down aj up)',
        ghost_key!(model, alt_key) == true && s.anchor == :fr_bottom &&
@@ -1822,26 +1827,29 @@ module NoxunSuRunner
     ghost_tool.onLButtonDown(0, cx, cy, v)
     ok('GHOST 8: klik v degenerovanom pohlade NEVLOZIL nic a session zije',
        cabinets(model).length == before8 && !ghost_session.nil? && ghost_session.active?)
-    # (b) SIKMY, ale NEDEGENEROVANY luc (review #268 P2-1): WALK pohlad z vysky
-    #     1,5 m tesne nad horizont. Stary straznik (EPS 1e-9) by ho prepustil
-    #     a klik by polozil korpus KILOMETRE od originu — poloha musi ostat
-    #     necitatelna. Mieri sa DO HORNEJ polovice okna, teda NAD horizont.
-    model.active_view.camera = Sketchup::Camera.new(e::Units.point(0.0, -3000.0, 1500.0),
-                                                    e::Units.point(0.0, 3000.0, 1500.0), Z_AXIS)
+    # (b) TAKMER VODOROVNY (walk) POHLAD — uhlova brana (review #268 P2-1).
+    #     Kamera je zamerne v PARALELNEJ projekcii a mieri vodorovne: vtedy ma
+    #     KAZDY pixel ten isty smer luca (dz = 0), takze scenar nezavisi od
+    #     toho, ci sa trafi presne riadok horizontu. Stary straznik (EPS 1e-9)
+    #     by taky luc pri perspektive prepustil a klik by polozil korpus
+    #     KILOMETRE od originu; DoD hovori: nepolozitelne a klik NEVLOZI NIC.
+    m8 = r03_marker(model, markers)
+    cam8 = Sketchup::Camera.new(e::Units.point(0.0, -3000.0, 1500.0),
+                                e::Units.point(0.0, 3000.0, 1500.0), Z_AXIS)
+    cam8.perspective = false
+    model.active_view.camera = cam8
     v = model.active_view
-    horizon_y = [(v.vpheight / 2).to_i - 1, 1].max
-    ghost_tool.onMouseMove(0, (v.vpwidth / 2).to_i, horizon_y, v)
-    far_ok = !s.placeable ||
-             (s.last_point && s.last_point[0].abs <= e::GhostTool::Calc::MAX_REACH_MM &&
-              s.last_point[1].abs <= e::GhostTool::Calc::MAX_REACH_MM)
-    ok("GHOST 8b: takmer vodorovny (walk) pohlad nevystrelí ghost kilometre od originu (#{s.placeable ? s.last_point.map { |q| q.round(0) }.inspect : 'nepolozitelne'})",
-       far_ok)
-    ghost_tool.onLButtonDown(0, (v.vpwidth / 2).to_i, horizon_y, v)
-    placed8 = cabinets(model).length > before8 ? cabinets(model).last : nil
-    ok('GHOST 8b: klik z walk pohladu bud nevlozi nic, alebo polozi skrinku v ZDRAVOM dosahu',
-       placed8.nil? || ghost_origin_mm(placed8).first(2).all? { |q| q.abs <= e::GhostTool::Calc::MAX_REACH_MM })
-    cleanup(model)
+    wx = (v.vpwidth / 2).to_i
+    wy = (v.vpheight / 2).to_i
+    ghost_tool.onMouseMove(0, wx, wy, v)
+    ok("GHOST 8b: takmer vodorovny (walk) pohlad je NEPOLOZITELNY — uhlova brana (#{s.placeable ? s.last_point.map { |q| q.round(0) }.inspect : 'nepolozitelne'})",
+       !s.placeable)
+    ghost_tool.onLButtonDown(0, wx, wy, v)
+    ok('GHOST 8b: klik z walk pohladu NEVLOZIL nic', cabinets(model).length == before8)
     ghost_teardown!(model)
+    Sketchup.undo
+    ok('GHOST 8b: walk pohlad nenechal ZIADEN krok Spat (1x Spat vratil marker)', !m8.valid?)
+    cleanup(model)
 
     # --- 9) UNDO POCAS GHOSTU (onCancel reason 2) = cancel, 0 mutacii -------
     cleanup(model)
@@ -1860,14 +1868,32 @@ module NoxunSuRunner
     ghost_teardown!(model)
 
     # --- 10) PREPNUTIE DOKUMENTU = cancel (cross-document vklad nikdy) ------
+    #     Ide sa REALNYM retazcom: instancia `PanelAppObserver` a jej
+    #     `onOpenModel` — teda presne to, co zavola SketchUp pri File > Open
+    #     (vratane poradia „cancel ghostu PRED prepnutim observerov").
+    #     POZOR na Windows pascu: File > Open smie recyklovat TEN ISTY `Model`
+    #     objekt, preto sa udalosti podava PRAVE TENTO model — porovnanie
+    #     identity by session nechalo zit a ghost by prezil do inej zakazky.
     cleanup(model)
     e::Panel.handle_insert(pg(model, GHOST_PARAMS.dup))
     ok('GHOST 10: vychodisko — session bezi', !ghost_session.nil?)
-    e::GhostTool.on_model_switched(model)
-    ok('GHOST 10: aktivacia TOHO ISTEHO dokumentu session NERUSI (guard identity objektom)',
+    e::Panel.on_model_switched(model)
+    ok('GHOST 10: aktivacia TOHO ISTEHO dokumentu session NERUSI (Ctrl+S ghost nezabije)',
        !ghost_session.nil? && ghost_session.active?)
+    tool10 = ghost_tool
+    obs10 = e::Panel::PanelAppObserver.new
+    obs10.onOpenModel(model)
+    ok('GHOST 10: realny onOpenModel session ZRUSIL, hoci je to TEN ISTY Model objekt',
+       ghost_session.nil?)
+    ok('GHOST 10: nastroj ma ukoncenie naplanovane (pop je odlozeny na timer)',
+       !tool10.nil? && tool10.attached?)
+    ok('GHOST 10: odlozeny pop naozaj odoberie NAS nastroj zo stacku POVODNEHO modelu',
+       e::GhostTool.pop_tool(tool10) == true && !tool10.attached? && ghost_tool.nil?)
+    # Cudzi dokument (macOS multi-doc, `onActivateModel`) — druha obrana.
+    e::Panel.handle_insert(pg(model, GHOST_PARAMS.dup))
     e::GhostTool.on_model_switched(Object.new)
-    ok('GHOST 10: udalost o CUDZOM dokumente session zrusi', ghost_session.nil?)
+    ok('GHOST 10: aktivacia CUDZIEHO dokumentu session zrusi (identita ako druha obrana)',
+       ghost_session.nil?)
     ghost_teardown!(model)
 
     # --- 11) DRUHE „VLOZIT" pocas session = stara prec, nova bezi ------------
@@ -2019,31 +2045,53 @@ module NoxunSuRunner
     cleanup(model)
 
     # --- 17) SEV `ghost_freeze_hardware`: kovanie zo sablony v TEJ ISTEJ operacii
-    hw_payload = GHOST_PARAMS.merge('hardware_sets' => { 'leg' => '__SU_TEST_GHOST_SET__' },
-                                    'hardware_set_defs' => {})
-    e::Panel.handle_insert(pg(model, hw_payload))
-    s = ghost_session
-    ok('GHOST 17: session si nesie snapshot kovania zo sablony (sev ma co volat)',
-       !s.nil? && !s.hardware.nil?)
-    if s && s.hardware
+    #     REALNY set z kniznice, a to taky, ktory NIE JE v default mapovani
+    #     projektu — inak by sa nemalo co „doplnit" a scenar by nic nemeral.
+    hw_lib = e::HardwareSets.load
+    mapped_ids = Array(hw_lib['mapping'].values).flat_map { |v| e::HardwareSets.value_set_ids(v) }
+    hw_set = Array(hw_lib['sets']).find { |sd| !mapped_ids.include?(sd['set_id']) }
+    if hw_set.nil?
+      info('GHOST 17: kniznica nema set mimo default mapovania — sev kovania preskoceny')
+    else
+      hw_sid = hw_set['set_id']
+      hw_gt = hw_set['generic_type']
+      hw_payload = GHOST_PARAMS.merge('hardware_sets' => { hw_gt => hw_sid },
+                                      'hardware_set_defs' => { hw_sid => hw_set })
+      e::Panel.handle_insert(pg(model, hw_payload))
+      s = ghost_session
+      ok("GHOST 17: session si nesie snapshot kovania zo sablony (set #{hw_sid}/#{hw_gt})",
+         !s.nil? && !s.hardware.nil? && s.hardware['mapping'][hw_gt] == hw_sid)
       ghost_camera!(model, [1200.0, 300.0], 0.0)
-      hwi = ghost_click!(model, [1200.0, 300.0, 0.0]) && model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
+      ghost_click!(model, [1200.0, 300.0, 0.0])
+      hwi = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
+      hw_state = e::HardwareSets.project_state(model) || {}
+      hw_cfg = hwi ? ((e::Store.config(hwi) || {})['hardware_sets'] || {}) : {}
       ok('GHOST 17: vklad so setmi zo sablony prebehol (sprievodny blok nezrusil operaciu)',
          !hwi.nil? && cabinets(model).length == 1)
-      ok('GHOST 17: poznamka o setoch sa dostala do session (status ju vypisuje po vlozeni)',
-         !s.hardware_note.nil?)
+      ok("GHOST 17: definicia setu je ZMRAZENA v projektovom snapshote modelu (#{(hw_state['sets'] || {}).keys.sort.join(', ')})",
+         (hw_state['sets'] || {}).key?(hw_sid))
+      ok("GHOST 17: skrinka si nesie mapovanie zo sablony (#{hw_cfg.inspect})", hw_cfg[hw_gt] == hw_sid)
+      ok("GHOST 17: hlaska o setoch MENUJE doplneny set (#{s.hardware_note.inspect})",
+         s.hardware_note.to_s.include?(hw_sid))
       ghost_teardown!(model)
       Sketchup.undo
-      ok('GHOST 17: 1x Spat vratil vklad AJ zapis setov (jedna operacia)', cabinets(model).empty?)
+      ok('GHOST 17: 1x Spat vratil vklad AJ zapis setov (jedna operacia)',
+         cabinets(model).empty? &&
+         !((e::HardwareSets.project_state(model) || {})['sets'] || {}).key?(hw_sid))
       cleanup(model)
 
       # (b) VYNIMKA v sprievodnom bloku musi zrusit CELY vklad — ziadna skrinka
-      #     so zapisanym, ale nezmrazenym setom. Sonda docasne prebije sev.
+      #     a ani zapis, ktory blok STIHOL vykonat. Sonda preto NAJPRV zapise
+      #     modelovy atribut a az potom hodi vynimku (bez zapisu by scenar
+      #     dokazoval len „nevznikla skrinka", nie rollback vykonanej zmeny).
       before17 = cabinets(model).length
       m17 = r03_marker(model, markers)
       sc = e::Panel.singleton_class
       sc.send(:alias_method, :ghost_freeze_hardware_orig, :ghost_freeze_hardware)
-      sc.send(:define_method, :ghost_freeze_hardware) { |_m, _hw| raise 'SU-TEST GHOST sonda kovania' }
+      sc.send(:define_method, :ghost_freeze_hardware) do |m, _hw|
+        m.set_attribute('NOXUN_TEST_GHOST', 'sprievodny_zapis', 'ano')
+        raise 'SU-TEST GHOST sonda kovania'
+      end
       begin
         bad_hw = ghost_place!(model, hw_payload, [1000.0, 250.0])
       ensure
@@ -2052,11 +2100,11 @@ module NoxunSuRunner
       end
       ok('GHOST 17b: vynimka v sprievodnom bloku zrusila CELY vklad (ziadna skrinka)',
          bad_hw.nil? && cabinets(model).length == before17)
+      ok('GHOST 17b: zapis, ktory blok STIHOL vykonat, je PREC (rollback celej operacie)',
+         model.get_attribute('NOXUN_TEST_GHOST', 'sprievodny_zapis').nil?)
       ok('GHOST 17b: zlyhany vklad session UKONCIL', ghost_session.nil?)
       Sketchup.undo
       ok('GHOST 17b: zruseny vklad nenechal ZIADEN krok Spat (1x Spat vratil marker)', !m17.valid?)
-    else
-      info('GHOST 17: mapovanie setov sa nepodarilo zostavit — sev kovania preskoceny')
     end
     ghost_teardown!(model)
 
