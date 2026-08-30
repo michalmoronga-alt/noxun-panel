@@ -149,6 +149,77 @@ NxTest.test('1b-6a: Ctrl+S meni CESTU aj GUID — nazov zadany pred ulozenim to 
   end
 end
 
+NxTest.test('1d/R-02b: RECYKLOVANY objekt po File>New NEZDEDI nazov zakazky [P2-GLM]') do
+  # VYROBNA pasca rovnakeho druhu ako P1-1, len v DRUHEJ pamati viazanej na
+  # objekt: `SESSION_KEY_BRIDGE`. Windows drzi jeden dokument na proces a pri
+  # File > New smie `Model` objekt RECYKLOVAT, takze `entry[:ref].equal?(model)`
+  # vrati true aj pre CUDZI, prave zalozeny dokument. Bez upratania mostu by
+  # novy Untitled zdedil kluc sedenia — a s nim NAZOV ZAKAZKY predosleho
+  # dokumentu, ktory by ticho odisiel do VEPO/CSV/XLSX.
+  core = Noxun::Engine::ProductionCore
+  dk = Noxun::Engine::DocKey
+  dk.reset!
+  m = Struct.new(:path, :guid).new('', 'GUID-A')
+  stary_kluc = core.project_key(m)
+  begin
+    core.save_project_name(m, 'Zakazka X')
+    NxTest.assert_equal('Zakazka X', core.project_name(m), 'vychodisko: dokument A sa vola X')
+    NxTest.refute(core.remembered_session_key(m).empty?, 'most si kluc sedenia pamata')
+
+    # File > New — SketchUp podá TEN ISTY objekt s NOVYM (prazdnym) dokumentom.
+    # `Engine.on_document_replaced` zije v main.rb (SketchUp loader, headless sa
+    # nenacitava), takze tu sa volaju jeho DVA kroky priamo; ze ich observery
+    # naozaj volaju cez neho, stryzi zdrojovy kontrakt v `test_doc_key.rb`
+    # a behaviorálne to prechádza in-SU sekciou DOCKEY.
+    m.guid = 'GUID-B'
+    dk.invalidate(m)
+    core.forget_session_key(m)
+
+    NxTest.assert_equal('', core.remembered_session_key(m),
+                        'most sa pri vymene dokumentu MUSI zabudnut')
+    NxTest.refute(core.project_key(m) == stary_kluc,
+                  'novy dokument ma novy kluc sedenia (DocKey rotoval)')
+    # Neulozeny dokument bez vlastneho nazvu sa vola „projekt" — HLAVNE sa
+    # nesmie volat ako ten predosly (to by odislo do VEPO/CSV/XLSX).
+    NxTest.refute(core.project_name(m) == 'Zakazka X',
+                  'novy Untitled NESMIE zdedit nazov zakazky predosleho dokumentu')
+    NxTest.assert_equal('projekt', core.project_name(m),
+                        'vracia sa nazov neulozeneho dokumentu, nie cudzi')
+  ensure
+    core.update_project_names do |map|
+      map.delete(stary_kluc)
+      map.delete(core.project_key(m))
+      map
+    end
+    dk.reset!
+  end
+end
+
+NxTest.test('1d/R-02b: onActivateModel most NEZAHADZUJE (macOS prepnutie medzi oknami)') do
+  # Protivaha: na macOS je aktivacia uz otvoreneho dokumentu bezna a jeho
+  # rozrobeny nazov musi prezit.
+  core = Noxun::Engine::ProductionCore
+  dk = Noxun::Engine::DocKey
+  dk.reset!
+  m = Struct.new(:path, :guid).new('', 'GUID-AKT')
+  kluc = core.project_key(m)
+  begin
+    core.save_project_name(m, 'Rozrobena')
+    src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'selection.rb'),
+                    encoding: 'UTF-8')
+    act = src[/def onActivateModel.*?\n        end\n/m].to_s
+    NxTest.refute(act.include?('on_document_replaced'),
+                  'onActivateModel nesmie upratovat pamate viazane na dokument')
+    NxTest.assert_equal('Rozrobena', core.project_name(m), 'nazov drzi')
+  ensure
+    core.update_project_names do |map|
+      map.delete(kluc)
+      map
+    end
+    dk.reset!
+  end
+end
+
 NxTest.test('1b-6a: zmigrovany nazov drzi aj po RESTARTE (nie len v pamati sedenia)') do
   # Most neulozeny→ulozeny zije v pamati procesu. Keby migracia nezapisala
   # zaznam na cestu, po restarte SketchUpu (= novy objekt modelu, prazdna

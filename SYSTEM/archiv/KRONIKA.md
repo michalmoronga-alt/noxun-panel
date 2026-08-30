@@ -37,7 +37,7 @@
   zákaziek by sa pomiešali. **Vedľajšok:** kľúč sedenia mena zákazky prežije prvé uloženie priamo, most 1b-6a ostáva už len ako poistka. `core/scale_observer.rb` používa
   surový guid ďalej — je to detektor zmeny dokumentu v ceste, ktorá pri ukladaní nebeží (rozhodnutie R-04). **Testy:** nová sada `test_doc_key.rb` (behaviorálna nad stub
   modelmi + zdrojové kontrakty producentov) · migrácia sád st1a/st1a-studio/st3a/st3b a **13 priamych `model.guid` miest v in-SU runneri** na `ProductionCore.model_guid`
-  (FIX 5 auditu — `pg` helper nepokrýval katalóg kovania ani Pravidlá). 2197 headless · 74 JS sád · plný in-SU beh **1193 PASS / 0 FAIL** (+9 nová in-SU sekcia DOCKEY).
+  (FIX 5 auditu — `pg` helper nepokrýval katalóg kovania ani Pravidlá). 2203 headless · 74 JS sád · plný in-SU beh **1202 PASS / 0 FAIL** (+18 nová in-SU sekcia DOCKEY).
   **Rebase na `main` po #266/#269/#268 (GHOST vkladanie, v0.8.22 → táto dávka je v0.8.23):** GHOST session sa viaže na OBJEKT modelu (`@model`, `equal?`) a ruší sa cez
   `onNewModel`/`onOpenModel` — s guidom nikdy nepracovala, takže zmena kľúča ju neláme. Prepočítaný sken potvrdil, že tri zmergované dávky **nepridali ani jeden nový
   producent `model.guid`** (jediný prírastok je hodnotovo agnostická JS fixture `'GUID-1'`), a `handle_insert` — prípravná fáza ghostu — ide cez ten istý `foreign_document?`
@@ -52,8 +52,30 @@
   nezbadal (rovnaká hodnota = žiadne `nxDropDocState`), zachytená identita v bufferi by sedela a `foreign_document?` by zápis PUSTIL — oneskorený apply by ticho
   pristál v práve otvorenej cudzej zákazke. Identita preto rotuje **UDALOSŤOU**: `DocKey.invalidate` z `onNewModel`/`onOpenModel`, **nikdy** z `onActivateModel`
   (macOS prepnutie medzi už otvorenými oknami) a **nikdy pri uložení** — to je stále celá pointa dávky. Rotujú **oba** AppObservery: `PanelAppObserver` garantuje
-  poradie voči pushu do panela, `ScaleWatch::EngineAppObserver` je nainštalovaný vždy (kryje Štúdio a dialógy bez Inspectora). **Dvojitá rotácia je neškodná** —
-  obe callbacky jedného eventu bežia v JEDNOM Ruby ticku, teda skôr než sa CEF klient dostane k slovu; hookovať len jeden observer by naopak nechalo dieru.
+  poradie voči pushu do panela, `ScaleWatch::EngineAppObserver` je nainštalovaný vždy (kryje Štúdio a dialógy bez Inspectora); hookovať len jeden by nechalo dieru.
+  **Slepá verifikácia delty to dotiahla (P2-N1) a je to podstatná oprava:** tvrdenie „dvojitá rotácia je neškodná, obe callbacky bežia v jednom Ruby ticku"
+  **NEPLATÍ** — callbacky observerov nie sú len oznámenie, **ony rovno notifikujú klientov**, takže sa medzi dve `invalidate` reálne vmestí `key()` a hodnota sa
+  zapečie do už odoslaného pushu. Štúdio by dostalo token A, panel token B: prvý klik v Štúdiu by v **správnom** dokumente skončil falošným „model sa prepol"
+  a `hw_sets.js` by pri zmene `model_guid` zahodil projektové drafty **druhýkrát** — už nad novým dokumentom, kde mohol používateľ medzitým písať. `invalidate`
+  má preto **EPOCHU UDALOSTI**: rotuje len vtedy, keď sa značka epochy líši od tej zapečatenej pri vzniku tokenu, takže jeden event New/Open vyrobí **najviac
+  jeden** token bez ohľadu na počet observerov a na interleaving s `key()`. Značkou je `Model#guid` — **nie ako identita** (na to sa nehodí, mení ju každé uloženie),
+  ale ako **detektor zmeny dokumentu**, presne v tej istej role, v akej ho používa `scale_observer` (R-04): medzi dvoma eventmi sa líši, počas jedného drží,
+  a uloženie túto cestu vôbec nespúšťa. Keď sa značka prečítať nedá, radšej sa **rotuje** — dva tokeny na jeden event sú nepohodlie, zdedený token cudzieho
+  dokumentu je tichý zápis do cudzej zákazky. Test pokrýva oba smery: interleaving `invalidate → key → invalidate` (ten istý event = tá istá identita) aj dva
+  po sebe idúce eventy (dve rôzne identity — epocha nesmie zablokovať druhý event). Ten istý `guid` je jediný v `NX_DK_GUID_ALLOWED` pridaný TOUTO dávkou.
+  **A ten istý falzifikovaný predpoklad mala DRUHÁ pamäť — most názvu zákazky (P2-GLM, nezávisle potvrdené aj GLM review):** `SESSION_KEY_BRIDGE`
+  (`ProductionCore`) overuje záznam cez `entry[:ref].equal?(model)` a jeho komentár doslova hovoril „Windows pri File > New/Open model zničí a vytvorí nový".
+  Na recyklovanom objekte `equal?` vráti true aj pre práve založený cudzí dokument, takže scenár *dokument A neuložený, v Štúdiu pomenovaný „X" → File > New →
+  nový Untitled B* skončí tak, že **B zdedí kľúč sedenia a s ním názov zákazky „X"** — a ten ticho odíde do **VEPO/CSV/XLSX**. Je to výrobná chyba rovnakého druhu
+  ako P1-1, len v inej pamäti. Preto vznikol **`Engine.on_document_replaced(model)`**: JEDNO miesto so **zoznamom všetkých pamätí viazaných na objekt modelu**
+  (dnes `DocKey.invalidate` + `ProductionCore.forget_session_key`), ktoré volajú oba AppObservery z `onNewModel`/`onOpenModel` — nikdy z `onActivateModel`, nikdy
+  pri uložení — a **pred** notifikáciou okien. Každý krok je ošetrený zvlášť: výmena dokumentu už prebehla, zlyhanie jedného cleanupu nesmie zastaviť ostatné.
+  Poučenie do budúcna: **každá ďalšia pamäť kľúčovaná `object_id` + `equal?` musí do toho zoznamu pribudnúť** — inak sa na ňu jednoducho zabudne, presne ako sa
+  stalo tejto.
+  **Zložený scenár (P3-GLM-1):** obe polovice pôvodnej chyby boli pripnuté len zvlášť. Pribudol reťazec *edit → Ctrl+S → echo* v pure sade aj **in-SU** (skutočný
+  `model.save`), a ten in-SU beh zároveň **empiricky potvrdil premisu celej dávky**: `PASS: DOCKEY 7: PREMISA DAVKY — SketchUp pri ulozeni ZMENIL Model#guid`.
+  Za ním `identita dokumentu Ctrl+S PREZILA` a `edit naplanovany PRED Ctrl+S sa po nom naozaj ZAPISAL` — plus protiváha, že ten istý edit s cudzou identitou
+  zapísaný NIE JE.
   **(P2-1)** plošný guard test sa dal obísť **interpoláciou**: strihanie komentárov cez `l.sub(/#.*$/,'')` zmazalo aj `"#{model.guid}"`, lebo interpolácia začína
   znakom `#` — mutácia s interpoláciou testom PREŠLA. Sken teraz vynecháva len riadky, ktoré sú CELÉ komentárom, a mutačné prípady (holý · interpolovaný · v komentári)
   sú v sade. **(P3-2)** fail-closed bola výsada JEDNEJ cesty (`foreign_document?`), kým ~20 priamych porovnaní v dialógoch a handleroch ju obchádzalo. Pribudol

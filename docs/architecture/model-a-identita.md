@@ -26,8 +26,10 @@ NEOPRAVUJÚ: duplicitu zbiera `Bom.collect` do kľúča `identities` a Kontrola 
 
 **STABILNÁ identita dokumentu pre identity guardy** (1d/R-02b). `DocKey.key(model)` vydá token `nxdoc-<random>`; **rotuje ho UDALOSŤ výmeny dokumentu, nie život Ruby objektu** —
 `DocKey.invalidate(model)` volajú `PanelAppObserver#onNewModel`/`#onOpenModel` **aj** `ScaleWatch::EngineAppObserver` (prvý garantuje poradie voči pushu do panela, druhý je
-nainštalovaný vždy a kryje Štúdio a dialógy bez Inspectora; dvojitá rotácia je neškodná — obe callbacky jedného eventu bežia v jednom Ruby ticku, pred tým, než sa CEF klient
-dostane k slovu). **`onActivateModel` NEROTUJE** (macOS prepnutie medzi už otvorenými dokumentmi) a **uloženie, prvé uloženie ani Save As identitu NEMENIA**. Je to JEDINÝ
+nainštalovaný vždy a kryje Štúdio a dialógy bez Inspectora; že rotujú dvaja, nevadí — `invalidate` má **epochu udalosti**, takže jeden event vyrobí najviac jeden token, viac
+nižšie). Volajú ho cez **`Engine.on_document_replaced`** (main.rb) — jedno miesto so **zoznamom všetkých pamätí viazaných na objekt modelu**: identita `DocKey` a most názvu
+zákazky `SESSION_KEY_BRIDGE` (`outputs.md`). Obe stáli na tej istej falzifikovanej premise, preto majú spoločný cleanup a **každá ďalšia taká pamäť doň musí pribudnúť**.
+**`onActivateModel` NEROTUJE** (macOS prepnutie medzi už otvorenými dokumentmi) a **uloženie, prvé uloženie ani Save As identitu NEMENIA**. Je to JEDINÝ
 zdroj hodnoty poľa `model_guid` v payloadoch — meno poľa na drôte je historické (kontrakt R-02 sa nemenil), no hodnotou už NIE JE `Sketchup::Model#guid`, lebo ten sa mení pri
 KAŽDOM uložení a Ctrl+S do 400 ms po úprave poľa panela vyzeral ako prepnutie dokumentu (edit sa zahodil, `nxDropDocState` zmazal rozpísaný stav; rovnako trpel baseline Pravidiel,
 guardy Štúdia aj okno Materiály).
@@ -37,12 +39,20 @@ File > Open smie ten istý objekt RECYKLOVAŤ** — to je v repe auditované už
 Na recyklovanom objekte by nový dokument zdedil starý token a **padli by všetky tri obrany R-02 naraz**: `nxSetModelGuid` by zmenu nezbadal (rovnaká hodnota = žiadne
 `nxDropDocState`), zachytená identita v bufferi by sedela a `foreign_document?` by zápis pustil — oneskorený apply by ticho pristál v cudzej zákazke.
 
+**EPOCHA UDALOSTI — jeden event = jeden token** (review delty #267, P2-N1). Rotujú dvaja observeri a poradie SketchUp negarantuje; naivné „zmaž záznam" nestačí, lebo callbacky
+observerov **nie sú len oznámenie — ony rovno notifikujú klientov**, takže medzi dve `invalidate` sa reálne vmestí `key()`: Štúdio by dostalo token A, panel token B, prvý klik
+v Štúdiu by v SPRÁVNOM dokumente skončil falošným „model sa prepol" a `hw_sets.js` by projektové drafty zahodil druhýkrát — už nad novým dokumentom. `invalidate` preto rotuje len
+vtedy, keď sa **značka epochy** líši od tej zapečatenej pri vzniku tokenu. Značkou je `Model#guid` — nie ako identita (na to sa nehodí, mení ho každé uloženie), ale ako **detektor
+zmeny dokumentu**, v tej istej role, v akej ho používa `scale_observer` (R-04): medzi dvoma eventmi sa líši, počas jedného eventu drží. Uloženie túto cestu nespúšťa. Keď sa značka
+prečítať nedá, radšej sa **rotuje** — dva tokeny na jeden event sú nepohodlie, zdedený token cudzieho dokumentu je tichý zápis do cudzej zákazky.
+
 **Pasce, ktoré tvar modulu určili:** (1) token sa NIKDY nezapisuje do modelu/.skp — zápis pri otvorení panela by špinil čistý dokument (dirty + undo + zákaz zápisov z push ciest,
-lekcia D-103) a token v súbore by prežil kópiu zákazky (dve kópie = jedna identita); kópia .skp nie je hrozba, jej otvorenie vytvorí nový objekt. (2) Rotácia tokenu počas života
-okna je zakázaná (Codex audit R-02b, BLOCKER 3): klient držiaci identitu do plného payloadu (sekcia Materiály) by sa po rotácii odmietal donekonečna — preto identita = život
-objektu, žiadna zmena pri Save As. (3) Registry drží SILNÚ referenciu + `equal?` (recyklácia `object_id` po GC) a **živý dokument sa NIKDY nevyhadzuje** (BLOCKER 2 — vytlačený
-živý by po návrate dostal nový token a klient by zahodil drafty); upratuje sa len `valid? == false` záznam, pri vzniku nového tokenu. (4) Chyba/ne-model = `''` — **fail-closed
-obojsmerne**: `Panel.foreign_document?` odmieta aj prázdny kľúč SERVERA (BLOCKER 1, `'' == ''` by pustilo zápis bez identity). (5) Token je náhodný (unikátny naprieč sedeniami),
+lekcia D-103) a token v súbore by prežil kópiu zákazky (dve kópie = jedna identita). Kópia .skp nie je hrozba: jej otvorenie ide cez `onOpenModel`, teda cez rotáciu — nový
+dokument dostane novú identitu **bez ohľadu na to, či SketchUp objekt recykloval**. (2) Identita sa neviaže na život objektu, ale na **dokument**: rotuje ju výhradne udalosť
+New/Open, `onActivateModel` nie a **uloženie, prvé uloženie ani Save As nie** (Codex audit R-02b, BLOCKER 3 — klient držiaci identitu do plného payloadu, sekcia Materiály, by sa
+po bezdôvodnej rotácii odmietal donekonečna; Save As je stále ten istý rozrobený dokument). (3) Registry drží SILNÚ referenciu + `equal?` (recyklácia `object_id` po GC) a **živý
+dokument sa NIKDY nevyhadzuje** (BLOCKER 2 — vytlačený živý by po návrate dostal nový token a klient by zahodil drafty); upratuje sa len `valid? == false` záznam. (4) Chyba/ne-model
+= `''` — **fail-closed obojsmerne**: odmieta sa aj prázdny kľúč SERVERA (BLOCKER 1, `'' == ''` by pustilo zápis bez identity). (5) Token je náhodný (unikátny naprieč sedeniami),
 lebo `ProductionCore#project_session_key` persistuje `guid:<hodnota>` do `vepo_settings.json` — deterministický čítač by po reštarte kolidoval.
 
 **`DocKey.foreign?(claimed, model, tolerate_blank_client: false)` je JEDINÝ porovnávač identity** (review #267 P3-2) — cezeň idú VŠETKY guardy: `Panel.foreign_document?`, zóny,

@@ -567,22 +567,25 @@ module Noxun
         # Ghost moze existovat len s otvorenym Inspectorom, a ten tento
         # observer vzdy pripaja (`attach_observer` -> `ensure_app_observer`).
         #
-        # 1d/R-02b (review #267 P1-1): z TOHO ISTEHO dovodu — Windows smie
-        # `Model` objekt RECYKLOVAT — sa tu rotuje aj IDENTITA DOKUMENTU.
-        # `DocKey.invalidate` musi bezat PRED `Panel.on_model_switched`: ten
-        # pushne `model_guid` do panela, a keby sa rotovalo az po nom, klient
-        # by dostal STARY token, `nxSetModelGuid` by zmenu nezbadal a
-        # oneskoreny zapis by pristal v novootvorenej cudzej zakazke.
-        # `onActivateModel` rotovat NESMIE (macOS: prepnutie medzi uz
-        # otvorenymi dokumentmi — kazdy si svoj token drzi).
+        # 1d/R-02b (review #267 P1-1 + delta P2-GLM): z TOHO ISTEHO dovodu —
+        # Windows smie `Model` objekt RECYKLOVAT — sa tu upratuju aj VSETKY
+        # pamate viazane na objekt modelu (identita DocKey + most nazvu
+        # zakazky SESSION_KEY_BRIDGE). Jeden zoznam je v
+        # `Engine.on_document_replaced`.
+        # MUSI bezat PRED `Panel.on_model_switched`: ten pushne `model_guid`
+        # do panela, a keby sa rotovalo az po nom, klient by dostal STARY
+        # token, `nxSetModelGuid` by zmenu nezbadal a oneskoreny zapis by
+        # pristal v novootvorenej cudzej zakazke.
+        # `onActivateModel` uprataval NESMIE (macOS: prepnutie medzi uz
+        # otvorenymi dokumentmi — kazdy si svoju identitu aj nazov drzi).
         def onNewModel(model)
-          DocKey.invalidate(model) if defined?(DocKey)
+          Engine.on_document_replaced(model)
           GhostTool.on_document_replaced('nový dokument') if defined?(GhostTool)
           Panel.on_model_switched(model)
         end
 
         def onOpenModel(model)
-          DocKey.invalidate(model) if defined?(DocKey)
+          Engine.on_document_replaced(model)
           GhostTool.on_document_replaced('otvorený iný dokument') if defined?(GhostTool)
           Panel.on_model_switched(model)
         end

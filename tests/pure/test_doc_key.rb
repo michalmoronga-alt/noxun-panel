@@ -59,33 +59,82 @@ NxTest.test('DocKey: onOpenModel nad TYM ISTYM objektom vyda NOVU identitu (Wind
   DK.reset!
   m = DkFakeModel.new(path: 'C:/Zakazky/Stara.skp', guid: 'G-1')
   stary = DK.key(m)
-  DK.invalidate(m) # presne to, co robi PanelAppObserver#onOpenModel
+  # File > Open nad recyklovanym objektom: meni sa dokument (cesta aj guid),
+  # objekt ostava ten isty — presne to podá SketchUp observeru.
   m.path = 'C:/Zakazky/Otvorena_ina.skp'
+  m.guid = 'G-2'
+  DK.invalidate(m) # presne to, co robi PanelAppObserver#onOpenModel
   novy = DK.key(m)
   NxTest.assert(!novy.empty?, 'novy token nie je prazdny')
   NxTest.refute(stary == novy, 'RECYKLOVANY objekt NESMIE zdedit identitu predosleho dokumentu')
 end
 
-NxTest.test('DocKey: invalidate je idempotentny — dva observery jedneho eventu = JEDEN novy token') do
-  # `PanelAppObserver` aj `ScaleWatch::EngineAppObserver` rotuju; poradie
-  # SketchUp negarantuje. Dve volania bez citania medzi nimi musia dat JEDEN
-  # token — inak by druhy observer prekrstil dokument, ktory prvy prave pomenoval.
+NxTest.test('DocKey: JEDEN event = JEDEN token aj ked medzi observermi bezi key() [P2-N1]') do
+  # JADRO nalezu P2-N1. Callbacky observerov NIE SU len oznamenie — ony rovno
+  # NOTIFIKUJU KLIENTOV, takze medzi dve `invalidate` sa REALNE vmesti `key`:
+  #   EngineAppObserver -> invalidate -> model_switched -> push do Studia (key!)
+  #   PanelAppObserver  -> invalidate -> on_model_switched -> push do panela (key!)
+  # Bez epochy by Studio drzalo token A, panel token B a prvy klik v Studiu by
+  # v SPRAVNOM dokumente skoncil falosnym „model sa prepol".
   DK.reset!
-  m = DkFakeModel.new(path: 'C:/Zakazky/A.skp')
-  DK.key(m)
+  m = DkFakeModel.new(path: 'C:/Zakazky/Stara.skp', guid: 'DOC-A')
+  stary = DK.key(m)
+
+  # File > Open: Windows podá TEN ISTY objekt, ale uz s inym dokumentom.
+  m.guid = 'DOC-B'
+  m.path = 'C:/Zakazky/Nova.skp'
+
+  DK.invalidate(m)          # 1. observer
+  t_studio = DK.key(m)      # ... a jeho notifikacia klientov
+  DK.invalidate(m)          # 2. observer TOHO ISTEHO eventu
+  t_panel = DK.key(m)       # ... a jeho notifikacia klientov
+
+  NxTest.refute(t_studio == stary, 'novy dokument dostal NOVU identitu')
+  NxTest.assert_equal(t_studio, t_panel,
+                      'oba observery JEDNEHO eventu musia klientom poslat TU ISTU identitu')
+end
+
+NxTest.test('DocKey: DVA rozne eventy rotuju DVAKRAT (epocha nesmie zablokovat druhy event)') do
+  # Protivaha k testu vyssie: epocha smie zliat len observerov JEDNEHO eventu.
+  # Keby zliala aj dva za sebou iduce File > Open, vratili by sme sa k P1-1.
+  DK.reset!
+  m = DkFakeModel.new(path: 'C:/A.skp', guid: 'DOC-A')
+  t_a = DK.key(m)
+
+  m.guid = 'DOC-B'          # prvy File > Open
   DK.invalidate(m)
+  t_b = DK.key(m)
+
+  m.guid = 'DOC-C'          # druhy File > Open (ten isty objekt)
   DK.invalidate(m)
-  NxTest.assert_equal(DK.key(m), DK.key(m), 'po dvoch invalidate je identita stabilna')
+  t_c = DK.key(m)
+
+  NxTest.assert_equal(3, [t_a, t_b, t_c].uniq.length, 'kazdy event ma vlastnu identitu')
+end
+
+NxTest.test('DocKey: bez citatelnej znacky epochy sa radsej ROTUJE (fail smerom k P1)') do
+  # Ked `guid` precitat nejde, dva tokeny na jeden event su nepohodlie —
+  # zdedeny token cudzieho dokumentu je tichy zapis do cudzej zakazky.
+  DK.reset!
+  bez = Class.new do
+    attr_accessor :path
+    def initialize; @path = 'C:/X.skp'; end
+    def valid?; true; end
+  end.new
+  t1 = DK.key(bez)
+  DK.invalidate(bez)
+  NxTest.refute(t1 == DK.key(bez), 'bez znacky epochy invalidate rotuje vzdy')
 end
 
 NxTest.test('DocKey: invalidate NEROTUJE identitu iných otvorených dokumentov') do
   # macOS multi-dokument: File > Open noveho okna nesmie prekrstit dokument,
   # ktory uz bezi (klient nad nim moze mat rozpisanu pracu).
   DK.reset!
-  a = DkFakeModel.new(path: 'C:/Zakazky/A.skp')
-  b = DkFakeModel.new(path: 'C:/Zakazky/B.skp')
+  a = DkFakeModel.new(path: 'C:/Zakazky/A.skp', guid: 'DOC-A')
+  b = DkFakeModel.new(path: 'C:/Zakazky/B.skp', guid: 'DOC-B')
   ta = DK.key(a)
   tb = DK.key(b)
+  b.guid = 'DOC-B2' # v okne B sa otvoril iny dokument
   DK.invalidate(b)
   NxTest.assert_equal(ta, DK.key(a), 'cudzi dokument si identitu drzi')
   NxTest.refute(tb == DK.key(b), 'invalidovany dokument dostal novy token')
@@ -108,36 +157,76 @@ NxTest.test('DocKey: ulozenie NEROTUJE — rotuje VYHRADNE udalost') do
   NxTest.assert_equal(t1, DK.key(m), 'bez udalosti sa identita nemeni')
 end
 
-NxTest.test('DocKey: onActivateModel identitu NEROTUJE (zdrojovy kontrakt observerov)') do
-  # Rotacia sa smie diat LEN v New/Open vetvach. Kontrakt sa overuje na zdrojaku,
-  # lebo observer callbacky bez SketchUpu spustit nevieme.
+NxTest.test('DocKey: onActivateModel NEUPRATUJE (zdrojovy kontrakt observerov)') do
+  # Upratovanie sa smie diat LEN v New/Open vetvach. Kontrakt sa overuje na
+  # zdrojaku, lebo observer callbacky bez SketchUpu spustit nevieme.
   %w[noxun_engine/ui/panel/selection.rb noxun_engine/core/scale_observer.rb].each do |rel|
     src = File.read(File.join(NxTest::ROOT, rel), encoding: 'UTF-8')
     act = src[/def onActivateModel.*?\n        end\n/m].to_s
     NxTest.refute(act.empty?, "#{rel}: onActivateModel sa nasiel")
-    NxTest.refute(act.include?('DocKey.invalidate'),
-                  "#{rel}: onActivateModel NESMIE rotovat identitu (macOS prepnutie medzi oknami)")
+    NxTest.refute(act.include?('on_document_replaced'),
+                  "#{rel}: onActivateModel NESMIE upratovat (macOS prepnutie medzi oknami)")
     %w[onNewModel onOpenModel].each do |cb|
       body = src[/def #{cb}\(model\).*?\n        end\n/m].to_s
-      NxTest.assert(body.include?('DocKey.invalidate'),
-                    "#{rel}: #{cb} musi rotovat identitu dokumentu")
+      NxTest.assert(body.include?('Engine.on_document_replaced(model)'),
+                    "#{rel}: #{cb} musi ohlasit vymenu dokumentu")
     end
   end
 end
 
-NxTest.test('DocKey: rotacia bezi PRED notifikaciou klientov') do
-  # Keby sa rotovalo az po `Panel.on_model_switched` / `model_switched`, stihol
-  # by odist push so STARYM tokenom a klient by prepnutie dokumentu nezbadal.
+NxTest.test('DocKey: vymena dokumentu je JEDNA udalost s JEDNYM zoznamom cleanupov [P2-GLM]') do
+  # Kazda pamat viazana na `object_id` + `equal?` musi mat svoj riadok na
+  # JEDNOM mieste — inak sa na dalsiu (ako sa stalo mostu nazvu zakazky)
+  # jednoducho zabudne.
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'main.rb'), encoding: 'UTF-8')
+  body = src[/def self\.on_document_replaced\(model\).*?\n    end\n/m].to_s
+  NxTest.refute(body.empty?, 'Engine.on_document_replaced existuje')
+  NxTest.assert(body.include?('DocKey.invalidate'), 'rotuje identitu dokumentu')
+  NxTest.assert(body.include?('ProductionCore.forget_session_key'),
+                'zahadzuje most nazvu zakazky (inak novy Untitled zdedi cudzi nazov)')
+  NxTest.assert(body.scan(/rescue StandardError/).length >= 2,
+                'kazdy cleanup je osetreny zvlast — zlyhanie jedneho nesmie zastavit ostatne')
+end
+
+NxTest.test('DocKey: upratovanie bezi PRED notifikaciou klientov') do
+  # Keby sa upratovalo az po `Panel.on_model_switched` / `model_switched`,
+  # stihol by odist push so STARYM tokenom a klient by prepnutie nezbadal.
   src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'selection.rb'),
                   encoding: 'UTF-8')
   body = src[/def onOpenModel\(model\).*?\n        end\n/m].to_s
-  NxTest.assert(body.index('DocKey.invalidate') < body.index('Panel.on_model_switched'),
-                'invalidate musi predchadzat pushu do panela')
+  NxTest.assert(body.index('on_document_replaced') < body.index('Panel.on_model_switched'),
+                'cleanup musi predchadzat pushu do panela')
   sw = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'scale_observer.rb'),
                  encoding: 'UTF-8')
   swb = sw[/def onOpenModel\(model\).*?\n        end\n/m].to_s
-  NxTest.assert(swb.index('DocKey.invalidate') < swb.index('model_switched'),
-                'invalidate musi predchadzat notifikacii Studia a dialogov')
+  NxTest.assert(swb.index('on_document_replaced') < swb.index('model_switched'),
+                'cleanup musi predchadzat notifikacii Studia a dialogov')
+end
+
+NxTest.test('DocKey: ZLOZENY scenar — edit + Ctrl+S + echo, rozpisana praca PREZIJE [P3-GLM-1]') do
+  # Obe polovice povodnej chyby naraz (dosial pripnute len zvlast):
+  # klient zachyti identitu pri NAPLANOVANI editu -> pouzivatel da Ctrl+S
+  # (SketchUp meni guid) -> debounce dobehne a zapise. Pred R-02b sa tento
+  # zapis TICHO ZAHODIL ako „patri inemu dokumentu".
+  DK.reset!
+  m = DkFakeModel.new(path: 'C:/Zakazky/Klinika.skp', guid: 'G-PRED')
+
+  zachytena = DK.key(m)                       # identita v okamihu naplanovania editu
+  payload = { 'model_guid' => zachytena, 'width' => 650.0 }
+
+  m.guid = 'G-PO'                             # Ctrl+S — SketchUp prepisal guid
+  NxTest.assert_equal(zachytena, DK.key(m), 'ulozenie identitu nezmenilo')
+  NxTest.refute(DK.foreign?(payload['model_guid'], m),
+                'debounced edit sa po Ctrl+S MUSI zapisat (jadro celej davky)')
+
+  # A protivaha v tom istom scenari: keby medzitym prisla VYMENA dokumentu,
+  # ten isty payload uz prejst NESMIE. (`Engine.on_document_replaced` zije
+  # v main.rb, ktory sa headless nenacitava — jeho obsah stryzi zdrojovy
+  # kontrakt nizsie, tu sa vola priamo krok, ktory rotuje identitu.)
+  m.guid = 'G-INY-DOKUMENT'
+  DK.invalidate(m)
+  NxTest.assert(DK.foreign?(payload['model_guid'], m),
+                'po vymene dokumentu ten isty edit uz zapisat NESMIE')
 end
 
 # --- Fail-closed porovnavac (review #267 P3-2) -------------------------------
@@ -282,7 +371,7 @@ end
 NxTest.test('DocKey: vsetci producenti model_guid beru hodnotu z DocKey') do
   NX_DK_PRODUCERS.each do |rel|
     src = File.read(File.join(NxTest::ROOT, rel), encoding: 'UTF-8')
-    NxTest.assert(src.include?('DocKey.'),
+    NxTest.assert(src.include?('DocKey.key('),
                   "#{rel} musi brat identitu dokumentu z DocKey")
     NxTest.assert(nx_dk_guid_hits(src).zero?,
                   "#{rel} uz nesmie citat model.guid priamo (meni sa pri kazdom ulozeni)")
@@ -309,6 +398,11 @@ end
 # nový výskyt `guid` v `noxun_engine/` musí test buď zhodiť, alebo si autor
 # musí vedome dopísať riadok sem (a tým rozhodnutie priznať).
 NX_DK_GUID_ALLOWED = {
+  # `DocKey.event_stamp` — guid ako ZNACKA EPOCHY UDALOSTI, nie identita
+  # (review delty #267, P2-N1): jedina vec, ktora sa medzi dvoma eventmi
+  # New/Open zmeni, ale POCAS jedneho eventu drzi, takze dva observery
+  # jedneho eventu nevyrobia dva rozne tokeny. Ulozenie tuto cestu nespusta.
+  'noxun_engine/core/doc_key.rb' => 1,
   # Cache stabilnych transformacii — guid je tu DETEKTOR zmeny dokumentu
   # v ceste (`forget_detached_models`), ktora pri ULOZENI vobec nebezi;
   # klucom cache je `object_id`, nie guid. Vedome (R-04, review #261 P1).

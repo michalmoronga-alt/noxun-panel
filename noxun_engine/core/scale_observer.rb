@@ -698,28 +698,30 @@ module Noxun
       # Navyse notifikuje moduly viazane na model — sekcie Studia sa nad novym
       # aktivnym modelom nacitaju nanovo (Codex review PR #26, P1).
       class EngineAppObserver < Sketchup::AppObserver
-        # 1d/R-02b (review #267 P1-1): identita dokumentu rotuje UDALOSTOU,
-        # lebo Windows smie pri File > Open RECYKLOVAT ten isty `Model` objekt
-        # (auditovane pri GHOST vkladani, review #268 P2-2) — cache viazana na
-        # objekt by novemu dokumentu vratila STARY token. Rotuje sa tu aj v
-        # `PanelAppObserver`: tento observer je nainstalovany VZDY (aj bez
+        # 1d/R-02b (review #267 P1-1 + delta P2-GLM): pamate viazane na OBJEKT
+        # modelu sa pri vymene dokumentu upratuju UDALOSTOU, lebo Windows smie
+        # pri File > Open RECYKLOVAT ten isty `Model` objekt (auditovane pri
+        # GHOST vkladani, review #268 P2-2) — inak by novy dokument zdedil
+        # identitu (DocKey) aj nazov zakazky (SESSION_KEY_BRIDGE) stareho.
+        # Jeden zoznam cleanupov je v `Engine.on_document_replaced`; robi to
+        # aj `PanelAppObserver`: tento observer je nainstalovany VZDY (aj bez
         # Inspectora, teda kryje Studio a dialogy), ten druhy zas garantuje
-        # poradie voci pushu do panela. Dvojita rotacia je neskodna — obe
-        # callbacky jedneho eventu bezia v jednom Ruby ticku, este pred tym,
-        # nez sa CEF klient dostane k slovu. Musi bezat PRED notifikaciou
-        # okien nizsie, aby uz hlasili CERSTVU identitu.
+        # poradie voci pushu do panela. Ze upratuju DVAJA, nevadi — `invalidate`
+        # ma epochu udalosti, takze jeden event vyrobi najviac jeden token
+        # (bez nej by Studio dostalo iny token nez panel; review delty P2-N1).
+        # Musi bezat PRED notifikaciou okien nizsie, aby uz hlasili CERSTVY stav.
         def onNewModel(model)
-          DocKey.invalidate(model) if defined?(DocKey)
+          Engine.on_document_replaced(model)
           model_switched(model)
         end
 
         def onOpenModel(model)
-          DocKey.invalidate(model) if defined?(DocKey)
+          Engine.on_document_replaced(model)
           model_switched(model)
         end
 
-        # BEZ rotacie identity — macOS prepnutie medzi UZ otvorenymi
-        # dokumentmi; kazdy ma vlastny objekt a svoj token si drzi.
+        # BEZ upratovania — macOS prepnutie medzi UZ otvorenymi dokumentmi;
+        # kazdy ma vlastny objekt a svoju identitu aj nazov si drzi.
         def onActivateModel(model)
           model_switched(model)
         end

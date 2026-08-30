@@ -43,13 +43,15 @@
 # `invalidate` volaju OBA AppObservery pluginu — `Panel::PanelAppObserver`
 # (existuje len s otvorenym Inspectorom, ale rotuje PRED `on_model_switched`,
 # teda pred pushom do panela) aj `ScaleWatch::EngineAppObserver` (instaluje sa
-# bezpodmienecne pri nacitani pluginu a notifikuje Studio a dialogy). Poradie
-# observerov SketchUp negarantuje, dvojita rotacia je vsak NESKODNA: obe
-# callbacky jedneho eventu bezia v JEDNOM Ruby ticku, teda skor nez sa CEF
-# klient vobec dostane k slovu — druha rotacia tak nanajvys posle este jedno
-# `nxDropDocState` nad uz zahodenym stavom. Hookovat len JEDEN observer by
-# naopak dieru nechalo: samotny Panel nekryje Studio otvorene bez Inspectora,
-# a samotny ScaleWatch sa moze spustit AZ PO tom, co panel pushol stary token.
+# bezpodmienecne pri nacitani pluginu a notifikuje Studio a dialogy). Hookovat
+# len JEDEN observer by dieru nechalo: samotny Panel nekryje Studio otvorene
+# bez Inspectora, a samotny ScaleWatch sa moze spustit AZ PO tom, co panel
+# pushol stary token.
+#
+# Poradie observerov SketchUp negarantuje a dvojita rotacia NIE JE neskodna
+# (review delty #267, P2-N1) — preto ma `invalidate` EPOCHU UDALOSTI: jeden
+# event New/Open vyrobi NAJVIAC JEDEN novy token bez ohladu na to, kolko
+# observerov ho ohlasi a ci medzi nimi stihne bezat `key`. Detail pri metode.
 #
 # NIKDY sa NEZAPISUJE do modelu ani .skp (zamietnuta alternativa "token v
 # NOXUN dictionary"): zapis pri otvoreni panela by zaspinil cisty dokument
@@ -99,7 +101,9 @@ module Noxun
           entry = registry[oid]
           unless entry && entry[:ref].equal?(model)
             prune_dead
-            entry = { ref: model, token: fresh_token }
+            # `event_stamp` sa PECATI pri vzniku tokenu — vdaka tomu druhy
+            # observer TOHO ISTEHO eventu uz nema co rotovat (viz `invalidate`).
+            entry = { ref: model, token: fresh_token, event_stamp: event_stamp(model) }
             registry[oid] = entry
           end
           entry[:token]
@@ -146,12 +150,38 @@ module Noxun
         # zdedil zaznam stareho. Ked objekt v registry nie je (macOS — naozaj
         # novy objekt), je to lacny no-op.
         #
-        # Idempotentne: druhe volanie v tom istom evente uz nema co zmazat,
-        # takze dva observery jedneho eventu nevyrobia dva rozne tokeny.
+        # EPOCHA UDALOSTI (review delty #267, P2-N1) — JEDEN event New/Open
+        # smie vyrobit NAJVIAC JEDEN novy token, aj ked ho ohlasia OBA
+        # observery. Naivna verzia (,,zmaz zaznam") to nespĺňala a bola to
+        # chyba: callbacky observerov NIE SU len oznamenie, ony rovno
+        # NOTIFIKUJU KLIENTOV, takze medzi dve `invalidate` sa vmesti `key` —
+        # `EngineAppObserver` posle Studiu token A, `PanelAppObserver` potom
+        # rotuje znova a panelu posle token B. Nasledok: prvy klik v Studiu by
+        # v SPRAVNOM dokumente skoncil falosnym ,,model sa prepol" a
+        # `hw_sets.js` by pri zmene `model_guid` zahodil projektove drafty
+        # DRUHYKRAT — uz nad novym dokumentom, kde uz mohol pouzivatel pisat.
+        #
+        # Znackou epochy je `event_stamp` = `Model#guid` (jedina vec, ktora sa
+        # medzi DVOMA roznymi eventmi zmeni, ale POCAS jedneho eventu drzi).
+        # Guid tu NIE JE identita (na to sa nehodi, meni ho kazde ulozenie) —
+        # je to DETEKTOR ZMENY DOKUMENTU, presne v tej istej role, v akej ho
+        # pouziva `scale_observer` (rozhodnutie R-04). Ulozenie tuto cestu
+        # nespusta, takze zmena guidu pri Ctrl+S sa sem nikdy nedostane.
+        #
+        # Ked stamp precitat nejde, radsej sa ROTUJE (fail smerom k P1): dva
+        # tokeny na jeden event su nepohodlie, zdedeny token cudzieho dokumentu
+        # je tichy zapis do cudzej zakazky.
         def invalidate(model)
           return false unless model
 
-          registry.delete(model.object_id)
+          oid = model.object_id
+          stamp = event_stamp(model)
+          entry = registry[oid]
+          # Ten isty dokument, ktory uz v TOMTO evente token dostal -> hotovo.
+          return false if entry && entry[:ref].equal?(model) &&
+                          !stamp.nil? && entry[:event_stamp] == stamp
+
+          registry.delete(oid)
           prune_dead
           true
         rescue StandardError => e
@@ -190,6 +220,17 @@ module Noxun
         # a nazov cudzieho neulozeneho projektu by sa objavil na dnesnom.
         def fresh_token
           "#{TOKEN_PREFIX}#{SecureRandom.hex(12)}"
+        end
+
+        # ZNACKA EPOCHY, NIE identita (viz `invalidate`). `Model#guid` sa meni
+        # pri kazdom ulozeni — preto sa na identitu nehodi — ale POCAS jedneho
+        # eventu New/Open drzi a medzi DVOMA eventmi sa lisi, co je presne to,
+        # co na rozoznanie ,,uz som tento event videl" treba. `nil` = nedalo sa
+        # precitat; volajuci vtedy radsej rotuje.
+        def event_stamp(model)
+          model.respond_to?(:guid) ? model.guid.to_s : nil
+        rescue StandardError
+          nil
         end
       end
     end

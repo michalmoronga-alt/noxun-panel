@@ -127,8 +127,16 @@ rástli mŕtve záznamy (nález review P1). Normalizácia je `\`→`/` + `downca
 
 **Ctrl+S ale mení cestu AJ guid NARAZ (1b-6a):** po prvom uložení sa záznam pod *starým* guid kľúčom z modelu už nedá nájsť — záložka hľadala `guid:<nový guid>` a našla prázdno,
 takže názov zadaný pred prvým uložením sa ticho stratil a všetky štyri exporty sa pomenovali podľa `.skp` súboru namiesto zákazky (výrobná P2). Most drží **pamäť procesu**
-`SESSION_KEY_BRIDGE` (`object_id` modelu → posledný kľúč sedenia, pod ktorým sa názov zapísal), overená **identitou objektu** (`equal?`, čisté porovnanie referencií) — cudzí
-dokument rozrobený názov zdediť nemôže, Windows SketchUp pri File > New/Open model zničí a vytvorí nový. Prvé čítanie po uložení záznam **adoptuje a hneď zmigruje na cestu**
+`SESSION_KEY_BRIDGE` (`object_id` modelu → posledný kľúč sedenia, pod ktorým sa názov zapísal), overená **identitou objektu** (`equal?`, čisté porovnanie referencií).
+
+> **`equal?` samo o sebe NESTAČÍ (1d/R-02b, review delty #267 P2-GLM).** Pôvodné zdôvodnenie „cudzí dokument názov zdediť nemôže, Windows pri File > New/Open model zničí
+> a vytvorí nový" je **nepravdivé** — Windows drží jeden dokument na proces a `Sketchup::Model` objekt smie **recyklovať** (auditované pri GHOST vkladaní, review #268 P2-2).
+> Na recyklovanom objekte vráti `equal?` true aj pre práve založený cudzí dokument, takže nový Untitled zdedil kľúč sedenia — a s ním **názov zákazky** predošlého dokumentu,
+> ktorý by ticho odišiel do VEPO/CSV/XLSX. Most preto zahadzuje **`Engine.on_document_replaced`** (volajú ho oba AppObservery z `onNewModel`/`onOpenModel`, nikdy
+> z `onActivateModel`, nikdy pri uložení) ešte **pred** notifikáciou okien; `equal?` tu ostáva ako druhá poistka proti recyklácii `object_id` po GC. Je to **ten istý koreň**
+> ako pri identite dokumentu (`DocKey`), preto majú obe pamäte **jeden spoločný zoznam cleanupov** — každá ďalšia pamäť viazaná na objekt modelu doň musí pribudnúť.
+
+Prvé čítanie po uložení záznam **adoptuje a hneď zmigruje na cestu**
 (`adopt_session_name`) a most sa spotrebuje; **bez migrácie** by názov žil len do konca sedenia a po reštarte by sa stratil aj tak. Kľúče sedenia sa spotrebujú pri prvom čítaní s
 platnou cestou **vždy** — aj keď cesta už svoj názov má: ten **má prednosť** a rozpísaný názov ho neprepíše, ale musí zaniknúť, inak by sa o pár minút vynoril pri „Uložiť ako" na
 čerstvej ceste (review #243 P2-2). Most sa zahadzuje **až po úspešnom zápise** — `save_vepo_settings` vracia `true`/`false` a pri zamknutom súbore či plnom disku ostáva most nažive,

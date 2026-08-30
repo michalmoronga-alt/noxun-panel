@@ -316,10 +316,10 @@ module Noxun
 
       # Nahradny kluc neulozeneho modelu — plati LEN v ramci sedenia. Prefix
       # ho odlisuje od cesty, aby sa dal pri prvom zapise s platnou cestou
-      # zmigrovat. Od 1d/R-02b je hodnotou DocKey token (stabilny pocas celeho
-      # zivota objektu modelu, aj cez prve ulozenie) — most SESSION_KEY_BRIDGE
-      # vyssie tym stratil svoj hlavny scenar (guid uz prve ulozenie neprepise),
-      # ale ostava: kryje starsie zaznamy v subore a nic nekazi.
+      # zmigrovat. Od 1d/R-02b je hodnotou DocKey token (drzi cez ulozenie,
+      # prve ulozenie aj Save As a rotuje az pri vymene dokumentu) — most
+      # SESSION_KEY_BRIDGE vyssie tym stratil svoj hlavny scenar (guid uz prve
+      # ulozenie neprepise), ale ostava: kryje starsie zaznamy v subore.
       def project_session_key(model)
         guid = model_guid(model)
         guid.empty? ? '' : "#{SESSION_KEY_PREFIX}#{guid}"
@@ -345,6 +345,15 @@ module Noxun
 
       # Kluc sedenia, pod ktorym sa nazov TOHTO dokumentu naposledy zapisal,
       # kym este nemal cestu. Prazdny retazec = nic sa nepamata.
+      #
+      # `equal?` SAMO O SEBE NESTACI (1d/R-02b, review delty #267 P2-GLM):
+      # Windows drzi jeden dokument na proces a pri File > New/Open smie
+      # `Model` objekt RECYKLOVAT, takze `equal?` by nad recyklovanym objektom
+      # vratilo true a novy Untitled by zdedil kluc sedenia — a s nim NAZOV
+      # ZAKAZKY predosleho dokumentu, ktory by odisiel do VEPO/CSV/XLSX.
+      # Zaznam preto zahadzuje `Engine.on_document_replaced` (oba AppObservery)
+      # este PRED notifikaciou okien; `equal?` tu ostava ako druha poistka
+      # proti recyklacii `object_id` po GC.
       def remembered_session_key(model)
         entry = model ? SESSION_KEY_BRIDGE[model.object_id] : nil
         return '' unless entry.is_a?(Hash) && entry[:ref].equal?(model)

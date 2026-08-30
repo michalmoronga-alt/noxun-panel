@@ -19,6 +19,37 @@ module Noxun
       puts "[NOXUN::Engine] #{msg}"
     end
 
+    # VYMENA DOKUMENTU = JEDNA UDALOST S JEDNYM ZOZNAMOM CLEANUPOV
+    # (1d/R-02b, review delty #267 P2-GLM). Volaju to OBA AppObservery
+    # pluginu z `onNewModel`/`onOpenModel` — NIKDY z `onActivateModel`
+    # (macOS prepnutie medzi uz otvorenymi dokumentmi) a nikdy pri ulozeni.
+    # MUSI bezat PRED notifikaciou klientov, inak stihne odist push so
+    # starym udajom.
+    #
+    # PRECO SPOLOCNE MIESTO: obe pamate nizsie stali na TEJ ISTEJ chybnej
+    # premise („Windows stary `Model` objekt znici"), lenze Windows drzi
+    # jeden dokument na proces a objekt smie RECYKLOVAT. Kazda pamat
+    # viazana na `object_id` + `equal?` teda musi mat svoj riadok TU:
+    #   * DocKey — inak by novy dokument zdedil IDENTITU stareho (tichy
+    #     zapis do cudzej zakazky).
+    #   * SESSION_KEY_BRIDGE — inak by novy Untitled zdedil NAZOV ZAKAZKY
+    #     predosleho dokumentu a odniesol si ho do VEPO/CSV/XLSX.
+    # Kazdy krok je samostatne osetreny: zlyhanie jedneho nesmie zabranit
+    # ostatnym (vymena dokumentu uz prebehla, vratit sa neda).
+    def self.on_document_replaced(model)
+      begin
+        DocKey.invalidate(model) if defined?(DocKey)
+      rescue StandardError => e
+        log_error(e, 'on_document_replaced/DocKey')
+      end
+      begin
+        ProductionCore.forget_session_key(model) if defined?(ProductionCore)
+      rescue StandardError => e
+        log_error(e, 'on_document_replaced/SESSION_KEY_BRIDGE')
+      end
+      nil
+    end
+
     def self.log_error(e, context = nil)
       log("#{context ? "#{context}: " : ''}#{e.class}: #{e.message}")
       bt = e.respond_to?(:backtrace) ? e.backtrace : nil
