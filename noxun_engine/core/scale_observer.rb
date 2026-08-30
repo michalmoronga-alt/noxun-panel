@@ -557,17 +557,29 @@ module Noxun
           [model_key(inst.model), inst.entityID]
         end
 
-        # Identita dokumentu pre TRVALU cache. Zamerne NIE `object_id` (Codex audit
-        # FIX 6): hodnotou cache je len pole cisel, takze zatvoreny dokument nic
-        # nedrzi pri zivote a jeho `object_id` sa po GC moze recyklovat — novy
-        # dokument s rovnakym `entityID` by potom dostal CUDZI stabilny transform.
-        # `guid` je stabilny per dokument (vzor `same_model?` v edge_check/grain_check).
+        # Identita dokumentu pre cache stabilnych transformacii.
+        # POZOR — `guid` sa tu pouzit NEDA (GH review #261, P1): SketchUp ho meni
+        # PRI KAZDOM ULOZENI dokumentu (zdokumentovane a testom podchytene
+        # v `tests/pure/test_st1a_studio.rb` — preto je kluc nazvu zakazky CESTA).
+        # Na guid kluci by Ctrl+S zneplatnil vsetky zapamatane polohy naraz:
+        # hned nasledujuci odmietnuty Scale by sa vracal len cez `clean_transform`
+        # (pri scale okolo pivotu posunuty origin) a `forget_dead_transforms` by
+        # stare zaznamy uz ani nenasiel. `object_id` je v ramci behu stabilny.
+        # Recyklacia `object_id` po zatvoreni dokumentu je osetrena inde —
+        # `forget_detached_models` pri zmene dokumentu cache vyprazdni (Windows/SDI);
+        # macOS zvysok je priznany v registri (R-36).
         def model_key(model)
+          model && model.object_id
+        end
+
+        # `guid` sa tu pouziva VYHRADNE ako DETEKTOR ZMENY dokumentu (nie ako kluc):
+        # `model_switched` sa pri ulozeni nespusta, takze zmena guid v tejto ceste
+        # znamena naozaj iny dokument.
+        def doc_guid(model)
           return nil unless model
-          g = model.respond_to?(:guid) ? model.guid.to_s : ''
-          g.empty? ? "oid:#{model.object_id}" : g
+          model.respond_to?(:guid) ? model.guid.to_s : nil
         rescue StandardError
-          "oid:#{model.object_id}"
+          nil
         end
 
         # R-04, cesta 1 — ERASE TICK: z cache vypadnu zaznamy entit, ktore v TOMTO
@@ -600,12 +612,24 @@ module Noxun
         # ZIJE DALEJ a moze mat rozbehnuty debounce — zmazanie jeho stabilneho
         # transformu by odmietnutemu scale vzalo presnu polohu (`clean_transform`
         # pri scale okolo pivotu vrati posunuty origin). Zvysok tam upratuje
-        # erase tick vyssie; priznane v registri.
+        # erase tick vyssie; priznane v registri (R-36).
+        #
+        # Rozhoduje sa podla GUID, nie podla `object_id` (GH review #261, P1
+        # a Codex audit FIX 6): keby sa `object_id` zatvoreneho dokumentu
+        # recykloval na novy dokument, porovnanie kluca by stare zaznamy
+        # PONECHALO a skrinka s rovnakym `entityID` by dostala cudziu polohu.
+        # Zmena GUID je tu spolahliva — `model_switched` sa pri ULOZENI nespusta,
+        # takze iny guid v tejto ceste znamena naozaj iny dokument. A ked sa
+        # dokument zmenil, ide prec CELA cache: zaznamy noveho dokumentu este
+        # neexistuju (naplni ich `attach_all` hned za tymto volanim).
         def forget_detached_models(model)
-          return unless model && @stable_transforms && !@stable_transforms.empty?
+          return unless model
           return unless sdi?
-          mid = model_key(model)
-          @stable_transforms.delete_if { |k, _| !(k.is_a?(Array) && k[0] == mid) }
+          gid = doc_guid(model)
+          prev = @active_doc_guid
+          @active_doc_guid = gid
+          return if prev.nil? || prev == gid
+          @stable_transforms = {}
         rescue StandardError => e
           Engine.log_error(e, 'ScaleWatch.forget_detached_models')
         end

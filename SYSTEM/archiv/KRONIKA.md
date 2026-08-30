@@ -36,6 +36,12 @@
   dokument procesu. Zo zvyšných nálezov: identita dokumentu v trvalej cache je odteraz **`guid`, nie `object_id`** (`object_id` zatvoreného dokumentu sa po GC recykluje a nový
   dokument s rovnakým `entityID` by dostal cudzí transform — pri krátkodobých frontách to neplatí, tam hodnota model drží pri živote), upratovanie je **jeden** prechod
   definíciami namiesto dvoch a je izolované rescue.
+  **A práve to `guid` kľúčovanie zachytilo GH review ako P1 — dobrá lekcia o tom, že jeden audítor nestačí:** SketchUp mení `Model#guid` **pri každom uložení** dokumentu.
+  Repo o tom vie už od ST-1a (`tests/pure/test_st1a_studio.rb` — presne preto je kľúčom názvu zákazky CESTA, nie guid), len to tento návrh nespojil. Na guid kľúči by Ctrl+S
+  naraz zneplatnil všetky zapamätané polohy: hneď nasledujúci odmietnutý scale by sa vracal len cez `clean_transform` a upratovanie by staré záznamy už ani nenašlo (leak,
+  ktorý mala dávka odstrániť). **Kľúčom preto ostáva `object_id`** (stabilné počas behu) a `guid` sa používa VÝHRADNE ako **detektor zmeny dokumentu** v `forget_detached_models`
+  — tá cesta pri ukladaní nebeží, takže iný guid tam znamená naozaj iný dokument. Vedľajší efekt: keď sa dokument zmenil, ide preč **celá** cache, čím je ošetrená aj tá
+  recyklácia `object_id`, kvôli ktorej audit guid navrhoval.
   **Testy:** 8 headless scenárov v `tests/pure/test_r01_observer_multimodel.rb` (6 mutácií overených, každá zhodí práve svoj test) — a pozor na pascu, ktorú stálo jedno kolo:
   **globálny stub `Sketchup`/`UI` v headless sade je zakázaný** — `defined?(UI) && UI.respond_to?(:start_timer)` prepne demos klienta do asynchrónnej vetvy a padne 43 cudzích
   testov; stuby preto žijú priamo v `Noxun::Engine::ScaleWatch`, kde ich Ruby nájde lexikálne skôr než globálne. In-SU `CH6` je **otočený**: charakterizoval, že záznam prežije

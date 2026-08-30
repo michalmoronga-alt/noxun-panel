@@ -32,7 +32,7 @@ dokumentoch sa zlejú; `onEraseEntity` nesie `nil` model (entita je pri erase u�
 nesprávneho dokumentu. Windows vetva nedotknutá. [E:R-01 + F-01 potvrdené dôkazmi + Codex #250]
 **Návrh:** kľúč `[model.object_id, entityID]` (vzor `transform_key` UŽ v súbore) + prune ako množina modelov;
 spracovanie po modeloch; 2 model-stub testy + macOS smoke. Spolu s R-04. **Odhad: M.**
-**✅ dávkou 1d/R-01+R-04 (PR #260, v0.8.17)** — `@dirty`/`@added` kľúčuje `event_key` = `[model.object_id, entityID]`;
+**✅ dávkou 1d/R-01+R-04 (PR #261, v0.8.17)** — `@dirty`/`@added` kľúčuje `event_key` = `[model.object_id, entityID]`;
 `@need_prune` + `@erase_model` nahradila **množina `@prune_models`** a ciele počíta `prune_targets`, každý s vlastným
 `begin/rescue`. Codex audit návrhu vrátil **3 BLOCKERY** — všetky zapracované: (1) pôvodný nápad získať dokument
 v `onEraseEntity` cez `Sketchup.active_model` je **zamietnutý** (erase chodí aj z undo/zatvárania, kde je aktívny už iný
@@ -57,11 +57,13 @@ bezpečne držať pred klikom (žiadny čistý pripravený objekt) ani ako polo�
 ### R-04 · P3 · core · `core/scale_observer.rb:500-513`
 `@stable_transforms` bez delete cesty — rastie cez erase aj zánik dokumentov (in-SU test rast charakterizuje).
 [E:R-13 + F-04 + C1] **Návrh:** prune pri erase/model detach; otočiť charakterizačný test. Spolu s R-01. **S.**
-**✅ dávkou 1d/R-01+R-04 (PR #260, v0.8.17)** — dve cesty: `forget_dead_transforms` na erase tiku (jeden prechod
+**✅ dávkou 1d/R-01+R-04 (PR #261, v0.8.17)** — dve cesty: `forget_dead_transforms` na erase tiku (jeden prechod
 definíciami; nič nerobí, keď cache pre ten dokument kľúč nemá) a `forget_detached_models` pri zmene dokumentu
-**len na Windows/SDI**. Identita dokumentu v cache je odteraz **`guid`, nie `object_id`** (Codex audit: `object_id`
-zatvoreného dokumentu sa po GC recykluje a nový dokument s rovnakým `entityID` by dostal cudzí transform).
-`CH6` je otočený na čistenie **a doplnený o Späť** — po vrátení zmazania musí byť záznam naspäť.
+**len na Windows/SDI**. Kľúčom ostáva `object_id`: Codex audit navrhoval `guid` (kvôli recyklácii `object_id` po GC),
+ale **GH review #261 to zachytilo ako P1** — SketchUp mení `Model#guid` pri KAŽDOM uložení (rovnaký dôvod, prečo je
+kľúčom názvu zákazky cesta), takže by Ctrl+S naraz zneplatnil všetky zapamätané polohy. `guid` sa preto používa len
+ako **detektor zmeny dokumentu** v `forget_detached_models` (tá cesta pri ukladaní nebeží) — a tým je ošetrená aj
+recyklácia `object_id`. `CH6` je otočený na čistenie **a doplnený o Späť** — po vrátení zmazania musí byť záznam naspäť.
 
 *Poznámka pre GHOST zadanie: po R-01–R-03 ostávajú produktové rozhodnutia z konceptu 09A (Tab vs. Alt/Option,
 počiatočný Z režim, Orbit suspend/resume, onCancel, getExtents) — idú do task package 1e, nie do registra.*

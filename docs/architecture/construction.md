@@ -269,10 +269,13 @@ Súbor, v ktorom žijú triedy prekrytí (`Sketchup::Overlay`) — celý je pod 
 
 **Stabilná transformácia** (`@stable_transforms`, z nej `reject_scale` obnovuje polohu) sa aktualizuje po každej úspešnej absorpcii, presune **aj po úspešnom commite orientačnej
 zmeny** (`Panel.handle_set_board_orientation` volá `remember_transform`) — bez toho by najbližší odmietnutý scale vrátil dosku do polohy PRED otočením, kým config už nesie novú
-orientáciu. Kľúč je `[model_key, entityID]`, kde `model_key` je **`guid` dokumentu, zámerne nie `object_id`** (R-04): hodnotou je len pole čísel, takže zatvorený dokument nič
-nedrží pri živote a jeho `object_id` sa po GC môže recyklovať — nový dokument s rovnakým `entityID` by dostal cudzí transform. Cache má **dve čistiace cesty** (R-04, v0.8.17):
-`forget_dead_transforms` na **erase tiku** (jeden prechod definíciami daného dokumentu; kľúče entít, ktoré už nežijú, padnú — a keď cache pre ten dokument nemá kľúč, model sa
-vôbec nečíta) a `forget_detached_models` pri **zmene dokumentu**, ktorá beží **výhradne na Windows/SDI** (`Sketchup.platform`): tam File>New/Open nahradí jediný dokument procesu.
+orientáciu. Kľúč je `[model.object_id, entityID]` — **`guid` sa ako kľúč použiť NEDÁ** (review #261, P1): SketchUp ho mení **pri každom uložení** dokumentu (rovnaký dôvod, prečo
+kľúčom názvu zákazky je CESTA — `tests/pure/test_st1a_studio.rb`), takže by Ctrl+S naraz zneplatnil všetky zapamätané polohy a upratovanie by staré záznamy už ani nenašlo.
+Cache má **dve čistiace cesty** (R-04, v0.8.17): `forget_dead_transforms` na **erase tiku** (jeden prechod definíciami daného dokumentu; kľúče entít, ktoré už nežijú, padnú — a
+keď cache pre ten dokument nemá kľúč, model sa vôbec nečíta) a `forget_detached_models` pri **zmene dokumentu**, ktorá beží **výhradne na Windows/SDI** (`Sketchup.platform`):
+tam File>New/Open nahradí jediný dokument procesu, takže ide preč **celá** cache (záznamy nového dokumentu ešte neexistujú — naplní ich `attach_all` hneď za tým). Rozhoduje sa
+podľa **`guid` ako detektora zmeny** (nie ako kľúča): `model_switched` sa pri ukladaní nespúšťa, takže iný guid v tejto ceste znamená naozaj iný dokument — a súčasne to
+zneškodňuje prípad, keď by sa `object_id` zatvoreného dokumentu recykloval na nový.
 Na macOS sa cache dokumentu v pozadí **nečistí zámerne** — ten dokument žije ďalej a môže mať rozbehnutý debounce, takže zmazanie záznamu by odmietnutému scale vzalo presnú
 polohu (`clean_transform` pri scale okolo pivotu vráti posunutý origin).
 

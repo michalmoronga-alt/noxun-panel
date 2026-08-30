@@ -134,6 +134,7 @@ module NxR01Fix
     end
     sw.instance_variable_set(:@last_model, nil)
     sw.instance_variable_set(:@rebuilding, false)
+    sw.instance_variable_set(:@active_doc_guid, nil)
     SW::Sketchup.nx_platform = :platform_win unless NxTest::IN_SKETCHUP
     SW::Sketchup.nx_active_model = nil unless NxTest::IN_SKETCHUP
   end
@@ -236,12 +237,12 @@ NxTest.test('R-04: erase tick pusti z cache zaznamy zmazanych entit, cudzi dokum
   live.model = mdl
   mid = f.sw.model_key(mdl)
   f.sw.instance_variable_set(:@stable_transforms,
-                             { [mid, 3] => [1], [mid, 99] => [2], ['guid-cudzi', 3] => [3] })
+                             { [mid, 3] => [1], [mid, 99] => [2], [12_345, 3] => [3] })
   f.sw.forget_dead_transforms(mdl)
   keys = f.ivar(:@stable_transforms).keys
   NxTest.assert(keys.include?([mid, 3]), 'ziva skrinka si zaznam musi udrzat')
   NxTest.refute(keys.include?([mid, 99]), 'zaznam zmazanej entity musi zmiznut')
-  NxTest.assert(keys.include?(['guid-cudzi', 3]), 'cudzi dokument sa erase tikom NEupratuje')
+  NxTest.assert(keys.include?([12_345, 3]), 'cudzi dokument sa erase tikom NEupratuje')
   f.reset!
 end
 
@@ -251,7 +252,7 @@ NxTest.test('R-04: upratovanie je bezpecne — prazdna cache, cudzie kluce a roz
   f.reset!
   # (a) ked cache pre tento dokument nema ziadny kluc, model sa vobec nechodi citat
   broken = f::BrokenModel.new([], 'guid-broken')
-  f.sw.instance_variable_set(:@stable_transforms, { ['guid-iny', 1] => [1] })
+  f.sw.instance_variable_set(:@stable_transforms, { [12_345, 1] => [1] })
   f.sw.forget_dead_transforms(broken)
   NxTest.assert_equal(1, f.ivar(:@stable_transforms).length)
   # (b) ked kluce ma, ale citanie dokumentu PADNE, vynimka sa nesmie dostat von
@@ -262,41 +263,51 @@ NxTest.test('R-04: upratovanie je bezpecne — prazdna cache, cudzie kluce a roz
   f.reset!
 end
 
-NxTest.test('R-04: zanik dokumentu cisti cache LEN na Windows (SDI) — macOS vetva sa jej nedotkne') do
+NxTest.test('R-04: INY dokument cisti cache LEN na Windows (SDI) — macOS vetva sa jej nedotkne') do
   f = NxR01Fix
   f.headless_only
   f.reset!
-  mdl = f.model
-  mid = f.sw.model_key(mdl)
-  fresh = { [mid, 1] => [1], ['guid-stary', 1] => [2], ['guid-stary', 5] => [3] }
+  mdl = f.model([], 'guid-A')
+  novy = f.model([], 'guid-B') # File > New: na Windows nahradil jediny dokument procesu
+  fresh = { [mdl.object_id, 1] => [1], [12_345, 1] => [2], [12_345, 5] => [3] }
   f.sw.instance_variable_set(:@stable_transforms, fresh.dup)
-  f.sw.forget_detached_models(mdl)
-  NxTest.assert_equal([[mid, 1]], f.ivar(:@stable_transforms).keys,
-                      'Windows: predosly dokument uz neexistuje, jeho zaznamy padaju')
+  f.sw.forget_detached_models(mdl) # prve volanie len zapamata dokument
+  NxTest.assert_equal(3, f.ivar(:@stable_transforms).length, 'prve prepnutie nemá co porovnat')
+  f.sw.forget_detached_models(mdl) # ten isty dokument — nic sa nedeje
+  NxTest.assert_equal(3, f.ivar(:@stable_transforms).length, 'ten isty dokument cache nemaze')
+  f.sw.forget_detached_models(novy) # iny guid = iny dokument
+  NxTest.assert_equal(0, f.ivar(:@stable_transforms).length,
+                      'Windows: predosly dokument uz neexistuje, cela cache ide prec')
   # macOS: dokument v pozadi ZIJE (moze mat rozbehnuty debounce) — nemazat
   # (Codex audit BLOCKER 1: inak by odmietnuty scale prisiel o presnu polohu).
+  f.reset!
   f.sw.instance_variable_set(:@stable_transforms, fresh.dup)
   NxR01Fix::SW::Sketchup.nx_platform = :platform_osx
   f.sw.forget_detached_models(mdl)
+  f.sw.forget_detached_models(novy)
   NxTest.assert_equal(3, f.ivar(:@stable_transforms).length, 'macOS: cache ostava nedotknuta')
   f.reset!
 end
 
-NxTest.test('R-04: identita dokumentu v trvalej cache je GUID, nie object_id (Codex audit FIX 6)') do
+NxTest.test('R-04: kluc cache NESMIE stat na `guid` — ten sa meni pri kazdom ULOZENI (review #261 P1)') do
   f = NxR01Fix
   f.headless_only
   f.reset!
-  a = f.model([], 'guid-A')
-  same_doc_again = f.model([], 'guid-A') # ten isty dokument, iny Ruby objekt
-  other = f.model([], 'guid-B')
-  NxTest.assert_equal(f.sw.model_key(a), f.sw.model_key(same_doc_again))
-  NxTest.refute(f.sw.model_key(a) == f.sw.model_key(other))
-  NxTest.assert_equal('guid-A', f.sw.model_key(a))
-  # transform_key stavia na tom istom kluci
-  inst = f::FakeInst.new(42, a)
-  NxTest.assert_equal(['guid-A', 42], f.sw.transform_key(inst))
-  # dokument bez guid (nemal by nastat) nesmie zhodit kluc na nil
-  NxTest.assert(f.sw.model_key(NxTest::FakeModel.new([])).to_s.start_with?('oid:'))
+  mdl = f.model([], 'guid-PRED-ULOZENIM')
+  inst = f::FakeInst.new(42, mdl)
+  key_before = f.sw.transform_key(inst)
+  NxTest.assert_equal([mdl.object_id, 42], key_before)
+  # Ctrl+S: SketchUp zmeni `Model#guid` (zdokumentovane v test_st1a_studio.rb),
+  # ale je to TEN ISTY dokument aj ta ista entita — kluc sa meniť NESMIE,
+  # inak by zapamatane polohy po ulozeni zmizli a upratovanie ich uz nenajde.
+  mdl.instance_variable_set(:@guid, 'guid-PO-ULOZENI')
+  NxTest.assert_equal(key_before, f.sw.transform_key(inst),
+                      'ulozenie dokumentu nesmie zneplatnit zapamatane polohy')
+  # ...a upratovanie na ten kluc stale dosiahne
+  f.sw.instance_variable_set(:@stable_transforms, { key_before => [1] })
+  f.sw.forget_dead_transforms(mdl)
+  NxTest.assert_equal(0, f.ivar(:@stable_transforms).length,
+                      'po zmene guid sa zaznam mrtvej entity musi dat stale zmazat')
   NxTest.assert(f.sw.model_key(nil).nil?)
   f.reset!
 end
