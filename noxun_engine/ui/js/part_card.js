@@ -361,10 +361,14 @@
     // dedenie) NErataj: JS zdedeny material nevie, necha skupiny a pocka na payload.
     if (v) regroupPartEdges(v);
     // D-41: cabinet_id = identity guard (Ruby zahodi echo po prekliknuti na iny korpus)
+    // R-02 (review #264 P1-2): identita DOKUMENTU sa berie z KARTY (`partCard.model_guid`,
+    // vzor `onPartGrain`) — je to dokument, ktorý má používateľ na obrazovke, nie
+    // ten, ktorý je aktívny v okamihu odoslania.
     if (window.sketchup && sketchup.set_part_material)
-      sketchup.set_part_material(JSON.stringify({ role_key: partCard.role_key, material_id: v,
+      sketchup.set_part_material(nxDocPayload({ role_key: partCard.role_key, material_id: v,
         cabinet_id: partCard.cabinet_id, create_missing_abs: !!createAbs,
-        catalog_schema: (typeof PANEL_CLIENT_SCHEMA !== 'undefined' ? PANEL_CLIENT_SCHEMA : 1) }));
+        catalog_schema: (typeof PANEL_CLIENT_SCHEMA !== 'undefined' ? PANEL_CLIENT_SCHEMA : 1) },
+        partCard.model_guid || ''));
   }
   // F3/N7: prekresli options KAZDEHO ABS selectu dielca podla materialu (2A-3b:
   // parameter je material_id), zachova hodnotu (aj mimo katalogu — F5).
@@ -397,8 +401,10 @@
   }
   function onEdgeChange(code, value){
     if (!partCard) return;
-    if (window.sketchup && sketchup.set_part_edge)
-      sketchup.set_part_edge(JSON.stringify({ role_key: partCard.role_key, edge: code, abs_id: value, cabinet_id: partCard.cabinet_id }));
+    if (window.sketchup && sketchup.set_part_edge) // R-02: + identita dokumentu z karty
+      sketchup.set_part_edge(nxDocPayload({ role_key: partCard.role_key, edge: code, abs_id: value,
+                                            cabinet_id: partCard.cabinet_id },
+                                          partCard.model_guid || ''));
   }
   // D-35: olep vsetky 4 hrany ABS 1.0 dekoru materialu dielca — JEDEN callback,
   // Ruby spravi JEDEN rebuild (1 undo). Identity guard: payload nesie cabinet_id
@@ -417,10 +423,11 @@
   }
   function sendEdgesAll(createAbs){
     if (!partCard) return;
-    if (window.sketchup && sketchup.set_part_edges_all)
-      sketchup.set_part_edges_all(JSON.stringify({ cabinet_id: partCard.cabinet_id, role_key: partCard.role_key,
+    if (window.sketchup && sketchup.set_part_edges_all) // R-02: + identita dokumentu z karty
+      sketchup.set_part_edges_all(nxDocPayload({ cabinet_id: partCard.cabinet_id, role_key: partCard.role_key,
         create_missing_abs: !!createAbs,
-        catalog_schema: (typeof PANEL_CLIENT_SCHEMA !== 'undefined' ? PANEL_CLIENT_SCHEMA : 1) }));
+        catalog_schema: (typeof PANEL_CLIENT_SCHEMA !== 'undefined' ? PANEL_CLIENT_SCHEMA : 1) },
+        partCard.model_guid || ''));
   }
   // ===== D-89 (a): HOVER HRANY -> ZVYRAZNENIE V MODELI =======================
   // Kurzor nad hranou (riadok zoznamu ALEBO farebny pas v 2D nahlade) rozsvieti
