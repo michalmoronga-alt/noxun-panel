@@ -123,7 +123,7 @@
   **Vedomý posun oproti stavu pred ghostom:** guardy STAVBY (`Fronts.validate_layout!`, interior validácie) bežia až v commite, takže konflikt „zámok × šablóna" (F8) sa ohlási
   pri **kliku**, nie pri stlačení „Vložiť" — hláška je tá istá vrátane výpisu aktívnych zámkov, v modeli sa nič nezmení a session končí (opakovaný klik by zlyhal rovnako).
   Vyplýva to z hranice R-03, ktorá `build_plan` do `prepare_insert` zámerne nepresúva. **Odložený `pop_tool` si drží KONKRÉTNU inštanciu nástroja**, nie `@active_tool` — inak
-  by timer založený starou session zhodil nástroj, ktorý medzitým pushlo druhé „Vložiť" (nájdené pri návrhu, nie testom). **Dôkazy:** **33 headless testov** novej sady
+  by timer založený starou session zhodil nástroj, ktorý medzitým pushlo druhé „Vložiť" (nájdené pri návrhu, nie testom). **Dôkazy:** **35 headless testov** novej sady
   `test_ghost_vkladanie.rb` (matika + automat + tool stack + zdrojové invarianty švu) a **in-SU sekcie `run_ghost` (17 scenárov) + `run_ghost_async`**; nástroj sa v nich simuluje
   **programovo, ale verne** — cez reálne `onMouseMove`/`onLButtonDown`/`onKeyDown`/`onCancel` nad živým `view`, kde cieľový bod ide cez `view.screen_coords` do `pickray`.
   Scenáre preto oddeľujú **presnosť myši** (pixelová tolerancia) od **presnosti transformu** (0,1 mm proti bodu, ktorý si ghost z lúča naozaj vzal).
@@ -147,7 +147,14 @@
   scenár kovania ide na **reálnom sete z knižnice mimo default mapovania** (`zaves-p2o`) a overuje zmrazenú definíciu v projektovom snapshote, mapovanie na skrinke aj obsah
   hlášky, pričom výnimková sonda **najprv zapíše** modelový atribút a až potom padne (dôkaz rollbacku vykonanej zmeny) · cross-doc scenár ide **reálnym `PanelAppObserver#onOpenModel`**
   nad TÝM ISTÝM `Model` objektom · systémové doručenie **Alt** sa programovo overiť nedá — je to priznaná hranica testu a overuje ho **smoke bod 2b** (fallback TAB).
-  Plný in-SU beh po opravách **1173 PASS / 0 FAIL**, headless **2145**, JS 73 sád.
+  **Finálne kolo (1×P2) našlo rohový prípad tejto opravy:** druhé „Vložiť" počas **suspendovaného** ghostu. Starý nástroj sa popnúť nedá (nie je navrchu), session mu zanikne
+  a `@active_tool` medzitým prepíše NOVÝ ghost — pôvodné riešenie delegovalo dokončenie na **globálne** `end_tool`, ktoré starú inštanciu už nepoznalo, takže by ostala visieť
+  ako vrch stacku bez session, kým používateľ ručne neprepne nástroj. Odložené ukončenie je preto **viazané na inštanciu**: `resume` s `finish_pending` popne **seba**
+  (`GhostTool.pop_tool(self)` — v tej chvíli je navrchu, `resume` to garantuje), a keby vrch medzitým znova stratil, `pop_tool` si `finish_pending` nastaví späť a dokoná sa
+  pri ďalšom `resume`. Nový ghost sa tým nedotkne ani registrácie, ani stacku. Rovnakou logikou je nástroj **viazaný na svoju session** (`live_session`) — nástroj bez vlastnej
+  živej session nekreslí, nevlastní klávesy a klik ignoruje, takže starý ghost nikdy neobsluhuje session nového (koniec „mŕtvej kresby"). Dôkaz: headless mutácia (návrat na
+  globálne `end_tool` test **zhodí**) + in-SU async reťaz `GHOST suspend` s reálnym cudzím nástrojom na stacku — po jeho skončení sa starý ghost odstráni **sám** a aktívnym
+  nástrojom je zase `SelectionTool`. Plný in-SU beh po opravách **1183 PASS / 0 FAIL**, headless **2147**, JS 73 sád.
   **Blok GHOST sa touto dávkou NEUZATVÁRA** — uzáver (minor 0.9.0, presun bloku do archívu) príde samostatným malým PR po Michalovom smoke.
 - **1d/R-03 · ŠEV `prepare_insert` / `commit_insert` V BUILDERI (v0.8.20, 30.8.2026, PR #265):** `CabinetBuilder.build` zlievalo normalizáciu, pridelenie ID, výpočet polohy,
   otvorenie operácie a stavbu geometrie do jedného toku. GHOST Tool (vkladanie na klik) tak nemal **čo bezpečne držať pred klikom** — žiadny pripravený objekt, ktorý sa dá

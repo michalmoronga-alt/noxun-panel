@@ -121,6 +121,12 @@ nástroj) pushol nástroj **nad** nás, slepý pop by zhodil **jeho** a ghost by
 najbližšom `resume`, teda presne keď sa vrch stacku vráti k nám. `active_tool_id` sa na rozhodovanie **nepoužíva** (nemapuje sa spoľahlivo na inštanciu). `detach!`/`attached?`
 robia pop navyše idempotentným.
 
+**Odložené ukončenie je viazané na INŠTANCIU, nie na globálny stav.** `resume` s `finish_pending` popne **seba** (`GhostTool.pop_tool(self)`, odložene timerom), nie „aktívny
+nástroj": pri druhom „Vložiť" počas **suspendovaného** ghostu (cudzí nástroj nad ním) sa starý nástroj popnúť nedá, session mu zanikne a `@active_tool` medzitým prepíše NOVÝ
+ghost — globálne `end_tool` by starú inštanciu už nepoznalo a tá by ostala visieť ako vrch stacku bez session, kým používateľ ručne neprepne nástroj. Z rovnakého dôvodu je
+nástroj **viazaný na svoju session** (`live_session` porovnáva identitu objektu): nástroj bez vlastnej živej session **nekreslí, nevlastní klávesy a klik ignoruje** — starý
+ghost tak nikdy neobsluhuje ani nekreslí session, ktorá patrí novému. Globálna session sa číta na **jedinom mieste** — v `activate`, kde sa na ňu nástroj viaže.
+
 **Klávesy:** ←/→ rotácia ∓90° (na PRVÝ down; `repeat > 1` vracia true bez zmeny), ↓ zámok, ↑ voľná výška, **Alt (`VK_MENU`/`VK_ALT`) cykluje kotvy** — zachytáva sa down AJ up
 a vracia true (minimalizuje aktiváciu menu-baru Windows). Klávesu vlastníme len so **živou** session; ostatné vracajú `false`. **Hranica testovania:** headless ani in-SU sada
 nedokáže overiť, či Windows Alt do Toolu naozaj **doručí** a či sa pritom neaktivuje menu lišta — testy overujú len správanie handlera. Systémové doručenie Alt patrí

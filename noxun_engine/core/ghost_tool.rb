@@ -641,6 +641,7 @@ module Noxun
           @on_top = false
           @finish_pending = false
           @model_ref = nil
+          @session = nil # SVOJA session (priradi ju `activate`)
         end
 
         def attached?
@@ -680,7 +681,12 @@ module Noxun
         # v momente aktivacie uz len domnienka (P3-8).
         def activate
           guarded('activate') do
+            # JEDINE miesto, kde sa cita GLOBALNA session — nastroj sa tu na nu
+            # VIAZE. Vsade inde uz cita `live_session` (SVOJU), takze stary
+            # (suspendovany) ghost nikdy nekresli ani neobsluhuje session,
+            # ktora patri NOVEMU ghostu.
             s = GhostTool.session
+            @session = s
             @model_ref = (s && s.model) || Sketchup.active_model
             @attached = true
             @on_top = true
@@ -727,14 +733,20 @@ module Noxun
         end
 
         # Vrch stacku sa vratil k nam. Ak sme medzitym mali skoncit (session
-        # zanikla, kym nad nami visel iny nastroj), dokoncime to TERAZ —
-        # odlozene timerom, aby sa `pop_tool` nevolal z Tool callbacku.
+        # zanikla, kym nad nami visel iny nastroj), dokoncime to TERAZ.
+        # POPNEME SEBA, nie „aktivny nastroj" (review #268 kolo 3, P2):
+        # po druhom „Vlozit" pocas SUSPENDOVANEHO ghostu je globalnym
+        # nastrojom uz NOVY ghost, takze globalne `end_tool` by tento (stary)
+        # nikdy neodstranilo a ostal by visiet ako vrch stacku bez session.
+        # `GhostTool.pop_tool(self)` je viazany na INSTANCIU: overi, ze sme
+        # naozaj navrchu (co `resume` prave garantuje), odoberie PRESNE nas
+        # a registraciu noveho ghostu sa ani nedotkne.
         def resume(view)
           guarded('resume') do
             @on_top = true
             if @finish_pending
               @finish_pending = false
-              GhostTool.end_tool(deferred: true)
+              finish_self_soon
             else
               refresh_status
             end
@@ -742,11 +754,21 @@ module Noxun
           end
         end
 
+        # Odlozeny pop SEBA SAMEHO — `pop_tool` sa nesmie volat priamo z Tool
+        # callbacku. Ked medzitym vrch stacku znova stratime, `pop_tool` si
+        # `finish_pending` nastavi spat a dokonci sa pri dalsom `resume`.
+        def finish_self_soon
+          UI.start_timer(0, false) { GhostTool.pop_tool(self) }
+        rescue StandardError => e
+          Engine.log_error(e, 'GhostTool.Tool#finish_self_soon')
+          nil
+        end
+
         # --- mys ------------------------------------------------------------
 
         def onMouseMove(_flags, x, y, view)
           guarded('onMouseMove') do
-            s = GhostTool.session
+            s = live_session
             next unless s && s.active?
 
             if s.z_mode == :locked
@@ -761,7 +783,7 @@ module Noxun
 
         def onLButtonDown(_flags, x, y, view)
           guarded('onLButtonDown') do
-            s = GhostTool.session
+            s = live_session
             next unless s && s.active?
 
             # Poloha sa este raz precita z aktualnej pozicie kurzora — klik
@@ -794,7 +816,7 @@ module Noxun
         def onKeyDown(key, repeat, _flags, view)
           res = false
           guarded('onKeyDown') do
-            s = GhostTool.session
+            s = live_session
             next unless s && s.active?
 
             owned = owned_key(key)
@@ -825,7 +847,7 @@ module Noxun
         def onKeyUp(key, _repeat, _flags, _view)
           res = false
           guarded('onKeyUp') do
-            s = GhostTool.session
+            s = live_session
             res = !s.nil? && s.active? && !owned_key(key).nil?
           end
           res
@@ -835,7 +857,7 @@ module Noxun
 
         def draw(view)
           guarded('draw') do
-            s = GhostTool.session
+            s = live_session
             next unless s && s.active? && s.last_point
 
             pts = GhostTool.world_corners(s)
@@ -861,7 +883,7 @@ module Noxun
         def getExtents # rubocop:disable Naming/MethodName — SketchUp API
           bb = Geom::BoundingBox.new
           begin
-            s = GhostTool.session
+            s = live_session
             GhostTool.world_corners(s).each { |p| bb.add(p) } if s && s.active? && s.last_point
           rescue StandardError => e
             Engine.log_error(e, 'GhostTool.getExtents')
@@ -872,6 +894,16 @@ module Noxun
         # --- interne --------------------------------------------------------
 
         private
+
+        # SVOJA a stale ZIVA session. Stary (suspendovany) ghost tak nikdy
+        # nekresli ani neobsluhuje session NOVEHO ghostu — nastroj bez svojej
+        # session je nemy: nekresli, nevlastni klavesy a klik ignoruje.
+        def live_session
+          s = GhostTool.session
+          return nil unless s && s.equal?(@session) && s.active?
+
+          s
+        end
 
         def draw_anchor(view, s, dim)
           a = GhostTool.world_anchor(s)
@@ -944,7 +976,7 @@ module Noxun
         end
 
         def refresh_status
-          Sketchup.status_text = GhostTool.status_text(GhostTool.session)
+          Sketchup.status_text = GhostTool.status_text(live_session)
         rescue StandardError
           nil
         end

@@ -1559,6 +1559,15 @@ module NoxunSuRunner
   # Bod (b) je ten podstatny — meria kanonicky transform, nie mieru mysi.
   GHOST_PIX_TOL = 30.0
 
+  # Cudzi nastroj na stacku — zastupuje iny extension, ktory si pocas ghostu
+  # pushne vlastny Tool (napr. z `onTransactionCommit`). SketchUp Tool je
+  # duck-typed, takze staci prazdna trieda.
+  class SuDummyTool
+    def activate; end
+
+    def deactivate(_view); end
+  end
+
   def ghost_tool
     e::GhostTool.active_tool
   end
@@ -2167,6 +2176,56 @@ module NoxunSuRunner
          !state[:gh_probe].nil? && char_stack_probe(model).nil?)
       ghost_teardown!(model)
       cleanup(model)
+    end]
+
+    # --- SUSPENDOVANY STARY GHOST + druhe „Vlozit" (review #268 kolo 3, P2) --
+    # Cudzi nastroj pushnuty NAD beziaci ghost sposobi, ze stary ghost NIE JE
+    # vrch stacku. Druhe „Vlozit" ho zrusi, ale popnut sa neda — ukoncenie sa
+    # odlozi. Musi sa dokoncit SAM pri najblizsom `resume` (ked cudzi nastroj
+    # skonci) a nesmie sa pritom dotknut NOVEHO ghostu. Retaz je ASYNC, lebo
+    # pop ide cez `UI.start_timer`.
+    steps << [0.5, lambda do
+      cleanup(model)
+      ghost_teardown!(model)
+      e::Panel.handle_insert(pg(model, GHOST_PARAMS.dup))
+      state[:sus_t1] = ghost_tool
+      # cudzi nastroj NAD ghostom -> stary ghost dostane `suspend`
+      model.tools.push_tool(SuDummyTool.new)
+      ok('GHOST suspend: cudzi nastroj nad ghostom ho zhodil z vrchu stacku',
+         !state[:sus_t1].nil? && state[:sus_t1].attached? && !state[:sus_t1].on_top?)
+      # druhe „Vlozit" pocas SUSPENDOVANEHO ghostu
+      e::Panel.handle_insert(pg(model, GHOST_PARAMS.merge('width' => 700.0)))
+      state[:sus_t2] = ghost_tool
+      ok('GHOST suspend: stary ghost sa NEPOPOL (nie je navrchu), ukoncenie ma ODLOZENE',
+         state[:sus_t1].attached? && state[:sus_t1].finish_pending?)
+      ok('GHOST suspend: novy ghost bezi a je to INA instancia',
+         !state[:sus_t2].nil? && !state[:sus_t2].equal?(state[:sus_t1]) &&
+         !ghost_session.nil? && ghost_session.active?)
+      ghost_camera!(model, [1500.0, 350.0], 0.0)
+      ghost_click!(model, [1500.0, 350.0, 0.0])
+    end]
+    steps << [SETTLE, lambda do
+      ok('GHOST suspend: klik NOVEHO ghostu polozil skrinku (sirka 700)',
+         cabinets(model).length == 1 &&
+         ((e::Store.config(cabinets(model).first) || {})['width'].to_f - 700.0).abs < 0.01)
+      ok('GHOST suspend: novy ghost po commite skoncil (odlozeny pop uz prebehol)',
+         !state[:sus_t2].attached?)
+      ok('GHOST suspend: stary ghost ZATIAL zije — pod nim je cudzi nastroj',
+         state[:sus_t1].attached? && !state[:sus_t1].on_top?)
+      # cudzi nastroj skonci -> stary ghost dostane `resume`
+      model.tools.pop_tool
+    end]
+    steps << [SETTLE, lambda do
+      ok('GHOST suspend: stary ghost sa pri resume odstranil SAM (ziadny mrtvy nastroj na stacku)',
+         !state[:sus_t1].attached? && !state[:sus_t1].finish_pending?)
+      ok('GHOST suspend: ziadna session ani registrovany ghost nastroj neostali',
+         ghost_session.nil? && ghost_tool.nil?)
+      ok('GHOST suspend: mrtvy ghost nic nekresli (prazdna obalka)',
+         !state[:sus_t1].getExtents.valid?)
+      info("GHOST suspend: aktivny nastroj po upratani = #{model.tools.active_tool_name}")
+      ok('GHOST suspend: skrinka z noveho ghostu ostala nedotknuta', cabinets(model).length == 1)
+      cleanup(model)
+      ghost_teardown!(model)
     end]
   end
 

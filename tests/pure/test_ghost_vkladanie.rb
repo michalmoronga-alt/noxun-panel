@@ -81,6 +81,26 @@ module NxGhost
     t
   end
 
+  # Headless nema `UI` — pre testy odlozeneho popu ho na chvilu nahradime
+  # modulom, ktory timer vykona OKAMZITE (inak by sa `resume` cesta nedala
+  # dokazat spravanim, len grepom zdrojaku).
+  def with_immediate_timer
+    had = Object.const_defined?(:UI)
+    return yield if had
+
+    ui = Module.new do
+      def self.start_timer(_delay, _repeat = false)
+        yield
+      end
+    end
+    Object.const_set(:UI, ui)
+    begin
+      yield
+    ensure
+      Object.send(:remove_const, :UI)
+    end
+  end
+
   # Aplikuje 16-cislovu maticu na lokalny bod (stlpcove poradie SketchUpu).
   def apply(m, pt)
     x = pt[0].to_f
@@ -453,6 +473,59 @@ NxTest.test('ghost tool: pop NEODOBERIE cudzi nastroj, ked nie sme vrch stacku')
     # Idempotencia: druhy pop toho isteho nastroja uz nic neodoberie.
     NxTest.assert(gt.pop_tool(t) == false)
     NxTest.assert_equal(1, model.tools.pops)
+  ensure
+    gt.instance_variable_set(:@active_tool, prev)
+  end
+end
+
+NxTest.test('ghost tool: resume s odlozenym koncom popne SEBA a LEN seba (nie „aktivny nastroj")') do
+  gt = NxGhost.gt
+  model = NxGhost::FakeModel.new
+  # Presna situacia z review #268 kola 3: stary ghost je SUSPENDOVANY (cudzi
+  # nastroj nad nim), medzitym pride druhe „Vlozit" — nova session, NOVY
+  # nastroj sa stane `@active_tool`. Ked cudzi nastroj skonci, stary ghost
+  # dostane `resume` a MUSI sa odstranit SAM. Globalne `end_tool` by uz
+  # starú instanciu nepoznalo a stary ghost by ostal vrchom stacku bez session.
+  old_tool = NxGhost.fake_tool(model, attached: true, on_top: false)
+  new_tool = NxGhost.fake_tool(NxGhost::FakeModel.new, attached: true, on_top: true)
+  prev = gt.instance_variable_get(:@active_tool)
+  begin
+    gt.instance_variable_set(:@active_tool, old_tool)
+    NxTest.assert(gt.pop_tool(old_tool) == false, 'suspendovany nastroj sa popnut nesmie')
+    NxTest.assert(old_tool.finish_pending?)
+    # druhe „Vlozit": novy nastroj prepise globalnu registraciu
+    gt.instance_variable_set(:@active_tool, new_tool)
+    NxGhost.with_immediate_timer { old_tool.resume(nil) }
+    NxTest.assert(!old_tool.attached?, 'stary ghost sa pri resume MUSI odstranit sam')
+    NxTest.assert_equal(1, model.tools.pops, 'stary ghost popol PRESNE raz')
+    NxTest.assert(!old_tool.finish_pending?)
+    NxTest.assert(gt.instance_variable_get(:@active_tool).equal?(new_tool),
+                  'novy ghost sa tym NESMIE dotknut (ani registracia, ani stack)')
+    NxTest.assert_equal(0, new_tool.model_ref.tools.pops, 'novy ghost sa nesmie popnut')
+    NxTest.assert(new_tool.attached? && new_tool.on_top?)
+  ensure
+    gt.instance_variable_set(:@active_tool, prev)
+  end
+end
+
+NxTest.test('ghost tool: resume nepopne, kym sme medzitym znova stratili vrch (odlozi to znova)') do
+  gt = NxGhost.gt
+  model = NxGhost::FakeModel.new
+  t = NxGhost.fake_tool(model, attached: true, on_top: false)
+  prev = gt.instance_variable_get(:@active_tool)
+  begin
+    gt.instance_variable_set(:@active_tool, t)
+    t.request_finish!
+    # `resume` nas da navrch, ale kym „timer" bezi, znova nas zhodi `suspend`.
+    NxGhost.with_immediate_timer do
+      t.instance_variable_set(:@on_top, true)
+      t.instance_variable_set(:@finish_pending, false)
+      t.suspend(nil) # cudzi nastroj sa vratil nad nas EST PRED popom
+      t.finish_self_soon
+    end
+    NxTest.assert_equal(0, model.tools.pops, 'nesmieme popnut cudzi nastroj')
+    NxTest.assert(t.attached?)
+    NxTest.assert(t.finish_pending?, 'ukoncenie sa ma ODLOZIT znova, nie stratit')
   ensure
     gt.instance_variable_set(:@active_tool, prev)
   end
