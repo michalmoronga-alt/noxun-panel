@@ -422,8 +422,11 @@ NX_DK_GUID_ALLOWED = {
   # klucom cache je `object_id`, nie guid. Vedome (R-04, review #261 P1).
   'noxun_engine/core/scale_observer.rb' => 1,
   # `same_model?` porovnava DVE SUCASNE drzane referencie v tom istom
-  # okamihu (`equal?` najprv, guid len ako zaloha pre novy Ruby obal toho
-  # isteho dokumentu) — ulozenie medzi dvoma citaniami sa tam stat nemoze.
+  # okamihu (`equal?` najprv; guid je len ZALOHA pre novy Ruby obal toho
+  # isteho dokumentu a od kola 3 review #267 plati LEN spolu so ZHODNOU
+  # cestou — samotny guid zdielaju dve sucasne otvorene KOPIE .skp, lebo je
+  # to obsah suboru). Ulozenie medzi dvoma citaniami sa tam stat nemoze
+  # a nejde o zapisovu cestu: overlay lifecycle, nie identita zapisu.
   'noxun_engine/core/edge_check.rb' => 2,
   'noxun_engine/core/grain_check.rb' => 2,
   'noxun_engine/core/hover_edge.rb' => 2
@@ -449,6 +452,55 @@ NxTest.test('DocKey: v celom plugine uz nie je NEPRIZNANY `model.guid`') do
   NX_DK_GUID_ALLOWED.each_key do |rel|
     NxTest.assert(found.key?(rel),
                   "#{rel} uz `.guid` necita — vyhod ho z NX_DK_GUID_ALLOWED (zoznam nesmie klamat)")
+  end
+end
+
+# --- `same_model?` v overlay guardoch (review #267 kolo 3, P3) ---------------
+#
+# Tieto tri moduly maju VLASTNY porovnavac (a vedomu vynimku v zozname vyssie),
+# lebo neriesia identitu ZAPISU, ale lifecycle prekrytia: porovnavaju dve
+# SUCASNE drzane referencie. Guid tam sam o sebe nestacil — je to obsah .skp
+# suboru, takze dve sucasne otvorene KOPIE tej istej zakazky ho maju ZHODNY
+# a dva rozne dokumenty by vysli ako jeden (prekrytie by sa neodpojilo).
+NX_DK_OVERLAY_GUARDS = [
+  Noxun::Engine::EdgeCheck,
+  Noxun::Engine::GrainCheck,
+  Noxun::Engine::HoverEdge
+].freeze
+
+NxTest.test('same_model?: ZHODNY guid + ROZNA cesta = RÔZNE dokumenty (dve otvorene kopie .skp)') do
+  NX_DK_OVERLAY_GUARDS.each do |mod|
+    original = DkFakeModel.new(path: 'C:/Zakazky/Klinika.skp', guid: 'ROVNAKY-GUID')
+    kopia = DkFakeModel.new(path: 'C:/Zakazky/Klinika - kopia.skp', guid: 'ROVNAKY-GUID')
+    NxTest.refute(mod.same_model?(original, kopia),
+                  "#{mod}: kopia .skp so zhodnym guidom NIE JE ten isty dokument")
+    NxTest.refute(mod.same_model?(kopia, original),
+                  "#{mod}: a plati to symetricky")
+  end
+end
+
+NxTest.test('same_model?: ZHODNY guid + ZHODNA cesta = ten isty dokument (novy Ruby obal)') do
+  NX_DK_OVERLAY_GUARDS.each do |mod|
+    stary = DkFakeModel.new(path: 'C:/Zakazky/Klinika.skp', guid: 'G-1')
+    novy_obal = DkFakeModel.new(path: 'C:/Zakazky/Klinika.skp', guid: 'G-1')
+    NxTest.assert(mod.same_model?(stary, novy_obal),
+                  "#{mod}: novy obal TOHO ISTEHO dokumentu sa musi rozpoznat (macOS)")
+    NxTest.assert(mod.same_model?(stary, stary), "#{mod}: `equal?` ma prednost")
+    NxTest.refute(mod.same_model?(stary, nil), "#{mod}: nil nie je dokument")
+  end
+end
+
+NxTest.test('same_model?: dva NEULOZENE dokumenty sa nezlucia cez prazdnu cestu') do
+  # Obe cesty su '' — rozlisit ich musi guid; zhodna prazdna cesta nesmie
+  # z porovnania spravit „to iste".
+  NX_DK_OVERLAY_GUARDS.each do |mod|
+    a = DkFakeModel.new(path: '', guid: 'G-A')
+    b = DkFakeModel.new(path: '', guid: 'G-B')
+    NxTest.refute(mod.same_model?(a, b), "#{mod}: dve Untitled zakazky nie su ten isty dokument")
+    prazdny = DkFakeModel.new(path: '', guid: '')
+    druhy_prazdny = DkFakeModel.new(path: '', guid: '')
+    NxTest.refute(mod.same_model?(prazdny, druhy_prazdny),
+                  "#{mod}: PRAZDNY guid nesmie nikdy znamenat zhodu (fail-closed)")
   end
 end
 

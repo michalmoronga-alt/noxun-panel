@@ -94,6 +94,11 @@
   odzbrojeným WeakRef hádže `RefError` v najkritickejšej ceste a GC by mohol záznam vziať POČAS života dokumentu. **Odpoveď z reálneho SketchUpu 2026 dáva in-SU
   sekcia DOCKEY**, ktorá `respond_to?(:valid?)` priamo skúša a výsledok vypisuje. **(P3-4/5/6)** STAV: vrátené plné znenia cudzích buletov (R-06a, F/D-27) — miesto
   sa škrtlo vo VLASTNOM texte a najstarší bulet (1b-7) sa zložil do už existujúceho zhrnutia „Staršie uzávery", riadky sú pod 400 znakmi a záznam KRONIKY je navrchu.
+  **Nočné kolo review (30./31.8.):** **P1 „Save As nerotuje identitu" ZAMIETNUTÝ** — Save As je pokračovanie TOHO ISTÉHO dokumentu (identický obsah, iná cesta), edit
+  naplánovaný pred ním sa MÁ zapísať do premenovaného súboru a rotácia by vrátila presne pôvodný bug R-02 (uprava sa pri uložení ticho zahodí); zdôvodnenie je odteraz
+  výslovne v hlavičke `doc_key.rb` aj v `model-a-identita.md`. **P3 prijatý: `same_model?` sprísnený** — záloha za `equal?` v `edge_check`/`grain_check`/`hover_edge` už
+  nestojí na samotnom guide (ten je obsah .skp súboru, takže dve súčasne otvorené **kópie** zákazky ho majú zhodný a overlay lifecycle by sa od prepnutého okna
+  neodpojil), ale vyžaduje **zhodný guid A zhodnú cestu**; behaviorálne pokryté nad všetkými tromi modulmi.
 
 - **1d/R-07 · KOMPATIBILITNÁ BRÁNA GLOBÁLNEJ KNIŽNICE SETOV KOVANIA (v0.8.21, 30.8.2026, PR #266):** knižnica setov žije v `%APPDATA%`, takže ju na jednom profile zdieľajú
   **všetky verzie pluginu**. Staršia verzia ju čítala **bez pohľadu na marker `std`**, neznámy tvar člena ticho zahodila (`normalize_members` je tolerantná — čítanie nesmie zhodiť

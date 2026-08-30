@@ -40,6 +40,15 @@
 #     do plneho payloadu, takze by sa po rotacii odmietala donekonecna.
 #     Kopia .skp suboru nebezpeci nie je: otvara sa cez `onOpenModel`.)
 #
+#     SAVE AS VYSLOVNE (namietka Codex kola 3, ZAMIETNUTA): Save As je
+#     POKRACOVANIE TOHO ISTEHO dokumentu — identicky obsah, len ina cesta.
+#     **Edit naplanovany PRED Save As sa aplikuje do premenovaneho suboru —
+#     a je to ZIADUCE, je to ten isty dokument.** Rotacia identity pri Save As
+#     by vratila presne povodny bug R-02: rozpisana uprava panela by sa pri
+#     ulozeni ticho zahodila ako „patri inemu dokumentu". Ziaden dokument
+#     sa pritom nevymiena — z povodneho suboru sa nestane druhe otvorene
+#     okno, takze niet komu identitu prekrizit.
+#
 # `invalidate` volaju OBA AppObservery pluginu — `Panel::PanelAppObserver`
 # (existuje len s otvorenym Inspectorom, ale rotuje PRED `on_model_switched`,
 # teda pred pushom do panela) aj `ScaleWatch::EngineAppObserver` (instaluje sa

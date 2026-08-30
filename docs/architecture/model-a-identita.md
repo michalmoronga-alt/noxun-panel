@@ -60,7 +60,10 @@ lekcia D-103) a token v súbore by prežil kópiu zákazky (dve kópie = jedna i
 otvorenie kópie je výmena dokumentu ako každá iná, takže nová identita vznikne **bez ohľadu na to, či SketchUp objekt recykloval a či kópia nesie ten istý `guid`** (nesie —
 guid je obsah súboru; práve na tom stroskotala epocha odvodená z modelu). (2) Identita sa neviaže na život objektu, ale na **dokument**: rotuje ju výhradne udalosť
 New/Open, `onActivateModel` nie a **uloženie, prvé uloženie ani Save As nie** (Codex audit R-02b, BLOCKER 3 — klient držiaci identitu do plného payloadu, sekcia Materiály, by sa
-po bezdôvodnej rotácii odmietal donekonečna; Save As je stále ten istý rozrobený dokument). (3) Registry drží SILNÚ referenciu + `equal?` (recyklácia `object_id` po GC) a **živý
+po bezdôvodnej rotácii odmietal donekonečna; Save As je stále ten istý rozrobený dokument). **Save As výslovne** (námietka Codex kola 3 na #267, zamietnutá): je to pokračovanie
+TOHO ISTÉHO dokumentu — identický obsah, iná cesta, žiadny observer. **Edit naplánovaný pred Save As sa aplikuje do premenovaného súboru — a je to žiaduce, je to ten istý
+dokument;** rotácia by vrátila presne pôvodný bug R-02 (rozpísaná úprava sa pri uložení ticho zahodí ako „patrí inému dokumentu"). Z pôvodného súboru sa navyše nestane druhé
+otvorené okno, takže niet komu identitu prekrížiť. (3) Registry drží SILNÚ referenciu + `equal?` (recyklácia `object_id` po GC) a **živý
 dokument sa NIKDY nevyhadzuje** (BLOCKER 2 — vytlačený živý by po návrate dostal nový token a klient by zahodil drafty); upratuje sa len `valid? == false` záznam. (4) Chyba/ne-model
 = `''` — **fail-closed obojsmerne**: odmieta sa aj prázdny kľúč SERVERA (BLOCKER 1, `'' == ''` by pustilo zápis bez identity). (5) Token je náhodný (unikátny naprieč sedeniami),
 lebo `ProductionCore#project_session_key` persistuje `guid:<hodnota>` do `vepo_settings.json` — deterministický čítač by po reštarte kolidoval.
@@ -72,7 +75,10 @@ pomenovaný `tolerate_blank_client:` (prázdny údaj z klienta = starší cachov
 výrazu. Plošný test stráži, že sa ručné porovnanie identity do pluginu nevráti. Producenti hodnoty: `Panel.model_guid`,
 `ProductionCore#model_guid`, `MaterialsDialog#model_guid`, `RulesDialog#model_guid`, okno katalógu kovania, `Materials.replace_uni_scan`. `core/scale_observer.rb` používa surový
 guid ďalej — je to detektor zmeny dokumentu v ceste, ktorá pri ukladaní nebeží (rozhodnutie R-04); to isté platí pre `same_model?` v `edge_check`/`grain_check`/`hover_edge`, ktoré
-porovnáva dve **súčasne držané** referencie v jednom okamihu (`equal?` má prednosť, guid je len záloha pre nový Ruby obal toho istého dokumentu).
+porovnáva dve **súčasne držané** referencie v jednom okamihu (`equal?` má prednosť, guid je len záloha pre nový Ruby obal toho istého dokumentu). **Od kola 3 review #267 záloha
+vyžaduje zhodný guid A zhodnú cestu:** guid je obsah .skp súboru, takže dve **súčasne otvorené kópie** tej istej zákazky ho majú rovnaký (macOS) — bez cesty by dva rôzne
+dokumenty vyšli ako jeden a prekrytie by sa od prepnutého okna neodpojilo. Nie je to zápisová diera (ide o lifecycle prekrytí, nie o identitu zápisu), preto zostáva vedomou
+výnimkou v `NX_DK_GUID_ALLOWED`, ale správanie stráži behaviorálna sada nad všetkými tromi modulmi.
 
 **GHOST vkladanie stojí na tom istom fakte o Windows:** `GhostTool` session drží priamo objekt modelu (`@model`, porovnania cez `equal?`) a ruší sa cez `onNewModel`/`onOpenModel`
 **bezpodmienečne** — práve preto, že porovnanie identity by pri recyklovanom objekte session omylom nechalo žiť. DocKey rotuje v tých istých dvoch callbackoch a z toho istého dôvodu.

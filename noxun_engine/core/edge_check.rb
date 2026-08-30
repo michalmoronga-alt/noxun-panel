@@ -460,14 +460,30 @@ module Noxun
         true
       end
 
-      # Identita dokumentu: SketchUp vracia zvycajne ten isty objekt, ale po
-      # File>Open/New sa meni — guid je zaloha pre pripad noveho Ruby obalu.
+      # Identita dokumentu pre OVERLAY LIFECYCLE (nie pre zapisy — tie riesi
+      # `DocKey.foreign?`). Porovnavaju sa DVE SUCASNE drzane referencie, takze
+      # `equal?` ma prednost; guid + cesta su ZALOHA pre pripad, ked SketchUp
+      # vyrobi NOVY Ruby obal toho isteho dokumentu (macOS).
+      #
+      # PRECO NESTACI SAMOTNY GUID (review #267 kolo 3, P3): `Model#guid` je
+      # OBSAH .skp SUBORU, takze DVE SUCASNE otvorene KOPIE tej istej zakazky
+      # (macOS vie mat viac dokumentov naraz) nesu ZHODNY guid, kym sa jedna
+      # z nich neulozi. Dva rozne dokumenty by tak vysli ako jeden a prekrytie
+      # by sa od zavreteho/prepnuteho okna neodpojilo (`active?` by tvrdilo
+      # „zapnute" nad cudzim dokumentom). Zaloha preto vyzaduje ZHODNY guid
+      # A ZAROVEN ZHODNU cestu: novy obal toho isteho dokumentu ma tu istu
+      # cestu, kopie .skp maju rozne. Toto je jediny sposob, ako ich odlisit —
+      # DocKey tu pomoct nevie (jeho token rotuje UDALOSTOU vymeny dokumentu,
+      # nie kazdym obalom, a tu sa porovnavaju dva ZIVE objekty naraz).
       def same_model?(a, b)
         return false if a.nil? || b.nil?
         return true if a.equal?(b)
         ga = a.respond_to?(:guid) ? a.guid.to_s : ''
         gb = b.respond_to?(:guid) ? b.guid.to_s : ''
-        !ga.empty? && ga == gb
+        return false if ga.empty? || ga != gb
+        pa = a.respond_to?(:path) ? a.path.to_s : ''
+        pb = b.respond_to?(:path) ? b.path.to_s : ''
+        pa == pb
       rescue StandardError
         false
       end

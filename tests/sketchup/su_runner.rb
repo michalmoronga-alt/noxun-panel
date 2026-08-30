@@ -9837,9 +9837,10 @@ module NoxunSuRunner
   end
 
   # Zastupca CUDZIEHO dokumentu. Guard `same_model?` v EdgeCheck aj GrainCheck
-  # porovnava `guid`, takze na spustenie VYPINACEJ vetvy staci objekt s inym
-  # guidom — `disable!` pracuje s ulozenym `@model` (skutocnym dokumentom),
-  # nie s tymto objektom.
+  # berie ako zalohu za `equal?` dvojicu `guid` + `path` (review #267 kolo 3),
+  # takze na spustenie VYPINACEJ vetvy staci objekt s INYM guidom — nezhoda
+  # padne uz na nom. `disable!` pracuje s ulozenym `@model` (skutocnym
+  # dokumentom), nie s tymto objektom.
   class CharForeignModel
     def guid
       'CHAR-FOREIGN-GUID'
