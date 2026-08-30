@@ -17,6 +17,40 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1d/R-34 · BRÁNA EXPORTOV ZASTAVÍ UŽ LEN SKUTOČNÉ ZLIATIE (30.8.2026, v0.8.18):** štvrtá vybavená položka registra bloku 1d (**R-34**, P3) — dovytriedenie brány **P0-2**,
+  ktorú priniesla hotfix dávka **P0-HF** (#252). Brána zastaví nákupný CSV, rozpočet aj cenovú ponuku, keď majú dve fyzické skrinky **spoločné `cabinet_id`** a kovanie účtované
+  **na vlastníka** (TipOn) by sa tým do objednávky dostalo len raz. Podklad na to rozhodnutie nesie expanzia sama — príznak `per_owner` na zdroji riadku. Lenže ten sa
+  označoval pri **každom vydanom owner členovi**, nie až vo vetve, kde dedup naozaj preskočí duplikát. Dôsledok: dve inštancie so zdieľaným ID, ale **rôznym vlastníkom**
+  (`owner_part_key` — napr. dvoje rôznych dvierok) sa v expanzii vôbec nestretnú, TipOn vznikne dvakrát, množstvá sú **správne** — a brána im export napriek tomu zastavila.
+  Zlyhávalo to bezpečným smerom (falošne pozitívne, a len v už oranžovo označenom stave), preto P3, ale používateľa to blokovalo bez dôvodu — nález Codex review #252, kolo 3.
+  **Čo platí teraz:** `owner_seen` už nedrží `true`, ale **už vydaný zdrojový záznam riadku**; druhý zásah na ten istý kľúč `[owner_id, owner_part_key, set_id, code]` mu
+  `per_owner` **doznačí** a až tým sa zdroj prizná ako miesto, kde sa množstvo zlialo. `add_row` preto príznak sám nikdy nepíše a vracia práve pridaný `src` — je to jediné
+  miesto, kam sa dá doznačiť. Kontrakt `dup_partition` sa nemenil ani o riadok: neznáma expanzia naďalej blokuje, dosky a skrinky bez owner člena naďalej len varujú.
+  Z pohľadu používateľa: **duplicitné ID bez skutočného zlievania export prepustí** (oranžový nález Kontroly ostáva a stále hovorí, že kusovník ich zlieva do jedného
+  vlastníka), duplicitné ID **so** zlievaním je tvrdý blok ako doteraz.
+  **Priznaný zvyšok (vedomý):** expanzia vidí pri položke len `owner_id`, takže **dve pravidlá na tej istej fyzickej skrinke** (dedup B3 — druhý TipOn na tie isté dvierka)
+  sú od dvoch inštancií nerozlíšiteľné a príznak dostanú tiež. Pri duplicitnom ID teda taká zákazka ostane blokovaná falošne — ale bezpečným smerom, a rozlíšiť to by
+  vyžadovalo identitu inštancie až v `Bom.collect`, čo je zásah do dátového kontraktu, nie hygiena predikátu.
+  **Codex review vrátil P1, ktorý dávku rozšíril — a je to lekcia o tom, že zúženie brány treba merať proti VŠETKÝM cestám, nie len proti tej, ktorú dávka rieši:** zdieľané ID
+  kazí objednávku ešte druhou cestou. `Bom.collect` drží override setov kovania v mape `cabinet_sets[cid]`, teda **jeden slot na ID** — dve inštancie s tým istým ID si ho
+  prepíšu a `resolve_set_id` potom použije mapu jednej z nich na **obe** (kľúčom je `owner_id`). Vtedy nie sú neisté počty, ale rovno **kódy** v nákupe, rozpočte aj v ponuke.
+  Pôvodná brána to blokovala len náhodou (cez owner člena) a toto zúženie by dieru odkrylo. Zber preto po novom hlási aditívny kľúč **`cabinet_set_conflicts`**
+  (`Bom.note_cabinet_sets` — čistá funkcia, testovateľná headless): **zhodné mapy konflikt NIE SÚ** (bežná kópia skrinky dá rovnaký výsledok nech vyhrá ktorákoľvek), rozdiel
+  áno — vrátane „jedna override má, druhá nie". `dup_partition` také ID blokuje aj bez zliatia owner člena a blokujúca hláška menuje oba dôsledky. **Druhé kolo pridalo P2
+  k tomu istému miestu** (a je to tá istá lekcia, len z druhej strany — brána sa nesmie rozšíriť viac, než dokazuje): rozdiel v type, ktorý si skrinka vôbec nemapuje, žiadny
+  kód nezmení. Záznam preto nesie **kľúče** rozdielu a `conflict_matters?` ich porovná s kľúčmi, ktorými si skrinka kovanie skutočne mapuje (`override_keys_in_use` číta
+  `generic_type` a `generic_type@owner_part_key` z `collected[:hardware]`); neznámy rozdiel blokuje ako doteraz. **Vedome NEDORIEŠENÉ:** či sa override náhodou nerovná
+  projektovej predvoľbe — mapovanie projektu nie je súčasťou zberu a odvodiť ho v bráne by znamenalo druhý výklad precedencie vedľa `HardwareSets.resolve_set_id`; ostáva to
+  falošným pozitívom v už duplicitnom stave, teda bezpečným smerom.
+  **Testy:** +8 headless v `tests/pure/test_p0hf_brany.rb` (brána nad **reálnou** `HardwareSets.expand`: rôzni vlastníci → prejde · rovnaký vlastník → blokuje · invariant
+  Σ zdrojov = množstvo riadku v oboch scenároch · rozídené overridy → blokuje · rozdiel v nepoužitom type (ani v cudzom `part_key`) → prejde · relevancia sa ráta PER SKRINKU ·
+  zhodné/žiadne → prejde · starý zber bez nového kľúča sa nesmie začať blokovať · jednotka `note_cabinet_sets`) a prepísaný pár v `tests/pure/test_hardware_sets.rb` (bez zliatia
+  príznak NIE je · pri reálnom preskoku áno). Osem mutácií overených — „označ pri každom vydaní" (vráti falošné pozitíva), „neoznač nikdy" (pustí reálny podpočet), „`add_row`
+  nevracia `src`", „brána ignoruje konflikty", „každý opakovaný zápis je konflikt", „relevancia vždy pravdivá", „za rozdiel sa hlásia všetky kľúče" aj „kľúče všetkých skriniek
+  v jednom vreci" — každá zhodila práve svoje testy. **Delta P2 opravy prešla nezávislou verifikáciou** (slepý agent, výhradne fix commit): žiadny P1/P2; z jeho P3 sa hneď
+  zapracovali dva — chýbajúci test per-skrinkového scopingu (jeho mutácia predtým prežila) a **trim kľúča** v `differing_override_keys`, lebo expanzia kľúče vidí až po
+  `normalize_cabinet_overrides`, takže neorezaný zápis by sa v bráne netrafil.
+
 - **1d/R-01+R-04 · OBSERVER VEĽKOSTI VIE, V KTOROM DOKUMENTE PRACUJE (30.8.2026, v0.8.17):** tretia vybavená položka registra bloku 1d — dve položky naraz, lebo register ich tak
   spája (**R-01** P1 + **R-04** P3). `ScaleWatch` je jediný observer, ktorý reaguje na zmenu veľkosti, presun a mazanie skriniek a dosiek; jeho vnútorné fronty boli kľúčované
   **holým `entityID`**, ktoré je ale LOKÁLNE pre dokument. Na macOS (viac otvorených dokumentov naraz) si tak dve inštancie s rovnakým ID v jednom 0,2 s okne udalosť prepísali
