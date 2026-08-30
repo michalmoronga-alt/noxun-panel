@@ -1551,6 +1551,13 @@ module NoxunSuRunner
   # klik ide tou istou cestou ako pouzivatelov (pickray -> rovina zamku).
 
   GHOST_PARAMS = { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0 }.freeze
+  # Klik ide cez PIXELY (`screen_coords` -> `pickray`), takze medzi ZIADANYM
+  # bodom a bodom, ktory z luca naozaj vyjde, lezi rozlisenie viewportu
+  # (radovo jednotky mm). Scenare preto oddeluju DVE veci:
+  #   (a) ghost si z luca vzal bod BLIZKO ziadaneho  -> GHOST_PIX_TOL
+  #   (b) skrinka sadla na TEN bod PRESNE            -> TOL (0,1 mm)
+  # Bod (b) je ten podstatny — meria kanonicky transform, nie mieru mysi.
+  GHOST_PIX_TOL = 30.0
 
   def ghost_tool
     e::GhostTool.active_tool
@@ -1579,11 +1586,33 @@ module NoxunSuRunner
     sc
   end
 
+  # Klik na bod; zapamata si POLOHU, ktoru si ghost z luca naozaj vzal
+  # (`ghost_used`) — proti nej sa potom meria presnost transformu.
   def ghost_click!(model, pt_mm)
     v = model.active_view
     sc = ghost_screen(model, pt_mm)
     ghost_tool.onMouseMove(0, sc.x, sc.y, v)
+    @ghost_used = ghost_session ? ghost_session.last_point : nil
     ghost_tool.onLButtonDown(0, sc.x, sc.y, v)
+    @ghost_used
+  end
+
+  # Poloha, ktoru ghost pouzil pri poslednom kliku (mm, svetovy ram).
+  def ghost_used
+    @ghost_used
+  end
+
+  # Sadla kotva PRESNE na bod, ktory si ghost vzal z luca? (X/Y; Z riesi zamok)
+  def ghost_on_used?(pt_mm)
+    u = ghost_used
+    !u.nil? && !pt_mm.nil? &&
+      (pt_mm[0] - u[0]).abs <= TOL && (pt_mm[1] - u[1]).abs <= TOL
+  end
+
+  def ghost_near_target?(target_mm)
+    u = ghost_used
+    !u.nil? && (u[0] - target_mm[0]).abs <= GHOST_PIX_TOL &&
+      (u[1] - target_mm[1]).abs <= GHOST_PIX_TOL
   end
 
   def ghost_key!(model, key, repeat = 1)
@@ -1648,8 +1677,10 @@ module NoxunSuRunner
     o = inst ? ghost_origin_mm(inst) : [nil, nil, nil]
     ok("GHOST 2: klik polozil PRESNE JEDNU skrinku (#{cabinets(model).length})",
        cabinets(model).length == 1 && !inst.nil?)
-    ok("GHOST 2: kotva sadla na kliknuty bod, origin drzi domacu vysku (#{o.map { |v| v && v.round(1) }.inspect})",
-       inst && (o[0] - 1200.0).abs <= 1.0 && (o[1] - 300.0).abs <= 1.0 && o[2].abs <= TOL)
+    ok("GHOST 2: ghost si z luca vzal bod pri kurzore (#{ghost_used && ghost_used.map { |v| v.round(1) }.inspect})",
+       ghost_near_target?([1200.0, 300.0]))
+    ok("GHOST 2: kotva sadla PRESNE na ten bod a origin drzi domacu vysku (#{o.map { |v| v && v.round(2) }.inspect})",
+       inst && ghost_on_used?(o) && o[2].abs <= TOL)
     ok('GHOST 2: nova skrinka je OZNACENA (Inspector pokracuje jej editaciou)',
        inst && model.selection.to_a.include?(inst))
     ok('GHOST 2: korpus je TOP-LEVEL', inst && inst.parent.is_a?(Sketchup::Model))
@@ -1666,8 +1697,8 @@ module NoxunSuRunner
     uo = up ? ghost_origin_mm(up) : [nil, nil, nil]
     ok("GHOST 3: horna skrinka visi na UPPER_HANG_Z (#{uo[2] && uo[2].round(1)})",
        up && (uo[2] - e::CabinetBuilder::UPPER_HANG_Z).abs <= TOL)
-    ok('GHOST 3: horna sadla na kliknute X/Y (rovina zamku je v UPPER_HANG_Z)',
-       up && (uo[0] - 800.0).abs <= 1.0 && (uo[1] - 200.0).abs <= 1.0)
+    ok('GHOST 3: horna sadla PRESNE na bod z luca (rovina zamku lezi v UPPER_HANG_Z)',
+       up && ghost_near_target?([800.0, 200.0]) && ghost_on_used?(uo))
     ghost_teardown!(model)
     cleanup(model)
 
@@ -1692,11 +1723,11 @@ module NoxunSuRunner
     ghost_click!(model, [1500.0, 400.0, 0.0])
     rot = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
     if rot
-      a = rot.transformation * e::Units.point(600.0, 0.0, 100.0) # prava dolna kotva korpusu
-      ok("GHOST 4: aktivna kotva sadla PRESNE na kliknuty bod aj po otoceni (#{mm(a.x).round(1)}, #{mm(a.y).round(1)})",
-         (mm(a.x) - 1500.0).abs <= 1.0 && (mm(a.y) - 400.0).abs <= 1.0)
+      a = rot.transformation * e::Units.point(600.0, 0.0, 100.0) # PRAVA DOLNA kotva korpusu
+      ok("GHOST 4: AKTIVNA kotva sadla PRESNE na bod z luca aj po otoceni (#{mm(a.x).round(2)}, #{mm(a.y).round(2)})",
+         ghost_near_target?([1500.0, 400.0]) && ghost_on_used?([mm(a.x), mm(a.y)]))
       xa = rot.transformation.xaxis
-      ok("GHOST 4: otocenie o 90° prezilo vklad (os X = #{mm(xa.x).round(3)}, #{mm(xa.y).round(3)})",
+      ok("GHOST 4: otocenie o 90° prezilo vklad (os X = #{xa.x.round(3)}, #{xa.y.round(3)})",
          xa.x.abs < 0.001 && (xa.y - 1.0).abs < 0.001)
     else
       ok('GHOST 4: otoceny vklad prebehol', false)
@@ -1747,8 +1778,8 @@ module NoxunSuRunner
     if axes_ok
       ax = ghost_place!(model, GHOST_PARAMS.dup, [1000.0, 250.0])
       ao = ax ? ghost_origin_mm(ax) : [nil, nil, nil]
-      ok("GHOST 6: pri OTOCENYCH osiach kreslenia drzi zamok svetove Z = 0 (#{ao[2] && ao[2].round(2)})",
-         ax && ao[2].abs <= TOL && (ao[0] - 1000.0).abs <= 1.0 && (ao[1] - 250.0).abs <= 1.0)
+      ok("GHOST 6: pri OTOCENYCH osiach kreslenia drzi zamok SVETOVE Z = 0 (#{ao[2] && ao[2].round(2)})",
+         ax && ao[2].abs <= TOL && ghost_near_target?([1000.0, 250.0]) && ghost_on_used?(ao))
       ghost_teardown!(model)
       cleanup(model)
       begin
@@ -1776,15 +1807,20 @@ module NoxunSuRunner
     ghost_camera!(model, [1000.0, 300.0], 0.0)
     ghost_move!(model, [1000.0, 300.0, 0.0])
     ok('GHOST 8: vychodisko — ghost je polozitelny', s.placeable)
-    # VODOROVNY pohlad: kamera v rovine zamku sa na nu diva „po hrane" —
-    # |dir.z| pod EPS, priesecnik neexistuje.
-    model.active_view.camera = Sketchup::Camera.new(e::Units.point(-3000.0, 0.0, 0.0),
-                                                    e::Units.point(1000.0, 0.0, 0.0), Z_AXIS)
+    last = s.last_point
+    # ROVINA ZA KAMEROU: kamera POD rovinou zamku pozerajuca NADOL — parameter
+    # luca vyjde zaporny (`t < 0`), priesecnik teda neplati.
+    # (Druhy degenerovany pripad, |dir.z| pod EPS, meria headless sada.)
+    model.active_view.camera = Sketchup::Camera.new(e::Units.point(1000.0, 300.0, -2000.0),
+                                                    e::Units.point(1000.0, 300.0, -5000.0),
+                                                    Y_AXIS)
     v = model.active_view
-    ghost_tool.onMouseMove(0, (v.vpwidth / 2).to_i, (v.vpheight / 2).to_i, v)
-    ok('GHOST 8: pri vodorovnom pohlade ghost DRZI poslednu polohu a nie je polozitelny',
-       !s.placeable && !s.last_point.nil?)
-    ghost_tool.onLButtonDown(0, (v.vpwidth / 2).to_i, (v.vpheight / 2).to_i, v)
+    cx = (v.vpwidth / 2).to_i
+    cy = (v.vpheight / 2).to_i
+    ghost_tool.onMouseMove(0, cx, cy, v)
+    ok('GHOST 8: ked rovina zamku lezi ZA kamerou, ghost DRZI poslednu polohu a nie je polozitelny',
+       !s.placeable && s.last_point == last)
+    ghost_tool.onLButtonDown(0, cx, cy, v)
     ok('GHOST 8: klik v degenerovanom pohlade NEVLOZIL nic a session zije',
        cabinets(model).length == before8 && !ghost_session.nil? && ghost_session.active?)
     ghost_teardown!(model)
@@ -1852,8 +1888,8 @@ module NoxunSuRunner
       no = nested ? ghost_origin_mm(nested) : [nil, nil, nil]
       ok('GHOST 12: vklad z otvoreneho komponentu skoncil TOP-LEVEL',
          nested && nested.parent.is_a?(Sketchup::Model))
-      ok("GHOST 12: transform je vo SVETOVOM rame (#{no.map { |x| x && x.round(1) }.inspect})",
-         nested && (no[0] - 1100.0).abs <= 1.0 && (no[1] - 260.0).abs <= 1.0 && no[2].abs <= TOL)
+      ok("GHOST 12: transform je vo SVETOVOM rame (#{no.map { |x| x && x.round(2) }.inspect})",
+         nested && ghost_near_target?([1100.0, 260.0]) && ghost_on_used?(no) && no[2].abs <= TOL)
       ok('GHOST 12: po vklade je model v ROOT kontexte',
          model.active_path.nil? || model.active_path.length.zero?)
       ghost_teardown!(model)

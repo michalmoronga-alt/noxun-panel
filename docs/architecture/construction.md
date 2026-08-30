@@ -72,6 +72,48 @@ operácii → spracovanie observerom → **interné Undo nástroja** (kópia mus
 dedup po tej prvej kópii pridal vlastný undo krok — vtedy interné undo trafí jeho, kópia prežije ako „zombie" a pole k nej pridá ďalšiu skrinku (živá chyba D-103; pre dosky to
 meria `async S6`).
 
+### ghost_tool.rb
+
+**GHOST VKLADANIE (V1-04): skrinka sa kladie KLIKOM, nie tlačidlom.** Modul drží tri vrstvy — `GhostTool` (vlastník session + čisté API pre panel), `GhostTool::Calc`
+(**čistá matematika bez SketchUpu** — kotvy, obálka, kanonická matica, ray × rovina zámku; testovateľná headless), `PlacementSession` (stav jedného vkladu) a `GhostTool::Tool`
+(SketchUp `Tool`). Ghost je **výhradne viewport grafika `draw`** — žiadna dočasná `ComponentInstance`, žiadna entita, žiadne ID a **žiadny krok Späť pred klikom**.
+
+**JEDEN vlastník session.** Modul drží NAJVIAC JEDNU session (`GhostTool.session`). Nesie: zmrazený `InsertPlan` (R-03 `prepare_insert`) · snapshot kovania zo šablóny
+(`take_insert_hardware!`) · šablónový ref · pôvodný model · **stav `:active` → `:committing` → `:committed` | `:cancelled`** · `rotation_index` (0..3) · `anchor` · `z_mode` ·
+poslednú platnú polohu s príznakom `placeable`. **Terminálne stavy sú idempotentné** — druhý klik aj druhý cancel sú no-op, takže dvojklik nikdy nevyrobí dve skrinky.
+Identita dokumentu je **objekt `Sketchup::Model`, nie `guid`** (mení sa pri každom uložení — lekcia #261/#264), takže Ctrl+S ghost nezruší.
+**Všetky konce životného cyklu rušia starú session PRED čímkoľvek ďalším:** druhé „Vložiť" (nová session s čerstvým snapshotom) · zavretie Inspectora (`set_on_closed`) ·
+prepnutie dokumentu (`Panel.on_model_switched`) · `onCancel` 0/1/2 · `deactivate`.
+
+**ZÁVÄZNÁ tabuľka kotiev.** Predná rovina korpusu je **vždy lokálne Y = 0** (čelá majú záporné Y a do kotiev NEVSTUPUJÚ; plinth recess ani presah čela rovinu Y = 0 nemenia).
+Dolná `under_sides` → spodok tela je DNO na `floor_height`; dolná `between_sides` → boky stoja na zemi, spodok je Z = 0; **horná normalizuje `floor_height` na 0**, takže oba
+varianty dna majú spodnú kotvu na Z = 0 (`UPPER_HANG_Z` je SVETOVÁ výška originu, nie lokálna kotva). Poradie cyklovania (Alt): ľavá-dolná → pravá-dolná → pravá-horná → ľavá-horná.
+
+**Transform sa skladá VŽDY NANOVO z celočíselného stavu** (`rotation_index % 4`), nikdy inkrementálnym násobením: `COS`/`SIN` sú tabuľky presných 0/±1, takže matica prejde
+`CabinetBuilder.rigid_matrix?` (R-03, `RIGID_TOL` 1e-6) bez numerického šumu aj po stovkách otočení. **Free Z:** `translation = picked − R(anchor)`. **Zámok typu (↓):**
+`translation.z = home_z` NAPEVNO — **lokálne Z kotvy sa NEODČÍTA** (origin skrinky drží domácu výšku svojho typu: dolná 0, horná `UPPER_HANG_Z`), X/Y sa berie z priesečníka
+lúča s **rovinou zámku** (`home_z`, svetový rám — nie drawing axes), takže ghost sedí pod kurzorom aj v prázdnom modeli. **Oba typy ŠTARTUJÚ v `:locked`.**
+`Calc` počíta v mm; `to_inch_matrix` prevedie **len transláciu** (rotačná časť je bezrozmerná).
+
+**Degenerované lúče** (`Calc.ray_plane`): priesečník platí LEN keď `|dir.z| > EPS`, výsledok je konečný a parameter lúča `t >= 0` (rovina PRED kamerou). Inak ghost **drží
+poslednú platnú polohu**, `placeable = false` (stlmená kresba) a **klik NECOMMITNE** — status povie prečo. Platí aj pre hornú rovinu `UPPER_HANG_Z` s kamerou nad ňou.
+
+**Tool lifecycle.** Aktivácia `model.tools.push_tool` (NIE `select_tool` — pôvodný nástroj sa zachová) + `UI.start_timer(0) { Sketchup.focus }` (CEF by si po HtmlDialog callbacku
+vzal fokus späť a klávesy by nefungovali). Koniec = **presne jedno `pop_tool`** cez `GhostTool.end_tool`; z Tool callbackov **odložené** timerom, z panela (`start`) **synchrónne** —
+inak by odložený pop zhodil práve pushnutý nový nástroj. `Tool#detach!`/`attached?` robia pop idempotentným. Prepnutie na iný nástroj chodí cez `deactivate` (nie `onCancel`)
+a **nepopuje**; `suspend`/`resume` (Orbit/Pan) session DRŽÍ. `getExtents` vracia obálku ghostu (bez nej by ho SketchUp orezal mimo bounds).
+**Klávesy:** ←/→ rotácia ∓90° (na PRVÝ down; `repeat > 1` vracia true bez zmeny), ↓ zámok, ↑ voľná výška, **Alt (`VK_MENU`/`VK_ALT`) cykluje kotvy** — zachytáva sa down AJ up
+a vracia true (minimalizuje aktiváciu menu-baru Windows). Vlastnené klávesy vracajú `true`, ostatné `false`. **Každý Tool callback je obalený** (`guarded`) — výnimka v callbacku
+sa inak ticho prehltne a nástroj „záhadne" prestane kresliť. **V `draw` sa NIKDY nevolá `Construction.build_plan`** — obálka je 8 bodov spočítaných RAZ zo zmrazeného configu.
+
+**Commit ide výhradne cez šev R-03** `CabinetBuilder.commit_insert(model, plan, transform:)` so sprievodným blokom (H2/D-76 zmrazenie setov kovania) — žiadny vlastný zápis do
+modelu, žiadny nový selection mechanizmus. Po úspechu `Panel.ghost_after_commit` (výber, status, `push_selected`, pečiatka šablóny cez `stamp_once!`) beží **mimo operácie**
+a jeho zlyhanie NESMIE zabrániť zatvoreniu committed session. **Žiadny ručný `StudioModelWatch` notify** — stale signalizáciu rieši `onTransactionCommit` sám.
+**Vedomý posun oproti stavu pred ghostom:** guardy STAVBY (`Fronts.validate_layout!`, interior validácie) bežia až v commite, takže konflikt „zámok × šablóna" (F8) sa ohlási
+pri KLIKU, nie pri stlačení „Vložiť" (hláška je tá istá — `Panel.ghost_insert_failed`); `Construction.build_plan` sa do `prepare_insert` zámerne nepresúva (hranica R-03).
+Zlyhaný commit session **končí** (preflighty už prebehli, opakovaný klik by zlyhal rovnako). Programatická cesta `CabinetBuilder.build` (`Placement.next_x` fallback)
+a `handle_insert_copy` sú GHOSTom **nedotknuté**. Testy: `tests/pure/test_ghost_vkladanie.rb`, in-SketchUp sekcie `run_ghost` a `run_ghost_async`.
+
 ### board_builder.rb
 
 samostatná doska (V0.4.7): `kind: board`, id BRD-xxx, rola `free_panel`, config = superset dielca korpusu (kusovník/VEPO majú jeden svet); materiál snapshot z katalógu, hrúbka VŽDY

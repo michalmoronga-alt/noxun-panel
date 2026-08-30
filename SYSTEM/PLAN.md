@@ -158,6 +158,11 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 
 ### GHOST VKLADANIE (V1-04) — TASK PACKAGE (1e, zapísané 29.8.2026, rev. po slepom review #254; štart na Michalovo „štartuj")
 
+**STAV BLOKU (30.8.2026): implementačná dávka je ✅ HOTOVÁ — v0.8.21.** Modul `core/ghost_tool.rb` (GhostTool + Calc + PlacementSession + Tool), šev v `handle_insert`,
+cancel pri zavretí Inspectora aj pri prepnutí dokumentu; 25 headless testov novej sady + in-SU sekcie `run_ghost` (15 scenárov) a `run_ghost_async`, plný beh **1155 PASS / 0 FAIL**.
+Plný záznam — čo pridal implementačný audit (4 BLOCKER + 5 FIX), vedomý posun F8 hlášky na klik a ako je nástroj simulovaný v testoch: [archiv/KRONIKA.md](archiv/KRONIKA.md),
+záznam **GHOST VKLADANIE**. **Blok ostáva OTVORENÝ do Michalovho smoke** (6 bodov nižšie); uzáver = samostatný malý PR s **minor bumpom 0.9.0** a presunom bloku do archívu.
+
 **Cieľ:** vloženie skrinky tam, kde sa používateľ pozerá — po „Vložiť" visí ghost skrinky na kurzore,
 klik ju položí ako jednu reálnu CAB v jednom Undo kroku. Koniec hľadania skriniek položených cez `next_x`
 mimo pohľadu. Podklady: koncepty [09](zdroje/next_sessions/09_GHOST_VKLADANIE.md) + [09A](zdroje/next_sessions/09A_GHOST_EXTERNY_SKETCHUP_AUDIT.md)

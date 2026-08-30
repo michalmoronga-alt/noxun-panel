@@ -104,6 +104,30 @@
   (mení sa orchestrácia, nie runner): parse check + simulácia kolízie v samostatných procesoch — odmietnutie počas držania, prevzatie po dobehu, prevzatie stale locku po
   `Stop-Process -Force`. Poznámka o vylučovaní behov pridaná do `CLAUDE.md` (Testovanie).
 
+- **GHOST VKLADANIE (V1-04) · IMPLEMENTAČNÁ DÁVKA (v0.8.21, 30.8.2026):** skrinka sa odteraz kladie **klikom tam, kam sa používateľ pozerá**. Tlačidlo „Vložiť" už nevkladá —
+  pripraví **zmrazený plán** (R-03 `prepare_insert`) a zavesí ghost na kurzor; skrinka vznikne až klikom cez `commit_insert`. Koniec hľadania skriniek, ktoré `Placement.next_x`
+  položil mimo pohľadu (tá cesta ostáva **fallbackom pre programatické volania a nedotknutá**, rovnako ako „Vložiť kópiu" a vkladanie dosky).
+  **Čo vzniklo:** nový modul `core/ghost_tool.rb` so štyrmi vrstvami — `GhostTool` (vlastník najviac JEDNEJ session), `Calc` (čistá matematika bez SketchUpu: kotvy, obálka,
+  kanonická matica, ray × rovina zámku), `PlacementSession` (stavový automat) a `Tool` (SketchUp `Tool`). Panel má voči nemu presne tri švy (`ghost_freeze_hardware` ·
+  `ghost_insert_failed` · `ghost_after_commit`) — výber, status, refresh aj pečiatka šablóny idú **existujúcimi cestami**, žiadny nový selection mechanizmus.
+  **Čo do návrhu pridal povinný implementačný audit (4 BLOCKER + 5 FIX + NOTE, session 01a052d7 — všetko zapracované):** (1) *jeden vlastník session so stavovým automatom*
+  (`:active → :committing → :committed | :cancelled`, terminálne stavy idempotentné) — dvojklik tak nikdy nevyrobí dve skrinky a druhý cancel je no-op; **všetky** konce
+  životného cyklu (druhé „Vložiť", zavretie Inspectora, prepnutie dokumentu, `onCancel` 0/1/2, `deactivate`) rušia starú session PRED čímkoľvek ďalším. (2) *záväzná tabuľka
+  kotiev per konštrukčný variant* — predná rovina korpusu je vždy lokálne **Y = 0** (čelá do kotiev nevstupujú), `under_sides` má spodok tela na `floor_height`,
+  `between_sides` na 0 a **horná normalizuje `floor_height` na 0** (UPPER_HANG_Z je svetová výška originu, nie lokálna kotva). (3) *kanonická konštrukcia transformu* — matica
+  sa skladá VŽDY NANOVO z celočíselného `rotation_index % 4` s presnými 0/±1, nikdy inkrementálnym násobením, takže prejde `rigid_matrix?` (R-03) aj po stovkách otočení;
+  v zámku sa **lokálne Z kotvy NEODČÍTA** (origin drží domácu výšku typu — to je zmysel zámku). (4) *degenerované lúče* — priesečník platí len pri `|dir.z| > EPS`, konečnom
+  výsledku a `t >= 0`; inak ghost drží poslednú platnú polohu, stlmí sa a **klik necommitne**. Ďalej z auditu: `push_tool`/`pop_tool` namiesto `select_tool` + odložený
+  `Sketchup.focus` (CEF si po HtmlDialog callbacku berie fokus späť), **žiadny `Construction.build_plan` v draw slučke** (obálka = 8 bodov spočítaných raz zo zmrazeného
+  configu), **žiadny ručný `StudioModelWatch` notify** (rieši ho `onTransactionCommit`), pečiatka šablóny presne raz (`stamp_once!`) a prispôsobenie in-SU insert scenárov.
+  **Vedomý posun oproti stavu pred ghostom:** guardy STAVBY (`Fronts.validate_layout!`, interior validácie) bežia až v commite, takže konflikt „zámok × šablóna" (F8) sa ohlási
+  pri **kliku**, nie pri stlačení „Vložiť" — hláška je tá istá vrátane výpisu aktívnych zámkov, v modeli sa nič nezmení a session končí (opakovaný klik by zlyhal rovnako).
+  Vyplýva to z hranice R-03, ktorá `build_plan` do `prepare_insert` zámerne nepresúva. **Odložený `pop_tool` si drží KONKRÉTNU inštanciu nástroja**, nie `@active_tool` — inak
+  by timer založený starou session zhodil nástroj, ktorý medzitým pushlo druhé „Vložiť" (nájdené pri návrhu, nie testom). **Dôkazy:** 25 headless testov novej sady
+  `test_ghost_vkladanie.rb` (matika + automat + zdrojové invarianty švu) a **in-SU sekcie `run_ghost` (15 scenárov) + `run_ghost_async`**; nástroj sa v nich simuluje
+  **programovo, ale verne** — cez reálne `onMouseMove`/`onLButtonDown`/`onKeyDown`/`onCancel` nad živým `view`, kde cieľový bod ide cez `view.screen_coords` do `pickray`.
+  Scenáre preto oddeľujú **presnosť myši** (pixelová tolerancia) od **presnosti transformu** (0,1 mm proti bodu, ktorý si ghost z lúča naozaj vzal). Plný in-SU beh
+  **1155 PASS / 0 FAIL**. **Blok GHOST sa touto dávkou NEUZATVÁRA** — uzáver (minor 0.9.0, presun bloku do archívu) príde samostatným malým PR po Michalovom smoke.
 - **1d/R-03 · ŠEV `prepare_insert` / `commit_insert` V BUILDERI (v0.8.20, 30.8.2026, PR #265):** `CabinetBuilder.build` zlievalo normalizáciu, pridelenie ID, výpočet polohy,
   otvorenie operácie a stavbu geometrie do jedného toku. GHOST Tool (vkladanie na klik) tak nemal **čo bezpečne držať pred klikom** — žiadny pripravený objekt, ktorý sa dá
   nakresliť ako duch bez toho, aby už zasiahol model — a ani **ako položiť skrinku na finálnu polohu**: `transform:` mal len `rebuild`. Register to viedol ako **TVRDÝ blocker
