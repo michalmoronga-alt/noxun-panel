@@ -1077,6 +1077,8 @@ module Noxun
         lookup  = catalog_lookup(catalog)
         rows = {}
         unmapped = []
+        # kluc clena `per: 'owner'` => UZ VYDANY zdrojovy zaznam riadku (R-34:
+        # dalsi zasah na ten isty kluc je realne zliatie a doznaci mu `per_owner`)
         owner_seen = {}
         Array(hardware_items).each do |it|
           next unless it.is_a?(Hash)
@@ -1195,19 +1197,22 @@ module Noxun
           end
           next if code.nil?
           m_qty = m['qty'].to_i
-          per_owner = m['per'] == 'owner'
-          total =
-            if per_owner
-              # audit B3: 1x na (korpus, vlastnik, set, kod) — druhe pravidlo
-              # s rovnakym vlastnikom TipOn nezdvoji.
-              key = [it['owner_id'].to_s, it['owner_part_key'].to_s, sid, code].join('|')
-              next if owner_seen[key]
-              owner_seen[key] = true
-              m_qty
-            else
-              qty * m_qty
-            end
-          add_row(rows, code, total, it, sid, lookup, per_owner)
+          # audit B3: clen `per: 'owner'` ide 1x na (korpus, vlastnik, set, kod)
+          # — druhe pravidlo s rovnakym vlastnikom TipOn nezdvoji.
+          key = m['per'] == 'owner' ? [it['owner_id'].to_s, it['owner_part_key'].to_s,
+                                       sid, code].join('|') : nil
+          prev = key && owner_seen[key]
+          if prev
+            # R-34 (review #252 kolo 3): AZ TU sa mnozstvo naozaj ZLIEVA —
+            # priznak preto nesie riadok, ktory duplikat POHLTIL, nie kazdy
+            # vydany owner clen. Bez toho by brana zastavila aj dve instancie
+            # so zdielanym `cabinet_id`, ale ROZNYM `owner_part_key`: tie sa
+            # nezlievaju (kluc sa nezhoduje) a ich mnozstva su spravne.
+            prev['per_owner'] = true
+            next
+          end
+          src = add_row(rows, code, key ? m_qty : qty * m_qty, it, sid, lookup)
+          owner_seen[key] = src if key
         end
       end
 
@@ -1242,15 +1247,19 @@ module Noxun
         end
       end
 
-      # `per_owner` (review #252 P2): zdroj priznava, ci mnozstvo prislo od clena
-      # UCTOVANEHO NA VLASTNIKA. Ma presne jedneho citatela a bez neho by nemal
-      # ako vzniknut: brana exportov (`ProductionCore.dup_partition`) potrebuje
-      # vediet, ci duplicitne ID skrinky NAOZAJ podpocita objednavku. Dedup
-      # `per: 'owner'` je jediny mechanizmus, ktory to sposobi — skrinka, ktorej
-      # sety maju len cleny `per: 'unit'`, sa spocita spravne aj pri zdielanom
-      # ID, a blokovat jej export by bolo zbytocne. Kluc je ADITIVNY (kto ho
-      # nepozna, nic nestrati) a zapisuje sa LEN ked je pravdivy.
-      def add_row(rows, code, quantity, it, sid, lookup, per_owner = false)
+      # `per_owner` (review #252 P2, spresnene R-34): zdroj priznava, ze jeho
+      # mnozstvo NAOZAJ POHLTILO duplikat clena UCTOVANEHO NA VLASTNIKA. Ma
+      # presne jedneho citatela a bez neho by nemal ako vzniknut: brana exportov
+      # (`ProductionCore.dup_partition`) potrebuje vediet, ci duplicitne ID
+      # skrinky NAOZAJ podpocita objednavku. Dedup `per: 'owner'` je jediny
+      # mechanizmus, ktory to sposobi — skrinka, ktorej sety maju len cleny
+      # `per: 'unit'`, sa spocita spravne aj pri zdielanom ID, a blokovat jej
+      # export by bolo zbytocne. Kluc je ADITIVNY (kto ho nepozna, nic
+      # nestrati), zapisuje sa LEN ked je pravdivy a NASTAVUJE HO
+      # `expand_members` az vo vetve realneho preskoku — `add_row` ho sam
+      # nikdy nepise (vratena `src` je presne to miesto, kam sa doznaci).
+      # -> `src` Hash, ktory prave pribudol do `row['sources']`.
+      def add_row(rows, code, quantity, it, sid, lookup)
         # GH #126 P2: identita kodu je case-insensitive (kontrakt katalogu) —
         # agregacny kluc kanonicky, zobrazuje sa prvy videny zapis.
         row = rows[code.downcase] ||= { 'code' => code, 'quantity' => 0, 'sources' => [],
@@ -1265,9 +1274,9 @@ module Noxun
           'set_id' => sid,
           'quantity' => quantity
         }
-        src['per_owner'] = true if per_owner
         row['sources'] << src
         row_join(row, lookup)
+        src
       end
 
       # D-93 (audit B4): nakupny riadok nesie ZNAMIENKO rucneho zasahu — pocet

@@ -182,11 +182,19 @@ Zámok, ktorý sa nepodarí vziať, je **IOError** — každá zapisovacia cesta
 vetva pri ňom vráti **skutočnú knižnicu** (nikdy seed — inak by používateľ videl cudzie defaulty a prvý úspešný zápis by ich zvečnil). Testy: `tests/pure/test_r08_zamky.rb`
 (vrátane REÁLNEHO dvojprocesového `flock` scenára).
 
-**Člen účtovaný na vlastníka a jeho stopa v riadku (P0-HF, review #252 P2).** `expand_members` počíta člena `per: 'unit'` ako `quantity × qty`, ale člena **`per: 'owner'`** len
-**raz na `[owner_id, owner_part_key, set_id, code]`** (audit B3: druhé pravidlo s tým istým vlastníkom TipOn nezdvojí). Práve tento dedup je **jediný mechanizmus, ktorým dve
-fyzické skrinky so zdieľaným `cabinet_id` dostanú položku raz namiesto dvakrát** — a teda jediný dôvod, prečo duplicitná identita smie zastaviť nákupný/cenový export. Aby to brána
-vedela rozhodnúť namiesto hádania, `add_row` značí zdroj riadku príznakom **`per_owner`**: kľúč je **aditívny**, zapisuje sa **len keď je pravdivý**, a má presne jedného čitateľa —
-`ProductionCore.dup_partition` ([outputs.md](outputs.md)). Bez neho by sa blokoval aj export zákazky, ktorá má samé `per: 'unit'` členy a spočíta sa správne aj so zdieľaným ID.
+**Člen účtovaný na vlastníka a stopa REÁLNEHO zliatia (P0-HF, review #252 P2; spresnené 1d/R-34).** `expand_members` počíta člena `per: 'unit'` ako `quantity × qty`, ale člena
+**`per: 'owner'`** len **raz na `[owner_id, owner_part_key, set_id, code]`** (audit B3: druhé pravidlo s tým istým vlastníkom TipOn nezdvojí). Práve tento dedup je **jediný
+mechanizmus, ktorým dve fyzické skrinky so zdieľaným `cabinet_id` dostanú položku raz namiesto dvakrát** — a teda jediný dôvod, prečo duplicitná identita smie zastaviť
+nákupný/cenový export. Aby to brána vedela rozhodnúť namiesto hádania, nesie zdroj riadku príznak **`per_owner`**: kľúč je **aditívny**, zapisuje sa **len keď je pravdivý**,
+a má presne jedného čitateľa — `ProductionCore.dup_partition` ([outputs.md](outputs.md)). Bez neho by sa blokoval aj export zákazky, ktorá má samé `per: 'unit'` členy
+a spočíta sa správne aj so zdieľaným ID.
+
+Príznak značí **výhradne vetva reálneho preskoku**, nie každý vydaný owner člen (R-34): `owner_seen[key]` drží **už vydaný zdrojový záznam** a druhý zásah na ten istý kľúč mu
+`per_owner` doznačí — preto `add_row` vracia `src` a sám príznak nikdy nepíše. Rozdiel je vidieť na dvoch inštanciách so zdieľaným `cabinet_id`, ale **rôznym `owner_part_key`**:
+kľúč sa nezhoduje, TipOn vznikne dvakrát, množstvá sú správne — a do R-34 ich brána napriek tomu zastavila. **Priznaný zvyšok:** expanzia vidí len `owner_id`, takže **dve
+pravidlá na tej istej fyzickej skrinke** (B3) sú od dvoch inštancií nerozlíšiteľné a príznak dostanú tiež; pri duplicitnom ID to ostáva falošne pozitívne, teda **bezpečným
+smerom** (radšej zastaviť, než poslať podpočítanú objednávku). Testy: `tests/pure/test_hardware_sets.rb` (bez zliatia / s reálnym preskokom) a `tests/pure/test_p0hf_brany.rb`
+(brána nad **reálnou** expanziou + invariant Σ zdrojov = množstvo riadku).
 
 **Brána dĺžkového kovania (1d/R-06a, v0.8.15).** Expanzia setu vie **len kusy** (`PER_KINDS` = `unit`/`owner`, subtotal = `cena × počet`), ale položka úchytkového profilu (D-90)
 nesie **dĺžku rezu** v `params['cut_length_mm']` a jej katalógová cena je **za meter**. Takú položku preto `expand` do naceneného riadku **nepustí**: predikát
