@@ -31,12 +31,19 @@ end
 NxTest.test('R-02: guard identity dokumentu je JEDEN zdielany helper') do
   body = r02_body(R02_SYNC_RB, 'foreign_document?')
   NxTest.refute(body.empty?, 'foreign_document? zije v sync.rb pri model_guid')
-  NxTest.assert(body.include?("data['model_guid'].to_s == model_guid(model)"),
-                'porovnava sa guid payloadu s guidom AKTIVNEHO dokumentu')
+  # R-02b + review #267 P3-2: samotne porovnanie uz nezije TU, ale v JEDNOM
+  # porovnavaci `DocKey.foreign?`, ktory pouzivaju VSETKY guardy (predtym mala
+  # fail-closed poistku len tato cesta a ~20 priamych porovnani ju obchadzalo).
+  NxTest.assert(body.include?('DocKey.foreign?(data[\'model_guid\'], model)'),
+                'porovnanie robi zdielany DocKey.foreign? v PRISNOM rezime')
+  NxTest.refute(body.include?('tolerate_blank_client'),
+                'zapisovy guard panela je PRISNY — payload bez identity nezapisuje')
   # PRISNE porovnanie (vzor handle_tag_visible / zone_ctx): prazdny guid nie je
   # starsi klient, je to okno bez dobehnuteho NX.init a to nesmie zapisovat.
-  NxTest.refute(body.include?('.empty?'),
-                'ziadna volnejsia vetva pre prazdny guid — prisne porovnanie')
+  # Jedina povolena praca s .empty? je FAIL-CLOSED smer (R-02b BLOCKER 1):
+  # prazdny kluc SERVERA zapis tiez zastavi — ziadna tolerantna vetva payloadu.
+  NxTest.refute(body.include?("data['model_guid'].to_s.empty?"),
+                'ziadna volnejsia vetva pre prazdny guid payloadu — prisne porovnanie')
   NxTest.assert(body.include?('set_status(') && body.include?('inému dokumentu'),
                 'nezhoda je NAHLAS (pouzivatel musi vediet, ze sa zmena neulozila)')
   NxTest.assert(body.include?('Engine.log('), 'nezhoda sa aj loguje (diagnostika)')

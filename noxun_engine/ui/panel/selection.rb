@@ -218,8 +218,7 @@ module Noxun
         # Je klik stale platny? Dokument sa nesmel prepnut a vo vybere musi byt
         # TEN ISTY dielec (podla kanonickeho role_key), z ktoreho sa odchadza.
         def select_cabinet_fresh?(model, data)
-          guid = data['model_guid'].to_s
-          return false if !guid.empty? && guid != model_guid(model)
+          return false if DocKey.foreign?(data['model_guid'], model, tolerate_blank_client: true)
 
           want = data['role_key'].to_s
           return true if want.empty? # starsi klient identitu dielca neposielal
@@ -265,7 +264,7 @@ module Noxun
           # PRISNE porovnanie (Codex #168 P2, 5. kolo): `clear_selection` je tiez
           # novy callback — prazdny guid nie je starsi klient, ale okno bez
           # dobehnuteho NX.init, a to nesmie cistit vyber v cudzom dokumente.
-          return push_selected(model, dedup: false) if data['model_guid'].to_s != model_guid(model)
+          return push_selected(model, dedup: false) if DocKey.foreign?(data['model_guid'], model)
 
           want = data['board_id'].to_s
           board = find_board(model)
@@ -296,7 +295,7 @@ module Noxun
 
           data = payload ? parse(payload) : {}
           return set_status('Dielce sa neoznačili — panel patrí inému dokumentu.', true) if
-            data['model_guid'].to_s != model_guid(model)
+            DocKey.foreign?(data['model_guid'], model)
 
           # Codex #170 P1: klient pred touto akciou flushol rozpisany edit, ALE
           # server ho mohol odmietnut (material_preflight). Vtedy uz bezal UI
@@ -370,7 +369,7 @@ module Noxun
           data = payload ? parse(payload) : {}
           noun = select_owner_nouns(data['origin'])
           return set_status("#{noun[:subject]} sa neoznačil — panel patrí inému dokumentu.", true) if
-            data['model_guid'].to_s != model_guid(model)
+            DocKey.foreign?(data['model_guid'], model)
 
           # Codex #179 P2 (kolo 3): rovnaky guard ako `handle_select_parts`.
           # Rozpisany edit mohol server odmietnut (material_preflight) — vtedy uz
@@ -468,7 +467,7 @@ module Noxun
 
           data = payload ? parse(payload) : {}
           return set_status('Pohľad sa nezarovnal — panel patrí inému dokumentu.', true) if
-            data['model_guid'].to_s != model_guid(model)
+            DocKey.foreign?(data['model_guid'], model)
 
           want = data['cabinet_id'].to_s
           # Vybraty moze byt aj DIELEC skrinky (rail drzi docasnu polozku) —
@@ -567,12 +566,26 @@ module Noxun
         # (`on_model_switched`) by tu mohlo session omylom nechat zit.
         # Ghost moze existovat len s otvorenym Inspectorom, a ten tento
         # observer vzdy pripaja (`attach_observer` -> `ensure_app_observer`).
+        #
+        # 1d/R-02b (review #267 P1-1 + delta P2-GLM): z TOHO ISTEHO dovodu —
+        # Windows smie `Model` objekt RECYKLOVAT — sa tu upratuju aj VSETKY
+        # pamate viazane na objekt modelu (identita DocKey + most nazvu
+        # zakazky SESSION_KEY_BRIDGE). Jeden zoznam je v
+        # `Engine.on_document_replaced`.
+        # MUSI bezat PRED `Panel.on_model_switched`: ten pushne `model_guid`
+        # do panela, a keby sa rotovalo az po nom, klient by dostal STARY
+        # token, `nxSetModelGuid` by zmenu nezbadal a oneskoreny zapis by
+        # pristal v novootvorenej cudzej zakazke.
+        # `onActivateModel` uprataval NESMIE (macOS: prepnutie medzi uz
+        # otvorenymi dokumentmi — kazdy si svoju identitu aj nazov drzi).
         def onNewModel(model)
+          Engine.on_document_replaced(model)
           GhostTool.on_document_replaced('nový dokument') if defined?(GhostTool)
           Panel.on_model_switched(model)
         end
 
         def onOpenModel(model)
+          Engine.on_document_replaced(model)
           GhostTool.on_document_replaced('otvorený iný dokument') if defined?(GhostTool)
           Panel.on_model_switched(model)
         end

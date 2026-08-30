@@ -236,14 +236,20 @@ module Noxun
         # UI-B1 (Codex #168 P2, 2. kolo): IDENTITA DOKUMENTU. ID objektov su
         # jedinecne LEN v ramci modelu (Ids.next_board_id pocita od zaciatku
         # v kazdom dokumente), takze dva otvorene dokumenty bezne obsahuju
-        # BRD-001 aj CAB-001. Bez guidu by:
+        # BRD-001 aj CAB-001. Bez identity by:
         #   * prepnutie dokumentu vyzeralo pre panel ako ECHO push tej istej
         #     identity (kontext by ostal na starom mieste namiesto resetu),
         #   * oneskoreny callback (krizik dosky, ABS prepinac) trafil CUDZI
         #     dokument. Zrkadlo ProductionCore#model_guid.
+        #
+        # 1d/R-02b: hodnotou uz NIE JE Model#guid (ten SketchUp meni pri
+        # KAZDOM ulozeni — Ctrl+S do 400 ms po uprave pola vyzeral ako
+        # prepnutie dokumentu a debounced edit sa zahodil), ale stabilny
+        # token DocKey viazany na objekt modelu. Meno metody aj pola
+        # `model_guid` na drote ostava — kontrakt R-02 sa nemeni.
         def model_guid(model = nil)
           m = model || Sketchup.active_model
-          m && m.respond_to?(:guid) ? m.guid.to_s : ''
+          m ? DocKey.key(m) : ''
         rescue StandardError
           ''
         end
@@ -262,11 +268,17 @@ module Noxun
         # PRISNE porovnanie (vzor `handle_tag_visible`, `handle_edge_option`,
         # `zone_ctx`, `handle_set_part_grain`): prazdny guid NIE JE starsi klient
         # — je to okno bez dobehnuteho NX.init, a to nesmie zapisovat nikam.
+        # A rovnako PRAZDNY KLUC SERVERA (DocKey nevedel dokument precitat)
+        # zapis zastavi — '' == '' by inak pustilo zapis bez identity na oboch
+        # stranach (Codex audit R-02b, BLOCKER 1: fail-closed plati obojsmerne).
+        # Samotne porovnanie robi `DocKey.foreign?` — TEN ISTY porovnavac ako
+        # vsetky ostatne guardy (review #267 P3-2), aby fail-closed nebolo
+        # vysadou tejto jednej cesty.
         # Hlaska je NAHLAS (nie tiche zahodenie ako pri echu vyberu): prepnutie
         # dokumentu je zriedkave a pouzivatel musi vediet, ze sa zmena neulozila.
         # `what` = co sa NEstalo, v 1. pade ('Skrinka sa nevložila').
         def foreign_document?(data, model, what)
-          return false if model && data['model_guid'].to_s == model_guid(model)
+          return false if model && !DocKey.foreign?(data['model_guid'], model)
 
           Engine.log("#{what}: model_guid #{data['model_guid'].inspect} nesedi s aktivnym dokumentom — zapis zahodeny")
           set_status("#{what} — panel patrí inému dokumentu. Klikni do okna zákazky a skús znova.", true)

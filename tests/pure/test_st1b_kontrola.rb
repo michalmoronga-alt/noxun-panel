@@ -223,7 +223,7 @@ NxTest.test('ŠT-1b: guard prepinacov zije v ProductionCore a NEMA okenny stav')
   NxTest.assert(guard.include?('identity_guard('), 'zvyrazenie hran zdiela identitu kliku')
   NxTest.assert(ident.include?("data['gen'].to_i == generation.to_i"),
                 'generaciu odovzdava OKNO (kazde ma vlastnu)')
-  NxTest.assert(ident.include?("data['model_guid'].to_s == model_guid(model)"),
+  NxTest.assert(ident.include?(%q<DocKey.foreign?(data['model_guid'], model)>),
                 'PRISNA zhoda dokumentu (callback HtmlDialogu je asynchronny)')
   # Okno je len obal — vlastne telo by znamenalo dve rozne spravania.
   NxTest.assert(S1B_STUDIO_RB.include?('ProductionCore.do_edge_check(') &&

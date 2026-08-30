@@ -297,12 +297,21 @@ module Noxun
         true
       end
 
+      # Identita dokumentu pre overlay lifecycle — TVAR AJ DOVODY su spolocne
+      # s `EdgeCheck.same_model?` (tam je plne zdovodnenie). Skratene: `equal?`
+      # ma prednost; zaloha vyzaduje ZHODNY guid A ZHODNU cestu, lebo guid je
+      # obsah .skp suboru a dve sucasne otvorene KOPIE tej istej zakazky ho maju
+      # rovnaky (review #267 kolo 3, P3) — bez cesty by prekrytie ostalo visiet
+      # nad cudzim dokumentom.
       def same_model?(a, b)
         return false if a.nil? || b.nil?
         return true if a.equal?(b)
         ga = a.respond_to?(:guid) ? a.guid.to_s : ''
         gb = b.respond_to?(:guid) ? b.guid.to_s : ''
-        !ga.empty? && ga == gb
+        return false if ga.empty? || ga != gb
+        pa = a.respond_to?(:path) ? a.path.to_s : ''
+        pb = b.respond_to?(:path) ? b.path.to_s : ''
+        pa == pb
       rescue StandardError
         false
       end

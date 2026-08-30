@@ -184,7 +184,7 @@ NxTest.test('ABS rail: panel prijima LEN whitelistovany kluc a VYSLOVNY boolean'
   NxTest.assert(h.include?('EdgeCheck::OPTION_KEYS.include?(key)'), 'kluc musi prejst whitelistom servera')
   NxTest.assert(h.include?('(value == true || value == false)'),
                 'hodnota musi byt VYSLOVNE boolean (retazec "false" je v Ruby pravdivy)')
-  NxTest.assert(h.include?("data['model_guid'].to_s == model_guid(model)"),
+  NxTest.assert(h.include?(%q<DocKey.foreign?(data['model_guid'], model)>),
                 'PRISNA zhoda dokumentu (callback HtmlDialogu je asynchronny)')
   NxTest.assert(h.include?('EdgeCheck.available?(model)'), 'bez Overlay API sa nic nenastavuje')
   NxTest.assert(h.include?('push_edge_check'), 'odmietnutie vrati okno na PRAVDIVY stav')

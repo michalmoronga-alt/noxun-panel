@@ -403,12 +403,13 @@ module Noxun
           (f - f.round).abs < 0.05 ? f.round.to_s : format('%.1f', f).tr('.', ',')
         end
 
-        # ŠT-3b-1: identita dokumentu je `model.guid`, NIE `model.path`.
-        # Cesta dva NEULOZENE modely nerozlisi (oba maju prazdny path) — a to
-        # si priznaval uz povodny komentar okna. `guid` je ta ista autorita,
-        # akou sa riadia vsetky ostatne zapisovacie cesty Studia.
+        # ŠT-3b-1: identita dokumentu NIE JE `model.path` — cesta dva NEULOZENE
+        # modely nerozlisi (oba maju prazdny path). Od 1d/R-02b je hodnotou
+        # token DocKey (viazany na objekt modelu): baseline formulara uz
+        # neprepise obycajne Ctrl+S (Model#guid sa menil pri kazdom ulozeni)
+        # a je to TA ISTA autorita ako vo vsetkych zapisovacich cestach Studia.
         def model_guid(model)
-          model ? model.guid.to_s : ''
+          model ? DocKey.key(model) : ''
         end
 
         # Formular je platny len pre stav, z ktoreho bol naplneny: ZHODA
@@ -551,8 +552,7 @@ module Noxun
           # a kryje aj prípad, keď by baseline z akéhokoľvek dôvodu prešiel.
           # Tolerantne (vzor `do_budget`): PRAZDNY udaj zo starsieho cachovaneho
           # DOM guard neblokuje, NEZHODNE ID ano.
-          guid = data['model_guid'].to_s
-          if !guid.empty? && guid != model_guid(model)
+          if DocKey.foreign?(data['model_guid'], model, tolerate_blank_client: true)
             # Tu ZAMERNE ostava PLNY push (na rozdiel od baseline vetvy vyssie):
             # prepnuty dokument je cudzi pre VSETKY sekcie okna, nielen pre
             # pravidla — echo jednej sekcie by nechalo kusovnik, kontrolu aj
@@ -662,8 +662,7 @@ module Noxun
 
           # (2) DOKUMENT — tolerantne na PRAZDNY udaj (starsi cachovany DOM),
           #     nezhodne id odmietame (vzor `handle_save`).
-          guid = data['model_guid'].to_s
-          if !guid.empty? && guid != model_guid(model)
+          if DocKey.foreign?(data['model_guid'], model, tolerate_blank_client: true)
             return reject_reset('Model sa medzitým prepol — sekcia je načítaná z tohto modelu.', model)
           end
 

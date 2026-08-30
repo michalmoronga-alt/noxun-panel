@@ -55,7 +55,8 @@ NxTest.test('ST-1a: telo presunutych metod zije v Core (a nikde inde druhykrat)'
     'vepo_edge_thicknesses' => 'Materials.edges.each_with_object',
     'default_project_name' => "File.basename(p, '.*')",
     'sheets_map' => 'Materials.sheets.each_with_object',
-    'model_guid' => 'model.respond_to?(:guid)',
+    # 1d/R-02b: identitu dava DocKey (Model#guid sa meni pri kazdom ulozeni).
+    'model_guid' => 'DocKey.key(model)',
     'pids_for_problem' => 'Sketchup::ComponentInstance',
     'refs_for' => 'bom[:rows].find'
   }
@@ -131,13 +132,18 @@ NxTest.test('ST-1a: refs_for je cista funkcia') do
   end
 end
 
-NxTest.test('ST-1a: model_guid znesie nil aj objekt bez guid') do
+NxTest.test('ST-1a: model_guid znesie nil aj ne-modelovy objekt (od R-02b DocKey)') do
   core = Noxun::Engine::ProductionCore
-  no_guid = Object.new
-  with_guid = Struct.new(:guid).new('G-1')
-  NxTest.assert_equal('', core.model_guid(nil), 'nil model = prazdny guid')
-  NxTest.assert_equal('', core.model_guid(no_guid), 'objekt bez guid = prazdny guid')
-  NxTest.assert_equal('G-1', core.model_guid(with_guid), 'guid sa cita z modelu')
+  Noxun::Engine::DocKey.reset!
+  not_model = Object.new
+  model = Struct.new(:path, :guid).new('C:/Zakazky/A.skp', 'G-1')
+  NxTest.assert_equal('', core.model_guid(nil), 'nil model = prazdna identita')
+  NxTest.assert_equal('', core.model_guid(not_model), 'ne-model = prazdna identita (fail-closed)')
+  token = core.model_guid(model)
+  NxTest.assert(token.start_with?('nxdoc-'), 'identita je token DocKey, nie guid')
+  model.guid = 'G-2' # simulacia Ctrl+S — SketchUp meni guid pri kazdom ulozeni
+  NxTest.assert_equal(token, core.model_guid(model),
+                      'ulozenie identitu NEMENI (oprava R-02b — guid ju menil)')
 end
 
 NxTest.test('ST-1a: vepo_base_label sklada label z dekoru, struktury, nazvu a typu') do

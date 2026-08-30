@@ -110,7 +110,7 @@ NxTest.test('UI-D1: „Označiť v modeli" NIE JE zapis ani krok Spat') do
 end
 
 NxTest.test('UI-D1: „Označiť v modeli" ma PRISNY guard dokumentu aj skrinky') do
-  NxTest.assert(UID1_SELECT_PART.include?("data['model_guid'].to_s != model_guid(model)"),
+  NxTest.assert(UID1_SELECT_PART.include?(%q<DocKey.foreign?(data['model_guid'], model)>),
                 'cudzi dokument akciu zastavi (ID skriniek sa naprie dokumentmi opakuju)')
   NxTest.assert(UID1_SELECT_PART.include?("Store.get(cab, 'cabinet_id').to_s != data['cabinet_id'].to_s"),
                 'oneskoreny callback nesmie oznacit dielec inej skrinky')
@@ -191,8 +191,8 @@ NxTest.test('UI-D1: karta dielca NEROBI flush handshake (a vie preco)') do
 end
 
 NxTest.test('UI-D1: zivy pocet aj zapis maju guard dokumentu') do
-  NxTest.assert(UID1_COUNT.include?("data['model_guid'].to_s != model_guid(model)"), 'pocet: guard dokumentu')
-  NxTest.assert(UID1_APPLY.include?("data['model_guid'].to_s != model_guid(model)"), 'zapis: guard dokumentu')
+  NxTest.assert(UID1_COUNT.include?(%q<DocKey.foreign?(data['model_guid'], model)>), 'pocet: guard dokumentu')
+  NxTest.assert(UID1_APPLY.include?(%q<DocKey.foreign?(data['model_guid'], model)>), 'zapis: guard dokumentu')
   NxTest.assert(UID1_PARTS_RB.include?("return [nil, nil, nil, 'Karta patrí inému dielcu"),
                 'karta musi sediet s dielcom vo vybere (asynchronny callback)')
 end

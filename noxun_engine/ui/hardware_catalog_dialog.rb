@@ -452,7 +452,9 @@ module Noxun
             'generic_types' => BuildPlan::GENERIC_TYPES.map { |gt|
               { 'key' => gt, 'label' => HardwareRules.label_for(gt) }
             },
-            'model_guid' => model ? model.guid.to_s : '',
+            # 1d/R-02b: identita dokumentu je token DocKey (Model#guid sa meni
+            # pri kazdom ulozeni) — rovnaka autorita ako panel a Studio.
+            'model_guid' => model ? DocKey.key(model) : '',
             'model_title' => model && !model.title.to_s.empty? ? model.title.to_s : 'Bez názvu'
           }
         end
@@ -593,7 +595,7 @@ module Noxun
           data = JSON.parse(payload.to_s)
           model = Sketchup.active_model
           return set_status('Žiadny aktívny model.', true) if model.nil?
-          if data['model_guid'].to_s != model.guid.to_s
+          if DocKey.foreign?(data['model_guid'], model)
             resync_sets
             return set_status('Model sa medzitým prepol — predvoľby sa obnovili, vyber znova.', true)
           end
@@ -692,7 +694,7 @@ module Noxun
           data = JSON.parse(payload.to_s)
           model = Sketchup.active_model
           return set_status('Žiadny aktívny model.', true) if model.nil?
-          if data['model_guid'].to_s != model.guid.to_s
+          if DocKey.foreign?(data['model_guid'], model)
             resync_sets
             return set_status('Model sa medzitým prepol — obnovené.', true)
           end
@@ -749,7 +751,7 @@ module Noxun
           data = JSON.parse(payload.to_s)
           model = Sketchup.active_model
           return set_status('Žiadny aktívny model.', true) if model.nil?
-          if data['model_guid'].to_s != model.guid.to_s
+          if DocKey.foreign?(data['model_guid'], model)
             resync_sets
             return set_status('Model sa medzitým prepol — obnovené.', true)
           end

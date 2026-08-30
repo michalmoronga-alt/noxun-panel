@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.8.22' unless defined?(VERSION)
+    VERSION = '0.8.23' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -18,6 +18,11 @@ module Noxun
     def self.log(msg)
       puts "[NOXUN::Engine] #{msg}"
     end
+
+    # `Engine.on_document_replaced` (vymena dokumentu = jedna udalost s jednym
+    # zoznamom cleanupov) zije v `core/doc_key.rb` — tam, kde zije aj identita
+    # dokumentu, a hlavne tam, odkial ho vie spustit headless sada (tento
+    # subor je SketchUp loader, testy ho nenacitavaju).
 
     def self.log_error(e, context = nil)
       log("#{context ? "#{context}: " : ''}#{e.class}: #{e.message}")
@@ -395,6 +400,7 @@ end
 # Vnutorne subory — Sketchup.require (funguje aj so sifrovanymi .rbe).
 # Poradie: pure moduly (shelves/fronts/zone_tree) pred construction; templates po builderi.
 Sketchup.require 'noxun_engine/core/units'
+Sketchup.require 'noxun_engine/core/doc_key' # 1d/R-02b: stabilna identita dokumentu (pred vsetkymi identity guardmi)
 Sketchup.require 'noxun_engine/core/ids'
 Sketchup.require 'noxun_engine/core/store'
 Sketchup.require 'noxun_engine/core/part_keys' # stabilna identita dielcov pre override a buduce vystupy

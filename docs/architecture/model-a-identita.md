@@ -22,6 +22,76 @@ identifikátory entít (CAB-xxx, BRD-xxx).
 dostane nové id). **Od 1b-3 (brána G bloku 1b) ich číta výhradne ZÁPISOVÁ cesta** — dedup tik `ScaleWatch` a `Panel.push_selected` → `request_dedup`. Čítacie cesty okien identitu
 NEOPRAVUJÚ: duplicitu zbiera `Bom.collect` do kľúča `identities` a Kontrola ju prizná ako ORANGE `duplicate_identity` (detail v [outputs.md](outputs.md)).
 
+### doc_key.rb
+
+**STABILNÁ identita dokumentu pre identity guardy** (1d/R-02b). `DocKey.key(model)` vydá token `nxdoc-<random>`; **rotuje ho UDALOSŤ výmeny dokumentu, nie život Ruby objektu** —
+`DocKey.invalidate(model)` volajú `PanelAppObserver#onNewModel`/`#onOpenModel` **aj** `ScaleWatch::EngineAppObserver` (prvý garantuje poradie voči pushu do panela, druhý je
+nainštalovaný vždy a kryje Štúdio a dialógy bez Inspectora; že rotujú dvaja, nevadí — udalosť je **ohraničená Ruby tickom**, takže vyrobí najviac jeden token, viac nižšie).
+Volajú ho cez **`Engine.on_document_replaced`** (žije v `core/doc_key.rb`, aby ho vedela spustiť aj headless sada) — jedno miesto so **zoznamom pamätí viazaných na objekt
+modelu**: identita `DocKey` a most názvu zákazky `SESSION_KEY_BRIDGE` (`outputs.md`). Obe stáli na tej istej falzifikovanej premise, preto majú spoločný cleanup a **každá ďalšia
+taká pamäť doň musí pribudnúť — okrem tých, ktoré upratuje vlastná zdokumentovaná cesta** (`GhostTool` session sa ruší priamo v observeroch kvôli vlastnej hláške a poradiu voči
+nástrojovému stacku; `ScaleWatch` cache transformácií čistí `forget_detached_models`, viď priznaná hranica tam).
+**`onActivateModel` NEROTUJE** (macOS prepnutie medzi už otvorenými dokumentmi) a **uloženie, prvé uloženie ani Save As identitu NEMENIA**. Je to JEDINÝ
+zdroj hodnoty poľa `model_guid` v payloadoch — meno poľa na drôte je historické (kontrakt R-02 sa nemenil), no hodnotou už NIE JE `Sketchup::Model#guid`, lebo ten sa mení pri
+KAŽDOM uložení a Ctrl+S do 400 ms po úprave poľa panela vyzeral ako prepnutie dokumentu (edit sa zahodil, `nxDropDocState` zmazal rozpísaný stav; rovnako trpel baseline Pravidiel,
+guardy Štúdia aj okno Materiály).
+
+**PREČO udalosťou a nie životom objektu (review #267 P1-1):** prvá verzia stavila na „nový dokument = nový `Model` objekt". **Windows drží jeden dokument na proces a pri
+File > Open smie ten istý objekt RECYKLOVAŤ** — to je v repe auditované už pri GHOST vkladaní (`construction.md` nižšie, `PanelAppObserver`, review #268 P2-2, in-SU GHOST 10).
+Na recyklovanom objekte by nový dokument zdedil starý token a **padli by všetky tri obrany R-02 naraz**: `nxSetModelGuid` by zmenu nezbadal (rovnaká hodnota = žiadne
+`nxDropDocState`), zachytená identita v bufferi by sedela a `foreign_document?` by zápis pustil — oneskorený apply by ticho pristál v cudzej zákazke.
+
+**JEDEN EVENT = JEDEN TOKEN, ohraničené RUBY TICKOM** (review delty #267 P2-N1, oprava mechanizmu review v2 P2-1). Rotujú dvaja observeri a poradie SketchUp negarantuje;
+naivné „zmaž záznam" nestačí, lebo callbacky observerov **nie sú len oznámenie — ony rovno notifikujú klientov**, takže medzi dve rotácie sa reálne vmestí `key()` a hodnota sa
+zapečie do už odoslaného pushu: Štúdio by dostalo token A, panel token B, prvý klik v Štúdiu by v SPRÁVNOM dokumente skončil falošným „model sa prepol" a `hw_sets.js` by
+projektové drafty zahodil druhýkrát — už nad novým dokumentom. `Engine.on_document_replaced` preto spustí cleanupy **raz za tick**: druhý observer toho istého eventu vidí
+otvorenú udalosť a vráti sa. Nulový timer (`UI.start_timer(0, false)`) udalosť zavrie pri najbližšom prechode message loopom — teda určite **až po** všetkých observeroch jedného
+eventu a určite **pred** ďalším File > New/Open (ten vyžaduje akciu používateľa). Poistka `DOC_EVENT_MAX_S`: keby timer nikdy neprišiel, zaseknutá udalosť by už nikdy nepustila
+rotáciu — čo je presne návrat P1 — preto sa po sekunde považuje za zavretú. Headless (a in-SU scenáre, ktoré chcú odsimulovať dva eventy) zatvárajú tick priamo cez
+`Engine.end_document_event`; je to **seam**, ktorý robí presne to isté ako timer.
+
+> **Prečo NIE „epocha odvodená z modelu".** Medziverzia skúšala značku z `Model#guid` a bola to **diera** (review v2, P2-1): `guid` je **obsah .skp súboru**, takže **kópia zákazky
+> nesie ten istý guid**, kým sa neuloží. File > Open kópie nad recyklovaným objektom by dal zhodnú značku, rotácia by sa vynechala a nový dokument by zdedil identitu starého —
+> teda celý pôvodný nález P1 späť, len tichšie. To isté platilo pre re-open toho istého súboru (revert) a pre Untitled → Untitled. **Tick nečíta z modelu žiadnu hodnotu**, takže
+> túto triedu dier nemá.
+
+**Pasce, ktoré tvar modulu určili:** (1) token sa NIKDY nezapisuje do modelu/.skp — zápis pri otvorení panela by špinil čistý dokument (dirty + undo + zákaz zápisov z push ciest,
+lekcia D-103) a token v súbore by prežil kópiu zákazky (dve kópie = jedna identita). Runtime token túto pascu nemá a **kópiu .skp chráni bezpodmienečná rotácia na `onOpenModel`**:
+otvorenie kópie je výmena dokumentu ako každá iná, takže nová identita vznikne **bez ohľadu na to, či SketchUp objekt recykloval a či kópia nesie ten istý `guid`** (nesie —
+guid je obsah súboru; práve na tom stroskotala epocha odvodená z modelu). (2) Identita sa neviaže na život objektu, ale na **dokument**: rotuje ju výhradne udalosť
+New/Open, `onActivateModel` nie a **uloženie, prvé uloženie ani Save As nie** (Codex audit R-02b, BLOCKER 3 — klient držiaci identitu do plného payloadu, sekcia Materiály, by sa
+po bezdôvodnej rotácii odmietal donekonečna; Save As je stále ten istý rozrobený dokument). **Save As výslovne** (námietka Codex kola 3 na #267, zamietnutá): je to pokračovanie
+TOHO ISTÉHO dokumentu — identický obsah, iná cesta, žiadny observer. **Edit naplánovaný pred Save As sa aplikuje do premenovaného súboru — a je to žiaduce, je to ten istý
+dokument;** rotácia by vrátila presne pôvodný bug R-02 (rozpísaná úprava sa pri uložení ticho zahodí ako „patrí inému dokumentu"). Z pôvodného súboru sa navyše nestane druhé
+otvorené okno, takže niet komu identitu prekrížiť. (3) Registry drží SILNÚ referenciu + `equal?` (recyklácia `object_id` po GC) a **živý
+dokument sa NIKDY nevyhadzuje** (BLOCKER 2 — vytlačený živý by po návrate dostal nový token a klient by zahodil drafty); upratuje sa len `valid? == false` záznam. (4) Chyba/ne-model
+= `''` — **fail-closed obojsmerne**: odmieta sa aj prázdny kľúč SERVERA (BLOCKER 1, `'' == ''` by pustilo zápis bez identity). (5) Token je náhodný (unikátny naprieč sedeniami),
+lebo `ProductionCore#project_session_key` persistuje `guid:<hodnota>` do `vepo_settings.json` — deterministický čítač by po reštarte kolidoval.
+
+**`DocKey.foreign?(claimed, model, tolerate_blank_client: false)` je JEDINÝ porovnávač identity** (review #267 P3-2) — cezeň idú VŠETKY guardy: `Panel.foreign_document?`, zóny,
+tagy, karty dielca a dosky, šablóny, Štúdio, Pravidlá, Materiály aj okno katalógu kovania. **Fail-closed na strane servera platí bez výnimky**: keď sa identita aktívneho dokumentu
+nedá prečítať (`key` vráti `''`), zápis končí — predtým mala túto poistku len `foreign_document?` a ~20 priamych porovnaní ju obchádzalo. Jediný povolený rozdiel medzi guardmi je
+pomenovaný `tolerate_blank_client:` (prázdny údaj z klienta = starší cachovaný DOM Štúdia/Materiálov, kryje ho generačný zámok) — vedomé rozhodnutie, nie vedľajší produkt tvaru
+výrazu. Plošný test stráži, že sa ručné porovnanie identity do pluginu nevráti. Producenti hodnoty: `Panel.model_guid`,
+`ProductionCore#model_guid`, `MaterialsDialog#model_guid`, `RulesDialog#model_guid`, okno katalógu kovania, `Materials.replace_uni_scan`. `core/scale_observer.rb` používa surový
+guid ďalej — je to detektor zmeny dokumentu v ceste, ktorá pri ukladaní nebeží (rozhodnutie R-04); to isté platí pre `same_model?` v `edge_check`/`grain_check`/`hover_edge`, ktoré
+porovnáva dve **súčasne držané** referencie v jednom okamihu (`equal?` má prednosť, guid je len záloha pre nový Ruby obal toho istého dokumentu). **Od kola 3 review #267 záloha
+vyžaduje zhodný guid A zhodnú cestu:** guid je obsah .skp súboru, takže dve **súčasne otvorené kópie** tej istej zákazky ho majú rovnaký (macOS) — bez cesty by dva rôzne
+dokumenty vyšli ako jeden a prekrytie by sa od prepnutého okna neodpojilo. Nie je to zápisová diera (ide o lifecycle prekrytí, nie o identitu zápisu), preto zostáva vedomou
+výnimkou v `NX_DK_GUID_ALLOWED`, ale správanie stráži behaviorálna sada nad všetkými tromi modulmi.
+
+**GHOST vkladanie stojí na tom istom fakte o Windows:** `GhostTool` session drží priamo objekt modelu (`@model`, porovnania cez `equal?`) a ruší sa cez `onNewModel`/`onOpenModel`
+**bezpodmienečne** — práve preto, že porovnanie identity by pri recyklovanom objekte session omylom nechalo žiť. DocKey rotuje v tých istých dvoch callbackoch a z toho istého dôvodu.
+S guidom ghost nikdy nepracoval; prípravná fáza `Panel.handle_insert` ide cez ten istý `foreign_document?` ako všetky ostatné zapisovacie handlery. Pod starým guidom by ju naopak
+Ctrl+S medzi otvorením panela a stlačením „Vložiť" **odmietol** hláškou „panel patrí inému dokumentu" — DocKey to rieši spolu so zvyškom guardov.
+
+**Testy:** `tests/pure/test_doc_key.rb` — behaviorálna sada nad stub modelmi (vrátane rotácie nad **recyklovaným** objektom a idempotencie dvoch observerov) + zdrojové kontrakty
+producentov a observerov (`onActivateModel` nesmie rotovať; `invalidate` musí byť PRED pushom) + **plošný sken celého `noxun_engine/**/*.rb`**: každý nový výskyt `.guid` musí buď
+test zhodiť, alebo si ho autor vedome dopíše do `NX_DK_GUID_ALLOWED` (zoznam nesmie klamať ani opačným smerom — odstránený výskyt test tiež nahlási). Sken vynecháva len riadky,
+ktoré sú CELÉ komentárom: pôvodné strihanie `#` až do konca riadku prepúšťalo `"#{model.guid}"` (interpolácia začína `#`), čo je podchytené mutačným testcasom. Polovičná migrácia
+identity je horšia než žiadna: časť guardov by Ctrl+S rozhodilo a časť nie. **In-SU sekcia `run_dockey`** overuje to isté v reálnom SketchUpe — vrátane probe `Model#valid?`
+a reprodukcie recyklácie cez skutočný `PanelAppObserver#onOpenModel` (vzor scenára GHOST 10).
+
 ### store.rb
 
 prístup k `NOXUN` dictionary.

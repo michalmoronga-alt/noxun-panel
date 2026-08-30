@@ -214,7 +214,7 @@ end
 NxTest.test('UI-C2 (F9): KAZDY zonovy callback overuje dokument aj skrinku') do
   ctx = UIC2_ZONES_RB[/def zone_ctx.*?\n        end\n/m].to_s
   NxTest.refute(ctx.empty?, 'spolocny vstup zone_ctx sa nenasiel')
-  NxTest.assert(ctx.include?("data['model_guid'].to_s != model_guid(model)"),
+  NxTest.assert(ctx.include?(%q<DocKey.foreign?(data['model_guid'], model)>),
                 'identita dokumentu sa musi porovnavat PRISNE (ID zon sa medzi dokumentmi opakuju)')
   NxTest.assert(ctx.include?("data['cabinet_id'].to_s"), 'callback musi niest aj identitu skrinky')
   %w[handle_split_zone handle_set_zone_shelves handle_clean_zone handle_set_zone_field].each do |h|
@@ -223,7 +223,7 @@ NxTest.test('UI-C2 (F9): KAZDY zonovy callback overuje dokument aj skrinku') do
   end
   # aj necinny select_zone (inak by ghost cudzieho modelu prepol aktivnu zonu)
   sel = UIC2_ZONES_RB[/def handle_select_zone\(.*?\n        end\n/m].to_s
-  NxTest.assert(sel.include?("data['model_guid'].to_s != model_guid(model)"))
+  NxTest.assert(sel.include?(%q<DocKey.foreign?(data['model_guid'], model)>))
   # a klient metadata naozaj posiela — z JEDNEHO miesta
   NxTest.assert(UIC2_ZONE_JS.include?('function nxZonePayload'), 'JS musi mat jedno miesto pre metadata')
   NxTest.assert(UIC2_ZONE_JS.include?('o.model_guid') && UIC2_ZONE_JS.include?('o.cabinet_id'))

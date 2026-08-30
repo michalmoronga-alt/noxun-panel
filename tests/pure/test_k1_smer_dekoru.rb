@@ -434,7 +434,7 @@ NxTest.test('K1: zapis overuje DOKUMENT aj to, ci je karta stale nad tym dielcom
   # Callback HtmlDialogu je asynchronny. Bez guardu dokumentu by oneskoreny klik
   # prestaval rovnomennu skrinku v INOM modeli (ID sa naprie dokumentmi
   # opakuju), bez kontroly vyberu by prepisal dielec, ktory uz na karte nie je.
-  NxTest.assert(K1_HANDLER.include?("data['model_guid'].to_s != model_guid(model)"),
+  NxTest.assert(K1_HANDLER.include?(%q<DocKey.foreign?(data['model_guid'], model)>),
                 'guard dokumentu je v zapisovej ceste')
   NxTest.assert(K1_HANDLER.include?("part_target_error(model, cab, params, rk, 'smer dekoru')"),
                 'identita dielca sa overuje PRED zapisom')

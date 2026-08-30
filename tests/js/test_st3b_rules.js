@@ -284,7 +284,8 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
      'zápis nesie identitu dokumentu');
   const rb = fs.readFileSync(path.join(JS, '..', 'rules_dialog.rb'), 'utf8');
   const iSave = rb.indexOf('def handle_save');
-  const iGuid = rb.indexOf('guid != model_guid(model)');
+  // R-02b / review #267 P3-2: porovnanie robí zdieľaný `DocKey.foreign?`.
+  const iGuid = rb.indexOf("DocKey.foreign?(data['model_guid'], model");
   ok(iSave >= 0 && iGuid > iSave,
      'a SERVER ho naozaj \u010d\u00edta v `handle_save` \u2014 inak by to bolo m\u0155tve pole');
   ok(/rdValidate\(rules\)/.test(saveFn),

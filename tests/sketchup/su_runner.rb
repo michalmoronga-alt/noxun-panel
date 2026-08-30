@@ -1653,6 +1653,140 @@ module NoxunSuRunner
     [mm(o.x), mm(o.y), mm(o.z)]
   end
 
+  # --- DOCKEY (1d/R-02b, review #267 P1-1 + delty P2-N1/P2-GLM/P2-1) --------
+  # Identita dokumentu v REALNOM SketchUpe — to, co headless sada nad stubom
+  # dokazat nevie:
+  #   1) MA `Sketchup::Model` metodu `valid?` (od nej zavisi upratovanie registry)?
+  #   2) Rotuje identita pri REALNOM `onOpenModel` nad TYM ISTYM `Model` objektom
+  #      (Windows recyklacia — jadro nalezu P1-1, vzor scenara GHOST 10)?
+  #   3) Zliaju sa OBA realne observery JEDNEHO ticku do JEDNEJ identity?
+  #   4) Prezije rozpisana praca realny Ctrl+S (`model.save`)?
+  def run_dockey(model)
+    cleanup(model)
+
+    # 1) PROBE `valid?` — nie je to assert o spravnosti pluginu, ale ZISTENIE
+    #    o API, ktore riadi navrh `prune_dead`. Vysledok ide do vypisu, nech je
+    #    priznanie v hlavicke doc_key.rb podlozene, nie odhadnute.
+    has_valid = model.respond_to?(:valid?)
+    val = has_valid ? (begin; model.valid?; rescue StandardError => ex; "vynimka #{ex.class}"; end) : 'N/A'
+    info("DOCKEY probe: Sketchup::Model#valid? dostupne=#{has_valid}, hodnota nad zivym modelom=#{val.inspect}")
+    ok('DOCKEY: registry sa upratuje fail-safe (chybajuce `valid?` zaznam PODRZI, nie zmaze)',
+       has_valid ? val == true : true)
+
+    # 2) Identita ZIVEHO dokumentu drzi (jadro celej davky — Ctrl+S ju nemeni).
+    t0 = e::Panel.model_guid(model)
+    ok('DOCKEY: identita nie je prazdna', !t0.to_s.empty?)
+    ok('DOCKEY: opakovane citanie vrati TU ISTU identitu', e::Panel.model_guid(model) == t0)
+    ok('DOCKEY: CERSTVY token zapis pusti', e::DocKey.foreign?(t0, model) == false)
+    ok('DOCKEY: CUDZI token zapis NEPUSTI', e::DocKey.foreign?('nxdoc-cudzi', model) == true)
+
+    # 3) ROTACIA + OHRANICENIE TICKOM nad REALNYM modelom. Od opravy P2-1 je
+    #    `invalidate` BEZPODMIENECNY (ziadna znacka z modelu), takze realny
+    #    `onOpenModel` nad TYM ISTYM objektom identitu naozaj prerotuje — to je
+    #    priama reprodukcia P1-1. A oba observery JEDNEHO ticku sa musia
+    #    zhodnut na JEDNEJ identite (P2-N1).
+    e.end_document_event # cisty tick (v SketchUpe ho zatvara nulovy timer)
+    e::Panel.push_selected(model)
+    e::ScaleWatch::EngineAppObserver.new.onOpenModel(model)
+    t1 = e::Panel.model_guid(model)
+    ok('DOCKEY: realny onOpenModel nad TYM ISTYM objektom vydal NOVU identitu (P1-1)',
+       !t1.to_s.empty? && t1 != t0)
+    ok('DOCKEY: STARY token uz zapis do dokumentu NEPUSTI',
+       e::DocKey.foreign?(t0, model) == true)
+    e::Panel::PanelAppObserver.new.onOpenModel(model) # DRUHY observer TOHO ISTEHO ticku
+    ok('DOCKEY: druhy observer toho isteho ticku identitu UZ NEPREROTOVAL (P2-N1)',
+       e::Panel.model_guid(model) == t1)
+    e.end_document_event
+    e::Panel::PanelAppObserver.new.onOpenModel(model) # NOVY tick = novy event
+    ok('DOCKEY: DRUHY tick rotuje znova (ohranicenie nesmie zlepit dva eventy)',
+       e::Panel.model_guid(model) != t1)
+    t_panel = e::Panel.model_guid(model)
+
+    # 4) `onActivateModel` identitu NEROTUJE — macOS prepnutie medzi uz
+    #    otvorenymi dokumentmi; rotacia by klientovi zahodila rozpisanu pracu.
+    e::Panel::PanelAppObserver.new.onActivateModel(model)
+    ok('DOCKEY: onActivateModel identitu NEROTUJE', e::Panel.model_guid(model) == t_panel)
+
+    # 5) Fail-closed: bez modelu sa nezapisuje ani s platne vyzerajucim tokenom.
+    ok('DOCKEY: prazdny kluc servera zastavi zapis (fail-closed)',
+       e::DocKey.foreign?(t_panel, nil) == true)
+
+    # 6) KOPIA .skp — diera medziverzie s „epochou z Model#guid" (review v2 P2-1):
+    #    guid je obsah SUBORU, takze kopia zakazky nesie ten isty guid. Nad
+    #    dvojnikom (realnemu modelu sa guid prepisat neda) sa overuje, ze
+    #    rotacia na tom NESTOJI.
+    dbl = Struct.new(:path, :guid) do
+      def valid?
+        true
+      end
+    end.new('C:/Zakazky/Klinika.skp', 'ROVNAKY-GUID')
+    e.end_document_event
+    d0 = e::DocKey.key(dbl)
+    dbl.path = 'C:/Zakazky/Klinika - kopia.skp' # ZHODNY guid, INY subor
+    e.on_document_replaced(dbl)
+    ok('DOCKEY: kopia .skp so ZHODNYM guidom dostala NOVU identitu (P2-1)',
+       !d0.to_s.empty? && e::DocKey.key(dbl) != d0)
+    e.end_document_event
+
+    # 7) ZLOZENY SCENAR — cela povodna chyba naraz, nad REALNYM Ctrl+S
+    #    (delta P3-GLM-1). Doteraz boli obe polovice pripnute zvlast.
+    #    Zaroven je to jediny miesto, kde sa EMPIRICKY overi premisa celej
+    #    davky: ze SketchUp pri ulozeni naozaj meni `Model#guid`.
+    cleanup(model)
+    # Skrinka sa stavia BUILDEROM (od GHOSTu `handle_insert` uz nevklada, len
+    # zavesi ducha na kurzor — a tu nas zaujima zapisova cesta, nie vkladanie).
+    inst = e::CabinetBuilder.build(model, GHOST_PARAMS.dup)
+    if inst && model.path.to_s.empty?
+      info('DOCKEY 7: model nema cestu (neulozeny) — zlozeny Ctrl+S scenar preskoceny')
+    elsif inst
+      cid = e::Store.get(inst, 'cabinet_id')
+      # `handle_apply_all` je AUTO-APPLY nad VYBEROM (bez vyberu ticho konci) —
+      # skrinku teda najprv oznacime, presne ako to robi pouzivatel.
+      model.selection.clear
+      model.selection.add(inst)
+      zachytena = e::Panel.model_guid(model)   # identita pri NAPLANOVANI editu
+      guid_pred = model.guid.to_s
+      saved = begin
+        model.save
+        true
+      rescue StandardError => ex
+        info("DOCKEY 7: model.save zlyhal (#{ex.class}) — scenar preskoceny")
+        false
+      end
+      if saved
+        ok('DOCKEY 7: PREMISA DAVKY — SketchUp pri ulozeni ZMENIL Model#guid',
+           !guid_pred.empty? && model.guid.to_s != guid_pred)
+        ok('DOCKEY 7: identita dokumentu Ctrl+S PREZILA (token sa nezmenil)',
+           e::Panel.model_guid(model) == zachytena)
+        # A teraz to, o co v celej davke ide: debounced edit naplanovany PRED
+        # ulozenim sa po nom MUSI zapisat, nie ticho zahodit.
+        e::Panel.handle_apply_all({ 'cabinet_id' => cid, 'width' => 650.0,
+                                    'model_guid' => zachytena }.to_json)
+        cfg = e::Store.config(inst) || {}
+        ok('DOCKEY 7: edit naplanovany PRED Ctrl+S sa po nom naozaj ZAPISAL',
+           (cfg['width'].to_f - 650.0).abs < 0.01)
+        # A protivaha: ten isty payload s CUDZOU identitou zapisat NESMIE.
+        e::Panel.handle_apply_all({ 'cabinet_id' => cid, 'width' => 700.0,
+                                    'model_guid' => 'nxdoc-cudzi' }.to_json)
+        cfg2 = e::Store.config(inst) || {}
+        ok('DOCKEY 7: ten isty edit s CUDZOU identitou sa NEZAPISAL',
+           (cfg2['width'].to_f - 650.0).abs < 0.01)
+      end
+    end
+
+    # 8) MOST NAZVU ZAKAZKY (delta P2-GLM) — druha pamat viazana na objekt
+    #    modelu. Po vymene dokumentu sa NESMIE pamatat, inak by novy Untitled
+    #    zdedil nazov zakazky a odniesol si ho do VEPO/CSV/XLSX.
+    e.end_document_event # cisty tick, inak by sa cleanup preskocil
+    e::ProductionCore.remember_session_key(model, "guid:#{e::Panel.model_guid(model)}")
+    ok('DOCKEY 8: vychodisko — most si kluc sedenia pamata',
+       !e::ProductionCore.remembered_session_key(model).to_s.empty?)
+    e.on_document_replaced(model)
+    ok('DOCKEY 8: vymena dokumentu most ZAHODILA (novy Untitled nezdedi nazov)',
+       e::ProductionCore.remembered_session_key(model).to_s.empty?)
+    cleanup(model)
+  end
+
   def run_ghost(model)
     cleanup(model)
     markers = []
@@ -8116,7 +8250,7 @@ module NoxunSuRunner
   end
 
   def st3a_scenar(model, hw, sets)
-    guid = model.guid.to_s
+    guid = e::ProductionCore.model_guid(model)
     rec = []
     sink = ->(script) { rec << script.to_s }
     gt = ST3A_SEED_GT
@@ -8310,7 +8444,7 @@ module NoxunSuRunner
     rec.clear
     rd.dispatch('save_rules',
                 { 'rules' => broken, 'also_global' => false,
-                  'model_guid' => model.guid.to_s, 'rules_rev' => rev }.to_json, sink)
+                  'model_guid' => e::ProductionCore.model_guid(model), 'rules_rev' => rev }.to_json, sink)
     ok('ŠT-3b-2c1 (b3): ulozenie pravidla BEZ pásma „všetko nad" sa ODMIETNE',
        rec.any? { |x| x.include?('neuložili') })
     # Review #223 (Codex P2): hlaska musi niest AJ identitu `rule_id` — dve
@@ -8364,7 +8498,7 @@ module NoxunSuRunner
          pay.is_a?(Hash) && pay['rules'].is_a?(Array) && !pay['rules'].empty? &&
          pay['cabinets'].to_i >= 1)
       ok('ŠT-3b-1 (a): a identitu dokumentu (baseline guard stoji na guid)',
-         pay && pay['model_guid'].to_s == model.guid.to_s)
+         pay && pay['model_guid'].to_s == e::ProductionCore.model_guid(model))
 
       target = st3b_pick_rule(model, inst)
       if target.nil?
@@ -8387,7 +8521,7 @@ module NoxunSuRunner
       rec.clear
       rd.dispatch('save_rules',
                   { 'rules' => edited, 'also_global' => false,
-                    'model_guid' => model.guid.to_s, 'rules_rev' => rev }.to_json, sink)
+                    'model_guid' => e::ProductionCore.model_guid(model), 'rules_rev' => rev }.to_json, sink)
       ok('ŠT-3b-1 (b): ulozenie zo sekcie prebehlo a povedalo, kolko skriniek prestavalo',
          rec.any? { |x| x.include?('prestavan') })
       ok("ŠT-3b-1 (b): pravidlo je v projekte zmenene (#{base_qty} -> #{new_qty})",
@@ -8420,7 +8554,7 @@ module NoxunSuRunner
       rec.clear
       rd.dispatch('save_rules',
                   { 'rules' => edited, 'also_global' => false,
-                    'model_guid' => model.guid.to_s, 'rules_rev' => rec_rev }.to_json, sink)
+                    'model_guid' => e::ProductionCore.model_guid(model), 'rules_rev' => rec_rev }.to_json, sink)
       ok("ŠT-3b-1 (b2): opakovane ulozenie stav obnovilo (#{st3b_qty(model, output)})",
          st3b_qty(model, output).to_i == new_qty)
 
@@ -8477,7 +8611,7 @@ module NoxunSuRunner
       rec.clear
       rd.dispatch('save_rules',
                   { 'rules' => edited, 'also_global' => false,
-                    'model_guid' => model.guid.to_s, 'rules_rev' => stale_rev }.to_json, sink)
+                    'model_guid' => e::ProductionCore.model_guid(model), 'rules_rev' => stale_rev }.to_json, sink)
       ok('ŠT-3b-1 (e): zapis po CUDZEJ zmene pravidiel sa ODMIETNE s hlaskou',
          rec.any? { |x| x.include?('medzitým zmenili') })
       ok('ŠT-3b-1 (e): a NIC sa nezapisalo (v projekte ostala cudzia hodnota)',
@@ -8494,7 +8628,7 @@ module NoxunSuRunner
       rec.clear
       rd.dispatch('save_rules',
                   { 'rules' => edited, 'also_global' => false,
-                    'model_guid' => model.guid.to_s,
+                    'model_guid' => e::ProductionCore.model_guid(model),
                     'rules_rev' => 'cudzi-odtlacok' }.to_json, sink)
       ok('ŠT-3b-2c2 (f): zapis s CUDZIM odtlackom pravidiel sa ODMIETNE',
          rec.any? { |x| x.include?('inej verzie') })
@@ -8519,7 +8653,7 @@ module NoxunSuRunner
       rec.clear
       rd.dispatch('save_rules',
                   { 'rules' => edited, 'also_global' => false,
-                    'model_guid' => model.guid.to_s,
+                    'model_guid' => e::ProductionCore.model_guid(model),
                     'rules_rev' => fresh_rev }.to_json, sink)
       ok('ŠT-3b-2c2 (f): so SPRAVNYM odtlackom ulozenie PREJDE',
          rec.any? { |x| x.include?('prestavan') })
@@ -8532,7 +8666,7 @@ module NoxunSuRunner
       rec.clear
       rd.dispatch('save_rules',
                   { 'rules' => edited, 'also_global' => false,
-                    'model_guid' => model.guid.to_s }.to_json, sink)
+                    'model_guid' => e::ProductionCore.model_guid(model) }.to_json, sink)
       ok('ŠT-3b-2c2 (f): zapis BEZ odtlacku sa ODMIETNE (stary DOM neprepise novsie pravidla)',
          rec.any? { |x| x.include?('predošlej verzie') })
       ok("ŠT-3b-2c2 (f): a NIC sa nezapisalo (v projekte ostalo #{before_norev})",
@@ -8645,7 +8779,7 @@ module NoxunSuRunner
 
       rec.clear
       rd.dispatch('reset_abs_override',
-                  { 'gen' => gen + 99, 'model_guid' => model.guid.to_s,
+                  { 'gen' => gen + 99, 'model_guid' => e::ProductionCore.model_guid(model),
                     'owner_id' => cid, 'part_key' => pkey }.to_json, sink)
       ok('ŠT-3b-2b (b): klik zo ZASTARANEHO zoznamu sa ODMIETNE',
          rec.any? { |x| x.include?('prepočítal') })
@@ -8666,7 +8800,7 @@ module NoxunSuRunner
         model.commit_operation
         rec.clear
         rd.dispatch('reset_abs_override',
-                    { 'gen' => gen, 'model_guid' => model.guid.to_s,
+                    { 'gen' => gen, 'model_guid' => e::ProductionCore.model_guid(model),
                       'owner_id' => cid, 'part_key' => pkey }.to_json, sink)
         ok('ŠT-3b-2b (c): NEJEDNOZNACNE cabinet_id (kopia pred dedup tikom) zapis ODMIETNE',
            rec.any? { |x| x.include?('viac kusov') })
@@ -8691,7 +8825,7 @@ module NoxunSuRunner
       rec.clear
       e::StudioDialog.send(:push_state)
       rd.dispatch('reset_abs_override',
-                  { 'gen' => e::StudioDialog.generation, 'model_guid' => model.guid.to_s,
+                  { 'gen' => e::StudioDialog.generation, 'model_guid' => e::ProductionCore.model_guid(model),
                     'owner_id' => cid, 'part_key' => pkey }.to_json, sink)
       ok('ŠT-3b-2b (d): reset povedal VYSLEDOK (co teraz plati podla pravidla)',
          rec.any? { |x| x.include?('späť na pravidlo') && x.include?('podľa pravidla') })
@@ -8741,7 +8875,7 @@ module NoxunSuRunner
       e::StudioDialog.send(:push_state)
       rec.clear
       rd.dispatch('reset_hw_override',
-                  { 'gen' => e::StudioDialog.generation, 'model_guid' => model.guid.to_s,
+                  { 'gen' => e::StudioDialog.generation, 'model_guid' => e::ProductionCore.model_guid(model),
                     'owner_id' => cid, 'part_key' => owner.to_s,
                     'generic_type' => gt, 'rule_id' => rid }.to_json, sink)
       ok('ŠT-3b-2b (f): reset kovania povedal, kolko teraz dava PRAVIDLO',
@@ -9703,9 +9837,10 @@ module NoxunSuRunner
   end
 
   # Zastupca CUDZIEHO dokumentu. Guard `same_model?` v EdgeCheck aj GrainCheck
-  # porovnava `guid`, takze na spustenie VYPINACEJ vetvy staci objekt s inym
-  # guidom — `disable!` pracuje s ulozenym `@model` (skutocnym dokumentom),
-  # nie s tymto objektom.
+  # berie ako zalohu za `equal?` dvojicu `guid` + `path` (review #267 kolo 3),
+  # takze na spustenie VYPINACEJ vetvy staci objekt s INYM guidom — nezhoda
+  # padne uz na nom. `disable!` pracuje s ulozenym `@model` (skutocnym
+  # dokumentom), nie s tymto objektom.
   class CharForeignModel
     def guid
       'CHAR-FOREIGN-GUID'
@@ -11073,6 +11208,7 @@ module NoxunSuRunner
     run_sync_rails(model)    # H3/D-80: vnutro pod vystuhami (odsadenie, upright, chrbat, odmietnutie)
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
     run_r03(model)           # R-03: sev prepare_insert/commit_insert — ciste pripravenie, vlastny rigidny transform, odmietnutia, edit kontext
+    run_dockey(model)        # 1d/R-02b: identita dokumentu — `valid?` probe, rotacia pri onOpenModel nad RECYKLOVANYM objektom, onActivateModel nerotuje, fail-closed
     run_ghost(model)         # GHOST V1-04: vkladanie na klik — 0 mutacii pred klikom, zamok/free vyska, rotacia a kotvy, degenerovany luc, undo/prepnutie/druhe „Vlozit", sablona a peciatka
     run_d45(model)           # D-45: hrubka <-> material tela (18,6 mm deadlock)
     run_d46(model)           # D-46: projektova predvolba korpusu s inou hrubkou (potvrdenie)

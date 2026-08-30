@@ -314,9 +314,12 @@ module Noxun
         path.to_s.strip.tr('\\', '/').downcase
       end
 
-      # Nahradny kluc neulozeneho modelu — plati LEN v ramci sedenia (guid sa
-      # po ulozeni zmeni). Preto ma vlastny prefix: aby sa dal rozoznat od
-      # cesty a pri prvom ulozeni zmigrovat.
+      # Nahradny kluc neulozeneho modelu — plati LEN v ramci sedenia. Prefix
+      # ho odlisuje od cesty, aby sa dal pri prvom zapise s platnou cestou
+      # zmigrovat. Od 1d/R-02b je hodnotou DocKey token (drzi cez ulozenie,
+      # prve ulozenie aj Save As a rotuje az pri vymene dokumentu) — most
+      # SESSION_KEY_BRIDGE vyssie tym stratil svoj hlavny scenar (guid uz prve
+      # ulozenie neprepise), ale ostava: kryje starsie zaznamy v subore.
       def project_session_key(model)
         guid = model_guid(model)
         guid.empty? ? '' : "#{SESSION_KEY_PREFIX}#{guid}"
@@ -342,6 +345,15 @@ module Noxun
 
       # Kluc sedenia, pod ktorym sa nazov TOHTO dokumentu naposledy zapisal,
       # kym este nemal cestu. Prazdny retazec = nic sa nepamata.
+      #
+      # `equal?` SAMO O SEBE NESTACI (1d/R-02b, review delty #267 P2-GLM):
+      # Windows drzi jeden dokument na proces a pri File > New/Open smie
+      # `Model` objekt RECYKLOVAT, takze `equal?` by nad recyklovanym objektom
+      # vratilo true a novy Untitled by zdedil kluc sedenia — a s nim NAZOV
+      # ZAKAZKY predosleho dokumentu, ktory by odisiel do VEPO/CSV/XLSX.
+      # Zaznam preto zahadzuje `Engine.on_document_replaced` (oba AppObservery)
+      # este PRED notifikaciou okien; `equal?` tu ostava ako druha poistka
+      # proti recyklacii `object_id` po GC.
       def remembered_session_key(model)
         entry = model ? SESSION_KEY_BRIDGE[model.object_id] : nil
         return '' unless entry.is_a?(Hash) && entry[:ref].equal?(model)
@@ -490,8 +502,11 @@ module Noxun
 
       # Stabilna identita modelu — zrkadlo MaterialsDialog.model_guid (oneskoreny
       # klik po prepnuti dokumentu nesmie otvorit modal nad inym projektom).
+      # 1d/R-02b: hodnota je token DocKey (Model#guid sa meni pri KAZDOM
+      # ulozeni — guardy Studia by inak videli Ctrl+S ako prepnutie dokumentu);
+      # meno metody aj pola `model_guid` na drote ostava.
       def model_guid(model)
-        model && model.respond_to?(:guid) ? model.guid.to_s : ''
+        model ? DocKey.key(model) : ''
       rescue StandardError
         ''
       end
@@ -1570,8 +1585,7 @@ module Noxun
           repush.call
           return status.call('Kontrola sa medzitým zmenila — obnovené, klikni znova.', true)
         end
-        guid = data['model_guid'].to_s
-        if !guid.empty? && guid != model_guid(model)
+        if DocKey.foreign?(data['model_guid'], model, tolerate_blank_client: true)
           repush.call
           return status.call('Model sa medzitým prepol — obnovené, klikni znova.', true)
         end
@@ -1623,7 +1637,7 @@ module Noxun
           status.call('Okno sa medzitým prepočítalo — obnovené, klikni znova.', true)
           return false
         end
-        unless data['model_guid'].to_s == model_guid(model)
+        if DocKey.foreign?(data['model_guid'], model)
           repush.call
           status.call('Model sa medzitým prepol — obnovené, klikni znova.', true)
           return false
@@ -1761,10 +1775,9 @@ module Noxun
           repush.call
           return status.call('Rozpočet sa medzitým prepočítal — obnovené, skús znova.', true)
         end
-        guid = data['model_guid'].to_s
         # Tolerantne: prazdny udaj z klienta (starsi cachovany DOM) guard
         # neblokuje, NEZHODNE ID ano.
-        if !guid.empty? && guid != model_guid(model)
+        if DocKey.foreign?(data['model_guid'], model, tolerate_blank_client: true)
           repush.call
           return status.call('Model sa medzitým prepol — obnovené, skús znova.', true)
         end
@@ -2030,8 +2043,7 @@ module Noxun
           repush.call
           return reject.call('Rozpočet sa medzitým prepočítal — obnovené, skús znova.')
         end
-        guid = data['model_guid'].to_s
-        if !guid.empty? && guid != model_guid(model)
+        if DocKey.foreign?(data['model_guid'], model, tolerate_blank_client: true)
           repush.call
           return reject.call('Model sa medzitým prepol — obnovené, skús znova.')
         end
