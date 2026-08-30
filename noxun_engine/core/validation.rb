@@ -610,6 +610,13 @@ module Noxun
               cut_txt = cut.empty? ? '' : " (#{cut})"
               "#{label} (#{where}): položka#{cut_txt} sa reže na dĺžku, ale set „#{sid}“ počíta kusy — " \
                 'nie je nacenená. Dĺžkové kovanie sa zatiaľ do setu mapovať nedá — objednaj ho ručne.'
+            when 'library_incompatible'
+              # R-07 (brana 1d): globalna kniznica setov je z novsej verzie
+              # alebo ma neznamy tvar — POUZIT sa nesmie (nakup z orezanych dat
+              # by bol NEUPLNY a ticho). Projekt vlastne predvolby este nema.
+              "#{label} (#{where}): knižnica setov kovania sa nedá bezpečne prečítať a projekt vlastné " \
+                'predvoľby ešte nemá — kovanie je bez kódov (nenacenené). Aktualizuj plugin, alebo ' \
+                'nastav predvoľby setov projektu v Štúdiu.'
             else
               "#{label} (#{where}) nemá priradený set — kovanie je bez kódov (nenacenené)."
             end

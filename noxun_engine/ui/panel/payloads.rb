@@ -223,7 +223,11 @@ module Noxun
           status, state = HardwareSets.project_state_status(model)
           return [status, state] if status == :ok && state
           if status == :missing
-            lib = HardwareSets.load
+            # R-07 (audit BLOCKER 1): nekompatibilna kniznica sa NEPOUZIVA ani
+            # tu — `usable_library` vtedy vracia prazdno, takze rozklik polozky
+            # v paneli nerozpise kody, ktore v supise (ProductionCore) vzniknut
+            # nemozu. Panel a supis sa rozist NESMU (lekcia R-06a).
+            lib = HardwareSets.usable_library
             sets = {}
             lib['sets'].each { |s| sets[s['set_id']] = s }
             return [status, { 'mapping' => lib['mapping'], 'sets' => sets }]
@@ -239,7 +243,9 @@ module Noxun
           status, state = hardware_read_state
           snap_sets = state['sets']
           proj_map = state['mapping']
-          globals = HardwareSets.load['sets']
+          # R-07: ponuka setov v paneli nesmie ponukat definicie z kniznice,
+          # ktoru sa nesmie POUZIT (vyber by ju skopiroval do .skp).
+          globals = HardwareSets.usable_library['sets']
           # H1a: override mapa moze mat composite kluce (gt@owner) a hodnota
           # moze byt selector — parser je jedina autorita tvaru; ponuku setov
           # sklada HardwareSets.set_options (definicia zo SNAPSHOTU vyhrava nad
