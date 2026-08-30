@@ -35,8 +35,9 @@
   so stavom session (kotva, otočenie, režim, editovateľná zamknutá výška v mm, „i" ikona zo spritu), **existuje výhradne počas session** (`active = false` ho schová pri
   každom konci) a `handle_ghost_lock_z` má **guard identity dokumentu ako zapisovacie handlery** (R-02) — hoci nezapisuje do modelu, mení stav session. Validácia výšky beží
   **na oboch stranách rovnako** (mm Float, 0–3000) a neplatný vstup **nič nemení**. Do `POJMY.md` pribudol fakt, prečo je 1400 práve 1400: **850 pracovná výška + 550 zástena**.
-  Testy: **2183 headless** (+10 scenárov), **75 JS sád** (nová `test_ghost_fb.js`), in-SU sekcia `run_ghost` rozšírená o scenár 18 (a–e). Blok GHOST **ostáva otvorený** —
-  smoke checklist má odteraz 11 bodov.
+  Testy: **2183 headless** (+10 scenárov), **75 JS sád** (nová `test_ghost_fb.js`), in-SU sekcia `run_ghost` rozšírená o scenár 18 (a–e) — plný beh **1199 PASS / 0 FAIL**.
+  Merací detail scenára 18a: snap dal `[1581.5, 296.8, 0]`, samotný lúč × rovina by dal `[2613, 1712, 0]` — **meter a pol vedľa**, takže scenár naozaj meria prichytávanie,
+  nie zhodu náhodou. Blok GHOST **ostáva otvorený** — smoke checklist má odteraz 11 bodov.
 
 - **1d/R-02b · STABILNÝ KĽÚČ DOKUMENTU (DocKey) NAMIESTO `Model#guid` (v0.8.23, 30.8.2026, PR #267):** priznaný zvyšok dávky R-02 (#264) — VŠETKY identity guardy (server
   `Panel.foreign_document?`, zóny, tagy, Štúdio, baseline Pravidiel, okno Materiály, katalóg kovania, `replace_uni_scan`) aj JS zrkadlo (`nxModelGuid`) stáli na
