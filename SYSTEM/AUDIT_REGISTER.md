@@ -136,7 +136,7 @@ SETOV a mapovaní (členov nie) → starší plugin knižnicu prečíta, oreže 
 `snapshot_std`); + kontrola počtu ČLENOV v `project_state_status` (2 riadky). D-109 pridá `STD_RATIO` do
 `STD_SUPPORTED` + obsahovú detekciu. Round-trip a downgrade-gate testy. **Odhad: M.**
 **✅ dávkou 1d/R-07 (PR #266, v0.8.21)** — knižnica má STAV (`library_state` `:ok`/`:read_only` + SK dôvod a kód
-`:newer`/`:foreign`/`:unknown_shape`/`:unreadable`), maticu počíta čistá `assess_library_doc`. Codex audit návrhu pridal
+`:newer`/`:foreign`/`:unknown_shape`/`:duplicate`/`:unreadable`), maticu počíta čistá **fail-closed** `assess_library_doc`. Codex audit návrhu pridal
 2 BLOCKERY a 3 FIXy, všetky zapracované: **(B2)** brána sa vyhodnocuje **pod zámkom nad čerstvo prečítaným súborom pred
 KAŽDÝM zápisom** — cachované `:ok` nie je dôkaz (druhá inštancia môže súbor medzitým nahradiť); jedno miesto v `write`
 kryje všetky zapisovacie cesty. **(B1)** read-only knižnica sa nesmie ani POUŽIŤ:
@@ -156,10 +156,15 @@ set nie je strata). Obe vrstvy používa aj `project_state_status`. **(F5)** `se
 **Verifikácia delty** našla ďalšie 1×P2 + 2×P3: guard šablón bol príliš široký (jedna mŕtva referencia brala kovanie
 šablóne aj nad ZDRAVOU knižnicou a hláška klamala) — zúžený na pokazený ZDROJ; zrušená cache rozbehla záplavu logu —
 `log_skip` je počas brány stíšený a dôvod ide do konzoly len pri ZMENE stavu; duplicitné `set_id` dostalo vlastný dôvod
-„oprav súbor". Degraded/`.bak` (**R-11**) sa **nerieši**, len sa mu nezavadzia (nový dôvod patrí do tej istej matice
-s vlastným kódom). Testy `tests/pure/test_r07_kniznica_brana.rb` (23 scenárov: dvojinštančný + reprodukcie nálezov review;
-mutačne overené, že padnú na regresii — okrem poradia *čítanie → rozhodnutie*, ktoré je pri necachovanom stave
-nepozorovateľné a ostáva obranou do hĺbky) + `tests/js/test_r07_kniznica_ui.js`.
+„oprav súbor". **Codex potvrdzovacie kolo** (1×P1 + 1×P2 + 1×P3) pridalo TRETIU vrstvu detektora — **typy hodnôt známych
+kľúčov** (`code_by_nl` ako pole prešlo whitelistom aj round-tripom, lebo ne-mapa sa počítala ako „nula položiek";
+`['future'].to_s` by sa pritom stalo objednaným „kódom") — a **fail-closed** bránu: výnimka v detektore (`qty: true` →
+`NoMethodError`) končí ako `:read_only`, nie ako výnimka, ktorú by `load` zachytil a `library_read_only?` vyvolala znova
+(súpis by skončil ako `nil`, teda BEZ oranžového priznania). Typová ochrana je aj vo `validate_member` — spoločnom tele
+čítacích ciest, ktoré cez bránu nejdú. Degraded/`.bak` (**R-11**) sa **nerieši**, len sa mu nezavadzia (nový dôvod patrí
+do tej istej matice s vlastným kódom). Testy `tests/pure/test_r07_kniznica_brana.rb` (26 scenárov: dvojinštančný +
+reprodukcie nálezov review; mutačne overené, že padnú na regresii — okrem poradia *čítanie → rozhodnutie*, ktoré je pri
+necachovanom stave nepozorovateľné a ostáva obranou do hĺbky) + `tests/js/test_r07_kniznica_ui.js`.
 
 ### R-08 · P1 · core · `core/json_file_store.rb:36-43` + sets/rules/abs_rules/dim_series/supplier_settings
 Read-modify-write globálnych katalógov bez medziprocesového zámku (revision check mimo zámku; globálne mapovanie

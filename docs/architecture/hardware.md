@@ -185,7 +185,9 @@ vetva pri ňom vráti **skutočnú knižnicu** (nikdy seed — inak by používa
 **Kompatibilitná BRÁNA globálnej knižnice (1d/R-07, v0.8.21).** Knižnica je globálna (`%APPDATA%`), takže ju zdieľajú **všetky verzie pluginu** na profile — a staršia verzia ju čítala bez pohľadu na
 marker `std`, neznámy tvar člena ticho zahodila a prvým zápisom stratu **zvečnila** (zápis navyše stampoval `std: 1` aj nad obsahom, ktorý bez novších tvarov čítať nejde, takže marker klamal aj dopredu).
 Od tejto dávky má knižnica **STAV** (vzor `HardwareCatalog.assess!`): `library_state` = `:ok` | `:read_only`, `library_state_reason` (hotová SK veta pre používateľa) a `library_state_code`
-(`:newer` · `:foreign` · `:unknown_shape` · `:unreadable`). Maticu počíta ČISTÁ `assess_library_doc(doc)` nad dokumentom — bez IO, takže sa dá vyhodnotiť aj nad súborom čerstvo prečítaným pod zámkom.
+(`:newer` · `:foreign` · `:unknown_shape` · `:duplicate` · `:unreadable`). Maticu počíta ČISTÁ `assess_library_doc(doc)` nad dokumentom — bez IO, takže sa dá vyhodnotiť aj nad súborom čerstvo prečítaným
+pod zámkom — a **fail-closed**: čokoľvek, čo v nej vyletí (cudzia hodnota, ktorá rozbije normalizáciu), končí ako `:read_only`, nikdy ako výnimka. Bez toho by ju `load` zachytil, zavolal
+`library_read_only?`, tá by ju vyvolala znova a nákupný súpis by skončil ako `nil` — teda BEZ oranžového priznania.
 
 Štyri veci, ktoré rozhodujú, či je brána naozaj brána:
 - **Stav sa NECACHUJE a `load` je bezpečný z princípu.** Zapamätané `:ok` je presne tá pasca, ktorú brána rieši: súbor mohol medzitým vymeniť iný proces, takže volajúci by sa rozhodol podľa STARŠIEHO
@@ -206,10 +208,15 @@ Od tejto dávky má knižnica **STAV** (vzor `HardwareCatalog.assess!`): `librar
 - **Seed-merge sa nad read-only knižnicou NEROBÍ** (`read_library` posudzuje stav PRED mergom): do novšieho súboru by sme primiešali svoje default sety a migrácie mapovania, teda presne tú tichú zmenu,
   pred ktorou brána chráni. V tej istej vetve sa **nikdy nevracia SEED** — inak by používateľ videl cudzie defaulty a prvý zápis by ich zvečnil (platí aj pre `rescue` vetvu `load`).
 
-**Detektor straty má DVE vrstvy, lebo whitelist sám nestačí.** (1) **Whitelist kľúčov** (`SET_KEYS` · `MEMBER_KEYS` · `PARAM_BANDS_KEYS` · `BAND_KEYS`) chytí NOVÉ POLE novšej verzie. (2) **Round-trip
-porovnanie** (`normalize_sets` + `members_lost?`) chytí novú HODNOTU známeho kľúča — novšia verzia typicky pridá najprv ju (`per: 'length'`), whitelist ju prepustí a normalizácia člena ho ticho zahodí.
+**Detektor straty má TRI vrstvy, lebo whitelist sám nestačí.** (1) **Whitelist kľúčov** (`SET_KEYS` · `MEMBER_KEYS` · `PARAM_BANDS_KEYS` · `BAND_KEYS`) chytí NOVÉ POLE novšej verzie. (2) **Typy hodnôt
+známych kľúčov** (`bad_type?`): kľúč, ktorý poznáme, môže v novšej verzii niesť iný TVAR — `code_by_nl` ako pole (štruktúrovaný rad popri fallback kóde), `qty` ako objekt. Normalizácia taký údaj buď
+zahodí bez stopy, alebo — horšie — pretypuje na nezmysel: `['future'].to_s` by sa stalo „kódom", ktorý sa objedná. Skalár je String alebo Numeric (číslo v JSONe je legitímna legacy podoba kódu aj
+počtu); `true`/`false`, pole a objekt skalár NIE SÚ. Bez tejto vrstvy diera unikala aj round-tripu, lebo `members_lost?` počítal ne-mapu ako „nula položiek" (dnes vracia sentinel, ktorý sa nikdy
+nezhoduje). (3) **Round-trip porovnanie** (`normalize_sets` + `members_lost?`) chytí novú HODNOTU známeho kľúča správneho typu — `per: 'length'` prejde whitelistom aj typmi a normalizácia člena ho
+ticho zahodí.
 Round-trip beží **so stíšeným `log_skip`** (`without_skip_log`): brána sa vyhodnocuje pri každom použití knižnice, takže bez stíšenia by nekompatibilná knižnica zapísala tú istú vetu do konzoly pri
-každom payloade; skutočné čítanie (`read_library`) loguje ďalej. Z rovnakého dôvodu ide do konzoly aj **dôvod read-only iba pri ZMENE stavu**. **Duplicitné `set_id`** má vlastný kód `:duplicate`
+každom payloade; skutočné čítanie (`read_library`) loguje ďalej. **Typová ochrana žije aj v `validate_member`** (nie len v bráne) — je to spoločné telo VŠETKÝCH čítacích ciest (cabinet override
+v configu, definície zo šablóny, `normalize_members` pri každej prestavbe) a tie cez bránu knižnice nejdú: `qty.to_i` nad `true` by inak zhodilo stavbu skrinky namiesto toho, aby ten člen odmietlo. Z rovnakého dôvodu ide do konzoly aj **dôvod read-only iba pri ZMENE stavu**. **Duplicitné `set_id`** má vlastný kód `:duplicate`
 a hlášku „oprav súbor" — „aktualizuj plugin" by tam nepomohlo, s verziou to nesúvisí (vzor katalógu, GH #99 P2).
 Porovnáva sa počet setov, počet členov a **počet položiek radu `code_by_nl`** (nečíselný kľúč radu sa zahadzuje po jednom, takže samotný počet členov to nechytí). Mapovanie ide cez `parse_mapping`
 **bez `set_ids`** — chyby tvaru sú strata, ale odkaz na už zmazaný set NIE (`delete_set!` mapovanie čistí zámerne). Legacy **konverzie hodnôt** (dopĺňaný `per`, chýbajúce `qty`, číslo namiesto stringu)

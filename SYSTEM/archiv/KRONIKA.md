@@ -21,7 +21,7 @@
   **všetky verzie pluginu**. Staršia verzia ju čítala **bez pohľadu na marker `std`**, neznámy tvar člena ticho zahodila (`normalize_members` je tolerantná — čítanie nesmie zhodiť
   prestavbu) a **prvým zápisom stratu zvečnila**; `write` navyše stampoval `std: 1` aj nad obsahom, ktorý bez novších tvarov čítať nejde, takže marker klamal aj dopredu. Register to
   viedol ako **R-07 (P1, core)**. Od tejto dávky má knižnica **STAV** (vzor `HardwareCatalog.assess!`): `:ok` / `:read_only` + SK dôvod a kód (`:newer` · `:foreign` ·
-  `:unknown_shape` · `:unreadable`), maticu počíta **čistá** `assess_library_doc(doc)` bez IO.
+  `:unknown_shape` · `:duplicate` · `:unreadable`), maticu počíta **čistá** a **fail-closed** `assess_library_doc(doc)` bez IO.
   **Čo do návrhu pridal povinný Codex audit (2 BLOCKER + 3 FIX + 2 NOTE, session 01a052d3) — všetko zapracované:** **(BLOCKER 2)** *cachované `:ok` nie je dôkaz* — pôvodný návrh
   vyhodnocoval bránu pri čítaní; medzitým mohla druhá inštancia (novší plugin) súbor nahradiť a náš zápis by ho zhodil na tvar, ktorému rozumieme my. Brána preto sedí v `write`
   **pod medziprocesovým zámkom** (R-08), po `JsonFileStore.reload!`, nad čerstvo prečítaným dokumentom — jedno miesto kryje **všetky** zapisovacie cesty (`save_set!` ·
@@ -72,13 +72,23 @@
   knižnice. `log_skip` je preto počas brány **stíšený** (`without_skip_log`) a dôvod read-only ide do konzoly **len pri zmene stavu**. **(P3-3)** obe polovice opravy P1-1 neboli pripnuté testom
   (mutácia „vráť cache" prešla) — pribudli dva pripínacie testy a mutačné overenie. **Bez opravy, len dôvod navyše:** duplicitné `set_id` má vlastný kód `:duplicate` a hlášku „oprav súbor"
   („aktualizuj plugin" tam nepomôže — s verziou to nesúvisí; vzor katalógu GH #99 P2).
-  Testy: `tests/pure/test_r07_kniznica_brana.rb` (23 scenárov: round-trip std 2 · plain std 1 · historický
+  **Čo pridalo Codex potvrdzovacie kolo (1×P1 + 1×P2 + 1×P3, reprodukcie reálne vykonané):** **(P1)** detektor mal dieru na **TYPOCH hodnôt známych kľúčov**. Whitelist kontroloval `code_by_nl` len keď
+  UŽ bola mapa a `members_lost?` počítal ne-mapu ako „nula položiek" — takže člen `{"code":"X","code_by_nl":["future"]}` (novšia verzia pridá štruktúrovaný rad popri fallback kóde) prešiel bránou ako
+  `:ok`, normalizácia vybrala `code`, rad zahodila bez stopy a najbližší `save_set!` by stratu zvečnil. Pribudla preto **tretia vrstva** (`bad_type?`) pre VŠETKY polia setu, člena aj pásma: skalár je
+  String alebo Numeric, `true`/`false`, pole a objekt nie. Nejde len o stratu — `['future'].to_s` by sa stalo „kódom", ktorý sa objedná. `nl_entries` navyše vracia pre ne-mapu **sentinel**, ktorý sa
+  s normalizovaným členom nikdy nezhoduje. **(P2)** neznámy typ `qty` **rozbíjal samotnú bránu**: `qty.to_i` nad `true` vyhodí `NoMethodError`, `load` ho zachytil, zavolal `library_read_only?` — a tá
+  ho vyvolala ZNOVA. Výsledok: žiadny stav, žiadny dôvod a `ProductionCore.hardware_expansion` vrátil `nil`, teda sekcia Nákup **bez oranžového priznania**. Obrana je dvojitá: `assess_library_doc` je
+  **fail-closed** (čokoľvek, čo v nej vyletí, končí ako `:read_only` s dôvodom „neznámy tvar") a `validate_member` má **typovú ochranu** `qty` — je to spoločné telo všetkých čítacích ciest (cabinet
+  override, definície zo šablóny, `normalize_members` pri každej prestavbe), ktoré cez bránu knižnice NEIDÚ, takže by taký záznam inak zhodil stavbu skrinky. **(P3)** tri dokumenty mali neúplný zoznam
+  stavových kódov (chýbal `:duplicate`).
+  Testy: `tests/pure/test_r07_kniznica_brana.rb` (26 scenárov: round-trip std 2 · plain std 1 · historický
   klamár · downgrade gate · **dvojinštančný scenár BLOCKER 2** · whitelist aj round-trip detektor · strata člena v snapshote · ORANGE expanzia · platný snapshot beží ďalej ·
   **reprodukcie nálezov review** · charakterizácia
   zdravej std-1 knižnice) a `tests/js/test_r07_kniznica_ui.js` (26 assertov nad mini-DOM: banner namiesto „prázdna", vypnuté globálne mutácie, projektové predvoľby ostávajú).
-  **Mutačne overené**, že nové testy naozaj pripínajú opravy (vrátená cache · staré poradie + cache · pôvodný guard šablón · odtíšený log · log pri každom vyhodnotení — každá mutácia zhodí práve
-  svoj test). **Priznané:** samotné poradie *čítanie → rozhodnutie* v `global_default_state` je pri necachovanom stave **nepozorovateľné** (kontrola pred čítaním sa aj tak vyhodnotí nad čerstvým
-  súborom) — je to obrana do hĺbky, nie vlastnosť, ktorú by test vedel odlíšiť; pripnutá je až v kombinácii s cache.
+  **Mutačne overené**, že nové testy naozaj pripínajú opravy (vrátená cache · staré poradie + cache · pôvodný guard šablón · odtíšený log · log pri každom vyhodnotení · odstránený fail-closed `rescue` ·
+  vrátený typ `code_by_nl` so sentinelom · odstránená typová ochrana `qty` — každá mutácia zhodí práve svoj test). **Priznané:** samotné poradie *čítanie → rozhodnutie* v `global_default_state` je pri
+  necachovanom stave **nepozorovateľné** (kontrola pred čítaním sa aj tak vyhodnotí nad čerstvým súborom) — je to obrana do hĺbky, nie vlastnosť, ktorú by test vedel odlíšiť; pripnutá je až
+  v kombinácii s cache. To isté platí pre typovú ochranu `qty` v bráne (predbehne ju whitelist) — preto je pripnutá **priamo na `validate_member`**, teda tam, kde na nej naozaj závisí prestavba.
 
 - **test-infra · PARALELNÁ IZOLÁCIA IN-SU TEST BEHOV (bez bumpu verzie — plugin sa nemení, 30.8.2026, PR #269):** nález z paralelného behu dávok 30.8.: `scripts/run_su_tests.ps1`
   používal pevný `%TEMP%\noxun_su_tests\su_result.txt`, zdieľaný `boot.rb` a spoločný SketchUp Plugins adresár — druhý súbežný beh prepísal výsledky, bootstrap aj nasadený plugin
