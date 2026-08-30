@@ -35,7 +35,7 @@
   so stavom session (kotva, otočenie, režim, editovateľná zamknutá výška v mm, „i" ikona zo spritu), **existuje výhradne počas session** (`active = false` ho schová pri
   každom konci) a `handle_ghost_lock_z` má **guard identity dokumentu ako zapisovacie handlery** (R-02) — hoci nezapisuje do modelu, mení stav session. Validácia výšky beží
   **na oboch stranách rovnako** (mm Float, 0–3000) a neplatný vstup **nič nemení**. Do `POJMY.md` pribudol fakt, prečo je 1400 práve 1400: **850 pracovná výška + 550 zástena**.
-  Testy: **2183 headless** (+10 scenárov), **75 JS sád** (nová `test_ghost_fb.js`), in-SU sekcia `run_ghost` rozšírená o scenár 18 (a–e) — plný beh **1199 PASS / 0 FAIL**.
+  Testy: **2216 headless** (+13 scenárov), **75 JS sád** (nová `test_ghost_fb.js`), in-SU sekcia `run_ghost` rozšírená o scenár 18 (a–e) — plný beh **1217 PASS / 0 FAIL** (nad DocKey identitou z 1d/R-02b).
   Merací detail scenára 18a: snap dal `[1581.5, 296.8, 0]`, samotný lúč × rovina by dal `[2613, 1712, 0]` — **meter a pol vedľa**, takže scenár naozaj meria prichytávanie,
   nie zhodu náhodou. Blok GHOST **ostáva otvorený** — smoke checklist má odteraz 11 bodov.
 
