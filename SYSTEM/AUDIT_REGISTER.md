@@ -135,6 +135,21 @@ SETOV a mapovaní (členov nie) → starší plugin knižnicu prečíta, oreže 
 **Návrh:** prevziať `HardwareCatalog.assess!` vzor 1:1 (novší std = read-only s hláškou; std z obsahu cez
 `snapshot_std`); + kontrola počtu ČLENOV v `project_state_status` (2 riadky). D-109 pridá `STD_RATIO` do
 `STD_SUPPORTED` + obsahovú detekciu. Round-trip a downgrade-gate testy. **Odhad: M.**
+**✅ dávkou 1d/R-07 (PR #266, v0.8.21)** — knižnica má STAV (`library_state` `:ok`/`:read_only` + SK dôvod a kód
+`:newer`/`:foreign`/`:unknown_shape`/`:unreadable`), maticu počíta čistá `assess_library_doc`. Codex audit návrhu pridal
+2 BLOCKERY a 3 FIXy, všetky zapracované: **(B2)** brána sa vyhodnocuje **pod zámkom nad čerstvo prečítaným súborom pred
+KAŽDÝM zápisom** — cachované `:ok` nie je dôkaz (druhá inštancia môže súbor medzitým nahradiť); jedno miesto v `write`
+kryje všetky zapisovacie cesty. **(B1)** read-only knižnica sa nesmie ani POUŽIŤ: `usable_library` vracia prázdno,
+`global_default_state` **nil** (odmietnu `ensure_project_state!`/`set_project_mapping!`/`add_project_sets!`/
+`freeze_template_sets!`/global fallback `resolve_set_def`), `merge_project_sets_seed!` má `:blocked` a súpis bez snapshotu
+skončí ORANGE **`library_incompatible`** (nový kód v `UNMAPPED_REASONS`; panel ide cez tú istú bránu, aby sa so súpisom
+nerozišiel). Platný projektový snapshot beží ďalej. **(F3)** seed-merge sa nad read-only knižnicou nerobí a nikdy sa
+nevracia SEED. **(F4)** detektor straty je **whitelist kľúčov** (set/člen/pásma/selector) + počet ČLENOV per set, ten istý
+pre knižnicu aj `project_state_status`; legacy konverzie hodnôt prejdú. **(F5)** `sets_payload` nesie `library_state` +
+`library_reason`, sekcia `hw` ukazuje dôvod bannerom a vypína globálne mutácie. `write` stampuje `std` podľa OBSAHU;
+**priznané (NOTE 7):** historický `std: 1` s novým obsahom sa neopravuje sám — marker sa povýši prvým legitímnym zápisom.
+Degraded/`.bak` (R-11) sa **nerieši**, len sa mu nezavadzia (nový dôvod patrí do tej istej matice s vlastným kódom).
+Testy `tests/pure/test_r07_kniznica_brana.rb` (14 scenárov vrátane dvojinštančného) + `tests/js/test_r07_kniznica_ui.js`.
 
 ### R-08 · P1 · core · `core/json_file_store.rb:36-43` + sets/rules/abs_rules/dim_series/supplier_settings
 Read-modify-write globálnych katalógov bez medziprocesového zámku (revision check mimo zámku; globálne mapovanie
@@ -344,7 +359,7 @@ B1 názov projektu (1b-6a, #244) · B2 hlavičky materiálov (1b-6b, #247) · A1
 1. **P0 hotfix** (✅ #252) → 2. **pred GHOST:** ~~R-01+R-04~~ (✅ #261) → ~~R-02~~ (✅ #264) → ~~R-03~~ (✅ #265 — **tvrdý blocker GHOST padol**) *(GHOST package upresňuje: tvrdý
 blocker je len R-03 — GHOST smie na Windows štartovať hneď po ňom; R-01 je macOS vetva, R-02 je na Windows P3
 a R-04 je platformovo nezávislá hygiena — všetky tri sa dorobia v 1d nezávisle od GHOST štartu)* → 3. **pred KOVANÍM:** ~~R-06 brána~~ (✅) ·
-R-07 · ~~R-08~~ (✅) · potom R-05 (+R-06 plný) ako D-109 šev → 4. **pred D-95/VÝROBOU:** R-17, R-16, R-22, po etapách R-15 →
+~~R-07~~ (✅ #266) · ~~R-08~~ (✅) · potom R-05 (+R-06 plný) ako D-109 šev → 4. **pred D-95/VÝROBOU:** R-17, R-16, R-22, po etapách R-15 →
 5. **perzistencia:** R-11 → R-12 → R-14 (R-13 po rozhodnutí Michala) → 6. **UI/hygiena:** ~~R-34~~ (✅ #262) ·
 R-23.1 Escape (S, hocikedy) · R-18 · zvyšok podľa kapacity. R-32 kostry priebežne pred každým zásahom.
 

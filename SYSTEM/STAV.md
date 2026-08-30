@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.8.20 · 30.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.8.21 · 30.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -18,7 +18,7 @@ Nálezy z reálnej výroby a chyby v cenách majú preto **najvyššiu prioritu 
 (okno zaniká — modul žije · uzavretý whitelist akcií · session token · echo vs. plný push · optimistický zámok) sú v [archiv/KRONIKA.md](archiv/KRONIKA.md),
 vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
-**Testy k v0.8.20:** **2112 headless** · 73 JS sád · posledný plný in-SketchUp beh **1088 PASS / 0 FAIL** (dávka 1d/R-03 — nová sekcia `run_r03` + `run_r03_async`: čisté
+**Testy k v0.8.21:** **2126 headless** · 74 JS sád · posledný plný in-SketchUp beh **1088 PASS / 0 FAIL** (dávka 1d/R-03 — sekcie `run_r03` + `run_r03_async`: čisté
 pripravenie vkladu, vlastný rigidný transform, odmietnutia mierky/zrkadla bez kroku Späť a rollback výnimky v sprievodnom bloku).
 
 > **Poznámka k procesu:** Codex review bol 21.–24.8. **nedostupný** — PR **#186–#226** prešli bránou so slepým subagentom. **Post-hoc sweep je od 27.8. HOTOVÝ** (34 PR cez Codex CLI + triáž 54 nezodpovedaných threadov): dve reálne P1 slepým kolám ušli a týždeň žili v `main`, obe sú dávno opravené — [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-E**.
@@ -28,7 +28,7 @@ pripravenie vkladu, vlastný rigidný transform, odmietnutia mierky/zrkadla bez 
 **Blok 1b · STABILIZAČNÁ REVÍZIA je prakticky uzavretý** ([PLAN.md](PLAN.md)): brány A/G/H hotové (1b-1/2/3), dlhy B+D (1b-4), sweep E, mimo písmen 1b-6a/6b/6c aj 1b-7, z F je hotové D-27 —
 **ostáva len D-51** (štandard veľkostí okien — čaká na Michalove hodnoty) a výklop ako typ čela (ide cez task package 1e).
 **Blok 1c · AUDIT KÓDU je HOTOVÝ (29.8.)** — traja audítori zliati do **[AUDIT_REGISTER.md](AUDIT_REGISTER.md)** (2×P0 + 35 položiek — 33 z 1c, 2 z review — + poradie pre 1d + 3 rozhodnutia Michala (R-05 · R-13 · R-30));
-**oba P0 sú vybavené dávkou P0-HF** (v0.8.14) a **beží blok 1d** (hotové: R-06 brána, R-08 zámky katalógov, R-01+R-04 multi-model observer, R-34 presnosť P0-2 brány, R-02 guard identity dokumentu, **R-03 šev vkladania — TVRDÝ blocker GHOST tým padol**). **Beží aj 1e PLÁNOVACIA DÁVKA** (task packages, priorita do 2.9.).
+**oba P0 sú vybavené dávkou P0-HF** (v0.8.14) a **beží blok 1d** (hotové: R-06 brána, R-08 zámky katalógov, R-01+R-04 multi-model observer, R-34 presnosť P0-2 brány, R-02 guard identity dokumentu, **R-03 šev vkladania — TVRDÝ blocker GHOST tým padol**, R-07 brána knižnice setov). **Beží aj 1e PLÁNOVACIA DÁVKA** (task packages, priorita do 2.9.).
 **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
@@ -39,6 +39,8 @@ Michal ju rozoberie v samostatnom okne). V1 rozsah zoštíhlený — checklist v
 
 ## Posledné uzávery
 
+- **1d/R-07 — starší a novší plugin si už nepoškodia knižnicu setov kovania** (knižnica z novšej verzie sa nedá ani zapísať, ani použiť: namiesto tichého orezania
+  ju súpis prizná oranžovým riadkom a Štúdio bannerom) — v0.8.21 (30.8.) · **Michal večer:** Štúdio → Kovanie → Sety musí vyzerať a fungovať presne ako doteraz (banner sa NESMIE ukázať).
 - **1d/R-03 — skrinka sa dá pripraviť BEZ zásahu do modelu a položiť na presnú polohu** (prípravná dávka pre GHOST vkladanie na klik — **tvrdý blocker tým padol**; z pohľadu používateľa sa dnes nemení NIČ) — v0.8.20 (30.8.) · **Michal večer:** netreba, bez UI zmeny.
 - **1d/R-02 — panel už nezapíše do nesprávneho dokumentu** (oneskorená akcia po prepnutí okna SketchUpu skončí hláškou „patrí inému dokumentu", nie tichým zápisom do cudzej zákazky — vkladanie, apply, premenovanie, kovanie, materiály aj karty dielca a dosky) — v0.8.19 (30.8.) · **Michal večer:** v dvoch oknách prepíš šírku skrinky a HNEĎ preklikni do druhého — zmena sa tam nesmie prejaviť.
 - **1d/R-34 — brána exportov už nezastaví zákazku, ktorá je v poriadku** (zdieľané ID skriniek zastaví nákup/rozpočet/ponuku len vtedy, keď sa kovanie NAOZAJ pomieša — účtované na vlastníka započítané raz, alebo rozídené sety dvoch skriniek s jedným ID; inak export prejde a ostáva len oranžový nález Kontroly) — v0.8.18 (30.8.) · **Michal večer:** netreba, bez UI zmeny.
@@ -56,11 +58,9 @@ Michal ju rozoberie v samostatnom okne). V1 rozsah zoštíhlený — checklist v
 - **1b-7 — koniec tichého návratu starej ceny dekoru** (editor prelieva už len bunky, ktorých si sa dotkol; pri strete ukáže *tvoja × v katalógu* a bez rozhodnutia neuloží) — v0.8.10 (27.8.) · **Michal večer:** oprav cenu dekoru, daj **Esc**, spusti „Aktualizovať z Demosu", otvor ten istý dekor — nová cena musí ostať.
 - **1b-E — POST-HOC SWEEP KOMPLET** (34 PR spätne cez Codex CLI + triáž 54 threadov; 29 nálezov, 10 platných) — kandidáti pre 1c v [zdroje/SWEEP_2026-08_kandidati.md](zdroje/SWEEP_2026-08_kandidati.md)
 - **1b-6a + 1b-6c — meno zákazky (delenie PR #243)**: názov prežije prvé uloženie (v0.8.9) a `vepo_settings.json` má **jedny zamknuté dvere** (v0.8.12 — dve inštancie SketchUpu si už nemažú nastavenia ani mená) · **Michal večer:** nový model → napíš názov zákazky → Ctrl+S → VEPO sa musí volať podľa zákazky.
-- **1b-4 — drobnosti sekcií Šablóny a Pravidlá** (odrážky B + D: PNG retry a dávkovanie, orezaný payload šablón; lenivý katalóg pások, víťaz pri vypnutej položke) — v0.8.8 (27.8.) · **Michal večer:** v **Šablónach** sa fotky dlaždíc majú doplniť po chvíli a **všetky**; v **Pravidlách** má poradie jantárových riadkov ostať rovnaké a vypnutá položka kovania má hovoriť „vypnuté".
-- **1b-3 — „Obnoviť" = čisté čítanie** (brána G: zber už nespúšťa dedup; duplicitné ID sa priznajú ORANGE riadkom Kontroly aj s výrobným dôsledkom, oprava = zápisová cesta) — v0.8.7 (27.8.) · **Michal večer:** v Štúdiu klikni „Obnoviť" a skús Späť — zoznam krokov sa refreshom nesmie meniť; po skopírovaní skrinky môže na okamih blysnúť oranžový riadok „Skrinky s ID … sú v modeli 2×".
-- **1b-2 — charakterizačné in-SU scenáre** (brána H: kópia · `*N` · Undo · prerušenie operácie · scale = regenerate · prepnutie modelu; +34 assertov, bez zmeny kódu, 27.8.) · **1b-1 — optimistický zámok Nastavení** (zastaraný pin nezostane po návrate do sekcie; status hovorí pravdu, keď prepočet zlyhá) — v0.8.6 (27.8.) · **PICKER-3 — dorobenie vyhľadávača** — v0.8.5 (26.8.)
+- **1b-4 — drobnosti sekcií Šablóny a Pravidlá** (PNG retry a dávkovanie, orezaný payload šablón; lenivý katalóg pások, víťaz pri vypnutej položke) — v0.8.8 (27.8.) · **1b-3 — „Obnoviť" = čisté čítanie** (brána G: zber už nespúšťa dedup; duplicitné ID sa priznajú ORANGE riadkom Kontroly) — v0.8.7 (27.8.)
 - **VEĽKÝ TEST 26.8.** — v0.8.4, PICKER-2 aj 8 dávok fázy ŠTÚDIO (#220–#227) PASS, žiadny nález · **DOCS CLEANUP KOMPLET** (#232–#234) · **PICKER-2/-1** (#231/#230, 25.8.) · **TEST-1 — prvé nálezy z testu naostro** (#229) · **ŠT-4b — UZÁVER FÁZY ŠTÚDIO** (#228, **v0.8.0**) · **ŠT-4a — ZANIKOL POSLEDNÝ SATELIT** (#227)
-- **Staršie uzávery** (fáza ŠTÚDIO ŠT-1…ŠT-3c #192–#226 · blok KRESBA #185–#190 · bloky UI-A…UI-D #165–#184 · ŠTART AUTONÓMIE #162–#164 · RETRO #161 · UPRATANIE #157–#160 · séria KLINIKA #144–#156 · Materiály 2.0 a dávky D/E #89–#140) — plné texty v [archiv/KRONIKA.md](archiv/KRONIKA.md)
+- **Staršie uzávery** (1b-2 charakterizačné in-SU scenáre · 1b-1 optimistický zámok Nastavení · PICKER-3 · fáza ŠTÚDIO ŠT-1…ŠT-3c #192–#226 · blok KRESBA #185–#190 · bloky UI-A…UI-D #165–#184 · ŠTART AUTONÓMIE #162–#164 · RETRO #161 · UPRATANIE #157–#160 · séria KLINIKA #144–#156 · Materiály 2.0 a dávky D/E #89–#140) — plné texty v [archiv/KRONIKA.md](archiv/KRONIKA.md)
 
 ## Kam sa pozrieť
 
