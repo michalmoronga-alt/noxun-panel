@@ -963,6 +963,21 @@ Okamžité cesty argument vynechajú (medzi klikom a odoslaním sa v jednovlákn
 preto sa helper vetví na `undefined`/`null`, nie na pravdivosť. **Rozsah guardu je 18 zápisových handlerov** — okrem korpusu, kovania a dosky aj `handle_set_cabinet_material`
 a tri cesty karty dielca (`material`, `edge`, `edges_all`); `handle_set_part_grain` má vlastný, tvarom starší guard z K1/D-108.
 
+**Rozpracovaný stav panela pri prepnutí dokumentu — tri obrany** (review #264 kolo 2). Zachytený guid sám nestačí: stav, ktorý drží dáta medzi akciou používateľa a volaním
+`sketchup.*`, prežije prepnutie dokumentu a pri odoslaní by dostal novú identitu.
+**(1) Centrálne zahodenie.** `nxSetModelGuid` je **jediný detektor zmeny dokumentu** na klientovi (každý push — `init`, `loadSelected`, `loadBoard`, `clearSelected` — ide cez
+neho). Pri skutočnej zmene hodnoty spustí `nxDropDocState()`, ktoré zahodí **všetok** rozpracovaný stav: `cancelCabinetEdits` · `cancelBoardEdits` · `dropCabRename` +
+`closeCabRenameEditor` · `absModalCloseSilent` · `closeSaveTemplateModal` · `closeSimilarModal`. **Echo push tej istej identity nezahodí nič** — rozpísaná práca musí prežiť
+(rovnaká zásada ako `NXShell.track`). Každý nový pending buffer, editor alebo modal patrí do tohto zoznamu; stráži ho `tests/pure/test_r02_doc_guard.rb`. Mimo zoznamu sú
+vedome `insertLocksTimer` (zámky žijú v pamäti Panel modulu, do modelu nezapisujú), `previewTimer` (lokálny re-render) a draft vkladacej karty (vklad pečiatkuje identitu až
+pri kliku).
+**(2) Vlastná zachytená identita v každom bufferi** — keby push zo servera neprišiel: `applyPendingGuid` (rozpísané edity formulára, používa ho aj **okamžitý** flush),
+`boardPending.guid` (batch karty dosky je kľúčovaný **dvojicou** dokument+doska — `BRD-001` je v každej zákazke, takže samotné id by zmiešalo edity dvoch dokumentov),
+`renameGuid` (inline premenovanie — `setIdbar` porovnáva len `cabinet_id`, takže editor prežije prepnutie na rovnomennú skrinku), `boardTarget()`/`partTarget()` (cieľ modalu
+chýbajúcej ABS: doska/dielec + dokument z času otvorenia — rozhodnutie je asynchrónne a karty sú mutovateľné globály), `tplModalGuid` a `simFor.guid` (staršie, už predtým
+správne).
+**(3) Serverový `foreign_document?`** — posledné slovo má vždy Ruby.
+
 ### actions_board.rb
 
 Doména panela: vloženie samostatnej dosky (`handle_insert_board`) a zápisové cesty jej karty (polia · materiál · ABS hrana · olep všetkých 4 · orientácia). Kontrakt karty je

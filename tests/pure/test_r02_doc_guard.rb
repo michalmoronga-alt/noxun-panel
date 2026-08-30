@@ -159,20 +159,103 @@ NxTest.test('R-02: debounced edity nesu ZACHYTENY dokument, nie ten pri odoslani
 
   form = File.read(File.join(R02_JS_DIR, 'form.js'), encoding: 'UTF-8')
   sched = form[/applyTimer = setTimeout.*/].to_s
-  NxTest.assert(form.include?('var guidSnapshot = nxDocGuid();'),
+  NxTest.assert(form.include?('applyPendingGuid = nxDocGuid();'),
                 'auto-apply zachytava dokument pri naplanovani')
-  NxTest.assert(sched.include?('cabSnapshot, guidSnapshot'),
+  NxTest.assert(sched.include?('cabSnapshot, applyPendingGuid'),
                 'zachyteny dokument ide do odlozeneho flushu')
   NxTest.assert(form.include?('sketchup.apply_all(nxDocPayload(payload, guidSnapshot))'),
                 'auto-apply posiela ZACHYTENY dokument')
 
   board = File.read(File.join(R02_JS_DIR, 'board_card.js'), encoding: 'UTF-8')
-  NxTest.assert(board.include?("guid: nxDocGuid()"),
+  NxTest.assert(board.include?('guid: pendGuid'),
                 'pending karty dosky si drzi dokument z casu naplanovania')
   NxTest.assert(board.include?('sketchup.set_board_fields(nxDocPayload(p, g))'),
                 'flush posiela ZACHYTENY dokument')
   NxTest.assert(board.include?('delete p.guid'),
                 'pracovny kluc pendingu sa do payloadu nedostane')
+  # Review #264 kolo 2: OKAMZITY flush musi prevziat zachyteny dokument —
+  # inak by stare hodnoty formulara opeciatkoval dnesnym guidom.
+  now = form[/function flushCabinetEditsNow\(\).*?\n  \}/m].to_s
+  NxTest.refute(now.empty?, 'flushCabinetEditsNow sa nasiel')
+  NxTest.assert(now.include?('applyPendingGuid'),
+                'okamzity flush berie ZACHYTENY dokument, nie dnesny')
+  NxTest.assert(now.include?('flushCabinetEdits(selectedCabId, g)'),
+                'zachyteny dokument ide do odoslania')
+  # Batch karty dosky je klucovany DVOJICOU dokument+doska (`BRD-001` je
+  # v kazdej zakazke — samotne id by zmiesalo edity dvoch dokumentov).
+  NxTest.assert(board.include?("boardPending.guid !== pendGuid"),
+                'pending dosky sa porovnava aj podla DOKUMENTU')
+end
+
+NxTest.test('R-02: zmena dokumentu ZAHODI vsetok rozpracovany stav panela') do
+  # Review #264 kolo 2 — rodina nalezov: UI stav, ktory prezije prepnutie
+  # dokumentu a pri odoslani dostane NOVY guid. Prva obrana je JEDNO miesto:
+  # `nxSetModelGuid` je jediny detektor zmeny dokumentu na klientovi (kazdy
+  # push ide cez neho), takze pri zmene hodnoty zahodi vsetky pending buffery,
+  # editory a modaly. Echo push tej istej identity nesmie zahodit NIC.
+  shell = File.read(File.join(R02_JS_DIR, 'shell.js'), encoding: 'UTF-8')
+  setter = shell[/function nxSetModelGuid\(g\)\{.*?\n  \}/m].to_s
+  NxTest.refute(setter.empty?, 'nxSetModelGuid sa nasiel')
+  NxTest.assert(setter.include?('if (next === nxModelGuid) return;'),
+                'echo push tej istej identity NEZAHADZUJE rozpisanu pracu')
+  NxTest.assert(setter.include?('nxDropDocState()'),
+                'skutocna zmena dokumentu spusti centralne zahodenie')
+
+  drop = shell[/function nxDropDocState\(\)\{.*?\n  \}/m].to_s
+  NxTest.refute(drop.empty?, 'nxDropDocState sa nasiel')
+  # UPLNY zoznam stavu, ktory drzi data medzi akciou a volanim `sketchup.*`.
+  # Kazdy novy pending buffer / editor / modal patri SEM (inak prezije
+  # prepnutie dokumentu a jeho zapis skonci v cudzej zakazke).
+  %w[cancelCabinetEdits cancelBoardEdits dropCabRename closeCabRenameEditor
+     absModalCloseSilent closeSaveTemplateModal closeSimilarModal].each do |fn|
+    NxTest.assert(drop.include?("typeof #{fn} === 'function'") && drop.include?("#{fn}();"),
+                  "#{fn} sa pri zmene dokumentu vola (a je volany bezpecne cez typeof)")
+  end
+end
+
+NxTest.test('R-02: kazdy pending buffer nesie VLASTNU zachytenu identitu') do
+  # Druha obrana (prva je centralne zahodenie, tretia serverovy guard):
+  # keby push zo servera neprisiel, buffer si identitu drzi sam.
+  form = File.read(File.join(R02_JS_DIR, 'form.js'), encoding: 'UTF-8')
+  board = File.read(File.join(R02_JS_DIR, 'board_card.js'), encoding: 'UTF-8')
+  bridge = File.read(File.join(R02_JS_DIR, 'bridge.js'), encoding: 'UTF-8')
+  part = File.read(File.join(R02_JS_DIR, 'part_card.js'), encoding: 'UTF-8')
+  core = File.read(File.join(R02_JS_DIR, 'core.js'), encoding: 'UTF-8')
+
+  NxTest.assert(core.include?('var applyPendingGuid = null;'),
+                'rozpisane edity formulara maju modulovy slot na dokument')
+  NxTest.assert(form.include?('function cancelCabinetEdits()'),
+                'existuje cesta, ktora rozpisane edity zahodi aj s identitou')
+
+  # Inline premenovanie: editor prezije prepnutie dokumentu na rovnomennu
+  # skrinku (setIdbar porovnava len cabinet_id), preto si guid drzi sam.
+  NxTest.assert(bridge.include?('renameGuid = nxDocGuid();'),
+                'editor nazvu zachytava dokument pri otvoreni')
+  NxTest.assert(bridge.include?('guid === nxDocGuid()'),
+                'Enter neposle nic, ked sa dokument medzitym zmenil')
+  NxTest.assert(bridge.include?('nxDocPayload({ cabinet_id: cid, name: name }, guid)'),
+                'premenovanie posiela ZACHYTENY dokument')
+  NxTest.assert(bridge.include?('renameGuid = \'\';'),
+                'zahodenie editora maze aj zachytenu identitu')
+
+  # Modal chybajucej ABS je asynchronny a karty su mutovatelne globaly —
+  # ciel sa preto zachytava pri OTVORENI a pri odoslani sa overuje.
+  NxTest.assert(board.include?('function boardTarget()') && board.include?('function boardTargetStale('),
+                'karta dosky ma snapshot ciela modalu')
+  NxTest.assert(part.include?('function partTarget()') && part.include?('function partTargetStale('),
+                'karta dielca ma snapshot ciela modalu')
+  %w[sendBoardMaterial sendBoardEdgesAll].each do |fn|
+    NxTest.assert(board.include?("function #{fn}(") && board[/function #{fn}\(.*?\n  \}/m].to_s.include?('Stale('),
+                  "#{fn} overuje ciel pred odoslanim")
+  end
+  %w[sendPartMaterial sendEdgesAll].each do |fn|
+    NxTest.assert(part[/function #{fn}\(.*?\n  \}/m].to_s.include?('partTargetStale('),
+                  "#{fn} overuje ciel pred odoslanim")
+  end
+  # Modal sa navyse zatvara pri KAZDEJ zmene toho, co je na obrazovke —
+  # `loadSelected` to robilo uz predtym, `loadBoard` a `clearSelected` nie.
+  NxTest.assert(bridge.scan('absModalCloseSilent()').length >= 3,
+                'ABS modal sa zatvara pri vsetkych troch pushoch (selected/board/clear)')
 end
 
 NxTest.test('R-02: in-SketchUp runner posiela identitu dokumentu ako panel') do

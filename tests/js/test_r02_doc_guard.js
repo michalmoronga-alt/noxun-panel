@@ -98,4 +98,51 @@ eq(JSON.parse(nxDocPayload({}, '')).model_guid, '', 'prazdny snapshot ostava pra
 eq(JSON.parse(nxDocPayload({}, null)).model_guid, 'guid-PO-PREPNUTI', 'null = aktualna identita');
 eq(JSON.parse(nxDocPayload({}, undefined)).model_guid, 'guid-PO-PREPNUTI', 'undefined = aktualna identita');
 
+// --- 7) CENTRALNE ZAHODENIE STAVU PRI ZMENE DOKUMENTU (review #264 kolo 2) --
+// `nxSetModelGuid` je jediny detektor zmeny dokumentu na klientovi. Pri
+// SKUTOCNEJ zmene hodnoty musi zahodit vsetok rozpracovany stav panela; echo
+// push toho isteho dokumentu NESMIE zahodit nic (rozpisana praca musi prezit).
+//
+// Cleanupy ziju v inych suboroch (form.js, board_card.js, bridge.js, part_card.js)
+// a v Node nie su nacitane — `nxDropDocState` ich preto vola cez `typeof`
+// a v tomto teste sa overuje, ze volanie NEPADNE a ze sa spusti prave vtedy,
+// ked sa guid naozaj zmenil. Zoznam mien strazi pure sada.
+const nxDropDocState = NXShell.nxDropDocState;
+eq(typeof nxDropDocState, 'function', 'centralne zahodenie stavu je exportovane');
+nxDropDocState(); // ziadny z cleanupov nie je v Node definovany — nesmie padnut
+n++;
+
+// Zmena hodnoty = drop; rovnaka hodnota = ziadny drop. Merame cez to, ci sa
+// identita naozaj prepisala (drop sam o sebe v Node nic viditelne nerobi).
+nxSetModelGuid('guid-X');
+eq(nxDocGuid(), 'guid-X', 'nova hodnota sa zapise');
+nxSetModelGuid('guid-X');
+eq(nxDocGuid(), 'guid-X', 'echo push tej istej identity ju nemeni');
+nxSetModelGuid('guid-Y');
+eq(nxDocGuid(), 'guid-Y', 'prepnutie dokumentu identitu prepise');
+
+// --- 8) SCENARE „prepnutie MEDZI naplanovanim a odoslanim" ------------------
+// Zrkadlia vzor, ktory pouzivaju vsetky pending buffery: zachyt identitu pri
+// naplanovani, posli ju s payloadom. Ak by sa citala az pri odosielani, kazdy
+// z tychto zapisov by pristal v cudzej zakazke.
+function pendingScenario(scheduleGuid, switchTo, payload){
+  nxSetModelGuid(scheduleGuid);
+  const snap = nxDocGuid();          // buffer si zachyti dokument
+  nxSetModelGuid(switchTo);          // pouzivatel prepol dokument
+  return JSON.parse(nxDocPayload(payload, snap)).model_guid;
+}
+eq(pendingScenario('doc-A', 'doc-B', { cabinet_id: 'CAB-001' }), 'doc-A',
+   'auto-apply korpusu: odlozeny zapis nesie dokument z casu naplanovania');
+eq(pendingScenario('doc-A', 'doc-B', { board_id: 'BRD-001', fields: { width: 555 } }), 'doc-A',
+   'polia karty dosky: batch nesie dokument z casu naplanovania');
+eq(pendingScenario('doc-A', 'doc-B', { cabinet_id: 'CAB-001', name: 'Skrinka' }), 'doc-A',
+   'premenovanie: Enter posle dokument z casu otvorenia editora');
+eq(pendingScenario('doc-A', 'doc-B', { board_id: 'BRD-001', create_missing_abs: true }), 'doc-A',
+   'modal chybajucej ABS: rozhodnutie nesie dokument z casu otvorenia');
+
+// Rovnaky dokument (ziadne prepnutie) = zachyteny aj aktualny su zhodne —
+// bezny pripad nesmie skoncit zbytocnym odmietnutim.
+eq(pendingScenario('doc-A', 'doc-A', { cabinet_id: 'CAB-001' }), 'doc-A',
+   'bez prepnutia sa nic nemeni (ziadne falosne odmietnutie)');
+
 console.log(`OK test_r02_doc_guard.js — ${n} kontrol`);

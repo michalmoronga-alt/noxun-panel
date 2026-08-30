@@ -54,6 +54,12 @@ templates, zones aj selection guard MAJÚ. [E:R-02 + F-02 ROZŠÍRENÉ]
 register zaradil medzi „guard MAJÚ" nesprávne — mali len echo `cabinet_id`. Druhý P1 kola 1: `nxDocPayload` čítal
 mutovateľný globál až pri ODOSLANÍ, takže **debounced** edity (auto-apply, polia dosky; 400 ms) by sa po prepnutí
 dokumentu opečiatkovali novým guidom a guard by ich pustil — identita sa preto **zachytáva pri naplánovaní**.
+**Kolo 2 (4× P1, jedna rodina)** doplnilo systémovú odpoveď: `nxSetModelGuid` je jediný detektor zmeny dokumentu a pri
+skutočnej zmene spúšťa `nxDropDocState()` — zahodí všetok rozpracovaný stav (pending buffery, inline editor názvu,
+modaly); echo push tej istej identity nezahodí nič. Druhá obrana = vlastná zachytená identita v každom bufferi
+(`applyPendingGuid` aj pre okamžitý flush · `boardPending` kľúčovaný dvojicou dokument+doska · `renameGuid` ·
+`boardTarget`/`partTarget` pre modal ABS). Priznaný zvyšok: `Model#guid` sa mení pri KAŽDOM uložení — vlastnosť
+celého vzoru (zóny, tagy, Štúdio ju majú tiež), nie tejto dávky.
 Porovnanie je **prísne** (vzor `handle_tag_visible` / `zone_ctx`): prázdny guid = okno bez dobehnutého `NX.init`
 a to nesmie zapisovať nikam. Nezhoda je **hláška**, nie tiché zahodenie — a to aj v auto-apply, kde sa echo výberu
 ďalej zahadzuje ticho (prepnutie dokumentu je zriedkavé, presun výberu bežný). Poradie je súčasť opravy: dokument

@@ -45,6 +45,16 @@
   a tri zápisové cesty karty dielca (materiál, hrana, olep všetkých 4) mali iba echo `cabinet_id`, ktoré prepnutie dokumentu nezachytí. Doplnené tým istým mechanizmom —
   rozsah dávky je teda **18 handlerov**, nie 14. `handle_set_part_grain` sa zámerne nekonvertoval: jeho tvar stráži `test_k1_smer_dekoru.rb` a prepis by rozbil existujúci
   kontrakt bez funkčného zisku. Po oprave **2078 headless · 73 JS sád**.
+  **Kolo 2 vrátilo 4× P1 — jednu rodinu:** UI stav, ktorý PREŽIJE prepnutie dokumentu a pri odoslaní dostane NOVÝ guid (okamžitý flush formulára · inline editor názvu ·
+  batch polí dosky kľúčovaný len `board_id` · modal chýbajúcej ABS, ktorý `loadBoard` nezatváral). Zachytený guid v jednom bufferi teda nestačil — chýbala **systémová**
+  odpoveď. Zaviedol sa **jeden vzor s tromi obranami**: (1) `nxSetModelGuid` je JEDINÝ detektor zmeny dokumentu na klientovi (každý push ide cez neho) a pri skutočnej zmene
+  hodnoty spustí `nxDropDocState()`, ktoré zahodí VŠETOK rozpracovaný stav (7 cleanupov); echo push tej istej identity nezahodí nič — rozpísaná práca musí prežiť.
+  (2) Každý buffer si drží VLASTNÚ zachytenú identitu pre prípad, že push nepríde: `applyPendingGuid` (aj pre okamžitý flush), `boardPending` kľúčovaný **dvojicou**
+  dokument+doska, `renameGuid`, `boardTarget()`/`partTarget()` pre modal ABS. (3) Serverový `foreign_document?` má posledné slovo. Sweep našiel nad rámec štyroch nálezov
+  ešte dve diery (ABS modal neprežíval `clearSelected`; `nxSetModelGuid` nemal detekciu zmeny, takže centrálny hook neexistoval) a potvrdil, že `tplModal` a `simFor`
+  identitu dokumentu už mali. **Priznaný zvyšok (vlastnosť celého vzoru, nie tejto dávky):** SketchUp mení `Model#guid` pri KAŽDOM uložení, takže Ctrl+S do 400 ms po
+  úprave poľa vyzerá pre guard ako prepnutie dokumentu a edit sa zahodí. Platí to rovnako pre zóny, tagy a Štúdio od ich zavedenia; prípadné riešenie (stabilný kľúč
+  dokumentu namiesto `guid`) je téma pre samostatnú dávku. Po kole 2: **2080 headless · 73 JS sád**.
 
 - **FIX · ŠT-1c B2 DOBEHOL CENOVÚ BRÁNU (30.8.2026, test-only, bez bump verzie):** dva in-SU FAILy známe od dávky 1d/R-01+R-04 boli ZASTARANÝ TEST, nie chyba pluginu — dávka
   **P0-HF** (#252, v0.8.14) postavila medzi gen guard a `savepanel` FINÁLNU CENOVÚ BRÁNU a scenár exportu cenovej ponuky s ňou nepočítal: skrinka scenára má 3 riadky bez ceny
