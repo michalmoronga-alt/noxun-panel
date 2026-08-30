@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.8.21 · 30.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.8.22 · 30.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -18,8 +18,7 @@ Nálezy z reálnej výroby a chyby v cenách majú preto **najvyššiu prioritu 
 (okno zaniká — modul žije · uzavretý whitelist akcií · session token · echo vs. plný push · optimistický zámok) sú v [archiv/KRONIKA.md](archiv/KRONIKA.md),
 vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
-**Testy k v0.8.21:** **2138 headless** · 74 JS sád · posledný plný in-SketchUp beh **1088 PASS / 0 FAIL** (dávka 1d/R-03 — sekcie `run_r03` + `run_r03_async`: čisté
-pripravenie vkladu, vlastný rigidný transform, odmietnutia mierky/zrkadla bez kroku Späť a rollback výnimky v sprievodnom bloku).
+**Testy k v0.8.22:** **2173 headless** · 74 JS sád · posledný plný in-SketchUp beh **1184 PASS / 0 FAIL** (dávka GHOST — sekcie `run_ghost` + `run_ghost_async`).
 
 > **Poznámka k procesu:** Codex review bol 21.–24.8. **nedostupný** — PR **#186–#226** prešli bránou so slepým subagentom. **Post-hoc sweep je od 27.8. HOTOVÝ** (34 PR cez Codex CLI + triáž 54 nezodpovedaných threadov): dve reálne P1 slepým kolám ušli a týždeň žili v `main`, obe sú dávno opravené — [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-E**.
 
@@ -29,16 +28,17 @@ pripravenie vkladu, vlastný rigidný transform, odmietnutia mierky/zrkadla bez 
 **ostáva len D-51** (štandard veľkostí okien — čaká na Michalove hodnoty) a výklop ako typ čela (ide cez task package 1e).
 **Blok 1c · AUDIT KÓDU je HOTOVÝ (29.8.)** — traja audítori zliati do **[AUDIT_REGISTER.md](AUDIT_REGISTER.md)** (2×P0 + 35 položiek — 33 z 1c, 2 z review — + poradie pre 1d + 3 rozhodnutia Michala (R-05 · R-13 · R-30));
 **oba P0 sú vybavené dávkou P0-HF** (v0.8.14) a **beží blok 1d** (hotové: R-06 brána, R-08 zámky katalógov, R-01+R-04 multi-model observer, R-34 presnosť P0-2 brány, R-02 guard identity dokumentu, **R-03 šev vkladania — TVRDÝ blocker GHOST tým padol**, R-07 brána knižnice setov). **Beží aj 1e PLÁNOVACIA DÁVKA** (task packages, priorita do 2.9.).
+**Blok GHOST VKLADANIE — implementačná dávka HOTOVÁ** (v0.8.22): skrinka sa kladie klikom. Blok sa uzatvára až po Michalovom smoke (6 bodov v [PLAN.md](PLAN.md)) — samostatný PR s bumpom 0.9.0.
 **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
 
 **Poradie ďalšej práce (Michal 26.8. + úprava 27.8. kvôli koncu MAX plánu 2.9.):** ~~1b~~ → ~~1c audit~~ → **1e plánovacia dávka** (task packages — Fable priorita do 2.9.)
-→ **1d refaktor z [AUDIT_REGISTER.md](AUDIT_REGISTER.md)** (beží súbežne cez subagentov, pokračuje aj po 2.9.) → **GHOST VKLADANIE** → **KOVANIE** (najprv USER-debata o setoch,
-Michal ju rozoberie v samostatnom okne). V1 rozsah zoštíhlený — checklist v [V1_VIZIA.md](V1_VIZIA.md).
+→ **1d refaktor z [AUDIT_REGISTER.md](AUDIT_REGISTER.md)** (beží súbežne cez subagentov, pokračuje aj po 2.9.) → ~~GHOST VKLADANIE~~ (implementácia hotová, čaká smoke) → **KOVANIE** (najprv USER-debata o setoch, Michal ju rozoberie v samostatnom okne). V1 rozsah zoštíhlený — checklist v [V1_VIZIA.md](V1_VIZIA.md).
 
 ## Posledné uzávery
 
+- **GHOST VKLADANIE — skrinka sa kladie KLIKOM tam, kam sa pozeráš** (po „Vložiť" visí ghost na kurzore: ←/→ točia po 90°, Alt prepína kotvu, ↓ drží domácu výšku a ↑ ju pustí, klik položí, Esc zruší; do kliku nevznikne nič a v Späť nepribudne žiadny krok) — v0.8.22 (30.8.) · **Michal večer: SMOKE — 6 bodov v [PLAN.md](PLAN.md), sekcia GHOST.**
 - **1d/R-07 — starší a novší plugin si už nepoškodia knižnicu setov kovania** (knižnica z novšej verzie sa nedá ani zapísať, ani použiť: namiesto tichého orezania
   ju súpis prizná oranžovým riadkom a Štúdio bannerom) — v0.8.21 (30.8.) · **Michal večer:** Štúdio → Kovanie → Sety musí vyzerať a fungovať presne ako doteraz (banner sa NESMIE ukázať).
 - **1d/R-03 — skrinka sa dá pripraviť BEZ zásahu do modelu a položiť na presnú polohu** (prípravná dávka pre GHOST vkladanie na klik — **tvrdý blocker tým padol**; z pohľadu používateľa sa dnes nemení NIČ) — v0.8.20 (30.8.) · **Michal večer:** netreba, bez UI zmeny.

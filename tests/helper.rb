@@ -119,6 +119,7 @@ end
 # V SketchUpe su uz nacitane pluginom — nenacitavame druhykrat.
 unless NxTest::IN_SKETCHUP
   %w[
+    core/units
     core/part_keys
     core/build_plan
     core/part_faces
@@ -157,6 +158,7 @@ unless NxTest::IN_SKETCHUP
     core/usage_stats
     core/cabinet_builder
     core/board_builder
+    core/ghost_tool
     core/zones
     core/tags
     core/bom

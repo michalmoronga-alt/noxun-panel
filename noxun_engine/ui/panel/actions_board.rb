@@ -29,6 +29,9 @@ module Noxun
           model = Sketchup.active_model
           data = parse(payload)
           return if foreign_document?(data, model, 'Doska sa nevložila') # R-02
+          # GHOST (V1-04): vlozenie DOSKY je iny sposob vkladania a beziacu
+          # ghost session skrinky ukoncuje (doska sa kladie synchronne).
+          GhostTool.cancel_session('vloženie dosky') if defined?(GhostTool)
           # UI-C1a: metadata sablony (`template_kind`/`template_name`) su MIMO
           # whitelistu poli, takze sa do buildera nedostanu tak ci tak — vyberu
           # sa vsak vyslovne, aby bolo jasne, ze ide o identitu na peciatku.

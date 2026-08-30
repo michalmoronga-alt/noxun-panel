@@ -94,6 +94,10 @@ module Noxun
             # D-89a: zvyraznenie hrany zije len s otvorenou kartou — po zatvoreni
             # panela sa overlay odpoji, aby v modeli neostala visiet ploska.
             HoverEdge.release if defined?(HoverEdge)
+            # GHOST (V1-04): ghost visiaci na kurzore patri vkladacej karte —
+            # so zatvorenym Inspectorom nema kto vklad dokoncit ani zrusit.
+            # Cancel = 0 mutacii modelu, 0 krokov Spat.
+            GhostTool.cancel_session('zatvorený Inspector') if defined?(GhostTool)
             @dialog = nil
           end
           attach_observer

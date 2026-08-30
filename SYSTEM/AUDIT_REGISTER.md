@@ -85,6 +85,8 @@ kanonický a `scaling(2)` padne už na jednotkovosti osí). `Geom::Transformatio
 Do stavby ide **pracovná nezmrazená kópia** plánu — `resolve_part` upratuje sticky `edge_warnings` in-place. `actions_cabinet.rb` sa nedotkla, správanie volajúcich je nezmenené
 (vrátane volania `build(model, type:, width:)`, ktoré Ruby prevádza na pozičný hash — signatúra ho drží cez `params = nil` + `**kw`);
 `bounds_mm` plán zámerne nenesie (uzavrie ho GHOST dávka). **Tvrdý blocker GHOST tým padol.**
+*(30.8.2026: **GHOST na ňom naozaj naštartoval** — implementačná dávka v0.8.21 postavila `core/ghost_tool.rb` priamo nad týmto švom; kotvy a obálku si uzavrela sama
+v `GhostTool::Calc` proti configu plánu, `bounds_mm` v pláne teda nepribudlo. Detail: [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **GHOST VKLADANIE**.)*
 
 ### R-04 · P3 · core · `core/scale_observer.rb:500-513`
 `@stable_transforms` bez delete cesty — rastie cez erase aj zánik dokumentov (in-SU test rast charakterizuje).
