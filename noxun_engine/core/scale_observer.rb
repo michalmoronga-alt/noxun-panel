@@ -24,6 +24,10 @@ module Noxun
           @entities_observer ||= CabinetEntitiesObserver.new
           @app_observer ||= EngineAppObserver.new
           @stable_transforms = {}
+          # R-04 (GH review #261 kolo 2, P2): identita dokumentu, s ktorou sa
+          # porovnava pri prvom File > New/Open — bez nej by prve prepnutie
+          # nemalo s cim porovnavat a zaznamy zaniknuteho dokumentu by prezili.
+          @active_doc_guid = doc_guid(safe { Sketchup.active_model })
           safe { Sketchup.remove_observer(@app_observer) }
           Sketchup.add_observer(@app_observer)
           n = attach_all(Sketchup.active_model)
@@ -628,7 +632,12 @@ module Noxun
           gid = doc_guid(model)
           prev = @active_doc_guid
           @active_doc_guid = gid
-          return if prev.nil? || prev == gid
+          # POZOR na `prev.nil?` (GH review #261 kolo 2, P2): PRVE File > New/Open
+          # po starte pluginu by s ranou vetvou „nevieme, s cim porovnavat" nechalo
+          # v cache cely prave zaniknuty dokument. `install` preto guid seeduje —
+          # a aj tak sa tu pri neznamom `prev` radsej CISTI: cache noveho dokumentu
+          # naplni `attach_all` hned za tymto volanim, takze zahodenie nic nestoji.
+          return if prev == gid
           @stable_transforms = {}
         rescue StandardError => e
           Engine.log_error(e, 'ScaleWatch.forget_detached_models')

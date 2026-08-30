@@ -275,7 +275,8 @@ Cache má **dve čistiace cesty** (R-04, v0.8.17): `forget_dead_transforms` na *
 keď cache pre ten dokument nemá kľúč, model sa vôbec nečíta) a `forget_detached_models` pri **zmene dokumentu**, ktorá beží **výhradne na Windows/SDI** (`Sketchup.platform`):
 tam File>New/Open nahradí jediný dokument procesu, takže ide preč **celá** cache (záznamy nového dokumentu ešte neexistujú — naplní ich `attach_all` hneď za tým). Rozhoduje sa
 podľa **`guid` ako detektora zmeny** (nie ako kľúča): `model_switched` sa pri ukladaní nespúšťa, takže iný guid v tejto ceste znamená naozaj iný dokument — a súčasne to
-zneškodňuje prípad, keď by sa `object_id` zatvoreného dokumentu recykloval na nový.
+zneškodňuje prípad, keď by sa `object_id` zatvoreného dokumentu recykloval na nový. Guid aktívneho dokumentu **seeduje `install`** a neznáme `prev` sa **nechápe ako „nič nerob"**,
+ale ako dôvod vyčistiť — inak by prvé File>New/Open po štarte pluginu nechalo v cache celý práve zaniknutý dokument.
 Na macOS sa cache dokumentu v pozadí **nečistí zámerne** — ten dokument žije ďalej a môže mať rozbehnutý debounce, takže zmazanie záznamu by odmietnutému scale vzalo presnú
 polohu (`clean_transform` pri scale okolo pivotu vráti posunutý origin).
 

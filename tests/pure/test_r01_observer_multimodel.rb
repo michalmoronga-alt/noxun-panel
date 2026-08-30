@@ -271,13 +271,21 @@ NxTest.test('R-04: INY dokument cisti cache LEN na Windows (SDI) — macOS vetva
   novy = f.model([], 'guid-B') # File > New: na Windows nahradil jediny dokument procesu
   fresh = { [mdl.object_id, 1] => [1], [12_345, 1] => [2], [12_345, 5] => [3] }
   f.sw.instance_variable_set(:@stable_transforms, fresh.dup)
-  f.sw.forget_detached_models(mdl) # prve volanie len zapamata dokument
-  NxTest.assert_equal(3, f.ivar(:@stable_transforms).length, 'prve prepnutie nemá co porovnat')
+  # `install` seeduje guid aktivneho dokumentu — tu sa to simuluje
+  f.sw.instance_variable_set(:@active_doc_guid, mdl.guid)
   f.sw.forget_detached_models(mdl) # ten isty dokument — nic sa nedeje
   NxTest.assert_equal(3, f.ivar(:@stable_transforms).length, 'ten isty dokument cache nemaze')
   f.sw.forget_detached_models(novy) # iny guid = iny dokument
   NxTest.assert_equal(0, f.ivar(:@stable_transforms).length,
                       'Windows: predosly dokument uz neexistuje, cela cache ide prec')
+  # PRVE prepnutie po starte (kolo 2, P2): aj ked sa nie je s cim porovnat,
+  # zaznamy prave zaniknuteho dokumentu NESMU prezit — `attach_all` cache
+  # noveho dokumentu naplni hned za tymto volanim.
+  f.reset!
+  f.sw.instance_variable_set(:@stable_transforms, fresh.dup)
+  f.sw.forget_detached_models(novy)
+  NxTest.assert_equal(0, f.ivar(:@stable_transforms).length,
+                      'prve prepnutie po starte nesmie nechat zaniknuty dokument v cache')
   # macOS: dokument v pozadi ZIJE (moze mat rozbehnuty debounce) — nemazat
   # (Codex audit BLOCKER 1: inak by odmietnuty scale prisiel o presnu polohu).
   f.reset!
