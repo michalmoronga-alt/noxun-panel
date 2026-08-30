@@ -17,6 +17,18 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **test-infra · PARALELNÁ IZOLÁCIA IN-SU TEST BEHOV (bez bumpu verzie — plugin sa nemení, 30.8.2026, PR #269):** nález z paralelného behu dávok 30.8.: `scripts/run_su_tests.ps1`
+  používal pevný `%TEMP%\noxun_su_tests\su_result.txt`, zdieľaný `boot.rb` a spoločný SketchUp Plugins adresár — druhý súbežný beh prepísal výsledky, bootstrap aj nasadený plugin
+  prvého (prvý potom čítal cudzie výsledky alebo testoval cudzí kód; `boot.rb` bol kolízny už PRED štartom SketchUpu prvého behu). **Riešenie v dvoch vrstvách:** (1) čo izolovať
+  ide, sa izoluje — každý beh má vlastný `run_<timestamp>_<PID>\` priecinok (výsledok, boot, kópia modelu, AppData sandbox); (2) čo izolovať nejde (jeden Plugins adresár = jeden
+  nasadený plugin), sa **vylučuje** — celý beh drží exkluzívne otvorený `deploy.lock` a druhý beh sa odmietne s `exit 2` a hláškou o držiteľovi (PID/čas/repo) namiesto tichej
+  kolízie. Zámok je otvorený file handle, nie marker súbor: po páde/kille procesu ho OS uvoľní sám, takže stale lock nevzniká a ďalší beh ho prevezme. Zámok sa drží až po
+  vyhodnotenie (nie len počas deployu), lebo SketchUp načítava plugin počas celého štartu a skoršie uvoľnenie by pustilo cudzí deploy pod rozbehnutý beh. Pri čítaní info o
+  držiteľovi pasca: `ReadAllText` zdieľa len Read a koliduje s Write prístupom držiteľa — čítať treba so share maskou ReadWrite. Navyše: kontrola exit kódu
+  `INSTALL_noxun_engine.ps1` (jeho `exit 1` cez `&` doteraz prešiel ticho ďalej) a best-effort upratovanie `run_*` priečinkov starších ako 1 deň. **Testované bez SketchUpu**
+  (mení sa orchestrácia, nie runner): parse check + simulácia kolízie v samostatných procesoch — odmietnutie počas držania, prevzatie po dobehu, prevzatie stale locku po
+  `Stop-Process -Force`. Poznámka o vylučovaní behov pridaná do `CLAUDE.md` (Testovanie).
+
 - **1d/R-03 · ŠEV `prepare_insert` / `commit_insert` V BUILDERI (v0.8.20, 30.8.2026, PR #265):** `CabinetBuilder.build` zlievalo normalizáciu, pridelenie ID, výpočet polohy,
   otvorenie operácie a stavbu geometrie do jedného toku. GHOST Tool (vkladanie na klik) tak nemal **čo bezpečne držať pred klikom** — žiadny pripravený objekt, ktorý sa dá
   nakresliť ako duch bez toho, aby už zasiahol model — a ani **ako položiť skrinku na finálnu polohu**: `transform:` mal len `rebuild`. Register to viedol ako **TVRDÝ blocker
