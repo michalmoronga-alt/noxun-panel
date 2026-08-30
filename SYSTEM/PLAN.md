@@ -160,7 +160,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 
 **STAV BLOKU (30.8.2026): implementačná dávka je ✅ HOTOVÁ — v0.8.22.** Modul `core/ghost_tool.rb` (GhostTool + Calc + PlacementSession + Tool), šev v `handle_insert`,
 cancel pri zavretí Inspectora aj pri prepnutí dokumentu; **35 headless testov** novej sady + in-SU sekcie `run_ghost` (17 scenárov) a `run_ghost_async`,
-plný beh **1183 PASS / 0 FAIL** (headless celkovo 2173, 74 JS sád).
+plný beh **1184 PASS / 0 FAIL** (headless celkovo 2173, 74 JS sád).
 Plný záznam — čo pridal implementačný audit (4 BLOCKER + 5 FIX), vedomý posun F8 hlášky na klik a ako je nástroj simulovaný v testoch: [archiv/KRONIKA.md](archiv/KRONIKA.md),
 záznam **GHOST VKLADANIE**. **Blok ostáva OTVORENÝ do Michalovho smoke** (6 bodov nižšie); uzáver = samostatný malý PR s **minor bumpom 0.9.0** a presunom bloku do archívu.
 

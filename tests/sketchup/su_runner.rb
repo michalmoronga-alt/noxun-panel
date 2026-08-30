@@ -2222,7 +2222,13 @@ module NoxunSuRunner
          ghost_session.nil? && ghost_tool.nil?)
       ok('GHOST suspend: mrtvy ghost nic nekresli (prazdna obalka)',
          !state[:sus_t1].getExtents.valid?)
-      info("GHOST suspend: aktivny nastroj po upratani = #{model.tools.active_tool_name}")
+      # Po upratani MUSI byt aktivny STANDARDNY nastroj (Vyber), nie zvysok po
+      # ghostovi. Identita nastroja sa cita DVOMA nezavislymi cestami — meno
+      # (`SelectionTool`) aj ID (21022); staci jedna, obe hovoria o tom istom.
+      tool_name = model.tools.active_tool_name.to_s
+      tool_id = model.tools.active_tool_id
+      ok("GHOST suspend: aktivny nastroj po upratani je STANDARDNY vyber (#{tool_name}, id #{tool_id})",
+         tool_name == 'SelectionTool' || tool_id == 21_022)
       ok('GHOST suspend: skrinka z noveho ghostu ostala nedotknuta', cabinets(model).length == 1)
       cleanup(model)
       ghost_teardown!(model)
