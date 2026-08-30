@@ -626,6 +626,16 @@ module Noxun
         # takze iny guid v tejto ceste znamena naozaj iny dokument. A ked sa
         # dokument zmenil, ide prec CELA cache: zaznamy noveho dokumentu este
         # neexistuju (naplni ich `attach_all` hned za tymto volanim).
+        #
+        # VEDOMA HRANICA (1d/R-02b, review v2 P3-3): guid je OBSAH .skp SUBORU,
+        # takze KOPIA zakazky (a re-open toho isteho suboru) nesie TEN ISTY guid —
+        # nad recyklovanym `Model` objektom sa cache vtedy NEVYPRAZDNI. Necha sa
+        # to tak (rozhodnutie R-04): stavka je NIZKA. Nejde o identitu ani o zapis
+        # — zastarany zaznam znamena nanajvys menej presny navrat po ODMIETNUTOM
+        # Scale, a `forget_dead_transforms` mrtve entity aj tak vyhadzuje. Identita
+        # dokumentu (`DocKey`) a most nazvu zakazky, kde by taka diera znamenala
+        # zapis do cudzej zakazky, na guid NESTOJA — ich cisti tickom ohraniceny
+        # `Engine.on_document_replaced`.
         def forget_detached_models(model)
           return unless model
           return unless sdi?

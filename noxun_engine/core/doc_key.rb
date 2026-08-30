@@ -49,9 +49,11 @@
 # pushol stary token.
 #
 # Poradie observerov SketchUp negarantuje a dvojita rotacia NIE JE neskodna
-# (review delty #267, P2-N1) — preto ma `invalidate` EPOCHU UDALOSTI: jeden
-# event New/Open vyrobi NAJVIAC JEDEN novy token bez ohladu na to, kolko
-# observerov ho ohlasi a ci medzi nimi stihne bezat `key`. Detail pri metode.
+# (review delty #267, P2-N1): callbacky observerov NIE SU len oznamenie, ony
+# rovno NOTIFIKUJU KLIENTOV, takze medzi dve rotacie sa vmesti `key` a hodnota
+# sa zapecie do UZ odoslaneho pushu — Studio by dostalo token A, panel token B.
+# Ohranicenie „JEDEN event = JEDEN token" preto drzi `Engine.on_document_replaced`
+# nizsie (RUBY TICK), NIE `invalidate` sam. Detail je pri nom.
 #
 # NIKDY sa NEZAPISUJE do modelu ani .skp (zamietnuta alternativa "token v
 # NOXUN dictionary"): zapis pri otvoreni panela by zaspinil cisty dokument
@@ -84,6 +86,130 @@ require 'securerandom'
 
 module Noxun
   module Engine
+    # VYMENA DOKUMENTU = JEDNA UDALOST S JEDNYM ZOZNAMOM CLEANUPOV
+    # (1d/R-02b, review delty #267 P2-GLM + review v2 P2-1).
+    #
+    # Zije TU (a nie v `main.rb`), aby ho headless sada vedela naozaj SPUSTIT —
+    # `main.rb` je SketchUp loader a testy ho nenacitavaju. Je to Engine-level
+    # koordinator, nie sucast DocKey: DocKey je len jeden z jeho cleanupov.
+    #
+    # KTO to vola: OBA AppObservery pluginu z `onNewModel`/`onOpenModel` —
+    # NIKDY z `onActivateModel` (macOS prepnutie medzi UZ otvorenymi
+    # dokumentmi) a nikdy pri ulozeni. MUSI bezat PRED notifikaciou klientov,
+    # inak stihne odist push so starym udajom.
+    #
+    # CO uprataava: kazdu pamat viazanu na OBJEKT modelu, ktoru neupratuje
+    # vlastna zdokumentovana cesta (viz `document_cleanups`).
+    #
+    # OHRANICENIE UDALOSTI = RUBY TICK. Poradie observerov SketchUp
+    # negarantuje a ich callbacky NIE SU len oznamenie — ony rovno notifikuju
+    # klientov, takze medzi dva cleanupy sa vmesti `DocKey.key` a hodnota sa
+    # zapecie do UZ odoslaneho pushu (Studio by dostalo token A, panel token B;
+    # prvy klik v Studiu by v SPRAVNOM dokumente skoncil falosnym „model sa
+    # prepol" a `hw_sets.js` by zahodil projektove drafty druhykrat). Preto
+    # sa cely blok spusti RAZ za tick: druhy observer toho isteho eventu vidi
+    # otvorenu udalost a vrati sa. Nulovy timer zavrie udalost pri najblizsom
+    # prechode message loopom — teda urcite az PO vsetkych observeroch jedneho
+    # eventu a urcite PRED dalsim File>New/Open (ten vyzaduje akciu uzivatela).
+    #
+    # PRECO NIE „epocha z modelu": medziverzia skusala znacku odvodenu
+    # z `Model#guid` a bola to DIERA (review v2, P2-1) — guid je OBSAH .skp
+    # SUBORU, takze KOPIA zakazky nesie ten isty guid, kym sa neulozi. Otvorenie
+    # kopie nad recyklovanym objektom by dalo zhodnu znacku, rotacia by sa
+    # vynechala a novy dokument by zdedil identitu stareho. Tick ziadnu hodnotu
+    # z modelu necita, takze tuto triedu dier nema.
+    DOC_EVENT_MAX_S = 1.0 # poistka, viz `document_event_open?`
+
+    class << self
+      def on_document_replaced(model)
+        return if document_event_open?
+
+        open_document_event
+        document_cleanups(model)
+        nil
+      end
+
+      # Koniec ticku vymeny dokumentu. V SketchUpe ho vola nulovy timer;
+      # headless (a in-SU scenare, ktore chcu odsimulovat DVA eventy) ho
+      # volaju priamo. Je to SEAM, nie testovacia barlicka — robi presne to,
+      # co timer, a nic navyse.
+      def end_document_event
+        @doc_event_open = false
+        @doc_event_at = nil
+        nil
+      end
+
+      private
+
+      # Zoznam pamati, ktore vymena dokumentu upratuje. KAZDA pamat viazana na
+      # `object_id` + `equal?`, ktoru NEUPRATUJE vlastna zdokumentovana cesta,
+      # sem patri — inak sa na nu zabudne (presne to sa stalo mostu nazvu
+      # zakazky, review #267 P2-GLM).
+      #
+      # VEDOME MIMO (maju vlastnu, zdokumentovanu cestu):
+      #   * `GhostTool` session — rusi ju `GhostTool.on_document_replaced`
+      #     priamo v observeroch, lebo potrebuje vlastnu hlasku a poradie voci
+      #     nastrojovemu stacku (`docs/architecture/construction.md`).
+      #   * `ScaleWatch` cache transformacii (`@stable_transforms`) — cisti ju
+      #     `forget_detached_models` v `model_switched`, este stale cez guid
+      #     ako detektor. Je to VEDOMA HRANICA (rozhodnutie R-04): staveme
+      #     nizko — zastarany zaznam v cache znamena nanajvys menej presny
+      #     navrat po odmietnutom Scale, nie zapis do cudzieho dokumentu.
+      #
+      # Kazdy krok je osetreny ZVLAST: vymena dokumentu uz prebehla, vratit sa
+      # neda, takze zlyhanie jedneho cleanupu nesmie zastavit ostatne.
+      def document_cleanups(model)
+        begin
+          DocKey.invalidate(model)
+        rescue StandardError => e
+          log_error(e, 'on_document_replaced/DocKey') if respond_to?(:log_error)
+        end
+        begin
+          ProductionCore.forget_session_key(model) if defined?(ProductionCore)
+        rescue StandardError => e
+          log_error(e, 'on_document_replaced/SESSION_KEY_BRIDGE') if respond_to?(:log_error)
+        end
+      end
+
+      def open_document_event
+        @doc_event_open = true
+        @doc_event_at = monotonic_now
+        schedule_document_event_end
+      end
+
+      # POISTKA proti zaseknutej udalosti. Keby timer nikdy nedosiel (chybajuce
+      # `UI`, vynimka v bloku), otvorena udalost by uz NIKDY nepustila dalsiu
+      # rotaciu — a to je presne navrat P1 (novy dokument so starou identitou).
+      # Zaseknuta udalost sa preto po `DOC_EVENT_MAX_S` povazuje za zavretu.
+      # Nikdy to nie je hlavny mechanizmus: observery jedneho eventu bezia
+      # mikrosekundy po sebe, dva realne eventy delí akcia uzivatela.
+      def document_event_open?
+        return false unless @doc_event_open
+        return true unless @doc_event_at
+        return true if (monotonic_now - @doc_event_at) <= DOC_EVENT_MAX_S
+
+        end_document_event
+        false
+      end
+
+      def schedule_document_event_end
+        if defined?(UI) && UI.respond_to?(:start_timer)
+          UI.start_timer(0, false) { Engine.end_document_event }
+        end
+        # Bez SketchUp UI (headless harness) sa nic neplanuje — udalost zavrie
+        # `end_document_event` volany testom, prip. poistka vyssie.
+      rescue StandardError => e
+        log_error(e, 'on_document_replaced/timer') if respond_to?(:log_error)
+        end_document_event
+      end
+
+      def monotonic_now
+        Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      rescue StandardError
+        Time.now.to_f
+      end
+    end
+
     module DocKey
       TOKEN_PREFIX = 'nxdoc-'
 
@@ -101,9 +227,7 @@ module Noxun
           entry = registry[oid]
           unless entry && entry[:ref].equal?(model)
             prune_dead
-            # `event_stamp` sa PECATI pri vzniku tokenu — vdaka tomu druhy
-            # observer TOHO ISTEHO eventu uz nema co rotovat (viz `invalidate`).
-            entry = { ref: model, token: fresh_token, event_stamp: event_stamp(model) }
+            entry = { ref: model, token: fresh_token }
             registry[oid] = entry
           end
           entry[:token]
@@ -140,48 +264,27 @@ module Noxun
         end
 
         # VYMENA DOKUMENTU — zahodi identitu naviazanu na TENTO objekt, takze
-        # najblizsie `key` vyda cerstvy token. Volat VYHRADNE z `onNewModel`
-        # a `onOpenModel` (nikdy z `onActivateModel`, nikdy pri ulozeni) a
-        # VZDY PRED notifikaciou klientov — inak stihne odist push so starym
-        # tokenom a klient zmenu dokumentu nezbada.
+        # najblizsie `key` vyda cerstvy token. Volat VYHRADNE cez
+        # `Engine.on_document_replaced` (ten drzi ohranicenie udalosti).
         #
-        # Maze sa podla `object_id`, lebo prave RECYKLOVANY objekt je ten
-        # nebezpecny pripad (Windows, File > Open): novy dokument by inak
-        # zdedil zaznam stareho. Ked objekt v registry nie je (macOS — naozaj
-        # novy objekt), je to lacny no-op.
+        # BEZPODMIENECNE. Maze sa podla `object_id`, lebo prave RECYKLOVANY
+        # objekt je ten nebezpecny pripad (Windows, File > Open): novy dokument
+        # by inak zdedil zaznam stareho. Ked objekt v registry nie je (macOS —
+        # naozaj novy objekt), je to lacny no-op.
         #
-        # EPOCHA UDALOSTI (review delty #267, P2-N1) — JEDEN event New/Open
-        # smie vyrobit NAJVIAC JEDEN novy token, aj ked ho ohlasia OBA
-        # observery. Naivna verzia (,,zmaz zaznam") to nespĺňala a bola to
-        # chyba: callbacky observerov NIE SU len oznamenie, ony rovno
-        # NOTIFIKUJU KLIENTOV, takze medzi dve `invalidate` sa vmesti `key` —
-        # `EngineAppObserver` posle Studiu token A, `PanelAppObserver` potom
-        # rotuje znova a panelu posle token B. Nasledok: prvy klik v Studiu by
-        # v SPRAVNOM dokumente skoncil falosnym ,,model sa prepol" a
-        # `hw_sets.js` by pri zmene `model_guid` zahodil projektove drafty
-        # DRUHYKRAT — uz nad novym dokumentom, kde uz mohol pouzivatel pisat.
-        #
-        # Znackou epochy je `event_stamp` = `Model#guid` (jedina vec, ktora sa
-        # medzi DVOMA roznymi eventmi zmeni, ale POCAS jedneho eventu drzi).
-        # Guid tu NIE JE identita (na to sa nehodi, meni ho kazde ulozenie) —
-        # je to DETEKTOR ZMENY DOKUMENTU, presne v tej istej role, v akej ho
-        # pouziva `scale_observer` (rozhodnutie R-04). Ulozenie tuto cestu
-        # nespusta, takze zmena guidu pri Ctrl+S sa sem nikdy nedostane.
-        #
-        # Ked stamp precitat nejde, radsej sa ROTUJE (fail smerom k P1): dva
-        # tokeny na jeden event su nepohodlie, zdedeny token cudzieho dokumentu
-        # je tichy zapis do cudzej zakazky.
+        # ZIADNA podmienka tu byt NESMIE. Medziverzia skusala „epochu" odvodenu
+        # z `Model#guid` a bola to DIERA (review v2, P2-1): guid je OBSAH .skp
+        # SUBORU — kopia zakazky nesie TEN ISTY guid, kym sa neulozi. File > Open
+        # kopie nad recyklovanym objektom by teda dal zhodny stamp, rotacia by
+        # sa vynechala a novy dokument by zdedil identitu stareho — teda CELY
+        # povodny nalez P1 spat, len tichsie. To iste platilo pre re-open toho
+        # isteho suboru (revert) a pre Untitled -> Untitled.
+        # Ohranicenie „jeden event = jeden token" preto NEROBI hodnota z modelu,
+        # ale RUBY TICK v `Engine.on_document_replaced`.
         def invalidate(model)
           return false unless model
 
-          oid = model.object_id
-          stamp = event_stamp(model)
-          entry = registry[oid]
-          # Ten isty dokument, ktory uz v TOMTO evente token dostal -> hotovo.
-          return false if entry && entry[:ref].equal?(model) &&
-                          !stamp.nil? && entry[:event_stamp] == stamp
-
-          registry.delete(oid)
+          registry.delete(model.object_id)
           prune_dead
           true
         rescue StandardError => e
@@ -222,16 +325,6 @@ module Noxun
           "#{TOKEN_PREFIX}#{SecureRandom.hex(12)}"
         end
 
-        # ZNACKA EPOCHY, NIE identita (viz `invalidate`). `Model#guid` sa meni
-        # pri kazdom ulozeni — preto sa na identitu nehodi — ale POCAS jedneho
-        # eventu New/Open drzi a medzi DVOMA eventmi sa lisi, co je presne to,
-        # co na rozoznanie ,,uz som tento event videl" treba. `nil` = nedalo sa
-        # precitat; volajuci vtedy radsej rotuje.
-        def event_stamp(model)
-          model.respond_to?(:guid) ? model.guid.to_s : nil
-        rescue StandardError
-          nil
-        end
       end
     end
   end

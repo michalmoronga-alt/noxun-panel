@@ -57,12 +57,17 @@
   **NEPLATÍ** — callbacky observerov nie sú len oznámenie, **ony rovno notifikujú klientov**, takže sa medzi dve `invalidate` reálne vmestí `key()` a hodnota sa
   zapečie do už odoslaného pushu. Štúdio by dostalo token A, panel token B: prvý klik v Štúdiu by v **správnom** dokumente skončil falošným „model sa prepol"
   a `hw_sets.js` by pri zmene `model_guid` zahodil projektové drafty **druhýkrát** — už nad novým dokumentom, kde mohol používateľ medzitým písať. `invalidate`
-  má preto **EPOCHU UDALOSTI**: rotuje len vtedy, keď sa značka epochy líši od tej zapečatenej pri vzniku tokenu, takže jeden event New/Open vyrobí **najviac
-  jeden** token bez ohľadu na počet observerov a na interleaving s `key()`. Značkou je `Model#guid` — **nie ako identita** (na to sa nehodí, mení ju každé uloženie),
-  ale ako **detektor zmeny dokumentu**, presne v tej istej role, v akej ho používa `scale_observer` (R-04): medzi dvoma eventmi sa líši, počas jedného drží,
-  a uloženie túto cestu vôbec nespúšťa. Keď sa značka prečítať nedá, radšej sa **rotuje** — dva tokeny na jeden event sú nepohodlie, zdedený token cudzieho
-  dokumentu je tichý zápis do cudzej zákazky. Test pokrýva oba smery: interleaving `invalidate → key → invalidate` (ten istý event = tá istá identita) aj dva
-  po sebe idúce eventy (dve rôzne identity — epocha nesmie zablokovať druhý event). Ten istý `guid` je jediný v `NX_DK_GUID_ALLOWED` pridaný TOUTO dávkou.
+  je preto **ohraničená RUBY TICKOM**: `Engine.on_document_replaced` spustí cleanupy raz za tick, druhý observer toho istého eventu vidí otvorenú udalosť
+  a vráti sa. Tick zatvára nulový timer (`UI.start_timer(0, false)`) — teda určite až PO všetkých observeroch jedného eventu a pred ďalším File > New/Open (ten
+  vyžaduje akciu používateľa); poistka `DOC_EVENT_MAX_S` odblokuje zaseknutú udalosť, lebo tá by už nikdy nepustila rotáciu (= návrat P1).
+  **Prvá verzia tejto opravy odvodzovala značku eventu z `Model#guid` a slepá verifikácia v2 v nej našla DETERMINISTICKÚ DIERU (P2-1) — dôležité poučenie:**
+  `guid` NIE JE značka udalosti, je to **obsah .skp súboru**, takže **kópia zákazky nesie ten istý guid**, kým sa neuloží. File > Open kópie nad recyklovaným
+  objektom by dal zhodnú značku, rotácia by sa vynechala a nový dokument by zdedil identitu starého — **celý pôvodný nález P1 späť, len tichšie** (rovnako
+  re-open toho istého súboru pri reverte a Untitled → Untitled). Tick nečíta z modelu žiadnu hodnotu, takže túto triedu dier nemá; `guid` z mechanizmu úplne
+  vypadol a s ním aj z `NX_DK_GUID_ALLOWED` (dávka tam nakoniec **nepridáva nič**). Testy pokrývajú všetky štyri smery: dva observery v jednom ticku (tá istá
+  identita) · dva ticky (dve identity) · **kópia .skp so zhodným guidom** (rotovať MUSÍ) · zaseknutá udalosť (poistka ju otvorí).
+  Vstupný bod sa presunul z `main.rb` do `core/doc_key.rb` — nie kvôli vrstvám, ale aby ho vedela **spustiť headless sada** (`main.rb` je SketchUp loader, testy
+  ho nenačítavajú); tick zatvára `Engine.end_document_event`, čo je zámerný **seam** robiaci presne to isté ako timer.
   **A ten istý falzifikovaný predpoklad mala DRUHÁ pamäť — most názvu zákazky (P2-GLM, nezávisle potvrdené aj GLM review):** `SESSION_KEY_BRIDGE`
   (`ProductionCore`) overuje záznam cez `entry[:ref].equal?(model)` a jeho komentár doslova hovoril „Windows pri File > New/Open model zničí a vytvorí nový".
   Na recyklovanom objekte `equal?` vráti true aj pre práve založený cudzí dokument, takže scenár *dokument A neuložený, v Štúdiu pomenovaný „X" → File > New →
@@ -71,7 +76,10 @@
   (dnes `DocKey.invalidate` + `ProductionCore.forget_session_key`), ktoré volajú oba AppObservery z `onNewModel`/`onOpenModel` — nikdy z `onActivateModel`, nikdy
   pri uložení — a **pred** notifikáciou okien. Každý krok je ošetrený zvlášť: výmena dokumentu už prebehla, zlyhanie jedného cleanupu nesmie zastaviť ostatné.
   Poučenie do budúcna: **každá ďalšia pamäť kľúčovaná `object_id` + `equal?` musí do toho zoznamu pribudnúť** — inak sa na ňu jednoducho zabudne, presne ako sa
-  stalo tejto.
+  stalo tejto. Doktrína má **vymenované výnimky** (review v2, P3-3): pamäte, ktoré upratuje vlastná zdokumentovaná cesta — `GhostTool` session (ruší sa priamo
+  v observeroch kvôli vlastnej hláške a poradiu voči nástrojovému stacku) a `ScaleWatch` cache transformácií (`forget_detached_models`). Tá druhá stále stojí na
+  guide, takže kópiu .skp nerozozná — **necháva sa tak (R-04) a je to priznaná hranica v komentári**: stávka je nízka, zastaraný záznam znamená nanajvýš menej
+  presný návrat po odmietnutom Scale, nie zápis do cudzieho dokumentu.
   **Zložený scenár (P3-GLM-1):** obe polovice pôvodnej chyby boli pripnuté len zvlášť. Pribudol reťazec *edit → Ctrl+S → echo* v pure sade aj **in-SU** (skutočný
   `model.save`), a ten in-SU beh zároveň **empiricky potvrdil premisu celej dávky**: `PASS: DOCKEY 7: PREMISA DAVKY — SketchUp pri ulozeni ZMENIL Model#guid`.
   Za ním `identita dokumentu Ctrl+S PREZILA` a `edit naplanovany PRED Ctrl+S sa po nom naozaj ZAPISAL` — plus protiváha, že ten istý edit s cudzou identitou

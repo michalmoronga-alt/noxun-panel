@@ -1653,19 +1653,14 @@ module NoxunSuRunner
     [mm(o.x), mm(o.y), mm(o.z)]
   end
 
-  # --- DOCKEY (1d/R-02b, review #267 P1-1 + delta P2-N1) --------------------
+  # --- DOCKEY (1d/R-02b, review #267 P1-1 + delty P2-N1/P2-GLM/P2-1) --------
   # Identita dokumentu v REALNOM SketchUpe — to, co headless sada nad stubom
   # dokazat nevie:
   #   1) MA `Sketchup::Model` metodu `valid?` (od nej zavisi upratovanie registry)?
-  #   2) Drzi identita nad ZIVYM modelom (opakovane citanie, `onActivateModel`)?
-  #   3) Zliaju sa OBA realne observery jedneho eventu do JEDNEJ identity?
-  #
-  # POZOR na hranicu vernosti: rotaciu nad RECYKLOVANYM objektom sa v runneri
-  # verne nafalsovat NEDA — `Model#guid` je read-only, takze „File > Open"
-  # zahrat nevieme a realny `open_file` by zhodil zvysok behu. Rotacia pri
-  # ZMENE dokumentu sa preto overuje nad dvojnikom (nizsie) a nad realnym
-  # modelom sa overuje to, co realne pozorovatelne JE: ze sa dva observery
-  # TOHO ISTEHO eventu na identite zhodnu.
+  #   2) Rotuje identita pri REALNOM `onOpenModel` nad TYM ISTYM `Model` objektom
+  #      (Windows recyklacia — jadro nalezu P1-1, vzor scenara GHOST 10)?
+  #   3) Zliaju sa OBA realne observery JEDNEHO ticku do JEDNEJ identity?
+  #   4) Prezije rozpisana praca realny Ctrl+S (`model.save`)?
   def run_dockey(model)
     cleanup(model)
 
@@ -1685,18 +1680,27 @@ module NoxunSuRunner
     ok('DOCKEY: CERSTVY token zapis pusti', e::DocKey.foreign?(t0, model) == false)
     ok('DOCKEY: CUDZI token zapis NEPUSTI', e::DocKey.foreign?('nxdoc-cudzi', model) == true)
 
-    # 3) EPOCHA UDALOSTI nad REALNYM modelom (delta P2-N1): oba observery
-    #    jedneho eventu — a medzi nimi push, presne ako v SketchUpe — musia
-    #    klientom vydat TU ISTU identitu. Bez epochy by Studio dostalo iny
-    #    token nez panel a prvy klik v Studiu by v SPRAVNOM dokumente skoncil
-    #    falosnym „model sa prepol".
-    e::ScaleWatch::EngineAppObserver.new.onOpenModel(model)
-    t_studio = e::Panel.model_guid(model)
+    # 3) ROTACIA + OHRANICENIE TICKOM nad REALNYM modelom. Od opravy P2-1 je
+    #    `invalidate` BEZPODMIENECNY (ziadna znacka z modelu), takze realny
+    #    `onOpenModel` nad TYM ISTYM objektom identitu naozaj prerotuje — to je
+    #    priama reprodukcia P1-1. A oba observery JEDNEHO ticku sa musia
+    #    zhodnut na JEDNEJ identite (P2-N1).
+    e.end_document_event # cisty tick (v SketchUpe ho zatvara nulovy timer)
     e::Panel.push_selected(model)
-    e::Panel::PanelAppObserver.new.onOpenModel(model)
+    e::ScaleWatch::EngineAppObserver.new.onOpenModel(model)
+    t1 = e::Panel.model_guid(model)
+    ok('DOCKEY: realny onOpenModel nad TYM ISTYM objektom vydal NOVU identitu (P1-1)',
+       !t1.to_s.empty? && t1 != t0)
+    ok('DOCKEY: STARY token uz zapis do dokumentu NEPUSTI',
+       e::DocKey.foreign?(t0, model) == true)
+    e::Panel::PanelAppObserver.new.onOpenModel(model) # DRUHY observer TOHO ISTEHO ticku
+    ok('DOCKEY: druhy observer toho isteho ticku identitu UZ NEPREROTOVAL (P2-N1)',
+       e::Panel.model_guid(model) == t1)
+    e.end_document_event
+    e::Panel::PanelAppObserver.new.onOpenModel(model) # NOVY tick = novy event
+    ok('DOCKEY: DRUHY tick rotuje znova (ohranicenie nesmie zlepit dva eventy)',
+       e::Panel.model_guid(model) != t1)
     t_panel = e::Panel.model_guid(model)
-    ok('DOCKEY: oba observery JEDNEHO eventu vydali TU ISTU identitu (epocha udalosti)',
-       !t_studio.to_s.empty? && t_studio == t_panel)
 
     # 4) `onActivateModel` identitu NEROTUJE — macOS prepnutie medzi uz
     #    otvorenymi dokumentmi; rotacia by klientovi zahodila rozpisanu pracu.
@@ -1707,30 +1711,22 @@ module NoxunSuRunner
     ok('DOCKEY: prazdny kluc servera zastavi zapis (fail-closed)',
        e::DocKey.foreign?(t_panel, nil) == true)
 
-    # 6) ROTACIA PRI ZMENE DOKUMENTU — nad dvojnikom, ktory sa vie tvarit ako
-    #    recyklovany `Model` (realnemu sa guid prepisat neda). Dvojnik nesie
-    #    presne tie tri veci, ktore DocKey cita: path, guid, valid?.
+    # 6) KOPIA .skp — diera medziverzie s „epochou z Model#guid" (review v2 P2-1):
+    #    guid je obsah SUBORU, takze kopia zakazky nesie ten isty guid. Nad
+    #    dvojnikom (realnemu modelu sa guid prepisat neda) sa overuje, ze
+    #    rotacia na tom NESTOJI.
     dbl = Struct.new(:path, :guid) do
       def valid?
         true
       end
-    end.new('C:/Zakazky/Stara.skp', 'DOC-A')
+    end.new('C:/Zakazky/Klinika.skp', 'ROVNAKY-GUID')
+    e.end_document_event
     d0 = e::DocKey.key(dbl)
-    dbl.path = 'C:/Zakazky/Nova.skp' # File > Open do TOHO ISTEHO objektu
-    dbl.guid = 'DOC-B'
-    e::DocKey.invalidate(dbl)        # 1. observer
-    d_studio = e::DocKey.key(dbl)    # ... a jeho push
-    e::DocKey.invalidate(dbl)        # 2. observer TOHO ISTEHO eventu
-    d_panel = e::DocKey.key(dbl)
-    ok('DOCKEY: RECYKLOVANY objekt s inym dokumentom dostal NOVU identitu (P1-1)',
-       !d_studio.to_s.empty? && d_studio != d0)
-    ok('DOCKEY: a oba observery toho eventu sa na nej ZHODLI (P2-N1)', d_studio == d_panel)
-    ok('DOCKEY: STARY token uz zapis do noveho dokumentu NEPUSTI',
-       e::DocKey.foreign?(d0, dbl) == true)
-    dbl.guid = 'DOC-C'               # DRUHY File > Open
-    e::DocKey.invalidate(dbl)
-    ok('DOCKEY: DRUHY event rotuje znova (epocha nesmie zlepit dva eventy)',
-       e::DocKey.key(dbl) != d_panel)
+    dbl.path = 'C:/Zakazky/Klinika - kopia.skp' # ZHODNY guid, INY subor
+    e.on_document_replaced(dbl)
+    ok('DOCKEY: kopia .skp so ZHODNYM guidom dostala NOVU identitu (P2-1)',
+       !d0.to_s.empty? && e::DocKey.key(dbl) != d0)
+    e.end_document_event
 
     # 7) ZLOZENY SCENAR — cela povodna chyba naraz, nad REALNYM Ctrl+S
     #    (delta P3-GLM-1). Doteraz boli obe polovice pripnute zvlast.
@@ -1781,6 +1777,7 @@ module NoxunSuRunner
     # 8) MOST NAZVU ZAKAZKY (delta P2-GLM) — druha pamat viazana na objekt
     #    modelu. Po vymene dokumentu sa NESMIE pamatat, inak by novy Untitled
     #    zdedil nazov zakazky a odniesol si ho do VEPO/CSV/XLSX.
+    e.end_document_event # cisty tick, inak by sa cleanup preskocil
     e::ProductionCore.remember_session_key(model, "guid:#{e::Panel.model_guid(model)}")
     ok('DOCKEY 8: vychodisko — most si kluc sedenia pamata',
        !e::ProductionCore.remembered_session_key(model).to_s.empty?)

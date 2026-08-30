@@ -167,13 +167,12 @@ NxTest.test('1d/R-02b: RECYKLOVANY objekt po File>New NEZDEDI nazov zakazky [P2-
     NxTest.refute(core.remembered_session_key(m).empty?, 'most si kluc sedenia pamata')
 
     # File > New — SketchUp podá TEN ISTY objekt s NOVYM (prazdnym) dokumentom.
-    # `Engine.on_document_replaced` zije v main.rb (SketchUp loader, headless sa
-    # nenacitava), takze tu sa volaju jeho DVA kroky priamo; ze ich observery
-    # naozaj volaju cez neho, stryzi zdrojovy kontrakt v `test_doc_key.rb`
-    # a behaviorálne to prechádza in-SU sekciou DOCKEY.
+    # Vola sa REALNY vstupny bod (zije v `core/doc_key.rb`, takze ho headless
+    # sada vie spustit); ze ho observery naozaj volaju PRED notifikaciou
+    # klientov, strazi zdrojovy kontrakt v `test_doc_key.rb`.
     m.guid = 'GUID-B'
-    dk.invalidate(m)
-    core.forget_session_key(m)
+    Noxun::Engine.end_document_event # cisty tick
+    Noxun::Engine.on_document_replaced(m)
 
     NxTest.assert_equal('', core.remembered_session_key(m),
                         'most sa pri vymene dokumentu MUSI zabudnut')
@@ -191,6 +190,7 @@ NxTest.test('1d/R-02b: RECYKLOVANY objekt po File>New NEZDEDI nazov zakazky [P2-
       map.delete(core.project_key(m))
       map
     end
+    Noxun::Engine.end_document_event
     dk.reset!
   end
 end
