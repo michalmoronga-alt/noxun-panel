@@ -339,6 +339,39 @@ module Noxun
                      'Šípky ←/→ otáčajú, Alt prepína kotvu, ↓ drží domácu výšku, ↑ pustí voľnú výšku, Esc zruší.')
         end
 
+        # GHOST-FB4: rucne prestavenie LOCKNUTEJ vysky z Ghost pasika.
+        # Do MODELU nezapisuje — meni stav BEZIACEJ session — ale guard
+        # identity dokumentu ma rovnaky ako zapisove handlery (R-02): panel
+        # patriaci inej zakazke nesmie hybat ghostom v tejto (cudzi = ignoruj
+        # + status). Neplatna hodnota NIC nemeni: stara vyska drzi a pasik sa
+        # prekresli spat na nu.
+        def handle_ghost_lock_z(payload)
+          model = Sketchup.active_model
+          data = parse(payload)
+          return if foreign_document?(data, model, 'Výška ghostu sa nezmenila')
+
+          s = GhostTool.session
+          return GhostTool.push_state(nil) unless s && s.active?
+
+          v = GhostTool::Calc.lock_z_value(data['lock_z'])
+          if v.nil?
+            GhostTool.push_state(s)
+            return set_status('Výška zámku musí byť číslo v mm od ' \
+                              "#{GhostTool::LOCK_Z_MIN_MM.round} do #{GhostTool::LOCK_Z_MAX_MM.round} — " \
+                              'ponechaná pôvodná hodnota.', true)
+          end
+          s.set_lock_z!(v)
+          # Zmena plati OKAMZITE: ghost na kurzore aj klik, ktory pride po nej.
+          GhostTool.invalidate_view(model)
+          GhostTool.push_state(s)
+          begin
+            Sketchup.status_text = GhostTool.status_text(s)
+          rescue StandardError
+            nil
+          end
+          set_status("Zámok výšky #{GhostTool.fmt_mm(s.lock_plane_z)} mm — ghost sadne na túto výšku.")
+        end
+
         # GHOST: sprievodny zapis kovania zo sablony (H2/D-76). Bezi VNUTRI
         # operacie vlozenia — vynimka zrusi CELU operaciu (ziadna skrinka
         # s nezmrazenym setom, rovnaky kontrakt ako pri aplikacii sablony).

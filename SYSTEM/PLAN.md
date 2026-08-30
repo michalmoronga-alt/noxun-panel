@@ -165,7 +165,12 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 cancel pri zavretí Inspectora aj pri prepnutí dokumentu; **35 headless testov** novej sady + in-SU sekcie `run_ghost` (17 scenárov) a `run_ghost_async`,
 plný beh **1184 PASS / 0 FAIL** (headless celkovo 2173, 74 JS sád).
 Plný záznam — čo pridal implementačný audit (4 BLOCKER + 5 FIX), vedomý posun F8 hlášky na klik a ako je nástroj simulovaný v testoch: [archiv/KRONIKA.md](archiv/KRONIKA.md),
-záznam **GHOST VKLADANIE**. **Blok ostáva OTVORENÝ do Michalovho smoke** (6 bodov nižšie); uzáver = samostatný malý PR s **minor bumpom 0.9.0** a presunom bloku do archívu.
+záznam **GHOST VKLADANIE**. **Blok ostáva OTVORENÝ do Michalovho smoke** (body nižšie); uzáver = samostatný malý PR s **minor bumpom 0.9.0** a presunom bloku do archívu.
+
+**Dávka GHOST-FB (v0.8.23, 31.8.) — ✅ HOTOVÁ, blok ostáva otvorený.** Odpoveď na Michalov živý test: koreňom problémov bol výškový zámok bez prichytávania.
+Pribudlo: **hybrid v zámku** (inference dá X/Y, zámok Z) + **natívne zvýraznenie snapov** (`ip.draw` + tooltip v oboch režimoch) · **kotva vždy pod kurzorom**
+(aj po Alt) · **pamäť kotvy/rotácie/režimu/výšok** do vypnutia SketchUpu (bez zápisu na disk aj do modelu) · **Ghost pásik** v Inspectore s editovateľnou
+zamknutou výškou (default dolná 0, horná 1400 = 850 + 550). Smoke body 7–11 nižšie.
 
 **Cieľ:** vloženie skrinky tam, kde sa používateľ pozerá — po „Vložiť" visí ghost skrinky na kurzore,
 klik ju položí ako jednu reálnu CAB v jednom Undo kroku. Koniec hľadania skriniek položených cez `next_x`
@@ -247,6 +252,15 @@ aktívnu kotvu, šípky fungujú HNEĎ (bez kliku do modelu). 2) ←/→ točí 
 3) Klik položí skrinku presne tam, kde bol ghost; jeden Ctrl+Z ju celú vráti. 4) Esc nič nevloží a nič
 nepribudne v Undo. 5) Počas ghostu si zorbituj pohľad — ghost prežije. 6) Skús horný korpus, šablónu s kovaním
 a vloženie, keď si v editácii skupiny (skrinka musí skončiť top-level).
+
+**Doplnok smoke checklistu po dávke GHOST-FB (v0.8.23, feedback z tvojho testu 30./31.8.):**
+7) **Snap vo výškovom zámku** — nabehni myšou na roh susednej skrinky (aj keď je 720 mm nad zemou): musí sa objaviť
+farebný bod a tooltip ako pri Move a ghost sa zarovná v X/Y s tým rohom, pričom **výšku drží zámok**.
+8) **Kotva skočí pod kurzor** — Alt prepne kotvu a skrinka sa presunie tak, aby nová kotva bola presne pod myšou
+(žiadne „skrinka ostala vedľa"). 9) **Pásik nad tlačidlom** — počas ghostu vidno riadok s kotvou, otočením, režimom
+a poľom výšky; **po vložení aj po Esc zmizne**. 10) **Pole výšky** — napíš 20 mm a klikni: skrinka sadne na 20;
+nezmysel („dvadsať", 9999) hodnotu nezmení a panel to povie. 11) **Pamäť** — po vložení stlač „Vložiť" znova:
+kotva, otočenie, režim aj zamknutá výška ostanú tam, kde si ich nechal (do zatvorenia SketchUpu).
 
 **Checklist uzáveru (blok GHOST sa uzatvára CELÝ):** **bump MINOR** (uzáver bloku podľa CLAUDE.md) + `?v=` →
 testy (headless + JS ak UI + **plný in-SU beh**) → docs (`construction.md` odsek Tool/PlacementSession +

@@ -215,6 +215,10 @@ module Noxun
           # Rozpocet — ten isty flush handshake, vlastnym kanalom Studia.
           cb(dlg, 'studio_do_budget_xlsx')  { |p| StudioDialog.do_budget_xlsx(p) }
           cb(dlg, 'studio_do_cp_xlsx')      { |p| StudioDialog.do_cp_xlsx(p) }
+          # GHOST-FB4: pole locknutej vysky v Ghost pasiku (mm). Meni stav
+          # BEZIACEJ session, nie model — guard identity dokumentu je preto
+          # rovnaky ako pri zapisovych handleroch (R-02).
+          cb(dlg, 'ghost_lock_z')       { |p| handle_ghost_lock_z(p) }
           # V0.4.7c: samostatna doska — vlozenie + karta (fields/material/ABS hrana)
           cb(dlg, 'insert_board')       { |p| handle_insert_board(p) }
           cb(dlg, 'set_board_fields')   { |p| handle_set_board_fields(p) }

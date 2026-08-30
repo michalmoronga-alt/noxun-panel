@@ -36,6 +36,11 @@ module Noxun
       }.freeze
       Z_MODES = %i[locked free].freeze
 
+      # GHOST-FB4: rozumny rozsah locknutej vysky (mm). Horna hranica je
+      # „este nabytok" — nad 3 m uz nejde o skrinku, ale o preklep.
+      LOCK_Z_MIN_MM = 0.0
+      LOCK_Z_MAX_MM = 3000.0
+
       # Farby ghostu (GL). Zamerne NIE `EdgeCheck::COLORS` (tri stavy olepu) —
       # ghost hovori o polohe, nie o vyrobe. Obrys = neutralna tmava
       # (`--nx-ink-strong`), predna stena a kotva = rodina vyberu `--nx-select`.
@@ -48,6 +53,24 @@ module Noxun
       class << self
         # Aktivna session (najviac JEDNA v celom module) a jej Tool.
         attr_reader :session, :active_tool
+
+        # --- GHOST-FB3: PAMAT NASTAVENI (per PROCES, nie per dokument) ------
+        # Kotva, rotacia, rezim vysky a locknute vysky prezijú koniec session
+        # a plati az do vypnutia SketchUpu. VEDOME sa NIKAM nezapisuje — ani na
+        # disk, ani do modelu: je to pracovny navyk pri jednom sedeni, nie
+        # udaj zakazky (inak by sa cudzia zakazka otvorila s cudzimi kotvami).
+        # Locknute vysky su per TYP skrinky ('lower' / 'upper'); PRVA session
+        # daneho typu si default vezme z `plan.home_z` (dolna 0, horna
+        # `UPPER_HANG_Z` = 1400) — hodnota sa nikde neduplikuje.
+        def memory
+          @memory ||= { anchor: ANCHORS.first, z_mode: :locked, rotation_index: 0, lock_z: {} }
+        end
+
+        # Naspat na tovarenske hodnoty (nova „prva session"). Pouzivaju testy
+        # a teardown in-SU sady — v behu pluginu ju nikto nevola.
+        def reset_memory!
+          @memory = nil
+        end
 
         # --- verejne API pre panel -----------------------------------------
 
@@ -67,6 +90,7 @@ module Noxun
           # CEF si po navrate z HtmlDialog callbacku vezme fokus spat — bez
           # tohto by sipky a Esc nefungovali, kym pouzivatel neklikne do modelu.
           focus_model_soon
+          push_state(s) # GHOST-FB4: pasik sa v paneli objavi so session
           s
         rescue StandardError => e
           Engine.log_error(e, 'GhostTool.start')
@@ -95,6 +119,8 @@ module Noxun
             invalidate_view(s.model)
           end
           end_tool(deferred: deferred)
+          # GHOST-FB4: pasik v paneli zmizne s KAZDYM koncom session.
+          push_state(nil) if changed || s
           changed
         rescue StandardError => e
           Engine.log_error(e, 'GhostTool.cancel_session')
@@ -105,6 +131,28 @@ module Noxun
         # samostatne, po dokonceni klikovej cesty).
         def release_session(s)
           @session = nil if @session.equal?(s)
+          push_state(nil) # GHOST-FB4: po vlozeni pasik zmizne
+        end
+
+        # --- GHOST-FB4: stav session do panela ------------------------------
+        # Pasik je INFORMACNY a existuje LEN pocas session — panel si z neho
+        # nic neodvodzuje ani nedopocitava, kazdy push ho cely prepise.
+        def state_payload(s)
+          return { 'active' => false } unless s && s.active?
+
+          { 'active' => true, 'type' => s.type_key,
+            'anchor' => s.anchor.to_s, 'anchor_label' => ANCHOR_LABELS[s.anchor].to_s,
+            'rotation' => s.rotation_index * 90, 'z_mode' => s.z_mode.to_s,
+            'lock_z' => s.lock_plane_z.to_f }
+        end
+
+        def push_state(s = @session)
+          return unless defined?(Panel) && Panel.respond_to?(:push_ghost)
+
+          Panel.push_ghost(state_payload(s))
+        rescue StandardError => e
+          Engine.log_error(e, 'GhostTool.push_state')
+          nil
         end
 
         # Ukonci NAS nastroj PRESNE JEDNYM `pop_tool`. Idempotentne: pop
@@ -203,9 +251,12 @@ module Noxun
         def world_transform(s)
           return nil unless s && s.last_point
 
+          # GHOST-FB4: v zamku plati LOCKNUTA vyska session (`lock_plane_z`) —
+          # default je domaca vyska typu (`plan.home_z`), ale pole v pasiku ju
+          # smie prestavit a zmena plati OKAMZITE aj pre commit.
           vals = Calc.matrix(anchor: s.anchor_point_mm, picked: s.last_point,
                              rotation_index: s.rotation_index,
-                             z_mode: s.z_mode, home_z: s.plan.home_z)
+                             z_mode: s.z_mode, home_z: s.lock_plane_z)
           Geom::Transformation.new(to_inch_matrix(vals))
         end
 
@@ -258,10 +309,10 @@ module Noxun
         def status_text(s)
           return '' unless s
 
-          lock = s.z_mode == :locked ? "výška #{fmt_mm(s.plan.home_z)} mm" : 'voľná výška'
+          lock = s.z_mode == :locked ? "výška #{fmt_mm(s.lock_plane_z)} mm" : 'voľná výška'
           warn = s.placeable ? '' : ' · POLOHA NEČITATEĽNÁ — otoč pohľad'
           "Ghost: klik položí skrinku · ←/→ otočiť · Alt kotva · ↓ zámok výšky · ↑ voľná výška · Esc zruší " \
-            "| kotva #{ANCHOR_LABELS[s.anchor]} · #{lock}#{warn}"
+            "| kotva #{ANCHOR_LABELS[s.anchor]} · #{lock} · otočenie #{s.rotation_index * 90}°#{warn}"
         end
 
         def fmt_mm(v)
@@ -436,6 +487,37 @@ module Noxun
           pt.all? { |v| v.to_f.abs <= MAX_REACH_MM }
         end
 
+        # GHOST-FB1 — HYBRID V ZAMKU: bod, ktory dal inference engine
+        # (`InputPoint`), sa v zamku pouzije LEN na X/Y; Z prepise ZAMOK.
+        # Vdaka tomu sa dolna skrinka prichyti na roh susednej skrinky, hoci
+        # ten roh lezi 100 mm nad podlahou (sokel) — a origin pritom drzi
+        # domacu vysku. Zdravotny strop plati na OBE podoby bodu: na surovy
+        # bod z inference aj na vysledok so zamknutym Z.
+        def lock_point(pt, plane_z)
+          return nil unless sane_point?(pt)
+
+          z = plane_z.to_f
+          return nil unless z.finite?
+
+          out = [pt[0].to_f, pt[1].to_f, z]
+          sane_point?(out) ? out : nil
+        end
+
+        # GHOST-FB4: validacia rucne zadanej locknutej vysky (mm). Vracia
+        # Float, alebo nil pri necisle / mimo rozsahu — volajuci vtedy
+        # PONECHA staru hodnotu (nikdy nespadne na 0).
+        def lock_z_value(raw)
+          s = raw.to_s.strip.tr(',', '.')
+          return nil if s.empty?
+          return nil unless s =~ /\A[+-]?\d+(\.\d+)?\z/
+
+          v = s.to_f
+          return nil unless v.finite?
+          return nil if v < LOCK_Z_MIN_MM || v > LOCK_Z_MAX_MM
+
+          v
+        end
+
         # Dalsia kotva v cykle (Alt). JEDNA metoda — pripadny TAB fallback
         # (Scope OUT tejto davky) by volal presne ju.
         def next_anchor(anchor, step = 1)
@@ -457,20 +539,33 @@ module Noxun
       class PlacementSession
         attr_reader :model, :plan, :hardware, :template_ref, :note, :state,
                     :rotation_index, :anchor, :z_mode, :last_point, :corners_mm,
-                    :anchors_mm, :cancel_reason, :hardware_note
+                    :anchors_mm, :cancel_reason, :hardware_note, :type_key
 
-        def initialize(model:, plan:, hardware: nil, template_ref: nil, note: nil)
+        def initialize(model:, plan:, hardware: nil, template_ref: nil, note: nil, memory: nil)
           @model = model
           @plan = plan
           @hardware = hardware
           @template_ref = template_ref
           @note = note.to_s
           @state = :active
-          @rotation_index = 0
-          @anchor = ANCHORS.first
+          # GHOST-FB3: session STARTUJE Z PAMATE modulu (kotva, rotacia, rezim
+          # vysky, locknute vysky) — do vypnutia SketchUpu si nastroj pamata,
+          # ako s nim pouzivatel naposledy pracoval. Prva session v behu
+          # dostane tovarenske hodnoty: lava dolna kotva, 0°, zamok.
+          @memory = memory || GhostTool.memory
+          @rotation_index = Calc.norm_rotation(@memory[:rotation_index])
+          @anchor = ANCHORS.include?(@memory[:anchor]) ? @memory[:anchor] : ANCHORS.first
           # OBA typy startuju v ZAMKU svojej domacej vysky (horna nikdy
-          # nestartuje vo free Z — zachovava dnesne spravanie buildera).
-          @z_mode = :locked
+          # nestartuje vo free Z — zachovava dnesne spravanie buildera), kym
+          # si pouzivatel v tomto behu nezvolil inak.
+          @z_mode = Z_MODES.include?(@memory[:z_mode]) ? @memory[:z_mode] : :locked
+          # Locknuta vyska je per TYP skrinky. Default sa NEDUPLIKUJE — berie
+          # sa z planu (`home_z`: dolna 0, horna UPPER_HANG_Z = 1400).
+          t = Calc.cfg_str(plan.config, :type)
+          @type_key = t.empty? ? 'lower' : t
+          store = (@memory[:lock_z] ||= {})
+          store[@type_key] = plan.home_z.to_f unless store.key?(@type_key)
+          @lock_z = store[@type_key].to_f
           # Obalka aj kotvy sa pocitaju RAZ zo ZMRAZENEHO configu (audit FIX 5)
           # — v `draw` sa uz nikdy nic neplanuje.
           @corners_mm = Calc.envelope_points(plan.config).map(&:freeze).freeze
@@ -567,12 +662,16 @@ module Noxun
           @placeable
         end
 
+        # KAZDA zmena ovladania sa zapise aj do PAMATE modulu (GHOST-FB3) —
+        # nasledujuca session zacne tam, kde tato skoncila.
         def rotate!(step)
           @rotation_index = Calc.norm_rotation(@rotation_index + step.to_i)
+          @memory[:rotation_index] = @rotation_index
         end
 
         def cycle_anchor!(step = 1)
           @anchor = Calc.next_anchor(@anchor, step)
+          @memory[:anchor] = @anchor
         end
 
         def set_z_mode!(mode)
@@ -580,12 +679,27 @@ module Noxun
           return false if @z_mode == mode
 
           @z_mode = mode
+          @memory[:z_mode] = mode
           true
         end
 
-        # Rovina zamku vo svete (mm) — dolna 0, horna UPPER_HANG_Z.
+        # GHOST-FB4: rucne prestavena locknuta vyska (mm) pre TENTO typ
+        # skrinky. Neplatny vstup NIC nemeni (stara hodnota drzi) — vracia
+        # false a volajuci o tom povie v statuse.
+        def set_lock_z!(raw)
+          v = Calc.lock_z_value(raw)
+          return false if v.nil?
+          return false if (v - @lock_z).abs < 1e-9
+
+          @lock_z = v
+          (@memory[:lock_z] ||= {})[@type_key] = v
+          true
+        end
+
+        # Rovina zamku vo svete (mm) — default je domaca vyska typu
+        # (dolna 0, horna UPPER_HANG_Z), pole v Ghost pasiku ju smie prestavit.
         def lock_plane_z
-          @plan.home_z.to_f
+          @lock_z.to_f
         end
 
         def anchor_point_mm
@@ -831,9 +945,14 @@ module Noxun
             when :right then s.rotate!(1)
             when :down  then s.set_z_mode!(:locked)
             when :up    then s.set_z_mode!(:free)
+            # GHOST-FB2: prepnutie kotvy NEMENI kliknuty bod — translacia sa
+            # prepocita s NOVOU kotvou, takze skrinka „preskoci" tak, aby nova
+            # kotva sadla pod kurzor. Jedno pravidlo pre cele ovladanie:
+            # kotva je vzdy tam, kde je mys (a rotacia sa toci okolo nej).
             when :alt   then s.cycle_anchor!
             end
             refresh_status
+            GhostTool.push_state(s) # GHOST-FB4: pasik drzi krok s klavesami
             view.invalidate if view
           end
           res
@@ -859,6 +978,12 @@ module Noxun
           guarded('draw') do
             s = live_session
             next unless s && s.active? && s.last_point
+
+            # GHOST-FB1: NATÍVNE zvyraznenie snapu — presne to, co pouzivatel
+            # pozna z Move (farebny bod rohu/stredu/hrany + tooltip). Kresli sa
+            # v OBOCH rezimoch, lebo inference sa v oboch pyta; `display?`
+            # rozhoduje SketchUp (bod na volnej ploche sa nekresli).
+            draw_inference(view)
 
             pts = GhostTool.world_corners(s)
             next if pts.empty?
@@ -905,6 +1030,20 @@ module Noxun
           s
         end
 
+        # GHOST-FB1: `@ip.draw` + `view.tooltip` — vlastnu grafiku snapov si
+        # NEKRESLIME (farby a tvary rohu/stredu/hrany su konvencia SketchUpu).
+        # Bezi LEN so zivou session (volane z `draw` za guardom) a vlastny
+        # rescue ma preto, aby chyba v tooltipe nezhodila kresbu ghostu.
+        def draw_inference(view)
+          ip = @ip
+          return unless ip && ip.valid? && ip.display?
+
+          ip.draw(view)
+          view.tooltip = ip.tooltip
+        rescue StandardError
+          nil
+        end
+
         def draw_anchor(view, s, dim)
           a = GhostTool.world_anchor(s)
           return unless a
@@ -918,29 +1057,80 @@ module Noxun
           end
         end
 
-        # Zamok vysky: X/Y z priesecnika luca s ROVINOU ZAMKU (world ram,
-        # nie drawing axes) — ghost tak sedi pod kurzorom aj v prazdnom modeli.
+        # GHOST-FB1 — ZAMOK VYSKY JE HYBRID. Najprv sa pyta INFERENCE ENGINE
+        # (`InputPoint.pick`) presne ako Move: ked snap sedi na REALNEJ
+        # geometrii, zoberu sa z neho X/Y (roh / hrana / plocha existujucej
+        # skrinky) a Z PREPISE ZAMOK. Bez toho nemalo vkladanie v zamku ZIADNE
+        # prichytavanie — pri dolnej so soklom nebolo v rovine Z = 0 co chytit
+        # a roh susednej skrinky lezi 720 mm nad nou. Fallback (prazdne miesto,
+        # ziadna geometria pod kurzorom) je dnesny priesecnik luca s ROVINOU
+        # ZAMKU (world ram, nie drawing axes), takze ghost sedi pod kurzorom aj
+        # v uplne prazdnom modeli. Degenerovane guardy (MIN_SIN / MAX_REACH)
+        # plati fallback; zdravotny strop plati OBOM.
         def pick_locked(s, x, y, view)
-          ray = view.pickray(x, y)
-          pt = nil
-          if ray
-            origin = to_mm_triplet(ray[0])
-            dir = [ray[1].x.to_f, ray[1].y.to_f, ray[1].z.to_f]
-            pt = Calc.ray_plane(origin, dir, s.lock_plane_z)
-          end
+          pt = pick_ip_locked(s, x, y, view) || pick_ray_locked(s, x, y, view)
           s.set_point(pt, !pt.nil?)
+        end
+
+        # X/Y zo snapu, Z zo zamku. Nil = inference nedal snap na geometrii
+        # (alebo bod nie je zdravy) a rozhoduje fallback.
+        def pick_ip_locked(s, x, y, view)
+          pos = pick_ip(x, y, view)
+          return nil unless pos && ip_on_geometry?
+
+          Calc.lock_point(to_mm_triplet(pos), s.lock_plane_z)
+        end
+
+        # ZAMOK berie z inference LEN snap na REALNEJ geometrii (vrchol, hrana,
+        # plocha). „Volny" bod inference — teda bod na podlahovej rovine
+        # KRESLENIA tam, kde nie je nic — by v zamku KLAMAL:
+        #   * pri hornej skrinke lezi rovina zamku 1400 mm nad podlahou, takze
+        #     X/Y z podlahy by ghost odsunuli od kurzora,
+        #   * pri OTOCENYCH osiach kreslenia by ho odsunuli tiez (zamok ma
+        #     drzat SVETOVY ram),
+        #   * a v degenerovanom pohlade (rovina za kamerou, walk pohlad) by
+        #     obisiel guardy `MIN_SIN` / `MAX_REACH` a spravil nepolozitelny
+        #     stav polozitelnym.
+        # Ked snap na geometrii nie je, rozhoduje priesecnik luca s rovinou
+        # zamku — presne ako pred GHOST-FB.
+        def ip_on_geometry?
+          ip = @ip
+          return false unless ip
+
+          !(ip.vertex.nil? && ip.edge.nil? && ip.face.nil?)
+        rescue StandardError
+          false
+        end
+
+        def pick_ray_locked(s, x, y, view)
+          ray = view.pickray(x, y)
+          return nil unless ray
+
+          origin = to_mm_triplet(ray[0])
+          dir = [ray[1].x.to_f, ray[1].y.to_f, ray[1].z.to_f]
+          Calc.ray_plane(origin, dir, s.lock_plane_z)
         end
 
         # Volna vyska: plny inference point SketchUpu. Aj tu plati ZDRAVOTNY
         # STROP (review #268 P2-1) — inference na extremne vzdialenej geometrii
         # by inak polozil korpus kilometre od zakazky.
         def pick_free(s, x, y, view)
-          @ip ||= Sketchup::InputPoint.new
-          @ip.pick(view, x, y)
-          pos = @ip.valid? ? @ip.position : nil
+          pos = pick_ip(x, y, view)
           pt = pos ? to_mm_triplet(pos) : nil
           pt = nil unless pt.nil? || Calc.sane_point?(pt)
           s.set_point(pt, !pt.nil?)
+        end
+
+        # JEDINE miesto, kde sa pyta inference engine — plati pre OBA rezimy,
+        # takze `@ip` je v oboch cerstvy a `draw` z neho vie vykreslit natívne
+        # zvyraznenie snapu aj tooltip (GHOST-FB1).
+        def pick_ip(x, y, view)
+          @ip ||= Sketchup::InputPoint.new
+          @ip.pick(view, x, y)
+          @ip.valid? ? @ip.position : nil
+        rescue StandardError => e
+          Engine.log_error(e, 'GhostTool.Tool#pick_ip')
+          nil
         end
 
         def to_mm_triplet(pt)

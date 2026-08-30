@@ -62,6 +62,12 @@
   Pri objednávaní a hľadaní treba počítať s oboma číslami.
 - **Rovnaký dekor existuje ako DTDL aj PD s INOU štruktúrou povrchu:** Kronospan K2738 Torro Cremona Oak = DTDL „PW BU" (DK 532848) + PD „FP" (DK 532772). → otvorená otázka kľúča skupiny (nižšie).
 
+### Výškové skladanie kuchyne
+
+- **Spodná hrana horných skriniek = 1400 mm nad podlahou** (potvrdené Michalom 31.8.2026). Číslo nie je zvyk, ale súčet: **850 mm pracovná výška** (horná plocha PD spodných skriniek)
+  **+ 550 mm zástena** medzi PD a hornými. Preto je `UPPER_HANG_Z = 1400` predvolená výška zavesenia hornej skrinky (a predvolená zamknutá výška ghost vkladania — pozri
+  [docs/architecture/construction.md § ghost_tool.rb](../docs/architecture/construction.md)). Atypy sa robia (vyššia zástena, nízky strop), preto je hodnota **prestaviteľná**, nie zadrôtovaná.
+
 ### Zásteny
 
 - **Zástena** = doska medzi PD a hornými skrinkami; **hrúbka 9,2–12 mm** (9,2 = dominantný Egger štandard — 63 položiek; 10 = Kronospan; do 12 podľa Michala), dĺžky ako pracovné dosky (4100).

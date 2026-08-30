@@ -1009,9 +1009,18 @@ v modeli**. **Poradie je súčasťou kontraktu:** doc guard (R-02) → šablóno
 `prepare_insert` → zrušenie prípadnej **starej** session → nová session + `push_tool` + status. **Preflighty bežia PRÁVE RAZ a Tool ich NEOPAKUJE** (Tool rieši polohu,
 nie výrobné pravidlá).
 
-Panel má voči `GhostTool` presne tri švy (`actions_cabinet.rb`): **`ghost_freeze_hardware`** (sprievodný blok H2 vnútri operácie vloženia — výnimka ruší celú operáciu),
+Panel má voči `GhostTool` presne tri švy **vkladu** (`actions_cabinet.rb`; štvrtý — Ghost pásik — je informačný a je popísaný nižšie): **`ghost_freeze_hardware`** (sprievodný blok H2 vnútri operácie vloženia — výnimka ruší celú operáciu),
 **`ghost_insert_failed`** (commit padol na guardoch stavby — v modeli sa nič nezmenilo, hláška je tá istá vrátane výpisu aktívnych zámkov) a **`ghost_after_commit`**
 (výber novej CAB, status s varovaniami, `push_selected`, pečiatka šablóny cez `stamp_once!`) — všetko **existujúcimi cestami**, žiadny nový selection mechanizmus.
+**Ghost pásik (GHOST-FB4)** je štvrtý šev a **jediná** vec, ktorú Inspector počas ghostu ukazuje navyše: jeden riadok pod „Vložiť korpus" so **stavom bežiacej session** —
+piktogram štyroch kotiev s aktívnou, otočenie v stupňoch, režim výšky, **editovateľné pole zamknutej výšky v mm** a „i" ikona (sprite `#i-info`) s tooltipom ovládania.
+Kreslí ho `ui/js/ghost_bar.js` z pushu `Panel.push_ghost` → `NX.setGhost`; **panel si z neho nič neodvodzuje** — každý push stav celý prepíše. Pásik **nie je trvalou
+súčasťou panela** (vertikálny priestor je vzácny): štartuje `hidden` a `active = false` ho schová, čo chodí pri **každom** konci session (vloženie, Esc, prepnutie dokumentu,
+zavretie Inspectora). Pole výšky ide späť `cb 'ghost_lock_z'` → `handle_ghost_lock_z`: **guard identity dokumentu je prvý** (R-02, `nxDocPayload` + `foreign_document?` —
+hoci sa nezapisuje do modelu, mení stav session a panel inej zákazky do nej siahať nesmie), validácia beží **na oboch stranách rovnako** (mm Float, 0–3000) a **neplatný
+vstup nič nemení** — pole sa vráti na poslednú platnú hodnotu a status povie prečo. Ostatné položky pásika sú informačné (jediná cesta ich zmeny sú klávesy v modeli).
+Kontrakt pamäte nastavení a zamknutej výšky: [construction.md § ghost_tool.rb](construction.md).
+
 Zmeny vo vkladacej karte sa do **bežiacej** session NEPREMIETAJÚ (snapshot je zmrazený; status to prizná) a **druhé „Vložiť" starú session zruší** a založí novú s čerstvým
 snapshotom. **Poznámku preflightov** (D-45 prevzatá hrúbka, materiálové noty) vypisuje **až `ghost_after_commit`** — pri stlačení „Vložiť" sa ešte nič nestalo, takže hlásiť ju
 vtedy by bolo predčasné a po kliku by sa zopakovala druhý raz.

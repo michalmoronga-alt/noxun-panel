@@ -1642,8 +1642,13 @@ module NoxunSuRunner
 
   # Teardown: ziadna session ani nastroj nesmie prezit do dalsej sekcie.
   # `deferred: false` = pop nastroja SYNCHRONNE (v teste necakame na timer).
+  # GHOST-FB3: spolu so session sa zahadzuje aj PAMAT nastaveni (kotva,
+  # rotacia, rezim, locknute vysky) — inak by si scenare navzajom menili
+  # vychodiskovy stav. Dedenie pamate medzi sessions ma preto vlastny scenar,
+  # ktory teardown vedome NEvola.
   def ghost_teardown!(_model)
     e::GhostTool.cancel_session('SU-TEST teardown', deferred: false)
+    e::GhostTool.reset_memory!
   rescue StandardError => ex
     info("GHOST teardown: #{ex.class}: #{ex.message}")
   end
@@ -1789,6 +1794,7 @@ module NoxunSuRunner
 
   def run_ghost(model)
     cleanup(model)
+    e::GhostTool.reset_memory! # GHOST-FB3: sekcia startuje na tovarenskych hodnotach
     markers = []
     e::Panel.handle_set_insert_locks({ 'locks' => {} }.to_json)
 
@@ -2250,6 +2256,121 @@ module NoxunSuRunner
       ok('GHOST 17b: zruseny vklad nenechal ZIADEN krok Spat (1x Spat vratil marker)', !m17.valid?)
     end
     ghost_teardown!(model)
+
+    # --- 18) GHOST-FB (smoke feedback 31.8.): snap v zamku, kotva pod
+    #     kurzorom, rucna vyska zamku a pamat nastaveni ----------------------
+    cleanup(model)
+    ghost_teardown!(model)
+    alt18 = defined?(VK_MENU) ? VK_MENU : VK_ALT
+
+    # (a) SNAP V ZAMKU NA ROH SUSEDNEJ SKRINKY. Roh lezi 720 mm NAD rovinou
+    #     zamku: keby sa zamok pytal len luca x roviny, vysiel by bod o cely
+    #     meter inde (luc cez pixely rohu pretina Z = 0 az za nim). Rozdiel
+    #     je preto skutocnym dokazom, ze sa v zamku pytame inference engine.
+    nb = ghost_place!(model, GHOST_PARAMS.dup, [1000.0, 300.0])
+    ghost_teardown!(model)
+    if nb.nil?
+      ok('GHOST 18a: susedna skrinka pre snap sa nevlozila', false)
+    else
+      cp = nb.transformation * e::Units.point(600.0, 0.0, 720.0) # pravy horny roh prednej steny
+      corner = [mm(cp.x), mm(cp.y), mm(cp.z)]
+      e::Panel.handle_insert(pg(model, GHOST_PARAMS.dup))
+      s = ghost_session
+      ghost_camera!(model, [corner[0], corner[1]], 0.0)
+      sc = ghost_screen(model, corner)
+      ghost_tool.onMouseMove(0, sc.x, sc.y, model.active_view)
+      lp = s.last_point
+      ray18 = model.active_view.pickray(sc.x, sc.y)
+      plain = ray18 ? e::GhostTool::Calc.ray_plane(
+        [mm(ray18[0].x), mm(ray18[0].y), mm(ray18[0].z)],
+        [ray18[1].x.to_f, ray18[1].y.to_f, ray18[1].z.to_f], 0.0
+      ) : nil
+      # Tolerancia 30 mm: inference smie chytit aj SUSEDNY vrchol tej istej
+      # skrinky (vnutorny roh boku je 18 mm vedla — hrubka dosky). Podstatne
+      # je, ze ghost sedi NA SKRINKE, nie meter vedla nej (fallback nizsie).
+      ok("GHOST 18a: v ZAMKU sa ghost chytil na ROH susednej skrinky (#{lp && lp.map { |q| q.round(1) }.inspect} vs roh #{corner.map { |q| q.round(1) }.inspect})",
+         !lp.nil? && (lp[0] - corner[0]).abs <= 30.0 && (lp[1] - corner[1]).abs <= 30.0)
+      ok("GHOST 18a: Z pritom drzi ZAMOK, hoci roh je 720 mm nad rovinou (#{lp && lp[2].round(2)})",
+         !lp.nil? && lp[2].abs <= TOL)
+      ok("GHOST 18a: samotny luc x rovina by dal INY bod (#{plain && plain.map { |q| q.round(0) }.inspect}) — snap je naozaj v hre",
+         plain.nil? || (plain[0] - corner[0]).abs > 50.0 || (plain[1] - corner[1]).abs > 50.0)
+
+      # (b) KOTVA POD KURZOROM: Alt prepne kotvu a skrinka SKOCI tak, aby nova
+      #     kotva sadla na ten isty kliknuty bod.
+      ok('GHOST 18b: Alt prepol kotvu a kliknuty bod sa NEZMENIL',
+         ghost_key!(model, alt18) == true && s.anchor == :fr_bottom && s.last_point == lp)
+      ghost_click!(model, corner)
+      jumped = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' && !i.equal?(nb) }
+      if jumped
+        ja = jumped.transformation * e::Units.point(600.0, 0.0, 100.0) # PRAVA DOLNA kotva
+        ok("GHOST 18b: prepnuta kotva sadla PRESNE pod kurzor (#{mm(ja.x).round(2)}, #{mm(ja.y).round(2)})",
+           ghost_on_used?([mm(ja.x), mm(ja.y)]))
+      else
+        ok('GHOST 18b: vklad s prepnutou kotvou prebehol', false)
+      end
+      ghost_teardown!(model)
+    end
+    cleanup(model)
+
+    # (c) POLE VYSKY V PASIKU: 20 mm -> skrinka sadne na 20; necislo, hodnota
+    #     mimo rozsahu ani panel INEHO dokumentu (R-02) NIC nezmenia.
+    ghost_teardown!(model)
+    e::Panel.handle_insert(pg(model, GHOST_PARAMS.dup))
+    s = ghost_session
+    e::Panel.handle_ghost_lock_z(pg(model, 'lock_z' => '20'))
+    ok("GHOST 18c: pole vysky prestavilo zamok na 20 mm (#{s.lock_plane_z.round(2)})",
+       (s.lock_plane_z - 20.0).abs < 0.001)
+    e::Panel.handle_ghost_lock_z(pg(model, 'lock_z' => 'dvadsat'))
+    ok('GHOST 18c: necitatelna vyska NIC nezmenila (stara drzi)', (s.lock_plane_z - 20.0).abs < 0.001)
+    e::Panel.handle_ghost_lock_z(pg(model, 'lock_z' => '9999'))
+    ok('GHOST 18c: vyska mimo rozsahu NIC nezmenila', (s.lock_plane_z - 20.0).abs < 0.001)
+    e::Panel.handle_ghost_lock_z({ 'model_guid' => 'SU-TEST-CUDZI-GUID', 'lock_z' => '900' }.to_json)
+    ok('GHOST 18c: pole z panela INEHO dokumentu sa ghostu nedotkne (R-02)',
+       (s.lock_plane_z - 20.0).abs < 0.001)
+    ghost_key!(model, VK_RIGHT)
+    ghost_key!(model, alt18)
+    ghost_camera!(model, [700.0, 200.0], 20.0)
+    ghost_click!(model, [700.0, 200.0, 20.0])
+    low = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
+    lo = low ? ghost_origin_mm(low) : [nil, nil, nil]
+    ok("GHOST 18c: skrinka sadla na RUCNE zadanu vysku 20 mm (Z = #{lo[2] && lo[2].round(2)})",
+       !low.nil? && (lo[2] - 20.0).abs <= TOL)
+
+    # (d) PAMAT NASTAVENI (per proces): nova session zacina tam, kde skoncila
+    #     predchadzajuca. Teardown sa tu VEDOME nevola — prave on pamat cisti.
+    e::Panel.handle_insert(pg(model, GHOST_PARAMS.dup))
+    s2 = ghost_session
+    ok("GHOST 18d: nova session ZDEDILA nastavenia (kotva #{s2 && s2.anchor}, otocenie #{s2 && s2.rotation_index * 90}°, vyska #{s2 && s2.lock_plane_z.round(1)})",
+       !s2.nil? && s2.anchor == :fr_bottom && s2.rotation_index == 1 &&
+       (s2.lock_plane_z - 20.0).abs < 0.001)
+    ghost_teardown!(model)
+    e::Panel.handle_insert(pg(model, GHOST_PARAMS.dup))
+    s3 = ghost_session
+    ok('GHOST 18d: po resete pamate startuje session na tovarenskych hodnotach',
+       !s3.nil? && s3.anchor == :fl_bottom && s3.rotation_index.zero? && s3.lock_plane_z.abs < 0.001)
+    ghost_teardown!(model)
+    cleanup(model)
+
+    # (e) GHOST PASIK: stav ide do panela pri starte session aj pri jej konci
+    #     (`active = false` = pasik zmizne — nie je trvalou castou panela).
+    rec18 = []
+    install_js_recorder(rec18)
+    begin
+      e::Panel.handle_insert(pg(model, GHOST_PARAMS.dup))
+      ghost_key!(model, VK_RIGHT)
+      e::GhostTool.cancel_session('SU-TEST pasik', deferred: false)
+    ensure
+      remove_js_recorder
+    end
+    ghosts18 = rec18.select { |x| x.include?('NX.setGhost') }
+    ok("GHOST 18e: pasik dostal stav BEZIACEJ session (#{ghosts18.length} pushov)",
+       ghosts18.any? { |x| x.include?('"active":true') && x.include?('"anchor"') && x.include?('"lock_z"') })
+    ok('GHOST 18e: sipka prekreslila pasik na nove otocenie',
+       ghosts18.any? { |x| x.include?('"rotation":90') })
+    ok('GHOST 18e: po konci session pasik dostal pokyn ZMIZNUT (active = false)',
+       ghosts18.any? { |x| x.include?('"active":false') })
+    ghost_teardown!(model)
+    cleanup(model)
 
     r03_clear_markers(model, markers)
     ghost_teardown!(model)

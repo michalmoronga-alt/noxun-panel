@@ -17,6 +17,28 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **GHOST-FB · SMOKE FEEDBACK GHOST VKLADANIA (v0.8.24, 31.8.2026, PR #270):** Michal ghost odskúšal naživo a nahlásil štyri veci; koreňom bola **jedna** — výškový zámok
+  počítal polohu **len** ako priesečník lúča s rovinou zámku, takže vkladanie nemalo **žiadne prichytávanie**. V rovine Z = 0 nie je pri dolnej skrinke so soklom čoho sa
+  chytiť a roh susednej skrinky leží 720 mm nad ňou. **FB-1:** `pick_locked` je odteraz **hybrid** — najprv `InputPoint.pick` (presne ako Move), z **reálneho snapu** X/Y,
+  Z prepíše zámok (`Calc.lock_point`); fallback je dnešná rovina. `draw` kreslí **natívne zvýraznenie** (`@ip.draw` + `view.tooltip`) v oboch režimoch — vlastnú grafiku
+  snapov si nekreslíme, farby rohu/stredu/hrany sú konvencia SketchUpu.
+  **Čo dávku posunulo: prvý plný in-SU beh zhodil štyri STARÉ scenáre naraz** (`run_ghost` 3, 6, 8, 8b) a bola to skutočná chyba návrhu, nie testu. `InputPoint` totiž vracia
+  platný bod **aj tam, kde nie je nič** — bod na podlahovej rovine **kreslenia**. Taký bod v zámku **klame**: hornej skrinke leží rovina zámku 1400 mm vyššie, takže X/Y
+  z podlahy ju odsunú od kurzora (3); pri otočených drawing axes ju odsunú tiež, hoci zámok má držať **svetový** rám (6); a v degenerovanom pohľade (rovina za kamerou,
+  walk pohľad) obíde guardy `MIN_SIN` / `MAX_REACH` a spraví nepoložiteľný stav položiteľným (8/8b) — presne tie brány, ktoré uzavrelo review #268. Pribudla preto brána
+  **`ip_on_geometry?`** (`vertex` / `edge` / `face`): v zámku vyhráva inference **len so snapom na reálnej geometrii**, inak rozhoduje rovina. Poučenie do budúcna: *„pýtať
+  sa inference" nie je to isté ako „prichytiť sa na geometriu"* — a in-SU sada je jediné miesto, kde sa ten rozdiel dá zmerať.
+  **FB-2** (kotva vždy pod kurzorom, aj po Alt) bola už matematicky pravda — translácia sa skladá z *aktuálnej* kotvy a *aktuálneho* bodu — ale nikde zapísaná: dávka ju
+  **zaklincovala testami** (4 kotvy × 4 rotácie × oba režimy, headless + in-SU dôkaz, že prepnutá kotva sadne presne pod kurzor). **FB-3:** kotva, rotácia, režim výšky
+  a zamknuté výšky (**per typ**) žijú v modulovej pamäti `GhostTool.memory` — **per proces, bez zápisu na disk aj do modelu**: je to pracovný návyk jedného sedenia, nie údaj
+  zákazky (inak by sa cudzia zákazka otvorila s cudzími kotvami). In-SU teardown ju čistí, aby si scenáre nemenili východisko. **FB-4:** Ghost pásik Inspectora — jeden riadok
+  so stavom session (kotva, otočenie, režim, editovateľná zamknutá výška v mm, „i" ikona zo spritu), **existuje výhradne počas session** (`active = false` ho schová pri
+  každom konci) a `handle_ghost_lock_z` má **guard identity dokumentu ako zapisovacie handlery** (R-02) — hoci nezapisuje do modelu, mení stav session. Validácia výšky beží
+  **na oboch stranách rovnako** (mm Float, 0–3000) a neplatný vstup **nič nemení**. Do `POJMY.md` pribudol fakt, prečo je 1400 práve 1400: **850 pracovná výška + 550 zástena**.
+  Testy: **2216 headless** (+13 scenárov), **75 JS sád** (nová `test_ghost_fb.js`), in-SU sekcia `run_ghost` rozšírená o scenár 18 (a–e) — plný beh **1217 PASS / 0 FAIL** (nad DocKey identitou z 1d/R-02b).
+  Merací detail scenára 18a: snap dal `[1581.5, 296.8, 0]`, samotný lúč × rovina by dal `[2613, 1712, 0]` — **meter a pol vedľa**, takže scenár naozaj meria prichytávanie,
+  nie zhodu náhodou. Blok GHOST **ostáva otvorený** — smoke checklist má odteraz 11 bodov.
+
 - **1d/R-02b · STABILNÝ KĽÚČ DOKUMENTU (DocKey) NAMIESTO `Model#guid` (v0.8.23, 30.8.2026, PR #267):** priznaný zvyšok dávky R-02 (#264) — VŠETKY identity guardy (server
   `Panel.foreign_document?`, zóny, tagy, Štúdio, baseline Pravidiel, okno Materiály, katalóg kovania, `replace_uni_scan`) aj JS zrkadlo (`nxModelGuid`) stáli na
   `Sketchup::Model#guid`, ktorý SketchUp **mení pri KAŽDOM uložení**. Ctrl+S do ~400 ms po úprave debounced poľa tak vyzeral ako prepnutie dokumentu: edit sa zahodil

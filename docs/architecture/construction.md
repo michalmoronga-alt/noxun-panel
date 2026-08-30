@@ -99,9 +99,32 @@ varianty dna majú spodnú kotvu na Z = 0 (`UPPER_HANG_Z` je SVETOVÁ výška or
 
 **Transform sa skladá VŽDY NANOVO z celočíselného stavu** (`rotation_index % 4`), nikdy inkrementálnym násobením: `COS`/`SIN` sú tabuľky presných 0/±1, takže matica prejde
 `CabinetBuilder.rigid_matrix?` (R-03, `RIGID_TOL` 1e-6) bez numerického šumu aj po stovkách otočení. **Free Z:** `translation = picked − R(anchor)`. **Zámok typu (↓):**
-`translation.z = home_z` NAPEVNO — **lokálne Z kotvy sa NEODČÍTA** (origin skrinky drží domácu výšku svojho typu: dolná 0, horná `UPPER_HANG_Z`), X/Y sa berie z priesečníka
-lúča s **rovinou zámku** (`home_z`, svetový rám — nie drawing axes), takže ghost sedí pod kurzorom aj v prázdnom modeli. **Oba typy ŠTARTUJÚ v `:locked`.**
+`translation.z = lock_plane_z` NAPEVNO — **lokálne Z kotvy sa NEODČÍTA** (origin skrinky drží zamknutú výšku; default je domáca výška typu: dolná 0, horná `UPPER_HANG_Z`),
+X/Y sa berie z bodu pod kurzorom (hybrid nižšie). **Oba typy ŠTARTUJÚ v `:locked`.**
 `Calc` počíta v mm; `to_inch_matrix` prevedie **len transláciu** (rotačná časť je bezrozmerná).
+
+**Kotva je VŽDY pod kurzorom — aj po Alt (GHOST-FB2).** Translácia sa skladá z *aktuálnej* kotvy a *aktuálneho* kliknutého bodu, takže prepnutie kotvy skrinku **presunie**
+tak, aby nová kotva skočila pod myš; rotácia sa tým točí okolo kurzora. Je to **jedno pravidlo pre celé ovládanie** a platí vo všetkých 4 kotvách × 4 rotáciách × oboch
+režimoch (headless dôkaz). V zámku to platí pre X/Y — Z drží zámok, to je jeho zmysel.
+
+**Zámok výšky je HYBRID: snap na geometrii najprv, rovina až ako fallback (GHOST-FB1).** `pick_locked` sa najprv pýta `InputPoint.pick` presne ako Move; keď snap sedí na
+**reálnej geometrii**, vezme si z neho **X/Y** a **Z prepíše zámkom** (`Calc.lock_point`). Inak sa počíta dnešný priesečník lúča s **rovinou zámku** (svetový rám, nie
+drawing axes) — preto ghost sedí pod kurzorom aj v úplne prázdnom modeli. Bez hybridu nemalo vkladanie v zámku **žiadne prichytávanie**: v rovine Z = 0 nie je pri dolnej
+skrinke so soklom čoho sa chytiť, a roh susednej skrinky leží 720 mm nad ňou.
+
+**Brána `ip_on_geometry?` (`vertex` / `edge` / `face`) je podstatná, nie kozmetická.** „Voľný" bod inference — bod na podlahovej rovine **kreslenia** tam, kde nie je nič —
+by v zámku **klamal** a in-SU sada to zmerala na štyroch miestach naraz: hornej skrinke leží rovina zámku 1400 mm nad podlahou, takže X/Y z podlahy ju **odsunú od kurzora**
+(`run_ghost` 3); pri **otočených drawing axes** ju odsunú tiež, hoci zámok má držať svetový rám (6); a v **degenerovanom pohľade** (rovina za kamerou, walk pohľad) by taký
+bod **obišiel guardy** `MIN_SIN` / `MAX_REACH` a spravil nepoložiteľný stav položiteľným (8, 8b). Zdravotný strop (`sane_point?`) platí **obom** cestám — bodu z inference
+aj výsledku so zamknutým Z. Inference sa pýtame v **oboch** režimoch, takže `@ip` je vždy čerstvý a `draw` z neho kreslí **natívne zvýraznenie snapu**
+(`@ip.draw` + `view.tooltip`, len keď `display?`) — farby a tvary rohu/stredu/hrany sú konvencia SketchUpu, vlastnú grafiku snapov si nekreslíme.
+
+**Zamknutá výška je prestaviteľná a pamätá sa (GHOST-FB3/FB4).** `PlacementSession#lock_plane_z` je default `plan.home_z`, ale Ghost pásik Inspectora ju smie prepísať
+(`set_lock_z!`, validácia `Calc.lock_z_value`: mm Float, rozsah `LOCK_Z_MIN_MM`..`LOCK_Z_MAX_MM` = 0–3000; neplatný vstup **nič nemení**). Zmena platí okamžite pre živý
+ghost aj pre commit. Kotva, rotácia, režim výšky a zamknuté výšky (**per typ** skrinky) žijú v **modulovej pamäti `GhostTool.memory`** — per proces, do vypnutia
+SketchUpu, **bez zápisu na disk aj do modelu**: je to pracovný návyk jedného sedenia, nie údaj zákazky (inak by sa cudzia zákazka otvorila s cudzími kotvami). Nová session
+z nej štartuje; `reset_memory!` (testy, in-SU teardown) vráti továrenské hodnoty. Stav session ide do panela cez `GhostTool.push_state` → `Panel.push_ghost` → `NX.setGhost`
+— pri každom konci session s `active = false`, takže pásik zmizne.
 
 **Degenerované lúče** (`Calc.ray_plane`) majú **dve nezávislé brány** — samotné „`|dir.z|` nad epsilon" je mŕtvy strážca: pri normalizovanom vektore ho prejde aj lúč jeden
 pixel pod horizontom (`dz` ≈ 1e-4) a `t` vyjde rádovo 10⁶, takže by klik položil korpus **kilometre od originu** (`rigid_matrix?` transláciu nijako neobmedzuje). Priesečník preto
