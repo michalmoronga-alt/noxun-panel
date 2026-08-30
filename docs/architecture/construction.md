@@ -16,6 +16,25 @@ plánovač cfg→BuildPlan (kovanie sa vyhodnocuje po vyradení degenerovaných 
 
 ### cabinet_builder.rb
 
+**ŠEV VKLADANIA (R-03, v0.8.20): `prepare_insert` → `commit_insert`; `build` je len ich kompozícia** a správanie všetkých doterajších volajúcich je nezmenené.
+`prepare_insert(model, params)` vydá **zmrazený `InsertPlan`** (config + `home_z`) — *žiadna* mutácia modelu, entít, ID ani Undo stacku, a **zámerne ani `ensure_root_context`**
+(ghost hover nesmie používateľovi zatvárať otvorený komponent). Config je **hlboká kópia s rekurzívnym freeze** vrátane vnorených hashov, polí aj stringov, a **v tomto poradí**:
+`enum_val` vracia `v.to_s`, čo je pri Stringu ten istý objekt ako vstup, takže priamy freeze by zmrazil `params` volajúceho. Plán si drží **referenciu na `Sketchup::Model`** ako identitu
+dokumentu — nie `guid`, ten sa mení pri každom uložení (lekcia #261/#264).
+
+`commit_insert(model, plan, transform:, &block)` je jediné miesto, kde vklad mení model, a **poradie krokov je súčasť kontraktu**: (1) guard identity dokumentu — plán z iného okna
+sa odmieta ešte pred zatvorením edit kontextu (cross-document vklad nikdy) · (2) validácia explicitného `transform` — prijme sa **len konečná pravotočivá RIGIDNÁ** transformácia
+(`rigid_transform?` číta `to_a`: jednotkové a navzájom kolmé osi, determinant +1, nulová perspektíva **a prvok [15] == 1**, lebo `Geom::Transformation.scaling(2)` nechá osi jednotkové
+a mierku uloží práve sem); scale/skos/zrkadlo by postavili korpus, ktorého geometria nesedí s configom, a scale observer by ho pod guardom ani nezachytil — tichá výrobná chyba ·
+(3) `ensure_root_context` **a kontrola postcondition** (helper po výnimke/20 iteráciách ticho vracia nil — bez kontroly by korpus skončil v cudzom komponente) · (4) až teraz ID a
+`next_x` · (5) operácia + **transparentný scale-lock follow-up, oboje VNÚTRI `guarded`** (zápis scale-lock atribútov mimo guardu by cez `EntitiesObserver#onElementModified` založil
+oneskorený dirty tik a transparentný presun ghost zón by zasiahol Undo po dokončenom vložení); `ScaleWatch.attach_one` je až za guardom. Do stavby ide **pracovná (nezmrazená) kópia**
+plánu: `PartKeys.migrate_overrides` zdieľa vnorené hashe overridov a `resolve_part` v nich in-place upratuje sticky `edge_warnings`.
+`build` volá `ensure_root_context` **PRED** `prepare_insert`, aby pri výnimke z `normalize` používateľ skončil v roote presne ako doteraz; commit si root ešte raz idempotentne overí.
+**Vedomé hranice R-03:** kontrakt čistoty `prepare_insert` je uzko formulovaný na *model, entity, ID a Undo* — `normalize` cez `Materials.normalized_abs_id` môže siahnuť na katalóg
+na disku a logovať, a `Construction.build_plan` sa do prepare **nepresúva** (validačné chyby by sa zobrazili pred hardware blokom a pred commit-time snapshotmi). Súradnice
+obálky/kotvy (`bounds_mm`) plán zámerne **nenesie** — uzavrie ich až GHOST dávka proti `BuildPlan`u. In-SU dôkazy: sekcia `run_r03` + `run_r03_async` (`su_runner.rb`).
+
 **K1/D-108 smer dekoru dielca:** `effective_grain(sheet, override)` je JEDINÁ autorita efektívneho smeru (`override → materiál`) a `resolve_part` ho **materializuje RAZ** do
 snapshotu dielca.
 

@@ -121,7 +121,10 @@ polôh sa čistí po mazaní aj po zániku dokumentu), v0.8.17, 30.8.; zvyšok �
 oranžový nález Kontroly), v0.8.18, 30.8.; priznaný zvyšok — dedup dvoch pravidiel na tej istej skrinke sa od dvoch inštancií nedá odlíšiť — je v zázname KRONIKY. ·
 **R-02** — guard identity dokumentu v 18 zapisovacích handleroch panela (oneskorená akcia po prepnutí okna SketchUpu skončí hláškou, nie tichým zápisom
 do cudzej zákazky), v0.8.19, 30.8.; jeden zdieľaný guard `foreign_document?` na serveri + jedno miesto `nxDocPayload` na klientovi, pri debounce sa identita
-ZACHYTÁVA už pri naplánovaní editu a zmena dokumentu centrálne zahodí všetok rozpracovaný stav panela (Codex review kolá 1 a 2, 2+4× P1).
+ZACHYTÁVA už pri naplánovaní editu a zmena dokumentu centrálne zahodí všetok rozpracovaný stav panela (Codex review kolá 1 a 2, 2+4× P1). ·
+**R-03** — šev `prepare_insert` / `commit_insert` v builderi (skrinku sa dá pripraviť BEZ zásahu do modelu a položiť na presnú polohu; správanie dnešných
+volajúcich sa nemení), v0.8.20, 30.8.; **tým padol TVRDÝ blocker bloku GHOST VKLADANIE** — package smie na Windows štartovať. Vedomé hranice (katalógový
+seed v `normalize`, `build_plan` ostáva v commite, `bounds_mm` plán nenesie) sú zapísané v `docs/architecture/construction.md`.
 
 ### 1e · PLÁNOVACIA DÁVKA — task packages (po 1c, súbežne s 1d — revízia poradia 27.8.2026)
 
@@ -159,8 +162,10 @@ mimo pohľadu. Podklady: koncepty [09](zdroje/next_sessions/09_GHOST_VKLADANIE.m
 `UPPER_HANG_Z`, nie podlahu (09 mal floor lock pre oba typy; zámok typu zachováva dnešné správanie buildera).
 Otvorené voľby uzatvára nižšie.
 
-**Predpoklady ([AUDIT_REGISTER.md](AUDIT_REGISTER.md)):** TVRDÝ blocker je **R-03** (šev `prepare_insert` +
-`build(..., transform:)` — najväčšia prípravná dávka, odhad L; bez nej package neštartuje). **R-01** (✅ v0.8.17)
+**Predpoklady ([AUDIT_REGISTER.md](AUDIT_REGISTER.md)):** TVRDÝ blocker **R-03** (šev `prepare_insert` +
+`build(..., transform:)`) je **✅ HOTOVÝ (v0.8.20, 30.8.)** — package tým môže štartovať. Tool dostáva `prepare_insert`
+(zmrazený plán viazaný na dokument, žiadny zásah do modelu pred klikom) a `commit_insert(..., transform:)`, ktorý prijme
+len RIGIDNÚ transformáciu; `bounds_mm`/kotvy si GHOST dávka uzavrie sama proti `BuildPlan`u. **R-01** (✅ v0.8.17)
 a **R-02** (✅ v0.8.19 — guard identity dokumentu má aj INSERT cesta, `foreign_document?` + `nxDocPayload`)
 sú macOS-vetvové a **sú hotové**; **R-04** (✅ v0.8.17) bola hygiena bez platformového kvalifikátora a išla spolu
 s R-01. Odchýlka od poradia registra je zapísaná aj v ňom.
