@@ -29,6 +29,15 @@ try {
   $lockStream = [System.IO.File]::Open($lockPath, [System.IO.FileMode]::Create,
     [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::Read)
 } catch [System.IO.IOException] {
+  # "Iny beh bezi" = LEN sharing/lock violation (Win32 0x20/0x21). Ostatne
+  # IOException (zla cesta, plny disk...) su realne chyby, nie kontencia —
+  # tie nesmu dostat hlasku "pockaj na beziaci beh", ktory neexistuje.
+  $hr = $_.Exception.HResult -band 0xFFFF
+  if (($hr -ne 0x20) -and ($hr -ne 0x21)) {
+    Write-Host ('CHYBA: deploy.lock sa neda otvorit: ' + $_.Exception.Message)
+    Write-Host ('  Zamok: ' + $lockPath)
+    exit 1
+  }
   # ReadAllText tu NEfunguje (zdiela len Read a kolidoval by s Write pristupom
   # drzitela) — citat treba so share maskou ReadWrite.
   $holder = ''
@@ -39,11 +48,17 @@ try {
     $holder = $sr.ReadToEnd().Trim()
     $sr.Close()
   } catch {}
-  Write-Host 'CHYBA: iny beh in-SU testov prave bezi — zdielany SketchUp Plugins adresar sa neda izolovat.'
+  Write-Host 'CHYBA: iny beh in-SU testov prave bezi - zdielany SketchUp Plugins adresar sa neda izolovat.'
   if ($holder) { Write-Host ('  Drzitel zamku: ' + $holder) }
+  else { Write-Host '  Drzitel zamku: (este sa nestihol zapisat)' }
   Write-Host ('  Zamok: ' + $lockPath)
   Write-Host '  Pockaj, kym beziaci beh dobehne (max ~8 min), a spusti skript znova.'
   exit 2
+} catch [System.UnauthorizedAccessException] {
+  # Napr. deploy.lock existuje ako PRIECINOK, alebo chybaju prava.
+  Write-Host ('CHYBA: deploy.lock sa neda otvorit: ' + $_.Exception.Message)
+  Write-Host ('  Zamok: ' + $lockPath)
+  exit 1
 }
 
 $exitCode = 1
@@ -54,11 +69,17 @@ try {
   $lockStream.Flush()
 
   # Deploy az POD zamkom — od tejto chvile je v Plugins kod tohto behu.
-  & (Join-Path $repo 'INSTALL_noxun_engine.ps1')
   # INSTALL konci pri chybe cez `exit 1` (nie vynimkou) — `&` to nezhodi volajuceho,
-  # preto explicitna kontrola. Ziadny nativny prikaz pred tymto miestom nebezi,
-  # takze $LASTEXITCODE nemoze byt zvyskovy z ineho volania.
-  if ($LASTEXITCODE) { throw "CHYBA: deploy pluginu zlyhal (INSTALL_noxun_engine.ps1, exit $LASTEXITCODE)." }
+  # preto explicitna kontrola. $LASTEXITCODE je ale SESSION-globalny a dedi sa aj
+  # od prikazov, ktore bezali PRED tymto skriptom (INSTALL na uspesnej ceste exit
+  # nevola a hodnotu nemeni), takze bez resetu by zvyskovy nenulovy kod zhodil
+  # beh po USPESNOM deployi.
+  $global:LASTEXITCODE = 0
+  & (Join-Path $repo 'INSTALL_noxun_engine.ps1')
+  if ($LASTEXITCODE) {
+    Write-Host "CHYBA: deploy pluginu zlyhal (INSTALL_noxun_engine.ps1, exit $LASTEXITCODE)."
+    exit 1
+  }
 
   # Best-effort upratanie run_* priecinkov starsich ako 1 den (kopie modelu su velke).
   Get-ChildItem $workRoot -Directory -Filter 'run_*' -ErrorAction SilentlyContinue |
@@ -121,11 +142,19 @@ try {
   } else {
     Write-Host 'TIMEOUT po 8 min.'
     if (Test-Path $out) { Get-Content $out | Write-Host }
+    # Zamok drzi tento skript, nie SketchUp — jeho ukoncenim sa uvolni, hoci
+    # instancia s testami mozno stale bezi. Dalsi beh by jej prepisal Plugins.
+    Write-Host 'POZOR: instancia SketchUpu pravdepodobne STALE BEZI a deploy lock sa ukoncenim tohto skriptu uvolni - pred dalsim behom visiacu instanciu zavri.'
   }
 } finally {
   # Zamok sa uvolnuje az PO vyhodnoteni — SketchUp nacitava plugin pocas celeho
   # startu a skorsie uvolnenie by pustilo cudzi deploy pod rozbehnuty beh.
   if ($lockStream) { $lockStream.Close() }
+  # Remove-Item je len kozmetika (FileMode::Create stale subor prevezme aj bez
+  # mazania). POZOR pri buducich upravach: FileShare::Read NEobsahuje
+  # FILE_SHARE_DELETE, takze zamok medzicasom prevzaty novym behom sa zmazat
+  # NEDA (IOException) a SilentlyContinue to ticho zje — to je ZAMER, mazanie
+  # nesmie vytrhnut subor novemu drzitelovi.
   Remove-Item $lockPath -Force -ErrorAction SilentlyContinue -Confirm:$false
 }
 exit $exitCode
