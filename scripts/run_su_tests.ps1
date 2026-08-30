@@ -68,6 +68,37 @@ try {
   $lockStream.Write($bytes, 0, $bytes.Length)
   $lockStream.Flush()
 
+  # Sentinel predchadzajuceho behu (Codex review P2): deploy.lock zije len so
+  # SKRIPTOM — po jeho timeoute/kille vsak odpojena instancia SketchUpu moze
+  # testy stale VYKONAVAT a novy beh by jej prepisal Plugins. Sentinel nesie
+  # PID instancie + cestu vysledku: kym instancia zije a marker konca nie je
+  # zapisany, dalsi beh sa odmietne. Uspesne dobehnuty beh neblokuje nic
+  # (marker existuje) — idle okno moze ostat otvorene (pravidlo repa).
+  $sentinel = Join-Path $workRoot 'last_run.txt'
+  if (Test-Path $sentinel) {
+    $prev = @{}
+    Get-Content $sentinel | ForEach-Object {
+      $k, $v = $_ -split '=', 2
+      if ($k) { $prev[$k] = $v }
+    }
+    $prevSuPid = 0
+    [void][int]::TryParse([string]$prev['pid'], [ref]$prevSuPid)
+    $prevOut = [string]$prev['out']
+    $prevAlive = $false
+    if ($prevSuPid -gt 0) {
+      $p = Get-Process -Id $prevSuPid -ErrorAction SilentlyContinue
+      # Kontrola mena chrani pred recyklovanym PID (iny proces s tym istym cislom).
+      if ($p -and ($p.ProcessName -like 'SketchUp*')) { $prevAlive = $true }
+    }
+    $prevDone = $prevOut -and (Test-Path $prevOut) -and (Select-String -Path $prevOut -Pattern 'KONIEC SUBORU' -Quiet)
+    if ($prevAlive -and -not $prevDone) {
+      Write-Host ('CHYBA: instancia SketchUpu z predchadzajuceho behu (PID ' + $prevSuPid + ') stale bezi a jej testy NEDOBEHLI (chyba koncovy marker).')
+      Write-Host ('  Vysledok predchadzajuceho behu: ' + $prevOut)
+      Write-Host '  Zavri visiacu instanciu (alebo pockaj na dobeh) a spusti skript znova.'
+      exit 2
+    }
+  }
+
   # Deploy az POD zamkom — od tejto chvile je v Plugins kod tohto behu.
   # INSTALL konci pri chybe cez `exit 1` (nie vynimkou) — `&` to nezhodi volajuceho,
   # preto explicitna kontrola. $LASTEXITCODE je ale SESSION-globalny a dedi sa aj
@@ -117,7 +148,12 @@ try {
   [System.IO.File]::WriteAllLines($boot, [string[]]$lines, (New-Object System.Text.UTF8Encoding($false)))
 
   Write-Host "Spustam SketchUp (model: $(Split-Path $modelCopy -Leaf), work: $work)..."
-  Start-Process -FilePath $su -ArgumentList '-RubyStartup', "`"$boot`"", "`"$modelCopy`""
+  $suProc = Start-Process -FilePath $su -ArgumentList '-RubyStartup', "`"$boot`"", "`"$modelCopy`"" -PassThru
+  # Sentinel sa zapisuje hned po starte (pod zamkom) — pri kille skriptu ostane
+  # a ochrani beziacu instanciu pred deployom dalsieho behu (vid vyssie).
+  [System.IO.File]::WriteAllLines($sentinel,
+    [string[]]@(('pid={0}' -f $suProc.Id), ('out={0}' -f $out)),
+    (New-Object System.Text.UTF8Encoding($false)))
 
   $deadline = (Get-Date).AddMinutes(8)
   $finished = $false
