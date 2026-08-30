@@ -46,8 +46,24 @@ module NxGhost
     e::CabinetBuilder::InsertPlan.new(model, config, home_z)
   end
 
+  # GHOST-FB3: session startuje z PAMATE modulu. Testy si preto dodavaju
+  # VLASTNU (cerstvu) pamat — inak by si scenare navzajom prepisovali kotvu,
+  # rotaciu aj rezim vysky. Modulovu pamat overuje samostatny scenar nizsie.
+  def fresh_memory
+    { anchor: gt::ANCHORS.first, z_mode: :locked, rotation_index: 0, lock_z: {} }
+  end
+
   def session(config = cfg, home_z = 0.0, **kw)
+    kw[:memory] = fresh_memory unless kw.key?(:memory)
     gt::PlacementSession.new(model: Object.new, plan: plan(config, home_z), **kw)
+  end
+
+  def hang
+    Noxun::Engine::CabinetBuilder::UPPER_HANG_Z
+  end
+
+  def src(*parts)
+    File.read(File.join(NxTest::ROOT, *parts), encoding: 'UTF-8')
   end
 
   # Fake tool stack — `pop_tool` len POCITA. Realny SketchUp odoberie VRCH
@@ -621,6 +637,219 @@ NxTest.test('ghost sev: loader nacita modul AZ PO cabinet_builder (pouziva sev R
   main = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'main.rb'), encoding: 'UTF-8')
   NxTest.assert(main.index("core/cabinet_builder'") < main.index("core/ghost_tool'"),
                 'ghost_tool sa nacitava pred cabinet_builderom')
+end
+
+# --- 8) GHOST-FB (smoke feedback 31.8.2026) --------------------------------
+# FB-1 hybrid v zamku · FB-2 kotva pod kurzorom · FB-3 pamat nastaveni ·
+# FB-4 Ghost pasik (stav do panela + validacia rucnej vysky).
+
+NxTest.test('ghost FB-1: v ZAMKU sa z inference bodu berie LEN X/Y, Z prepise zamok') do
+  c = NxGhost.calc
+  # Roh susednej skrinky lezi 720 mm nad podlahou — zamok ho stiahne na svoju rovinu.
+  NxTest.assert_equal([1600.0, 300.0, 0.0], c.lock_point([1600.0, 300.0, 720.0], 0.0))
+  # Horna skrinka: ta ista mechanika na rovine UPPER_HANG_Z.
+  NxTest.assert_equal([1600.0, 300.0, 1400.0], c.lock_point([1600.0, 300.0, 90.0], 1400.0))
+  # Rucne prestavena vyska zamku (FB-4) je pre hybrid obycajna rovina.
+  NxTest.assert_equal([10.0, 20.0, 20.0], c.lock_point([10.0, 20.0, 999.0], 20.0))
+end
+
+NxTest.test('ghost FB-1: ZDRAVOTNY STROP plati aj na bod z inference (nie len na fallback luc)') do
+  c = NxGhost.calc
+  NxTest.assert(c.lock_point([2_000_000.0, 0.0, 0.0], 0.0).nil?, 'bod 2 km od originu nesmie byt polohou')
+  NxTest.assert(c.lock_point([0.0, Float::INFINITY, 0.0], 0.0).nil?)
+  NxTest.assert(c.lock_point([0.0, 0.0], 0.0).nil?, 'neuplny bod nie je poloha')
+  NxTest.assert(c.lock_point(nil, 0.0).nil?)
+  NxTest.assert(c.lock_point([1.0, 2.0, 3.0], Float::NAN).nil?, 'nezdrava rovina zamku nesmie prejst')
+  NxTest.assert(c.lock_point([1.0, 2.0, 3.0], 2_000_000.0).nil?, 'rovina kilometre vysoko nie je poloha')
+end
+
+NxTest.test('ghost FB-2: prepnutie kotvy polozi NOVU kotvu pod kurzor (4 kotvy x 4 rotacie x oba rezimy)') do
+  [[NxGhost.cfg, 0.0], [NxGhost.upper_cfg, NxGhost.hang]].each do |(c, home)|
+    picked = [1500.0, 250.0, 640.0]
+    %i[locked free].each do |mode|
+      (0..3).each do |k|
+        s = NxGhost.session(c, home)
+        s.set_point(picked, true)
+        k.times { s.rotate!(1) }
+        s.set_z_mode!(mode)
+        4.times do
+          a = s.anchor_point_mm
+          m = NxGhost.calc.matrix(anchor: a, picked: s.last_point, rotation_index: s.rotation_index,
+                                  z_mode: s.z_mode, home_z: s.lock_plane_z)
+          got = NxGhost.apply(m, a)
+          NxTest.assert_close(picked[0], got[0], 1e-9,
+                              "#{c[:type]}/#{mode}/k=#{k}/#{s.anchor}: kotva nie je pod kurzorom (X)")
+          NxTest.assert_close(picked[1], got[1], 1e-9,
+                              "#{c[:type]}/#{mode}/k=#{k}/#{s.anchor}: kotva nie je pod kurzorom (Y)")
+          # Vo volnej vyske sadne kotva aj na Z kurzora; v zamku drzi origin
+          # locknutu vysku (to je zmysel zamku — Z sa vedome NEsleduje).
+          NxTest.assert_close(picked[2], got[2], 1e-9, 'free: kotva nesadla na Z kurzora') if mode == :free
+          NxTest.assert_close(s.lock_plane_z, m[14], 1e-9, 'zamok: origin nedrzi locknutu vysku') if mode == :locked
+          s.cycle_anchor!
+        end
+      end
+    end
+  end
+end
+
+NxTest.test('ghost FB-3: druha session ZDEDI kotvu, rotaciu, rezim aj locknute vysky') do
+  mem = NxGhost.fresh_memory
+  s1 = NxGhost.session(NxGhost.cfg, 0.0, memory: mem)
+  s1.rotate!(1)
+  s1.cycle_anchor!
+  s1.set_z_mode!(:free)
+  NxTest.assert(s1.set_lock_z!('250'))
+  s2 = NxGhost.session(NxGhost.cfg, 0.0, memory: mem)
+  NxTest.assert_equal(1, s2.rotation_index, 'rotacia sa nezdedila')
+  NxTest.assert_equal(:fr_bottom, s2.anchor, 'kotva sa nezdedila')
+  NxTest.assert_equal(:free, s2.z_mode, 'rezim vysky sa nezdedil')
+  NxTest.assert_close(250.0, s2.lock_plane_z, 1e-9, 'locknuta vyska sa nezdedila')
+  # Locknuta vyska je per TYP: horna si drzi svoju (default UPPER_HANG_Z).
+  up = NxGhost.session(NxGhost.upper_cfg, NxGhost.hang, memory: mem)
+  NxTest.assert_close(NxGhost.hang, up.lock_plane_z, 1e-9, 'horna prebrala vysku dolnej')
+  NxTest.assert(up.set_lock_z!('1500'))
+  s3 = NxGhost.session(NxGhost.cfg, 0.0, memory: mem)
+  NxTest.assert_close(250.0, s3.lock_plane_z, 1e-9, 'zmena hornej prepisala dolnu')
+  # PRVA session v behu = tovarenske hodnoty.
+  fresh = NxGhost.session(NxGhost.cfg, 0.0)
+  NxTest.assert_equal(0, fresh.rotation_index)
+  NxTest.assert_equal(:fl_bottom, fresh.anchor)
+  NxTest.assert_equal(:locked, fresh.z_mode)
+  NxTest.assert_close(0.0, fresh.lock_plane_z, 1e-9)
+end
+
+NxTest.test('ghost FB-3: modulova pamat zije PER PROCES a reset ju vrati na defaulty') do
+  gt = NxGhost.gt
+  gt.reset_memory!
+  begin
+    m = gt.memory
+    NxTest.assert_equal(:fl_bottom, m[:anchor])
+    NxTest.assert_equal(:locked, m[:z_mode])
+    NxTest.assert_equal(0, m[:rotation_index])
+    NxTest.assert_equal({}, m[:lock_z])
+    # Session BEZ vlastnej pamate pisze do modulovej (to je bezna cesta pluginu).
+    s = gt::PlacementSession.new(model: Object.new, plan: NxGhost.plan)
+    s.rotate!(1)
+    s.cycle_anchor!
+    s.set_lock_z!('120')
+    NxTest.assert_equal(1, gt.memory[:rotation_index])
+    NxTest.assert_equal(:fr_bottom, gt.memory[:anchor])
+    NxTest.assert_close(120.0, gt.memory[:lock_z]['lower'], 1e-9)
+    gt.reset_memory!
+    NxTest.assert_equal(0, gt.memory[:rotation_index])
+    NxTest.assert_equal({}, gt.memory[:lock_z])
+  ensure
+    gt.reset_memory!
+  end
+end
+
+NxTest.test('ghost FB-4: validacia locknutej vysky — cislo v mm, rozsah 0..3000') do
+  c = NxGhost.calc
+  NxTest.assert_close(20.0, c.lock_z_value('20'), 1e-9)
+  NxTest.assert_close(1400.5, c.lock_z_value('1400,5'), 1e-9, 'ciarka je desatinny oddelovac')
+  NxTest.assert_close(1400.5, c.lock_z_value(' 1400.5 '), 1e-9)
+  NxTest.assert_close(0.0, c.lock_z_value('0'), 1e-9)
+  NxTest.assert_close(3000.0, c.lock_z_value('3000'), 1e-9)
+  NxTest.assert_close(850.0, c.lock_z_value(850.0), 1e-9, 'Float z Ruby strany musi prejst')
+  [nil, '', '   ', 'abc', '12abc', '-1', '3001', '1e3', '1/2', '--5'].each do |bad|
+    NxTest.assert(c.lock_z_value(bad).nil?, "#{bad.inspect} nesmie prejst ako vyska")
+  end
+end
+
+NxTest.test('ghost FB-4: neplatna vyska NIC nemeni; platna sa premietne do transformu aj do pamate') do
+  mem = NxGhost.fresh_memory
+  s = NxGhost.session(NxGhost.cfg, 0.0, memory: mem)
+  NxTest.assert_close(0.0, s.lock_plane_z, 1e-9, 'dolna startuje na domacej vyske 0')
+  NxTest.assert(!s.set_lock_z!('abc'), 'necislo sa nesmie prijat')
+  NxTest.assert(!s.set_lock_z!('4000'), 'hodnota mimo rozsahu sa nesmie prijat')
+  NxTest.assert_close(0.0, s.lock_plane_z, 1e-9, 'po neplatnom vstupe ma drzat STARA hodnota')
+  NxTest.assert(s.set_lock_z!('20'))
+  NxTest.assert_close(20.0, s.lock_plane_z, 1e-9)
+  NxTest.assert(!s.set_lock_z!('20'), 'rovnaka hodnota nie je zmena')
+  NxTest.assert_close(20.0, mem[:lock_z]['lower'], 1e-9, 'zmena sa nezapisala do pamate')
+  a = s.anchor_point_mm
+  m = NxGhost.calc.matrix(anchor: a, picked: [500.0, 100.0, 0.0], rotation_index: 0,
+                          z_mode: :locked, home_z: s.lock_plane_z)
+  NxTest.assert_close(20.0, m[14], 1e-9, 'zamok neposadil origin na rucne zadanu vysku')
+  # Horna skrinka startuje na 1400 (850 pracovna vyska + 550 zastena).
+  up = NxGhost.session(NxGhost.upper_cfg, NxGhost.hang, memory: NxGhost.fresh_memory)
+  NxTest.assert_close(1400.0, up.lock_plane_z, 1e-9)
+end
+
+NxTest.test('ghost FB-4: stav pasika nesie kotvu, otocenie, rezim aj vysku — koniec session ho SCHOVA') do
+  gt = NxGhost.gt
+  s = NxGhost.session
+  s.rotate!(1)
+  s.cycle_anchor!
+  p = gt.state_payload(s)
+  NxTest.assert_equal(true, p['active'])
+  NxTest.assert_equal('lower', p['type'])
+  NxTest.assert_equal('fr_bottom', p['anchor'])
+  NxTest.assert_equal('pravá dolná', p['anchor_label'])
+  NxTest.assert_equal(90, p['rotation'])
+  NxTest.assert_equal('locked', p['z_mode'])
+  NxTest.assert_close(0.0, p['lock_z'], 1e-9)
+  # Pasik NIE JE trvalou castou panela — bez session a po jej konci je prec.
+  NxTest.assert_equal({ 'active' => false }, gt.state_payload(nil))
+  s.cancel!('Esc')
+  NxTest.assert_equal({ 'active' => false }, gt.state_payload(s))
+  up = NxGhost.session(NxGhost.upper_cfg, NxGhost.hang)
+  NxTest.assert_equal('upper', gt.state_payload(up)['type'])
+  NxTest.assert_close(1400.0, gt.state_payload(up)['lock_z'], 1e-9)
+end
+
+NxTest.test('ghost sev FB: hybrid sa pyta inference PRVY, kresli natívne snapy a nic neuklada') do
+  gt_src = NxGhost.src('noxun_engine', 'core', 'ghost_tool.rb')
+  body = gt_src[/def pick_locked\(s, x, y, view\)(.*?)\n        end/m, 1].to_s
+  NxTest.assert(!body.empty?, 'pick_locked sa nenasiel')
+  NxTest.assert(body.include?('pick_ip_locked') && body.include?('pick_ray_locked'),
+                'zamok nie je hybrid (inference + fallback rovina)')
+  NxTest.assert(body.index('pick_ip_locked') < body.index('pick_ray_locked'),
+                'inference sa musi pytat PRVA — fallback rovina je az druha')
+  # BRANA: v zamku vyhrava inference LEN so snapom na REALNEJ geometrii.
+  # „Volny" bod inference (podlahova rovina KRESLENIA) by odsunul hornu
+  # skrinku od kurzora, pokazil zamok pri otocenych osiach a obisiel guardy
+  # degenerovanych pohladov (MIN_SIN / MAX_REACH) — merane in-SU 3/6/8/8b.
+  ipl = gt_src[/def pick_ip_locked\(s, x, y, view\)(.*?)\n        end/m, 1].to_s
+  NxTest.assert(ipl.include?('ip_on_geometry?'),
+                'zamok berie aj volny bod inference — obisiel by guardy degenerovanych pohladov')
+  gate = gt_src[/def ip_on_geometry\?(.*?)\n        end/m, 1].to_s
+  NxTest.assert(gate.include?('ip.vertex') && gate.include?('ip.edge') && gate.include?('ip.face'),
+                'brana snapu sa nepyta na realnu geometriu (vrchol/hrana/plocha)')
+  draw = gt_src[/def draw\(view\)(.*?)\n        end\n/m, 1].to_s
+  NxTest.assert(draw.include?('draw_inference'), 'draw nekresli natívne zvyraznenie snapu')
+  di = gt_src[/def draw_inference\(view\)(.*?)\n        end/m, 1].to_s
+  NxTest.assert(di.include?('ip.draw(view)') && di.include?('view.tooltip'),
+                'zvyraznenie snapu nejde natívnou cestou (ip.draw + tooltip)')
+  NxTest.assert(di.include?('ip.display?'), 'snap sa ma kreslit len ked ho SketchUp chce zobrazit')
+  # ZIADNE ukladanie nastaveni — pamat zije v procese, nie na disku ani v modeli.
+  code = File.readlines(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'ghost_tool.rb'), encoding: 'UTF-8')
+             .reject { |l| l.strip.start_with?('#') }.join
+  NxTest.assert(!code.include?('File.') && !code.include?('set_attribute') && !code.include?('write_defaults'),
+                'ghost si nastavenia nesmie ukladat na disk ani do modelu')
+end
+
+NxTest.test('ghost sev FB: pole vysky ma guard identity dokumentu a pasik nie je trvalou castou panela') do
+  cab = NxGhost.src('noxun_engine', 'ui', 'panel', 'actions_cabinet.rb')
+  h = cab[/def handle_ghost_lock_z\(payload\).*?\n        end\n/m].to_s
+  NxTest.assert(!h.empty?, 'handle_ghost_lock_z chyba')
+  NxTest.assert(h.index('foreign_document?') < h.index('GhostTool.session'),
+                'guard identity dokumentu musi bezat PRED zmenou stavu session (R-02)')
+  NxTest.assert(h.include?('GhostTool.push_state'), 'po zmene sa pasik neprekresli')
+  panel = NxGhost.src('noxun_engine', 'ui', 'panel.rb')
+  NxTest.assert(panel.include?("cb(dlg, 'ghost_lock_z')"), 'callback pola vysky nie je registrovany')
+  sync = NxGhost.src('noxun_engine', 'ui', 'panel', 'sync.rb')
+  NxTest.assert(sync.include?('def push_ghost') && sync.include?('NX.setGhost'),
+                'push stavu ghostu do panela chyba')
+  html = NxGhost.src('noxun_engine', 'ui', 'panel.html')
+  bar = html[/<div id="ghostBar"[^>]*>/].to_s
+  NxTest.assert(!bar.empty?, 'Ghost pasik v paneli chyba')
+  NxTest.assert(bar.include?('hidden'),
+                'pasik musi startovat SKRYTY — vertikalny priestor panela je vzacny')
+  NxTest.assert(html.include?('js/ghost_bar.js'), 'ghost_bar.js sa nenacitava')
+  js = NxGhost.src('noxun_engine', 'ui', 'js', 'ghost_bar.js')
+  NxTest.assert(js.include?('nxDocPayload'), 'pole vysky posiela payload bez identity dokumentu')
+  NxTest.assert(js.include?('#i-info') == false, 'ikonu kresli HTML sprite, nie JS')
 end
 
 NxTest.test('ghost: prevod matice mm -> palce sa dotkne LEN translacie') do
