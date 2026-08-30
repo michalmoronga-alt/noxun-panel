@@ -200,11 +200,17 @@ Od tejto dávky má knižnica **STAV** (vzor `HardwareCatalog.assess!`): `librar
   a `template_set_defs` **nil**. Súpis bez projektového snapshotu skončí ORANGE **`library_incompatible`** (`expand(..., no_set_reason:)`; ostatné dôvody sa nemenia) — a **panel hovorí to isté**:
   `Panel.decorate_hardware_purchase` pri blokovanej knižnici **neuplatní ani override skrinky** (ukazuje na set_id, ktorého definícia by musela prísť práve z nej) a ten istý kód posiela do `explain`
   (`no_set_reason:`). Bez toho by panel radil „priraď set" tam, kde je príčina úplne iná (panel a súpis sa rozísť nesmú, lekcia R-06a). **PLATNÝ projektový snapshot funguje ďalej** — jeho zdrojom je .skp.
+  **Hranica je úzka:** `template_set_defs` vracia nil LEN pri pokazenom ZDROJI (`:invalid` snapshot alebo blokovaná knižnica). Jedna nerozložiteľná referencia nad zdravými zdrojmi (kópia korpusu
+  z iného modelu, medzitým zmazaný set) sa iba **vynechá** — šablóna ju nenesie a pri aplikácii skončí ORANGE `set_missing`, presne ako sľubuje kontrakt GH #133 P2. Zahodiť kvôli nej celé kovanie
+  šablóny by bola strata bez dôvodu a hláška volajúceho („sety projektu sú poškodené — obnov ich") by nad zdravým projektom klamala a poslala používateľa na Obnoviť, ktoré prepíše snapshot.
 - **Seed-merge sa nad read-only knižnicou NEROBÍ** (`read_library` posudzuje stav PRED mergom): do novšieho súboru by sme primiešali svoje default sety a migrácie mapovania, teda presne tú tichú zmenu,
   pred ktorou brána chráni. V tej istej vetve sa **nikdy nevracia SEED** — inak by používateľ videl cudzie defaulty a prvý zápis by ich zvečnil (platí aj pre `rescue` vetvu `load`).
 
 **Detektor straty má DVE vrstvy, lebo whitelist sám nestačí.** (1) **Whitelist kľúčov** (`SET_KEYS` · `MEMBER_KEYS` · `PARAM_BANDS_KEYS` · `BAND_KEYS`) chytí NOVÉ POLE novšej verzie. (2) **Round-trip
 porovnanie** (`normalize_sets` + `members_lost?`) chytí novú HODNOTU známeho kľúča — novšia verzia typicky pridá najprv ju (`per: 'length'`), whitelist ju prepustí a normalizácia člena ho ticho zahodí.
+Round-trip beží **so stíšeným `log_skip`** (`without_skip_log`): brána sa vyhodnocuje pri každom použití knižnice, takže bez stíšenia by nekompatibilná knižnica zapísala tú istú vetu do konzoly pri
+každom payloade; skutočné čítanie (`read_library`) loguje ďalej. Z rovnakého dôvodu ide do konzoly aj **dôvod read-only iba pri ZMENE stavu**. **Duplicitné `set_id`** má vlastný kód `:duplicate`
+a hlášku „oprav súbor" — „aktualizuj plugin" by tam nepomohlo, s verziou to nesúvisí (vzor katalógu, GH #99 P2).
 Porovnáva sa počet setov, počet členov a **počet položiek radu `code_by_nl`** (nečíselný kľúč radu sa zahadzuje po jednom, takže samotný počet členov to nechytí). Mapovanie ide cez `parse_mapping`
 **bez `set_ids`** — chyby tvaru sú strata, ale odkaz na už zmazaný set NIE (`delete_set!` mapovanie čistí zámerne). Legacy **konverzie hodnôt** (dopĺňaný `per`, chýbajúce `qty`, číslo namiesto stringu)
 prejdú. Whitelisty sú **kontrakt**: každé nové pole člena/pásma sa musí doplniť do nich, inak si vlastný zápis vyrobí read-only stav. **Obe vrstvy používa aj `project_state_status`**, takže snapshot

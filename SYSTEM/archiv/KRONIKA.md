@@ -64,10 +64,21 @@
   odmietnutý, hláška bez rady) a **regresia voči mainu**, kde `load` spadol do seedu a prvý zápis súbor samoopravil. Zvolená vetva: **samoopravnosť sa zachováva** — bez zálohy
   nie je z čoho čo stratiť; `:read_only` ostáva až keď sa nedá prečítať **ani `.bak`**, a jeho dôvod menuje **celú cestu k súboru**. R-11 (primár s PLATNOU zálohou) sem
   nepadá vôbec, takže mu to nezavadzia. **(P3-6)** hláška výberu setu v paneli poslala používateľa „otvor Katalóg kovania", kde sa to opraviť nedá — hovorí teraz dôvod brány.
-  Testy: `tests/pure/test_r07_kniznica_brana.rb` (19 scenárov: round-trip std 2 · plain std 1 · historický
+  **Čo pridala slepá verifikácia delty (1×P2 + 2×P3 — nálezy, ktoré vyrobili až SAMOTNÉ opravy):** **(P2-1)** zúženie guardu šablón. Oprava P2-4 pridala „ani jedna referencia sa nesmie stratiť",
+  lenže tá podmienka platila aj nad **zdravou** knižnicou a zdravým snapshotom: stačila jedna mŕtva referencia v mapovaní skrinky (korpus skopírovaný z iného modelu, medzitým zmazaný set) a šablóna
+  prišla o **celé** kovanie — a hláška volajúceho pritom tvrdila „sety projektu sú poškodené — obnov ich", teda posielala používateľa na Obnoviť, ktoré prepíše snapshot. `template_set_defs` vracia
+  nil **len pri pokazenom ZDROJI** (`:invalid` snapshot alebo blokovaná knižnica); jedna nerozložiteľná referencia sa vynechá presne ako dovtedy (ORANGE `set_missing` pri aplikácii).
+  **(P3-2)** zrušenie cache rozbehlo **záplavu logu**: round-trip kontrola púšťa obsah cez `normalize_sets`, ktorá pri každom preskočenom člene loguje — a brána sa vyhodnocuje pri každom použití
+  knižnice. `log_skip` je preto počas brány **stíšený** (`without_skip_log`) a dôvod read-only ide do konzoly **len pri zmene stavu**. **(P3-3)** obe polovice opravy P1-1 neboli pripnuté testom
+  (mutácia „vráť cache" prešla) — pribudli dva pripínacie testy a mutačné overenie. **Bez opravy, len dôvod navyše:** duplicitné `set_id` má vlastný kód `:duplicate` a hlášku „oprav súbor"
+  („aktualizuj plugin" tam nepomôže — s verziou to nesúvisí; vzor katalógu GH #99 P2).
+  Testy: `tests/pure/test_r07_kniznica_brana.rb` (23 scenárov: round-trip std 2 · plain std 1 · historický
   klamár · downgrade gate · **dvojinštančný scenár BLOCKER 2** · whitelist aj round-trip detektor · strata člena v snapshote · ORANGE expanzia · platný snapshot beží ďalej ·
-  **reprodukcie všetkých nálezov review** · charakterizácia
+  **reprodukcie nálezov review** · charakterizácia
   zdravej std-1 knižnice) a `tests/js/test_r07_kniznica_ui.js` (26 assertov nad mini-DOM: banner namiesto „prázdna", vypnuté globálne mutácie, projektové predvoľby ostávajú).
+  **Mutačne overené**, že nové testy naozaj pripínajú opravy (vrátená cache · staré poradie + cache · pôvodný guard šablón · odtíšený log · log pri každom vyhodnotení — každá mutácia zhodí práve
+  svoj test). **Priznané:** samotné poradie *čítanie → rozhodnutie* v `global_default_state` je pri necachovanom stave **nepozorovateľné** (kontrola pred čítaním sa aj tak vyhodnotí nad čerstvým
+  súborom) — je to obrana do hĺbky, nie vlastnosť, ktorú by test vedel odlíšiť; pripnutá je až v kombinácii s cache.
 
 - **test-infra · PARALELNÁ IZOLÁCIA IN-SU TEST BEHOV (bez bumpu verzie — plugin sa nemení, 30.8.2026, PR #269):** nález z paralelného behu dávok 30.8.: `scripts/run_su_tests.ps1`
   používal pevný `%TEMP%\noxun_su_tests\su_result.txt`, zdieľaný `boot.rb` a spoločný SketchUp Plugins adresár — druhý súbežný beh prepísal výsledky, bootstrap aj nasadený plugin

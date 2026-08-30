@@ -153,9 +153,13 @@ set nie je strata). Obe vrstvy používa aj `project_state_status`. **(F5)** `se
 **Interné slepé review (2×P1, 3×P2, 2×P3)** doplnilo: stav sa **NECACHUJE** a `read_library` pri read-only vracia **prázdno**
 (`load` je bezpečný z princípu; samostatná „bezpečná" metóda zanikla — stačilo raz siahnuť na `load`); poškodený primár
 **bez zálohy** ostáva **samoopravný ako na maine** (read-only s cestou v hláške až keď sa nedá prečítať ani `.bak`).
-Degraded/`.bak` (**R-11**) sa **nerieši**, len sa mu nezavadzia (nový dôvod patrí do tej istej matice s vlastným kódom).
-Testy `tests/pure/test_r07_kniznica_brana.rb` (19 scenárov: dvojinštančný + reprodukcie všetkých nálezov review) +
-`tests/js/test_r07_kniznica_ui.js`.
+**Verifikácia delty** našla ďalšie 1×P2 + 2×P3: guard šablón bol príliš široký (jedna mŕtva referencia brala kovanie
+šablóne aj nad ZDRAVOU knižnicou a hláška klamala) — zúžený na pokazený ZDROJ; zrušená cache rozbehla záplavu logu —
+`log_skip` je počas brány stíšený a dôvod ide do konzoly len pri ZMENE stavu; duplicitné `set_id` dostalo vlastný dôvod
+„oprav súbor". Degraded/`.bak` (**R-11**) sa **nerieši**, len sa mu nezavadzia (nový dôvod patrí do tej istej matice
+s vlastným kódom). Testy `tests/pure/test_r07_kniznica_brana.rb` (23 scenárov: dvojinštančný + reprodukcie nálezov review;
+mutačne overené, že padnú na regresii — okrem poradia *čítanie → rozhodnutie*, ktoré je pri necachovanom stave
+nepozorovateľné a ostáva obranou do hĺbky) + `tests/js/test_r07_kniznica_ui.js`.
 
 ### R-08 · P1 · core · `core/json_file_store.rb:36-43` + sets/rules/abs_rules/dim_series/supplier_settings
 Read-modify-write globálnych katalógov bez medziprocesového zámku (revision check mimo zámku; globálne mapovanie
