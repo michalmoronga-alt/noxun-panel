@@ -347,24 +347,49 @@
     // (2A-3b: dispatcher zrkadli schema 2 hierarchiu group/structure/universal).
     if (v && !absUsableForSheet(MATERIALS.edges, sheetRecOf(v), catalogSchemaNow(), sheetThicknessOf(v))){
       var prev = partCard.has_material_override ? (partCard.material_id || '') : '';
+      var tgtM = partTarget(); // R-02: dielec + dokument z casu OTVORENIA modalu
       openAbsModal('Dekor „' + decorOfSheet(v) + '" nemá použiteľnú ' + absMissingLabel(catalogSchemaNow()) + ' pre túto hrúbku — hrany podľa pravidla by ostali bez ABS.',
-        function(create){ sendPartMaterial(v, create); },
+        function(create){ sendPartMaterial(v, create, tgtM); },
         function(){ el('pcMaterial').value = prev; regroupPartEdges(prev || partCard.material_id); });
       return;
     }
     sendPartMaterial(v, false);
   }
-  function sendPartMaterial(v, createAbs){
+  // R-02 (review #264 kolo 2): CIEL odlozeneho rozhodnutia karty dielca =
+  // trojica DIELEC + SKRINKA + DOKUMENT z casu, ked pouzivatel akciu spustil.
+  // Modal chybajucej ABS je asynchronny a `partCard` je mutovatelny globál —
+  // bez snapshotu by sa „Vytvoriť a pokračovať" aplikovalo na kartu, ktora je
+  // na obrazovke TERAZ (a este by zalozilo katalogovy zaznam pasky).
+  function partTarget(){
+    return partCard ? { cabinet_id: partCard.cabinet_id, role_key: partCard.role_key,
+                        guid: partCard.model_guid || '' } : null;
+  }
+  function partTargetStale(t){
+    return !t || !partCard || t.cabinet_id !== partCard.cabinet_id ||
+           t.role_key !== partCard.role_key || t.guid !== (partCard.model_guid || '');
+  }
+
+  // `forPart` = snapshot ciela z casu spustenia akcie (cesta cez modal).
+  function sendPartMaterial(v, createAbs, forPart){
     if (!partCard) return;
+    var tgt = forPart || partTarget();
+    if (partTargetStale(tgt)){
+      NX.setStatus('Karta sa medzitým zmenila — materiál dielca sa nenastavil.', true);
+      return;
+    }
     // F3: pri zmene materialu (override) pregrupuj ABS selecty LOKALNE podla noveho
     // materialu — netreba cakat na Ruby echo. Pri ZRUSENI override (v==='' = navrat na
     // dedenie) NErataj: JS zdedeny material nevie, necha skupiny a pocka na payload.
     if (v) regroupPartEdges(v);
     // D-41: cabinet_id = identity guard (Ruby zahodi echo po prekliknuti na iny korpus)
+    // R-02 (review #264 P1-2): identita DOKUMENTU sa berie z KARTY (`partCard.model_guid`,
+    // vzor `onPartGrain`) — je to dokument, ktorý má používateľ na obrazovke, nie
+    // ten, ktorý je aktívny v okamihu odoslania.
     if (window.sketchup && sketchup.set_part_material)
-      sketchup.set_part_material(JSON.stringify({ role_key: partCard.role_key, material_id: v,
-        cabinet_id: partCard.cabinet_id, create_missing_abs: !!createAbs,
-        catalog_schema: (typeof PANEL_CLIENT_SCHEMA !== 'undefined' ? PANEL_CLIENT_SCHEMA : 1) }));
+      sketchup.set_part_material(nxDocPayload({ role_key: tgt.role_key, material_id: v,
+        cabinet_id: tgt.cabinet_id, create_missing_abs: !!createAbs,
+        catalog_schema: (typeof PANEL_CLIENT_SCHEMA !== 'undefined' ? PANEL_CLIENT_SCHEMA : 1) },
+        tgt.guid));
   }
   // F3/N7: prekresli options KAZDEHO ABS selectu dielca podla materialu (2A-3b:
   // parameter je material_id), zachova hodnotu (aj mimo katalogu — F5).
@@ -397,8 +422,10 @@
   }
   function onEdgeChange(code, value){
     if (!partCard) return;
-    if (window.sketchup && sketchup.set_part_edge)
-      sketchup.set_part_edge(JSON.stringify({ role_key: partCard.role_key, edge: code, abs_id: value, cabinet_id: partCard.cabinet_id }));
+    if (window.sketchup && sketchup.set_part_edge) // R-02: + identita dokumentu z karty
+      sketchup.set_part_edge(nxDocPayload({ role_key: partCard.role_key, edge: code, abs_id: value,
+                                            cabinet_id: partCard.cabinet_id },
+                                          partCard.model_guid || ''));
   }
   // D-35: olep vsetky 4 hrany ABS 1.0 dekoru materialu dielca — JEDEN callback,
   // Ruby spravi JEDEN rebuild (1 undo). Identity guard: payload nesie cabinet_id
@@ -409,18 +436,25 @@
     // znamena poslat bez flagu (server vrati dnesnu hlasku s navodom).
     var decor = decorOfSheet(partCard.material_id);
     if (!absUsableForSheet(MATERIALS.edges, sheetRecOf(partCard.material_id), catalogSchemaNow(), parseFloat(partCard.thickness))){
+      var tgtE = partTarget(); // R-02: dielec + dokument z casu OTVORENIA modalu
       openAbsModal('Dekor „' + decor + '" nemá použiteľnú ' + absMissingLabel(catalogSchemaNow()) + ' — bez nej sa hrany nedajú olepiť.',
-        function(create){ sendEdgesAll(create); }, null);
+        function(create){ sendEdgesAll(create, tgtE); }, null);
       return;
     }
     sendEdgesAll(false);
   }
-  function sendEdgesAll(createAbs){
+  function sendEdgesAll(createAbs, forPart){
     if (!partCard) return;
-    if (window.sketchup && sketchup.set_part_edges_all)
-      sketchup.set_part_edges_all(JSON.stringify({ cabinet_id: partCard.cabinet_id, role_key: partCard.role_key,
+    var tgt = forPart || partTarget();
+    if (partTargetStale(tgt)){
+      NX.setStatus('Karta sa medzitým zmenila — hrany sa neolepili.', true);
+      return;
+    }
+    if (window.sketchup && sketchup.set_part_edges_all) // R-02: + identita dokumentu z karty
+      sketchup.set_part_edges_all(nxDocPayload({ cabinet_id: tgt.cabinet_id, role_key: tgt.role_key,
         create_missing_abs: !!createAbs,
-        catalog_schema: (typeof PANEL_CLIENT_SCHEMA !== 'undefined' ? PANEL_CLIENT_SCHEMA : 1) }));
+        catalog_schema: (typeof PANEL_CLIENT_SCHEMA !== 'undefined' ? PANEL_CLIENT_SCHEMA : 1) },
+        tgt.guid));
   }
   // ===== D-89 (a): HOVER HRANY -> ZVYRAZNENIE V MODELI =======================
   // Kurzor nad hranou (riadok zoznamu ALEBO farebny pas v 2D nahlade) rozsvieti

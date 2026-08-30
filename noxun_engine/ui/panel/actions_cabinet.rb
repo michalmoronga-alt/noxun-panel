@@ -286,6 +286,10 @@ module Noxun
         def handle_insert(payload)
           model = Sketchup.active_model
           params = parse(payload)
+          # R-02: identita DOKUMENTU pred cimkolvek inym — vklad je najkritickejsia
+          # zapisova cesta (nova geometria + nove ID v cudzej zakazke sa nedaju
+          # „prehliadnut", pouzivatel ich najde az pri objednavke).
+          return if foreign_document?(params, model, 'Skrinka sa nevložila')
           # UI-C1a: metadata sablony sa z payloadu vyberu HNED — do buildera
           # sa nikdy nedostanu; peciatka pouzitia ide az po uspesnom vlozeni.
           tpl_ref = take_template_ref!(params, 'cabinet')
@@ -330,7 +334,10 @@ module Noxun
         # neaplikuju (kopia = verny duplikat oznacenej skrinky).
         def handle_insert_copy(payload)
           model = Sketchup.active_model
-          cid = parse(payload)['cabinet_id'].to_s
+          data = parse(payload)
+          return if foreign_document?(data, model, 'Kópia sa nevložila') # R-02
+
+          cid = data['cabinet_id'].to_s
           cab = cid.empty? ? find_cabinet(model) : find_cabinet_by_id(model, cid)
           return set_status('Skrinka na kopírovanie sa nenašla.', true) if cab.nil?
 
@@ -358,6 +365,8 @@ module Noxun
         def handle_rename_cabinet(payload)
           model = Sketchup.active_model
           data = parse(payload)
+          return if foreign_document?(data, model, 'Názov sa nezmenil') # R-02
+
           echo = data['cabinet_id'].to_s
           cab = find_cabinet(model)
           return set_status('Najprv označ NOXUN korpus.', true) if cab.nil?
@@ -397,10 +406,12 @@ module Noxun
         # Konstrukcne/rozmerove zmeny na oznaceny korpus. Zachova strom zon + cela.
         def handle_apply(payload)
           model = Sketchup.active_model
+          data = parse(payload)
+          return if foreign_document?(data, model, 'Zmena sa neuložila') # R-02
+
           cab = find_cabinet(model)
           return set_status('Najprv oznac NOXUN korpus v modeli.', true) if cab.nil?
 
-          data = parse(payload)
           params = existing_params(cab)
           PARAM_KEYS.each do |k|
             params[k] = data[k] if data.key?(k)
@@ -422,10 +433,12 @@ module Noxun
         # ochrana; volajuci moze byt akykolvek (callback je verejny kanal).
         def handle_apply_fronts(payload)
           model = Sketchup.active_model
+          data = parse(payload)
+          return if foreign_document?(data, model, 'Čelá sa nezmenili') # R-02
+
           cab = find_cabinet(model)
           return set_status('Najprv oznac NOXUN korpus v modeli.', true) if cab.nil?
 
-          data = parse(payload)
           echo = data['cabinet_id'].to_s
           if !echo.empty? && echo != Store.get(cab, 'cabinet_id').to_s
             Engine.log("apply_fronts zahodeny — echo #{echo} nesedi s vyberom #{Store.get(cab, 'cabinet_id')}")
@@ -444,10 +457,16 @@ module Noxun
         # zahodi namiesto zasiahnutia nespravneho objektu (rovnaky guard ako doska).
         def handle_apply_all(payload)
           model = Sketchup.active_model
+          data = parse(payload)
+          # R-02: prepnutie dokumentu sa hlasi NAHLAS aj v auto-apply. Echo
+          # `cabinet_id` sa ticho zahadzuje preto, ze presun vyberu je bezny;
+          # prepnuty dokument bezny NIE JE a pouzivatel musi vediet, ze zmena,
+          # ktoru prave napisal, sa NEULOZILA (inak ju najde az v objednavke).
+          return if foreign_document?(data, model, 'Zmena sa neuložila')
+
           cab = find_cabinet(model)
           return if cab.nil? # auto-apply bez vyberu = ticho (ziadny modal)
 
-          data = parse(payload)
           echo = data['cabinet_id'].to_s
           if !echo.empty? && echo != Store.get(cab, 'cabinet_id').to_s
             Engine.log("apply_all zahodeny — echo #{echo} nesedi s vyberom #{Store.get(cab, 'cabinet_id')}")

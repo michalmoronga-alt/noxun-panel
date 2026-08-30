@@ -45,12 +45,18 @@
   // guardu ticho zmizol. Rovnake ID = editor sa NEPREPISE; ine ID = zrusi sa.
   var renameFor = null;      // cabinet_id s otvorenym editorom (null = zavrety)
   var renameSending = false; // Escape/odoslanie uz zavrelo editor — blur nesmie strielat druhykrat
+  // R-02 (review #264 kolo 2): DOKUMENT, v ktorom sa editor otvoril. `setIdbar`
+  // porovnava len `cabinet_id`, takze editor prezije prepnutie dokumentu na
+  // rovnomennu skrinku (CAB-001 je v kazdej zakazke) a Enter by poslal STARE
+  // meno s NOVYM guidom. Zachytena identita to zastavi aj na klientovi.
+  var renameGuid = '';
   var lastCabName = '';      // posledny nazov z Ruby (fallback pri zruseni editora)
 
   // Zrusi rozpisany editor BEZ odoslania (zmena vyberu, doska, prazdny vyber).
   function dropCabRename(){
     if (!renameFor) return;
     renameFor = null;
+    renameGuid = '';
     renameSending = true;
   }
 
@@ -68,6 +74,7 @@
     var cur = btn.querySelector('.cnametext');
     var txt = cur ? cur.textContent : '';
     renameFor = selectedCabId;
+    renameGuid = nxDocGuid(); // R-02: dokument z casu OTVORENIA editora
     renameSending = false;
     var inp = document.createElement('input');
     inp.type = 'text'; inp.id = 'cnameInput'; inp.className = 'cnameinput';
@@ -88,15 +95,20 @@
     if (!inp || renameSending) return;
     renameSending = true; // blur po Enter/odstraneni prvku nesmie poslat druhy callback
     var cid = renameFor;
+    var guid = renameGuid;
     renameFor = null;
+    renameGuid = '';
     var name = cabNameValue(inp.value);
     // Editor sa zatvara HNED (ziadny stuck input, ked server zapis zahodi);
     // spravny nazov dokresli push_selected — autorita je vzdy server.
     closeCabRenameEditor();
     // Identity guard aj na klientovi (server ma svoj vlastny, prisnejsi):
-    // ak sa vyber medzitym presunul, zapis sa neposiela vobec.
-    if (cid && cid === selectedCabId && window.sketchup && sketchup.rename_cabinet){
-      sketchup.rename_cabinet(JSON.stringify({ cabinet_id: cid, name: name }));
+    // ak sa vyber ALEBO DOKUMENT medzitym zmenil, zapis sa neposiela vobec.
+    // R-02 (review #264 kolo 2): odosiela sa ZACHYTENY guid, nie dnesny —
+    // meno v inpute patri dokumentu, v ktorom sa editor otvoril.
+    if (cid && cid === selectedCabId && guid === nxDocGuid() &&
+        window.sketchup && sketchup.rename_cabinet){
+      sketchup.rename_cabinet(nxDocPayload({ cabinet_id: cid, name: name }, guid));
     }
   }
 
@@ -455,6 +467,16 @@
       if (typeof refreshHardwarePurchase === 'function') refreshHardwarePurchase(d.items || []);
     },
     loadSelected: function(c){
+      // R-02 (review #264 kolo 3): IDENTITA DOKUMENTU JE PRVA VEC V PUSHI.
+      // Dovod je poradie: nizsie sa rozhoduje `keepGaps` (ci sa ZACHOVAJU
+      // rozpisane riadky ciel) a to rozhodnutie musi vidiet UZ vycisteny stav.
+      // Kym `nxSetModelGuid` sedel az v `setUiMode` na konci pushu, prepnutie
+      // dokumentu A -> B s rovnakym CAB id nechalo riadky z A zit; centralny
+      // reset potom zrusil uz len timer a ponechane riadky pozbieral prvy edit
+      // v B a odoslal ich s guidom B — server ich prijal do NESPRAVNEJ zakazky.
+      // `setUiMode` volanie nizsie ostava ako poistka (echo = early return).
+      var sameDoc = (String(c.model_guid || '') === nxDocGuid());
+      if (typeof nxSetModelGuid === 'function') nxSetModelGuid(c.model_guid);
       // V0.4.7c: odchod z kontextu dosky — zrus cakajuce board edity + kartu
       cancelBoardEdits();
       renderBoardCard(null);
@@ -472,7 +494,13 @@
       // D-22: pod tym istym guardom je aj zamok presahov (edge_limit_off) —
       // starsie echo nesmie vratit novsi klik na zamok (renderFronts vo form.js).
       // D-23: a aj riadky ciel — pri keepGaps sa NEprestavaju (light-update).
-      var keepGaps = (c.cabinet_id && c.cabinet_id === selectedCabId) && !!(applyTimer || cabEditsInFlight);
+      // R-02 (review #264 kolo 3): `cabinet_id` NESTACI — `CAB-001` je v kazdej
+      // zakazke, takze bez `sameDoc` by sa riadky ciel z jedneho dokumentu
+      // zachovali v druhom. Identita dokumentu je preto SUCASTOU podmienky
+      // (a vycistenie stavu uz aj tak prebehlo hore — su to dve nezavisle
+      // poistky toho isteho).
+      var keepGaps = sameDoc && (c.cabinet_id && c.cabinet_id === selectedCabId) &&
+                     !!(applyTimer || cabEditsInFlight);
       cabEditsInFlight = false;
       renderFronts(c.fronts, keepGaps);
       currentZoneTree = c.zone_tree ? sanitizeTree(c.zone_tree) : defaultTree();
@@ -520,8 +548,18 @@
     // V0.4.7c: karta dosky. VYCISTI cely korpusovy stav (Codex audit c) — zonove
     // akcie a preview sa rozhoduju podla selectedCabId aj ked su skryte CSS.
     loadBoard: function(b){
+      // R-02 (review #264 kolo 3): TA ISTA PASCA ako v `loadSelected` — riadok
+      // nizsie rozhoduje o zachovani pending batchu podla SAMOTNEHO `board_id`,
+      // a `BRD-001` je v kazdej zakazke. Identita dokumentu preto ide PRVA;
+      // pri jej zmene `nxDropDocState` batch zahodi este pred tymto testom.
+      if (typeof nxSetModelGuid === 'function') nxSetModelGuid(b && b.model_guid);
       if (boardCard && b && boardCard.board_id !== b.board_id) cancelBoardEdits(); // ina doska
-      if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; } // korpusovy debounce nesmie strielat v kontexte dosky
+      cancelCabinetEdits(); // korpusovy debounce nesmie strielat v kontexte dosky (R-02: aj zachyteny guid)
+      // R-02 (review #264 kolo 2): karta dosky sa prekresluje aj pri prepnuti
+      // DOKUMENTU — otvoreny modal chybajucej ABS by svoje „Vytvoriť a
+      // pokračovať" aplikoval na INU dosku (a zalozil by katalogovy zaznam).
+      // `loadSelected` to robi uz dlho, doska na to cakala.
+      if (typeof absModalCloseSilent === 'function') absModalCloseSilent();
       setSelected(null);
       activeZoneId = null; frontItems = null; hwItems = null;
       invalidateFrontPlaceholders(); // D-23: bez resolved dat ziadne ≈ odhady
@@ -541,7 +579,10 @@
       if (typeof nxSetModelGuid === 'function') nxSetModelGuid(guid); // identita dokumentu aj bez vyberu
       cancelBoardEdits();                    // V0.4.7c: koniec kontextu dosky
       renderBoardCard(null);
-      if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; }
+      cancelCabinetEdits(); // R-02: s timerom odchadza aj zachyteny dokument
+      // R-02 (review #264 kolo 2): prazdny vyber = niet karty, na ktoru by sa
+      // rozhodnutie modalu dalo aplikovat.
+      if (typeof absModalCloseSilent === 'function') absModalCloseSilent();
       // D-32: identita prec PRED setUiMode — reset karty (materializeInsertCard
       // vnutri setUiMode) nesmie bezat nad zvyskami stareho vyberu.
       setSelected(null);

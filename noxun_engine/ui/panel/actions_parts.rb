@@ -12,9 +12,14 @@ module Noxun
         # stary stav = override PRED zmenou || base, nikdy nie len rec hodnota).
         def handle_set_part_material(payload)
           model = Sketchup.active_model
+          data = parse(payload)
+          # R-02 (review #264 P1): identita DOKUMENTU je PRVA. `part_target_error`
+          # nizsie kontroluje CIEL v aktivnom dokumente — dielec s rovnakym
+          # `part_key` v rovnomennej skrinke inej zakazky by mu presiel.
+          return if foreign_document?(data, model, 'Materiál dielca sa nezmenil')
+
           cab = find_cabinet(model)
           return set_status('Najprv oznac dielec v korpuse.', true) if cab.nil?
-          data = parse(payload)
           return if stale_cabinet_echo?(cab, data, 'material dielca')
           rk = data['role_key'].to_s
           return set_status('Chyba identifikacie dielca.', true) if rk.empty?
@@ -150,9 +155,11 @@ module Noxun
         # ABS hrana dielca (part_override.edges[code]). abs_id: konkretne / '' (bez ABS) / '__inherit__' (dedi).
         def handle_set_part_edge(payload)
           model = Sketchup.active_model
+          data = parse(payload)
+          return if foreign_document?(data, model, 'ABS hrana sa nezmenila') # R-02 (review #264 P1)
+
           cab = find_cabinet(model)
           return set_status('Najprv oznac dielec v korpuse.', true) if cab.nil?
-          data = parse(payload)
           return if stale_cabinet_echo?(cab, data, 'hrana dielca') # D-41 audit FIX 6
           rk = data['role_key'].to_s
           code = data['edge'].to_s
@@ -350,9 +357,11 @@ module Noxun
         # medzitym robi nieco ine, chybova hlaska by matla.
         def handle_set_part_edges_all(payload)
           model = Sketchup.active_model
+          data = parse(payload)
+          return if foreign_document?(data, model, 'Olep hrán sa nezmenil') # R-02 (review #264 P1)
+
           cab = find_cabinet(model)
           return set_status('Najprv oznac dielec v korpuse.', true) if cab.nil?
-          data = parse(payload)
           rk = data['role_key'].to_s
           return set_status('Chyba identifikacie dielca.', true) if rk.empty?
           unless data['cabinet_id'].to_s == Store.get(cab, 'cabinet_id').to_s

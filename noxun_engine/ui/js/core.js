@@ -9,6 +9,11 @@
   var currentZoneTree = null;   // strukturny strom zon (nový vklad aj oznaceny)
   var previewMode = 'zones';
   var applyTimer = null;
+  // R-02 (review #264): DOKUMENT, ktoremu patria rozpisane edity formulara.
+  // Zachytava sa pri naplanovani debounce a pouziva ho AJ okamzity flush —
+  // `nxModelGuid` medzitym prepise najblizsi push a stare hodnoty by dostali
+  // identitu ineho dokumentu. null = ziadne rozpisane edity.
+  var applyPendingGuid = null;
   var frontItems = null;        // rozlozene cela z backendu
   // UI-B2: posledny payload kovania (config.hardware oznacenej skrinky). Drzi sa
   // LEN preto, aby z neho vedel kreslit nahlad (projekcia Kovanie a ghost

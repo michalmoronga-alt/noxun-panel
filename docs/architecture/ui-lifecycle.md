@@ -947,25 +947,78 @@ katalógové a stavové zmeny vlastné úzke kanály namiesto `push_init`. Od v0
 Späť/Znova, prepnutie dokumentu aj zmena výberu, takže bez toho by okno tagov, ikona raily a checkbox ghost zón ostali na opačnom stave než model. Pole `zones_visible`
 v `push_init` tým zaniklo — zóny sú riadok v `tags`.
 
+**GUARD IDENTITY DOKUMENTU — `foreign_document?(data, model, what)`** (R-02, v0.8.19). Jediný guard, ktorým prechádza **každý zápisový handler panela**. Panel je JEDEN pre všetky
+otvorené dokumenty a callback HtmlDialogu je asynchrónny, pritom ID objektov sú jedinečné LEN v rámci modelu (`CAB-001` aj `BRD-001` sú v každej zákazke) — echo `cabinet_id` /
+`board_id` teda prepnutie dokumentu **nezachytí** a oneskorený klik by prestaval rovnomennú skrinku v cudzej zákazke. Porovnanie je **prísne** (vzor `handle_tag_visible`,
+`zone_ctx`, `handle_set_part_grain`): prázdny guid nie je starší klient, je to okno bez dobehnutého `NX.init` a to nesmie zapisovať nikam. Nezhoda = **hláška** (`set_status` +
+`Engine.log`), nie tiché zahodenie — prepnutie dokumentu je zriedkavé a používateľ musí vedieť, že sa zmena neuložila. Klientskym protipólom je **`nxDocPayload(obj, guid)`** v
+`ui/js/shell.js`: jediné miesto, kde zápisový payload dostáva `model_guid` (obdoba `nxZonePayload`, ktorý navyše pridáva `cabinet_id`). Ten istý tvar payloadu posiela aj in-SU
+runner (helper `pg(model, hash)` v `tests/sketchup/su_runner.rb`).
+
+**Zachytená identita, nie identita pri odoslaní** (review #264 P1). `nxModelGuid` je mutovateľný globál, ktorý prepíše najbližší push zo servera. Cesty s **odloženým**
+odoslaním preto čítajú `nxDocGuid()` už pri **naplánovaní** editu a zachytenú hodnotu podávajú helperu druhým argumentom — bez toho by sa zápis odložený o 400 ms opečiatkoval
+NOVÝM dokumentom a guard by ho pustil presne tam, kam nemá. Týka sa to dvoch debounce ciest: **auto-apply korpusu** (`form.js`, `guidSnapshot` vedľa `cabSnapshot`) a **polí karty
+dosky** (`board_card.js`, `boardPending.guid`). Karta dielca berie identitu z **payloadu karty** (`partCard.model_guid`) — je to dokument, ktorý má používateľ na obrazovke.
+Okamžité cesty argument vynechajú (medzi klikom a odoslaním sa v jednovláknovom JS push vykonať nemôže). Prázdny reťazec je **platná** zachytená hodnota (server ju odmietne),
+preto sa helper vetví na `undefined`/`null`, nie na pravdivosť. **Rozsah guardu je 18 zápisových handlerov** — okrem korpusu, kovania a dosky aj `handle_set_cabinet_material`
+a tri cesty karty dielca (`material`, `edge`, `edges_all`); `handle_set_part_grain` má vlastný, tvarom starší guard z K1/D-108.
+
+**Rozpracovaný stav panela pri prepnutí dokumentu — tri obrany** (review #264 kolo 2). Zachytený guid sám nestačí: stav, ktorý drží dáta medzi akciou používateľa a volaním
+`sketchup.*`, prežije prepnutie dokumentu a pri odoslaní by dostal novú identitu.
+**(1) Centrálne zahodenie.** `nxSetModelGuid` je **jediný detektor zmeny dokumentu** na klientovi (každý push — `init`, `loadSelected`, `loadBoard`, `clearSelected` — ide cez
+neho). Pri skutočnej zmene hodnoty spustí `nxDropDocState()`, ktoré zahodí **všetok** rozpracovaný stav: `cancelCabinetEdits` · `cancelBoardEdits` · `dropCabRename` +
+`closeCabRenameEditor` · `absModalCloseSilent` · `closeSaveTemplateModal` · `closeSimilarModal`. **Echo push tej istej identity nezahodí nič** — rozpísaná práca musí prežiť
+(rovnaká zásada ako `NXShell.track`). Každý nový pending buffer, editor alebo modal patrí do tohto zoznamu; stráži ho `tests/pure/test_r02_doc_guard.rb`. Mimo zoznamu sú
+vedome `insertLocksTimer` (zámky žijú v pamäti Panel modulu, do modelu nezapisujú), `previewTimer` (lokálny re-render) a draft vkladacej karty (vklad pečiatkuje identitu až
+pri kliku).
+**(2) Vlastná zachytená identita v každom bufferi** — keby push zo servera neprišiel: `applyPendingGuid` (rozpísané edity formulára, používa ho aj **okamžitý** flush),
+`boardPending.guid` (batch karty dosky je kľúčovaný **dvojicou** dokument+doska — `BRD-001` je v každej zákazke, takže samotné id by zmiešalo edity dvoch dokumentov),
+`renameGuid` (inline premenovanie — `setIdbar` porovnáva len `cabinet_id`, takže editor prežije prepnutie na rovnomennú skrinku), `boardTarget()`/`partTarget()` (cieľ modalu
+chýbajúcej ABS: doska/dielec + dokument z času otvorenia — rozhodnutie je asynchrónne a karty sú mutovateľné globály), `tplModalGuid` a `simFor.guid` (staršie, už predtým
+správne).
+**(3) Serverový `foreign_document?`** — posledné slovo má vždy Ruby.
+**PORADIE V PUSHI je súčasť kontraktu** (review #264 kolo 3): centrálne zahodenie je užitočné len vtedy, keď beží PRED stavovými rozhodnutiami pushu. `nxSetModelGuid` je preto
+**prvý príkaz** `loadSelected` aj `loadBoard` (v `clearSelected` a `init` bol prvý už predtým), nie až vedľajší efekt `setUiMode` na konci. Dve rozhodnutia, ktoré na tom stoja:
+`keepGaps` v `loadSelected` (zachovanie rozpísaných riadkov čiel — `CAB-001` je v každej zákazke, takže identita dokumentu je aj priamou súčasťou podmienky) a test „iná doska"
+v `loadBoard` (zahadzuje pending batch podľa samotného `board_id`). Volanie `nxSetModelGuid` v `setUiMode` zostáva ako poistka — echo je v ňom lacný early return.
+Do `keepGaps` patrí aj závierka `cabEditsInFlight`, a tú nuluje **výhradne `nxDropDocState`**, nie `cancelCabinetEdits`: rušenie rozpísaných editov beží aj
+v **jednodokumentovom** flow (zastavený okamžitý flush pri červenom poli, rozpísaný výraz v poli) a zhodená závierka by tam nechala najbližšie echo zmazať práve pridané čelo
+aj rozpísané gap hodnoty. `nxDropDocState` navyše **zhodí fokus** (`document.activeElement.blur()` v `try/catch`) — CEF drží `activeElement` aj po strate fokusu okna, takže
+`bset` na karte dosky by pole s kurzorom preskočilo a nechalo v ňom hodnotu zo starej zákazky.
+
 ### actions_board.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+Doména panela: vloženie samostatnej dosky (`handle_insert_board`) a zápisové cesty jej karty (polia · materiál · ABS hrana · olep všetkých 4 · orientácia). Kontrakt karty je
+v odseku „UI-C1c (orientácia dosky v paneli)" a vo „Vkladacej karte". **Dve úrovne identity so zámerne rôznou hlasnosťou** (R-02): identitu **dokumentu** overuje spoločná brána
+`guarded_board` cez `foreign_document?` **nahlas** (zápis do cudzej zákazky by sa našiel až v objednávke), zatiaľ čo echo `board_id`, výber bez dosky a „v Inspectore vyhrala
+skrinka" sa ďalej zahadzujú **ticho** (len log) — používateľ už medzitým robí niečo iné a hláška by ho mýlila. `handle_insert_board` má guard vlastný, pred `BoardBuilder.build`.
 
 ### actions_cabinet.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+Doména panela: vloženie skrinky (`handle_insert`, `handle_insert_copy`), premenovanie (`handle_rename_cabinet`, D-100) a zápisy konštrukcie/čiel (`handle_apply`,
+`handle_apply_fronts`, `handle_apply_all` = auto-apply). Materiálové preflighty (D-45: telo → chrbát → remap ABS) a zámky vkladacej karty (D-39) sú v odsekoch „Obsah Korpusu"
+a „Vkladacia karta". **Poradie guardov (R-02): identita dokumentu PRVÁ**, až potom echo `cabinet_id` — `CAB-001` je v každej zákazke, takže echo prepnutý dokument nerozozná.
+Pri vklade beží guard pred `CabinetBuilder.build`. Auto-apply hlási nezhodu dokumentu **nahlas** (na rozdiel od tichého echa výberu): zmena, ktorú používateľ práve napísal, sa
+neuložila a bez hlášky by to zistil až v objednávke.
 
 ### actions_hardware.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+Doména panela: ručné zásahy do počtov kovania (`handle_set_hardware_override`, D-93 — zápis PO POLIACH `quantity` / `disabled` / `nominal_length` s merge záznamu identity)
+a výber setu na skrinke (`handle_set_hardware_set`, V0.6 D1b, H1b/D-81 aj per-dielec). Pravidlá a sety sú v [hardware.md](hardware.md), UI v odseku „Kontext Kovanie (UI-C4…)".
+Obe cesty overujú identitu **dokumentu** (`foreign_document?`, R-02) **pred** identitou rendrovanej skrinky (`cabinet_id`) a zápis vždy beží ako jeden rebuild = jeden krok Späť.
 
 ### actions_materials.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+Doména panela: materiály **označenej skrinky** (`handle_set_cabinet_material` — override projektovej predvoľby pre telo/čelo/chrbát; materiál tela riadi hrúbku korpusu, D-45)
+a echo prepínače kontrol hrán a kresby (`handle_edge_toggle`, `handle_edge_option`, `handle_grain_toggle`). Projektové predvoľby tu **nežijú** — presunuli sa do Štúdia
+(sekcia Materiály). Kontrakt katalógu je v [materials.md](materials.md). Guard identity dokumentu (R-02) beží **pred** echom `cabinet_id`: zámena materiálu tela mení aj hrúbku,
+takže zápis do cudzej zákazky je tu obzvlášť drahý.
 
 ### actions_parts.rb
 
-Doména panela: zápisové cesty karty dielca. Kontrakt a všetky guardy (dokument · cieľ zmeny · odpojenosť) sú v odseku „Karta dielca (UI-D1…)".
+Doména panela: zápisové cesty karty dielca. Kontrakt a všetky guardy (dokument · cieľ zmeny · odpojenosť) sú v odseku „Karta dielca (UI-D1…)". Poradie guardov je záväzné:
+**identita dokumentu je prvá** (R-02) — `part_target_error` hľadá cieľ v AKTÍVNOM dokumente, takže rovnomenný dielec v inej zákazke by mu prešiel. `handle_set_part_grain`
+má vlastný, tvarom starší guard (K1/D-108, `data['model_guid']` inline); ostatné tri zápisové cesty idú cez zdieľaný `foreign_document?`.
 
 ### actions_settings.rb
 

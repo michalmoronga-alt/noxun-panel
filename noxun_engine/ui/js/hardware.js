@@ -722,10 +722,10 @@
     // neodosiela; server by ju aj tak odmietol ako neznamy set.
     if (sel.value === HW_SET_PARAM) return;
     if (window.sketchup && sketchup.set_hardware_set)
-      sketchup.set_hardware_set(JSON.stringify({ generic_type: sel.getAttribute('data-gt'),
-                                                 owner_part_key: sel.getAttribute('data-owner') || null,
-                                                 set_id: sel.value,
-                                                 cabinet_id: sel.getAttribute('data-cab') || '' })); // GH #127 P2
+      sketchup.set_hardware_set(nxDocPayload({ generic_type: sel.getAttribute('data-gt'),
+                                               owner_part_key: sel.getAttribute('data-owner') || null,
+                                               set_id: sel.value,
+                                               cabinet_id: sel.getAttribute('data-cab') || '' })); // GH #127 P2 + R-02
   }
 
   // D-93: select dlzky + zamok v TOM ISTOM riadku (vertikalny priestor).
@@ -752,8 +752,10 @@
     return out;
   }
   function hwSend(payload){
+    // R-02: identita dokumentu (echo `cabinet_id` z hwPayload prepnutie
+    // dokumentu nezachyti — CAB-001 je v kazdej zakazke).
     if (window.sketchup && sketchup.set_hardware_override)
-      sketchup.set_hardware_override(JSON.stringify(payload));
+      sketchup.set_hardware_override(nxDocPayload(payload));
   }
   // Zapis ide PO POLIACH (field + value; value null = zrus len toto pole) —
   // zmena dlzky nesmie zmazat rucny pocet a naopak.

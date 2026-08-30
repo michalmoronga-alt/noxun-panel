@@ -248,6 +248,31 @@ module Noxun
           ''
         end
 
+        # R-02: JEDINY GUARD IDENTITY DOKUMENTU pre ZAPISOVE handlery panela
+        # (vklad skrinky aj dosky, apply, premenovanie, kovanie, karta dosky).
+        # Vrati true = payload patri INEMU dokumentu a volajuci ZAPIS ODMIETNE.
+        #
+        # PRECO: callback HtmlDialogu je asynchronny a panel je JEDEN pre vsetky
+        # otvorene dokumenty. ID objektov su pritom jedinecne LEN v ramci modelu
+        # (CAB-001 aj BRD-001 su v kazdom projekte), takze echo `cabinet_id` /
+        # `board_id` prepnutie dokumentu NEZACHYTI — oneskoreny klik by prestaval
+        # rovnomennu skrinku v cudzej zakazke. Z pluginu sa objednava realna
+        # zakazka, takze taky zapis je vyrobne riziko, nie kozmeticky detail.
+        #
+        # PRISNE porovnanie (vzor `handle_tag_visible`, `handle_edge_option`,
+        # `zone_ctx`, `handle_set_part_grain`): prazdny guid NIE JE starsi klient
+        # — je to okno bez dobehnuteho NX.init, a to nesmie zapisovat nikam.
+        # Hlaska je NAHLAS (nie tiche zahodenie ako pri echu vyberu): prepnutie
+        # dokumentu je zriedkave a pouzivatel musi vediet, ze sa zmena neulozila.
+        # `what` = co sa NEstalo, v 1. pade ('Skrinka sa nevložila').
+        def foreign_document?(data, model, what)
+          return false if model && data['model_guid'].to_s == model_guid(model)
+
+          Engine.log("#{what}: model_guid #{data['model_guid'].inspect} nesedi s aktivnym dokumentom — zapis zahodeny")
+          set_status("#{what} — panel patrí inému dokumentu. Klikni do okna zákazky a skús znova.", true)
+          true
+        end
+
         # UI-D2: zoznam nesie aj `preview_rev` — dlaydica podla neho vie, ci
         # ma o PNG vobec ziadat (a JS podla neho cachuje). Samotny obrazok ide
         # samostatnym kanalom nizsie.

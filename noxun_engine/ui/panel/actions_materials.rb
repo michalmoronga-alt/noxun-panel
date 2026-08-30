@@ -14,9 +14,14 @@ module Noxun
         # prevezme z katalogu a vsetko ide v JEDNOM rebuilde (1 undo krok, audit N11).
         def handle_set_cabinet_material(payload)
           model = Sketchup.active_model
+          data = parse(payload)
+          # R-02 (review #264 P1): identita DOKUMENTU pred identitou skrinky —
+          # `cabinet_id` prepnutie dokumentu nezachyti (CAB-001 je v kazdej
+          # zakazke) a zamena materialu tela navyse meni hrubku korpusu.
+          return if foreign_document?(data, model, 'Materiál skrinky sa nezmenil')
+
           cab = find_cabinet(model)
           return set_status('Najprv oznac NOXUN korpus.', true) if cab.nil?
-          data = parse(payload)
           # D-45 (audit F9): oneskoreny callback po prekliknuti nesmie zasiahnut iny
           # korpus — echo s cudzim cabinet_id sa TICHO zahodi (vzor actions_parts).
           return if stale_cabinet_echo?(cab, data, 'material korpusu')

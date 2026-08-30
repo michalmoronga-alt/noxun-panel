@@ -363,6 +363,14 @@
   // DOM cast nizsie bezi normalne (rovnaky vzor ako insert_state.js/usage.js).
   if (typeof module !== 'undefined' && module.exports){
     module.exports = NXShell;
+    // R-02 (tests/js/test_r02_doc_guard.js): zapisovy payload panela zije MIMO
+    // NXShell namespace — pouziva modulovy `nxModelGuid`, ktory nie je sucastou
+    // kostry Inspectora. Deklaracie funkcii su hoistovane, takze referencia tu
+    // plati aj ked su definovane nizsie.
+    module.exports.nxDocPayload = nxDocPayload;
+    module.exports.nxDocGuid = nxDocGuid;
+    module.exports.nxSetModelGuid = nxSetModelGuid;
+    module.exports.nxDropDocState = nxDropDocState;
   }
 
   // ===== DOM: rail ==========================================================
@@ -626,7 +634,88 @@
   var nxModelGuid = '';
   // Hodnota sa prepisuje LEN ked ju volajuci naozaj poslal — payload bez tohto
   // pola (starsi push, vnoreny objekt) nesmie zmazat platnu identitu.
-  function nxSetModelGuid(g){ if (g !== undefined && g !== null) nxModelGuid = String(g); }
+  //
+  // R-02 (review #264 kolo 2): toto je zaroven JEDINY DETEKTOR ZMENY DOKUMENTU
+  // na klientovi — kazdy push (init, loadSelected, loadBoard, clearSelected) ide
+  // cez neho. Pri SKUTOCNEJ zmene hodnoty sa zahodi vsetok rozpracovany stav
+  // panela (nxDropDocState); echo push toho isteho dokumentu nezahodi NIC
+  // (rozpisana praca musi prezit — rovnaka zasada ako pri NXShell.track).
+  function nxSetModelGuid(g){
+    if (g === undefined || g === null) return;
+    var next = String(g);
+    if (next === nxModelGuid) return;
+    nxModelGuid = next;
+    nxDropDocState();
+  }
+
+  // VSETOK stav panela, ktory drzi data MEDZI akciou pouzivatela a volanim
+  // `sketchup.*`. Po prepnuti dokumentu uz ziadny z nich nema kam zapisat:
+  // pending buffery patria starej zakazke a otvoreny editor ci modal by svoje
+  // rozhodnutie aplikoval na kartu, ktora na obrazovke uz nie je.
+  //
+  // Je to PRVA obrana (druhou je zachytena identita v kazdom bufferi, tretou
+  // serverovy `foreign_document?`). Zamerne sa NEVYMENOVAVA cez `window[...]`,
+  // ale menami — zoznam je greppovatelny aj testovatelny a `typeof` na
+  // nedeklarovanom identifikatore je bezpecny (Node aj CEF).
+  //
+  // MIMO zoznamu su vedome: `insertLocksTimer` (zamky vkladacej karty ziju
+  // v pamati Panel modulu, do modelu nezapisuju), `previewTimer` (lokalny
+  // re-render) a draft vkladacej karty (`NXInsert` — vklad peciatkuje identitu
+  // az v okamihu kliku).
+  function nxDropDocState(){
+    if (typeof cancelCabinetEdits === 'function') cancelCabinetEdits();   // auto-apply korpusu
+    if (typeof cancelBoardEdits === 'function') cancelBoardEdits();       // polia karty dosky
+    if (typeof dropCabRename === 'function') dropCabRename();             // inline premenovanie
+    if (typeof closeCabRenameEditor === 'function') closeCabRenameEditor();
+    if (typeof absModalCloseSilent === 'function') absModalCloseSilent(); // modal chybajucej ABS
+    if (typeof closeSaveTemplateModal === 'function') closeSaveTemplateModal();
+    if (typeof closeSimilarModal === 'function') closeSimilarModal();     // „Použiť na podobné"
+    // Zatvarka „apply odoslany, echo este nedoslo" je DRUHA polovica podmienky
+    // `keepGaps`. Nuluje sa VYHRADNE tu, nie v `cancelCabinetEdits` (interne
+    // review kola 4, P2): tam bezi aj jednodokumentove flow — zruseny okamzity
+    // flush a rozpisany vyraz v poli — a zhodena zatvarka by nechala najblizsie
+    // echo zmazat prave pridane celo. Tu bezi len pri REALNEJ zmene dokumentu.
+    if (typeof cabEditsInFlight !== 'undefined') cabEditsInFlight = false;
+    // Fokus: CEF drzi `document.activeElement` aj po strate fokusu okna, takze
+    // `bset` (karta dosky) by po prepnuti dokumentu pole s kurzorom PRESKOCILO
+    // a nechalo v nom hodnotu zo starej zakazky — Enter by ju poslal do novej.
+    // Blur pred prekreslenim to zavrie; fokus nie je nikdy dovod, aby zahodenie
+    // stavu zlyhalo, preto try/catch.
+    try {
+      if (typeof document !== 'undefined' && document.activeElement &&
+          typeof document.activeElement.blur === 'function') document.activeElement.blur();
+    } catch (e) { /* fokus sa nepodarilo zhodit — stav je aj tak uz zahodeny */ }
+  }
+
+  // R-02: JEDNO miesto, kde ZAPISOVY payload panela dostane identitu dokumentu.
+  // Vzor `nxZonePayload` (zone_tree.js) — ten navyse pridava `cabinet_id`, tento
+  // je pre cesty, ktoré si svoju vlastnú identitu (cabinet_id / board_id) nesú
+  // samy alebo ju nemajú vôbec (vkladanie).
+  //
+  // PRECO: callback HtmlDialogu je asynchrónny a panel je JEDEN pre všetky
+  // otvorené dokumenty. ID objektov sú jedinečné LEN v rámci modelu, takže echo
+  // `cabinet_id` prepnutie dokumentu NEZACHYTÍ. Server payload bez zhodného
+  // guidu ODMIETNE — prázdny guid je okno bez dobehnutého NX.init a to nesmie
+  // zapisovať nikam.
+  //
+  // `guid` = ZACHYTENA identita (review #264 P1). `nxModelGuid` je mutovatelny
+  // global, ktory prepise najblizsi push zo servera — pri debounced editoch
+  // (auto-apply korpusu, polia karty dosky; 400 ms) by sa oneskoreny zapis
+  // opeciatkoval NOVYM dokumentom a guard by ho pustil presne tam, kam nema.
+  // Volajuci s odlozenym odoslanim preto cita `nxDocGuid()` uz pri NAPLANOVANI
+  // a zachytenu hodnotu poda sem; okamzite cesty argument vynechaju (medzi
+  // klikom a odoslanim sa v jednovlaknovom JS push vykonat nemoze).
+  // Prazdny retazec je PLATNA zachytena hodnota (server ju odmietne) — preto sa
+  // vetvi na undefined/null, nie na pravdivost.
+  function nxDocPayload(obj, guid){
+    var o = obj || {};
+    o.model_guid = (guid === undefined || guid === null) ? nxDocGuid() : String(guid);
+    return JSON.stringify(o);
+  }
+
+  // Identita dokumentu, ktory panel PRAVE zobrazuje. Citat ju treba v okamihu,
+  // ked sa akcia NAPLANUJE — nie ked sa odosiela (viz nxDocPayload vyssie).
+  function nxDocGuid(){ return (typeof nxModelGuid === 'string') ? nxModelGuid : ''; }
 
   // Posledny STAV zo servera. Drzi sa LEN preto, aby sa dalo rohove nastavenie
   // prekreslit s cerstvymi poctami — panel si z neho nic neodvodzuje ani nic

@@ -14,11 +14,27 @@
     if (boardTimer){ clearTimeout(boardTimer); boardTimer = null; }
     boardPending = null;
   }
+
+  // R-02 (review #264 kolo 2): CIEL odlozeneho rozhodnutia karty dosky =
+  // dvojica DOSKA + DOKUMENT z casu, ked pouzivatel akciu spustil. Modal
+  // chybajucej ABS je asynchronny (caka na klik) a `boardCard` je mutovatelny
+  // globál — bez snapshotu by sa „Vytvoriť a pokračovať" aplikovalo na dosku,
+  // ktora je na obrazovke TERAZ, nie na tu, o ktorej pouzivatel rozhodoval.
+  function boardTarget(){
+    return boardCard ? { id: boardCard.board_id, guid: nxDocGuid() } : null;
+  }
+  function boardTargetStale(t){
+    return !t || !boardCard || t.id !== boardCard.board_id || t.guid !== nxDocGuid();
+  }
   function flushBoardEdits(){
     boardTimer = null;
     var p = boardPending; boardPending = null;
     if (!p || !p.board_id) return;
-    if (window.sketchup && sketchup.set_board_fields) sketchup.set_board_fields(JSON.stringify(p));
+    // R-02: identita dokumentu ide s KAZDYM zapisovym payloadom karty dosky —
+    // tu ZACHYTENA pri naplanovani editu, nie precitana pri odosielani.
+    var g = p.guid;
+    delete p.guid; // pracovny kluc pendingu, nie pole payloadu
+    if (window.sketchup && sketchup.set_board_fields) sketchup.set_board_fields(nxDocPayload(p, g));
   }
   // Okamzity flush (Enter commit) — VZDY najprv zrusi bezaici timeout, inak by
   // stary timer predcasne flushol nasledujuci novy edit (Codex expr audit).
@@ -54,8 +70,22 @@
       if (elm) elm.classList.remove('bad');
       value = v;
     }
-    if (!boardPending || boardPending.board_id !== boardCard.board_id){
-      boardPending = { board_id: boardCard.board_id, fields: {} };
+    // R-02 (review #264 P1): s doskou sa zachytáva aj DOKUMENT z času
+    // NAPLÁNOVANIA. `nxModelGuid` je globál, ktorý prepíše najbližší push —
+    // bez snapshotu by sa zápis odložený o 400 ms opečiatkoval NOVÝM
+    // dokumentom a guard by ho pustil do cudzej zákazky.
+    //
+    // Kolo 2: batch je kľúčovaný DVOJICOU dokument+doska. Samotné `board_id`
+    // nestačí — `BRD-001` je v každej zákazke, takže edit v novom dokumente by
+    // sa primiešal do batchu zo starého (a s jeho guidom): timer by ho poslal
+    // ako cudzí (server odmietne, hodnota STRATENÁ), a návrat do pôvodného
+    // dokumentu by hodnoty z toho druhého zapísal sem. Pri nesúlade sa starý
+    // pending ZAHODÍ a založí nový.
+    var pendGuid = nxDocGuid();
+    if (!boardPending || boardPending.board_id !== boardCard.board_id ||
+        boardPending.guid !== pendGuid){
+      cancelBoardEdits();
+      boardPending = { board_id: boardCard.board_id, guid: pendGuid, fields: {} };
     }
     boardPending.fields[key] = value;
     if (boardTimer) clearTimeout(boardTimer);
@@ -69,22 +99,31 @@
     // 2A-3b: dispatcher zrkadli schema 2 hierarchiu group/structure/universal).
     if (v && !absUsableForSheet(MATERIALS.edges, sheetRecOf(v), catalogSchemaNow(), sheetThicknessOf(v))){
       var prev = boardCard.material_id || '';
+      var tgt = boardTarget(); // R-02: doska + dokument z casu OTVORENIA modalu
       openAbsModal('Dekor „' + decorOfSheet(v) + '" nemá použiteľnú ' + absMissingLabel(catalogSchemaNow()) + ' pre túto hrúbku — prevedené hrany by ostali bez ABS.',
-        function(create){ sendBoardMaterial(v, create); },
+        function(create){ sendBoardMaterial(v, create, tgt); },
         function(){ if (el('bc_material')) el('bc_material').value = prev; regroupBoardEdges(prev); });
       return;
     }
     sendBoardMaterial(v, false);
   }
-  function sendBoardMaterial(v, createAbs){
+  // `forBoard` = snapshot { id, guid } z casu, ked pouzivatel akciu spustil
+  // (cesta cez modal chybajucej ABS). Priame volanie ho vynecha — vtedy je
+  // cielom prave to, na co sa pouzivatel pozera.
+  function sendBoardMaterial(v, createAbs, forBoard){
     if (!boardCard) return;
+    var tgt = forBoard || boardTarget();
+    if (boardTargetStale(tgt)){
+      NX.setStatus('Karta sa medzitým zmenila — materiál dosky sa nenastavil.', true);
+      return;
+    }
     // F3: pregrupuj ABS hrany dosky LOKALNE podla noveho materialu — doska ma
     // vzdy konkretny material (ziadne dedenie => vzdy ratame). N7: ziadny change event.
     regroupBoardEdges(v);
     if (window.sketchup && sketchup.set_board_material)
-      sketchup.set_board_material(JSON.stringify({ board_id: boardCard.board_id, material_id: v,
+      sketchup.set_board_material(nxDocPayload({ board_id: tgt.id, material_id: v,
         create_missing_abs: !!createAbs,
-        catalog_schema: (typeof PANEL_CLIENT_SCHEMA !== 'undefined' ? PANEL_CLIENT_SCHEMA : 1) }));
+        catalog_schema: (typeof PANEL_CLIENT_SCHEMA !== 'undefined' ? PANEL_CLIENT_SCHEMA : 1) }, tgt.guid));
   }
   // F3/N7: prekresli options ABS selectov dosky podla materialu (2A-3b:
   // parameter je material_id), zachova hodnotu (aj F5).
@@ -102,7 +141,7 @@
   function onBoardEdgeChange(code, value){
     if (!boardCard) return;
     if (window.sketchup && sketchup.set_board_edge)
-      sketchup.set_board_edge(JSON.stringify({ board_id: boardCard.board_id, edge: code, abs_id: value }));
+      sketchup.set_board_edge(nxDocPayload({ board_id: boardCard.board_id, edge: code, abs_id: value }));
   }
   // D-35: olep vsetky 4 hrany ABS 1.0 dekoru materialu dosky (1 rebuild = 1 undo).
   // PRED bulkom flush pending debounce editov (audit FIX 6) — cakajuci zapis poli
@@ -114,18 +153,24 @@
     var th = sheetThicknessOf(boardCard.material_id);
     if (!absUsableForSheet(MATERIALS.edges, sheetRecOf(boardCard.material_id), catalogSchemaNow(),
                            th === null ? parseFloat(boardCard.thickness) : th)){
+      var tgt = boardTarget(); // R-02: doska + dokument z casu OTVORENIA modalu
       openAbsModal('Dekor „' + decor + '" nemá použiteľnú ' + absMissingLabel(catalogSchemaNow()) + ' — bez nej sa hrany nedajú olepiť.',
-        function(create){ sendBoardEdgesAll(create); }, null);
+        function(create){ sendBoardEdgesAll(create, tgt); }, null);
       return;
     }
     sendBoardEdgesAll(false);
   }
-  function sendBoardEdgesAll(createAbs){
+  function sendBoardEdgesAll(createAbs, forBoard){
     if (!boardCard) return;
+    var tgt = forBoard || boardTarget();
+    if (boardTargetStale(tgt)){
+      NX.setStatus('Karta sa medzitým zmenila — hrany sa neolepili.', true);
+      return;
+    }
     flushBoardEditsNow();
     if (window.sketchup && sketchup.set_board_edges_all)
-      sketchup.set_board_edges_all(JSON.stringify({ board_id: boardCard.board_id, create_missing_abs: !!createAbs,
-        catalog_schema: (typeof PANEL_CLIENT_SCHEMA !== 'undefined' ? PANEL_CLIENT_SCHEMA : 1) }));
+      sketchup.set_board_edges_all(nxDocPayload({ board_id: tgt.id, create_missing_abs: !!createAbs,
+        catalog_schema: (typeof PANEL_CLIENT_SCHEMA !== 'undefined' ? PANEL_CLIENT_SCHEMA : 1) }, tgt.guid));
   }
 
   // ===== UI-C1c: ORIENTACIA DOSKY (segmentove tlacidla) =====================
@@ -162,7 +207,7 @@
     if (boardCard.orientation === o) return; // klik na uz zvolenu = no-op
     flushBoardEditsNow();
     if (window.sketchup && sketchup.set_board_orientation)
-      sketchup.set_board_orientation(JSON.stringify({ board_id: boardCard.board_id, orientation: o }));
+      sketchup.set_board_orientation(nxDocPayload({ board_id: boardCard.board_id, orientation: o }));
   }
 
   // Zapis hodnoty len ked pole NEMA fokus — refresh z backendu nesmie prepisat
@@ -552,7 +597,7 @@
       res.payload.template_kind = ref.kind;
       res.payload.template_name = ref.name;
     }
-    if (window.sketchup && sketchup.insert_board) sketchup.insert_board(JSON.stringify(res.payload));
+    if (window.sketchup && sketchup.insert_board) sketchup.insert_board(nxDocPayload(res.payload)); // R-02
   }
 
   // ===== UI-C1b: DOSKOVA SABLONA VO VKLADACEJ KARTE =========================

@@ -35,6 +35,8 @@
   // korpus; zmena materialu tela navyse meni hrubku, tam je zamena drahá).
   function onCabinetMaterial(which, value){
     if (!selectedCabId){ NX.setStatus('Najprv označ skrinku.', true); return; }
+    // R-02 (review #264 P1-2): `cabinet_id` prepnutie DOKUMENTU nezachytí —
+    // CAB-001 je v každej zákazke. Payload preto nesie aj identitu dokumentu.
     if (window.sketchup && sketchup.set_cabinet_material)
-      sketchup.set_cabinet_material(JSON.stringify({ which: which, value: value, cabinet_id: selectedCabId }));
+      sketchup.set_cabinet_material(nxDocPayload({ which: which, value: value, cabinet_id: selectedCabId }));
   }

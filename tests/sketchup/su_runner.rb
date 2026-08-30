@@ -110,6 +110,13 @@ module NoxunSuRunner
     e::Units.to_mm(len)
   end
 
+  # R-02: zapisove handlery panela vyzaduju identitu DOKUMENTU (`model_guid`) —
+  # runner ju musi poslat presne tak, ako ju posiela panel (nxDocPayload).
+  # JEDNO miesto, nech sa scenare nemusia starat o tvar payloadu.
+  def pg(model, hash)
+    hash.merge('model_guid' => e::Panel.model_guid(model)).to_json
+  end
+
   # Guard (Codex review PR #20, P1 + V0.4.7b): Untitled NEstaci — neulozena moze byt
   # aj zakazka. Povolene: (a) model ENGINEtests*.skp, alebo (b) neulozeny model BEZ
   # jedineho NOXUN vlastnickeho objektu (korpus AJ doska — cerstve testovacie okno;
@@ -554,14 +561,14 @@ module NoxunSuRunner
        %w[board_id name role role_label length width thickness material_id
           grain_direction edges edge_labels edge_sides quantity].all? { |k| pay.key?(k) })
     e::Panel.select_only(model, binst)
-    e::Panel.handle_set_board_fields({ 'board_id' => 'BRD-999', 'fields' => { 'width' => 555.0 } }.to_json)
+    e::Panel.handle_set_board_fields(pg(model, 'board_id' => 'BRD-999', 'fields' => { 'width' => 555.0 }))
     ok('sync-board: guard zahodil zapis s nespravnym echo board_id',
        ((e::Store.config(binst) || {})['width'].to_f - 580.0).abs < 0.01)
 
-    e::Panel.handle_set_board_fields({ 'board_id' => bid, 'fields' => { 'width' => 555.0 } }.to_json)
+    e::Panel.handle_set_board_fields(pg(model, 'board_id' => bid, 'fields' => { 'width' => 555.0 }))
     ok('sync-board: panel zapis presiel (width 555)',
        ((e::Store.config(binst) || {})['width'].to_f - 555.0).abs < 0.01)
-    e::Panel.handle_set_board_edge({ 'board_id' => bid, 'edge' => 'W1', 'abs_id' => k_abs20 }.to_json)
+    e::Panel.handle_set_board_edge(pg(model, 'board_id' => bid, 'edge' => 'W1', 'abs_id' => k_abs20))
     ecfg = (e::Store.config(binst) || {})['edges'] || {}
     ok('sync-board: ABS hrana W1 cez panel, L1 default drzi (read-modify-write)',
        ecfg['W1'] == k_abs20 && ecfg['L1'] == k_abs10)
@@ -577,7 +584,7 @@ module NoxunSuRunner
     b_sheet = e::Materials.sheet(bmat)
     exp_l1, = e::Materials.abs_for_sheet(b_sheet, :jednotka, 18.0)
     exp_w1, = e::Materials.abs_for_sheet(b_sheet, :dvojka, 18.0) # dekor 2mm nema -> nil
-    e::Panel.handle_set_board_material({ 'board_id' => bid, 'material_id' => bmat }.to_json)
+    e::Panel.handle_set_board_material(pg(model, 'board_id' => bid, 'material_id' => bmat))
     mcfg = e::Store.config(binst) || {}
     mecfg = mcfg['edges'] || {}
     ok("sync-board: zmena materialu KORPUS->BIELA previedla ABS dekor (L1 -> #{exp_l1 || 'nil'}, W1 2mm -> #{exp_w1 || 'nil'})",
@@ -707,15 +714,15 @@ module NoxunSuRunner
     cid14 = e::Store.get(inst, 'cabinet_id').to_s
     e::Panel.select_only(model, shelf14)
     # zle echo cabinet_id -> ticho zahodene, ziadna zmena
-    e::Panel.handle_set_part_edges_all({ 'cabinet_id' => 'CAB-999', 'role_key' => rk14 }.to_json)
+    e::Panel.handle_set_part_edges_all(pg(model, 'cabinet_id' => 'CAB-999', 'role_key' => rk14))
     ov14 = (e::Store.config(inst) || {})['part_overrides'] || {}
     ok('sync-abs: part bulk so zlym echo cabinet_id nic nezmenil', !ov14.key?(rk14))
     # kluc INEHO dielca nez oznaceneho -> ticho zahodene
-    e::Panel.handle_set_part_edges_all({ 'cabinet_id' => cid14, 'role_key' => 'cabinet/side:left' }.to_json)
+    e::Panel.handle_set_part_edges_all(pg(model, 'cabinet_id' => cid14, 'role_key' => 'cabinet/side:left'))
     ov14b = (e::Store.config(inst) || {})['part_overrides'] || {}
     ok('sync-abs: part bulk s klucom ineho dielca nic nezmenil', !ov14b.key?('cabinet/side:left'))
     # spravne echo: VSETKY 4 hrany jednym callbackom (ABS dekoru materialu dielca)
-    e::Panel.handle_set_part_edges_all({ 'cabinet_id' => cid14, 'role_key' => rk14 }.to_json)
+    e::Panel.handle_set_part_edges_all(pg(model, 'cabinet_id' => cid14, 'role_key' => rk14))
     find_part14 = lambda do
       inst.definition.entities.grep(Sketchup::ComponentInstance)
           .find { |i| e::Store.get(i, 'part_key').to_s == rk14 }
@@ -737,8 +744,8 @@ module NoxunSuRunner
     # set_board_fields tesne pred bulkom — bulk musi pracovat nad cerstvym configom)
     e::Panel.select_only(model, binst)
     bid14 = e::Store.get(binst, 'id').to_s
-    e::Panel.handle_set_board_fields({ 'board_id' => bid14, 'fields' => { 'width' => 590.0 } }.to_json)
-    e::Panel.handle_set_board_edges_all({ 'board_id' => bid14 }.to_json)
+    e::Panel.handle_set_board_fields(pg(model, 'board_id' => bid14, 'fields' => { 'width' => 590.0 }))
+    e::Panel.handle_set_board_edges_all(pg(model, 'board_id' => bid14))
     bcfg14 = e::Store.config(binst) || {}
     ok('sync-abs: board bulk po flushi poli — sirka 590 drzi a 4 hrany olepene',
        (bcfg14['width'].to_f - 590.0).abs < 0.01 &&
@@ -748,16 +755,16 @@ module NoxunSuRunner
     ok('sync-abs: board bulk 1x undo vratil hrany, flush poli bol samostatny krok (sirka 590)',
        (bcfg14u['width'].to_f - 590.0).abs < 0.01 &&
        (bcfg14u['edges'] || {})['L2'].nil?)
-    e::Panel.handle_set_board_edges_all({ 'board_id' => 'BRD-999' }.to_json)
+    e::Panel.handle_set_board_edges_all(pg(model, 'board_id' => 'BRD-999'))
     ok('sync-abs: board bulk so zlym echo board_id nic nezmenil',
        ((e::Store.config(binst) || {})['edges'] || {})['L2'].nil?)
     # nenajdena ABS (HDF_WHITE_3 je od M-B1 UNI zaznam — pasky NEMA a picker
     # vracia REASON_UNI): atomicky no-op — hrany NEDOTKNUTE (ziadne 4x nil!)
     # a ZIADEN undo krok (marker width 570 sa musi undo-nut prvy)
-    e::Panel.handle_set_board_material({ 'board_id' => bid14, 'material_id' => 'HDF_WHITE_3' }.to_json)
+    e::Panel.handle_set_board_material(pg(model, 'board_id' => bid14, 'material_id' => 'HDF_WHITE_3'))
     edges_before14 = ((e::Store.config(binst) || {})['edges'] || {}).dup
-    e::Panel.handle_set_board_fields({ 'board_id' => bid14, 'fields' => { 'width' => 570.0 } }.to_json)
-    e::Panel.handle_set_board_edges_all({ 'board_id' => bid14 }.to_json)
+    e::Panel.handle_set_board_fields(pg(model, 'board_id' => bid14, 'fields' => { 'width' => 570.0 }))
+    e::Panel.handle_set_board_edges_all(pg(model, 'board_id' => bid14))
     bcfg14n = e::Store.config(binst) || {}
     ok('sync-abs: bulk bez ABS variantu = atomicky no-op (hrany nedotknute, ziadne 4x nil)',
        (bcfg14n['edges'] || {}) == edges_before14 && (bcfg14n['width'].to_f - 570.0).abs < 0.01)
@@ -785,13 +792,13 @@ module NoxunSuRunner
       cid41 = e::Store.get(inst, 'cabinet_id').to_s
       e::Panel.select_only(model, shelf41)
       # rucna hrana zladena s POVODNYM dekorom (SU SYNC KORPUS) — remap ju musi previest
-      e::Panel.handle_set_part_edge({ 'cabinet_id' => cid41, 'role_key' => rk41,
-                                      'edge' => 'L1', 'abs_id' => k_abs10 }.to_json)
+      e::Panel.handle_set_part_edge(pg(model, 'cabinet_id' => cid41, 'role_key' => rk41,
+                                              'edge' => 'L1', 'abs_id' => k_abs10))
       # create_missing_abs = serverova cesta ensure_edge_for_sheet — klient musi
       # rozumiet skupinam (catalog_schema), inak ensure vrati :schema_read_only.
-      e::Panel.handle_set_part_material({ 'cabinet_id' => cid41, 'role_key' => rk41,
-                                          'material_id' => sid41, 'create_missing_abs' => true,
-                                          'catalog_schema' => e::Materials::SCHEMA_CURRENT }.to_json)
+      e::Panel.handle_set_part_material(pg(model, 'cabinet_id' => cid41, 'role_key' => rk41,
+                                                  'material_id' => sid41, 'create_missing_abs' => true,
+                                                  'catalog_schema' => e::Materials::SCHEMA_CURRENT))
       created41 = e::Materials.abs_for_sheet(e::Materials.sheet(sid41), :jednotka, 18.0).first
       part41 = inst.definition.entities.grep(Sketchup::ComponentInstance)
                    .find { |i| e::Store.get(i, 'part_key').to_s == rk41 }
@@ -815,8 +822,8 @@ module NoxunSuRunner
       shelf41c = inst41.definition.entities.grep(Sketchup::ComponentInstance)
                        .find { |i| e::Store.get(i, 'part_key').to_s == rk41 }
       e::Panel.select_only(model, shelf41c) if shelf41c
-      e::Panel.handle_set_part_edge({ 'cabinet_id' => cid41, 'role_key' => rk41,
-                                      'edge' => 'L1', 'abs_id' => '__inherit__' }.to_json)
+      e::Panel.handle_set_part_edge(pg(model, 'cabinet_id' => cid41, 'role_key' => rk41,
+                                              'edge' => 'L1', 'abs_id' => '__inherit__'))
       e::Materials.delete_edge(created41) if created41
       e::Materials.delete_sheet(sid41)
       ok('sync-abs C2: cleanup docasneho dekoru (katalog bez SU D41 zaznamov)',
@@ -835,9 +842,9 @@ module NoxunSuRunner
     colH = e::Bom.collect(model)
     legH = colH[:hardware].find { |h| h['owner_id'] == cid15 && h['generic_type'] == 'leg' }
     if legH
-      e::Panel.handle_set_hardware_override({ 'owner_part_key' => legH['owner_part_key'],
-                                              'generic_type' => 'leg', 'rule_id' => legH['rule_id'],
-                                              'disabled' => true }.to_json)
+      e::Panel.handle_set_hardware_override(pg(model, 'owner_part_key' => legH['owner_part_key'],
+                                                     'generic_type' => 'leg', 'rule_id' => legH['rule_id'],
+                                                     'disabled' => true))
       col15 = e::Bom.collect(model)
       # raw hardware_overrides nesie disabled zaznam; v config.hardware[] uz NIE je (nalez 2)
       ok('sync-semafor: raw hardware_overrides zbiera disabled zaznam (owner_id/owner_pid)',
@@ -870,8 +877,8 @@ module NoxunSuRunner
       ok('sync-semafor: stale generacia odmietnuta — selection nezmeneny', model.selection.size == sz15)
       # reset kovania: ORANGE polozka zmizne z CERSTVEHO zberu (kanon je aktualny stav)
       e::Panel.select_only(model, inst)
-      e::Panel.handle_set_hardware_override({ 'owner_part_key' => legH['owner_part_key'],
-                                              'generic_type' => 'leg', 'rule_id' => legH['rule_id'] }.to_json)
+      e::Panel.handle_set_hardware_override(pg(model, 'owner_part_key' => legH['owner_part_key'],
+                                                     'generic_type' => 'leg', 'rule_id' => legH['rule_id']))
       val15c = e::Validation.run(e::Bom.collect(model), sheets: smap15)
       ok('sync-semafor: reset kovania -> ORANGE polozka zmizla',
          val15c['items'].none? { |i| i['category'] == 'hardware' && i['owner_id'] == cid15 })
@@ -1167,7 +1174,7 @@ module NoxunSuRunner
                          'template_kind' => 'cabinet', 'template_name' => tpl_name)
               end
     if payload
-      e::Panel.handle_insert(payload.to_json)
+      e::Panel.handle_insert(pg(model, payload))
       inst = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
       cfg = inst ? (e::Store.config(inst) || {}) : {}
       ok("vklad D-39: zamknuta vyska prebila sablonu (950, sirka zo sablony #{cfg['width']})",
@@ -1198,12 +1205,12 @@ module NoxunSuRunner
     rec = []
     install_js_recorder(rec)
     begin
-      e::Panel.handle_insert({ 'type' => 'lower', 'width' => 600.0, 'height' => 300.0,
-                               'depth' => 510.0,
-                               'fronts' => { 'items' => [
-                                 { 'id' => 'F1', 'type' => 'door', 'mode' => 'fixed', 'height' => 250.0, 'wings' => '1', 'locked' => true },
-                                 { 'id' => 'F2', 'type' => 'door', 'mode' => 'fixed', 'height' => 250.0, 'wings' => '1', 'locked' => true }
-                               ] } }.to_json)
+      e::Panel.handle_insert(pg(model, 'type' => 'lower', 'width' => 600.0, 'height' => 300.0,
+                                       'depth' => 510.0,
+                                       'fronts' => { 'items' => [
+                                         { 'id' => 'F1', 'type' => 'door', 'mode' => 'fixed', 'height' => 250.0, 'wings' => '1', 'locked' => true },
+                                         { 'id' => 'F2', 'type' => 'door', 'mode' => 'fixed', 'height' => 250.0, 'wings' => '1', 'locked' => true }
+                                       ] }))
     ensure
       remove_js_recorder
     end
@@ -1221,9 +1228,9 @@ module NoxunSuRunner
       rec2 = []
       install_js_recorder(rec2)
       begin
-        e::Panel.handle_insert({ 'type' => 'lower', 'width' => 600.0, 'height' => 720.0,
-                                 'depth' => 510.0, 'thickness' => 18.0,
-                                 'material_id' => vklad_res['sheets'].first }.to_json)
+        e::Panel.handle_insert(pg(model, 'type' => 'lower', 'width' => 600.0, 'height' => 720.0,
+                                         'depth' => 510.0, 'thickness' => 18.0,
+                                         'material_id' => vklad_res['sheets'].first))
       ensure
         remove_js_recorder
       end
@@ -1261,7 +1268,7 @@ module NoxunSuRunner
       info('kopia: plan nema nohy — hardware_override cast preskocena')
     end
     src_cid = e::Store.get(src, 'cabinet_id')
-    e::Panel.handle_insert_copy({ 'cabinet_id' => src_cid }.to_json)
+    e::Panel.handle_insert_copy(pg(model, 'cabinet_id' => src_cid))
     copy = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
     ok('kopia B3: kopia vlozena a oznacena s NOVYM CAB id',
        copy && copy != src && e::Store.get(copy, 'cabinet_id') != src_cid)
@@ -1277,7 +1284,7 @@ module NoxunSuRunner
       ok("kopia B3: ABS override boku prezil kopiu (L1 = #{abs_b3.inspect})",
          b3_edges.key?('L1') && b3_edges['L1'] == abs_b3)
     end
-    e::Panel.handle_insert_copy({ 'cabinet_id' => 'CAB-999' }.to_json)
+    e::Panel.handle_insert_copy(pg(model, 'cabinet_id' => 'CAB-999'))
     ok('kopia B3: neexistujuce id = ziadna nova skrinka',
        cabinets(model).length == (copy ? before + 2 : before + 1))
 
@@ -1346,8 +1353,8 @@ module NoxunSuRunner
       rec = []
       install_js_recorder(rec)
       begin
-        e::Panel.handle_set_cabinet_material({ 'which' => 'body', 'value' => id186,
-                                               'cabinet_id' => cid }.to_json)
+        e::Panel.handle_set_cabinet_material(pg(model, 'which' => 'body', 'value' => id186,
+                                                       'cabinet_id' => cid))
       ensure
         remove_js_recorder
       end
@@ -1368,7 +1375,7 @@ module NoxunSuRunner
 
       # (b) HRUBKA -> MATERIAL: zmena hrubky na 18,6 si doberie material
       #     ROVNAKEHO dekoru (deterministicky pick, ziadny nahodny material).
-      e::Panel.handle_apply_all({ 'cabinet_id' => cid, 'thickness' => 18.6 }.to_json)
+      e::Panel.handle_apply_all(pg(model, 'cabinet_id' => cid, 'thickness' => 18.6))
       cfg_b = e::Store.config(inst) || {}
       ok('D-45 (b): zmena hrubky si dobrala material rovnakeho dekoru',
          (cfg_b['thickness'].to_f - 18.6).abs < 0.01 && cfg_b['material_id'] == id186)
@@ -1385,7 +1392,7 @@ module NoxunSuRunner
         rec2 = []
         install_js_recorder(rec2)
         begin
-          e::Panel.handle_apply_all({ 'cabinet_id' => cid, 'thickness' => 18.0 }.to_json)
+          e::Panel.handle_apply_all(pg(model, 'cabinet_id' => cid, 'thickness' => 18.0))
         ensure
           remove_js_recorder
         end
@@ -1404,8 +1411,8 @@ module NoxunSuRunner
       e::Materials.set_project_default(model, 'default_material_id', id186)
       model.commit_operation
       before = cabinets(model).length
-      e::Panel.handle_insert({ 'type' => 'lower', 'width' => 600.0, 'height' => 720.0,
-                               'depth' => 510.0, 'thickness' => 18.0 }.to_json)
+      e::Panel.handle_insert(pg(model, 'type' => 'lower', 'width' => 600.0, 'height' => 720.0,
+                                       'depth' => 510.0, 'thickness' => 18.0))
       fresh = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
       cfg_i = fresh ? (e::Store.config(fresh) || {}) : {}
       ok('D-45 (c): vklad prevzal hrubku 18,6 z projektovej predvolby',
@@ -1420,8 +1427,8 @@ module NoxunSuRunner
       rec3 = []
       install_js_recorder(rec3)
       begin
-        e::Panel.handle_insert({ 'type' => 'lower', 'width' => 600.0, 'height' => 720.0,
-                                 'depth' => 510.0, 'thickness' => 18.0, 'material_id' => id186 }.to_json)
+        e::Panel.handle_insert(pg(model, 'type' => 'lower', 'width' => 600.0, 'height' => 720.0,
+                                         'depth' => 510.0, 'thickness' => 18.0, 'material_id' => id186))
       ensure
         remove_js_recorder
       end
@@ -4198,7 +4205,7 @@ module NoxunSuRunner
     b = lez
     bid = e::Store.get(b, 'id').to_s
     e::Panel.select_only(model, b)
-    e::Panel.handle_set_board_orientation({ 'board_id' => bid, 'orientation' => 'stojaca' }.to_json)
+    e::Panel.handle_set_board_orientation(pg(model, 'board_id' => bid, 'orientation' => 'stojaca'))
     cfg_after = e::Store.config(b) || {}
     ok('UI-C1c edit: config prevzal novu orientaciu', cfg_after['orientation'] == 'stojaca')
     ok('UI-C1c edit: instancia sa naozaj otocila (dekor mieri do -Y)',
@@ -4220,7 +4227,7 @@ module NoxunSuRunner
     ok('UI-C1c edit: 1x Spat vratil orientaciu AJ transformaciu (jeden krok)',
        (e::Store.config(b) || {})['orientation'] == 'leziaca' &&
        vec_near?(b.transformation.zaxis, 0, 0, 1))
-    e::Panel.handle_set_board_orientation({ 'board_id' => bid, 'orientation' => 'stojaca' }.to_json)
+    e::Panel.handle_set_board_orientation(pg(model, 'board_id' => bid, 'orientation' => 'stojaca'))
     ok('UI-C1c edit: opakovane prepnutie dava TU ISTU transformaciu (ziadna kumulacia)',
        tr_key(b.transformation) == tr_standing)
 
@@ -4231,7 +4238,7 @@ module NoxunSuRunner
       model.commit_operation
     end
     e::ScaleWatch.remember_transform(b)
-    e::Panel.handle_set_board_orientation({ 'board_id' => bid, 'orientation' => 'leziaca' }.to_json)
+    e::Panel.handle_set_board_orientation(pg(model, 'board_id' => bid, 'orientation' => 'leziaca'))
     ok('UI-C1c delta: rucne otocenie o 90° prezilo prepnutie orientacie',
        vec_near?(b.transformation.xaxis, 0, 1, 0) && vec_near?(b.transformation.zaxis, 0, 0, 1) &&
        (e::Store.config(b) || {})['orientation'] == 'leziaca')
@@ -4243,7 +4250,7 @@ module NoxunSuRunner
       model.commit_operation
     end
     e::ScaleWatch.remember_transform(b)
-    e::Panel.handle_set_board_orientation({ 'board_id' => bid, 'orientation' => 'stojaca' }.to_json)
+    e::Panel.handle_set_board_orientation(pg(model, 'board_id' => bid, 'orientation' => 'stojaca'))
     ok('UI-C1c delta: po navrate rucnej rotacie doska zas stoji v kontraktovej polohe',
        vec_near?(b.transformation.zaxis, 0, -1, 0) && vec_near?(b.transformation.xaxis, 1, 0, 0))
 
@@ -4313,7 +4320,7 @@ module NoxunSuRunner
     e::Panel.select_only(model, b)
     cfg_keep = (e::Store.config(b) || {})['orientation']
     tr_before_bad = tr_key(b.transformation)
-    e::Panel.handle_set_board_orientation({ 'board_id' => bid, 'orientation' => 'zavesena' }.to_json)
+    e::Panel.handle_set_board_orientation(pg(model, 'board_id' => bid, 'orientation' => 'zavesena'))
     ok('UI-C1c guard: neznama orientacia pri EDITE nic nezmeni (config ani poloha)',
        (e::Store.config(b) || {})['orientation'] == cfg_keep &&
        tr_key(b.transformation) == tr_before_bad)
@@ -4326,7 +4333,7 @@ module NoxunSuRunner
       e::Store.write(b, { config: bad })
       model.commit_operation
     end
-    e::Panel.handle_set_board_orientation({ 'board_id' => bid, 'orientation' => 'leziaca' }.to_json)
+    e::Panel.handle_set_board_orientation(pg(model, 'board_id' => bid, 'orientation' => 'leziaca'))
     ok('UI-C1c guard: NEZNAMA ULOZENA orientacia sa odmietne (poloha ostala)',
        (e::Store.config(b) || {})['orientation'] == 'zavesena' &&
        tr_key(b.transformation) == tr_before_bad)
@@ -4409,8 +4416,8 @@ module NoxunSuRunner
     end
 
     # --- 2) zdrojovy override: hrana L1 = BEZ ABS ----------------------------
-    e::Panel.handle_set_part_edge({ 'role_key' => src_key, 'edge' => 'L1', 'abs_id' => '',
-                                    'cabinet_id' => cid_a }.to_json)
+    e::Panel.handle_set_part_edge(pg(model, 'role_key' => src_key, 'edge' => 'L1', 'abs_id' => '',
+                                            'cabinet_id' => cid_a))
     cab_a = e::Panel.find_cabinet_by_id(model, cid_a)
     cab_b = e::Panel.find_cabinet_by_id(model, cid_b)
     ok('UI-D1: zdrojovy dielec ma rucny override hrany L1',
@@ -4942,9 +4949,9 @@ module NoxunSuRunner
       det_abs_before = e::Store.get(detached, 'config').to_s
       edges_abs_before = ((e::Store.config(k1_part(inst, 'front_door')) || {})['edges'] || {}).dup
       e::Panel.select_only(model, detached)
-      e::Panel.handle_set_part_edge({ 'role_key' => fkey, 'edge' => 'L1', 'abs_id' => '',
-                                      'cabinet_id' => cid }.to_json)
-      e::Panel.handle_set_part_edges_all({ 'role_key' => fkey, 'cabinet_id' => cid }.to_json)
+      e::Panel.handle_set_part_edge(pg(model, 'role_key' => fkey, 'edge' => 'L1', 'abs_id' => '',
+                                              'cabinet_id' => cid))
+      e::Panel.handle_set_part_edges_all(pg(model, 'role_key' => fkey, 'cabinet_id' => cid))
       e::Panel.handle_set_part_material({ 'role_key' => fkey, 'material_id' => 'K1UNI18',
                                           'cabinet_id' => cid, 'model_guid' => guid }.to_json)
       # „Použiť na podobné" uz odpojene dielce vylucila z CIELOV (UI-D1), ale
@@ -4966,8 +4973,8 @@ module NoxunSuRunner
       # ktoru nikto nevidel na obrazovke. Assert je spolocny s odpojenym
       # dielcom — nic sa nesmie zmenit.
       e::Panel.select_only(model, inst)
-      e::Panel.handle_set_part_edge({ 'role_key' => fkey, 'edge' => 'L1', 'abs_id' => '',
-                                      'cabinet_id' => cid }.to_json)
+      e::Panel.handle_set_part_edge(pg(model, 'role_key' => fkey, 'edge' => 'L1', 'abs_id' => '',
+                                              'cabinet_id' => cid))
       e::Panel.handle_set_part_material({ 'role_key' => fkey, 'material_id' => 'K1UNI18',
                                           'cabinet_id' => cid, 'model_guid' => guid }.to_json)
       inst = e::Panel.find_cabinet_by_id(model, cid)
@@ -8468,8 +8475,8 @@ module NoxunSuRunner
     else
       rk = e::Store.get(shelf, 'part_key').to_s
       e::Panel.select_only(model, shelf) # handler pracuje s OZNACENYM dielcom
-      e::Panel.handle_set_part_edge({ 'cabinet_id' => aid, 'role_key' => rk,
-                                      'edge' => 'L1', 'abs_id' => abs_id }.to_json)
+      e::Panel.handle_set_part_edge(pg(model, 'cabinet_id' => aid, 'role_key' => rk,
+                                              'edge' => 'L1', 'abs_id' => abs_id))
       after_edge = core.fresh_collect(model)
       want = Array(after_edge[:records])
              .select { |r| r['edges'].is_a?(Hash) && r['edges'].values.map(&:to_s).include?(abs_id) }

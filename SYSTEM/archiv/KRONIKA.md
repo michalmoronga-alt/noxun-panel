@@ -17,6 +17,61 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1d/R-02 · GUARD IDENTITY DOKUMENTU V ZAPISOVACÍCH HANDLEROCH PANELA (v0.8.19, 30.8.2026, PR #264):** panel je JEDEN pre všetky otvorené dokumenty a callback HtmlDialogu je
+  asynchrónny — 14 zapisovacích handlerov (cabinet 6 · hardware 2 · board 6) pritom brali cieľ z `Sketchup.active_model` a payload identitu dokumentu vôbec nenieslo. Echo
+  `cabinet_id`/`board_id`, ktoré tie cesty už mali, prepnutie dokumentu **nezachytí**: ID sú jedinečné len v rámci modelu, takže `CAB-001` aj `BRD-001` sú v každej zákazke —
+  oneskorený klik by prestaval rovnomennú skrinku v cudzej zákazke a keďže sa z pluginu objednáva naostro, našlo by sa to až v objednávke. Register to viedol ako **P1 na macOS**
+  (dva dokumenty naraz) a **P3 na Windows/SDI**; insert bol označený za najkritickejší (predpoklad bloku GHOST).
+  **Riešenie je mechanické a zámerne bez vlastného konceptu:** vzor už v repe existoval (parts, materials, templates, zones aj selection guard ho mali), takže dávka ho
+  **rozšírila, nie vymyslela** — jeden zdieľaný `Panel.foreign_document?(data, model, what)` v `ui/panel/sync.rb` hneď pri `model_guid` a jedno klientske miesto
+  `nxDocPayload(obj)` v `ui/js/shell.js` (obdoba `nxZonePayload`, ktorý navyše pridáva `cabinet_id`). Päť handlerov karty dosky guard nedostalo skopírovaný — prechádzajú
+  spoločnou bránou `guarded_board`.
+  **Tri rozhodnutia, ktoré stojí za to pamätať.** (1) Porovnanie je **prísne**, nie „prázdny guid prejde": prázdny guid nie je starší klient, je to okno bez dobehnutého
+  `NX.init` a to nesmie zapisovať nikam (rovnaká úvaha ako pri `handle_tag_visible` a `zone_ctx`). (2) Nezhoda dokumentu je **hláška**, kým echo výberu sa ďalej zahadzuje
+  **ticho** — presun výberu je bežný a hláška by mýlila, prepnutie dokumentu bežné nie je a používateľ musí vedieť, že sa zmena neuložila; platí to aj pre auto-apply, kde by
+  inak zmena napísaná do formulára zmizla bez stopy. (3) **Poradie je súčasť opravy**: dokument sa overuje PRED echom identity objektu, inak by prvá hláška hovorila
+  „Najprv označ NOXUN korpus" namiesto pravdy.
+  **Cena, ktorú si dávka vypýtala:** prísny guard by zrušil 26 volaní v in-SU runneri, ktoré payload bez `model_guid` posielali. Namiesto zmäkčenia guardu dostal runner helper
+  `pg(model, hash)` a posiela **rovnaký tvar payloadu ako panel** — sada tak testuje reálnu cestu, nie výnimku pre testy. Nové sady: `tests/pure/test_r02_doc_guard.rb`
+  (kontrakt guardu, prítomnosť vo všetkých 14 handleroch, poradie voči echu, JS strana bez holého `JSON.stringify`) a `tests/js/test_r02_doc_guard.js` (helper nemaže platnú
+  identitu, keď volajúci hodnotu neposlal). Zelené: **2077 headless · 73 JS sád**; in-SU sa nespúšťal (nie je to dávka builderov/observerov) — runner zmeny overí najbližší
+  plný beh.
+  **Codex review kolo 1 vrátilo 2× P1 a obe boli vecné** (oprava je v tom istom PR). **(a) Zachytená identita:** `nxDocPayload` čítal mutovateľný globál `nxModelGuid` až
+  v okamihu ODOSLANIA — pri dvoch debounce cestách (auto-apply korpusu, polia karty dosky; 400 ms) by sa oneskorený zápis po prepnutí dokumentu opečiatkoval NOVÝM guidom
+  a guard by ho pustil presne tam, kam nemá. Identita sa preto číta už pri NAPLÁNOVANÍ (`nxDocGuid()` vedľa `cabSnapshot`, resp. `boardPending.guid`) a podáva helperu druhým
+  argumentom; prázdny reťazec je platná zachytená hodnota, preto sa vetví na `undefined`/`null`, nie na pravdivosť. Karta dielca berie identitu z payloadu karty
+  (`partCard.model_guid`) — dokument, ktorý má používateľ na obrazovke. **(b) Medzery v pokrytí:** systematický sweep všetkých `sketchup.*` volaní proti párovým Ruby
+  handlerom ukázal, že register tvrdil „materials/parts guard MAJÚ" **nepresne** — guard mal len `handle_set_part_grain` (K1/D-108); `handle_set_cabinet_material`
+  a tri zápisové cesty karty dielca (materiál, hrana, olep všetkých 4) mali iba echo `cabinet_id`, ktoré prepnutie dokumentu nezachytí. Doplnené tým istým mechanizmom —
+  rozsah dávky je teda **18 handlerov**, nie 14. `handle_set_part_grain` sa zámerne nekonvertoval: jeho tvar stráži `test_k1_smer_dekoru.rb` a prepis by rozbil existujúci
+  kontrakt bez funkčného zisku. Po oprave **2078 headless · 73 JS sád**.
+  **Kolo 2 vrátilo 4× P1 — jednu rodinu:** UI stav, ktorý PREŽIJE prepnutie dokumentu a pri odoslaní dostane NOVÝ guid (okamžitý flush formulára · inline editor názvu ·
+  batch polí dosky kľúčovaný len `board_id` · modal chýbajúcej ABS, ktorý `loadBoard` nezatváral). Zachytený guid v jednom bufferi teda nestačil — chýbala **systémová**
+  odpoveď. Zaviedol sa **jeden vzor s tromi obranami**: (1) `nxSetModelGuid` je JEDINÝ detektor zmeny dokumentu na klientovi (každý push ide cez neho) a pri skutočnej zmene
+  hodnoty spustí `nxDropDocState()`, ktoré zahodí VŠETOK rozpracovaný stav (7 cleanupov); echo push tej istej identity nezahodí nič — rozpísaná práca musí prežiť.
+  (2) Každý buffer si drží VLASTNÚ zachytenú identitu pre prípad, že push nepríde: `applyPendingGuid` (aj pre okamžitý flush), `boardPending` kľúčovaný **dvojicou**
+  dokument+doska, `renameGuid`, `boardTarget()`/`partTarget()` pre modal ABS. (3) Serverový `foreign_document?` má posledné slovo. Sweep našiel nad rámec štyroch nálezov
+  ešte dve diery (ABS modal neprežíval `clearSelected`; `nxSetModelGuid` nemal detekciu zmeny, takže centrálny hook neexistoval) a potvrdil, že `tplModal` a `simFor`
+  identitu dokumentu už mali. **Priznaný zvyšok (vlastnosť celého vzoru, nie tejto dávky):** SketchUp mení `Model#guid` pri KAŽDOM uložení, takže Ctrl+S do 400 ms po
+  úprave poľa vyzerá pre guard ako prepnutie dokumentu a edit sa zahodí. Platí to rovnako pre zóny, tagy a Štúdio od ich zavedenia; prípadné riešenie (stabilný kľúč
+  dokumentu namiesto `guid`) je téma pre samostatnú dávku. Po kole 2: **2080 headless · 73 JS sád**.
+  **Kolo 3 vrátilo 1× P1 — reziduál PORADIA po oprave kola 2:** centrálne zahodenie stavu je užitočné len vtedy, keď beží PRED stavovými rozhodnutiami pushu, a `nxSetModelGuid`
+  sedelo až v `setUiMode` na KONCI `loadSelected`. Rozhodnutie `keepGaps` (či sa zachovajú rozpísané riadky čiel) sa teda vyhodnotilo skôr: pri prepnutí dokumentu A → B
+  s rovnakým `CAB` id riadky z A prežili, centrálny reset potom zrušil už len timer a ponechané riadky pozbieral prvý edit v B a odoslal ich s guidom B — server ich prijal
+  do nesprávnej zákazky. Oprava má dve nezávislé polovice: identita dokumentu je **prvý príkaz** `loadSelected` (a `loadBoard`, kde je tá istá pasca — pending batch sa
+  zahadzuje podľa samotného `board_id`, pritom `BRD-001` je v každej zákazke), a `sameDoc` je zároveň **súčasťou podmienky** `keepGaps`. Tretí kus: `cancelCabinetEdits`
+  nuluje aj závierku `cabEditsInFlight` — druhú polovicu `keepGaps`, ktorá prepnutie dokumentu prežila sama.
+  **VEDOMÁ ODCHÝLKA OD PRAVIDLA 3 KÔL** (rozhodnutie orchestrátora, precedens **UI-B1** — 5 kôl, záznam nižšie v tejto kronike): dávka išla na **4 kolá review** namiesto
+  rozdelenia PR. Dôvod: nálezy **konvergujú** (2 → 4 zo sweepu → 1 reziduál poradia) a celý PR je JEDEN mechanizmus — rozdelenie by tú istú prácu len rozsekalo na časti,
+  z ktorých ani jedna nie je samostatne zmysluplná, a hranicu medzi nimi by nemal kto strážiť. Po kole 3: **2081 headless · 73 JS sád**.
+  **Kolo 4 = INTERNÉ SLEPÉ REVIEW** (GH Codex vyčerpal denný limit — vzor pri výpadku): **žiadny P1**, 2× P2 + 1× P3, všetky opravené. **P2-1 bola REGRESIA z kola 3:**
+  nulovanie závierky `cabEditsInFlight` v `cancelCabinetEdits` je pre prepnutie dokumentu zbytočné (kryje ho `sameDoc` v `keepGaps`), ale rozbíjalo **jednodokumentové** flow —
+  tá funkcia beží aj pri zastavenom okamžitom flushi (červené pole) a pri rozpísanom výraze v poli, takže najbližšie echo by zmazalo práve pridané čelo aj rozpísané gap
+  hodnoty. Nulovanie sa presunulo do `nxDropDocState`, ktoré beží výhradne pri reálnej zmene dokumentu. **P2-2:** CEF drží `document.activeElement` aj po strate fokusu okna,
+  takže `bset` na karte dosky pole s kurzorom preskočilo a po prepnutí A → B (obe `BRD-001`) v ňom nechalo hodnotu z A — `nxDropDocState` preto fokus zhadzuje. **P3:**
+  zrkadlo `keepGaps` v JS sade normalizovalo prázdny guid inak než produkcia, takže by regresiu normalizácie neodhalilo. Po kole 4: **2081 headless · 73 JS sád**
+  (sada R-02 má 45 kontrol).
+
 - **FIX · ŠT-1c B2 DOBEHOL CENOVÚ BRÁNU (30.8.2026, test-only, bez bump verzie):** dva in-SU FAILy známe od dávky 1d/R-01+R-04 boli ZASTARANÝ TEST, nie chyba pluginu — dávka
   **P0-HF** (#252, v0.8.14) postavila medzi gen guard a `savepanel` FINÁLNU CENOVÚ BRÁNU a scenár exportu cenovej ponuky s ňou nepočítal: skrinka scenára má 3 riadky bez ceny
   (materiál bez cenníka v izolovanom APPDATA behu), takže čerstvá generácia končila na potvrditeľnej vetve brány a k stubovanému savepanelu sa nikdy nedostala. Scenár je
