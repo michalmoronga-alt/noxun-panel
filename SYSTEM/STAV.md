@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.8.22 · 30.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.8.23 · 30.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -18,7 +18,8 @@ Nálezy z reálnej výroby a chyby v cenách majú preto **najvyššiu prioritu 
 (okno zaniká — modul žije · uzavretý whitelist akcií · session token · echo vs. plný push · optimistický zámok) sú v [archiv/KRONIKA.md](archiv/KRONIKA.md),
 vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
-**Testy k v0.8.22:** **2173 headless** · 74 JS sád · posledný plný in-SketchUp beh **1184 PASS / 0 FAIL** (dávka GHOST — sekcie `run_ghost` + `run_ghost_async`).
+**Testy k v0.8.23:** **@HEADLESS@ headless** · @JS@ JS sád · posledný plný in-SketchUp beh **@SU@** (dávka 1d/R-02b — celá sada beží nad novou stabilnou identitou
+dokumentu DocKey; 13 priamych `model.guid` miest runnera zmigrovaných na `ProductionCore.model_guid`).
 
 > **Poznámka k procesu:** Codex review bol 21.–24.8. **nedostupný** — PR **#186–#226** prešli bránou so slepým subagentom. **Post-hoc sweep je od 27.8. HOTOVÝ** (34 PR cez Codex CLI + triáž 54 nezodpovedaných threadov): dve reálne P1 slepým kolám ušli a týždeň žili v `main`, obe sú dávno opravené — [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-E**.
 
@@ -27,8 +28,8 @@ vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 **Blok 1b · STABILIZAČNÁ REVÍZIA je prakticky uzavretý** ([PLAN.md](PLAN.md)): brány A/G/H hotové (1b-1/2/3), dlhy B+D (1b-4), sweep E, mimo písmen 1b-6a/6b/6c aj 1b-7, z F je hotové D-27 —
 **ostáva len D-51** (štandard veľkostí okien — čaká na Michalove hodnoty) a výklop ako typ čela (ide cez task package 1e).
 **Blok 1c · AUDIT KÓDU je HOTOVÝ (29.8.)** — traja audítori zliati do **[AUDIT_REGISTER.md](AUDIT_REGISTER.md)** (2×P0 + 35 položiek — 33 z 1c, 2 z review — + poradie pre 1d + 3 rozhodnutia Michala (R-05 · R-13 · R-30));
-**oba P0 sú vybavené dávkou P0-HF** (v0.8.14) a **beží blok 1d** (hotové: R-06 brána, R-08 zámky katalógov, R-01+R-04 multi-model observer, R-34 presnosť P0-2 brány, R-02 guard identity dokumentu, **R-03 šev vkladania — TVRDÝ blocker GHOST tým padol**, R-07 brána knižnice setov). **Beží aj 1e PLÁNOVACIA DÁVKA** (task packages, priorita do 2.9.).
-**Blok GHOST VKLADANIE — implementačná dávka HOTOVÁ** (v0.8.22): skrinka sa kladie klikom. Blok sa uzatvára až po Michalovom smoke (6 bodov v [PLAN.md](PLAN.md)) — samostatný PR s bumpom 0.9.0.
+**oba P0 sú vybavené dávkou P0-HF** (v0.8.14) a **beží blok 1d** (hotové: R-06 brána, R-08 zámky katalógov, R-01+R-04 multi-model observer, R-34 presnosť P0-2 brány, R-02 guard identity dokumentu + **R-02b stabilný kľúč dokumentu**, **R-03 šev vkladania — TVRDÝ blocker GHOST tým padol**, R-07 brána knižnice setov). **Beží aj 1e PLÁNOVACIA DÁVKA** (task packages, priorita do 2.9.).
+**Blok GHOST VKLADANIE — implementačná dávka HOTOVÁ** (v0.8.22): skrinka sa kladí klikom. Blok sa uzatvára až po Michalovom smoke (6 bodov v [PLAN.md](PLAN.md)) — samostatný PR s bumpom 0.9.0.
 **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
@@ -41,6 +42,9 @@ vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 - **GHOST VKLADANIE — skrinka sa kladie KLIKOM tam, kam sa pozeráš** (po „Vložiť" visí ghost na kurzore: ←/→ točia po 90°, Alt prepína kotvu, ↓ drží domácu výšku a ↑ ju pustí, klik položí, Esc zruší; do kliku nevznikne nič a v Späť nepribudne žiadny krok) — v0.8.22 (30.8.) · **Michal večer: SMOKE — 6 bodov v [PLAN.md](PLAN.md), sekcia GHOST.**
 - **1d/R-07 — starší a novší plugin si už nepoškodia knižnicu setov kovania** (knižnica z novšej verzie sa nedá ani zapísať, ani použiť: namiesto tichého orezania
   ju súpis prizná oranžovým riadkom a Štúdio bannerom) — v0.8.21 (30.8.) · **Michal večer:** Štúdio → Kovanie → Sety musí vyzerať a fungovať presne ako doteraz (banner sa NESMIE ukázať).
+- **1d/R-02b — Ctrl+S už nezahadzuje rozpísanú prácu** (identity guardy stoja na novom stabilnom kľúči dokumentu namiesto `Model#guid`, ktorý SketchUp mení pri každom uložení;
+  ochrana New/Open pred zápisom do cudzej zákazky ostáva, Save As identitu vedome drží) — v0.8.23 (30.8.) · **Michal večer:** uprav šírku skrinky v paneli a do sekundy stlač
+  **Ctrl+S** — zmena sa musí uložiť a rozpísané polia nesmú zmiznúť.
 - **1d/R-03 — skrinka sa dá pripraviť BEZ zásahu do modelu a položiť na presnú polohu** (prípravná dávka pre GHOST vkladanie na klik — **tvrdý blocker tým padol**; z pohľadu používateľa sa dnes nemení NIČ) — v0.8.20 (30.8.) · **Michal večer:** netreba, bez UI zmeny.
 - **1d/R-02 — panel už nezapíše do nesprávneho dokumentu** (oneskorená akcia po prepnutí okna SketchUpu skončí hláškou „patrí inému dokumentu", nie tichým zápisom do cudzej zákazky — vkladanie, apply, premenovanie, kovanie, materiály aj karty dielca a dosky) — v0.8.19 (30.8.) · **Michal večer:** v dvoch oknách prepíš šírku skrinky a HNEĎ preklikni do druhého — zmena sa tam nesmie prejaviť.
 - **1d/R-34 — brána exportov už nezastaví zákazku, ktorá je v poriadku** (zdieľané ID skriniek zastaví nákup/rozpočet/ponuku len vtedy, keď sa kovanie NAOZAJ pomieša — účtované na vlastníka započítané raz, alebo rozídené sety dvoch skriniek s jedným ID; inak export prejde a ostáva len oranžový nález Kontroly) — v0.8.18 (30.8.) · **Michal večer:** netreba, bez UI zmeny.
@@ -48,13 +52,11 @@ vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
   — v0.8.17 (30.8.) · **Michal večer:** vlož skrinku so zónami, zmaž ju (ghosty musia zmiznúť), **Ctrl+Z** a hneď skús neplatné zväčšenie — musí sa vrátiť tam, kde bola.
 - **1d/R-08 — dve okná SketchUpu si už neprepíšu nastavenia** (sety a pravidlá kovania, ABS pravidlá, rozmerové rady aj sadzby dodávateľa; zastaraný formulár skončí hláškou
   „medzitým sa zmenilo", nie tichým prepisom) — v0.8.16 (30.8.) · **Michal večer:** v dvoch oknách SketchUpu ulož za sebou dva rôzne sety kovania — musia tam byť OBA.
-- **1d/R-06a — dĺžkové kovanie sa už nenacení ako kusy** (úchytkový profil rezaný na dĺžku sa cez set nedostane do nákupu ani do ponuky — vydá oranžový riadok Kontroly
-  s rozmerom „rez 597 mm"; kusové kovanie sa nemení) — v0.8.15 (29.8.) · **Michal večer:** namapuj úchytkový profil na set — nesmie sa objaviť v Nákupe ani v Rozpočte.
+- **1d/R-06a — dĺžkové kovanie sa už nenacení ako kusy** (úchytkový profil rezaný na dĺžku vydá oranžový riadok Kontroly, do nákupu/ponuky nejde) — v0.8.15 (29.8.) · **Michal večer:** namapuj úchytkový profil na set — nesmie sa objaviť v Nákupe ani v Rozpočte.
 - **P0-HF — finálne brány pred zápisom exportov** (chybný XLSX/CSV už nevznikne: **tvrdo** sa zastaví záporná „Nábytková zostava", nesúlad ponuky s rozpočtom a zliate ID skriniek;
   **riadky bez ceny** až po druhom, vedomom kliku — STANDARD §11.3) — v0.8.14 (29.8.) · **Michal večer:** riadok bez ceny + „XLSX rozpočet" = prvý klik neuloží nič, druhý PRIZNÁ podhodnotenú sumu.
 - **1c — AUDIT KÓDU KOMPLET** (traja audítori → [AUDIT_REGISTER.md](AUDIT_REGISTER.md); Codex review #250 korigoval samotný audit — kontrakt STANDARD §11.3 má prednosť pred audítorom) — 29.8., bez zmeny kódu.
-- **F/D-27 — tagy modelu z panela** (ikona oka v raile → zoznam NOXUN tagov; klik = jeden krok Späť; checkbox ghost zón ide tou istou cestou; kontroly už nekreslia nad skrytým) — v0.8.13 (28.8.) ·
-  **Michal večer:** skry v raile **Čelá** — musia zmiznúť, ikona sa rozsvieti, **Ctrl+Z** ich vráti; skús to aj so zapnutou ABS kontrolou (nad skrytým nesmie ostať plôška).
+- **F/D-27 — tagy modelu z panela** (ikona oka v raile → zoznam NOXUN tagov; klik = jeden krok Späť; kontroly už nekreslia nad skrytým) — v0.8.13 (28.8.) · **Michal večer:** skry v raile **Čelá** — musia zmiznúť a **Ctrl+Z** ich vráti, aj so zapnutou ABS kontrolou.
 - **1b-7 — koniec tichého návratu starej ceny dekoru** (editor prelieva už len bunky, ktorých si sa dotkol; pri strete ukáže *tvoja × v katalógu* a bez rozhodnutia neuloží) — v0.8.10 (27.8.) · **Michal večer:** oprav cenu dekoru, daj **Esc**, spusti „Aktualizovať z Demosu", otvor ten istý dekor — nová cena musí ostať.
 - **1b-E — POST-HOC SWEEP KOMPLET** (34 PR spätne cez Codex CLI + triáž 54 threadov; 29 nálezov, 10 platných) — kandidáti pre 1c v [zdroje/SWEEP_2026-08_kandidati.md](zdroje/SWEEP_2026-08_kandidati.md)
 - **1b-6a + 1b-6c — meno zákazky (delenie PR #243)**: názov prežije prvé uloženie (v0.8.9) a `vepo_settings.json` má **jedny zamknuté dvere** (v0.8.12 — dve inštancie SketchUpu si už nemažú nastavenia ani mená) · **Michal večer:** nový model → napíš názov zákazky → Ctrl+S → VEPO sa musí volať podľa zákazky.

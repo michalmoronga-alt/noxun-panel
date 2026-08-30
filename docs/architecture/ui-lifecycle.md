@@ -345,9 +345,11 @@ hodnoty aj fokus) a stráži to guard test.
 **Identita výberu** sa odvodzuje z payloadu (`<model_guid>|cab:<id>` / `…|part:<cab>/<role_key>` / `…|board:<id>` / `none`) v JEDINOM mieste zmeny režimu (`setUiMode(mode, sel)`).
 
 **Identitu dokumentu nesie každý push** (`Panel.model_guid`) — ID sú jedinečné len v rámci modelu (`Ids.next_board_id` počíta v každom dokumente od začiatku), takže dva otvorené
-dokumenty bežne obsahujú `CAB-001` aj `BRD-001`; bez guidu by prepnutie dokumentu vyzeralo ako echo push a panel by ostal v starom kontexte. Ten istý guid nesú aj **asynchrónne
-callbacky panela** (`clear_selection`, `nx_edge_toggle`) a server ich pri nezhode odmietne a len obnoví stav: **nová identita ⇒ reset kontextu na Korpus**, **echo push tej istej
-identity kontext ani zbalenia NEMENÍ** (auto-apply, Späť/Znova, refresh po zmene katalógu).
+dokumenty bežne obsahujú `CAB-001` aj `BRD-001`; bez identity by prepnutie dokumentu vyzeralo ako echo push a panel by ostal v starom kontexte. Tú istú identitu nesú aj
+**asynchrónne callbacky panela** (`clear_selection`, `nx_edge_toggle`) a server ich pri nezhode odmietne a len obnoví stav: **nová identita ⇒ reset kontextu na Korpus**, **echo
+push tej istej identity kontext ani zbalenia NEMENÍ** (auto-apply, Späť/Znova, refresh po zmene katalógu). **Hodnotou poľa `model_guid` je od 1d/R-02b token `DocKey`**
+(kontrakt v [model-a-identita.md](model-a-identita.md)) — nie `Model#guid`, ktorý SketchUp mení pri KAŽDOM uložení: Ctrl+S do 400 ms po úprave poľa tak už nevyzerá ako prepnutie
+dokumentu (debounced edit prežije a `nxDropDocState` sa nespustí). Identita sa mení len s objektom modelu — uloženie, prvé uloženie ani Save As ju nerotujú.
 
 Pri `part`/`board` rail ukáže **dočasnú položku** s krížikom a kontexty **zosivejú** (guard v `setViewContext` + `aria-disabled`, vzor D-78 — HTML `disabled` sa nepoužíva); krížik
 pri dielci ide existujúcou cestou `select_cabinet` → `handle_select_cabinet`, pri doske novým `clear_selection` → `handle_clear_selection` (výber sa čistí pod

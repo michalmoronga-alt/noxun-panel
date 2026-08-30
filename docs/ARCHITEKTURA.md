@@ -35,7 +35,7 @@ DC pasce [DC_PRAVIDLA.md](DC_PRAVIDLA.md) · UI dizajn [UI_DIZAJN.md](UI_DIZAJN.
 
 | Modul | Odsek žije v |
 |---|---|
-| `units` · `ids` · `store` · `part_keys` · `build_plan` | [architecture/model-a-identita.md](architecture/model-a-identita.md) |
+| `units` · `ids` · `store` · `part_keys` · `build_plan` · `doc_key` | [architecture/model-a-identita.md](architecture/model-a-identita.md) |
 | `json_file_store` · `dim_series` · `debug` | [architecture/model-a-identita.md](architecture/model-a-identita.md) |
 | `templates` · `template_usage` · `template_previews` | [architecture/model-a-identita.md](architecture/model-a-identita.md) |
 | `construction` · `cabinet_builder` · `board_builder` · `placement` · `zones` · `zone_tree` · `tags` | [architecture/construction.md](architecture/construction.md) |

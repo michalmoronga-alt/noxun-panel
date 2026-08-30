@@ -22,6 +22,24 @@ identifikátory entít (CAB-xxx, BRD-xxx).
 dostane nové id). **Od 1b-3 (brána G bloku 1b) ich číta výhradne ZÁPISOVÁ cesta** — dedup tik `ScaleWatch` a `Panel.push_selected` → `request_dedup`. Čítacie cesty okien identitu
 NEOPRAVUJÚ: duplicitu zbiera `Bom.collect` do kľúča `identities` a Kontrola ju prizná ako ORANGE `duplicate_identity` (detail v [outputs.md](outputs.md)).
 
+### doc_key.rb
+
+**STABILNÁ identita dokumentu pre identity guardy** (1d/R-02b). `DocKey.key(model)` vydá token `nxdoc-<random>` viazaný na **objekt** modelu: File > New/Open = nový objekt = nový
+token (Windows SketchUp starý objekt ničí — overené mostom SESSION_KEY_BRIDGE; macOS má objekt per dokument); **uloženie, prvé uloženie aj Save As identitu NEMENIA**. Je to JEDINÝ
+zdroj hodnoty poľa `model_guid` v payloadoch — meno poľa na drôte je historické (kontrakt R-02 sa nemenil), no hodnotou už NIE JE `Sketchup::Model#guid`, lebo ten sa mení pri
+KAŽDOM uložení a Ctrl+S do 400 ms po úprave poľa panela vyzeral ako prepnutie dokumentu (edit sa zahodil, `nxDropDocState` zmazal rozpísaný stav; rovnako trpel baseline Pravidiel,
+guardy Štúdia aj okno Materiály).
+
+**Pasce, ktoré tvar modulu určili:** (1) token sa NIKDY nezapisuje do modelu/.skp — zápis pri otvorení panela by špinil čistý dokument (dirty + undo + zákaz zápisov z push ciest,
+lekcia D-103) a token v súbore by prežil kópiu zákazky (dve kópie = jedna identita); kópia .skp nie je hrozba, jej otvorenie vytvorí nový objekt. (2) Rotácia tokenu počas života
+okna je zakázaná (Codex audit R-02b, BLOCKER 3): klient držiaci identitu do plného payloadu (sekcia Materiály) by sa po rotácii odmietal donekonečna — preto identita = život
+objektu, žiadna zmena pri Save As. (3) Registry drží SILNÚ referenciu + `equal?` (recyklácia `object_id` po GC) a **živý dokument sa NIKDY nevyhadzuje** (BLOCKER 2 — vytlačený
+živý by po návrate dostal nový token a klient by zahodil drafty); upratuje sa len `valid? == false` záznam, pri vzniku nového tokenu. (4) Chyba/ne-model = `''` — **fail-closed
+obojsmerne**: `Panel.foreign_document?` odmieta aj prázdny kľúč SERVERA (BLOCKER 1, `'' == ''` by pustilo zápis bez identity). (5) Token je náhodný (unikátny naprieč sedeniami),
+lebo `ProductionCore#project_session_key` persistuje `guid:<hodnota>` do `vepo_settings.json` — deterministický čítač by po reštarte kolidoval. Konzumenti: `Panel.model_guid`,
+`ProductionCore#model_guid`, `MaterialsDialog#model_guid`, `RulesDialog#model_guid`, okno katalógu kovania, `Materials.replace_uni_scan`. `core/scale_observer.rb` používa surový
+guid ďalej — je to detektor zmeny dokumentu v ceste, ktorá pri ukladaní nebeží (rozhodnutie R-04). Testy: `tests/pure/test_doc_key.rb`.
+
 ### store.rb
 
 prístup k `NOXUN` dictionary.

@@ -68,6 +68,13 @@ a to nesmie zapisovať nikam. Nezhoda je **hláška**, nie tiché zahodenie — 
 ďalej zahadzuje ticho (prepnutie dokumentu je zriedkavé, presun výberu bežný). Poradie je súčasť opravy: dokument
 sa overuje PRED echom `cabinet_id`/`board_id`, lebo `CAB-001` je v každej zákazke. In-SU runner posiela ten istý
 tvar payloadu (helper `pg(model, hash)`), takže sada testuje reálnu cestu, nie výnimku.
+**✅ priznaný zvyšok dávkou 1d/R-02b (PR #267, v0.8.21)** — hodnota `model_guid` už nie je `Model#guid` (menil sa
+pri KAŽDOM uložení → Ctrl+S do 400 ms po úprave poľa vyzeral ako prepnutie dokumentu a edit sa zahodil), ale token
+nového `core/doc_key.rb` viazaný na OBJEKT modelu: New/Open = nová identita, uloženie/prvé uloženie/Save As ju
+NEMENIA. Nič sa nezapisuje do modelu/.skp; JS aj tvar payloadov nezmenené. Codex audit návrhu: 3 BLOCKERy
+(fail-closed obojsmerne · žiadne vytláčanie živých dokumentov z registry · žiadna rotácia identity počas života
+okna — preto Save As identitu drží) + 2 FIXy (headless load, migrácia priamych `model.guid` miest v runneri
+a sadách). Detail v `docs/architecture/model-a-identita.md` (### doc_key.rb) a KRONIKE.
 
 ### R-03 · P1 · core · `core/cabinet_builder.rb:107-138` + `ui/panel/actions_cabinet.rb:286-324`
 `build` zlieva normalize → ID → `next_x` → operáciu → geometriu; `transform:` má len `rebuild`. Tool nemá čo
