@@ -79,8 +79,11 @@ bezpečne držať pred klikom (žiadny čistý pripravený objekt) ani ako polo�
 lebo `enum_val` vracia pri Stringu ten istý objekt ako vstup a priamy freeze by zmrazil `params` volajúceho); plán si drží **referenciu na `Sketchup::Model`**, nie `guid` (ten sa mení
 pri každom uložení — lekcia #261/#264). `commit_insert` má **záväzné poradie**: guard dokumentu → validácia RIGIDNÉHO transformu → `ensure_root_context` **s kontrolou postcondition**
 (helper po 20 iteráciách ticho vracia nil) → ID a `next_x` → operácia; **scale-lock ostal VNÚTRI `guarded`** bloku (mimo neho by zápis DC atribútov cez `onElementModified` založil
-oneskorený dirty tik). Validátor `rigid_transform?` je čistá funkcia nad `to_a` a chytá aj **rovnomernú mierku schovanú v prvku [15]** (`scaling(2)` nechá osi jednotkové).
-Do stavby ide **pracovná nezmrazená kópia** plánu — `resolve_part` upratuje sticky `edge_warnings` in-place. `actions_cabinet.rb` sa nedotkla, správanie volajúcich je nezmenené;
+oneskorený dirty tik). Validátor `rigid_matrix?` je čistá funkcia nad 16 číslami z `to_a`; kontrola prvku `[15]` chytá **nekanonickú/legacy maticu**, ktorá nesie mierku tam (moderný SketchUp `[15]` drží
+kanonický a `scaling(2)` padne už na jednotkovosti osí). `Geom::Transformation` je **mutovateľná** (`set!`), preto sa hneď po validácii robí **snapshot** z tých istých overených
+čísel a ďalej sa pracuje len s ním — inak by sprievodný blok mohol transform po validácii prepísať na mierku a korpus by vznikol zväčšený pod `guarded` guardom.
+Do stavby ide **pracovná nezmrazená kópia** plánu — `resolve_part` upratuje sticky `edge_warnings` in-place. `actions_cabinet.rb` sa nedotkla, správanie volajúcich je nezmenené
+(vrátane volania `build(model, type:, width:)`, ktoré Ruby prevádza na pozičný hash — signatúra ho drží cez `params = nil` + `**kw`);
 `bounds_mm` plán zámerne nenesie (uzavrie ho GHOST dávka). **Tvrdý blocker GHOST tým padol.**
 
 ### R-04 · P3 · core · `core/scale_observer.rb:500-513`

@@ -23,14 +23,22 @@ plánovač cfg→BuildPlan (kovanie sa vyhodnocuje po vyradení degenerovaných 
 dokumentu — nie `guid`, ten sa mení pri každom uložení (lekcia #261/#264).
 
 `commit_insert(model, plan, transform:, &block)` je jediné miesto, kde vklad mení model, a **poradie krokov je súčasť kontraktu**: (1) guard identity dokumentu — plán z iného okna
-sa odmieta ešte pred zatvorením edit kontextu (cross-document vklad nikdy) · (2) validácia explicitného `transform` — prijme sa **len konečná pravotočivá RIGIDNÁ** transformácia
-(`rigid_transform?` číta `to_a`: jednotkové a navzájom kolmé osi, determinant +1, nulová perspektíva **a prvok [15] == 1**, lebo `Geom::Transformation.scaling(2)` nechá osi jednotkové
-a mierku uloží práve sem); scale/skos/zrkadlo by postavili korpus, ktorého geometria nesedí s configom, a scale observer by ho pod guardom ani nezachytil — tichá výrobná chyba ·
+sa odmieta ešte pred zatvorením edit kontextu (cross-document vklad nikdy) · (2) validácia explicitného `transform` **a hneď snapshot** — prijme sa len konečná pravotočivá RIGIDNÁ transformácia (`rigid_matrix?` nad 16 číslami z `to_a`: jednotkové a navzájom
+kolmé osi, determinant +1, nulová perspektíva a prvok `[15] == 1`); scale/skos/zrkadlo by postavili korpus, ktorého geometria nesedí s configom, a scale observer by ho pod guardom ani
+nezachytil — tichá výrobná chyba. **`[15]` je uniformný mierkový deliteľ:** moderný SketchUp ho drží kanonický (1.0) a rovnomernú mierku premieta do osí, takže `scaling(2)` padne už
+na jednotkovosti osí — kontrola `[15]` je ochrana pred **nekanonickou/legacy maticou** (surové pole, matica zo staršieho súboru), ktorá mierku nesie práve tam. **`Geom::Transformation`
+je mutovateľná (`set!`)**, preto sa `to_a` číta práve raz a z tých istých overených čísel sa vyrobí kanonický snapshot (`snapshot_insert_transform!`); ďalej sa pracuje **výhradne
+so snapshotom** — inak by sprievodný blok (H2), ktorý beží už po validácii, mohol transform prepísať na mierku a korpus by vznikol zväčšený pod `guarded` guardom ·
 (3) `ensure_root_context` **a kontrola postcondition** (helper po výnimke/20 iteráciách ticho vracia nil — bez kontroly by korpus skončil v cudzom komponente) · (4) až teraz ID a
 `next_x` · (5) operácia + **transparentný scale-lock follow-up, oboje VNÚTRI `guarded`** (zápis scale-lock atribútov mimo guardu by cez `EntitiesObserver#onElementModified` založil
 oneskorený dirty tik a transparentný presun ghost zón by zasiahol Undo po dokončenom vložení); `ScaleWatch.attach_one` je až za guardom. Do stavby ide **pracovná (nezmrazená) kópia**
 plánu: `PartKeys.migrate_overrides` zdieľa vnorené hashe overridov a `resolve_part` v nich in-place upratuje sticky `edge_warnings`.
 `build` volá `ensure_root_context` **PRED** `prepare_insert`, aby pri výnimke z `normalize` používateľ skončil v roote presne ako doteraz; commit si root ešte raz idempotentne overí.
+
+**Signatúra `build(model, params = nil, transform: nil, **kw, &block)` je kompatibilná zámerne.** Pred R-03 nemala metóda žiadny keyword parameter, takže Ruby 3 prevádzalo
+`build(model, type: 'lower', width: 600)` na **pozičný hash** a takto sa volať dá. Holý `transform:` by tieto volania rozbil (`unknown keyword`), preto je `params` voliteľný a zvyšné
+keywordy sa zbierajú do `**kw`: keď `params` chýba, použijú sa **ony** ako parametre skrinky. Jediné **rezervované** meno je `transform` (nie je to parameter korpusu — `normalize`
+ho nepozná); kto by ho v params predsa len chcel, musí params poslať pozične. Params dvakrat (pozične aj keywordmi) je `ArgumentError`, nie tiché zliatie.
 **Vedomé hranice R-03:** kontrakt čistoty `prepare_insert` je uzko formulovaný na *model, entity, ID a Undo* — `normalize` cez `Materials.normalized_abs_id` môže siahnuť na katalóg
 na disku a logovať, a `Construction.build_plan` sa do prepare **nepresúva** (validačné chyby by sa zobrazili pred hardware blokom a pred commit-time snapshotmi). Súradnice
 obálky/kotvy (`bounds_mm`) plán zámerne **nenesie** — uzavrie ich až GHOST dávka proti `BuildPlan`u. In-SU dôkazy: sekcia `run_r03` + `run_r03_async` (`su_runner.rb`).

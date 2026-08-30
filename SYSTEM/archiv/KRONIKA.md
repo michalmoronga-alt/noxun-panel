@@ -26,8 +26,8 @@
   `build` je ich kompozícia so zachovaným poradím (`ensure_root_context` PRED normalizáciou, aby pri chybe validácie používateľ skončil v roote presne ako doteraz).
   **Čo do návrhu pridal povinný Codex audit (2 BLOCKER + 4 FIX + 3 NOTE, session 01a05242):** (1) *validácia rigidného transformu* — pôvodný návrh prijímal `transform:` bez
   kontroly; scale/skos/zrkadlo by postavili korpus, ktorého geometria nesedí s configom, a scale observer by ho pod `guarded` ani nezachytil, takže by chyba prešla ticho až do
-  výroby. Validátor je čistá funkcia nad `to_a` a chytá aj **rovnomernú mierku schovanú v prvku [15]** (`Geom::Transformation.scaling(2)` nechá osi jednotkové a mierku uloží
-  práve tam — bez tejto kontroly by dvojnásobne zväčšený vklad prešiel ako „rigidný"). (2) *scale-lock OSTÁVA vnútri `guarded`* — presunúť transparentný follow-up von zo strážneho
+  výroby. Validátor je čistá funkcia nad 16 číslami z `to_a`; kontrola prvku `[15]` (uniformný mierkový deliteľ) je pritom ochrana pred **nekanonickou/legacy maticou** — moderný
+  SketchUp `[15]` drží kanonický a rovnomernú mierku premieta do osí, takže `scaling(2)` padne už na jednotkovosti osí. (2) *scale-lock OSTÁVA vnútri `guarded`* — presunúť transparentný follow-up von zo strážneho
   okna vyzeralo ako čistejší rez, ale zápis DC atribútov mimo guardu by cez `EntitiesObserver#onElementModified` založil oneskorený dirty tik a transparentný presun ghost zón by
   zasiahol Undo po dokončenom vložení (D-40). (3) *plytký freeze nestačí* — `zone_tree`, čelá, overridy aj sety sú vnorené, takže mrazí sa **rekurzívne**; a **až po hlbokej kópii**,
   lebo `enum_val` vracia `v.to_s`, čo je pri Stringu ten istý objekt ako vstup — priamy freeze by zmrazil `params` volajúceho. (4) *identita dokumentu je referencia na `Model`*,
@@ -37,8 +37,15 @@
   `Construction.build_plan` sa do prepare **nepresúva**, lebo by sa validačné chyby zobrazili pred hardware blokom a pred commit-time snapshotmi; a `bounds_mm` plán zámerne
   **nenesie** — envelope a kotvy si uzavrie až GHOST dávka proti `BuildPlan`u (YAGNI). Do stavby ide **pracovná nezmrazená kópia** plánu, lebo `PartKeys.migrate_overrides` zdieľa
   vnorené hashe overridov a `resolve_part` v nich in-place upratuje sticky `edge_warnings` — plán tak ostáva nemenný a stavba sa nezmenila ani o riadok.
-  **Testy:** 2103 headless (nová sada `test_r03_insert_sev` — mrazenie sa dokazuje **pokusmi o mutáciu** vnorených štruktúr, nie holým `frozen?`, a odmietnutia sa merajú
-  model-stubom, ktorý pri akomkoľvek dotyku vyhodí výnimku) · 73 JS sád · in-SU **1083 PASS / 0 FAIL** (nová sekcia `run_r03` + `run_r03_async`: vklad na vlastný rigidný transform
+  **Čo pridalo review kolo (Codex CLI, 4 nálezy, opravené pred mergom):** (P1) *validovaná transformácia sa musí SNAPSHOTNÚŤ* — `Geom::Transformation` je mutovateľná cez `set!`,
+  takže medzi validáciou a použitím bola diera: sprievodný blok beží v tej istej operácii **až po** validácii a mohol transform prepísať na mierku; korpus by vznikol zväčšený pod
+  `guarded` guardom, kde ho observer nezachytí. Fix: `to_a` sa číta **práve raz** a z tých istých overených čísel sa postaví kanonický snapshot, s ktorým sa ďalej pracuje výhradne.
+  (P2) *nová signatúra rozbíjala keyword-hash volanie* — pred R-03 nemal `build` žiadny keyword parameter, takže Ruby 3 prevádzalo `build(model, type: 'lower', width: 600)` na
+  pozičný hash; holý `transform:` by také volania zhodil na `unknown keyword`. Fix: `build(model, params = nil, transform: nil, **kw, &block)` — chýbajúce `params` sa doplnia z
+  `**kw`, `transform` je jediné rezervované meno a params dvakrat je `ArgumentError`, nie tiché zliatie. (P3) upresnená semantika prvku `[15]` v textoch (viď vyššie) a doplnené
+  mutačné vetvy freeze testov (rozdelené zóny s `cuts`, `hardware_overrides`, `hardware_sets` vrátane selectora a jeho pásiem, vnorené `edge_warnings`, stringový kľúč).
+  **Testy:** 2112 headless (nová sada `test_r03_insert_sev` — mrazenie sa dokazuje **pokusmi o mutáciu** vnorených štruktúr, nie holým `frozen?`, a odmietnutia sa merajú
+  model-stubom, ktorý pri akomkoľvek dotyku vyhodí výnimku) · 73 JS sád · in-SU **1088 PASS / 0 FAIL** (nová sekcia `run_r03` + `run_r03_async`: vklad na vlastný rigidný transform
   sadne presne a 1× Späť ho vráti celý, vklad z otvoreného komponentu skončí top-level, odmietnutia nevyrobia korpus ani krok Späť, a výnimka v sprievodnom bloku vráti geometriu
   **aj modelový zápis**). **Tvrdý blocker GHOST tým padol** — package smie na Windows štartovať.
 
