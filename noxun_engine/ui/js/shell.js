@@ -368,6 +368,7 @@
     // kostry Inspectora. Deklaracie funkcii su hoistovane, takze referencia tu
     // plati aj ked su definovane nizsie.
     module.exports.nxDocPayload = nxDocPayload;
+    module.exports.nxDocGuid = nxDocGuid;
     module.exports.nxSetModelGuid = nxSetModelGuid;
   }
 
@@ -644,11 +645,25 @@
   // `cabinet_id` prepnutie dokumentu NEZACHYTÍ. Server payload bez zhodného
   // guidu ODMIETNE — prázdny guid je okno bez dobehnutého NX.init a to nesmie
   // zapisovať nikam.
-  function nxDocPayload(obj){
+  //
+  // `guid` = ZACHYTENA identita (review #264 P1). `nxModelGuid` je mutovatelny
+  // global, ktory prepise najblizsi push zo servera — pri debounced editoch
+  // (auto-apply korpusu, polia karty dosky; 400 ms) by sa oneskoreny zapis
+  // opeciatkoval NOVYM dokumentom a guard by ho pustil presne tam, kam nema.
+  // Volajuci s odlozenym odoslanim preto cita `nxDocGuid()` uz pri NAPLANOVANI
+  // a zachytenu hodnotu poda sem; okamzite cesty argument vynechaju (medzi
+  // klikom a odoslanim sa v jednovlaknovom JS push vykonat nemoze).
+  // Prazdny retazec je PLATNA zachytena hodnota (server ju odmietne) — preto sa
+  // vetvi na undefined/null, nie na pravdivost.
+  function nxDocPayload(obj, guid){
     var o = obj || {};
-    o.model_guid = (typeof nxModelGuid === 'string') ? nxModelGuid : '';
+    o.model_guid = (guid === undefined || guid === null) ? nxDocGuid() : String(guid);
     return JSON.stringify(o);
   }
+
+  // Identita dokumentu, ktory panel PRAVE zobrazuje. Citat ju treba v okamihu,
+  // ked sa akcia NAPLANUJE — nie ked sa odosiela (viz nxDocPayload vyssie).
+  function nxDocGuid(){ return (typeof nxModelGuid === 'string') ? nxModelGuid : ''; }
 
   // Posledny STAV zo servera. Drzi sa LEN preto, aby sa dalo rohove nastavenie
   // prekreslit s cerstvymi poctami — panel si z neho nic neodvodzuje ani nic

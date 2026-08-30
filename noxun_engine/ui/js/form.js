@@ -149,13 +149,19 @@
     if (!selectedCabId) return;            // nic oznacene -> len nahlad, ziadny rebuild
     if (applyTimer) clearTimeout(applyTimer);
     var cabSnapshot = selectedCabId;       // Codex expr audit BLOCKER: identita z casu naplanovania
-    applyTimer = setTimeout(function(){ flushCabinetEdits(cabSnapshot); }, 400);
+    // R-02 (review #264 P1): s korpusom sa zachytava aj DOKUMENT. `nxModelGuid`
+    // je globál, ktorý prepíše najbližší push — bez snapshotu by sa oneskorený
+    // zápis opečiatkoval NOVÝM dokumentom a guard by ho pustil do cudzej zákazky.
+    var guidSnapshot = nxDocGuid();
+    applyTimer = setTimeout(function(){ flushCabinetEdits(cabSnapshot, guidSnapshot); }, 400);
   }
 
   // Okamzity/odlozeny apply korpusu. Snapshot cabinet_id ide s payloadom — Ruby
   // handler ho overi proti aktualnemu vyberu (oneskoreny zapis po prekliknuti
   // na iny korpus sa ticho zahodi namiesto zasiahnutia nespravneho objektu).
-  function flushCabinetEdits(cabSnapshot){
+  // `guidSnapshot` = dokument z času NAPLÁNOVANIA (R-02, review #264 P1).
+  // Okamžité cesty ho vynechajú — vtedy platí aktuálny.
+  function flushCabinetEdits(cabSnapshot, guidSnapshot){
     applyTimer = null;
     var ae = document.activeElement;
     if (ae && isExprInput(ae) && isExprStr(ae.value)) return; // vyraz stale rozpisany
@@ -164,7 +170,7 @@
     var payload = collectAll();
     payload.cabinet_id = cabSnapshot || selectedCabId;
     cabEditsInFlight = true; // D-07 Codex B2: echo tohto apply nesmie prepisat novsi vstup
-    if (window.sketchup && sketchup.apply_all) sketchup.apply_all(nxDocPayload(payload)); // R-02
+    if (window.sketchup && sketchup.apply_all) sketchup.apply_all(nxDocPayload(payload, guidSnapshot)); // R-02
   }
   function flushCabinetEditsNow(){
     if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; }

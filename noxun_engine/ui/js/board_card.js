@@ -18,8 +18,11 @@
     boardTimer = null;
     var p = boardPending; boardPending = null;
     if (!p || !p.board_id) return;
-    // R-02: identita dokumentu ide s KAZDYM zapisovym payloadom karty dosky.
-    if (window.sketchup && sketchup.set_board_fields) sketchup.set_board_fields(nxDocPayload(p));
+    // R-02: identita dokumentu ide s KAZDYM zapisovym payloadom karty dosky —
+    // tu ZACHYTENA pri naplanovani editu, nie precitana pri odosielani.
+    var g = p.guid;
+    delete p.guid; // pracovny kluc pendingu, nie pole payloadu
+    if (window.sketchup && sketchup.set_board_fields) sketchup.set_board_fields(nxDocPayload(p, g));
   }
   // Okamzity flush (Enter commit) — VZDY najprv zrusi bezaici timeout, inak by
   // stary timer predcasne flushol nasledujuci novy edit (Codex expr audit).
@@ -55,8 +58,12 @@
       if (elm) elm.classList.remove('bad');
       value = v;
     }
+    // R-02 (review #264 P1): s doskou sa zachytáva aj DOKUMENT z času
+    // NAPLÁNOVANIA. `nxModelGuid` je globál, ktorý prepíše najbližší push —
+    // bez snapshotu by sa zápis odložený o 400 ms opečiatkoval NOVÝM
+    // dokumentom a guard by ho pustil do cudzej zákazky.
     if (!boardPending || boardPending.board_id !== boardCard.board_id){
-      boardPending = { board_id: boardCard.board_id, fields: {} };
+      boardPending = { board_id: boardCard.board_id, guid: nxDocGuid(), fields: {} };
     }
     boardPending.fields[key] = value;
     if (boardTimer) clearTimeout(boardTimer);
