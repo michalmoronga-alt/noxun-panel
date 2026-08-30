@@ -27,7 +27,7 @@ regresia:** `ŠT-1c B2` padá rovnako na čistom `main` (1055 PASS / 2 FAIL) —
 
 **Blok 1b · STABILIZAČNÁ REVÍZIA je prakticky uzavretý** ([PLAN.md](PLAN.md)): brány A/G/H hotové (1b-1/2/3), dlhy B+D (1b-4), sweep E, mimo písmen 1b-6a/6b/6c aj 1b-7, z F je hotové D-27 —
 **ostáva len D-51** (štandard veľkostí okien — čaká na Michalove hodnoty) a výklop ako typ čela (ide cez task package 1e).
-**Blok 1c · AUDIT KÓDU je HOTOVÝ (29.8.)** — traja audítori zliati do **[AUDIT_REGISTER.md](AUDIT_REGISTER.md)** (2×P0 + 33 položiek + poradie pre 1d + 2 rozhodnutia Michala);
+**Blok 1c · AUDIT KÓDU je HOTOVÝ (29.8.)** — traja audítori zliati do **[AUDIT_REGISTER.md](AUDIT_REGISTER.md)** (2×P0 + 35 položiek — 33 z 1c, 2 z review — + poradie pre 1d + 3 rozhodnutia Michala (R-05 · R-13 · R-30));
 **oba P0 sú vybavené dávkou P0-HF** (v0.8.14) a **beží blok 1d** (hotové: R-06 brána, R-08 zámky katalógov, R-01+R-04 multi-model observer). **Beží aj 1e PLÁNOVACIA DÁVKA** (task packages, priorita do 2.9.).
 **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
