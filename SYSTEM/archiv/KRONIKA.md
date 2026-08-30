@@ -36,12 +36,17 @@
   prepíšu a `resolve_set_id` potom použije mapu jednej z nich na **obe** (kľúčom je `owner_id`). Vtedy nie sú neisté počty, ale rovno **kódy** v nákupe, rozpočte aj v ponuke.
   Pôvodná brána to blokovala len náhodou (cez owner člena) a toto zúženie by dieru odkrylo. Zber preto po novom hlási aditívny kľúč **`cabinet_set_conflicts`**
   (`Bom.note_cabinet_sets` — čistá funkcia, testovateľná headless): **zhodné mapy konflikt NIE SÚ** (bežná kópia skrinky dá rovnaký výsledok nech vyhrá ktorákoľvek), rozdiel
-  áno — vrátane „jedna override má, druhá nie". `dup_partition` také ID blokuje aj bez zliatia owner člena a blokujúca hláška menuje oba dôsledky.
-  **Testy:** +7 headless v `tests/pure/test_p0hf_brany.rb` (brána nad **reálnou** `HardwareSets.expand`: rôzni vlastníci → prejde · rovnaký vlastník → blokuje · invariant
-  Σ zdrojov = množstvo riadku v oboch scenároch · rozídené overridy → blokuje · zhodné/žiadne → prejde · starý zber bez nového kľúča sa nesmie začať blokovať · jednotka
-  `note_cabinet_sets`) a prepísaný pár v `tests/pure/test_hardware_sets.rb` (bez zliatia príznak NIE je · pri reálnom preskoku áno). Päť mutácií overených — „označ pri každom
-  vydaní" (vráti falošné pozitíva), „neoznač nikdy" (pustí reálny podpočet), „`add_row` nevracia `src`", „brána ignoruje konflikty" aj „každý opakovaný zápis je konflikt" —
-  každá zhodila práve svoje testy.
+  áno — vrátane „jedna override má, druhá nie". `dup_partition` také ID blokuje aj bez zliatia owner člena a blokujúca hláška menuje oba dôsledky. **Druhé kolo pridalo P2
+  k tomu istému miestu** (a je to tá istá lekcia, len z druhej strany — brána sa nesmie rozšíriť viac, než dokazuje): rozdiel v type, ktorý si skrinka vôbec nemapuje, žiadny
+  kód nezmení. Záznam preto nesie **kľúče** rozdielu a `conflict_matters?` ich porovná s kľúčmi, ktorými si skrinka kovanie skutočne mapuje (`override_keys_in_use` číta
+  `generic_type` a `generic_type@owner_part_key` z `collected[:hardware]`); neznámy rozdiel blokuje ako doteraz. **Vedome NEDORIEŠENÉ:** či sa override náhodou nerovná
+  projektovej predvoľbe — mapovanie projektu nie je súčasťou zberu a odvodiť ho v bráne by znamenalo druhý výklad precedencie vedľa `HardwareSets.resolve_set_id`; ostáva to
+  falošným pozitívom v už duplicitnom stave, teda bezpečným smerom.
+  **Testy:** +8 headless v `tests/pure/test_p0hf_brany.rb` (brána nad **reálnou** `HardwareSets.expand`: rôzni vlastníci → prejde · rovnaký vlastník → blokuje · invariant
+  Σ zdrojov = množstvo riadku v oboch scenároch · rozídené overridy → blokuje · rozdiel v nepoužitom type → prejde · zhodné/žiadne → prejde · starý zber bez nového kľúča sa
+  nesmie začať blokovať · jednotka `note_cabinet_sets`) a prepísaný pár v `tests/pure/test_hardware_sets.rb` (bez zliatia príznak NIE je · pri reálnom preskoku áno). Sedem
+  mutácií overených — „označ pri každom vydaní" (vráti falošné pozitíva), „neoznač nikdy" (pustí reálny podpočet), „`add_row` nevracia `src`", „brána ignoruje konflikty",
+  „každý opakovaný zápis je konflikt", „relevancia vždy pravdivá" aj „za rozdiel sa hlásia všetky kľúče" — každá zhodila práve svoje testy.
 
 - **1d/R-01+R-04 · OBSERVER VEĽKOSTI VIE, V KTOROM DOKUMENTE PRACUJE (30.8.2026, v0.8.17):** tretia vybavená položka registra bloku 1d — dve položky naraz, lebo register ich tak
   spája (**R-01** P1 + **R-04** P3). `ScaleWatch` je jediný observer, ktorý reaguje na zmenu veľkosti, presun a mazanie skriniek a dosiek; jeho vnútorné fronty boli kľúčované

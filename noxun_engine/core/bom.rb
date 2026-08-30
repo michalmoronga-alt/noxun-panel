@@ -53,7 +53,7 @@ module Noxun
         # instancia ziadny override nemala), `conflicts` ID, kde sa instancie
         # rozisli a nakupne KODY su preto neiste.
         cabinet_sets_seen = {}
-        cabinet_set_conflicts = []
+        cabinet_set_conflicts = {}
         warnings = []
         placements = [] # D-103: umiestnenie top-level skriniek/dosiek (zachytna siet duplicit)
         # 1b-3: IDENTITA kazdej top-level skrinky/dosky — jeden zaznam na INSTANCIU.
@@ -157,14 +157,34 @@ module Noxun
       # ako konflikt a brana exportov (`ProductionCore.dup_partition`) ho blokuje.
       # ZHODNE mapy (bezna kopia skrinky) konflikt NIE su — vysledok je rovnaky
       # nech vyhra ktorakolvek, takze blokovat ich by bolo falosne pozitivne.
+      #
+      # Zaznam nesie KLUCE, v ktorych sa instancie rozisli (review #262 P2):
+      # rozdiel v type, ktory si skrinka vobec nemapuje, nikoho nepomyli —
+      # relevanciu rozhoduje az brana (`ProductionCore.dup_partition`), lebo
+      # az ona vidi polozky kovania. `conflicts` je mapa ID => zoznam klucov.
+      # Porovnava sa proti PRVEJ videnej instancii; ked su si vsetky rovne,
+      # rovna sa jej kazda, takze jedno porovnanie staci.
       # `map` = override mapa instancie alebo nil (instancia ziadny nema).
       def note_cabinet_sets(cid, map, cabinet_sets, seen, conflicts)
         cabinet_sets[cid] = map if map
-        if seen.key?(cid)
-          conflicts << cid if seen[cid] != map && !conflicts.include?(cid)
-        else
+        unless seen.key?(cid)
           seen[cid] = map
+          return
         end
+        diff = differing_override_keys(seen[cid], map)
+        return if diff.empty?
+        cur = (conflicts[cid] ||= [])
+        diff.each { |k| cur << k unless cur.include?(k) }
+        cur.sort!
+      end
+
+      # Kluce, v ktorych sa dve override mapy nezhoduju — vratane tych, ktore
+      # jedna z nich VOBEC NEMA (chybajuci override je tiez rozdiel: expanzia by
+      # na tu instanciu pouzila cudzi zaznam namiesto projektoveho mapovania).
+      def differing_override_keys(a, b)
+        ah = a.is_a?(Hash) ? a : {}
+        bh = b.is_a?(Hash) ? b : {}
+        (ah.keys | bh.keys).select { |k| ah[k] != bh[k] }.map(&:to_s)
       end
 
       # 1b-3: jeden zaznam na INSTANCIU (nie na ID) — pocet zaznamov s tym istym

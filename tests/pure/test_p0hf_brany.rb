@@ -52,8 +52,8 @@ module NxP0
 
   # --- fixtury -------------------------------------------------------------
 
-  def collected(identities = [], conflicts = [])
-    { records: [], hardware: [], hardware_overrides: [], cabinet_sets: {},
+  def collected(identities = [], conflicts = {}, hardware = [])
+    { records: [], hardware: hardware, hardware_overrides: [], cabinet_sets: {},
       cabinet_set_conflicts: conflicts,
       placements: [], warnings: [], identities: identities }
   end
@@ -100,6 +100,12 @@ module NxP0
   def r34_item(part_key)
     { 'owner_id' => 'CAB-R34', 'owner_part_key' => part_key, 'generic_type' => 'hinge',
       'quantity' => 2, 'rule_id' => 'zavesy-podla-vysky', 'params' => {}, 'source' => 'rule' }
+  end
+
+  # Tie iste polozky, ako vidi brana v `collected[:hardware]` — z nich sa cita,
+  # ktorymi klucmi si skrinka kovanie naozaj mapuje.
+  def r34_items
+    %w[front:F1/wing:single front:F2/wing:single].map { |k| r34_item(k) }
   end
 
   def r34_expand(*part_keys)
@@ -293,13 +299,34 @@ end
 
 NxTest.test('1d/R-34: zdielane ID + ROZIDENE set overridy — kody su neiste, BLOKUJE') do
   exp = NxP0.r34_expand('front:F1/wing:single', 'front:F2/wing:single') # ziadne zliatie
-  col = NxP0.collected(NxP0.ident('CAB-R34'), ['CAB-R34'])
+  col = NxP0.collected(NxP0.ident('CAB-R34'), { 'CAB-R34' => ['hinge'] }, NxP0.r34_items)
   blocking, warn = NxP0::PC.dup_partition(col, exp)
   NxTest.assert_equal([['cabinet', 'CAB-R34', 2]], blocking,
                       'expanzia by pouzila mapu jednej instancie na obe — nedokazatelne')
   NxTest.assert_equal([], warn)
   b = NxP0::PC.export_blockers(dups: blocking)
   NxTest.assert(b.first.include?('CAB-R34') && b.first.include?('set'), b.first)
+
+  # rozdiel na kluci VLASTNIKA (`generic_type@owner_part_key`) sa ratá rovnako
+  col2 = NxP0.collected(NxP0.ident('CAB-R34'),
+                        { 'CAB-R34' => ['hinge@front:F1/wing:single'] }, NxP0.r34_items)
+  NxTest.assert_equal([['cabinet', 'CAB-R34', 2]], NxP0::PC.dup_partition(col2, exp).first)
+end
+
+# review #262 P2: blokovat sa smie LEN rozdiel, ktory tej skrinke naozaj zmeni kod.
+NxTest.test('1d/R-34: rozdiel v NEPOUZITOM type skrinku neblokuje (review #262 P2)') do
+  exp = NxP0.r34_expand('front:F1/wing:single', 'front:F2/wing:single')
+  col = NxP0.collected(NxP0.ident('CAB-R34'), { 'CAB-R34' => %w[slide leg] }, NxP0.r34_items)
+  blocking, warn = NxP0::PC.dup_partition(col, exp)
+  NxTest.assert_equal([], blocking, 'skrinka ma len zavesy — rozidene vysuvy jej kod nezmenia')
+  NxTest.assert_equal([['cabinet', 'CAB-R34', 2]], warn, 'ORANGE nalez Kontroly ostava')
+  # ...ale ked je medzi nimi AJ pouzity typ, blok plati
+  mix = NxP0.collected(NxP0.ident('CAB-R34'), { 'CAB-R34' => %w[slide hinge] }, NxP0.r34_items)
+  NxTest.assert_equal([['cabinet', 'CAB-R34', 2]], NxP0::PC.dup_partition(mix, exp).first)
+  # NEZNAMY rozdiel (prazdny zoznam klucov) blokuje — nedokazatelna kolizia
+  unk = NxP0.collected(NxP0.ident('CAB-R34'), { 'CAB-R34' => [] }, NxP0.r34_items)
+  NxTest.assert_equal([['cabinet', 'CAB-R34', 2]], NxP0::PC.dup_partition(unk, exp).first,
+                      'bez znamych klucov sa kolizia neda vyvratit')
 end
 
 NxTest.test('1d/R-34: ZHODNE (alebo ziadne) set overridy konflikt NIE SU — export prejde') do
@@ -320,30 +347,37 @@ NxTest.test('1d/R-34: Bom.note_cabinet_sets — konflikt LEN pri rozidenych mapa
   a = { 'hinge' => 'set-a' }
   b = { 'hinge' => 'set-b' }
 
-  same = {}; seen = {}; conf = []
+  same = {}; seen = {}; conf = {}
   bom.note_cabinet_sets('CAB-1', a, same, seen, conf)
   bom.note_cabinet_sets('CAB-1', a, same, seen, conf)
-  NxTest.assert_equal([], conf, 'dve kopie s TOU ISTOU mapou konflikt nie su')
+  NxTest.assert_equal({}, conf, 'dve kopie s TOU ISTOU mapou konflikt nie su')
   NxTest.assert_equal(a, same['CAB-1'], 'override sa zbiera ako doteraz')
 
-  diff = {}; seen2 = {}; conf2 = []
+  diff = {}; seen2 = {}; conf2 = {}
   bom.note_cabinet_sets('CAB-2', a, diff, seen2, conf2)
   bom.note_cabinet_sets('CAB-2', b, diff, seen2, conf2)
   bom.note_cabinet_sets('CAB-2', a, diff, seen2, conf2)
-  NxTest.assert_equal(['CAB-2'], conf2, 'rozidene mapy = konflikt, a hlasi sa RAZ')
+  NxTest.assert_equal({ 'CAB-2' => ['hinge'] }, conf2,
+                      'zaznam nesie KLUC rozdielu, a hlasi sa RAZ (review #262 P2)')
   NxTest.assert_equal(a, diff['CAB-2'], 'posledny zapis vyhrava ako doteraz (tretia instancia)')
 
   # jedna instancia override MA, druha NIE — expanzia by ho pouzila na obe
-  mix = {}; seen3 = {}; conf3 = []
+  mix = {}; seen3 = {}; conf3 = {}
   bom.note_cabinet_sets('CAB-3', nil, mix, seen3, conf3)
   bom.note_cabinet_sets('CAB-3', a, mix, seen3, conf3)
-  NxTest.assert_equal(['CAB-3'], conf3, 'chybajuci override je tiez rozdiel')
+  NxTest.assert_equal({ 'CAB-3' => ['hinge'] }, conf3, 'chybajuci override je tiez rozdiel')
 
-  none = {}; seen4 = {}; conf4 = []
+  none = {}; seen4 = {}; conf4 = {}
   bom.note_cabinet_sets('CAB-4', nil, none, seen4, conf4)
   bom.note_cabinet_sets('CAB-4', nil, none, seen4, conf4)
-  NxTest.assert_equal([], conf4, 'ziadna z instancii override nema — niet co pomiesat')
+  NxTest.assert_equal({}, conf4, 'ziadna z instancii override nema — niet co pomiesat')
   NxTest.assert_equal({}, none, 'a do `cabinet_sets` sa nezapisuje nic')
+
+  # zhoda v jednom kluci, rozdiel v druhom — hlasi sa LEN ten rozdielny
+  part = {}; seen5 = {}; conf5 = {}
+  bom.note_cabinet_sets('CAB-5', { 'hinge' => 'set-a', 'slide' => 'set-s' }, part, seen5, conf5)
+  bom.note_cabinet_sets('CAB-5', { 'hinge' => 'set-a', 'slide' => 'set-x' }, part, seen5, conf5)
+  NxTest.assert_equal({ 'CAB-5' => ['slide'] }, conf5, 'zhodny kluc do zaznamu nepatri')
 end
 
 NxTest.test('1d/R-34: Σ zdrojov = mnozstvo riadku v OBIDVOCH scenaroch (invariant)') do

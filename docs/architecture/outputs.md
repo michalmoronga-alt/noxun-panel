@@ -103,9 +103,13 @@ Podklad nesie expanzia sama — zdroj riadku nesie príznak **`per_owner`** (adi
 správne a **export im prejde** (ORANGE nález Kontroly ostáva). So zhodným vlastníkom je to skutočná kolízia a blok platí ako doteraz — detail a priznaný zvyšok v odseku
 `hardware_sets.rb` ([hardware.md](hardware.md)). **DRUHÁ blokujúca cesta — rozídené set overridy (review #262 P1):** `cabinet_sets` má na ID **jeden slot**, takže pri zdieľanom
 `cabinet_id` posledná inštancia prepíše prvú a `resolve_set_id` použije tú jednu mapu na **obe** (kľúčom je `owner_id`) — vtedy sú neisté rovno **KÓDY**, nie len počty, a to sa
-nedá ani dokázať, ani vyvrátiť. Také ID hlási zber v aditívnom kľúči **`cabinet_set_conflicts`** (`Bom.note_cabinet_sets`) a `cabinet_set_conflicts(collected)` ich pridá
-k blokujúcim aj bez zliatia owner člena; **zhodné (alebo nijaké) mapy konflikt nie sú** — bežná kópia skrinky dá rovnaký výsledok nech vyhrá ktorákoľvek. Kľúč je aditívny:
-starší zber bez neho sa správa ako predtým. Blokujúca hláška preto menuje **oba** dôsledky (TipOn započítaný raz · set podľa druhej skrinky).
+nedá ani dokázať, ani vyvrátiť. Také ID hlási zber v aditívnom kľúči **`cabinet_set_conflicts`** (`Bom.note_cabinet_sets`) a brána ich pridá k blokujúcim aj bez zliatia owner
+člena; **zhodné (alebo nijaké) mapy konflikt nie sú** — bežná kópia skrinky dá rovnaký výsledok nech vyhrá ktorákoľvek. **Blokuje sa len rozdiel, ktorý tej skrinke naozaj mení
+kód (review #262 P2):** záznam nesie KĽÚČE rozdielu a `conflict_matters?` ich porovná s kľúčmi, ktorými si skrinka kovanie skutočne mapuje — `override_keys_in_use` ich číta
+z `collected[:hardware]` ako `generic_type` a `generic_type@owner_part_key` (vzor `resolve_mapping_value`). Rozídený `slide` na skrinke, ktorá má len závesy, teda neblokuje;
+**neznámy rozdiel (prázdny zoznam kľúčov) blokuje** — rovnaká logika ako pri neznámej expanzii. Kľúč je aditívny: starší zber bez neho sa správa ako predtým. Blokujúca hláška
+menuje **oba** dôsledky (TipOn započítaný raz · set podľa druhej skrinky). **Priznaný zvyšok:** či sa override rovná projektovej predvoľbe, brána nevie — mapovanie projektu
+nie je súčasťou zberu a druhý výklad precedencie (`HardwareSets.resolve_set_id` je jediná autorita) by bol presne ten druhý verdikt o tej istej veci, ktorému sa tu vyhýbame.
 Tvrdé dôvody **vypadli z `cp_warnings`** — jeden dôvod žije v jednom zozname, dva zoznamy o tej istej veci by sa časom rozišli; `cp_warnings(hits, dups, confirmed)` drží už len
 firewall, neblokujúce duplicity a **potvrdené** riadky bez ceny. Kontrakt strážia `tests/pure/test_p0hf_brany.rb` (pri každom dôvode sa meria **prázdny priečinok**, nie text
 statusu), `tests/pure/test_hardware_sets.rb` (príznak `per_owner`) a `tests/js/test_p0hf_potvrdenie.js` (dvojkrokový klik).
@@ -214,7 +218,9 @@ Zber modelu a agregácia riadkov kusovníka (`Bom.collect`, `Bom.compute`, `Bom.
 `cabinet_sets`, **`cabinet_set_conflicts`**, `placements`, `identities` a `warnings`; `compute()` ich **ignoruje** (tvar výstupu ani SCHEMA `.skp` sa nimi nemenia), číta ich
 `Validation.run` a payloady sekcií. **`cabinet_set_conflicts` (1d/R-34, review #262 P1)** je zoznam ID skriniek, ktorých override setov kovania sa medzi inštanciami **rozišiel** —
 `cabinet_sets` má na ID jeden slot, takže pri zdieľanom ID by expanzia použila mapu jednej inštancie na obe. Rozhoduje o tom `Bom.note_cabinet_sets` (čistá funkcia, testovaná
-headless): zhodné mapy — ani „obe bez overridu" — konflikt nie sú, chýbajúci override oproti prítomnému áno. Jediný čitateľ je `ProductionCore.dup_partition`.
+headless): zhodné mapy — ani „obe bez overridu" — konflikt nie sú, chýbajúci override oproti prítomnému áno. Hodnotou je **zoznam kľúčov**, v ktorých sa inštancie rozišli
+(`differing_override_keys`), aby brána vedela posúdiť, či sa rozdiel tej skrinky vôbec týka; porovnáva sa proti PRVEJ videnej inštancii (keď sa všetky rovnajú jej, rovnajú sa
+navzájom). Jediný čitateľ je `ProductionCore.dup_partition`.
 Pravidlo, ktoré z toho platí pre každý ďalší zásah: **záznam nesie presne to, čo jeho čitateľ naozaj číta.** Pole bez čitateľa je pozvánka pre budúci kód postaviť sa naň — preto
 z `manual_overrides['abs']` v 1b-4 vypadli `material_id` aj `pid` (adresa jantárového riadku je zámerne identita `owner_id` + `part_key`, nikdy persistent_id). Detail kontraktu
 jantárových riadkov — čo je zdrojom ABS overridu, ako sa páruje kovanie a v akom poradí sa riadky kreslia — žije v [hardware.md](hardware.md), odsek `hardware_rules.rb`

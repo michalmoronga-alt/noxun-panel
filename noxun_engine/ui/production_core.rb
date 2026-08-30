@@ -816,6 +816,8 @@ module Noxun
       # roznych override mapach vyhra jedna a expanzia ju pouzije na OBE instancie
       # — vtedy su neiste rovno KODY, nie len pocty. Zoznam takych ID pripravuje
       # `Bom.note_cabinet_sets`; zhodne mapy (bezna kopia) konflikt nie su.
+      # A blokuje sa LEN rozdiel, ktory sa TEJ skrinky naozaj tyka (review #262 P2):
+      # rozidena mapa v type, ktory si skrinka vobec nemapuje, ziadny kod nezmeni.
       def dup_partition(collected, expansion)
         ident = identities_of(collected)
         cabs = Validation.duplicate_owner_ids(ident)
@@ -824,19 +826,49 @@ module Noxun
 
         merged = owner_scoped_cabinet_ids(expansion)
         ambiguous = cabinet_set_conflicts(collected)
+        in_use = override_keys_in_use(collected)
         blocking, harmless = cabs.partition do |_kind, id, _n|
-          merged.nil? || merged[id] || ambiguous[id]
+          merged.nil? || merged[id] || conflict_matters?(ambiguous[id], in_use[id] || {})
         end
         [blocking, (harmless + others).sort_by { |kind, id, _n| [kind, id] }]
       end
 
       # ID skriniek, ktorych override setov kovania sa medzi instanciami ROZISIEL
-      # (aditivny kluc zberu — kto ho nema, nic nestrati).
+      # => kluce, v ktorych sa rozisli (aditivny kluc zberu — kto ho nema, nic
+      # nestrati; zber bez neho sa sprava presne ako pred R-34).
       def cabinet_set_conflicts(collected)
+        raw = collected.is_a?(Hash) ? collected[:cabinet_set_conflicts] : nil
+        return {} unless raw.is_a?(Hash)
         out = {}
-        list = collected.is_a?(Hash) ? collected[:cabinet_set_conflicts] : nil
-        Array(list).each { |id| out[id.to_s] = true }
+        raw.each { |cid, keys| out[cid.to_s] = Array(keys).map(&:to_s) }
         out
+      end
+
+      # Kluce, ktorymi si polozky kovania TEJ skrinky naozaj vedia vybrat set —
+      # `generic_type` a `generic_type@owner_part_key` (vzor `resolve_mapping_value`
+      # v HardwareSets; poradie tu nehra rolu, staci ci sa kluc vobec pouziva).
+      def override_keys_in_use(collected)
+        out = {}
+        Array(collected.is_a?(Hash) ? collected[:hardware] : nil).each do |it|
+          next unless it.is_a?(Hash)
+          gt = it['generic_type'].to_s
+          next if gt.empty?
+          keys = (out[it['owner_id'].to_s] ||= {})
+          keys[gt] = true
+          opk = it['owner_part_key'].to_s
+          keys["#{gt}@#{opk}"] = true unless opk.empty?
+        end
+        out
+      end
+
+      # Rozidena mapa blokuje LEN vtedy, ked sa lisi v kluci, ktorym si skrinka
+      # kovanie naozaj mapuje — rozdiel v nepouzitom type ziadny kod nezmeni
+      # (review #262 P2). NEZNAMY rozdiel (prazdny zoznam klucov) blokuje:
+      # nedokazatelnu koliziu zastavujeme, rovnako ako neznamu expanziu.
+      def conflict_matters?(keys, in_use)
+        return false if keys.nil?
+        return true if keys.empty?
+        keys.any? { |k| in_use[k] }
       end
 
       # ID skriniek, ktorym expanzia pridelila aspon jedneho clena uctovaneho
