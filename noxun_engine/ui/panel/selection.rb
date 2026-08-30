@@ -560,11 +560,20 @@ module Noxun
       # Tri cesty (vzor ScaleWatch::EngineAppObserver): New/Open + onActivateModel
       # pre prepinanie medzi UZ otvorenymi dokumentmi (Codex review PR #18).
       class PanelAppObserver < Sketchup::AppObserver
+        # GHOST (V1-04, review #268 P2-2): New/Open = dokument pod ghostom uz
+        # NIE JE ten, v ktorom vklad zacal — session sa rusi BEZPODMIENECNE,
+        # este pred prepnutim observerov. Windows drzi jeden dokument na proces
+        # a smie recyklovat ten isty `Model` objekt, takze porovnanie identity
+        # (`on_model_switched`) by tu mohlo session omylom nechat zit.
+        # Ghost moze existovat len s otvorenym Inspectorom, a ten tento
+        # observer vzdy pripaja (`attach_observer` -> `ensure_app_observer`).
         def onNewModel(model)
+          GhostTool.on_document_replaced('nový dokument') if defined?(GhostTool)
           Panel.on_model_switched(model)
         end
 
         def onOpenModel(model)
+          GhostTool.on_document_replaced('otvorený iný dokument') if defined?(GhostTool)
           Panel.on_model_switched(model)
         end
 

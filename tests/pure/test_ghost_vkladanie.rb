@@ -82,9 +82,11 @@ end
 
 NxTest.test('ghost: horna skrinka ma OBA varianty dna od Z = 0 (UPPER_HANG_Z je svetova vyska, nie kotva)') do
   %w[under_sides between_sides].each do |bm|
-    a = NxGhost.calc.anchor_points(NxGhost.upper_cfg(bottom_mode: bm))
+    c = NxGhost.upper_cfg(bottom_mode: bm)
+    a = NxGhost.calc.anchor_points(c)
     NxTest.assert_equal([0.0, 0.0, 0.0], a[:fl_bottom], "horna #{bm}: spodna kotva nie je na Z = 0")
-    NxTest.assert_equal([720.0, a[:fl_top][2]].last, a[:fl_top][2])
+    NxTest.assert_equal([0.0, 0.0, c[:height]], a[:fl_top], "horna #{bm}: horna kotva nie je na vyske korpusu")
+    NxTest.assert_equal([c[:width], 0.0, c[:height]], a[:fr_top], "horna #{bm}: prava horna kotva nesedi")
   end
   # Poistka: aj keby config hornej niesol floor_height (normalize ho nuluje),
   # kotva ostava na Z = 0 — typ vitazi nad hodnotou.
@@ -214,6 +216,27 @@ NxTest.test('ghost: ray x rovina zamku — degenerovane pripady vracaju nil') do
   NxTest.assert(c.ray_plane([0.0, 0.0, Float::INFINITY], [0.0, 0.0, -1.0], 0.0).nil?)
   NxTest.assert(c.ray_plane([0.0, 0.0, 500.0], [0.0, 0.0, Float::NAN], 0.0).nil?)
   NxTest.assert(c.ray_plane(nil, [0.0, 0.0, -1.0], 0.0).nil?)
+end
+
+NxTest.test('ghost: SIKMY ale nedegenerovany luc — takmer vodorovny pohlad NIE JE poloha') do
+  c = NxGhost.calc
+  # WALK pohlad z vysky 1500 mm, jeden pixel pod horizontom: `dz` je rádovo
+  # 1e-4, holy EPS 1e-9 by to prepustil a `t` by vyslo ~1,5e7 mm — klik by
+  # polozil korpus 15 km od originu. Uhlova brana to musi utnut.
+  NxTest.assert(c.ray_plane([0.0, 0.0, 1500.0], [1.0, 0.0, -1e-4], 0.0).nil?,
+                'takmer vodorovny luc (sin 1e-4) mal vratit nil')
+  # Nenormalizovany smer: rozhoduje POMER, nie velkost zlozky.
+  NxTest.assert(c.ray_plane([0.0, 0.0, 1500.0], [1000.0, 0.0, -0.1], 0.0).nil?,
+                'nenormalizovany takmer vodorovny luc mal vratit nil')
+  # Uhol UZ prejde (sin 1,2e-3), ale vysledok je 1,25 km od kamery —
+  # zdravotny strop ho musi zastavit (druha, nezavisla brana).
+  NxTest.assert(c.ray_plane([0.0, 0.0, 1500.0], [1.0, 0.0, -1.2e-3], 0.0).nil?,
+                'luc mimo zdravy dosah (1,25 km) mal vratit nil')
+  # Hranicna kontrola: strop plati aj na SURADNICE vysledku.
+  NxTest.assert(!c.sane_point?([2_000_000.0, 0.0, 0.0]), 'bod 2 km od originu nie je zdravy')
+  NxTest.assert(!c.sane_point?([0.0, Float::INFINITY, 0.0]))
+  NxTest.assert(!c.sane_point?([0.0, 0.0]))
+  NxTest.assert(c.sane_point?([80_000.0, 45_000.0, 0.0]), 'bezna zakazka musi prejst')
 end
 
 NxTest.test('ghost: ray x rovina zamku — platny luc trafi rovinu presne') do
@@ -351,6 +374,85 @@ NxTest.test('ghost sev: handle_insert UZ NESTAVIA — pripravi plan a zavesi gho
                 'ghost nesmie planovat v draw slucke')
   NxTest.assert(gt.include?('push_tool') && !gt.include?('select_tool'),
                 'ghost sa musi aktivovat push_tool (select_tool by zahodil povodny nastroj)')
+end
+
+NxTest.test('ghost: File>New / File>Open rusia session BEZPODMIENECNE (Windows recykluje Model objekt)') do
+  gt = NxGhost.gt
+  model = Object.new
+  s = gt.instance_variable_get(:@session)
+  begin
+    gt.instance_variable_set(:@session, gt::PlacementSession.new(model: model, plan: NxGhost.plan(NxGhost.cfg, 0.0, model)))
+    live = gt.session
+    # Poistka identity by tu vratila „ten isty dokument" — a session by
+    # prezila do inej zakazky. Udalost o novom/otvorenom dokumente ju musi
+    # zrusit bez ohladu na identitu.
+    NxTest.assert(gt.on_model_switched(model) == false,
+                  'aktivacia toho isteho dokumentu session rušiť NESMIE (Ctrl+S)')
+    NxTest.assert(live.active?, 'session mala prezit aktivaciu toho isteho dokumentu')
+    NxTest.assert(gt.on_document_replaced('test') == true, 'New/Open musi session zrusit')
+    NxTest.assert(live.terminal? && gt.session.nil?, 'po New/Open nesmie ostat ziadna session')
+    NxTest.assert(gt.on_document_replaced('test') == false, 'druhe New/Open uz nema co rusit')
+  ensure
+    gt.instance_variable_set(:@session, s)
+  end
+end
+
+NxTest.test('ghost session: slot sa uvolni aj nad rozrobenym commitom') do
+  gt = NxGhost.gt
+  model = Object.new
+  s = gt.instance_variable_get(:@session)
+  begin
+    live = gt::PlacementSession.new(model: model, plan: NxGhost.plan(NxGhost.cfg, 0.0, model))
+    gt.instance_variable_set(:@session, live)
+    live.begin_commit! # simuluje commit prerušený vynimkou MIMO StandardError
+    NxTest.assert(live.committing?)
+    gt.cancel_session('mrtva session', deferred: false)
+    NxTest.assert(gt.session.nil?, 'rozrobena session nesmie drzat slot navzdy')
+  ensure
+    gt.instance_variable_set(:@session, s)
+  end
+end
+
+NxTest.test('ghost sev: New/Open vetva AppObservera rusi session pred prepnutim observerov') do
+  sel = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'selection.rb'), encoding: 'UTF-8')
+  obs = sel[/class PanelAppObserver.*?\n      end\n/m].to_s
+  NxTest.assert(!obs.empty?, 'PanelAppObserver sa nenasiel')
+  %w[onNewModel onOpenModel].each do |ev|
+    body = obs[/def #{ev}\(model\)(.*?)\n        end/m, 1].to_s
+    NxTest.assert(body.include?('GhostTool.on_document_replaced'),
+                  "#{ev} nerusi ghost session bezpodmienecne")
+    NxTest.assert(body.index('GhostTool.on_document_replaced') < body.index('Panel.on_model_switched'),
+                  "#{ev}: cancel ghostu musi bezat PRED prepnutim observerov")
+  end
+  # `onActivateModel` ostava na IDENTITE — aktivacia toho isteho dokumentu
+  # (aj po Ctrl+S) ghost rušiť nesmie.
+  act = obs[/def onActivateModel\(model\)(.*?)\n        end/m, 1].to_s
+  NxTest.assert(!act.include?('on_document_replaced'),
+                'onActivateModel nesmie rušiť bezpodmienecne — Ctrl+S ghost drzi')
+end
+
+NxTest.test('ghost sev: iné spôsoby vkladania (kópia, doska) session ukončia') do
+  cab = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_cabinet.rb'), encoding: 'UTF-8')
+  copy = cab[/def handle_insert_copy\(payload\).*?\n        end\n/m].to_s
+  NxTest.assert(copy.include?('GhostTool.cancel_session'), 'handle_insert_copy nerusi ghost session')
+  NxTest.assert(copy.index('GhostTool.cancel_session') < copy.index('CabinetBuilder.build'),
+                'kopia musi zrusit ghost PRED stavbou')
+  brd = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_board.rb'), encoding: 'UTF-8')
+  ins = brd[/def handle_insert_board\(payload\).*?\n        end\n/m].to_s
+  NxTest.assert(ins.include?('GhostTool.cancel_session'), 'handle_insert_board nerusi ghost session')
+  NxTest.assert(ins.index('GhostTool.cancel_session') < ins.index('BoardBuilder.build'),
+                'vlozenie dosky musi zrusit ghost PRED stavbou')
+end
+
+NxTest.test('ghost sev: poznamka preflightov ide do statusu PRAVE RAZ (po vlozeni)') do
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_cabinet.rb'), encoding: 'UTF-8')
+  ins = src[/def handle_insert\(payload\).*?\n        end\n/m].to_s
+  after = src[/def ghost_after_commit\(model, inst, session\).*?\n        end\n/m].to_s
+  NxTest.assert(after.include?('session.note'), 'ghost_after_commit nevypisuje poznamku preflightov')
+  # Status pri zaveseni ghostu poznamku UZ neopakuje — inak by ju pouzivatel
+  # videl dvakrat (raz predcasne).
+  status = ins[/set_status\('Skrinka visí na kurzore.*?\)\n/m].to_s
+  NxTest.assert(!status.include?('note'), 'poznamka sa vypisuje uz pri zaveseni ghostu — bola by dvakrat')
 end
 
 NxTest.test('ghost sev: zavretie Inspectora a prepnutie dokumentu session RUSIA') do

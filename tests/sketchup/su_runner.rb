@@ -1808,9 +1808,8 @@ module NoxunSuRunner
     ghost_move!(model, [1000.0, 300.0, 0.0])
     ok('GHOST 8: vychodisko — ghost je polozitelny', s.placeable)
     last = s.last_point
-    # ROVINA ZA KAMEROU: kamera POD rovinou zamku pozerajuca NADOL — parameter
-    # luca vyjde zaporny (`t < 0`), priesecnik teda neplati.
-    # (Druhy degenerovany pripad, |dir.z| pod EPS, meria headless sada.)
+    # (a) ROVINA ZA KAMEROU: kamera POD rovinou zamku pozerajuca NADOL —
+    #     parameter luca vyjde zaporny (`t < 0`), priesecnik neplati.
     model.active_view.camera = Sketchup::Camera.new(e::Units.point(1000.0, 300.0, -2000.0),
                                                     e::Units.point(1000.0, 300.0, -5000.0),
                                                     Y_AXIS)
@@ -1823,6 +1822,25 @@ module NoxunSuRunner
     ghost_tool.onLButtonDown(0, cx, cy, v)
     ok('GHOST 8: klik v degenerovanom pohlade NEVLOZIL nic a session zije',
        cabinets(model).length == before8 && !ghost_session.nil? && ghost_session.active?)
+    # (b) SIKMY, ale NEDEGENEROVANY luc (review #268 P2-1): WALK pohlad z vysky
+    #     1,5 m tesne nad horizont. Stary straznik (EPS 1e-9) by ho prepustil
+    #     a klik by polozil korpus KILOMETRE od originu — poloha musi ostat
+    #     necitatelna. Mieri sa DO HORNEJ polovice okna, teda NAD horizont.
+    model.active_view.camera = Sketchup::Camera.new(e::Units.point(0.0, -3000.0, 1500.0),
+                                                    e::Units.point(0.0, 3000.0, 1500.0), Z_AXIS)
+    v = model.active_view
+    horizon_y = [(v.vpheight / 2).to_i - 1, 1].max
+    ghost_tool.onMouseMove(0, (v.vpwidth / 2).to_i, horizon_y, v)
+    far_ok = !s.placeable ||
+             (s.last_point && s.last_point[0].abs <= e::GhostTool::Calc::MAX_REACH_MM &&
+              s.last_point[1].abs <= e::GhostTool::Calc::MAX_REACH_MM)
+    ok("GHOST 8b: takmer vodorovny (walk) pohlad nevystrelí ghost kilometre od originu (#{s.placeable ? s.last_point.map { |q| q.round(0) }.inspect : 'nepolozitelne'})",
+       far_ok)
+    ghost_tool.onLButtonDown(0, (v.vpwidth / 2).to_i, horizon_y, v)
+    placed8 = cabinets(model).length > before8 ? cabinets(model).last : nil
+    ok('GHOST 8b: klik z walk pohladu bud nevlozi nic, alebo polozi skrinku v ZDRAVOM dosahu',
+       placed8.nil? || ghost_origin_mm(placed8).first(2).all? { |q| q.abs <= e::GhostTool::Calc::MAX_REACH_MM })
+    cleanup(model)
     ghost_teardown!(model)
 
     # --- 9) UNDO POCAS GHOSTU (onCancel reason 2) = cancel, 0 mutacii -------
@@ -1986,6 +2004,61 @@ module NoxunSuRunner
     ok('GHOST 15: „Vlozit kopiu" vklada SYNCHRONNE (bez ghostu) a oznaci kopiu',
        cabinets(model).length == 3 && ghost_session.nil? &&
        model.selection.to_a.any? { |i| e::Store.kind(i) == 'cabinet' })
+
+    # --- 16) PRAZDNY MODEL / PRAZDNE MIESTO: zamok nepotrebuje podlahovu plochu -
+    #     Zamok je CISTY priesecnik luca s rovinou — funguje aj tam, kde pod
+    #     kurzorom nie je ziadna geometria (a teda ani inference).
+    cleanup(model)
+    empty_spot = [42_000.0, 26_000.0]
+    empty = ghost_place!(model, GHOST_PARAMS.dup, empty_spot)
+    eo = empty ? ghost_origin_mm(empty) : [nil, nil, nil]
+    ok('GHOST 16: v prazdnom mieste bez jedinej plochy pod kurzorom klik POLOZIL skrinku',
+       empty && cabinets(model).length == 1 && ghost_near_target?(empty_spot) && ghost_on_used?(eo))
+    ok('GHOST 16: zamok drzi Z = 0 aj bez podlahovej plochy', empty && eo[2].abs <= TOL)
+    ghost_teardown!(model)
+    cleanup(model)
+
+    # --- 17) SEV `ghost_freeze_hardware`: kovanie zo sablony v TEJ ISTEJ operacii
+    hw_payload = GHOST_PARAMS.merge('hardware_sets' => { 'leg' => '__SU_TEST_GHOST_SET__' },
+                                    'hardware_set_defs' => {})
+    e::Panel.handle_insert(pg(model, hw_payload))
+    s = ghost_session
+    ok('GHOST 17: session si nesie snapshot kovania zo sablony (sev ma co volat)',
+       !s.nil? && !s.hardware.nil?)
+    if s && s.hardware
+      ghost_camera!(model, [1200.0, 300.0], 0.0)
+      hwi = ghost_click!(model, [1200.0, 300.0, 0.0]) && model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
+      ok('GHOST 17: vklad so setmi zo sablony prebehol (sprievodny blok nezrusil operaciu)',
+         !hwi.nil? && cabinets(model).length == 1)
+      ok('GHOST 17: poznamka o setoch sa dostala do session (status ju vypisuje po vlozeni)',
+         !s.hardware_note.nil?)
+      ghost_teardown!(model)
+      Sketchup.undo
+      ok('GHOST 17: 1x Spat vratil vklad AJ zapis setov (jedna operacia)', cabinets(model).empty?)
+      cleanup(model)
+
+      # (b) VYNIMKA v sprievodnom bloku musi zrusit CELY vklad — ziadna skrinka
+      #     so zapisanym, ale nezmrazenym setom. Sonda docasne prebije sev.
+      before17 = cabinets(model).length
+      m17 = r03_marker(model, markers)
+      sc = e::Panel.singleton_class
+      sc.send(:alias_method, :ghost_freeze_hardware_orig, :ghost_freeze_hardware)
+      sc.send(:define_method, :ghost_freeze_hardware) { |_m, _hw| raise 'SU-TEST GHOST sonda kovania' }
+      begin
+        bad_hw = ghost_place!(model, hw_payload, [1000.0, 250.0])
+      ensure
+        sc.send(:alias_method, :ghost_freeze_hardware, :ghost_freeze_hardware_orig)
+        sc.send(:remove_method, :ghost_freeze_hardware_orig)
+      end
+      ok('GHOST 17b: vynimka v sprievodnom bloku zrusila CELY vklad (ziadna skrinka)',
+         bad_hw.nil? && cabinets(model).length == before17)
+      ok('GHOST 17b: zlyhany vklad session UKONCIL', ghost_session.nil?)
+      Sketchup.undo
+      ok('GHOST 17b: zruseny vklad nenechal ZIADEN krok Spat (1x Spat vratil marker)', !m17.valid?)
+    else
+      info('GHOST 17: mapovanie setov sa nepodarilo zostavit — sev kovania preskoceny')
+    end
+    ghost_teardown!(model)
 
     r03_clear_markers(model, markers)
     ghost_teardown!(model)

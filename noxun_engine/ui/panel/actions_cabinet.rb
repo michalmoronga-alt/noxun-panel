@@ -331,9 +331,12 @@ module Noxun
           if GhostTool.start(model, plan, hardware: hw, template_ref: tpl_ref, note: note).nil?
             return set_status('Ghost vkladanie sa nepodarilo spustiť — skús to znova.', true)
           end
+          # Poznamku preflightov (D-45 prevzata hrubka, materialove noty)
+          # vypisuje AZ `ghost_after_commit` — pri stlaceni „Vlozit" sa este
+          # nic nestalo, takze hlasit „hrubka prevzata" by bolo predcasne
+          # a po kliku by sa to zopakovalo druhy raz (review #268 P3-7).
           set_status('Skrinka visí na kurzore — klikni, kam ju položiť. ' \
-                     'Šípky ←/→ otáčajú, Alt prepína kotvu, ↓ drží domácu výšku, ↑ pustí voľnú výšku, Esc zruší.' \
-                     "#{note}")
+                     'Šípky ←/→ otáčajú, Alt prepína kotvu, ↓ drží domácu výšku, ↑ pustí voľnú výšku, Esc zruší.')
         end
 
         # GHOST: sprievodny zapis kovania zo sablony (H2/D-76). Bezi VNUTRI
@@ -379,6 +382,11 @@ module Noxun
           model = Sketchup.active_model
           data = parse(payload)
           return if foreign_document?(data, model, 'Kópia sa nevložila') # R-02
+
+          # GHOST (V1-04): iny sposob vkladania = koniec zivotneho cyklu
+          # beziacej session. Kopia sa kladie SYNCHRONNE (`next_x`), takze
+          # ghost visiaci na kurzore by uz nemal co dokoncit.
+          GhostTool.cancel_session('vloženie kópie') if defined?(GhostTool)
 
           cid = data['cabinet_id'].to_s
           cab = cid.empty? ? find_cabinet(model) : find_cabinet_by_id(model, cid)

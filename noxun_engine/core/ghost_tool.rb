@@ -71,6 +71,11 @@ module Noxun
         rescue StandardError => e
           Engine.log_error(e, 'GhostTool.start')
           @session = nil
+          # Nastroj sa uz mohol pushnut (alebo aktivovat len ciastocne) — bez
+          # tohto by visel na stacku bez session a pouzivatel by z neho vysiel
+          # len prepnutim nastroja. `activate` sa preto registruje ako PRVE,
+          # nech je co popnut aj pri chybe uprostred nej.
+          end_tool(deferred: false)
           nil
         end
 
@@ -83,7 +88,10 @@ module Noxun
           changed = false
           if s
             changed = s.cancel!(reason)
-            @session = nil if s.terminal?
+            # Slot sa uvolnuje aj nad `:committing` (review #268 P3-10): ked by
+            # z commitu vybublala vynimka MIMO `StandardError`, session by
+            # ostala navzdy „rozrobena" a drzala by slot az do restartu.
+            @session = nil if s.terminal? || s.committing?
             invalidate_view(s.model)
           end
           end_tool(deferred: deferred)
@@ -132,9 +140,24 @@ module Noxun
           false
         end
 
-        # Prepnutie dokumentu (Panel.on_model_switched). Session patri JEDNEMU
-        # dokumentu — plan sa porovnava OBJEKTOM modelu, nie guidom (ten sa meni
-        # pri kazdom ulozeni, lekcia #261/#264), takze Ctrl+S ghost NEZRUSI.
+        # PRVA (a na Windows JEDINA spolahliva) obrana: File > New / Open.
+        # Udalost sama o sebe znamena, ze dokument pod ghostom uz nie je ten,
+        # v ktorom vklad zacal — ruší sa preto BEZPODMIENECNE, bez porovnavania
+        # identity. Dovod (review #268 P2-2): Windows drzi JEDEN dokument na
+        # proces a pri File>Open smie RECYKLOVAT ten isty `Sketchup::Model`
+        # objekt; porovnanie objektom by vtedy vratilo „ten isty dokument"
+        # a session by prezila do cudzej zakazky. Na `guid` sa spoliehat NEDA
+        # (meni ho kazde ulozenie — Ctrl+S ghost rušiť nesmie).
+        def on_document_replaced(reason = 'nový alebo otvorený dokument')
+          return false unless @session
+
+          cancel_session(reason)
+        end
+
+        # DRUHA obrana (macOS multi-dokument, `onActivateModel`): aktivacia
+        # INEHO dokumentu. Tu uz identita zmysel ma — aktivacia TOHO ISTEHO
+        # dokumentu (aj po ulozeni) ghost rušiť nesmie. Plan sa porovnava
+        # OBJEKTOM modelu, nie guidom (lekcia #261/#264).
         def on_model_switched(model)
           s = @session
           return false unless s
@@ -239,6 +262,19 @@ module Noxun
       # =====================================================================
       module Calc
         EPS = 1e-9
+        # STRAZNIK DEGENEROVANYCH LUCOV (interne review #268, P2-1).
+        # Holy `EPS` na zlozke smeru je MRTVY straznik: pri normalizovanom
+        # vektore ho prejde aj luc jeden pixel pod horizontom (dz ~ 1e-4),
+        # z coho vyjde parameter luca radovo 10^6 — a klik by polozil korpus
+        # KILOMETRE od originu (`rigid_matrix?` translaciu nijako neobmedzuje).
+        # Preto dve NEZAVISLE brany:
+        #   MIN_SIN      — UHLOVA hranica sklonu luca voci rovine (sinus uhla);
+        #                  1e-3 je ~0,057°, teda „takmer vodorovny pohlad"
+        #   MAX_REACH_MM — ZDRAVOTNY STROP na vysledok (1 km od kamery aj od
+        #                  originu modelu). Chrani AJ free rezim, kde inference
+        #                  vie vratit bod na extremne vzdialenej geometrii.
+        MIN_SIN = 1e-3
+        MAX_REACH_MM = 1_000_000.0
         # Presne hodnoty cos/sin pre nasobky 90° — ziadny numericky sum,
         # `rigid_matrix?` (RIGID_TOL 1e-6) ich prijme bez rezervy.
         COS = [1.0, 0.0, -1.0, 0.0].freeze
@@ -340,26 +376,49 @@ module Noxun
            tx,  ty,  tz,  1.0]
         end
 
-        # Priesecnik luca s VODOROVNOU rovinou zamku (audit BLOCKER 3).
-        # Plati LEN ked je luc dostatocne strmy, vysledok konecny a parameter
-        # `t >= 0` (rovina lezi PRED kamerou). Inak nil — ghost drzi poslednu
-        # platnu polohu, `placeable = false` a klik NECOMMITNE.
+        # Priesecnik luca s VODOROVNOU rovinou zamku (audit BLOCKER 3 +
+        # review #268 P2-1). Plati LEN ked su splnene VSETKY podmienky:
+        #   * smer je konecny a nenulovy,
+        #   * luc je voci rovine dostatocne SKLONENY (`MIN_SIN`) — takmer
+        #     vodorovny pohlad polohu neurcuje,
+        #   * parameter `t >= 0` (rovina lezi PRED kamerou),
+        #   * vysledok je v ZDRAVOM dosahu (`MAX_REACH_MM`) — sikmy, ale este
+        #     nie „vodorovny" luc inak vystreli bod kilometre od originu.
+        # Inak nil — ghost drzi poslednu platnu polohu, `placeable = false`
+        # a klik NECOMMITNE.
         def ray_plane(origin, direction, plane_z)
           return nil unless origin && direction
 
-          dz = direction[2].to_f
-          return nil unless dz.finite? && dz.abs > EPS
+          d = [direction[0].to_f, direction[1].to_f, direction[2].to_f]
+          return nil unless d.all?(&:finite?)
+
+          len = Math.sqrt((d[0] * d[0]) + (d[1] * d[1]) + (d[2] * d[2]))
+          return nil unless len.finite? && len > EPS
+          # dz/len je SINUS uhla medzi lucom a rovinou — jednotka smeru sa tak
+          # nemusi predpokladat (pickray vracia jednotkovy, testy nemusia).
+          return nil unless (d[2] / len).abs > MIN_SIN
 
           oz = origin[2].to_f
           return nil unless oz.finite? && plane_z.to_f.finite?
 
-          t = (plane_z.to_f - oz) / dz
+          t = (plane_z.to_f - oz) / d[2]
           return nil unless t.finite? && t >= 0.0
+          # Dlzka luca po rovinu (`t` je v jednotkach `d`, preto krat `len`).
+          return nil unless (t * len) <= MAX_REACH_MM
 
-          pt = [origin[0].to_f + (t * direction[0].to_f),
-                origin[1].to_f + (t * direction[1].to_f),
-                plane_z.to_f]
-          pt.all? { |v| v.finite? } ? pt : nil
+          pt = [origin[0].to_f + (t * d[0]), origin[1].to_f + (t * d[1]), plane_z.to_f]
+          sane_point?(pt) ? pt : nil
+        end
+
+        # ZDRAVOTNY STROP na KAZDU polohu ghostu — plati pre zamok aj pre free
+        # inference. Poloha musi byt konecna a najviac `MAX_REACH_MM` od
+        # originu modelu; inak sa ghost nesmie polozit (radsej ziadna poloha
+        # nez korpus kilometre od zakazky).
+        def sane_point?(pt)
+          return false unless pt.is_a?(Array) && pt.length == 3
+          return false unless pt.all? { |v| v.is_a?(Numeric) && v.to_f.finite? }
+
+          pt.all? { |v| v.to_f.abs <= MAX_REACH_MM }
         end
 
         # Dalsia kotva v cykle (Alt). JEDNA metoda — pripadny TAB fallback
@@ -419,6 +478,13 @@ module Noxun
 
         def terminal?
           @state == :committed || @state == :cancelled
+        end
+
+        # Rozrobeny commit. Navonok sa nevyskytuje (commit je synchronny) —
+        # okrem pripadu, ked z neho vybublala vynimka MIMO `StandardError`.
+        # `cancel_session` podla toho uvolni slot (review #268 P3-10).
+        def committing?
+          @state == :committing
         end
 
         def placeable
@@ -572,12 +638,17 @@ module Noxun
 
         # --- lifecycle ------------------------------------------------------
 
+        # PORADIE JE ZAMERNE: registracia a `@attached` idu ako PRVE, aby sa
+        # nastroj dal popnut aj vtedy, keby cokolvek nizsie zlyhalo (review
+        # #268 P3-2). Model sa berie zo SESSION — `Sketchup.active_model` je
+        # v momente aktivacie uz len domnienka (P3-8).
         def activate
           guarded('activate') do
-            @ip = Sketchup::InputPoint.new
-            @model_ref = Sketchup.active_model
+            s = GhostTool.session
+            @model_ref = (s && s.model) || Sketchup.active_model
             @attached = true
             GhostTool.register_tool(self)
+            @ip = Sketchup::InputPoint.new
             refresh_status
             view = @model_ref.active_view
             view.invalidate if view
@@ -697,9 +768,14 @@ module Noxun
         # Alt zachytavame AJ pri pusteni a vraciame true — minimalizuje to
         # aktivaciu menu-baru Windows. (TAB fallback je Scope OUT; cyklovanie
         # kotiev je jedna volatelna metoda `PlacementSession#cycle_anchor!`.)
+        # Klavesu vlastnime LEN so ZIVOU session — symetria s `onKeyDown`
+        # (review #268 P3-6): po commite/cancele uz nesmieme SketchUpu nic brat.
         def onKeyUp(key, _repeat, _flags, _view)
           res = false
-          guarded('onKeyUp') { res = !owned_key(key).nil? }
+          guarded('onKeyUp') do
+            s = GhostTool.session
+            res = !s.nil? && s.active? && !owned_key(key).nil?
+          end
           res
         end
 
@@ -771,12 +847,16 @@ module Noxun
           s.set_point(pt, !pt.nil?)
         end
 
-        # Volna vyska: plny inference point SketchUpu.
+        # Volna vyska: plny inference point SketchUpu. Aj tu plati ZDRAVOTNY
+        # STROP (review #268 P2-1) — inference na extremne vzdialenej geometrii
+        # by inak polozil korpus kilometre od zakazky.
         def pick_free(s, x, y, view)
           @ip ||= Sketchup::InputPoint.new
           @ip.pick(view, x, y)
           pos = @ip.valid? ? @ip.position : nil
-          s.set_point(pos ? to_mm_triplet(pos) : nil, !pos.nil?)
+          pt = pos ? to_mm_triplet(pos) : nil
+          pt = nil unless pt.nil? || Calc.sane_point?(pt)
+          s.set_point(pt, !pt.nil?)
         end
 
         def to_mm_triplet(pt)

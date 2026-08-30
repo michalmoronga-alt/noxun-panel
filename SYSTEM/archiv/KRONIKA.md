@@ -126,8 +126,20 @@
   by timer založený starou session zhodil nástroj, ktorý medzitým pushlo druhé „Vložiť" (nájdené pri návrhu, nie testom). **Dôkazy:** 25 headless testov novej sady
   `test_ghost_vkladanie.rb` (matika + automat + zdrojové invarianty švu) a **in-SU sekcie `run_ghost` (15 scenárov) + `run_ghost_async`**; nástroj sa v nich simuluje
   **programovo, ale verne** — cez reálne `onMouseMove`/`onLButtonDown`/`onKeyDown`/`onCancel` nad živým `view`, kde cieľový bod ide cez `view.screen_coords` do `pickray`.
-  Scenáre preto oddeľujú **presnosť myši** (pixelová tolerancia) od **presnosti transformu** (0,1 mm proti bodu, ktorý si ghost z lúča naozaj vzal). Plný in-SU beh
-  **1155 PASS / 0 FAIL**. **Blok GHOST sa touto dávkou NEUZATVÁRA** — uzáver (minor 0.9.0, presun bloku do archívu) príde samostatným malým PR po Michalovom smoke.
+  Scenáre preto oddeľujú **presnosť myši** (pixelová tolerancia) od **presnosti transformu** (0,1 mm proti bodu, ktorý si ghost z lúča naozaj vzal).
+  **Čo pridalo review PR #268 (bez P1; dve P2 a desať P3):** (P2-1) *strážca degenerovaných lúčov bol MŔTVY* — `EPS` 1e-9 na zložke smeru prepustí pri normalizovanom vektore aj
+  lúč jeden pixel pod horizontom (`dz` ≈ 1e-4), parameter lúča vyjde rádovo 10⁶ a klik by položil korpus **kilometre od originu** (`rigid_matrix?` transláciu neobmedzuje);
+  stlmený ghost aj hláška boli tým pádom nedosiahnuteľný kód. Odteraz platia **dve nezávislé brány**: uhlová (`|dz| / |dir| > MIN_SIN`, 1e-3 ≈ 0,057°, podiel — na jednotkovosti
+  smeru nezáleží) **a** zdravotný strop výsledku (`MAX_REACH_MM` 1 km od kamery aj od originu), pričom strop `Calc.sane_point?` chráni **aj free inference** na extrémne
+  vzdialenej geometrii. (P2-2) *cancel pri prepnutí dokumentu cez identitu objektu na Windows nemusí nikdy nastať* — Windows drží jeden dokument na proces a pri File > Open smie
+  **recyklovať ten istý `Sketchup::Model`**, takže `for_model?` vráti true a session (aj guard `commit_insert`) by prežila do cudzej zákazky. Riešenie **nie je** doplnenie
+  `guid` do identity (menilo by ho každé Ctrl+S a ghost by padal pri ukladaní — package to zakazuje), ale **udalosť**: `PanelAppObserver#onNewModel`/`#onOpenModel` volajú
+  `GhostTool.on_document_replaced`, ktorý ruší **bezpodmienečne**, ešte pred prepnutím observerov. Porovnanie objektom zostáva ako **druhá obrana pre macOS multi-dokument**
+  (`onActivateModel` — tam musí platiť opak: aktivácia toho istého dokumentu ghost rušiť nesmie). Z P3: `handle_insert_copy` aj `handle_insert_board` sú nové konce životného
+  cyklu · `start` po výnimke popne nástroj (a `activate` sa registruje ako **prvé**, nech je čo popnúť aj pri chybe uprostred nej) · `Tool` berie model **zo session**, nie
+  z `Sketchup.active_model` · `onKeyUp` vlastní klávesu len so **živou** session · poznámka preflightov ide do statusu **práve raz** (až po vložení) · `cancel_session` uvoľní slot
+  aj nad `:committing` (commit prerušený výnimkou mimo `StandardError`). Plný in-SU beh po opravách **1166 PASS / 0 FAIL**, headless **2143**.
+  **Blok GHOST sa touto dávkou NEUZATVÁRA** — uzáver (minor 0.9.0, presun bloku do archívu) príde samostatným malým PR po Michalovom smoke.
 - **1d/R-03 · ŠEV `prepare_insert` / `commit_insert` V BUILDERI (v0.8.20, 30.8.2026, PR #265):** `CabinetBuilder.build` zlievalo normalizáciu, pridelenie ID, výpočet polohy,
   otvorenie operácie a stavbu geometrie do jedného toku. GHOST Tool (vkladanie na klik) tak nemal **čo bezpečne držať pred klikom** — žiadny pripravený objekt, ktorý sa dá
   nakresliť ako duch bez toho, aby už zasiahol model — a ani **ako položiť skrinku na finálnu polohu**: `transform:` mal len `rebuild`. Register to viedol ako **TVRDÝ blocker

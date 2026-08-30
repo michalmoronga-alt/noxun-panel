@@ -83,7 +83,15 @@ meria `async S6`).
 poslednú platnú polohu s príznakom `placeable`. **Terminálne stavy sú idempotentné** — druhý klik aj druhý cancel sú no-op, takže dvojklik nikdy nevyrobí dve skrinky.
 Identita dokumentu je **objekt `Sketchup::Model`, nie `guid`** (mení sa pri každom uložení — lekcia #261/#264), takže Ctrl+S ghost nezruší.
 **Všetky konce životného cyklu rušia starú session PRED čímkoľvek ďalším:** druhé „Vložiť" (nová session s čerstvým snapshotom) · zavretie Inspectora (`set_on_closed`) ·
-prepnutie dokumentu (`Panel.on_model_switched`) · `onCancel` 0/1/2 · `deactivate`.
+**File > New / Open** · aktivácia iného dokumentu · `onCancel` 0/1/2 · `deactivate` · iný spôsob vloženia (`handle_insert_copy`, `handle_insert_board`).
+
+**Prepnutie dokumentu má DVE obrany a Windows drží tú prvú.** `GhostTool.on_document_replaced` (volá ho `PanelAppObserver#onNewModel`/`#onOpenModel` ešte pred prepnutím
+observerov) ruší session **bezpodmienečne** — Windows drží jeden dokument na proces a pri File > Open smie **recyklovať ten istý `Sketchup::Model` objekt**, takže porovnanie
+identity by vrátilo „ten istý dokument" a session by prežila do cudzej zákazky (`commit_insert` by prešiel z rovnakého dôvodu). Porovnanie objektom
+(`GhostTool.on_model_switched`, cesta `onActivateModel`) je **druhá obrana pre macOS multi-dokument**; tam musí platiť opak — aktivácia toho istého dokumentu ghost rušiť nesmie.
+Na `guid` sa spoľahnúť **nedá ani ako na kľúč, ani ako na doplnok identity**: mení ho každé uloženie, takže by Ctrl+S ghost zabil (package to zakazuje). Ghost môže existovať len
+s otvoreným Inspectorom a ten `PanelAppObserver` vždy pripája (`attach_observer` → `ensure_app_observer`), takže prvá obrana je vždy aktívna.
+Slot session sa uvoľňuje aj nad stavom `:committing` — commit prerušený výnimkou **mimo `StandardError`** by ho inak držal až do reštartu.
 
 **ZÁVÄZNÁ tabuľka kotiev.** Predná rovina korpusu je **vždy lokálne Y = 0** (čelá majú záporné Y a do kotiev NEVSTUPUJÚ; plinth recess ani presah čela rovinu Y = 0 nemenia).
 Dolná `under_sides` → spodok tela je DNO na `floor_height`; dolná `between_sides` → boky stoja na zemi, spodok je Z = 0; **horná normalizuje `floor_height` na 0**, takže oba
@@ -95,8 +103,12 @@ varianty dna majú spodnú kotvu na Z = 0 (`UPPER_HANG_Z` je SVETOVÁ výška or
 lúča s **rovinou zámku** (`home_z`, svetový rám — nie drawing axes), takže ghost sedí pod kurzorom aj v prázdnom modeli. **Oba typy ŠTARTUJÚ v `:locked`.**
 `Calc` počíta v mm; `to_inch_matrix` prevedie **len transláciu** (rotačná časť je bezrozmerná).
 
-**Degenerované lúče** (`Calc.ray_plane`): priesečník platí LEN keď `|dir.z| > EPS`, výsledok je konečný a parameter lúča `t >= 0` (rovina PRED kamerou). Inak ghost **drží
-poslednú platnú polohu**, `placeable = false` (stlmená kresba) a **klik NECOMMITNE** — status povie prečo. Platí aj pre hornú rovinu `UPPER_HANG_Z` s kamerou nad ňou.
+**Degenerované lúče** (`Calc.ray_plane`) majú **dve nezávislé brány** — samotné „`|dir.z|` nad epsilon" je mŕtvy strážca: pri normalizovanom vektore ho prejde aj lúč jeden
+pixel pod horizontom (`dz` ≈ 1e-4) a `t` vyjde rádovo 10⁶, takže by klik položil korpus **kilometre od originu** (`rigid_matrix?` transláciu nijako neobmedzuje). Priesečník preto
+platí len keď (a) je lúč voči rovine dostatočne **sklonený** — `|dz| / |dir| > MIN_SIN` (1e-3 ≈ 0,057°; podiel, takže na jednotkovosti smeru nezáleží), (b) `t >= 0` (rovina PRED
+kamerou) a (c) výsledok je v **zdravom dosahu** `MAX_REACH_MM` (1 km od kamery aj od originu). Ten istý strop (`Calc.sane_point?`) platí aj pre **free inference** — bod na
+extrémne vzdialenej geometrii sa nesmie stať polohou. Inak ghost **drží poslednú platnú polohu**, `placeable = false` (stlmená kresba) a **klik NECOMMITNE** — status povie prečo.
+Platí aj pre hornú rovinu `UPPER_HANG_Z` s kamerou nad ňou.
 
 **Tool lifecycle.** Aktivácia `model.tools.push_tool` (NIE `select_tool` — pôvodný nástroj sa zachová) + `UI.start_timer(0) { Sketchup.focus }` (CEF by si po HtmlDialog callbacku
 vzal fokus späť a klávesy by nefungovali). Koniec = **presne jedno `pop_tool`** cez `GhostTool.end_tool`; z Tool callbackov **odložené** timerom, z panela (`start`) **synchrónne** —

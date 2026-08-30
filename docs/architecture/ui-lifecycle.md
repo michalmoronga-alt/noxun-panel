@@ -1011,11 +1011,17 @@ Panel má voči `GhostTool` presne tri švy (`actions_cabinet.rb`): **`ghost_fre
 **`ghost_insert_failed`** (commit padol na guardoch stavby — v modeli sa nič nezmenilo, hláška je tá istá vrátane výpisu aktívnych zámkov) a **`ghost_after_commit`**
 (výber novej CAB, status s varovaniami, `push_selected`, pečiatka šablóny cez `stamp_once!`) — všetko **existujúcimi cestami**, žiadny nový selection mechanizmus.
 Zmeny vo vkladacej karte sa do **bežiacej** session NEPREMIETAJÚ (snapshot je zmrazený; status to prizná) a **druhé „Vložiť" starú session zruší** a založí novú s čerstvým
-snapshotom. **Zavretie Inspectora** (`set_on_closed`) aj **prepnutie dokumentu** (`Panel.on_model_switched`, hneď pred guardom `@dialog`) session **rušia** — 0 mutácií modelu,
-0 krokov Späť. `handle_insert_copy` a vkladanie dosky ghostom **dotknuté nie sú**. Kontrakt nástroja, kotiev a transformu:
-[construction.md § ghost_tool.rb](construction.md).
-Pri vklade beží guard pred `CabinetBuilder.build`. Auto-apply hlási nezhodu dokumentu **nahlas** (na rozdiel od tichého echa výberu): zmena, ktorú používateľ práve napísal, sa
-neuložila a bez hlášky by to zistil až v objednávke.
+snapshotom. **Poznámku preflightov** (D-45 prevzatá hrúbka, materiálové noty) vypisuje **až `ghost_after_commit`** — pri stlačení „Vložiť" sa ešte nič nestalo, takže hlásiť ju
+vtedy by bolo predčasné a po kliku by sa zopakovala druhý raz.
+
+**Konce životného cyklu session** (všetky = 0 mutácií modelu a 0 krokov Späť): druhé „Vložiť" · **zavretie Inspectora** (`set_on_closed`) · **File > New / Open**
+(`PanelAppObserver`, **bezpodmienečne** — pozri nižšie) · **aktivácia iného dokumentu** (`Panel.on_model_switched`, hneď pred guardom `@dialog`) · `onCancel` 0/1/2 ·
+`deactivate` · **iný spôsob vloženia**: `handle_insert_copy` aj `handle_insert_board` rušia bežiacu session hneď na začiatku (kladú synchrónne, ghost by už nemal čo dokončiť) —
+inak sa **ich správanie nemení**. Kontrakt nástroja, kotiev a transformu: [construction.md § ghost_tool.rb](construction.md).
+
+**Poradie guardov pri vklade (R-02):** identita **dokumentu** je prvá — pred šablónovým refom, preflightmi aj pred `CabinetBuilder.prepare_insert` (od GHOSTu je príprava plánu
+prvým krokom smerom k modelu; druhou obranou zostáva guard v `commit_insert`, ktorý plán z iného dokumentu odmietne). Auto-apply hlási nezhodu dokumentu **nahlas** (na rozdiel od
+tichého echa výberu): zmena, ktorú používateľ práve napísal, sa neuložila a bez hlášky by to zistil až v objednávke.
 
 ### actions_hardware.rb
 
