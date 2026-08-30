@@ -269,10 +269,30 @@ Súbor, v ktorom žijú triedy prekrytí (`Sketchup::Overlay`) — celý je pod 
 
 **Stabilná transformácia** (`@stable_transforms`, z nej `reject_scale` obnovuje polohu) sa aktualizuje po každej úspešnej absorpcii, presune **aj po úspešnom commite orientačnej
 zmeny** (`Panel.handle_set_board_orientation` volá `remember_transform`) — bez toho by najbližší odmietnutý scale vrátil dosku do polohy PRED otočením, kým config už nesie novú
-orientáciu. Kľúč je `[model.object_id, entityID]` a **nikto z cache nemaže** — záznamy zmazaných entít aj starých dokumentov v nej ostávajú (charakterizované, nie schválené: fixuje
-to `CH6`, kandidát do registra 1c). `CH6` maže **mimo `ScaleWatch.guard`**, teda skutočnou erase cestou: v guarde `notify_erase` okamžite vracia, takže mazanie cez testovací
-`cleanup` by prežitie záznamu „dokázalo" aj vtedy, keby cache upratoval erase observer — scenár preto vloží vlastnú operáciu s `erase!`, počká na debounce a kontroluje **konkrétny
-kľúč**, nie len počet. `EngineAppObserver` notifikuje dialógy viazané na model (File>New/Open/Activate).
+orientáciu. Kľúč je `[model.object_id, entityID]` — **`guid` sa ako kľúč použiť NEDÁ** (review #261, P1): SketchUp ho mení **pri každom uložení** dokumentu (rovnaký dôvod, prečo
+kľúčom názvu zákazky je CESTA — `tests/pure/test_st1a_studio.rb`), takže by Ctrl+S naraz zneplatnil všetky zapamätané polohy a upratovanie by staré záznamy už ani nenašlo.
+Cache má **dve čistiace cesty** (R-04, v0.8.17): `forget_dead_transforms` na **erase tiku** (jeden prechod definíciami daného dokumentu; kľúče entít, ktoré už nežijú, padnú — a
+keď cache pre ten dokument nemá kľúč, model sa vôbec nečíta) a `forget_detached_models` pri **zmene dokumentu**, ktorá beží **výhradne na Windows/SDI** (`Sketchup.platform`):
+tam File>New/Open nahradí jediný dokument procesu, takže ide preč **celá** cache (záznamy nového dokumentu ešte neexistujú — naplní ich `attach_all` hneď za tým). Rozhoduje sa
+podľa **`guid` ako detektora zmeny** (nie ako kľúča): `model_switched` sa pri ukladaní nespúšťa, takže iný guid v tejto ceste znamená naozaj iný dokument — a súčasne to
+zneškodňuje prípad, keď by sa `object_id` zatvoreného dokumentu recykloval na nový. Guid aktívneho dokumentu **seeduje `install`** a neznáme `prev` sa **nechápe ako „nič nerob"**,
+ale ako dôvod vyčistiť — inak by prvé File>New/Open po štarte pluginu nechalo v cache celý práve zaniknutý dokument.
+Na macOS sa cache dokumentu v pozadí **nečistí zámerne** — ten dokument žije ďalej a môže mať rozbehnutý debounce, takže zmazanie záznamu by odmietnutému scale vzalo presnú
+polohu (`clean_transform` pri scale okolo pivotu vráti posunutý origin).
+
+**Multi-model kľúčovanie udalostí** (R-01, v0.8.17): `@dirty` aj `@added` sú kľúčované `[model.object_id, entityID]` (`event_key`) — holé `entityID` je lokálne pre dokument, takže
+dve inštancie z dvoch dokumentov v jednom debounce okne (macOS) si udalosť prepísali a jedna sa stratila. Tu `object_id` **stačí**, lebo hodnotou je živá entita, ktorá svoj model
+drží po celý debounce. Požiadavky o prune sú **množina dokumentov** `@prune_models` (vzor `@requested`) namiesto pôvodných jediných slotov `@need_prune` + `@erase_model`; ciele
+počíta `prune_targets` a **každý cieľ má vlastný `begin/rescue`** — fronty sú v tom momente už vyprázdnené, takže výnimka nad jedným (napr. zatváraným) dokumentom by inak vzala
+aj všetky ostatné požiadavky toho tiku. Erase, ktorého dokument sa **nedal zistiť** (entita je pri `onEraseEntity` už neplatná), ide do množiny ako **sentinel `nil`** a v tiku sa
+rozhodne fallbackom `@last_model → touched_models.first → Sketchup.active_model` — ten sa **pridá** k známym cieľom, nie až keď je množina prázdna. **Priznaný zvyšok:** dva
+*neznáme* erasy z dvoch dokumentov splynú aj naďalej; spoľahlivý pôvod by vyžadoval per-model observer držiaci silnú referenciu na každý otvorený dokument (register **R-36**).
+
+`CH6` maže **mimo `ScaleWatch.guard`**, teda skutočnou erase cestou: v guarde `notify_erase` okamžite vracia, takže mazanie cez testovací
+`cleanup` by správanie cache „dokázalo" aj vtedy, keby ju nikto neupratoval — scenár preto vloží vlastnú operáciu s `erase!`, počká na debounce a kontroluje **konkrétny
+kľúč**, nie len počet; a hneď za tým **Späť**, ktoré musí vrátiť skrinku AJ jej záznam (upratovanie nesmie byť jednosmerné).
+`EngineAppObserver` notifikuje dialógy viazané na model (File>New/Open/Activate) a **ako prvé** pustí záznamy zaniknutého dokumentu (Windows) — až potom `attach_all`, ktorý cache
+pre nový dokument rovno naplní.
 
 **Charakterizované sadou `CHAR`** (`tests/sketchup/su_runner.rb`, `run_char` — dávka 1b-2, brána H bloku 1b; zapisuje DNEŠNÉ správanie, aby mal hardening bloku 1d a GHOST Tool
 vrstva pevnú pôdu): absorpcia scale je **jeden** undo krok a nepridáva vlastný (`CH3`, `CH5`); dedup kópie aj `*N` násobenia sa lepí na paste krok, takže jedno Undo vráti celú
@@ -283,4 +303,5 @@ G) je `ScaleWatch` — spolu s `Panel.push_selected` → `request_dedup` — JED
 (`CH7`, guard `tests/pure/test_1b3_citanie.rb`).** **Padnutý
 `CHAR` test neznamená „oprav test", ale „správanie sa zmenilo — povedz prečo".** Dve vetvy sa na Windows spustiť nedajú a sú zapísané ako MANUÁLNE scenáre priamo v INFO riadkoch
 behu: **Znova (Ctrl+Y)** po scale (Ruby API nemá na Windows spoľahlivú redo akciu — PLAN blok 3) a **dva otvorené dokumenty naraz** (macOS; Windows drží jeden dokument na proces —
-guardy `scale_observer.rb:149-150, 194-200, 382-383`, ich dátovú štruktúru `CH6` overuje aspoň priamo).
+guardy `event_key`, `notify_erase`/`prune_targets` a `refresh_panel` v `scale_observer.rb`, ich dátovú štruktúru `CH6` overuje aspoň priamo: množina `@requested` aj množina
+`@prune_models` vrátane sentinelu).

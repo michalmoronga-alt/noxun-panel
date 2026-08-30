@@ -8601,8 +8601,9 @@ module NoxunSuRunner
   #       dokumentu ich nezhasina (guard `same_model?` drzi), kym udalost
   #       o dokumente s INYM `guid` ich zhasnut MUSI; dalej ze opakovana
   #       aktivacia dedup nerozbije a nerobi undo krok, datova struktura
-  #       multi-model guardov (`scale_observer.rb:149-150, 194-200`) a ze cache
-  #       `@stable_transforms` prezije REALNE (neguardnute) zmazanie entity.
+  #       multi-model guardov (`@requested` aj `@prune_models`/`prune_targets`)
+  #       a ze cache `@stable_transforms` sa po REALNOM (neguardnutom) zmazani
+  #       entity UPRATUJE — a po Späť zaznam DOSTANE SPAT (R-04, v0.8.17).
   #
   # Kroky sa pripajaju do TEJ ISTEJ async retaze ako S1–S6 (vzor `run_stale`),
   # aby scenare bezali cez REALNY debounce tick observera, nie cez priame
@@ -9234,7 +9235,7 @@ module NoxunSuRunner
       state[:ch6_key] = key
       state[:ch6_st_before] = st.length
       # Bez tohto vychodiska by zaverecny assert nemal co merat: „kluc je v cache"
-      # sa musi dokazat PRED mazanim, inak by „ostal tam" platilo aj o kluci,
+      # sa musi dokazat PRED mazanim, inak by „zmizol" platilo aj o kluci,
       # ktory tam nikdy nebol.
       ok("CH6 vychodisko: skrinka MA zaznam v cache stabilnych transformacii (kluc #{key.inspect}, " \
          "#{st.length} zaznamov)",
@@ -9253,25 +9254,60 @@ module NoxunSuRunner
       before = state[:ch6_st_before]
       key = state[:ch6_key]
       st = e::ScaleWatch.instance_variable_get(:@stable_transforms) || {}
-      # CHARAKTERIZACIA, NIE SCHVALENIE: cache stabilnych transformacii je
-      # klucovana [model.object_id, entityID] a NIKTO z nej nemaze — ani erase
-      # observer po REALNOM zmazani entity. Zaznamy zmazanych entit (a starych
-      # dokumentov) v nej ostavaju navzdy.
-      ok("CH6: cache stabilnych transformacii PREZIJE REALNE zmazanie entity — po Delete a ustaleni " \
-         "debounce je zaznam #{key.inspect} STALE v nej (#{before} -> #{st.length})",
-         !key.nil? && st.key?(key) && st.length >= before)
+      # R-04 (davka 1d): OTOCENY charakterizacny assert. Do v0.8.16 cache
+      # stabilnych transformacii nemala ZIADNU mazaciu cestu a zaznam zmazanej
+      # entity v nej ostaval navzdy (charakterizovane, nie schvalene). Od v0.8.17
+      # ho erase tik upratuje — meria sa KONKRETNY kluc, nie len pocet.
+      ok("CH6: cache stabilnych transformacii sa po REALNOM zmazani entity UPRATUJE — zaznam " \
+         "#{key.inspect} je po Delete a ustaleni debounce prec (#{before} -> #{st.length})",
+         !key.nil? && !st.key?(key) && st.length < before)
       ok('CH6: skrinka je z modelu naozaj prec — mazanie bezalo, nie je to prazdny assert',
          cabinets(model).empty?)
-      info('CH6: cache `@stable_transforms` (scale_observer.rb) rastie a nema ciasteciu cestu — ' \
-           'kandidat do registra 1c (hygiena/pamat, nie vyrobne riziko).')
+      # MULTI-MODEL PRUNE (scale_observer.rb, `@prune_models` + `prune_targets`) je
+      # rovnako macOS vetva ako `@requested` vyssie — na Windows sa overuje DATOVA
+      # STRUKTURA a hned sa upratuje, aby tick nedostal cudzi objekt.
+      foreign = Object.new
+      e::ScaleWatch.notify_erase(model)
+      e::ScaleWatch.notify_erase(foreign)
+      e::ScaleWatch.notify_erase(nil) # entita uz neplatna — dokument sa nedal zistit
+      pending = e::ScaleWatch.instance_variable_get(:@prune_models) || {}
+      keys = pending.keys
+      targets = e::ScaleWatch.prune_targets(pending, [])
+      e::ScaleWatch.instance_variable_set(:@prune_models, {})
+      e::ScaleWatch.instance_variable_set(:@last_model, model)
+      ok("CH6: prune poziadavky su MNOZINA per dokument — druhy dokument neprepise prvy a NEZNAMY " \
+         "erase (sentinel) sa nestrati (#{keys.length} zaznamov, #{targets.length} cielov)",
+         keys.length == 3 && keys.include?(model.object_id) && keys.include?(foreign.object_id) &&
+         keys.include?(nil) && targets.length == 2 &&
+         targets.include?(model) && targets.include?(foreign))
+      Sketchup.undo
+    end]
+    steps << [SETTLE, lambda do
+      # R-04 + Codex audit FIX 4: upratanie cache NESMIE byt jednosmerne. Po Späť
+      # je skrinka naspat v modeli a musi mat zaznam ZNOVA — inak by prvy odmietnuty
+      # Scale hned po Späť obnovoval polohu len z `clean_transform` (menej presne
+      # pri scale okolo pivotu).
+      back = cabinets(model).first
+      st = e::ScaleWatch.instance_variable_get(:@stable_transforms) || {}
+      k = back && back.valid? ? e::ScaleWatch.transform_key(back) : nil
+      ok("CH6: Späť po zmazani vrati skrinku AJ jej zaznam v cache (kluc #{k.inspect}, #{st.length} zaznamov)",
+         !back.nil? && !k.nil? && st.key?(k))
+      info('CH6: cache `@stable_transforms` (scale_observer.rb) ma od v0.8.17 dve cistiace cesty — ' \
+           'erase tik (mrtve entity daneho dokumentu) a zanik dokumentu na Windows/SDI ' \
+           '(`forget_detached_models`, na macOS zamerne NEbezi: dokument v pozadi zije dalej).')
       info('CH6 MANUALNY SCENAR (prepnutie dvoch dokumentov): na Windows sa spustit NEDA — SketchUp drzi ' \
            'JEDEN dokument na proces (SDI), viac otvorenych dokumentov naraz je macOS scenar; guardy, ktore to ' \
-           'riesia, su v scale_observer.rb:149-150, 194-200 a 382-383. Postup na macOS (alebo na Windows cez ' \
+           'riesia, su v scale_observer.rb (`event_key`, `notify_erase`, `prune_targets`, `refresh_panel`). ' \
+           'Postup na macOS (alebo na Windows cez ' \
            'File > Open v tom istom okne, co je iba ciastkova nahrada): 1) v dokumente A zapni Zvyraznenie hran ' \
            'a vloz skrinku, 2) otvor dokument B — overlay dokumentu A musi ZHASNUT a Studio aj rail musia hlasit ' \
            'vypnute, 3) v B vloz skrinku a sprav kopiu — musi dostat vlastne ID (observery sa pripojili na B), ' \
            '4) prepni sa spat na A — Inspector aj Studio musia ukazovat cisla dokumentu A, nie B, ' \
            '5) v A sprav kopiu a hned prepni na B — dedup tick nesmie siahnut do B (mnozina ziadostí per dokument).')
+      info('CH6 MANUALNY SCENAR (R-01, macOS): v dokumentoch A aj B zmaz skrinku v tom istom okamihu ' \
+           '(do 0,2 s) — po ustaleni musia byt ghost zony upratane v OBOCH dokumentoch, nie len v tom ' \
+           'poslednom. A druhy: v A rozbehni neplatny Scale a do 0,2 s prepni na B — po odmietnuti sa ' \
+           'skrinka v A musi vratit do POVODNEJ polohy (cache dokumentu v pozadi sa na macOS necisti).')
       cleanup(model)
     end]
 

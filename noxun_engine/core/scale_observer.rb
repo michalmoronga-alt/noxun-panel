@@ -24,6 +24,10 @@ module Noxun
           @entities_observer ||= CabinetEntitiesObserver.new
           @app_observer ||= EngineAppObserver.new
           @stable_transforms = {}
+          # R-04 (GH review #261 kolo 2, P2): identita dokumentu, s ktorou sa
+          # porovnava pri prvom File > New/Open — bez nej by prve prepnutie
+          # nemalo s cim porovnavat a zaznamy zaniknuteho dokumentu by prezili.
+          @active_doc_guid = doc_guid(safe { Sketchup.active_model })
           safe { Sketchup.remove_observer(@app_observer) }
           Sketchup.add_observer(@app_observer)
           n = attach_all(Sketchup.active_model)
@@ -94,13 +98,24 @@ module Noxun
         # Zmena korpusu/dosky (V0.4.7d): scale -> absorpcia (rebuild), inak
         # (move/rotate) -> korpus presunie ghost zony, doska si len zapamata transform.
         # Rozlisenie scale/move sa robi az v process_dirty (po ustaleni transformacie).
+        # R-01: kluc udalosti nesie AJ dokument. Hole `entityID` je LOKALNE pre model,
+        # takze dve instancie z dvoch dokumentov (macOS) s rovnakym ID by si v jednom
+        # debounce okne udalost prepisali — jedna by sa stratila. `model.object_id`
+        # tu staci (a je lacnejsi nez guid): hodnotou je ZIVA entita, ktora svoj model
+        # drzi pri zivote po cely debounce, takze recyklacia object_id po GC nehrozi.
+        # Pre TRVALU cache (`@stable_transforms`) to NEPLATI — tam sa kluci `model_key`.
+        def event_key(entity, mdl)
+          [mdl ? mdl.object_id : nil, entity.entityID]
+        end
+
         def notify_change(entity)
           return if @rebuilding
           return unless entity && entity.valid?
           return unless DEDUP_KINDS.include?(Store.kind(entity).to_s)
+          mdl = (entity.model rescue nil)
           @dirty ||= {}
-          @dirty[entity.entityID] = entity
-          @last_model = (entity.model rescue nil) || @last_model # fix #8: model pre prune
+          @dirty[event_key(entity, mdl)] = entity
+          @last_model = mdl || @last_model # fix #8: model pre prune
           schedule
         rescue StandardError => e
           Engine.log_error(e, 'ScaleWatch.notify_change')
@@ -108,10 +123,23 @@ module Noxun
 
         # Zmazanie entity (napr. korpusu) -> pri najblizsom tiku upraceme osirotene ghost skupiny.
         # fix #8: model nesieme z eventu (pri erase je Sketchup.active_model v multi-model nespolahlivy).
+        # R-01: poziadavky su MNOZINA dokumentov (vzor `@requested`, D-103) — jediny slot
+        # `@erase_model` znamenal, ze druhy erase v druhom dokumente ten prvy PREPISE a
+        # jeho ghosty ostanu neupratane.
+        # ZNAMY ZVYSOK (macOS, priznany v registri): pri erase je entita uz neplatna,
+        # takze jej dokument sa NEDA zistit — taka poziadavka ide do mnoziny ako
+        # SENTINEL `nil` a v tiku sa rozhodne fallbackom. Dva NEZNAME erasy z dvoch
+        # dokumentov teda splynu aj nadalej; tato davka rusi len prepisovanie ZNAMYCH
+        # poziadaviek. Spolahlivy povod by vyzadoval per-model observer, ktory by drzal
+        # silnu referenciu na kazdy otvoreny dokument — vedome odlozene.
         def notify_erase(model = nil)
           return if @rebuilding
-          @need_prune = true
-          @erase_model = model || @erase_model || @last_model
+          @prune_models ||= {}
+          if model
+            @prune_models[model.object_id] = model
+          else
+            @prune_models[nil] = nil
+          end
           schedule
         rescue StandardError => e
           Engine.log_error(e, 'ScaleWatch.notify_erase')
@@ -130,9 +158,10 @@ module Noxun
           return if @rebuilding
           return unless entity.is_a?(Sketchup::ComponentInstance) && entity.valid?
           return unless DEDUP_KINDS.include?(Store.kind(entity).to_s)
+          mdl = (entity.model rescue nil)
           @added ||= {}
-          @added[entity.entityID] = entity
-          @last_model = (entity.model rescue nil) || @last_model # fix #8: model pre dedup/prune
+          @added[event_key(entity, mdl)] = entity # R-01: kluc nesie aj dokument
+          @last_model = mdl || @last_model # fix #8: model pre dedup/prune
           schedule
         rescue StandardError => e
           Engine.log_error(e, 'ScaleWatch.notify_added')
@@ -182,10 +211,8 @@ module Noxun
           @dirty = {}
           added = @added || {}
           @added = {}
-          need_prune = @need_prune
-          @need_prune = false
-          erase_model = @erase_model
-          @erase_model = nil
+          prune_requests = @prune_models || {} # R-01: MNOZINA dokumentov, nie jediny slot
+          @prune_models = {}
           requested = (@requested || {}).values # D-103: modely s ziadostou o opravu identity
           @requested = {}
 
@@ -198,7 +225,8 @@ module Noxun
           # D-103 (Codex audit BLOCKER 1): ziadosti z ineho dokumentu sa NESMU
           # stratit — pridavaju sa k dotknutym modelom, nie ako fallback jedneho.
           touched_models = (touched_models + requested.compact).uniq
-          touched_models = [erase_model || @last_model].compact if touched_models.empty?
+          touched_models = prune_requests.values.compact.uniq if touched_models.empty?
+          touched_models = [@last_model].compact if touched_models.empty?
           added_models = added.values.select { |i| i && i.valid? }.map(&:model).compact.uniq
 
           touched_models.each do |mdl|
@@ -268,20 +296,41 @@ module Noxun
               Engine.log_error(e, 'ScaleWatch.process_dirty')
             end
           end
-          if need_prune
-            # GH P2: cisty delete (bez predoslych change/add eventov) moze mat vsetky
-            # tri zdroje nil — fallback na aktivny model (Windows = jediny dokument;
-            # refresh_panel aj prune maju vlastne multi-model guardy).
-            prune_model = erase_model || @last_model || touched_models.first || Sketchup.active_model
-            prune_ghosts(prune_model)
-            # D-34 (audit B4b): po ustaleni erase VZDY resync panela — zmazanie
-            # oznacenej skrinky nemusi vystrelit selection event a Inspector by
-            # visel na mrtvych datach. push_selected pri prazdnom/neplatnom vybere
-            # posle NX.clearSelected -> rezim vkladania + reset karty (audit B2).
-            # Model je zachyteny z eventu PRED invalidaciou entity (fix #8);
-            # refresh_panel ma multi-model guard (len aktivny dokument).
-            refresh_panel(prune_model)
+          prune_targets(prune_requests, touched_models).each do |pm|
+            # R-01 (Codex audit FIX 5): KAZDY ciel vlastny begin/rescue. Fronty su
+            # uz vyprazdnene, takze vynimka nad jednym dokumentom (napr. zatvaranym)
+            # by inak vzala aj vsetky ostatne poziadavky toho istoho tiku.
+            begin
+              prune_ghosts(pm)
+              forget_dead_transforms(pm) # R-04: cache pusti entity, ktore uz nezijú
+              # D-34 (audit B4b): po ustaleni erase VZDY resync panela — zmazanie
+              # oznacenej skrinky nemusi vystrelit selection event a Inspector by
+              # visel na mrtvych datach. push_selected pri prazdnom/neplatnom vybere
+              # posle NX.clearSelected -> rezim vkladania + reset karty (audit B2).
+              # Model je zachyteny z eventu PRED invalidaciou entity (fix #8);
+              # refresh_panel ma multi-model guard (len aktivny dokument).
+              refresh_panel(pm)
+            rescue StandardError => e
+              Engine.log_error(e, 'ScaleWatch.prune tick')
+            end
           end
+        end
+
+        # Ciele upratovania po erase. Znamé dokumenty idu KAZDY zvlast; SENTINEL
+        # `nil` (erase, ktoreho dokument sa uz nedal zistit) sa rozhodne fallbackom
+        # a PRIDA sa k mnozine — nie az vtedy, ked je prazdna (Codex audit BLOCKER 3:
+        # inak by kombinacia „znamy A + neznamy B" ticho zahodila B).
+        # GH P2: cisty delete (bez predoslych change/add eventov) moze mat vsetky
+        # zdroje nil — fallback konci na aktivnom modeli (Windows = jediny dokument;
+        # refresh_panel aj prune maju vlastne multi-model guardy).
+        def prune_targets(requests, touched_models)
+          return [] if requests.nil? || requests.empty?
+          targets = requests.reject { |k, _| k.nil? }.values.compact
+          if requests.key?(nil)
+            fallback = @last_model || touched_models.first || (safe { Sketchup.active_model })
+            targets << fallback if fallback
+          end
+          targets.uniq
         end
 
         # Presun ghost zon za korpusom (bez rebuildu). TRANSPARENTNA operacia (fix #3): 4. param
@@ -509,7 +558,97 @@ module Noxun
         end
 
         def transform_key(inst)
-          [inst.model.object_id, inst.entityID]
+          [model_key(inst.model), inst.entityID]
+        end
+
+        # Identita dokumentu pre cache stabilnych transformacii.
+        # POZOR — `guid` sa tu pouzit NEDA (GH review #261, P1): SketchUp ho meni
+        # PRI KAZDOM ULOZENI dokumentu (zdokumentovane a testom podchytene
+        # v `tests/pure/test_st1a_studio.rb` — preto je kluc nazvu zakazky CESTA).
+        # Na guid kluci by Ctrl+S zneplatnil vsetky zapamatane polohy naraz:
+        # hned nasledujuci odmietnuty Scale by sa vracal len cez `clean_transform`
+        # (pri scale okolo pivotu posunuty origin) a `forget_dead_transforms` by
+        # stare zaznamy uz ani nenasiel. `object_id` je v ramci behu stabilny.
+        # Recyklacia `object_id` po zatvoreni dokumentu je osetrena inde —
+        # `forget_detached_models` pri zmene dokumentu cache vyprazdni (Windows/SDI);
+        # macOS zvysok je priznany v registri (R-36).
+        def model_key(model)
+          model && model.object_id
+        end
+
+        # `guid` sa tu pouziva VYHRADNE ako DETEKTOR ZMENY dokumentu (nie ako kluc):
+        # `model_switched` sa pri ulozeni nespusta, takze zmena guid v tejto ceste
+        # znamena naozaj iny dokument.
+        def doc_guid(model)
+          return nil unless model
+          model.respond_to?(:guid) ? model.guid.to_s : nil
+        rescue StandardError
+          nil
+        end
+
+        # R-04, cesta 1 — ERASE TICK: z cache vypadnu zaznamy entit, ktore v TOMTO
+        # dokumente uz nezijú. Cudzich dokumentov sa nedotkne (ich entity su zive).
+        # Codex audit FIX 7: JEDEN prechod definiciami pre oba kindy (nie 2x
+        # `Ids.each_of_kind`) a rovno sa vracia, ked cache pre tento dokument
+        # ziadny kluc nema — vtedy sa model vobec neprechadza.
+        def forget_dead_transforms(model)
+          return unless model && @stable_transforms && !@stable_transforms.empty?
+          mid = model_key(model)
+          mine = @stable_transforms.keys.select { |k| k.is_a?(Array) && k[0] == mid }
+          return if mine.empty?
+          live = {}
+          model.definitions.each do |dfn|
+            next unless dfn.valid?
+            next if dfn.image? || dfn.group?
+            dfn.instances.each do |inst|
+              live[inst.entityID] = true if inst.valid? && DEDUP_KINDS.include?(Store.kind(inst).to_s)
+            end
+          end
+          mine.each { |k| @stable_transforms.delete(k) unless live[k[1]] }
+        rescue StandardError => e
+          Engine.log_error(e, 'ScaleWatch.forget_dead_transforms')
+        end
+
+        # R-04, cesta 2 — ZANIK DOKUMENTU. Spusta sa VYHRADNE na Windows (SDI):
+        # tam File > New / Open nahradi jediny dokument procesu, takze zaznamy toho
+        # predosleho uz nikto nikdy nepouzije (jeho entity su neplatne).
+        # Na macOS sa NECISTI (Codex audit BLOCKER 1): tam dokument A po prepnuti
+        # ZIJE DALEJ a moze mat rozbehnuty debounce — zmazanie jeho stabilneho
+        # transformu by odmietnutemu scale vzalo presnu polohu (`clean_transform`
+        # pri scale okolo pivotu vrati posunuty origin). Zvysok tam upratuje
+        # erase tick vyssie; priznane v registri (R-36).
+        #
+        # Rozhoduje sa podla GUID, nie podla `object_id` (GH review #261, P1
+        # a Codex audit FIX 6): keby sa `object_id` zatvoreneho dokumentu
+        # recykloval na novy dokument, porovnanie kluca by stare zaznamy
+        # PONECHALO a skrinka s rovnakym `entityID` by dostala cudziu polohu.
+        # Zmena GUID je tu spolahliva — `model_switched` sa pri ULOZENI nespusta,
+        # takze iny guid v tejto ceste znamena naozaj iny dokument. A ked sa
+        # dokument zmenil, ide prec CELA cache: zaznamy noveho dokumentu este
+        # neexistuju (naplni ich `attach_all` hned za tymto volanim).
+        def forget_detached_models(model)
+          return unless model
+          return unless sdi?
+          gid = doc_guid(model)
+          prev = @active_doc_guid
+          @active_doc_guid = gid
+          # POZOR na `prev.nil?` (GH review #261 kolo 2, P2): PRVE File > New/Open
+          # po starte pluginu by s ranou vetvou „nevieme, s cim porovnavat" nechalo
+          # v cache cely prave zaniknuty dokument. `install` preto guid seeduje —
+          # a aj tak sa tu pri neznamom `prev` radsej CISTI: cache noveho dokumentu
+          # naplni `attach_all` hned za tymto volanim, takze zahodenie nic nestoji.
+          return if prev == gid
+          @stable_transforms = {}
+        rescue StandardError => e
+          Engine.log_error(e, 'ScaleWatch.forget_detached_models')
+        end
+
+        # Windows = jeden dokument na proces (SDI). `Sketchup.platform` je predpisany
+        # sposob detekcie (docs/SKETCHUP_PRAVIDLA.md), nie `RUBY_PLATFORM`.
+        def sdi?
+          Sketchup.respond_to?(:platform) && Sketchup.platform == :platform_win
+        rescue StandardError
+          false
         end
 
         def safe
@@ -574,6 +713,9 @@ module Noxun
         private
 
         def model_switched(model)
+          # R-04: NAJPRV pustit zaznamy zaniknuteho dokumentu (Windows/SDI), az potom
+          # attach_all — ten cache pre novy dokument rovno naplni (`remember_transform`).
+          ScaleWatch.forget_detached_models(model)
           ScaleWatch.attach_all(model)
           ScaleWatch.attach_entities(model)
           # D-104: zvyraznenie hran patri modelu, v ktorom sa zaplo — pri prepnuti

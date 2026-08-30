@@ -33,6 +33,13 @@ dokumentoch sa zlejú; `onEraseEntity` nesie `nil` model (entita je pri erase u�
 nesprávneho dokumentu. Windows vetva nedotknutá. [E:R-01 + F-01 potvrdené dôkazmi + Codex #250]
 **Návrh:** kľúč `[model.object_id, entityID]` (vzor `transform_key` UŽ v súbore) + prune ako množina modelov;
 spracovanie po modeloch; 2 model-stub testy + macOS smoke. Spolu s R-04. **Odhad: M.**
+**✅ dávkou 1d/R-01+R-04 (PR #261, v0.8.17)** — `@dirty`/`@added` kľúčuje `event_key` = `[model.object_id, entityID]`;
+`@need_prune` + `@erase_model` nahradila **množina `@prune_models`** a ciele počíta `prune_targets`, každý s vlastným
+`begin/rescue`. Codex audit návrhu vrátil **3 BLOCKERY** — všetky zapracované: (1) pôvodný nápad získať dokument
+v `onEraseEntity` cez `Sketchup.active_model` je **zamietnutý** (erase chodí aj z undo/zatvárania, kde je aktívny už iný
+dokument); (2) kombinácia „známy dokument + neznámy erase" by sentinel **stratila**, keby sa fallback púšťal až pri
+prázdnej množine — pridáva sa vždy; (3) mazanie cache pri prepnutí dokumentu by na macOS vzalo polohu dokumentu
+v pozadí — beží preto len na Windows/SDI. **Priznaný zvyšok = R-36.**
 
 ### R-02 · P1 (macOS) / P3 (Windows) · ui · `ui/panel/actions_cabinet.rb` · `actions_hardware.rb` · `actions_board.rb` · `ui/js/actions.js:385-411`
 Zapisovacie handlery bez guardu identity dokumentu — payload nenesie `model_guid`, server berie
@@ -51,6 +58,13 @@ bezpečne držať pred klikom (žiadny čistý pripravený objekt) ani ako polo�
 ### R-04 · P3 · core · `core/scale_observer.rb:500-513`
 `@stable_transforms` bez delete cesty — rastie cez erase aj zánik dokumentov (in-SU test rast charakterizuje).
 [E:R-13 + F-04 + C1] **Návrh:** prune pri erase/model detach; otočiť charakterizačný test. Spolu s R-01. **S.**
+**✅ dávkou 1d/R-01+R-04 (PR #261, v0.8.17)** — dve cesty: `forget_dead_transforms` na erase tiku (jeden prechod
+definíciami; nič nerobí, keď cache pre ten dokument kľúč nemá) a `forget_detached_models` pri zmene dokumentu
+**len na Windows/SDI**. Kľúčom ostáva `object_id`: Codex audit navrhoval `guid` (kvôli recyklácii `object_id` po GC),
+ale **GH review #261 to zachytilo ako P1** — SketchUp mení `Model#guid` pri KAŽDOM uložení (rovnaký dôvod, prečo je
+kľúčom názvu zákazky cesta), takže by Ctrl+S naraz zneplatnil všetky zapamätané polohy. `guid` sa preto používa len
+ako **detektor zmeny dokumentu** v `forget_detached_models` (tá cesta pri ukladaní nebeží) — a tým je ošetrená aj
+recyklácia `object_id`. `CH6` je otočený na čistenie **a doplnený o Späť** — po vrátení zmazania musí byť záznam naspäť.
 
 *Poznámka pre GHOST zadanie: po R-01–R-03 ostávajú produktové rozhodnutia z konceptu 09A (Tab vs. Alt/Option,
 počiatočný Z režim, Orbit suspend/resume, onCancel, getExtents) — idú do task package 1e, nie do registra.*
@@ -271,6 +285,16 @@ pred preplietaním so seed-merge cestou), ale dve súbežne otvorené okná sa n
 sekcie → klient ju posiela späť → porovnanie POD zámkom → `:conflict` a načítanie formulára nanovo. Pri rozmerových
 radoch je alternatíva zápis PO KĽÚČOCH (rad je nezávislý per rozmer), ktorý revíziu nepotrebuje. **Odhad: S/M.**
 
+### R-36 · P3 (macOS) · core · `core/scale_observer.rb` — `onEraseEntity` · `notify_erase`
+Zvyšok po R-01: pri `onEraseEntity` je entita **už neplatná**, takže jej dokument sa nedá zistiť. Taká požiadavka ide
+do množiny ako sentinel `nil` a v tiku ju rozhodne fallback — takže **dva NEZNÁME erasy z dvoch dokumentov splynú**
+(prepisovanie ZNÁMYCH požiadaviek R-01 odstránila). Dôsledok na macOS: v jednom z dvoch dokumentov ostanú osirotené
+ghost zóny do najbližšieho erase v ňom. Windows sa netýka (jeden dokument na proces).
+**Návrh:** zviazať dokument s observerom už pri `attach_one` (per-model `CabinetEntityObserver`). **POZOR — to je
+presne dôvod odloženia:** observer by držal **silnú referenciu na každý otvorený dokument**, takže zatvorený dokument
+by sa neuvoľnil; riešenie potrebuje aj cestu, ktorá registráciu pri zániku dokumentu spoľahlivo zruší (na macOS na to
+nie je udalosť). Robiť až s GHOST/Tool vrstvou, ktorá multi-model lifecycle rieši tak či tak. **Odhad: M.**
+
 ## Vyriešené počas blokov 1b/1c/1d (záznam — nevybavovať; sem sa presúvajú aj ✅ položky pri uzávere 1d)
 
 B1 názov projektu (1b-6a, #244) · B2 hlavičky materiálov (1b-6b, #247) · A1/A2 tichý návrat ceny dekoru
@@ -278,7 +302,7 @@ B1 názov projektu (1b-6a, #244) · B2 hlavičky materiálov (1b-6b, #247) · A1
 
 ## Odporúčané poradie pre 1d (zhoda [E] aj [F/S])
 
-1. **P0 hotfix** (✅ #252) → 2. **pred GHOST:** R-01+R-04 → R-02 → R-03 *(GHOST package upresňuje: tvrdý
+1. **P0 hotfix** (✅ #252) → 2. **pred GHOST:** ~~R-01+R-04~~ (✅ #261) → R-02 → R-03 *(GHOST package upresňuje: tvrdý
 blocker je len R-03 — GHOST smie na Windows štartovať hneď po ňom; R-01 je macOS vetva, R-02 je na Windows P3
 a R-04 je platformovo nezávislá hygiena — všetky tri sa dorobia v 1d nezávisle od GHOST štartu)* → 3. **pred KOVANÍM:** ~~R-06 brána~~ (✅) ·
 R-07 · ~~R-08~~ (✅) · potom R-05 (+R-06 plný) ako D-109 šev → 4. **pred D-95/VÝROBOU:** R-17, R-16, R-22, po etapách R-15 →
