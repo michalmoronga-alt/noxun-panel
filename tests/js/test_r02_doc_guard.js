@@ -74,4 +74,28 @@ eq(JSON.parse(nxDocPayload({})).model_guid, '', 'prazdny retazec je platna hodno
 nxSetModelGuid('guid-C');
 deq(JSON.parse(nxDocPayload()), { model_guid: 'guid-C' }, 'volanie bez argumentu je bezpecne');
 
+// --- 6) ZACHYTENA identita (review #264 P1) --------------------------------
+// `nxModelGuid` je mutovatelny global, ktory prepise najblizsi push. Debounced
+// edity (auto-apply korpusu, polia karty dosky; 400 ms) preto citaju identitu
+// uz pri NAPLANOVANI a zachytenu hodnotu podaju helperu — inak by sa oneskoreny
+// zapis opeciatkoval NOVYM dokumentom a guard by ho pustil presne tam, kam nema.
+const nxDocGuid = NXShell.nxDocGuid;
+eq(typeof nxDocGuid, 'function', 'citac aktualnej identity je exportovany');
+
+nxSetModelGuid('guid-PRI-KLIKU');
+const captured = nxDocGuid();          // debounce: snapshot pri naplanovani
+eq(captured, 'guid-PRI-KLIKU', 'snapshot vrati identitu z casu naplanovania');
+nxSetModelGuid('guid-PO-PREPNUTI');    // medzitym dorazil push z INEHO dokumentu
+eq(JSON.parse(nxDocPayload({ cabinet_id: 'CAB-001' }, captured)).model_guid, 'guid-PRI-KLIKU',
+   'odlozeny zapis nesie POVODNY dokument, nie ten aktualny');
+eq(JSON.parse(nxDocPayload({ cabinet_id: 'CAB-001' })).model_guid, 'guid-PO-PREPNUTI',
+   'okamzita cesta bez snapshotu nesie aktualny dokument');
+
+// Prazdny snapshot je PLATNA hodnota — panel bez dobehnuteho NX.init naplanoval
+// edit a server ho ma odmietnut; NESMIE sa „opravit" na aktualny guid.
+eq(JSON.parse(nxDocPayload({}, '')).model_guid, '', 'prazdny snapshot ostava prazdny');
+// null/undefined = „nemam snapshot" -> aktualna identita (okamzite cesty).
+eq(JSON.parse(nxDocPayload({}, null)).model_guid, 'guid-PO-PREPNUTI', 'null = aktualna identita');
+eq(JSON.parse(nxDocPayload({}, undefined)).model_guid, 'guid-PO-PREPNUTI', 'undefined = aktualna identita');
+
 console.log(`OK test_r02_doc_guard.js — ${n} kontrol`);

@@ -36,6 +36,15 @@
   (kontrakt guardu, prítomnosť vo všetkých 14 handleroch, poradie voči echu, JS strana bez holého `JSON.stringify`) a `tests/js/test_r02_doc_guard.js` (helper nemaže platnú
   identitu, keď volajúci hodnotu neposlal). Zelené: **2077 headless · 73 JS sád**; in-SU sa nespúšťal (nie je to dávka builderov/observerov) — runner zmeny overí najbližší
   plný beh.
+  **Codex review kolo 1 vrátilo 2× P1 a obe boli vecné** (oprava je v tom istom PR). **(a) Zachytená identita:** `nxDocPayload` čítal mutovateľný globál `nxModelGuid` až
+  v okamihu ODOSLANIA — pri dvoch debounce cestách (auto-apply korpusu, polia karty dosky; 400 ms) by sa oneskorený zápis po prepnutí dokumentu opečiatkoval NOVÝM guidom
+  a guard by ho pustil presne tam, kam nemá. Identita sa preto číta už pri NAPLÁNOVANÍ (`nxDocGuid()` vedľa `cabSnapshot`, resp. `boardPending.guid`) a podáva helperu druhým
+  argumentom; prázdny reťazec je platná zachytená hodnota, preto sa vetví na `undefined`/`null`, nie na pravdivosť. Karta dielca berie identitu z payloadu karty
+  (`partCard.model_guid`) — dokument, ktorý má používateľ na obrazovke. **(b) Medzery v pokrytí:** systematický sweep všetkých `sketchup.*` volaní proti párovým Ruby
+  handlerom ukázal, že register tvrdil „materials/parts guard MAJÚ" **nepresne** — guard mal len `handle_set_part_grain` (K1/D-108); `handle_set_cabinet_material`
+  a tri zápisové cesty karty dielca (materiál, hrana, olep všetkých 4) mali iba echo `cabinet_id`, ktoré prepnutie dokumentu nezachytí. Doplnené tým istým mechanizmom —
+  rozsah dávky je teda **18 handlerov**, nie 14. `handle_set_part_grain` sa zámerne nekonvertoval: jeho tvar stráži `test_k1_smer_dekoru.rb` a prepis by rozbil existujúci
+  kontrakt bez funkčného zisku. Po oprave **2078 headless · 73 JS sád**.
 
 - **FIX · ŠT-1c B2 DOBEHOL CENOVÚ BRÁNU (30.8.2026, test-only, bez bump verzie):** dva in-SU FAILy známe od dávky 1d/R-01+R-04 boli ZASTARANÝ TEST, nie chyba pluginu — dávka
   **P0-HF** (#252, v0.8.14) postavila medzi gen guard a `savepanel` FINÁLNU CENOVÚ BRÁNU a scenár exportu cenovej ponuky s ňou nepočítal: skrinka scenára má 3 riadky bez ceny

@@ -18,7 +18,7 @@ Nálezy z reálnej výroby a chyby v cenách majú preto **najvyššiu prioritu 
 (okno zaniká — modul žije · uzavretý whitelist akcií · session token · echo vs. plný push · optimistický zámok) sú v [archiv/KRONIKA.md](archiv/KRONIKA.md),
 vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
-**Testy k v0.8.19:** **2077 headless** · 73 JS sád · posledný plný in-SketchUp beh **1061 PASS / 0 FAIL** (test-only dávka `fix/st1c-b2-cenova-brana`: scenár `ŠT-1c B2`
+**Testy k v0.8.19:** **2078 headless** · 73 JS sád · posledný plný in-SketchUp beh **1061 PASS / 0 FAIL** (test-only dávka `fix/st1c-b2-cenova-brana`: scenár `ŠT-1c B2`
 zosúladený s cenovou bránou **P0-HF** (#252) — dokazuje poradie gen guard → cenová brána → savepanel; 2 dovtedy známe FAILy boli zastaraný test, nie regresia).
 
 > **Poznámka k procesu:** Codex review bol 21.–24.8. **nedostupný** — PR **#186–#226** prešli bránou so slepým subagentom. **Post-hoc sweep je od 27.8. HOTOVÝ** (34 PR cez Codex CLI + triáž 54 nezodpovedaných threadov): dve reálne P1 slepým kolám ušli a týždeň žili v `main`, obe sú dávno opravené — [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-E**.
@@ -39,7 +39,7 @@ Michal ju rozoberie v samostatnom okne). V1 rozsah zoštíhlený — checklist v
 
 ## Posledné uzávery
 
-- **1d/R-02 — panel už nezapíše do nesprávneho dokumentu** (oneskorená akcia po prepnutí okna SketchUpu skončí hláškou „patrí inému dokumentu", nie tichým zápisom do cudzej zákazky — vkladanie, apply, premenovanie, kovanie aj karta dosky) — v0.8.19 (30.8.) · **Michal večer:** v dvoch oknách prepíš šírku skrinky a HNEĎ preklikni do druhého — zmena sa tam nesmie prejaviť.
+- **1d/R-02 — panel už nezapíše do nesprávneho dokumentu** (oneskorená akcia po prepnutí okna SketchUpu skončí hláškou „patrí inému dokumentu", nie tichým zápisom do cudzej zákazky — vkladanie, apply, premenovanie, kovanie, materiály aj karty dielca a dosky) — v0.8.19 (30.8.) · **Michal večer:** v dvoch oknách prepíš šírku skrinky a HNEĎ preklikni do druhého — zmena sa tam nesmie prejaviť.
 - **1d/R-34 — brána exportov už nezastaví zákazku, ktorá je v poriadku** (zdieľané ID skriniek zastaví nákup/rozpočet/ponuku len vtedy, keď sa kovanie NAOZAJ pomieša — účtované na vlastníka započítané raz, alebo rozídené sety dvoch skriniek s jedným ID; inak export prejde a ostáva len oranžový nález Kontroly) — v0.8.18 (30.8.) · **Michal večer:** netreba, bez UI zmeny.
 - **1d/R-01+R-04 — observer veľkosti je multi-model bezpečný a už si nepamätá zmazané** (pamäť pôvodných polôh sa po zmazaní skrinky vyprázdni a po **Späť** ju dostane naspäť)
   — v0.8.17 (30.8.) · **Michal večer:** vlož skrinku so zónami, zmaž ju (ghosty musia zmiznúť), **Ctrl+Z** a hneď skús neplatné zväčšenie — musí sa vrátiť tam, kde bola.

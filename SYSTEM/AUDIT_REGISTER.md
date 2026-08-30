@@ -49,7 +49,11 @@ templates, zones aj selection guard MAJÚ. [E:R-02 + F-02 ROZŠÍRENÉ]
 **Návrh:** zdieľaný guard (vzor tagov/`part_target_error`) + `model_guid` do payloadov — jedna mechanická dávka. **S/M.**
 **✅ dávkou 1d/R-02 (PR #264, v0.8.19)** — jeden zdieľaný guard `Panel.foreign_document?` (v `ui/panel/sync.rb` pri
 `model_guid`) a jedno klientske miesto `nxDocPayload` (v `ui/js/shell.js`, obdoba `nxZonePayload`). Guard prešiel do
-všetkých 14 handlerov: cabinet 6 · hardware 2 · board 6 (z toho 5 cez spoločnú bránu `guarded_board` — nie 5 kópií).
+**18** handlerov: cabinet 6 · hardware 2 · board 6 (z toho 5 cez spoločnú bránu `guarded_board` — nie 5 kópií) · a po
+**Codex review kola 1 (2× P1)** aj materiál skrinky + tri cesty karty dielca (materiál, hrana, olep všetkých 4), ktoré
+register zaradil medzi „guard MAJÚ" nesprávne — mali len echo `cabinet_id`. Druhý P1 kola 1: `nxDocPayload` čítal
+mutovateľný globál až pri ODOSLANÍ, takže **debounced** edity (auto-apply, polia dosky; 400 ms) by sa po prepnutí
+dokumentu opečiatkovali novým guidom a guard by ich pustil — identita sa preto **zachytáva pri naplánovaní**.
 Porovnanie je **prísne** (vzor `handle_tag_visible` / `zone_ctx`): prázdny guid = okno bez dobehnutého `NX.init`
 a to nesmie zapisovať nikam. Nezhoda je **hláška**, nie tiché zahodenie — a to aj v auto-apply, kde sa echo výberu
 ďalej zahadzuje ticho (prepnutie dokumentu je zriedkavé, presun výberu bežný). Poradie je súčasť opravy: dokument

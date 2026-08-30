@@ -951,9 +951,17 @@ v `push_init` tým zaniklo — zóny sú riadok v `tags`.
 otvorené dokumenty a callback HtmlDialogu je asynchrónny, pritom ID objektov sú jedinečné LEN v rámci modelu (`CAB-001` aj `BRD-001` sú v každej zákazke) — echo `cabinet_id` /
 `board_id` teda prepnutie dokumentu **nezachytí** a oneskorený klik by prestaval rovnomennú skrinku v cudzej zákazke. Porovnanie je **prísne** (vzor `handle_tag_visible`,
 `zone_ctx`, `handle_set_part_grain`): prázdny guid nie je starší klient, je to okno bez dobehnutého `NX.init` a to nesmie zapisovať nikam. Nezhoda = **hláška** (`set_status` +
-`Engine.log`), nie tiché zahodenie — prepnutie dokumentu je zriedkavé a používateľ musí vedieť, že sa zmena neuložila. Klientskym protipólom je **`nxDocPayload(obj)`** v
+`Engine.log`), nie tiché zahodenie — prepnutie dokumentu je zriedkavé a používateľ musí vedieť, že sa zmena neuložila. Klientskym protipólom je **`nxDocPayload(obj, guid)`** v
 `ui/js/shell.js`: jediné miesto, kde zápisový payload dostáva `model_guid` (obdoba `nxZonePayload`, ktorý navyše pridáva `cabinet_id`). Ten istý tvar payloadu posiela aj in-SU
 runner (helper `pg(model, hash)` v `tests/sketchup/su_runner.rb`).
+
+**Zachytená identita, nie identita pri odoslaní** (review #264 P1). `nxModelGuid` je mutovateľný globál, ktorý prepíše najbližší push zo servera. Cesty s **odloženým**
+odoslaním preto čítajú `nxDocGuid()` už pri **naplánovaní** editu a zachytenú hodnotu podávajú helperu druhým argumentom — bez toho by sa zápis odložený o 400 ms opečiatkoval
+NOVÝM dokumentom a guard by ho pustil presne tam, kam nemá. Týka sa to dvoch debounce ciest: **auto-apply korpusu** (`form.js`, `guidSnapshot` vedľa `cabSnapshot`) a **polí karty
+dosky** (`board_card.js`, `boardPending.guid`). Karta dielca berie identitu z **payloadu karty** (`partCard.model_guid`) — je to dokument, ktorý má používateľ na obrazovke.
+Okamžité cesty argument vynechajú (medzi klikom a odoslaním sa v jednovláknovom JS push vykonať nemôže). Prázdny reťazec je **platná** zachytená hodnota (server ju odmietne),
+preto sa helper vetví na `undefined`/`null`, nie na pravdivosť. **Rozsah guardu je 18 zápisových handlerov** — okrem korpusu, kovania a dosky aj `handle_set_cabinet_material`
+a tri cesty karty dielca (`material`, `edge`, `edges_all`); `handle_set_part_grain` má vlastný, tvarom starší guard z K1/D-108.
 
 ### actions_board.rb
 
@@ -978,11 +986,16 @@ Obe cesty overujú identitu **dokumentu** (`foreign_document?`, R-02) **pred** i
 
 ### actions_materials.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+Doména panela: materiály **označenej skrinky** (`handle_set_cabinet_material` — override projektovej predvoľby pre telo/čelo/chrbát; materiál tela riadi hrúbku korpusu, D-45)
+a echo prepínače kontrol hrán a kresby (`handle_edge_toggle`, `handle_edge_option`, `handle_grain_toggle`). Projektové predvoľby tu **nežijú** — presunuli sa do Štúdia
+(sekcia Materiály). Kontrakt katalógu je v [materials.md](materials.md). Guard identity dokumentu (R-02) beží **pred** echom `cabinet_id`: zámena materiálu tela mení aj hrúbku,
+takže zápis do cudzej zákazky je tu obzvlášť drahý.
 
 ### actions_parts.rb
 
-Doména panela: zápisové cesty karty dielca. Kontrakt a všetky guardy (dokument · cieľ zmeny · odpojenosť) sú v odseku „Karta dielca (UI-D1…)".
+Doména panela: zápisové cesty karty dielca. Kontrakt a všetky guardy (dokument · cieľ zmeny · odpojenosť) sú v odseku „Karta dielca (UI-D1…)". Poradie guardov je záväzné:
+**identita dokumentu je prvá** (R-02) — `part_target_error` hľadá cieľ v AKTÍVNOM dokumente, takže rovnomenný dielec v inej zákazke by mu prešiel. `handle_set_part_grain`
+má vlastný, tvarom starší guard (K1/D-108, `data['model_guid']` inline); ostatné tri zápisové cesty idú cez zdieľaný `foreign_document?`.
 
 ### actions_settings.rb
 

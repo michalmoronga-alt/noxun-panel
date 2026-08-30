@@ -714,15 +714,15 @@ module NoxunSuRunner
     cid14 = e::Store.get(inst, 'cabinet_id').to_s
     e::Panel.select_only(model, shelf14)
     # zle echo cabinet_id -> ticho zahodene, ziadna zmena
-    e::Panel.handle_set_part_edges_all({ 'cabinet_id' => 'CAB-999', 'role_key' => rk14 }.to_json)
+    e::Panel.handle_set_part_edges_all(pg(model, 'cabinet_id' => 'CAB-999', 'role_key' => rk14))
     ov14 = (e::Store.config(inst) || {})['part_overrides'] || {}
     ok('sync-abs: part bulk so zlym echo cabinet_id nic nezmenil', !ov14.key?(rk14))
     # kluc INEHO dielca nez oznaceneho -> ticho zahodene
-    e::Panel.handle_set_part_edges_all({ 'cabinet_id' => cid14, 'role_key' => 'cabinet/side:left' }.to_json)
+    e::Panel.handle_set_part_edges_all(pg(model, 'cabinet_id' => cid14, 'role_key' => 'cabinet/side:left'))
     ov14b = (e::Store.config(inst) || {})['part_overrides'] || {}
     ok('sync-abs: part bulk s klucom ineho dielca nic nezmenil', !ov14b.key?('cabinet/side:left'))
     # spravne echo: VSETKY 4 hrany jednym callbackom (ABS dekoru materialu dielca)
-    e::Panel.handle_set_part_edges_all({ 'cabinet_id' => cid14, 'role_key' => rk14 }.to_json)
+    e::Panel.handle_set_part_edges_all(pg(model, 'cabinet_id' => cid14, 'role_key' => rk14))
     find_part14 = lambda do
       inst.definition.entities.grep(Sketchup::ComponentInstance)
           .find { |i| e::Store.get(i, 'part_key').to_s == rk14 }
@@ -792,13 +792,13 @@ module NoxunSuRunner
       cid41 = e::Store.get(inst, 'cabinet_id').to_s
       e::Panel.select_only(model, shelf41)
       # rucna hrana zladena s POVODNYM dekorom (SU SYNC KORPUS) — remap ju musi previest
-      e::Panel.handle_set_part_edge({ 'cabinet_id' => cid41, 'role_key' => rk41,
-                                      'edge' => 'L1', 'abs_id' => k_abs10 }.to_json)
+      e::Panel.handle_set_part_edge(pg(model, 'cabinet_id' => cid41, 'role_key' => rk41,
+                                              'edge' => 'L1', 'abs_id' => k_abs10))
       # create_missing_abs = serverova cesta ensure_edge_for_sheet — klient musi
       # rozumiet skupinam (catalog_schema), inak ensure vrati :schema_read_only.
-      e::Panel.handle_set_part_material({ 'cabinet_id' => cid41, 'role_key' => rk41,
-                                          'material_id' => sid41, 'create_missing_abs' => true,
-                                          'catalog_schema' => e::Materials::SCHEMA_CURRENT }.to_json)
+      e::Panel.handle_set_part_material(pg(model, 'cabinet_id' => cid41, 'role_key' => rk41,
+                                                  'material_id' => sid41, 'create_missing_abs' => true,
+                                                  'catalog_schema' => e::Materials::SCHEMA_CURRENT))
       created41 = e::Materials.abs_for_sheet(e::Materials.sheet(sid41), :jednotka, 18.0).first
       part41 = inst.definition.entities.grep(Sketchup::ComponentInstance)
                    .find { |i| e::Store.get(i, 'part_key').to_s == rk41 }
@@ -822,8 +822,8 @@ module NoxunSuRunner
       shelf41c = inst41.definition.entities.grep(Sketchup::ComponentInstance)
                        .find { |i| e::Store.get(i, 'part_key').to_s == rk41 }
       e::Panel.select_only(model, shelf41c) if shelf41c
-      e::Panel.handle_set_part_edge({ 'cabinet_id' => cid41, 'role_key' => rk41,
-                                      'edge' => 'L1', 'abs_id' => '__inherit__' }.to_json)
+      e::Panel.handle_set_part_edge(pg(model, 'cabinet_id' => cid41, 'role_key' => rk41,
+                                              'edge' => 'L1', 'abs_id' => '__inherit__'))
       e::Materials.delete_edge(created41) if created41
       e::Materials.delete_sheet(sid41)
       ok('sync-abs C2: cleanup docasneho dekoru (katalog bez SU D41 zaznamov)',
@@ -1353,8 +1353,8 @@ module NoxunSuRunner
       rec = []
       install_js_recorder(rec)
       begin
-        e::Panel.handle_set_cabinet_material({ 'which' => 'body', 'value' => id186,
-                                               'cabinet_id' => cid }.to_json)
+        e::Panel.handle_set_cabinet_material(pg(model, 'which' => 'body', 'value' => id186,
+                                                       'cabinet_id' => cid))
       ensure
         remove_js_recorder
       end
@@ -4416,8 +4416,8 @@ module NoxunSuRunner
     end
 
     # --- 2) zdrojovy override: hrana L1 = BEZ ABS ----------------------------
-    e::Panel.handle_set_part_edge({ 'role_key' => src_key, 'edge' => 'L1', 'abs_id' => '',
-                                    'cabinet_id' => cid_a }.to_json)
+    e::Panel.handle_set_part_edge(pg(model, 'role_key' => src_key, 'edge' => 'L1', 'abs_id' => '',
+                                            'cabinet_id' => cid_a))
     cab_a = e::Panel.find_cabinet_by_id(model, cid_a)
     cab_b = e::Panel.find_cabinet_by_id(model, cid_b)
     ok('UI-D1: zdrojovy dielec ma rucny override hrany L1',
@@ -4949,9 +4949,9 @@ module NoxunSuRunner
       det_abs_before = e::Store.get(detached, 'config').to_s
       edges_abs_before = ((e::Store.config(k1_part(inst, 'front_door')) || {})['edges'] || {}).dup
       e::Panel.select_only(model, detached)
-      e::Panel.handle_set_part_edge({ 'role_key' => fkey, 'edge' => 'L1', 'abs_id' => '',
-                                      'cabinet_id' => cid }.to_json)
-      e::Panel.handle_set_part_edges_all({ 'role_key' => fkey, 'cabinet_id' => cid }.to_json)
+      e::Panel.handle_set_part_edge(pg(model, 'role_key' => fkey, 'edge' => 'L1', 'abs_id' => '',
+                                              'cabinet_id' => cid))
+      e::Panel.handle_set_part_edges_all(pg(model, 'role_key' => fkey, 'cabinet_id' => cid))
       e::Panel.handle_set_part_material({ 'role_key' => fkey, 'material_id' => 'K1UNI18',
                                           'cabinet_id' => cid, 'model_guid' => guid }.to_json)
       # „Použiť na podobné" uz odpojene dielce vylucila z CIELOV (UI-D1), ale
@@ -4973,8 +4973,8 @@ module NoxunSuRunner
       # ktoru nikto nevidel na obrazovke. Assert je spolocny s odpojenym
       # dielcom — nic sa nesmie zmenit.
       e::Panel.select_only(model, inst)
-      e::Panel.handle_set_part_edge({ 'role_key' => fkey, 'edge' => 'L1', 'abs_id' => '',
-                                      'cabinet_id' => cid }.to_json)
+      e::Panel.handle_set_part_edge(pg(model, 'role_key' => fkey, 'edge' => 'L1', 'abs_id' => '',
+                                              'cabinet_id' => cid))
       e::Panel.handle_set_part_material({ 'role_key' => fkey, 'material_id' => 'K1UNI18',
                                           'cabinet_id' => cid, 'model_guid' => guid }.to_json)
       inst = e::Panel.find_cabinet_by_id(model, cid)
@@ -8475,8 +8475,8 @@ module NoxunSuRunner
     else
       rk = e::Store.get(shelf, 'part_key').to_s
       e::Panel.select_only(model, shelf) # handler pracuje s OZNACENYM dielcom
-      e::Panel.handle_set_part_edge({ 'cabinet_id' => aid, 'role_key' => rk,
-                                      'edge' => 'L1', 'abs_id' => abs_id }.to_json)
+      e::Panel.handle_set_part_edge(pg(model, 'cabinet_id' => aid, 'role_key' => rk,
+                                              'edge' => 'L1', 'abs_id' => abs_id))
       after_edge = core.fresh_collect(model)
       want = Array(after_edge[:records])
              .select { |r| r['edges'].is_a?(Hash) && r['edges'].values.map(&:to_s).include?(abs_id) }
