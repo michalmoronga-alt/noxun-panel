@@ -277,7 +277,9 @@ module Noxun
       #
       # Dovod je SK veta pre pouzivatela (`library_state_reason`) a KOD
       # (`library_state_code`) pre kod. Kody su `:newer` · `:foreign` ·
-      # `:unknown_shape` · `:duplicate` · `:unreadable`.
+      # `:unknown_shape` · `:duplicate` · `:unreadable` · `:unexpected_shape`
+      # (posledny = fail-closed vetva, moze ho sposobit aj chyba pluginu nad
+      # zdravym suborom, preto jeho hlaska NENAVADZA subor mazat).
       #
       # ROZSIROVANIE (R-11, poskodeny primar s platnou zalohou): novy dovod
       # patri DOVNUTRA `assess_library_doc` (alebo pred nu do `library_assess!`)
@@ -422,13 +424,23 @@ module Noxun
         # `library_read_only?` a ta by ju vyvolala ZNOVA: ziadny stav, ziadny
         # dovod a nakupny supis by skoncil ako nil — teda BEZ oranzoveho
         # priznania. Nezrozumitelny dokument je preto read-only, nie vynimka.
+        #
+        # VLASTNY KOD, nie `:unreadable` (Codex P3): sem padne aj PROGRAMATORSKA
+        # chyba nad uplne zdravym suborom. Hlaska „oprav alebo zmaz subor" by
+        # vtedy navadzala zmazat funkcnu kniznicu kvoli chybe v pluginu —
+        # dovod preto hovori „nemaz, nahlas".
         Engine.log_error(e, 'HardwareSets.assess_library_doc') if defined?(Engine)
-        [:read_only, :unreadable, unreadable_sk]
+        [:read_only, :unexpected_shape, unexpected_sk]
       end
 
       # SK dovody — jedno znenie pre banner, status aj log.
       def unreadable_sk
         "Knižnica setov kovania sa nedá prečítať — oprav alebo zmaž súbor #{path}"
+      end
+
+      def unexpected_sk
+        'Knižnica setov kovania má neočakávaný tvar alebo nastala interná chyba — ' \
+          'nič sa nezapisuje. Súbor NEMAŽ, nahlás problém.'
       end
 
       def unknown_set_sk

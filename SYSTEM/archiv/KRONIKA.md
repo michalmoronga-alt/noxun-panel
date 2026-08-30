@@ -21,7 +21,7 @@
   **všetky verzie pluginu**. Staršia verzia ju čítala **bez pohľadu na marker `std`**, neznámy tvar člena ticho zahodila (`normalize_members` je tolerantná — čítanie nesmie zhodiť
   prestavbu) a **prvým zápisom stratu zvečnila**; `write` navyše stampoval `std: 1` aj nad obsahom, ktorý bez novších tvarov čítať nejde, takže marker klamal aj dopredu. Register to
   viedol ako **R-07 (P1, core)**. Od tejto dávky má knižnica **STAV** (vzor `HardwareCatalog.assess!`): `:ok` / `:read_only` + SK dôvod a kód (`:newer` · `:foreign` ·
-  `:unknown_shape` · `:duplicate` · `:unreadable`), maticu počíta **čistá** a **fail-closed** `assess_library_doc(doc)` bez IO.
+  `:unknown_shape` · `:duplicate` · `:unreadable` · `:unexpected_shape`), maticu počíta **čistá** a **fail-closed** `assess_library_doc(doc)` bez IO.
   **Čo do návrhu pridal povinný Codex audit (2 BLOCKER + 3 FIX + 2 NOTE, session 01a052d3) — všetko zapracované:** **(BLOCKER 2)** *cachované `:ok` nie je dôkaz* — pôvodný návrh
   vyhodnocoval bránu pri čítaní; medzitým mohla druhá inštancia (novší plugin) súbor nahradiť a náš zápis by ho zhodil na tvar, ktorému rozumieme my. Brána preto sedí v `write`
   **pod medziprocesovým zámkom** (R-08), po `JsonFileStore.reload!`, nad čerstvo prečítaným dokumentom — jedno miesto kryje **všetky** zapisovacie cesty (`save_set!` ·
@@ -78,9 +78,11 @@
   String alebo Numeric, `true`/`false`, pole a objekt nie. Nejde len o stratu — `['future'].to_s` by sa stalo „kódom", ktorý sa objedná. `nl_entries` navyše vracia pre ne-mapu **sentinel**, ktorý sa
   s normalizovaným členom nikdy nezhoduje. **(P2)** neznámy typ `qty` **rozbíjal samotnú bránu**: `qty.to_i` nad `true` vyhodí `NoMethodError`, `load` ho zachytil, zavolal `library_read_only?` — a tá
   ho vyvolala ZNOVA. Výsledok: žiadny stav, žiadny dôvod a `ProductionCore.hardware_expansion` vrátil `nil`, teda sekcia Nákup **bez oranžového priznania**. Obrana je dvojitá: `assess_library_doc` je
-  **fail-closed** (čokoľvek, čo v nej vyletí, končí ako `:read_only` s dôvodom „neznámy tvar") a `validate_member` má **typovú ochranu** `qty` — je to spoločné telo všetkých čítacích ciest (cabinet
+  **fail-closed** (čokoľvek, čo v nej vyletí, končí ako `:read_only`) a `validate_member` má **typovú ochranu** `qty` — je to spoločné telo všetkých čítacích ciest (cabinet
   override, definície zo šablóny, `normalize_members` pri každej prestavbe), ktoré cez bránu knižnice NEIDÚ, takže by taký záznam inak zhodil stavbu skrinky. **(P3)** tri dokumenty mali neúplný zoznam
-  stavových kódov (chýbal `:duplicate`).
+  stavových kódov (chýbal `:duplicate`). **Finálne Codex kolo (1×P3):** fail-closed vetva mapovala AKÚKOĽVEK internú výnimku na `:unreadable` s hláškou „oprav alebo zmaž súbor" — programátorská chyba
+  nad úplne zdravým súborom sa tak tvárila ako poškodenie dát a navádzala používateľa zmazať funkčnú knižnicu. Vetva má preto **vlastný kód `:unexpected_shape`** a hlášku „knižnica má neočakávaný tvar
+  alebo nastala interná chyba — nič sa nezapisuje. Súbor NEMAŽ, nahlás problém."
   Testy: `tests/pure/test_r07_kniznica_brana.rb` (26 scenárov: round-trip std 2 · plain std 1 · historický
   klamár · downgrade gate · **dvojinštančný scenár BLOCKER 2** · whitelist aj round-trip detektor · strata člena v snapshote · ORANGE expanzia · platný snapshot beží ďalej ·
   **reprodukcie nálezov review** · charakterizácia

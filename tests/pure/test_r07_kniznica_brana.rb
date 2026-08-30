@@ -669,7 +669,12 @@ NxTest.test('R-07 (Codex P2): brána ZLYHÁVA ZATVORENE — výnimka v detektore
     r::HWS.define_singleton_method(:normalize_sets) { |_sets| raise 'vybuch v normalizacii' }
     begin
       NxTest.assert_equal(:read_only, r::HWS.library_state, 'brana zlyhava ZATVORENE')
-      NxTest.assert_equal(:unreadable, r::HWS.library_state_code)
+      # VLASTNY kod (Codex P3): sem padne aj chyba PLUGINU nad zdravym
+      # suborom, takze dovod NESMIE navadzat subor zmazat.
+      NxTest.assert_equal(:unexpected_shape, r::HWS.library_state_code)
+      reason = r::HWS.library_state_reason
+      NxTest.assert(reason.include?('NEMAŽ'), "dovod hovori NEMAZ: #{reason}")
+      NxTest.refute(reason.include?('zmaž súbor'), "a NEnavadza na zmazanie: #{reason}")
       NxTest.assert_equal({ 'sets' => [], 'mapping' => {} }, r::HWS.load,
                           'a `load` z nej nic nevyda')
     ensure

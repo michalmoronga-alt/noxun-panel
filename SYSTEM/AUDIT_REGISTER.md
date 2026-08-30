@@ -136,7 +136,9 @@ SETOV a mapovaní (členov nie) → starší plugin knižnicu prečíta, oreže 
 `snapshot_std`); + kontrola počtu ČLENOV v `project_state_status` (2 riadky). D-109 pridá `STD_RATIO` do
 `STD_SUPPORTED` + obsahovú detekciu. Round-trip a downgrade-gate testy. **Odhad: M.**
 **✅ dávkou 1d/R-07 (PR #266, v0.8.21)** — knižnica má STAV (`library_state` `:ok`/`:read_only` + SK dôvod a kód
-`:newer`/`:foreign`/`:unknown_shape`/`:duplicate`/`:unreadable`), maticu počíta čistá **fail-closed** `assess_library_doc`. Codex audit návrhu pridal
+`:newer`/`:foreign`/`:unknown_shape`/`:duplicate`/`:unreadable`/`:unexpected_shape`), maticu počíta čistá **fail-closed**
+`assess_library_doc` (jej vetva má vlastný kód a hláška „súbor NEMAŽ, nahlás problém" — padne do nej aj chyba pluginu nad
+zdravým súborom). Codex audit návrhu pridal
 2 BLOCKERY a 3 FIXy, všetky zapracované: **(B2)** brána sa vyhodnocuje **pod zámkom nad čerstvo prečítaným súborom pred
 KAŽDÝM zápisom** — cachované `:ok` nie je dôkaz (druhá inštancia môže súbor medzitým nahradiť); jedno miesto v `write`
 kryje všetky zapisovacie cesty. **(B1)** read-only knižnica sa nesmie ani POUŽIŤ:

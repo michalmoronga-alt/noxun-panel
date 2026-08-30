@@ -185,9 +185,10 @@ vetva pri ňom vráti **skutočnú knižnicu** (nikdy seed — inak by používa
 **Kompatibilitná BRÁNA globálnej knižnice (1d/R-07, v0.8.21).** Knižnica je globálna (`%APPDATA%`), takže ju zdieľajú **všetky verzie pluginu** na profile — a staršia verzia ju čítala bez pohľadu na
 marker `std`, neznámy tvar člena ticho zahodila a prvým zápisom stratu **zvečnila** (zápis navyše stampoval `std: 1` aj nad obsahom, ktorý bez novších tvarov čítať nejde, takže marker klamal aj dopredu).
 Od tejto dávky má knižnica **STAV** (vzor `HardwareCatalog.assess!`): `library_state` = `:ok` | `:read_only`, `library_state_reason` (hotová SK veta pre používateľa) a `library_state_code`
-(`:newer` · `:foreign` · `:unknown_shape` · `:duplicate` · `:unreadable`). Maticu počíta ČISTÁ `assess_library_doc(doc)` nad dokumentom — bez IO, takže sa dá vyhodnotiť aj nad súborom čerstvo prečítaným
-pod zámkom — a **fail-closed**: čokoľvek, čo v nej vyletí (cudzia hodnota, ktorá rozbije normalizáciu), končí ako `:read_only`, nikdy ako výnimka. Bez toho by ju `load` zachytil, zavolal
-`library_read_only?`, tá by ju vyvolala znova a nákupný súpis by skončil ako `nil` — teda BEZ oranžového priznania.
+(`:newer` · `:foreign` · `:unknown_shape` · `:duplicate` · `:unreadable` · `:unexpected_shape`). Maticu počíta ČISTÁ `assess_library_doc(doc)` nad dokumentom — bez IO, takže sa dá vyhodnotiť aj nad
+súborom čerstvo prečítaným pod zámkom — a **fail-closed**: čokoľvek, čo v nej vyletí (cudzia hodnota, ktorá rozbije normalizáciu), končí ako `:read_only`, nikdy ako výnimka. Bez toho by ju `load`
+zachytil, zavolal `library_read_only?`, tá by ju vyvolala znova a nákupný súpis by skončil ako `nil` — teda BEZ oranžového priznania. Tá vetva má **vlastný kód `:unexpected_shape`**, nie `:unreadable`:
+padne do nej aj obyčajná chyba pluginu nad úplne zdravým súborom, takže jej hláška hovorí „nič sa nezapisuje, súbor NEMAŽ, nahlás problém" — nikdy nenavádza knižnicu zmazať.
 
 Štyri veci, ktoré rozhodujú, či je brána naozaj brána:
 - **Stav sa NECACHUJE a `load` je bezpečný z princípu.** Zapamätané `:ok` je presne tá pasca, ktorú brána rieši: súbor mohol medzitým vymeniť iný proces, takže volajúci by sa rozhodol podľa STARŠIEHO
