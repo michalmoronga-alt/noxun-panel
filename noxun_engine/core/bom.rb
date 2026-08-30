@@ -181,10 +181,13 @@ module Noxun
       # Kluce, v ktorych sa dve override mapy nezhoduju — vratane tych, ktore
       # jedna z nich VOBEC NEMA (chybajuci override je tiez rozdiel: expanzia by
       # na tu instanciu pouzila cudzi zaznam namiesto projektoveho mapovania).
+      # Kluc sa TRIMUJE — expanzia ho vidi az po `normalize_cabinet_overrides`
+      # (parser kluce strippuje), takze neorezany zapis by sa v brane netrafil
+      # do kluca, ktory sa realne pouzije.
       def differing_override_keys(a, b)
         ah = a.is_a?(Hash) ? a : {}
         bh = b.is_a?(Hash) ? b : {}
-        (ah.keys | bh.keys).select { |k| ah[k] != bh[k] }.map(&:to_s)
+        (ah.keys | bh.keys).select { |k| ah[k] != bh[k] }.map { |k| k.to_s.strip }
       end
 
       # 1b-3: jeden zaznam na INSTANCIU (nie na ID) — pocet zaznamov s tym istym

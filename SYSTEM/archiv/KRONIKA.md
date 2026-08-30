@@ -43,10 +43,13 @@
   projektovej predvoľbe — mapovanie projektu nie je súčasťou zberu a odvodiť ho v bráne by znamenalo druhý výklad precedencie vedľa `HardwareSets.resolve_set_id`; ostáva to
   falošným pozitívom v už duplicitnom stave, teda bezpečným smerom.
   **Testy:** +8 headless v `tests/pure/test_p0hf_brany.rb` (brána nad **reálnou** `HardwareSets.expand`: rôzni vlastníci → prejde · rovnaký vlastník → blokuje · invariant
-  Σ zdrojov = množstvo riadku v oboch scenároch · rozídené overridy → blokuje · rozdiel v nepoužitom type → prejde · zhodné/žiadne → prejde · starý zber bez nového kľúča sa
-  nesmie začať blokovať · jednotka `note_cabinet_sets`) a prepísaný pár v `tests/pure/test_hardware_sets.rb` (bez zliatia príznak NIE je · pri reálnom preskoku áno). Sedem
-  mutácií overených — „označ pri každom vydaní" (vráti falošné pozitíva), „neoznač nikdy" (pustí reálny podpočet), „`add_row` nevracia `src`", „brána ignoruje konflikty",
-  „každý opakovaný zápis je konflikt", „relevancia vždy pravdivá" aj „za rozdiel sa hlásia všetky kľúče" — každá zhodila práve svoje testy.
+  Σ zdrojov = množstvo riadku v oboch scenároch · rozídené overridy → blokuje · rozdiel v nepoužitom type (ani v cudzom `part_key`) → prejde · relevancia sa ráta PER SKRINKU ·
+  zhodné/žiadne → prejde · starý zber bez nového kľúča sa nesmie začať blokovať · jednotka `note_cabinet_sets`) a prepísaný pár v `tests/pure/test_hardware_sets.rb` (bez zliatia
+  príznak NIE je · pri reálnom preskoku áno). Osem mutácií overených — „označ pri každom vydaní" (vráti falošné pozitíva), „neoznač nikdy" (pustí reálny podpočet), „`add_row`
+  nevracia `src`", „brána ignoruje konflikty", „každý opakovaný zápis je konflikt", „relevancia vždy pravdivá", „za rozdiel sa hlásia všetky kľúče" aj „kľúče všetkých skriniek
+  v jednom vreci" — každá zhodila práve svoje testy. **Delta P2 opravy prešla nezávislou verifikáciou** (slepý agent, výhradne fix commit): žiadny P1/P2; z jeho P3 sa hneď
+  zapracovali dva — chýbajúci test per-skrinkového scopingu (jeho mutácia predtým prežila) a **trim kľúča** v `differing_override_keys`, lebo expanzia kľúče vidí až po
+  `normalize_cabinet_overrides`, takže neorezaný zápis by sa v bráne netrafil.
 
 - **1d/R-01+R-04 · OBSERVER VEĽKOSTI VIE, V KTOROM DOKUMENTE PRACUJE (30.8.2026, v0.8.17):** tretia vybavená položka registra bloku 1d — dve položky naraz, lebo register ich tak
   spája (**R-01** P1 + **R-04** P3). `ScaleWatch` je jediný observer, ktorý reaguje na zmenu veľkosti, presun a mazanie skriniek a dosiek; jeho vnútorné fronty boli kľúčované

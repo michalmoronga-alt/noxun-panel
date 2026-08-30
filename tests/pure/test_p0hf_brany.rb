@@ -327,6 +327,22 @@ NxTest.test('1d/R-34: rozdiel v NEPOUZITOM type skrinku neblokuje (review #262 P
   unk = NxP0.collected(NxP0.ident('CAB-R34'), { 'CAB-R34' => [] }, NxP0.r34_items)
   NxTest.assert_equal([['cabinet', 'CAB-R34', 2]], NxP0::PC.dup_partition(unk, exp).first,
                       'bez znamych klucov sa kolizia neda vyvratit')
+  # kluc VLASTNIKA, ktoreho skrinka nema, tiez neblokuje
+  cudzi = NxP0.collected(NxP0.ident('CAB-R34'),
+                         { 'CAB-R34' => ['hinge@front:F9/wing:single'] }, NxP0.r34_items)
+  NxTest.assert_equal([], NxP0::PC.dup_partition(cudzi, exp).first,
+                      'skrinka taky part_key nema — jej kod sa nemeni')
+end
+
+NxTest.test('1d/R-34: relevancia klucov sa rata PER SKRINKU, nie cez celu zakazku') do
+  exp = NxP0.r34_expand('front:F1/wing:single', 'front:F2/wing:single')
+  # CAB-R34 ma zavesy, CAB-INA vysuvy; konflikt je na CAB-R34 v type `slide`,
+  # ktory pouziva LEN tá druha skrinka — miesat ich kluce sa nesmie
+  items = NxP0.r34_items + [NxP0.r34_item('front:F1/panel').merge('owner_id' => 'CAB-INA',
+                                                                 'generic_type' => 'slide')]
+  col = NxP0.collected(NxP0.ident('CAB-R34'), { 'CAB-R34' => ['slide'] }, items)
+  NxTest.assert_equal([], NxP0::PC.dup_partition(col, exp).first,
+                      'cudzia skrinka nesmie rozhodovat o blokovani tejto')
 end
 
 NxTest.test('1d/R-34: ZHODNE (alebo ziadne) set overridy konflikt NIE SU — export prejde') do
