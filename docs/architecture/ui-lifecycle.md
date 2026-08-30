@@ -947,17 +947,34 @@ katalógové a stavové zmeny vlastné úzke kanály namiesto `push_init`. Od v0
 Späť/Znova, prepnutie dokumentu aj zmena výberu, takže bez toho by okno tagov, ikona raily a checkbox ghost zón ostali na opačnom stave než model. Pole `zones_visible`
 v `push_init` tým zaniklo — zóny sú riadok v `tags`.
 
+**GUARD IDENTITY DOKUMENTU — `foreign_document?(data, model, what)`** (R-02, v0.8.19). Jediný guard, ktorým prechádza **každý zápisový handler panela**. Panel je JEDEN pre všetky
+otvorené dokumenty a callback HtmlDialogu je asynchrónny, pritom ID objektov sú jedinečné LEN v rámci modelu (`CAB-001` aj `BRD-001` sú v každej zákazke) — echo `cabinet_id` /
+`board_id` teda prepnutie dokumentu **nezachytí** a oneskorený klik by prestaval rovnomennú skrinku v cudzej zákazke. Porovnanie je **prísne** (vzor `handle_tag_visible`,
+`zone_ctx`, `handle_set_part_grain`): prázdny guid nie je starší klient, je to okno bez dobehnutého `NX.init` a to nesmie zapisovať nikam. Nezhoda = **hláška** (`set_status` +
+`Engine.log`), nie tiché zahodenie — prepnutie dokumentu je zriedkavé a používateľ musí vedieť, že sa zmena neuložila. Klientskym protipólom je **`nxDocPayload(obj)`** v
+`ui/js/shell.js`: jediné miesto, kde zápisový payload dostáva `model_guid` (obdoba `nxZonePayload`, ktorý navyše pridáva `cabinet_id`). Ten istý tvar payloadu posiela aj in-SU
+runner (helper `pg(model, hash)` v `tests/sketchup/su_runner.rb`).
+
 ### actions_board.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+Doména panela: vloženie samostatnej dosky (`handle_insert_board`) a zápisové cesty jej karty (polia · materiál · ABS hrana · olep všetkých 4 · orientácia). Kontrakt karty je
+v odseku „UI-C1c (orientácia dosky v paneli)" a vo „Vkladacej karte". **Dve úrovne identity so zámerne rôznou hlasnosťou** (R-02): identitu **dokumentu** overuje spoločná brána
+`guarded_board` cez `foreign_document?` **nahlas** (zápis do cudzej zákazky by sa našiel až v objednávke), zatiaľ čo echo `board_id`, výber bez dosky a „v Inspectore vyhrala
+skrinka" sa ďalej zahadzujú **ticho** (len log) — používateľ už medzitým robí niečo iné a hláška by ho mýlila. `handle_insert_board` má guard vlastný, pred `BoardBuilder.build`.
 
 ### actions_cabinet.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+Doména panela: vloženie skrinky (`handle_insert`, `handle_insert_copy`), premenovanie (`handle_rename_cabinet`, D-100) a zápisy konštrukcie/čiel (`handle_apply`,
+`handle_apply_fronts`, `handle_apply_all` = auto-apply). Materiálové preflighty (D-45: telo → chrbát → remap ABS) a zámky vkladacej karty (D-39) sú v odsekoch „Obsah Korpusu"
+a „Vkladacia karta". **Poradie guardov (R-02): identita dokumentu PRVÁ**, až potom echo `cabinet_id` — `CAB-001` je v každej zákazke, takže echo prepnutý dokument nerozozná.
+Pri vklade beží guard pred `CabinetBuilder.build`. Auto-apply hlási nezhodu dokumentu **nahlas** (na rozdiel od tichého echa výberu): zmena, ktorú používateľ práve napísal, sa
+neuložila a bez hlášky by to zistil až v objednávke.
 
 ### actions_hardware.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+Doména panela: ručné zásahy do počtov kovania (`handle_set_hardware_override`, D-93 — zápis PO POLIACH `quantity` / `disabled` / `nominal_length` s merge záznamu identity)
+a výber setu na skrinke (`handle_set_hardware_set`, V0.6 D1b, H1b/D-81 aj per-dielec). Pravidlá a sety sú v [hardware.md](hardware.md), UI v odseku „Kontext Kovanie (UI-C4…)".
+Obe cesty overujú identitu **dokumentu** (`foreign_document?`, R-02) **pred** identitou rendrovanej skrinky (`cabinet_id`) a zápis vždy beží ako jeden rebuild = jeden krok Späť.
 
 ### actions_materials.rb
 

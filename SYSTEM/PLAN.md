@@ -118,7 +118,9 @@ v0.8.16, 30.8.; zvyšok „úplná náhrada bez revízie" (globálne pravidlá k
 **R-01+R-04** — multi-model bezpečnosť observera veľkosti (udalosti aj požiadavky o upratanie nesú dokument, pamäť stabilných
 polôh sa čistí po mazaní aj po zániku dokumentu), v0.8.17, 30.8.; zvyšok „erase bez známeho dokumentu" je v registri ako **R-36**. ·
 **R-34** — presnosť brány P0-2 (zdieľané ID skriniek zastaví export len pri **skutočnom** zliatí kovania účtovaného na vlastníka; bez zliatia export prejde a ostáva
-oranžový nález Kontroly), v0.8.18, 30.8.; priznaný zvyšok — dedup dvoch pravidiel na tej istej skrinke sa od dvoch inštancií nedá odlíšiť — je v zázname KRONIKY.
+oranžový nález Kontroly), v0.8.18, 30.8.; priznaný zvyšok — dedup dvoch pravidiel na tej istej skrinke sa od dvoch inštancií nedá odlíšiť — je v zázname KRONIKY. ·
+**R-02** — guard identity dokumentu vo všetkých 14 zapisovacích handleroch panela (oneskorená akcia po prepnutí okna SketchUpu skončí hláškou, nie tichým zápisom
+do cudzej zákazky), v0.8.19, 30.8.; jeden zdieľaný guard `foreign_document?` na serveri + jedno miesto `nxDocPayload` na klientovi.
 
 ### 1e · PLÁNOVACIA DÁVKA — task packages (po 1c, súbežne s 1d — revízia poradia 27.8.2026)
 
@@ -157,10 +159,10 @@ mimo pohľadu. Podklady: koncepty [09](zdroje/next_sessions/09_GHOST_VKLADANIE.m
 Otvorené voľby uzatvára nižšie.
 
 **Predpoklady ([AUDIT_REGISTER.md](AUDIT_REGISTER.md)):** TVRDÝ blocker je **R-03** (šev `prepare_insert` +
-`build(..., transform:)` — najväčšia prípravná dávka, odhad L; bez nej package neštartuje). **R-01** a **R-02**
-sú macOS-vetvové (pre Windows-only prevádzku neblokujú — guard identity dokumentu pre INSERT cestu je aj tak
-scope IN tejto dávky); **R-04** je hygiena bez platformového kvalifikátora a ide spolu s R-01. Odchýlka od
-poradia registra je zapísaná aj v ňom.
+`build(..., transform:)` — najväčšia prípravná dávka, odhad L; bez nej package neštartuje). **R-01** (✅ v0.8.17)
+a **R-02** (✅ v0.8.19 — guard identity dokumentu má aj INSERT cesta, `foreign_document?` + `nxDocPayload`)
+sú macOS-vetvové a **sú hotové**; **R-04** (✅ v0.8.17) bola hygiena bez platformového kvalifikátora a išla spolu
+s R-01. Odchýlka od poradia registra je zapísaná aj v ňom.
 
 **Scope IN:** SketchUp `Tool` — ghost = čistá viewport grafika cez `draw(view)` s **čitateľnou prednou stranou
 a VIDITEĽNÝM aktívnym anchorom** (bez toho sa prepínanie kotiev nedá kontrolovať), `InputPoint` inference,

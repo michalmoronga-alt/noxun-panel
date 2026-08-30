@@ -17,6 +17,26 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1d/R-02 · GUARD IDENTITY DOKUMENTU V ZAPISOVACÍCH HANDLEROCH PANELA (v0.8.19, 30.8.2026, PR #264):** panel je JEDEN pre všetky otvorené dokumenty a callback HtmlDialogu je
+  asynchrónny — 14 zapisovacích handlerov (cabinet 6 · hardware 2 · board 6) pritom brali cieľ z `Sketchup.active_model` a payload identitu dokumentu vôbec nenieslo. Echo
+  `cabinet_id`/`board_id`, ktoré tie cesty už mali, prepnutie dokumentu **nezachytí**: ID sú jedinečné len v rámci modelu, takže `CAB-001` aj `BRD-001` sú v každej zákazke —
+  oneskorený klik by prestaval rovnomennú skrinku v cudzej zákazke a keďže sa z pluginu objednáva naostro, našlo by sa to až v objednávke. Register to viedol ako **P1 na macOS**
+  (dva dokumenty naraz) a **P3 na Windows/SDI**; insert bol označený za najkritickejší (predpoklad bloku GHOST).
+  **Riešenie je mechanické a zámerne bez vlastného konceptu:** vzor už v repe existoval (parts, materials, templates, zones aj selection guard ho mali), takže dávka ho
+  **rozšírila, nie vymyslela** — jeden zdieľaný `Panel.foreign_document?(data, model, what)` v `ui/panel/sync.rb` hneď pri `model_guid` a jedno klientske miesto
+  `nxDocPayload(obj)` v `ui/js/shell.js` (obdoba `nxZonePayload`, ktorý navyše pridáva `cabinet_id`). Päť handlerov karty dosky guard nedostalo skopírovaný — prechádzajú
+  spoločnou bránou `guarded_board`.
+  **Tri rozhodnutia, ktoré stojí za to pamätať.** (1) Porovnanie je **prísne**, nie „prázdny guid prejde": prázdny guid nie je starší klient, je to okno bez dobehnutého
+  `NX.init` a to nesmie zapisovať nikam (rovnaká úvaha ako pri `handle_tag_visible` a `zone_ctx`). (2) Nezhoda dokumentu je **hláška**, kým echo výberu sa ďalej zahadzuje
+  **ticho** — presun výberu je bežný a hláška by mýlila, prepnutie dokumentu bežné nie je a používateľ musí vedieť, že sa zmena neuložila; platí to aj pre auto-apply, kde by
+  inak zmena napísaná do formulára zmizla bez stopy. (3) **Poradie je súčasť opravy**: dokument sa overuje PRED echom identity objektu, inak by prvá hláška hovorila
+  „Najprv označ NOXUN korpus" namiesto pravdy.
+  **Cena, ktorú si dávka vypýtala:** prísny guard by zrušil 26 volaní v in-SU runneri, ktoré payload bez `model_guid` posielali. Namiesto zmäkčenia guardu dostal runner helper
+  `pg(model, hash)` a posiela **rovnaký tvar payloadu ako panel** — sada tak testuje reálnu cestu, nie výnimku pre testy. Nové sady: `tests/pure/test_r02_doc_guard.rb`
+  (kontrakt guardu, prítomnosť vo všetkých 14 handleroch, poradie voči echu, JS strana bez holého `JSON.stringify`) a `tests/js/test_r02_doc_guard.js` (helper nemaže platnú
+  identitu, keď volajúci hodnotu neposlal). Zelené: **2077 headless · 73 JS sád**; in-SU sa nespúšťal (nie je to dávka builderov/observerov) — runner zmeny overí najbližší
+  plný beh.
+
 - **FIX · ŠT-1c B2 DOBEHOL CENOVÚ BRÁNU (30.8.2026, test-only, bez bump verzie):** dva in-SU FAILy známe od dávky 1d/R-01+R-04 boli ZASTARANÝ TEST, nie chyba pluginu — dávka
   **P0-HF** (#252, v0.8.14) postavila medzi gen guard a `savepanel` FINÁLNU CENOVÚ BRÁNU a scenár exportu cenovej ponuky s ňou nepočítal: skrinka scenára má 3 riadky bez ceny
   (materiál bez cenníka v izolovanom APPDATA behu), takže čerstvá generácia končila na potvrditeľnej vetve brány a k stubovanému savepanelu sa nikdy nedostala. Scenár je

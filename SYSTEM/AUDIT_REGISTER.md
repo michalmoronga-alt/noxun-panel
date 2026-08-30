@@ -47,6 +47,14 @@ Zapisovacie handlery bez guardu identity dokumentu — payload nenesie `model_gu
 14 handlerov (cabinet 6 · hardware 2 · board 6); insert je najkritickejší (GHOST). Kontrast: parts, materials,
 templates, zones aj selection guard MAJÚ. [E:R-02 + F-02 ROZŠÍRENÉ]
 **Návrh:** zdieľaný guard (vzor tagov/`part_target_error`) + `model_guid` do payloadov — jedna mechanická dávka. **S/M.**
+**✅ dávkou 1d/R-02 (PR #264, v0.8.19)** — jeden zdieľaný guard `Panel.foreign_document?` (v `ui/panel/sync.rb` pri
+`model_guid`) a jedno klientske miesto `nxDocPayload` (v `ui/js/shell.js`, obdoba `nxZonePayload`). Guard prešiel do
+všetkých 14 handlerov: cabinet 6 · hardware 2 · board 6 (z toho 5 cez spoločnú bránu `guarded_board` — nie 5 kópií).
+Porovnanie je **prísne** (vzor `handle_tag_visible` / `zone_ctx`): prázdny guid = okno bez dobehnutého `NX.init`
+a to nesmie zapisovať nikam. Nezhoda je **hláška**, nie tiché zahodenie — a to aj v auto-apply, kde sa echo výberu
+ďalej zahadzuje ticho (prepnutie dokumentu je zriedkavé, presun výberu bežný). Poradie je súčasť opravy: dokument
+sa overuje PRED echom `cabinet_id`/`board_id`, lebo `CAB-001` je v každej zákazke. In-SU runner posiela ten istý
+tvar payloadu (helper `pg(model, hash)`), takže sada testuje reálnu cestu, nie výnimku.
 
 ### R-03 · P1 · core · `core/cabinet_builder.rb:107-138` + `ui/panel/actions_cabinet.rb:286-324`
 `build` zlieva normalize → ID → `next_x` → operáciu → geometriu; `transform:` má len `rebuild`. Tool nemá čo
@@ -310,7 +318,7 @@ B1 názov projektu (1b-6a, #244) · B2 hlavičky materiálov (1b-6b, #247) · A1
 
 ## Odporúčané poradie pre 1d (zhoda [E] aj [F/S])
 
-1. **P0 hotfix** (✅ #252) → 2. **pred GHOST:** ~~R-01+R-04~~ (✅ #261) → R-02 → R-03 *(GHOST package upresňuje: tvrdý
+1. **P0 hotfix** (✅ #252) → 2. **pred GHOST:** ~~R-01+R-04~~ (✅ #261) → ~~R-02~~ (✅ #264) → R-03 *(GHOST package upresňuje: tvrdý
 blocker je len R-03 — GHOST smie na Windows štartovať hneď po ňom; R-01 je macOS vetva, R-02 je na Windows P3
 a R-04 je platformovo nezávislá hygiena — všetky tri sa dorobia v 1d nezávisle od GHOST štartu)* → 3. **pred KOVANÍM:** ~~R-06 brána~~ (✅) ·
 R-07 · ~~R-08~~ (✅) · potom R-05 (+R-06 plný) ako D-109 šev → 4. **pred D-95/VÝROBOU:** R-17, R-16, R-22, po etapách R-15 →
