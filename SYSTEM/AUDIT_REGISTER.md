@@ -276,8 +276,10 @@ rôznym `owner_part_key` majú správne množstvá a brána ich napriek tomu zas
 **Návrh:** označovať `owner_id` až pri reálnom preskoku duplikátu. **S.**
 **✅ dávkou 1d/R-34 (PR #262, v0.8.18)** — `owner_seen` drží **už vydaný zdrojový záznam** riadku a druhý zásah na ten istý kľúč mu `per_owner` doznačí; `add_row` príznak sám
 nepíše a vracia `src`. Duplicitné ID **bez** reálneho zlievania export prepustí (ORANGE nález Kontroly ostáva), **so** zlievaním blokuje ako doteraz; `dup_partition` sa
-nemenil. **Priznaný zvyšok:** dve pravidlá na tej istej skrinke (dedup B3) sú od dvoch inštancií nerozlíšiteľné — expanzia vidí len `owner_id` — takže príznak dostanú tiež;
-rozlíšenie by vyžadovalo identitu inštancie až v `Bom.collect` (zásah do kontraktu, nie hygiena predikátu).
+nemenil v koncepte. **Review #262 P1 dávku rozšíril:** zdieľané ID kazí objednávku aj druhou cestou — `cabinet_sets` má na ID jeden slot, takže pri **rozídených** override
+mapách expanzia použije mapu jednej inštancie na obe a neisté sú rovno KÓDY. Zber to hlási aditívnym kľúčom `cabinet_set_conflicts` (`Bom.note_cabinet_sets`; zhodné mapy
+konflikt nie sú) a brána také ID blokuje aj bez zliatia owner člena. **Priznaný zvyšok:** dve pravidlá na tej istej skrinke (dedup B3) sú od dvoch inštancií nerozlíšiteľné —
+expanzia vidí len `owner_id` — takže príznak dostanú tiež; rozlíšenie by vyžadovalo identitu inštancie až v `Bom.collect` (zásah do kontraktu, nie hygiena predikátu).
 
 ### R-35 · P2 · core/ui · `core/hardware_rules.rb:write` + `core/dim_series.rb:set` (+ ich okná)
 Zvyšok po R-08 (z Codex auditu dávky 1d/R-08, nálezy #3 a #6): tieto dva súbory sa zapisujú ako **ÚPLNÁ NÁHRADA

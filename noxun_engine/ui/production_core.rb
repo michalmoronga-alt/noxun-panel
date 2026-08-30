@@ -810,6 +810,12 @@ module Noxun
       #
       # NEZNAMA EXPANZIA = BLOKUJE. Ked sa expanzia nedala zostavit, kolizia sa
       # nedokaze ani vyvratit — pri objednavke je bezpecnejsie zastavit.
+      #
+      # ROZISLE SET OVERRIDY = BLOKUJU (R-34, review #262 P1). Druha cesta, ktorou
+      # zdielane ID skazi objednavku: `cabinet_sets` ma na ID jeden slot, takze pri
+      # roznych override mapach vyhra jedna a expanzia ju pouzije na OBE instancie
+      # — vtedy su neiste rovno KODY, nie len pocty. Zoznam takych ID pripravuje
+      # `Bom.note_cabinet_sets`; zhodne mapy (bezna kopia) konflikt nie su.
       def dup_partition(collected, expansion)
         ident = identities_of(collected)
         cabs = Validation.duplicate_owner_ids(ident)
@@ -817,8 +823,20 @@ module Noxun
         return [[], others] if cabs.empty?
 
         merged = owner_scoped_cabinet_ids(expansion)
-        blocking, harmless = cabs.partition { |_kind, id, _n| merged.nil? || merged[id] }
+        ambiguous = cabinet_set_conflicts(collected)
+        blocking, harmless = cabs.partition do |_kind, id, _n|
+          merged.nil? || merged[id] || ambiguous[id]
+        end
         [blocking, (harmless + others).sort_by { |kind, id, _n| [kind, id] }]
+      end
+
+      # ID skriniek, ktorych override setov kovania sa medzi instanciami ROZISIEL
+      # (aditivny kluc zberu — kto ho nema, nic nestrati).
+      def cabinet_set_conflicts(collected)
+        out = {}
+        list = collected.is_a?(Hash) ? collected[:cabinet_set_conflicts] : nil
+        Array(list).each { |id| out[id.to_s] = true }
+        out
       end
 
       # ID skriniek, ktorym expanzia pridelila aspon jedneho clena uctovaneho
@@ -899,8 +917,9 @@ module Noxun
       def export_blockers(dups: [], cp: nil)
         out = []
         unless Array(dups).empty?
-          out << "v modeli sú skrinky so spoločným ID (#{dup_ids_text(dups)}) — kovanie účtované " \
-                 'na vlastníka (napr. TipOn) by sa započítalo len raz; oprav ich v sekcii Kontrola'
+          out << "v modeli sú skrinky so spoločným ID (#{dup_ids_text(dups)}) — kovanie by sa " \
+                 'objednalo zle (napr. TipOn účtovaný na vlastníka len raz alebo set podľa ' \
+                 'druhej skrinky); oprav ich v sekcii Kontrola'
         end
         c = cp.is_a?(Hash) ? cp : {}
         if c['assembly_negative']

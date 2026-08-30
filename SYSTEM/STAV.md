@@ -39,7 +39,7 @@ Michal ju rozoberie v samostatnom okne). V1 rozsah zoštíhlený — checklist v
 
 ## Posledné uzávery
 
-- **1d/R-34 — brána exportov už nezastaví zákazku, ktorá je v poriadku** (zdieľané ID skriniek zastaví nákup/rozpočet/ponuku len vtedy, keď sa kovanie účtované na vlastníka NAOZAJ zlialo do jedného; inak export prejde a ostáva len oranžový nález Kontroly) — v0.8.18 (30.8.) · **Michal večer:** netreba, bez UI zmeny.
+- **1d/R-34 — brána exportov už nezastaví zákazku, ktorá je v poriadku** (zdieľané ID skriniek zastaví nákup/rozpočet/ponuku len vtedy, keď sa kovanie NAOZAJ pomieša — účtované na vlastníka započítané raz, alebo rozídené sety dvoch skriniek s jedným ID; inak export prejde a ostáva len oranžový nález Kontroly) — v0.8.18 (30.8.) · **Michal večer:** netreba, bez UI zmeny.
 - **1d/R-01+R-04 — observer veľkosti je multi-model bezpečný a už si nepamätá zmazané** (pamäť pôvodných polôh sa po zmazaní skrinky vyprázdni a po **Späť** ju dostane naspäť)
   — v0.8.17 (30.8.) · **Michal večer:** vlož skrinku so zónami, zmaž ju (ghosty musia zmiznúť), **Ctrl+Z** a hneď skús neplatné zväčšenie — musí sa vrátiť tam, kde bola.
 - **1d/R-08 — dve okná SketchUpu si už neprepíšu nastavenia** (sety a pravidlá kovania, ABS pravidlá, rozmerové rady aj sadzby dodávateľa; zastaraný formulár skončí hláškou

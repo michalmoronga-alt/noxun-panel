@@ -52,8 +52,9 @@ module NxP0
 
   # --- fixtury -------------------------------------------------------------
 
-  def collected(identities = [])
+  def collected(identities = [], conflicts = [])
     { records: [], hardware: [], hardware_overrides: [], cabinet_sets: {},
+      cabinet_set_conflicts: conflicts,
       placements: [], warnings: [], identities: identities }
   end
 
@@ -283,6 +284,66 @@ NxTest.test('1d/R-34: zdielane ID + ROVNAKY vlastnik — TipOn sa zlial, export 
   NxTest.assert_equal(1, b.length, b.inspect)
   NxTest.assert(b.first.include?('CAB-R34'), b.first)
   NxTest.assert(b.first.include?('kovanie'), b.first)
+end
+
+# review #262 P1: zdielane ID skazi objednavku EŠTE JEDNOU cestou — `cabinet_sets`
+# ma na ID jeden slot, takze pri ROZDIELNYCH override mapach vyhra jedna a expanzia
+# ju pouzije na obe instancie. Vtedy su neiste rovno KODY (nie len pocty), takze
+# take ID blokuje aj vtedy, ked sa ziadny owner clen nezlial.
+
+NxTest.test('1d/R-34: zdielane ID + ROZIDENE set overridy — kody su neiste, BLOKUJE') do
+  exp = NxP0.r34_expand('front:F1/wing:single', 'front:F2/wing:single') # ziadne zliatie
+  col = NxP0.collected(NxP0.ident('CAB-R34'), ['CAB-R34'])
+  blocking, warn = NxP0::PC.dup_partition(col, exp)
+  NxTest.assert_equal([['cabinet', 'CAB-R34', 2]], blocking,
+                      'expanzia by pouzila mapu jednej instancie na obe — nedokazatelne')
+  NxTest.assert_equal([], warn)
+  b = NxP0::PC.export_blockers(dups: blocking)
+  NxTest.assert(b.first.include?('CAB-R34') && b.first.include?('set'), b.first)
+end
+
+NxTest.test('1d/R-34: ZHODNE (alebo ziadne) set overridy konflikt NIE SU — export prejde') do
+  exp = NxP0.r34_expand('front:F1/wing:single', 'front:F2/wing:single')
+  col = NxP0.collected(NxP0.ident('CAB-R34')) # `Bom` konflikt nenahlasil
+  blocking, warn = NxP0::PC.dup_partition(col, exp)
+  NxTest.assert_equal([], blocking, 'nech vyhra ktorakolvek mapa, vysledok je rovnaky')
+  NxTest.assert_equal([['cabinet', 'CAB-R34', 2]], warn)
+  # a stary zber BEZ noveho kluca sa sprava rovnako (kluc je aditivny)
+  legacy = { records: [], hardware: [], cabinet_sets: {}, placements: [], warnings: [],
+             identities: NxP0.ident('CAB-R34') }
+  NxTest.assert_equal([], NxP0::PC.dup_partition(legacy, exp).first,
+                      'zber bez kluca `cabinet_set_conflicts` nesmie zacat blokovat')
+end
+
+NxTest.test('1d/R-34: Bom.note_cabinet_sets — konflikt LEN pri rozidenych mapach') do
+  bom = Noxun::Engine::Bom
+  a = { 'hinge' => 'set-a' }
+  b = { 'hinge' => 'set-b' }
+
+  same = {}; seen = {}; conf = []
+  bom.note_cabinet_sets('CAB-1', a, same, seen, conf)
+  bom.note_cabinet_sets('CAB-1', a, same, seen, conf)
+  NxTest.assert_equal([], conf, 'dve kopie s TOU ISTOU mapou konflikt nie su')
+  NxTest.assert_equal(a, same['CAB-1'], 'override sa zbiera ako doteraz')
+
+  diff = {}; seen2 = {}; conf2 = []
+  bom.note_cabinet_sets('CAB-2', a, diff, seen2, conf2)
+  bom.note_cabinet_sets('CAB-2', b, diff, seen2, conf2)
+  bom.note_cabinet_sets('CAB-2', a, diff, seen2, conf2)
+  NxTest.assert_equal(['CAB-2'], conf2, 'rozidene mapy = konflikt, a hlasi sa RAZ')
+  NxTest.assert_equal(a, diff['CAB-2'], 'posledny zapis vyhrava ako doteraz (tretia instancia)')
+
+  # jedna instancia override MA, druha NIE — expanzia by ho pouzila na obe
+  mix = {}; seen3 = {}; conf3 = []
+  bom.note_cabinet_sets('CAB-3', nil, mix, seen3, conf3)
+  bom.note_cabinet_sets('CAB-3', a, mix, seen3, conf3)
+  NxTest.assert_equal(['CAB-3'], conf3, 'chybajuci override je tiez rozdiel')
+
+  none = {}; seen4 = {}; conf4 = []
+  bom.note_cabinet_sets('CAB-4', nil, none, seen4, conf4)
+  bom.note_cabinet_sets('CAB-4', nil, none, seen4, conf4)
+  NxTest.assert_equal([], conf4, 'ziadna z instancii override nema — niet co pomiesat')
+  NxTest.assert_equal({}, none, 'a do `cabinet_sets` sa nezapisuje nic')
 end
 
 NxTest.test('1d/R-34: Σ zdrojov = mnozstvo riadku v OBIDVOCH scenaroch (invariant)') do

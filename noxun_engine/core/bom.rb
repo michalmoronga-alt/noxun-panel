@@ -11,7 +11,8 @@
 #
 # API (Codex F5 — collector oddeleny od cisteho vypoctu):
 #   Bom.collect(model) -> {records:, hardware:, hardware_overrides:, manual_overrides:,
-#                          cabinet_sets:, placements:, identities:, warnings:, cabinets:, boards:}
+#                          cabinet_sets:, cabinet_set_conflicts:, placements:, identities:,
+#                          warnings:, cabinets:, boards:}
 #   Bom.compute(collected) -> {rows:, sheets:, edging:, hardware:, warnings:, summary:}
 # Headless testy krmia compute() zaznamami priamo (collect je tenky a vyzaduje SketchUp).
 #
@@ -47,6 +48,12 @@ module Noxun
         hardware_overrides = []
         manual_overrides = { 'abs' => [], 'hardware' => [] }
         cabinet_sets = {}
+        # R-34 (review #262 P1): `cabinet_sets` ma na ID JEDEN slot — pozri
+        # `note_cabinet_sets`. `seen` drzi mapu PRVEJ instancie toho ID (nil =
+        # instancia ziadny override nemala), `conflicts` ID, kde sa instancie
+        # rozisli a nakupne KODY su preto neiste.
+        cabinet_sets_seen = {}
+        cabinet_set_conflicts = []
         warnings = []
         placements = [] # D-103: umiestnenie top-level skriniek/dosiek (zachytna siet duplicit)
         # 1b-3: IDENTITA kazdej top-level skrinky/dosky — jeden zaznam na INSTANCIU.
@@ -76,9 +83,9 @@ module Noxun
             # V0.6 D1: cabinet override setov kovania (mapa generic_type=>set_id)
             # — expanzia setov ju berie per korpus (audit B1/F6). Aditivne pole,
             # compute() ho ignoruje.
-            if ccfg['hardware_sets'].is_a?(Hash) && !ccfg['hardware_sets'].empty?
-              cabinet_sets[cid] = ccfg['hardware_sets']
-            end
+            cs = ccfg['hardware_sets']
+            note_cabinet_sets(cid, (cs.is_a?(Hash) && !cs.empty? ? cs : nil),
+                              cabinet_sets, cabinet_sets_seen, cabinet_set_conflicts)
             Array(ccfg['warnings']).each { |w| warnings << (w.is_a?(Hash) ? w.merge('owner_id' => cid) : { 'message' => w.to_s, 'owner_id' => cid }) }
             # ŠT-3b-2a: mapa VNORENYCH dielcov korpusu (part_key -> zaznam) sa
             # stavia POPRI zbere — je to jediny podklad, proti ktoremu sa daju
@@ -136,8 +143,28 @@ module Noxun
         end
         { records: records, hardware: hardware, hardware_overrides: hardware_overrides,
           manual_overrides: manual_overrides,
-          cabinet_sets: cabinet_sets, placements: placements, identities: identities,
+          cabinet_sets: cabinet_sets, cabinet_set_conflicts: cabinet_set_conflicts,
+          placements: placements, identities: identities,
           warnings: warnings, cabinets: cabinets, boards: boards }
+      end
+
+      # R-34 (review #262 P1): `cabinet_sets` je mapa ID => override setov, teda
+      # na jedno ID JEDEN slot. Ked si dve fyzicke skrinky delia `cabinet_id`,
+      # posledna prepise prvu — a `resolve_set_id` potom aplikuje TU JEDNU mapu
+      # na OBE (kluc je `owner_id`). Ked sa instancie rozisli, nie su neiste len
+      # POCTY (to riesi dedup `per: 'owner'`), ale rovno KODY v nakupe, rozpocte
+      # aj v ponuke — a to sa uz nedokaze ani vyvratit. Take ID sa preto priznava
+      # ako konflikt a brana exportov (`ProductionCore.dup_partition`) ho blokuje.
+      # ZHODNE mapy (bezna kopia skrinky) konflikt NIE su — vysledok je rovnaky
+      # nech vyhra ktorakolvek, takze blokovat ich by bolo falosne pozitivne.
+      # `map` = override mapa instancie alebo nil (instancia ziadny nema).
+      def note_cabinet_sets(cid, map, cabinet_sets, seen, conflicts)
+        cabinet_sets[cid] = map if map
+        if seen.key?(cid)
+          conflicts << cid if seen[cid] != map && !conflicts.include?(cid)
+        else
+          seen[cid] = map
+        end
       end
 
       # 1b-3: jeden zaznam na INSTANCIU (nie na ID) — pocet zaznamov s tym istym

@@ -31,9 +31,17 @@
   **Priznaný zvyšok (vedomý):** expanzia vidí pri položke len `owner_id`, takže **dve pravidlá na tej istej fyzickej skrinke** (dedup B3 — druhý TipOn na tie isté dvierka)
   sú od dvoch inštancií nerozlíšiteľné a príznak dostanú tiež. Pri duplicitnom ID teda taká zákazka ostane blokovaná falošne — ale bezpečným smerom, a rozlíšiť to by
   vyžadovalo identitu inštancie až v `Bom.collect`, čo je zásah do dátového kontraktu, nie hygiena predikátu.
-  **Testy:** +3 headless v `tests/pure/test_p0hf_brany.rb` (brána nad **reálnou** `HardwareSets.expand`: rôzni vlastníci → prejde · rovnaký vlastník → blokuje · invariant
-  Σ zdrojov = množstvo riadku v oboch scenároch) a prepísaný pár v `tests/pure/test_hardware_sets.rb` (bez zliatia príznak NIE je · pri reálnom preskoku áno). Tri mutácie
-  overené — „označ pri každom vydaní" (vráti falošné pozitíva), „neoznač nikdy" (pustí reálny podpočet) aj „`add_row` nevracia `src`" — každá zhodila práve svoje testy.
+  **Codex review vrátil P1, ktorý dávku rozšíril — a je to lekcia o tom, že zúženie brány treba merať proti VŠETKÝM cestám, nie len proti tej, ktorú dávka rieši:** zdieľané ID
+  kazí objednávku ešte druhou cestou. `Bom.collect` drží override setov kovania v mape `cabinet_sets[cid]`, teda **jeden slot na ID** — dve inštancie s tým istým ID si ho
+  prepíšu a `resolve_set_id` potom použije mapu jednej z nich na **obe** (kľúčom je `owner_id`). Vtedy nie sú neisté počty, ale rovno **kódy** v nákupe, rozpočte aj v ponuke.
+  Pôvodná brána to blokovala len náhodou (cez owner člena) a toto zúženie by dieru odkrylo. Zber preto po novom hlási aditívny kľúč **`cabinet_set_conflicts`**
+  (`Bom.note_cabinet_sets` — čistá funkcia, testovateľná headless): **zhodné mapy konflikt NIE SÚ** (bežná kópia skrinky dá rovnaký výsledok nech vyhrá ktorákoľvek), rozdiel
+  áno — vrátane „jedna override má, druhá nie". `dup_partition` také ID blokuje aj bez zliatia owner člena a blokujúca hláška menuje oba dôsledky.
+  **Testy:** +7 headless v `tests/pure/test_p0hf_brany.rb` (brána nad **reálnou** `HardwareSets.expand`: rôzni vlastníci → prejde · rovnaký vlastník → blokuje · invariant
+  Σ zdrojov = množstvo riadku v oboch scenároch · rozídené overridy → blokuje · zhodné/žiadne → prejde · starý zber bez nového kľúča sa nesmie začať blokovať · jednotka
+  `note_cabinet_sets`) a prepísaný pár v `tests/pure/test_hardware_sets.rb` (bez zliatia príznak NIE je · pri reálnom preskoku áno). Päť mutácií overených — „označ pri každom
+  vydaní" (vráti falošné pozitíva), „neoznač nikdy" (pustí reálny podpočet), „`add_row` nevracia `src`", „brána ignoruje konflikty" aj „každý opakovaný zápis je konflikt" —
+  každá zhodila práve svoje testy.
 
 - **1d/R-01+R-04 · OBSERVER VEĽKOSTI VIE, V KTOROM DOKUMENTE PRACUJE (30.8.2026, v0.8.17):** tretia vybavená položka registra bloku 1d — dve položky naraz, lebo register ich tak
   spája (**R-01** P1 + **R-04** P3). `ScaleWatch` je jediný observer, ktorý reaguje na zmenu veľkosti, presun a mazanie skriniek a dosiek; jeho vnútorné fronty boli kľúčované
