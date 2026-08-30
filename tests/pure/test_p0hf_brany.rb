@@ -80,6 +80,35 @@ module NxP0
     { 'rows' => [{ 'code' => 'TIPON', 'quantity' => 2, 'sources' => srcs }], 'unmapped' => [] }
   end
 
+  # --- 1d/R-34: fixtury pre branu nad REALNOU expanziou --------------------
+  #
+  # Set s jednym clenom `per: 'unit'` (zaves) a jednym `per: 'owner'` (TipOn) —
+  # najmensi tvar, na ktorom sa da rozlisit ZLIATIE od suvyskytu. Katalog nie je
+  # potrebny (neznamy kod = `missing`, mnozstva a zdroje ostavaju).
+  def r34_state
+    set = Noxun::Engine::HardwareSets.normalize_sets(
+      [{ 'set_id' => 'zaves-tipon', 'generic_type' => 'hinge',
+         'members' => [{ 'code' => 'ZAVES', 'per' => 'unit', 'qty' => 1 },
+                       { 'code' => 'TIPON', 'per' => 'owner', 'qty' => 1 }] }]
+    ).first
+    { 'mapping' => { 'hinge' => 'zaves-tipon' }, 'sets' => { 'zaves-tipon' => set } }
+  end
+
+  # Polozka kovania v tvare `Bom.collect` — vsetky nesu TO ISTE `owner_id`
+  # (= dve fyzicke skrinky zdielaju ID), lisia sa VLASTNIKOM.
+  def r34_item(part_key)
+    { 'owner_id' => 'CAB-R34', 'owner_part_key' => part_key, 'generic_type' => 'hinge',
+      'quantity' => 2, 'rule_id' => 'zavesy-podla-vysky', 'params' => {}, 'source' => 'rule' }
+  end
+
+  def r34_expand(*part_keys)
+    Noxun::Engine::HardwareSets.expand(part_keys.map { |k| r34_item(k) }, r34_state, catalog: [])
+  end
+
+  def r34_row(exp, code)
+    exp['rows'].find { |r| r['code'] == code }
+  end
+
   # Vsetky ID skriniek zo zberu — predvolba pre `base_stubs`: bezna zakazka
   # kovanie uctovane na vlastnika MA (TipOn na dvierkach).
   def cabinet_ids(col)
@@ -214,6 +243,60 @@ NxTest.test('P0-HF-02: blokuje LEN tu skrinku, ktora owner clena naozaj ma') do
   blocking, warn = NxP0::PC.dup_partition(col, NxP0.hw_exp(['CAB-006']))
   NxTest.assert_equal(['CAB-006'], blocking.map { |_k, id, _n| id })
   NxTest.assert_equal(['CAB-005'], warn.map { |_k, id, _n| id })
+end
+
+# --- 1d/R-34: predikat merany na REALNEJ expanzii ----------------------------
+#
+# Do 1d/R-34 stal predikat na tom, ci skrinka owner clena LEN MA — a to je
+# priliz siroke: dve instancie so zdielanym `cabinet_id`, ale ROZNYM vlastnikom
+# (`owner_part_key`) sa v expanzii vobec nestretnu, mnozstva su spravne a brana
+# ich napriek tomu zastavila. Teraz predikat stoji na tom, ci sa clen NAOZAJ
+# ZLIAL. Zlyhanie je stale bezpecnym smerom, ale falosne pozitiva odpadli.
+#
+# Nalez KONTROLY (ORANGE „kusovnik ich zlieva do jedneho vlastnika") sa tym
+# NEMENI — ostava v obidvoch scenaroch.
+
+NxTest.test('1d/R-34: zdielane ID + RUZNI vlastnici — nic sa nezlialo, export PREJDE') do
+  exp = NxP0.r34_expand('front:F1/wing:single', 'front:F2/wing:single')
+  tipon = NxP0.r34_row(exp, 'TIPON')
+  NxTest.assert_equal(2, tipon['quantity'], 'kazdy vlastnik dostal svoj TipOn')
+  NxTest.assert_equal([nil, nil], tipon['sources'].map { |s| s['per_owner'] },
+                      'ziadny zdroj duplikat nepohltil')
+  col = NxP0.collected(NxP0.ident('CAB-R34'))
+  blocking, warn = NxP0::PC.dup_partition(col, exp)
+  NxTest.assert_equal([], blocking, 'objednavka je spravna — niet co zastavovat')
+  NxTest.assert_equal([['cabinet', 'CAB-R34', 2]], warn, 'ORANGE nalez Kontroly ostava')
+  NxTest.assert_equal([], NxP0::PC.export_blockers(dups: blocking), 'export prejde')
+end
+
+NxTest.test('1d/R-34: zdielane ID + ROVNAKY vlastnik — TipOn sa zlial, export BLOKUJE') do
+  exp = NxP0.r34_expand('front:F1/wing:single', 'front:F1/wing:single')
+  tipon = NxP0.r34_row(exp, 'TIPON')
+  NxTest.assert_equal(1, tipon['quantity'], 'druhy TipOn sa preskocil — objednavka je podpocitana')
+  NxTest.assert_equal([true], tipon['sources'].map { |s| s['per_owner'] },
+                      'priznak nesie zdroj, ktory duplikat pohltil')
+  col = NxP0.collected(NxP0.ident('CAB-R34'))
+  blocking, warn = NxP0::PC.dup_partition(col, exp)
+  NxTest.assert_equal([['cabinet', 'CAB-R34', 2]], blocking, 'tvrdy blok ako doteraz')
+  NxTest.assert_equal([], warn)
+  b = NxP0::PC.export_blockers(dups: blocking)
+  NxTest.assert_equal(1, b.length, b.inspect)
+  NxTest.assert(b.first.include?('CAB-R34'), b.first)
+  NxTest.assert(b.first.include?('kovanie'), b.first)
+end
+
+NxTest.test('1d/R-34: Σ zdrojov = mnozstvo riadku v OBIDVOCH scenaroch (invariant)') do
+  [%w[front:F1/wing:single front:F2/wing:single],
+   %w[front:F1/wing:single front:F1/wing:single]].each do |keys|
+    exp = NxP0.r34_expand(*keys)
+    exp['rows'].each do |r|
+      NxTest.assert_equal(r['quantity'], r['sources'].sum { |s| s['quantity'].to_i },
+                          "#{r['code']} pri #{keys.inspect}: zdroje scitaju presne mnozstvo riadku")
+    end
+    # per: unit clen sa nezlieva NIKDY — 2 polozky x qty 2
+    NxTest.assert_equal(4, NxP0.r34_row(exp, 'ZAVES')['quantity'])
+    NxTest.assert_equal([nil, nil], NxP0.r34_row(exp, 'ZAVES')['sources'].map { |s| s['per_owner'] })
+  end
 end
 
 NxTest.test('P0-HF-02: NEZNAMA expanzia blokuje (koliziu nemozno vyvratit)') do

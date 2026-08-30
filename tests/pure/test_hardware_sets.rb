@@ -149,19 +149,44 @@ NxTest.test('hw sety: expand — per owner TipOn 1x na dvierka, dedup cez dve pr
   NxTest.assert_equal(2, NxSets.row(res2, '250831')['quantity'], 'ine dvierka = druhy TipOn')
 end
 
-# review #252 P2: brana exportov musi vediet ROZLISIT, ci duplicitne ID skrinky
-# naozaj podpocita objednavku — a to sposobi VYHRADNE dedup clena `per: 'owner'`.
-# Bez tohto priznaku by sa blokoval aj export zakazky, ktora ma len `per: 'unit'`
-# cleny a spocita sa spravne aj pri zdielanom ID.
-NxTest.test('hw sety: zdroj riadku PRIZNAVA, ci clen bol uctovany NA VLASTNIKA (`per_owner`)') do
+# review #252 P2 + R-34: brana exportov musi vediet ROZLISIT, ci duplicitne ID
+# skrinky naozaj podpocita objednavku — a to sposobi VYHRADNE REALNE ZLIATIE
+# clena `per: 'owner'`. Priznak preto nesie riadok, ktory duplikat POHLTIL:
+#  * ziadny preskok (jedina polozka, alebo dva RIADNE ROZNI vlastnici) = ziadny
+#    priznak — mnozstva su spravne a blokovat export by bolo brat platny vystup,
+#  * preskok = priznak na uz vydanom zdroji.
+NxTest.test('hw sety: BEZ zliatia zdroj priznak `per_owner` NEDOSTANE (R-34)') do
   st = NxSets.state
   st['mapping']['hinge'] = 'zaves-p2o'
   res = HWS.expand([NxSets.hinge_item('quantity' => 3)], st, catalog: NxSets.catalog)
   owner = NxSets.row(res, '250831')['sources'].first
   unit  = NxSets.row(res, '245723')['sources'].first
-  NxTest.assert_equal(true, owner['per_owner'], 'TipOn (per: owner) je oznaceny')
-  NxTest.assert_equal(nil, unit['per_owner'], 'per: unit clen priznak NEMA (kluc je aditivny)')
+  NxTest.assert_equal(1, owner['quantity'], 'TipOn na vlastnika raz')
+  NxTest.assert_equal(nil, owner['per_owner'], 'jedina polozka nic nezliala — priznak NIE')
+  NxTest.assert_equal(nil, unit['per_owner'], 'per: unit clen priznak NEMA NIKDY (kluc je aditivny)')
   NxTest.assert_equal(owner['cabinet_id'], unit['cabinet_id'], 'obe z tej istej skrinky')
+
+  # dve instancie so ZDIELANYM cabinet_id, ale ROZNYM vlastnikom (`owner_part_key`):
+  # kluc dedupu sa nezhoduje, TipOn vznikne 2x — teda ziadne zliatie a ziadny priznak
+  dve = [NxSets.hinge_item, NxSets.hinge_item('owner_part_key' => 'front:F2/wing:single')]
+  res2 = HWS.expand(dve, st, catalog: NxSets.catalog)
+  NxTest.assert_equal(2, NxSets.row(res2, '250831')['quantity'], 'ine dvierka = druhy TipOn')
+  NxTest.assert_equal([nil, nil], NxSets.row(res2, '250831')['sources'].map { |s| s['per_owner'] },
+                      'rozni vlastnici sa NEZLIEVAJU — brana taky export zastavit nesmie')
+end
+
+NxTest.test('hw sety: REALNY preskok duplikatu priznak `per_owner` ZAPISE (R-34)') do
+  st = NxSets.state
+  st['mapping']['hinge'] = 'zaves-p2o'
+  # dve polozky s TYM ISTYM vlastnikom (audit B3) — druhy TipOn sa preskoci
+  items = [NxSets.hinge_item, NxSets.hinge_item('rule_id' => 'ine-pravidlo-tiez-hinge')]
+  res = HWS.expand(items, st, catalog: NxSets.catalog)
+  srcs = NxSets.row(res, '250831')['sources']
+  NxTest.assert_equal(1, srcs.length, 'preskoceny clen zdroj NEPRIDA')
+  NxTest.assert_equal(1, srcs.first['quantity'], 'TipOn na vlastnika raz')
+  NxTest.assert_equal(true, srcs.first['per_owner'], 'priznak nesie riadok, ktory duplikat pohltil')
+  NxTest.assert_equal(nil, NxSets.row(res, '245723')['sources'].first['per_owner'],
+                      'per: unit clen sa nezlieva NIKDY')
 end
 
 NxTest.test('hw sety: expand — rad podla NL, presny kluc, sused NIKDY (F10)') do

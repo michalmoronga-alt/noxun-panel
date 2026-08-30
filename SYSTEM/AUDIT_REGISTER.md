@@ -22,7 +22,7 @@
 - **P0-2 · Export s duplicitnou identitou dobehne s podpočítaným kovaním** (CSV kovania/rozpočet/ponuka; `per: owner`
   dedup na `owner_id`) — [E:P0-HF-02 ≡ A3]; prevracia vedomý kompromis 1b-3 (#240). Tvrdý blok; predikát rozlišuje
   skrinku od dosky; VEPO sa neblokuje. → *✅ PR #252 (`dup_partition` — blokuje len ID, ktorých sety majú
-  reálne `per: 'owner'` člena). Zvyšná presnosť predikátu = **R-34**.*
+  reálne `per: 'owner'` člena). Zvyšná presnosť predikátu = **R-34** (✅ #262, v0.8.18 — blokuje až REÁLNE zliatie).*
 
 ## Os GHOST — observery · undo · vkladanie (blok 1d PRED blokom GHOST)
 
@@ -274,6 +274,10 @@ nie až vo vetve, kde `owner_seen[key]` reálne preskočí duplikát — dve in�
 rôznym `owner_part_key` majú správne množstvá a brána ich napriek tomu zastaví. Zlyháva výhradne bezpečným smerom
 (falošne pozitívne, len v už ORANGE-označenom stave). Návrh opravy je v threade #252.
 **Návrh:** označovať `owner_id` až pri reálnom preskoku duplikátu. **S.**
+**✅ dávkou 1d/R-34 (PR #262, v0.8.18)** — `owner_seen` drží **už vydaný zdrojový záznam** riadku a druhý zásah na ten istý kľúč mu `per_owner` doznačí; `add_row` príznak sám
+nepíše a vracia `src`. Duplicitné ID **bez** reálneho zlievania export prepustí (ORANGE nález Kontroly ostáva), **so** zlievaním blokuje ako doteraz; `dup_partition` sa
+nemenil. **Priznaný zvyšok:** dve pravidlá na tej istej skrinke (dedup B3) sú od dvoch inštancií nerozlíšiteľné — expanzia vidí len `owner_id` — takže príznak dostanú tiež;
+rozlíšenie by vyžadovalo identitu inštancie až v `Bom.collect` (zásah do kontraktu, nie hygiena predikátu).
 
 ### R-35 · P2 · core/ui · `core/hardware_rules.rb:write` + `core/dim_series.rb:set` (+ ich okná)
 Zvyšok po R-08 (z Codex auditu dávky 1d/R-08, nálezy #3 a #6): tieto dva súbory sa zapisujú ako **ÚPLNÁ NÁHRADA
@@ -306,8 +310,8 @@ B1 názov projektu (1b-6a, #244) · B2 hlavičky materiálov (1b-6b, #247) · A1
 blocker je len R-03 — GHOST smie na Windows štartovať hneď po ňom; R-01 je macOS vetva, R-02 je na Windows P3
 a R-04 je platformovo nezávislá hygiena — všetky tri sa dorobia v 1d nezávisle od GHOST štartu)* → 3. **pred KOVANÍM:** ~~R-06 brána~~ (✅) ·
 R-07 · ~~R-08~~ (✅) · potom R-05 (+R-06 plný) ako D-109 šev → 4. **pred D-95/VÝROBOU:** R-17, R-16, R-22, po etapách R-15 →
-5. **perzistencia:** R-11 → R-12 → R-14 (R-13 po rozhodnutí Michala) → 6. **UI/hygiena:** **R-34 (S — najrýchlejší
-win: dovytrieženie už nasadenej P0-2 brány, falošné pozitíva blokujú export)** · R-23.1 Escape (S, hocikedy) · R-18 · zvyšok podľa kapacity. R-32 kostry priebežne pred každým zásahom.
+5. **perzistencia:** R-11 → R-12 → R-14 (R-13 po rozhodnutí Michala) → 6. **UI/hygiena:** ~~R-34~~ (✅ #262) ·
+R-23.1 Escape (S, hocikedy) · R-18 · zvyšok podľa kapacity. R-32 kostry priebežne pred každým zásahom.
 
 **Otvorené rozhodnutia Michala:** R-05 (rozsah zaokrúhľovania pomeru per zákazka vs per skrinka — rozhodne
 USER-debata o setoch, PRED implementáciou D-109) · R-13 (`std` na entite: čítať vs vypustiť) · R-30 (jantárové

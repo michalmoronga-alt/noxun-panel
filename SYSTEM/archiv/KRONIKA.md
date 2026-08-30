@@ -17,6 +17,24 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1d/R-34 · BRÁNA EXPORTOV ZASTAVÍ UŽ LEN SKUTOČNÉ ZLIATIE (30.8.2026, v0.8.18):** štvrtá vybavená položka registra bloku 1d (**R-34**, P3) — dovytriedenie brány **P0-2**,
+  ktorú priniesla hotfix dávka **P0-HF** (#252). Brána zastaví nákupný CSV, rozpočet aj cenovú ponuku, keď majú dve fyzické skrinky **spoločné `cabinet_id`** a kovanie účtované
+  **na vlastníka** (TipOn) by sa tým do objednávky dostalo len raz. Podklad na to rozhodnutie nesie expanzia sama — príznak `per_owner` na zdroji riadku. Lenže ten sa
+  označoval pri **každom vydanom owner členovi**, nie až vo vetve, kde dedup naozaj preskočí duplikát. Dôsledok: dve inštancie so zdieľaným ID, ale **rôznym vlastníkom**
+  (`owner_part_key` — napr. dvoje rôznych dvierok) sa v expanzii vôbec nestretnú, TipOn vznikne dvakrát, množstvá sú **správne** — a brána im export napriek tomu zastavila.
+  Zlyhávalo to bezpečným smerom (falošne pozitívne, a len v už oranžovo označenom stave), preto P3, ale používateľa to blokovalo bez dôvodu — nález Codex review #252, kolo 3.
+  **Čo platí teraz:** `owner_seen` už nedrží `true`, ale **už vydaný zdrojový záznam riadku**; druhý zásah na ten istý kľúč `[owner_id, owner_part_key, set_id, code]` mu
+  `per_owner` **doznačí** a až tým sa zdroj prizná ako miesto, kde sa množstvo zlialo. `add_row` preto príznak sám nikdy nepíše a vracia práve pridaný `src` — je to jediné
+  miesto, kam sa dá doznačiť. Kontrakt `dup_partition` sa nemenil ani o riadok: neznáma expanzia naďalej blokuje, dosky a skrinky bez owner člena naďalej len varujú.
+  Z pohľadu používateľa: **duplicitné ID bez skutočného zlievania export prepustí** (oranžový nález Kontroly ostáva a stále hovorí, že kusovník ich zlieva do jedného
+  vlastníka), duplicitné ID **so** zlievaním je tvrdý blok ako doteraz.
+  **Priznaný zvyšok (vedomý):** expanzia vidí pri položke len `owner_id`, takže **dve pravidlá na tej istej fyzickej skrinke** (dedup B3 — druhý TipOn na tie isté dvierka)
+  sú od dvoch inštancií nerozlíšiteľné a príznak dostanú tiež. Pri duplicitnom ID teda taká zákazka ostane blokovaná falošne — ale bezpečným smerom, a rozlíšiť to by
+  vyžadovalo identitu inštancie až v `Bom.collect`, čo je zásah do dátového kontraktu, nie hygiena predikátu.
+  **Testy:** +3 headless v `tests/pure/test_p0hf_brany.rb` (brána nad **reálnou** `HardwareSets.expand`: rôzni vlastníci → prejde · rovnaký vlastník → blokuje · invariant
+  Σ zdrojov = množstvo riadku v oboch scenároch) a prepísaný pár v `tests/pure/test_hardware_sets.rb` (bez zliatia príznak NIE je · pri reálnom preskoku áno). Tri mutácie
+  overené — „označ pri každom vydaní" (vráti falošné pozitíva), „neoznač nikdy" (pustí reálny podpočet) aj „`add_row` nevracia `src`" — každá zhodila práve svoje testy.
+
 - **1d/R-01+R-04 · OBSERVER VEĽKOSTI VIE, V KTOROM DOKUMENTE PRACUJE (30.8.2026, v0.8.17):** tretia vybavená položka registra bloku 1d — dve položky naraz, lebo register ich tak
   spája (**R-01** P1 + **R-04** P3). `ScaleWatch` je jediný observer, ktorý reaguje na zmenu veľkosti, presun a mazanie skriniek a dosiek; jeho vnútorné fronty boli kľúčované
   **holým `entityID`**, ktoré je ale LOKÁLNE pre dokument. Na macOS (viac otvorených dokumentov naraz) si tak dve inštancie s rovnakým ID v jednom 0,2 s okne udalosť prepísali

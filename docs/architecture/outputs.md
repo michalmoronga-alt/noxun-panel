@@ -98,7 +98,10 @@ pri zdieľanom ID — zastaviť ich export by znamenalo brať používateľovi p
 `dup_partition(collected, expansion)` vracia dvojicu **[blokujúce, varovacie]**: prvá polovica ide do `export_blockers`, druhá (dosky **aj** skrinky bez owner člena) do
 `dup_id_suffix` / `cp_warnings` — kusovník ich zlieva do jedného vlastníka, takže sa priznajú, ale súbor nezastavia a **nikdy nedostanú vetu o kovaní** (do 29.8. sa `kind`
 zahadzoval a veta sa tvrdila aj nad doskou — seed A7 sweepu). **Neznáma expanzia blokuje**: kolíziu nemožno ani dokázať, ani vyvrátiť, a pri objednávke je bezpečnejšie zastaviť.
-Podklad nesie expanzia sama — `add_row` značí zdroj riadku príznakom **`per_owner`** (aditívny kľúč, zapisuje sa len keď je pravdivý, jediný čitateľ je táto brána).
+Podklad nesie expanzia sama — zdroj riadku nesie príznak **`per_owner`** (aditívny kľúč, zapisuje sa len keď je pravdivý, jediný čitateľ je táto brána). **Od 1d/R-34 značí
+`expand_members` až vetvu REÁLNEHO preskoku**, nie každý vydaný owner člen: dve inštancie so zdieľaným `cabinet_id`, ale rôznym `owner_part_key` sa nezlievajú, množstvá majú
+správne a **export im prejde** (ORANGE nález Kontroly ostáva). So zhodným vlastníkom je to skutočná kolízia a blok platí ako doteraz — detail a priznaný zvyšok v odseku
+`hardware_sets.rb` ([hardware.md](hardware.md)).
 Tvrdé dôvody **vypadli z `cp_warnings`** — jeden dôvod žije v jednom zozname, dva zoznamy o tej istej veci by sa časom rozišli; `cp_warnings(hits, dups, confirmed)` drží už len
 firewall, neblokujúce duplicity a **potvrdené** riadky bez ceny. Kontrakt strážia `tests/pure/test_p0hf_brany.rb` (pri každom dôvode sa meria **prázdny priečinok**, nie text
 statusu), `tests/pure/test_hardware_sets.rb` (príznak `per_owner`) a `tests/js/test_p0hf_potvrdenie.js` (dvojkrokový klik).
