@@ -46,7 +46,7 @@
   Materials · skew v `load_with_revision`) — každú chytila aspoň jedna assercia. Headless **2054 PASS / 0 FAIL**, 72 JS sád zelených. In-SketchUp beh nebol potrebný (žiadny
   builder, observer ani geometria).
 
-- **1d/R-06a (PR #256) · BRÁNA: DĹŽKOVÉ KOVANIE SA UŽ NENACENÍ AKO KUSY (29.8.2026, v0.8.15):** prvá vybavená položka registra bloku 1d (**R-06**, P1, slepý subagent S-05). Expanzia setov
+- **1d/R-06a · BRÁNA: DĹŽKOVÉ KOVANIE SA UŽ NENACENÍ AKO KUSY (29.8.2026, v0.8.15):** prvá vybavená položka registra bloku 1d (**R-06**, P1, slepý subagent S-05). Expanzia setov
   vedela vždy len **kusy** — `subtotal = cena × počet` — ale úchytkový profil (D-90) sa **reže na dĺžku** a jeho katalógová cena je **za meter**; `cut_length_mm` sa v
   `hardware_sets.rb` nečítalo nikde. Držal to len seed (typ `handle` nemapovaný), pričom editor setov typ `handle` ponúka a katalóg pozná MJ „m" — **prvé uloženie takého setu by
   bola aktívna cenová chyba** v nákupnom CSV, v rozpočte aj v cenovej ponuke. Produkcia je od 20.8. naostro, preto brána hneď.
