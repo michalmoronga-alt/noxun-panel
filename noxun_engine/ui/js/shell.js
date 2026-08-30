@@ -370,6 +370,7 @@
     module.exports.nxDocPayload = nxDocPayload;
     module.exports.nxDocGuid = nxDocGuid;
     module.exports.nxSetModelGuid = nxSetModelGuid;
+    module.exports.nxDropDocState = nxDropDocState;
   }
 
   // ===== DOM: rail ==========================================================
@@ -633,7 +634,43 @@
   var nxModelGuid = '';
   // Hodnota sa prepisuje LEN ked ju volajuci naozaj poslal — payload bez tohto
   // pola (starsi push, vnoreny objekt) nesmie zmazat platnu identitu.
-  function nxSetModelGuid(g){ if (g !== undefined && g !== null) nxModelGuid = String(g); }
+  //
+  // R-02 (review #264 kolo 2): toto je zaroven JEDINY DETEKTOR ZMENY DOKUMENTU
+  // na klientovi — kazdy push (init, loadSelected, loadBoard, clearSelected) ide
+  // cez neho. Pri SKUTOCNEJ zmene hodnoty sa zahodi vsetok rozpracovany stav
+  // panela (nxDropDocState); echo push toho isteho dokumentu nezahodi NIC
+  // (rozpisana praca musi prezit — rovnaka zasada ako pri NXShell.track).
+  function nxSetModelGuid(g){
+    if (g === undefined || g === null) return;
+    var next = String(g);
+    if (next === nxModelGuid) return;
+    nxModelGuid = next;
+    nxDropDocState();
+  }
+
+  // VSETOK stav panela, ktory drzi data MEDZI akciou pouzivatela a volanim
+  // `sketchup.*`. Po prepnuti dokumentu uz ziadny z nich nema kam zapisat:
+  // pending buffery patria starej zakazke a otvoreny editor ci modal by svoje
+  // rozhodnutie aplikoval na kartu, ktora na obrazovke uz nie je.
+  //
+  // Je to PRVA obrana (druhou je zachytena identita v kazdom bufferi, tretou
+  // serverovy `foreign_document?`). Zamerne sa NEVYMENOVAVA cez `window[...]`,
+  // ale menami — zoznam je greppovatelny aj testovatelny a `typeof` na
+  // nedeklarovanom identifikatore je bezpecny (Node aj CEF).
+  //
+  // MIMO zoznamu su vedome: `insertLocksTimer` (zamky vkladacej karty ziju
+  // v pamati Panel modulu, do modelu nezapisuju), `previewTimer` (lokalny
+  // re-render) a draft vkladacej karty (`NXInsert` — vklad peciatkuje identitu
+  // az v okamihu kliku).
+  function nxDropDocState(){
+    if (typeof cancelCabinetEdits === 'function') cancelCabinetEdits();   // auto-apply korpusu
+    if (typeof cancelBoardEdits === 'function') cancelBoardEdits();       // polia karty dosky
+    if (typeof dropCabRename === 'function') dropCabRename();             // inline premenovanie
+    if (typeof closeCabRenameEditor === 'function') closeCabRenameEditor();
+    if (typeof absModalCloseSilent === 'function') absModalCloseSilent(); // modal chybajucej ABS
+    if (typeof closeSaveTemplateModal === 'function') closeSaveTemplateModal();
+    if (typeof closeSimilarModal === 'function') closeSimilarModal();     // „Použiť na podobné"
+  }
 
   // R-02: JEDNO miesto, kde ZAPISOVY payload panela dostane identitu dokumentu.
   // Vzor `nxZonePayload` (zone_tree.js) — ten navyse pridava `cabinet_id`, tento

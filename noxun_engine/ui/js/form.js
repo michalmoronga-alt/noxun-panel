@@ -124,7 +124,7 @@
     invalidateFrontPlaceholders(); // D-23: lokalna zmena -> stare ≈ vysky neplatia (doplni az cerstve echo)
     var ae = document.activeElement;
     if (ae && isExprInput(ae) && isExprStr(ae.value)){
-      if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; }
+      cancelCabinetEdits(); // R-02: s timerom odchadza aj zachyteny dokument
       ae.classList.remove('bad');
       return; // zivy nahlad "= X" kresli listener v expr.js
     }
@@ -152,17 +152,22 @@
     // R-02 (review #264 P1): s korpusom sa zachytava aj DOKUMENT. `nxModelGuid`
     // je globál, ktorý prepíše najbližší push — bez snapshotu by sa oneskorený
     // zápis opečiatkoval NOVÝM dokumentom a guard by ho pustil do cudzej zákazky.
-    var guidSnapshot = nxDocGuid();
-    applyTimer = setTimeout(function(){ flushCabinetEdits(cabSnapshot, guidSnapshot); }, 400);
+    // Kolo 2: guid zije aj v MODULOVEJ premennej, lebo rozpisane edity vie
+    // odoslat aj OKAMZITY flush (`flushCabinetEditsNow` — Studio, „Vlozit
+    // kopiu", „Dielcov", vlastnik kovania). Ten o lokalnu premennu timera
+    // nezavadi a bez toho by stare hodnoty opeciatkoval NOVYM dokumentom.
+    applyPendingGuid = nxDocGuid();
+    applyTimer = setTimeout(function(){ flushCabinetEdits(cabSnapshot, applyPendingGuid); }, 400);
   }
 
   // Okamzity/odlozeny apply korpusu. Snapshot cabinet_id ide s payloadom — Ruby
   // handler ho overi proti aktualnemu vyberu (oneskoreny zapis po prekliknuti
   // na iny korpus sa ticho zahodi namiesto zasiahnutia nespravneho objektu).
   // `guidSnapshot` = dokument z času NAPLÁNOVANIA (R-02, review #264 P1).
-  // Okamžité cesty ho vynechajú — vtedy platí aktuálny.
+  // `null`/`undefined` = žiadne rozpísané edity, platí aktuálny dokument.
   function flushCabinetEdits(cabSnapshot, guidSnapshot){
     applyTimer = null;
+    applyPendingGuid = null;
     var ae = document.activeElement;
     if (ae && isExprInput(ae) && isExprStr(ae.value)) return; // vyraz stale rozpisany
     if (!selectedCabId) return;
@@ -172,9 +177,21 @@
     cabEditsInFlight = true; // D-07 Codex B2: echo tohto apply nesmie prepisat novsi vstup
     if (window.sketchup && sketchup.apply_all) sketchup.apply_all(nxDocPayload(payload, guidSnapshot)); // R-02
   }
+  // R-02 (review #264 kolo 2): okamzity flush PREBERA zachyteny dokument
+  // rozpisanych editov. Predtym len zrusil timer a poslal DNESNYM guidom —
+  // po prepnuti dokumentu tak stare hodnoty formulara dostali NOVU identitu
+  // a serverovy guard ich pustil do cudzej zakazky.
   function flushCabinetEditsNow(){
+    var g = applyPendingGuid;              // null = ziadne rozpisane edity
+    cancelCabinetEdits();
+    flushCabinetEdits(selectedCabId, g);
+  }
+
+  // Zahodenie rozpisanych editov BEZ odoslania. Vola sa aj centralne pri zmene
+  // dokumentu (`nxDropDocState` v shell.js) — pending patri starej zakazke.
+  function cancelCabinetEdits(){
     if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; }
-    flushCabinetEdits(selectedCabId);
+    applyPendingGuid = null;
   }
 
   function updateAvailable(){

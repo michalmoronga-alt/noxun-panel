@@ -45,12 +45,18 @@
   // guardu ticho zmizol. Rovnake ID = editor sa NEPREPISE; ine ID = zrusi sa.
   var renameFor = null;      // cabinet_id s otvorenym editorom (null = zavrety)
   var renameSending = false; // Escape/odoslanie uz zavrelo editor — blur nesmie strielat druhykrat
+  // R-02 (review #264 kolo 2): DOKUMENT, v ktorom sa editor otvoril. `setIdbar`
+  // porovnava len `cabinet_id`, takze editor prezije prepnutie dokumentu na
+  // rovnomennu skrinku (CAB-001 je v kazdej zakazke) a Enter by poslal STARE
+  // meno s NOVYM guidom. Zachytena identita to zastavi aj na klientovi.
+  var renameGuid = '';
   var lastCabName = '';      // posledny nazov z Ruby (fallback pri zruseni editora)
 
   // Zrusi rozpisany editor BEZ odoslania (zmena vyberu, doska, prazdny vyber).
   function dropCabRename(){
     if (!renameFor) return;
     renameFor = null;
+    renameGuid = '';
     renameSending = true;
   }
 
@@ -68,6 +74,7 @@
     var cur = btn.querySelector('.cnametext');
     var txt = cur ? cur.textContent : '';
     renameFor = selectedCabId;
+    renameGuid = nxDocGuid(); // R-02: dokument z casu OTVORENIA editora
     renameSending = false;
     var inp = document.createElement('input');
     inp.type = 'text'; inp.id = 'cnameInput'; inp.className = 'cnameinput';
@@ -88,15 +95,20 @@
     if (!inp || renameSending) return;
     renameSending = true; // blur po Enter/odstraneni prvku nesmie poslat druhy callback
     var cid = renameFor;
+    var guid = renameGuid;
     renameFor = null;
+    renameGuid = '';
     var name = cabNameValue(inp.value);
     // Editor sa zatvara HNED (ziadny stuck input, ked server zapis zahodi);
     // spravny nazov dokresli push_selected — autorita je vzdy server.
     closeCabRenameEditor();
     // Identity guard aj na klientovi (server ma svoj vlastny, prisnejsi):
-    // ak sa vyber medzitym presunul, zapis sa neposiela vobec.
-    if (cid && cid === selectedCabId && window.sketchup && sketchup.rename_cabinet){
-      sketchup.rename_cabinet(nxDocPayload({ cabinet_id: cid, name: name })); // R-02
+    // ak sa vyber ALEBO DOKUMENT medzitym zmenil, zapis sa neposiela vobec.
+    // R-02 (review #264 kolo 2): odosiela sa ZACHYTENY guid, nie dnesny —
+    // meno v inpute patri dokumentu, v ktorom sa editor otvoril.
+    if (cid && cid === selectedCabId && guid === nxDocGuid() &&
+        window.sketchup && sketchup.rename_cabinet){
+      sketchup.rename_cabinet(nxDocPayload({ cabinet_id: cid, name: name }, guid));
     }
   }
 
@@ -521,7 +533,12 @@
     // akcie a preview sa rozhoduju podla selectedCabId aj ked su skryte CSS.
     loadBoard: function(b){
       if (boardCard && b && boardCard.board_id !== b.board_id) cancelBoardEdits(); // ina doska
-      if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; } // korpusovy debounce nesmie strielat v kontexte dosky
+      cancelCabinetEdits(); // korpusovy debounce nesmie strielat v kontexte dosky (R-02: aj zachyteny guid)
+      // R-02 (review #264 kolo 2): karta dosky sa prekresluje aj pri prepnuti
+      // DOKUMENTU — otvoreny modal chybajucej ABS by svoje „Vytvoriť a
+      // pokračovať" aplikoval na INU dosku (a zalozil by katalogovy zaznam).
+      // `loadSelected` to robi uz dlho, doska na to cakala.
+      if (typeof absModalCloseSilent === 'function') absModalCloseSilent();
       setSelected(null);
       activeZoneId = null; frontItems = null; hwItems = null;
       invalidateFrontPlaceholders(); // D-23: bez resolved dat ziadne ≈ odhady
@@ -541,7 +558,10 @@
       if (typeof nxSetModelGuid === 'function') nxSetModelGuid(guid); // identita dokumentu aj bez vyberu
       cancelBoardEdits();                    // V0.4.7c: koniec kontextu dosky
       renderBoardCard(null);
-      if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; }
+      cancelCabinetEdits(); // R-02: s timerom odchadza aj zachyteny dokument
+      // R-02 (review #264 kolo 2): prazdny vyber = niet karty, na ktoru by sa
+      // rozhodnutie modalu dalo aplikovat.
+      if (typeof absModalCloseSilent === 'function') absModalCloseSilent();
       // D-32: identita prec PRED setUiMode — reset karty (materializeInsertCard
       // vnutri setUiMode) nesmie bezat nad zvyskami stareho vyberu.
       setSelected(null);
