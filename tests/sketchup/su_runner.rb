@@ -41,6 +41,21 @@
 #     (mierka, rovnomerna mierka, zrkadlo, plan z ineho dokumentu) bez jedinej
 #     mutacie a bez kroku Spat. Rollback vynimky v sprievodnom bloku je v ASYNC
 #     retazi (run_r03_async) — dokazuje sa az PO ustaleni observer debounce.
+#   GHOST sekcia (V1-04) — VKLADANIE NA KLIK. „Vlozit" uz nevklada: zavesi ghost
+#     na kurzor a skrinka vznikne az klikom. Nastroj sa simuluje PROGRAMOVO, ale
+#     VERNE — cez realne Tool callbacky (onMouseMove / onLButtonDown / onKeyDown
+#     / onCancel) nad ZIVYM `view`; cielovy bod ide cez `view.screen_coords`,
+#     takze klik pouzije tu istu cestu ako pouzivatelov (pickray -> rovina
+#     zamku). Scenare: 0 entit a 0 krokov Spat pred klikom · klik = presne 1 CAB
+#     na ocakavanom transforme + 1x Spat vrati vsetko · zamok vysky typu (dolna
+#     Z=0, horna UPPER_HANG_Z) · rotacia a kotvy (kotva ostava na kliknutom
+#     bode) · free Z nad realnou plosinou · otocene drawing axes (zamok drzi
+#     SVETOVY ram) · getExtents daleko mimo bounds · degenerovany luc (klik
+#     NECOMMITNE) · Spat pocas ghostu (onCancel 2) · prepnutie dokumentu ·
+#     druhe „Vlozit" · vklad z otvoreneho edit kontextu · sablona + peciatka
+#     pouzitia (raz a len po uspechu) · zlyhany commit (hlaska so zamkami,
+#     0 mutacii) · regresie programatickeho `build` a „Vlozit kopiu".
+#     Dedup a undo cez REALNY debounce tick su v `run_ghost_async`.
 #   UI-C1c sekcia — ORIENTACIA DOSKY (leziaca/stojaca/na_stenu): svetove osi,
 #     normala dekorovej plochy a kotviace roviny pre kazdu hodnotu, zhodnost
 #     matic stojaca/na_stenu (lisi sa POLE, nie bbox), zmena orientacie ako
@@ -1184,8 +1199,10 @@ module NoxunSuRunner
                          'template_kind' => 'cabinet', 'template_name' => tpl_name)
               end
     if payload
-      e::Panel.handle_insert(pg(model, payload))
-      inst = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
+      # GHOST (V1-04): „Vlozit" uz nevklada — scenar preto ide CELOU cestou
+      # panela (preflighty + zamky) a skrinku polozi syntetickym KLIKOM.
+      inst = ghost_place!(model, payload, [1300.0, 300.0])
+      ghost_teardown!(model)
       cfg = inst ? (e::Store.config(inst) || {}) : {}
       ok("vklad D-39: zamknuta vyska prebila sablonu (950, sirka zo sablony #{cfg['width']})",
          inst && (cfg['height'].to_f - 950.0).abs < 0.01 && (cfg['width'].to_f - 450.0).abs < 0.01)
@@ -1209,20 +1226,23 @@ module NoxunSuRunner
     end
 
     # 2) F8 konflikt A: zamknuta vyska + vysoke pevne cela -> vklad ODMIETNUTY
-    #    backend hlaskou; status vymenuje aktivne zamky (recorder na Panel.js)
+    #    backend hlaskou; status vymenuje aktivne zamky (recorder na Panel.js).
+    #    GHOST (V1-04): guardy STAVBY (`Fronts.validate_layout!`) bezia az
+    #    v commite, takze odmietnutie pride pri KLIKU — hlaska je ta ista.
     e::Panel.handle_set_insert_locks({ 'locks' => { 'height' => 300.0 } }.to_json)
     before = cabinets(model).length
     rec = []
     install_js_recorder(rec)
     begin
-      e::Panel.handle_insert(pg(model, 'type' => 'lower', 'width' => 600.0, 'height' => 300.0,
-                                       'depth' => 510.0,
-                                       'fronts' => { 'items' => [
-                                         { 'id' => 'F1', 'type' => 'door', 'mode' => 'fixed', 'height' => 250.0, 'wings' => '1', 'locked' => true },
-                                         { 'id' => 'F2', 'type' => 'door', 'mode' => 'fixed', 'height' => 250.0, 'wings' => '1', 'locked' => true }
-                                       ] }))
+      ghost_place!(model, { 'type' => 'lower', 'width' => 600.0, 'height' => 300.0,
+                            'depth' => 510.0,
+                            'fronts' => { 'items' => [
+                              { 'id' => 'F1', 'type' => 'door', 'mode' => 'fixed', 'height' => 250.0, 'wings' => '1', 'locked' => true },
+                              { 'id' => 'F2', 'type' => 'door', 'mode' => 'fixed', 'height' => 250.0, 'wings' => '1', 'locked' => true }
+                            ] } }, [1100.0, 300.0])
     ensure
       remove_js_recorder
+      ghost_teardown!(model)
     end
     ok('vklad F8: zamknuta vyska x pevne cela — vklad odmietnuty (nic sa nevlozilo)',
        cabinets(model).length == before)
@@ -1248,6 +1268,9 @@ module NoxunSuRunner
          cabinets(model).length == before2)
       ok('vklad F8: hlaska nesie hrubkovy konflikt + zamky',
          rec2.any? { |s| s.include?('NX.setStatus') && s.include?('mm') && s.include?('aktívne zámky') })
+      # GHOST (V1-04): PREFLIGHT odmietol vklad este PRED ghostom — na kurzore
+      # nesmie ostat visiet ziadna skrinka.
+      ok('vklad F8: odmietnuty preflight NEZALOZIL ghost session', ghost_session.nil?)
     else
       info('vklad F8: bez seedu SU VKLAD — hrubkovy konflikt preskoceny')
     end
@@ -1520,6 +1543,476 @@ module NoxunSuRunner
     end]
   end
 
+  # --- SYNC-GHOST: vkladanie na klik (V1-04) --------------------------------
+  # Od GHOSTu „Vlozit" NEVKLADA — zavesi ghost na kurzor a skrinka vznikne az
+  # KLIKOM. Nastroj sa simuluje PROGRAMOVO, ale VERNE: cez realne Tool callbacky
+  # (`onMouseMove` / `onLButtonDown` / `onKeyDown` / `onCancel`) nad ZIVYM
+  # `view`. Cielovy bod sa prevadza na pixely cez `view.screen_coords`, takze
+  # klik ide tou istou cestou ako pouzivatelov (pickray -> rovina zamku).
+
+  GHOST_PARAMS = { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0 }.freeze
+
+  def ghost_tool
+    e::GhostTool.active_tool
+  end
+
+  def ghost_session
+    e::GhostTool.session
+  end
+
+  # Kamera nad cielovym bodom: `screen_coords` musi vratit pouzitelne pixely
+  # a luc musi rovinu zamku pretat PRED kamerou (inak degenerovany pripad).
+  def ghost_camera!(model, target_mm, plane_z = 0.0)
+    tgt = e::Units.point(target_mm[0], target_mm[1], plane_z)
+    eye = e::Units.point(target_mm[0] - 2500.0, target_mm[1] - 3500.0, plane_z + 2500.0)
+    model.active_view.camera = Sketchup::Camera.new(eye, tgt, Z_AXIS)
+    model.active_view
+  end
+
+  def ghost_screen(model, pt_mm)
+    model.active_view.screen_coords(e::Units.point(pt_mm[0], pt_mm[1], pt_mm[2] || 0.0))
+  end
+
+  def ghost_move!(model, pt_mm)
+    sc = ghost_screen(model, pt_mm)
+    ghost_tool.onMouseMove(0, sc.x, sc.y, model.active_view)
+    sc
+  end
+
+  def ghost_click!(model, pt_mm)
+    v = model.active_view
+    sc = ghost_screen(model, pt_mm)
+    ghost_tool.onMouseMove(0, sc.x, sc.y, v)
+    ghost_tool.onLButtonDown(0, sc.x, sc.y, v)
+  end
+
+  def ghost_key!(model, key, repeat = 1)
+    ghost_tool.onKeyDown(key, repeat, 0, model.active_view)
+  end
+
+  # „Vlozit" presne ako panel (vratane preflightov) + syntetický klik na bod
+  # v rovine zamku. Vracia novu instanciu (alebo nil, ak vklad neprebehol).
+  def ghost_place!(model, params, at_mm = [1200.0, 300.0])
+    plane = params['type'].to_s == 'upper' ? e::CabinetBuilder::UPPER_HANG_Z : 0.0
+    e::Panel.handle_insert(pg(model, params))
+    return nil unless ghost_session && ghost_tool
+
+    ghost_camera!(model, at_mm, plane)
+    ghost_click!(model, [at_mm[0], at_mm[1], plane])
+    model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
+  end
+
+  # Teardown: ziadna session ani nastroj nesmie prezit do dalsej sekcie.
+  # `deferred: false` = pop nastroja SYNCHRONNE (v teste necakame na timer).
+  def ghost_teardown!(_model)
+    e::GhostTool.cancel_session('SU-TEST teardown', deferred: false)
+  rescue StandardError => ex
+    info("GHOST teardown: #{ex.class}: #{ex.message}")
+  end
+
+  def ghost_origin_mm(inst)
+    o = inst.transformation.origin
+    [mm(o.x), mm(o.y), mm(o.z)]
+  end
+
+  def run_ghost(model)
+    cleanup(model)
+    markers = []
+    e::Panel.handle_set_insert_locks({ 'locks' => {} }.to_json)
+
+    # --- 1) PRED KLIKOM: ziadna entita, ziadne ID, ziadny krok Spat ---------
+    before = cabinets(model).length
+    m1 = r03_marker(model, markers)
+    e::Panel.handle_insert(pg(model, GHOST_PARAMS.dup))
+    s = ghost_session
+    ok('GHOST 1: „Vlozit" nevlozilo NIC — ghost visi na kurzore',
+       !s.nil? && s.active? && cabinets(model).length == before)
+    ok('GHOST 1: session je viazana na TENTO dokument a plan je ZMRAZENY',
+       !s.nil? && s.plan.for_model?(model) && s.plan.config.frozen?)
+    ok('GHOST 1: nastroj je aktivny (push_tool, nie select_tool)',
+       !ghost_tool.nil? && ghost_tool.attached?)
+    ok('GHOST 1: OBA rezimy startuju v zamku vysky typu, na lavej dolnej kotve',
+       !s.nil? && s.z_mode == :locked && s.anchor == :fl_bottom && !s.placeable)
+    ghost_teardown!(model)
+    ok('GHOST 1: Esc/zavretie session zrusi a nastroj konci',
+       ghost_session.nil? && ghost_tool.nil?)
+    Sketchup.undo
+    ok('GHOST 1: cely ghost cyklus bez kliku nezalozil ZIADEN krok Spat (1x Spat vratil marker)',
+       !m1.valid?)
+    ok('GHOST 1: po zruseni ghostu je v modeli presne tolko korpusov ako pred nim',
+       cabinets(model).length == before)
+
+    # --- 2) KLIK: presne 1 CAB na ocakavanom transforme, 1x Spat vrati vsetko -
+    cleanup(model)
+    inst = ghost_place!(model, GHOST_PARAMS.dup, [1200.0, 300.0])
+    o = inst ? ghost_origin_mm(inst) : [nil, nil, nil]
+    ok("GHOST 2: klik polozil PRESNE JEDNU skrinku (#{cabinets(model).length})",
+       cabinets(model).length == 1 && !inst.nil?)
+    ok("GHOST 2: kotva sadla na kliknuty bod, origin drzi domacu vysku (#{o.map { |v| v && v.round(1) }.inspect})",
+       inst && (o[0] - 1200.0).abs <= 1.0 && (o[1] - 300.0).abs <= 1.0 && o[2].abs <= TOL)
+    ok('GHOST 2: nova skrinka je OZNACENA (Inspector pokracuje jej editaciou)',
+       inst && model.selection.to_a.include?(inst))
+    ok('GHOST 2: korpus je TOP-LEVEL', inst && inst.parent.is_a?(Sketchup::Model))
+    ok('GHOST 2: session je terminalna a nastroj sa uz nema o co oprieť',
+       ghost_session.nil?)
+    Sketchup.undo
+    ok('GHOST 2: 1x Spat vratil CELY vklad',
+       (inst.nil? || !inst.valid?) && cabinets(model).length.zero?)
+    ghost_teardown!(model)
+
+    # --- 3) ZAMOK VYSKY TYPU: dolna na Z=0, horna na UPPER_HANG_Z -----------
+    cleanup(model)
+    up = ghost_place!(model, GHOST_PARAMS.merge('type' => 'upper', 'depth' => 320.0), [800.0, 200.0])
+    uo = up ? ghost_origin_mm(up) : [nil, nil, nil]
+    ok("GHOST 3: horna skrinka visi na UPPER_HANG_Z (#{uo[2] && uo[2].round(1)})",
+       up && (uo[2] - e::CabinetBuilder::UPPER_HANG_Z).abs <= TOL)
+    ok('GHOST 3: horna sadla na kliknute X/Y (rovina zamku je v UPPER_HANG_Z)',
+       up && (uo[0] - 800.0).abs <= 1.0 && (uo[1] - 200.0).abs <= 1.0)
+    ghost_teardown!(model)
+    cleanup(model)
+
+    # --- 4) ROTACIA a KOTVY: kotva ostava na kliknutom bode -----------------
+    e::Panel.handle_insert(pg(model, GHOST_PARAMS.dup))
+    s = ghost_session
+    ghost_camera!(model, [1500.0, 400.0], 0.0)
+    ghost_move!(model, [1500.0, 400.0, 0.0])
+    ok('GHOST 4: pohyb mysou dal ghostu platnu polohu', s.placeable)
+    ok('GHOST 4: sipky su VLASTNENE klavesy (Tool ich pohlti)',
+       ghost_key!(model, VK_RIGHT) == true && ghost_key!(model, VK_LEFT) == true)
+    ghost_key!(model, VK_RIGHT)
+    ok("GHOST 4: sipka vpravo otocila o +90° (index #{s.rotation_index})", s.rotation_index == 1)
+    ok('GHOST 4: drzana klavesa (repeat) stav NEMENI, ale ostava vlastnena',
+       ghost_key!(model, VK_RIGHT, 3) == true && s.rotation_index == 1)
+    alt_key = defined?(VK_MENU) ? VK_MENU : VK_ALT
+    ok('GHOST 4: Alt cykluje kotvy (a je vlastneny down aj up)',
+       ghost_key!(model, alt_key) == true && s.anchor == :fr_bottom &&
+       ghost_tool.onKeyUp(alt_key, 1, 0, model.active_view) == true)
+    ok('GHOST 4: cudzia klavesa NIE JE vlastnena (inference lock ostava SketchUpu)',
+       ghost_key!(model, 65) == false)
+    ghost_click!(model, [1500.0, 400.0, 0.0])
+    rot = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
+    if rot
+      a = rot.transformation * e::Units.point(600.0, 0.0, 100.0) # prava dolna kotva korpusu
+      ok("GHOST 4: aktivna kotva sadla PRESNE na kliknuty bod aj po otoceni (#{mm(a.x).round(1)}, #{mm(a.y).round(1)})",
+         (mm(a.x) - 1500.0).abs <= 1.0 && (mm(a.y) - 400.0).abs <= 1.0)
+      xa = rot.transformation.xaxis
+      ok("GHOST 4: otocenie o 90° prezilo vklad (os X = #{mm(xa.x).round(3)}, #{mm(xa.y).round(3)})",
+         xa.x.abs < 0.001 && (xa.y - 1.0).abs < 0.001)
+    else
+      ok('GHOST 4: otoceny vklad prebehol', false)
+    end
+    ghost_teardown!(model)
+    cleanup(model)
+
+    # --- 5) FREE Z: ↑ pusti ghost na inference point (nenulove Z) ------------
+    model.start_operation('SU-TEST GHOST plosina', true)
+    grp = model.entities.add_group
+    grp.entities.add_face([e::Units.point(1700.0, 0.0, 500.0), e::Units.point(2300.0, 0.0, 500.0),
+                           e::Units.point(2300.0, 600.0, 500.0), e::Units.point(1700.0, 600.0, 500.0)])
+    model.commit_operation
+    e::Panel.handle_insert(pg(model, GHOST_PARAMS.dup))
+    s = ghost_session
+    ghost_camera!(model, [2000.0, 300.0], 500.0)
+    ok('GHOST 5: ↑ prepne na volnu vysku', ghost_key!(model, VK_UP) == true && s.z_mode == :free)
+    ghost_move!(model, [2000.0, 300.0, 500.0])
+    free = s.last_point
+    ok("GHOST 5: inference point ma NENULOVE Z (#{free && free[2].round(1)} mm)",
+       !free.nil? && (free[2] - 500.0).abs <= 5.0)
+    ok('GHOST 5: ↓ vrati zamok vysky typu', ghost_key!(model, VK_DOWN) == true && s.z_mode == :locked)
+    ok('GHOST 5: prechod zamok/free NEZMENIL X ani Y kliknuteho bodu',
+       (s.last_point[0] - free[0]).abs < 0.01 && (s.last_point[1] - free[1]).abs < 0.01)
+    ghost_key!(model, VK_UP)
+    ghost_click!(model, [2000.0, 300.0, 500.0])
+    fr = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
+    fo = fr ? ghost_origin_mm(fr) : [nil, nil, nil]
+    ok("GHOST 5: vo volnej vyske sadol origin nad podlahu (Z = #{fo[2] && fo[2].round(1)} mm)",
+       fr && fo[2] > 100.0)
+    ghost_teardown!(model)
+    cleanup(model)
+    if grp.valid?
+      model.start_operation('SU-TEST GHOST plosina prec', true)
+      grp.erase!
+      model.commit_operation
+    end
+
+    # --- 6) OTOCENE DRAWING AXES: zamok drzi SVETOVY ram --------------------
+    axes_ok = begin
+      model.axes.set(e::Units.point(300.0, 400.0, 250.0),
+                     Geom::Vector3d.new(1, 1, 0), Geom::Vector3d.new(-1, 1, 0), Z_AXIS)
+      true
+    rescue StandardError => ex
+      info("GHOST 6: drawing axes sa nedaju prestavit (#{ex.class}) — scenar preskoceny")
+      false
+    end
+    if axes_ok
+      ax = ghost_place!(model, GHOST_PARAMS.dup, [1000.0, 250.0])
+      ao = ax ? ghost_origin_mm(ax) : [nil, nil, nil]
+      ok("GHOST 6: pri OTOCENYCH osiach kreslenia drzi zamok svetove Z = 0 (#{ao[2] && ao[2].round(2)})",
+         ax && ao[2].abs <= TOL && (ao[0] - 1000.0).abs <= 1.0 && (ao[1] - 250.0).abs <= 1.0)
+      ghost_teardown!(model)
+      cleanup(model)
+      begin
+        model.axes.set(ORIGIN, X_AXIS, Y_AXIS, Z_AXIS)
+      rescue StandardError
+        nil
+      end
+    end
+
+    # --- 7) GHOST DALEKO MIMO BOUNDS: getExtents ho nesmie orezat -----------
+    e::Panel.handle_insert(pg(model, GHOST_PARAMS.dup))
+    far = [80_000.0, 45_000.0]
+    ghost_camera!(model, far, 0.0)
+    ghost_move!(model, [far[0], far[1], 0.0])
+    ext = ghost_tool.getExtents
+    ok("GHOST 7: getExtents vracia obalku ghostu aj 80 m od originu (#{mm(ext.max.x).round(0)} mm)",
+       ext.valid? && (mm(ext.max.x) - far[0]).abs < 2000.0 && (mm(ext.min.y) - far[1]).abs < 2000.0)
+    ghost_teardown!(model)
+
+    # --- 8) DEGENEROVANY LUC: klik NECOMMITNE -------------------------------
+    cleanup(model)
+    before8 = cabinets(model).length
+    e::Panel.handle_insert(pg(model, GHOST_PARAMS.dup))
+    s = ghost_session
+    ghost_camera!(model, [1000.0, 300.0], 0.0)
+    ghost_move!(model, [1000.0, 300.0, 0.0])
+    ok('GHOST 8: vychodisko — ghost je polozitelny', s.placeable)
+    # VODOROVNY pohlad: kamera v rovine zamku sa na nu diva „po hrane" —
+    # |dir.z| pod EPS, priesecnik neexistuje.
+    model.active_view.camera = Sketchup::Camera.new(e::Units.point(-3000.0, 0.0, 0.0),
+                                                    e::Units.point(1000.0, 0.0, 0.0), Z_AXIS)
+    v = model.active_view
+    ghost_tool.onMouseMove(0, (v.vpwidth / 2).to_i, (v.vpheight / 2).to_i, v)
+    ok('GHOST 8: pri vodorovnom pohlade ghost DRZI poslednu polohu a nie je polozitelny',
+       !s.placeable && !s.last_point.nil?)
+    ghost_tool.onLButtonDown(0, (v.vpwidth / 2).to_i, (v.vpheight / 2).to_i, v)
+    ok('GHOST 8: klik v degenerovanom pohlade NEVLOZIL nic a session zije',
+       cabinets(model).length == before8 && !ghost_session.nil? && ghost_session.active?)
+    ghost_teardown!(model)
+
+    # --- 9) UNDO POCAS GHOSTU (onCancel reason 2) = cancel, 0 mutacii -------
+    cleanup(model)
+    before9 = cabinets(model).length
+    m9 = r03_marker(model, markers)
+    e::Panel.handle_insert(pg(model, GHOST_PARAMS.dup))
+    ghost_camera!(model, [900.0, 200.0], 0.0)
+    ghost_move!(model, [900.0, 200.0, 0.0])
+    ghost_tool.onCancel(2, model.active_view)
+    ok('GHOST 9: Spat pocas ghostu session ZRUSI (undo sa neblokuje)',
+       ghost_session.nil? && cabinets(model).length == before9)
+    ok('GHOST 9: opakovany onCancel je no-op (idempotentny koniec)',
+       e::GhostTool.cancel_session('opakovanie', deferred: false) == false)
+    Sketchup.undo
+    ok('GHOST 9: zruseny ghost nenechal ZIADEN krok Spat (1x Spat vratil marker)', !m9.valid?)
+    ghost_teardown!(model)
+
+    # --- 10) PREPNUTIE DOKUMENTU = cancel (cross-document vklad nikdy) ------
+    cleanup(model)
+    e::Panel.handle_insert(pg(model, GHOST_PARAMS.dup))
+    ok('GHOST 10: vychodisko — session bezi', !ghost_session.nil?)
+    e::GhostTool.on_model_switched(model)
+    ok('GHOST 10: aktivacia TOHO ISTEHO dokumentu session NERUSI (guard identity objektom)',
+       !ghost_session.nil? && ghost_session.active?)
+    e::GhostTool.on_model_switched(Object.new)
+    ok('GHOST 10: udalost o CUDZOM dokumente session zrusi', ghost_session.nil?)
+    ghost_teardown!(model)
+
+    # --- 11) DRUHE „VLOZIT" pocas session = stara prec, nova bezi ------------
+    cleanup(model)
+    e::Panel.handle_insert(pg(model, GHOST_PARAMS.dup))
+    first = ghost_session
+    first_tool = ghost_tool
+    e::Panel.handle_insert(pg(model, GHOST_PARAMS.merge('width' => 900.0)))
+    second = ghost_session
+    ok('GHOST 11: druhe „Vlozit" zrusilo STARU session a zalozilo NOVU s cerstvym snapshotom',
+       !first.equal?(second) && first.terminal? && second && second.active? &&
+       (second.plan.config[:width].to_f - 900.0).abs < 0.01)
+    ok('GHOST 11: na stacku ostal PRAVE JEDEN ghost nastroj (stary je odpojeny)',
+       !ghost_tool.nil? && !ghost_tool.equal?(first_tool) && !first_tool.attached?)
+    ghost_click!(model, [1400.0, 350.0, 0.0])
+    ok('GHOST 11: klik polozil skrinku z NOVEJ session (sirka 900)',
+       cabinets(model).length == 1 &&
+       ((e::Store.config(cabinets(model).first) || {})['width'].to_f - 900.0).abs < 0.01)
+    ghost_teardown!(model)
+    cleanup(model)
+
+    # --- 12) VLOZENIE Z OTVORENEHO EDIT KONTEXTU konci TOP-LEVEL ------------
+    model.start_operation('SU-TEST GHOST kontext', true)
+    ctx = model.entities.add_group
+    ctx.entities.add_cpoint(ORIGIN)
+    model.commit_operation
+    opened = begin
+      model.active_path = [ctx]
+      model.active_path && model.active_path.length.positive?
+    rescue StandardError => ex
+      info("GHOST 12: active_path= nedostupne (#{ex.class}) — scenar preskoceny")
+      false
+    end
+    if opened
+      nested = ghost_place!(model, GHOST_PARAMS.dup, [1100.0, 260.0])
+      no = nested ? ghost_origin_mm(nested) : [nil, nil, nil]
+      ok('GHOST 12: vklad z otvoreneho komponentu skoncil TOP-LEVEL',
+         nested && nested.parent.is_a?(Sketchup::Model))
+      ok("GHOST 12: transform je vo SVETOVOM rame (#{no.map { |x| x && x.round(1) }.inspect})",
+         nested && (no[0] - 1100.0).abs <= 1.0 && (no[1] - 260.0).abs <= 1.0 && no[2].abs <= TOL)
+      ok('GHOST 12: po vklade je model v ROOT kontexte',
+         model.active_path.nil? || model.active_path.length.zero?)
+      ghost_teardown!(model)
+    end
+    cleanup(model)
+    if ctx.valid?
+      model.start_operation('SU-TEST GHOST kontext prec', true)
+      ctx.erase!
+      model.commit_operation
+    end
+
+    # --- 13) SABLONA s materialom + peciatka pouzitia LEN po uspechu a RAZ ---
+    tpl_name = '__SU_TEST_GHOST__'
+    if e::TemplateStore.find('cabinet', tpl_name)
+      info("GHOST 13: sablona #{tpl_name} uz existuje — scenar preskoceny (chranime pouzivatelske data)")
+    else
+      e::TemplateStore.upsert('cabinet', tpl_name,
+                              { 'type' => 'lower', 'width' => 450.0, 'height' => 720.0, 'depth' => 510.0,
+                                'thickness' => 18.0, 'floor_height' => 100.0,
+                                'bottom_mode' => 'under_sides', 'top_mode' => 'full',
+                                'back_mode' => 'overlay', 'back_thickness' => 3.0,
+                                'material_id' => 'K009_PW_DTDL_18',
+                                'zone_tree' => { 'id' => 'Z1', 'shelves' => 2, 'children' => [] },
+                                'fronts' => { 'items' => [] } })
+      tpl_snapshot = File.binread(e::TemplateStore.path)
+      seq_before = e::TemplateUsage.seq_for('cabinet', tpl_name)
+      payload = (e::TemplateStore.find('cabinet', tpl_name) || {})['config']
+                .merge('height' => 950.0, 'template_kind' => 'cabinet', 'template_name' => tpl_name)
+      # Zamok vysky z vkladacej karty musi prebit sablonu — preflighty bezia
+      # v `handle_insert`, teda PRED klikom.
+      e::Panel.handle_set_insert_locks({ 'locks' => { 'height' => 950.0 } }.to_json)
+      tinst = ghost_place!(model, payload, [1600.0, 500.0])
+      tcfg = tinst ? (e::Store.config(tinst) || {}) : {}
+      ok("GHOST 13: zamknuta vyska prebila sablonu (950, sirka zo sablony #{tcfg['width']})",
+         tinst && (tcfg['height'].to_f - 950.0).abs < 0.01 && (tcfg['width'].to_f - 450.0).abs < 0.01)
+      ok('GHOST 13: material a zony sablony presli az do vlozeneho korpusu',
+         tcfg['material_id'] == 'K009_PW_DTDL_18' && ((tcfg['zone_tree'] || {})['shelves']).to_i == 2)
+      ok('GHOST 13: subor sablon je po vklade BYTE-nezmeneny',
+         File.binread(e::TemplateStore.path) == tpl_snapshot)
+      seq_after = e::TemplateUsage.seq_for('cabinet', tpl_name)
+      ok("GHOST 13: peciatka pouzitia sadla az PO uspesnom vlozeni (#{seq_before.inspect} -> #{seq_after.inspect})",
+         !seq_after.nil? && seq_after != seq_before)
+      # DVOJKLIK: druhy klik na uz commitnutu session je NO-OP — ziadna druha
+      # skrinka a ziadna druha peciatka.
+      if tinst && ghost_tool
+        ghost_click!(model, [1600.0, 500.0, 0.0])
+        ok('GHOST 13: druhy klik po commite nevyrobil druhu skrinku ani druhu peciatku',
+           cabinets(model).length == 1 && e::TemplateUsage.seq_for('cabinet', tpl_name) == seq_after)
+      end
+      ghost_teardown!(model)
+      e::Panel.handle_set_insert_locks({ 'locks' => {} }.to_json)
+      e::TemplateStore.delete('cabinet', tpl_name)
+      cleanup(model)
+    end
+
+    # --- 14) ZLYHANY COMMIT: guardy stavby, 0 mutacii, hlaska so zamkami ----
+    #     F8 konflikt (zamknuta vyska x vysoke pevne cela) sa od GHOSTu ohlasi
+    #     az pri KLIKU — `Fronts.validate_layout!` bezi v commite.
+    before14 = cabinets(model).length
+    m14 = r03_marker(model, markers)
+    e::Panel.handle_set_insert_locks({ 'locks' => { 'height' => 300.0 } }.to_json)
+    rec = []
+    install_js_recorder(rec)
+    begin
+      bad = ghost_place!(model, GHOST_PARAMS.merge(
+        'height' => 300.0,
+        'fronts' => { 'items' => [
+          { 'id' => 'F1', 'type' => 'door', 'mode' => 'fixed', 'height' => 250.0, 'wings' => '1', 'locked' => true },
+          { 'id' => 'F2', 'type' => 'door', 'mode' => 'fixed', 'height' => 250.0, 'wings' => '1', 'locked' => true }
+        ] }
+      ), [1000.0, 300.0])
+    ensure
+      remove_js_recorder
+    end
+    ok('GHOST 14: zlyhany commit NEVLOZIL nic', bad.nil? && cabinets(model).length == before14)
+    ok('GHOST 14: hlaska pomenovala aktivne zamky (rovnaka ako pred ghostom)',
+       rec.any? { |s2| s2.include?('NX.setStatus') && s2.include?('aktívne zámky') && s2.include?('výška') })
+    ok('GHOST 14: zlyhany commit session KONCI (opakovany klik uz nema co skusat)',
+       ghost_session.nil?)
+    Sketchup.undo
+    ok('GHOST 14: zlyhany commit nenechal ZIADEN krok Spat (1x Spat vratil marker)', !m14.valid?)
+    e::Panel.handle_set_insert_locks({ 'locks' => {} }.to_json)
+    ghost_teardown!(model)
+
+    # --- 15) REGRESIE: programaticka cesta a kopia su GHOSTom nedotknute ----
+    cleanup(model)
+    a = e::CabinetBuilder.build(model, GHOST_PARAMS.dup)
+    b = e::CabinetBuilder.build(model, GHOST_PARAMS.dup)
+    ok('GHOST 15: programaticky `build` stavia dalej VEDLA existujucich (Placement.next_x fallback)',
+       cabinets(model).length == 2 &&
+       mm(b.transformation.origin.x) > mm(a.transformation.origin.x) + 500.0)
+    ok('GHOST 15: programaticky `build` ziadnu ghost session nezaklada', ghost_session.nil?)
+    e::Panel.handle_insert_copy(pg(model, 'cabinet_id' => e::Store.get(a, 'cabinet_id')))
+    ok('GHOST 15: „Vlozit kopiu" vklada SYNCHRONNE (bez ghostu) a oznaci kopiu',
+       cabinets(model).length == 3 && ghost_session.nil? &&
+       model.selection.to_a.any? { |i| e::Store.kind(i) == 'cabinet' })
+
+    r03_clear_markers(model, markers)
+    ghost_teardown!(model)
+    cleanup(model)
+    ok('GHOST: cleanup (0 korpusov, ziadna session, ziadny nastroj, markery prec)',
+       cabinets(model).empty? && ghost_session.nil? && ghost_tool.nil? &&
+       markers.none? { |c| c.valid? })
+  rescue StandardError => ex
+    log_line("FAIL: GHOST vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    remove_js_recorder
+    ghost_teardown!(model)
+    r03_clear_markers(model, markers) if defined?(markers) && markers
+    begin
+      model.axes.set(ORIGIN, X_AXIS, Y_AXIS, Z_AXIS)
+    rescue StandardError
+      nil
+    end
+    cleanup(model)
+  end
+
+  # GHOST cez REALNY debounce tick: observer nesmie z ghost vkladu spravit
+  # kopiu (ziadna druha CAB, ziadny extra krok Spat) — a to ani vtedy, ked
+  # su v modeli DVE IDENTICKE skrinky (dedup cesta, lekcia D-103).
+  def run_ghost_async(model, state, steps)
+    steps << [0.5, lambda do
+      cleanup(model)
+      ghost_teardown!(model)
+      state[:gh_probe] = char_push_stack_probe(model, 'SU-TEST GHOST sonda undo stacku')
+      state[:gh_a] = ghost_place!(model, GHOST_PARAMS.dup, [1000.0, 200.0])
+      ghost_teardown!(model)
+    end]
+    steps << [SETTLE, lambda do
+      ok('GHOST async: po ustaleni observera je v modeli PRESNE JEDNA skrinka (ziadna „kopia")',
+         cabinets(model).length == 1)
+      ids = cabinets(model).map { |i| e::Store.get(i, 'cabinet_id').to_s }
+      ok("GHOST async: identita je jedina a stabilna (#{ids.join(', ')})", ids.uniq.length == 1)
+      # DVE IDENTICKE skrinky = dedup cesta: druhy ghost vklad s tym istym
+      # configom NA INE miesto nesmie observer povazovat za kopiu.
+      state[:gh_b] = ghost_place!(model, GHOST_PARAMS.dup, [2600.0, 200.0])
+      ghost_teardown!(model)
+    end]
+    steps << [SETTLE, lambda do
+      cids = cabinets(model).map { |i| e::Store.get(i, 'cabinet_id').to_s }.sort
+      ok("GHOST async: dva ghost vklady = dve skrinky s DVOMA roznymi ID (#{cids.join(', ')})",
+         cabinets(model).length == 2 && cids.uniq.length == 2)
+      Sketchup.undo
+    end]
+    steps << [SETTLE, lambda do
+      ok('GHOST async: 1x Spat vratil DRUHY vklad cely (dedup tik nepridal vlastny krok)',
+         cabinets(model).length == 1)
+      Sketchup.undo
+    end]
+    steps << [SETTLE, lambda do
+      ok('GHOST async: dalsie Spat vratilo PRVY vklad — ghost nepridal ziadny krok navyse',
+         cabinets(model).length.zero?)
+      Sketchup.undo
+      ok('GHOST async: pod vkladmi lezi presne sonda undo stacku (nikto medzitym nic nekomitol)',
+         !state[:gh_probe].nil? && char_stack_probe(model).nil?)
+      ghost_teardown!(model)
+      cleanup(model)
+    end]
+  end
+
   # --- SYNC-D45: hrubka <-> material tela (deadlock 18,6 mm) -----------------
   # Bloker z testovania: katalogovy material 18,6 mm sa nedal pouzit. Tu sa overuju
   # VSETKY tri cesty von + odmietnutia. Katalog: docasny testovaci dekor (18 + 18,6),
@@ -1629,9 +2122,11 @@ module NoxunSuRunner
       e::Materials.set_project_default(model, 'default_material_id', id186)
       model.commit_operation
       before = cabinets(model).length
-      e::Panel.handle_insert(pg(model, 'type' => 'lower', 'width' => 600.0, 'height' => 720.0,
-                                       'depth' => 510.0, 'thickness' => 18.0))
-      fresh = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
+      # GHOST (V1-04): vklad ide CELOU cestou panela (preflight prevezme hrubku
+      # z predvolby) a skrinku polozi syntetický klik.
+      fresh = ghost_place!(model, { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0,
+                                    'depth' => 510.0, 'thickness' => 18.0 }, [1500.0, 400.0])
+      ghost_teardown!(model)
       cfg_i = fresh ? (e::Store.config(fresh) || {}) : {}
       ok('D-45 (c): vklad prevzal hrubku 18,6 z projektovej predvolby',
          cabinets(model).length == before + 1 && (cfg_i['thickness'].to_f - 18.6).abs < 0.01)
@@ -1654,6 +2149,7 @@ module NoxunSuRunner
          cabinets(model).length == before2)
       ok('D-45 (d): hlaska pomenovala zamok aj material sablony',
          rec3.any? { |s| s.include?('NX.setStatus') && s.include?('Zamknutá hrúbka') && s.include?('aktívne zámky') })
+      ok('D-45 (d): odmietnuty preflight NEZALOZIL ghost session', ghost_session.nil?)
       e::Panel.handle_set_insert_locks({ 'locks' => {} }.to_json)
 
       # (e) SABLONA na EXISTUJUCU skrinku (audit B4): sablona s materialom 18,6
@@ -10263,6 +10759,11 @@ module NoxunSuRunner
     # R-03: rollback zlyhaneho vkladu cez REALNY debounce tick (nie priame volanie).
     run_r03_async(model, state, steps)
 
+    # GHOST V1-04: ghost vklad cez REALNY debounce tick — observer z neho nesmie
+    # spravit „kopiu" ani pridat vlastny krok Spat (aj pri dvoch identickych
+    # skrinkach = dedup cesta).
+    run_ghost_async(model, state, steps)
+
     # S6b: zachytna siet v KONTROLE — ked uz dva kusy na jednom mieste vzniknu
     # (starsi projekt, paste-in-place), semafor ich MUSI ukazat. Overuje CELU
     # retaz Bom.collect -> Validation.run(placements:), nielen cistu funkciu.
@@ -10350,6 +10851,7 @@ module NoxunSuRunner
     run_sync_rails(model)    # H3/D-80: vnutro pod vystuhami (odsadenie, upright, chrbat, odmietnutie)
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
     run_r03(model)           # R-03: sev prepare_insert/commit_insert — ciste pripravenie, vlastny rigidny transform, odmietnutia, edit kontext
+    run_ghost(model)         # GHOST V1-04: vkladanie na klik — 0 mutacii pred klikom, zamok/free vyska, rotacia a kotvy, degenerovany luc, undo/prepnutie/druhe „Vlozit", sablona a peciatka
     run_d45(model)           # D-45: hrubka <-> material tela (18,6 mm deadlock)
     run_d46(model)           # D-46: projektova predvolba korpusu s inou hrubkou (potvrdenie)
     # ŠT-2b bezi ESTE PRED sekciami 2A: `run_2a4` konci ROLLBACKOM katalogu na

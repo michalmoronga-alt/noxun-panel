@@ -106,10 +106,16 @@ NxTest.test('R-02: guard bezi PRED akymkolvek zapisom aj pred echo identitou') d
                   "#{name}: guard dokumentu pred part_target_error")
   end
   # Vklad: guard pred builderom (nova geometria v cudzej zakazke je najhorsi
-  # pripad — nikto ju tam nehlada).
+  # pripad — nikto ju tam nehlada). Od GHOST vkladania (V1-04) `handle_insert`
+  # nestavia — pripravi ZMRAZENY plan a zavesi ghost na kurzor, takze prvym
+  # krokom smerom k modelu je `prepare_insert`; guard musi byt pred NIM.
+  # (Druha obrana ostava v `commit_insert`, ktory plan z ineho dokumentu
+  # odmietne — R-03.)
   ins = r02_body(R02_CAB_RB, 'handle_insert')
-  NxTest.assert(ins.index('foreign_document?') < ins.index('CabinetBuilder.build'),
-                'handle_insert: guard pred stavbou')
+  NxTest.assert(ins.index('foreign_document?') < ins.index('CabinetBuilder.prepare_insert'),
+                'handle_insert: guard pred pripravou vkladu')
+  NxTest.assert(ins.index('foreign_document?') < ins.index('GhostTool.start'),
+                'handle_insert: guard pred zalozenim ghost session')
   insb = r02_body(R02_BOARD_RB, 'handle_insert_board')
   NxTest.assert(insb.index('foreign_document?') < insb.index('BoardBuilder.build'),
                 'handle_insert_board: guard pred stavbou')

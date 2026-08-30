@@ -100,33 +100,35 @@ module Noxun
         end
 
         # Ukonci NAS nastroj PRESNE JEDNYM `pop_tool`. Idempotentne: pop
-        # prebehne len ak je nas nastroj este pripojeny.
+        # prebehne len ak je TEN ISTY nastroj este pripojeny.
+        # POZOR: odlozeny pop si drzi KONKRETNU instanciu (nie `@active_tool`) —
+        # inak by timer zalozeny starou session zhodil nastroj, ktory medzitym
+        # pushlo druhe „Vlozit".
         def end_tool(deferred: true)
           t = @active_tool
           return false unless t && t.attached?
 
           if deferred
-            UI.start_timer(0, false) { pop_tool_now }
+            UI.start_timer(0, false) { pop_tool(t) }
             true
           else
-            pop_tool_now
+            pop_tool(t)
           end
         rescue StandardError => e
           Engine.log_error(e, 'GhostTool.end_tool')
           false
         end
 
-        def pop_tool_now
-          t = @active_tool
-          return false unless t && t.attached?
+        def pop_tool(tool)
+          return false unless tool && tool.attached?
 
-          model = t.model_ref || Sketchup.active_model
-          @active_tool = nil
-          t.detach!
+          model = tool.model_ref || Sketchup.active_model
+          @active_tool = nil if @active_tool.equal?(tool)
+          tool.detach!
           model.tools.pop_tool
           true
         rescue StandardError => e
-          Engine.log_error(e, 'GhostTool.pop_tool_now')
+          Engine.log_error(e, 'GhostTool.pop_tool')
           false
         end
 
