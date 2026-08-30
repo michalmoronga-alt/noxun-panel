@@ -314,9 +314,12 @@ module Noxun
         path.to_s.strip.tr('\\', '/').downcase
       end
 
-      # Nahradny kluc neulozeneho modelu — plati LEN v ramci sedenia (guid sa
-      # po ulozeni zmeni). Preto ma vlastny prefix: aby sa dal rozoznat od
-      # cesty a pri prvom ulozeni zmigrovat.
+      # Nahradny kluc neulozeneho modelu — plati LEN v ramci sedenia. Prefix
+      # ho odlisuje od cesty, aby sa dal pri prvom zapise s platnou cestou
+      # zmigrovat. Od 1d/R-02b je hodnotou DocKey token (stabilny pocas celeho
+      # zivota objektu modelu, aj cez prve ulozenie) — most SESSION_KEY_BRIDGE
+      # vyssie tym stratil svoj hlavny scenar (guid uz prve ulozenie neprepise),
+      # ale ostava: kryje starsie zaznamy v subore a nic nekazi.
       def project_session_key(model)
         guid = model_guid(model)
         guid.empty? ? '' : "#{SESSION_KEY_PREFIX}#{guid}"
@@ -490,8 +493,11 @@ module Noxun
 
       # Stabilna identita modelu — zrkadlo MaterialsDialog.model_guid (oneskoreny
       # klik po prepnuti dokumentu nesmie otvorit modal nad inym projektom).
+      # 1d/R-02b: hodnota je token DocKey (Model#guid sa meni pri KAZDOM
+      # ulozeni — guardy Studia by inak videli Ctrl+S ako prepnutie dokumentu);
+      # meno metody aj pola `model_guid` na drote ostava.
       def model_guid(model)
-        model && model.respond_to?(:guid) ? model.guid.to_s : ''
+        model ? DocKey.key(model) : ''
       rescue StandardError
         ''
       end

@@ -31,12 +31,18 @@ end
 NxTest.test('R-02: guard identity dokumentu je JEDEN zdielany helper') do
   body = r02_body(R02_SYNC_RB, 'foreign_document?')
   NxTest.refute(body.empty?, 'foreign_document? zije v sync.rb pri model_guid')
-  NxTest.assert(body.include?("data['model_guid'].to_s == model_guid(model)"),
-                'porovnava sa guid payloadu s guidom AKTIVNEHO dokumentu')
+  NxTest.assert(body.include?("data['model_guid'].to_s == current"),
+                'porovnava sa identita payloadu s identitou AKTIVNEHO dokumentu')
+  NxTest.assert(body.include?('current = model_guid(model)'),
+                'identitu servera dava model_guid (od R-02b hodnota z DocKey)')
   # PRISNE porovnanie (vzor handle_tag_visible / zone_ctx): prazdny guid nie je
   # starsi klient, je to okno bez dobehnuteho NX.init a to nesmie zapisovat.
-  NxTest.refute(body.include?('.empty?'),
-                'ziadna volnejsia vetva pre prazdny guid — prisne porovnanie')
+  # Jedina povolena praca s .empty? je FAIL-CLOSED smer (R-02b BLOCKER 1):
+  # prazdny kluc SERVERA zapis tiez zastavi — ziadna tolerantna vetva payloadu.
+  NxTest.assert(body.include?('!current.empty?'),
+                'prazdny kluc servera zapis zastavi (fail-closed obojsmerne)')
+  NxTest.refute(body.include?("data['model_guid'].to_s.empty?"),
+                'ziadna volnejsia vetva pre prazdny guid payloadu — prisne porovnanie')
   NxTest.assert(body.include?('set_status(') && body.include?('inému dokumentu'),
                 'nezhoda je NAHLAS (pouzivatel musi vediet, ze sa zmena neulozila)')
   NxTest.assert(body.include?('Engine.log('), 'nezhoda sa aj loguje (diagnostika)')

@@ -163,7 +163,8 @@ NxTest.test('ŠT-3a-2: MODELOVE zapisy predvolieb projektu su UZ v sekcii') do
   # guard — zapis zo zastaraneho UI sa musi odmietnut, nie prejst.
   %w[handle_map_project handle_merge_seed handle_reset_project].each do |m|
     body = ST3A_HW_RB[/def #{m}\(payload\).*?\n        end\n/m].to_s
-    NxTest.assert(body.include?("data['model_guid'].to_s != model.guid.to_s"),
+    # 1d/R-02b: identita je token DocKey (guid sa menil pri kazdom ulozeni).
+    NxTest.assert(body.include?("data['model_guid'].to_s != DocKey.key(model)"),
                   "#{m}: guard identity dokumentu")
     NxTest.assert(body.include?('resync_sets'),
                   "#{m}: odmietnutie MUSI obnovit sekciu (inak posle dalsi zapis so starym stavom)")

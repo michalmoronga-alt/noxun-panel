@@ -8116,7 +8116,7 @@ module NoxunSuRunner
   end
 
   def st3a_scenar(model, hw, sets)
-    guid = model.guid.to_s
+    guid = e::ProductionCore.model_guid(model)
     rec = []
     sink = ->(script) { rec << script.to_s }
     gt = ST3A_SEED_GT
@@ -8310,7 +8310,7 @@ module NoxunSuRunner
     rec.clear
     rd.dispatch('save_rules',
                 { 'rules' => broken, 'also_global' => false,
-                  'model_guid' => model.guid.to_s, 'rules_rev' => rev }.to_json, sink)
+                  'model_guid' => e::ProductionCore.model_guid(model), 'rules_rev' => rev }.to_json, sink)
     ok('ŠT-3b-2c1 (b3): ulozenie pravidla BEZ pásma „všetko nad" sa ODMIETNE',
        rec.any? { |x| x.include?('neuložili') })
     # Review #223 (Codex P2): hlaska musi niest AJ identitu `rule_id` — dve
@@ -8364,7 +8364,7 @@ module NoxunSuRunner
          pay.is_a?(Hash) && pay['rules'].is_a?(Array) && !pay['rules'].empty? &&
          pay['cabinets'].to_i >= 1)
       ok('ŠT-3b-1 (a): a identitu dokumentu (baseline guard stoji na guid)',
-         pay && pay['model_guid'].to_s == model.guid.to_s)
+         pay && pay['model_guid'].to_s == e::ProductionCore.model_guid(model))
 
       target = st3b_pick_rule(model, inst)
       if target.nil?
@@ -8387,7 +8387,7 @@ module NoxunSuRunner
       rec.clear
       rd.dispatch('save_rules',
                   { 'rules' => edited, 'also_global' => false,
-                    'model_guid' => model.guid.to_s, 'rules_rev' => rev }.to_json, sink)
+                    'model_guid' => e::ProductionCore.model_guid(model), 'rules_rev' => rev }.to_json, sink)
       ok('ŠT-3b-1 (b): ulozenie zo sekcie prebehlo a povedalo, kolko skriniek prestavalo',
          rec.any? { |x| x.include?('prestavan') })
       ok("ŠT-3b-1 (b): pravidlo je v projekte zmenene (#{base_qty} -> #{new_qty})",
@@ -8420,7 +8420,7 @@ module NoxunSuRunner
       rec.clear
       rd.dispatch('save_rules',
                   { 'rules' => edited, 'also_global' => false,
-                    'model_guid' => model.guid.to_s, 'rules_rev' => rec_rev }.to_json, sink)
+                    'model_guid' => e::ProductionCore.model_guid(model), 'rules_rev' => rec_rev }.to_json, sink)
       ok("ŠT-3b-1 (b2): opakovane ulozenie stav obnovilo (#{st3b_qty(model, output)})",
          st3b_qty(model, output).to_i == new_qty)
 
@@ -8477,7 +8477,7 @@ module NoxunSuRunner
       rec.clear
       rd.dispatch('save_rules',
                   { 'rules' => edited, 'also_global' => false,
-                    'model_guid' => model.guid.to_s, 'rules_rev' => stale_rev }.to_json, sink)
+                    'model_guid' => e::ProductionCore.model_guid(model), 'rules_rev' => stale_rev }.to_json, sink)
       ok('ŠT-3b-1 (e): zapis po CUDZEJ zmene pravidiel sa ODMIETNE s hlaskou',
          rec.any? { |x| x.include?('medzitým zmenili') })
       ok('ŠT-3b-1 (e): a NIC sa nezapisalo (v projekte ostala cudzia hodnota)',
@@ -8494,7 +8494,7 @@ module NoxunSuRunner
       rec.clear
       rd.dispatch('save_rules',
                   { 'rules' => edited, 'also_global' => false,
-                    'model_guid' => model.guid.to_s,
+                    'model_guid' => e::ProductionCore.model_guid(model),
                     'rules_rev' => 'cudzi-odtlacok' }.to_json, sink)
       ok('ŠT-3b-2c2 (f): zapis s CUDZIM odtlackom pravidiel sa ODMIETNE',
          rec.any? { |x| x.include?('inej verzie') })
@@ -8519,7 +8519,7 @@ module NoxunSuRunner
       rec.clear
       rd.dispatch('save_rules',
                   { 'rules' => edited, 'also_global' => false,
-                    'model_guid' => model.guid.to_s,
+                    'model_guid' => e::ProductionCore.model_guid(model),
                     'rules_rev' => fresh_rev }.to_json, sink)
       ok('ŠT-3b-2c2 (f): so SPRAVNYM odtlackom ulozenie PREJDE',
          rec.any? { |x| x.include?('prestavan') })
@@ -8532,7 +8532,7 @@ module NoxunSuRunner
       rec.clear
       rd.dispatch('save_rules',
                   { 'rules' => edited, 'also_global' => false,
-                    'model_guid' => model.guid.to_s }.to_json, sink)
+                    'model_guid' => e::ProductionCore.model_guid(model) }.to_json, sink)
       ok('ŠT-3b-2c2 (f): zapis BEZ odtlacku sa ODMIETNE (stary DOM neprepise novsie pravidla)',
          rec.any? { |x| x.include?('predošlej verzie') })
       ok("ŠT-3b-2c2 (f): a NIC sa nezapisalo (v projekte ostalo #{before_norev})",
@@ -8645,7 +8645,7 @@ module NoxunSuRunner
 
       rec.clear
       rd.dispatch('reset_abs_override',
-                  { 'gen' => gen + 99, 'model_guid' => model.guid.to_s,
+                  { 'gen' => gen + 99, 'model_guid' => e::ProductionCore.model_guid(model),
                     'owner_id' => cid, 'part_key' => pkey }.to_json, sink)
       ok('ŠT-3b-2b (b): klik zo ZASTARANEHO zoznamu sa ODMIETNE',
          rec.any? { |x| x.include?('prepočítal') })
@@ -8666,7 +8666,7 @@ module NoxunSuRunner
         model.commit_operation
         rec.clear
         rd.dispatch('reset_abs_override',
-                    { 'gen' => gen, 'model_guid' => model.guid.to_s,
+                    { 'gen' => gen, 'model_guid' => e::ProductionCore.model_guid(model),
                       'owner_id' => cid, 'part_key' => pkey }.to_json, sink)
         ok('ŠT-3b-2b (c): NEJEDNOZNACNE cabinet_id (kopia pred dedup tikom) zapis ODMIETNE',
            rec.any? { |x| x.include?('viac kusov') })
@@ -8691,7 +8691,7 @@ module NoxunSuRunner
       rec.clear
       e::StudioDialog.send(:push_state)
       rd.dispatch('reset_abs_override',
-                  { 'gen' => e::StudioDialog.generation, 'model_guid' => model.guid.to_s,
+                  { 'gen' => e::StudioDialog.generation, 'model_guid' => e::ProductionCore.model_guid(model),
                     'owner_id' => cid, 'part_key' => pkey }.to_json, sink)
       ok('ŠT-3b-2b (d): reset povedal VYSLEDOK (co teraz plati podla pravidla)',
          rec.any? { |x| x.include?('späť na pravidlo') && x.include?('podľa pravidla') })
@@ -8741,7 +8741,7 @@ module NoxunSuRunner
       e::StudioDialog.send(:push_state)
       rec.clear
       rd.dispatch('reset_hw_override',
-                  { 'gen' => e::StudioDialog.generation, 'model_guid' => model.guid.to_s,
+                  { 'gen' => e::StudioDialog.generation, 'model_guid' => e::ProductionCore.model_guid(model),
                     'owner_id' => cid, 'part_key' => owner.to_s,
                     'generic_type' => gt, 'rule_id' => rid }.to_json, sink)
       ok('ŠT-3b-2b (f): reset kovania povedal, kolko teraz dava PRAVIDLO',

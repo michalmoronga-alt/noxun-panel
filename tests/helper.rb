@@ -120,6 +120,7 @@ end
 unless NxTest::IN_SKETCHUP
   %w[
     core/units
+    core/doc_key
     core/part_keys
     core/build_plan
     core/part_faces

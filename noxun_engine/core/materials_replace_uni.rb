@@ -52,7 +52,10 @@ module Noxun
       # jobs — klasifikácia sa ho nedotýka).
       def replace_uni_scan(model, uni_id)
         out = { 'cabs' => [], 'boards' => [], 'project' => {},
-                'model_guid' => (model && model.respond_to?(:guid) ? model.guid.to_s : '') }
+                # 1d/R-02b: identita dokumentu je token DocKey (Model#guid sa
+                # meni pri kazdom ulozeni — save medzi scanom a potvrdenim by
+                # ponuku zneplatnil).
+                'model_guid' => (model ? DocKey.key(model) : '') }
         return out unless model && defined?(Ids)
         uid = uni_id.to_s
         Ids.each_of_kind(model, 'cabinet') do |inst|

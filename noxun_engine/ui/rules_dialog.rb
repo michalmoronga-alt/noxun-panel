@@ -403,12 +403,13 @@ module Noxun
           (f - f.round).abs < 0.05 ? f.round.to_s : format('%.1f', f).tr('.', ',')
         end
 
-        # ŠT-3b-1: identita dokumentu je `model.guid`, NIE `model.path`.
-        # Cesta dva NEULOZENE modely nerozlisi (oba maju prazdny path) — a to
-        # si priznaval uz povodny komentar okna. `guid` je ta ista autorita,
-        # akou sa riadia vsetky ostatne zapisovacie cesty Studia.
+        # ŠT-3b-1: identita dokumentu NIE JE `model.path` — cesta dva NEULOZENE
+        # modely nerozlisi (oba maju prazdny path). Od 1d/R-02b je hodnotou
+        # token DocKey (viazany na objekt modelu): baseline formulara uz
+        # neprepise obycajne Ctrl+S (Model#guid sa menil pri kazdom ulozeni)
+        # a je to TA ISTA autorita ako vo vsetkych zapisovacich cestach Studia.
         def model_guid(model)
-          model ? model.guid.to_s : ''
+          model ? DocKey.key(model) : ''
         end
 
         # Formular je platny len pre stav, z ktoreho bol naplneny: ZHODA

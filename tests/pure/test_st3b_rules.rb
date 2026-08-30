@@ -150,13 +150,15 @@ end
 
 # --- 3) baseline guard: model_guid, nie path --------------------------------
 
-NxTest.test('ŠT-3b-1: baseline formulara stoji na `model.guid`, NIE na `model.path`') do
+NxTest.test('ŠT-3b-1: baseline formulara stoji na identite dokumentu, NIE na `model.path`') do
   code = ST3B_RULES_CODE
   NxTest.refute(code.include?('model.path'),
                 'cesta dva NEULOZENE modely nerozlisi (oba maju prazdny path)')
   NxTest.refute(code.include?('@baseline_path'), 'stara premenna zanikla')
   guid = ST3B_RULES_RB[/def model_guid\(model\).*?\n        end\n/m].to_s
-  NxTest.assert(guid.include?('model.guid'), 'identita dokumentu je guid')
+  # 1d/R-02b: identitou je token DocKey — Model#guid sa meni pri kazdom
+  # ulozeni, takze Ctrl+S s otvorenym oknom Pravidiel zneplatnoval baseline.
+  NxTest.assert(guid.include?('DocKey.key(model)'), 'identita dokumentu je token DocKey')
   valid = ST3B_RULES_RB[/def baseline_valid\?\(model\).*?\n        end\n/m].to_s
   NxTest.assert(valid.include?('model_guid(model) != @baseline_guid'), 'guard porovnava guid')
   NxTest.assert(valid.include?('current == @baseline_rules'),

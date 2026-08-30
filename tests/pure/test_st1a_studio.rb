@@ -118,27 +118,32 @@ NxTest.test('1b-6a: Ctrl+S meni CESTU aj GUID — nazov zadany pred ulozenim to 
   # Simulacia musi menit TEN ISTY objekt modelu (SketchUp iny nevytvara) —
   # dva samostatne Structy s rovnakym guid, ktore tu stali do 1b-6a, chybu
   # MASKOVALI, lebo zmenu guid vobec nepredviedli.
+  # 1d/R-02b: klucom sedenia uz nie je guid, ale DocKey token viazany na OBJEKT
+  # modelu — prve ulozenie ho uz NEROTUJE, takze nazov sa najde priamo (most
+  # SESSION_KEY_BRIDGE ostava len ako poistka starsich zaznamov). Migracia na
+  # cestu ale bezat MUSI dalej — kluc sedenia zije len do konca procesu.
   core = Noxun::Engine::ProductionCore
   m = Struct.new(:path, :guid).new('', 'GUID-UNTITLED')
+  skey = core.project_key(m)
   begin
-    NxTest.assert_equal('guid:GUID-UNTITLED', core.project_key(m),
-                        'neulozeny model ma kluc sedenia (plati len dovtedy, kym sa neulozi)')
+    NxTest.assert(skey.start_with?('guid:nxdoc-'),
+                  "neulozeny model ma kluc sedenia z DocKey tokenu (#{skey})")
     core.save_project_name(m, 'Rozrobena zakazka')
     NxTest.assert_equal('Rozrobena zakazka', core.project_name(m))
-    # Ctrl+S na TOM ISTOM modeli: pribudla cesta a guid je INY.
+    # Ctrl+S na TOM ISTOM modeli: pribudla cesta a guid je INY (token nie).
     m.path = 'C:/Zakazky/Nova.skp'
     m.guid = 'GUID-PO-ULOZENI'
     NxTest.assert_equal('Rozrobena zakazka', core.project_name(m),
-                        'zmena guid pri prvom ulozeni nesmie nazov zakazky zahodit')
+                        'prve ulozenie nesmie nazov zakazky zahodit')
     map = core.project_names
     NxTest.assert(map.key?('c:/zakazky/nova.skp'),
                   'citanie zaznam ZMIGROVALO na cestu (inak by zil len do konca sedenia)')
-    NxTest.refute(map.key?('guid:GUID-UNTITLED'),
-                  'guid zaznam po migracii zanikol — inak by v subore rastli mrtve kluce')
+    NxTest.refute(map.key?(skey),
+                  'kluc sedenia po migracii zanikol — inak by v subore rastli mrtve kluce')
   ensure
     core.save_project_name(m, '')
     core.update_project_names do |map|
-      %w[guid:GUID-UNTITLED guid:GUID-PO-ULOZENI].each { |k| map.delete(k) }
+      map.delete(skey)
       map
     end
   end
@@ -598,15 +603,26 @@ ensure
   ST1B_FORGET_SETTING.call('druhy_proces', 'last_dir')
 end
 
-NxTest.test('ST-1a: model bez akejkolvek identity dostane DEFAULT (nema sa kam zapisat)') do
+NxTest.test('ST-1a: neulozeny model ma VLASTNY kluc sedenia a zastupny nazov') do
   core = Noxun::Engine::ProductionCore
-  # Ani cesta, ani guid = neexistuje stabilny kluc. Vymyslat ho by znamenalo,
-  # ze si dva rozne dokumenty prepisu ten isty zaznam.
+  # 1d/R-02b: kluc sedenia dava DocKey token viazany na objekt modelu — aj
+  # model bez guid ho ma. Povodna obava „vymysleny kluc = dva dokumenty si
+  # prepisu zaznam" nehrozi: kazdy objekt dostane INY token (test nizsie).
   empty = Struct.new(:path, :guid).new('', '')
-  NxTest.assert_equal('', core.project_key(empty), 'bez cesty aj bez guid nie je kluc')
+  key_a = core.project_key(empty)
+  NxTest.assert(key_a.start_with?('guid:nxdoc-'), 'neulozeny model ma kluc sedenia')
+  druhy = Struct.new(:path, :guid).new('', '')
+  NxTest.refute(core.project_key(druhy) == key_a,
+                'dva neulozene dokumenty NIKDY nezdielaju zaznam')
   NxTest.assert_equal('projekt', core.project_name(empty), 'neulozena zakazka ma zastupny nazov')
-  NxTest.assert_equal('projekt', core.save_project_name(empty, 'ine meno'),
-                      'a zapis sa NEUDEJE')
+  begin
+    # Kluc sedenia existuje, takze pomenovat sa da UZ PRED prvym ulozenim —
+    # presne scenar 1b-6a (do R-02b to slo len vdaka guid; teraz vdaka tokenu).
+    NxTest.assert_equal('ine meno', core.save_project_name(empty, 'ine meno'),
+                        'zapis pod kluc sedenia sa udeje')
+  ensure
+    core.save_project_name(empty, '') # zaznam sedenia nesmie ostat v sandboxe
+  end
   named = Struct.new(:path, :guid).new('C:/x/KLINIKA_v7.skp', '')
   NxTest.assert_equal('KLINIKA_v7', core.project_name(named),
                       'bez ulozeneho zaznamu sa nazov berie zo suboru zakazky')

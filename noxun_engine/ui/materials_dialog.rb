@@ -214,11 +214,13 @@ module Noxun
           }
         end
 
-        # D-42 (audit BLOCKER 4): stabilna identita modelu (guid). Projektove
+        # D-42 (audit BLOCKER 4): stabilna identita modelu. Projektove
         # predvolby su per-MODEL; oneskoreny callback po prepnuti dokumentu nesmie
         # ulozit predvolbu vybranu v modeli A do prave aktivneho modelu B.
+        # 1d/R-02b: hodnota je token DocKey — Model#guid sa meni pri kazdom
+        # ulozeni, takze Ctrl+S by identitu okna zneplatnil.
         def model_guid(model)
-          model && model.respond_to?(:guid) ? model.guid.to_s : ''
+          model ? DocKey.key(model) : ''
         rescue StandardError
           ''
         end
