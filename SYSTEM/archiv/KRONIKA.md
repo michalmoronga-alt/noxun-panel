@@ -55,6 +55,15 @@
   identitu dokumentu už mali. **Priznaný zvyšok (vlastnosť celého vzoru, nie tejto dávky):** SketchUp mení `Model#guid` pri KAŽDOM uložení, takže Ctrl+S do 400 ms po
   úprave poľa vyzerá pre guard ako prepnutie dokumentu a edit sa zahodí. Platí to rovnako pre zóny, tagy a Štúdio od ich zavedenia; prípadné riešenie (stabilný kľúč
   dokumentu namiesto `guid`) je téma pre samostatnú dávku. Po kole 2: **2080 headless · 73 JS sád**.
+  **Kolo 3 vrátilo 1× P1 — reziduál PORADIA po oprave kola 2:** centrálne zahodenie stavu je užitočné len vtedy, keď beží PRED stavovými rozhodnutiami pushu, a `nxSetModelGuid`
+  sedelo až v `setUiMode` na KONCI `loadSelected`. Rozhodnutie `keepGaps` (či sa zachovajú rozpísané riadky čiel) sa teda vyhodnotilo skôr: pri prepnutí dokumentu A → B
+  s rovnakým `CAB` id riadky z A prežili, centrálny reset potom zrušil už len timer a ponechané riadky pozbieral prvý edit v B a odoslal ich s guidom B — server ich prijal
+  do nesprávnej zákazky. Oprava má dve nezávislé polovice: identita dokumentu je **prvý príkaz** `loadSelected` (a `loadBoard`, kde je tá istá pasca — pending batch sa
+  zahadzuje podľa samotného `board_id`, pritom `BRD-001` je v každej zákazke), a `sameDoc` je zároveň **súčasťou podmienky** `keepGaps`. Tretí kus: `cancelCabinetEdits`
+  nuluje aj závierku `cabEditsInFlight` — druhú polovicu `keepGaps`, ktorá prepnutie dokumentu prežila sama.
+  **VEDOMÁ ODCHÝLKA OD PRAVIDLA 3 KÔL** (rozhodnutie orchestrátora, precedens **UI-B1** — 5 kôl, záznam nižšie v tejto kronike): dávka išla na **4 kolá review** namiesto
+  rozdelenia PR. Dôvod: nálezy **konvergujú** (2 → 4 zo sweepu → 1 reziduál poradia) a celý PR je JEDEN mechanizmus — rozdelenie by tú istú prácu len rozsekalo na časti,
+  z ktorých ani jedna nie je samostatne zmysluplná, a hranicu medzi nimi by nemal kto strážiť. Po kole 3: **2081 headless · 73 JS sád**.
 
 - **FIX · ŠT-1c B2 DOBEHOL CENOVÚ BRÁNU (30.8.2026, test-only, bez bump verzie):** dva in-SU FAILy známe od dávky 1d/R-01+R-04 boli ZASTARANÝ TEST, nie chyba pluginu — dávka
   **P0-HF** (#252, v0.8.14) postavila medzi gen guard a `savepanel` FINÁLNU CENOVÚ BRÁNU a scenár exportu cenovej ponuky s ňou nepočítal: skrinka scenára má 3 riadky bez ceny

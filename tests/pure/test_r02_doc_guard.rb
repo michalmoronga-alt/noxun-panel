@@ -258,6 +258,54 @@ NxTest.test('R-02: kazdy pending buffer nesie VLASTNU zachytenu identitu') do
                 'ABS modal sa zatvara pri vsetkych troch pushoch (selected/board/clear)')
 end
 
+NxTest.test('R-02: identita dokumentu sa vyhodnocuje PRVA v celom push flow') do
+  # Review #264 kolo 3 (rezidual poradia): centralne zahodenie stavu je uzitocne
+  # len vtedy, ked bezi PRED stavovymi rozhodnutiami pushu. `keepGaps` (ci sa
+  # zachovaju rozpisane riadky ciel) sa rozhodovalo skor, nez `setUiMode` na
+  # konci pushu vobec dosiel k `nxSetModelGuid` — riadky z dokumentu A tak
+  # prezili do B a prvy dalsi edit ich odoslal s guidom B.
+  bridge = File.read(File.join(R02_JS_DIR, 'bridge.js'), encoding: 'UTF-8')
+
+  sel = bridge[/loadSelected: function\(c\)\{.*?\n    \},\n/m].to_s
+  NxTest.refute(sel.empty?, 'loadSelected sa nasiel')
+  gu = sel.index('nxSetModelGuid(c.model_guid)')
+  NxTest.assert(!gu.nil?, 'loadSelected nastavuje identitu dokumentu sam')
+  # Hladaju sa VOLANIA/priradenia, nie hole nazvy — tie su aj v komentari nad
+  # guardom a poradie by potom meralo komentare.
+  ['cancelBoardEdits();', 'var keepGaps', 'renderFronts(c.fronts',
+   'setSelected(c.cabinet_id', 'setUiMode(c.part_card'].each do |later|
+    at = sel.index(later)
+    NxTest.assert(!at.nil? && gu < at,
+                  "identita dokumentu je v loadSelected PRED `#{later}`")
+  end
+  NxTest.assert(sel.include?('var sameDoc = (String(c.model_guid || \'\') === nxDocGuid());'),
+                'zhoda dokumentu sa zachyti PRED prepisom identity')
+  NxTest.assert(sel.index('var sameDoc') < gu, 'sameDoc sa cita este pred prepisom')
+  NxTest.assert(sel.include?('var keepGaps = sameDoc &&'),
+                'identita dokumentu je SUCASTOU podmienky keepGaps')
+
+  brd = bridge[/loadBoard: function\(b\)\{.*?\n    \},\n/m].to_s
+  NxTest.refute(brd.empty?, 'loadBoard sa nasiel')
+  gb = brd.index('nxSetModelGuid(b && b.model_guid)')
+  NxTest.assert(!gb.nil?, 'loadBoard nastavuje identitu dokumentu sam')
+  # Ta ista pasca: pending batch sa zahadzuje podla SAMOTNEHO board_id, pritom
+  # `BRD-001` je v kazdej zakazke.
+  NxTest.assert(gb < brd.index('boardCard.board_id !== b.board_id').to_i,
+                'identita dokumentu je v loadBoard PRED testom na inu dosku')
+
+  # `clearSelected` malo identitu prvu uz predtym — nesmie sa to stratit.
+  clr = bridge[/clearSelected: function\(guid\)\{.*?\n    \},\n/m].to_s
+  NxTest.assert(clr.index('nxSetModelGuid(guid)').to_i < clr.index('cancelBoardEdits()').to_i,
+                'clearSelected drzi identitu prvu')
+
+  # Zatvarka „apply odoslany, echo este nedoslo" je DRUHA polovica keepGaps —
+  # sama o sebe prezije prepnutie dokumentu, takze ju musi nulovat cleanup.
+  form = File.read(File.join(R02_JS_DIR, 'form.js'), encoding: 'UTF-8')
+  cancel = form[/function cancelCabinetEdits\(\)\{.*?\n  \}/m].to_s
+  NxTest.assert(cancel.include?('cabEditsInFlight = false;'),
+                'zahodenie editov nuluje aj zatvarku cabEditsInFlight')
+end
+
 NxTest.test('R-02: in-SketchUp runner posiela identitu dokumentu ako panel') do
   # Runner je jediny dalsi klient tychto handlerov — bez guidu by mu prisny
   # guard zahodil kazdy zapis a sada by zlyhala z NESPRAVNEHO dovodu.

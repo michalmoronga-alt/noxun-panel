@@ -58,8 +58,11 @@ dokumentu opečiatkovali novým guidom a guard by ich pustil — identita sa pre
 skutočnej zmene spúšťa `nxDropDocState()` — zahodí všetok rozpracovaný stav (pending buffery, inline editor názvu,
 modaly); echo push tej istej identity nezahodí nič. Druhá obrana = vlastná zachytená identita v každom bufferi
 (`applyPendingGuid` aj pre okamžitý flush · `boardPending` kľúčovaný dvojicou dokument+doska · `renameGuid` ·
-`boardTarget`/`partTarget` pre modal ABS). Priznaný zvyšok: `Model#guid` sa mení pri KAŽDOM uložení — vlastnosť
-celého vzoru (zóny, tagy, Štúdio ju majú tiež), nie tejto dávky.
+`boardTarget`/`partTarget` pre modal ABS). **Kolo 3 (1× P1)** doriešilo PORADIE: identita dokumentu je prvý príkaz
+`loadSelected` aj `loadBoard` a `sameDoc` je priamo v podmienke `keepGaps` — inak sa stavové rozhodnutie pushu spraví
+skôr, než centrálne zahodenie vôbec zbehne. Priznaný zvyšok: `Model#guid` sa mení pri KAŽDOM uložení — vlastnosť
+celého vzoru (zóny, tagy, Štúdio ju majú tiež), nie tejto dávky. Dávka išla na **4 kolá review** — vedomá odchýlka
+od pravidla 3 kôl (konvergujúce nálezy jedného mechanizmu; precedens UI-B1), zdôvodnenie v KRONIKE.
 Porovnanie je **prísne** (vzor `handle_tag_visible` / `zone_ctx`): prázdny guid = okno bez dobehnutého `NX.init`
 a to nesmie zapisovať nikam. Nezhoda je **hláška**, nie tiché zahodenie — a to aj v auto-apply, kde sa echo výberu
 ďalej zahadzuje ticho (prepnutie dokumentu je zriedkavé, presun výberu bežný). Poradie je súčasť opravy: dokument

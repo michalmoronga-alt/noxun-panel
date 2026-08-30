@@ -145,4 +145,42 @@ eq(pendingScenario('doc-A', 'doc-B', { board_id: 'BRD-001', create_missing_abs: 
 eq(pendingScenario('doc-A', 'doc-A', { cabinet_id: 'CAB-001' }), 'doc-A',
    'bez prepnutia sa nic nemeni (ziadne falosne odmietnutie)');
 
+// --- 9) DROP SA SPUSTI PRESNE PRI ZMENE DOKUMENTU (review #264 kolo 3) ------
+// `nxDropDocState` hlada cleanupy cez `typeof <meno>` — nedeklarovany
+// identifikator sa v CommonJS module rozvija po scope chain az na `globalThis`,
+// takze sa daju nainstalovat SKUTOCNE spy funkcie a overit, ze sa drop spusti
+// len vtedy, ked sa dokument naozaj zmenil.
+let dropped = 0;
+global.cancelCabinetEdits = function(){ dropped++; };
+
+nxSetModelGuid('doc-1');
+eq(dropped, 1, 'prva zmena dokumentu zahodi rozpracovany stav');
+nxSetModelGuid('doc-1');
+eq(dropped, 1, 'echo push tej istej identity NEZAHADZUJE rozpisanu pracu');
+nxSetModelGuid('doc-2');
+eq(dropped, 2, 'prepnutie dokumentu zahodi stav znova');
+nxSetModelGuid(undefined);
+nxSetModelGuid(null);
+eq(dropped, 2, 'payload bez identity nic nezahadzuje (a identitu nemaze)');
+eq(nxDocGuid(), 'doc-2', 'identita po chybajucej hodnote drzi');
+delete global.cancelCabinetEdits;
+
+// --- 10) PODMIENKA „zachovaj rozpisane riadky ciel" ------------------------
+// Zrkadlo pravidla z `bridge.js` (`keepGaps`). Rozhodnutie stoji na TROCH
+// veciach a dokument je jednou z nich — `CAB-001` je v kazdej zakazke, takze
+// bez neho by sa riadky ciel z jedneho dokumentu zachovali v druhom a prvy
+// dalsi edit by ich odoslal s NOVYM guidom (server by ich prijal do zlej
+// zakazky). Presne toto je nalez kola 3.
+function keepGaps(pushGuid, curGuid, pushCab, curCab, pending){
+  return (String(pushGuid) === String(curGuid)) && !!(pushCab && pushCab === curCab) && !!pending;
+}
+eq(keepGaps('doc-A', 'doc-A', 'CAB-001', 'CAB-001', true), true,
+   'echo push toho isteho dokumentu a skrinky: rozpisane riadky PREZIJU');
+eq(keepGaps('doc-B', 'doc-A', 'CAB-001', 'CAB-001', true), false,
+   'iny dokument s ROVNAKYM cabinet_id: riadky NEPREZIJU');
+eq(keepGaps('doc-A', 'doc-A', 'CAB-002', 'CAB-001', true), false,
+   'ina skrinka v tom istom dokumente: riadky NEPREZIJU');
+eq(keepGaps('doc-A', 'doc-A', 'CAB-001', 'CAB-001', false), false,
+   'bez rozpisanych editov niet co zachovavat');
+
 console.log(`OK test_r02_doc_guard.js — ${n} kontrol`);

@@ -977,6 +977,11 @@ pri kliku).
 chýbajúcej ABS: doska/dielec + dokument z času otvorenia — rozhodnutie je asynchrónne a karty sú mutovateľné globály), `tplModalGuid` a `simFor.guid` (staršie, už predtým
 správne).
 **(3) Serverový `foreign_document?`** — posledné slovo má vždy Ruby.
+**PORADIE V PUSHI je súčasť kontraktu** (review #264 kolo 3): centrálne zahodenie je užitočné len vtedy, keď beží PRED stavovými rozhodnutiami pushu. `nxSetModelGuid` je preto
+**prvý príkaz** `loadSelected` aj `loadBoard` (v `clearSelected` a `init` bol prvý už predtým), nie až vedľajší efekt `setUiMode` na konci. Dve rozhodnutia, ktoré na tom stoja:
+`keepGaps` v `loadSelected` (zachovanie rozpísaných riadkov čiel — `CAB-001` je v každej zákazke, takže identita dokumentu je aj priamou súčasťou podmienky) a test „iná doska"
+v `loadBoard` (zahadzuje pending batch podľa samotného `board_id`). Do `keepGaps` patrí aj závierka `cabEditsInFlight`, ktorú preto nuluje `cancelCabinetEdits`. Volanie
+`nxSetModelGuid` v `setUiMode` zostáva ako poistka — echo je v ňom lacný early return.
 
 ### actions_board.rb
 
