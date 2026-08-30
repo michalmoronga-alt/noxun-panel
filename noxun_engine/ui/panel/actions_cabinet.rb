@@ -283,6 +283,23 @@ module Noxun
           [:ok, { 'mapping' => res, 'defs' => defs }]
         end
 
+        # GHOST VKLADANIE (V1-04): „Vlozit" UZ NEVKLADA — pripravi ZMRAZENY plan
+        # (R-03 `prepare_insert`) a zavesi ghost na kurzor; skrinka vznikne az
+        # KLIKOM v modeli (`GhostTool` -> `commit_insert`).
+        #
+        # PORADIE JE SUCASTOU KONTRAKTU: doc guard -> sablonovy ref -> kovanie
+        # zo sablony -> D-45/D-76 preflighty -> material -> `prepare_insert` ->
+        # zrusenie pripadnej STAREJ session -> nova session + `push_tool`.
+        # Preflighty bezia PRAVE RAZ a Tool ich NEOPAKUJE (Tool riesi polohu,
+        # nie vyrobne pravidla). Snapshot je zmrazeny: zmeny vo vkladacej karte
+        # sa do beziacej session NEPREMIETAJU — status to prizna.
+        #
+        # VEDOMY POSUN OPROTI STAVU PRED GHOSTOM: guardy STAVBY
+        # (`Fronts.validate_layout!`, interior validacie) bezia az v commite,
+        # takze konflikt „zamok x sablona" (F8) sa ohlasi pri KLIKU, nie pri
+        # stlaceni „Vlozit" — hlaska je ta ista (`ghost_insert_failed`).
+        # `Construction.build_plan` sa do `prepare_insert` zamerne nepresuva
+        # (vedoma hranica R-03).
         def handle_insert(payload)
           model = Sketchup.active_model
           params = parse(payload)
@@ -302,29 +319,55 @@ module Noxun
           return set_status("#{tf[:error]}#{insert_locks_hint}", true) if tf && tf[:error]
           pf = material_preflight(params, model)
           return set_status("#{pf[:error]}#{insert_locks_hint}", true) if pf && pf[:error]
-          pf = { note: "#{tf ? tf[:note] : ''}#{pf ? pf[:note] : ''}" }
-          hw_note = ''
+          note = "#{tf ? tf[:note] : ''}#{pf ? pf[:note] : ''}"
           begin
-            # Zmrazenie setov zo sablony je SUCAST operacie vlozenia (1 undo);
-            # jeho zlyhanie zrusi celu operaciu — ziadna skrinka s nezmrazenym
-            # setom (rovnaky kontrakt ako pri aplikacii sablony).
-            inst = CabinetBuilder.build(model, params) do
-              hw_note = freeze_template_hardware!(model, hw['mapping'], hw['defs']) if hw
-            end
+            plan = CabinetBuilder.prepare_insert(model, params)
           rescue StandardError => e
-            # F8: konflikt sablona x zamok NIC ticho neupravuje — vklad odmietnu
-            # existujuce guardy stavby (Fronts.validate_layout!, hrubkova kontrola
-            # materialu, interior validacie) a status vymenuje aktivne zamky.
             Engine.log_error(e, 'Panel.handle_insert')
             return set_status("Chyba: #{e.message}#{insert_locks_hint}", true)
           end
+          # Stara session konci PRED vznikom novej (druhe „Vlozit" = novy
+          # snapshot); `GhostTool.start` to robi ako prvy krok.
+          if GhostTool.start(model, plan, hardware: hw, template_ref: tpl_ref, note: note).nil?
+            return set_status('Ghost vkladanie sa nepodarilo spustiť — skús to znova.', true)
+          end
+          set_status('Skrinka visí na kurzore — klikni, kam ju položiť. ' \
+                     'Šípky ←/→ otáčajú, Alt prepína kotvu, ↓ drží domácu výšku, ↑ pustí voľnú výšku, Esc zruší.' \
+                     "#{note}")
+        end
+
+        # GHOST: sprievodny zapis kovania zo sablony (H2/D-76). Bezi VNUTRI
+        # operacie vlozenia — vynimka zrusi CELU operaciu (ziadna skrinka
+        # s nezmrazenym setom, rovnaky kontrakt ako pri aplikacii sablony).
+        def ghost_freeze_hardware(model, hw)
+          return '' unless hw
+
+          freeze_template_hardware!(model, hw['mapping'], hw['defs'])
+        end
+
+        # GHOST: vklad zlyhal az v commite (guardy stavby). V modeli sa NIC
+        # nezmenilo — hlaska je ta ista ako pred ghostom, vratane vymenovania
+        # aktivnych zamkov vkladacej karty.
+        def ghost_insert_failed(err)
+          set_status("Chyba: #{err.message}#{insert_locks_hint}", true)
+        end
+
+        # GHOST: po USPESNOM commite — vyber, status, refresh panela a peciatka
+        # sablony. Bezi MIMO operacie vlozenia; zlyhanie ktorehokolvek kroku
+        # nesmie zabranit zatvoreniu session (skrinka uz stoji).
+        # Peciatka ide cez `stamp_once!` — dvojklik ju uz nezopakuje.
+        # ZIADNY rucny `StudioModelWatch` notify: stale signalizaciu rieši
+        # `onTransactionCommit` sam.
+        def ghost_after_commit(model, inst, session)
+          return unless inst
+
           select_only(model, inst)
           cid = Store.get(inst, 'cabinet_id')
           status_with_warnings(inst, "Vlozeny #{cid} — #{part_count(inst)} dielcov." \
-                                     "#{pf ? pf[:note] : ''}#{hw_note}" \
+                                     "#{session.note}#{session.hardware_note}" \
                                      "#{zone_depth_note((Store.config(inst) || {})['zone_tree'])}")
           push_selected(model)
-          stamp_template_used(tpl_ref) # UI-C1a: az PO vlozeni, mimo operacie
+          session.stamp_once! { stamp_template_used(session.template_ref) } # UI-C1a: az PO vlozeni, mimo operacie
         end
 
         # B3 „Vlozit kopiu": PRESNA serverova kopia — config sa cita z MODELU

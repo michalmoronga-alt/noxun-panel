@@ -433,6 +433,7 @@ Sketchup.require 'noxun_engine/core/scale_observer'
 Sketchup.require 'noxun_engine/core/placement'      # V0.4.7b umiestnovanie (top-level cabinet+board)
 Sketchup.require 'noxun_engine/core/cabinet_builder'
 Sketchup.require 'noxun_engine/core/board_builder' # V0.4.7 samostatna doska
+Sketchup.require 'noxun_engine/core/ghost_tool'    # V1-04 GHOST vkladanie na klik (po cabinet_builder — pouziva sev R-03)
 Sketchup.require 'noxun_engine/core/tags'          # D-27 viditelnost tagov modelu (po builderoch — cita ich konstanty mien)
 Sketchup.require 'noxun_engine/core/templates'
 Sketchup.require 'noxun_engine/core/template_previews' # UI-D2: PNG nahlady sablon (subor vedla templates.json)

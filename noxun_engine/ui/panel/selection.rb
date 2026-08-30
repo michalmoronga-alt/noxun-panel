@@ -48,6 +48,11 @@ module Noxun
         end
 
         def on_model_switched(model)
+          # GHOST (V1-04) PRVE a BEZ OHLADU na panel: session patri JEDNEMU
+          # dokumentu — cross-document vklad nikdy. Identita je OBJEKT modelu
+          # (nie guid, ten sa meni pri kazdom ulozeni), takze Ctrl+S ghost
+          # nezrusi. Cancel = 0 mutacii modelu, 0 krokov Spat.
+          GhostTool.on_model_switched(model) if defined?(GhostTool)
           return unless @dialog # panel zavrety — observer prepne az dalsie otvorenie
 
           detach_observer
