@@ -444,6 +444,17 @@ module Noxun
             'purchase' => item['purchase'] }
         end
 
+        # GHOST-FB4: Ghost pasik vkladacej karty — stav BEZIACEJ session
+        # (kotva, rotacia, rezim vysky, locknuta vyska). Pasik NIE JE trvalou
+        # sucastou panela (vertikalny priestor je vzacny): `active = false`
+        # ho schova a presne to chodi pri kazdom konci session. Panel si z neho
+        # nic neodvodzuje — kazdy push stav CELY prepise.
+        def push_ghost(state)
+          js("NX.setGhost(#{(state || { 'active' => false }).to_json})")
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.push_ghost')
+        end
+
         def set_status(msg, error = false)
           js("NX.setStatus(#{msg.to_json}, #{error ? 'true' : 'false'})")
         end

@@ -624,7 +624,12 @@
     // D-27: viditelnost NOXUN tagov v modeli. Chodi po KAZDOM pushi vyberu
     // (Späť/Znova, prepnutie dokumentu, zmena vyberu) aj po kazdom prepnuti —
     // panel si ziadnu vlastnu kopiu stavu nedrzi.
-    setTags: function(state){ if (typeof nxApplyTags === 'function') nxApplyTags(state); }
+    setTags: function(state){ if (typeof nxApplyTags === 'function') nxApplyTags(state); },
+    // GHOST-FB4: stav BEZIACEJ ghost session do pasika vkladacej karty
+    // (kotva, otocenie, rezim vysky, locknuta vyska). `active = false` pasik
+    // SCHOVA — chodi pri kazdom konci session (vlozenie, Esc, prepnutie
+    // dokumentu, zavretie Inspectora). Panel si stav nedrzi ani nedopocitava.
+    setGhost: function(state){ if (typeof nxGhostApply === 'function') nxGhostApply(state); }
   };
 
   // UI-B3: informacny stlpec Zakladnych. Texty sklada cista funkcia nxCabInfo

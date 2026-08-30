@@ -302,6 +302,25 @@
       <button class="primary wide" id="insertGoCab" onclick="insertCabinet()">Vložiť korpus</button>
       <button class="primary wide" id="insertGoBoard" onclick="insertBoard()">Vložiť dosku</button>
     </div>
+    <!-- GHOST-FB4: GHOST PASIK — vidno ho VYHRADNE pocas beziacej ghost
+         session (skrinka visi na kurzore) a po vlozeni/Esc zmizne. Nie je to
+         trvala cast panela: vertikalny priestor je vzacny. Obsah je
+         INFORMACNY (kotva, otocenie, rezim vysky) — jediny ovladac je pole
+         locknutej vysky. Stav kresli js/ghost_bar.js z pushu Ruby. -->
+    <div id="ghostBar" class="ghostbar" hidden>
+      <span class="gbanchor" id="gbAnchor" role="img" aria-label="Aktívna kotva">
+        <span class="gbdot" data-anchor="fl_top"></span><span class="gbdot" data-anchor="fr_top"></span>
+        <span class="gbdot" data-anchor="fl_bottom"></span><span class="gbdot" data-anchor="fr_bottom"></span>
+      </span>
+      <span class="gbtxt" id="gbRot">0°</span>
+      <span class="gbtxt" id="gbMode">zámok</span>
+      <span class="gblock" id="gbLockWrap">
+        <input id="gbLockZ" type="text" inputmode="decimal" aria-label="Výška zámku v mm"
+               onchange="onGhostLockZ()"><span class="unit">mm</span>
+      </span>
+      <button type="button" class="gbinfo" id="gbInfo" aria-label="Nápoveda ovládania ghostu"
+              title="←/→ otočí o 90° · Alt prepne kotvu · ↓ zámok výšky · ↑ voľná výška · Esc zruší · klik vloží"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg></button>
+    </div>
   </div>
 </details>
 
@@ -864,6 +883,9 @@
 <!-- UI-B1: kostra Inspectora — stavovy stroj vyber x kontext, rail, sektory. -->
 <script src="js/shell.js?v=0.8.23"></script>
 <script src="js/actions.js?v=0.8.23"></script>
+<!-- GHOST-FB4: Ghost pasik vkladacej karty. Musi byt PRED bridge.js
+     (NX.setGhost vola nxGhostApply); sam na nikom nezavisi. -->
+<script src="js/ghost_bar.js?v=0.8.23"></script>
 <!-- UI-B3: nastavenia Inspectora (koliesko) + rozmerove rady N6. Musi byt PRED
      bridge.js (NX.setUiSettings volá nxApplyUiSettings) a za core.js (el/esc). -->
 <script src="js/settings.js?v=0.8.23"></script>

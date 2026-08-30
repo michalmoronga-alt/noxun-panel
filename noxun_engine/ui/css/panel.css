@@ -1083,6 +1083,33 @@
   .nx-inspector body:not([data-insert-kind="board"]) #insertGoBoard { display: none; }
   .nx-inspector body[data-insert-kind="board"] #insertGoCab { display: none; }
 
+  /* --- GHOST-FB4: Ghost pasik (len pocas beziacej session) ----------------
+     JEDEN riadok, ziadny nadpis a ziadna vlastna karta — vertikalny priestor
+     panela je vzacny a pasik zije len par sekund. Farby su rodina VYBERU
+     (teal): je to STAV nastroja, nie akcia. `hidden` na elemente ho schova
+     (ziadna trieda navyse) — presne to posiela Ruby pri konci session. */
+  .nx-inspector .ghostbar { display: flex; align-items: center; gap: 8px; margin: 8px 0 0;
+                            padding: 5px 8px; border: 1px solid var(--nx-select);
+                            border-radius: 6px; background: var(--nx-select-bg-soft);
+                            font-size: 11px; color: var(--nx-ink-strong); }
+  .nx-inspector .ghostbar[hidden] { display: none; }
+  /* Piktogram styroch kotiev prednej steny — aktivna svieti. */
+  .nx-inspector .gbanchor { display: grid; grid-template-columns: 7px 7px; grid-gap: 3px;
+                            padding: 3px; border: 1px solid var(--nx-border-strong);
+                            border-radius: 6px; background: var(--nx-surface); flex: none; }
+  .nx-inspector .gbdot { width: 7px; height: 7px; border-radius: 50%;
+                         background: var(--nx-border-strong); }
+  .nx-inspector .gbdot.on { background: var(--nx-select-strong); }
+  .nx-inspector .gbtxt { white-space: nowrap; color: var(--nx-select-strong); font-weight: 600; }
+  .nx-inspector .gblock { display: flex; align-items: center; gap: 3px; margin-left: auto; }
+  .nx-inspector .gblock.dim { opacity: .55; }
+  .nx-inspector .gblock input { width: 52px; padding: 2px 4px; font-size: 11px; text-align: right;
+                                border: 1px solid var(--nx-border-strong); border-radius: 6px; }
+  .nx-inspector .gbinfo { flex: none; padding: 2px; border: 0; background: none; cursor: help;
+                          color: var(--nx-ink-muted); line-height: 0; }
+  .nx-inspector .gbinfo .ic { width: 14px; height: 14px; }
+  .nx-inspector .gbinfo:hover { color: var(--nx-select-strong); }
+
   /* --- S4: skupiny podla KONTEXTU (data-view-ctx na <body>) --------------
      Skupina nesie `data-s4="<kontext>"`. Zakladne pravidlo vsetky skryje,
      kontextove ich vrati — takze rezimy part/board/insert nepotrebuju
