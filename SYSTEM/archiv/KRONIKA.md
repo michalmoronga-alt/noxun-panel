@@ -17,6 +17,42 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1d/R-01+R-04 · OBSERVER VEĽKOSTI VIE, V KTOROM DOKUMENTE PRACUJE (30.8.2026, v0.8.17):** tretia vybavená položka registra bloku 1d — dve položky naraz, lebo register ich tak
+  spája (**R-01** P1 + **R-04** P3). `ScaleWatch` je jediný observer, ktorý reaguje na zmenu veľkosti, presun a mazanie skriniek a dosiek; jeho vnútorné fronty boli kľúčované
+  **holým `entityID`**, ktoré je ale LOKÁLNE pre dokument. Na macOS (viac otvorených dokumentov naraz) si tak dve inštancie s rovnakým ID v jednom 0,2 s okne udalosť prepísali
+  a jedna sa stratila; požiadavka na upratanie ghost zón mala navyše **jediný slot** (`@need_prune` + `@erase_model`), takže dve mazania v dvoch dokumentoch sa zliali do jedného
+  a v jednom z nich ostali zóny visieť. Windows sa to netýka (SDI — jeden dokument na proces), preto je to macOS vetva — ale je to presne tá vrstva, na ktorej bude stáť GHOST
+  vkladanie, takže sa čistí PRED ním.
+  **Čo platí teraz:** udalosti kľúčuje `event_key` = `[model.object_id, entityID]`, prune požiadavky sú **množina dokumentov** `@prune_models` (vzor `@requested` z D-103), ciele
+  počíta `prune_targets` a **každý cieľ má vlastný `begin/rescue`** — fronty sú v tom momente už vyprázdnené, takže výnimka nad jedným (napr. zatváraným) dokumentom by inak vzala
+  aj všetky ostatné požiadavky toho tiku. **R-04:** cache stabilných polôh (`@stable_transforms`, z nej sa obnovuje poloha po odmietnutom scale) mala doteraz nulovú mazaciu cestu
+  — rástla o záznamy zmazaných entít aj zaniknutých dokumentov. Dostala dve: `forget_dead_transforms` na erase tiku (jeden prechod definíciami toho dokumentu; keď preň cache
+  kľúč nemá, model sa vôbec nečíta) a `forget_detached_models` pri zmene dokumentu.
+  **Codex audit návrhu vrátil 3 BLOCKERY a všetky tri zmenili riešenie:** (1) pôvodný nápad zisťovať dokument v `onEraseEntity` cez `Sketchup.active_model` je **zamietnutý** —
+  erase chodí aj z undo a zo zatvárania, kde je aktívny už iný dokument, takže by sme ghosty upratovali v ZLOM dokumente a požiadavku o ten správny stratili; ostáva teda
+  sentinel `nil` s fallbackom. (2) Sentinel by sa v kombinácii „známy dokument A + neznámy erase B" **stratil**, keby sa fallback púšťal až pri prázdnej množine cieľov —
+  pridáva sa preto vždy. (3) Mazanie cache pri prepnutí dokumentu by na macOS vzalo polohu dokumentu, ktorý ŽIJE ĎALEJ a môže mať rozbehnutý debounce (odmietnutý scale by sa
+  potom vracal len cez `clean_transform`, čo pri scale okolo pivotu vráti posunutý origin) — beží preto **výhradne na Windows/SDI**, kde File>New/Open naozaj nahradí jediný
+  dokument procesu. Zo zvyšných nálezov: identita dokumentu v trvalej cache je odteraz **`guid`, nie `object_id`** (`object_id` zatvoreného dokumentu sa po GC recykluje a nový
+  dokument s rovnakým `entityID` by dostal cudzí transform — pri krátkodobých frontách to neplatí, tam hodnota model drží pri živote), upratovanie je **jeden** prechod
+  definíciami namiesto dvoch a je izolované rescue.
+  **A práve to `guid` kľúčovanie zachytilo GH review ako P1 — dobrá lekcia o tom, že jeden audítor nestačí:** SketchUp mení `Model#guid` **pri každom uložení** dokumentu.
+  Repo o tom vie už od ST-1a (`tests/pure/test_st1a_studio.rb` — presne preto je kľúčom názvu zákazky CESTA, nie guid), len to tento návrh nespojil. Na guid kľúči by Ctrl+S
+  naraz zneplatnil všetky zapamätané polohy: hneď nasledujúci odmietnutý scale by sa vracal len cez `clean_transform` a upratovanie by staré záznamy už ani nenašlo (leak,
+  ktorý mala dávka odstrániť). **Kľúčom preto ostáva `object_id`** (stabilné počas behu) a `guid` sa používa VÝHRADNE ako **detektor zmeny dokumentu** v `forget_detached_models`
+  — tá cesta pri ukladaní nebeží, takže iný guid tam znamená naozaj iný dokument. Vedľajší efekt: keď sa dokument zmenil, ide preč **celá** cache, čím je ošetrená aj tá
+  recyklácia `object_id`, kvôli ktorej audit guid navrhoval. **Druhé kolo review pridalo P2 k tomu istému miestu:** guid sa nikde neseedoval, takže PRVÉ File>New/Open po štarte
+  pluginu nemalo s čím porovnávať a celý práve zaniknutý dokument by v cache prežil — `install` ho teraz seeduje a neznáme `prev` sa chápe ako dôvod vyčistiť, nie ako „nič nerob".
+  **Testy:** 8 headless scenárov v `tests/pure/test_r01_observer_multimodel.rb` (6 mutácií overených, každá zhodí práve svoj test) — a pozor na pascu, ktorú stálo jedno kolo:
+  **globálny stub `Sketchup`/`UI` v headless sade je zakázaný** — `defined?(UI) && UI.respond_to?(:start_timer)` prepne demos klienta do asynchrónnej vetvy a padne 43 cudzích
+  testov; stuby preto žijú priamo v `Noxun::Engine::ScaleWatch`, kde ich Ruby nájde lexikálne skôr než globálne. In-SU `CH6` je **otočený**: charakterizoval, že záznam prežije
+  reálne zmazanie, teraz dokazuje, že zmizne (1 → 0, konkrétny kľúč) — a pribudlo **Späť**, ktoré musí vrátiť skrinku AJ jej záznam (upratovanie nesmie byť jednosmerné),
+  plus dátová štruktúra prune množiny vrátane sentinelu. Plný in-SU beh **1057 PASS / 2 FAIL**; obidva FAILy sú `ŠT-1c B2` (export cenovej ponuky) a **overene padajú aj na
+  čistom `main`** — zastaraný test po cenovej bráne P0-HF (#252), nie regresia tejto dávky.
+  **Priznaný zvyšok — nová položka registra R-36:** dva NEZNÁME erasy z dvoch dokumentov splynú aj naďalej. Spoľahlivý pôvod by vyžadoval per-model observer držiaci silnú
+  referenciu na každý otvorený dokument (a cestu, ktorá ju pri zániku dokumentu zruší — na macOS na to nie je udalosť); patrí to k GHOST/Tool vrstve, ktorá multi-model
+  lifecycle rieši tak či tak.
+
 - **1d/R-08 · DVE OKNÁ SKETCHUPU SI UŽ NEPREPÍŠU KATALÓGY (30.8.2026, v0.8.16):** druhá vybavená položka registra bloku 1d (**R-08**, P1, externý Codex E:R-06). Päť globálnych
   súborov v `%APPDATA%\NOXUN\Engine` — **sety kovania · pravidlá kovania · ABS pravidlá · rozmerové rady · nastavenia dodávateľa** — sa menilo štýlom „prečítaj → uprav → zapíš"
   **bez medziprocesového zámku**, a kontrola revízie (kde vôbec bola) sedela MIMO neho. Kto pracoval v dvoch oknách SketchUpu naraz, prišiel o zmenu z toho prvého bez akejkoľvek
