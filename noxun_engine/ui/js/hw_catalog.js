@@ -660,9 +660,7 @@
         var m = hwEl('hwDelModal');
         if (m) m.style.display = '';
       } else if (action === 'hw-del-close'){
-        MDH_DEL = null;
-        var m2 = hwEl('hwDelModal');
-        if (m2) m2.style.display = 'none';
+        hwDelClose();
       } else if (action === 'hw-del-confirm'){
         var item2 = MDH_ITEMS[MDH_DEL];
         if (item2) mdhSend('hw_delete', { code: MDH_DEL, row_rev: item2.row_rev || '' });
@@ -926,10 +924,17 @@
     hwCloseModals();
   }
 
-  function hwCloseModals(){
+  // R-23.1: zatvorenie potvrdenia mazania ma MENO. Escape retaz (`nx_esc.js`)
+  // vola tu istu cestu ako tlacidlo „Zrušiť" — potrebuje teda volatelnu funkciu,
+  // nie vetvu schovanu v delegacii klikov.
+  function hwDelClose(){
+    MDH_DEL = null;
     var m = hwEl('hwDelModal');
     if (m) m.style.display = 'none';
-    MDH_DEL = null;
+  }
+
+  function hwCloseModals(){
+    hwDelClose();
     // Review P2 #4: nahlad z Demosu NIE JE modal — zije v tele sekcie, ktore
     // sa pri odchode UCHOVA. Bez tohto by v nom navzdy visel stav
     // „Načítavam stránku…", hoci server beh uz zrusil (`hw_leave`).

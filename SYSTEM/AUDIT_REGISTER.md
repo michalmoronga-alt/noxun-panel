@@ -296,6 +296,15 @@ beží pred `XlsxWriter.write_book` (spresnenie GLM 30.8.) — OSTÁVA: HLÁSIŤ
 10 ručných modálov mimo kostry; 5 štúdiových nemá VLASTNÝ Escape (dokumentový handler pozná len NXModal — reprodukcia úzka, ale kontrakt „Escape zatvára modál" neplatí); `absModal` bez Escape; Tab-trap 3× skopírovaný. [S-13]
 **Návrh:** (1) Escape reťaz hneď (**S**) · (2) `confirm` tvar v nx_modal + zrušiť kópie Tab-trapu (**M**) ·
 (3) kostru prevziať pri D-110.
+**✅ časť (1) dávkou 1d/R-23.1 (PR #273, v0.9.1)** — nový zdieľaný `ui/js/nx_esc.js`: **JEDEN** dokumentový Escape
+handler pre obe okná s prioritným zoznamom vrstiev. Escape odteraz zatvára všetkých šesť modálov bez neho
+(`absModal` · `mdRestoreModal` · `mdDeleteModal` · `mdUniModal` · `demosModal` · `hwDelModal`) — a to **volaním tej
+istej funkcie ako tlačidlo „Zrušiť"** (`mddCancel` ruší bežiaci Demos fetch, `absModalChoose('cancel')` vracia
+select), nie holým `display:none`. Vrstvy s vlastným Escapom (kostra D-15, `nxdaModal`/`tplModal`/`simModal`/`cfgModal`,
+rozbaľovacie nastavenia raily a lišty, combobox) sú v zozname `FOREIGN`: reťaz im udalosť **púšťa ďalej**, takže
+**jedno stlačenie zatvorí práve jednu vrstvu**; `budPrModal` je tam tiež — vo fáze `run` sa zavrieť NESMIE
+(audit #9). Vlastná vrstva udalosť **spotrebuje** (`stopImmediatePropagation`). Testy `tests/js/test_r23_escape.js`.
+Časti **(2)** a **(3)** ostávajú otvorené — Tab-trap je stále 3× skopírovaný a kostru preberú modály až pri D-110.
 
 ### R-24 · P3 · ui · 11× HTML-escaper (5× `esc` + 6 premenovaných klonov) · 2× cssEscape · 4× normText
 Trojica elementárnych pomocníkov naklonovaná po moduloch; normalizácie sa už rozišli; v `hw_sets.js:41` sú

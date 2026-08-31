@@ -297,6 +297,23 @@ vrátane `NXModal.isOpen()`) a po vybavení zhasne.
 `tests/js/test_st1c_ponuka.js`, `tests/js/test_st2c_modal.js`, `tests/js/test_st2c_editor.js`, `tests/js/test_st2d_kde.js` (mini-DOM je od 2c-2a zdieľaný v `tests/js/minidom.js`)
 (mini-DOM s naozajstným parsovaním HTML a bublaním udalostí — repeater ani Escape nasepkavača sa na stubovanom `querySelector` overiť nedajú).
 
+### Escape reťaz ručných modálov (R-23.1, ui/js/nx_esc.js)
+
+Modály **mimo** kostry D-15 Escape dlho nemali vôbec — kontrakt „Escape zatvára modál" pre šesť z nich neplatil (`absModal` v Inspectorovi; `mdRestoreModal`, `mdDeleteModal`,
+`mdUniModal`, `demosModal`, `hwDelModal` v Štúdiu; jedinou cestou von bola myš). Rieši to **JEDEN dokumentový handler s prioritným zoznamom vrstiev**, zdieľaný oboma oknami
+(`nx_esc.js` sa načítava v `panel.html` aj `studio.html`, vždy **pred** `nx_modal.js` a `studio.js` — stráži to `tests/js/test_r23_escape.js`). Šesť samostatných listenerov by bola
+tá istá pasca ako pri `ecMenu`: všetky visia na `document`, takže by jedno stlačenie zavrelo dve vrstvy a poradie by záviselo na poradí `<script>` tagov.
+
+**Pravidlo je „jedno stlačenie = najvyššia otvorená vrstva".** Zoznam `FOREIGN` menuje vrstvy, ktorých Escape už obsluhuje niekto iný (kostra D-15 · `nxdaModal`/`tplModal`/
+`simModal`/`cfgModal` s vlastným handlerom · warnpanel, rohové menu ABS a tagov, combobox D-85 · `ecMenu`/`vepoMenu` Štúdia) — kým je hociktorá otvorená, reťaz **nerobí nič**
+a udalosť **púšťa ďalej** jej vlastníkovi; spodný modál sa zavrie až druhým stlačením. V tom istom zozname je **`budPrModal`**: Escape sa ho nesmie dotknúť ani vtedy, keď je pod
+ním niečo naše (audit #9). Vlastnú vrstvu naopak reťaz **spotrebuje** (`stopImmediatePropagation`, vzor vyššie), inak by ju za ňou dostal ešte handler Štúdia.
+
+**Escape = klik na „Zrušiť", nie `display:none`:** volá sa tá istá funkcia ako z tlačidla — `mddCancel` ruší bežiaci Demos fetch na serveri, `absModalChoose('cancel')` vracia
+pôvodnú hodnotu selectu, `mdUniClose` zahadzuje pending odtlačok. Preto dostal `hwDelModal` pomenované `hwDelClose()` (dovtedy vetva schovaná v delegácii klikov). Otvorenosť sa
+pozná genericky z `style.display !== 'none'` (`budPrModal` v DOM ani nie je, kým nebeží), takže reťaz nepotrebuje háčik v otváraní. **Vedomé obmedzenie:** fokus sa po Escape
+nikam nevracia — spúšťač týchto šiestich modálov nie je nikde uložený (rovnako ako dnes pri kliku na „Zrušiť"); a `nxdaModal` má Escape naďalej len pri fokuse v poli hľadania.
+
 ### Observery panela
 
 (`ui/panel/selection.rb`) — panel počúva DVE veci: `SelObserver` (zmena výberu) a **`PanelModelObserver` (D-101: `onTransactionUndo`/`Redo`/`Abort`)**, lebo **Späť/Znova nevystrelí
