@@ -10,6 +10,8 @@ označené „V1 rozsah" v blokoch [PLAN.md](PLAN.md). **Bod sa odškrtáva, až
 v PLANe prázdny**; V1 je hotové, keď je odškrtnuté všetko. Stav dopĺňajú uzávery dávok.
 
 1. [ ] **Návrh:** vloženie skriniek na klik (GHOST) → zostava vrátane skriniek so spotrebičmi; šablóny s kovaním = opakované typy na 1 klik. *(Zarovnanie a snap k susedom rieši blok „V1.0 zostavy" — snaper logika sa preberá DO pluginu, žiadny externý plugin; plné segmenty/attachments sú mimo V1.)*
+   **Vloženie na klik je HOTOVÉ** — blok GHOST VKLADANIE, v0.9.0 (31.8.2026), potvrdený Michalovým smoke; plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).
+   Bod ostáva neodškrtnutý, lebo jeho V1 rozsah nie je prázdny — chýbajú **zostavy** (vrátane skriniek so spotrebičmi) a zarovnanie k susedom.
 2. [ ] **Konštrukcia:** korpusy vrátane per-dielec odsadení (vzduchové komíny, špeciály — V1-01), výstuhy správne v interiéri (hotové, D-80), sokel/nohy podľa výšky (hotové, D-79),
    čelo ako **cenová položka s dodávateľom** (V1-07 vo V1 rozsahu) a balík V0.4.8 (rohové spoje per strana, chrbát s poldrážkou, „bez dielca" varianty, per-dielec hrúbky a odsadenia).
 3. [x] **Materiály:** katalóg z Demosu, skupinové farby, ABS automatika so semaforom, vyhľadávač s kontextom *(hotové — Materiály 2.0 + PICKER-1/2/3)*; quick-win textúry z Demos fotky ostávajú v bode 7.

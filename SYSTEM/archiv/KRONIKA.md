@@ -17,6 +17,22 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **UZÁVER BLOKU GHOST VKLADANIE (v0.9.0, 31.8.2026):** Michal večer prešiel **celý smoke checklist** package a nahlásil **PASS** — základné body 1–6
+  (ghost visí na kurzore a šípky fungujú hneď bez kliku do modelu · ←/→ točia okolo aktívnej kotvy · ↓ drží domácu výšku typu, ↑ pustí do voľnej ·
+  **Alt prepína kotvy a menu lišta SketchUpu sa pritom neaktivuje** · klik položí skrinku presne tam, kde ghost stál, a jeden Ctrl+Z ju celú vráti ·
+  Esc nič nevloží a nič nepribudne v Undo · orbit ghost prežije · horný korpus, šablóna s kovaním aj vloženie z editácie skupiny skončia top-level)
+  aj doplnkové body 7–11 z dávky GHOST-FB (snap vo výškovom zámku · kotva skočí pod kurzor · pásik pod Náhľadom aj pri vklade dvojklikom na šablónu ·
+  pole výšky vrátane odmietnutia nezmyslu · pamäť kotvy/otočenia/režimu/výšky do zatvorenia SketchUpu). **Zapísaný fallback TAB sa teda nepoužije** —
+  jediná otvorená voľba package, ktorú sa programovo overiť nedalo (systémové doručenie Alt), je uzavretá v prospech Alt.
+  **Tým istým sedením Michal odškrtol aj štyri staršie odložené smoke testy** z blokov 1b/1d, ktoré čakali na živé okno: **R-08** (dve okná SketchUpu,
+  dva rôzne sety kovania — ostali oba) · **R-01+R-04** (skrinka so zónami, zmazanie, Ctrl+Z a neplatné zväčšenie) · **R-02** (dve okná, oneskorená zmena
+  skončí hláškou „patrí inému dokumentu") · **R-07** (Štúdio → Kovanie → Sety bez banneru, vizuál nezmenený). Uzáver je **čisto dokumentačný** — kód sa
+  nemenil, mení sa len číslo verzie: **minor bump 0.8.25 → 0.9.0** (uzáver bloku podľa CLAUDE.md) vrátane 43 `?v=` v `ui/*.html`. Blok bol z [../PLAN.md](../PLAN.md)
+  **presunutý plným textom** do [ROADMAP_hotove_etapy.md](ROADMAP_hotove_etapy.md) (v PLANe už neostáva) a doplnený o výsledok: PR **#265** (predpoklad R-03 —
+  šev `prepare_insert` + `build(transform:)`) · **#268** (Tool + PlacementSession + in-SU sada `run_ghost`) · **#270** (GHOST-FB) · **#271** (pozícia pásika
+  a zelená predná stena) · uzáver. **V1_VIZIA bod 1 ostáva `[ ]`** — rozsah bodu nie je prázdny (zostavy a snap k susedom rieši blok „V1.0 zostavy"),
+  takže hotovosť GHOST-u nesie KRONIKA a archív, nie odškrtnutie vízie. **Testy nad finálnym stavom: 2217 headless · 75 JS sád · plný in-SketchUp beh 1217 PASS / 0 FAIL.**
+  Ďalej pokračuje front **1d** (R-23.1, R-11/R-12/R-14…) a po USER-debate o setoch blok **KOVANIE**.
 - **GHOST-FB · POZÍCIA PÁSIKA (v0.8.25, 31.8.2026):** Michal pri živom teste videl počas ghostu len status dole — **pásik nikde**. Príčina bola čisto štruktúrna: `#ghostBar`
   žil vnútri `<details>` sektora **Materiály** (hneď za `#insertGoRow`), a pri vklade **dvojklikom na šablónu** ostáva ten sektor **zbalený** — pásik teda technicky
   existoval a mal správny stav, len ho zbalený rodič nevykreslil. Oprava presúva pásik **von zo všetkých sektorov**, na samostatné miesto **medzi Náhľad a Základné**
