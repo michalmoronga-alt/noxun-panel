@@ -17,6 +17,14 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **GHOST-FB · POZÍCIA PÁSIKA (v0.8.25, 31.8.2026):** Michal pri živom teste videl počas ghostu len status dole — **pásik nikde**. Príčina bola čisto štruktúrna: `#ghostBar`
+  žil vnútri `<details>` sektora **Materiály** (hneď za `#insertGoRow`), a pri vklade **dvojklikom na šablónu** ostáva ten sektor **zbalený** — pásik teda technicky
+  existoval a mal správny stav, len ho zbalený rodič nevykreslil. Oprava presúva pásik **von zo všetkých sektorov**, na samostatné miesto **medzi Náhľad a Základné**
+  (upresnenie Michala; pôvodné zadanie mierilo pod hlavičku). Obsah pásika ani JS logika sa nemenili — presunul sa markup a upravilo CSS: rozostup ako má sektor
+  (`margin: 0 0 8px`), sýtejšie pozadie `--nx-select-bg` a tenký teal prah vľavo, aby bol na holom pozadí panela na prvý pohľad zrejmý. **Poučenie:** viditeľnosť prvku,
+  ktorý má byť vidieť *vždy počas režimu*, nesmie závisieť od rodiča, ktorého si používateľ zbaľuje — jediným vlastníkom je vlastný `hidden` z pushu Ruby. Zafixované
+  guard testom (bilancia `<details>` pred pásikom + poloha medzi `secPreview` a `secBasic` + CSS margin). `#insertGoRow` ostáva na mieste (vzor UI-C1b: primárna akcia
+  posledná). Testy: **2217 headless** (+1), **75 JS sád**; in-SU beh sa nekonal — dávka nemení Ruby ani JS, len HTML/CSS.
 - **GHOST-FB · SMOKE FEEDBACK GHOST VKLADANIA (v0.8.24, 31.8.2026, PR #270):** Michal ghost odskúšal naživo a nahlásil štyri veci; koreňom bola **jedna** — výškový zámok
   počítal polohu **len** ako priesečník lúča s rovinou zámku, takže vkladanie nemalo **žiadne prichytávanie**. V rovine Z = 0 nie je pri dolnej skrinke so soklom čoho sa
   chytiť a roh susednej skrinky leží 720 mm nad ňou. **FB-1:** `pick_locked` je odteraz **hybrid** — najprv `InputPoint.pick` (presne ako Move), z **reálneho snapu** X/Y,

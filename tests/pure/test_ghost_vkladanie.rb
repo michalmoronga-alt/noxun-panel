@@ -852,6 +852,26 @@ NxTest.test('ghost sev FB: pole vysky ma guard identity dokumentu a pasik nie je
   NxTest.assert(js.include?('#i-info') == false, 'ikonu kresli HTML sprite, nie JS')
 end
 
+# Fix 31.8. (Michalov zivy test): pasik bol vnoreny v sektore Materialy, takze pri
+# vklade dvojklikom na sablonu (sektor ostal zbaleny) ho pouzivatel VOBEC nevidel.
+# Odvtedy stoji samostatne medzi Nahladom a Zakladnymi — mimo kazdeho <details>.
+NxTest.test('ghost pasik: stoji MIMO sektorov (medzi Nahladom a Zakladnymi)') do
+  # Komentare panela sa o sektoroch bavia aj TEXTOM (`Sektory su <details ...>`),
+  # preto sa pred pocitanim tagov vyhadzuju — inak by bilancia nikdy nesedela.
+  html = NxGhost.src('noxun_engine', 'ui', 'panel.html').gsub(/<!--.*?-->/m, '')
+  at = html.index('<div id="ghostBar"')
+  NxTest.assert(!at.nil?, 'Ghost pasik v paneli chyba')
+  head = html[0...at]
+  NxTest.assert_equal(head.scan('<details').size, head.scan('</details>').size,
+                      'pasik nesmie byt vnoreny v ziadnom <details> — zbaleny sektor by ho skryl')
+  NxTest.assert(head.include?('id="secPreview"'), 'pasik ma stat AZ za sektorom Nahlad')
+  NxTest.assert(html[at..-1].include?('id="secBasic"'), 'pasik ma stat PRED sektorom Zakladne')
+  css = NxGhost.src('noxun_engine', 'ui', 'css', 'panel.css')
+  rule = css[/\.nx-inspector \.ghostbar \{[^}]*\}/m].to_s
+  NxTest.assert(rule.include?('margin: 0 0 8px'),
+                'samostatny pasik ma mat rozostup ako sektor (0 0 8px)')
+end
+
 NxTest.test('ghost: prevod matice mm -> palce sa dotkne LEN translacie') do
   m = NxGhost.calc.matrix(anchor: [0.0, 0.0, 0.0], picked: [254.0, 0.0, 0.0],
                           rotation_index: 1, z_mode: :free, home_z: 0.0)

@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.8.24 · 31.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.8.25 · 31.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -18,7 +18,7 @@ Nálezy z reálnej výroby a chyby v cenách majú preto **najvyššiu prioritu 
 (okno zaniká — modul žije · uzavretý whitelist akcií · session token · echo vs. plný push · optimistický zámok) sú v [archiv/KRONIKA.md](archiv/KRONIKA.md),
 vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
-**Testy k v0.8.24:** **2216 headless** · 75 JS sád · posledný plný in-SketchUp beh **1217 PASS / 0 FAIL** (dávka GHOST-FB nad stabilnou identitou dokumentu DocKey z 1d/R-02b).
+**Testy k v0.8.25:** **2217 headless** · 75 JS sád · posledný plný in-SketchUp beh **1217 PASS / 0 FAIL** (dávka GHOST-FB nad stabilnou identitou dokumentu DocKey z 1d/R-02b).
 
 > **Poznámka k procesu:** Codex review bol 21.–24.8. **nedostupný** — PR **#186–#226** prešli bránou so slepým subagentom. **Post-hoc sweep je od 27.8. HOTOVÝ** (34 PR cez Codex CLI + triáž 54 nezodpovedaných threadov): dve reálne P1 slepým kolám ušli a týždeň žili v `main`, obe sú dávno opravené — [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-E**.
 
@@ -38,9 +38,9 @@ vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
 ## Posledné uzávery
 
-- **GHOST VKLADANIE — skrinka sa kladie KLIKOM** (v0.8.22) **+ GHOST-FB** (v0.8.24, 31.8.): v zámku sa ghost prichytáva na rohy a hrany existujúcich skriniek (výšku drží zámok) · kotva skočí pod kurzor aj po Alt · kotva/otočenie/režim/výška sa pamätajú do zatvorenia SketchUpu · **Ghost pásik** s prestaviteľnou zamknutou výškou (0 / 1400) · **Michal večer: SMOKE — 11 bodov v [PLAN.md](PLAN.md).**
-- **1d/R-07 — starší a novší plugin si už nepoškodia knižnicu setov kovania** (knižnica z novšej verzie sa nedá ani zapísať, ani použiť: namiesto tichého orezania
-  ju súpis prizná oranžovým riadkom a Štúdio bannerom) — v0.8.21 (30.8.) · **Michal večer:** Štúdio → Kovanie → Sety musí vyzerať a fungovať presne ako doteraz (banner sa NESMIE ukázať).
+- **GHOST VKLADANIE — skrinka sa kladie KLIKOM** (v0.8.22) **+ GHOST-FB** (v0.8.24, 31.8.): v zámku sa ghost prichytáva na rohy a hrany existujúcich skriniek (výšku drží zámok) · kotva skočí pod kurzor aj po Alt · kotva/otočenie/režim/výška sa pamätajú do zatvorenia SketchUpu ·
+  **Ghost pásik** s prestaviteľnou zamknutou výškou (0 / 1400), od **v0.8.25** stojí samostatne **hneď pod sektorom Náhľad** (zbalený sektor ho už neschová) · **Michal večer: SMOKE — 11 bodov v [PLAN.md](PLAN.md); dvojklik na šablónu → pásik hneď vidno hore pod Náhľadom.**
+- **1d/R-07 — starší a novší plugin si už nepoškodia knižnicu setov kovania** (knižnica z novšej verzie sa nedá ani zapísať, ani použiť: namiesto tichého orezania ju súpis prizná oranžovým riadkom a Štúdio bannerom) — v0.8.21 (30.8.) · **Michal večer:** Štúdio → Kovanie → Sety musí vyzerať a fungovať presne ako doteraz (banner sa NESMIE ukázať).
 - **1d/R-02b — Ctrl+S už nezahadzuje rozpísanú prácu** (identity dokumentu už nerotuje uloženie, ale iba File > New/Open) — v0.8.23 (30.8.) · **Michal večer:** uprav šírku skrinky a do sekundy daj **Ctrl+S** — zmena sa musí uložiť a rozpísané polia ostať.
 - **1d/R-03 — skrinka sa dá pripraviť BEZ zásahu do modelu a položiť na presnú polohu** (prípravná dávka pre GHOST vkladanie na klik — **tvrdý blocker tým padol**; z pohľadu používateľa sa dnes nemení NIČ) — v0.8.20 (30.8.) · **Michal večer:** netreba, bez UI zmeny.
 - **1d/R-02 — panel už nezapíše do nesprávneho dokumentu** (oneskorená akcia po prepnutí okna SketchUpu skončí hláškou „patrí inému dokumentu", nie tichým zápisom do cudzej zákazky — vkladanie, apply, premenovanie, kovanie, materiály aj karty dielca a dosky) — v0.8.19 (30.8.) · **Michal večer:** v dvoch oknách prepíš šírku skrinky a HNEĎ preklikni do druhého — zmena sa tam nesmie prejaviť.
