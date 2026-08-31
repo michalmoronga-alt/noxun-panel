@@ -37,9 +37,17 @@
   otvára). **P2 — Escape počas čakania na server:** `mdUniClose()` zavrel modál a zmazal stav, ale callback `MD.replaceUniOffer` ho bez kontroly zobrazil znova a zahodený
   rozpis dopadu sa vrátil. Otázka `replace_uni_preview`/`replace_uni_apply` si odteraz nesie **generáciu relácie** a server ju vracia v každej odpovedi (vzor revízie
   náhľadov šablón); klient zobrazí len tú odpoveď, na ktorú stále čaká. Samotný lokálny príznak „čakám" by nestačil — dve otázky za sebou sa bez echa nedajú rozlíšiť
-  a stará ponuka by sa dala potvrdiť v novej relácii, teda nahradiť UNI v celom projekte niečím iným, než čo je na obrazovke. **Mutácie 3/3 (reťaz) a 5/5 (generácia)**
-  — každá nová kontrola bola overená tým, že po zásahu do kódu padne. **Testy: 2217 headless · 76 JS sád** (`test_r23_escape.js` 105 kontrol nad mini-DOM s bublaním,
-  `test_replace_uni.js` 50); in-SU beh sa nekonal — dávka nemení geometriu, observerov ani undo.
+  a stará ponuka by sa dala potvrdiť v novej relácii, teda nahradiť UNI v celom projekte niečím iným, než čo je na obrazovke.
+  **Review kolo 2 vrátilo ďalšie dva P2 a oba boli o tom istom — „čo je naozaj navrchu".** (a) Korelácia bola na úrovni **relácie** modálu, takže dve rýchle „Ukázať dopad"
+  za sebou (cieľ A → zmena variantu → cieľ B) niesli to isté číslo: pomalšia odpoveď A prešla ako platná, spotrebovala čakanie, čerstvá B prepadla — a potvrdiť sa dal plán
+  pre **starší cieľ**, teda zápis do modelu podľa niečoho iného, než je na obrazovke. `gen` je odteraz **per-request** (rastie aj pri každej jednotlivej otázke), serverový
+  kanál sa nemenil. (b) Medzi **vlastnými** vrstvami rozhodovalo poradie tabuľky `OWN`, nie vykreslenie: pri dvoch otvorených naraz (oneskorená `MD.confirmDelete` otvorí
+  `mdDeleteModal` pod už otvoreným `hwDelModal`, oba z-index 60) by Escape zavrel ten **skrytý** a navonok by sa „nestalo nič" — `topOpen()` teraz vyberá uzol **posledný
+  v dokumentovom poradí** (`compareDocumentPosition`, generické, žiadna logika per modál). **Priznané a NEopravené:** že `MD.confirmDelete` po odchode zo sekcie modál vôbec
+  znovu otvorí, je samostatná predexistujúca chyba toho toku (tá istá trieda ako oneskorená odpoveď UNI) — kandidát do registra, zapísaná komentárom v kóde aj v `ui-lifecycle.md`.
+  **Mutácie: kolo 1 — 3/3 (reťaz) a 5/5 (generácia); kolo 2 — 2/2 a 2/2**
+  — každá nová kontrola bola overená tým, že po zásahu do kódu padne. **Testy: 2217 headless · 76 JS sád** (`test_r23_escape.js` 112 kontrol nad mini-DOM s bublaním,
+  `test_replace_uni.js` 55); in-SU beh sa nekonal — dávka nemení geometriu, observerov ani undo.
 - **UZÁVER BLOKU GHOST VKLADANIE (v0.9.0, 31.8.2026):** Michal večer prešiel **celý smoke checklist** package a nahlásil **PASS** — základné body 1–6
   (ghost visí na kurzore a šípky fungujú hneď bez kliku do modelu · ←/→ točia okolo aktívnej kotvy · ↓ drží domácu výšku typu, ↑ pustí do voľnej ·
   **Alt prepína kotvy a menu lišta SketchUpu sa pritom neaktivuje** · klik položí skrinku presne tam, kde ghost stál, a jeden Ctrl+Z ju celú vráti ·
