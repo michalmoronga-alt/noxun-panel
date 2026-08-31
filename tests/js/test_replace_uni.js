@@ -232,6 +232,28 @@ const CAT = {
   eq(modal.style.display, 'none', 'a modal zavrelo hned');
   M.MD.replaceUniOffer(answer({ stale: true }));
   eq(modal.style.display, '', 'stale odpoved z apply sa UKAZE — potvrdzuje sa nanovo');
+
+  // 5) DVE OTAZKY V TEJ ISTEJ RELACII (review kolo 2): „Ukazat dopad" na ciel A,
+  //    hned zmena variantu a „Ukazat dopad" na ciel B. Pomalsia odpoved na A sa
+  //    musi zahodit — inak by spotrebovala cakanie, cerstva odpoved B by prepadla
+  //    a POTVRDIT by sa dal plan pre STARSI ciel (zapis do modelu podla nieco
+  //    ineho, nez je na obrazovke).
+  M.mdUniClose();
+  SENT.length = 0;
+  openAndAsk();                                            // otazka A (K111_18)
+  const A = answer({ pending: { uni_id: 'UNI_K', target_id: 'K111_18' } });
+  ELS.mdUniVariant.value = 'K111_186';
+  M.mdUniPreview();                                        // otazka B, bez zatvorenia
+  const B = answer({ pending: { uni_id: 'UNI_K', target_id: 'K111_186' } });
+  ok(A.gen !== B.gen, 'kazda otazka nesie VLASTNE cislo, nie cislo relacie');
+  M.MD.replaceUniOffer(A);                                 // pomalsia odpoved dorazi prva
+  eq(ELS.mdUniStep2.style.display, 'none', 'odpoved na PREDOSLU otazku sa zahadzuje');
+  M.MD.replaceUniOffer(B);
+  eq(ELS.mdUniStep2.style.display, '', 'a odpoved na POSLEDNU otazku sa ukaze');
+  M.mdUniConfirm();
+  const sent = SENT[SENT.length - 1];
+  const applied = JSON.parse(sent.slice(sent.indexOf(':') + 1));
+  eq(applied.confirm.target_id, 'K111_186', 'potvrdzuje sa plan pre POSLEDNY ciel, nie pre stary');
   M.mdUniClose();
 })();
 

@@ -131,9 +131,10 @@ používa"; obe SCHEMA-aware, aby počty a zoznam ukazovali na tú istú skupinu
 **M-B2 „Nahradiť UNI…"** (`materials_replace_uni`): scan+čistá klasifikácia, rozpis dopadu pred potvrdením, SHA256 odtlačok plánu, all-or-nothing, 1 undo (skrinky+dosky+predvoľby).
 
 **Korelácia otázky a odpovede (R-23.1, review #273):** rozpis dopadu prichádza **asynchrónne** (`MD.replaceUniOffer`) a modál si otvára sám, takže Escape medzi otázkou
-a odpoveďou by ho vrátil späť aj s rozpisom, ktorý používateľ práve zahodil. Otázka (`replace_uni_preview` aj `replace_uni_apply`) preto nesie **generáciu relácie `gen`** a server
-ju vracia v **každej** odpovedi — klient zobrazí len tú, na ktorú stále čaká. Každé otvorenie aj zatvorenie modálu generáciu posunie; samotný lokálny príznak „čakám" by nestačil,
-lebo dve otázky za sebou (Escape → otvor znova → iný cieľ) sa bez echa nedajú rozlíšiť a stará ponuka by sa dala potvrdiť v novej relácii. Ten istý vzor ako revízia náhľadov
+a odpoveďou by ho vrátil späť aj s rozpisom, ktorý používateľ práve zahodil. Otázka (`replace_uni_preview` aj `replace_uni_apply`) preto nesie číslo `gen` a server ho vracia
+v **každej** odpovedi — klient zobrazí len odpoveď na **poslednú** otázku. **`gen` je per-request, nie per-relácia** (review kolo 2): rastie pri otvorení, zatvorení **aj pri každej
+jednotlivej otázke**. Na úrovni relácie by dve rýchle „Ukázať dopad" (cieľ A → zmena variantu → cieľ B) niesli to isté číslo, pomalšia odpoveď A by prešla ako platná, spotrebovala
+čakanie a čerstvá B by prepadla — a potvrdiť by sa dal plán pre **starší cieľ**, teda zápis do modelu podľa niečoho iného, než je na obrazovke. Ten istý vzor ako revízia náhľadov
 šablón. Testy: `tests/js/test_replace_uni.js`.
 
 ### materials_* — spoločný kontrakt (SCHEMA · UNI · duplák · Demos väzba)

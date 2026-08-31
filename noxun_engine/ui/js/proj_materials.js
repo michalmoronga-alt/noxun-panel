@@ -2255,24 +2255,32 @@
   // a renderuje rozpis. Katalógové echo/init modal aj ponuku RUŠÍ (audit F6).
   var MD_UNI = null;          // { uni_id, key } otvoreného modalu
   var MD_UNI_PENDING = null;  // pending odtlačok aktuálnej ponuky zo servera
-  // R-23.1 review #273 (P2): GENERÁCIA relácie „Nahradiť UNI…". Odpoveď servera
-  // (`MD.replaceUniOffer`) dorazí ASYNCHRÓNNE a modal si otvára sama — takže
-  // Escape (alebo odchod zo sekcie) medzi otázkou a odpoveďou by okno o chvíľu
-  // vrátil späť aj s rozpisom, ktorý používateľ práve zahodil. Každé otvorenie
-  // aj zatvorenie modalu preto generáciu posunie a otázka si generáciu NESIE
-  // SO SEBOU — server ju vracia v odpovedi (`p.gen`, vzor revízie náhľadov
-  // šablón). Sám lokálny príznak „čakám" by nestačil: dve otázky za sebou
-  // (Escape → otvor znova → spýtaj sa na INÝ dekor) sa bez echa nedajú
-  // rozlíšiť a odpoveď na tú prvú by sa dala potvrdiť v druhej relácii —
-  // teda nahradiť UNI v celom projekte niečím iným, než čo je na obrazovke.
-  var MD_UNI_GEN = 0;         // generácia aktuálnej relácie
-  var MD_UNI_REQ = null;      // generácia, ku ktorej patrí odoslaná otázka (alebo null)
-  // Odoslali sme serveru otázku — odpoveď na ňu je odteraz očakávaná.
-  function mdUniAwait(){ MD_UNI_REQ = MD_UNI_GEN; }
-  // Je odpoveď, ktorá práve prišla, ešte tá, na ktorú sa čaká?
+  // R-23.1 review #273 (P2): IDENTITA KAŽDEJ OTÁZKY „Nahradiť UNI…". Odpoveď
+  // servera (`MD.replaceUniOffer`) dorazí ASYNCHRÓNNE a modal si otvára sama —
+  // takže Escape (alebo odchod zo sekcie) medzi otázkou a odpoveďou by okno
+  // o chvíľu vrátil späť aj s rozpisom, ktorý používateľ práve zahodil.
+  // Číslo `gen` preto rastie pri KAŽDEJ udalosti, ktorá mení to, na čo sa čaká:
+  // otvorenie modalu, zatvorenie modalu aj **každá jednotlivá otázka**. Otázka
+  // si svoje číslo nesie so sebou a server ho vracia v odpovedi (vzor revízie
+  // náhľadov šablón); zobrazí sa len odpoveď na tú POSLEDNÚ.
+  //
+  // Prečo to nestačí na úrovni relácie modalu (review kolo 2): dve rýchle
+  // „Ukázať dopad" po sebe (cieľ A → zmena variantu → cieľ B) by niesli TO ISTÉ
+  // číslo, takže pomalšia odpoveď A by prešla ako platná, spotrebovala čakanie
+  // a čerstvá odpoveď B by sa zahodila — a potvrdiť by sa dal plán pre STARŠÍ
+  // cieľ, teda ZÁPIS DO MODELU podľa niečoho iného, než je na obrazovke.
+  // Rásť to môže bez obáv: je to čítač jednej relácie okna, nie kľúč do úložiska.
+  var MD_UNI_GEN = 0;         // číslo poslednej udalosti (otvorenie/zatvorenie/otázka)
+  var MD_UNI_REQ = null;      // číslo otázky, na ktorú sa čaká (alebo null)
+  // Nová otázka serveru: dostane vlastné číslo a čaká sa odteraz na ŇU.
+  function mdUniAsk(){
+    MD_UNI_GEN++;
+    MD_UNI_REQ = MD_UNI_GEN;
+    return MD_UNI_GEN;
+  }
+  // Je odpoveď, ktorá práve prišla, tá, na ktorú sa čaká?
   function mdUniCurrent(gen){
-    return MD_UNI_REQ !== null && MD_UNI_REQ === MD_UNI_GEN &&
-           gen != null && Number(gen) === MD_UNI_GEN;
+    return MD_UNI_REQ !== null && gen != null && Number(gen) === MD_UNI_REQ;
   }
 
   // Čistá funkcia (Node test): kandidáti cieľa = non-UNI skupiny s doskami.
@@ -2377,22 +2385,22 @@
     var vsel = mdEl('mdUniVariant');
     if (!MD_UNI || !vsel || !vsel.value) return;
     if (window.sketchup && sketchup.replace_uni_preview){
+      // Každé „Ukázať dopad" je VLASTNÁ otázka s vlastným číslom — dve rýchlo
+      // za sebou sa tak nedajú zameniť a platí odpoveď na tú poslednú.
       sketchup.replace_uni_preview(JSON.stringify({
         uni_id: MD_UNI.uni_id, target_id: vsel.value, model_guid: MD_MODEL_GUID,
-        gen: MD_UNI_GEN }));
-      mdUniAwait();
+        gen: mdUniAsk() }));
     }
   }
   function mdUniConfirm(){
     var pending = MD_UNI_PENDING;
     mdUniClose();
     if (pending && window.sketchup && sketchup.replace_uni_apply){
-      sketchup.replace_uni_apply(JSON.stringify({ confirm: pending, model_guid: MD_MODEL_GUID,
-                                                  gen: MD_UNI_GEN }));
       // Aj apply môže vrátiť `replaceUniOffer` (blokácia / stale rozpis na
-      // opätovné potvrdenie), takže odpoveď sa očakáva — ale až PO `mdUniClose()`
-      // vyššie, inak by ju jeho posun generácie zahodil.
-      mdUniAwait();
+      // opätovné potvrdenie), takže si berie číslo otázky rovnako — ale až PO
+      // `mdUniClose()` vyššie, inak by ho zatvorenie zhodilo.
+      sketchup.replace_uni_apply(JSON.stringify({ confirm: pending, model_guid: MD_MODEL_GUID,
+                                                  gen: mdUniAsk() }));
     }
   }
   function mdUniClose(){
