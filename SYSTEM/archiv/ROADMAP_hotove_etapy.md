@@ -167,7 +167,7 @@ použiteľný), ale všetko je pomenované, aby sa to nestratilo.
 - **PR bloku:** **#265** (predpoklad R-03 — šev `prepare_insert` + `build(transform:)`, v0.8.20) · **#268** (Tool + PlacementSession
   + in-SU sada `run_ghost`, v0.8.22) · **#270** (GHOST-FB — hybrid snap v zámku, natívne zvýraznenie, kotva pod kurzorom,
   pamäť nastavení, Ghost pásik, v0.8.23/v0.8.24) · **#271** (pásik samostatne pod Náhľadom + jasná zelená predná stena, v0.8.25)
-  · **uzáver bloku PR_UZAVER** (minor bump **v0.9.0**, presun tohto textu do archívu).
+  · **uzáver bloku #272** (minor bump **v0.9.0**, presun tohto textu do archívu).
 - **Testy pri uzávere:** **2217 headless** · **75 JS sád** · plný in-SketchUp beh **1217 PASS / 0 FAIL**.
 - **Michalov smoke 31.8.2026 večer — PASS celý checklist:** základné body 1–6 (ghost na kurzore so šípkami hneď, rotácia okolo kotvy,
   ↓ domáca výška / ↑ voľná, **Alt prepína kotvy a menu lišta SketchUpu sa neaktivuje — zapísaný fallback TAB sa teda nepoužil**,
