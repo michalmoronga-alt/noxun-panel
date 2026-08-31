@@ -147,3 +147,149 @@ použiteľný), ale všetko je pomenované, aby sa to nestratilo.
   > - **Vstup, ktorý už čaká:** `../zdroje/SWEEP_2026-08_kandidati.md` — nálezy z post-hoc sweepu #186–#226: sekcia **A** 7 z hlavnej session sweepu · sekcia **B** 18 z triáže review threadov (*z toho B1 je už vyriešené, otvorených 17*) · sekcia **C** 13 ďalších z bloku 1b (*C4 a C5 sú tiež už vyriešené*). Každý má adresu v kóde. **Prvý krok bloku 1c je preliať tento zoznam do registra**, v tomto poradí: **(1)** dedup (známe zhody sú v zozname vymenované) → **(2)** vyradiť to, čo je medzitým hotové alebo už má dávku → **(3)** overiť proti vtedajšiemu `main` (čísla riadkov sú k `0070697`, `ui/production_core.rb` sa medzitým posunul) → **(4)** až potom priradiť R-číslo, závažnosť, vrstvu a blokovanú funkciu.
   > - **Prioritné osi auditu** (od budúcich funkcií dozadu): observery/undo/Tool lifecycle (→ GHOST) · dátový model setov kovania (→ D-109/KOVANIE) · `ui/production_core.rb` — jadro výstupov v UI vrstve (→ Ponuka/plošná kontrola) · payload kontrakty a identita · perzistencia, `std` verzie, migrácie (→ shared library) · zjednotenie UI vzorov na nx_modal/nx_combo · VŠETKY aktuálne stub odseky architektúry (k 26.8. ich je 19; zoznam grepom, detail v podklade).
   > - **Mimo záberu** (zapísané aj v podklade): prepisovanie funkčných builderov a zapisovacích ciest · hromadné premenovania · vizuál Inspectora/Štúdia · predčasné abstrakcie pre neschválené funkcie (attachment/segmenty) · výkon bez merania.
+
+## Blok GHOST VKLADANIE (V1-04) — HOTOVÉ (v0.9.0, 31.8.2026)
+
+> **Presunuté z [../PLAN.md](../PLAN.md) 31.8.2026** pri uzávere bloku — v PLANe už neostáva.
+> Nasleduje plný pôvodný text task package vrátane zadania, uzavretých volieb, smoke checklistu
+> aj checklistu uzáveru. Text sa nemenil — upravené sú výhradne relatívne cesty odkazov
+> (súbor leží o úroveň nižšie). Priebeh dávok, implementačný audit a poučenia sú
+> v [KRONIKA.md](KRONIKA.md) (záznamy **GHOST VKLADANIE**, **GHOST-FB**, **GHOST-FB · POZÍCIA PÁSIKA**
+> a **UZÁVER BLOKU GHOST VKLADANIE**).
+
+**Výsledok uzáveru (31.8.2026, v0.9.0):**
+
+- **Čo blok priniesol používateľovi:** skrinka sa už nekladie naslepo cez `next_x` mimo pohľadu — po „Vložiť" visí na kurzore
+  ghost s čitateľnou zelenou prednou stenou a viditeľnou aktívnou kotvou, ←/→ ho otáčajú o 90°, ↓/↑ prepínajú výškový zámok
+  a voľnú výšku, Alt cykluje kotvy a klik položí **jednu reálnu skrinku v jednom Undo kroku** presne tam, kde ghost stál.
+  V zámku sa ghost prichytáva na rohy a hrany existujúcich skriniek (X/Y zo snapu, výšku drží zámok) a **Ghost pásik**
+  pod sektorom Náhľad ukazuje kotvu, otočenie, režim a editovateľnú zamknutú výšku; nastavenia si pamätá do zatvorenia SketchUpu.
+- **PR bloku:** **#265** (predpoklad R-03 — šev `prepare_insert` + `build(transform:)`, v0.8.20) · **#268** (Tool + PlacementSession
+  + in-SU sada `run_ghost`, v0.8.22) · **#270** (GHOST-FB — hybrid snap v zámku, natívne zvýraznenie, kotva pod kurzorom,
+  pamäť nastavení, Ghost pásik, v0.8.23/v0.8.24) · **#271** (pásik samostatne pod Náhľadom + jasná zelená predná stena, v0.8.25)
+  · **uzáver bloku #272** (minor bump **v0.9.0**, presun tohto textu do archívu).
+- **Testy pri uzávere:** **2217 headless** · **75 JS sád** · plný in-SketchUp beh **1217 PASS / 0 FAIL**.
+- **Michalov smoke 31.8.2026 večer — PASS celý checklist:** základné body 1–6 (ghost na kurzore so šípkami hneď, rotácia okolo kotvy,
+  ↓ domáca výška / ↑ voľná, **Alt prepína kotvy a menu lišta SketchUpu sa neaktivuje — zapísaný fallback TAB sa teda nepoužil**,
+  klik = presne jedna skrinka a jeden Ctrl+Z ju vráti, Esc nič nevloží, orbit ghost prežije, horný korpus aj šablóna s kovaním
+  aj vloženie z editácie skupiny) **a doplnkové body 7–11** z dávky GHOST-FB (snap vo výškovom zámku, kotva skočí pod kurzor,
+  pásik viditeľný pod Náhľadom aj pri vklade dvojklikom na šablónu, pole výšky vrátane odmietnutia nezmyslu, pamäť nastavení).
+- **Tým istým sedením potvrdené aj staršie odložené smoke testy** z blokov 1b/1d: **R-08** (dve okná SketchUpu, dva rôzne sety kovania —
+  ostali oba) · **R-01+R-04** (skrinka so zónami, zmazanie, Ctrl+Z a neplatné zväčšenie) · **R-02** (dve okná — oneskorená zmena skončí
+  hláškou „patrí inému dokumentu") · **R-07** (Štúdio → Kovanie → Sety vyzerá a funguje ako doteraz, banner sa neukázal).
+- **V1_VIZIA bod 1 ostáva `[ ]`** podľa checklistu uzáveru — rozsah bodu nie je prázdny (zostavy a snap k susedom rieši blok „V1.0 zostavy").
+
+**Pôvodný plný text bloku z [../PLAN.md](../PLAN.md):**
+
+### GHOST VKLADANIE (V1-04) — TASK PACKAGE (1e, zapísané 29.8.2026, rev. po slepom review #254; štart na Michalovo „štartuj")
+
+**STAV BLOKU (30.8.2026): implementačná dávka je ✅ HOTOVÁ — v0.8.22.** Modul `core/ghost_tool.rb` (GhostTool + Calc + PlacementSession + Tool), šev v `handle_insert`,
+cancel pri zavretí Inspectora aj pri prepnutí dokumentu; **35 headless testov** novej sady + in-SU sekcie `run_ghost` (17 scenárov) a `run_ghost_async`,
+plný beh **1184 PASS / 0 FAIL** (headless celkovo 2173, 74 JS sád).
+Plný záznam — čo pridal implementačný audit (4 BLOCKER + 5 FIX), vedomý posun F8 hlášky na klik a ako je nástroj simulovaný v testoch: [archiv/KRONIKA.md](KRONIKA.md),
+záznam **GHOST VKLADANIE**. **Blok ostáva OTVORENÝ do Michalovho smoke** (body nižšie); uzáver = samostatný malý PR s **minor bumpom 0.9.0** a presunom bloku do archívu.
+
+**Dávka GHOST-FB (v0.8.23, 31.8.) — ✅ HOTOVÁ, blok ostáva otvorený.** Odpoveď na Michalov živý test: koreňom problémov bol výškový zámok bez prichytávania.
+Pribudlo: **hybrid v zámku** (inference dá X/Y, zámok Z) + **natívne zvýraznenie snapov** (`ip.draw` + tooltip v oboch režimoch) · **kotva vždy pod kurzorom**
+(aj po Alt) · **pamäť kotvy/rotácie/režimu/výšok** do vypnutia SketchUpu (bez zápisu na disk aj do modelu) · **Ghost pásik** v Inspectore s editovateľnou
+zamknutou výškou (default dolná 0, horná 1400 = 850 + 550). Smoke body 7–11 nižšie.
+**Následný fix (v0.8.25, 31.8.):** pásik sa presunul **z vnútra sektora Materiály** na samostatné miesto **pod sektor Náhľad** — pri vklade dvojklikom na šablónu
+ho zbalený sektor schoval, takže o bežiacej session hovoril len status. Viditeľnosť riadi už len vlastný `hidden`; guard test to stráži.
+Tou istou dávkou dostala **predná stena ghostu jasnú zelenú** (#00C85A) — pôvodný tmavý teal splýval s obrysom ghostu aj s čiernymi hranami modelu. Zvyšok ghost smoke = PASS.
+
+**Cieľ:** vloženie skrinky tam, kde sa používateľ pozerá — po „Vložiť" visí ghost skrinky na kurzore,
+klik ju položí ako jednu reálnu CAB v jednom Undo kroku. Koniec hľadania skriniek položených cez `next_x`
+mimo pohľadu. Podklady: koncepty [09](../zdroje/next_sessions/09_GHOST_VKLADANIE.md) + [09A](../zdroje/next_sessions/09A_GHOST_EXTERNY_SKETCHUP_AUDIT.md)
+— package z nich preberá schválený kontrakt s JEDNOU vedomou zmenou: ↓ pre horný korpus drží
+`UPPER_HANG_Z`, nie podlahu (09 mal floor lock pre oba typy; zámok typu zachováva dnešné správanie buildera).
+Otvorené voľby uzatvára nižšie.
+
+**Predpoklady ([AUDIT_REGISTER.md](../AUDIT_REGISTER.md)):** TVRDÝ blocker **R-03** (šev `prepare_insert` +
+`build(..., transform:)`) je **✅ HOTOVÝ (v0.8.20, 30.8.)** — package tým môže štartovať. Tool dostáva `prepare_insert`
+(zmrazený plán viazaný na dokument, žiadny zásah do modelu pred klikom) a `commit_insert(..., transform:)`, ktorý prijme
+len RIGIDNÚ transformáciu; `bounds_mm`/kotvy si GHOST dávka uzavrie sama proti `BuildPlan`u. **R-01** (✅ v0.8.17)
+a **R-02** (✅ v0.8.19 — guard identity dokumentu má aj INSERT cesta, `foreign_document?` + `nxDocPayload`)
+sú macOS-vetvové a **sú hotové**; **R-04** (✅ v0.8.17) bola hygiena bez platformového kvalifikátora a išla spolu
+s R-01. Odchýlka od poradia registra je zapísaná aj v ňom.
+
+**Scope IN:** SketchUp `Tool` — ghost = čistá viewport grafika cez `draw(view)` s **čitateľnou prednou stranou
+a VIDITEĽNÝM aktívnym anchorom** (bez toho sa prepínanie kotiev nedá kontrolovať), `InputPoint` inference,
+`getExtents` pre kreslenie mimo bounds · PlacementSession viazaná na `model_guid` (prepnutie dokumentu = cancel,
+NIKDY cross-document insert) · rotácia ←/→ o 90° okolo aktívneho anchoru · 4 anchory na PREDNEJ rovine KORPUSU
+(nie čiel; presné súradnice per konštrukčný variant určí implementačný audit proti BuildPlanu) · **Z režimy:
+↓ = VÝŠKOVÝ ZÁMOK TYPU** (LOKÁLNY PLACEMENT ORIGIN korpusu — presne to, čo dnes kladie translácia buildera:
+dolný na world Z=0, horný na `UPPER_HANG_Z` —
+zámok drží Z bez ohľadu na inference; world rám, nie drawing axes; X/Y sa v zámku berie z ray×ROVINA ZÁMKU —
+pri dolnej Z=0, pri hornej Z=`UPPER_HANG_Z`, aby ghost sedel pod kurzorom; funguje aj v prázdnom modeli)
+**a ↑ = free Z** (plný inference point) — **oba typy ŠTARTUJÚ v zámku svojej domácej výšky** (zachováva dnešné
+správanie: horná pristane na 1400, kým používateľ vedome nestlačí ↑) · commit VŽDY top-level v koreňovom ráme
+(`ensure_root_context` vzor buildera — aj keď je používateľ v nested edit kontexte; in-SU scenár povinný) ·
+commit = `prepare_insert` snapshot → `build(transform:)` + hardware freeze v TEJ ISTEJ operácii → select novej
+CAB → push → template usage stamp až PO úspechu · **preflighty sa NEduplikujú do Tool triedy** (Tool rieši
+polohu, nie výrobné pravidlá — 09 §3) · Escape/onCancel/Undo počas ghostu = 0 mutácií modelu, 0 Undo krokov ·
+Orbit/Pan suspend/resume drží session · `Sketchup.focus` po štarte z HtmlDialogu (klávesy fungujú bez extra
+kliku) · status bar nápoveda · po vložení tool KONČÍ cez štandardný tool stack (návrat do bežného SketchUp
+workflow) a Inspector pokračuje editáciou novej CAB; po commite sa notifikuje aj StudioModelWatch (stale
+signalizácia) — nielen ScaleWatch/dedup.
+
+**Správanie Inspectora POČAS aktívnej session (uzavreté):** snapshot je zmrazený v `prepare_insert` — zmeny
+vo vkladacej karte sa do bežiacej session NEPREMIETAJÚ (status to prizná) · druhý klik na „Vložiť" zruší starú
+session a založí novú s čerstvým snapshotom · zavretie Inspectora session ZRUŠÍ (cancel, 0 mutácií).
+
+**Scope OUT (vedome NErobí):** „vložiť vedľa vybranej" · snap k NOXUN korpusom · attachment/segmenty ·
+auto-orientácia podľa steny · repeat-placement · ďalšie anchor body · 2D HUD/overlay framework ·
+zmena `insert_copy` a board placementu · náhrada `Placement.next_x` (ostáva fallback pre programatické cesty).
+
+**UZAVRETÉ VOĽBY package (Michal potvrdí pri „štartuj", inak platia tieto):** (1) cyklovanie anchorov =
+**Alt/Option** (odporúčanie 09A — konvencia SketchUp Move gripov; TAB má verziové/fokusové pasce). POZOR:
+Alt je na Windows systémová klávesa — **implementačný audit MUSÍ Alt overiť** (spolu s onCancel reasons a
+arrow ownership) a in-SU sada ho testuje; zapísaný fallback = TAB, ak Alt neprejde. (2) Z režimy a štart podľa
+Scope IN (výškový zámok typu; horná NIKDY neštartuje vo free Z). (3) Klávesy ← → ↑ ↓ Tool vedome preberá od
+inference locku POČAS aktívneho ghostu; spotrebúvajú sa LEN klávesy, ktoré ghost vlastní.
+
+**Dotknuté dáta/kontrakt → AUDIT: ÁNO (codex-audit pred implementáciou povinný).** Nový modul (Tool) + zásah
+do insert lifecycle; dátový kontrakt entít sa NEMENÍ (CAB vzniká štandardným builderom), ale Tool lifecycle
+je observer-citlivá oblasť. Implementačný audit navyše MUSÍ uzavrieť: presné anchor súradnice pre
+under_sides/between_sides/upper a atypy · `onCancel` reasons pre podporované SU verzie · arrow-key ownership ·
+funkčnosť Alt na Windows.
+
+**Testy a DoD:** headless — čistá transform matematika (4 rotácie × 4 anchory; anchor ostáva na inference bode
+po rotácii; zámok/free prechody nemenia X/Y; Escape v každom stave = nulový zápis). **In-SU POVINNÉ** (sekcia
+`run_ghost`): pred klikom 0 NOXUN entít · klik = presne 1 CAB na očakávanom transforme · 1× Ctrl+Z vráti celé ·
+nová CAB označená v Inspectore · lower (Z=0) aj upper (`UPPER_HANG_Z` pri zámku) · free Z na bode s nenulovým
+Z · šablóna s materiálmi/kovaním + zámky karty · usage stamp len po úspechu · zámok pri otočených axes · ghost
+ďaleko mimo bounds (getExtents) · prázdny model bez podlahovej face · Undo počas ghostu · prepnutie dokumentu =
+bezpečný cancel · **nested edit context → commit top-level so správnym transformom** · Alt cyklovanie · druhé
+„Vložiť" počas session · regresie: programatický `build` cez fallback, ScaleWatch/dedup nevyrobí druhú CAB ani
+extra Undo. Mutačné overenie štandard. DoD = všetky scenáre zelené + smoke checklist Michala prejde.
+
+**Odhad náročnosti: L** (po R-03; Tool + session + in-SU sada). Poradie cyklu anchorov určí implementácia
+(kandidát z 09: ľavý spodný → pravý spodný → pravý horný → ľavý horný).
+**Riziká:** Tool lifecycle (focus z CEF, onCancel/Undo, suspend/resume) — najväčšie, kryté in-SU scenármi ·
+Alt na Windows (overí audit, fallback TAB) · geometria anchorov pri atypických konštrukciách (uzavrie audit) ·
+SU verzie (pixely/klávesy — držať ghost čisto 3D). Rez dávky: Tool + session v JEDNEJ dávke, R-03 šev PREDTÝM
+samostatne — nikdy nie jeden obrí PR.
+
+**Smoke checklist pre Michala (po nasadení):** 1) „Vložiť" → ghost visí na kurzore, vidno prednú stranu aj
+aktívnu kotvu, šípky fungujú HNEĎ (bez kliku do modelu). 2) ←/→ točí okolo kotvy, ↓ drží skrinku na domácej výške
+(dolná na zemi, horná na 1400), ↑ ju pustí do voľnej výšky. **2b) Alt prepína kotvy (a vidno, ktorá je aktívna) — a menu lišta SketchUpu sa pritom NEAKTIVUJE.**
+*(Systémové doručenie Alt sa programovo overiť nedá — testy overujú len handler, tento bod je jediný dôkaz; ak Alt neprejde, zapísaný fallback je TAB.)*
+3) Klik položí skrinku presne tam, kde bol ghost; jeden Ctrl+Z ju celú vráti. 4) Esc nič nevloží a nič
+nepribudne v Undo. 5) Počas ghostu si zorbituj pohľad — ghost prežije. 6) Skús horný korpus, šablónu s kovaním
+a vloženie, keď si v editácii skupiny (skrinka musí skončiť top-level).
+
+**Doplnok smoke checklistu po dávke GHOST-FB (v0.8.23, feedback z tvojho testu 30./31.8.):**
+7) **Snap vo výškovom zámku** — nabehni myšou na roh susednej skrinky (aj keď je 720 mm nad zemou): musí sa objaviť
+farebný bod a tooltip ako pri Move a ghost sa zarovná v X/Y s tým rohom, pričom **výšku drží zámok**.
+8) **Kotva skočí pod kurzor** — Alt prepne kotvu a skrinka sa presunie tak, aby nová kotva bola presne pod myšou
+(žiadne „skrinka ostala vedľa"). 9) **Pásik pod Náhľadom** — počas ghostu vidno hore v paneli (hneď pod sektorom Náhľad,
+teda aj pri vklade **dvojklikom na šablónu**, keď sú sektory zbalené) riadok s kotvou, otočením, režimom
+a poľom výšky; **po vložení aj po Esc zmizne**. 10) **Pole výšky** — napíš 20 mm a klikni: skrinka sadne na 20;
+nezmysel („dvadsať", 9999) hodnotu nezmení a panel to povie. 11) **Pamäť** — po vložení stlač „Vložiť" znova:
+kotva, otočenie, režim aj zamknutá výška ostanú tam, kde si ich nechal (do zatvorenia SketchUpu).
+
+**Checklist uzáveru (blok GHOST sa uzatvára CELÝ):** **bump MINOR** (uzáver bloku podľa CLAUDE.md) + `?v=` →
+testy (headless + JS ak UI + **plný in-SU beh**) → docs (`construction.md` odsek Tool/PlacementSession +
+`ui-lifecycle.md` insert cesta + ARCHITEKTURA router riadok) → STAV/KRONIKA → **blok presunúť plným textom do
+[archiv/ROADMAP_hotove_etapy.md](ROADMAP_hotove_etapy.md)** (v PLANe neostáva) → V1_VIZIA **bod 1 ostáva `[ ]`**
+(rozsah bodu nie je prázdny — zostavy); hotovosť GHOST-u zaznamená KRONIKA a presun bloku do archívu.
