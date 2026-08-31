@@ -156,6 +156,9 @@ nedokáže overiť, či Windows Alt do Toolu naozaj **doručí** a či sa pritom
 **Michalovmu smoke checklistu** (`SYSTEM/PLAN.md`, sekcia GHOST, bod 2); zapísaný fallback pri zlyhaní je **TAB** (Scope OUT dávky, cyklovanie kotiev je preto jedna volateľná
 metóda `PlacementSession#cycle_anchor!`). **Každý Tool callback je obalený** (`guarded`) — výnimka v callbacku sa inak ticho prehltne a nástroj „záhadne" prestane kresliť.
 **V `draw` sa NIKDY nevolá `Construction.build_plan`** — obálka je 8 bodov spočítaných RAZ zo zmrazeného configu.
+**Farby ghostu:** obrys neutrálna tmavá (`OUTLINE_RGB`), kotva rodina výberu (`ANCHOR_RGB`), nepoložiteľný stav stlmený (`DIM_RGB`) a **predná stena JASNÁ ZELENÁ**
+(`FRONT_RGB = #00C85A`, v0.8.25). Pôvodný tmavý teal `--nx-select` v modeli **splýval** s obrysom ghostu aj s čiernymi hranami geometrie (Michalov živý test 31.8.) —
+orientácia ghostu sa nedala prečítať. Zelená je jediná „kričiaca" farba ghostu a v modeli nekoliduje s ničím; ghost nemá výplň, kreslí sa len `GL_LINE_LOOP`.
 
 **Commit ide výhradne cez šev R-03** `CabinetBuilder.commit_insert(model, plan, transform:)` so sprievodným blokom (H2/D-76 zmrazenie setov kovania) — žiadny vlastný zápis do
 modelu, žiadny nový selection mechanizmus. Po úspechu `Panel.ghost_after_commit` (výber, status, `push_selected`, pečiatka šablóny cez `stamp_once!`) beží **mimo operácie**

@@ -1012,8 +1012,12 @@ nie výrobné pravidlá).
 Panel má voči `GhostTool` presne tri švy **vkladu** (`actions_cabinet.rb`; štvrtý — Ghost pásik — je informačný a je popísaný nižšie): **`ghost_freeze_hardware`** (sprievodný blok H2 vnútri operácie vloženia — výnimka ruší celú operáciu),
 **`ghost_insert_failed`** (commit padol na guardoch stavby — v modeli sa nič nezmenilo, hláška je tá istá vrátane výpisu aktívnych zámkov) a **`ghost_after_commit`**
 (výber novej CAB, status s varovaniami, `push_selected`, pečiatka šablóny cez `stamp_once!`) — všetko **existujúcimi cestami**, žiadny nový selection mechanizmus.
-**Ghost pásik (GHOST-FB4)** je štvrtý šev a **jediná** vec, ktorú Inspector počas ghostu ukazuje navyše: jeden riadok pod „Vložiť korpus" so **stavom bežiacej session** —
+**Ghost pásik (GHOST-FB4)** je štvrtý šev a **jediná** vec, ktorú Inspector počas ghostu ukazuje navyše: jeden riadok so **stavom bežiacej session** —
 piktogram štyroch kotiev s aktívnou, otočenie v stupňoch, režim výšky, **editovateľné pole zamknutej výšky v mm** a „i" ikona (sprite `#i-info`) s tooltipom ovládania.
+**Pozícia je zámerne mimo sektorov** (fix v0.8.25 z Michalovho živého testu): pásik stojí **samostatne medzi sektorom Náhľad a Základné**, teda mimo každého `<details>`
+aj mimo každého kontextovo skrývaného rodiča. Pôvodne bol vnútri sektora Materiály (pod „Vložiť korpus") a pri vložení **dvojklikom na šablónu** ho zbalený sektor
+schoval — používateľ o bežiacej session vedel len zo statusu. Odteraz je jediným vlastníkom jeho viditeľnosti **vlastný atribút `hidden`**; guard test
+(`tests/pure/test_ghost_vkladanie.rb`) stráži, že sa do žiadneho `<details>` nevráti.
 Kreslí ho `ui/js/ghost_bar.js` z pushu `Panel.push_ghost` → `NX.setGhost`; **panel si z neho nič neodvodzuje** — každý push stav celý prepíše. Pásik **nie je trvalou
 súčasťou panela** (vertikálny priestor je vzácny): štartuje `hidden` a `active = false` ho schová, čo chodí pri **každom** konci session (vloženie, Esc, prepnutie dokumentu,
 zavretie Inspectora). Pole výšky ide späť `cb 'ghost_lock_z'` → `handle_ghost_lock_z`: **guard identity dokumentu je prvý** (R-02, `nxDocPayload` + `foreign_document?` —

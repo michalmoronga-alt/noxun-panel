@@ -171,6 +171,9 @@ záznam **GHOST VKLADANIE**. **Blok ostáva OTVORENÝ do Michalovho smoke** (bod
 Pribudlo: **hybrid v zámku** (inference dá X/Y, zámok Z) + **natívne zvýraznenie snapov** (`ip.draw` + tooltip v oboch režimoch) · **kotva vždy pod kurzorom**
 (aj po Alt) · **pamäť kotvy/rotácie/režimu/výšok** do vypnutia SketchUpu (bez zápisu na disk aj do modelu) · **Ghost pásik** v Inspectore s editovateľnou
 zamknutou výškou (default dolná 0, horná 1400 = 850 + 550). Smoke body 7–11 nižšie.
+**Následný fix (v0.8.25, 31.8.):** pásik sa presunul **z vnútra sektora Materiály** na samostatné miesto **pod sektor Náhľad** — pri vklade dvojklikom na šablónu
+ho zbalený sektor schoval, takže o bežiacej session hovoril len status. Viditeľnosť riadi už len vlastný `hidden`; guard test to stráži.
+Tou istou dávkou dostala **predná stena ghostu jasnú zelenú** (#00C85A) — pôvodný tmavý teal splýval s obrysom ghostu aj s čiernymi hranami modelu. Zvyšok ghost smoke = PASS.
 
 **Cieľ:** vloženie skrinky tam, kde sa používateľ pozerá — po „Vložiť" visí ghost skrinky na kurzore,
 klik ju položí ako jednu reálnu CAB v jednom Undo kroku. Koniec hľadania skriniek položených cez `next_x`
@@ -257,7 +260,8 @@ a vloženie, keď si v editácii skupiny (skrinka musí skončiť top-level).
 7) **Snap vo výškovom zámku** — nabehni myšou na roh susednej skrinky (aj keď je 720 mm nad zemou): musí sa objaviť
 farebný bod a tooltip ako pri Move a ghost sa zarovná v X/Y s tým rohom, pričom **výšku drží zámok**.
 8) **Kotva skočí pod kurzor** — Alt prepne kotvu a skrinka sa presunie tak, aby nová kotva bola presne pod myšou
-(žiadne „skrinka ostala vedľa"). 9) **Pásik nad tlačidlom** — počas ghostu vidno riadok s kotvou, otočením, režimom
+(žiadne „skrinka ostala vedľa"). 9) **Pásik pod Náhľadom** — počas ghostu vidno hore v paneli (hneď pod sektorom Náhľad,
+teda aj pri vklade **dvojklikom na šablónu**, keď sú sektory zbalené) riadok s kotvou, otočením, režimom
 a poľom výšky; **po vložení aj po Esc zmizne**. 10) **Pole výšky** — napíš 20 mm a klikni: skrinka sadne na 20;
 nezmysel („dvadsať", 9999) hodnotu nezmení a panel to povie. 11) **Pamäť** — po vložení stlač „Vložiť" znova:
 kotva, otočenie, režim aj zamknutá výška ostanú tam, kde si ich nechal (do zatvorenia SketchUpu).

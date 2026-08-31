@@ -1087,10 +1087,15 @@
      JEDEN riadok, ziadny nadpis a ziadna vlastna karta — vertikalny priestor
      panela je vzacny a pasik zije len par sekund. Farby su rodina VYBERU
      (teal): je to STAV nastroja, nie akcia. `hidden` na elemente ho schova
-     (ziadna trieda navyse) — presne to posiela Ruby pri konci session. */
-  .nx-inspector .ghostbar { display: flex; align-items: center; gap: 8px; margin: 8px 0 0;
+     (ziadna trieda navyse) — presne to posiela Ruby pri konci session.
+     Od v0.8.25 stoji pasik SAMOSTATNE medzi sektormi Nahlad a Zakladne (nie
+     vnutri sektora), preto ma margin ako sektor (`0 0 8px`) a sytejsie
+     pozadie `--nx-select-bg` + tenky teal prah vlavo: na holom pozadi panela
+     musi byt na prvy pohlad jasne, ze bezi ghost session. */
+  .nx-inspector .ghostbar { display: flex; align-items: center; gap: 8px; margin: 0 0 8px;
                             padding: 5px 8px; border: 1px solid var(--nx-select);
-                            border-radius: 6px; background: var(--nx-select-bg-soft);
+                            border-radius: 6px; background: var(--nx-select-bg);
+                            box-shadow: inset 3px 0 0 var(--nx-select);
                             font-size: 11px; color: var(--nx-ink-strong); }
   .nx-inspector .ghostbar[hidden] { display: none; }
   /* Piktogram styroch kotiev prednej steny — aktivna svieti. */
