@@ -17,6 +17,29 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1d/R-23.1 · ESCAPE REŤAZ RUČNÝCH MODÁLOV (v0.9.1, 1.9.2026, PR #273):** Kontrakt UI 2.0 hovorí „Escape zatvára modál", ale platil len pre modály na zdieľanej
+  kostre D-15. **Šesť ručných Escape nemalo vôbec** — `absModal` (chýbajúca ABS páska) v Inspectorovi a `mdRestoreModal`, `mdDeleteModal`, `mdUniModal`, `demosModal`,
+  `hwDelModal` v Štúdiu; jedinou cestou von bola myš. **Čo platí teraz:** Escape zatvára všetkých šesť a robí presne to, čo tlačidlo „Zrušiť" (`mddCancel` ruší bežiaci
+  Demos fetch na serveri, `absModalChoose('cancel')` vracia pôvodnú hodnotu selectu) — preto dostal `hwDelModal` pomenované `hwDelClose()` namiesto vetvy schovanej
+  v delegácii klikov. **Riešenie je JEDEN dokumentový handler s prioritným zoznamom vrstiev** (`ui/js/nx_esc.js`, zdieľaný oboma oknami, načítaný pred `nx_modal.js`
+  a `studio.js`), nie šesť nových listenerov: všetky Escape listenery visia na `document`, `stopPropagation` medzi nimi nefunguje, takže šesť nezávislých by znamenalo,
+  že jedno stlačenie zavrie dve vrstvy a o poradí rozhoduje poradie `<script>` tagov. Vlastnú vrstvu reťaz **spotrebuje** (`stopImmediatePropagation`), cudziu **pustí
+  ďalej**. **`budPrModal` (fázové okno prepočtu cien) sa Escapom nesmie dotknúť ani vtedy, keď je pod ním niečo naše** — vo fáze `run` by beh na serveri ostal visieť
+  bez okna (audit #9). **Vedomé odchýlky:** fokus sa po Escape nevracia na spúšťač (tie modály si spúšťač nikde neukladajú — rovnako ako dnes pri kliku na „Zrušiť");
+  `nxdaModal` ostáva cudzí a má Escape naďalej len pri fokuse v poli hľadania; časti (2) a (3) položky R-23 z [../AUDIT_REGISTER.md](../AUDIT_REGISTER.md) ostávajú otvorené.
+  **Review kolo 1 (Codex) vrátilo tri nálezy a všetky boli o niečom inom než o samotnej reťazi.** **P1 — porušený checklist uzáveru:** dávka označila R-23.1 za hotovú
+  v AUDIT_REGISTERi, ale `STAV.md` ďalej hlásil v0.9.0 a „najbližšie R-23.1", `PLAN.md` ju nemal medzi hotovými dávkami 1d a KRONIKA nemala záznam — zdroje pravdy teda
+  posielali ďalšieho agenta robiť hotovú prácu znova; opravené v tejto vetve (tento záznam je jej súčasťou). **P2 — poradie blokujúcich vrstiev:** cudzie vrstvy sa
+  vyhodnocovali bez ohľadu na to, čo je reálne nad čím. Flyouty žijú v stacking kontexte railu (z-index 55), `.nxmodal` je 60 — takže klávesnicová cesta „rohové menu ABS
+  → combobox → dekor bez použiteľnej pásky" nechala prvé Escape zavrieť **schovaný** flyout cez `boot.js` a modál si vypýtal druhé stlačenie. Cudzie vrstvy sú preto
+  odteraz v dvoch triedach: **skutočné modály blokujú vždy**, **flyouty a menu len vtedy, keď nie je otvorený žiadny náš modál**. Combobox D-85 je vedome medzi flyoutmi
+  (v žiadnom z tých šiestich modálov `select[data-nx-combo]` nie je — stráži to zdrojový guard — a `NXCombo.pick()` ponuku zatvára ešte pred `change`, ktorý `absModal`
+  otvára). **P2 — Escape počas čakania na server:** `mdUniClose()` zavrel modál a zmazal stav, ale callback `MD.replaceUniOffer` ho bez kontroly zobrazil znova a zahodený
+  rozpis dopadu sa vrátil. Otázka `replace_uni_preview`/`replace_uni_apply` si odteraz nesie **generáciu relácie** a server ju vracia v každej odpovedi (vzor revízie
+  náhľadov šablón); klient zobrazí len tú odpoveď, na ktorú stále čaká. Samotný lokálny príznak „čakám" by nestačil — dve otázky za sebou sa bez echa nedajú rozlíšiť
+  a stará ponuka by sa dala potvrdiť v novej relácii, teda nahradiť UNI v celom projekte niečím iným, než čo je na obrazovke. **Mutácie 3/3 (reťaz) a 5/5 (generácia)**
+  — každá nová kontrola bola overená tým, že po zásahu do kódu padne. **Testy: 2217 headless · 76 JS sád** (`test_r23_escape.js` 105 kontrol nad mini-DOM s bublaním,
+  `test_replace_uni.js` 50); in-SU beh sa nekonal — dávka nemení geometriu, observerov ani undo.
 - **UZÁVER BLOKU GHOST VKLADANIE (v0.9.0, 31.8.2026):** Michal večer prešiel **celý smoke checklist** package a nahlásil **PASS** — základné body 1–6
   (ghost visí na kurzore a šípky fungujú hneď bez kliku do modelu · ←/→ točia okolo aktívnej kotvy · ↓ drží domácu výšku typu, ↑ pustí do voľnej ·
   **Alt prepína kotvy a menu lišta SketchUpu sa pritom neaktivuje** · klik položí skrinku presne tam, kde ghost stál, a jeden Ctrl+Z ju celú vráti ·
