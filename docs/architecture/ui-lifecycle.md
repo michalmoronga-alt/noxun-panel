@@ -304,10 +304,14 @@ Modály **mimo** kostry D-15 Escape dlho nemali vôbec — kontrakt „Escape za
 (`nx_esc.js` sa načítava v `panel.html` aj `studio.html`, vždy **pred** `nx_modal.js` a `studio.js` — stráži to `tests/js/test_r23_escape.js`). Šesť samostatných listenerov by bola
 tá istá pasca ako pri `ecMenu`: všetky visia na `document`, takže by jedno stlačenie zavrelo dve vrstvy a poradie by záviselo na poradí `<script>` tagov.
 
-**Pravidlo je „jedno stlačenie = najvyššia otvorená vrstva".** Zoznam `FOREIGN` menuje vrstvy, ktorých Escape už obsluhuje niekto iný (kostra D-15 · `nxdaModal`/`tplModal`/
-`simModal`/`cfgModal` s vlastným handlerom · warnpanel, rohové menu ABS a tagov, combobox D-85 · `ecMenu`/`vepoMenu` Štúdia) — kým je hociktorá otvorená, reťaz **nerobí nič**
-a udalosť **púšťa ďalej** jej vlastníkovi; spodný modál sa zavrie až druhým stlačením. V tom istom zozname je **`budPrModal`**: Escape sa ho nesmie dotknúť ani vtedy, keď je pod
-ním niečo naše (audit #9). Vlastnú vrstvu naopak reťaz **spotrebuje** (`stopImmediatePropagation`, vzor vyššie), inak by ju za ňou dostal ešte handler Štúdia.
+**Pravidlo je „jedno stlačenie = najvyššia otvorená vrstva"** a cudzie vrstvy sú preto **v dvoch triedach** (review #273 kolo 1): **(a) skutočné modály** — kostra D-15 ·
+`nxdaModal`/`tplModal`/`simModal`/`cfgModal` s vlastným handlerom · **`budPrModal`**, ktorého sa Escape nesmie dotknúť ani vtedy, keď je pod ním niečo naše (audit #9) — sú
+celoplošné prekrytia, takže nad nami sú **vždy** a reťaz pri nich **nerobí nič**; **(b) flyouty a menu** — warnpanel, rohové menu ABS a tagov, `ecMenu`/`vepoMenu` Štúdia,
+combobox D-85 — žijú v stacking kontexte railu/lišty (z-index 55 a nižšie), kým `.nxmodal` je 60, takže **pod otvoreným modálom sú schované** a blokujú **len vtedy, keď žiadny
+náš modál otvorený nie je**. Bez toho rozdielu by cesta „rohové menu ABS → combobox → dekor bez použiteľnej pásky" nechala prvé Escape zavrieť **neviditeľnú** vrstvu a modál by
+si vyžiadal druhé stlačenie. Combobox je v (b) preto, že v žiadnom z tých šiestich modálov `select[data-nx-combo]` nie je (stráži to test) a `NXCombo.pick()` ponuku zatvára
+ešte pred `change`, ktorý `absModal` otvára — keby raz pribudol, patrí do (a) (`.cbpop` má z-index 120). Vlastnú vrstvu naopak reťaz **spotrebuje** (`stopImmediatePropagation`,
+vzor vyššie), inak by ju za ňou dostal ešte handler Štúdia; flyout pod modálom teda ostáva otvorený a zavrie ho až ďalšie stlačenie u jeho vlastníka.
 
 **Escape = klik na „Zrušiť", nie `display:none`:** volá sa tá istá funkcia ako z tlačidla — `mddCancel` ruší bežiaci Demos fetch na serveri, `absModalChoose('cancel')` vracia
 pôvodnú hodnotu selectu, `mdUniClose` zahadzuje pending odtlačok. Preto dostal `hwDelModal` pomenované `hwDelClose()` (dovtedy vetva schovaná v delegácii klikov). Otvorenosť sa

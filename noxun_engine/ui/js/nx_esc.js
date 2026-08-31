@@ -22,9 +22,11 @@
   //     modaly s vlastnym handlerom) ALEBO ktorych sa Escape dotknut NESMIE:
   //     fazove okno prepoctu cien `budPrModal` riadi SERVER a vo faze `run` by
   //     zatvorenie nechalo beh visiet bez okna (kontrakt nx_modal.js, audit #9).
-  //     Kym je hocktora z nich otvorena, tento handler NEROBI NIC a udalost
-  //     pusti dalej — obsluzi ju jej vlastnik. Zavriet dve vrstvy naraz je horsie
-  //     nez zavriet spodnu az druhym stlacenim.
+  //     Kym je taka vrstva NAD nami, tento handler NEROBI NIC a udalost pusti
+  //     dalej — obsluzi ju jej vlastnik. Zavriet dve vrstvy naraz je horsie nez
+  //     zavriet spodnu az druhym stlacenim. Co znamena „nad nami", riesi
+  //     komentar pri `blockedBy()` nizsie — nie kazda cudzia vrstva nad nami
+  //     naozaj je.
   //   * `OWN` = sest modalov vyssie. Zatvori sa PRVY otvoreny v poradi zoznamu
   //     a udalost sa SPOTREBUJE (`stopImmediatePropagation` — vzor nx_modal.js;
   //     `stopPropagation` by nestacilo), inak by ju za nami dostal este handler
@@ -79,36 +81,58 @@
       { id: 'hwDelModal', fn: 'hwDelClose' }
     ];
 
-    // Vrstvy, ktore Escape uz obsluhuje niekto iny (alebo sa ich dotknut nesmie).
-    var FOREIGN_IDS = [
+    // ----- CUDZIE VRSTVY: DVE TRIEDY, LEBO NIE KAZDA JE NAD NAMI --------------
+    // (a) SKUTOCNE MODALY — celoplosne prekrytie so scrimom. Ked je taky
+    //     otvoreny, je nad vsetkym (`.nxmodal` ma z-index 60, kostra D-15 este
+    //     vyssie) a nas modal sa pod nim otvorit ani nema. Blokuju VZDY.
+    var FOREIGN_MODAL_IDS = [
       'budPrModal', // fazove okno prepoctu cien — SERVER, vo faze `run` sa zavriet NESMIE
       'nxdaModal',  // „Pridat z Demosu" — vlastny Escape na poli hladania
       'tplModal',   // ulozit ako sablonu — vlastny Escape na uzle modalu
       'simModal',   // podobne dielce — vlastny Escape na uzle modalu
       'cfgModal'    // nastavenia Inspectora — vlastny Escape + navrat fokusu
     ];
-    // Prekryvne ovladace s vlastnym Escapom: funkcia „je otvoreny?" (Inspector)
-    // alebo top-level priznak skriptu okna (Studio).
-    var FOREIGN_FNS = ['warnPanelOpen', 'nxEdgeMenuOpen', 'nxTagMenuOpen'];
-    var FOREIGN_FLAGS = ['ecMenuOpen', 'vepoMenuOpen'];
+    // (b) FLYOUTY A MENU — male prekryvne okienka prilepene k svojmu tlacidlu,
+    //     ktore ziju v stacking kontexte raila/listy (z-index 55 a nizsie).
+    //     Tie pod modalom OSTAVAJU otvorene a su pod nim SCHOVANE: klavesnicova
+    //     cesta „rohove menu ABS otvorene → combobox materialu → dekor bez
+    //     pouzitelnej pasky" otvori `absModal` (z-index 60) NAD stale otvorenym
+    //     menu (review #273 kolo 1, P2). Keby blokovali aj vtedy, prve stlacenie
+    //     Escape by zavrelo NEVIDITELNU vrstvu a pouzivatel by musel stlacit
+    //     dvakrat. Preto blokuju LEN vtedy, ked ziadny nas modal otvoreny nie je.
+    //     Zatvarat ich pri otvarani modalu by znamenalo hacik v kazdom otvarani
+    //     (a tichu stratu rozrobeneho nastavenia) — necha sa im vlastny Escape,
+    //     len az po tom nasom.
+    //     Funkcia „je otvoreny?" (Inspector) alebo top-level priznak okna (Studio).
+    var FLYOUT_FNS = ['warnPanelOpen', 'nxEdgeMenuOpen', 'nxTagMenuOpen'];
+    var FLYOUT_FLAGS = ['ecMenuOpen', 'vepoMenuOpen'];
+    //
+    // Combobox D-85 (`NXCombo`) je zamerne v triede (b): v ziadnom z tych
+    // siestich modalov `select[data-nx-combo]` NIE JE (su to potvrdzovacie okna;
+    // `mdUniModal` ma dva OBYCAJNE selecty) a `NXCombo.pick()` ponuku zatvara
+    // EST PRED udalostou `change`, ktora `absModal` otvara — otvoreny combobox
+    // NAD nasim modalom teda vzniknut nema ako. Keby do niektoreho z nich
+    // combobox raz pribudol, patri do triedy (a): jeho `.cbpop` ma z-index 120,
+    // teda NAD modalom.
 
     // Meno vrstvy, ktora Escape drzi nad nami (alebo null).
     function blockedBy(){
       var i;
-      for (i = 0; i < FOREIGN_IDS.length; i++){
-        if (visible(FOREIGN_IDS[i])) return FOREIGN_IDS[i];
+      for (i = 0; i < FOREIGN_MODAL_IDS.length; i++){
+        if (visible(FOREIGN_MODAL_IDS[i])) return FOREIGN_MODAL_IDS[i];
       }
-      for (i = 0; i < FOREIGN_FNS.length; i++){
-        var f = global[FOREIGN_FNS[i]];
-        if (typeof f === 'function' && f() === true) return FOREIGN_FNS[i];
-      }
-      for (i = 0; i < FOREIGN_FLAGS.length; i++){
-        if (global[FOREIGN_FLAGS[i]] === true) return FOREIGN_FLAGS[i];
-      }
-      // Komponenty: kostra D-15 a combobox materialov. V Inspectorovi `NXModal`
-      // vobec nie je nacitany, preto obozretne.
+      // Kostra D-15. V Inspectorovi `NXModal` vobec nie je nacitany, preto obozretne.
       if (global.NXModal && typeof global.NXModal.isOpen === 'function' &&
           global.NXModal.isOpen() === true) return 'NXModal';
+      // Trieda (b): kym je otvoreny NAS modal, je nad flyoutmi — Escape patri jemu.
+      if (topOpen()) return null;
+      for (i = 0; i < FLYOUT_FNS.length; i++){
+        var f = global[FLYOUT_FNS[i]];
+        if (typeof f === 'function' && f() === true) return FLYOUT_FNS[i];
+      }
+      for (i = 0; i < FLYOUT_FLAGS.length; i++){
+        if (global[FLYOUT_FLAGS[i]] === true) return FLYOUT_FLAGS[i];
+      }
       if (global.NXCombo && typeof global.NXCombo.isOpen === 'function' &&
           global.NXCombo.isOpen() === true) return 'NXCombo';
       return null;
@@ -147,8 +171,8 @@
       global.document.addEventListener('keydown', onKey);
     }
 
-    var API = { OWN: OWN, FOREIGN_IDS: FOREIGN_IDS, FOREIGN_FNS: FOREIGN_FNS,
-                FOREIGN_FLAGS: FOREIGN_FLAGS,
+    var API = { OWN: OWN, FOREIGN_MODAL_IDS: FOREIGN_MODAL_IDS,
+                FLYOUT_FNS: FLYOUT_FNS, FLYOUT_FLAGS: FLYOUT_FLAGS,
                 blockedBy: blockedBy, topOpen: topOpen, closeTop: closeTop,
                 onKey: onKey };
     global.NXEsc = API;

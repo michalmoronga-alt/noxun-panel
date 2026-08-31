@@ -139,35 +139,60 @@ ok(!r.consumed, 'udalost sa nespotrebuje — musi doletiet ku kostre D-15');
 eq(r.after, 1, 'handler okna ju teda dostane');
 eq(NXEsc.blockedBy(), 'NXModal', 'blockedBy() menuje vrstvu, ktora Escape drzi');
 
-// Rozbalovacie nastavenie Studia (ecMenu) — to isté pravidlo.
+// --- FLYOUTY A MENU: blokuju len vtedy, ked pod nimi NIE JE nas modal -------
+// Review #273 kolo 1 (P2): rohove menu ABS, warnpanel, ecMenu/vepoMenu aj
+// combobox ziju v stacking kontexte raila/listy (z-index 55 a nizsie), kdezto
+// `.nxmodal` je 60 — takze pod otvorenym modalom su SCHOVANE. Keby blokovali aj
+// vtedy, prve stlacenie Escape by zavrelo neviditelnu vrstvu a pouzivatel by
+// musel stlacit dvakrat.
+
+// Bez modalu blokuju: Escape patri im a retaz ho pusta dalej ich vlastnikovi.
+['warnPanelOpen', 'nxEdgeMenuOpen', 'nxTagMenuOpen'].forEach(function(name){
+  reset();
+  W[name] = function(){ return true; };
+  const rr = esc();
+  ok(!rr.consumed && rr.after === 1, name + ': bez modalu Escape patri prekryvnemu ovladacu');
+  eq(NXEsc.blockedBy(), name, 'blockedBy() menuje ' + name);
+});
+reset();
+W.ecMenuOpen = true;
+r = esc();
+ok(!r.consumed && r.after === 1, 'ecMenu bez modalu: Escape pusti retaz dalej — nastavenie zavrie Studio');
+eq(NXEsc.blockedBy(), 'ecMenuOpen', 'blockedBy() menuje ecMenu');
+reset();
+W.NXCombo = { isOpen: function(){ return true; } };
+r = esc();
+ok(!r.consumed && r.after === 1, 'combobox bez modalu: Escape zatvara ponuku');
+eq(NXEsc.blockedBy(), 'NXCombo', 'blockedBy() menuje combobox');
+
+// PRESNA SCENA NALEZU: rohove menu ABS ostane otvorene pod `absModal`
+// (klavesnicova cesta menu → combobox → dekor bez pouzitelnej pasky).
+// PRVE stlacenie musi zavriet VIDITELNY modal, nie schovane menu.
+reset();
+W.nxEdgeMenuOpen = function(){ return true; };
+open('absModal');
+eq(NXEsc.blockedBy(), null, 'otvoreny modal je nad flyoutom — nic retaz nedrzi');
+r = esc();
+ok(!isOpen('absModal'), 'prve stlacenie zavrie VIDITELNY modal, nie schovane rohove menu');
+eq(CALLS, ['absModalChoose:cancel'], 'a to cestou „Zrusit" (revert selectu)');
+ok(r.consumed && r.after === 0, 'udalost sa spotrebuje — menu sa v tom istom stlaceni NEZATVARA');
+// Druhe stlacenie uz patri menu (modal je prec) — retaz ho pusta do boot.js.
+r = esc();
+eq(NXEsc.blockedBy(), 'nxEdgeMenuOpen', 'po zavreti modalu drzi Escape uz rohove menu');
+ok(!r.consumed && r.after === 1, 'druhe stlacenie doleti k jeho vlastnikovi');
+
+// To iste pre priznak Studia aj combobox — jeden modal, jedno stlacenie.
 reset();
 open('mdDeleteModal');
 W.ecMenuOpen = true;
 r = esc();
-ok(isOpen('mdDeleteModal'), 'otvorene rozbalovacie nastavenie: modal pod nim ostava');
-ok(!r.consumed && r.after === 1, 'Escape pusti retaz dalej — nastavenie zavrie Studio');
-eq(NXEsc.blockedBy(), 'ecMenuOpen', 'blockedBy() menuje ecMenu');
-// Druhe stlacenie (uz bez menu) modal zavrie — vrstvy sa lupu po jednej.
-W.ecMenuOpen = false;
-r = esc();
-ok(!isOpen('mdDeleteModal') && r.consumed, 'druhe stlacenie zavrie uz modal');
-
-// Prekryvne ovladace Inspectora (warnpanel, rohove menu ABS, tagy).
-['warnPanelOpen', 'nxEdgeMenuOpen', 'nxTagMenuOpen'].forEach(function(name){
-  reset();
-  open('absModal');
-  W[name] = function(){ return true; };
-  const rr = esc();
-  ok(isOpen('absModal') && !rr.consumed, name + ': Escape patri prekryvnemu ovladacu, nie modalu');
-  eq(NXEsc.blockedBy(), name, 'blockedBy() menuje ' + name);
-});
-
-// Otvoreny combobox materialov (D-85) — Escape zatvara ponuku, nie modal.
+ok(!isOpen('mdDeleteModal') && r.consumed && r.after === 0,
+   'ecMenu pod modalom: prve stlacenie zavrie modal');
 reset();
 open('mdUniModal');
 W.NXCombo = { isOpen: function(){ return true; } };
 r = esc();
-ok(isOpen('mdUniModal') && !r.consumed, 'otvorena ponuka comboboxu: modal ostava');
+ok(!isOpen('mdUniModal') && r.consumed, 'combobox pod modalom: prve stlacenie zavrie modal');
 
 // Rucne modaly, ktore uz vlastny Escape MAJU, retaz neprebera.
 ['nxdaModal', 'tplModal', 'simModal', 'cfgModal'].forEach(function(id){
@@ -196,7 +221,9 @@ closeBudPr(bud);
 eq(NXEsc.blockedBy(), null, 'po zaniku okna uz retaz nic nedrzi');
 ok(NXEsc.OWN.every(function(l){ return l.id !== 'budPrModal'; }),
    'budPrModal NIE JE vo vlastnych vrstvach retaze');
-ok(NXEsc.FOREIGN_IDS.indexOf('budPrModal') > -1, 'a JE v zozname cudzich vrstiev');
+ok(NXEsc.FOREIGN_MODAL_IDS.indexOf('budPrModal') > -1, 'a JE v zozname cudzich MODALOV');
+ok(NXEsc.FLYOUT_FNS.indexOf('budPrModal') === -1 && NXEsc.FLYOUT_FLAGS.indexOf('budPrModal') === -1,
+   'a nie medzi flyoutmi — tie modal pod sebou prepustaju, budPrModal nikdy');
 
 // ============ 4) DROBNOSTI KONTRAKTU =======================================
 
@@ -245,7 +272,7 @@ NXEsc.OWN.forEach(function(layer){
 });
 
 const STUDIO_JS = fs.readFileSync(path.join(JS, 'studio.js'), 'utf8');
-NXEsc.FOREIGN_FLAGS.forEach(function(flag){
+NXEsc.FLYOUT_FLAGS.forEach(function(flag){
   ok(STUDIO_JS.indexOf('var ' + flag) > -1,
      flag + ' je top-level priznak studio.js (retaz ho cita cez window)');
 });
@@ -262,5 +289,31 @@ ok(tagAt(STUDIO_HTML, 'nx_esc') < tagAt(STUDIO_HTML, 'studio'),
    'a PRED studio.js — jeho listener musi bezat prvy, aby vedel udalost spotrebovat');
 ok(tagAt(PANEL_HTML, 'nx_esc') > -1 && tagAt(PANEL_HTML, 'nx_esc') < tagAt(PANEL_HTML, 'form'),
    'v Inspectorovi PRED form.js (absModal)');
+
+// Predpoklad, na ktorom stoji zaradenie comboboxu medzi FLYOUTY (trieda b):
+// v ziadnom z tych siestich modalov `select[data-nx-combo]` NIE JE, takze
+// otvorena ponuka (`.cbpop`, z-index 120) nad nimi vzniknut nema ako. Keby tam
+// combobox raz pribudol, patri medzi cudzie MODALY — inak by Escape zavrel
+// modal aj s otvorenou ponukou nad nim.
+function modalMarkup(html, id){
+  const clean = html.replace(/<!--[\s\S]*?-->/g, '');
+  const start = clean.indexOf('<div id="' + id + '"');
+  if (start < 0) return null;
+  const re = /<(\/?)div\b[^>]*>/g;
+  re.lastIndex = start;
+  let m, depth = 0;
+  while ((m = re.exec(clean)) !== null){
+    depth += m[1] ? -1 : 1;
+    if (depth === 0) return clean.slice(start, re.lastIndex);
+  }
+  return null;
+}
+NXEsc.OWN.forEach(function(layer){
+  const html = layer.id === 'absModal' ? PANEL_HTML : STUDIO_HTML;
+  const markup = modalMarkup(html, layer.id);
+  ok(!!markup, layer.id + ': markup modalu sa nasiel');
+  eq(markup.indexOf('data-nx-combo'), -1,
+     layer.id + ' nema combobox D-85 — combobox smie byt vo flyoutoch');
+});
 
 console.log('OK test_r23_escape.js — ' + n + ' kontrol');
