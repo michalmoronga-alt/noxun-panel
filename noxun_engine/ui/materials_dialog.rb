@@ -822,6 +822,11 @@ module Noxun
         # (materials_replace_uni.rb) — ponuka nemoze slubit nic ine, nez apply
         # spravi. Potvrdenie sa viaze kanonickym ODTLACKOM planu (audit B1):
         # zmena configov, katalogu ci modelu medzi ponukou a potvrdenim = stale.
+        # R-23.1 (review #273): odpoveď vracia `gen` z otázky — generáciu
+        # relácie modalu. Klient tak vie, či odpoveď patrí tomu, na čo ešte čaká;
+        # bez toho by rozpis zahodený Escapom modal znova otvoril (a odpoveď na
+        # starú otázku by sa dala potvrdiť v novej relácii). Ten istý vzor ako
+        # revízia náhľadov šablón — identita otázky sa vracia v odpovedi.
         def handle_replace_uni_preview(payload)
           data = JSON.parse(payload.to_s)
           model = Sketchup.active_model
@@ -831,12 +836,14 @@ module Noxun
           if Materials.replace_uni_empty?(plan)
             uni = Materials.sheet(data['uni_id'].to_s)
             label = uni ? uni['decor'].to_s : 'UNI'
-            return js("MD.replaceUniOffer(#{{ 'empty' => "#{label} sa v projekte nepoužíva — niet čo nahradiť." }.to_json})")
+            return js("MD.replaceUniOffer(#{{ 'gen' => data['gen'],
+                                              'empty' => "#{label} sa v projekte nepoužíva — niet čo nahradiť." }.to_json})")
           end
           unless plan['blocked'].empty?
-            return js("MD.replaceUniOffer(#{{ 'blocked' => plan['summary']['blocked'] }.to_json})")
+            return js("MD.replaceUniOffer(#{{ 'gen' => data['gen'],
+                                              'blocked' => plan['summary']['blocked'] }.to_json})")
           end
-          js("MD.replaceUniOffer(#{{ 'summary' => plan['summary'],
+          js("MD.replaceUniOffer(#{{ 'gen' => data['gen'], 'summary' => plan['summary'],
                                      'pending' => ru_pending(model, data, plan) }.to_json})")
         end
 
@@ -851,13 +858,14 @@ module Noxun
           return set_status('UNI sa v projekte už nepoužíva — niet čo nahradiť.', true) if Materials.replace_uni_empty?(plan)
           unless plan['blocked'].empty?
             set_status('Stav sa medzitým zmenil — nahradenie je teraz blokované.', true)
-            return js("MD.replaceUniOffer(#{{ 'blocked' => plan['summary']['blocked'] }.to_json})")
+            return js("MD.replaceUniOffer(#{{ 'gen' => data['gen'],
+                                              'blocked' => plan['summary']['blocked'] }.to_json})")
           end
           fresh = ru_pending(model, confirm, plan)
           unless Materials.replace_uni_pending_ok?(confirm, fresh)
             set_status('Stav sa medzitým zmenil — skontroluj rozpis znova a potvrď nanovo.')
-            return js("MD.replaceUniOffer(#{{ 'summary' => plan['summary'], 'pending' => fresh,
-                                              'stale' => true }.to_json})")
+            return js("MD.replaceUniOffer(#{{ 'gen' => data['gen'], 'summary' => plan['summary'],
+                                              'pending' => fresh, 'stale' => true }.to_json})")
           end
           # Board joby KOMPLET pripravene PRED operaciou (audit F4): overena
           # identita, normalizovany config, validacia — pad az po start_operation

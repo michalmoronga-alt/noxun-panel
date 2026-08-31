@@ -2255,6 +2255,25 @@
   // a renderuje rozpis. Katalógové echo/init modal aj ponuku RUŠÍ (audit F6).
   var MD_UNI = null;          // { uni_id, key } otvoreného modalu
   var MD_UNI_PENDING = null;  // pending odtlačok aktuálnej ponuky zo servera
+  // R-23.1 review #273 (P2): GENERÁCIA relácie „Nahradiť UNI…". Odpoveď servera
+  // (`MD.replaceUniOffer`) dorazí ASYNCHRÓNNE a modal si otvára sama — takže
+  // Escape (alebo odchod zo sekcie) medzi otázkou a odpoveďou by okno o chvíľu
+  // vrátil späť aj s rozpisom, ktorý používateľ práve zahodil. Každé otvorenie
+  // aj zatvorenie modalu preto generáciu posunie a otázka si generáciu NESIE
+  // SO SEBOU — server ju vracia v odpovedi (`p.gen`, vzor revízie náhľadov
+  // šablón). Sám lokálny príznak „čakám" by nestačil: dve otázky za sebou
+  // (Escape → otvor znova → spýtaj sa na INÝ dekor) sa bez echa nedajú
+  // rozlíšiť a odpoveď na tú prvú by sa dala potvrdiť v druhej relácii —
+  // teda nahradiť UNI v celom projekte niečím iným, než čo je na obrazovke.
+  var MD_UNI_GEN = 0;         // generácia aktuálnej relácie
+  var MD_UNI_REQ = null;      // generácia, ku ktorej patrí odoslaná otázka (alebo null)
+  // Odoslali sme serveru otázku — odpoveď na ňu je odteraz očakávaná.
+  function mdUniAwait(){ MD_UNI_REQ = MD_UNI_GEN; }
+  // Je odpoveď, ktorá práve prišla, ešte tá, na ktorú sa čaká?
+  function mdUniCurrent(gen){
+    return MD_UNI_REQ !== null && MD_UNI_REQ === MD_UNI_GEN &&
+           gen != null && Number(gen) === MD_UNI_GEN;
+  }
 
   // Čistá funkcia (Node test): kandidáti cieľa = non-UNI skupiny s doskami.
   function mdUniTargets(catalog, schema2){
@@ -2313,6 +2332,9 @@
     if (!us) return false;
     MD_UNI = { uni_id: us.material_id, key: key };
     MD_UNI_PENDING = null;
+    // Nová relácia: odpoveď na otázku z tej PREDOŠLEJ sem už nepatrí.
+    MD_UNI_GEN++;
+    MD_UNI_REQ = null;
     var name = mdEl('mdUniName');
     if (name) name.textContent = 'Nahradiť ' + (g.decor || 'UNI') + ' reálnym dekorom';
     var gsel = mdEl('mdUniGroup');
@@ -2356,18 +2378,30 @@
     if (!MD_UNI || !vsel || !vsel.value) return;
     if (window.sketchup && sketchup.replace_uni_preview){
       sketchup.replace_uni_preview(JSON.stringify({
-        uni_id: MD_UNI.uni_id, target_id: vsel.value, model_guid: MD_MODEL_GUID }));
+        uni_id: MD_UNI.uni_id, target_id: vsel.value, model_guid: MD_MODEL_GUID,
+        gen: MD_UNI_GEN }));
+      mdUniAwait();
     }
   }
   function mdUniConfirm(){
     var pending = MD_UNI_PENDING;
     mdUniClose();
-    if (pending && window.sketchup && sketchup.replace_uni_apply)
-      sketchup.replace_uni_apply(JSON.stringify({ confirm: pending, model_guid: MD_MODEL_GUID }));
+    if (pending && window.sketchup && sketchup.replace_uni_apply){
+      sketchup.replace_uni_apply(JSON.stringify({ confirm: pending, model_guid: MD_MODEL_GUID,
+                                                  gen: MD_UNI_GEN }));
+      // Aj apply môže vrátiť `replaceUniOffer` (blokácia / stale rozpis na
+      // opätovné potvrdenie), takže odpoveď sa očakáva — ale až PO `mdUniClose()`
+      // vyššie, inak by ju jeho posun generácie zahodil.
+      mdUniAwait();
+    }
   }
   function mdUniClose(){
     MD_UNI = null;
     MD_UNI_PENDING = null;
+    // Koniec relácie: odpoveď na rozbehnutú otázku sa už nemá kde zobraziť
+    // (a nesmie modal vzkriesiť — R-23.1 review #273, Escape počas čakania).
+    MD_UNI_GEN++;
+    MD_UNI_REQ = null;
     var m = mdEl('mdUniModal');
     if (m) m.style.display = 'none';
   }
@@ -2731,6 +2765,12 @@
     // / nič na nahradenie. Render VÝHRADNE cez DOM API (textContent); autorita
     // potvrdenia je server (pending odtlačok plánu ide celý späť).
     replaceUniOffer: function(p){
+      // Odpoveď zo starej relácie (Escape / odchod zo sekcie medzi otázkou
+      // a odpoveďou) sa ZAHADZUJE — inak by zahodený rozpis dopadu modal
+      // znovu otvoril. Stav sa tým nestráca: server je autorita a rozpis
+      // sa dá vypýtať znova.
+      if (!mdUniCurrent(p.gen)) return;
+      MD_UNI_REQ = null;
       if (p.empty){
         mdUniClose();
         MD.setStatus(p.empty, false);
@@ -2998,6 +3038,12 @@
       mdUnknownTypeWarning: mdUnknownTypeWarning,
       // M-B2 — „Nahradit UNI…" (ciste funkcie bez DOM)
       mdUniTargets: mdUniTargets, mdUniSummaryLines: mdUniSummaryLines,
+      // R-23.1 review #273: `mdUniOpen`/`mdUniPreview`/`mdUniClose` potrebuju
+      // DOM a exportuju sa ZAMERNE — kontrakt „odpoved servera po zatvoreni
+      // modal NEVZKRIESI" (generacia relacie) sa inak overit neda nicim nez
+      // klikanim s pomalym serverom (tests/js/test_replace_uni.js).
+      mdUniOpen: mdUniOpen, mdUniPreview: mdUniPreview, mdUniClose: mdUniClose,
+      mdUniConfirm: mdUniConfirm,
       // ŠT-2a — sekcia `mat` v Studiu (tests/js/test_st2a_mat.js). `matToolsHtml`
       // je cista funkcia; `matRenderBody` DOM potrebuje a exportuje sa ZAMERNE —
       // kontrakt „push zo servera nezmaze rozpisany formular" (audit #2) sa inak
