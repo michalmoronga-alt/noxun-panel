@@ -54,6 +54,18 @@ function mkEl(tag){
       this._html = '';
       if (v !== '') this.appendChild(mkText(String(v)));
     },
+    // R-23.1 (review #273 kolo 2): dokumentove poradie uzlov — `nx_esc.js` podla
+    // neho vybera, ktory z dvoch otvorenych modalov je NAVRCHU (pri zhodnom
+    // z-index kresli prehliadac ako posledny ten, ktory je v HTML nizsie).
+    // Vracia bity 4 = FOLLOWING / 2 = PRECEDING, spocitane z poradia pri prechode
+    // stromu do hlbky (bity o vnoreni sa nepocitaju — porovnavaju sa surodenci).
+    compareDocumentPosition(other){
+      const order = [];
+      (function walk(n){ order.push(n); (n.children || []).forEach(walk); })(DOC.body);
+      const i = order.indexOf(this), j = order.indexOf(other);
+      if (i < 0 || j < 0 || i === j) return 0;
+      return j > i ? 4 : 2;
+    },
     querySelector(sel){ const r = qsa(this, sel); return r.length ? r[0] : null; },
     querySelectorAll(sel){ return qsa(this, sel); },
     closest(sel){

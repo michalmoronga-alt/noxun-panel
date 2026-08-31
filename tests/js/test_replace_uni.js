@@ -4,9 +4,50 @@
 //   mdUniTargets        — kandidati ciela (non-UNI skupiny s doskami)
 //   mdUniSummaryLines   — riadky rozpisu dopadu
 //   mdTileHtml/mdDetailHtml — badge + tlacidlo Nahradit UNI…
+//   GENERACIA RELACIE (R-23.1 review #273) — odpoved servera po zatvoreni
+//     modalu (Escape / odchod zo sekcie) uz modal NEVZKRIESI. Je to tichy
+//     regres: rozpis dopadu, ktory pouzivatel prave zahodil, by sa mu o chvilu
+//     vratil na obrazovku — a nasledne „Nahradit" by prestavalo cely projekt.
 'use strict';
 const assert = require('assert');
 const path = require('path');
+
+// --- DOM stub (vzor tests/js/test_st2a_mat.js) — uzly modalu „Nahradit UNI…".
+// Neznamy `id` vracia null presne ako prehliadac (kod s tym pocita).
+const ELS = {};
+function stubEl(id){
+  const n = { id, style: {}, children: [], _html: '', _attrs: {} };
+  Object.defineProperty(n, 'innerHTML', {
+    get(){ return n._html; },
+    set(v){ n._html = v; n.children = []; }
+  });
+  Object.defineProperty(n, 'textContent', { get(){ return n._text || ''; }, set(v){ n._text = v; } });
+  n.appendChild = function(c){ n.children.push(c); return c; };
+  n.setAttribute = function(k, v){ n._attrs[k] = String(v); };
+  n.getAttribute = function(k){ return Object.prototype.hasOwnProperty.call(n._attrs, k) ? n._attrs[k] : null; };
+  return n;
+}
+['mdUniModal', 'mdUniName', 'mdUniGroup', 'mdUniVariant', 'mdUniBody',
+ 'mdUniStep1', 'mdUniStep2', 'mdUniConfirmBtn', 'mdUniNextBtn'].forEach(function(id){
+  ELS[id] = stubEl(id);
+});
+const SENT = [];   // otazky odoslane serveru
+global.window = { sketchup: {
+  replace_uni_preview: function(p){ SENT.push('preview:' + p); },
+  replace_uni_apply: function(p){ SENT.push('apply:' + p); }
+} };
+global.sketchup = global.window.sketchup;   // v CEF je to ten isty holy global
+global.document = {
+  getElementById: function(id){ return ELS[id] || null; },
+  createElement: function(tag){ return stubEl('new-' + tag); },
+  querySelector: function(){ return null; },
+  addEventListener: function(){}
+};
+
+// Poradie `<script>` v studio.html: `studio.js` je PRVY a zaklada `window.NX`,
+// ktore `proj_materials.js` cita ako holy global (v CEF su to ta ista vec).
+require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'studio.js'));
+global.NX = global.window.NX;
 const M = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'proj_materials.js'));
 
 let passed = 0;
@@ -107,6 +148,113 @@ const CAT = {
   ok(M.mdTileHtml(k111, 0).indexOf('mdunib') < 0, 'realna dlazdica badge nema');
   ok(M.mdDetailHtml(uk).indexOf('Nahradiť UNI…') >= 0, 'detail UNI ma tlacidlo');
   ok(M.mdDetailHtml(k111).indexOf('Nahradiť UNI…') < 0, 'realny detail tlacidlo nema');
+})();
+
+// --- GENERACIA RELACIE: odpoved po zatvoreni modal NEVZKRIESI ---------------
+// R-23.1 review #273 (P2): `MD.replaceUniOffer` dorazi ASYNCHRONNE a modal si
+// otvara sama. Escape (nx_esc.js vola `mdUniClose`) medzi otazkou a odpovedou
+// by tak zahodeny rozpis dopadu vratil spat na obrazovku — a co je horsie,
+// odpoved na STARU otazku by sa dala potvrdit v novej relacii (nahradenie UNI
+// v celom projekte niecim inym, nez co je na obrazovke). Otazka preto nesie
+// `gen` a server ho v odpovedi vracia (vzor revizie nahladov sablon).
+(function(){
+  M.mdSetCatalog({ catalog: CAT, catalog_schema: 2 });
+  const uniKey = M.groupCatalogByDecor(CAT, true).find(g => g.gid === 'GRP-UK').key;
+  const modal = ELS.mdUniModal;
+  const PENDING = { uni_id: 'UNI_K', target_id: 'K111_18' };
+
+  function openAndAsk(){
+    ok(M.mdUniOpen(uniKey), 'modal „Nahradit UNI…" sa otvoril');
+    ELS.mdUniVariant.value = 'K111_18';
+    M.mdUniPreview();
+  }
+  // Odpoved servera na POSLEDNU odoslanu otazku — `gen` sa vracia z jej payloadu
+  // presne tak, ako to robi `handle_replace_uni_preview` v materials_dialog.rb.
+  function answer(extra){
+    const last = SENT[SENT.length - 1];
+    const req = JSON.parse(last.slice(last.indexOf(':') + 1));
+    const p = { gen: req.gen, summary: {}, pending: PENDING };
+    Object.keys(extra || {}).forEach(function(k){ p[k] = extra[k]; });
+    return p;
+  }
+
+  // 1) Escape POCAS cakania na `replace_uni_preview`.
+  SENT.length = 0;
+  openAndAsk();
+  eq(SENT.length, 1, 'otazka na server odisla');
+  ok(answer().gen != null, 'otazka nesie generaciu relacie');
+  const OLD = answer();                  // odpoved, ktora dorazi az po Escape
+  M.mdUniClose();                        // presne to, co spravi Escape (nx_esc.js)
+  eq(modal.style.display, 'none', 'Escape modal zavrel');
+  M.MD.replaceUniOffer(OLD);
+  eq(modal.style.display, 'none', 'zahodeny rozpis dopadu sa uz NEVRACIA');
+  eq(ELS.mdUniStep2.style.display, 'none', 'a ani krok 2 sa nezobrazi');
+
+  // 2) Bez Escapu ta ista cesta modal normalne ukaze (guard proti prehnanej
+  //    obrane — inak by kontrola „ignoruj" utisila cely tok).
+  openAndAsk();
+  M.MD.replaceUniOffer(answer());
+  eq(modal.style.display, '', 'bez Escapu rozpis dopadu modal ukaze');
+  eq(ELS.mdUniStep2.style.display, '', 'a prepne ho na krok 2 (rozpis)');
+
+  // 3) DVE otazky za sebou: odpoved na tu PRVU do druhej relacie nepatri.
+  //    Toto je to, co lokalny priznak „cakam" sam neustrazi — bez echa `gen`
+  //    by sa stary rozpis ukazal ako odpoved na novu otazku.
+  M.mdUniClose();
+  openAndAsk();
+  const FIRST = answer();
+  M.mdUniClose();                        // Escape
+  openAndAsk();                          // nova relacia, nova otazka
+  M.MD.replaceUniOffer(FIRST);
+  eq(ELS.mdUniStep2.style.display, 'none', 'oneskorena odpoved na prvu otazku sa ignoruje');
+  eq(modal.style.display, '', 'a modal ostava tam, kde pouzivatel je (krok 1)');
+  M.MD.replaceUniOffer(answer());
+  eq(ELS.mdUniStep2.style.display, '', 'odpoved na AKTUALNU otazku sa ukaze');
+
+  // 3b) Otvorenie BEZ zatvorenia (skratka z KONTROLY vola `mdUniOpen` priamo
+  //     nad uz otvorenym modalom) je tiez nova relacia — inak by odpoved na
+  //     otazku o STAROM UNI ukazala rozpis pod novym nadpisom.
+  M.mdUniClose();
+  openAndAsk();
+  const BEFORE_SHORTCUT = answer();
+  ok(M.mdUniOpen(uniKey), 'skratka otvorila modal nanovo bez zatvorenia');
+  M.MD.replaceUniOffer(BEFORE_SHORTCUT);
+  eq(ELS.mdUniStep2.style.display, 'none', 'odpoved na otazku predoslej relacie sa ignoruje');
+
+  // 4) APPLY tou istou cestou odpoveda (blokacia / stale rozpis) — a to sa
+  //    ukazat MUSI, hoci `mdUniConfirm` modal predtym zavrel.
+  M.mdUniClose();
+  SENT.length = 0;
+  openAndAsk();
+  M.MD.replaceUniOffer(answer());
+  M.mdUniConfirm();
+  eq(SENT.length, 2, 'potvrdenie odoslalo apply');
+  eq(modal.style.display, 'none', 'a modal zavrelo hned');
+  M.MD.replaceUniOffer(answer({ stale: true }));
+  eq(modal.style.display, '', 'stale odpoved z apply sa UKAZE — potvrdzuje sa nanovo');
+
+  // 5) DVE OTAZKY V TEJ ISTEJ RELACII (review kolo 2): „Ukazat dopad" na ciel A,
+  //    hned zmena variantu a „Ukazat dopad" na ciel B. Pomalsia odpoved na A sa
+  //    musi zahodit — inak by spotrebovala cakanie, cerstva odpoved B by prepadla
+  //    a POTVRDIT by sa dal plan pre STARSI ciel (zapis do modelu podla nieco
+  //    ineho, nez je na obrazovke).
+  M.mdUniClose();
+  SENT.length = 0;
+  openAndAsk();                                            // otazka A (K111_18)
+  const A = answer({ pending: { uni_id: 'UNI_K', target_id: 'K111_18' } });
+  ELS.mdUniVariant.value = 'K111_186';
+  M.mdUniPreview();                                        // otazka B, bez zatvorenia
+  const B = answer({ pending: { uni_id: 'UNI_K', target_id: 'K111_186' } });
+  ok(A.gen !== B.gen, 'kazda otazka nesie VLASTNE cislo, nie cislo relacie');
+  M.MD.replaceUniOffer(A);                                 // pomalsia odpoved dorazi prva
+  eq(ELS.mdUniStep2.style.display, 'none', 'odpoved na PREDOSLU otazku sa zahadzuje');
+  M.MD.replaceUniOffer(B);
+  eq(ELS.mdUniStep2.style.display, '', 'a odpoved na POSLEDNU otazku sa ukaze');
+  M.mdUniConfirm();
+  const sent = SENT[SENT.length - 1];
+  const applied = JSON.parse(sent.slice(sent.indexOf(':') + 1));
+  eq(applied.confirm.target_id, 'K111_186', 'potvrdzuje sa plan pre POSLEDNY ciel, nie pre stary');
+  M.mdUniClose();
 })();
 
 console.log(JSON.stringify({ passed: passed, failed: 0 }));

@@ -297,6 +297,33 @@ vrátane `NXModal.isOpen()`) a po vybavení zhasne.
 `tests/js/test_st1c_ponuka.js`, `tests/js/test_st2c_modal.js`, `tests/js/test_st2c_editor.js`, `tests/js/test_st2d_kde.js` (mini-DOM je od 2c-2a zdieľaný v `tests/js/minidom.js`)
 (mini-DOM s naozajstným parsovaním HTML a bublaním udalostí — repeater ani Escape nasepkavača sa na stubovanom `querySelector` overiť nedajú).
 
+### Escape reťaz ručných modálov (R-23.1, ui/js/nx_esc.js)
+
+Modály **mimo** kostry D-15 Escape dlho nemali vôbec — kontrakt „Escape zatvára modál" pre šesť z nich neplatil (`absModal` v Inspectorovi; `mdRestoreModal`, `mdDeleteModal`,
+`mdUniModal`, `demosModal`, `hwDelModal` v Štúdiu; jedinou cestou von bola myš). Rieši to **JEDEN dokumentový handler s prioritným zoznamom vrstiev**, zdieľaný oboma oknami
+(`nx_esc.js` sa načítava v `panel.html` aj `studio.html`, vždy **pred** `nx_modal.js` a `studio.js` — stráži to `tests/js/test_r23_escape.js`). Šesť samostatných listenerov by bola
+tá istá pasca ako pri `ecMenu`: všetky visia na `document`, takže by jedno stlačenie zavrelo dve vrstvy a poradie by záviselo na poradí `<script>` tagov.
+
+**Pravidlo je „jedno stlačenie = najvyššia otvorená vrstva"** a cudzie vrstvy sú preto **v dvoch triedach** (review #273 kolo 1): **(a) skutočné modály** — kostra D-15 ·
+`nxdaModal`/`tplModal`/`simModal`/`cfgModal` s vlastným handlerom · **`budPrModal`**, ktorého sa Escape nesmie dotknúť ani vtedy, keď je pod ním niečo naše (audit #9) — sú
+celoplošné prekrytia, takže nad nami sú **vždy** a reťaz pri nich **nerobí nič**; **(b) flyouty a menu** — warnpanel, rohové menu ABS a tagov, `ecMenu`/`vepoMenu` Štúdia,
+combobox D-85 — žijú v stacking kontexte railu/lišty (z-index 55 a nižšie), kým `.nxmodal` je 60, takže **pod otvoreným modálom sú schované** a blokujú **len vtedy, keď žiadny
+náš modál otvorený nie je**. Bez toho rozdielu by cesta „rohové menu ABS → combobox → dekor bez použiteľnej pásky" nechala prvé Escape zavrieť **neviditeľnú** vrstvu a modál by
+si vyžiadal druhé stlačenie. Combobox je v (b) preto, že v žiadnom z tých šiestich modálov `select[data-nx-combo]` nie je (stráži to test) a `NXCombo.pick()` ponuku zatvára
+ešte pred `change`, ktorý `absModal` otvára — keby raz pribudol, patrí do (a) (`.cbpop` má z-index 120). Vlastnú vrstvu naopak reťaz **spotrebuje** (`stopImmediatePropagation`,
+vzor vyššie), inak by ju za ňou dostal ešte handler Štúdia; flyout pod modálom teda ostáva otvorený a zavrie ho až ďalšie stlačenie u jeho vlastníka.
+
+**Medzi vlastnými vrstvami rozhoduje DOKUMENTOVÉ PORADIE, nie poradie tabuľky `OWN`** (review #273 kolo 2): všetky `.nxmodal` majú z-index 60, takže navrchu kreslí prehliadač ten,
+ktorý je v HTML nižšie — a `topOpen()` preto vyberá **posledný otvorený uzol v dokumentovom poradí** (`compareDocumentPosition`, generické, žiadna logika per modál). Bez toho by
+scenár „preflight zmazania materiálu odoslaný → prepnutie sekcie na Kovanie → `hwDelModal` → oneskorená `MD.confirmDelete` otvorí `mdDeleteModal` pod ním" nechal Escape zavrieť
+**skrytý** materiálový modál a navonok by sa „nestalo nič". *(Že `MD.confirmDelete` po odchode zo sekcie modál vôbec znovu otvorí, je samostatná chyba toho toku — tá istá trieda
+ako oneskorená odpoveď „Nahradiť UNI…"; reťaz ju len prestáva zhoršovať, opravená nie je.)*
+
+**Escape = klik na „Zrušiť", nie `display:none`:** volá sa tá istá funkcia ako z tlačidla — `mddCancel` ruší bežiaci Demos fetch na serveri, `absModalChoose('cancel')` vracia
+pôvodnú hodnotu selectu, `mdUniClose` zahadzuje pending odtlačok. Preto dostal `hwDelModal` pomenované `hwDelClose()` (dovtedy vetva schovaná v delegácii klikov). Otvorenosť sa
+pozná genericky z `style.display !== 'none'` (`budPrModal` v DOM ani nie je, kým nebeží), takže reťaz nepotrebuje háčik v otváraní. **Vedomé obmedzenie:** fokus sa po Escape
+nikam nevracia — spúšťač týchto šiestich modálov nie je nikde uložený (rovnako ako dnes pri kliku na „Zrušiť"); a `nxdaModal` má Escape naďalej len pri fokuse v poli hľadania.
+
 ### Observery panela
 
 (`ui/panel/selection.rb`) — panel počúva DVE veci: `SelObserver` (zmena výberu) a **`PanelModelObserver` (D-101: `onTransactionUndo`/`Redo`/`Abort`)**, lebo **Späť/Znova nevystrelí

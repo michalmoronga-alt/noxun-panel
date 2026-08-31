@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.9.0 · 31.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.9.1 · 1.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -21,7 +21,7 @@ Nálezy z reálnej výroby a chyby v cenách majú preto **najvyššiu prioritu 
 (okno zaniká — modul žije · uzavretý whitelist akcií · session token · echo vs. plný push · optimistický zámok) sú v [archiv/KRONIKA.md](archiv/KRONIKA.md),
 vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
-**Testy k v0.9.0:** **2217 headless** · 75 JS sád · plný in-SketchUp beh **1217 PASS / 0 FAIL** (nad finálnym stavom uzáveru GHOST).
+**Testy k v0.9.1:** **2217 headless** · 76 JS sád · plný in-SketchUp beh **1217 PASS / 0 FAIL** (nad finálnym stavom uzáveru GHOST).
 
 > **Poznámka k procesu:** Codex review bol 21.–24.8. **nedostupný** — PR **#186–#226** prešli bránou so slepým subagentom. **Post-hoc sweep je od 27.8. HOTOVÝ** (34 PR cez Codex CLI + triáž 54 nezodpovedaných threadov): dve reálne P1 slepým kolám ušli a týždeň žili v `main`, obe sú dávno opravené — [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-E**.
 
@@ -30,31 +30,31 @@ vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 **Blok 1b · STABILIZAČNÁ REVÍZIA je prakticky uzavretý** ([PLAN.md](PLAN.md)): brány A/G/H hotové (1b-1/2/3), dlhy B+D (1b-4), sweep E, mimo písmen 1b-6a/6b/6c aj 1b-7, z F je hotové D-27 —
 **ostáva len D-51** (štandard veľkostí okien — čaká na Michalove hodnoty) a výklop ako typ čela (ide cez task package 1e).
 **Blok 1c · AUDIT KÓDU je HOTOVÝ (29.8.)** — traja audítori zliati do **[AUDIT_REGISTER.md](AUDIT_REGISTER.md)** (2×P0 + 35 položiek — 33 z 1c, 2 z review — + poradie pre 1d + 3 rozhodnutia Michala (R-05 · R-13 · R-30));
-**oba P0 sú vybavené dávkou P0-HF** (v0.8.14) a **beží blok 1d** (hotové: R-06 brána, R-08 zámky katalógov, R-01+R-04 multi-model observer, R-34 presnosť P0-2 brány, R-02 guard identity dokumentu + **R-02b**, **R-03 šev vkladania**, R-07 brána knižnice setov). **Beží aj 1e PLÁNOVACIA DÁVKA** (task packages, priorita do 2.9.).
+**oba P0 sú vybavené dávkou P0-HF** (v0.8.14) a **beží blok 1d** (hotové: R-06 brána, R-08 zámky katalógov, R-01+R-04 multi-model observer, R-34 presnosť P0-2 brány, R-02 guard identity dokumentu + **R-02b**, **R-03 šev vkladania**, R-07 brána knižnice setov, **R-23.1 Escape ručných modálov**). **Beží aj 1e PLÁNOVACIA DÁVKA** (task packages, priorita do 2.9.).
 **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
 
 **Poradie ďalšej práce (Michal 26.8. + úprava 27.8. kvôli koncu MAX plánu 2.9.):** ~~1b~~ → ~~1c audit~~ → **1e plánovacia dávka** (task packages — Fable priorita do 2.9.)
-→ **1d refaktor z [AUDIT_REGISTER.md](AUDIT_REGISTER.md)** (beží súbežne cez subagentov, pokračuje aj po 2.9. — najbližšie **R-23.1 Escape**, potom perzistencia **R-11 → R-12 → R-14**, ďalej R-18 a zvyšok podľa kapacity; R-13 čaká na rozhodnutie Michala)
+→ **1d refaktor z [AUDIT_REGISTER.md](AUDIT_REGISTER.md)** (beží súbežne cez subagentov, pokračuje aj po 2.9. — najbližšie perzistencia **R-11 → R-12 → R-14**, ďalej R-18 a zvyšok podľa kapacity; R-13 čaká na rozhodnutie Michala)
 → ~~GHOST VKLADANIE~~ (**hotové, v0.9.0**) → **KOVANIE** (najprv USER-debata o setoch, Michal ju rozoberie v samostatnom okne). V1 rozsah zoštíhlený — checklist v [V1_VIZIA.md](V1_VIZIA.md).
 
 ## Posledné uzávery
 
+- **1d/R-23.1 — Escape zatvára aj posledných šesť ručných modálov** (chýbajúca ABS páska v Inspectorovi; obnova zálohy, mazanie variantu, „Nahradiť UNI…", Demos diff
+  a mazanie položky kovania v Štúdiu) — **jedno stlačenie = jedna vrstva**, Escape robí to, čo „Zrušiť" — v0.9.1 (1.9.2026) · **Michal večer:** v Štúdiu → Kovanie otvor
+  potvrdenie zmazania položky a stlač **Esc** (musí sa zavrieť); nad **oknom prepočtu cien počas behu** sa Esc naopak zavrieť NESMIE.
 - **UZÁVER BLOKU GHOST VKLADANIE (v0.9.0, 31.8.2026)** — **Michal odškrtol CELÝ smoke checklist** (11 bodov: ghost na kurzore, rotácia okolo kotvy, zámok/voľná výška,
-  **Alt kotvy bez aktivácie menu lišty** — fallback TAB sa nepoužije, klik = jedna skrinka a jeden Ctrl+Z, Esc bez zápisu, orbit, horný korpus/šablóna s kovaním/nested kontext,
-  snap v zámku, kotva pod kurzorom, pásik pod Náhľadom, pole výšky, pamäť nastavení). Uzáver je čisto dokumentačný — kód sa nemení, len minor bump a presun bloku
-  plným textom do [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).
-- **Michal tým istým sedením odškrtol aj staršie odložené testy:** **R-08** (dve okná, dva sety kovania — ostali oba) · **R-01+R-04** (zóny, zmazanie skrinky, Ctrl+Z,
-  neplatné zväčšenie) · **R-02** (dve okná — hláška „patrí inému dokumentu") · **R-07** (Štúdio → Kovanie → Sety bez banneru). **Všetky PASS**, žiadny nález.
+  **Alt kotvy bez aktivácie menu lišty** — fallback TAB sa nepoužije, klik = jedna skrinka a jeden Ctrl+Z, Esc bez zápisu, orbit, horný korpus/šablóna s kovaním/nested
+  kontext, snap v zámku, kotva pod kurzorom, pásik pod Náhľadom, pole výšky, pamäť nastavení). Uzáver je čisto dokumentačný — kód sa nemení, len minor bump a presun
+  bloku plným textom do [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).
+- **Michal tým istým sedením odškrtol aj staršie odložené testy:** **R-08** (dve okná, dva sety kovania) · **R-01+R-04** (zóny, zmazanie, Ctrl+Z) · **R-02** (hláška „patrí inému dokumentu") · **R-07** (Sety bez banneru). **Všetky PASS**, žiadny nález.
 - **GHOST VKLADANIE — skrinka sa kladie KLIKOM** (v0.8.22) **+ GHOST-FB** (v0.8.24) **+ poloha pásika a zelená predná stena** (v0.8.25): **Ghost pásik** s prestaviteľnou zamknutou výškou (0 / 1400) stojí samostatne **hneď pod sektorom Náhľad**; nastavenia sa pamätajú do zatvorenia SketchUpu.
 - **1d/R-07 — starší a novší plugin si už nepoškodia knižnicu setov kovania** (knižnica z novšej verzie sa nedá ani zapísať, ani použiť — súpis ju prizná oranžovým riadkom a Štúdio bannerom) — v0.8.21 (30.8.) · **overené Michalom 31.8.**
 - **1d/R-02b — Ctrl+S už nezahadzuje rozpísanú prácu** (identity dokumentu už nerotuje uloženie, ale iba File > New/Open) — v0.8.23 (30.8.) · **Michal večer:** uprav šírku skrinky a do sekundy daj **Ctrl+S** — zmena sa musí uložiť a rozpísané polia ostať.
 - **1d/R-02 — panel už nezapíše do nesprávneho dokumentu** (oneskorená akcia po prepnutí okna SketchUpu skončí hláškou „patrí inému dokumentu", nie tichým zápisom do cudzej zákazky) — v0.8.19 (30.8.) · **overené Michalom 31.8.** · **R-03** (šev vkladania bez zásahu do modelu, v0.8.20) a **R-34** (brána exportov už nezastaví zákazku, ktorá je v poriadku, v0.8.18) sú bez UI zmeny.
-- **1d/R-01+R-04 — observer veľkosti je multi-model bezpečný a už si nepamätá zmazané** (pamäť pôvodných polôh sa po zmazaní skrinky vyprázdni a po **Späť** ju dostane naspäť)
-  — v0.8.17 (30.8.) · **overené Michalom 31.8.**
-- **1d/R-08 — dve okná SketchUpu si už neprepíšu nastavenia** (sety a pravidlá kovania, ABS pravidlá, rozmerové rady aj sadzby dodávateľa; zastaraný formulár skončí hláškou
-  „medzitým sa zmenilo", nie tichým prepisom) — v0.8.16 (30.8.) · **overené Michalom 31.8.**
+- **1d/R-01+R-04 — observer veľkosti je multi-model bezpečný a už si nepamätá zmazané** (pamäť polôh sa po zmazaní skrinky vyprázdni a po **Späť** ju dostane naspäť) — v0.8.17 (30.8.) · **overené Michalom 31.8.**
+- **1d/R-08 — dve okná SketchUpu si už neprepíšu nastavenia** (sety a pravidlá kovania, ABS pravidlá, rady aj sadzby dodávateľa; zastaraný formulár skončí hláškou „medzitým sa zmenilo") — v0.8.16 (30.8.) · **overené Michalom 31.8.**
 - **1d/R-06a — dĺžkové kovanie sa už nenacení ako kusy** (úchytkový profil sa cez set nedostane do nákupu ani do ponuky — vydá oranžový riadok Kontroly) — v0.8.15 (29.8.) · **Michal večer:** namapuj úchytkový profil na set — nesmie sa objaviť v Nákupe ani v Rozpočte.
 - **P0-HF — finálne brány pred zápisom exportov** (chybný XLSX/CSV už nevznikne: **tvrdo** sa zastaví záporná „Nábytková zostava", nesúlad ponuky s rozpočtom a zliate ID skriniek;
   **riadky bez ceny** až po druhom, vedomom kliku — STANDARD §11.3) — v0.8.14 (29.8.) · **Michal večer:** riadok bez ceny + „XLSX rozpočet" = prvý klik neuloží nič, druhý PRIZNÁ podhodnotenú sumu.
