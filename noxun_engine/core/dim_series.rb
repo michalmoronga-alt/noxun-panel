@@ -127,13 +127,46 @@ module Noxun
       # stale prebijaju „posledny vyhrava". Zamok tu teda zapisy len
       # SERIALIZUJE. Doriesenie vedie register ako R-35 (revizia + konfliktova
       # vetva su UI kontrakt, nie zamok).
+      #
+      # 1d/R-11: poskodeny primar s platnou `.bak` sa cita zo ZALOHY, takze
+      # zapis by rady prepisal STARSIM obsahom. Brana bezi POD ZAMKOM tesne
+      # pred zapisom a odmietnutie konci ako kazde ine zlyhanie — `nil`;
+      # KONKRETNY dovod si volajuci vezme z `write_block_reason`.
       def set(raw)
         series = normalize(raw)
-        with_catalog_lock { JsonFileStore.write(path, 'std' => STD, 'series' => series) }
-        series
+        stored = with_catalog_lock do
+          next false if degraded_write_blocked?
+
+          JsonFileStore.write(path, 'std' => STD, 'series' => series)
+        end
+        stored ? series : nil
       rescue StandardError => e
         Engine.log_error(e, 'DimSeries.set')
         nil
+      end
+
+      # Dovod odmietnutia POSLEDNEHO zapisu (prazdny = nic sa neodmietlo).
+      # `set` si drzi navratovy tvar (rady/`nil`) — dvojica `[nil, dovod]` by
+      # rozbila vsetkych volajucich a `[false, dovod]` by bola pravdiva.
+      def write_block_reason
+        @write_block_reason.to_s
+      end
+
+      # I/O chyba z `degraded?` sa NEchyta — vyleti do rescue vetvy `set`
+      # a skonci ako `nil` (neuspesny zapis), nie ako povolenie zapisovat.
+      def degraded_write_blocked?
+        prev = @write_block_reason
+        @write_block_reason = ''
+        return false unless JsonFileStore.degraded?(path)
+
+        @write_block_reason = 'Rozmerové rady sú poškodené — číta sa záloha, zápisy sú vypnuté ' \
+                              "(oprav alebo zmaž súbor #{path})"
+        # Log LEN pri ZMENE stavu — seed-merge sa o zapis pokusa pri kazdom
+        # nacitani, takze bezpodmienecny zapis by zaplavil Ruby konzolu.
+        if prev.to_s != @write_block_reason && defined?(Engine)
+          Engine.log("dim series: zapis odmietnuty — #{@write_block_reason}")
+        end
+        true
       end
 
       def with_catalog_lock(&blk)

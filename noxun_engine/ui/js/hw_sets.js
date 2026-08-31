@@ -48,16 +48,27 @@
   }
   function hwsTrim(v){ return String(v == null ? '' : v).trim(); }
   // R-07: kompatibilitná brána GLOBÁLNEJ knižnice. Server posiela
-  // `library_state` ('ok' | 'read_only') a `library_reason` (hotová SK veta —
-  // JS si žiadny vlastný preklad neskladá). Knižnica z novšej verzie sa nesmie
-  // ani meniť, ani potichu používať: sekcia vypne GLOBÁLNE mutácie a dôvod
-  // povie bannerom. PROJEKTOVÉ predvoľby nad zdravým snapshotom fungujú ďalej
-  // — ich zdrojom je .skp, nie knižnica.
+  // `library_state` ('ok' | 'read_only' | 'degraded') a `library_reason`
+  // (hotová SK veta — JS si žiadny vlastný preklad neskladá). Knižnica
+  // z novšej verzie sa nesmie ani meniť, ani potichu používať: sekcia vypne
+  // GLOBÁLNE mutácie a dôvod povie bannerom. PROJEKTOVÉ predvoľby nad zdravým
+  // snapshotom fungujú ďalej — ich zdrojom je .skp, nie knižnica.
   function hwsLibBlocked(data){ return !!(data && data.library_state === 'read_only'); }
+  // R-11 DEGRADOVANÁ knižnica (poškodený primár + platná záloha): obsah je
+  // POUŽITEĽNÝ — sety sa čítajú zo zálohy, dajú sa zmraziť do projektu
+  // a projektové predvoľby sa menia ďalej. Zakázané sú VÝHRADNE zápisy do
+  // globálneho SÚBORU; keby sa vykonali, primár by sa prepísal obsahom
+  // odvodeným od STARŠEJ zálohy.
+  function hwsLibDegraded(data){ return !!(data && data.library_state === 'degraded'); }
+  // Smie sa zapisovať do globálnej knižnice? (read_only aj degraded = nie)
+  function hwsLibWriteBlocked(data){ return hwsLibBlocked(data) || hwsLibDegraded(data); }
   // Akcie, ktoré menia knižnicu alebo z nej kopírujú do .skp (`hws-merge-seed`
-  // a `hws-reset-proj` zapisujú do modelu, ale ich ZDROJOM je knižnica).
+  // a `hws-reset-proj` zapisujú do modelu, ale ich ZDROJOM je knižnica) —
+  // vypína ich LEN `read_only` (pri degraded je zdroj v poriadku).
   var HWS_LIB_ACTIONS = ['hws-new', 'hws-edit', 'hws-del', 'hws-save',
                          'hws-merge-seed', 'hws-reset-proj'];
+  // Akcie, ktoré ZAPISUJÚ do globálneho súboru — vypnuté aj pri degraded.
+  var HWS_WRITE_ACTIONS = ['hws-new', 'hws-edit', 'hws-del', 'hws-save'];
   function hwsLibReason(data){
     return (data && data.library_reason) || 'Knižnica setov kovania sa nedá bezpečne prečítať';
   }
@@ -350,12 +361,20 @@
         '. Sety sa zatiaľ nedajú zobraziť ani meniť — predvoľby projektu nižšie fungujú ďalej.'));
       return;
     }
+    // R-11: degradovaná knižnica sa ZOBRAZUJE (obsah zálohy je platný) —
+    // vypnuté je len zakladanie a úprava setov, teda zápis do súboru.
+    if (hwsLibDegraded(HWS_DATA)){
+      nb.disabled = true;
+      box.appendChild(hwsMk('div', 'hwbanner', hwsLibReason(HWS_DATA) +
+        '. Sety vidíš a dajú sa použiť v projekte, ale meniť knižnicu sa zatiaľ nedá.'));
+    }
     if (HWS_EDIT){ box.appendChild(hwsEditorNode()); }
     var sets = HWS_DATA.sets || [];
     if (!sets.length && !HWS_EDIT){
       box.appendChild(hwsMk('div', 'muted', 'Knižnica setov je prázdna.'));
       return;
     }
+    var writeOff = hwsLibWriteBlocked(HWS_DATA); // R-11: degraded = len čítanie
     sets.forEach(function(s){
       var card = hwsMk('div', 'hwsset');
       var head = hwsMk('div', 'hwsset-head');
@@ -364,11 +383,13 @@
       var eb = hwsMk('button', 'ghostbtn hwsbtn', 'Upraviť');
       eb.setAttribute('data-action', 'hws-edit');
       eb.setAttribute('data-set-id', s.set_id);
+      if (writeOff) eb.disabled = true;
       head.appendChild(eb);
       var db = hwsMk('button', 'ghostbtn hwsbtn' + (HWS_DEL_ARM === s.set_id ? ' danger' : ''),
                      HWS_DEL_ARM === s.set_id ? 'Naozaj zmazať?' : 'Zmazať');
       db.setAttribute('data-action', 'hws-del');
       db.setAttribute('data-set-id', s.set_id);
+      if (writeOff) db.disabled = true;
       head.appendChild(db);
       card.appendChild(head);
       var ul = hwsMk('div', 'hwsset-members');
@@ -653,7 +674,9 @@
     det.open = HWS_GLOBAL_OPEN; // prerender (napr. + pásmo) nesmie zavrieť sekciu
     det.setAttribute('data-hws-det', 'global');
     det.appendChild(hwsMk('summary', null, 'Predvoľby nových projektov (globálne)'));
-    if (libBlocked){
+    // R-11: globálna predvoľba je ZÁPIS do knižnice — degradovaná knižnica ju
+    // nepustí rovnako ako nekompatibilná (projektové predvoľby vyššie bežia).
+    if (hwsLibWriteBlocked(HWS_DATA)){
       det.appendChild(hwsMk('div', 'hwbanner', hwsLibReason(HWS_DATA) +
         '. Globálne predvoľby sa zatiaľ nedajú meniť.'));
     } else {
@@ -786,6 +809,9 @@
         // knižnici nesmú odoslať ani zo zastaraného DOM-u (server ich aj tak
         // odmietne, ale používateľ by dostal zbytočnú chybovú hlášku).
         if (hwsLibBlocked(HWS_DATA) && HWS_LIB_ACTIONS.indexOf(a) !== -1) return;
+        // R-11: degradovaná knižnica sa SMIE používať (doplnenie predvolieb
+        // aj obnova z globálu bežia ďalej) — zastavia sa len ZÁPISY do súboru.
+        if (hwsLibDegraded(HWS_DATA) && HWS_WRITE_ACTIONS.indexOf(a) !== -1) return;
         if (a === 'hws-new'){
           HWS_EDIT = { set_id: '', name: '', generic_type: 'hinge', existing: false,
                        members: [{ is_series: false, per: 'unit', qty: 1, code: '', label: '' }] };
@@ -1022,7 +1048,7 @@
     // R-07: globálna predvoľba je zápis do knižnice — pri nekompatibilnej sa
     // neodosiela (select ju ani nevykreslí, toto je poistka pre zmenu selectu
     // zo zastaraného DOM-u).
-    if (action === 'hws-map-global' && hwsLibBlocked(HWS_DATA)) return;
+    if (action === 'hws-map-global' && hwsLibWriteBlocked(HWS_DATA)) return;
     if (action === 'hws-map-global'){
       // R-08: globálna predvoľba nesie REVÍZIU knižnice (rovnako ako uloženie
       // a mazanie setu) — dve otvorené okná si ju inak ticho prepíšu.
@@ -1058,6 +1084,9 @@
       // R-07: kompatibilitná brána knižnice (banner + vypnuté globálne mutácie)
       hwsLibBlocked: hwsLibBlocked, hwsLibReason: hwsLibReason,
       HWS_LIB_ACTIONS: HWS_LIB_ACTIONS,
+      // R-11: degradovaná knižnica (poškodený primár + platná záloha)
+      hwsLibDegraded: hwsLibDegraded, hwsLibWriteBlocked: hwsLibWriteBlocked,
+      HWS_WRITE_ACTIONS: HWS_WRITE_ACTIONS,
       // ŠT-3a-3: `HWSETS` a helpery fokusu potrebuju DOM a exportuju sa
       // ZAMERNE — kontrakty „setData NEKRESLI" a „fokus prezije prekreslenie"
       // sa inak nedaju overit nicim nez klikanim (tests/js/test_st3a_hw.js).

@@ -217,11 +217,44 @@ module Noxun
       # `true`. Dnesny `JsonFileStore.write` bud vrati true, alebo vyhodi — ale
       # R-11 ma pridat write guard, ktory zapis ODMIETNE bez vynimky; s
       # bezpodmienecnym `true` by sa odmietnutie hlasilo ako ulozene.
+      #
+      # 1d/R-11: presne ten predpovedany guard. Poskodeny primar s platnou
+      # `.bak` sa cita zo ZALOHY — zapis by nastavenia prepisal STARSIM
+      # obsahom, takze sa ODMIETNE (bez vynimky) a `write` vrati `false`.
       def write(doc)
-        with_catalog_lock { JsonFileStore.write(path, normalize(doc)) }
+        with_catalog_lock do
+          next false if degraded_write_blocked?
+
+          JsonFileStore.write(path, normalize(doc))
+        end
       rescue StandardError => e
         Engine.log_error(e, 'SupplierSettings.write') if defined?(Engine)
         false
+      end
+
+      # Dovod odmietnutia POSLEDNEHO zapisu (prazdny = nic sa neodmietlo).
+      # `patch_active!` uz ma kanal chyb, takze si ho vyzdvihne rovno do
+      # `errors` — okno Nastavenia tak ukaze KONKRETNU vetu namiesto
+      # vseobecneho „nastavenia sa nepodarilo ulozit".
+      def write_block_reason
+        @write_block_reason.to_s
+      end
+
+      # Brana bezi POD ZAMKOM nad cerstvym stavom suboru (lekcia R-07 B2).
+      # I/O chyba z `degraded?` sa NEchyta — vyleti do rescue vetvy `write`.
+      def degraded_write_blocked?
+        prev = @write_block_reason
+        @write_block_reason = ''
+        return false unless JsonFileStore.degraded?(path)
+
+        @write_block_reason = 'Nastavenia dodávateľa sú poškodené — číta sa záloha, zápisy sú ' \
+                              "vypnuté (oprav alebo zmaž súbor #{path})"
+        # Log LEN pri ZMENE stavu — seed-merge sa o zapis pokusa pri kazdom
+        # nacitani, takze bezpodmienecny zapis by zaplavil Ruby konzolu.
+        if prev.to_s != @write_block_reason && defined?(Engine)
+          Engine.log("supplier settings: zapis odmietnuty — #{@write_block_reason}")
+        end
+        true
       end
 
       def reload!
@@ -604,7 +637,13 @@ module Noxun
             sup['mode_values'].delete(k.to_s) if cur.empty?
           end
         end
-        return [false, ['nastavenia sa nepodarilo uložiť'], :write_failed] unless write(doc)
+        # R-11: ked zapis odmietla brana degradovaneho suboru, chyba MUSI
+        # povedat preco — „nepodarilo sa uložiť" by pouzivatela poslalo hladat
+        # problem s pravami, hoci naprava je oprava/zmazanie JEDNEHO suboru.
+        unless write(doc)
+          reason = write_block_reason
+          return [false, [reason.empty? ? 'nastavenia sa nepodarilo uložiť' : reason], :write_failed]
+        end
         [true, [], :ok]
       end
 

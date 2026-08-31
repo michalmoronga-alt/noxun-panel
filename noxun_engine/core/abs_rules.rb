@@ -231,8 +231,40 @@ module Noxun
         false
       end
 
+      # 1d/R-11: dovod, preco bol POSLEDNY zapis odmietnuty branou (prazdny
+      # retazec = brana nic neodmietla). Navratovy TVAR `write` sa nemeni
+      # (`true`/`false`) — `[false, dovod]` by bolo v Ruby PRAVDIVE a kazda
+      # ternarka volajuceho by odmietnutie ohlasila ako uspech.
+      def write_block_reason
+        @write_block_reason.to_s
+      end
+
+      # Brana degradovaneho suboru. Vola sa VZDY POD ZAMKOM tesne pred zapisom
+      # a cita stav suboru NANOVO (lekcia R-07 B2: cachovany verdikt nie je
+      # dokaz). I/O chyba z `degraded?` sa tu VEDOME nechyta — vyleti do
+      # rescue vetvy `write` a skonci ako neuspesny zapis.
+      def degraded_write_blocked?
+        prev = @write_block_reason
+        @write_block_reason = ''
+        return false unless JsonFileStore.degraded?(path)
+
+        @write_block_reason = "Pravidlá ABS sú poškodené — číta sa záloha, zápisy sú vypnuté " \
+                              "(oprav alebo zmaž súbor #{path})"
+        # Log LEN pri ZMENE stavu — seed-merge sa o zapis pokusa pri kazdom
+        # nacitani, takze bezpodmienecny zapis by zaplavil Ruby konzolu.
+        if prev.to_s != @write_block_reason && defined?(Engine)
+          Engine.log("abs rules: zapis odmietnuty — #{@write_block_reason}")
+        end
+        true
+      end
+
       def write(rules)
         with_catalog_lock do
+          # R-11: poskodeny primar s platnou `.bak` sa cita zo ZALOHY — zapis
+          # by primar prepisal obsahom odvodenym od STARSICH dat a vsetko medzi
+          # zalohou a poskodenim by zmizlo.
+          next false if degraded_write_blocked?
+
           JsonFileStore.write(path, { 'std' => STD, 'seed_version' => SEED_VERSION, 'rules' => rules })
         end
       rescue StandardError => e

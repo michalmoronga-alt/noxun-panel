@@ -272,14 +272,46 @@ module Noxun
       # globalna kniznica pravidiel nema reviziu. Register to vedie ako
       # samostatnu polozku (R-35) — doriesi ju davka, ktora prinesie reviziu
       # do payloadu sekcie a konfliktovu vetvu okna.
+      #
+      # 1d/R-11: pred zapisom bezi este brana DEGRADOVANEHO suboru (poskodeny
+      # primar + platna `.bak`).
       def write(rules)
         with_catalog_lock do
+          next false if degraded_write_blocked?
+
           JsonFileStore.write(path, { 'std' => STD, 'seed_version' => SEED_VERSION,
                                       'rules' => normalize_rules(rules) })
         end
       rescue StandardError => e
         Engine.log_error(e, 'HardwareRules.write') if defined?(Engine)
         false
+      end
+
+      # 1d/R-11: dovod odmietnutia POSLEDNEHO zapisu (prazdny = nic sa
+      # neodmietlo). Okno Pravidla ho pri zlyhani globalneho zapisu ukaze
+      # namiesto vseobecneho „globalny zapis zlyhal". Navratovy tvar `write`
+      # sa NEMENI — `[false, dovod]` je v Ruby pravdive a ternarky volajucich
+      # by odmietnutie hlasili ako uspech.
+      def write_block_reason
+        @write_block_reason.to_s
+      end
+
+      # Brana sa vyhodnocuje POD ZAMKOM nad cerstvym stavom suboru (lekcia
+      # R-07 B2). I/O chyba z `degraded?` sa NEchyta — vyleti do rescue vetvy
+      # `write` a skonci ako neuspesny zapis.
+      def degraded_write_blocked?
+        prev = @write_block_reason
+        @write_block_reason = ''
+        return false unless JsonFileStore.degraded?(path)
+
+        @write_block_reason = 'Globálne pravidlá kovania sú poškodené — číta sa záloha, zápisy sú ' \
+                              "vypnuté (oprav alebo zmaž súbor #{path})"
+        # Log LEN pri ZMENE stavu — seed-merge sa o zapis pokusa pri kazdom
+        # nacitani, takze bezpodmienecny zapis by zaplavil Ruby konzolu.
+        if prev.to_s != @write_block_reason && defined?(Engine)
+          Engine.log("hardware rules: zapis odmietnuty — #{@write_block_reason}")
+        end
+        true
       end
 
       def reload!

@@ -41,7 +41,13 @@ module Noxun
           # nieco ine — a status by pritom hlasil uspech. Priznak nesie LEN tato
           # cesta, aby iny push (tema) rozpisany draft neprepisal.
           push_ui_settings(refill_editor: true)
-          return set_status('Rozmerové rady sa nepodarilo uložiť (disk/práva).', true) if stored.nil?
+          if stored.nil?
+            # 1d/R-11: poskodeny primar s platnou `.bak` = zapis ODMIETLA brana,
+            # nie disk. Vseobecna hlaska „disk/prava" by pouzivatela poslala
+            # hladat nespravnu pricinu — naprava je oprava/zmazanie suboru.
+            reason = DimSeries.write_block_reason
+            return set_status(reason.empty? ? 'Rozmerové rady sa nepodarilo uložiť (disk/práva).' : reason, true)
+          end
 
           set_status('Rozmerové rady uložené.')
         end
