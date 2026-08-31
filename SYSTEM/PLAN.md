@@ -173,6 +173,7 @@ Pribudlo: **hybrid v zámku** (inference dá X/Y, zámok Z) + **natívne zvýraz
 zamknutou výškou (default dolná 0, horná 1400 = 850 + 550). Smoke body 7–11 nižšie.
 **Následný fix (v0.8.25, 31.8.):** pásik sa presunul **z vnútra sektora Materiály** na samostatné miesto **pod sektor Náhľad** — pri vklade dvojklikom na šablónu
 ho zbalený sektor schoval, takže o bežiacej session hovoril len status. Viditeľnosť riadi už len vlastný `hidden`; guard test to stráži.
+Tou istou dávkou dostala **predná stena ghostu jasnú zelenú** (#00C85A) — pôvodný tmavý teal splýval s obrysom ghostu aj s čiernymi hranami modelu. Zvyšok ghost smoke = PASS.
 
 **Cieľ:** vloženie skrinky tam, kde sa používateľ pozerá — po „Vložiť" visí ghost skrinky na kurzore,
 klik ju položí ako jednu reálnu CAB v jednom Undo kroku. Koniec hľadania skriniek položených cez `next_x`

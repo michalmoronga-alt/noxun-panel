@@ -43,9 +43,16 @@ module Noxun
 
       # Farby ghostu (GL). Zamerne NIE `EdgeCheck::COLORS` (tri stavy olepu) —
       # ghost hovori o polohe, nie o vyrobe. Obrys = neutralna tmava
-      # (`--nx-ink-strong`), predna stena a kotva = rodina vyberu `--nx-select`.
+      # (`--nx-ink-strong`), kotva = rodina vyberu `--nx-select`.
+      # PREDNA STENA (fix v0.8.25, Michalov zivy test): povodny tmavy teal
+      # `--nx-select` (#107787) sa v modeli MIESAL s tmavym obrysom a s ciernymi
+      # hranami geometrie — orientaciu ghostu sa nedalo precitat. Je preto
+      # JASNA ZELENA: ta v modeli nekoliduje s nicim (obrys je siva, kotva teal),
+      # je citatelna na bielom pozadi aj v tmavej scene a je to jedina farba
+      # ghostu, ktora ma „krical". Zostava LINKA (GL_LINE_LOOP) — ghost nema
+      # ziadnu vypln, takze niet co dalsie zosvetlovat.
       OUTLINE_RGB = [55, 71, 79].freeze     # #37474f
-      FRONT_RGB   = [16, 119, 135].freeze   # --nx-select #107787
+      FRONT_RGB   = [0, 200, 90].freeze     # jasna zelena #00C85A
       ANCHOR_RGB  = [11, 86, 97].freeze     # --nx-select-strong #0B5661
       DIM_RGB     = [150, 158, 162].freeze  # nepolozitelny stav (stlmeny ghost)
       ANCHOR_ARM_MM = 60.0                  # rameno krizika aktivnej kotvy
