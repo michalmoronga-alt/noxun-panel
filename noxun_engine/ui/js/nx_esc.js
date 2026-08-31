@@ -68,10 +68,11 @@
       return true;
     }
 
-    // Poradie = od najvrchnejsej vrstvy. Dva z tychto modalov naraz otvorene
-    // byt nemozu (kazdy patri inej sekcii a odchod zo sekcie ich zatvara,
-    // `absModal` je jediny v Inspectorovi) — poradie je tu preto, aby bolo
-    // spravanie deterministicke aj keby sa to raz zmenilo.
+    // Tabulka vlastnych vrstiev. PORADIE V NEJ NIE JE PRIORITA (review #273
+    // kolo 2): ked su otvorene dve naraz, rozhoduje DOKUMENTOVE PORADIE uzlov
+    // — pri zhodnom `z-index` (vsetky `.nxmodal` maju 60) kresli prehliadac ako
+    // posledny ten, ktory je v HTML nizsie, takze prave ten je VIDIET. Vid
+    // `topOpen()` nizsie.
     var OWN = [
       { id: 'absModal', fn: 'absModalChoose', arg: 'cancel' },
       { id: 'demosModal', fn: 'mddCancel' },
@@ -138,12 +139,40 @@
       return null;
     }
 
+    // Je uzol `b` v dokumentovom poradi ZA uzlom `a`? (bit 4 =
+    // `Node.DOCUMENT_POSITION_FOLLOWING`; konstanta sa pise cislom, lebo
+    // `Node` v Node.js testoch neexistuje). Ked porovnanie nie je k dispozicii,
+    // vrati `false` — retaz vtedy ostane pri poradi tabulky.
+    function follows(a, b){
+      if (!a || !b || typeof a.compareDocumentPosition !== 'function') return false;
+      return (a.compareDocumentPosition(b) & 4) === 4;
+    }
+
     // Vrstva, ktoru by Escape prave teraz zatvoril (alebo null).
+    //
+    // Ked su otvorene DVE vlastne vrstvy naraz, zatvara sa tá, ktora je
+    // v dokumentovom poradi POSLEDNA — pri zhodnom `z-index` (vsetky `.nxmodal`
+    // maju 60) ju prehliadac kresli navrch, takze prave ju pouzivatel vidi.
+    // Review #273 kolo 2 (P2): stavalo sa to na scenari „preflight zmazania
+    // materialu odosla, pouzivatel prepne sekciu na Kovanie a otvori `hwDelModal`,
+    // oneskorena odpoved `MD.confirmDelete` otvori `mdDeleteModal` POD nim" —
+    // podla poradia tabulky by Escape zavrel ten SKRYTY materialovy a navonok by
+    // sa „nestalo nic". Rozhodovanie je genericke (ziadna logika per modal),
+    // takze plati aj pre buduce dvojice.
+    //
+    // POZNAMKA (nie je to oprava tejto davky): ze `MD.confirmDelete` po odchode
+    // zo sekcie modal vobec znova otvori, je SAMOSTATNA chyba toho toku — ta ista
+    // trieda ako oneskorena odpoved „Nahradit UNI…", ktoru rieši generacia
+    // relacie v `proj_materials.js`. Kandidat do registra; reťaz ju len prestane
+    // zhorsovat.
     function topOpen(){
+      var best = null, bestNode = null;
       for (var i = 0; i < OWN.length; i++){
-        if (visible(OWN[i].id)) return OWN[i];
+        if (!visible(OWN[i].id)) continue;
+        var node = el(OWN[i].id);
+        if (!best || follows(bestNode, node)){ best = OWN[i]; bestNode = node; }
       }
-      return null;
+      return best;
     }
 
     // Zatvorenie bez klavesnice (odchod zo sekcie a pod. si okna riesia samy —

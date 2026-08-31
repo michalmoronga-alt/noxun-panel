@@ -204,6 +204,25 @@ ok(!isOpen('mdUniModal') && r.consumed, 'combobox pod modalom: prve stlacenie za
   ok(isOpen('absModal') && !rr.consumed, 'a modal pod nim tiez nie (jedno stlacenie, jedna vrstva)');
 });
 
+// --- DVE VLASTNE VRSTVY NARAZ: rozhoduje DOKUMENTOVE PORADIE, nie tabulka ---
+// Review #273 kolo 2 (P2): scenar zo Studia — preflight zmazania materialu uz
+// odosiel, pouzivatel prepne sekciu na Kovanie a otvori `hwDelModal`; oneskorena
+// odpoved `MD.confirmDelete` otvori `mdDeleteModal` POD nim. Oba maju z-index 60,
+// takze VIDIET je ten, ktory je v HTML nizsie — a prave ten musi Escape zavriet.
+// Podla poradia tabulky OWN by sa zavrel skryty materialovy a navonok by sa
+// „nestalo nic".
+reset();
+open('mdDeleteModal');                    // v tabulke SKOR, v DOM VYSSIE
+open('hwDelModal');                       // v DOM NIZSIE = kresli sa navrch
+eq(NXEsc.topOpen().id, 'hwDelModal', 'topOpen() menuje ten, ktory je v DOM posledny');
+r = esc();
+ok(!isOpen('hwDelModal'), 'Escape zavrel VIDITELNY modal kovania');
+ok(isOpen('mdDeleteModal'), 'a materialovy pod nim ostal otvoreny');
+eq(CALLS, ['hwDelClose'], 'volala sa jeho vlastna zatvaracia cesta');
+ok(r.consumed && r.after === 0, 'jedno stlacenie = jedna vrstva');
+r = esc();
+ok(!isOpen('mdDeleteModal') && r.consumed, 'druhe stlacenie zavrie uz ten spodny');
+
 // ============ 3) `budPrModal` — ESCAPE SA HO NESMIE DOTKNUT ================
 // Fazove okno prepoctu cien riadi SERVER. Vo faze `run` by zatvorenie nechalo
 // beh visiet bez okna, takze retaz pri nom NEROBI NIC — ani sebe pod nim.
@@ -289,6 +308,13 @@ ok(tagAt(STUDIO_HTML, 'nx_esc') < tagAt(STUDIO_HTML, 'studio'),
    'a PRED studio.js — jeho listener musi bezat prvy, aby vedel udalost spotrebovat');
 ok(tagAt(PANEL_HTML, 'nx_esc') > -1 && tagAt(PANEL_HTML, 'nx_esc') < tagAt(PANEL_HTML, 'form'),
    'v Inspectorovi PRED form.js (absModal)');
+
+// Predpoklad scenara „dve vlastne vrstvy naraz": v `studio.html` je `hwDelModal`
+// (sekcia Kovanie, `#hwModalRoot`) naozaj NIZSIE nez `mdDeleteModal` (`#matModalRoot`),
+// takze pri zhodnom z-index sa kresli navrch. Keby sa markup prehodil, prehodi sa
+// aj to, co ma Escape zatvorit — a test scenara vyssie by tvrdil nepravdu.
+ok(STUDIO_HTML.indexOf('id="mdDeleteModal"') < STUDIO_HTML.indexOf('id="hwDelModal"'),
+   'studio.html: hwDelModal je v dokumentovom poradi ZA mdDeleteModal');
 
 // Predpoklad, na ktorom stoji zaradenie comboboxu medzi FLYOUTY (trieda b):
 // v ziadnom z tych siestich modalov `select[data-nx-combo]` NIE JE, takze

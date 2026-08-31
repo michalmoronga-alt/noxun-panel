@@ -313,6 +313,12 @@ si vyžiadal druhé stlačenie. Combobox je v (b) preto, že v žiadnom z tých 
 ešte pred `change`, ktorý `absModal` otvára — keby raz pribudol, patrí do (a) (`.cbpop` má z-index 120). Vlastnú vrstvu naopak reťaz **spotrebuje** (`stopImmediatePropagation`,
 vzor vyššie), inak by ju za ňou dostal ešte handler Štúdia; flyout pod modálom teda ostáva otvorený a zavrie ho až ďalšie stlačenie u jeho vlastníka.
 
+**Medzi vlastnými vrstvami rozhoduje DOKUMENTOVÉ PORADIE, nie poradie tabuľky `OWN`** (review #273 kolo 2): všetky `.nxmodal` majú z-index 60, takže navrchu kreslí prehliadač ten,
+ktorý je v HTML nižšie — a `topOpen()` preto vyberá **posledný otvorený uzol v dokumentovom poradí** (`compareDocumentPosition`, generické, žiadna logika per modál). Bez toho by
+scenár „preflight zmazania materiálu odoslaný → prepnutie sekcie na Kovanie → `hwDelModal` → oneskorená `MD.confirmDelete` otvorí `mdDeleteModal` pod ním" nechal Escape zavrieť
+**skrytý** materiálový modál a navonok by sa „nestalo nič". *(Že `MD.confirmDelete` po odchode zo sekcie modál vôbec znovu otvorí, je samostatná chyba toho toku — tá istá trieda
+ako oneskorená odpoveď „Nahradiť UNI…"; reťaz ju len prestáva zhoršovať, opravená nie je.)*
+
 **Escape = klik na „Zrušiť", nie `display:none`:** volá sa tá istá funkcia ako z tlačidla — `mddCancel` ruší bežiaci Demos fetch na serveri, `absModalChoose('cancel')` vracia
 pôvodnú hodnotu selectu, `mdUniClose` zahadzuje pending odtlačok. Preto dostal `hwDelModal` pomenované `hwDelClose()` (dovtedy vetva schovaná v delegácii klikov). Otvorenosť sa
 pozná genericky z `style.display !== 'none'` (`budPrModal` v DOM ani nie je, kým nebeží), takže reťaz nepotrebuje háčik v otváraní. **Vedomé obmedzenie:** fokus sa po Escape
