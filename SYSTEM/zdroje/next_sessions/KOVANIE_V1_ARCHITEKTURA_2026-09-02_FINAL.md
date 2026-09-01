@@ -181,6 +181,12 @@ G **nohy 4/6 + klipy cez šírku + sokel pri vkladaní** [LOW po O3] → H **ad-
 I **šablóny 🔧** [MEDIUM; R12]. Mockup Čelá/Kovanie/Zóny PRED UI časťami A a B. Malé PR, brány podľa CLAUDE.md,
 audit-povinnosť per dávka (kontrakt/schéma/migrácia = vždy).
 
+## 13a. UI mockup — SCHVÁLENÝ (Michal, 2.9.2026)
+
+`SYSTEM/zdroje/ui20/mockup_kovanie_v1.html` (4 scény: Čelá · Kovanie · Katalóg+sety · Kontrola) je od 2.9.2026
+**záväzná UX referencia pre slice A/B/D/H** — Michal preklikal bez výhrad. Implementácia sa porovnáva 1:1 s mockupom;
+odchýlka = vedomé rozhodnutie zapísané v package/PR, nie improvizácia.
+
 ## 14. Detail fill pred/počas implementácie (nie architektúra)
 
 PDF follow-up list (#10, 8 bodov) · overiť H70 „92" v Michalových podkladoch (oficiálne 105/106/108) ·
