@@ -23,6 +23,8 @@ Decision: do not lock derived-part identity/model yet. First collect real system
   - KD 19 -> EB 9.5
 - For Noxun V1, EB can therefore be fixed to 10.5 unless later requirements justify exposing the axis.
 - **Confirmed production rule:** bottom material thickness = 16 mm and wooden rear-panel thickness = 16 mm for Atira V1.
+- **Opening-mode confirmation:** Noxun uses both damped/classic (Silent System) and push-to-open variants for Atira.
+- For the V1 manufactured-part recipe, opening mode does not create a separate box-geometry recipe. Treat opening mode as an orthogonal hardware/resolver axis that selects the appropriate runner/component set and installation data.
 
 ### Quadro / TANDEM family
 - User correction: Quadro width calculation depends on the selected runner / installation width EB.
@@ -58,10 +60,10 @@ Two useful computational families remain:
 
 Important: do NOT infer that Quadro and TANDEM have identical formulas. They share the same kind of recipe, but runner-specific constants/axes differ.
 
-Important: opening mode is an orthogonal hardware axis for these drawer families. Do not fork the manufactured-part recipe merely because the runner is damped/classic vs push-to-open.
+Important: opening mode is an orthogonal hardware axis for both V1 drawer archetypes. Do not fork the manufactured-part recipe merely because the runner is damped/classic vs push-to-open.
 
 ## Next audit work
-1. Collect exact V1 Atira recipe: generated manufactured parts, dimensions, material/thickness, height variants, NL variants, opening mode impact, mandatory hardware SKUs.
+1. Collect exact V1 Atira recipe: generated manufactured parts, dimensions, material/thickness, height variants, NL variants, mandatory hardware SKUs, and opening-mode-specific hardware/installation data.
 2. Collect exact V1 Quadro EB23 recipe: four wooden box parts + bottom, dimensions, 16/18 mm thickness effects, NL, catches, opening-mode-specific runner/installation data.
 3. Compare StrongBox and TANDEMBOX Antaro against Atira to identify true shared parameters vs system-specific branches.
 4. Compare Blum TANDEM against Quadro EB23 to identify shared recipe fields vs runner-specific constants.
@@ -71,6 +73,7 @@ Important: opening mode is an orthogonal hardware axis for these drawer families
 - User production choices: confirmed by user, 2026-09-01.
 - Atira formulas: confirmed by user-supplied Hettich sheet and official Hettich catalogue.
 - Atira 16 mm bottom + 16 mm wooden rear panel: confirmed by user, 2026-09-01.
+- Atira Silent System + Push-to-open use in Noxun: confirmed by user, 2026-09-01.
 - Quadro EB23 profile / width: official Hettich runner documentation.
 - Quadro default 16 mm and supported 18 mm box material: confirmed by user, 2026-09-01.
 - Quadro box construction and Excel dimensions: confirmed by user, 2026-09-01.
