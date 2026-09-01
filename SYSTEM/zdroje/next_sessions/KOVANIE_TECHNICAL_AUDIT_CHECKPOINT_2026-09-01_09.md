@@ -50,6 +50,18 @@ User-confirmed production rule:
 - `height_variant` changes the rear-panel **height** and railing composition, not the rear-panel width formula.
 - Therefore V1 should keep rear-panel width on the shared Atira geometry recipe and keep rear-panel height as height-variant data.
 
+## Atira manufactured-part BOM
+
+User-confirmed production rule:
+
+- The standard Atira drawer generates exactly **two manufactured sheet-material parts**:
+  1. bottom,
+  2. wooden rear panel.
+- The drawer front is already the existing front/owner and must not be emitted again as a derived Atira manufactured part.
+- Metal drawer sides, runners, rear-panel holders/connectors, railings, railing connectors and related fittings are hardware/procurement components, not manufactured sheet parts.
+- This cleanly separates the manufactured geometry recipe from supplier/component expansion: Atira geometry emits two manufactured parts, while the selected hardware configuration resolves to one bundled supplier SKU or multiple atomic SKUs depending on procurement packaging.
+- Current V1 production thickness for both Atira manufactured parts remains 16 mm, as recorded in checkpoint #08.
+
 ## Architectural implication
 
 This strengthens the existing slim-V1 direction:
@@ -69,3 +81,4 @@ Do not lock derived-part identity from this checkpoint; C10 remains AUDIT FIRST.
 - Atira H70/H144/H176 resolver = highest safely compatible height variant from actual available internal vertical space + manual override: user-confirmed 2026-09-01.
 - Atira railing composition H70=0, H144=1 per side, H176=1 per side: user-confirmed 2026-09-01.
 - Atira rear-panel width formula shared across H70/H144/H176: `RB = LB - 2*EB - 63`; only rear-panel height changes with height variant: user-confirmed 2026-09-01.
+- Atira manufactured sheet-material BOM = bottom + wooden rear panel only; front remains existing owner and remaining components are hardware/procurement: user-confirmed 2026-09-01.
