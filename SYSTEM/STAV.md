@@ -31,7 +31,7 @@ vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 **1e HOTOVÁ** — posledný package KOVANIE vznikol 2.9. **Blok KOVANIE ŠTARTOVAL (2.9.):** architektúra V1 uzavretá po cross-audite (Codex/GLM/Opus) + reconcile + O1–O3
 ([zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md](zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md)), mockup schválený
 ([zdroje/ui20/mockup_kovanie_v1.html](zdroje/ui20/mockup_kovanie_v1.html)), packages KOV-A/B/H v [PLAN.md](PLAN.md); **PR #277 D-52a (jadro updatera) v Codex review** — D-52 je tvrdý predpoklad prvého schema bumpu.
-**Od 2.9. večer bez Fable** — orchestruje Opus, review Codex; vstupný bod je pamäť `handoff-2026-09-02` + tento súbor. **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
+**Od 2.9. večer bez Fable** — orchestruje Opus, review Codex; vstupný bod je [zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md](zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md) + tento súbor; packages všetkých slices sú v PLAN. **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
 
