@@ -538,12 +538,19 @@ module Noxun
         # by kazda globalna mutacia skoncila na vseobecnom „zlyhalo" (brana
         # vracia :write_failed / false) a pouzivatel by netusil, ze staci
         # aktualizovat plugin. Dovod je JEDEN — ten isty, ktory nesie banner.
+        #
+        # R-11: TA ISTA cesta plati aj pre DEGRADOVANU kniznicu (poskodeny
+        # primar + platna `.bak`). GLOBALNE zapisy sa preto pytaju
+        # `library_write_blocked?`; cesty, ktore rozhoduju o POUZITI obsahu
+        # (predvolba projektu, resolver setu), sa dalej pytaju
+        # `library_read_only?` — obsah zalohy je platny a zakazka sa musi dat
+        # dokoncit.
         def library_blocked_txt
           "#{HardwareSets.library_state_reason} — zmena sa neuložila."
         end
 
         def handle_set_save(payload)
-          return set_status(library_blocked_txt, true) if HardwareSets.library_read_only?
+          return set_status(library_blocked_txt, true) if HardwareSets.library_write_blocked?
 
           data = JSON.parse(payload.to_s)
           status, info = HardwareSets.save_set!(data['set'].is_a?(Hash) ? data['set'] : {},
@@ -570,7 +577,7 @@ module Noxun
         end
 
         def handle_set_delete(payload)
-          return set_status(library_blocked_txt, true) if HardwareSets.library_read_only?
+          return set_status(library_blocked_txt, true) if HardwareSets.library_write_blocked?
 
           data = JSON.parse(payload.to_s)
           status, = HardwareSets.delete_set!(data['set_id'].to_s, revision: data['revision'].to_s)
@@ -670,7 +677,7 @@ module Noxun
         # vyber znova". Po zahodeni sa editor otvori nad CERSTVOU kniznicou
         # a pripne si jej reviziu.
         def handle_map_global(payload)
-          return set_status(library_blocked_txt, true) if HardwareSets.library_read_only?
+          return set_status(library_blocked_txt, true) if HardwareSets.library_write_blocked?
 
           data = JSON.parse(payload.to_s)
           status = HardwareSets.set_global_mapping!(data['generic_type'].to_s, mapping_value(data),

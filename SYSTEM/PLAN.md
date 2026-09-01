@@ -129,7 +129,13 @@ volajúcich sa nemení), v0.8.20, 30.8.; **tým padol TVRDÝ blocker bloku GHOST
 seed v `normalize`, `build_plan` ostáva v commite, `bounds_mm` plán nenesie) sú zapísané v `docs/architecture/construction.md`. ·
 **R-07** — kompatibilitná brána globálnej knižnice setov kovania (starší a novší plugin na jednom profile si ju už nepoškodia: knižnica z novšej verzie sa
 nedá zapísať ANI použiť — súpis kovania ju prizná oranžovým riadkom a Štúdio bannerom s dôvodom, namiesto tichého orezania), v0.8.21, 30.8.;
-degraded/`.bak` (**R-11**) sa nerieši, len sa mu nezavadzia.
+degraded/`.bak` (**R-11**) sa nerieši, len sa mu nezavadzia. ·
+**R-11** — brána degradovaného globálneho súboru (poškodený primár + platná `.bak`): plugin zo zálohy ďalej ČÍTA, ale zápisy do pokazeného súboru vypne a povie dôvod —
+inak by prvý zápis prepísal primár obsahom odvodeným od STARŠEJ zálohy a všetko medzi zálohou a poškodením by zmizlo. Týka sa piatich stores (sety a pravidlá kovania,
+ABS pravidlá, rozmerové rady, sadzby dodávateľa), v0.9.2, 1.9.2026; knižnica setov má degraded ako **vlastný stav** (obsah zálohy sa smie čítať aj použiť na projekt,
+zakázané sú len zápisy do globálneho súboru). Codex audit návrhu vrátil 3 BLOCKERy + 2 FIXy + 1 NOTE — všetky zapracované, priznaný zvyšok je TOCTOU okno voči
+zapisovateľom, ktorí zámok ignorujú. Do registra pribudli **R-37** (obsahovo zlý, ale tvarovo platný primár zničí dobrú zálohu už pri načítaní) a **R-38**
+(`vepo_settings.json` — chýbajúci guard aj kanál na dôvod zlyhania).
 **R-02b** — stabilný kľúč dokumentu (`core/doc_key.rb`) namiesto `Model#guid` vo VŠETKÝCH identity guardoch (Ctrl+S už nezahadzuje rozpísanú prácu panela,
 zón, tagov, Štúdia, Pravidiel ani Materiálov; New/Open ďalej chráni pred zápisom do cudzej zákazky; Save As identitu vedome drží — Codex audit BLOCKER 3),
 v0.8.23, 30.8.; priznaný zvyšok R-02 tým padol, JS aj tvar payloadov nezmenené. ·

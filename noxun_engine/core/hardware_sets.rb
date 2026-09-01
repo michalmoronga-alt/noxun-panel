@@ -272,6 +272,8 @@ module Noxun
       # neznamy obsah TICHO orezala a prvym zapisom stratu ZVECNILA. Od tejto
       # davky ma kniznica STAV (vzor `HardwareCatalog.assess!`):
       #   :ok        — subor je tejto verzii cely zrozumitelny,
+      #   :degraded  — 1d/R-11, viz nizsie: obsah sa SMIE citat aj pouzit,
+      #                ale do globalneho SUBORU sa nesmie zapisat,
       #   :read_only — nesmie sa ANI zapisat, ANI POUZIT (`load` z nej nic
       #                nevyda — viz jeho odsek).
       #
@@ -279,14 +281,28 @@ module Noxun
       # (`library_state_code`) pre kod. Kody su `:newer` · `:foreign` ·
       # `:unknown_shape` · `:duplicate` · `:unreadable` · `:unexpected_shape`
       # (posledny = fail-closed vetva, moze ho sposobit aj chyba pluginu nad
-      # zdravym suborom, preto jeho hlaska NENAVADZA subor mazat).
+      # zdravym suborom, preto jeho hlaska NENAVADZA subor mazat) · `:degraded`.
       #
-      # ROZSIROVANIE (R-11, poskodeny primar s platnou zalohou): novy dovod
-      # patri DOVNUTRA `assess_library_doc` (alebo pred nu do `library_assess!`)
-      # ako DALSIA kontrola s vlastnym kodom — nikdy ako druhy, samostatny
-      # stavovy priznak. `apply_library_state` zapisuje VYSLEDOK jednej matice,
-      # takze sa dva dovody nemozu prebijat a `:read_only` sa nemoze vratit
-      # na `:ok` len preto, ze druha kontrola nic nenasla.
+      # 1d/R-11 — DEGRADOVANY SUBOR (poskodeny primar + platna `.bak`).
+      # R-07 tu nechala miesto s poznamkou „novy dovod patri do tej istej
+      # matice". Matica ostava JEDNA (jeden stav, jeden kod, jeden dovod), ale
+      # kontrola NEMOHLA prist dovnutra `assess_library_doc`: tá je CISTA
+      # funkcia nad DOKUMENTOM (ziadne IO) a degraded je vlastnost SUBOROV na
+      # disku — dokument sa v tom pripade parsuje uplne v poriadku, lebo
+      # pochadza zo ZALOHY. Kontrola preto sedi vo vrstve NAD nou
+      # (`assess_library`), ktora vysledok dokumentovej matice len DOPLNI,
+      # a `apply_library_state` aj tak zapisuje jediny vysledok — dva dovody
+      # sa nemozu prebijat a `:read_only` nikdy nespadne na nizsi stupen
+      # (degraded sa zvazuje LEN vtedy, ked dokument dopadol `:ok`).
+      #
+      # PRECO NIE `:read_only`: zaloha je POUZITELNY obsah (na rozdiel od
+      # kniznice z novsej verzie, kde je obsah orezany o to, comu nerozumieme).
+      # Zakazka sa musi dat dokoncit: sety sa daju CITAT, zmrazit do projektu
+      # a projektove predvolby menit — to su zapisy do MODELU, nie do
+      # poskodeneho suboru. Zakazane su VYHRADNE zapisy do globalneho suboru
+      # (`save_set!` · `delete_set!` · `set_global_mapping!` · seed-merge ·
+      # `ensure_seeded`), lebo prave ony by primar prepisali obsahom odvodenym
+      # od STARSEJ zalohy.
       #
       # STAV SA NECACHUJE (review P1-1). Zapamatane `:ok` je presne ta pasca,
       # ktoru brana riesi: subor mohol medzitym nahradit iny proces, takze
@@ -311,6 +327,15 @@ module Noxun
         library_state == :read_only
       end
 
+      # 1d/R-11: smie sa zapisat do GLOBALNEHO SUBORU kniznice? `:read_only`
+      # zakazuje vsetko, `:degraded` LEN zapisy do suboru. Volajuci, ktori
+      # rozhoduju o POUZITI obsahu (projektovy snapshot, expanzia, sablony),
+      # sa dalej pytaju `library_read_only?` — degradovana kniznica sa pouzit
+      # SMIE (obsah zalohy je platny).
+      def library_write_blocked?
+        [:read_only, :degraded].include?(library_state)
+      end
+
       # Test-only reset (stav je modulova cache nad globalnym suborom).
       def reset_library_state!
         @lib_state = nil
@@ -323,7 +348,33 @@ module Noxun
       # cesta (payloady, expanzia). Pred ZAPISOM sa brana vyhodnocuje ZNOVA
       # a pod zamkom (`write`) nad suborom po `reload!`.
       def library_assess!
-        apply_library_state(*assess_library_doc(read_library_doc))
+        apply_library_state(*assess_library(read_library_doc))
+      end
+
+      # JEDNA matica stavu: dokument (`assess_library_doc`, ciste) + stav
+      # SUBOROV na disku (R-11 degraded). Poradie je zamerne — pri
+      # nezrozumitelnom dokumente sa degraded uz neriesi (`:read_only` je
+      # prisnejsi a jeho dovod je pre pouzivatela dolezitejsi).
+      def assess_library(doc)
+        state, code, reason = assess_library_doc(doc)
+        return [state, code, reason] unless state == :ok
+        return [:degraded, :degraded, degraded_sk] if library_degraded_file?
+
+        [:ok, nil, '']
+      end
+
+      # R-11: poskodeny primar + platna `.bak`. Cita sa PRIAMO z disku (bez
+      # sekundovej cache) — detail a dovody su v `JsonFileStore.degraded?`.
+      # I/O chyba sa TU rescue-uje na `false` VEDOME NIE JE: fail-closed
+      # spravanie zabezpecuje `library_assess!` az cez svojich volajucich —
+      # vynimka vyleti do ich rescue vetiev ako neuspech, nie ako povolenie.
+      def library_degraded_file?
+        JsonFileStore.degraded?(path)
+      end
+
+      def degraded_sk
+        'Knižnica setov kovania je poškodená — číta sa záloha, globálne zápisy sú vypnuté ' \
+          "(oprav alebo zmaž súbor #{path})"
       end
 
       # Dokument kniznice na posudenie. Chybajuci subor = CISTY stav (nil).
@@ -351,8 +402,8 @@ module Noxun
         @lib_state_reason = reason.to_s
         # Log LEN pri zmene — stav sa vyhodnocuje pri kazdom pouziti, takze
         # bezpodmienecny zapis by pri read-only kniznici zaplavil konzolu.
-        if changed && state == :read_only && defined?(Engine) && Engine.respond_to?(:log)
-          Engine.log("hardware sets: kniznica READ-ONLY — #{reason}")
+        if changed && state != :ok && defined?(Engine) && Engine.respond_to?(:log)
+          Engine.log("hardware sets: kniznica #{state == :degraded ? 'DEGRADOVANA' : 'READ-ONLY'} — #{reason}")
         end
         state
       end
@@ -581,7 +632,10 @@ module Noxun
       # zvecnil — rovnaka lekcia ako zlyhany zamok v R-08).
       def read_library
         doc = JsonFileStore.read(path, copy: false)
-        read_only = apply_library_state(*assess_library_doc(doc)) == :read_only
+        # R-11: cez TU ISTU maticu — degradovana kniznica sa CITA normalne
+        # (dokument pochadza zo zalohy a je platny); prazdno je vyhradne pre
+        # `:read_only`. Zapisy zastavi az brana v `write`.
+        read_only = apply_library_state(*assess_library(doc)) == :read_only
         return [blank_library, false] if read_only
         sets = doc.is_a?(Hash) ? normalize_sets(doc['sets']) : []
         mapping = doc.is_a?(Hash) ? normalize_mapping(doc['mapping'], sets) : {}
@@ -699,9 +753,21 @@ module Noxun
           # ZAMKOM pred KAZDYM zapisom; tato jedna brana kryje vsetky zapisove
           # cesty (`save_set!` · `delete_set!` · `set_global_mapping!` ·
           # seed-merge · `ensure_seeded`), lebo vsetky koncia tu.
+          #
+          # R-11 pouziva TU ISTU branu: `:degraded` (poskodeny primar + platna
+          # `.bak`) zapis do suboru odmietne rovnako ako `:read_only` — inak by
+          # sme primar prepisali obsahom odvodenym od STARSEJ zalohy. Citanie
+          # a pouzitie obsahu degradovana kniznica dovoluje (viz `read_library`).
           JsonFileStore.reload!(path)
-          if apply_library_state(*assess_library_doc(read_library_doc)) == :read_only
-            Engine.log("hardware sets: zapis kniznice odmietnuty — #{library_state_reason}") if defined?(Engine)
+          before = @lib_state
+          if [:read_only, :degraded].include?(apply_library_state(*assess_library(read_library_doc)))
+            # Log LEN pri ZMENE stavu (vzor `apply_library_state`): seed-merge
+            # sa nad degradovanou kniznicou pokusi zapisat pri KAZDOM `load`,
+            # takze bezpodmienecny zapis by zaplavil Ruby konzolu. Pouzivatel
+            # o odmietnuti vie z UI hlasky, nie z logu.
+            if before != @lib_state && defined?(Engine)
+              Engine.log("hardware sets: zapis kniznice odmietnuty — #{library_state_reason}")
+            end
             next false
           end
           # R-07 (bod 7): marker sa stampuje podla OBSAHU (`snapshot_std`), nie
@@ -775,7 +841,9 @@ module Noxun
           # R-07: brana PRED reviziou — nad nekompatibilnou kniznicou nie je
           # o com hovorit (a `load` z nej nic nevyda, takze bez tejto vetvy by
           # sa mutacia rozhodovala nad PRAZDNOM a hlasila nezmysly).
-          next [:write_failed, library_state_reason] if library_read_only?
+          # R-11: aj DEGRADOVANA kniznica (poskodeny primar + platna zaloha)
+          # odmieta zapisy do suboru — dovod ide do hlasky rovnako ako pri R-07.
+          next [:write_failed, library_state_reason] if library_write_blocked?
           next [:conflict, nil] if revision && revision != self.revision
           lib = load
           sets = lib['sets']
@@ -805,7 +873,7 @@ module Noxun
         return [:not_found, nil] if sid.empty?
         with_catalog_lock do
           JsonFileStore.reload!(path)
-          next [:write_failed, library_state_reason] if library_read_only? # R-07
+          next [:write_failed, library_state_reason] if library_write_blocked? # R-07 + R-11
           next [:conflict, nil] if revision && revision != self.revision
           lib = load
           sets = lib['sets'].reject { |s| s['set_id'] == sid }
@@ -831,7 +899,7 @@ module Noxun
         return false unless BuildPlan::GENERIC_TYPES.include?(gt)
         with_catalog_lock do
           JsonFileStore.reload!(path)
-          next false if library_read_only? # R-07
+          next false if library_write_blocked? # R-07 + R-11
           next :conflict if revision && revision != self.revision
           lib = load
           mapping = lib['mapping']

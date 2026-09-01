@@ -59,6 +59,53 @@ module Noxun
         File.exist?(key) || File.exist?("#{key}.bak")
       end
 
+      # --- 1d/R-11: DEGRADOVANY stav (poskodeny primar + platna zaloha) -------
+      #
+      # `read_primary_or_backup` cita pri poskodenom primare TICHO zo zalohy.
+      # Volajuci potom nad datami ZALOHY pracuje dalej a jeho najblizsi zapis
+      # prepise primar obsahom odvodenym od STARSEJ zalohy — vsetko medzi
+      # zalohou a poskodenim je nenavratne prec. Vzor spravnej odpovede ma
+      # `HardwareCatalog.assess!` (GH #99 P1): citaj zo zalohy, ale ZAPISY
+      # ZASTAV, kym pouzivatel subor neopravi alebo nezmaze.
+      #
+      # DEGRADED je PRAVE VTEDY, ked primar EXISTUJE a NEPARSUJE sa a zaroven
+      # EXISTUJE parsovatelna `.bak`:
+      #   * chybajuci primar s platnou zalohou degraded NIE JE — nic sa
+      #     nestratilo (zhodne s `HardwareCatalog.assess!`, kde chybajuci subor
+      #     je cisty stav);
+      #   * poskodeny primar BEZ pouzitelnej zalohy degraded NIE JE — nie je
+      #     z coho co stratit a volajuci sa spravaju ako doteraz (seed +
+      #     samoopravny prvy zapis; rovnaka uvaha ako R-07 `read_library_doc`).
+      #
+      # CITA SA PRIAMO Z DISKU, BEZ sekundovej cache `read` (audit F5): cache
+      # by vratila hodnotu spred poskodenia a brana by pustila zapis presne
+      # v okamihu, ked ma stat. Tato metoda je preto jedine miesto v module,
+      # ktore obchadza `cache`.
+      #
+      # I/O CHYBY SA NERESCUE-UJU (audit F5): `false` znamena „smies zapisat".
+      # Nedostupny subor (prava, sharing violation, sietovy disk) o zdravi
+      # primaru NEHOVORI NIC, takze vynimka musi vyletiet a skoncit v rescue
+      # vetve volajuceho ako NEUSPESNY zapis. Rescue-uje sa VYHRADNE
+      # `JSON::ParserError` (= poskodeny obsah) a `Errno::ENOENT` (= definovana
+      # odpoved „subor nie je").
+      def degraded?(path)
+        key = File.expand_path(path)
+        return false unless json_state(key) == :corrupt
+
+        json_state("#{key}.bak") == :ok
+      end
+
+      # :ok (parsuje sa) | :corrupt (existuje, ale nie je JSON) | :missing.
+      # Ine chyby (EACCES, EBUSY, …) VEDOME prebublaju k volajucemu.
+      def json_state(path)
+        JSON.parse(File.binread(path))
+        :ok
+      rescue JSON::ParserError
+        :corrupt
+      rescue Errno::ENOENT
+        :missing
+      end
+
       def invalidate(path = nil)
         if path
           cache.delete(File.expand_path(path))

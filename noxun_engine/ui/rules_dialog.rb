@@ -613,7 +613,17 @@ module Noxun
 
           global_note = ''
           if data['also_global']
-            global_note = HardwareRules.write(rules) ? ' + globálna predvoľba' : ' (globálny zápis zlyhal!)'
+            # 1d/R-11: pri zlyhani sa pyta KONKRETNY dovod. Globalny subor
+            # pravidiel moze mat poskodeny primar s platnou `.bak` — vtedy
+            # zapis ODMIETNE brana (nie disk) a naprava je oprava/zmazanie
+            # JEDNEHO suboru. „Globalny zapis zlyhal!" by pouzivatela poslalo
+            # hladat problem s pravami.
+            global_note = if HardwareRules.write(rules)
+                            ' + globálna predvoľba'
+                          else
+                            reason = HardwareRules.write_block_reason
+                            reason.empty? ? ' (globálny zápis zlyhal!)' : " — #{reason}"
+                          end
           end
           @rev_conflicts = 0 # uspech = seria konfliktov sa konci (druhe znenie sa resetuje)
           set_status("Pravidlá uložené do projektu#{global_note} — prestavaných #{jobs.size} skriniek.")
