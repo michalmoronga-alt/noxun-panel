@@ -40,6 +40,11 @@ Decision: do not lock derived-part identity/model yet. First collect real system
 - Official Hettich Quadro V6 EB23 drawing specifies bottom offset/range `12-13 mm`; Noxun can use `12 mm` as the V1 default while retaining the official range as technical data.
 - For the 16 mm example, `102 = 130 - 16 - 12`, i.e. front/rear height = drawer height - bottom thickness - bottom offset.
 - Official current Blum TANDEM planning shows a closely related bottom offset/range of `11-13 mm` for the cited 11-16 mm wooden-drawer variants. Do not assume it is exactly identical to Quadro; keep the offset as runner-family/system data.
+- **Opening-mode confirmation:** Noxun uses both damped/classic and push-to-open variants for Quadro; the same is true for Blum TANDEM (BLUMOTION/classic and TIP-ON).
+- For the V1 manufacturing recipe, opening mode does **not** change the base manufactured box geometry for the cited Quadro EB23 and TANDEM profiles. Width/length box formulas stay on the same system recipe.
+- Opening mode still changes mechanical/system data: concrete runner/SKU, installation/drilling details, front gap/trigger requirements, possible synchronisation, and in some variants required cabinet depth or attachment dimensions. Therefore opening mode belongs to hardware/resolver data, not to a duplicated manufactured-part recipe.
+- Hettich Technical Assistant exposes separate Quadro V6 EB23 installation instructions for Silent System and Push to open, supporting this separation of same box family vs different runner installation.
+- Current Blum TANDEM data likewise keeps `SKW = LW - 42` and `SKL = NL - 10` for the cited standard 11-16 mm BLUMOTION and TIP-ON variants, while TIP-ON adds trigger/front-gap and related installation requirements.
 - Audit still required: verify exactly which component dimensions change with 16 vs 18 mm while the EB23 runner installation geometry remains fixed; do not assume every part formula is unchanged.
 - Official Hettich data for classic Quadro V6 EB23 gives internal drawer width `SKW = LB - 46` and nominal drawer length equal to NL; min cabinet depth NL+13 for that classic V6 configuration.
 - Other Quadro generations/variants differ (e.g. V6 5D / V6 YOU use internal width LB-42 and drawer length NL-10), so runner variant MUST remain a future data axis even if V1 fixes the current profile.
@@ -53,9 +58,11 @@ Two useful computational families remain:
 
 Important: do NOT infer that Quadro and TANDEM have identical formulas. They share the same kind of recipe, but runner-specific constants/axes differ.
 
+Important: opening mode is an orthogonal hardware axis for these drawer families. Do not fork the manufactured-part recipe merely because the runner is damped/classic vs push-to-open.
+
 ## Next audit work
 1. Collect exact V1 Atira recipe: generated manufactured parts, dimensions, material/thickness, height variants, NL variants, opening mode impact, mandatory hardware SKUs.
-2. Collect exact V1 Quadro EB23 recipe: four wooden box parts + bottom, dimensions, 16/18 mm thickness effects, NL, catches, opening-mode differences, runner SKUs.
+2. Collect exact V1 Quadro EB23 recipe: four wooden box parts + bottom, dimensions, 16/18 mm thickness effects, NL, catches, opening-mode-specific runner/installation data.
 3. Compare StrongBox and TANDEMBOX Antaro against Atira to identify true shared parameters vs system-specific branches.
 4. Compare Blum TANDEM against Quadro EB23 to identify shared recipe fields vs runner-specific constants.
 5. Only then decide derived part keys / owner relationship / BuildPlan integration.
@@ -68,5 +75,7 @@ Important: do NOT infer that Quadro and TANDEM have identical formulas. They sha
 - Quadro default 16 mm and supported 18 mm box material: confirmed by user, 2026-09-01.
 - Quadro box construction and Excel dimensions: confirmed by user, 2026-09-01.
 - Quadro bottom offset 12-13 mm: official Hettich technical assistant sheet.
-- TANDEM bottom offset 11-13 mm: official current Blum technical catalogue for cited variants.
+- Quadro Silent System + Push to open use in Noxun: confirmed by user, 2026-09-01; separate official Hettich EB23 installation instructions verified.
+- TANDEM BLUMOTION/classic + TIP-ON use in Noxun: confirmed by user, 2026-09-01.
+- TANDEM bottom offset 11-13 mm and same cited base box formulas across BLUMOTION/TIP-ON profiles: official current Blum technical catalogue.
 - TANDEM formulas: official Blum technical catalogue.
