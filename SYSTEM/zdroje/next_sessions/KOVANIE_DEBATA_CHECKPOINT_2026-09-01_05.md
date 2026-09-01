@@ -42,8 +42,9 @@
 ## 5. Dvierka ako hardware owner
 
 - Pri dvojkrídlových dvierkach má každé krídlo vlastného hardware ownera (`F1-L`, `F1-R`).
-- Medzi krídlami existuje len logická väzba dvojice; nevzniká zbytočná spoločná mechanická zostava.
+- Medzi krídlami môže existovať jednoduchá logická väzba dvojice kvôli smeru/rozloženiu, ale **V1 nezavádza všeobecný systém symetrických alebo synchronizovaných čiel**.
 - Počet závesov sa počíta a validuje pre každé krídlo samostatne.
+- Každé krídlo má vo V1 vlastný lock/override počtu závesov; žiadne automatické prenášanie locku na „rovnaké“ alebo symetrické čelá.
 - Pri jednokrídlových dvierkach Engine smer neháda, ak ho nevie spoľahlivo odvodiť: stav `Neurčený`.
 - `Neurčený smer` je počas návrhu WARNING, pri finálnej kontrole ERROR a blokuje výrobný výstup.
 
@@ -63,8 +64,8 @@
 - Zamknutý počet pod vypočítaným minimom: WARNING počas návrhu, ERROR pri finálnej kontrole.
 - Zamknutý počet vyšší než odporúčané minimum je platný `OK`; možno jemne ukázať odporúčané minimum, ale bez warningu.
 
-## 8. Synchronizácia lockov na rovnakých dverách
+## 8. Mimo scope V1 — symetrické/rovnaké čelá
 
-- Pri symetrických dverách sa lock počtu závesov štandardne synchronizuje aj na druhé symetrické krídlo.
-- UX má umožniť jedným klikom `Použiť aj na ostatné rovnaké` a zároveň `Upraviť samostatne`, čím sa konkrétne krídlo odpojí.
-- Za **rovnaké dvere** pre túto hromadnú aplikáciu sa považuje: rovnaký typ + rovnaké rozmery + rovnaký materiál/hrúbka.
+- Synchronizácia nastavení medzi symetrickými alebo „rovnakými“ čelami je **výslovne mimo V1**.
+- V1 nebude mať `Použiť aj na ostatné rovnaké`, skupinové locky ani automatické odpájanie zo synchronizovaných skupín.
+- Ak sa neskôr ukáže reálna potreba, táto oblasť sa navrhne samostatne ako bulk/synchronization feature, aby sa nemiešala do základného modelu kovania.
