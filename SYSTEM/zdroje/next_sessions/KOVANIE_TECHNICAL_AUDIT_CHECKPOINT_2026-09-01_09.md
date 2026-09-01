@@ -62,6 +62,29 @@ User-confirmed production rule:
 - This cleanly separates the manufactured geometry recipe from supplier/component expansion: Atira geometry emits two manufactured parts, while the selected hardware configuration resolves to one bundled supplier SKU or multiple atomic SKUs depending on procurement packaging.
 - Current V1 production thickness for both Atira manufactured parts remains 16 mm, as recorded in checkpoint #08.
 
+## Atira manufactured-part material selection
+
+User-confirmed V1 direction:
+
+- Bottom + wooden rear panel use the project's/default **drawer material** for 16 mm sheet material.
+- The same default applies to both Atira manufactured parts.
+- Manual material override remains available.
+- Do not derive this implicitly from carcass material merely because the carcass has a related decor; drawer material is its own project/default choice.
+
+## Closure before Fable Stage-2 audit
+
+The product/production decision pass is intentionally paused here. The remaining open items are primarily technical/repository/catalogue audit work and should not block starting Fable:
+
+- exact Atira and Quadro purchasable SKU/component composition per opening mode, NL, height/load variant and Demos packaging;
+- exact current catalogue compatibility tables and supplier bundle-vs-atomic mappings;
+- derived manufactured-part identity and flow through BuildPlan/BOM/material/ABS/VEPO;
+- migration/updater bridge for old hardware sets/rules/live jobs;
+- implementation impact for Fronts flap support and `generic_type=lift`;
+- density/weight fallback, Kontrola deep-linking, ad-hoc hardware and remaining validation details;
+- UI mockup and final Inspector interaction details after architecture audit.
+
+These should be resolved by repo-grounded audits and implementation design. Do not reopen product-detail questioning unless an audit exposes a real ambiguity that changes production behavior or V1 scope.
+
 ## Architectural implication
 
 This strengthens the existing slim-V1 direction:
@@ -82,3 +105,4 @@ Do not lock derived-part identity from this checkpoint; C10 remains AUDIT FIRST.
 - Atira railing composition H70=0, H144=1 per side, H176=1 per side: user-confirmed 2026-09-01.
 - Atira rear-panel width formula shared across H70/H144/H176: `RB = LB - 2*EB - 63`; only rear-panel height changes with height variant: user-confirmed 2026-09-01.
 - Atira manufactured sheet-material BOM = bottom + wooden rear panel only; front remains existing owner and remaining components are hardware/procurement: user-confirmed 2026-09-01.
+- Atira 16 mm bottom + rear panel material selection = project/default drawer material, same for both, with manual override: user-confirmed 2026-09-01.
