@@ -65,6 +65,7 @@ Decision: do not lock derived-part identity/model yet. First collect real system
 - Official Hettich data for classic Quadro V6 EB23 gives internal drawer width `SKW = LB - 46` and nominal drawer length equal to NL; min cabinet depth NL+13 for that classic V6 configuration.
 - Other Quadro generations/variants differ (e.g. V6 5D / V6 YOU use internal width LB-42 and drawer length NL-10), so runner variant MUST remain a future data axis even if V1 fixes the current profile.
 - Blum TANDEM standard planning uses `SKW = LW - 42` and `SKL = NL - 10` for the cited hook/locking-device variants, confirming the same broad computational family but not identical constants to classic Quadro V6 EB23.
+- **Load-class decision for V1:** Noxun uses Quadro V6 EB23 as a 30 kg standard system. No higher-load Quadro branch is required in V1 unless a concrete production need appears later.
 
 ## Procurement / supplier packaging distinction
 
@@ -100,7 +101,7 @@ Important: supplier packaging (one complete kit SKU vs several component SKUs) i
 
 ## Next audit work
 1. Complete exact V1 Atira recipe: generated manufactured parts, dimensions, material/thickness, H70/H144/H176 rules, full applicable NL set, mandatory hardware SKUs, railing components, verified 30/50 kg load classes, and opening-mode-specific hardware/installation data.
-2. Collect exact V1 Quadro EB23 recipe: four wooden box parts + bottom, dimensions, 16/18 mm thickness effects, NL, catches, load classes, opening-mode-specific runner/installation data.
+2. Complete exact V1 Quadro EB23 recipe: four wooden box parts + bottom, dimensions, 16/18 mm thickness effects, NL, catches, fixed 30 kg V1 load class, and opening-mode-specific runner/installation data.
 3. Audit representative Demos packaging cases: same logical drawer requirement sold as one kit SKU vs assembled from multiple SKUs; propose minimal data model compatible with existing hardware expansion/provenance.
 4. Compare StrongBox and TANDEMBOX Antaro against Atira to identify true shared parameters vs system-specific branches.
 5. Compare Blum TANDEM against Quadro EB23 to identify shared recipe fields vs runner-specific constants.
@@ -122,6 +123,7 @@ Important: supplier packaging (one complete kit SKU vs several component SKUs) i
 - Quadro box construction and Excel dimensions: confirmed by user, 2026-09-01.
 - Quadro bottom offset 12-13 mm: official Hettich technical assistant sheet.
 - Quadro Silent System + Push to open use in Noxun: confirmed by user, 2026-09-01; separate official Hettich EB23 installation instructions verified.
+- Quadro V6 EB23 30 kg as the only required Noxun V1 load class: confirmed by user, 2026-09-01.
 - TANDEM BLUMOTION/classic + TIP-ON use in Noxun: confirmed by user, 2026-09-01.
 - TANDEM bottom offset 11-13 mm and same cited base box formulas across BLUMOTION/TIP-ON profiles: official current Blum technical catalogue.
 - TANDEM formulas: official Blum technical catalogue.
