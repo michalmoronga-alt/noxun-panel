@@ -1,5 +1,7 @@
 # KOVANIE V1 — CROSS-AUDIT PROMPTS (2026-09-01)
 
+> Stav: KONCEPT / pracovný checkpoint — nie implementačný spec, neimplementovať priamo; uzavretá architektúra: KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md.
+
 > Tri nezávislé audity nad JEDNÝM zdrojom pravdy: `KOVANIE_CROSSAUDIT_2026-09-01_SOURCE_PACK.md`.
 > Source pack neobsahuje závery žiadneho audítora — líšia sa LEN wrappre podľa nástrojov a fokusu.
 > Audity bežia nezávisle; závery sa NIKDY nezdieľajú medzi audítormi pred reconcile kolom.

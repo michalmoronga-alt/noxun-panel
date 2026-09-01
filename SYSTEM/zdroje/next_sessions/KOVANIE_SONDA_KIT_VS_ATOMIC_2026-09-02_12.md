@@ -1,5 +1,7 @@
 # KOVANIE — sonda Gmail/Disk: kit vs. atomic nákup zásuviek (2026-09-02, checkpoint #12)
 
+> Stav: KONCEPT / pracovný checkpoint — nie implementačný spec, neimplementovať priamo; uzavretá architektúra: KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md.
+
 > Zdroj: subagent (read-only) nad 14 objednávkovými hárkami Disku (`OBJEDNÁVKA …`, firemná šablóna ~200 Démos kódov,
 > stĺpec MENO = zákazka), 5 rozpočtami XLSX, hárkom `SKLAD NOXUN` a ~20 Gmail vláknami (objednávky na objednavky@vepo-porez.sk).
 > Prílohy PDF (FA/CP od VEPO) MCP neotvorí — ceny sú z rozpočtov a z hárku Szebellai 12/2024. Obdobie 2024–2026.

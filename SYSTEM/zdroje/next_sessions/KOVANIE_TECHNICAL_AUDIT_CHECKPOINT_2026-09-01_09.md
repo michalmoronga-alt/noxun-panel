@@ -1,5 +1,7 @@
 # KOVANIE — technical audit checkpoint 2026-09-01 #09
 
+> Stav: KONCEPT / pracovný checkpoint — nie implementačný spec, neimplementovať priamo; uzavretá architektúra: KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md.
+
 Working delta checkpoint. NOT implementation spec. Continues #08.
 
 ## Quadro V6 EB23 — newly closed production decisions

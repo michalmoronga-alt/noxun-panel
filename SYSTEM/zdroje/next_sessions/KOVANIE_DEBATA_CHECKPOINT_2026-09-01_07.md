@@ -1,5 +1,7 @@
 # KOVANIE — debata checkpoint 2026-09-01 #07
 
+> Stav: KONCEPT / pracovný checkpoint — nie implementačný spec, neimplementovať priamo; uzavretá architektúra: KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md.
+
 > Working debate checkpoint. Nie je to implementačný spec. Zachytáva rozhodnutia po prvom Orchestrator/Fable 5 review a následnej diskusii s Michalom.
 
 ## Uzavreté rozhodnutia po review

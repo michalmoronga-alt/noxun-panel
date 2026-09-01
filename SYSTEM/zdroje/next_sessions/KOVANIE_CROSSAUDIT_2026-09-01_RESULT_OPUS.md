@@ -1,5 +1,7 @@
 # CROSS-AUDIT VÝSLEDOK — BLIND OPUS (2026-09-01)
 
+> Stav: KONCEPT / pracovný checkpoint — nie implementačný spec, neimplementovať priamo; uzavretá architektúra: KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md.
+
 > Zverejnené po dobehnutí všetkých troch auditov (blind protokol dodržaný — audítori sa navzájom nevideli).
 > Audítor: Opus subagent, read-only repo, source pack + checkpoint #10, bez vedomia o iných auditoch.
 

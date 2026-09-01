@@ -1,5 +1,7 @@
 # KOVANIE V1 — CROSS-AUDIT RECONCILE (2026-09-02)
 
+> Stav: KONCEPT / pracovný checkpoint — nie implementačný spec, neimplementovať priamo; uzavretá architektúra: KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md.
+
 > Syntéza troch nezávislých auditov Round 2 architektúry: **Codex** (implementácia vs kód, UNSAFE-as-written)
 > · **GLM** (dátové toky a value-vs-complexity, SOUND WITH CHANGES) · **blind Opus** (tiché zlyhania, SOUND WITH CHANGES).
 > Zdroje: `KOVANIE_CROSSAUDIT_2026-09-01_RESULT_{CODEX,GLM,OPUS}.md` nad source packom + checkpoint #10.

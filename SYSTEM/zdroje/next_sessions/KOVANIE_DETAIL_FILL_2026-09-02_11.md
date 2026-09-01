@@ -1,5 +1,7 @@
 # KOVANIE — detail fill checkpoint 2026-09-02 #11
 
+> Stav: KONCEPT / pracovný checkpoint — nie implementačný spec, neimplementovať priamo; uzavretá architektúra: KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md.
+
 > Produkčné rozhodnutia Michala po schválení mockupu (2.9.2026). Vstupy pre data packy receptov (slice C),
 > ABS defaulty nových rolí (slice A/C) a 4. materiálový kanál (slice C). Dopĺňa FINAL §3/§6/§14.
 

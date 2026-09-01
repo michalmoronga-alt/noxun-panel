@@ -1,5 +1,7 @@
 # KOVANIE — checkpoint USER debaty 2026-09-01 · 03
 
+> Stav: KONCEPT / pracovný checkpoint — nie implementačný spec, neimplementovať priamo; uzavretá architektúra: KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md.
+
 > **Stav:** PRACOVNÝ CHECKPOINT / USER-DEBATA — nie implementačný spec, neimplementovať priamo.
 > **Nadväzuje na:** `KOVANIE_DEBATA_CHECKPOINT_2026-09-01_02.md`.
 > **Účel:** zachytiť ďalšie rozhodnutia po kompresii kontextu.

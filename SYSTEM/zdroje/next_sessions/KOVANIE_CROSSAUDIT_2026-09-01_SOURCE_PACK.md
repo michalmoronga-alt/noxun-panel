@@ -1,5 +1,7 @@
 # KOVANIE V1 — CROSS-AUDIT SOURCE PACK (2026-09-01)
 
+> Stav: KONCEPT / pracovný checkpoint — nie implementačný spec, neimplementovať priamo; uzavretá architektúra: KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md.
+
 > **Status:** neutral audit input. This pack is IDENTICAL for all independent auditors.
 > It contains NO conclusions from any other auditor. It distinguishes facts from proposals.
 > **Your mission is to BREAK the proposed architecture, not to redesign the system.**
