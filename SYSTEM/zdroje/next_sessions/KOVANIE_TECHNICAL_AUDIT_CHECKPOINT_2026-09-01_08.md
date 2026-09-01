@@ -27,6 +27,9 @@ Decision: do not lock derived-part identity/model yet. First collect real system
 ### Quadro / TANDEM family
 - User correction: Quadro width calculation depends on the selected runner / installation width EB.
 - For V1, keep this simple and fix Quadro to the most-used `EB = 23` profile.
+- **Confirmed production rule:** Quadro EB23 wooden drawer box normally uses 16 mm material for all five manufactured box parts (left/right side, inner front, rear, bottom).
+- **Supported but less-used variant:** the Quadro EB23 box can also be made from 18 mm material. V1 data/model must therefore not hardcode `Quadro = 16 mm`; 16 mm should be the default, while 18 mm remains a valid material-thickness variant.
+- Audit still required: verify exactly which component dimensions change with 16 vs 18 mm while the EB23 runner installation geometry remains fixed; do not assume every part formula is unchanged.
 - Official Hettich data for classic Quadro V6 EB23 gives internal drawer width `SKW = LB - 46` and nominal drawer length equal to NL; min cabinet depth NL+13 for that classic V6 configuration.
 - Other Quadro generations/variants differ (e.g. V6 5D / V6 YOU use internal width LB-42 and drawer length NL-10), so runner variant MUST remain a future data axis even if V1 fixes the current profile.
 - Blum TANDEM standard planning uses `SKW = LW - 42` and `SKL = NL - 10` for the cited hook/locking-device variants, confirming the same broad computational family but not identical constants to classic Quadro V6 EB23.
@@ -41,7 +44,7 @@ Important: do NOT infer that Quadro and TANDEM have identical formulas. They sha
 
 ## Next audit work
 1. Collect exact V1 Atira recipe: generated manufactured parts, dimensions, material/thickness, height variants, NL variants, opening mode impact, mandatory hardware SKUs.
-2. Collect exact V1 Quadro EB23 recipe: four wooden box parts + bottom, dimensions, thickness assumptions, NL, catches, opening-mode differences, runner SKUs.
+2. Collect exact V1 Quadro EB23 recipe: four wooden box parts + bottom, dimensions, 16/18 mm thickness effects, NL, catches, opening-mode differences, runner SKUs.
 3. Compare StrongBox and TANDEMBOX Antaro against Atira to identify true shared parameters vs system-specific branches.
 4. Compare Blum TANDEM against Quadro EB23 to identify shared recipe fields vs runner-specific constants.
 5. Only then decide derived part keys / owner relationship / BuildPlan integration.
@@ -51,4 +54,5 @@ Important: do NOT infer that Quadro and TANDEM have identical formulas. They sha
 - Atira formulas: confirmed by user-supplied Hettich sheet and official Hettich catalogue.
 - Atira 16 mm bottom + 16 mm wooden rear panel: confirmed by user, 2026-09-01.
 - Quadro EB23 profile / width: official Hettich runner documentation.
+- Quadro default 16 mm and supported 18 mm box material: confirmed by user, 2026-09-01.
 - TANDEM formulas: official Blum technical catalogue.
