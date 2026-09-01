@@ -91,3 +91,35 @@ Používateľ zvolil **A**: set member quantity nepoužíva univerzálny voľný
 - jednoduchý násobok základnej veličiny.
 
 Cieľ: sety zostávajú flexibilné a editovateľné bez hardcodovania každého komponentu v Engine, ale pravidlá sú čitateľné, auditovateľné a bezpečné.
+
+## 11. Výstup / agregácia kovania
+
+Používateľ zvolil **A**:
+- výsledný objednávkový pohľad agreguje rovnaké konkrétne položky podľa SKU/katalógovej identity,
+- napr. jedna položka sa zobrazí ako `Podložka X · 24 ks`, nie po jednotlivých owneroch,
+- po rozbalení musí zostať plná dohľadateľnosť pôvodu množstva: skrinka / owner / množstvo,
+- cieľ je jeden kanonický výpočet s čistým nákupným pohľadom a auditovateľným rozpadom pôvodu.
+
+## 12. OTVORENÝ AUDIT BOD — individuálne / doplnkové kovanie mimo setu
+
+**Tento bod NIE JE uzavreté rozhodnutie V1. Má sa cielene preskúmať v audite nad pripravovaným PR a potom predložiť varianty riešenia používateľovi.**
+
+Motivácia:
+- nechceme vyrábať množstvo abstraktných jednoúčelových setov len preto, aby sa do korpusu dostala jedna konkrétna doplnková položka,
+- zároveň musí byť jasné, ku ktorému objektu/miestu v korpuse položka patrí, aby používateľ neskôr nemusel pátrať, odkiaľ sa v objednávke vzala.
+
+Príklady:
+- zámok na dvere,
+- výsuvný vešiak v skrini,
+- vypínač,
+- magnet/doraz/adaptér,
+- iné doplnkové kovanie, ktoré nie je prirodzenou súčasťou hlavného resolved setu.
+
+Smer na audit:
+- preveriť koncept podobný `Ostatné / Pridať položku`,
+- možnosť priradiť konkrétnu katalógovú položku priamo k **ownerovi / čelu / funkčnej alebo konštrukčnej zóne / celej skrinke** podľa významu,
+- položka môže byť samostatná alebo doplnkom existujúceho setu,
+- musí niesť jasný pôvod a vstupovať do agregovaného objednávkového výstupu,
+- nesmie meniť globálnu definíciu setu, pokiaľ používateľ výslovne neupravuje samotný set.
+
+Audit má navrhnúť 2–3 konkrétne UX + dátové varianty a zhodnotiť kompromis medzi jednoduchosťou, owner modelom, traceability a budúcim rozširovaním. Až potom používateľ rozhodne finálny kontrakt.
