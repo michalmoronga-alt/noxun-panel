@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.9.6' unless defined?(VERSION)
+    VERSION = '0.9.7' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -517,16 +517,11 @@ module Noxun
         log_error(e, 'ensure_uni_records')
       end
 
-      # D-52a (B3): PROCESNY LEASE. Kazda ziva instancia SketchUpu si zapise
-      # `Plugins/noxun_engine.leases/<pid>.lease`; `Updater.apply!` odmietne
-      # swap, kym zije ina instancia (rename priecinka pod jej rukami by jej
-      # zobral subory spod nog). Vlastny chraneny blok — zlyhanie zapisu
-      # NESMIE zhodit boot (aktualizacia sa proste odmietne opatrnejsie).
-      begin
-        Updater.write_lease!(File.dirname(plugin_dir))
-      rescue StandardError => e
-        log_error(e, 'updater lease')
-      end
+# D-52a (B3): PROCESNY LEASE si zapisuje LOADER (`noxun_engine.rb`,
+# `Boot.write_lease!`) hned na zaciatku bootu a POD ZAMKOM aktualizacie —
+# NIE tu. Zapis az na konci `main.rb` by prisiel po nacitani celeho stromu,
+# takze `Updater.apply!`, ktory prave bezi, by tento proces nemusel vidiet
+# (Codex #277 kolo 2, P1).
 
       begin
         install_toolbar # UI-02: logo · Studio · ABS kontrola · Vlozit

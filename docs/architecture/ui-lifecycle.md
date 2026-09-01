@@ -1831,13 +1831,21 @@ lease — staging trvá a medzitým mohla nabehnúť ďalšia inštancia)* → *
 `.rb.new` → `.rb` → **(6)** `.old` sa maže až po úspechu. Každý krok má definovaný rollback; zlyhanie kroku 5 vracia **celý** swap. Zlyhanie mazania `.old` je **úspech
 s poznámkou** (zvyšok uprace najbližší boot). Swap zároveň prirodzene **zrkadlí** — osirené súbory zaniknú s `.old`.
 
+**JEDNO PRAVIDLO PRE CELÝ SWAP.** Od okamihu, keď **uspeje prvý rename kroku 3** (`noxun_engine` → `.old`), platí buď **(A)** plný rollback **overený na disku** — živý strom aj
+loader späť, artefakty upratané, marker zmazaný, **žiadny latch** — alebo **(B)** **latch + zachované `.new`, `.old` a marker** a chyba s presným stavom, ktorý dorovná boot
+recovery. **Tretia možnosť neexistuje.** Preto každá chybová cesta za krokom 3 (zlyhaný rename kroku 4, **zlyhaný zápis markera**, zlyhaný rename loadera) končí v jedinom mieste,
+`abort_after_move!`; guard test nad zdrojom trvá na tom, že sa tam za krokom 3 `raise Refused` nepíše nikde inde. Latch sa pri **úspešnom** rollbacku zámerne **nezapína**: na disku
+je presne to, čo tam bolo pred pokusom, nič sa nikam nenačítalo a zbytočný latch by zamkol plugin po chybe, ktorá ho nepoznačila.
+
 **Bod commitu = úspešný rename loadera.** Od tej chvíle leží v `Plugins` nová generácia a v pamäti beží starý Ruby, takže `Engine.restart_required!` sa volá **okamžite po ňom** —
 pred zápisom markera aj pred upratovaním. Výnimka v upratovaní preto nikdy nenechá okná odomknuté a **nerobí z úspešnej aktualizácie neúspech**: skončí ako poznámka vo výsledku
 (zvyšok dorovná najbližší boot).
 
-**Keď zlyhá aj rollback kroku 5**, `.old`, `.new` **ani marker sa nemažú** — sú to jediné stopy, z ktorých vie boot recovery zložiť kompletnú generáciu; latch sa zapne aj tu.
-Hláška rozlišuje dva prípady: loader na disku je (⇒ „reštartuj SketchUp, dorovná sa pri štarte") a loader chýba (⇒ „spusti INSTALL" — recovery žije v loaderi, bez neho nemá čo
-bežať).
+**Keď zlyhá aj rollback**, `.old`, `.new` **ani marker sa nemažú** — sú to jediné stopy, z ktorých vie boot recovery zložiť kompletnú generáciu; latch sa zapne aj tu. Hláška
+rozlišuje dva prípady: loader na disku je (⇒ „reštartuj SketchUp, dorovná sa pri štarte") a loader chýba (⇒ „spusti INSTALL" — recovery žije v loaderi, bez neho nemá čo bežať).
+
+**`.old` sa maže na jedinom mieste — `discard_previous!` — a len keď na svojom mieste stojí živý strom AJ loader.** Je to posledná kompletná kópia pluginu: bez tohto guardu by
+opakovaný pokus o aktualizáciu po zlyhanom kroku 4 (keď živý strom chýba) zmazal jediný strom, ktorý na disku ostal.
 
 **Prečo sa VERSION číta zo STAGED stromu (F8):** zdroj sa mohol medzi manifestom a swapom zmeniť. Autorita je `noxun_engine.rb` v `.new`, krížovo overená proti `main.rb` v `.new`, a
 rozhodnutie „novšia" sa prepočíta z nej tesne pred krokom 3. Porovnanie verzií je **číselné po segmentoch** (`0.9.9 < 0.10.0`); chýbajúca, neplatná aj **duplicitná** definícia
@@ -1851,10 +1859,15 @@ capability marker balíka.
 **Kanonické hranice (F9):** cieľ je `Engine.plugin_dir` + **súrodenecký** loader. Odmieta sa zdroj == cieľ, zdroj vnútri cieľa, cieľ vnútri zdroja, priečinok s príponou `.new`/`.old`,
 **symlink/junction/reparse point** (`File.realpath` ≠ zapísaná cesta) a relatívna cesta z manifestu, ktorá by unikla zo staging rootu.
 
-**Zámok a lease (B3):** aktualizácia má **vlastný** `noxun_engine.update.lock` (`flock`, `LOCK_NB` — nezískaný zámok je okamžité odmietnutie, **nikdy čakanie**), nie
-`materials.lock`: kopírovanie stoviek súborov zo share je dlhá operácia a katalógový zámok by ju držal celý ten čas. Každá živá inštancia si pri načítaní zapíše
-`noxun_engine.leases/<pid>.lease` (hook v `main.rb`); swap sa odmietne, kým žije **iný** PID (na Windows sa overuje cez `tasklist /FO CSV`, inde cez `Process.kill(0, pid)`), mŕtve
-lease sa upracú. Neistota pri overovaní PID sa **nevydáva za „mŕtvy"** — swap radšej neprebehne.
+**Zámok a lease (B3):** aktualizácia má **vlastný** `noxun_engine.update.lock` (`flock`, `LOCK_NB` — nezískaný zámok je pre `apply!` okamžité odmietnutie, **nikdy čakanie**), nie
+`materials.lock`: kopírovanie stoviek súborov zo share je dlhá operácia a katalógový zámok by ju držal celý ten čas. Každá živá inštancia si zapíše `noxun_engine.leases/<pid>.lease`
+**už v loaderi, na začiatku bootu a pod tým istým zámkom** — nie až na konci `main.rb`, kde by ju bežiaci `apply!` nemusel stihnúť uvidieť. Swap sa odmietne, kým žije **iný** PID
+(na Windows sa overuje cez `tasklist /FO CSV`, inde cez `Process.kill(0, pid)`), mŕtve lease sa upracú. Kontrola beží **dvakrát**: pri vstupe do `apply!` a **znova pod zámkom tesne
+pred swapom** (staging trvá a medzitým mohla nabehnúť ďalšia inštancia).
+
+**Lease je fail-closed na oboch stranách.** Boot, ktorý si lease nedokáže zapísať (priečinok `noxun_engine.leases` je obyčajný súbor, chýbajú práva), vráti `:lease_failed`
+a **plugin sa nenačíta** — inštancia, ktorú nikto nevidí, je horšia než inštancia, ktorá nebeží. A `live_leases` pri nezistiteľnom stave (priečinok chýba, je to súbor, nedá sa
+prečítať) **nevracia ticho prázdny zoznam**, ale vyhodí `Refused`, takže `apply!` odmietne. Neistota pri overovaní PID sa rovnako **nevydáva za „mŕtvy"** — swap radšej neprebehne.
 
 **Restart latch (B2):** po úspešnom commite beží v pamäti STARÝ Ruby kód nad NOVÝMI súbormi. `Engine.restart_required!` preto zamkne **všetky** vstupné body — toolbar príkazy
 (`main.rb`), `Panel.show`, `Panel.show_insert`, `StudioDialog.show` — a každý z nich sa `Engine.update_restart_pending?` odmietne natívnou hláškou „Noxun Engine bol aktualizovaný —
@@ -1883,8 +1896,12 @@ Rename v rámci jedného priečinka je atomický, takže medzistav neexistuje. P
 **nesúlad znamená, že sa plugin v tomto okne zámerne nenačíta**. Mazanie zvyškov je kozmetika a beží „naticho": jeho zlyhanie nesmie zhodiť štrukturálnu opravu.
 
 **Boot vracia stav a ten rozhoduje, či sa plugin vôbec načíta:** `:idle` (nič sa nedialo) a `:done` (dorovnané, strom sedí) → extension sa registruje; `:busy` (**zámok drží iná
-inštancia, ktorá práve aktualizuje** — boot naň krátko počká, max ~5 s), `:restart` (strom nezodpovedá tomuto loaderu) a `:error` (opravu sa nepodarilo dokončiť) → **extension sa
-NEregistruje** a používateľ dostane natívnu hlášku. Bez toho by SketchUp, ktorý nabehne uprostred cudzej aktualizácie, načítal strom, ktorý mu updater o sekundu vymení pod rukami.
+inštancia, ktorá práve aktualizuje** — boot naň krátko počká, max ~5 s), `:restart` (strom nezodpovedá tomuto loaderu), `:lease_failed` (nedá sa zapísať stopa procesu) a `:error`
+(opravu sa nepodarilo dokončiť) → **extension sa NEregistruje** a používateľ dostane natívnu hlášku.
+
+**Zámok sa pritom berie VŽDY, aj keď na disku nie sú žiadne artefakty.** `apply!` ho drží už od chvíle, keď len počíta manifest zdroja — teda dávno pred vznikom prvého `.new`
+súboru. Boot, ktorý by sa v tom okne pozrel iba na artefakty, by nič nenašiel, načítal strom a updater by mu ho o pár sekúnd vymenil pod rukami. Bežný štart je tak jeden `flock`,
+zápis lease a päť `File.exist?` — zanedbateľná réžia.
 
 **Vedomé hranice D-52a:** žiadne UI (tlačidlo, stavový riadok, pole cesty), žiadny asynchrónny check s deadline, žiadna bariéra zatvárania okien pred swapom, žiadne natívne hlášky
 výsledku — to všetko je D-52b. Ďalej mimo rozsahu: podpisovanie balíka, auto-update na pozadí, G-Disk sync knižníc (D-48).

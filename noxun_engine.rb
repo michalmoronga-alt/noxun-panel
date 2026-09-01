@@ -6,7 +6,7 @@ require 'extensions.rb'
 
 module Noxun
   module Engine
-    VERSION = '0.9.6'
+    VERSION = '0.9.7'
 
     class << self
       # Drzime kvoli UI::Notification (potrebuje registrovany extension objekt).
@@ -21,8 +21,8 @@ end
 # tato sekcia zije v loaderi a je UMYSELNE sebestacna: ziadny `Sketchup.*`,
 # ziadny modul pluginu, len `File`/`FileUtils`.
 #
-# Ked nie je co robit (bezny start), je to pat `File.exist?` volani a koniec —
-# nulova rezia.
+# Bezny start je jeden `flock`, zapis stopy procesu (`lease`) a pat `File.exist?`
+# volani — zanedbatelna rezia.
 #
 # ZELEZNE PRAVIDLO (Codex #277 P1): STROM NA DISKU MUSI ZODPOVEDAT LOADERU,
 # KTORY SA PRAVE VYKONAVA. Recovery bezi ZVNUTRA loadera, ktory SketchUp uz
@@ -37,9 +37,14 @@ end
 # Ked po oprave verzia stromu NESEDI s verziou vykonavaneho loadera, extension
 # sa NEZAREGISTRUJE a pouzivatel dostane pokyn restartovat.
 #
-# ZAMOK (Codex #277 P1): ked prave bezi swap v inom procese, tento boot vidi
-# transakcne artefakty, ale zamok nedostane. NESMIE sa nacitat — updater by mu
-# strom vymenil pod rukami. Kratko pocka a potom odmietne nacitanie.
+# ZAMOK (Codex #277 P1, spresnene v kole 2): zamok sa berie VZDY — aj ked na
+# disku nie su ziadne artefakty. `apply!` ho drzi uz od chvile, ked len POCITA
+# manifest zdroja, teda davno pred vznikom prveho `.new` suboru; boot, ktory by
+# sa v tom okne pozrel len na artefakty, by nic nenasiel a updater by mu strom
+# vymenil pod rukami. Ked zamok ani po kratkom cakani nepride, plugin sa
+# NENACITA. Pod tym istym zamkom si boot zapise aj svoj `lease` — updater tak
+# novy proces vidi hned, ako zamok pusti (nie az po nacitani celeho stromu);
+# zlyhanie zapisu lease je FAIL-CLOSED a plugin sa tiez nenacita.
 #
 # Kontrakt s `core/updater.rb`: logika recovery zije LEN TU a modul ju
 # NEDUPLIKUJE (guard test `test_d52a_updater.rb` to strazi). Modul pri starte
@@ -68,27 +73,46 @@ module Noxun
       BROKEN_MESSAGE = 'Noxun Engine nedokázal dorovnať nedokončenú aktualizáciu. ' \
                        'Reštartuj SketchUp; ak to nepomôže, spusti INSTALL_noxun_engine.ps1.'
 
+      LEASES_DIR = 'noxun_engine.leases'
+
+      LEASE_MESSAGE = 'Noxun Engine si nedokázal zapísať stopu procesu do priečinka Plugins ' \
+                      "(#{LEASES_DIR}). Bez nej by aktualizácia nevidela ostatné okná SketchUpu, " \
+                      'takže sa plugin zámerne nenačítal — oprav práva k priečinku Plugins.'
+
       # :idle    — nic sa nedialo (bezny start)
       # :done    — transakcia dorovnana a strom sedi s vykonavanym loaderom
       # :busy    — aktualizacia prave bezi v inom procese
       # :restart — disk je v poriadku, ale NEZODPOVEDA tomuto loaderu
-      # :error   — opravu sa nepodarilo dokoncit
+      # :error   — opravu alebo zapis lease sa nepodarilo dokoncit
+      #
+      # ZAMOK SA BERIE VZDY (Codex #277 kolo 2), aj ked ziadne artefakty na disku
+      # nie su: `apply!` drzi zamok uz od chvile, ked len POCITA manifest zdroja
+      # — teda DAVNO predtym, nez vznikne prvy `.new` subor. Boot, ktory by sa
+      # v tom okne pozrel len na artefakty, by nic nenasiel, nacital strom a
+      # updater by mu ho o par sekund vymenil pod rukami.
+      #
+      # LEASE SA ZAPISUJE TU, na ZACIATKU bootu a POD ZAMKOM — nie az na konci
+      # `main.rb`. Updater tak novy proces uvidi hned, ako zamok pusti, a nie az
+      # potom, ako doleze cely strom. Zlyhanie zapisu je FAIL-CLOSED: bez lease
+      # by nas cudzia aktualizacia nevidela, takze sa plugin radsej nenacita.
       def self.recover!(plugins_dir)
         paths = paths_for(plugins_dir)
-        return :idle unless pending?(paths)
-
         require 'fileutils'
         status = with_lock(paths[:lock]) do
           begin
-            repair!(paths)
-            FileUtils.rm_f(paths[:marker])
-            generation_matches?(paths) ? :done : :restart
+            if pending?(paths)
+              repair!(paths)
+              FileUtils.rm_f(paths[:marker])
+              write_lease!(paths) ? (generation_matches?(paths) ? :done : :restart) : :lease_failed
+            else
+              write_lease!(paths) ? :idle : :lease_failed
+            end
           rescue StandardError => e
             puts "[NOXUN::Engine] recovery aktualizacie zlyhala: #{e.class}: #{e.message}"
             :error
           end
         end
-        puts "[NOXUN::Engine] nedokoncena aktualizacia: #{status}" unless status == :idle
+        puts "[NOXUN::Engine] stav aktualizacie pri starte: #{status}" unless status == :idle
         status
       rescue StandardError => e
         puts "[NOXUN::Engine] recovery aktualizacie zlyhala: #{e.class}: #{e.message}"
@@ -98,10 +122,23 @@ module Noxun
       def self.paths_for(plugins_dir)
         tree = File.join(plugins_dir, TREE_NAME)
         ldr  = File.join(plugins_dir, LOADER_NAME)
-        { tree: tree, tree_new: "#{tree}.new", tree_old: "#{tree}.old",
+        { dir: plugins_dir, tree: tree, tree_new: "#{tree}.new", tree_old: "#{tree}.old",
           ldr: ldr, ldr_new: "#{ldr}.new", ldr_old: "#{ldr}.old",
           marker: File.join(plugins_dir, MARKER_NAME),
-          lock: File.join(plugins_dir, LOCK_NAME) }
+          lock: File.join(plugins_dir, LOCK_NAME),
+          leases: File.join(plugins_dir, LEASES_DIR) }
+      end
+
+      # Stopa ZIVEHO procesu. Format musi ostat zhodny s `Updater.write_lease!`
+      # (`<pid>.lease` v `noxun_engine.leases`) — strazi guard test.
+      def self.write_lease!(p)
+        FileUtils.mkdir_p(p[:leases])
+        File.binwrite(File.join(p[:leases], "#{Process.pid}.lease"),
+                      %({"std":1,"pid":#{Process.pid},"at":"#{Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ')}"}))
+        true
+      rescue StandardError => e
+        puts "[NOXUN::Engine] lease sa neda zapisat: #{e.class}: #{e.message}"
+        false
       end
 
       def self.pending?(p)
@@ -244,6 +281,7 @@ module Noxun
         msg = case status
               when :busy then BUSY_MESSAGE
               when :restart then RESTART_MESSAGE
+              when :lease_failed then LEASE_MESSAGE
               else BROKEN_MESSAGE
               end
         puts "[NOXUN::Engine] #{msg}"
@@ -261,7 +299,7 @@ end
 # nad zmiesanou generaciou.
 Noxun::Engine::Boot.status = Noxun::Engine::Boot.recover!(File.dirname(File.expand_path(__FILE__)))
 
-if %i[busy restart error].include?(Noxun::Engine::Boot.status)
+if %i[busy restart error lease_failed].include?(Noxun::Engine::Boot.status)
   Noxun::Engine::Boot.announce(Noxun::Engine::Boot.status)
 else
   module Noxun

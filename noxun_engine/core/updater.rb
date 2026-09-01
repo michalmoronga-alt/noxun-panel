@@ -553,12 +553,31 @@ module Noxun
 
       # Mrtve lease sa upracu, zive sa vratia. `self_pid` je NAS proces —
       # ten aktualizaciu prave robi a sam sebe neprekaza.
+      # FAIL-CLOSED (Codex #277 kolo 2, P2): nezistitelny stav lease NIE JE
+      # „nikto nebezi". Chybajuci alebo necitatelny priecinok znamena, ze o inych
+      # instanciach nevieme NIC — a swap pod cudzou instanciou je presne to, comu
+      # lease brani. Preto sa vyhodi `Refused` a `apply!` skonci odmietnutim.
+      # (Kazda ziva instancia si lease zapisuje uz v LOADERI, este pred nacitanim
+      # stromu, takze v realnej instalacii priecinok VZDY existuje.)
       def live_leases(plugins_dir, self_pid = Process.pid)
         dir = leases_dir(plugins_dir)
-        return [] unless File.directory?(dir)
+        if File.exist?(dir) && !File.directory?(dir)
+          raise Refused, "#{LEASES_DIR} v Plugins nie je priečinok — nedá sa zistiť, či nebeží " \
+                         'ďalšia inštancia SketchUpu (zmaž ten súbor a reštartuj SketchUp)'
+        end
+        unless File.directory?(dir)
+          raise Refused, "v Plugins chýba priečinok #{LEASES_DIR} — nedá sa zistiť, či nebeží " \
+                         'ďalšia inštancia SketchUpu (reštartuj SketchUp)'
+        end
 
         live = []
-        Dir.children(dir).sort.each do |name|
+        entries = begin
+          Dir.children(dir)
+        rescue StandardError => e
+          raise Refused, "priečinok #{LEASES_DIR} sa nedá prečítať (#{e.class}) — " \
+                         'nedá sa zistiť, či nebeží ďalšia inštancia SketchUpu'
+        end
+        entries.sort.each do |name|
           next unless name =~ /\A(\d+)\.lease\z/
 
           pid = Regexp.last_match(1).to_i
@@ -742,84 +761,76 @@ module Noxun
         swap!(plugins, current, target)
       end
 
-      # Kroky 3–6. Kazdy krok ma definovany rollback a ZIADNY z nich nesmie
-      # nechat NOVY strom so STARYM loaderom.
+      # Kroky 3–6.
+      #
+      # JEDNO PRAVIDLO PRE CELY SWAP (Codex #277 kolo 2): od okamihu, kedy
+      # USPEJE prvy rename kroku 3 (`noxun_engine` -> `.old`), plati BUD
+      #   (A) PLNY ROLLBACK OVERENY NA DISKU — zivy strom aj loader su spat,
+      #       artefakty upratane, marker zmazany, ziadny latch; ALEBO
+      #   (B) LATCH + ZACHOVANE ARTEFAKTY (`.new`, `.old`) + ZACHOVANY MARKER
+      #       a chyba s presnym stavom, ktoru dorovna boot recovery.
+      # TRETIA MOZNOST NEEXISTUJE. Kazda chybova cesta za krokom 3 preto konci
+      # v `abort_after_move!` — nikde inde sa `raise` nepise (strazi guard test).
       def swap!(plugins, from_version, to_version)
         tree = tree_path(plugins)
         tree_new = staged_tree(plugins)
-        tree_old = previous_tree(plugins)
         loader = loader_path(plugins)
         loader_new = staged_loader(plugins)
         loader_old = previous_loader(plugins)
 
-        FileUtils.rm_rf(tree_old)
-        FileUtils.rm_f(loader_old)
+        # Zvysky predchadzajucej generacie sa upratuju LEN kym je zivy strom na
+        # mieste (viac v `discard_previous!`).
+        discard_previous!(plugins)
 
-        # (3) strom bokom
+        # (3) strom bokom — POSLEDNY krok, po ktorom je este mozne skoncit
+        # uplne bez stopy.
         begin
-          File.rename(tree, tree_old)
+          File.rename(tree, previous_tree(plugins))
         rescue StandardError => e
           cleanup_staging(plugins)
           clear_marker(plugins)
           raise Refused, "priečinok pluginu sa nedá presunúť (#{e.class}) — zavri SketchUp a skús znova"
         end
 
+        # ----- OD TEJTO CHVILE PLATI PRAVIDLO (A) ALEBO (B) -----------------
+
         # (4) novy strom na miesto
         begin
           File.rename(tree_new, tree)
         rescue StandardError => e
-          begin
-            File.rename(tree_old, tree)
-          rescue StandardError
-            nil
-          end
-          cleanup_staging(plugins)
-          clear_marker(plugins)
-          raise Refused, "nový priečinok pluginu sa nedá nasadiť (#{e.class}) — nič sa nezmenilo"
+          abort_after_move!(plugins, "nový priečinok pluginu sa nedá nasadiť (#{e.class})")
         end
-        write_marker!(plugins, 'tree_swapped', from: from_version, to: to_version)
 
-        # (5) loader — TIEZ cez staging; zlyhanie vracia CELY swap
+        # Marker po kroku 4. Zlyhanie zapisu (plny disk, prava, antivirus) je
+        # rovnako vazne ako zlyhanie renameu: bez markera by po pade nikto
+        # nevedel, ze transakcia bezala — a hlavne by vynimka utiekla so ZIVYM
+        # NOVYM stromom a VYPNUTYM latchom.
+        begin
+          write_marker!(plugins, 'tree_swapped', from: from_version, to: to_version)
+        rescue StandardError => e
+          abort_after_move!(plugins, "stav aktualizácie sa nedá zapísať (#{e.class})")
+        end
+
+        # (5) loader — TIEZ cez staging
         begin
           File.rename(loader, loader_old) if File.file?(loader)
           File.rename(loader_new, loader)
         rescue StandardError => e
-          if rollback_after_loader_failure!(plugins)
-            raise Refused, "loader sa nedá vymeniť (#{e.class}) — pôvodná verzia beží ďalej"
-          end
-
-          # P1 (#277): ROLLBACK ZLYHAL. Marker ani `.new`/`.old` sa teraz NESMU
-          # mazat — su to jedine stopy, z ktorych vie boot recovery zlozit
-          # kompletnu generaciu. Latch sa zapina aj tu: v `Plugins` moze lezat
-          # NOVY strom, takze otvorene okno by nacitalo nove HTML nad starym Ruby.
-          Engine.restart_required!
-          # Recovery bootstrap žije v LOADERI — keď ten na disku nie je, boot ju
-          # nemá odkiaľ spustiť a hláška „reštartuj" by klamala.
-          if File.file?(loader)
-            raise Refused, "loader sa nedá vymeniť (#{e.class}) a vrátenie zmien zlyhalo — " \
-                           'REŠTARTUJ SketchUp, plugin sa dorovná pri štarte'
-          end
-
-          raise Refused, "loader sa nedá vymeniť (#{e.class}) a vrátenie zmien zlyhalo — " \
-                         'v Plugins chýba noxun_engine.rb, spusti INSTALL_noxun_engine.ps1'
+          abort_after_move!(plugins, "loader sa nedá vymeniť (#{e.class})")
         end
 
-        # COMMIT BOD (P1 #277): od tejto chvile lezi v `Plugins` NOVA generacia
-        # a v pamati bezi STARY Ruby kod. Latch sa preto zapina OKAMZITE —
-        # vsetko dalsie je uz len upratovanie a nesmie rozhodovat o tom, ci sa
-        # vstupne body zamknu (vynimka v upratovani by inak nechala okna otvorene
-        # nad novymi subormi).
+        # COMMIT BOD: od tejto chvile lezi v `Plugins` NOVA generacia a v pamati
+        # bezi STARY Ruby kod. Latch sa preto zapina OKAMZITE — vsetko dalsie je
+        # uz len upratovanie a nesmie rozhodovat o tom, ci sa vstupne body
+        # zamknu (vynimka v upratovani by inak nechala okna otvorene nad novymi
+        # subormi).
         Engine.restart_required!
 
         # (6) upratanie predchadzajucej generacie
         note = ''
         begin
           write_marker!(plugins, 'loader_swapped', from: from_version, to: to_version)
-          begin
-            FileUtils.rm_rf(tree_old, secure: true)
-            FileUtils.rm_f(loader_old)
-            raise IOError, 'zvyšok sa nezmazal' if File.exist?(tree_old) || File.exist?(loader_old)
-          rescue StandardError
+          unless discard_previous!(plugins)
             note = 'starú verziu sa nepodarilo zmazať — upratá sa pri najbližšom štarte SketchUpu'
           end
           write_marker!(plugins, 'done', from: from_version, to: to_version)
@@ -833,15 +844,37 @@ module Noxun
         { 'ok' => true, 'from' => from_version, 'to' => to_version, 'note' => note }
       end
 
-      # Krok 5 zlyhal: novy strom uz stoji na mieste, ale loader je stary.
-      # Tento stav NESMIE prezit — vracia sa CELY swap.
+      # JEDINY vychod z chyby za krokom 3. Bud vrati predchadzajucu generaciu
+      # (a je to cisty neuspech), alebo zapne latch, NECHA vsetky artefakty
+      # a povie presny stav. Vzdy vyhadzuje `Refused`.
       #
-      # P1 (#277): vracia `true` LEN vtedy, ked KAZDY krok vratenia uspel a na
-      # disku naozaj lezi kompletna STARA generacia. Pri `false` sa NIC nemaze —
-      # marker, `.old` aj `.new` ostavaju ako jediny podklad pre boot recovery.
-      # Zmazat ich „pre poriadok" by znicilo zalozny obsah a plugin by uz nemal
-      # z coho vstat.
-      def rollback_after_loader_failure!(plugins)
+      # Latch sa pri USPESNOM rollbacku ZAMERNE NEZAPINA: na disku je presne to,
+      # co tam bolo pred pokusom, ziadne nove subory sa nikam nenacitali a
+      # zbytocny latch by pouzivatelovi zamkol plugin po chybe, ktora ho nijako
+      # nepoznacila.
+      def abort_after_move!(plugins, reason)
+        if restore_previous_generation!(plugins)
+          raise Refused, "#{reason} — nič sa nezmenilo, pôvodná verzia beží ďalej"
+        end
+
+        # Rollback ZLYHAL: marker, `.new` ani `.old` sa NESMU mazat — su to
+        # jedine stopy, z ktorych vie boot recovery zlozit kompletnu generaciu.
+        Engine.restart_required!
+        # Recovery bootstrap zije v LOADERI — ked ten na disku nie je, boot ju
+        # nema odkial spustit a hlaska „restartuj" by klamala.
+        if File.file?(loader_path(plugins))
+          raise Refused, "#{reason} a vrátenie zmien zlyhalo — REŠTARTUJ SketchUp, " \
+                         'plugin sa dorovná pri štarte'
+        end
+
+        raise Refused, "#{reason} a vrátenie zmien zlyhalo — v Plugins chýba noxun_engine.rb, " \
+                       'spusti INSTALL_noxun_engine.ps1'
+      end
+
+      # Vrati predchadzajucu generaciu (strom AJ loader). `true` LEN vtedy, ked
+      # KAZDY krok uspel a DISK to potvrdzuje — navratove hodnoty renameov samy
+      # o sebe nestacia.
+      def restore_previous_generation!(plugins)
         tree = tree_path(plugins)
         tree_new = staged_tree(plugins)
         tree_old = previous_tree(plugins)
@@ -853,17 +886,34 @@ module Noxun
         ok &&= try_rename(tree, tree_new) if ok && Dir.exist?(tree) && !File.exist?(tree_new)
         ok &&= try_rename(tree_old, tree) if ok && Dir.exist?(tree_old) && !Dir.exist?(tree)
 
-        # Dokazom rollbacku nie su navratove hodnoty renameov, ale DISK: strom
-        # aj loader musia byt spat na svojich miestach a `.old` uz nesmie drzat
-        # jedinu kopiu (inak by upratanie nizsie zmazalo zalohu).
         ok &&= File.file?(loader) && Dir.exist?(tree)
         return false unless ok
 
         cleanup_staging(plugins)
-        FileUtils.rm_rf(tree_old)
-        FileUtils.rm_f(loader_old)
+        discard_previous!(plugins)
         clear_marker(plugins)
         true
+      end
+
+      # JEDINE miesto, kde sa maze predchadzajuca generacia (`.old`).
+      #
+      # GUARD (Codex #277 kolo 2): `.old` je posledna KOMPLETNA kopia pluginu,
+      # takze sa nikdy nesmie zmazat, kym na svojom mieste nestoji zivy strom AJ
+      # loader. Bez tejto poistky by opakovany pokus o aktualizaciu po zlyhanom
+      # kroku 4 zmazal jediny strom, ktory na disku ostal.
+      # Vracia `true`, ked po nom uz ziadny `.old` zvysok nie je.
+      def discard_previous!(plugins)
+        return false unless Dir.exist?(tree_path(plugins)) && File.file?(loader_path(plugins))
+
+        tree_old = previous_tree(plugins)
+        loader_old = previous_loader(plugins)
+        begin
+          FileUtils.rm_rf(tree_old, secure: true)
+          FileUtils.rm_f(loader_old)
+        rescue StandardError => e
+          Engine.log_error(e, 'Updater.discard_previous!') if Engine.respond_to?(:log_error)
+        end
+        !File.exist?(tree_old) && !File.exist?(loader_old)
       end
 
       def try_rename(src, dst)
