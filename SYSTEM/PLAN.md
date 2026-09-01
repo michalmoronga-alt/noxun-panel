@@ -183,19 +183,116 @@ roztriediť do **kódových a logických blokov** → každému určiť **priori
 audit áno/nie · testy a DoD · riziká · smoke checklist pre Michala · checklist uzáveru. Každý package si na štarte
 spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom packages preberajú sekvenčne bez ďalšieho plánovania.
 
-### KOVANIE (zaradené Michalom 26.8.2026, po bloku GHOST VKLADANIE)
+### KOVANIE (zaradené Michalom 26.8.2026; architektúra + UX UZAVRETÉ 2.9.2026)
 
-*(Predchádzajúci blok GHOST VKLADANIE je od 31.8.2026 uzavretý — v0.9.0; jeho plný text je v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).)*
+**Autorita bloku:** [zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md](zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md)
+(po cross-audite Codex/GLM/Opus + reconcile + rozhodnutia O1–O3) · **UX referencia:** [zdroje/ui20/mockup_kovanie_v1.html](zdroje/ui20/mockup_kovanie_v1.html)
+(schválený 2.9.) · vendor dáta: checkpoint #10 · detail fill: checkpoint #11. Otvorené postrehy D-109/D-110/D-111 sú v packages nižšie
+(D-109 mechanika = R-05 po V1, výsledok cez KOV-G). **Predpoklad prvého schema bumpu: D-52 updater** (blok 6 — štartovaný 2.9.).
+Poradie slices: **0 (D-52) → A → B → H → C → D → E → F → G → I**; C a D dostanú package po sonde Démos (kit vs atomic) a fixtures.
+Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-only), implementuje subagent v worktree, brány podľa CLAUDE.md.
 
-**Predpoklad štartu: USER-debata s Michalom o setoch** (podklad sa pripraví pred debatou; dáta v [zdroje/SEED_KATALOG_2026-07.md](zdroje/SEED_KATALOG_2026-07.md) §2,
-nezáväzný koncept [zdroje/next_sessions/03_KOVANIE_FAZA3.md](zdroje/next_sessions/03_KOVANIE_FAZA3.md)).
+- **KOV-A · TASK PACKAGE „ČELÁ — DÁTOVÁ VRSTVA A KLASIFIKÁCIA" (slice A; štart po D-52):**
+  **Cieľ:** čelo pozná svoj typ (dvierka · zásuvkové · výklop · sklop · blenda), spôsob otvárania, smer dvierok a klasifikáciu zásuvky;
+  výklop a blenda sa dajú postaviť; smery vidno v modeli; Neurčený smer je RED nález. **Kovanie, nákup ani ceny sa touto dávkou NEMENIA** —
+  výstupy existujúcich zákaziek sú CONTENT-identické (jediný nový nález je smer).
+  **Scope IN:** `fronts.rb` items[] — `type` rozšírený o `lift` · `fall` · `blind` (existujúce `door`/`drawer_front`/`none` nemenné);
+  polia **scopované per typ** (FINAL §2): `opening_mode` (`classic`|`tipon`) na pohyblivých, `direction` (`left`|`right`|`unset`) len na jednokrídlových
+  dvierkach (2 krídla = odvodené Ľ+P, neukladá sa), `drawer` blok = VÝHRADNE klasifikácia `{construction: metal|wood|other, variant: standard|internal}`
+  (systém/osi = KOV-D); polia sa pri prepnutí typu **držia** (dormant, vzor `migrate_overrides`) a `normalize_items` ich nikdy nezahodí — `prune_*`
+  overridov kovania sa v A nemení (zjednotenie pravidla pamäte = KOV-D). Roly: lift/fall → `flap` (+`flap_dir`), blind → `false_front`;
+  `cabinet_builder` ich stavia ako panel čela (rovnaký box), tag Čelá, **`thickness_ok_for?` + `materialized_part` rozšírené o `flap`/`false_front`**
+  (Opus F-5a — inak 19 mm čelný materiál zhodí stavbu); ABS default pre obe roly = ako dvierka (4 hrany 1,0). **5 uzavretých ciest round-trip**
+  (`normalize_items` · `config_to_params` · `normalize` · `cabinet_config` · `template_config_from`) + JS `collectFronts` + **CONFIG_SCHEMA bump** (R-12).
+  **Nový aditívny kľúč zberu `hardware_issues`** v `Bom.collect` (`{code, severity, cabinet_id, part_key, message}`; jediný čitateľ `Validation.run`) —
+  v A nesie len `front_direction_unset` → **RED bez brány (O1)**; KOV-D ho rozšíri o hard konflikty + brány. Brána smeru je **pre-committed**:
+  riadok do AUDIT_REGISTER „pristane s prvým direction-consuming výstupom (D-95)". **Overlay „Smer otvárania"** (modul `direction_check`, vzor
+  `grain_check`: prerušované `>` `<` `∧` `∨`, blenda plné X, žiadny zápis/undo; prepínač v raile Inspectora + lište Kontroly Štúdia, jeden stav).
+  **UI Inspector podľa mockupu scéna 1:** zoznam čiel s badge `smer?`, karta čela = typegrid piktogramov (5 nových sprite ikon) + kontextové riadky
+  (smer segrow s ⚠ Neurčené · otváranie · konštrukcia · štandardná/vnútorná); náhľad kreslí symboly smerov; existujúce riadky kovania ostávajú ako dnes
+  (set podľa otvárania príde s D — hint v karte). Dvojkrídlo: smer neponúka. **Žiadny default smeru nikde** (ani preview) — O1 podmienka.
+  **Scope OUT:** resolver, sety, recepty, `lift` generic type a kovanie výklopov (KOV-E), zmena závesov podľa Tip-On (KOV-F), ad-hoc (KOV-H),
+  exportné brány, D-111 sokel, heuristika smeru z kontextu.
+  **Audit: ÁNO** (config kontrakt + schema bump + nové roly + nový kľúč zberu).
+  **Testy a DoD:** headless — round-trip všetkých 5 ciest pre každé nové pole (matica typ × pole), legacy config → defaulty, `hardware_issues`
+  vzniká len pre jednokrídlo `unset`, charakterizácia: existujúce fixtures + **reálny .skp korpus** (KLINIKA-typ) dajú CONTENT-identický kusovník/VEPO/
+  nákup pred a po; JS — `collectFronts` round-trip, show/hide matica karty (5 typov × riadky), žiadny default smeru v kóde (guard grep);
+  **in-SU povinné** — stavba výklop/blenda + rebuild + Ctrl+Z, šablóna uložiť/vložiť s výklopom (polia prežijú), kópia `*3`, overlay bez undo kroku,
+  hrúbka 19 mm na flap/blende sa postaví. Mutácie min. 3 (pole vypadne z jednej cesty · default smeru · overlay zapisuje).
+  **Riziká:** tichá strata poľa v jednej z 5 ciest (preto matica) · hrúbkový kontrakt · výkon overlayu pri veľkej zákazke (merať) · ikony sprite.
+  **Smoke pre Michala:** vlož skrinku → F2 prepni na Výklop a F3 na Blendu (postavia sa, náhľad ukáže ∧ a X) · jednokrídlové dvierka = badge `smer?`,
+  Kontrola RED, **nákupný CSV aj rozpočet prejdú** · nastav Ľavé → nález zmizne, overlay v modeli kreslí `>` prerušovane · Tip-On prepni (zatiaľ
+  informatívne) · ulož šablónu s výklopom a vlož ju · kópia ×3 · otvor zákazku KLINIKA → kusovník/nákup/VEPO čísla identické ako pred aktualizáciou.
+  **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `docs/architecture/construction.md` (fronts, roly), `outputs.md`
+  (`hardware_issues`), `ui-lifecycle.md` (karta čela, overlay), `UI_DIZAJN.md` (ikony) na mieste → AUDIT_REGISTER riadok brány smeru →
+  STAV/KRONIKA/PLAN.
 
-- **Redizajn katalógu a setov — z prvého testu v0.8.0 (Michal 24.8.):** **D-109** pomer člena setu „1 ks na N nôh" (príchyt soklovej lišty — dnes len per unit/owner, pomer sa musí dopočítať ručne)
-  · **D-110** pridávanie kovaní je neprehľadné (formulár dole pod zoznamom, poradie polí nesedí s dodávateľským listom; *časť „nová položka nie je vidieť" vyriešená v TEST-1, PR #229*) · **D-111** výber
-  setu podľa výšky sokla je schovaný v Predvoľbách projektu, hoci ho človek hľadá pri vkladaní skrinky. Plné znenia v [DOGFOODING.md](DOGFOODING.md).
-- **Kovanie fáza 3 — V1 rozsah:** výplne šuflíkov **vo výťaži/kusovníku — fáza A** (V1-05, Atira dno+chrbát, Quadro/Tandem; vzorce dodá Michal) · výklopy ako **cenové zaradenie
-  podľa hmotnosti** (C-05 — AVENTOS tabuľky, hustoty z M-C ako SNAPSHOT) · smer otvárania a typ závesu · automatika počtu nôh podľa šírky · „Použiť na podobné".
-  **Mimo V1** (V1_VIZIA): plný geometrický model výklopov a geometria výplní (fáza B) — v zásobníku.
+- **KOV-B · TASK PACKAGE „KATALÓG A SETY — KLASIFIKÁCIA A EDITORY" (slice B, D-110; štart po KOV-A, paralelne s KOV-H):**
+  **Cieľ:** set aj položka katalógu nesú tú istú klasifikáciu ako čelo; katalóg je zoskupený; položka a set sa zakladajú v modaloch podľa mockupu
+  scéna 3; editor setu vysvetľuje „Ako sa určí kód? / Koľko?" a ukazuje **živý náhľad expanzie**. Nákup existujúcich zákaziek sa NEMENÍ.
+  **Scope IN:** `hardware_sets` — nové polia setu `use_type` (door|drawer|lift|fall|other) · `opening_mode` (classic|tipon|other) · `drawer_construction`
+  (metal|wood|other, len drawer) · `manufacturer` · `series` · `active` (bool, default true) → `SET_KEYS` + `normalize_sets` + `validate_set` +
+  **`snapshot_std` obsahová detekcia + `std` bump v TEJ ISTEJ dávke** (R-07: starší plugin → read-only, nikdy orez); **starý set bez klasifikácie =
+  platný „nezaradený"** (resolvuje presne ako dnes — charakterizačný test). **Kontrolované zoznamy** výrobcov a rád: nový malý globálny store
+  `hardware_taxonomy.json` (`JsonFileStore` + `.bak`, pod `Materials.with_catalog_lock`, seed Hettich/Blum/Strong + rady Sensys/InnoTech Atira/Quadro/
+  AVENTOS/TANDEM…, `+ Vytvoriť`), rada patrí presne jednému výrobcovi. `hardware_catalog` — položka + `manufacturer`/`series` (kategória existuje),
+  record std bump; **serverové zoskupenie** Kategória → Výrobca → Rada (poradie a orez vždy zo servera, „no silent caps" ostáva), hľadanie roztvára len
+  zhody, nová položka sa zvýrazní (existujúci `pin`). **Modaly** (nx_modal.js, D-15 vzor): Nová/Upraviť položka (Démos hľadanie/URL hore — existujúci
+  parser doplní len explicitný brand + Tip-On kľúčové slová, inak prázdne; poradie polí kód → názov → cena → MJ → kategória → výrobca → rada → poznámka),
+  Nový/Upraviť set (klasifikácia 1→6 kontextovo, auto-návrh mena editovateľný, členovia). **Editor člena:** jedno „+ Pridať člena" → „Ako sa určí kód?"
+  (pevný · podľa dĺžky výsuvu = `code_by_nl` · podľa parametra = `param_bands`) + „Koľko?" (na 1 kus = `per:'unit'` · na ownera = `per:'owner'`) —
+  tri dnešné tlačidlá zanikajú, dátový tvar člena sa NEMENÍ (XOR kontrakt; **žiadne `code_by_height`** — R4). **Živý náhľad expanzie**: serverový
+  read-only endpoint nad vzorovým ownerom (výber NL/počtu z ukážky), text skladá server (vzor `explain`). Pohľad Sety = dlaždice s chipmi klasifikácie
+  + stav Aktívny/Neaktívny; neaktívny set sa nenúka ako nový default (mapovanie podľa klasifikácie = KOV-D).
+  **Scope OUT:** resolver a default mapovanie podľa (typ × otváranie) (KOV-D), per-height sety a osové tabuľky (KOV-D), D-109/pomer (R-05), „newer
+  version" notifikácia snapshotu (KOV-D), logá výrobcov, Démos inferencia rady/kategórie z breadcrumbu, D-111.
+  **Audit: ÁNO** (schéma knižnice setov + katalógu + nový store, migrácia std).
+  **Testy a DoD:** headless — round-trip nových polí, **downgrade brána** (súbor s novými poľami → starší tvar = read-only, nie orez), `snapshot_std`
+  detekcia, taxonómia (zámok, seed, rada↔výrobca integrita, `+ Vytvoriť` dedup case-insensitive), starý set bez klasifikácie expanduje identicky
+  (charakterizácia nad seed knižnicou), náhľad expanzie = ten istý výsledok ako `expand`; JS — modaly (validácia, kontextové polia, auto-názov),
+  zoskupenie + hľadanie, editor člena (3×2 kombinácie); in-SU — uloženie setu zo Štúdia, dve okná (R-08 konflikt) nezmenené. Mutácie min. 3.
+  **Riziká:** rozsah UI (deliť na B1 dáta+std / B2 katalóg UI / B3 editor setu) · kolízia s R-35 (úplná náhrada bez revízie — nezhoršiť) · Démos parser regresie.
+  **Smoke pre Michala:** založ set cez modal: Zásuvka → Klasické → Kovové bočnice → Hettich → InnoTech Atira → názov navrhnutý → člen „K-sada podľa NL"
+  → náhľad expanzie ukáže kód pre NL 470 · katalóg: Závesy zbalené/rozbalené, hľadanie „tipon" roztvorí len Blum · starý set KLASIK má chip „nezaradený"
+  a nákup KLINIKA dáva identické čísla · na druhom PC so starším pluginom (ak ešte je) knižnica hlási read-only, nie prázdno.
+  **Checklist uzáveru:** bump patch + `?v=` → testy → `docs/architecture/hardware.md` (`hardware_sets`, `hardware_catalog`, nový odsek taxonómie)
+  + `ui-lifecycle.md` (sekcia hw, modaly) + ARCHITEKTURA router riadok → STANDARD §6 doplnok klasifikácie → D-110 do DOGFOODING_vyriesene → STAV/KRONIKA/PLAN.
+
+- **KOV-H · TASK PACKAGE „AD-HOC KOVANIE" (slice H; štart po KOV-A, nezávisle od B):**
+  **Cieľ:** ku skrinke, čelu alebo zóne sa dá pridať konkrétna položka kovania mimo setov (zámok, uholník, vešiak, HF komponenty…) a objaví sa v nákupe
+  a rozpočte s jasným pôvodom — bez zakladania umelých setov a bez zaprataného katalógu. Mockup scéna 2.
+  **Scope IN:** `config['hardware_manual'][]` = `{id, owner_part_key|nil, source: catalog|free, code, name, qty, unit, price_eur, note}`;
+  **serverová normalizácia** (whitelist, qty limity, cena Float ≥ 0, `owner_part_key` musí existovať v pláne alebo nil) v `CabinetBuilder.normalize` +
+  `cabinet_config` + `config_to_params` + `template_config_from` + **CONFIG_SCHEMA bump**; **plný snapshot** `code/name/unit/price` aj pri katalógovej
+  položke (cena v čase pridania; prepočet cien ju NEprepisuje — priznané); `Bom.collect` nesie aditívny kľúč `hardware_manual` s `owner_id`; **vlastný
+  pass-through kanál v expanzii** (vetva podľa pôvodu poľa PRED set rezolúciou — nikdy cez `resolve_set_id`, žiadny `generic_type custom`): riadok
+  nákupu s `source: 'manual'` a pôvodom (owner, human_label), agregácia podľa kódu s ostatnými riadkami, `Σ zdrojov = množstvo` invariant platí;
+  katalógový kód, ktorý v katalógu už nie je → `missing` flag (vzor `row_join`) + ORANGE; položka s mŕtvym `owner_part_key` → ORANGE „bez vlastníka",
+  v nákupe ostáva (nič sa ticho nestráca); zdieľané `cabinet_id` → položky vstupujú do `dup_partition` (blokujúca vetva iba pri zliatí per-owner —
+  manuálne položky sú per inštancia, takže varovná). **UI Inspector kontext Kovanie:** riadok „+ Pridať konkrétnu položku (mimo setov)" → modal
+  (Patrí k: skrinka/čelá/zóny · Zdroj: katalóg (existujúci combobox položiek) / voľná · množstvo · cena · poznámka); riadok s chipom „ručná",
+  úprava a zmazanie = **1 mutácia = 1 krok Späť** (`rebuild` netreba — zápis configu + push; položky nemenia geometriu). Šablóna nesie položky
+  s configom (explicitné rozhodnutie „Uložiť aj kovanie" = KOV-I; do vtedy položky cestujú vždy); kópia skrinky ich prenáša (nové id).
+  Rozpočet/CP: riadky prechádzajú existujúcou cestou z nákupu (žiadny nový výpočet).
+  **Scope OUT:** „uložiť do katalógu" bridge · prepočet cien manuálnych položiek z Démosu · dĺžkové položky (ostáva R-06a ORANGE) · položky na
+  úrovni zákazky bez skrinky (budget_custom_items existujú) · HF automatika.
+  **Audit: ÁNO** (config kontrakt + kontrakt zberu/expanzie + brána).
+  **Testy a DoD:** headless — normalizácia (odmietnutia), pass-through expanzia s pôvodom, agregácia s riadkom zo setu s rovnakým kódom, `missing`,
+  mŕtvy owner, dup gate (varovná vs blokujúca), round-trip 4 ciest + šablóna + kópia; JS — modal, riadok, delete; in-SU — pridať/upraviť/zmazať =
+  po jednom kroku Späť, prestavba skrinky položky drží, kópia `*2` prenáša, CSV nákupu obsahuje riadok s pôvodom. Mutácie min. 3.
+  **Riziká:** cena snapshot vs. živý katalóg (priznať v UI „cena z času pridania") · owner combobox pri veľa čelách · zliatie s riadkom setu (agregácia
+  podľa kódu je ŽELANÁ, pôvod ich rozlíši).
+  **Smoke pre Michala:** k F1 pridaj Bystricu 93240 ×2 z katalógu → Nákup ukáže riadok, rozklik pôvod „F1 dvierka ľavé · ručná" · pridaj voľnú položku
+  „zámok Abloy 12 €" ku skrinke · zmeň šírku skrinky → položky ostali · skopíruj skrinku → kópia ich má · zmaž katalógovú položku z katalógu →
+  riadok „chýba v katalógu" (ORANGE), CSV ju stále obsahuje · Ctrl+Z vráti každý krok.
+  **Checklist uzáveru:** bump patch + `?v=` → testy → `docs/architecture/hardware.md` (odsek ad-hoc v `hardware_sets`), `outputs.md` (zber, brána),
+  `ui-lifecycle.md` (modal) → STANDARD §6 (ad-hoc kanál) → STAV/KRONIKA/PLAN.
+
+- **Ďalšie slices (package pri štarte, z FINAL §3–§8):** **KOV-C** context_for + recepty Atira/Quadro + odvodené dielce + 4. materiálový kanál
+  (po sonde Démos a fixtures; audit-povinná, in-SU povinné) · **KOV-D** resolver + osi setov + zámky (R2/R3) + brány (O2) · **KOV-E** výklopy HK/HL
+  (`+lift`) · **KOV-F** závesy MAX(výška, hmotnosť) + úchytka/krídlo + Tip-On piest · **KOV-G** nohy 4/6 + klipy cez šírku (O3) + sokel pri vkladaní (D-111)
+  · **KOV-I** šablóny „Uložiť aj kovanie" + 🔧.
+- **Mimo V1** (FINAL §12): D-109 pomer (R-05), plný `per:'length'`, HF, Antaro/Strong/TANDEM (dáta pripravené v #10), inner drawer automatika.
 
 ### 2 · KONTROLA + VÝROBA
 
