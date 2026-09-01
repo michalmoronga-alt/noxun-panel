@@ -69,3 +69,25 @@
 - Synchronizácia nastavení medzi symetrickými alebo „rovnakými“ čelami je **výslovne mimo V1**.
 - V1 nebude mať `Použiť aj na ostatné rovnaké`, skupinové locky ani automatické odpájanie zo synchronizovaných skupín.
 - Ak sa neskôr ukáže reálna potreba, táto oblasť sa navrhne samostatne ako bulk/synchronization feature, aby sa nemiešala do základného modelu kovania.
+
+## 9. Dvierkové sety — Classic / Tip-On
+
+- `Classic` používa záves s **integrovaným tlmením**; tlmenie nie je samostatný prepínač.
+- `Tip-On` používa P2O záves bez tlmenia + **presne 1× TIP-ON piest na jedno krídlo**.
+- Podložky a krytky sú spoločné katalógové komponenty a môžu byť referencované Classic aj Tip-On setmi; netreba ich duplikovať podľa opening mode.
+- Defaultná množstvová logika bežného dvierkového setu:
+  - záves = podľa vypočítaného/locked počtu závesov,
+  - montážna podložka = `1× na záves`,
+  - krytka = `1× na záves`,
+  - TIP-ON piest = `1× na krídlo` iba pre Tip-On.
+- Toto je default, nie hardcode konkrétneho setu: členovia a množstvová logika setu zostávajú editovateľné v definícii konkrétneho setu.
+
+## 10. Jednoduché množstvové pravidlá členov setu
+
+Používateľ zvolil **A**: set member quantity nepoužíva univerzálny voľný formula language. V1 má malý kontrolovaný zoznam jednoduchých pravidiel, minimálne:
+- pevný počet,
+- `N× na záves`,
+- `N× na owner/krídlo/zostavu`,
+- jednoduchý násobok základnej veličiny.
+
+Cieľ: sety zostávajú flexibilné a editovateľné bez hardcodovania každého komponentu v Engine, ale pravidlá sú čitateľné, auditovateľné a bezpečné.
