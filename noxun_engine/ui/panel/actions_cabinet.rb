@@ -310,6 +310,13 @@ module Noxun
           # UI-C1a: metadata sablony sa z payloadu vyberu HNED — do buildera
           # sa nikdy nedostanu; peciatka pouzitia ide az po uspesnom vlozeni.
           tpl_ref = take_template_ref!(params, 'cabinet')
+          # R-12 [B1]: guard nad CIELOVOU instanciou pred novsou SABLONOU
+          # nechrani — pri vklade ziadny cielovy korpus este neexistuje.
+          # Autorita je ULOZENY ZAZNAM sablony, nie payload z CEF (JS prenasa
+          # len zname polia, takze marker by v nom uz nemusel byt).
+          if (tpl_msg = newer_template_refusal(tpl_ref, 'vloženie by nastavenia stratilo'))
+            return set_status("#{tpl_msg} Nič sa nevložilo.", true)
+          end
           hw_status, hw = take_insert_hardware!(params) # H2 (D-76)
           if hw_status == :lossy
             return set_status("Šablóna nesie kovanie, ktoré sa nedá prečítať (#{Array(hw).join(', ')}) — " \
@@ -425,7 +432,19 @@ module Noxun
           cab = cid.empty? ? find_cabinet(model) : find_cabinet_by_id(model, cid)
           return set_status('Skrinka na kopírovanie sa nenašla.', true) if cab.nil?
 
-          params = CabinetBuilder.config_to_params(Store.config(cab) || {})
+          src_cfg = Store.config(cab) || {}
+          # R-12 [B2]: kopia NEJDE cez rebuild — `config_to_params` je uzavrety
+          # whitelist a novy korpus by vznikol s TICHO orezanym configom (a este
+          # by sa tvaril ako platny zaznam tejto verzie). Odvodeny objekt sa
+          # z novsieho configu nevytvara vobec.
+          if CabinetBuilder.newer_config?(src_cfg)
+            return set_status(
+              "#{CabinetBuilder.newer_config_message('Korpus', 'kópia by nastavenia stratila')} " \
+              'Kópia sa nevložila.', true
+            )
+          end
+
+          params = CabinetBuilder.config_to_params(src_cfg)
           inst = CabinetBuilder.build(model, params)
           select_only(model, inst)
           status_with_warnings(inst, "Vložená kópia #{Store.get(cab, 'cabinet_id')} → " \

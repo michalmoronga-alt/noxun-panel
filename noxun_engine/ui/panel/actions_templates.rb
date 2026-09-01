@@ -113,6 +113,16 @@ module Noxun
 
           # H2 (D-76): model = zdroj ZMRAZENYCH definicii setov kovania.
           cab_cfg = Store.config(cab) || {}
+          # R-12 [B2]: „Ulozit ako sablonu" je STRATOVA cesta bez rebuildu —
+          # `template_config_from` je dalsi uzavrety whitelist. Zo skrinky
+          # z NOVSEJ verzie by vznikla ORIEZANA sablona, ktoru by uz nikto
+          # nerozoznal ako necelu. Radsej ziadny zapis.
+          if CabinetBuilder.newer_config?(cab_cfg)
+            return set_status(
+              "#{CabinetBuilder.newer_config_message('Korpus', 'šablóna by nastavenia stratila')} " \
+              'Šablóna sa neuložila.', true
+            )
+          end
           config = template_config_from(cab_cfg, model: model)
           hw_note = template_save_hardware_note(cab_cfg, config, model) # GH #133 P2
           type_note = apply_template_type!(config, data['type'])        # UI-B3 modal: Nazov + Typ
@@ -220,6 +230,27 @@ module Noxun
           return nil if name.empty? || kind != expected_kind
 
           [kind, name]
+        end
+
+        # R-12 [B1]: odmietnutie vkladu zo sablony, ktora je z NOVSEJ verzie.
+        # Zaznam sa nacita ZNOVA zo skladu — payload z CEF nesie len zname
+        # polia (form.js/actions.js), takze marker `config_schema` v nom
+        # nemusi byt vobec; jedina autorita je ULOZENY zaznam.
+        # Sablona, ktora medzitym zmizla, vklad NEBLOKUJE (rovnaka zasada ako
+        # `stamp_template_used`) — chyba zaznamu nie je dokaz nekompatibility.
+        # Vracia SK hlasku, alebo nil, ked je vsetko v poriadku.
+        def newer_template_refusal(ref, consequence)
+          return nil if ref.nil?
+
+          kind, name = ref
+          tpl = TemplateStore.find(kind, name)
+          return nil if tpl.nil?
+          return nil unless CabinetBuilder.newer_config?(tpl['config'])
+
+          CabinetBuilder.newer_config_message('Šablóna', consequence)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.newer_template_refusal')
+          nil
         end
 
         # Peciatka „naposledy pouzite" — SAMOSTATNA operacia PO uspesnom

@@ -378,6 +378,16 @@ module Noxun
           # nezobrazuje, ale guard je SERVEROVY a ostava.
           tpl = TemplateStore.find('cabinet', name)
           return set_status('Šablóna sa nenašla.', true) if tpl.nil?
+          # R-12 [B1]: dopredny guard prestavby chrani CIELOVU skrinku, nie
+          # zdroj — sablona z NOVSEJ verzie by sa do nej zliala uz OREZANA
+          # (merge_template + normalize su uzavrete whitelisty) a rebuild by to
+          # nemal ako zbadat. Kontroluje sa RAW config ULOZENEHO zaznamu.
+          if CabinetBuilder.newer_config?(tpl['config'])
+            return set_status(
+              "#{CabinetBuilder.newer_config_message('Šablóna', 'použitie by nastavenia stratilo')} " \
+              'Nepoužitá, nič sa nezmenilo.', true
+            )
+          end
           model = Sketchup.active_model
           # Review #225: PRAVE JEDNA oznacena skrinka (vzor `capture_preview_for`).
           # `find_cabinet` by pri viacnasobnom vybere TICHO vzal prvy korpus —
