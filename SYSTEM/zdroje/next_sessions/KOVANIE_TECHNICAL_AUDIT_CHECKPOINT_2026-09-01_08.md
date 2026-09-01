@@ -37,8 +37,8 @@ Decision: do not lock derived-part identity/model yet. First collect real system
 - If preferred ranking exists and no preferred length fits, resolver may automatically select a technically compatible non-preferred length and mark it as outside preferred. It must not hard-block or require confirmation merely because a valid length is non-preferred.
 - Therefore the V1 technical compatibility model must remain independent from stock/delivery preference. The preferred layer may be added later without changing recipe identity or compatibility rules.
 - Stock/order history must not be interpreted as technical compatibility: Atira was underrepresented in the seed because Noxun had previously purchased large industrial packs of H70/H176 components.
-- **Load-class intent from user:** standard Atira choice should be 30 kg; 620 mm should use the higher-load runner; user also recalls a 60 kg option for 470/520 mm and wants it available if cheap to support.
-- **Audit discrepancy:** current/recent official Hettich InnoTech Atira material found in research exposes 30 kg and 50 kg load classes (620 mm = 50 kg only; 470/520 support 30 or 50 kg in cited Silent System data). No official Atira 60 kg variant has yet been found. Keep `60 kg @ 470/520` OPEN until user/source verification; do not encode it as fact.
+- **Confirmed load-class intent:** 30 kg is the standard Atira choice; 620 mm uses the 50 kg runner; 470/520 mm may also use 50 kg when required and cheap to support. User correction: the earlier mention of 60 kg was a mix-up with Blum TANDEM, not Atira.
+- Current/recent Hettich data found in research exposes the same 30 kg / 50 kg Atira load classes; no Atira 60 kg support is required.
 
 ### Quadro / TANDEM family
 - User correction: Quadro width calculation depends on the selected runner / installation width EB.
@@ -99,7 +99,7 @@ Important: preferred/stocked lengths are a soft ranking overlay only and can sta
 Important: supplier packaging (one complete kit SKU vs several component SKUs) is orthogonal to the logical hardware set/recipe. Resolve it in procurement expansion, not in manufactured-part geometry.
 
 ## Next audit work
-1. Complete exact V1 Atira recipe: generated manufactured parts, dimensions, material/thickness, H70/H144/H176 rules, full applicable NL set, mandatory hardware SKUs, railing components, verified load classes, and opening-mode-specific hardware/installation data.
+1. Complete exact V1 Atira recipe: generated manufactured parts, dimensions, material/thickness, H70/H144/H176 rules, full applicable NL set, mandatory hardware SKUs, railing components, verified 30/50 kg load classes, and opening-mode-specific hardware/installation data.
 2. Collect exact V1 Quadro EB23 recipe: four wooden box parts + bottom, dimensions, 16/18 mm thickness effects, NL, catches, load classes, opening-mode-specific runner/installation data.
 3. Audit representative Demos packaging cases: same logical drawer requirement sold as one kit SKU vs assembled from multiple SKUs; propose minimal data model compatible with existing hardware expansion/provenance.
 4. Compare StrongBox and TANDEMBOX Antaro against Atira to identify true shared parameters vs system-specific branches.
@@ -115,7 +115,7 @@ Important: supplier packaging (one complete kit SKU vs several component SKUs) i
 - Atira complete-NL V1 intent: confirmed by user, 2026-09-01.
 - Atira preferred/recommended list explicitly optional / outside V1 if complex; valid non-preferred automatic fallback allowed: confirmed by user, 2026-09-01.
 - Main Atira nominal-length sequence `260/300/350/420/470/520/620`: current/recent official Hettich InnoTech Atira catalogue/planning data; compatibility must still be validated per concrete selected component profile.
-- Atira 30/50 kg official load classes: current/recent Hettich data; 620 = 50 kg in cited data, 470/520 = 30 or 50 kg. User-recalled 60 kg at 470/520 remains unverified/open.
+- Atira 30/50 kg official load classes: current/recent Hettich data; 620 = 50 kg in cited data, 470/520 = 30 or 50 kg. User confirmed 2026-09-01 that the earlier 60 kg mention was a mix-up with Blum TANDEM.
 - Supplier packaging distinction (some Demos configurations one code, others multiple component products): confirmed by user, 2026-09-01; exact representative Demos SKUs still require audit.
 - Quadro EB23 profile / width: official Hettich runner documentation.
 - Quadro default 16 mm and supported 18 mm box material: confirmed by user, 2026-09-01.
