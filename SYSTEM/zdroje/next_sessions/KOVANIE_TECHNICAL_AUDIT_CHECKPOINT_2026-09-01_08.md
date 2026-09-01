@@ -31,6 +31,10 @@ Decision: do not lock derived-part identity/model yet. First collect real system
   - `H176` with railing: wooden rear-panel height `176 mm`; minimum internal clear/opening height `224 mm`.
 - The same broad concept is expected later for Blum metal-sided systems: height variant changes rear-panel/railing/component data and minimum required vertical space, but should remain a data-driven recipe axis rather than a new resolver family.
 - Exact Hettich nomenclature and minimum-space figures still require official-catalog cross-check before implementation; current values above are user-confirmed Noxun production inputs.
+- **NL coverage decision:** Atira is a high-frequency Noxun system and V1 should support the complete applicable catalogue length set, not only a narrow Noxun whitelist. Resolver should normally choose the longest compatible nominal length from available space, with manual override retained.
+- Current Hettich InnoTech Atira planning/catalogue data lists the main nominal-length sequence `260 / 300 / 350 / 420 / 470 / 520 / 620 mm`. Exact availability must still be validated per selected height/profile/opening/component set because not every component presentation necessarily exposes every length.
+- **Soft preferred-length list:** Noxun may mark a subset of lengths as preferred/recommended (e.g. because they are normally stocked or have better delivery). This is a ranking/recommendation overlay only, never a compatibility ban. Non-preferred but technically valid lengths remain selectable and visible, e.g. after preferred choices in UI.
+- Stock/order history must not be interpreted as technical compatibility: Atira was underrepresented in the seed because Noxun had previously purchased large industrial packs of H70/H176 components.
 
 ### Quadro / TANDEM family
 - User correction: Quadro width calculation depends on the selected runner / installation width EB.
@@ -70,8 +74,10 @@ Important: opening mode is an orthogonal hardware axis for both V1 drawer archet
 
 Important: Atira `height_variant` is confirmed as a data-driven axis, with at least H70/H144/H176 in Noxun V1.
 
+Important: preferred/stocked lengths are a soft ranking overlay, not part of the technical compatibility model.
+
 ## Next audit work
-1. Complete exact V1 Atira recipe: generated manufactured parts, dimensions, material/thickness, H70/H144/H176 rules, NL variants, mandatory hardware SKUs, railing components, and opening-mode-specific hardware/installation data.
+1. Complete exact V1 Atira recipe: generated manufactured parts, dimensions, material/thickness, H70/H144/H176 rules, full applicable NL set, mandatory hardware SKUs, railing components, and opening-mode-specific hardware/installation data.
 2. Collect exact V1 Quadro EB23 recipe: four wooden box parts + bottom, dimensions, 16/18 mm thickness effects, NL, catches, opening-mode-specific runner/installation data.
 3. Compare StrongBox and TANDEMBOX Antaro against Atira to identify true shared parameters vs system-specific branches.
 4. Compare Blum TANDEM against Quadro EB23 to identify shared recipe fields vs runner-specific constants.
@@ -83,6 +89,8 @@ Important: Atira `height_variant` is confirmed as a data-driven axis, with at le
 - Atira 16 mm bottom + 16 mm wooden rear panel: confirmed by user, 2026-09-01.
 - Atira Silent System + Push-to-open use in Noxun: confirmed by user, 2026-09-01.
 - Atira H70/H144/H176 production height data: confirmed by user, 2026-09-01; official catalogue cross-check still required before implementation lock.
+- Atira complete-NL V1 intent and soft preferred-length concept: confirmed by user, 2026-09-01.
+- Main Atira nominal-length sequence `260/300/350/420/470/520/620`: current/recent official Hettich InnoTech Atira catalogue/planning data; compatibility must still be validated per concrete selected component profile.
 - Quadro EB23 profile / width: official Hettich runner documentation.
 - Quadro default 16 mm and supported 18 mm box material: confirmed by user, 2026-09-01.
 - Quadro box construction and Excel dimensions: confirmed by user, 2026-09-01.
