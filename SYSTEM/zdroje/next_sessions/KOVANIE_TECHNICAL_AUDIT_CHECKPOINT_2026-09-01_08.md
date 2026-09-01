@@ -37,6 +37,8 @@ Decision: do not lock derived-part identity/model yet. First collect real system
 - If preferred ranking exists and no preferred length fits, resolver may automatically select a technically compatible non-preferred length and mark it as outside preferred. It must not hard-block or require confirmation merely because a valid length is non-preferred.
 - Therefore the V1 technical compatibility model must remain independent from stock/delivery preference. The preferred layer may be added later without changing recipe identity or compatibility rules.
 - Stock/order history must not be interpreted as technical compatibility: Atira was underrepresented in the seed because Noxun had previously purchased large industrial packs of H70/H176 components.
+- **Load-class intent from user:** standard Atira choice should be 30 kg; 620 mm should use the higher-load runner; user also recalls a 60 kg option for 470/520 mm and wants it available if cheap to support.
+- **Audit discrepancy:** current/recent official Hettich InnoTech Atira material found in research exposes 30 kg and 50 kg load classes (620 mm = 50 kg only; 470/520 support 30 or 50 kg in cited Silent System data). No official Atira 60 kg variant has yet been found. Keep `60 kg @ 470/520` OPEN until user/source verification; do not encode it as fact.
 
 ### Quadro / TANDEM family
 - User correction: Quadro width calculation depends on the selected runner / installation width EB.
@@ -64,6 +66,22 @@ Decision: do not lock derived-part identity/model yet. First collect real system
 - Other Quadro generations/variants differ (e.g. V6 5D / V6 YOU use internal width LB-42 and drawer length NL-10), so runner variant MUST remain a future data axis even if V1 fixes the current profile.
 - Blum TANDEM standard planning uses `SKW = LW - 42` and `SKL = NL - 10` for the cited hook/locking-device variants, confirming the same broad computational family but not identical constants to classic Quadro V6 EB23.
 
+## Procurement / supplier packaging distinction
+
+User added an important Demos procurement reality:
+- Some drawer configurations are purchasable from Demos as one complete commercial set with one supplier/order code.
+- Other configurations must be purchased as multiple separate products/SKUs: e.g. runner(s), drawer side profiles, rear-panel holders/connectors, railing/connectors, etc.
+
+Architectural implication (provisional but strong):
+- A **logical Engine hardware set / recipe result** is not the same thing as a **supplier packaging SKU**.
+- The logical set should describe the required mechanical result/components for one owner.
+- Procurement expansion may resolve that requirement either to:
+  1. one bundled supplier SKU/kit, or
+  2. several atomic supplier SKUs and quantities.
+- Therefore do not force `hardware_set == one catalog item` and do not duplicate geometry/rule logic merely because the supplier sells one variant as a kit and another as individual components.
+- Canonical purchasing aggregation remains by concrete purchasable SKU after expansion, with owner/provenance retained.
+- Stage-2 audit should inspect representative Demos cases and determine the smallest data representation for `bundle/kit vs atomic components`; reuse existing `hardware_expansion` / purchasing provenance machinery where possible rather than inventing a parallel BOM.
+
 ## Architectural interpretation — provisional only
 
 Two useful computational families remain:
@@ -78,12 +96,15 @@ Important: Atira `height_variant` is confirmed as a data-driven axis, with at le
 
 Important: preferred/stocked lengths are a soft ranking overlay only and can stay outside V1 if costly. Technical compatibility must not depend on the preference layer.
 
+Important: supplier packaging (one complete kit SKU vs several component SKUs) is orthogonal to the logical hardware set/recipe. Resolve it in procurement expansion, not in manufactured-part geometry.
+
 ## Next audit work
-1. Complete exact V1 Atira recipe: generated manufactured parts, dimensions, material/thickness, H70/H144/H176 rules, full applicable NL set, mandatory hardware SKUs, railing components, load classes, and opening-mode-specific hardware/installation data.
+1. Complete exact V1 Atira recipe: generated manufactured parts, dimensions, material/thickness, H70/H144/H176 rules, full applicable NL set, mandatory hardware SKUs, railing components, verified load classes, and opening-mode-specific hardware/installation data.
 2. Collect exact V1 Quadro EB23 recipe: four wooden box parts + bottom, dimensions, 16/18 mm thickness effects, NL, catches, load classes, opening-mode-specific runner/installation data.
-3. Compare StrongBox and TANDEMBOX Antaro against Atira to identify true shared parameters vs system-specific branches.
-4. Compare Blum TANDEM against Quadro EB23 to identify shared recipe fields vs runner-specific constants.
-5. Only then decide derived part keys / owner relationship / BuildPlan integration.
+3. Audit representative Demos packaging cases: same logical drawer requirement sold as one kit SKU vs assembled from multiple SKUs; propose minimal data model compatible with existing hardware expansion/provenance.
+4. Compare StrongBox and TANDEMBOX Antaro against Atira to identify true shared parameters vs system-specific branches.
+5. Compare Blum TANDEM against Quadro EB23 to identify shared recipe fields vs runner-specific constants.
+6. Only then decide derived part keys / owner relationship / BuildPlan integration.
 
 ## Evidence status
 - User production choices: confirmed by user, 2026-09-01.
@@ -94,6 +115,8 @@ Important: preferred/stocked lengths are a soft ranking overlay only and can sta
 - Atira complete-NL V1 intent: confirmed by user, 2026-09-01.
 - Atira preferred/recommended list explicitly optional / outside V1 if complex; valid non-preferred automatic fallback allowed: confirmed by user, 2026-09-01.
 - Main Atira nominal-length sequence `260/300/350/420/470/520/620`: current/recent official Hettich InnoTech Atira catalogue/planning data; compatibility must still be validated per concrete selected component profile.
+- Atira 30/50 kg official load classes: current/recent Hettich data; 620 = 50 kg in cited data, 470/520 = 30 or 50 kg. User-recalled 60 kg at 470/520 remains unverified/open.
+- Supplier packaging distinction (some Demos configurations one code, others multiple component products): confirmed by user, 2026-09-01; exact representative Demos SKUs still require audit.
 - Quadro EB23 profile / width: official Hettich runner documentation.
 - Quadro default 16 mm and supported 18 mm box material: confirmed by user, 2026-09-01.
 - Quadro box construction and Excel dimensions: confirmed by user, 2026-09-01.
