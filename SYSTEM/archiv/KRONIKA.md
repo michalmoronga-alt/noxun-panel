@@ -17,6 +17,20 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOVANIE — ARCHITEKTÚRA V1 + CROSS-AUDIT + MOCKUP + ŠTART (1.–2.9.2026, docs commity `928a9d5…2fd6aac`, bez zmeny kódu; PR #277 = prvý kód):**
+  najväčšie plánovacie sedenie projektu, celé pred koncom MAX plánu (Fable). **Reťaz:** USER-debata (checkpointy 01–09, Michal hlasom) → orchestrator review package →
+  **Round 1** kritika (7 otázok, HF von / stavové zóny von / revízie von) → **Round 2** s nezávislým vendor researchom (checkpoint #10: Hettich TuI/Planning/MTA, Blum MA-513/
+  TD-066/KA-140, Démos — 5 systémov, tagy OFFICIAL/SECONDARY/UNCONFIRMED; korekcia H70 min. výšky 92→105/106/108) → **cross-audit troch nezávislých modelov** (Codex
+  UNSAFE-as-written, GLM + blind Opus SOUND WITH CHANGES; blind protokol — výsledky do repa až po dobehnutí všetkých) → **jedno reconcile kolo** (R1–R12 prijaté: recepty
+  s projektovým snapshotom, exkluzivita slide + migrácia D-93 zámkov, zámky len v hardware_overrides, code_by_height a custom typ zamietnuté, 4. materiálový kanál, context
+  z interiéru, KD→EB os, nový RED kľúč + fail-closed dielce, D-109 odklad, atómové bumpy) → **rozhodnutia Michala O1–O3** (smer = RED bez brány s pre-committed bránou; drawer_no_fit
+  = tvrdý blocker; D-109 mechanika k R-05) → `KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md` → **interaktívny mockup** 4 scén (schválený bez výhrad) → detail fill #11
+  (ABS zásuviek, UNI 16 default) + **sonda kit vs atomic #12** (93 % K-sady; tabuľka Démos kódov) → **packages KOV-A/B/H** + revízia D-52 po Codex audite (4 BLOCKER + 7 FIX:
+  recovery bootstrap v loaderi, restart latch, update lock + lease, downgrade zakázaný) → **PR #277 D-52a** (Codex kolo 1: 4×P1+1×P2 v oprave).
+  **Poučenia:** (1) cross-audit troch modelov s rôznymi fokusmi našiel štyri diery, ktoré by prežili testy (dvojitá emisia slide, osirotené zámky, recepty bez snapshotu, 16 mm
+  offset riadok-vs-interiér) — hodnota je v rôznych triedach chýb, nie v hlasovaní; (2) research subagent s neskorším „follow-up na zaujímavosti" dal navyše pasce a URL vzory
+  zadarmo; (3) docs commity musia prejsť guard testami (status riadok konceptov, mojibake) — main bol 2.9. dočasne červený. Plné texty: `zdroje/next_sessions/KOVANIE_*`.
+
 - **1d/R-14 · VERZIA FORMÁTU DÁT ROZPOČTU — `budget_std` (v0.9.4, 1.9.2026, PR #276):** rozpočet zákazky žije v ôsmich `NOXUN` kľúčoch **na modeli**
   (režim, prepisy súm, násobky, m² vizualizácie, vlastné položky, spotrebiče, ich započítanie a zaradenie v ponuke) a **všetky sa čítajú cez uzavreté whitelisty**
   (`build_custom`, `build_appliance`, `numeric_map`). Zákazka uložená NOVŠÍM pluginom by teda prvým klikom v Rozpočte ticho prišla o polia, ktorým staršia verzia

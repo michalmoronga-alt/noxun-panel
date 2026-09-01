@@ -27,18 +27,17 @@ vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
 ## Robí sa
 
-**Blok 1b · STABILIZAČNÁ REVÍZIA je prakticky uzavretý** ([PLAN.md](PLAN.md)): brány A/G/H hotové (1b-1/2/3), dlhy B+D (1b-4), sweep E, mimo písmen 1b-6a/6b/6c aj 1b-7, z F je hotové D-27 —
-**ostáva len D-51** (štandard veľkostí okien — čaká na Michalove hodnoty) a výklop ako typ čela (ide cez task package 1e).
-**Blok 1c · AUDIT KÓDU je HOTOVÝ (29.8.)** — traja audítori zliati do **[AUDIT_REGISTER.md](AUDIT_REGISTER.md)** (2×P0 + 35 položiek — 33 z 1c, 2 z review — + poradie pre 1d + 3 rozhodnutia Michala (R-05 · R-13 · R-30));
-**oba P0 sú vybavené dávkou P0-HF** (v0.8.14) a **beží blok 1d** (hotové: R-06 · R-08 zámky · R-01+R-04 observer · R-34 · R-02+R-02b identita dokumentu · R-03 šev vkladania · R-07 brána knižnice · R-23.1 Escape · R-11 degraded záloha · R-12 guard configu · **R-14 verzia dát rozpočtu**; audit R-11 pridal R-37 a R-38).
-**Beží aj 1e PLÁNOVACIA DÁVKA** (task packages, priorita do 2.9.).
-**Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
+**Blok 1b uzavretý až na D-51** (čaká na Michalove hodnoty) · **1c hotový** ([AUDIT_REGISTER.md](AUDIT_REGISTER.md)) · **1d beží** (hotové R-06/R-08/R-01+04/R-34/R-02(b)/R-03/R-07/R-23.1/R-11/R-12/R-14; ďalej R-18 + zvyšok; R-13 čaká na Michala).
+**1e HOTOVÁ** — posledný package KOVANIE vznikol 2.9. **Blok KOVANIE ŠTARTOVAL (2.9.):** architektúra V1 uzavretá po cross-audite (Codex/GLM/Opus) + reconcile + O1–O3
+([zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md](zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md)), mockup schválený
+([zdroje/ui20/mockup_kovanie_v1.html](zdroje/ui20/mockup_kovanie_v1.html)), packages KOV-A/B/H v [PLAN.md](PLAN.md); **PR #277 D-52a (jadro updatera) v Codex review** — D-52 je tvrdý predpoklad prvého schema bumpu.
+**Od 2.9. večer bez Fable** — orchestruje Opus, review Codex; vstupný bod je pamäť `handoff-2026-09-02` + tento súbor. **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
 
-**Poradie ďalšej práce (Michal 26.8. + úprava 27.8. kvôli koncu MAX plánu 2.9.):** ~~1b~~ → ~~1c audit~~ → **1e plánovacia dávka** (task packages — Fable priorita do 2.9.)
-→ **1d refaktor z [AUDIT_REGISTER.md](AUDIT_REGISTER.md)** (beží súbežne cez subagentov, pokračuje aj po 2.9. — perzistencia ~~R-11~~ → ~~R-12~~ → ~~R-14~~ → najbližšie **R-18**, ďalej R-37/R-38 a zvyšok registra podľa kapacity; R-13 čaká na rozhodnutie Michala)
-→ ~~GHOST VKLADANIE~~ (**hotové, v0.9.0**) → **KOVANIE** (najprv USER-debata o setoch, Michal ju rozoberie v samostatnom okne). V1 rozsah zoštíhlený — checklist v [V1_VIZIA.md](V1_VIZIA.md).
+**Poradie (Michal 2.9.: „poradie je na tebe"):** **PR #277 D-52a** (Codex 4×P1 opravy → `@codex review` → merge) → **D-52b** (UI updatera, rez v PLAN D-52) → **KOV-A** čelá dátová vrstva
+→ **KOV-B** katalóg+sety (paralelne **KOV-H** ad-hoc) → **KOV-C** context_for + recepty + odvodené dielce → **KOV-D** resolver + zámky + brány → E/F/G/I. Súbežne 1d podľa kapacity.
+Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` (KOV-A/B/C/D/H povinné) → subagent vo worktree → `codex-po-pr` → merge → uzáver. V1 checklist v [V1_VIZIA.md](V1_VIZIA.md).
 
 ## Posledné uzávery
 
