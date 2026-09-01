@@ -1642,6 +1642,12 @@ vtedy, keď naozaj niečo bežalo).
 história okna: **UI-C1a: okno spravuje VÝHRADNE korpusové šablóny** — payload je `Panel.template_list(kind: 'cabinet', previews: true)` a `find`/`upsert`/`delete`/`set_preview`
 majú vlastný `kind` guard, HTML nie je ochrana, takže doskovú šablónu sa odtiaľ nedá použiť, vymazať ani odfotiť.
 
+**R-12 (v0.9.3) — `handle_apply` odmietne šablónu z NOVŠEJ verzie.** Guard prestavby chráni cieľovú skrinku, nie zdroj: config šablóny by sa do cieľa zlial už orezaný
+(`merge_template` + `normalize` sú uzavreté whitelisty) a rebuild by to nemal ako zbadať. Kontroluje sa preto **RAW config uloženého záznamu**
+(`CabinetBuilder.newer_config?`) **pred** merge aj pred `rebuild_many`; hláška ide z jediného zdroja `CabinetBuilder.newer_config_message`. Tú istú kontrolu má **vklad
+zo šablóny** v paneli (`Panel.newer_template_refusal` — záznam sa načíta zo skladu, lebo cez CEF chodia len známe polia) a obe stratové ne-rebuild cesty panela
+(„Vložiť kópiu", „Uložiť ako šablónu"). Detail kontraktu: [construction.md](construction.md), odsek `cabinet_builder.rb`.
+
 **SMOKE PACK 1:** riadok má tretie tlačidlo **„Odfotiť" / „Prefotiť"** (podľa `preview_rev`) — pridá k šablóne náhľad z **práve jednej označenej** skrinky bez toho, aby prepísalo
 jej dáta; je **vždy aktívne** (vzor D-78 — dôvod, prečo to teraz nejde, povie server v statuse), text namiesto ikony preto, že toto okno sprite `icons.js` nenačítava).
 
