@@ -492,6 +492,10 @@ Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-
   · downgrade odmietnutý · in-SU smoke s oboma oknami + druhá inštancia (úspech/reštart, poškodený balík, zamknutý priečinok, odpojený share, žiadne siroty)
   · mutácie: odstránený recovery bootstrap, update lock, restart latch — každá zabitá testom. **Rez:** **D-52a** = loader recovery + marker + lock/lease +
   manifest + swap + settings store + restart latch API (headless, bez UI) · **D-52b** = About UI, async check, bariéra okien, natívne hlášky, in-SU smoke.
+  **STAV 2.9.2026: rez D-52a (jadro bez UI) je IMPLEMENTOVANÝ** — `core/updater.rb` (manifest, staging, validácia,
+  swap s rollbackmi, update lock + procesný lease, downgrade zakázaný, settings store, restart latch API),
+  recovery bootstrap v loaderi `noxun_engine.rb`, 32 headless testov. **Otvorené ostáva D-52b** (About UI, async
+  check, bariéra okien, natívne hlášky výsledku, in-SU smoke) — až po ňom sa D-52 zatvára do archívu.
   **Checklist uzáveru:** bump patch + `?v=` → testy → **nový odsek modulu updater v
   `docs/architecture/ui-lifecycle.md`** (vstupný bod je sekcia About; core helper popísať tamtiež; R-32 vzor:
   overiť proti kódu) + ARCHITEKTURA router riadok → STAV/KRONIKA/PLAN → D-52 do DOGFOODING_vyriesene

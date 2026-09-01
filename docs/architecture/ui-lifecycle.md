@@ -1813,6 +1813,57 @@ sa obsah inak rozsypal.
 **Vedomá odchýlka od wireframu mockupu:** licencie tretích strán a diagnostika (`Debug.report`) sa **nepridávajú** — v koliesku dnes nie sú, takže by to nebolo zrkadlo, ale nový
 obsah v oboch vstupoch (patrí do vlastnej dávky).
 
+### updater.rb — aktualizácia pluginu jedným klikom (D-52a, jadro bez UI)
+
+**Vstupný bod bude sekcia „O plugine" v Štúdiu (D-52b); tu je opísané ČISTÉ JADRO, ktoré tam sedí pod tlačidlom.** Modul je headless: pri načítaní nesiaha na `Sketchup.*` ani
+`UI.*` a **všetky cesty prijíma ako parametre** (`Engine.plugin_dir` / `find_support_file` patria UI vrstve). Vďaka tomu beží celá sada nad TEMP sandboxom a nikdy nad živým
+`Plugins`.
+
+**Formát balíka = kópia repa:** `noxun_engine.rb` + strom `noxun_engine/`. **Jednotka atomicity je CELÝ BALIK** — loader a strom sú jedna generácia. *Nový strom so starým loaderom
+je zakázaný stav*: `main.rb` drží VERSION len ako fallback, takže by plugin hlásil starú verziu nad novým kódom.
+
+**Rozloženie v `Plugins`** (všetko súrodenci stromu): `noxun_engine.new/` + `noxun_engine.rb.new` (staging) · `noxun_engine.old/` + `noxun_engine.rb.old` (predchádzajúca
+generácia) · `noxun_engine.update.json` (transakčný marker) · `noxun_engine.update.lock` (zámok) · `noxun_engine.leases/<pid>.lease`.
+
+**Postup `apply!`:** kanonické hranice → zámok → *(marker existuje ⇒ odmietnuť)* → *(žije iná inštancia ⇒ odmietnuť)* → **manifest zo zdroja** (relatívna cesta → SHA1 + veľkosť) →
+**staging KÓPIOU** do `.new` (nie rename — sieťový share vie streamovať useknutý súbor) → **validácia staged stromu proti manifestu byte-for-byte** → **(3)** `noxun_engine` →
+`.old` → **(4)** `.new` → `noxun_engine` → **(5)** loader `.rb` → `.rb.old`, `.rb.new` → `.rb` → **(6)** `.old` sa maže až po úspechu. Každý krok má definovaný rollback; zlyhanie
+kroku 5 vracia **celý** swap. Zlyhanie mazania `.old` je **úspech s poznámkou** (zvyšok uprace najbližší boot). Swap zároveň prirodzene **zrkadlí** — osirené súbory zaniknú s `.old`.
+
+**Prečo sa VERSION číta zo STAGED stromu (F8):** zdroj sa mohol medzi manifestom a swapom zmeniť. Autorita je `noxun_engine.rb` v `.new`, krížovo overená proti `main.rb` v `.new`, a
+rozhodnutie „novšia" sa prepočíta z nej tesne pred krokom 3. Porovnanie verzií je **číselné po segmentoch** (`0.9.9 < 0.10.0`); chýbajúca, neplatná aj **duplicitná** definícia
+VERSION je chyba, nie „nejaká hodnota".
+
+**Downgrade je vo V1 ZAKÁZANÝ (B4):** trojstav `:newer | :same | :older` ostáva ako informácia, ale `:older` končí odmietnutím s dôvodom („staršiu verziu nainštaluj ručne cez
+INSTALL"). Samotné VERSION nehovorí nič o tom, či staršia verzia ešte rozumie dátam, ktoré novšia už zapísala (schéma katalógov, marker configu) — na návrat by bol potrebný
+capability marker balíka.
+
+**Kanonické hranice (F9):** cieľ je `Engine.plugin_dir` + **súrodenecký** loader. Odmieta sa zdroj == cieľ, zdroj vnútri cieľa, cieľ vnútri zdroja, priečinok s príponou `.new`/`.old`,
+**symlink/junction/reparse point** (`File.realpath` ≠ zapísaná cesta) a relatívna cesta z manifestu, ktorá by unikla zo staging rootu.
+
+**Zámok a lease (B3):** aktualizácia má **vlastný** `noxun_engine.update.lock` (`flock`, `LOCK_NB` — nezískaný zámok je okamžité odmietnutie, **nikdy čakanie**), nie
+`materials.lock`: kopírovanie stoviek súborov zo share je dlhá operácia a katalógový zámok by ju držal celý ten čas. Každá živá inštancia si pri načítaní zapíše
+`noxun_engine.leases/<pid>.lease` (hook v `main.rb`); swap sa odmietne, kým žije **iný** PID (na Windows sa overuje cez `tasklist /FO CSV`, inde cez `Process.kill(0, pid)`), mŕtve
+lease sa upracú. Neistota pri overovaní PID sa **nevydáva za „mŕtvy"** — swap radšej neprebehne.
+
+**Restart latch (B2):** po úspešnom commite beží v pamäti STARÝ Ruby kód nad NOVÝMI súbormi. `Engine.restart_required!` preto zamkne **všetky** vstupné body — toolbar príkazy
+(`main.rb`), `Panel.show`, `Panel.show_insert`, `StudioDialog.show` — a každý z nich sa `Engine.update_restart_pending?` odmietne natívnou hláškou „Noxun Engine bol aktualizovaný —
+reštartuj SketchUp." (`UI.messagebox`, nikdy cez CEF: okno by načítalo nové HTML/JS proti starým callbackom). Latch je jednosmerný; zháša ho jedine reštart.
+
+**Nastavenie cesty k balíku (F11):** vlastný malý `updater_settings.json` v `%APPDATA%\NOXUN\Engine` (`{std, source_dir}`) cez `JsonFileStore` (+ `.bak`) — **nie** `SupplierSettings`
+(nepatrí pod jeho revízny zámok). Zápis beží pod `Materials.with_catalog_lock` (R-08) a nad **degradovaným** súborom sa odmieta (R-11, vzor `dim_series.rb`): čítanie zo zálohy +
+zápis by cestu prepísali starším obsahom. Zlyhaný zápis vracia `nil`, nikdy tichý fallback.
+
+**RECOVERY PO PÁDE ŽIJE V LOADERI `noxun_engine.rb`, NIE V MODULE (B1).** Pri páde medzi krokmi 3 a 5 môže strom **chýbať**, takže kód, ktorý ho opraví, sa z neho nesmie načítavať.
+Loader má preto malú sebestačnú sekciu `Noxun::Engine::Boot` (len `File`/`FileUtils`), ktorá beží **pred** registráciou extensionu; keď nie je čo robiť, sú to štyri `File.exist?`
+a koniec. **Rozhoduje stav disku, marker je len sprievodka:** existuje `noxun_engine.new` ⇒ krok 4 neprebehol ⇒ vracia sa STARÁ generácia; existuje `.old` a `.new` už nie ⇒ krok 4
+prebehol ⇒ transakcia sa DOKONČÍ (loader + upratanie). Rename v rámci jedného priečinka je atomický, takže medzistav neexistuje. Recovery vždy nechá **jednu kompletnú generáciu —
+strom AJ loader**, a nakoniec zmaže marker. Modul recovery **neduplikuje**; pri štarte aktualizácie iba odmietne bežať, keď marker existuje („predchádzajúca aktualizácia sa
+nedokončila — reštartuj SketchUp"). Guard test `tests/pure/test_d52a_updater.rb` stráži, že logika ostáva v loaderi a že VERSION kontrakt loadera je nedotknutý.
+
+**Vedomé hranice D-52a:** žiadne UI (tlačidlo, stavový riadok, pole cesty), žiadny asynchrónny check s deadline, žiadna bariéra zatvárania okien pred swapom, žiadne natívne hlášky
+výsledku — to všetko je D-52b. Ďalej mimo rozsahu: podpisovanie balíka, auto-update na pozadí, G-Disk sync knižníc (D-48).
+
 ### Veľkosť okna pri otvorení (D-77)
 
 `width`/`height` v `HtmlDialog.new` platia **len pri prvom otvorení** — potom rozhoduje veľkosť zapamätaná pod `preferences_key`, a `min_width`/`min_height` bránia iba ručnému
