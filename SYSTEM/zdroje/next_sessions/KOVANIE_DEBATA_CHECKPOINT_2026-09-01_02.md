@@ -29,49 +29,275 @@ Príklad:
 
 ---
 
-## 3. D-110 — pridávanie položky do katalógu — ROZHODNUTÉ / ROZPRACOVANÉ
+## 3. D-110 — katalóg kovania / položky a sety — ROZHODNUTÉ
 
-### 3.1 Vstupné cesty úplne navrchu formulára
+### 3.1 Modaly
 
-Na začiatku formulára má byť blok na načítanie/identifikáciu položky. Minimálne dve cesty:
+Použiť samostatný modal nad zatmaveným pozadím pre:
+- Pridať položku,
+- Upraviť položku,
+- Pridať set,
+- Upraviť set.
 
-1. **Démos vyhľadávanie** — podľa kódu/názvu, následný výber výsledku a automatické predvyplnenie dostupných údajov.
-2. **URL** — používateľ vloží URL a systém automaticky rozpozná, či ide o Démos alebo cudzí zdroj.
+Editácia sa otvorí plne predvyplnená; klasifikácia je editovateľná, chránená identita/kód ostáva chránená tam, kde to vyžaduje dnešný systém.
 
-Nepoužívať povinný ručný prepínač `Démos / iné`, ak URL možno spoľahlivo rozpoznať podľa hostu.
+### 3.2 Vstupné cesty položky
 
-### 3.2 Démos URL
+Na vrchu formulára:
+1. **Démos vyhľadávanie**,
+2. **URL**.
 
-Ak URL patrí Démosu:
+Nie sú to samostatné režimy formulára, iba vstupné cesty.
 
-- systém sa pokúsi automaticky načítať produktový detail,
-- predvyplní dostupné údaje,
-- uloží Démos väzbu,
-- ak načítanie/parser zlyhá, používateľ musí mať vždy možnosť **pokračovať manuálnym vyplnením**.
+Démos URL:
+- automaticky rozpoznať,
+- skúsiť parse/prefill,
+- pri chybe vždy umožniť manuálne doplnenie.
 
-Démos URL je špeciálna systémová väzba, nie iba obyčajný textový odkaz.
+Cudzia URL:
+- neparsovať automaticky,
+- uložiť ako zdroj/reference,
+- údaje vyplniť ručne.
 
-### 3.3 Cudzia URL
+### 3.3 Auto-klasifikácia z Démosu
 
-Ak URL nie je Démos:
+- parser má skúsiť navrhnúť aj klasifikáciu,
+- výrobca/brand môže prísť explicitne,
+- rada/kategória/opening mode sa môžu inferovať z názvu/breadcrumb/parametrov,
+- explicitný TIP-ON/PTO/PTOs/Push-to-open signál má prednosť pred neurčitým „s tlmením“,
+- pri nízkej istote pole radšej nechať prázdne,
+- neznámu produktovú radu **nevytvárať potichu**; iba navrhnúť `+ Vytvoriť`,
+- predvyplnené polia sa uložia jedným Save, bez povinného potvrdenia každého poľa.
 
-- **žiadne automatické parsovanie údajov**,
-- formulár sa vyplní ručne,
-- cudzia URL sa **uloží k položke ako zdroj/odkaz** pre budúce dohľadanie a kontrolu.
+### 3.4 Poradie formulára položky
 
-### 3.4 UX princíp
+`Démos / URL`
+→ `Kód → Názov → Cena → MJ`
+→ `Kategória → Výrobca → Produktová rada`
+→ `Dodávateľ → Poznámka → URL`
 
-Démos vyhľadávanie a URL nie sú dva oddelené režimy celého formulára. Sú to dve vstupné cesty do toho istého formulára. Po načítaní/predvyplnení musí používateľ údaje vidieť, skontrolovať a podľa pravidiel doplniť/upraviť.
+### 3.5 Katalóg
+
+Hierarchia:
+`Kategória → Výrobca → Produktová rada`
+
+- skupiny zbaliteľné,
+- textové hľadanie + quick filtre,
+- filtre minimálne: kategória / výrobca / produktová rada / Klasické-TipOn,
+- search automaticky otvorí iba vetvy so zhodou,
+- po pridaní položky automaticky otvoriť správnu vetvu a zvýrazniť nový záznam.
 
 ---
 
-## 4. ĎALŠÍ BOD
+## 4. Sety — klasifikácia, defaulty, snapshoty — ROZHODNUTÉ
 
-Pokračovať v **D-110 — poradie a klasifikácia polí formulára položky po vstupnom bloku URL/Démos**.
+### 4.1 Povinná klasifikácia setu
 
-Treba postupne uzavrieť:
-- ktoré polia systém načíta/predvyplní,
-- ktoré používateľ klasifikuje ručne,
-- poradie polí,
-- výrobca / produktová rada / kategória / MJ / cena / poznámka,
-- ako sa nová klasifikácia setov a kovania prejaví v katalógu položiek.
+Minimálne osi:
+- typ použitia / typ čela,
+- spôsob otvárania: Klasické / Tip-On / Ostatné,
+- konštrukcia zásuvky, ak relevantná: drevený box / kovové bočnice / ostatné,
+- výrobca,
+- produktová rada.
+
+Set má jednu jasnú klasifikáciu Klasické alebo Tip-On. Jednotlivé komponenty môžu byť zdieľané medzi setmi.
+
+### 4.2 Výrobca a produktová rada
+
+- rada patrí presne jednému výrobcovi,
+- kontrolované zoznamy, nie free text,
+- `+ Vytvoriť výrobcu` / `+ Vytvoriť produktovú radu`,
+- logo výrobcu je vítané ako vizuálna pomôcka, textový názov ostáva.
+
+### 4.3 Poradie tvorby setu
+
+1. Typ čela / použitia
+2. Spôsob otvárania
+3. Konštrukcia zásuvky (ak relevantná)
+4. Výrobca
+5. Produktová rada
+6. Názov setu
+7. Členovia setu
+
+Názov systém navrhne z klasifikácie, používateľ ho môže voľne upraviť.
+
+### 4.4 Default sety
+
+Hierarchia:
+`globálny firemný default → project override → concrete front override`
+
+Po výbere typu čela + spôsobu otvárania sa automaticky vyberie kompatibilný default set; používateľ ho môže prepísať.
+
+### 4.5 Snapshot/versioning setov
+
+- existujúce projekty ostávajú zmrazené na pôvodnom snapshote/verzii,
+- editácia globálneho setu nesmie spätne meniť staré projekty,
+- pri otvorení starého projektu môže UI nenápadne ukázať **„Dostupná novšia verzia setu“** + ručný update,
+- bez automatického upgradu a bez promptu pri každom otvorení.
+
+---
+
+## 5. Výrobné recepty zásuviek — ROZHODNUTÉ
+
+### 5.1 Oddelená knižnica receptov
+
+- vzorce neukladať priamo do produktovej rady,
+- samostatná knižnica výrobných receptov,
+- konkrétny systém/rada na recept odkazuje,
+- viac systémov môže zdieľať rovnaký recept a líšiť sa parametrami/konštantami.
+
+Príklad: Hettich Quadro a Blum TANDEM môžu používať rovnakú výpočtovú rodinu, ak audit potvrdí spoločnú matematiku.
+
+### 5.2 UI umiestnenie
+
+Studio → širší blok **Technické nastavenia**:
+- Dodávateľ / Démos,
+- Výrobné recepty,
+- prípadne ďalšie technické knižnice neskôr.
+
+UI umiestnenie môže byť spoločné, dátový store receptov má zostať oddelený od supplier settings.
+
+### 5.3 Immutable kontrakt
+
+Po overení:
+- samotný recept je **nemenný**,
+- parametrová sada konkrétneho systému je tiež **nemenná**,
+- existujúce záznamy sa spätne neprepisujú,
+- zmena technickej logiky znamená nový recept/variant/verziu,
+- starý variant môže byť označený neaktívny/deprecated, ale ostáva dostupný kvôli reprodukovateľnosti,
+- UI existujúce overené recepty/parametre zobrazuje read-only; pribúdať môžu nové.
+
+### 5.4 V1 kandidáti zásuviek
+
+Predbežný scope, finálne potvrdiť auditom používateľovho disku/Gmailu na PC:
+- Hettich Atira,
+- Hettich Quadro,
+- Blum TANDEM,
+- Blum TANDEMBOX Antaro,
+- Blum LEGRABOX.
+
+Audit má potvrdiť reálnu frekvenciu, varianty, nominálne dĺžky, kódy, Tip-On/classic a parametre.
+
+---
+
+## 6. Zásuvky — konštrukcia, internal, atyp — ROZHODNUTÉ
+
+### 6.1 Konštrukcia zásuvky
+
+Pri type čela Zásuvka:
+- Drevený box / skrytý výsuv,
+- Kovové bočnice,
+- Ostatné / atyp.
+
+Kategória vyberá rodinu logiky, ale neurčuje natvrdo počet výrobných dielcov. Konkrétny systém/recept určuje výsledné dielce a vzorce.
+
+### 6.2 Ostatné / atyp
+
+- manuálny ľubovoľný set/kovanie + množstvo,
+- bez automatického generovania výrobných dielcov zásuvky,
+- mimo V1 automatiky.
+
+### 6.3 Internal drawer
+
+Rezervovať vlastnosť:
+`drawer_variant = standard | internal`
+
+- `standard` plne automatizovať vo V1,
+- `internal` evidovať už teraz,
+- plnú automatiku vnútorného čela/setu odložiť,
+- internal drawer nie je `Ostatné`; ostáva normálnym variantom systémov Atira/Legrabox/etc.
+
+---
+
+## 7. Nosnosť zásuvkových výsuvov — PRIPRAVIŤ DÁTOVO, AUTOMATIKA NESKÔR
+
+- konkrétny variant setu má niesť `load_capacity_kg`, napr. 30 / 50 / 60 kg,
+- jedna produktová rada môže mať viac nosnostných variantov,
+- V1 nemusí robiť automatické rozhodovanie,
+- neskoršia policy vyhodnotí riziko podľa geometrie/objemu zásuvky a praktických hraníc + dokumentácie výrobcu,
+- nejde o presný výpočet hmotnosti budúceho obsahu,
+- pri rizikovej zásuvke Engine:
+  - upozorní,
+  - navrhne kompatibilný silnejší set,
+  - ponúkne one-click prepnutie,
+  - **nikdy ho neprepne automaticky bez vedomia používateľa**.
+
+---
+
+## 8. V1 výklopy — scope
+
+Primárne automatizovať:
+- Blum AVENTOS HK top,
+- Blum AVENTOS HF top,
+- `Ostatné` ako manuálne riešenie pre plynové/lacné/málo používané varianty.
+
+---
+
+## 9. AVENTOS HF top — ROZHODNUTÉ
+
+### 9.1 Model zostavy
+
+- používateľ vyberie **jedno existujúce čelo** a zvolí HF top,
+- Engine ho chápe ako vstup pre jednu nadradenú HF zostavu,
+- HF zostava vlastní dve previazané výrobné čelá: horné + dolné,
+- obe sú normálne výrobné dielce s materiálom/ABS/rozmermi/hmotnosťou,
+- z pohľadu kovania tvoria jednu mechanickú zostavu.
+
+### 9.2 Rozdelenie čela
+
+- default návrh **50/50**,
+- asymetria je povolená iba v dokumentáciou kompatibilnom rozsahu,
+- HF recept navrhne správnu medzeru medzi čelami podľa technickej dokumentácie,
+- používateľ môže medzeru upraviť iba v povolenom rozsahu,
+- všeobecná project front-gap nemá prebiť technickú požiadavku HF systému.
+
+### 9.3 Preview pred zásahom do modelu
+
+- počas konfigurácie sa pôvodné jedno čelo **iba virtuálne rozdelí**,
+- žiadna modelová geometria sa nemení, kým používateľ nepotvrdí,
+- po potvrdení sa vytvoria dve reálne výrobné čelá,
+- Cancel = návrat bez zásahu do modelu.
+
+### 9.4 Deliaca čiara — UX priorita
+
+Preferované:
+- drag deliacej čiary vo viewporte + presná číselná hodnota v Inspectore.
+
+V1 fallback, ak by drag vyžadoval neprimerane veľký nový interaction framework:
+- číselná hodnota v Inspectore + živý viewport preview.
+
+Implementáciu V1 neblokovať kvôli dragu.
+
+### 9.5 Validácia
+
+Engine musí kontrolovať:
+- rozmery korpusu/zostavy,
+- povolené rozdelenie čiel,
+- materiál/hmotnosť,
+- ďalšie oficiálne systémové limity.
+
+Ak HF konfigurácia nie je kompatibilná:
+- nesmie sa tváriť ako platný HF top,
+- automatický HF výpočet/set sa zakáže,
+- používateľ môže pokračovať cez `Ostatné / manuálne kovanie`,
+- UI presne vypíše prekročený limit.
+
+### 9.6 Výber mechanizmu / Power Factor
+
+- Engine z geometrie, materiálu a hmotnosti zostavy vypočíta potrebnú hodnotu podľa oficiálneho HF receptu,
+- automaticky vyberie **odporúčaný kompatibilný HF top mechanizmus/silu**,
+- používateľ môže ručne zvoliť iba inú **kompatibilnú** variantu,
+- nekompatibilný mechanizmus nesmie byť potvrdený ako validný HF top.
+
+---
+
+## 10. ĎALŠÍ BOD DEBATY
+
+Pokračovať v HF top po automatickom výbere mechanizmu.
+
+Najbližšie otvorené otázky:
+- či používateľ vôbec potrebuje v bežnom Inspectore vidieť vypočítaný Power Factor/LF, alebo stačí výsledný mechanizmus + detail po rozbalení,
+- následne počet/stredové závesy a ďalšie odvodené členy HF setu,
+- potom HK top.
+
+Držať workflow: **jedna otázka naraz**.
