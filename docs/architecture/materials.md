@@ -213,6 +213,12 @@ prepočíta (keď ho medzitým urobila druhá inštancia, nezapisuje sa nič), a
 dávky pýta `Materials.dir`, takže zámok a dáta sú VŽDY v jednom priečinku aj pod `test_dir_override` (dovtedy izolovaný in-SketchUp test menil ŽIVÉ ABS pravidlá používateľa).
 Zlyhaný zámok = `false`, nikdy tichý úspech. Testy: `tests/pure/test_r08_zamky.rb`.
 
+**Brána degradovaného súboru (1d/R-11, v0.9.2).** Poškodený `abs_rules.json` s platnou `.bak` sa číta zo ZÁLOHY (recovery `JsonFileStore`) — a keďže modul sa **sám** self-healuje
+(normalizácia + doplnenie nových default rolí), jeho najbližší zápis by primár prepísal obsahom odvodeným od STARŠEJ zálohy a všetky medzitým upravené role by zmizli. `write` má
+preto hneď po zámku `degraded_write_blocked?` a odmietnutie vracia `false`; dôvod (celá cesta k súboru + čo s tým) je vo **`AbsRules.write_block_reason`**. Modul nemá používateľský
+editor, takže hláška ide zatiaľ len do Ruby konzoly — a **iba pri ZMENE stavu**, lebo self-heal sa o zápis pokúsi pri každom načítaní pravidiel. Kontrakt `JsonFileStore.degraded?`
+(priamo z disku, I/O chyby vyletia) je v [model-a-identita.md](model-a-identita.md). Testy: `tests/pure/test_r11_degradovana_zaloha.rb`.
+
 ### demos/ — Demos konektor (core/demos/*.rb)
 
 Demos konektor (V0.6 dávky B + M-A). Jednotlivé moduly konektora majú vlastné odseky nižšie.

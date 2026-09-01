@@ -112,7 +112,25 @@ musia mŕtve kľúče **odfiltrovať jointom s reálnymi dielcami** (`Bom.collec
 
 ### json_file_store.rb
 
-atomický JSON zápis + `.bak` + cache.
+Spoločná perzistencia malých JSON katalógov v `%APPDATA%\NOXUN\Engine` (materiály, šablóny, sety a pravidlá kovania, ABS, rozmerové rady, nastavenia dodávateľa). Modul rieši
+**atomicitu**, nie súbeh — medziprocesový zámok je nad ním (`Materials.with_catalog_lock`, sidecar `materials.lock`, 1d/R-08).
+
+- **Zápis** ide `tmp → fsync → `.bak` → rename`: nikdy neexistuje okno, v ktorom by bol cieľový súbor neúplný. `preserve_valid_backup` odloží PREDCHÁDZAJÚCI obsah do `.bak`, ale
+  **len keď sa parsuje** — poškodený primár nesmie prepísať poslednú dobrú zálohu.
+- **Čítanie** má sekundovú cache (`CHECK_INTERVAL`) kľúčovanú expandovanou cestou; položka sa invaliduje podľa podpisu súboru (mtime + veľkosť) alebo ručne cez `reload!` /
+  `invalidate`. Hodnota je **deep-frozen**, `read(copy: true)` vracia kópiu. Cudzí proces cache nezhodí — preto každá zapisovacia cesta číta pod zámkom NANOVO (`reload!`).
+- **`.bak` recovery:** `read_primary_or_backup` pri poškodenom primári prečíta zálohu, takže panel sa neotvorí prázdny.
+- **`degraded?(path)` (1d/R-11)** je odpoveď na tienistú stranu tej recovery: keď sa číta zo zálohy, najbližší zápis by primár prepísal obsahom odvodeným od **staršej** zálohy
+  a všetko medzi zálohou a poškodením by zmizlo. `degraded?` je pravda **práve vtedy**, keď primár EXISTUJE a NEPARSUJE sa a zároveň existuje parsovateľná `.bak`. Chýbajúci primár
+  s platnou zálohou degraded NIE JE (nič sa nestratilo — zhodne s `HardwareCatalog.assess!`) a poškodený primár BEZ zálohy tiež nie (niet z čoho čo stratiť; volajúci sa správajú
+  ako doteraz, prvý zápis súbor samoopraví). Dve vlastnosti sú **kontrakt**: (1) číta **priamo z disku**, mimo sekundovej cache — cachovaná hodnota spred poškodenia by bránu
+  otvorila presne v okamihu, keď má stáť; (2) **I/O chyby sa nerescue-ujú** (`false` znamená „smieš zapísať", a nedostupný súbor o zdraví primára nehovorí nič) — rescue je len
+  pre `JSON::ParserError` (poškodený obsah) a `Errno::ENOENT` (súbor nie je), zvyšok vyletí a skončí v rescue vetve volajúceho ako NEÚSPEŠNÝ zápis.
+- **Guard NEŽIJE tu.** `write` sa nemení; bránu volá **každý z piatich volajúcich na jednom mieste svojej zapisovacej cesty, POD zámkom** tesne pred zápisom (cachovaný stav nie je
+  dôkaz — lekcia R-07). Odkazy: `hardware_sets` / `hardware_rules` v [hardware.md](hardware.md), `abs_rules` v [materials.md](materials.md), `supplier_settings`
+  v [outputs.md](outputs.md), `dim_series` nižšie. Testy: `tests/pure/test_r11_degradovana_zaloha.rb`.
+- **Priznaný zvyšok (R-11):** TOCTOU okno voči zapisovateľom, ktorí `materials.lock` ignorujú (ručný editor, antivírus) — uzavrel by ho až CAS/podpis tesne pred `rename`; vedome
+  sa nerieši.
 
 ### dim_series.rb
 
@@ -129,6 +147,10 @@ nestal (to isté platí pre `Engine.set_ui_theme`). Modul o modeli nevie — rad
 [hardware.md](hardware.md), odsek `hardware_sets.rb`); nezískaný zámok skončí ako `nil`, teda ako každé iné zlyhanie zápisu. **Priznaný zvyšok:** rad je ÚPLNÁ NÁHRADA — panel
 posiela celý objekt a súbor nemá revíziu, takže dve otvorené okná sa nad ním stále prebíjajú „posledný vyhráva". Zámok ich zápisy len SERIALIZUJE; revízia + konfliktová vetva sú
 UI kontrakt a register ich vedie ako **R-35**.
+
+**1d/R-11:** `set` má hneď po zámku bránu degradovaného súboru (`degraded_write_blocked?`) — poškodený primár s platnou `.bak` sa číta zo ZÁLOHY, takže zápis by rady prepísal
+STARŠÍM obsahom. Odmietnutie končí ako každé iné zlyhanie (`nil`; dvojica `[nil, dôvod]` by rozbila volajúcich a `[false, dôvod]` by bola v Ruby pravdivá), ale KONKRÉTNY dôvod si
+panel vezme z **`DimSeries.write_block_reason`** a ukáže ho namiesto všeobecného „disk/práva" — náprava je oprava alebo zmazanie jedného súboru, nie hľadanie problému s právami.
 
 ## Knižnica šablón
 

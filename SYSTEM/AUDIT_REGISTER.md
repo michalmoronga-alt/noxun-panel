@@ -216,6 +216,30 @@ z mena (premenovanie identitu nemení). **S.**
 Poškodený primár sa ticho číta zo zálohy a najbližší zápis ho prepíše STARŠÍM obsahom (strata všetkého medzi
 zálohou a poškodením). HardwareCatalog má správny vzor (degraded = read-only, GH #99); sets, rules, abs_rules,
 dim_series a supplier ho nemajú. [S-07] **Návrh:** `JsonFileStore.degraded?(path)` + write guard na jednom mieste. **M.**
+**✅ dávkou 1d/R-11 (PR #274, v0.9.2)** — `JsonFileStore.degraded?(path)` = primár EXISTUJE a NEPARSUJE sa **a zároveň** existuje
+parsovateľná `.bak`. Chýbajúci primár s platnou zálohou degraded NIE JE (zhodne s `HardwareCatalog.assess!`), poškodený primár BEZ
+zálohy tiež nie (správanie volajúcich sa nemení — samoopravný prvý zápis). Codex audit návrhu vrátil **3 BLOCKERy + 2 FIXy + 1 NOTE**,
+všetky zapracované: **(F5)** brána parsuje OBA súbory PRIAMO z disku, **mimo sekundovej cache** `read` (cachovaná hodnota spred
+poškodenia by bránu otvorila presne vtedy, keď má stáť), a **I/O chyby sa NErescue-ujú** — `false` znamená „smieš zapísať", takže
+EACCES/sharing violation musí vyletieť a skončiť v rescue vetve volajúceho ako NEÚSPEŠNÝ zápis (rescue je len `JSON::ParserError`
+a `Errno::ENOENT`). **(B3)** guard NEŽIJE centrálne v `JsonFileStore.write` — sedí v 5 caller cestách, na JEDNOM mieste per modul,
+**pod zámkom `materials.lock` nad čerstvým stavom súboru** (lekcia R-07 B2) a kryje aj `ensure_seeded` a seed-merge v `load`;
+`vepo_settings.json` do rozsahu nepatrí (**R-38**). **(B1)** knižnica setov má degraded ako **VLASTNÝ stav `:degraded`** v tej istej
+matici, nie ako obyčajný `:read_only`: obsah zálohy je POUŽITEĽNÝ, takže sa číta (`read_library` vracia dáta, nie prázdno), dá sa
+zmraziť do projektu (`global_default_state`) a projektové predvoľby bežia ďalej — zakázané sú VÝHRADNE zápisy do globálneho SÚBORU
+(`save_set!` · `delete_set!` · `set_global_mapping!` · seed-merge · `ensure_seeded`). Dve osi = dva predikáty: `library_read_only?`
+(smiem POUŽIŤ) sa nemení, nový `library_write_blocked?` (smiem ZAPÍSAŤ do súboru) platí pre `:read_only` aj `:degraded`. Kontrola
+**nemohla prísť dovnútra `assess_library_doc`** (čistá funkcia nad DOKUMENTOM, bez IO — degraded je vlastnosť SÚBOROV a dokument sa
+pritom parsuje bez problému, veď pochádza zo zálohy), preto sedí vo vrstve NAD ňou (`assess_library`), ktorá výsledok dokumentovej
+matice len dopĺňa a degraded zvažuje **len keď dokument dopadol `:ok`** — `apply_library_state` tak stále zapisuje jediný výsledok
+a `:read_only` nikdy nespadne na nižší stupeň. **(F4)** ostatné 4 moduly si držia dnešné návratové typy (`false`/`nil`) a dôvod nesie
+named accessor `Module.write_block_reason` (`[false, dôvod]` je v Ruby PRAVDIVÉ — ternárky v UI by odmietnutie hlásili ako úspech);
+`SupplierSettings` použil existujúci kanál `errors/status`. UI hlášky sú konkrétne: banner degradovanej knižnice v sekcii `hw`
+(sety VIDNO, globálne mutácie vypnuté), okno Pravidlá pri „aj ako globálna predvoľba" a panel pri rozmerových radoch. **Log iba pri
+ZMENE stavu** — seed-merge sa nad degradovaným súborom pokúsi zapísať pri každom načítaní. **(N6) Priznaný zvyšok:** TOCTOU okno voči
+zapisovateľom, ktorí `materials.lock` ignorujú (ručný editor, antivírus) — uzavrel by ho až CAS/podpis tesne pred `rename`; vedome sa
+nerieši. Testy `tests/pure/test_r11_degradovana_zaloha.rb` (28 scenárov: truth-table vrátane nahriatej cache a I/O chyby, per modul
+čítanie zo zálohy · odmietnutý zápis · bajtovo nedotknutý primár · náprava zmazaním; 6 mutácií overených) + `tests/js/test_r11_degradovana_ui.js` (27).
 
 ### R-12 · P2 · core · `core/cabinet_builder.rb:227-233, 1241-1289, 1560-1610`
 Prestavba zákazky z NOVŠIEHO pluginu ticho stratí dáta: configy sú uzavreté whitelisty a dopredný guard existuje
@@ -237,6 +261,16 @@ nerozlišuje legacy/current/newer/invalid. **Rozhodnutie Michala:** doplniť č�
 Dáta rozpočtu v zákazke (8 NOXUN kľúčov) bez verzie formátu — prvý klik v Rozpočte nad zákazkou z novšieho
 pluginu ticho odreže neznáme polia (pasca pre spotrebiče S1). [S-12]
 **Návrh:** `budget_std` + dopredný guard (read-only s hláškou), tvar ako R-12. **S.**
+
+### R-37 · P2 · core · `core/supplier_settings.rb` (`normalize` + `merge_seed` + `load`) + 3 ďalšie stores
+Z Codex auditu dávky 1d/R-11, nález B2 — **diera, ktorú `degraded?` NECHYTÁ**, lebo primár sa parsuje. Tvarovo PLATNÝ, ale obsahovo
+zlý primár zničí dobrú zálohu už pri NAČÍTANÍ: `supplier_settings.json` s obsahom `[]` prejde `JSON.parse`, `normalize` z neho spraví
+SEED, `merge_seed` označí dokument za zmenený a `load` ho AUTO-ZAPÍŠE — a `JsonFileStore.write` pritom najprv uloží to platné `[]` do
+`.bak` (`preserve_valid_backup`), teda **zničí poslednú dobrú zálohu**. Shape maticu má len `hardware_sets` (R-07); `hardware_rules`,
+`abs_rules`, `dim_series` a `supplier_settings` ju nemajú a tolerantné čítanie im tichý downgrade dovolí.
+**Návrh:** minimálna shape brána pred seed/normalizačným AUTO-zápisom (dokument, ktorý nemá očakávaný koreňový tvar, sa NEMÁ
+prepisovať seedom — má sa priznať ako poškodený, vzor `assess_library_doc`); alternatíva je nezapisovať `.bak` pri zápise, ktorý
+vznikol iba z normalizácie. Samostatná dávka. **Odhad: S/M.**
 
 ## Os VÝSTUPY — production_core · rozpočet · ponuka (pred D-95/KONTROLA+VÝROBA)
 
@@ -289,6 +323,14 @@ beží pred `XlsxWriter.write_book` (spresnenie GLM 30.8.) — OSTÁVA: HLÁSIŤ
 (dnes status príde až po ňom) + opraviť klamlivý blokový komentár „ide do statusu aj do logu" v
 `production_core.rb` (log nevzniká; známy dlh Docs cleanup C). [E:R-12 korigované #250]
 **Návrh:** hlásenie pred vznikom súboru, nezastavovať; opraviť komentár. **S.**
+
+### R-38 · P3 · ui · `ui/production_core.rb` — `vepo_settings.json` (`update_vepo_settings` · `save_project_name` · `save_merge_18_36`)
+Z Codex auditu dávky 1d/R-11, nález B3 (vedome MIMO rozsahu R-11). Šiesty globálny JSON store priečinka nemá ani jedno z toho, čo
+ostatných päť: **dôvod zlyhania zápisu sa nesurfaceuje nikde** (`update_vepo_settings` vráti `false`, `save_project_name` výsledok
+zahodí, `save_merge_18_36` ho ignoruje) a **chýba mu aj degraded guard** z R-11 — poškodený primár s platnou `.bak` teda stále vie
+prepísať novšie nastavenia obsahom odvodeným od staršej zálohy. Zámok (1b-6c) má, integritnú bránu nie.
+**Návrh:** rovnaká brána ako pre ostatných 5 (`JsonFileStore.degraded?` pod zámkom tesne pred zápisom) + **vlastný UI kontrakt** —
+tri cesty musia najprv začať výsledok zápisu vôbec čítať a mať kam ho povedať. Samostatná dávka. **Odhad: S.**
 
 ## Os UI VZORY a drobné dlhy
 
@@ -401,7 +443,7 @@ B1 názov projektu (1b-6a, #244) · B2 hlavičky materiálov (1b-6b, #247) · A1
 blocker je len R-03 — GHOST smie na Windows štartovať hneď po ňom; R-01 je macOS vetva, R-02 je na Windows P3
 a R-04 je platformovo nezávislá hygiena — všetky tri sa dorobia v 1d nezávisle od GHOST štartu)* → 3. **pred KOVANÍM:** ~~R-06 brána~~ (✅) ·
 ~~R-07~~ (✅ #266) · ~~R-08~~ (✅) · potom R-05 (+R-06 plný) ako D-109 šev → 4. **pred D-95/VÝROBOU:** R-17, R-16, R-22, po etapách R-15 →
-5. **perzistencia:** R-11 → R-12 → R-14 (R-13 po rozhodnutí Michala) → 6. **UI/hygiena:** ~~R-34~~ (✅ #262) ·
+5. **perzistencia:** ~~R-11~~ (✅ #274) → R-12 → R-14 (R-13 po rozhodnutí Michala; **R-37** a **R-38** pribudli z auditu R-11 — R-37 patrí k tej istej rodine, R-38 je samostatný UI kontrakt) → 6. **UI/hygiena:** ~~R-34~~ (✅ #262) ·
 R-23.1 Escape (S, hocikedy) · R-18 · zvyšok podľa kapacity. R-32 kostry priebežne pred každým zásahom.
 
 **Otvorené rozhodnutia Michala:** R-05 (rozsah zaokrúhľovania pomeru per zákazka vs per skrinka — rozhodne

@@ -275,9 +275,15 @@ seed-merge v `load` a pre `ensure_seeded` (dvojitý check — rýchly a ešte ra
   a Ruby 3 by taký hash pri existencii kwargs poslal do nich — z volania by zmizol povinný `patch`.
 - Okno kontroluje revíziu **naďalej aj u seba** (lacno, kvôli hláške a rozpísanému formuláru) a obe vetvy konfliktu končia v tej istej obsluhe `reject_stale` — jedna hláška,
   jedno správanie (`SS.saved()` + načítanie formulára nanovo).
-- `write` vracia **presný výsledok** `JsonFileStore.write`, nie bezpodmienečné `true` — write guard z R-11 bude vedieť zápis odmietnuť **bez výnimky** a bezpodmienečné `true` by
-  odmietnutie hlásilo ako uložené.
+- `write` vracia **presný výsledok** `JsonFileStore.write`, nie bezpodmienečné `true` — write guard z R-11 zápis odmieta **bez výnimky** a bezpodmienečné `true` by odmietnutie
+  hlásilo ako uložené.
 - `dir` sa pýta `Materials.dir`, aby zámok a dáta boli vždy v jednom priečinku (aj pod `test_dir_override`).
+
+**Brána degradovaného súboru (1d/R-11, v0.9.2).** Poškodený `supplier_settings.json` s platnou `.bak` sa číta zo ZÁLOHY, takže uloženie sadzieb by primár prepísalo obsahom
+odvodeným od STARŠEJ zálohy — a sadzby sú **cenové** dáta. `write` má preto hneď po zámku `degraded_write_blocked?` a vracia `false`. Dôvod sa **nesurfaceuje novým kanálom**:
+`patch_active_locked!` si ho vypýta z `SupplierSettings.write_block_reason` a pošle existujúcim `[false, [dôvod], :write_failed]`, takže sekcia Nastavenia ukáže konkrétnu vetu
+(„súbor je poškodený — číta sa záloha, zápisy sú vypnuté, oprav alebo zmaž `<cesta>`") namiesto „nastavenia sa nepodarilo uložiť". Kontrakt `JsonFileStore.degraded?` (číta priamo
+z disku, I/O chyby vyletia ako neúspešný zápis) je v [model-a-identita.md](model-a-identita.md). Testy: `tests/pure/test_r11_degradovana_zaloha.rb`.
 
 ### vepo_export.rb
 

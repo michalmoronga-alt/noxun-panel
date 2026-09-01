@@ -32,6 +32,11 @@ dvojitý check. `dir` sa od tejto dávky pýta `Materials.dir` — kým si ho mo
 nemá revíziu, takže dve súbežne otvorené okná sa nad ňou stále prebíjajú „posledný vyhráva". Zámok ich zápisy serializuje, nič viac; doriešenie vedie
 [AUDIT_REGISTER.md](../../SYSTEM/AUDIT_REGISTER.md) ako **R-35**.
 
+**Brána degradovaného súboru (1d/R-11, v0.9.2).** `write` má hneď po zámku `degraded_write_blocked?` — poškodený primár s platnou `.bak` sa číta zo ZÁLOHY, takže zápis by pravidlá prepísal STARŠÍM
+obsahom. Odmietnutie je `false` (návratový tvar sa nemení — `[false, dôvod]` by bolo v Ruby pravdivé a ternárky volajúcich by ohlásili úspech) a KONKRÉTNY dôvod si volajúci vezme z
+**`HardwareRules.write_block_reason`**: okno Pravidlá ho pri „aj ako globálna predvoľba" ukáže namiesto „globálny zápis zlyhal!". Mechanika a celý kontrakt `JsonFileStore.degraded?` sú v odseku
+`hardware_sets.rb` nižšie a v [model-a-identita.md](model-a-identita.md) (`json_file_store.rb`).
+
 **BASELINE guard formulára stojí na `model.guid`** (ŠT-3b-1; predtým `model.path`, ktorý dva NEULOŽENÉ modely nerozlíši — oba majú prázdny path) **+ zhoda aktuálnych pravidiel
 modelu s baseline** (chytí undo snapshotu aj súbežnú zmenu inou cestou); baseline sa obnovuje pri KAžDOM zostavení payloadu. Odmietnutý zápis NIC nezapíše; **od ŠT-3b-2c1 sa
 formulár načíta nanovo LACNÝM ECHOM sekcie** (`push_section_echo(force: true)`), nie plným `bump: false` pushom. *(Pôvodný dôvod — plný push deduplikoval ID kópií, takže odmietnutie
@@ -184,8 +189,9 @@ vetva pri ňom vráti **skutočnú knižnicu** (nikdy seed — inak by používa
 
 **Kompatibilitná BRÁNA globálnej knižnice (1d/R-07, v0.8.21).** Knižnica je globálna (`%APPDATA%`), takže ju zdieľajú **všetky verzie pluginu** na profile — a staršia verzia ju čítala bez pohľadu na
 marker `std`, neznámy tvar člena ticho zahodila a prvým zápisom stratu **zvečnila** (zápis navyše stampoval `std: 1` aj nad obsahom, ktorý bez novších tvarov čítať nejde, takže marker klamal aj dopredu).
-Od tejto dávky má knižnica **STAV** (vzor `HardwareCatalog.assess!`): `library_state` = `:ok` | `:read_only`, `library_state_reason` (hotová SK veta pre používateľa) a `library_state_code`
-(`:newer` · `:foreign` · `:unknown_shape` · `:duplicate` · `:unreadable` · `:unexpected_shape`). Maticu počíta ČISTÁ `assess_library_doc(doc)` nad dokumentom — bez IO, takže sa dá vyhodnotiť aj nad
+Od tejto dávky má knižnica **STAV** (vzor `HardwareCatalog.assess!`): `library_state` = `:ok` | `:degraded` (1d/R-11, nižšie) | `:read_only`, `library_state_reason` (hotová SK veta pre používateľa)
+a `library_state_code`
+(`:newer` · `:foreign` · `:unknown_shape` · `:duplicate` · `:unreadable` · `:unexpected_shape` · `:degraded`). Maticu počíta ČISTÁ `assess_library_doc(doc)` nad dokumentom — bez IO, takže sa dá vyhodnotiť aj nad
 súborom čerstvo prečítaným pod zámkom — a **fail-closed**: čokoľvek, čo v nej vyletí (cudzia hodnota, ktorá rozbije normalizáciu), končí ako `:read_only`, nikdy ako výnimka. Bez toho by ju `load`
 zachytil, zavolal `library_read_only?`, tá by ju vyvolala znova a nákupný súpis by skončil ako `nil` — teda BEZ oranžového priznania. Tá vetva má **vlastný kód `:unexpected_shape`**, nie `:unreadable`:
 padne do nej aj obyčajná chyba pluginu nad úplne zdravým súborom, takže jej hláška hovorí „nič sa nezapisuje, súbor NEMAŽ, nahlás problém" — nikdy nenavádza knižnicu zmazať.
@@ -228,12 +234,32 @@ a knižnica sa v tom, čo považujú za stratu, nerozídu.
 ktorý už vyžaduje 2, sa **neopravuje sám** — čítať sa dá ďalej (std 1 je podporovaná hodnota) a marker sa povýši prirodzene prvým legitímnym zápisom; bez mutácie sa súboru nikto nedotkne.
 **Poškodený súbor:** primár BEZ zálohy je **čistý stav** (`read_library_doc` vráti nil) — nie je z čoho čo stratiť a `main` sa tak správal odjakživa (`load` spadne do seedu a prvý zápis súbor
 **samoopraví**). Zavrieť ho do read-only by používateľa poslalo do slepej uličky: zápis odmietnutý, seed nedostupný a nič mu nepovie, že stačí zmazať jeden súbor. Keď sa nedá prečítať **ani záloha**,
-ostáva `:read_only` s dôvodom, ktorý **menuje celú cestu k súboru**. Poškodený primár s **platnou** `.bak` (degraded) je **R-11** a sem vôbec nepadne (čítanie zo zálohy uspeje) — táto dávka mu nezavadzia:
-nový dôvod tam patrí ako ĎALŠIA kontrola v tej istej matici s vlastným kódom, nikdy ako druhý stavový príznak (inak by `:read_only` mohla vrátiť na `:ok` kontrola, ktorá nič nenašla).
+ostáva `:read_only` s dôvodom, ktorý **menuje celú cestu k súboru**.
 UI: `sets_payload` nesie `library_state` + `library_reason`, sekcia `hw` Štúdia pri read-only **knižnicu nevykreslí vôbec**
 (zobrazený obsah by už bol orezaný), namiesto zavádzajúceho „Knižnica setov je prázdna." ukáže **dôvod** a vypne globálne mutácie; odmietnutie na serveri mapuje `library_blocked_txt` na konkrétnu hlášku
 a rovnaký dôvod dostane aj výber setu v paneli, poznámka pri ukladaní šablóny a aplikácia šablóny — tá **nesmie vyhodiť výnimku** (zhodila by celé vkladanie skrinky; kontrakt znie „stavba beží ďalej,
 len bez snapshotu"). Testy: `tests/pure/test_r07_kniznica_brana.rb` (dvojinštančný scenár, reprodukcie interného review a charakterizácia zdravej std-1 knižnice) a `tests/js/test_r07_kniznica_ui.js`.
+
+**DEGRADOVANÁ knižnica — poškodený primár + PLATNÁ `.bak` (1d/R-11, v0.9.2).** `JsonFileStore` pri poškodenom primári ticho číta zálohu, takže knižnica sa načíta a vyzerá zdravo — a najbližší zápis
+by primár prepísal obsahom odvodeným od **STARŠEJ zálohy** (všetky sety uložené medzi zálohou a poškodením by zmizli). Od tejto dávky je to **`:degraded`**, tretia hodnota tej istej matice
+s vlastným kódom `:degraded`.
+
+- **Prečo NIE `:read_only`.** Read-only stavy hovoria „obsahu NEROZUMIEME" (novšia verzia, orezané dáta) — tam sa obsah nesmie ani použiť. Tu je obsah zálohy **plnohodnotný**, len je STARŠÍ ako to,
+  čo sa nedá prečítať. Zákazka sa musí dať dokončiť, preto degraded knižnica **sa číta** (`read_library` vracia dáta, nie prázdno), **dá sa zmraziť do projektu** (`global_default_state` vracia stav)
+  a projektové predvoľby sa menia ďalej — to sú zápisy do MODELU. Zakázané sú **VÝHRADNE zápisy do globálneho SÚBORU**: `save_set!` · `delete_set!` · `set_global_mapping!` · seed-merge ·
+  `ensure_seeded`, teda presne to, čo by primár prepísalo.
+- **Dve osi = dva predikáty.** `library_read_only?` (smiem obsah POUŽIŤ?) sa nemení a používajú ho cesty o použití; `library_write_blocked?` (smiem zapísať do SÚBORU?) je pravda pre `:read_only`
+  **aj** `:degraded` a používajú ho zapisovacie cesty vrátane troch mutátorov a UI handlerov.
+- **Kde matica žije.** `assess_library_doc` je ČISTÁ funkcia nad DOKUMENTOM (bez IO) — degraded je ale vlastnosť SÚBOROV na disku (dokument sa parsuje bez problému, veď pochádza zo zálohy), takže
+  kontrola sedí vo vrstve NAD ňou: `assess_library(doc)` doplní výsledok dokumentovej matice a zvažuje degraded **len keď dokument dopadol `:ok`**. `apply_library_state` tak stále zapisuje jediný
+  výsledok — dva dôvody sa nemôžu prebíjať a `:read_only` nikdy nespadne na nižší stupeň. Stav sa (ako v R-07) **NECACHUJE** a pred zápisom sa vyhodnocuje znova pod zámkom.
+- **Log iba pri ZMENE stavu.** Seed-merge sa nad degradovanou knižnicou pokúsi zapísať pri KAŽDOM `load`, takže bezpodmienečné logovanie odmietnutia by zaplavilo Ruby konzolu; používateľ sa o dôvode
+  dozvie z UI, nie z logu.
+- **UI:** sekcia `hw` sety **ZOBRAZÍ** (na rozdiel od read-only) a k nim dá oranžový banner „knižnica je poškodená — číta sa záloha, globálne zápisy sú vypnuté"; vypnuté sú `+ Nový set`, `Upraviť`,
+  `Zmazať` a globálne predvoľby, kým `Doplniť nové predvoľby` a projektový výber setu bežia ďalej (`hwsLibDegraded` / `hwsLibWriteBlocked`, `HWS_WRITE_ACTIONS` ⊂ `HWS_LIB_ACTIONS`).
+- **Náprava pre používateľa:** opraviť alebo zmazať jeden súbor — dôvod menuje celú cestu. Po zmazaní poškodeného primára sa číta záloha a prvý zápis súbor obnoví.
+
+Testy: `tests/pure/test_r11_degradovana_zaloha.rb` + `tests/js/test_r11_degradovana_ui.js`.
 
 **Člen účtovaný na vlastníka a stopa REÁLNEHO zliatia (P0-HF, review #252 P2; spresnené 1d/R-34).** `expand_members` počíta člena `per: 'unit'` ako `quantity × qty`, ale člena
 **`per: 'owner'`** len **raz na `[owner_id, owner_part_key, set_id, code]`** (audit B3: druhé pravidlo s tým istým vlastníkom TipOn nezdvojí). Práve tento dedup je **jediný

@@ -17,6 +17,42 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1d/R-11 · DEGRADED `.bak` BRÁNA PRE VOLAJÚCICH JsonFileStore (v0.9.2, 1.9.2026, PR #274):** `JsonFileStore` má od začiatku `.bak` recovery — poškodený primárny súbor
+  sa ticho prečíta zo zálohy, takže sa panel neotvorí prázdny. Tienistá strana tej istej mince: volajúci potom pracuje nad dátami ZÁLOHY a jeho najbližší zápis prepíše
+  primár obsahom odvodeným od **staršej** zálohy — všetko, čo používateľ uložil medzi zálohou a poškodením, zmizne bez slova. Správnu odpoveď mal v repe jediný modul
+  (`HardwareCatalog.assess!`, GH #99 P1: čítaj zo zálohy, ZÁPISY zastav); päť ďalších volajúcich ju nemalo — `hardware_sets` (globálna knižnica setov), `hardware_rules`,
+  `abs_rules`, `dim_series`, `supplier_settings`.
+  **Čo platí teraz:** `JsonFileStore.degraded?(path)` je pravda **práve vtedy**, keď primár EXISTUJE a NEPARSUJE sa a zároveň existuje parsovateľná `.bak`. Chýbajúci
+  primár s platnou zálohou degraded NIE JE (nič sa nestratilo — zhodne s `assess!`) a poškodený primár BEZ zálohy tiež nie (niet z čoho čo stratiť, správanie ostáva ako
+  na `main`: seed a samoopravný prvý zápis). Guard volá **každý z piatich volajúcich na jednom mieste svojej zapisovacej cesty, POD zámkom `materials.lock`** tesne pred
+  zápisom, takže kryje aj `ensure_seeded` a seed-merge v `load`. Čítacia cesta sa NEMENÍ.
+  **Codex audit návrhu vrátil 3 BLOCKERy + 2 FIXy + 1 NOTE, všetky zapracované.** **(F5)** brána parsuje oba súbory PRIAMO z disku, **mimo sekundovej cache** `read`
+  (cachovaná hodnota spred poškodenia by bránu otvorila presne vtedy, keď má stáť), a **I/O chyby sa NErescue-ujú**: `false` znamená „smieš zapísať", takže EACCES či
+  sharing violation musí vyletieť a skončiť v rescue vetve volajúceho ako NEÚSPEŠNÝ zápis — rescue je len `JSON::ParserError` a `Errno::ENOENT`. **(B3)** guard nesmel
+  ísť centrálne do `JsonFileStore.write` (ostal v piatich caller cestách) a `vepo_settings.json` do rozsahu nepatrí. **(B1)** knižnica setov nesmela dostať obyčajný
+  `:read_only` z R-07 — ten vracia prázdnu knižnicu a odmieta ju aj POUŽIŤ, čím by degradovaná knižnica zastavila rozrobenú zákazku. Dostala preto **vlastný stav
+  `:degraded`**: obsah zálohy je plnohodnotný, takže sa číta, dá sa zmraziť do projektu a projektové predvoľby bežia ďalej (to sú zápisy do MODELU) — zakázané sú
+  VÝHRADNE zápisy do globálneho súboru. **(F4)** ostatné štyri moduly si držia dnešné návratové typy (`false`/`nil`) a dôvod nesie named accessor
+  `Module.write_block_reason`; `[false, dôvod]` je totiž v Ruby PRAVDIVÉ a ternárky v UI by odmietnutie ohlásili ako úspech. `SupplierSettings` použil svoj existujúci
+  kanál `errors/status`.
+  **Prečo matica nie je v `assess_library_doc`** (zadanie to nechávalo na rozhodnutie implementácie): tá funkcia je ČISTÁ nad DOKUMENTOM a nerobí IO — degraded je ale
+  vlastnosť SÚBOROV na disku a dokument sa pritom parsuje úplne v poriadku, veď pochádza zo zálohy. Kontrola preto sedí vo vrstve NAD ňou (`assess_library`), ktorá
+  výsledok dokumentovej matice iba dopĺňa a degraded zvažuje **len keď dokument dopadol `:ok`**. `apply_library_state` tak stále zapisuje jediný výsledok — dva dôvody sa
+  nemôžu prebíjať a `:read_only` nikdy nespadne na nižší stupeň. Dve osi = dva predikáty: `library_read_only?` (smiem POUŽIŤ) sa nemenil, pribudol
+  `library_write_blocked?` (smiem ZAPÍSAŤ do súboru). Ako vedľajší dôsledok necachovaného stavu sa **log odmietnutia zúžil na ZMENU stavu** — seed-merge sa nad
+  degradovaným súborom pokúsi zapísať pri každom načítaní a bezpodmienečné logovanie by zaplavilo konzolu (rovnaká lekcia ako `log_skip` v R-07).
+  **UI:** sekcia `hw` Štúdia sety pri degraded ZOBRAZÍ (na rozdiel od read-only) a dá k nim oranžový banner; vypnuté sú „+ Nový set", „Upraviť", „Zmazať" a globálne
+  predvoľby, kým „Doplniť nové predvoľby" a projektový výber setu bežia ďalej. Okno Pravidlá a panel pri rozmerových radoch ukážu konkrétnu vetu namiesto „globálny zápis
+  zlyhal!" / „disk/práva".
+  **Priznaný zvyšok (audit NOTE 6):** TOCTOU okno voči zapisovateľom, ktorí `materials.lock` ignorujú (ručný editor, antivírus) — medzi kontrolou a `rename` môže súbor
+  poškodiť ktokoľvek zvonku; uzavrel by to až CAS/podpis tesne pred `rename`, vedome sa to nerieši. Audit navyše odhalil dve veci mimo rozsahu, ktoré idú do registra:
+  **R-37** (tvarovo platný, ale obsahovo zlý primár — napr. `[]` — zničí dobrú zálohu už pri načítaní cez `normalize` + `merge_seed` + auto-zápis; `degraded?` to nechytá,
+  lebo primár sa parsuje) a **R-38** (`vepo_settings.json` nemá guard ani kanál, ktorým by povedal, prečo sa zápis nepodaril).
+  **Testy:** `tests/pure/test_r11_degradovana_zaloha.rb` (28 scenárov — truth-table vrátane nahriatej cache a I/O chyby, per modul čítanie zo zálohy · odmietnutý zápis ·
+  bajtovo nedotknutý primár · náprava zmazaním jedného súboru, správanie bez zálohy, behavior testy UI hlášok) + `tests/js/test_r11_degradovana_ui.js` (27). **Mutačne
+  overených 6 mutácií** (guard preč · `degraded?` vždy false · kontrola mimo zámku · široký `rescue StandardError` · degraded ako read_only · všeobecná hláška namiesto
+  dôvodu) — každá padla. In-SketchUp beh sa nevyžiadal: dávka sa nedotýka builderov ani observerov.
+
 - **1d/R-23.1 · ESCAPE REŤAZ RUČNÝCH MODÁLOV (v0.9.1, 1.9.2026, PR #273):** Kontrakt UI 2.0 hovorí „Escape zatvára modál", ale platil len pre modály na zdieľanej
   kostre D-15. **Šesť ručných Escape nemalo vôbec** — `absModal` (chýbajúca ABS páska) v Inspectorovi a `mdRestoreModal`, `mdDeleteModal`, `mdUniModal`, `demosModal`,
   `hwDelModal` v Štúdiu; jedinou cestou von bola myš. **Čo platí teraz:** Escape zatvára všetkých šesť a robí presne to, čo tlačidlo „Zrušiť" (`mddCancel` ruší bežiaci
