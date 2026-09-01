@@ -6,7 +6,7 @@ require 'extensions.rb'
 
 module Noxun
   module Engine
-    VERSION = '0.9.5'
+    VERSION = '0.9.6'
 
     class << self
       # Drzime kvoli UI::Notification (potrebuje registrovany extension objekt).
@@ -21,18 +21,25 @@ end
 # tato sekcia zije v loaderi a je UMYSELNE sebestacna: ziadny `Sketchup.*`,
 # ziadny modul pluginu, len `File`/`FileUtils`.
 #
-# Ked nie je co robit (bezny start), su to PIAT stat volania a koniec — nulova
-# rezia. Ked transakcia ostala nedokoncena, dorobi sa ALEBO vrati posledna
-# KOMPLETNA generacia — VZDY strom AJ loader spolu (novy strom so starym
-# loaderom je zakazany stav: `main.rb` fallback by hlasil staru verziu nad
-# novym kodom).
+# Ked nie je co robit (bezny start), je to pat `File.exist?` volani a koniec —
+# nulova rezia.
 #
-# ROZHODUJE STAV DISKU, marker je len sprievodka:
-#   * existuje `noxun_engine.new`  => krok 4 (nasadenie noveho stromu) NEPREBEHOL
-#     => vracia sa STARA generacia;
-#   * existuje `noxun_engine.old` a `.new` uz NIE => krok 4 PREBEHOL
-#     => transakcia sa DOKONCI (loader + upratanie).
+# ZELEZNE PRAVIDLO (Codex #277 P1): STROM NA DISKU MUSI ZODPOVEDAT LOADERU,
+# KTORY SA PRAVE VYKONAVA. Recovery bezi ZVNUTRA loadera, ktory SketchUp uz
+# nacital — takze „dokoncit dopredu" (nasadit novy loader na disk a pokracovat
+# starym kodom nad novym stromom) je ZAKAZANE. Preto:
+#   * `.new` strom este stoji  => krok 4 NEPREBEHOL   => vrat STARU generaciu;
+#   * `.rb.new` este stoji     => vykonava sa STARY loader => ROLLBACK stromu
+#                                 na `.old` (nikdy nie dokoncenie dopredu);
+#   * `.old` ostal a `.rb.new` uz nie => vykonava sa NOVY loader => dokonci
+#                                 upratanie.
 # Rename v ramci jedneho priecinka je atomicky, takze medzistav neexistuje.
+# Ked po oprave verzia stromu NESEDI s verziou vykonavaneho loadera, extension
+# sa NEZAREGISTRUJE a pouzivatel dostane pokyn restartovat.
+#
+# ZAMOK (Codex #277 P1): ked prave bezi swap v inom procese, tento boot vidi
+# transakcne artefakty, ale zamok nedostane. NESMIE sa nacitat — updater by mu
+# strom vymenil pod rukami. Kratko pocka a potom odmietne nacitanie.
 #
 # Kontrakt s `core/updater.rb`: logika recovery zije LEN TU a modul ju
 # NEDUPLIKUJE (guard test `test_d52a_updater.rb` to strazi). Modul pri starte
@@ -45,28 +52,80 @@ module Noxun
       MARKER_NAME = 'noxun_engine.update.json'
       LOCK_NAME   = 'noxun_engine.update.lock'
 
-      def self.recover!(plugins_dir)
-        tree     = File.join(plugins_dir, TREE_NAME)
-        tree_new = "#{tree}.new"
-        tree_old = "#{tree}.old"
-        ldr      = File.join(plugins_dir, LOADER_NAME)
-        ldr_new  = "#{ldr}.new"
-        ldr_old  = "#{ldr}.old"
-        marker   = File.join(plugins_dir, MARKER_NAME)
+      LOCK_WAIT_SECONDS = 5.0 # kratke bezpecne cakanie na cudziu transakciu
+      LOCK_POLL = 0.2
+      VERSION_RE = /^[ \t]*VERSION\s*=\s*'([^']*)'/.freeze
 
-        return false unless File.exist?(marker) || File.exist?(tree_new) ||
-                            File.exist?(tree_old) || File.exist?(ldr_new) ||
-                            File.exist?(ldr_old)
+      # Vysledok bootu — cita ho koniec tohto suboru (a headless testy).
+      class << self
+        attr_accessor :status
+      end
+
+      BUSY_MESSAGE = 'Noxun Engine sa práve aktualizuje v inom okne SketchUpu. ' \
+                     'Zavri toto okno a spusti SketchUp znova, keď aktualizácia dobehne.'
+      RESTART_MESSAGE = 'Noxun Engine bol aktualizovaný. Reštartuj SketchUp — ' \
+                        'plugin sa v tomto okne zámerne nenačítal.'
+      BROKEN_MESSAGE = 'Noxun Engine nedokázal dorovnať nedokončenú aktualizáciu. ' \
+                       'Reštartuj SketchUp; ak to nepomôže, spusti INSTALL_noxun_engine.ps1.'
+
+      # :idle    — nic sa nedialo (bezny start)
+      # :done    — transakcia dorovnana a strom sedi s vykonavanym loaderom
+      # :busy    — aktualizacia prave bezi v inom procese
+      # :restart — disk je v poriadku, ale NEZODPOVEDA tomuto loaderu
+      # :error   — opravu sa nepodarilo dokoncit
+      def self.recover!(plugins_dir)
+        paths = paths_for(plugins_dir)
+        return :idle unless pending?(paths)
 
         require 'fileutils'
-        # Ten isty zamok, aky drzi `Updater.apply!` — ked prave bezi swap v inom
-        # procese, recovery sa NEPLETIE (a necaka).
-        File.open(File.join(plugins_dir, LOCK_NAME), File::RDWR | File::CREAT, 0o644) do |f|
-          return false unless f.flock(File::LOCK_EX | File::LOCK_NB)
+        status = with_lock(paths[:lock]) do
+          begin
+            repair!(paths)
+            FileUtils.rm_f(paths[:marker])
+            generation_matches?(paths) ? :done : :restart
+          rescue StandardError => e
+            puts "[NOXUN::Engine] recovery aktualizacie zlyhala: #{e.class}: #{e.message}"
+            :error
+          end
+        end
+        puts "[NOXUN::Engine] nedokoncena aktualizacia: #{status}" unless status == :idle
+        status
+      rescue StandardError => e
+        puts "[NOXUN::Engine] recovery aktualizacie zlyhala: #{e.class}: #{e.message}"
+        :error
+      end
+
+      def self.paths_for(plugins_dir)
+        tree = File.join(plugins_dir, TREE_NAME)
+        ldr  = File.join(plugins_dir, LOADER_NAME)
+        { tree: tree, tree_new: "#{tree}.new", tree_old: "#{tree}.old",
+          ldr: ldr, ldr_new: "#{ldr}.new", ldr_old: "#{ldr}.old",
+          marker: File.join(plugins_dir, MARKER_NAME),
+          lock: File.join(plugins_dir, LOCK_NAME) }
+      end
+
+      def self.pending?(p)
+        File.exist?(p[:marker]) || File.exist?(p[:tree_new]) || File.exist?(p[:tree_old]) ||
+          File.exist?(p[:ldr_new]) || File.exist?(p[:ldr_old])
+      end
+
+      # Zamok drzi bezici `apply!`. Kratko pockame (swap je otazka sekund);
+      # ked ho ani potom nedostaneme, je to `:busy` a plugin sa NENACITA.
+      def self.with_lock(lock_path)
+        File.open(lock_path, File::RDWR | File::CREAT, 0o644) do |f|
+          deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + LOCK_WAIT_SECONDS
+          got = false
+          loop do
+            got = f.flock(File::LOCK_EX | File::LOCK_NB)
+            break if got
+            break if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+
+            sleep(LOCK_POLL)
+          end
+          return :busy unless got
 
           begin
-            repair!(tree, tree_new, tree_old, ldr, ldr_new, ldr_old)
-            FileUtils.rm_f(marker)
+            yield
           ensure
             begin
               f.flock(File::LOCK_UN)
@@ -75,109 +134,148 @@ module Noxun
             end
           end
         end
-        puts '[NOXUN::Engine] nedokoncena aktualizacia dorovnana pri starte'
-        true
-      rescue StandardError => e
-        puts "[NOXUN::Engine] recovery aktualizacie zlyhala: #{e.class}: #{e.message}"
-        false
       end
 
-      def self.repair!(tree, tree_new, tree_old, ldr, ldr_new, ldr_old)
-        if Dir.exist?(tree_new) && (Dir.exist?(tree) || Dir.exist?(tree_old))
-          keep_old!(tree, tree_new, tree_old, ldr, ldr_new, ldr_old)
-        elsif Dir.exist?(tree_new)
-          adopt_new!(tree, tree_new, ldr, ldr_new, ldr_old)
-        elsif Dir.exist?(tree_old)
-          if Dir.exist?(tree)
-            keep_new!(tree, tree_old, ldr, ldr_new, ldr_old)
-          else
-            restore_old!(tree, tree_old, ldr, ldr_new, ldr_old)
-          end
+      def self.repair!(p)
+        if Dir.exist?(p[:tree_new])
+          keep_old!(p)          # krok 4 neprebehol
+        elsif File.exist?(p[:ldr_new])
+          rollback_tree!(p)     # vykonava sa STARY loader — nikdy nedokoncuj dopredu
+        elsif Dir.exist?(p[:tree_old])
+          finish_new!(p)        # vykonava sa NOVY loader — dokonci upratanie
         else
-          finish!(ldr, ldr_new, ldr_old)
+          finish_leftovers!(p)
         end
       end
 
-      # `.new` este stoji => swap sa NEDOSTAL za krok 4. Plati STARA generacia.
-      def self.keep_old!(tree, tree_new, tree_old, ldr, ldr_new, ldr_old)
-        FileUtils.rm_rf(tree_new)
-        if Dir.exist?(tree_old)
-          FileUtils.rm_rf(tree) if Dir.exist?(tree)
-          File.rename(tree_old, tree)
-        end
-        FileUtils.rm_f(ldr_new)
-        restore_loader!(ldr, ldr_old)
-      end
-
-      # Strom aj `.old` chybaju — jedina KOMPLETNA generacia je pripraveny `.new`
-      # (bol validovany pred krokom 3). Bez neho by plugin nemal co nacitat.
-      def self.adopt_new!(tree, tree_new, ldr, ldr_new, ldr_old)
-        File.rename(tree_new, tree)
-        if File.exist?(ldr_new)
-          FileUtils.rm_f(ldr_old)
-          File.rename(ldr, ldr_old) if File.exist?(ldr)
-          File.rename(ldr_new, ldr)
-        end
-        FileUtils.rm_f(ldr_old)
-      end
-
-      # Novy strom uz stoji na mieste => transakcia sa DOKONCI.
-      def self.keep_new!(tree, tree_old, ldr, ldr_new, ldr_old)
-        if File.exist?(ldr_new)
-          FileUtils.rm_f(ldr_old)
-          File.rename(ldr, ldr_old) if File.exist?(ldr)
-          File.rename(ldr_new, ldr)
-        elsif !File.exist?(ldr)
-          # Nova generacia nema loader a `.rb.new` uz nie je — nedokoncitelna.
-          # Vracia sa CELA stara generacia (strom aj loader).
-          FileUtils.rm_rf(tree)
-          File.rename(tree_old, tree)
-          File.rename(ldr_old, ldr) if File.exist?(ldr_old)
+      # `.new` este stoji => plati STARA generacia (strom aj loader).
+      def self.keep_old!(p)
+        if Dir.exist?(p[:tree_old])
+          rm_quiet(p[:tree]) if Dir.exist?(p[:tree])
+          File.rename(p[:tree_old], p[:tree])
+        elsif !Dir.exist?(p[:tree])
+          # Strom aj `.old` chybaju — jedina kompletna generacia je pripraveny
+          # `.new` (validovany pred krokom 3). Nasadi sa, ale tomuto loaderu uz
+          # nemusi zodpovedat: `generation_matches?` potom vypyta restart.
+          File.rename(p[:tree_new], p[:tree])
+          adopt_loader!(p)
+          rm_quiet(p[:ldr_old])
           return
         end
-        FileUtils.rm_rf(tree_old)
-        FileUtils.rm_f(ldr_old)
+        rm_quiet(p[:tree_new])
+        rm_quiet(p[:ldr_new])
+        restore_loader!(p)
       end
 
-      # Strom zmizol, `.new` nie je — vracia sa STARA generacia.
-      def self.restore_old!(tree, tree_old, ldr, ldr_new, ldr_old)
-        File.rename(tree_old, tree)
-        FileUtils.rm_f(ldr_new)
-        restore_loader!(ldr, ldr_old)
+      # Strom uz je NOVY, ale `.rb.new` este ceka => loader v pamati je STARY.
+      # Dokoncit dopredu by dalo zakazanu kombinaciu stary loader / novy strom,
+      # preto sa strom VRACIA na `.old`.
+      def self.rollback_tree!(p)
+        if Dir.exist?(p[:tree_old])
+          rm_quiet(p[:tree_new])
+          File.rename(p[:tree], p[:tree_new]) if Dir.exist?(p[:tree])
+          File.rename(p[:tree_old], p[:tree])
+          rm_quiet(p[:tree_new])
+        end
+        rm_quiet(p[:ldr_new])
+        restore_loader!(p)
+      end
+
+      # `.old` ostal, `.rb.new` uz nie => vykonava sa NOVY loader nad NOVYM
+      # stromom. Ostava upratat predchadzajucu generaciu.
+      def self.finish_new!(p)
+        unless Dir.exist?(p[:tree])
+          File.rename(p[:tree_old], p[:tree]) # strom chyba — vrat, co mame
+          restore_loader!(p)
+          return
+        end
+        rm_quiet(p[:tree_old])
+        rm_quiet(p[:ldr_old])
       end
 
       # Ziadny `.new` ani `.old` strom — ostal len zvysok po staging/upratovani.
-      def self.finish!(ldr, ldr_new, ldr_old)
-        FileUtils.rm_f(ldr_new)
-        File.rename(ldr_old, ldr) if !File.exist?(ldr) && File.exist?(ldr_old)
-        FileUtils.rm_f(ldr_old)
+      def self.finish_leftovers!(p)
+        rm_quiet(p[:ldr_new])
+        File.rename(p[:ldr_old], p[:ldr]) if !File.exist?(p[:ldr]) && File.exist?(p[:ldr_old])
+        rm_quiet(p[:ldr_old])
       end
 
-      # Loader STAREJ generacie sa vracia VZDY, ked existuje — inak by nad
-      # vratenym starym stromom ostal novy loader (zakazany zmieseny stav).
-      def self.restore_loader!(ldr, ldr_old)
-        return unless File.exist?(ldr_old)
+      # Loader STAREJ generacie sa vracia VZDY, ked existuje.
+      def self.restore_loader!(p)
+        return unless File.exist?(p[:ldr_old])
 
-        FileUtils.rm_f(ldr)
-        File.rename(ldr_old, ldr)
+        rm_quiet(p[:ldr])
+        File.rename(p[:ldr_old], p[:ldr])
+      end
+
+      def self.adopt_loader!(p)
+        return unless File.exist?(p[:ldr_new])
+
+        rm_quiet(p[:ldr_old])
+        File.rename(p[:ldr], p[:ldr_old]) if File.exist?(p[:ldr])
+        File.rename(p[:ldr_new], p[:ldr])
+      end
+
+      # Mazanie je KOZMETIKA — zvysok uprace najblizsi boot. Zlyhanie preto
+      # NESMIE zhodit strukturalnu opravu (a spravit z pluginu mrtvolu).
+      def self.rm_quiet(path)
+        FileUtils.rm_rf(path)
+        true
+      rescue StandardError
+        false
+      end
+
+      # Sedi strom s loaderom, ktory sa PRAVE VYKONAVA? `Engine::VERSION` je
+      # definovana vyssie v tomto subore, takze je to verzia beziaceho kodu.
+      def self.generation_matches?(p)
+        main = File.join(p[:tree], 'main.rb')
+        return false unless File.file?(main) && File.file?(p[:ldr])
+
+        head = File.open(main, 'rb') { |f| f.read(8192) }.to_s
+        tree_version = head.force_encoding(Encoding::UTF_8)[VERSION_RE, 1]
+        return false if tree_version.nil?
+
+        tree_version == Noxun::Engine::VERSION
+      rescue StandardError
+        false
+      end
+
+      def self.announce(status)
+        msg = case status
+              when :busy then BUSY_MESSAGE
+              when :restart then RESTART_MESSAGE
+              else BROKEN_MESSAGE
+              end
+        puts "[NOXUN::Engine] #{msg}"
+        ::UI.messagebox(msg) if defined?(::UI) && ::UI.respond_to?(:messagebox)
+      rescue StandardError
+        nil
       end
     end
   end
 end
 
-Noxun::Engine::Boot.recover!(File.dirname(File.expand_path(__FILE__)))
+# Stav recovery rozhoduje, ci sa plugin vobec smie nacitat. `:busy` (cudzia
+# aktualizacia bezi), `:restart` (strom nesedi s tymto loaderom) a `:error`
+# (opravu sa nepodarilo dokoncit) NAcitanie zastavia — inak by SketchUp bezal
+# nad zmiesanou generaciou.
+Noxun::Engine::Boot.status = Noxun::Engine::Boot.recover!(File.dirname(File.expand_path(__FILE__)))
 
-module Noxun
-  module Engine
-    unless defined?(@loaded)
-      ex = SketchupExtension.new('Noxun Engine', 'noxun_engine/main')
-      ex.description = 'Nabytkarsky system Noxun — parametricke korpusy, zony a cela, materialy a ABS s dekorovymi skupinami, pravidla kovania, kusovnik a VEPO export s kontrolou.'
-      ex.version     = VERSION
-      ex.creator     = 'Noxun Forge'
-      ex.copyright   = 'Noxun Forge © 2026'
-      self.extension = ex
-      Sketchup.register_extension(ex, true)
-      @loaded = true
+if %i[busy restart error].include?(Noxun::Engine::Boot.status)
+  Noxun::Engine::Boot.announce(Noxun::Engine::Boot.status)
+else
+  module Noxun
+    module Engine
+      unless defined?(@loaded)
+        ex = SketchupExtension.new('Noxun Engine', 'noxun_engine/main')
+        ex.description = 'Nabytkarsky system Noxun — parametricke korpusy, zony a cela, materialy a ABS s dekorovymi skupinami, pravidla kovania, kusovnik a VEPO export s kontrolou.'
+        ex.version     = VERSION
+        ex.creator     = 'Noxun Forge'
+        ex.copyright   = 'Noxun Forge © 2026'
+        self.extension = ex
+        Sketchup.register_extension(ex, true)
+        @loaded = true
+      end
     end
   end
 end

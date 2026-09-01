@@ -207,6 +207,25 @@ module Noxun
         parse_version(head.to_s.force_encoding(Encoding::UTF_8))
       end
 
+      # Lacne citanie hlavicky staci na KONTROLU verzie (jedno male citanie zo
+      # sietoveho share). Pred COMMITOM to nestaci: druha definicia `VERSION`
+      # moze lezat az za hranicou hlavicky a v Ruby by prebila prvu, takze by
+      # sa nasadil balik s inou verziou, nez akou sa rozhodovalo. Preto sa tu
+      # skenuje CELY subor (Codex #277 P2).
+      def assert_single_version!(path, label)
+        raise Refused, "súbor #{File.basename(path)} chýba" unless File.file?(path)
+
+        text = File.binread(path).force_encoding(Encoding::UTF_8)
+        hits = text.scan(VERSION_RE).flatten
+        raise Refused, "#{label}: v súbore nie je VERSION" if hits.empty?
+        raise Refused, "#{label}: VERSION je v súbore #{hits.length}× — balík je nejednoznačný" if hits.length > 1
+
+        value = hits.first.to_s.strip
+        raise Refused, "#{label}: neplatná VERSION #{value.inspect}" unless value =~ VALID_VERSION_RE
+
+        value
+      end
+
       # --- kanonicke hranice (F9) -------------------------------------------
       def normalize_path(path)
         p = File.expand_path(path.to_s).tr('\\', '/')
@@ -697,6 +716,22 @@ module Noxun
                            'downgrade je zakázaný, staršiu verziu nainštaluj ručne cez INSTALL'
           end
 
+          # P2 (#277): duplicitna VERSION sa v hlavicke (4 kB) najst NEMUSI —
+          # druha definicia moze lezat hlbsie a prebila by prvu. Tesne pred
+          # commitom sa preto skenuje CELY staged loader aj `main.rb`.
+          assert_single_version!(staged_loader(plugins), 'loader balíka')
+          assert_single_version!(File.join(staged_tree(plugins), 'main.rb'), 'main.rb balíka')
+
+          # P1 (#277): lease sa kontroluje ZNOVA, tesne pred swapom. Medzi
+          # prvou kontrolou a koncom stagingu (kopirovanie zo share trva) mohla
+          # nabehnut dalsia instancia SketchUpu — renamovat strom pod nou by jej
+          # zobralo subory spod ruk.
+          late = live_leases(plugins)
+          unless late.empty?
+            raise Refused, "medzitým sa spustila ďalšia inštancia SketchUpu (PID #{late.join(', ')}) — " \
+                           'zavri ostatné okná a skús znova'
+          end
+
           write_marker!(plugins, 'staged', from: current, to: target)
         rescue StandardError
           cleanup_staging(plugins)
@@ -749,29 +784,63 @@ module Noxun
           File.rename(loader, loader_old) if File.file?(loader)
           File.rename(loader_new, loader)
         rescue StandardError => e
-          rollback_after_loader_failure!(plugins)
-          raise Refused, "loader sa nedá vymeniť (#{e.class}) — pôvodná verzia beží ďalej"
+          if rollback_after_loader_failure!(plugins)
+            raise Refused, "loader sa nedá vymeniť (#{e.class}) — pôvodná verzia beží ďalej"
+          end
+
+          # P1 (#277): ROLLBACK ZLYHAL. Marker ani `.new`/`.old` sa teraz NESMU
+          # mazat — su to jedine stopy, z ktorych vie boot recovery zlozit
+          # kompletnu generaciu. Latch sa zapina aj tu: v `Plugins` moze lezat
+          # NOVY strom, takze otvorene okno by nacitalo nove HTML nad starym Ruby.
+          Engine.restart_required!
+          # Recovery bootstrap žije v LOADERI — keď ten na disku nie je, boot ju
+          # nemá odkiaľ spustiť a hláška „reštartuj" by klamala.
+          if File.file?(loader)
+            raise Refused, "loader sa nedá vymeniť (#{e.class}) a vrátenie zmien zlyhalo — " \
+                           'REŠTARTUJ SketchUp, plugin sa dorovná pri štarte'
+          end
+
+          raise Refused, "loader sa nedá vymeniť (#{e.class}) a vrátenie zmien zlyhalo — " \
+                         'v Plugins chýba noxun_engine.rb, spusti INSTALL_noxun_engine.ps1'
         end
-        write_marker!(plugins, 'loader_swapped', from: from_version, to: to_version)
+
+        # COMMIT BOD (P1 #277): od tejto chvile lezi v `Plugins` NOVA generacia
+        # a v pamati bezi STARY Ruby kod. Latch sa preto zapina OKAMZITE —
+        # vsetko dalsie je uz len upratovanie a nesmie rozhodovat o tom, ci sa
+        # vstupne body zamknu (vynimka v upratovani by inak nechala okna otvorene
+        # nad novymi subormi).
+        Engine.restart_required!
 
         # (6) upratanie predchadzajucej generacie
         note = ''
         begin
-          FileUtils.rm_rf(tree_old, secure: true)
-          FileUtils.rm_f(loader_old)
-          raise IOError, 'zvyšok sa nezmazal' if File.exist?(tree_old) || File.exist?(loader_old)
-        rescue StandardError
-          note = 'starú verziu sa nepodarilo zmazať — upratá sa pri najbližšom štarte SketchUpu'
+          write_marker!(plugins, 'loader_swapped', from: from_version, to: to_version)
+          begin
+            FileUtils.rm_rf(tree_old, secure: true)
+            FileUtils.rm_f(loader_old)
+            raise IOError, 'zvyšok sa nezmazal' if File.exist?(tree_old) || File.exist?(loader_old)
+          rescue StandardError
+            note = 'starú verziu sa nepodarilo zmazať — upratá sa pri najbližšom štarte SketchUpu'
+          end
+          write_marker!(plugins, 'done', from: from_version, to: to_version)
+          clear_marker(plugins)
+        rescue StandardError => e
+          # Aktualizacia UZ PRESLA — chyba v upratovani z nej nesmie spravit
+          # neuspech (volajuci by hlasil zlyhanie updatu, ktory sa NAOZAJ stal).
+          Engine.log_error(e, 'Updater.swap! upratanie') if Engine.respond_to?(:log_error)
+          note = 'aktualizácia prebehla, upratanie sa nedokončilo — dorovná sa pri najbližšom štarte SketchUpu'
         end
-
-        write_marker!(plugins, 'done', from: from_version, to: to_version)
-        clear_marker(plugins)
-        Engine.restart_required!
         { 'ok' => true, 'from' => from_version, 'to' => to_version, 'note' => note }
       end
 
       # Krok 5 zlyhal: novy strom uz stoji na mieste, ale loader je stary.
       # Tento stav NESMIE prezit — vracia sa CELY swap.
+      #
+      # P1 (#277): vracia `true` LEN vtedy, ked KAZDY krok vratenia uspel a na
+      # disku naozaj lezi kompletna STARA generacia. Pri `false` sa NIC nemaze —
+      # marker, `.old` aj `.new` ostavaju ako jediny podklad pre boot recovery.
+      # Zmazat ich „pre poriadok" by znicilo zalozny obsah a plugin by uz nemal
+      # z coho vstat.
       def rollback_after_loader_failure!(plugins)
         tree = tree_path(plugins)
         tree_new = staged_tree(plugins)
@@ -779,26 +848,30 @@ module Noxun
         loader = loader_path(plugins)
         loader_old = previous_loader(plugins)
 
-        begin
-          File.rename(loader_old, loader) if File.file?(loader_old) && !File.file?(loader)
-        rescue StandardError
-          nil
-        end
-        begin
-          File.rename(tree, tree_new) if File.directory?(tree) && !File.exist?(tree_new)
-        rescue StandardError
-          nil
-        end
-        begin
-          File.rename(tree_old, tree) if File.directory?(tree_old) && !File.exist?(tree)
-        rescue StandardError
-          nil
-        end
+        ok = true
+        ok = try_rename(loader_old, loader) if File.file?(loader_old) && !File.file?(loader)
+        ok &&= try_rename(tree, tree_new) if ok && Dir.exist?(tree) && !File.exist?(tree_new)
+        ok &&= try_rename(tree_old, tree) if ok && Dir.exist?(tree_old) && !Dir.exist?(tree)
+
+        # Dokazom rollbacku nie su navratove hodnoty renameov, ale DISK: strom
+        # aj loader musia byt spat na svojich miestach a `.old` uz nesmie drzat
+        # jedinu kopiu (inak by upratanie nizsie zmazalo zalohu).
+        ok &&= File.file?(loader) && Dir.exist?(tree)
+        return false unless ok
+
         cleanup_staging(plugins)
         FileUtils.rm_rf(tree_old)
         FileUtils.rm_f(loader_old)
         clear_marker(plugins)
         true
+      end
+
+      def try_rename(src, dst)
+        File.rename(src, dst)
+        true
+      rescue StandardError => e
+        Engine.log_error(e, 'Updater rollback') if Engine.respond_to?(:log_error)
+        false
       end
     end
   end
