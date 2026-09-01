@@ -32,6 +32,16 @@ User decision: automatic highest-compatible variant + manual override.
 - This follows the same general V1 principle as Quadro: maximize useful drawer volume from computed context, while preserving user control and allowing visual verification in atypical geometry.
 - Do not add persistent FunctionalZone state just to support this choice; use `context_for(owner)` / computed surrounding-space data.
 
+## Atira railing composition
+
+User-confirmed production rule:
+
+- `H70`: no railing.
+- `H144`: one railing on the left side + one railing on the right side.
+- `H176`: one railing on the left side + one railing on the right side.
+- Therefore in V1, `height_variant` deterministically selects the basic railing-count composition for these three Atira variants; no separate railing-count user axis is needed for the standard recipe.
+- The concrete railing / connector SKUs and supplier packaging remain procurement/component data and still require catalogue/Demos audit.
+
 ## Architectural implication
 
 This strengthens the existing slim-V1 direction:
@@ -49,3 +59,4 @@ Do not lock derived-part identity from this checkpoint; C10 remains AUDIT FIRST.
 - Context-driven box-height proposal + manual override + manual visual check for difficult obstruction cases: user-confirmed 2026-09-01.
 - Quadro V1 Noxun default height clearance = `40 mm`; defined as recipe/data default rather than an official Hettich constant: user-confirmed 2026-09-01.
 - Atira H70/H144/H176 resolver = highest safely compatible height variant from actual available internal vertical space + manual override: user-confirmed 2026-09-01.
+- Atira railing composition H70=0, H144=1 per side, H176=1 per side: user-confirmed 2026-09-01.
