@@ -346,6 +346,13 @@ module Noxun
         # bez modelu (legacy volanie) sa kovanie do sablony neuklada.
         def template_config_from(cfg, model: nil)
           tc = {
+            # R-12: aj sablona je uzavrety whitelist, takze nesie marker
+            # kontraktu configu. Stampuje sa AKTUALNA hodnota (zaznam prave
+            # vyrobil TENTO whitelist), nie hodnota zo zdrojovej skrinky —
+            # zdroj z novsej verzie sa do sablony vobec nedostane
+            # (`handle_save_template_as` ho odmietne). Vdaka markeru starsi
+            # plugin sablonu z novsej verzie rozozna a nepouzije ju.
+            'config_schema' => CabinetBuilder::CONFIG_SCHEMA,
             'type' => cfg['type'], 'width' => cfg['width'], 'height' => cfg['height'], 'depth' => cfg['depth'],
             'thickness' => cfg['thickness'], 'floor_height' => cfg['floor_height'],
             'bottom_mode' => cfg['bottom_mode'], 'top_mode' => cfg['top_mode'], 'back_mode' => cfg['back_mode'],

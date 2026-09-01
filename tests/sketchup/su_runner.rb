@@ -1543,6 +1543,324 @@ module NoxunSuRunner
     end]
   end
 
+  # --- SYNC-R12: dopredny guard CONFIGU korpusu (`config_schema`) ------------
+  # Zakazka z NOVSIEHO pluginu sa NESMIE ticho orezat. Sonda „novsieho pluginu"
+  # je zapis markera `config_schema + 1` + pola, ktoremu tato verzia nerozumie,
+  # priamo do ulozeneho configu (presne to, co by v .skp nechala novsia verzia).
+  # Meria sa: marker sa naozaj zapisuje (build AJ rebuild) · prestavba je
+  # ODMIETNUTA a model ostava BAJTOVO nedotknuty · odmietnutie nezaklada ZIADEN
+  # krok Spat · stratove NE-rebuild cesty (kopia, sablona pri pouziti aj vklade,
+  # ulozenie ako sablona) odmietaju rovnako · citacie cesty (BOM/Validation)
+  # bezia dalej.
+  R12_PARAMS = { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0 }.freeze
+  R12_TPL = '__SU_TEST_R12_BUDUCA__'
+
+  # Sonda: prepise ulozeny config tak, ako by ho nechal NOVSI plugin. Zapis ide
+  # POD guardom vo vlastnej operacii — je to priprava scenara, nie pouzivatelov
+  # krok (observer nesmie z pripravy urobit dirty tik).
+  def r12_make_future!(model, inst)
+    cfg = e::Store.config(inst) || {}
+    cfg['config_schema'] = e::CabinetBuilder::CONFIG_SCHEMA + 1
+    cfg['vyklop_z_buducnosti'] = { 'typ' => 'flap' }
+    e::CabinetBuilder.guarded do
+      model.start_operation('SU-TEST R-12 future config', true)
+      e::Store.write_config(inst, cfg)
+      model.commit_operation
+    end
+    e::Store.get(inst, 'config')
+  end
+
+  # Odtlacok stavu skrinky: RAW config + geometria + transformacia. Odmietnuta
+  # prestavba musi nechat vsetky tri bajtovo/ciselne rovnake.
+  def r12_snapshot(inst)
+    { raw: e::Store.get(inst, 'config'),
+      parts: inst.definition.entities.length,
+      w: mm(inst.definition.bounds.width).round(3),
+      h: mm(inst.definition.bounds.height).round(3),
+      tr: inst.transformation.to_a.map { |v| v.round(9) } }
+  end
+
+  def run_r12(model)
+    cleanup(model)
+    markers = []
+
+    # 1) MARKER sa zapisuje pri vklade AJ pri prestavbe (jediny zapisovy bod).
+    inst = e::CabinetBuilder.build(model, R12_PARAMS.dup)
+    cur = e::CabinetBuilder::CONFIG_SCHEMA
+    cfg1 = e::Store.config(inst) || {}
+    ok("R-12: vlozena skrinka nesie config_schema #{cfg1['config_schema']} (aktualny #{cur})",
+       cfg1['config_schema'].to_i == cur)
+    e::CabinetBuilder.rebuild(model, inst, R12_PARAMS.merge('width' => 650.0))
+    cfg2 = e::Store.config(inst) || {}
+    ok("R-12: marker prezil prestavbu (sirka #{cfg2['width']}, config_schema #{cfg2['config_schema']})",
+       cfg2['config_schema'].to_i == cur && (cfg2['width'].to_f - 650.0).abs < 0.01)
+
+    # 2) PRESTAVBA skrinky z NOVSEJ verzie: odmietnutie, ziadna mutacia modelu,
+    #    ziadny krok Spat.
+    r12_make_future!(model, inst)
+    snap = r12_snapshot(inst)
+    m1 = r03_marker(model, markers)
+    msg = begin
+      e::CabinetBuilder.rebuild(model, inst, R12_PARAMS.merge('width' => 700.0))
+      nil
+    rescue StandardError => ex
+      ex.message
+    end
+    ok("R-12: prestavba skrinky z novsej verzie ODMIETNUTA (#{msg.to_s[0, 60]})",
+       !msg.nil? && msg.include?('z novšej verzie Noxun'))
+    after = r12_snapshot(inst)
+    ok('R-12: odmietnuta prestavba nechala config BAJTOVO nedotknuty', after[:raw] == snap[:raw])
+    ok("R-12: odmietnuta prestavba nechala geometriu nedotknutu (dielcov #{after[:parts]}, sirka #{after[:w]} mm)",
+       after[:parts] == snap[:parts] && after[:w] == snap[:w] && after[:h] == snap[:h])
+    ok('R-12: neznáme pole novsej verzie prezilo (nic sa neorezalo)',
+       (e::Store.config(inst) || {})['vyklop_z_buducnosti'].is_a?(Hash))
+    Sketchup.undo
+    ok('R-12: odmietnutie nezalozilo ZIADEN krok Spat (1x Spat vratil marker)', !m1.valid?)
+
+    # 3) „Vlozit kopiu" (stratova cesta BEZ rebuildu) — kopia nesmie vzniknut.
+    before3 = cabinets(model).length
+    m2 = r03_marker(model, markers)
+    model.selection.clear
+    model.selection.add(inst)
+    e::Panel.handle_insert_copy(pg(model, 'cabinet_id' => e::Store.get(inst, 'cabinet_id')))
+    ok("R-12: „Vlozit kopiu\" z novsej skrinky ODMIETNUTA (korpusov #{cabinets(model).length})",
+       cabinets(model).length == before3)
+    Sketchup.undo
+    ok('R-12: odmietnuta kopia nezalozila ZIADEN krok Spat', !m2.valid?)
+
+    # 4) „Ulozit ako sablonu" — zaznam v kniznici NESMIE vzniknut.
+    name4 = '__SU_TEST_R12_ULOZENIE__'
+    e::TemplateStore.delete('cabinet', name4) if e::TemplateStore.find('cabinet', name4)
+    e::Panel.handle_save_template_as(pg(model, 'cabinet_id' => e::Store.get(inst, 'cabinet_id'),
+                                              'name' => name4, 'type' => 'lower'))
+    ok('R-12: „Ulozit ako sablonu" z novsej skrinky NEZAPISALA nic',
+       e::TemplateStore.find('cabinet', name4).nil?)
+
+    # 5) CITACIE cesty sa NEBLOKUJU — kusovnik aj semafor nad novsou skrinkou beziá.
+    col = begin
+      e::Bom.collect(model)
+    rescue StandardError => ex
+      info("R-12: Bom.collect vynimka: #{ex.class}: #{ex.message}")
+      nil
+    end
+    ok("R-12: kusovnik novsiu skrinku CITA dalej (korpusov #{col ? col[:cabinets] : '?'}, " \
+       "dielcov #{col ? col[:records].length : '?'})",
+       !col.nil? && col[:cabinets] >= 1 && col[:records].length >= 5)
+    val = begin
+      !e::Validation.run(col).nil?
+    rescue StandardError => ex
+      info("R-12: Validation.run vynimka: #{ex.class}: #{ex.message}")
+      false
+    end
+    ok('R-12: semafor nad novsou skrinkou dobehne (citanie sa neblokuje)', val)
+    cleanup(model)
+
+    # 6) SABLONA z NOVSEJ verzie: POUZITIE na kompatibilnu skrinku aj VKLAD.
+    tpl_cfg = { 'type' => 'lower', 'width' => 500.0, 'height' => 720.0, 'depth' => 510.0,
+                'thickness' => 18.0, 'back_thickness' => 3.0,
+                'config_schema' => cur + 1, 'vyklop_z_buducnosti' => { 'typ' => 'flap' } }
+    e::TemplateStore.delete('cabinet', R12_TPL) if e::TemplateStore.find('cabinet', R12_TPL)
+    if e::TemplateStore.upsert('cabinet', R12_TPL, tpl_cfg)
+      target = e::CabinetBuilder.build(model, R12_PARAMS.dup)
+      tsnap = r12_snapshot(target)
+      model.selection.clear
+      model.selection.add(target)
+      m3 = r03_marker(model, markers)
+      e::TemplatesDialog.handle_apply({ 'template' => R12_TPL }.to_json)
+      ok('R-12: POUZITIE sablony z novsej verzie odmietnute (skrinka nedotknuta)',
+         r12_snapshot(target)[:raw] == tsnap[:raw])
+      Sketchup.undo
+      ok('R-12: odmietnuta sablona nezalozila ZIADEN krok Spat', !m3.valid?)
+
+      before6 = cabinets(model).length
+      e::Panel.handle_insert(pg(model, R12_PARAMS.merge('template_kind' => 'cabinet',
+                                                        'template_name' => R12_TPL)))
+      ok("R-12: VKLAD zo sablony z novsej verzie odmietnuty (korpusov #{cabinets(model).length})",
+         cabinets(model).length == before6)
+      ok('R-12: odmietnuty vklad NEZALOZIL ghost session', ghost_session.nil?)
+      e::TemplateStore.delete('cabinet', R12_TPL)
+    else
+      info("R-12: sablonu #{R12_TPL} sa nepodarilo zapisat — sablonove scenare preskocene")
+    end
+
+    r03_clear_markers(model, markers)
+    cleanup(model)
+    ok('R-12: cleanup (0 korpusov, markery prec, testovacia sablona prec)',
+       cabinets(model).empty? && markers.none?(&:valid?) &&
+       e::TemplateStore.find('cabinet', R12_TPL).nil?)
+  rescue StandardError => ex
+    log_line("FAIL: R-12 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    r03_clear_markers(model, markers) if defined?(markers) && markers
+    e::TemplateStore.delete('cabinet', R12_TPL) if e::TemplateStore.find('cabinet', R12_TPL)
+    cleanup(model)
+  end
+
+  # R-12 ASYNC: dva scenare, ktore musia prejst REALNYM debounce tikom.
+  #
+  # (R12a) SCALE nad skrinkou z NOVSEJ verzie. Observer sa NEMENI. Dokazuje sa:
+  #        transformacia obnovena · config a geometria bajtovo nedotknute ·
+  #        NULA vlastnych krokov Spat.
+  #        CHARAKTERIZACIA (nalez behu, PLATI aj pre dnesny
+  #        `guard_unknown_hardware!`): absorpcia bezi v TRANSPARENTNEJ operacii
+  #        pripojenej k pouzivatelovmu Scale kroku, takze `abort_safely` zrusi
+  #        AJ TEN — v okamihu, ked `process_dirty` vynimku chyti, uz
+  #        transformacia zvacsena NIE JE a `reject_scale` sa preto NESPUSTI.
+  #        Model je teda spravne obnoveny a undo stack cisty, ale pouzivatel
+  #        HLASKU NEDOSTANE. Scenar to PRIBIJA (nie schvaluje) — je to
+  #        prevzata vlastnost observera, nie zmena tejto davky; hlaska by
+  #        vyzadovala zasah do observer/undo lifecycle (audit-povinne).
+  # (R12b) ZMIESANY dedup: v jednej „paste" operacii vzniknu DVE kopie — prva
+  #        (nizsie entityID, teda PRVA v poradi dedupu) z NOVSEJ verzie, druha
+  #        kompatibilna. Kompatibilna MUSI dostat nove `cabinet_id`, novsia
+  #        ostava so zdielanym ID a cyklus sa kvoli nej NESMIE zrutit.
+  def run_r12_async(model, state, steps)
+    # (a) SCALE
+    steps << [0.5, lambda do
+      cleanup(model)
+      state[:r12_mb] = []
+      state[:r12_rejects] = 0
+      r12_silence_messagebox!(state[:r12_mb])
+      r12_count_rejects!(state)
+      inst = e::CabinetBuilder.build(model, R12_PARAMS.dup)
+      state[:r12a] = inst
+      r12_make_future!(model, inst)
+      state[:r12a_snap] = r12_snapshot(inst)
+      model.start_operation('R-12 scale marker', true)
+      state[:r12a_marker] = model.entities.add_cpoint(ORIGIN)
+      model.commit_operation
+      # simulacia pouzivatelskeho Scale (observer NIE je guardnuty)
+      model.start_operation('SU-TEST user scale (R-12)', true)
+      inst.transformation = inst.transformation * Geom::Transformation.scaling(ORIGIN, 1.5, 1.0, 1.0)
+      model.commit_operation
+    end]
+    steps << [SETTLE, lambda do
+      inst = state[:r12a]
+      snap = state[:r12a_snap]
+      clean = e::ScaleWatch.scale_factors(inst.transformation).nil?
+      now = r12_snapshot(inst)
+      ok("R-12 async (a): scale nad novsou skrinkou ZRUSENY — transformacia obnovena (cista=#{clean})",
+         clean && now[:tr] == snap[:tr])
+      ok('R-12 async (a): config ostal BAJTOVO nedotknuty', now[:raw] == snap[:raw])
+      ok("R-12 async (a): geometria nedotknuta (dielcov #{now[:parts]}, sirka #{now[:w]} mm)",
+         now[:parts] == snap[:parts] && now[:w] == snap[:w])
+      ok('R-12 async (a) CHARAKTERIZACIA: abort transparentnej absorpcie zrusil aj pouzivatelov ' \
+         "Scale krok, takze `reject_scale` sa NESPUSTIL (#{state[:r12_rejects]}x) a hlasku " \
+         "pouzivatel NEDOSTAL (#{Array(state[:r12_mb]).length} sprav) — prevzata vlastnost observera",
+         state[:r12_rejects].to_i.zero? && Array(state[:r12_mb]).empty?)
+      Sketchup.undo
+      ok('R-12 async (a): odmietnutie nezanechalo ZIADEN vlastny krok Spat (1x Spat vratil marker)',
+         !state[:r12a_marker].valid?)
+      r12_restore_messagebox!
+      r12_restore_rejects!
+      cleanup(model)
+    end]
+
+    # (b) ZMIESANY dedup
+    steps << [0.5, lambda do
+      cleanup(model)
+      orig = e::CabinetBuilder.build(model, R12_PARAMS.merge('width' => 520.0))
+      state[:r12b_orig] = orig
+      state[:r12b_cid] = e::Store.get(orig, 'cabinet_id')
+      keys = %w[std kind id cabinet_id template_id role part_key_schema manufactured
+                production_class config]
+      model.start_operation('R-12 dedup marker', true)
+      state[:r12b_marker] = model.entities.add_cpoint(ORIGIN)
+      model.commit_operation
+      # jedna „paste" operacia = dve kopie. PORADIE JE SUCASTOU TESTU: novsia
+      # vznika PRVA (nizsie entityID), takze bez preskocenia by jej vynimka
+      # vyhladovala tu kompatibilnu.
+      model.start_operation('SU-TEST user copy (R-12 zmiesane)', true)
+      future = model.entities.add_instance(
+        orig.definition, orig.transformation * Geom::Transformation.translation(e::Units.vector(800, 0, 0))
+      )
+      compat = model.entities.add_instance(
+        orig.definition, orig.transformation * Geom::Transformation.translation(e::Units.vector(1600, 0, 0))
+      )
+      [future, compat].each do |cp|
+        keys.each do |k|
+          v = e::Store.get(orig, k)
+          cp.set_attribute('NOXUN', k, v) unless v.nil?
+        end
+      end
+      fcfg = e::Store.config(future) || {}
+      fcfg['config_schema'] = e::CabinetBuilder::CONFIG_SCHEMA + 1
+      fcfg['vyklop_z_buducnosti'] = { 'typ' => 'flap' }
+      e::Store.write_config(future, fcfg)
+      state[:r12b_future] = future
+      state[:r12b_compat] = compat
+      state[:r12b_future_raw] = e::Store.get(future, 'config')
+      model.commit_operation
+    end]
+    steps << [SETTLE, lambda do
+      cid = state[:r12b_cid]
+      future = state[:r12b_future]
+      compat = state[:r12b_compat]
+      fcid = future && future.valid? ? e::Store.get(future, 'cabinet_id') : nil
+      ccid = compat && compat.valid? ? e::Store.get(compat, 'cabinet_id') : nil
+      ok("R-12 async (b): KOMPATIBILNA kopia dostala nove ID (#{cid} -> #{ccid}) — novsia ju nevyhladovala",
+         !ccid.nil? && ccid != cid)
+      ok("R-12 async (b): NOVSIA kopia ostala so zdielanym ID (#{fcid}) a bez prestavby",
+         fcid == cid && e::Store.get(future, 'config') == state[:r12b_future_raw])
+      ok('R-12 async (b): original si necha svoje ID',
+         state[:r12b_orig].valid? && e::Store.get(state[:r12b_orig], 'cabinet_id') == cid)
+      Sketchup.undo
+      ok('R-12 async (b): 1x Spat vratil CELU paste operaciu (obe kopie prec, marker zije)',
+         (future.nil? || !future.valid?) && (compat.nil? || !compat.valid?) &&
+         state[:r12b_marker].valid? && cabinets(model).length == 1)
+      Sketchup.undo
+      ok('R-12 async (b): druhy Spat vratil marker (dedup nepridal vlastny krok)',
+         !state[:r12b_marker].valid?)
+      cleanup(model)
+    end]
+  end
+
+  # `reject_scale` hlasi korpus MODALNYM `UI.messagebox` — v automatickom behu
+  # by dialog runner zastavil. Sonda ho na cas scenara vymeni za zberac textov
+  # (a VZDY vrati naspat; neobnoveny stub by ovplyvnil zvysok behu).
+  def r12_silence_messagebox!(bag)
+    return if @r12_mb_patched
+
+    UI.singleton_class.send(:alias_method, :nx_r12_messagebox, :messagebox)
+    UI.define_singleton_method(:messagebox) do |*args|
+      bag << args.first.to_s
+      1
+    end
+    @r12_mb_patched = true
+  end
+
+  def r12_restore_messagebox!
+    return unless @r12_mb_patched
+
+    UI.singleton_class.send(:alias_method, :messagebox, :nx_r12_messagebox)
+    UI.singleton_class.send(:remove_method, :nx_r12_messagebox)
+    @r12_mb_patched = false
+  rescue StandardError => ex
+    log_line("FAIL: R-12 obnova UI.messagebox: #{ex.class}: #{ex.message}")
+  end
+
+  # Sonda: pocitadlo spusteni `ScaleWatch.reject_scale`. Bez neho by sa nedalo
+  # rozlisit „transformaciu obnovil observer" od „obnovil ju abort operacie".
+  def r12_count_rejects!(state)
+    return if @r12_reject_patched
+
+    e::ScaleWatch.singleton_class.send(:alias_method, :nx_r12_reject, :reject_scale)
+    e::ScaleWatch.define_singleton_method(:reject_scale) do |inst, error|
+      state[:r12_rejects] = state[:r12_rejects].to_i + 1
+      nx_r12_reject(inst, error)
+    end
+    @r12_reject_patched = true
+  end
+
+  def r12_restore_rejects!
+    return unless @r12_reject_patched
+
+    e::ScaleWatch.singleton_class.send(:alias_method, :reject_scale, :nx_r12_reject)
+    e::ScaleWatch.singleton_class.send(:remove_method, :nx_r12_reject)
+    @r12_reject_patched = false
+  rescue StandardError => ex
+    log_line("FAIL: R-12 obnova ScaleWatch.reject_scale: #{ex.class}: #{ex.message}")
+  end
+
   # --- SYNC-GHOST: vkladanie na klik (V1-04) --------------------------------
   # Od GHOSTu „Vlozit" NEVKLADA — zavesi ghost na kurzor a skrinka vznikne az
   # KLIKOM. Nastroj sa simuluje PROGRAMOVO, ale VERNE: cez realne Tool callbacky
@@ -11237,6 +11555,10 @@ module NoxunSuRunner
     # R-03: rollback zlyhaneho vkladu cez REALNY debounce tick (nie priame volanie).
     run_r03_async(model, state, steps)
 
+    # R-12: scale nad skrinkou z NOVSEJ verzie + ZMIESANY dedup — obe cesty
+    # vedu cez REALNY debounce tick observera.
+    run_r12_async(model, state, steps)
+
     # GHOST V1-04: ghost vklad cez REALNY debounce tick — observer z neho nesmie
     # spravit „kopiu" ani pridat vlastny krok Spat (aj pri dvoch identickych
     # skrinkach = dedup cesta).
@@ -11289,6 +11611,8 @@ module NoxunSuRunner
             remove_js_recorder # idempotentne — D-34 recorder nesmie prezit FAIL
             d101_teardown(state) # idempotentne — sonda a fake dialog panela tiez nie
             stale_teardown(state) # a to iste pre sondu okna Studio (STALE)
+            r12_restore_messagebox! # R-12 sonda: stub modalu nesmie prezit FAIL
+            r12_restore_rejects!    # ani sonda pocitadla reject_scale
             cleanup(model)
           rescue StandardError
             nil
@@ -11329,6 +11653,7 @@ module NoxunSuRunner
     run_sync_rails(model)    # H3/D-80: vnutro pod vystuhami (odsadenie, upright, chrbat, odmietnutie)
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
     run_r03(model)           # R-03: sev prepare_insert/commit_insert — ciste pripravenie, vlastny rigidny transform, odmietnutia, edit kontext
+    run_r12(model)           # 1d/R-12: dopredny guard configu — marker, odmietnuta prestavba bez mutacie a bez kroku Spat, kopia/sablony, citanie dalej bezi
     run_dockey(model)        # 1d/R-02b: identita dokumentu — `valid?` probe, rotacia pri onOpenModel nad RECYKLOVANYM objektom, onActivateModel nerotuje, fail-closed
     run_ghost(model)         # GHOST V1-04: vkladanie na klik — 0 mutacii pred klikom, zamok/free vyska, rotacia a kotvy, degenerovany luc, undo/prepnutie/druhe „Vlozit", sablona a peciatka
     run_d45(model)           # D-45: hrubka <-> material tela (18,6 mm deadlock)

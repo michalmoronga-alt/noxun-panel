@@ -45,6 +45,21 @@ module Noxun
       # neprelozi (enum guard v norm_overrides aj v zapisovej ceste panela).
       GRAIN_OVERRIDES = %w[length width].freeze
 
+      # R-12 (blok 1d): VERZIA KONTRAKTU CONFIGU KORPUSU. Config je uzavrety
+      # whitelist (`normalize` + `cabinet_config`), takze zakazka ulozena
+      # NOVSIM pluginom by pri prestavbe ticho prisla o polia, ktore tato
+      # verzia nepozna (`plan_schema` verzuje tranzientny plan a
+      # `part_key_schema` len kluce dielcov — kompatibilitu CONFIGU nevyjadri
+      # ani jeden). Marker sa zapisuje pri KAZDOM zapise configu a dopredny
+      # guard (`guard_newer_config!`) odmietne prestavbu, ked je ulozene cislo
+      # VYSSIE nez toto.
+      #
+      # DISCIPLINA BUMPU (SYSTEM/STANDARD.md 2.5): cislo sa zvysi pri KAZDOM
+      # rozsireni whitelistu configu o pole, ktoreho TICHA STRATA by poskodila
+      # vyrobu (nove pole konstrukcie, novy typ cela, nova rola). Cisto
+      # odvodene/kozmeticke pole bump nevyzaduje.
+      CONFIG_SCHEMA = 1
+
       MIN = { width: 200.0, height: 200.0, depth: 150.0 }.freeze
       # D-45: povoleny rozsah hrubky korpusu (mm) — JEDINY zdroj pravdy pre clamp
       # v normalize, pre prevzatie hrubky z materialu aj pre projektovy guard.
@@ -430,6 +445,11 @@ module Noxun
           # by prisla o kovanie). Radsej jasne odmietnut; model sa da dalej
           # citat aj exportovat, len prestavba caka na aktualizaciu pluginu.
           guard_unknown_hardware!(inst)
+          # R-12: to iste pre CELY config — novsi kontrakt configu (marker
+          # `config_schema`) znamena polia, ktore tato verzia nepozna a
+          # `normalize` by ich zahodila. Citanie, exporty, VEPO ani vyber sa
+          # NEBLOKUJU — zastavi sa vyhradne PRESTAVBA.
+          guard_newer_config!(inst)
 
           inst.make_unique if inst.definition.instances.size > 1
           cdef = inst.definition
@@ -455,6 +475,38 @@ module Noxun
           unknown = BuildPlan.unknown_generic_types(cfg['hardware'], set_keys)
           return if unknown.empty?
           raise "Korpus nesie kovanie z novšej verzie Noxun (#{unknown.join(', ')}) — projekt vyžaduje novší plugin, prestavba by kovanie stratila."
+        end
+
+        # --- R-12: dopredny guard CONFIGU korpusu ---------------------------
+        # Guard cita RAW ULOZENY config z ENTITY (`Store.config`), NIKDY nie
+        # params z panela: klientsky payload prechadza cez CEF a cez uzavrete
+        # whitelisty JS, takze marker v nom uz mohol vypadnut — autorita je
+        # vyhradne to, co je v modeli.
+        def guard_newer_config!(inst)
+          cfg = Store.config(inst)
+          return unless newer_config?(cfg)
+
+          raise newer_config_message('Korpus', 'prestavba by nastavenia stratila')
+        end
+
+        # Marker configu ako Integer. Chybajuci marker = 0 (legacy korpus
+        # spred R-12) a ten NIKDY neblokuje.
+        def config_schema_of(cfg)
+          return 0 unless cfg.is_a?(Hash)
+
+          cfg['config_schema'].to_i
+        end
+
+        # Je ulozeny config z NOVSEJ verzie? Porovnanie je PRISNE vacsie —
+        # rovnaka schema je kompatibilna, starsia (aj 0) tiez.
+        def newer_config?(cfg)
+          config_schema_of(cfg) > CONFIG_SCHEMA
+        end
+
+        # JEDINY textovy zdroj odmietnutia (rebuild, sablony, kopia,
+        # ulozenie ako sablona) — pouzivatel ma vsade citat to iste.
+        def newer_config_message(subject, consequence)
+          "#{subject} je z novšej verzie Noxun — #{consequence}; projekt vyžaduje novší plugin."
         end
 
         # V0.2c fix #6: detekuje kopie korpusu (viac instancii so zdielanym cabinet_id) a kazdej
@@ -483,6 +535,19 @@ module Noxun
           done = []
           dups.each do |inst|
             next unless inst && inst.valid?
+            # R-12: kopia z NOVSEJ verzie sa PRESKOCI, cyklus ide dalej.
+            # Prestavba pod novym ID by jej config orezala, ale vynimka
+            # z `rebuild_in_operation` by dobehla az do rescue okolo CELEJ
+            # metody — prva takato kopia by vyhladovala vsetky ostatne
+            # (kompatibilne) duplicity a follow-up tik sa uz neplanuje.
+            # PRIZNANY DOSLEDOK: kopia si necha ZDIELANE `cabinet_id`, takze
+            # Kontrola drzi ORANGE `duplicate_identity` a zliate ID zastavi
+            # nakupne/cenove exporty (brana P0-2). To je vedome — tichy orez
+            # vyrobnych dat je horsi nez zastaveny export.
+            if newer_config?(Store.config(inst))
+              Engine.log('dedup: kopia korpusu je z novsej verzie Noxun — ID sa neprideluje') if defined?(Engine)
+              next
+            end
             new_cid = Ids.next_cabinet_id(model)
             trans = fresh_ids ? true : transparent
             # V0.3.4 undo fix (runner S2): prepis identity (standard 2.2: autorita = instancia)
@@ -1469,6 +1534,12 @@ module Noxun
         def cabinet_config(cfg)
           {
             engine_version: Engine::VERSION,
+            # R-12: marker kontraktu configu. Zapisuje sa VZDY a VZDY ako
+            # AKTUALNA hodnota — `cabinet_config` je JEDINE miesto, kde config
+            # korpusu vznika (build aj rebuild idu cez `write_cabinet_attrs`),
+            # takze co je v modeli, to naozaj zodpoveda tomuto whitelistu.
+            # Zamerne sa NEPREBERA z params: klientsky payload nie je autorita.
+            config_schema: CONFIG_SCHEMA,
             part_key_schema: PartKeys::SCHEMA,
             plan_schema: cfg[:plan_schema] || BuildPlan::SCHEMA,
             warnings: cfg[:warnings].is_a?(Array) ? cfg[:warnings] : [],

@@ -43,6 +43,24 @@ ho nepozná); kto by ho v params predsa len chcel, musí params poslať pozične
 na disku a logovať, a `Construction.build_plan` sa do prepare **nepresúva** (validačné chyby by sa zobrazili pred hardware blokom a pred commit-time snapshotmi). Súradnice
 obálky/kotvy (`bounds_mm`) plán zámerne **nenesie** — uzavrie ich až GHOST dávka proti `BuildPlan`u. In-SU dôkazy: sekcia `run_r03` + `run_r03_async` (`su_runner.rb`).
 
+**DOPREDNÝ GUARD CONFIGU (R-12, v0.9.3): `CONFIG_SCHEMA` + `guard_newer_config!`.** Config korpusu je uzavretý whitelist (`normalize` + `cabinet_config`), takže zákazka
+z NOVŠIEHO pluginu prišla pri prvej prestavbe ticho o všetko, čomu táto verzia nerozumie — a uložením stratu zvečnila; `plan_schema` verzuje tranzientný tvar plánu
+a `part_key_schema` len kľúče dielcov, takže kompatibilitu **configu** nevyjadrí ani jeden. Marker `config_schema` sa preto zapisuje v **jedinom zápisovom bode** —
+`cabinet_config` (cez `write_cabinet_attrs` ním ide vklad AJ prestavba) — a **vždy ako aktuálna hodnota**; z params sa zámerne nepreberá (payload z CEF nie je autorita).
+`guard_newer_config!` stojí v `rebuild_in_operation` vedľa `guard_unknown_hardware!`, číta **RAW uložený config entity** a pri vyššom čísle odmieta **prestavbu**; legacy
+config bez markera (0) prechádza a **čítanie, výber, kusovník, VEPO ani exporty sa neblokujú**. Hlášku všetkých ciest skladá jediný zdroj `newer_config_message`.
+**`dedup_copies` novšiu kópiu PRESKOČÍ** (kontrola pred `start_operation`, takže žiadna zrušená operácia ani krok Späť) a pokračuje zvyškom: výnimka by cez `rescue`
+okolo celej metódy vyhladovala ostatné — kompatibilné — duplicity a follow-up tik sa už neplánuje. **Priznaný dôsledok:** preskočená kópia si necháva zdieľané
+`cabinet_id`, takže Kontrola drží ORANGE `duplicate_identity` a zliate ID zastaví nákupné/cenové exporty (brána P0-2) — vedome: tichý orez výrobných dát je horší
+než zastavený export.
+**Štyri stratové cesty BEZ rebuildu majú vlastné odmietnutie** (guard nad cieľovou inštanciou by ich nechytil): použitie šablóny a vklad zo šablóny (autorita je
+**uložený záznam**, nie payload — JS prenáša len známe polia), „Vložiť kópiu" (`config_to_params` → `build`) a „Uložiť ako šablónu" (`template_config_from` je ďalší
+uzavretý whitelist). Šablónový config marker **nesie**, inak by šablóna z novšej verzie vyzerala ako legacy. In-SU dôkazy: sekcia `run_r12` + `run_r12_async`.
+**Charakterizácia scale cesty (nález behu, platí aj pre `guard_unknown_hardware!`):** absorpcia beží v **transparentnej** operácii pripojenej k používateľovmu Scale
+kroku, takže `abort_safely` zruší **aj ten** — v okamihu, keď `process_dirty` výnimku chytí, transformácia už zväčšená nie je a `reject_scale` sa **nespustí**. Model
+je teda korektne obnovený a undo stack čistý, ale **hlášku používateľ nedostane**. Je to prevzatá vlastnosť observera (dávka R-12 ju nezaviedla); zmena by siahala do
+observer/undo lifecycle, a preto patrí do vlastnej audit-povinnej dávky.
+
 **K1/D-108 smer dekoru dielca:** `effective_grain(sheet, override)` je JEDINÁ autorita efektívneho smeru (`override → materiál`) a `resolve_part` ho **materializuje RAZ** do
 snapshotu dielca.
 

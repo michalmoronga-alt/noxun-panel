@@ -136,6 +136,12 @@ ABS pravidlá, rozmerové rady, sadzby dodávateľa), v0.9.2, 1.9.2026; knižnic
 zakázané sú len zápisy do globálneho súboru). Codex audit návrhu vrátil 3 BLOCKERy + 2 FIXy + 1 NOTE — všetky zapracované, priznaný zvyšok je TOCTOU okno voči
 zapisovateľom, ktorí zámok ignorujú. Do registra pribudli **R-37** (obsahovo zlý, ale tvarovo platný primár zničí dobrú zálohu už pri načítaní) a **R-38**
 (`vepo_settings.json` — chýbajúci guard aj kanál na dôvod zlyhania).
+**R-12** — dopredný guard configu korpusu (`config_schema`): zákazka z NOVŠIEHO pluginu už pri prestavbe ticho nepríde o nastavenia. Config je uzavretý whitelist,
+takže polia, ktorým staršia verzia nerozumie, sa doteraz pri prvom rebuilde zahodili a uložením zvečnili. Marker sa zapisuje v jedinom zápisovom bode (vklad aj
+prestavba), guard číta RAW uložený config a odmieta VÝHRADNE prestavbu a odvodené objekty (kópia, uloženie ako šablóna, použitie aj vklad šablóny) — čítanie,
+kusovník, VEPO a exporty bežia ďalej; legacy skrinky bez markera prechádzajú, v0.9.3, 1.9.2026. Codex audit návrhu vrátil 2 BLOCKERy + 2 FIXy + 2 NOTE (všetky
+zapracované). Priznané zvyšky: novšia KÓPIA si necháva zdieľané ID (ORANGE Kontroly + brána P0-2 exportov) a pri **scale** používateľ hlášku nedostane —
+abort transparentnej absorpcie zruší aj jeho Scale krok, takže `reject_scale` sa nespustí (prevzatá vlastnosť observera, platí aj pre dnešný hardvérový guard). ·
 **R-02b** — stabilný kľúč dokumentu (`core/doc_key.rb`) namiesto `Model#guid` vo VŠETKÝCH identity guardoch (Ctrl+S už nezahadzuje rozpísanú prácu panela,
 zón, tagov, Štúdia, Pravidiel ani Materiálov; New/Open ďalej chráni pred zápisom do cudzej zákazky; Save As identitu vedome drží — Codex audit BLOCKER 3),
 v0.8.23, 30.8.; priznaný zvyšok R-02 tým padol, JS aj tvar payloadov nezmenené. ·

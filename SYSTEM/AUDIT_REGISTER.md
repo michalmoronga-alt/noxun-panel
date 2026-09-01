@@ -250,6 +250,24 @@ Riziko pre rolu `flap`: rola v `BuildPlan::ROLES` JE, ale neznámy typ čela sa 
 čítanie/export beží) — ale existujúce markery kompatibilitu configu NEDOKÁŽU (`BuildPlan::SCHEMA` verzuje
 tranzientný tvar plánu, `part_key_schema` len kľúče dielcov): builder musí začať zapisovať VLASTNÝ
 `config_schema` marker a guard porovnáva ten. **S/M.**
+**✅ dávkou 1d/R-12 (PR #275, v0.9.3)** — `CabinetBuilder::CONFIG_SCHEMA = 1` (Integer, vlastní builder). Marker sa zapisuje v **jedinom
+zápisovom bode** `cabinet_config` (cez `write_cabinet_attrs` ním ide vklad AJ prestavba) a **vždy ako aktuálna hodnota** — z params sa
+zámerne nepreberá **[F4]**. `guard_newer_config!` stojí vedľa `guard_unknown_hardware!` v `rebuild_in_operation`, číta **RAW uložený
+config entity** (`Store.config`, nie payload z CEF) a pri vyššom čísle odmieta **prestavbu**; legacy config bez markera (0) prechádza
+a čítanie/výber/kusovník/VEPO/exporty sa neblokujú. Codex audit návrhu vrátil **2 BLOCKERy + 2 FIXy + 2 NOTE**, všetky zapracované:
+**[B1]** guard nad cieľovou inštanciou nechráni pred novšou ŠABLÓNOU — kontroluje sa RAW config **uloženého záznamu** pred POUŽITÍM
+(`TemplatesDialog.handle_apply`, ešte pred `merge_template`) aj pred VKLADOM (`Panel.newer_template_refusal`, záznam sa načíta zo
+skladu), a `template_config_from` marker **stampuje**, inak by šablóna z novšej verzie vyzerala ako legacy. **[B2]** dve stratové
+NE-rebuild cesty majú vlastné odmietnutie pred vznikom odvodeného objektu: „Vložiť kópiu" (pred `config_to_params`/`build`) a „Uložiť
+ako šablónu" (pred `template_config_from`/`upsert`). **[F3]** `dedup_copies` novšiu kópiu **preskočí** (kontrola pred
+`start_operation`) a pokračuje zvyškom — výnimka by cez rescue okolo celej metódy vyhladovala ostatné duplicity; **priznaný dôsledok:**
+zdieľané `cabinet_id` ⇒ ORANGE `duplicate_identity` a brána P0-2 zastaví nákupné/cenové exporty. **[N5]** scale observer sa NEMENÍ;
+in-SU beh však ukázal **charakterizáciu** (platí aj pre dnešný `guard_unknown_hardware!`): absorpcia beží v TRANSPARENTNEJ operácii, jej
+`abort_safely` zruší aj používateľov Scale krok, takže v okamihu rescue už transformácia nie je zväčšená a `reject_scale` sa
+**nespustí** — model je obnovený a undo stack čistý, ale **hlášku používateľ nedostane**; zmena patrí do vlastnej audit-povinnej dávky
+(observer/undo lifecycle). **[N6]** jeden Integer stačí — žiadne per-subtree verzovanie. Hlášku všetkých ciest skladá jediný zdroj
+`newer_config_message`. Testy `tests/pure/test_r12_config_schema.rb` (16 scenárov, 6 mutácií overených) + in-SU `run_r12` a
+`run_r12_async` (marker · odmietnutá prestavba bez mutácie a bez kroku Späť · kópia · obe šablónové cesty · scale · zmiešaný dedup).
 
 ### R-13 · P2 · core · `core/store.rb:9-10, 28-49` + STANDARD §2.1
 `NOXUN/std` na entite sa VŠADE píše a NIKDE nečíta — záväzný bod štandardu bez implementácie; čítacia vrstva
@@ -443,7 +461,7 @@ B1 názov projektu (1b-6a, #244) · B2 hlavičky materiálov (1b-6b, #247) · A1
 blocker je len R-03 — GHOST smie na Windows štartovať hneď po ňom; R-01 je macOS vetva, R-02 je na Windows P3
 a R-04 je platformovo nezávislá hygiena — všetky tri sa dorobia v 1d nezávisle od GHOST štartu)* → 3. **pred KOVANÍM:** ~~R-06 brána~~ (✅) ·
 ~~R-07~~ (✅ #266) · ~~R-08~~ (✅) · potom R-05 (+R-06 plný) ako D-109 šev → 4. **pred D-95/VÝROBOU:** R-17, R-16, R-22, po etapách R-15 →
-5. **perzistencia:** ~~R-11~~ (✅ #274) → R-12 → R-14 (R-13 po rozhodnutí Michala; **R-37** a **R-38** pribudli z auditu R-11 — R-37 patrí k tej istej rodine, R-38 je samostatný UI kontrakt) → 6. **UI/hygiena:** ~~R-34~~ (✅ #262) ·
+5. **perzistencia:** ~~R-11~~ (✅ #274) → ~~R-12~~ (✅ #275) → R-14 (R-13 po rozhodnutí Michala; **R-37** a **R-38** pribudli z auditu R-11 — R-37 patrí k tej istej rodine, R-38 je samostatný UI kontrakt) → 6. **UI/hygiena:** ~~R-34~~ (✅ #262) ·
 R-23.1 Escape (S, hocikedy) · R-18 · zvyšok podľa kapacity. R-32 kostry priebežne pred každým zásahom.
 
 **Otvorené rozhodnutia Michala:** R-05 (rozsah zaokrúhľovania pomeru per zákazka vs per skrinka — rozhodne

@@ -17,6 +17,38 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1d/R-12 · DOPREDNÝ GUARD CONFIGU KORPUSU — `config_schema` (v0.9.3, 1.9.2026, PR #275):** config skrinky je **uzavretý whitelist**
+  (`CabinetBuilder.normalize` + `cabinet_config`): číta sa z neho presne toľko kľúčov, koľko daná verzia pozná, a všetko ostatné pri prvej prestavbe vypadne.
+  Pre zákazku otvorenú **starším** pluginom to znamenalo tichú stratu — nový typ čela (rola `flap` sa v `BuildPlan::ROLES` už nachádza, ale neznámy typ sa
+  vo `fronts.rb` pretypuje na `door`) aj akékoľvek nové konštrukčné pole zmizli bez slova a prvé uloženie stratu **zvečnilo**. Dopredný guard mal pritom
+  v repe len jednu vetvu — kovanie (`guard_unknown_hardware!`); `plan_schema` verzuje tranzientný tvar plánu a `part_key_schema` len kľúče dielcov, takže
+  kompatibilitu **configu** nevyjadrí ani jeden a bolo treba **vlastný marker**.
+  **Čo platí teraz:** `CabinetBuilder::CONFIG_SCHEMA = 1` je verzia kontraktu configu. Marker sa zapisuje v **jedinom zápisovom bode** — `cabinet_config`,
+  cez ktorý ide `write_cabinet_attrs` z vkladu AJ z prestavby — a **vždy ako aktuálna hodnota**; z params sa zámerne nepreberá, lebo klientsky payload
+  z CEF nie je autorita. `guard_newer_config!` stojí vedľa hardvérového guardu v `rebuild_in_operation`, číta **RAW uložený config entity** a pri vyššom
+  čísle odmieta **prestavbu** hláškou z jediného zdroja (`newer_config_message`). Legacy config bez markera (0) prechádza a **čítanie, výber, kusovník,
+  VEPO ani exporty sa neblokujú** — model z novšej verzie sa ďalej číta a fakturuje, len sa nedá prestavať.
+  **Codex audit návrhu vrátil 2 BLOCKERy + 2 FIXy + 2 NOTE, všetky zapracované.** **(B1)** guard nad *cieľovou* inštanciou nechráni pred novšou **šablónou**:
+  pri aplikácii sa config šablóny zlieva s korpusom **pred** rebuildom a pri vklade neexistuje cieľ vôbec. Kontroluje sa preto RAW config **uloženého záznamu**
+  (`TemplatesDialog.handle_apply` pred `merge_template`, `Panel.newer_template_refusal` pred `prepare_insert`) — nie payload, ktorý cez CEF nesie len známe polia —
+  a `template_config_from` marker **stampuje**, inak by šablóna z novšej verzie vyzerala ako legacy. **(B2)** dve stratové cesty **bez rebuildu** dostali vlastné
+  odmietnutie pred vznikom odvodeného objektu: „Vložiť kópiu" (`Store.config` → `config_to_params` → `build`) a „Uložiť ako šablónu" (ďalší uzavretý whitelist).
+  **(F3)** `dedup_copies` novšiu kópiu **preskočí** (kontrola pred `start_operation`, takže žiadna zrušená operácia ani krok Späť) a **pokračuje zvyškom** —
+  výnimka by cez `rescue` okolo celej metódy vyhladovala všetky ostatné, kompatibilné duplicity a follow-up tik sa už neplánuje. **(F4)** marker patrí do
+  `cabinet_config`, nie do `normalize`. **(N6)** jeden Integer stačí (monolitický `normalize`, celodefiničný rebuild) — žiadne per-subtree verzovanie.
+  **Priznané zvyšky.** (1) Preskočená novšia kópia si necháva **zdieľané `cabinet_id`**: Kontrola drží ORANGE `duplicate_identity` a zliate ID zastaví
+  nákupné/cenové exporty (brána P0-2). Vedome — tichý orez výrobných dát je horší než zastavený export. (2) **Scale nad skrinkou z novšej verzie hlášku
+  nevydá.** Observer sa podľa dispozície **(N5)** nemenil a in-SU beh ukázal, čo jeho dvojvrstvový režim v tejto vetve naozaj robí: absorpcia beží
+  v **transparentnej** operácii pripojenej k používateľovmu Scale kroku, takže `abort_safely` zruší **aj ten** — v okamihu, keď `process_dirty` výnimku chytí,
+  transformácia už zväčšená nie je a `reject_scale` sa **nespustí**. Model je korektne obnovený a undo stack čistý, ale používateľ nedostane vysvetlenie.
+  Je to **prevzatá** vlastnosť observera (rovnako sa správa dnešný `guard_unknown_hardware!`), nie regresia tejto dávky; scenár `run_r12_async` ju **pribíja**
+  charakterizačným assertom, aby sa zmena nestala nepozorovane. Oprava patrí do vlastnej audit-povinnej dávky (observer/undo lifecycle).
+  **Testy:** `tests/pure/test_r12_config_schema.rb` (16 scenárov: marker a jediný zápisový bod · truth-table markera · guard číta entitu, nie params ·
+  poradie kontrol na všetkých štyroch stratových cestách · šablónový round-trip; **6 mutácií overených** — guard preč, marker sa nezapisuje, `>=` namiesto `>`,
+  dedup bez preskočenia, šablóna bez markera, refusal z payloadu) + in-SU `run_r12` a `run_r12_async` (odmietnutá prestavba nechá config **bajtovo** nedotknutý,
+  geometriu aj undo stack; kópia, obe šablónové cesty a „Uložiť ako šablónu" nezapíšu nič; kusovník a semafor nad takou skrinkou bežia ďalej; zmiešaný dedup —
+  kompatibilná kópia dostane nové ID, novšia ostane a nevyhladuje ju). Plný beh **1244 PASS / 0 FAIL**.
+
 - **1d/R-11 · DEGRADED `.bak` BRÁNA PRE VOLAJÚCICH JsonFileStore (v0.9.2, 1.9.2026, PR #274):** `JsonFileStore` má od začiatku `.bak` recovery — poškodený primárny súbor
   sa ticho prečíta zo zálohy, takže sa panel neotvorí prázdny. Tienistá strana tej istej mince: volajúci potom pracuje nad dátami ZÁLOHY a jeho najbližší zápis prepíše
   primár obsahom odvodeným od **staršej** zálohy — všetko, čo používateľ uložil medzi zálohou a poškodením, zmizne bez slova. Správnu odpoveď mal v repe jediný modul

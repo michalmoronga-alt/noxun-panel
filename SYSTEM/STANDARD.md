@@ -135,6 +135,7 @@ gola_profile · hinge · slide · leg · handle · shelf_pin · connector · fre
   "role": "cabinet",
   "manufactured": false,
   "config": {
+    "config_schema": 1,
     "type": "lower",
     "name": "Spodná skrinka 800",
     "construction_preset": "noxun-lower-18",
@@ -154,6 +155,13 @@ gola_profile · hinge · slide · leg · handle · shelf_pin · connector · fre
   }
 }
 ```
+
+**`config_schema` — verzia kontraktu configu korpusu (záväzné od v0.9.3, R-12).** Config korpusu je **uzavretý whitelist** (`CabinetBuilder.normalize` + `cabinet_config`), takže zákazka uložená novším pluginom by pri prestavbe ticho prišla o polia, ktorým staršia verzia nerozumie. Preto:
+
+- **Marker je povinný v každom uloženom configu korpusu** a zapisuje sa **v jedinom zápisovom bode** (`cabinet_config`, cez ktorý ide vklad aj prestavba) — vždy ako **aktuálna** hodnota `CabinetBuilder::CONFIG_SCHEMA`, nikdy sa nepreberá zo vstupných params (klientsky payload nie je autorita). Chýbajúci marker = legacy config (0) a je platný.
+- **Dopredný guard:** uložené číslo **vyššie** než `CONFIG_SCHEMA` odmieta **PRESTAVBU** (a odvodené objekty: kópia skrinky, uloženie ako šablóna). Čítanie, výber, kusovník, VEPO ani exporty sa neblokujú — model z novšej verzie sa ďalej číta.
+- **Šablóna nesie ten istý marker** (`template_config_from`) — jej config je rovnako uzavretý whitelist, takže staršia verzia šablónu z novšej odmietne použiť aj vložiť.
+- **Disciplína bumpu:** číslo sa zvýši pri **každom rozšírení whitelistu configu o pole, ktorého tichá strata by poškodila výrobu** (nové konštrukčné pole, nový typ čela, nová rola). Čisto odvodené alebo kozmetické pole bump nevyžaduje. `plan_schema` (tvar tranzientného plánu) ani `part_key_schema` (kľúče dielcov) kompatibilitu configu **nevyjadrujú** a nenahrádzajú ho.
 
 **Zóna** (`kind: zone`; nevýrobná — ghost):
 
