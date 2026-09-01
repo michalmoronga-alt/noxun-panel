@@ -464,6 +464,34 @@ Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-
   **Smoke pre Michala:** nastav cestu na priečinok s novšou kópiou → About ukáže dostupnú verziu →
   Aktualizovať → reštart → nová verzia beží a v Plugins nie sú osirené staré súbory; priečinok s pokazeným
   balíkom → hláška, stará verzia beží ďalej; koliesko Inspectora tlačidlo NEukazuje.
+  **REVÍZIA PO CODEX AUDITE (2.9.2026, 4 BLOCKER + 7 FIX — všetky prijaté; záväzné pre implementáciu, delí sa na D-52a jadro a D-52b UI):**
+  **(B1) Recovery bootstrap v LOADERI + transakčný marker.** Swap prežije pád: stav transakcie žije v `Plugins/noxun_engine.update.json`
+  (`{state: staged|tree_swapped|loader_swapped|done, from, to, started_at, pid}`), a **loader `noxun_engine.rb` nesie malú čistú recovery
+  sekciu** (pred `require 'noxun_engine/main'`): podľa markera a prítomnosti `.new`/`.old` deterministicky **dokončí alebo vráti** poslednú kompletnú
+  generáciu (stromu aj loaderu) — kód recovery žije v loaderi, lebo strom môže chýbať; headless test načítava loader priamo. Pôvodný „uprace ďalší beh"
+  neplatí. **(B2) Restart latch.** Po úspešnom commite `Engine.restart_required!` — VŠETKY vstupné body pluginu (toolbar príkazy, `Panel.show`,
+  `StudioDialog.show`, vkladanie, updater) až do reštartu odmietnu s natívnou hláškou „Aktualizované — reštartuj SketchUp"; starý Ruby nikdy nenačíta nové
+  HTML/JS. **(B3) Update lock + procesný lease.** Samostatný `Plugins/noxun_engine.update.lock` (flock) držaný od recovery/cleanup po commit (nie
+  `materials.lock` — dlhá operácia); pri načítaní každý proces zapíše `Plugins/noxun_engine.leases/<pid>.lease`, updater pred štartom odmietne, ak žije iný
+  proces so živým PID (tasklist), hláška „zavri ostatné okná SketchUpu"; mŕtve lease sa upracú. **(B4) Downgrade vo V1 ZAKÁZANÝ.** Starší balík = tlačidlo
+  `aria-disabled` s dôvodom („staršia verzia — reinštaluj ručne cez INSTALL"); trojstav ostáva ako informácia. *(Rozhodnutie orchestrátora — Michal môže
+  vrátiť, ale len s capability markerom balíka; samotné VERSION nestačí.)* **(F5) Explicitný `updater_check`** z oboch vstupov do About (navigácia aj
+  deep-link), nie zo `settings_payload`; beží asynchrónne (Ruby vlákno + deadline, výsledok cez `UI.start_timer` poll) s tokenom viazaným na cestu +
+  inštanciu Štúdia — neskorá odpoveď sa zahodí. **(F6) Izolácia blokujúceho I/O:** čítanie hlavičky aj staging bežia vo vlákne s deadline; hlavné vlákno
+  nečaká; po deadline hláška „zdroj nedostupný", výsledok vlákna sa ignoruje. **(F7) Vlastný namespace `data-updater-edit`** (nie `data-ss`) s vlastným
+  focus/dirty/save. **(F8) Manifest SHA1** relatívnych ciest zo zdroja → porovnanie so STAGED stromom (byte-for-byte dôkaz), verzia a rozhodnutie „novšia"
+  sa **prepočítajú zo staged loadera** tesne pred swapom. **(F9) Kanonické hranice:** cieľ = `Engine.plugin_dir` + súrodenecký loader; odmietnuť
+  zdroj == cieľ, zdroj vnútri cieľa, `.new/.old`, symlinky/junctiony/reparse points (realpath ≠ path), relatívne cesty unikajúce zo staging rootu.
+  **(F10) Bariéra pred swapom:** potvrdenie v Štúdiu → zavrieť Inspector aj Štúdio → počkať na oba `set_on_closed` (timer, limit 3 s) → swap → výsledok
+  natívne (`UI.messagebox`), nikdy cez CEF. **(F11) `updater_settings.json`:** `std`, zápis pod `Materials.with_catalog_lock`, brána degradovanej `.bak`
+  (R-11 vzor). **Testy (min. sada z auditu):** verzie (`0.9.9 < 0.10.0`, chýbajúci/duplicitný VERSION, loader–main nesúlad) · manifest/staging (chýbajúci,
+  skrátený, rovnako veľký poškodený, zdroj zmenený počas kopírovania, extra súbor, symlink, prekryv) s cieľom byte-identickým pri každom odmietnutí ·
+  zlyhania krokov 3–5 + mazania `.old` (kontrola stromu AJ loadera) · **simulovaný pád po každej hranici** → recovery pri ďalšom boote dá jednu kompletnú
+  generáciu · dva OS procesy (jeden vstúpi, druhý nemaže staging ani nečaká bez limitu; zlyhaný flock) · restart latch blokuje všetky vstupy · async check
+  (visiaci FS neblokuje, timeout, stará odpoveď zahodená, deep-link = presne 1 check) · JS (prvky len v Štúdiu, cesta prežije push, SS_DIRTY nedotknuté)
+  · downgrade odmietnutý · in-SU smoke s oboma oknami + druhá inštancia (úspech/reštart, poškodený balík, zamknutý priečinok, odpojený share, žiadne siroty)
+  · mutácie: odstránený recovery bootstrap, update lock, restart latch — každá zabitá testom. **Rez:** **D-52a** = loader recovery + marker + lock/lease +
+  manifest + swap + settings store + restart latch API (headless, bez UI) · **D-52b** = About UI, async check, bariéra okien, natívne hlášky, in-SU smoke.
   **Checklist uzáveru:** bump patch + `?v=` → testy → **nový odsek modulu updater v
   `docs/architecture/ui-lifecycle.md`** (vstupný bod je sekcia About; core helper popísať tamtiež; R-32 vzor:
   overiť proti kódu) + ARCHITEKTURA router riadok → STAV/KRONIKA/PLAN → D-52 do DOGFOODING_vyriesene
