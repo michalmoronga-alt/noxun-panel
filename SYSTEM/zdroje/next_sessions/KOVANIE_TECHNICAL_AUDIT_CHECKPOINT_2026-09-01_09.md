@@ -22,6 +22,16 @@ User decision: automatic proposal + manual override.
 - V1 does not need perfect collision intelligence. Better automatic collision/context reasoning can be added later.
 - Future drawer systems (for example TANDEM) may use a different default clearance without changing the architecture; keep the clearance system/recipe-data driven.
 
+## Atira height-variant resolver
+
+User decision: automatic highest-compatible variant + manual override.
+
+- For the current V1 Atira variants `H70 / H144 / H176`, resolver should choose the **highest height variant that safely fits the real available internal vertical space**.
+- Compatibility is evaluated against the system/variant minimum-space data already being audited, not merely against drawer-front height.
+- Manual `height_variant` override remains available.
+- This follows the same general V1 principle as Quadro: maximize useful drawer volume from computed context, while preserving user control and allowing visual verification in atypical geometry.
+- Do not add persistent FunctionalZone state just to support this choice; use `context_for(owner)` / computed surrounding-space data.
+
 ## Architectural implication
 
 This strengthens the existing slim-V1 direction:
@@ -38,3 +48,4 @@ Do not lock derived-part identity from this checkpoint; C10 remains AUDIT FIRST.
 - Complete relevant Quadro V6 EB23 NL coverage + longest-compatible automatic selection + manual override: user-confirmed 2026-09-01.
 - Context-driven box-height proposal + manual override + manual visual check for difficult obstruction cases: user-confirmed 2026-09-01.
 - Quadro V1 Noxun default height clearance = `40 mm`; defined as recipe/data default rather than an official Hettich constant: user-confirmed 2026-09-01.
+- Atira H70/H144/H176 resolver = highest safely compatible height variant from actual available internal vertical space + manual override: user-confirmed 2026-09-01.
