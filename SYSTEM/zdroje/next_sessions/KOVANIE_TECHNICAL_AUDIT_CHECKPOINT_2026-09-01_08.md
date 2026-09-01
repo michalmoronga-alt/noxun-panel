@@ -24,28 +24,25 @@ Decision: do not lock derived-part identity/model yet. First collect real system
 - For Noxun V1, EB can therefore be fixed to 10.5 unless later requirements justify exposing the axis.
 - **Confirmed production rule:** bottom material thickness = 16 mm and wooden rear-panel thickness = 16 mm for Atira V1.
 
-### Quadro V6 EB23 / TANDEM family
+### Quadro / TANDEM family
 - User correction: Quadro width calculation depends on the selected runner / installation width EB.
-- For V1, keep this simple and fix Quadro to the most-used classic `Quadro V6, EB = 23` profile.
-- **Confirmed construction:** inner front and rear are between the two drawer sides. The bottom is also between the drawer sides; user drawings + Excel show the bottom extending the full nominal drawer length below the inner front/rear rather than being shortened between them.
+- For V1, keep this simple and fix Quadro to the most-used `EB = 23` profile.
 - **Confirmed production rule:** Quadro EB23 wooden drawer box normally uses 16 mm material for all five manufactured box parts (left/right side, inner front, rear, bottom).
-- **Supported but less-used variant:** the Quadro EB23 box can also be made from 18 mm material. V1 data/model must therefore not hardcode `Quadro = 16 mm`; 16 mm is default, 18 mm remains valid.
-- Official Hettich meaning relevant to the recipe: `SKW` is the clear/internal drawer width, not the assembled outside width. For EB23, `SKW = LB - 46`.
-- This explains the user's real Excel example exactly:
-  - cabinet external width = 950 mm,
-  - cabinet sides = 18 mm -> clear cabinet width `LB = 950 - 2*18 = 914 mm`,
-  - Quadro EB23 -> `SKW = 914 - 46 = 868 mm`,
-  - NL = 450 mm,
-  - total chosen drawer side height = 130 mm,
-  - produced 16 mm parts in the spreadsheet:
-    - bottom: `868 x 450`, qty 1,
-    - rear: `868 x 102`, qty 1,
-    - inner front: same as rear `868 x 102`, qty 1,
-    - side: `450 x 130`, qty 2.
-- Because `SKW = 868` is the clear width between side panels, 16 mm drawer sides yield assembled outside width 900 mm; inside a 914 mm clear cabinet this leaves 7 mm per side externally. `EB 23 = 7 + 16`, which is internally consistent. With 18 mm drawer sides, the same SKW gives 5 mm external clearance per side and `EB 23 = 5 + 18`.
-- **Provisional inference from the user's 130 -> 102 example:** front/rear height follows `H - bottom_thickness - bottom_vertical_offset`. With 16 mm material, `130 - 16 - 12 = 102`, strongly indicating a 12 mm lower bottom offset for the Noxun construction. This is NOT yet locked until user explicitly confirms the 12 mm production setting.
-- Official Hettich data for classic Quadro V6 EB23 gives nominal drawer length equal to NL and minimum cabinet depth NL+13 for the cited slide-on configurations.
-- Other Quadro generations/variants differ (e.g. V6 YOU uses internal width LB-42 and drawer length NL-10), so runner variant MUST remain a future data axis even if V1 fixes the current profile.
+- **Supported but less-used variant:** the Quadro EB23 box can also be made from 18 mm material. V1 data/model must therefore not hardcode `Quadro = 16 mm`; 16 mm should be the default, while 18 mm remains a valid material-thickness variant.
+- Confirmed Noxun assembly: left/right sides run full drawer length; bottom is between the sides and runs full nominal drawer length; inner front and rear are between the sides and sit above the bottom.
+- User Excel example for outer cabinet width 950 mm, 18 mm cabinet sides, NL 450, drawer height 130:
+  - internal cabinet width `LB = 950 - 36 = 914`
+  - Quadro V6 EB23 internal drawer width `SKW = LB - 46 = 868`
+  - 2x side = `450 x 130`
+  - bottom = `868 x 450`
+  - inner front = `868 x 102`
+  - rear = `868 x 102`
+- Official Hettich Quadro V6 EB23 drawing specifies bottom offset/range `12-13 mm`; Noxun can use `12 mm` as the V1 default while retaining the official range as technical data.
+- For the 16 mm example, `102 = 130 - 16 - 12`, i.e. front/rear height = drawer height - bottom thickness - bottom offset.
+- Official current Blum TANDEM planning shows a closely related bottom offset/range of `11-13 mm` for the cited 11-16 mm wooden-drawer variants. Do not assume it is exactly identical to Quadro; keep the offset as runner-family/system data.
+- Audit still required: verify exactly which component dimensions change with 16 vs 18 mm while the EB23 runner installation geometry remains fixed; do not assume every part formula is unchanged.
+- Official Hettich data for classic Quadro V6 EB23 gives internal drawer width `SKW = LB - 46` and nominal drawer length equal to NL; min cabinet depth NL+13 for that classic V6 configuration.
+- Other Quadro generations/variants differ (e.g. V6 5D / V6 YOU use internal width LB-42 and drawer length NL-10), so runner variant MUST remain a future data axis even if V1 fixes the current profile.
 - Blum TANDEM standard planning uses `SKW = LW - 42` and `SKL = NL - 10` for the cited hook/locking-device variants, confirming the same broad computational family but not identical constants to classic Quadro V6 EB23.
 
 ## Architectural interpretation — provisional only
@@ -56,22 +53,20 @@ Two useful computational families remain:
 
 Important: do NOT infer that Quadro and TANDEM have identical formulas. They share the same kind of recipe, but runner-specific constants/axes differ.
 
-The Quadro example strengthens the recipe model: `EB`, runner variant, nominal length, drawer material thickness, chosen drawer height, and bottom vertical offset are recipe parameters; generated manufactured parts should be ordinary manufacturing outputs, not manufacturer-specific special entities.
-
 ## Next audit work
-1. Confirm the Quadro V6 EB23 bottom lower offset used by Noxun (Excel example implies 12 mm).
-2. Collect exact V1 Atira recipe: generated manufactured parts, dimensions, height variants, NL variants, opening-mode impact, mandatory hardware SKUs.
-3. Complete exact V1 Quadro EB23 recipe: 16/18 mm thickness effects, height rule, catches, opening-mode differences, runner SKUs.
-4. Compare StrongBox and TANDEMBOX Antaro against Atira to identify true shared parameters vs system-specific branches.
-5. Compare Blum TANDEM against Quadro EB23 to identify shared recipe fields vs runner-specific constants.
-6. Only then decide derived part keys / owner relationship / BuildPlan integration.
+1. Collect exact V1 Atira recipe: generated manufactured parts, dimensions, material/thickness, height variants, NL variants, opening mode impact, mandatory hardware SKUs.
+2. Collect exact V1 Quadro EB23 recipe: four wooden box parts + bottom, dimensions, 16/18 mm thickness effects, NL, catches, opening-mode differences, runner SKUs.
+3. Compare StrongBox and TANDEMBOX Antaro against Atira to identify true shared parameters vs system-specific branches.
+4. Compare Blum TANDEM against Quadro EB23 to identify shared recipe fields vs runner-specific constants.
+5. Only then decide derived part keys / owner relationship / BuildPlan integration.
 
 ## Evidence status
 - User production choices: confirmed by user, 2026-09-01.
 - Atira formulas: confirmed by user-supplied Hettich sheet and official Hettich catalogue.
 - Atira 16 mm bottom + 16 mm wooden rear panel: confirmed by user, 2026-09-01.
-- Quadro EB23 profile / `SKW = LB - 46`: official Hettich documentation.
+- Quadro EB23 profile / width: official Hettich runner documentation.
 - Quadro default 16 mm and supported 18 mm box material: confirmed by user, 2026-09-01.
-- Quadro construction and 950/450/130 -> 868/450/102 example: confirmed by user's drawings and Excel screenshot, 2026-09-01.
-- Quadro 12 mm lower-bottom offset: inferred from user example + compatible with Hettich geometry; awaiting explicit user confirmation.
+- Quadro box construction and Excel dimensions: confirmed by user, 2026-09-01.
+- Quadro bottom offset 12-13 mm: official Hettich technical assistant sheet.
+- TANDEM bottom offset 11-13 mm: official current Blum technical catalogue for cited variants.
 - TANDEM formulas: official Blum technical catalogue.
