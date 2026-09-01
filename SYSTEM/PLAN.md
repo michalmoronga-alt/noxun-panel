@@ -288,10 +288,111 @@ Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-
   **Checklist uzáveru:** bump patch + `?v=` → testy → `docs/architecture/hardware.md` (odsek ad-hoc v `hardware_sets`), `outputs.md` (zber, brána),
   `ui-lifecycle.md` (modal) → STANDARD §6 (ad-hoc kanál) → STAV/KRONIKA/PLAN.
 
-- **Ďalšie slices (package pri štarte, z FINAL §3–§8):** **KOV-C** context_for + recepty Atira/Quadro + odvodené dielce + 4. materiálový kanál
-  (po sonde Démos a fixtures; audit-povinná, in-SU povinné) · **KOV-D** resolver + osi setov + zámky (R2/R3) + brány (O2) · **KOV-E** výklopy HK/HL
-  (`+lift`) · **KOV-F** závesy MAX(výška, hmotnosť) + úchytka/krídlo + Tip-On piest · **KOV-G** nohy 4/6 + klipy cez šírku (O3) + sokel pri vkladaní (D-111)
-  · **KOV-I** šablóny „Uložiť aj kovanie" + 🔧.
+- **KOV-C · TASK PACKAGE „RECEPTY, KONTEXT A ODVODENÉ DIELCE ZÁSUVIEK" (slice C; štart po KOV-A; audit-povinná; in-SU povinné; rez C1/C2):**
+  **Cieľ:** zásuvkové čelo (klasifikované v KOV-A) dostane z receptu automaticky **vyrábané dielce** (Atira: dno + drevený chrbát; Quadro V6 EB23: 2 boky + dno +
+  vnútorné čelo + chrbát), **resolved systém** (výškový variant · NL · nosnosť · otváranie) z počítaného kontextu a **jednu položku kovania** s parametrami; recepty sú
+  dáta zmrazené v projekte; nevyriešená zásuvka neemituje nič a je RED + tvrdý blocker (O2). Dáta: FINAL §3/§4/§6, checkpointy #10 (vzorce, tabuľky), #11 (ABS, UNI 16, H70=105),
+  #12 (kódy K-sád), draft `zdroje/next_sessions/KOVANIE_RECIPE_DATA_DRAFT_2026-09-02_13.md`.
+  **C1 · jadro (čisté, bez zmeny výstupov):** nový modul `core/drawer_recipes.rb` + data packy `noxun_engine/data/recipes/atira.json`, `quadro_v6_eb23.json`
+  (schéma: `family` metal_box|wood_undermount · `system` · `runner_variants` {`eb_by_kd` 16→12.5/18→10.5/19→9.5, `orderable` flag} · piny `mounting: slide_on`,
+  `rear_type: wooden` · konštanty vzorcov (Atira: `BB = LB−2EB−51.5`, `RB = LB−2EB−63`, `BL = NL+10`; Quadro: `SKW = LB−46`, `SKL = NL`, `bottom_offset 12`,
+  `box_clearance 40`) · `height_variants` {H70/H144/H176: rear_height 65.5/144/176, `min_clear_height` per opening SiSy/P2O/P2Os = 105/106/108 · 189/190/192 · 221/222/224,
+  railing 0/1+1/1+1} · `nl_series` 260…620 · `availability` {NL→loads: 260→[30], 300–520→[30,50], 620→[50]; P2Os 10 kg len 260–350} · `min_depth` (NL×opening) tabuľka
+  (260: 279 SiSy / 305 P2O; ≥300: NL+15; Quadro NL+13) · `thickness_supported` (Atira [16]; Quadro [16,18]) · `inner_supported: false` · `recipe_version`).
+  Čisté funkcie: `Recipes.load(system)` (validácia schémy pri načítaní — chýbajúca tabuľka = odmietnutie celého packu, nikdy tichý default) ·
+  `Recipes.resolve(ctx, classification, overrides)` → `{variant, nl, load, opening, parts[], hardware_params, conflicts[], explain}` (najvyšší variant, ktorého
+  `min_clear_height[opening] ≤ clear_height`; najdlhšia NL s `min_depth[nl][opening] ≤ clear_depth`; load = default 30 / 50 pri NL 620; override polia z
+  `hardware_overrides` majú prednosť — nekompatibilný override = conflict, nikdy tichá zmena) · `context_for(owner, plan, cfg)` v `construction.rb`: čistá fn →
+  `{clear_width (listová zóna pretínajúca riadok, nie w−2t), clear_height (prienik z-intervalu riadku čela s interiérom z_lo=floor+t … z_hi=height−t / rail_geometry
+  a listovou zónou), clear_depth (= interior back_front_y — v schéme pomenované `interior_depth`; porovnáva sa s vendor Mindest-Korpustiefe ako VNÚTORNÁ hĺbka —
+  overiť v audite), side_thickness (KD), obstructions[] (shelf / divider_h / divider_v pretínajúce riadok)}`; **named test: 16 mm offset riadok-vs-interiér**.
+  **Projektový snapshot receptov:** kľúč `drawer_recipes` v NOXUN dict modelu `{std, recipe_version, systems}` — zrkadlo `HardwareRules.ensure_project_rules!`
+  (zápis VNÚTRI operácie buildera, prestavba číta VÝHRADNE snapshot, nikdy auto-merge); `merge_recipes_seed!` = explicitná akcia s diffom (UI v KOV-D).
+  Testy C1: headless nad fixtúrami — vzorce Atira/Quadro proti #10 hodnotám (tabuľkový test každého riadku), výber variantu/NL (hranice, opening závislé
+  min_depth NL260, 620 → 50 kg), overridy (kompatibilný drží / nekompatibilný conflict), context (16 mm offset, priečka cez riadok = obstruction, listová zóna),
+  snapshot (nemení sa sám, merge len explicitne), schéma packu (chýbajúca tabuľka = odmietnutie).
+  **C2 · integrácia (mení výstupy — VŠETKY zmeny len pre čelá klasifikované ako zásuvka so systémom; ostatné zákazky CONTENT-identické):**
+  (a) `Construction.build_plan` volá resolver pre každé drawer-klasifikované čelo → **odvodené dielce** do `plan.parts` s part_key `front:<id>/drawer_bottom` ·
+  `/drawer_back` · `/box_side:left|right` · `/drawer_inner_front`, nové ROLES + `plan_schema` bump + `material signals` enum (`:drawer`) + `human_label` vetvy;
+  (b) **4. materiálový kanál** `:drawer`: `PROJECT_KEYS` + `default_drawer_material_id` (fallback **UNI 16 mm** — nemazateľný), `eff_drawer` v `effective_materials`,
+  D-46 pending-confirmation reuse; `thickness_ok_for?` + `materialized_part` pre nové roly; **hrúbka = vstup receptu** — materiál mimo `thickness_supported` = conflict;
+  ABS per rola z #11 (`drawer_bottom` bez; `drawer_side`/`drawer_inner_front`/`drawer_back` horná dlhá hrana 1,0 mm) ako explicitné `AbsRules` seed záznamy;
+  (c) **jedna položka kovania** `generic_type: slide`, `rule_id: 'recipe:<system>'`, `params {system, height_variant, nominal_length, load, opening, runner_variant}`
+  + **R2 exkluzivita**: `HardwareRules.evaluate` potlačí `fit_series`/slide pravidlá pre drawer-klasifikované čelá (build warning `legacy_slide_suppressed`
+  info, len prvý raz per zákazka) + **migrácia D-93 zámkov**: `nominal_length` override s `rule_id vysuvy-nl-podla-hlbky` sa premapuje na `recipe:<system>`
+  identitu (ak NL v rade — inak conflict `nl_lock_invalid`, nikdy tiché zmiznutie); charakterizačný test „jedno zásuvkové čelo → presne jedna slide položka";
+  (d) **fail-closed**: `conflicts[]` neprázdne → ŽIADNE odvodené dielce, ŽIADNA slide položka; do `hardware_issues` (kľúč z KOV-A) RED `drawer_no_fit` /
+  `drawer_thickness_unsupported` / `drawer_obstruction` / `drawer_internal_unsupported` s presným dôvodom a `export_blockers` rozšírené o tieto kódy (HW CSV + rozpočet + CP;
+  VEPO nie) — prepočet ČERSTVÝ pri exporte (vzor `dup_partition`), hláška menuje zásuvku, dôvod, kam kliknúť; test „pri blockeri je cieľový priečinok prázdny";
+  (e) Inspector: karta zásuvky ukazuje resolved riadok + osi (read-only v C; zámky/prepínanie = KOV-D), Kontrola RED riadky s navigáciou; Nákup: slide položka
+  zatiaľ expanduje cez dnešné mapovanie `slide` (set podľa NL — code_by_nl); **per-height sety a výber podľa klasifikácie = KOV-D** (do vtedy: ak set nemá kód pre
+  NL/variant → ORANGE `nl_missing` ako dnes, nikdy tichá zámena).
+  **Scope OUT:** per-height sety/selector a defaulty podľa klasifikácie (D) · zámky UI a zmena osí (D — v C platia len existujúce `nominal_length` overridy po migrácii) ·
+  „Doplniť nové recepty" UI (D) · Antaro/Strong/TANDEM (dáta pripravené) · vnútorné zásuvky (len klasifikácia + RED) · sync tyč P2O (KOV-D, dĺžková ostáva R-06a) ·
+  editor receptov · dokonalý kolízny solver (obstruction z listovej zóny + police/priečky stačí; atyp = vizuálna kontrola, #09).
+  **Audit: ÁNO** (nový modul + data pack, plan_schema/ROLES, snapshot kľúč na modeli, hardware kontrakt, brány). **In-SU POVINNÉ** (buildery, plán↔model, undo).
+  **Testy a DoD C2:** headless — plán s odvodenými dielcami (rozmery Atira 900×560×175 → dno 791×480, chrbát 779,5×144 pri H144; Quadro 950 → SKW 868…), 4. kanál (UNI
+  fallback, override, hrúbka 18 pri Atire = conflict), ABS per rola, R2 (jedna slide položka; legacy potlačené; D-93 migrácia s NL v rade aj mimo radu), fail-closed
+  (nič sa neemituje + RED + blocker), **charakterizácia**: zákazky bez drawer klasifikácie CONTENT-identické (kusovník/VEPO/nákup/rozpočet); JS — karta resolved riadok,
+  Kontrola riadky; **in-SU** — stavba zásuvky s dielcami, rebuild po zmene hĺbky/výšky (iný variant/NL, žiadna duplicita dielcov, part_overrides prežijú), Ctrl+Z,
+  kópia `*2`, šablóna uložiť/vložiť (drawer config + snapshot receptov), plytká skrinka → žiadne dielce + RED + export zastavený s prázdnym priečinkom.
+  Mutácie min. 4 (legacy nepotlačené · migrácia zámku zahodí hodnotu · dielce emitované pri conflict · snapshot auto-merge). **Riziká:** rozsah (preto C1/C2; C2 sa smie
+  ďalej rezať na C2a dielce+materiál / C2b kovanie+brány) · definícia hĺbky (audit) · reálne .skp fixtures (D-93 zámok, legacy snapshot) treba vyrobiť PRED C2.
+  **Smoke pre Michala:** skrinka 900×720×560, F2 zásuvkové čelo 175 (Kovové bočnice) → v kusovníku pribudnú dno 791×480 a chrbát 779,5×144 (H144), Kontrola bez nálezov,
+  nákup 1× K-Atira 470 · zmeň hĺbku na 500 → NL 470→420, dielce sa prepočítajú, žiadny duplicitný riadok · drevený box (Quadro) → 5 dielcov, boky 450×135 · nastav materiál
+  zásuviek v projekte na bielu 16 → všetky dielce ju dedia · plytká skrinka 300 → RED „bez riešenia", dielce zmiznú, nákupný CSV odmietne s hláškou · otvor KLINIKA →
+  čísla identické.
+  **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `construction.md` (context_for, roly, resolver hook), `hardware.md` (recipes, R2, snapshot),
+  `materials.md` (4. kanál), `outputs.md` (blockery, hardware_issues kódy), `model-a-identita.md` (part_keys drawer), ARCHITEKTURA router riadok (drawer_recipes)
+  → STANDARD §5/§6/§7 doplnky (roly, drawer materiál, recepty) → STAV/KRONIKA/PLAN.
+
+- **KOV-D · TASK PACKAGE „RESOLVER — SETY PODĽA KLASIFIKÁCIE, OSI, ZÁMKY A NAVIGÁCIA" (slice D; štart po KOV-B a KOV-C; audit-povinná):**
+  **Cieľ:** kovanie sa vyberá automaticky **podľa klasifikácie čela** (typ × otváranie [× konštrukcia]) a **výškový variant vyberá set** (kit kód podľa NL vnútri);
+  používateľ vidí resolved systém s osami, môže **zamknúť os** (NL, výškový variant, nosnosť) alebo prepnúť na iný kompatibilný set; resolver nikdy nemení potichu;
+  „Doplniť nové recepty" s diffom; Kontrola je navigátor. Mockup scény 1–2. FINAL §5/§7/§8.
+  **Scope IN:** (a) **defaulty podľa klasifikácie**: mapovanie setov rozšírené z `generic_type[@owner]` o kľúč klasifikácie `slide|hinge|lift × opening_mode
+  [× drawer_construction]` (globál → projekt → čelo; `resolve_set_id` = jediná autorita; neaktívny set sa nenúka; starý projekt bez mapovania = dnešné správanie);
+  (b) **per-height sety cez selector pásma** (`resolve_set_id` už vyberá set podľa numerického parametra — precedens D-81/nohy-podla-sokla): parameter položky
+  `height_variant` (70/144/176) → set „Atira · H70 / H144 / H176" s `code_by_nl` (seed zo sondy #12: 357695/357696/… vs 357774/357775/357783…; Quadro K-sety SiSy vs
+  P2O podľa opening); **žiadny nový tvar člena** (R4); seed setov generovaný Z recipe NL série + completeness test (GLM M6); (c) **zámky per os** = polia
+  `hardware_overrides` (`nominal_length` existuje; + `height_variant`, `load`), D-93 sémantika, jantárové riadky v Pravidlách + „vrátiť na pravidlo" existujúcou cestou;
+  UI: chipy osí s ikonou zámku v karte čela aj v kontexte Kovanie (jeden stav), klik = zamknúť aktuálnu hodnotu / odomknúť; **nekompatibilný zámok** po zmene geometrie
+  = RED conflict + návrh náhrady + potvrdenie (náhrada ostáva zamknutá; nikdy tiché prepnutie) — bez diff-modal frameworku (status + Kontrola + potvrdzovací D-15 modal);
+  (d) **explain**: server skladá text „prečo tento variant/NL" + „čo je v balení" (členovia + kódy) — `HardwareSets.explain` rozšírený; (e) **„Doplniť nové recepty"** v sekcii
+  Pravidlá Štúdia (`merge_recipes_seed!` s textovým diffom pred potvrdením; snapshot inak nemenný) + info „dostupná novšia verzia setu" (record_rev porovnanie);
+  (f) **Kontrola navigátor**: klik na RED/ORANGE riadok = select + `focus_inspector` + otvorenie sekcie Čelá/Kovanie + highlight riadku (malé JS); (g) **P2O sync tyč**
+  člen (dĺžková položka, trigger `width>600 && opening==tipon`) — ostáva za R-06a ORANGE, ale jej chýbanie = **blocker** nákupu (Codex C4) cez `hardware_issues`;
+  (h) prepnutie typu zásuvky späť na dvierka: zjednotené pravidlo pamäte (drawer klasifikácia + overridy sa DRŽIA; `prune_none_front_overrides` len pre `none`) — Opus I-4;
+  (i) Tip-On dvierka → set podľa klasifikácie (P2O záves + piest per owner) — dáta zo seedu; hinge počet = KOV-F.
+  **Scope OUT:** viacosový diff-modal · pomer D-109 · lifty (E) · závesy MAX (F) · linear pricing · šablóny 🔧 (I).
+  **Audit: ÁNO** (mapovací kľúč = kontrakt setov + snapshot; overrides schéma; brány).
+  **Testy a DoD:** headless — resolve_set_id s klasifikačným kľúčom (precedencia globál/projekt/čelo, neaktívny set, starý projekt), selector pásma per variant + code_by_nl
+  (každá kombinácia zo seedu má kód — completeness), zámky (drží/konflikt/náhrada ostáva zamknutá), explain text, merge_recipes_seed diff + nemennosť snapshotu, sync tyč
+  blocker; JS — chipy zámkov, potvrdzovací modal, Kontrola navigácia; in-SU — zámok NL prežije prestavbu, zmena hĺbky s nekompatibilným zámkom = RED + potvrdenie,
+  „Doplniť recepty" = 1 krok Späť; mutácie min. 3 (zámok ticho prepísaný · neaktívny set ponúknutý · seed bez kódu prejde). **Riziká:** kolízia s R-35 (úplná náhrada
+  mapovania) · rozsah UI (rezať D1 dáta/mapovanie, D2 zámky+UI, D3 navigácia+recepty UI).
+  **Smoke pre Michala:** vlož skrinku so zásuvkou → Nákup ukáže K-Atira kód podľa NL A výšky (H144 = 357774 rad) · prepni na Tip-On → P2O kit + pri šírke 900 blocker
+  sync tyč (ORANGE riadok + zastavený CSV) · zamkni NL 420, zmeň hĺbku na 600 → NL ostáva 420 · zmenši hĺbku na 400 → RED konflikt s návrhom 350, potvrď → 350 zamknuté ·
+  Kontrola: klik na riadok otvorí správne čelo · Pravidlá → „Doplniť nové recepty" ukáže diff, potvrdenie = 1 Späť.
+  **Checklist uzáveru:** bump patch + `?v=` → testy → `hardware.md` (mapovanie, per-height sety, zámky, explain, recepty merge), `ui-lifecycle.md` (chipy, modal, navigácia),
+  `outputs.md` (blockery) → STANDARD §6 → D-109/D-111 stav v DOGFOODING → STAV/KRONIKA/PLAN.
+
+- **KOV-E · „VÝKLOPY HK/HL" (po C, D):** `GENERIC_TYPES + lift` (plan_schema bump, `guard_unknown_hardware!` už chráni starší plugin) · roly `flap` z KOV-A dostanú
+  pravidlo kind `weight_bands` (hmotnosť čela = rozmery × hrúbka × `Materials.density_for(typ)`; hustota nil → konzervatívny odhad + ORANGE) s tabuľkou HK top / HL top
+  (data pack `lifts.json` z OFICIÁLNYCH Blum hodnôt — PDF follow-up pred zápisom; UNCONFIRMED sa nezapíše) · sety klasifikácia `lift × opening` (Tip-On = piest per owner)
+  · fail-closed + RED rovnako ako zásuvky · žiadna geometria (cenové zaradenie). Audit ÁNO (GENERIC_TYPES). Smoke: výklop 600×400 → HK top set podľa hmotnosti; Tip-On → +piest;
+  ťažké čelo mimo tabuľky → RED + blocker.
+- **KOV-F · „ZÁVESY MAX(VÝŠKA, HMOTNOSŤ) + ÚCHYTKA + TIP-ON" (po D):** nový rule kind `max_bands` (dva vstupy: výška čela + hmotnosť; výsledok = max) — výškové prahy
+  zo seedu (900/1400/1900 → 2/3/4/5, Michal potvrdil 2.9.), hmotnostné z tabuľky výrobcu (Michal dodá / oficiálne) · override počtu = zámok (existuje) · pod minimom ORANGE,
+  export potvrditeľný · šírka len WARNING · úchytka: pravidlo `fixed 1` na krídlo/zásuvkové čelo LEN pri `opening_mode == classic` (vypínateľné; set úchytky podľa klasifikácie)
+  · Tip-On dvierka = P2O záves + presne 1 piest/krídlo (per:'owner'). Audit NIE (pravidlá = JSON + kind). Smoke: dvierka 1250 mm → 3 závesy; Tip-On → P2O + 1 piest; úchytka 1 ks.
+- **KOV-G · „NOHY 4/6, PRÍCHYTY, SOKEL PRI VKLADANÍ" (po D; LOW):** pravidlo nôh `bands` na šírku korpusu (<1000 → 4, ≥1000 → 6; AXILO aj klzáky) · **príchyt sokla = druhé
+  bands pravidlo na šírku** (1 / 2) — O3, bez pomerového člena · set nôh podľa výšky sokla (existuje) viditeľný **pri vkladaní** (riadok v ghost pásiku/vkladacej karte) aj v
+  Korpuse pri sokli (D-111) — override per skrinka. Audit NIE. Smoke: skrinka 1200 → 6 nôh + 2 príchyty; sokel 150 → iný set nôh viditeľný už pri vkladaní.
+- **KOV-I · „ŠABLÓNY — ULOŽIŤ AJ KOVANIE" (po D):** checkbox „Uložiť aj kovanie" v mini-modale Inspectora (dnes freeze vždy → voľba) · 🔧 badge odvodený z prítomnosti
+  `hardware_sets` snapshotu (žiadne nové pole) · hover súhrn + read-only detail pred vložením · **R12:** buď prenášať relevantné drawer overridy (`hardware_overrides` pre
+  front kľúče) do šablóny, alebo v detaile priznať „zámky sa neprenášajú" — rozhodnúť v package audite · hard conflict blokuje uloženie S kovaním, geometria sa uloží.
+  Audit NIE (whitelist šablóny sa rozširuje aditívne; overiť). Smoke: šablóna so zásuvkou má 🔧, po vložení rovnaký systém/NL; bez kovania = defaulty projektu.
 - **Mimo V1** (FINAL §12): D-109 pomer (R-05), plný `per:'length'`, HF, Antaro/Strong/TANDEM (dáta pripravené v #10), inner drawer automatika.
 
 ### 2 · KONTROLA + VÝROBA
@@ -496,6 +597,26 @@ Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-
   `docs/architecture/ui-lifecycle.md`** (vstupný bod je sekcia About; core helper popísať tamtiež; R-32 vzor:
   overiť proti kódu) + ARCHITEKTURA router riadok → STAV/KRONIKA/PLAN → D-52 do DOGFOODING_vyriesene
   (plný text + riadok navrch indexu).
+- **D-52b · TASK PACKAGE „UPDATER — UI V ŠTÚDIU" (po mergi D-52a / PR #277; štart na „štartuj D-52b"):**
+  **Cieľ:** Michal aj Lucia zaktualizujú plugin jedným klikom zo sekcie **O plugine** v Štúdiu; jadro (recovery, lock, lease, latch, swap) je z D-52a — táto dávka pridáva
+  LEN UI a asynchrónny check. **Scope IN:** pole „Distribučný priečinok" v sekcii About (**vlastný namespace `data-updater-edit`** s vlastným focus/dirty/save — NIE `data-ss`,
+  F7; uloženie cez `Updater` settings store z D-52a, Enter/mini-tlačidlo; rozpísaná cesta prežije plný push) · **explicitný `updater_check`** volaný z OBOCH vstupov do About
+  (navigácia aj deep-link), NIE zo `settings_payload`; beží v Ruby vlákne s deadline (default 4 s; čítanie hlavičky aj manifest zdroja), výsledok cez `UI.start_timer` poll,
+  token = (cesta, inštancia Štúdia, sekvencia) — neskorá/cudzia odpoveď sa zahodí, UI nikdy nezamrzne (F5/F6) · **stavový riadok** (trojstav: novšia = tlačidlo aktívne ·
+  rovnaká = `aria-disabled` „aktuálna" · **staršia = `aria-disabled` „staršia verzia — reinštaluj ručne cez INSTALL"** (B4) · nedostupné = hláška s cestou a dôvodom) ·
+  **tlačidlo „Aktualizovať"**: D-15 potvrdenie („zatvoria sa obe okná, po dokončení reštartuj SketchUp") → **bariéra**: zavrieť Inspector aj Štúdio, počkať na oba
+  `set_on_closed` (timer, limit 3 s; ak nedobehne → zrušiť s hláškou), až potom `Updater.apply!` → **výsledok VÝHRADNE natívne** `UI.messagebox` (úspech: „Aktualizované na X —
+  reštartuj SketchUp"; odmietnutie: presný dôvod — cudzí proces/lease, zamknutý priečinok, poškodený balík, nedostupný zdroj) (F10) · po úspechu latch z D-52a blokuje všetky vstupy ·
+  updater prvky sa renderujú LEN pre štúdiový vstup `nxAboutHtml` (koliesko Inspectora ich nemá — vedomá odchýlka „about je čítanie", pomenovať v docs). **Scope OUT:** G-Disk sync ·
+  podpisovanie · auto-check na pozadí · auto-reload · downgrade. **Audit: NIE** (jadro auditované v D-52a; UI nad existujúcim kontraktom) — ale codex-po-pr povinné.
+  **Testy a DoD:** JS — prvky len v Štúdiu, `data-updater-edit` neovplyvní `SS_DIRTY` ani revíziu SupplierSettings, stavy tlačidla, deep-link = presne 1 check; headless —
+  token/deadline logika (umelo visiace I/O neblokuje, timeout hláška, stará odpoveď zahodená); **in-SU smoke** (POVINNÝ — jediný reálny test swapu): s otvoreným Inspectorom
+  aj Štúdiom klik → obe okná sa zavrú → natívna hláška → po reštarte nová verzia, žiadne `.new/.old` siroty; druhá inštancia SketchUpu → odmietnutie s hláškou; poškodený
+  balík → stará verzia beží; odpojený share → timeout, UI živé. Mutácie min. 2 (bariéra preskočená · výsledok cez CEF). **Riziká:** Ruby vlákna v SketchUpe (I/O v Thread +
+  poll timer — overiť v audite/smoke) · CEF drží súbory (preto bariéra) · Windows Defender pri rename. **Smoke pre Michala:** nastav cestu na priečinok s novšou kópiou → About
+  ukáže „dostupná 0.9.x" → Aktualizovať → okná sa zavrú, hláška, reštart → nová verzia; skús so staršou kópiou → tlačidlo neaktívne s vysvetlením; vytiahni sieťový disk →
+  sekcia hlási nedostupný zdroj, Štúdio nezamrzne. **Checklist uzáveru:** bump patch + `?v=` → testy → `ui-lifecycle.md` (odsek About + updater UI, vedomá odchýlka) →
+  D-52 do DOGFOODING_vyriesene (plný text + riadok indexu) → STAV/KRONIKA/PLAN (blok 6 položka hotová).
 - **D-20 · Quick actions — bezpečný move plugin** — zlúčiť noxun_mower + Snaper do jedného toolbaru; kopírovanie musí prejsť štandardným dedup tickom (dnes vzniká kópia bez NOXUN identity).
 
 ## Po V1 — zásobník (nezaradené, nestratiť)

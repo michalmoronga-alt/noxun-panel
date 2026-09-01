@@ -480,3 +480,9 @@ R-23.1 Escape (S, hocikedy) · R-18 · zvyšok podľa kapacity. R-32 kostry prie
 **Otvorené rozhodnutia Michala:** R-05 (rozsah zaokrúhľovania pomeru per zákazka vs per skrinka — rozhodne
 USER-debata o setoch, PRED implementáciou D-109) · R-13 (`std` na entite: čítať vs vypustiť) · R-30 (jantárové
 riadky vs ručný refresh — pri D-95).
+
+### R-39 · P1 · PRE-COMMITTED BRÁNA · smer dvierok `Neurčený` (O1, 2.9.2026)
+Rozhodnutie Michala O1 (reconcile cross-auditu KOVANIE): `direction = unset` je od KOV-A **RED nález bez exportnej brány** — smer dnes nemení žiadny
+vydaný výstup (nákup ani rezy). **Brána sa ZAVÄZUJE pristáť v TEJ ISTEJ dávke ako prvý výstup, ktorý smer reálne spotrebuje** (D-95 riadený prechod /
+výrobné zadanie): vtedy `front_direction_unset` prejde z RED nálezu do `export_blockers` daného výstupu. Tvrdé podmienky dovtedy: ŽIADNY default ani
+heuristika smeru nikde v kóde (ani preview/overlay); legacy configy bez poľa sa negatujú. **Otvorené, kým výstup so smerom nevznikne** — nezatvárať bez brány.
