@@ -13,12 +13,14 @@ Working delta checkpoint. NOT implementation spec. Continues #08.
 User decision: automatic proposal + manual override.
 
 - Proposed box height should come from the **real available internal vertical space**, not merely from drawer-front height.
-- Working production rule/example: `box_height ~= available_height - 20 mm`.
-- `20 mm` is currently a Noxun working/example clearance, not yet locked as an official Hettich constant.
+- Noxun V1 default proposal: `box_height ~= available_height - 40 mm`.
+- `40 mm` is a **Noxun default clearance / recipe parameter**, not an official Hettich constant and not an immutable architecture rule.
+- The larger 40 mm default is intentionally conservative and should cover many common obstruction cases involving partitions/dividers, cabinet top, cabinet bottom and similar geometry.
 - Manual box-height override is required.
 - Critical obstructions are real cabinet/context geometry such as internal partitions/dividers, cabinet top and cabinet bottom. These can reduce usable space while the front itself does not know about the obstruction.
-- V1 does not need perfect collision intelligence. In difficult cases the user can inspect the drawn geometry and manually correct the box height.
-- Better automatic collision/context reasoning can be added later.
+- For very shallow/narrow or otherwise atypical drawer sectors, the user can visually inspect the generated geometry and manually correct the proposed height.
+- V1 does not need perfect collision intelligence. Better automatic collision/context reasoning can be added later.
+- Future drawer systems (for example TANDEM) may use a different default clearance without changing the architecture; keep the clearance system/recipe-data driven.
 
 ## Architectural implication
 
@@ -34,4 +36,5 @@ Do not lock derived-part identity from this checkpoint; C10 remains AUDIT FIRST.
 
 - Quadro 30 kg-only V1 load class: user-confirmed 2026-09-01.
 - Complete relevant Quadro V6 EB23 NL coverage + longest-compatible automatic selection + manual override: user-confirmed 2026-09-01.
-- Context-driven box-height proposal (`available internal space - approx. 20 mm`) + manual override + manual visual check for difficult obstruction cases: user-confirmed 2026-09-01.
+- Context-driven box-height proposal + manual override + manual visual check for difficult obstruction cases: user-confirmed 2026-09-01.
+- Quadro V1 Noxun default height clearance = `40 mm`; defined as recipe/data default rather than an official Hettich constant: user-confirmed 2026-09-01.
