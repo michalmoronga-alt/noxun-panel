@@ -30,6 +30,17 @@ function mkEl(tag){
     set id(v){ this.attrs.id = String(v); },
     get className(){ return this.attrs.class || ''; },
     set className(v){ this.attrs.class = String(v); },
+    // 1d/R-14: `classList` nad atributom `class` — inline zapis bunky rozpoctu
+    // (`budNumericSend`) ho pouziva PRED odoslanim, takze bez neho sa cesta
+    // „pole -> server" v mini-DOM vobec nedala prejst. Cita a pise TEN ISTY
+    // atribut, aky vidi selektor `.cls` (ziadny druhy stav).
+    classList: {
+      _list(el){ return String(el.attrs.class || '').split(/\s+/).filter(Boolean); },
+      add(c){ const l = this._list(this._el); if (l.indexOf(c) < 0) l.push(c); this._el.attrs.class = l.join(' '); },
+      remove(c){ this._el.attrs.class = this._list(this._el).filter(function(x){ return x !== c; }).join(' '); },
+      contains(c){ return this._list(this._el).indexOf(c) >= 0; },
+      toggle(c, on){ const has = this.contains(c); const want = (on === undefined) ? !has : !!on; if (want) this.add(c); else this.remove(c); return want; }
+    },
     getAttribute(k){ return Object.prototype.hasOwnProperty.call(this.attrs, k) ? this.attrs[k] : null; },
     setAttribute(k, v){ this.attrs[k] = String(v); },
     removeAttribute(k){ delete this.attrs[k]; },
@@ -74,6 +85,10 @@ function mkEl(tag){
       return null;
     }
   };
+  // `classList` je zdielany literal — kazdy uzol potrebuje VLASTNY (inak by
+  // pisal do posledne vytvoreneho elementu).
+  el.classList = Object.create(el.classList);
+  el.classList._el = el;
   return el;
 }
 

@@ -999,6 +999,24 @@ module Noxun
       end
 
       # Kolko riadkov suctu nema cenu — z CERSTVEHO rozpoctu, nie z DOM.
+      # 1d/R-14: dovod, preco sa CENOVY export nesmie vyrobit — nil = mozeme.
+      # Cita sa VYHRADNE priznak z payloadu rozpoctu (`Budget.std_payload`),
+      # nikdy sa model nepyta druhykrat: hárok musi stat na TYCH ISTYCH datach,
+      # z akych vznikli jeho cisla.
+      #
+      # VEPO a kusovnik branu ZAMERNE nedostavaju — rozpoctove data nenesu,
+      # takze ich orezanie neskresluje (rovnaka logika ako vynimka VEPO
+      # v P0-HF). A blokuje sa NEKOMPATIBILNA VERZIA DAT, nie rozpracovanost
+      # rozpoctu — tu STANDARD §11.3 vyslovne pripusta a rieši ju dvojkrokove
+      # potvrdenie nizsie.
+      def budget_std_block(budget)
+        std = budget.is_a?(Hash) ? budget['budget_std'] : nil
+        return nil unless std.is_a?(Hash) && std['blocked'] == true
+
+        reason = std['reason'].to_s
+        reason.empty? ? 'Dáta rozpočtu nie sú kompatibilné s touto verziou — cenový export je zastavený.' : reason
+      end
+
       def unpriced_count(budget)
         totals = budget.is_a?(Hash) && budget['totals'].is_a?(Hash) ? budget['totals'] : {}
         totals['unknown_count_in_total'].to_i
@@ -1887,6 +1905,12 @@ module Noxun
         budget = budget_payload(model, bom, collected, nil, hw_exp)
         return status.call('Rozpočet sa nepodarilo zostaviť (pozri Ruby konzolu).', true) if budget.nil?
 
+        # 1d/R-14: KOMPATIBILITNA BRANA — pred vsetkymi ostatnymi. Pri novsom
+        # alebo poskodenom markeri `budget_std` je stav rozpoctu orezany o to,
+        # comu tato verzia nerozumie, takze hárok by niesol ZLE CISLA.
+        std_stop = budget_std_block(budget)
+        return status.call(std_stop, true) if std_stop
+
         # P0-HF-01/02: FINALNA CENOVA BRANA PRED VYBEROM SUBORU — dve vetvy.
         # TVRDA (zliati vlastnici kovania) zapis nepusti nikdy; POTVRDITELNA
         # (riadky bez ceny) ho zastavi prvykrat a druhy klik ju s potvrdenim
@@ -1948,6 +1972,12 @@ module Noxun
         hw_exp = hardware_expansion(model, collected)
         budget = budget_payload(model, bom, collected, nil, hw_exp, smap)
         return status.call('Rozpočet sa nepodarilo zostaviť (pozri Ruby konzolu).', true) if budget.nil?
+
+        # 1d/R-14: TA ISTA kompatibilitna brana ako pri XLSX rozpoctu — ponuka
+        # je VIEW nad tym istym payloadom, takze orezany stav by poslal
+        # zakaznikovi zle cislo.
+        std_stop = budget_std_block(budget)
+        return status.call(std_stop, true) if std_stop
 
         cp = budget['cp_preview']
         cp ||= CpExport.preview(budget, BudgetStore.cp_overrides(model), SupplierSettings.active)

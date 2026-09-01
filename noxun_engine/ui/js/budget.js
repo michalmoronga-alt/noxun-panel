@@ -217,6 +217,73 @@
     return (typeof studioSec === 'undefined') ? 'budget' : studioSec;
   }
 
+  // --- R-14: KOMPATIBILITA DAT ROZPOCTU (marker `budget_std`) --------------
+  //
+  // Zakazka ulozena NOVSIM pluginom (alebo s poskodenym markerom) sa DA CITAT,
+  // ale cisla su pocitane z OREZANEHO stavu — vsetko, comu tato verzia
+  // nerozumie, z nich vypadlo. Preto v OBOCH sekciach (Rozpocet aj Cenova
+  // ponuka):
+  //   1. TRVALY banner s dovodom (nie status, ktory zmizne pri prvom prekresleni),
+  //   2. VYPNUTE vsetky ovladace, ktore menia model alebo vyrabaju CENOVY
+  //      dokument — vratane prepinaca „samostatne" v ponuke (`cp_sep`),
+  //   3. poistka v odosielacej ceste (klik zo zastaraneho DOM sa neposle).
+  // Server je autorita v oboch smeroch: mutacie odmieta `BudgetStore.write!`,
+  // exporty `ProductionCore.budget_std_block` — toto je UX vrstva nad tym.
+  //
+  // ZAMERNE NEVYPNUTE: prepinac DPH a „Obnoviť" (ciste zobrazenie/prepocet
+  // okna) a „Prepočítať ceny" — ten zapisuje do KATALOGU cien, nie do zakazky,
+  // a jeho vysledok je spravny bez ohladu na verziu dat rozpoctu.
+  var BUD_STD_OFF = { mode: 1, draft: 1, remove: 1, more: 1, override: 1, multiplier: 1,
+                      viz_m2: 1, appl_included: 1, cp_sep: 1, custom_field: 1,
+                      appl_field: 1, xlsx: 1, cp: 1 };
+
+  var BUD_STD_FALLBACK = 'Dáta rozpočtu nie sú kompatibilné s touto verziou — úpravy a cenové ' +
+                         'exporty sú vypnuté.';
+
+  // Ciste: priznak zo servera, alebo null (kompatibilna zakazka).
+  function budStdInfo(b){
+    var s = (b && b.budget_std) ? b.budget_std : null;
+    return (s && s.blocked === true) ? s : null;
+  }
+
+  function budStdBlocked(b){ return !!budStdInfo(b); }
+
+  // Ciste: veta pre banner, tooltip aj status. Znenie sklada SERVER (jeden
+  // zdroj pre mutacie, exporty aj UI) — fallback je len poistka.
+  function budStdReason(b){
+    var s = budStdInfo(b);
+    if (!s) return '';
+    return String(s.reason || '') || BUD_STD_FALLBACK;
+  }
+
+  // Ciste: patri akcia medzi vypnute ovladace?
+  function budStdOff(action, b){
+    return budStdBlocked(b) && BUD_STD_OFF[String(action)] === 1;
+  }
+
+  function budStdBannerHtml(b){
+    if (!budStdBlocked(b)) return '';
+    return '<div class="hwbanner">' + bEsc(budStdReason(b)) +
+           ' Čísla nižšie sú z orezaných dát — úpravy aj cenové exporty sú vypnuté.</div>';
+  }
+
+  // Vypnutie ovladacov PO vykresleni. Jeden prechod nad hotovym DOM je zamerne
+  // lacnejsi nez podmienka v pätnastich markup funkciach — a nedá sa zabudnúť
+  // pri pridani dalsieho ovladaca (staci ho zapisat do `BUD_STD_OFF`).
+  function budStdDisable(box){
+    var b = budBudget();
+    if (!box || !box.querySelectorAll || !budStdBlocked(b)) return;
+    var reason = budStdReason(b);
+    var nodes = box.querySelectorAll('[data-bud]');
+    for (var i = 0; i < nodes.length; i++){
+      var el = nodes[i];
+      if (!budStdOff(el.getAttribute('data-bud'), b)) continue;
+      el.disabled = true;
+      el.setAttribute('disabled', 'disabled');
+      el.setAttribute('title', reason);
+    }
+  }
+
   // NEAKTUALNOST okna (jantarove „Obnoviť"). Stav aj markup ziju v `studio.js`
   // — cita sa odtial presne tak, ako `ST` a `studioSec`: v prehliadaci su to
   // globaly suboru, ktory sa nacitava PRED tymto. Ziadna druha kopia tlacidla:
@@ -261,7 +328,8 @@
       return;
     }
     var d = b.vat_divisor;
-    var h = budSummaryHtml(b, d);
+    // R-14: banner je PRVA vec v tele — pod ním sú čísla z orezaných dát.
+    var h = budStdBannerHtml(b) + budSummaryHtml(b, d);
     (b.sections || []).forEach(function(sec){
       if (sec.key === 'rounding') h += budRoundingHtml(sec, b, d);
       else h += budSectionHtml(sec, b, d);
@@ -271,12 +339,14 @@
     // druhej kopie tabulky, ktora by sa casom rozisla.
     h += budCpLinkHtml(b, d);
     box.innerHTML = h;
+    budStdDisable(box);
   }
 
   function budDrawTools(){
     var box = budEl('sectools');
     if (!box) return;
     box.innerHTML = budToolsHtml(budBudget());
+    budStdDisable(box);
   }
 
   // TELO sekcie (#secbody). Lista sekcie ma vlastnu funkciu — v Studiu su to
@@ -896,13 +966,18 @@
     var box = budEl('sectools');
     if (!box) return;
     box.innerHTML = budOfferToolsHtml();
+    budStdDisable(box);
   }
 
   function budDrawOfferBody(){
     var box = budEl('secbody');
     if (!box) return;
     var b = budBudget();
-    box.innerHTML = budOfferHtml(b, b ? b.vat_divisor : null);
+    // R-14: TEN ISTY banner ako v Rozpočte — ponuka je projekcia toho istého
+    // payloadu, takže orezané dáta sú aj jej problém (a export odtiaľto ide
+    // zákazníkovi).
+    box.innerHTML = budStdBannerHtml(b) + budOfferHtml(b, b ? b.vat_divisor : null);
+    budStdDisable(box);
   }
 
   function budRenderOfferTools(){
@@ -1062,6 +1137,9 @@
   function budCpExport(){
     var st = budData();
     if (!st || !window.sketchup || !sketchup.cp_xlsx) return;
+    // R-14: to isté ako pri XLSX rozpočtu — orezané dáta, zlé číslo, a tento
+    // dokument ide zákazníkovi.
+    if (budStdBlocked(st.budget)){ NX.setStatus(budStdReason(st.budget), true); return; }
     if (budNeedsConfirm('cp', st)) return; // P0-HF: riadky bez ceny = dvojkrokový export
     NX.setStatus('Pripravujem cenovú ponuku…', false);
     // ST-1a (audit #1): nazov projektu je SERVEROVY udaj — z DOM sa uz
@@ -1444,6 +1522,10 @@
   function budSend(op, extra){
     var st = budData();
     if (!st || !window.sketchup || !sketchup.budget_mutate) return;
+    // R-14: poistka pre klik zo zastaraneho DOM (ovladace su vypnute uz pri
+    // kresleni). Server mutaciu odmietne tak ci tak — toto ju len nepusti do
+    // fronty a povie dovod hned.
+    if (budStdBlocked(st.budget)){ NX.setStatus(budStdReason(st.budget), true); return; }
     if (BUD_BUSY){ BUD_QUEUE.push([op, extra]); return; }
     BUD_BUSY = true;
     if (budBusyTimer) clearTimeout(budBusyTimer);
@@ -1497,6 +1579,9 @@
   function budXlsx(){
     var st = budData();
     if (!st || !window.sketchup || !sketchup.budget_xlsx) return;
+    // R-14: cenový export z orezaných dát by niesol zlé čísla (server ho
+    // zastaví pred savepanel; tu sa nepošle vôbec).
+    if (budStdBlocked(st.budget)){ NX.setStatus(budStdReason(st.budget), true); return; }
     if (budNeedsConfirm('xlsx', st)) return;
     NX.setStatus('Pripravujem XLSX rozpočet…', false);
     // ST-1a (audit #1): nazov projektu cita SERVER — z DOM uz nechodi.
@@ -1815,5 +1900,11 @@
       // zastaví, druhý pošle `confirm_unpriced`" sa inak overiť nedá.
       budUnpricedCount: budUnpricedCount, budConfirmText: budConfirmText,
       budNeedsConfirm: budNeedsConfirm, budArmed: budArmed, budDisarm: budDisarm,
-      budXlsx: budXlsx, budCpExport: budCpExport };
+      budXlsx: budXlsx, budCpExport: budCpExport,
+      // 1d/R-14: kompatibilitna brana dat rozpoctu (tests/js/test_r14_budget_std.js).
+      // `budStdDisable` potrebuje DOM a exportuje sa ZAMERNE — kontrakt
+      // „vypnute su VSETKY modelove ovladace oboch sekcii" sa inak overit neda.
+      budStdBlocked: budStdBlocked, budStdReason: budStdReason, budStdOff: budStdOff,
+      budStdBannerHtml: budStdBannerHtml, budStdDisable: budStdDisable,
+      BUD_STD_OFF: BUD_STD_OFF };
   }

@@ -10,6 +10,7 @@
 #   budget_appliances_included — sceituju sa spotrebice do SPOLU? (default NIE)
 #   budget_cp_overrides        — { zdrojovy_kluc => "samostatne"|"zostava" }
 #                                zaradenie polozky v CENOVEJ PONUKE (E-b2)
+#   budget_std                 — VERZIA FORMATU dat rozpoctu (R-14, Integer)
 #
 # ========================== ZAVAZNE PRAVIDLA ===========================
 # 1) MALE MUTACNE METODY — kazda zmena ma vlastnu metodu a vlastnu
@@ -41,6 +42,34 @@ module Noxun
       KEY_APPLIANCES  = 'budget_appliances'
       KEY_APPL_INCL   = 'budget_appliances_included'
       KEY_CP_OVERRIDES = 'budget_cp_overrides'
+      # R-14 (blok 1d): VERZIA FORMATU DAT ROZPOCTU V ZAKAZKE.
+      # POZOR na zamenu mien: `budget_std_multipliers` su CENOVE NASOBICE
+      # standardnych riadkov, s verziou nemaju nic spolocne.
+      KEY_STD = 'budget_std'
+
+      # Cislo, ktoremu TATO verzia pluginu rozumie. Rozpoctove data su uzavrete
+      # whitelisty (`build_custom`/`build_appliance`/`numeric_map`), takze
+      # zakazka ulozena NOVSIM pluginom by prvym klikom v Rozpocte ticho prisla
+      # o polia, ktore tato verzia nepozna.
+      #
+      # DISCIPLINA BUMPU (SYSTEM/STANDARD.md 11.3, vzor CONFIG_SCHEMA): cislo
+      # sa zvysi pri KAZDOM rozsireni whitelistu rozpoctovych dat o pole,
+      # ktoreho ticha strata by poskodila CENU alebo objednavku (nove pole
+      # vlastnej polozky, vazba spotrebica na katalog v bloku 4, novy kluc
+      # zaradenia v ponuke). Cisto odvodene/zobrazovacie pole bump nevyzaduje.
+      BUDGET_STD = 1
+
+      # Sentinel pre rozlisenie „atribut NIE JE" od „atribut je a je prazdny".
+      # `read_attr` obe splostuje na nil a fail-open `.to_i` by z poskodenej
+      # hodnoty spravil legacy (0) — teda povolenie (F3 auditu).
+      STD_MISSING = Object.new.freeze
+
+      # Hlasky odmietnutia — JEDINY textovy zdroj pre mutacie, banner v UI aj
+      # branu cenovych exportov (vzor `newer_config_message` z R-12).
+      STD_MESSAGES = {
+        'newer' => 'Rozpočet zákazky je z novšej verzie Noxun — úprava by dáta orezala; aktualizuj plugin.',
+        'invalid' => 'Dáta rozpočtu sú poškodené (neplatná verzia formátu) — nahlás problém, needituj.'
+      }.freeze
 
       # Typy spotrebicov (S1 z enumu spravi vazbu na katalog — ID struktura
       # ostava kompatibilna dopredu).
@@ -86,7 +115,53 @@ module Noxun
       MAX_TEXT = { 'popis' => 200, 'nazov' => 200, 'kod' => 60, 'dodavatel' => 80,
                    'poznamka' => 500, 'url' => 500, 'cp_skupina' => 60 }.freeze
 
+      # R-14: prepinac „prave bezi mutacny blok `write!`". Nizkourovnove zapisy
+      # (`write_attr`/`write_json`) mimo neho su ZAKAZANE — inak by budúca
+      # mutacia (napr. spotrebice S1) dopredny guard aj zapis markera obisla.
+      @in_write = false
+
       module_function
+
+      # --- verzia formatu dat (R-14) ------------------------------------------
+
+      # Stav markera v zakazke:
+      #   :legacy  — atribut NIE JE (zakazka spred R-14) — mutacie PREJDU
+      #              a prva z nich marker zapise,
+      #   :current — marker <= BUDGET_STD (data rozumieme) — mutacie PREJDU,
+      #   :newer   — marker > BUDGET_STD (zakazka z novsieho pluginu),
+      #   :invalid — marker JE, ale nie je to cele kladne cislo (poskodene
+      #              data), alebo citanie atributu vyhodilo vynimku.
+      # Posledne dva stavy mutacie ODMIETAJU — kazdy vlastnou hlaskou.
+      def std_state(model)
+        kind, raw = read_std(model)
+        return :legacy if kind == :missing
+        return :invalid unless kind == :present && raw.is_a?(Integer) && raw >= 1
+
+        raw > BUDGET_STD ? :newer : :current
+      end
+
+      def std_compatible?(model)
+        %i[legacy current].include?(std_state(model))
+      end
+
+      # Dovod odmietnutia pre dany stav; '' = stav je kompatibilny.
+      # Prijima symbol aj string (payload posiela string).
+      def std_block_reason(state)
+        STD_MESSAGES[state.to_s] || ''
+      end
+
+      # -> [:missing | :present | :error, hodnota]
+      # ZAMERNE nejde cez `read_attr`: ten rescue-uje na nil a „atribut nie je"
+      # by sa nedalo odlisit od „citanie zlyhalo" ani od ulozeneho prazdna.
+      def read_std(model)
+        return [:missing, nil] unless model.respond_to?(:get_attribute)
+
+        v = model.get_attribute(Store::DICT, KEY_STD, STD_MISSING)
+        v.equal?(STD_MISSING) ? [:missing, nil] : [:present, v]
+      rescue StandardError => e
+        Engine.log_error(e, 'BudgetStore.read_std') if defined?(Engine)
+        [:error, nil]
+      end
 
       # --- citanie -------------------------------------------------------------
 
@@ -101,7 +176,10 @@ module Noxun
           'custom_items' => custom_items(model),
           'appliances' => appliances(model),
           'appliances_included' => appliances_included?(model),
-          'cp_overrides' => cp_overrides(model)
+          'cp_overrides' => cp_overrides(model),
+          # R-14: kompatibilita dat cestuje SO STAVOM — payload rozpoctu z nej
+          # sklada priznak pre obe sekcie okna aj pre branu cenovych exportov.
+          'std' => std_state(model).to_s
         }
       end
 
@@ -462,7 +540,13 @@ module Noxun
         nil
       end
 
+      # R-14: zapis JE POVOLENY LEN vnutri `write!`. Volanie mimo neho je chyba
+      # programu (obisiel by dopredny guard aj zapis markera) — a vynimka je
+      # jediny sposob, ako to zastavit aj v buducej mutacii, ktora by na
+      # `write_attr` siahla priamo.
       def write_attr(model, key, value)
+        raise 'BudgetStore: zápis mimo write! — mutácia musí ísť cez jediný choke point (R-14)' unless @in_write
+
         model.set_attribute(Store::DICT, key, value)
         true
       end
@@ -482,10 +566,27 @@ module Noxun
 
       # Jedna mutacia = jeden undo krok. Volat AZ PO validacii (chybny vstup
       # nesmie otvorit operaciu). -> [true, []] | [false, [chyby]]
+      #
+      # R-14: JEDINY CHOKE POINT vsetkych 12 mutacii, takze dopredny guard
+      # stoji TU — tesne pred `start_operation`, aby odmietnuta mutacia
+      # nezalozila ziadny krok Spat. Marker sa zapisuje PO mutacnom bloku,
+      # ale este PRED `commit_operation`: udaj a marker su tak JEDNA operacia
+      # (jeden krok Spat vrati oboje, vynimka pri zapise markera zrusi cely
+      # krok — ziadny polovicny zapis).
       def write!(model, operation_name)
         return [false, ['model nie je k dispozícii']] unless model
+
+        reason = std_block_reason(std_state(model))
+        return [false, [reason]] unless reason.empty?
+
         model.start_operation(operation_name, true)
-        yield
+        begin
+          @in_write = true
+          yield
+          stamp_std(model)
+        ensure
+          @in_write = false
+        end
         model.commit_operation
         [true, []]
       rescue StandardError => e
@@ -496,6 +597,13 @@ module Noxun
         end
         Engine.log_error(e, 'BudgetStore.write!') if defined?(Engine)
         [false, ['zmenu sa nepodarilo uložiť']]
+      end
+
+      # R-14: marker sa zapisuje VZDY ako AKTUALNA hodnota (nikdy sa nepreberá
+      # z ulozeneho stavu ani z klientskeho payloadu — autorita je verzia,
+      # ktora zapis vykonava). Bezi vnutri otvorenej operacie `write!`.
+      def stamp_std(model)
+        write_attr(model, KEY_STD, BUDGET_STD)
       end
 
       # --- pomocne -------------------------------------------------------------
