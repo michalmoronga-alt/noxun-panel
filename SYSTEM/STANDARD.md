@@ -929,6 +929,20 @@ Možnosti:
 - **DPH sa nepripočítava.** Firma je neplatca, katalógové ceny sú konečné a prepočet „bez DPH" je len zobrazenie, nikdy základ výpočtu.
 - **Neznáma cena sa NIKDY nenahradí nulou** — riadok ju prizná, medzisúčet je len zo známych cien a súhrn nahlas povie, že nie je úplný.
 
+**Dáta rozpočtu v zákazke a ich verzia (záväzné od v0.9.4, R-14).** Per zákazka žije v `NOXUN` dictionary **na MODELI** deväť kľúčov: `budget_mode` · `budget_overrides` ·
+`budget_std_multipliers` (cenové násobiče štandardných riadkov) · `budget_viz_m2` · `budget_custom_items[]` · `budget_appliances[]` · `budget_appliances_included` ·
+`budget_cp_overrides` · **`budget_std` (Integer) — verzia formátu týchto dát**. Čítajú sa cez uzavreté whitelisty, preto:
+
+- **Marker je povinný v každej zákazke, do ktorej sa rozpočet zapísal**, a zapisuje sa **v jedinom zápisovom bode** (`BudgetStore.write!`, cez ktorý ide všetkých 12 mutácií) —
+  vždy ako **aktuálna** hodnota `BudgetStore::BUDGET_STD`, nikdy sa nepreberá z uloženého stavu ani z klientskeho payloadu. **Zapisuje sa v TEJ ISTEJ operácii ako údaj** (údaj + marker = jeden krok Späť).
+- **Chýbajúci atribút = legacy zákazka** (spred R-14): mutácie prejdú a prvá z nich marker získa. **Prítomná, ale neplatná hodnota** (nie celé číslo ≥ 1, alebo zlyhané čítanie) je
+  **poškodenie dát** — mutácie sa odmietnu vlastnou hláškou. Fail-open `.to_i` je zakázaný: z poškodenej hodnoty nesmie vzniknúť povolenie.
+- **Dopredný guard:** uložené číslo **vyššie** než `BUDGET_STD` odmieta **VŠETKY mutácie rozpočtu** a **oba cenové exporty** (XLSX rozpočtu aj XLSX cenovej ponuky, zastavené ešte
+  pred výberom súboru — ich čísla by boli počítané z orezaného stavu). **Čítanie, zobrazenie, kusovník ani VEPO sa neblokujú** (rozpočtové dáta nenesú). Pozor na rozdiel:
+  blokuje sa **nekompatibilná verzia dát**, nie **rozpracovaný rozpočet** — ten je legitímny stav zákazky a rieši ho dvojkrokové potvrdenie vyššie v tejto sekcii.
+- **Disciplína bumpu:** číslo sa zvýši pri **každom rozšírení whitelistu rozpočtových dát o pole, ktorého tichá strata by poškodila cenu alebo objednávku** (nové pole vlastnej
+  položky, väzba spotrebiča na katalóg). Čisto odvodené alebo zobrazovacie pole bump nevyžaduje. Vykonateľná podoba: [`core/budget_store.rb`](../noxun_engine/core/budget_store.rb).
+
 ---
 
 ## 12. Otvorené body

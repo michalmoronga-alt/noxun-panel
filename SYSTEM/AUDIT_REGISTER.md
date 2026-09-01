@@ -279,6 +279,19 @@ nerozlišuje legacy/current/newer/invalid. **Rozhodnutie Michala:** doplniť č�
 Dáta rozpočtu v zákazke (8 NOXUN kľúčov) bez verzie formátu — prvý klik v Rozpočte nad zákazkou z novšieho
 pluginu ticho odreže neznáme polia (pasca pre spotrebiče S1). [S-12]
 **Návrh:** `budget_std` + dopredný guard (read-only s hláškou), tvar ako R-12. **S.**
+**✅ dávkou 1d/R-14 (PR #276, v0.9.4)** — `BudgetStore::BUDGET_STD = 1` (Integer, kľúč `budget_std`; meno `budget_std_multipliers` je náhodná zhoda — sú to cenové násobiče).
+Guard aj pečiatka žijú v **jedinom choke pointe `write!`** (ide ním všetkých 12 mutácií): kontrola stojí tesne PRED `start_operation` (odmietnutie nezaloží krok Späť), marker sa
+zapisuje PO mutačnom bloku a EŠTE PRED `commit_operation` — **údaj + marker = jedna operácia**, takže 1× Späť vráti oboje a výnimka pri zápise markera abortuje celý krok.
+Nízkoúrovňové `write_attr`/`write_json` mimo `write!` vyhadzujú výnimku (poistka pre budúcu mutáciu S1). Codex audit návrhu vrátil **1 BLOCKER + 3 FIXy + 2 NOTE**, všetky
+zapracované: **[B1]** cenové výstupy NIE SÚ bezpečné pri novšom markeri — stav sa počíta z orezaných dát, takže XLSX by niesol zlé čísla; kompatibilitný príznak ide
+**v budget payloade** (`budget_std`) → **trvalý banner v OBOCH sekciách** (Rozpočet aj Cenová ponuka) + **deaktivácia všetkých modelových ovládačov** vrátane `cp_group`
++ **server blokuje oba cenové exporty ešte PRED `savepanel`**; VEPO a nákupný CSV kovania sa NEBLOKUJÚ (rozpočtové dáta nenesú) a blokuje sa **nekompatibilná verzia dát, nie
+rozpracovanosť** rozpočtu (súlad so STANDARD §11.3). **[F2]** guard v jedinom choke pointe, marker v tej istej operácii. **[F3]** žiadny fail-open `.to_i` — legacy je VÝHRADNE
+neprítomný atribút (číta sa cez sentinel), `''`/`'abc'`/float/záporné/výnimka pri čítaní sú NEPLATNÝ marker s **odlišnou** hláškou („dáta sú poškodené"). **[F4]** in-SU sekcia
+je povinná (headless fake model Undo nevracia) — `run_r14`/`run_r14_async` dokazujú, že 1× Späť odstráni údaj AJ marker, ďalšia mutácia marker predošlej operácie NECHÁ a zlyhaný
+zápis markera nezanechá polovičný stav ani krok Späť. **[N5]** kanál chýb `do_budget → budgetResult(false) → čerstvý push → červený status` overený vrátane poradia.
+**[N6]** iná cesta zapisujúca rozpočtové kľúče neexistuje — od tejto dávky to stráži runtime guard aj test. Testy `tests/pure/test_r14_budget_std.rb` (19 scenárov, 7 mutácií
+overených) + `tests/js/test_r14_budget_std.js` (76) + in-SU `run_r14` / `run_r14_async` (20 scenárov).
 
 ### R-37 · P2 · core · `core/supplier_settings.rb` (`normalize` + `merge_seed` + `load`) + 3 ďalšie stores
 Z Codex auditu dávky 1d/R-11, nález B2 — **diera, ktorú `degraded?` NECHYTÁ**, lebo primár sa parsuje. Tvarovo PLATNÝ, ale obsahovo
@@ -461,7 +474,7 @@ B1 názov projektu (1b-6a, #244) · B2 hlavičky materiálov (1b-6b, #247) · A1
 blocker je len R-03 — GHOST smie na Windows štartovať hneď po ňom; R-01 je macOS vetva, R-02 je na Windows P3
 a R-04 je platformovo nezávislá hygiena — všetky tri sa dorobia v 1d nezávisle od GHOST štartu)* → 3. **pred KOVANÍM:** ~~R-06 brána~~ (✅) ·
 ~~R-07~~ (✅ #266) · ~~R-08~~ (✅) · potom R-05 (+R-06 plný) ako D-109 šev → 4. **pred D-95/VÝROBOU:** R-17, R-16, R-22, po etapách R-15 →
-5. **perzistencia:** ~~R-11~~ (✅ #274) → ~~R-12~~ (✅ #275) → R-14 (R-13 po rozhodnutí Michala; **R-37** a **R-38** pribudli z auditu R-11 — R-37 patrí k tej istej rodine, R-38 je samostatný UI kontrakt) → 6. **UI/hygiena:** ~~R-34~~ (✅ #262) ·
+5. **perzistencia:** ~~R-11~~ (✅ #274) → ~~R-12~~ (✅ #275) → ~~R-14~~ (✅ #276) (R-13 po rozhodnutí Michala; **R-37** a **R-38** pribudli z auditu R-11 — R-37 patrí k tej istej rodine, R-38 je samostatný UI kontrakt) → 6. **UI/hygiena:** ~~R-34~~ (✅ #262) ·
 R-23.1 Escape (S, hocikedy) · R-18 · zvyšok podľa kapacity. R-32 kostry priebežne pred každým zásahom.
 
 **Otvorené rozhodnutia Michala:** R-05 (rozsah zaokrúhľovania pomeru per zákazka vs per skrinka — rozhodne
