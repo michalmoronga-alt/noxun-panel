@@ -214,6 +214,11 @@ Tvar odovzdania stavu je ten istý ako všade inde, len bohatší: okrem `genera
 Kontrakt stráži `tests/pure/test_st1a_core.rb`, `tests/pure/test_st1a_studio.rb`, `tests/pure/test_st1b_kontrola.rb`, `tests/pure/test_st1c_nakup.rb` a
 `tests/pure/test_st1c_rozpocet.rb`.
 
+**Brány pred zápisom cenového súboru (P0-HF + 1d/R-14).** Oba XLSX exporty (`do_budget_xlsx`, `do_cp_xlsx`) majú pred `UI.savepanel` tri vrstvy v tomto poradí:
+**(1) kompatibilita dát** — `budget_std_block(budget)` číta VÝHRADNE príznak `budget['budget_std']` z payloadu (nikdy sa nepýta modelu druhýkrát: hárok musí stáť na tých istých dátach, z akých vznikli jeho čísla) a pri novšom/poškodenom markeri export zastaví hláškou zo `BudgetStore`;
+**(2) tvrdé blokery** `export_blockers` (záporná zostava, nesúlad ponuky s rozpočtom, zliate ID skriniek); **(3) potvrditeľné riadky bez ceny** `export_confirmations` (dvojkrokový export, STANDARD §11.3).
+Rozdiel medzi (1) a (3) je vecný a zámerný: **blokuje sa NEKOMPATIBILNÁ VERZIA dát, nie rozpracovanosť rozpočtu** — tú štandard výslovne pripúšťa a rieši potvrdením. `do_export` (VEPO) ani `do_hw_csv` bránu (1) nemajú: rozpočtové dáta nenesú, takže ich orezanie neskresľuje (rovnaká výnimka ako pri VEPO v P0-HF; stráži to guard test).
+
 ## Bez vlastného odseku
 
 ### bom.rb
@@ -246,11 +251,36 @@ Odhad počtu platní (2B-1/D-43) — zmienky v odseku `production_core.rb` a v s
 
 ### budget.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+_(kostra založená dávkou 1d/R-14 — doplniť pri ďalších zásahoch)_
+
+Čistý výpočet rozpočtu: `compute(bom, state, settings, …)` je funkcia bez modelu (BOM + katalógy + stav zákazky + sadzby dodávateľa → payload), `payload_for(model, …)` je jej tenká SketchUp nadstavba (`BudgetStore.state` + `SupplierSettings.active`).
+Cenová ponuka je VIEW nad hotovým payloadom (`cp_preview`), nie druhý výpočet — STANDARD §11.3.
+
+**Kompatibilita dát cestuje v payloade (1d/R-14).** `normalize_state` prijíma aj kľúč `std` (stav markera `budget_std` zo `BudgetStore.std_state`) a `compute` z neho skladá `payload['budget_std'] = { state, blocked, reason }`.
+Je to **jediná cesta**, ktorou sa o nekompatibilných dátach dozvie ktokoľvek ďalej: banner sekcie Rozpočet aj Cenová ponuka (`ui/js/budget.js`) a brána oboch cenových exportov (`ProductionCore.budget_std_block`) čítajú TENTO kľúč — nikto sa nepýta modelu druhýkrát a nikto si stav neodvodzuje sám.
+Stav bez kľúča (legacy volanie výpočtu, čisté testy) je `current`, teda **nikdy neblokuje** — výpočet kompatibilitu neposudzuje, len ju NESIE. Znenie hlášky skladá `BudgetStore.std_block_reason` (jeden textový zdroj pre mutácie, exporty aj UI).
 
 ### budget_store.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+_(kostra založená dávkou 1d/R-14 — doplniť pri ďalších zásahoch)_
+
+Dáta rozpočtu **konkrétnej zákazky** v `NOXUN` dictionary na MODELI (cestujú so `.skp`): `budget_mode`, `budget_overrides`, `budget_std_multipliers` (cenové násobiče), `budget_viz_m2`, `budget_custom_items[]`, `budget_appliances[]`, `budget_appliances_included`, `budget_cp_overrides` — a od 1d/R-14 aj `budget_std`.
+Každá z 12 mutácií má vlastnú malú metódu (`set_mode!`, `set_override!`, `add_custom_item!` …), validácia je serverová a beží **pred** otvorením operácie (chybný vstup neotvorí krok Späť), a všetky mutácie končia v jedinom zápisovom bode **`write!`** = jedna mutácia = jeden krok Späť.
+
+**Verzia formátu dát `budget_std` (1d/R-14, v0.9.4).** Rozpočtové dáta sa čítajú cez uzavreté whitelisty (`build_custom` / `build_appliance` / `numeric_map`), takže zákazka uložená NOVŠÍM pluginom by prvým klikom v Rozpočte ticho prišla o polia, ktorým táto verzia nerozumie — a nasledujúci XLSX by niesol podhodnotené číslo. Preto:
+
+- **`BUDGET_STD` (Integer) je verzia, ktorej rozumie táto verzia pluginu**, a zapisuje sa na model pod kľúčom `budget_std`. Meno `budget_std_multipliers` je NÁHODNÁ zhoda — sú to cenové násobiče, nie verzia.
+- **Guard aj pečiatka žijú v JEDINOM choke pointe `write!`:** kontrola markera stojí tesne PRED `start_operation` (odmietnutá mutácia nezaloží žiadny krok Späť), marker sa zapisuje
+  PO mutačnom bloku a EŠTE PRED `commit_operation` — **údaj a marker sú jedna operácia**, takže jeden Ctrl+Z vráti oboje a výnimka pri zápise markera abortuje celý krok (žiadny
+  polovičný zápis). Marker sa zapisuje **vždy ako aktuálna hodnota**, nikdy sa nepreberá z uloženého stavu ani z klientskeho payloadu.
+- **Nízkoúrovňové `write_attr` / `write_json` mimo `write!` vyhodia výnimku** (prepínač `@in_write`). Je to poistka pre BUDÚCU mutáciu (spotrebiče S1): kto by siahol na dict priamo, obišiel by dopredný guard aj marker.
+- **Žiadny fail-open.** `legacy` je VÝHRADNE neprítomný atribút (číta sa cez sentinel `STD_MISSING`, nie cez tolerantné `read_attr`) — ten prejde a prvá mutácia marker získa.
+  `''`, `'abc'`, `1.0`, `0`, `-1` aj výnimka pri čítaní sú `:invalid` a mutácie sa odmietajú **vlastnou hláškou** o poškodených dátach; vyššie číslo je `:newer` s hláškou
+  o novšej verzii. Poškodená hodnota sa NIKDY neprepisuje potichu.
+- **Čítanie sa neblokuje nikdy** — `state` novšiu zákazku prečíta a pridá do nej `'std'`; zastavené sú len mutácie a (cez payload) oba cenové exporty. VEPO a nákupný CSV kovania rozpočtové dáta nenesú, takže bránu nedostávajú.
+- **Disciplína bumpu:** číslo sa zvýši pri každom rozšírení whitelistu rozpočtových dát o pole, ktorého tichá strata by poškodila cenu alebo objednávku (blok 4 = väzba spotrebiča na katalóg). Detail v STANDARD §11.3.
+
+Testy: `tests/pure/test_r14_budget_std.rb` (19 scenárov, 7 mutácií overených) · `tests/js/test_r14_budget_std.js` (banner + vypnuté ovládače oboch sekcií) · in-SU `run_r14` a `run_r14_async` (undo atómovosť — headless fake model kroky Späť nevracia).
 
 ### price_refresh.rb
 

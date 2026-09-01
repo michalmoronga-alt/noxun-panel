@@ -1695,6 +1695,190 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # ============ 1d/R-14: VERZIA FORMATU DAT ROZPOCTU (`budget_std`) =========
+  #
+  # PRECO TU (a nie len headless): jadrom dispozicie je UNDO ATOMOVOST — udaj
+  # a marker musia byt JEDNA operacia. Fake model headless sady kroky Spat
+  # nevracia, takze „1x Spat vrati OBOJE" sa da dokazat vyhradne v SketchUpe.
+  # Dokazuje sa:
+  #   (1) legacy zakazka (bez markera) sa edituje a marker si tym zapise —
+  #       a JEDEN Ctrl+Z odstrani udaj AJ marker,
+  #   (2) dalsia mutacia: Ctrl+Z vrati UDAJ, marker z PREDOSLEJ operacie ZOSTAVA,
+  #   (3) vynimka pri zapise markera ABORTUJE cely krok (ziadny polovicny zapis
+  #       a ZIADNY krok Spat navyse),
+  #   (4) zakazka z NOVSEJ verzie: mutacia odmietnuta bez zapisu a bez kroku
+  #       Spat, ale CITANIE a payload beziá dalej (banner + brana exportov stoja
+  #       na `budget_std` priznaku v payloade),
+  #   (5) kanal chyb do okna: `do_budget` posle `budgetResult(op,false)`
+  #       a cerveny status s dovodom.
+  # Ctrl+Y (Znova) je v ASYNC casti — `send_action` je asynchronne.
+  #
+  # ZAMERNE TU NIE JE spustenie `do_budget_xlsx`: brana R-14 zastavi export
+  # PRED `savepanel`, ale keby zlyhala, runner by uviazol na modalnom dialogu
+  # ulozenia suboru. Spravanie brany kryje headless sada
+  # (`tests/pure/test_r14_budget_std.rb`) meranim „subor nevznikol + picker sa
+  # neotvoril"; tu sa overuje PRIZNAK, z ktoreho brana cita.
+  R14_KEYS = %w[budget_mode budget_overrides budget_std_multipliers budget_viz_m2
+                budget_custom_items budget_appliances budget_appliances_included
+                budget_cp_overrides budget_std].freeze
+
+  def r14_marker(model)
+    model.get_attribute(e::Store::DICT, e::BudgetStore::KEY_STD, nil)
+  end
+
+  # Cisty stol pre rozpocet zakazky — VLASTNY krok Spat, nikdy nie sucast
+  # mereneho scenara.
+  def r14_clear!(model)
+    model.start_operation('SU-TEST R-14 cleanup', true)
+    dict = model.attribute_dictionary(e::Store::DICT)
+    R14_KEYS.each { |k| dict.delete_key(k) } if dict
+    model.commit_operation
+  end
+
+  def r14_set_marker!(model, value)
+    model.start_operation('SU-TEST R-14 marker', true)
+    model.set_attribute(e::Store::DICT, e::BudgetStore::KEY_STD, value)
+    model.commit_operation
+  end
+
+  def run_r14(model)
+    bs = e::BudgetStore
+    cur = bs::BUDGET_STD
+    markers = []
+    r14_clear!(model)
+
+    # (1) LEGACY: mutacia prejde, marker vznikne, JEDEN Ctrl+Z vrati OBOJE.
+    ok('R-14: legacy zakazka (bez markera) — stav `legacy`', bs.std_state(model) == :legacy)
+    ok_mode, = bs.set_mode!(model, 'vysoky')
+    ok("R-14: mutacia legacy zakazky prejde a marker si zapise (#{r14_marker(model).inspect})",
+       ok_mode && bs.mode(model) == 'vysoky' && r14_marker(model) == cur)
+    Sketchup.undo
+    ok("R-14: 1x Spat vratil UDAJ AJ MARKER (rezim #{bs.mode(model)}, marker #{r14_marker(model).inspect})",
+       bs.mode(model) != 'vysoky' && r14_marker(model).nil?)
+
+    # (2) DALSIA mutacia: Spat vrati udaj, marker z PREDOSLEJ operacie ostava.
+    bs.set_mode!(model, 'vysoky')          # operacia A — marker vznikol
+    bs.set_viz_m2!(model, 25.0)            # operacia B — nad uz oznacenymi datami
+    ok("R-14: druha mutacia zapisala udaj (m² #{bs.viz_m2(model).inspect})", bs.viz_m2(model) == 25.0)
+    Sketchup.undo
+    ok("R-14: Spat nad DRUHOU mutaciou vratil udaj, marker z prvej OSTAL " \
+       "(m² #{bs.viz_m2(model).inspect}, marker #{r14_marker(model).inspect})",
+       bs.viz_m2(model).nil? && r14_marker(model) == cur)
+
+    # (3) VYNIMKA pri zapise markera = ABORT celeho kroku.
+    mode_before = bs.mode(model)
+    m1 = r03_marker(model, markers)
+    sc = bs.singleton_class
+    sc.send(:alias_method, :r14_orig_stamp_std, :stamp_std)
+    sc.send(:define_method, :stamp_std) { |_m| raise 'SU-TEST: zapis markera zlyhal' }
+    failed, errs = begin
+      bs.set_mode!(model, 'nizky')
+    ensure
+      sc.send(:remove_method, :stamp_std)
+      sc.send(:alias_method, :stamp_std, :r14_orig_stamp_std)
+      sc.send(:remove_method, :r14_orig_stamp_std)
+    end
+    ok("R-14: zlyhany zapis markera vratil chybu (#{Array(errs).join(' · ')})", failed == false)
+    ok("R-14: a NIC sa nezapisalo — rezim ostal #{bs.mode(model)}", bs.mode(model) == mode_before)
+    Sketchup.undo
+    ok('R-14: zlyhana mutacia NEZALOZILA ziadny krok Spat (1x Spat vratil marker)', !m1.valid?)
+
+    # (4) NOVSIA verzia: odmietnutie bez zapisu a bez kroku Spat, citanie zije.
+    r14_clear!(model)
+    bs.set_mode!(model, 'vysoky')
+    r14_set_marker!(model, cur + 1)
+    ok('R-14: marker z novsej verzie = stav `newer`', bs.std_state(model) == :newer)
+    m2 = r03_marker(model, markers)
+    ok2, errs2 = bs.set_mode!(model, 'nizky')
+    ok("R-14: mutacia nad novsou zakazkou ODMIETNUTA (#{Array(errs2).first.to_s[0, 60]})",
+       ok2 == false && Array(errs2).first.to_s.include?('novšej verzie Noxun'))
+    ok("R-14: odmietnutie nic nezapisalo (rezim #{bs.mode(model)}, marker #{r14_marker(model).inspect})",
+       bs.mode(model) == 'vysoky' && r14_marker(model) == cur + 1)
+    Sketchup.undo
+    ok('R-14: odmietnuta mutacia NEZALOZILA krok Spat (1x Spat vratil marker)', !m2.valid?)
+
+    st = begin
+      bs.state(model)
+    rescue StandardError => ex
+      info("R-14: BudgetStore.state vynimka: #{ex.class}: #{ex.message}")
+      nil
+    end
+    ok("R-14: citanie sa NEBLOKUJE — stav sa precital (rezim #{st && st['mode']}, std #{st && st['std']})",
+       !st.nil? && st['mode'] == 'vysoky' && st['std'] == 'newer')
+
+    # PRIZNAK, z ktoreho cita banner OBOCH sekcii aj brana cenovych exportov —
+    # meria sa nad ZIVYM modelom cez produkcnu cestu payloadu.
+    payload = begin
+      col = e::Bom.collect(model)
+      e::ProductionCore.budget_payload(model, e::Bom.compute(col), col)
+    rescue StandardError => ex
+      info("R-14: budget_payload vynimka: #{ex.class}: #{ex.message}")
+      nil
+    end
+    flag = payload.is_a?(Hash) ? payload['budget_std'] : nil
+    ok("R-14: payload rozpoctu nesie kompatibilitny priznak (#{flag.inspect})",
+       flag.is_a?(Hash) && flag['blocked'] == true && flag['state'] == 'newer' &&
+       flag['reason'].to_s.include?('novšej verzie'))
+    ok('R-14: a brana cenovych exportov by z neho zastavila zapis',
+       !e::ProductionCore.budget_std_block(payload).nil?)
+
+    # (5) KANAL CHYB do okna: echo vysledku + cerveny status s dovodom.
+    scripts = st1c_capture(e::StudioDialog) do
+      e::StudioDialog.do_budget(st1c_bud_payload('mode', 'mode' => 'nizky').to_json)
+    end
+    ok('R-14: okno dostalo `budgetResult(..., false)` — rozpisany draft sa nezavrie',
+       scripts.any? { |s| s.include?('budgetResult') && s.include?('false') })
+    ok('R-14: a cerveny status s dovodom („Nezapísané: …")',
+       scripts.any? { |s| s.include?('Nezapísané') && s.include?('novšej verzie Noxun') })
+
+    r14_clear!(model)
+    r03_clear_markers(model, markers)
+    ok("R-14: cleanup (rozpoctove data prec, marker #{r14_marker(model).inspect})",
+       r14_marker(model).nil? && markers.none?(&:valid?) &&
+       bs.mode(model) == e::SupplierSettings::DEFAULT_MODE)
+  rescue StandardError => ex
+    log_line("FAIL: R-14 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    r03_clear_markers(model, markers) if defined?(markers) && markers
+    r14_clear!(model)
+  end
+
+  # R-14 ASYNC: Ctrl+Y (Znova) — `send_action` je asynchronne, takze vysledok
+  # sa meria az v dalsom kroku retaze. Overuje sa DRUHA polovica atomovosti:
+  # ked jeden Ctrl+Z odstranil udaj aj marker, Znova musi vratit OBOJE.
+  def run_r14_async(model, state, steps)
+    steps << [0.5, lambda do
+      bs = e::BudgetStore
+      r14_clear!(model)
+      bs.set_mode!(model, 'vysoky')
+      state[:r14_after_write] = [bs.mode(model), r14_marker(model)]
+      Sketchup.undo
+      state[:r14_after_undo] = [bs.mode(model), r14_marker(model)]
+      state[:r14_redo_sent] =
+        if d101_send_action('editRedo') then :action_name
+        elsif d101_send_action(21836) then :action_id
+        end
+    end]
+    steps << [SETTLE, lambda do
+      bs = e::BudgetStore
+      w = state[:r14_after_write]
+      u = state[:r14_after_undo]
+      ok("R-14 async: Ctrl+Z odstranil udaj AJ marker (#{w.inspect} -> #{u.inspect})",
+         w == ['vysoky', bs::BUDGET_STD] && u.first != 'vysoky' && u.last.nil?)
+      now = [bs.mode(model), r14_marker(model)]
+      if state[:r14_redo_sent] && now == w
+        info("R-14 REDO: pouzita cesta #{state[:r14_redo_sent] == :action_name ? "send_action('editRedo')" : 'send_action(21836)'}")
+        ok("R-14 async: Znova vratilo UDAJ AJ MARKER naraz (#{now.inspect})", true)
+      elsif state[:r14_redo_sent]
+        info("R-14 REDO: redo akcia bola prijata, ale bez ucinku (stav #{now.inspect}) — " \
+             'Ruby API nema na Windows spolahlivu redo cestu; atomovost kryje undo vetva vyssie.')
+      else
+        info('R-14 REDO: redo akcia Ruby API nedostupna — Znova netestovane.')
+      end
+      r14_clear!(model)
+      ok('R-14 async: cleanup (rozpoctove data prec)', r14_marker(model).nil?)
+    end]
+  end
+
   # R-12 ASYNC: dva scenare, ktore musia prejst REALNYM debounce tikom.
   #
   # (R12a) SCALE nad skrinkou z NOVSEJ verzie. Observer sa NEMENI. Dokazuje sa:
@@ -11559,6 +11743,10 @@ module NoxunSuRunner
     # vedu cez REALNY debounce tick observera.
     run_r12_async(model, state, steps)
 
+    # R-14: Znova (Ctrl+Y) nad mutaciou rozpoctu — `send_action` je asynchronne,
+    # takze ucinok sa meria az v dalsom kroku retaze.
+    run_r14_async(model, state, steps)
+
     # GHOST V1-04: ghost vklad cez REALNY debounce tick — observer z neho nesmie
     # spravit „kopiu" ani pridat vlastny krok Spat (aj pri dvoch identickych
     # skrinkach = dedup cesta).
@@ -11654,6 +11842,7 @@ module NoxunSuRunner
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
     run_r03(model)           # R-03: sev prepare_insert/commit_insert — ciste pripravenie, vlastny rigidny transform, odmietnutia, edit kontext
     run_r12(model)           # 1d/R-12: dopredny guard configu — marker, odmietnuta prestavba bez mutacie a bez kroku Spat, kopia/sablony, citanie dalej bezi
+    run_r14(model)           # 1d/R-14: verzia formatu dat rozpoctu — marker v TEJ ISTEJ operacii (1x Spat vrati oboje), odmietnutie novsej zakazky bez zapisu a bez kroku Spat, citanie a priznak v payloade
     run_dockey(model)        # 1d/R-02b: identita dokumentu — `valid?` probe, rotacia pri onOpenModel nad RECYKLOVANYM objektom, onActivateModel nerotuje, fail-closed
     run_ghost(model)         # GHOST V1-04: vkladanie na klik — 0 mutacii pred klikom, zamok/free vyska, rotacia a kotvy, degenerovany luc, undo/prepnutie/druhe „Vlozit", sablona a peciatka
     run_d45(model)           # D-45: hrubka <-> material tela (18,6 mm deadlock)

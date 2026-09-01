@@ -142,6 +142,12 @@ prestavba), guard číta RAW uložený config a odmieta VÝHRADNE prestavbu a od
 kusovník, VEPO a exporty bežia ďalej; legacy skrinky bez markera prechádzajú, v0.9.3, 1.9.2026. Codex audit návrhu vrátil 2 BLOCKERy + 2 FIXy + 2 NOTE (všetky
 zapracované). Priznané zvyšky: novšia KÓPIA si necháva zdieľané ID (ORANGE Kontroly + brána P0-2 exportov) a pri **scale** používateľ hlášku nedostane —
 abort transparentnej absorpcie zruší aj jeho Scale krok, takže `reject_scale` sa nespustí (prevzatá vlastnosť observera, platí aj pre dnešný hardvérový guard). ·
+**R-14** — verzia formátu dát rozpočtu (`budget_std`): zákazka z NOVŠIEHO pluginu už prvým klikom v Rozpočte ticho nepríde o dáta. Osem rozpočtových kľúčov na modeli sa číta cez
+uzavreté whitelisty, takže neznáme polia sa doteraz orezali a zápisom zvečnili — a nasledujúci XLSX by niesol podhodnotené číslo. Marker aj guard žijú v jedinom zápisovom bode
+`BudgetStore.write!` (údaj + marker = JEDNA operácia = jeden krok Späť), legacy zákazky bez markera prechádzajú a marker si zapíšu; nekompatibilná zákazka sa ďalej **číta**, ale
+mutácie sú odmietnuté, obe sekcie (Rozpočet aj Cenová ponuka) nesú trvalý banner s dôvodom a **oba cenové exporty sú zastavené ešte pred výberom súboru** — VEPO a nákupný CSV
+kovania bežia ďalej, v0.9.4, 1.9.2026. Codex audit návrhu vrátil 1 BLOCKER + 3 FIXy + 2 NOTE (všetky zapracované; blokuje sa nekompatibilná VERZIA dát, nie rozpracovanosť
+rozpočtu — súlad so STANDARD §11.3). ·
 **R-02b** — stabilný kľúč dokumentu (`core/doc_key.rb`) namiesto `Model#guid` vo VŠETKÝCH identity guardoch (Ctrl+S už nezahadzuje rozpísanú prácu panela,
 zón, tagov, Štúdia, Pravidiel ani Materiálov; New/Open ďalej chráni pred zápisom do cudzej zákazky; Save As identitu vedome drží — Codex audit BLOCKER 3),
 v0.8.23, 30.8.; priznaný zvyšok R-02 tým padol, JS aj tvar payloadov nezmenené. ·

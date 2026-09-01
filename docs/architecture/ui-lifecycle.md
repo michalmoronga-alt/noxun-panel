@@ -1492,6 +1492,19 @@ konci — kým mala každá polovica vlastnú dvojicu, jedno prekreslenie ju spr
 guard test): `studio.js` priraďuje celé `window.NX = {…}`, takže v opačnom poradí by prepísal obal aj `budgetResult`/`priceRefresh` a rozpočet by po prvom zápise zamrzol. Prefixy
 `bud*`/`BUD_*` sú tam preto, že oba súbory bežia v JEDNOM globálnom scope (kolízia mena `renderBody` medzi `studio.js` a `budget.js`).
 
+#### NEKOMPATIBILNÉ DÁTA ROZPOČTU (1d/R-14, v0.9.4)
+
+zákazka z NOVŠIEHO pluginu (alebo s poškodeným markerom `budget_std`) sa **ďalej číta a zobrazuje**, ale jej čísla sú počítané z OREZANÉHO stavu. Payload preto nesie príznak
+`budget.budget_std` (`{ state, blocked, reason }`, skladá ho `Budget.std_payload`) a klient z neho robí tri veci — **v OBOCH sekciách, Rozpočet aj Cenová ponuka**:
+**(1) trvalý banner** `budStdBannerHtml` navrchu tela (nie status — ten by zmizol pri prvom prekreslení, a payload chodí po každom kliku; vzor bannerov R-07/R-11, trieda `.hwbanner`),
+**(2) vypnuté ovládače** — jeden prechod `budStdDisable(box)` po každom zo štyroch kreslení (telo + lišta, obe sekcie) nad `[data-bud]` uzlami podľa zoznamu `BUD_STD_OFF`
+(režim, prepis sumy, násobok, m², spotrebiče v súčte, pridávačky, ⋯ editor, mazanie, inline polia, prepínač „samostatne" **a oba XLSX exporty**). Jeden prechod nad hotovým DOM je
+zámerne lacnejší než podmienka v pätnástich markup funkciách — a nedá sa zabudnúť pri pridaní ďalšieho ovládača (stačí ho zapísať do `BUD_STD_OFF`).
+**ZÁMERNE zapnuté ostávajú** prepínač DPH a „Obnoviť" (číre zobrazenie) a **„Prepočítať ceny"** — ten zapisuje do KATALÓGU cien, nie do zákazky, a jeho výsledok je správny bez ohľadu na verziu dát rozpočtu.
+**(3) poistka v odosielacej ceste** (`budSend`, `budXlsx`, `budCpExport`): klik zo zastaraného DOM sa NEPOŠLE a okno povie dôvod červeným statusom.
+Autorita je server v oboch smeroch — mutácie odmieta `BudgetStore.write!`, exporty `ProductionCore.budget_std_block`, a znenie hlášky má **jeden zdroj** (`BudgetStore.std_block_reason`), takže klient si žiadny text neskladá.
+Kanál odmietnutia je ten istý, aký má každý neúspešný zápis: `do_budget` → `NX.budgetResult(op, false)` → čerstvý payload → červený status („Nezapísané: …").
+
 #### GENERAČNÝ KONTRAKT (audit #1) — najdôležitejšia vec dávky
 
 budget-iniciovaný push ide `push_state(bump: false)` — payload je **plný** (Kontrola dostane čerstvé rozpočtové ORANGE), ale **generácia okna sa nedvíha**. Mutácia rozpočtu totiž

@@ -17,6 +17,30 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1d/R-14 · VERZIA FORMÁTU DÁT ROZPOČTU — `budget_std` (v0.9.4, 1.9.2026, PR #276):** rozpočet zákazky žije v ôsmich `NOXUN` kľúčoch **na modeli**
+  (režim, prepisy súm, násobky, m² vizualizácie, vlastné položky, spotrebiče, ich započítanie a zaradenie v ponuke) a **všetky sa čítajú cez uzavreté whitelisty**
+  (`build_custom`, `build_appliance`, `numeric_map`). Zákazka uložená NOVŠÍM pluginom by teda prvým klikom v Rozpočte ticho prišla o polia, ktorým staršia verzia
+  nerozumie — a zápis by stratu **zvečnil**. Pasca mierila priamo na blok 4 (spotrebiče S1 dostanú väzbu na katalóg). Verziu formátu pritom dáta nemali žiadnu;
+  meno `budget_std_multipliers` je náhodná zhoda (cenové násobiče), nie marker.
+  **Čo platí teraz:** `BudgetStore::BUDGET_STD = 1` pod kľúčom `budget_std`. Guard aj pečiatka žijú v **jedinom choke pointe `write!`**, ktorým ide všetkých 12 mutácií:
+  kontrola stojí tesne PRED `start_operation` (odmietnutie nezaloží žiadny krok Späť) a marker sa zapisuje PO mutačnom bloku, ale EŠTE PRED `commit_operation` —
+  **údaj a marker sú jedna operácia**. Legacy zákazka (bez atribútu) sa edituje ako doteraz a prvou mutáciou marker získa; nekompatibilná sa ďalej **číta a zobrazuje**,
+  ale mutácie sú odmietnuté, obe sekcie Štúdia (Rozpočet aj Cenová ponuka) nesú **trvalý banner** s dôvodom, ich modelové ovládače sú **vypnuté** (vrátane prepínača
+  „samostatne") a **oba cenové exporty server zastaví ešte pred výberom súboru**. VEPO a nákupný CSV kovania bránu nedostávajú — rozpočtové dáta nenesú.
+  **Codex audit návrhu vrátil 1 BLOCKER + 3 FIXy + 2 NOTE, všetky zapracované.** **(B1)** pôvodný návrh „read-only s hláškou" považoval cenové výstupy za bezpečné —
+  nie sú: stav sa počíta z už orezaných dát, takže XLSX by niesol **zlé čísla**. Preto kompatibilitný príznak cestuje **v budget payloade** (`budget['budget_std']`),
+  ktorý už používajú obe sekcie aj obe exportné cesty — jeden zdroj pravdy pre banner, pre vypnutie ovládačov aj pre bránu. Rozdiel voči P0-HF je vecný a je v štandarde:
+  blokuje sa **nekompatibilná VERZIA dát**, nie **rozpracovaný rozpočet** (ten STANDARD §11.3 výslovne pripúšťa a rieši dvojkrokovým potvrdením). **(F2)** guard patrí
+  do `write!`, nie do dvanástich metód. **(F3)** žiadny fail-open `.to_i`: `legacy` je **výhradne neprítomný atribút** (číta sa cez sentinel, nie cez tolerantné
+  `read_attr`), kým `''`, `'abc'`, float, záporné číslo aj **výnimka pri čítaní** sú NEPLATNÝ marker a mutácie odmietajú **odlišnou** hláškou o poškodených dátach —
+  z poškodenej hodnoty nesmie vzniknúť povolenie. **(F4)** in-SU sekcia je povinná, lebo headless fake model kroky Späť nevracia. **(N5)** kanál chýb do okna
+  (`budgetResult(op,false)` → čerstvý payload → červený status) je overený **vrátane poradia**. **(N6)** iná cesta zapisujúca rozpočtové kľúče neexistuje — a aby
+  nevznikla, `write_attr`/`write_json` mimo `write!` odteraz **vyhadzujú výnimku** (poistka pre budúcu mutáciu S1).
+  **Priznaný zvyšok:** „Prepočítať ceny" ostáva nad nekompatibilnou zákazkou ZAPNUTÉ — zapisuje do katalógu cien, nie do zákazky, a jeho výsledok je správny bez ohľadu
+  na verziu rozpočtových dát. Overenie: 2280 headless (+19), 78 JS sád (+1, 76 assertov), in-SU **1264 PASS / 0 FAIL** (`run_r14` + `run_r14_async`: 1× Späť vráti údaj
+  AJ marker, ďalšia mutácia marker predošlej operácie necháva, zlyhaný zápis markera nezanechá polovičný stav ani krok Späť). **Ctrl+Y sa v SketchUpe cez Ruby API
+  nepodarilo vyvolať** (známa Windows vlastnosť, rovnako ako v D-101/STALE) — Znova je v logu ako INFO, atómovosť dokazuje undo vetva. 7 mutácií kódu overených.
+
 - **1d/R-12 · DOPREDNÝ GUARD CONFIGU KORPUSU — `config_schema` (v0.9.3, 1.9.2026, PR #275):** config skrinky je **uzavretý whitelist**
   (`CabinetBuilder.normalize` + `cabinet_config`): číta sa z neho presne toľko kľúčov, koľko daná verzia pozná, a všetko ostatné pri prvej prestavbe vypadne.
   Pre zákazku otvorenú **starším** pluginom to znamenalo tichú stratu — nový typ čela (rola `flap` sa v `BuildPlan::ROLES` už nachádza, ale neznámy typ sa

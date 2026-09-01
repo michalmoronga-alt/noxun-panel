@@ -133,7 +133,11 @@ module Noxun
             'cp_highlight_threshold' => SupplierSettings.scalar(sup, 'cp_highlight_threshold')
           },
           'viz_m2' => st['viz_m2'],
-          'appliances_included' => st['appliances_included']
+          'appliances_included' => st['appliances_included'],
+          # R-14: kompatibilita DAT ROZPOCTU v zakazke. Pri novsom/neplatnom
+          # markeri su sumy nizsie pocitane z OREZANEHO stavu — okno to musi
+          # povedat bannerom a cenove exporty sa zastavia.
+          'budget_std' => std_payload(st['std'])
         }
         payload['budget_check'] = check(payload)
         # E-b2: CENOVA PONUKA je VIEW nad TYMTO payloadom — nahlad v UI aj export
@@ -696,7 +700,27 @@ module Noxun
           'custom_items' => Array(s['custom_items']).select { |i| i.is_a?(Hash) },
           'appliances' => Array(s['appliances']).select { |i| i.is_a?(Hash) },
           'appliances_included' => (s['appliances_included'] == true),
-          'cp_overrides' => (s['cp_overrides'].is_a?(Hash) ? s['cp_overrides'] : {}) }
+          'cp_overrides' => (s['cp_overrides'].is_a?(Hash) ? s['cp_overrides'] : {}),
+          # R-14: verzia formatu dat rozpoctu. Stav bez tohto kluca (legacy
+          # volanie vypoctu, ciste testy) = 'current' — vypocet je cista
+          # funkcia a kompatibilitu neposudzuje, len ju NESIE dalej.
+          'std' => std_state_of(s['std']) }
+      end
+
+      # R-14: povolene stavy markera (`BudgetStore.std_state`).
+      STD_STATES = %w[legacy current newer invalid].freeze
+
+      def std_state_of(value)
+        v = value.to_s
+        STD_STATES.include?(v) ? v : 'current'
+      end
+
+      # R-14: KOMPATIBILITNY PRIZNAK v payloade. Cesta je zamerne jedna: sekcia
+      # Rozpocet, sekcia Cenova ponuka aj obe cenove exportne brany citaju TENTO
+      # kluc — nikto sa nepyta modelu druhykrat a nikto si stav neodvodzuje sam.
+      def std_payload(state)
+        reason = BudgetStore.std_block_reason(state)
+        { 'state' => state, 'blocked' => !reason.empty?, 'reason' => reason }
       end
 
       def estimate_for(bom, sheets)
