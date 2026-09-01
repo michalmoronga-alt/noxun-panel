@@ -22,6 +22,7 @@ Decision: do not lock derived-part identity/model yet. First collect real system
   - KD 18 -> EB 10.5
   - KD 19 -> EB 9.5
 - For Noxun V1, EB can therefore be fixed to 10.5 unless later requirements justify exposing the axis.
+- **Confirmed production rule:** bottom material thickness = 16 mm and wooden rear-panel thickness = 16 mm for Atira V1.
 
 ### Quadro / TANDEM family
 - User correction: Quadro width calculation depends on the selected runner / installation width EB.
@@ -48,5 +49,6 @@ Important: do NOT infer that Quadro and TANDEM have identical formulas. They sha
 ## Evidence status
 - User production choices: confirmed by user, 2026-09-01.
 - Atira formulas: confirmed by user-supplied Hettich sheet and official Hettich catalogue.
+- Atira 16 mm bottom + 16 mm wooden rear panel: confirmed by user, 2026-09-01.
 - Quadro EB23 profile / width: official Hettich runner documentation.
 - TANDEM formulas: official Blum technical catalogue.
