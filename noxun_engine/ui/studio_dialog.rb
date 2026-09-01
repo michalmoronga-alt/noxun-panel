@@ -122,7 +122,13 @@ module Noxun
         # HTML, takze `execute_script` by prisiel do prazdna. Odklada sa a
         # spotrebuje ju NAJBLIZSI `push_state` (pri novom okne ho vyvola
         # `ready`, pri uz otvorenom ho volame priamo tu).
+        #
+        # D-52a (B2): restart latch — po aktualizacii lezia na disku NOVE
+        # `ui/studio.html` a `ui/js/*.js`, ale v pamati bezi STARY Ruby; okno sa
+        # preto az do restartu SketchUpu neotvara.
         def show(open_section: nil, anchor: nil)
+          return nil if Engine.update_restart_pending?
+
           @pending_section = SECTIONS.include?(open_section.to_s) ? open_section.to_s : nil
           @pending_anchor = @pending_section ? anchor.to_s.strip : nil
           @pending_anchor = nil if @pending_anchor.to_s.empty?
