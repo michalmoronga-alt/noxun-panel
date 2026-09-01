@@ -1,5 +1,7 @@
 # KOVANIE V1 — FINÁLNA ARCHITEKTÚRA (2026-09-02)
 
+> Stav: KONCEPT-FINAL — uzavretý podklad pre task packages (autorita dávky = package v SYSTEM/PLAN.md); neimplementovať priamo.
+
 > **Status: FINAL po cross-audite.** Nahrádza §5 source packu (`KOVANIE_CROSSAUDIT_2026-09-01_SOURCE_PACK.md`)
 > so zapracovanými zmenami R1–R12 z reconcile a rozhodnutiami Michala O1–O3 (2.9.2026).
 > Je to PODKLAD pre task packages (package = autorita dávky, šablóna 1e) — žiadne ďalšie veľké návrhové kolo.

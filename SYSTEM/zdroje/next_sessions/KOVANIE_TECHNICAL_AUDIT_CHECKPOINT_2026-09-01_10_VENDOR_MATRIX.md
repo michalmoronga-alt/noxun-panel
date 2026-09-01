@@ -1,5 +1,7 @@
 # KOVANIE — technical audit checkpoint 2026-09-01 #10 — VENDOR RESEARCH MATRIX
 
+> Stav: KONCEPT / pracovný checkpoint — nie implementačný spec, neimplementovať priamo; uzavretá architektúra: KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md.
+
 > Working research checkpoint. NOT implementation spec.
 > Zdroj: nezávislý research subagent (Round 2 Orchestrator), 1.9.2026 — oficiálne katalógy Hettich/Blum + Démos Trade.
 > Tagy dôveryhodnosti: VERIFIED OFFICIAL · VERIFIED SECONDARY · USER-CONFIRMED NOXUN · INFERRED · UNCONFIRMED.

@@ -1,5 +1,7 @@
 # KOVANIE V1 — ORCHESTRATOR REVIEW PACKAGE
 
+> Stav: KONCEPT / pracovný checkpoint — nie implementačný spec, neimplementovať priamo; uzavretá architektúra: KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md.
+
 > **Status:** REVIEW INPUT / CHALLENGE PACKAGE — **NOT an implementation spec**.
 > **Date:** 2026-09-01
 > **Goal:** challenge the proposed V1 hardware architecture against the real repository, domain logic, implementation cost, and actual user value **before implementation**.

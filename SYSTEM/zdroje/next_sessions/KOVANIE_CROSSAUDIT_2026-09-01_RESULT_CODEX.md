@@ -1,5 +1,7 @@
 # CROSS-AUDIT VÝSLEDOK — CODEX (2026-09-01)
 
+> Stav: KONCEPT / pracovný checkpoint — nie implementačný spec, neimplementovať priamo; uzavretá architektúra: KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md.
+
 > Zverejnené po dobehnutí všetkých troch auditov (blind protokol dodržaný — audítori sa navzájom nevideli).
 > Audítor: Codex CLI (gpt-5.6-sol, effort high), lokálny repo prístup, task-mtizkxnj-mf1ppr, 13m26s.
 > Fokus: implementovateľnosť proti reálnemu kódu.

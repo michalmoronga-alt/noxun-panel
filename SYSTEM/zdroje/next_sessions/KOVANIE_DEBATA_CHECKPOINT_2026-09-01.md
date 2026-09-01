@@ -1,5 +1,7 @@
 # KOVANIE — checkpoint USER debaty 2026-09-01
 
+> Stav: KONCEPT / pracovný checkpoint — nie implementačný spec, neimplementovať priamo; uzavretá architektúra: KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md.
+
 > **Stav:** PRACOVNÝ CHECKPOINT / USER-DEBATA — nie implementačný spec, neimplementovať priamo.
 > **Účel:** zachovať rozhodnutia z hlasovej debaty s Michalom a umožniť bezpečne nadviazať aj po kompresii kontextu.
 > **Súvisiace podklady:** `SYSTEM/PLAN.md` blok KOVANIE, `SYSTEM/DOGFOODING.md` D-109/D-110/D-111, `SYSTEM/POJMY.md` Kovanie — sety, `SYSTEM/zdroje/next_sessions/03_KOVANIE_FAZA3.md`.

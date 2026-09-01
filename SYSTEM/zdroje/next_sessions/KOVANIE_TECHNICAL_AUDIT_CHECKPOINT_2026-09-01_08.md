@@ -1,5 +1,7 @@
 # KOVANIE — technical audit checkpoint 2026-09-01 #08
 
+> Stav: KONCEPT / pracovný checkpoint — nie implementačný spec, neimplementovať priamo; uzavretá architektúra: KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md.
+
 Working research checkpoint. NOT implementation spec.
 
 ## C10 — derived drawer parts: AUDIT FIRST
