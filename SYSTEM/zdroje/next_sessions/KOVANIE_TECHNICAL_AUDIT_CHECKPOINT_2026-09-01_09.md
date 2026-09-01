@@ -42,6 +42,14 @@ User-confirmed production rule:
 - Therefore in V1, `height_variant` deterministically selects the basic railing-count composition for these three Atira variants; no separate railing-count user axis is needed for the standard recipe.
 - The concrete railing / connector SKUs and supplier packaging remain procurement/component data and still require catalogue/Demos audit.
 
+## Atira wooden rear-panel width
+
+User-confirmed production rule:
+
+- `H70`, `H144`, and `H176` use the same rear-panel width formula: `RB = LB - 2*EB - 63`.
+- `height_variant` changes the rear-panel **height** and railing composition, not the rear-panel width formula.
+- Therefore V1 should keep rear-panel width on the shared Atira geometry recipe and keep rear-panel height as height-variant data.
+
 ## Architectural implication
 
 This strengthens the existing slim-V1 direction:
@@ -60,3 +68,4 @@ Do not lock derived-part identity from this checkpoint; C10 remains AUDIT FIRST.
 - Quadro V1 Noxun default height clearance = `40 mm`; defined as recipe/data default rather than an official Hettich constant: user-confirmed 2026-09-01.
 - Atira H70/H144/H176 resolver = highest safely compatible height variant from actual available internal vertical space + manual override: user-confirmed 2026-09-01.
 - Atira railing composition H70=0, H144=1 per side, H176=1 per side: user-confirmed 2026-09-01.
+- Atira rear-panel width formula shared across H70/H144/H176: `RB = LB - 2*EB - 63`; only rear-panel height changes with height variant: user-confirmed 2026-09-01.
