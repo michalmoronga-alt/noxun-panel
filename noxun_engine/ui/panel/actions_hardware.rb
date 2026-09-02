@@ -238,11 +238,32 @@ module Noxun
         def hw_manual_search_result(query, gen)
           items, total = HardwareCatalog.search_with_total(HardwareCatalog.items, query.to_s,
                                                            top: MANUAL_SEARCH_TOP)
+          items, total = drop_inactive(items, total)
           { 'gen' => gen.to_i, 'total' => total.to_i,
             'items' => Array(items).map { |i| manual_search_item(i) } }
         rescue StandardError => e
           Engine.log_error(e, 'Panel.hw_manual_search_result')
           { 'gen' => gen.to_i, 'total' => 0, 'items' => [] }
+        end
+
+        # Codex #285 kolo 2 (P2-I): `search_with_total` vracia NEAKTIVNU polozku
+        # pri PRESNEJ zhode kodu aj bez `include_inactive` — je to vedomy
+        # kontrakt katalogu (kto kod pozna, ma pravo ho v katalogu najst).
+        # V naseptavaci je to ale pasca: vykreslila by sa ako bezny vyber
+        # a pouzivatel, ktory pozna stary kod, by si do zakazky pridal polozku,
+        # ktoru katalog vedie ako UZ NEOBJEDNAVANU.
+        #
+        # ZAPISOVA cesta (`norm_hardware_manual` / `HardwareCatalog.find`) sa
+        # VEDOME NEMENI: polozka, ktora v configu uz je (legacy zakazka,
+        # sablona), musi prestavbu prezit — zahodit ju by znamenalo ticho
+        # odobrat kus z objednavky.
+        #
+        # `total` sa znizuje o to, co filter zahodil — inak by ponuka slubovala
+        # viac, nez sa da vybrat (zasada „no silent caps" plati aj naopak).
+        def drop_inactive(items, total)
+          list = Array(items)
+          kept = list.reject { |i| i.is_a?(Hash) && i['active'] == false }
+          [kept, [total.to_i - (list.length - kept.length), kept.length].max]
         end
 
         def manual_search_item(item)

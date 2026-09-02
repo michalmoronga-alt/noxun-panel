@@ -244,11 +244,38 @@ NxTest.test('KOV-H2: hladanie NEPONUKA neaktivne polozky') do
   NxTest.assert(codes.include?('KOVH2-A'), 'aktivna polozka sa v ponuke najde')
   NxTest.refute(codes.include?('KOVH2-OFF'),
                 'do zakazky sa nema dostat kod, ktory uz nikto neobjednava')
-  # JEDINA vynimka je PRESNY kod — rovnako ako v katalogu Studia: kto ho pozna,
-  # ma pravo ho vidiet (a serverova kontrola zapisu `active` aj tak nerieši).
-  exact = Noxun::Engine::Panel.hw_manual_search_result('KOVH2-OFF', 2)
-  NxTest.assert(exact['items'].map { |i| i['code'] }.include?('KOVH2-OFF'),
-                'presny kod neaktivnu polozku najde (kontrakt `search_with_total`)')
+end
+
+# Codex #285 kolo 2 P2-I: `search_with_total` vracia neaktivnu polozku pri
+# PRESNEJ zhode kodu (vedomy kontrakt katalogu). V naseptavaci je to pasca —
+# vykreslila by sa ako bezny vyber a kto pozna stary kod, pridal by si do
+# zakazky polozku, ktoru katalog vedie ako uz neobjednavanu.
+NxTest.test('KOV-H2: ani PRESNY kod neaktivnu polozku do ponuky nepusti') do
+  NxKovh2.catalog_ready!
+  raw, raw_total = Noxun::Engine::HardwareCatalog.search_with_total(
+    Noxun::Engine::HardwareCatalog.items, 'KOVH2-OFF', top: 20
+  )
+  NxTest.assert(raw.map { |i| i['item_code'] }.include?('KOVH2-OFF'),
+                'PREMISA: katalog ju pri presnej zhode kodu vracia')
+  res = Noxun::Engine::Panel.hw_manual_search_result('KOVH2-OFF', 2)
+  NxTest.refute(res['items'].map { |i| i['code'] }.include?('KOVH2-OFF'),
+                'naseptavac ju uz NEPONUKA')
+  NxTest.assert_equal res['items'].length, res['total'],
+                      'a `total` nesluboje viac, nez sa da vybrat (no silent caps naopak)'
+  NxTest.assert(res['total'] < raw_total || raw_total.zero?,
+                "filter sa v pocte PRIZNA (surovy #{raw_total} -> #{res['total']})")
+end
+
+NxTest.test('KOV-H2: ZAPISOVA cesta sa NEMENI — legacy polozka prezije prestavbu') do
+  NxKovh2.catalog_ready!
+  # Polozka s neaktivnym kodom UZ v configu (legacy zakazka, sablona) musi
+  # prestavbu prezit — zahodit ju by znamenalo ticho odobrat kus z objednavky.
+  rows = NxKovh2::CB.norm_hardware_manual([NxKovh2.cat_item('code' => 'KOVH2-OFF')])
+  NxTest.assert_equal 1, rows.length, 'citacia cesta ju NEZAHADZUJE'
+  NxTest.assert_equal 'Zrušený uholník', rows.first['name'],
+                      'a nazov jej dopĺňa katalog ako kazdej inej'
+  body = NxKovh2.src('ui/panel/actions_hardware.rb')[/def drop_inactive.*?\n        end\n/m].to_s
+  NxTest.refute(body.empty?, 'filter zije LEN v naseptavaci')
 end
 
 NxTest.test('KOV-H2: hladanie vracia NAJVIAC 20 poloziek') do
