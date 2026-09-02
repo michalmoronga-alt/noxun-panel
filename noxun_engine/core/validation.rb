@@ -15,6 +15,10 @@
 #            - ABS paska hrany MIMO KATALOGU (2A-2 audit F6: hrana referencuje
 #              abs_id, ktore v aktualnom katalogu nie je — napr. po zmazani pri
 #              migracii; kontrola bezi LEN ked volajuci ABS katalog dodal)
+#            - KOV-A1: dvierka s vedome NEURCENYM smerom otvarania
+#              (`front_direction`, z aditivneho `hardware_issues`) — jediny RED,
+#              ktory ZATIAL nema exportnu branu (O1/R-39; legacy configy bez
+#              pola sa negatuju a nalez nikdy nedostanu)
 #   ORANGE — podozrenie na prehliadnutie:
 #            - celo/dvierka (front_door/drawer_front) bez JEDINEJ ABS hrany
 #            - volna doska (free_panel) bez ABS ("skontroluj — moze byt zamer")
@@ -72,6 +76,14 @@ module Noxun
       # zapisovalo do modelu a robilo krok Späť pri obycajnom CITANI. Odteraz sa to
       # PRIZNA a opravu spusti az realna akcia zapisu (observer / zapis z panela).
       CAT_DUP_ID      = 'duplicate_identity'
+      # RED — KOV-A1 (O1, R-39): dvierka s vedome NEURCENYM smerom otvarania
+      # (= strana pantov). Nalez je LEN nalez: ZIADNA exportna brana. Smer dnes
+      # nemeni ziadne vydane cislo (nakup ani rezy), brana pristane az s prvym
+      # vystupom, ktory smer realne ponesie (D-95 vyrobne zadanie) — a je do
+      # tej doby PRE-COMMITTED v SYSTEM/AUDIT_REGISTER.md (R-39).
+      # LEGACY configy (kluc `direction` vobec nemaju) sem NIKDY nepridu —
+      # `Fronts.direction_slots` im vrati stav nil a `Bom` z neho nalez netvori.
+      CAT_FRONT_DIR   = 'front_direction'
 
       # Druh top-level kusu, ktory MA KOVANIE. Zdielana konstanta preto, ze
       # „skrinka vs. doska" nie je kozmetika textu: len pri skrinke zliatie
@@ -111,6 +123,9 @@ module Noxun
       #                          disabled} ... ]  (raw — disabled polozky su TU, v
       #                          config.hardware[] uz nie su, nalez 2)
       #   warnings: [ {code, message, owner_id, part_key} ... ]
+      #   hardware_issues: [ {code, severity, owner_id, owner_pid, part_key,
+      #                       front_id, label} ... ]  (KOV-A1; nil/chybajuci =
+      #                       kontrola sa preskoci — legacy volania bez zmeny)
       # sheets: { material_id => { 'thickness' => Float, 'sheet_size' => [l, w] } }
       #   (katalog dosiek; headless testy krmia mapu priamo, v SketchUpe Materials.sheets)
       # edges: { abs_id => zaznam } — katalog ABS pasok pre kontrolu abs_missing
@@ -151,6 +166,7 @@ module Noxun
         end
         Array(collected[:records]).each { |r| check_record(r, smap, emap, items) }
         Array(collected[:hardware_overrides]).each { |ov| check_hardware(ov, items) }
+        check_hardware_issues(collected[:hardware_issues], items)
         check_hardware_expansion(hardware_expansion, items)
         check_placements(placements, items)
         check_identities(identities, items)
@@ -538,6 +554,45 @@ module Noxun
                           "vlastné ID. #{follow} Identita sa opraví pri najbližšom zásahu " \
                           'do modelu (posuň kópiu alebo ju uprav v Inspectore).',
           'stable_key' => "#{CAT_DUP_ID}|#{kind}|#{id}" }
+      end
+
+      # --- KOV-A1: tvrde nalezy kovania (`hardware_issues` z Bom.collect) ----
+      #
+      # Aditivny kluc zberu; nil / chybajuci = kontrola sa cela preskoci (legacy
+      # volania a headless testy bez neho, vzor `placements:`). V A1 sa spracuva
+      # JEDINY kod — ostatne (KOV-C/D: drawer_no_fit, owner bez setu…) sa
+      # ZAMERNE ignoruju, aby ich prve verzie neprepadli do Kontroly skor, nez
+      # bude hotova ich brana.
+      def check_hardware_issues(issues, items)
+        Array(issues).each do |iss|
+          next unless iss.is_a?(Hash)
+          next unless iss['code'].to_s == 'front_direction_unset'
+
+          items << front_direction_item(iss)
+        end
+      end
+
+      # RED riadok „dvierka bez urceneho smeru". Znenie podla mockupu (scena 4):
+      # menuje CELO (`label` zo servera — `PartKeys.human_label`) aj SKRINKU
+      # a otvorene hovori, ze export zatial nezastavi.
+      #
+      # `owner_pid` je EXTRA pole MIMO `stable_key` (vzor `extra:` v
+      # `record_item`): identita PROBLEMU je kategoria + vlastnik + dielec, aby
+      # klik-select po prestavbe nasiel cerstvu entitu; `owner_pid` je len
+      # adresa VYSKYTU pri duplicitnom `cabinet_id` (FIX 11).
+      def front_direction_item(iss)
+        oid = iss['owner_id'].to_s
+        pkey = iss['part_key'].to_s
+        label = iss['label'].to_s.strip
+        label = pkey.empty? ? 'čelo' : pkey if label.empty?
+        { 'severity' => RED, 'category' => CAT_FRONT_DIR,
+          'owner_id' => oid, 'part_key' => (pkey.empty? ? nil : pkey), 'hw_key' => nil,
+          'owner_pid' => iss['owner_pid'],
+          'message_sk' => "Čelo #{label} (#{oid.empty? ? '—' : oid}) — smer otvárania je " \
+                          '„Neurčený“. Smer = strana pántov; urči ho v karte čela. ' \
+                          'Exporty to zatiaľ neblokuje (smer nemení žiadne dnešné číslo) — ' \
+                          'zablokuje až výrobné zadanie, ktoré smer ponesie (D-95).',
+          'stable_key' => "#{CAT_FRONT_DIR}|#{oid}|#{pkey}" }
       end
 
       # --- kontroly kovania a stavby ----------------------------------------
