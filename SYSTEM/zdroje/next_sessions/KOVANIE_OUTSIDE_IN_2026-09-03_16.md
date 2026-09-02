@@ -37,7 +37,7 @@
 
 | # | Nález | Verdikt | Dôvod / dopad |
 |---|---|---|---|
-| 1 | Symbol otvárania: DIN EN 12519 / ISO 7519 kreslí vrchol trojuholníka **k pántom**, náš náhľad aj overlay (A2a/A2b) kreslia šípku **na voľnú hranu** | **OTVORENÉ — otázka pre Michala (O4)**: ako číta symbol slovenský stolár/výkres? Ak DIN, prehodiť orientáciu šípky (S, jedna konštanta `ARROW_TIP` + `pvSymPathXY` + JS) v malej fix dávke po A2 | zdroje sú katalógy noriem (paywall) — „VERIFIED" tu znamená existenciu stránky, nie prečítaný text; rozhoduje prax, nie norma |
+| 1 | Symbol otvárania: DIN EN 12519 / ISO 7519 kreslí vrchol trojuholníka **k pántom**, náš náhľad aj overlay (A2a/A2b) kreslia šípku **na voľnú hranu** | **ZATVORENÉ (O4, Michal 3.9.): „šípka na voľnú hranu sedí — nič nemeníme, normy sú rôzne, mne sedí táto."** | zdroje sú katalógy noriem (paywall) — „VERIFIED" tu znamená existenciu stránky, nie prečítaný text; rozhoduje prax, nie norma |
 | 2 | Blum/Hettich nemajú verejné JSON API (len BXF/CAD portály) | BERIEME (potvrdenie) | recepty ako zmrazené JSON data packy v repe (KOV-C §3) sú správna cesta |
 | 3 | imos/Polyboard/Cabinet Vision = fail-closed + zámky držia až do konfliktu | BERIEME (potvrdenie O2/R3) | dôkaz slabý (produktové stránky), ale zhoda s našou architektúrou |
 | 4 | Snapshot receptov v AttributeDictionary OK; Overlay `draw` nesmie meniť model | BERIEME (známe) | kategória mala byť MISSED CONSTRAINT; pre A2b už platí |

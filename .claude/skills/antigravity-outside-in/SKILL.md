@@ -39,8 +39,12 @@ precedens nesie **licenciu** (GPL = vzory áno, kód nie; proprietárny produkt 
 4. **Reconcile (orchestrátor, krátko):** pri každom nálezi „berieme / neberieme / mení návrh" + dôvod, do toho istého súboru; ALREADY
    EXISTS a SIMPLER NATIVE PATH sa **pred prijatím overia probe snippetom v SketchUp 2026** (SkAgent `execute_ruby`) — modely si API
    vymýšľajú. Až potom `codex-audit` nad (prípadne upraveným) návrhom.
-5. **Ekonomika:** Gemini pool je veľkorysý, ale Codex má kĺzavé okno ~5 h zdieľané GH review + CLI (3.9.: dva paralelné Codex audity ho
-   vyčerpali) — outside-in rešerš patrí na agy, nie na Codex.
+5. **Ekonomika:** Gemini pool je veľkorysý (pilot 3.9.: dva behy ≈ 2,2 % 5-hodinového limitu), ale Codex má kĺzavé okno ~5 h zdieľané GH review + CLI
+   (3.9.: dva paralelné Codex audity ho vyčerpali) — outside-in rešerš patrí na agy, nie na Codex.
+6. **Kusovanie (Michal 3.9.): Gemini Flash NIE JE thinking model** — odpovedá rýchlo, ale bez kôl uvažovania. Preto: **jeden beh = 1–2 cielené otázky**
+   (nie šesť), pokojne 3–6 malých paralelných behov; každý beh dostane len výsek kontextu, ktorý k otázke patrí. Syntézu packetov a reconcile robí
+   orchestrátor; keď treba súdiť medzi protichodnými zdrojmi, druhé kolo pusti na thinking modeli (`gemini-3.1-pro-high` alebo `claude-opus-4-6-thinking`
+   z pool-u agy) s už nájdenými URL — retrieval lacno (Flash), úsudok draho (Pro/Opus) a len tam, kde treba.
 
 ## Pasce
 
