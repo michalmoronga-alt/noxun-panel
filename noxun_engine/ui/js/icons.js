@@ -186,6 +186,22 @@
     // hrane. Zasuvkove celo pouziva existujuci 'rows-2' (rad vodorovnych celo),
     // vyklop 'p-top' (horna hrana = os otacania) a „Bez cela" 'front'.
     'door': '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M8 3v18"/><path d="M16 11v2"/>',
+    // ===== KOV-A2a: typegrid karty cela + smery otvarania ===================
+    // Prekreslene z mockupu SYSTEM/zdroje/ui20/mockup_kovanie_v1.html (32x26)
+    // do Lucide mriezky 24x24. Vzdy plati: PLNA ciara = dielec, PRERUSOVANA =
+    // pohyb (kam sa celo otvara) — to iste pravidlo ma nahlad.
+    // Vyklop: panel dole, celo sa dviha NAHOR.
+    'front-lift': '<rect x="3" y="9" width="18" height="12" rx="1"/><path d="m9 6 3-3 3 3" stroke-dasharray="2 2"/>',
+    // Sklop: panel hore, celo padá NADOL.
+    'front-fall': '<rect x="3" y="3" width="18" height="12" rx="1"/><path d="m9 18 3 3 3-3" stroke-dasharray="2 2"/>',
+    // Blenda: pevny dielec — preskrtnuty panel (ziadny pohyb, ziadne kovanie).
+    'front-blind': '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="m3 4 18 16"/><path d="M21 4 3 20"/>',
+    // Smer = STRANA PANTOV. Sipka ukazuje na VOLNU hranu, teda kam sa krídlo
+    // otvara: `dir-left` (panty vlavo) = hrot vpravo.
+    'dir-left': '<path d="m7 5 10 7-10 7" stroke-dasharray="3 2"/>',
+    'dir-right': '<path d="M17 5 7 12l10 7" stroke-dasharray="3 2"/>',
+    // Neurcene: prerusovany kruh s otaznikom — je to STAV, nie strana.
+    'dir-unset': '<circle cx="12" cy="12" r="7" stroke-dasharray="3 2"/><path d="M12 9v3"/><path d="M12 15.5h.01"/>',
     // ===== UI-D1: hrana dielca v karte (square-dashed-top) ==================
     // JEDNA ikona pre vsetky styri hrany — ktora hrana to je, povie ROTACIA
     // (CSS `.eic[data-rot]`), nie styri kresby. Plna hrubsia ciara = hrana, o
