@@ -856,7 +856,8 @@
   .ecsw-taped { background: var(--nx-edge-taped); }
 
   /* --- ŠT-1b (audit #7): SPUSTACE oboch prepinacov -------------------------
-     „Zvýrazniť hrany" a „Smer kresby" ziju od tejto davky v liste sekcie
+     „Zvýrazniť hrany", „Smer kresby" a (od KOV-A2b) „Smer otvárania" ziju
+     v liste sekcie
      KONTROLA okna Studio (predtym v tabe Kontrola zaniknuteho okna Vyroba). Styly su
      preto TU, v zdielanom panel.css, a ZAMERNE NESCOPNUTE — kopia v HTML okna
      by bola druha pravda o tom, ako prepinac vyzera.
@@ -865,15 +866,15 @@
      ale ZANIKLI — lista zaniknuteho okna Vyroba sa zmazala cela (audit #9) a v Studiu ma
      spustac tvar ROHOVEHO TROJUHOLNIKA (audit #15, mockup), takze by to bolo
      mrtve CSS v zdielanom subore. */
-  .ecbtn, .gcbtn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  .ecbtn, .gcbtn, .dcbtn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
             cursor: pointer; font: inherit; font-size: 12px; padding: 5px 11px; border-radius: 6px;
             background: var(--nx-surface-sunken); color: var(--nx-ink-strong);
             border: 1px solid var(--nx-border); }
-  .ecbtn:hover, .gcbtn:hover { background: var(--nx-ghost-hover); }
-  .ecbtn.on, .gcbtn.on { background: var(--nx-select); color: var(--nx-on-accent);
+  .ecbtn:hover, .gcbtn:hover, .dcbtn:hover { background: var(--nx-ghost-hover); }
+  .ecbtn.on, .gcbtn.on, .dcbtn.on { background: var(--nx-select); color: var(--nx-on-accent);
             border-color: var(--nx-select); }
-  .ecbtn.on:hover, .gcbtn.on:hover { background: var(--nx-select-strong); }
-  .ecbtn .ic, .gcbtn .ic { width: 14px; height: 14px; }
+  .ecbtn.on:hover, .gcbtn.on:hover, .dcbtn.on:hover { background: var(--nx-select-strong); }
+  .ecbtn .ic, .gcbtn .ic, .dcbtn .ic { width: 14px; height: 14px; }
   /* Rohovy trojuholnik pri „Zvýrazniť hrany" (audit #15) — TEN ISTY vzor ako
      v raile Inspectora: trojuholnik je ZNAMIENKO (pseudo-prvok), klikacia zona
      je SAMOSTATNE tlacidlo v pravom dolnom rohu (vnorene tlacidlo je neplatne

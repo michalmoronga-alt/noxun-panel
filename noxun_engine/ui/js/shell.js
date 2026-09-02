@@ -331,6 +331,35 @@
       return { available: available, on: on, tip: tip };
     }
 
+    // ===== KOV-A2b: prepinac „Smer otvárania" v raile ========================
+    // CISTA funkcia — z jedineho serveroveho stavu (`DirectionCheck.ui_state`)
+    // spravi to, co ma DOM nasadit. Presne ten isty vzor ako `grainRail`, len
+    // s vlastnymi textami; klient si NIC neprepocitava a NIC si nepamata.
+    // 1 krídlo / 2–4 krídla / 5+ krídel — zrkadlo `direction_wing_plural` v Ruby.
+    function directionWingWord(n){
+      var v = Math.abs(Number(n) || 0);
+      if (v === 1) return 'krídlo';
+      if (v >= 2 && v <= 4) return 'krídla';
+      return 'krídel';
+    }
+    function directionRail(st){
+      var s = st || {};
+      var available = (s.available !== false);
+      var on = available && !!s.active;
+      var tip;
+      if (!available){
+        tip = 'Smer otvárania — vyžaduje SketchUp 2023 alebo novší';
+      } else if (on){
+        tip = 'Smer otvárania čiel je ZAPNUTÝ';
+        if (s.wings != null) tip += ' — ' + s.wings + ' ' + directionWingWord(s.wings);
+        if (s.unknown) tip += ' · ' + s.unknown + ' neurčených';
+        if (s.legacy) tip += ' · ' + s.legacy + ' bez smeru (legacy)';
+      } else {
+        tip = 'Smer otvárania čiel v modeli (zapnúť/vypnúť)';
+      }
+      return { available: available, on: on, tip: tip };
+    }
+
     return {
       secKey: secKey,
       exclusiveClose: exclusiveClose,
@@ -354,6 +383,8 @@
       sectorMeta: sectorMeta,
       grainRail: grainRail,
       grainPartWord: grainPartWord,
+      directionRail: directionRail,
+      directionWingWord: directionWingWord,
       mode: function(){ return state.mode; },
       label: function(){ return state.label; }
     };
@@ -627,6 +658,13 @@
   function onGrainCheckToggle(){
     if (window.sketchup && sketchup.nx_grain_toggle)
       sketchup.nx_grain_toggle(JSON.stringify({ model_guid: nxModelGuid }));
+  }
+  // KOV-A2b: SMER OTVARANIA z raily. Ta ista cesta ako prepinac v ŠTÚDIU
+  // (Engine.toggle_direction_check) — panel si ZIADNY vlastny stav nedrzi.
+  // Guard dokumentu je rovnaky ako pri ABS a kresbe.
+  function onDirectionCheckToggle(){
+    if (window.sketchup && sketchup.nx_direction_toggle)
+      sketchup.nx_direction_toggle(JSON.stringify({ model_guid: nxModelGuid }));
   }
   // Identita dokumentu, ktoreho stav panel prave zobrazuje. Chodi v KAZDOM
   // pushi (init aj loadSelected/loadBoard); pri prazdnom vybere sa drzi
@@ -923,5 +961,18 @@
     n.setAttribute('aria-pressed', s.on ? 'true' : 'false');
     n.setAttribute('aria-disabled', s.available ? 'false' : 'true');
     var tip = el('railKresbaTip');
+    if (tip) tip.textContent = s.tip;
+  }
+
+  // KOV-A2b: to iste pre SMER OTVARANIA. Rozhodovanie je v CISTEJ funkcii
+  // NXShell.directionRail (Node testy) — tu ostava len nasadenie do DOM.
+  function nxApplyDirectionCheck(st){
+    var n = el('railSmer');
+    if (!n) return;
+    var s = NXShell.directionRail(st);
+    n.classList.toggle('on', s.on);
+    n.setAttribute('aria-pressed', s.on ? 'true' : 'false');
+    n.setAttribute('aria-disabled', s.available ? 'false' : 'true');
+    var tip = el('railSmerTip');
     if (tip) tip.textContent = s.tip;
   }

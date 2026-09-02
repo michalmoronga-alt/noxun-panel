@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.9.16' unless defined?(VERSION)
+    VERSION = '0.9.17' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -308,6 +308,32 @@ module Noxun
       log_error(e, 'Engine.broadcast_grain_check')
     end
 
+    # --- KOV-A2b: zdielane prepnutie SMERU OTVARANIA ------------------------
+    # Presna kopia vzoru vyssie. JEDINE miesto, kde sa symboly smeru otvarania
+    # prepinaju — volaju ho VSETCI klienti: rail Inspectora aj lista sekcie
+    # Kontrola v okne Studio. Dva vstupne body nesmu mat dva stavy.
+    # Ziadna operacia a ziadny zapis do modelu: DirectionCheck je overlay NAD
+    # modelom, nie jeho obsah (lekcia D-103/D-105).
+    def self.toggle_direction_check(model = nil)
+      return nil unless defined?(DirectionCheck)
+
+      state = DirectionCheck.toggle(model || Sketchup.active_model)
+      broadcast_direction_check(state)
+      state
+    rescue StandardError => e
+      log_error(e, 'Engine.toggle_direction_check')
+      nil
+    end
+
+    # `state = nil` je zamer: po PREPOCTE (prestavba pri zapnutych symboloch) sa
+    # cerstve cisla nikde nedrzia a kazde okno si ich vypyta samo.
+    def self.broadcast_direction_check(state = nil)
+      StudioDialog.push_direction_check(state) if defined?(StudioDialog) # lista sekcie Kontrola
+      Panel.push_direction_check(state) if defined?(Panel)               # rail Inspectora
+    rescue StandardError => e
+      log_error(e, 'Engine.broadcast_direction_check')
+    end
+
     # --- D-27: zdielane prepnutie VIDITELNOSTI TAGU MODELU ------------------
     # JEDINE miesto, kde sa viditelnost tagu prepina — volaju ho OBA vstupne
     # body: okno tagov v raile Inspectora aj checkbox „Zobraziť zóny (ghost)
@@ -474,7 +500,8 @@ Sketchup.require 'noxun_engine/core/validation'    # V0.5 D kontrolny semafor vy
 Sketchup.require 'noxun_engine/core/edge_check'     # D-104 kontrola hran (po validation — zdiela jeho definicie UNI/nelepitelnych)
 Sketchup.require 'noxun_engine/core/hover_edge'     # D-89a hrana pod kurzorom (pred edge_overlay — ten definuje jej Overlay triedu)
 Sketchup.require 'noxun_engine/core/grain_check'    # K2/D-87 smer kresby (po edge_check — zdiela jeho prechod modelom; pred edge_overlay)
-Sketchup.require 'noxun_engine/core/edge_overlay'   # D-104 Sketchup::Overlay + ModelObserver (SU 2023+, guardovane) + D-89a HoverEdgeOverlay + K2 GrainOverlay
+Sketchup.require 'noxun_engine/core/direction_check' # KOV-A2b smer otvarania (po grain_check — zdiela jeho vzory; pred edge_overlay)
+Sketchup.require 'noxun_engine/core/edge_overlay'   # D-104 Sketchup::Overlay + ModelObserver (SU 2023+, guardovane) + D-89a HoverEdgeOverlay + K2 GrainOverlay + KOV-A2b DirectionOverlay
 Sketchup.require 'noxun_engine/core/supplier_settings' # V0.6 E-a: sadzby/rezimy/standardne riadky rozpoctu (globál)
 Sketchup.require 'noxun_engine/core/budget_store'  # V0.6 E-a: data rozpoctu v zakazke (po store + supplier_settings)
 Sketchup.require 'noxun_engine/core/budget'        # V0.6 E-a: vypocet rozpoctu (po bom/sheet_estimate/budget_store)

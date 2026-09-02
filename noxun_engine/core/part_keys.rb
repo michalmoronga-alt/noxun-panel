@@ -113,6 +113,16 @@ module Noxun
       ZONE_PART_LABELS = { 'shelf' => 'Polica', 'divider_v' => 'Zvislá priečka',
                            'divider_h' => 'Vodorovná priečka' }.freeze
 
+      # KOV-A2b: ID CELA z kluca dielca (`front:F2/wing:single` -> „F2"), inak
+      # nil. Pouziva ju deep-link „klik na RED nález otvorí kartu čela" — kluc
+      # ineho druhu (zona, doska, korpus) sa NEHADA a Inspector nedostane nic.
+      # CISTA funkcia (ziadne IO), zamerne TU: format kluca je kontrakt tohto
+      # modulu a druhy parser inde by sa casom rozisiel.
+      def front_id(key)
+        m = key.to_s.strip.match(%r{\Afront:([^/]+)/})
+        m ? m[1] : nil
+      end
+
       # „F2" podla poradia v resolved celach; bez zhody surove id.
       def front_no(front_id, fronts)
         idx = Array(fronts).index { |f| f.is_a?(Hash) && f['id'].to_s == front_id.to_s }

@@ -1,0 +1,26 @@
+{
+  "note": "KOV-A2b: SPOLOCNA tabulka fixtur pre RUBY overlay (DirectionCheck) a JS nahlad (core.js). Obe sady citaju TENTO subor a porovnavaju svoj vysledok s tym istym 'expect' — tym je dokazane, ze model a nahlad kreslia to iste. `null` = nekresli sa NIC (legacy). Zmena pravidla = zmena TU (a obe sady spadnu naraz).",
+  "wings": [
+    { "case": "1 kridlo, panty vlavo -> sipka na volnu hranu vpravo", "wings_n": 1, "slots": [{ "wing": "single", "state": "left" }], "expect": ["left"] },
+    { "case": "1 kridlo, panty vpravo", "wings_n": 1, "slots": [{ "wing": "single", "state": "right" }], "expect": ["right"] },
+    { "case": "1 kridlo, vedome NEURCENE -> otaznik (nie strana)", "wings_n": 1, "slots": [{ "wing": "single", "state": "unset" }], "expect": ["unknown"] },
+    { "case": "1 kridlo LEGACY (kluc chyba) -> NIC", "wings_n": 1, "slots": [{ "wing": "single", "state": null }], "expect": [null] },
+    { "case": "1 kridlo bez slotu -> strana sa NEHADA", "wings_n": 1, "slots": [], "expect": [null] },
+    { "case": "2 kridla su ODVODENE (geometricky iste)", "wings_n": 2, "slots": [], "expect": ["left", "right"] },
+    { "case": "3 kridla: krajne odvodene, stredne podla slotu", "wings_n": 3, "slots": [{ "wing": "p2", "state": "unset" }], "expect": ["left", "unknown", "right"] },
+    { "case": "3 kridla bez slotu: stredne sa NEKRESLI, krajne ano", "wings_n": 3, "slots": [], "expect": ["left", null, "right"] },
+    { "case": "3 kridla, stredne panty vpravo", "wings_n": 3, "slots": [{ "wing": "p2", "state": "right" }], "expect": ["left", "right", "right"] },
+    { "case": "4 kridla, obe stredne urcene", "wings_n": 4, "slots": [{ "wing": "p2", "state": "left" }, { "wing": "p3", "state": "right" }], "expect": ["left", "left", "right", "right"] },
+    { "case": "4 kridla, jedno stredne legacy", "wings_n": 4, "slots": [{ "wing": "p3", "state": "unset" }], "expect": ["left", null, "unknown", "right"] },
+    { "case": "ziadne kridlo = ziadny symbol", "wings_n": 0, "slots": [], "expect": [] }
+  ],
+  "types": [
+    { "case": "vyklop sa dviha nahor", "type": "lift", "expect": "up" },
+    { "case": "sklop pada nadol", "type": "fall", "expect": "down" },
+    { "case": "blenda sa NEHYBE", "type": "blind", "expect": "cross" },
+    { "case": "zasuvka je VEDOME bez symbolu", "type": "drawer_front", "expect": null },
+    { "case": "dvierka riesia kridla, nie typ", "type": "door", "expect": null },
+    { "case": "Bez cela", "type": "none", "expect": null },
+    { "case": "neznamy typ z novsej verzie", "type": "sliding_2027", "expect": null }
+  ]
+}

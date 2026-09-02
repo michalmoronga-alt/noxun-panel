@@ -429,6 +429,9 @@ NX_DK_GUID_ALLOWED = {
   # a nejde o zapisovu cestu: overlay lifecycle, nie identita zapisu.
   'noxun_engine/core/edge_check.rb' => 2,
   'noxun_engine/core/grain_check.rb' => 2,
+  # KOV-A2b: `DirectionCheck.same_model?` je BAJT-ZHODNY s vetvou vyssie
+  # (overlay lifecycle, nie zapisova cesta) — plati preto to iste zdovodnenie.
+  'noxun_engine/core/direction_check.rb' => 2,
   'noxun_engine/core/hover_edge.rb' => 2
 }.freeze
 

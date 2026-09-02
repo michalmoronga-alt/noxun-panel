@@ -300,7 +300,12 @@ cez `data-rot` v CSS — nikdy štyri ikony),
 `grain` (K2/D-87 — kontrola smeru kresby: dielec naležato so **šrafovaním**,
 teda miniatúra toho, čo overlay kreslí v modeli; čiary nedobiehajú k hrane
 rovnako ako v `core/grain_check.rb`. **Jedna kresba pre obe miesta** — rail
-Inspectora aj prepínač „Smer kresby" v lište sekcie Kontrola v Štúdiu).
+Inspectora aj prepínač „Smer kresby" v lište sekcie Kontrola v Štúdiu),
+`direction` (KOV-A2b — smer otvárania v modeli: panel čela s **prerušovanou
+šípkou na voľnú hranu**, teda miniatúra toho, čo overlay kreslí, presne ako
+`grain` pri kresbe dekoru. Plná čiara = dielec, prerušovaná = pohyb — to isté
+pravidlo ako `dir-left`/`dir-right` v karte. **Jedna kresba pre obe miesta** —
+rail Inspectora aj prepínač „Smer otvárania" v lište sekcie Kontrola).
 
 > **Inventár je úplný k v0.7.28** (blok UI-D uzavretý, `grain` doplnený dávkou
 > „Kontrola kresby v raile"; dávka „ABS 3-stav v raile" **žiadnu ikonu

@@ -67,6 +67,10 @@ module Noxun
             # Ten isty vzor ako `edge_check` — PULL pri otvoreni panela, dalsie
             # zmeny pushom (z raily aj zo Studia). CISTE CITANIE.
             grain_check: grain_check_state,
+            # KOV-A2b: stav symbolov smeru otvarania pre tretiu funkcnu ikonu
+            # raily. Ten isty vzor ako `grain_check` — PULL pri otvoreni panela,
+            # dalsie zmeny pushom (z raily aj zo Studia). CISTE CITANIE.
+            direction_check: direction_check_state,
             # UI-B3 (koliesko): nastavenia POCITACA — rozmerove rady (N6) pre
             # ponuky pri rozmeroch a meno aktualnej temy pre prepinac vzhladu.
             # Nie su to data zakazky (ziju v %APPDATA%, nikdy v .skp).
@@ -175,6 +179,45 @@ module Noxun
           js("if (window.NX && NX.setGrainCheck) NX.setGrainCheck(#{st.to_json});")
         rescue StandardError => e
           Engine.log_error(e, 'Panel.push_grain_check')
+        end
+
+        # KOV-A2b: stav symbolov smeru otvarania pre rail. Nedostupny/nenacitany
+        # DirectionCheck (SketchUp bez Overlay API) = ikona zosedne, panel sa tym
+        # nezhodi. Cisla sklada VYHRADNE server (`DirectionCheck.ui_state`).
+        def direction_check_state
+          return { 'available' => false, 'active' => false } unless defined?(DirectionCheck)
+
+          DirectionCheck.ui_state(Sketchup.active_model)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.direction_check_state')
+          { 'available' => false, 'active' => false }
+        end
+
+        # Protajsok StudioDialog#push_direction_check. Vola ho
+        # Engine.broadcast_direction_check (klik z raily aj zo Studia) a
+        # DirectionCheck po prepocte cache (prestavba pri zapnutych symboloch).
+        def push_direction_check(state = nil)
+          return unless dialog_alive?
+
+          st = state || direction_check_state
+          js("if (window.NX && NX.setDirectionCheck) NX.setDirectionCheck(#{st.to_json});")
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.push_direction_check')
+        end
+
+        # KOV-A2b DEEP-LINK: klik na RED nález „smer otvárania" v Kontrole
+        # (Studio) uz oznacil dielec v modeli — toto navyse otvori jeho KARTU
+        # CELA v Inspectorovi. Server si o tom NIC nepamata: posiela sa jediny
+        # udaj (ID cela) a rozhodnutie „prepni kontext, otvor kartu, doscrolluj"
+        # robi klient. Zavrety Inspector = neposiela sa nic.
+        def push_focus_front(front_id)
+          fid = front_id.to_s
+          return if fid.empty?
+          return unless dialog_alive?
+
+          js("if (window.NX && NX.focusFront) NX.focusFront(#{fid.to_json});")
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.push_focus_front')
         end
 
         # dedup: false = refresh po programovom selecte zo Studia (V0.5 B,

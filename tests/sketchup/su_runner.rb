@@ -11597,6 +11597,382 @@ module NoxunSuRunner
     log_line("INFO: KOV-A1 cleanup katalogu: #{ex.class}: #{ex.message}")
   end
 
+  # ===== KOV-A2b: SMER OTVARANIA V MODELI ===================================
+  # Overuje to, co headless sada NEVIE: zivotny cyklus overlayu, ze zapnutie
+  # NEVYROBI krok Spat ani nezmeni model, ze symbol sedi na SPRAVNOM kridle
+  # a na prednej ploche, ze prestavba aj Spat kresbu prekreslia, ze dve
+  # skrinky so zdielanym `cabinet_id` kreslia KAZDA PODLA SEBA — a vykon.
+
+  def a2b_overlay_present?(model)
+    return false unless model.respond_to?(:overlays)
+
+    model.overlays.to_a.any? do |o|
+      o.respond_to?(:overlay_id) && o.overlay_id.to_s == e::DirectionCheck::OVERLAY_ID
+    end
+  end
+
+  def a2b_state(model)
+    e::DirectionCheck.ui_state(model)
+  end
+
+  # Zaznam kresby konkretneho VYSKYTU dielca zo scan cache.
+  def a2b_occ(part)
+    cache = e::DirectionCheck.instance_variable_get(:@cache)
+    pid = part && part.valid? && part.respond_to?(:entityID) ? part.entityID : nil
+    return nil if pid.nil?
+
+    Array(cache ? cache['occurrences'] : []).find { |o| o['part'] == pid }
+  end
+
+  def a2b_symbol_of(part)
+    occ = a2b_occ(part)
+    occ ? occ['symbol'] : nil
+  end
+
+  def a2b_points(part)
+    occ = a2b_occ(part)
+    Array(occ ? occ['lines'] : [])
+  end
+
+  # Bod, v ktorom sa stretava NAJVIAC usecek — pri sipke je to HROT.
+  def a2b_tip(part)
+    pts = a2b_points(part)
+    return nil if pts.empty?
+
+    pts.group_by { |p| [mm(p.x).round(2), mm(p.y).round(2), mm(p.z).round(2)] }
+       .max_by { |_, v| v.length }&.first
+  end
+
+  def a2b_item(type, over = {})
+    { 'id' => 'F1', 'type' => type, 'mode' => 'auto', 'wings' => '1' }.merge(over)
+  end
+
+  def a2b_params(items, over = {})
+    { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0,
+      'thickness' => 18.0, 'floor_height' => 100.0,
+      'fronts' => { 'items' => items } }.merge(over)
+  end
+
+  def a2b_part(inst, key)
+    inst.definition.entities.grep(Sketchup::ComponentInstance)
+        .find { |i| e::Store.kind(i) == 'part' && e::Store.get(i, 'part_key').to_s == key }
+  end
+
+  # Obal dielca vo SVETOVYCH mm — dielec je VNORENY, takze plati
+  # `inst.transformation * part.transformation` (rovnako ako v skene).
+  def a2b_world_box(inst, part)
+    tr = inst.transformation * part.transformation
+    b = part.definition.bounds
+    lo = b.min.transform(tr)
+    hi = b.max.transform(tr)
+    xs = [mm(lo.x), mm(hi.x)].sort
+    ys = [mm(lo.y), mm(hi.y)].sort
+    { x_min: xs[0], x_max: xs[1], x_mid: (xs[0] + xs[1]) / 2.0, y_min: ys[0], y_max: ys[1] }
+  end
+
+  # Jedna skrinka s dvierkami daneho smeru; vrati [instancia, dielec kridla].
+  def a2b_door(model, over, key = 'front:F1/wing:single')
+    inst = e::CabinetBuilder.build(model, a2b_params([a2b_item('door', over)]))
+    [inst, inst ? a2b_part(inst, key) : nil]
+  end
+
+  # Klik na nalez Kontroly presne tak, ako ho posiela Studio (`nx_select`).
+  def a2b_do_select(model, key, focus)
+    gen = e::StudioDialog.instance_variable_get(:@generation).to_i
+    e::ProductionCore.do_select(model, { 'gen' => gen, 'problem_key' => key,
+                                         'focus_inspector' => focus },
+                                generation: gen, status: ->(_m, _err = false) {}, repush: -> {})
+  end
+
+  # Panel v runneri OTVORENY nie je: HtmlDialog sa stane `visible?` az ked sa
+  # pretoci message loop (preto je sekcia D-52b stepovana), takze `focus` by
+  # bol vzdy false a ceruzka by sa nedala overit vobec. Na cas scenara sa preto
+  # nahradia PRESNE DVE veci — odpoved `dialog_alive?` a odchytenie
+  # `push_focus_front`. Resolver, rozhodnutie o cieli aj vyber v modeli bezia
+  # NAOSTRO (to je to, co sa testuje).
+  def a2b_with_panel_stub(captured)
+    sc = e::Panel.singleton_class
+    orig_alive = sc.instance_method(:dialog_alive?)
+    orig_push = sc.instance_method(:push_focus_front)
+    sc.send(:define_method, :dialog_alive?) { true }
+    sc.send(:define_method, :push_focus_front) do |fid|
+      captured << fid.to_s
+      orig_push.bind(self).call(fid)
+    end
+    yield
+  ensure
+    sc.send(:define_method, :dialog_alive?, orig_alive)
+    sc.send(:define_method, :push_focus_front, orig_push)
+  end
+
+  def run_kova2b(model)
+    unless e::DirectionCheck.available?(model)
+      info('KOV-A2b: SketchUp bez Overlay API (SU 2022 a starsi) — sekcia preskocena')
+      return
+    end
+    cleanup(model)
+    markers = []
+    guid = e::Panel.model_guid(model)
+    begin
+      # 1) PRED ZAPNUTIM: dostupne, vypnute, ziadne cisla
+      st = a2b_state(model)
+      ok('KOV-A2b: pred zapnutim je smer otvarania vypnuty a bez poctov',
+         st['available'] == true && st['active'] == false && st['wings'].nil?)
+
+      inst, wing = a2b_door(model, 'direction' => 'left')
+      return ok('KOV-A2b: vlozenie korpusu s dvierkami', false) unless inst && wing
+
+      cid = e::Store.get(inst, 'cabinet_id').to_s
+      cfg_before = e::Store.get(inst, 'config').to_s
+      gen = e::StudioDialog.instance_variable_get(:@generation).to_i
+      # MARKER = posledna REALNA operacia pred prepnutim; pocet entit sa berie
+      # AZ PO nom (marker sam je entita — inak by test meral vlastnu stopu).
+      marker = r03_marker(model, markers)
+      ents_before = model.entities.length
+
+      # 2) ZAPNUTIE ZO STUDIA: overlay v modeli, kresli, MODEL SA NEZMENIL
+      e::StudioDialog.do_direction_check({ 'gen' => gen, 'model_guid' => guid }.to_json)
+      st = a2b_state(model)
+      ok("KOV-A2b: zapnutie zo Studia zaregistrovalo overlay a kresli (#{st['wings']} kridel)",
+         st['active'] == true && a2b_overlay_present?(model) && st['wings'].to_i == 1)
+      ok('KOV-A2b: zapnutie NEZMENILO model (ziadna nova entita, config bajt-presne rovnaky)',
+         model.entities.length == ents_before && e::Store.get(inst, 'config').to_s == cfg_before)
+      ok('KOV-A2b: prepinac sa zapamatal (%APPDATA%, nie .skp)',
+         e::DirectionCheck.remembered? == true)
+      Sketchup.undo
+      ok('KOV-A2b: zapnutie NIE JE krok Spat (1x Spat vratilo marker, nie kresbu)',
+         !marker.valid? && a2b_overlay_present?(model))
+      e::DirectionCheck.refresh!(model)
+
+      # 3) SYMBOL SEDI NA SPRAVNOM KRIDLE A NA PREDNEJ PLOCHE
+      ok("KOV-A2b: „panty vlavo“ kresli sipku (#{a2b_symbol_of(wing).inspect})",
+         a2b_symbol_of(wing) == 'left')
+      pts = a2b_points(wing)
+      box = a2b_world_box(inst, wing)
+      face_y = box[:y_min] - e::DirectionCheck::OUT_MM
+      ok('KOV-A2b: symbol lezi na PREDNEJ ploche cela, posunuty von z telesa',
+         !pts.empty? && pts.all? { |p| (mm(p.y) - face_y).abs <= 0.05 })
+      xs = pts.map { |p| mm(p.x) }
+      tip = a2b_tip(wing)
+      ok("KOV-A2b: hrot sipky je pri VOLNEJ hrane vpravo (x #{tip && tip[0]} > stred #{box[:x_mid].round(1)})",
+         tip && tip[0] > box[:x_mid] && (xs.max - tip[0]).abs <= 0.05 &&
+         xs.min > box[:x_min] && xs.max < box[:x_max])
+
+      # 4) ZRKADLO: „panty vpravo" ma hrot pri LAVEJ hrane
+      inst2, wing2 = a2b_door(model, 'direction' => 'right')
+      e::DirectionCheck.refresh!(model)
+      tip2 = a2b_tip(wing2)
+      box2 = a2b_world_box(inst2, wing2)
+      ok("KOV-A2b: „panty vpravo“ ma hrot pri LAVEJ hrane (x #{tip2 && tip2[0]} < stred #{box2[:x_mid].round(1)})",
+         a2b_symbol_of(wing2) == 'right' && tip2 && tip2[0] < box2[:x_mid])
+      inst2.erase! if inst2 && inst2.valid?
+
+      # 5) NEURCENE = kruh + otaznik · LEGACY = NIC (R-39)
+      inst3, wing3 = a2b_door(model, 'direction' => 'unset')
+      e::DirectionCheck.refresh!(model)
+      occ3 = a2b_occ(wing3)
+      ok("KOV-A2b: „neurcene“ kresli kruh a otaznik (#{a2b_symbol_of(wing3).inspect})",
+         a2b_symbol_of(wing3) == 'unknown' && occ3 && !occ3['text'].nil? &&
+         Array(occ3['lines']).length == e::DirectionCheck::RING_SEGS * 2)
+      inst3.erase! if inst3 && inst3.valid?
+
+      inst4, wing4 = a2b_door(model, {})
+      e::DirectionCheck.refresh!(model)
+      st = a2b_state(model)
+      ok("KOV-A2b: LEGACY celo (kluc smeru chyba) NEKRESLI NIC, ale prizna sa (#{st['legacy']})",
+         a2b_occ(wing4).nil? && st['legacy'].to_i >= 1)
+      inst4.erase! if inst4 && inst4.valid?
+
+      # 6) 3 KRIDLA: krajne ODVODENE, stredne podla ulozeneho stavu
+      inst5 = e::CabinetBuilder.build(model, a2b_params([a2b_item('door', 'wings' => '3',
+                                                                 'wing_directions' => { 'p2' => 'unset' })],
+                                                        'width' => 900.0))
+      e::DirectionCheck.refresh!(model)
+      syms = %w[p1 p2 p3].map { |w| a2b_symbol_of(a2b_part(inst5, "front:F1/wing:#{w}")) }
+      ok("KOV-A2b: 3 kridla — krajne odvodene, stredne podla slotu (#{syms.inspect})",
+         syms == %w[left unknown right])
+      inst5.erase! if inst5 && inst5.valid?
+
+      # 7) VYKLOP ∧ · SKLOP ∨ · BLENDA X · ZASUVKA nic
+      { 'lift' => %w[front:F1/flap up], 'fall' => %w[front:F1/flap down],
+        'blind' => %w[front:F1/blind cross] }.each do |type, (key, want)|
+        i = e::CabinetBuilder.build(model, a2b_params([a2b_item(type)]))
+        e::DirectionCheck.refresh!(model)
+        got = a2b_symbol_of(a2b_part(i, key))
+        ok("KOV-A2b: #{type} kresli #{want} (#{got.inspect})", got == want)
+        i.erase! if i && i.valid?
+      end
+      i6 = e::CabinetBuilder.build(model, a2b_params([a2b_item('drawer_front')]))
+      e::DirectionCheck.refresh!(model)
+      ok('KOV-A2b: zasuvkove celo je VEDOME bez symbolu',
+         a2b_occ(a2b_part(i6, 'front:F1/panel')).nil?)
+      i6.erase! if i6 && i6.valid?
+
+      # 8) PRESTAVBA prekresli BEZ kroku Spat navyse; Spat kresbu vrati
+      marker = r03_marker(model, markers)
+      e::CabinetBuilder.rebuild(model, inst,
+                                a2b_params([a2b_item('door', 'direction' => 'right')]))
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      e::DirectionCheck.refresh!(model)
+      wing = a2b_part(inst, 'front:F1/wing:single')
+      ok("KOV-A2b: po prestavbe sa kresba otocila (#{a2b_symbol_of(wing).inspect})",
+         a2b_symbol_of(wing) == 'right')
+      Sketchup.undo
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      e::DirectionCheck.refresh!(model)
+      wing = a2b_part(inst, 'front:F1/wing:single')
+      ok('KOV-A2b: 1x Spat vratil prestavbu a s nou aj kresbu (dirty cesta)',
+         marker.valid? && a2b_symbol_of(wing) == 'left')
+
+      # 9) DUPLICATE-ID: kopia zdiela DEFINICIU aj `cabinet_id`, ale ma VLASTNY
+      #    config s opacnym smerom. Overlay musi kreslit PER INSTANCIA — dva
+      #    zaznamy nad TYM ISTYM vnorenym dielcom (zdielana definicia = zhodne
+      #    `entityID`) s ROZNYMI symbolmi. Dedup tik je pocas toho vypnuty
+      #    (`ScaleWatch.guard`), inak by kopii pridelil nove ID.
+      copy = nil
+      cfg_copy = JSON.parse(e::Store.get(inst, 'config').to_s)
+      Array(cfg_copy['front_items']).each { |f| f['direction'] = 'right' if f['id'] == 'F1' }
+      Array((cfg_copy['fronts'] || {})['items']).each { |f| f['direction'] = 'right' if f['id'] == 'F1' }
+      e::ScaleWatch.guard do
+        model.start_operation('KOV-A2b dup', true)
+        copy = model.entities.add_instance(inst.definition,
+                                           Geom::Transformation.translation([mm(2000), 0, 0]))
+        e::Store.write(copy, 'std' => e::Store::STD, 'kind' => 'cabinet', 'cabinet_id' => cid,
+                             :config => cfg_copy)
+        model.commit_operation
+      end
+      e::DirectionCheck.refresh!(model)
+      cache = e::DirectionCheck.instance_variable_get(:@cache)
+      dup_occ = Array(cache ? cache['occurrences'] : []).select { |o| o['part'] == wing.entityID }
+      ok("KOV-A2b: dve instancie so zdielanym ID kreslia KAZDA PODLA SVOJHO configu (#{dup_occ.map { |o| o['symbol'] }.inspect})",
+         dup_occ.length == 2 && dup_occ.map { |o| o['symbol'] }.sort == %w[left right])
+      e::ScaleWatch.guard do
+        model.start_operation('KOV-A2b dup cleanup', true)
+        copy.erase! if copy && copy.valid?
+        model.commit_operation
+      end
+
+      # 10) RAIL INSPECTORA: druhy vstupny bod, JEDEN zdroj stavu
+      e::DirectionCheck.refresh!(model)
+      st = a2b_state(model)
+      ok('KOV-A2b/rail: rail cita PRESNE ten isty stav ako Studio',
+         e::Panel.direction_check_state == st && e::DirectionCheck.ui_state(model) == st)
+      e::Panel.handle_direction_toggle({ 'model_guid' => guid }.to_json)
+      ok('KOV-A2b/rail: vypnutie z raily zhaslo overlay aj v Studiu (jeden stav)',
+         a2b_state(model)['active'] == false && !a2b_overlay_present?(model))
+      e::Panel.handle_direction_toggle({ 'model_guid' => guid }.to_json)
+      ok('KOV-A2b/rail: opatovne zapnutie z raily zaplo TEN ISTY overlay (nova instancia)',
+         a2b_state(model)['active'] == true && a2b_overlay_present?(model))
+      e::Panel.handle_direction_toggle({ 'model_guid' => 'CUDZI-GUID' }.to_json)
+      ok('KOV-A2b/rail: klik s cudzou identitou dokumentu NIC neprepol',
+         a2b_overlay_present?(model) && e::Panel.direction_check_state['active'] == true)
+
+      # 11) OBNOVA ZAPAMATANEHO PREPINACA (otvorenie okna STUDIO)
+      e::DirectionCheck.disable!
+      ok('KOV-A2b: po disable! overlay v modeli nie je', !a2b_overlay_present?(model))
+      st = e::DirectionCheck.restore!(model)
+      ok('KOV-A2b: zapamatany prepinac sa pri otvoreni okna obnovi',
+         st['active'] == true && a2b_overlay_present?(model))
+
+      # 12) PREPNUTIE DOKUMENTU overlay vypne (vetva EngineAppObserver)
+      e::DirectionCheck.on_model_changed(nil)
+      ok('KOV-A2b: udalost o INOM dokumente overlay vypla',
+         !a2b_overlay_present?(model) && a2b_state(model)['active'] == false)
+      ok('KOV-A2b: zapamatany prepinac to NEZRUSILO (je to nastavenie pocitaca)',
+         e::DirectionCheck.remembered? == true)
+
+      # 12b) DEEP-LINK (Codex #282 P2): ceruzka pri RED naleze o CELE musi
+      #      oznacit VLASTNIKA. Karta cela zije v Inspectorovi LEN nad oznacenou
+      #      SKRINKOU — vyber vnoreneho dielca by panel prepol do rezimu
+      #      „dielec“, kontext Cela by sa nedal zapnut a deep-link by ticho
+      #      zomrel. Bez ceruzky ostava dnesne spravanie (oznaci sa dielec).
+      inst_dl = e::CabinetBuilder.build(model, a2b_params([a2b_item('door', 'direction' => 'unset')]))
+      item_dl = kova_dir_items(model).first
+      key_dl = item_dl && item_dl['stable_key']
+      ok('KOV-A2b/deep-link: RED nalez o smere otvarania existuje', !key_dl.nil?)
+      if key_dl && inst_dl
+        pencil = []
+        a2b_with_panel_stub(pencil) { a2b_do_select(model, key_dl, true) }
+        sel = model.selection.to_a
+        ok("KOV-A2b/deep-link: ceruzka oznacila SKRINKU, nie vnoreny dielec " \
+           "(#{sel.length} ks, kind #{sel.first && e::Store.kind(sel.first)})",
+           sel.length == 1 && e::Store.kind(sel.first) == 'cabinet' && sel.first == inst_dl)
+        ok("KOV-A2b/deep-link: a Inspector dostal ID cela (#{pencil.inspect})", pencil == ['F1'])
+
+        plain = []
+        a2b_with_panel_stub(plain) { a2b_do_select(model, key_dl, false) }
+        sel2 = model.selection.to_a
+        ok("KOV-A2b/deep-link: obycajny klik na riadok NEMENI dnesne spravanie (#{sel2.length} ks, " \
+           "kind #{sel2.first && e::Store.kind(sel2.first)})",
+           sel2.length == 1 && e::Store.kind(sel2.first) == 'part' &&
+           e::Store.get(sel2.first, 'part_key').to_s == 'front:F1/wing:single')
+        ok('KOV-A2b/deep-link: a vtedy sa do Inspectora neposiela NIC', plain.empty?)
+      end
+      inst_dl.erase! if inst_dl && inst_dl.valid?
+
+      # 13) VYKON na velkej zakazke (~40 skriniek x 6 ciel)
+      a2b_perf(model)
+    ensure
+      begin
+        e::DirectionCheck.disable!
+        e::DirectionCheck.remember!(false)
+      rescue StandardError
+        nil
+      end
+      r03_clear_markers(model, markers)
+      cleanup(model)
+    end
+    ok('KOV-A2b: cleanup (overlay prec, prepinac vypnuty, model prazdny)',
+       !a2b_overlay_present?(model) && e::DirectionCheck.remembered? == false &&
+       cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: KOV-A2b vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    begin
+      e::DirectionCheck.disable!
+      e::DirectionCheck.remember!(false)
+    rescue StandardError
+      nil
+    end
+    cleanup(model)
+  end
+
+  # Vykon: postavi ~40 skriniek so 6 celami (≈250 dielcov) a zmeria ZAPNUTIE
+  # (sken celej zakazky) + prvy prepocet payloadu. Cielom je < 300 ms; ked
+  # sa cislo zhorsi, sken sa musi optimalizovat.
+  A2B_PERF_CABS = 40
+  A2B_PERF_ITEMS = [
+    { 'id' => 'F1', 'type' => 'door', 'mode' => 'fixed', 'height' => 300.0, 'wings' => '2' },
+    { 'id' => 'F2', 'type' => 'door', 'mode' => 'fixed', 'height' => 300.0, 'wings' => '1',
+      'direction' => 'left' },
+    { 'id' => 'F3', 'type' => 'door', 'mode' => 'fixed', 'height' => 300.0, 'wings' => '1',
+      'direction' => 'unset' },
+    { 'id' => 'F4', 'type' => 'drawer_front', 'mode' => 'fixed', 'height' => 200.0 },
+    { 'id' => 'F5', 'type' => 'lift', 'mode' => 'fixed', 'height' => 200.0 },
+    { 'id' => 'F6', 'type' => 'blind', 'mode' => 'auto' }
+  ].freeze
+
+  def a2b_perf(model)
+    e::DirectionCheck.disable!
+    built = 0
+    A2B_PERF_CABS.times do
+      p = a2b_params(A2B_PERF_ITEMS.map(&:dup), 'height' => 1800.0, 'width' => 600.0)
+      built += 1 if e::CabinetBuilder.build(model, p)
+    end
+    parts = model.entities.grep(Sketchup::ComponentInstance)
+                 .select { |i| e::Store.kind(i) == 'cabinet' }
+                 .sum { |i| i.definition.entities.grep(Sketchup::ComponentInstance).count { |x| e::Store.kind(x) == 'part' } }
+    t0 = Time.now
+    st = e::DirectionCheck.enable!(model)
+    ms = ((Time.now - t0) * 1000).round(1)
+    info("KOV-A2b VYKON: #{built} skriniek / #{parts} dielcov -> zapnutie + prvy prepocet #{ms} ms " \
+         "(#{st['wings']} kridel, #{st['marks']} symbolov, #{st['legacy']} legacy; ciel < 300 ms)")
+    ok("KOV-A2b: vykon na velkej zakazke je pouzitelny (#{ms} ms)", ms < 1500.0)
+    ok("KOV-A2b: velka zakazka kresli vsetky symboly (#{st['marks']})",
+       st['marks'].to_i >= built * 5)
+  rescue StandardError => ex
+    log_line("FAIL: KOV-A2b vykon: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
   def run_kova(model)
     cleanup(model)
     markers = []
@@ -12551,6 +12927,7 @@ module NoxunSuRunner
     run_st4a(model)          # ŠT-4a: sekcie Nastavenia v Studiu + zanik POSLEDNEHO satelitu — zapis sadzby prepocita rozpocet, baseline revizia odmietne stary zapis, ziadny krok Spat
     run_d52b(model)          # D-52b: updater v sekcii „O plugine" — trojstav nad realnym diskom, REALNY swap nad TEMP sandboxom (nikdy nad zivym Plugins), latch, opakovany pokus
     run_kova(model)          # KOV-A1: cela — vyklop/sklop/blenda (plan vs. model 1:1, 19 mm celo), sablona/kopia/dormant s novymi polami, RED nalez smeru bez kroku Spat, dup-ID
+    run_kova2b(model)        # KOV-A2b: smer otvarania v modeli — lifecycle overlayu, symbol na spravnom kridle a prednej ploche, prestavba/Spat, dup-ID per instancia, vykon
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

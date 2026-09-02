@@ -38,6 +38,7 @@
   // nastavenia otvorene (cisto zobrazovacie, nikam sa neuklada).
   var EDGE = null;
   var GRAIN = null;
+  var DIRECTION = null;
   var ecMenuOpen = false;
   // SMOKE 1A: to iste plati pre rohove nastavenie VEPO exportu — otvorenost je
   // CISTO klientska (nikam sa neuklada), hodnota checkboxu je zo servera.
@@ -538,9 +539,9 @@
   // tlačidlo vedľa (vnorené tlačidlo je neplatné HTML) — vzor railu Inspectora.
   function ecNum(v){ return ECM.num(v); }
 
-  function edgeCheckBarHtml(st, menuOpen, grain){
+  function edgeCheckBarHtml(st, menuOpen, grain, direction){
     if (!st || !st.available){
-      return '<span class="ecoff">Zvýraznenie hrán a smer kresby vyžadujú SketchUp 2023 alebo novší.</span>';
+      return '<span class="ecoff">Zvýraznenie hrán, smer kresby a smer otvárania vyžadujú SketchUp 2023 alebo novší.</span>';
     }
     var on = st.active === true;
     return '<span class="echk"><button type="button" id="ecBtn" class="ecbtn' + (on ? ' on' : '') + '"' +
@@ -550,8 +551,8 @@
       '<button type="button" id="ecMore" class="cornerzone" data-ec="menu"' +
       ' aria-expanded="' + (menuOpen ? 'true' : 'false') + '" aria-haspopup="true"' +
       ' aria-label="Nastavenie zvýraznenia hrán" title="Nastavenie — ktoré stavy hrán sa zvýraznia"></button>' +
-      edgeCheckMenuHtml(st, menuOpen) + '</span>' + grainBtnHtml(grain) +
-      '<span class="ecinfo">' + edgeCheckText(st) + grainInfoHtml(grain) + '</span>';
+      edgeCheckMenuHtml(st, menuOpen) + '</span>' + grainBtnHtml(grain) + directionBtnHtml(direction) +
+      '<span class="ecinfo">' + edgeCheckText(st) + grainInfoHtml(grain) + directionInfoHtml(direction) + '</span>';
   }
 
   // Rozbaľovacie okno = ZDIELANY komponent (js/edge_menu.js). Okno mu len
@@ -624,6 +625,40 @@
     if (v === 1) return 'dielec';
     if (v >= 2 && v <= 4) return 'dielce';
     return 'dielcov';
+  }
+
+  // KOV-A2b: prepínač smeru otvárania. Rovnaký tvar ako „Smer kresby"
+  // (obyčajné tlačidlo — nie je čo nastavovať), vlastné texty a vlastný stav.
+  function directionBtnHtml(d){
+    if (!d || !d.available) return '';
+    var on = d.active === true;
+    return '<button type="button" id="dcBtn" class="dcbtn' + (on ? ' on' : '') + '"' +
+      ' data-dc="toggle" aria-pressed="' + (on ? 'true' : 'false') + '"' +
+      ' title="Nakreslí na čelá symboly otvárania — šípka na voľnú hranu, ∧ výklop, ∨ sklop, X blenda.' +
+      ' Model sa nemení, kreslí sa nad ním.">' + ico('direction') + 'Smer otvárania</button>';
+  }
+
+  // Doveta k textu lišty. Vypnutý prepínač mlčí (rovnaký dôvod ako pri kresbe).
+  function directionInfoHtml(d){
+    var t = directionCheckText(d);
+    return t ? ' · <span class="dcinfo">' + t + '</span>' : '';
+  }
+
+  function directionCheckText(d){
+    if (!d || !d.available || !d.active) return '';
+    var w = ecNum(d.wings);
+    var t = w + ' ' + directionWingPluralSk(w);
+    if (ecNum(d.unknown)) t += ' · ' + ecNum(d.unknown) + ' neurčených';
+    if (ecNum(d.legacy)) t += ' · ' + ecNum(d.legacy) + ' bez smeru (legacy)';
+    return t;
+  }
+
+  // 1 krídlo / 2–4 krídla / 5+ krídel (slovenske sklonovanie poctu)
+  function directionWingPluralSk(n){
+    var v = Math.abs(n);
+    if (v === 1) return 'krídlo';
+    if (v >= 2 && v <= 4) return 'krídla';
+    return 'krídel';
   }
 
   // Relay do Ruby — gen aj model_guid overuje SERVER (starý DOM / prepnutý
@@ -699,6 +734,7 @@
       // echom nižšie) — klient si ho nikdy neodvodzuje.
       EDGE = (ST && ST.edge_check) ? ST.edge_check : null;
       GRAIN = (ST && ST.grain_check) ? ST.grain_check : null;
+      DIRECTION = (ST && ST.direction_check) ? ST.direction_check : null;
       var mdl = el('stModel');
       if (mdl) mdl.textContent = ST ? ('zákazka: ' + ST.model_title + ' · v' + ST.version) : '…';
       // Deep-link sekcie sa posiela PRAVE RAZ; kotva s nou.
@@ -785,6 +821,10 @@
     },
     setGrainCheck: function(state){
       GRAIN = state || null;
+      if (studioSec === 'ctrl') renderTools();
+    },
+    setDirectionCheck: function(state){
+      DIRECTION = state || null;
       if (studioSec === 'ctrl') renderTools();
     },
     // Server hlási, že sa v modeli OD POSLEDNÉHO PREPOČTU niečo zmenilo.
@@ -910,7 +950,7 @@
     // kontrola nemá). Jeden riadok, žiadny nový blok: vertikálny priestor
     // je vzácny a nastavenie hrán je overlay pod tlačidlom.
     if (studioSec === 'ctrl'){
-      box.innerHTML = edgeCheckBarHtml(EDGE, ecMenuOpen, GRAIN) +
+      box.innerHTML = edgeCheckBarHtml(EDGE, ecMenuOpen, GRAIN, DIRECTION) +
         '<span class="spacer"></span>' +
         '<span class="sechint">Zoradené podľa závažnosti — poradie určuje server.</span>' +
         // Review #7: Kontrola bola JEDINA sekcia BEZ „Obnoviť" — a pritom je to
@@ -1440,6 +1480,12 @@
     sketchup.grain_check_toggle(JSON.stringify(edgeCheckPayload(ST)));
   }
 
+  // KOV-A2b: ten istý relay (gen + model_guid overuje SERVER) pre smer otvárania.
+  function directionCheckToggle(){
+    if (!ST || !window.sketchup || !sketchup.direction_check_toggle) return;
+    sketchup.direction_check_toggle(JSON.stringify(edgeCheckPayload(ST)));
+  }
+
   // Otvorenie/zatvorenie nastavenia je CISTO klientska vec (nikam sa neukladá).
   // Otvorenie tu zavrie tú istú kópiu v raile Inspectora —
   // Ruby to len prepošle (žiadny stav, žiadny zápis).
@@ -1562,6 +1608,7 @@
         return;
       }
       if (t.closest('[data-gc]')){ grainCheckToggle(); return; }
+      if (t.closest('[data-dc]')){ directionCheckToggle(); return; }
       var nav = t.closest('[data-nav]');
       if (nav){ onNav(nav.getAttribute('data-nav')); return; }
       // Š8: semaforový chip = filter (druhý klik ho zruší). Je to čisto
@@ -1725,6 +1772,9 @@
       edgeCheckMenuHtml: edgeCheckMenuHtml, edgeCheckOptionPayload: edgeCheckOptionPayload,
       edgeCheckSelectionHint: edgeCheckSelectionHint,
       grainBtnHtml: grainBtnHtml, grainCheckText: grainCheckText,
-      grainPartPluralSk: grainPartPluralSk
+      grainPartPluralSk: grainPartPluralSk,
+      // KOV-A2b: tretie tlacidlo listy sekcie Kontrola.
+      directionBtnHtml: directionBtnHtml, directionCheckText: directionCheckText,
+      directionWingPluralSk: directionWingPluralSk
     };
   }

@@ -751,6 +751,9 @@ module Noxun
           # modelu, v ktorom sa zapol (zapamatany prepinac ostava, je to
           # nastavenie pocitaca).
           GrainCheck.on_model_changed(model) if defined?(GrainCheck)
+          # KOV-A2b: a to iste pre symboly smeru otvarania — overlay patri
+          # modelu, v ktorom sa zapol.
+          DirectionCheck.on_model_changed(model) if defined?(DirectionCheck)
           # ŠT-3b-1: vetva `RulesDialog.on_model_changed` tu ZANIKLA spolu
           # s oknom — modul nema ZIADNY asynchronny beh (na rozdiel od
           # katalogu kovania nizsie), takze po prepnuti dokumentu netreba nic

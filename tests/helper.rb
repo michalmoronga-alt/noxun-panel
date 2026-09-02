@@ -169,6 +169,7 @@ unless NxTest::IN_SKETCHUP
     core/validation
     core/edge_check
     core/grain_check
+    core/direction_check
     core/hover_edge
     core/supplier_settings
     core/budget_store

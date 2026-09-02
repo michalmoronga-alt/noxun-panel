@@ -221,6 +221,41 @@ module Noxun
             '(materiál bez smeru sa nekreslí).'
         end
 
+        # KOV-A2b: SMER OTVARANIA z raily Inspectora. Presna kopia vzoru
+        # kontroly kresby vyssie — prepnutie robi ZDIELANA
+        # Engine.toggle_direction_check, teda ta ista cesta, akou prepina
+        # sekcia Kontrola v Štúdiu. Symboly sa kreslia NAD modelom: ziadny
+        # zapis, ziadna operacia, ziadny undo krok.
+        # IDENTITY GUARD DOKUMENTU: callback HtmlDialogu je asynchronny — bez
+        # neho by klik po prepnuti dokumentu zapol symboly v CUDZOM modeli.
+        def handle_direction_toggle(payload = nil)
+          model = Sketchup.active_model
+          unless defined?(DirectionCheck) && DirectionCheck.available?(model)
+            push_direction_check
+            return set_status('Smer otvárania vyžaduje SketchUp 2023 alebo novší.', true)
+          end
+
+          if DocKey.foreign?(payload ? parse(payload)['model_guid'] : nil, model)
+            push_direction_check
+            return set_status('Model sa medzitým prepol — stav obnovený, klikni znova.', true)
+          end
+
+          state = Engine.toggle_direction_check(model)
+          set_status(direction_toggle_status(state))
+        end
+
+        # Kratke potvrdenie do statusu panela. Podrobny rozpis nesie lista
+        # sekcie Kontrola v okne ŠTÚDIO — rail je len prepinac. Text sklada
+        # ZDIELANE jadro, aby obe miesta hovorili to iste.
+        def direction_toggle_status(state)
+          if defined?(ProductionCore) && ProductionCore.respond_to?(:direction_check_status)
+            return ProductionCore.direction_check_status(state)
+          end
+
+          st = state.is_a?(Hash) ? state : {}
+          st['active'] ? 'Smer otvárania zapnutý.' : 'Smer otvárania vypnutý — v modeli nič neostalo.'
+        end
+
         # 1 dielec / 2–4 dielce / 5+ dielcov.
         # ŠT-1c PR B3: tvar slova sklada ZDIELANE jadro (`ProductionCore`) —
         # doteraz tu bola vlastna kopia toho isteho pravidla a druhy vypis

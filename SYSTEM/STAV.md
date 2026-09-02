@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.9.16 · 3.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.9.17 · 3.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -17,44 +17,44 @@ Etapa **V0.6 (katalógy a ceny) je obsahovo splnená**: plugin vedie zákazku od
 (okno zaniká — modul žije · uzavretý whitelist akcií · session token · echo vs. plný push · optimistický zámok) sú v [archiv/KRONIKA.md](archiv/KRONIKA.md),
 vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
-**Blok KOVANIE má v maine prvé dve dávky.** **KOV-A1** dala čelám typy **výklop · sklop · blenda**, pamäť na **smer otvárania** (= strana pántov), spôsob otvárania aj
-klasifikáciu zásuvky; neurčený smer je **RED nález v Kontrole bez exportnej brány**. **KOV-A2a** k tomu pridala **ovládače**: rozbaľovačka typu v riadku čela zanikla a nahradila
-ju **karta čela** (typegrid šiestich piktogramov + smer · otváranie · klasifikácia zásuvky), náhľad kreslí smery a typy symbolmi. **Výstupy existujúcich zákaziek sú obsahovo
-identické** (golden charakterizácia). **Pozor:** model uložený od v0.9.15 už neprestaví starší plugin (`CONFIG_SCHEMA` 2, guard R-12).
+**Blok KOVANIE má v maine celý slice A.** **KOV-A1** dala čelám typy **výklop · sklop · blenda**, pamäť na **smer otvárania** (= strana pántov), spôsob otvárania aj
+klasifikáciu zásuvky; neurčený smer je **RED nález v Kontrole bez exportnej brány**. **KOV-A2a** pridala **ovládače** (karta čela: typegrid šiestich piktogramov + smer ·
+otváranie · klasifikácia zásuvky) a symboly v náhľade; **KOV-A2b** dala smerom **pohľad na celú zákazku** — prepínač „Smer otvárania" (rail Inspectora aj lišta Kontroly)
+nakreslí symboly priamo na čelá v modeli. **Výstupy existujúcich zákaziek sú obsahovo identické** (golden charakterizácia).
+**Pozor:** model uložený od v0.9.15 už neprestaví starší plugin (`CONFIG_SCHEMA` 2, guard R-12).
 
-**Testy k v0.9.16:** **2466 headless** · 80 JS sád · plný in-SketchUp beh **1355 PASS / 0 FAIL** (naposledy k v0.9.15 — A2a je UI dávka bez buildera a observera).
+**Testy k v0.9.17:** **2505 headless** · 81 JS sád · plný in-SketchUp beh **1390 PASS / 0 FAIL** (overlay smeru: 35 scenárov; výkon 24 ms na 486 dielcoch pri cieli 300 ms).
 
 ## Robí sa
 
 **Blok 1b uzavretý až na D-51** (čaká na Michalove hodnoty) · **1c hotový** ([AUDIT_REGISTER.md](AUDIT_REGISTER.md)) · **1d beží** (hotové R-06/R-08/R-01+04/R-34/R-02(b)/R-03/R-07/R-23.1/R-11/R-12/R-14; ďalej R-18 + zvyšok; R-13 čaká na Michala).
 **1e HOTOVÁ.** **Blok KOVANIE beží (od 2.9.):** architektúra V1 uzavretá po cross-audite + O1–O3 ([zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md](zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md)),
 mockup schválený ([zdroje/ui20/mockup_kovanie_v1.html](zdroje/ui20/mockup_kovanie_v1.html)), packages v [PLAN.md](PLAN.md); **D-52 UPDATER KOMPLET (v0.9.14)**.
-**KOV-A1 HOTOVÁ** (PR #280, v0.9.15 — dátová vrstva čiel) a **KOV-A2a HOTOVÁ** (PR #281, v0.9.16 — karta čela, badge, náhľad symbolov); **ďalšia je KOV-A2b** —
-overlay „Smer otvárania" v modeli (modul `direction_check`, dva prepínače = jeden stav, in-SU beh povinný).
+**KOV-A je KOMPLET** (A1 PR #280 · A2a PR #281 · A2b PR #282 — dátová vrstva, karta čela a overlay smerov); **ďalej KOV-B** (katalóg a sety)
+**paralelne s KOV-H** (ad-hoc kovanie) — obe majú package v [PLAN.md](PLAN.md) a obe sú audit-povinné.
 **Od 2.9. večer bez Fable** — orchestruje Opus, review Codex; vstupný bod je [zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md](zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md) + tento súbor; packages všetkých slices sú v PLAN. **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
 
-**Poradie (Michal 2.9.: „poradie je na tebe"):** ~~D-52a~~ → ~~D-52b1/b2~~ → ~~KOV-A1~~ → ~~KOV-A2a~~ (oboje v maine) → **KOV-A2b** (overlay smerov v modeli)
+**Poradie (Michal 2.9.: „poradie je na tebe"):** ~~D-52a~~ → ~~D-52b1/b2~~ → ~~KOV-A1~~ → ~~KOV-A2a~~ → ~~KOV-A2b~~ (celý slice A je v maine)
 → **KOV-B** katalóg+sety (paralelne **KOV-H** ad-hoc) → **KOV-C** context_for + recepty + odvodené dielce → **KOV-D** resolver + zámky + brány → E/F/G/I. Súbežne 1d podľa kapacity.
 Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` (KOV-A/B/C/D/H povinné) → subagent vo worktree → `codex-po-pr` → merge → uzáver. V1 checklist v [V1_VIZIA.md](V1_VIZIA.md).
 
 ## Posledné uzávery
 
-- **KOV-A2a — typ čela sa vyberá PIKTOGRAMOM a smer otvárania sa dá konečne nastaviť** (v0.9.16, 3.9.2026, PR #281): klik na názov typu v riadku otvorí **kartu čela**
-  priamo pod ním — šesť dlaždíc typu (Dvierka · Zásuvka · Výklop · Sklop · Blenda · Bez čela) a pod nimi len to, čo dáva zmysel: **Smer** (Ľavé · Neurčené · Pravé),
-  **Otváranie** (Klasické · Tip-On), pri zásuvke **Konštrukcia** a **Štandardná/Vnútorná**. Dvojkrídlo sa na smer nepýta (je odvodený), 3/4-krídlové len na **stredné**
-  krídla. Neurčený smer má v riadku badge **„smer?"**; **stará zákazka nič nedostane** — nikde sa nič nepredvolí. Náhľad kreslí **prerušované symboly** (šipka na voľnú
-  hranu, `?` pri neurčenom, ∧/∨ výklop/sklop, X blenda) · **Michal večer:** vlož skrinku → F2 na **Výklop**, F3 na **Blendu** (postavia sa, náhľad ∧ a X) · jednokrídlové
-  dvierka → badge **smer?** + RED v Štúdiu → Kontrola, ale **nákupný CSV aj rozpočet musia prejsť** · daj **Ľavé** → nález zmizne a v náhľade je šipka · **3 krídla** → pribudne
-  riadok „Krídlo 2/3", krajné sa nepýtajú · **Tip-On** (zatiaľ informatívne) · ulož šablónu s výklopom a vlož ju · kopíruj ×3 · **KLINIKA** — čísla identické, Kontrola bez nového nálezu.
-- **KOV-A1 — dátová vrstva čiel** (v0.9.15, PR #280): nové typy sa **postavia, olepia a idú do kusovníka aj VEPO**, smer/otváranie/klasifikácia sa v zákazke držia, neurčený
-  smer je RED nález bez brány; **staré zákazky sa nemenia ani o číslo**. Ovládače doručila KOV-A2a (vyššie) · **Michal večer (ak ešte nebolo):** Štúdio → Pravidlá → ABS
-  pravidlá majú riadky **„Výklop/sklop"** a **„Blenda"** (4 hrany 1,0) a tvoje úpravy sú nedotknuté; šírka **599 ↔ 605** (auto 1 vs. 2 krídla) ako doteraz.
-- **1d/R-14 — zákazka z NOVŠIEHO pluginu už pri prvom kliku v Rozpočte ticho nepríde o dáta**: taký rozpočet sa ďalej **číta**, ale **upravovať sa nedá** (banner + oba
-  XLSX exporty zastavené; VEPO a nákup bežia ďalej) — v0.9.4 (1.9.2026) · **Michal večer:** over len, že **bežná práca s Rozpočtom je bez zmeny**.
-- **1d/R-12 — to isté pri PRESTAVBE skrinky**: korpus z novšieho pluginu sa ďalej **číta, počíta aj exportuje**, ale **prestavať** sa nedá (rovnako kópia a šablóny) — v0.9.3 (1.9.2026) · **Michal večer:** over, že **bežná práca ide bez zmeny**.
-- **1d/R-11 — poškodený súbor nastavení už neprepíše novšiu prácu staršou zálohou** (plugin zo zálohy ČÍTA, ale zápisy VYPNE a povie prečo) — v0.9.2 (1.9.2026) · **Michal večer:** pokaz kópiu `hardware_sets.json` — sety musia byť **vidieť** + oranžový banner.
+- **KOV-A2b — smery otvárania VIDNO PRIAMO V MODELI** (v0.9.17, 3.9.2026, PR #282): nový prepínač **„Smer otvárania"** (ikona v raile Inspectora aj tlačidlo v lište
+  Štúdio → Kontrola — **jeden stav**, prepneš kdekoľvek) nakreslí na každé čelo symbol: **prerušovaná šípka** ukazuje, kam sa krídlo otvára (smer = strana pántov),
+  **∧** výklop, **∨** sklop, **plné X** blenda, **jantárový „?" v krúžku** = neurčený smer; **stará zákazka nekreslí nič**. Kreslí sa NAD modelom: nič sa neuloží,
+  nevznikne krok Späť, po vypnutí neostane nič. Navyše **ceruzka** pri RED náleze v Kontrole otvorí v Inspectorovi rovno **kartu toho čela** · **Michal večer:** zapni
+  ikonu v raile → šípky na správnu stranu, na neurčených „?" · prepni smer v karte → kresba sa otočí hneď · **Ctrl+Z** → vráti sa aj kresba · zapni na **KLINIKE**
+  (254 dielcov) — naskočí okamžite a **nič v modeli sa nesmie zmeniť** · po zatvorení a otvorení Štúdia si prepínač stav pamätá.
+- **KOV-A2a — typ čela sa vyberá PIKTOGRAMOM a smer sa dá nastaviť** (v0.9.16, PR #281): klik na názov typu otvorí **kartu čela** — šesť dlaždíc typu a pod nimi len to,
+  čo dáva zmysel: **Smer** (Ľavé · Neurčené · Pravé), **Otváranie**, pri zásuvke **Konštrukcia** a **Štandardná/Vnútorná**; dvojkrídlo sa na smer nepýta (je odvodený),
+  3/4-krídlové len na **stredné** krídla, neurčený smer má badge **„smer?"**. **KOV-A1** (v0.9.15, PR #280) pod tým drží dáta: nové typy sa **postavia, olepia a idú do
+  kusovníka aj VEPO** · **Michal večer (ak ešte nebolo):** F2 **Výklop**, F3 **Blenda** · badge **smer?** + RED v Kontrole, ale **nákupný CSV aj rozpočet musia prejsť**.
+- **1d/R-14 · R-12 · R-11 — zákazka či nastavenia z NOVŠIEHO pluginu sa už ticho nezmrzačia** (v0.9.2–v0.9.4, 1.9.2026): taký rozpočet aj korpus sa ďalej **čítajú,
+  počítajú a exportujú**, ale **upraviť/prestavať** sa nedajú (banner + zastavené XLSX; VEPO a nákup bežia ďalej) a poškodený súbor nastavení sa číta zo zálohy so
+  **zakázaným zápisom** · **Michal večer:** over, že **bežná práca s Rozpočtom aj prestavba idú bez zmeny**; pokaz kópiu `hardware_sets.json` — sety musia byť **vidieť**.
 - **D-52 — Aktualizovať jedným klikom** (v0.9.14, PR #277/#278/#279): Štúdio → O plugine → priečinok, kontrola verzie, tlačidlo; bariéra okien, atomický swap,
   restart latch; downgrade zakázaný · **Michal večer:** cesta na NOVŠIU kópiu → Aktualizovať → reštart → nová verzia; staršia kópia = tlačidlo neaktívne.
 - **UZÁVER BLOKU GHOST VKLADANIE (v0.9.0, 31.8.2026)** — **Michal odškrtol CELÝ smoke checklist** (11 bodov), uzáver bol čisto dokumentačný (plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md)); tým istým sedením odškrtol aj staršie odložené testy **R-08 · R-01+R-04 · R-02 · R-07** — **všetky PASS**, žiadny nález.

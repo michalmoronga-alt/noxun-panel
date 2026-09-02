@@ -1,8 +1,9 @@
 # frozen_string_literal: true
 # Noxun Engine — D-104/D-105: SketchUp objekty kontroly hran (Overlay +
-# ModelObserver + SelectionObserver) + D-89a hover hrany + K2/D-87 smer kresby.
-# Logika a stav ziju v core/edge_check.rb, core/hover_edge.rb a
-# core/grain_check.rb; tu su LEN tenke SketchUp obaly.
+# ModelObserver + SelectionObserver) + D-89a hover hrany + K2/D-87 smer kresby
+# + KOV-A2b smer otvarania. Logika a stav ziju v core/edge_check.rb,
+# core/hover_edge.rb, core/grain_check.rb a core/direction_check.rb; tu su LEN
+# tenke SketchUp obaly.
 #
 # Cely subor je pod guardom `defined?(Sketchup::Overlay)` — Overlay API prislo v
 # SketchUp 2023. Na starsom SketchUpe (a v headless testoch) trieda vobec
@@ -134,6 +135,53 @@ module Noxun
 
         def onTransactionAbort(model) # rubocop:disable Naming/MethodName — SketchUp API
           GrainCheck.mark_dirty(model)
+        end
+      end
+
+      # KOV-A2b: SMER OTVARANIA. Tretie samostatne prekrytie — hovori o INEJ
+      # veci nez K2 (tam smer KRESBY dekoru, tu smer OTVARANIA cela) a obe sa
+      # daju zapnut naraz nad tym istym celom. Logika a stav ziju
+      # v core/direction_check.rb.
+      class DirectionOverlay < Sketchup::Overlay
+        def initialize
+          super(DirectionCheck::OVERLAY_ID, DirectionCheck::OVERLAY_NAME,
+                description: 'Symboly smeru otvárania na čelách — šípka na voľnú hranu, ' \
+                             '∧ výklop, ∨ sklop, X blenda (KOV-A2b).')
+        end
+
+        def draw(view)
+          DirectionCheck.draw(view)
+        rescue StandardError => e
+          Engine.log_error(e, 'DirectionOverlay#draw')
+          nil
+        end
+
+        def getExtents # rubocop:disable Naming/MethodName — SketchUp API
+          DirectionCheck.extents(respond_to?(:model) ? model : nil)
+        rescue StandardError => e
+          Engine.log_error(e, 'DirectionOverlay#getExtents')
+          Geom::BoundingBox.new
+        end
+      end
+
+      # KOV-A2b: prestavba cela (alebo Spat/Znova) meni smer aj geometriu
+      # panelov — cache symbolov je vtedy stara. V callbacku sa NIC neskenuje
+      # ani nemeni: len dirty + ziadost o prekreslenie.
+      class DirectionModelWatch < Sketchup::ModelObserver
+        def onTransactionCommit(model) # rubocop:disable Naming/MethodName — SketchUp API
+          DirectionCheck.mark_dirty(model)
+        end
+
+        def onTransactionUndo(model) # rubocop:disable Naming/MethodName — SketchUp API
+          DirectionCheck.mark_dirty(model)
+        end
+
+        def onTransactionRedo(model) # rubocop:disable Naming/MethodName — SketchUp API
+          DirectionCheck.mark_dirty(model)
+        end
+
+        def onTransactionAbort(model) # rubocop:disable Naming/MethodName — SketchUp API
+          DirectionCheck.mark_dirty(model)
         end
       end
 

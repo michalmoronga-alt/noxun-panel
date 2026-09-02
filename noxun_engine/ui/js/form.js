@@ -1525,6 +1525,27 @@
     // ten jeho (poloziek kovania byva viac, nez sa zmesti na obraz).
     hwFlash(target);
   }
+  // KOV-A2b DEEP-LINK: „klik na RED nález smeru v Kontrole otvorí kartu čela".
+  // Server posiela LEN ID cela (`NX.focusFront`) — VSETKO ostatne je klientske:
+  // prepni kontext na Cela, otvor kartu prave tohto cela, rozbal cestu k nemu
+  // a doscrolluj. Ked riadok neexistuje (medzitym prestavana skrinka, iny
+  // vyber), NEROBI SA NIC — falosne otvorena cudzia karta by klamala.
+  // Vracia true/false, aby sa cesta dala overit v Node testoch.
+  function nxFocusFront(fid){
+    var id = (fid == null) ? '' : String(fid);
+    if (!id) return false;
+    var row = frontRowById(id);
+    if (!row) return false;
+    if (typeof setViewContext === 'function') setViewContext('cela');
+    openFrontCardId = id;
+    refreshFrontCards();
+    if (typeof nxRevealTarget === 'function') nxRevealTarget(row);
+    if (row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
+    var btn = row.querySelector('.ftname');
+    if (btn && btn.focus) btn.focus();
+    return true;
+  }
+
   // D-23: klik na celo v nahlade — otvor sekciu Cela, riadok do pohladu, fokus
   // pola vysky. Riadok sa hlada cez dataset.frontId (nie cez cislo).
   function focusFrontRow(fid){
@@ -1567,6 +1588,8 @@
                        frontExtraOf: frontExtraOf, refreshFrontCards: refreshFrontCards,
                        updateFrontDirBadges: updateFrontDirBadges,
                        addFrontKind: addFrontKind, syncFrontCardOwner: syncFrontCardOwner,
-                       closeFrontCard: closeFrontCard };
+                       closeFrontCard: closeFrontCard,
+                       // KOV-A2b: deep-link zo Studia (`NX.focusFront`).
+                       nxFocusFront: nxFocusFront };
   }
 

@@ -402,6 +402,41 @@ kresbu v cudzom modeli) a hláškou pri SketchUpe bez Overlay API — nikdy tich
 **spoločná pre rail aj Štúdio** (pôvodný `rows-3` bol náhrada, kým vlastný symbol neexistoval). Testy: `tests/pure/test_k2_smer_kresby.rb`, `tests/js/test_k2_smer_kresby.js`,
 in-SketchUp sekcia `run_k2`.
 
+### direction_check.rb
+
+(+ `DirectionOverlay`/`DirectionModelWatch` v `edge_overlay.rb`) — **KOV-A2b: SMER OTVÁRANIA v modeli.** Prepínač „Smer otvárania" nakreslí na **prednú plochu každého čela** symbol toho, ako sa
+otvára: prerušovaná šípka na **voľnú hranu** (smer = strana pántov), `∧` výklop, `∨` sklop, **plné X** blenda, zásuvka **vedome nič** (mockupový ∧ by splýval s výklopom). Je to **POHĽAD, nie
+dáta**: `Sketchup::Overlay` NAD modelom — žiadna operácia, žiadny undo krok, nič v .skp; po vypnutí v modeli neostane nič. Vlastný modul (nie ďalší stav K2) zámerne: K2 hovorí o smere **kresby
+dekoru**, toto o smere **otvárania** — a obe sa dajú zapnúť naraz nad tým istým čelom.
+
+**ZDROJ JE ULOŽENÝ CONFIG, nikdy geometria:** pre každú top-level inštanciu `cabinet` sa číta `front_items` a `Fronts.direction_slots` (KOV-A1 = **jediná** definícia „kde sa smer pýta"); dielec sa
+dohľadá medzi vnorenými `kind: part` podľa `part_key` (tá istá cesta ako `ProductionCore.pids_in_cabinet`). Kreslí sa **per INŠTANCIA** — dve skrinky so zdieľaným `cabinet_id` majú každá svoj config
+a každá svoju kresbu. Trojstav A1 platí bez výnimky (**R-39: žiadny default ani heuristika — ani v overlayi**): `left`/`right` → šípka · `unset` → prerušovaný kruh + „?" · **kľúč chýba (legacy) →
+nekreslí sa NIČ**. Krajné krídla 2/3/4-krídlových dvierok sú **ODVODENÉ** (A1 variant a: p1 pánty vľavo, posledné vpravo). Výber symbolu (`dir_symbol`/`type_symbol`/`wing_symbols`) je **zrkadlo**
+`frontDirSymbol`/`frontTypeSymbol`/`frontWingSymbols` z `ui/js/core.js` — čo vidno v náhľade karty, to je aj v modeli (stráži test nad spoločnými fixtúrami).
+
+**Geometria:** symbol leží na ploche **MIN osi hrúbky** (tá, na ktorú sa pozerá používateľ) posunutej o `OUT_MM = 0,7` von — viac než `EdgeCheck::OUT_MM` (0,5), aby ho neprekryla plôška olepu, a
+menej než `HoverEdge::OUT_MM` (0,9), takže hover hrany ostáva navrchu. Osi určuje zdieľané `PartFaces.axes_for_snapshot` (čelo = `AXES_FRONT`); neoveriteľné osi = **nekreslí sa nič** (D-88). Celý tvar
+žije v čistej vrstve (`plan_2d` → `arrow_2d`/`chevron_2d`/`cross_2d`/`ring_2d` v mm roviny čela), takže sa dá testovať bez SketchUpu. Prerušované sa kreslí `line_stipple = '-'`; pero sa po kreslení
+**vracia do východzieho stavu**, inak by prerušovane kreslili aj prekrytia za nami.
+
+**Farby:** `COLOR = #880e4f` (tmavá malinová) pre vyriešené symboly — nie tri stavy olepu (`EdgeCheck::COLORS`), nie `GrainCheck::COLOR` (#37474f — obe prekrytia môžu byť zapnuté naraz), nie teal
+rodina výberu/`HoverEdge`, nie fialová/modrá (v modeli splýva s modrým zvýraznením výberu, lekcia D-105); najbližší sused je smer kresby (vzdialenosť 99 v RGB, viac než už prijatá dvojica
+kresba/hover 81). `COLOR_UNSET = #e65100` (token `--nx-warn-fg`) pre kruh a „?" — **ten istý jantár, akým svieti badge „smer?"** v Inspectorovi, takže panel a model hovoria jednou farbou; priznaná
+blízkosť k `EdgeCheck::EXTRA` je vedomá (rozhoduje odstup „neurčené" vs „vyriešené" = 140, a stavy olepu sú tenké plôšky NA HRANÁCH, kým „?" je glyf v STREDE čela). Vzájomnú odlišnosť všetkých
+farieb prekrytí stráži guard test.
+
+**Sken beží len** pri zapnutí a po `ModelObserver` dirty (prestavba, Späť/Znova) — prepočet je lazy v `draw`, `view_payload` drží tri hotové GL polia (prerušované · plné · „neurčené") plus kotvy
+textov a `extents` obal kresby. Skryté čelá (tag `Noxun/Čelá`) sa preskakujú **zdieľanou** bránkou `EdgeCheck.drawable?`.
+
+**Prepínač si pamätá POČÍTAČ** (`%APPDATA%\NOXUN\Engine\direction_check.json`, NIKDY .skp); `restore!` ho obnoví pri `StudioDialog.show` **pred prvým `push_state`**. **VSTUPNÉ BODY sú dva a majú
+JEDEN zdroj stavu** (presné zrkadlo K2): tlačidlo `railSmer` v raile Inspectora (`nx_direction_toggle` → `Panel.handle_direction_toggle` s prísnym guardom dokumentu a hláškou pri SketchUpe bez
+Overlay API) a prepínač v lište sekcie Kontrola v Štúdiu (`direction_check_toggle` → `ProductionCore.do_direction_check`, identity guard `gen` + `model_guid` **zdieľaný** s kontrolou hrán).
+Prepína sa výhradne cez `Engine.toggle_direction_check` a nový stav rozpošle `Engine.broadcast_direction_check` **obom klientom naraz**; tou istou cestou idú aj prepočet po prestavbe
+(`notify_count_changed`) a vypnutie pri prepnutí dokumentu (`notify_state_changed` z `EngineAppObserver`) — stráži test. Texty skladá SERVER (`ProductionCore.direction_check_status`); JS
+(`NXShell.directionRail`, `directionBtnHtml`/`directionCheckText`) len zobrazuje čísla. Ikona `#i-direction` je **spoločná pre rail aj Štúdio**. Testy: `tests/pure/test_kova2b_smer_overlay.rb`,
+`tests/js/test_kova2b_smer_overlay.js`, in-SketchUp sekcia `run_kova2b`.
+
 ### hover_edge.rb
 
 (+ `HoverEdgeOverlay` v `edge_overlay.rb`) — **D-89 (a): hrana pod kurzorom.** Hover nad hranou v karte dielca/dosky rozsvieti tú istú hranu priamo v modeli. Je to **POHĽAD, nie
@@ -421,8 +456,8 @@ Ruby.
 ### edge_overlay.rb
 
 Súbor, v ktorom žijú triedy prekrytí (`Sketchup::Overlay`) — celý je pod guardom dostupnosti API (SU 2023+). Bývajú v ňom overlay kontroly olepu (kontrakt a pasce sú v odseku
-`edge_check.rb`), `GrainOverlay`/`GrainModelWatch` (odsek `grain_check.rb`) a `HoverEdgeOverlay` (odsek `hover_edge.rb`). Spoločné pre všetky tri: **žiadna operácia, žiadny zápis,
-žiadny undo krok, nič v .skp**.
+`edge_check.rb`), `GrainOverlay`/`GrainModelWatch` (odsek `grain_check.rb`), `DirectionOverlay`/`DirectionModelWatch` (odsek `direction_check.rb`) a `HoverEdgeOverlay` (odsek
+`hover_edge.rb`). Spoločné pre všetky: **žiadna operácia, žiadny zápis, žiadny undo krok, nič v .skp**.
 
 ## Observery
 
