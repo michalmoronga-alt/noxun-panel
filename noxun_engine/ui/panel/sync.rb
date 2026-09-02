@@ -527,9 +527,20 @@ module Noxun
         # Status doplneny o pocet BuildPlan upozorneni z posledneho planu korpusu.
         # Nefatalne stavy (orezane vystuhy, preskocene police...) tak uz nie su neviditelne.
         def status_with_warnings(cab, msg)
+          set_status("#{msg}#{warn_suffix(cab)}")
+        end
+
+        # KOV-H2 (Codex #285 kolo 2, P2-H): pripona „· N upozorneni" je JEDNA
+        # funkcia, lebo ju potrebuje aj hlaska vysledku rucnej operacie —
+        # tá totiz status prestavby PREPISE. Bez zdielanej pripony by
+        # varovania z TEJ ISTEJ prestavby pouzivatel nikdy neuvidel (alebo by
+        # sa text skladal na dvoch miestach a casom sa rozisiel).
+        # -> '' | ' · 2 upozornenia'
+        def warn_suffix(cab)
           warns = cab && cab.valid? ? ((Store.config(cab) || {})['warnings'] || []) : []
-          msg = "#{msg} · #{warns.size} #{warn_word(warns.size)}" unless warns.empty?
-          set_status(msg)
+          return '' if warns.empty?
+
+          " · #{warns.size} #{warn_word(warns.size)}"
         end
 
         def warn_word(n)

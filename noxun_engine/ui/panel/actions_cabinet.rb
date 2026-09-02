@@ -691,7 +691,10 @@ module Noxun
           end
           status_with_warnings(cab, "Prestavané — #{Store.get(cab, 'cabinet_id')} (#{part_count(cab)} dielcov).#{pf ? pf[:note] : ''}")
           push_selected(model)
-          push_manual_result(op, true, manual_ok_msg(op, removed))
+          # P2-H: hlaska vysledku PREPISE status prestavby (klient ju posiela do
+          # `NX.setStatus`), takze musi niest aj jej varovania — inak by
+          # upozornenia z TEJ ISTEJ prestavby zmizli bez stopy.
+          push_manual_result(op, true, manual_ok_msg(op, removed, cab))
         end
 
         # --- KOV-H2: signal vysledku pre modal rucnej polozky ----------------
@@ -742,12 +745,13 @@ module Noxun
         # `push_manual_result` sem NEDOSIAHNE. Bez tohto guardu spadol KAZDY
         # apply bez `manual_op` (nasla to in-SketchUp sada, headless nie —
         # handler potrebuje zivy model).
-        def manual_ok_msg(op, removed = nil)
+        def manual_ok_msg(op, removed = nil, cab = nil)
           return '' unless op.is_a?(Hash)
 
-          return "Odstránená ručná položka „#{removed}“." if removed
-
-          MANUAL_OK_MSGS[op['kind'].to_s].to_s
+          base = removed ? "Odstránená ručná položka „#{removed}“." : MANUAL_OK_MSGS[op['kind'].to_s].to_s
+          # Pripona je ZDIELANA so `status_with_warnings` — jeden zdroj textu,
+          # ziadne skladanie na klientovi.
+          "#{base}#{warn_suffix(cab)}"
         end
 
         # Nazov mazanej polozky z ULOZENEHO zoznamu (CISTA funkcia). Volna

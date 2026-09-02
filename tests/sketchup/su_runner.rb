@@ -12079,6 +12079,43 @@ module NoxunSuRunner
       ok('KOV-H2 (P2-B): zlyhana prestavba NEUROBILA ziadny krok Spat',
          !m6.valid? && inst.valid? && kovh_manual(inst).length == before6.length)
 
+      # --- 9) VAROVANIA PRESTAVBY v hlaske vysledku (Codex kolo 2, P2-H) ----
+      # Hlaska vysledku PREPISE status prestavby (klient ju posiela do
+      # `NX.setStatus`), takze musi niest aj jej varovania — inak by
+      # upozornenia z TEJ ISTEJ prestavby zmizli bez stopy. Varovania sa
+      # vyrobia REALNE: prilis plytka skrinka s policou (BuildPlan ich zapise
+      # do configu pri stavbe).
+      warn_inst = e::CabinetBuilder.build(model, kovh_params(
+        [], 'width' => 400.0, 'depth' => 150.0, 'height' => 300.0,
+            'zone_tree' => { 'id' => 'Z1', 'shelves' => 3, 'children' => [] }
+      ))
+      if warn_inst
+        wcid = e::Store.get(warn_inst, 'cabinet_id').to_s
+        wcount = Array((e::Store.config(warn_inst) || {})['warnings']).length
+        kovh2_select!(model, warn_inst)
+        wres = nil
+        kovh2_capture_js do |calls|
+          e::Panel.handle_apply_all(pg(model,
+                                       'cabinet_id' => wcid,
+                                       'hardware_manual' => [kovh_free('id' => '')],
+                                       'manual_op' => { 'kind' => 'add', 'id' => '',
+                                                        'token' => 'su-h2-warn' }))
+          wres = calls.find { |c| c.to_s.start_with?('NX.hwManualResult(') }.to_s
+        end
+        if wcount.positive?
+          ok("KOV-H2 (P2-H): hlaska vysledku nesie VAROVANIA prestavby (#{wcount})",
+             wres.include?('upozorn'))
+        else
+          info('KOV-H2 (P2-H): skrinka nevyrobila ziadne varovanie — scenar preskoceny')
+        end
+        ok('KOV-H2 (P2-H): a stale hlasi, ze polozka pribudla',
+           wres.include?('Položka pridaná'))
+        cleanup(model)
+        inst = e::CabinetBuilder.build(model, kovh_params([kovh_cat('owner_part_key' => owner)]))
+        cid = inst ? e::Store.get(inst, 'cabinet_id').to_s : cid
+        kovh2_select!(model, inst) if inst
+      end
+
       # --- 6) POVOD nakupneho riadku nad ZIVYM modelom ----------------------
       exp = kovh_expand(model)
       src_rows = Array(exp && exp['rows'])

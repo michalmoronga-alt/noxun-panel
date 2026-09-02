@@ -350,7 +350,7 @@ NxTest.test('KOV-H2: KAZDA vetva `handle_apply_all` odpoveda modalu') do
                   "skory navrat „#{line}“ musi odpovedat modalu — zamok odomyka " \
                   'VYHRADNE volajuci (kontrakt D-15)')
   end
-  NxTest.assert(body.include?('push_manual_result(op, true, manual_ok_msg(op, removed))'),
+  NxTest.assert(body.include?('push_manual_result(op, true, manual_ok_msg(op, removed, cab))'),
                 'a uspesna cesta tiez')
   NxTest.assert(body.index('push_selected(model)') < body.rindex('push_manual_result'),
                 'pri odmietnuti ide signal AZ PO pushi — panel sa vrati na ULOZENY stav')
@@ -361,6 +361,53 @@ end
 # nezmenena — bez `push_selected` by si panel drzal ODMIETNUTY zoznam a
 # najblizsia nesuvisiaca zmena skrinky by ho poslala znova (duplicitne
 # pridanie, alebo dodatocne uplatnene „neuspesne" mazanie).
+# Codex #285 kolo 2 P2-H: hlaska vysledku PREPISE status prestavby (klient ju
+# posiela do `NX.setStatus`), takze musi niest aj jej varovania — inak by
+# upozornenia z TEJ ISTEJ prestavby zmizli bez stopy.
+NxTest.test('KOV-H2: hlaska vysledku nesie VAROVANIA prestavby') do
+  panel = Noxun::Engine::Panel
+  fake = Class.new do
+    def initialize(cfg)
+      @cfg = cfg
+    end
+
+    attr_reader :cfg
+
+    def valid?
+      true
+    end
+  end
+  # `warn_suffix` cita `Store.config(cab)` — podstrcime ho pre cas testu.
+  sc = Noxun::Engine::Store.singleton_class
+  sc.send(:alias_method, :kovh2_orig_config, :config)
+  sc.send(:define_method, :config) { |cab| cab.respond_to?(:cfg) ? cab.cfg : {} }
+  begin
+    two = fake.new('warnings' => %w[a b])
+    none = fake.new('warnings' => [])
+    op = { 'kind' => 'add', 'id' => '', 'token' => 't' }
+    NxTest.assert_equal 'Položka pridaná. · 2 upozornenia', panel.manual_ok_msg(op, nil, two),
+                        'varovania prestavby su v hlaske vysledku'
+    NxTest.assert_equal 'Položka pridaná.', panel.manual_ok_msg(op, nil, none),
+                        'bez varovani ostava hlaska holá'
+    NxTest.assert_equal 'Položka pridaná.', panel.manual_ok_msg(op, nil, nil),
+                        'a bez skrinky tiez (ziadna vynimka)'
+    NxTest.assert_equal 'Odstránená ručná položka „X“. · 2 upozornenia',
+                        panel.manual_ok_msg({ 'kind' => 'delete', 'id' => 'H1' }, 'X', two),
+                        'aj pri mazani'
+    NxTest.assert_equal ' · 1 upozornenie', panel.warn_suffix(fake.new('warnings' => %w[a])),
+                        'pripona sklonuje (jedna definicia pre status aj vysledok)'
+  ensure
+    sc.send(:remove_method, :config)
+    sc.send(:alias_method, :config, :kovh2_orig_config)
+    sc.send(:remove_method, :kovh2_orig_config)
+  end
+  # ZDROJ TEXTU je JEDEN — `status_with_warnings` pouziva TU ISTU priponu.
+  src = NxKovh2.src('ui/panel/sync.rb')
+  body = src[/def status_with_warnings.*?\n        end\n/m].to_s
+  NxTest.assert(body.include?('warn_suffix(cab)'),
+                'status prestavby a hlaska vysledku skladaju priponu z JEDNEHO miesta')
+end
+
 NxTest.test('KOV-H2: aj po VYNIMKE prestavby dostane panel ULOZENY stav') do
   body = NxKovh2.src('ui/panel/actions_cabinet.rb')[/def handle_apply_all.*?\n        end\n/m].to_s
   rescue_body = body[/rescue StandardError => e.*?raise/m].to_s
