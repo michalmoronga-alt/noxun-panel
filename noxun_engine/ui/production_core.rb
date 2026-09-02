@@ -553,6 +553,14 @@ module Noxun
 
         oid = item['owner_id'].to_s
         pkey = item['part_key'].to_s
+        # KOV-A1 (Codex #280 P2-A): nalez, ktory nesie `owner_pid`, adresuje
+        # KONKRETNY VYSKYT — pri dvoch skrinkach so zdielanym `cabinet_id` je to
+        # jediny udaj, ktorym sa da povedat, KTORA z nich problem ma. Bez tohto
+        # scopu by klik na RED „dvierka bez určeného smeru" oznacil dvierka
+        # v OBOCH a `owner_pid` (audit #14 FIX 11) by nerobil NIC.
+        scoped = scoped_owner_instance(model, item, oid)
+        return pids_in_cabinet(scoped, pkey) if scoped
+
         out = []
         model.entities.grep(Sketchup::ComponentInstance).each do |inst|
           case Store.kind(inst)
@@ -584,6 +592,49 @@ module Noxun
           end
         end
         out.compact.uniq
+      end
+
+      # KOV-A1 (Codex #280 P2-A): instancia, na ktoru nalez ukazuje svojim
+      # `owner_pid` — alebo nil, ked sa to NEDA spolahlivo overit.
+      #
+      # FAIL-OPEN je tu zamer: pri akejkolvek pochybnosti (kluc chyba alebo nie
+      # je Integer, entita medzitym zanikla ci patri inemu dokumentu, nie je to
+      # TOP-LEVEL korpus, alebo sa `cabinet_id` rozisiel) sa vraciame k dnesnej
+      # vseobecnej vetve. Scope smie vyber ZUZIT, nikdy ho nesmie VYPRAZDNIT —
+      # prazdny vyber by pouzivatelovi ukazal „Zoznam sa medzitým zmenil"
+      # namiesto dielca, ktory v modeli stoji.
+      #
+      # `cabinet_id` sa overuje ZAMERNE: `owner_pid` je adresa VYSKYTU, ale
+      # identita problemu je (owner_id + part_key). Ked sa rozidu (prestavba,
+      # dedup kopie, recyklovany PID), autoritou ostava IDENTITA.
+      def scoped_owner_instance(model, item, oid)
+        pid = item['owner_pid']
+        return nil unless pid.is_a?(Integer) && pid.positive?
+        return nil if oid.empty?
+
+        ent = model.find_entity_by_persistent_id(pid)
+        return nil unless ent.is_a?(Sketchup::ComponentInstance) && ent.valid?
+        return nil unless ent.parent.is_a?(Sketchup::Model) # len TOP-LEVEL kus
+        return nil unless Store.kind(ent) == 'cabinet'
+        return nil unless Store.get(ent, 'cabinet_id').to_s == oid
+
+        ent
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.scoped_owner_instance')
+        nil
+      end
+
+      # Dielce JEDNEJ skrinky podla part_key. Prazdny kluc alebo ziadna zhoda
+      # (dielec sa nepostavil — vzor `part_skipped_degenerate`) = sama instancia;
+      # presne ten isty fallback ako vo vseobecnej vetve, takze vyber nikdy
+      # nevyjde prazdny.
+      def pids_in_cabinet(inst, pkey)
+        return [inst.persistent_id] if pkey.empty?
+
+        found = inst.definition.entities.grep(Sketchup::ComponentInstance).filter_map do |pi|
+          pi.persistent_id if Store.kind(pi) == 'part' && Store.get(pi, 'part_key').to_s == pkey
+        end
+        found.empty? ? [inst.persistent_id] : found
       end
 
       # ŠT-3b-2a (F10): oko pri jantarovom riadku sekcie Pravidlá. Adresa je
@@ -1248,8 +1299,12 @@ module Noxun
         'rail_front' => 'Výstuha predná', 'rail_back' => 'Výstuha zadná',
         'plinth' => 'Sokel', 'front_door' => 'Dvierka', 'drawer_front' => 'Čelo zásuvky',
         'free_panel' => 'Voľná doska',
-        # KOV-A1: vyklop aj sklop nesie rola `flap` (typ rozlisuje karta cela).
-        'flap' => 'Výklop', 'false_front' => 'Blenda'
+        # KOV-A1 (Codex #280 P2-B): rola `flap` je SPOLOCNA pre vyklop AJ sklop,
+        # takze jej nazov musi byt NEUTRALNY — „Výklop" by v kusovniku aj v karte
+        # dielca klamal pri kazdom sklope. Konkretny text (vyklop vs. sklop) vie
+        # povedat len TYP cela, nie rola: `PartKeys.flap_label` (rovnaky neutralny
+        # tvar bez zhody) a od KOV-A2 karta cela s piktogramami.
+        'flap' => 'Výklop/sklop', 'false_front' => 'Blenda'
       }.freeze
 
       def role_label(role)

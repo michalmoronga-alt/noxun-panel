@@ -50,6 +50,11 @@ resolvery** klik→entita (`pids_for_problem` vrátane fallbacku na vlastníka p
 korpus]; vetva `rule_ref` v `do_select` je vlastná zámerne — override v kusovníku vlastný riadok mať nemusí, napr. vypnuté kovanie; od ŠT-3b-2b beží **bez `fresh_collect`** — hľadá
 podľa identity, takže plný sken modelu bol čistá réžia).
 
+**KOV-A1 — `owner_pid` scopuje klik na JEDEN výskyt.** Keď nález nesie `owner_pid` (Integer) a `scoped_owner_instance` overí, že ide o **živú top-level skrinku s tým istým
+`cabinet_id`**, `pids_for_problem` hľadá dielec `part_key` **len v nej** (`pids_in_cabinet`); inak beží dnešná všeobecná vetva. Bez toho by klik na RED „dvierka bez určeného
+smeru" pri dvoch skrinkách so zdieľaným ID označil dvierka v OBOCH a `owner_pid` (audit #14 FIX 11) by nerobil nič. Overenie je **fail-open**: chýbajúci/nečíselný kľúč, zaniknutá
+entita, iný druh alebo nezhodné `cabinet_id` → všeobecná vetva, takže scope smie výber len ZÚŽIŤ, nikdy ho nevyprázdni. `pids_for_override` `owner_pid` neposiela, takže sa nemení.
+
 **ZÁVÄZNÝ kontrakt modulu: žiadny okenný stav** — `@dialog`, `@generation` ani `@pending_*` sem nepatria (dve okná nad jedným jadrom by si ich prepisovali); stráži to guard test,
 ktorý v `production_core.rb` nepripustí ani jednu inštančnú premennú. Do ŠT-1c PR B3 si `ProductionDialog` ponechával **tenké obaly s pôvodnými menami, signatúrami AJ
 privátnosťou** (aby bol refactor bez zmeny správania); s oknom zanikli a volajúci — panel, pure testy aj in-SketchUp runner — idú na jadro priamo. Loader (`main.rb`) načítava jadro
@@ -188,7 +193,10 @@ menovky (`Budget.sheet_label`, `CpExport.material_label`) — sú v `core/`, kam
 
 **`rows_with_roles`** dopĺňa voliteľný stĺpec „Rola" **read-only obohatením** — záznamy sa zoskupia TÝM ISTÝM `Bom.row_key`, akým vznikli riadky, pretože pridať rolu do kľúča
 agregácie by zmenilo kusovník **aj VEPO** (a párovanie beží cez Ruby hash: kľúč riadku je POLE, v JSON by sa už nespárovalo). SK názvy rolí sú `ROLE_LABELS` — jedna autorita, JS
-žiadny preklad enumu nemá.
+žiadny preklad enumu nemá (`part_card.js` má vlastnú mapu len ako fallback popisu karty a musí s ňou byť zhodný).
+**KOV-A1:** rola **`flap` je spoločná pre výklop AJ sklop**, preto je jej názov neutrálny **„Výklop/sklop"** — „Výklop" by pri každom sklope klamal v stĺpci Rola kusovníka,
+v karte dielca aj v prehľade ABS pravidiel. Konkrétny text vie povedať len TYP čela, nie rola: server ho skladá v `PartKeys.flap_label` (rovnaký neutrálny tvar bez zhody)
+a od KOV-A2 aj karta čela. `false_front` = „Blenda" (blenda je jednoznačná).
 
 **ŠT-1b sem pridala celý zvyšok KONTROLY: `control_payload`** (Validation.run nad čerstvým zberom **+ zlúčenie s upozorneniami rozpočtu cez `Validation.with_budget`**) je **jediné
 miesto, kde vzniká číslo semaforu** — číta ho sekcia Kontrola v Štúdiu, badge navigácie **aj `do_export`** (status aj sekcia KONTROLA vo VEPO LOGu; do review #1 mal export vlastný

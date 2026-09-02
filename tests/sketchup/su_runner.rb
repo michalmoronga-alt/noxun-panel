@@ -11785,6 +11785,29 @@ module NoxunSuRunner
            dup.first && dup.first['owner_pid'] == b.persistent_id)
         ok('KOV-A1 dup-ID: stable_key owner_pid NEOBSAHUJE',
            dup.first && dup.first['stable_key'] == "front_direction|#{cid_a}|front:F1/wing:single")
+
+        # Codex #280 P2-A: klik na nalez smie oznacit dvierka LEN tej skrinky,
+        # ktora smer nema — inak by `owner_pid` (FIX 11) nerobil nic.
+        if dup.first
+          want = kova_parts(b)['front:F1/wing:single']
+          other = kova_parts(a)['front:F1/wing:single']
+          pids = e::ProductionCore.pids_for_problem(model, dup.first)
+          ok("KOV-A1 P2-A: klik oznaci PRESNE dvierka skrinky s `unset` (#{pids.length} ks)",
+             want && pids == [want.persistent_id])
+          ok('KOV-A1 P2-A: dvierka DRUHEJ (vyriesenej) skrinky sa NEOZNACIA',
+             other && !pids.include?(other.persistent_id))
+
+          # FAIL-OPEN: ked instancia z `owner_pid` zanikne, resolver sa vrati
+          # k dnesnemu spravaniu (podla owner_id) — NIKDY prazdny vyber.
+          stale = dup.first.dup
+          model.start_operation('KOV-A1 dup id erase', true)
+          b.erase!
+          model.commit_operation
+          back = e::ProductionCore.pids_for_problem(model, stale)
+          ok("KOV-A1 P2-A: po zmazani instancie sa resolver vrati k owner_id (#{back.length} ks)",
+             back == [other.persistent_id])
+          ok('KOV-A1 P2-A: fail-open NIKDY nevrati prazdny vyber', !back.empty?)
+        end
       end
     end
 

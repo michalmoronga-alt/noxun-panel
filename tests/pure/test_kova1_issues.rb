@@ -231,6 +231,41 @@ module NxTest
                  'kusovnik, nakup ani ceny sa novym klucom NEMENIA ani o cislo')
   end
 
+  # ============ P2-A: `owner_pid` scopuje klik na JEDEN vyskyt ==============
+  #
+  # Charakterizacia ZDROJA (vzor test_1b3_citanie.rb): telo `pids_for_problem`
+  # vyzaduje ZIVY SketchUp model, takze sa headless spustit neda — overuje sa
+  # PRITOMNOST vetvy a jej fail-open guardy. Ucinok nad realnym modelom dokazuje
+  # in-SketchUp sekcia `run_kova` (dup-ID scenar).
+  test('KOV-A1 P2-A: Validation prenasa owner_pid do polozky Kontroly (mimo stable_key)') do
+    it = I.run_items(I.issues([I.front('direction' => 'unset')], 'CAB-5', 909)).first
+    assert_equal(909, it['owner_pid'], 'bez tohto pola nema klik co scopovat')
+    refute(it['stable_key'].include?('909'), 'pid je adresa VYSKYTU, nie identita problemu')
+  end
+
+  test('KOV-A1 P2-A: pids_for_problem scopuje podla owner_pid a je FAIL-OPEN') do
+    s = I.src('ui/production_core.rb')
+    branch = s[/def pids_for_problem\(model, item\).*?\n        out = \[\]/m].to_s
+    assert(branch.include?('scoped_owner_instance(model, item, oid)'),
+           'pids_for_problem sa musi najprv spytat na scope podla owner_pid')
+    assert(branch.include?('return pids_in_cabinet(scoped, pkey) if scoped'),
+           'pri overenej instancii hlada dielec LEN v nej')
+    scope = s[/def scoped_owner_instance\(model, item, oid\).*?\n      end/m].to_s
+    assert(scope.include?("pid.is_a?(Integer)"), 'kluc musi byt Integer (fail-open)')
+    assert(scope.include?('find_entity_by_persistent_id(pid)'), 'entita sa hlada cerstvo v modeli')
+    assert(scope.include?('ent.valid?'), 'zanikla entita = fail-open')
+    assert(scope.include?('ent.parent.is_a?(Sketchup::Model)'), 'len TOP-LEVEL kus')
+    assert(scope.include?("Store.kind(ent) == 'cabinet'"), 'len korpus (dosky/dielce sa nemenia)')
+    assert(scope.include?("Store.get(ent, 'cabinet_id').to_s == oid"),
+           'autoritou ostava IDENTITA — nezhodne cabinet_id = fail-open')
+    fb = s[/def pids_in_cabinet\(inst, pkey\).*?\n      end/m].to_s
+    assert(fb.include?('found.empty? ? [inst.persistent_id] : found'),
+           'nepostaveny dielec = vlastnik, nikdy prazdny vyber')
+    # Vetvy board/part a dup kategorie ostavaju NEDOTKNUTE.
+    assert(s.include?('return pids_for_duplicate(model, item) if dup_cats.include?'),
+           'dup kategorie maju nadalej vlastnu adresu')
+  end
+
   test('KOV-A1: collect nesie hardware_issues ako ADITIVNY kluc (zdroj = ulozeny config)') do
     s = I.src('core/bom.rb')
     assert(s.include?('hardware_issues: hardware_issues'), 'kluc je sucastou navratu collect')
