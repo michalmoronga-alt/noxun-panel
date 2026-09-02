@@ -148,6 +148,7 @@ unless NxTest::IN_SKETCHUP
     core/front_profiles
     core/hardware_rules
     core/hardware_catalog
+    core/hardware_taxonomy
     core/hardware_sets
     modules/shelves
     modules/fronts

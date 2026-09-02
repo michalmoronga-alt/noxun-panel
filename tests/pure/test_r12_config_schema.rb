@@ -325,3 +325,28 @@ module NxTest
     end
   end
 end
+
+# --- KOV-B1: bump na 4 + brana definicii setov v sablone ---------------------
+
+module NxTest
+  test('KOV-B1 (R-12): CONFIG_SCHEMA je >= 4 a sada R-12 ostava zelena') do
+    cb = NxR12::CB
+    assert(cb::CONFIG_SCHEMA >= 4,
+           "schema configu #{cb::CONFIG_SCHEMA} < 4 — sety s klasifikaciou cestuju v sablonach")
+    assert(cb.newer_config?('config_schema' => cb::CONFIG_SCHEMA + 1))
+    refute(cb.newer_config?('config_schema' => cb::CONFIG_SCHEMA))
+    # sablona ulozena TOUTO verziou nesie marker, takze ju starsi plugin odmietne
+    tc = Noxun::Engine::Panel.template_config_from(NxR12.stored_config)
+    assert_equal(cb::CONFIG_SCHEMA, tc['config_schema'],
+                 'sablonovy whitelist stampuje AKTUALNY marker')
+  end
+
+  test('KOV-B1 (R-12): histori bumpu je zapisana v zdroji (disciplina STANDARD 2.5)') do
+    s = NxR12.src('core/cabinet_builder.rb')
+    hist = s[/HISTORIA:.*?CONFIG_SCHEMA = /m].to_s
+    assert(!hist.empty?, 'komentar HISTORIA sa naslo')
+    assert(hist.include?('4 = KOV-B1'), 'kazde cislo ma v komentari svoj dovod')
+    assert(hist.include?('assess_set_defs'),
+           'a menuje aj DOPREDNU branu, ktora k bumpu patri')
+  end
+end

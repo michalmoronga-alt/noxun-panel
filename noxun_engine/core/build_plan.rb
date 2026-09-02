@@ -16,7 +16,11 @@
 #                          Verzuje sa NEZAVISLE od PartKeys::SCHEMA (format identity).
 #                          Historia: 1 = V0.3.4 (hardware vzdy []); 2 = V0.4 (hardware plni
 #                          rules engine, polozky string-keyed so sprisnenym kontraktom —
-#                          ziadna datova migracia, lebo schema 1 hardware nikdy nenieslo).
+#                          ziadna datova migracia, lebo schema 1 hardware nikdy nenieslo);
+#                          3 = KOV-B1 (slovnik GENERIC_TYPES sa rozsiril o `lift` — vyklopy
+#                          a sklopy; polozka s nim je pre STARSI plugin neznamy typ a jeho
+#                          `guard_unknown_hardware!` prestavbu odmietne, takze plan, ktory ho
+#                          moze niest, uz nie je plan schemy 2).
 #   parts       [dielec] — deskriptory REALNE POSTAVITELNYCH dielcov. Degenerovane dielce
 #                          (nekladny rozmer boxu, napr. z extremne uzkych zon) sa do parts
 #                          NEdostanu — plan ich vyradi s warningom part_skipped_degenerate,
@@ -73,7 +77,7 @@
 module Noxun
   module Engine
     module BuildPlan
-      SCHEMA = 2
+      SCHEMA = 3
 
       # Najmensi vyrobitelny rozmer (mm). JEDINY prah degenerovanosti v systeme:
       # plan (partition v Construction.build_plan) aj builder (positive_box?) ho zdielaju —
@@ -96,7 +100,12 @@ module Noxun
       # wall_hanger = zavesenie skrinky na stenu (rektifikacny uholnik "Bystrica",
       # debata 2.8.2026). Rozsirenie je aditivne; starsi plugin config s nim
       # NEvaliduje — forward-compat guard resi CabinetBuilder (audit D1 B5).
-      GENERIC_TYPES = %w[leg hinge slide handle shelf_pin connector wall_hanger].freeze
+      # lift = vyklopy a sklopy (KOV-B1, presunute z KOV-E podla auditu #17
+      # BLOCKER 2): kanonicka mapa typu pouzitia setu `lift`/`fall` -> `lift`
+      # ho potrebuje UZ TERAZ, inak sa vyklopovy set neda ulozit. PRAVIDLA ani
+      # SEED MAPOVANIE k nemu zatial NIE SU — tie prinesie KOV-E; slovnik je
+      # tu preto, aby uz nebolo treba dalsi bump kontraktu.
+      GENERIC_TYPES = %w[leg hinge slide handle shelf_pin connector wall_hanger lift].freeze
 
       # H1a (audit BLOCKER 2): JEDINY parser kluca mapovania setov kovania.
       # Tvar kluca: "generic_type" ALEBO "generic_type@owner_part_key"
@@ -111,6 +120,12 @@ module Noxun
       # Zije v BuildPlan, lebo tu zije slovnik GENERIC_TYPES a parser potrebuju
       # AJ vrstvy nacitane pred HardwareSets (guard prestavby v CabinetBuilder).
       # Vrati [generic_type, owner_part_key|nil] alebo nil (neplatny tvar).
+      #
+      # KOV-B1: pre KANONICKY TRIEDNY kluc (`class:<gt>|<opening_mode>[|<drawer_
+      # construction>]`, autorita tvaru je HardwareSets.parse_class_key) vracia
+      # NIL — nie je to vyber podla generickeho typu ani podla vlastnika, takze
+      # ho `resolve_set_id` ani zmrazovanie snapshotu nesmu nikdy chytit.
+      # Typovu cast z neho vie vytiahnut `hardware_set_key_type` nizsie.
       def self.parse_hardware_set_key(key)
         raw = key.to_s.strip
         return nil if raw.empty?
@@ -126,9 +141,24 @@ module Noxun
       # Genericky typ z kluca mapovania aj ked kluc TATO verzia nepozna
       # (forward-compat guard nizsie potrebuje odlisit neznamy TYP od
       # neplatneho ownera). Vrati String (moze byt neznamy typ) alebo nil.
+      #
+      # KOV-B1: pozna aj prefix `class:` a vracia z neho PRVY segment (typ
+      # kovania). Dosledok je zamerny a obojsmerny:
+      #   * TATO verzia: `class:lift|classic` -> 'lift' (znamy typ, prestavbu
+      #     neblokuje), `class:sliding|classic` -> 'sliding' (neznamy -> blok);
+      #   * STARSI plugin prefix nepozna, takze mu z toho isteho kluca vyjde
+      #     cely retazec „class:lift|classic" — neznamy typ, teda BLOK. Presne
+      #     to chceme: triedne mapovanie je obsah, ktoremu nerozumie.
+      HW_SET_CLASS_PREFIX = 'class:'
+
       def self.hardware_set_key_type(key)
         raw = key.to_s.strip
         return nil if raw.empty?
+        low = raw.downcase
+        if low.start_with?(HW_SET_CLASS_PREFIX)
+          gt = low[HW_SET_CLASS_PREFIX.length..].to_s.split('|').first.to_s.strip
+          return gt.empty? ? nil : gt
+        end
         gt = raw.split('@', 2).first.to_s.strip
         gt.empty? ? nil : gt
       end

@@ -114,7 +114,8 @@ module Noxun
       HW_LABELS = {
         'leg' => 'Nohy', 'hinge' => 'Závesy', 'slide' => 'Výsuv',
         'handle' => 'Úchytky', 'shelf_pin' => 'Podperky', 'connector' => 'Spojky',
-        'wall_hanger' => 'Zavesenie na stenu'
+        'wall_hanger' => 'Zavesenie na stenu',
+        'lift' => 'Výklop / sklop' # KOV-B1 (pravidla az KOV-E)
       }.freeze
 
       # H1a: slovenske nazvy parametrov pasiem — 4. PAD pre vety typu „nemá

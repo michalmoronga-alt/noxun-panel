@@ -162,6 +162,8 @@ gola_profile · hinge · slide · leg · handle · shelf_pin · connector · fre
 - **Dopredný guard:** uložené číslo **vyššie** než `CONFIG_SCHEMA` odmieta **PRESTAVBU** (a odvodené objekty: kópia skrinky, uloženie ako šablóna). Čítanie, výber, kusovník, VEPO ani exporty sa neblokujú — model z novšej verzie sa ďalej číta.
 - **Šablóna nesie ten istý marker** (`template_config_from`) — jej config je rovnako uzavretý whitelist, takže staršia verzia šablónu z novšej odmietne použiť aj vložiť.
 - **Disciplína bumpu:** číslo sa zvýši pri **každom rozšírení whitelistu configu o pole, ktorého tichá strata by poškodila výrobu** (nové konštrukčné pole, nový typ čela, nová rola). Čisto odvodené alebo kozmetické pole bump nevyžaduje. `plan_schema` (tvar tranzientného plánu) ani `part_key_schema` (kľúče dielcov) kompatibilitu configu **nevyjadrujú** a nenahrádzajú ho.
+- **Čísla sa prideľujú SEKVENČNE podľa poradia mergov, nie podľa poradia návrhov** (audit #17 FIX 5): dve dávky rozpracované naraz si nesmú nárokovať to isté číslo. Bump patrí do dávky, ktorá pole reálne zavádza, a jeho dôvod sa zapisuje do komentára `HISTORIA` pri konštante.
+- **Bump chráni SPÄTNE** (staršia verzia novší config odmietne). Keď dávka prináša aj obsah, ktorý sa dá do modelu zapísať zvonku (napr. definície setov zo šablóny), potrebuje **navyše DOPREDNÚ bránu**, ktorá taký obsah odmietne PRED zápisom — `4 = KOV-B1` je presne tento prípad (`HardwareSets.assess_set_defs`).
 
 **Zóna** (`kind: zone`; nevýrobná — ghost):
 
@@ -453,6 +455,35 @@ položka, ktorú dodávateľ vedie mimo katalógu. Žije v configu korpusu ako *
 **vyexportovala**, len bez toho, čomu nerozumie. Odteraz: keď zber nájde skrinku s `config_schema` vyšším než pozná táto verzia, **nákupný zoznam kovania, rozpočet XLSX aj cenová
 ponuka XLSX sa NEVYTVORIA** (hláška menuje skrinky a žiada aktualizáciu pluginu) a Kontrola to hlási RED. **VEPO sa neblokuje** — rezací výstup z rozmerov dielcov staršia verzia
 číta správne. Potvrdiť sa to nedá: chýbajúce dáta sa nedajú „vziať na vedomie".
+
+**KLASIFIKÁCIA SETU (KOV-B1, záväzné od v0.9.19).** Set nesie okrem `generic_type` aj to, NA ČO sa používa: `use_type` (`door|drawer|lift|fall|other`) · `opening_mode`
+(`classic|tipon|other`, kde `other` = „neuplatňuje sa" — nohy, podperky, zavesenie) · `drawer_construction` (`metal|wood|other`, **len pri zásuvke**) · `manufacturer` ·
+`series` · `active`. Slovníky sú **uzavreté** a s klasifikáciou čela (`Fronts`) držia jednu doménovú pravdu.
+
+- **All-or-nothing:** klasifikácia buď **úplne chýba** (legacy „nezaradený" set — správa sa presne ako pred KOV-B1), alebo je **úplná a kontextovo platná**. Čiastočný tvar sa
+  pri zápise odmieta. **Rada je VOLITEĽNÁ** — podperky ani klzáky žiadnu nemajú a vynútená rada by znečistila taxonómiu vymyslenými menami.
+- **`generic_type` je ODVODENÝ** kanonickou mapou `door→hinge` · `drawer→slide` · `lift/fall→lift`; pri `other` sa uvádza explicitne. Chýbajúci sa doplní, nesediaci je chyba.
+  Je to jediná autorita vzťahu — dva protirečivé zápisy o tom istom sete nie sú možné.
+- **`active` je sparse** (ukladá sa len `false`) a **nákup ho NEČÍTA**: existujúce mapovanie, snapshot aj šablóna expandujú identicky. Ovplyvňuje len ponuku v UI.
+- **Čítanie je celé-alebo-vôbec:** neúplný či neznámy klasifikačný blok sa zahodí CELÝ a set sa číta ako nezaradený — `generic_type` (a teda nákup) sa NIKDY nemení. Strata sa
+  vždy prizná bránou (nižšie), nikdy sa neoreže ticho.
+
+**TAXONÓMIA VÝROBCOV A RÁD.** `manufacturer`/`series` sú **kanonické názvy z jediného zoznamu** (`%APPDATA%\NOXUN\Engine\hardware_taxonomy.json`), nie voľný text — inak by
+v katalógu za mesiac boli „Hettich", „hettich" aj „Hettch". Identita mena je case-insensitive a bez diakritiky; **rada patrí presne jednému výrobcovi**. Zoznam sa dopĺňa len
+pridávaním (`create_manufacturer!` / `create_series!`); premenovanie a mazanie **nie sú vo V1** — museli by prejsť všetky sety, položky, snapshoty aj šablóny. Členstvo sa
+kontroluje pri zápise do **globálnych** úložísk (knižnica setov, katalóg položiek); validácia setu ostáva **čistá**, lebo snapshot v .skp a šablóny cestujú medzi počítačmi
+s inou taxonómiou.
+
+**MAPOVACÍ KĽÚČ `class:`.** Okrem `generic_type` a `generic_type@owner_part_key` pozná mapovanie aj **triedny kľúč**
+`class:<generic_type>|<opening_mode>[|<drawer_construction>]` (tretí segment len pri `slide`, žiadny `@owner` sufix). Je pripravený pre výber setu podľa spôsobu otvárania;
+v0.9.19 ho **nič nečíta** a zapisovacie cesty ho nepíšu — platí preň iba **bezstratový round-trip** a detekcia markera `std`.
+
+**MARKER `std` KNIŽNICE A SNAPSHOTU:** `1` = legacy · `2` = pásma/selector · **`3` = klasifikácia alebo triedny kľúč**. Marker je LAZY podľa obsahu, takže čisto legacy dáta
+ostávajú čitateľné pre staršie verzie; obsah so `std: 3` je pre staršiu verziu read-only (knižnica) alebo `:invalid` (snapshot) — nikdy čiastočne prečítaný.
+
+**ŠABLÓNA NESIE DEFINÍCIE SETOV BEZSTRATOVO ALEBO VÔBEC.** `hardware_set_defs` sú dátový obsah mimo modelu (dá sa ručne upraviť aj priniesť z novšej verzie), takže pred
+každým vkladom a použitím šablóny beží **rovnaký detektor straty ako nad knižnicou** (`assess_set_defs`). Nečitateľné definície = odmietnutie **PRED akoukoľvek operáciou**,
+teda bez jediného zápisu do modelu. K tomu patrí bump `config_schema` (§2.5), ktorý tú istú šablónu odmietne aj spätne.
 
 **Fáza 2 — mapovanie na konkrétny katalógový kód.** Na konci projektu (alebo raz v nastaveniach) sa flag `hinge` namapuje na konkrétny kód (`Blum 71B3550`). **Mapovanie sa ukladá a nabudúce prebehne automaticky.**
 

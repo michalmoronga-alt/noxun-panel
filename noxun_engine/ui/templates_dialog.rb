@@ -421,6 +421,18 @@ module Noxun
             return set_status("Šablóna nesie kovanie, ktoré sa nedá prečítať (#{Array(hw_lost).join(', ')}) — " \
                               'je z novšej verzie Noxun alebo ručne upravená. Nepoužitá, nič sa nezmenilo.', true)
           end
+          # KOV-B1 (audit #17 BLOCKER 1): to iste plati pre DEFINICIE setov —
+          # `freeze_template_sets!` ich zmrazi do .skp a doteraz sli len cez
+          # tolerantny `normalize_sets`, takze sablona z novsej verzie by sa
+          # zapisala UZ OREZANA. Kontrola bezi PRED `rebuild_many`, teda skor,
+          # nez sa otvori akakolvek operacia — odmietnutie = model netknuty.
+          hw_def_status, hw_def_lost =
+            HardwareSets.assess_set_defs((tpl['config'] || {})['hardware_set_defs'])
+          if hw_def_status == :lossy
+            return set_status("Šablóna nesie sety kovania, ktoré sa nedajú prečítať " \
+                              "(#{Array(hw_def_lost).join(', ')}) — je z novšej verzie Noxun " \
+                              'alebo ručne upravená. Nepoužitá, nič sa nezmenilo.', true)
+          end
 
           target = Panel.existing_params(cab)
           merged = merge_template(target, tpl['config'])

@@ -11844,6 +11844,225 @@ module NoxunSuRunner
     end
   end
 
+  # ===== KOV-B1: KLASIFIKACIA SETOV, TAXONOMIA, BRANA SABLON ================
+  #
+  # Co headless sada NEVIE overit (a preto to je tu):
+  #   1) ZAPIS klasifikovaneho setu do REALNEHO suboru kniznice — marker `std` 3
+  #      v subore a to, ze si ho TA ISTA verzia hned precita ako `:ok`;
+  #   2) PROJEKTOVY SNAPSHOT v .skp: `set_project_mapping!` vo vlastnej operacii
+  #      (= 1 krok Spat), `std` 3 priamo v NOXUN dict, prestavba skrinky nad nim
+  #      a NAKUP TOTOZNY s tym, co da NEklasifikovany set (klasifikacia je
+  #      metadata, nikdy nie vyber kodu);
+  #   3) SABLONA z „novsej verzie" — brana `assess_set_defs` musi odmietnut
+  #      OBE cesty (vklad aj pouzitie) BEZ toho, aby sa otvorila akakolvek
+  #      operacia: pocet entit, snapshot v dict AJ undo stack ostavaju nedotknute;
+  #   4) `create_manufacturer!` je zapis do GLOBALNEHO suboru — v SketchUpe
+  #      NESMIE vyrobit krok Spat.
+  #
+  # SANDBOX: cela sekcia bezi nad IZOLOVANYM %APPDATA% (`Materials.test_dir_override`,
+  # vzor run_2a2), takze REALNA kniznica setov, katalog kovania ani taxonomia sa
+  # NIKDY nedotknu. Override sa v `ensure` VZDY vracia na nil a vsetky modulove
+  # cache sa resetuju. Sablona je namespacovana („SU TEST KOVB1 …") a maze sa —
+  # `TemplateStore` override NEMA (cita `ENV['APPDATA']` priamo).
+
+  KOVB1_TPL  = 'SU TEST KOVB1 sablona'
+  KOVB1_SID  = 'su-b1-zaves'
+  KOVB1_CODE = '104717' # seed katalogu kovania (cerstvy sandbox ho ma)
+
+  def kovb1_reset_caches!
+    e::JsonFileStore.invalidate # cela cache suborov (kniznica, katalog, taxonomia)
+    e::Materials.reload!
+    e::HardwareCatalog.reset_state!
+    e::HardwareSets.reset_library_state!
+    e::HardwareTaxonomy.reset_state!
+  end
+
+  def kovb1_set(over = {})
+    { 'set_id' => KOVB1_SID, 'name' => 'SU B1 záves', 'generic_type' => 'hinge',
+      'members' => [{ 'code' => KOVB1_CODE, 'per' => 'unit', 'qty' => 1 }] }.merge(over)
+  end
+
+  def kovb1_class(over = {})
+    kovb1_set({ 'use_type' => 'door', 'opening_mode' => 'classic',
+                'manufacturer' => 'Hettich', 'series' => 'Sensys' }.merge(over))
+  end
+
+  def kovb1_params(over = {})
+    { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0,
+      'thickness' => 18.0, 'floor_height' => 100.0,
+      'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto',
+                                  'wings' => '1' }] } }.merge(over)
+  end
+
+  # Snapshot setov zo ZIVEHO modelu ako SUROVY retazec (porovnanie „nezmenilo sa").
+  def kovb1_snap_raw(model)
+    model.get_attribute(e::Store::DICT, e::HardwareSets::MODEL_KEY).to_s
+  end
+
+  def kovb1_expand(model)
+    e::ProductionCore.hardware_expansion(model, e::Bom.collect(model))
+  end
+
+  def run_kovb1(model)
+    cleanup(model)
+    markers = []
+    tmp = File.join(Dir.tmpdir, "noxun_kovb1_#{Process.pid}")
+    FileUtils.mkdir_p(tmp)
+    e::Materials.test_dir_override = tmp
+    kovb1_reset_caches!
+    begin
+      ok('KOV-B1: sandbox %APPDATA% je aktivny (realna kniznica sa nedotkne)',
+         e::HardwareSets.path.start_with?(tmp) && e::HardwareTaxonomy.path.start_with?(tmp))
+
+      # --- 1) TAXONOMIA + ZAPIS KLASIFIKOVANEHO SETU DO SUBORU -------------
+      mans = e::HardwareTaxonomy.manufacturers.map { |m| m['name'] }
+      ok("KOV-B1: taxonomia sa zaseedovala (#{mans.length} výrobcov)",
+         mans.include?('Hettich') && mans.include?('Blum'))
+      ok('KOV-B1: rada „Sensys" patri Hettichu',
+         e::HardwareTaxonomy.find_series('Sensys').to_h['manufacturer'] == 'Hettich')
+
+      status, rec = e::HardwareSets.save_set!(kovb1_class)
+      ok("KOV-B1: klasifikovany set sa ULOZIL do kniznice (#{status.inspect})", status == :ok)
+      ok('KOV-B1: a nesie CELU klasifikaciu',
+         rec.is_a?(Hash) && rec['use_type'] == 'door' && rec['manufacturer'] == 'Hettich' &&
+         rec['series'] == 'Sensys')
+      doc = JSON.parse(File.binread(e::HardwareSets.path))
+      ok("KOV-B1: subor kniznice nesie std 3 (#{doc['std']})",
+         doc['std'] == e::HardwareSets::STD_CLASSIFIED)
+      e::JsonFileStore.invalidate(e::HardwareSets.path)
+      e::HardwareSets.reset_library_state!
+      ok('KOV-B1: a TA ISTA verzia si ho hned precita ako `:ok`',
+         e::HardwareSets.library_state == :ok)
+      back = e::HardwareSets.load['sets'].find { |s| s['set_id'] == KOVB1_SID }
+      ok('KOV-B1: `load` vrati set s klasifikaciou (bezstratovy round-trip)',
+         back && back['use_type'] == 'door' && back['series'] == 'Sensys')
+      # vyrobca mimo taxonomie sa NEULOZI
+      bad_status, bad_msg = e::HardwareSets.save_set!(kovb1_class('manufacturer' => 'Vymyslena'))
+      ok("KOV-B1: vyrobca mimo taxonomie = odmietnutie (#{bad_status.inspect})",
+         bad_status == :invalid && bad_msg.to_s.include?('Vymyslena'))
+
+      # --- 2) PROJEKTOVY SNAPSHOT + NAKUP ----------------------------------
+      inst = e::CabinetBuilder.build(model, kovb1_params)
+      return ok('KOV-B1: vlozenie skrinky so zavesmi', false) unless inst
+
+      m1 = r03_marker(model, markers)
+      model.start_operation('SU KOV-B1 mapovanie', true)
+      wrote = e::HardwareSets.set_project_mapping!(model, 'hinge', KOVB1_SID, kovb1_class)
+      model.commit_operation
+      ok('KOV-B1: zapis projektoveho mapovania s klasifikovanou definiciou presiel', wrote)
+      st, state = e::HardwareSets.project_state_status(model)
+      ok("KOV-B1: snapshot sa cita ako `:ok` (#{st.inspect})", st == :ok)
+      ok('KOV-B1: a klasifikacia je v nom CELA',
+         state && state['sets'][KOVB1_SID] &&
+         state['sets'][KOVB1_SID]['use_type'] == 'door' &&
+         state['sets'][KOVB1_SID]['series'] == 'Sensys')
+      snap = JSON.parse(kovb1_snap_raw(model))
+      ok("KOV-B1: snapshot v NOXUN dict nesie std 3 (#{snap['std']})",
+         snap['std'] == e::HardwareSets::STD_CLASSIFIED)
+      exp_class = kovb1_expand(model)
+      Sketchup.undo
+      # POZOR: skrinka si pri stavbe zmrazila GLOBALNE predvolby, takze snapshot
+      # v modeli existuje uz PRED nasim zapisom — po Spat teda musi zmiznut
+      # NAS set, nie cely snapshot.
+      _, undone = e::HardwareSets.project_state_status(model)
+      ok('KOV-B1: zapis mapovania je PRESNE jeden krok Spat',
+         m1.valid? && (undone.nil? || undone['mapping']['hinge'] != KOVB1_SID))
+
+      # to iste s NEklasifikovanou definiciou — nakup musi vyjst ROVNAKY
+      model.start_operation('SU KOV-B1 mapovanie plain', true)
+      e::HardwareSets.set_project_mapping!(model, 'hinge', KOVB1_SID, kovb1_set)
+      model.commit_operation
+      snap2 = JSON.parse(kovb1_snap_raw(model))
+      ok("KOV-B1: legacy snapshot ostava na povodnom std (#{snap2['std']})",
+         snap2['std'] != e::HardwareSets::STD_CLASSIFIED)
+      exp_plain = kovb1_expand(model)
+      ok('KOV-B1: NAKUP je s klasifikaciou aj bez nej TOTOZNY (kody, pocty, ceny)',
+         JSON.generate(exp_class) == JSON.generate(exp_plain))
+
+      # prestavba skrinky nad klasifikovanym snapshotom
+      model.start_operation('SU KOV-B1 mapovanie klas', true)
+      e::HardwareSets.set_project_mapping!(model, 'hinge', KOVB1_SID, kovb1_class)
+      model.commit_operation
+      m2 = r03_marker(model, markers)
+      e::CabinetBuilder.rebuild(model, inst,
+                                e::CabinetBuilder.config_to_params(e::Store.config(inst) || {}))
+      ok('KOV-B1: prestavba skrinky nad klasifikovanym snapshotom prejde', inst.valid?)
+      Sketchup.undo
+      ok('KOV-B1: a je to jeden krok Spat', m2.valid? && inst.valid?)
+
+      # --- 3) SABLONA Z „NOVSEJ VERZIE" — ODMIETNUTIE BEZ ZAPISU -----------
+      tpl_cfg = e::Panel.template_config_from(e::Store.config(inst) || {}, model: model)
+      tpl_cfg['hardware_sets'] = { 'hinge' => KOVB1_SID }
+      # neznamy kluc `foo` AJ hodnota `use_type` z novsej verzie
+      tpl_cfg['hardware_set_defs'] = { KOVB1_SID => kovb1_class('use_type' => 'sliding',
+                                                                'foo' => 1) }
+      ok('KOV-B1: brana `assess_set_defs` nad definiciami sablony ODMIETA',
+         e::HardwareSets.assess_set_defs(tpl_cfg['hardware_set_defs'])[0] == :lossy)
+
+      snap_before = kovb1_snap_raw(model)
+      cabs_before = cabinets(model).length
+      # Marker sa zaklada PRED odpoctom entit — je to sam o sebe construction
+      # point v `model.entities`, takze odpocet spred neho by bol o jeden mimo.
+      m3 = r03_marker(model, markers)
+      ents_before = model.entities.length
+
+      # (a) VKLAD zo sablony — brana bezi PRED `prepare_insert` aj pred ghostom
+      ins_params = e::CabinetBuilder.config_to_params(tpl_cfg)
+      ins_params['hardware_sets'] = tpl_cfg['hardware_sets']
+      ins_params['hardware_set_defs'] = tpl_cfg['hardware_set_defs']
+      e::Panel.handle_insert(pg(model, ins_params))
+      ok('KOV-B1 (vklad): ziadna nova skrinka nevznikla', cabinets(model).length == cabs_before)
+      ok('KOV-B1 (vklad): ziadna ghost session sa nezacala',
+         !defined?(e::GhostTool) || e::GhostTool.session.nil? || !e::GhostTool.session.active?)
+
+      # (b) POUZITIE sablony — brana bezi PRED `rebuild_many`
+      e::TemplateStore.delete('cabinet', KOVB1_TPL) if e::TemplateStore.find('cabinet', KOVB1_TPL)
+      if e::TemplateStore.upsert('cabinet', KOVB1_TPL, tpl_cfg)
+        model.selection.clear
+        model.selection.add(inst)
+        e::TemplatesDialog.handle_apply({ 'template' => KOVB1_TPL }.to_json)
+        ok('KOV-B1 (pouzitie): snapshot setov v modeli sa NEZMENIL',
+           kovb1_snap_raw(model) == snap_before)
+      else
+        info('KOV-B1: sablonu sa nepodarilo ulozit — scenar pouzitia preskoceny')
+      end
+
+      ok('KOV-B1: pocet entit modelu je po OBOCH odmietnutiach nezmeneny',
+         model.entities.length == ents_before)
+      Sketchup.undo
+      ok('KOV-B1: a NEOTVORILA sa ziadna operacia (undo zobral len nas marker)',
+         !m3.valid? && inst.valid? && kovb1_snap_raw(model) == snap_before)
+
+      # --- 4) ZAPIS DO TAXONOMIE NEROBI KROK SPAT --------------------------
+      m4 = r03_marker(model, markers)
+      tstatus, = e::HardwareTaxonomy.create_manufacturer!('SU B1 Výrobca')
+      ok("KOV-B1: novy vyrobca sa zalozil (#{tstatus.inspect})", tstatus == :ok)
+      Sketchup.undo
+      ok('KOV-B1: zapis do GLOBALNEHO zoznamu vyrobcov NEROBI krok Spat',
+         !m4.valid? &&
+         !e::HardwareTaxonomy.find_manufacturer('SU B1 Výrobca').nil?)
+    rescue StandardError => ex
+      log_line("FAIL: KOV-B1 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    ensure
+      begin
+        e::TemplateStore.delete('cabinet', KOVB1_TPL) if e::TemplateStore.find('cabinet', KOVB1_TPL)
+      rescue StandardError
+        nil
+      end
+      r03_clear_markers(model, markers)
+      e::Materials.test_dir_override = nil
+      kovb1_reset_caches!
+      cleanup(model)
+      begin
+        FileUtils.rm_rf(tmp)
+      rescue StandardError
+        nil
+      end
+      ok('KOV-B1: cleanup (override prec, model prazdny, realne katalogy netknute)',
+         e::Materials.test_dir_override.nil? && cabinets(model).empty? && boards(model).empty?)
+    end
+  end
+
   # ===== KOV-A2b: SMER OTVARANIA V MODELI ===================================
   # Overuje to, co headless sada NEVIE: zivotny cyklus overlayu, ze zapnutie
   # NEVYROBI krok Spat ani nezmeni model, ze symbol sedi na SPRAVNOM kridle
@@ -13175,6 +13394,7 @@ module NoxunSuRunner
     run_d52b(model)          # D-52b: updater v sekcii „O plugine" — trojstav nad realnym diskom, REALNY swap nad TEMP sandboxom (nikdy nad zivym Plugins), latch, opakovany pokus
     run_kova(model)          # KOV-A1: cela — vyklop/sklop/blenda (plan vs. model 1:1, 19 mm celo), sablona/kopia/dormant s novymi polami, RED nalez smeru bez kroku Spat, dup-ID
     run_kovh1(model)         # KOV-H1: ad-hoc kovanie — polozky prezijú prestavbu (1 krok Spat), kopia ma nove ID, sablona ich nesie, mrtvy vlastnik = ORANGE a polozka ostava v nakupe, CSV bez poloziek BAJTOVO nezmeneny
+    run_kovb1(model)          # KOV-B1: klasifikacia setov + taxonomia — std 3 v subore aj v .skp, nakup TOTOZNY s legacy setom, sablona z novsej verzie odmietnuta BEZ operacie, zapis vyrobcu bez kroku Spat
     run_kova2b(model)        # KOV-A2b: smer otvarania v modeli — lifecycle overlayu, symbol na spravnom kridle a prednej ploche, prestavba/Spat, dup-ID per instancia, vykon
     run_async(model, nil)
   rescue StandardError => ex

@@ -142,6 +142,13 @@ module NxR07
       'sets' => sets, 'mapping' => mapping }.merge(over)
   end
 
+  # Marker, ktoremu TATO verzia nerozumie. Cislo sa NEPISE RUCNE (KOV-B1
+  # zaviedol std 3 a vsetky testy „novsej verzie" na trojke naraz zozltli) —
+  # berie sa o jednu nad najvyssim PODPOROVANYM.
+  def newer_std
+    HWS::STD_SUPPORTED.max + 1
+  end
+
   def model_with(state = nil)
     m = NxTest::FakeEntity.new
     m.set_attribute(E::Store::DICT, HWS::MODEL_KEY, state.to_json) if state
@@ -208,11 +215,11 @@ end
 
 # --- 2) DOWNGRADE GATE ------------------------------------------------------
 
-NxTest.test('R-07 brána: knižnica z novšej verzie (std 3) je READ-ONLY s dôvodom') do
+NxTest.test('R-07 brána: knižnica z novšej verzie (neznámy std) je READ-ONLY s dôvodom') do
   NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
   r = NxR07
   r.with_library do
-    r.install(r.doc([r.plain_set('cudzi')], {}, 'std' => 3))
+    r.install(r.doc([r.plain_set('cudzi')], {}, 'std' => r.newer_std))
     NxTest.assert(r::HWS.library_read_only?, 'novsi marker = read-only')
     NxTest.assert_equal(:newer, r::HWS.library_state_code)
     NxTest.assert(r::HWS.library_state_reason.include?('novšej verzie'),
@@ -226,7 +233,7 @@ NxTest.test('R-07 (FIX 3): nad read-only knižnicou sa seed-merge NEROBÍ — s�
   r.with_library do
     # seed_version 0 = seed-merge by INAK dosypal vsetky SEED_SETS a spustil
     # migracie mapovania.
-    r.install(r.doc([r.plain_set('cudzi')], {}, 'std' => 3, 'seed_version' => 0))
+    r.install(r.doc([r.plain_set('cudzi')], {}, 'std' => r.newer_std, 'seed_version' => 0))
     before = r.bytes
     lib = r::HWS.load
     # Review P1-1: `load` z nekompatibilnej kniznice nevydá NIC — ani seed
@@ -242,7 +249,7 @@ NxTest.test('R-07 brána: nad read-only knižnicou sa ODMIETNE každý zápis') 
   NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
   r = NxR07
   r.with_library do
-    r.install(r.doc([r.plain_set('cudzi')], { 'hinge' => 'cudzi' }, 'std' => 3))
+    r.install(r.doc([r.plain_set('cudzi')], { 'hinge' => 'cudzi' }, 'std' => r.newer_std))
     before = r.bytes
     NxTest.refute(r::HWS.write([r.plain_set], {}), 'write')
     NxTest.assert_equal(:write_failed, r::HWS.save_set!(r.plain_set)[0], 'save_set!')
@@ -254,7 +261,7 @@ end
 
 # --- 3) BLOCKER 2: brána POD ZÁMKOM pred každým zápisom ---------------------
 
-NxTest.test('R-07 (BLOCKER 2): cudzí súbor std 3 podsunutý PRED zámkom náš zápis ZASTAVÍ') do
+NxTest.test('R-07 (BLOCKER 2): cudzí súbor z novšej verzie podsunutý PRED zámkom náš zápis ZASTAVÍ') do
   NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
   r = NxR07
   r.with_library do |path|
@@ -264,14 +271,14 @@ NxTest.test('R-07 (BLOCKER 2): cudzí súbor std 3 podsunutý PRED zámkom náš
     r::STORE.read(path) # nahriata sekundova cache (stav beziaceho pluginu)
 
     # 2) druha instancia (novsi plugin) subor nahradi tesne PRED nasim zamkom
-    cudzi = r.doc([r.plain_set('od-novsej')], {}, 'std' => 3)
+    cudzi = r.doc([r.plain_set('od-novsej')], {}, 'std' => r.newer_std)
     fired = r.with_other_instance(path, cudzi) do
       status, = r::HWS.save_set!(r.plain_set('nas-novy'))
       NxTest.assert_equal(:write_failed, status,
                           'cachovane :ok NIE JE dokaz — zapis sa odmietne')
     end
     NxTest.assert(fired, 'fixture: druha instancia naozaj zapisala')
-    NxTest.assert_equal(3, r.raw['std'], 'subor novsej verzie ostal')
+    NxTest.assert_equal(r.newer_std, r.raw['std'], 'subor novsej verzie ostal')
     NxTest.assert_equal(['od-novsej'], r.raw['sets'].map { |s| s['set_id'] },
                         'a nas set sa doN NEdostal')
     NxTest.assert(r::HWS.library_read_only?, 'stav modulu sa pritom OMLADIL na read-only')
@@ -368,7 +375,7 @@ NxTest.test('R-07 (BLOCKER 1): z read-only knižnice sa do modelu NEKOPÍRUJE ni
   NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
   r = NxR07
   r.with_library do
-    r.install(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }, 'std' => 3))
+    r.install(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }, 'std' => r.newer_std))
     NxTest.assert_equal({ 'sets' => [], 'mapping' => {} }, r::HWS.load,
                         'load z nekompatibilnej kniznice nevydá nic')
     NxTest.assert_equal(nil, r::HWS.global_default_state, 'global_default_state = nil')
@@ -391,7 +398,7 @@ NxTest.test('R-07 (BLOCKER 1): súpis bez snapshotu = ORANGE library_incompatibl
   NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
   r = NxR07
   r.with_library do
-    r.install(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }, 'std' => 3))
+    r.install(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }, 'std' => r.newer_std))
     col = r.collected([r.hinge_item], 'CAB-1' => { 'hinge' => 'zaves-a' })
     exp = r::PC.hardware_expansion(r.model_with, col)
     NxTest.assert_equal([], exp['rows'], 'ziadny nacene(ny) riadok z nekompatibilnej kniznice')
@@ -415,7 +422,7 @@ NxTest.test('R-07: PLATNÝ projektový snapshot funguje aj pri read-only knižni
   NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
   r = NxR07
   r.with_library do
-    r.install(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }, 'std' => 3))
+    r.install(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }, 'std' => r.newer_std))
     snap = { 'std' => 1, 'mapping' => { 'hinge' => 'zaves-a' },
              'sets' => { 'zaves-a' => r.plain_set } }
     exp = r::PC.hardware_expansion(r.model_with(snap), r.collected([r.hinge_item]))
@@ -463,7 +470,7 @@ NxTest.test('R-07 (P1-1 pripnutie): `library_state` sa NECACHUJE — výmena sú
     r.install(r.doc([r.plain_set]))
     NxTest.assert_equal(:ok, r::HWS.library_state, 'prvy verdikt naplni modulovy stav')
     # Vymena BEZ `reset_library_state!` — presne to, co spravi druha instancia.
-    r.install_raw(r.doc([r.plain_set('od-novsej')], {}, 'std' => 3))
+    r.install_raw(r.doc([r.plain_set('od-novsej')], {}, 'std' => r.newer_std))
     NxTest.assert_equal(:read_only, r::HWS.library_state,
                         'zapamatany verdikt sa NESMIE pouzit nad novym obsahom')
     NxTest.assert_equal(:newer, r::HWS.library_state_code, 'a dovod je z NOVEHO suboru')
@@ -473,14 +480,14 @@ NxTest.test('R-07 (P1-1 pripnutie): `library_state` sa NECACHUJE — výmena sú
   end
 end
 
-NxTest.test('R-07 (P1-1 pripnutie): global_default_state po výmene za std 3 vráti nil') do
+NxTest.test('R-07 (P1-1 pripnutie): global_default_state po výmene za novší std vráti nil') do
   NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
   r = NxR07
   r.with_library do
     r.install(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }))
     NxTest.assert(r::HWS.global_default_state['sets'].any?, 'zdravy stav sa zmrazit da')
     # Zdravy load uz prebehol (riadok vyssie) — teraz subor vymeni novsi plugin.
-    r.install_raw(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }, 'std' => 3))
+    r.install_raw(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }, 'std' => r.newer_std))
     NxTest.assert_equal(nil, r::HWS.global_default_state,
                         'do .skp sa uz nesmie zmrazit NIC (verdikt nesmie byt zastarany)')
   end
@@ -528,7 +535,7 @@ NxTest.test('R-07 (P2-3): panel dáva ROVNAKÝ dôvod ako súpis (žiadne „pri
   NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
   r = NxR07
   r.with_library do
-    r.install(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }, 'std' => 3))
+    r.install(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }, 'std' => r.newer_std))
     # Skrinka MA override na set — panel ho pri read-only kniznici NEUPLATNI
     # (definicia by musela prist prave z tej kniznice), takze `explain` dostane
     # prazdne overridy a dovod `library_incompatible`. Presne to robi
@@ -731,7 +738,7 @@ NxTest.test('R-07 (P2-4): šablóna pri read-only knižnici — bez kovania a BE
   NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
   r = NxR07
   r.with_library do
-    r.install(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }, 'std' => 3))
+    r.install(r.doc([r.plain_set], { 'hinge' => 'zaves-a' }, 'std' => r.newer_std))
     m = r.model_with
     # Ukladanie sablony: mapovanie BEZ definicii sa ulozit NESMIE.
     NxTest.assert_equal(nil, r::HWS.template_set_defs(m, { 'hinge' => 'zaves-a' }),

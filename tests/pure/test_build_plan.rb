@@ -251,3 +251,30 @@ NxTest.test('build_plan 2b1: validate_material_source! — nil ok, uplny tvar no
     NxTest.assert(raised, "neplatny material_source musi raisnut: #{bad.inspect}")
   end
 end
+
+# --- KOV-B1: `lift` v slovniku typov kovania + plan_schema -------------------
+
+NxTest.test('KOV-B1: `GENERIC_TYPES` obsahuje `lift` a plan_schema je 3') do
+  bp = Noxun::Engine::BuildPlan
+  NxTest.assert(bp::GENERIC_TYPES.include?('lift'),
+                'vyklopy/sklopy — presunute z KOV-E, aby sa dal ulozit vyklopovy set')
+  NxTest.assert_equal(3, bp::SCHEMA,
+                      'rozsirenie slovnika = plan, ktoremu STARSI plugin nerozumie')
+  NxTest.assert_equal([], bp.unknown_generic_types([{ 'generic_type' => 'lift' }]),
+                      'nam je `lift` znamy')
+  NxTest.assert_equal(['sliding'], bp.unknown_generic_types([{ 'generic_type' => 'sliding' }]),
+                      'a typ z novsej verzie prestavbu dalej blokuje')
+  # KOV-E doplni pravidla a data; SEED mapovanie k nemu zatial NIE JE
+  NxTest.refute(Noxun::Engine::HardwareSets::SEED_MAPPING.key?('lift'),
+                'ziadny default set pre vyklopy (to je KOV-E)')
+end
+
+NxTest.test('KOV-B1: `hardware_set_key_type` pozna prefix `class:`') do
+  bp = Noxun::Engine::BuildPlan
+  NxTest.assert_equal('slide', bp.hardware_set_key_type('class:slide|tipon|metal'))
+  NxTest.assert_equal('lift', bp.hardware_set_key_type('CLASS:Lift|classic'), 'downcase')
+  NxTest.assert_equal('hinge', bp.hardware_set_key_type('hinge@front:F1/panel'),
+                      'bezny composite kluc sa nemeni')
+  NxTest.assert_equal(nil, bp.parse_hardware_set_key('class:hinge|classic'),
+                      'triedny kluc NIE JE vyber podla typu ani dielca')
+end

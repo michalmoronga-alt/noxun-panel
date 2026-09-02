@@ -44,7 +44,8 @@
   function rdLabel(t){
     return { leg:'Nohy', hinge:'Závesy', slide:'Výsuv', handle:'Úchytky',
              shelf_pin:'Podperky', connector:'Spojky',
-             wall_hanger:'Zavesenie na stenu' }[t] || t;
+             wall_hanger:'Zavesenie na stenu',
+             lift:'Výklop / sklop' }[t] || t;
   }
   // TEST-1 (Michalov test v0.8.0): pravidlá „Úchytky" sú DVE — jedno pre
   // dvierka (`front_door`), druhé pre zásuvkové čelá (`drawer_front`) — a mali

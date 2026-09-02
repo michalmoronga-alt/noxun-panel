@@ -17,6 +17,54 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-B1 · KATALÓG A SETY — KLASIFIKÁCIA, TAXONÓMIA, STD 3 (v0.9.19, 3.9.2026):** prvý rez slice B (B1/B2/B3 podľa Codex auditu #17). Set kovania bol dovtedy len
+  „mapovanie generického typu na kódy" — nevedelo sa z neho, **na čo** je: či je to záves na dvierka alebo na výklop, či je klasický alebo TipOn, od koho je a z akej rady.
+  Bez toho sa nedá postaviť strom katalógu (B2), editor setu (B3) ani resolver, ktorý set vyberie sám (D). B1 prináša **celý dátový kontrakt bez štipky UI**, takže navonok
+  je viditeľná JEDINÁ vec — v zozname typov kovania pribudol **„Výklop / sklop"**. Existujúce zákazky nakupujú **obsahovo identicky a CSV bajtovo** (golden
+  `tests/fixtures/kovh_golden/seed_kniznica.json`, prvý commit vetvy = odtlačok z NEZMENENÉHO mainu).
+  **Štyri BLOCKERY auditu #17 rozhodli tvar dávky.** *(B1)* **Šablóny obchádzali downgrade bránu setov** — `hardware_set_defs` išli len cez tolerantný `normalize_sets`,
+  takže starší plugin by pri použití šablóny zmrazil do .skp **orezaný** set a nikto by už nevedel, že tam niečo bolo. Odpoveď je dvojitá: `CONFIG_SCHEMA` **3 → 4** chráni
+  SPÄTNE (šablónu z 0.9.19 staršia verzia nepoužije) a nová čistá `HardwareSets.assess_set_defs` chráni DOPREDU — beží na OBOCH cestách (`Panel.take_insert_hardware!` pred
+  `prepare_insert` aj pred ghost session; `TemplatesDialog.handle_apply` pred `rebuild_many`), takže odmietnutie znamená „model sa nezmenil ani o krok Späť". Detektor je ten
+  istý, aký používa knižnica — tri cesty k tým istým dátam sa nesmú rozísť. *(B2)* **`use_type` nemal vzťah k povinnému `generic_type` a `lift/fall` sa nedali uložiť.**
+  Zavedená je **jediná kanonická mapa** `door→hinge · drawer→slide · lift/fall→lift · other→explicitný`: chýbajúci typ sa doplní, nesediaci je chyba, ktorá menuje obe strany.
+  K tomu sa z KOV-E presunul **`GENERIC_TYPES + lift`** (vrátane `plan_schema` 2 → 3) — bez neho by sa výklopový set nedal uložiť vôbec; pravidlá a seed mapovanie k nemu
+  zostávajú KOV-E. *(B3)* **Tichý prepis medzi dvoma oknami v modale setu** ostáva ako **R-41** pre B3 (pripnutá revízia + základná definícia). *(B4)* **Taxonómia dostala
+  plný kontrakt verzovaného dokumentu**, nie len „JsonFileStore + `.bak`" (nižšie).
+  **Klasifikácia je ALL-OR-NOTHING** (FIX 6): buď úplne chýba (legacy „nezaradený" set — správa sa presne ako dosiaľ), alebo je úplná a kontextovo platná
+  (`drawer_construction` **práve** pri zásuvke, `series` **voliteľná**). Vedomá odchýlka od mockupu: rada nie je povinná — podperky, klzáky ani „Bystrica" žiadnu nemajú
+  a vynútená rada by do taxonómie priniesla vymyslené mená; B3 to zobrazí ako „— bez rady —". **Čítanie je tolerantné, ale celé-alebo-vôbec:** neúplný či neznámy blok sa
+  zahodí CELÝ a `generic_type` (a teda NÁKUP) sa nikdy nemení — a strata sa vždy prizná **štvrtou vrstvou detektora** `classification_lost?`. Tá musela vzniknúť, lebo
+  `use_type` je ZNÁMY kľúč so SKALÁRNOU hodnotou: whitelist ani počty by `use_type: 'sliding'` z novšej verzie nechytili a prvý zápis by stratu zvečnil (rovnaká lekcia ako
+  `per: 'length'` v R-07). Beží vo všetkých troch bránach — knižnica, snapshot, šablóna.
+  **`save_set!` MERGUJE klasifikáciu z uloženého setu.** Editor posiela dodnes len štyri kľúče (`set_id`, `name`, `generic_type`, `members`), takže bez merge by KAŽDÁ úprava
+  člena ticho zhodila zaradenie — presne tá trieda tichej straty, ktorú dávka rieši; je to jedna z piatich overených mutácií. Kľúč, ktorý vo vstupe **vôbec nie je**, sa
+  preberá z uloženého setu; kľúč prítomný s prázdnou hodnotou (a `active: true`) je **vedomé vymazanie**. Validácia preto musela ísť **až pod zámok** — uložený set sa smie
+  čítať len čerstvo (R-08). `save_set!` zároveň vracia **štruktúrované chyby** `{row, field, msg}` (FIX 13, kontrakt pre B3) ako TRETÍ prvok, takže dnešné dvojprvkové
+  destruovanie u volajúcich ostáva nedotknuté.
+  **Taxonómia výrobcov a rád je NOVÝ modul** `core/hardware_taxonomy.rb` (`%APPDATA%\NOXUN\Engine\hardware_taxonomy.json`, `{std, schema, seed_version, manufacturers[],
+  series[]}`). Dôvod je vecný: keby si `manufacturer` písal každý set a každá položka sám, vznikla by za mesiac zbierka „Hettich" / „hettich" / „Hettch" a strom katalógu (B2)
+  ani filtre (D) by na nich nesadli. Identita mena je `Materials.slug` (case-insensitive, bez diakritiky), **rada patrí presne jednému výrobcovi** (slug rady je globálne
+  unikátny — inak sa z reťazca „Sensys" nedá zistiť, či je to Hettich alebo Blum). Matica stavov je vzor R-07/R-11 (`:ok` / `:degraded` / `:read_only`, fail-closed, stav sa
+  **necachuje**, `load` z read-only nevydá ani obsah ani seed) a API je **len create** (R-35 / FIX 10) — rename a delete vo V1 neexistujú, museli by prejsť všetky sety,
+  položky, snapshoty aj šablóny. Členstvo sa kontroluje **výhradne v globálnych zápisoch** (`save_set!`, `create_item`/`patch_item`); `validate_set` ostáva ČISTÁ, lebo ju
+  používa aj zápis snapshotu do .skp a čítanie šablón — tie cestujú medzi PC s inou taxonómiou a vynútená kontrola by znamenala, že zákazku z iného počítača sa nedá otvoriť.
+  V katalógu beží kontrola **zámerne mimo katalógového zámku**: taxonómia má vlastný sidecar (`materials.lock`) a vnorenie by vyrobilo poradie zámkov.
+  **Marker `std` má tretiu hodnotu a ostáva LAZY podľa obsahu:** `3` dostane set s **ktorýmkoľvek** kľúčom mimo legacy štvorice (každé klasifikačné pole aj `active`
+  samostatne) alebo mapovanie s triednym kľúčom; čisto legacy dáta ostávajú na 1/2, takže spätná čitateľnosť sa zbytočne neblokuje. Katalóg položiek dostal tú istú mechaniku
+  (`SCHEMA_CURRENT` 2, ale `schema_for` stampuje 1, kým nikto nemá výrobcu). **Kanonický triedny kľúč mapovania** `class:<gt>|<opening_mode>[|<drawer_construction>]` je
+  pripravený pre KOV-D (FIX 8): pozná ho jediný parser, whitelist brány aj detekcia std — ale `resolve_set_id`, `expand` ani `explain` ho **nečítajú** a zapisovacie cesty ho
+  **nepíšu**. V B1 ide výhradne o bezstratový round-trip, takže KOV-D už nebude potrebovať ďalší bump.
+  **Testy:** 2607 headless (+62 oproti mainu, dve nové sady `test_kovb1_sety.rb` a `test_kovb1_taxonomia.rb`) · 81 JS sád · in-SU **1447 PASS / 0 FAIL** vrátane novej sekcie **`run_kovb1`** (27 scenárov, sandbox nad
+  izolovaným `%APPDATA%`: std 3 v súbore aj v .skp, nákup s klasifikáciou totožný s legacy setom, šablóna z novšej verzie odmietnutá bez jedinej operácie, zápis výrobcu bez
+  kroku Späť). **Mutácie (5, každá overená):** legacy setu sa doplní klasifikácia · `active` sa uloží aj ako `true` · brána šablón ignoruje stratu klasifikácie · triedny
+  kľúč sa pri round-tripe zahodí · `save_set!` neurobí merge. Sada R-07 už marker „novšej verzie" nepíše ručne (`newer_std` = `STD_SUPPORTED.max + 1`) — std 3 je od tejto
+  dávky náš. **Codex kolo 1 = 3×P2 → interná delta-verifikácia** (nové GH kolo sa nežiadalo, pravidlo z 29.8.): *(P2-A)* kontrola taxonómie prijímala „hettich" cez slug, ale
+  ukladala zápis volajúceho — `HardwareTaxonomy.resolve_classification` vracia kanonické mená a `save_set!` aj `create_item`/`patch_item` ukladajú výhradne tie (7314980);
+  *(P2-B)* `read_template_mapping` hľadal stratu v SUROVOM zápise kľúča, takže platný nekanonický triedny kľúč (` CLASS: Hinge | Classic `) šablónu falošne odmietol — porovnáva
+  sa kanonický tvar (`canonical_mapping_key`, 5922146); *(P2-C)* `assess_set_defs` pri dvoch definíciách s rovnakým `set_id` ticho prepísal prvú, kým `collect_set_defs` drží
+  prvú — duplicita je odteraz strata a šablóna sa odmietne (d8a4ba1). Každá oprava má vlastný test (headless 2615/0), delta overená orchestrátorom.
+
 - **KOV-H1 · AD-HOC KOVANIE — DÁTOVÁ VRSTVA (v0.9.18, 3.9.2026):** prvá polovica slice H (rez H1/H2 podľa Codex auditu #15). Pravidlá a sety pokrývajú len to, čo sa dá
   odvodiť; **zvyšok musí ísť pridať ručne** — zámok, špeciálny doraz, položka mimo katalógu. H1 prináša **celý dátový kontrakt bez štipky UI** (to je H2), takže navonok je
   dávka neviditeľná a existujúce zákazky dávajú **bajtovo rovnaký** nákupný CSV (golden `tests/fixtures/kovh_golden/`, prvý commit vetvy = odtlačok z NEZMENENÉHO mainu).

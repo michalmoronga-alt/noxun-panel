@@ -28,7 +28,16 @@ module Noxun
   module Engine
     module HardwareCatalog
       STD = 'noxun-hardware-catalog'
-      SCHEMA_CURRENT = 1
+      # KOV-B1: polozka moze niest `manufacturer`/`series` z taxonomie
+      # (`HardwareTaxonomy`) — starsi plugin ich nepozna a jeho `normalize_item`
+      # by ich pri prvom zapise TICHO zahodil. Marker je preto LAZY PODLA
+      # OBSAHU (`schema_for`, vzor `HardwareSets.snapshot_std` a materialov):
+      # katalog BEZ vyrobcov ostava na schema 1 a starsie verzie ho citaju dalej;
+      # akonahle ma cokolvek vyrobcu ci radu, stampuje sa 2 a starsi plugin ho
+      # odmietne ako read-only („aktualizuj plugin"), nikdy ticho neoreze.
+      SCHEMA_BASE = 1
+      SCHEMA_CLASSIFIED = 2
+      SCHEMA_CURRENT = SCHEMA_CLASSIFIED
       # Verzia SEED sady (nezavisla od SCHEMA — tvar zaznamov sa nemeni).
       # Upgrade existujuceho katalogu robi apply_seed_patches! (audit D1 F8):
       # merge-safe backfill novych kodov + oprava LEN preukazatelne
@@ -54,7 +63,7 @@ module Noxun
       # VYMAZANIE vazby (prazdna hodnota); neprazdnu URL zapisuje vyhradne
       # proposal flow. use_count/price_checked_at NIKDY z klienta.
       PATCHABLE = %w[name_sk price_eur_vat supplier notes category unit active
-                     demos_url].freeze
+                     demos_url manufacturer series].freeze
 
       PRICE_TOLERANCE = 0.005
       WATCHDOG_S = 45
@@ -196,9 +205,14 @@ module Noxun
 
       # Minimalna citatelnost ulozeneho riadku — tvrdsie veci strazi
       # normalize/validate pri zapise; tu len to, co by zhodilo citacie cesty.
+      # KOV-B1: `manufacturer`/`series` musia byt Stringy — novsia verzia im
+      # moze dat iny TVAR (objekt s id a nazvom) a nase citanie by ho ticho
+      # zmenilo na nezmyselny retazec. Ne-String = „necitatelne polozky"
+      # (assess! -> read-only), nikdy tichy prepis.
       def valid_stored_item?(item)
         item.is_a?(Hash) && !item['item_code'].to_s.strip.empty? &&
-          !item['name_sk'].to_s.strip.empty?
+          !item['name_sk'].to_s.strip.empty? &&
+          %w[manufacturer series].all? { |k| item[k].nil? || item[k].is_a?(String) }
       end
 
       # --- citanie ------------------------------------------------------------
@@ -257,6 +271,13 @@ module Noxun
         out['price_eur_vat'] = price unless price.nil?
         put_opt(out, 'supplier', a['supplier'] || a[:supplier])
         put_opt(out, 'notes', a['notes'] || a[:notes])
+        # KOV-B1: vyrobca a rada z TAXONOMIE (`HardwareTaxonomy`) — obe
+        # VOLITELNE (podperky ani skrutky ziadneho vyrobcu mat nemusia).
+        # Ulozeny je KANONICKY NAZOV, nie id — cestuje medzi PC bez joinu.
+        # Clenstvo v taxonomii tu NEOVERUJEME: `normalize_item` je cista
+        # funkcia a bezi aj v citacich cestach nad datami z inych PC.
+        put_opt(out, 'manufacturer', a['manufacturer'] || a[:manufacturer])
+        put_opt(out, 'series', a['series'] || a[:series])
         # active: default true, kluc sa uklada LEN pri false (sparse, Q1).
         raw_active = a.key?('active') ? a['active'] : a[:active]
         out['active'] = false if raw_active == false || raw_active.to_s.strip.downcase == 'false'
@@ -271,6 +292,49 @@ module Noxun
 
       def canonical_unit(raw)
         UNIT_ALIASES[raw.to_s.strip.downcase]
+      end
+
+      # KOV-B1: LAZY marker schemy podla obsahu. `SCHEMA_CLASSIFIED` dostane LEN
+      # katalog, ktory bez novych poli citat NEJDE — teda ten, kde ma aspon
+      # jedna polozka vyrobcu alebo radu.
+      def schema_for(items)
+        classified = Array(items).any? do |i|
+          i.is_a?(Hash) &&
+            (!i['manufacturer'].to_s.strip.empty? || !i['series'].to_s.strip.empty?)
+        end
+        classified ? SCHEMA_CLASSIFIED : SCHEMA_BASE
+      end
+
+      # KOV-B1: patri vyrobca (a pripadna rada) polozky do TAXONOMIE?
+      # Rovnake pravidlo ako pri sete (`HardwareSets.taxonomy_refusal`):
+      # bez vyrobcu sa nekontroluje nic, s vyrobcom musi meno v zozname EXISTOVAT
+      # a rada mu musi patrit — inak by v katalogu za mesiac boli „Hettich",
+      # „hettich" aj „Hettch" a strom (KOV-B2) ani filtre (KOV-D) by na nich
+      # nesadli.
+      #
+      # Bezi ZAMERNE MIMO `with_lock`: taxonomia ma svoj vlastny zamok
+      # (`materials.lock`) a vnorit ho do katalogoveho by vyrobilo PORADIE
+      # zamkov — presne to riziko, kvoli ktoremu maju vsetky katalogy jeden
+      # spolocny sidecar. Kontroluje sa HODNOTA, ktoru pouzivatel nastavuje;
+      # identitu riadku strazi `row_rev` uz pod zamkom.
+      # Vracia AJ KANONICKU dvojicu: kontrola je case-insensitive (aby „hettich"
+      # nasiel „Hettich"), ale ulozit sa smie vyhradne kanonicky zapis zo
+      # zoznamu — inak by v katalogu vyrastlo „hettich" vedla „Hettich"
+      # a zoskupenie (KOV-B2) ani filtre (KOV-D) by na tom nesadli.
+      # -> [refusal|nil, canon_manufacturer|nil, canon_series|nil]
+      def taxonomy_refusal(manufacturer, series)
+        man = manufacturer.to_s.strip
+        ser = series.to_s.strip
+        return [nil, nil, nil] if man.empty? && ser.empty?
+        # FAIL-CLOSED: nad nekompatibilnou taxonomiou `load` nic nevyda, takze
+        # kontrola by hlasila „vyrobca nie je v zozname" namiesto skutocneho
+        # dovodu. Polozka BEZ vyrobcu sa uklada dalej.
+        return [[:invalid, HardwareTaxonomy.state_reason], nil, nil] if HardwareTaxonomy.read_only?
+
+        canon_man, canon_ser, errs = HardwareTaxonomy.resolve_classification(man, ser)
+        return [[:invalid, errs.first['msg']], nil, nil] unless errs.empty?
+
+        [nil, canon_man, canon_ser]
       end
 
       def put_opt(out, key, raw)
@@ -291,6 +355,13 @@ module Noxun
         rec.delete('demos_url')
         rec.delete('price_checked_at')
         rec.delete('use_count')
+        refusal, canon_man, canon_ser = taxonomy_refusal(rec['manufacturer'], rec['series'])
+        return refusal if refusal
+
+        # Kluce sa LEN prepisuju (`normalize_item` ich zaklada iba pri neprazdnej
+        # hodnote), takze polozke bez vyrobcu sa nic nedoplna.
+        rec['manufacturer'] = canon_man if canon_man
+        rec['series'] = canon_ser if canon_ser
         with_lock do
           JsonFileStore.invalidate(path)
           data = load
@@ -321,6 +392,20 @@ module Noxun
            Materials.normalize_price(clean['price_eur_vat']).nil?
           return [:invalid, 'cena musí byť číslo (alebo prázdna = nezadaná)']
         end
+        # KOV-B1: taxonomia sa overuje nad EFEKTIVNOU dvojicou (patch prebija
+        # ulozene hodnoty) a MIMO zamku — viz `taxonomy_refusal`.
+        base = find(code) || {}
+        refusal, canon_man, canon_ser = taxonomy_refusal(
+          clean.key?('manufacturer') ? clean['manufacturer'] : base['manufacturer'],
+          clean.key?('series') ? clean['series'] : base['series']
+        )
+        return refusal if refusal
+
+        # Kanonicky tvar sa dosadzuje LEN do klucov, ktore patch NAOZAJ nesie —
+        # ulozena hodnota, ktorej sa patch nedotyka, sa nesmie prepisat (patch
+        # je uzavrety whitelist zmien, nie prepis celeho zaznamu).
+        clean['manufacturer'] = canon_man if clean.key?('manufacturer') && canon_man
+        clean['series'] = canon_ser if clean.key?('series') && canon_ser
         with_lock do
           JsonFileStore.invalidate(path)
           data = load
@@ -388,7 +473,9 @@ module Noxun
         # mutacie (create/patch/delete) ju tak zachovaju bez vlastnej rezie.
         stored_sv = fresh.is_a?(Hash) ? fresh['seed_version'].to_i : 0
         sv = (data['seed_version'] || (stored_sv.positive? ? stored_sv : 1)).to_i
-        payload = { 'std' => STD, 'schema' => SCHEMA_CURRENT,
+        # KOV-B1: marker sa stampuje podla OBSAHU, nie konstantou — katalog bez
+        # vyrobcov ostava citatelny pre starsie verzie (vzor `snapshot_std`).
+        payload = { 'std' => STD, 'schema' => schema_for(data['items']),
                     'seed_version' => sv, 'items' => data['items'] }
         JsonFileStore.write(path, payload)
       rescue StandardError => e
@@ -437,7 +524,11 @@ module Noxun
         return 1 if q.empty? # prazdny dotaz = zoznam (score konstantne, sort tie-breakmi)
         code = norm_text(item['item_code'])
         name = norm_text(item['name_sk'])
-        extra = "#{norm_text(item['supplier'])} #{norm_text(item['notes'])}"
+        # KOV-B1: hladanie indexuje AJ vyrobcu a radu — bez toho by sa polozka
+        # „hettich" ci „atira" nedala najst inak nez presnym kodom (a strom
+        # KOV-B2 by mal filter, ktory hladanie nevie zopakovat).
+        extra = "#{norm_text(item['supplier'])} #{norm_text(item['notes'])} " \
+                "#{norm_text(item['manufacturer'])} #{norm_text(item['series'])}"
         total = 0
         q.split(' ').each do |tok|
           t = 0

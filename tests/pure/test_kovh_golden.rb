@@ -42,7 +42,22 @@ module NxKovhGolden
     { 'item_code' => 'HET-Q500', 'name_sk' => 'Quadro V6 500 mm',
       'category' => 'VYSUVY', 'unit' => 'par', 'price_eur_vat' => 19.50 },
     { 'item_code' => 'AXILO-100', 'name_sk' => 'Noha AXILO 100 mm',
-      'category' => 'NOHY', 'unit' => 'ks', 'price_eur_vat' => 1.15 }
+      'category' => 'NOHY', 'unit' => 'ks', 'price_eur_vat' => 1.15 },
+    # KOV-B1: kody, ktore potrebuje scenar `seed_kniznica` (SEED_SETS). Kody
+    # 104717/357695/357696 su tu ZAMERNE NIE — seed sada tak pokryva aj riadky
+    # „mimo katalogu" a ceny `nil` (nezadana != 0) v jednom odtlacku.
+    { 'item_code' => '106412', 'name_sk' => 'HETTICH 9071656 podložka 8099 s excentrom D=1,5',
+      'category' => 'ZAVESY', 'unit' => 'ks', 'price_eur_vat' => 0.97 },
+    { 'item_code' => '105408', 'name_sk' => 'HETTICH krytka misky Sensys',
+      'category' => 'ZAVESY', 'unit' => 'ks' },
+    { 'item_code' => '105425', 'name_sk' => 'HETTICH krytka ramienka Sensys',
+      'category' => 'ZAVESY', 'unit' => 'ks' },
+    { 'item_code' => '367823', 'name_sk' => 'Häfele 637.76.355 noha AXILO v. 150 mm + podložka',
+      'category' => 'NOHY', 'unit' => 'ks', 'price_eur_vat' => 1.38 },
+    { 'item_code' => '93240', 'name_sk' => 'Rektifikačný uholník „Bystrica“',
+      'category' => 'SPOJOVACI_MATERIAL', 'unit' => 'ks' },
+    { 'item_code' => '306125', 'name_sk' => 'Podperka policová s návlekom 7/5 Zn biela',
+      'category' => 'SPOJOVACI_MATERIAL', 'unit' => 'ks' }
   ].freeze
 
   module_function
@@ -133,6 +148,30 @@ module NxKovhGolden
                        'owner_id' => 'CAB-002', 'quantity' => 4)],
       'state' => state({ 'leg' => 'nohy-axilo' }, [NOHY_SET, CHYBA_SET]),
       'overrides' => { 'CAB-002' => { 'leg' => 'nohy-neznama' } }
+    },
+    # 7) KOV-B1: SEED KNIZNICA — mapovanie aj definicie presne tak, ako ich
+    #    dostane NOVY projekt (`SEED_MAPPING` + `SEED_SETS`). Toto je dokaz
+    #    „nakup existujucich zakaziek je CONTENT-identicky, CSV bajtovo":
+    #    odtlacok vznikol nad NEZMENENYM core PRED klasifikaciou setov a po
+    #    davke musi vyjst to iste. Pokryva vsetkych 5 namapovanych typov —
+    #    zaves na DVOCH vlastnikoch, rad podla NL (420 aj 470), nohu vyberanu
+    #    pasmom podla vysky sokla (150), zavesenie a podperky.
+    'seed_kniznica' => {
+      'items' => [
+        item('owner_part_key' => 'front:F1/wing:single'),
+        item('owner_part_key' => 'front:F2/wing:single', 'quantity' => 3),
+        item('generic_type' => 'slide', 'rule_id' => 'vysuv-podla-hlbky', 'quantity' => 1,
+             'owner_part_key' => 'front:F3/panel', 'params' => { 'nominal_length' => 420.0 }),
+        item('generic_type' => 'slide', 'rule_id' => 'vysuv-podla-hlbky', 'quantity' => 2,
+             'owner_id' => 'CAB-002', 'owner_part_key' => 'front:F1/panel',
+             'params' => { 'nominal_length' => 470.0 }),
+        item('generic_type' => 'leg', 'rule_id' => 'nohy-zakladne', 'quantity' => 4,
+             'params' => { 'height' => 150.0 }),
+        item('generic_type' => 'wall_hanger', 'rule_id' => 'zavesenie-horna',
+             'owner_id' => 'CAB-002', 'quantity' => 2),
+        item('generic_type' => 'shelf_pin', 'rule_id' => 'podperky-police', 'quantity' => 4)
+      ],
+      'state' => state(HS::SEED_MAPPING.dup, HS::SEED_SETS)
     }
   }.freeze
 

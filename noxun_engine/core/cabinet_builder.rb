@@ -74,7 +74,18 @@ module Noxun
       #       `ProductionCore.export_blockers`): sama prestavbova brana
       #       nestacila — starsi plugin by zakazku so schemou 3 bez problemov
       #       VYEXPORTOVAL, len bez ad-hoc poloziek (audit #15 BLOCKER 3).
-      CONFIG_SCHEMA = 3
+      #   4 = KOV-B1 — sety s KLASIFIKACIOU (`use_type`, `opening_mode`,
+      #       `drawer_construction`, `manufacturer`, `series`, `active`)
+      #       cestuju v SABLONACH (`hardware_set_defs`) a projektovy snapshot
+      #       ma std 3. Starsi plugin by pri pouziti takej sablony zmrazil do
+      #       .skp OREZANY set (klasifikacia prec) a nikto by uz nevedel, ze
+      #       tam nieco bolo. Cislo sa prideluje SEKVENCNE podla poradia
+      #       mergov (audit #17 FIX 5 — H1 vzala 3). K bumpu patria DVE brany:
+      #       existujuci R-12 guard sablon (marker v `template_config_from`)
+      #       odmietne sablonu z novsej verzie SPATNE, a nova
+      #       `HardwareSets.assess_set_defs` chrani DOPREDU — definicie, ktore
+      #       sa nedaju precitat bezstratovo, sa do modelu nezapisu vobec.
+      CONFIG_SCHEMA = 4
 
       MIN = { width: 200.0, height: 200.0, depth: 150.0 }.freeze
       # D-45: povoleny rozsah hrubky korpusu (mm) — JEDINY zdroj pravdy pre clamp

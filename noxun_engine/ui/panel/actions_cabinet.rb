@@ -299,10 +299,21 @@ module Noxun
         # z novsej verzie (neznamy typ kovania) ci rucne upravena sa NEVKLADA
         # ocesana, vklad sa odmietne.
         # -> [:ok, { 'mapping', 'defs' } | nil] | [:lossy, [zahodene kluce]]
+        # -> [:ok, hw|nil] | [:lossy, [zahodene kluce mapovania]]
+        #  | [:lossy_defs, [neprecitatelne definicie setov]]
         def take_insert_hardware!(params)
           defs = params.delete('hardware_set_defs')
           status, res = HardwareSets.read_template_mapping(params['hardware_sets'])
           return [:lossy, res] unless status == :ok
+
+          # KOV-B1 (audit #17 BLOCKER 1): definicie setov zo sablony sa citaju
+          # BEZSTRATOVO ALEBO VOBEC — presne ako mapovanie nad nimi. Doteraz
+          # sli len cez tolerantny `normalize_sets`, takze sablona z novsej
+          # verzie by sa do .skp zmrazila UZ OREZANA. Kontrola bezi TU, teda
+          # PRED `prepare_insert` aj pred vznikom ghost session — odmietnutie
+          # znamena, ze sa v modeli nestalo NIC.
+          dstatus, dres = HardwareSets.assess_set_defs(defs)
+          return [:lossy_defs, dres] unless dstatus == :ok
 
           if res.empty?
             params.delete('hardware_sets')
@@ -349,6 +360,13 @@ module Noxun
           hw_status, hw = take_insert_hardware!(params) # H2 (D-76)
           if hw_status == :lossy
             return set_status("Šablóna nesie kovanie, ktoré sa nedá prečítať (#{Array(hw).join(', ')}) — " \
+                              'je z novšej verzie Noxun alebo ručne upravená. Nič sa nevložilo.', true)
+          end
+          # KOV-B1: definicie setov zo sablony (`hardware_set_defs`) maju vlastnu
+          # hlasku — pouzivatel ma vediet, ci je problem vo VYBERE setu, alebo
+          # v jeho DEFINICII.
+          if hw_status == :lossy_defs
+            return set_status("Šablóna nesie sety kovania, ktoré sa nedajú prečítať (#{Array(hw).join(', ')}) — " \
                               'je z novšej verzie Noxun alebo ručne upravená. Nič sa nevložilo.', true)
           end
           tf = insert_thickness_preflight(params, model) # D-45
