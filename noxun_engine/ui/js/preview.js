@@ -10,6 +10,16 @@
   var PV_FRONT_DOOR = '#e0f2f4';    // --nx-select-bg (vypln dvierok)
   var PV_FRONT_DRAWER = '#bfe3e8';  // tmavsi odtien rodiny (vypln zasuvky)
   var PV_FRONT_STROKE = '#7fc4cf';  // --nx-part-border (obrys cela)
+  // KOV-A1 (Codex #280 P2-C): POPIS typu cela v nahlade — JEDNO miesto.
+  // Do KOV-A1 sa kazde ne-zasuvkove a ne-`none` celo popisovalo ako „dvierka",
+  // takze pri configu z API sa rozbalovacka volala „Výklop" a nahlad vedla nej
+  // tvrdil „dvierka". Fallback ostava „dvierka" — ale UZ LEN pre NEZNAMY typ
+  // (napr. z novsej verzie), nie pre kazdy typ, ktory tento zoznam nepozna.
+  // ŠTÝL (výplň, symboly ∧/∨/X, smery) sa TU ZAMERNE NEMENI — to je KOV-A2;
+  // tato oprava riesi vyhradne TEXT, aby si UI neprotirecilo.
+  var PV_FRONT_TYPE_DESC = { door: 'dvierka', drawer_front: 'zásuvka',
+                             lift: 'výklop', fall: 'sklop', blind: 'blenda' };
+  function frontTypeDesc(type){ return PV_FRONT_TYPE_DESC[type] || 'dvierka'; }
   // UI-B2: koty su decentne — tenka ciara + tlmeny text. Zrkadlo tokenu
   // --nx-ink-faint (SVG atributy nevedia var(), rovnaky vzor ako farby vyssie).
   var PV_DIM = '#90a4ae';           // --nx-ink-faint (ciary a texty kot)
@@ -583,7 +593,7 @@
       });
       // popis do stredu PANELU (pri profile nesmie skoncit v jeho pruhu);
       // cislo ostava vyskou RIADKU — presne to, co je v zozname ciel.
-      S.push('<text x="'+rx(W/2)+'" y="'+ry(z+(ph > 0 ? ph : h)/2)+'" font-size="18" fill="'+PV_SELECT_ACCENT+'" text-anchor="middle" dominant-baseline="middle">'+fnum+' · '+(it.type==='drawer_front'?'zásuvka':'dvierka')+' '+Math.round(h)+'</text>');
+      S.push('<text x="'+rx(W/2)+'" y="'+ry(z+(ph > 0 ? ph : h)/2)+'" font-size="18" fill="'+PV_SELECT_ACCENT+'" text-anchor="middle" dominant-baseline="middle">'+fnum+' · '+frontTypeDesc(it.type)+' '+Math.round(h)+'</text>');
       S.push('</g>');
     });
   }
@@ -1341,6 +1351,8 @@
                        // UI-C1b: draft ciel, odhad navrhu a doskova projekcia
                        nxFrontsResolve: nxFrontsResolve, nxDraftStats: nxDraftStats,
                        nxGrainArrows: nxGrainArrows, pvBoardScene: pvBoardScene,
-                       nxFrontsExtent: nxFrontsExtent };
+                       nxFrontsExtent: nxFrontsExtent,
+                       // KOV-A1 (P2-C): popis typu cela v nahlade
+                       frontTypeDesc: frontTypeDesc, PV_FRONT_TYPE_DESC: PV_FRONT_TYPE_DESC };
   }
 

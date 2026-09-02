@@ -608,6 +608,18 @@ module NxTest
     assert_equal(allow.sort, found, 'literal `unset` mimo allowlistu')
   end
 
+  test('KOV-A1 GUARD: nahlad popisuje kazdy typ vlastnym slovom (P2-C)') do
+    js = NxKovA1.src('ui/js/preview.js')
+    assert(js.include?('var PV_FRONT_TYPE_DESC = {'), 'popisy typov ziju na JEDNOM mieste')
+    %w[lift fall blind].each do |t|
+      assert(js.match?(/PV_FRONT_TYPE_DESC = \{[^}]*#{t}:/m), "mapa pozna typ #{t}")
+    end
+    assert(js.include?("+frontTypeDesc(it.type)+"),
+           'popis v texte ide cez mapu, nie cez natvrdo zapisanu vetvu')
+    refute(js.include?("(it.type==='drawer_front'?'zásuvka':'dvierka')"),
+           'stary dvojstavovy fallback (vsetko ostatne = „dvierka") uz neexistuje')
+  end
+
   test('KOV-A1 GUARD: form.js pass-through BEZ defaultu + tri NEAKTIVNE volby typu') do
     s = NxKovA1.src('ui/js/form.js')
     assert(s.include?("var FRONT_EXTRA_KEYS = ['direction', 'wing_directions', 'opening_mode', 'drawer']"),

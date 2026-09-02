@@ -641,6 +641,11 @@ Krátky popis ostáva preto, že select je najužší prvok riadku a orezaná vo
 vracia späť **bez akéhokoľvek defaultu** — vzor D-90 `profile`, ale s tvrdým rozdielom: kľúč, ktorý config nemal, sa tu nesmie objaviť, inak by legacy zákazka dostala RED nález
 o neurčenom smere. Guard v `tests/pure/test_kova1_cela.rb` stráži telo oboch funkcií aj prítomnosť troch neaktívnych volieb.
 
+**Popis typu v náhľade (Codex #280 P2-C):** `preview.js` má mapu **`PV_FRONT_TYPE_DESC`** + čistú `frontTypeDesc(type)` — jedno miesto, kde typ dostáva slovo
+(`dvierka · zásuvka · výklop · sklop · blenda`). Do KOV-A1 sa každé ne-zásuvkové a ne-`none` čelo popisovalo ako „dvierka", takže pri configu z API sa rozbaľovačka v riadku
+volala „Výklop" a náhľad vedľa nej tvrdil „dvierka". Fallback `'dvierka'` ostáva, ale **už len pre NEZNÁMY typ** (napr. z novšej verzie). **Výplň, symboly (∧ / ∨ / X)
+a smery sa tu zámerne nemenia — to je KOV-A2**; táto oprava rieši výhradne text, aby si UI neprotirečilo. Testuje `tests/js/test_uib2_nahlad.js`.
+
 ### Úchytky = D-96 (form.js refreshFrontProfileUI / onFrontProfilePick + čisté funkcie v core.js)
 
 profil sa už **necyklí ikonou v riadku** (pri viacerých profiloch a budúcej voľbe hrany osadenia by to bolo nepoužiteľné) — nastavuje sa v skupine pre **ROZSAH** (`all` / `door` /
