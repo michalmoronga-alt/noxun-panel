@@ -50,8 +50,17 @@
   model), JS sady serverovú stranu nevidia — chytila to až sekcia `run_kovh2` pri prvom behu. Oprava je nil-guard + regresný assert; je to učebnicová ukážka, prečo je in-SU beh
   pri zásahoch do zápisovej cesty povinný.
   **Testy:** `tests/js/test_kovh2_adhoc_ui.js` (152 kontrol, mini-DOM nad skutočnou kostrou; 6/6 mutácií zhodilo assert) · `tests/pure/test_kovh2_payload.rb` (4/4 mutácie) ·
-  in-SU sekcia `run_kovh2` (26 scenárov; celý beh **1473 PASS / 0 FAIL**) · headless spolu **2635**, JS **82 sád**.
-  **Codex review:** doplní orchestrátor po review.
+  in-SU sekcia `run_kovh2` (33 scenárov po review kole; celý beh **1480 PASS / 0 FAIL**) · headless spolu **2641**, JS **82 sád**.
+  **CODEX REVIEW (#285, kolo 1): 1×P1 + 5×P2, všetky reálne — a všetky o tom, čo sa deje MEDZI dvoma stavmi.** *(P1)* **Modal prežil zmenu výberu**: držal rozpísaný zoznam
+  jednej skrinky, kým `loadSelected` pod ním vymenil dáta aj `selectedCabId` — odoslanie by položku pripísalo NESPRÁVNEJ skrinke (a pri zhode `id` prepísalo cudzí záznam).
+  Zatvára sa výhradne pri zmene IDENTITY; echo tej istej skrinky, na ktoré modal práve čaká, ho zavrieť nesmie. *(P2-A)* **Odpoveď sa korelovala podľa `kind`** — lenže všetky
+  `add` majú prázdne `id`, takže pomalá prestavba priradila odpoveď na A modalu B. Každé odoslanie má odteraz vlastný **token**, ktorý server len vracia v echu (uzavretý tvar:
+  String/Integer, orezaná dĺžka — payload je verejný kanál). *(P2-B)* **Po výnimke prestavby chýbal resync**: klient si `hwManual` prepisuje optimisticky, takže by si držal
+  odmietnutý zoznam a najbližšia nesúvisiaca zmena skrinky by ho poslala znova (duplicitné pridanie, alebo dodatočne uplatnené „neúspešné" mazanie). *(P2-C)* **Dve zóny dali
+  dve „Polica 1"** — v ponuke „Patrí k" dve identické voľby; rozlíšenie zónou sa dopĺňa len tam, kde je popis dvojznačný, a len v tejto ponuke (`PartKeys.human_label` má iných
+  čitateľov). *(P2-D)* **Ad-hoc riadky sa neobnovili po zmene katalógu** — a to pri riadkoch, ktorých jediný zmysel je ukazovať živú cenu; ľahký push `NX.setHardwareSets` teraz
+  nesie aj `manual_view`. *(P2-E)* **Rozpísaný dotaz sa strácal** (a pri úprave pole vyzeralo vybraté nad prázdnym kódom) — pamäť kostry si drží aj text dotazu pod kľúčom, ktorý
+  sa do `values()` nikdy nedostane. Kolo neprinieslo žiadnu zmenu dátového kontraktu; každý nález má vlastný commit a vlastný test, ktorý bez opravy padá (8/8 mutácií).
 
 - **KOV-B1 · KATALÓG A SETY — KLASIFIKÁCIA, TAXONÓMIA, STD 3 (v0.9.19, 3.9.2026):** prvý rez slice B (B1/B2/B3 podľa Codex auditu #17). Set kovania bol dovtedy len
   „mapovanie generického typu na kódy" — nevedelo sa z neho, **na čo** je: či je to záves na dvierka alebo na výklop, či je klasický alebo TipOn, od koho je a z akej rady.
