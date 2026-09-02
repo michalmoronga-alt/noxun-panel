@@ -183,10 +183,39 @@ module Noxun
 
             out << { 'key' => key, 'label' => label }
           end
-          out
+          disambiguate_owner_labels!(out)
         rescue StandardError => e
           Engine.log_error(e, 'Panel.hardware_manual_owners')
           [{ 'key' => nil, 'label' => MANUAL_CAB_LABEL }]
+        end
+
+        # Codex #285 P2-C: `zone:ZA/shelf:1` aj `zone:ZB/shelf:1` daju „Polica 1"
+        # — v ponuke „Patrí k" by tak stali DVE identicke volby a pouzivatel by
+        # nevedel, ktory dielec pripina.
+        #
+        # Rozlisenie sa dopĺňa LEN tam, kde je popis naozaj DVOJZNACNY (a LEN
+        # v tejto ponuke — `PartKeys.human_label` sa nemeni, ma inych citatelov:
+        # riadky kovania, Kontrolu, povod v Nakupe). Jednoznacne popisy ostavaju
+        # holé; zdrojom prívesku je SEGMENT KLUCA (id zony), nikdy vymysleny text.
+        # CISTA funkcia — vstup MENI a vracia ho.
+        def disambiguate_owner_labels!(list)
+          counts = Hash.new(0)
+          list.each { |o| counts[o['label']] += 1 }
+          list.each do |o|
+            next if counts[o['label']] < 2
+
+            zone = owner_zone_id(o['key'])
+            next if zone.nil?
+
+            o['label'] = "#{o['label']} · zóna #{zone}"
+          end
+          list
+        end
+
+        # Id zony z kluca dielca (`zone:Z2/shelf:1` -> „Z2"), inak nil.
+        def owner_zone_id(key)
+          m = key.to_s.match(%r{\Azone:([^/]+)/})
+          m ? m[1] : nil
         end
 
         # KOV-A2a: mapa `front_id -> { 'wings_n' =>, 'slots' => [...] }` z JEDINEJ

@@ -180,6 +180,43 @@ NxTest.test('KOV-H2: ponuka „Patrí k" = cela skrinka + cela a zonove dielce')
   NxTest.assert(labels.include?('F1 · dvierka ľavé'), 'popisy su ludske')
 end
 
+# Codex #285 P2-C: dve listove zony daju obe „Polica 1" — v ponuke by stali dve
+# IDENTICKE volby a pouzivatel by nevedel, ktory dielec pripina.
+NxTest.test('KOV-H2: DVOJZNACNE popisky zonovych dielcov sa rozlisia zonou') do
+  tree = { 'id' => 'Z1',
+           'split' => { 'axis' => 'v', 'count' => 2,
+                        'cuts' => [{ 'size' => nil }, { 'size' => nil }] },
+           'children' => [{ 'id' => 'Z1a', 'shelves' => 1, 'children' => [] },
+                          { 'id' => 'Z1b', 'shelves' => 1, 'children' => [] }] }
+  plan = NxKovh2::CB.plan_parts_by_key(NxKovh2.params('zone_tree' => tree))
+  list = Noxun::Engine::Panel.hardware_manual_owners(
+    { 'front_items' => [{ 'id' => 'F1', 'type' => 'door', 'wings_n' => 2 }] }, plan
+  )
+  shelves = list.select { |o| o['key'].to_s.include?('/shelf:') }
+  NxTest.assert_equal 2, shelves.length, 'obe police su v ponuke'
+  NxTest.assert_equal shelves.map { |o| o['label'] }.uniq.length, shelves.length,
+                      'a maju ROZNE popisky (inak sa neda vybrat, ktoru pripinam)'
+  NxTest.assert(shelves.all? { |o| o['label'].start_with?('Polica 1 · zóna Z1') },
+                "rozlisenie je ID ZONY z kluca, nikdy vymysleny text (#{shelves.map { |o| o['label'] }})")
+  # Jednoznacne popisky ostavaju HOLE — privesok pri kazdom riadku by bol sum.
+  divider = list.find { |o| o['key'].to_s.include?('/divider_v:') }
+  NxTest.assert_equal 'Zvislá priečka 1', divider && divider['label'],
+                      'jednoznacny popis privesok NEDOSTANE'
+  front = list.find { |o| o['key'].to_s.start_with?('front:') }
+  NxTest.assert(front && !front['label'].include?('zóna'), 'ani celo')
+end
+
+NxTest.test('KOV-H2: rozlisenie sa robi LEN v ponuke, `human_label` sa nemeni') do
+  # `PartKeys.human_label` ma inych citatelov (riadky kovania, Kontrola, povod
+  # v Nakupe) — zmena jeho tvaru by sa prejavila v hlaskach aj v CSV.
+  NxTest.assert_equal 'Polica 1',
+                      Noxun::Engine::PartKeys.human_label('zone:Z1a/shelf:1'),
+                      'popis dielca ostava taky, aky bol'
+  src = NxKovh2.src('ui/panel/payloads.rb')
+  NxTest.assert(src.include?('def disambiguate_owner_labels!'),
+                'rozlisenie zije v payloade ponuky')
+end
+
 NxTest.test('KOV-H2: pri poskodenom plane ostava aspon cela skrinka') do
   list = Noxun::Engine::Panel.hardware_manual_owners({}, {})
   NxTest.assert_equal [{ 'key' => nil, 'label' => 'celá skrinka' }], list,
