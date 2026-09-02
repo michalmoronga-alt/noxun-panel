@@ -31,6 +31,12 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Architektúra sa udr
 - PR popis po slovensky: čo sa mení z pohľadu používateľa + ako testované (SkAgent/MCP výsledky). Malé PR > obrie PR — deliť po celkoch.
 - Commit messages: vecné, slovensky/anglicky konzistentne s históriou, trailer `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`.
 - Paralelné úlohy: každá vo vlastnej vetve (agenti: worktree izolácia), konflikty rieši integrácia pred PR.
+- **Antigravity OUTSIDE-IN / prior-art audit (od 3.9.2026, skill `antigravity-outside-in`):** pri **štarte bloku**, **novom module alebo novej SketchUp API ploche**
+  (Tool, Overlay, Observer, HtmlDialog kanál, súbory, sieť), **UX vzore s CAD precedensom** a **pred schválením mockupu** beží PRED `codex-audit` lacný široký
+  web research cez Antigravity CLI (Gemini Flash): čo už SketchUp/CAD svet rieši, jednoduchšia natívna cesta, oficiálne limity, licencie precedensov. Výstup =
+  research packet (`SYSTEM/zdroje/next_sessions/<BLOK>_OUTSIDE_IN_<dátum>.md`) → orchestrátor reconcile (nálezy ALREADY EXISTS/SIMPLER NATIVE PATH sa najprv
+  overia probe snippetom v SketchUpe) → až potom interné audity. Nie pre fix/docs/čisto dátové dávky. Poradie pri veľkom bloku: USER debata → draft →
+  **Antigravity outside-in** → reconcile → Codex (+GLM/blind Opus) cross-audit → reconcile → mockup → packages → implementácia → review.
 - **Codex kontrolné body (risk-based od 12.8.):** skill `codex-audit` PRED implementáciou je povinný **LEN** pre dávky meniace **dátový kontrakt, schému, migráciu, observer/undo lifecycle** alebo pridávajúce **nový modul** — rozhoduje OBSAH zásahu, nie žáner dávky (aj „fix" observera je audit-povinný). Fix, docs a UI dávky, ktoré sa žiadnej z vymenovaných oblastí nedotýkajú, idú rovno do implementácie (v prostredí bez Codex CLI krok neblokuje — ohlás a pokračuj). Skill `codex-po-pr` PO odoslaní PR je povinný **bez výnimky**. **Pravidlo 3 kôl:** ak review ide do 3. kola opráv, PR bol zle narezaný — zavrieť a rozdeliť, nie iterovať (lekcia PR #93). Oba skilly v `.claude/skills/`.
 - **Autonómne bloky (od 12.8.):** Michal ráno odsúhlasí blok dávok; tie sa spracúvajú **sekvenčne bez čakania na pokyn medzi dávkami** — každá štartuje z čerstvého `main` po mergi predchodcu (nestackovať). Na konci bloku **denný report** (zrozumiteľný z mobilu, bez čítania diffu): čo je v maine · čo čaká a prečo · čo zlyhalo · čo večer otestovať. Výber a poradie práce určuje Michal (PLAN.md) — agent si sám dávky nevyberá.
 

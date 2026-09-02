@@ -339,8 +339,9 @@ Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-
   = RED conflict + návrh náhrady + potvrdenie (náhrada ostáva zamknutá; nikdy tiché prepnutie) — bez diff-modal frameworku (status + Kontrola + potvrdzovací D-15 modal);
   (d) **explain**: server skladá text „prečo tento variant/NL" + „čo je v balení" (členovia + kódy) — `HardwareSets.explain` rozšírený; (e) **„Doplniť nové recepty"** v sekcii
   Pravidlá Štúdia (`merge_recipes_seed!` s textovým diffom pred potvrdením; snapshot inak nemenný) + info „dostupná novšia verzia setu" (record_rev porovnanie);
-  (f) **Kontrola navigátor**: klik na RED/ORANGE riadok = select + `focus_inspector` + otvorenie sekcie Čelá/Kovanie + highlight riadku (malé JS); (g) **P2O sync tyč**
-  člen (dĺžková položka, trigger `width>600 && opening==tipon`) — ostáva za R-06a ORANGE, ale jej chýbanie = **blocker** nákupu (Codex C4) cez `hardware_issues`;
+  (f) **Kontrola navigátor**: klik na RED/ORANGE riadok = select + `focus_inspector` + otvorenie sekcie Čelá/Kovanie + highlight riadku (malé JS); (g) **P2O/TIP-ON sync tyč**
+  člen (dĺžková položka; trigger = parameter receptu/systému `sync_rod_min_width` × `opening==tipon` — outside-in #16: Blum TIP-ON od ≥ 300 mm, Hettich P2O od ≥ 600 mm,
+  potvrdiť v oficiálnych PDF pri detail fill) — ostáva za R-06a ORANGE, ale jej chýbanie = **blocker** nákupu (Codex C4) cez `hardware_issues`;
   (h) prepnutie typu zásuvky späť na dvierka: zjednotené pravidlo pamäte (drawer klasifikácia + overridy sa DRŽIA; `prune_none_front_overrides` len pre `none`) — Opus I-4;
   (i) Tip-On dvierka → set podľa klasifikácie (P2O záves + piest per owner) — dáta zo seedu; hinge počet = KOV-F.
   **Scope OUT:** viacosový diff-modal · pomer D-109 · lifty (E) · závesy MAX (F) · linear pricing · šablóny 🔧 (I).
