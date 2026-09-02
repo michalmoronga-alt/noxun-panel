@@ -488,6 +488,10 @@
       applyVisibility(t);
       buildFrontHwBadges(c.hardware || []); // D3: badge kovania PRED renderom riadkov ciel
       hwItems = c.hardware || [];           // UI-B2: ten isty payload kresli projekciu Kovanie
+      // KOV-H1: ad-hoc polozky su ECHO SERVERA — panel ich len drzi a posiela
+      // spat (`collectAll`). ZIADNY default: payload bez kluca = null = kluc sa
+      // neposiela a `apply_all` si necha to, co je v configu.
+      hwManual = Array.isArray(c.hardware_manual) ? c.hardware_manual : null;
       // D-23 (audit F5/4): frontItems PRED renderFronts — placeholder ≈ vysky
       // paruje s CERSTVYM payloadom (povodne poradie by parovalo so starou skrinkou).
       frontItems = c.front_items || [];
@@ -575,6 +579,7 @@
       if (typeof absModalCloseSilent === 'function') absModalCloseSilent();
       setSelected(null);
       activeZoneId = null; frontItems = null; frontSlots = null; hwItems = null;
+      hwManual = null; // KOV-H1: bez oznacenej skrinky niet ad-hoc poloziek (kluc sa neposiela)
       closeFrontCard(); // KOV-A2a: odchod z korpusu = karta cela zaniká
       invalidateFrontPlaceholders(); // D-23: bez resolved dat ziadne ≈ odhady
       buildFrontHwBadges([]);
@@ -601,6 +606,7 @@
       // vnutri setUiMode) nesmie bezat nad zvyskami stareho vyberu.
       setSelected(null);
       activeZoneId = null; frontItems = null; frontSlots = null; hwItems = null;
+      hwManual = null; // KOV-H1: bez oznacenej skrinky niet ad-hoc poloziek (kluc sa neposiela)
       closeFrontCard(); // KOV-A2a: odchod z korpusu = karta cela zaniká
       buildFrontHwBadges([]); // Codex PR #30: badge patria oznacenej skrinke — bez nej ziadne
       setCabInfo(null);       // UI-B3: bez skrinky niet dielcov ani plochy

@@ -79,7 +79,16 @@
   // D-07: hodnota gap pola cez evalDim (vyrazy); prazdne/nezmysel = default.
   function frontGapVal(id, dflt){ var v = numv(id); return isNaN(v) ? dflt : v; }
   function resetFrontGaps(){ setNum('fr_gap', 3); setNum('fr_gap_top', 2); setNum('fr_gap_bottom', 2); setNum('fr_gap_sides', 2); onField(); }
-  function collectAll(){ var c = collectConstruction(); c.fronts = collectFronts(); return c; }
+  // KOV-H1: ad-hoc polozky kovania idu SPAT nezmenene (pass-through). Sú
+  // ECHOM servera z `cabinet_payload` — panel ich v H1 nijako neupravuje
+  // (UI je H2). Kluc sa posiela LEN ked ho payload naozaj mal: `|| []` by
+  // z „o polozkach neviem" spravilo „polozky nie su" a apply by ich zmazal.
+  function collectAll(){
+    var c = collectConstruction();
+    c.fronts = collectFronts();
+    if (hwManual) c.hardware_manual = hwManual;
+    return c;
+  }
 
   // --- validacia poli (cerveny okraj, ziadne modaly) ---
   // V0.4.7e: cita cez evalDim (vyraz = hodnota); ROZPISANY vyraz vo fokusovanom

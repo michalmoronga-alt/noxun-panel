@@ -19,6 +19,11 @@
     var MATERIAL_KEYS = ['material_id', 'front_material_id', 'back_material_id'];
     // H2 (D-76): kovanie zo sablony — mapovanie setov + zmrazene definicie.
     var HARDWARE_KEYS = ['hardware_sets', 'hardware_set_defs'];
+    // KOV-H1: ad-hoc polozky sablony su POLE, nie mapa — `plainMap()` vracia
+    // pre pole null, takze do HARDWARE_KEYS patrit nemozu. Vlastny zoznam
+    // s vlastnym citacom (`plainList`), rovnaky kontrakt: ZIADNY default,
+    // prazdny/chybajuci kluc sa NEPOSIELA.
+    var HARDWARE_LIST_KEYS = ['hardware_manual'];
     // UI-C1b: typ vkladaneho objektu = JEDNA volba z troch segmentovych
     // tlacidiel (Dolna · Horna · Doska). Nahradila dvojicu radiov kind+ctype;
     // stav je tu, nie v DOM (kostra panela sa neprekresluje).
@@ -205,9 +210,18 @@
       }
       return any ? out : null;
     }
+    // KOV-H1: pole zo sablony sa preberá TAK, AKO PRISLO (prvky su serverove
+    // zaznamy — panel im nerozumie a ani nemusi). Prazdne pole = null (kluc sa
+    // neposiela), aby sa „sablona ziadne nema" nelisilo od „sablona o nich nevie".
+    function plainList(v){
+      return (Array.isArray(v) && v.length) ? v.slice() : null;
+    }
     function hardwareOf(src){
-      var out = { hardware_sets: null, hardware_set_defs: null };
+      var out = { hardware_sets: null, hardware_set_defs: null, hardware_manual: null };
       HARDWARE_KEYS.forEach(function(k){ out[k] = plainMap(src ? src[k] : null); });
+      HARDWARE_LIST_KEYS.forEach(function(k){ out[k] = plainList(src ? src[k] : null); });
+      // Zmrazene definicie bez mapovania nemaju vyznam; ad-hoc polozky su na
+      // mapovani NEZAVISLE (nejdu cez sety), takze sa tu NENULUJU.
       if (!out.hardware_sets) out.hardware_set_defs = null;
       return out;
     }
@@ -286,11 +300,13 @@
       var hw = state.hardware || {};
       var out = {};
       HARDWARE_KEYS.forEach(function(k){ if (hw[k]) out[k] = hw[k]; });
+      HARDWARE_LIST_KEYS.forEach(function(k){ if (hw[k]) out[k] = hw[k]; });
       return out;
     }
 
     return {
       state: state,
+      HARDWARE_LIST_KEYS: HARDWARE_LIST_KEYS,
       LOCK_FIELDS: LOCK_FIELDS,
       BOARD_LOCK_FIELDS: BOARD_LOCK_FIELDS,
       INSERT_TYPES: INSERT_TYPES,

@@ -398,8 +398,13 @@
     // H2 (D-76): sety kovania zo sablony (mapovanie + zmrazene definicie) idu
     // do payloadu rovnako ako materialy — server ich normalizuje a zmrazi do
     // projektu v operacii vlozenia. Bez sablony su kluce prazdne = neposlu sa.
+    // KOV-H1: ad-hoc polozky vkladanej skrinky pochadzaju VYHRADNE zo sablony
+    // (`NXInsert`), nikdy z OZNACENEJ skrinky — `collectAll()` nesie echo
+    // vyberu, takze bez tohto zmazania by nova skrinka zdedila cudzie polozky.
+    delete p.hardware_manual;
     var hw = NXInsert.hardwarePayload();
     NXInsert.HARDWARE_KEYS.forEach(function(k){ if (hw[k]) p[k] = hw[k]; });
+    NXInsert.HARDWARE_LIST_KEYS.forEach(function(k){ if (hw[k]) p[k] = hw[k]; });
     // UI-C1a: identita pouzitej sablony (kind + nazov) — server si zaznam znovu
     // najde, metadata odstrani PRED builderom a az po uspesnom vlozeni z nich
     // spravi peciatku „naposledy pouzite". Do configu skrinky sa nedostanu.
