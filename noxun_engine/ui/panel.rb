@@ -57,6 +57,14 @@ module Noxun
           false
         end
 
+        # D-52b (bariéra pred swapom): `true` AZ VTEDY, ked dobehol
+        # `set_on_closed` — teda ked uz okno neexistuje. `dialog_alive?`
+        # na to NESTACI: hovori o VIDITELNOSTI, kym CEF moze este drzat
+        # otvorene subory z `ui/` a rename priecinka by na Windows zlyhal.
+        def dialog_closed?
+          @dialog.nil?
+        end
+
         # UI-02: toolbar tlacidlo „Vlozit" — panel BEZ vyberu ukazuje vkladaciu
         # kartu, takze staci otvorit panel a zhodit vyber. Ziadna operacia a
         # ziadny zapis do modelu (lekcia D-103: prazdny vyber sa vycisti pod
