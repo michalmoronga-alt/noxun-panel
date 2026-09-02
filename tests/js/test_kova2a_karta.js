@@ -211,6 +211,37 @@ eq(C.frontCardKeepOpen(null, 'CAB-001', 'F1'), null,
 eq(C.frontCardKeepOpen('CAB-001', null, 'F1'), null, 'odchod z korpusu (doska, vkladanie) tiez');
 eq(C.frontCardKeepOpen('CAB-001', 'CAB-001', null), null, 'ked nic otvorene nie je, nic sa neotvara');
 
+// ============ 4c) IDENTITA FOKUSU V KARTE (Codex #281 kolo 2, P2) =========
+// Karta sa prekresluje CELA, takze fokusovane tlacidlo zanikne. Identita, cez
+// ktoru sa fokus vrati, je cista funkcia — testuje sa bez DOM.
+eq(C.frontCardFocusKey({ t: 'door' }), 't:door', 'dlazdica typu');
+eq(C.frontCardFocusKey({ k: 'direction', v: 'left', w: 'single' }), 's:direction|left|single',
+   'segment s kridlom');
+eq(C.frontCardFocusKey({ k: 'opening_mode', v: 'tipon' }), 's:opening_mode|tipon|',
+   'segment bez kridla (kridlo je volitelne)');
+eq(C.frontCardFocusKey({}), null, 'bez atributov ziadna identita');
+eq(C.frontCardFocusKey(null), null, 'chybajuci vstup nespadne');
+eq(C.frontCardFocusKey({ k: 'direction' }), null, 'kluc bez hodnoty = ziadna identita');
+eq(C.frontCardFocusKey({ k: 'direction', v: '' }), null, 'prazdna hodnota tiez nie');
+
+eq(C.frontCardFocusSelector('t:door'), '[data-t="door"]', 'spatna cesta: dlazdica');
+eq(C.frontCardFocusSelector('s:direction|left|single'),
+   '[data-k="direction"][data-v="left"][data-w="single"]', 'spatna cesta: segment s kridlom');
+eq(C.frontCardFocusSelector('s:opening_mode|tipon|'),
+   '[data-k="opening_mode"][data-v="tipon"]', 'bez kridla sa atribut do selektora nedava');
+eq(C.frontCardFocusSelector(null), null, 'ziadna identita = ziadny selektor');
+eq(C.frontCardFocusSelector('t:'), null, 'poskodeny kluc dlazdice');
+eq(C.frontCardFocusSelector('s:direction||single'), null, 'poskodeny kluc segmentu');
+eq(C.frontCardFocusSelector('nezmysel'), null, 'neznamy prefix');
+// Okruzna cesta drzi pre VSETKY reálne ovladace karty.
+C.FRONT_CARD_TYPES.forEach(t => {
+  eq(C.frontCardFocusSelector(C.frontCardFocusKey({ t: t })), `[data-t="${t}"]`, `okruh: dlazdica ${t}`);
+});
+C.FRONT_DIR_OPTIONS.forEach(o => {
+  eq(C.frontCardFocusSelector(C.frontCardFocusKey({ k: 'direction', v: o.value, w: 'single' })),
+     `[data-k="direction"][data-v="${o.value}"][data-w="single"]`, `okruh: smer ${o.value}`);
+});
+
 // ============ 5) SYMBOLY NAHLADU ===========================================
 
 eq(C.frontDirSymbol('left'), 'left', 'panty vlavo = sipka na volnu hranu vpravo');
@@ -485,5 +516,46 @@ eq(rowOf('F1').dataset.frontExtra, dsAfterFirst, 'a dataset ostal bitovo rovnaky
 FM.onFrontSeg(segBtn('direction', 'right'));
 eq(items()[0].direction, 'right', 'zmena volby sa zapise');
 ok(applyCalls > applyAfterFirst, 'a apply sa spusti');
+
+// --- 6k) kolo 2 P2: prekreslenie karty NESMIE zhodit fokus -----------------
+// Bez obnovy by po KAZDEJ klavesovej zmene (dlazdica/segment) fokus spadol na
+// `<body>` a pouzivatel klavesnice by musel pretabovat cely Inspector.
+resetRows();
+FM.addFrontRow({ id: 'F1', type: 'drawer_front' });
+// Zaznam servera pre jednokridlove dvierka — po prepnuti typu sa v karte
+// objavi riadok smeru, na ktorom sa da fokus overit.
+global.frontSlots = { F1: entry(1, [slot('single', null)]) };
+openCard('F1');
+function tileBtn(t){ return rowOf('F1').querySelectorAll('.typetile').find(b => b.dataset.t === t); }
+// (a) DLAZDICA typu: fokus ostane na dlazdici, ktora sa prave zapla.
+const doorTile = tileBtn('door');
+doorTile.focus();
+ok(DOC.activeElement === doorTile, 'fokus je na dlazdici pred zmenou');
+FM.onFrontTile(doorTile);
+// POZN.: mini-DOM (na rozdiel od prehliadaca) nechava `activeElement` aj na
+// ODPOJENOM uzle, preto sa neoveruje „nie je null", ale to podstatne: fokus
+// sedi na uzle, ktory je v ZIVEJ karte — teda na cerstvo vykreslenom tlacidle.
+ok(DOC.activeElement !== doorTile, 'fokus NEostal na uzle, ktory prekreslenim zanikol');
+ok(DOC.activeElement && DOC.activeElement.closest('.fcard') === rowOf('F1').querySelector('.fcard'),
+   'fokus je v ZIVEJ karte, nie na odpojenom zvysku');
+eq(DOC.activeElement && DOC.activeElement.dataset.t, 'door',
+   'fokus sa vratil na dlazdicu S ROVNAKOU identitou');
+eq(DOC.activeElement.attrs.class.indexOf('on') >= 0, true, 'a je to uz tá aktivna');
+// (b) SEGMENT: to iste pre smer (a kridlo je sucastou identity).
+const rightSeg = rowOf('F1').querySelectorAll('.segrow button')
+  .find(b => b.dataset.k === 'direction' && b.dataset.v === 'right');
+rightSeg.focus();
+FM.onFrontSeg(rightSeg);
+eq(items()[0].direction, 'right', 'zmena sa zapisala');
+eq(DOC.activeElement && DOC.activeElement.dataset.k, 'direction', 'fokus ostal na segmente smeru');
+eq(DOC.activeElement && DOC.activeElement.dataset.v, 'right', 'a na tej istej volbe');
+eq(DOC.activeElement && DOC.activeElement.dataset.w, 'single', 'kridlo je sucastou identity');
+ok(DOC.activeElement.closest('.fcard') === rowOf('F1').querySelector('.fcard'),
+   'a aj tu je fokus v ZIVEJ karte');
+// (c) Fokus MIMO karty sa prekreslenim nesmie hnut.
+const fh = rowOf('F1').querySelector('.fh');
+fh.focus();
+FM.refreshFrontCards();
+ok(DOC.activeElement === fh, 'fokus mimo karty ostava, kde bol');
 
 console.log(`OK test_kova2a_karta.js — ${n} kontrol`);

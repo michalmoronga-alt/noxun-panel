@@ -316,6 +316,34 @@
     return String(prevCabId) === String(nextCabId) ? openId : null;
   }
 
+  // KOV-A2a (Codex #281 kolo 2 P2): OBNOVA FOKUSU PO PREKRESLENI KARTY.
+  // Karta sa prekresluje CELA (`innerHTML`), takze tlacidlo, ktore prave drzalo
+  // fokus, zanikne a fokus spadne na `<body>` — pouzivatel klavesnice by musel
+  // pretabovat cely Inspector po KAZDEJ zmene typu ci segmentu. Identita
+  // ovladaca je preto CISTA funkcia (da sa testovat bez DOM):
+  //   dlazdica typu -> `{ t: '<typ>' }`
+  //   segment       -> `{ k: '<kluc>', v: '<hodnota>', w: '<kridlo>' }` (w volitelne)
+  // Chybajuce atributy = ZIADNA identita (null) -> fokus sa neobnovuje.
+  // POZN.: hodnoty su uzavrete enumy z `FRONT_*_OPTIONS` a `FRONT_CARD_TYPES`
+  // (bez `|`), preto staci jednoduchy oddelovac.
+  function frontCardFocusKey(attrs){
+    var a = attrs || {};
+    if (a.t) return 't:' + a.t;
+    if (a.k && a.v != null && a.v !== '') return 's:' + a.k + '|' + a.v + '|' + (a.w || '');
+    return null;
+  }
+  // Inverzna cesta: z kluca spat SELEKTOR, ktorym sa tlacidlo najde v cerstvo
+  // vykreslenej karte. Poskodeny kluc = null (radsej ziadny fokus nez naslepo
+  // fokusovany cudzi ovladac).
+  function frontCardFocusSelector(key){
+    if (!key) return null;
+    if (key.indexOf('t:') === 0) return key.length > 2 ? '[data-t="' + key.slice(2) + '"]' : null;
+    if (key.indexOf('s:') !== 0) return null;
+    var p = key.slice(2).split('|');
+    if (p.length !== 3 || !p[0] || !p[1]) return null;
+    return '[data-k="' + p[0] + '"][data-v="' + p[1] + '"]' + (p[2] ? '[data-w="' + p[2] + '"]' : '');
+  }
+
   // ===== KOV-A2a: symboly 2D nahladu =====================================
   // Prevod STAVU na SYMBOL. Nahlad kresli symboly, nie stavy — preto sa tu
   // (a nikde inde) rozhoduje, co sa ma nakreslit.
@@ -1037,6 +1065,7 @@
       FRONT_DRAWER_VARIANT_OPTIONS: FRONT_DRAWER_VARIANT_OPTIONS,
       frontCardModel: frontCardModel, frontWingLabel: frontWingLabel,
       frontCardKeepOpen: frontCardKeepOpen,
+      frontCardFocusKey: frontCardFocusKey, frontCardFocusSelector: frontCardFocusSelector,
       frontExtraOnTypeChange: frontExtraOnTypeChange, frontExtraOnWings: frontExtraOnWings,
       frontExtraOnSegrow: frontExtraOnSegrow, frontDirBadge: frontDirBadge,
       frontDirSymbol: frontDirSymbol, frontTypeSymbol: frontTypeSymbol,

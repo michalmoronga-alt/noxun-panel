@@ -1206,8 +1206,35 @@
         card.className = 'fcard';
         row.appendChild(card); // karta je VZDY posledna v stlpci
       }
+      // Codex #281 kolo 2 (P2): karta sa prekresluje CELA, takze tlacidlo,
+      // ktore prave drzalo fokus, zanikne a fokus spadne na `<body>` —
+      // pouzivatel klavesnice by po KAZDEJ zmene typu ci segmentu musel
+      // pretabovat cely Inspector. Render ostava celistvy (ziadny inkrementalny
+      // prepis); obnovi sa LEN fokus, a to podla LOGICKEJ identity ovladaca
+      // (ciste funkcie v core.js), nie podla indexu deti.
+      var focusKey = frontCardFocusOf(card);
       card.innerHTML = frontCardHtml(row);
+      frontCardRefocus(card, focusKey);
     }
+  }
+  // Identita fokusovaneho ovladaca, ak lezi V TEJTO karte (inak null —
+  // fokus mimo karty sa prekreslenim nedotkne a nesmie sa nikam presuvat).
+  function frontCardFocusOf(card){
+    if (!card || typeof document === 'undefined') return null;
+    var ae = document.activeElement;
+    if (!ae || typeof ae.closest !== 'function' || ae.closest('.fcard') !== card) return null;
+    var d = ae.dataset || {};
+    return frontCardFocusKey({ t: d.t, k: d.k, v: d.v, w: d.w });
+  }
+  // Najde v CERSTVO vykreslenej karte tlacidlo s rovnakou identitou a vrati mu
+  // fokus. `preventScroll` je zamer: karta sa nema pod rukou posunut; staršie
+  // jadra ten parameter nepoznaju, preto fallback na obycajny `focus()`.
+  function frontCardRefocus(card, key){
+    var sel = frontCardFocusSelector(key);
+    if (!sel || !card) return;
+    var target = card.querySelector(sel);
+    if (!target || typeof target.focus !== 'function') return;
+    try { target.focus({ preventScroll: true }); } catch (e) { target.focus(); }
   }
 
   // HTML karty z ciseho view-modelu (`frontCardModel` v core.js). Panel tu
