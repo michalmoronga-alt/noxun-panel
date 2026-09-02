@@ -501,3 +501,8 @@ jediné miesto, kde sa stampuje `config_schema`, a položka by ostala pod starou
 a má vlastný `push_selected(dedup: false)`. **Podmienka:** kým je zoznam takých polí jedno-položkový, sa neoplatí — riziko druhej pravdy
 o configu je väčšie než ušetrené milisekundy. Robiť až keď sa trieda „dátových" zmien rozšíri (KOV-H2 úpravy položiek a ďalšie) alebo
 keď sa prestavba pri jednej položke ukáže ako reálna prekážka práce. **Odhad: S/M.**
+
+### R-41 · P2 · ui · `ui/js/hw_sets.js` (HWS_EDIT) — draft editora setu posiela ČERSTVÚ revíziu, nie pripnutú (Codex audit KOV-B #17, BLOCKER 3, 3.9.2026)
+Draft `HWS_EDIT` zámerne prežíva push, ale pri uložení posiela `HWS_DATA.revision` z posledného payloadu — keď druhé okno medzitým zmení ten istý set a prvé dostane refresh,
+staré polia odídu s NOVOU revíziou a serverový CAS prejde (tichý prepis medzi dvoma oknami; editor mapovania `hwsPinRev` ten vzor má správne). **Oprava = KOV-B3**
+(pripnutá revízia + základná definícia pri otvorení modalu, konflikt = obnova/riešenie). Do B3 sa nič nemení; riziko je len pri dvoch oknách nad tým istým setom.
