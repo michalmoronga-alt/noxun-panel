@@ -11878,6 +11878,20 @@ module NoxunSuRunner
     sc.send(:remove_method, :kovh2_orig_js)
   end
 
+  # Prestavba, ktora VZDY vyhodi vynimku — na overenie rescue vetvy
+  # `handle_apply_all` nad ZIVYM modelom (Codex #285 P2-B). Original sa v
+  # `ensure` VZDY vracia.
+  def kovh2_with_failing_rebuild
+    sc = e::CabinetBuilder.singleton_class
+    sc.send(:alias_method, :kovh2_orig_rebuild, :rebuild)
+    sc.send(:define_method, :rebuild) { |*_a, **_kw| raise 'SU TEST: prestavba zlyhala' }
+    yield
+  ensure
+    sc.send(:remove_method, :rebuild)
+    sc.send(:alias_method, :rebuild, :kovh2_orig_rebuild)
+    sc.send(:remove_method, :kovh2_orig_rebuild)
+  end
+
   # Payload skrinky presne tak, ako ho dostane panel pri `push_selected`.
   def kovh2_payload(inst)
     e::Panel.cabinet_payload(inst)
@@ -12001,6 +12015,69 @@ module NoxunSuRunner
       Sketchup.undo
       ok('KOV-H2: zmazanie je PRESNE jeden krok Spat',
          m4.valid? && kovh_manual(inst).length == 1)
+
+      # --- 7) ZMENA VYBERU POD MODALOM: nic sa nezapise (Codex #285 P1) -----
+      # Klientsku cast (modal sa zavrie) dokazuje JS sada; TU sa overuje
+      # SERVEROVA polovica toho isteho scenara: apply orazitkovany INOU
+      # skrinkou sa zahodi a modal dostane ODMIETNUTIE — bez neho by ostal
+      # zamknuty a pouzivatel by cakal na odpoved, ktora nikdy nepride.
+      other = e::CabinetBuilder.build(model, kovh_params([]))
+      if other
+        m5 = r03_marker(model, markers)
+        kovh2_select!(model, other)
+        before5 = kovh_manual(inst)
+        stale = nil
+        kovh2_capture_js do |calls|
+          e::Panel.handle_apply_all(pg(model,
+                                       'cabinet_id' => cid, # UZ NEOZNACENA skrinka
+                                       'hardware_manual' => before5 + [kovh_free('id' => '')],
+                                       'manual_op' => { 'kind' => 'add', 'id' => '',
+                                                        'token' => 'su-h2-stale' }))
+          stale = calls.find { |c| c.to_s.start_with?('NX.hwManualResult(') }.to_s
+        end
+        ok('KOV-H2 (P1): apply s cudzou identitou skrinky sa ZAHODIL',
+           kovh_manual(inst).length == before5.length)
+        ok('KOV-H2 (P1): a modal dostal ODMIETNUTIE so SVOJIM tokenom',
+           stale.start_with?('NX.hwManualResult(false,') && stale.include?('su-h2-stale'))
+        Sketchup.undo
+        ok('KOV-H2 (P1): zahodeny apply NEUROBIL ziadny krok Spat',
+           !m5.valid? && inst.valid?)
+        kovh2_select!(model, inst)
+      end
+
+      # --- 8) VYNIMKA PRESTAVBY: klient dostane ULOZENY stav (P2-B) ---------
+      # Klient si `hwManual` prepisuje OPTIMISTICKY uz pred apply. Ked
+      # prestavba padne, ulozena skrinka ostane nezmenena — bez `push_selected`
+      # by si panel drzal ODMIETNUTY zoznam a najblizsia nesuvisiaca zmena
+      # skrinky by ho poslala znova.
+      m6 = r03_marker(model, markers)
+      before6 = kovh_manual(inst)
+      pushed = nil
+      failed = nil
+      kovh2_capture_js do |calls|
+        kovh2_with_failing_rebuild do
+          begin
+            e::Panel.handle_apply_all(pg(model,
+                                         'cabinet_id' => cid,
+                                         'hardware_manual' => before6 + [kovh_free('id' => '')],
+                                         'manual_op' => { 'kind' => 'add', 'id' => '',
+                                                          'token' => 'su-h2-boom' }))
+          rescue StandardError
+            nil # vynimku prepusta `cb` wrapper — tu ju len necháme prejsť
+          end
+        end
+        pushed = calls.find { |c| c.to_s.start_with?('NX.loadSelected(') }.to_s
+        failed = calls.find { |c| c.to_s.start_with?('NX.hwManualResult(') }.to_s
+      end
+      ok('KOV-H2 (P2-B): po vynimke prestavby ostal ULOZENY config nedotknuty',
+         kovh_manual(inst).length == before6.length)
+      ok('KOV-H2 (P2-B): a panel dostal RESYNC (`push_selected`) s ulozenym zoznamom',
+         !pushed.empty? && pushed.include?('hardware_manual'))
+      ok('KOV-H2 (P2-B): resync ide PRED odpovedou modalu',
+         !failed.empty? && failed.start_with?('NX.hwManualResult(false,'))
+      Sketchup.undo
+      ok('KOV-H2 (P2-B): zlyhana prestavba NEUROBILA ziadny krok Spat',
+         !m6.valid? && inst.valid? && kovh_manual(inst).length == before6.length)
 
       # --- 6) POVOD nakupneho riadku nad ZIVYM modelom ----------------------
       exp = kovh_expand(model)
