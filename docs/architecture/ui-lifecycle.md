@@ -668,6 +668,12 @@ Pravidlo (a) sa **týka aj tlačidla „+ pridaj dvere"** (Codex #281 P1): nový
 Späť a žiadny nový callback servera**. Klik na **už nasadenú hodnotu** (typ aj segment) sa zahodí — žiadny prázdny rebuild a žiadny prázdny krok Späť; segment to pozná podľa
 `aria-pressed`, ktoré karta kreslí z view-modelu (Codex #281 P2-C).
 
+**Prekreslenie karty NEZHADZUJE FOKUS** (Codex #281 kolo 2). Karta sa prepisuje celá (`card.innerHTML`), takže tlačidlo, ktoré držalo fokus, zanikne a fokus by spadol na
+`<body>` — používateľ klávesnice by po každej zmene typu či segmentu tabovaním prechádzal celý Inspector znova. Render ostal celistvý; obnovuje sa **len fokus**, a to podľa
+**logickej identity** ovládača (`frontCardFocusKey` / `frontCardFocusSelector` v `core.js` — dlaždica `data-t`, segment `data-k`+`data-v`+`data-w`), nie podľa indexu detí.
+`refreshFrontCards` si identitu zapamätá **len keď fokus leží v tej istej karte** (`activeElement.closest('.fcard') === card`) a vráti ho cez `focus({ preventScroll: true })`
+s fallbackom — karta sa nemá pod rukou posunúť. Fokus mimo karty sa nedotkne ničoho.
+
 **Otvorená karta patrí KONKRÉTNEJ SKRINKE** (Codex #281 P2-B). `front_id` (F1) má každá skrinka v zákazke, takže samotné ID čela identitu karty neurčuje — bez brány by sa po
 prepnutí výberu otvorila karta cudzieho čela. Čistá `frontCardKeepOpen(prevCabId, nextCabId, openId)` rozhodne, či prežije; `bridge.js` ju volá **pred** `renderFronts` a pri zmene
 **dokumentu** posiela predchodcu ako `null` (ID skriniek sa naprieč dokumentmi opakujú — tá istá zásada ako pri `keepGaps`). Doska, prázdny výber aj návrh vkladania kartu

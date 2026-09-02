@@ -44,6 +44,10 @@
   otvorila **karta cudzieho čela**; rozhoduje čistá `frontCardKeepOpen` volaná **pred** `renderFronts` (pri zmene dokumentu s `null` predchodcom). **P2-C** — klik na už aktívny
   segment robil prázdny rebuild aj prázdny krok Späť; guard cez `aria-pressed` (ten istý vzor ako dlaždica typu). Sada karty tým narástla na **168 kontrol** (matica `wings_n`
   1/2/3/4/null, vlastník karty, obe tlačidlá „+ pridaj…", dvojklik na segment) a pribudli **4 mutácie** (spolu 9).
+  **Codex kolo 2 = 1×P2 → interná delta-verifikácia** (commit `19480de`): prekreslenie karty **zhadzovalo fokus** — karta sa prepisuje celá (`innerHTML`), takže tlačidlo, ktoré
+  ho držalo, zaniklo a fokus spadol na `<body>`; používateľ klávesnice tak po KAŽDEJ zmene typu či segmentu tabovaním prechádzal celý Inspector znova. Render ostal celistvý
+  (žiadny inkrementálny prepis), obnovuje sa **len fokus** podľa **logickej identity** ovládača (čisté `frontCardFocusKey` / `frontCardFocusSelector` v `core.js`), a to len keď
+  fokus naozaj ležal v tej istej karte. Sada karty tým narástla na **202 kontrol**, mutácií je **10**.
 
 - **KOV-A1 · ČELÁ — DÁTOVÁ VRSTVA (PR #280, v0.9.15, 3.9.2026):** prvá dávka bloku KOVANIE. **Typy:** `items[].type` pozná `lift` (výklop), `fall` (sklop) a `blind` (blenda)
   popri `door`/`drawer_front`/`none`; lift+fall → rola **`flap`** (`front:F#/flap`, suffix `FLAP-#`), blind → **`false_front`** (`front:F#/blind`, `BLIND-#`), oba s identickou
