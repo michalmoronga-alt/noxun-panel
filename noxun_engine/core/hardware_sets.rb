@@ -12,6 +12,13 @@
 #   { "set_id": "zaves-klasik",            # slug identita, NEMENNA
 #     "name": "Záves KLASIK (Sensys 110°)",
 #     "generic_type": "hinge",             # BuildPlan::GENERIC_TYPES
+#     # --- KLASIFIKACIA (KOV-B1) — VOLITELNY BLOK, all-or-nothing ---
+#     "use_type": "door",                  # USE_TYPES; urcuje generic_type
+#     "opening_mode": "classic",           # OPENING_MODES ('other' = neuplatnuje sa)
+#     "drawer_construction": "metal",      # LEN pri use_type 'drawer'
+#     "manufacturer": "Hettich",           # kanonicky nazov z HardwareTaxonomy
+#     "series": "Sensys",                  # VOLITELNA rada (kluc chyba = bez rady)
+#     "active": false,                     # sparse — uklada sa LEN false
 #     "members": [
 #       { "code": "104717", "per": "unit",  "qty": 1, "label": "záves" },
 #       { "code": "250831", "per": "owner", "qty": 1, "label": "TipOn" },
@@ -48,6 +55,15 @@
 #     povoleny LEN v cabinet override mape (config['hardware_sets']).
 #     Projektovy/globalny mapping composite kluce NEMA — owner_part_key nie je
 #     jednoznacny naprieg skrinkami (front:F1/panel existuje v kazdej).
+#   "class:<generic_type>|<opening_mode>[|<drawer_construction>]"  — KOV-B1,
+#     TRIEDNY kluc pripraveny pre KOV-D („vysuvy TipOn maju iny set nez
+#     klasicke"). Tvar je uzavrety (tretí segment LEN pri `slide`, ziadny
+#     `@owner` sufix, segmenty trim+downcase) a od tejto davky ho pozna
+#     parser, whitelist brany aj std detekcia — takze KOV-D uz NEBUDE
+#     potrebovat dalsi bump. ZATIAL HO NIC NECITA: `resolve_set_id`, `expand`
+#     ani `explain` sa nan nepytaju a zapisove cesty ho nepisu. Ucel tejto
+#     davky je vyhradne BEZSTRATOVY ROUND-TRIP (kto ho ma v subore, o neho
+#     nepride) a spravny marker std.
 # Hodnota mapovania:
 #   "set_id"  (String)                 — pevny set
 #   selector  (Hash)                   — set podla ciselneho parametra polozky:
@@ -94,7 +110,16 @@ module Noxun
       # NIKDY ticho iny nakup). Snapshoty bez novych tvarov ostavaju std 1,
       # takze starsie verzie ich citaju dalej bez zmeny.
       STD_PARAM_FORMS = 2
-      STD_SUPPORTED   = [STD, STD_PARAM_FORMS].freeze
+
+      # KOV-B1: set nesie KLASIFIKACIU (typ pouzitia · sposob otvarania ·
+      # konstrukcia zasuvky · vyrobca · rada · aktivny) alebo mapovanie nesie
+      # TRIEDNY kluc `class:…`. Starsi plugin oboje ticho OREZE (whitelist
+      # klucov) a prvym zapisom stratu zvecni, preto taky obsah dostane std 3
+      # a starsia verzia ho odmietne ako read-only / `:invalid`. Marker je
+      # LAZY podla OBSAHU (`snapshot_std`): cisto legacy kniznica a snapshot
+      # ostavaju na 1/2, takze spatna citatelnost sa zbytocne neblokuje.
+      STD_CLASSIFIED  = 3
+      STD_SUPPORTED   = [STD, STD_PARAM_FORMS, STD_CLASSIFIED].freeze
 
       # v2 (H1a): +set „Nohy podla vysky sokla" (param_bands) a migracia
       # globalneho defaultu leg z 'nohy-klzak-17' na neho.
@@ -121,10 +146,55 @@ module Noxun
       # (alebo cudzej) verzie a kniznica/snapshot sa smie uz len CITAT.
       # POZOR: whitelisty su KONTRAKT — kazde nove pole clena/pasma sa musi
       # doplnit SEM, inak vlastny zapis vyrobi read-only stav.
-      SET_KEYS         = %w[set_id name generic_type members].freeze
+      # LEGACY_SET_KEYS = tvar setu pred KOV-B1. Sluzi na LAZY detekciu std:
+      # set, ktory ma ktorykolvek kluc MIMO tohto zoznamu, uz nie je citatelny
+      # starsim pluginom (`snapshot_std` -> 3).
+      LEGACY_SET_KEYS  = %w[set_id name generic_type members].freeze
       MEMBER_KEYS      = %w[per qty label code code_by_nl param_bands].freeze
       PARAM_BANDS_KEYS = %w[param bands].freeze
       BAND_KEYS        = %w[min max].freeze # + hodnota (code / set_id)
+
+      # === KOV-B1: KLASIFIKACIA SETU ==========================================
+      #
+      # Set uz nie je len „mapovanie generickeho typu na kody" — nesie AJ to,
+      # NA CO sa pouziva. Slovniky su UZAVRETE (neznama hodnota = obsah novsej
+      # verzie, nie nova kategoria).
+      #
+      #   use_type            na co je set (dvierka / zasuvka / vyklop / sklop /
+      #                       ine — nohy, podperky, zavesenie)
+      #   opening_mode        sposob otvarania; `other` = „neuplatnuje sa"
+      #   drawer_construction konstrukcia zasuvky — LEN pri `use_type: 'drawer'`
+      #   manufacturer        kanonicky nazov z HardwareTaxonomy (povinny)
+      #   series              kanonicky nazov rady — VOLITELNY (podperky, klzaky
+      #                       ani „Bystrica" ziadnu radu nemaju; vynutena rada by
+      #                       taxonomiu znecistila vymyslenymi menami)
+      #   active              sparse priznak — uklada sa LEN `false`
+      USE_TYPES           = %w[door drawer lift fall other].freeze
+      OPENING_MODES       = %w[classic tipon other].freeze
+      DRAWER_CONSTRUCTIONS = %w[metal wood other].freeze
+
+      # KANONICKA MAPA typu pouzitia na typ kovania (audit #17 BLOCKER 2).
+      # JEDINA autorita vztahu: `generic_type` je pri klasifikovanom sete
+      # ODVODENY, nie nezavisly udaj — inak by sa dali ulozit dva protirecive
+      # zapisy o tom istom sete. `other` mapu nema (typ sa uvedie explicitne).
+      USE_TYPE_GENERIC = { 'door' => 'hinge', 'drawer' => 'slide',
+                           'lift' => 'lift', 'fall' => 'lift' }.freeze
+
+      # Klasifikacne kluce su ALL-OR-NOTHING (audit #17 FIX 6): pri zapise su
+      # bud VSETKY (kontextovo platne), alebo ZIADNY = legacy „nezaradeny" set.
+      # Ciastocny tvar sa odmieta — polovicna klasifikacia by v B3 vyzerala ako
+      # hotove zaradenie a filtre KOV-D by nan nesadli.
+      CLASS_KEYS = %w[use_type opening_mode drawer_construction manufacturer series].freeze
+
+      # POZOR: whitelist je KONTRAKT (viz odsek vyssie) — kazde nove pole setu
+      # sa musi doplnit SEM, inak vlastny zapis vyrobi read-only stav.
+      SET_KEYS = (LEGACY_SET_KEYS + CLASS_KEYS + %w[active]).freeze
+
+      # Poradie klucov normalizovaneho setu (stabilny tvar = stabilny odtlacok
+      # kniznice aj snapshotu). Klasifikacne kluce su pritomne LEN pri
+      # klasifikovanom sete, `series` a `active` len ked maju hodnotu.
+      SET_KEY_ORDER = %w[set_id name generic_type use_type opening_mode
+                         drawer_construction manufacturer series active members].freeze
 
       # H1b: parametre, podla ktorych sa daju stavat pasma clena (param_bands)
       # a selector mapovania. JEDINA autorita ponuky pre UI — okno Katalog
@@ -451,8 +521,13 @@ module Noxun
         #     clena ticho zahodi. Porovnavame preto, ci citacia normalizacia
         #     nic NESTRATILA: pocet setov, pocet clenov a pocet poloziek radu.
         #     Je to TEN ISTY detektor, aky pouziva `project_state_status`.
+        # KOV-B1: 4. vrstva — KLASIFIKACIA. `use_type: 'sliding'` z novsej
+        # verzie je ZNAMY kluc so SKALARNOU hodnotou (whitelist ho pusti) a
+        # tolerantne citanie by cely blok ticho zahodilo; prvy zapis by stratu
+        # zvecnil. Rovnako `active` z novsieho tvaru.
         norm_sets = without_skip_log { normalize_sets(raw_sets) }
-        if norm_sets.length != raw_sets.length || members_lost?(raw_sets, norm_sets)
+        if norm_sets.length != raw_sets.length || members_lost?(raw_sets, norm_sets) ||
+           classification_lost?(raw_sets, norm_sets)
           return [:read_only, :unknown_shape, unknown_set_sk]
         end
         if mapping.is_a?(Hash)
@@ -519,11 +594,15 @@ module Noxun
       end
 
       # nil = kľúč chýba (legitímne). Inak musí sedieť TYP.
+      # KOV-B1: `:bool` je vlastny druh pre `active` — `true`/`false` a nic ine.
+      # Skalar by tu nestacil: novsia verzia moze dat `active` napr. datum
+      # („aktivny do…") a citacia normalizacia by ho ticho zahodila.
       def bad_type?(value, kind)
         return false if value.nil?
         case kind
         when :scalar then !scalar_value?(value)
         when :hash   then !value.is_a?(Hash)
+        when :bool   then !(value == true || value == false)
         else true
         end
       end
@@ -533,6 +612,10 @@ module Noxun
         s = stringify(set)
         return true unless (s.keys - SET_KEYS).empty?
         return true if %w[set_id name generic_type].any? { |k| bad_type?(s[k], :scalar) }
+        # KOV-B1: klasifikacne polia su SKALARE, `active` je BOOL. Novsi TVAR
+        # znameho kluca (pole ci objekt v `use_type`) by citanie ticho zahodilo.
+        return true if CLASS_KEYS.any? { |k| bad_type?(s[k], :scalar) }
+        return true if bad_type?(s['active'], :bool)
         # Neznamy generic_type = typ kovania novsej verzie; `normalize_sets` by
         # cely set ticho zahodil.
         return true unless BuildPlan::GENERIC_TYPES.include?(s['generic_type'].to_s.strip)
@@ -574,13 +657,69 @@ module Noxun
       end
 
       # Polozka GLOBALNEHO mapovania: kluc musi byt zname `generic_type` (bez
-      # composite `gt@owner` — ten patri LEN cabinet override mape) a hodnota
-      # set_id alebo selector zo znamych klucov.
+      # composite `gt@owner` — ten patri LEN cabinet override mape) ALEBO
+      # kanonicky TRIEDNY kluc `class:…` (KOV-B1), a hodnota set_id alebo
+      # selector zo znamych klucov.
       def incompatible_mapping_entry?(key, value)
-        parsed = BuildPlan.parse_hardware_set_key(key)
-        return true if parsed.nil? || parsed[1]
+        if class_mapping_key?(key)
+          # Neplatny triedny tvar (neznamy typ, neznamy sposob otvarania,
+          # tretí segment mimo vysuvu) = obsah, ktoremu tato verzia nerozumie —
+          # rovnaka odpoved ako pri neznamom generickom type.
+          return true if parse_class_key(key)[0].nil?
+        else
+          parsed = BuildPlan.parse_hardware_set_key(key)
+          return true if parsed.nil? || parsed[1]
+        end
         return false if value.is_a?(String) || value.is_a?(Symbol)
         incompatible_bands?(value, 'set_id')
+      end
+
+      # --- KOV-B1: TRIEDNY kluc mapovania (`class:…`) -------------------------
+      #
+      # Kanonicky tvar `class:<generic_type>|<opening_mode>[|<drawer_construction>]`
+      # pripraveny pre KOV-D. Segmenty sa trimuju a downcasuju, tretí segment
+      # ma LEN `slide` (konstrukcia zasuvky inde nedava zmysel) a `@owner` sufix
+      # je zakazany (vyber na urovni dielca je iny pojem a patri do cabinet mapy).
+      #
+      # ZAPISOVA cesta neplatny tvar ODMIETNE, citacia ho LOGUJE a vyhodi —
+      # presne ako pri ostatnych klucoch (`parse_mapping` je jediny parser).
+      def class_mapping_key?(key)
+        key.to_s.strip.downcase.start_with?(BuildPlan::HW_SET_CLASS_PREFIX)
+      end
+
+      # -> [kanonicky kluc, nil] | [nil, SK dovod]
+      def parse_class_key(key)
+        raw = key.to_s.strip
+        return [nil, 'kľúč nie je triedny'] unless class_mapping_key?(raw)
+        return [nil, 'triedny kľúč nemá výber na úrovni dielca'] if raw.include?('@')
+
+        segs = raw.downcase[BuildPlan::HW_SET_CLASS_PREFIX.length..].to_s.split('|', -1).map(&:strip)
+        unless [2, 3].include?(segs.length)
+          return [nil, 'triedny kľúč musí mať typ kovania a spôsob otvárania']
+        end
+
+        gt, om, dc = segs
+        return [nil, "neznámy typ kovania „#{gt}“"] unless BuildPlan::GENERIC_TYPES.include?(gt)
+        return [nil, "neznámy spôsob otvárania „#{om}“"] unless OPENING_MODES.include?(om)
+
+        if segs.length == 3
+          return [nil, 'konštrukciu zásuvky má len výsuv'] unless gt == 'slide'
+          return [nil, "neznáma konštrukcia zásuvky „#{dc}“"] unless DRAWER_CONSTRUCTIONS.include?(dc)
+        end
+        ["#{BuildPlan::HW_SET_CLASS_PREFIX}#{segs.join('|')}", nil]
+      end
+
+      # Typ kovania z LUBOVOLNEHO kluca mapovania (bezny, composite aj triedny)
+      # alebo nil pri neplatnom tvare. Jedina cesta, ktorou sa typ z kluca cita.
+      def mapping_key_type(key)
+        if class_mapping_key?(key)
+          canon, = parse_class_key(key)
+          return nil if canon.nil?
+
+          return canon[BuildPlan::HW_SET_CLASS_PREFIX.length..].to_s.split('|').first
+        end
+        parsed = BuildPlan.parse_hardware_set_key(key)
+        parsed && parsed[0]
       end
 
       # Prazdna kniznica — jediny tvar, ktory sa vracia namiesto obsahu, ktory
@@ -831,11 +970,18 @@ module Noxun
       # suborom. Kym check sedel MIMO zamku, druha instancia stihla medzi
       # kontrolou a zapisom ulozit svoju zmenu a nas zapis ju zmazal (guard
       # pritom hlasil uspech). Zlyhany zamok konci ako `:write_failed`.
+      # KOV-B1: vysledok je TROJICA `[status, info, errors]` — treti prvok su
+      # STRUKTUROVANE chyby (`{row, field, msg}`) pre editor setu (B3). Dnesne
+      # dvojprvkove destruovanie u volajucich (`status, info = save_set!(…)`)
+      # tym NIE JE dotknute — Ruby prebytocny prvok zahodi.
+      #
+      # KOV-B1: validacia bezi AZ POD ZAMKOM, lebo potrebuje ULOZENY set
+      # (merge klasifikacie, viz `merge_class_keys`) a ten sa smie citat len
+      # cerstvo pod zamkom (R-08).
       def save_set!(set_def, revision: nil, create: false)
-        norm, errors = validate_set(set_def)
-        if norm.nil?
-          return [:invalid, errors.first || 'set sa nedá uložiť — skontroluj kódy a členov']
-        end
+        raw = set_def.is_a?(Hash) ? stringify(set_def) : nil
+        return invalid_set([set_err(nil, 'set musí byť objekt')]) if raw.nil?
+
         with_catalog_lock do
           JsonFileStore.reload!(path)
           # R-07: brana PRED reviziou — nad nekompatibilnou kniznicou nie je
@@ -847,11 +993,20 @@ module Noxun
           next [:conflict, nil] if revision && revision != self.revision
           lib = load
           sets = lib['sets']
-          idx = sets.index { |s| s['set_id'] == norm['set_id'] }
+          sid = raw['set_id'].to_s.strip
+          idx = sid.empty? ? nil : sets.index { |s| s['set_id'] == sid }
+          merged = idx && !create ? merge_class_keys(raw, sets[idx]) : raw
+          norm, errors = validate_set_detailed(merged)
+          next invalid_set(errors) if norm.nil?
+
+          refusal = taxonomy_refusal(norm)
+          next refusal if refusal
+
           next [:exists, norm['set_id']] if create && idx
           if idx
             if sets[idx]['generic_type'] != norm['generic_type']
-              next [:invalid, 'typ kovania existujúceho setu sa nemení — vytvor nový set']
+              msg = 'typ kovania existujúceho setu sa nemení — vytvor nový set'
+              next [:invalid, msg, [set_err('generic_type', msg)]]
             end
             sets[idx] = norm
           else
@@ -863,6 +1018,56 @@ module Noxun
       rescue StandardError => e
         Engine.log_error(e, 'HardwareSets.save_set!') if defined?(Engine)
         [:write_failed, nil]
+      end
+
+      def invalid_set(errors)
+        first = Array(errors).first
+        [:invalid, (first ? first['msg'] : 'set sa nedá uložiť — skontroluj kódy a členov'),
+         Array(errors)]
+      end
+
+      # KOV-B1 (R5) — MERGE KLASIFIKACIE pri uprave EXISTUJUCEHO setu.
+      #
+      # Editor setu posiela dnes LEN styri kluce (`set_id`, `name`,
+      # `generic_type`, `members`). Bez tohto merge by KAZDA uprava clena TICHO
+      # ZHODILA klasifikaciu ulozeneho setu — teda presne ta trieda tichej
+      # straty, ktoru cela davka rieši (a je to jedna z mutacii sady).
+      #   * kluc, ktory vo vstupe VOBEC NIE JE  -> preberie sa z ULOZENEHO setu,
+      #   * kluc pritomny s `nil`/`''` (a `active: true`) -> VEDOME VYMAZANIE.
+      # Az MERGED tvar ide do validacie, takze all-or-nothing pravidlo plati
+      # nad tym, co sa naozaj ulozi.
+      def merge_class_keys(raw, stored)
+        out = raw.dup
+        return out unless stored.is_a?(Hash)
+
+        (CLASS_KEYS + ['active']).each do |k|
+          next if out.key?(k)
+
+          out[k] = stored[k] if stored.key?(k)
+        end
+        out
+      end
+
+      # Patri klasifikacia setu do TAXONOMIE? Kontrola bezi VYHRADNE tu (zapis
+      # do GLOBALNEJ kniznice). `validate_set` ostava CISTA — pouziva ju aj
+      # zapis projektoveho snapshotu a citanie sablon, ktore cestuju medzi PC
+      # s INOU taxonomiou; vynutit ju tam by znamenalo, ze zakazku z ineho
+      # pocitaca sa neda otvorit.
+      # -> nil (v poriadku) | hotova odpoved pre volajuceho
+      def taxonomy_refusal(norm)
+        return nil unless classified?(norm)
+        # FAIL-CLOSED: nad NEKOMPATIBILNOU taxonomiou sa klasifikovany set
+        # ulozit NEDA — `load` z nej nic nevyda, takze kontrola by hlasila
+        # „vyrobca nie je v zozname" namiesto skutocneho dovodu. Legacy set
+        # prejde dalej (taxonomia sa ho netyka). Degradovana taxonomia sa
+        # CITAT smie, takze kontrola nad nou bezi normalne.
+        return [:write_failed, HardwareTaxonomy.state_reason] if HardwareTaxonomy.read_only?
+
+        errs = HardwareTaxonomy.check_classification(norm['manufacturer'], norm['series'])
+        return nil if errs.empty?
+
+        struct = errs.map { |e| set_err(e['field'], e['msg']) }
+        [:invalid, struct.first['msg'], struct]
       end
 
       # Zmaze set z globalnej kniznice; mapovanie globalu sa ocisti (write ho
@@ -1068,6 +1273,9 @@ module Noxun
         sets = normalize_sets(sets_map.values)
         return [:invalid, nil] if sets.length != sets_map.length
         return [:invalid, nil] if members_lost?(sets_map.values, sets)
+        # KOV-B1: a (c) KLASIFIKACIA — snapshot z novsej verzie by inak prisiel
+        # o `use_type`/`active` a `set_project_mapping!` by stratu zvecnil.
+        return [:invalid, nil] if classification_lost?(sets_map.values, sets)
         by_id = {}
         sets.each { |s| by_id[s['set_id']] = s }
         norm_map = normalize_mapping(mapping, sets)
@@ -1098,6 +1306,35 @@ module Noxun
           nm = Array(norm['members'])
           next true if rm.length != nm.length
           rm.each_with_index.any? { |m, i| nl_entries(m) != nl_entries(nm[i]) }
+        end
+      end
+
+      # KOV-B1 — 4. VRSTVA DETEKTORA STRATY (klasifikacia a `active`).
+      #
+      # Prve tri vrstvy (whitelist klucov, pocet setov/clenov, pocet poloziek
+      # radu) klasifikaciu nechytia: `use_type` je ZNAMY kluc so SKALARNOU
+      # hodnotou, takze whitelist pusti aj hodnotu z novsej verzie
+      # (`use_type: 'sliding'`) — a tolerantne citanie ju ticho zahodi. Prvy
+      # zapis by stratu zvecnil, presne ako pri `per: 'length'` v R-07 P1-2.
+      #
+      # Porovnava sa RAW definicia s vysledkom `normalize_sets`:
+      #   * raw ma neprazdny KTORYKOLVEK klasifikacny kluc, ale normalizovany
+      #     set klasifikaciu NEMA -> STRATA;
+      #   * raw ma `active: false`, ale normalizovany priznak nema -> STRATA.
+      # Pouzivaju ju VSETKY TRI brany: `assess_library_doc` (globalna kniznica),
+      # `project_state_status` (snapshot v .skp) a `assess_set_defs` (sablona) —
+      # tri cesty k tym istym datam sa nesmu rozist.
+      def classification_lost?(raw_sets, normalized)
+        raw = {}
+        Array(raw_sets).each { |s| raw[s['set_id'].to_s.strip] = s if s.is_a?(Hash) }
+        Array(normalized).any? do |norm|
+          src = raw[norm['set_id'].to_s]
+          # Chybajuci zdroj riesi `members_lost?` — tu by to bola druha hlaska
+          # o tej istej veci.
+          next false if src.nil?
+          next true if classified?(src) && CLASS_KEYS.none? { |k| norm.key?(k) }
+
+          src['active'] == false && norm['active'] != false
         end
       end
 
@@ -1203,7 +1440,20 @@ module Noxun
       # R-07: TU ISTU logiku pouziva aj zapis GLOBALNEJ kniznice (`write`) —
       # marker musi hovorit o obsahu rovnako v .skp aj v %APPDATA%, inak
       # jedna z dvoch ciest starsiemu pluginu klame.
+      # KOV-B1: najvyssi marker vyhrava. std 3 dostane obsah, ktoremu by starsi
+      # plugin nerozumel UZ NA UROVNI SETU alebo KLUCA MAPOVANIA — teda set
+      # s KTORYMKOLVEK klucom mimo `LEGACY_SET_KEYS` (kazde klasifikacne pole aj
+      # `active` samostatne) alebo mapovanie s TRIEDNYM klucom. Cisto legacy
+      # obsah ostava na svojom povodnom std (1/2) — spatna citatelnost sa
+      # zbytocne neblokuje.
       def snapshot_std(mapping, sets)
+        classified =
+          Array(sets).any? do |s|
+            s.is_a?(Hash) && !(s.keys.map(&:to_s) - LEGACY_SET_KEYS).empty?
+          end ||
+          (mapping.is_a?(Hash) && mapping.each_key.any? { |k| class_mapping_key?(k) })
+        return STD_CLASSIFIED if classified
+
         new_forms =
           Array(sets).any? do |s|
             Array(s['members']).any? { |m| m.is_a?(Hash) && m['param_bands'].is_a?(Hash) }
@@ -1269,16 +1519,68 @@ module Noxun
       # definiciu, pole aj mapu; nevalidna definicia sa vyhodi (volajuci potom
       # neprejde referencnou kontrolou vyssie).
       def collect_set_defs(set_defs)
-        list =
-          case set_defs
-          when nil then []
-          when Array then set_defs
-          when Hash then set_defs.key?('members') || set_defs.key?(:members) ? [set_defs] : set_defs.values
-          else [set_defs]
-          end
         out = {}
-        normalize_sets(list).each { |d| out[d['set_id']] = d }
+        normalize_sets(set_defs_list(set_defs)).each { |d| out[d['set_id']] = d }
         out
+      end
+
+      # Definicie setov v lubovolnom prijimanom tvare -> pole surovych definicii.
+      # (Jedna definicia · pole · mapa set_id => definicia.)
+      def set_defs_list(set_defs)
+        case set_defs
+        when nil then []
+        when Array then set_defs
+        when Hash then set_defs.key?('members') || set_defs.key?(:members) ? [set_defs] : set_defs.values
+        else [set_defs]
+        end
+      end
+
+      # === KOV-B1: BEZSTRATOVA BRANA DEFINICII SETOV V SABLONE ================
+      # (audit #17 BLOCKER 1)
+      #
+      # `hardware_set_defs` v sablone islo doteraz LEN cez tolerantny
+      # `normalize_sets` — teda cez cestu, ktora neznamy obsah TICHO ORezE. Kym
+      # sety nemali co stratit, nevadilo to; od KOV-B1 by starsi plugin zmrazil
+      # do .skp set BEZ klasifikacie (a novsi tvar by uz nikto neobnovil).
+      # Sablona je datovy subor MIMO modelu — moze byt rucne upravena alebo
+      # z novsej verzie — takze sa cita BEZSTRATOVO ALEBO VOBEC, rovnako ako
+      # mapovanie v `read_template_mapping`.
+      #
+      # Vola sa PRED akoukolvek operaciou a PRED akymkolvek zapisom do modelu
+      # (vklad `Panel.take_insert_hardware!`, pouzitie `TemplatesDialog.handle_apply`),
+      # takze odmietnutie znamena „model sa nezmenil ani o krok Spat".
+      # Detektor je TEN ISTY ako v kniznici a v snapshote (whitelist klucov +
+      # round-trip + strata klenov + strata klasifikacie).
+      #
+      # CISTA funkcia (ziadne IO). Legacy sablona bez definicii prejde.
+      # -> [:ok, { set_id => norm }] | [:lossy, [nazvy neprecitatelnych definicii]]
+      def assess_set_defs(defs)
+        return [:ok, {}] if defs.nil?
+        return [:lossy, ['hardware_set_defs']] unless defs.is_a?(Array) || defs.is_a?(Hash)
+
+        out = {}
+        lost = []
+        set_defs_list(defs).each_with_index do |raw, i|
+          label = raw.is_a?(Hash) ? (raw['set_id'] || raw[:set_id]).to_s.strip : ''
+          label = "definícia #{i + 1}" if label.empty?
+          d = raw.is_a?(Hash) ? stringify(raw) : nil
+          if d.nil? || incompatible_set?(d)
+            lost << label
+            next
+          end
+          norm = without_skip_log { normalize_sets([d]) }
+          if norm.length != 1 || members_lost?([d], norm) || classification_lost?([d], norm)
+            lost << label
+            next
+          end
+          out[norm.first['set_id']] = norm.first
+        end
+        lost.empty? ? [:ok, out] : [:lossy, lost.uniq]
+      rescue StandardError => e
+        # Fail-closed ako `assess_library_doc`: nezrozumitelny obsah je
+        # ODMIETNUTIE, nikdy vynimka, ktora by zhodila vkladanie skrinky.
+        Engine.log_error(e, 'HardwareSets.assess_set_defs') if defined?(Engine)
+        [:lossy, ['hardware_set_defs']]
       end
 
       # --- precedencia definicii (H1a, audit BLOCKER 4) ------------------------
@@ -1478,9 +1780,10 @@ module Noxun
       def mapping_types_by_set(mapping)
         out = {}
         (mapping.is_a?(Hash) ? mapping : {}).each do |key, value|
-          parsed = BuildPlan.parse_hardware_set_key(key)
-          next if parsed.nil?
-          gt = parsed[0]
+          # KOV-B1: typ nesie AJ triedny kluc (prvy segment) — inak by sa
+          # definicia setu, na ktory ukazuje, do sablony nezmrazila.
+          gt = mapping_key_type(key)
+          next if gt.nil?
           value_set_ids(value).each do |sid|
             out[sid] = out.key?(sid) && out[sid] != gt ? nil : gt
           end
@@ -2117,31 +2420,170 @@ module Noxun
 
       # PRISNA validacia JEDNEHO setu (zapisova cesta). ALL-OR-NOTHING:
       # jediny chybny clen zhodi cely set — ziadny tichy drop clenov.
-      # -> [norm|nil, errors]
+      # Spatne kompatibilna signatura: chyby su SPRAVY (Stringy).
+      # -> [norm|nil, [String]]
       def validate_set(set)
-        return [nil, ['set musí byť objekt']] unless set.is_a?(Hash)
+        norm, errors = validate_set_detailed(set)
+        [norm, errors.map { |e| e['msg'] }]
+      end
+
+      # TA ISTA validacia so STRUKTUROVANYMI chybami (kontrakt pre B3, audit
+      # #17 FIX 13): `{ 'row' => nil|index clena, 'field' => …, 'msg' => SK veta }`.
+      # Editor setu tak vie chybu ukazat PRI POLI, nielen v jednom cervenom
+      # riadku nad formularom. `row` je nil pri chybe CELEHO setu.
+      #
+      # CISTA FUNKCIA — ZIADNE IO. Pouziva ju aj zapis projektoveho snapshotu
+      # a citanie sablon, ktore cestuju medzi PC s INOU taxonomiou; clenstvo
+      # vyrobcu/rady v taxonomii sa preto overuje AZ v `save_set!` (globalna
+      # kniznica), nikdy tu.
+      # -> [norm|nil, [{row, field, msg}]]
+      def validate_set_detailed(set)
+        return [nil, [set_err(nil, 'set musí byť objekt')]] unless set.is_a?(Hash)
         s = deep_copy(stringify(set))
         sid = s['set_id'].to_s.strip
-        return [nil, ['set nemá set_id']] if sid.empty?
-        gt = s['generic_type'].to_s.strip
+        return [nil, [set_err('set_id', 'set nemá set_id')]] if sid.empty?
+
+        klass, gt, cerrors = classify(s, sid)
+        return [nil, cerrors] unless cerrors.empty?
         unless BuildPlan::GENERIC_TYPES.include?(gt)
-          return [nil, ["set „#{sid}“ má neznámy typ kovania „#{gt}“"]]
+          return [nil, [set_err('generic_type', "set „#{sid}“ má neznámy typ kovania „#{gt}“")]]
         end
+
         raw_members = s['members']
         unless raw_members.is_a?(Array) && !raw_members.empty?
-          return [nil, ["set „#{sid}“ nemá členov"]]
+          return [nil, [set_err('members', "set „#{sid}“ nemá členov")]]
         end
         errors = []
         members = raw_members.each_with_index.map do |m, i|
           norm, errs = validate_member(m, i, strict: true)
-          errors.concat(errs.map { |e| "set „#{sid}“: #{e}" })
+          errs.each { |e| errors << set_err('members', "set „#{sid}“: #{e}", row: i) }
           norm
         end
         return [nil, errors] unless errors.empty?
-        [{ 'set_id' => sid,
-           'name' => (s['name'].to_s.strip.empty? ? sid : s['name'].to_s.strip),
-           'generic_type' => gt,
-           'members' => members }, []]
+
+        name = s['name'].to_s.strip.empty? ? sid : s['name'].to_s.strip
+        [build_set(sid, name, gt, klass, read_active(s['active']), members), []]
+      end
+
+      def set_err(field, msg, row: nil)
+        { 'row' => row, 'field' => field, 'msg' => msg }
+      end
+
+      # Normalizovany set v PEVNOM poradi klucov (SET_KEY_ORDER). Klasifikacne
+      # kluce su pritomne LEN pri klasifikovanom sete, `series` len ked ma
+      # hodnotu, `active` len ked je `false` (sparse).
+      def build_set(sid, name, gt, klass, active, members)
+        out = { 'set_id' => sid, 'name' => name, 'generic_type' => gt }
+        CLASS_KEYS.each { |k| out[k] = klass[k] if klass.key?(k) }
+        out['active'] = false if active == false
+        out['members'] = members
+        out
+      end
+
+      # `active` je SPARSE (audit #17 FIX 7): default je „aktivny", uklada sa
+      # LEN `false`. Citanie zachova presne `false` (aj ako string z rucne
+      # upraveneho suboru); cokolvek ine = kluc chyba.
+      # -> false | nil
+      def read_active(raw)
+        return false if raw == false || raw.to_s.strip.downcase == 'false'
+
+        nil
+      end
+
+      # Je set KLASIFIKOVANY? (aspon jeden klasifikacny kluc s hodnotou)
+      def classified?(set)
+        return false unless set.is_a?(Hash)
+
+        CLASS_KEYS.any? { |k| !set[k].to_s.strip.empty? }
+      end
+
+      # === JEDNA AUTORITA PRAVIDIEL KLASIFIKACIE (zapis aj citanie) ===========
+      #
+      # Klasifikacia je ALL-OR-NOTHING: bud UPLNE CHYBA (legacy „nezaradeny"
+      # set — sprava sa presne ako pred KOV-B1), alebo je UPLNA a kontextovo
+      # platna. Ciastocny tvar je CHYBA, nie „rozrobene": polovicna
+      # klasifikacia by v editore vyzerala ako hotove zaradenie.
+      #
+      # `generic_type` je pri klasifikovanom sete ODVODENY (`USE_TYPE_GENERIC`):
+      # chybajuci sa DOPLNI, nesediaci je CHYBA. Pri `use_type: 'other'` mapa
+      # neexistuje, takze typ musi prist explicitne.
+      # -> [klasifikacia Hash, generic_type String, errors]
+      def classify(s, sid)
+        gt = s['generic_type'].to_s.strip
+        return [{}, gt, []] unless classified?(s)
+
+        errors = []
+        out = {}
+        ut = s['use_type'].to_s.strip
+        unless USE_TYPES.include?(ut)
+          errors << set_err('use_type', "set „#{sid}“ má neznámy typ použitia „#{ut}“")
+        end
+        om = s['opening_mode'].to_s.strip
+        unless OPENING_MODES.include?(om)
+          errors << set_err('opening_mode', "set „#{sid}“ má neznámy spôsob otvárania „#{om}“")
+        end
+        dc = s['drawer_construction'].to_s.strip
+        if ut == 'drawer'
+          if dc.empty?
+            errors << set_err('drawer_construction', "set „#{sid}“: pri zásuvke treba uviesť konštrukciu")
+          elsif !DRAWER_CONSTRUCTIONS.include?(dc)
+            errors << set_err('drawer_construction', "set „#{sid}“ má neznámu konštrukciu zásuvky „#{dc}“")
+          end
+        elsif !dc.empty?
+          errors << set_err('drawer_construction',
+                            "set „#{sid}“: konštrukciu zásuvky má len set na zásuvky")
+        end
+        man = s['manufacturer']
+        if !man.is_a?(String) || man.strip.empty?
+          errors << set_err('manufacturer', "set „#{sid}“ nemá výrobcu")
+        end
+        ser = s['series']
+        if !ser.nil? && !ser.is_a?(String)
+          errors << set_err('series', "set „#{sid}“ má neplatnú produktovú radu")
+        end
+
+        gt, gerrors = classified_generic_type(sid, ut, gt)
+        errors.concat(gerrors)
+        return [{}, gt, errors] unless errors.empty?
+
+        out['use_type'] = ut
+        out['opening_mode'] = om
+        out['drawer_construction'] = dc if ut == 'drawer'
+        out['manufacturer'] = man.strip
+        # VOLITELNA rada (vedoma odchylka od mockupu, ktory ju ukazuje ako
+        # povinnu): podperky, klzaky ani „Bystrica" ziadnu radu nemaju a
+        # vynutena rada by do taxonomie priniesla vymyslene mena. Prazdna
+        # hodnota = kluc sa NEUKLADA (B3 ju ukaze ako „— bez rady —").
+        st = ser.to_s.strip
+        out['series'] = st unless st.empty?
+        [out, gt, []]
+      end
+
+      # `generic_type` klasifikovaneho setu: odvodeny z `use_type` (mimo `other`).
+      # -> [generic_type, errors]
+      def classified_generic_type(sid, use_type, gt)
+        derived = USE_TYPE_GENERIC[use_type]
+        if derived.nil?
+          # `use_type: 'other'` (alebo neznamy — ten uz ma vlastnu chybu):
+          # typ kovania musi prist explicitne, mapa preň neexistuje.
+          return [gt, []] unless use_type == 'other' && gt.empty?
+
+          return [gt, [set_err('generic_type',
+                               "set „#{sid}“: pri type použitia „iné“ treba vybrať typ kovania")]]
+        end
+        return [derived, []] if gt.empty? || gt == derived
+
+        [gt, [set_err('generic_type',
+                      "typ použitia „#{use_type_sk(use_type)}“ znamená typ kovania " \
+                      "„#{derived}“ — set má „#{gt}“")]]
+      end
+
+      # SK nazvy typov pouzitia — LEN pre hlasky servera (UI si ich sklada B3).
+      USE_TYPE_SK = { 'door' => 'dvierka', 'drawer' => 'zásuvka', 'lift' => 'výklop',
+                      'fall' => 'sklop', 'other' => 'iné' }.freeze
+
+      def use_type_sk(use_type)
+        USE_TYPE_SK[use_type.to_s] || use_type.to_s
       end
 
       # PRISNA validacia pola setov. Duplicitne set_id = chyba (v citacej ceste
@@ -2314,11 +2756,33 @@ module Noxun
             next nil
           end
           seen[sid] = true
-          { 'set_id' => sid,
-            'name' => (s['name'].to_s.strip.empty? ? sid : s['name'].to_s.strip),
-            'generic_type' => gt,
-            'members' => members }
+          build_set(sid,
+                    (s['name'].to_s.strip.empty? ? sid : s['name'].to_s.strip),
+                    gt, read_set_classification(s, sid), read_active(s['active']), members)
         end
+      end
+
+      # KOV-B1 — KLASIFIKACIA V CITACEJ CESTE (tolerantna).
+      #
+      # Cita sa CELA alebo VOBEC: neuplny blok, neznama hodnota enumu alebo
+      # nesulad s kanonickou mapou zahodi CELU klasifikaciu a set sa cita ako
+      # „nezaradeny". `generic_type` sa pritom NIKDY nemeni — EXPANZIA (a teda
+      # nakup) je od klasifikacie uplne nezavisla, takze poskodeny klasifikacny
+      # blok NESMIE zmenit ani jeden objednany kod.
+      #
+      # Tichy orez to NEROBI: stratu zachyti 4. vrstva detektora
+      # (`classification_lost?`) a kniznica/snapshot/sablona skoncia ako
+      # read-only / `:invalid` / odmietnute, nikdy ako „precitane v poriadku".
+      def read_set_classification(s, sid)
+        return {} unless classified?(s)
+
+        klass, gt, errors = classify(s, sid)
+        # Aj ked su pravidla splnene, ODVODENY typ sa musi zhodovat s ULOZENYM
+        # — inak by set po zapise zmenil typ kovania (a s nim aj nakup).
+        return klass if errors.empty? && gt == s['generic_type'].to_s.strip
+
+        log_skip("set „#{sid}“: klasifikácia nečitateľná — číta sa ako nezaradený")
+        {}
       end
 
       def normalize_members(members)
@@ -2342,6 +2806,26 @@ module Noxun
         out = {}
         errors = []
         mapping.each do |key, value|
+          # KOV-B1: TRIEDNY kluc sa rozpozna PRED `parse_hardware_set_key` —
+          # ten by ho odmietol ako neplatny (`class:slide|tipon` nie je
+          # generic_type). Prijimaju ho VSETKY mapy: globalna, projektovy
+          # snapshot aj cabinet override (`allow_owner` sa ho netyka —
+          # vyber na urovni dielca ma vlastny tvar a v triednom kluci je zakazany).
+          if class_mapping_key?(key)
+            canon, cerr = parse_class_key(key)
+            if canon.nil?
+              errors << "mapovanie „#{key}“: #{cerr}"
+              next
+            end
+            status, norm, refs = parse_mapping_value(value)
+            if status != :ok
+              errors << "mapovanie „#{key}“: #{norm}"
+              next
+            end
+            next if ids && refs.any? { |sid| !ids.include?(sid) }
+            out[canon] = norm
+            next
+          end
           parsed = BuildPlan.parse_hardware_set_key(key)
           if parsed.nil?
             errors << "mapovanie „#{key}“ má neplatný kľúč"

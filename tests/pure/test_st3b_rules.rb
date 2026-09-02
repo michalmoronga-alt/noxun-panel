@@ -1319,10 +1319,19 @@ NxTest.test('ŠT-3b-2c1 (review NOTE 2): nazvy kovania su JEDNA pravda (server =
   NxTest.assert(!map.empty?, 'klientska mapa sa nasla')
   # Ta ista hlaska o tom istom pravidle chodi raz z klienta (`rdValidate`) a raz
   # zo servera (`rules_problems`) — dva nazvy pre jednu vec su chyba.
-  %w[leg hinge slide handle shelf_pin connector wall_hanger].each do |gt|
+  # KOV-B1: zoznam sa NEOPISUJE — berie sa slovnik BuildPlan, takze kazdy novy
+  # typ kovania (napr. `lift`) musi dostat nazov na OBOCH stranach naraz.
+  Noxun::Engine::BuildPlan::GENERIC_TYPES.each do |gt|
     server = hr.label_for(gt)
+    NxTest.assert(server != gt, "typ `#{gt}` nema serverovy nazov (label_for vratil kluc)")
     client = map[/#{gt}\s*:\s*'([^']+)'/, 1].to_s
     NxTest.assert_equal(server, client, "nazov `#{gt}` musi byt na oboch stranach rovnaky")
+  end
+  # Tretia mapa tych istych nazvov zije v semafore (`Validation::HW_LABELS`) —
+  # aj tu musi sediet, inak by Kontrola volala jednu vec inak nez Studio.
+  Noxun::Engine::BuildPlan::GENERIC_TYPES.each do |gt|
+    NxTest.assert_equal(hr.label_for(gt), Noxun::Engine::Validation::HW_LABELS[gt],
+                        "nazov `#{gt}` musi sediet aj vo Validation::HW_LABELS")
   end
 end
 

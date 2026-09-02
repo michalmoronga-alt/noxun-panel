@@ -873,7 +873,10 @@ module Noxun
       def label_for(generic_type)
         { 'leg' => 'Nohy', 'hinge' => 'Závesy', 'slide' => 'Výsuv',
           'handle' => 'Úchytky', 'shelf_pin' => 'Podperky', 'connector' => 'Spojky',
-          'wall_hanger' => 'Zavesenie na stenu' }[generic_type.to_s] || generic_type.to_s
+          'wall_hanger' => 'Zavesenie na stenu',
+          # KOV-B1: typ existuje v slovniku BuildPlan (set sa da ulozit), ale
+          # PRAVIDLO nan zatial ziadne nie je — to prinesie KOV-E.
+          'lift' => 'Výklop / sklop' }[generic_type.to_s] || generic_type.to_s
       end
 
       def stringify(h)
