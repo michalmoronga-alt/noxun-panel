@@ -102,9 +102,13 @@ NxTest.test('ŠT-2c 2c-1: sirkove varianty karty maju styl pri svojej definicii'
   NxTest.assert(S2C1_MODAL_JS.include?('function cardCls'), 'sirka je jedno miesto v kostre')
   NxTest.assert(S2C1_MODAL_JS.include?("if (sz === 'small') sz = 'sm';"),
                 '`small` je alias `sm` — stare volania sa prepisovat nemusia')
+  # KOV-H2: styly kostry ziju v ZDIELANOM `panel.css` — kostru nacitava uz aj
+  # Inspector a dve kopie tych istych tried su dva modalove svety.
   %w[.nxmcard.sm .nxmcard.wide].each do |cls|
-    NxTest.assert(S2C1_STUDIO_HTML.include?("#{cls} { width:"),
-                  "sirka `#{cls}` je definovana v studio.html")
+    NxTest.assert(S2C1_PANEL_CSS.include?("#{cls} { width:"),
+                  "sirka `#{cls}` je definovana v zdielanom panel.css")
+    NxTest.refute(S2C1_STUDIO_HTML.include?("#{cls} { width:"),
+                  "a `studio.html` uz vlastnu kopiu `#{cls}` NEMA")
   end
 end
 
@@ -122,8 +126,10 @@ NxTest.test('ŠT-2c 2c-1 (audit #10/#11): nasepkavac vs D-15 modal') do
                 'scroll listener je v CAPTURE faze — scroll vnutri karty modalu NEBUBLA')
   NxTest.assert(S2C1_PANEL_CSS.include?('z-index: var(--nx-z-suggest, 80)'),
                 'panel.css nema vlastne cislo vrstvy — cita premennu')
-  m = S2C1_STUDIO_HTML[/--nx-z-scrim:\s*(\d+);\s*--nx-z-suggest:\s*(\d+);/]
+  m = S2C1_PANEL_CSS[/--nx-z-scrim:\s*(\d+);\s*--nx-z-suggest:\s*(\d+);/]
   NxTest.assert(!m.nil?, 'obe vrstvy su definovane na jednom mieste pri `.nxscrim`')
+  NxTest.refute(S2C1_STUDIO_HTML.include?('--nx-z-scrim:'),
+                'a `studio.html` uz vlastnu kopiu definicie vrstiev NEMA (KOV-H2)')
   NxTest.assert(Regexp.last_match(2).to_i > Regexp.last_match(1).to_i,
                 'nasepkavac je NAD scrimom (inak by bol viditelny, ale neklikatelny)')
 end

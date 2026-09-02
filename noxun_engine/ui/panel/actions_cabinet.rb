@@ -612,19 +612,28 @@ module Noxun
         def handle_apply_all(payload)
           model = Sketchup.active_model
           data = parse(payload)
+          # KOV-H2: ked apply prisiel z modalu rucnej polozky, ceka na VYSLEDOK.
+          # `nil` = bezna zmena pola, ziadny modal neceka a nic sa neposiela.
+          op = manual_op(data)
           # R-02: prepnutie dokumentu sa hlasi NAHLAS aj v auto-apply. Echo
           # `cabinet_id` sa ticho zahadzuje preto, ze presun vyberu je bezny;
           # prepnuty dokument bezny NIE JE a pouzivatel musi vediet, ze zmena,
           # ktoru prave napisal, sa NEULOZILA (inak ju najde az v objednavke).
-          return if foreign_document?(data, model, 'Zmena sa neuložila')
+          if foreign_document?(data, model, 'Zmena sa neuložila')
+            # Modal by inak ostal ZAMKNUTY navzdy (zamok odomyka VYHRADNE
+            # volajuci) — aj tichy zahod musi mat odpoved.
+            return push_manual_result(op, false, 'Zmena sa neuložila — prepol sa dokument.')
+          end
 
           cab = find_cabinet(model)
-          return if cab.nil? # auto-apply bez vyberu = ticho (ziadny modal)
+          if cab.nil? # auto-apply bez vyberu = ticho (ziadny modal)
+            return push_manual_result(op, false, 'Skrinka už nie je označená — položka sa neuložila.')
+          end
 
           echo = data['cabinet_id'].to_s
           if !echo.empty? && echo != Store.get(cab, 'cabinet_id').to_s
             Engine.log("apply_all zahodeny — echo #{echo} nesedi s vyberom #{Store.get(cab, 'cabinet_id')}")
-            return
+            return push_manual_result(op, false, 'Výber sa medzitým zmenil — skús to znova.')
           end
           params = existing_params(cab)
           PARAM_KEYS.each do |k|
@@ -639,7 +648,10 @@ module Noxun
             @last_apply_error = hm[:error]
             set_status(hm[:error], true)
             push_selected(model) # UI resync — panel sa vrati na ULOZENY stav
-            return
+            # AZ PO pushi: modal ostava otvoreny s rozpisanymi hodnotami, ale
+            # `hwManual` uz drzi ULOZENY zoznam (neuspesna zmena sa nesmie
+            # drzat). Poradie je preto kontrakt, nie nahoda.
+            return push_manual_result(op, false, hm[:error])
           end
           pf = material_preflight(params, model) # D-45: telo + chrbat + ABS remap
           if pf && pf[:error]
@@ -650,15 +662,55 @@ module Noxun
             @last_apply_error = pf[:error]
             set_status(pf[:error], true)
             push_selected(model) # UI resync (auto-apply nesmie nechat select 18 nad modelom 3)
-            return
+            return push_manual_result(op, false, pf[:error])
           end
           @last_apply_error = nil # uspesny apply pripadny stary odmietnutok maze
-          suspend_selection_sync do
-            CabinetBuilder.rebuild(model, cab, params)
-            reselect(model, cab)
+          begin
+            suspend_selection_sync do
+              CabinetBuilder.rebuild(model, cab, params)
+              reselect(model, cab)
+            end
+          rescue StandardError => e
+            # Vynimka prestavby konci v `cb` wrapperi (log + status). Bez tejto
+            # vetvy by ale modal ostal zamknuty a pouzivatel by nemal ako von.
+            push_manual_result(op, false, "Kovanie sa neuložilo — #{e.message}.")
+            raise
           end
           status_with_warnings(cab, "Prestavané — #{Store.get(cab, 'cabinet_id')} (#{part_count(cab)} dielcov).#{pf ? pf[:note] : ''}")
           push_selected(model)
+          push_manual_result(op, true, manual_ok_msg(op))
+        end
+
+        # --- KOV-H2: signal vysledku pre modal rucnej polozky ----------------
+        #
+        # Modal D-15 sa pri odoslani ZAMKNE a odomyka ho VYHRADNE volajuci
+        # (kontrakt kostry) — server mu preto musi odpovedat v KAZDEJ vetve
+        # `handle_apply_all`, aj v tej, ktora zapis ticho zahadzuje.
+        MANUAL_OPS = %w[add edit delete].freeze
+
+        # -> nil (apply prisiel z formulara) | { 'kind' =>, 'id' => }
+        def manual_op(data)
+          raw = data['manual_op']
+          return nil unless raw.is_a?(Hash)
+
+          kind = raw['kind'].to_s
+          return nil unless MANUAL_OPS.include?(kind)
+
+          { 'kind' => kind, 'id' => raw['id'].to_s }
+        end
+
+        def push_manual_result(op, ok, msg)
+          return nil if op.nil?
+
+          js("NX.hwManualResult(#{ok ? 'true' : 'false'}, #{msg.to_s.to_json}, #{op.to_json})")
+          nil
+        end
+
+        MANUAL_OK_MSGS = { 'add' => 'Položka pridaná.', 'edit' => 'Položka upravená.',
+                           'delete' => 'Položka odstránená.' }.freeze
+
+        def manual_ok_msg(op)
+          MANUAL_OK_MSGS[op['kind'].to_s].to_s
         end
 
       end

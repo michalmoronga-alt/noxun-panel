@@ -33,6 +33,10 @@ S1C2_SHELL_JS  = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', '
                            encoding: 'UTF-8')
 S1C2_STUDIO_HTML = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio.html'),
                              encoding: 'UTF-8')
+# KOV-H2: styl kostry sa presunul zo `studio.html` do ZDIELANEHO `panel.css`
+# (kostru nacitava uz aj Inspector). Guard sa pyta na TO ISTE, len na inom mieste.
+S1C2_PANEL_CSS = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'css', 'panel.css'),
+                           encoding: 'UTF-8')
 
 # --- 1) `offer` je SEKCIA a jej zrkadla sedia --------------------------------
 
@@ -152,8 +156,8 @@ NxTest.test('ŠT-1c B2: D-15 kostra je ZDIELANY komponent (vzor edge_menu.js)') 
   %w[mhead mbody mfoot nxscrim].each do |cls|
     NxTest.assert(S1C2_MODAL_JS.include?("class=\"#{cls}\"") || S1C2_MODAL_JS.include?("\"#{cls}"),
                   "kostra nesie cast `#{cls}` (mockup)")
-    NxTest.assert(S1C2_STUDIO_HTML.include?(".#{cls} "),
-                  "a ma k nej styl v studio.html")
+    NxTest.assert(S1C2_PANEL_CSS.include?(".#{cls} "),
+                  "a ma k nej styl v zdielanom panel.css (KOV-H2: obe okna)")
   end
   # Kolizia mien: `panel.css` uz `.nxmodal` pouziva pre SCRIM starsich modalov.
   NxTest.assert(S1C2_MODAL_JS.include?('class="nxmcard'),

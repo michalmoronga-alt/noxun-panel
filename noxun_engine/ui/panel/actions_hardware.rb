@@ -210,6 +210,47 @@ module Noxun
           push_selected(model)
         end
 
+        # --- KOV-H2: hladanie v katalogu pre modal rucnej polozky ------------
+        #
+        # CITACIA cesta: ziadna operacia, ziadny zapis do modelu, ziadny krok
+        # Spat. Preto tu NIE JE guard dokumentu — nic sa nemeni a odpoved
+        # obsahuje len to, co je v katalogu (ten je globalny, nie per zakazka).
+        #
+        # PORADIE SKLADA SERVER (`HardwareCatalog.search_with_total`) — panel
+        # ho len kresli, presne ako v Studiu (kontrakt GH #100 P2). `gen` je
+        # generacia dotazu: odpovede chodia asynchronne a bez nej by pomalsie
+        # kolo prepisalo cerstvejsie vysledky.
+        #
+        # Vracia sa NAJVIAC `MANUAL_SEARCH_TOP` poloziek + `total`, aby panel
+        # vedel priznat orezanie (zasada „no silent caps"). Neaktivne polozky
+        # sa neponukaju (default `search`) — do zakazky sa nema dostat kod,
+        # ktory uz nikto neobjednava.
+        MANUAL_SEARCH_TOP = 20
+
+        def handle_hw_manual_search(payload)
+          data = parse(payload)
+          js("NX.hwManualSearchResult(#{hw_manual_search_result(data['q'], data['gen']).to_json})")
+        end
+
+        # CISTA funkcia (ziadny SketchUp objekt, ziadny dialog) — headless
+        # testovatelna. Klientovi ide LEN to, co potrebuje ponuka: kod, nazov,
+        # MJ, kategoria a ZIVA cena; nic z toho sa nikdy neuklada do configu.
+        def hw_manual_search_result(query, gen)
+          items, total = HardwareCatalog.search_with_total(HardwareCatalog.items, query.to_s,
+                                                           top: MANUAL_SEARCH_TOP)
+          { 'gen' => gen.to_i, 'total' => total.to_i,
+            'items' => Array(items).map { |i| manual_search_item(i) } }
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.hw_manual_search_result')
+          { 'gen' => gen.to_i, 'total' => 0, 'items' => [] }
+        end
+
+        def manual_search_item(item)
+          { 'code' => item['item_code'].to_s, 'name_sk' => item['name_sk'].to_s,
+            'unit' => item['unit'].to_s, 'category' => item['category'],
+            'price_eur_vat' => (item['price_eur_vat'].is_a?(Numeric) ? item['price_eur_vat'].to_f : nil) }
+        end
+
         # Hlaska po zmene setu — rozlisi skrinku a konkretny dielec (D-81).
         def hw_set_status_msg(gt, owner, sid, set_def)
           who = "#{HardwareRules.label_for(gt)}#{owner ? " pre dielec #{owner}" : ''}"
