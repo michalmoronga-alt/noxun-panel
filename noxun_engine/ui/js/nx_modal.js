@@ -70,6 +70,13 @@
     // Podla `_base` sa pri dalsom otvoreni pozna KOLIZIA (katalog zmenil tu
     // istu bunku) — tá sa pouzivatelovi UKAZE a pyta rozhodnutie.
     var MEM = {};
+    // KOV-H2 (Codex #285 P2-E): pri `lookup` su v hodnotach LEN vybrane kody,
+    // takze rozpisany dotaz BEZ vyberu by sa zatvorenim ticho stratil — a to
+    // je presne stav, v ktorom pouzivatel odchadza nieco overit. Pamat si ho
+    // preto drzi pod prilepenym sufixom; do `values()` sa NIKDY nedostane
+    // (`values` iteruje POLIA specifikacie), takze kontrakt „lookup vracia len
+    // hodnotu" plati dalej.
+    var MEM_Q = '__q';
 
     function esc(s){
       return String(s == null ? '' : s)
@@ -167,10 +174,7 @@
       var d = f || {};
       var key = esc(d.key);
       var id = 'nxm_' + key;
-      // Ked volajuci nema ulozeny popis vybraneho zaznamu, ukaze sa HODNOTA
-      // (kod). Prazdne pole nad neprazdnou hodnotou by klamalo.
-      var qval = (d.valueText == null || d.valueText === '')
-        ? (d.value == null ? '' : d.value) : d.valueText;
+      var qval = lookupInitialQuery(d);
       return '<div class="mrow mlookup" data-nxm-lkrow="' + key + '">' +
         '<label for="' + id + '_q">' + esc(d.label) + '</label>' +
         '<input id="' + id + '_q" type="text" class="mlkq" data-nxm-lkq="' + key + '"' +
@@ -184,6 +188,16 @@
         esc(lookupInitialHint(d)) + '</div>' +
         '<div class="mlklist" id="nxmlk_' + key + '" data-nxm-lklist="' + key + '"' +
         ' role="listbox"></div></div>';
+    }
+
+    // VYCHODISKOVY text pola hladania. Ked volajuci nema ulozeny popis
+    // vybraneho zaznamu, ukaze sa HODNOTA (kod) — prazdne pole nad neprazdnou
+    // hodnotou by klamalo. Je to JEDNA definicia: kresli sa z nej markup
+    // a porovnava sa proti nej pamat rozpisaneho dotazu.
+    function lookupInitialQuery(d){
+      var t = (d || {}).valueText;
+      if (t != null && t !== '') return t;
+      return (d || {}).value == null ? '' : (d || {}).value;
     }
 
     // `hint` smie byt FUNKCIA (popis vybranej polozky) alebo TEXT (staticka
@@ -1279,6 +1293,18 @@
         }
         any = true;
       });
+      // Rozpisany dotaz naseptavaca (bod P2-E vyssie). Pamata sa LEN vtedy,
+      // ked sa lisi od VYCHODISKOVEHO textu — otvorit a zavrit okno pamat
+      // nezaklada (rovnaka zasada ako pri plochych poliach).
+      ((OPEN.base && OPEN.base.fields) || []).forEach(function(f){
+        if (!f || f.type !== 'lookup') return;
+        var node = lkNode('data-nxm-lkq', f.key);
+        if (!node) return;
+        var txt = String(node.value == null ? '' : node.value);
+        if (txt === String(lookupInitialQuery(f))) return;
+        out[String(f.key) + MEM_Q] = txt;
+        any = true;
+      });
       var s = memSlot(key);
       if (!any){
         if (MEM[s] && MEM[s].key === String(key)) delete MEM[s];
@@ -1311,6 +1337,7 @@
       out.fromMemory = true;
       out.fields = (s.fields || []).map(function(f){
         if (!f || f.type === 'group') return f;
+        if (f.type === 'lookup') return withLookupMemory(f, mem);
         if (!Object.prototype.hasOwnProperty.call(mem, f.key)) return f;
         var g = shallow(f);
         // Riadky sa NEPREPISUJU cele — pamat nesie len ZMENENE bunky,
@@ -1320,6 +1347,23 @@
         return g;
       });
       return { base: s, spec: out };
+    }
+
+    // Vliatie pamate do pola `lookup` (P2-E). DVE veci naraz:
+    //   * rozpisany DOTAZ sa vrati (bez neho by sa napisany text stratil),
+    //   * ked je obnovena HODNOTA prazdna, zobrazeny text sa VYCISTI — inak by
+    //     pole vyzeralo vybrate (svietil by povodny nazov polozky), kym by
+    //     submit az potom zlyhal na „vyber polozku z katalógu".
+    function withLookupMemory(f, mem){
+      var qk = String(f.key) + MEM_Q;
+      var hasV = Object.prototype.hasOwnProperty.call(mem, f.key);
+      var hasQ = Object.prototype.hasOwnProperty.call(mem, qk);
+      if (!hasV && !hasQ) return f;
+      var g = shallow(f);
+      if (hasV) g.value = mem[f.key];
+      if (hasQ) g.valueText = mem[qk];
+      else if (String(g.value == null ? '' : g.value) === '') g.valueText = '';
+      return g;
     }
 
     // „Začať odznova" — pas z pamate ponuka CESTU VON: formular sa prekresli

@@ -175,6 +175,90 @@ function qa(sel){ return ROOT.querySelectorAll(sel); }
   ok(!global.NXModal.isOpen(), 'druhe Escape zatvori modal');
 })();
 
+// ====== 1b) PAMAT ROZPISANEHO DOTAZU (Codex #285 P2-E) ======================
+// `values()` vracia pri `lookup` LEN vybranu hodnotu, takze napisany dotaz BEZ
+// vyberu by sa zatvorenim ticho stratil — a to je presne stav, v ktorom
+// pouzivatel odchadza nieco overit. A naopak: ked pamat obnovi PRAZDNU hodnotu,
+// zobrazeny text sa musi vycistit, inak pole vyzera vybrate a submit az potom
+// zlyha.
+
+(function(){
+  const spec = function(){
+    return { title: 'Pamäť dotazu', memoryKey: 'lk:test',
+             fields: [{ key: 'code', label: 'Položka', type: 'lookup',
+                        value: '', valueText: '',
+                        search: function(){ /* nic — testujeme pamat */ } }],
+             onSubmit: function(){} };
+  };
+  global.NXModal.open(spec());
+  const qn = q('[data-nxm-lkq="code"]');
+  qn.value = 'uholnik ry';
+  dispatch(qn, 'input');
+  eq(global.NXModal.values().code, '', 'dotaz BEZ vyberu hodnotu nezaklada');
+  global.NXModal.close();
+
+  global.NXModal.open(spec());
+  eq(q('[data-nxm-lkq="code"]').value, 'uholnik ry',
+     'rozpisany dotaz sa po znovuotvoreni VRATI');
+  eq(global.NXModal.values().code, '',
+     'ale hodnota ostava prazdna — nic vybrane nebolo');
+  eq(Object.keys(global.NXModal.values()), ['code'],
+     'a pomocny kluc pamate sa do `values()` NEDOSTANE');
+  ok(textOf(ROOT).indexOf('Predvyplnené z rozpísaného konceptu') > -1,
+     'predvyplnenie z pamate je VIDNO (pohodlie nesmie byt pasca)');
+  global.NXModal.clearMemory('lk:test');
+  global.NXModal.close();
+
+  // UPRAVA existujucej polozky: pamat obnovi PRAZDNU hodnotu -> zobrazeny text
+  // sa musi vycistit, inak pole klame.
+  const editSpec = function(){
+    return { title: 'Úprava', memoryKey: 'lk:edit',
+             fields: [{ key: 'code', label: 'Položka', type: 'lookup',
+                        value: '93240', valueText: '93240 · Bystrica',
+                        search: function(){} }],
+             onSubmit: function(){} };
+  };
+  global.NXModal.open(editSpec());
+  eq(q('[data-nxm-lkq="code"]').value, '93240 · Bystrica', 'uprava predvyplni popis polozky');
+  const q2 = q('[data-nxm-lkq="code"]');
+  q2.value = 'ine';                       // pisanie zahodi vyber
+  dispatch(q2, 'input');
+  eq(global.NXModal.values().code, '', 'pisanie vyber zahodilo');
+  global.NXModal.close();
+
+  global.NXModal.open(editSpec());
+  eq(global.NXModal.values().code, '', 'pamat obnovila PRAZDNU hodnotu');
+  eq(q('[data-nxm-lkq="code"]').value, 'ine',
+     'a v poli je ROZPISANY dotaz — nikdy povodny nazov polozky');
+  ok(q('[data-nxm-lkq="code"]').value.indexOf('Bystrica') === -1,
+     'pole nesmie vyzerat vybrate, kym vybrane nie je');
+  global.NXModal.clearMemory('lk:edit');
+  global.NXModal.close();
+
+  // HRANICNY STAV: pouzivatel prepise pole SPAT na povodny text. Dotaz sa vtedy
+  // od vychodiskoveho nelisi (pamat ho nedrzi), ale HODNOTA je uz prazdna —
+  // bez vycistenia by pole ukazovalo nazov polozky nad prazdnym kodom a submit
+  // by zlyhal az potom.
+  global.NXModal.open(editSpec());
+  const q3 = q('[data-nxm-lkq="code"]');
+  q3.value = '93240 · Bystrica';          // ten isty text, ale cez `input`
+  dispatch(q3, 'input');                  // -> skryta hodnota sa zahodi
+  eq(global.NXModal.values().code, '', 'pisanie vyber zahodilo aj pri zhodnom texte');
+  global.NXModal.close();
+
+  global.NXModal.open(editSpec());
+  eq(global.NXModal.values().code, '', 'pamat obnovila prazdnu hodnotu');
+  eq(q('[data-nxm-lkq="code"]').value, '',
+     'a pole je PRAZDNE — nikdy nazov polozky nad prazdnym kodom');
+  global.NXModal.clearMemory('lk:edit');
+  global.NXModal.close();
+
+  // Otvorit a zavrit BEZ pisania pamat nezaklada (zasada kostry).
+  global.NXModal.open(spec());
+  global.NXModal.close();
+  eq(global.NXModal.memory('lk:test'), null, 'bez pisania sa pamat nezaklada');
+})();
+
 // ===================== 2) POLIA MODALU + validacia ===========================
 
 (function(){
