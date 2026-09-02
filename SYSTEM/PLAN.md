@@ -194,7 +194,7 @@ Poradie slices: **0 (D-52 ✅) → A1 ✅ → A2 (A2a ✅ · A2b AKTUÁLNA) → 
 Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-only), implementuje subagent v worktree, brány podľa CLAUDE.md.
 
 - **KOV-A2 · TASK PACKAGE „ČELÁ — KARTA, NÁHĽAD A OVERLAY SMEROV" (slice A, rez A2; štart po merge A1):**
-  **A2a HOTOVÁ (PR #NNN, v0.9.16)** — karta čela (typegrid · smer · otváranie · klasifikácia zásuvky), badge „smer?", serverový `front_slots`, symboly náhľadu
+  **A2a HOTOVÁ (PR #281, v0.9.16)** — karta čela (typegrid · smer · otváranie · klasifikácia zásuvky), badge „smer?", serverový `front_slots`, symboly náhľadu
   a overenie RED riadku v Kontrole. **Zostáva A2b:** overlay „Smer otvárania" v modeli — modul `direction_check` (vzor `grain_check`, FIX 12), jeden serverový toggle
   + **broadcast do oboch UI** (rail Inspectora + lišta Kontroly Štúdia = jeden stav), odpojenie pri zmene dokumentu, sken len pri zapnutí/dirty, **in-SU beh povinný**
   (výkon na ~254 dielcoch, undo/redo bez kroku, fallback bez Overlay API, duplicate-ID per inštancia). Otvorené z A2a: **deep-link „klik na RED nález otvorí Inspector

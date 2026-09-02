@@ -29,7 +29,7 @@ identické** (golden charakterizácia). **Pozor:** model uložený od v0.9.15 u�
 **Blok 1b uzavretý až na D-51** (čaká na Michalove hodnoty) · **1c hotový** ([AUDIT_REGISTER.md](AUDIT_REGISTER.md)) · **1d beží** (hotové R-06/R-08/R-01+04/R-34/R-02(b)/R-03/R-07/R-23.1/R-11/R-12/R-14; ďalej R-18 + zvyšok; R-13 čaká na Michala).
 **1e HOTOVÁ.** **Blok KOVANIE beží (od 2.9.):** architektúra V1 uzavretá po cross-audite + O1–O3 ([zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md](zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md)),
 mockup schválený ([zdroje/ui20/mockup_kovanie_v1.html](zdroje/ui20/mockup_kovanie_v1.html)), packages v [PLAN.md](PLAN.md); **D-52 UPDATER KOMPLET (v0.9.14)**.
-**KOV-A1 HOTOVÁ** (PR #280, v0.9.15 — dátová vrstva čiel) a **KOV-A2a HOTOVÁ** (PR #NNN, v0.9.16 — karta čela, badge, náhľad symbolov); **ďalšia je KOV-A2b** —
+**KOV-A1 HOTOVÁ** (PR #280, v0.9.15 — dátová vrstva čiel) a **KOV-A2a HOTOVÁ** (PR #281, v0.9.16 — karta čela, badge, náhľad symbolov); **ďalšia je KOV-A2b** —
 overlay „Smer otvárania" v modeli (modul `direction_check`, dva prepínače = jeden stav, in-SU beh povinný).
 **Od 2.9. večer bez Fable** — orchestruje Opus, review Codex; vstupný bod je [zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md](zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md) + tento súbor; packages všetkých slices sú v PLAN. **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
@@ -41,7 +41,7 @@ Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` (KO
 
 ## Posledné uzávery
 
-- **KOV-A2a — typ čela sa vyberá PIKTOGRAMOM a smer otvárania sa dá konečne nastaviť** (v0.9.16, 3.9.2026, PR #NNN): klik na názov typu v riadku otvorí **kartu čela**
+- **KOV-A2a — typ čela sa vyberá PIKTOGRAMOM a smer otvárania sa dá konečne nastaviť** (v0.9.16, 3.9.2026, PR #281): klik na názov typu v riadku otvorí **kartu čela**
   priamo pod ním — šesť dlaždíc typu (Dvierka · Zásuvka · Výklop · Sklop · Blenda · Bez čela) a pod nimi len to, čo dáva zmysel: **Smer** (Ľavé · Neurčené · Pravé),
   **Otváranie** (Klasické · Tip-On), pri zásuvke **Konštrukcia** a **Štandardná/Vnútorná**. Dvojkrídlo sa na smer nepýta (je odvodený), 3/4-krídlové len na **stredné**
   krídla. Neurčený smer má v riadku badge **„smer?"**; **stará zákazka nič nedostane** — nikde sa nič nepredvolí. Náhľad kreslí **prerušované symboly** (šipka na voľnú

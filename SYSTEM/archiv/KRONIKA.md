@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **KOV-A2a · ČELÁ — KARTA ČELA A NÁHĽAD (PR #NNN, v0.9.16, 3.9.2026):** UI polovica slice A (package KOV-A2 sa vedome režal na **A2a karta** + **A2b overlay**, aby PR
+- **KOV-A2a · ČELÁ — KARTA ČELA A NÁHĽAD (PR #281, v0.9.16, 3.9.2026):** UI polovica slice A (package KOV-A2 sa vedome režal na **A2a karta** + **A2b overlay**, aby PR
   ostalo malé a bez in-SU povinnosti). **Rozbaľovačka typu `select.ftype` ZANIKLA** — typ žije v `dataset.frontType` (vzor D-90 `profile`) a vyberá sa **typegridom šiestich
   piktogramov** v **karte čela** `.fcard`. Karta je **tretí potomok stĺpca `.frow`** (za `.fmain` a `.fhw`), teda **priamo pod svojím riadkom** — *vedomá odchýlka od mockupu*,
   kde je samostatným blokom pod zoznamom: kontext ostáva pri riadku a v skupine nepribudne trvalý blok (vertikálny priestor je vzácny). Otvorená je **najviac jedna** a drží sa cez

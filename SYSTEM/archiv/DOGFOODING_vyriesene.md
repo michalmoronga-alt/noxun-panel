@@ -4,7 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
-- **Výklop ako samostatný typ čela** *(bez D-čísla)* — typ je v paneli **voliteľný** (typegrid piktogramov v karte čela) — vyriešené 3.9.2026, KOV-A1 PR #280 + KOV-A2a PR #NNN, v0.9.16
+- **Výklop ako samostatný typ čela** *(bez D-čísla)* — typ je v paneli **voliteľný** (typegrid piktogramov v karte čela) — vyriešené 3.9.2026, KOV-A1 PR #280 + KOV-A2a PR #281, v0.9.16
 - **D-52** — Aktualizovať jedným klikom (updater) — vyriešené 3.9.2026, PR #277 + #278 + #279, v0.9.14
 > **Presunuté zo živého zápisníka [../DOGFOODING.md](../DOGFOODING.md) 26.8.2026** (dávka
 > Docs cleanup B): index aj plné texty žijú od tejto dávky na jednom mieste — v tomto súbore.
@@ -97,7 +97,7 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené (plné texty)
 
-### Výklop ako samostatný typ čela *(bez D-čísla — vzišlo z kontraktu UI 2.0, otvorené dávkou UI-C3 19.8.2026)* (vyriešené 3.9.2026, dávky KOV-A1 PR #280 · KOV-A2a PR #NNN, v0.9.15 → v0.9.16)
+### Výklop ako samostatný typ čela *(bez D-čísla — vzišlo z kontraktu UI 2.0, otvorené dávkou UI-C3 19.8.2026)* (vyriešené 3.9.2026, dávky KOV-A1 PR #280 · KOV-A2a PR #281, v0.9.15 → v0.9.16)
 
 **Pôvodný postreh:** kontrakt UI 2.0 žiada výklop v ponuke typov čela. UI-C3 ho tam dala **len ako neaktívnu voľbu s vysvetlením**, lebo rola `flap` (kanonická
 v STANDARD §2.4, ale nikde nepoužitá) potrebovala vlastnú cestu cez **builder, ABS pravidlá, kusovník a VEPO** — to je zmena dátového kontraktu, teda vlastná dávka
