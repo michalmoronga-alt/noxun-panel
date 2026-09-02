@@ -106,7 +106,10 @@ module Noxun
         'side_left' => [AXES_UPRIGHT], 'side_right' => [AXES_UPRIGHT], 'divider_v' => [AXES_UPRIGHT],
         'bottom' => [AXES_LYING], 'top' => [AXES_LYING], 'shelf' => [AXES_LYING],
         'divider_h' => [AXES_LYING], 'free_panel' => [AXES_LYING],
+        # KOV-A1: flap (vyklop/sklop) a false_front (blenda) stoja v rovine ciel
+        # s rovnakou matematikou ako zasuvkove celo -> ROVNAKE osi.
         'front_door' => [AXES_FRONT], 'drawer_front' => [AXES_FRONT],
+        'flap' => [AXES_FRONT], 'false_front' => [AXES_FRONT],
         'back' => [AXES_WALL], 'plinth' => [AXES_WALL],
         'rail_front' => [AXES_LYING, AXES_WALL], 'rail_back' => [AXES_LYING, AXES_WALL]
       }.freeze

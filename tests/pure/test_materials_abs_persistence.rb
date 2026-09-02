@@ -307,6 +307,10 @@ NxTest.test('abs_rules: seed pravidla — ZAMOK presnej mapy VSETKYCH roli (D-30
   expected = {
     'front_door'   => { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 },
     'drawer_front' => { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 },
+    # KOV-A1: vyklop/sklop (flap) a blenda (false_front) su cela -> 4 hrany 1,0
+    # ako dvierka (SEED_VERSION 3).
+    'flap'         => { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 },
+    'false_front'  => { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 },
     'shelf'        => { 'L1' => 1.0 },
     'side_left'    => { 'L1' => 1.0 },
     'side_right'   => { 'L1' => 1.0 },
@@ -323,7 +327,7 @@ NxTest.test('abs_rules: seed pravidla — ZAMOK presnej mapy VSETKYCH roli (D-30
   NxTest.assert_equal(expected, rules::SEED_RULES, 'SEED_RULES sa lisia od zamknutej mapy')
   NxTest.assert_equal(expected, rules.load, 'cerstvy subor musi vratit presne seed mapu')
   # Funkcny pohlad cez thicknesses_for (rovnake skupiny ako mapa vyssie).
-  %w[front_door drawer_front].each do |role|
+  %w[front_door drawer_front flap false_front].each do |role|
     th = rules.thicknesses_for(role)
     NxTest.assert_equal(%w[L1 L2 W1 W2], th.keys.sort, "rola #{role}")
     th.each_value { |v| NxTest.assert_close(1.0, v) }

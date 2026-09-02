@@ -1247,7 +1247,9 @@ module Noxun
         'shelf' => 'Polica', 'divider_v' => 'Zvislá priečka', 'divider_h' => 'Vodorovná priečka',
         'rail_front' => 'Výstuha predná', 'rail_back' => 'Výstuha zadná',
         'plinth' => 'Sokel', 'front_door' => 'Dvierka', 'drawer_front' => 'Čelo zásuvky',
-        'free_panel' => 'Voľná doska'
+        'free_panel' => 'Voľná doska',
+        # KOV-A1: vyklop aj sklop nesie rola `flap` (typ rozlisuje karta cela).
+        'flap' => 'Výklop', 'false_front' => 'Blenda'
       }.freeze
 
       def role_label(role)

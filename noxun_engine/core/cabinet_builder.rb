@@ -58,7 +58,15 @@ module Noxun
       # rozsireni whitelistu configu o pole, ktoreho TICHA STRATA by poskodila
       # vyrobu (nove pole konstrukcie, novy typ cela, nova rola). Cisto
       # odvodene/kozmeticke pole bump nevyzaduje.
-      CONFIG_SCHEMA = 1
+      #
+      # HISTORIA:
+      #   1 = R-12 (zavedenie markera, 1d)
+      #   2 = KOV-A1 — nove typy cela (`lift`/`fall`/`blind` -> roly flap /
+      #       false_front) a nove polia polozky (`direction`, `wing_directions`,
+      #       `opening_mode`, `drawer`). Ticha strata ktorehokolvek z nich by
+      #       zmenila VYROBU (dielec by zmizol) alebo by zahodila smer, ktory
+      #       pouzivatel vedome urcil — presne pripad z disciliny bumpu.
+      CONFIG_SCHEMA = 2
 
       MIN = { width: 200.0, height: 200.0, depth: 150.0 }.freeze
       # D-45: povoleny rozsah hrubky korpusu (mm) — JEDINY zdroj pravdy pre clamp
@@ -80,6 +88,9 @@ module Noxun
         'back'         => 'Noxun/Chrbát',
         'front_door'   => 'Noxun/Čelá',
         'drawer_front' => 'Noxun/Čelá',
+        # KOV-A1: vyklop/sklop (rola flap) a blenda (false_front) su tiez cela.
+        'flap'         => 'Noxun/Čelá',
+        'false_front'  => 'Noxun/Čelá',
         'shelf'        => 'Noxun/Vnútro',
         'divider_v'    => 'Noxun/Vnútro',
         'divider_h'    => 'Noxun/Vnútro'
@@ -825,7 +836,9 @@ module Noxun
         # Ostatne dielce vyzaduju presnu zhodu s konstrukcnou hrubkou.
         def thickness_ok_for?(role, want, have)
           case role.to_s
-          when 'front_door', 'drawer_front'
+          # KOV-A1: flap/false_front su cela ako kazde ine — beru katalogovu
+          # hrubku sveho materialu (18 / 18,6 / 19 mm).
+          when 'front_door', 'drawer_front', 'flap', 'false_front'
             thickness_in_range?(have) || (have - want).abs < 0.05
           else
             (have - want).abs < 0.05
@@ -1012,7 +1025,7 @@ module Noxun
         # pd[:material] (:front/:korpus) z Construction je sekundarny signal (cela maju :front).
         def base_material_for(role, mat_sym, eff_body, eff_front, eff_back)
           case role.to_s
-          when 'front_door', 'drawer_front' then eff_front
+          when 'front_door', 'drawer_front', 'flap', 'false_front' then eff_front
           when 'back' then eff_back
           else mat_sym == :front ? eff_front : eff_body
           end
@@ -1417,7 +1430,7 @@ module Noxun
         # Cela maju hrubku v osi Y. Ak katalog hovori 18/19 mm, upravime box,
         # polohu pred korpusom aj vyrobny udaj naraz.
         def materialized_part(pd, resolved)
-          return pd unless %w[front_door drawer_front].include?(pd[:role].to_s)
+          return pd unless %w[front_door drawer_front flap false_front].include?(pd[:role].to_s)
           th = resolved[:sheet_thickness].to_f
           return pd unless th.positive?
 

@@ -41,7 +41,9 @@ module Noxun
       # Tolerancia zmestenia na platnu (mm) — Length konverzie + rezerva rezu.
       DIM_TOL = 0.1
 
-      FRONT_ROLES = %w[front_door drawer_front].freeze
+      # KOV-A1: + flap (vyklop/sklop) a false_front (blenda) — ORANGE „celo bez
+      # ABS" a hrubkove pravidlo ciel platia aj pre ne.
+      FRONT_ROLES = %w[front_door drawer_front flap false_front].freeze
       PANEL_ROLE  = 'free_panel'
       EDGE_CODES  = %w[L1 L2 W1 W2].freeze
 

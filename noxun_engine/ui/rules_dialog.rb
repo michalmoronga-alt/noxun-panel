@@ -37,9 +37,10 @@ module Noxun
       # ŠT-3b-2a: poradie rol v read-only prehlade ABS pravidiel (korpus -> cela).
       # Poradie hashu z disku by sa menilo s kazdym seed-merge, takze ho urcuje
       # SERVER; rola z novsej verzie sa NEZAMLCI — pripoji sa na koniec.
+      # KOV-A1: flap/false_front hned za drawer_front — cela drzia pokope.
       ABS_ROLE_ORDER = %w[side_left side_right top bottom shelf divider_v divider_h
                           back rail_front rail_back plinth front_door drawer_front
-                          free_panel].freeze
+                          flap false_front free_panel].freeze
 
       # Strop zoznamu rucnych zasahov (F15). „Použiť na podobné" vie vyrobit
       # desiatky riadkov naraz — nekonecny zoznam by zo sekcie spravil vypis.

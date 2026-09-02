@@ -3,9 +3,14 @@
 # Cela stoja PRED korpusom (zaporne Y), delene na vysku, poradie ODSPODU nahor (F1 dole).
 # Rezim polozky: 'fixed' (pevna vyska) alebo 'auto' (rovnomerne si rozdelia zvysok).
 # 'locked' = fixed, ktore sa nemeni pri auto prepocte (priznak pre UI a buduci auto-fit).
-# Typy riadkov: 'door' / 'drawer_front' / 'none' (D-18 „Bez cela" — riadok drzi vysku
-# v rade ako celo, ale panel sa NEgeneruje = otvorena nika; POZOR: structured
-# items[].type 'none' != legacy STRING config fronts='none', ktory znamena ziadne cela).
+# Typy riadkov: 'door' / 'drawer_front' / 'lift' / 'fall' / 'blind' / 'none'
+# (D-18 „Bez cela" — riadok drzi vysku v rade ako celo, ale panel sa NEgeneruje =
+# otvorena nika; POZOR: structured items[].type 'none' != legacy STRING config
+# fronts='none', ktory znamena ziadne cela).
+# KOV-A1: 'lift' (vyklop) a 'fall' (sklop) -> rola `flap`; 'blind' (blenda) ->
+# rola `false_front`. Oba maju ROVNAKU panelovu matematiku ako zasuvkove celo
+# (1 panel cez cely otvor, wings_n 1). UI ich spristupni az KOV-A2 — dovtedy
+# vznikaju len cez config/API, ale kontrakt, builder aj vystupy ich uz poznaju.
 # Cisto vypoctovy modul (mm Float) — vrati hotove deskriptory dielcov (box/origin/material).
 module Noxun
   module Engine
@@ -28,6 +33,44 @@ module Noxun
       # Pod BuildPlan::MIN_DIM uz panel neexistuje -> tvrdy raise (profil bez
       # panelu nesmie ticho prejst ako dnesne degeneraty).
       MIN_PROFILE_PANEL = 70.0
+
+      # --- KOV-A1: kontrakt typov a smerovych poli ----------------------------
+      #
+      # TYPY riadku. `lift`/`fall`/`blind` pribudli v KOV-A1; neznamy typ sa
+      # (ako doteraz) sklopi na 'door' — config z novsej verzie tak nespadne,
+      # len sa zobrazi konzervativne.
+      TYPES = %w[door drawer_front lift fall blind none].freeze
+      # Typy s rolou `flap` (jeden panel, smer vyklapania nesie `flap_dir`).
+      FLAP_TYPES = %w[lift fall].freeze
+      # Typy, ktore NEMAJU uchytkovy profil (D-90 profilove pravidlo pozna len
+      # dvierka a zasuvkove celo — profil na vyklope by vyrobil falosny
+      # `profile_rule_missing`; profil na pohyblivych celach je KOV-E/F).
+      PROFILELESS_TYPES = %w[none lift fall blind].freeze
+      # Smer otvarania = STRANA PANTOV (Michal 3.9.2026): 'left' = panty vlavo.
+      # TROJSTAV (audit #14 BLOCKER 1): kluc CHYBA = legacy (ziadny nalez, NIKDY
+      # sa nedoplna) · 'unset' = pouzivatel vedome nechal neurcene (RED) ·
+      # 'left'/'right' = vyriesene. `unset` vznika VYHRADNE pouzivatelskou
+      # akciou (KOV-A2) alebo z POSKODENEJ hodnoty (fail-visible, nizsie).
+      DIRECTIONS = %w[left right unset].freeze
+      # 3/4-kridlove dvierka (audit #14 BLOCKER 2, Michal 3.9. — variant a):
+      # KRAJNE kridla su ODVODENE (p1 = panty vlavo, posledne = panty vpravo,
+      # nic sa neuklada), STREDNE maju vlastny trojstav. p2 plati pri 3 aj 4
+      # kridlach, p3 len pri 4; ine kluce sa zahadzuju.
+      WING_DIRECTION_KEYS = %w[p2 p3].freeze
+      # Sposob otvarania. Chybajuci kluc = legacy (citatelia neskor = classic);
+      # NEPLATNA hodnota -> kluc PREC (na rozdiel od smeru tu ziadny „neurcene"
+      # stav neexistuje, takze nie je co priznavat).
+      OPENING_MODES = %w[classic tipon].freeze
+      # Klasifikacia zasuvky (audit #14 BLOCKER 4). Chybajuci kluc = stav
+      # „neklasifikovane" — NIKDY sa nedoplna `metal`+`standard`. Pod-polia sa
+      # whitelistuju NEZAVISLE; hash bez jedineho platneho pod-pola -> kluc prec.
+      DRAWER_CONSTRUCTIONS = %w[metal wood other].freeze
+      DRAWER_VARIANTS      = %w[standard internal].freeze
+      # Polia, ktore su DORMANT (audit #14 BLOCKER 3): v configu sa drzia VZDY
+      # bez ohladu na aktualny typ a pocet kridiel, takze po navrate na
+      # dvierka/1 kridlo sa ulozena hodnota obnovi. Aplikovatelnost urcuje
+      # VYHRADNE `direction_slots` z efektivneho `wings_n`.
+      DORMANT_KEYS = %w[direction wing_directions opening_mode drawer].freeze
 
       module_function
 
@@ -69,7 +112,7 @@ module Noxun
           panels = panels_for(it, idx, gs, opening_w, z, h, gap)
           total_wings += panels.size if it['type'] == 'door'
           parts.concat(panels)
-          resolved << {
+          res = {
             'id' => it['id'] || "F#{idx}", 'type' => it['type'], 'mode' => it['mode'],
             'height' => h.round(2), 'locked' => !!it['locked'], 'wings' => it['wings'],
             'wings_n' => (it['type'] == 'door' ? panels.size : 1), # D-07: efektivny pocet kridiel pre nahlad
@@ -77,9 +120,62 @@ module Noxun
             'profile' => it['profile'] || FrontProfiles::NONE,
             'z' => z.round(2)
           }
+          # KOV-A1 (audit #14 FIX 6): `front_items` je SIESTA projekcia configu —
+          # cache v ulozenom configu, ktoru cita nahlad, `human_label` aj
+          # `Bom.collect`. Nove polia musia prejst aj tadiaj, ale VYHRADNE ako
+          # pass-through: co v polozke NIE JE, sa tu NEVYMYSLI.
+          DORMANT_KEYS.each { |k| res[k] = it[k] if it.key?(k) }
+          # `flap_dir` je ODVODENY z typu (nie je to default smeru dvierok —
+          # trojstav O1 sa tyka STRANY PANTOV, toto je smer vyklapania).
+          res['flap_dir'] = (it['type'] == 'fall' ? 'down' : 'up') if FLAP_TYPES.include?(it['type'])
+          resolved << res
           z += h + gap
         end
         { parts: parts, items: resolved, wings: total_wings, warnings: warnings }
+      end
+
+      # --- KOV-A1: JEDINA definicia „kde sa smer pyta" ------------------------
+      #
+      # Vstup je RESOLVED polozka cela (`front_items`, teda vystup `layout`),
+      # NIE surova polozka configu — aplikovatelnost rozhoduje EFEKTIVNY pocet
+      # kridiel `wings_n` (auto okolo 600 mm), nie surove `wings` (audit #14
+      # BLOCKER 3). Vracia zoznam slotov:
+      #   [{ wing: 'single'|'p2'|'p3', part_key: String, state: nil|'unset'|'left'|'right' }]
+      # kde `state` nil = LEGACY (pole v configu vobec nie je -> ZIADNY nalez).
+      #
+      # Pravidlo (Michal 3.9.2026, variant a):
+      #   1 kridlo  -> jeden slot `single` so scalarnym `direction`
+      #   2 kridla  -> [] (odvodene: lave = panty vlavo, prave = panty vpravo)
+      #   3 kridla  -> stredne kridlo p2
+      #   4 kridla  -> stredne kridla p2 a p3
+      #   ne-dvierka (zasuvka, vyklop, sklop, blenda, „Bez cela") -> []
+      #
+      # CISTA funkcia (ziadne IO) — citaju ju `Bom.collect` (A1), overlay aj
+      # karta cela (A2). Nikde inde sa o aplikovatelnosti smeru NEROZHODUJE.
+      # Neznamy/chybajuci `wings_n` (velmi stary ulozeny config) = 0 -> [],
+      # cize legacy zakazka nikdy nedostane nalez z tejto cesty.
+      def direction_slots(item)
+        return [] unless item.is_a?(Hash) && item['type'].to_s == 'door'
+        front_id = item['id'].to_s
+        case item['wings_n'].to_i
+        when 1
+          [{ wing: 'single', part_key: PartKeys.front(front_id, 'wing', 'single'),
+             state: item['direction'] }]
+        when 3
+          [wing_direction_slot(front_id, 'p2', item)]
+        when 4
+          [wing_direction_slot(front_id, 'p2', item), wing_direction_slot(front_id, 'p3', item)]
+        else
+          []
+        end
+      end
+
+      # Slot STREDNEHO kridla — stav zije v `wing_directions`, nie v scalarnom
+      # `direction` (ten pri viackridlovych dvierkach ostava dormant a NECITA sa).
+      def wing_direction_slot(front_id, wing, item)
+        wd = item['wing_directions']
+        { wing: wing, part_key: PartKeys.front(front_id, 'wing', wing),
+          state: (wd.is_a?(Hash) ? wd[wing] : nil) }
       end
 
       # D-90: kontrola vysky panelu POD profilom (po vypocte realnej vysky riadku).
@@ -111,7 +207,8 @@ module Noxun
         (f - f.round).abs < 0.05 ? f.round.to_s : format('%.1f', f).tr('.', ',')
       end
 
-      # Panely jedneho cela. drawer_front = 1 panel; door = 1..4 kridla podla wings (D-24).
+      # Panely jedneho cela. drawer_front / lift / fall / blind = 1 panel;
+      # door = 1..4 kridla podla wings (D-24).
       # D-07: medzera medzi kridlami = cfg gap (predtym natvrdo GAP_DEFAULT).
       # D-24 IDENTITA (audit blocker): suffix recykluje SketchUp definiciu a tvori
       # part_id (cabinet_builder add_part); part_key nesie overridy a kovanie.
@@ -140,6 +237,17 @@ module Noxun
         if item['type'] == 'drawer_front'
           [box_desc("DRW-#{idx}", PartKeys.front(front_id, 'panel'),
                     'drawer_front', "Zasuvkove celo #{idx}", gs, opening_w, z, ph,
+                    profile: prof, profile_band: band)]
+        elsif FLAP_TYPES.include?(item['type'])
+          # KOV-A1 (audit #14 BLOCKER 5): vyklop aj sklop maju KANONICKY kluc
+          # `front:F#/flap` — `front:F#/panel` by kolidoval so zasuvkovym celom
+          # a override by po prepnuti typu ticho preskocil na iny dielec.
+          [box_desc("FLAP-#{idx}", PartKeys.front(front_id, 'flap'),
+                    'flap', "#{item['type'] == 'fall' ? 'Sklop' : 'Výklop'} #{idx}",
+                    gs, opening_w, z, ph, profile: prof, profile_band: band)]
+        elsif item['type'] == 'blind'
+          [box_desc("BLIND-#{idx}", PartKeys.front(front_id, 'blind'),
+                    'false_front', "Blenda #{idx}", gs, opening_w, z, ph,
                     profile: prof, profile_band: band)]
         else
           wings = resolve_wings(item['wings'], opening_w)
@@ -310,7 +418,7 @@ module Noxun
           used_ids[front_id] = true
 
           type = (it['type'] || it[:type]).to_s
-          type = 'door' unless %w[door drawer_front none].include?(type) # D-18: + none
+          type = 'door' unless TYPES.include?(type) # D-18: + none; KOV-A1: + lift/fall/blind
           hraw = it['height'] || it[:height]
           has_h = !(hraw.nil? || hraw.to_s.strip.empty?)
           mode = (it['mode'] || it[:mode]).to_s
@@ -322,8 +430,11 @@ module Noxun
           # ziadna migracia); neznamu hodnotu (aj z novsej verzie) normalize
           # sklopi na 'none'. Riadok "Bez cela" profil nema — nie je na com.
           profile = FrontProfiles.normalize(it['profile'] || it[:profile])
-          profile = FrontProfiles::NONE if type == 'none'
-          {
+          # KOV-A1 (vedomy limit): profil ma zmysel len na dvierkach a zasuvke —
+          # D-90 profilove pravidlo ine roly nepozna a `profile_rule_missing` by
+          # hlasil chybu, ktora nie je chybou pouzivatela.
+          profile = FrontProfiles::NONE if PROFILELESS_TYPES.include?(type)
+          out = {
             'id' => front_id,
             'type' => type,
             'mode' => mode,
@@ -332,7 +443,73 @@ module Noxun
             'wings' => (type == 'door' ? wings : 1),
             'profile' => profile
           }
+          # KOV-A1 DORMANT polia: kluc sa do vystupu dostane LEN ked ho vstup
+          # naozaj nesie v platnom tvare — chybajuci kluc sa NIKDY nedoplna
+          # (inak by legacy zakazka dostala RED smerovy nalez, ktory si nikto
+          # nevypytal). Drzia sa BEZ OHLADU na typ riadku: prepnutie dvierok na
+          # zasuvku a spat nesmie ulozeny smer zahodit.
+          dir = norm_direction(it['direction'] || it[:direction])
+          out['direction'] = dir if dir
+          wdir = norm_wing_directions(it['wing_directions'] || it[:wing_directions])
+          out['wing_directions'] = wdir if wdir
+          om = norm_enum(it['opening_mode'] || it[:opening_mode], OPENING_MODES)
+          out['opening_mode'] = om if om
+          drw = norm_drawer(it['drawer'] || it[:drawer])
+          out['drawer'] = drw if drw
+          out
         end
+      end
+
+      # --- KOV-A1: normalizacia smerovych a klasifikacnych poli ---------------
+
+      # Smer otvarania (strana pantov) ako TROJSTAV. Vracia nil = „kluc sa do
+      # configu vobec nedostane" (legacy), inak 'left'/'right'/'unset'.
+      #   nil / prazdny retazec  -> nil  (legacy; TOTO je jedina cesta, ako sa
+      #                                   pole moze stratit — a je vedoma)
+      #   'left' / 'right'       -> hodnota
+      #   iny NEPRAZDNY STRING   -> 'unset' (FAIL-VISIBLE: poskodena hodnota,
+      #                             hodnota z novsej verzie ci preklep sa PRIZNA
+      #                             ako neurcene, nikdy sa NEHADA strana)
+      #   iny TYP (cislo, true, pole) -> nil — nie je to smer a nikdy nim nebol;
+      #                             materializovat z neho `unset` by vyrobilo
+      #                             RED nalez z poskodeneho suboru bez informacie.
+      def norm_direction(raw)
+        return nil unless raw.is_a?(String)
+        v = raw.strip
+        return nil if v.empty?
+        DIRECTIONS.include?(v) ? v : 'unset'
+      end
+
+      # Smery STREDNYCH kridiel 3/4-kridlovych dvierok. Povolene kluce su LEN
+      # p2/p3; prazdny vysledok = kluc sa do configu nedostane.
+      def norm_wing_directions(raw)
+        return nil unless raw.is_a?(Hash)
+        out = {}
+        WING_DIRECTION_KEYS.each do |k|
+          v = norm_direction(raw[k] || raw[k.to_sym])
+          out[k] = v if v
+        end
+        out.empty? ? nil : out
+      end
+
+      # Klasifikacia zasuvky. Pod-polia su NEZAVISLE (samotna konstrukcia bez
+      # variantu je platny stav); hash bez jedineho platneho pod-pola -> nil.
+      def norm_drawer(raw)
+        return nil unless raw.is_a?(Hash)
+        out = {}
+        c = norm_enum(raw['construction'] || raw[:construction], DRAWER_CONSTRUCTIONS)
+        out['construction'] = c if c
+        v = norm_enum(raw['variant'] || raw[:variant], DRAWER_VARIANTS)
+        out['variant'] = v if v
+        out.empty? ? nil : out
+      end
+
+      # Uzavrety zoznam hodnot: mimo zoznamu (aj prazdne/iny typ) -> nil = kluc
+      # sa do configu nedostane. ZIADNY default sa nedoplna.
+      def norm_enum(raw, allowed)
+        return nil unless raw.is_a?(String)
+        v = raw.strip
+        allowed.include?(v) ? v : nil
       end
 
       # Legacy V0.1/V0.2a: door_mode none/1/2/auto -> 1 door celo auto vyska (alebo ziadne).
