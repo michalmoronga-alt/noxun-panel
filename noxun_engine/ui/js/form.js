@@ -1034,9 +1034,12 @@
     if (hw) hw.style.display = (sel.value === 'none') ? 'none' : '';
     // D-90: „Bez čela" nemá na čom profil držať — indikátor zmizne a stav sa
     // zhodí na 'none' (rovnako to robí Ruby normalize; UI sa mu nesmie rozísť).
+    // KOV-A1 (Codex #280 P2-D): to isté platí pre výklop, sklop aj blendu —
+    // zoznam je JEDEN (`PROFILELESS_FRONT_TYPES` v core.js, zrkadlo servera),
+    // nie druhá podmienka, ktorá by sa časom rozišla.
     var pb = row.querySelector('.fprof');
     if (pb){
-      var off = (sel.value === 'none');
+      var off = frontProfileless(sel.value);
       pb.style.visibility = off ? 'hidden' : 'visible';
       if (off && row.dataset.frontProfile !== 'none'){
         row.dataset.frontProfile = 'none';

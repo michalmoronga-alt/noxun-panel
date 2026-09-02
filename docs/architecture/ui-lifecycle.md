@@ -649,12 +649,18 @@ a smery sa tu zámerne nemenia — to je KOV-A2**; táto oprava rieši výhradne
 ### Úchytky = D-96 (form.js refreshFrontProfileUI / onFrontProfilePick + čisté funkcie v core.js)
 
 profil sa už **necyklí ikonou v riadku** (pri viacerých profiloch a budúcej voľbe hrany osadenia by to bolo nepoužiteľné) — nastavuje sa v skupine pre **ROZSAH** (`all` / `door` /
-`drawer_front`). Čisté funkcie: `frontProfileScopeItems` (typ `none` do rozsahu NIKDY nepatrí — rovnako to robí Ruby normalize) · `frontProfileCommon` → `'<id>'` | `''` (prázdny
+`drawer_front`). Čisté funkcie: `frontProfileScopeItems` (**profileless typy do rozsahu NIKDY nepatria — ani v „všetky"**) · `frontProfileCommon` → `'<id>'` | `''` (prázdny
 rozsah) | `null` (rôzne → **disabled** voľba „(rôzne)", nikdy tichý výber) · `frontProfileStateText` (veta „UKW-7: F1, F2 · bez profilu: F3"). Zápis ide do **tých istých dát**
 (`row.dataset.frontProfile`) a ďalej `collectFronts` → `apply_all`, takže server ostáva autoritou a nepribudlo žiadne nové pole ani callback. Aktivita sekcie závisí **výhradne od
 obsahu rozsahu**, NIE od `selectedCabId` — `refreshFrontProfileUI` beží z `renderFronts`, teda ešte pred tým, než `loadSelected` nastaví identitu.
 
 **Hrana osadenia sa neponúka**, kým ju registry (`core/front_profiles.rb`) nepozná.
+
+**KOV-A1 — profileless typy (Codex #280 P2-D).** Zoznam čiel, ktoré úchytkový profil mať NEMÔŽU, žije v `core.js` ako **`PROFILELESS_FRONT_TYPES`** (`none`, `lift`, `fall`,
+`blind`) + predikát `frontProfileless(type)` — je to **zrkadlo servera** (`Fronts::PROFILELESS_TYPES`) a Ruby guard v `tests/pure/test_kova1_cela.rb` stráži, že sa zoznamy
+nerozídu. Používajú ho **všetci traja**: `frontProfileScopeItems` (rozsah), `frontProfileStateText` (veta stavu — inak by hlásila „bez profilu: F2" o výklope) a
+`onFrontTypeChange` vo `form.js` (skryje indikátor a zhodí `dataset.frontProfile` na `'none'`). Bez zrkadla by UI ponúklo UKW profil na výklope, spustilo prestavbu a Ruby
+`normalize` by voľbu **ticho zahodilo** — používateľ by videl nastavenie, ktoré sa nikdy nikde neprejaví.
 
 ### N26 medzery jantárovo (preview.js)
 

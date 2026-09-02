@@ -608,6 +608,28 @@ module NxTest
     assert_equal(allow.sort, found, 'literal `unset` mimo allowlistu')
   end
 
+  test('KOV-A1 GUARD: klientsky PROFILELESS_FRONT_TYPES sedi s Fronts::PROFILELESS_TYPES') do
+    # Codex #280 P2-D: klient rozhoduje, ci vobec PONUKNE uchytkovy profil.
+    # Ked sa zoznamy rozidu, UI ponukne nastavenie, ktore server ticho zahodi
+    # (normalize sklopi profil na 'none') — pouzivatel by videl volbu bez ucinku.
+    # Vzor guardu: MD_CLIENT_SCHEMA v test_guards.rb.
+    js = NxKovA1.src('ui/js/core.js')
+    raw = js[/PROFILELESS_FRONT_TYPES\s*=\s*\[([^\]]*)\]/, 1]
+    refute(raw.nil?, 'PROFILELESS_FRONT_TYPES sa v core.js nenasla')
+    client = raw.scan(/'([^']+)'/).flatten
+    assert_equal(K::F::PROFILELESS_TYPES, client,
+                 "klientsky zoznam #{client.inspect} nesedi so serverom " \
+                 "#{K::F::PROFILELESS_TYPES.inspect} — pri novom type bumpni OBA")
+    # Jeden zdroj: obe miesta, ktore o profile rozhoduju, idu cez predikat.
+    assert(js.include?('function frontProfileless(type)'), 'predikat zije na jednom mieste')
+    assert(js.include?('if (!it || frontProfileless(it.type)) return false;'),
+           'frontProfileScopeItems vynechava profileless typy vo VSETKYCH rozsahoch')
+    assert(js.include?('return it && !frontProfileless(it.type);'),
+           'veta stavu ma TEN ISTY filter (inak by hlasila „bez profilu" o vyklope)')
+    assert(NxKovA1.src('ui/js/form.js').include?('var off = frontProfileless(sel.value);'),
+           'form.js pouziva ten isty zoznam, nie vlastnu podmienku')
+  end
+
   test('KOV-A1 GUARD: nahlad popisuje kazdy typ vlastnym slovom (P2-C)') do
     js = NxKovA1.src('ui/js/preview.js')
     assert(js.include?('var PV_FRONT_TYPE_DESC = {'), 'popisy typov ziju na JEDNOM mieste')

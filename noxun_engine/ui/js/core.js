@@ -52,12 +52,20 @@
     });
     return out;
   }
+  // KOV-A1 (Codex #280 P2-D): typy cela, ktore uchytkovy profil NEMAJU —
+  // ZRKADLO servera (`Fronts::PROFILELESS_TYPES`). Bez zrkadla by UI ponukalo
+  // UKW profil aj na vyklope/sklope/blende, spustilo prestavbu a Ruby by volbu
+  // TICHO zahodilo (normalize ich sklopi na 'none') — pouzivatel by videl
+  // nastavenie, ktore sa nikdy nikde neprejavi. Ruby guard v
+  // `tests/pure/test_kova1_cela.rb` strazi, ze sa zoznamy NEROZIDU.
+  var PROFILELESS_FRONT_TYPES = ['none', 'lift', 'fall', 'blind'];
+  function frontProfileless(type){ return PROFILELESS_FRONT_TYPES.indexOf(type) >= 0; }
   // Cela, ktorych sa rozsah tyka. scope = 'all' | 'door' | 'drawer_front'.
-  // „Bez čela" (type 'none') NIKDY — nema na com profil drzat (rovnako to
-  // robi Ruby normalize, ktora mu profil zhodi na 'none').
+  // Profileless typy sa VYNECHAVAJU vo VSETKYCH rozsahoch (aj v „všetky") —
+  // rovnako to robi Ruby normalize.
   function frontProfileScopeItems(items, scope){
     return (items || []).filter(function(it){
-      if (!it || it.type === 'none') return false;
+      if (!it || frontProfileless(it.type)) return false;
       return scope === 'all' || it.type === scope;
     });
   }
@@ -77,7 +85,9 @@
   // Veta do skupiny Uchytky — co je NASADENE (nie co sa chysta).
   // items = [{ label:'F1', type, profile }] v DATOVOM poradi; reg = registry.
   function frontProfileStateText(items, reg){
-    var list = (items || []).filter(function(it){ return it && it.type !== 'none'; });
+    // KOV-A1 (P2-D): TEN ISTY filter ako `frontProfileScopeItems` — inak by veta
+    // stavu tvrdila „bez profilu: F2" o čele, ktoré profil mať ani nemôže.
+    var list = (items || []).filter(function(it){ return it && !frontProfileless(it.type); });
     if (!list.length) return 'Skrinka zatiaľ nemá čelá, na ktorých by profil sedel.';
     var order = [], byId = {};
     list.forEach(function(it){
@@ -760,6 +770,8 @@
       frontProfileOptionList: frontProfileOptionList,
       collectFrontHwBuy: collectFrontHwBuy,
       frontProfileScopeItems: frontProfileScopeItems,
+      // KOV-A1 (P2-D): zrkadlo Fronts::PROFILELESS_TYPES + jeho predikat
+      PROFILELESS_FRONT_TYPES: PROFILELESS_FRONT_TYPES, frontProfileless: frontProfileless,
       frontProfileCommon: frontProfileCommon,
       frontProfileStateText: frontProfileStateText,
       // D-100 (tests/js/test_d100_nazvy.js) — zrkadlo ocistenia nazvu skrinky
