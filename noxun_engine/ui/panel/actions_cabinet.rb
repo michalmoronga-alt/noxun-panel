@@ -643,6 +643,10 @@ module Noxun
           # KOV-H1: ad-hoc kovanie ide TOU ISTOU cestou ako cela (audit #15
           # BLOCKER 1: ziadny novy zapisovy kanal — `collectAll` -> `apply_all`
           # -> `normalize` -> rebuild = 1 krok Spat, guardy, R-12).
+          # Nazov mazanej polozky sa cita PRED preflightom — ten uz `params`
+          # prepise ODOSLANYM zoznamom a zaznam by v nom nebol. Status musi
+          # povedat, CO sa odstranilo (mazanie ide bez potvrdzovacieho okna).
+          removed = manual_removed_label(params, op)
           hm = manual_preflight(params, data)
           if hm && hm[:error]
             @last_apply_error = hm[:error]
@@ -678,7 +682,7 @@ module Noxun
           end
           status_with_warnings(cab, "Prestavané — #{Store.get(cab, 'cabinet_id')} (#{part_count(cab)} dielcov).#{pf ? pf[:note] : ''}")
           push_selected(model)
-          push_manual_result(op, true, manual_ok_msg(op))
+          push_manual_result(op, true, manual_ok_msg(op, removed))
         end
 
         # --- KOV-H2: signal vysledku pre modal rucnej polozky ----------------
@@ -709,8 +713,26 @@ module Noxun
         MANUAL_OK_MSGS = { 'add' => 'Položka pridaná.', 'edit' => 'Položka upravená.',
                            'delete' => 'Položka odstránená.' }.freeze
 
-        def manual_ok_msg(op)
+        def manual_ok_msg(op, removed = nil)
+          return "Odstránená ručná položka „#{removed}“." if removed
+
           MANUAL_OK_MSGS[op['kind'].to_s].to_s
+        end
+
+        # Nazov mazanej polozky z ULOZENEHO zoznamu (CISTA funkcia). Volna
+        # polozka ma nazov, katalogova moze mat len kod — a ked nie je ani ten,
+        # vrati sa nil a plati vseobecna hlaska (nikdy sa nic nevymysla).
+        def manual_removed_label(params, op)
+          return nil unless op.is_a?(Hash) && op['kind'] == 'delete'
+
+          rec = Array(params['hardware_manual']).find do |r|
+            r.is_a?(Hash) && r['id'].to_s == op['id'].to_s
+          end
+          return nil unless rec.is_a?(Hash)
+
+          name = rec['name'].to_s.strip
+          name = rec['code'].to_s.strip if name.empty?
+          name.empty? ? nil : name
         end
 
       end

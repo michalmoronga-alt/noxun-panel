@@ -1300,5 +1300,12 @@
       hwManualItemText: hwManualItemText, hwManualDraft: hwManualDraft,
       hwManualFields: hwManualFields, hwManualHit: hwManualHit,
       hwManualValidate: hwManualValidate, hwManualParsePrice: hwManualParsePrice,
-      hwManualRecord: hwManualRecord, hwManualNextList: hwManualNextList };
+      hwManualRecord: hwManualRecord, hwManualNextList: hwManualNextList,
+      // CELY tok modalu (mini-DOM): otvorenie -> hladanie -> odoslanie ->
+      // odpoved servera. Testovat ho po castiach by znamenalo napisat si vlastnu
+      // kopiu toku a overovat kopiu, nie produkt.
+      hwManualOpen: hwManualOpen, hwManualSubmit: hwManualSubmit,
+      hwManualSearchResult: hwManualSearchResult, hwManualCtxSwitch: hwManualCtxSwitch,
+      onHwManualResult: onHwManualResult, onHwManualDel: onHwManualDel,
+      onHwManualEdit: onHwManualEdit, onHwManualAdd: onHwManualAdd };
   }
