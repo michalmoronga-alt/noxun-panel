@@ -17,3 +17,5 @@
 **Otvorené pre Michala (nie blokery):** hmotnostné prahy závesov (tabuľka výrobcu — KOV-F), PDF follow-up z #10 (nie sú V1 blokery), Disk súbory `výpočet quadro V6 EB 23.xlsx` + StrongMax datasheety (pre KOV-C dáta). Súvisí: KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md, SYSTEM/STAV.md, skill codex-po-pr, CLAUDE.md Git workflow.
 
 **Packages (všetky v SYSTEM/PLAN.md, 2.9. večer):** D-52 (+revízia po Codex audite, rez a/b) · KOV-A · KOV-B · KOV-H · KOV-C (C1/C2) · KOV-D · KOV-E · KOV-F · KOV-G · KOV-I. Dáta receptov: checkpoint #13. Pre-committed brána smeru: AUDIT_REGISTER R-39.
+
+**AKTUALIZÁCIA 3.9.2026:** Michal rozhodol B2 = variant a (krajné krídla odvodené, stredné `unset` → RED). Package KOV-A prepísaný na **KOV-A1** (dátová vrstva) + **KOV-A2** (karta + overlay) v `SYSTEM/PLAN.md`; **A1 je v implementácii** (subagent, vetva `feat/kov-a1-cela-data`, PR podľa `codex-po-pr`). Po merge A1 → A2 → B ‖ H → C → D.

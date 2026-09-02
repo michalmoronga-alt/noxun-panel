@@ -30,12 +30,12 @@ vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 **Blok 1b uzavretý až na D-51** (čaká na Michalove hodnoty) · **1c hotový** ([AUDIT_REGISTER.md](AUDIT_REGISTER.md)) · **1d beží** (hotové R-06/R-08/R-01+04/R-34/R-02(b)/R-03/R-07/R-23.1/R-11/R-12/R-14; ďalej R-18 + zvyšok; R-13 čaká na Michala).
 **1e HOTOVÁ** — posledný package KOVANIE vznikol 2.9. **Blok KOVANIE ŠTARTOVAL (2.9.):** architektúra V1 uzavretá po cross-audite (Codex/GLM/Opus) + reconcile + O1–O3
 ([zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md](zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md)), mockup schválený
-([zdroje/ui20/mockup_kovanie_v1.html](zdroje/ui20/mockup_kovanie_v1.html)), packages KOV-A/B/H v [PLAN.md](PLAN.md); **D-52 UPDATER JE KOMPLET (v0.9.14)** — D-52a #277 (jadro) · D-52b1 #278 · D-52b2 #279 (UI, apply s bariérou); in-SU 1297/0; tvrdý predpoklad prvého schema bumpu SPLNENÝ → **KOV-A štartuje** (Codex audit návrhu beží).
+([zdroje/ui20/mockup_kovanie_v1.html](zdroje/ui20/mockup_kovanie_v1.html)), packages KOV-A/B/H v [PLAN.md](PLAN.md); **D-52 UPDATER JE KOMPLET (v0.9.14)** — D-52a #277 (jadro) · D-52b1 #278 · D-52b2 #279 (UI, apply s bariérou); in-SU 1297/0; → **KOV-A: audit HOTOVÝ (#14), Michal rozhodol 3/4 krídla (variant a), rez A1/A2 — A1 v implementácii.**
 **Od 2.9. večer bez Fable** — orchestruje Opus, review Codex; vstupný bod je [zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md](zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md) + tento súbor; packages všetkých slices sú v PLAN. **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
 
-**Poradie (Michal 2.9.: „poradie je na tebe"):** ~~D-52a~~ → ~~D-52b1/b2~~ (v maine) → **KOV-A** (čelá — dátová vrstva; audit → implementácia) → **KOV-A** čelá dátová vrstva
+**Poradie (Michal 2.9.: „poradie je na tebe"):** ~~D-52a~~ → ~~D-52b1/b2~~ (v maine) → **KOV-A1** (čelá — dátová vrstva; v implementácii) → **KOV-A2** (karta čela + overlay smerov)
 → **KOV-B** katalóg+sety (paralelne **KOV-H** ad-hoc) → **KOV-C** context_for + recepty + odvodené dielce → **KOV-D** resolver + zámky + brány → E/F/G/I. Súbežne 1d podľa kapacity.
 Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` (KOV-A/B/C/D/H povinné) → subagent vo worktree → `codex-po-pr` → merge → uzáver. V1 checklist v [V1_VIZIA.md](V1_VIZIA.md).
 

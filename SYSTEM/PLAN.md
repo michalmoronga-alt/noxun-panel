@@ -189,43 +189,103 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 (po cross-audite Codex/GLM/Opus + reconcile + rozhodnutia O1–O3) · **UX referencia:** [zdroje/ui20/mockup_kovanie_v1.html](zdroje/ui20/mockup_kovanie_v1.html)
 (schválený 2.9.) · vendor dáta: checkpoint #10 · detail fill: checkpoint #11. Otvorené postrehy D-109/D-110/D-111 sú v packages nižšie
 (D-109 mechanika = R-05 po V1, výsledok cez KOV-G). **Predpoklad prvého schema bumpu: D-52 updater** (blok 6 — štartovaný 2.9.).
-Poradie slices: **0 (D-52) → A → B → H → C → D → E → F → G → I**; C a D dostanú package po sonde Démos (kit vs atomic) a fixtures.
+Poradie slices: **0 (D-52 ✅) → A1 → A2 → B → H → C → D → E → F → G → I** (KOV-A rezaná po Codex audite #14 na A1 dátová vrstva / A2 UI+overlay; otázka 3/4 krídel rozhodnutá Michalom 3.9. — variant a); C a D dostanú package po sonde Démos (kit vs atomic) a fixtures.
 Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-only), implementuje subagent v worktree, brány podľa CLAUDE.md.
 
-- **KOV-A · TASK PACKAGE „ČELÁ — DÁTOVÁ VRSTVA A KLASIFIKÁCIA" (slice A; štart po D-52):**
-  **Cieľ:** čelo pozná svoj typ (dvierka · zásuvkové · výklop · sklop · blenda), spôsob otvárania, smer dvierok a klasifikáciu zásuvky;
-  výklop a blenda sa dajú postaviť; smery vidno v modeli; Neurčený smer je RED nález. **Kovanie, nákup ani ceny sa touto dávkou NEMENIA** —
-  výstupy existujúcich zákaziek sú CONTENT-identické (jediný nový nález je smer).
-  **Scope IN:** `fronts.rb` items[] — `type` rozšírený o `lift` · `fall` · `blind` (existujúce `door`/`drawer_front`/`none` nemenné);
-  polia **scopované per typ** (FINAL §2): `opening_mode` (`classic`|`tipon`) na pohyblivých, `direction` (`left`|`right`|`unset`) len na jednokrídlových
-  dvierkach (2 krídla = odvodené Ľ+P, neukladá sa), `drawer` blok = VÝHRADNE klasifikácia `{construction: metal|wood|other, variant: standard|internal}`
-  (systém/osi = KOV-D); polia sa pri prepnutí typu **držia** (dormant, vzor `migrate_overrides`) a `normalize_items` ich nikdy nezahodí — `prune_*`
-  overridov kovania sa v A nemení (zjednotenie pravidla pamäte = KOV-D). Roly: lift/fall → `flap` (+`flap_dir`), blind → `false_front`;
-  `cabinet_builder` ich stavia ako panel čela (rovnaký box), tag Čelá, **`thickness_ok_for?` + `materialized_part` rozšírené o `flap`/`false_front`**
-  (Opus F-5a — inak 19 mm čelný materiál zhodí stavbu); ABS default pre obe roly = ako dvierka (4 hrany 1,0). **5 uzavretých ciest round-trip**
-  (`normalize_items` · `config_to_params` · `normalize` · `cabinet_config` · `template_config_from`) + JS `collectFronts` + **CONFIG_SCHEMA bump** (R-12).
-  **Nový aditívny kľúč zberu `hardware_issues`** v `Bom.collect` (`{code, severity, cabinet_id, part_key, message}`; jediný čitateľ `Validation.run`) —
-  v A nesie len `front_direction_unset` → **RED bez brány (O1)**; KOV-D ho rozšíri o hard konflikty + brány. Brána smeru je **pre-committed**:
-  riadok do AUDIT_REGISTER „pristane s prvým direction-consuming výstupom (D-95)". **Overlay „Smer otvárania"** (modul `direction_check`, vzor
-  `grain_check`: prerušované `>` `<` `∧` `∨`, blenda plné X, žiadny zápis/undo; prepínač v raile Inspectora + lište Kontroly Štúdia, jeden stav).
-  **UI Inspector podľa mockupu scéna 1:** zoznam čiel s badge `smer?`, karta čela = typegrid piktogramov (5 nových sprite ikon) + kontextové riadky
-  (smer segrow s ⚠ Neurčené · otváranie · konštrukcia · štandardná/vnútorná); náhľad kreslí symboly smerov; existujúce riadky kovania ostávajú ako dnes
-  (set podľa otvárania príde s D — hint v karte). Dvojkrídlo: smer neponúka. **Žiadny default smeru nikde** (ani preview) — O1 podmienka.
-  **Scope OUT:** resolver, sety, recepty, `lift` generic type a kovanie výklopov (KOV-E), zmena závesov podľa Tip-On (KOV-F), ad-hoc (KOV-H),
-  exportné brány, D-111 sokel, heuristika smeru z kontextu.
-  **Audit: ÁNO** (config kontrakt + schema bump + nové roly + nový kľúč zberu).
-  **Testy a DoD:** headless — round-trip všetkých 5 ciest pre každé nové pole (matica typ × pole), legacy config → defaulty, `hardware_issues`
-  vzniká len pre jednokrídlo `unset`, charakterizácia: existujúce fixtures + **reálny .skp korpus** (KLINIKA-typ) dajú CONTENT-identický kusovník/VEPO/
-  nákup pred a po; JS — `collectFronts` round-trip, show/hide matica karty (5 typov × riadky), žiadny default smeru v kóde (guard grep);
-  **in-SU povinné** — stavba výklop/blenda + rebuild + Ctrl+Z, šablóna uložiť/vložiť s výklopom (polia prežijú), kópia `*3`, overlay bez undo kroku,
-  hrúbka 19 mm na flap/blende sa postaví. Mutácie min. 3 (pole vypadne z jednej cesty · default smeru · overlay zapisuje).
-  **Riziká:** tichá strata poľa v jednej z 5 ciest (preto matica) · hrúbkový kontrakt · výkon overlayu pri veľkej zákazke (merať) · ikony sprite.
-  **Smoke pre Michala:** vlož skrinku → F2 prepni na Výklop a F3 na Blendu (postavia sa, náhľad ukáže ∧ a X) · jednokrídlové dvierka = badge `smer?`,
-  Kontrola RED, **nákupný CSV aj rozpočet prejdú** · nastav Ľavé → nález zmizne, overlay v modeli kreslí `>` prerušovane · Tip-On prepni (zatiaľ
-  informatívne) · ulož šablónu s výklopom a vlož ju · kópia ×3 · otvor zákazku KLINIKA → kusovník/nákup/VEPO čísla identické ako pred aktualizáciou.
-  **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `docs/architecture/construction.md` (fronts, roly), `outputs.md`
-  (`hardware_issues`), `ui-lifecycle.md` (karta čela, overlay), `UI_DIZAJN.md` (ikony) na mieste → AUDIT_REGISTER riadok brány smeru →
-  STAV/KRONIKA/PLAN.
+- **KOV-A1 · TASK PACKAGE „ČELÁ — DÁTOVÁ VRSTVA" (slice A, rez A1 po Codex audite #14; štart 3.9.2026 — D-52 je v maine):**
+  **Cieľ:** config čela pozná typ (dvierka · zásuvkové · výklop · sklop · blenda), spôsob otvárania, smer dvierok (= **strana pántov**, Michal 3.9.) a klasifikáciu
+  zásuvky; výklop, sklop a blenda sa **dajú postaviť** (cez config/API — UI ich sprístupní A2); neurčený smer je **RED nález bez brány** (O1, R-39).
+  **Kovanie, nákup, ceny ani VEPO existujúcich zákaziek sa NEMENIA** — výstupy sú CONTENT-identické (golden charakterizácia z mainu).
+  **Rozhodnutia auditu #14 (záväzné, plné znenie v [zdroje/next_sessions/KOVANIE_KOVA_AUDIT_2026-09-03_14.md](zdroje/next_sessions/KOVANIE_KOVA_AUDIT_2026-09-03_14.md)):**
+  **(B1) trojstav smeru** — kľúč `direction` chýba = legacy (žiadny nález, NIKDY sa nedopĺňa) · `unset` = explicitne neurčené = RED · `left`/`right` = vyriešené.
+  `unset` vzniká len používateľskou akciou (A2); jediná ne-používateľská cesta je **poškodená hodnota** (neznámy neprázdny string → `unset`, fail-visible; nil/'' → kľúč sa
+  zahodí = legacy). Guard test prehľadá Ruby aj JS: žiadny fallback `direction || …`, žiadne `'left'`/`'right'` ako default, literál `unset` len na allowlistovaných miestach.
+  **(B2) 3/4-krídlové dvierka — Michal 3.9.: variant a.** Krajné krídla sú **odvodené** (p1 = pánty vľavo, posledné = pánty vpravo — nič sa neukladá), **stredné krídla majú
+  vlastný trojstav** v `wing_directions` `{ 'p2' => …, 'p3' => … }` (p2 platí pri 3 aj 4 krídlach, p3 len pri 4; iné kľúče sa zahodia); každé stredné `unset` = vlastný RED
+  nález s part_key krídla (`front:F#/wing:p2`). Dvojkrídlo: odvodené Ľ+P, nič sa neukladá ani nečíta.
+  **(B3) dormant** — `direction`, `wing_directions`, `opening_mode`, `drawer` sa v configu VŽDY držia bez ohľadu na aktuálny typ a počet krídel; aplikovateľnosť určuje
+  **efektívny `wings_n`** z resolved `front_items` (auto okolo 600 mm), nie surové `wings`; po návrate na 1 krídlo/dvierka sa uložená hodnota obnoví. **Jediná definícia
+  aplikovateľnosti** = nová čistá `Fronts.direction_slots(resolved_item)` → `[{wing: 'single'|'p2'|'p3', part_key:, state: nil|'unset'|'left'|'right'}]`
+  (1 krídlo → single · 2 → [] · 3 → p2 · 4 → p2, p3; ne-dvierka → []); číta ju `Bom.collect` (A1), overlay aj karta (A2).
+  **(B4) zásuvka bez klasifikácie** = stav „neklasifikované" (kľúč `drawer` chýba; nikdy sa nedopĺňa `metal`+`standard`); klasifikácia `{construction: metal|wood|other,
+  variant: standard|internal}` vzniká len explicitne (A2); pod-polia sa whitelistujú nezávisle, hash bez platného pod-poľa → kľúč preč. `opening_mode` (`classic`|`tipon`):
+  chýba = legacy (čitatelia neskôr = classic), neplatná hodnota → kľúč preč. **NOTE 14:** `opening_mode` ani `drawer` sa v A NEDOSTANÚ do kontextu pravidiel kovania.
+  **(B5) kanonické part_keys** — `lift`/`fall` → rola `flap`, `PartKeys.front(id, 'flap')` = `front:F#/flap`, suffix `FLAP-#`, názvy „Výklop #" / „Sklop #"; `blind` → rola
+  `false_front`, `PartKeys.front(id, 'blind')` = `front:F#/blind`, suffix `BLIND-#`, názov „Blenda #". Rovnaká panelová matematika ako zásuvkové čelo (1 panel, celá šírka
+  otvoru, `wings_n` 1). Overridy sú per kind → pri prepnutí typu ostávajú dormant pod starým kľúčom (vzor `migrate_overrides`), neprenášajú sa. `human_label`: `/flap` →
+  „F2 · výklop" alebo „sklop" (typ z resolved čela; bez zhody „výklop/sklop"), `/blind` → „F2 · blenda". Resolved item nesie `flap_dir` `up`|`down` odvodené z typu
+  (nie je to default smeru dvierok — O1 sa týka strany pántov).
+  **Vedomé limity A1:** úchytkový `profile` je pre `lift`/`fall`/`blind` normalizovaný na `none` (profilové pravidlo D-90 pozná len dvierka a zásuvku — inak by vznikol
+  falošný `profile_rule_missing`; profil na výklope = KOV-E/F) · preview kreslí nové typy zatiaľ ako dvierka (popisy a symboly = A2) · UI select typu nesie `lift`/`fall`/`blind`
+  ako **neaktívne** voľby (nahrádzajú dnešnú `flap (fáza 3)`), aby config z API neprepol typ na `door` pri prvej editácii (D-90 P1 vzor: projekcia nesmie stratiť pole).
+  **Scope IN (kód):** `fronts.rb` — `normalize_items` (typy + 4 nové polia s trojstavom, dormant, whitelisty), `panels_for` (flap/blind), `layout` resolved items =
+  pass-through nových polí LEN ak sú prítomné + `flap_dir`, nová `direction_slots`; `part_keys.rb` — `human_label` vetvy; **allowlisty rolí** (úplný zoznam z grepu
+  `front_door`): `cabinet_builder` `PART_TAGS` (Noxun/Čelá) · `thickness_ok_for?` · `base_material_for` · `materialized_part` (Opus F-5a — 18/18,6/19 mm) ·
+  `part_faces::ROLE_AXES` (AXES_FRONT — FIX 8) · `abs_rules` `EDGE_LABELS` + `edge_sides` + `SEED_RULES` (4 hrany 1,0 ako dvierka) + **`SEED_VERSION` 3** (merge doplní
+  len chýbajúce roly, používateľské pravidlá nedotknuté — FIX 7) · `validation::FRONT_ROLES` (ORANGE „čelo bez ABS" platí aj pre ne) · `production_core::ROLE_LABELS`
+  („Výklop", „Blenda") · `rules_dialog::ABS_ROLE_ORDER` · JS `part_card.js` `isFront` (FIX 9); **CONFIG_SCHEMA 1 → 2** (R-12; história v komentári; test pinuje ≥ 2);
+  **6 projekcií round-trip**: `normalize_items` · `config_to_params` · `normalize` · `cabinet_config` · `template_config_from` · `Fronts.layout → front_items` (FIX 6) +
+  **7. JS pass-through**: `addFrontRow` odloží nové polia do datasetu (len prítomné), `collectFronts` ich pošle späť BEZ defaultov (vzor D-90 `profile`, ale bez `|| default`);
+  **`hardware_issues`** — nový aditívny kľúč `Bom.collect` (`[{code: 'front_direction_unset', severity: 'red', owner_id, owner_pid, part_key, front_id, label}]`
+  z `ccfg['front_items']` cez `direction_slots`; legacy nil = nič; `compute()` ho ignoruje; FIX 11: `owner_pid` = identita výskytu pri duplicitnom `cabinet_id`) →
+  **`Validation.run`** nová RED kategória `front_direction` (stable_key `front_direction|owner|part_key`, `owner_pid` ako extra mimo kľúča, text menuje čelo cez `label`
+  a hovorí, že exporty zatiaľ neblokuje — znenie podľa mockupu scéna 4); AUDIT_REGISTER R-39 dostane riadok „RED kanál pristál v A1 (PR #N), brána stále otvorená".
+  **Scope OUT (A1):** karta čela/typegrid/segrow, `smer?` badge, preview symboly a popisy, sprite ikony, overlay smerov (celé = **A2**); resolver, sety, recepty, `lift`
+  generic type (KOV-E), Tip-On závesy (KOV-F), ad-hoc (KOV-H), exportné brány, heuristika smeru, zjednotenie `prune_none_front_overrides` (KOV-D).
+  **Audit:** HOTOVÝ (checkpoint #14: 5 BLOCKER + 7 FIX + 3 NOTE — všetky zapracované vyššie). Subagent spraví krátky read-only audit proti mainu pred kódom.
+  **Testy a DoD (A1):** headless — **round-trip matica 6 projekcií × (6 typov × 4 polia)**, string aj symbol kľúče · trojstav: legacy bez kľúča ostáva bez kľúča vo VŠETKÝCH
+  6 projekciách (žiadna cesta nematerializuje `unset` ani stranu) · poškodená hodnota → `unset`, nil/'' → kľúč preč · `direction_slots` × efektívne 1/2/3/4/auto okolo
+  600 mm (599 vs 601) · prepnutie typu tam a späť (dormant sa obnoví; neaktívne pole sa nečíta) · legacy V0.1 string fronts a zásuvka bez klasifikácie (nič sa nevymyslí) ·
+  stabilita/unikátnosť part_key pri prepínaní typov + staré overridy ostávajú pod starým kľúčom · ABS: čistá inštalácia seeduje flap/false_front, upgrade súboru v2 → v3
+  doplní LEN chýbajúce roly (používateľské hodnoty nedotknuté) · flap/false_front: materiál `:front`, hrúbka 18/18,6/19 prejde, `ROLE_AXES`, 4 ABS hrany, tag Čelá,
+  ROLE_LABELS, human_label · `hardware_issues` len pre aplikovateľné sloty s `unset` (single / p2 / p3), duplicate-ID s rozdielnym smerom → presne jeden RED s `owner_pid`
+  inštancie s `unset`, `Bom.compute` obsahovo identický s kľúčom aj bez neho · `CONFIG_SCHEMA >= 2` pin + sada R-12 zelená · **golden charakterizácia**:
+  `tests/fixtures/kova_golden/*.json` vygenerované z MAINU pred zmenou (plan parts/hardware/warnings/front_items + `normalize_config` pre ~10 reprezentatívnych configov
+  vrátane legacy string a 3/4 krídel) — po zmene zhodné · guard: žiadny default smeru v Ruby ani JS · guard: form.js pass-through bez defaultu + neaktívne voľby typu.
+  JS — bez novej sady (UI = A2), len guardy. **In-SU POVINNÉ** (sekcia `run_kova`): build/rebuild/Ctrl+Z pre lift, fall aj blind (plán↔model 1:1, panel v rovine čiel,
+  tag Noxun/Čelá, rola v snapshote) · 19 mm čelný materiál na výklope aj blende sa postaví (`materialized_part`) · šablóna uložiť/vložiť s výklopom, s `direction: 'left'`
+  a `wing_directions` (polia prežijú) · kópia `*2` prenáša polia · prepnutie typu a späť cez config (dormant prežije rebuild) · `hardware_issues` na živom modeli: config
+  s `unset` → RED vo `Validation.run`, legacy config → nič, dup-ID scenár · ŽIADNY nový krok Späť pri čítaní (`Bom.collect`). Mutácie min. 4 (pole vypadne z jednej projekcie ·
+  normalize materializuje `unset` pre legacy · `direction_slots` číta surové `wings` namiesto `wings_n` · profil na blende prejde). **Pred/po na reálnej zákazke:** Michal
+  dodá cestu ku KLINIKA `.skp` (na tomto PC nie je) → dvojitý in-SU dump (main vs. vetva) kusovník/nákup/VEPO; do vtedy platí golden + smoke Michala.
+  **Riziká:** tichá strata poľa v jednej zo 7 projekcií (preto matica) · omylom materializovaný `unset` (guard) · veľkosť PR (jeden PR, dva logické celky commitov:
+  a) kontrakt + roly, b) `hardware_issues` + Validation — pri 3. kole review sa reže presne tu) · **D-52 u Lucie:** prvý model uložený s CONFIG_SCHEMA 2 odmietne starší
+  plugin prestavať (R-12) — pred prvým KOV-A modelom aktualizovať oba PC.
+  **Smoke pre Michala (A1 je navonok takmer neviditeľná):** aktualizuj plugin (D-52) na oboch PC · otvor KLINIKA → kusovník/nákup/VEPO/rozpočet čísla identické ako pred
+  aktualizáciou, Kontrola bez nového nálezu (legacy čelá RED nedostanú) · vlož skrinku, F1 dvierka 1 krídlo → **žiadny** nález (bez UI sa `unset` nedá vytvoriť) · šírka
+  599 ↔ 601 (auto 1/2 krídla) — správanie ako doteraz · ulož šablónu a vlož ju · Štúdio → Pravidlá → ABS pravidlá ukazujú riadky „Výklop" a „Blenda" (4 hrany 1,0),
+  tvoje upravené pravidlá nedotknuté.
+  **Checklist uzáveru A1:** bump 0.9.15 + `?v=` → testy vrátane in-SU → docs na mieste: `construction.md` (fronts.rb: polia, trojstav, dormant, `direction_slots`, nové
+  roly; cabinet_builder allowlisty + CONFIG_SCHEMA 2), `model-a-identita.md` (part_keys flap/blind, human_label), `outputs.md` (bom `hardware_issues` + validation
+  `front_direction`), `materials.md` (abs_rules SEED_VERSION 3) → STANDARD §5.3 (polia items, trojstav, dormant) + POJMY (smer = strana pántov; výklop/sklop/blenda)
+  → AUDIT_REGISTER R-39 riadok → STAV/KRONIKA/PLAN (A1 → ✅, A2 štartuje) → DOGFOODING položka „výklop ako samostatný typ čela": rola postavená, UI v A2.
+
+- **KOV-A2 · TASK PACKAGE „ČELÁ — KARTA, NÁHĽAD A OVERLAY SMEROV" (slice A, rez A2; štart po merge A1):**
+  **Cieľ:** používateľ vyberie typ čela piktogramom a nastaví smer, otváranie a klasifikáciu podľa mockupu scéna 1; `smer?` badge a RED nález sú viditeľné; smery vidno
+  v modeli overlayom.
+  **Scope IN:** karta čela = **typegrid** 5 piktogramov (nahrádza select typu; 5 nových sprite ikon podľa UI_DIZAJN) + **kontextové riadky**: smer segrow (Ľavé · Neurčené ⚠
+  · Pravé) LEN pri `wings_n == 1`; pri 3/4 krídlach **jeden segrow na každé stredné krídlo** („Krídlo 2/3") — vedomé rozšírenie mockupu (B2 variant a); dvojkrídlo smer
+  neponúka; otváranie (Klasické/Tip-On) na pohyblivých; konštrukcia (Kovové/Drevené/Iné) + Štandardná/Vnútorná len pri zásuvke; blenda nemá nič (inforow).
+  **`unset` vzniká VÝHRADNE**: nové dvierka (userAdd), prepnutie typu na dvierka bez uloženej hodnoty, klik na segrow „Neurčené"; render, editácia iného poľa ani echo
+  `unset` nikdy nevyrobia (test). `collectFronts` plný (obrátené poradie, všetky polia). Zoznam čiel: badge `smer?` z `direction_slots`. Náhľad: symboly smerov prerušovane
+  (`>` `<` pre single aj stredné krídla; odvodené krajné a dvojkrídlo sa kreslia tiež — sú jednoznačné), `∧`/`∨` výklop/sklop, blenda plné X, popisy typov (výklop/sklop/
+  blenda); **žiadny fallback na stranu**. **Overlay „Smer otvárania"** modul `direction_check` (vzor `grain_check`, FIX 12): jeden serverový toggle + broadcast do oboch UI
+  (rail Inspectora + lišta Kontroly Štúdia = jeden stav), odpojenie pri zmene dokumentu (`ScaleObserver.model_switched` vetva), nový overlay objekt pri zapnutí, sken len
+  pri zapnutí/dirty (nie v každom `draw`), žiadny zápis ani undo. Kontrola: RED riadok klikateľný (existujúca select mašinéria cez owner_id + part_key). Hint v karte:
+  „set podľa otvárania príde s KOV-D".
+  **Scope OUT:** všetko z A1 OUT · heuristika smeru · zmena kovania podľa Tip-On.
+  **Audit:** NIE (UI dávka bez zmeny kontraktu — kontrakt pristál v A1); `codex-po-pr` povinné.
+  **Testy a DoD:** JS — renderFronts → collectFronts (obrátené poradie, všetky polia; editácia iného poľa nematerializuje default; legacy item bez kľúča ostáva bez kľúča) ·
+  show/hide matica 6 typov × riadky · klávesnica typegrid/segrow (šípky, Enter, aria) · nx-combo po rerenderi · preview všetkých typov a smerov bez fallbacku · oba
+  prepínače overlayu = jeden stav; headless — `direction_check` čistá vrstva (výber symbolov z `direction_slots`), guardy toggle; **in-SU** — overlay z oboch vstupov,
+  prepnutie dokumentu, undo/redo bez kroku, fallback bez Overlay API, výkon na ~254 dielcoch (merať), duplicate-ID s rozdielnym smerom kreslí per inštancia.
+  Mutácie min. 3 (default smeru v JS · overlay zapisuje · segrow materializuje pri renderi).
+  **Riziká:** vertikálny priestor karty (kontextové riadky len keď treba) · ikony sprite · výkon overlayu pri veľkej zákazke.
+  **Smoke pre Michala:** vlož skrinku → F2 prepni na Výklop, F3 na Blendu (postavia sa, náhľad ∧ a X) · jednokrídlové dvierka = badge `smer?`, Kontrola RED, **nákupný CSV aj
+  rozpočet prejdú** · Ľavé → nález zmizne, overlay kreslí `>` prerušovane · 3 krídla → stredné krídlo má vlastný riadok smeru, krajné sa nepýtajú · Tip-On prepni
+  (informatívne) · šablóna s výklopom uložiť/vložiť · kópia ×3 · KLINIKA čísla identické.
+  **Checklist uzáveru A2:** bump + `?v=` → testy vrátane in-SU → `ui-lifecycle.md` (karta čela, overlay), `construction.md` (`direction_check`), `UI_DIZAJN.md` (ikony)
+  → UI20_KONTRAKT §7 (výklop už aktívny — odchýlka zaniká) → DOGFOODING „výklop ako typ čela" → vyriešené → STAV/KRONIKA/PLAN.
 
 - **KOV-B · TASK PACKAGE „KATALÓG A SETY — KLASIFIKÁCIA A EDITORY" (slice B, D-110; štart po KOV-A, paralelne s KOV-H):**
   **Cieľ:** set aj položka katalógu nesú tú istú klasifikáciu ako čelo; katalóg je zoskupený; položka a set sa zakladajú v modaloch podľa mockupu

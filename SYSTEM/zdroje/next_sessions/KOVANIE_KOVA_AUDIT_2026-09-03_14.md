@@ -1,7 +1,7 @@
 # KOV-A — Codex audit návrhu pred implementáciou (3.9.2026, checkpoint #14)
 
 > Stav: KONCEPT / audit checkpoint — nie implementačný spec. Codex CLI task `task-mtjno9g8-jnkb0j` (gpt-5.6-sol, 14 min) nad package KOV-A v PLAN.md + FINAL §2/§8/§11 + mockup.
-> Verdikt: **5 BLOCKER + 7 FIX + 3 NOTE; rez A1/A2 odporučený.** A1 nie je pripravené na implementáciu, kým sa nerozhodnú blockery 1–5.
+> Verdikt: **5 BLOCKER + 7 FIX + 3 NOTE; rez A1/A2 odporučený.** Všetkých 5 blockerov je ROZHODNUTÝCH (B2 Michalom 3.9.2026 — variant a, nižšie); packages KOV-A1/KOV-A2 sú v PLAN.md (autorita dávky).
 
 ## BLOCKERY (nálezy Codexu) + rozhodnutie orchestrátora
 
@@ -51,3 +51,11 @@ Schema bump v A1 pristane až po nasadení D-52 na oboch PC.
 **Smer pri 3- a 4-krídlových dvierkach** (dnes `wings 3/4`, krídla `p1…p4`): a) **krajné krídla odvodené** (p1 = pánty vľavo, posledné = pánty vpravo) a **stredné krídla
 `unset`** → RED, kým ich neurčíš ručne *(odporúčanie — konzistentné s O1: nič sa neháda, len geometricky jednoznačné krajné krídla)* · b) všetky krídla `unset` · c) 3/4 krídla
 smer nemajú (overlay bez symbolu, žiadny nález).
+
+## Rozhodnutie Michala (3.9.2026) — BLOCKER 2
+
+**Variant a):** krajné krídla **odvodené** (ľavé = pánty vľavo, pravé = pánty vpravo), stredné krídla **„neurčené" → RED, kým ich neurčí ručne.**
+Tým je zároveň potvrdená sémantika smeru: `direction` = **strana pántov** (Ľavé = pánty vľavo). Kontrakt odvodený orchestrátorom:
+`direction` (scalar, trojstav) platí len pri efektívnom `wings_n == 1`; stredné krídla 3/4-krídlových dvierok majú vlastný trojstav v `wing_directions`
+`{ 'p2' => …, 'p3' => … }` (p2 pri 3 aj 4 krídlach, p3 len pri 4); krajné krídla a dvojkrídlo nič neukladajú. Jediná definícia aplikovateľnosti =
+`Fronts.direction_slots(resolved_item)`. Plné znenie: package **KOV-A1** v `SYSTEM/PLAN.md`.
