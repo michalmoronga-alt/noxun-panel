@@ -395,6 +395,67 @@ function qa(sel){ return ROOT.querySelectorAll(sel); }
   ok(global.NXModal.isOpen(), 'modal ostava otvoreny s dovodom');
 })();
 
+// ============ 5b) ZMENA VYBERU POD OTVORENYM MODALOM (Codex #285 P1) ========
+// Modal drzi rozpisany zoznam JEDNEJ skrinky. Keby prezil zmenu vyberu,
+// odoslanie by postavilo zoznam z NOVEJ skrinky a orazitkovalo ho jej
+// identitou — polozka by pristala na nespravnej skrinke (a pri zhode `id` by
+// PREPISALA cudzi zaznam). Zatvara sa preto pri kazdej zmene IDENTITY.
+
+(function(){
+  reset({ manual: [], view: [] });
+  HW.onHwManualAdd();
+  ok(global.NXModal.isOpen(), 'modal je otvoreny');
+  // ECHO TEJ ISTEJ skrinky (nas vlastny apply, na ktory modal caka) ho
+  // zatvorit NESMIE — inak by zmizol skor, nez pride odpoved.
+  eq(HW.hwManualDropIfForeign('CAB-002', true), false,
+     'echo TEJ ISTEJ skrinky modal NEZATVARA');
+  ok(global.NXModal.isOpen(), 'a modal ostava otvoreny');
+  ok(!!HW.hwManualState(), 'aj jeho stav');
+
+  // INA skrinka = ina identita -> modal ide prec.
+  eq(HW.hwManualDropIfForeign('CAB-009', true), true, 'INA skrinka modal ZATVORI');
+  ok(!global.NXModal.isOpen(), 'okno je zavrete');
+  eq(HW.hwManualState(), null, 'a stav modalu je vycisteny');
+  eq(STATUS[STATUS.length - 1], { msg: HW.HW_MAN_DROP_SK, err: true },
+     'pouzivatel sa dozvie, ze sa NIC neulozilo');
+
+  // TA ISTA skrinka v INOM DOKUMENTE je tiez ina identita.
+  reset({ manual: [], view: [] });
+  HW.onHwManualAdd();
+  eq(HW.hwManualDropIfForeign('CAB-002', false), true,
+     'ta ista skrinka v INOM dokumente modal ZATVORI');
+  ok(!global.NXModal.isOpen(), 'okno je zavrete aj tu');
+
+  // Bezuce hladanie uz nema komu odpovedat.
+  reset({ manual: [], view: [] });
+  HW.onHwManualAdd();
+  const qn = q('[data-nxm-lkq="code"]');
+  qn.value = 'uholnik';
+  dispatch(qn, 'input');
+  const stale = SENT[SENT.length - 1].data.gen;
+  HW.hwManualDropIfForeign('CAB-009', true);
+  HW.onHwManualAdd();                       // novy modal nad NOVOU skrinkou
+  HW.hwManualSearchResult({ gen: stale, total: 1,
+                            items: [{ code: 'STARY', name_sk: 'z predchadzajucej skrinky' }] });
+  eq(qa('.mlkitem').length, 0,
+     'odpoved hladania z pred zatvorenia sa do noveho modalu NEDOSTANE');
+  reset({ manual: [], view: [] });
+})();
+
+// Zdrojovy guard: rozhodnutie robi `hardware.js` a `bridge.js` ho vola PRED
+// instalaciou noveho stavu — inak by sa stary formular mal proti comu odoslat.
+(function(){
+  const fs = require('node:fs');
+  const src = fs.readFileSync(path.join(JS, 'bridge.js'), 'utf8');
+  const load = src.slice(src.indexOf('loadSelected: function(c)'));
+  const call = load.indexOf('hwManualDropIfForeign(c.cabinet_id, sameDoc)');
+  ok(call > -1, 'loadSelected zatvara modal pri cudzej identite');
+  ok(call < load.indexOf('hwManual = Array.isArray('),
+     'a robi to PRED instalaciou noveho stavu');
+  ok(src.split('hwManualDropModal(HW_MAN_DROP_SK)').length - 1 === 2,
+     'odchod na dosku aj prazdny vyber modal tiez zatvaraju');
+})();
+
 // ===================== 6) RIADKY KONTEXTU KOVANIE ============================
 
 (function(){

@@ -1234,6 +1234,43 @@
     hwManualSend(next, op);
   }
 
+  // ---- ZATVORENIE MODALU PRI ZMENE IDENTITY (Codex #285 P1) ---------------
+  // Modal drzi ROZPISANY zoznam JEDNEJ skrinky. Ked sa pod nim zmeni vyber
+  // (ina skrinka, iny dokument, doska, prazdny vyber), `loadSelected` vymeni
+  // `hwManual`/`hwManualView`/`hwManualOwners` aj `selectedCabId` — a odoslanie
+  // stareho formulara by potom postavilo zoznam z NOVEJ skrinky a orazitkovalo
+  // ho JEJ identitou. Polozka by pristala na nespravnej skrinke a pri zhode
+  // `id` by dokonca PREPISALA cudzi zaznam.
+  //
+  // Zatvara sa preto VYHRADNE pri zmene IDENTITY. Echo TEJ ISTEJ skrinky (nas
+  // vlastny apply, na ktory modal prave caka) modal zatvorit NESMIE — inak by
+  // sa zavrel skor, nez by prisla odpoved, ktoru drzi otvoreny.
+  function hwManualDropModal(reason){
+    var open = (typeof NXModal !== 'undefined' && NXModal &&
+                typeof NXModal.isOpen === 'function' && NXModal.isOpen());
+    if (!HW_MAN && !open) return false;
+    HW_MAN = null;
+    HW_MAN_Q.gen++;      // bezuce hladanie uz nema komu odpovedat
+    HW_MAN_Q.done = null;
+    if (open && typeof NXModal.close === 'function') NXModal.close();
+    if (reason && typeof NX !== 'undefined' && NX && NX.setStatus) NX.setStatus(reason, true);
+    return true;
+  }
+  // Dovod je JEDEN text (JS ho nesklada z kusov) — pouzivatel musi vediet, ze
+  // sa nic neulozilo, inak by cakal, ze polozka pribudla.
+  var HW_MAN_DROP_SK = 'Výber sa zmenil — okno ručnej položky sa zavrelo, nič sa neuložilo.';
+
+  // ROZHODNUTIE „je to iny vyber?" zije TU, nie v `bridge.js` — modal patri
+  // tomuto suboru a podmienka sa nesmie rozist s tym, co modal drzi.
+  // `sameDoc` dodava volajuci (identitu dokumentu pozna push), `cabId` je
+  // skrinka CERSTVEHO payloadu. -> true = modal sa zavrel.
+  function hwManualDropIfForeign(cabId, sameDoc){
+    if (sameDoc === true && String(cabId == null ? '' : cabId) === String(selectedCabId || '')){
+      return false;   // ECHO tej istej skrinky — modal caka prave na nu
+    }
+    return hwManualDropModal(HW_MAN_DROP_SK);
+  }
+
   // Odpoved servera na zapis. Modal ZAMOK odomyka VYHRADNE volajuci (kontrakt
   // D-15) — a to v OBOCH vetvach: uspech okno zatvara a pamat draftu zahadza,
   // odmietnutie ho necha OTVORENE s hodnotami a len povie dovod.
@@ -1307,5 +1344,8 @@
       hwManualOpen: hwManualOpen, hwManualSubmit: hwManualSubmit,
       hwManualSearchResult: hwManualSearchResult, hwManualCtxSwitch: hwManualCtxSwitch,
       onHwManualResult: onHwManualResult, onHwManualDel: onHwManualDel,
-      onHwManualEdit: onHwManualEdit, onHwManualAdd: onHwManualAdd };
+      onHwManualEdit: onHwManualEdit, onHwManualAdd: onHwManualAdd,
+      hwManualDropModal: hwManualDropModal, HW_MAN_DROP_SK: HW_MAN_DROP_SK,
+      hwManualDropIfForeign: hwManualDropIfForeign,
+      hwManualState: function(){ return HW_MAN; } };
   }

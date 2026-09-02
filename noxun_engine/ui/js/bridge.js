@@ -488,6 +488,12 @@
       // v B a odoslal ich s guidom B — server ich prijal do NESPRAVNEJ zakazky.
       // `setUiMode` volanie nizsie ostava ako poistka (echo = early return).
       var sameDoc = (String(c.model_guid || '') === nxDocGuid());
+      // KOV-H2 (Codex #285 P1): modal ručnej položky patrí JEDNEJ skrinke.
+      // Zatvára sa pri zmene IDENTITY — inej skrinke alebo inom dokumente;
+      // ECHO tej istej skrinky (náš vlastný apply, na ktorý modal čaká) ho
+      // zavrieť NESMIE. Ide to PRED inštaláciou nového stavu, aby sa starý
+      // formulár nemal ako odoslať proti novým dátam.
+      if (typeof hwManualDropIfForeign === 'function') hwManualDropIfForeign(c.cabinet_id, sameDoc);
       if (typeof nxSetModelGuid === 'function') nxSetModelGuid(c.model_guid);
       // V0.4.7c: odchod z kontextu dosky — zrus cakajuce board edity + kartu
       cancelBoardEdits();
@@ -595,6 +601,10 @@
       if (typeof absModalCloseSilent === 'function') absModalCloseSilent();
       setSelected(null);
       activeZoneId = null; frontItems = null; frontSlots = null; hwItems = null;
+      // KOV-H2 (Codex #285 P1): odchod z korpusu (doska alebo prazdny vyber) je
+      // ZMENA IDENTITY — otvoreny modal by odoslal zoznam skrinky, ktora uz nie
+      // je oznacena.
+      if (typeof hwManualDropModal === 'function') hwManualDropModal(HW_MAN_DROP_SK);
       hwManual = null; // KOV-H1: bez oznacenej skrinky niet ad-hoc poloziek (kluc sa neposiela)
       hwManualView = []; hwManualOwners = []; // KOV-H2: niet co kreslit ani ponukat
       closeFrontCard(); // KOV-A2a: odchod z korpusu = karta cela zaniká
@@ -623,6 +633,10 @@
       // vnutri setUiMode) nesmie bezat nad zvyskami stareho vyberu.
       setSelected(null);
       activeZoneId = null; frontItems = null; frontSlots = null; hwItems = null;
+      // KOV-H2 (Codex #285 P1): odchod z korpusu (doska alebo prazdny vyber) je
+      // ZMENA IDENTITY — otvoreny modal by odoslal zoznam skrinky, ktora uz nie
+      // je oznacena.
+      if (typeof hwManualDropModal === 'function') hwManualDropModal(HW_MAN_DROP_SK);
       hwManual = null; // KOV-H1: bez oznacenej skrinky niet ad-hoc poloziek (kluc sa neposiela)
       hwManualView = []; hwManualOwners = []; // KOV-H2: niet co kreslit ani ponukat
       closeFrontCard(); // KOV-A2a: odchod z korpusu = karta cela zaniká
