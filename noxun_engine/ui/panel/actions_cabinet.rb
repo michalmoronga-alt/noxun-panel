@@ -691,8 +691,14 @@ module Noxun
         # (kontrakt kostry) — server mu preto musi odpovedat v KAZDEJ vetve
         # `handle_apply_all`, aj v tej, ktora zapis ticho zahadzuje.
         MANUAL_OPS = %w[add edit delete].freeze
+        # Codex #285 P2-A: `token` je KORELACNY kluc jedneho odoslania. Server
+        # ho NEVYRABA ani neinterpretuje — len ho vracia v echu, aby klient
+        # spoznal, ci odpoved patri PRAVE tomu modalu, ktory zapis poslal.
+        # Preto uzavrety tvar: len String/Integer a orezana dlzka (payload je
+        # verejny kanal, do `execute_script` sa nesmie dostat lubovolny objekt).
+        MANUAL_TOKEN_MAX = 40
 
-        # -> nil (apply prisiel z formulara) | { 'kind' =>, 'id' => }
+        # -> nil (apply prisiel z formulara) | { 'kind' =>, 'id' =>, 'token' => }
         def manual_op(data)
           raw = data['manual_op']
           return nil unless raw.is_a?(Hash)
@@ -700,7 +706,16 @@ module Noxun
           kind = raw['kind'].to_s
           return nil unless MANUAL_OPS.include?(kind)
 
-          { 'kind' => kind, 'id' => raw['id'].to_s }
+          { 'kind' => kind, 'id' => raw['id'].to_s, 'token' => manual_token(raw['token']) }
+        end
+
+        # Token z klienta: LEN retazec alebo cele cislo, orezany na dlzku.
+        # Cokolvek ine (hash, pole, nil) = prazdny token — odpoved sa potom
+        # ziadnemu modalu nepriradi, co je bezpecnejsie nez priradit ju zle.
+        def manual_token(raw)
+          return '' unless raw.is_a?(String) || raw.is_a?(Integer)
+
+          raw.to_s[0, MANUAL_TOKEN_MAX]
         end
 
         def push_manual_result(op, ok, msg)

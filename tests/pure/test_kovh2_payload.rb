@@ -241,12 +241,25 @@ end
 
 NxTest.test('KOV-H2: `manual_op` prijima LEN znamu operaciu') do
   panel = Noxun::Engine::Panel
-  NxTest.assert_equal({ 'kind' => 'add', 'id' => '' },
+  NxTest.assert_equal({ 'kind' => 'add', 'id' => '', 'token' => '' },
                       panel.manual_op('manual_op' => { 'kind' => 'add' }),
                       'pridanie ide bez id')
-  NxTest.assert_equal({ 'kind' => 'edit', 'id' => 'H1' },
-                      panel.manual_op('manual_op' => { 'kind' => 'edit', 'id' => 'H1' }),
+  NxTest.assert_equal({ 'kind' => 'edit', 'id' => 'H1', 'token' => 't1' },
+                      panel.manual_op('manual_op' => { 'kind' => 'edit', 'id' => 'H1',
+                                                       'token' => 't1' }),
                       'uprava nesie id')
+  # Codex #285 P2-A: `token` je KORELACNY kluc — server ho len VRACIA, nikdy
+  # neinterpretuje; uzavrety tvar chrani `execute_script` pred cudzim objektom.
+  NxTest.assert_equal 'h7', panel.manual_op('manual_op' => { 'kind' => 'add', 'token' => 'h7' })['token'],
+                      'token klienta sa vracia nezmeneny'
+  NxTest.assert_equal '12', panel.manual_op('manual_op' => { 'kind' => 'add', 'token' => 12 })['token'],
+                      'cele cislo je platny token'
+  NxTest.assert_equal '', panel.manual_op('manual_op' => { 'kind' => 'add', 'token' => { 'x' => 1 } })['token'],
+                      'cudzi objekt = PRAZDNY token (odpoved sa radsej nepriradi nikomu)'
+  NxTest.assert_equal '', panel.manual_op('manual_op' => { 'kind' => 'add' })['token'],
+                      'stary klient bez tokenu tiez'
+  NxTest.assert_equal 40, panel.manual_op('manual_op' => { 'kind' => 'add', 'token' => 'x' * 99 })['token'].length,
+                      'dlzka je orezana (payload je verejny kanal)'
   NxTest.assert(panel.manual_op({}).nil?, 'bezna zmena pola ziadnu operaciu nema')
   NxTest.assert(panel.manual_op('manual_op' => { 'kind' => 'drop' }).nil?,
                 'neznamy druh operacie sa NEPRIJIMA (payload je verejny kanal)')

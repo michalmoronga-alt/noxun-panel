@@ -822,6 +822,14 @@
   // Generacia hladania (odpoved so starsou generaciou sa zahadzuje) + callback
   // kostry, ktoremu vysledok patri.
   var HW_MAN_Q = { gen: 0, done: null };
+  // TOKEN ODOSLANEJ OPERACIE (Codex #285 P2-A). Korelovat odpoved podla `kind`
+  // nestaci: VSETKY `add` maju prazdne `id`, takze pri pomalej prestavbe
+  // (pouzivatel medzitym zavrie modal a posle dalsiu operaciu toho isteho
+  // druhu) by sa odpoved na A priradila k B — zavrela by cudzi modal a zahodila
+  // jeho draft, alebo by ukazala cudzie odmietnutie. Kazde odoslanie ma preto
+  // VLASTNY rastuci token; server ho vracia v echu a klient porovnava JEHO.
+  var HW_MAN_SEQ = 0;
+  function hwManualToken(){ HW_MAN_SEQ += 1; return 'h' + HW_MAN_SEQ; }
 
   function hwManualUnitLabel(u){
     var v = String(u == null ? '' : u);
@@ -1206,7 +1214,8 @@
       NXModal.setBusy(false);
       return;
     }
-    var op = { kind: item ? 'edit' : 'add', id: item ? String(item.id) : '' };
+    var op = { kind: item ? 'edit' : 'add', id: item ? String(item.id) : '',
+               token: hwManualToken() };
     var next = hwManualNextList(hwManual, hwManualRecord(values, item), op);
     if (!next){
       NXModal.showErrors([{ msg: 'Položka sa medzitým zmenila — zavri okno a skús znova.' }]);
@@ -1215,7 +1224,7 @@
     }
     NXModal.clearErrors();
     if (!hwManualSend(next, op)){ NXModal.setBusy(false); return; }
-    if (HW_MAN) HW_MAN.sent = true;
+    if (HW_MAN){ HW_MAN.sent = true; HW_MAN.token = op.token; }
   }
 
   // Mazanie ide BEZ potvrdzovacieho okna — poistka je JEDEN krok Spat (vzor
@@ -1228,7 +1237,7 @@
       NX.setStatus('Panel nemá zoznam ručných položiek — označ skrinku znova.', true);
       return;
     }
-    var op = { kind: 'delete', id: String(it.id) };
+    var op = { kind: 'delete', id: String(it.id), token: hwManualToken() };
     var next = hwManualNextList(hwManual, null, op);
     if (!next){ NX.setStatus('Položka sa medzitým zmenila — panel sa obnovil.', true); return; }
     hwManualSend(next, op);
@@ -1275,13 +1284,18 @@
   // D-15) — a to v OBOCH vetvach: uspech okno zatvara a pamat draftu zahadza,
   // odmietnutie ho necha OTVORENE s hodnotami a len povie dovod.
   //
-  // KORELACIA: ten isty callback pride aj po mazani z riadku (bez modalu) —
-  // vtedy staci status. Preto sa vyzaduje `HW_MAN.sent`.
+  // KORELACIA JE PO TOKENE (Codex #285 P2-A), nie po druhu operacie: `kind`
+  // odpoved nerozlisi (vsetky `add` maju prazdne `id`), takze pomala prestavba
+  // by odpoved na UZ ZAVRETY modal priradila k prave otvorenemu. Modal preberie
+  // odpoved LEN vtedy, ked sedi token, ktory sam odoslal. Ten isty callback
+  // pride aj po mazani z riadku (bez modalu) — vtedy staci status.
   function onHwManualResult(ok, msg, op){
     var text = String(msg == null ? '' : msg);
     var open = (typeof NXModal !== 'undefined' && NXModal &&
                 typeof NXModal.isOpen === 'function' && NXModal.isOpen());
-    var mine = !!(HW_MAN && HW_MAN.sent && open && op && String(op.kind) === String(HW_MAN.kind));
+    var token = String((op && op.token) == null ? '' : op.token);
+    var mine = !!(HW_MAN && HW_MAN.sent && open && op && token !== '' &&
+                  token === String(HW_MAN.token == null ? '' : HW_MAN.token));
     if (!mine){
       if (text) NX.setStatus(text, ok !== true);
       return;

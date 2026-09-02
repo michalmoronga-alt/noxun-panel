@@ -294,7 +294,9 @@ function qa(sel){ return ROOT.querySelectorAll(sel); }
   eq(SENT[1].cb, 'apply_all', 'EXISTUJUCOU cestou `apply_all` (ziadny novy kanal)');
   eq(CANCELS, 1, 'cakajuci debounce sa ZRUSIL — rozpisany edit ide v tom istom payloade');
   const p = SENT[1].data;
-  eq(p.manual_op, { kind: 'add', id: '' }, 'payload nesie operaciu pre modal');
+  eq({ kind: p.manual_op.kind, id: p.manual_op.id }, { kind: 'add', id: '' },
+     'payload nesie operaciu pre modal');
+  ok(!!p.manual_op.token, 'a korelacny token odoslania (Codex #285 P2-A)');
   eq(p.cabinet_id, 'CAB-002', 'a identitu skrinky');
   eq(p.hardware_manual.length, 1, 'zoznam ma novu polozku');
   eq(p.hardware_manual[0].code, '93240', 'so spravnym kodom');
@@ -306,7 +308,7 @@ function qa(sel){ return ROOT.querySelectorAll(sel); }
 
   // MUTACIA 3: odmietnutie modal NESMIE zatvorit.
   HW.onHwManualResult(false, 'Kovanie sa neuložilo — kód „93240“ nie je v katalógu.',
-                      { kind: 'add', id: '' });
+                      p.manual_op);
   ok(global.NXModal.isOpen(), 'odmietnutie necha modal OTVORENY');
   ok(!global.NXModal.isBusy(), 'a zamok pusti');
   eq(global.NXModal.values().code, '93240', 'hodnoty ostanu na mieste');
@@ -319,7 +321,7 @@ function qa(sel){ return ROOT.querySelectorAll(sel); }
   eq(p2.hardware_manual.length, 1,
      'opakovane odoslanie po odmietnuti prida polozku RAZ (nie dvakrat)');
 
-  HW.onHwManualResult(true, 'Položka pridaná.', { kind: 'add', id: '' });
+  HW.onHwManualResult(true, 'Položka pridaná.', p2.manual_op);
   ok(!global.NXModal.isOpen(), 'az potvrdenie servera modal zatvori');
   eq(STATUS[STATUS.length - 1], { msg: 'Položka pridaná.', err: false },
      'a hlaska servera ide do statusu');
@@ -340,12 +342,13 @@ function qa(sel){ return ROOT.querySelectorAll(sel); }
   DOC.getElementById('nxm_qty').value = '5';
   global.NXModal.submit();
   const p = SENT[SENT.length - 1].data;
-  eq(p.manual_op, { kind: 'edit', id: 'H1' }, 'uprava posiela operaciu edit s id');
+  eq({ kind: p.manual_op.kind, id: p.manual_op.id }, { kind: 'edit', id: 'H1' },
+     'uprava posiela operaciu edit s id');
   eq(p.hardware_manual.length, 2, 'zoznam ostava rovnako dlhy');
   eq(p.hardware_manual[0].qty, 5, 'a meni sa PRAVE upravovana polozka');
   eq(p.hardware_manual[0].id, 'H1', 'ktora si drzi svoje id');
   eq(p.hardware_manual[1].name, 'Zámok Abloy', 'druha ostava nedotknuta');
-  HW.onHwManualResult(true, 'Položka upravená.', { kind: 'edit', id: 'H1' });
+  HW.onHwManualResult(true, 'Položka upravená.', p.manual_op);
   ok(!global.NXModal.isOpen(), 'potvrdenie modal zatvori');
 
   // Prepnutie Zdroja mení sadu polí a NESMIE stratit rozpisane hodnoty.
@@ -368,7 +371,8 @@ function qa(sel){ return ROOT.querySelectorAll(sel); }
   HW.onHwManualDel({ getAttribute: function(){ return 'H2'; } });
   ok(!global.NXModal.isOpen(), 'mazanie ZIADNE potvrdzovacie okno neotvara');
   const d = SENT[SENT.length - 1].data;
-  eq(d.manual_op, { kind: 'delete', id: 'H2' }, 'posiela operaciu delete');
+  eq({ kind: d.manual_op.kind, id: d.manual_op.id }, { kind: 'delete', id: 'H2' },
+     'posiela operaciu delete');
   // MUTACIA 2: zoznam MUSI byt pole bez polozky, nikdy null.
   ok(Array.isArray(d.hardware_manual), 'zoznam je POLE (nikdy null — apply by ich zmazal vsetky)');
   eq(d.hardware_manual.length, 1, 'bez zmazanej polozky');
@@ -393,6 +397,54 @@ function qa(sel){ return ROOT.querySelectorAll(sel); }
   global.NXModal.submit();
   eq(SENT.length, 0, 'bez zoznamu sa NEPOSIELA nic (`|| []` je zakazane)');
   ok(global.NXModal.isOpen(), 'modal ostava otvoreny s dovodom');
+})();
+
+// ============ 5a) KORELACIA ODPOVEDE TOKENOM (Codex #285 P2-A) ==============
+// `kind` odpoved nerozlisi: VSETKY `add` maju prazdne `id`. Pri pomalej
+// prestavbe (pouzivatel medzitym zavrie modal a posle dalsiu operaciu toho
+// isteho druhu) by sa odpoved na A priradila k B — zavrela by cudzi modal
+// a zahodila jeho draft.
+
+(function(){
+  reset({ manual: [], view: [] });
+  HW.onHwManualAdd();
+  DOC.getElementById('nxm_code').value = '93240';
+  global.NXModal.submit();
+  const opA = SENT[SENT.length - 1].data.manual_op;
+  ok(opA.token && String(opA.token).length > 0, 'kazde odoslanie nesie VLASTNY token');
+
+  // Pouzivatel modal zavrie a otvori novy (ta ista skrinka, ta ista operacia).
+  global.NXModal.close();
+  HW.onHwManualAdd();
+  DOC.getElementById('nxm_code').value = '93241';
+  global.NXModal.submit();
+  const opB = SENT[SENT.length - 1].data.manual_op;
+  ok(String(opA.token) !== String(opB.token), 'druhe odoslanie ma INY token');
+
+  // Odpoved na PRVE odoslanie nesmie zavriet DRUHY modal.
+  HW.onHwManualResult(true, 'Položka pridaná.', opA);
+  ok(global.NXModal.isOpen(), 'odpoved so STARYM tokenom cudzi modal NEZATVARA');
+  ok(global.NXModal.isBusy(), 'ani nepusti jeho zamok');
+  eq(global.NXModal.values().code, '93241', 'a nechá jeho hodnoty na mieste');
+
+  // Odmietnutie so starym tokenom tiez nesmie skoncit v cudzom formulari.
+  HW.onHwManualResult(false, 'Kód „93240“ nie je v katalógu.', opA);
+  eq(textOf(ROOT).indexOf('93240'), -1, 'cudzie odmietnutie sa v modali NEZOBRAZI');
+  ok(global.NXModal.isBusy(), 'zamok drzi dalej — modal caka na SVOJU odpoved');
+
+  // Vlastna odpoved modal zatvori.
+  HW.onHwManualResult(true, 'Položka pridaná.', opB);
+  ok(!global.NXModal.isOpen(), 'odpoved so SVOJIM tokenom modal zatvori');
+
+  // Odpoved BEZ tokenu (stary server) sa modalu nepriradi — radsej len status
+  // nez zavriet cudzie okno.
+  reset({ manual: [], view: [] });
+  HW.onHwManualAdd();
+  DOC.getElementById('nxm_code').value = '93240';
+  global.NXModal.submit();
+  HW.onHwManualResult(true, 'Položka pridaná.', { kind: 'add', id: '' });
+  ok(global.NXModal.isOpen(), 'odpoved BEZ tokenu modal nezatvara');
+  reset({ manual: [], view: [] });
 })();
 
 // ============ 5b) ZMENA VYBERU POD OTVORENYM MODALOM (Codex #285 P1) ========
