@@ -23,7 +23,7 @@ otváranie · klasifikácia zásuvky) a symboly v náhľade; **KOV-A2b** dala sm
 nakreslí symboly priamo na čelá v modeli. **Výstupy existujúcich zákaziek sú obsahovo identické** (golden charakterizácia).
 **Pozor:** model uložený od v0.9.15 už neprestaví starší plugin (`CONFIG_SCHEMA` 2, guard R-12).
 
-**Testy k v0.9.17:** **2501 headless** · 81 JS sád · plný in-SketchUp beh **1385 PASS / 0 FAIL** (overlay smeru: 30 scenárov; výkon 37 ms na 486 dielcoch pri cieli 300 ms).
+**Testy k v0.9.17:** **2505 headless** · 81 JS sád · plný in-SketchUp beh **1390 PASS / 0 FAIL** (overlay smeru: 35 scenárov; výkon 24 ms na 486 dielcoch pri cieli 300 ms).
 
 ## Robí sa
 

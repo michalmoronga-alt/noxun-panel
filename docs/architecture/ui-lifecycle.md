@@ -1529,10 +1529,15 @@ tretia inštancia — okno Výroba — zanikla v ŠT-1c PR B3, takže sú už le
 pushi ako Kusovník** (`control` · `counts` · `edge_check` · `grain_check` · `direction_check`) — prepnutie sekcie je čisto zobrazovacie a nesmie chodiť na server. Každý prepínač má
 navyše **lacné echo** (`push_edge_check` / `push_grain_check` / `push_direction_check`), ktorým sa po prepnutí odkiaľkoľvek prekreslí LEN lišta.
 
-**Deep-link Kontrola → karta čela (KOV-A2b):** ceruzka pri RED náleze „smer otvárania" najprv vyberie dielec v modeli (existujúca cesta `problem_key` → `pids_for_problem`
-s `owner_pid` scope) a potom — a **len keď je Inspector otvorený** — pošle `NX.focusFront(front_id)`. `front_id` vytiahne zo `part_key` zdieľaný `PartKeys.front_id`; klient prepne
-kontext na **Čelá**, otvorí kartu práve toho čela (`openFrontCardId` + `refreshFrontCards`) a doscrolluje riadok. **Žiadny nový stav na serveri** a pri neznámom ID sa neotvorí nič
-(cudzia otvorená karta by klamala). Opačný smer (panel → Štúdio) existoval už predtým.
+**Deep-link Kontrola → karta čela (KOV-A2b):** ceruzka pri RED náleze „smer otvárania" vyberie v modeli **VLASTNÍKA (korpus)** a potom — a **len keď je Inspector otvorený** —
+pošle `NX.focusFront(front_id)`. `front_id` vytiahne zo `part_key` zdieľaný `PartKeys.front_id`; klient prepne kontext na **Čelá**, otvorí kartu práve toho čela
+(`openFrontCardId` + `refreshFrontCards`) a doscrolluje riadok. **Žiadny nový stav na serveri** a pri neznámom ID sa neotvorí nič (cudzia otvorená karta by klamala).
+
+**Prečo vlastník a nie dielec** (Codex #282 P2): karta čela žije v Inspectorovi LEN nad označenou **skrinkou**. Výber vnoreného dielca prepne panel do režimu „dielec", v ktorom
+`setViewContext('cela')` neprejde (`NXShell.ctxEnabled`) — deep-link by ticho zomrel a používateľ by videl kartu dielca. Rozhoduje **server** (výber je jeho autorita, klient si
+druhý krok nevymýšľa): čistá `ProductionCore.select_target_item` adresuje nález **tou istou položkou bez `part_key`**, takže sa použije presne tá vetva `pids_for_problem`, ktorá
+obsluhuje korpusové nálezy (`scoped_owner_instance` pri známom `owner_pid`, inak všeobecná podľa `owner_id`) — **žiadny druhý resolver**. Bez ceruzky (obyčajný klik na riadok)
+ostáva dnešné správanie: označí sa **dielec**. Status vety sú preto dve (`front_focus_status` hovorí o skrinke a otvorenej karte). Opačný smer (panel → Štúdio) existoval už predtým.
 
 **Vedomé odchýlky:** režim „diel po diele" (D-95) je mimo dávky (blok KONTROLA+VÝROBA). Testy: `tests/pure/test_st1b_kontrola.rb`, `tests/js/test_st1b_kontrola.js` (+ presunuté
 sady `test_d104`/`test_d105`/`test_k2`/`test_abs_rail_3stav`), in-SketchUp sekcia `run_st1b`.

@@ -1539,6 +1539,9 @@ module Noxun
         # ŠT-3b-2b (review #221): zber sa robi AZ V TEJ VETVE, ktora ho naozaj
         # potrebuje. Vetva `rule_ref` hlada podla identity a s BOM nerobi nic —
         # plny sken modelu (a dedup tik v nom) bol pri nej cista rezia.
+        # KOV-A2b (Codex #282 P2): `focus` sa pocita UZ TU — pri naleze o cele
+        # rozhoduje aj o tom, CO sa v modeli oznaci (nizsie).
+        focus = data['focus_inspector'] == true && Panel.dialog_alive?
         front_id = nil
         if data['problem_key']
           collected = fresh_collect(model)
@@ -1554,11 +1557,11 @@ module Noxun
             repush.call
             return status.call('Kontrola sa medzitým zmenila — obnovené, klikni znova.', true)
           end
-          pids = pids_for_problem(model, item)
           # KOV-A2b: nalez o CELE (kluc `front:…`) vie povedat, ktore celo to je
           # — Inspector potom nemusi hladat riadok rucne. Parser kluca je
           # ZDIELANY (`PartKeys.front_id`); ine kluce vratia nil a neposiela sa nic.
           front_id = PartKeys.front_id(item['part_key'])
+          pids = pids_for_problem(model, select_target_item(item, front_id, focus))
         elsif data['rule_ref']
           # ŠT-3b-2a: oko pri jantarovom riadku sekcie Pravidlá. Vlastna vetva
           # ZAMERNE: `refs_for` hlada v HOTOVOM bome podla klucov riadkov, kdezto
@@ -1585,25 +1588,46 @@ module Noxun
           targets.each { |t| sel.add(t) }
         end
         Panel.push_selected(model, dedup: false) # B2: ziadna mutacia pri selecte
-        focus = data['focus_inspector'] == true && Panel.dialog_alive?
         Panel.bring_to_front if focus
         # KOV-A2b DEEP-LINK: pri náleze o čele sa v Inspectorovi rovno otvorí
         # KARTA toho čela (kontext Čelá + rozbalený riadok). Ziadny novy stav na
         # serveri — posiela sa jediny udaj a zvysok robi klient.
-        Panel.push_focus_front(front_id) if focus && front_id
+        if focus && front_id
+          Panel.push_focus_front(front_id)
+          return status.call(front_focus_status(targets.length, front_id))
+        end
         status.call("Vybraných #{targets.length} položiek v modeli." \
-                    "#{focus ? front_focus_note(front_id) : ''}")
+                    "#{focus ? ' Inspector je vpredu — dielec sa dá hneď upraviť.' : ''}")
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_select')
         status.call("Chyba výberu: #{e.message}", true)
       end
 
-      # Doveta statusu po vybere s „ceruzkou". Pri náleze o čele povie, ze
-      # Inspector uz ma otvorenu jeho kartu — inak ostava povodne znenie.
-      def front_focus_note(front_id)
-        return ' Inspector je vpredu — dielec sa dá hneď upraviť.' if front_id.nil?
+      # KOV-A2b (Codex #282 P2): CO sa pri kliku na nalez oznaci.
+      #
+      # Ceruzka pri naleze o CELE mieri na KARTU CELA v Inspectorovi — a ta zije
+      # LEN nad oznacenou SKRINKOU. Vyber VNORENEHO dielca prepne panel do rezimu
+      # „dielec", v ktorom `setViewContext('cela')` neprejde (`NXShell.ctxEnabled`),
+      # takze deep-link by ticho zomrel a pouzivatel by videl kartu dielca.
+      # Preto sa pri TEJTO kombinacii (nalez o cele + ceruzka) vybera VLASTNIK —
+      # adresuje sa TOU ISTOU polozkou bez `part_key`, teda presne tak, ako by
+      # vyber vysiel pri korpusovom naleze (`scoped_owner_instance` pri znamom
+      # `owner_pid`, inak vseobecna vetva podla `owner_id`). ZIADNA druha cesta
+      # rozlisovania: `pids_for_problem` ostava jediny resolver.
+      # Obycajny klik na riadok (bez ceruzky) sa NEMENI — oznaci dielec.
+      # CISTA funkcia (ziadne IO) — headless testovatelna.
+      def select_target_item(item, front_id, focus)
+        return item unless focus && !front_id.to_s.empty? && item.is_a?(Hash)
 
-        " Inspector je vpredu — karta čela #{front_id} je otvorená."
+        item.merge('part_key' => nil)
+      end
+
+      # Veta po kliku s ceruzkou na nalez o CELE. Hovori o SKRINKE (nie
+      # o „položkách") — presne to sa v modeli oznacilo.
+      def front_focus_status(count, front_id)
+        n = count.to_i
+        what = n == 1 ? 'Vybraná skrinka' : "Vybraných #{n} skriniek"
+        "#{what} v modeli — Inspector je vpredu, karta čela #{front_id} je otvorená."
       end
 
       # --- ŠT-1b (audit #2): JEDNO CISLO KONTROLY PRE VSETKYCH ------------

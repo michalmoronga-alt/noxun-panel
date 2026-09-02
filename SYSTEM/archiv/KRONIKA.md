@@ -35,6 +35,10 @@
   a na prednej ploche, prestavba a Ctrl+Z, prepnutie dokumentu, duplicate-ID). **Výkon: 36,8 ms** na 40 skrinkách / 486 dielcoch (cieľ < 300 ms) — sken beží len pri zapnutí a po
   `ModelObserver` dirty, `draw` je lazy nad hotovými GL poľami. Mutácie: overlay zapisuje do modelu · JS odvodzuje stranu pre legacy · stav ide len jednému oknu — všetky tri
   spadli na tom teste, ktorý ich má chytať.
+  **Codex kolo 1 = 1×P2 → interná delta-verifikácia** (len-P2, nové GH kolo sa nevyžiadalo): deep-link by v praxi nikdy nedorazil ku karte, lebo ceruzka označila **vnorený
+  dielec** a panel tým prešiel do režimu „dielec", v ktorom sa kontext Čelá nedá zapnúť. Opravené **na serveri** (výber je jeho autorita): pri kombinácii „nález o čele +
+  ceruzka" sa adresuje **vlastník** — tá istá položka bez `part_key`, teda existujúca korpusová vetva `pids_for_problem`; žiadny druhý resolver a obyčajný klik na riadok
+  ostáva bez zmeny. Pribudla čistá `select_target_item` (+ 4 headless testy, in-SU scenár s inštrumentovaným `push_focus_front` a štvrtá mutácia „ceruzka opäť vyberá dielec").
 
 - **KOV-A2a · ČELÁ — KARTA ČELA A NÁHĽAD (PR #281, v0.9.16, 3.9.2026):** UI polovica slice A (package KOV-A2 sa vedome režal na **A2a karta** + **A2b overlay**, aby PR
   ostalo malé a bez in-SU povinnosti). **Rozbaľovačka typu `select.ftype` ZANIKLA** — typ žije v `dataset.frontType` (vzor D-90 `profile`) a vyberá sa **typegridom šiestich

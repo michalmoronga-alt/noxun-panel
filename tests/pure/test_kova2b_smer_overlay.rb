@@ -410,11 +410,63 @@ end
 NxTest.test('KOV-A2b: deep-link posiela LEN ID cela a len pri otvorenom Inspectorovi') do
   sel = A2B_PCORE[/def do_select.*?\n      end\n/m].to_s
   NxTest.assert(sel.include?('PartKeys.front_id('), 'front_id sa cita ZDIELANYM parserom')
-  NxTest.assert(sel.include?('Panel.push_focus_front(front_id) if focus && front_id'),
+  NxTest.assert(sel.include?('Panel.push_focus_front(front_id)') && sel.include?('if focus && front_id'),
                 'bez ceruzky (focus_inspector) a bez cela sa neposiela nic')
   push = A2B_SYNC[/def push_focus_front.*?\n        end\n/m].to_s
   NxTest.refute(push.empty?, 'kanal musi existovat')
   NxTest.assert(push.include?('dialog_alive?'), 'zavrety Inspector nedostane nic')
   NxTest.assert(push.include?('NX.focusFront'), 'klientska cesta')
   NxTest.refute(push.include?('Store.set'), 'deep-link nic nezapisuje')
+end
+
+# --- 8) Codex #282 P2: CO sa pri ceruzke oznaci -------------------------------
+#
+# Karta cela zije v Inspectorovi LEN nad oznacenou SKRINKOU. Keby ceruzka
+# oznacila VNORENY dielec, panel by presiel do rezimu „dielec", kontext Cela by
+# sa nedal zapnut a deep-link by ticho zomrel. Vyber je autorita SERVERA, takze
+# rozhodnutie robi on — klient si druhy krok nevymysla.
+
+A2B_ITEM = { 'severity' => 'red', 'category' => 'front_direction', 'owner_id' => 'CAB-1',
+             'owner_pid' => 42, 'part_key' => 'front:F2/wing:single',
+             'stable_key' => 'front_direction|CAB-1|front:F2/wing:single' }.freeze
+
+NxTest.test('KOV-A2b: ceruzka na nalez o CELE adresuje VLASTNIKA (kluc dielca padne)') do
+  pc = Noxun::Engine::ProductionCore
+  got = pc.select_target_item(A2B_ITEM, 'F2', true)
+  NxTest.assert_equal(nil, got['part_key'], 'bez `part_key` = vyber korpusu (vzor korpusoveho nalezu)')
+  NxTest.assert_equal('CAB-1', got['owner_id'], 'identita vlastnika ostava')
+  NxTest.assert_equal(42, got['owner_pid'], 'a scope na KONKRETNU instanciu tiez')
+  NxTest.assert_equal('front:F2/wing:single', A2B_ITEM['part_key'], 'povodna polozka sa NEMENI')
+end
+
+NxTest.test('KOV-A2b: bez ceruzky a mimo ciel sa vyber NEMENI (dnesne spravanie)') do
+  pc = Noxun::Engine::ProductionCore
+  NxTest.assert_equal(A2B_ITEM, pc.select_target_item(A2B_ITEM, 'F2', false),
+                      'obycajny klik na riadok oznaci DIELEC ako doteraz')
+  NxTest.assert_equal(A2B_ITEM, pc.select_target_item(A2B_ITEM, nil, true),
+                      'nalez, ktory nie je o cele, ostava bez zmeny')
+  NxTest.assert_equal(A2B_ITEM, pc.select_target_item(A2B_ITEM, '', true), 'prazdne ID tiez')
+  NxTest.assert_equal(nil, pc.select_target_item(nil, 'F2', true), 'poskodena polozka nespadne')
+end
+
+NxTest.test('KOV-A2b: veta po ceruzke hovori o SKRINKE a o otvorenej karte') do
+  pc = Noxun::Engine::ProductionCore
+  one = pc.front_focus_status(1, 'F2')
+  NxTest.assert(one.include?('Vybraná skrinka'), one)
+  NxTest.assert(one.include?('karta čela F2 je otvorená'), one)
+  NxTest.refute(one.include?('položiek'), 'oznacil sa korpus, nie „položky"')
+  many = pc.front_focus_status(3, 'F1')
+  NxTest.assert(many.include?('Vybraných 3 skriniek'), many)
+end
+
+NxTest.test('KOV-A2b: `focus` sa pocita PRED vyberom (inak by nemal na co vplyvat)') do
+  sel = A2B_PCORE[/def do_select.*?\n      end\n/m].to_s
+  i_focus = sel.index("focus = data['focus_inspector']")
+  i_pids = sel.index('pids = pids_for_problem(model, select_target_item(')
+  NxTest.assert(i_focus && i_pids, 'obe miesta musia existovat')
+  NxTest.assert(i_focus < i_pids, 'ceruzka rozhoduje aj o CIELI vyberu, nielen o zdvihnuti okna')
+  NxTest.assert_equal(1, sel.scan("focus = data['focus_inspector']").length,
+                      'jedno miesto, kde sa ceruzka vyhodnocuje (dve by sa rozisli)')
+  NxTest.assert(sel.include?('return status.call(front_focus_status(targets.length, front_id))'),
+                'ceruzka na celo ma vlastnu vetu o skrinke')
 end

@@ -11676,6 +11676,35 @@ module NoxunSuRunner
     [inst, inst ? a2b_part(inst, key) : nil]
   end
 
+  # Klik na nalez Kontroly presne tak, ako ho posiela Studio (`nx_select`).
+  def a2b_do_select(model, key, focus)
+    gen = e::StudioDialog.instance_variable_get(:@generation).to_i
+    e::ProductionCore.do_select(model, { 'gen' => gen, 'problem_key' => key,
+                                         'focus_inspector' => focus },
+                                generation: gen, status: ->(_m, _err = false) {}, repush: -> {})
+  end
+
+  # Panel v runneri OTVORENY nie je: HtmlDialog sa stane `visible?` az ked sa
+  # pretoci message loop (preto je sekcia D-52b stepovana), takze `focus` by
+  # bol vzdy false a ceruzka by sa nedala overit vobec. Na cas scenara sa preto
+  # nahradia PRESNE DVE veci — odpoved `dialog_alive?` a odchytenie
+  # `push_focus_front`. Resolver, rozhodnutie o cieli aj vyber v modeli bezia
+  # NAOSTRO (to je to, co sa testuje).
+  def a2b_with_panel_stub(captured)
+    sc = e::Panel.singleton_class
+    orig_alive = sc.instance_method(:dialog_alive?)
+    orig_push = sc.instance_method(:push_focus_front)
+    sc.send(:define_method, :dialog_alive?) { true }
+    sc.send(:define_method, :push_focus_front) do |fid|
+      captured << fid.to_s
+      orig_push.bind(self).call(fid)
+    end
+    yield
+  ensure
+    sc.send(:define_method, :dialog_alive?, orig_alive)
+    sc.send(:define_method, :push_focus_front, orig_push)
+  end
+
   def run_kova2b(model)
     unless e::DirectionCheck.available?(model)
       info('KOV-A2b: SketchUp bez Overlay API (SU 2022 a starsi) — sekcia preskocena')
@@ -11851,6 +11880,35 @@ module NoxunSuRunner
          !a2b_overlay_present?(model) && a2b_state(model)['active'] == false)
       ok('KOV-A2b: zapamatany prepinac to NEZRUSILO (je to nastavenie pocitaca)',
          e::DirectionCheck.remembered? == true)
+
+      # 12b) DEEP-LINK (Codex #282 P2): ceruzka pri RED naleze o CELE musi
+      #      oznacit VLASTNIKA. Karta cela zije v Inspectorovi LEN nad oznacenou
+      #      SKRINKOU — vyber vnoreneho dielca by panel prepol do rezimu
+      #      „dielec“, kontext Cela by sa nedal zapnut a deep-link by ticho
+      #      zomrel. Bez ceruzky ostava dnesne spravanie (oznaci sa dielec).
+      inst_dl = e::CabinetBuilder.build(model, a2b_params([a2b_item('door', 'direction' => 'unset')]))
+      item_dl = kova_dir_items(model).first
+      key_dl = item_dl && item_dl['stable_key']
+      ok('KOV-A2b/deep-link: RED nalez o smere otvarania existuje', !key_dl.nil?)
+      if key_dl && inst_dl
+        pencil = []
+        a2b_with_panel_stub(pencil) { a2b_do_select(model, key_dl, true) }
+        sel = model.selection.to_a
+        ok("KOV-A2b/deep-link: ceruzka oznacila SKRINKU, nie vnoreny dielec " \
+           "(#{sel.length} ks, kind #{sel.first && e::Store.kind(sel.first)})",
+           sel.length == 1 && e::Store.kind(sel.first) == 'cabinet' && sel.first == inst_dl)
+        ok("KOV-A2b/deep-link: a Inspector dostal ID cela (#{pencil.inspect})", pencil == ['F1'])
+
+        plain = []
+        a2b_with_panel_stub(plain) { a2b_do_select(model, key_dl, false) }
+        sel2 = model.selection.to_a
+        ok("KOV-A2b/deep-link: obycajny klik na riadok NEMENI dnesne spravanie (#{sel2.length} ks, " \
+           "kind #{sel2.first && e::Store.kind(sel2.first)})",
+           sel2.length == 1 && e::Store.kind(sel2.first) == 'part' &&
+           e::Store.get(sel2.first, 'part_key').to_s == 'front:F1/wing:single')
+        ok('KOV-A2b/deep-link: a vtedy sa do Inspectora neposiela NIC', plain.empty?)
+      end
+      inst_dl.erase! if inst_dl && inst_dl.valid?
 
       # 13) VYKON na velkej zakazke (~40 skriniek x 6 ciel)
       a2b_perf(model)
