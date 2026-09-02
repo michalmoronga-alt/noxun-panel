@@ -296,6 +296,13 @@ viď [construction.md](construction.md)). Zber ich obohatí o `owner_id`, **`own
 ticho odobrať kus z objednávky, preto ostáva v nákupe a `Validation` ju priznáva ORANGE. Položka bez vlastníka (patrí celej skrinke) `owner_missing` nikdy nemá. Čitatelia sú dvaja:
 `Validation.run` a `ProductionCore.hardware_expansion` (posiela ich do `HardwareSets.expand(manual_items:)`); `compute()` kľúč ignoruje.
 
+**`cabinet_fronts` (KOV-H2):** aditívna mapa `cabinet_id -> front_items` (resolved čelá poslednej stavby). Slúži **výhradne** na ľudský popis vlastníka v rozklikanom **pôvode**
+nákupného riadku: `PartKeys.human_label` potrebuje resolved čelá, aby vedelo, že `front:Fmsi0wnix-1-3a3kxe` je „F1" — bez nich by v Štúdiu svietilo generované id. Zbiera sa v TOM
+ISTOM prechode z už načítaného `ccfg` (žiadny druhý sken modelu) a **prvá inštancia vyhráva**: dve skrinky so zdieľaným `cabinet_id` sú samostatná chyba identity (rieši ju
+`identities`), popisok sa kvôli nej nemá prečo hádať. Čitateľ je jediný — `ProductionCore.decorate_source_owners`, ktoré doplní **`owner_label`** do každého záznamu
+`rows[].sources` expanzie (`nil` = kovanie celej skrinky). Je to **aditívne pole zdroja**: nákupný CSV, `Budget.hardware_section` ani cenová ponuka ho nečítajú, takže výstup
+zákazky sa nemení ani o znak (drží to golden odtlačok `test_kovh_golden.rb`). `compute()` kľúč ignoruje.
+
 **`newer_configs` (KOV-H1, R-12 exportná brána):** aditívny zoznam ID skriniek, ktorých uložený `config_schema` je **vyšší** než `CabinetBuilder::CONFIG_SCHEMA`
 (`CabinetBuilder.newer_config?` — jedno kritérium pre prestavbovú aj exportnú bránu). Vzniklo z auditu #15 BLOCKER 3: R-12 chránil len **prestavbu**, takže staršia verzia pluginu
 zákazku zo schémy 3 normálne **vyexportovala** — len bez toho, čomu nerozumie, a objednávka aj cena boli neúplné bez slova. Čitatelia: `ProductionCore.export_blockers(newer:)`
