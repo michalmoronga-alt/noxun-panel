@@ -6,7 +6,7 @@ require 'extensions.rb'
 
 module Noxun
   module Engine
-    VERSION = '0.9.7'
+    VERSION = '0.9.8'
 
     class << self
       # Drzime kvoli UI::Notification (potrebuje registrovany extension objekt).
@@ -100,12 +100,25 @@ module Noxun
         require 'fileutils'
         status = with_lock(paths[:lock]) do
           begin
-            if pending?(paths)
-              repair!(paths)
-              FileUtils.rm_f(paths[:marker])
-              write_lease!(paths) ? (generation_matches?(paths) ? :done : :restart) : :lease_failed
+            done = if pending?(paths)
+                     repair!(paths)
+                     FileUtils.rm_f(paths[:marker])
+                     :done
+                   else
+                     :idle
+                   end
+            if !write_lease!(paths)
+              :lease_failed
+            elsif generation_matches?(paths)
+              done
             else
-              write_lease!(paths) ? :idle : :lease_failed
+              # Codex #277 kolo 3 (P1): kontrola bezi VZDY, aj ked na disku uz
+              # ziadne artefakty nie su. Presne to je stav po cakani na zamok:
+              # cudzi proces medzitym update DOKONCIL a upratal, takze
+              # `pending?` je false — ale NAS loader v pamati je stary a strom
+              # na disku novy. Bez tejto kontroly by sa zaregistroval nad cudzou
+              # generaciou.
+              :restart
             end
           rescue StandardError => e
             puts "[NOXUN::Engine] recovery aktualizacie zlyhala: #{e.class}: #{e.message}"
@@ -173,16 +186,40 @@ module Noxun
         end
       end
 
+      # Codex #277 kolo 3 (P1): o tom, ci loader na disku uz patri NOVEJ
+      # generacii, rozhoduje jeho OBSAH (VERSION), nie pritomnost `.rb.new`.
+      # Od kola 3 sa zaloha loadera robi KOPIOU, takze `.rb` existuje v kazdom
+      # okamihu a pritomnost suborov by stav nerozlisila spolahlivo.
       def self.repair!(p)
         if Dir.exist?(p[:tree_new])
           keep_old!(p)          # krok 4 neprebehol
-        elsif File.exist?(p[:ldr_new])
-          rollback_tree!(p)     # vykonava sa STARY loader — nikdy nedokoncuj dopredu
         elsif Dir.exist?(p[:tree_old])
-          finish_new!(p)        # vykonava sa NOVY loader — dokonci upratanie
+          if loader_matches_tree?(p)
+            finish_new!(p)      # na disku uz je NOVY loader — dokonci upratanie
+          else
+            rollback_tree!(p)   # na disku je STARY loader — nikdy nedokoncuj dopredu
+          end
         else
           finish_leftovers!(p)
         end
+      end
+
+      # Sedi loader NA DISKU so stromom NA DISKU? `nil` verzia (necitatelny
+      # subor, chybajuce VERSION) sa berie ako NESEDI — rollback je bezpecnejsi
+      # nez dokoncenie dopredu.
+      def self.loader_matches_tree?(p)
+        lv = version_of(p[:ldr])
+        tv = version_of(File.join(p[:tree], 'main.rb'))
+        !lv.nil? && !tv.nil? && lv == tv
+      end
+
+      def self.version_of(file)
+        return nil unless File.file?(file)
+
+        head = File.open(file, 'rb') { |f| f.read(8192) }.to_s
+        head.force_encoding(Encoding::UTF_8)[VERSION_RE, 1]
+      rescue StandardError
+        nil
       end
 
       # `.new` este stoji => plati STARA generacia (strom aj loader).
@@ -231,25 +268,40 @@ module Noxun
       end
 
       # Ziadny `.new` ani `.old` strom — ostal len zvysok po staging/upratovani.
+      # Zmieseny stav (loader jednej generacie nad stromom druhej) sa tu este da
+      # zachranit, ked `.rb.old` patri k stromu, ktory na disku lezi.
       def self.finish_leftovers!(p)
         rm_quiet(p[:ldr_new])
         File.rename(p[:ldr_old], p[:ldr]) if !File.exist?(p[:ldr]) && File.exist?(p[:ldr_old])
+        if !loader_matches_tree?(p) && File.file?(p[:ldr_old]) &&
+           version_of(p[:ldr_old]) == version_of(File.join(p[:tree], 'main.rb'))
+          File.rename(p[:ldr_old], p[:ldr]) # atomicky prepis, ziadne mazanie
+        end
         rm_quiet(p[:ldr_old])
       end
 
-      # Loader STAREJ generacie sa vracia VZDY, ked existuje.
+      # Loader STAREJ generacie sa vracia, ked na disku este nie je.
+      #
+      # Codex #277 kolo 3 (P1): NIC sa pritom NEMAZE. `File.rename` cielovy
+      # subor prepise atomicky (Windows MoveFileExW s REPLACE_EXISTING, POSIX
+      # rename(2)), takze `Plugins` nie su ani na okamih bez bootovatelneho
+      # `noxun_engine.rb`. Ked uz spravny loader na mieste je, nerobi sa nic.
       def self.restore_loader!(p)
-        return unless File.exist?(p[:ldr_old])
-
-        rm_quiet(p[:ldr])
-        File.rename(p[:ldr_old], p[:ldr])
+        if File.file?(p[:ldr_old]) &&
+           (!File.file?(p[:ldr]) || version_of(p[:ldr]) != version_of(p[:ldr_old]))
+          File.rename(p[:ldr_old], p[:ldr])
+        end
+        # Zaloha sa uprace az KED je na mieste pouzitelny loader.
+        rm_quiet(p[:ldr_old]) if File.file?(p[:ldr])
       end
 
+      # Nasadenie pripraveneho loadera. Zaloha ide KOPIOU a nova verzia
+      # atomickym prepisom — rovnaky dovod ako pri `restore_loader!`.
       def self.adopt_loader!(p)
-        return unless File.exist?(p[:ldr_new])
+        return unless File.file?(p[:ldr_new])
 
         rm_quiet(p[:ldr_old])
-        File.rename(p[:ldr], p[:ldr_old]) if File.exist?(p[:ldr])
+        FileUtils.cp(p[:ldr], p[:ldr_old]) if File.file?(p[:ldr])
         File.rename(p[:ldr_new], p[:ldr])
       end
 
@@ -264,17 +316,15 @@ module Noxun
 
       # Sedi strom s loaderom, ktory sa PRAVE VYKONAVA? `Engine::VERSION` je
       # definovana vyssie v tomto subore, takze je to verzia beziaceho kodu.
+      # Blokuje sa LEN DOKAZANY nesulad. Ked sa verzia stromu zistit NEDA
+      # (chybajuci alebo necitatelny `main.rb`), nie je to dovod nenacitat
+      # plugin — o chybajucom strome povie SketchUp sam pri `Sketchup.require`
+      # a tvrdy zakaz by z kozmetickej priciny spravil mrtvy plugin.
       def self.generation_matches?(p)
-        main = File.join(p[:tree], 'main.rb')
-        return false unless File.file?(main) && File.file?(p[:ldr])
+        tv = version_of(File.join(p[:tree], 'main.rb'))
+        return true if tv.nil?
 
-        head = File.open(main, 'rb') { |f| f.read(8192) }.to_s
-        tree_version = head.force_encoding(Encoding::UTF_8)[VERSION_RE, 1]
-        return false if tree_version.nil?
-
-        tree_version == Noxun::Engine::VERSION
-      rescue StandardError
-        false
+        tv == Noxun::Engine::VERSION
       end
 
       def self.announce(status)

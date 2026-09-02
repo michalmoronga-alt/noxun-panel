@@ -53,7 +53,16 @@
 #  13. `discard_previous!` bez guardu na zivy strom
 #      -> „(#277/2 P1): `.old` sa nesmie zmazat…" + guard nad zdrojom;
 #  14. zlyhanie zapisu markera po kroku 4 utecie von (bez rollbacku a latchu)
-#      -> „(#277/2 P1): zlyhany zapis markera po kroku 4…" + guard nad zdrojom.
+#      -> „(#277/2 P1): zlyhany zapis markera po kroku 4…" + guard nad zdrojom;
+#  15. zaloha loadera RENAMEOM namiesto kopie (okno bez `noxun_engine.rb`)
+#      -> „(#277/3 P1): zaloha loadera je KOPIA…" + guard nad zdrojom;
+#  16. recovery rozhoduje podla PRITOMNOSTI `.rb.new`, nie podla obsahu
+#      -> „pad v stave loader_copied…" + „(#277/3 P1): recovery rozhoduje
+#         z OBSAHU loadera…";
+#  17. `generation_matches?` sa na ceste bez artefaktov preskoci
+#      -> „(#277/3 P1): boot po CAKANI na zamok pozna cudzi update (:restart)";
+#  18. lease neoveruje identitu procesu (staci zivy PID)
+#      -> „(#277/3 P2): recyklovany PID neblokuje aktualizaciu".
 #
 # CELA SADA BEZI NAD TEMP SANDBOXOM — nikdy nad zivym `Plugins` priecinkom.
 # Testy, ktore spustaju druhy Ruby proces alebo zapisuju do %APPDATA%, sa
@@ -167,14 +176,31 @@ module NxD52
     sc.send(:remove_method, :nx_d52_orig_rename)
   end
 
+  # Stub `Updater.process_image`: `map` je PID -> navratova hodnota
+  # (String = image name, nil = proces nezije, :raise = nezistitelny stav).
+  def with_process_image(map)
+    sc = U.singleton_class
+    sc.send(:alias_method, :nx_d52_orig_image, :process_image)
+    sc.send(:define_method, :process_image) do |pid|
+      raise Noxun::Engine::Updater::Refused, 'test: tasklist zlyhal' if map[pid.to_i] == :raise
+
+      map.key?(pid.to_i) ? map[pid.to_i] : nx_d52_orig_image(pid)
+    end
+    yield
+  ensure
+    sc.send(:remove_method, :process_image)
+    sc.send(:alias_method, :process_image, :nx_d52_orig_image)
+    sc.send(:remove_method, :nx_d52_orig_image)
+  end
+
   # Docasna pasca nad `Updater.stage!` — simuluje instanciu SketchUpu, ktora
   # nabehne AZ POCAS kopirovania balika (lease vznikne po prvej kontrole).
-  def with_lease_during_staging(pid)
+  def with_lease_during_staging(pid, exe = 'SketchUp.exe')
     sc = U.singleton_class
     sc.send(:alias_method, :nx_d52_orig_stage, :stage!)
     sc.send(:define_method, :stage!) do |src, plugins, manifest|
       out = nx_d52_orig_stage(src, plugins, manifest)
-      write_lease!(plugins, pid)
+      write_lease!(plugins, pid, exe)
       out
     end
     yield
@@ -264,21 +290,31 @@ module NxD52
       File.rename(tree, tree_old)
       FileUtils.cp_r(File.join(new_pkg, 'noxun_engine'), tree)
       FileUtils.cp(File.join(new_pkg, 'noxun_engine.rb'), "#{ldr}.new")
+    when 'loader_copied' # pad MEDZI (5a) kopiou zalohy a (5b) renameom
+      File.rename(tree, tree_old)
+      FileUtils.cp_r(File.join(new_pkg, 'noxun_engine'), tree)
+      FileUtils.cp(ldr, "#{ldr}.old")  # zaloha je KOPIA — `.rb` ostava stary
+      FileUtils.cp(File.join(new_pkg, 'noxun_engine.rb'), "#{ldr}.new")
     when 'loader_swapped' # krok 5 hotovy, `.old` este nie je upratany
       File.rename(tree, tree_old)
       FileUtils.cp_r(File.join(new_pkg, 'noxun_engine'), tree)
-      File.rename(ldr, "#{ldr}.old")
+      FileUtils.cp(ldr, "#{ldr}.old")
       FileUtils.cp(File.join(new_pkg, 'noxun_engine.rb'), ldr)
     when 'before_cleanup' # to iste, ale marker uz hlasi `done`
       File.rename(tree, tree_old)
       FileUtils.cp_r(File.join(new_pkg, 'noxun_engine'), tree)
-      File.rename(ldr, "#{ldr}.old")
+      FileUtils.cp(ldr, "#{ldr}.old")
       FileUtils.cp(File.join(new_pkg, 'noxun_engine.rb'), ldr)
     else
       raise ArgumentError, state
     end
 
-    marker = { 'std' => 1, 'state' => state == 'tree_moved' ? 'staged' : (state == 'before_cleanup' ? 'done' : state),
+    marker_state = case state
+                   when 'tree_moved' then 'staged'
+                   when 'before_cleanup' then 'done'
+                   else state
+                   end
+    marker = { 'std' => 1, 'state' => marker_state,
                'from' => '0.9.4', 'to' => '0.9.5', 'started_at' => '2026-09-02T08:00:00Z', 'pid' => 424_242 }
     write(File.join(plugins, 'noxun_engine.update.json'), JSON.pretty_generate(marker))
     env
@@ -566,6 +602,7 @@ end
   'staged' => '0.9.4',         # swap sa nezacal -> plati STARA generacia
   'tree_moved' => '0.9.4',     # pad MEDZI krokom 3 a 4 -> STARA generacia
   'tree_swapped' => '0.9.4',   # loader je este STARY -> ROLLBACK stromu
+  'loader_copied' => '0.9.4',  # zaloha hotova, `.rb` este STARY -> ROLLBACK
   'loader_swapped' => '0.9.5', # vykonava sa uz NOVY loader -> dokonci upratanie
   'before_cleanup' => '0.9.5'
 }.each do |state, expected|
@@ -574,6 +611,10 @@ end
 
     env = NxD52.sandbox
     NxD52.crash_state!(env, state)
+    # Codex #277 kolo 3 (P1): SketchUp musi mat co spustit v KAZDOM okamihu —
+    # bez `noxun_engine.rb` by recovery nikdy nenabehla.
+    NxTest.assert(File.file?(File.join(env[:plugins], 'noxun_engine.rb')),
+                  "v stave #{state} chyba bootovatelny loader — recovery by nemala odkial bezat")
     out = NxD52.boot!(env)
     NxTest.assert(out['raw'] !~ /recovery aktualizacie zlyhala/,
                   "recovery hlasila chybu: #{out['raw'].lines.first(3).join(' ')}")
@@ -665,8 +706,12 @@ NxTest.test('D-52a (#277 P1): nova instancia POCAS stagingu swap zastavi') do
   alive = Process.spawn(RbConfig.ruby, holder)
 
   # Pri VSTUPE lease este neexistuje — vznikne az po skopirovani balika.
-  err = NxD52.with_lease_during_staging(alive) do
-    NxTest.assert_raise('medzitým') { NxD52::U.apply!(env[:src], env[:tree]) }
+  # Identita procesu je stubnuta: spusteny `ruby.exe` by inak (spravne) nebol
+  # povazovany za instanciu SketchUpu.
+  err = NxD52.with_process_image(alive => 'SketchUp.exe') do
+    NxD52.with_lease_during_staging(alive) do
+      NxTest.assert_raise('medzitým') { NxD52::U.apply!(env[:src], env[:tree]) }
+    end
   end
   NxTest.assert(err.message.include?(alive.to_s), "odmietnutie pomenuje PID: #{err.message}")
   NxD52.assert_untouched(plugins, before, 'neskory lease')
@@ -681,9 +726,9 @@ NxTest.test('D-52a (#277 P1): ZLYHANY rollback nemaze zalozne generacie ani mark
   plugins = env[:plugins]
   Noxun::Engine.reset_restart_latch!
 
-  # (5) prvy rename loadera zlyha => loader ostava STARY na mieste;
+  # (5b) vymena loadera zlyha => loader ostava STARY na mieste;
   # rollback stromu potom zlyha tiez => nic sa nesmie zmazat.
-  err = NxD52.with_rename_trap([['noxun_engine.rb', 'noxun_engine.rb.old'],
+  err = NxD52.with_rename_trap([%w[noxun_engine.rb.new noxun_engine.rb],
                                 %w[noxun_engine noxun_engine.new]]) do
     NxTest.assert_raise('vrátenie zmien zlyhalo') { NxD52::U.apply!(env[:src], env[:tree]) }
   end
@@ -691,20 +736,8 @@ NxTest.test('D-52a (#277 P1): ZLYHANY rollback nemaze zalozne generacie ani mark
   NxTest.assert(Noxun::Engine.restart_required?,
                 'pri nedokoncenom rollbacku MUSI byt latch zapnuty — v Plugins lezi novy strom')
 
-  # Druha vetva hlasky: ked na disku CHYBA loader, recovery pri boote nema
-  # odkial bezat — odkaz na INSTALL je jedina pravdiva rada.
-  env2 = NxD52.sandbox
-  NxD52.with_rename_trap([['noxun_engine.rb.new', 'noxun_engine.rb'],
-                          ['noxun_engine.rb.old', 'noxun_engine.rb'],
-                          %w[noxun_engine noxun_engine.new]]) do
-    e2 = NxTest.assert_raise('vrátenie zmien zlyhalo') { NxD52::U.apply!(env2[:src], env2[:tree]) }
-    NxTest.assert(e2.message.include?('INSTALL'),
-                  "bez loadera nesmie hlaska sluboovat opravu pri starte: #{e2.message}")
-  end
-  NxTest.assert(File.exist?(File.join(env2[:plugins], 'noxun_engine.rb.old')),
-                'zaloha loadera MUSI ostat aj v tejto vetve')
-  Noxun::Engine.reset_restart_latch!
-  FileUtils.rm_rf(env2[:root])
+  NxTest.assert(File.file?(File.join(plugins, 'noxun_engine.rb')),
+                'loader je od kola 3 na mieste POCAS celeho swapu — kopia, nie rename')
 
   NxTest.assert(File.exist?(File.join(plugins, 'noxun_engine.old')), '.old strom MUSI ostat')
   NxTest.assert(File.exist?(File.join(plugins, 'noxun_engine.rb.new')), '.rb.new MUSI ostat')
@@ -725,8 +758,9 @@ end
 NxTest.test('D-52a (#277 P1): latch je zapnuty aj ked upratanie po commite zlyha') do
   env = NxD52.sandbox
   Noxun::Engine.reset_restart_latch!
-  # Marker sa zapisuje 4×; pasca plati az na ten PO commite loadera.
-  res = NxD52.with_rename_trap(/\Anoxun_engine\.update\.json\.tmp-/, 'noxun_engine.update.json', skip: 3) do
+  # Marker sa zapisuje 6× (staged, staged+to, tree_swapped, loader_copied,
+  # loader_swapped, done); pasca plati az na ten PO commite loadera.
+  res = NxD52.with_rename_trap(/\Anoxun_engine\.update\.json\.tmp-/, 'noxun_engine.update.json', skip: 4) do
     NxD52::U.apply!(env[:src], env[:tree])
   end
   NxTest.assert(res['ok'], 'aktualizacia PRESLA — chyba v upratovani z nej nesmie spravit neuspech')
@@ -928,6 +962,194 @@ NxTest.test('D-52a (#277/2 P1): zlyhany zapis markera po kroku 4 vrati povodny s
   FileUtils.rm_rf(env[:root])
 end
 
+# --- 5d) nalezy Codex review #277, kolo 3 ------------------------------------
+
+NxTest.test('D-52a (#277/3 P1): File.rename PREPISE existujuci ciel (atomicky replace)') do
+  # Cely krok (5b) na tom stoji: jeden rename nad existujucim `.rb`.
+  # Windows: MoveFileExW s MOVEFILE_REPLACE_EXISTING; POSIX: rename(2).
+  dir = File.realpath(Dir.mktmpdir('nx-d52a-rn-'))
+  a = NxD52.write(File.join(dir, 'ciel.rb'), 'stary obsah')
+  b = NxD52.write(File.join(dir, 'ciel.rb.new'), 'novy obsah')
+  File.rename(b, a)
+  NxTest.assert_equal('novy obsah', File.binread(a), 'rename musí prepísať existujúci cieľ')
+  NxTest.refute(File.exist?(b), 'zdroj po renamovaní zaniká')
+  FileUtils.rm_rf(dir)
+end
+
+NxTest.test('D-52a (#277/3 P1): zaloha loadera je KOPIA — `.rb` nezmizne ani na okamih') do
+  env = NxD52.sandbox
+  plugins = env[:plugins]
+  loader = File.join(plugins, 'noxun_engine.rb')
+  videne = []
+
+  # Snimame existenciu `.rb` po KAZDOM renamovani pocas celeho swapu.
+  sc = File.singleton_class
+  sc.send(:alias_method, :nx_d52_watch_rename, :rename)
+  sc.send(:define_method, :rename) do |src, dst|
+    out = nx_d52_watch_rename(src, dst)
+    videne << File.file?(loader)
+    out
+  end
+  begin
+    res = NxD52::U.apply!(env[:src], env[:tree])
+  ensure
+    sc.send(:remove_method, :rename)
+    sc.send(:alias_method, :rename, :nx_d52_watch_rename)
+    sc.send(:remove_method, :nx_d52_watch_rename)
+  end
+
+  NxTest.assert(res['ok'], 'aktualizacia presla')
+  NxTest.assert(videne.length > 3, "cakalo sa viac renameov (#{videne.length})")
+  NxTest.assert(videne.all?, 'po ZIADNOM kroku swapu nesmie `noxun_engine.rb` chybat')
+  NxTest.assert_equal('0.9.5', NxD52.generation(plugins, 'po swape'))
+  Noxun::Engine.reset_restart_latch!
+  FileUtils.rm_rf(env[:root])
+end
+
+NxTest.test('D-52a (#277/3 P1): zlyhanie (5b) necha STARY loader nedotknuty') do
+  env = NxD52.sandbox
+  plugins = env[:plugins]
+  before = NxD52.fingerprint(plugins)
+  Noxun::Engine.reset_restart_latch!
+
+  err = NxD52.with_rename_trap([%w[noxun_engine.rb.new noxun_engine.rb]]) do
+    NxTest.assert_raise('nič sa nezmenilo') { NxD52::U.apply!(env[:src], env[:tree]) }
+  end
+  NxTest.assert(err.message.include?('vymeniť'), "dovod pomenuje loader: #{err.message}")
+  NxTest.assert(File.file?(File.join(plugins, 'noxun_engine.rb')), 'loader ostal na mieste')
+  NxTest.refute(Noxun::Engine.restart_required?, 'rollback presiel — latch netreba')
+  NxTest.assert_equal('0.9.4', NxD52.generation(plugins, 'po zlyhani (5b)'))
+  NxD52.assert_untouched(plugins, before, 'zlyhanie kroku 5b')
+  FileUtils.rm_rf(env[:root])
+end
+
+NxTest.test('D-52a (#277/3 P1): boot po CAKANI na zamok pozna cudzi update (:restart)') do
+  NxTest.skip!('potrebuje dva OS procesy') unless NxTest.headless?
+
+  # Proces A drzi zamok a medzitym „dokonci" update: strom je uz NOVY a ziadne
+  # artefakty neostali. Proces B ma v pamati STARY loader — `pending?` je false,
+  # takze bez kontroly generacie by sa zaregistroval nad cudzim stromom.
+  env = NxD52.sandbox
+  plugins = env[:plugins]
+  ready = File.join(env[:root], 'ready_wait')
+  go = File.join(env[:root], 'go_wait')
+  novy = NxD52.build_package(File.join(env[:root], 'novy'), '0.9.5', 'new')
+  holder = NxD52.write(File.join(env[:root], 'holder_wait.rb'), <<~RUBY2)
+    require 'fileutils'
+    File.open(#{File.join(plugins, 'noxun_engine.update.lock').inspect}, File::RDWR | File::CREAT, 0o644) do |f|
+      f.flock(File::LOCK_EX)
+      File.binwrite(#{ready.inspect}, 'x')
+      # „Cudzi update" vymeni STROM, ale loader na disku necha stary — presne
+      # tak to vidí proces, ktory uz stary loader vykonava.
+      FileUtils.rm_rf(#{File.join(plugins, 'noxun_engine').inspect})
+      FileUtils.cp_r(#{File.join(novy, 'noxun_engine').inspect}, #{File.join(plugins, 'noxun_engine').inspect})
+      300.times { break if File.exist?(#{go.inspect}); sleep 0.05 }
+    end
+  RUBY2
+  pid = Process.spawn(RbConfig.ruby, holder)
+  300.times { break if File.exist?(ready); sleep 0.02 }
+  NxTest.assert(File.exist?(ready), 'drziaci proces sa nespustil')
+  File.binwrite(go, 'x') # nech zamok pusti, kym boot caka
+
+  out = NxD52.boot!(env)
+  NxTest.assert(NxD52.leftovers(plugins).empty?, 'po cudzom update neostali ziadne artefakty')
+  NxTest.assert_equal('restart', out['status'],
+                      'boot MUSI porovnat generaciu aj ked `pending?` je false')
+  NxTest.refute(out['registered'], 'stary loader sa NESMIE zaregistrovat nad novym stromom')
+  NxTest.assert(out['message'].include?('Reštartuj'), "chyba hláška: #{out['message']}")
+
+  Process.wait(pid)
+  FileUtils.rm_rf(env[:root])
+end
+
+NxTest.test('D-52a (#277/3 P2): recyklovany PID neblokuje aktualizaciu') do
+  env = NxD52.sandbox
+  plugins = env[:plugins]
+  u = NxD52::U
+  cudzi = 424_242
+
+  # Stopa po ukoncenom SketchUpe; OS medzitym PID pridelil inemu programu.
+  u.write_lease!(plugins, cudzi, 'SketchUp.exe')
+  NxTest.assert(File.exist?(u.lease_path(plugins, cudzi)), 'stopa vznikla')
+  raw = JSON.parse(File.binread(u.lease_path(plugins, cudzi)))
+  NxTest.assert_equal('SketchUp.exe', raw['exe'], 'stopa nesie image name')
+  NxTest.refute(raw['started_at'].to_s.empty?, 'a cas vzniku')
+
+  NxD52.with_process_image(cudzi => 'chrome.exe') do
+    NxTest.assert_equal([], u.live_leases(plugins), 'cudzi program NIE JE ziva instancia')
+  end
+  NxTest.refute(File.exist?(u.lease_path(plugins, cudzi)), 'mrtva stopa sa uprace')
+
+  # Ta ista PID, ale STALE SketchUp -> stopa plati a swap sa odmietne.
+  u.write_lease!(plugins, cudzi, 'SketchUp.exe')
+  before = NxD52.fingerprint(plugins)
+  NxD52.with_process_image(cudzi => 'SketchUp.exe') do
+    NxTest.assert_equal([cudzi], u.live_leases(plugins), 'ziva instancia SketchUpu sa najde')
+    NxTest.assert_raise('ďalšia inštancia') { u.apply!(env[:src], env[:tree]) }
+  end
+  NxD52.assert_untouched(plugins, before, 'ziva instancia')
+
+  # Iný program s tým istým menom v stope: image name sedí, ale nie je to
+  # SketchUp -> stopa neplatí.
+  u.write_lease!(plugins, cudzi, 'notepad.exe')
+  NxD52.with_process_image(cudzi => 'notepad.exe') do
+    NxTest.assert_equal([], u.live_leases(plugins), 'iny program stopu nedrzi')
+  end
+
+  # Nezistitelny stav ostava FAIL-CLOSED (kolo 2).
+  u.write_lease!(plugins, cudzi, 'SketchUp.exe')
+  NxD52.with_process_image(cudzi => :raise) do
+    NxTest.assert_raise('tasklist') { u.live_leases(plugins) }
+    NxTest.assert_raise('tasklist') { u.apply!(env[:src], env[:tree]) }
+  end
+  NxD52.assert_untouched(plugins, before, 'nezistitelny stav procesu')
+  FileUtils.rm_rf(env[:root])
+end
+
+NxTest.test('D-52a (#277/3 P1): recovery rozhoduje z OBSAHU loadera, nie z pritomnosti suborov') do
+  NxTest.skip!('potrebuje samostatny Ruby proces') unless NxTest.headless?
+
+  # Stav `loader_copied` BEZ `.rb.new` (zvysok sa nedopatrenim zmazal): podla
+  # pritomnosti suborov by to vyzeralo ako „loader uz je novy" a recovery by
+  # dokoncila dopredu. Podla OBSAHU je `.rb` stale stary -> rollback stromu.
+  env = NxD52.sandbox
+  NxD52.crash_state!(env, 'loader_copied')
+  FileUtils.rm_f(File.join(env[:plugins], 'noxun_engine.rb.new'))
+
+  out = NxD52.boot!(env)
+  NxTest.assert_equal('done', out['status'])
+  NxTest.assert_equal('0.9.4', NxD52.generation(env[:plugins], 'obsahove rozhodnutie'))
+  NxTest.assert_equal('0.9.4', out['version'], 'vykonany loader sedi so stromom')
+  NxTest.assert(out['registered'], 'po oprave sa plugin nacita')
+  NxTest.assert(NxD52.leftovers(env[:plugins]).empty?, 'zvysky su upratane')
+  FileUtils.rm_rf(env[:root])
+end
+
+NxTest.test('D-52a (#277/3 P1): zmieseny stav (novy loader, stary strom) sa dorovna zo zalohy') do
+  NxTest.skip!('potrebuje samostatny Ruby proces') unless NxTest.headless?
+
+  # Ziadny `.new` ani `.old` STROM, ale loader patri inej generacii nez strom.
+  env = NxD52.sandbox
+  plugins = env[:plugins]
+  novy = NxD52.build_package(File.join(env[:root], 'novy'), '0.9.5', 'new')
+  FileUtils.cp(File.join(plugins, 'noxun_engine.rb'), File.join(plugins, 'noxun_engine.rb.old'))
+  FileUtils.cp(File.join(novy, 'noxun_engine.rb'), File.join(plugins, 'noxun_engine.rb'))
+
+  out = NxD52.boot!(env)
+  NxTest.assert_equal('0.9.4', NxD52.generation(plugins, 'zmieseny stav dorovnany'))
+  NxTest.assert(NxD52.leftovers(plugins).empty?, 'zvysky su upratane')
+  NxTest.refute(out['registered'],
+                'vykonany loader bol NOVY nad starym stromom — registrovat sa NESMIE')
+  NxTest.assert_equal('restart', out['status'])
+
+  # Dalsi boot uz cita opraveny loader a je konzistentny.
+  again = NxD52.boot!(env)
+  NxTest.assert_equal('idle', again['status'])
+  NxTest.assert(again['registered'], 'po restarte uz vsetko sedi')
+  NxTest.assert_equal('0.9.4', again['version'])
+  FileUtils.rm_rf(env[:root])
+end
+
 # --- 6) dva procesy: zamok a lease -------------------------------------------
 
 NxTest.test('D-52a: druhy proces dostane odmietnutie OKAMZITE a staging nemaze') do
@@ -992,10 +1214,14 @@ NxTest.test('D-52a: lease — ziva ina instancia swap zastavi, mrtve lease sa up
   holder = NxD52.write(File.join(env[:root], 'holder2.rb'),
                        "200.times { break if File.exist?(#{go.inspect}); sleep 0.05 }\n")
   alive = Process.spawn(RbConfig.ruby, holder)
-  u.write_lease!(plugins, alive)
+  u.write_lease!(plugins, alive, 'SketchUp.exe')
   before = NxD52.fingerprint(plugins)
-  NxTest.assert(u.live_leases(plugins).include?(alive), 'zivy PID sa musi najst')
-  NxTest.assert_raise('ďalšia inštancia') { u.apply!(env[:src], env[:tree]) }
+  # Stub identity: proces naozaj ZIJE (skutocny PID), tvarime sa len, ze je to
+  # SketchUp — inak by ho kontrola z kola 3 spravne zahodila ako `ruby.exe`.
+  NxD52.with_process_image(alive => 'SketchUp.exe') do
+    NxTest.assert(u.live_leases(plugins).include?(alive), 'zivy PID sa musi najst')
+    NxTest.assert_raise('ďalšia inštancia') { u.apply!(env[:src], env[:tree]) }
+  end
   NxD52.assert_untouched(plugins, before, 'lease')
 
   File.binwrite(go, 'x')
@@ -1167,6 +1393,18 @@ NxTest.test('D-52a (#277/2): za krokom 3 vedie KAZDA chybova cesta cez abort_aft
   NxTest.assert(abort_body.include?('restore_previous_generation!'), 'abort najprv skusi plny rollback')
   NxTest.assert(abort_body.include?('Engine.restart_required!'),
                 'a pri neuspesnom rollbacku zapina latch')
+  # Dve vetvy hlasky: recovery zije v loaderi, takze bez neho je jedina pravdiva
+  # rada INSTALL (swapom uz taky stav vzniknut nevie — zaloha je KOPIA).
+  NxTest.assert(abort_body.include?('REŠTARTUJ'), 'vetva s pritomnym loaderom')
+  NxTest.assert(abort_body.include?('INSTALL'), 'vetva s chybajucim loaderom')
+
+  # Kolo 3: zaloha loadera je KOPIA + JEDINY atomicky replace-rename.
+  NxTest.assert(body.include?('copy_file!(loader, loader_old)'),
+                'zaloha loadera MUSI byt kopia — rename by nechal Plugins bez noxun_engine.rb')
+  NxTest.refute(body.include?('File.rename(loader, loader_old)'),
+                'rename `.rb -> .rb.old` je presne ta diera, ktoru kolo 3 zatvorilo')
+  NxTest.assert_equal(1, body.scan(/File\.rename\(loader_new, loader\)/).length,
+                      'vymena loadera je JEDEN atomicky krok')
 
   # `.old` je posledna kompletna kopia — maze sa na JEDNOM mieste, pod guardom.
   NxTest.assert_equal(1, src.scan(/rm_rf\(tree_old/).length,
@@ -1174,6 +1412,32 @@ NxTest.test('D-52a (#277/2): za krokom 3 vedie KAZDA chybova cesta cez abort_aft
   discard = src[/def discard_previous!.*?\n      end\n/m].to_s
   NxTest.assert(discard.include?('return false unless Dir.exist?(tree_path(plugins)) && File.file?(loader_path(plugins))'),
                 'discard_previous! musi odmietnut mazat `.old`, kym nie je zivy strom AJ loader')
+end
+
+NxTest.test('D-52a (#277/3): recovery rozhoduje z OBSAHU a nikdy nemaze zivy loader') do
+  loader = File.read(File.join(NxTest::ROOT, 'noxun_engine.rb'), encoding: 'UTF-8')
+  boot = loader[/module Boot\b.*?\n    end\n/m].to_s
+  NxTest.refute(boot.empty?, 'recovery sekcia sa nenasla')
+
+  repair = boot[/def self\.repair!.*?\n      end\n/m].to_s
+  NxTest.assert(repair.include?('loader_matches_tree?'),
+                'o generacii loadera rozhoduje OBSAH (VERSION), nie pritomnost `.rb.new`')
+  NxTest.refute(repair.include?('ldr_new'),
+                'pritomnost `.rb.new` uz nesmie rozhodovat — zaloha je od kola 3 kopia')
+
+  # V `Plugins` nesmie ani na okamih chybat bootovatelny loader, takze recovery
+  # zivy `.rb` NIKDY nemaze; nova verzia sa nasadzuje atomickym prepisom.
+  code = boot.lines.map { |l| l.sub(/#.*$/, '') }.join
+  NxTest.refute(code.include?('rm_quiet(p[:ldr])'),
+                'recovery nesmie mazat zivy loader — SketchUp by nemal co spustit')
+  NxTest.assert(code.include?('File.rename(p[:ldr_old], p[:ldr])'),
+                'stary loader sa vracia atomickym prepisom')
+
+  # Kontrola generacie bezi VZDY, aj na ceste bez artefaktov.
+  rec = boot[/def self\.recover!.*?\n      end\n/m].to_s
+  NxTest.assert(rec.include?('generation_matches?'),
+                'generation_matches? musi bezat aj ked `pending?` je false')
+  NxTest.assert(rec.include?(':restart'), 'nesulad konci stavom :restart')
 end
 
 NxTest.test('D-52a (#277/2): loader a modul zapisuju lease v ROVNAKOM tvare') do

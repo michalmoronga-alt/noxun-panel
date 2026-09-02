@@ -1827,8 +1827,8 @@ generácia) · `noxun_engine.update.json` (transakčný marker) · `noxun_engine
 
 **Postup `apply!`:** kanonické hranice → zámok → *(marker existuje ⇒ odmietnuť)* → *(žije iná inštancia ⇒ odmietnuť)* → **manifest zo zdroja** (relatívna cesta → SHA1 + veľkosť) →
 **staging KÓPIOU** do `.new` (nie rename — sieťový share vie streamovať useknutý súbor) → **validácia staged stromu proti manifestu byte-for-byte** → *(**opakovaná** kontrola
-lease — staging trvá a medzitým mohla nabehnúť ďalšia inštancia)* → **(3)** `noxun_engine` → `.old` → **(4)** `.new` → `noxun_engine` → **(5)** loader `.rb` → `.rb.old`,
-`.rb.new` → `.rb` → **(6)** `.old` sa maže až po úspechu. Každý krok má definovaný rollback; zlyhanie kroku 5 vracia **celý** swap. Zlyhanie mazania `.old` je **úspech
+lease — staging trvá a medzitým mohla nabehnúť ďalšia inštancia)* → **(3)** `noxun_engine` → `.old` → **(4)** `.new` → `noxun_engine` → **(5a)** záloha loadera **kópiou** `.rb` → `.rb.old`,
+**(5b)** jediný atomický `File.rename('.rb.new', '.rb')` → **(6)** `.old` sa maže až po úspechu. Každý krok má definovaný rollback; zlyhanie ktoréhokoľvek vracia **celý** swap. Zlyhanie mazania `.old` je **úspech
 s poznámkou** (zvyšok uprace najbližší boot). Swap zároveň prirodzene **zrkadlí** — osirené súbory zaniknú s `.old`.
 
 **JEDNO PRAVIDLO PRE CELÝ SWAP.** Od okamihu, keď **uspeje prvý rename kroku 3** (`noxun_engine` → `.old`), platí buď **(A)** plný rollback **overený na disku** — živý strom aj
@@ -1836,6 +1836,12 @@ loader späť, artefakty upratané, marker zmazaný, **žiadny latch** — alebo
 recovery. **Tretia možnosť neexistuje.** Preto každá chybová cesta za krokom 3 (zlyhaný rename kroku 4, **zlyhaný zápis markera**, zlyhaný rename loadera) končí v jedinom mieste,
 `abort_after_move!`; guard test nad zdrojom trvá na tom, že sa tam za krokom 3 `raise Refused` nepíše nikde inde. Latch sa pri **úspešnom** rollbacku zámerne **nezapína**: na disku
 je presne to, čo tam bolo pred pokusom, nič sa nikam nenačítalo a zbytočný latch by zamkol plugin po chybe, ktorá ho nepoznačila.
+
+**Loader sa vymieňa tak, aby `noxun_engine.rb` existoval v KAŽDOM okamihu.** Záloha je **kópia** (`.rb` ostáva na mieste, zapisuje sa cez bokový súbor + `fsync`, až potom
+premenovanie na `.rb.old`), a samotná výmena je **jediný atomický `File.rename('.rb.new', '.rb')`** — na Windows `MoveFileExW` s `MOVEFILE_REPLACE_EXISTING`, na POSIXe `rename(2)`,
+oba prepíšu existujúci cieľ. Pôvodné poradie (rename `.rb` → `.rb.old`, potom `.rb.new` → `.rb`) nechávalo medzi krokmi okamih **bez loadera**: pád v ňom by znamenal, že SketchUp
+nemá čo spustiť, recovery (ktorá žije práve v loaderi) by nikdy nenabehla a plugin by ostal mŕtvy až do reinštalu. Keď zlyhá krok (5b), starý `.rb` je nedotknutý a platí pravidlo
+(A)/(B) po kroku 3. Recovery v loaderi rovnako **nikdy nemaže živý `.rb`** — starú verziu vracia atomickým prepisom.
 
 **Bod commitu = úspešný rename loadera.** Od tej chvíle leží v `Plugins` nová generácia a v pamäti beží starý Ruby, takže `Engine.restart_required!` sa volá **okamžite po ňom** —
 pred zápisom markera aj pred upratovaním. Výnimka v upratovaní preto nikdy nenechá okná odomknuté a **nerobí z úspešnej aktualizácie neúspech**: skončí ako poznámka vo výsledku
@@ -1865,6 +1871,12 @@ capability marker balíka.
 (na Windows sa overuje cez `tasklist /FO CSV`, inde cez `Process.kill(0, pid)`), mŕtve lease sa upracú. Kontrola beží **dvakrát**: pri vstupe do `apply!` a **znova pod zámkom tesne
 pred swapom** (staging trvá a medzitým mohla nabehnúť ďalšia inštancia).
 
+**Lease nesie identitu procesu, nie len PID.** Zapisuje sa `{std, pid, exe, started_at}` a `live_leases` overí cez `tasklist /FI "PID eq N" /FO CSV /NH`, že PID **stále** patrí
+procesu s tým istým image name **a** že je to inštancia SketchUpu (`sketchup` v mene, case-insensitive). Bez toho by po zatvorení SketchUpu ostala stopa, OS by to číslo pridelil
+inému programu a `chrome.exe` s recyklovaným PID by navždy blokoval aktualizáciu hláškou „zavri ostatné okná SketchUpu". Mimo Windows sa image name zistiť nedá — tam rozhoduje
+samotná živosť procesu (produkcia beží výhradne na Windows, headless CI na Linuxe). Výstup `tasklist` sa parsuje **binárne**: na slovenskom Windows chodí v konzolovej kódovej
+stránke, nie v UTF-8.
+
 **Lease je fail-closed na oboch stranách.** Boot, ktorý si lease nedokáže zapísať (priečinok `noxun_engine.leases` je obyčajný súbor, chýbajú práva), vráti `:lease_failed`
 a **plugin sa nenačíta** — inštancia, ktorú nikto nevidí, je horšia než inštancia, ktorá nebeží. A `live_leases` pri nezistiteľnom stave (priečinok chýba, je to súbor, nedá sa
 prečítať) **nevracia ticho prázdny zoznam**, ale vyhodí `Refused`, takže `apply!` odmietne. Neistota pri overovaní PID sa rovnako **nevydáva za „mŕtvy"** — swap radšej neprebehne.
@@ -1889,8 +1901,11 @@ je len sprievodka:
 | na disku | znamená | recovery urobí |
 |---|---|---|
 | stojí `noxun_engine.new` | krok 4 neprebehol | vráti **starú** generáciu (uprace `.new`, prípadne vráti `.old`) |
-| stojí `noxun_engine.rb.new` | vykonáva sa ešte **starý** loader | **rollback stromu** na `.old` — nikdy nie dokončenie dopredu |
-| ostal len `.old` | vykonáva sa už **nový** loader | dokončí upratanie predchádzajúcej generácie |
+| `.old` ostal a **VERSION v `.rb` ≠ VERSION v strome** | na disku je ešte **starý** loader | **rollback stromu** na `.old` — nikdy nie dokončenie dopredu |
+| `.old` ostal a **VERSION v `.rb` = VERSION v strome** | na disku je už **nový** loader | dokončí upratanie predchádzajúcej generácie |
+
+O generácii loadera rozhoduje **obsah (VERSION), nie prítomnosť `.rb.new`**: odkedy je záloha kópiou, `.rb` existuje vždy, takže prítomnosť súborov by stav nerozlíšila. Nečitateľná
+verzia sa berie ako „nesedí" — rollback je bezpečnejší než dokončenie dopredu.
 
 Rename v rámci jedného priečinka je atomický, takže medzistav neexistuje. Po oprave sa ešte porovná `Engine::VERSION` (verzia práve vykonávaného loadera) s `VERSION` v strome —
 **nesúlad znamená, že sa plugin v tomto okne zámerne nenačíta**. Mazanie zvyškov je kozmetika a beží „naticho": jeho zlyhanie nesmie zhodiť štrukturálnu opravu.
@@ -1898,6 +1913,10 @@ Rename v rámci jedného priečinka je atomický, takže medzistav neexistuje. P
 **Boot vracia stav a ten rozhoduje, či sa plugin vôbec načíta:** `:idle` (nič sa nedialo) a `:done` (dorovnané, strom sedí) → extension sa registruje; `:busy` (**zámok drží iná
 inštancia, ktorá práve aktualizuje** — boot naň krátko počká, max ~5 s), `:restart` (strom nezodpovedá tomuto loaderu), `:lease_failed` (nedá sa zapísať stopa procesu) a `:error`
 (opravu sa nepodarilo dokončiť) → **extension sa NEregistruje** a používateľ dostane natívnu hlášku.
+
+**Porovnanie generácie beží VŽDY — aj na ceste `:idle`.** Je to presne stav po čakaní na zámok: cudzí proces medzitým aktualizáciu **dokončil a upratal**, takže na disku niet čo
+opravovať (`pending?` je false), ale náš loader v pamäti je starý a strom na disku nový. Bez tejto kontroly by sa starý loader zaregistroval nad cudzou generáciou. Blokuje sa len
+**dokázaný** nesúlad: keď sa verzia stromu zistiť nedá (chýbajúci alebo nečitateľný `main.rb`), plugin sa načíta normálne a o probléme povie samotný `Sketchup.require`.
 
 **Zámok sa pritom berie VŽDY, aj keď na disku nie sú žiadne artefakty.** `apply!` ho drží už od chvíle, keď len počíta manifest zdroja — teda dávno pred vznikom prvého `.new`
 súboru. Boot, ktorý by sa v tom okne pozrel iba na artefakty, by nič nenašiel, načítal strom a updater by mu ho o pár sekúnd vymenil pod rukami. Bežný štart je tak jeden `flock`,

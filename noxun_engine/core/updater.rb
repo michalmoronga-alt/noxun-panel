@@ -95,6 +95,8 @@ module Noxun
       MARKER_NAME = 'noxun_engine.update.json'
       LOCK_NAME   = 'noxun_engine.update.lock'
       LEASES_DIR  = 'noxun_engine.leases'
+      # Image name ziveho procesu pluginu (case-insensitive podretazec).
+      LEASE_IMAGE_HINT = 'sketchup'
 
       NEW_SUFFIX = '.new'
       OLD_SUFFIX = '.old'
@@ -421,7 +423,7 @@ module Noxun
       # --- transakcny marker -------------------------------------------------
       # Atomicky zapis (tmp + rename v tom istom priecinku) — polovicny marker
       # by recovery pri boote precitala ako poskodenu a nevedela by, co robit.
-      STATES = %w[staged tree_swapped loader_swapped done].freeze
+      STATES = %w[staged tree_swapped loader_copied loader_swapped done].freeze
 
       def write_marker!(plugins_dir, state, from: nil, to: nil)
         raise Refused, "neznámy stav aktualizácie (#{state})" unless STATES.include?(state.to_s)
@@ -502,12 +504,23 @@ module Noxun
         File.join(leases_dir(plugins_dir), "#{pid.to_i}.lease")
       end
 
-      def write_lease!(plugins_dir, pid = Process.pid)
+      # Lease nesie aj IDENTITU procesu (Codex #277 kolo 3, P2): samotny PID
+      # nestaci — po ukonceni SketchUpu ho OS pridelí inemu programu a mrtva
+      # stopa by aktualizaciu blokovala klamlivou hlaskou „zavri ostatne okna".
+      # `exe` je image name pri zapise, `started_at` cas vzniku stopy.
+      def current_image_name
+        File.basename(Process.argv0.to_s)
+      rescue StandardError
+        ''
+      end
+
+      def write_lease!(plugins_dir, pid = Process.pid, exe = current_image_name)
         dir = leases_dir(plugins_dir)
         FileUtils.mkdir_p(dir)
+        now = Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ')
         File.binwrite(lease_path(plugins_dir, pid),
-                      JSON.generate('std' => STD, 'pid' => pid.to_i,
-                                    'at' => Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ')))
+                      JSON.generate('std' => STD, 'pid' => pid.to_i, 'exe' => exe.to_s,
+                                    'started_at' => now, 'at' => now))
         true
       rescue StandardError => e
         Engine.log_error(e, 'Updater.write_lease!') if Engine.respond_to?(:log_error)
@@ -523,36 +536,83 @@ module Noxun
         RbConfig::CONFIG['host_os'].to_s =~ /mswin|mingw|cygwin/ ? true : false
       end
 
-      # Zije PID? Na Windows to vie povedat len `tasklist` (Ruby `Process.kill(0)`
-      # tam na cudzi proces nie je spolahlive). CSV format sa parsuje jednoznacne —
-      # holy `include?(pid)` by sa trafil do stlpca s pamatou.
-      def pid_alive?(pid)
+      # Image name procesu s danym PID:
+      #   String  — proces zije a takto sa vola jeho program,
+      #   nil     — proces NEZIJE,
+      #   :unknown — beziaci system to nevie povedat (mimo Windows).
+      # Ked sa dotaz NEPODARI vykonat, vyleti `Refused` — fail-closed z kola 2:
+      # nezistitelny stav nie je „nikto nebezi".
+      def process_image(pid)
+        n = pid.to_i
+        return nil if n <= 0
+
+        unless windows?
+          begin
+            Process.kill(0, n)
+            return :unknown # POSIX: proces zije, meno programu nezistujeme
+          rescue Errno::ESRCH
+            return nil
+          rescue Errno::EPERM
+            return :unknown # cudzi pouzivatel, ale ZIJE
+          rescue StandardError => e
+            raise Refused, "stav procesu #{n} sa nedá zistiť (#{e.class})"
+          end
+        end
+
+        out = begin
+          `tasklist /FI "PID eq #{n}" /NH /FO CSV 2>NUL`
+        rescue StandardError => e
+          raise Refused, "`tasklist` sa nedá spustiť (#{e.class}) — nedá sa zistiť, " \
+                         'či nebeží ďalšia inštancia SketchUpu'
+        end
+        # `tasklist` pise v KONZOLOVEJ kodovej stranke (na SK Windows CP852),
+        # nie v UTF-8 — regex nad takym retazcom by hodil „invalid byte
+        # sequence". Parsuje sa preto BINARNE a vysledok sa az potom ocisti.
+        raw = out.to_s.dup.force_encoding(Encoding::BINARY)
+        row = raw.lines.find { |l| l.include?("\"#{n}\"") }
+        return nil if row.nil? # ziadny taky proces (tasklist vypise INFO riadok)
+
+        row[/\A"([^"]*)"/, 1].to_s.force_encoding(Encoding::UTF_8).scrub
+      end
+
+      # Patri PID STALE tomu procesu, ktory si stopu zapisal?
+      #
+      # Codex #277 kolo 3 (P2): po ukonceni SketchUpu stopa na disku ostane a OS
+      # ten PID casom pridelí uplne inemu programu. Bez kontroly identity by
+      # `chrome.exe` s recyklovanym cislom navzdy zablokoval aktualizaciu
+      # hlaskou „zavri ostatne okna SketchUpu". Preto musi image name
+      #   (a) sediet s tym, co je v stope (ked ho stopa nesie), A ZAROVEN
+      #   (b) byt instancia SketchUpu.
+      # Mimo Windows sa image name zistit neda — tam rozhoduje samotna zivost
+      # (produkcia bezi vyhradne na Windows, headless CI je Linux).
+      def lease_alive?(pid, recorded_exe = nil)
         n = pid.to_i
         return false if n <= 0
         return true if n == Process.pid
 
-        if windows?
-          out = `tasklist /FI "PID eq #{n}" /NH /FO CSV 2>NUL`
-          out.to_s.include?("\"#{n}\"")
-        else
-          begin
-            Process.kill(0, n)
-            true
-          rescue Errno::ESRCH
-            false
-          rescue Errno::EPERM
-            true # cudzi pouzivatel, ale ZIJE
-          rescue StandardError
-            false
-          end
-        end
-      rescue StandardError
-        # Neistota sa NEVYDAVA za „mrtvy" — swap radsej neprebehne.
-        true
+        image = process_image(n)
+        return false if image.nil? # proces nezije
+        return true if image == :unknown
+
+        name = image.to_s.strip.downcase
+        want = recorded_exe.to_s.strip.downcase
+        return false unless want.empty? || want == name
+
+        name.include?(LEASE_IMAGE_HINT)
       end
 
       # Mrtve lease sa upracu, zive sa vratia. `self_pid` je NAS proces —
       # ten aktualizaciu prave robi a sam sebe neprekaza.
+      # `exe` zo stopy. Poskodena alebo stara stopa (bez pola) vrati prazdny
+      # retazec — kontrola identity sa vtedy opiera len o to, ze PID patri
+      # instancii SketchUpu.
+      def recorded_exe(lease_file)
+        raw = JSON.parse(File.binread(lease_file))
+        raw.is_a?(Hash) ? raw['exe'].to_s : ''
+      rescue StandardError
+        ''
+      end
+
       # FAIL-CLOSED (Codex #277 kolo 2, P2): nezistitelny stav lease NIE JE
       # „nikto nebezi". Chybajuci alebo necitatelny priecinok znamena, ze o inych
       # instanciach nevieme NIC — a swap pod cudzou instanciou je presne to, comu
@@ -583,7 +643,7 @@ module Noxun
           pid = Regexp.last_match(1).to_i
           next if pid == self_pid.to_i
 
-          if pid_alive?(pid)
+          if lease_alive?(pid, recorded_exe(File.join(dir, name)))
             live << pid
           else
             begin
@@ -811,9 +871,26 @@ module Noxun
           abort_after_move!(plugins, "stav aktualizácie sa nedá zapísať (#{e.class})")
         end
 
-        # (5) loader — TIEZ cez staging
+        # (5a) ZALOHA LOADERA = KOPIA, nie rename (Codex #277 kolo 3, P1).
+        # Rename by na okamih nechal `Plugins` BEZ `noxun_engine.rb` — a prave
+        # v tom okne nema SketchUp co spustit, takze by nikdy nenabehla ani
+        # recovery a plugin by ostal mrtvy az do reinstalu. Kopia stary loader
+        # nechava na mieste, takze bootovatelny je v KAZDOM okamihu.
         begin
-          File.rename(loader, loader_old) if File.file?(loader)
+          copy_file!(loader, loader_old)
+        rescue StandardError => e
+          abort_after_move!(plugins, "zálohu loadera sa nedá vytvoriť (#{e.class})")
+        end
+        begin
+          write_marker!(plugins, 'loader_copied', from: from_version, to: to_version)
+        rescue StandardError => e
+          abort_after_move!(plugins, "stav aktualizácie sa nedá zapísať (#{e.class})")
+        end
+
+        # (5b) JEDINY atomicky krok: `File.rename` PREPISE existujuci ciel
+        # (Windows MoveFileExW s MOVEFILE_REPLACE_EXISTING, POSIX rename(2)).
+        # Ked zlyha, stary `.rb` ostava NEDOTKNUTY a plati pravidlo po kroku 3.
+        begin
           File.rename(loader_new, loader)
         rescue StandardError => e
           abort_after_move!(plugins, "loader sa nedá vymeniť (#{e.class})")
@@ -914,6 +991,38 @@ module Noxun
           Engine.log_error(e, 'Updater.discard_previous!') if Engine.respond_to?(:log_error)
         end
         !File.exist?(tree_old) && !File.exist?(loader_old)
+      end
+
+      # Zaloha KOPIOU (Codex #277 kolo 3): zdroj ostava na mieste, takze
+      # `Plugins` nie su ani na okamih bez bootovatelneho `noxun_engine.rb`.
+      # Kopiruje sa cez BOKOVY subor a az potom sa premenuje — polovicna zaloha
+      # by pri recovery vyzerala ako platna generacia. Zapis sa fsyncuje: po
+      # pade musi byt na disku bud cela zaloha, alebo ziadna.
+      def copy_file!(src, dst)
+        tmp = "#{dst}.tmp-#{Process.pid}"
+        FileUtils.rm_f(tmp)
+        begin
+          data = File.binread(src)
+          File.open(tmp, 'wb') do |f|
+            f.write(data)
+            f.flush
+            begin
+              f.fsync
+            rescue StandardError
+              nil
+            end
+          end
+          FileUtils.rm_f(dst)
+          File.rename(tmp, dst)
+          raise IOError, "zaloha #{File.basename(dst)} nevznikla" unless File.file?(dst)
+          unless File.size(dst) == data.bytesize
+            raise IOError, "zaloha #{File.basename(dst)} je neuplna"
+          end
+
+          true
+        ensure
+          FileUtils.rm_f(tmp)
+        end
       end
 
       def try_rename(src, dst)
