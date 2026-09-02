@@ -280,6 +280,11 @@ NxTest.test('KOV-H2: hlaska mazania menuje polozku') do
   NxTest.assert(del.call('NIET').nil?, 'neznama polozka nazov NEVYMYSLA')
   NxTest.assert(panel.manual_removed_label(params, { 'kind' => 'add', 'id' => 'H1' }).nil?,
                 'pri pridani sa nic nemenuje')
+  # Regres z in-SketchUp behu: `manual_ok_msg` sa vola AJ pri beznom apply
+  # z formulara (argumenty sa vyhodnocuju EAGERNE, takze skory navrat
+  # `push_manual_result` sem nedosiahne) — bez guardu spadol KAZDY apply.
+  NxTest.assert_equal '', panel.manual_ok_msg(nil), 'bez operacie je hlaska prazdna, nie vynimka'
+  NxTest.assert_equal '', panel.manual_ok_msg(nil, 'X'), 'ani s nazvom polozky'
   NxTest.assert_equal 'Odstránená ručná položka „Zámok Abloy“.',
                       panel.manual_ok_msg({ 'kind' => 'delete', 'id' => 'H1' }, 'Zámok Abloy'),
                       'status povie, CO sa odstranilo (mazanie ide bez potvrdenia)'

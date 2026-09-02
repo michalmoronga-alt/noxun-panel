@@ -713,7 +713,14 @@ module Noxun
         MANUAL_OK_MSGS = { 'add' => 'Položka pridaná.', 'edit' => 'Položka upravená.',
                            'delete' => 'Položka odstránená.' }.freeze
 
+        # POZOR: vola sa AJ pri beznom apply z formulara, ked `op` je nil —
+        # argumenty sa v Ruby vyhodnocuju EAGERNE, takze skory navrat
+        # `push_manual_result` sem NEDOSIAHNE. Bez tohto guardu spadol KAZDY
+        # apply bez `manual_op` (nasla to in-SketchUp sada, headless nie —
+        # handler potrebuje zivy model).
         def manual_ok_msg(op, removed = nil)
+          return '' unless op.is_a?(Hash)
+
           return "Odstránená ručná položka „#{removed}“." if removed
 
           MANUAL_OK_MSGS[op['kind'].to_s].to_s
