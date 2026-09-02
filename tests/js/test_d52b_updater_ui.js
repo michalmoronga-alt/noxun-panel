@@ -290,6 +290,65 @@ function updEl(attrs, value){
   eq(payload.check_token, 11, 'a TOKEN tej kontroly — server bez zhody neaktualizuje');
 })();
 
+// --- 4d) ROZPÍSANÁ CESTA ZAMYKÁ TLAČIDLO HNEĎ (Codex #278 kolo 2, P2) -------
+
+(function(){
+  S.setStudioSection('about');
+  T.ssApplyState(STATE);
+  T.SS.updater({ enabled: true, state: 'newer', source_dir: 'X:/dist', current: '0.9.12',
+                 available: '0.9.13', token: 3, saved: true });
+  ELS.updBtn.removeAttribute('aria-disabled');
+  eq(ELS.updBtn.getAttribute('aria-disabled'), null, 'východisko: tlačidlo je aktívne');
+
+  // Používateľ začne prepisovať cestu. Kontrola pritom patrí tej ULOŽENEJ —
+  // tlačidlo musí zhasnúť OKAMŽITE, nie až po prekreslení tela.
+  const inp = updEl({ 'data-updater-edit': 'source_dir' }, 'X:/dist-INE');
+  ELS.updDir.value = 'X:/dist-INE';
+  fireInput(inp);
+  eq(ELS.updBtn.getAttribute('aria-disabled'), 'true',
+     'rozpísaná cesta tlačidlo ZAMKNE hneď pri písaní');
+  ok(ELS.updState.textContent.indexOf('nie je uložená') > -1, 'a stavový riadok povie prečo');
+
+  // Návrat na uloženú hodnotu ho zase odomkne (guard nie je „raz zamkni navždy").
+  const back = updEl({ 'data-updater-edit': 'source_dir' }, 'X:/dist');
+  ELS.updDir.value = 'X:/dist';
+  fireInput(back);
+  eq(ELS.updBtn.getAttribute('aria-disabled'), null, 'zhodná cesta tlačidlo vráti');
+})();
+
+// --- 4e) ACK PATRÍ TOMU, ČO SA ODOSLALO (Codex #278 kolo 2, P2) -------------
+
+(function(){
+  S.setStudioSection('about');
+  T.ssApplyState(STATE);
+
+  // Enter uloží A…
+  ELS.updDir.value = 'A:/prva';
+  SENT.length = 0;
+  fireKey(updEl({ 'data-updater-edit': 'source_dir' }, 'A:/prva'), 'Enter');
+  eq(JSON.parse(SENT[0][1]).source_dir, 'A:/prva', 'odoslala sa hodnota A');
+  eq(T.updSent(), 'A:/prva', 'a klient si pamätá, čo poslal');
+
+  // …používateľ ale medzitým píše B.
+  ELS.updDir.value = 'B:/druha';
+  fireInput(updEl({ 'data-updater-edit': 'source_dir' }, 'B:/druha'));
+  eq(T.updDirty(), 'B:/druha', 'rozpis je B');
+
+  // Až TERAZ dorazí potvrdenie uloženia A.
+  T.SS.updater({ enabled: true, state: 'idle', source_dir: 'A:/prva', saved: true, current: '0.9.12' });
+  eq(T.updDirty(), 'B:/druha', 'potvrdenie STARÉHO uloženia rozpis NEZAHODÍ');
+  eq(ELS.updDir.value, 'B:/druha', 'ani neprepíše pole hodnotou A');
+  ok(T.updMerged().dirty === true, 'a tlačidlo ostáva zamknuté (B nie je uložená)');
+
+  // Uloženie B potvrdenie prijme — vrátane normalizovaného tvaru zo servera.
+  ELS.updDir.value = 'B:/druha';
+  fireKey(updEl({ 'data-updater-edit': 'source_dir' }, 'B:/druha'), 'Enter');
+  T.SS.updater({ enabled: true, state: 'idle', source_dir: 'B:/druha', saved: true, current: '0.9.12' });
+  eq(T.updDirty(), null, 'potvrdenie AKTUÁLNEHO uloženia rozpis zahodí');
+  eq(ELS.updDir.value, 'B:/druha', 'a v poli je to, čo server uložil');
+  eq(T.updSent(), null, 'pamäť odoslanej hodnoty sa vyčistí');
+})();
+
 // --- 5) VSTUP DO SEKCIE = PRESNE JEDEN CHECK ---------------------------------
 
 (function(){

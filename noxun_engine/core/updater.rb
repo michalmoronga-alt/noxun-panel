@@ -841,10 +841,34 @@ module Noxun
           'available' => '', 'reason' => "zdroj sa nepodarilo prečítať (#{e.class})" }
       end
 
-      # --- samotna aktualizacia ---------------------------------------------
-      # Vracia hash `{'ok' => true, 'from', 'to', 'note'}`; kazde odmietnutie je
-      # `Refused` s dovodom a ciel ostava BYTE-IDENTICKY.
+      # --- samotna aktualizacia (DVE FAZY) -----------------------------------
+      #
+      # D-52b (Codex #278 kolo 2, P1): `apply!` robil VSETKO v jednom volani —
+      # vratane manifestu a KOPIROVANIA celeho balika zo (sietoveho) zdroja.
+      # V UI vrstve to bezalo v hlavnom vlakne, takze visiaci UNC share zamrazil
+      # SketchUp na desiatky sekund. Preto su fazy dve:
+      #
+      #   `prepare!` — VSETKO blokujuce I/O nad ZDROJOM (manifest, staging do
+      #                `.new`, validacia, rozhodnutie o verzii). Je WORKER-SAFE:
+      #                ziadne `Sketchup.*`, ziadne `UI.*` a ZIVEJ generacie sa
+      #                nedotyka — meni sa vyhradne `.new`. Vracia TIKET.
+      #   `commit!`  — LEN renamey v `Plugins` (lokalne, rychle) + latch. Bezi
+      #                VYHRADNE v hlavnom vlakne.
+      #
+      # Medzi fazami sa zamok PUSTA a mutualnu exkluziu drzi MARKER: kazdy iny
+      # proces (aj druhy pokus) sa o neho zastavi. `commit!` preto overi, ze
+      # marker na disku je NAS (pid + `started_at` + obe verzie) — inak odmietne
+      # a nic nesahne. Kto `prepare!` nedokonci commitom, MUSI zavolat
+      # `abort_prepared!` (UI to robi na deadline aj pri nezhode verzie).
+      #
+      # `apply!` ostava ako jednoduchy obal (headless sada aj in-SU sekcia ho
+      # pouzivaju) — je to presne `prepare!` + `commit!`.
       def apply!(source_dir_value, plugin_dir)
+        commit!(prepare!(source_dir_value, plugin_dir))
+      end
+
+      # FAZA 1 — bezpecna vo vlakne. Vracia tiket pre `commit!`.
+      def prepare!(source_dir_value, plugin_dir)
         source, plugins, = check_boundaries!(source_dir_value, plugin_dir)
 
         with_update_lock(plugins) do
@@ -858,12 +882,12 @@ module Noxun
           end
 
           cleanup_staging(plugins) # zvysky po pade, ktory recovery uz vyriesila
-          run_transaction!(source, plugins)
+          stage_transaction!(source, plugins)
         end
       end
 
-      # Telo transakcie — bezi VYHRADNE pod `with_update_lock`.
-      def run_transaction!(source, plugins)
+      # Telo pripravy — bezi VYHRADNE pod `with_update_lock`.
+      def stage_transaction!(source, plugins)
         current = read_version(loader_path(plugins))
         manifest = source_manifest(source)
 
@@ -896,14 +920,17 @@ module Noxun
           # P1 (#277): lease sa kontroluje ZNOVA, tesne pred swapom. Medzi
           # prvou kontrolou a koncom stagingu (kopirovanie zo share trva) mohla
           # nabehnut dalsia instancia SketchUpu — renamovat strom pod nou by jej
-          # zobralo subory spod ruk.
+          # zobralo subory spod ruk. (Druhy raz to robi `commit!`, lebo medzi
+          # fazami moze ubehnut cas.)
           late = live_leases(plugins)
           unless late.empty?
             raise Refused, "medzitým sa spustila ďalšia inštancia SketchUpu (PID #{late.join(', ')}) — " \
                            'zavri ostatné okná a skús znova'
           end
 
-          write_marker!(plugins, 'staged', from: current, to: target)
+          payload = write_marker!(plugins, 'staged', from: current, to: target)
+          { 'plugins' => plugins, 'source' => source, 'from' => current, 'to' => target,
+            'pid' => payload['pid'], 'stamp' => payload['started_at'] }
         rescue StandardError => e
           cleanup_staging(plugins)
           # D-52b (P3 #277): ked marker prezije, pouzivatel to musi vediet UZ
@@ -914,8 +941,69 @@ module Noxun
 
           raise Refused, "#{e.message}#{note}"
         end
+      end
 
-        swap!(plugins, current, target)
+      # FAZA 2 — LEN renamey (lokalne, rychle). Hlavne vlakno.
+      def commit!(ticket)
+        t = ticket.is_a?(Hash) ? ticket : {}
+        plugins = t['plugins'].to_s
+        raise Refused, 'aktualizácia nie je pripravená' if plugins.empty?
+
+        with_update_lock(plugins) do
+          # Marker je JEDINY doklad o tom, ze `.new` v priecinku je NAS. Ked
+          # nesedi (cudzi proces, iny pokus, medzitym upratane), NIC sa nedeje —
+          # cudzie artefakty sa nemazu.
+          unless own_prepared_marker?(read_marker(plugins), t)
+            raise Refused, 'pripravená aktualizácia už neplatí — skús znova'
+          end
+
+          unless Dir.exist?(staged_tree(plugins)) && File.file?(staged_loader(plugins))
+            note = marker_note(clear_marker(plugins))
+            raise Refused, "pripravený balík už v Plugins nie je — skús znova#{note}"
+          end
+
+          late = live_leases(plugins)
+          unless late.empty?
+            cleanup_staging(plugins)
+            note = marker_note(clear_marker(plugins))
+            raise Refused, "medzitým sa spustila ďalšia inštancia SketchUpu (PID #{late.join(', ')}) — " \
+                           "zavri ostatné okná a skús znova#{note}"
+          end
+
+          swap!(plugins, t['from'], t['to'])
+        end
+      end
+
+      # Zrusenie PRIPRAVENEJ aktualizacie (deadline, nezhoda verzie). Uprace
+      # `.new` aj marker — ale LEN ked su NASE. Vracia `true` pri upratani.
+      def abort_prepared!(ticket)
+        t = ticket.is_a?(Hash) ? ticket : {}
+        plugins = t['plugins'].to_s
+        return false if plugins.empty?
+
+        with_update_lock(plugins) do
+          next false unless own_prepared_marker?(read_marker(plugins), t)
+
+          cleanup_staging(plugins)
+          clear_marker(plugins)
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'Updater.abort_prepared!') if Engine.respond_to?(:log_error)
+        false
+      end
+
+      # Marker patri TEJTO pripravenej transakcii? Rozhoduje pid, casova
+      # peciatka aj OBE verzie — samotny stav `staged` by pripustil cudziu
+      # (alebo starsiu vlastnu) transakciu.
+      def own_prepared_marker?(marker, ticket)
+        return false unless marker.is_a?(Hash) && ticket.is_a?(Hash)
+
+        marker['state'].to_s == 'staged' &&
+          marker['pid'].to_i == Process.pid &&
+          !ticket['stamp'].to_s.empty? &&
+          marker['started_at'].to_s == ticket['stamp'].to_s &&
+          marker['from'].to_s == ticket['from'].to_s &&
+          marker['to'].to_s == ticket['to'].to_s
       end
 
       # Kroky 3–6.

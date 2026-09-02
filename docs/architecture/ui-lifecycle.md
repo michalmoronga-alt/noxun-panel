@@ -1832,7 +1832,15 @@ je zakázaný stav*: `main.rb` drží VERSION len ako fallback, takže by plugin
 **Rozloženie v `Plugins`** (všetko súrodenci stromu): `noxun_engine.new/` + `noxun_engine.rb.new` (staging) · `noxun_engine.old/` + `noxun_engine.rb.old` (predchádzajúca
 generácia) · `noxun_engine.update.json` (transakčný marker) · `noxun_engine.update.lock` (zámok) · `noxun_engine.leases/<pid>.lease`.
 
-**Postup `apply!`:** kanonické hranice → zámok → *(marker existuje ⇒ odmietnuť)* → *(žije iná inštancia ⇒ odmietnuť)* → **manifest zo zdroja** (relatívna cesta → SHA1 + veľkosť) →
+**`apply!` má od D-52b DVE FÁZY** (Codex #278 kolo 2): `prepare!` a `commit!`. Dôvod je prevádzkový: manifest a **kopírovanie celého balíka** zo (sieťového) zdroja trvá, a kým to
+bežalo v jednom volaní, robila to UI vrstva v hlavnom vlákne — visiaci UNC share tak zamrazil SketchUp na desiatky sekúnd. **`prepare!`** (kanonické hranice → zámok → marker →
+manifest → staging → validácia → rozhodnutie o verzii) je preto **worker-safe** — nesiaha na `Sketchup.*` ani `UI.*` a **živej generácie sa nedotýka**, mení výhradne `.new` — a
+vracia **tiket**. **`commit!`** (len renamey v `Plugins` + latch) beží v hlavnom vlákne. Medzi fázami sa **zámok pustí** a mutuálnu exkluzivitu drží **marker**: každý iný proces
+(aj druhý pokus) sa o neho zastaví, a `commit!` trvá na tom, že marker na disku je **náš** (pid + `started_at` + obe verzie) — inak odmietne a cudzích artefaktov sa nedotkne.
+Kto `prepare!` nedokončí commitom, musí zavolať **`abort_prepared!`** (UI to robí po deadline aj pri nezhode verzie); ten upratuje takisto len vlastný staging. `apply!` ostáva
+ako obal `prepare!` + `commit!` — používa ho headless sada aj in-SU sekcia.
+
+**Postup (obe fázy dokopy):** kanonické hranice → zámok → *(marker existuje ⇒ odmietnuť)* → *(žije iná inštancia ⇒ odmietnuť)* → **manifest zo zdroja** (relatívna cesta → SHA1 + veľkosť) →
 **staging KÓPIOU** do `.new` (nie rename — sieťový share vie streamovať useknutý súbor) → **validácia staged stromu proti manifestu byte-for-byte** → *(**opakovaná** kontrola
 lease — staging trvá a medzitým mohla nabehnúť ďalšia inštancia)* → **(3)** `noxun_engine` → `.old` → **(4)** `.new` → `noxun_engine` → **(5a)** záloha loadera **kópiou** `.rb` → `.rb.old`,
 **(5b)** jediný atomický `File.rename('.rb.new', '.rb')` → **(6)** `.old` sa maže až po úspechu. Každý krok má definovaný rollback; zlyhanie ktoréhokoľvek vracia **celý** swap. Zlyhanie mazania `.old` je **úspech
@@ -1979,6 +1987,12 @@ zámok), a cesta pod ňu nepatrí — nemá revíziu a neukladá sa cez `ss_save
 cesta PREŽIJE plný push** (`UPD_DIRTY` vyhráva nad payloadom) a zaniká výhradne na potvrdenie servera (`SS.updater({saved:true})`, vzor `SS.saved()`); vtedy sa do poľa zapíše
 **normalizovaný** tvar, ktorý je naozaj uložený. Ukladá sa Enterom aj mini-tlačidlom a uloženie rovno spustí nový check (v novom priečinku je iná verzia).
 
+**Rozpísaná cesta zamyká tlačidlo OKAMŽITE.** Kontrola patrí **uloženej** ceste, takže kým je v poli niečo iné, klik by aktualizoval z iného priečinka, než aký má človek pred
+očami. Každý `input` preto volá `updPaint()` — telo sekcie sa počas písania neprekresľuje, takže bez toho by tlačidlo ostalo aktívne — a stav hovorí „cesta nie je uložená".
+
+**Potvrdenie uloženia patrí TOMU, ČO SA ODOSLALO** (Codex #278 kolo 2, P2). Klient si pamätá odoslanú hodnotu (`UPD_SENT`) a `saved: true` zahodí rozpis a nasadí normalizovanú
+cestu **len keď je v poli stále ona**. Bez toho platilo: Enter uloží A, používateľ píše B, dorazí ack na A — a rozrobené B by zmizlo.
+
 **Stavový riadok sa obnovuje CIELENE.** `updPaint()` prepíše len `#updState` a `#updBtn` — telo sekcie sa neprekresľuje, lebo používateľ môže mať kurzor v poli cesty. Trojstav
 jadra plus dva prevádzkové stavy: `newer` = tlačidlo aktívne · `same` = `aria-disabled` „máš aktuálnu verziu" · `older` = `aria-disabled` „staršiu verziu nainštaluj ručne cez
 INSTALL" (B4) · `checking` a `error` (hláška nesie **cestu aj dôvod**). Vždy `aria-disabled`, **nikdy HTML `disabled`** (D-78) — tlačidlo ostáva zamerateľné a klik naň povie dôvod.
@@ -1988,6 +2002,19 @@ INSTALL" (B4) · `checking` a `error` (hláška nesie **cestu aj dôvod**). Vžd
 oboch modulov nevráti `true`** → až potom `Updater.apply!`. Čaká sa na `dialog_closed?` (`@dialog.nil?`, teda dobehnutý `set_on_closed`), **nie** na `dialog_alive?`: to hovorí
 o VIDITEĽNOSTI, kým CEF ešte môže držať otvorené súbory z `ui/` a rename priečinka by na Windows zlyhal. Limit sú 3 s; po ňom sa aktualizácia **zruší** natívnou hláškou („na disku
 sa nič nezmenilo"). Guard test nad zdrojom trvá na tom, že `handle_updater_apply` nevolá `updater_run_apply` priamo.
+
+**PRÍPRAVA BALÍKA BEŽÍ VO VLÁKNE, COMMIT V HLAVNOM** (Codex #278 kolo 2, P1). Bariéra bola len prvá polovica: za ňou nasledovalo `Updater.apply!`, ktoré v tom istom timer
+callbacku počítalo manifest a kopírovalo stovky súborov zo share. UI vrstva preto volá **`Updater.prepare!` vo vlákne** s vlastným deadline (`UPDATER_STAGE_S`, 60 s) a polluje
+výsledok; **`Updater.commit!`** spúšťa až hlavné vlákno. Po deadline sa beh **zruší natívnou hláškou** („Zdroj nedostupný — aktualizácia ZRUŠENÁ, na disku sa nič nezmenilo") a
+vlákno sa — rovnako ako pri kontrole — opúšťa, nezabíja; živá generácia je nedotknutá a prípadný `.new` s markerom upratá boot recovery.
+
+**SINGLE-FLIGHT** (Codex #278 kolo 2, P1). Dva rýchle kliky (alebo dve odoslania toho istého potvrdenia) by naplánovali **dve bariéry** a druhá by po commite prvej bežala nad už
+vymenenými súbormi. Bránia tomu tri veci naraz: príznak `@updater_apply_inflight` sa zapína **pred** zatvorením okien; **doklad o kontrole sa pri prijatí SPOTREBUJE** (token je
+jednorazový, takže druhé odoslanie nemá čím prejsť); a **každé odložené čakanie bariéry si pred vlastným behom overí `Engine.restart_required?`** — keď medzitým niekto commitol,
+zruší sa bez zásahu a bez hlášky (výsledok už oznámil ten prvý beh). Príznak sa uvoľňuje na každom konci: úspech, odmietnutie, deadline prípravy aj limit bariéry.
+
+**Doklad o kontrole viaže aj VERZIU.** Balík na share sa môže vymeniť aj **medzi potvrdením a stagingom**, takže samotná zhoda cesty nestačí: záznam nesie `available` z kontroly
+a po `prepare!` sa porovná s verziou **staged** loadera (`ticket['to']`). Nezhoda = `abort_prepared!` a hláška „Balík sa medzitým zmenil (X → Y) — NIČ sa nenainštalovalo".
 
 **Výsledok ide VÝHRADNE natívne (`UI.messagebox`)** — úspech („Aktualizované na X — reštartuj SketchUp", plus poznámka z jadra, ak nejaká je), odmietnutie s presným dôvodom
 z `Refused` aj neočakávaná výnimka. Do CEF sa poslať nedá: okná sú v tom bode zavreté a po úspešnom swape by nové HTML bežalo proti starým callbackom. Guard test nad zdrojom

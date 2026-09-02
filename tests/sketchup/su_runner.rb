@@ -10144,7 +10144,14 @@ module NoxunSuRunner
       # --- (b) REALNY SWAP nad SANDBOXOM ------------------------------------
       # Toto je jediny test, ktory naozaj vymiena subory. Ciel je TEMP, nikdy
       # zivy `Plugins` — jadro cestu prijima ako parameter.
+      #
+      # Codex #278 kolo 2 (P2): uspesny swap zapne restart latch a ten hlasi
+      # MODALNYM `UI.messagebox` — v automatickom behu by dialog runner
+      # ZASTAVIL. Hlaska sa preto na cas scenara zbiera do vrecka (vzor R-12)
+      # a rovno sa aj OVERUJE, ze naozaj hovori o restarte.
       e.reset_restart_latch!
+      bag = []
+      r12_silence_messagebox!(bag)
       res = u.apply!(env[:src], env[:tree])
       ok("D-52b (b): swap nad sandboxom prebehol (#{res['from']} -> #{res['to']}, stav #{res['state']})",
          res['ok'] && res['to'] == D52B_SRC_VER)
@@ -10158,7 +10165,12 @@ module NoxunSuRunner
          leftovers.empty?)
       ok('D-52b (b): restart latch je ZAPNUTY (stary Ruby nad novymi subormi)',
          e.restart_required?)
+      bag.clear
       ok('D-52b (b): a latch odmietne otvorenie okna', e.update_restart_pending? == true)
+      ok("D-52b (b): odmietnutie je NATIVNA hlaska o restarte (#{bag.first.to_s[0, 60]})",
+         bag.length == 1 && bag.first.to_s.include?('reštartuj'))
+      r12_restore_messagebox!
+      e.reset_restart_latch! # zvysok runnera musi bezat dalej
 
       # --- (c) OPAKOVANY pokus nad TYM ISTYM zdrojom sa ODMIETNE ------------
       e.reset_restart_latch! # ostatne sekcie runnera musia bezat dalej
@@ -10172,6 +10184,7 @@ module NoxunSuRunner
       ok('D-52b (c): a odmietnutie latch NEZAPINA (na disku sa nic nezmenilo)',
          !e.restart_required?)
     ensure
+      r12_restore_messagebox! # idempotentne
       e.reset_restart_latch!
       begin
         FileUtils.rm_rf(env[:root])
@@ -10180,6 +10193,7 @@ module NoxunSuRunner
       end
     end
   rescue StandardError => ex
+    r12_restore_messagebox! # neobnoveny stub by ovplyvnil zvysok behu
     e.reset_restart_latch!
     log_line("FAIL: D-52b sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
   end
@@ -10193,29 +10207,37 @@ module NoxunSuRunner
     false
   end
 
-  # Stub `Updater.apply!`: zaznamena volanie a STAV OKIEN v okamihu volania —
-  # presne to je dokaz bariery. ZIVY `Plugins` sa pri tom nedotkne.
+  # Sonda OBOCH faz jadra (od #278 kolo 2 je `apply!` rozdelene na `prepare!`
+  # vo vlakne a `commit!` v hlavnom): zaznamena volania a STAV OKIEN v okamihu
+  # kazdeho z nich — presne to je dokaz bariery. ZIVY `Plugins` sa nedotkne.
   def d52b_install_apply_probe(state)
-    return if state[:d52b_probe]
+    return state[:d52b_probe] if state[:d52b_probe]
 
-    box = { calls: [] }
+    box = { calls: [], commits: [] }
     state[:d52b_probe] = box
     runner = self
     sc = e::Updater.singleton_class
-    sc.send(:alias_method, :nx_d52b_orig_apply, :apply!)
-    sc.send(:define_method, :apply!) do |src, plugin_dir|
+    sc.send(:alias_method, :nx_d52b_orig_prepare, :prepare!)
+    sc.send(:alias_method, :nx_d52b_orig_commit, :commit!)
+    sc.send(:define_method, :prepare!) do |src, plugin_dir|
       box[:calls] << { src: src.to_s, dir: plugin_dir.to_s, closed: runner.d52b_dialogs_closed? }
-      { 'ok' => true, 'state' => 'done', 'from' => 'x', 'to' => 'y', 'note' => '' }
+      { 'plugins' => plugin_dir.to_s, 'from' => 'x', 'to' => D52B_SRC_VER, 'stamp' => 'SU' }
+    end
+    sc.send(:define_method, :commit!) do |ticket|
+      box[:commits] << { closed: runner.d52b_dialogs_closed?, ticket: ticket }
+      { 'ok' => true, 'state' => 'done', 'from' => 'x', 'to' => D52B_SRC_VER, 'note' => '' }
     end
     box
   end
 
   def d52b_teardown(state)
     sc = e::Updater.singleton_class
-    if sc.method_defined?(:nx_d52b_orig_apply) || sc.private_method_defined?(:nx_d52b_orig_apply)
-      sc.send(:remove_method, :apply!)
-      sc.send(:alias_method, :apply!, :nx_d52b_orig_apply)
-      sc.send(:remove_method, :nx_d52b_orig_apply)
+    { prepare!: :nx_d52b_orig_prepare, commit!: :nx_d52b_orig_commit }.each do |name, orig|
+      next unless sc.method_defined?(orig) || sc.private_method_defined?(orig)
+
+      sc.send(:remove_method, name)
+      sc.send(:alias_method, name, orig)
+      sc.send(:remove_method, orig)
     end
     if sc.method_defined?(:nx_d52b_orig_src) || sc.private_method_defined?(:nx_d52b_orig_src)
       sc.send(:remove_method, :source_dir)
@@ -10297,10 +10319,13 @@ module NoxunSuRunner
       call = box[:calls].first || {}
       ok('D-52b async (bariera): a AZ POTOM, co boli obe okna zavrete',
          call[:closed] == true)
-      ok("D-52b async (bariera): swap dostal SKONTROLOVANU cestu a ZIVY priecinok pluginu (#{call[:dir]})",
+      ok("D-52b async (bariera): priprava dostala SKONTROLOVANU cestu a ZIVY priecinok pluginu (#{call[:dir]})",
          call[:src] == state[:d52b_env][:src] && call[:dir].to_s == e.plugin_dir.to_s)
+      ok("D-52b async (#278/2 P1): commit prebehol PRESNE raz a tiez az po zatvoreni (#{box[:commits].length})",
+         box[:commits].length == 1 && box[:commits].first[:closed] == true)
       # A este dokaz P1 guardu: klik BEZ dokladu o kontrole neprejde.
       box[:calls].clear
+      box[:commits].clear
       rec = []
       e::SupplierSettingsDialog.instance_variable_set(:@updater_check_ok, nil)
       e::SupplierSettingsDialog.dispatch('updater_apply', '{}', ->(s) { rec << s.to_s })

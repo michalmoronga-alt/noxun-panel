@@ -1668,3 +1668,83 @@ NxTest.test('D-52a: modul je CISTY — pri nacitani ziadny Sketchup./UI.') do
                 "core/updater.rb sa dotyka SketchUp API na riadkoch #{offenders.join(', ')} — " \
                 'jadro musi ostat headless (cesty chodia ako parametre)')
 end
+
+# --- D-52b (Codex #278 kolo 2, P1): ROZDELENIE `apply!` NA DVE FAZY ---------
+#
+# `prepare!` (manifest + staging + validacia) je od kola 2 WORKER-SAFE a bezi
+# v UI vrstve vo vlakne; `commit!` (renamey) v hlavnom. Medzi fazami sa zamok
+# PUSTA, takze jedina vec, ktora drzi exkluzivitu, je MARKER — a `commit!` musi
+# trvat na tom, ze je NAS. Bez toho by sa dal commitnut cudzi (alebo starsi)
+# staging.
+
+NxTest.test('D-52b (#278/2 P1): `commit!` BEZ platnej pripravy ODMIETNE') do
+  env = NxD52.sandbox
+  before = NxD52.fingerprint(env[:plugins])
+  Noxun::Engine.reset_restart_latch!
+
+  # (a) ziadny tiket
+  NxTest.assert_raise('nie je pripravená') { NxD52::U.commit!(nil) }
+  NxTest.assert_raise('nie je pripravená') { NxD52::U.commit!({}) }
+
+  # (b) tiket bez pripravy na disku (nic sa nestagovalo)
+  bogus = { 'plugins' => env[:plugins], 'from' => '0.9.4', 'to' => '0.9.5', 'stamp' => 'X' }
+  err = NxTest.assert_raise { NxD52::U.commit!(bogus) }
+  NxTest.assert(err.message.include?('neplatí'), "dovod: #{err.message}")
+  NxD52.assert_untouched(env[:plugins], before, 'commit bez pripravy')
+
+  # (c) REALNA priprava — tiket z nej PLATI, cudzi (zmenena verzia/peciatka) NIE
+  ticket = NxD52::U.prepare!(env[:src], env[:tree])
+  NxTest.assert_equal('0.9.5', ticket['to'], 'priprava vrati verziu STAGED balika')
+  NxTest.assert(Dir.exist?(File.join(env[:plugins], 'noxun_engine.new')), 'a `.new` naozaj stoji')
+  NxTest.assert(File.file?(File.join(env[:plugins], 'noxun_engine.update.json')), 'marker tiez')
+  NxTest.assert(NxD52.generation(env[:plugins], 'po priprave') == '0.9.4',
+                'ZIVA generacia je po priprave NEDOTKNUTA')
+
+  foreign = ticket.merge('stamp' => 'cudzia-peciatka')
+  err2 = NxTest.assert_raise { NxD52::U.commit!(foreign) }
+  NxTest.assert(err2.message.include?('neplatí'), "cudzi tiket sa odmietne: #{err2.message}")
+  NxTest.assert(Dir.exist?(File.join(env[:plugins], 'noxun_engine.new')),
+                'a CUDZI staging sa pri tom NEMAZE')
+
+  res = NxD52::U.commit!(ticket)
+  NxTest.assert(res['ok'], 'nas tiket commitne')
+  NxTest.assert_equal('0.9.5', NxD52.generation(env[:plugins], 'po commite'))
+  NxTest.assert(Noxun::Engine.restart_required?, 'a latch je zapnuty')
+  Noxun::Engine.reset_restart_latch!
+  FileUtils.rm_rf(env[:root])
+end
+
+NxTest.test('D-52b (#278/2 P1): `abort_prepared!` uprace `.new` aj marker') do
+  env = NxD52.sandbox
+  before = NxD52.fingerprint(env[:plugins])
+  Noxun::Engine.reset_restart_latch!
+
+  ticket = NxD52::U.prepare!(env[:src], env[:tree])
+  # Cudzi tiket neuprace NIC — inak by si dva behy zmazali staging navzajom.
+  NxTest.refute(NxD52::U.abort_prepared!(ticket.merge('stamp' => 'ina')), 'cudzi tiket neuprace nic')
+  NxTest.assert(Dir.exist?(File.join(env[:plugins], 'noxun_engine.new')), 'staging ostal')
+
+  NxTest.assert(NxD52::U.abort_prepared!(ticket), 'nas tiket sa uprace')
+  NxD52.assert_untouched(env[:plugins], before, 'po zruseni pripravy')
+  NxTest.refute(Noxun::Engine.restart_required?, 'zrusena priprava latch NEZAPINA')
+
+  # A po zruseni sa da skusit ZNOVA (marker uz nebrzdi).
+  res = NxD52::U.apply!(env[:src], env[:tree])
+  NxTest.assert(res['ok'], 'druhy pokus po zruseni prejde')
+  Noxun::Engine.reset_restart_latch!
+  FileUtils.rm_rf(env[:root])
+end
+
+NxTest.test('D-52b (#278/2 P1): `prepare!` sa ZIVEJ generacie NEDOTYKA') do
+  env = NxD52.sandbox
+  before = NxD52.fingerprint(env[:plugins])
+  Noxun::Engine.reset_restart_latch!
+
+  ticket = NxD52::U.prepare!(env[:src], env[:tree])
+  live = NxD52.fingerprint(env[:plugins])
+  NxTest.assert_equal(before, live,
+                      'priprava (manifest + staging) meni VYHRADNE `.new` — ziva generacia je ' \
+                      'byte-identicka, takze zrusenie po deadline je bez nasledkov')
+  NxD52::U.abort_prepared!(ticket)
+  FileUtils.rm_rf(env[:root])
+end

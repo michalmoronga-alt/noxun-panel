@@ -58,6 +58,11 @@ module Noxun
       UPDATER_POLL_S = 0.2
       UPDATER_BARRIER_S = 3.0
       UPDATER_BARRIER_POLL_S = 0.1
+      # Codex #278 kolo 2 (P1): PRIPRAVA balika (manifest + kopirovanie stoviek
+      # suborov zo share) je nerovnako dlha operacia — minuta je strop, po
+      # ktorom je zdroj evidentne nedostupny a caka sa zbytocne.
+      UPDATER_STAGE_S = 60.0
+      UPDATER_STAGE_POLL_S = 0.25
 
       # Popisky a jednotky sadzieb sluzieb — poradie = poradie v sekcii (zhodne
       # s Budget::SERVICE_DEFS, aby sa nastavenie a rozpocet citali rovnako).
@@ -380,8 +385,12 @@ module Noxun
           # pamata (cesta, sekvencia, stav, instancia okna) a klient mu to pri
           # klike vracia. Bez toho by stacilo, aby druha instancia medzitym
           # ulozila INU cestu: potvrdenie by menovalo cestu A a nasadilo B.
+          # `available` je sucastou dokladu (Codex #278 kolo 2, P1): balik na
+          # share sa moze medzi kontrolou a potvrdenim VYMENIT a modal by
+          # menoval inu verziu, nez aka by sa nasadila.
           @updater_check_ok = { 'dir' => token['dir'].to_s, 'token' => token['seq'],
-                                'state' => state, 'dlg' => token['dlg'] }
+                                'state' => state, 'dlg' => token['dlg'],
+                                'available' => r['available'].to_s }
           push_updater('state' => state, 'source_dir' => token['dir'], 'token' => token['seq'],
                        'available' => r['available'].to_s, 'reason' => r['reason'].to_s)
         end
@@ -438,6 +447,13 @@ module Noxun
         def handle_updater_apply(payload = nil)
           return updater_off unless updater?
           return set_status('Plugin je už aktualizovaný — reštartuj SketchUp.', true) if Engine.restart_required?
+          # SINGLE-FLIGHT (Codex #278 kolo 2, P1). Dva rychle kliky (alebo dve
+          # odoslania toho isteho potvrdenia) by naplanovali DVE bariery; druha
+          # by po commite prvej bezala nad UZ VYMENENYMI subormi. Priznak sa
+          # zapina PRED zatvorenim okien — teda skor, nez sa cokolvek stane.
+          if @updater_apply_inflight
+            return set_status('Aktualizácia už prebieha — počkaj na jej výsledok.', true)
+          end
 
           dir = Updater.source_dir
           return set_status('Najprv zadaj distribučný priečinok a ulož ho.', true) if dir.empty?
@@ -445,6 +461,13 @@ module Noxun
           data = payload.is_a?(Hash) ? payload : (payload.nil? ? {} : JSON.parse(payload.to_s))
           reason = updater_apply_mismatch(data, dir)
           return set_status(reason, true) if reason
+
+          # TOKEN JE JEDNORAZOVY: doklad o kontrole sa SPOTREBUJE. Druhe
+          # odoslanie toho isteho potvrdenia tak nema com prejst ani vtedy, keby
+          # priznak vyssie zlyhal.
+          @updater_apply_expect = @updater_check_ok['available'].to_s
+          @updater_check_ok = nil
+          @updater_apply_inflight = true
 
           # Poradie je zavazne: hlaska este do ZIVEHO okna, potom zatvorenie,
           # a swap az ked obe okna naozaj dobehnu (`set_on_closed`).
@@ -489,9 +512,19 @@ module Noxun
         end
 
         def await_dialogs_closed(dir, deadline)
+          # ODLOZENE CAKANIE MUSI ESTE RAZ OVERIT, ZE SA MEDZITYM NIC NESTALO
+          # (Codex #278 kolo 2, P1): keby iny beh medzitym COMMITOL, tento by
+          # spustil swap zo STAREHO Ruby nad UZ NOVYMI subormi. Rusi sa bez
+          # zasahu — vysledok uz oznamil ten prvy beh.
+          if Engine.restart_required?
+            @updater_apply_inflight = false
+            return false
+          end
+
           return updater_run_apply(dir) if dialogs_closed?
 
           if updater_now >= deadline
+            @updater_apply_inflight = false
             return updater_message('Aktualizácia sa NESPUSTILA — okná pluginu sa nepodarilo zavrieť ' \
                                    "do #{UPDATER_BARRIER_S.round} s. Zavri Inspector aj Štúdio ručne " \
                                    'a skús to znova. Na disku sa nič nezmenilo.')
@@ -502,8 +535,66 @@ module Noxun
 
         # Samotny swap. Vysledok ide VYHRADNE natívne — okna su v tomto bode
         # zavrete a po uspechu by nove HTML/JS bezalo proti starym callbackom.
+        # DVE FAZY (Codex #278 kolo 2, P1). Do tejto opravy bezalo cele
+        # `Updater.apply!` — teda aj manifest zdroja a kopirovanie stoviek
+        # suborov zo share — SYNCHRONNE v `UI.start_timer` callbacku. Visiaci
+        # UNC share tak zamrazil SketchUp na desiatky sekund a pouzivatel nemal
+        # ako zasiahnut. Preto:
+        #   * `Updater.prepare!` (manifest + staging do `.new` + validacia) bezi
+        #     vo VLAKNE s vlastnym deadline — ziva generacia sa pri nom nedotyka,
+        #     takze po zruseni je na disku presne to, co tam bolo;
+        #   * `Updater.commit!` (renamey v Plugins) bezi v HLAVNOM vlakne, je to
+        #     lokalna a rychla operacia.
         def updater_run_apply(dir)
-          res = Updater.apply!(dir, Engine.plugin_dir)
+          plugins = Engine.plugin_dir # `Engine.*` sa cita v HLAVNOM vlakne
+          box = { 'done' => false, 'ticket' => nil, 'error' => nil }
+          # VO VLAKNE JE LEN SUBOROVE I/O — ziadne `Sketchup.*`, ziadne `UI.*`,
+          # ziadny zapis do stavu okna (guard test nad zdrojom to strazi).
+          updater_spawn do
+            begin
+              box['ticket'] = Updater.prepare!(dir, plugins)
+            rescue StandardError => e
+              box['error'] = e
+            end
+            box['done'] = true
+          end
+          poll_updater_stage(box, updater_now + UPDATER_STAGE_S)
+        end
+
+        def poll_updater_stage(box, deadline)
+          return updater_finish_apply(box) if box['done']
+
+          if updater_now >= deadline
+            # Vlakno sa NEZABIJA (nad visiacim sharom je to nespolahlive) —
+            # opusti sa. Ziva generacia je nedotknuta; keby priprava predsa len
+            # dobehla, jej `.new` a marker uprace boot recovery.
+            @updater_apply_inflight = false
+            return updater_message('Zdroj nedostupný — aktualizácia ZRUŠENÁ. Na disku sa nič ' \
+                                   'nezmenilo a plugin beží ďalej v pôvodnej verzii. Keď sa zdroj ' \
+                                   'vráti, reštartuj SketchUp a skús to znova.')
+          end
+
+          updater_schedule(UPDATER_STAGE_POLL_S) { poll_updater_stage(box, deadline) }
+        end
+
+        # Hlavne vlakno: overi VERZIU proti dokladu o kontrole a commitne.
+        def updater_finish_apply(box)
+          @updater_apply_inflight = false
+          err = box['error']
+          if err
+            Engine.log_error(err, 'SupplierSettingsDialog.updater_prepare') unless err.is_a?(Updater::Refused)
+            reason = err.is_a?(Updater::Refused) ? err.message : "#{err.class}: #{err.message}"
+            return updater_message(updater_failure_text(reason))
+          end
+
+          ticket = box['ticket']
+          mismatch = updater_version_mismatch(ticket)
+          if mismatch
+            Updater.abort_prepared!(ticket) # pripraveny `.new` ani marker neostanu
+            return updater_message(mismatch)
+          end
+
+          res = Updater.commit!(ticket)
           note = res.is_a?(Hash) ? res['note'].to_s : ''
           msg = "Aktualizované na #{res.is_a?(Hash) ? res['to'] : '?'} — reštartuj SketchUp."
           msg = "#{msg}\n\n#{note}" unless note.empty?
@@ -513,6 +604,21 @@ module Noxun
         rescue StandardError => e
           Engine.log_error(e, 'SupplierSettingsDialog.updater_run_apply')
           updater_message(updater_failure_text("#{e.class}: #{e.message}"))
+        end
+
+        # Codex #278 kolo 2 (P1): doklad o kontrole viaze aj VERZIU. Medzi
+        # kontrolou a potvrdenim mohol niekto na share vymenit balik — modal
+        # menoval X, ale pripravene je Y. Nainstalovat Y by znamenalo nasadit
+        # nieco, co clovek nikdy neodsuhlasil.
+        def updater_version_mismatch(ticket)
+          want = @updater_apply_expect.to_s
+          return nil if want.empty?
+
+          got = (ticket.is_a?(Hash) ? ticket['to'] : nil).to_s
+          return nil if got == want
+
+          "Balík sa medzitým zmenil (#{want} → #{got}) — NIČ sa nenainštalovalo. " \
+            'Skontroluj znova a potvrď to, čo naozaj chceš nasadiť.'
         end
 
         # Codex #278 (P2): „plugin ostal nezmenený" NIE JE pravda vzdy.

@@ -276,6 +276,11 @@
   // (chodí pri každej zmene modelu) a zaniká výhradne na potvrdenie servera.
   var UPD = null;         // posledný stav zo servera (`SS.updater`)
   var UPD_DIRTY = null;   // ROZPÍSANÁ cesta (null = nič sa nepíše)
+  // Hodnota, ktorú odoslalo POSLEDNÉ uloženie. Potvrdenie servera smie zahodiť
+  // rozpis LEN vtedy, keď je v poli stále ona (Codex #278 kolo 2, P2): kým
+  // odpoveď letí, používateľ mohol písať ďalej a „upratanie" by mu prepísalo
+  // rozrobenú cestu tou odoslanou.
+  var UPD_SENT = null;
 
   // Stav, z ktorého sa kreslí: základ z payloadu (uložená cesta, bežiaca
   // verzia, latch), navrch živý výsledok checku a úplne navrchu rozpísaná
@@ -369,7 +374,16 @@
     var inp = ssEl('updDir');
     var val = inp ? String(inp.value == null ? '' : inp.value) : (UPD_DIRTY || '');
     UPD_DIRTY = val;
+    UPD_SENT = val;   // proti tomuto sa porovná obsah poľa, keď dorazí potvrdenie
     if (!updSend('updater_set_dir', { source_dir: val })) SS.setStatus('Cestu sa nepodarilo odoslať.', true);
+  }
+
+  // Obsah poľa cesty PRÁVE TERAZ (bez DOM padá na rozpísanú hodnotu).
+  function updFieldValue(){
+    var inp = ssEl('updDir');
+    if (inp) return String(inp.value == null ? '' : inp.value);
+
+    return (UPD_DIRTY === null) ? null : UPD_DIRTY;
   }
 
   // POTVRDENIE PRED SWAPOM (D-15). Bez kostry modalu sa aktualizácia
@@ -595,11 +609,18 @@
     updater: function(u){
       UPD = u || null;
       if (u && u.saved){
-        UPD_DIRTY = null;
-        var inp = ssEl('updDir');
-        // Server cestu NORMALIZUJE (lomítka, koncový oddeľovač) — pole musí
-        // ukázať to, čo je naozaj uložené, nie to, čo používateľ napísal.
-        if (inp) inp.value = (u.source_dir == null) ? '' : u.source_dir;
+        // Codex #278 kolo 2 (P2): potvrdenie patrí TOMU, čo sa odoslalo. Keď
+        // používateľ medzitým písal ďalej, jeho rozpis PREŽIJE — inak by mu
+        // odpoveď na staré uloženie prepísala rozrobenú cestu.
+        var now = updFieldValue();
+        if (UPD_SENT === null || now === null || now === UPD_SENT){
+          UPD_DIRTY = null;
+          UPD_SENT = null;
+          var inp = ssEl('updDir');
+          // Server cestu NORMALIZUJE (lomítka, koncový oddeľovač) — pole musí
+          // ukázať to, čo je naozaj uložené, nie to, čo používateľ napísal.
+          if (inp) inp.value = (u.source_dir == null) ? '' : u.source_dir;
+        }
       }
       if (updPaint()) return;
       if (ssActive() === 'about') ssRenderBody();
@@ -668,6 +689,11 @@
       // `SS_DIRTY`, ani pripnutej revízie dodávateľa (F7).
       if (t.getAttribute('data-updater-edit')){
         UPD_DIRTY = String(t.value == null ? '' : t.value);
+        // Codex #278 kolo 2 (P2): rozpísaná cesta MENÍ STAV tlačidla (kontrola
+        // patrí ULOŽENEJ ceste), ale telo sa počas písania neprekresľuje —
+        // tlačidlo by ostalo aktívne a klik by aktualizoval z inej cesty, než
+        // akú má človek pred očami. Preto sa stavový riadok obnoví CIELENE.
+        updPaint();
         return;
       }
       var key = t.getAttribute('data-ss');
@@ -720,5 +746,6 @@
                        updPaint: updPaint, updSaveDir: updSaveDir, updApply: updApply,
                        updAct: updAct, updTyping: updTyping,
                        updDirty: function(){ return UPD_DIRTY; },
+                       updSent: function(){ return UPD_SENT; },
                        SS_SECTIONS: SS_SECTIONS, SS: SS };
   }
