@@ -9915,7 +9915,7 @@ module NoxunSuRunner
     ok('ŠT-4a: sekcie `sup`/`bset`/`about` su v zozname sekcii Studia',
        %w[sup bset about].all? { |k| e::StudioDialog::SECTIONS.include?(k) })
     ok('ŠT-4a: whitelist akcii sekcie pozna PRESNE ulozenie, nacitanie nanovo a kontrolu updatera',
-       sd::SECTION_ACTIONS == %w[ss_save ss_reload updater_check updater_set_dir])
+       sd::SECTION_ACTIONS == %w[ss_save ss_reload updater_check updater_set_dir updater_apply])
     # Posledny satelit odisiel — premostovat uz niet kam.
     ok('ŠT-4a: PREMOSTENIA zanikli CELE (konstanty aj cesty)',
        !e::StudioDialog.const_defined?(:WINDOW_BRIDGES) &&
