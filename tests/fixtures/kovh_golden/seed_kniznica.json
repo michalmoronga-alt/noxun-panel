@@ -1,0 +1,247 @@
+{
+  "expand": {
+    "rows": [
+      {
+        "code": "105408",
+        "quantity": 5,
+        "sources": [
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2
+          },
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": "front:F2/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 3
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "HETTICH krytka misky Sensys",
+        "category": "ZAVESY",
+        "unit": "ks",
+        "price_eur_vat": null,
+        "manual_note": null,
+        "subtotal_eur_vat": null
+      },
+      {
+        "code": "105425",
+        "quantity": 5,
+        "sources": [
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2
+          },
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": "front:F2/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 3
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "HETTICH krytka ramienka Sensys",
+        "category": "ZAVESY",
+        "unit": "ks",
+        "price_eur_vat": null,
+        "manual_note": null,
+        "subtotal_eur_vat": null
+      },
+      {
+        "code": "106412",
+        "quantity": 5,
+        "sources": [
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2
+          },
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": "front:F2/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 3
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "HETTICH 9071656 podložka 8099 s excentrom D=1,5",
+        "category": "ZAVESY",
+        "unit": "ks",
+        "price_eur_vat": 0.97,
+        "manual_note": null,
+        "subtotal_eur_vat": 4.85
+      },
+      {
+        "code": "367823",
+        "quantity": 4,
+        "sources": [
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": null,
+            "generic_type": "leg",
+            "rule_id": "nohy-zakladne",
+            "set_id": "nohy-podla-sokla",
+            "quantity": 4
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "Häfele 637.76.355 noha AXILO v. 150 mm + podložka",
+        "category": "NOHY",
+        "unit": "ks",
+        "price_eur_vat": 1.38,
+        "manual_note": null,
+        "subtotal_eur_vat": 5.52
+      },
+      {
+        "code": "306125",
+        "quantity": 4,
+        "sources": [
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": null,
+            "generic_type": "shelf_pin",
+            "rule_id": "podperky-police",
+            "set_id": "podperky-police",
+            "quantity": 4
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "Podperka policová s návlekom 7/5 Zn biela",
+        "category": "SPOJOVACI_MATERIAL",
+        "unit": "ks",
+        "price_eur_vat": null,
+        "manual_note": null,
+        "subtotal_eur_vat": null
+      },
+      {
+        "code": "93240",
+        "quantity": 2,
+        "sources": [
+          {
+            "cabinet_id": "CAB-002",
+            "owner_part_key": null,
+            "generic_type": "wall_hanger",
+            "rule_id": "zavesenie-horna",
+            "set_id": "zavesenie-bystrica",
+            "quantity": 2
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "Rektifikačný uholník „Bystrica“",
+        "category": "SPOJOVACI_MATERIAL",
+        "unit": "ks",
+        "price_eur_vat": null,
+        "manual_note": null,
+        "subtotal_eur_vat": null
+      },
+      {
+        "code": "104717",
+        "quantity": 5,
+        "sources": [
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": "front:F1/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2
+          },
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": "front:F2/wing:single",
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 3
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": true,
+        "name_sk": null,
+        "category": null,
+        "unit": null,
+        "price_eur_vat": null,
+        "manual_note": null,
+        "subtotal_eur_vat": null
+      },
+      {
+        "code": "357695",
+        "quantity": 1,
+        "sources": [
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": "front:F3/panel",
+            "generic_type": "slide",
+            "rule_id": "vysuv-podla-hlbky",
+            "set_id": "vysuv-atira-biela-h70",
+            "quantity": 1
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": true,
+        "name_sk": null,
+        "category": null,
+        "unit": null,
+        "price_eur_vat": null,
+        "manual_note": null,
+        "subtotal_eur_vat": null
+      },
+      {
+        "code": "357696",
+        "quantity": 2,
+        "sources": [
+          {
+            "cabinet_id": "CAB-002",
+            "owner_part_key": "front:F1/panel",
+            "generic_type": "slide",
+            "rule_id": "vysuv-podla-hlbky",
+            "set_id": "vysuv-atira-biela-h70",
+            "quantity": 2
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": true,
+        "name_sk": null,
+        "category": null,
+        "unit": null,
+        "price_eur_vat": null,
+        "manual_note": null,
+        "subtotal_eur_vat": null
+      }
+    ],
+    "unmapped": [
+
+    ],
+    "summary": {
+      "rows": 9,
+      "quantity": 33,
+      "total_eur_vat": 10.37,
+      "unknown_prices": 7,
+      "unmapped": 0
+    }
+  },
+  "csv": "\"NOXUN kovanie — nákupný zoznam\";\"GOLDEN\";\"2026-09-03 00:00\"\r\n\"kategória\";\"kód\";\"názov\";\"počet\";\"MJ\";\"cena € s DPH\";\"medzisúčet € s DPH\"\r\n\"ZAVESY\";\"105408\";\"HETTICH krytka misky Sensys\";\"5\";\"ks\";\"\";\"\"\r\n\"ZAVESY\";\"105425\";\"HETTICH krytka ramienka Sensys\";\"5\";\"ks\";\"\";\"\"\r\n\"ZAVESY\";\"106412\";\"HETTICH 9071656 podložka 8099 s excentrom D=1,5\";\"5\";\"ks\";\"0,97\";\"4,85\"\r\n\"NOHY\";\"367823\";\"Häfele 637.76.355 noha AXILO v. 150 mm + podložka\";\"4\";\"ks\";\"1,38\";\"5,52\"\r\n\"SPOJOVACI_MATERIAL\";\"306125\";\"Podperka policová s návlekom 7/5 Zn biela\";\"4\";\"ks\";\"\";\"\"\r\n\"SPOJOVACI_MATERIAL\";\"93240\";\"Rektifikačný uholník „Bystrica“\";\"2\";\"ks\";\"\";\"\"\r\n\"MIMO KATALÓGU\";\"104717\";\"\";\"5\";\"\";\"\";\"\"\r\n\"MIMO KATALÓGU\";\"357695\";\"\";\"1\";\"\";\"\";\"\"\r\n\"MIMO KATALÓGU\";\"357696\";\"\";\"2\";\"\";\"\";\"\"\r\n\"SPOLU (len známe ceny)\";\"\";\"\";\"33\";\"\";\"\";\"10,37\"\r\n"
+}
