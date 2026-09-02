@@ -46,7 +46,7 @@ DC pasce [DC_PRAVIDLA.md](DC_PRAVIDLA.md) · UI dizajn [UI_DIZAJN.md](UI_DIZAJN.
 | `materials` a celý split (`materials_catalog` · `materials_decor` · `materials_abs` · `materials_demos_create` · `materials_project` · `materials_replace_uni`) | [architecture/materials.md](architecture/materials.md) |
 | `materials_migration` · `materials_health` · `abs_rules` | [architecture/materials.md](architecture/materials.md) |
 | `demos/` (`client` · `slug_matcher` · `name_search` · `product_parser` · `family` · `lookup` · `sitemap_cache` · `image_cache`) | [architecture/materials.md](architecture/materials.md) |
-| `hardware_rules` · `hardware_catalog` · `hardware_sets` | [architecture/hardware.md](architecture/hardware.md) |
+| `hardware_rules` · `hardware_catalog` · `hardware_taxonomy` · `hardware_sets` | [architecture/hardware.md](architecture/hardware.md) |
 | `validation` · `bom` · `budget` · `budget_store` · `sheet_estimate` | [architecture/outputs.md](architecture/outputs.md) |
 | `price_refresh` · `supplier_settings` · `vepo_export` · `cp_export` · `xlsx_writer` | [architecture/outputs.md](architecture/outputs.md) |
 | `usage_stats` | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |

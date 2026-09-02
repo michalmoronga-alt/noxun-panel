@@ -156,14 +156,112 @@ okna — bez toho nová položka (`use_count` 0) prepadla za strop a z UI zmizla
 `hws_merge_seed` · `hws_reset_project`), ktoré sú od tejto dávky v `SECTION_ACTIONS`. Každý z nich je `start_operation` … `commit_operation` (**1 zmena = 1 krok Späť**) a každý má
 serverový `model_guid` guard — zápis zo zastaraného UI sa odmietne a stav sa obnoví (`resync_sets`).
 
-## Bez vlastného odseku
+**Výrobca a rada položky (KOV-B1, v0.9.19).** Položka nesie VOLITEĽNÉ `manufacturer` a `series` — kanonické názvy z `hardware_taxonomy.rb` (nie id: názov cestuje medzi PC bez
+joinu). Obe sú v `PATCHABLE`, prirodzene cestujú v `record_rev` a **hľadanie ich tokenizuje** (`score_item` — dotaz „hettich" či „atira" položku nájde; bez toho by mal strom
+KOV-B2 filter, ktorý sa hľadaním nedá zopakovať). Skrutky ani podperky výrobcu mať nemusia — prázdna hodnota znamená, že kľúč **sa neuloží**.
+
+Tri veci, ktoré k tomu patria:
+
+- **`SCHEMA_CURRENT` je 2, ale marker je LAZY podľa OBSAHU** (`schema_for`, vzor `HardwareSets.snapshot_std` a materiálov): katalóg BEZ výrobcov sa stampuje `1` a staršie verzie
+  ho čítajú ďalej; akonáhle má ktorákoľvek položka výrobcu alebo radu, stampuje sa `2` a starší plugin ho odmietne ako read-only („aktualizuj plugin"), NIKDY ticho neoreže.
+  Spätná čitateľnosť sa teda blokuje len tam, kde je čo stratiť.
+- **Ne-String hodnota = nečitateľné položky.** `valid_stored_item?` vyžaduje String (alebo chýbajúci kľúč) — novšia verzia môže dať `manufacturer` iný TVAR (objekt s id
+  a názvom) a naše čítanie by ho ticho zmenilo na nezmyselný reťazec. `assess!` z toho urobí `:read_only`.
+- **Členstvo v taxonómii sa overuje pri `create_item` aj `patch_item`** nad EFEKTÍVNOU dvojicou (patch prebíja uložené): neprázdny výrobca musí v zozname existovať a rada mu musí
+  patriť, inak `[:invalid, dôvod]`; nekompatibilná taxonómia je fail-closed (položka s výrobcom sa neuloží, položka bez neho prejde). Kontrola beží **ZÁMERNE MIMO katalógového
+  zámku** — taxonómia má vlastný sidecar (`materials.lock`) a vnoriť ho do katalógového by vyrobilo PORADIE zámkov, teda presne to riziko, kvôli ktorému majú katalógy jeden
+  spoločný sidecar. Stráži to zdrojový guard v `tests/pure/test_hardware_catalog.rb`.
+
+### hardware_taxonomy.rb
+
+**Jediný zoznam prípustných výrobcov a rád kovania (KOV-B1, v0.9.19; audit #17 BLOCKER 4).** Set aj položka katalógu nesú `manufacturer`/`series` ako reťazec — keby si ho každý
+písal sám, vznikla by za mesiac zbierka „Hettich" / „hettich" / „Hettch" a strom katalógu (KOV-B2) ani filtre (KOV-D) by na nich nesadli. Súbor
+`%APPDATA%\NOXUN\Engine\hardware_taxonomy.json` = `{ std, schema, seed_version, manufacturers[], series[] }` (+ `.bak`), teda **globálny** — kontrakt je preto rovnaký ako
+u knižnice setov (R-07/R-08/R-11) a katalógu (GH #99).
+
+- **Identita mena je `Materials.slug`** — case-insensitive a bez diakritiky („Hettich" == „hettich" == „HETTICH"). `name` je KANONICKÝ zobrazovaný tvar (prvé zapísané znenie)
+  a práve on sa ukladá do setov a položiek.
+- **Rada patrí PRESNE JEDNÉMU výrobcovi**, takže slug rady je **globálne unikátny** — inak by sa z uloženého reťazca „Sensys" nedalo zistiť, či je to Hettich alebo Blum.
+  V súbore je to invariant brány: ten istý slug dvakrát = `:duplicate`, rada bez existujúceho výrobcu = `:unknown_shape`.
+- **Matica stavov** (vzor `HardwareSets`): `:ok` · `:degraded` (poškodený primár + platná `.bak` — číta sa, do SÚBORU sa nezapisuje) · `:read_only` (cudzí `std`, novšia `schema`,
+  neznámy tvar, duplicita). Čistá `assess_doc(doc)` je bez IO a **fail-closed** (výnimka = `:unexpected_shape` s hláškou „súbor NEMAŽ, nahlás"); `assess` nad ňou dopĺňa degraded.
+  Stav sa **NECACHUJE** (`state` ho vyhodnocuje pri každom použití), `state_code`/`state_reason` sú výsledok poslednej kontroly a log ide do konzoly len pri ZMENE stavu.
+  Z `:read_only` súboru `load` vracia **PRÁZDNO a nikdy seed** — cudzie defaulty by prvý zápis zvečnil (lekcia R-07 P1-1).
+- **API je LEN create** (register R-35, audit #17 FIX 10): `create_manufacturer!` a `create_series!` → `[:ok | :exists | :invalid | :conflict | :write_failed, …]`. Rename a delete
+  vo V1 NEEXISTUJÚ — museli by prejsť všetky sety, položky, snapshoty v .skp aj šablóny a bez toho by za sebou nechali osirelé reťazce. „Úplná náhrada" obsahu (vzor pravidiel
+  kovania) sa tu vedome nezavádza: dve otvorené okná by si ju prebili.
+- **Zápis:** `with_catalog_lock` → `JsonFileStore.reload!` → **znovu posúdená brána nad čerstvým dokumentom** → prípadná revízia (`load_with_revision` dáva obsah aj odtlačok
+  z JEDNÉHO stavu súboru) → atomický zápis. Do súboru zapisuje **jediné miesto** (`write`); zlyhaný `flock` je IOError a končí ako `:write_failed`, nikdy ako tichý úspech.
+- **Seed (`SEED_VERSION` 1):** Hettich · Blum · Grass · Strong · Ostatné a ich rady (Sensys, InnoTech Atira, Quadro, AvanTech YOU, AXILO; CLIP top, AVENTOS, TANDEMBOX, LEGRABOX,
+  MERIVOBOX, TIP-ON; Nova Pro, Tiomos; StrongMax). Merge dopĺňa LEN chýbajúce mená, nikdy neprepisuje a nad read-only ani degradovaným súborom sa nerobí; `ensure_seeded` má
+  DVOJITÝ check (rýchly + pod zámkom), takže oneskorený seeder neprepíše reálnu zmenu.
+- **`check_classification(manufacturer, series)`** → `[]` alebo `[{ field, msg }]` je spoločný kontrakt pre set aj položku katalógu. Volajúci si musí NAJPRV overiť `read_only?` —
+  nad nekompatibilnou taxonómiou vracia `load` prázdno a kontrola by hlásila „výrobca nie je v zozname" namiesto skutočného dôvodu.
+
+Zápis do taxonómie je zápis do globálneho súboru, takže v SketchUpe **nerobí krok Späť**. Testy: `tests/pure/test_kovb1_taxonomia.rb` (vrátane REÁLNEHO dvojprocesového `flock`)
+a in-SketchUp sekcia `run_kovb1`.
 
 ### hardware_sets.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+Sety kovania (mapovacie pravidlo generický typ → kódy katalógu) + projektový snapshot predvolieb na modeli; nadväzujúce zmienky sú v odsekoch `hardware_rules.rb`
+a `hardware_catalog.rb` a v [ui-lifecycle.md](ui-lifecycle.md) (sekcia `hw` Štúdia).
 
-Sety kovania + projektový snapshot predvolieb na modeli; zmienky sú v odsekoch `hardware_rules.rb` a `hardware_catalog.rb` a v [ui-lifecycle.md](ui-lifecycle.md) (sekcia `hw`
-Štúdia).
+**KLASIFIKÁCIA SETU (KOV-B1, v0.9.19).** Set už nie je len „mapovanie typu na kódy" — nesie AJ to, NA ČO sa používa: `use_type` (door|drawer|lift|fall|other) · `opening_mode`
+(classic|tipon|other, kde `other` = „neuplatňuje sa" pri nohách, podperkách a zavesení) · `drawer_construction` (metal|wood|other, **len pri zásuvke**) · `manufacturer` ·
+`series` · `active`. Slovníky sú UZAVRETÉ (neznáma hodnota = obsah novšej verzie, nie nová kategória) a s čelami držia JEDNU doménovú pravdu — `Fronts` sa načítava PO
+`hardware_sets`, takže väzbu drží guard test, nie referencia.
+
+Šesť pravidiel, na ktorých kontrakt stojí:
+
+- **ALL-OR-NOTHING** (audit #17 FIX 6). Klasifikácia buď ÚPLNE chýba (legacy „nezaradený" set — správa sa presne ako pred KOV-B1), alebo je ÚPLNÁ a kontextovo platná.
+  Čiastočný tvar zápis ODMIETNE: polovičná klasifikácia by v editore vyzerala ako hotové zaradenie a filtre KOV-D by na ňu nesadli. **Rada je VOLITEĽNÁ** (vedomá odchýlka od
+  mockupu): podperky, klzáky ani „Bystrica" žiadnu radu nemajú a vynútená rada by do taxonómie priniesla vymyslené mená.
+- **`generic_type` je ODVODENÝ** kanonickou mapou `USE_TYPE_GENERIC` (`door→hinge` · `drawer→slide` · `lift/fall→lift`; `other` → explicitný typ) — audit #17 BLOCKER 2. Chýbajúci
+  sa doplní, nesediaci je chyba s vetou, ktorá menuje OBE strany. Je to jediná autorita vzťahu; dva protirečivé zápisy o tom istom sete sa uložiť nedajú.
+- **Čítanie je tolerantné, ale CELÉ-ALEBO-VÔBEC.** Neúplný, nekonzistentný alebo neznámy klasifikačný blok sa zahodí CELÝ (`log_skip`) a set sa číta ako nezaradený —
+  `generic_type` (a teda EXPANZIA a NÁKUP) sa pritom **NIKDY nemení**. Tichý orez to nie je: stratu prizná 4. vrstva detektora nižšie.
+- **`active` je SPARSE** (audit #17 FIX 7): default je „aktívny", ukladá sa LEN `false`. **`expand`, `explain`, `resolve_set_id` ani `set_options` ho NEČÍTAJÚ** — existujúce
+  mapovanie, snapshot aj šablóna expandujú deep-equal so setom bez príznaku. Ponuku podľa neho filtruje až UI (KOV-B3).
+- **`save_set!` MERGUJE klasifikáciu z uloženého setu.** Editor posiela dnes len štyri kľúče (`set_id`, `name`, `generic_type`, `members`), takže bez merge by KAŽDÁ úprava člena
+  ticho zhodila zaradenie — presne tá trieda tichej straty, ktorú dávka rieši (a je to jedna z mutácií sady). Kľúč, ktorý vo vstupe VÔBEC NIE JE, sa preberie z uloženého setu;
+  kľúč prítomný s `nil`/`''` (a `active: true`) je VEDOMÉ vymazanie. Až merged tvar ide do validácie, takže all-or-nothing platí nad tým, čo sa naozaj uloží. Validácia preto beží
+  **až pod zámkom** (uložený set sa smie čítať len čerstvo — R-08).
+- **Taxonómia sa kontroluje LEN v `save_set!`** (zápis do globálnej knižnice). `validate_set` ostáva ČISTÁ (žiadne IO) — používa ju aj zápis projektového snapshotu a čítanie
+  šablón, ktoré cestujú medzi PC s INOU taxonómiou; vynútiť ju tam by znamenalo, že zákazku z iného počítača sa nedá otvoriť. Nekompatibilná taxonómia je fail-closed:
+  klasifikovaný set sa uložiť nedá (`[:write_failed, dôvod taxonómie]`), legacy set áno; degradovaná taxonómia sa čítať smie, takže kontrola nad ňou beží normálne.
+
+**Chyby sú ŠTRUKTUROVANÉ** (kontrakt pre KOV-B3, audit #17 FIX 13): `validate_set_detailed` a `save_set!` vracajú `[{ 'row' => nil|index člena, 'field' => …, 'msg' => SK veta }]`,
+takže editor vie chybu ukázať PRI POLI. `save_set!` je odteraz TROJICA `[status, info, errors]` — dnešné dvojprvkové destruovanie u volajúcich (`status, info = …`) tým nie je
+dotknuté (Ruby prebytočný prvok zahodí) a stráži to test.
+
+**Marker `std` má TRI hodnoty a je LAZY podľa obsahu.** `1` = len legacy tvary · `2` = pásma člena alebo selector v mapovaní (GH #131) · **`3` = set s KTORÝMKOĽVEK kľúčom mimo
+`LEGACY_SET_KEYS`** (každé klasifikačné pole aj `active` samostatne) **alebo mapovanie s triednym kľúčom `class:`**. Čisto legacy obsah ostáva na svojom pôvodnom std, takže
+spätná čitateľnosť sa zbytočne neblokuje; obsah so `std: 3` je pre starší plugin `:read_only` (knižnica) a `:invalid` (snapshot) — NIKDY čiastočné čítanie. Tú istú funkciu
+(`snapshot_std`) používa zápis knižnice aj zápis snapshotu: marker musí hovoriť o obsahu rovnako v `%APPDATA%` aj v .skp.
+
+**TRIEDNY kľúč mapovania `class:<generic_type>|<opening_mode>[|<drawer_construction>]`** (KOV-B1, pripravené pre KOV-D — „výsuvy TipOn majú iný set než klasické"). Tvar je
+uzavretý: tretí segment má LEN `slide`, `@owner` sufix je zakázaný (výber na úrovni dielca je iný pojem), segmenty sa trimujú a downcasujú. Pozná ho **jediný parser**
+(`parse_mapping` ho rozpozná PRED `parse_hardware_set_key`), prijímajú ho všetky mapy (globálna, snapshot aj cabinet override), počíta s ním whitelist brány, `snapshot_std`,
+`referenced_set_ids` aj `mapping_types_by_set` — ale **`resolve_set_id`, `expand` ani `explain` ho NEČÍTAJÚ** a zapisovacie cesty ho nepíšu. Účelom tejto dávky je výhradne
+**bezstratový round-trip** a správny marker, takže KOV-D už nebude potrebovať ďalší bump. `BuildPlan.hardware_set_key_type` z neho vracia prvý segment (starší plugin prefix
+nepozná, takže mu z toho istého kľúča vyjde neznámy typ a prestavbu zablokuje — presne to chceme), `BuildPlan.parse_hardware_set_key` vracia `nil`.
+
+**BEZSTRATOVÁ BRÁNA DEFINÍCIÍ SETOV V ŠABLÓNE — `assess_set_defs` (audit #17 BLOCKER 1).** `hardware_set_defs` išli doteraz LEN cez tolerantný `normalize_sets`, teda cez cestu,
+ktorá neznámy obsah ticho oreže; od KOV-B1 by starší plugin zmrazil do .skp set BEZ klasifikácie. Šablóna je dátový súbor MIMO modelu (môže byť ručne upravená alebo z novšej
+verzie), takže sa číta **bezstratovo alebo vôbec** — rovnako ako mapovanie v `read_template_mapping`. Čistá funkcia vracia `[:ok, {set_id => norm}]` alebo `[:lossy, [názvy]]`
+a používa TEN ISTÝ detektor ako knižnica. Volá sa na OBOCH cestách a VŽDY **pred akoukoľvek operáciou**: `Panel.take_insert_hardware!` (vklad — pred `prepare_insert` aj pred
+ghost session; vlastný status `:lossy_defs` = vlastná hláška) a `TemplatesDialog.handle_apply` (použitie — pred `rebuild_many`). Odmietnutie preto znamená „model sa nezmenil ani
+o krok Späť"; poradie stráži zdrojový guard a in-SketchUp sekcia `run_kovb1`. K bráne patrí bump `CabinetBuilder::CONFIG_SCHEMA` na **4** ([construction.md](construction.md)),
+ktorý tú istú šablónu odmietne aj SPÄTNE.
+
+**Detektor straty má ŠTYRI vrstvy** — tri pôvodné (nižšie, R-07) plus **`classification_lost?`**: `use_type` je ZNÁMY kľúč so SKALÁRNOU hodnotou, takže whitelist aj počty by
+hodnotu z novšej verzie (`use_type: 'sliding'`) prepustili a tolerantné čítanie by celý blok ticho zahodilo. Porovnáva sa RAW definícia s výsledkom `normalize_sets`: raw má
+neprázdny ktorýkoľvek klasifikačný kľúč a normalizovaný set klasifikáciu nemá → STRATA; rovnako raw `active: false` bez príznaku v normalizovanom. Beží vo **VŠETKÝCH TROCH
+bránach** — `assess_library_doc`, `project_state_status` aj `assess_set_defs` — tri cesty k tým istým dátam sa nesmú rozísť. Dôsledok: knižnica z novšej verzie je `:read_only
+:unknown_shape`, snapshot `:invalid` a šablóna odmietnutá, nikdy tichý orez.
+
+Testy klasifikácie: `tests/pure/test_kovb1_sety.rb` (vrátane charakterizácie „klasifikovaná kópia SEED knižnice nakupuje deep-equal" a piatich overených mutácií), golden
+odtlačok `tests/fixtures/kovh_golden/seed_kniznica.json` a in-SketchUp sekcia `run_kovb1`.
 
 **AD-HOC KANÁL: konkrétne kovanie MIMO setov (KOV-H1, v0.9.18).** `expand` má druhý vstup **`manual_items:`** — ad-hoc položky zákazky (`Bom.collect` kľúč `hardware_manual`, tvar
 drží `cabinet_builder.rb`). Sú to položky, ktoré do skrinky pridal človek: konkrétny katalógový kód alebo voľná položka s vlastným názvom a cenou. Kanál beží **PRED set

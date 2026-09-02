@@ -61,6 +61,10 @@ tichá strata ktoréhokoľvek z nich by zmenila výrobu alebo zahodila vedome ur
 `hardware_manual[]`) — tichá strata by ODOBRALA POLOŽKU Z OBJEDNÁVKY. **Dôsledok pre prax:** model uložený s markerom 3 odmietne prestavať starší plugin, preto sa pred prvým
 takým modelom aktualizujú **obe PC** (D-52 updater). K bumpu 3 patrí **EXPORTNÁ brána** (`Bom.collect` → `newer_configs` → `ProductionCore.export_blockers`, viď
 [outputs.md](outputs.md)): sama prestavbová brána nestačila, lebo starší plugin by zákazku so schémou 3 bez problémov **vyexportoval** — len bez ad-hoc kovania (audit #15 BLOCKER 3).
+· **`4` = KOV-B1** (sety s KLASIFIKÁCIOU cestujú v šablónach cez `hardware_set_defs` a projektový snapshot má `std` 3) — starší plugin by pri použití takej šablóny zmrazil do
+.skp OREZANÝ set a nikto by už nevedel, že tam niečo bolo. Čísla sa prideľujú **sekvenčne podľa poradia mergov** (audit #17 FIX 5 — KOV-H1 vzala 3). K bumpu 4 patrí **DOPREDNÁ
+brána** `HardwareSets.assess_set_defs` ([hardware.md](hardware.md)): R-12 marker odmietne novšiu šablónu SPÄTNE, `assess_set_defs` odmietne nečitateľné definície DOPREDU —
+pri vklade aj pri použití, vždy PRED akoukoľvek operáciou, takže model sa nezmení ani o krok Späť.
 
 **AD-HOC KOVANIE `hardware_manual[]` (KOV-H1, v0.9.18).** Ďalšie pole configu, nie nový zápisový kanál (audit #15 BLOCKER 1): panel ho posiela v `collectAll()` presne ako čelá,
 takže ide cestou `apply_all` → `normalize` → **rebuild** — jeden krok Späť, guardy dokumentu aj skrinky, R-12, `push_selected(dedup: false)`. Cena je prestavba geometrie pri

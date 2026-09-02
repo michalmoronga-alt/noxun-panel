@@ -114,8 +114,17 @@ parser inde by sa časom rozišiel; jediný čitateľ je zatiaľ deep-link „kl
 
 ### build_plan.rb
 
-**ZÁVÄZNÝ kontrakt plánu** (SCHEMA 2, MIN_DIM, validátor, `warnings[]`, hardware string-keyed s GENERIC_TYPES/limitmi/referenčnou integritou ownera). Geometria, kusovník aj VEPO
+**ZÁVÄZNÝ kontrakt plánu** (SCHEMA 3, MIN_DIM, validátor, `warnings[]`, hardware string-keyed s GENERIC_TYPES/limitmi/referenčnou integritou ownera). Geometria, kusovník aj VEPO
 čítajú TEN ISTÝ plán.
+
+**`GENERIC_TYPES` + `lift` a `SCHEMA` 2 → 3 (KOV-B1, v0.9.19).** Slovník typov kovania dostal `lift` (výklopy a sklopy) — presunuté z KOV-E podľa auditu #17 BLOCKER 2, lebo
+kanonická mapa `use_type → generic_type` v `hardware_sets.rb` ho potrebuje UŽ TERAZ (inak sa výklopový set nedá uložiť). PRAVIDLÁ ani seed mapovanie k nemu zatiaľ NIE SÚ — tie
+prinesie KOV-E; slovník je tu preto, aby už nebol potrebný ďalší bump kontraktu. Rozšírenie je pre STARŠÍ plugin neznámy typ, ktorý jeho `guard_unknown_hardware!` odmietne, takže
+plán, ktorý ho môže niesť, už nie je plánom schémy 2 — odtiaľ bump. Slovenský názov („Výklop / sklop") žije v troch mapách naraz (`HardwareRules.label_for`,
+`Validation::HW_LABELS`, `ui/js/rules.js`) a paritu stráži guard, ktorý iteruje `GENERIC_TYPES` — nie opísaný zoznam.
+
+**`hardware_set_key_type` pozná prefix `class:`** (triedny kľúč mapovania setov, [hardware.md](hardware.md)): vracia z neho prvý segment, takže `class:lift|classic` prestavbu
+neblokuje a `class:sliding|classic` z novšej verzie áno. `parse_hardware_set_key` pre triedny kľúč vracia `nil` — nie je to výber podľa typu ani podľa dielca.
 
 ## Perzistencia a nastavenia počítača
 
