@@ -17,6 +17,33 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-H1 · AD-HOC KOVANIE — DÁTOVÁ VRSTVA (v0.9.18, 3.9.2026):** prvá polovica slice H (rez H1/H2 podľa Codex auditu #15). Pravidlá a sety pokrývajú len to, čo sa dá
+  odvodiť; **zvyšok musí ísť pridať ručne** — zámok, špeciálny doraz, položka mimo katalógu. H1 prináša **celý dátový kontrakt bez štipky UI** (to je H2), takže navonok je
+  dávka neviditeľná a existujúce zákazky dávajú **bajtovo rovnaký** nákupný CSV (golden `tests/fixtures/kovh_golden/`, prvý commit vetvy = odtlačok z NEZMENENÉHO mainu).
+  **Štyri BLOCKERY auditu #15 rozhodli tvar dávky.** *(B1)* **Žiadny nový zápisový kanál** — `hardware_manual[]` je ďalšie pole configu a ide cestou `collectAll()` →
+  `apply_all` → `normalize` → **rebuild**, presne ako čelá: jeden krok Späť, guardy dokumentu aj skrinky, R-12, `dedup: false`, a `cabinet_config` (jediné miesto vzniku
+  configu) stampuje schému. Priamy zápis by ho obišiel a položka by ostala pod starou schémou. Cena je prestavba geometrie pri pridaní položky — **vedome prijaté**;
+  optimalizácia je kandidát **R-40** v registri, nie súčasť H. *(B2)* **Katalógová položka sa oceňuje ŽIVOU cenou katalógu** a v configu má len kód + snapshot názvu/MJ;
+  snapshot ceny + agregácia podľa kódu by na jednom nákupnom riadku zmiešali dve ceny. Voľná položka má vlastný riadok (`free:<skrinka>:<id>`) a cenu zo snapshotu — tú zadal
+  človek. *(B3)* **R-12 dostal EXPORTNÚ bránu** (platí všeobecne, aj bez ad-hoc položiek): dovtedy chránil len prestavbu, takže staršia verzia zákazku z novšej schémy
+  normálne **vyexportovala** — len bez toho, čomu nerozumie. Teraz `Bom.collect` nesie `newer_configs` a `export_blockers` zastaví nákupný CSV, rozpočet aj ponuku (**VEPO
+  nie** — rezací výstup z rozmerov dielcov staršia verzia číta správne); Kontrola to hlási RED, aby to bolo vidno skôr než pri exporte. *(B4)* **Vlastník sa kontroluje
+  STRIKTNE len pri ADD/EDIT** — rebuild kľúč nikdy nezahodí a po zániku dielca je položka ORANGE „bez vlastníka", ale **ostáva v nákupe**: tichý drop by odobral kus
+  z objednávky. Rozpor „vlastník musí existovať" × „položka po zániku ostáva" tak zmizol rozdelením na zápisovú a čítaciu cestu.
+  **Ad-hoc kanál je v expanzii ZÁMERNE samostatný** (`expand(manual_items:)`, beží PRED set rezolúciou): nikdy `resolve_set_id`, nikdy `note_manual`. To druhé je vecné —
+  `note_manual` je D-93 znamienko ručného zásahu do **počtu setovej položky** (`source: 'manual'`), úplne iný pojem; ad-hoc pôvod preto nesie `origin: 'adhoc'` na zdroji
+  a `adhoc_quantity` na riadku (FIX 7, stráži to mutácia). Katalógová položka sa **zlieva** s riadkom rovnakého kódu zo setu; kód, ktorý z katalógu zmizol, je
+  **`catalog_missing`, nie `missing`** — riadok má názov zo snapshotu, takže ho ponuka nesmie preskočiť a chýba mu LEN cena (FIX 6). `finalize` dostal kľúč riadku ako
+  posledného rozhodcu zoradenia: voľné riadky majú prázdny kód aj kategóriu a nestabilný `sort_by` by ich medzi behmi preusporiadal.
+  **Nové ID len pri vzniku novej skrinky** (`rekey_hardware_manual` v `dedup_copies` a „Vložiť kópiu"; v `normalize` **nikdy** — mutácia). JS je čistý pass-through **bez
+  defaultov**: `plainMap` vracia pre pole `null`, preto má šablónové pole vlastný zoznam `HARDWARE_LIST_KEYS`; `|| []` by z „o položkách neviem" spravilo „položky nie sú"
+  a apply by ich zmazal. Legacy šablóna bez kľúča položky cieľa **nezmaže** (vetva ako `plinth_recess`/`name`), a `insertCabinet()` kľúč z payloadu maže, aby nová skrinka
+  nezdedila položky práve označenej skrinky.
+  **Testy:** 29 headless + 81 JS sád + **in-SU `run_kovh1`** (28 scenárov: prestavba = 1 krok Späť s nezmenenými ID, CSV bez položiek bajtovo zhodný, kópia s vlastnými ID,
+  dve katalógové položky rovnakého kódu = jeden riadok s jednou živou cenou, mŕtvy vlastník = ORANGE a položka ostáva v nákupe, čítanie bez kroku Späť, šablóna). Sada si
+  testovací kód katalógu zakladá a po sebe maže. **Mutácie (5):** pole vypadne z `config_to_params` · cena katalógovej položky sa uloží · snapshot víťazí nad živým katalógom ·
+  `note_manual` započíta ad-hoc · brána novšej schémy sa vynechá v CP exporte. **CONFIG_SCHEMA 2 → 3** — model uložený od v0.9.18 už starší plugin neprestaví ani nevyexportuje.
+
 - **KOV-A2b · SMER OTVÁRANIA V MODELI — UZÁVER SLICE A (PR #282, v0.9.17, 3.9.2026):** druhá polovica rezu A2 a s ňou **koniec celého slice KOV-A** (A1 #280 dátová vrstva ·
   A2a #281 karta čela · A2b #282 overlay). Nový modul **`core/direction_check.rb`** je **presné zrkadlo `grain_check.rb`** — ten istý lifecycle overlayu, tá istá pamäť
   prepínača v `%APPDATA%`, ten istý broadcast do oboch okien. Vlastný modul (nie ďalší stav K2) zámerne: K2 hovorí o smere **kresby dekoru**, toto o smere **otvárania**, a obe
