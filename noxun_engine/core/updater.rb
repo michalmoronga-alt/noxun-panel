@@ -762,11 +762,19 @@ module Noxun
         File.join(dir, SETTINGS_FILE)
       end
 
+      # Codex #278 kolo 3 (P2): koncove lomitko sa strihá LEN tam, kde nejde
+      # o KOREN — presne ako v `normalize_path`. `chomp('/')` nad korenom dava
+      # nepouzitelnu cestu (`/` -> prazdna, `D:/` -> „aktualny priecinok na
+      # disku D", `//server/share` -> UNC koren bez zdielania) a vsetky tri sa
+      # daju do pola distribucneho priecinka realne napisat.
       def normalize_source(value)
         v = value.to_s.strip
         return '' if v.empty?
 
-        v.tr('\\', '/').chomp('/')
+        p = v.tr('\\', '/')
+        return p if p =~ ROOT_PATH_RE
+
+        p.chomp('/')
       end
 
       def settings

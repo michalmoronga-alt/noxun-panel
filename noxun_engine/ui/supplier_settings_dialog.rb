@@ -431,7 +431,11 @@ module Noxun
           end
 
           @updater_dir = saved
-          push_updater('state' => 'idle', 'source_dir' => saved, 'saved' => true)
+          # `req` je poradove cislo POZIADAVKY klienta (Codex #278 kolo 3, P2):
+          # vracia sa nedotknute, aby klient poznal, KTOREMU ulozeniu potvrdenie
+          # patri — ack starsieho ulozenia uz nesmie zahodit rozpis toho novsieho.
+          push_updater('state' => 'idle', 'source_dir' => saved, 'saved' => true,
+                       'req' => data['req'])
           set_status(saved.empty? ? 'Distribučný priečinok je zmazaný.' : "Priečinok uložený: #{saved}")
           handle_updater_check
         end
@@ -672,7 +676,7 @@ module Noxun
           data = { 'enabled' => updater?, 'state' => 'idle', 'source_dir' => '',
                    'current' => Engine::VERSION.to_s, 'available' => '', 'reason' => '',
                    'locked' => (updater? ? Engine.restart_required? : false),
-                   'saved' => false }.merge(over)
+                   'saved' => false, 'req' => nil }.merge(over)
           js("SS.updater(#{data.to_json})")
         end
 

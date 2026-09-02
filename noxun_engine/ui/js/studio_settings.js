@@ -276,11 +276,13 @@
   // (chodí pri každej zmene modelu) a zaniká výhradne na potvrdenie servera.
   var UPD = null;         // posledný stav zo servera (`SS.updater`)
   var UPD_DIRTY = null;   // ROZPÍSANÁ cesta (null = nič sa nepíše)
-  // Hodnota, ktorú odoslalo POSLEDNÉ uloženie. Potvrdenie servera smie zahodiť
-  // rozpis LEN vtedy, keď je v poli stále ona (Codex #278 kolo 2, P2): kým
-  // odpoveď letí, používateľ mohol písať ďalej a „upratanie" by mu prepísalo
-  // rozrobenú cestu tou odoslanou.
-  var UPD_SENT = null;
+  // POSLEDNÉ uloženie: jeho poradové číslo a odoslaná hodnota. Potvrdenie
+  // servera smie zahodiť rozpis LEN vtedy, keď (a) patrí TOMUTO uloženiu
+  // (`req`, Codex #278 kolo 3) a (b) v poli je stále odoslaná hodnota
+  // (Codex #278 kolo 2). Dve uloženia rýchlo za sebou tak nemôžu skončiť tak,
+  // že ack toho prvého zahodí rozpis patriaci druhému.
+  var UPD_REQ = 0;      // rastúce číslo požiadavky (0 = žiadna neodoslaná)
+  var UPD_SENT = null;  // hodnota, ktorú odoslala požiadavka `UPD_REQ`
 
   // Stav, z ktorého sa kreslí: základ z payloadu (uložená cesta, bežiaca
   // verzia, latch), navrch živý výsledok checku a úplne navrchu rozpísaná
@@ -375,7 +377,10 @@
     var val = inp ? String(inp.value == null ? '' : inp.value) : (UPD_DIRTY || '');
     UPD_DIRTY = val;
     UPD_SENT = val;   // proti tomuto sa porovná obsah poľa, keď dorazí potvrdenie
-    if (!updSend('updater_set_dir', { source_dir: val })) SS.setStatus('Cestu sa nepodarilo odoslať.', true);
+    UPD_REQ += 1;     // …a proti tomuto sa porovná, KTORÉMU uloženiu ack patrí
+    if (!updSend('updater_set_dir', { source_dir: val, req: UPD_REQ })){
+      SS.setStatus('Cestu sa nepodarilo odoslať.', true);
+    }
   }
 
   // Obsah poľa cesty PRÁVE TERAZ (bez DOM padá na rozpísanú hodnotu).
@@ -609,11 +614,12 @@
     updater: function(u){
       UPD = u || null;
       if (u && u.saved){
-        // Codex #278 kolo 2 (P2): potvrdenie patrí TOMU, čo sa odoslalo. Keď
-        // používateľ medzitým písal ďalej, jeho rozpis PREŽIJE — inak by mu
-        // odpoveď na staré uloženie prepísala rozrobenú cestu.
+        // Potvrdenie patrí TOMU, čo sa odoslalo — a to sa overuje DVAKRÁT:
+        // podľa čísla požiadavky (ack staršieho uloženia sa zahodí celý) a
+        // podľa obsahu poľa (používateľ mohol medzitým písať ďalej).
+        var stale = (u.req != null) && (Number(u.req) !== UPD_REQ);
         var now = updFieldValue();
-        if (UPD_SENT === null || now === null || now === UPD_SENT){
+        if (!stale && (UPD_SENT === null || now === null || now === UPD_SENT)){
           UPD_DIRTY = null;
           UPD_SENT = null;
           var inp = ssEl('updDir');
@@ -747,5 +753,6 @@
                        updAct: updAct, updTyping: updTyping,
                        updDirty: function(){ return UPD_DIRTY; },
                        updSent: function(){ return UPD_SENT; },
+                       updReq: function(){ return UPD_REQ; },
                        SS_SECTIONS: SS_SECTIONS, SS: SS };
   }

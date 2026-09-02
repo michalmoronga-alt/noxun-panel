@@ -328,14 +328,17 @@ function updEl(attrs, value){
   fireKey(updEl({ 'data-updater-edit': 'source_dir' }, 'A:/prva'), 'Enter');
   eq(JSON.parse(SENT[0][1]).source_dir, 'A:/prva', 'odoslala sa hodnota A');
   eq(T.updSent(), 'A:/prva', 'a klient si pamätá, čo poslal');
+  const reqA = JSON.parse(SENT[0][1]).req;
+  eq(reqA, T.updReq(), 'požiadavka nesie svoje poradové číslo (server ho vráti späť)');
 
   // …používateľ ale medzitým píše B.
   ELS.updDir.value = 'B:/druha';
   fireInput(updEl({ 'data-updater-edit': 'source_dir' }, 'B:/druha'));
   eq(T.updDirty(), 'B:/druha', 'rozpis je B');
 
-  // Až TERAZ dorazí potvrdenie uloženia A.
-  T.SS.updater({ enabled: true, state: 'idle', source_dir: 'A:/prva', saved: true, current: '0.9.12' });
+  // Až TERAZ dorazí potvrdenie uloženia A — s JEHO číslom požiadavky.
+  T.SS.updater({ enabled: true, state: 'idle', source_dir: 'A:/prva', saved: true,
+                 current: '0.9.12', req: reqA });
   eq(T.updDirty(), 'B:/druha', 'potvrdenie STARÉHO uloženia rozpis NEZAHODÍ');
   eq(ELS.updDir.value, 'B:/druha', 'ani neprepíše pole hodnotou A');
   ok(T.updMerged().dirty === true, 'a tlačidlo ostáva zamknuté (B nie je uložená)');
@@ -347,6 +350,25 @@ function updEl(attrs, value){
   eq(T.updDirty(), null, 'potvrdenie AKTUÁLNEHO uloženia rozpis zahodí');
   eq(ELS.updDir.value, 'B:/druha', 'a v poli je to, čo server uložil');
   eq(T.updSent(), null, 'pamäť odoslanej hodnoty sa vyčistí');
+
+  // Codex #278 kolo 3: ack sa páruje aj podľa ČÍSLA POŽIADAVKY. Dve uloženia
+  // rýchlo za sebou — ack toho PRVÉHO nesmie ukončiť rozpis patriaci druhému.
+  ELS.updDir.value = 'C:/tretia';
+  fireInput(updEl({ 'data-updater-edit': 'source_dir' }, 'C:/tretia'));
+  SENT.length = 0;
+  fireKey(updEl({ 'data-updater-edit': 'source_dir' }, 'C:/tretia'), 'Enter');
+  const req1 = JSON.parse(SENT[0][1]).req;
+  ELS.updDir.value = 'D:/stvrta';
+  fireInput(updEl({ 'data-updater-edit': 'source_dir' }, 'D:/stvrta'));
+  SENT.length = 0;
+  fireKey(updEl({ 'data-updater-edit': 'source_dir' }, 'D:/stvrta'), 'Enter');
+  const req2 = JSON.parse(SENT[0][1]).req;
+  ok(req2 === req1 + 1, 'druhé uloženie má vyššie číslo požiadavky');
+
+  T.SS.updater({ enabled: true, state: 'idle', source_dir: 'C:/tretia', saved: true, req: req1 });
+  eq(T.updDirty(), 'D:/stvrta', 'ack PRVEJ požiadavky rozpis nezahodí…');
+  T.SS.updater({ enabled: true, state: 'idle', source_dir: 'D:/stvrta', saved: true, req: req2 });
+  eq(T.updDirty(), null, '…až ack tej AKTUÁLNEJ');
 })();
 
 // --- 5) VSTUP DO SEKCIE = PRESNE JEDEN CHECK ---------------------------------
