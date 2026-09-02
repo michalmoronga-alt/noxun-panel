@@ -531,6 +531,21 @@ module Noxun
         !File.exist?(marker_path(plugins_dir))
       end
 
+      # D-52b (P3 z delta-verifikacie #277): USPESNA cesta vysledok
+      # `clear_marker` uz priznavala (`state` = `cleanup_pending`), ODMIETACIA
+      # a ROLLBACKOVA nie — tam sa navratova hodnota zahadzovala. Marker, ktory
+      # prezije, je pritom TRVALA BRZDA: kazdy dalsi `apply!` sa o neho zastavi
+      # hlaskou „predchádzajúca aktualizácia sa nedokončila" a pouzivatel by
+      # netusil, odkial sa vzala. Poznamka sa preto pripaja do KAZDEJ `Refused`
+      # spravy, ktora vznikla na ceste mazajucej marker.
+      MARKER_STUCK_NOTE = ' (pozn.: stopa po pokuse — súbor noxun_engine.update.json ' \
+                          'v priečinku Plugins — sa nedala zmazať; ďalšia aktualizácia sa ' \
+                          'o ňu zastaví, kým ju nezmažeš alebo nereštartuješ SketchUp)'
+
+      def marker_note(cleared)
+        cleared ? '' : MARKER_STUCK_NOTE
+      end
+
       # --- update lock (B3) --------------------------------------------------
       # VLASTNY zamok, nie `materials.lock`: aktualizacia je DLHA operacia
       # (kopirovanie stovky suborov zo sietoveho share) a katalogovy zamok by
@@ -889,10 +904,15 @@ module Noxun
           end
 
           write_marker!(plugins, 'staged', from: current, to: target)
-        rescue StandardError
+        rescue StandardError => e
           cleanup_staging(plugins)
-          clear_marker(plugins)
-          raise
+          # D-52b (P3 #277): ked marker prezije, pouzivatel to musi vediet UZ
+          # TERAZ — inak sa o nom dozvie az z nasledujuceho pokusu, ktory sa
+          # o neho zastavi celkom inou hlaskou.
+          note = marker_note(clear_marker(plugins))
+          raise if note.empty?
+
+          raise Refused, "#{e.message}#{note}"
         end
 
         swap!(plugins, current, target)
@@ -925,8 +945,9 @@ module Noxun
           File.rename(tree, previous_tree(plugins))
         rescue StandardError => e
           cleanup_staging(plugins)
-          clear_marker(plugins)
-          raise Refused, "priečinok pluginu sa nedá presunúť (#{e.class}) — zavri SketchUp a skús znova"
+          note = marker_note(clear_marker(plugins)) # D-52b (P3 #277)
+          raise Refused, "priečinok pluginu sa nedá presunúť (#{e.class}) — " \
+                         "zavri SketchUp a skús znova#{note}"
         end
 
         # ----- OD TEJTO CHVILE PLATI PRAVIDLO (A) ALEBO (B) -----------------
@@ -1017,7 +1038,12 @@ module Noxun
       # nepoznacila.
       def abort_after_move!(plugins, reason)
         if restore_previous_generation!(plugins)
-          raise Refused, "#{reason} — nič sa nezmenilo, pôvodná verzia beží ďalej"
+          # D-52b (P3 #277): rollback vratil generaciu, ale marker po nom mohol
+          # ostat lezat (`clear_marker` vnutri `restore_previous_generation!`).
+          # Stav sa cita z DISKU — inak by hlaska tvrdila „nič sa nezmenilo"
+          # nad brzdou, ktora zastavi kazdy dalsi pokus.
+          note = marker_note(!File.exist?(marker_path(plugins)))
+          raise Refused, "#{reason} — nič sa nezmenilo, pôvodná verzia beží ďalej#{note}"
         end
 
         # Rollback ZLYHAL: marker, `.new` ani `.old` sa NESMU mazat — su to

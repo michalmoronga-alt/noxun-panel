@@ -1309,7 +1309,16 @@ NxTest.test('D-52a (#277/4 P2): nezmazatelny marker sa PRIZNA, nezamlci') do
   NxTest.assert(Noxun::Engine.restart_required?, 'latch je zapnuty')
   NxTest.assert_equal('0.9.5', NxD52.generation(plugins, 'po commite'))
   NxTest.assert(File.exist?(File.join(plugins, 'noxun_engine.update.json')), 'marker naozaj ostal')
-  NxTest.refute(NxD52::U.clear_marker(plugins) == 'true', 'clear_marker vracia BOOLEAN')
+  # D-52b (P3 z delta-verifikacie #277): povodny assert porovnaval navratovu
+  # hodnotu s RETAZCOM `'true'` — to nemohlo zlyhat ani vtedy, keby
+  # `clear_marker` vzdy klamal. Meria sa teda SPRAVANIE: pod blokovanym `rm_f`
+  # vrati `false` (marker ostal), po jeho uvolneni `true` a marker je prec.
+  NxTest.refute(NxD52.with_rmf_block('noxun_engine.update.json') { NxD52::U.clear_marker(plugins) },
+                'kym sa marker neda zmazat, `clear_marker` hlasi NEUSPECH')
+  NxTest.assert(File.exist?(File.join(plugins, 'noxun_engine.update.json')),
+                'a marker pri tom naozaj ostal lezat')
+  NxTest.assert(NxD52::U.clear_marker(plugins), 'ked sa zmazat DA, hlasi uspech')
+  NxTest.refute(File.exist?(File.join(plugins, 'noxun_engine.update.json')), 'a marker je prec')
   Noxun::Engine.reset_restart_latch!
   FileUtils.rm_rf(env[:root])
 end
