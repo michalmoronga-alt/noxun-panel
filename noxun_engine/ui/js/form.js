@@ -647,6 +647,7 @@
     // smer pýta — sloty sú preto prázdne a karta smerový riadok nekreslí.
     // Odvodiť si ho z počtu krídel by znamenalo druhú pravdu (pasca FIX 11).
     frontSlots = null;
+    closeFrontCard();                        // ani otvorena karta cela (Codex #281 P2-B)
     renderFronts(insertFrontsOf(src));       //         cela + medzery + edge_limit_off
     currentZoneTree = src.zone_tree ? sanitizeTree(src.zone_tree) : defaultTree();
     activeZoneId = null;
@@ -929,9 +930,10 @@
   function frontTypeIcon(t){ return FRONT_TYPE_ICON[t] || 'front'; }
   function frontTypeLabel(t){ return FRONT_TYPE_LABEL[t] || 'Čelo'; }
   function frontTypeTile(t){ return FRONT_TYPE_TILE[t] || 'Čelo'; }
-  // KOV-A2a: sloty SERVERA pre dané čelo (`front_slots`). `undefined` = server
-  // sa k tomuto čelu ešte nevyjadril (nový riadok pred prvým echom) — karta
-  // vtedy smerový riadok NEKRESLÍ a nič si neodvodzuje.
+  // KOV-A2a: ZÁZNAM SERVERA pre dané čelo (`front_slots[fid]` = `{ wings_n,
+  // slots }`). `undefined` = server sa k tomuto čelu ešte nevyjadril (nový
+  // riadok pred prvým echom, návrh vkladania) — karta vtedy smerový riadok
+  // NEKRESLÍ a nič si neodvodzuje.
   function frontSlotsOf(fid){
     if (!frontSlots || !fid) return undefined;
     return Object.prototype.hasOwnProperty.call(frontSlots, fid) ? frontSlots[fid] : undefined;
@@ -959,6 +961,14 @@
     // zanikla, meni ho dlazdica typegridu v karte cela.
     row.dataset.frontType = item.type || 'door';
     frontExtraStore(row, item); // KOV-A1: smer/otváranie/klasifikácia (bez defaultov)
+    // KOV-A2a (Codex #281 P1): „+ pridaj dvere" JE používateľská akcia (pravidlo
+    // (a) z kontraktu) — nové dvierka bez uloženého smeru sa musia PRIZNAŤ ako
+    // neurčené. Bez toho by každé nové čelo natrvalo obišlo RED nález, badge aj
+    // „?" v náhľade, lebo Ruby by ho čítalo ako legacy (kľúč chýba). Rozhoduje
+    // JEDINÝ výrobca v core.js — typ mu ide z datasetu, takže „+ pridaj čelo"
+    // (zásuvkové) nevyrobí nič a v tomto súbore nestojí žiadny literál stavu.
+    // Render UŽ EXISTUJÚCICH položiek (userAdd nie je) sa nedotkne ničoho.
+    if (userAdd) frontExtraSet(row, frontExtraOnTypeChange(frontExtraOf(row), row.dataset.frontType));
     var fhId = frontHeightInputId(row.dataset.frontId);
     // SMOKE PACK 1: ovladace cela ziju v `.fmain` — PEVNOM, NEZALAMOVACOM rade.
     // `.frow` je od tejto davky STLPEC (rad ovladacov + riadok kovania pod nim),
@@ -1134,7 +1144,8 @@
   function syncFrontDirBadge(row){
     if (!row) return;
     var btn = row.querySelector('.ftname'); if (!btn) return;
-    var want = frontDirBadge(frontSlotsOf(row.dataset.frontId));
+    var entry = frontSlotsOf(row.dataset.frontId);
+    var want = frontDirBadge(entry && entry.slots);
     var badge = btn.querySelector('.fbadge');
     if (!want){ if (badge) badge.remove(); return; }
     if (!badge){
@@ -1150,6 +1161,17 @@
     var rows = wrap.querySelectorAll('.frow');
     for (var i = 0; i < rows.length; i++) syncFrontDirBadge(rows[i]);
   }
+
+  // KOV-A2a (Codex #281 P2-B): otvorená karta patrí KONKRÉTNEJ SKRINKE.
+  // `front_id` (F1) má každá skrinka, takže bez tejto brány by sa po prepnutí
+  // výberu otvorila karta CUDZIEHO čela — a stav by unikol aj do režimu
+  // vkladania. Volá sa PRED `renderFronts` (bridge.js), aby sa cudzia karta ani
+  // nestihla vykresliť; rozhodnutie robí čistá funkcia v core.js.
+  function syncFrontCardOwner(prevCabId, nextCabId){
+    openFrontCardId = frontCardKeepOpen(prevCabId, nextCabId, openFrontCardId);
+  }
+  // Odchod z korpusu úplne (doska, prázdny výber, návrh vkladania).
+  function closeFrontCard(){ openFrontCardId = null; }
 
   function frontRowById(fid){
     var wrap = el('frontRows'); if (!wrap || !fid) return null;
@@ -1248,6 +1270,10 @@
   // panel si ziadny stav nevymysla.
   function onFrontSeg(btn){
     var row = btn.closest('.frow'); if (!row) return;
+    // Codex #281 P2-C: klik na UŽ AKTÍVNU voľbu = žiadny prázdny krok Späť
+    // (ten istý guard má dlaždica typu). Aktívny stav nesie `aria-pressed`,
+    // ktorý karta kreslí z view-modelu — netreba druhý výpočet toho istého.
+    if (btn.getAttribute('aria-pressed') === 'true') return;
     frontExtraSet(row, frontExtraOnSegrow(frontExtraOf(row), btn.dataset.k,
                                           btn.dataset.v, btn.dataset.w));
     refreshFrontCards();
@@ -1512,6 +1538,8 @@
                        onFrontCardToggle: onFrontCardToggle, onFrontTile: onFrontTile,
                        onFrontSeg: onFrontSeg, onFrontWings: onFrontWings,
                        frontExtraOf: frontExtraOf, refreshFrontCards: refreshFrontCards,
-                       updateFrontDirBadges: updateFrontDirBadges };
+                       updateFrontDirBadges: updateFrontDirBadges,
+                       addFrontKind: addFrontKind, syncFrontCardOwner: syncFrontCardOwner,
+                       closeFrontCard: closeFrontCard };
   }
 

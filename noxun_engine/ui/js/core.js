@@ -160,13 +160,18 @@
     if (!wd || typeof wd !== 'object') return null;
     return wd[wing] == null ? null : wd[wing];
   }
-  // VIEW-MODEL karty. `item` = polozka cela (typ + dormant polia), `slots` =
-  // to, co poslal SERVER (`front_slots[front_id]`).
-  //   slots === null/undefined -> server sa k celu este nevyjadril (novy riadok
-  //     pred prvym echom) — smerovy riadok sa NEKRESLI a nic sa neodvodzuje.
-  //   slots === []             -> server povedal „tu sa smer nepyta".
+  // VIEW-MODEL karty. `item` = polozka cela (typ + dormant polia), `entry` =
+  // ZAZNAM SERVERA `front_slots[front_id]` v tvare `{ wings_n, slots }`.
+  //   entry == null            -> server sa k celu este nevyjadril (novy riadok
+  //     pred prvym echom, navrh vkladania) — nic sa nekresli a nic neodvodzuje.
+  //   entry.slots.length > 0   -> presne tie kridla, na ktore sa smer PYTA.
+  //   entry.slots == [] a wings_n == 2 -> DVOJKRIDLO: smer je odvodeny, preto
+  //     sa nepyta, ale POVIE sa, co plati.
+  //   entry.slots == [] a wings_n nil  -> Codex #281 P2-A: server NEVIE (stary
+  //     `front_items` pred D-07 bez `wings_n`). Prazdne pole samo o sebe teda
+  //     dvojkridlo NEZNAMENA — vtedy sa nekresli ANI riadok, ANI veta.
   // VSTUP SA NEMENI (ziadna materializacia pri renderi).
-  function frontCardModel(item, slots){
+  function frontCardModel(item, entry){
     var it = item || {};
     var type = it.type || 'door';
     var known = FRONT_CARD_TYPES.indexOf(type) >= 0;
@@ -184,7 +189,8 @@
       return { type: type, known: known, tiles: tiles, rows: rows };
     }
     if (type === 'door'){
-      var list = Array.isArray(slots) ? slots : null;
+      var e = (entry && typeof entry === 'object') ? entry : null;
+      var list = (e && Array.isArray(e.slots)) ? e.slots : null;
       if (list && list.length){
         var total = list.length + 2; // krajne kridla su odvodene, otazky su len stredne
         list.forEach(function(s){
@@ -198,9 +204,10 @@
                         options: FRONT_DIR_OPTIONS, active: frontDirValue(it, wing) });
           }
         });
-      } else if (list){
-        // Dvojkridlo (a kazdy iny pripad, kde server otazku nekladie): smer je
-        // ODVODENY z geometrie, preto sa nepyta — len sa povie, co plati.
+      } else if (e && Number(e.wings_n) === 2){
+        // Dvojkridlo: smer je ODVODENY z geometrie, preto sa nepyta — len sa
+        // povie, co plati. Ostatne pripady prazdneho zoznamu (server nevie)
+        // mlcia: tvrdit „dvojkrídlo" o starom cache by bola lož.
         rows.push({ kind: 'info', tone: 'muted',
                     text: 'Dvojkrídlo: ľavé krídlo má pánty vľavo, pravé vpravo — smer sa neurčuje.' });
       }
@@ -298,6 +305,17 @@
       return s && s.state === FRONT_DIR_UNSET;
     });
   }
+  // KOV-A2a (Codex #281 P2-B): OTVORENA KARTA PATRI KONKRETNEJ SKRINKE.
+  // `front_id` (F1) ma kazda skrinka v zakazke, takze samotne ID cela identitu
+  // karty NEURCUJE — po prepnuti vyberu by sa otvorila karta cudzieho cela.
+  // Karta prezije LEN echo TEJ ISTEJ skrinky; pri chybajucej identite na
+  // ktorejkolvek strane (doska, prazdny vyber, navrh vkladania, iny dokument)
+  // sa zatvara. Vracia NOVU hodnotu `openFrontCardId`.
+  function frontCardKeepOpen(prevCabId, nextCabId, openId){
+    if (!openId || !prevCabId || !nextCabId) return null;
+    return String(prevCabId) === String(nextCabId) ? openId : null;
+  }
+
   // ===== KOV-A2a: symboly 2D nahladu =====================================
   // Prevod STAVU na SYMBOL. Nahlad kresli symboly, nie stavy — preto sa tu
   // (a nikde inde) rozhoduje, co sa ma nakreslit.
@@ -1018,6 +1036,7 @@
       FRONT_DRAWER_CONSTR_OPTIONS: FRONT_DRAWER_CONSTR_OPTIONS,
       FRONT_DRAWER_VARIANT_OPTIONS: FRONT_DRAWER_VARIANT_OPTIONS,
       frontCardModel: frontCardModel, frontWingLabel: frontWingLabel,
+      frontCardKeepOpen: frontCardKeepOpen,
       frontExtraOnTypeChange: frontExtraOnTypeChange, frontExtraOnWings: frontExtraOnWings,
       frontExtraOnSegrow: frontExtraOnSegrow, frontDirBadge: frontDirBadge,
       frontDirSymbol: frontDirSymbol, frontTypeSymbol: frontTypeSymbol,

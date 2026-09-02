@@ -670,12 +670,14 @@
     if (sym === 'down')  return 'M ' + rx(cx - h) + ' ' + ry(cz + h) + ' L ' + rx(cx) + ' ' + ry(cz - h) + ' L ' + rx(cx + h) + ' ' + ry(cz + h);
     return '';
   }
-  // Sloty SERVERA pre dane celo. V rezime vkladania (`insert`) resolved cela
-  // neexistuju, takze sloty su prazdne — odvodene krajne kridla sa nakreslia
-  // aj tak (su geometricky iste), pytany smer nie.
+  // Sloty SERVERA pre dane celo — z jeho zaznamu `{ wings_n, slots }` (Codex
+  // #281 P2-A). V rezime vkladania (`insert`) resolved cela neexistuju, takze
+  // zaznam chyba — odvodene krajne kridla sa nakreslia aj tak (su geometricky
+  // iste, plynu z poctu stlpcov), pytany smer nie.
   function frontSlotsFor(fid){
     if (!frontSlots || !fid) return null;
-    return Object.prototype.hasOwnProperty.call(frontSlots, fid) ? frontSlots[fid] : null;
+    var e = Object.prototype.hasOwnProperty.call(frontSlots, fid) ? frontSlots[fid] : null;
+    return (e && Array.isArray(e.slots)) ? e.slots : null;
   }
 
   // D-08 / UI-B2: kontext Korpus = celny rez s kotami. Sirka dole, vyska vpravo,

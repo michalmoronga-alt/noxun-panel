@@ -84,14 +84,18 @@ module Noxun
           params
         end
 
-        # KOV-A2a: mapa `front_id -> [{ wing, part_key, state }]` z JEDINEJ
+        # KOV-A2a: mapa `front_id -> { 'wings_n' =>, 'slots' => [...] }` z JEDINEJ
         # definicie aplikovatelnosti smeru (`Fronts.direction_slots`, KOV-A1).
-        #   prazdne pole = server hovori „tu sa smer nepyta" (dvojkridlo,
-        #                  zasuvka, vyklop, sklop, blenda, „Bez cela")
-        #   `state` nil  = LEGACY (kluc v configu nie je) — segrow bez aktivnej
-        #                  volby a BEZ nalezu; NIKDY sa nedopĺňa
-        # Velmi stary `front_items` (pred D-07, bez `wings_n`) da prazdne pole —
-        # legacy zakazka tak nikdy nedostane smerovy riadok z tejto cesty.
+        #   `slots` neprazdne = presne tie kridla, na ktore sa smer PYTA
+        #   `slots` prazdne   = tu sa smer nepyta (dvojkridlo, zasuvka, vyklop,
+        #                       sklop, blenda, „Bez cela")
+        #   `state` nil       = LEGACY (kluc v configu nie je) — segrow bez
+        #                       aktivnej volby a BEZ nalezu; NIKDY sa nedopĺňa
+        # Codex #281 P2-A: `wings_n` ide von SPOLU so slotmi, lebo prazdne pole
+        # samo o sebe NEZNAMENA dvojkridlo — da ho aj velmi stary `front_items`
+        # (pred D-07, bez `wings_n`), kde server o pocte kridiel nevie NIC.
+        # Bez tohto rozlisenia by karta nad starym cache tvrdila „Dvojkrídlo…",
+        # co je lož. `nil` = neznamy pocet -> panel mlci.
         # Kluce su STRINGY (JSON do panela); symbolove kluce slotu sa prekladaju
         # TU, aby si JS nemusel pamatat dva tvary.
         def front_slots_payload(front_items)
@@ -102,9 +106,11 @@ module Noxun
             fid = it['id'].to_s
             next if fid.empty?
 
-            out[fid] = Fronts.direction_slots(it).map do |s|
+            wn = it['wings_n'].to_i
+            slots = Fronts.direction_slots(it).map do |s|
               { 'wing' => s[:wing].to_s, 'part_key' => s[:part_key].to_s, 'state' => s[:state] }
             end
+            out[fid] = { 'wings_n' => (wn.positive? ? wn : nil), 'slots' => slots }
           end
           out
         end

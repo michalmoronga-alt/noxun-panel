@@ -3,11 +3,12 @@
 #
 # CO SA OVERUJE
 #   1) `Panel.front_slots_payload` je CISTA projekcia nad ulozenym
-#      `front_items`: mapa `front_id -> [{ wing, part_key, state }]` z JEDINEJ
-#      definicie aplikovatelnosti smeru (`Fronts.direction_slots`, KOV-A1).
-#      Server je tym AUTORITA na otazku „kde sa smer pyta" — panel si ju
-#      z poctu kridiel neodvodzuje. LEGACY zaznam (bez `wings_n`) da PRAZDNE
-#      pole, takze stara zakazka nikdy nedostane smerovy riadok.
+#      `front_items`: mapa `front_id -> { wings_n, slots }` z JEDINEJ definicie
+#      aplikovatelnosti smeru (`Fronts.direction_slots`, KOV-A1). Server je tym
+#      AUTORITA na otazku „kde sa smer pyta" — panel si ju z poctu kridiel
+#      neodvodzuje. `wings_n` ide von SPOLU so slotmi (Codex #281 P2-A), lebo
+#      prazdne pole samo o sebe dvojkridlo NEZNAMENA — da ho aj LEGACY zaznam
+#      (pred D-07, bez `wings_n`), kde server o pocte kridiel nevie NIC.
 #   2) `state` prechadza NEZMENENY: nil = legacy (kluc v configu nie je),
 #      'unset' = vedome neurcene, 'left'/'right' = vyriesene. Payload NIC
 #      nedopĺňa — inak by legacy zakazka dostala RED nalez.
@@ -21,6 +22,10 @@
 #   1. `front_slots_payload` doplni `state` na 'unset', ked v polozke chyba.
 #   2. `front_slots_payload` cita surove `wings` namiesto `wings_n`.
 #   3. `frontCardModel` kresli smerovy riadok aj bez slotov (odvodi si ho).
+#   4. `addFrontRow` neprizna smer novym dvierkam („+ pridaj dvere").
+#   5. `front_slots_payload` neposiela `wings_n` (karta by nad starym cache
+#      tvrdila „Dvojkrídlo…").
+#   6. `onFrontSeg` zapise aj klik na UZ AKTIVNU volbu (prazdny krok Spat).
 require_relative '../helper' unless defined?(NxTest)
 
 # Headless: ui/*.rb nie su v require zozname helpera (UI vrstva) — rovnaky
@@ -56,50 +61,61 @@ module NxTest
       it = stored.nil? ? A2.item : A2.item('direction' => stored)
       out = A2::E::Panel.front_slots_payload([it])
       assert_equal(['F1'], out.keys, 'kluc mapy je ID cela')
+      assert_equal(1, out['F1']['wings_n'], 'zaznam nesie aj efektivny pocet kridiel')
       assert_equal([{ 'wing' => 'single', 'part_key' => 'front:F1/wing:single', 'state' => want }],
-                   out['F1'], "stav #{stored.inspect} prejde payloadom nezmeneny")
+                   out['F1']['slots'], "stav #{stored.inspect} prejde payloadom nezmeneny")
     end
   end
 
   test('KOV-A2a: dvojkridlo sa na smer NEPYTA (krajne kridla su odvodene)') do
     out = A2::E::Panel.front_slots_payload([A2.item('wings_n' => 2, 'direction' => 'left')])
-    assert_equal([], out['F1'], 'prazdne pole = „tu sa otazka nekladie"')
+    assert_equal([], out['F1']['slots'], 'prazdne pole = „tu sa otazka nekladie"')
+    # Codex #281 P2-A: `wings_n` je to JEDINE, cim sa dvojkridlo odlisi od
+    # „server nevie" — karta podla neho rozhoduje, ci vetu o dvojkridle ukaze.
+    assert_equal(2, out['F1']['wings_n'], 'dvojkridlo sa MUSI dat rozoznat od neznama')
   end
 
   test('KOV-A2a: 3 a 4 kridla maju sloty len na STREDNE kridla') do
     out3 = A2::E::Panel.front_slots_payload(
       [A2.item('wings_n' => 3, 'wing_directions' => { 'p2' => 'unset' })]
     )
-    assert_equal([{ 'wing' => 'p2', 'part_key' => 'front:F1/wing:p2', 'state' => 'unset' }], out3['F1'])
+    assert_equal(3, out3['F1']['wings_n'])
+    assert_equal([{ 'wing' => 'p2', 'part_key' => 'front:F1/wing:p2', 'state' => 'unset' }],
+                 out3['F1']['slots'])
     out4 = A2::E::Panel.front_slots_payload(
       [A2.item('wings_n' => 4, 'wing_directions' => { 'p3' => 'right' })]
     )
+    assert_equal(4, out4['F1']['wings_n'])
     assert_equal([{ 'wing' => 'p2', 'part_key' => 'front:F1/wing:p2', 'state' => nil },
                   { 'wing' => 'p3', 'part_key' => 'front:F1/wing:p3', 'state' => 'right' }],
-                 out4['F1'], 'neurcene stredne kridlo si NIC nedomysli')
+                 out4['F1']['slots'], 'neurcene stredne kridlo si NIC nedomysli')
   end
 
   test('KOV-A2a: efektivny pocet kridiel rozhoduje, nie surove `wings`') do
     # Auto nad 600 mm da dve kridla — payload musi ist z `wings_n` (co plati),
     # nie z `wings` ('auto'). Inak by sa dvojkridlo pytalo na stranu pantov.
     out = A2::E::Panel.front_slots_payload([A2.item('wings' => 'auto', 'wings_n' => 2)])
-    assert_equal([], out['F1'])
+    assert_equal([], out['F1']['slots'])
+    assert_equal(2, out['F1']['wings_n'])
     out1 = A2::E::Panel.front_slots_payload([A2.item('wings' => '2', 'wings_n' => 1)])
-    assert_equal(['single'], out1['F1'].map { |s| s['wing'] },
+    assert_equal(['single'], out1['F1']['slots'].map { |s| s['wing'] },
                  'surove `wings` sa NECITA — plati efektivny pocet z planu')
   end
 
   test('KOV-A2a: ne-dvierka nemaju sloty ZIADNE') do
     %w[drawer_front lift fall blind none].each do |t|
       out = A2::E::Panel.front_slots_payload([A2.item('type' => t, 'direction' => 'left')])
-      assert_equal([], out['F1'], "#{t} sa na stranu pantov nepyta")
+      assert_equal([], out['F1']['slots'], "#{t} sa na stranu pantov nepyta")
     end
   end
 
-  test('KOV-A2a: LEGACY `front_items` (pred D-07, bez `wings_n`) da prazdne sloty') do
+  test('KOV-A2a: LEGACY `front_items` (pred D-07, bez `wings_n`) = prazdne sloty A NEZNAMY pocet') do
     legacy = { 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'height' => 300.0, 'wings' => '1' }
-    assert_equal([], A2::E::Panel.front_slots_payload([legacy])['F1'],
-                 'stara zakazka nedostane smerovy riadok z tejto cesty')
+    out = A2::E::Panel.front_slots_payload([legacy])['F1']
+    assert_equal([], out['slots'], 'stara zakazka nedostane smerovy riadok z tejto cesty')
+    # Codex #281 P2-A: a NESMIE sa tvarit ako dvojkridlo — inak by karta nad
+    # starym cache tvrdila „Dvojkrídlo: ľavé krídlo má pánty vľavo…", co je lož.
+    assert_equal(nil, out['wings_n'], 'neznamy pocet kridiel sa PRIZNA, nehada')
   end
 
   test('KOV-A2a: payload je ODOLNY a NIC nezapisuje') do
@@ -120,8 +136,8 @@ module NxTest
        A2.item('id' => 'F2', 'wings_n' => 1, 'direction' => 'unset')]
     )
     assert_equal(%w[F1 F2], out.keys.sort)
-    assert_equal([], out['F1'])
-    assert_equal('unset', out['F2'].first['state'])
+    assert_equal([], out['F1']['slots'])
+    assert_equal('unset', out['F2']['slots'].first['state'])
   end
 
   test('KOV-A2a: `cabinet_payload` posiela `front_slots` vedla `front_items`') do

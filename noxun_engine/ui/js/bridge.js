@@ -506,6 +506,13 @@
       var keepGaps = sameDoc && (c.cabinet_id && c.cabinet_id === selectedCabId) &&
                      !!(applyTimer || cabEditsInFlight);
       cabEditsInFlight = false;
+      // KOV-A2a (Codex #281 P2-B): otvorena KARTA CELA patri konkretnej skrinke.
+      // `front_id` (F1) ma kazda skrinka, takze bez tejto brany by sa po
+      // prepnuti vyberu otvorila karta CUDZIEHO cela. Ide to PRED renderFronts,
+      // aby sa taka karta ani nestihla vykreslit; pri zmene DOKUMENTU sa
+      // predchodca vedome posiela ako null (ID skriniek sa naprie dokumentmi
+      // opakuju — rovnaka zasada ako pri `keepGaps`).
+      syncFrontCardOwner(sameDoc ? selectedCabId : null, c.cabinet_id);
       renderFronts(c.fronts, keepGaps);
       currentZoneTree = c.zone_tree ? sanitizeTree(c.zone_tree) : defaultTree();
       tplNameSuggestion = c.template_name_suggestion || ''; // D-14 modal prefill
@@ -566,6 +573,7 @@
       if (typeof absModalCloseSilent === 'function') absModalCloseSilent();
       setSelected(null);
       activeZoneId = null; frontItems = null; frontSlots = null; hwItems = null;
+      closeFrontCard(); // KOV-A2a: odchod z korpusu = karta cela zaniká
       invalidateFrontPlaceholders(); // D-23: bez resolved dat ziadne ≈ odhady
       buildFrontHwBadges([]);
       setCabInfo(null); // UI-B3: kontext dosky — korpusove dopocty neplatia
@@ -591,6 +599,7 @@
       // vnutri setUiMode) nesmie bezat nad zvyskami stareho vyberu.
       setSelected(null);
       activeZoneId = null; frontItems = null; frontSlots = null; hwItems = null;
+      closeFrontCard(); // KOV-A2a: odchod z korpusu = karta cela zaniká
       buildFrontHwBadges([]); // Codex PR #30: badge patria oznacenej skrinke — bez nej ziadne
       setCabInfo(null);       // UI-B3: bez skrinky niet dielcov ani plochy
       setCtxNote(null);       // ani suhrn skrinky do kontextoveho riadku
