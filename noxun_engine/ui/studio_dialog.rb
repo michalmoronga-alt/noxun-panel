@@ -128,6 +128,8 @@ module Noxun
         # preto az do restartu SketchUpu neotvara.
         def show(open_section: nil, anchor: nil)
           return nil if Engine.update_restart_pending?
+          # D-52b2 (#278 kolo 3, P1): to iste pocas beziacej aktualizacie.
+          return nil if Engine.update_in_progress?
 
           @pending_section = SECTIONS.include?(open_section.to_s) ? open_section.to_s : nil
           @pending_anchor = @pending_section ? anchor.to_s.strip : nil

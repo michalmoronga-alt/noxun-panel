@@ -1820,7 +1820,7 @@ Inspectora to nepatrí — a mŕtve tlačidlo v druhom vstupe by bolo D-78.
 **Vedomá odchýlka od wireframu mockupu:** licencie tretích strán a diagnostika (`Debug.report`) sa **nepridávajú** — v koliesku dnes nie sú, takže by to nebolo zrkadlo, ale nový
 obsah v oboch vstupoch (patrí do vlastnej dávky).
 
-### updater.rb — aktualizácia pluginu jedným klikom (D-52a jadro + D-52b UI)
+### updater.rb — aktualizácia pluginu jedným klikom (D-52a jadro · D-52b1 kontrola · D-52b2 aplikovanie)
 
 **Vstupný bod je sekcia „O plugine" v Štúdiu; tu je najprv opísané ČISTÉ JADRO, ktoré tam sedí pod tlačidlom, a na konci UI vrstva nad ním.** Modul je headless: pri načítaní
 nesiaha na `Sketchup.*` ani `UI.*` a **všetky cesty prijíma ako parametre** (`Engine.plugin_dir` / `find_support_file` patria UI vrstve). Vďaka tomu beží celá sada nad TEMP
@@ -1952,7 +1952,7 @@ opravovať (`pending?` je false), ale náš loader v pamäti je starý a strom n
 súboru. Boot, ktorý by sa v tom okne pozrel iba na artefakty, by nič nenašiel, načítal strom a updater by mu ho o pár sekúnd vymenil pod rukami. Bežný štart je tak jeden `flock`,
 zápis lease a päť `File.exist?` — zanedbateľná réžia.
 
-#### UI vrstva (D-52b) — sekcia „O plugine" v Štúdiu
+#### UI vrstva — sekcia „O plugine" v Štúdiu (D-52b1 kontrola, D-52b2 aplikovanie)
 
 **Server je `supplier_settings_dialog.rb`** (autorita sekcie `about`), klient je `ui/js/about.js` (markup) + `ui/js/studio_settings.js` (stav a akcie) + dva vstupné hooky
 v `ui/js/studio.js`. Nový modul nevznikol zámerne: UI stojí nad hotovým kontraktom jadra a druhý server sekcie `about` by sa s prvým časom rozišiel.
@@ -2015,6 +2015,19 @@ zruší sa bez zásahu a bez hlášky (výsledok už oznámil ten prvý beh). Pr
 
 **Doklad o kontrole viaže aj VERZIU.** Balík na share sa môže vymeniť aj **medzi potvrdením a stagingom**, takže samotná zhoda cesty nestačí: záznam nesie `available` z kontroly
 a po `prepare!` sa porovná s verziou **staged** loadera (`ticket['to']`). Nezhoda = `abort_prepared!` a hláška „Balík sa medzitým zmenil (X → Y) — NIČ sa nenainštalovalo".
+
+**POČAS BEHU SA OKNÁ NEOTVÁRAJÚ** (Codex #278 kolo 3, P1). Restart latch zapína až **commit**, kým príprava balíka zo share trvá desiatky sekúnd — a v tom okne by si používateľ
+stihol otvoriť Inspector z toolbaru, takže by commit bežal s CEF držiacim súbory z `ui/`. Preto má UI vrstva príznak `updater_apply_inflight?`, ktorý číta
+`Engine.update_in_progress?`, a **všetky tri vstupné body** (`Panel.show`, `Panel.show_insert`, `StudioDialog.show`) ho kontrolujú hneď vedľa latchu a odmietnu natívnou hláškou.
+Príznak sa uvoľňuje na **jedinom mieste** — `updater_done!` (bez textu je to tichý koniec, s textom natívny výsledok) — takže zabudnutý reset nemôže okná zamknúť natrvalo.
+
+**DRUHÁ BARIÉRA TESNE PRED `commit!`.** Bariéra pred prípravou nestačí: medzi ňou a commitom prebehlo dlhé kopírovanie. `commit_when_closed` preto stav okien overí **znova**,
+prípadné okno zavrie a počká (rovnaký 3 s limit); keď sa nezavrie, aktualizácia sa **zruší** — `abort_prepared!` upratá pripravený balík a hláška povie, že sa na disku nič
+nezmenilo.
+
+**Keď zlyhá aj upratanie prípravy** (Codex #278 kolo 3, P2), hláška to **prizná a povie, čo s tým**: pripravený `.new` a marker sú brzda, o ktorú sa ďalší pokus zastaví celkom
+inou hláškou. `abort_note` preto pri neúspešnom `abort_prepared!` dopĺňa „reštartuj SketchUp (pri štarte sa dorovná), alebo v Plugins zmaž `noxun_engine.update.json`
+a `noxun_engine.new`".
 
 **Výsledok ide VÝHRADNE natívne (`UI.messagebox`)** — úspech („Aktualizované na X — reštartuj SketchUp", plus poznámka z jadra, ak nejaká je), odmietnutie s presným dôvodom
 z `Refused` aj neočakávaná výnimka. Do CEF sa poslať nedá: okná sú v tom bode zavreté a po úspešnom swape by nové HTML bežalo proti starým callbackom. Guard test nad zdrojom

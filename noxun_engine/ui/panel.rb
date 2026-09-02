@@ -18,6 +18,9 @@ module Noxun
         # otvorilo s nezhodnymi callbackmi. Preto sa az do restartu neotvara.
         def show
           return nil if Engine.update_restart_pending?
+          # D-52b2 (#278 kolo 3, P1): pocas BEZIACEJ aktualizacie tiez nie —
+          # CEF by drzal subory z `ui/` a commit by zlyhal.
+          return nil if Engine.update_in_progress?
 
           dlg = ensure_dialog
           if dlg.visible?
@@ -74,6 +77,7 @@ module Noxun
         # zhodilo vyber v modeli a az potom narazilo na zavrety panel.
         def show_insert
           return nil if Engine.update_restart_pending?
+          return nil if Engine.update_in_progress?
 
           model = Sketchup.active_model
           suspend_selection_sync { model.selection.clear } if model

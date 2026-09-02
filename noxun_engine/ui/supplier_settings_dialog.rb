@@ -290,6 +290,12 @@ module Noxun
         #     `set_on_closed` (F10; CEF drzi subory z `ui/` a rename by zlyhal),
         #   * vysledok VYHRADNE natívne (`UI.messagebox`) — nikdy cez CEF.
 
+        # D-52b2 (#278 kolo 3, P1): cita ho `Engine.update_in_progress?`, cez
+        # ktory vstupne body pluginu odmietaju otvorenie okien pocas behu.
+        def updater_apply_inflight?
+          @updater_apply_inflight == true
+        end
+
         def updater?
           defined?(Updater) ? true : false
         end
@@ -521,15 +527,14 @@ module Noxun
           # spustil swap zo STAREHO Ruby nad UZ NOVYMI subormi. Rusi sa bez
           # zasahu — vysledok uz oznamil ten prvy beh.
           if Engine.restart_required?
-            @updater_apply_inflight = false
+            updater_done! # bez hlasky — vysledok uz oznamil ten prvy beh
             return false
           end
 
           return updater_run_apply(dir) if dialogs_closed?
 
           if updater_now >= deadline
-            @updater_apply_inflight = false
-            return updater_message('Aktualizácia sa NESPUSTILA — okná pluginu sa nepodarilo zavrieť ' \
+            return updater_done!('Aktualizácia sa NESPUSTILA — okná pluginu sa nepodarilo zavrieť ' \
                                    "do #{UPDATER_BARRIER_S.round} s. Zavri Inspector aj Štúdio ručne " \
                                    'a skús to znova. Na disku sa nič nezmenilo.')
           end
@@ -572,8 +577,7 @@ module Noxun
             # Vlakno sa NEZABIJA (nad visiacim sharom je to nespolahlive) —
             # opusti sa. Ziva generacia je nedotknuta; keby priprava predsa len
             # dobehla, jej `.new` a marker uprace boot recovery.
-            @updater_apply_inflight = false
-            return updater_message('Zdroj nedostupný — aktualizácia ZRUŠENÁ. Na disku sa nič ' \
+            return updater_done!('Zdroj nedostupný — aktualizácia ZRUŠENÁ. Na disku sa nič ' \
                                    'nezmenilo a plugin beží ďalej v pôvodnej verzii. Keď sa zdroj ' \
                                    'vráti, reštartuj SketchUp a skús to znova.')
           end
@@ -583,31 +587,76 @@ module Noxun
 
         # Hlavne vlakno: overi VERZIU proti dokladu o kontrole a commitne.
         def updater_finish_apply(box)
-          @updater_apply_inflight = false
           err = box['error']
           if err
             Engine.log_error(err, 'SupplierSettingsDialog.updater_prepare') unless err.is_a?(Updater::Refused)
             reason = err.is_a?(Updater::Refused) ? err.message : "#{err.class}: #{err.message}"
-            return updater_message(updater_failure_text(reason))
+            return updater_done!(updater_failure_text(reason))
           end
 
           ticket = box['ticket']
           mismatch = updater_version_mismatch(ticket)
-          if mismatch
-            Updater.abort_prepared!(ticket) # pripraveny `.new` ani marker neostanu
-            return updater_message(mismatch)
+          return updater_done!(mismatch + abort_note(ticket)) if mismatch
+
+          # Codex #278 kolo 3 (P1): priprava trvala a okna sa medzitym mohli
+          # ZNOVA otvorit (toolbar, deep-link, hoci vstupne body to uz odmietaju
+          # — na rade je este otvorene okno z casu pred klikom). Stav sa preto
+          # overuje ZNOVA tesne pred commitom; zatvorenie sa zopakuje a caka sa
+          # rovnakym limitom ako pri prvej bariere.
+          commit_when_closed(ticket, updater_now + UPDATER_BARRIER_S)
+        rescue Updater::Refused => e
+          updater_done!(updater_failure_text(e.message))
+        rescue StandardError => e
+          Engine.log_error(e, 'SupplierSettingsDialog.updater_finish_apply')
+          updater_done!(updater_failure_text("#{e.class}: #{e.message}"))
+        end
+
+        # DRUHA BARIERA — tesne pred `commit!`.
+        def commit_when_closed(ticket, deadline)
+          return updater_commit!(ticket) if dialogs_closed?
+
+          close_plugin_dialogs
+          if updater_now >= deadline
+            return updater_done!('Aktualizácia sa NEDOKONČILA — okná pluginu sa medzitým znova ' \
+                                 'otvorili a nepodarilo sa ich zavrieť. Na disku sa nič nezmenilo; ' \
+                                 "zavri Inspector aj Štúdio a skús to znova.#{abort_note(ticket)}")
           end
 
+          updater_schedule(UPDATER_BARRIER_POLL_S) { commit_when_closed(ticket, deadline) }
+        end
+
+        def updater_commit!(ticket)
           res = Updater.commit!(ticket)
           note = res.is_a?(Hash) ? res['note'].to_s : ''
           msg = "Aktualizované na #{res.is_a?(Hash) ? res['to'] : '?'} — reštartuj SketchUp."
           msg = "#{msg}\n\n#{note}" unless note.empty?
-          updater_message(msg)
+          updater_done!(msg)
         rescue Updater::Refused => e
-          updater_message(updater_failure_text(e.message))
+          updater_done!(updater_failure_text(e.message))
         rescue StandardError => e
-          Engine.log_error(e, 'SupplierSettingsDialog.updater_run_apply')
-          updater_message(updater_failure_text("#{e.class}: #{e.message}"))
+          Engine.log_error(e, 'SupplierSettingsDialog.updater_commit')
+          updater_done!(updater_failure_text("#{e.class}: #{e.message}"))
+        end
+
+        # Zrusenie PRIPRAVENEJ aktualizacie + poznamka, ked sa NEPODARILO
+        # upratat (Codex #278 kolo 3, P2). Pripraveny `.new` a marker su totiz
+        # BRZDA: dalsi pokus sa o marker zastavi celkom inou hlaskou, takze sa
+        # o nom clovek musi dozvediet TERAZ a musi vediet, co s tym.
+        def abort_note(ticket)
+          return '' if Updater.abort_prepared!(ticket)
+
+          "\n\nUpratanie pripraveného balíka ZLYHALO — reštartuj SketchUp (pri štarte sa dorovná), " \
+            "alebo v priečinku Plugins zmaž #{Updater::MARKER_NAME} a #{Updater::TREE_NAME}#{Updater::NEW_SUFFIX}."
+        end
+
+        # KONIEC BEHU — JEDINE miesto, kde sa priznak uvolnuje (vstupne body sa
+        # zase otvaraju). Bez textu je to TICHY koniec (cudzi commit medzitym
+        # vysledok uz oznamil); s textom ide vysledok VYHRADNE natívne.
+        def updater_done!(text = nil)
+          @updater_apply_inflight = false
+          return true if text.nil?
+
+          updater_message(text)
         end
 
         # Codex #278 kolo 2 (P1): doklad o kontrole viaze aj VERZIU. Medzi

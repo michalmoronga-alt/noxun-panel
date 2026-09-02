@@ -775,6 +775,131 @@ NxTest.test('D-52b (#278/2 P1): odlozena bariera sa po CUDZOM commite zrusi bez 
   end
 end
 
+# --- 3b3) OKNA POCAS BEHU (Codex #278 kolo 3, P1) ---------------------------
+
+NxTest.test('D-52b2 (#278/3 P1): pocas behu sa okna NEOTVARAJU') do
+  NxD52b.with_env do |env|
+    hang = ->(_dir, _plugins) { raise 'test: priprava visi' }
+    NxD52b.with_core(prepare: hang) do |_prep, _com|
+      NxD52b.with_source_dir('X:/dist') do
+        sd = Noxun::Engine::SupplierSettingsDialog
+        NxTest.refute(Noxun::Engine.update_in_progress?, 'pred klikom sa okna otvaraju normalne')
+
+        sd.dispatch('updater_apply', NxD52b.arm_check!('X:/dist'), env.sink)
+        NxTest.assert(sd.updater_apply_inflight?, 'beh je oznaceny ako prebiehajuci')
+        NxTest.assert(Noxun::Engine.update_in_progress?,
+                      'a vstupne body pluginu ho vidia — inak by si clovek pocas dlhej pripravy ' \
+                      'stihol otvorit Inspector z toolbaru a commit by bezal s otvorenymi oknami')
+        # Guard je v OBOCH vstupnych bodoch panela aj v Studiu.
+        %w[panel.rb studio_dialog.rb].each do |file|
+          s = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', file), encoding: 'UTF-8')
+          NxTest.assert(s.include?('return nil if Engine.update_in_progress?'),
+                        "#{file} odmieta otvorenie pocas behu")
+        end
+        panel = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel.rb'), encoding: 'UTF-8')
+        NxTest.assert_equal(2, panel.scan(/Engine\.update_in_progress\?/).length,
+                            'panel ma guard aj v `show`, aj v `show_insert`')
+
+        # Po skonceni behu sa vstupy zase otvaraju.
+        env.now += 120.0
+        env.tick!
+        NxTest.refute(sd.updater_apply_inflight?, 'po zruseni je priznak prec')
+        NxTest.refute(Noxun::Engine.update_in_progress?, 'a okna sa zase otvaraju')
+      end
+    end
+  end
+end
+
+NxTest.test('D-52b2 (#278/3 P1): okno otvorene POCAS pripravy zastavi commit') do
+  NxD52b.with_env do |env|
+    NxD52b.with_core do |prep, com, aborts|
+      NxD52b.with_source_dir('X:/dist') do
+        sd = Noxun::Engine::SupplierSettingsDialog
+        sd.dispatch('updater_apply', NxD52b.arm_check!('X:/dist'), env.sink)
+        NxTest.assert_equal(1, env.threads.length, 'priprava bezi')
+
+        # Kym vlakno pracovalo, okno sa (napr. z toolbaru pred zapnutim guardu)
+        # znova otvorilo.
+        dlg = NxD52b::FakeDialog.new
+        Noxun::Engine::StudioDialog.instance_variable_set(:@dialog, dlg)
+        env.threads.first.run_now!
+        env.tick!
+        NxTest.assert_equal(1, prep.length, 'priprava dobehla')
+        NxTest.assert_equal([], com, 'ale commit sa NESPUSTIL — okno je otvorene')
+        NxTest.assert_equal(1, dlg.closes, 'a druha bariera ho zacala zatvarat')
+
+        # Ked `set_on_closed` dobehne, commit prejde.
+        Noxun::Engine::StudioDialog.instance_variable_set(:@dialog, nil)
+        env.now += 0.2
+        env.settle!
+        NxTest.assert_equal(1, com.length, 'commit prebehol AZ po zatvoreni')
+        NxTest.assert_equal([], aborts, 'a nic sa nezahadzovalo')
+      end
+    end
+  end
+end
+
+NxTest.test('D-52b2 (#278/3 P1): okno, ktore sa NEZAVRE, aktualizaciu ZRUSI') do
+  NxD52b.with_env do |env|
+    NxD52b.with_core(abort_result: true) do |_prep, com, aborts|
+      NxD52b.with_source_dir('X:/dist') do
+        sd = Noxun::Engine::SupplierSettingsDialog
+        sd.dispatch('updater_apply', NxD52b.arm_check!('X:/dist'), env.sink)
+        Noxun::Engine::StudioDialog.instance_variable_set(:@dialog, NxD52b::FakeDialog.new)
+        env.threads.first.run_now!
+        8.times do
+          env.now += 1.0
+          env.tick!
+        end
+        NxTest.assert_equal([], com, 'nad otvorenym oknom sa NIKDY necommitne')
+        NxTest.assert_equal(1, aborts.length, 'pripraveny balik sa uprace')
+        NxTest.assert(env.notices.first.to_s.include?('NEDOKONČILA'), env.notices.first.to_s)
+        Noxun::Engine::StudioDialog.instance_variable_set(:@dialog, nil)
+      end
+    end
+  end
+end
+
+# --- 3b4) ZLYHANE UPRATANIE PRIPRAVY (Codex #278 kolo 3, P2) ----------------
+
+NxTest.test('D-52b2 (#278/3 P2): ked sa pripravu NEPODARI upratat, hlaska to POVIE') do
+  NxD52b.with_env do |env|
+    other = NxD52b::TICKET.merge('to' => '7.7.7')
+    NxD52b.with_core(prepare: other, abort_result: false) do |_prep, com, aborts|
+      NxD52b.with_source_dir('X:/dist') do
+        Noxun::Engine::SupplierSettingsDialog.dispatch(
+          'updater_apply', NxD52b.arm_check!('X:/dist', 'newer', '9.9.9'), env.sink
+        )
+        env.settle!
+        NxTest.assert_equal([], com, 'vymeneny balik sa nenasadil')
+        NxTest.assert_equal(1, aborts.length, 'upratanie sa POKUSILO')
+        msg = env.notices.first.to_s
+        NxTest.assert(msg.include?('Upratanie'), "hlaska priznava zlyhane upratanie: #{msg}")
+        NxTest.assert(msg.include?('noxun_engine.update.json'), 'menuje MARKER')
+        NxTest.assert(msg.include?('noxun_engine.new'), 'aj pripraveny strom')
+        NxTest.assert(msg.include?('reštartuj'), 'a ponuka restart ako prvu cestu von')
+      end
+    end
+  end
+end
+
+NxTest.test('D-52b2 (#278/3 P2): USPESNE upratanie ziadnu poznamku nepridava') do
+  NxD52b.with_env do |env|
+    other = NxD52b::TICKET.merge('to' => '7.7.7')
+    NxD52b.with_core(prepare: other, abort_result: true) do |_prep, _com, aborts|
+      NxD52b.with_source_dir('X:/dist') do
+        Noxun::Engine::SupplierSettingsDialog.dispatch(
+          'updater_apply', NxD52b.arm_check!('X:/dist', 'newer', '9.9.9'), env.sink
+        )
+        env.settle!
+        NxTest.assert_equal(1, aborts.length, 'upratanie prebehlo')
+        NxTest.refute(env.notices.first.to_s.include?('Upratanie'),
+                      'a hlaska pouzivatela nestrasi nicim, co nemusi riesit')
+      end
+    end
+  end
+end
+
 # --- 3c) ZLYHANY ROLLBACK (Codex #278 P2) ------------------------------------
 
 NxTest.test('D-52b (#278 P2): pri ZLYHANOM rollbacku hlaska NEtvrdi „nezmenený"') do
@@ -917,7 +1042,8 @@ NxTest.test('D-52b: vysledok swapu sa do CEF nedostane (guard nad zdrojom)') do
   # Od rozdelenia na dve fazy (#278 kolo 2) su vysledkove vetvy v troch
   # metodach: spustenie, poll pripravy a dokoncenie. Ziadna z nich nesmie
   # pisat do okna — v tom bode uz zije nad (mozno) vymenenymi subormi.
-  bodies = %w[updater_run_apply poll_updater_stage updater_finish_apply].map do |name|
+  bodies = %w[updater_run_apply poll_updater_stage updater_finish_apply
+              commit_when_closed updater_commit!].map do |name|
     b = D52B_SUP_RB[/def #{name}.*?\n        end\n/m].to_s
     NxTest.refute(b.empty?, "`#{name}` sa v zdrojaku nenasla — uprav guard test")
     b
@@ -927,10 +1053,16 @@ NxTest.test('D-52b: vysledok swapu sa do CEF nedostane (guard nad zdrojom)') do
     NxTest.refute(body.include?('push_updater'), 'ani do sekcie')
     NxTest.refute(body.include?('js('), 'ani inym CEF kanalom')
   end
-  finish = bodies.last
-  NxTest.assert(finish.scan(/updater_message/).length >= 3,
-                'vsetky tri vetvy (uspech, odmietnutie, vynimka) koncia natívnou hlaskou')
-  NxTest.assert(bodies[1].include?('updater_message'), 'a deadline pripravy tiez')
+  commit = bodies.last
+  NxTest.assert(commit.scan(/updater_done!/).length >= 3,
+                'vsetky tri vetvy commitu (uspech, odmietnutie, vynimka) koncia natívnou hlaskou')
+  NxTest.assert(bodies[1].include?('updater_done!'), 'a deadline pripravy tiez')
+  # Kazdy koniec behu MUSI uvolnit priznak — jedine miesto je `updater_done!`
+  # (inak by sa okna uz nikdy neotvorili).
+  done = D52B_SUP_RB[/def updater_done!.*?\n        end\n/m].to_s
+  NxTest.assert(done.include?('@updater_apply_inflight = false'), 'priznak sa uvolnuje v `updater_done!`')
+  NxTest.assert_equal(1, D52B_SUP_RB.scan(/@updater_apply_inflight = false/).length,
+                      'a NIKDE INDE — dva resety by sa casom rozisli')
   msg = D52B_SUP_RB[/def updater_message.*?\n        end\n/m].to_s
   NxTest.assert(msg.include?('::UI.messagebox'), 'a natívna hlaska je `UI.messagebox`')
 end

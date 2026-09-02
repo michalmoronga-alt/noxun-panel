@@ -10309,6 +10309,17 @@ module NoxunSuRunner
       ok('D-52b async (bariera): obe okna boli pred klikom otvorene', state[:d52b_open])
       ok('D-52b async (bariera): swap sa NESPUSTIL hned — najprv sa zatvaraju okna',
          box[:calls].empty?)
+      # Codex #278 kolo 3 (P1): kym beh trva, vstupne body pluginu okna
+      # NEOTVARAJU — inak by si ich clovek pocas dlhej pripravy otvoril
+      # z toolbaru a commit by bezal s CEF drziacim subory z `ui/`.
+      ok('D-52b async (#278/3 P1): pocas behu su vstupne body ZAMKNUTE',
+         e::SupplierSettingsDialog.updater_apply_inflight?)
+      bag = []
+      r12_silence_messagebox!(bag)
+      opened = e::Panel.show
+      r12_restore_messagebox!
+      ok("D-52b async (#278/3 P1): `Panel.show` pocas behu NEOTVORI okno a povie preco (#{bag.first.to_s[0, 40]})",
+         opened.nil? && bag.length == 1 && bag.first.to_s.include?('Prebieha aktualizácia'))
     end]
     steps << [SETTLE, lambda do
       box = state[:d52b_probe] || { calls: [] }
@@ -10331,6 +10342,8 @@ module NoxunSuRunner
       e::SupplierSettingsDialog.dispatch('updater_apply', '{}', ->(s) { rec << s.to_s })
       ok('D-52b async (#278 P1): klik BEZ dokladu o kontrole sa odmietne a swap sa nespusti',
          box[:calls].empty? && rec.any? { |x| x.include?('medzitým zmenila') })
+      ok('D-52b async (#278/3 P1): po dobehnuti behu sa vstupne body zase OTVARAJU',
+         !e::SupplierSettingsDialog.updater_apply_inflight? && !e.update_in_progress?)
       d52b_teardown(state)
       cleanup(model)
     end]

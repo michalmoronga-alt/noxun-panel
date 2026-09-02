@@ -111,6 +111,30 @@ module Noxun
       true
     end
 
+    # D-52b2 (Codex #278 kolo 3, P1): KYM AKTUALIZACIA BEZI, sa okna NESMU
+    # otvarat. Latch (`restart_required?`) zapina az COMMIT — priprava balika
+    # zo sietoveho share pritom trva desiatky sekund a v tom case je este
+    # vypnuty. Pouzivatel by si stihol otvorit Inspector z toolbaru a commit
+    # by bezal s CEF drziacim subory z `ui/` — presne to, comu bariera
+    # predchadza. Priznak vlastni UI vrstva (`SupplierSettingsDialog`), tu je
+    # len jeho citanie a natívna hlaska.
+    APPLY_IN_PROGRESS_MESSAGE = 'Prebieha aktualizácia Noxun Engine — počkaj na jej výsledok. ' \
+                                'Okná pluginu sa medzitým neotvárajú (inak by ich SketchUp držal ' \
+                                'otvorené a výmena súborov by zlyhala).'
+
+    def self.update_in_progress?
+      return false unless defined?(SupplierSettingsDialog) &&
+                          SupplierSettingsDialog.respond_to?(:updater_apply_inflight?)
+      return false unless SupplierSettingsDialog.updater_apply_inflight?
+
+      begin
+        ::UI.messagebox(APPLY_IN_PROGRESS_MESSAGE) if defined?(::UI) && ::UI.respond_to?(:messagebox)
+      rescue StandardError
+        nil # hlaska nesmie prebit samotne odmietnutie
+      end
+      true
+    end
+
     # Guard vstupneho bodu: `true` = volajuci ma SKONCIT. Hlaska je NATIVNA
     # (`UI.messagebox`) — CEF uz moze byt nad novymi subormi. Headless (bez UI)
     # sa len vrati `true`.
