@@ -216,6 +216,35 @@ module Noxun
           note.empty? ? nil : { note: note }
         end
 
+        # KOV-H1 (audit #15 BLOCKER 4): STRIKTNA kontrola ad-hoc poloziek na
+        # ZAPISOVEJ ceste z panela. Vlastnik musi existovat v AKTUALNOM plane
+        # (plan sa stavia z params UZ so zmenami, ktore prave prisli — inak by
+        # sa nedalo v jednom kroku zmensit skrinku a pripnut polozku na dielec,
+        # ktory po zmene vznikne) a katalogovy kod musi byt v katalogu.
+        # Odmietnutie je CELE (`ManualRejected`) — ZIADNY tichy drop polozky.
+        # Nepritomny kluc = panel o ad-hoc polozkach nic nehovori: `params` si
+        # necha to, co je v ulozenom configu.
+        # -> nil (v poriadku) | { error: SK hlaska }
+        def manual_preflight(params, data)
+          return nil unless data.key?('hardware_manual')
+
+          raw = data['hardware_manual']
+          # Review #283 P2-A: panel posiela CELY zoznam (echo, nie diff), takze
+          # prisne sa smu kontrolovat LEN nove a realne zmenene zaznamy. Inak by
+          # po zmiznuti kodu z katalogu neprešla ziadna dalsia editacia skrinky
+          # a zmazanie cela-vlastnika by sa odmietlo namiesto toho, aby polozka
+          # prezila ako `owner_missing`. Porovnava sa proti ULOZENEMU zoznamu,
+          # ktory je v `params` este PRED prepisom.
+          strict_ids = CabinetBuilder.manual_strict_subset(params['hardware_manual'], raw)
+          params['hardware_manual'] = raw
+          keys = CabinetBuilder.plan_parts_by_key(params).keys
+          CabinetBuilder.norm_hardware_manual(raw, strict_owners: true, strict_ids: strict_ids,
+                                                   plan_keys: keys)
+          nil
+        rescue CabinetBuilder::ManualRejected => e
+          { error: "Kovanie sa neuložilo — #{e.message}." }
+        end
+
         def str_or_nil(v)
           s = v.to_s.strip
           s.empty? ? nil : s
@@ -445,6 +474,10 @@ module Noxun
           end
 
           params = CabinetBuilder.config_to_params(src_cfg)
+          # KOV-H1 (audit FIX 10): kopia je NOVA skrinka — jej ad-hoc polozky
+          # kovania dostanu vlastnu identitu. Obsah (kod, nazov, cena, pocet,
+          # vlastnik) sa NEMENI, meni sa LEN `id`.
+          CabinetBuilder.rekey_hardware_manual(params)
           inst = CabinetBuilder.build(model, params)
           select_only(model, inst)
           status_with_warnings(inst, "Vložená kópia #{Store.get(cab, 'cabinet_id')} → " \
@@ -580,6 +613,16 @@ module Noxun
             params[k] = data[k] if data.key?(k)
           end
           params['fronts'] = data['fronts'] if data.key?('fronts')
+          # KOV-H1: ad-hoc kovanie ide TOU ISTOU cestou ako cela (audit #15
+          # BLOCKER 1: ziadny novy zapisovy kanal — `collectAll` -> `apply_all`
+          # -> `normalize` -> rebuild = 1 krok Spat, guardy, R-12).
+          hm = manual_preflight(params, data)
+          if hm && hm[:error]
+            @last_apply_error = hm[:error]
+            set_status(hm[:error], true)
+            push_selected(model) # UI resync — panel sa vrati na ULOZENY stav
+            return
+          end
           pf = material_preflight(params, model) # D-45: telo + chrbat + ABS remap
           if pf && pf[:error]
             # Codex #170 P1: ODMIETNUTY apply si zapamatame. Klient si ho totiz

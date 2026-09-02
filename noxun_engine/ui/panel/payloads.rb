@@ -397,7 +397,13 @@ module Noxun
             'rail_depth' => cfg['rail_depth'], 'rails_orientation' => cfg['rails_orientation'],
             'rails_top_offset' => cfg['rails_top_offset'],
             'zone_tree' => cfg['zone_tree'] || ZoneTree.default_tree((cfg['shelves'] || 0).to_i),
-            'fronts' => Fronts.normalize_config(cfg['fronts'])
+            'fronts' => Fronts.normalize_config(cfg['fronts']),
+            # KOV-H1: ad-hoc polozky kovania CESTUJU SO SABLONOU (kluc je vzdy,
+            # aj prazdny — `merge_template` inak rozlisuje „sablona kluc nema"
+            # = zachovaj polozky CIELA, co je spravanie legacy sablon).
+            # ID sa NEPREKLUCUJU: su unikatne v ramci skrinky, takze zhoda
+            # naprie skrinkami nicomu nevadi (kluc riadku nesie `cabinet_id`).
+            'hardware_manual' => CabinetBuilder.norm_hardware_manual(cfg['hardware_manual'])
           }
           # V0.3 FIX 1: korpusove materialy do sablony LEN ak su na zdroji nastavene (non-nil).
           # part_overrides do sablony NEUKLADAME — su viazane na konkretne dielce/zony zdroja

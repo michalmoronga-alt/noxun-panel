@@ -519,6 +519,11 @@ module Noxun
           # („Chladnickova") by po pouziti sablony ticho zmizol. Rovnaky vzor ako
           # plinth_recess: chybajuci kluc = zachovaj hodnotu CIELA.
           merged['name'] = target_params['name'] unless tpl_config.key?('name')
+          # KOV-H1: LEGACY sablona (bez kluca) nesmie cielovej skrinke ticho
+          # ZMAZAT ad-hoc polozky kovania — rovnaky vzor ako plinth_recess/name.
+          # Sablona, ktora kluc MA, svoje polozky prenasa (vratane prazdneho
+          # zoznamu = „tato sablona ziadne nema").
+          merged['hardware_manual'] = target_params['hardware_manual'] unless tpl_config.key?('hardware_manual')
           %w[material_id front_material_id back_material_id].each do |k|
             tv = Panel.present_str(tpl_config[k])
             merged[k] = tv || target_params[k]

@@ -1568,8 +1568,16 @@ module Noxun
       #   je pricina INA a konkretnejsia — R-07: `library_incompatible`, teda
       #   „projekt nema vlastne predvolby a globalna kniznica sa nesmie
       #   pouzit". Ostatne dovody (chybajuci set, pasma, dlzka) sa NEMENIA.
+      # manual_items (KOV-H1): ad-hoc polozky kovania zo VSETKYCH skriniek
+      #   (`Bom.collect` kluc `hardware_manual`). Je to VLASTNY KANAL PRED set
+      #   rezoluciou — nikdy `resolve_set_id`, nikdy `note_manual` (to je D-93
+      #   znamienko rucneho zasahu do POCTU setovej polozky, uplne iny pojem,
+      #   audit #15 FIX 7). Katalogova ad-hoc polozka sa ZLIEVA s riadkom
+      #   rovnakeho kodu zo setu (jedna cena, jedna objednavka); volna polozka
+      #   ma vlastny riadok. `unmapped` sa ad-hoc netyka — polozka ma kod alebo
+      #   nazov od pouzivatela, takze nemapovana byt nemoze.
       def expand(hardware_items, state, cabinet_overrides: {}, catalog: nil,
-                 no_set_reason: 'no_set')
+                 no_set_reason: 'no_set', manual_items: [])
         mapping = state.is_a?(Hash) && state['mapping'].is_a?(Hash) ? state['mapping'] : {}
         sets    = state.is_a?(Hash) && state['sets'].is_a?(Hash) ? state['sets'] : {}
         # Cabinet override mapy prechadzaju TYM ISTYM parserom (citacia cesta —
@@ -1581,6 +1589,10 @@ module Noxun
         # kluc clena `per: 'owner'` => UZ VYDANY zdrojovy zaznam riadku (R-34:
         # dalsi zasah na ten isty kluc je realne zliatie a doznaci mu `per_owner`)
         owner_seen = {}
+        # KOV-H1: ad-hoc kanal ide PRVY — riadok potom existuje uz vtedy, ked
+        # k nemu pribudne setovy zdroj rovnakeho kodu (zliatie je tym pádom
+        # bezne `add_row` a cena vyjde JEDNA).
+        expand_manual(manual_items, rows, lookup)
         Array(hardware_items).each do |it|
           next unless it.is_a?(Hash)
           gt  = it['generic_type'].to_s
@@ -1781,6 +1793,81 @@ module Noxun
         src
       end
 
+      # --- KOV-H1: ad-hoc kanal (polozky mimo setov) -------------------------
+      #
+      # Vstup su UZ OCISTENE zaznamy z configu (`CabinetBuilder.norm_hardware_manual`)
+      # obohatene zberom o `owner_id`/`owner_pid`/`owner_missing`. Tu sa NIC
+      # nevaliduje druhykrat — expanzia je citacia cesta a nepouzitelny zaznam
+      # sa proste preskoci (rovnaky ton ako `expand`).
+      def expand_manual(manual_items, rows, lookup)
+        Array(manual_items).each do |it|
+          next unless it.is_a?(Hash)
+
+          qty = it['qty'].to_i
+          next if qty < 1
+
+          case it['source'].to_s
+          when 'catalog' then add_adhoc_row(rows, it, qty, lookup)
+          when 'free'    then add_free_row(rows, it, qty)
+          end
+        end
+      end
+
+      # Katalogova ad-hoc polozka = BEZNY nakupny riadok podla kodu. Zlieva sa
+      # so setovymi zdrojmi rovnakeho kodu (agregacia je case-insensitive ako
+      # v `add_row`), takze cena je JEDNA a ziva z katalogu (audit BLOCKER 2).
+      # `adhoc_quantity` = kolko kusov riadku pochadza z ad-hoc poloziek; bez
+      # neho by sa z riadku nedalo zistit, ze ho clovek doplnil rucne.
+      def add_adhoc_row(rows, it, quantity, lookup)
+        code = it['code'].to_s.strip
+        return if code.empty?
+
+        row = rows[code.downcase] ||= { 'code' => code, 'quantity' => 0, 'sources' => [],
+                                        'manual_quantity' => 0 }
+        row['quantity'] += quantity
+        row['adhoc_quantity'] = row['adhoc_quantity'].to_i + quantity
+        # SNAPSHOT nazvu/MJ z configu — pouzije sa LEN vtedy, ked kod v katalogu
+        # NIE JE (`row_join`). Prvy zapis vyhrava: ked tu isty kod doplnia dve
+        # skrinky, snapshoty su rovnake (server ich pri pridani bral z katalogu).
+        row['adhoc_snapshot'] ||= { 'name' => it['name'].to_s, 'unit' => it['unit'].to_s }
+        row['sources'] << adhoc_source(it, quantity)
+        row_join(row, lookup)
+        row
+      end
+
+      # Volna polozka = VLASTNY riadok (nema kod, s nicim sa zliat nemoze).
+      # Kluc `free:<cabinet_id>:<id>` — dve skrinky s rovnakou volnou polozkou
+      # su dva riadky, presne ako dva rozne nazvy. Cena a MJ su zo SNAPSHOTU
+      # (zadal ich pouzivatel), takze riadok NIKDY nie je `missing`.
+      def add_free_row(rows, it, quantity)
+        id = it['id'].to_s
+        return if id.empty?
+
+        key = "free:#{it['owner_id']}:#{id}"
+        price = it['price_eur_vat']
+        row = rows[key] ||= { 'code' => '', 'quantity' => 0, 'sources' => [],
+                              'manual_quantity' => 0, 'adhoc_quantity' => 0,
+                              'free' => true, 'free_key' => key,
+                              'missing' => false, 'name_sk' => it['name'].to_s,
+                              'category' => nil, 'unit' => it['unit'].to_s,
+                              'price_eur_vat' => (price.is_a?(Numeric) ? price.to_f : nil) }
+        row['quantity'] += quantity
+        row['adhoc_quantity'] = row['adhoc_quantity'].to_i + quantity
+        row['sources'] << adhoc_source(it, quantity)
+        row
+      end
+
+      # Zdroj ad-hoc riadku. `generic_type`/`rule_id`/`set_id` su nil — polozka
+      # ZIADNY set ani pravidlo nema a predstierat opak by rozbilo rozklik
+      # povodu v Nakupe. `origin: 'adhoc'` je jediny priznak, podla ktoreho sa
+      # da ad-hoc zdroj rozoznat (NIKDY `source: 'manual'`, to je D-93).
+      def adhoc_source(it, quantity)
+        { 'cabinet_id' => it['owner_id'].to_s,
+          'owner_part_key' => (it['owner_part_key'].nil? ? nil : it['owner_part_key'].to_s),
+          'generic_type' => nil, 'rule_id' => nil, 'set_id' => nil,
+          'quantity' => quantity, 'origin' => 'adhoc', 'manual_id' => it['id'].to_s }
+      end
+
       # D-93 (audit B4): nakupny riadok nesie ZNAMIENKO rucneho zasahu — pocet
       # kusov z poloziek so source 'manual' + hodnoty, ktore by dal automat.
       # Nakupny CSV kontrakt sa TYM NEMENI (znamienko zije v sekcii Nakup Studia).
@@ -1807,6 +1894,22 @@ module Noxun
       def row_join(row, lookup)
         item = lookup[row['code'].downcase]
         if item.nil?
+          # KOV-H1 (audit #15 FIX 6): ked riadok nesie ad-hoc SNAPSHOT, kod
+          # z katalogu zmizol (alebo tam nikdy nebol) — ale nazov a MJ MAME.
+          # Riadok preto NIE JE `missing` („bez nazvu a ceny"), je
+          # `catalog_missing` („bez ceny"): v CSV a v ponuke ostava citatelny
+          # a Kontrola ho prizna ORANGE. Bez tohto by ho CP ticho preskocil
+          # a v nakupe by ostal holy kod.
+          snap = row['adhoc_snapshot']
+          if snap.is_a?(Hash)
+            row['missing'] = false
+            row['catalog_missing'] = true
+            row['name_sk'] = snap['name']
+            row['category'] = nil
+            row['unit'] = snap['unit']
+            row['price_eur_vat'] = nil
+            return row
+          end
           row['missing'] = true
           row['name_sk'] = nil
           row['category'] = nil
@@ -1855,15 +1958,20 @@ module Noxun
         if defined?(HardwareCatalog)
           HardwareCatalog::CATEGORIES.each_with_index { |c, i| cat_rank[c] = i }
         end
-        list = rows.values.sort_by do |r|
-          [r['missing'] ? 1 : 0, cat_rank.fetch(r['category'], 98) || 98, r['code']]
-        end
+        # KOV-H1: kluc riadku je POSLEDNY clen zoradenia. Pri setovych riadkoch
+        # nemeni NIC (kluc = `code.downcase`, takze o poradi rozhodne uz `code`),
+        # ale VOLNE riadky maju `code` prazdny a kategoriu nil — bez tohto
+        # rozhodcu by ich `sort_by` (nestabilny) preusporadal medzi behmi.
+        list = rows.sort_by do |key, r|
+          [r['missing'] ? 1 : 0, cat_rank.fetch(r['category'], 98) || 98, r['code'], key]
+        end.map { |_key, r| r }
         total = 0.0
         unknown = 0
         list.each do |r|
           # D-93: znamienko rucneho zasahu — hotovy text (nil = ziadny zasah).
           r['manual_note'] = manual_note(r)
           r.delete('manual_auto') # pomocna zbierka, do payloadu nepatri
+          r.delete('adhoc_snapshot') # KOV-H1: to iste — snapshot uz je v riadku
           price = r['price_eur_vat']
           if price.is_a?(Numeric) && r['missing'] == false
             r['subtotal_eur_vat'] = (price.to_f * r['quantity']).round(2)

@@ -488,3 +488,16 @@ výrobné zadanie): vtedy `front_direction_unset` prejde z RED nálezu do `expor
 heuristika smeru nikde v kóde (ani preview/overlay); legacy configy bez poľa sa negatujú. **Otvorené, kým výstup so smerom nevznikne** — nezatvárať bez brány.
 RED kanál `front_direction` pristál v KOV-A1 (PR #280, v0.9.15) — brána ostáva otvorená.
 Overlay „Smer otvárania" kreslí **len uložený stav, žiadny default** (A2b, PR #282, v0.9.17): `left`/`right` šípka · `unset` otáznik · legacy NIČ; **brána stále otvorená**.
+
+### R-40 · P3 · ui/core · zápis configu skrinky BEZ prestavby (KOV-H1, 3.9.2026)
+Kandidát z auditu KOV-H (checkpoint #15, dôsledok rozhodnutia BLOCKER 1). Zmena, ktorá sa dotkne **len dát** configu a nemá žiadny
+geometrický dôsledok — dnes **ad-hoc kovanie `hardware_manual[]`** (pridať / upraviť / zmazať položku), zajtra rovnaká trieda zmien —
+ide plnou cestou `apply_all` → `normalize` → **rebuild**, teda cez kompletnú prestavbu geometrie (stovky ms). Bolo to **vedomé
+rozhodnutie**: prestavba je jediná cesta, ktorá má guardy dokumentu aj skrinky, R-12 marker, `dedup: false` a garantuje **jeden krok
+Späť** — a druhý zápisový kanál by tieto záruky musel celé zduplikovať (presne to bol BLOCKER 1: priamy zápis obchádza `cabinet_config`,
+jediné miesto, kde sa stampuje `config_schema`, a položka by ostala pod starou schémou).
+**Návrh:** úzka cesta pre **whitelist dátových polí**, ktorá stampuje marker tým istým serializérom, beží pod `CabinetBuilder.guarded`
+(inak by ju observer vzal ako zmenu korpusu a pripojil transparentnú operáciu — precedens `handle_rename_cabinet`, audit BLOCKER 1 D-100)
+a má vlastný `push_selected(dedup: false)`. **Podmienka:** kým je zoznam takých polí jedno-položkový, sa neoplatí — riziko druhej pravdy
+o configu je väčšie než ušetrené milisekundy. Robiť až keď sa trieda „dátových" zmien rozšíri (KOV-H2 úpravy položiek a ďalšie) alebo
+keď sa prestavba pri jednej položke ukáže ako reálna prekážka práce. **Odhad: S/M.**

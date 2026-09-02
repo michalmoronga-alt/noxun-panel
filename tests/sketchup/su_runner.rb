@@ -11597,6 +11597,253 @@ module NoxunSuRunner
     log_line("INFO: KOV-A1 cleanup katalogu: #{ex.class}: #{ex.message}")
   end
 
+  # ===== KOV-H1: AD-HOC KOVANIE (datova vrstva) =============================
+  #
+  # Headless sada (`tests/pure/test_kovh1_adhoc.rb`) dokazuje KONTRAKT — tvar
+  # polozky, brany, expanziu, ceny. TATO sekcia dokazuje to, co headless nevie:
+  #   1) polozky prezijú REALNU prestavbu a su presne v ULOZENOM configu
+  #   2) prestavba s polozkami je PRESNE JEDEN krok Spat
+  #   3) zmena sirky (ina cesta apply) polozky nezahodi
+  #   4) KOPIA skrinky ma NOVE ID poloziek, ale rovnaky obsah (FIX 10)
+  #   5) sablona ulozit/pouzit polozky prenesie
+  #   6) zmazanie CELA-vlastnika = ORANGE nalez nad ZIVYM modelom, polozka
+  #      ostava v nakupe (B4)
+  #   7) expanzia z REALNEHO modelu: volna polozka ma vlastny riadok, dve
+  #      katalogove polozky rovnakeho kodu sa ZLEJU do jedneho riadku s jednou
+  #      ZIVOU cenou (B2)
+  #   8) nakupny CSV: bez poloziek je BAJTOVO rovnaky ako pred nimi (FIX 13),
+  #      s nimi pribudne presne riadok volnej polozky
+  #
+  # KATALOG: sekcia si zaklada VLASTNU polozku (kod je namespacovany „SU-KOVH…")
+  # a po sebe ju VZDY maze — vzor testovacich dekorov `SU SYNC …`.
+
+  KOVH_CODE = 'SU-KOVH-1'
+  KOVH_TPL  = 'SU TEST KOVH adhoc'
+
+  def kovh_catalog_seed!
+    e::HardwareCatalog.load
+    kovh_catalog_purge!
+    status, = e::HardwareCatalog.create_item(
+      'item_code' => KOVH_CODE, 'name_sk' => 'SU test závesu', 'category' => 'ZAVESY',
+      'unit' => 'ks', 'price_eur_vat' => 2.5
+    )
+    return true if status == :ok
+
+    info("KOV-H1: zalozenie testovacej polozky katalogu zlyhalo (#{status.inspect})")
+    false
+  end
+
+  def kovh_catalog_purge!
+    rec = e::HardwareCatalog.find(KOVH_CODE)
+    return 0 unless rec
+
+    e::HardwareCatalog.delete_item(KOVH_CODE, row_rev: e::HardwareCatalog.record_rev(rec))
+    1
+  rescue StandardError => ex
+    log_line("INFO: KOV-H1 cleanup katalogu: #{ex.class}: #{ex.message}")
+    0
+  end
+
+  def kovh_params(manual, over = {})
+    { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0,
+      'thickness' => 18.0, 'floor_height' => 100.0,
+      'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'wings' => '1' }] },
+      'hardware_manual' => manual }.merge(over)
+  end
+
+  def kovh_free(over = {})
+    { 'id' => 'H-FREE', 'owner_part_key' => nil, 'source' => 'free', 'name' => 'SU zámok',
+      'unit' => 'ks', 'price_eur_vat' => 9.0, 'qty' => 1, 'note' => '' }.merge(over)
+  end
+
+  def kovh_cat(over = {})
+    { 'id' => 'H-CAT', 'owner_part_key' => nil, 'source' => 'catalog', 'code' => KOVH_CODE,
+      'qty' => 2, 'note' => '' }.merge(over)
+  end
+
+  def kovh_manual(inst)
+    Array((e::Store.config(inst) || {})['hardware_manual'])
+  end
+
+  # Expanzia nad ZIVYM modelom presne tou cestou, akou ju robi Studio.
+  def kovh_expand(model)
+    e::ProductionCore.hardware_expansion(model, e::Bom.collect(model))
+  end
+
+  def kovh_csv(model)
+    exp = kovh_expand(model)
+    exp && e::HardwareSets.purchase_csv(exp, project: 'SU', generated_at: 'FIX')
+  end
+
+  # Prestavba TEJ ISTEJ skrinky s inym zoznamom ad-hoc poloziek (cabinet_id sa
+  # nemeni — inak by sa CSV rozislo uz len kvoli inemu ID v sekcii NEMAPOVANE).
+  def kovh_set_manual!(model, inst, manual)
+    e::CabinetBuilder.rebuild(model, inst,
+                              e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+                                .merge('hardware_manual' => manual))
+  end
+
+  def run_kovh1(model)
+    cleanup(model)
+    markers = []
+    seeded = kovh_catalog_seed!
+    begin
+      # --- 1) BUILD s polozkami: config + schema --------------------------
+      inst = e::CabinetBuilder.build(model, kovh_params([kovh_free, kovh_cat]))
+      return ok('KOV-H1: vlozenie skrinky s ad-hoc kovanim', false) unless inst
+
+      stored = kovh_manual(inst)
+      ok("KOV-H1: obe polozky su v ULOZENOM configu (#{stored.length})", stored.length == 2)
+      free = stored.find { |i| i['source'] == 'free' }
+      cat  = stored.find { |i| i['source'] == 'catalog' }
+      ok('KOV-H1: volna polozka nesie nazov, MJ aj cenu zo zadania',
+         free && free['name'] == 'SU zámok' && free['unit'] == 'ks' &&
+         (free['price_eur_vat'].to_f - 9.0).abs < 0.001)
+      ok('KOV-H1 (B2): katalogova polozka cenu NENESIE — oceni ju zivy katalog',
+         cat && !cat.key?('price_eur_vat'))
+      ok("KOV-H1 (FIX 12): nazov katalogovej polozky doplnil SERVER (#{cat && cat['name']})",
+         !seeded || (cat && cat['name'] == 'SU test závesu'))
+      ok('KOV-H1 (R-12): ulozeny config nesie AKTUALNU schemu',
+         (e::Store.config(inst) || {})['config_schema'].to_i == e::CabinetBuilder::CONFIG_SCHEMA)
+
+      # --- 2) PRESTAVBA (zmena sirky) = 1 krok Spat, polozky prezili ------
+      m2 = r03_marker(model, markers)
+      e::CabinetBuilder.rebuild(model, inst,
+                                e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+                                  .merge('width' => 900.0))
+      after = kovh_manual(inst)
+      ok("KOV-H1: polozky prezili zmenu sirky (#{after.length})", after.length == 2)
+      ok('KOV-H1 (FIX 10): a prezili s NEZMENENYMI ID — prestavba identitu neprekluckuje',
+         after.map { |i| i['id'] }.sort == %w[H-CAT H-FREE])
+      Sketchup.undo
+      ok('KOV-H1: prestavba s ad-hoc polozkami je PRESNE jeden krok Spat',
+         m2.valid? && ((e::Store.config(inst) || {})['width'].to_f - 600.0).abs <= TOL)
+
+      # --- 3) NAKUPNY CSV nad TOU ISTOU skrinkou (FIX 13) -----------------
+      kovh_set_manual!(model, inst, [])
+      csv_before = kovh_csv(model)
+      ok('KOV-H1: nakupny CSV sa da zostavit (baseline bez ad-hoc poloziek)', !csv_before.nil?)
+      kovh_set_manual!(model, inst, [kovh_free, kovh_cat])
+      csv_with = kovh_csv(model)
+      ok('KOV-H1: CSV nakupu obsahuje riadok volnej polozky (prazdny kod, nazov zo snapshotu)',
+         csv_with.to_s.include?('"";"";"SU zámok"'))
+      kovh_set_manual!(model, inst, [])
+      ok('KOV-H1 (FIX 13): CSV zakazky BEZ ad-hoc poloziek je BAJTOVO rovnaky ako pred nimi',
+         !csv_before.nil? && kovh_csv(model) == csv_before)
+      kovh_set_manual!(model, inst, [kovh_free, kovh_cat])
+
+      # --- 4) KOPIA: nove ID, rovnaky obsah (FIX 10) ----------------------
+      copy = e::CabinetBuilder.build(model,
+                                     e::CabinetBuilder.rekey_hardware_manual(
+                                       e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+                                     ))
+      cmanual = copy ? kovh_manual(copy) : []
+      ok("KOV-H1: kopia ma rovnaky pocet poloziek (#{cmanual.length})", cmanual.length == 2)
+      ok('KOV-H1 (FIX 10): kopia ma VLASTNE ID poloziek',
+         (cmanual.map { |i| i['id'] } & %w[H-CAT H-FREE]).empty? &&
+         cmanual.map { |i| i['id'] }.uniq.length == 2)
+      ok('KOV-H1: obsah poloziek kopie je zhodny (zdroj, kod, nazov, pocet)',
+         cmanual.map { |i| [i['source'], i['code'], i['name'], i['qty']] }.sort ==
+         kovh_manual(inst).map { |i| [i['source'], i['code'], i['name'], i['qty']] }.sort)
+
+      # --- 5) EXPANZIA nad ZIVYM modelom (B2) ------------------------------
+      exp = kovh_expand(model)
+      rows = Array(exp && exp['rows'])
+      frees = rows.select { |r| r['free'] == true }
+      ok("KOV-H1: volne polozky maju VLASTNE riadky (#{frees.length} — original + kopia)",
+         frees.length == 2 && frees.all? { |r| r['name_sk'] == 'SU zámok' })
+      ok('KOV-H1: volny riadok je ocenený zo snapshotu a NIKDY nie je „mimo katalogu“',
+         frees.all? { |r| r['missing'] == false && (r['price_eur_vat'].to_f - 9.0).abs < 0.001 })
+      merged = rows.find { |r| r['code'].to_s == KOVH_CODE }
+      ok("KOV-H1 (B2): dve katalogove polozky rovnakeho kodu = JEDEN riadok (#{merged && merged['quantity']} ks)",
+         !seeded || (merged && merged['quantity'] == 4 && merged['adhoc_quantity'] == 4))
+      ok('KOV-H1 (B2): zliaty riadok ma JEDNU zivu cenu z katalogu',
+         !seeded || (merged && (merged['price_eur_vat'].to_f - 2.5).abs < 0.001 &&
+                     (merged['subtotal_eur_vat'].to_f - 10.0).abs < 0.001))
+      ok('KOV-H1: invariant Σ zdrojov = mnozstvo riadku plati pre KAZDY riadok',
+         rows.all? { |r| r['quantity'].to_i == Array(r['sources']).sum { |s| s['quantity'].to_i } })
+      ok('KOV-H1 (FIX 7): ad-hoc zdroje nesu `origin` a NEZAPOCITALI sa do D-93 znamienka',
+         rows.all? { |r| r['manual_quantity'].to_i.zero? } &&
+         rows.any? { |r| Array(r['sources']).any? { |s| s['origin'] == 'adhoc' } })
+      cleanup(model)
+
+      # --- 6) MRTVY VLASTNIK: ORANGE nad ZIVYM modelom (B4) ---------------
+      owner = 'front:F1/wing:single'
+      inst2 = e::CabinetBuilder.build(model, kovh_params([kovh_free('owner_part_key' => owner)]))
+      return ok('KOV-H1: vlozenie skrinky s polozkou na dielci', false) unless inst2
+
+      cid2 = e::Store.get(inst2, 'cabinet_id').to_s
+      mine = Array(e::Bom.collect(model)[:hardware_manual]).select { |i| i['id'] == 'H-FREE' }
+      ok('KOV-H1: zber nesie ad-hoc polozku s adresou zijuceho vlastnika',
+         mine.length == 1 && mine.first['owner_missing'] == false)
+
+      # Celo zmizne PANELOVOU cestou (review #283 P2-A): `collectAll()` posiela
+      # CELY zoznam ad-hoc poloziek ako echo, takze prisna kontrola vlastnika by
+      # tu zmenu ODMIETLA — hoci sa polozka vobec nemenila. Musi prejsť a polozka
+      # ma prezit s `owner_missing`. Payload je presne to, co posiela panel.
+      model.selection.clear
+      model.selection.add(inst2)
+      e::Panel.handle_apply_all(pg(model,
+                                   'cabinet_id' => cid2,
+                                   'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'none',
+                                                               'mode' => 'auto' }] },
+                                   'hardware_manual' => kovh_manual(inst2)))
+      ok('KOV-H1 (P2-A): zmazanie cela-vlastnika PANELOM prešlo — celo je prec',
+         Array((e::Store.config(inst2) || {})['front_items']).none? do |f|
+           f.is_a?(Hash) && f['type'].to_s != 'none'
+         end)
+      ok('KOV-H1 (P2-A): a polozka to PREZILA (prisne sa kontroluju len zmenene zaznamy)',
+         kovh_manual(inst2).length == 1 &&
+         kovh_manual(inst2).first['owner_part_key'] == owner)
+      col2 = e::Bom.collect(model)
+      dead = Array(col2[:hardware_manual]).find { |i| i['id'] == 'H-FREE' }
+      ok('KOV-H1 (B4): polozka po zaniku dielca OSTAVA v zbere a je oznacena `owner_missing`',
+         dead && dead['owner_missing'] == true)
+      items = Array(e::ProductionCore.control_payload(col2)['items'])
+              .select { |i| i['category'] == 'hardware_adhoc' }
+      ok("KOV-H1 (B4): Kontrola dava ORANGE „bez vlastnika“ (#{items.length})",
+         items.length == 1 && items.first['severity'] == 'orange')
+      ok('KOV-H1: nalez ukazuje na SKRINKU (dielec uz neexistuje) a menuje polozku',
+         items.first && items.first['owner_id'] == cid2 &&
+         items.first['message_sk'].to_s.include?('SU zámok'))
+      exp2 = kovh_expand(model)
+      ok('KOV-H1 (B4): polozka bez vlastnika je NADALEJ v nakupe (nic sa ticho nezmazalo)',
+         Array(exp2 && exp2['rows']).any? { |r| r['name_sk'] == 'SU zámok' })
+      m3 = r03_marker(model, markers)
+      e::Bom.collect(model)
+      e::ProductionCore.control_payload(e::Bom.collect(model))
+      kovh_expand(model)
+      Sketchup.undo
+      ok('KOV-H1: citanie (zber + Kontrola + expanzia) NEROBI krok Spat',
+         !m3.valid? && inst2.valid? && kovh_manual(inst2).length == 1)
+      cleanup(model)
+
+      # --- 7) SABLONA: ulozit + pouzit ------------------------------------
+      src = e::CabinetBuilder.build(model, kovh_params([kovh_free]))
+      tpl_cfg = src ? e::Panel.template_config_from(e::Store.config(src) || {}, model: model) : {}
+      ok('KOV-H1: sablonovy whitelist nesie ad-hoc polozky',
+         Array(tpl_cfg['hardware_manual']).length == 1)
+      e::TemplateStore.delete('cabinet', KOVH_TPL) if e::TemplateStore.find('cabinet', KOVH_TPL)
+      if e::TemplateStore.upsert('cabinet', KOVH_TPL, tpl_cfg)
+        target = e::CabinetBuilder.build(model, kovh_params([]))
+        model.selection.clear
+        model.selection.add(target)
+        e::TemplatesDialog.handle_apply({ 'template' => KOVH_TPL }.to_json)
+        ok('KOV-H1: POUZITIE sablony prenieslo ad-hoc polozku do cielovej skrinky',
+           kovh_manual(target).length == 1 && kovh_manual(target).first['name'] == 'SU zámok')
+        e::TemplateStore.delete('cabinet', KOVH_TPL)
+      else
+        info('KOV-H1: sablonu sa nepodarilo ulozit — scenar sablony preskoceny')
+      end
+    rescue StandardError => ex
+      log_line("FAIL: KOV-H1 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    ensure
+      r03_clear_markers(model, markers)
+      kovh_catalog_purge!
+      cleanup(model)
+    end
+  end
+
   # ===== KOV-A2b: SMER OTVARANIA V MODELI ===================================
   # Overuje to, co headless sada NEVIE: zivotny cyklus overlayu, ze zapnutie
   # NEVYROBI krok Spat ani nezmeni model, ze symbol sedi na SPRAVNOM kridle
@@ -12927,6 +13174,7 @@ module NoxunSuRunner
     run_st4a(model)          # ŠT-4a: sekcie Nastavenia v Studiu + zanik POSLEDNEHO satelitu — zapis sadzby prepocita rozpocet, baseline revizia odmietne stary zapis, ziadny krok Spat
     run_d52b(model)          # D-52b: updater v sekcii „O plugine" — trojstav nad realnym diskom, REALNY swap nad TEMP sandboxom (nikdy nad zivym Plugins), latch, opakovany pokus
     run_kova(model)          # KOV-A1: cela — vyklop/sklop/blenda (plan vs. model 1:1, 19 mm celo), sablona/kopia/dormant s novymi polami, RED nalez smeru bez kroku Spat, dup-ID
+    run_kovh1(model)         # KOV-H1: ad-hoc kovanie — polozky prezijú prestavbu (1 krok Spat), kopia ma nove ID, sablona ich nesie, mrtvy vlastnik = ORANGE a polozka ostava v nakupe, CSV bez poloziek BAJTOVO nezmeneny
     run_kova2b(model)        # KOV-A2b: smer otvarania v modeli — lifecycle overlayu, symbol na spravnom kridle a prednej ploche, prestavba/Spat, dup-ID per instancia, vykon
     run_async(model, nil)
   rescue StandardError => ex

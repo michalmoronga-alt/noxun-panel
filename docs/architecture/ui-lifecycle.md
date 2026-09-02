@@ -923,6 +923,16 @@ nová `rev` = nový pull, starý obrázok sa už nikdy nenasadí) a **záporná 
 **Zámky D-39 dostali rozsah**: korpusové kľúče sú nezmenené, doska má **vlastné** `length`/`width` vo **vlastnom úložisku** (Codex FIX 12) a do Ruby **nikdy neidú** — serverový
 whitelist `Panel::INSERT_LOCK_FIELDS` je korpusový a zostáva ním, takže doskový zámok drží hodnotu len v UI pri prepnutí šablóny.
 
+**Kovanie šablóny má v insert stave DVA zoznamy kľúčov a ANI JEDEN default.** `NXInsert.HARDWARE_KEYS` (`hardware_sets`, `hardware_set_defs`) sú **mapy** a čítajú sa cez
+`plainMap`; **`HARDWARE_LIST_KEYS` (KOV-H1: `hardware_manual`)** je **pole** a má vlastný čítač `plainList` — `plainMap` vracia pre pole `null`, takže do prvého zoznamu patriť
+nemôže. Kontrakt oboch je rovnaký: prázdna mapa aj prázdne pole = `null` = kľúč sa **do insert payloadu neposiela** (vzor A1 pass-through, stráži to guard test). Rozdiel medzi
+nimi je jeden: zmrazené definície bez mapovania sa nulujú, ad-hoc položky sú na mapovaní **nezávislé** (nejdú cez sety), takže sa nenulujú. `insertCabinet()` navyše z payloadu
+**vymaže `hardware_manual` ešte pred priložením šablónových kľúčov**: `collectAll()` nesie echo OZNAČENEJ skrinky, takže bez toho by nová skrinka zdedila cudzie ručné položky.
+
+**Ad-hoc kovanie v korpusovej karte je v H1 čistý pass-through** (UI príde v KOV-H2): `bridge.js` si pri `loadSelected` odloží `hwManual` = presne to, čo poslal server
+(`Array.isArray(...) ? ... : null` — payload bez kľúča je `null`, **nikdy** prázdne pole), `collectAll()` ho pošle späť **len keď existuje** a odchod z korpusu (doska aj prázdny
+výber) pamäť vyčistí. `|| []` by z „o položkách neviem" spravilo „položky nie sú" a najbližší apply by ich zmazal — presne preto to guard test zakazuje.
+
 **Kontrakt hrúbky doskovej šablóny** (zapísaný v `core/templates.rb board_tpl`) plní `applyBoardTemplate`: šablóna s `material_id: nil` predvyplní **UNI materiál roly „Doska“**
 (`uniBoardSheetId` nad novým poľom payloadu `uni_role`) a **až potom** dosadí hrúbku šablóny — poradie je kontrakt, lebo `onInsertBoardMaterial` by draft prepísal katalógovým
 defaultom.

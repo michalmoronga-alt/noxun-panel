@@ -66,7 +66,15 @@ module Noxun
       #       `opening_mode`, `drawer`). Ticha strata ktorehokolvek z nich by
       #       zmenila VYROBU (dielec by zmizol) alebo by zahodila smer, ktory
       #       pouzivatel vedome urcil — presne pripad z disciliny bumpu.
-      CONFIG_SCHEMA = 2
+      #   3 = KOV-H1 — ad-hoc kovanie `hardware_manual[]` (polozka mimo setov
+      #       viazana na skrinku alebo konkretny dielec). Ticha strata by
+      #       ODOBRALA POLOZKU Z OBJEDNAVKY: starsi plugin by ju pri prvej
+      #       prestavbe zmazal a nakup by bol NEUPLNY bez slova. K bumpu patri
+      #       EXPORTNA brana (`Bom.collect` -> `newer_configs` ->
+      #       `ProductionCore.export_blockers`): sama prestavbova brana
+      #       nestacila — starsi plugin by zakazku so schemou 3 bez problemov
+      #       VYEXPORTOVAL, len bez ad-hoc poloziek (audit #15 BLOCKER 3).
+      CONFIG_SCHEMA = 3
 
       MIN = { width: 200.0, height: 200.0, depth: 150.0 }.freeze
       # D-45: povoleny rozsah hrubky korpusu (mm) — JEDINY zdroj pravdy pre clamp
@@ -76,6 +84,23 @@ module Noxun
       # Fallback farby SketchUp materialu, ak material_id nie je v katalogu (Materials preberie color).
       FALLBACK_RGB_KORPUS = [216, 196, 160].freeze
       FALLBACK_RGB_FRONT  = [245, 245, 245].freeze
+
+      # --- KOV-H1: ad-hoc kovanie (`config['hardware_manual'][]`) -----------
+      # UZAVRETY whitelist poli JEDNEJ polozky. Nic ine sa do configu nedostane.
+      MANUAL_KEYS    = %w[id owner_part_key source code name unit price_eur_vat qty note].freeze
+      # `catalog` = polozka katalogu (verime LEN kodu — nazov/MJ/cenu drzi server),
+      # `free`    = volna polozka (nazov, MJ a cenu zadal pouzivatel).
+      # `manual` tu VEDOME NIE JE — to je D-93 znamienko rucneho zasahu do
+      # POCTU/dlzky setovej polozky (`config.hardware[].source`), uplne iny pojem
+      # (audit #15 FIX 7). Ad-hoc kanal nesie `origin: 'adhoc'` az na riadku.
+      MANUAL_SOURCES = %w[catalog free].freeze
+      MANUAL_QTY_MAX = 999
+      MANUAL_NOTE_MAX = 200
+
+      # Odmietnutie ZAPISOVEJ cesty (ADD/EDIT z panela, `strict_owners: true`).
+      # Citacia cesta (rebuild, legacy config) polozku len zahodi s logom —
+      # prestavba nikdy nespadne na cudzom configu.
+      ManualRejected = Class.new(StandardError)
 
       # DC scaletool bitova maska = uchopy na SKRYTIE (dogfood D-06, potvrdene 19.7.):
       # 120 = 8+16+32+64 (roviny XY/XZ/YZ + rohy) -> ostavaju CISTE osi X/Y/Z (1+2+4).
@@ -569,6 +594,10 @@ module Noxun
               begin
                 Store.write(inst, { std: Store::STD, kind: 'cabinet', id: new_cid, cabinet_id: new_cid })
                 params = config_to_params(Store.config(inst) || {})
+                # KOV-H1 (audit FIX 10): tu vznika NOVA skrinka z existujucej —
+                # jedine miesto (spolu s „Vlozit kopiu"), kde ad-hoc polozky
+                # dostavaju vlastnu identitu. `normalize` ID NIKDY nemeni.
+                rekey_hardware_manual(params)
                 rebuild_in_operation(model, inst, normalize(params))
                 model.commit_operation
               rescue StandardError => e
@@ -1587,6 +1616,8 @@ module Noxun
             part_overrides: cfg[:part_overrides].is_a?(Hash) ? cfg[:part_overrides] : {},
             hardware_overrides: cfg[:hardware_overrides].is_a?(Array) ? cfg[:hardware_overrides] : [],
             hardware_sets: cfg[:hardware_sets].is_a?(Hash) ? cfg[:hardware_sets] : {},
+            # KOV-H1: ad-hoc polozky kovania (pole; prazdne = skrinka ziadne nema)
+            hardware_manual: cfg[:hardware_manual].is_a?(Array) ? cfg[:hardware_manual] : [],
             available_width: cfg[:available_width],
             available_height: cfg[:available_height],
             available_depth: cfg[:available_depth],
@@ -1720,6 +1751,10 @@ module Noxun
             # V0.6 D1 (audit B1): cabinet override setov kovania — mapa
             # {generic_type => set_id}; bez round-tripu by ju rebuild zmazal.
             hardware_sets: norm_hardware_sets(raw(p, :hardware_sets)),
+            # KOV-H1: ad-hoc polozky kovania mimo setov. CITACIA cesta
+            # (`strict_owners: false`) — kluc vlastnika sa NIKDY nezahadzuje,
+            # striktnu kontrolu robi panelova ADD/EDIT cesta PRED rebuildom.
+            hardware_manual: norm_hardware_manual(raw(p, :hardware_manual)),
             part_key_schema: raw(p, :part_key_schema).to_i,
             # D-100: nazov prechadza cez JEDINU ocistovaciu cestu — stary
             # zapeceny default (aj bez diakritiky) sa tu zmeni na nil a skrinka
@@ -1825,6 +1860,303 @@ module Noxun
           out.values
         end
 
+        # --- KOV-H1: ad-hoc kovanie -----------------------------------------
+        #
+        # Ocisti `hardware_manual` na pole poloziek s UZAVRETYM whitelistom
+        # (`MANUAL_KEYS`). Polozka je „konkretne kovanie mimo setov" viazana na
+        # skrinku (`owner_part_key` nil) alebo na KONKRETNY dielec.
+        #
+        # DVA REZIMY (audit #15 BLOCKER 4):
+        #   `strict_owners: false` (default) = CITACIA cesta — rebuild, kopia,
+        #     legacy config. Neplatna polozka VYPADNE s logom, kluc vlastnika sa
+        #     NIKDY nezahadzuje (dielec mohol zaniknut; `Bom.collect` to prizna
+        #     ako `owner_missing` a Validation da ORANGE, polozka ostava v nakupe).
+        #   `strict_owners: true` = ZAPISOVA cesta z panela (ADD/EDIT). Vlastnik
+        #     MUSI existovat v `plan_keys` a katalogovy kod MUSI byt v katalogu;
+        #     inak sa ODMIETA CELA ZMENA (`ManualRejected`) — ziadny tichy drop.
+        #
+        # `strict_ids` (review #283 P2-A) ZUZUJE prisnost na KONKRETNE zaznamy.
+        # Panel posiela v kazdom `collectAll()` CELY ulozeny zoznam (je to echo,
+        # nie diff), takze bez tohto by sa NEZMENENE polozky validovali, akoby ich
+        # pouzivatel prave pridal: po zmazani kodu z katalogu by sa odmietla kazda
+        # dalsia editacia skrinky a zmazanie cela-vlastnika by neprelo vobec —
+        # namiesto toho, aby polozka prezila ako `owner_missing` (BLOCKER 4).
+        #   nil  = prisne sa kontroluje VSETKO (legacy volanie / „vsetko je nove")
+        #   pole = prisne LEN tieto ID + kazdy zaznam BEZ ID (ten nemoze byt
+        #          nezmenene echo — ulozene zaznamy ID vzdy maju)
+        # Ktore ID to su, pocita cista `manual_strict_subset(stored, submitted)`.
+        #
+        # CENY (audit #15 BLOCKER 2): katalogova polozka cenu NEUKLADA NIKDY —
+        # oceni ju ZIVY katalog pri expanzii ako kazdy iny riadok. V configu
+        # ostava len `code` + snapshot `name`/`unit` pre pripad, ze kod
+        # z katalogu zmizne. Cenu nesie VYHRADNE volna polozka.
+        def norm_hardware_manual(raw, strict_owners: false, strict_ids: nil, plan_keys: nil)
+          return [] unless raw.is_a?(Array)
+
+          keys = plan_keys.nil? ? nil : Array(plan_keys).map(&:to_s)
+          ids = strict_ids.nil? ? nil : Array(strict_ids).map(&:to_s)
+          seen = {}
+          raw.filter_map do |it|
+            rec = manual_item(it, strict_owners && manual_strict?(it, ids), keys)
+            next nil if rec.nil?
+
+            # ID doplna normalize LEN ked chyba alebo koliduje; PRVY vyskyt si
+            # svoje vzdy nechava (FIX 10 — prestavba nesmie prekluckovat ID).
+            id = rec['id'].to_s
+            id = '' if id.empty? || seen[id]
+            rec['id'] = id.empty? ? next_manual_id(seen) : id
+            seen[rec['id']] = true
+            rec
+          end
+        end
+
+        # KOV-H1 (audit #15 FIX 10): NOVE ID pre VSETKY ad-hoc polozky. Vola sa
+        # VYHRADNE tam, kde z existujucej skrinky vznika NOVA (dedup kopii,
+        # „Vlozit kopiu") — NIKDY z `normalize`/rebuildu. Prijima config aj
+        # params (string aj symbolovy kluc); vstup MENI a vracia ho.
+        def rekey_hardware_manual(cfg_or_params)
+          return cfg_or_params unless cfg_or_params.is_a?(Hash)
+
+          key = cfg_or_params.key?('hardware_manual') ? 'hardware_manual' : :hardware_manual
+          list = cfg_or_params[key]
+          return cfg_or_params unless list.is_a?(Array)
+
+          seen = {}
+          cfg_or_params[key] = list.map do |it|
+            next it unless it.is_a?(Hash)
+
+            copy = it.dup
+            copy['id'] = next_manual_id(seen)
+            seen[copy['id']] = true
+            copy
+          end
+          cfg_or_params
+        end
+
+        # KOV-H1 (review #283 P2-A): ID zaznamov, ktore sa musia kontrolovat
+        # PRISNE — teda NOVYCH a REALNE ZMENENYCH oproti ULOZENEMU zoznamu.
+        # CISTA funkcia (ziadny model, ziadny katalog) — headless testovatelna.
+        #
+        # `stored`    = `config['hardware_manual']` PRED zmenou
+        # `submitted` = surove pole z panela (echo celeho zoznamu + zmeny)
+        #
+        # Zaznam BEZ ID sa do zoznamu nedava — prisny je uz z definicie
+        # (`manual_strict?`). Duplicitne ID v odoslanom zozname su prisne VZDY:
+        # druhy taky zaznam je realne NOVA polozka (normalize mu prideli nove ID),
+        # aj keby sa obsahom trafil do ulozeneho.
+        def manual_strict_subset(stored, submitted)
+          old = {}
+          Array(stored).each do |rec|
+            next unless rec.is_a?(Hash)
+
+            id = manual_id(rec)
+            old[id] = manual_fingerprint(rec) unless id.empty?
+          end
+          counts = Hash.new(0)
+          Array(submitted).each do |rec|
+            counts[manual_id(rec)] += 1 if rec.is_a?(Hash)
+          end
+          out = []
+          Array(submitted).each do |rec|
+            next unless rec.is_a?(Hash)
+
+            id = manual_id(rec)
+            next if id.empty?
+
+            same = counts[id] == 1 && old.key?(id) && old[id] == manual_fingerprint(rec)
+            out << id unless same
+          end
+          out.uniq
+        end
+
+        # Odtlacok OBSAHU polozky pre porovnanie „zmenila sa?".
+        # `name`/`unit` KATALOGOVEJ polozky sa ZAMERNE NEPOROVNAVAJU: vlastni ich
+        # SERVER (dopĺňa ich z katalogu podla kodu), takze premenovanie polozky
+        # v katalogu by z kazdej nezmenenej polozky spravilo „upravenu" a zablokovalo
+        # by dalsiu editaciu skrinky. Pri VOLNEJ polozke su to naopak udaje
+        # POUZIVATELA — ich zmena JE editacia a kontroluje sa prisne.
+        # Porovnava sa NORMALIZOVANA hodnota (nie surova), aby „2" a 2 neboli zmena.
+        def manual_fingerprint(rec)
+          src = mraw(rec, 'source').to_s.strip
+          out = { 'owner' => present(mraw(rec, 'owner_part_key')), 'source' => src,
+                  'code' => mraw(rec, 'code').to_s.strip,
+                  'qty' => manual_qty(mraw(rec, 'qty')),
+                  'price' => manual_price(rec)[0],
+                  'note' => manual_note(mraw(rec, 'note')) }
+          if src == 'free'
+            out['name'] = mraw(rec, 'name').to_s.strip
+            out['unit'] = manual_unit(mraw(rec, 'unit'))
+          end
+          out
+        end
+
+        # Ma sa TENTO zaznam kontrolovat prisne? `ids` nil = cely zoznam.
+        def manual_strict?(raw, ids)
+          return true if ids.nil?
+          return true unless raw.is_a?(Hash)
+
+          id = manual_id(raw)
+          id.empty? || ids.include?(id)
+        end
+
+        # Jedna polozka -> ocisteny zaznam alebo nil (citacia cesta).
+        # V strict rezime kazde odmietnutie VYHODI `ManualRejected`.
+        def manual_item(raw, strict, plan_keys)
+          return nil unless raw.is_a?(Hash)
+
+          src = mraw(raw, 'source').to_s.strip
+          return manual_drop(strict, 'ručná položka kovania má neznámy zdroj') unless MANUAL_SOURCES.include?(src)
+
+          qty = manual_qty(mraw(raw, 'qty'))
+          return manual_drop(strict, "množstvo ručnej položky musí byť celé číslo 1–#{MANUAL_QTY_MAX}") if qty.nil?
+
+          owner = manual_owner(raw, strict, plan_keys)
+          return nil if owner == :drop
+
+          rec = { 'id' => manual_id(raw), 'owner_part_key' => owner, 'source' => src,
+                  'qty' => qty, 'note' => manual_note(mraw(raw, 'note')) }
+          src == 'catalog' ? manual_catalog(rec, raw, strict) : manual_free(rec, raw, strict)
+        end
+
+        # `catalog`: klientovi sa veri LEN kod (audit #15 FIX 12). Nazov a MJ
+        # dopĺňa SERVER z katalogu; ked kod v katalogu nie je, pri ADD/EDIT sa
+        # polozka odmieta (pouzi volnu), pri rebuilde ostava SNAPSHOT z configu,
+        # aby polozka po zmazani kodu z katalogu nezmizla z objednavky.
+        def manual_catalog(rec, raw, strict)
+          code = mraw(raw, 'code').to_s.strip
+          return manual_drop(strict, 'katalógová ručná položka nemá kód') if code.empty?
+
+          rec['code'] = code
+          item = defined?(HardwareCatalog) ? HardwareCatalog.find(code) : nil
+          if item.is_a?(Hash)
+            rec['name'] = item['name_sk'].to_s
+            rec['unit'] = item['unit'].to_s
+            return rec
+          end
+          if strict
+            return manual_drop(true, "kód „#{code}“ nie je v katalógu kovania — pridaj ho ako voľnú položku")
+          end
+
+          rec['name'] = mraw(raw, 'name').to_s.strip
+          unit = manual_unit(mraw(raw, 'unit'))
+          return manual_drop(false, "ručná položka „#{code}“ má neplatnú mernú jednotku") if unit.nil?
+
+          rec['unit'] = unit
+          rec # cena sa pri katalogovej polozke NEUKLADA NIKDY (BLOCKER 2)
+        end
+
+        # `free`: nazov je povinny, MJ z `HardwareCatalog::UNITS`, cena Float
+        # >= 0 konecna alebo nil („bez ceny"). Kod je VZDY prazdny — volna
+        # polozka sa nesmie tvarit ako katalogovy kod (zliala by sa s nim).
+        def manual_free(rec, raw, strict)
+          name = mraw(raw, 'name').to_s.strip
+          return manual_drop(strict, 'voľná ručná položka nemá názov') if name.empty?
+
+          unit = manual_unit(mraw(raw, 'unit'))
+          return manual_drop(strict, "voľná položka „#{name}“ má neplatnú mernú jednotku") if unit.nil?
+
+          price, ok = manual_price(raw)
+          return manual_drop(strict, "cena položky „#{name}“ musí byť nezáporné číslo") unless ok
+
+          rec['code'] = ''
+          rec['name'] = name
+          rec['unit'] = unit
+          rec['price_eur_vat'] = price unless price.nil?
+          rec
+        end
+
+        # Vlastnik: nil (skrinka) alebo SYNTAKTICKY platny part_key. Pri ADD/EDIT
+        # musi kluc existovat v aktualnom plane (audit #15 BLOCKER 4) — inak by
+        # sa dala polozka zavesit na dielec, ktory nikdy neexistoval. Rebuild
+        # kluc NIKDY nezahadzuje. -> nil | String | :drop
+        def manual_owner(raw, strict, plan_keys)
+          owner = present(mraw(raw, 'owner_part_key'))
+          return nil if owner.nil?
+
+          unless PartKeys.valid?(owner)
+            manual_drop(strict, "ručná položka má neplatný kľúč dielca „#{owner}“")
+            return :drop
+          end
+          if strict && !plan_keys.nil? && !plan_keys.include?(owner)
+            manual_drop(true, "dielec „#{owner}“ v skrinke neexistuje — ručná položka sa nedá pripnúť")
+          end
+          owner
+        end
+
+        # Mnozstvo: CELE cislo 1..999. Desatinne cislo ani text neprejdu —
+        # „2,5 kusa" je vzdy chyba vstupu, nie hodnota na zaokruhlenie.
+        def manual_qty(raw)
+          q = case raw
+              when Integer then raw
+              when Float   then (raw.finite? && (raw % 1).zero?) ? raw.to_i : nil
+              when String  then (raw.strip.match?(/\A\d+\z/) ? raw.strip.to_i : nil)
+              end
+          return nil if q.nil? || q < 1 || q > MANUAL_QTY_MAX
+
+          q
+        end
+
+        # MJ ide cez JEDINU autoritu (`HardwareCatalog.canonical_unit`) — MJ mimo
+        # slovnika sa NEPREKLOPI na tichy default 'ks' (cena za balenie/meter by
+        # sa tvarila ako cena za kus). nil = polozka sa odmieta.
+        def manual_unit(raw)
+          return nil unless defined?(HardwareCatalog)
+
+          HardwareCatalog.canonical_unit(raw)
+        end
+
+        # -> [cena|nil, platne?]. nil cena = „nezadana" (NIKDY 0, standard §11.3).
+        def manual_price(raw)
+          return [nil, true] unless raw.key?('price_eur_vat') || raw.key?(:price_eur_vat)
+
+          v = mraw(raw, 'price_eur_vat')
+          return [nil, true] if v.nil? || v.to_s.strip.empty?
+
+          f = defined?(Materials) ? Materials.normalize_price(v) : Float(v.to_s.tr(',', '.'))
+          return [nil, false] if f.nil? || !f.is_a?(Numeric) || !f.to_f.finite? || f.to_f.negative?
+
+          [f.to_f, true]
+        rescue ArgumentError, TypeError
+          [nil, false]
+        end
+
+        # ID musi byt bezpecny SEGMENT (vstupuje do kluca nakupneho riadku
+        # `free:<cabinet_id>:<id>`) — `PartKeys.segment` je jedina autorita tvaru.
+        def manual_id(raw)
+          v = mraw(raw, 'id').to_s.strip
+          v.empty? ? '' : PartKeys.segment(v)
+        end
+
+        def manual_note(raw)
+          v = raw.to_s.strip
+          v.length > MANUAL_NOTE_MAX ? v[0, MANUAL_NOTE_MAX] : v
+        end
+
+        # Nove ID polozky. Unikatne v ramci JEDNEJ skrinky (kluc riadku nesie aj
+        # `cabinet_id`, takze zhoda naprie skrinkami nicomu nevadi).
+        def next_manual_id(seen)
+          @manual_id_seq = @manual_id_seq.to_i
+          loop do
+            @manual_id_seq += 1
+            id = "H#{Time.now.to_i.to_s(36)}-#{@manual_id_seq.to_s(36)}-#{format('%04x', rand(0x10000))}"
+            return id unless seen.key?(id)
+          end
+        end
+
+        # Cita kluc v oboch tvaroch (config = stringy, panel payload = stringy,
+        # testy niekedy symboly) — vzor `raw(p, key)`.
+        def mraw(hash, key)
+          hash.key?(key) ? hash[key] : hash[key.to_sym]
+        end
+
+        # Odmietnutie: strict = VYNIMKA (cela zmena padne), inak log + nil.
+        def manual_drop(strict, message)
+          raise ManualRejected, message if strict
+
+          Engine.log("hardware_manual: polozka preskocena — #{message}") if defined?(Engine)
+          nil
+        end
+
         # D-18 (Codex audit F1): celo typu 'none' nema dielce — rucne zasahy kovania
         # viazane na jeho front id su mrtve zaznamy (UI by ukazovalo „vypnute" polozky
         # bez existujuceho dielca a pri neskorsom navrate na dvierka by zasah necakane
@@ -1910,6 +2242,11 @@ module Noxun
             # zahodil cabinet override setov kovania. H1a: ten isty parser ako
             # normalize — params uz opustaju config v platnom tvare.
             'hardware_sets' => norm_hardware_sets(cfg['hardware_sets']),
+            # KOV-H1: ad-hoc polozky. Bez kopie by ich KAZDY rebuild zo stored
+            # configu zahodil (rovnaka pasca ako `hardware_sets`, GH #126 P1).
+            # ID sa TU nemenia — nova identita vznika VYHRADNE cez
+            # `rekey_hardware_manual` v kopirovacich cestach (audit FIX 10).
+            'hardware_manual' => (cfg['hardware_manual'].is_a?(Array) ? cfg['hardware_manual'] : []),
             'name' => cfg['name']
           }
           migrate_legacy_part_keys(params, cfg)

@@ -24,6 +24,12 @@
   // vrstva) — je to TEN ISTY payload, ktory dostava sekcia kovania, ziadne nove
   // pole a ziadny vlastny vypocet. null = nic oznacene.
   var hwItems = null;
+  // KOV-H1: ad-hoc polozky kovania OZNACENEJ skrinky, presne ako ich poslal
+  // server (`cabinet_payload`). Panel v H1 ZIADNE UI nema — drzi ich LEN preto,
+  // aby ich `collectAll()` poslal SPAT nezmenene a apply ich neprepisal
+  // prazdnom. NIC sa tu nevyraba ani nedefaultuje: `null` = payload kluc nemal
+  // (alebo nie je nic oznacene) a vtedy sa kluc NEPOSIELA (vzor A1 pass-through).
+  var hwManual = null;
   var PALETTE = ['#46beff','#6eff96','#ffaf50','#dc78ff','#ffeb5a'];
   // V0.3 materialy + ABS
   var MATERIALS = { sheets: [], edges: [] }; // katalog z backendu

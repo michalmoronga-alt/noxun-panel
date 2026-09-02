@@ -113,15 +113,14 @@ const TPL_HW = deepFreeze({
   hardware_sets: { hinge: 'zaves-klasik', slide: { param: 'front_height', bands: [] } },
   hardware_set_defs: { 'zaves-klasik': { set_id: 'zaves-klasik', generic_type: 'hinge' } }
 });
-eq(ins.hardwareOf({}), { hardware_sets: null, hardware_set_defs: null },
-  'sablona bez kovania = ziadne kluce');
-eq(ins.hardwareOf({ hardware_sets: {}, hardware_set_defs: {} }),
-  { hardware_sets: null, hardware_set_defs: null },
-  'prazdne mapy = null (do payloadu sa neposielaju)');
-eq(ins.hardwareOf({ hardware_set_defs: { x: {} } }),
-  { hardware_sets: null, hardware_set_defs: null },
+// KOV-H1: `hardware_manual` je TRETI kluc kovania sablony (pole, nie mapa).
+const HW_EMPTY = { hardware_sets: null, hardware_set_defs: null, hardware_manual: null };
+eq(ins.hardwareOf({}), HW_EMPTY, 'sablona bez kovania = ziadne kluce');
+eq(ins.hardwareOf({ hardware_sets: {}, hardware_set_defs: {}, hardware_manual: [] }),
+  HW_EMPTY, 'prazdne mapy AJ prazdne pole = null (do payloadu sa neposielaju)');
+eq(ins.hardwareOf({ hardware_set_defs: { x: {} } }), HW_EMPTY,
   'definicie BEZ mapovania nemaju co zmrazit');
-eq(ins.hardwareOf({ hardware_sets: 'nezmysel' }), { hardware_sets: null, hardware_set_defs: null },
+eq(ins.hardwareOf({ hardware_sets: 'nezmysel', hardware_manual: 'nezmysel' }), HW_EMPTY,
   'necakany tvar sa zahodi (server je aj tak autorita)');
 const hw = ins.hardwareOf(TPL_HW);
 eq(hw.hardware_sets, TPL_HW.hardware_sets, 'mapovanie sablony sa nesie');
@@ -140,6 +139,26 @@ eq(ins.hardwarePayload().hardware_sets.hinge, 'zaves-klasik',
   'vyber sablony cez composeSource stav naplni');
 ins.setHardware(ins.composeSource(DEFAULTS, TPL)); // ina sablona BEZ kovania
 eq(ins.hardwarePayload(), {}, 'prepnutie na sablonu bez kovania stav vycisti');
+
+// --- KOV-H1: ad-hoc polozky kovania zo sablony (pole, pass-through) ---
+const TPL_ADHOC = deepFreeze({
+  type: 'lower', width: 600,
+  hardware_manual: [{ id: 'H1', source: 'free', code: '', name: 'Zámok Abloy',
+    unit: 'ks', price_eur_vat: 12.0, qty: 1, note: '', owner_part_key: null }]
+});
+const adhoc = ins.hardwareOf(TPL_ADHOC);
+eq(adhoc.hardware_manual.length, 1, 'ad-hoc polozky sablony sa nesu');
+eq(adhoc.hardware_manual[0].name, 'Zámok Abloy', 'zaznam ide TAK, AKO PRISIEL zo servera');
+eq(adhoc.hardware_sets, null, 'ad-hoc polozky su NEZAVISLE od mapovania setov');
+adhoc.hardware_manual.push({ id: 'X' }); // mutacia vysledku...
+eq(TPL_ADHOC.hardware_manual.length, 1, '...sa NEDOTKNE sablony (kopia pola, N11)');
+
+ins.setHardware(TPL_ADHOC);
+eq(Object.keys(ins.hardwarePayload()), ['hardware_manual'],
+  'sablona LEN s ad-hoc polozkami posiela LEN ten kluc');
+ins.setHardware(ins.composeSource(DEFAULTS, TPL)); // sablona bez kovania
+eq(ins.hardwarePayload(), {}, 'prepnutie na sablonu bez ad-hoc poloziek stav vycisti');
+eq(ins.HARDWARE_LIST_KEYS, ['hardware_manual'], 'zoznam POLOVYCH klucov kovania je kontrakt');
 
 // --- UI-C1a: druh sablony (identita = kind + name) ---
 eq(ins.templateKind({ name: 'A', kind: 'cabinet' }), 'cabinet', 'explicitny kind cabinet');

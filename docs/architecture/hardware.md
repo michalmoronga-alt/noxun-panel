@@ -165,6 +165,34 @@ _(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
 Sety kovania + projektový snapshot predvolieb na modeli; zmienky sú v odsekoch `hardware_rules.rb` a `hardware_catalog.rb` a v [ui-lifecycle.md](ui-lifecycle.md) (sekcia `hw`
 Štúdia).
 
+**AD-HOC KANÁL: konkrétne kovanie MIMO setov (KOV-H1, v0.9.18).** `expand` má druhý vstup **`manual_items:`** — ad-hoc položky zákazky (`Bom.collect` kľúč `hardware_manual`, tvar
+drží `cabinet_builder.rb`). Sú to položky, ktoré do skrinky pridal človek: konkrétny katalógový kód alebo voľná položka s vlastným názvom a cenou. Kanál beží **PRED set
+rezolúciou** a je zámerne samostatný — nikdy `resolve_set_id`, nikdy `generic_type 'custom'`, nikdy `note_manual`. (`note_manual` je D-93 **znamienko ručného zásahu do počtu/dĺžky
+SETOVEJ položky**, teda úplne iný pojem so vstupom `source == 'manual'`; audit #15 FIX 7 to oddelil natvrdo. Ad-hoc pôvod nesie `origin: 'adhoc'` na ZDROJI riadku a stráži to
+mutačný test.)
+
+Tri pravidlá, na ktorých kanál stojí:
+
+- **Katalógová položka je BEŽNÝ riadok podľa kódu.** `add_adhoc_row` ju zlieva do `rows[code.downcase]` presne ako `add_row`, takže sa **spojí so setovým riadkom rovnakého kódu**
+  a cena je JEDNA a **živá z katalógu** (`row_join`). To je audit #15 BLOCKER 2: pôvodný návrh držal cenu v snapshote configu a agregácia podľa kódu by na jednom nákupnom riadku
+  zmiešala dve ceny. V configu ostáva len kód + snapshot názvu/MJ. Riadok navyše nesie **`adhoc_quantity`** (koľko kusov z neho je ručných) — bez neho by sa z riadku nedalo
+  zistiť, že ho človek doplnil.
+- **Voľná položka má VLASTNÝ riadok** pod kľúčom **`free:<cabinet_id>:<id>`** (`add_free_row`): `code` je prázdny (nesmie sa tváriť ako katalógový kód a zliať sa s ním), `free:
+  true`, `free_key` = ten kľúč, názov/MJ/cena zo snapshotu a **nikdy `missing`** — cenu zadal používateľ, takže riadok nie je „bez názvu a ceny". Neznáma cena ostáva `nil`
+  (subtotal `nil`, súhrn to prizná v `unknown_prices`), NIKDY nula (STANDARD §11.3).
+- **Kód, ktorý z katalógu ZMIZOL, je `catalog_missing`, nie `missing`** (audit #15 FIX 6). `row_join` si na riadku pozrie privátny `adhoc_snapshot` (názov + MJ z configu, `finalize`
+  ho z payloadu maže ako `manual_auto`): keď existuje, riadok dostane názov a MJ zo snapshotu, cenu `nil` a príznak `catalog_missing`. Dôvod je vecný — riadok **má názov**, takže
+  ho cenová ponuka nesmie preskočiť a v CSV nemá ostať holý kód; chýba mu LEN cena a Kontrola to prizná ORANGE.
+
+Invariant **`Σ sources.quantity == row.quantity`** platí aj tu (jeden zdroj na výskyt položky); ad-hoc zdroj má `generic_type`/`rule_id`/`set_id` **`nil`** (položka žiadny set ani
+pravidlo nemá a predstierať opak by rozbilo rozklik pôvodu v Nákupe) a navyše `origin: 'adhoc'` + `manual_id`. `unmapped` sa ad-hoc **netýka** — položka má kód alebo názov od
+človeka, takže nemapovaná byť nemôže. **`finalize` zoraďuje s kľúčom riadku ako posledným rozhodcom**: voľné riadky majú prázdny `code` aj `category`, takže bez neho by ich
+nestabilný `sort_by` medzi behmi preusporiadal; pre setové riadky je to no-op (kľúč = `code.downcase`).
+
+**Nákupný CSV sa NEMENÍ** (audit #15 FIX 13): žiadny nový stĺpec — pôvod žije v sekcii Nákup Štúdia (rozklik zdrojov) a v `sources`. Voľná položka je v CSV riadok s **prázdnym
+kódom** a názvom zo snapshotu. Že zákazka BEZ ad-hoc položiek dáva **bajtovo** ten istý CSV a štrukturálne tú istú expanziu, dokazuje golden charakterizácia
+`tests/fixtures/kovh_golden/` (generátor sa spúšťa ručne; rozdiel je nález, nie šum).
+
 **Globálna knižnica žije pod medziprocesovým zámkom (1d/R-08).** Súbor `%APPDATA%\NOXUN\Engine\hardware_sets.json` menili DVE inštancie SketchUpu naraz a robili to štýlom
 „prečítaj → uprav → zapíš" **bez zámku** — set uložený v jednom okne zmizol bez slova, keď to druhé okno o chvíľu niečo uložilo. Od tejto dávky ide **každý** zápis
 (`write` · `save_set!` · `delete_set!` · `set_global_mapping!` · seed-merge v `load` · `ensure_seeded`) cez `lock → čerstvé čítanie → kontrola revízie → atomický zápis`, kde
