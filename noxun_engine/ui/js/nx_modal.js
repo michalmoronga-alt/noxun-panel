@@ -11,6 +11,9 @@
   // rozsirila o to, co potrebuje D-69 editor materialu: typy poli `group`
   // (nadpis sekcie formulara), `rows` (opakovatelne riadky), `checkbox`,
   // `color`, sirkove varianty karty a PAMAT ROZPISANYCH HODNOT v komponente.
+  // KOV-H2 pridala typ `lookup` (naseptavac nad SERVEROVYM hladanim) — je
+  // GENERICKY: kostra nevie, ci hlada polozku katalogu kovania alebo cokolvek
+  // ine, dostane len funkciu `search` a kresli, co jej vrati.
   //
   // KONTRAKT (audit #9): komponent spravuje VYHRADNE modaly, ktore si ho
   // vyziadaju cez `NXModal.open`. Fazove okno prepoctu cien (`#budPrModal`
@@ -67,6 +70,13 @@
     // Podla `_base` sa pri dalsom otvoreni pozna KOLIZIA (katalog zmenil tu
     // istu bunku) — tá sa pouzivatelovi UKAZE a pyta rozhodnutie.
     var MEM = {};
+    // KOV-H2 (Codex #285 P2-E): pri `lookup` su v hodnotach LEN vybrane kody,
+    // takze rozpisany dotaz BEZ vyberu by sa zatvorenim ticho stratil — a to
+    // je presne stav, v ktorom pouzivatel odchadza nieco overit. Pamat si ho
+    // preto drzi pod prilepenym sufixom; do `values()` sa NIKDY nedostane
+    // (`values` iteruje POLIA specifikacie), takze kontrakt „lookup vracia len
+    // hodnotu" plati dalej.
+    var MEM_Q = '__q';
 
     function esc(s){
       return String(s == null ? '' : s)
@@ -96,7 +106,8 @@
     //   'text' (default) · 'select' (`options` = [hodnota, popis]) ·
     //   'checkbox' (hodnota je BOOLEAN) · 'color' (vzorka + textovy #RRGGBB) ·
     //   'group' (NADPIS sekcie formulara, hodnotu nema) ·
-    //   'rows' (opakovatelne riadky, hodnota je POLE HASHOV).
+    //   'rows' (opakovatelne riadky, hodnota je POLE HASHOV) ·
+    //   'lookup' (KOV-H2: naseptavac so SERVEROVYM hladanim — nizsie).
     // `cls` je doplnkova trieda vstupu (napr. `mshort`).
     function fieldHtml(f){
       var d = f || {};
@@ -105,6 +116,7 @@
                (d.hint ? '<span>' + esc(d.hint) + '</span>' : '') + '</div>';
       }
       if (d.type === 'rows') return rowsHtml(d, d.value);
+      if (d.type === 'lookup') return lookupHtml(d);
       var key = esc(d.key);
       var id = 'nxm_' + key;
       var lbl = '<label for="' + id + '">' + esc(d.label) + '</label>';
@@ -136,6 +148,240 @@
                 (d.placeholder ? ' placeholder="' + esc(d.placeholder) + '"' : '') + '>';
       }
       return '<div class="mrow">' + lbl + input + hint + '</div>';
+    }
+
+    // --- POLE `lookup` (KOV-H2) ----------------------------------------------
+    // Naseptavac nad ZOZNAMOM, ktory drzi SERVER: textove pole + ponuka
+    // vysledkov. Kostra o obsahu nevie NIC — volajuci dodava `search`, ktory
+    // si vysledky vypyta (v Inspectorovi callbackom `hw_manual_search`) a
+    // zavola `done(items, total)`. Polozka ma tvar `{ value, text, hint }`;
+    // `render`/`hint` su volitelne prepisy pre surovejsi tvar.
+    //
+    // TRI VECI, KTORE SU KONTRAKT (a preto ziju TU, nie u volajuceho):
+    //   1. `values()` vracia LEN `value` (kod) — NIKDY nazov ani cenu. Server
+    //      si nazov aj cenu dopĺňa sam z katalogu (KOV-H1 FIX 12: klientovi sa
+    //      veri len kod), takze poslat mu text z obrazovky by bola cesta, ako
+    //      dostat do zakazky cenu, ktora uz neplati.
+    //   2. PISANIE ZAHADZUJE VYBER. Ked pouzivatel po vybere do pola dopise
+    //      znak, skryta hodnota sa vycisti — inak by odoslal STARY kod pod
+    //      NOVYM textom a na obrazovke by o tom nebolo ani slovo.
+    //   3. STARSIA ODPOVED SA IGNORUJE (`seq`). Odpovede chodia asynchronne,
+    //      takze pomalsie kolo by inak prepisalo cerstvejsie vysledky.
+    //
+    // Ponuka je VLASTNA VRSTVA: Escape zatvara JU, nie modal (vzor naseptavaca
+    // `#mdSgBox`), a Enter v poli hladania formular NIKDY neodosle.
+    function lookupHtml(f){
+      var d = f || {};
+      var key = esc(d.key);
+      var id = 'nxm_' + key;
+      var qval = lookupInitialQuery(d);
+      return '<div class="mrow mlookup" data-nxm-lkrow="' + key + '">' +
+        '<label for="' + id + '_q">' + esc(d.label) + '</label>' +
+        '<input id="' + id + '_q" type="text" class="mlkq" data-nxm-lkq="' + key + '"' +
+        ' autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false"' +
+        ' aria-controls="nxmlk_' + key + '" value="' + esc(qval) + '"' +
+        (d.placeholder ? ' placeholder="' + esc(d.placeholder) + '"' : '') + '>' +
+        // Skryte pole je JEDINA odosielana hodnota (`values()` cita `nxm_<key>`).
+        '<input type="hidden" id="' + id + '" data-nxm="' + key + '"' +
+        ' value="' + esc(d.value == null ? '' : d.value) + '">' +
+        '<div class="mlkhint" data-nxm-lkhint="' + key + '">' +
+        esc(lookupInitialHint(d)) + '</div>' +
+        '<div class="mlklist" id="nxmlk_' + key + '" data-nxm-lklist="' + key + '"' +
+        ' role="listbox"></div></div>';
+    }
+
+    // VYCHODISKOVY text pola hladania. Ked volajuci nema ulozeny popis
+    // vybraneho zaznamu, ukaze sa HODNOTA (kod) — prazdne pole nad neprazdnou
+    // hodnotou by klamalo. Je to JEDNA definicia: kresli sa z nej markup
+    // a porovnava sa proti nej pamat rozpisaneho dotazu.
+    function lookupInitialQuery(d){
+      var t = (d || {}).valueText;
+      if (t != null && t !== '') return t;
+      return (d || {}).value == null ? '' : (d || {}).value;
+    }
+
+    // `hint` smie byt FUNKCIA (popis vybranej polozky) alebo TEXT (staticka
+    // vysvetlivka pod polom) — pri funkcii sa na zaciatku nekresli nic.
+    function lookupInitialHint(d){
+      if (typeof d.hint === 'function') return d.hintText == null ? '' : d.hintText;
+      return d.hint == null ? (d.hintText == null ? '' : d.hintText) : d.hint;
+    }
+
+    function lookupSpec(key){
+      var found = null;
+      ((OPEN && OPEN.spec && OPEN.spec.fields) || []).forEach(function(f){
+        if (f && f.type === 'lookup' && String(f.key) === String(key)) found = f;
+      });
+      return found;
+    }
+
+    function lookupState(key){
+      if (!OPEN) return null;
+      OPEN.lookup = OPEN.lookup || {};
+      if (!OPEN.lookup[key]){
+        OPEN.lookup[key] = { seq: 0, items: [], total: 0, active: -1, open: false };
+      }
+      return OPEN.lookup[key];
+    }
+
+    function lkNode(attr, key){
+      if (typeof document === 'undefined') return null;
+      var r = document.getElementById(ROOT_ID);
+      return (r && r.querySelector) ? r.querySelector('[' + attr + '="' + key + '"]') : null;
+    }
+
+    function lookupText(f, it){
+      if (f && typeof f.render === 'function'){
+        var t = f.render(it);
+        return String(t == null ? '' : t);
+      }
+      if (it && it.text != null) return String(it.text);
+      return String(it == null ? '' : it);
+    }
+
+    function lookupHintOf(f, it){
+      if (f && typeof f.hint === 'function'){
+        var h = f.hint(it);
+        return String(h == null ? '' : h);
+      }
+      return String((it && it.hint != null) ? it.hint : '');
+    }
+
+    function lookupValueOf(it){
+      if (it && it.value != null) return String(it.value);
+      return String(it == null ? '' : it);
+    }
+
+    function lookupExpanded(key, on){
+      var q = lkNode('data-nxm-lkq', key);
+      if (q && q.setAttribute) q.setAttribute('aria-expanded', on ? 'true' : 'false');
+    }
+
+    function lookupRender(key){
+      var box = lkNode('data-nxm-lklist', key);
+      if (!box) return;
+      var f = lookupSpec(key);
+      var s = lookupState(key);
+      if (!s || !s.open){ box.innerHTML = ''; lookupExpanded(key, false); return; }
+      var h = '';
+      s.items.forEach(function(it, i){
+        var on = i === s.active;
+        h += '<button type="button" class="mlkitem' + (on ? ' on' : '') + '" role="option"' +
+             ' aria-selected="' + (on ? 'true' : 'false') + '"' +
+             ' data-nxm-act="lookuppick" data-nxm-lk="' + esc(key) + '"' +
+             ' data-nxm-idx="' + i + '">' + esc(lookupText(f, it)) + '</button>';
+      });
+      if (!s.items.length){
+        h += '<div class="mlkempty">Nič sa nenašlo — skús iné slovo alebo kód.</div>';
+      } else if (s.total > s.items.length){
+        // ZIADNE TICHE OREZANIE (zasada „no silent caps"): kolko sa nezmestilo,
+        // musi byt vidno — inak pouzivatel hlada polozku, ktora „tam nie je".
+        h += '<div class="mlkmore">… ďalších ' + (s.total - s.items.length) +
+             ' — spresni hľadanie</div>';
+      }
+      box.innerHTML = h;
+      lookupExpanded(key, true);
+    }
+
+    function lookupClose(key){
+      var s = lookupState(key);
+      if (!s) return;
+      s.open = false;
+      s.active = -1;
+      lookupRender(key);
+    }
+
+    // Zatvori ponuky VSETKYCH lookupov okrem `keep` (klik mimo).
+    function lookupCloseOthers(keep){
+      if (!OPEN || !OPEN.lookup) return;
+      Object.keys(OPEN.lookup).forEach(function(k){
+        if (String(k) === String(keep)) return;
+        if (OPEN.lookup[k].open) lookupClose(k);
+      });
+    }
+
+    function lookupSearch(key){
+      var f = lookupSpec(key);
+      var s = lookupState(key);
+      if (!f || !s || typeof f.search !== 'function') return;
+      var q = lkNode('data-nxm-lkq', key);
+      var seq = ++s.seq;
+      f.search(q ? String(q.value == null ? '' : q.value) : '', function(items, total){
+        // Odpoved patri TOMUTO otvoreniu a TOMUTO kolu — inak sa zahadzuje.
+        if (!OPEN || !OPEN.lookup || OPEN.lookup[key] !== s) return;
+        if (seq !== s.seq) return;
+        s.items = items || [];
+        s.total = (total == null) ? s.items.length : total;
+        s.active = s.items.length ? 0 : -1;
+        s.open = true;
+        lookupRender(key);
+      });
+    }
+
+    function lookupMove(key, delta){
+      var s = lookupState(key);
+      if (!s || !s.open || !s.items.length) return;
+      var n = s.items.length;
+      s.active = ((s.active < 0 ? 0 : s.active) + delta + n) % n;
+      lookupRender(key);
+    }
+
+    function lookupPick(key, idx){
+      var f = lookupSpec(key);
+      var s = lookupState(key);
+      if (!f || !s || typeof document === 'undefined') return;
+      var it = s.items[Number(idx)];
+      if (!it) return;
+      var val = document.getElementById('nxm_' + key);
+      var q = lkNode('data-nxm-lkq', key);
+      var hint = lkNode('data-nxm-lkhint', key);
+      if (val) val.value = lookupValueOf(it);
+      if (q) q.value = lookupText(f, it);
+      if (hint) hint.textContent = lookupHintOf(f, it);
+      lookupClose(key);
+      if (OPEN) OPEN.memSkip = false;   // vyber je zasah do formulara
+      if (q && q.focus){ try { q.focus(); } catch (e) { /* fokus nie je kriticky */ } }
+    }
+
+    // Pisanie ZAHADZUJE predchadzajuci vyber (bod 2 kontraktu vyssie).
+    function lookupTyped(key){
+      if (typeof document === 'undefined') return;
+      var val = document.getElementById('nxm_' + key);
+      if (val) val.value = '';
+      var f = lookupSpec(key);
+      var hint = lkNode('data-nxm-lkhint', key);
+      if (hint && typeof f === 'object' && f && typeof f.hint === 'function') hint.textContent = '';
+      lookupSearch(key);
+    }
+
+    // Klavesnica v poli hladania. -> true = udalost je SPRACOVANA (modal ju uz
+    // nesmie dostat).
+    function lookupKey(ev){
+      if (!OPEN || !ev || !ev.target || !ev.target.getAttribute) return false;
+      var key = ev.target.getAttribute('data-nxm-lkq');
+      if (!key) return false;
+      var s = lookupState(key);
+      if (ev.key === 'Escape'){
+        if (!s || !s.open) return false;  // zatvorena ponuka = Escape patri modalu
+        lookupClose(key);
+        if (ev.preventDefault) ev.preventDefault();
+        return true;
+      }
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp'){
+        if (!s || !s.open) lookupSearch(key);
+        else lookupMove(key, ev.key === 'ArrowDown' ? 1 : -1);
+        if (ev.preventDefault) ev.preventDefault();
+        return true;
+      }
+      if (ev.key === 'Enter'){
+        // Enter v poli hladania NIKDY neodosiela formular — bud vyberie
+        // zvyraznenu polozku, alebo (pri zatvorenej ponuke) spusti hladanie.
+        if (s && s.open && s.active >= 0) lookupPick(key, s.active);
+        else lookupSearch(key);
+        if (ev.preventDefault) ev.preventDefault();
+        return true;
+      }
+      return false;
     }
 
     // --- REPEATER `rows` (audit ŠT-2c #14) -----------------------------------
@@ -525,7 +771,11 @@
             if (e.field && line.querySelector) input = line.querySelector('[data-nxm-col="' + e.field + '"]');
           }
         } else if (e.field){
-          input = document.getElementById('nxm_' + e.field);
+          // KOV-H2: pri `lookup` je `nxm_<key>` SKRYTE pole — cerveny okraj by
+          // nebolo vidno. Chyba preto sadne na pole HLADANIA (`_q`), ktore
+          // existuje vyhradne pri naseptavaci.
+          input = document.getElementById('nxm_' + e.field + '_q') ||
+                  document.getElementById('nxm_' + e.field);
           host = (input && input.closest) ? input.closest('.mrow') : null;
         }
         if (!host){ rest.push(msg); return; }
@@ -799,6 +1049,8 @@
     //   checkbox    -> BOOLEAN,
     //   rows        -> POLE HASHOV,
     //   group       -> v hodnotach VOBEC NIE JE (je to nadpis, nie pole).
+    //   lookup      -> RETAZEC, a to LEN `value` (kod) zo skryteho pola
+    //                  `nxm_<key>` — nikdy text ani cena z obrazovky.
     function values(){
       var out = {};
       if (!OPEN || typeof document === 'undefined') return out;
@@ -1041,6 +1293,18 @@
         }
         any = true;
       });
+      // Rozpisany dotaz naseptavaca (bod P2-E vyssie). Pamata sa LEN vtedy,
+      // ked sa lisi od VYCHODISKOVEHO textu — otvorit a zavrit okno pamat
+      // nezaklada (rovnaka zasada ako pri plochych poliach).
+      ((OPEN.base && OPEN.base.fields) || []).forEach(function(f){
+        if (!f || f.type !== 'lookup') return;
+        var node = lkNode('data-nxm-lkq', f.key);
+        if (!node) return;
+        var txt = String(node.value == null ? '' : node.value);
+        if (txt === String(lookupInitialQuery(f))) return;
+        out[String(f.key) + MEM_Q] = txt;
+        any = true;
+      });
       var s = memSlot(key);
       if (!any){
         if (MEM[s] && MEM[s].key === String(key)) delete MEM[s];
@@ -1073,6 +1337,7 @@
       out.fromMemory = true;
       out.fields = (s.fields || []).map(function(f){
         if (!f || f.type === 'group') return f;
+        if (f.type === 'lookup') return withLookupMemory(f, mem);
         if (!Object.prototype.hasOwnProperty.call(mem, f.key)) return f;
         var g = shallow(f);
         // Riadky sa NEPREPISUJU cele — pamat nesie len ZMENENE bunky,
@@ -1082,6 +1347,23 @@
         return g;
       });
       return { base: s, spec: out };
+    }
+
+    // Vliatie pamate do pola `lookup` (P2-E). DVE veci naraz:
+    //   * rozpisany DOTAZ sa vrati (bez neho by sa napisany text stratil),
+    //   * ked je obnovena HODNOTA prazdna, zobrazeny text sa VYCISTI — inak by
+    //     pole vyzeralo vybrate (svietil by povodny nazov polozky), kym by
+    //     submit az potom zlyhal na „vyber polozku z katalógu".
+    function withLookupMemory(f, mem){
+      var qk = String(f.key) + MEM_Q;
+      var hasV = Object.prototype.hasOwnProperty.call(mem, f.key);
+      var hasQ = Object.prototype.hasOwnProperty.call(mem, qk);
+      if (!hasV && !hasQ) return f;
+      var g = shallow(f);
+      if (hasV) g.value = mem[f.key];
+      if (hasQ) g.valueText = mem[qk];
+      else if (String(g.value == null ? '' : g.value) === '') g.valueText = '';
+      return g;
     }
 
     // „Začať odznova" — pas z pamate ponuka CESTU VON: formular sa prekresli
@@ -1152,7 +1434,7 @@
       warnDupKeys(s);
       var eff = withMemory(s);
       OPEN = { base: eff.base, spec: eff.spec, trigger: trigger,
-               busy: false, memSkip: false, flags: {} };
+               busy: false, memSkip: false, flags: {}, lookup: {} };
       // Stitky (kolizie z pamate) musia zit v STAVE — prekreslenie kontajnera
       // ich z DOM neprecita spat.
       (eff.spec.fields || []).forEach(function(f){
@@ -1162,13 +1444,23 @@
       focusFirst(r);
     }
 
+    // `onClose` (review #285 kolo 2, P2-G) je sucast kontraktu: volajuci si
+    // pri modali drzi VLASTNY stav (co odoslal, na co caka) a bez signalu
+    // o zatvoreni by mu ostal visiet aj po Escape, kliku na scrim, kriziku
+    // ci „Zrušiť" — a dalsia akcia by sa potom spravala, akoby okno este zilo.
+    // Vola sa AZ po skutocnom zatvoreni (OPEN je uz null), takze volajuci smie
+    // z neho bez rizika rekurzie citat stav aj otvarat nove okno.
     function close(){
       if (typeof document === 'undefined'){ OPEN = null; return; }
       remember();                       // Esc nesmie byt ticha strata hodnot
       var r = document.getElementById(ROOT_ID);
       if (r) r.innerHTML = '';
       var back = OPEN && OPEN.trigger;
+      var done = OPEN && OPEN.base ? OPEN.base.onClose : null;
       OPEN = null;
+      if (typeof done === 'function'){
+        try { done(); } catch (e) { warn('onClose volajuceho zlyhal.'); }
+      }
       // Fokus patri spat na spustac — inak by po zatvoreni skoncil na <body>
       // a klavesnicova cesta by sa prerusila presne tam, kde zacala.
       if (back && back.focus){
@@ -1249,10 +1541,16 @@
         if (!OPEN) return;
         var t = ev.target;
         if (!t || !t.closest) return;
+        // KOV-H2: klik MIMO ponuky naseptavaca ju zatvara (klik do jeho riadku
+        // nie — inak by zmizla skor, nez by sa dala vybrat polozka).
+        var lkrow = t.closest('[data-nxm-lkrow]');
+        lookupCloseOthers(lkrow ? lkrow.getAttribute('data-nxm-lkrow') : null);
         var act = t.closest('[data-nxm-act]');
         if (act){
           var a = act.getAttribute('data-nxm-act');
           if (a === 'submit') submit();
+          else if (a === 'lookuppick') lookupPick(act.getAttribute('data-nxm-lk'),
+                                                  act.getAttribute('data-nxm-idx'));
           else if (a === 'rowadd') rowAdd(act.getAttribute('data-nxm-rows'));
           else if (a === 'rowdel') rowDel(act);
           else if (a === 'conftake') confResolve(act, true);
@@ -1275,7 +1573,8 @@
         if (!OPEN) return;
         var t = ev.target;
         if (!t || !t.getAttribute) return;
-        if (!t.getAttribute('data-nxm') && !t.getAttribute('data-nxm-col')) return;
+        if (!t.getAttribute('data-nxm') && !t.getAttribute('data-nxm-col') &&
+            !t.getAttribute('data-nxm-lkq')) return;
         OPEN.memSkip = false;
       }
       document.addEventListener('change', touched);
@@ -1285,13 +1584,22 @@
         touched(ev);
         if (!OPEN) return;
         var t = ev.target;
-        if (!t || !t.getAttribute || t.getAttribute('data-nxm-color') !== '1') return;
+        if (!t || !t.getAttribute) return;
+        // KOV-H2: pisanie do naseptavaca zahodi predchadzajuci vyber a spusti
+        // nove hladanie (bod 2 kontraktu `lookup`).
+        var lk = t.getAttribute('data-nxm-lkq');
+        if (lk){ lookupTyped(lk); return; }
+        if (t.getAttribute('data-nxm-color') !== '1') return;
         var sw = document.getElementById('nxm_' + t.getAttribute('data-nxm') + '_sw');
         if (sw && sw.style) sw.style.background = isHex(t.value) ? String(t.value) : '';
       });
 
       document.addEventListener('keydown', function(ev){
         if (!OPEN) return;
+        // KOV-H2: otvorena ponuka naseptavaca je VLASTNA VRSTVA — Escape,
+        // sipky a Enter patria najprv jej (vzor `#mdSgBox`). Az ked ju
+        // udalost nespotrebuje, rozhoduje modal.
+        if (lookupKey(ev)) return;
         if (ev.key === 'Escape'){
           close();
           // Escape SPOTREBUJE modal — okno za nim (Studio zatvara Escapom svoje
@@ -1322,7 +1630,7 @@
     }
 
     var API = { ROOT_ID: ROOT_ID, modalHtml: modalHtml, fieldHtml: fieldHtml,
-                rowsHtml: rowsHtml, cardCls: cardCls,
+                rowsHtml: rowsHtml, lookupHtml: lookupHtml, cardCls: cardCls,
                 open: open, close: close, submit: submit,
                 isOpen: isOpen, isBusy: isBusy, setBusy: setBusy,
                 values: values, spec: spec, setRows: setRows,

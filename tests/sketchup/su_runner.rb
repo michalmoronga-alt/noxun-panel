@@ -11844,6 +11844,299 @@ module NoxunSuRunner
     end
   end
 
+  # ===== KOV-H2: AD-HOC KOVANIE — UI CESTA (payload, modal, povod) ==========
+  #
+  # Headless sada (`tests/pure/test_kovh2_payload.rb`) dokazuje TVAR payloadov
+  # a JS sada (`tests/js/test_kovh2_adhoc_ui.js`) spravanie modalu. TATO sekcia
+  # dokazuje to, co ani jedna z nich nevie — spravanie nad ZIVYM modelom:
+  #   1) `push_selected` reálnej skrinky nesie `hardware_manual_view`
+  #      (so ZIVOU cenou z katalogu) aj `hardware_manual_owners` z AKTUALNEHO
+  #      planu — nie z fixtury,
+  #   2) hladanie v katalogu (`hw_manual_search`) je CITACIE: ziadny krok Spat,
+  #   3) apply s `manual_op` = PRESNE JEDEN krok Spat a modal dostane
+  #      `hwManualResult(true, …)`,
+  #   4) ODMIETNUTIE (neplatny kod) = ZIADNY krok Spat, config sa nezmeni
+  #      a modal dostane `hwManualResult(false, …)` — inak by ostal zamknuty,
+  #   5) zmazanie polozky z panela = jeden krok Spat a status MENUJE polozku,
+  #   6) `owner_label` v zdrojoch nakupneho riadku sa sklada z REALNYCH
+  #      resolved ciel (generovane id cela -> „F1 · dvierka ľavé").
+  #
+  # Katalog: pouziva sa TA ISTA namespacovana polozka ako v KOV-H1
+  # (`kovh_catalog_seed!`) a po sekcii sa VZDY maze.
+
+  # Zachytenie `Panel.js` — v runneri je panel zavrety, takze `js` ticho
+  # nerobi nic a signal modalu by sa nedal overit inak nez cez alias.
+  def kovh2_capture_js
+    sc = e::Panel.singleton_class
+    out = []
+    sc.send(:alias_method, :kovh2_orig_js, :js)
+    sc.send(:define_method, :js) { |script| out << script }
+    yield out
+  ensure
+    sc.send(:remove_method, :js)
+    sc.send(:alias_method, :js, :kovh2_orig_js)
+    sc.send(:remove_method, :kovh2_orig_js)
+  end
+
+  # Prestavba, ktora VZDY vyhodi vynimku — na overenie rescue vetvy
+  # `handle_apply_all` nad ZIVYM modelom (Codex #285 P2-B). Original sa v
+  # `ensure` VZDY vracia.
+  def kovh2_with_failing_rebuild
+    sc = e::CabinetBuilder.singleton_class
+    sc.send(:alias_method, :kovh2_orig_rebuild, :rebuild)
+    sc.send(:define_method, :rebuild) { |*_a, **_kw| raise 'SU TEST: prestavba zlyhala' }
+    yield
+  ensure
+    sc.send(:remove_method, :rebuild)
+    sc.send(:alias_method, :rebuild, :kovh2_orig_rebuild)
+    sc.send(:remove_method, :kovh2_orig_rebuild)
+  end
+
+  # Payload skrinky presne tak, ako ho dostane panel pri `push_selected`.
+  def kovh2_payload(inst)
+    e::Panel.cabinet_payload(inst)
+  end
+
+  def kovh2_select!(model, inst)
+    model.selection.clear
+    model.selection.add(inst)
+  end
+
+  def run_kovh2(model)
+    cleanup(model)
+    markers = []
+    seeded = kovh_catalog_seed!
+    begin
+      owner = 'front:F1/wing:single'
+      inst = e::CabinetBuilder.build(model, kovh_params([kovh_cat('owner_part_key' => owner)]))
+      return ok('KOV-H2: vlozenie skrinky s ad-hoc polozkou', false) unless inst
+
+      cid = e::Store.get(inst, 'cabinet_id').to_s
+      kovh2_select!(model, inst)
+
+      # --- 1) PAYLOAD reálnej skrinky --------------------------------------
+      pay = kovh2_payload(inst)
+      view = Array(pay['hardware_manual_view'])
+      ok("KOV-H2: payload skrinky nesie riadok ad-hoc polozky (#{view.length})", view.length == 1)
+      row = view.first || {}
+      ok('KOV-H2: riadok nesie ZIVU cenu z katalogu (v configu ZIADNA nie je)',
+         !seeded || (row['price_eur_vat'].to_f - 2.5).abs < 0.001)
+      ok("KOV-H2: a ZIVY nazov z katalogu (#{row['name']})",
+         !seeded || row['name'].to_s == 'SU test závesu')
+      ok("KOV-H2: popis vlastnika sklada SERVER (#{row['owner_label']})",
+         row['owner_label'].to_s == 'F1 · dvierka')
+      ok('KOV-H2: a dielec v plane existuje, takze ziadny stav sa nepriznava',
+         row['owner_missing'] == false && row['catalog_missing'] == false)
+
+      owners = Array(pay['hardware_manual_owners'])
+      keys = owners.map { |o| o['key'] }
+      ok('KOV-H2: ponuka „Patrí k" zacina celou skrinkou', owners.first &&
+         owners.first['key'].nil? && owners.first['label'] == 'celá skrinka')
+      ok("KOV-H2: ponuka nesie dielce AKTUALNEHO planu (#{keys.length - 1} dielcov)",
+         keys.include?(owner) && keys.length > 1)
+      ok('KOV-H2: a NEPONUKA korpusove dielce (boky, dno, strop, chrbat, sokel)',
+         keys.none? { |k| k.to_s.start_with?('cabinet/') })
+      ok('KOV-H2: ziadny popis v ponuke nie je surovy kluc',
+         owners.none? { |o| o['label'].to_s.include?('/') || o['label'].to_s.include?(':') })
+
+      # --- 2) HLADANIE v katalogu je CITACIE --------------------------------
+      m1 = r03_marker(model, markers)
+      hits = nil
+      kovh2_capture_js do |calls|
+        e::Panel.handle_hw_manual_search({ 'q' => KOVH_CODE, 'gen' => 3 }.to_json)
+        hits = calls.first.to_s
+      end
+      ok('KOV-H2: hladanie odpoveda vlastnym kanalom s generaciou dotazu',
+         hits.start_with?('NX.hwManualSearchResult(') && hits.include?('"gen":3'))
+      ok('KOV-H2: a najde zalozenu polozku katalogu',
+         !seeded || hits.include?(KOVH_CODE))
+      Sketchup.undo
+      ok('KOV-H2: hladanie NEROBI krok Spat (citacia cesta)',
+         !m1.valid? && inst.valid? && kovh_manual(inst).length == 1)
+
+      # --- 3) APPLY s `manual_op` = JEDEN krok Spat + signal modalu ---------
+      m2 = r03_marker(model, markers)
+      added = kovh_manual(inst) + [kovh_free('id' => '')]
+      res = nil
+      kovh2_capture_js do |calls|
+        e::Panel.handle_apply_all(pg(model,
+                                     'cabinet_id' => cid,
+                                     'hardware_manual' => added,
+                                     'manual_op' => { 'kind' => 'add', 'id' => '' }))
+        res = calls.find { |c| c.to_s.start_with?('NX.hwManualResult(') }.to_s
+      end
+      ok("KOV-H2: pridanie polozky PANELOM prešlo (#{kovh_manual(inst).length})",
+         kovh_manual(inst).length == 2)
+      ok('KOV-H2: novej polozke pridelil ID SERVER (klient posiela prazdne)',
+         kovh_manual(inst).map { |i| i['id'].to_s }.none?(&:empty?) &&
+         kovh_manual(inst).map { |i| i['id'] }.uniq.length == 2)
+      ok('KOV-H2: modal dostal POTVRDENIE (inak by ostal zamknuty navzdy)',
+         res.start_with?('NX.hwManualResult(true,') && res.include?('"kind":"add"'))
+      Sketchup.undo
+      ok('KOV-H2: pridanie ad-hoc polozky je PRESNE jeden krok Spat',
+         m2.valid? && kovh_manual(inst).length == 1)
+
+      # --- 4) ODMIETNUTIE: ziadny krok Spat, modal dostane dovod ------------
+      m3 = r03_marker(model, markers)
+      before = kovh_manual(inst)
+      bad = before + [kovh_cat('id' => '', 'code' => 'SU-KOVH-NIET')]
+      rej = nil
+      kovh2_capture_js do |calls|
+        e::Panel.handle_apply_all(pg(model,
+                                     'cabinet_id' => cid,
+                                     'hardware_manual' => bad,
+                                     'manual_op' => { 'kind' => 'add', 'id' => '' }))
+        rej = calls.find { |c| c.to_s.start_with?('NX.hwManualResult(') }.to_s
+      end
+      ok('KOV-H2: kod mimo katalogu sa ODMIETNE — config ostava nedotknuty',
+         kovh_manual(inst).length == 1 &&
+         kovh_manual(inst).first['id'] == before.first['id'])
+      ok('KOV-H2: modal dostal ODMIETNUTIE aj s dovodom',
+         rej.start_with?('NX.hwManualResult(false,') && rej.include?('katal'))
+      Sketchup.undo
+      ok('KOV-H2: odmietnuty zapis NEUROBIL ziadny krok Spat',
+         !m3.valid? && inst.valid? && kovh_manual(inst).length == 1)
+
+      # --- 5) ZMAZANIE z panela: jeden krok Spat, status menuje polozku -----
+      m4 = r03_marker(model, markers)
+      gone = kovh_manual(inst).first['id'].to_s
+      del = nil
+      kovh2_capture_js do |calls|
+        e::Panel.handle_apply_all(pg(model,
+                                     'cabinet_id' => cid,
+                                     'hardware_manual' => [],
+                                     'manual_op' => { 'kind' => 'delete', 'id' => gone }))
+        del = calls.find { |c| c.to_s.start_with?('NX.hwManualResult(') }.to_s
+      end
+      ok('KOV-H2: zmazanie polozky PANELOM prešlo', kovh_manual(inst).empty?)
+      ok('KOV-H2: status MENUJE, co sa odstranilo (mazanie ide bez potvrdenia)',
+         del.start_with?('NX.hwManualResult(true,') &&
+         (!seeded || del.include?('SU test závesu')))
+      Sketchup.undo
+      ok('KOV-H2: zmazanie je PRESNE jeden krok Spat',
+         m4.valid? && kovh_manual(inst).length == 1)
+
+      # --- 7) ZMENA VYBERU POD MODALOM: nic sa nezapise (Codex #285 P1) -----
+      # Klientsku cast (modal sa zavrie) dokazuje JS sada; TU sa overuje
+      # SERVEROVA polovica toho isteho scenara: apply orazitkovany INOU
+      # skrinkou sa zahodi a modal dostane ODMIETNUTIE — bez neho by ostal
+      # zamknuty a pouzivatel by cakal na odpoved, ktora nikdy nepride.
+      other = e::CabinetBuilder.build(model, kovh_params([]))
+      if other
+        m5 = r03_marker(model, markers)
+        kovh2_select!(model, other)
+        before5 = kovh_manual(inst)
+        stale = nil
+        kovh2_capture_js do |calls|
+          e::Panel.handle_apply_all(pg(model,
+                                       'cabinet_id' => cid, # UZ NEOZNACENA skrinka
+                                       'hardware_manual' => before5 + [kovh_free('id' => '')],
+                                       'manual_op' => { 'kind' => 'add', 'id' => '',
+                                                        'token' => 'su-h2-stale' }))
+          stale = calls.find { |c| c.to_s.start_with?('NX.hwManualResult(') }.to_s
+        end
+        ok('KOV-H2 (P1): apply s cudzou identitou skrinky sa ZAHODIL',
+           kovh_manual(inst).length == before5.length)
+        ok('KOV-H2 (P1): a modal dostal ODMIETNUTIE so SVOJIM tokenom',
+           stale.start_with?('NX.hwManualResult(false,') && stale.include?('su-h2-stale'))
+        Sketchup.undo
+        ok('KOV-H2 (P1): zahodeny apply NEUROBIL ziadny krok Spat',
+           !m5.valid? && inst.valid?)
+        kovh2_select!(model, inst)
+      end
+
+      # --- 8) VYNIMKA PRESTAVBY: klient dostane ULOZENY stav (P2-B) ---------
+      # Klient si `hwManual` prepisuje OPTIMISTICKY uz pred apply. Ked
+      # prestavba padne, ulozena skrinka ostane nezmenena — bez `push_selected`
+      # by si panel drzal ODMIETNUTY zoznam a najblizsia nesuvisiaca zmena
+      # skrinky by ho poslala znova.
+      m6 = r03_marker(model, markers)
+      before6 = kovh_manual(inst)
+      pushed = nil
+      failed = nil
+      kovh2_capture_js do |calls|
+        kovh2_with_failing_rebuild do
+          begin
+            e::Panel.handle_apply_all(pg(model,
+                                         'cabinet_id' => cid,
+                                         'hardware_manual' => before6 + [kovh_free('id' => '')],
+                                         'manual_op' => { 'kind' => 'add', 'id' => '',
+                                                          'token' => 'su-h2-boom' }))
+          rescue StandardError
+            nil # vynimku prepusta `cb` wrapper — tu ju len necháme prejsť
+          end
+        end
+        pushed = calls.find { |c| c.to_s.start_with?('NX.loadSelected(') }.to_s
+        failed = calls.find { |c| c.to_s.start_with?('NX.hwManualResult(') }.to_s
+      end
+      ok('KOV-H2 (P2-B): po vynimke prestavby ostal ULOZENY config nedotknuty',
+         kovh_manual(inst).length == before6.length)
+      ok('KOV-H2 (P2-B): a panel dostal RESYNC (`push_selected`) s ulozenym zoznamom',
+         !pushed.empty? && pushed.include?('hardware_manual'))
+      ok('KOV-H2 (P2-B): resync ide PRED odpovedou modalu',
+         !failed.empty? && failed.start_with?('NX.hwManualResult(false,'))
+      Sketchup.undo
+      ok('KOV-H2 (P2-B): zlyhana prestavba NEUROBILA ziadny krok Spat',
+         !m6.valid? && inst.valid? && kovh_manual(inst).length == before6.length)
+
+      # --- 9) VAROVANIA PRESTAVBY v hlaske vysledku (Codex kolo 2, P2-H) ----
+      # Hlaska vysledku PREPISE status prestavby (klient ju posiela do
+      # `NX.setStatus`), takze musi niest aj jej varovania — inak by
+      # upozornenia z TEJ ISTEJ prestavby zmizli bez stopy. Varovania sa
+      # vyrobia REALNE: prilis plytka skrinka s policou (BuildPlan ich zapise
+      # do configu pri stavbe).
+      warn_inst = e::CabinetBuilder.build(model, kovh_params(
+        [], 'width' => 400.0, 'depth' => 150.0, 'height' => 300.0,
+            'zone_tree' => { 'id' => 'Z1', 'shelves' => 3, 'children' => [] }
+      ))
+      if warn_inst
+        wcid = e::Store.get(warn_inst, 'cabinet_id').to_s
+        wcount = Array((e::Store.config(warn_inst) || {})['warnings']).length
+        kovh2_select!(model, warn_inst)
+        wres = nil
+        kovh2_capture_js do |calls|
+          e::Panel.handle_apply_all(pg(model,
+                                       'cabinet_id' => wcid,
+                                       'hardware_manual' => [kovh_free('id' => '')],
+                                       'manual_op' => { 'kind' => 'add', 'id' => '',
+                                                        'token' => 'su-h2-warn' }))
+          wres = calls.find { |c| c.to_s.start_with?('NX.hwManualResult(') }.to_s
+        end
+        if wcount.positive?
+          ok("KOV-H2 (P2-H): hlaska vysledku nesie VAROVANIA prestavby (#{wcount})",
+             wres.include?('upozorn'))
+        else
+          info('KOV-H2 (P2-H): skrinka nevyrobila ziadne varovanie — scenar preskoceny')
+        end
+        ok('KOV-H2 (P2-H): a stale hlasi, ze polozka pribudla',
+           wres.include?('Položka pridaná'))
+        cleanup(model)
+        inst = e::CabinetBuilder.build(model, kovh_params([kovh_cat('owner_part_key' => owner)]))
+        cid = inst ? e::Store.get(inst, 'cabinet_id').to_s : cid
+        kovh2_select!(model, inst) if inst
+      end
+
+      # --- 6) POVOD nakupneho riadku nad ZIVYM modelom ----------------------
+      exp = kovh_expand(model)
+      src_rows = Array(exp && exp['rows'])
+      adhoc = src_rows.flat_map { |r| Array(r['sources']) }
+                      .select { |s| s['origin'].to_s == 'adhoc' }
+      ok("KOV-H2: nakupny riadok nesie ad-hoc zdroj (#{adhoc.length})", adhoc.length == 1)
+      ok("KOV-H2: a v nom LUDSKY popis vlastnika (#{adhoc.first && adhoc.first['owner_label']})",
+         adhoc.first && adhoc.first['owner_label'].to_s == 'F1 · dvierka')
+      ok('KOV-H2: setove zdroje popis dostali tiez (nil = kovanie celej skrinky)',
+         src_rows.all? { |r| Array(r['sources']).all? { |s| s.key?('owner_label') } })
+      ok('KOV-H2: zber nesie resolved cela per skrinka (zdroj popisu)',
+         (e::Bom.collect(model)[:cabinet_fronts] || {}).key?(cid))
+    rescue StandardError => ex
+      log_line("FAIL: KOV-H2 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    ensure
+      r03_clear_markers(model, markers)
+      kovh_catalog_purge!
+      cleanup(model)
+    end
+  end
+
   # ===== KOV-B1: KLASIFIKACIA SETOV, TAXONOMIA, BRANA SABLON ================
   #
   # Co headless sada NEVIE overit (a preto to je tu):
@@ -13394,6 +13687,7 @@ module NoxunSuRunner
     run_d52b(model)          # D-52b: updater v sekcii „O plugine" — trojstav nad realnym diskom, REALNY swap nad TEMP sandboxom (nikdy nad zivym Plugins), latch, opakovany pokus
     run_kova(model)          # KOV-A1: cela — vyklop/sklop/blenda (plan vs. model 1:1, 19 mm celo), sablona/kopia/dormant s novymi polami, RED nalez smeru bez kroku Spat, dup-ID
     run_kovh1(model)         # KOV-H1: ad-hoc kovanie — polozky prezijú prestavbu (1 krok Spat), kopia ma nove ID, sablona ich nesie, mrtvy vlastnik = ORANGE a polozka ostava v nakupe, CSV bez poloziek BAJTOVO nezmeneny
+    run_kovh2(model)         # KOV-H2: ad-hoc kovanie UI — payload skrinky nesie zivu cenu a ponuku dielcov, hladanie bez kroku Spat, apply s manual_op = 1 krok Spat + signal modalu, odmietnutie 0 krokov, povod nakupneho riadku s ludskym popisom vlastnika
     run_kovb1(model)          # KOV-B1: klasifikacia setov + taxonomia — std 3 v subore aj v .skp, nakup TOTOZNY s legacy setom, sablona z novsej verzie odmietnuta BEZ operacie, zapis vyrobcu bez kroku Spat
     run_kova2b(model)        # KOV-A2b: smer otvarania v modeli — lifecycle overlayu, symbol na spravnom kridle a prednej ploche, prestavba/Spat, dup-ID per instancia, vykon
     run_async(model, nil)

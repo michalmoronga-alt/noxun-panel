@@ -154,6 +154,10 @@ module Noxun
           # V0.4 kovanie: rucny pocet / vypnutie / reset polozky + editor pravidiel
           cb(dlg, 'set_hardware_override') { |p| handle_set_hardware_override(p) }
           cb(dlg, 'set_hardware_set')      { |p| handle_set_hardware_set(p) } # V0.6 D1b: set na skrinke
+          # KOV-H2: hladanie v katalogu kovania pre modal rucnej polozky.
+          # CISTE CITANIE — ziadna operacia, ziadny zapis, ziadny krok Spat;
+          # odpoved chodi kanalom `NX.hwManualSearchResult` s generaciou dotazu.
+          cb(dlg, 'hw_manual_search')      { |p| handle_hw_manual_search(p) }
           # ŠT-3b-1: `open_rules` ZANIKOL spolu s oknom — tlacidlo panela ide
           # deep-linkom `openStudio('rules')` (vzor „Materiály projektu" zo ŠT-2b).
           # ŠT-3a-2: `open_hardware_catalog` ZANIKOL spolu s oknom — tlacidlo

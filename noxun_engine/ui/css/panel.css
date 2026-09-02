@@ -583,6 +583,30 @@
   .hwbox.hov { border-color: var(--nx-select); }
   .hwbox.hov > .hwboxh { background: var(--nx-select-bg-hover); color: var(--nx-select-strong); }
   .hwbox.hov > .hwboxh .ic { color: var(--nx-select-strong); }
+  /* ===== KOV-H2: RUCNE PRIDANE POLOZKY (ad-hoc kovanie mimo setov) =====
+     Blok stoji POD boxmi vlastnikov: su to INE data (`hardware_manual`), takze
+     nepatria do boxu, ktory zoskupuje polozky z pravidiel. Nadpis sa kresli LEN
+     ked polozky su — prazdny nadpis nad tlacidlom by zabral riadok a nepovedal
+     nic (vertikalny priestor panela je vzacny). */
+  .hwman { margin: 6px 0 0; }
+  .hwmanh { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+            color: var(--nx-ink-faint); margin: 8px 0 2px; }
+  .hwman-row .hwman-qty { flex: 0 0 auto; font-size: 11.5px; color: var(--nx-ink-muted);
+                          white-space: nowrap; }
+  /* Chip pri nazve. „ručná" je NEUTRALNY stitok (nie je to chyba), „bez
+     vlastníka" a „chýba v katalógu" su JANTAROVE stavy — semaforove
+     --nx-state-* su rezervovane pre Kontrolu a sem sa miesat nesmu. */
+  .hwchip { font-size: 9.5px; font-weight: 600; line-height: 1.6; padding: 0 5px;
+            border-radius: 9px; white-space: nowrap; color: var(--nx-ink-muted);
+            background: var(--nx-surface-sunken); border: 1px solid var(--nx-border); }
+  .hwchip.warn { color: var(--nx-warnchip-fg); background: var(--nx-warn-bg-soft);
+                 border-color: var(--nx-warnchip-border); }
+  /* Tlacidlo je POSLEDNE v sekcii a na celu sirku — je to vstup do modalu,
+     nie akcia riadku. */
+  .hwmanadd { margin: 6px 0 2px; }
+  .hwmanbtn { display: flex; width: 100%; align-items: center; justify-content: center; gap: 6px;
+              font-size: 12px; }
+  .hwmanbtn .ic { width: 13px; height: 13px; }
   /* PRAVIDLA KOVANIA (dialog) */
   .rrule { border: 1px solid var(--nx-border); border-radius: 6px; padding: 8px 10px; margin: 8px 0; background: var(--nx-surface); }
   .rrule .rhead { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
@@ -1443,8 +1467,9 @@
   /* ŠT-2c (audit #11): v Štúdiu beží ten istý formulár aj VNÚTRI D-15 modalu,
      ktorého scrim je vrstva `--nx-z-scrim`. Vlastné číslo by tu bolo magické
      a pri prvej zmene scrimu by dropdown ticho zapadol POD modal (viditeľný,
-     ale neklikateľný). Preto sa číta premenná definovaná pri `.nxscrim`
-     v `studio.html`; fallback 80 platí v paneli, kde D-15 modal nie je. */
+     ale neklikateľný). Preto sa číta premenná definovaná pri `.nxscrim` —
+     od KOV-H2 je v TOMTO súbore (kostru načítavajú obe okná), takže fallback
+     80 je už len poistka pre prípad, že by sekcia kostry zanikla. */
   #mdSgBox { position: fixed; z-index: var(--nx-z-suggest, 80); background: var(--nx-surface);
              border: 1px solid var(--nx-border-strong); border-radius: 6px;
              box-shadow: 0 4px 14px var(--nx-modal-shadow); max-height: 200px; overflow-y: auto; }
@@ -1665,6 +1690,14 @@
    s tooltipom zo servera, jantarova ako ostatne override znaky. */
 .hwmanual { color: var(--nx-warnchip-fg); display: inline-flex; vertical-align: -2px; }
 .hwmanual .ic { width: 13px; height: 13px; }
+/* KOV-H2: riadok nakupneho zoznamu sa da ROZKLIKNUT — pod nim sa rozvinie
+   POVOD (z ktorych skriniek, setov a rucnych poloziek riadok vznikol). Ziadny
+   novy stlpec: sucet by sa v sirokej tabulke uz nemal kam zmestit. */
+.hwbuyrow { cursor: pointer; }
+.hwbuyrow:hover > td { background: var(--nx-select-bg-hover); }
+.hwbuyrow.on > td { background: var(--nx-select-bg-soft); }
+.hwtab tr.hwsrc > td { font-size: 11.5px; color: var(--nx-ink-muted);
+                       background: var(--nx-surface-sunken); }
 
 /* ===== V0.6 D2: Pridat z Demosu (katalog kovania) ===== */
 .hwdemos-hit { padding: 3px 8px; border: 1px solid var(--nx-border); border-radius: 6px;
@@ -1677,3 +1710,169 @@
 .hwdemos-warn { background: var(--nx-warn-bg); border: 1px solid var(--nx-warnchip-border);
                 color: var(--nx-warn-fg); border-radius: 6px; padding: 4px 8px; margin: 4px 0; font-size: 12px; }
 .hwdemos-rel { color: var(--nx-ink-muted); font-size: 11.5px; margin: 3px 0; }
+
+  /* ===== D-15: ZDIELANA KOSTRA MODALOV — presunute zo `studio.html` (KOV-H2) =====
+     Do KOV-H2 zili tieto pravidla INLINE v `studio.html`, lebo kostru nacitalo
+     jedine Studio. Od KOV-H2 ju nacitava aj Inspector (`panel.html` — modal
+     rucnej polozky kovania), takze definicia patri do ZDIELANEHO suboru: dve
+     kopie tych istych tried su dva modalove svety, ktore sa casom rozidu. */
+  /* ---------- D-15: ZDIEĽANÁ KOSTRA MODALOV (js/nx_modal.js) ----------
+     Schválený vzor kontraktu UI 2.0: mhead (titulok + podtitul + ×) · mbody
+     (polia) · mfoot (Zrušiť + zelené potvrdenie). POZOR na mená: `panel.css`
+     už používa `.nxmodal` pre SCRIM starších modalov, preto sa karta tejto
+     kostry volá `.nxmcard` (mockup ju kreslí ako `.nxmodal`). */
+  /* Z-VRSTVY MODALU (audit ŠT-2c #11). Hodnoty žijú TU, pri definícii scrimu,
+     a von sa dávajú premennou. Dôvod: prekrytie našepkávača (`#mdSgBox`
+     vyššie v tomto súbore) je vzťah DVOCH vrstiev — keby tam sedelo vlastné
+     číslo, prvá zmena scrimu by ho ticho poslala POD modal a dropdown by sa
+     v editore materiálu prestal dať kliknúť. `panel.css` preto číta
+     `var(--nx-z-suggest, 80)`; fallback 80 platí v paneli, kde D-15 modal
+     ani scrim nie sú. */
+  :root { --nx-z-scrim: 150; --nx-z-suggest: 151; }
+  .nxscrim { position: fixed; inset: 0; z-index: var(--nx-z-scrim); background: var(--nx-scrim);
+             display: flex; align-items: flex-start; justify-content: center; padding: 48px 16px; }
+  .nxmcard { background: var(--nx-surface); border: 1px solid var(--nx-border); border-radius: 9px;
+             box-shadow: 0 18px 50px var(--nx-modal-shadow); width: 560px; max-width: 96vw;
+             max-height: calc(100vh - 96px); display: flex; flex-direction: column; }
+  .nxmcard.sm { width: 420px; }
+  /* `wide` = formuláre s opakovateľnými riadkami (D-69 editor materiálu):
+     riadok dosky nesie kód · hrúbku · formát · cenu naraz, na 560 px by sa
+     stĺpce zlomili pod seba a tabuľka by prestala byť čitateľná. */
+  .nxmcard.wide { width: 640px; }
+  .mhead { display: flex; align-items: center; gap: 8px; padding: 11px 14px;
+           border-bottom: 1px solid var(--nx-border); }
+  .mhead h3 { margin: 0; font-size: 13.5px; color: var(--nx-ink-title); }
+  .mhead .msub { font-size: 11px; color: var(--nx-ink-soft); }
+  .mhead .mx { margin-left: auto; border: 0; background: none; color: var(--nx-ink-faint);
+               cursor: pointer; padding: 3px; line-height: 1; }
+  .mhead .mx:hover { color: var(--nx-danger); }
+  .mhead .mx .ic { width: 15px; height: 15px; }
+  .mbody { padding: 10px 14px; overflow: auto; }
+  .mbody .hint { font-size: 11px; color: var(--nx-ink-faint); line-height: 1.45; margin-top: 8px; }
+  /* ŠT-2c: pás „predvyplnené z pamäte". Rozpísané hodnoty prežijú Esc
+     (schválený kontrakt D-15 z PR B2), ale používateľ MUSÍ vidieť, že pozerá
+     na svoj starý koncept — a musí mať cestu von jedným klikom. */
+  .mmemo { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; padding: 5px 8px;
+           font-size: 11px; color: var(--nx-ink-soft); background: var(--nx-surface-sunken);
+           border: 1px solid var(--nx-border-soft); border-radius: 6px; }
+  .mmemo .linkbtn { margin-left: auto; border: 0; background: none; padding: 0; font: inherit;
+                    color: var(--nx-select-accent); text-decoration: underline; cursor: pointer; }
+  .mfoot { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--nx-border);
+           background: var(--nx-bg); border-radius: 0 0 9px 9px; }
+  .mfoot .spacer { flex: 1; }
+  .mfoot .primary { display: inline-flex; align-items: center; gap: 5px; }
+  .mfoot .primary .ic { width: 14px; height: 14px; }
+  /* ST-3c-1: DESTRUKTIVNE potvrdenie (`danger: true`) — ta ista geometria
+     ako `.primary` (inak by tlacidlo v patke vyskocilo z kostry), len
+     cervena rodina podla UI_DIZAJN; farby berie `.danger` z panel.css. */
+  .mfoot .danger { display: inline-flex; align-items: center; gap: 5px; }
+  .mfoot .danger .ic { width: 14px; height: 14px; }
+  .mrow { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  .mrow label { flex: 0 0 118px; font-size: 12px; color: var(--nx-ink-label); }
+  .mrow input, .mrow select { flex: 1; min-width: 0; padding: 5px 7px; font: inherit; font-size: 12.5px;
+                              border: 1px solid var(--nx-border-strong); border-radius: 6px;
+                              background: var(--nx-surface); color: var(--nx-ink); }
+  .mrow input.mshort, .mrow select.mshort { flex: 0 0 96px; }
+  .mrow .munit { font-size: 11px; color: var(--nx-ink-faint); }
+  /* ŠT-2c: typy polí pre dlhšie formuláre (D-69 editor materiálu).
+     `group` = nadpis sekcie — dlhý formulár bez predelov sa číta ako jedna
+     kopa políčok a používateľ v ňom stratí, kde končí identita a začínajú
+     dosky. */
+  .mgroup { display: flex; align-items: baseline; gap: 8px; margin: 14px 0 4px;
+            padding-top: 8px; border-top: 1px solid var(--nx-border-soft); }
+  .mgroup:first-child { margin-top: 2px; padding-top: 0; border-top: 0; }
+  .mgroup h4 { margin: 0; font-size: 12px; letter-spacing: .3px; text-transform: uppercase;
+               color: var(--nx-ink-soft); }
+  .mgroup span { font-size: 11px; color: var(--nx-ink-faint); }
+  .mrow.mcheck input { flex: 0 0 auto; width: 14px; height: 14px; }
+  /* `color` = vzorka + text #RRGGBB (hodnotu musí byť vidno a dať skopírovať) */
+  .mrow .mswatch { flex: 0 0 20px; height: 20px; border-radius: 6px;
+                   border: 1px solid var(--nx-border-strong); background: var(--nx-surface-sunken); }
+  /* `rows` = opakovateľné riadky (dosky, ABS) — tabuľka s + / − */
+  .mrows { margin: 6px 0 10px; }
+  .mrhead { font-size: 12px; color: var(--nx-ink-label); margin-bottom: 4px; }
+  .mrcols, .mrline { display: flex; align-items: center; gap: 6px; }
+  .mrcols { font-size: 10.5px; color: var(--nx-ink-faint); padding: 0 2px 2px; }
+  .mrcols span { flex: 1; min-width: 0; }
+  .mrcols .mrgap { flex: 0 0 26px; }
+  .mrline { margin: 3px 0; }
+  .mrline input, .mrline select { flex: 1; min-width: 0; padding: 4px 6px; font: inherit;
+                                  font-size: 12.5px; border: 1px solid var(--nx-border-strong);
+                                  border-radius: 6px; background: var(--nx-surface); color: var(--nx-ink); }
+  .mrline input[type="checkbox"] { flex: 0 0 14px; width: 14px; height: 14px; }
+  .mrline .mrdel { flex: 0 0 26px; display: inline-flex; align-items: center; justify-content: center;
+                   padding: 3px 0; background: var(--nx-surface-sunken); color: var(--nx-ink-faint);
+                   border: 1px solid var(--nx-border); border-radius: 6px; cursor: pointer; }
+  .mrline .mrdel:hover:not(.off) { color: var(--nx-danger); border-color: var(--nx-danger); }
+  /* D-78: posledný riadok sa odobrať nedá, ale tlačidlo NIE JE mŕtve —
+     ostáva zamerateľné a klik povie dôvod do `.mrnote`. */
+  .mrline .mrdel.off { opacity: .45; }
+  .mrline .mrdel .ic { width: 13px; height: 13px; }
+  /* ŠT-2c 2c-2a (review 2c-1 #8): širka stĺpca musí sedieť v HLAVIČKE aj
+     v bunke — inak nadpis „Cena" visí nad polovicou tabuľky. Triedy sú
+     zdieľané (`colCls` ich dáva obom) a scope je `.mrline`, lebo `.mrow`
+     verzia `.mshort` platí pre ploché polia s inou šírkou. */
+  .mrcols span.mshort, .mrline input.mshort, .mrline select.mshort { flex: 0 0 96px; }
+  .mrcols span.mtiny, .mrline input.mtiny, .mrline select.mtiny { flex: 0 0 62px; }
+  .mrcols span.mcheckcol { flex: 0 0 14px; }
+  /* Zamknutá (identitná) bunka existujúceho variantu: `readonly`, NIE
+     `disabled` — hodnotu musí byť vidno, dať zamerať aj skopírovať. */
+  .mrline input[readonly] { background: var(--nx-surface-sunken); color: var(--nx-ink-soft); }
+  /* Serverové chyby PRI POLIACH (validate-all). Riadok sa zalamuje, aby veta
+     sadla pod pole, ktorého sa týka — modal sa pri odmietnutí nezatvára. */
+  .mrow, .mrline { flex-wrap: wrap; }
+  .merr { flex: 0 0 100%; font-size: 11px; color: var(--nx-danger); padding: 2px 0 0; }
+  .mrow > .merr { margin-left: 126px; }
+  .merr:empty, .merrtop:empty { display: none; }
+  .merrtop { margin: 0 0 8px; padding: 5px 8px; font-size: 11.5px; color: var(--nx-danger);
+             background: var(--nx-danger-bg-soft); border: 1px solid var(--nx-danger-border);
+             border-radius: 6px; }
+  .mrow input.bad, .mrow select.bad, .mrline input.bad, .mrline select.bad {
+    border-color: var(--nx-danger-line); background: var(--nx-danger-bg-soft); }
+  /* Štítok riadku po zotavení z konfliktu — riadok zmenený ZVONKU musí byť
+     vidno, inak by ho používateľ potvrdil bez toho, aby o zmene vedel. */
+  .mrline .mrflag { flex: 0 0 100%; font-size: 10.5px; letter-spacing: .2px;
+                    color: var(--nx-warnchip-fg); background: var(--nx-warn-bg-soft);
+                    border: 1px solid var(--nx-warnchip-border); border-radius: 9px;
+                    padding: 0 7px; margin-bottom: 2px; width: fit-content; }
+  /* 1b-7: KOLIZIA BUNKY — tú istú hodnotu zmenil používateľ AJ katalóg.
+     `_note` len hlási, kolízia PÝTA ROZHODNUTIE a bez neho sa uložiť nedá,
+     preto je to červená rodina (nie jantárová) a pás sedí POD riadkom
+     (`flex: 0 0 100%` v už zalamovanom `.mrline`) — šírky stĺpcov ostávajú
+     nedotknuté a vertikálny priestor rastie len tam, kde treba rozhodnúť. */
+  .mrline .mrconf { flex: 0 0 100%; display: flex; flex-wrap: wrap; align-items: baseline;
+                    gap: 4px 10px; margin: 3px 0 1px; padding: 4px 7px; font-size: 11px;
+                    color: var(--nx-danger); background: var(--nx-danger-bg-soft);
+                    border: 1px solid var(--nx-danger-border); border-radius: 6px; }
+  .mrconf .mrconfmsg { flex: 0 0 100%; color: var(--nx-ink-soft); }
+  .mrconf .mrconfitem { display: inline-flex; align-items: baseline; gap: 6px; }
+  .mrconf .mrconfitem b { color: var(--nx-ink-strong); font-weight: 600; }
+  .mrconf .linkbtn { border: 0; background: none; padding: 0; font: inherit;
+                     color: var(--nx-select-accent); text-decoration: underline; cursor: pointer; }
+  /* Bunka v kolízii má VLASTNU triedu — `bad` patrí serverovým chybám
+     a `clearErrors` ho pri každom novom kole validácie zhasne. */
+  .mrline input.conf, .mrline select.conf {
+    border-color: var(--nx-danger-line); background: var(--nx-danger-bg-soft); }
+  .mrempty { font-size: 11px; color: var(--nx-ink-faint); padding: 4px 2px; }
+  .mrnote:not(:empty) { font-size: 11px; color: var(--nx-warnchip-fg); padding: 3px 2px 0; }
+  .mradd { margin-top: 4px; }
+  .mradd .mrbtn { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }
+  .mradd .mrbtn .ic { width: 13px; height: 13px; }
+  /* KOV-H2: `lookup` = pole hľadania + ponuka výsledkov zo SERVERA. Ponuka aj
+     vysvetlivka sa zalamujú POD riadok (`.mrow` je už `flex-wrap: wrap`), takže
+     šírka poľa ostáva rovnaká ako pri ostatných typoch. Ponuka je v TOKU
+     dokumentu, nie `position: absolute` — karta modalu má vlastný scroll
+     (`.mbody`) a plávajúca vrstva by pri ňom ostala visieť nad cudzím riadkom
+     (tá istá pasca ako `#mdSgBox`, len tu ju netreba riskovať). */
+  .mlkhint:not(:empty) { flex: 0 0 100%; font-size: 11px; color: var(--nx-ink-soft);
+                         padding: 2px 0 0; }
+  .mrow > .mlkhint:not(:empty) { margin-left: 126px; }
+  .mlklist:not(:empty) { flex: 0 0 100%; margin: 4px 0 0; max-height: 190px; overflow-y: auto;
+                         border: 1px solid var(--nx-border-strong); border-radius: 6px;
+                         background: var(--nx-surface); }
+  .mlkitem { display: block; width: 100%; text-align: left; border: 0; background: none;
+             font: inherit; font-size: 12.5px; color: var(--nx-ink); padding: 4px 9px;
+             cursor: pointer; }
+  .mlkitem:hover, .mlkitem.on { background: var(--nx-select-bg-hover); }
+  .mlkempty, .mlkmore { font-size: 11.5px; color: var(--nx-ink-faint); padding: 4px 9px; }
+  .mlkmore { border-top: 1px solid var(--nx-border-soft); }

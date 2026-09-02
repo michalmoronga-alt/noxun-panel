@@ -468,13 +468,35 @@ module Noxun
             else
               cfg = Store.config(cab) || {}
               items = hardware_items_payload(cfg)
-              { 'cabinet_id' => Store.get(cab, 'cabinet_id'),
+              cid = Store.get(cab, 'cabinet_id')
+              { 'cabinet_id' => cid,
                 'options' => hardware_set_options(cfg, items),
-                'items' => items.map { |h| hardware_purchase_row(h) }.compact }
+                'items' => items.map { |h| hardware_purchase_row(h) }.compact,
+                # KOV-H2 (Codex #285 P2-D): ad-hoc riadky sa oceňujú ZIVYM
+                # katalogom, takze uprava ci zmazanie polozky v subezne
+                # otvorenom Studiu ich musi obnovit TYM ISTYM lahkym pushom.
+                # Bez toho by v Inspectorovi svietila stara cena (alebo by
+                # chybal chip „chýba v katalógu") az do zmeny vyberu.
+                # Plan sa stavia LEN ked skrinka ad-hoc polozky naozaj ma —
+                # tento push chodi po KAZDEJ zmene katalogu.
+                'manual_view' => manual_view_for_refresh(cfg, cid) }
             end
           js("NX.setHardwareSets(#{data.to_json})")
         rescue StandardError => e
           Engine.log_error(e, 'Panel.push_hardware_sets')
+        end
+
+        # KOV-H2: ad-hoc riadky pre ZIVY refresh. Prazdny zoznam = skrinka
+        # ziadne ad-hoc polozky nema, takze sa `plan_parts_by_key` (cely
+        # `build_plan`) vobec nevola.
+        def manual_view_for_refresh(cfg, cab_id)
+          items = cfg['hardware_manual']
+          return [] unless items.is_a?(Array) && !items.empty?
+
+          hardware_manual_view(cfg, manual_plan_keys(CabinetBuilder.config_to_params(cfg)), cab_id)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.manual_view_for_refresh')
+          []
         end
 
         # D-92: minimalny tvar pre zivy refresh — identita riadku + to, co sa
@@ -505,9 +527,20 @@ module Noxun
         # Status doplneny o pocet BuildPlan upozorneni z posledneho planu korpusu.
         # Nefatalne stavy (orezane vystuhy, preskocene police...) tak uz nie su neviditelne.
         def status_with_warnings(cab, msg)
+          set_status("#{msg}#{warn_suffix(cab)}")
+        end
+
+        # KOV-H2 (Codex #285 kolo 2, P2-H): pripona „· N upozorneni" je JEDNA
+        # funkcia, lebo ju potrebuje aj hlaska vysledku rucnej operacie —
+        # tá totiz status prestavby PREPISE. Bez zdielanej pripony by
+        # varovania z TEJ ISTEJ prestavby pouzivatel nikdy neuvidel (alebo by
+        # sa text skladal na dvoch miestach a casom sa rozisiel).
+        # -> '' | ' · 2 upozornenia'
+        def warn_suffix(cab)
           warns = cab && cab.valid? ? ((Store.config(cab) || {})['warnings'] || []) : []
-          msg = "#{msg} · #{warns.size} #{warn_word(warns.size)}" unless warns.empty?
-          set_status(msg)
+          return '' if warns.empty?
+
+          " · #{warns.size} #{warn_word(warns.size)}"
         end
 
         def warn_word(n)

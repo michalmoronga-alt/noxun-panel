@@ -425,8 +425,15 @@ const M = require(path.join(JS, 'proj_materials.js'));
   const html = fs.readFileSync(path.join(JS, '..', 'studio.html'), 'utf8');
   ok(css.indexOf('#mdSgBox { position: fixed; z-index: var(--nx-z-suggest, 80)') > -1,
      'audit ŠT-2c #11: `panel.css` nema vlastne cislo vrstvy — cita premennu');
-  const scrim = html.match(/--nx-z-scrim:\s*(\d+);\s*--nx-z-suggest:\s*(\d+);/);
+  // KOV-H2: kostru nacitavaju UZ OBE okna, takze jej CSS (a s nim aj definicia
+  // vrstiev) sa presunulo zo `studio.html` do zdielaneho `panel.css`. Pravidlo
+  // sa nezmenilo — obe cisla musia zit na JEDNOM mieste, pri `.nxscrim`.
+  const scrim = css.match(/--nx-z-scrim:\s*(\d+);\s*--nx-z-suggest:\s*(\d+);/);
   ok(scrim, 'obe vrstvy su definovane na JEDNOM mieste — pri `.nxscrim`');
+  ok(html.indexOf('--nx-z-scrim:') === -1,
+     'a `studio.html` uz vlastnu kopiu definicie NEMA (dva modalove svety)');
+  ok(html.indexOf('.nxmcard {') === -1,
+     'ani vlastnu kopiu karty kostry — pravidla ziju v zdielanom `panel.css`');
   ok(Number(scrim[2]) > Number(scrim[1]),
      'a nasepkavac je NAD scrimom (inak by bol v modali viditelny, ale neklikatelny)');
 })();

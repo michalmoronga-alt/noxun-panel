@@ -30,6 +30,16 @@
   // prazdnom. NIC sa tu nevyraba ani nedefaultuje: `null` = payload kluc nemal
   // (alebo nie je nic oznacene) a vtedy sa kluc NEPOSIELA (vzor A1 pass-through).
   var hwManual = null;
+  // KOV-H2: dva payloady LEN NA CITANIE (server ich sklada v `cabinet_payload`).
+  //   `hwManualView`   — riadky tak, ako sa kreslia: popis vlastnika, ZIVA cena
+  //                      z katalogu, priznaky „bez vlastnika" / „chyba v katalogu",
+  //   `hwManualOwners` — ponuka „Patrí k" v modali (cela skrinka + dielce planu).
+  // NIKDY sa neposielaju spat (`collectAll` ich nepozna) — inak by sa cena
+  // z obrazovky mohla dostat do configu. Prazdne pole = „niet co kreslit";
+  // pass-through `hwManual` vyssie ostava jedinym miestom, kde `null` nieco
+  // ZNAMENA (a preto tam `|| []` je zakazane).
+  var hwManualView = [];
+  var hwManualOwners = [];
   var PALETTE = ['#46beff','#6eff96','#ffaf50','#dc78ff','#ffeb5a'];
   // V0.3 materialy + ABS
   var MATERIALS = { sheets: [], edges: [] }; // katalog z backendu

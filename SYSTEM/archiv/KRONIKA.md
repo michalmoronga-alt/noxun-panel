@@ -17,6 +17,60 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-H2 · AD-HOC KOVANIE — INSPECTOR UI (v0.9.20, 3.9.2026):** druhý rez slice H. Dátovú vrstvu dala H1 (položka mimo setov v `config['hardware_manual'][]`), ale **nebolo
+  ju ako pridať** — jediná cesta bola ručne editovaný config. H2 jej dáva obrazovku: blok **„Ručne pridané"** v kontexte Kovanie, D-15 modal a **rozklik pôvodu** v sekcii Nákup
+  Štúdia. **Dátový kontrakt H1 sa nezmenil ani o kľúč** — žiadny nový zápisový kanál, žiadna zmena `norm_hardware_manual`, CSV ani cien.
+  **Prvé rozhodnutie bolo, kde má modal žiť.** Kostru D-15 (`nx_modal.js`) načítavalo dovtedy len Štúdio a jej CSS ležalo **inline v `studio.html`**. Druhá kópia tried pre
+  Inspector by znamenala **dva modalové svety v jednom plugine** — iný Escape, iný fokus, iný scrim, a časom iné šírky. Pravidlá sa preto presunuli 1:1 do zdieľaného
+  `ui/css/panel.css` (obe okná ho načítavajú) spolu s definíciou z-vrstiev; `panel.html` dostal `#nxModalRoot` **mimo prekresľovaných sektorov** a `nx_modal.js` **za**
+  `nx_esc.js`, **pred** `core.js`/`hardware.js`. Tri guardy sa prepli na `panel.css` a navyše strážia, že `studio.html` kópiu **nemá**.
+  **Katalóg kovania má tisíce riadkov, takže `select` nestačil.** Kostra dostala **generický typ poľa `lookup`** — našepkávač nad hľadaním, ktoré drží server. Tri veci sú v ňom
+  kontrakt a preto žijú v kostre, nie u volajúceho: `values()` vracia **LEN kód** (nikdy názov ani cenu z obrazovky — H1 FIX 12, inak by sa do zákazky dostala cena, ktorá už
+  neplatí, a to potichu) · **písanie po výbere výber zahadzuje** (inak by odišiel starý kód pod novým textom) · **staršia odpoveď sa ignoruje** (odpovede chodia asynchrónne).
+  Ponuka je vlastná vrstva: Escape zatvára **ju**, Enter vyberie zvýraznenú položku a formulár **nikdy** neodošle. Typ je generický — B2/B3 ho použijú pre kód člena setu.
+  **Panel nepočíta nič.** Payload skrinky dostal dva kľúče **len na čítanie**: `hardware_manual_view[]` (živý názov a cena z katalógu — cena katalógovej položky sa v configu
+  NEUKLADÁ, takže panel ju nemá odkiaľ vziať; popis vlastníka, `owner_missing` z **jedinej existujúcej** čistej `Bom.manual_items_for`, `catalog_missing`) a
+  `hardware_manual_owners[]` (celá skrinka + čelá a zónové dielce aktuálneho plánu). Korpusové dielce sa **neponúkajú** vedome — „uholník patrí k ľavému boku" nie je informácia,
+  s ktorou by výroba alebo nákup vedeli niečo robiť; surový kľúč sa neponúka nikdy. `collectAll` o oboch kľúčoch **nevie**, takže sa nikdy nevracajú serveru.
+  **Zápis ide existujúcou cestou a je JEDEN krok Späť.** JS zostaví nový zoznam z `hwManual` (add = záznam s **prázdnym `id`**, prideľuje ho server) a pošle ho cez
+  `collectAll()` → `apply_all`. Čakajúci debounce sa **ruší, nie flushuje** — rozpísaný edit ide v TOM ISTOM payloade; samostatný flush by znamenal dva rebuildy a dva kroky Späť
+  pre jednu zmenu. Payload nesie `manual_op {kind, id}` a server naň odpovedá `NX.hwManualResult(ok, msg, op)` v **každej** vetve, aj v tých, ktoré zápis ticho zahadzujú
+  (cudzí dokument, zrušený výber, nesediace echo, výnimka prestavby): zámok odosielania odomyká **výhradne volajúci**, takže vetva bez odpovede by nechala modal zamknutý navždy.
+  Pri odmietnutí ide signál **až po `push_selected`** — modal ostáva otvorený s hodnotami, ale `hwManual` už drží uložený zoznam (neúspešná zmena sa nesmie držať).
+  **Mazanie ide bez potvrdzovacieho okna** — poistkou je jeden krok Späť (vzor „Vrátiť na pravidlo"); potvrdenie pri každom mazaní by bolo klik navyše pri každej oprave. Status
+  **menuje**, čo sa odstránilo. **Vedomé odchýlky od mockupu:** cena katalógovej položky sa needituje ani neposiela (mockup mal „Cena s DPH (snapshot)" — je to len informácia
+  z katalógu, H1 BLOCKER 2) a MJ sú **zrkadlom** serverovej `HardwareCatalog::UNITS` v JS namiesto štvrtého payload kľúča (guard stráži, že sa nerozídu).
+  **Nákup konečne povie, ODKIAĽ kus je.** Nákupný riadok je súčet — ten istý kód môže prísť zo setu jednej skrinky aj z ručnej položky inej, a z tabuľky to nebolo vidieť
+  vôbec. Riadok s ručným podielom nesie chip **„ručná"**, klik naň rozbalí **Pôvod** („CAB-2 · F1 · dvierka ľavé · ručná ×2" vs. „CAB-2 · set zaves-klasik ×4"). Žiadny nový
+  stĺpec (horizontálny priestor) a stav rozkliku **neprežíva push** — čerstvý payload môže riadky preusporiadať a otvorený index by ukázal pôvod cudzieho riadku. Popis skladá
+  server: `ProductionCore.decorate_source_owners` nad novým aditívnym kľúčom zberu `cabinet_fronts` (resolved čelá per skrinka — bez nich by z generovaného id čela nebolo
+  poznať, o ktoré ide). **Nákupný CSV, rozpočet ani ponuka pole nečítajú, takže výstup zákazky sa nemení ani o znak.**
+  **In-SketchUp beh našiel P1, ktorý headless nevidel.** `manual_ok_msg(op, removed)` sa volá aj pri **bežnom** apply z formulára, keď `op` je `nil` — a Ruby vyhodnocuje
+  argumenty **eagerne**, takže skorý návrat `push_manual_result` sa k slovu nedostal a spadol **každý** apply bez `manual_op`. Headless sady handler nespúšťajú (potrebuje živý
+  model), JS sady serverovú stranu nevidia — chytila to až sekcia `run_kovh2` pri prvom behu. Oprava je nil-guard + regresný assert; je to učebnicová ukážka, prečo je in-SU beh
+  pri zásahoch do zápisovej cesty povinný.
+  **Testy:** `tests/js/test_kovh2_adhoc_ui.js` (152 kontrol, mini-DOM nad skutočnou kostrou; 6/6 mutácií zhodilo assert) · `tests/pure/test_kovh2_payload.rb` (4/4 mutácie) ·
+  in-SU sekcia `run_kovh2` (35 scenárov po dvoch review kolách; celý beh **1482 PASS / 0 FAIL**) · headless spolu **2644**, JS **82 sád**.
+  **CODEX REVIEW (#285, kolo 1): 1×P1 + 5×P2, všetky reálne — a všetky o tom, čo sa deje MEDZI dvoma stavmi.** *(P1)* **Modal prežil zmenu výberu**: držal rozpísaný zoznam
+  jednej skrinky, kým `loadSelected` pod ním vymenil dáta aj `selectedCabId` — odoslanie by položku pripísalo NESPRÁVNEJ skrinke (a pri zhode `id` prepísalo cudzí záznam).
+  Zatvára sa výhradne pri zmene IDENTITY; echo tej istej skrinky, na ktoré modal práve čaká, ho zavrieť nesmie. *(P2-A)* **Odpoveď sa korelovala podľa `kind`** — lenže všetky
+  `add` majú prázdne `id`, takže pomalá prestavba priradila odpoveď na A modalu B. Každé odoslanie má odteraz vlastný **token**, ktorý server len vracia v echu (uzavretý tvar:
+  String/Integer, orezaná dĺžka — payload je verejný kanál). *(P2-B)* **Po výnimke prestavby chýbal resync**: klient si `hwManual` prepisuje optimisticky, takže by si držal
+  odmietnutý zoznam a najbližšia nesúvisiaca zmena skrinky by ho poslala znova (duplicitné pridanie, alebo dodatočne uplatnené „neúspešné" mazanie). *(P2-C)* **Dve zóny dali
+  dve „Polica 1"** — v ponuke „Patrí k" dve identické voľby; rozlíšenie zónou sa dopĺňa len tam, kde je popis dvojznačný, a len v tejto ponuke (`PartKeys.human_label` má iných
+  čitateľov). *(P2-D)* **Ad-hoc riadky sa neobnovili po zmene katalógu** — a to pri riadkoch, ktorých jediný zmysel je ukazovať živú cenu; ľahký push `NX.setHardwareSets` teraz
+  nesie aj `manual_view`. *(P2-E)* **Rozpísaný dotaz sa strácal** (a pri úprave pole vyzeralo vybraté nad prázdnym kódom) — pamäť kostry si drží aj text dotazu pod kľúčom, ktorý
+  sa do `values()` nikdy nedostane. Kolo neprinieslo žiadnu zmenu dátového kontraktu; každý nález má vlastný commit a vlastný test, ktorý bez opravy padá (8/8 mutácií).
+  **KOLO 2: 4×P2, tentoraz o STAVE, KTORÝ PREŽIL SVOJU OBRAZOVKU.** *(P2-F)* Prepnutie „Z katalógu ↔ Voľná položka" prekresľuje modal a draft sa skladal z uloženej položky
+  + práve vykreslených polí — cesta *voľná → katalóg → voľná* teda zahodila napísaný názov, cenu aj nevybraný dotaz; draft odvtedy žije v stave modalu a prežíva prekreslenie
+  (hodnoty neaktívneho zdroja sú výhradne pre obrazovku, do configu sa nedostanú). *(P2-G)* Po Escape, scrime, krížiku či „Zrušiť" ostal `HW_MAN` visieť, takže najbližšia zmena
+  výberu hlásila „okno sa zavrelo, nič sa neuložilo" — hoci ho používateľ zavrel sám; kostra D-15 dostala do kontraktu **`onClose`** (volá sa až po skutočnom zatvorení, takže
+  volajúci z neho smie bez rizika rekurzie otvárať nové okno) a je to diera, ktorú mal **každý** volajúci držiaci si vlastný stav. *(P2-H)* Hláška výsledku prepisovala status
+  prestavby, takže **varovania z tej istej prestavby** používateľ nikdy neuvidel — prípona „· N upozornení" je odteraz jedna zdieľaná funkcia. *(P2-I)* Katalóg vracia neaktívnu
+  položku pri **presnej zhode kódu** (vedomý kontrakt); v našepkávači to znamenalo, že kto pozná starý kód, pridá si do zákazky už neobjednávanú položku — filter pribudol
+  **len do našepkávača** (a `total` sa o zahodené znižuje), zápisová cesta ostáva nedotknutá, aby legacy položka prežila prestavbu. Kolo 2 bolo len P2, takže tretie GH kolo sa
+  nevyžiadalo; 6/6 mutácií zhodilo assert.
+
 - **KOV-B1 · KATALÓG A SETY — KLASIFIKÁCIA, TAXONÓMIA, STD 3 (v0.9.19, 3.9.2026):** prvý rez slice B (B1/B2/B3 podľa Codex auditu #17). Set kovania bol dovtedy len
   „mapovanie generického typu na kódy" — nevedelo sa z neho, **na čo** je: či je to záves na dvierka alebo na výklop, či je klasický alebo TipOn, od koho je a z akej rady.
   Bez toho sa nedá postaviť strom katalógu (B2), editor setu (B3) ani resolver, ktorý set vyberie sám (D). B1 prináša **celý dátový kontrakt bez štipky UI**, takže navonok

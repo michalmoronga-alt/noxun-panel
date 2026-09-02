@@ -122,7 +122,9 @@
       for (i = 0; i < FOREIGN_MODAL_IDS.length; i++){
         if (visible(FOREIGN_MODAL_IDS[i])) return FOREIGN_MODAL_IDS[i];
       }
-      // Kostra D-15. V Inspectorovi `NXModal` vobec nie je nacitany, preto obozretne.
+      // Kostra D-15. Od KOV-H2 ju nacitavaju OBE okna (modal rucnej polozky
+      // kovania v Inspectorovi), test na `typeof` ostava ako poistka pre
+      // pripad, ze by ju niektore okno prestalo nacitavat.
       if (global.NXModal && typeof global.NXModal.isOpen === 'function' &&
           global.NXModal.isOpen() === true) return 'NXModal';
       // Trieda (b): kym je otvoreny NAS modal, je nad flyoutmi — Escape patri jemu.

@@ -448,6 +448,49 @@
          + '<svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg></span>';
   }
 
+  // ---- KOV-H2: PÔVOD nákupného riadku (chip „ručná" + rozklik) -------------
+  // Riadok nákupu je SÚČET: ten istý kód môže prísť zo setu jednej skrinky aj
+  // z ručne pridanej položky inej. Doteraz to z tabuľky nebolo vidieť vôbec —
+  // teraz nesie riadok chip „ručná" (aspoň časť kusov je ručná) a KLIK naň
+  // rozbalí zoznam zdrojov. Žiadny nový stĺpec (horizontálny priestor).
+  //
+  // Stav rozkliku ZÁMERNE neprežíva push: čerstvý payload môže riadky
+  // preusporiadať a otvorený index by ukázal pôvod CUDZIEHO riadku.
+  var buyOpen = {};
+
+  // Aspoň časť kusov riadku pochádza z ručne pridanej položky. Voľná položka
+  // je ručná VŽDY (vlastný riadok bez kódu). Čistá funkcia (Node testy).
+  function hwRowManual(r){
+    if (!r) return false;
+    if (r.free === true) return true;
+    var n = Number(r.adhoc_quantity);
+    return isFinite(n) && n > 0;
+  }
+  // Jeden zdroj do vety: „CAB-2 · F1 · dvierka ľavé · ručná ×2".
+  // `owner_label` skladá SERVER (`PartKeys.human_label`) — JS z part_key nič
+  // neodvodzuje; prázdny popis = kovanie patrí celej skrinke.
+  function hwSourceText(s){
+    var d = s || {};
+    var parts = [];
+    if (d.cabinet_id) parts.push(String(d.cabinet_id));
+    if (d.owner_label) parts.push(String(d.owner_label));
+    if (String(d.origin || '') === 'adhoc') parts.push('ručná');
+    else if (d.set_id) parts.push('set ' + d.set_id);
+    else if (d.generic_type) parts.push(String(d.generic_type));
+    var q = Number(d.quantity);
+    var txt = parts.length ? parts.join(' · ') : '—';
+    return txt + ((isFinite(q) && q > 0) ? ' ×' + q : '');
+  }
+  function hwSourcesHtml(r){
+    var list = (r && r.sources) || [];
+    if (!list.length){
+      return '<tr class="hwsrc"><td colspan="6">Pôvod sa nedá zistiť — riadok neniesol zdroje.</td></tr>';
+    }
+    return '<tr class="hwsrc"><td colspan="6"><b>Pôvod:</b> '
+         + list.map(function(s){ return esc(hwSourceText(s)); }).join(' &nbsp;·&nbsp; ')
+         + '</td></tr>';
+  }
+
   // Telo sekcie: NÁKUPNÝ ZOZNAM zo setov (hore) + generika podľa pravidiel
   // (dole, klik-select cez .hwgen ostáva). Vracia HTML — sekcie Štúdia si
   // telo skladajú do reťazca (na rozdiel od okna Výroba, ktoré písalo priamo
@@ -466,14 +509,23 @@
       } else {
         h += '<table class="bomtab hwtab"><thead><tr><th>Kód</th><th>Názov</th><th>ks</th><th>MJ</th><th>€ s DPH</th><th>Spolu</th></tr></thead><tbody>';
         var cat = null;
-        rows.forEach(function(r){
+        rows.forEach(function(r, i){
           var c = r.missing ? 'MIMO KATALÓGU' : (r.category || '—');
           if (c !== cat){ cat = c; h += '<tr class="hwcat"><td colspan="6">' + esc(c) + '</td></tr>'; }
-          h += '<tr' + (r.missing ? ' class="hwmiss"' : '') + '><td>' + esc(r.code) + '</td>'
-             + '<td>' + esc(r.missing ? 'nie je v katalógu kovania' : (r.name_sk || '')) + '</td>'
+          // KOV-H2: chip „ručná" + rozklik pôvodu. Voľná položka kód NEMÁ —
+          // v stĺpci Kód je pomlčka, nie prázdno (prázdna bunka vyzerá ako chyba).
+          var man = hwRowManual(r);
+          var open = buyOpen[i] === true;
+          var cls = 'hwbuyrow' + (r.missing ? ' hwmiss' : '') + (open ? ' on' : '');
+          h += '<tr class="' + cls + '" data-buy="' + i + '"'
+             + ' title="Klik ukáže pôvod — z ktorých skriniek, setov a ručných položiek riadok vznikol">'
+             + '<td>' + esc(r.code || '—') + '</td>'
+             + '<td>' + esc(r.missing ? 'nie je v katalógu kovania' : (r.name_sk || ''))
+             + (man ? ' <span class="hwchip">ručná</span>' : '') + '</td>'
              + '<td><b>' + num(r.quantity) + '</b>' + hwManualMark(r.manual_note) + '</td>'
              + '<td>' + esc(r.unit || '—') + '</td>'
              + '<td>' + price(r.price_eur_vat) + '</td><td>' + price(r.subtotal_eur_vat) + '</td></tr>';
+          if (open) h += hwSourcesHtml(r);
         });
         var sum = hs.summary || {};
         h += '<tr class="hwsum"><td colspan="5">SPOLU — len známe ceny'
@@ -721,6 +773,10 @@
   var NXAPI = {
     setStudio: function(data){
       ST = data || null;
+      // KOV-H2: rozklikaný pôvod patrí riadkom, ktoré používateľ videl —
+      // čerstvý payload ich môže preusporiadať, takže otvorený index by ukázal
+      // pôvod CUDZIEHO riadku.
+      buyOpen = {};
       // PLNY payload = cerstve cisla zo servera, takze „neaktuálne" padá —
       // a to PRED renderom, inak by lišta este raz nakreslila jantar.
       // Zhadzuje ho VYHRADNE tento push: echa nizsie (lista VEPO, prepinace,
@@ -1650,6 +1706,15 @@
       if (t.closest('#vepoBtn')){ vepoExport(); return; }
       if (t.closest('#hwCsvBtn')){ hwCsvExport(); return; }
       if (t.closest('#refreshBtn')){ requestRefresh(); return; }
+      // KOV-H2: klik na riadok nákupu rozbalí/zbalí jeho PÔVOD (zoznam zdrojov).
+      // Žiadny zápis, žiadny server — je to čisté zobrazenie toho, čo už payload
+      // nesie. Ide PRED riadkom generiky: obe sú `<tr>` v tej istej sekcii.
+      var buyr = t.closest('tr.hwbuyrow');
+      if (buyr){
+        var bi = parseInt(buyr.getAttribute('data-buy'), 10);
+        if (!isNaN(bi)){ buyOpen[bi] = !buyOpen[bi]; renderBody(); }
+        return;
+      }
       // ŠT-1c PR A: riadok generiky kovania — klik označí vlastníka v modeli.
       var hwr = t.closest('tr.hwgen');
       if (hwr){
@@ -1766,6 +1831,9 @@
       // ŠT-1c PR A sekcia Nákup kovania (Š7) + D-93 znamienko ručného zásahu
       // (sada tests/js/test_d93_nl_override.js sa sem presunula z production.js)
       buySection: buySection, price: price, hwManualMark: hwManualMark,
+      // KOV-H2: chip „ručná" + rozklik pôvodu (tests/js/test_kovh2_adhoc_ui.js)
+      hwRowManual: hwRowManual, hwSourceText: hwSourceText, hwSourcesHtml: hwSourcesHtml,
+      setBuyOpen: function(m){ buyOpen = m || {}; },
       // Š10 prepinace (sady D-104 / D-105 / K2 / ABS rail 3-stav)
       edgeCheckBarHtml: edgeCheckBarHtml, edgeCheckText: edgeCheckText,
       edgePluralSk: edgePluralSk, edgeCheckPayload: edgeCheckPayload,

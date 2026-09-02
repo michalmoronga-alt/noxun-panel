@@ -467,6 +467,23 @@
       if ((d.cabinet_id || '') !== (selectedCabId || '')) return;
       if (typeof refreshHardwareSets === 'function') refreshHardwareSets(d.options || []);
       if (typeof refreshHardwarePurchase === 'function') refreshHardwarePurchase(d.items || []);
+      // KOV-H2 (Codex #285 P2-D): ad-hoc riadky sú ocenené ŽIVÝM katalógom,
+      // takže ich musí obnoviť ten istý ľahký push. Kľúč chýba pri starom
+      // payloade aj vtedy, keď skrinka žiadne ručné položky nemá — vtedy sa
+      // neprekresľuje nič (zoznam je aj tak prázdny).
+      if (Array.isArray(d.manual_view) && typeof refreshHardwareManual === 'function'){
+        refreshHardwareManual(d.manual_view);
+      }
+    },
+    // KOV-H2: výsledok hľadania v katalógu pre modal ručnej položky. Odpoveď
+    // nesie generáciu dotazu — staršie kolo sa zahadzuje v `hardware.js`.
+    hwManualSearchResult: function(res){
+      if (typeof hwManualSearchResult === 'function') hwManualSearchResult(res);
+    },
+    // KOV-H2: výsledok ZÁPISU ručnej položky. Modal D-15 sa pri odoslaní zamkne
+    // a odomyká ho VÝHRADNE volajúci — preto server odpovedá v každej vetve.
+    hwManualResult: function(ok, msg, op){
+      if (typeof onHwManualResult === 'function') onHwManualResult(ok, msg, op);
     },
     loadSelected: function(c){
       // R-02 (review #264 kolo 3): IDENTITA DOKUMENTU JE PRVA VEC V PUSHI.
@@ -478,6 +495,12 @@
       // v B a odoslal ich s guidom B — server ich prijal do NESPRAVNEJ zakazky.
       // `setUiMode` volanie nizsie ostava ako poistka (echo = early return).
       var sameDoc = (String(c.model_guid || '') === nxDocGuid());
+      // KOV-H2 (Codex #285 P1): modal ručnej položky patrí JEDNEJ skrinke.
+      // Zatvára sa pri zmene IDENTITY — inej skrinke alebo inom dokumente;
+      // ECHO tej istej skrinky (náš vlastný apply, na ktorý modal čaká) ho
+      // zavrieť NESMIE. Ide to PRED inštaláciou nového stavu, aby sa starý
+      // formulár nemal ako odoslať proti novým dátam.
+      if (typeof hwManualDropIfForeign === 'function') hwManualDropIfForeign(c.cabinet_id, sameDoc);
       if (typeof nxSetModelGuid === 'function') nxSetModelGuid(c.model_guid);
       // V0.4.7c: odchod z kontextu dosky — zrus cakajuce board edity + kartu
       cancelBoardEdits();
@@ -492,6 +515,12 @@
       // spat (`collectAll`). ZIADNY default: payload bez kluca = null = kluc sa
       // neposiela a `apply_all` si necha to, co je v configu.
       hwManual = Array.isArray(c.hardware_manual) ? c.hardware_manual : null;
+      // KOV-H2: dve ZOBRAZOVACIE projekcie tych istych poloziek. Tu `|| []`
+      // NIE JE zakazane — nejde o pass-through, ale o „co sa ma nakreslit":
+      // stary payload bez klucov = kreslit netreba nic (a `hwManual` vyssie
+      // ostava nedotknuty, takze sa polozky NEZMAZU).
+      hwManualView = Array.isArray(c.hardware_manual_view) ? c.hardware_manual_view : [];
+      hwManualOwners = Array.isArray(c.hardware_manual_owners) ? c.hardware_manual_owners : [];
       // D-23 (audit F5/4): frontItems PRED renderFronts — placeholder ≈ vysky
       // paruje s CERSTVYM payloadom (povodne poradie by parovalo so starou skrinkou).
       frontItems = c.front_items || [];
@@ -579,7 +608,12 @@
       if (typeof absModalCloseSilent === 'function') absModalCloseSilent();
       setSelected(null);
       activeZoneId = null; frontItems = null; frontSlots = null; hwItems = null;
+      // KOV-H2 (Codex #285 P1): odchod z korpusu (doska alebo prazdny vyber) je
+      // ZMENA IDENTITY — otvoreny modal by odoslal zoznam skrinky, ktora uz nie
+      // je oznacena.
+      if (typeof hwManualDropModal === 'function') hwManualDropModal(HW_MAN_DROP_SK);
       hwManual = null; // KOV-H1: bez oznacenej skrinky niet ad-hoc poloziek (kluc sa neposiela)
+      hwManualView = []; hwManualOwners = []; // KOV-H2: niet co kreslit ani ponukat
       closeFrontCard(); // KOV-A2a: odchod z korpusu = karta cela zaniká
       invalidateFrontPlaceholders(); // D-23: bez resolved dat ziadne ≈ odhady
       buildFrontHwBadges([]);
@@ -606,7 +640,12 @@
       // vnutri setUiMode) nesmie bezat nad zvyskami stareho vyberu.
       setSelected(null);
       activeZoneId = null; frontItems = null; frontSlots = null; hwItems = null;
+      // KOV-H2 (Codex #285 P1): odchod z korpusu (doska alebo prazdny vyber) je
+      // ZMENA IDENTITY — otvoreny modal by odoslal zoznam skrinky, ktora uz nie
+      // je oznacena.
+      if (typeof hwManualDropModal === 'function') hwManualDropModal(HW_MAN_DROP_SK);
       hwManual = null; // KOV-H1: bez oznacenej skrinky niet ad-hoc poloziek (kluc sa neposiela)
+      hwManualView = []; hwManualOwners = []; // KOV-H2: niet co kreslit ani ponukat
       closeFrontCard(); // KOV-A2a: odchod z korpusu = karta cela zaniká
       buildFrontHwBadges([]); // Codex PR #30: badge patria oznacenej skrinke — bez nej ziadne
       setCabInfo(null);       // UI-B3: bez skrinky niet dielcov ani plochy

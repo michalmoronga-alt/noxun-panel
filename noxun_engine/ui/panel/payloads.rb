@@ -81,7 +81,141 @@ module Noxun
           # V0.6 D1b: vyber setu per typ NA SKRINKE (override projektovej
           # predvolby) — ponuka + efektivny stav; server je autorita.
           params['hardware_set_options'] = hardware_set_options(cfg, params['hardware'])
+          # KOV-H2: ad-hoc polozky pre UI. `hardware_manual` v `params` uz je —
+          # to je SUROVE echo, ktore panel posiela SPAT (pass-through KOV-H1).
+          # Tieto dva kluce su NAVIAC a VYHRADNE NA CITANIE: popisky vlastnika,
+          # ZIVE ceny katalogu a ponuka dielcov, na ktore sa da polozka pripnut.
+          # Panel ich NIKDY neposiela spat (`collectAll` ich nepozna) — inak by
+          # sa cena z obrazovky mohla dostat do configu (audit #15 BLOCKER 2).
+          #
+          # Plan sa stavia RAZ pre oba kluce (`plan_parts_by_key` je cely
+          # `build_plan`) — dva samostatne volania by ho postavili dvakrat.
+          plan = manual_plan_keys(params)
+          params['hardware_manual_view'] = hardware_manual_view(cfg, plan, params['cabinet_id'])
+          params['hardware_manual_owners'] = hardware_manual_owners(cfg, plan)
           params
+        end
+
+        # --- KOV-H2: ad-hoc polozky pre UI Inspectora ------------------------
+        #
+        # `celá skrinka` = polozka BEZ vlastnika. Text je SERVEROVY (JS ho
+        # neskladá) a je to ten isty retazec v ponuke aj v riadku.
+        MANUAL_CAB_LABEL = 'celá skrinka'
+        # Ponukaju sa LEN cela a zonove dielce. Korpusove dielce (boky, dno,
+        # strop, chrbat, sokel) sa NEponukaju vedome: „uholnik patri k lavemu
+        # boku" nie je informacia, ktoru by vyroba alebo nakup vedeli pouzit —
+        # a zoznam by narastol o osem poloziek, v ktorych sa to podstatne straca.
+        MANUAL_OWNER_PREFIXES = %w[front: zone:].freeze
+
+        # Mapa part_key -> deskriptor AKTUALNEHO planu skrinky (alebo prazdna).
+        def manual_plan_keys(params)
+          CabinetBuilder.plan_parts_by_key(params)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.manual_plan_keys')
+          {}
+        end
+
+        # Riadky ad-hoc poloziek TAK, AKO SA KRESLIA: popis vlastnika, ZIVY
+        # nazov a cena z katalogu, priznaky „dielec uz neexistuje" a „kod uz
+        # nie je v katalogu". Cena katalogovej polozky sa v configu NEUKLADA
+        # (KOV-H1 BLOCKER 2), takze ju MUSI dodat tento payload — inak by
+        # riadok v paneli nemal co ukazat.
+        def hardware_manual_view(cfg, plan, cab_id)
+          items = cfg['hardware_manual'].is_a?(Array) ? cfg['hardware_manual'] : []
+          return [] if items.empty?
+
+          fronts = payload_fronts(cfg)
+          # `owner_missing` pocita JEDINA existujuca cista funkcia (Bom) —
+          # druha kopia tej istej podmienky by sa casom rozisla s Kontrolou.
+          Bom.manual_items_for(cab_id, nil, items, plan).map do |it|
+            manual_view_row(it, fronts)
+          end
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.hardware_manual_view')
+          []
+        end
+
+        def manual_view_row(it, fronts)
+          src = it['source'].to_s
+          code = it['code'].to_s
+          item = (src == 'catalog' && !code.empty? && defined?(HardwareCatalog)) ? HardwareCatalog.find(code) : nil
+          missing = src == 'catalog' && item.nil?
+          { 'id' => it['id'].to_s,
+            'owner_part_key' => it['owner_part_key'],
+            'owner_label' => PartKeys.human_label(it['owner_part_key'], fronts: fronts),
+            'owner_missing' => it['owner_missing'] == true,
+            'source' => src,
+            'code' => code,
+            # Pri katalogovej polozke je autoritou ZIVY katalog; snapshot
+            # z configu sa pouzije az vtedy, ked kod z katalogu zmizol.
+            'name' => (item.is_a?(Hash) ? item['name_sk'].to_s : it['name'].to_s),
+            'unit' => (item.is_a?(Hash) ? item['unit'].to_s : it['unit'].to_s),
+            'price_eur_vat' => manual_view_price(it, item, src),
+            'qty' => it['qty'].to_i,
+            'note' => it['note'].to_s,
+            'catalog_missing' => missing }
+        end
+
+        # Cena: volna polozka ma vlastnu (zadal ju clovek), katalogova ZIVU
+        # z katalogu. Chybajuci kod = nil („bez ceny"), NIKDY 0 (standard §11.3).
+        def manual_view_price(it, item, src)
+          if src == 'free'
+            return it['price_eur_vat'].is_a?(Numeric) ? it['price_eur_vat'].to_f : nil
+          end
+          return nil unless item.is_a?(Hash)
+
+          item['price_eur_vat'].is_a?(Numeric) ? item['price_eur_vat'].to_f : nil
+        end
+
+        # Ponuka „Patrí k" pre modal: celá skrinka + KAZDY dielec planu, ktoreho
+        # popis vie server naozaj zlozit. Surovy kluc sa NEPONUKA — v ponuke by
+        # vyzeral ako nazov a pritom by nepovedal nic (rovnaka zasada ako
+        # `hwGroupTitle` v paneli).
+        def hardware_manual_owners(cfg, plan)
+          fronts = payload_fronts(cfg)
+          out = [{ 'key' => nil, 'label' => MANUAL_CAB_LABEL }]
+          plan.keys.each do |raw|
+            key = raw.to_s
+            next unless MANUAL_OWNER_PREFIXES.any? { |p| key.start_with?(p) }
+
+            label = PartKeys.human_label(key, fronts: fronts).to_s
+            next if label.empty? || label == key
+
+            out << { 'key' => key, 'label' => label }
+          end
+          disambiguate_owner_labels!(out)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.hardware_manual_owners')
+          [{ 'key' => nil, 'label' => MANUAL_CAB_LABEL }]
+        end
+
+        # Codex #285 P2-C: `zone:ZA/shelf:1` aj `zone:ZB/shelf:1` daju „Polica 1"
+        # — v ponuke „Patrí k" by tak stali DVE identicke volby a pouzivatel by
+        # nevedel, ktory dielec pripina.
+        #
+        # Rozlisenie sa dopĺňa LEN tam, kde je popis naozaj DVOJZNACNY (a LEN
+        # v tejto ponuke — `PartKeys.human_label` sa nemeni, ma inych citatelov:
+        # riadky kovania, Kontrolu, povod v Nakupe). Jednoznacne popisy ostavaju
+        # holé; zdrojom prívesku je SEGMENT KLUCA (id zony), nikdy vymysleny text.
+        # CISTA funkcia — vstup MENI a vracia ho.
+        def disambiguate_owner_labels!(list)
+          counts = Hash.new(0)
+          list.each { |o| counts[o['label']] += 1 }
+          list.each do |o|
+            next if counts[o['label']] < 2
+
+            zone = owner_zone_id(o['key'])
+            next if zone.nil?
+
+            o['label'] = "#{o['label']} · zóna #{zone}"
+          end
+          list
+        end
+
+        # Id zony z kluca dielca (`zone:Z2/shelf:1` -> „Z2"), inak nil.
+        def owner_zone_id(key)
+          m = key.to_s.match(%r{\Azone:([^/]+)/})
+          m ? m[1] : nil
         end
 
         # KOV-A2a: mapa `front_id -> { 'wings_n' =>, 'slots' => [...] }` z JEDINEJ

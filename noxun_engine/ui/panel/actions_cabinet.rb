@@ -612,19 +612,28 @@ module Noxun
         def handle_apply_all(payload)
           model = Sketchup.active_model
           data = parse(payload)
+          # KOV-H2: ked apply prisiel z modalu rucnej polozky, ceka na VYSLEDOK.
+          # `nil` = bezna zmena pola, ziadny modal neceka a nic sa neposiela.
+          op = manual_op(data)
           # R-02: prepnutie dokumentu sa hlasi NAHLAS aj v auto-apply. Echo
           # `cabinet_id` sa ticho zahadzuje preto, ze presun vyberu je bezny;
           # prepnuty dokument bezny NIE JE a pouzivatel musi vediet, ze zmena,
           # ktoru prave napisal, sa NEULOZILA (inak ju najde az v objednavke).
-          return if foreign_document?(data, model, 'Zmena sa neuložila')
+          if foreign_document?(data, model, 'Zmena sa neuložila')
+            # Modal by inak ostal ZAMKNUTY navzdy (zamok odomyka VYHRADNE
+            # volajuci) — aj tichy zahod musi mat odpoved.
+            return push_manual_result(op, false, 'Zmena sa neuložila — prepol sa dokument.')
+          end
 
           cab = find_cabinet(model)
-          return if cab.nil? # auto-apply bez vyberu = ticho (ziadny modal)
+          if cab.nil? # auto-apply bez vyberu = ticho (ziadny modal)
+            return push_manual_result(op, false, 'Skrinka už nie je označená — položka sa neuložila.')
+          end
 
           echo = data['cabinet_id'].to_s
           if !echo.empty? && echo != Store.get(cab, 'cabinet_id').to_s
             Engine.log("apply_all zahodeny — echo #{echo} nesedi s vyberom #{Store.get(cab, 'cabinet_id')}")
-            return
+            return push_manual_result(op, false, 'Výber sa medzitým zmenil — skús to znova.')
           end
           params = existing_params(cab)
           PARAM_KEYS.each do |k|
@@ -634,12 +643,19 @@ module Noxun
           # KOV-H1: ad-hoc kovanie ide TOU ISTOU cestou ako cela (audit #15
           # BLOCKER 1: ziadny novy zapisovy kanal — `collectAll` -> `apply_all`
           # -> `normalize` -> rebuild = 1 krok Spat, guardy, R-12).
+          # Nazov mazanej polozky sa cita PRED preflightom — ten uz `params`
+          # prepise ODOSLANYM zoznamom a zaznam by v nom nebol. Status musi
+          # povedat, CO sa odstranilo (mazanie ide bez potvrdzovacieho okna).
+          removed = manual_removed_label(params, op)
           hm = manual_preflight(params, data)
           if hm && hm[:error]
             @last_apply_error = hm[:error]
             set_status(hm[:error], true)
             push_selected(model) # UI resync — panel sa vrati na ULOZENY stav
-            return
+            # AZ PO pushi: modal ostava otvoreny s rozpisanymi hodnotami, ale
+            # `hwManual` uz drzi ULOZENY zoznam (neuspesna zmena sa nesmie
+            # drzat). Poradie je preto kontrakt, nie nahoda.
+            return push_manual_result(op, false, hm[:error])
           end
           pf = material_preflight(params, model) # D-45: telo + chrbat + ABS remap
           if pf && pf[:error]
@@ -650,15 +666,108 @@ module Noxun
             @last_apply_error = pf[:error]
             set_status(pf[:error], true)
             push_selected(model) # UI resync (auto-apply nesmie nechat select 18 nad modelom 3)
-            return
+            return push_manual_result(op, false, pf[:error])
           end
           @last_apply_error = nil # uspesny apply pripadny stary odmietnutok maze
-          suspend_selection_sync do
-            CabinetBuilder.rebuild(model, cab, params)
-            reselect(model, cab)
+          begin
+            suspend_selection_sync do
+              CabinetBuilder.rebuild(model, cab, params)
+              reselect(model, cab)
+            end
+          rescue StandardError => e
+            # Vynimka prestavby konci v `cb` wrapperi (log + status). Bez tejto
+            # vetvy by ale modal ostal zamknuty a pouzivatel by nemal ako von.
+            #
+            # Codex #285 P2-B: PRED odpovedou musi ist RESYNC. Klient si totiz
+            # `hwManual` prepisal OPTIMISTICKY uz pred odoslanim, kym operacia
+            # sa zrusila a ULOZENA skrinka ostala nezmenena — bez pushu by si
+            # panel drzal ODMIETNUTY zoznam a najblizsia nesuvisiaca zmena
+            # skrinky by ho poslala znova (duplicitne pridanie, alebo dodatocne
+            # uplatnene „neuspesne" mazanie). Rovnako to robia obe preflight
+            # vetvy vyssie.
+            push_selected(model)
+            push_manual_result(op, false, "Kovanie sa neuložilo — #{e.message}.")
+            raise
           end
           status_with_warnings(cab, "Prestavané — #{Store.get(cab, 'cabinet_id')} (#{part_count(cab)} dielcov).#{pf ? pf[:note] : ''}")
           push_selected(model)
+          # P2-H: hlaska vysledku PREPISE status prestavby (klient ju posiela do
+          # `NX.setStatus`), takze musi niest aj jej varovania — inak by
+          # upozornenia z TEJ ISTEJ prestavby zmizli bez stopy.
+          push_manual_result(op, true, manual_ok_msg(op, removed, cab))
+        end
+
+        # --- KOV-H2: signal vysledku pre modal rucnej polozky ----------------
+        #
+        # Modal D-15 sa pri odoslani ZAMKNE a odomyka ho VYHRADNE volajuci
+        # (kontrakt kostry) — server mu preto musi odpovedat v KAZDEJ vetve
+        # `handle_apply_all`, aj v tej, ktora zapis ticho zahadzuje.
+        MANUAL_OPS = %w[add edit delete].freeze
+        # Codex #285 P2-A: `token` je KORELACNY kluc jedneho odoslania. Server
+        # ho NEVYRABA ani neinterpretuje — len ho vracia v echu, aby klient
+        # spoznal, ci odpoved patri PRAVE tomu modalu, ktory zapis poslal.
+        # Preto uzavrety tvar: len String/Integer a orezana dlzka (payload je
+        # verejny kanal, do `execute_script` sa nesmie dostat lubovolny objekt).
+        MANUAL_TOKEN_MAX = 40
+
+        # -> nil (apply prisiel z formulara) | { 'kind' =>, 'id' =>, 'token' => }
+        def manual_op(data)
+          raw = data['manual_op']
+          return nil unless raw.is_a?(Hash)
+
+          kind = raw['kind'].to_s
+          return nil unless MANUAL_OPS.include?(kind)
+
+          { 'kind' => kind, 'id' => raw['id'].to_s, 'token' => manual_token(raw['token']) }
+        end
+
+        # Token z klienta: LEN retazec alebo cele cislo, orezany na dlzku.
+        # Cokolvek ine (hash, pole, nil) = prazdny token — odpoved sa potom
+        # ziadnemu modalu nepriradi, co je bezpecnejsie nez priradit ju zle.
+        def manual_token(raw)
+          return '' unless raw.is_a?(String) || raw.is_a?(Integer)
+
+          raw.to_s[0, MANUAL_TOKEN_MAX]
+        end
+
+        def push_manual_result(op, ok, msg)
+          return nil if op.nil?
+
+          js("NX.hwManualResult(#{ok ? 'true' : 'false'}, #{msg.to_s.to_json}, #{op.to_json})")
+          nil
+        end
+
+        MANUAL_OK_MSGS = { 'add' => 'Položka pridaná.', 'edit' => 'Položka upravená.',
+                           'delete' => 'Položka odstránená.' }.freeze
+
+        # POZOR: vola sa AJ pri beznom apply z formulara, ked `op` je nil —
+        # argumenty sa v Ruby vyhodnocuju EAGERNE, takze skory navrat
+        # `push_manual_result` sem NEDOSIAHNE. Bez tohto guardu spadol KAZDY
+        # apply bez `manual_op` (nasla to in-SketchUp sada, headless nie —
+        # handler potrebuje zivy model).
+        def manual_ok_msg(op, removed = nil, cab = nil)
+          return '' unless op.is_a?(Hash)
+
+          base = removed ? "Odstránená ručná položka „#{removed}“." : MANUAL_OK_MSGS[op['kind'].to_s].to_s
+          # Pripona je ZDIELANA so `status_with_warnings` — jeden zdroj textu,
+          # ziadne skladanie na klientovi.
+          "#{base}#{warn_suffix(cab)}"
+        end
+
+        # Nazov mazanej polozky z ULOZENEHO zoznamu (CISTA funkcia). Volna
+        # polozka ma nazov, katalogova moze mat len kod — a ked nie je ani ten,
+        # vrati sa nil a plati vseobecna hlaska (nikdy sa nic nevymysla).
+        def manual_removed_label(params, op)
+          return nil unless op.is_a?(Hash) && op['kind'] == 'delete'
+
+          rec = Array(params['hardware_manual']).find do |r|
+            r.is_a?(Hash) && r['id'].to_s == op['id'].to_s
+          end
+          return nil unless rec.is_a?(Hash)
+
+          name = rec['name'].to_s.strip
+          name = rec['code'].to_s.strip if name.empty?
+          name.empty? ? nil : name
         end
 
       end

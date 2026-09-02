@@ -308,6 +308,18 @@ ok(tagAt(STUDIO_HTML, 'nx_esc') < tagAt(STUDIO_HTML, 'studio'),
    'a PRED studio.js — jeho listener musi bezat prvy, aby vedel udalost spotrebovat');
 ok(tagAt(PANEL_HTML, 'nx_esc') > -1 && tagAt(PANEL_HTML, 'nx_esc') < tagAt(PANEL_HTML, 'form'),
    'v Inspectorovi PRED form.js (absModal)');
+// KOV-H2: kostru D-15 nacitavaju UZ OBE okna (modal rucnej polozky kovania),
+// takze poradie `nx_esc -> nx_modal -> konzument` musi platit aj v paneli.
+// Bez neho by Escape zavrel modal AJ vrstvu pod nim (warnpanel, rohove menu).
+ok(tagAt(PANEL_HTML, 'nx_modal') > -1, 'panel.html nacitava zdielanu kostru D-15');
+ok(tagAt(PANEL_HTML, 'nx_esc') < tagAt(PANEL_HTML, 'nx_modal'),
+   'poradie skriptov v paneli: nx_esc.js PRED nx_modal.js');
+ok(tagAt(PANEL_HTML, 'nx_modal') < tagAt(PANEL_HTML, 'core'),
+   'a nx_modal.js PRED core.js (hardware.js kostru vola menom)');
+ok(tagAt(PANEL_HTML, 'nx_modal') < tagAt(PANEL_HTML, 'hardware'),
+   'aj PRED hardware.js — modal rucnej polozky ju otvara');
+ok(PANEL_HTML.indexOf('id="nxModalRoot"') > -1,
+   'panel.html ma kotvu #nxModalRoot (mimo prekreslovanych sektorov)');
 
 // Predpoklad scenara „dve vlastne vrstvy naraz": v `studio.html` je `hwDelModal`
 // (sekcia Kovanie, `#hwModalRoot`) naozaj NIZSIE nez `mdDeleteModal` (`#matModalRoot`),

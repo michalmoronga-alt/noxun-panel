@@ -987,6 +987,22 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Hw`).
   horšie než skrátený názov. Selecty v riadku majú šírku **podľa obsahu
   v medziach** (`flex: 0 1 auto` + min/max, vzor UX-03), nie pevných N px:
   krátke názvy setov inak plytvali miestom a dlhé sa aj tak nezmestili.
+- **Ručne pridané položky majú VLASTNÝ blok, nie box vlastníka** (KOV-H2).
+  Ad-hoc kovanie sú iné dáta než položky z pravidiel, takže stoja **pod** boxmi
+  vo vlastnom bloku „Ručne pridané"; **nadpis sa kreslí len keď položky sú**
+  a tlačidlo „Pridať konkrétnu položku (mimo setov)" je **posledné** v sekcii.
+  Riadok používa ten istý vzor `.hwitem` + `.hwbuy` ako položka z pravidiel —
+  zoznam kovania sa nemá čítať dvoma spôsobmi.
+- **Chip pri názve priznáva PÔVOD a STAV** (`.hwchip`): „ručná" je **neutrálny**
+  štítok (nie je to chyba), „bez vlastníka" a „chýba v katalógu" sú **jantárové**
+  (upozornenie — semaforové `--nx-state-*` patria Kontrole a sem sa nemiešajú).
+  Ten istý chip nesie aj riadok v sekcii **Nákup** Štúdia.
+- **Súčtový riadok sa dá ROZKLIKNÚŤ na pôvod, nie rozšíriť o stĺpec** (KOV-H2).
+  Nákupný riadok je súčet zo setov aj z ručných položiek; klik naň rozvinie
+  sub-riadok „Pôvod" so zoznamom zdrojov. Nový stĺpec by v širokej tabuľke
+  nemal kam ísť a väčšine riadkov by nič nepovedal — **detail patrí pod riadok,
+  nie vedľa neho**. Stav rozkliku neprežíva čerstvý payload: preusporiadané
+  riadky by ukázali pôvod cudzieho riadku.
 - **Rovnaké položky sa zbalia pod JEDEN súhrn** (smoke test 20.8.). Podperky
   políc mali riadok na každú policu, hoci hovoria to isté — teraz je nad nimi
   súhrn **„Podperky políc — 5 políc: 20 ks"** s rozklikom. Zásady:

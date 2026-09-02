@@ -196,6 +196,12 @@ zmazalo rozpísaný formulár.
 server a vo fáze `run` sa Escapom zavrieť nesmie (beh by ostal visieť bez okna); a Escape handler Štúdia (`ecMenu`) je preto podmienený `!nxModalOpen()` — oba listenery visia na
 `document` a `stopPropagation` medzi nimi **nefunguje** (tá istá lekcia ako pri zatváraní `ecMenu` klikom mimo).
 
+**`onClose` JE SÚČASŤ KONTRAKTU (review #285 kolo 2, P2-G).** Volajúci si pri modali drží **vlastný stav** (čo odoslal, na čo čaká) a bez signálu o zatvorení mu ostane visieť aj
+po Escape, kliku na scrim, krížiku či „Zrušiť" — ďalšia akcia sa potom správa, akoby okno ešte žilo (ad-hoc kovanie takto hlásilo „okno sa zavrelo, nič sa neuložilo" po tom, čo ho
+používateľ zavrel sám). Volá sa **až po skutočnom zatvorení** (`OPEN` je už `null`), takže volajúci z neho smie bez rizika rekurzie čítať stav aj otvárať nové okno; výnimka
+v ňom sa **nikdy** nepremietne do kostry. Dôsledok pre volajúcich: stav sa nastavuje **až za** `NXModal.open`, lebo `open` najprv zatvára predchádzajúci modal a jeho `onClose` by
+čerstvý stav hneď vynuloval.
+
 **`submit` modal NEZATVÁRA** (audit #10): pošle hodnoty cez `onSubmit` a zatvorenie je rozhodnutie volajúceho — rozpočet ho zavrie **len** na `NX.budgetResult(op, true)`, takže
 odmietnutý zápis nechá používateľovi jeho hodnoty na mieste (opraviť číslo, nie písať formulár znova). Kotva `#nxModalRoot` žije **mimo `#secbody`**, takže prekreslenie sekcie po
 zápise modal nezhodí.
@@ -229,6 +235,27 @@ kostra, inak by nemala proti čomu porovnávať default.
 
 **Pozor na mená tried:** mockup kreslí kartu ako `.nxmodal`, lenže `panel.css` toto meno už používa pre SCRIM starších modalov — karta sa preto volá **`.nxmcard`**,
 `mhead`/`mbody`/`mfoot`/`mrow` ostávajú doslovné.
+
+**KOV-H2 — kostru načítavajú OBE okná a jej CSS žije v `panel.css`.** Do KOV-H2 ju načítavalo len Štúdio a pravidlá ležali **inline v `studio.html`**; keď si ju vypýtal aj
+Inspector (modal ručnej položky kovania), presunuli sa **1:1 do zdieľaného `ui/css/panel.css`** — dve kópie tých istých tried sú dva modalové svety, ktoré sa časom rozídu. S nimi
+sa presunula aj **definícia z-vrstiev** (`--nx-z-scrim` / `--nx-z-suggest` pri `.nxscrim`), takže `#mdSgBox` číta premennú z toho istého súboru; guardy (`test_st1c_ponuka.rb`,
+`test_st2c_modal.rb`, `test_st2c_modal.js`) sa pýtajú na `panel.css` a navyše strážia, že `studio.html` kópiu **nemá**. `panel.html` dostal kotvu **`#nxModalRoot`** (mimo
+prekresľovaných sektorov, ako v Štúdiu) a `js/nx_modal.js` **za** `nx_esc.js` a **pred** `core.js`/`hardware.js` — poradie stráži `tests/js/test_r23_escape.js`.
+
+**Typ poľa `lookup` (KOV-H2)** — našepkávač nad zoznamom, ktorý drží **server**: textové pole + ponuka výsledkov. Kostra o obsahu nevie nič, dostane len `search(query, done)` od
+volajúceho a položky tvaru `{value, text, hint}` (`render`/`hint` sú voliteľné prepisy). **Tri veci sú kontrakt a preto žijú v kostre, nie u volajúceho:** (1) `values()` vracia
+**LEN `value`** zo skrytého poľa `nxm_<key>` — nikdy názov ani cenu z obrazovky (KOV-H1 FIX 12: klientovi sa verí len kód, inak by sa do zákazky dostala cena, ktorá už neplatí,
+a to potichu); (2) **písanie po výbere výber ZAHADZUJE** — bez toho by odišiel starý kód pod novým textom; (3) **staršia odpoveď sa ignoruje** (`seq`), lebo odpovede chodia
+asynchrónne a pomalšie kolo by prepísalo čerstvejšie výsledky. Ponuka je **vlastná vrstva**: Escape zatvára **ju** (druhé stlačenie až modal), šípky sa pohybujú po výsledkoch,
+Enter vyberie zvýraznenú položku a formulár **nikdy** neodošle; orezanie sa priznáva („… ďalších N"). Ponuka je v **toku dokumentu**, nie `position: fixed` — karta má vlastný
+scroll (`.mbody`) a plávajúca vrstva by ostala visieť nad cudzím riadkom (tá istá pasca ako `#mdSgBox`). Serverová chyba pri `lookup` sadá na pole **hľadania** (`nxm_<key>_q`),
+lebo červený okraj skrytého poľa nie je vidieť. Typ je **generický** — B2/B3 ho použijú pre kód člena setu.
+
+**PAMÄŤ DRAFTU DRŽÍ AJ ROZPÍSANÝ DOTAZ (review #285 P2-E).** `values()` vracia len vybranú hodnotu, takže napísaný dotaz **bez výberu** by zatvorenie ticho zahodilo — a to je
+presne stav, v ktorom používateľ odchádza niečo overiť. Pamäť si ho preto drží pod prilepeným sufixom **`__q`**, ktorý sa do `values()` **nikdy** nedostane (`values` iteruje POLIA
+špecifikácie), takže kontrakt „lookup vracia len hodnotu" platí ďalej. Pri **úprave** bola pasca horšia: pamäť obnovila prázdnu skrytú hodnotu, ale `valueText` prekreslil pôvodnú
+položku, takže pole **vyzeralo vybraté** a submit až potom zlyhal — preto sa pri obnovenej prázdnej hodnote zobrazený text **vyčistí**. Východiskový text poľa má jednu definíciu
+(`lookupInitialQuery`): kreslí sa z nej markup a porovnáva sa proti nej pamäť, takže „nič som nepísal" pamäť nezakladá.
 
 **Prekryvné ovládače vnútri karty** (našepkávač `#mdSgBox` z `proj_materials.js`; audit ŠT-2c #10/#11) majú **opačné** pravidlo než okno za modalom: Escape patrí **najprv im** a
 stačí `ev.stopPropagation()` na inpute (dokumentový poslucháč modalu je na **inom** uzle — `stopImmediatePropagation` by zastavil len ďalších poslucháčov toho istého inputu a
@@ -754,6 +781,78 @@ chyba — semaforové `--nx-state-*` sa sem nemiešajú). Čisté jadro (`hwShel
 Trieda je `.hwbox` (nie `.hwown` z mockupu): `.hwown` už označuje popis vlastníka VNÚTRI riadku a dva významy jednej triedy by sa poprali. Klik na hlavičku má **flush handshake**
 ako „Dielcov" (`onInfoParts`), ale z iného dôvodu: nie kvôli prepísaniu formulára (táto cesta push nevyvolá), ale kvôli **výberu** — rozpísaný edit čaká 400 ms a keby timer dobehol
 až PO výbere, `handle_apply_all` by skrinku prestaval a `finish_cab` by reselectol celý korpus, takže by sa práve kliknutý vlastník ticho stratil; neplatné pole akciu **zastaví**.
+
+**KOV-H2 — RUČNE PRIDANÉ POLOŽKY (ad-hoc kovanie mimo setov).** Pod boxmi vlastníkov (a pred skupinou Sety) je blok `.hwman`: **nadpis „Ručne pridané" len keď položky sú**
+(prázdny nadpis nad tlačidlom by zabral riadok a nepovedal nič), pod ním riadok každej položky vo vzore D-92 (`.hwitem` + `.hwbuy`) a **posledné** ghost tlačidlo na celú šírku
+„Pridať konkrétnu položku (mimo setov)". Bez označenej skrinky blok nevzniká — kreslí sa **až za** vetvou `items === null`, ktorá sa vracia skôr. Riadok je iné dáta než položky
+z pravidiel (`config['hardware_manual']`, nie `config['hardware']`), preto **nemá identitné atribúty** `data-owner`/`data-type`/`data-rule` — `hwGroups` ani
+`refreshHardwarePurchase` ho hľadať nesmú.
+
+**Panel nepočíta nič.** Riadky sa kreslia z payloadu `hardware_manual_view[]`, ktorý skladá server (`Panel.hardware_manual_view`): **živý názov a cena z katalógu** (cena
+katalógovej položky sa v configu NEUKLADÁ — KOV-H1 BLOCKER 2, takže panel ju nemá odkiaľ vziať), popis vlastníka z `PartKeys.human_label`, `owner_missing` (počíta ho **jediná
+existujúca** čistá funkcia `Bom.manual_items_for`, aby sa druhá kópia podmienky nerozišla s Kontrolou) a `catalog_missing`. Stavy sa **priznávajú chipmi**: „ručná" (vždy),
+„bez vlastníka" a „chýba v katalógu" (jantárové — sú to upozornenia, nie semaforové `--nx-state-*`). Ponuku „Patrí k" nesie `hardware_manual_owners[]` = celá skrinka + čelá
+a zónové dielce **aktuálneho plánu**; korpusové dielce sa **neponúkajú** vedome („uholník patrí k ľavému boku" nie je informácia, s ktorou by výroba alebo nákup vedeli niečo
+robiť) a **surový kľúč sa neponúka nikdy** (v ponuke by vyzeral ako názov a nepovedal by nič — tá istá zásada ako `hwGroupTitle`). **Dvojznačné popisky sa rozlíšia zónou**
+(review #285 P2-C): `zone:ZA/shelf:1` aj `zone:ZB/shelf:1` dajú „Polica 1", takže v ponuke by stáli dve identické voľby. Prívesok („Polica 1 · zóna Z1a") sa dopĺňa **len tam, kde
+je popis naozaj dvojznačný**, a **len v tejto ponuke** — `PartKeys.human_label` sa nemení, má iných čitateľov (riadky kovania, Kontrola, pôvod v Nákupe, hlášky). Zdrojom prívesku
+je **segment kľúča** (id zóny), nikdy vymyslený text. Oba kľúče sú **len na čítanie**: `collectAll`
+o nich nevie, takže sa **nikdy** nevracajú serveru — inak by sa cena z obrazovky dostala do configu. Plán sa pre oba stavia **raz** (`plan_parts_by_key` je celý `build_plan`).
+
+**Modal je D-15 kostra** (`hw:manual:add` / `hw:manual:edit:<id>`): *Patrí k* · *Zdroj* (Z katalógu / Voľná položka) · pri katalógu **`lookup`** so serverovým hľadaním
+(`hw_manual_search` — čítacia cesta, žiadny krok Späť, poradie skladá server, odpoveď nesie `gen`), pri voľnej *Názov · MJ · Cena s DPH* · *Množstvo* · *Poznámka*. Cena
+**katalógovej** položky sa needituje ani neposiela (mockup mal „Cena s DPH (snapshot)" — **vedomá odchýlka**, je to len informácia z katalógu). Prepnutie *Zdroja* mení sadu polí
+a kostra ich za behu nevymieňa, preto sa modal **otvorí znova s tým, čo už používateľ napísal**. Hodnoty nesie **draft modalu** (`HW_MAN.draft`), nie pamäť — pamäť porovnáva proti
+defaultom a hodnoty **druhého, práve nevykresleného** zdroja by nemala proti čomu merať. Draft preto **prežíva prekreslenie** (review #285 kolo 2, P2-F): pred prepnutím sa doň
+vlejú viditeľné hodnoty (`hwManualMergeDraft` — čistá funkcia; kľúče, ktoré práve vykreslené nie sú, sa **neprepisujú**) a po prekreslení sa vrátia, takže cesta *voľná → katalóg →
+voľná* už napísaný názov ani cenu nezahodí. **Nevybraný dotaz** katalógu sa číta z poľa hľadania, lebo vo `values()` nie je (kontrakt `lookup` vracia len kód). Hodnoty neaktívneho
+zdroja sú **výhradne pre obrazovku** — do `values()` ani do configu sa nedostanú, `hwManualRecord` číta len polia svojho zdroja. MJ sú **zrkadlom** serverovej `HardwareCatalog::UNITS` (nie payload — menia sa raz za rok; že sa nerozídu, stráži
+`tests/pure/test_kovh2_payload.rb`).
+
+**Zápis nemení kanál.** JS zostaví NOVÝ zoznam z `hwManual` (add = záznam s **prázdnym `id`**, prideľuje ho server; edit = nahradí práve jednu; delete = vynechá ju — a keď sa
+`id` v zozname **nenájde**, vráti `null` a zápis sa zastaví: tichý append by z úpravy spravil duplikát) a pošle ho existujúcim `collectAll()` → `apply_all`. Čakajúci debounce sa
+**ruší, nie flushuje** — rozpísaný edit ide v TOM ISTOM payloade, takže jedna zmena = jeden rebuild = **jeden krok Späť**; samostatný flush by znamenal dva. Payload navyše nesie
+**`manual_op {kind, id}`** a `handle_apply_all` naň odpovedá **`NX.hwManualResult(ok, msg, op)`** v **každej** vetve — aj v tých, ktoré zápis ticho zahadzujú (cudzí dokument,
+zrušený výber, nesediace echo, výnimka prestavby). Dôvod je kontrakt D-15: zámok odosielania odomyká **výhradne volajúci**, takže vetva bez odpovede by nechala modal zamknutý
+navždy. Pri **odmietnutí** ide signál **až po `push_selected`**: modal ostáva otvorený s hodnotami, ale `hwManual` už drží ULOŽENÝ zoznam (neúspešná zmena sa nesmie držať) —
+poradie je preto kontrakt, nie náhoda. Úspech modal **zatvorí** a zahodí pamäť draftu (`setBusy(false, {clear: true})`).
+
+**Mazanie ide bez potvrdzovacieho okna** — poistkou je jeden krok Späť (vzor „Vrátiť na pravidlo"); potvrdenie pri každom mazaní by bolo klik navyše pri každej oprave. Status
+**menuje**, čo sa odstránilo (`manual_removed_label` číta názov z **uloženého** zoznamu ešte pred preflightom — ten `params` už prepíše odoslaným zoznamom). **Hláška výsledku
+PREPÍŠE status prestavby** (klient ju posiela do `NX.setStatus`), takže nesie aj jeho **varovania** — inak by upozornenia z tej istej prestavby zmizli bez stopy (review #285
+kolo 2, P2-H). Prípona „· N upozornení" je **jedna funkcia** (`warn_suffix`), ktorú používa `status_with_warnings` aj `manual_ok_msg`: jeden zdroj textu, žiadne skladanie na
+klientovi.
+
+**NAŠEPKÁVAČ NEPONÚKA NEAKTÍVNE POLOŽKY (review #285 kolo 2, P2-I).** `HardwareCatalog.search_with_total` vracia neaktívny záznam pri **presnej zhode kódu** aj bez
+`include_inactive` — vedomý kontrakt katalógu (kto kód pozná, má právo ho tam nájsť). V našepkávači je to pasca: vykreslil by sa ako bežný výber a kto pozná starý kód, pridal by si
+do zákazky položku, ktorú katalóg vedie ako **už neobjednávanú**. Filter (`drop_inactive`) žije **výhradne v našepkávači** a `total` sa znižuje o to, čo zahodil (zásada „no silent
+caps" platí aj naopak). **Zápisová cesta sa nemení**: položka s neaktívnym kódom, ktorá v configu už je (legacy zákazka, šablóna), musí prestavbu prežiť — zahodiť ju by znamenalo
+ticho odobrať kus z objednávky.
+
+**MODAL PATRÍ JEDNEJ SKRINKE A ZMENU VÝBERU NEPREŽIJE (review #285 P1).** Držal rozpísaný zoznam, kým `loadSelected` pod ním vymenil `hwManual`/`hwManualView`/`hwManualOwners`
+aj `selectedCabId` — odoslanie starého formulára by potom postavilo zoznam z **novej** skrinky a opečiatkovalo ho **jej** identitou; položka by pristála na nesprávnej skrinke a pri
+zhode `id` by prepísala cudzí záznam. Rozhodnutie „je to iný výber?" žije v `hardware.js` (**`hwManualDropIfForeign`**), nie v `bridge.js` — modal patrí tomu súboru a podmienka sa
+nesmie rozísť s tým, čo modal drží. Zatvára sa **výhradne pri zmene IDENTITY**: iná skrinka, iný dokument, odchod na dosku, prázdny výber. **Echo tej istej skrinky (náš vlastný
+apply, na ktorý modal práve čaká) ho zavrieť NESMIE** — inak by zmizol skôr, než príde odpoveď, ktorá ho drží otvorený. Zatvorenie zároveň zahadzuje bežiace hľadanie, aby odpoveď
+spred zatvorenia nepristála v novom okne, a status povie, že sa **nič neuložilo**.
+
+**ODPOVEĎ SA KORELUJE TOKENOM, NIE DRUHOM OPERÁCIE (review #285 P2-A).** Všetky `add` majú prázdne `id`, takže pri pomalej prestavbe (používateľ medzitým zavrie modal a pošle ďalšiu
+operáciu toho istého druhu) sa odpoveď na A priradila k B — zavrela cudzí modal a zahodila jeho draft. Každé odoslanie má preto **vlastný rastúci token** v `manual_op`; server ho
+v `manual_op(data)` len **preberie do echa** a vráti, nikdy ho neinterpretuje. Tvar je uzavretý (String/Integer, dĺžka orezaná na `MANUAL_TOKEN_MAX`): payload je verejný kanál a do
+`execute_script` sa nesmie dostať cudzí objekt. Cudzí tvar aj chýbajúci token = **prázdny** token, teda odpoveď sa nepriradí žiadnemu modalu — bezpečnejšie než priradiť ju zle.
+
+**PO VÝNIMKE PRESTAVBY IDE RESYNC (review #285 P2-B).** Klient si `hwManual` prepisuje **optimisticky** už pred apply; keď `CabinetBuilder.rebuild` vyhodí výnimku, operácia sa zruší
+a uložená skrinka ostane nezmenená — bez `push_selected` by si panel držal **odmietnutý** zoznam a najbližšia nesúvisiaca zmena skrinky by ho poslala znova (duplicitné pridanie,
+alebo dodatočne uplatnené „neúspešné" mazanie). Rescue vetva preto pushne **pred** odpoveďou modalu a výnimku ďalej `raise`-uje pre `cb` wrapper.
+
+**ŽIVÝ REFRESH PO ZMENE KATALÓGU (review #285 P2-D).** `hardware_manual_view` sa plnil len pri `loadSelected`, takže úprava či zmazanie položky katalógu v súbežne otvorenom Štúdiu
+nechala v Inspectorovi **starú cenu** (alebo chýbajúci chip „chýba v katalógu") až do zmeny výberu — a to pri riadkoch, ktorých jediný zmysel je ukazovať živú cenu. Zmena katalógu
+už má svoj **ľahký** kanál (`HardwareCatalogDialog.push_items` → `Panel.push_hardware_sets` → `NX.setHardwareSets`), ktorý obnovuje ponuky setov a nákupné riadky D-92; nesie preto
+aj `manual_view` a JS ním prekreslí **len vlastný blok** (`refreshHardwareManual`). Žiadny plný push výberu, žiadny zdvih generácie okna, žiadny krok Späť. Blok je preto rozdelený
+na **obal a obsah** (vzor `rowsHtml`/`rowsInnerHtml` v kostre) a keď skrinka žiadne ad-hoc položky nemá, `plan_parts_by_key` sa **nevolá vôbec** — tento push chodí po každej zmene
+katalógu.
+
+Testy: `tests/js/test_kovh2_adhoc_ui.js`, `tests/pure/test_kovh2_payload.rb`, in-SketchUp sekcia `run_kovh2`.
 
 **Klik na hlavičku → `nx_select_hw_owner` → `Panel.handle_select_hw_owner`** (`ui/panel/selection.rb`): prázdne `part_keys` = celá skrinka (`reselect`), inak `parts_by_keys` =
 výrobné dielce s daným `part_key` v **rovnakom rozsahu ako kusovník** (`manufactured_parts` — vnorené AJ odpojené). Je to **čisté čítanie + zmena výberu** pod
@@ -1567,6 +1666,14 @@ dostávať** (a v PR B3 zaniklo celé).
 skrinky z Inspectora sem sama nedorazí — bez neho by sa nákupný zoznam dal exportovať zo starých počtov bez cesty k čerstvým); tabuľky preberajú `.bomtab` **Štúdia** (rovnaký
 vzhľad ako Kusovník vedľa nich), ale nesú marker **`.hwtab`**, ktorý vracia ruku a hover **výhradne riadku generiky `tr.hwgen`** — `.bomtab tbody tr` má v Štúdiu afordanciu kvôli
 Kusovníku, kým tu je klikateľný jediný typ riadku (pôvodné okno dávalo ruku tiež len `tr.bomrow`/`tr.hwrow`).
+
+**KOV-H2 — chip „ručná" a ROZKLIK PÔVODU.** Nákupný riadok je **súčet**: ten istý kód môže prísť zo setu jednej skrinky aj z ručne pridanej položky inej — a z tabuľky to
+nebolo vidieť vôbec. Riadok, ktorého aspoň časť kusov je ručná (`adhoc_quantity > 0`) alebo je to voľná položka, nesie pri názve chip **„ručná"**; voľná položka má v stĺpci Kód
+**pomlčku** (prázdna bunka vyzerá ako chyba). **Klik na riadok** rozbalí pod ním sub-riadok **„Pôvod"** so zoznamom zdrojov („CAB-2 · F1 · dvierka ľavé · ručná ×2" / „CAB-2 ·
+set zaves-klasik ×4"). Žiadny nový stĺpec (horizontálny priestor) a stav rozkliku **zámerne neprežíva push** — čerstvý payload môže riadky preusporiadať a otvorený index by
+ukázal pôvod cudzieho riadku. Popis vlastníka skladá **server**: `ProductionCore.decorate_source_owners` doplní do každého zdroja `owner_label` z resolved čiel **tej** skrinky
+(zber nesie nový aditívny kľúč `cabinet_fronts`), lebo z generovaného id čela („front:Fmsi0wnix-1-3a3kxe") sa nedá prečítať, o ktoré čelo ide; `nil` = kovanie celej skrinky.
+Nákupný CSV, rozpočet ani ponuka pole nečítajú — **výstup zákazky sa nemení ani o znak**.
 
 Riadok generiky sa v0.7.58 premenoval z `tr.hwrow` na `tr.hwgen`: `.hwrow` je v zdieľanom panel.css **flex riadok** kovania Inspectora/Katalógu a `<tr>` s `display: flex` strácal
 zarovnanie stĺpcov s hlavičkou (guard `tests/pure/test_tr_flex_kolizia.rb` stráži, že žiadny `<tr>` nenesie triedu, ktorej panel.css dáva flex/grid). Export ide **vlastným kanálom

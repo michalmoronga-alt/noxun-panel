@@ -590,7 +590,11 @@
     var groups = hwGroups(items, hwDisabledOffs(items, overrides), frontIds, cabId);
     var html = groups.map(function(g){ return hwBoxHtml(g, cabId); }).join('');
     if (!html) html = '<div class="muted">Skrinka nemá žiadne kovanie (bez čiel, bez podstavca).</div>';
-    box.innerHTML = html;
+    // KOV-H2: pod boxmi vlastnikov ziju RUCNE PRIDANE polozky (ad-hoc kovanie
+    // mimo setov) + tlacidlo na pridanie. Su to INE data (`hardware_manual`,
+    // nie `config.hardware`), preto vlastny blok a nie box vlastnika — a preto
+    // ho `hwGroups` ani `refreshHardwarePurchase` nevidia.
+    box.innerHTML = html + hwManualHtml();
     // V0.6 D1b: vyber setu per typ — override projektovej predvolby na CELEJ
     // skrinke. Kompaktne (vertikalny priestor): 1 riadok na pritomny typ.
     // D-75: riadok je aj pri PRAZDNEJ ponuke (server posiela len typy, ktore
@@ -790,6 +794,574 @@
   // kovania" — tlacidlo panela ide priamo deep-linkom `openStudio('hw')`
   // (`js/actions.js`), rovnako ako „Materiály projektu…" od ŠT-2b.
 
+  // ====================== KOV-H2: RUCNE PRIDANE POLOZKY =====================
+  // Ad-hoc kovanie = KONKRETNA polozka MIMO setov, pripnuta ku skrinke alebo
+  // k jednemu dielcu (datova vrstva je KOV-H1). Panel ju vie pridat, upravit
+  // a zmazat — a to VZDY TOU ISTOU cestou ako kazdu inu zmenu skrinky:
+  //   `hwManual` (echo servera) -> novy zoznam -> `collectAll()` -> `apply_all`
+  // Ziadny novy zapisovy kanal, ziadny druhy tvar payloadu, 1 zmena = 1 krok
+  // Spat (KOV-H1 audit #15 BLOCKER 1).
+  //
+  // CO PANEL NEROBI: nepocita ceny, neskladá popisky vlastnika a neoveruje
+  // katalog. To vsetko je v payloade zo servera (`hardware_manual_view`,
+  // `hardware_manual_owners`) — panel kresli, co dostal. Do configu sa
+  // z obrazovky vracia LEN to, co si pouzivatel naozaj vybral: kod (pri
+  // katalogovej polozke) alebo nazov/MJ/cena (pri volnej).
+
+  // MJ su ZRKADLO serverovej `HardwareCatalog::UNITS` (jediny slovnik jednotiek).
+  // Vedome NIE v payloade: menia sa raz za rok a kazdy push vyberu by ich niesol
+  // zbytocne. Ze sa nerozidu, strazi guard `tests/pure/test_kovh2_payload.rb`.
+  var HW_MANUAL_UNITS = [['ks', 'ks'], ['set', 'sada'], ['par', 'pár'],
+                         ['bal', 'balenie'], ['m', 'bm (bežný meter)']];
+  var HW_MANUAL_QTY_MAX = 999;    // zrkadlo CabinetBuilder::MANUAL_QTY_MAX
+  var HW_MANUAL_NOTE_MAX = 200;   // zrkadlo CabinetBuilder::MANUAL_NOTE_MAX
+
+  // Stav OTVORENEHO modalu: { id: '<id polozky>' | null, kind: 'add'|'edit',
+  // sent: odoslali sme z neho zapis? }. `null` = ziadny nas modal nebezi.
+  var HW_MAN = null;
+  // Generacia hladania (odpoved so starsou generaciou sa zahadzuje) + callback
+  // kostry, ktoremu vysledok patri.
+  var HW_MAN_Q = { gen: 0, done: null };
+  // TOKEN ODOSLANEJ OPERACIE (Codex #285 P2-A). Korelovat odpoved podla `kind`
+  // nestaci: VSETKY `add` maju prazdne `id`, takze pri pomalej prestavbe
+  // (pouzivatel medzitym zavrie modal a posle dalsiu operaciu toho isteho
+  // druhu) by sa odpoved na A priradila k B — zavrela by cudzi modal a zahodila
+  // jeho draft, alebo by ukazala cudzie odmietnutie. Kazde odoslanie ma preto
+  // VLASTNY rastuci token; server ho vracia v echu a klient porovnava JEHO.
+  var HW_MAN_SEQ = 0;
+  function hwManualToken(){ HW_MAN_SEQ += 1; return 'h' + HW_MAN_SEQ; }
+
+  function hwManualUnitLabel(u){
+    var v = String(u == null ? '' : u);
+    for (var i = 0; i < HW_MANUAL_UNITS.length; i++){
+      if (HW_MANUAL_UNITS[i][0] === v) return HW_MANUAL_UNITS[i][1];
+    }
+    return v || 'ks';   // MJ z novsej verzie sa NEPREKLADA, ale ani nezahadzuje
+  }
+  // Cislo s desatinnou CIARKOU (slovensky zapis) — 2 desatiny, nikdy 0 miesto
+  // „nezadana" (standard §11.3: nezadana cena je pomlcka, nie nula).
+  function hwManualNum(v){
+    var f = Number(v);
+    if (v == null || !isFinite(f)) return '';
+    return f.toFixed(2).replace('.', ',');
+  }
+  function hwManualPriceText(v){
+    var s = hwManualNum(v);
+    return s === '' ? '—' : (s + ' €');
+  }
+  // Vlastnik do vety. Popis sklada SERVER (`PartKeys.human_label`); prazdny
+  // = polozka patri celej skrinke.
+  function hwManualOwnerText(it){
+    var l = String((it && it.owner_label) || '');
+    return l === '' ? 'celá skrinka' : l;
+  }
+  function hwManualName(it){
+    var n = String((it && it.name) || '').trim();
+    if (n !== '') return n;
+    var c = String((it && it.code) || '').trim();
+    return c !== '' ? c : 'bez názvu';
+  }
+  // Chipy riadku. „ručná" je VZDY (je to jediny rozdiel oproti polozke
+  // z pravidiel), zvysne dva su STAVY, ktore treba priznat.
+  // -> [{ text, title, warn }]
+  function hwManualChips(it){
+    var out = [{ text: 'ručná', title: 'Pridané ručne — mimo setov a pravidiel', warn: false }];
+    if (it && it.owner_missing === true){
+      out.push({ text: 'bez vlastníka',
+                 title: 'Dielec, ku ktorému bola pripnutá, už neexistuje — položka ostáva v nákupe',
+                 warn: true });
+    }
+    if (it && it.catalog_missing === true){
+      out.push({ text: 'chýba v katalógu',
+                 title: 'Kód už nie je v katalógu kovania — v nákupe ostáva bez ceny',
+                 warn: true });
+    }
+    return out;
+  }
+  function hwManualQtyText(it){
+    var q = parseInt(it && it.qty, 10);
+    return (isFinite(q) ? q : 0) + ' ' + hwManualUnitLabel(it && it.unit);
+  }
+  // Sekundarny riadok (vzor D-92 `.hwbuy`): kod · cena/MJ · patri · poznamka.
+  function hwManualBuyText(it){
+    var d = it || {};
+    var parts = [];
+    parts.push(d.source === 'free' ? 'voľná položka' : (String(d.code || '') || 'bez kódu'));
+    parts.push(hwManualPriceText(d.price_eur_vat) + ' / ' + hwManualUnitLabel(d.unit));
+    parts.push('patrí: ' + hwManualOwnerText(d));
+    var note = String(d.note || '').trim();
+    if (note !== '') parts.push('pozn.: ' + note);
+    return parts.join(' · ');
+  }
+  function hwManualTitle(it){
+    return hwManualName(it) + ' · ' + hwManualQtyText(it) + ' · ' + hwManualBuyText(it);
+  }
+
+  function hwManualItemHtml(it){
+    var id = esc(String((it && it.id) || ''));
+    var chips = hwManualChips(it).map(function(c){
+      return ' <span class="hwchip' + (c.warn ? ' warn' : '') + '" title="' + esc(c.title) + '">'
+           + esc(c.text) + '</span>';
+    }).join('');
+    var buy = hwManualBuyText(it);
+    return '<div class="hwitem hwman-item" data-manid="' + id + '">'
+      // `.hwrow` = ta ista geometria ako riadok polozky z pravidiel; identitne
+      // atributy (data-owner/type/rule) tu ZAMERNE NIE SU — ad-hoc polozka
+      // ziadne pravidlo nema a `refreshHardwarePurchase` ju hladat nesmie.
+      + '<div class="hwrow hwman-row">'
+      + '<span class="hwname" title="' + esc(hwManualTitle(it)) + '">'
+      + esc(hwManualName(it)) + chips + '</span>'
+      + '<span class="hwman-qty">' + esc(hwManualQtyText(it)) + '</span>'
+      + '<button type="button" class="ghostbtn hwbtn" data-id="' + id + '"'
+      + ' title="Upraviť ručnú položku" aria-label="Upraviť ručnú položku"'
+      + ' onclick="onHwManualEdit(this)">' + NXIcons.svg('pencil') + '</button>'
+      + '<button type="button" class="ghostbtn hwbtn" data-id="' + id + '"'
+      + ' title="Odstrániť ručnú položku (Ctrl+Z ju vráti)" aria-label="Odstrániť ručnú položku"'
+      + ' onclick="onHwManualDel(this)">' + NXIcons.svg('trash') + '</button>'
+      + '</div>'
+      + '<div class="hwbuy' + ((it && (it.owner_missing || it.catalog_missing)) ? ' hwbuy-warn' : '')
+      + '" title="' + esc(buy) + '">' + esc(buy) + '</div>'
+      + '</div>';
+  }
+
+  // Cely blok. Nadpis je LEN ked su polozky (prazdny nadpis nad tlacidlom by
+  // zabral riadok a nepovedal nic — vertikalny priestor panela je vzacny).
+  // OBAL a OBSAH su ZVLAST (vzor `rowsHtml`/`rowsInnerHtml` v nx_modal.js):
+  // zivy refresh po zmene katalogu prepisuje LEN obsah, takze uzol bloku
+  // prezije a nic ine v sekcii sa nedotkne.
+  function hwManualInnerHtml(list){
+    var items = list || ((typeof hwManualView !== 'undefined' && hwManualView) ? hwManualView : []);
+    var rows = items.map(hwManualItemHtml).join('');
+    return (rows ? '<div class="hwmanh">Ručne pridané</div>' + rows : '')
+      + '<div class="hwmanadd"><button type="button" class="ghostbtn hwmanbtn"'
+      + ' title="Konkrétna položka mimo setov — pripne sa ku skrinke alebo k dielcu"'
+      + ' onclick="onHwManualAdd()">' + NXIcons.svg('plus')
+      + ' Pridať konkrétnu položku (mimo setov)</button></div>';
+  }
+  function hwManualHtml(list){
+    return '<div class="hwman" id="hwManBlock">' + hwManualInnerHtml(list) + '</div>';
+  }
+
+  // ZIVY refresh riadkov ad-hoc poloziek (Codex #285 P2-D) — bez plneho pushu
+  // vyberu. Prekresluje LEN vlastny blok: boxy vlastnikov, rozpisany pocet ani
+  // vyber setu sa nedotknu (vzor `refreshHardwarePurchase`).
+  function refreshHardwareManual(view){
+    hwManualView = Array.isArray(view) ? view : [];
+    var block = el('hwManBlock');
+    if (!block) return false;                        // sekcia nie je vykreslena
+    block.innerHTML = hwManualInnerHtml();
+    return true;
+  }
+
+  // ---- modal (D-15 kostra) -------------------------------------------------
+  function hwManualFind(id){
+    var list = (typeof hwManualView !== 'undefined' && hwManualView) ? hwManualView : [];
+    for (var i = 0; i < list.length; i++){
+      if (String(list[i].id) === String(id)) return list[i];
+    }
+    return null;
+  }
+  // Ponuka „Patrí k". Vlastnik, ktory uz v plane NIE JE (zmenena konstrukcia),
+  // sa PRIZNA ako doplnena volba — inak by select klamal a uprava polozky by
+  // ju ticho prepla na celu skrinku (vzor `hwSetOptionList`).
+  function hwManualOwnerOptions(owners, current){
+    var cur = String(current == null ? '' : current);
+    var out = [];
+    var found = false;
+    (owners || []).forEach(function(o){
+      if (!o) return;
+      var k = String(o.key == null ? '' : o.key);
+      if (k === cur) found = true;
+      out.push([k, String(o.label || (k === '' ? 'celá skrinka' : k))]);
+    });
+    if (!out.length) out.push(['', 'celá skrinka']);
+    if (cur !== '' && !found) out.push([cur, cur + ' (dielec už neexistuje)']);
+    return out;
+  }
+  // Text vybranej katalogovej polozky do pola hladania.
+  function hwManualItemText(it){
+    var code = String((it && it.code) || '');
+    var name = String((it && it.name) || '');
+    if (code === '') return name;
+    return name === '' ? code : (code + ' · ' + name);
+  }
+  // Hodnoty formulara pre polozku (alebo prazdny formular pri pridavani).
+  function hwManualDraft(it){
+    if (!it){
+      return { owner: '', source: 'catalog', code: '', code_text: '',
+               name: '', unit: 'ks', price: '', qty: '1', note: '' };
+    }
+    var free = it.source === 'free';
+    return { owner: String(it.owner_part_key || ''),
+             source: free ? 'free' : 'catalog',
+             code: String(it.code || ''),
+             code_text: hwManualItemText(it),
+             name: free ? String(it.name || '') : '',
+             unit: String(it.unit || 'ks'),
+             price: free ? hwManualNum(it.price_eur_vat) : '',
+             qty: String(it.qty == null ? 1 : it.qty),
+             note: String(it.note || '') };
+  }
+  // Polia modalu. KONTEXTOVE: pri katalogovej polozke sa pyta KOD, pri volnej
+  // nazov/MJ/cena. Cena KATALOGOVEJ polozky sa needituje ani neposiela —
+  // oceni ju zivy katalog (KOV-H1 BLOCKER 2), takze je to len informacia
+  // pod polom (vedoma odchylka od mockupu, ktory mal „Cena s DPH (snapshot)").
+  // CISTA funkcia (Node testy).
+  function hwManualFields(owners, draft){
+    var v = draft || hwManualDraft(null);
+    var src = (v.source === 'free') ? 'free' : 'catalog';
+    var out = [
+      { key: 'owner', label: 'Patrí k', type: 'select', value: String(v.owner || ''),
+        options: hwManualOwnerOptions(owners, v.owner),
+        hint: 'vo výrobe aj v nákupe bude vidieť, kam patrí' },
+      { key: 'source', label: 'Zdroj', type: 'select', value: src,
+        options: [['catalog', 'Z katalógu'], ['free', 'Voľná položka']] }
+    ];
+    if (src === 'catalog'){
+      out.push({ key: 'code', label: 'Položka katalógu', type: 'lookup',
+                 placeholder: 'kód alebo názov (napr. 93240 alebo uholník)',
+                 value: String(v.code || ''), valueText: String(v.code_text || ''),
+                 hintText: 'Cenu aj názov drží katalóg — do zákazky sa neukladajú.',
+                 search: hwManualSearch });
+    } else {
+      out.push({ key: 'name', label: 'Názov', value: String(v.name || ''),
+                 placeholder: 'napr. zámok Abloy' });
+      out.push({ key: 'unit', label: 'MJ', type: 'select', cls: 'mshort',
+                 value: String(v.unit || 'ks'), options: HW_MANUAL_UNITS });
+      out.push({ key: 'price', label: 'Cena s DPH', cls: 'mshort',
+                 value: String(v.price || ''), placeholder: '0,00',
+                 hint: '€ za MJ · prázdne = bez ceny' });
+    }
+    out.push({ key: 'qty', label: 'Množstvo', cls: 'mshort', value: String(v.qty || '1'),
+               hint: 'celé číslo 1 – ' + HW_MANUAL_QTY_MAX });
+    out.push({ key: 'note', label: 'Poznámka', value: String(v.note || ''),
+               placeholder: 'nepovinné — napr. podľa priania zákazníka' });
+    return out;
+  }
+
+  // Hladanie v katalogu = SERVEROVA cesta (`hw_manual_search`). Panel poradie
+  // NESKLADA — kresli, co pride.
+  function hwManualSearch(query, done){
+    HW_MAN_Q.gen++;
+    HW_MAN_Q.done = done;
+    if (!(window.sketchup && sketchup.hw_manual_search)){ done([], 0); return; }
+    sketchup.hw_manual_search(JSON.stringify({ q: String(query == null ? '' : query),
+                                               gen: HW_MAN_Q.gen }));
+  }
+  // Jedna polozka katalogu do tvaru, ktoremu rozumie kostra (`lookup`).
+  function hwManualHit(i){
+    var d = i || {};
+    var code = String(d.code || '');
+    var name = String(d.name_sk || '');
+    var price = (d.price_eur_vat == null)
+      ? 'cena nezadaná'
+      : (hwManualPriceText(d.price_eur_vat) + ' s DPH / ' + hwManualUnitLabel(d.unit));
+    return { value: code,
+             text: (code === '' ? name : (name === '' ? code : code + ' · ' + name)),
+             hint: price + ' · katalóg' + (d.category ? ' · ' + d.category : '') };
+  }
+  // Odpoved servera. STARSIA GENERACIA sa zahadzuje — odpovede chodia
+  // asynchronne a pomalsie kolo by prepisalo cerstvejsie vysledky.
+  function hwManualSearchResult(res){
+    var r = res || {};
+    if (Number(r.gen) !== HW_MAN_Q.gen) return;
+    var done = HW_MAN_Q.done;
+    if (typeof done !== 'function') return;
+    done((r.items || []).map(hwManualHit), Number(r.total || 0));
+  }
+
+  function hwManualOpen(item, draft){
+    if (typeof NXModal === 'undefined' || !NXModal || typeof NXModal.open !== 'function') return;
+    var owners = (typeof hwManualOwners !== 'undefined' && hwManualOwners) ? hwManualOwners : [];
+    NXModal.open({
+      title: item ? 'Upraviť ručnú položku' : 'Pridať konkrétnu položku (mimo setov)',
+      sub: 'mimo setov — ide rovno do nákupu',
+      size: 'md',
+      okLabel: item ? 'Uložiť' : 'Pridať',
+      // Konvencia kluca `<okno/domena>:<mode>[:<ciel>]` — `hw:manual:edit:<id>`
+      // sa deli o jeden slot, takze otvorenie INEJ polozky stary rozpis zahodi.
+      memoryKey: item ? ('hw:manual:edit:' + item.id) : 'hw:manual:add',
+      note: 'Položka ide priamo do nákupu a rozpočtu. Katalógovú ocení živý katalóg — ' +
+            'jej cena sa do zákazky neukladá.',
+      fields: hwManualFields(owners, draft || hwManualDraft(item)),
+      onSubmit: function(v){ hwManualSubmit(v, item); },
+      // P2-G: zatvorenie (Escape, scrim, krizik, „Zrušiť" aj nase vlastne)
+      // stav VZDY vycisti. Bez toho by po beznom zatvoreni ostal visiet a
+      // najblizsia zmena vyberu by hlasila „okno sa zavrelo, nič sa
+      // neuložilo" — hoci ho pouzivatel zavrel sam.
+      onClose: function(){ HW_MAN = null; }
+    });
+    // AZ ZA `open`: kostra najprv zatvara predchadzajuci modal, takze jeho
+    // `onClose` by novy stav hned vynuloval.
+    HW_MAN = { id: item ? String(item.id) : null, kind: item ? 'edit' : 'add',
+               sent: false, token: null,
+               // P2-F: draft prezije prepinanie zdroja — su v nom aj hodnoty
+               // toho zdroja, ktory prave nie je vykresleny.
+               draft: draft || hwManualDraft(item) };
+  }
+  function onHwManualAdd(){ hwManualOpen(null, null); }
+  function onHwManualEdit(btn){
+    var it = hwManualFind(btn.getAttribute('data-id'));
+    if (!it){ NX.setStatus('Položka sa medzitým zmenila — panel sa obnovil.', true); return; }
+    hwManualOpen(it, null);
+  }
+  // Vliatie VIDITELNYCH hodnot do draftu. Kluce, ktore prave vykreslene nie su
+  // (druhy zdroj), sa NEPREPISUJU — draft si ich drzi dalej. CISTA funkcia.
+  //
+  // Codex #285 kolo 2 P2-F: predtym sa draft skladal z ULOZENEJ polozky +
+  // prave vykreslenych poli, takze cesta „voľná -> katalóg -> voľná" zahodila
+  // napisany nazov aj cenu (a rovnako nevybrany dotaz katalogu). Hodnoty
+  // NEAKTIVNEHO zdroja ziju VYHRADNE v drafte — do `values()` ani do configu
+  // sa nedostanu (`hwManualRecord` cita len polia svojho zdroja).
+  var HW_MAN_DRAFT_KEYS = ['owner', 'qty', 'note', 'code', 'code_text', 'name', 'unit', 'price'];
+
+  function hwManualMergeDraft(base, values, queryText){
+    var d = {};
+    var b = base || {};
+    var k;
+    for (k in b){ if (Object.prototype.hasOwnProperty.call(b, k)) d[k] = b[k]; }
+    var v = values || {};
+    HW_MAN_DRAFT_KEYS.forEach(function(key){
+      if (v[key] != null) d[key] = String(v[key]);
+    });
+    if (v.source === 'free' || v.source === 'catalog') d.source = v.source;
+    // Nevybrany dotaz katalogu nie je vo `values()` (kontrakt `lookup` vracia
+    // LEN kod) — cita sa z pola hladania, inak by sa prepnutim stratil.
+    if (queryText != null) d.code_text = String(queryText);
+    return d;
+  }
+
+  // Prepnutie „Zdroj" meni SADU POLI, a tu kostra D-15 za behu nevymiena —
+  // modal sa preto otvori znova s TYM, CO UZ POUZIVATEL NAPISAL. Hodnoty nesie
+  // DRAFT MODALU (nie pamat: tá porovnava proti defaultom a hodnoty druheho,
+  // prave nevykresleneho zdroja by nemala proti comu merat).
+  function hwManualCtxSwitch(){
+    if (!HW_MAN || typeof NXModal === 'undefined' || !NXModal.isOpen || !NXModal.isOpen()) return;
+    if (NXModal.isBusy && NXModal.isBusy()) return;   // bezi zapis — nesahat
+    var item = HW_MAN.id ? hwManualFind(HW_MAN.id) : null;
+    var qn = (typeof el === 'function') ? el('nxm_code_q') : null;
+    var base = HW_MAN.draft || hwManualDraft(item);
+    var d = hwManualMergeDraft(base, NXModal.values(), qn ? qn.value : null);
+    hwManualOpen(item, d);
+  }
+  if (typeof document !== 'undefined' && document.addEventListener){
+    document.addEventListener('change', function(ev){
+      var t = ev.target;
+      if (!t || !t.getAttribute) return;
+      if (t.getAttribute('data-nxm') !== 'source') return;
+      hwManualCtxSwitch();
+    });
+  }
+
+  // ---- validacia a zapis ---------------------------------------------------
+  // Klient strazi LEN povinne polia a format. AUTORITA je server
+  // (`manual_preflight`): vlastnik musi existovat v plane, kod v katalogu.
+  // CISTA funkcia (Node testy) -> [] | [{ field, msg }]
+  function hwManualValidate(v){
+    var d = v || {};
+    var out = [];
+    var free = d.source === 'free';
+    if (free){
+      if (String(d.name || '').trim() === ''){
+        out.push({ field: 'name', msg: 'Voľná položka musí mať názov.' });
+      }
+      if (hwManualParsePrice(d.price) === false){
+        out.push({ field: 'price', msg: 'Cena musí byť nezáporné číslo (alebo prázdna).' });
+      }
+    } else if (String(d.code || '').trim() === ''){
+      out.push({ field: 'code', msg: 'Vyber položku z katalógu — alebo prepni Zdroj na voľnú položku.' });
+    }
+    var q = String(d.qty == null ? '' : d.qty).trim();
+    var n = /^\d+$/.test(q) ? parseInt(q, 10) : NaN;
+    if (!isFinite(n) || n < 1 || n > HW_MANUAL_QTY_MAX){
+      out.push({ field: 'qty', msg: 'Množstvo musí byť celé číslo 1 až ' + HW_MANUAL_QTY_MAX + '.' });
+    }
+    if (String(d.note || '').length > HW_MANUAL_NOTE_MAX){
+      out.push({ field: 'note', msg: 'Poznámka je dlhšia než ' + HW_MANUAL_NOTE_MAX + ' znakov.' });
+    }
+    return out;
+  }
+  // -> null (prazdne = bez ceny) | Number | false (nezmysel)
+  function hwManualParsePrice(raw){
+    var s = String(raw == null ? '' : raw).trim().replace(',', '.');
+    if (s === '') return null;
+    if (!/^\d+(\.\d+)?$/.test(s)) return false;
+    var f = parseFloat(s);
+    return (isFinite(f) && f >= 0) ? f : false;
+  }
+  // Zaznam do configu. Pri KATALOGOVEJ polozke ide LEN kod (KOV-H1 FIX 12:
+  // klientovi sa veri len kod — nazov, MJ aj cenu dopĺňa server z katalogu).
+  // `id` je pri pridavani PRAZDNE: prideluje ho server (`norm_hardware_manual`).
+  // CISTA funkcia (Node testy).
+  function hwManualRecord(v, item){
+    var d = v || {};
+    var free = d.source === 'free';
+    var rec = { id: item ? String(item.id) : '',
+                owner_part_key: (String(d.owner || '') === '') ? null : String(d.owner),
+                source: free ? 'free' : 'catalog',
+                qty: parseInt(String(d.qty || '').trim(), 10),
+                note: String(d.note == null ? '' : d.note) };
+    if (free){
+      rec.name = String(d.name || '').trim();
+      rec.unit = String(d.unit || 'ks');
+      var p = hwManualParsePrice(d.price);
+      if (typeof p === 'number') rec.price_eur_vat = p;
+    } else {
+      rec.code = String(d.code || '').trim();
+    }
+    return rec;
+  }
+  // Novy CELY zoznam (panel posiela echo, nie diff). `null` = operacia sa
+  // nedala vykonat (polozka v zozname nie je) — TICHY append by z upravy
+  // spravil duplikat. CISTA funkcia (Node testy).
+  function hwManualNextList(list, rec, op){
+    var kind = (op || {}).kind;
+    var id = String((op || {}).id || '');
+    var out = [];
+    var hit = false;
+    (list || []).forEach(function(x){
+      var xid = String((x && x.id) || '');
+      if (id !== '' && xid === id){
+        hit = true;
+        if (kind === 'delete') return;
+        if (kind === 'edit'){ out.push(rec); return; }
+      }
+      out.push(x);
+    });
+    if (kind === 'add'){ out.push(rec); return out; }
+    return hit ? out : null;
+  }
+
+  function hwManualSend(next, op){
+    // Cervene pole formulara by zapis aj tak zastavilo v `flushCabinetEdits` —
+    // tu sa zastavi SKOR, aby sa modal nezamkol nad zapisom, ktory neodide.
+    if (typeof validateFields === 'function' && !validateFields()){
+      NX.setStatus('Skontroluj červené polia — kým sú v poriadku, položka sa neuloží.', true);
+      return false;
+    }
+    // Rozpisany edit formulara ide S NAMI v tom istom payloade (`collectAll`),
+    // takze cakajuci debounce sa RUSI — samostatny flush by znamenal DVA
+    // rebuildy a dva kroky Spat pre jednu zmenu.
+    if (typeof cancelCabinetEdits === 'function') cancelCabinetEdits();
+    hwManual = next;
+    var payload = collectAll();
+    payload.cabinet_id = selectedCabId;
+    payload.manual_op = op;
+    cabEditsInFlight = true; // echo tohto apply nesmie prepisat novsi vstup
+    if (window.sketchup && sketchup.apply_all) sketchup.apply_all(nxDocPayload(payload));
+    return true;
+  }
+
+  function hwManualSubmit(values, item){
+    var errs = hwManualValidate(values);
+    if (errs.length){ NXModal.showErrors(errs); NXModal.setBusy(false); return; }
+    if (!Array.isArray(hwManual)){
+      // `|| []` je zakazane: „o polozkach neviem" nie je „polozky nie su".
+      NXModal.showErrors([{ msg: 'Panel nemá zoznam ručných položiek — označ skrinku znova.' }]);
+      NXModal.setBusy(false);
+      return;
+    }
+    var op = { kind: item ? 'edit' : 'add', id: item ? String(item.id) : '',
+               token: hwManualToken() };
+    var next = hwManualNextList(hwManual, hwManualRecord(values, item), op);
+    if (!next){
+      NXModal.showErrors([{ msg: 'Položka sa medzitým zmenila — zavri okno a skús znova.' }]);
+      NXModal.setBusy(false);
+      return;
+    }
+    NXModal.clearErrors();
+    if (!hwManualSend(next, op)){ NXModal.setBusy(false); return; }
+    if (HW_MAN){ HW_MAN.sent = true; HW_MAN.token = op.token; }
+  }
+
+  // Mazanie ide BEZ potvrdzovacieho okna — poistka je JEDEN krok Spat (vzor
+  // „Vrátiť na pravidlo"); potvrdzovacie okno pri kazdom mazani by bolo klik
+  // navyse pri kazdej oprave. Status povie, CO sa odstranilo.
+  function onHwManualDel(btn){
+    var it = hwManualFind(btn.getAttribute('data-id'));
+    if (!it){ NX.setStatus('Položka sa medzitým zmenila — panel sa obnovil.', true); return; }
+    if (!Array.isArray(hwManual)){
+      NX.setStatus('Panel nemá zoznam ručných položiek — označ skrinku znova.', true);
+      return;
+    }
+    var op = { kind: 'delete', id: String(it.id), token: hwManualToken() };
+    var next = hwManualNextList(hwManual, null, op);
+    if (!next){ NX.setStatus('Položka sa medzitým zmenila — panel sa obnovil.', true); return; }
+    hwManualSend(next, op);
+  }
+
+  // ---- ZATVORENIE MODALU PRI ZMENE IDENTITY (Codex #285 P1) ---------------
+  // Modal drzi ROZPISANY zoznam JEDNEJ skrinky. Ked sa pod nim zmeni vyber
+  // (ina skrinka, iny dokument, doska, prazdny vyber), `loadSelected` vymeni
+  // `hwManual`/`hwManualView`/`hwManualOwners` aj `selectedCabId` — a odoslanie
+  // stareho formulara by potom postavilo zoznam z NOVEJ skrinky a orazitkovalo
+  // ho JEJ identitou. Polozka by pristala na nespravnej skrinke a pri zhode
+  // `id` by dokonca PREPISALA cudzi zaznam.
+  //
+  // Zatvara sa preto VYHRADNE pri zmene IDENTITY. Echo TEJ ISTEJ skrinky (nas
+  // vlastny apply, na ktory modal prave caka) modal zatvorit NESMIE — inak by
+  // sa zavrel skor, nez by prisla odpoved, ktoru drzi otvoreny.
+  function hwManualDropModal(reason){
+    var open = (typeof NXModal !== 'undefined' && NXModal &&
+                typeof NXModal.isOpen === 'function' && NXModal.isOpen());
+    // P2-G: hlasi sa LEN skutocne zatvorenie. Ked uz okno otvorene nie je
+    // (pouzivatel ho zavrel sam), nema sa co ohlasovat — hlaska „nič sa
+    // neuložilo" by tvrdila, ze o nieco prisiel.
+    if (!open){ HW_MAN = null; return false; }
+    HW_MAN = null;
+    HW_MAN_Q.gen++;      // bezuce hladanie uz nema komu odpovedat
+    HW_MAN_Q.done = null;
+    if (typeof NXModal.close === 'function') NXModal.close();
+    if (reason && typeof NX !== 'undefined' && NX && NX.setStatus) NX.setStatus(reason, true);
+    return true;
+  }
+  // Dovod je JEDEN text (JS ho nesklada z kusov) — pouzivatel musi vediet, ze
+  // sa nic neulozilo, inak by cakal, ze polozka pribudla.
+  var HW_MAN_DROP_SK = 'Výber sa zmenil — okno ručnej položky sa zavrelo, nič sa neuložilo.';
+
+  // ROZHODNUTIE „je to iny vyber?" zije TU, nie v `bridge.js` — modal patri
+  // tomuto suboru a podmienka sa nesmie rozist s tym, co modal drzi.
+  // `sameDoc` dodava volajuci (identitu dokumentu pozna push), `cabId` je
+  // skrinka CERSTVEHO payloadu. -> true = modal sa zavrel.
+  function hwManualDropIfForeign(cabId, sameDoc){
+    if (sameDoc === true && String(cabId == null ? '' : cabId) === String(selectedCabId || '')){
+      return false;   // ECHO tej istej skrinky — modal caka prave na nu
+    }
+    return hwManualDropModal(HW_MAN_DROP_SK);
+  }
+
+  // Odpoved servera na zapis. Modal ZAMOK odomyka VYHRADNE volajuci (kontrakt
+  // D-15) — a to v OBOCH vetvach: uspech okno zatvara a pamat draftu zahadza,
+  // odmietnutie ho necha OTVORENE s hodnotami a len povie dovod.
+  //
+  // KORELACIA JE PO TOKENE (Codex #285 P2-A), nie po druhu operacie: `kind`
+  // odpoved nerozlisi (vsetky `add` maju prazdne `id`), takze pomala prestavba
+  // by odpoved na UZ ZAVRETY modal priradila k prave otvorenemu. Modal preberie
+  // odpoved LEN vtedy, ked sedi token, ktory sam odoslal. Ten isty callback
+  // pride aj po mazani z riadku (bez modalu) — vtedy staci status.
+  function onHwManualResult(ok, msg, op){
+    var text = String(msg == null ? '' : msg);
+    var open = (typeof NXModal !== 'undefined' && NXModal &&
+                typeof NXModal.isOpen === 'function' && NXModal.isOpen());
+    var token = String((op && op.token) == null ? '' : op.token);
+    var mine = !!(HW_MAN && HW_MAN.sent && open && op && token !== '' &&
+                  token === String(HW_MAN.token == null ? '' : HW_MAN.token));
+    if (!mine){
+      if (text) NX.setStatus(text, ok !== true);
+      return;
+    }
+    if (ok === true){
+      NXModal.setBusy(false, { clear: true });   // server potvrdil -> pamat zaniká
+      NXModal.close();
+      HW_MAN = null;
+      if (text) NX.setStatus(text, false);
+      return;
+    }
+    HW_MAN.sent = false;
+    NXModal.setBusy(false);
+    NXModal.showErrors([{ msg: text || 'Položka sa neuložila.' }]);
+  }
+
   // Node testy (tests/js/test_hw_panel_sets.js) — LEN ciste funkcie ponuky
   // setov (bez DOM). V CEF je module undefined a vetva sa preskoci.
   if (typeof module !== 'undefined' && module.exports){
@@ -815,5 +1387,32 @@
       hwItemManual: hwItemManual, hwShelfPinSummary: hwShelfPinSummary,
       hwShelfCountText: hwShelfCountText, hwShelfPinTitle: hwShelfPinTitle,
       hwShelfPinTip: hwShelfPinTip, hwSplitShelfPins: hwSplitShelfPins,
-      HW_SHELF_PIN: HW_SHELF_PIN, HW_PINS_MIN: HW_PINS_MIN, HW_PINS_KEY: HW_PINS_KEY };
+      HW_SHELF_PIN: HW_SHELF_PIN, HW_PINS_MIN: HW_PINS_MIN, HW_PINS_KEY: HW_PINS_KEY,
+      // KOV-H2 ad-hoc polozky (tests/js/test_kovh2_adhoc_ui.js) — ciste
+      // skladanie textov, poli modalu, validacia a novy zoznam; DOM sa testuje
+      // cez mini-DOM nad kostrou D-15.
+      HW_MANUAL_UNITS: HW_MANUAL_UNITS, HW_MANUAL_QTY_MAX: HW_MANUAL_QTY_MAX,
+      HW_MANUAL_NOTE_MAX: HW_MANUAL_NOTE_MAX,
+      hwManualUnitLabel: hwManualUnitLabel, hwManualPriceText: hwManualPriceText,
+      hwManualOwnerText: hwManualOwnerText, hwManualName: hwManualName,
+      hwManualChips: hwManualChips, hwManualQtyText: hwManualQtyText,
+      hwManualBuyText: hwManualBuyText, hwManualItemHtml: hwManualItemHtml,
+      hwManualHtml: hwManualHtml, hwManualInnerHtml: hwManualInnerHtml,
+      hwManualOwnerOptions: hwManualOwnerOptions,
+      hwManualItemText: hwManualItemText, hwManualDraft: hwManualDraft,
+      hwManualFields: hwManualFields, hwManualHit: hwManualHit,
+      hwManualMergeDraft: hwManualMergeDraft,
+      hwManualValidate: hwManualValidate, hwManualParsePrice: hwManualParsePrice,
+      hwManualRecord: hwManualRecord, hwManualNextList: hwManualNextList,
+      // CELY tok modalu (mini-DOM): otvorenie -> hladanie -> odoslanie ->
+      // odpoved servera. Testovat ho po castiach by znamenalo napisat si vlastnu
+      // kopiu toku a overovat kopiu, nie produkt.
+      hwManualOpen: hwManualOpen, hwManualSubmit: hwManualSubmit,
+      hwManualSearchResult: hwManualSearchResult, hwManualCtxSwitch: hwManualCtxSwitch,
+      onHwManualResult: onHwManualResult, onHwManualDel: onHwManualDel,
+      onHwManualEdit: onHwManualEdit, onHwManualAdd: onHwManualAdd,
+      hwManualDropModal: hwManualDropModal, HW_MAN_DROP_SK: HW_MAN_DROP_SK,
+      hwManualDropIfForeign: hwManualDropIfForeign,
+      refreshHardwareManual: refreshHardwareManual,
+      hwManualState: function(){ return HW_MAN; } };
   }

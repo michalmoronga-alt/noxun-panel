@@ -160,6 +160,23 @@ ins.setHardware(ins.composeSource(DEFAULTS, TPL)); // sablona bez kovania
 eq(ins.hardwarePayload(), {}, 'prepnutie na sablonu bez ad-hoc poloziek stav vycisti');
 eq(ins.HARDWARE_LIST_KEYS, ['hardware_manual'], 'zoznam POLOVYCH klucov kovania je kontrakt');
 
+// KOV-H2: ZOBRAZOVACIE projekcie ad-hoc poloziek (`hardware_manual_view`,
+// `hardware_manual_owners`) sa do vkladania NEDOSTANU. Su to udaje SERVERA pre
+// obrazovku (zive ceny, popisky vlastnika, ponuka dielcov) — keby ich vklad
+// poslal spat, cena z obrazovky by skoncila v configu novej skrinky.
+const TPL_VIEW = deepFreeze({
+  type: 'lower', width: 600,
+  hardware_manual: [{ id: 'H1', source: 'catalog', code: '93240', qty: 2 }],
+  hardware_manual_view: [{ id: 'H1', name: 'Bystrica', price_eur_vat: 1.14 }],
+  hardware_manual_owners: [{ key: null, label: 'celá skrinka' }]
+});
+ins.setHardware(TPL_VIEW);
+eq(Object.keys(ins.hardwarePayload()), ['hardware_manual'],
+  'do insert payloadu ide LEN `hardware_manual` — projekcie sa nikdy neposielaju');
+eq(Object.keys(ins.hardwareOf(TPL_VIEW)).sort(),
+  ['hardware_manual', 'hardware_set_defs', 'hardware_sets'],
+  'a stav vkladania o `_view`/`_owners` ani nevie');
+
 // --- UI-C1a: druh sablony (identita = kind + name) ---
 eq(ins.templateKind({ name: 'A', kind: 'cabinet' }), 'cabinet', 'explicitny kind cabinet');
 eq(ins.templateKind({ name: 'A', kind: 'board' }), 'board', 'explicitny kind board');
