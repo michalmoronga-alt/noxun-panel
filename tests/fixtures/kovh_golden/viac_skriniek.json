@@ -1,0 +1,55 @@
+{
+  "expand": {
+    "rows": [
+      {
+        "code": "BLUM-71B3550",
+        "quantity": 7,
+        "sources": [
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": null,
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2
+          },
+          {
+            "cabinet_id": "CAB-002",
+            "owner_part_key": null,
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 3
+          },
+          {
+            "cabinet_id": "CAB-003",
+            "owner_part_key": null,
+            "generic_type": "hinge",
+            "rule_id": "zavesy-podla-vysky",
+            "set_id": "zaves-klasik",
+            "quantity": 2
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "Záves Clip Top 110°",
+        "category": "ZAVESY",
+        "unit": "ks",
+        "price_eur_vat": 3.42,
+        "manual_note": null,
+        "subtotal_eur_vat": 23.94
+      }
+    ],
+    "unmapped": [
+
+    ],
+    "summary": {
+      "rows": 1,
+      "quantity": 7,
+      "total_eur_vat": 23.94,
+      "unknown_prices": 0,
+      "unmapped": 0
+    }
+  },
+  "csv": "\"NOXUN kovanie — nákupný zoznam\";\"GOLDEN\";\"2026-09-03 00:00\"\r\n\"kategória\";\"kód\";\"názov\";\"počet\";\"MJ\";\"cena € s DPH\";\"medzisúčet € s DPH\"\r\n\"ZAVESY\";\"BLUM-71B3550\";\"Záves Clip Top 110°\";\"7\";\"ks\";\"3,42\";\"23,94\"\r\n\"SPOLU (len známe ceny)\";\"\";\"\";\"7\";\"\";\"\";\"23,94\"\r\n"
+}

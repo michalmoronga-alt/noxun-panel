@@ -1,0 +1,61 @@
+{
+  "expand": {
+    "rows": [
+      {
+        "code": "AXILO-100",
+        "quantity": 4,
+        "sources": [
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": null,
+            "generic_type": "leg",
+            "rule_id": "nohy-fixne",
+            "set_id": "nohy-axilo",
+            "quantity": 4
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "Noha AXILO 100 mm",
+        "category": "NOHY",
+        "unit": "ks",
+        "price_eur_vat": 1.15,
+        "manual_note": null,
+        "subtotal_eur_vat": 4.6
+      },
+      {
+        "code": "ZABUDNUTY",
+        "quantity": 4,
+        "sources": [
+          {
+            "cabinet_id": "CAB-002",
+            "owner_part_key": null,
+            "generic_type": "leg",
+            "rule_id": "nohy-fixne",
+            "set_id": "nohy-neznama",
+            "quantity": 4
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": true,
+        "name_sk": null,
+        "category": null,
+        "unit": null,
+        "price_eur_vat": null,
+        "manual_note": null,
+        "subtotal_eur_vat": null
+      }
+    ],
+    "unmapped": [
+
+    ],
+    "summary": {
+      "rows": 2,
+      "quantity": 8,
+      "total_eur_vat": 4.6,
+      "unknown_prices": 1,
+      "unmapped": 0
+    }
+  },
+  "csv": "\"NOXUN kovanie — nákupný zoznam\";\"GOLDEN\";\"2026-09-03 00:00\"\r\n\"kategória\";\"kód\";\"názov\";\"počet\";\"MJ\";\"cena € s DPH\";\"medzisúčet € s DPH\"\r\n\"NOHY\";\"AXILO-100\";\"Noha AXILO 100 mm\";\"4\";\"ks\";\"1,15\";\"4,60\"\r\n\"MIMO KATALÓGU\";\"ZABUDNUTY\";\"\";\"4\";\"\";\"\";\"\"\r\n\"SPOLU (len známe ceny)\";\"\";\"\";\"8\";\"\";\"\";\"4,60\"\r\n"
+}

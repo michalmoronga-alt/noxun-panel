@@ -1,0 +1,75 @@
+{
+  "expand": {
+    "rows": [
+      {
+        "code": "HET-Q470",
+        "quantity": 1,
+        "sources": [
+          {
+            "cabinet_id": "CAB-001",
+            "owner_part_key": null,
+            "generic_type": "slide",
+            "rule_id": "vysuv-podla-hlbky",
+            "set_id": "vysuv-quadro",
+            "quantity": 1
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "Quadro V6 470 mm",
+        "category": "VYSUVY",
+        "unit": "par",
+        "price_eur_vat": 18.9,
+        "manual_note": null,
+        "subtotal_eur_vat": 18.9
+      },
+      {
+        "code": "HET-Q500",
+        "quantity": 2,
+        "sources": [
+          {
+            "cabinet_id": "CAB-002",
+            "owner_part_key": null,
+            "generic_type": "slide",
+            "rule_id": "vysuv-podla-hlbky",
+            "set_id": "vysuv-quadro",
+            "quantity": 2
+          }
+        ],
+        "manual_quantity": 0,
+        "missing": false,
+        "name_sk": "Quadro V6 500 mm",
+        "category": "VYSUVY",
+        "unit": "par",
+        "price_eur_vat": 19.5,
+        "manual_note": null,
+        "subtotal_eur_vat": 39.0
+      }
+    ],
+    "unmapped": [
+      {
+        "cabinet_id": "CAB-003",
+        "owner_part_key": null,
+        "generic_type": "slide",
+        "rule_id": "vysuv-podla-hlbky",
+        "quantity": 1,
+        "set_id": "vysuv-quadro",
+        "reason": "nl_missing",
+        "nominal_length": 419.6,
+        "params_label": null,
+        "param": "nominal_length",
+        "value": 419.6,
+        "member_index": 0,
+        "member_label": null
+      }
+    ],
+    "summary": {
+      "rows": 2,
+      "quantity": 3,
+      "total_eur_vat": 57.9,
+      "unknown_prices": 0,
+      "unmapped": 1
+    }
+  },
+  "csv": "\"NOXUN kovanie — nákupný zoznam\";\"GOLDEN\";\"2026-09-03 00:00\"\r\n\"kategória\";\"kód\";\"názov\";\"počet\";\"MJ\";\"cena € s DPH\";\"medzisúčet € s DPH\"\r\n\"VYSUVY\";\"HET-Q470\";\"Quadro V6 470 mm\";\"1\";\"par\";\"18,90\";\"18,90\"\r\n\"VYSUVY\";\"HET-Q500\";\"Quadro V6 500 mm\";\"2\";\"par\";\"19,50\";\"39,00\"\r\n\"SPOLU (len známe ceny)\";\"\";\"\";\"3\";\"\";\"\";\"57,90\"\r\n\r\n\"NEMAPOVANÉ (bez kódov — nenacenené)\";\"dôvod\";\"kde\";\"počet\";\"rozmer\";\"\";\"\"\r\n\"slide\";\"set „vysuv-quadro“ nemá kód pre dĺžku NL 419,6\";\"CAB-003\";\"1\";\"\";\"\";\"\"\r\n"
+}
