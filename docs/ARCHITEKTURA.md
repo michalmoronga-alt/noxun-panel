@@ -50,7 +50,7 @@ DC pasce [DC_PRAVIDLA.md](DC_PRAVIDLA.md) · UI dizajn [UI_DIZAJN.md](UI_DIZAJN.
 | `validation` · `bom` · `budget` · `budget_store` · `sheet_estimate` | [architecture/outputs.md](architecture/outputs.md) |
 | `price_refresh` · `supplier_settings` · `vepo_export` · `cp_export` · `xlsx_writer` | [architecture/outputs.md](architecture/outputs.md) |
 | `usage_stats` | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
-| `updater` (D-52a — jadro aktualizácie pluginu: manifest, staging, swap, zámok/lease, restart latch; recovery žije v loaderi) | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
+| `updater` (D-52a jadro — manifest, staging, swap, zámok/lease, restart latch; recovery žije v loaderi · D-52b UI — sekcia „O plugine": asynchrónny check s tokenom, bariéra zatvorenia okien, natívne hlášky) | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
 
 ### Modules (`noxun_engine/modules/`)
 
