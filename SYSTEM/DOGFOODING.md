@@ -49,6 +49,19 @@ v [PLAN.md](PLAN.md) — dnes už len **D-51** a položka „výklop ako samosta
   OTVORENÉ — väčší celok, návrh + Codex audit; kandidát hneď po dávke kovania. **Základ už stojí: D-104 + D-105** (v0.5.58/v0.5.59) dávajú vizuálnu časť pre olep — tri stavy hrany priamo v modeli, s
   prepínačmi, živými počtami a filtrom podľa označeného. D-95 k tomu doplní **odškrtávanie so stavom uloženým v zákazke**, riadený prechod dielec po dielci a rozšírenie na **rozmery a kovanie**; z
   pôvodného zadania ostávajú otvorené aj **šípky smeru dekoru** a **X-ray cez telesá**.*
+- **D-112 · Zmenená ABS (odlišná od dekoru dielca) musí byť viditeľná vo VEPO exporte** (Michal 3.9., dielňa — skladanie zákazky KLINIKA) — dielce, kde ručne zmenil pásku
+  (biely dielec, hnedá ABS), pri zadávaní objednávky do VEPO **zabudol označiť** — VEPO to zvyčajne dostáva ako poznámku v objednávkovom formulári. Plugin rozdiel pozná: hrana nesie
+  `abs_id` a katalóg vie dekor pásky aj dosky, takže „ABS ≠ dekor dielca" je čisto odvodený údaj. VEPO CSV kontrakt **nemá stĺpec poznámky** (`nazov;dlzka;hrana_pozdlz;sirka;
+  hrana_naprieč;hrubka;pocet_ks;material` — pásku VEPO odvodí z materiálu), takže kandidáti: (a) samostatný oddiel vo VEPO LOGu „dielce s odlišnou ABS — prepíš do poznámky objednávky"
+  (najmenší zásah, CSV nezmenené), (b) príznak v stĺpci `nazov` („Dno · ABS hnedá" — pozor na `NAME_MAX` a agregáciu riadkov), (c) samostatná skupina/súbor per ABS dekor.
+  **Výrobný dopad:** nesprávny olep dodaný z VEPO. *Stav: OTVORENÉ — Michal: „zapísať, prebrať a dotiahneme"; výrobný nález (priorita nad plánovanými blokmi), variant sa rozhodne
+  pri debate; patrí k výstupom (VEPO_KONTRAKT + `vepo_export`).*
+- **D-113 · Názvy korpusových dielcov nesú aspoň krátky popis korpusu** (Michal 3.9., dielňa — skladanie KLINIKY) — dielce prídu z VEPO označené názvom z CSV („Dno", „Bok lavy"…),
+  takže pri skladaní nie je vidno, **ku ktorej skrinke dielec patrí**; želaný tvar napr. „Cab1_Dno", „Cab2_Bok L/P". Dnes VEPO `row_name` spája názvy agregovaného riadku (`names`
+  cez `/`, orez `NAME_MAX`) a kusovník riadky zhodných dielcov **zlučuje naprieč skrinkami** (rozmery + materiál + hrany) — pri prefixe skrinky by riadok „Dno" ×3 buď rozpadol,
+  alebo niesol „Cab1/Cab2/Cab3", čo je pri zhodných dielcoch vlastne užitočné (ktorýkoľvek sedí). Zdroj krátkeho kódu: `cabinet_id` (CAB-xxx) alebo `CabinetBuilder.display_name`
+  (D-100 — výstupy názov skrinky dnes nepoužívajú). *Stav: OTVORENÉ — rozhodnúť tvar (kód vs. názov, oddeľovač, dopad na agregáciu a `NAME_MAX`), potom malá dávka vo výstupoch
+  (kusovník + VEPO + štítky); súvisí s D-95 (kontrola diel po diele) a D-94 (pôvod riadku).*
 - **EN DANIELI textový export** výrobného zadania (Michal: „po E") — **vedome odložené z dávky E** (6.8., nič z toho neblokuje prácu so zákazkou); supplier-agnostický výstup. *Stav: čaká na prax — vytiahne sa, keď si to reálna zákazka vypýta.*
 
 ## STABILITA

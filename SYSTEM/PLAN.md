@@ -250,8 +250,8 @@ Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-
   dodá cestu ku KLINIKA `.skp` (na tomto PC nie je) → dvojitý in-SU dump (main vs. vetva) kusovník/nákup/VEPO; do vtedy platí golden + smoke Michala.
   **Riziká:** tichá strata poľa v jednej zo 7 projekcií (preto matica) · omylom materializovaný `unset` (guard) · veľkosť PR (jeden PR, dva logické celky commitov:
   a) kontrakt + roly, b) `hardware_issues` + Validation — pri 3. kole review sa reže presne tu) · **D-52 u Lucie:** prvý model uložený s CONFIG_SCHEMA 2 odmietne starší
-  plugin prestavať (R-12) — pred prvým KOV-A modelom aktualizovať oba PC.
-  **Smoke pre Michala (A1 je navonok takmer neviditeľná):** aktualizuj plugin (D-52) na oboch PC · otvor KLINIKA → kusovník/nákup/VEPO/rozpočet čísla identické ako pred
+  plugin prestavať (R-12) — pred prvým KOV-A modelom aktualizovať oba PC *(Michal 3.9.: Lucia plugin zatiaľ nepoužíva, druhé PC až po V1 + zdieľanej knižnici — do vtedy teoretické)*.
+  **Smoke pre Michala (A1 je navonok takmer neviditeľná):** aktualizuj plugin (D-52; druhé PC až keď ho Lucia začne používať) · otvor KLINIKA (súbor Majdiakova — verziu upresníš) → kusovník/nákup/VEPO/rozpočet čísla identické ako pred
   aktualizáciou, Kontrola bez nového nálezu (legacy čelá RED nedostanú) · vlož skrinku, F1 dvierka 1 krídlo → **žiadny** nález (bez UI sa `unset` nedá vytvoriť) · šírka
   599 ↔ 601 (auto 1/2 krídla) — správanie ako doteraz · ulož šablónu a vlož ju · Štúdio → Pravidlá → ABS pravidlá ukazujú riadky „Výklop" a „Blenda" (4 hrany 1,0),
   tvoje upravené pravidlá nedotknuté.
@@ -494,6 +494,10 @@ Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-
   ui-lifecycle.md odseky na mieste → STAV/KRONIKA/PLAN → D-94 do DOGFOODING_vyriesene (plný text + riadok
   navrch indexu).
 - **D-95 · Režim krížovej kontroly „diel po diele"** — riadený prechod zákazkou s odškrtávaním, stav uložený v zákazke; rozšírenie na rozmery a kovanie, šípky smeru dekoru, X-ray. *(Vizuálny základ pre olep už stojí: D-104 + D-105.)*
+- **D-112 · Zmenená ABS viditeľná vo VEPO exporte** (Michal 3.9., dielňa) — dielce s páskou odlišnou od dekoru sa do objednávky VEPO označujú ručne poznámkou (pri KLINIKE zabudnuté);
+  plugin rozdiel pozná — LOG oddiel / príznak v názve / skupina per ABS (rozhodnúť pri debate). **Výrobný nález — priorita.**
+- **D-113 · Krátky popis korpusu v názvoch dielcov** (Michal 3.9., dielňa) — štítky z VEPO nepovedia, ku ktorej skrinke dielec patrí („Cab1_Dno", „Cab2_Bok L/P"); rozhodnúť tvar
+  a dopad na agregáciu riadkov kusovníka.
 - **EN DANIELI textový export** výrobného zadania — supplier-agnostický výstup, vedome odložený z dávky E.
 - **Nárezový plán fáza 2** — guillotine, kerf, orezky, orientácia dekoru; vlastná heuristika v čistom Ruby (OpenCutList je GPL — algoritmus áno, kód nie), kontrakt D-19 pripravený.
 - **Stráž kolízií** — upozorniť, keď sa dielce prekrývajú alebo vyskočia mimo box (bbox check do validačnej vrstvy semaforu).
