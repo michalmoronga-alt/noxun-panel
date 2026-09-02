@@ -1444,13 +1444,23 @@
       focusFirst(r);
     }
 
+    // `onClose` (review #285 kolo 2, P2-G) je sucast kontraktu: volajuci si
+    // pri modali drzi VLASTNY stav (co odoslal, na co caka) a bez signalu
+    // o zatvoreni by mu ostal visiet aj po Escape, kliku na scrim, kriziku
+    // ci „Zrušiť" — a dalsia akcia by sa potom spravala, akoby okno este zilo.
+    // Vola sa AZ po skutocnom zatvoreni (OPEN je uz null), takze volajuci smie
+    // z neho bez rizika rekurzie citat stav aj otvarat nove okno.
     function close(){
       if (typeof document === 'undefined'){ OPEN = null; return; }
       remember();                       // Esc nesmie byt ticha strata hodnot
       var r = document.getElementById(ROOT_ID);
       if (r) r.innerHTML = '';
       var back = OPEN && OPEN.trigger;
+      var done = OPEN && OPEN.base ? OPEN.base.onClose : null;
       OPEN = null;
+      if (typeof done === 'function'){
+        try { done(); } catch (e) { warn('onClose volajuceho zlyhal.'); }
+      }
       // Fokus patri spat na spustac — inak by po zatvoreni skoncil na <body>
       // a klavesnicova cesta by sa prerusila presne tam, kde zacala.
       if (back && back.focus){

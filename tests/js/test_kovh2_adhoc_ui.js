@@ -578,6 +578,32 @@ function qa(sel){ return ROOT.querySelectorAll(sel); }
   reset({ manual: [], view: [] });
 })();
 
+// P2-G: BEZNE zatvorenie (Escape, scrim, krizik, „Zrušiť") stav VYCISTI —
+// inak by najblizsia zmena vyberu hlasila „okno sa zavrelo, nič sa neuložilo",
+// hoci ho pouzivatel zavrel sam.
+(function(){
+  reset({ manual: [], view: [] });
+  HW.onHwManualAdd();
+  ok(!!HW.hwManualState(), 'otvoreny modal ma stav');
+  dispatch(q('[data-nxm-lkq="code"]'), 'keydown', { key: 'Escape' });   // ponuka je zatvorena
+  ok(!global.NXModal.isOpen(), 'Escape modal zavrel');
+  eq(HW.hwManualState(), null, 'a stav sa VYCISTIL (kontrakt `onClose` kostry)');
+  eq(HW.hwManualDropIfForeign('CAB-009', true), false,
+     'nasledna zmena vyberu uz nema co zatvarat');
+  eq(STATUS.length, 0, 'a NIC nehlasi — pouzivatel okno zavrel sam');
+
+  // To iste pre klik na „Zrušiť" (delegovana akcia kostry).
+  reset({ manual: [], view: [] });
+  HW.onHwManualAdd();
+  const cancel = qa('[data-nxm-act="close"]');
+  ok(cancel.length > 0, 'modal ma zatvaracie tlacidlo');
+  dispatch(cancel[cancel.length - 1], 'click');
+  ok(!global.NXModal.isOpen(), 'klik na „Zrušiť" modal zavrel');
+  eq(HW.hwManualState(), null, 'a stav je vycisteny aj tu');
+  eq(STATUS.length, 0, 'bez hlasky');
+  reset({ manual: [], view: [] });
+})();
+
 // Zdrojovy guard: rozhodnutie robi `hardware.js` a `bridge.js` ho vola PRED
 // instalaciou noveho stavu — inak by sa stary formular mal proti comu odoslat.
 (function(){

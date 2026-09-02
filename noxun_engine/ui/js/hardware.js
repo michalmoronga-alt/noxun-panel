@@ -1073,7 +1073,6 @@
   function hwManualOpen(item, draft){
     if (typeof NXModal === 'undefined' || !NXModal || typeof NXModal.open !== 'function') return;
     var owners = (typeof hwManualOwners !== 'undefined' && hwManualOwners) ? hwManualOwners : [];
-    HW_MAN = { id: item ? String(item.id) : null, kind: item ? 'edit' : 'add', sent: false };
     NXModal.open({
       title: item ? 'Upraviť ručnú položku' : 'Pridať konkrétnu položku (mimo setov)',
       sub: 'mimo setov — ide rovno do nákupu',
@@ -1085,8 +1084,17 @@
       note: 'Položka ide priamo do nákupu a rozpočtu. Katalógovú ocení živý katalóg — ' +
             'jej cena sa do zákazky neukladá.',
       fields: hwManualFields(owners, draft || hwManualDraft(item)),
-      onSubmit: function(v){ hwManualSubmit(v, item); }
+      onSubmit: function(v){ hwManualSubmit(v, item); },
+      // P2-G: zatvorenie (Escape, scrim, krizik, „Zrušiť" aj nase vlastne)
+      // stav VZDY vycisti. Bez toho by po beznom zatvoreni ostal visiet a
+      // najblizsia zmena vyberu by hlasila „okno sa zavrelo, nič sa
+      // neuložilo" — hoci ho pouzivatel zavrel sam.
+      onClose: function(){ HW_MAN = null; }
     });
+    // AZ ZA `open`: kostra najprv zatvara predchadzajuci modal, takze jeho
+    // `onClose` by novy stav hned vynuloval.
+    HW_MAN = { id: item ? String(item.id) : null, kind: item ? 'edit' : 'add',
+               sent: false, token: null };
   }
   function onHwManualAdd(){ hwManualOpen(null, null); }
   function onHwManualEdit(btn){
@@ -1273,11 +1281,14 @@
   function hwManualDropModal(reason){
     var open = (typeof NXModal !== 'undefined' && NXModal &&
                 typeof NXModal.isOpen === 'function' && NXModal.isOpen());
-    if (!HW_MAN && !open) return false;
+    // P2-G: hlasi sa LEN skutocne zatvorenie. Ked uz okno otvorene nie je
+    // (pouzivatel ho zavrel sam), nema sa co ohlasovat — hlaska „nič sa
+    // neuložilo" by tvrdila, ze o nieco prisiel.
+    if (!open){ HW_MAN = null; return false; }
     HW_MAN = null;
     HW_MAN_Q.gen++;      // bezuce hladanie uz nema komu odpovedat
     HW_MAN_Q.done = null;
-    if (open && typeof NXModal.close === 'function') NXModal.close();
+    if (typeof NXModal.close === 'function') NXModal.close();
     if (reason && typeof NX !== 'undefined' && NX && NX.setStatus) NX.setStatus(reason, true);
     return true;
   }
