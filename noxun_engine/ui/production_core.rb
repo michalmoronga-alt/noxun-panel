@@ -825,10 +825,39 @@ module Noxun
         exp['unmapped'] = Array(exp['unmapped']).map do |u|
           u.is_a?(Hash) ? u.merge('reason_sk' => HardwareSets.unmapped_reason_sk(u)) : u
         end
+        # KOV-H2: kazdy ZDROJ nakupneho riadku dostane LUDSKY popis vlastnika,
+        # aby sa dal v sekcii Nakup rozkliknut povod („CAB-2 · F1 · dvierka
+        # ľavé · ručná ×2"). Je to ADITIVNE pole zdroja: nakupny CSV, rozpocet
+        # ani ponuka ho necitaju, takze sa vystup zakazky nemeni ani o znak.
+        decorate_source_owners(exp['rows'], collected)
         exp.merge('state_status' => status.to_s)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.hardware_expansion')
         nil
+      end
+
+      # KOV-H2: `owner_label` do KAZDEHO zdroja nakupneho riadku. Popis sklada
+      # `PartKeys.human_label` z resolved ciel TEJ skrinky (`cabinet_fronts` zo
+      # zberu) — bez nich by z generovaneho id cela („front:Fmsi0wnix-1-3a3kxe")
+      # nebolo poznat, o ktore celo ide. `nil` = kovanie patri CELEJ skrinke.
+      #
+      # CISTA funkcia nad uz nacitanymi datami (ziadny druhy sken modelu, ziadny
+      # zapis). Starsi zber bez `cabinet_fronts` = popis sa neda zlozit a pole
+      # ostane `nil` — nikdy sa NEHADA surovy kluc.
+      def decorate_source_owners(rows, collected)
+        fronts = collected.is_a?(Hash) ? collected[:cabinet_fronts] : nil
+        by_cab = fronts.is_a?(Hash) ? fronts : {}
+        Array(rows).each do |row|
+          next unless row.is_a?(Hash)
+
+          Array(row['sources']).each do |src|
+            next unless src.is_a?(Hash)
+
+            src['owner_label'] = PartKeys.human_label(src['owner_part_key'],
+                                                     fronts: Array(by_cab[src['cabinet_id'].to_s]))
+          end
+        end
+        rows
       end
 
       # --- ŠT-1c (audit #3): generika kovania s POPISKAMI --------------------

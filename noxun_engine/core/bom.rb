@@ -58,6 +58,15 @@ module Noxun
         hardware_issues = [] # KOV-A1: tvrde nalezy kovania (zatial len smer dvierok)
         newer_configs = []   # KOV-H1 (R-12 exportna brana): ID skriniek z NOVSEJ verzie
         hardware_manual = [] # KOV-H1: ad-hoc polozky kovania (mimo setov)
+        # KOV-H2: resolved cela per skrinka. Aditivny kluc — `compute()` ho
+        # IGNORUJE. Sluzi VYHRADNE na LUDSKY popis vlastnika v rozklikanom
+        # povode nakupneho riadku (`PartKeys.human_label` potrebuje `front_items`,
+        # aby vedelo, ze `front:Fmsi0…` je „F1"). Zbiera sa v TOM ISTOM prechode
+        # z uz nacitaneho `ccfg`, takze nevznika druhy sken modelu.
+        # PRVA instancia vyhrava: dve skrinky so ZDIELANYM `cabinet_id` su
+        # samostatna chyba identity (rieši ju `identities`) — popisok sa kvoli
+        # nej nema preco hadat.
+        cabinet_fronts = {}
         cabinet_sets = {}
         # R-34 (review #262 P1): `cabinet_sets` ma na ID JEDEN slot — pozri
         # `note_cabinet_sets`. `seen` drzi mapu PRVEJ instancie toho ID (nil =
@@ -92,6 +101,8 @@ module Noxun
             newer_configs << cid if !cid.empty? && !newer_configs.include?(cid) &&
                                     defined?(CabinetBuilder) && CabinetBuilder.newer_config?(ccfg)
             Array(ccfg['hardware']).each { |h| hardware << h.merge('owner_id' => cid, 'owner_pid' => inst.persistent_id) }
+            # KOV-H2: resolved cela pre popis vlastnika v povode nakupneho riadku.
+            cabinet_fronts[cid] ||= (ccfg['front_items'].is_a?(Array) ? ccfg['front_items'] : [])
             # V0.5 D (nalez 2): RAW hardware_overrides — disabled:true polozka je
             # UZ VYRADENA z config.hardware[] pri vyhodnoteni pravidiel, takze semafor
             # "vypnute kovanie" ju vie zistit LEN z povodneho zaznamu. owner_id/owner_pid
@@ -178,7 +189,7 @@ module Noxun
           cabinet_sets: cabinet_sets, cabinet_set_conflicts: cabinet_set_conflicts,
           placements: placements, identities: identities,
           hardware_issues: hardware_issues, newer_configs: newer_configs,
-          hardware_manual: hardware_manual,
+          hardware_manual: hardware_manual, cabinet_fronts: cabinet_fronts,
           warnings: warnings, cabinets: cabinets, boards: boards }
       end
 

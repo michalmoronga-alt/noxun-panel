@@ -1690,6 +1690,14 @@
    s tooltipom zo servera, jantarova ako ostatne override znaky. */
 .hwmanual { color: var(--nx-warnchip-fg); display: inline-flex; vertical-align: -2px; }
 .hwmanual .ic { width: 13px; height: 13px; }
+/* KOV-H2: riadok nakupneho zoznamu sa da ROZKLIKNUT — pod nim sa rozvinie
+   POVOD (z ktorych skriniek, setov a rucnych poloziek riadok vznikol). Ziadny
+   novy stlpec: sucet by sa v sirokej tabulke uz nemal kam zmestit. */
+.hwbuyrow { cursor: pointer; }
+.hwbuyrow:hover > td { background: var(--nx-select-bg-hover); }
+.hwbuyrow.on > td { background: var(--nx-select-bg-soft); }
+.hwtab tr.hwsrc > td { font-size: 11.5px; color: var(--nx-ink-muted);
+                       background: var(--nx-surface-sunken); }
 
 /* ===== V0.6 D2: Pridat z Demosu (katalog kovania) ===== */
 .hwdemos-hit { padding: 3px 8px; border: 1px solid var(--nx-border); border-radius: 6px;
