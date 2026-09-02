@@ -527,3 +527,51 @@ NxTest.test('KOV-B1 katalog: kontrola taxonomie bezi MIMO katalogoveho zamku') d
   NxTest.assert(refusal.include?('HardwareTaxonomy.read_only?'),
                 'fail-closed: nad nekompatibilnou taxonomiou sa polozka s vyrobcom neulozi')
 end
+
+# --- Codex #284 P2-A: polozka uklada KANONICKE meno z taxonomie -------------
+
+NxTest.test('KOV-B1 (P2-A): polozka zalozena s „hettich"/„sensys" ma KANONICKE mena') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  tax = Noxun::Engine::HardwareTaxonomy
+  tax_path = tax.path
+  before = (File.binread(tax_path) if File.exist?(tax_path))
+  begin
+    hwc_empty!
+    FileUtils.rm_f(tax_path)
+    Noxun::Engine::JsonFileStore.invalidate(tax_path)
+    tax.reset_state!
+    # CREATE — kontrola najde „Hettich" aj z „hettich", ale ulozit sa smie LEN
+    # kanonicky zapis (inak by v katalogu vyrastli dve mena tej istej firmy).
+    status, rec = HWC.create_item(hwc_item('manufacturer' => ' hettich ',
+                                           'series' => 'SENSYS'))
+    NxTest.assert_equal(:ok, status)
+    NxTest.assert_equal('Hettich', rec['manufacturer'])
+    NxTest.assert_equal('Sensys', rec['series'])
+    NxTest.assert_equal('Hettich', HWC.find('104717')['manufacturer'], 'aj v subore')
+    NxTest.assert_equal('Sensys', HWC.find('104717')['series'])
+    # PATCH — kanonizuje sa LEN kluc, ktory patch naozaj nesie
+    cur = HWC.find('104717')
+    st2, rec2 = HWC.patch_item('104717', { 'series' => 'quadro' },
+                               row_rev: HWC.record_rev(cur))
+    NxTest.assert_equal(:ok, st2)
+    NxTest.assert_equal('Quadro', rec2['series'], 'patchnuta rada je kanonicka')
+    NxTest.assert_equal('Hettich', rec2['manufacturer'], 'vyrobca sa patchom nemenil')
+    # patch BEZ klasifikacnych klucov ulozene hodnoty nechava tak
+    cur2 = HWC.find('104717')
+    st3, rec3 = HWC.patch_item('104717', { 'price_eur_vat' => 5.5 },
+                               row_rev: HWC.record_rev(cur2))
+    NxTest.assert_equal(:ok, st3)
+    NxTest.assert_equal('Hettich', rec3['manufacturer'])
+    NxTest.assert_equal('Quadro', rec3['series'])
+    # polozka BEZ vyrobcu sa kanonizaciou nedotkne
+    st4, rec4 = HWC.create_item(hwc_item('item_code' => '999555'))
+    NxTest.assert_equal(:ok, st4)
+    NxTest.refute(rec4.key?('manufacturer'))
+    NxTest.refute(rec4.key?('series'))
+  ensure
+    if before then File.binwrite(tax_path, before) else FileUtils.rm_f(tax_path) end
+    FileUtils.rm_f("#{tax_path}.bak")
+    Noxun::Engine::JsonFileStore.invalidate(tax_path)
+    tax.reset_state!
+  end
+end

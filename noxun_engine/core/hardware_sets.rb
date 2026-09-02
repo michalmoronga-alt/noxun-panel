@@ -1054,6 +1054,11 @@ module Noxun
       # s INOU taxonomiou; vynutit ju tam by znamenalo, ze zakazku z ineho
       # pocitaca sa neda otvorit.
       # -> nil (v poriadku) | hotova odpoved pre volajuceho
+      # POZOR: pri uspechu MENI `norm` — dosadi KANONICKE mena z taxonomie.
+      # Kontrola je case-insensitive (aby „hettich" nasiel „Hettich"), takze bez
+      # tohto prepisu by sa do kniznice ulozil zapis VOLAJUCEHO a vedla
+      # kanonickeho „Hettich" by vyrastol „hettich" — invariant jedineho mena,
+      # na ktorom stoji zoskupenie katalogu (B2) aj filtre (D), by padol.
       def taxonomy_refusal(norm)
         return nil unless classified?(norm)
         # FAIL-CLOSED: nad NEKOMPATIBILNOU taxonomiou sa klasifikovany set
@@ -1063,11 +1068,18 @@ module Noxun
         # CITAT smie, takze kontrola nad nou bezi normalne.
         return [:write_failed, HardwareTaxonomy.state_reason] if HardwareTaxonomy.read_only?
 
-        errs = HardwareTaxonomy.check_classification(norm['manufacturer'], norm['series'])
-        return nil if errs.empty?
-
-        struct = errs.map { |e| set_err(e['field'], e['msg']) }
-        [:invalid, struct.first['msg'], struct]
+        canon_man, canon_ser, errs =
+          HardwareTaxonomy.resolve_classification(norm['manufacturer'], norm['series'])
+        unless errs.empty?
+          struct = errs.map { |e| set_err(e['field'], e['msg']) }
+          return [:invalid, struct.first['msg'], struct]
+        end
+        # Kluce sa LEN prepisuju (nikdy nepridavaju): `series` je volitelna,
+        # takze setu bez rady sa kluc doplnit nesmie. Poradie klucov sa
+        # prepisom existujuceho kluca v Ruby nemeni (SET_KEY_ORDER drzi).
+        norm['manufacturer'] = canon_man if canon_man
+        norm['series'] = canon_ser if canon_ser && norm.key?('series')
+        nil
       end
 
       # Zmaze set z globalnej kniznice; mapovanie globalu sa ocisti (write ho

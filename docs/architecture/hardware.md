@@ -195,8 +195,11 @@ u knižnice setov (R-07/R-08/R-11) a katalógu (GH #99).
 - **Seed (`SEED_VERSION` 1):** Hettich · Blum · Grass · Strong · Ostatné a ich rady (Sensys, InnoTech Atira, Quadro, AvanTech YOU, AXILO; CLIP top, AVENTOS, TANDEMBOX, LEGRABOX,
   MERIVOBOX, TIP-ON; Nova Pro, Tiomos; StrongMax). Merge dopĺňa LEN chýbajúce mená, nikdy neprepisuje a nad read-only ani degradovaným súborom sa nerobí; `ensure_seeded` má
   DVOJITÝ check (rýchly + pod zámkom), takže oneskorený seeder neprepíše reálnu zmenu.
-- **`check_classification(manufacturer, series)`** → `[]` alebo `[{ field, msg }]` je spoločný kontrakt pre set aj položku katalógu. Volajúci si musí NAJPRV overiť `read_only?` —
-  nad nekompatibilnou taxonómiou vracia `load` prázdno a kontrola by hlásila „výrobca nie je v zozname" namiesto skutočného dôvodu.
+- **`resolve_classification(manufacturer, series)`** → `[kanonický výrobca|nil, kanonická rada|nil, errors]` je spoločný kontrakt pre set aj položku katalógu
+  (`check_classification` je nad ňou len wrapper na chyby). Zhoda je case-insensitive a bez diakritiky, ale **uložiť sa smie VÝHRADNE kanonický zápis zo zoznamu** —
+  zapisovacie cesty (`HardwareSets.save_set!`, `HardwareCatalog.create_item`/`patch_item`) preto berú mená odtiaľto; inak by vedľa „Hettich" vyrástol „hettich" a padol by
+  invariant jediného mena, na ktorom stojí zoskupenie (B2) aj filtre (D). Kľúče sa pritom LEN prepisujú, nikdy nedopĺňajú (rada je voliteľná a patch mení len to, čo nesie).
+  Volajúci si musí NAJPRV overiť `read_only?` — nad nekompatibilnou taxonómiou vracia `load` prázdno a kontrola by hlásila „výrobca nie je v zozname" namiesto skutočného dôvodu.
 
 Zápis do taxonómie je zápis do globálneho súboru, takže v SketchUpe **nerobí krok Späť**. Testy: `tests/pure/test_kovb1_taxonomia.rb` (vrátane REÁLNEHO dvojprocesového `flock`)
 a in-SketchUp sekcia `run_kovb1`.

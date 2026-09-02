@@ -392,3 +392,26 @@ NxTest.test('KOV-B1 taxonomia: do suboru zapisuje JEDINE miesto a to POD zamkom'
     NxTest.assert(door.include?('rescue StandardError'), "#{m}: zlyhany zamok neuletí ako vynimka")
   end
 end
+
+# --- Codex #284 P2-A: resolve_classification vracia KANONICKE mena ----------
+
+NxTest.test('KOV-B1 taxonomia (P2-A): `resolve_classification` vracia kanonicke mena') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  t = NxB1Tax
+  t.with_taxonomy do
+    t.install(t.doc(%w[Hettich Blum], [['Sensys', 'Hettich']]))
+    NxTest.assert_equal(['Hettich', 'Sensys', []],
+                        t::TAX.resolve_classification(' hettich ', 'SENSYS'),
+                        'zhoda je CI a bez diakritiky, vystup je KANONICKY zapis zo zoznamu')
+    NxTest.assert_equal(['Hettich', nil, []], t::TAX.resolve_classification('HETTICH'),
+                        'rada je volitelna — bez nej sa nic nedopĺňa')
+    NxTest.assert_equal([nil, nil, []], t::TAX.resolve_classification('', ''))
+    man, ser, errs = t::TAX.resolve_classification('Blum', 'Sensys')
+    NxTest.assert_equal('Blum', man, 'vyrobca sa nasiel')
+    NxTest.assert_equal(nil, ser, 'ale rada mu nepatri — kanonicka rada sa NEVRACIA')
+    NxTest.assert_equal('series', errs.first['field'])
+    # `check_classification` ostava wrapperom nad tou istou pravdou
+    NxTest.assert_equal(errs, t::TAX.check_classification('Blum', 'Sensys'))
+    NxTest.assert_equal([], t::TAX.check_classification('hettich', 'sensys'))
+  end
+end

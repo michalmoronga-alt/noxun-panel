@@ -352,31 +352,45 @@ module Noxun
       # taxonomiou vracia `load` prazdno a kontrola by hlasila „vyrobca nie je
       # v zozname", hoci skutocny dovod je uplne iny.
       def check_classification(manufacturer, series = nil)
+        resolve_classification(manufacturer, series)[2]
+      end
+
+      # KANONICKA PODOBA dvojice (vyrobca, rada) + chyby. Kontrola je
+      # case-insensitive a bez diakritiky, takze „hettich" NAJDE „Hettich" —
+      # ale ulozit sa smie VYHRADNE kanonicky zapis zo zoznamu. Keby si volajuci
+      # ulozil svoj vstup, vzniklo by v kniznici „hettich" VEDLA „Hettich"
+      # a padol by invariant JEDINEHO mena, na ktorom stoji zoskupenie katalogu
+      # (KOV-B2) aj filtre (KOV-D) — teda presne to, kvoli comu taxonomia vznikla.
+      # Zapisove cesty setu aj polozky preto beru mena ODTIALTO.
+      # -> [canon_manufacturer|nil, canon_series|nil, errors]
+      def resolve_classification(manufacturer, series = nil)
         man = manufacturer.to_s.strip
         ser = series.to_s.strip
-        return [] if man.empty? && ser.empty?
+        return [nil, nil, []] if man.empty? && ser.empty?
         if man.empty?
-          return [{ 'field' => 'manufacturer',
-                    'msg' => "rada „#{ser}“ sa nedá priradiť bez výrobcu" }]
+          return [nil, nil, [{ 'field' => 'manufacturer',
+                               'msg' => "rada „#{ser}“ sa nedá priradiť bez výrobcu" }]]
         end
 
         doc = load
         m = doc['manufacturers'].find { |x| same_name?(x['name'], man) }
         if m.nil?
-          return [{ 'field' => 'manufacturer',
-                    'msg' => "výrobca „#{man}“ nie je v zozname — najprv ho pridaj" }]
+          return [nil, nil, [{ 'field' => 'manufacturer',
+                               'msg' => "výrobca „#{man}“ nie je v zozname — najprv ho pridaj" }]]
         end
-        return [] if ser.empty?
+        return [m['name'], nil, []] if ser.empty?
 
         s = doc['series'].find { |x| same_name?(x['name'], ser) }
         if s.nil?
-          [{ 'field' => 'series',
-             'msg' => "rada „#{ser}“ nie je v zozname — najprv ju pridaj k výrobcovi „#{m['name']}“" }]
+          [m['name'], nil,
+           [{ 'field' => 'series',
+              'msg' => "rada „#{ser}“ nie je v zozname — najprv ju pridaj k výrobcovi „#{m['name']}“" }]]
         elsif !same_name?(s['manufacturer'], m['name'])
-          [{ 'field' => 'series',
-             'msg' => "rada „#{ser}“ patrí výrobcovi „#{s['manufacturer']}“" }]
+          [m['name'], nil,
+           [{ 'field' => 'series',
+              'msg' => "rada „#{ser}“ patrí výrobcovi „#{s['manufacturer']}“" }]]
         else
-          []
+          [m['name'], s['name'], []]
         end
       end
 

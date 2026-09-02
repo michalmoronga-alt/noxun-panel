@@ -728,3 +728,45 @@ NxTest.test('KOV-B1 (R13): kazdy SEED set sa da klasifikovat (mapa pokryva realn
                         "#{s['set_id']}: typ kovania sa klasifikaciou NEMENI")
   end
 end
+
+# --- Codex #284 P2-A: do kniznice sa uklada KANONICKE meno z taxonomie ------
+
+NxTest.test('KOV-B1 (P2-A): set ulozeny s „hettich"/„sensys" ma v subore KANONICKE mena') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  b = NxB1
+  b.with_library do
+    b.install_base
+    # Kontrola je case-insensitive (aby sa dalo pisat rukou), ULOZIT sa vsak
+    # smie LEN kanonicky zapis — inak by v kniznici vyrastlo „hettich" VEDLA
+    # „Hettich" a zoskupenie (B2) ani filtre (D) by na tom nesadli.
+    status, rec = b::HWS.save_set!(b.classified('manufacturer' => ' hettich ',
+                                                'series' => 'SENSYS'))
+    NxTest.assert_equal(:ok, status)
+    NxTest.assert_equal('Hettich', rec['manufacturer'], 'vratena definicia je kanonicka')
+    NxTest.assert_equal('Sensys', rec['series'])
+    stored = b.stored('zaves-a')
+    NxTest.assert_equal('Hettich', stored['manufacturer'], 'a v SUBORE tiez')
+    NxTest.assert_equal('Sensys', stored['series'])
+    NxTest.assert_equal(%w[set_id name generic_type use_type opening_mode
+                           manufacturer series members], stored.keys,
+                        'poradie klucov sa prepisom nemeni')
+  end
+end
+
+NxTest.test('KOV-B1 (P2-A): setu BEZ rady sa kluc `series` nedoplna') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  b = NxB1
+  b.with_library do
+    b.install_base
+    bez = b.classified
+    bez.delete('series')
+    status, rec = b::HWS.save_set!(bez)
+    NxTest.assert_equal(:ok, status)
+    NxTest.refute(rec.key?('series'), 'rada je volitelna — kanonizacia ju nesmie pridat')
+    NxTest.refute(b.stored('zaves-a').key?('series'))
+    # legacy (nezaradeny) set sa taxonomie netyka vobec
+    st2, rec2 = b::HWS.save_set!(b.set_def('set_id' => 'legacy'), create: true)
+    NxTest.assert_equal(:ok, st2)
+    NxTest.refute(rec2.key?('manufacturer'))
+  end
+end

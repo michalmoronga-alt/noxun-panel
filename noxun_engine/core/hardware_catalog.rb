@@ -317,18 +317,24 @@ module Noxun
       # zamkov — presne to riziko, kvoli ktoremu maju vsetky katalogy jeden
       # spolocny sidecar. Kontroluje sa HODNOTA, ktoru pouzivatel nastavuje;
       # identitu riadku strazi `row_rev` uz pod zamkom.
-      # -> nil (v poriadku) | [:invalid, dovod] | [:read_only, dovod]
+      # Vracia AJ KANONICKU dvojicu: kontrola je case-insensitive (aby „hettich"
+      # nasiel „Hettich"), ale ulozit sa smie vyhradne kanonicky zapis zo
+      # zoznamu — inak by v katalogu vyrastlo „hettich" vedla „Hettich"
+      # a zoskupenie (KOV-B2) ani filtre (KOV-D) by na tom nesadli.
+      # -> [refusal|nil, canon_manufacturer|nil, canon_series|nil]
       def taxonomy_refusal(manufacturer, series)
         man = manufacturer.to_s.strip
         ser = series.to_s.strip
-        return nil if man.empty? && ser.empty?
+        return [nil, nil, nil] if man.empty? && ser.empty?
         # FAIL-CLOSED: nad nekompatibilnou taxonomiou `load` nic nevyda, takze
         # kontrola by hlasila „vyrobca nie je v zozname" namiesto skutocneho
         # dovodu. Polozka BEZ vyrobcu sa uklada dalej.
-        return [:invalid, HardwareTaxonomy.state_reason] if HardwareTaxonomy.read_only?
+        return [[:invalid, HardwareTaxonomy.state_reason], nil, nil] if HardwareTaxonomy.read_only?
 
-        errs = HardwareTaxonomy.check_classification(man, ser)
-        errs.empty? ? nil : [:invalid, errs.first['msg']]
+        canon_man, canon_ser, errs = HardwareTaxonomy.resolve_classification(man, ser)
+        return [[:invalid, errs.first['msg']], nil, nil] unless errs.empty?
+
+        [nil, canon_man, canon_ser]
       end
 
       def put_opt(out, key, raw)
@@ -349,9 +355,13 @@ module Noxun
         rec.delete('demos_url')
         rec.delete('price_checked_at')
         rec.delete('use_count')
-        refusal = taxonomy_refusal(rec['manufacturer'], rec['series'])
+        refusal, canon_man, canon_ser = taxonomy_refusal(rec['manufacturer'], rec['series'])
         return refusal if refusal
 
+        # Kluce sa LEN prepisuju (`normalize_item` ich zaklada iba pri neprazdnej
+        # hodnote), takze polozke bez vyrobcu sa nic nedoplna.
+        rec['manufacturer'] = canon_man if canon_man
+        rec['series'] = canon_ser if canon_ser
         with_lock do
           JsonFileStore.invalidate(path)
           data = load
@@ -385,12 +395,17 @@ module Noxun
         # KOV-B1: taxonomia sa overuje nad EFEKTIVNOU dvojicou (patch prebija
         # ulozene hodnoty) a MIMO zamku — viz `taxonomy_refusal`.
         base = find(code) || {}
-        refusal = taxonomy_refusal(
+        refusal, canon_man, canon_ser = taxonomy_refusal(
           clean.key?('manufacturer') ? clean['manufacturer'] : base['manufacturer'],
           clean.key?('series') ? clean['series'] : base['series']
         )
         return refusal if refusal
 
+        # Kanonicky tvar sa dosadzuje LEN do klucov, ktore patch NAOZAJ nesie —
+        # ulozena hodnota, ktorej sa patch nedotyka, sa nesmie prepisat (patch
+        # je uzavrety whitelist zmien, nie prepis celeho zaznamu).
+        clean['manufacturer'] = canon_man if clean.key?('manufacturer') && canon_man
+        clean['series'] = canon_ser if clean.key?('series') && canon_ser
         with_lock do
           JsonFileStore.invalidate(path)
           data = load
