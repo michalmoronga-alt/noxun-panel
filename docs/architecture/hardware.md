@@ -255,7 +255,8 @@ verzie), takže sa číta **bezstratovo alebo vôbec** — rovnako ako mapovanie
 a používa TEN ISTÝ detektor ako knižnica. Volá sa na OBOCH cestách a VŽDY **pred akoukoľvek operáciou**: `Panel.take_insert_hardware!` (vklad — pred `prepare_insert` aj pred
 ghost session; vlastný status `:lossy_defs` = vlastná hláška) a `TemplatesDialog.handle_apply` (použitie — pred `rebuild_many`). Odmietnutie preto znamená „model sa nezmenil ani
 o krok Späť"; poradie stráži zdrojový guard a in-SketchUp sekcia `run_kovb1`. K bráne patrí bump `CabinetBuilder::CONFIG_SCHEMA` na **4** ([construction.md](construction.md)),
-ktorý tú istú šablónu odmietne aj SPÄTNE.
+ktorý tú istú šablónu odmietne aj SPÄTNE. **Opakovaný `set_id` v poli definícií je tiež strata, nikdy prepis:** brána by inak posúdila POSLEDNÚ definíciu, kým
+`collect_set_defs` (cez `normalize_sets`) drží PRVÚ — do .skp by teda sadli iné kódy, než ktoré prešli kontrolou.
 
 **Detektor straty má ŠTYRI vrstvy** — tri pôvodné (nižšie, R-07) plus **`classification_lost?`**: `use_type` je ZNÁMY kľúč so SKALÁRNOU hodnotou, takže whitelist aj počty by
 hodnotu z novšej verzie (`use_type: 'sliding'`) prepustili a tolerantné čítanie by celý blok ticho zahodilo. Porovnáva sa RAW definícia s výsledkom `normalize_sets`: raw má

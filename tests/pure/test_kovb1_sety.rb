@@ -803,3 +803,33 @@ NxTest.test('KOV-B1 (P2-B): vklad zo sablony s nekanonickym triednym klucom prej
   NxTest.assert_equal(:ok, status, 'sablona sa uz falosne neodmieta')
   NxTest.assert_equal({ 'class:hinge|classic' => 'zaves-a' }, hw['mapping'])
 end
+
+# --- Codex #284 P2-C: duplicitny `set_id` v definiciach sablony = odmietnutie -
+
+NxTest.test('KOV-B1 (P2-C): dve definicie s rovnakym `set_id` sa ODMIETNU, nikdy neprepisu') do
+  b = NxB1
+  prva = b.set_def('members' => [{ 'code' => 'PRVA', 'per' => 'unit', 'qty' => 1 }])
+  druha = b.set_def('members' => [{ 'code' => 'DRUHA', 'per' => 'unit', 'qty' => 1 }])
+  status, lost = b::HWS.assess_set_defs([prva, druha])
+  NxTest.assert_equal(:lossy, status,
+                      'brana by inak zvalidovala INU definiciu, nez sa zmrazi do projektu')
+  NxTest.assert(lost.any? { |l| l.to_s.include?('zaves-a') }, lost.inspect)
+  # kontrola dokazu: `collect_set_defs` drzi PRVU definiciu, brana by (bez opravy)
+  # bola posudila DRUHU — presne ten rozpor, ktory sa tu zakazuje
+  NxTest.assert_equal('PRVA', b::HWS.collect_set_defs([prva, druha])['zaves-a']['members'][0]['code'])
+  # dve ROZNE definicie prechadzaju dalej
+  NxTest.assert_equal(:ok, b::HWS.assess_set_defs([prva, b.set_def('set_id' => 'zaves-b')])[0])
+end
+
+NxTest.test('KOV-B1 (P2-C): sablona s duplicitnym `set_id` sa neuplatni ani pri vklade') do
+  b = NxB1
+  defs = [b.set_def('members' => [{ 'code' => 'PRVA', 'per' => 'unit', 'qty' => 1 }]),
+          b.set_def('members' => [{ 'code' => 'DRUHA', 'per' => 'unit', 'qty' => 1 }])]
+  params = { 'type' => 'lower', 'hardware_sets' => { 'hinge' => 'zaves-a' },
+             'hardware_set_defs' => defs }
+  status, lost = b::PANEL.take_insert_hardware!(params)
+  NxTest.assert_equal(:lossy_defs, status)
+  NxTest.assert(lost.any? { |l| l.to_s.include?('zaves-a') }, lost.inspect)
+  # a cesta POUZITIA sablony ma tu istu branu (zdrojovy kontrakt je overeny
+  # v teste „KOV-B1 (M3)"), takze do modelu sa nezapise nic
+end

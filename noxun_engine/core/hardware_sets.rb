@@ -1585,7 +1585,17 @@ module Noxun
             lost << label
             next
           end
-          out[norm.first['set_id']] = norm.first
+          # DUPLICITNA identita = strata, NIKDY prepis (Codex #284 P2-C).
+          # `out[sid] = …` by ticho zahodilo PRVU definiciu, kym
+          # `collect_set_defs` (cez `normalize_sets`) drzi prave tu prvu — brana
+          # by teda zvalidovala INU definiciu, nez sa zmrazi do projektu, a do
+          # .skp by sadli ine kody, nez ktore presli kontrolou.
+          sid = norm.first['set_id']
+          if out.key?(sid)
+            lost << "#{sid} (duplicitne)"
+            next
+          end
+          out[sid] = norm.first
         end
         lost.empty? ? [:ok, out] : [:lossy, lost.uniq]
       rescue StandardError => e
