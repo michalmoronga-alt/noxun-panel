@@ -602,6 +602,8 @@ Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-
   overiť proti kódu) + ARCHITEKTURA router riadok → STAV/KRONIKA/PLAN → D-52 do DOGFOODING_vyriesene
   (plný text + riadok navrch indexu).
 - **D-52b · TASK PACKAGE „UPDATER — UI V ŠTÚDIU" (D-52a je v maine — PR #277; ŠTARTOVATEĽNÁ;
+  **REZ 3.9. (pravidlo 3 kôl po Codex kole 3 na #278):** **D-52b1** = #278 prerobený (cesta + nastavenia + async check + stavový riadok + doklad; tlačidlo len aria-disabled) ·
+  **D-52b2** = `feat/d52b2-updater-apply` stacked (apply flow: single-flight, worker príprava, guard show počas in-flight + re-check dialog_closed? pred commit!, hlášky, in-SU async).
   3× P3 z delta-verifikácie #277 zapracovať: (1) `clear_marker` výsledok sa na rollback/refuse cestách zahadzuje — do `Refused` správy doplniť poznámku o markeri; (2) tautologický assert `clear_marker == 'true'` v `test_d52a_updater.rb:~1312` odstrániť; (3) `close_all_dialogs` overiť in-SU, headless ho nepokrýva):**
   **Cieľ:** Michal aj Lucia zaktualizujú plugin jedným klikom zo sekcie **O plugine** v Štúdiu; jadro (recovery, lock, lease, latch, swap) je z D-52a — táto dávka pridáva
   LEN UI a asynchrónny check. **Scope IN:** pole „Distribučný priečinok" v sekcii About (**vlastný namespace `data-updater-edit`** s vlastným focus/dirty/save — NIE `data-ss`,
