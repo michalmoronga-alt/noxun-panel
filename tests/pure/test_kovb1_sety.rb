@@ -770,3 +770,36 @@ NxTest.test('KOV-B1 (P2-A): setu BEZ rady sa kluc `series` nedoplna') do
     NxTest.refute(rec2.key?('manufacturer'))
   end
 end
+
+# --- Codex #284 P2-B: nekanonicky triedny kluc v sablone NIE JE strata ------
+
+NxTest.test('KOV-B1 (P2-B): platny triedny kluc v nekanonickom zapise sablonu NEODMIETNE') do
+  h = NxB1::HWS
+  status, map = h.read_template_mapping(' CLASS: Hinge | Classic ' => 'zaves-a')
+  NxTest.assert_equal(:ok, status, 'trim a velkost pismen NIE SU strata')
+  NxTest.assert_equal({ 'class:hinge|classic' => 'zaves-a' }, map, 'ulozi sa KANONICKY tvar')
+  # kanonicky zapis funguje dalej rovnako
+  NxTest.assert_equal([:ok, { 'class:slide|tipon|metal' => 'vysuv-a' }],
+                      h.read_template_mapping('class:slide|tipon|metal' => 'vysuv-a'))
+  # NEPLATNY triedny kluc ostava stratou (novsia verzia / rucna uprava)
+  NxTest.assert_equal(:lossy, h.read_template_mapping('class:foo|classic' => 'x')[0])
+  NxTest.assert_equal(['class:hinge|tipon|metal'],
+                      h.read_template_mapping('class:hinge|tipon|metal' => 'x')[1],
+                      'hlaska menuje SUROVY zapis, ktory sa necita')
+  # a beznych klucov sa zmena nedotyka
+  NxTest.assert_equal([:ok, { 'leg' => 'nohy-a' }],
+                      h.read_template_mapping(' leg ' => ' nohy-a '))
+  NxTest.assert_equal(:lossy, h.read_template_mapping('slide@front:F1/panel' => 'x')[0],
+                      'composite kluc je v sablone stale neprenosny')
+  NxTest.assert_equal('class:hinge|classic', h.canonical_mapping_key(' CLASS: Hinge|Classic '))
+  NxTest.assert_equal(nil, h.canonical_mapping_key('class:foo|classic'))
+  NxTest.assert_equal('leg', h.canonical_mapping_key('  leg '))
+end
+
+NxTest.test('KOV-B1 (P2-B): vklad zo sablony s nekanonickym triednym klucom prejde') do
+  b = NxB1
+  params = { 'type' => 'lower', 'hardware_sets' => { ' CLASS: Hinge | Classic ' => 'zaves-a' } }
+  status, hw = b::PANEL.take_insert_hardware!(params)
+  NxTest.assert_equal(:ok, status, 'sablona sa uz falosne neodmieta')
+  NxTest.assert_equal({ 'class:hinge|classic' => 'zaves-a' }, hw['mapping'])
+end

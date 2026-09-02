@@ -1782,8 +1782,22 @@ module Noxun
         return [:lossy, ['hardware_sets']] unless raw.is_a?(Hash)
 
         map = normalize_mapping(raw, nil, allow_owner: false)
-        lost = raw.keys.map(&:to_s).reject { |k| map.key?(k.strip) }
+        # Strata sa porovnava v KANONICKOM tvare kluca, nie v surovom zapise:
+        # triedny kluc ` CLASS: Hinge | Classic ` je platny a parser z neho
+        # spravi `class:hinge|classic`, takze hladanie SUROVEHO zapisu v mape by
+        # ho oznacilo za stratu a sablonu by FALOSNE odmietlo (Codex #284 P2-B).
+        lost = raw.keys.map(&:to_s).reject { |k| (c = canonical_mapping_key(k)) && map.key?(c) }
         lost.empty? ? [:ok, map] : [:lossy, lost]
+      end
+
+      # Kanonicky tvar LUBOVOLNEHO kluca mapovania (bezny, composite aj triedny)
+      # alebo nil, ked kluc nema platny tvar. Jedina cesta, ktorou sa kluc
+      # porovnava s vysledkom `parse_mapping`.
+      def canonical_mapping_key(key)
+        raw = key.to_s.strip
+        return parse_class_key(raw)[0] if class_mapping_key?(raw)
+
+        raw
       end
 
       # set_id => generic_type podla KLUCA mapovania (composite kluc nesie typ
