@@ -57,8 +57,39 @@ než zastavený export.
 **uložený záznam**, nie payload — JS prenáša len známe polia), „Vložiť kópiu" (`config_to_params` → `build`) a „Uložiť ako šablónu" (`template_config_from` je ďalší
 uzavretý whitelist). Šablónový config marker **nesie**, inak by šablóna z novšej verzie vyzerala ako legacy. In-SU dôkazy: sekcia `run_r12` + `run_r12_async`.
 **História markera:** `1` = R-12 zavedenie · **`2` = KOV-A1** (nové typy čela `lift`/`fall`/`blind` a nové polia položky `direction`/`wing_directions`/`opening_mode`/`drawer`) —
-tichá strata ktoréhokoľvek z nich by zmenila výrobu alebo zahodila vedome určený smer, čo je presne prípad z disciplíny bumpu (STANDARD §2.5). **Dôsledok pre prax:** model
-uložený s markerom 2 odmietne prestavať starší plugin, preto sa pred prvým KOV-A modelom aktualizujú **obe PC** (D-52 updater).
+tichá strata ktoréhokoľvek z nich by zmenila výrobu alebo zahodila vedome určený smer, čo je presne prípad z disciplíny bumpu (STANDARD §2.5) · **`3` = KOV-H1** (ad-hoc kovanie
+`hardware_manual[]`) — tichá strata by ODOBRALA POLOŽKU Z OBJEDNÁVKY. **Dôsledok pre prax:** model uložený s markerom 3 odmietne prestavať starší plugin, preto sa pred prvým
+takým modelom aktualizujú **obe PC** (D-52 updater). K bumpu 3 patrí **EXPORTNÁ brána** (`Bom.collect` → `newer_configs` → `ProductionCore.export_blockers`, viď
+[outputs.md](outputs.md)): sama prestavbová brána nestačila, lebo starší plugin by zákazku so schémou 3 bez problémov **vyexportoval** — len bez ad-hoc kovania (audit #15 BLOCKER 3).
+
+**AD-HOC KOVANIE `hardware_manual[]` (KOV-H1, v0.9.18).** Ďalšie pole configu, nie nový zápisový kanál (audit #15 BLOCKER 1): panel ho posiela v `collectAll()` presne ako čelá,
+takže ide cestou `apply_all` → `normalize` → **rebuild** — jeden krok Späť, guardy dokumentu aj skrinky, R-12, `push_selected(dedup: false)`. Cena je prestavba geometrie pri
+pridaní položky (stovky ms) — vedome prijaté; „zápis configu bez rebuildu" je kandidát v [AUDIT_REGISTER](../../SYSTEM/AUDIT_REGISTER.md), nie súčasť H.
+
+`norm_hardware_manual(raw, strict_owners: false, plan_keys: nil)` je **uzavretý whitelist** (`MANUAL_KEYS`) položky
+`{id, owner_part_key|nil, source, code, name, unit, price_eur_vat?, qty, note}` a má **dva režimy**:
+
+- **čítacia cesta** (default — rebuild, kópia, legacy config): nepoužiteľná položka vypadne s logom, `qty` musí byť **celé** číslo 1–999, MJ ide cez jedinú autoritu
+  `HardwareCatalog.canonical_unit` (MJ mimo slovníka sa NEPREKLOPÍ na tiché „ks" — cena za balenie/meter by sa tvárila ako cena za kus), `note` sa orezáva na 200 znakov;
+- **zápisová cesta** (`strict_owners: true`, panelový ADD/EDIT cez `Panel.manual_preflight` PRED rebuildom): každé odmietnutie je **`ManualRejected`** = odmieta sa **celá zmena**,
+  žiadny tichý drop.
+
+Štyri pravidlá kontraktu, ktoré rozhodli audit #15:
+
+- **`source: 'catalog'` — klientovi sa verí LEN kód** (FIX 12). `name`/`unit` doplní **server** z katalógu podľa kódu; **cena sa NEUKLADÁ NIKDY** (BLOCKER 2) — položka sa oceňuje
+  živou cenou katalógu ako každý iný nákupný riadok. Kód mimo katalógu sa pri ADD/EDIT **odmieta** („použi voľnú položku"), pri rebuilde sa zachová **snapshot** `name`/`unit`
+  z configu, aby položka po zmiznutí kódu z katalógu nezmizla z objednávky.
+- **`source: 'free'`** — `name` povinné, MJ zo slovníka, `price_eur_vat` Float ≥ 0 alebo nil („bez ceny", nikdy 0 — STANDARD §11.3), `code` je **vždy prázdny** (voľná položka sa
+  nesmie tváriť ako katalógový kód a zliať sa s ním).
+- **`owner_part_key`** (BLOCKER 4): `nil` = patrí celej skrinke. Existencia v pláne sa kontroluje **STRIKTNE len pri ADD/EDIT**; `normalize`/rebuild kľúč **nikdy nezahodí** —
+  dielec mohol zaniknúť a `Bom.collect` to prizná ako `owner_missing` (ORANGE, položka ostáva v nákupe). Tichý drop by znamenal odobrať kus z objednávky.
+- **`id`** je `PartKeys.segment`-bezpečný a unikátny v rámci skrinky; `normalize` **dopĺňa len chýbajúce a kolidujúce** (prvý výskyt si svoje drží). Nové ID pre všetky položky dáva
+  **výhradne `rekey_hardware_manual`**, volaný len tam, kde z existujúcej skrinky vzniká NOVÁ — `dedup_copies` a „Vložiť kópiu" (FIX 10). V `normalize` sa nevolá **nikdy** (stráži
+  mutačný test): prestavba by inak menila identitu položiek.
+
+Round-trip drží štyri cesty: `normalize` (`hardware_manual:`) · `cabinet_config` · `config_to_params` · `Panel.template_config_from` (položky **cestujú so šablónou**; legacy
+šablóna bez kľúča položky cieľa **nezmaže** — `merge_template` má rovnakú vetvu ako `plinth_recess`/`name`). Klientská strana je čistý pass-through **bez defaultov** (vzor A1),
+viď [ui-lifecycle.md](ui-lifecycle.md).
 **Allowlisty rolí (KOV-A1):** `PART_TAGS` (`flap`/`false_front` → `Noxun/Čelá`), `thickness_ok_for?` (18 / 18,6 / 19 mm ako ostatné čelá), `base_material_for` (čelný materiál)
 a `materialized_part` (prepis hrúbky boxu, polohy pred korpusom aj výrobného údaja) poznajú obe nové roly.
 **Charakterizácia scale cesty (nález behu, platí aj pre `guard_unknown_hardware!`):** absorpcia beží v **transparentnej** operácii pripojenej k používateľovmu Scale

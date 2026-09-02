@@ -34,6 +34,14 @@ schváleného mockupu, scéna 4) menuje čelo serverovým `label`-om aj skrinku,
 dovtedy platia tvrdé podmienky O1 — žiadny default ani heuristika smeru nikde v kóde a legacy configy vyňaté (guard testy v `tests/pure/test_kova1_cela.rb`).
 `FRONT_ROLES` sa rozšírilo o `flap` a `false_front`, takže ORANGE „čelo bez ABS" a hrúbkové pravidlo čiel platia aj pre výklop, sklop a blendu.
 
+**KOV-H1 — dve nové kategórie.** **RED `newer_config` (`CAT_NEWER_CFG`)**, na rozdiel od `front_direction` **bránu MÁ**: číta aditívny `collected[:newer_configs]` a hovorí, že
+nákupný CSV, rozpočet ani cenová ponuka sa nedajú vyexportovať a treba aktualizovať plugin. V Kontrole je preto, aby to bolo vidno **skôr**, než používateľ doladí rozpočet a naraz
+mu export odmietne vzniknúť; `stable_key` = `newer_config|owner_id`, klik mieri na skrinku. **ORANGE `hardware_adhoc` (`CAT_HW_ADHOC`)** číta aditívny `collected[:hardware_manual]`
+a má jediný nález — **mŕtvy vlastník** (`owner_missing`): ručná položka je pripnutá na dielec, ktorý už neexistuje. Text menuje položku, hovorí, že **ostáva v nákupe**, a ponúka dve
+cesty (prepnúť na iný dielec / zmazať); `part_key` je zámerne `nil`, takže klik-select označí SKRINKU (dielec už niet). Obe kontroly sa pri chýbajúcom kľúči celé preskočia (vzor
+`placements:`). Tretia zmena je v `check_hardware_expansion`: riadok s **`catalog_missing`** (ad-hoc kód, ktorý z katalógu zmizol) ide **existujúcou** ORANGE cestou `hardware_code`,
+len s vetou, ktorá menuje ručnú položku a hovorí „ostáva bez ceny" — nie „bez názvu a ceny", lebo názov má zo snapshotu.
+
 ### production_core.rb — zdieľané čisté jadro výstupov zákazky (ŠT-1a PR A)
 
 kusovník, súpisy platní/ABS a VEPO export sa sťahovali z okna Výroba do nového okna **Štúdio**; aby obe okná čítali **tie isté čísla**, čistí pomocníci prešli do jedného modulu
@@ -83,9 +91,16 @@ uložil.** Rozpočet aj cenová ponuka sa zapísali na disk a AŽ POTOM sa vyhod
 nákupný CSV rovnako vznikol aj nad zliatymi vlastníkmi kovania. Súbor, ktorý už existuje, sa dá odoslať dodávateľovi aj zákazníkovi — červený status pod ním prišiel neskoro. Brána
 sa volá **pred `savepanel`** (picker sa pri chybe ani neotvorí) a má **dve vetvy**, ktorých rozdiel je záväzný:
 
-*(1) TVRDÁ — `export_blockers(collected:, cp:)`.* Stavy, ktoré sú VŽDY chyba a **nedajú sa potvrdiť**: duplicitné ID **skrinky** (`collected:` — CSV kovania, rozpočet, ponuka),
-záporná „Nábytková zostava" a nesúlad ponuky s rozpočtom (`cp:` — len ponuka). Nedáva zmysel poslať dodávateľovi objednávku, o ktorej vieme, že je podpočítaná. Hláška
-`export_blocked_status` musí povedať **oboje**: že súbor NEVZNIKOL (inak ho používateľ ide hľadať na disk) a **prečo + kde to opraviť**.
+*(1) TVRDÁ — `export_blockers(dups:, cp:, newer:)`.* Stavy, ktoré sú VŽDY chyba a **nedajú sa potvrdiť**: duplicitné ID **skrinky** (`dups:` — CSV kovania, rozpočet, ponuka),
+záporná „Nábytková zostava" a nesúlad ponuky s rozpočtom (`cp:` — len ponuka) a **zákazka z NOVŠEJ verzie pluginu** (`newer:` — CSV kovania, rozpočet, ponuka). Nedáva zmysel poslať
+dodávateľovi objednávku, o ktorej vieme, že je podpočítaná. Hláška `export_blocked_status` musí povedať **oboje**: že súbor NEVZNIKOL (inak ho používateľ ide hľadať na disk)
+a **prečo + kde to opraviť**. Zoznamy ID majú **jedno znenie stropu** („tri ID + a ďalšie N") — `ids_text`, ktoré používa aj `dup_ids_text`.
+
+**`newer:` je KOV-H1 hardening R-12 (audit #15 BLOCKER 3), a platí VŠEOBECNE** — aj pre zákazku bez ad-hoc kovania. R-12 dovtedy chránil len **prestavbu**: staršia verzia pluginu
+zákazku so schémou vyššou než vlastná normálne **vyexportovala**, len bez toho, čomu nerozumie (pole configu je pre ňu neviditeľné), takže objednávka aj cena boli neúplné a nikto to
+nemal ako zbadať. Zdrojom je aditívny `Bom.collect` kľúč **`newer_configs`** (`ProductionCore.newer_configs(collected)`). Potvrdiť sa to nedá: chýbajúce dáta sa nedajú „vziať na
+vedomie", dá sa len aktualizovať plugin. **VEPO bránu opäť nedostáva** — je to rezací výstup z rozmerov dielcov, ktoré staršia verzia číta správne (rovnaká výnimka ako pri
+duplicitách). Že sú to práve **tri** výstupy, stráži guard test v `tests/pure/test_kovh1_adhoc.rb`.
 
 *(2) POTVRDITEĽNÁ — `export_confirmations(budget:)`.* Dnes jediný dôvod: **riadky bez ceny**. STANDARD §11.3 hovorí, že neznáma cena sa NIKDY nenahradí nulou, ale má sa **priznať**
 („medzisúčet je len zo známych cien a súhrn nahlas povie, že nie je úplný") — **rozpracovaný rozpočet je legitímny stav zákazky** a plošný tvrdý blok by používateľovi bral výstup,
@@ -269,6 +284,18 @@ cez `Fronts.direction_slots` — jedinú definíciu (viď [construction.md](cons
 nemá. `compute()` kľúč **ignoruje** — kusovník, nákup ani ceny sa ním nemenia ani o číslo (dokazuje golden charakterizácia `tests/fixtures/kova_golden/`). Jediný čitateľ je
 `Validation.run`.
 
+**`hardware_manual` (KOV-H1):** aditívny kľúč s **ad-hoc položkami kovania** (konkrétne kovanie mimo setov, `config['hardware_manual'][]` — tvar drží `cabinet_builder.rb`,
+viď [construction.md](construction.md)). Zber ich obohatí o `owner_id`, **`owner_pid`** a **`owner_missing`** a robí to čistá `Bom.manual_items_for(owner_id, owner_pid, items, nested)`
+(headless testovateľná) — v TOM ISTOM prechode, z už načítaného `ccfg`, nad mapou vnorených dielcov, ktorú si `collect` aj tak stavia pre `manual_overrides`. `owner_missing` znamená,
+že položka je pripnutá na dielec, ktorý v skrinke **už nie je** (čelo sa zmazalo, konštrukcia sa zmenila). Položka sa **NEZAHADZUJE** (audit #15 BLOCKER 4): zahodiť ju by znamenalo
+ticho odobrať kus z objednávky, preto ostáva v nákupe a `Validation` ju priznáva ORANGE. Položka bez vlastníka (patrí celej skrinke) `owner_missing` nikdy nemá. Čitatelia sú dvaja:
+`Validation.run` a `ProductionCore.hardware_expansion` (posiela ich do `HardwareSets.expand(manual_items:)`); `compute()` kľúč ignoruje.
+
+**`newer_configs` (KOV-H1, R-12 exportná brána):** aditívny zoznam ID skriniek, ktorých uložený `config_schema` je **vyšší** než `CabinetBuilder::CONFIG_SCHEMA`
+(`CabinetBuilder.newer_config?` — jedno kritérium pre prestavbovú aj exportnú bránu). Vzniklo z auditu #15 BLOCKER 3: R-12 chránil len **prestavbu**, takže staršia verzia pluginu
+zákazku zo schémy 3 normálne **vyexportovala** — len bez toho, čomu nerozumie, a objednávka aj cena boli neúplné bez slova. Čitatelia: `ProductionCore.export_blockers(newer:)`
+(zastaví nákupný CSV, rozpočet aj ponuku; VEPO nie) a `Validation` (RED `newer_config`). `compute()` kľúč ignoruje.
+
 ### sheet_estimate.rb
 
 _(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
@@ -285,6 +312,13 @@ Cenová ponuka je VIEW nad hotovým payloadom (`cp_preview`), nie druhý výpoč
 **Kompatibilita dát cestuje v payloade (1d/R-14).** `normalize_state` prijíma aj kľúč `std` (stav markera `budget_std` zo `BudgetStore.std_state`) a `compute` z neho skladá `payload['budget_std'] = { state, blocked, reason }`.
 Je to **jediná cesta**, ktorou sa o nekompatibilných dátach dozvie ktokoľvek ďalej: banner sekcie Rozpočet aj Cenová ponuka (`ui/js/budget.js`) a brána oboch cenových exportov (`ProductionCore.budget_std_block`) čítajú TENTO kľúč — nikto sa nepýta modelu druhýkrát a nikto si stav neodvodzuje sám.
 Stav bez kľúča (legacy volanie výpočtu, čisté testy) je `current`, teda **nikdy neblokuje** — výpočet kompatibilitu neposudzuje, len ju NESIE. Znenie hlášky skladá `BudgetStore.std_block_reason` (jeden textový zdroj pre mutácie, exporty aj UI).
+
+**Ad-hoc kovanie v sekcii KOVANIE (KOV-H1, audit #15 FIX 8).** `hardware_section` preberá hotovú expanziu ako doteraz a **nič neexpanduje sama** — pribudli tri veci, všetky
+aditívne: riadok, ktorého množstvo (aj čiastočne) pochádza z ručne pridaných položiek, nesie **`origin: 'adhoc'`**; **voľná** položka nesie `free: true` a — to je vecné — má
+**vlastný kľúč riadku** `hw:free:<skrinka>:<id>` (kľúč je adresa ručného prepisu ceny v `BudgetStore`, a voľné položky kód nemajú, takže `hw:` by mali všetky rovnaký a druhá by
+prepísala prvú). Poznámku riadku skladá `hardware_note`: `missing` = „kód nie je v katalógu kovania" (bez názvu aj ceny), **`catalog_missing`** = „ručne pridaná položka — kód už
+nie je v katalógu (bez ceny)"; sú to dva rôzne stavy a dve rôzne vety. **Voľné položky sú mimo `stale_scan`** — nemajú kód, takže v katalógu nemajú čo porovnávať (vetva je
+explicitná, aby to bol zámer, nie náhoda). Cenová ponuka voľný riadok **nepreskočí** (`CpExport.specification` filtruje `missing`, a voľná položka ňou nikdy nie je).
 
 ### budget_store.rb
 

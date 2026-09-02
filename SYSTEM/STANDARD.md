@@ -433,6 +433,27 @@ Globálna knižnica `%APPDATA%\NOXUN\Engine\hardware_rules.json` je len default 
 - **Nákupný CSV kontrakt sa nemení.** Znamienko ručného zásahu žije v UI: nákupný riadok nesie `manual_quantity` + hotový slovenský text `manual_note`,
   breakdown v kusovníku `rule_nominal_length` + `manual_note`.
 
+**AD-HOC KOVANIE — konkrétna položka MIMO setov (KOV-H1, v0.9.18).** Pravidlá a sety pokrývajú to, čo sa dá odvodiť; **zvyšok musí ísť pridať ručne** — zámok, špeciálny doraz,
+položka, ktorú dodávateľ vedie mimo katalógu. Žije v configu korpusu ako **`hardware_manual[]`** (samostatné pole, NIE `config.hardware[]` — to je výstup pravidiel) v tvare
+`{id, owner_part_key|nil, source, code, name, unit, price_eur_vat?, qty, note}`:
+
+- **`source: 'catalog'`** — klientovi sa verí **len kód** (+ množstvo, vlastník, poznámka); `name`/`unit` doplní **server z katalógu** a **cena sa NEUKLADÁ**: položka sa oceňuje
+  **živou cenou katalógu** ako každý iný nákupný riadok a **zlieva sa** s riadkom rovnakého kódu zo setu (jedna cena, jedna objednávka). V configu je snapshot názvu/MJ len pre
+  prípad, že kód z katalógu zmizne. Kód mimo katalógu **pri pridaní** = odmietnutie („použi voľnú položku").
+- **`source: 'free'`** — `name` povinné, `unit` z `HardwareCatalog::UNITS`, `price_eur_vat` Float ≥ 0 alebo `nil`; má **vlastný nákupný riadok** (kľúč `free:<cabinet_id>:<id>`),
+  v CSV riadok s prázdnym kódom, a **nikdy nie je `missing`**.
+- `qty` je celé číslo 1–999; `id` je unikátne **v rámci skrinky** a **nové ID dostane len položka novej skrinky** (kópia) — prestavba identitu nemení.
+- **`owner_part_key`** = skrinka (`nil`) alebo **konkrétny dielec**; logická zóna sa neponúka (nemá identitu). Existencia sa kontroluje **striktne len pri pridaní/úprave**;
+  po zániku dielca položka **ostáva v nákupe** a je ORANGE „bez vlastníka" — tichý drop by odobral kus z objednávky.
+- **Pôvod** nesie riadok aj zdroj (`origin: 'adhoc'`), NIKDY sa nepletie s D-93 znamienkom ručného zásahu do počtu (`source: 'manual'`). **Nákupný CSV kontrakt sa nemení** —
+  pôvod žije v sekcii Nákup Štúdia a v `sources`.
+- Zapisuje sa **existujúcou cestou** (`apply_all` → `normalize` → rebuild), takže platí jedna mutácia = jeden krok Späť a všetky guardy.
+
+**R-12 EXPORTNÁ BRÁNA (KOV-H1, platí všeobecne).** Marker `config_schema` (§2.5) chránil len **prestavbu** — staršia verzia pluginu zákazku z novšej schémy normálne
+**vyexportovala**, len bez toho, čomu nerozumie. Odteraz: keď zber nájde skrinku s `config_schema` vyšším než pozná táto verzia, **nákupný zoznam kovania, rozpočet XLSX aj cenová
+ponuka XLSX sa NEVYTVORIA** (hláška menuje skrinky a žiada aktualizáciu pluginu) a Kontrola to hlási RED. **VEPO sa neblokuje** — rezací výstup z rozmerov dielcov staršia verzia
+číta správne. Potvrdiť sa to nedá: chýbajúce dáta sa nedajú „vziať na vedomie".
+
 **Fáza 2 — mapovanie na konkrétny katalógový kód.** Na konci projektu (alebo raz v nastaveniach) sa flag `hinge` namapuje na konkrétny kód (`Blum 71B3550`). **Mapovanie sa ukladá a nabudúce prebehne automaticky.**
 
 **Prekrytie čiel (`overlay`) určí typ pántu — dnes neimplementované, pribudne s budúcou prácou na kovaní (zaradenie do bloku určí PLAN).** Dovtedy ho konfigurácia čiel nenesie (5.3): prekrytie korpusu je dôsledok zvoleného kovania,
