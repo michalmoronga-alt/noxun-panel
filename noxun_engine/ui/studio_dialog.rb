@@ -122,7 +122,13 @@ module Noxun
         # HTML, takze `execute_script` by prisiel do prazdna. Odklada sa a
         # spotrebuje ju NAJBLIZSI `push_state` (pri novom okne ho vyvola
         # `ready`, pri uz otvorenom ho volame priamo tu).
+        #
+        # D-52a (B2): restart latch — po aktualizacii lezia na disku NOVE
+        # `ui/studio.html` a `ui/js/*.js`, ale v pamati bezi STARY Ruby; okno sa
+        # preto az do restartu SketchUpu neotvara.
         def show(open_section: nil, anchor: nil)
+          return nil if Engine.update_restart_pending?
+
           @pending_section = SECTIONS.include?(open_section.to_s) ? open_section.to_s : nil
           @pending_anchor = @pending_section ? anchor.to_s.strip : nil
           @pending_anchor = nil if @pending_anchor.to_s.empty?
@@ -141,6 +147,18 @@ module Noxun
           dlg
         rescue StandardError => e
           Engine.log_error(e, 'StudioDialog.show')
+        end
+
+        # D-52a: spolocna cesta zatvorenia (protajsok `Panel.hide`). Vola ju
+        # `Engine.close_all_dialogs` po uspesnom commite aktualizacie.
+        def hide
+          return false unless @dialog
+
+          @dialog.close
+          true
+        rescue StandardError => e
+          Engine.log_error(e, 'StudioDialog.hide')
+          false
         end
 
         def dialog_alive?
@@ -1197,8 +1215,12 @@ module Noxun
           end
         end
 
+        # D-52a (Codex #277 kolo 4, P1): to iste, co v `Panel.cb` — latch musi
+        # zastavit aj okno, ktore uz bezalo v case commitu.
         def cb(dlg, name)
           dlg.add_action_callback(name) do |_ctx, *args|
+            next if Engine.update_locked?(:studio)
+
             begin
               yield(args.first)
             rescue StandardError => e

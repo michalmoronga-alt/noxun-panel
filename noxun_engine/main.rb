@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.9.4' unless defined?(VERSION)
+    VERSION = '0.9.9' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -352,7 +352,16 @@ module Noxun
 
       tb = UI::Toolbar.new(TOOLBAR_NAME)
 
-      cmd_panel = UI::Command.new('Inspector') { Panel.dialog_alive? ? Panel.hide : Panel.show }
+      # D-52a (B2): KAZDY vstupny bod pluginu ma restart latch. Po uspesnej
+      # aktualizacii bezi v pamati STARY Ruby kod nad NOVYMI subormi — otvorene
+      # okno by nacitalo nove HTML/JS proti starym callbackom. Guard je preto
+      # PRIAMO v tele kazdeho prikazu (nie az v `Panel.show`), aby sa cez toolbar
+      # nedal spustit ani prepinac prekrytia.
+      cmd_panel = UI::Command.new('Inspector') do
+        next if update_restart_pending?
+
+        Panel.dialog_alive? ? Panel.hide : Panel.show
+      end
       cmd_panel.tooltip = 'Inspector — panel Noxun Engine (znova zavrie)'
       cmd_panel.status_bar_text = 'Otvori alebo zavrie panel na vkladanie a upravu korpusov.'
       cmd_panel.set_validation_proc { toolbar_state { Panel.dialog_alive? } }
@@ -362,7 +371,11 @@ module Noxun
       # ST-1a (audit #2): tlačidlo sa volá Štúdio a otvára ŠTÚDIO.
       # ŠT-1c PR B3: okno Výroba zaniklo — Štúdio je JEDINÉ okno výstupov
       # zákazky (Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka).
-      cmd_studio = UI::Command.new('Štúdio') { StudioDialog.show }
+      cmd_studio = UI::Command.new('Štúdio') do
+        next if update_restart_pending?
+
+        StudioDialog.show
+      end
       cmd_studio.tooltip = 'Štúdio — kusovník, kontrola, nákup kovania, rozpočet a cenová ponuka'
       cmd_studio.status_bar_text = 'Kusovník, kontrola, rozpočet, cenová ponuka a výstupy zákazky.'
       toolbar_icon(cmd_studio, 'noxun_studio.svg')
@@ -372,7 +385,11 @@ module Noxun
       # — tá zavola EdgeCheck.toggle a rozposle novy stav vsetkym oknam (Studio
       # ma prepinac v liste sekcie Kontrola, Inspector ikonu v raile; bez pushu
       # by obe ostali na starom stave).
-      cmd_abs = UI::Command.new('ABS kontrola hrán') { toggle_edge_check }
+      cmd_abs = UI::Command.new('ABS kontrola hrán') do
+        next if update_restart_pending?
+
+        toggle_edge_check
+      end
       cmd_abs.tooltip = 'ABS kontrola hrán — zvýrazní olep v modeli (prepínač)'
       cmd_abs.status_bar_text = 'Zapne/vypne farebné zvýraznenie olepu hrán. Nastavenie je v Štúdiu → Kontrola.'
       cmd_abs.set_validation_proc do
@@ -385,7 +402,11 @@ module Noxun
       toolbar_icon(cmd_abs, 'noxun_abs.svg')
       tb.add_item(cmd_abs)
 
-      cmd_insert = UI::Command.new('Vložiť skrinku') { Panel.show_insert }
+      cmd_insert = UI::Command.new('Vložiť skrinku') do
+        next if update_restart_pending?
+
+        Panel.show_insert
+      end
       cmd_insert.tooltip = 'Vložiť skrinku — otvorí panel vo vkladacom režime'
       cmd_insert.status_bar_text = 'Otvori panel s vkladacou kartou (vyber v modeli sa zrusi).'
       toolbar_icon(cmd_insert, 'noxun_insert.svg')
@@ -409,6 +430,7 @@ Sketchup.require 'noxun_engine/core/part_faces' # D-88: kontrakt hrana -> plocha
 Sketchup.require 'noxun_engine/core/json_file_store' # cache + bezpecny atomicky zapis JSON katalogov
 Sketchup.require 'noxun_engine/core/dim_series'  # UI-B3 (N6): rozmerove rady panela (%APPDATA%, nastavenie pocitaca)
 Sketchup.require 'noxun_engine/core/materials'   # V0.3 materialovy katalog (pred abs_rules)
+Sketchup.require 'noxun_engine/core/updater'     # D-52a: jadro aktualizatora pluginu (po materials — pouziva with_catalog_lock)
 Sketchup.require 'noxun_engine/core/materials_catalog' # V0.5.1 split: CRUD/validacia/scan/patch/seed
 Sketchup.require 'noxun_engine/core/materials_decor'    # V0.5.1 split: D-41 dekor = kluc skupiny + batch
 Sketchup.require 'noxun_engine/core/materials_abs'      # V0.5.1 split: ABS podla dekoru (picker, remap)
@@ -494,6 +516,12 @@ module Noxun
       rescue StandardError => e
         log_error(e, 'ensure_uni_records')
       end
+
+# D-52a (B3): PROCESNY LEASE si zapisuje LOADER (`noxun_engine.rb`,
+# `Boot.write_lease!`) hned na zaciatku bootu a POD ZAMKOM aktualizacie —
+# NIE tu. Zapis az na konci `main.rb` by prisiel po nacitani celeho stromu,
+# takze `Updater.apply!`, ktory prave bezi, by tento proces nemusel vidiet
+# (Codex #277 kolo 2, P1).
 
       begin
         install_toolbar # UI-02: logo · Studio · ABS kontrola · Vlozit

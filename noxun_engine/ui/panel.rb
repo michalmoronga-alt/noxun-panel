@@ -13,7 +13,12 @@ module Noxun
 
       class << self
         # --- otvorenie ------------------------------------------------------
+        # D-52a (B2): restart latch. Po aktualizacii lezia na disku NOVE
+        # `ui/*.html` a `ui/js/*.js`, ale v pamati bezi STARY Ruby — okno by sa
+        # otvorilo s nezhodnymi callbackmi. Preto sa az do restartu neotvara.
         def show
+          return nil if Engine.update_restart_pending?
+
           dlg = ensure_dialog
           if dlg.visible?
             dlg.bring_to_front
@@ -57,7 +62,11 @@ module Noxun
         # ziadny zapis do modelu (lekcia D-103: prazdny vyber sa vycisti pod
         # suspend guardom, aby observer nespustil vlastny refresh, a refresh
         # panela ide s `dedup: false` — dedup MENI model).
+        # D-52a (B2): guard je TU, nie az v `show` — vkladanie by inak najprv
+        # zhodilo vyber v modeli a az potom narazilo na zavrety panel.
         def show_insert
+          return nil if Engine.update_restart_pending?
+
           model = Sketchup.active_model
           suspend_selection_sync { model.selection.clear } if model
           dlg = show
@@ -260,8 +269,14 @@ module Noxun
         end
 
         # Wrapper: begin/rescue + slovensky status pri chybe; nikdy 'return' v bloku (pouzi next).
+        # D-52a (Codex #277 kolo 4, P1): latch strazi aj UZ OTVORENE okno.
+        # Guard v `show` chrani len OTVARANIE — okno, ktore bezalo v case
+        # commitu, by inak starymi handlermi mutovalo model nad NOVYM balikom
+        # (a reload stranky by sparoval nove HTML so starymi callbackmi).
         def cb(dlg, name)
           dlg.add_action_callback(name) do |_ctx, *args|
+            next if Engine.update_locked?(:panel)
+
             begin
               yield(args.first)
             rescue StandardError => e

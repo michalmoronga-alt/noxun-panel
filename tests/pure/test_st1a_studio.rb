@@ -1152,7 +1152,9 @@ end
 # --- 8) vstupne body (audit #2) ---------------------------------------------
 
 NxTest.test('ST-1a: toolbar aj rail vedu do ŠTÚDIA; Výroba zmizla aj z Extensions menu') do
-  NxTest.assert(ST1B_MAIN_RB.include?("UI::Command.new('Štúdio') { StudioDialog.show }"),
+  # D-52a: prikaz uz nie je jednoriadkovy — nesie restart latch (B2). Kontroluje
+  # sa preto TELO prikazu, nie jeho presne zalomenie.
+  NxTest.assert(ST1B_MAIN_RB =~ /cmd_studio = UI::Command\.new\('Štúdio'\).*?StudioDialog\.show/m,
                 'toolbar tlacidlo Štúdio otvara Studio')
   # ŠT-1c PR B3: docasna polozka menu „Výroba" zanikla spolu s oknom.
   NxTest.refute(ST1B_MAIN_RB.include?("menu.add_item('Výroba"),

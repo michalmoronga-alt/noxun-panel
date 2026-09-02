@@ -135,7 +135,9 @@ NxTest.test('UI-02 + ST-1a: kazde tlacidlo ma slovensky tooltip a Studio priznav
   # ŠT-1c PR B1: v Studiu ziju VSETKY styri obsahy okna Vyroba (Kusovnik ·
   # Kontrola · Nakup kovania · Rozpocet), takze tooltip uz NESMIE posielat
   # pouzivatela inam — okno Vyroba je prazdna skrupina.
-  NxTest.assert(body.include?('cmd_studio = UI::Command.new(\'Štúdio\') { StudioDialog.show }'),
+  # D-52a: telo prikazu je viacriadkove (restart latch B2) — kontroluje sa, KAM
+  # vedie, nie ako je zalomene.
+  NxTest.assert(body =~ /cmd_studio = UI::Command\.new\('Štúdio'\).*?StudioDialog\.show/m,
                 'tlacidlo Štúdio otvara StudioDialog, nie ProductionDialog')
   studio = body[/cmd_studio\.tooltip = '([^']+)'/, 1].to_s
   NxTest.refute(studio.include?('Výroba'),
