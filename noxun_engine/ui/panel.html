@@ -863,6 +863,11 @@
      (v/w) sem NIKDY nedopisovat natvrdo. -->
 <footer class="nxfoot">Noxun Engine <span id="verline">…</span></footer>
 
+<!-- KOV-H2: kotva zdieľaných modalov D-15 (js/nx_modal.js) — TÁ ISTÁ, akú má
+     studio.html. Žije MIMO prekresľovaných sektorov (`#secbody` v Štúdiu,
+     `#hwRows` a spol. tu), takže `push_selected` po zápise modal nezhodí. -->
+<div id="nxModalRoot"></div>
+
 <!-- Poradie skriptov je kontrakt: errors prvy (chytac), icons hned za nim (sprite
      musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
@@ -880,6 +885,10 @@
      modály otvárajú — jeho listener má bežať ako PRVÝ, aby vedel udalosť
      spotrebovať skôr, než ju dostane handler okna. -->
 <script src="js/nx_esc.js?v=0.9.19"></script>
+<!-- KOV-H2: zdieľaná kostra modalov D-15 (ten istý súbor načítava aj
+     studio.html). Musí byť ZA nx_esc.js (reťaz Escape má bežať prvá) a PRED
+     core.js/hardware.js — modal ručnej položky kovania ju volá menom. -->
+<script src="js/nx_modal.js?v=0.9.19"></script>
 <!-- ŠT-4a: zdieľaný obsah „O plugine" (rovnaký súbor načítava aj studio.html). -->
 <script src="js/about.js?v=0.9.19"></script>
 <!-- D-85 (UI-03): zdielany combobox. Musi byt PRED core/part/board — tie ho pri
