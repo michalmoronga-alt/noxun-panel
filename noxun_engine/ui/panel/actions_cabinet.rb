@@ -229,9 +229,17 @@ module Noxun
           return nil unless data.key?('hardware_manual')
 
           raw = data['hardware_manual']
+          # Review #283 P2-A: panel posiela CELY zoznam (echo, nie diff), takze
+          # prisne sa smu kontrolovat LEN nove a realne zmenene zaznamy. Inak by
+          # po zmiznuti kodu z katalogu neprešla ziadna dalsia editacia skrinky
+          # a zmazanie cela-vlastnika by sa odmietlo namiesto toho, aby polozka
+          # prezila ako `owner_missing`. Porovnava sa proti ULOZENEMU zoznamu,
+          # ktory je v `params` este PRED prepisom.
+          strict_ids = CabinetBuilder.manual_strict_subset(params['hardware_manual'], raw)
           params['hardware_manual'] = raw
           keys = CabinetBuilder.plan_parts_by_key(params).keys
-          CabinetBuilder.norm_hardware_manual(raw, strict_owners: true, plan_keys: keys)
+          CabinetBuilder.norm_hardware_manual(raw, strict_owners: true, strict_ids: strict_ids,
+                                                   plan_keys: keys)
           nil
         rescue CabinetBuilder::ManualRejected => e
           { error: "Kovanie sa neuložilo — #{e.message}." }

@@ -11777,11 +11777,24 @@ module NoxunSuRunner
       ok('KOV-H1: zber nesie ad-hoc polozku s adresou zijuceho vlastnika',
          mine.length == 1 && mine.first['owner_missing'] == false)
 
-      # Celo zmizne (typ 'none' = riadok bez dielca) -> vlastnik uz neexistuje.
-      e::CabinetBuilder.rebuild(model, inst2,
-                                e::CabinetBuilder.config_to_params(e::Store.config(inst2) || {})
-                                  .merge('fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'none',
-                                                                     'mode' => 'auto' }] }))
+      # Celo zmizne PANELOVOU cestou (review #283 P2-A): `collectAll()` posiela
+      # CELY zoznam ad-hoc poloziek ako echo, takze prisna kontrola vlastnika by
+      # tu zmenu ODMIETLA — hoci sa polozka vobec nemenila. Musi prejsť a polozka
+      # ma prezit s `owner_missing`. Payload je presne to, co posiela panel.
+      model.selection.clear
+      model.selection.add(inst2)
+      e::Panel.handle_apply_all(pg(model,
+                                   'cabinet_id' => cid2,
+                                   'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'none',
+                                                               'mode' => 'auto' }] },
+                                   'hardware_manual' => kovh_manual(inst2)))
+      ok('KOV-H1 (P2-A): zmazanie cela-vlastnika PANELOM prešlo — celo je prec',
+         Array((e::Store.config(inst2) || {})['front_items']).none? do |f|
+           f.is_a?(Hash) && f['type'].to_s != 'none'
+         end)
+      ok('KOV-H1 (P2-A): a polozka to PREZILA (prisne sa kontroluju len zmenene zaznamy)',
+         kovh_manual(inst2).length == 1 &&
+         kovh_manual(inst2).first['owner_part_key'] == owner)
       col2 = e::Bom.collect(model)
       dead = Array(col2[:hardware_manual]).find { |i| i['id'] == 'H-FREE' }
       ok('KOV-H1 (B4): polozka po zaniku dielca OSTAVA v zbere a je oznacena `owner_missing`',

@@ -366,6 +366,98 @@ NxTest.test('KOV-H1 (B4/FIX 12): kod mimo katalogu — ADD odmietne, rebuild zac
   NxTest.refute(kept.key?('price_eur_vat'), 'ani vtedy sa cena neuklada')
 end
 
+# --- review #283 P2-A: PRISNE LEN NOVE A ZMENENE ----------------------------
+#
+# Panel posiela v KAZDOM `collectAll()` cely ulozeny zoznam (echo, nie diff).
+# Keby sa prisne kontroloval CELY, po zmiznuti kodu z katalogu by neprešla
+# ziadna dalsia editacia skrinky a zmazanie cela-vlastnika by sa odmietlo
+# namiesto toho, aby polozka prezila ako `owner_missing` (BLOCKER 4).
+
+NxTest.test('KOV-H1 (P2-A): `manual_strict_subset` — prisne LEN nove a REALNE zmenene zaznamy') do
+  NxKovh1.catalog_ready!
+  cb = Noxun::Engine::CabinetBuilder
+  stored = NxKovh1.norm([NxKovh1.cat_item('id' => 'H1'), NxKovh1.free_item('id' => 'H2')])
+
+  NxTest.assert_equal([], cb.manual_strict_subset(stored, stored),
+                      'nezmenene echo nema co kontrolovat prisne')
+  # Ciselny retazec z CEF nie je zmena — porovnava sa NORMALIZOVANA hodnota.
+  echo = stored.map { |i| i.merge('qty' => i['qty'].to_s) }
+  NxTest.assert_equal([], cb.manual_strict_subset(stored, echo), '„2“ a 2 nie je zmena')
+
+  edited = stored.map { |i| i['id'] == 'H1' ? i.merge('qty' => 5) : i }
+  NxTest.assert_equal(['H1'], cb.manual_strict_subset(stored, edited), 'zmeneny pocet = prisne')
+  moved = stored.map { |i| i['id'] == 'H2' ? i.merge('owner_part_key' => 'front:F1/wing:single') : i }
+  NxTest.assert_equal(['H2'], cb.manual_strict_subset(stored, moved), 'zmeneny vlastnik = prisne')
+  renamed = stored.map { |i| i['id'] == 'H2' ? i.merge('name' => 'Iný zámok') : i }
+  NxTest.assert_equal(['H2'], cb.manual_strict_subset(stored, renamed),
+                      'nazov VOLNEJ polozky je udaj pouzivatela — zmena = prisne')
+
+  # ...ale nazov KATALOGOVEJ polozky vlastni server: premenovanie v katalogu
+  # nesmie z nezmenenej polozky spravit „upravenu" (a zablokovat editaciu).
+  cat_renamed = stored.map { |i| i['id'] == 'H1' ? i.merge('name' => 'Iný názov z katalógu') : i }
+  NxTest.assert_equal([], cb.manual_strict_subset(stored, cat_renamed),
+                      'nazov katalogovej polozky do odtlacku NEPATRI')
+
+  added = stored + [NxKovh1.free_item('id' => 'H3', 'name' => 'Nová')]
+  NxTest.assert_equal(['H3'], cb.manual_strict_subset(stored, added), 'nova polozka = prisne')
+  dup = stored + [stored.first.dup]
+  NxTest.assert_equal(['H1'], cb.manual_strict_subset(stored, dup),
+                      'duplicitne ID = realne NOVA polozka, teda prisne')
+  NxTest.assert_equal([], cb.manual_strict_subset(stored, [NxKovh1.free_item('id' => '')]),
+                      'zaznam BEZ ID sa do zoznamu nedava — prisny je uz z definicie')
+end
+
+NxTest.test('KOV-H1 (P2-A): nezmenena polozka prejde aj ked jej kod z katalogu ZMIZOL') do
+  NxKovh1.catalog_ready!
+  gone = NxKovh1.norm([NxKovh1.cat_item('code' => 'ZMIZNUTY', 'name' => 'Starý kód', 'unit' => 'ks')])
+  NxTest.assert_equal(1, gone.length, 'predpoklad: polozka je v ulozenom configu')
+
+  # Bez zuzenia by tu padla vynimka a KAZDA dalsia editacia skrinky by zlyhala.
+  out = NxKovh1.norm(gone, strict_owners: true, strict_ids: [], plan_keys: [])
+  NxTest.assert_equal(1, out.length, 'nezmenene echo prejde tolerantnou cestou')
+  NxTest.assert_equal('Starý kód', out.first['name'], 'a drzi snapshot')
+
+  # Ta ista polozka ako NOVA (alebo prave zmenena) sa odmieta dalej.
+  err = nil
+  begin
+    NxKovh1.norm(gone, strict_owners: true, strict_ids: gone.map { |i| i['id'] }, plan_keys: [])
+  rescue Noxun::Engine::CabinetBuilder::ManualRejected => e
+    err = e.message
+  end
+  NxTest.assert(err.to_s.include?('ZMIZNUTY'), "zmenena polozka sa kontroluje prisne: #{err.inspect}")
+end
+
+NxTest.test('KOV-H1 (P2-A): mrtvy vlastnik NEBLOKUJE zmenu, ked sa polozka nemenila') do
+  NxKovh1.catalog_ready!
+  owner = 'front:F1/wing:single'
+  stored = NxKovh1.norm([NxKovh1.free_item('owner_part_key' => owner)])
+
+  # Zmazanie cela: kluc uz v plane NIE JE, ale polozka sa nemenila -> prejde
+  # a kluc si ZACHOVA (`Bom.collect` z neho spravi `owner_missing`).
+  out = NxKovh1.norm(stored, strict_owners: true, strict_ids: [], plan_keys: [])
+  NxTest.assert_equal(1, out.length, 'zmazanie cela-vlastnika zmenu NEODMIETA')
+  NxTest.assert_equal(owner, out.first['owner_part_key'], 'kluc sa NIKDY nezahadzuje')
+
+  # Nova polozka na mrtvom dielci sa odmieta aj nadalej.
+  err = nil
+  begin
+    NxKovh1.norm([NxKovh1.free_item('id' => 'H9', 'owner_part_key' => owner)],
+                 strict_owners: true, strict_ids: ['H9'], plan_keys: [])
+  rescue Noxun::Engine::CabinetBuilder::ManualRejected => e
+    err = e.message
+  end
+  NxTest.assert(err.to_s.include?(owner), "nova polozka na mrtvom dielci sa odmieta: #{err.inspect}")
+end
+
+NxTest.test('KOV-H1 (P2-A): panelova cesta posiela ZUZENY zoznam, nie cely') do
+  src = NxKovh1.src('ui/panel/actions_cabinet.rb')
+  NxTest.assert(src.include?("strict_ids = CabinetBuilder.manual_strict_subset(params['hardware_manual'], raw)"),
+                'preflight porovnava odoslany zoznam s ULOZENYM')
+  NxTest.assert(src.index('manual_strict_subset') < src.index("params['hardware_manual'] = raw"),
+                'a robi to PRED prepisom ulozeneho zoznamu (inak by porovnaval sam so sebou)')
+  NxTest.assert(src.include?('strict_ids: strict_ids'), 'a zuzenie naozaj odovzdava')
+end
+
 # =============================================================================
 # 3. ROUND-TRIP STYROCH CIEST + CONFIG_SCHEMA
 # =============================================================================

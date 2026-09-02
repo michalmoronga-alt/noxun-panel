@@ -74,6 +74,15 @@ pridaní položky (stovky ms) — vedome prijaté; „zápis configu bez rebuild
 - **zápisová cesta** (`strict_owners: true`, panelový ADD/EDIT cez `Panel.manual_preflight` PRED rebuildom): každé odmietnutie je **`ManualRejected`** = odmieta sa **celá zmena**,
   žiadny tichý drop.
 
+**Prísne sa kontrolujú LEN nové a reálne zmenené záznamy** (`strict_ids:`, review #283 P2-A). Panel posiela v každom `collectAll()` **celý uložený zoznam** — je to echo, nie
+diff. Keby sa prísne validoval celý, nezmenené položky by sa posudzovali, akoby ich používateľ práve pridal: po zmiznutí kódu z katalógu by neprešla **žiadna ďalšia editácia
+skrinky** a zmazanie čela-vlastníka by sa odmietlo namiesto toho, aby položka prežila ako `owner_missing` (čo B4 výslovne chce). Zúženie počíta čistá
+**`manual_strict_subset(stored, submitted)`**: porovnáva odoslané záznamy s uloženým zoznamom podľa `id` + **odtlačku obsahu** (`manual_fingerprint`) a vracia ID, ktoré treba
+overiť prísne. Odtlačok porovnáva **normalizované** hodnoty (`„2"` a `2` nie je zmena) a pri `source: 'catalog'` **zámerne vynecháva `name`/`unit`** — tie vlastní server, takže
+premenovanie položky v katalógu nesmie z nezmenenej položky spraviť „upravenú"; pri voľnej položke sú to naopak údaje používateľa a ich zmena **je** editácia. Záznam **bez id**
+je prísny vždy (uložené záznamy id majú, takže bez neho nemôže ísť o echo) a **duplicitné id** v odoslanom zozname je tiež prísne (druhý taký záznam je reálne nová položka).
+`strict_ids: nil` = prísne sa kontroluje všetko (legacy volanie).
+
 Štyri pravidlá kontraktu, ktoré rozhodli audit #15:
 
 - **`source: 'catalog'` — klientovi sa verí LEN kód** (FIX 12). `name`/`unit` doplní **server** z katalógu podľa kódu; **cena sa NEUKLADÁ NIKDY** (BLOCKER 2) — položka sa oceňuje

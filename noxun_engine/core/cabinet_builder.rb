@@ -1875,17 +1875,29 @@ module Noxun
         #     MUSI existovat v `plan_keys` a katalogovy kod MUSI byt v katalogu;
         #     inak sa ODMIETA CELA ZMENA (`ManualRejected`) — ziadny tichy drop.
         #
+        # `strict_ids` (review #283 P2-A) ZUZUJE prisnost na KONKRETNE zaznamy.
+        # Panel posiela v kazdom `collectAll()` CELY ulozeny zoznam (je to echo,
+        # nie diff), takze bez tohto by sa NEZMENENE polozky validovali, akoby ich
+        # pouzivatel prave pridal: po zmazani kodu z katalogu by sa odmietla kazda
+        # dalsia editacia skrinky a zmazanie cela-vlastnika by neprelo vobec —
+        # namiesto toho, aby polozka prezila ako `owner_missing` (BLOCKER 4).
+        #   nil  = prisne sa kontroluje VSETKO (legacy volanie / „vsetko je nove")
+        #   pole = prisne LEN tieto ID + kazdy zaznam BEZ ID (ten nemoze byt
+        #          nezmenene echo — ulozene zaznamy ID vzdy maju)
+        # Ktore ID to su, pocita cista `manual_strict_subset(stored, submitted)`.
+        #
         # CENY (audit #15 BLOCKER 2): katalogova polozka cenu NEUKLADA NIKDY —
         # oceni ju ZIVY katalog pri expanzii ako kazdy iny riadok. V configu
         # ostava len `code` + snapshot `name`/`unit` pre pripad, ze kod
         # z katalogu zmizne. Cenu nesie VYHRADNE volna polozka.
-        def norm_hardware_manual(raw, strict_owners: false, plan_keys: nil)
+        def norm_hardware_manual(raw, strict_owners: false, strict_ids: nil, plan_keys: nil)
           return [] unless raw.is_a?(Array)
 
           keys = plan_keys.nil? ? nil : Array(plan_keys).map(&:to_s)
+          ids = strict_ids.nil? ? nil : Array(strict_ids).map(&:to_s)
           seen = {}
           raw.filter_map do |it|
-            rec = manual_item(it, strict_owners, keys)
+            rec = manual_item(it, strict_owners && manual_strict?(it, ids), keys)
             next nil if rec.nil?
 
             # ID doplna normalize LEN ked chyba alebo koliduje; PRVY vyskyt si
@@ -1919,6 +1931,72 @@ module Noxun
             copy
           end
           cfg_or_params
+        end
+
+        # KOV-H1 (review #283 P2-A): ID zaznamov, ktore sa musia kontrolovat
+        # PRISNE — teda NOVYCH a REALNE ZMENENYCH oproti ULOZENEMU zoznamu.
+        # CISTA funkcia (ziadny model, ziadny katalog) — headless testovatelna.
+        #
+        # `stored`    = `config['hardware_manual']` PRED zmenou
+        # `submitted` = surove pole z panela (echo celeho zoznamu + zmeny)
+        #
+        # Zaznam BEZ ID sa do zoznamu nedava — prisny je uz z definicie
+        # (`manual_strict?`). Duplicitne ID v odoslanom zozname su prisne VZDY:
+        # druhy taky zaznam je realne NOVA polozka (normalize mu prideli nove ID),
+        # aj keby sa obsahom trafil do ulozeneho.
+        def manual_strict_subset(stored, submitted)
+          old = {}
+          Array(stored).each do |rec|
+            next unless rec.is_a?(Hash)
+
+            id = manual_id(rec)
+            old[id] = manual_fingerprint(rec) unless id.empty?
+          end
+          counts = Hash.new(0)
+          Array(submitted).each do |rec|
+            counts[manual_id(rec)] += 1 if rec.is_a?(Hash)
+          end
+          out = []
+          Array(submitted).each do |rec|
+            next unless rec.is_a?(Hash)
+
+            id = manual_id(rec)
+            next if id.empty?
+
+            same = counts[id] == 1 && old.key?(id) && old[id] == manual_fingerprint(rec)
+            out << id unless same
+          end
+          out.uniq
+        end
+
+        # Odtlacok OBSAHU polozky pre porovnanie „zmenila sa?".
+        # `name`/`unit` KATALOGOVEJ polozky sa ZAMERNE NEPOROVNAVAJU: vlastni ich
+        # SERVER (dopĺňa ich z katalogu podla kodu), takze premenovanie polozky
+        # v katalogu by z kazdej nezmenenej polozky spravilo „upravenu" a zablokovalo
+        # by dalsiu editaciu skrinky. Pri VOLNEJ polozke su to naopak udaje
+        # POUZIVATELA — ich zmena JE editacia a kontroluje sa prisne.
+        # Porovnava sa NORMALIZOVANA hodnota (nie surova), aby „2" a 2 neboli zmena.
+        def manual_fingerprint(rec)
+          src = mraw(rec, 'source').to_s.strip
+          out = { 'owner' => present(mraw(rec, 'owner_part_key')), 'source' => src,
+                  'code' => mraw(rec, 'code').to_s.strip,
+                  'qty' => manual_qty(mraw(rec, 'qty')),
+                  'price' => manual_price(rec)[0],
+                  'note' => manual_note(mraw(rec, 'note')) }
+          if src == 'free'
+            out['name'] = mraw(rec, 'name').to_s.strip
+            out['unit'] = manual_unit(mraw(rec, 'unit'))
+          end
+          out
+        end
+
+        # Ma sa TENTO zaznam kontrolovat prisne? `ids` nil = cely zoznam.
+        def manual_strict?(raw, ids)
+          return true if ids.nil?
+          return true unless raw.is_a?(Hash)
+
+          id = manual_id(raw)
+          id.empty? || ids.include?(id)
         end
 
         # Jedna polozka -> ocisteny zaznam alebo nil (citacia cesta).
