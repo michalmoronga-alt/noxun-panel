@@ -977,12 +977,24 @@ module Noxun
         Array(collected.is_a?(Hash) ? collected[:identities] : nil)
       end
 
+      # KOV-H1: ID skriniek z NOVSEJ verzie pluginu (aditivny kluc zberu —
+      # starsi zber ho nema a brana sa vtedy sprava presne ako pred KOV-H1).
+      def newer_configs(collected)
+        Array(collected.is_a?(Hash) ? collected[:newer_configs] : nil).map(&:to_s)
+      end
+
       # Strop na tri ID + „a ďalšie N" — jedno znenie pre sufix, zoznam dovodov
       # aj branu, aby sa tri texty o tej istej veci nemohli rozist.
       def dup_ids_text(dups)
-        ids = dups.map { |_kind, id, _n| id }
-        more = ids.length > 3 ? " a ďalšie #{ids.length - 3}" : ''
-        "#{ids.first(3).join(', ')}#{more}"
+        ids_text(dups.map { |_kind, id, _n| id })
+      end
+
+      # To iste nad HOLYM zoznamom ID (KOV-H1: brana novsej schemy) — jedno
+      # znenie stropu pre vsetky zoznamy ID v statuse.
+      def ids_text(ids)
+        list = Array(ids).map(&:to_s)
+        more = list.length > 3 ? " a ďalšie #{list.length - 3}" : ''
+        "#{list.first(3).join(', ')}#{more}"
       end
 
       # --- P0-HF (externy audit 29.8.2026): FINALNA BRANA PRED ZAPISOM ------
@@ -1028,10 +1040,25 @@ module Noxun
       # Volajuci posiela LEN to, co sa jeho vystupu tyka:
       #   `dups:` — BLOKUJUCA polovica `dup_partition` (nakupny CSV, rozpocet
       #             aj ponuka); varovacia polovica sem NEPATRI,
-      #   `cp:`   — LEN ponuka (zaporna zostava, nesulad s rozpoctom).
+      #   `cp:`   — LEN ponuka (zaporna zostava, nesulad s rozpoctom),
+      #   `newer:`— ID skriniek z NOVSEJ verzie pluginu (`Bom.collect`
+      #             `newer_configs`); nakupny CSV, rozpocet aj ponuka.
       # -> [dovod, ...]; prazdne pole = zapis smie prebehnut.
-      def export_blockers(dups: [], cp: nil)
+      #
+      # KOV-H1 (audit #15 BLOCKER 3): NOVSIA SCHEMA CONFIGU je tvrdy dovod.
+      # R-12 chranil len PRESTAVBU, takze starsi plugin zakazku so schemou
+      # z novsej verzie normalne EXPORTOVAL — len bez toho, comu nerozumie
+      # (pole configu je pre neho neviditelne). Objednavka aj cena by boli
+      # NEUPLNE a nikto by to nezbadal. Potvrdit sa to neda: chybajuce data
+      # sa nedaju „vziat na vedomie", da sa len aktualizovat plugin.
+      # VEPO branu opat NEDOSTAVA — je to rezaci vystup z rozmerov dielcov,
+      # ktore starsia verzia cita spravne (rovnaka logika ako pri duplicitach).
+      def export_blockers(dups: [], cp: nil, newer: [])
         out = []
+        unless Array(newer).empty?
+          out << "skrinky #{ids_text(newer)} sú z novšej verzie pluginu — nákup a ceny by boli " \
+                 'neúplné; aktualizuj plugin'
+        end
         unless Array(dups).empty?
           out << "v modeli sú skrinky so spoločným ID (#{dup_ids_text(dups)}) — kovanie by sa " \
                  'objednalo zle (napr. TipOn účtovaný na vlastníka len raz alebo set podľa ' \
@@ -1491,7 +1518,7 @@ module Noxun
         # podpocitane kovanie; toto CSV ide dodavatelovi, takze nesmie vzniknut.
         # Blokuje LEN skutocna kolizia (review #252 P2) — rozhoduje expanzia.
         blocking_dups, warn_dups = dup_partition(collected, exp)
-        blockers = export_blockers(dups: blocking_dups)
+        blockers = export_blockers(dups: blocking_dups, newer: newer_configs(collected))
         return status.call(export_blocked_status(blockers), true) unless blockers.empty?
 
         # audit #1: nazov projektu je SERVEROVA autorita (jeden nazov pre
@@ -2057,7 +2084,7 @@ module Noxun
         # (riadky bez ceny) ho zastavi prvykrat a druhy klik ju s potvrdenim
         # prejde. Varovanie pod hotovym harkom bolo v oboch pripadoch neskoro.
         blocking_dups, warn_dups = dup_partition(collected, hw_exp)
-        blockers = export_blockers(dups: blocking_dups)
+        blockers = export_blockers(dups: blocking_dups, newer: newer_configs(collected))
         return status.call(export_blocked_status(blockers), true) unless blockers.empty?
 
         unpriced = export_confirmations(budget: budget)
@@ -2134,7 +2161,7 @@ module Noxun
         # a neblokuje) — vyhodnocuje sa az nad hotovym harkom a ide do
         # `cp_warnings`.
         blocking_dups, warn_dups = dup_partition(collected, hw_exp)
-        blockers = export_blockers(dups: blocking_dups, cp: cp)
+        blockers = export_blockers(dups: blocking_dups, cp: cp, newer: newer_configs(collected))
         return status.call(export_blocked_status(blockers), true) unless blockers.empty?
 
         unpriced = export_confirmations(budget: budget)

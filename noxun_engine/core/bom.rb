@@ -56,6 +56,7 @@ module Noxun
         hardware_overrides = []
         manual_overrides = { 'abs' => [], 'hardware' => [] }
         hardware_issues = [] # KOV-A1: tvrde nalezy kovania (zatial len smer dvierok)
+        newer_configs = []   # KOV-H1 (R-12 exportna brana): ID skriniek z NOVSEJ verzie
         cabinet_sets = {}
         # R-34 (review #262 P1): `cabinet_sets` ma na ID JEDEN slot — pozri
         # `note_cabinet_sets`. `seen` drzi mapu PRVEJ instancie toho ID (nil =
@@ -80,6 +81,15 @@ module Noxun
             add_placement(placements, inst, 'cabinet', cid)
             add_identity(identities, 'cabinet', cid)
             ccfg = Store.config(inst) || {}
+            # KOV-H1 (audit #15 BLOCKER 3): R-12 chranil LEN prestavbu — starsi
+            # plugin by zakazku so schemou z novsej verzie bez problemov
+            # VYEXPORTOVAL, len bez toho, comu nerozumie (napr. bez ad-hoc
+            # kovania), a nakup by bol NEUPLNY bez slova. Zber to preto priznava
+            # ADITIVNYM klucom; branu drzi `ProductionCore.export_blockers`
+            # (nakupny CSV + rozpocet + ponuka; VEPO nie) a Kontrola RED riadok.
+            # `compute()` kluc — ako ostatne aditivne — IGNORUJE.
+            newer_configs << cid if !cid.empty? && !newer_configs.include?(cid) &&
+                                    defined?(CabinetBuilder) && CabinetBuilder.newer_config?(ccfg)
             Array(ccfg['hardware']).each { |h| hardware << h.merge('owner_id' => cid, 'owner_pid' => inst.persistent_id) }
             # V0.5 D (nalez 2): RAW hardware_overrides — disabled:true polozka je
             # UZ VYRADENA z config.hardware[] pri vyhodnoteni pravidiel, takze semafor
@@ -160,7 +170,7 @@ module Noxun
           manual_overrides: manual_overrides,
           cabinet_sets: cabinet_sets, cabinet_set_conflicts: cabinet_set_conflicts,
           placements: placements, identities: identities,
-          hardware_issues: hardware_issues,
+          hardware_issues: hardware_issues, newer_configs: newer_configs,
           warnings: warnings, cabinets: cabinets, boards: boards }
       end
 

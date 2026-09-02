@@ -84,6 +84,12 @@ module Noxun
       # LEGACY configy (kluc `direction` vobec nemaju) sem NIKDY nepridu —
       # `Fronts.direction_slots` im vrati stav nil a `Bom` z neho nalez netvori.
       CAT_FRONT_DIR   = 'front_direction'
+      # RED — KOV-H1 (R-12 exportna brana): skrinka ma config z NOVSEJ verzie
+      # pluginu. Na rozdiel od `front_direction` tento nalez EXPORTNU BRANU MA
+      # (`ProductionCore.export_blockers` zastavi nakupny CSV, rozpocet aj
+      # ponuku) — Kontrola ho ukazuje preto, aby to bolo vidno AJ BEZ pokusu
+      # o export, teda skor, nez pouzivatel zacne rozpocet dolaďovat.
+      CAT_NEWER_CFG   = 'newer_config'
 
       # Druh top-level kusu, ktory MA KOVANIE. Zdielana konstanta preto, ze
       # „skrinka vs. doska" nie je kozmetika textu: len pri skrinke zliatie
@@ -167,6 +173,7 @@ module Noxun
         Array(collected[:records]).each { |r| check_record(r, smap, emap, items) }
         Array(collected[:hardware_overrides]).each { |ov| check_hardware(ov, items) }
         check_hardware_issues(collected[:hardware_issues], items)
+        check_newer_configs(collected[:newer_configs], items)
         check_hardware_expansion(hardware_expansion, items)
         check_placements(placements, items)
         check_identities(identities, items)
@@ -593,6 +600,28 @@ module Noxun
                           'Exporty to zatiaľ neblokuje (smer nemení žiadne dnešné číslo) — ' \
                           'zablokuje až výrobné zadanie, ktoré smer ponesie (D-95).',
           'stable_key' => "#{CAT_FRONT_DIR}|#{oid}|#{pkey}" }
+      end
+
+      # --- KOV-H1 (R-12 exportna brana): skrinka z NOVSEJ verzie -------------
+      #
+      # Aditivny kluc zberu (`newer_configs`); nil / chybajuci = kontrola sa
+      # cela preskoci (legacy volania a headless testy bez neho, vzor
+      # `placements:`). Na rozdiel od `front_direction` tento RED exportnu branu
+      # MA — Kontrola ho ukazuje preto, aby sa o probleme vedelo skor, nez
+      # pouzivatel dolaďuje rozpocet a naraz mu export odmietne vzniknut.
+      def check_newer_configs(ids, items)
+        Array(ids).each do |raw|
+          id = raw.to_s.strip
+          next if id.empty?
+
+          items << { 'severity' => RED, 'category' => CAT_NEWER_CFG,
+                     'owner_id' => id, 'part_key' => nil, 'hw_key' => nil,
+                     'message_sk' => "Skrinka #{id} je z novšej verzie Noxun — tento plugin jej " \
+                                     'nastavenia nepozná celé. Nákupný zoznam kovania, rozpočet ani ' \
+                                     'cenová ponuka sa nedajú vyexportovať (boli by neúplné); ' \
+                                     'aktualizuj plugin.',
+                     'stable_key' => "#{CAT_NEWER_CFG}|#{id}" }
+        end
       end
 
       # --- kontroly kovania a stavby ----------------------------------------
