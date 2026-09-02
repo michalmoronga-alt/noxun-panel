@@ -1501,6 +1501,17 @@
                        // pull/cache rozhodovania a nasadenie obrazka na dlazdicu.
                        tplPrevKey: tplPrevKey, tplPicHtml: tplPicHtml, tplTileHtml: tplTileHtml,
                        nxTplPreviewPlan: nxTplPreviewPlan, nxTplPreviewStore: nxTplPreviewStore,
-                       tplBindPreview: tplBindPreview };
+                       tplBindPreview: tplBindPreview,
+                       // KOV-A2a: cesta „riadok -> karta -> collectFronts" sa da
+                       // overit LEN nad skutocnym DOM (mini-DOM sady). V CEF su
+                       // tieto funkcie GLOBALNE (volaju ich inline `onclick`
+                       // v markupe riadku), v Node ich treba vyviest vyslovne.
+                       // Ziadna z nich nie je „ciste jadro" — logika zije
+                       // v `core.js`, tu sa len napaja na DOM.
+                       addFrontRow: addFrontRow, collectFronts: collectFronts,
+                       onFrontCardToggle: onFrontCardToggle, onFrontTile: onFrontTile,
+                       onFrontSeg: onFrontSeg, onFrontWings: onFrontWings,
+                       frontExtraOf: frontExtraOf, refreshFrontCards: refreshFrontCards,
+                       updateFrontDirBadges: updateFrontDirBadges };
   }
 

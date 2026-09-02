@@ -283,8 +283,17 @@ zavesená; tretí typ „Doska" používa existujúci `slab`),
 `columns-3` / `rows-2` / `rows-3` (UI-C2 — dlaždice delenia zóny; spolu
 s existujúcim `columns-2` tvoria štvoricu „2/3 stĺpce · 2/3 riadky“),
 `door` (UI-C3 — typ čela v riadku, N27: panel so zvislou osou závesu a
-úchytkou pri druhej hrane; zásuvkové čelo používa `rows-2`, výklop `p-top`
-a „Bez čela“ `front`),
+úchytkou pri druhej hrane; zásuvkové čelo používa `rows-2` a „Bez čela“ `front`),
+`front-lift` / `front-fall` / `front-blind` (KOV-A2a — **typegrid karty čela**:
+výklop = panel dole + prerušovaná šípka nahor, sklop = panel hore + šípka nadol,
+blenda = prekrížený panel. Tá istá mapa `FRONT_TYPE_ICON` kreslí ikonu v riadku
+aj dlaždicu v karte, takže sa nemôžu rozísť; do KOV-A1 mali tieto typy dočasný
+fallback `front`),
+`dir-left` / `dir-right` / `dir-unset` (KOV-A2a — **smer otvárania** v segmente
+karty: smer = **strana pántov**, takže šípka ukazuje na VOĽNÚ hranu (`dir-left`
+= pánty vľavo = hrot vpravo); „neurčené“ je prerušovaný kruh s otáznikom — je to
+**stav, nie strana**. Prerušovaná čiara = pohyb, plná = dielec; to isté pravidlo
+kreslí 2D náhľad),
 `edge` (UI-D1 — hrana dielca v karte: plná hrubšia čiara = hrana, o ktorej
 riadok hovorí, ostatné tri sú prerušované. **Jedna kresba, štyri rotácie**
 cez `data-rot` v CSS — nikdy štyri ikony),

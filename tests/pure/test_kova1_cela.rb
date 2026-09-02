@@ -595,9 +595,14 @@ module NxTest
     # bolo druha pravda o tom, co „neurceny" znamena.
     #   modules/fronts.rb — DIRECTIONS + norm_direction (jediny vyrobca)
     #   core/bom.rb       — porovnanie stavu slotu (jediny citatel)
+    #   ui/js/core.js     — KOV-A2a: JEDINY klientsky vyrobca. Karta cela stav
+    #     „neurcene" naozaj vyraba (nove dvierka · prepnutie typu · klik na
+    #     „Neurčené" · 3/4 kridla), ale VYHRADNE cez `FRONT_DIR_UNSET` a tri
+    #     ciste funkcie v tomto subore. `form.js` (DOM) ani `preview.js`
+    #     (kresba) literal nepoznaju — citaju hodnotu z ponuky, resp. symbol.
     # POZN.: kod `front_direction_unset` NIE JE literal `unset` (iny token),
-    # takze validation.rb ani JS na allowliste byt nemusia.
-    allow = %w[modules/fronts.rb core/bom.rb]
+    # takze validation.rb ani zvysok JS na allowliste byt nemusia.
+    allow = %w[modules/fronts.rb core/bom.rb ui/js/core.js]
     literal = /['"]unset['"]/
     files = Dir[File.join(NxKovA1::SRC_DIR, '**', '*.rb')] +
             Dir[File.join(NxKovA1::SRC_DIR, 'ui', 'js', '*.js')]
@@ -626,7 +631,9 @@ module NxTest
            'frontProfileScopeItems vynechava profileless typy vo VSETKYCH rozsahoch')
     assert(js.include?('return it && !frontProfileless(it.type);'),
            'veta stavu ma TEN ISTY filter (inak by hlasila „bez profilu" o vyklope)')
-    assert(NxKovA1.src('ui/js/form.js').include?('var off = frontProfileless(sel.value);'),
+    # KOV-A2a: `onFrontTypeChange` dostava RIADOK (typ zije v datasete), nie
+    # select — zoznam sa tym nemeni, len sa cita z ineho miesta.
+    assert(NxKovA1.src('ui/js/form.js').include?('var off = frontProfileless(type);'),
            'form.js pouziva ten isty zoznam, nie vlastnu podmienku')
   end
 
@@ -642,7 +649,7 @@ module NxTest
            'stary dvojstavovy fallback (vsetko ostatne = „dvierka") uz neexistuje')
   end
 
-  test('KOV-A1 GUARD: form.js pass-through BEZ defaultu + tri NEAKTIVNE volby typu') do
+  test('KOV-A1 GUARD: form.js pass-through BEZ defaultu + VSETKYCH SEST typov v ponuke') do
     s = NxKovA1.src('ui/js/form.js')
     assert(s.include?("var FRONT_EXTRA_KEYS = ['direction', 'wing_directions', 'opening_mode', 'drawer']"),
            'form.js musi drzat zoznam prenasanych poli na JEDNOM mieste')
@@ -652,12 +659,18 @@ module NxTest
     body = s[/function frontExtraStore.*?^  \}\n  function frontExtraApply.*?^  \}/m]
     assert(body, 'telo pass-through funkcii sa nenaslo')
     refute(body.match?(/\|\|\s*['"]/), 'pass-through nesmie doplnat ZIADNY default')
-    # Tri neaktivne volby typu (nahradili `flap (faza 3)`).
-    %w[lift fall blind].each do |t|
-      assert(s.include?("<option value=\"#{t}\" disabled>"),
-             "select typu musi niest NEAKTIVNU volbu #{t} (inak by config z API prepol typ na door)")
-    end
+    # KOV-A2a: rozbalovacka typu ZANIKLA — typ sa vybera PIKTOGRAMOM v karte
+    # cela, takze uz niet „neaktivnych volieb". Ponuka typov je teraz zoznam
+    # `FRONT_CARD_TYPES` v core.js a MUSI drzat vsetkych sest (aj „Bez čela" —
+    # D-18 je platny typ riadku). Kontrakt ostava ten isty: co server pozna,
+    # to sa musi dat v paneli aj nastavit, inak by prva editacia ineho pola
+    # typ ticho stratila.
+    types = NxKovA1.src('ui/js/core.js')[/FRONT_CARD_TYPES\s*=\s*\[([^\]]*)\]/, 1]
+    refute(types.nil?, 'FRONT_CARD_TYPES sa v core.js nenasla')
+    assert_equal(K::F::TYPES.sort, types.scan(/'([^']+)'/).flatten.sort,
+                 'typegrid musi ponukat PRESNE typy, ktore pozna server (Fronts::TYPES)')
     refute(s.include?('value="flap"'), 'stara volba `flap (faza 3)` uz neexistuje')
+    refute(s.include?('class="ftype"'), 'rozbalovacka typu v riadku uz neexistuje (KOV-A2a)')
     assert(s.include?("lift: 'Výklop'") && s.include?("fall: 'Sklop'") && s.include?("blind: 'Blenda'"),
            'FRONT_TYPE_LABEL pozna nove typy')
   end
