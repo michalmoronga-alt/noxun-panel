@@ -342,7 +342,22 @@ Zóna nesie `allowed_modules` — čo do nej smie. Modul pri vklade dostane rozm
 **Škáry sú konfigurovateľné** (`gap` medzi čelami, `gap_top`/`gap_bottom`/`gap_sides` po obvode).
 Prekrytie korpusu (`overlay`) ani odlišná škára medzi krídlami (`gap_between`) v konfigurácii čiel **nie sú** — prekrytie určuje typ pántu, preto patria k budúcej práci na kovaní (viď 6.2; zaradenie určí PLAN).
 
-`items[].type` nadobúda `door` · `drawer_front` · `none` (D-18 „Bez čela"): riadok `none` drží výšku v rade presne ako čelo (fixed/auto/lock, rovnaká matematika),
+`items[].type` nadobúda `door` · `drawer_front` · `lift` (výklop) · `fall` (sklop) · `blind` (blenda) · `none` (D-18 „Bez čela"); neznámy typ sa sklopí na `door`.
+`lift`/`fall` → rola **`flap`** (kľúč `front:F#/flap`), `blind` → rola **`false_front`** (kľúč `front:F#/blind`); oba majú identickú panelovú matematiku ako zásuvkové čelo
+(1 panel cez celý otvor, `wings_n` 1) a v ABS pravidlách 4 hrany 1,0 mm ako dvierka. Úchytkový `profile` je pre ne (aj pre `none`) normalizovaný na `none` — profilové pravidlo
+D-90 pozná len dvierka a zásuvku (KOV-A1, vedomý limit; profil na pohyblivom čele = KOV-E/F).
+
+**Štyri voliteľné polia položky (KOV-A1) — trojstav a dormant:** `direction` (smer otvárania = **strana pántov**, `left` = pánty vľavo) · `wing_directions` (`{"p2","p3"}` =
+stredné krídla 3/4-krídlových dvierok; krajné sú ODVODENÉ a neukladajú sa) · `opening_mode` (`classic`|`tipon`) · `drawer` (`{"construction": metal|wood|other,
+"variant": standard|internal}`, pod-polia nezávisle).
+**TROJSTAV** platí pre smer: kľúč **CHÝBA = legacy** (nikdy sa nedopĺňa, nikdy nedá nález) · `unset` = vedome neurčené (RED nález `front_direction`, bez exportnej brány — O1/R-39) ·
+`left`/`right` = vyriešené. `unset` vzniká **výhradne** používateľskou akciou alebo z poškodenej hodnoty (neznámy neprázdny string → `unset` fail-visible; `nil`/`""`/iný typ →
+kľúč sa zahodí). Pri `opening_mode` a `drawer` žiadny „neurčený" stav neexistuje — neplatná hodnota kľúč **zahodí**.
+**DORMANT:** všetky štyri sa v configu držia bez ohľadu na aktuálny typ a počet krídel (prepnutie typu ani `1 ↔ 2 ↔ auto` hodnotu nezahodí, po návrate sa obnoví).
+**Aplikovateľnosť smeru má JEDINÚ definíciu** — `Fronts.direction_slots(resolved_item)` nad efektívnym `wings_n` (nie surovým `wings`): 1 krídlo → `single` · 2 → nič (odvodené
+Ľ+P) · 3 → `p2` · 4 → `p2`+`p3` · ne-dvierka → nič. **Nikde v kóde (Ruby, JS, náhľad ani overlay) nesmie existovať default ani heuristika smeru.**
+
+`items[].type: "none"` (D-18 „Bez čela"): riadok `none` drží výšku v rade presne ako čelo (fixed/auto/lock, rovnaká matematika),
 ale panel sa negeneruje = otvorená nika v rade čiel.
 Medzery voči susedom ostávajú ako pri skutočnom čele (reálny otvor je opticky väčší o susedné škáry — vedomé rozhodnutie); `wings` je pre `none` neutrálne 1.
 Bez dielca nevzniká kovanie ani položka kusovníka/VEPO.

@@ -486,3 +486,4 @@ Rozhodnutie Michala O1 (reconcile cross-auditu KOVANIE): `direction = unset` je 
 vydaný výstup (nákup ani rezy). **Brána sa ZAVÄZUJE pristáť v TEJ ISTEJ dávke ako prvý výstup, ktorý smer reálne spotrebuje** (D-95 riadený prechod /
 výrobné zadanie): vtedy `front_direction_unset` prejde z RED nálezu do `export_blockers` daného výstupu. Tvrdé podmienky dovtedy: ŽIADNY default ani
 heuristika smeru nikde v kóde (ani preview/overlay); legacy configy bez poľa sa negatujú. **Otvorené, kým výstup so smerom nevznikne** — nezatvárať bez brány.
+RED kanál `front_direction` pristál v KOV-A1 (PR #TBD, v0.9.15) — brána ostáva otvorená.

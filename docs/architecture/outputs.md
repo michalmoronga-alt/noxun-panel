@@ -25,6 +25,15 @@ dva verejné pohľady — `duplicate_owner_ids` (len `KIND_CABINET`, teda kusy, 
 ešte preosieva `ProductionCore.dup_partition` cez skutočnú expanziu — detail v odseku `production_core.rb`. Kind-ová podmienka je tá istá, aká rozhoduje o znení nálezu
 v `duplicate_id_item`, takže sa hláška a brána nemôžu rozísť.)*
 
+**KOV-A1 — RED kategória `front_direction` (`CAT_FRONT_DIR`), jediný RED BEZ brány.** Vstupom je aditívny `collected[:hardware_issues]` z `Bom.collect` (`nil`/chýbajúci =
+kontrola sa preskočí, vzor `placements:`); `check_hardware_issues` spracuje **výhradne** kód `front_direction_unset` — ostatné kódy (KOV-C/D: `drawer_no_fit`, owner bez
+resolved setu…) sa zámerne ignorujú, aby sa do Kontroly nedostali skôr než ich vlastná brána. `stable_key` = `front_direction|owner_id|part_key`, takže klik-select po prestavbe
+nájde čerstvú entitu a dve inštancie so zdieľaným ID dajú **jeden** riadok; `owner_pid` sa nesie ako **extra pole mimo kľúča** (vzor `extra:` v `record_item`). Text (znenie podľa
+schváleného mockupu, scéna 4) menuje čelo serverovým `label`-om aj skrinku, hovorí, že smer = **strana pántov**, a otvorene priznáva, že export zatiaľ nezastaví.
+**Brána je pre-committed v [SYSTEM/AUDIT_REGISTER.md](../../SYSTEM/AUDIT_REGISTER.md) R-39** a pristane až s prvým výstupom, ktorý smer reálne spotrebuje (D-95 výrobné zadanie);
+dovtedy platia tvrdé podmienky O1 — žiadny default ani heuristika smeru nikde v kóde a legacy configy vyňaté (guard testy v `tests/pure/test_kova1_cela.rb`).
+`FRONT_ROLES` sa rozšírilo o `flap` a `false_front`, takže ORANGE „čelo bez ABS" a hrúbkové pravidlo čiel platia aj pre výklop, sklop a blendu.
+
 ### production_core.rb — zdieľané čisté jadro výstupov zákazky (ŠT-1a PR A)
 
 kusovník, súpisy platní/ABS a VEPO export sa sťahovali z okna Výroba do nového okna **Štúdio**; aby obe okná čítali **tie isté čísla**, čistí pomocníci prešli do jedného modulu
@@ -242,6 +251,15 @@ jantárových riadkov — čo je zdrojom ABS overridu, ako sa páruje kovanie a 
 **`identities` (1b-3):** `collect` nesie popri `placements` aj **jeden záznam na INŠTANCIU** top-level skrinky/dosky (`{kind, id}`, prázdne ID sa zahadzuje) — z toho `Validation`
 robí nález `duplicate_identity`. Kľúč je **aditívny** (kto ho nepozná, nič nestratí), zbiera sa v tom istom prechode a `compute()` ho ignoruje; pri doskách sa — rovnako ako
 `placements` — plní **pred** filtrom `manufactured`, lebo zdieľané ID je chyba identity aj pri dočasne nevyrábanej doske.
+
+**`hardware_issues` (KOV-A1):** ďalší **aditívny** kľúč — TVRDÉ nálezy kovania. V A1 má jediný kód `front_direction_unset` (dvierka s vedome neurčeným smerom otvárania).
+Zdrojom je **uložený `config['front_items']`** korpusu, presne ako kovanie z `config.hardware[]`: žiadne prepočítavanie plánu, žiadne čítanie geometrie, žiadny druhý prechod
+modelom. Výpočet je vyčlenený do čistej `Bom.front_direction_issues(owner_id, owner_pid, front_items)` (headless testovateľná), ktorá o aplikovateľnosti rozhoduje **výhradne**
+cez `Fronts.direction_slots` — jedinú definíciu (viď [construction.md](construction.md)). Nález vzniká LEN pri stave `unset`; legacy čelo (kľúč `direction` v configu nemá) má stav
+`nil` a nález **nikdy** nedostane. Záznam nesie `code`, `severity`, `owner_id`, **`owner_pid`**, `part_key`, `front_id` a serverový `label` (`PartKeys.human_label`).
+`owner_pid` = `persistent_id` konkrétnej inštancie (audit #14 FIX 11): pri dvoch skrinkách so zdieľaným `cabinet_id` je to jediný údaj, ktorým sa dá ukázať, KTORÁ z nich smer
+nemá. `compute()` kľúč **ignoruje** — kusovník, nákup ani ceny sa ním nemenia ani o číslo (dokazuje golden charakterizácia `tests/fixtures/kova_golden/`). Jediný čitateľ je
+`Validation.run`.
 
 ### sheet_estimate.rb
 

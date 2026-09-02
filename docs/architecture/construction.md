@@ -56,6 +56,11 @@ než zastavený export.
 **Štyri stratové cesty BEZ rebuildu majú vlastné odmietnutie** (guard nad cieľovou inštanciou by ich nechytil): použitie šablóny a vklad zo šablóny (autorita je
 **uložený záznam**, nie payload — JS prenáša len známe polia), „Vložiť kópiu" (`config_to_params` → `build`) a „Uložiť ako šablónu" (`template_config_from` je ďalší
 uzavretý whitelist). Šablónový config marker **nesie**, inak by šablóna z novšej verzie vyzerala ako legacy. In-SU dôkazy: sekcia `run_r12` + `run_r12_async`.
+**História markera:** `1` = R-12 zavedenie · **`2` = KOV-A1** (nové typy čela `lift`/`fall`/`blind` a nové polia položky `direction`/`wing_directions`/`opening_mode`/`drawer`) —
+tichá strata ktoréhokoľvek z nich by zmenila výrobu alebo zahodila vedome určený smer, čo je presne prípad z disciplíny bumpu (STANDARD §2.5). **Dôsledok pre prax:** model
+uložený s markerom 2 odmietne prestavať starší plugin, preto sa pred prvým KOV-A modelom aktualizujú **obe PC** (D-52 updater).
+**Allowlisty rolí (KOV-A1):** `PART_TAGS` (`flap`/`false_front` → `Noxun/Čelá`), `thickness_ok_for?` (18 / 18,6 / 19 mm ako ostatné čelá), `base_material_for` (čelný materiál)
+a `materialized_part` (prepis hrúbky boxu, polohy pred korpusom aj výrobného údaja) poznajú obe nové roly.
 **Charakterizácia scale cesty (nález behu, platí aj pre `guard_unknown_hardware!`):** absorpcia beží v **transparentnej** operácii pripojenej k používateľovmu Scale
 kroku, takže `abort_safely` zruší **aj ten** — v okamihu, keď `process_dirty` výnimku chytí, transformácia už zväčšená nie je a `reject_scale` sa **nespustí**. Model
 je teda korektne obnovený a undo stack čistý, ale **hlášku používateľ nedostane**. Je to prevzatá vlastnosť observera (dávka R-12 ju nezaviedla); zmena by siahala do
@@ -282,6 +287,25 @@ police v zónach: rovnomerné rozloženie v svetlej výške (`n` políc ⇒ `n+1
 ### fronts.rb
 
 čelá fixed/auto s lockmi, „bez čela", krídla 1–4, **úchytkový profil na hornej hrane (D-90 — riadok drží výšku, skracuje sa PANEL; `profile_band` je podklad vizuálu aj náhľadu)**.
+
+**KOV-A1 — TYPY:** `items[].type` ∈ `door` · `drawer_front` · `lift` (výklop) · `fall` (sklop) · `blind` (blenda) · `none`; neznámy typ sa (ako doteraz) sklopí na `door`.
+`lift`/`fall` → rola **`flap`**, kľúč `front:F#/flap`, suffix `FLAP-#`, názvy „Výklop #" / „Sklop #"; `blind` → rola **`false_front`**, kľúč `front:F#/blind`, suffix `BLIND-#`.
+Oba typy majú **identickú panelovú matematiku ako zásuvkové čelo** (1 panel cez celý otvor, `wings_n` 1, `AXES_FRONT`). **Vedomý limit A1:** úchytkový `profile` je pre
+`lift`/`fall`/`blind` (aj `none`) normalizovaný na `none` — profilové pravidlo D-90 pozná len dvierka a zásuvku, inak by vznikol falošný `profile_rule_missing`
+(profil na pohyblivom čele = KOV-E/F). UI ich sprístupní až KOV-A2; v A1 vznikajú len cez config/API a select typu ich nesie ako **neaktívne** voľby.
+
+**KOV-A1 — ŠTYRI NOVÉ POLIA POLOŽKY (trojstav + dormant):** `direction` (smer otvárania = **strana pántov**, `left` = pánty vľavo) · `wing_directions` (`{p2, p3}` pre stredné
+krídla 3/4-krídlových dvierok) · `opening_mode` (`classic|tipon`) · `drawer` (`{construction: metal|wood|other, variant: standard|internal}`, pod-polia nezávisle).
+**TROJSTAV smeru (audit #14 B1):** kľúč CHÝBA = legacy — **nikdy sa nedopĺňa** a nikdy nedá nález · `unset` = vedome neurčené (RED) · `left`/`right` = vyriešené.
+`unset` vzniká VÝHRADNE používateľskou akciou (A2) alebo z **poškodenej hodnoty** (neznámy neprázdny string → `unset`, fail-visible; `nil`/`''`/iný typ → kľúč sa zahodí).
+Neplatný `opening_mode` a `drawer` bez platného pod-poľa → kľúč preč (tam žiadny „neurčený" stav neexistuje). **DORMANT (B3):** všetky štyri sa v configu držia bez ohľadu na
+aktuálny typ a počet krídel, takže prepnutie typu alebo `1 ↔ 2 ↔ auto` hodnotu nezahodí; po návrate sa obnoví. Guard test stráži, že **žiadna cesta v Ruby ani JS** nedopĺňa
+default smeru a že literál `unset` žije len v `fronts.rb` (výrobca) a `bom.rb` (čitateľ).
+
+**`Fronts.direction_slots(resolved_item)` = JEDINÁ definícia „kde sa smer pýta"** — čistá funkcia nad **resolved** položkou (`front_items`), rozhoduje **efektívny `wings_n`**
+(auto okolo 600 mm na čelnom otvore), nikdy surové `wings`: 1 krídlo → `single` · 2 → `[]` (odvodené Ľ+P) · 3 → `p2` · 4 → `p2`+`p3` · ne-dvierka → `[]`. Vracia
+`[{wing:, part_key:, state:}]`, kde `state` `nil` = legacy. Čítajú ju `Bom.collect` (A1), overlay aj karta čela (A2) — **nikde inde sa o aplikovateľnosti nerozhoduje**.
+Resolved položka navyše nesie `flap_dir` (`up` pre `lift`, `down` pre `fall`) — odvodený z typu, **nie je to default smeru** (O1 sa týka strany pántov).
 
 ## Osi dielca a prekrytia v modeli
 
