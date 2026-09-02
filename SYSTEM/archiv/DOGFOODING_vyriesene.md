@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **Výklop ako samostatný typ čela** *(bez D-čísla)* — typ je v paneli **voliteľný** (typegrid piktogramov v karte čela) — vyriešené 3.9.2026, KOV-A1 PR #280 + KOV-A2a PR #NNN, v0.9.16
 - **D-52** — Aktualizovať jedným klikom (updater) — vyriešené 3.9.2026, PR #277 + #278 + #279, v0.9.14
 > **Presunuté zo živého zápisníka [../DOGFOODING.md](../DOGFOODING.md) 26.8.2026** (dávka
 > Docs cleanup B): index aj plné texty žijú od tejto dávky na jednom mieste — v tomto súbore.
@@ -95,6 +96,22 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### Výklop ako samostatný typ čela *(bez D-čísla — vzišlo z kontraktu UI 2.0, otvorené dávkou UI-C3 19.8.2026)* (vyriešené 3.9.2026, dávky KOV-A1 PR #280 · KOV-A2a PR #NNN, v0.9.15 → v0.9.16)
+
+**Pôvodný postreh:** kontrakt UI 2.0 žiada výklop v ponuke typov čela. UI-C3 ho tam dala **len ako neaktívnu voľbu s vysvetlením**, lebo rola `flap` (kanonická
+v STANDARD §2.4, ale nikde nepoužitá) potrebovala vlastnú cestu cez **builder, ABS pravidlá, kusovník a VEPO** — to je zmena dátového kontraktu, teda vlastná dávka
+s Codex auditom, nie prílepok k UI reorganizácii.
+
+**Riešenie v dvoch dávkach.** **KOV-A1 (v0.9.15, PR #280)** postavila dátovú vrstvu: typy `lift` (výklop), `fall` (sklop) a `blind` (blenda), roly `flap` a `false_front`,
+kanonické `part_key` (`front:F#/flap`, `front:F#/blind`), ABS seed, tagy, SK názvy rolí a výstupy — builder ich postaví, olepí a nesie ich kusovník aj VEPO. **KOV-A2a
+(v0.9.16)** im dala ovládač: rozbaľovačka typu v riadku čela **zanikla** a nahradil ju **typegrid šiestich piktogramov** v karte čela (Dvierka · Zásuvka · Výklop · Sklop ·
+Blenda · Bez čela). Všetky typy, ktoré pozná server (`Fronts::TYPES`), sú tak aj voliteľné — stráži to guard v `tests/pure/test_kova1_cela.rb`, aby sa ponuka a kontrakt
+už nikdy nerozišli. Výklop, sklop a blenda dostali **vlastné sprite symboly** (`front-lift` / `front-fall` / `front-blind`) a **vlastné slovo v náhľade** (2D symboly
+`∧` / `∨` / plné X namiesto výplne bez rozdílu).
+
+**Čo ostáva:** **kovanie výklopu (AVENTOS) sa pridáva ručne** — automatický výber mechanizmu z hmotnosti a rozmerov je **KOV-E**. Karta to hovorí jednou vetou priamo pri
+type, než aby ponúkala voľbu bez účinku. Týmto zároveň **zanikla odchýlka „Výklop je v ponuke, ale neaktívny"** z `SYSTEM/zdroje/ui20/UI20_KONTRAKT.md` §7.
 
 ### D-52 — Tlačidlo „Aktualizovať" (auto-update pluginu) (vyriešené 3.9.2026, dávky D-52a PR #277 · D-52b1 PR #278 · D-52b2 PR #279, v0.9.9 → v0.9.14)
 
