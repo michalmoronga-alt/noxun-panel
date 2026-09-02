@@ -289,6 +289,9 @@
     return {
       enabled: (live.enabled !== undefined) ? live.enabled : (base.enabled !== false),
       source_dir: dir,
+      // Token POSLEDNEJ kontroly. Klik ho posiela späť a server aktualizuje
+      // LEN vtedy, keď sedí s jeho vlastným záznamom aj s uloženou cestou.
+      token: (live.token == null) ? null : live.token,
       // Rozpísaná a NEULOŽENÁ cesta zamyká tlačidlo: aktualizovalo by sa
       // z ULOŽENEJ cesty, nie z tej v poli — klik by spravil niečo iné, než
       // čo má človek pred očami.
@@ -299,6 +302,23 @@
       available: live.available || '',
       reason: live.reason || ''
     };
+  }
+
+  // CUDZIA ZMENA CESTY (Codex #278 P1). `updater_settings.json` je súbor
+  // POČÍTAČA — uložiť doň môže aj druhá inštancia SketchUpu alebo človek
+  // ručne. Plný push potom nesie NOVÚ cestu, ale živý výsledok kontroly
+  // (`UPD`) patrí tej STAREJ: tlačidlo by ostalo aktívne, potvrdenie by
+  // menovalo cestu A a aktualizovalo by sa z B. Preto sa výsledok ZAHODÍ
+  // a — ak je sekcia otvorená — rovno beží nová kontrola.
+  function updOnPayload(){
+    if (!UPD) return false;
+    var about = (SS_STATE && SS_STATE.about) ? SS_STATE.about : null;
+    var base = (about && about.updater) ? about.updater : null;
+    if (!base || base.source_dir === undefined) return false;
+    if (String(UPD.source_dir == null ? '' : UPD.source_dir) === String(base.source_dir || '')) return false;
+    UPD = null;
+    if (ssActive() === 'about') updSend('updater_check', {});
+    return true;
   }
 
   // Píše používateľ práve do poľa CESTY? Vtedy sa telo sekcie neprekresľuje
@@ -373,7 +393,10 @@
         // Modal sa zatvára HNEĎ (výnimka z „zápis nezatvára modal"): okná sa
         // o chvíľu zavrú aj s ním a výsledok chodí natívnou hláškou.
         window.NXModal.close();
-        updSend('updater_apply', {});
+        // Klik nesie CESTU A TOKEN kontroly, ktorej vysledok mal clovek pred
+        // ocami ? server aktualizuje LEN vtedy, ked mu to sedi s vlastnym
+        // zaznamom aj s prave ulozenou cestou (Codex #278 P1).
+        updSend('updater_apply', { checked_path: u.source_dir, check_token: u.token });
       }
     });
     return true;
@@ -606,6 +629,10 @@
     // cestu pushu; prekreslenie z navigácie by jej ušlo a zastaraný pin by
     // prežil návrat do sekcie (falošný konflikt → zahodená editácia).
     SS_STATE = s;
+    // D-52b (Codex #278 P1): cudzia zmena distribucnej cesty zneplatni zivy
+    // vysledok kontroly ? musi to bezat AJ ked sekcia  prave otvorena
+    // nie je, inak by sa do nej clovek vratil so stavom o inom priecinku.
+    updOnPayload();
     if (!ssActive()) return;
     ssRenderBody();
     ssRenderTools();
@@ -689,6 +716,7 @@
                        ssFailed: function(){ return SS_FAILED; },
                        // D-52b (tests/js/test_d52b_updater_ui.js)
                        ssOnAboutEnter: ssOnAboutEnter, updMerged: updMerged,
+                       updOnPayload: updOnPayload,
                        updPaint: updPaint, updSaveDir: updSaveDir, updApply: updApply,
                        updAct: updAct, updTyping: updTyping,
                        updDirty: function(){ return UPD_DIRTY; },

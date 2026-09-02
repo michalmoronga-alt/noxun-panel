@@ -1962,6 +1962,18 @@ guard test nad zdrojom to stráži. Hlavné vlákno sa nikdy nečaká: `UI.start
 sekcia ukázala verziu úplne iného miesta) aj odpoveď patriaca ZANIKNUTEJ inštancii okna (`StudioDialog.instance_token` = `object_id` živého dialógu). Asynchrónna odpoveď už nemá
 sink (`with_client` žije presne jeden synchrónny callback) a ide kanálom okna — vzor asynchrónnych emitov Demosu.
 
+**JEDEN BEŽIACI DOTAZ NA JEDNU CESTU** (`updater_worker`, Codex #278 P2). Vlákno sa po deadline nezabíja, takže bez evidencie by každý návrat do sekcie pridal ďalšie zablokované
+vlákno na tú istú mŕtvu cestu a tie by sa hromadili až do reštartu SketchUpu. **Živý (visiaci) beh sa preto zdieľa** — nový dotaz na tú istú cestu sa naň len prihlási s vlastným
+tokenom. **Hotový beh sa naopak zahadzuje**: jeho výsledok je z iného okamihu a share sa medzitým mohol vrátiť, takže ďalšia kontrola musí zdroj prečítať nanovo. Iná cesta = vlastný
+beh.
+
+**APLIKUJE SA LEN TO, ČO BOLO SKONTROLOVANÉ** (Codex #278 P1). `updater_settings.json` je súbor počítača — uložiť doň môže aj druhá inštancia SketchUpu alebo človek ručne. Bez
+dôkazu by stačilo, aby sa cesta medzi kontrolou a klikom zmenila: potvrdenie by menovalo priečinok A a nasadilo by sa B. Server si preto pri každom **úspešnom** doručení výsledku
+zapíše `{dir, token, state, dlg}`, posiela `token` klientovi a ten ho pri klike vracia v `checked_path` + `check_token`. `apply!` sa spustí len keď sedí **všetko**: zapísaný stav je
+`newer`, jeho cesta = práve uložená cesta, inštancia okna je tá istá a klientove hodnoty sa zhodujú so zápisom. Inak odmietnutie („cesta sa medzitým zmenila — skontroluj znova").
+Klientská strana to zrkadlí: keď plný push prinesie inú `about.updater.source_dir`, než akej patrí živý výsledok, výsledok sa **zahodí** (tlačidlo zamkne) a v otvorenej sekcii sa
+rovno spustí nová kontrola.
+
 **Cesta má vlastný namespace `data-updater-edit` (F7), nie `data-ss`.** Dôvod je vecný: `data-ss` nesie revíznu mechaniku dodávateľa (`SS_DIRTY`, pripnutá `SS_BASE_REV`, optimistický
 zámok), a cesta pod ňu nepatrí — nemá revíziu a neukladá sa cez `ss_save`. Vetva v `input` listeneri končí `return` ešte pred celou tou mechanikou. Zdieľané je jedno: **rozpísaná
 cesta PREŽIJE plný push** (`UPD_DIRTY` vyhráva nad payloadom) a zaniká výhradne na potvrdenie servera (`SS.updater({saved:true})`, vzor `SS.saved()`); vtedy sa do poľa zapíše
@@ -1980,6 +1992,11 @@ sa nič nezmenilo"). Guard test nad zdrojom trvá na tom, že `handle_updater_ap
 **Výsledok ide VÝHRADNE natívne (`UI.messagebox`)** — úspech („Aktualizované na X — reštartuj SketchUp", plus poznámka z jadra, ak nejaká je), odmietnutie s presným dôvodom
 z `Refused` aj neočakávaná výnimka. Do CEF sa poslať nedá: okná sú v tom bode zavreté a po úspešnom swape by nové HTML bežalo proti starým callbackom. Guard test nad zdrojom
 zakazuje v `updater_run_apply` `set_status`, `push_updater` aj `js(`.
+
+**Neúspech sa VETVÍ podľa restart latchu** (`updater_failure_text`, Codex #278 P2): „plugin ostal nezmenený" nie je pravda vždy. `abort_after_move!` má dve vetvy — po **úspešnom**
+rollbacku je na disku presne to, čo tam bolo (a latch sa zámerne nezapína), ale po **zlyhanom** rollbacku ostávajú `.new`/`.old` aj marker, latch sa zapne a generáciu dorovná až
+boot recovery. Latch je jediný príznak, ktorý jadro v tom druhom prípade spoľahlivo zapína, takže rozhoduje on: so zapnutým latchom hláška hovorí „AKTUALIZÁCIA JE NEÚPLNÁ —
+REŠTARTUJ SketchUp, plugin sa pri štarte dorovná". Presný dôvod z jadra ostáva v oboch vetvách.
 
 **Testovacie seamy.** Asynchrónny check a bariéra stoja na troch veciach z prostredia — hodinách, vlákne a timeri (+ natívnej hláške). `SupplierSettingsDialog.test_clock /
 test_spawn / test_schedule / test_notify` ich v headless sade nahradia (vzor `Materials.test_dir_override`), takže token, deadline aj bariéra sa overia bez SketchUpu a bez čakania

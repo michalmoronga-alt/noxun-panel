@@ -97,7 +97,7 @@ module Noxun
           when 'ss_reload'      then handle_reload
           when 'updater_check'  then handle_updater_check
           when 'updater_set_dir' then handle_updater_set_dir(payload)
-          when 'updater_apply'  then handle_updater_apply
+          when 'updater_apply'  then handle_updater_apply(payload)
           end
         end
 
@@ -309,9 +309,36 @@ module Noxun
 
           token = { 'seq' => seq, 'dir' => dir, 'dlg' => studio_token }
           push_updater('state' => 'checking', 'source_dir' => dir)
+          entry = updater_worker(dir, Engine::VERSION.to_s)
+          poll_updater_check(token, entry['box'], updater_now + UPDATER_DEADLINE_S)
+          true
+        end
+
+        # JEDEN BEZIACI DOTAZ NA JEDNU CESTU (Codex #278 P2).
+        #
+        # Vlakno sa po deadline NEZABIJA (nad visiacim UNC sharom je `Thread#kill`
+        # nespolahlivy), takze bez tejto evidencie by KAZDY navrat do sekcie
+        # pridal dalsie zablokovane vlakno na tu istu mrtvu cestu — a tie by sa
+        # hromadili az do restartu SketchUpu.
+        #
+        # ZIVY (visiaci) beh sa preto ZDIELA: novy dotaz na tu istu cestu sa len
+        # PRIHLASI na jeho vysledok s VLASTNYM tokenom. HOTOVY beh sa naopak
+        # zahadzuje — jeho vysledok je z ineho okamihu a share sa medzitym mohol
+        # vratit, takze nova kontrola musi zdroj precitat NANOVO.
+        def updater_worker(dir, current)
+          reg = (@updater_workers ||= {})
+          reg.delete_if { |_k, v| v['box']['done'] } # dobehnute behy sa nedrzia
+          entry = reg[dir]
+          if entry
+            entry['reused'] = entry['reused'].to_i + 1
+            return entry
+          end
+
           box = { 'done' => false, 'result' => nil }
-          current = Engine::VERSION.to_s
-          updater_spawn do
+          entry = { 'box' => box, 'started_at' => updater_now, 'reused' => 0 }
+          # VO VLAKNE JE LEN SUBOROVE I/O — ziadne `Sketchup.*`, ziadne `UI.*`,
+          # ziadny zapis do stavu okna (guard test nad zdrojom to strazi).
+          entry['thread'] = updater_spawn do
             begin
               box['result'] = Updater.check(dir, current)
             rescue StandardError => e
@@ -320,8 +347,8 @@ module Noxun
             end
             box['done'] = true
           end
-          poll_updater_check(token, box, updater_now + UPDATER_DEADLINE_S)
-          true
+          reg[dir] = entry
+          entry
         end
 
         # Jeden tik pollu. Re-armuje sa sam (`UI.start_timer` je jednorazovy).
@@ -348,7 +375,14 @@ module Noxun
 
           r = result.is_a?(Hash) ? result : {}
           state = r['ok'] ? r['state'].to_s : 'error'
-          push_updater('state' => state, 'source_dir' => token['dir'],
+          # DOKLAD O KONTROLE (Codex #278 P1). `apply!` sa smie spustit VYHRADNE
+          # nad tym, co uzivatel naozaj videl skontrolovane — preto si server
+          # pamata (cesta, sekvencia, stav, instancia okna) a klient mu to pri
+          # klike vracia. Bez toho by stacilo, aby druha instancia medzitym
+          # ulozila INU cestu: potvrdenie by menovalo cestu A a nasadilo B.
+          @updater_check_ok = { 'dir' => token['dir'].to_s, 'token' => token['seq'],
+                                'state' => state, 'dlg' => token['dlg'] }
+          push_updater('state' => state, 'source_dir' => token['dir'], 'token' => token['seq'],
                        'available' => r['available'].to_s, 'reason' => r['reason'].to_s)
         end
 
@@ -394,12 +428,23 @@ module Noxun
         end
 
         # --- aktualizacia (F10) ----------------------------------------------
-        def handle_updater_apply
+        #
+        # Codex #278 (P1): klient posiela CESTU A TOKEN kontroly, ktorej vysledok
+        # mal pred ocami. Bez toho stacilo, aby druha instancia SketchUpu (alebo
+        # rucny zasah do `updater_settings.json`) medzitym ulozila INU cestu:
+        # potvrdenie by menovalo cestu A a nasadila by sa B. Zhodovat sa musi
+        # VSETKO — cesta z kliku, posledna USPESNA kontrola tejto instancie okna
+        # a cesta, ktora je AKTUALNE ulozena.
+        def handle_updater_apply(payload = nil)
           return updater_off unless updater?
           return set_status('Plugin je už aktualizovaný — reštartuj SketchUp.', true) if Engine.restart_required?
 
           dir = Updater.source_dir
           return set_status('Najprv zadaj distribučný priečinok a ulož ho.', true) if dir.empty?
+
+          data = payload.is_a?(Hash) ? payload : (payload.nil? ? {} : JSON.parse(payload.to_s))
+          reason = updater_apply_mismatch(data, dir)
+          return set_status(reason, true) if reason
 
           # Poradie je zavazne: hlaska este do ZIVEHO okna, potom zatvorenie,
           # a swap az ked obe okna naozaj dobehnu (`set_on_closed`).
@@ -407,6 +452,23 @@ module Noxun
           close_plugin_dialogs
           await_dialogs_closed(dir, updater_now + UPDATER_BARRIER_S)
           true
+        end
+
+        # `nil` = klik smie prejst. Inak DOVOD odmietnutia (jedna hlaska pre
+        # vsetky nezhody — pouzivatel ma spravit to iste: skontrolovat znova).
+        RECHECK_MSG = 'Cesta k balíku sa medzitým zmenila — skontroluj znova (odíď zo sekcie ' \
+                      'a vráť sa do nej) a až potom aktualizuj.'
+
+        def updater_apply_mismatch(data, dir)
+          ok = @updater_check_ok
+          return RECHECK_MSG unless ok.is_a?(Hash)
+          return RECHECK_MSG unless ok['state'].to_s == 'newer'
+          return RECHECK_MSG unless ok['dir'].to_s == dir          # kontrola bola nad INOU cestou
+          return RECHECK_MSG unless ok['dlg'] == studio_token      # a v INEJ instancii okna
+          return RECHECK_MSG unless data['checked_path'].to_s == dir
+          return RECHECK_MSG unless data['check_token'].to_i == ok['token'].to_i
+
+          nil
         end
 
         def close_plugin_dialogs
@@ -447,10 +509,26 @@ module Noxun
           msg = "#{msg}\n\n#{note}" unless note.empty?
           updater_message(msg)
         rescue Updater::Refused => e
-          updater_message("Aktualizácia sa NEVYKONALA — plugin ostal nezmenený.\n\nDôvod: #{e.message}")
+          updater_message(updater_failure_text(e.message))
         rescue StandardError => e
           Engine.log_error(e, 'SupplierSettingsDialog.updater_run_apply')
-          updater_message("Aktualizácia zlyhala (#{e.class}): #{e.message}")
+          updater_message(updater_failure_text("#{e.class}: #{e.message}"))
+        end
+
+        # Codex #278 (P2): „plugin ostal nezmenený" NIE JE pravda vzdy.
+        # `abort_after_move!` ma DVE vetvy — pri USPESNOM rollbacku je na disku
+        # presne to, co tam bolo (a latch sa zamerne NEZAPINA), ale pri ZLYHANOM
+        # rollbacku ostavaju artefakty `.new`/`.old` aj marker, latch sa ZAPNE
+        # a generaciu dorovna az boot recovery. Rozhoduje preto LATCH: je to
+        # jediny priznak, ktory jadro po commite (a po zlyhanom rollbacku)
+        # spolahlivo zapina.
+        def updater_failure_text(reason)
+          if Engine.restart_required?
+            return "AKTUALIZÁCIA JE NEÚPLNÁ — REŠTARTUJ SketchUp, plugin sa pri štarte dorovná.\n\n" \
+                   "Dôvod: #{reason}"
+          end
+
+          "Aktualizácia sa NEVYKONALA — plugin ostal nezmenený.\n\nDôvod: #{reason}"
         end
 
         def updater_message(text)

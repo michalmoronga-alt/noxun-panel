@@ -229,6 +229,67 @@ function updEl(attrs, value){
   T.ssApplyState(STATE);                          // späť na fixture
 })();
 
+// --- 4b) CUDZIA ZMENA CESTY ZNEPLATNÍ VÝSLEDOK (Codex #278 P1) --------------
+
+(function(){
+  S.setStudioSection('about');
+  T.ssApplyState(STATE);
+  // Používateľ skontroloval cestu z payloadu a videl „novšia verzia".
+  T.SS.updater({ enabled: true, state: 'newer', source_dir: 'X:/dist', current: '0.9.11',
+                 available: '0.9.12', token: 7 });
+  ok(T.updMerged().state === 'newer' && T.updMerged().token === 7, 'stav je pripravený na klik');
+
+  // Medzitým DRUHÁ inštancia uložila do updater_settings.json inú cestu —
+  // plný push ju prinesie ako `about.updater.source_dir`.
+  const cudzi = JSON.parse(JSON.stringify(STATE));
+  cudzi.about.updater.source_dir = 'B:/nova';
+  SENT.length = 0;
+  T.ssApplyState(cudzi);
+  eq(T.updMerged().state, 'idle',
+     'živý výsledok patril STAREJ ceste — po cudzej zmene sa ZAHADZUJE');
+  eq(T.updMerged().source_dir, 'B:/nova', 'a v poli je cesta, ktorá je naozaj uložená');
+  ok(A.nxUpdaterEnabled(T.updMerged()) === false,
+     'tlačidlo je neaktívne — inak by potvrdenie menovalo A a nasadilo B');
+  eq(SENT.filter(function(x){ return x[0] === 'updater_check'; }).length, 1,
+     'a rovno beží nová kontrola (sekcia je otvorená)');
+
+  // Ten istý push druhýkrát už nič nezhadzuje ani nespúšťa.
+  SENT.length = 0;
+  T.ssApplyState(cudzi);
+  eq(SENT.length, 0, 'push s NEZMENENOU cestou nespúšťa nič');
+
+  // Mimo sekcie sa stav zahodí, ale kontrola sa nespúšťa (nikto sa nepozerá).
+  T.SS.updater({ enabled: true, state: 'newer', source_dir: 'B:/nova', current: '0.9.11',
+                 available: '0.9.12', token: 8 });
+  S.setStudioSection('bom');
+  const cudzi2 = JSON.parse(JSON.stringify(STATE));
+  cudzi2.about.updater.source_dir = 'C:/tretia';
+  SENT.length = 0;
+  T.ssApplyState(cudzi2);
+  eq(SENT.length, 0, 'zavretá sekcia kontrolu nespúšťa');
+  S.setStudioSection('about');
+  eq(T.updMerged().state, 'idle', 'ale zastaraný výsledok je aj tak preč');
+  T.ssApplyState(STATE);
+})();
+
+// --- 4c) KLIK NESIE DOKLAD O KONTROLE ---------------------------------------
+
+(function(){
+  S.setStudioSection('about');
+  T.ssApplyState(STATE);
+  T.SS.updater({ enabled: true, state: 'newer', source_dir: 'X:/dist', current: '0.9.11',
+                 available: '0.9.12', token: 11 });
+  let sub = null;
+  window.NXModal = { open: function(spec){ sub = spec; }, close: function(){} };
+  SENT.length = 0;
+  T.updApply();
+  sub.onSubmit({});
+  const sent = SENT.find(function(x){ return x[0] === 'updater_apply'; });
+  const payload = JSON.parse(sent[1]);
+  eq(payload.checked_path, 'X:/dist', 'klik posiela CESTU, ktorej výsledok mal človek pred očami');
+  eq(payload.check_token, 11, 'a TOKEN tej kontroly — server bez zhody neaktualizuje');
+})();
+
 // --- 5) VSTUP DO SEKCIE = PRESNE JEDEN CHECK ---------------------------------
 
 (function(){

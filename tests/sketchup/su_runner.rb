@@ -10223,6 +10223,10 @@ module NoxunSuRunner
       sc.send(:remove_method, :nx_d52b_orig_src)
     end
     state[:d52b_probe] = nil
+    e::SupplierSettingsDialog.instance_variable_set(:@updater_check_ok, nil)
+    env = state[:d52b_env]
+    state[:d52b_env] = nil
+    FileUtils.rm_rf(env[:root]) if env && env[:root]
   rescue StandardError => ex
     log_line("INFO: D-52b teardown: #{ex.class}: #{ex.message}")
   end
@@ -10249,15 +10253,36 @@ module NoxunSuRunner
       e::StudioDialog.show
     end]
     steps << [SETTLE, lambda do
-      box = d52b_install_apply_probe(state)
-      # Cesta sa NEBERIE zo ziveho %APPDATA% — test nesmie prepisat Michalovo
-      # nastavenie. Stub vracia sandboxovu cestu len na cas scenara.
+      # REALNY asynchronny check: skutocne Ruby vlakno + skutocny
+      # `UI.start_timer` nad skutocnym priecinkom. Headless sada obe veci
+      # nahradzuje seamami, takze TOTO je jediny dokaz, ze vlakna v SketchUpe
+      # naozaj dobiehaju (riziko pomenovane v zadani D-52b).
+      env = d52b_sandbox
+      state[:d52b_env] = env
       sc = e::Updater.singleton_class
+      src = env[:src]
+      # Cesta sa NEBERIE zo ziveho %APPDATA% — test nesmie prepisat Michalovo
+      # nastavenie. Stub ju vracia len na cas scenara.
       sc.send(:alias_method, :nx_d52b_orig_src, :source_dir)
-      sc.send(:define_method, :source_dir) { 'Z:/noxun-d52b-sandbox' }
-      state[:d52b_open] = e::Panel.dialog_alive? && e::StudioDialog.dialog_alive?
+      sc.send(:define_method, :source_dir) { src }
+      e::SupplierSettingsDialog.instance_variable_set(:@updater_check_ok, nil)
       rec = []
-      e::SupplierSettingsDialog.dispatch('updater_apply', '{}', ->(s) { rec << s.to_s })
+      e::SupplierSettingsDialog.dispatch('updater_check', '{}', ->(s) { rec << s.to_s })
+      ok('D-52b async (check): sekcia hned hlasi „kontrolujem" a hlavne vlakno sa vratilo',
+         rec.any? { |x| x.include?('"state":"checking"') })
+    end]
+    steps << [2.5, lambda do
+      done = e::SupplierSettingsDialog.instance_variable_get(:@updater_check_ok)
+      ok("D-52b async (check): REALNE vlakno dobehlo a timer nasadil vysledok (#{done.inspect})",
+         done.is_a?(Hash) && done['state'] == 'newer' && done['dir'] == state[:d52b_env][:src])
+      state[:d52b_check] = done
+      # BARIERA: klik posiela CESTU A TOKEN kontroly (Codex #278 P1).
+      box = d52b_install_apply_probe(state)
+      state[:d52b_open] = e::Panel.dialog_alive? && e::StudioDialog.dialog_alive?
+      payload = { 'checked_path' => (done || {})['dir'].to_s,
+                  'check_token' => (done || {})['token'] }.to_json
+      rec = []
+      e::SupplierSettingsDialog.dispatch('updater_apply', payload, ->(s) { rec << s.to_s })
       state[:d52b_rec] = rec
       ok('D-52b async (bariera): obe okna boli pred klikom otvorene', state[:d52b_open])
       ok('D-52b async (bariera): swap sa NESPUSTIL hned — najprv sa zatvaraju okna',
@@ -10272,8 +10297,15 @@ module NoxunSuRunner
       call = box[:calls].first || {}
       ok('D-52b async (bariera): a AZ POTOM, co boli obe okna zavrete',
          call[:closed] == true)
-      ok("D-52b async (bariera): swap dostal ULOZENU cestu a ZIVY priecinok pluginu (#{call[:dir]})",
-         call[:src] == 'Z:/noxun-d52b-sandbox' && call[:dir].to_s == e.plugin_dir.to_s)
+      ok("D-52b async (bariera): swap dostal SKONTROLOVANU cestu a ZIVY priecinok pluginu (#{call[:dir]})",
+         call[:src] == state[:d52b_env][:src] && call[:dir].to_s == e.plugin_dir.to_s)
+      # A este dokaz P1 guardu: klik BEZ dokladu o kontrole neprejde.
+      box[:calls].clear
+      rec = []
+      e::SupplierSettingsDialog.instance_variable_set(:@updater_check_ok, nil)
+      e::SupplierSettingsDialog.dispatch('updater_apply', '{}', ->(s) { rec << s.to_s })
+      ok('D-52b async (#278 P1): klik BEZ dokladu o kontrole sa odmietne a swap sa nespusti',
+         box[:calls].empty? && rec.any? { |x| x.include?('medzitým zmenila') })
       d52b_teardown(state)
       cleanup(model)
     end]

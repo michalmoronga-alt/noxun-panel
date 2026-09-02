@@ -28,7 +28,15 @@
 #   4. deadline chyba (poll caka donekonecna)
 #      -> „D-52b: visiace I/O neblokuje a po deadline pride hlaska";
 #   5. check bezi zo `settings_payload`
-#      -> „D-52b: payload sekcie NESIAHA na zdroj".
+#      -> „D-52b: payload sekcie NESIAHA na zdroj";
+#   6. (#278 P1) `updater_apply_mismatch` vzdy pusti
+#      -> „swap nad CUDZO ZMENENOU cestou sa ODMIETNE" + „…BEZ kontroly…";
+#   7. (#278 P2) hlaska sa nevetvi podla restart latchu
+#      -> „pri ZLYHANOM rollbacku hlaska NEtvrdi „nezmenený"";
+#   8. (#278 P2) evidencia beziacich dotazov zrusena (kazdy check spawne vlakno)
+#      -> „tri kontroly TEJ ISTEJ visiacej cesty = JEDNO vlakno";
+#   9. (#278 P2) zdiela sa aj HOTOVY beh (vysledok sa recykluje)
+#      -> „DOBEHNUTY beh sa nezdiela — dalsia kontrola cita NANOVO".
 require_relative '../helper' unless defined?(NxTest)
 
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog') if NxTest.headless?
@@ -148,6 +156,9 @@ module NxD52b
     env.install!
     prev_dlg = E::StudioDialog.instance_variable_get(:@dialog)
     E::StudioDialog.instance_variable_set(:@dialog, nil)
+    # Doklad o kontrole ani evidencia vlakien nesmu pretiect medzi testami.
+    SD.instance_variable_set(:@updater_check_ok, nil)
+    SD.instance_variable_set(:@updater_workers, nil)
     begin
       yield env
     ensure
@@ -179,6 +190,9 @@ module NxD52b
     sc.send(:alias_method, :nx_d52b_orig_apply, :apply!)
     sc.send(:define_method, :apply!) do |dir, plugin_dir|
       calls << [dir, plugin_dir]
+      # `Proc` = scenar s VEDLAJSIM UCINKOM (napr. zlyhany rollback, ktory
+      # zapina restart latch a az potom vyhodi `Refused`).
+      next result.call(dir, plugin_dir) if result.is_a?(Proc)
       raise result if result.is_a?(Exception)
 
       result
@@ -200,6 +214,19 @@ module NxD52b
     sc.send(:remove_method, :source_dir)
     sc.send(:alias_method, :source_dir, :nx_d52b_orig_src)
     sc.send(:remove_method, :nx_d52b_orig_src)
+  end
+
+  # DOKLAD O USPESNEJ KONTROLE (Codex #278 P1). Bez neho `updater_apply`
+  # odmietne — server aktualizuje LEN nad tym, co uzivatel naozaj videl
+  # skontrolovane. Vracia payload v tvare, aky posiela klient.
+  def arm_check!(dir, state = 'newer')
+    token = SD.instance_variable_get(:@updater_seq).to_i + 1
+    SD.instance_variable_set(:@updater_seq, token)
+    SD.instance_variable_set(:@updater_dir, dir)
+    SD.instance_variable_set(:@updater_check_ok,
+                             { 'dir' => dir, 'token' => token, 'state' => state,
+                               'dlg' => SD.studio_token })
+    { 'checked_path' => dir, 'check_token' => token }.to_json
   end
 
   # Fake okno: `close` iba zaznamena. `set_on_closed` (a s nim vynulovanie
@@ -364,7 +391,7 @@ NxTest.test('D-52b: bariera — swap NEZACNE, kym su okna otvorene') do
       NxD52b.with_source_dir('X:/dist') do
         dlg = NxD52b::FakeDialog.new
         Noxun::Engine::StudioDialog.instance_variable_set(:@dialog, dlg)
-        Noxun::Engine::SupplierSettingsDialog.dispatch('updater_apply', '{}', env.sink)
+        Noxun::Engine::SupplierSettingsDialog.dispatch('updater_apply', NxD52b.arm_check!('X:/dist'), env.sink)
 
         NxTest.assert_equal(1, dlg.closes, 'okno dostalo pokyn zavriet sa')
         NxTest.assert_equal([], calls, 'ale swap NEBEZI — `set_on_closed` este nedobehol')
@@ -390,7 +417,7 @@ NxTest.test('D-52b: nezavrete okna po limite = ZRUSENIE s natívnou hlaskou') do
     NxD52b.with_apply('ok' => true, 'to' => '0.9.11', 'note' => '') do |calls|
       NxD52b.with_source_dir('X:/dist') do
         Noxun::Engine::StudioDialog.instance_variable_set(:@dialog, NxD52b::FakeDialog.new)
-        Noxun::Engine::SupplierSettingsDialog.dispatch('updater_apply', '{}', env.sink)
+        Noxun::Engine::SupplierSettingsDialog.dispatch('updater_apply', NxD52b.arm_check!('X:/dist'), env.sink)
         6.times do
           env.now += 1.0
           env.tick!
@@ -411,7 +438,7 @@ NxTest.test('D-52b: vysledok aktualizacie ide VYHRADNE natívne') do
                       'note' => '') do |_calls|
       NxD52b.with_source_dir('X:/dist') do
         env.sent.clear
-        Noxun::Engine::SupplierSettingsDialog.dispatch('updater_apply', '{}', env.sink)
+        Noxun::Engine::SupplierSettingsDialog.dispatch('updater_apply', NxD52b.arm_check!('X:/dist'), env.sink)
         NxTest.assert_equal(1, env.notices.length, 'uspech oznamuje natívna hlaska')
         NxTest.assert(env.notices.first.include?('0.9.11'), 'menuje nasadenu verziu')
         NxTest.assert(env.notices.first.include?('reštartuj'), 'a ziada restart')
@@ -428,7 +455,7 @@ NxTest.test('D-52b: ODMIETNUTIE nesie presny dovod z jadra') do
     refused = Noxun::Engine::Updater::Refused.new('beží ďalšia inštancia SketchUpu (PID 42) — zavri ostatné okná')
     NxD52b.with_apply(refused) do |calls|
       NxD52b.with_source_dir('X:/dist') do
-        Noxun::Engine::SupplierSettingsDialog.dispatch('updater_apply', '{}', env.sink)
+        Noxun::Engine::SupplierSettingsDialog.dispatch('updater_apply', NxD52b.arm_check!('X:/dist'), env.sink)
         NxTest.assert_equal(1, calls.length, 'swap sa pokusil')
         NxTest.assert_equal(1, env.notices.length, 'a odmietnutie je natívna hlaska')
         NxTest.assert(env.notices.first.include?('PID 42'), "presny dovod: #{env.notices.first}")
@@ -460,6 +487,147 @@ NxTest.test('D-52b: po uspesnej aktualizacii latch dalsi pokus zastavi') do
         NxTest.assert(env.statuses.any? { |s| s.include?('reštartuj') }, 'sekcia ziada restart')
       ensure
         Noxun::Engine.reset_restart_latch!
+      end
+    end
+  end
+end
+
+# --- 3b) DOKLAD O KONTROLE (Codex #278 P1) -----------------------------------
+
+NxTest.test('D-52b (#278 P1): swap nad CUDZO ZMENENOU cestou sa ODMIETNE') do
+  NxD52b.with_env do |env|
+    NxD52b.with_apply('ok' => true, 'to' => 'x', 'note' => '') do |calls|
+      # Uzivatel skontroloval cestu A a videl „novsia verzia"…
+      payload = NxD52b.arm_check!('A:/stara')
+      # …ale medzitym DRUHA INSTANCIA ulozila do `updater_settings.json` cestu B.
+      NxD52b.with_source_dir('B:/nova') do
+        Noxun::Engine::SupplierSettingsDialog.dispatch('updater_apply', payload, env.sink)
+        NxTest.assert_equal([], calls,
+                            'swap sa NESPUSTIL — inak by potvrdenie menovalo A a nasadilo B')
+        NxTest.assert(env.statuses.any? { |s| s.include?('medzitým zmenila') },
+                      "sekcia povie, ze treba skontrolovat znova: #{env.statuses.inspect}")
+      end
+    end
+  end
+end
+
+NxTest.test('D-52b (#278 P1): swap BEZ kontroly a so STARYM tokenom sa ODMIETNE') do
+  NxD52b.with_env do |env|
+    NxD52b.with_apply('ok' => true, 'to' => 'x', 'note' => '') do |calls|
+      NxD52b.with_source_dir('X:/dist') do
+        sd = Noxun::Engine::SupplierSettingsDialog
+
+        # (a) ziadna kontrola — klient si token vymyslel
+        sd.instance_variable_set(:@updater_check_ok, nil)
+        sd.dispatch('updater_apply', { 'checked_path' => 'X:/dist', 'check_token' => 1 }.to_json, env.sink)
+        NxTest.assert_equal([], calls, 'bez ULOZENEHO dokladu o kontrole sa neaktualizuje')
+
+        # (b) doklad je, ale token je z PREKONANEJ kontroly
+        NxD52b.arm_check!('X:/dist')
+        stale = { 'checked_path' => 'X:/dist', 'check_token' => 0 }.to_json
+        sd.dispatch('updater_apply', stale, env.sink)
+        NxTest.assert_equal([], calls, 'stary token neprejde')
+
+        # (c) kontrola skoncila stavom `same` — tlacidlo bolo neaktivne, klik
+        #     mohol prist len z upraveneho DOM
+        NxD52b.arm_check!('X:/dist', 'same')
+        ok_payload = { 'checked_path' => 'X:/dist',
+                       'check_token' => sd.instance_variable_get(:@updater_check_ok)['token'] }.to_json
+        sd.dispatch('updater_apply', ok_payload, env.sink)
+        NxTest.assert_equal([], calls, 'server neverí klientovi, ze bola novsia verzia')
+
+        # (d) VSETKO sedi -> prejde (dokaz, ze guard nie je „vzdy odmietni")
+        good = NxD52b.arm_check!('X:/dist')
+        sd.dispatch('updater_apply', good, env.sink)
+        NxTest.assert_equal(1, calls.length, 'zhodny doklad aktualizaciu PUSTI')
+      end
+    end
+  end
+end
+
+# --- 3c) ZLYHANY ROLLBACK (Codex #278 P2) ------------------------------------
+
+NxTest.test('D-52b (#278 P2): pri ZLYHANOM rollbacku hlaska NEtvrdi „nezmenený"') do
+  NxD52b.with_env do |env|
+    # Presne to, co robi `abort_after_move!`, ked sa generaciu vratit NEPODARI:
+    # zapne latch, necha artefakty a vyhodi `Refused`.
+    boom = lambda do |_src, _dir|
+      Noxun::Engine.restart_required!
+      raise Noxun::Engine::Updater::Refused,
+            'loader sa nedá vymeniť (Errno::EACCES) a vrátenie zmien zlyhalo — REŠTARTUJ SketchUp'
+    end
+    NxD52b.with_apply(boom) do |calls|
+      NxD52b.with_source_dir('X:/dist') do
+        Noxun::Engine::SupplierSettingsDialog.dispatch('updater_apply', NxD52b.arm_check!('X:/dist'), env.sink)
+        NxTest.assert_equal(1, calls.length, 'swap sa pokusil')
+        msg = env.notices.first.to_s
+        NxTest.refute(msg.include?('nezmenený'),
+                      "hlaska nesmie tvrdit, ze plugin ostal nezmeneny: #{msg}")
+        NxTest.assert(msg.include?('NEÚPLNÁ'), "priznava neuplnu aktualizaciu: #{msg}")
+        NxTest.assert(msg.include?('REŠTARTUJ'), 'a ziada restart (boot recovery generaciu dorovna)')
+        NxTest.assert(msg.include?('Errno::EACCES'), 'presny dovod z jadra ostava')
+      ensure
+        Noxun::Engine.reset_restart_latch!
+      end
+    end
+  end
+end
+
+NxTest.test('D-52b (#278 P2): pri USPESNOM rollbacku hlaska „nezmenený" OSTAVA') do
+  NxD52b.with_env do |env|
+    refused = Noxun::Engine::Updater::Refused.new(
+      'priečinok pluginu sa nedá presunúť (Errno::EACCES) — zavri SketchUp a skús znova'
+    )
+    NxD52b.with_apply(refused) do |_calls|
+      NxD52b.with_source_dir('X:/dist') do
+        Noxun::Engine.reset_restart_latch!
+        Noxun::Engine::SupplierSettingsDialog.dispatch('updater_apply', NxD52b.arm_check!('X:/dist'), env.sink)
+        msg = env.notices.first.to_s
+        NxTest.assert(msg.include?('nezmenený'), "bez latchu je disk naozaj nedotknuty: #{msg}")
+        NxTest.refute(msg.include?('NEÚPLNÁ'), 'a o restart sa nepyta zbytocne')
+      end
+    end
+  end
+end
+
+# --- 3d) JEDEN BEZIACI DOTAZ NA JEDNU CESTU (Codex #278 P2) ------------------
+
+NxTest.test('D-52b (#278 P2): tri kontroly TEJ ISTEJ visiacej cesty = JEDNO vlakno') do
+  NxD52b.with_env do |env|
+    NxD52b.with_check(->(_d, _c) { raise 'test: vlakno visi' }) do |_calls|
+      NxD52b.with_source_dir('X:/hanging') do
+        sd = Noxun::Engine::SupplierSettingsDialog
+        3.times { sd.dispatch('updater_check', '{}', env.sink) }
+        NxTest.assert_equal(1, env.threads.length,
+                            'visiaci beh sa ZDIELA — inak by kazdy navrat do sekcie pridal ' \
+                            'dalsie zablokovane vlakno na mrtvu cestu')
+        NxTest.assert_equal('checking', env.last_updater['state'], 'a sekcia stale hlasi kontrolu')
+      end
+
+      # INA cesta je INY beh — zdielat sa smie len rovnaka.
+      NxD52b.with_source_dir('Y:/ina') do
+        Noxun::Engine::SupplierSettingsDialog.dispatch('updater_check', '{}', env.sink)
+        NxTest.assert_equal(2, env.threads.length, 'druha cesta dostane vlastne vlakno')
+      end
+    end
+  end
+end
+
+NxTest.test('D-52b (#278 P2): DOBEHNUTY beh sa nezdiela — dalsia kontrola cita NANOVO') do
+  NxD52b.with_env do |env|
+    NxD52b.with_check('ok' => true, 'state' => 'newer', 'available' => '9.9.9') do |calls|
+      NxD52b.with_source_dir('X:/dist') do
+        sd = Noxun::Engine::SupplierSettingsDialog
+        sd.dispatch('updater_check', '{}', env.sink)
+        env.threads.first.run_now!
+        env.tick!
+        NxTest.assert_equal('newer', env.last_updater['state'], 'prva kontrola dobehla')
+
+        sd.dispatch('updater_check', '{}', env.sink)
+        NxTest.assert_equal(2, env.threads.length,
+                            'share sa mohol medzitym zmenit — hotovy vysledok sa NERECYKLUJE')
+        env.threads.last.run_now!
+        NxTest.assert_equal(2, calls.length, 'a zdroj sa naozaj cita NANOVO')
       end
     end
   end
@@ -526,7 +694,8 @@ NxTest.test('D-52b: vysledok swapu sa do CEF nedostane (guard nad zdrojom)') do
 end
 
 NxTest.test('D-52b: vlakno robi LEN suborove I/O') do
-  body = D52B_SUP_RB[/def handle_updater_check.*?\n        end\n/m].to_s
+  # Vlakno spusta `updater_worker` (evidencia JEDNEHO behu na cestu, #278 P2).
+  body = D52B_SUP_RB[/def updater_worker.*?\n        end\n/m].to_s
   thread_body = body[/updater_spawn do.*?\n          end\n/m].to_s
   NxTest.refute(thread_body.empty?, 'telo vlakna sa nenaslo — uprav guard test')
   NxTest.assert(thread_body.include?('Updater.check'), 'vlakno cita hlavicku loadera zo zdroja')
