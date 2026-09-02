@@ -299,6 +299,9 @@
       // Token POSLEDNEJ kontroly. Klik ho posiela späť a server aktualizuje
       // LEN vtedy, keď sedí s jeho vlastným záznamom aj s uloženou cestou.
       token: (live.token == null) ? null : live.token,
+      // ULOŽENÁ cesta (bez rozpisu). Pri rozpísanej ceste ju stavový riadok
+      // MENUJE — inak by človek nevedel, čo je naozaj v nastavení.
+      saved_dir: saved,
       // Rozpísaná a NEULOŽENÁ cesta zamyká tlačidlo: aktualizovalo by sa
       // z ULOŽENEJ cesty, nie z tej v poli — klik by spravil niečo iné, než
       // čo má človek pred očami.
@@ -325,6 +328,24 @@
     if (String(UPD.source_dir == null ? '' : UPD.source_dir) === String(base.source_dir || '')) return false;
     UPD = null;
     if (ssActive() === 'about') updSend('updater_check', {});
+    return true;
+  }
+
+  // POLE IDE ZA ULOŽENOU CESTOU (Codex #278/b1 P2). `SS.updater` prekresľuje
+  // len stavový riadok a tlačidlo (telo sa počas písania nesmie prepísať) —
+  // lenže cesta sa môže zmeniť ZVONKA (druhá inštancia, ručný zásah do
+  // `updater_settings.json`) a prísť aj BEZ plného payloadu. Bez tohto by
+  // sekcia hlásila kontrolu priečinka B, v poli by stálo A — a „Uložiť" by
+  // B prepísalo späť na A. Rozpísaná cesta má prednosť vždy: tá sa nechá
+  // a stavový riadok povie, čo je uložené.
+  function updSyncField(u){
+    if (!u || u.source_dir == null) return false;
+    if (UPD_DIRTY !== null) return false;
+    var inp = ssEl('updDir');
+    if (!inp) return false;
+    var next = String(u.source_dir);
+    if (String(inp.value == null ? '' : inp.value) === next) return false;
+    inp.value = next;
     return true;
   }
 
@@ -628,6 +649,7 @@
           if (inp) inp.value = (u.source_dir == null) ? '' : u.source_dir;
         }
       }
+      updSyncField(u);
       if (updPaint()) return;
       if (ssActive() === 'about') ssRenderBody();
     }

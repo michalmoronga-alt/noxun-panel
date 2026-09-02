@@ -1773,3 +1773,40 @@ NxTest.test('D-52b1 (#278/3 P2): settings store nezmrza KORENOVE cesty') do
   NxTest.assert_equal('//server/share', u.source_dir, 'a nacita sa rovnako')
   u.set_source_dir('')
 end
+
+NxTest.test('D-52b1 (#278/b1 P2): tiket nesie NONCE — commit cudzej pripravy neprejde') do
+  env = NxD52.sandbox
+  u = NxD52::U
+  Noxun::Engine.reset_restart_latch!
+
+  # PRVA priprava. Tiket si odlozime a stopu po nej UPRACEME — presne to sa
+  # deje, ked prvy beh skonci deadline-om a `abort_prepared!` po nom uprace.
+  first = u.prepare!(env[:src], env[:tree])
+  NxTest.assert(!first['nonce'].to_s.empty?, 'priprava vracia nonce')
+  stamp = first['stamp']
+  u.abort_prepared!(first)
+
+  # DRUHA priprava v TEJ ISTEJ sekunde a nad TYMI ISTYMI verziami: peciatku
+  # jej vnutime rovnaku, takze sa od prvej lisi UZ LEN nonce-om. (Realny
+  # scenar: dva pokusy tesne po sebe — `started_at` ma sekundove rozlisenie.)
+  u.instance_variable_set(:@started_at, stamp)
+  second = u.prepare!(env[:src], env[:tree])
+  NxTest.assert_equal(stamp, second['stamp'], 'obe pripravy maju ROVNAKU peciatku')
+  NxTest.assert_equal(first['from'], second['from'], 'aj rovnaku vychodziu verziu')
+  NxTest.assert_equal(first['to'], second['to'], 'aj rovnaku cielovu verziu')
+  NxTest.refute(first['nonce'] == second['nonce'], 'a lisia sa PRESNE nonce-om')
+
+  err = NxTest.assert_raise { u.commit!(first) }
+  NxTest.assert(err.message.include?('neplatí'),
+                "oneskoreny commit PRVEHO tiketu sa odmietne: #{err.message}")
+  NxTest.assert(Dir.exist?(File.join(env[:plugins], 'noxun_engine.new')),
+                'a pripravu DRUHEHO behu pri tom nezmaze')
+  NxTest.assert_equal('0.9.4', NxD52.generation(env[:plugins], 'po odmietnutom commite'),
+                      'ziva generacia je nedotknuta')
+
+  res = u.commit!(second)
+  NxTest.assert(res['ok'], 'tiket, ktory k markeru NAOZAJ patri, commitne')
+  NxTest.assert_equal('0.9.5', NxD52.generation(env[:plugins], 'po commite'))
+  Noxun::Engine.reset_restart_latch!
+  FileUtils.rm_rf(env[:root])
+end

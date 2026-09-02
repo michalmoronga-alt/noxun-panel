@@ -47,6 +47,7 @@ require 'fileutils'
 require 'digest'
 require 'rbconfig'
 require 'open3'
+require 'securerandom'
 
 module Noxun
   module Engine
@@ -509,6 +510,13 @@ module Noxun
           'from' => from.to_s,
           'to' => to.to_s,
           'started_at' => (@started_at ||= Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ')),
+          # NONCE = identita KONKRETNEJ pripravy (Codex #278/b1 P2). Dvojica
+          # (pid, `started_at`) nestaci: peciatka ma sekundove rozlisenie, takze
+          # dve pripravy v tej istej sekunde nad tymi istymi verziami by mali
+          # ROVNAKY „podpis" a oneskoreny `commit!` prveho tiketu by presiel
+          # proti markeru toho DRUHEHO. Nonce zije po cely cas transakcie
+          # (marker sa v nej prepisuje viackrat) a zanika s `clear_marker`.
+          'nonce' => (@nonce ||= SecureRandom.hex(8)),
           'pid' => Process.pid
         }
         path = marker_path(plugins_dir)
@@ -547,6 +555,7 @@ module Noxun
       # Vysledok sa preto OVERUJE na disku a volajuci sa o nom dozvie.
       def clear_marker(plugins_dir)
         @started_at = nil
+        @nonce = nil
         begin
           FileUtils.rm_f(marker_path(plugins_dir))
         rescue StandardError => e
@@ -962,7 +971,8 @@ module Noxun
 
           payload = write_marker!(plugins, 'staged', from: current, to: target)
           { 'plugins' => plugins, 'source' => source, 'from' => current, 'to' => target,
-            'pid' => payload['pid'], 'stamp' => payload['started_at'] }
+            'pid' => payload['pid'], 'stamp' => payload['started_at'],
+            'nonce' => payload['nonce'] }
         rescue StandardError => e
           cleanup_staging(plugins)
           # D-52b (P3 #277): ked marker prezije, pouzivatel to musi vediet UZ
@@ -1024,13 +1034,18 @@ module Noxun
         false
       end
 
-      # Marker patri TEJTO pripravenej transakcii? Rozhoduje pid, casova
-      # peciatka aj OBE verzie — samotny stav `staged` by pripustil cudziu
-      # (alebo starsiu vlastnu) transakciu.
+      # Marker patri TEJTO pripravenej transakcii? Rozhoduje NONCE — identita
+      # konkretnej pripravy. Pid, peciatka aj obe verzie ostavaju ako doplnkova
+      # kontrola, ale samy o sebe NESTACIA: peciatka ma sekundove rozlisenie,
+      # takze dve pripravy v tej istej sekunde nad tymi istymi verziami by boli
+      # nerozoznatelne a oneskoreny `commit!` prveho tiketu by nasadil balik
+      # toho druheho (Codex #278/b1 P2).
       def own_prepared_marker?(marker, ticket)
         return false unless marker.is_a?(Hash) && ticket.is_a?(Hash)
+        return false if ticket['nonce'].to_s.empty?
 
-        marker['state'].to_s == 'staged' &&
+        marker['nonce'].to_s == ticket['nonce'].to_s &&
+          marker['state'].to_s == 'staged' &&
           marker['pid'].to_i == Process.pid &&
           !ticket['stamp'].to_s.empty? &&
           marker['started_at'].to_s == ticket['stamp'].to_s &&

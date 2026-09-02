@@ -10253,6 +10253,41 @@ module NoxunSuRunner
     log_line("INFO: D-52b teardown: #{ex.class}: #{ex.message}")
   end
 
+  # KANAL OKNA JE JEDINY SPOLAHLIVY POZOROVATEL (Codex #278/b1 P2).
+  # Sink z `dispatch` zije PRESNE jeden synchronny callback: ked vlakno stihne
+  # dobehnut este v prvom polle, vysledok ide nim — inak uz oknom
+  # (`StudioDialog.settings_js`). Test preto instrumentuje KANAL OKNA na CELY
+  # cas cakania a vysledok hlada v spolocnom zazname; nesmie zavisiet od toho,
+  # ci worker dobehol v prvom polle.
+  def d52b_watch_window!(state)
+    return if state[:d52b_win]
+
+    rec = []
+    state[:d52b_win] = rec
+    sd = e::StudioDialog
+    sd.singleton_class.send(:alias_method, :nx_d52b_orig_sjs, :settings_js)
+    sd.singleton_class.send(:define_method, :settings_js) do |script|
+      rec << script.to_s
+      true
+    end
+    rec
+  end
+
+  def d52b_unwatch_window!(state)
+    sc = e::StudioDialog.singleton_class
+    if sc.method_defined?(:nx_d52b_orig_sjs) || sc.private_method_defined?(:nx_d52b_orig_sjs)
+      sc.send(:remove_method, :settings_js)
+      sc.send(:alias_method, :settings_js, :nx_d52b_orig_sjs)
+      sc.send(:remove_method, :nx_d52b_orig_sjs)
+    end
+    state[:d52b_win] = nil
+  end
+
+  # Vsetko, co sekcia dostala — bez ohladu na to, ktorym kanalom to islo.
+  def d52b_pushes(state)
+    Array(state[:d52b_rec]) + Array(state[:d52b_win])
+  end
+
   def run_d52b_async(model, state, steps)
     steps << [0.5, lambda do
       cleanup(model)
@@ -10288,62 +10323,75 @@ module NoxunSuRunner
       sc.send(:alias_method, :nx_d52b_orig_src, :source_dir)
       sc.send(:define_method, :source_dir) { src }
       e::SupplierSettingsDialog.instance_variable_set(:@updater_check_ok, nil)
+      d52b_watch_window!(state) # POZOROVATEL BEZI UZ PRED dispatchom
       rec = []
       e::SupplierSettingsDialog.dispatch('updater_check', '{}', ->(s) { rec << s.to_s })
-      ok('D-52b async (check): sekcia hned hlasi „kontrolujem" a hlavne vlakno sa vratilo',
-         rec.any? { |x| x.include?('"state":"checking"') })
-    end]
-    steps << [2.5, lambda do
-      done = e::SupplierSettingsDialog.instance_variable_get(:@updater_check_ok)
-      ok("D-52b async (check): REALNE vlakno dobehlo a timer nasadil vysledok (#{done.inspect})",
-         done.is_a?(Hash) && done['state'] == 'newer' && done['dir'] == state[:d52b_env][:src])
-      state[:d52b_check] = done
-      # BARIERA: klik posiela CESTU A TOKEN kontroly (Codex #278 P1).
-      box = d52b_install_apply_probe(state)
-      state[:d52b_open] = e::Panel.dialog_alive? && e::StudioDialog.dialog_alive?
-      payload = { 'checked_path' => (done || {})['dir'].to_s,
-                  'check_token' => (done || {})['token'] }.to_json
-      rec = []
-      e::SupplierSettingsDialog.dispatch('updater_apply', payload, ->(s) { rec << s.to_s })
-      state[:d52b_rec] = rec
-      ok('D-52b async (bariera): obe okna boli pred klikom otvorene', state[:d52b_open])
-      ok('D-52b async (bariera): swap sa NESPUSTIL hned — najprv sa zatvaraju okna',
-         box[:calls].empty?)
-      # Codex #278 kolo 3 (P1): kym beh trva, vstupne body pluginu okna
-      # NEOTVARAJU — inak by si ich clovek pocas dlhej pripravy otvoril
-      # z toolbaru a commit by bezal s CEF drziacim subory z `ui/`.
-      ok('D-52b async (#278/3 P1): pocas behu su vstupne body ZAMKNUTE',
-         e::SupplierSettingsDialog.updater_apply_inflight?)
-      bag = []
-      r12_silence_messagebox!(bag)
-      opened = e::Panel.show
-      r12_restore_messagebox!
-      ok("D-52b async (#278/3 P1): `Panel.show` pocas behu NEOTVORI okno a povie preco (#{bag.first.to_s[0, 40]})",
-         opened.nil? && bag.length == 1 && bag.first.to_s.include?('Prebieha aktualizácia'))
-    end]
-    steps << [SETTLE, lambda do
-      box = state[:d52b_probe] || { calls: [] }
-      ok('D-52b async (bariera): klik zavrel OBE okna (`set_on_closed` dobehol)',
-         d52b_dialogs_closed?)
-      ok("D-52b async (bariera): swap sa spustil PRESNE raz (#{box[:calls].length})",
-         box[:calls].length == 1)
-      call = box[:calls].first || {}
-      ok('D-52b async (bariera): a AZ POTOM, co boli obe okna zavrete',
-         call[:closed] == true)
-      ok("D-52b async (bariera): priprava dostala SKONTROLOVANU cestu a ZIVY priecinok pluginu (#{call[:dir]})",
-         call[:src] == state[:d52b_env][:src] && call[:dir].to_s == e.plugin_dir.to_s)
-      ok("D-52b async (#278/2 P1): commit prebehol PRESNE raz a tiez az po zatvoreni (#{box[:commits].length})",
-         box[:commits].length == 1 && box[:commits].first[:closed] == true)
-      # A este dokaz P1 guardu: klik BEZ dokladu o kontrole neprejde.
-      box[:calls].clear
-      box[:commits].clear
-      rec = []
-      e::SupplierSettingsDialog.instance_variable_set(:@updater_check_ok, nil)
-      e::SupplierSettingsDialog.dispatch('updater_apply', '{}', ->(s) { rec << s.to_s })
-      ok('D-52b async (#278 P1): klik BEZ dokladu o kontrole sa odmietne a swap sa nespusti',
-         box[:calls].empty? && rec.any? { |x| x.include?('medzitým zmenila') })
-      ok('D-52b async (#278/3 P1): po dobehnuti behu sa vstupne body zase OTVARAJU',
-         !e::SupplierSettingsDialog.updater_apply_inflight? && !e.update_in_progress?)
+        ok('D-52b async (check): sekcia HNED hlasi „kontrolujem" a hlavne vlakno sa vratilo',
+           d52b_pushes(state).any? { |x| x.include?('"state":"checking"') })
+      end]
+      # Deadline kontroly su 4 s; dve cakania (2,5 + 2,5 s) su za nim, takze vysledok
+      # je v tej chvili UZ doruceny — a to bez ohladu na to, ci vlakno stihlo prvy
+      # poll (vtedy ide sinkom) alebo az neskorsi (vtedy kanalom okna). Prve cakanie
+      # len ohlasi INFO, aby bolo v logu vidno, ktora cesta to bola.
+      steps << [2.5, lambda do
+        done = e::SupplierSettingsDialog.instance_variable_get(:@updater_check_ok)
+        info("D-52b async (check): po 2,5 s je vysledok #{done.nil? ? 'este NEDORUCENY' : 'uz doruceny'}")
+      end]
+      steps << [2.5, lambda do
+        done = e::SupplierSettingsDialog.instance_variable_get(:@updater_check_ok)
+        src = state[:d52b_env] ? state[:d52b_env][:src] : nil
+        ok("D-52b async (check): REALNE vlakno dobehlo a timer nasadil vysledok (#{done.inspect})",
+           done.is_a?(Hash) && done['state'] == 'newer' && done['dir'] == src)
+        ok("D-52b async (check): vysledok prisiel do sekcie (pushov #{d52b_pushes(state).length})",
+           d52b_pushes(state).any? { |x| x.include?('"state":"newer"') })
+        state[:d52b_check] = done
+        # BARIERA: klik posiela CESTU A TOKEN kontroly (Codex #278 P1).
+        box = d52b_install_apply_probe(state)
+        state[:d52b_open] = e::Panel.dialog_alive? && e::StudioDialog.dialog_alive?
+        payload = { 'checked_path' => (done || {})['dir'].to_s,
+                    'check_token' => (done || {})['token'] }.to_json
+        rec = []
+        e::SupplierSettingsDialog.dispatch('updater_apply', payload, ->(s) { rec << s.to_s })
+        state[:d52b_rec] = rec
+        ok('D-52b async (bariera): obe okna boli pred klikom otvorene', state[:d52b_open])
+        ok('D-52b async (bariera): swap sa NESPUSTIL hned — najprv sa zatvaraju okna',
+           box[:calls].empty?)
+        # Codex #278 kolo 3 (P1): kym beh trva, vstupne body pluginu okna NEOTVARAJU
+        # — inak by si ich clovek pocas dlhej pripravy otvoril z toolbaru a commit by
+        # bezal s CEF drziacim subory z `ui/`.
+        ok('D-52b async (#278/3 P1): pocas behu su vstupne body ZAMKNUTE',
+           e::SupplierSettingsDialog.updater_apply_inflight?)
+        bag = []
+        r12_silence_messagebox!(bag)
+        opened = e::Panel.show
+        r12_restore_messagebox!
+        ok("D-52b async (#278/3 P1): `Panel.show` pocas behu NEOTVORI okno a povie preco (#{bag.first.to_s[0, 40]})",
+           opened.nil? && bag.length == 1 && bag.first.to_s.include?('Prebieha aktualizácia'))
+      end]
+      steps << [SETTLE, lambda do
+        box = state[:d52b_probe] || { calls: [] }
+        ok('D-52b async (bariera): klik zavrel OBE okna (`set_on_closed` dobehol)',
+           d52b_dialogs_closed?)
+        ok("D-52b async (bariera): swap sa spustil PRESNE raz (#{box[:calls].length})",
+           box[:calls].length == 1)
+        call = box[:calls].first || {}
+        ok('D-52b async (bariera): a AZ POTOM, co boli obe okna zavrete',
+           call[:closed] == true)
+        ok("D-52b async (bariera): priprava dostala SKONTROLOVANU cestu a ZIVY priecinok pluginu (#{call[:dir]})",
+           call[:src] == state[:d52b_env][:src] && call[:dir].to_s == e.plugin_dir.to_s)
+        ok("D-52b async (#278/2 P1): commit prebehol PRESNE raz a tiez az po zatvoreni (#{box[:commits].length})",
+           box[:commits].length == 1 && box[:commits].first[:closed] == true)
+        # A este dokaz P1 guardu: klik BEZ dokladu o kontrole neprejde.
+        box[:calls].clear
+        box[:commits].clear
+        rec = []
+        e::SupplierSettingsDialog.instance_variable_set(:@updater_check_ok, nil)
+        e::SupplierSettingsDialog.dispatch('updater_apply', '{}', ->(s) { rec << s.to_s })
+        ok('D-52b async (#278 P1): klik BEZ dokladu o kontrole sa odmietne a swap sa nespusti',
+           box[:calls].empty? && rec.any? { |x| x.include?('medzitým zmenila') })
+        ok('D-52b async (#278/3 P1): po dobehnuti behu sa vstupne body zase OTVARAJU',
+           !e::SupplierSettingsDialog.updater_apply_inflight? && !e.update_in_progress?)
+        d52b_unwatch_window!(state)
       d52b_teardown(state)
       cleanup(model)
     end]
@@ -12095,7 +12143,8 @@ module NoxunSuRunner
             stale_teardown(state) # a to iste pre sondu okna Studio (STALE)
             r12_restore_messagebox! # R-12 sonda: stub modalu nesmie prezit FAIL
             r12_restore_rejects!    # ani sonda pocitadla reject_scale
-            d52b_teardown(state)    # D-52b: stub `apply!`/`source_dir` uz vobec nie
+            d52b_unwatch_window!(state) # D-52b: instrumentacia kanala okna
+            d52b_teardown(state)    # D-52b: stub `prepare!`/`commit!`/`source_dir` uz vobec nie
             cleanup(model)
           rescue StandardError
             nil
