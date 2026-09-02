@@ -539,16 +539,20 @@ module NxTest
     %w[flap false_front].each do |role|
       assert(E::Validation::FRONT_ROLES.include?(role), "Validation::FRONT_ROLES chyba #{role}")
     end
-    assert_equal('Výklop', E::ProductionCore.role_label('flap'))
+    # Rola `flap` je SPOLOCNA pre vyklop aj sklop -> nazov musi byt NEUTRALNY
+    # (Codex #280 P2-B). Konkretny text vie povedat len TYP cela.
+    assert_equal('Výklop/sklop', E::ProductionCore.role_label('flap'))
     assert_equal('Blenda', E::ProductionCore.role_label('false_front'))
+    refute(E::ProductionCore.role_label('flap') == 'Výklop',
+           'nazov roly nesmie tvrdit „výklop" — pri sklope by klamal')
     rd = NxKovA1.src('ui/rules_dialog.rb')
     assert(rd.match?(/drawer_front\s*\n?\s*flap false_front/) || rd.include?('flap false_front'),
            'ABS_ROLE_ORDER musi niest flap aj false_front (hned za drawer_front)')
     pc = NxKovA1.src('ui/js/part_card.js')
     assert(pc.include?("pc.role === 'flap'") && pc.include?("pc.role === 'false_front'"),
            'part_card.js: isFront musi poznat nove roly (inak by 19 mm material bol disabled)')
-    assert(pc.include?("flap:'Výklop'") && pc.include?("false_front:'Blenda'"),
-           'part_card.js: nazvy roli')
+    assert(pc.include?("flap:'Výklop/sklop'") && pc.include?("false_front:'Blenda'"),
+           'part_card.js: nazvy roli (flap NEUTRALNE — spolocna rola vyklopu aj sklopu)')
   end
 
   # ========================= 7) CONFIG_SCHEMA ===============================

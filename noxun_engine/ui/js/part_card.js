@@ -3,8 +3,10 @@
     var m = { side_left:'Bok ľavý', side_right:'Bok pravý', bottom:'Dno', top:'Vrch', back:'Chrbát',
       shelf:'Polica', divider_v:'Priečka zvislá', divider_h:'Priečka vodorovná', front_door:'Dvierka',
       drawer_front:'Zásuvkové čelo', plinth:'Sokel', rail_front:'Výstuha predná', rail_back:'Výstuha zadná',
-      // KOV-A1: výklop aj sklop nesie rola `flap`, blenda `false_front`.
-      flap:'Výklop', false_front:'Blenda' };
+      // KOV-A1: rola `flap` je SPOLOČNÁ pre výklop aj sklop, preto neutrálny
+      // názov — „Výklop" by pri každom sklope klamal. Konkrétny text povie až
+      // typ čela (server: PartKeys.flap_label; karta čela príde v KOV-A2).
+      flap:'Výklop/sklop', false_front:'Blenda' };
     return m[role] || role;
   }
   function sheetLabelOf(id){

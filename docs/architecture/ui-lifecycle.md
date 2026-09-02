@@ -631,9 +631,15 @@ doskočí na **box vlastníka** (`hwBoxByGroup(hwFrontGroup(fid))` — kľúč s
 **Materiál čiel** má DRUHÝ ovládač (`cab_front_c`) priamo v zozname, lebo sektor Materiály patrí kontextu Korpus a tu je skrytý — tá istá hodnota, dva vstupné body, synchro drží
 každá cesta, ktorá siaha na `cab_front`.
 
-**Výklop** je v ponuke typov ako **disabled** voľba s upozornením (rola `flap` potrebuje vlastnú cestu cez builder/ABS/kusovník — vedomá odchýlka, dôvod v
-`SYSTEM/zdroje/ui20/UI20_KONTRAKT.md`); popis voľby je krátky zámerne — celá veta žije v `title` selectu a v hinte skupiny. *(Pôvodný dôvod „dlhý text by rad zalomil" po SMOKE
-PACKU 1 zanikol: `flex-basis` selectu je 0 a rad sa nezalamuje. Krátky popis ostáva preto, že select je najužší prvok riadku a orezaná voľba nič nepovie.)*
+**Výklop · Sklop · Blenda** sú v ponuke typov ako **tri disabled voľby** (KOV-A1 nahradila pôvodnú jedinú „Výklop (fáza 3)"). Dátovo už existujú — builder ich postaví, ABS
+olepí, kusovník aj VEPO ich nesú — ale **ovládač k nim príde až v KOV-A2** (typegrid s piktogramami), preto sú neaktívne. V ponuke stáť MUSIA: `select.value = typ` funguje aj na
+disabled voľbu, takže config z API si typ udrží a prvá editácia iného poľa ho neprepne späť na „Dvierka" (vzor D-90 P1 — projekcia nesmie stratiť pole). Popis voľby je krátky
+zámerne — celá veta žije v `title` selectu a v hinte skupiny. *(Pôvodný dôvod „dlhý text by rad zalomil" po SMOKE PACKU 1 zanikol: `flex-basis` selectu je 0 a rad sa nezalamuje.
+Krátky popis ostáva preto, že select je najužší prvok riadku a orezaná voľba nič nepovie.)*
+
+**KOV-A1 pass-through:** `addFrontRow` odkladá `direction`, `wing_directions`, `opening_mode` a `drawer` do `row.dataset.frontExtra` (**len prítomné kľúče**) a `collectFronts` ich
+vracia späť **bez akéhokoľvek defaultu** — vzor D-90 `profile`, ale s tvrdým rozdielom: kľúč, ktorý config nemal, sa tu nesmie objaviť, inak by legacy zákazka dostala RED nález
+o neurčenom smere. Guard v `tests/pure/test_kova1_cela.rb` stráži telo oboch funkcií aj prítomnosť troch neaktívnych volieb.
 
 ### Úchytky = D-96 (form.js refreshFrontProfileUI / onFrontProfilePick + čisté funkcie v core.js)
 
