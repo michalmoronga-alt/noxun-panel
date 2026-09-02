@@ -10060,6 +10060,225 @@ module NoxunSuRunner
     nil
   end
 
+  # ====================== D-52b: UPDATER V SEKCII „O PLUGINE" =================
+  #
+  # Headless sada overuje LOGIKU (token, deadline, bariera nad fake oknami).
+  # Tu sa overuje to, co sa bez SketchUpu overit NEDA:
+  #   1) SWAP NAD REALNYM DISKOM — kompletna generacia (loader + strom) sa
+  #      naozaj vymeni, zvysky `.new`/`.old` zaniknu a restart latch sa zapne.
+  #      Bezi VYHRADNE nad TEMP SANDBOXOM (`plugins_dir` je parameter jadra) —
+  #      ZIVY `Plugins` priecinok sa v teste NIKDY nedotyka.
+  #   2) `Engine.close_all_dialogs` (D-52a P3 z delta-verifikacie #277) —
+  #      headless nema okna, takze sa dokazat nedalo.
+  #   3) BARIERA: s otvorenym Inspectorom AJ Studiom klik na „Aktualizovať"
+  #      obe okna zavrie a swap zacne AZ VTEDY, ked dobehne ich `set_on_closed`
+  #      (nie ked prestanu byt viditelne — CEF drzi subory z `ui/`).
+  D52B_SRC_VER = '9.9.9'   # „novsia" verzia v sandboxe (nikdy nekoliduje s realnou)
+  D52B_CUR_VER = '9.9.0'
+
+  def d52b_write(path, text)
+    FileUtils.mkdir_p(File.dirname(path))
+    File.binwrite(path, text)
+    path
+  end
+
+  # Balik = kopia repa: loader + strom. Loader nesie ten isty VERSION kontrakt
+  # ako realny (`VERSION = '…'` v hlavicke) a recovery sekciu nepotrebuje —
+  # v sandboxe sa nikdy nespusta, len citata a kopiruje.
+  def d52b_package(root, version)
+    FileUtils.rm_rf(root)
+    d52b_write(File.join(root, 'noxun_engine.rb'),
+               "# sandbox loader\nmodule Noxun\n  module Engine\n    VERSION = '#{version}'\n  end\nend\n")
+    d52b_write(File.join(root, 'noxun_engine', 'main.rb'),
+               "# sandbox main\nmodule Noxun\n  module Engine\n    VERSION = '#{version}' unless defined?(VERSION)\n  end\nend\n")
+    d52b_write(File.join(root, 'noxun_engine', 'ui', 'panel.html'), "<html>#{version}</html>\n")
+    root
+  end
+
+  def d52b_sandbox
+    root = File.join(Dir.tmpdir, "noxun_d52b_#{Process.pid}_#{Time.now.to_i}")
+    FileUtils.mkdir_p(root)
+    # `realpath` je povinny: %TEMP% moze na Windows prist v 8.3 tvare a
+    # kanonicke hranice jadra by ho odmietli ako „odkaz na ine miesto".
+    root = File.realpath(root).tr('\\', '/')
+    src = File.join(root, 'src')
+    plugins = File.join(root, 'plugins')
+    d52b_package(src, D52B_SRC_VER)
+    d52b_package(plugins, D52B_CUR_VER)
+    # Realna instalacia ma lease VZDY (zapisuje ho loader na zaciatku bootu)
+    # a `live_leases` je fail-closed — bez neho by `apply!` spravne odmietol.
+    e::Updater.write_lease!(plugins)
+    { root: root, src: src, plugins: plugins, tree: File.join(plugins, 'noxun_engine') }
+  end
+
+  def run_d52b(model)
+    cleanup(model)
+    return ok('D-52b: jadro updatera je nacitane', false) unless defined?(e::Updater)
+    return ok('D-52b: modul sekcii nastaveni je nacitany', false) unless defined?(e::SupplierSettingsDialog)
+
+    u = e::Updater
+    ok('D-52b: whitelist sekcie pozna PRESNE tri akcie updatera',
+       e::SupplierSettingsDialog::SECTION_ACTIONS ==
+         %w[ss_save ss_reload updater_check updater_set_dir updater_apply])
+    ok('D-52b: NASADENY plugin ma zdielany builder „O plugine"',
+       File.exist?(File.join(e.plugin_dir, 'ui', 'js', 'about.js')))
+    ok('D-52b: aj jadro updatera',
+       File.exist?(File.join(e.plugin_dir, 'core', 'updater.rb')))
+
+    env = d52b_sandbox
+    begin
+      # --- (a) TROJSTAV nad REALNYM diskom ---------------------------------
+      newer = u.check(env[:src], D52B_CUR_VER)
+      ok("D-52b (a): novsia kopia = `newer` (#{newer['available']})",
+         newer['ok'] && newer['state'] == 'newer' && newer['available'] == D52B_SRC_VER)
+      same = u.check(env[:src], D52B_SRC_VER)
+      ok('D-52b (a): rovnaka verzia = `same` (tlacidlo ostane neaktivne)',
+         same['ok'] && same['state'] == 'same')
+      older = u.check(env[:plugins], D52B_SRC_VER)
+      ok('D-52b (a): starsia kopia = `older` (downgrade je vo V1 zakazany)',
+         older['ok'] && older['state'] == 'older')
+      missing = u.check(File.join(env[:root], 'niet'), D52B_CUR_VER)
+      ok("D-52b (a): nedostupny zdroj = chyba S CESTOU (#{missing['reason']})",
+         !missing['ok'] && missing['state'] == 'error' && missing['reason'].include?('niet'))
+
+      # --- (b) REALNY SWAP nad SANDBOXOM ------------------------------------
+      # Toto je jediny test, ktory naozaj vymiena subory. Ciel je TEMP, nikdy
+      # zivy `Plugins` — jadro cestu prijima ako parameter.
+      e.reset_restart_latch!
+      res = u.apply!(env[:src], env[:tree])
+      ok("D-52b (b): swap nad sandboxom prebehol (#{res['from']} -> #{res['to']}, stav #{res['state']})",
+         res['ok'] && res['to'] == D52B_SRC_VER)
+      ldr = u.read_version(File.join(env[:plugins], 'noxun_engine.rb'))
+      mn = u.read_version(File.join(env[:plugins], 'noxun_engine', 'main.rb'))
+      ok("D-52b (b): na disku je JEDNA KOMPLETNA generacia (loader #{ldr}, main #{mn})",
+         ldr == D52B_SRC_VER && mn == D52B_SRC_VER)
+      leftovers = %w[noxun_engine.new noxun_engine.rb.new noxun_engine.old noxun_engine.rb.old
+                     noxun_engine.update.json].select { |x| File.exist?(File.join(env[:plugins], x)) }
+      ok("D-52b (b): ziadne siroty po swape (#{leftovers.empty? ? 'ziadne' : leftovers.join(', ')})",
+         leftovers.empty?)
+      ok('D-52b (b): restart latch je ZAPNUTY (stary Ruby nad novymi subormi)',
+         e.restart_required?)
+      ok('D-52b (b): a latch odmietne otvorenie okna', e.update_restart_pending? == true)
+
+      # --- (c) OPAKOVANY pokus nad TYM ISTYM zdrojom sa ODMIETNE ------------
+      e.reset_restart_latch! # ostatne sekcie runnera musia bezat dalej
+      begin
+        u.apply!(env[:src], env[:tree])
+        ok('D-52b (c): opakovany swap sa odmietne (rovnaka verzia)', false)
+      rescue u::Refused => ex
+        ok("D-52b (c): opakovany swap sa ODMIETNE s dovodom (#{ex.message})",
+           ex.message.include?('rovnaká verzia'))
+      end
+      ok('D-52b (c): a odmietnutie latch NEZAPINA (na disku sa nic nezmenilo)',
+         !e.restart_required?)
+    ensure
+      e.reset_restart_latch!
+      begin
+        FileUtils.rm_rf(env[:root])
+      rescue StandardError
+        nil
+      end
+    end
+  rescue StandardError => ex
+    e.reset_restart_latch!
+    log_line("FAIL: D-52b sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
+  # --- D-52b ASYNC: `close_all_dialogs` + BARIERA pred swapom -----------------
+  # Obe veci stoja na `set_on_closed`, ktory CEF vola ASYNCHRONNE — v jednom
+  # synchronnom kroku sa dokazat nedaju.
+  def d52b_dialogs_closed?
+    e::Panel.dialog_closed? && e::StudioDialog.dialog_closed?
+  rescue StandardError
+    false
+  end
+
+  # Stub `Updater.apply!`: zaznamena volanie a STAV OKIEN v okamihu volania —
+  # presne to je dokaz bariery. ZIVY `Plugins` sa pri tom nedotkne.
+  def d52b_install_apply_probe(state)
+    return if state[:d52b_probe]
+
+    box = { calls: [] }
+    state[:d52b_probe] = box
+    runner = self
+    sc = e::Updater.singleton_class
+    sc.send(:alias_method, :nx_d52b_orig_apply, :apply!)
+    sc.send(:define_method, :apply!) do |src, plugin_dir|
+      box[:calls] << { src: src.to_s, dir: plugin_dir.to_s, closed: runner.d52b_dialogs_closed? }
+      { 'ok' => true, 'state' => 'done', 'from' => 'x', 'to' => 'y', 'note' => '' }
+    end
+    box
+  end
+
+  def d52b_teardown(state)
+    sc = e::Updater.singleton_class
+    if sc.method_defined?(:nx_d52b_orig_apply) || sc.private_method_defined?(:nx_d52b_orig_apply)
+      sc.send(:remove_method, :apply!)
+      sc.send(:alias_method, :apply!, :nx_d52b_orig_apply)
+      sc.send(:remove_method, :nx_d52b_orig_apply)
+    end
+    if sc.method_defined?(:nx_d52b_orig_src) || sc.private_method_defined?(:nx_d52b_orig_src)
+      sc.send(:remove_method, :source_dir)
+      sc.send(:alias_method, :source_dir, :nx_d52b_orig_src)
+      sc.send(:remove_method, :nx_d52b_orig_src)
+    end
+    state[:d52b_probe] = nil
+  rescue StandardError => ex
+    log_line("INFO: D-52b teardown: #{ex.class}: #{ex.message}")
+  end
+
+  def run_d52b_async(model, state, steps)
+    steps << [0.5, lambda do
+      cleanup(model)
+      e.reset_restart_latch! # latch by okna otvorit nedovolil
+      e::Panel.show
+      e::StudioDialog.show
+    end]
+    steps << [SETTLE, lambda do
+      ok('D-52b async: obe okna pluginu su otvorene (vychodisko oboch scenarov)',
+         e::Panel.dialog_alive? && e::StudioDialog.dialog_alive?)
+      # (P3 z delta-verifikacie #277) `close_all_dialogs` — headless ho
+      # nepokryva, lebo nema okna.
+      ok('D-52b async: `close_all_dialogs` vratil true', e.close_all_dialogs == true)
+    end]
+    steps << [SETTLE, lambda do
+      ok('D-52b async: `close_all_dialogs` zavrel OBE okna a `set_on_closed` DOBEHOL',
+         d52b_dialogs_closed?)
+      # BARIERA: znova otvorime obe okna a spustime akciu sekcie.
+      e::Panel.show
+      e::StudioDialog.show
+    end]
+    steps << [SETTLE, lambda do
+      box = d52b_install_apply_probe(state)
+      # Cesta sa NEBERIE zo ziveho %APPDATA% — test nesmie prepisat Michalovo
+      # nastavenie. Stub vracia sandboxovu cestu len na cas scenara.
+      sc = e::Updater.singleton_class
+      sc.send(:alias_method, :nx_d52b_orig_src, :source_dir)
+      sc.send(:define_method, :source_dir) { 'Z:/noxun-d52b-sandbox' }
+      state[:d52b_open] = e::Panel.dialog_alive? && e::StudioDialog.dialog_alive?
+      rec = []
+      e::SupplierSettingsDialog.dispatch('updater_apply', '{}', ->(s) { rec << s.to_s })
+      state[:d52b_rec] = rec
+      ok('D-52b async (bariera): obe okna boli pred klikom otvorene', state[:d52b_open])
+      ok('D-52b async (bariera): swap sa NESPUSTIL hned — najprv sa zatvaraju okna',
+         box[:calls].empty?)
+    end]
+    steps << [SETTLE, lambda do
+      box = state[:d52b_probe] || { calls: [] }
+      ok('D-52b async (bariera): klik zavrel OBE okna (`set_on_closed` dobehol)',
+         d52b_dialogs_closed?)
+      ok("D-52b async (bariera): swap sa spustil PRESNE raz (#{box[:calls].length})",
+         box[:calls].length == 1)
+      call = box[:calls].first || {}
+      ok('D-52b async (bariera): a AZ POTOM, co boli obe okna zavrete',
+         call[:closed] == true)
+      ok("D-52b async (bariera): swap dostal ULOZENU cestu a ZIVY priecinok pluginu (#{call[:dir]})",
+         call[:src] == 'Z:/noxun-d52b-sandbox' && call[:dir].to_s == e.plugin_dir.to_s)
+      d52b_teardown(state)
+      cleanup(model)
+    end]
+  end
+
   def run_st2d(model)
     cleanup(model)
     return ok('ŠT-2d: okno Studio je nacitane', false) unless defined?(e::StudioDialog)
@@ -11752,6 +11971,11 @@ module NoxunSuRunner
     # skrinkach = dedup cesta).
     run_ghost_async(model, state, steps)
 
+    # D-52b: `close_all_dialogs` a BARIERA pred swapom — obe stoja na
+    # `set_on_closed`, ktory CEF vola ASYNCHRONNE. Bezi az tu, aby sa scenar
+    # nestretol s fake oknom sekcie STALE.
+    run_d52b_async(model, state, steps)
+
     # S6b: zachytna siet v KONTROLE — ked uz dva kusy na jednom mieste vzniknu
     # (starsi projekt, paste-in-place), semafor ich MUSI ukazat. Overuje CELU
     # retaz Bom.collect -> Validation.run(placements:), nielen cistu funkciu.
@@ -11801,6 +12025,7 @@ module NoxunSuRunner
             stale_teardown(state) # a to iste pre sondu okna Studio (STALE)
             r12_restore_messagebox! # R-12 sonda: stub modalu nesmie prezit FAIL
             r12_restore_rejects!    # ani sonda pocitadla reject_scale
+            d52b_teardown(state)    # D-52b: stub `apply!`/`source_dir` uz vobec nie
             cleanup(model)
           rescue StandardError
             nil
@@ -11880,6 +12105,7 @@ module NoxunSuRunner
     run_st3b(model)          # ŠT-3b-1: sekcia Pravidla v Studiu + zanik okna Pravidla kovania — ulozenie = 1 krok Spat (pravidla AJ geometria), NO-OP merge_seed bez undo kroku, baseline guard odmietne zapis po cudzej zmene
     run_st3c(model)          # ŠT-3c-1: sekcia Sablony v Studiu + zanik okna Sablony — apply = 1 krok Spat + typovy guard, fotenie bez undo kroku (kamera sa vrati), mazanie oboch druhov, vlastny PNG kanal sekcie
     run_st4a(model)          # ŠT-4a: sekcie Nastavenia v Studiu + zanik POSLEDNEHO satelitu — zapis sadzby prepocita rozpocet, baseline revizia odmietne stary zapis, ziadny krok Spat
+    run_d52b(model)          # D-52b: updater v sekcii „O plugine" — trojstav nad realnym diskom, REALNY swap nad TEMP sandboxom (nikdy nad zivym Plugins), latch, opakovany pokus
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

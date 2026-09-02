@@ -43,7 +43,11 @@ end
 # --- 1) ZANIK OKNA -----------------------------------------------------------
 
 NxTest.test('ŠT-4a: okno „Nastavenia rozpočtu" ZANIKLO — a bol to POSLEDNY satelit') do
-  %w[UI::HtmlDialog DLG_KEY ensure_dialog register_dialog_fit set_on_closed].each do |gone|
+  # D-52b: povodne bol v zozname aj `set_on_closed`. Bariera pred swapom
+  # o zatvarani okien HOVORI (caka, kym dobehne `set_on_closed` PANELA
+  # a STUDIA), takze samotne slovo uz o vlastnom okne nic nedokazuje —
+  # dokazuje ho `@dialog`: modul, ktory nema okno, nema ani jeho referenciu.
+  %w[UI::HtmlDialog DLG_KEY ensure_dialog register_dialog_fit @dialog].each do |gone|
     NxTest.refute(ST4A_SUP_RB.include?(gone), "#{gone} v module uz nie je")
   end
   %i[show ensure_dialog register_callbacks push_state].each do |m|
@@ -84,7 +88,10 @@ NxTest.test('ŠT-4a: akcie sekcie maju JEDINY whitelist a prefixovane mena') do
   NxTest.assert(sd.const_defined?(:SECTION_ACTIONS), 'whitelist zije v module')
   actions = sd::SECTION_ACTIONS
   NxTest.assert(actions.frozen?, 'zoznam je uzavrety')
-  NxTest.assert_equal(%w[ss_save ss_reload], actions, 'ulozenie + nacitanie nanovo — nic viac')
+  # D-52b pridala tri akcie updatera sekcie `about` (kontrola verzie, ulozenie
+  # distribucneho priecinka, samotna aktualizacia) — presna rovnost drzi dalej.
+  NxTest.assert_equal(%w[ss_save ss_reload updater_check updater_set_dir updater_apply], actions,
+                      'ulozenie + nacitanie nanovo + tri akcie updatera — nic viac')
   # `save`/`reload`/`ready` su prilis vseobecne mena na to, aby zili v JEDNOM
   # priestore callbackov okna vedla akcii ostatnych sekcii.
   %w[save reload ready].each do |bare|
@@ -202,7 +209,10 @@ NxTest.test('ŠT-4a: klient kresli LEN do otvorenej sekcie a rozpisane NEZAHADZU
 end
 
 NxTest.test('ŠT-4a: „O plugine" je JEDEN OBSAH s DVOMA VSTUPMI') do
-  NxTest.assert(ST4A_ABOUT_JS.include?('function nxAboutHtml(info)'), 'markup stavia zdielany builder')
+  # D-52b: builder ma druhy argument (stav updatera) — zdielany OBSAH sa tym
+  # nemeni, updater sa kresli LEN vtedy, ked ho volajuci poda (dokaz je
+  # v tests/js/test_d52b_updater_ui.js).
+  NxTest.assert(ST4A_ABOUT_JS.include?('function nxAboutHtml(info'), 'markup stavia zdielany builder')
   NxTest.assert(ST4A_PANEL_HTML.include?('id="cfgAbout"'), 'koliesko Inspectora ma hostitela')
   NxTest.refute(ST4A_PANEL_HTML.include?('class="aboutname"'),
                 'a NEMA vlastnu kopiu markupu (dve kopie by sa rozisli)')
