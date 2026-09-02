@@ -9915,7 +9915,7 @@ module NoxunSuRunner
     ok('ŠT-4a: sekcie `sup`/`bset`/`about` su v zozname sekcii Studia',
        %w[sup bset about].all? { |k| e::StudioDialog::SECTIONS.include?(k) })
     ok('ŠT-4a: whitelist akcii sekcie pozna PRESNE ulozenie, nacitanie nanovo a kontrolu updatera',
-       sd::SECTION_ACTIONS == %w[ss_save ss_reload updater_check updater_set_dir])
+       sd::SECTION_ACTIONS == %w[ss_save ss_reload updater_check updater_set_dir updater_apply])
     # Posledny satelit odisiel — premostovat uz niet kam.
     ok('ŠT-4a: PREMOSTENIA zanikli CELE (konstanty aj cesty)',
        !e::StudioDialog.const_defined?(:WINDOW_BRIDGES) &&
@@ -10117,9 +10117,9 @@ module NoxunSuRunner
     return ok('D-52b: modul sekcii nastaveni je nacitany', false) unless defined?(e::SupplierSettingsDialog)
 
     u = e::Updater
-    ok('D-52b1: whitelist sekcie pozna PRESNE dve akcie updatera',
+    ok('D-52b: whitelist sekcie pozna PRESNE tri akcie updatera',
        e::SupplierSettingsDialog::SECTION_ACTIONS ==
-         %w[ss_save ss_reload updater_check updater_set_dir])
+         %w[ss_save ss_reload updater_check updater_set_dir updater_apply])
     ok('D-52b: NASADENY plugin ma zdielany builder „O plugine"',
        File.exist?(File.join(e.plugin_dir, 'ui', 'js', 'about.js')))
     ok('D-52b: aj jadro updatera',
@@ -10141,16 +10141,50 @@ module NoxunSuRunner
       ok("D-52b (a): nedostupny zdroj = chyba S CESTOU (#{missing['reason']})",
          !missing['ok'] && missing['state'] == 'error' && missing['reason'].include?('niet'))
 
-      # SAMOTNY SWAP (a s nim latch, bariera a natívne hlasky) je davka D-52b2 —
-      # tam sa nad TYM ISTYM sandboxom overuje aj `prepare!`/`commit!`. V tejto
-      # davke sa priecinok NASTAVUJE a verzia OVERUJE; jadro (uz rozdelene na dve
-      # fazy) ma plnu sadu nad TEMP sandboxom v `tests/pure/test_d52a_updater.rb`.
-      ok('D-52b1: apply flow v sekcii NEEXISTUJE (pride s D-52b2)',
-         !e::SupplierSettingsDialog::SECTION_ACTIONS.include?('updater_apply') &&
-         !e::SupplierSettingsDialog.respond_to?(:handle_updater_apply))
-      ok('D-52b1: jadro je uz ROZDELENE na dve fazy (pouzije ho D-52b2)',
-         %i[prepare! commit! abort_prepared!].all? { |m| u.respond_to?(m) })
+      # --- (b) REALNY SWAP nad SANDBOXOM ------------------------------------
+      # Toto je jediny test, ktory naozaj vymiena subory. Ciel je TEMP, nikdy
+      # zivy `Plugins` — jadro cestu prijima ako parameter.
+      #
+      # Codex #278 kolo 2 (P2): uspesny swap zapne restart latch a ten hlasi
+      # MODALNYM `UI.messagebox` — v automatickom behu by dialog runner
+      # ZASTAVIL. Hlaska sa preto na cas scenara zbiera do vrecka (vzor R-12)
+      # a rovno sa aj OVERUJE, ze naozaj hovori o restarte.
+      e.reset_restart_latch!
+      bag = []
+      r12_silence_messagebox!(bag)
+      res = u.apply!(env[:src], env[:tree])
+      ok("D-52b (b): swap nad sandboxom prebehol (#{res['from']} -> #{res['to']}, stav #{res['state']})",
+         res['ok'] && res['to'] == D52B_SRC_VER)
+      ldr = u.read_version(File.join(env[:plugins], 'noxun_engine.rb'))
+      mn = u.read_version(File.join(env[:plugins], 'noxun_engine', 'main.rb'))
+      ok("D-52b (b): na disku je JEDNA KOMPLETNA generacia (loader #{ldr}, main #{mn})",
+         ldr == D52B_SRC_VER && mn == D52B_SRC_VER)
+      leftovers = %w[noxun_engine.new noxun_engine.rb.new noxun_engine.old noxun_engine.rb.old
+                     noxun_engine.update.json].select { |x| File.exist?(File.join(env[:plugins], x)) }
+      ok("D-52b (b): ziadne siroty po swape (#{leftovers.empty? ? 'ziadne' : leftovers.join(', ')})",
+         leftovers.empty?)
+      ok('D-52b (b): restart latch je ZAPNUTY (stary Ruby nad novymi subormi)',
+         e.restart_required?)
+      bag.clear
+      ok('D-52b (b): a latch odmietne otvorenie okna', e.update_restart_pending? == true)
+      ok("D-52b (b): odmietnutie je NATIVNA hlaska o restarte (#{bag.first.to_s[0, 60]})",
+         bag.length == 1 && bag.first.to_s.include?('reštartuj'))
+      r12_restore_messagebox!
+      e.reset_restart_latch! # zvysok runnera musi bezat dalej
+
+      # --- (c) OPAKOVANY pokus nad TYM ISTYM zdrojom sa ODMIETNE ------------
+      e.reset_restart_latch! # ostatne sekcie runnera musia bezat dalej
+      begin
+        u.apply!(env[:src], env[:tree])
+        ok('D-52b (c): opakovany swap sa odmietne (rovnaka verzia)', false)
+      rescue u::Refused => ex
+        ok("D-52b (c): opakovany swap sa ODMIETNE s dovodom (#{ex.message})",
+           ex.message.include?('rovnaká verzia'))
+      end
+      ok('D-52b (c): a odmietnutie latch NEZAPINA (na disku sa nic nezmenilo)',
+         !e.restart_required?)
     ensure
+      r12_restore_messagebox! # idempotentne
       e.reset_restart_latch!
       begin
         FileUtils.rm_rf(env[:root])
@@ -10159,28 +10193,64 @@ module NoxunSuRunner
       end
     end
   rescue StandardError => ex
+    r12_restore_messagebox! # neobnoveny stub by ovplyvnil zvysok behu
     e.reset_restart_latch!
     log_line("FAIL: D-52b sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
   end
 
-  # --- D-52b1 ASYNC: REALNY asynchronny check --------------------------------
-  # Headless sada nahradzuje vlakno aj timer seamami, takze TOTO je jediny
-  # dokaz, ze kontrola verzie v SketchUpe naozaj dobehne: skutocne Ruby vlakno
-  # + skutocny `UI.start_timer` nad skutocnym priecinkom. (Riziko pomenovane
-  # v zadani D-52b: „Ruby vlakna v SketchUpe".)
+  # --- D-52b ASYNC: `close_all_dialogs` + BARIERA pred swapom -----------------
+  # Obe veci stoja na `set_on_closed`, ktory CEF vola ASYNCHRONNE — v jednom
+  # synchronnom kroku sa dokazat nedaju.
+  def d52b_dialogs_closed?
+    e::Panel.dialog_closed? && e::StudioDialog.dialog_closed?
+  rescue StandardError
+    false
+  end
+
+  # Sonda OBOCH faz jadra (od #278 kolo 2 je `apply!` rozdelene na `prepare!`
+  # vo vlakne a `commit!` v hlavnom): zaznamena volania a STAV OKIEN v okamihu
+  # kazdeho z nich — presne to je dokaz bariery. ZIVY `Plugins` sa nedotkne.
+  def d52b_install_apply_probe(state)
+    return state[:d52b_probe] if state[:d52b_probe]
+
+    box = { calls: [], commits: [] }
+    state[:d52b_probe] = box
+    runner = self
+    sc = e::Updater.singleton_class
+    sc.send(:alias_method, :nx_d52b_orig_prepare, :prepare!)
+    sc.send(:alias_method, :nx_d52b_orig_commit, :commit!)
+    sc.send(:define_method, :prepare!) do |src, plugin_dir|
+      box[:calls] << { src: src.to_s, dir: plugin_dir.to_s, closed: runner.d52b_dialogs_closed? }
+      { 'plugins' => plugin_dir.to_s, 'from' => 'x', 'to' => D52B_SRC_VER, 'stamp' => 'SU' }
+    end
+    sc.send(:define_method, :commit!) do |ticket|
+      box[:commits] << { closed: runner.d52b_dialogs_closed?, ticket: ticket }
+      { 'ok' => true, 'state' => 'done', 'from' => 'x', 'to' => D52B_SRC_VER, 'note' => '' }
+    end
+    box
+  end
+
   def d52b_teardown(state)
     sc = e::Updater.singleton_class
+    { prepare!: :nx_d52b_orig_prepare, commit!: :nx_d52b_orig_commit }.each do |name, orig|
+      next unless sc.method_defined?(orig) || sc.private_method_defined?(orig)
+
+      sc.send(:remove_method, name)
+      sc.send(:alias_method, name, orig)
+      sc.send(:remove_method, orig)
+    end
     if sc.method_defined?(:nx_d52b_orig_src) || sc.private_method_defined?(:nx_d52b_orig_src)
       sc.send(:remove_method, :source_dir)
       sc.send(:alias_method, :source_dir, :nx_d52b_orig_src)
       sc.send(:remove_method, :nx_d52b_orig_src)
     end
+    state[:d52b_probe] = nil
     e::SupplierSettingsDialog.instance_variable_set(:@updater_check_ok, nil)
     env = state[:d52b_env]
     state[:d52b_env] = nil
     FileUtils.rm_rf(env[:root]) if env && env[:root]
   rescue StandardError => ex
-    log_line("INFO: D-52b1 teardown: #{ex.class}: #{ex.message}")
+    log_line("INFO: D-52b teardown: #{ex.class}: #{ex.message}")
   end
 
   # KANAL OKNA JE JEDINY SPOLAHLIVY POZOROVATEL (Codex #278/b1 P2).
@@ -10221,39 +10291,116 @@ module NoxunSuRunner
   def run_d52b_async(model, state, steps)
     steps << [0.5, lambda do
       cleanup(model)
+      e.reset_restart_latch! # latch by okna otvorit nedovolil
+      e::Panel.show
+      e::StudioDialog.show
+    end]
+    steps << [SETTLE, lambda do
+      ok('D-52b async: obe okna pluginu su otvorene (vychodisko oboch scenarov)',
+         e::Panel.dialog_alive? && e::StudioDialog.dialog_alive?)
+      # (P3 z delta-verifikacie #277) `close_all_dialogs` — headless ho
+      # nepokryva, lebo nema okna.
+      ok('D-52b async: `close_all_dialogs` vratil true', e.close_all_dialogs == true)
+    end]
+    steps << [SETTLE, lambda do
+      ok('D-52b async: `close_all_dialogs` zavrel OBE okna a `set_on_closed` DOBEHOL',
+         d52b_dialogs_closed?)
+      # BARIERA: znova otvorime obe okna a spustime akciu sekcie.
+      e::Panel.show
+      e::StudioDialog.show
+    end]
+    steps << [SETTLE, lambda do
+      # REALNY asynchronny check: skutocne Ruby vlakno + skutocny
+      # `UI.start_timer` nad skutocnym priecinkom. Headless sada obe veci
+      # nahradzuje seamami, takze TOTO je jediny dokaz, ze vlakna v SketchUpe
+      # naozaj dobiehaju (riziko pomenovane v zadani D-52b).
       env = d52b_sandbox
       state[:d52b_env] = env
+      sc = e::Updater.singleton_class
+      src = env[:src]
       # Cesta sa NEBERIE zo ziveho %APPDATA% — test nesmie prepisat Michalovo
       # nastavenie. Stub ju vracia len na cas scenara.
-      src = env[:src]
-      sc = e::Updater.singleton_class
       sc.send(:alias_method, :nx_d52b_orig_src, :source_dir)
       sc.send(:define_method, :source_dir) { src }
       e::SupplierSettingsDialog.instance_variable_set(:@updater_check_ok, nil)
       d52b_watch_window!(state) # POZOROVATEL BEZI UZ PRED dispatchom
+      # Sink `dispatch` zije PRESNE jeden synchronny callback, takze „checking"
+      # (a pri rychlom vlakne aj vysledok) ide NIM, nie kanalom okna. Zaznam sa
+      # preto odklada do stavu HNED — `d52b_pushes` spaja obe cesty a bez tohto
+      # priradenia by bol assert nizsie vzdy nepravdivy.
       rec = []
       state[:d52b_rec] = rec
       e::SupplierSettingsDialog.dispatch('updater_check', '{}', ->(s) { rec << s.to_s })
-      ok('D-52b1 (check): sekcia HNED hlasi „kontrolujem" a hlavne vlakno sa vratilo',
+      ok('D-52b async (check): sekcia HNED hlasi „kontrolujem" a hlavne vlakno sa vratilo',
          d52b_pushes(state).any? { |x| x.include?('"state":"checking"') })
     end]
     # Deadline kontroly su 4 s; dve cakania (2,5 + 2,5 s) su za nim, takze
-    # vysledok — uspech aj timeout — je v tej chvili UZ dorucený. Prve cakanie
-    # len ohlasi INFO, aby bolo v logu vidno, ci vlakno stihlo skorsi poll.
+    # vysledok je v tej chvili UZ doruceny — a to bez ohladu na to, ci vlakno
+    # stihlo prvy poll (vtedy ide sinkom) alebo az neskorsi (vtedy kanalom
+    # okna). Prve cakanie len ohlasi INFO, aby bolo v logu vidno, ktora cesta
+    # to bola.
     steps << [2.5, lambda do
       done = e::SupplierSettingsDialog.instance_variable_get(:@updater_check_ok)
-      info("D-52b1 (check): po 2,5 s je vysledok #{done.nil? ? 'este NEDORUCENY' : 'uz dorucený'}")
+      info("D-52b async (check): po 2,5 s je vysledok #{done.nil? ? 'este NEDORUCENY' : 'uz doruceny'}")
     end]
     steps << [2.5, lambda do
       done = e::SupplierSettingsDialog.instance_variable_get(:@updater_check_ok)
       src = state[:d52b_env] ? state[:d52b_env][:src] : nil
-      pushes = d52b_pushes(state)
-      ok("D-52b1 (check): REALNE vlakno dobehlo a timer nasadil vysledok (#{done.inspect})",
+      ok("D-52b async (check): REALNE vlakno dobehlo a timer nasadil vysledok (#{done.inspect})",
          done.is_a?(Hash) && done['state'] == 'newer' && done['dir'] == src)
-      ok("D-52b1 (doklad): server si pamata CESTU, TOKEN aj VERZIU (#{done ? done['available'] : '-'})",
+      ok("D-52b async (doklad): server si pamata CESTU, TOKEN aj VERZIU (#{done ? done['available'] : '-'})",
          done.is_a?(Hash) && done['available'] == D52B_SRC_VER && !done['token'].nil?)
-      ok("D-52b1 (check): vysledok prisiel do sekcie (pushov #{pushes.length})",
-         pushes.any? { |x| x.include?('"state":"newer"') })
+      ok("D-52b async (check): vysledok prisiel do sekcie (pushov #{d52b_pushes(state).length})",
+         d52b_pushes(state).any? { |x| x.include?('"state":"newer"') })
+      state[:d52b_check] = done
+      # BARIERA: klik posiela CESTU A TOKEN kontroly (Codex #278 P1).
+      box = d52b_install_apply_probe(state)
+      state[:d52b_open] = e::Panel.dialog_alive? && e::StudioDialog.dialog_alive?
+      payload = { 'checked_path' => (done || {})['dir'].to_s,
+                  'check_token' => (done || {})['token'] }.to_json
+      # VLASTNY kluc: zaznam kontroly (`:d52b_rec`) sa nesmie prepisat —
+      # `d52b_pushes` ho cita aj po tomto dispatchi.
+      arec = []
+      state[:d52b_apply_rec] = arec
+      e::SupplierSettingsDialog.dispatch('updater_apply', payload, ->(s) { arec << s.to_s })
+      ok('D-52b async (bariera): obe okna boli pred klikom otvorene', state[:d52b_open])
+      ok('D-52b async (bariera): swap sa NESPUSTIL hned — najprv sa zatvaraju okna',
+         box[:calls].empty?)
+      # Codex #278 kolo 3 (P1): kym beh trva, vstupne body pluginu okna
+      # NEOTVARAJU — inak by si ich clovek pocas dlhej pripravy otvoril
+      # z toolbaru a commit by bezal s CEF drziacim subory z `ui/`.
+      ok('D-52b async (#278/3 P1): pocas behu su vstupne body ZAMKNUTE',
+         e::SupplierSettingsDialog.updater_apply_inflight?)
+      bag = []
+      r12_silence_messagebox!(bag)
+      opened = e::Panel.show
+      r12_restore_messagebox!
+      ok("D-52b async (#278/3 P1): `Panel.show` pocas behu NEOTVORI okno a povie preco (#{bag.first.to_s[0, 40]})",
+         opened.nil? && bag.length == 1 && bag.first.to_s.include?('Prebieha aktualizácia'))
+    end]
+    steps << [SETTLE, lambda do
+      box = state[:d52b_probe] || { calls: [] }
+      ok('D-52b async (bariera): klik zavrel OBE okna (`set_on_closed` dobehol)',
+         d52b_dialogs_closed?)
+      ok("D-52b async (bariera): swap sa spustil PRESNE raz (#{box[:calls].length})",
+         box[:calls].length == 1)
+      call = box[:calls].first || {}
+      ok('D-52b async (bariera): a AZ POTOM, co boli obe okna zavrete',
+         call[:closed] == true)
+      ok("D-52b async (bariera): priprava dostala SKONTROLOVANU cestu a ZIVY priecinok pluginu (#{call[:dir]})",
+         call[:src] == state[:d52b_env][:src] && call[:dir].to_s == e.plugin_dir.to_s)
+      ok("D-52b async (#278/2 P1): commit prebehol PRESNE raz a tiez az po zatvoreni (#{box[:commits].length})",
+         box[:commits].length == 1 && box[:commits].first[:closed] == true)
+      # A este dokaz P1 guardu: klik BEZ dokladu o kontrole neprejde.
+      box[:calls].clear
+      box[:commits].clear
+      rec2 = []
+      e::SupplierSettingsDialog.instance_variable_set(:@updater_check_ok, nil)
+      e::SupplierSettingsDialog.dispatch('updater_apply', '{}', ->(s) { rec2 << s.to_s })
+      ok('D-52b async (#278 P1): klik BEZ dokladu o kontrole sa odmietne a swap sa nespusti',
+         box[:calls].empty? && rec2.any? { |x| x.include?('medzitým zmenila') })
+      ok('D-52b async (#278/3 P1): po dobehnuti behu sa vstupne body zase OTVARAJU',
+         !e::SupplierSettingsDialog.updater_apply_inflight? && !e.update_in_progress?)
       d52b_unwatch_window!(state)
       d52b_teardown(state)
       cleanup(model)
@@ -11952,8 +12099,9 @@ module NoxunSuRunner
     # skrinkach = dedup cesta).
     run_ghost_async(model, state, steps)
 
-    # D-52b1: REALNY asynchronny check verzie (skutocne vlakno + skutocny
-    # timer). Bezi az tu, aby sa scenar nestretol s fake oknom sekcie STALE.
+    # D-52b: `close_all_dialogs` a BARIERA pred swapom — obe stoja na
+    # `set_on_closed`, ktory CEF vola ASYNCHRONNE. Bezi az tu, aby sa scenar
+    # nestretol s fake oknom sekcie STALE.
     run_d52b_async(model, state, steps)
 
     # S6b: zachytna siet v KONTROLE — ked uz dva kusy na jednom mieste vzniknu
@@ -12005,8 +12153,8 @@ module NoxunSuRunner
             stale_teardown(state) # a to iste pre sondu okna Studio (STALE)
             r12_restore_messagebox! # R-12 sonda: stub modalu nesmie prezit FAIL
             r12_restore_rejects!    # ani sonda pocitadla reject_scale
-            d52b_unwatch_window!(state) # D-52b1: instrumentacia kanala okna
-            d52b_teardown(state)    # D-52b1: stub `source_dir` uz vobec nie
+            d52b_unwatch_window!(state) # D-52b: instrumentacia kanala okna
+            d52b_teardown(state)    # D-52b: stub `prepare!`/`commit!`/`source_dir` uz vobec nie
             cleanup(model)
           rescue StandardError
             nil
@@ -12086,7 +12234,7 @@ module NoxunSuRunner
     run_st3b(model)          # ŠT-3b-1: sekcia Pravidla v Studiu + zanik okna Pravidla kovania — ulozenie = 1 krok Spat (pravidla AJ geometria), NO-OP merge_seed bez undo kroku, baseline guard odmietne zapis po cudzej zmene
     run_st3c(model)          # ŠT-3c-1: sekcia Sablony v Studiu + zanik okna Sablony — apply = 1 krok Spat + typovy guard, fotenie bez undo kroku (kamera sa vrati), mazanie oboch druhov, vlastny PNG kanal sekcie
     run_st4a(model)          # ŠT-4a: sekcie Nastavenia v Studiu + zanik POSLEDNEHO satelitu — zapis sadzby prepocita rozpocet, baseline revizia odmietne stary zapis, ziadny krok Spat
-    run_d52b(model)          # D-52b1: updater v sekcii „O plugine" — trojstav nad REALNYM diskom, hranice zdroja, whitelist bez apply flow
+    run_d52b(model)          # D-52b: updater v sekcii „O plugine" — trojstav nad realnym diskom, REALNY swap nad TEMP sandboxom (nikdy nad zivym Plugins), latch, opakovany pokus
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

@@ -141,41 +141,45 @@ function updEl(attrs, value){
   ok(esc.indexOf('<img src=x>') < 0 && esc.indexOf('&lt;img') > -1, 'cesta je escapovaná');
 })();
 
-// --- 2) TROJSTAV v stavovom riadku (tlačidlo je v D-52b1 vždy neaktívne) -----
+// --- 2) TROJSTAV + prevádzkové stavy tlačidla --------------------------------
 
 (function(){
   function html(u){ return A.nxUpdaterHtml(u); }
-  const base = { enabled: true, current: '0.9.12', source_dir: 'X:/dist' };
+  const base = { enabled: true, current: '0.9.10', source_dir: 'X:/dist' };
 
-  // Stavový riadok hovorí PRAVDU o verziách už v tejto dávke — to je celý
-  // úžitok b1: cestu nastavíš a hneď vieš, či je v priečinku niečo novšie.
-  const newer = Object.assign({}, base, { state: 'newer', available: '0.9.13' });
-  ok(A.nxUpdaterText(newer).indexOf('V0.9.13') > -1, 'NOVŠIA: riadok menuje dostupnú verziu');
-  ok(A.nxUpdaterEnabled(newer) === false,
-     'ale tlačidlo je aj tak neaktívne — výmena súborov je dávka D-52b2');
-  ok(html(newer).indexOf('aria-disabled="true"') > -1, 'a markup to priznáva');
+  const newer = Object.assign({}, base, { state: 'newer', available: '0.9.11' });
+  ok(A.nxUpdaterEnabled(newer) === true, 'NOVŠIA verzia = tlačidlo aktívne');
+  ok(html(newer).indexOf('aria-disabled') < 0, 'a v markupe nie je aria-disabled');
+  ok(A.nxUpdaterText(newer).indexOf('V0.9.11') > -1, 'stavový riadok menuje dostupnú verziu');
 
-  const same = Object.assign({}, base, { state: 'same', available: '0.9.12' });
-  ok(A.nxUpdaterText(same).indexOf('aktuálnu') > -1, 'ROVNAKÁ: povie, že je aktuálna');
+  const same = Object.assign({}, base, { state: 'same', available: '0.9.10' });
+  ok(A.nxUpdaterEnabled(same) === false, 'ROVNAKÁ verzia = tlačidlo neaktívne');
+  ok(html(same).indexOf('aria-disabled="true"') > -1, 'cez aria-disabled, NIKDY cez HTML disabled');
   ok(html(same).indexOf(' disabled') < 0, 'HTML `disabled` sa nepoužíva (D-78)');
+  ok(A.nxUpdaterText(same).indexOf('aktuálnu') > -1, 'a povie, že je aktuálna');
 
   const older = Object.assign({}, base, { state: 'older', available: '0.9.1' });
+  ok(A.nxUpdaterEnabled(older) === false, 'STARŠIA verzia = tlačidlo neaktívne (B4)');
   ok(A.nxUpdaterText(older).indexOf('INSTALL') > -1,
-     'STARŠIA: hláška posiela na ručný INSTALL — downgrade je vo V1 zakázaný (B4)');
+     'a hláška posiela na ručný INSTALL — downgrade je vo V1 zakázaný');
 
   const err = Object.assign({}, base, { state: 'error', reason: 'zdrojový priečinok neexistuje (X:/dist)' });
+  ok(A.nxUpdaterEnabled(err) === false, 'nedostupný zdroj = tlačidlo neaktívne');
   ok(A.nxUpdaterText(err).indexOf('X:/dist') > -1 && A.nxUpdaterText(err).indexOf('neexistuje') > -1,
-     'CHYBA: hláška nesie CESTU aj DÔVOD');
+     'hláška nesie CESTU aj DÔVOD');
 
-  ok(A.nxUpdaterText(Object.assign({}, base, { state: 'checking' })).indexOf('Kontrolujem') > -1,
-     'počas kontroly to riadok povie');
-  const dirty = Object.assign({}, base, { state: 'newer', available: '0.9.13', dirty: true });
-  ok(A.nxUpdaterText(dirty).indexOf('nie je uložená') > -1,
-     'ROZPÍSANÁ, neuložená cesta: riadok pýta uloženie (kontrola patrí ULOŽENEJ ceste)');
+  ok(A.nxUpdaterEnabled(Object.assign({}, base, { state: 'checking' })) === false,
+     'počas kontroly sa klikať nedá');
+  const dirty = Object.assign({}, base, { state: 'newer', available: '0.9.11', dirty: true });
+  ok(A.nxUpdaterEnabled(dirty) === false,
+     'ROZPÍSANÁ, neuložená cesta tlačidlo zamkne — aktualizovalo by sa z ULOŽENEJ');
+  ok(A.nxUpdaterText(dirty).indexOf('nie je uložená') > -1, 'a povie, že ju treba uložiť');
+  ok(A.nxUpdaterEnabled(Object.assign({}, base, { state: 'newer', available: '1.0.0', locked: true })) === false,
+     'po úspešnej aktualizácii latch tlačidlo zamkne (D-52a B2)');
   ok(A.nxUpdaterText({ enabled: true, state: 'newer', locked: true }).indexOf('reštartuj') > -1,
-     'po aktualizácii latch pýta reštart (D-52a B2)');
-  ok(A.nxUpdaterText({ enabled: false }).indexOf('nie je načítaný') > -1,
-     'bez načítaného jadra to sekcia povie');
+     'a povie, že treba reštart');
+  ok(A.nxUpdaterEnabled({ enabled: false, state: 'newer' }) === false,
+     'bez načítaného jadra updatera sa neaktualizuje nič');
 })();
 
 // --- 3) `data-updater-edit` NEOVPLYVNÍ revíznu mechaniku dodávateľa ----------
@@ -268,6 +272,24 @@ function updEl(attrs, value){
   T.ssApplyState(STATE);
 })();
 
+// --- 4c) KLIK NESIE DOKLAD O KONTROLE ---------------------------------------
+
+(function(){
+  S.setStudioSection('about');
+  T.ssApplyState(STATE);
+  T.SS.updater({ enabled: true, state: 'newer', source_dir: 'X:/dist', current: '0.9.11',
+                 available: '0.9.12', token: 11 });
+  let sub = null;
+  window.NXModal = { open: function(spec){ sub = spec; }, close: function(){} };
+  SENT.length = 0;
+  T.updApply();
+  sub.onSubmit({});
+  const sent = SENT.find(function(x){ return x[0] === 'updater_apply'; });
+  const payload = JSON.parse(sent[1]);
+  eq(payload.checked_path, 'X:/dist', 'klik posiela CESTU, ktorej výsledok mal človek pred očami');
+  eq(payload.check_token, 11, 'a TOKEN tej kontroly — server bez zhody neaktualizuje');
+})();
+
 // --- 4d) ROZPÍSANÁ CESTA ZAMYKÁ TLAČIDLO HNEĎ (Codex #278 kolo 2, P2) -------
 
 (function(){
@@ -275,24 +297,23 @@ function updEl(attrs, value){
   T.ssApplyState(STATE);
   T.SS.updater({ enabled: true, state: 'newer', source_dir: 'X:/dist', current: '0.9.12',
                  available: '0.9.13', token: 3, saved: true });
-  ELS.updState.textContent = '';
+  ELS.updBtn.removeAttribute('aria-disabled');
+  eq(ELS.updBtn.getAttribute('aria-disabled'), null, 'východisko: tlačidlo je aktívne');
 
-  // Používateľ začne prepisovať cestu. Kontrola pritom patrí tej ULOŽENEJ,
-  // takže stavový riadok to musí povedať OKAMŽITE — telo sekcie sa počas
-  // písania neprekresľuje, preto `updPaint()` priamo z `input`.
+  // Používateľ začne prepisovať cestu. Kontrola pritom patrí tej ULOŽENEJ —
+  // tlačidlo musí zhasnúť OKAMŽITE, nie až po prekreslení tela.
   const inp = updEl({ 'data-updater-edit': 'source_dir' }, 'X:/dist-INE');
   ELS.updDir.value = 'X:/dist-INE';
   fireInput(inp);
-  ok(ELS.updState.textContent.indexOf('nie je uložená') > -1,
-     'rozpísaná cesta sa v stavovom riadku ohlási hneď pri písaní');
-  eq(ELS.updBtn.getAttribute('aria-disabled'), 'true', 'a tlačidlo ostáva zamknuté');
+  eq(ELS.updBtn.getAttribute('aria-disabled'), 'true',
+     'rozpísaná cesta tlačidlo ZAMKNE hneď pri písaní');
+  ok(ELS.updState.textContent.indexOf('nie je uložená') > -1, 'a stavový riadok povie prečo');
 
-  // Návrat na uloženú hodnotu vráti riadok k výsledku kontroly.
+  // Návrat na uloženú hodnotu ho zase odomkne (guard nie je „raz zamkni navždy").
   const back = updEl({ 'data-updater-edit': 'source_dir' }, 'X:/dist');
   ELS.updDir.value = 'X:/dist';
   fireInput(back);
-  ok(ELS.updState.textContent.indexOf('nie je uložená') < 0,
-     'zhodná cesta hlášku o neuloženej ceste zase odstráni');
+  eq(ELS.updBtn.getAttribute('aria-disabled'), null, 'zhodná cesta tlačidlo vráti');
 })();
 
 // --- 4e) ACK PATRÍ TOMU, ČO SA ODOSLALO (Codex #278 kolo 2, P2) -------------
@@ -438,30 +459,50 @@ function updEl(attrs, value){
   eq(SENT.map(function(x){ return x[0]; }), ['updater_set_dir'], 'mini-tlačidlo ukladá to isté');
 })();
 
-// --- 7) TLAČIDLO „Aktualizovať" je v tejto dávke NEAKTÍVNE ------------------
+// --- 7) APLIKÁCIA: bez potvrdenia sa NESPUSTÍ --------------------------------
 
 (function(){
   S.setStudioSection('about');
-  T.ssApplyState(STATE);
-  T.SS.updater({ enabled: true, state: 'newer', source_dir: 'X:/dist', current: '0.9.12',
-                 available: '0.9.13', token: 5, saved: true });
+  // Potvrdené uloženie zahodí rozpis z predošlého bloku — inak by potvrdenie
+  // menovalo cestu, ktorá ešte nie je uložená.
+  T.SS.updater({ enabled: true, state: 'idle', source_dir: 'X:/dist', current: '0.9.10', saved: true });
+  T.SS.updater({ enabled: true, state: 'newer', source_dir: 'X:/dist', current: '0.9.10',
+                 available: '0.9.11' });
 
-  // Aj pri NOVŠEJ verzii ostáva zamknuté — výmena súborov je dávka D-52b2.
-  ok(A.nxUpdaterEnabled(T.updMerged()) === false,
-     'novšia verzia tlačidlo NEODOMKNE — apply flow v tejto dávke nie je');
-  const html = A.nxUpdaterHtml({ enabled: true, state: 'newer', available: '0.9.13',
-                                 source_dir: 'X:/dist', current: '0.9.12' });
-  ok(html.indexOf('aria-disabled="true"') > -1, 'markup je `aria-disabled`, nie HTML `disabled`');
-  ok(html.indexOf(A.NX_UPD_SOON) > -1, 'a tooltip povie, že aktualizovanie príde v ďalšej dávke');
-
-  // Klik NEMLČÍ (D-78) a nič neposiela.
-  const btn = stubEl('btn');
-  btn.setAttribute('data-updater-act', 'apply');
-  btn.setAttribute('aria-disabled', 'true');
+  // (a) neaktívne tlačidlo MLČAŤ nesmie — povie dôvod (D-78).
+  const off = stubEl('btn');
+  off.setAttribute('data-updater-act', 'apply');
+  off.setAttribute('aria-disabled', 'true');
   SENT.length = 0;
-  fireClick(btn);
-  eq(SENT.length, 0, 'klik neposiela žiadnu akciu');
-  ok(ELS.status.textContent.indexOf('ďalšej dávke') > -1, 'ale povie dôvod');
+  fireClick(off);
+  eq(SENT.length, 0, 'klik na neaktívne tlačidlo NIČ neposiela');
+  ok(ELS.status.textContent.length > 0, 'ale povie dôvod');
+
+  // (b) bez kostry modalu sa swap NESPUSTÍ (mutácia „bariéra preskočená").
+  const on = stubEl('btn');
+  on.setAttribute('data-updater-act', 'apply');
+  delete window.NXModal;
+  SENT.length = 0;
+  fireClick(on);
+  eq(SENT.length, 0, 'bez D-15 potvrdenia sa aktualizácia NESPUSTÍ');
+  ok(ELS.status.textContent.indexOf('nespustila') > -1, 'a sekcia to povie');
+
+  // (c) s modalom: otvorí sa potvrdenie a AŽ jeho odoslanie posiela akciu.
+  let opened = null;
+  let closed = 0;
+  window.NXModal = { open: function(spec){ opened = spec; },
+                     close: function(){ closed += 1; } };
+  SENT.length = 0;
+  fireClick(on);
+  eq(SENT.length, 0, 'samotný klik ešte nič nemení');
+  ok(opened && opened.okLabel === 'Aktualizovať', 'otvorí sa D-15 potvrdenie');
+  ok(opened.note.indexOf('ZATVORIA OBE OKNÁ') > -1, 'a hovorí, že sa zatvoria OBE okná');
+  ok(opened.note.indexOf('REŠTARTUJ') > -1, 'aj že po dokončení treba reštart');
+  ok(opened.sub.indexOf('X:/dist') > -1 && opened.sub.indexOf('V0.9.11') > -1,
+     'potvrdenie menuje priečinok aj verziu');
+  opened.onSubmit({});
+  eq(SENT.map(function(x){ return x[0]; }), ['updater_apply'], 'až potvrdenie spustí aktualizáciu');
+  eq(closed, 1, 'a modal sa zatvorí — okná sa o chvíľu zavrú aj s ním');
 })();
 
 // --- 8) STAVOVÝ RIADOK sa obnovuje CIELENE (fokus v poli prežije) ------------
@@ -478,12 +519,11 @@ function updEl(attrs, value){
   eq(ELS.secbody.innerHTML, 'TELO SEKCIE',
      'výsledok checku telo sekcie NEPREKRESĽUJE (kurzor v poli cesty by prišiel o obsah)');
   ok(ELS.updState.textContent.indexOf('V0.9.11') > -1, 'ale stavový riadok je čerstvý');
-  eq(ELS.updBtn.getAttribute('aria-disabled'), 'true',
-     'tlačidlo ostáva zamknuté aj pri novšej verzii — výmena je dávka D-52b2');
+  eq(ELS.updBtn.getAttribute('aria-disabled'), null, 'a tlačidlo sa odomklo');
 
   T.SS.updater({ enabled: true, state: 'same', source_dir: 'X:/dist', current: '0.9.10',
                  available: '0.9.10' });
-  ok(ELS.updState.textContent.indexOf('aktuálnu') > -1, 'rovnaká verzia riadok prekreslí');
+  eq(ELS.updBtn.getAttribute('aria-disabled'), 'true', 'rovnaká verzia ho zase zamkne');
 
   // Kým sa píše do poľa cesty, telo sa neprekresľuje ani plným pushom.
   const inp = updEl({ 'data-updater-edit': 'source_dir' }, 'W:/rozpisane');

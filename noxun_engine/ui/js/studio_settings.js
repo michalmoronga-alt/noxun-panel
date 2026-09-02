@@ -412,15 +412,44 @@
     return (UPD_DIRTY === null) ? null : UPD_DIRTY;
   }
 
-  // D-52b1: tlačidlo „Aktualizovať" je zatiaľ NEAKTÍVNE — samotná výmena
-  // súborov (D-15 potvrdenie, zatvorenie oboch okien, príprava balíka, commit)
-  // je dávka D-52b2. Klik preto povie DÔVOD, nemlčí (D-78).
-  function updAct(action, _btn){
+  // POTVRDENIE PRED SWAPOM (D-15). Bez kostry modalu sa aktualizácia
+  // NESPUSTÍ — swap zatvára obe okná a prepisuje súbory pluginu, takže
+  // „potvrdenie sa nedalo zobraziť, tak sme to spravili" je neprípustné.
+  function updApply(){
+    var u = updMerged();
+    if (typeof window === 'undefined' || !window.NXModal){
+      SS.setStatus('Potvrdenie sa nedá zobraziť (js/nx_modal.js) — aktualizácia sa nespustila.', true);
+      return false;
+    }
+    window.NXModal.open({
+      title: 'Aktualizovať Noxun Engine',
+      sub: 'Nasadiť ' + (u.available ? ('V' + u.available) : 'novú verziu') + ' z „' + u.source_dir + '"?',
+      note: 'Pred výmenou súborov sa ZATVORIA OBE OKNÁ pluginu (Inspector aj Štúdio) — inak ich ' +
+            'SketchUp drží otvorené a priečinok sa nedá premenovať. Po dokončení REŠTARTUJ ' +
+            'SketchUp; výsledok sa ukáže v okne SketchUpu, nie tu.',
+      okLabel: 'Aktualizovať',
+      fields: [],
+      onSubmit: function(){
+        // Modal sa zatvára HNEĎ (výnimka z „zápis nezatvára modal"): okná sa
+        // o chvíľu zavrú aj s ním a výsledok chodí natívnou hláškou.
+        window.NXModal.close();
+        // Klik nesie CESTU A TOKEN kontroly, ktorej vysledok mal clovek pred
+        // ocami ? server aktualizuje LEN vtedy, ked mu to sedi s vlastnym
+        // zaznamom aj s prave ulozenou cestou (Codex #278 P1).
+        updSend('updater_apply', { checked_path: u.source_dir, check_token: u.token });
+      }
+    });
+    return true;
+  }
+
+  function updAct(action, btn){
     if (action === 'save-dir'){ updSaveDir(); return; }
     if (action !== 'apply') return;
-
-    SS.setStatus((typeof nxUpdaterSoon === 'string') ? nxUpdaterSoon
-                                                    : 'Aktualizovanie príde v ďalšej dávke.', true);
+    if (btn && btn.getAttribute && btn.getAttribute('aria-disabled') === 'true'){
+      SS.setStatus((typeof nxUpdaterText === 'function') ? nxUpdaterText(updMerged()) : 'Nedostupné.', true);
+      return;
+    }
+    updApply();
   }
 
   // --- kreslenie do zdieľaných uzlov --------------------------------------
@@ -742,7 +771,7 @@
                        // D-52b (tests/js/test_d52b_updater_ui.js)
                        ssOnAboutEnter: ssOnAboutEnter, updMerged: updMerged,
                        updOnPayload: updOnPayload,
-                       updPaint: updPaint, updSaveDir: updSaveDir,
+                       updPaint: updPaint, updSaveDir: updSaveDir, updApply: updApply,
                        updAct: updAct, updTyping: updTyping,
                        updDirty: function(){ return UPD_DIRTY; },
                        updSent: function(){ return UPD_SENT; },

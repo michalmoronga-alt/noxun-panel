@@ -12,23 +12,14 @@
   // XSS: hodnoty idú cez `nxAboutEsc` — priečinok je síce cesta zo servera,
   // ale do HTML sa NIKDY nevkladá surový reťazec.
   //
-  // D-52b1: k spoločnému obsahu pribudol UPDATER (pole distribučného priečinka
-  // a stavový riadok s verziou). Renderuje sa VÝHRADNE pre ŠTÚDIOVÝ vstup —
-  // volajúci ho vypýta tým, že podá stav updatera druhým argumentom; koliesko
-  // Inspectora ho nepodáva a prvky sa v ňom neobjavia.
-  //
-  // Tlačidlo „Aktualizovať" je v tejto dávke VEDOME NEAKTÍVNE: samotná výmena
-  // súborov (potvrdenie, zatvorenie oboch okien, príprava balíka, commit) je
-  // dávka D-52b2. Neaktívna akcia sa podľa D-78 nesmie skrývať ani mlčať —
-  // preto je `aria-disabled` s dôvodom, nie zmiznutá.
+  // D-52b: k spoločnému obsahu pribudol UPDATER (pole distribučného priečinka,
+  // stavový riadok, tlačidlo „Aktualizovať"). Renderuje sa VÝHRADNE pre
+  // ŠTÚDIOVÝ vstup — volajúci ho vypýta tým, že podá stav updatera druhým
+  // argumentom; koliesko Inspectora ho nepodáva a prvky sa v ňom neobjavia.
   // Je to VEDOMÁ ODCHÝLKA od zapísaného „sup/about sú čítanie" (dôvod aj
   // hranice sú v docs/architecture/ui-lifecycle.md): tlačidlo, ktoré zatvorí
   // obe okná a prepíše súbory pluginu, patrí do jedného miesta — a mŕtve
   // tlačidlo v druhom vstupe by bolo D-78.
-
-  // Dôvod neaktívneho tlačidla v D-52b1 (D-78: nedostupná akcia sa VYSVETLÍ).
-  var NX_UPD_SOON = 'Samotné aktualizovanie príde v ďalšej dávke — teraz vieš ' +
-                    'nastaviť priečinok a overiť, či je v ňom novšia verzia.';
 
   function nxAboutEsc(s){
     return String(s == null ? '' : s)
@@ -76,14 +67,12 @@
     }
   }
 
-  // D-52b1: tlačidlo je NEAKTÍVNE VŽDY — výmena súborov je dávka D-52b2.
-  // Vracia `false` zámerne a natvrdo; stavový riadok nad ním pritom hovorí
-  // pravdu o verziách (trojstav), takže sekcia je už teraz užitočná: cestu
-  // nastavíš a hneď vidíš, či v priečinku niečo novšie je.
-  // `aria-disabled`, nikdy HTML `disabled` (D-78) — tlačidlo ostáva
-  // zamerateľné a klik naň povie dôvod.
-  function nxUpdaterEnabled(_u){
-    return false;
+  // Tlačidlo je AKTÍVNE výhradne pri `newer`. Ostatné stavy ho nechávajú
+  // `aria-disabled` (nikdy HTML `disabled`, vzor D-78) — ostáva zamerateľné
+  // a klik povie dôvod.
+  function nxUpdaterEnabled(u){
+    var d = u || {};
+    return d.enabled !== false && !d.locked && !d.dirty && String(d.state) === 'newer';
   }
 
   function nxUpdaterHtml(u){
@@ -107,7 +96,7 @@
         '<button type="button" class="primary" id="updBtn" data-updater-act="apply"' +
           (on ? '' : ' aria-disabled="true"') +
           ' title="' + nxAboutEsc(on ? 'Zatvorí Inspector aj Štúdio a nasadí novú verziu'
-                                     : NX_UPD_SOON) + '">' +
+                                     : nxUpdaterText(d)) + '">' +
           '<svg class="ic" aria-hidden="true"><use href="#i-cloud-download"/></svg> Aktualizovať</button>' +
       '</div></div>';
   }
@@ -142,7 +131,6 @@
     window.nxAboutHtml = nxAboutHtml;
     window.nxAboutFill = nxAboutFill;
     window.nxUpdaterText = nxUpdaterText;
-    window.nxUpdaterSoon = NX_UPD_SOON;
     window.nxUpdaterEnabled = nxUpdaterEnabled;
   }
 
@@ -150,5 +138,5 @@
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { nxAboutHtml: nxAboutHtml, nxAboutFill: nxAboutFill, nxAboutEsc: nxAboutEsc,
                        nxUpdaterHtml: nxUpdaterHtml, nxUpdaterText: nxUpdaterText,
-                       nxUpdaterEnabled: nxUpdaterEnabled, NX_UPD_SOON: NX_UPD_SOON };
+                       nxUpdaterEnabled: nxUpdaterEnabled };
   }

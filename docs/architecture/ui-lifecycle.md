@@ -1820,7 +1820,7 @@ Inspectora to nepatrí — a mŕtve tlačidlo v druhom vstupe by bolo D-78.
 **Vedomá odchýlka od wireframu mockupu:** licencie tretích strán a diagnostika (`Debug.report`) sa **nepridávajú** — v koliesku dnes nie sú, takže by to nebolo zrkadlo, ale nový
 obsah v oboch vstupoch (patrí do vlastnej dávky).
 
-### updater.rb — aktualizácia pluginu jedným klikom (D-52a jadro + D-52b1 UI kontroly)
+### updater.rb — aktualizácia pluginu jedným klikom (D-52a jadro · D-52b1 kontrola · D-52b2 aplikovanie)
 
 **Vstupný bod je sekcia „O plugine" v Štúdiu; tu je najprv opísané ČISTÉ JADRO, ktoré tam sedí pod tlačidlom, a na konci UI vrstva nad ním.** Modul je headless: pri načítaní
 nesiaha na `Sketchup.*` ani `UI.*` a **všetky cesty prijíma ako parametre** (`Engine.plugin_dir` / `find_support_file` patria UI vrstve). Vďaka tomu beží celá sada nad TEMP
@@ -1954,7 +1954,7 @@ opravovať (`pending?` je false), ale náš loader v pamäti je starý a strom n
 súboru. Boot, ktorý by sa v tom okne pozrel iba na artefakty, by nič nenašiel, načítal strom a updater by mu ho o pár sekúnd vymenil pod rukami. Bežný štart je tak jeden `flock`,
 zápis lease a päť `File.exist?` — zanedbateľná réžia.
 
-#### UI vrstva (D-52b1) — sekcia „O plugine" v Štúdiu
+#### UI vrstva — sekcia „O plugine" v Štúdiu (D-52b1 kontrola, D-52b2 aplikovanie)
 
 **Server je `supplier_settings_dialog.rb`** (autorita sekcie `about`), klient je `ui/js/about.js` (markup) + `ui/js/studio_settings.js` (stav a akcie) + dva vstupné hooky
 v `ui/js/studio.js`. Nový modul nevznikol zámerne: UI stojí nad hotovým kontraktom jadra a druhý server sekcie `about` by sa s prvým časom rozišiel.
@@ -1977,10 +1977,10 @@ vlákno na tú istú mŕtvu cestu a tie by sa hromadili až do reštartu SketchU
 tokenom. **Hotový beh sa naopak zahadzuje**: jeho výsledok je z iného okamihu a share sa medzitým mohol vrátiť, takže ďalšia kontrola musí zdroj prečítať nanovo. Iná cesta = vlastný
 beh.
 
-**DOKLAD O KONTROLE** (Codex #278 P1). `updater_settings.json` je súbor počítača — uložiť doň môže aj druhá inštancia SketchUpu alebo človek ručne. Bez
+**APLIKUJE SA LEN TO, ČO BOLO SKONTROLOVANÉ** (Codex #278 P1). `updater_settings.json` je súbor počítača — uložiť doň môže aj druhá inštancia SketchUpu alebo človek ručne. Bez
 dôkazu by stačilo, aby sa cesta medzi kontrolou a klikom zmenila: potvrdenie by menovalo priečinok A a nasadilo by sa B. Server si preto pri každom **úspešnom** doručení výsledku
 zapíše `{dir, token, state, dlg}`, posiela `token` klientovi a ten ho pri klike vracia v `checked_path` + `check_token`. `apply!` sa spustí len keď sedí **všetko**: zapísaný stav je
-`newer`, jeho cesta = práve uložená cesta, inštancia okna je tá istá a klientove hodnoty sa zhodujú so zápisom — **doklad spotrebúva až D-52b2**, tu sa iba ukladá a posiela klientovi.
+`newer`, jeho cesta = práve uložená cesta, inštancia okna je tá istá a klientove hodnoty sa zhodujú so zápisom. Inak odmietnutie („cesta sa medzitým zmenila — skontroluj znova").
 Klientská strana to zrkadlí: keď plný push prinesie inú `about.updater.source_dir`, než akej patrí živý výsledok, výsledok sa **zahodí** (tlačidlo zamkne) a v otvorenej sekcii sa
 rovno spustí nová kontrola.
 
@@ -2004,21 +2004,52 @@ uloženú** („Uložená je „B""), takže je zrejmé, čoho sa kontrola týka
 jadra plus dva prevádzkové stavy: `newer` = tlačidlo aktívne · `same` = `aria-disabled` „máš aktuálnu verziu" · `older` = `aria-disabled` „staršiu verziu nainštaluj ručne cez
 INSTALL" (B4) · `checking` a `error` (hláška nesie **cestu aj dôvod**). Vždy `aria-disabled`, **nikdy HTML `disabled`** (D-78) — tlačidlo ostáva zamerateľné a klik naň povie dôvod.
 
+**BARIÉRA PRED SWAPOM (F10) je jediná cesta k `apply!`.** Klik → D-15 potvrdenie („zatvoria sa OBE okná, po dokončení reštartuj SketchUp"; bez `nx_modal.js` sa aktualizácia
+**nespustí** — „potvrdenie sa nedalo zobraziť, tak sme to spravili" je pri prepise súborov neprípustné) → `Panel.hide` + `StudioDialog.hide` → **timer čaká, kým `dialog_closed?`
+oboch modulov nevráti `true`** → až potom `Updater.apply!`. Čaká sa na `dialog_closed?` (`@dialog.nil?`, teda dobehnutý `set_on_closed`), **nie** na `dialog_alive?`: to hovorí
+o VIDITEĽNOSTI, kým CEF ešte môže držať otvorené súbory z `ui/` a rename priečinka by na Windows zlyhal. Limit sú 3 s; po ňom sa aktualizácia **zruší** natívnou hláškou („na disku
+sa nič nezmenilo"). Guard test nad zdrojom trvá na tom, že `handle_updater_apply` nevolá `updater_run_apply` priamo.
+
+**PRÍPRAVA BALÍKA BEŽÍ VO VLÁKNE, COMMIT V HLAVNOM** (Codex #278 kolo 2, P1). Bariéra bola len prvá polovica: za ňou nasledovalo `Updater.apply!`, ktoré v tom istom timer
+callbacku počítalo manifest a kopírovalo stovky súborov zo share. UI vrstva preto volá **`Updater.prepare!` vo vlákne** s vlastným deadline (`UPDATER_STAGE_S`, 60 s) a polluje
+výsledok; **`Updater.commit!`** spúšťa až hlavné vlákno. Po deadline sa beh **zruší natívnou hláškou** („Zdroj nedostupný — aktualizácia ZRUŠENÁ, na disku sa nič nezmenilo") a
+vlákno sa — rovnako ako pri kontrole — opúšťa, nezabíja; živá generácia je nedotknutá a prípadný `.new` s markerom upratá boot recovery.
+
+**SINGLE-FLIGHT** (Codex #278 kolo 2, P1). Dva rýchle kliky (alebo dve odoslania toho istého potvrdenia) by naplánovali **dve bariéry** a druhá by po commite prvej bežala nad už
+vymenenými súbormi. Bránia tomu tri veci naraz: príznak `@updater_apply_inflight` sa zapína **pred** zatvorením okien; **doklad o kontrole sa pri prijatí SPOTREBUJE** (token je
+jednorazový, takže druhé odoslanie nemá čím prejsť); a **každé odložené čakanie bariéry si pred vlastným behom overí `Engine.restart_required?`** — keď medzitým niekto commitol,
+zruší sa bez zásahu a bez hlášky (výsledok už oznámil ten prvý beh). Príznak sa uvoľňuje na každom konci: úspech, odmietnutie, deadline prípravy aj limit bariéry.
+
+**Doklad o kontrole viaže aj VERZIU.** Balík na share sa môže vymeniť aj **medzi potvrdením a stagingom**, takže samotná zhoda cesty nestačí: záznam nesie `available` z kontroly
+a po `prepare!` sa porovná s verziou **staged** loadera (`ticket['to']`). Nezhoda = `abort_prepared!` a hláška „Balík sa medzitým zmenil (X → Y) — NIČ sa nenainštalovalo".
+
+**POČAS BEHU SA OKNÁ NEOTVÁRAJÚ** (Codex #278 kolo 3, P1). Restart latch zapína až **commit**, kým príprava balíka zo share trvá desiatky sekúnd — a v tom okne by si používateľ
+stihol otvoriť Inspector z toolbaru, takže by commit bežal s CEF držiacim súbory z `ui/`. Preto má UI vrstva príznak `updater_apply_inflight?`, ktorý číta
+`Engine.update_in_progress?`, a **všetky tri vstupné body** (`Panel.show`, `Panel.show_insert`, `StudioDialog.show`) ho kontrolujú hneď vedľa latchu a odmietnu natívnou hláškou.
+Príznak sa uvoľňuje na **jedinom mieste** — `updater_done!` (bez textu je to tichý koniec, s textom natívny výsledok) — takže zabudnutý reset nemôže okná zamknúť natrvalo.
+
+**DRUHÁ BARIÉRA TESNE PRED `commit!`.** Bariéra pred prípravou nestačí: medzi ňou a commitom prebehlo dlhé kopírovanie. `commit_when_closed` preto stav okien overí **znova**,
+prípadné okno zavrie a počká (rovnaký 3 s limit); keď sa nezavrie, aktualizácia sa **zruší** — `abort_prepared!` upratá pripravený balík a hláška povie, že sa na disku nič
+nezmenilo.
+
+**Keď zlyhá aj upratanie prípravy** (Codex #278 kolo 3, P2), hláška to **prizná a povie, čo s tým**: pripravený `.new` a marker sú brzda, o ktorú sa ďalší pokus zastaví celkom
+inou hláškou. `abort_note` preto pri neúspešnom `abort_prepared!` dopĺňa „reštartuj SketchUp (pri štarte sa dorovná), alebo v Plugins zmaž `noxun_engine.update.json`
+a `noxun_engine.new`".
+
+**Výsledok ide VÝHRADNE natívne (`UI.messagebox`)** — úspech („Aktualizované na X — reštartuj SketchUp", plus poznámka z jadra, ak nejaká je), odmietnutie s presným dôvodom
+z `Refused` aj neočakávaná výnimka. Do CEF sa poslať nedá: okná sú v tom bode zavreté a po úspešnom swape by nové HTML bežalo proti starým callbackom. Guard test nad zdrojom
+zakazuje v `updater_run_apply` `set_status`, `push_updater` aj `js(`.
+
+**Neúspech sa VETVÍ podľa restart latchu** (`updater_failure_text`, Codex #278 P2): „plugin ostal nezmenený" nie je pravda vždy. `abort_after_move!` má dve vetvy — po **úspešnom**
+rollbacku je na disku presne to, čo tam bolo (a latch sa zámerne nezapína), ale po **zlyhanom** rollbacku ostávajú `.new`/`.old` aj marker, latch sa zapne a generáciu dorovná až
+boot recovery. Latch je jediný príznak, ktorý jadro v tom druhom prípade spoľahlivo zapína, takže rozhoduje on: so zapnutým latchom hláška hovorí „AKTUALIZÁCIA JE NEÚPLNÁ —
+REŠTARTUJ SketchUp, plugin sa pri štarte dorovná". Presný dôvod z jadra ostáva v oboch vetvách.
+
 **Testovacie seamy.** Asynchrónny check a bariéra stoja na troch veciach z prostredia — hodinách, vlákne a timeri (+ natívnej hláške). `SupplierSettingsDialog.test_clock /
 test_spawn / test_schedule / test_notify` ich v headless sade nahradia (vzor `Materials.test_dir_override`), takže token, deadline aj bariéra sa overia bez SketchUpu a bez čakania
 v reálnom čase. V produkcii sú `nil`.
 
-**Tlačidlo „Aktualizovať" je v D-52b1 zámerne NEAKTÍVNE.** Sekcia vie cestu nastaviť a verziu overiť; samotná výmena súborov (D-15 potvrdenie, zatvorenie oboch okien, príprava
-balíka vo vlákne, `commit!`, natívne hlášky) je **dávka D-52b2** — rez podľa pravidla 3 kôl (PR #278). Neaktívna akcia sa podľa D-78 nesmie skrývať ani mlčať: tlačidlo je
-`aria-disabled` s dôvodom (`NX_UPD_SOON`) a klik naň ho zopakuje do stavového riadku okna.
-
-**Potvrdenie uloženia sa páruje s POŽIADAVKOU** (Codex #278 kolo 3, P2). Klient posiela s cestou aj poradové číslo `req` a server ho vracia nedotknuté; rozpis zaniká len keď ack
-patrí **poslednej** požiadavke **a** v poli je stále odoslaná hodnota. Bez toho by ack skoršieho uloženia (A) ukončil rozpis, ktorý medzitým patril novšiemu (B).
-
-**Cesty sú root-aware** (Codex #278 kolo 3, P2). `Updater.normalize_source` strihá koncové lomítko len tam, kde nejde o **koreň** — `/`, `D:/` aj `//server/share` ostávajú
-nedotknuté (rovnaké pravidlo ako `normalize_path`). Všetky tri sa dajú do poľa distribučného priečinka reálne napísať a `chomp('/')` by z nich spravil nepoužiteľnú cestu.
-
-**Vedomé hranice D-52b1:** žiadne aplikovanie (D-52b2), žiadny auto-check na pozadí (kontrola je vždy vstup do sekcie alebo uloženie cesty — nedostupný share sa preto „opraví" odchodom a návratom do sekcie),
+**Vedomé hranice D-52b:** žiadny auto-check na pozadí (kontrola je vždy vstup do sekcie alebo uloženie cesty — nedostupný share sa preto „opraví" odchodom a návratom do sekcie),
 žiadny auto-reload, žiadny downgrade, žiadne podpisovanie balíka, žiadny G-Disk sync knižníc (D-48).
 
 ### Veľkosť okna pri otvorení (D-77)

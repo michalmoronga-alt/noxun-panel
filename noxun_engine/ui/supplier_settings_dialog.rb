@@ -43,23 +43,26 @@ module Noxun
       # Mena su prefixovane `ss_` — `save`/`reload` (mena z okna) su prilis
       # vseobecne na to, aby zili vedla akcii ostatnych sekcii v JEDNOM
       # priestore callbackov okna.
-      # D-52b1 pridala DVE akcie updatera (sekcia `about`): kontrolu verzie
-      # a ulozenie distribucneho priecinka. Mena su prefixovane `updater_`
-      # z toho isteho dovodu ako `ss_` — vsetky sekcie Studia ziju v JEDNOM
-      # priestore callbackov okna.
-      #
-      # SAMOTNA AKTUALIZACIA (`updater_apply`) je VEDOME MIMO tejto davky —
-      # bariera okien, priprava balika vo vlakne a commit su D-52b2. V tejto
-      # davke sa cesta nastavi a verzia OVERI; tlacidlo „Aktualizovať" je
-      # `aria-disabled` s dovodom (D-78: nedostupna akcia sa hlasi, nemlci).
-      SECTION_ACTIONS = %w[ss_save ss_reload updater_check updater_set_dir].freeze
+      # D-52b pridala TRI akcie updatera (sekcia `about`): kontrola verzie,
+      # ulozenie distribucneho priecinka a samotna aktualizacia. Mena su
+      # prefixovane `updater_` z toho isteho dovodu ako `ss_` — vsetky sekcie
+      # Studia ziju v JEDNOM priestore callbackov okna.
+      SECTION_ACTIONS = %w[ss_save ss_reload updater_check updater_set_dir updater_apply].freeze
 
-      # --- D-52b1: casovanie kontroly verzie -------------------------------
-      # Kontrola cita hlavicku loadera zo ZDROJA, ktory je typicky sietovy
-      # share — odpojeny disk vie „viset" desiatky sekund. Preto deadline: po
-      # nom sa vysledok uz nikdy nepouzije a sekcia povie, ze zdroj neodpovedal.
+      # --- D-52b: casovanie updatera ---------------------------------------
+      # Kontrola verzie cita hlavicku loadera zo ZDROJA, ktory je typicky
+      # sietovy share — odpojeny disk vie „viset" desiatky sekund. Preto
+      # deadline: po nom sa vysledok uz nikdy nepouzije a sekcia povie, ze
+      # zdroj neodpovedal. Bariera pred swapom caka na zatvorenie OBOCH okien.
       UPDATER_DEADLINE_S = 4.0
       UPDATER_POLL_S = 0.2
+      UPDATER_BARRIER_S = 3.0
+      UPDATER_BARRIER_POLL_S = 0.1
+      # Codex #278 kolo 2 (P1): PRIPRAVA balika (manifest + kopirovanie stoviek
+      # suborov zo share) je nerovnako dlha operacia — minuta je strop, po
+      # ktorom je zdroj evidentne nedostupny a caka sa zbytocne.
+      UPDATER_STAGE_S = 60.0
+      UPDATER_STAGE_POLL_S = 0.25
 
       # Popisky a jednotky sadzieb sluzieb — poradie = poradie v sekcii (zhodne
       # s Budget::SERVICE_DEFS, aby sa nastavenie a rozpocet citali rovnako).
@@ -73,12 +76,13 @@ module Noxun
 
       class << self
         # --- TESTOVACIE SEAMY (D-52b) ----------------------------------------
-        # Asynchronna kontrola verzie stoji na TROCH veciach z prostredia:
-        # hodiny, vlakno a timer. Headless sada ich nahradí, takze sa token aj
-        # deadline daju overit bez SketchUpu a bez cakania v realnom case.
-        # V produkcii su vsetky `nil` a kod ide standardnou cestou (vzor
-        # `Materials` `test_dir_override`).
-        attr_accessor :test_clock, :test_spawn, :test_schedule
+        # Asynchronna kontrola verzie a bariera pred swapom stoja na TROCH
+        # veciach z prostredia: hodiny, vlakno a timer (+ natívna hláška).
+        # Headless sada ich nahradí, takze sa token, deadline aj bariera daju
+        # overit bez SketchUpu a bez cakania v realnom case. V produkcii su
+        # vsetky `nil` a kod ide standardnou cestou (vzor `Materials`
+        # `test_dir_override`).
+        attr_accessor :test_clock, :test_spawn, :test_schedule, :test_notify
 
         # --- vstup SEKCII (vzor RulesDialog.dispatch) ------------------------
 
@@ -98,6 +102,7 @@ module Noxun
           when 'ss_reload'      then handle_reload
           when 'updater_check'  then handle_updater_check
           when 'updater_set_dir' then handle_updater_set_dir(payload)
+          when 'updater_apply'  then handle_updater_apply(payload)
           end
         end
 
@@ -278,15 +283,18 @@ module Noxun
         # vstup `nxAboutHtml` — koliesko Inspectora ich NEMA (mrtve tlacidlo
         # v druhom vstupe = D-78).
         #
-        # JADRO (recovery, zamok, lease, manifest, staging, swap, latch) je
-        # z D-52a (`core/updater.rb`, ciste headless; od tejto davky rozdelene
-        # na `prepare!` + `commit!`). Tato vrstva pridava LEN:
-        #   * pole distribucneho priecinka s vlastnym ulozenim (F7/F11),
+        # JADRO (recovery, zamok, lease, manifest, swap, latch) je z D-52a
+        # (`core/updater.rb`, ciste headless). Tato vrstva pridava LEN:
         #   * asynchronnu kontrolu verzie s deadline a tokenom (F5/F6),
-        #   * DOKLAD o kontrole, z ktoreho bude vychadzat D-52b2.
-        #
-        # SAMOTNE APLIKOVANIE JE MIMO TEJTO DAVKY (D-52b2): bariera okien,
-        # priprava balika vo vlakne, commit a natívne hlasky vysledku.
+        #   * BARIERU pred swapom — zavriet obe okna a POCKAT na ich
+        #     `set_on_closed` (F10; CEF drzi subory z `ui/` a rename by zlyhal),
+        #   * vysledok VYHRADNE natívne (`UI.messagebox`) — nikdy cez CEF.
+
+        # D-52b2 (#278 kolo 3, P1): cita ho `Engine.update_in_progress?`, cez
+        # ktory vstupne body pluginu odmietaju otvorenie okien pocas behu.
+        def updater_apply_inflight?
+          @updater_apply_inflight == true
+        end
 
         def updater?
           defined?(Updater) ? true : false
@@ -436,6 +444,258 @@ module Noxun
                        'req' => data['req'])
           set_status(saved.empty? ? 'Distribučný priečinok je zmazaný.' : "Priečinok uložený: #{saved}")
           handle_updater_check
+        end
+
+        # --- aktualizacia (F10) ----------------------------------------------
+        #
+        # Codex #278 (P1): klient posiela CESTU A TOKEN kontroly, ktorej vysledok
+        # mal pred ocami. Bez toho stacilo, aby druha instancia SketchUpu (alebo
+        # rucny zasah do `updater_settings.json`) medzitym ulozila INU cestu:
+        # potvrdenie by menovalo cestu A a nasadila by sa B. Zhodovat sa musi
+        # VSETKO — cesta z kliku, posledna USPESNA kontrola tejto instancie okna
+        # a cesta, ktora je AKTUALNE ulozena.
+        def handle_updater_apply(payload = nil)
+          return updater_off unless updater?
+          return set_status('Plugin je už aktualizovaný — reštartuj SketchUp.', true) if Engine.restart_required?
+          # SINGLE-FLIGHT (Codex #278 kolo 2, P1). Dva rychle kliky (alebo dve
+          # odoslania toho isteho potvrdenia) by naplanovali DVE bariery; druha
+          # by po commite prvej bezala nad UZ VYMENENYMI subormi. Priznak sa
+          # zapina PRED zatvorenim okien — teda skor, nez sa cokolvek stane.
+          if @updater_apply_inflight
+            return set_status('Aktualizácia už prebieha — počkaj na jej výsledok.', true)
+          end
+
+          dir = Updater.source_dir
+          return set_status('Najprv zadaj distribučný priečinok a ulož ho.', true) if dir.empty?
+
+          data = payload.is_a?(Hash) ? payload : (payload.nil? ? {} : JSON.parse(payload.to_s))
+          reason = updater_apply_mismatch(data, dir)
+          return set_status(reason, true) if reason
+
+          # TOKEN JE JEDNORAZOVY: doklad o kontrole sa SPOTREBUJE. Druhe
+          # odoslanie toho isteho potvrdenia tak nema com prejst ani vtedy, keby
+          # priznak vyssie zlyhal.
+          @updater_apply_expect = @updater_check_ok['available'].to_s
+          @updater_check_ok = nil
+          @updater_apply_inflight = true
+
+          # Poradie je zavazne: hlaska este do ZIVEHO okna, potom zatvorenie,
+          # a swap az ked obe okna naozaj dobehnu (`set_on_closed`).
+          set_status('Zatváram okná pluginu — aktualizácia sa spustí po ich zatvorení…')
+          close_plugin_dialogs
+          await_dialogs_closed(dir, updater_now + UPDATER_BARRIER_S)
+          true
+        end
+
+        # `nil` = klik smie prejst. Inak DOVOD odmietnutia (jedna hlaska pre
+        # vsetky nezhody — pouzivatel ma spravit to iste: skontrolovat znova).
+        RECHECK_MSG = 'Cesta k balíku sa medzitým zmenila — skontroluj znova (odíď zo sekcie ' \
+                      'a vráť sa do nej) a až potom aktualizuj.'
+
+        def updater_apply_mismatch(data, dir)
+          ok = @updater_check_ok
+          return RECHECK_MSG unless ok.is_a?(Hash)
+          return RECHECK_MSG unless ok['state'].to_s == 'newer'
+          return RECHECK_MSG unless ok['dir'].to_s == dir          # kontrola bola nad INOU cestou
+          return RECHECK_MSG unless ok['dlg'] == studio_token      # a v INEJ instancii okna
+          return RECHECK_MSG unless data['checked_path'].to_s == dir
+          return RECHECK_MSG unless data['check_token'].to_i == ok['token'].to_i
+
+          nil
+        end
+
+        def close_plugin_dialogs
+          Panel.hide if defined?(Panel) && Panel.respond_to?(:hide)
+          StudioDialog.hide if defined?(StudioDialog) && StudioDialog.respond_to?(:hide)
+          true
+        rescue StandardError => e
+          Engine.log_error(e, 'SupplierSettingsDialog.close_plugin_dialogs')
+          false
+        end
+
+        # `dialog_closed?` (nie `dialog_alive?`) — cakame na DOBEHNUTY
+        # `set_on_closed`, nie na neviditelne okno: CEF moze este drzat subory
+        # z `ui/` a rename priecinka by na Windows zlyhal.
+        def dialogs_closed?
+          [defined?(Panel) ? Panel : nil, defined?(StudioDialog) ? StudioDialog : nil]
+            .compact.all? { |mod| mod.respond_to?(:dialog_closed?) ? mod.dialog_closed? : true }
+        end
+
+        def await_dialogs_closed(dir, deadline)
+          # ODLOZENE CAKANIE MUSI ESTE RAZ OVERIT, ZE SA MEDZITYM NIC NESTALO
+          # (Codex #278 kolo 2, P1): keby iny beh medzitym COMMITOL, tento by
+          # spustil swap zo STAREHO Ruby nad UZ NOVYMI subormi. Rusi sa bez
+          # zasahu — vysledok uz oznamil ten prvy beh.
+          if Engine.restart_required?
+            updater_done! # bez hlasky — vysledok uz oznamil ten prvy beh
+            return false
+          end
+
+          return updater_run_apply(dir) if dialogs_closed?
+
+          if updater_now >= deadline
+            return updater_done!('Aktualizácia sa NESPUSTILA — okná pluginu sa nepodarilo zavrieť ' \
+                                   "do #{UPDATER_BARRIER_S.round} s. Zavri Inspector aj Štúdio ručne " \
+                                   'a skús to znova. Na disku sa nič nezmenilo.')
+          end
+
+          updater_schedule(UPDATER_BARRIER_POLL_S) { await_dialogs_closed(dir, deadline) }
+        end
+
+        # Samotny swap. Vysledok ide VYHRADNE natívne — okna su v tomto bode
+        # zavrete a po uspechu by nove HTML/JS bezalo proti starym callbackom.
+        # DVE FAZY (Codex #278 kolo 2, P1). Do tejto opravy bezalo cele
+        # `Updater.apply!` — teda aj manifest zdroja a kopirovanie stoviek
+        # suborov zo share — SYNCHRONNE v `UI.start_timer` callbacku. Visiaci
+        # UNC share tak zamrazil SketchUp na desiatky sekund a pouzivatel nemal
+        # ako zasiahnut. Preto:
+        #   * `Updater.prepare!` (manifest + staging do `.new` + validacia) bezi
+        #     vo VLAKNE s vlastnym deadline — ziva generacia sa pri nom nedotyka,
+        #     takze po zruseni je na disku presne to, co tam bolo;
+        #   * `Updater.commit!` (renamey v Plugins) bezi v HLAVNOM vlakne, je to
+        #     lokalna a rychla operacia.
+        def updater_run_apply(dir)
+          plugins = Engine.plugin_dir # `Engine.*` sa cita v HLAVNOM vlakne
+          box = { 'done' => false, 'ticket' => nil, 'error' => nil }
+          # VO VLAKNE JE LEN SUBOROVE I/O — ziadne `Sketchup.*`, ziadne `UI.*`,
+          # ziadny zapis do stavu okna (guard test nad zdrojom to strazi).
+          updater_spawn do
+            begin
+              box['ticket'] = Updater.prepare!(dir, plugins)
+            rescue StandardError => e
+              box['error'] = e
+            end
+            box['done'] = true
+          end
+          poll_updater_stage(box, updater_now + UPDATER_STAGE_S)
+        end
+
+        def poll_updater_stage(box, deadline)
+          return updater_finish_apply(box) if box['done']
+
+          if updater_now >= deadline
+            # Vlakno sa NEZABIJA (nad visiacim sharom je to nespolahlive) —
+            # opusti sa. Ziva generacia je nedotknuta; keby priprava predsa len
+            # dobehla, jej `.new` a marker uprace boot recovery.
+            return updater_done!('Zdroj nedostupný — aktualizácia ZRUŠENÁ. Na disku sa nič ' \
+                                   'nezmenilo a plugin beží ďalej v pôvodnej verzii. Keď sa zdroj ' \
+                                   'vráti, reštartuj SketchUp a skús to znova.')
+          end
+
+          updater_schedule(UPDATER_STAGE_POLL_S) { poll_updater_stage(box, deadline) }
+        end
+
+        # Hlavne vlakno: overi VERZIU proti dokladu o kontrole a commitne.
+        def updater_finish_apply(box)
+          err = box['error']
+          if err
+            Engine.log_error(err, 'SupplierSettingsDialog.updater_prepare') unless err.is_a?(Updater::Refused)
+            reason = err.is_a?(Updater::Refused) ? err.message : "#{err.class}: #{err.message}"
+            return updater_done!(updater_failure_text(reason))
+          end
+
+          ticket = box['ticket']
+          mismatch = updater_version_mismatch(ticket)
+          return updater_done!(mismatch + abort_note(ticket)) if mismatch
+
+          # Codex #278 kolo 3 (P1): priprava trvala a okna sa medzitym mohli
+          # ZNOVA otvorit (toolbar, deep-link, hoci vstupne body to uz odmietaju
+          # — na rade je este otvorene okno z casu pred klikom). Stav sa preto
+          # overuje ZNOVA tesne pred commitom; zatvorenie sa zopakuje a caka sa
+          # rovnakym limitom ako pri prvej bariere.
+          commit_when_closed(ticket, updater_now + UPDATER_BARRIER_S)
+        rescue Updater::Refused => e
+          updater_done!(updater_failure_text(e.message))
+        rescue StandardError => e
+          Engine.log_error(e, 'SupplierSettingsDialog.updater_finish_apply')
+          updater_done!(updater_failure_text("#{e.class}: #{e.message}"))
+        end
+
+        # DRUHA BARIERA — tesne pred `commit!`.
+        def commit_when_closed(ticket, deadline)
+          return updater_commit!(ticket) if dialogs_closed?
+
+          close_plugin_dialogs
+          if updater_now >= deadline
+            return updater_done!('Aktualizácia sa NEDOKONČILA — okná pluginu sa medzitým znova ' \
+                                 'otvorili a nepodarilo sa ich zavrieť. Na disku sa nič nezmenilo; ' \
+                                 "zavri Inspector aj Štúdio a skús to znova.#{abort_note(ticket)}")
+          end
+
+          updater_schedule(UPDATER_BARRIER_POLL_S) { commit_when_closed(ticket, deadline) }
+        end
+
+        def updater_commit!(ticket)
+          res = Updater.commit!(ticket)
+          note = res.is_a?(Hash) ? res['note'].to_s : ''
+          msg = "Aktualizované na #{res.is_a?(Hash) ? res['to'] : '?'} — reštartuj SketchUp."
+          msg = "#{msg}\n\n#{note}" unless note.empty?
+          updater_done!(msg)
+        rescue Updater::Refused => e
+          updater_done!(updater_failure_text(e.message))
+        rescue StandardError => e
+          Engine.log_error(e, 'SupplierSettingsDialog.updater_commit')
+          updater_done!(updater_failure_text("#{e.class}: #{e.message}"))
+        end
+
+        # Zrusenie PRIPRAVENEJ aktualizacie + poznamka, ked sa NEPODARILO
+        # upratat (Codex #278 kolo 3, P2). Pripraveny `.new` a marker su totiz
+        # BRZDA: dalsi pokus sa o marker zastavi celkom inou hlaskou, takze sa
+        # o nom clovek musi dozvediet TERAZ a musi vediet, co s tym.
+        def abort_note(ticket)
+          return '' if Updater.abort_prepared!(ticket)
+
+          "\n\nUpratanie pripraveného balíka ZLYHALO — reštartuj SketchUp (pri štarte sa dorovná), " \
+            "alebo v priečinku Plugins zmaž #{Updater::MARKER_NAME} a #{Updater::TREE_NAME}#{Updater::NEW_SUFFIX}."
+        end
+
+        # KONIEC BEHU — JEDINE miesto, kde sa priznak uvolnuje (vstupne body sa
+        # zase otvaraju). Bez textu je to TICHY koniec (cudzi commit medzitym
+        # vysledok uz oznamil); s textom ide vysledok VYHRADNE natívne.
+        def updater_done!(text = nil)
+          @updater_apply_inflight = false
+          return true if text.nil?
+
+          updater_message(text)
+        end
+
+        # Codex #278 kolo 2 (P1): doklad o kontrole viaze aj VERZIU. Medzi
+        # kontrolou a potvrdenim mohol niekto na share vymenit balik — modal
+        # menoval X, ale pripravene je Y. Nainstalovat Y by znamenalo nasadit
+        # nieco, co clovek nikdy neodsuhlasil.
+        def updater_version_mismatch(ticket)
+          want = @updater_apply_expect.to_s
+          return nil if want.empty?
+
+          got = (ticket.is_a?(Hash) ? ticket['to'] : nil).to_s
+          return nil if got == want
+
+          "Balík sa medzitým zmenil (#{want} → #{got}) — NIČ sa nenainštalovalo. " \
+            'Skontroluj znova a potvrď to, čo naozaj chceš nasadiť.'
+        end
+
+        # Codex #278 (P2): „plugin ostal nezmenený" NIE JE pravda vzdy.
+        # `abort_after_move!` ma DVE vetvy — pri USPESNOM rollbacku je na disku
+        # presne to, co tam bolo (a latch sa zamerne NEZAPINA), ale pri ZLYHANOM
+        # rollbacku ostavaju artefakty `.new`/`.old` aj marker, latch sa ZAPNE
+        # a generaciu dorovna az boot recovery. Rozhoduje preto LATCH: je to
+        # jediny priznak, ktory jadro po commite (a po zlyhanom rollbacku)
+        # spolahlivo zapina.
+        def updater_failure_text(reason)
+          if Engine.restart_required?
+            return "AKTUALIZÁCIA JE NEÚPLNÁ — REŠTARTUJ SketchUp, plugin sa pri štarte dorovná.\n\n" \
+                   "Dôvod: #{reason}"
+          end
+
+          "Aktualizácia sa NEVYKONALA — plugin ostal nezmenený.\n\nDôvod: #{reason}"
+        end
+
+        def updater_message(text)
+          hook = test_notify
+          return hook.call(text) if hook
+
+          ::UI.messagebox(text) if defined?(::UI) && ::UI.respond_to?(:messagebox)
+          text
         end
 
         # --- prostredie (seamy) ----------------------------------------------

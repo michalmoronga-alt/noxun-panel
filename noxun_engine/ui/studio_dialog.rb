@@ -128,6 +128,8 @@ module Noxun
         # preto az do restartu SketchUpu neotvara.
         def show(open_section: nil, anchor: nil)
           return nil if Engine.update_restart_pending?
+          # D-52b2 (#278 kolo 3, P1): to iste pocas beziacej aktualizacie.
+          return nil if Engine.update_in_progress?
 
           @pending_section = SECTIONS.include?(open_section.to_s) ? open_section.to_s : nil
           @pending_anchor = @pending_section ? anchor.to_s.strip : nil
@@ -165,6 +167,13 @@ module Noxun
           !@dialog.nil? && @dialog.visible?
         rescue StandardError
           false
+        end
+
+        # D-52b (bariéra pred swapom): protajsok `Panel.dialog_closed?` —
+        # `true` az ked dobehol `set_on_closed` (referencia okna je `nil`).
+        # Viditelnost nestaci: CEF moze este drzat subory z `ui/`.
+        def dialog_closed?
+          @dialog.nil?
         end
 
         # D-52b: identita PRAVE ZIJUCEJ instancie okna. Je sucastou tokenu
