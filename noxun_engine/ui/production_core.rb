@@ -813,7 +813,11 @@ module Noxun
           Array(collected[:hardware]), state,
           cabinet_overrides: overrides,
           catalog: HardwareCatalog.items,
-          no_set_reason: no_set_reason
+          no_set_reason: no_set_reason,
+          # KOV-H1: ad-hoc polozky su VLASTNY kanal expanzie (mimo setov) —
+          # stav setov ich neovplyvnuje, takze idu do expanzie aj vtedy, ked
+          # sa mapovanie nedalo pouzit (R-07 `library_incompatible`).
+          manual_items: Array(collected[:hardware_manual])
         )
         # H1b (audit FIX 9 UI): dovod dostane SK text uz na SERVERI — tab
         # Kovanie aj CSV citaju to iste 'reason_sk' (JS ziadny vlastny preklad

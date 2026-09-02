@@ -57,6 +57,7 @@ module Noxun
         manual_overrides = { 'abs' => [], 'hardware' => [] }
         hardware_issues = [] # KOV-A1: tvrde nalezy kovania (zatial len smer dvierok)
         newer_configs = []   # KOV-H1 (R-12 exportna brana): ID skriniek z NOVSEJ verzie
+        hardware_manual = [] # KOV-H1: ad-hoc polozky kovania (mimo setov)
         cabinet_sets = {}
         # R-34 (review #262 P1): `cabinet_sets` ma na ID JEDEN slot — pozri
         # `note_cabinet_sets`. `seen` drzi mapu PRVEJ instancie toho ID (nil =
@@ -130,6 +131,12 @@ module Noxun
               nested[key] = rec unless key.empty? || nested.key?(key)
             end
             collect_manual_overrides(manual_overrides, ccfg, cid, nested)
+            # KOV-H1: ad-hoc polozky kovania. Zbieraju sa AZ TU, lebo potrebuju
+            # mapu VNORENYCH dielcov — bez nej sa neda povedat, ci vlastnik
+            # polozky este existuje. Aditivny kluc; `compute()` ho ignoruje.
+            hardware_manual.concat(
+              manual_items_for(cid, inst.persistent_id, ccfg['hardware_manual'], nested)
+            )
           when 'board'
             boards += 1
             # D-103: umiestnenie sa zbiera PRED filtrom manufactured — duplicitna
@@ -171,7 +178,32 @@ module Noxun
           cabinet_sets: cabinet_sets, cabinet_set_conflicts: cabinet_set_conflicts,
           placements: placements, identities: identities,
           hardware_issues: hardware_issues, newer_configs: newer_configs,
+          hardware_manual: hardware_manual,
           warnings: warnings, cabinets: cabinets, boards: boards }
+      end
+
+      # KOV-H1: ad-hoc polozky JEDNEJ skrinky, obohatene o adresu vlastnika.
+      #
+      # CISTA funkcia (ziadny SketchUp objekt) — headless testovatelna; `collect`
+      # jej dodava uz nacitane `ccfg['hardware_manual']` a mapu VNORENYCH dielcov,
+      # takze nevznika druhy sken modelu.
+      #
+      # `owner_missing` (audit #15 BLOCKER 4): polozka pripnuta na dielec, ktory
+      # v skrinke UZ NIE JE (celo sa zmazalo, konstrukcia sa zmenila). Polozka
+      # sa NEZAHADZUJE — ostava v nakupe a Kontrola ju prizna ORANGE; zahodit
+      # ju by znamenalo ticho odobrat kus z objednavky. Polozka BEZ vlastnika
+      # (patri celej skrinke) `owner_missing` NIKDY nema.
+      # `owner_pid` je persistent_id KONKRETNEJ instancie — pri dvoch skrinkach
+      # so zdielanym `cabinet_id` jediny udaj, ktorym sa da ukazat, ktora to je.
+      def manual_items_for(owner_id, owner_pid, items, nested)
+        keys = nested.is_a?(Hash) ? nested : {}
+        Array(items).filter_map do |it|
+          next nil unless it.is_a?(Hash)
+
+          okey = it['owner_part_key'].to_s
+          it.merge('owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
+                   'owner_missing' => (!okey.empty? && !keys.key?(okey)))
+        end
       end
 
       # KOV-A1: nalezy „dvierka bez urceneho smeru" jedneho korpusu.

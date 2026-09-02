@@ -275,17 +275,37 @@ module Noxun
           price = r['missing'] == true ? nil : num(r['price_eur_vat'])
           item = lookup[code.downcase]
           row = base_row(
-            key: "hw:#{code.downcase}",
+            # KOV-H1: VOLNY riadok kod NEMA, takze `hw:` by mal kazdy rovnaky —
+            # a kluc riadku je adresa rucneho prepisu ceny (BudgetStore). Preto
+            # ide do kluca jeho vlastna identita `free:<skrinka>:<id>`.
+            key: (r['free'] == true ? "hw:#{r['free_key']}" : "hw:#{code.downcase}"),
             nazov: (r['name_sk'].to_s.strip.empty? ? code : r['name_sk'].to_s),
             kod: code, dodavatel: (item.is_a?(Hash) ? item['supplier'] : nil),
             mj: unit_label(r['unit']), mnozstvo: qty, cena_mj: price,
-            poznamka: (r['missing'] == true ? 'kód nie je v katalógu kovania' : nil),
+            poznamka: hardware_note(r),
             zdroj: SRC_AUTO
           )
           row['category'] = r['category']
+          # KOV-H1 (audit #15 FIX 8): povod riadku ide do rozpoctu ADITIVNE —
+          # `origin: 'adhoc'` ked riadok (aj ciastocne) pochadza z rucne
+          # pridanych poloziek, `free` pri volnej polozke bez kodu. Ziadny
+          # vypocet sa tym nemeni; su to udaje pre zobrazenie a stale-scan.
+          row['origin'] = 'adhoc' if r['adhoc_quantity'].to_i.positive?
+          row['free'] = true if r['free'] == true
           row
         end.compact
         section('hardware', rows)
+      end
+
+      # Poznamka riadku kovania. Dva RÔZNE stavy, dve rôzne vety:
+      #   `missing`         — kod v katalogu nie je a riadok nema ani nazov
+      #   `catalog_missing` — KOV-H1: rucne pridany kod z katalogu zmizol, nazov
+      #                       mame zo snapshotu, chyba LEN cena
+      def hardware_note(r)
+        return 'kód nie je v katalógu kovania' if r['missing'] == true
+        return 'ručne pridaná položka — kód už nie je v katalógu (bez ceny)' if r['catalog_missing'] == true
+
+        nil
       end
 
       # GH #137 P2: MJ kovania musi prezit 1:1 do exportu — katalog povoluje
@@ -499,6 +519,12 @@ module Noxun
         if hardware_catalog
           lookup = hardware_lookup(hardware_catalog)
           Array(hardware['rows']).each do |r|
+            # KOV-H1 (audit #15 FIX 8): VOLNA polozka kod nema — v katalogu
+            # nema co porovnavat, takze do scanu veku cien nepatri. (Bez tejto
+            # vetvy by ju prazdny kod v `lookup` aj tak nenasiel; je tu preto,
+            # aby to bol ZAMER, nie nahoda.)
+            next if r['free'] == true
+
             code = r['kod'].to_s.downcase
             rec = lookup[code]
             next unless rec.is_a?(Hash)

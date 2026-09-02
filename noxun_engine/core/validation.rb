@@ -90,6 +90,11 @@ module Noxun
       # ponuku) — Kontrola ho ukazuje preto, aby to bolo vidno AJ BEZ pokusu
       # o export, teda skor, nez pouzivatel zacne rozpocet dolaďovat.
       CAT_NEWER_CFG   = 'newer_config'
+      # ORANGE — KOV-H1: ad-hoc polozka kovania pripnuta na dielec, ktory
+      # v skrinke UZ NIE JE. Polozka OSTAVA v nakupe (zahodit ju by znamenalo
+      # ticho odobrat kus z objednavky) — len sa prizna, aby ju clovek vedel
+      # prepnut na iny dielec alebo zmazat.
+      CAT_HW_ADHOC    = 'hardware_adhoc'
 
       # Druh top-level kusu, ktory MA KOVANIE. Zdielana konstanta preto, ze
       # „skrinka vs. doska" nie je kozmetika textu: len pri skrinke zliatie
@@ -174,6 +179,7 @@ module Noxun
         Array(collected[:hardware_overrides]).each { |ov| check_hardware(ov, items) }
         check_hardware_issues(collected[:hardware_issues], items)
         check_newer_configs(collected[:newer_configs], items)
+        check_hardware_manual(collected[:hardware_manual], items)
         check_hardware_expansion(hardware_expansion, items)
         check_placements(placements, items)
         check_identities(identities, items)
@@ -624,6 +630,31 @@ module Noxun
         end
       end
 
+      # --- KOV-H1: ad-hoc polozky kovania (`hardware_manual` z Bom.collect) ---
+      #
+      # Aditivny kluc zberu; nil / chybajuci = kontrola sa cela preskoci (vzor
+      # `placements:`). V H1 ma JEDINY nalez: MRTVY VLASTNIK. Polozka ostava
+      # v nakupe — nalez existuje preto, aby si clovek vsimol, ze uz nevie,
+      # KAM kovanie patri (dielec zanikol pri zmene konstrukcie).
+      def check_hardware_manual(manual, items)
+        Array(manual).each do |it|
+          next unless it.is_a?(Hash) && it['owner_missing'] == true
+
+          oid = it['owner_id'].to_s
+          pkey = it['owner_part_key'].to_s
+          name = it['name'].to_s.strip
+          name = it['code'].to_s.strip if name.empty?
+          name = 'bez názvu' if name.empty?
+          items << { 'severity' => ORANGE, 'category' => CAT_HW_ADHOC,
+                     'owner_id' => oid, 'part_key' => nil, 'hw_key' => nil,
+                     'owner_pid' => it['owner_pid'],
+                     'message_sk' => "Ručná položka kovania „#{name}“ (#{oid.empty? ? '—' : oid}) " \
+                                     'nemá vlastníka — dielec už neexistuje. Položka ostáva ' \
+                                     'v nákupe; prepni ju na iný dielec alebo ju zmaž.',
+                     'stable_key' => [CAT_HW_ADHOC, oid, pkey, it['id'].to_s].join('|') }
+        end
+      end
+
       # --- kontroly kovania a stavby ----------------------------------------
 
       # ORANGE: vypnute kovanie. Realny stav je disabled: true (nie quantity 0 —
@@ -715,17 +746,29 @@ module Noxun
           }
         end
         Array(exp['rows']).each do |row|
-          next unless row.is_a?(Hash) && row['missing'] == true
+          next unless row.is_a?(Hash)
+          # KOV-H1: `catalog_missing` je TA ISTA pricina („kod nie je v katalogu")
+          # s inym dosledkom — ad-hoc riadok ma SNAPSHOT nazvu, takze mu chyba
+          # LEN cena. Riadok ide TOU ISTOU ORANGE cestou, len s vetou, ktora
+          # menuje RUCNU polozku (a nie set, ktory ziadny nema).
+          next unless row['missing'] == true || row['catalog_missing'] == true
           code = row['code'].to_s
           Array(row['sources']).each do |src|
             next unless src.is_a?(Hash)
             oid = src['cabinet_id'].to_s
             opk = src['owner_part_key'].to_s
             gt  = src['generic_type'].to_s
+            adhoc = src['origin'].to_s == 'adhoc'
+            msg = if adhoc
+                    "Ručná položka „#{row['name_sk']}“ (kód #{code}, #{oid.empty? ? '—' : oid}) " \
+                      'už nie je v katalógu kovania — v nákupe ostáva bez ceny.'
+                  else
+                    "Kód #{code} zo setu „#{src['set_id']}“ nie je v katalógu kovania — bez názvu a ceny."
+                  end
             items << {
               'severity' => ORANGE, 'category' => CAT_HW_CODE,
               'owner_id' => oid, 'part_key' => (opk.empty? ? nil : opk), 'hw_key' => nil,
-              'message_sk' => "Kód #{code} zo setu „#{src['set_id']}“ nie je v katalógu kovania — bez názvu a ceny.",
+              'message_sk' => msg,
               'stable_key' => [CAT_HW_CODE, oid, opk, gt, src['rule_id'].to_s,
                                src['set_id'].to_s, code].join('|')
             }
