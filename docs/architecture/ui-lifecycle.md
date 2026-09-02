@@ -604,12 +604,17 @@ cesta, akou počíta builder, takže sa kontrola a stavba nemôžu rozísť; zly
 tri skupiny v **záväznom poradí** — **Zoznam čiel** (`data-key="fronts"`) · **Úchytky** (`fhandles`) · **Medzery a presahy** (`fgaps`). Riadok čela `.frow` je od SMOKE PACKU 1
 **STĹPEC**: hore `.fmain` = ovládače v **pevnom, NEZALAMOVACOM** rade, pod ním riadok naviazaného kovania `.fhw`. Predtým bol `.frow` jeden zalamovací rad a pri **vypísanej** výške
 (pribudlo „mm" + chip AUTO) súčet presiahol šírku panela — krížik `.fdel` padol o riadok nižšie a riadok sa rozbil (Michalov smoke test 20.8.). `.fmain` nesie: `.fnum` (kanonická
-pozícia F1 dole — D-23) · **`.ftico` ikonu typu (N27**, mapa `FRONT_TYPE_ICON` je jediné miesto prekladu typ→symbol; mení sa `href` v `<use>`, nie innerHTML) · `select.ftype` ·
+pozícia F1 dole — D-23) · **`.ftname`** (tlačidlo karty čela: ikona typu `.ftico` + názov `.ftl` s ellipsis + prípadný badge `.fbadge` „smer?") ·
 **`.dwrap` s úzkym poľom výšky (46 px, hodnota vpravo)** + šípkou **výškového radu (N25)** · `.funit` „mm" a **chip `.fauto`** · `select.fw` · **`.fprof` INDIKÁTOR profilu** ·
 `.fdel`.
 
-**`select.ftype` je JEDINÝ rastúci prvok** (`flex: 1 1 0`), všetko ostatné má pevnú stopu — riadok tak využije celú šírku a zároveň sa nikdy nezalomí; súčet stôp + medzier pri
-obsahu 470 px stráži guard `tests/pure/test_smoke1_riadky.rb` (spadne pri pridaní ďalšieho ovládača, nie až na Michalovej obrazovke).
+**KOV-A2a: `select.ftype` ZANIKOL.** Typ sa vyberá **piktogramom v karte čela** a v riadku žije v `dataset.frontType` (vzor D-90 `profile` — `collectFronts` ho číta odtiaľ, takže
+editácia iného poľa ho nestratí). Mapa `FRONT_TYPE_ICON` ostáva jediným miestom prekladu typ→symbol a kreslí ikonu v riadku **aj** dlaždicu v karte; mení sa `href` v `<use>`, nie
+innerHTML (vzor `NXIcons.set`). Výklop, sklop a blenda majú od tejto dávky **vlastné sprite symboly** (`front-lift` / `front-fall` / `front-blind`), nie fallback `front`.
+
+**`.ftname` je JEDINÝ rastúci prvok** (`flex: 1 1 0`, `min-width: 60px`), všetko ostatné má pevnú stopu — riadok tak využije celú šírku a zároveň sa nikdy nezalomí; súčet stôp +
+medzier pri obsahu 470 px stráži guard `tests/pure/test_smoke1_riadky.rb` (spadne pri pridaní ďalšieho ovládača, nie až na Michalovej obrazovke). V rozpočte je **aj badge
+„smer?"** — stojí vedľa „mm" a chipu AUTO, takže v najužšom paneli sa názov typu oreže (plné znenie nesie `title` tlačidla).
 
 **Živý náhľad výrazu `.exprhint`** („= 450" pri `300+150`) je v riadku čela **overlay** (`position: absolute` pod poľom, `z-index` pod `.miniopts`, `pointer-events: none`) — ako
 flex položka pridal do radu ~34 px, na ktoré `nowrap` už nemá rezervu, takže by riadok pretiekol presne tak, ako predtým zalamoval (Codex #183 P2). Je to ten istý vzor ako
@@ -631,20 +636,64 @@ doskočí na **box vlastníka** (`hwBoxByGroup(hwFrontGroup(fid))` — kľúč s
 **Materiál čiel** má DRUHÝ ovládač (`cab_front_c`) priamo v zozname, lebo sektor Materiály patrí kontextu Korpus a tu je skrytý — tá istá hodnota, dva vstupné body, synchro drží
 každá cesta, ktorá siaha na `cab_front`.
 
-**Výklop · Sklop · Blenda** sú v ponuke typov ako **tri disabled voľby** (KOV-A1 nahradila pôvodnú jedinú „Výklop (fáza 3)"). Dátovo už existujú — builder ich postaví, ABS
-olepí, kusovník aj VEPO ich nesú — ale **ovládač k nim príde až v KOV-A2** (typegrid s piktogramami), preto sú neaktívne. V ponuke stáť MUSIA: `select.value = typ` funguje aj na
-disabled voľbu, takže config z API si typ udrží a prvá editácia iného poľa ho neprepne späť na „Dvierka" (vzor D-90 P1 — projekcia nesmie stratiť pole). Popis voľby je krátky
-zámerne — celá veta žije v `title` selectu a v hinte skupiny. *(Pôvodný dôvod „dlhý text by rad zalomil" po SMOKE PACKU 1 zanikol: `flex-basis` selectu je 0 a rad sa nezalamuje.
-Krátky popis ostáva preto, že select je najužší prvok riadku a orezaná voľba nič nepovie.)*
+**KARTA ČELA (KOV-A2a)** je `.fcard` — **TRETÍ potomok stĺpca `.frow`** (za `.fmain` a `.fhw`), teda leží **priamo pod svojím riadkom**; otvorená je **vždy najviac jedna** a drží
+sa cez **identitu čela** (`openFrontCardId`), nie cez index riadku — klik na segrow spustí apply a echo riadky prestaví, takže bez identity by karta pod rukou zmizla. *Vedomá
+odchýlka od mockupu*, kde je karta samostatný blok pod celým zoznamom: takto ostáva kontext pri riadku, ktorého sa týka, a v skupine nepribúda trvalý blok (vertikálny priestor je
+vzácny). Z toho istého dôvodu karta **nemá hlavičku** — F-číslo, typ aj výšku má riadok priamo nad ňou. Riadok kovania `.fhw` sa pri otvorenej karte vkladá **nad ňu**.
+
+Obsah karty skladá **čistý view-model `frontCardModel(item, slots)`** (core.js): **typegrid** = 6 dlaždíc (Dvierka · Zásuvka · Výklop · Sklop · Blenda · **Bez čela** — `none` je
+platný typ D-18, preto musí ostať voliteľný; popisky sú krátke, plný názov nesie `title`) + **kontextové riadky `.prow`**: „Smer" (Ľavé · **Neurčené ⚠** · Pravé) pri slote
+`single` · „Krídlo 2/3" (resp. 2/4 a 3/4) **per stredné krídlo** pri slotoch `p2`/`p3` — *vedomé rozšírenie mockupu, variant a z BLOCKERA 2* · „Otváranie" (Klasické · Tip-On) na
+pohyblivých typoch · „Konštrukcia" + „Zásuvka" pri zásuvkovom čele · blenda a „Bez čela" majú len vetu, prečo ovládače nemajú. Riadky Závesy / zámky osí / resolved systém sú
+**KOV-C/D**, nie tu; karta to hovorí jednou vetou („Set kovania podľa otvárania príde s KOV-D."), než aby ponúkala voľbu bez účinku.
+
+**KDE sa smer pýta, rozhoduje VÝHRADNE SERVER** — `cabinet_payload` posiela `front_slots` (`front_id → { wings_n, slots }` z `Fronts.direction_slots`) a panel z `wings`
+ani `wings_n` **nič neodvodzuje**: keby si to odvodil, dvojkrídlo by sa začalo pýtať na stranu pántov a 3/4-krídlové dvierka aj na krajné krídla (tie sú odvodené — A1 kontrakt).
+**`wings_n` chodí SPOLU so slotmi (Codex #281 P2-A)**, lebo prázdny zoznam slotov sám o sebe dvojkrídlo **neznamená** — dá ho aj veľmi starý `front_items` (pred D-07), kde server
+o počte krídel nevie nič. Preto: neprázdne `slots` → presne tie krídla, na ktoré sa smer pýta · `slots == []` **a `wings_n == 2`** → veta o dvojkrídle namiesto riadku ·
+`slots == []` a `wings_n` **null** → karta **mlčí** (ani riadok, ani veta; tvrdiť „Dvojkrídlo…" nad starým cache by bola lož) · **chýbajúci kľúč čela** (nový riadok pred prvým
+echom, návrh vkladania) → to isté mlčanie. `state` je len zdroj **badge „smer?"** — aktívnu voľbu čítajú riadky z položky, takže LEGACY čelo (kľúč v configu nie je) nemá
+zvýraznenú žiadnu voľbu a badge nedostane.
+
+**„Neurčené" vzniká VÝHRADNE štyrmi používateľskými akciami** a vždy cez jednu z troch čistých funkcií v `core.js` (`frontExtraOnTypeChange` · `frontExtraOnWings` ·
+`frontExtraOnSegrow`, každá vracia **nový** objekt): (a) „+ pridaj dvere" · (b) prepnutie dlaždice na dvierka, keď smer uložený nie je · (c) klik na „Neurčené" · (d) prepnutie na
+3/4 krídla — a to len pre **chýbajúce stredné** krídla. Render, echo ani editácia iného poľa nezapíšu nič; návrat na 1/2/auto ani prepnutie na iný typ **nič nemaže** (dormant).
+Literál stavu preto žije **len v `core.js`** (`FRONT_DIR_UNSET`) — `form.js` číta hodnotu z tlačidla, `preview.js` symbol; allowlist stráži `tests/pure/test_kova1_cela.rb`.
+
+Pravidlo (a) sa **týka aj tlačidla „+ pridaj dvere"** (Codex #281 P1): nový riadok dvierok prejde tým istým výrobcom (`addFrontRow` pri `userAdd` volá
+`frontExtraOnTypeChange` s typom z datasetu), inak by každé nové čelo natrvalo obišlo RED nález, badge aj `?` v náhľade — Ruby by ho čítalo ako legacy. „+ pridaj čelo"
+(zásuvkové) nevyrobí nič, lebo o tom rozhoduje výrobca, nie volajúci.
+
+**Zápis ide POVODNOU cestou** — dlaždica aj segrow prepíšu `dataset.frontType` / `dataset.frontExtra` a zavolajú `onField()` → `collectFronts` → `apply_all`, teda **jeden krok
+Späť a žiadny nový callback servera**. Klik na **už nasadenú hodnotu** (typ aj segment) sa zahodí — žiadny prázdny rebuild a žiadny prázdny krok Späť; segment to pozná podľa
+`aria-pressed`, ktoré karta kreslí z view-modelu (Codex #281 P2-C).
+
+**Prekreslenie karty NEZHADZUJE FOKUS** (Codex #281 kolo 2). Karta sa prepisuje celá (`card.innerHTML`), takže tlačidlo, ktoré držalo fokus, zanikne a fokus by spadol na
+`<body>` — používateľ klávesnice by po každej zmene typu či segmentu tabovaním prechádzal celý Inspector znova. Render ostal celistvý; obnovuje sa **len fokus**, a to podľa
+**logickej identity** ovládača (`frontCardFocusKey` / `frontCardFocusSelector` v `core.js` — dlaždica `data-t`, segment `data-k`+`data-v`+`data-w`), nie podľa indexu detí.
+`refreshFrontCards` si identitu zapamätá **len keď fokus leží v tej istej karte** (`activeElement.closest('.fcard') === card`) a vráti ho cez `focus({ preventScroll: true })`
+s fallbackom — karta sa nemá pod rukou posunúť. Fokus mimo karty sa nedotkne ničoho.
+
+**Otvorená karta patrí KONKRÉTNEJ SKRINKE** (Codex #281 P2-B). `front_id` (F1) má každá skrinka v zákazke, takže samotné ID čela identitu karty neurčuje — bez brány by sa po
+prepnutí výberu otvorila karta cudzieho čela. Čistá `frontCardKeepOpen(prevCabId, nextCabId, openId)` rozhodne, či prežije; `bridge.js` ju volá **pred** `renderFronts` a pri zmene
+**dokumentu** posiela predchodcu ako `null` (ID skriniek sa naprieč dokumentmi opakujú — tá istá zásada ako pri `keepGaps`). Doska, prázdny výber aj návrh vkladania kartu
+zatvárajú. Testuje `tests/js/test_kova2a_karta.js` (vrátane celej cesty nad mini-DOM) a `tests/pure/test_kova2a_karta.rb`.
 
 **KOV-A1 pass-through:** `addFrontRow` odkladá `direction`, `wing_directions`, `opening_mode` a `drawer` do `row.dataset.frontExtra` (**len prítomné kľúče**) a `collectFronts` ich
 vracia späť **bez akéhokoľvek defaultu** — vzor D-90 `profile`, ale s tvrdým rozdielom: kľúč, ktorý config nemal, sa tu nesmie objaviť, inak by legacy zákazka dostala RED nález
-o neurčenom smere. Guard v `tests/pure/test_kova1_cela.rb` stráži telo oboch funkcií aj prítomnosť troch neaktívnych volieb.
+o neurčenom smere. KOV-A2a k nim pridala **zápis z karty** (`frontExtraSet`, prázdny objekt dataset **odstráni**) — pravidlo „žiadny default" platí nezmenené.
 
 **Popis typu v náhľade (Codex #280 P2-C):** `preview.js` má mapu **`PV_FRONT_TYPE_DESC`** + čistú `frontTypeDesc(type)` — jedno miesto, kde typ dostáva slovo
 (`dvierka · zásuvka · výklop · sklop · blenda`). Do KOV-A1 sa každé ne-zásuvkové a ne-`none` čelo popisovalo ako „dvierka", takže pri configu z API sa rozbaľovačka v riadku
-volala „Výklop" a náhľad vedľa nej tvrdil „dvierka". Fallback `'dvierka'` ostáva, ale **už len pre NEZNÁMY typ** (napr. z novšej verzie). **Výplň, symboly (∧ / ∨ / X)
-a smery sa tu zámerne nemenia — to je KOV-A2**; táto oprava rieši výhradne text, aby si UI neprotirečilo. Testuje `tests/js/test_uib2_nahlad.js`.
+volala „Výklop" a náhľad vedľa nej tvrdil „dvierka". Fallback `'dvierka'` ostáva, ale **už len pre NEZNÁMY typ** (napr. z novšej verzie). Testuje `tests/js/test_uib2_nahlad.js`.
+
+**Symboly otvárania v projekcii Čelá (KOV-A2a, `drawFrontSymbols`).** Pravidlo je jedno: **prerušovaná čiara = pohyb, plná = dielec** (to isté hovoria sprite ikony typegridu).
+Kreslia sa vo výberovej farbe `PV_SELECT_ACCENT`, jediná výnimka je „neurčené" v jantári (`--nx-warn-fg`) — je to otvorená otázka, nie chyba stavby. **Dvierka: symbol je PER
+KRÍDLO** — jednokrídlové podľa slotu servera, krajné krídla 2/3/4-krídlového čela **odvodené** (A1 kontrakt: p1 = pánty vľavo, posledné vpravo — nič sa neukladá), stredné opäť
+podľa slotov; šípka mieri na **voľnú hranu** a je k nej aj posunutá, takže neleží na popise čela. **LEGACY čelo sa nekreslí vôbec** (žiadny fallback na stranu). Výklop `∧` a sklop
+`∨` idú k hrane, ktorá sa otvára; blenda je **plné X** (nehýbe sa). **Zásuvka symbol VEDOME nemá** — mockupový `∧` by splýval s výklopom. Čo sa má nakresliť, rozhodujú **čisté
+funkcie v `core.js`** (`frontWingSymbols` · `frontDirSymbol` · `frontTypeSymbol`) nad `front_slots`; `preview.js` stav smeru vôbec neinterpretuje (stráži guard). V režime
+vkladania sloty neexistujú, takže sa kreslia iba odvodené krajné krídla.
 
 ### Úchytky = D-96 (form.js refreshFrontProfileUI / onFrontProfilePick + čisté funkcie v core.js)
 
@@ -975,6 +1024,12 @@ Centrálne callbacky Inspectora (`Panel.*`) — vstupný bod všetkých volaní 
 ### payloads.rb
 
 Doména panela: skladanie payloadov pre klienta. Kontrakt vkladacej karty a knižnice šablón je v odseku „Vkladacia karta — šablóny, typ a doska".
+
+**`front_slots` (KOV-A2a).** `cabinet_payload` posiela vedľa `front_items` aj mapu `front_id → { 'wings_n', 'slots' }`, ktorú skladá `front_slots_payload` z **jedinej** definície
+aplikovateľnosti smeru (`Fronts.direction_slots`, KOV-A1) nad **uloženým** `front_items`. Je to **čistá projekcia**: žiadny zápis, žiadny prepočet plánu a `state` prechádza
+**nezmenený** (nil = legacy — kľúč v configu nie je, `unset` = vedome neurčené, `left`/`right` = vyriešené). Tým je server **autoritou na otázku „kde sa smer pýta"**; panel si ju
+z počtu krídel neodvodzuje. **`wings_n` je súčasťou záznamu** (Codex #281 P2-A) a pri neznámom počte je `nil`: legacy záznam bez `wings_n` (pred D-07) tak dá `{ nil, [] }` —
+prázdne sloty **a priznané neznámo**, takže karta o ňom nepovie ani „pýtam sa", ani „je to dvojkrídlo".
 
 ### resolvers.rb
 

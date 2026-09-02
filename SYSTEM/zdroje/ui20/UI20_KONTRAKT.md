@@ -235,21 +235,21 @@ Police = pills 0–6 · Vnútro = rezervovaný slot (po V1).
 
 **Čelá:** riadky s ikonou typu (N27) · úzke pole 46 px, „mm" pri hodnote, AUTO chip na návrat
 (zámok pri výške ZRUŠENÝ — zamknuté ⇔ vypísané) · rady výšok N25 · naviazané kovanie pod riadkom
-(klik → Kovanie) · výklop v ponuke s upozornením „AVENTOS ručne, automatika fáza 3" · D-84 reč
+(klik → Kovanie) · typ čela sa vyberá PIKTOGRAMOM v karte čela (KOV-A2a) · D-84 reč
 stolára · D-96 Úchytky · materiál čiel aj priamo v zozname · interaktívne prvky v riadku STOPUJÚ
 bublanie (lekcia: select sa zatváral).
 
 **Čelá — vedomé odchýlky od konceptu (implementácia UI-C3, 19.8.2026):**
-- **Výklop je v ponuke typov, ale NEAKTÍVNY** (voľba s vysvetlením „AVENTOS ručne,
-  automatika fáza 3"). Koncept ho počítal ako bežný typ; v skutočnosti je rola `flap`
-  síce kanonická (STANDARD §2.4), ale **nikde sa nepoužíva** — sprevádzkovať ju znamená
-  zásah do **buildera, ABS pravidiel, kusovníka a VEPO**, teda zmenu dátového kontraktu
-  s Codex auditom a in-SketchUp behom. To je vlastná dávka, nie prílepok k UI
-  reorganizácii. Poctivejšie je povedať, že sa s výklopom ráta, než ho zamlčať (rovnaký
-  vzor ako rezervovaný slot „Vnútro" v Zónach). *Otvorené v [../../DOGFOODING.md](../../DOGFOODING.md).*
-- **Popis výklopovej voľby je KRÁTKY** („Výklop (fáza 3)"), celá veta žije v tooltipe
-  selectu a v hinte skupiny. Dôvod je layout: `flex-basis` selectu je jeho najširšia
-  položka, takže dlhý text odtlačí zvyšok riadku na ďalší riadok.
+- ~~**Výklop je v ponuke typov, ale NEAKTÍVNY**~~ — **ODCHÝLKA ZANIKLA (KOV-A2a,
+  v0.9.16).** Rola `flap` (výklop aj sklop) a `false_front` (blenda) pristali dátovo
+  v KOV-A1 (builder, ABS, kusovník aj VEPO ich nesú) a KOV-A2a im dala ovládač:
+  **typegrid šiestich piktogramov** v karte čela. Všetky typy, ktoré pozná server
+  (`Fronts::TYPES`), sú tak aj **voliteľné** — stráži to guard v
+  `tests/pure/test_kova1_cela.rb`. Kovanie výklopu (AVENTOS) ostáva ručné až do KOV-E;
+  karta to hovorí nahlas jednou vetou, než aby ponúkala voľbu bez účinku.
+- ~~**Popis výklopovej voľby je KRÁTKY**~~ — **ZANIKLA s rozbaľovačkou typu.** V riadku
+  stojí už len NÁZOV typu (`.ftname`, jediný rastúci prvok radu, s ellipsis a plným
+  znením v `title`); typ sa vyberá v karte, kde má každá dlaždica vlastný piktogram.
 - **Sekcia Úchytky NEPONÚKA hranu osadenia.** Koncept ju uvádza (profil + hrana +
   rozsah); registry profilov (`core/front_profiles.rb`) však dnes pozná len skrátenie
   hornej hrany. Ponúkať voľbu, ktorá nemá kam sadnúť, by bola lož — pribudne s ďalšími

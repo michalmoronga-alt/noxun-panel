@@ -46,6 +46,22 @@ function mkEl(tag){
     removeAttribute(k){ delete this.attrs[k]; },
     hasAttribute(k){ return Object.prototype.hasOwnProperty.call(this.attrs, k); },
     appendChild(c){ c.parent = this; this.children.push(c); return c; },
+    // KOV-A2a: zoznam ciel stavia riadky OBRATENE (`insertBefore(row,
+    // wrap.firstChild)`) a karta cela sa vklada pred/za surodencov, takze
+    // mini-DOM musi vediet aj vkladat a odpajat, nie len pripajat na koniec.
+    get firstChild(){ return this.children.length ? this.children[0] : null; },
+    insertBefore(c, ref){
+      const i = ref ? this.children.indexOf(ref) : -1;
+      c.parent = this;
+      if (i < 0) this.children.push(c); else this.children.splice(i, 0, c);
+      return c;
+    },
+    removeChild(c){
+      const i = this.children.indexOf(c);
+      if (i >= 0){ this.children.splice(i, 1); c.parent = null; }
+      return c;
+    },
+    remove(){ if (this.parent) this.parent.removeChild(this); },
     addEventListener(type, fn){ (this._listeners[type] || (this._listeners[type] = [])).push(fn); },
     focus(){ DOC.activeElement = this; },
     blur(){ if (DOC.activeElement === this) DOC.activeElement = null; },
@@ -89,7 +105,31 @@ function mkEl(tag){
   // pisal do posledne vytvoreneho elementu).
   el.classList = Object.create(el.classList);
   el.classList._el = el;
+  // KOV-A2a: `dataset` nad TYM ISTYM atributom, aky vidi selektor `[data-x]`
+  // (riadok cela drzi typ, profil aj dormant polia vylucne v datasete). Bez
+  // neho sa cesta „dataset -> collectFronts" v mini-DOM vobec neda prejst.
+  // Proxy zamerne: `delete el.dataset.x` musi atribut naozaj odstranit —
+  // rozdiel medzi „nema kluc" a „ma prazdny" je v KOV-A1 kontrakte zasadny.
+  el.dataset = new Proxy({}, {
+    get(_t, k){ return typeof k === 'string' ? el.attrs[dataAttr(k)] : undefined; },
+    set(_t, k, v){ el.attrs[dataAttr(k)] = String(v); return true; },
+    has(_t, k){ return Object.prototype.hasOwnProperty.call(el.attrs, dataAttr(k)); },
+    deleteProperty(_t, k){ delete el.attrs[dataAttr(k)]; return true; },
+    ownKeys(){
+      return Object.keys(el.attrs).filter(function (a){ return a.indexOf('data-') === 0; })
+        .map(function (a){ return a.slice(5).replace(/-([a-z])/g, function (_m, c){ return c.toUpperCase(); }); });
+    },
+    getOwnPropertyDescriptor(_t, k){
+      return has(k) ? { configurable: true, enumerable: true, value: el.attrs[dataAttr(k)] } : undefined;
+      function has(x){ return Object.prototype.hasOwnProperty.call(el.attrs, dataAttr(x)); }
+    }
+  });
   return el;
+}
+
+// `frontExtra` -> `data-front-extra` (rovnaky prevod ako v prehliadaci).
+function dataAttr(key){
+  return 'data-' + String(key).replace(/[A-Z]/g, function (m){ return '-' + m.toLowerCase(); });
 }
 
 function textOf(node){

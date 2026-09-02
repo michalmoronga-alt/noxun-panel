@@ -98,9 +98,12 @@ end
 
 NxTest.test('SMOKE1 cela: sucet pevnych stop + medzier sa VOJDE do sirky karty') do
   # Poradie zodpoveda markupu `addFrontRow` (form.js).
+  # KOV-A2a: `select.ftype` z radu ZANIKOL (typ sa vybera piktogramom v karte
+  # cela) a jeho miesto zabralo tlacidlo `.ftname`. Ikona typu `.ftico` uz nie
+  # je samostatna polozka radu — zije UVNUTRI `.ftname`, takze ju kryje jeho
+  # `min-width` a do rozpoctu sa NERATA druhykrat.
   fixed = {
     '.frow .fnum' => smoke1_fixed_px('.frow .fnum'),
-    '.frow .ftico' => smoke1_fixed_px('.frow .ftico'),
     '.frow input.fh' => smoke1_fixed_px('.frow input.fh'),
     '.frow select.fw' => smoke1_fixed_px('.frow select.fw'),
     '.frow .fprof' => smoke1_fixed_px('.frow .fprof'),
@@ -111,21 +114,38 @@ NxTest.test('SMOKE1 cela: sucet pevnych stop + medzier sa VOJDE do sirky karty')
   gap = smoke1_decl('.frow .fmain', 'gap').to_f
   NxTest.assert(gap.positive?, 'rad ma deklarovanu medzeru')
 
-  # 9 flex poloziek radu = 8 medzier: fnum · ftico · ftype · dwrap · funit ·
-  # fauto · fw · fprof · fdel.
-  gaps = gap * 8
+  # 8 flex poloziek radu = 7 medzier: fnum · ftname · dwrap · funit · fauto ·
+  # fw · fprof · fdel.
+  gaps = gap * 7
   # `.dwrap` je obal pola vysky: input + 2 px + sipka radu (`.pbtn` 17 px).
   dwrap = fixed['.frow input.fh'] + 2 + 17
   # Nemeratelne, ale realne: „mm" (~14 px) + chip AUTO (~36 px) — prave tato
   # dvojica riadok pretiekla, takze v rozpocte MUSI byt.
   unit_auto = 14 + 36
-  ftype_min = smoke1_min_px('.frow select.ftype')
-  NxTest.assert(ftype_min.positive?, 'rozbalovacka typu ma citatelne minimum')
+  ftname_min = smoke1_min_px('.frow .ftname')
+  NxTest.assert(ftname_min.positive?, 'nazov typu ma citatelne minimum (aj s ikonou vnutri)')
+  # Badge „smer?" (KOV-A2a) sa v riadku objavi LEN pri neurcenom smere — je
+  # nemeratelny, ale realny (text 9 px ~24 px + padding 8 + ramik 2), takze
+  # v rozpocte MUSI byt: pri vypisanej vyske stoji vedla „mm" aj chipu AUTO.
+  badge = 34
 
-  total = fixed['.frow .fnum'] + fixed['.frow .ftico'] + ftype_min + dwrap + unit_auto +
+  total = fixed['.frow .fnum'] + ftname_min + badge + dwrap + unit_auto +
           fixed['.frow select.fw'] + fixed['.frow .fprof'] + fixed['.frow .fdel'] + gaps
   NxTest.assert(total <= SMOKE1_FRONT_BUDGET,
                 "riadok cela pri 470 px: #{total.round} px <= #{SMOKE1_FRONT_BUDGET} px")
+end
+
+# KOV-A2a: karta cela nesmie rozbit ani rad, ani predel medzi celami.
+NxTest.test('SMOKE1 cela: karta cela je SAMOSTATNY riadok stlpca, nie polozka radu') do
+  NxTest.assert(SMOKE1_FORM.include?("card.className = 'fcard'"), 'karta ma svoju triedu')
+  NxTest.assert(SMOKE1_FORM.include?('row.appendChild(card); // karta je VZDY posledna v stlpci'),
+                'karta patri do `.frow` (stlpec), NIE do `.fmain` (nezalamovaci rad)')
+  # Riadok kovania sa pri otvorenej karte vklada NAD nu — inak by predel medzi
+  # celami ostal nad kovanim a karta by visela pod nim.
+  NxTest.assert(SMOKE1_FORM.include?('if (card) row.insertBefore(span, card);'),
+                'kovanie ostava nad kartou')
+  NxTest.assert(smoke1_decl('.nx-inspector .frow .fcard', 'border').to_s.include?('var(--nx-part-border)'),
+                'karta pouziva TOKEN ramika (ziadny natvrdo zapisany hex)')
 end
 
 NxTest.test('SMOKE1 cela (Codex #183 P2): zivy nahlad vyrazu NEZABERA sirku radu') do
@@ -142,13 +162,21 @@ NxTest.test('SMOKE1 cela (Codex #183 P2): zivy nahlad vyrazu NEZABERA sirku radu
                 'hint nesmie prekryt otvorenu ponuku rozmeroveho radu')
 end
 
-NxTest.test('SMOKE1 cela: rozbalovacka typu je JEDINY rastuci prvok (vyuzije zvysok sirky)') do
-  flex = smoke1_decl('.frow select.ftype', 'flex').to_s
-  NxTest.assert(flex.start_with?('1 1'), "`.ftype` rastie aj sa zmrsti (#{flex})")
-  ['.frow .fnum', '.frow .ftico', '.frow input.fh', '.frow select.fw',
-   '.frow .fprof', '.frow .fdel'].each do |sel|
+NxTest.test('SMOKE1 cela: nazov typu je JEDINY rastuci prvok (vyuzije zvysok sirky)') do
+  # KOV-A2a: rastucim prvkom bola rozbalovacka typu, teraz je nim tlacidlo
+  # `.ftname` (ikona + nazov + pripadny badge „smer?"). Pravidlo je to iste:
+  # PRAVE JEDEN prvok radu rastie, vsetky ostatne maju pevnu stopu.
+  flex = smoke1_decl('.frow .ftname', 'flex').to_s
+  NxTest.assert(flex.start_with?('1 1'), "`.ftname` rastie aj sa zmrsti (#{flex})")
+  NxTest.assert_equal(nil, smoke1_decl('.frow select.ftype', 'flex'),
+                      'rozbalovacka typu v riadku uz neexistuje')
+  ['.frow .fnum', '.frow input.fh', '.frow select.fw',
+   '.frow .fprof', '.frow .fdel', '.frow .fbadge'].each do |sel|
     NxTest.assert(smoke1_decl(sel, 'flex').to_s.start_with?('0 0'), "#{sel} nerastie ani sa nezmrsti")
   end
+  # Nazov sa v uzkom rade musi OREZAT (nie tlacit susedov) — ellipsis + nowrap.
+  NxTest.assert_equal('ellipsis', smoke1_decl('.frow .ftname .ftl', 'text-overflow'))
+  NxTest.assert_equal('nowrap', smoke1_decl('.frow .ftname .ftl', 'white-space'))
 end
 
 NxTest.test('SMOKE1 cela: markup riadku obaluje ovladace do `.fmain`') do

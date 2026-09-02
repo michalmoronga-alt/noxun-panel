@@ -189,11 +189,16 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 (po cross-audite Codex/GLM/Opus + reconcile + rozhodnutia O1–O3) · **UX referencia:** [zdroje/ui20/mockup_kovanie_v1.html](zdroje/ui20/mockup_kovanie_v1.html)
 (schválený 2.9.) · vendor dáta: checkpoint #10 · detail fill: checkpoint #11. Otvorené postrehy D-109/D-110/D-111 sú v packages nižšie
 (D-109 mechanika = R-05 po V1, výsledok cez KOV-G). **Predpoklad prvého schema bumpu: D-52 updater** (blok 6 — štartovaný 2.9.).
-Poradie slices: **0 (D-52 ✅) → A1 ✅ → A2 (AKTUÁLNA) → B → H → C → D → E → F → G → I** (KOV-A rezaná po Codex audite #14 na A1 dátová vrstva / A2 UI+overlay; otázka 3/4 krídel rozhodnutá Michalom 3.9. — variant a); C a D dostanú package po sonde Démos (kit vs atomic) a fixtures.
+Poradie slices: **0 (D-52 ✅) → A1 ✅ → A2 (A2a ✅ · A2b AKTUÁLNA) → B → H → C → D → E → F → G → I** (KOV-A rezaná po Codex audite #14 na A1 dátová vrstva / A2 UI+overlay; otázka 3/4 krídel rozhodnutá Michalom 3.9. — variant a); C a D dostanú package po sonde Démos (kit vs atomic) a fixtures.
 **KOV-A1 je v maine** (PR #280, v0.9.15 — plný text package v git histórii a v checkpointe #14; záznam dávky v [archiv/KRONIKA.md](archiv/KRONIKA.md)).
 Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-only), implementuje subagent v worktree, brány podľa CLAUDE.md.
 
 - **KOV-A2 · TASK PACKAGE „ČELÁ — KARTA, NÁHĽAD A OVERLAY SMEROV" (slice A, rez A2; štart po merge A1):**
+  **A2a HOTOVÁ (PR #281, v0.9.16)** — karta čela (typegrid · smer · otváranie · klasifikácia zásuvky), badge „smer?", serverový `front_slots`, symboly náhľadu
+  a overenie RED riadku v Kontrole. **Zostáva A2b:** overlay „Smer otvárania" v modeli — modul `direction_check` (vzor `grain_check`, FIX 12), jeden serverový toggle
+  + **broadcast do oboch UI** (rail Inspectora + lišta Kontroly Štúdia = jeden stav), odpojenie pri zmene dokumentu, sken len pri zapnutí/dirty, **in-SU beh povinný**
+  (výkon na ~254 dielcoch, undo/redo bez kroku, fallback bez Overlay API, duplicate-ID per inštancia). Otvorené z A2a: **deep-link „klik na RED nález otvorí Inspector
+  kontext Čelá"** (dnes existuje len smer panel → Štúdio; opačný je nový serverový kanál — patrí k A2b). Nižšie je PÔVODNÝ text package (časť A2a je hotová).
   **Cieľ:** používateľ vyberie typ čela piktogramom a nastaví smer, otváranie a klasifikáciu podľa mockupu scéna 1; `smer?` badge a RED nález sú viditeľné; smery vidno
   v modeli overlayom.
   **Vstup z A1 (Codex #280 P2-B):** rola `flap` je SPOLOČNÁ pre výklop aj sklop, preto je jej label neutrálny **„Výklop/sklop"** (`ProductionCore::ROLE_LABELS`,

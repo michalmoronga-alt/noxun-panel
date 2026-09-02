@@ -17,6 +17,38 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-A2a · ČELÁ — KARTA ČELA A NÁHĽAD (PR #281, v0.9.16, 3.9.2026):** UI polovica slice A (package KOV-A2 sa vedome režal na **A2a karta** + **A2b overlay**, aby PR
+  ostalo malé a bez in-SU povinnosti). **Rozbaľovačka typu `select.ftype` ZANIKLA** — typ žije v `dataset.frontType` (vzor D-90 `profile`) a vyberá sa **typegridom šiestich
+  piktogramov** v **karte čela** `.fcard`. Karta je **tretí potomok stĺpca `.frow`** (za `.fmain` a `.fhw`), teda **priamo pod svojím riadkom** — *vedomá odchýlka od mockupu*,
+  kde je samostatným blokom pod zoznamom: kontext ostáva pri riadku a v skupine nepribudne trvalý blok (vertikálny priestor je vzácny). Otvorená je **najviac jedna** a drží sa cez
+  **identitu čela** (`openFrontCardId`), preto prežije prestavbu riadkov po `apply_all`. Ďalšie vedomé odchýlky: **6. dlaždica „Bez čela"** (`none` je platný typ D-18, musel
+  ostať voliteľný) a **zásuvka bez symbolu v náhľade** (mockupový `∧` by splýval s výklopom).
+  **SERVER JE AUTORITA APLIKOVATEĽNOSTI SMERU:** `cabinet_payload` posiela nový `front_slots` (`front_id → [{ wing, part_key, state }]`) z `Fronts.direction_slots` nad uloženým
+  `front_items` — čistá projekcia bez zápisu. JS z `wings`/`wings_n` **nič neodvodzuje**: prázdne pole = „tu sa otázka nekladie" (dvojkrídlo dostane vetu, nie segrow), chýbajúci
+  kľúč = karta smerový riadok nekreslí vôbec (nový riadok pred prvým echom, návrh vkladania). `state` je iba zdroj badge „smer?" — aktívnu voľbu čítajú riadky z položky.
+  **KLIENTSKY VYROBCA STAVU „NEURČENÉ" JE JEDNO MIESTO:** `core.js` (`FRONT_DIR_UNSET` + tri čisté funkcie, každá vracia NOVÝ objekt). Vzniká **výhradne** štyrmi užívateľskými
+  akciami (nové dvierka · prepnutie dlaždice na dvierka bez uloženého smeru · klik na „Neurčené" · 3/4 krídla → len CHÝBAJÚCE stredné); render, echo ani editácia iného poľa
+  nezapíšu nič a návrat na 1/2/auto ani prepnutie typu **nič nemaže** (dormant). Allowlist literalu v `test_kova1_cela.rb` sa preto rozšíril o `ui/js/core.js` — a **o nič iné**.
+  **Nič nové na serveri:** zmena z karty prepíše dataset a ide **pôvodnou cestou** `onField → collectFronts → apply_all` (jeden krok Späť, žiadny nový callback).
+  **Náhľad** kreslí prerušované symboly (šipka na voľnú hranu per krídlo, `?` v jantári pri neurčenom, `∧`/`∨` výklop/sklop, plné X blenda) — výber symbolu je opäť čistá funkcia
+  v `core.js`, `preview.js` stav smeru neinterpretuje. **Sprite** dostal `front-lift`/`front-fall`/`front-blind`/`dir-left`/`dir-right`/`dir-unset`.
+  **Guardy, ktoré sa museli prepísať** (rozbaľovačka zanikla): `test_smoke1_riadky.rb` (rastúci prvok radu je `.ftname`, v rozpočte pribudol badge), `test_uic3_cela.rb` (ikona
+  z datasetu), `test_kova1_cela.rb` („tri neaktívne voľby" → typegrid musí ponúkať **presne `Fronts::TYPES`**). mini-DOM dostal `dataset` + `insertBefore`/`remove`.
+  **Kontrola v Štúdiu** funguje bez zmeny (RED riadok `front_direction` sa renderuje generálnou cestou, klik-select cez `owner_id` + `part_key` + `owner_pid` scope z A1);
+  **deep-link „klik na nález otvorí Inspector kontext Čelá"** ostáva OTVORENÝ — dnes existuje len smer panel → Štúdio, opačný by bol nový serverový kanál (patrí k A2b).
+  **Týmto zanikla odchýlka „Výklop je v ponuke, ale neaktívny"** (UI20_KONTRAKT §7) a s ňou aj dogfooding položka „Výklop ako samostatný typ čela".
+  **Codex kolo 1 = 1×P1 + 3×P2, všetky platné a opravené** (commit `d4a3a94`): **P1** — „+ pridaj dvere" nevyrobilo „neurčené", takže **každé nové čelo natrvalo obišlo RED nález,
+  badge aj `?` v náhľade** (Ruby ho čítalo ako legacy); `addFrontRow` pri `userAdd` teraz púšťa dataset tým istým výrobcom a typ rozhoduje ON (zásuvkové „+ pridaj čelo" nevyrobí
+  nič). **P2-A** — prázdny zoznam slotov **dvojkrídlo neznamená**: dá ho aj `front_items` spred D-07 bez `wings_n`, a karta z neho písala „Dvojkrídlo…"; payload preto nesie
+  ZÁZNAM `{ wings_n, slots }` a pri neznámom počte karta **mlčí**. **P2-B** — otvorená karta sa držala podľa `front_id`, ktoré má každá skrinka, takže po prepnutí výberu sa
+  otvorila **karta cudzieho čela**; rozhoduje čistá `frontCardKeepOpen` volaná **pred** `renderFronts` (pri zmene dokumentu s `null` predchodcom). **P2-C** — klik na už aktívny
+  segment robil prázdny rebuild aj prázdny krok Späť; guard cez `aria-pressed` (ten istý vzor ako dlaždica typu). Sada karty tým narástla na **168 kontrol** (matica `wings_n`
+  1/2/3/4/null, vlastník karty, obe tlačidlá „+ pridaj…", dvojklik na segment) a pribudli **4 mutácie** (spolu 9).
+  **Codex kolo 2 = 1×P2 → interná delta-verifikácia** (commit `19480de`): prekreslenie karty **zhadzovalo fokus** — karta sa prepisuje celá (`innerHTML`), takže tlačidlo, ktoré
+  ho držalo, zaniklo a fokus spadol na `<body>`; používateľ klávesnice tak po KAŽDEJ zmene typu či segmentu tabovaním prechádzal celý Inspector znova. Render ostal celistvý
+  (žiadny inkrementálny prepis), obnovuje sa **len fokus** podľa **logickej identity** ovládača (čisté `frontCardFocusKey` / `frontCardFocusSelector` v `core.js`), a to len keď
+  fokus naozaj ležal v tej istej karte. Sada karty tým narástla na **202 kontrol**, mutácií je **10**.
+
 - **KOV-A1 · ČELÁ — DÁTOVÁ VRSTVA (PR #280, v0.9.15, 3.9.2026):** prvá dávka bloku KOVANIE. **Typy:** `items[].type` pozná `lift` (výklop), `fall` (sklop) a `blind` (blenda)
   popri `door`/`drawer_front`/`none`; lift+fall → rola **`flap`** (`front:F#/flap`, suffix `FLAP-#`), blind → **`false_front`** (`front:F#/blind`, `BLIND-#`), oba s identickou
   panelovou matematikou ako zásuvkové čelo. **Štyri nové polia položky** (`direction` = strana pántov · `wing_directions` {p2,p3} · `opening_mode` · `drawer`) s **trojstavom**

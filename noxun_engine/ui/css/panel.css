@@ -118,8 +118,12 @@
        .fhw   = naviazane kovanie ako samostatny riadok pod nim (UI-C3).
      Sucet pevnych stop + medzier musi ostat pod sirkou karty pri 470 px —
      strazi to guard test `tests/pure/test_smoke1_riadky.rb`, aby buduci
-     ovladac v rade nezalomil to iste znova. Zvysnu sirku berie `select.ftype`
-     (jediny rastuci prvok), takze riadok vyuziva maximum sirky. */
+     ovladac v rade nezalomil to iste znova. Zvysnu sirku berie `.ftname`
+     (jediny rastuci prvok), takze riadok vyuziva maximum sirky.
+
+     KOV-A2a: `select.ftype` ZANIKOL — typ sa uz nevybera rozbalovackou, ale
+     PIKTOGRAMOM v karte cela. Jeho miesto v rade zabralo tlacidlo `.ftname`
+     (ikona typu + nazov + pripadny badge „smer?"), ktore kartu otvara. */
   .frow { display: flex; flex-direction: column; margin: 0; padding: 2px 0 1px; }
   /* Jemne predelenie MEDZI celami — hairline, ZIADNY novy vertikalny priestor:
      odstup 4 px sa presunul z `margin: 4px 0` do `padding` + 1 px linky
@@ -127,14 +131,31 @@
   .frow + .frow { border-top: 1px solid var(--nx-border-soft); }
   .frow .fmain { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; min-width: 0; }
   .frow .fnum { flex: 0 0 22px; color: var(--nx-ink-faint); font-size: 11px; text-align: center; } /* D-23: "F1" namiesto "1" */
-  /* min-width: 0 — bez neho select nepusti pod sirku najdlhsej polozky a rad by
-     sa pri uzkom paneli rozsiril nad ramec karty (D-90: v rade pribudla volba
-     profilu). Je to JEDINY prvok radu s `flex-grow` — dostane vsetko, co po
-     pevnych stopach ostane. */
-  .frow select.ftype { flex: 1 1 0; min-width: 56px; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 6px; }
-  /* UI-C3 (N27): ikona TYPU cela pred rozbalovackou — cita sa skor nez text. */
+  /* KOV-A2a: NAZOV TYPU = tlacidlo, ktore otvara kartu cela. `min-width: 0`
+     (cez `min-width: 72px` nizsie) — bez neho by najdlhsi nazov rad rozsiril
+     nad ramec karty. Je to JEDINY prvok radu s `flex-grow` — dostane vsetko,
+     co po pevnych stopach ostane. Vyzera ako TEXT, nie ako tlacidlo (ram az
+     na hover/fokus): v rade uz su tri tlacidla a stvrty ram by z riadku
+     spravil listu ovladacov. */
+  .frow .ftname { flex: 1 1 0; min-width: 60px; display: inline-flex; align-items: center; gap: 4px;
+                  padding: 3px 4px; border: 1px solid transparent; border-radius: 6px;
+                  background: none; color: var(--nx-ink-strong); font: inherit; font-size: 12px;
+                  text-align: left; cursor: pointer; }
+  .frow .ftname:hover { border-color: var(--nx-border-strong); background: var(--nx-select-bg-soft); }
+  .frow .ftname:focus-visible { outline: 2px solid var(--nx-select); outline-offset: -2px; }
+  .frow .ftname[aria-expanded="true"] { background: var(--nx-select-bg); border-color: var(--nx-select);
+                                        color: var(--nx-select-strong); }
+  /* Nazov sa OREZE (rad sa nikdy nezalamuje) — plne znenie nesie `title`. */
+  .frow .ftname .ftl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* UI-C3 (N27): ikona TYPU cela pred nazvom — cita sa skor nez text. */
   .frow .ftico { flex: 0 0 15px; display: inline-flex; color: var(--nx-ink-faint); }
   .frow .ftico .ic { width: 14px; height: 14px; }
+  /* KOV-A2a: badge „smer?" — JANTAR (je to otvorena otazka, nie chyba stavby;
+     RED nalez patri Kontrole v Studiu). Nikdy sa nezmrsti pod svoj text. */
+  .frow .fbadge { flex: 0 0 auto; font-size: 9px; font-weight: 600; line-height: 1.5;
+                  border-radius: 9px; padding: 0 4px; white-space: nowrap;
+                  color: var(--nx-warnchip-fg); background: var(--nx-warn-bg-soft);
+                  border: 1px solid var(--nx-warnchip-border); }
   /* UI-C3: pole vysky je UZKE (46 px) a hodnota zarovnana doprava — rozmer je
      cislo, nie veta (UX-03). Jednotka „mm" stoji PRI HODNOTE, nie v hlavicke. */
   .frow input.fh { flex: 0 0 46px; width: 46px; min-width: 0; padding: 3px 4px; text-align: right;
@@ -174,6 +195,60 @@
   .frow .fprof .ic { width: 15px; height: 15px; }
   .frow .fprof.on { color: var(--nx-select); }
   .frow .fdel { flex: 0 0 22px; background: var(--nx-danger-bg); color: var(--nx-danger); border: 1px solid var(--nx-danger-border); border-radius: 6px; padding: 2px 0; }
+
+  /* ===== KOV-A2a: KARTA CELA ==============================================
+     Karta je TRETI potomok stlpca `.frow` (za `.fmain` a `.fhw`), teda lezi
+     PRIAMO POD svojim riadkom — odchylka od mockupu, kde je samostatny blok
+     pod celym zoznamom. Dovod: kontext ostava pri riadku, ktoreho sa tyka,
+     a v skupine nepribuda trvaly blok (vertikalny priestor je vzacny).
+     Otvorena je VZDY NAJVIAC JEDNA. `.fmain` sa tym nemeni (rad ostava
+     nezalamovaci) a hairline predel `.frow + .frow` lezi az pod kartou.
+
+     VSETKY pravidla karty su scopnute pod `.nx-inspector .fcard` — triedy
+     `.segrow` a `.inforow` UZ V PANELI ZIJU s inym vzhladom (vkladacia karta
+     UI-C1b, informacny stlpec UI-B3), takze bez tohto scopu by sa dva vizualne
+     jazyky bili. Vyssia specificita (3 triedy) vyhrava bez ohladu na poradie. */
+  .nx-inspector .frow .fcard { border: 1px solid var(--nx-part-border); background: var(--nx-part-bg);
+                               border-radius: 8px; padding: 7px 8px 8px; margin: 3px 0 2px; }
+  /* Sest typov v JEDNOM rade — dva rady by kartu zbytocne predlzili. Popisky
+     su preto KRATKE (plny nazov typu nesie `title` dlazdice). */
+  .nx-inspector .fcard .typegrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+  .nx-inspector .fcard .typetile { border: 1px solid var(--nx-border); border-radius: 6px;
+              background: var(--nx-surface); cursor: pointer; padding: 4px 1px 3px; display: flex;
+              flex-direction: column; align-items: center; gap: 2px; color: var(--nx-ink-muted); font: inherit; }
+  .nx-inspector .fcard .typetile:hover { border-color: var(--nx-select); color: var(--nx-select); }
+  .nx-inspector .fcard .typetile:focus-visible { outline: 2px solid var(--nx-select); outline-offset: -2px; }
+  .nx-inspector .fcard .typetile.on { background: var(--nx-select-bg); border-color: var(--nx-select);
+              color: var(--nx-select-strong); }
+  .nx-inspector .fcard .typetile .ic { width: 22px; height: 22px; }
+  .nx-inspector .fcard .typetile .tl { font-size: 9px; font-weight: 600; line-height: 1.15; text-align: center;
+                  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Kontextovy riadok karty: popis vlavo (pevne), ovladac vpravo (rastie). */
+  .nx-inspector .fcard .prow { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+  .nx-inspector .fcard .prow .pl { flex: 0 0 74px; font-size: 11px; color: var(--nx-ink-label); }
+  .nx-inspector .fcard .segrow { display: flex; flex: 1 1 0; min-width: 0; margin: 0;
+            border: 1px solid var(--nx-border-strong); border-radius: 6px; overflow: hidden; }
+  .nx-inspector .fcard .segrow button { flex: 1 1 0; min-width: 0; font: inherit; font-size: 11px;
+                   padding: 3px 2px; border: 0; border-right: 1px solid var(--nx-border-soft);
+                   border-radius: 0; background: var(--nx-surface); color: var(--nx-ink-muted);
+                   cursor: pointer; display: inline-flex; flex-direction: row;
+                   align-items: center; justify-content: center; gap: 3px; }
+  .nx-inspector .fcard .segrow button:last-child { border-right: 0; }
+  .nx-inspector .fcard .segrow button:hover { background: var(--nx-select-bg-soft); color: var(--nx-select);
+                   border-color: var(--nx-border-soft); }
+  .nx-inspector .fcard .segrow button:focus-visible { outline: 2px solid var(--nx-select); outline-offset: -2px; }
+  .nx-inspector .fcard .segrow button.on { background: var(--nx-select-bg); color: var(--nx-select-strong);
+                   font-weight: 600; }
+  /* „Neurcene" je STAV, nie chyba — jantar (RED nalez patri Kontrole). */
+  .nx-inspector .fcard .segrow button.warnstate.on { background: var(--nx-warn-bg-soft); color: var(--nx-warnchip-fg); }
+  .nx-inspector .fcard .segrow .ic { width: 13px; height: 13px; }
+  .nx-inspector .fcard .inforow { display: block; font-size: 11px; color: var(--nx-ink-muted);
+                   margin-top: 6px; line-height: 1.4; }
+  .nx-inspector .fcard .inforow b { color: var(--nx-ink-strong); font-weight: 600; font-size: inherit; }
+  .nx-inspector .fcard .inforow.warn { color: var(--nx-warnchip-fg); }
+  .nx-inspector .fcard .inforow.err { color: var(--nx-err-fg); }
+  /* Hint v karte je uz odsadeny kartou — nepotrebuje vlastny spodny odstup. */
+  .nx-inspector .fcard .hint { margin: 5px 0 0; }
   /* D-22: zamok limitu presahov (v riadku medzier sekcie Cela) — ikona + text v rade */
   .row .lockbtn { flex: 1; text-align: left; padding: 4px 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
   .row .lockbtn.unlocked { background: var(--nx-warn-bg); border-color: var(--nx-warn); color: var(--nx-warn-fg); }

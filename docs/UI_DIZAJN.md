@@ -283,8 +283,17 @@ zavesená; tretí typ „Doska" používa existujúci `slab`),
 `columns-3` / `rows-2` / `rows-3` (UI-C2 — dlaždice delenia zóny; spolu
 s existujúcim `columns-2` tvoria štvoricu „2/3 stĺpce · 2/3 riadky“),
 `door` (UI-C3 — typ čela v riadku, N27: panel so zvislou osou závesu a
-úchytkou pri druhej hrane; zásuvkové čelo používa `rows-2`, výklop `p-top`
-a „Bez čela“ `front`),
+úchytkou pri druhej hrane; zásuvkové čelo používa `rows-2` a „Bez čela“ `front`),
+`front-lift` / `front-fall` / `front-blind` (KOV-A2a — **typegrid karty čela**:
+výklop = panel dole + prerušovaná šípka nahor, sklop = panel hore + šípka nadol,
+blenda = prekrížený panel. Tá istá mapa `FRONT_TYPE_ICON` kreslí ikonu v riadku
+aj dlaždicu v karte, takže sa nemôžu rozísť; do KOV-A1 mali tieto typy dočasný
+fallback `front`),
+`dir-left` / `dir-right` / `dir-unset` (KOV-A2a — **smer otvárania** v segmente
+karty: smer = **strana pántov**, takže šípka ukazuje na VOĽNÚ hranu (`dir-left`
+= pánty vľavo = hrot vpravo); „neurčené“ je prerušovaný kruh s otáznikom — je to
+**stav, nie strana**. Prerušovaná čiara = pohyb, plná = dielec; to isté pravidlo
+kreslí 2D náhľad),
 `edge` (UI-D1 — hrana dielca v karte: plná hrubšia čiara = hrana, o ktorej
 riadok hovorí, ostatné tri sú prerušované. **Jedna kresba, štyri rotácie**
 cez `data-rot` v CSS — nikdy štyri ikony),
@@ -802,12 +811,27 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Fronts`).
   Medzery a presahy. Ikony skupín (N3b) ukazujú, o čom skupina hovorí
   (`front` · `profile` · `columns-2`).
 - **Riadok začína ikonou typu (N27).** Ikona odpovedá na „čo to je" skôr, než
-  sa oko dostane k textu rozbaľovačky — nie je to jej náhrada, obe zostávajú.
+  sa oko dostane k textu — a od **KOV-A2a** stojí **vnútri tlačidla názvu typu**
+  (`.ftname`), ktoré otvára kartu čela. Rozbaľovačka typu zanikla: typ sa vyberá
+  **piktogramom v karte**, nie zoznamom. Tlačidlo vyzerá ako TEXT (rám až na hover
+  a fokus) — v rade už sú tri tlačidlá a štvrtý rám by z riadku spravil lištu
+  ovládačov.
+- **Karta čela je TRETÍ riadok stĺpca, nie samostatný blok (KOV-A2a).** Otvorí sa
+  **pod svojím riadkom** a naraz je otvorená **najviac jedna** — kontext tak ostáva
+  pri veci, ktorej sa týka, a v skupine nepribudne trvalý blok (*vertikálny priestor
+  je vzácny*). Z toho istého dôvodu **nemá hlavičku**: F-číslo, typ aj výšku má
+  riadok priamo nad ňou. Kontextový riadok karty (`.prow`) sa zobrazí **len keď má
+  čo ponúknuť** — blenda a „Bez čela" majú namiesto prázdnych ovládačov jednu vetu,
+  prečo ich nemajú.
+- **„Neurčené" je STAV, nie chyba.** Segment aj badge „smer?" sú **jantárové**
+  (`--nx-warnchip-*`), nie červené: červená patrí nálezu v Kontrole (Štúdio), tu ide
+  o otvorenú otázku. **Nič sa nepredvolí** — legacy čelo má segment bez zvýraznenia
+  a pod ním vetu, čo platí, kým to nikto neurčí.
 - **Rad ovládačov sa NEZALAMUJE** (smoke test 20.8.). Riadok čela je **stĺpec**:
   hore pevný nezalamovací rad `.fmain`, pod ním riadok kovania. Zalamovací rad
   vyzeral bezpečne, kým bola výška prázdna — vypísaná hodnota k nemu pridala
   „mm" aj chip AUTO a krížik ✗ spadol o riadok nižšie. **Pravidlo pre budúce
-  ovládače:** v takom rade smie **rásť jediný prvok** (tu `select.ftype`),
+  ovládače:** v takom rade smie **rásť jediný prvok** (od KOV-A2a `.ftname`),
   všetko ostatné má pevnú stopu, a súčet stôp + medzier musí sedieť pri šírke
   **470 px** — stráži to guard test, nie oko. **Do rozpočtu patrí aj to, čo sa
   objaví len chvíľu**: živý náhľad výrazu („= 450") sa preto kreslí ako

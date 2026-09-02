@@ -51,6 +51,11 @@ module Noxun
           params['fronts'] = Fronts.normalize_config(cfg['fronts']) # kanonicke pre riadky cela
           params['zones'] = cfg['zones'] || []                      # ploche zony pre strom + nahlad
           params['front_items'] = cfg['front_items'] || []          # rozlozene cela pre nahlad
+          # KOV-A2a: KDE sa smer pyta — SERVER je autorita. Panel z `wings`
+          # ani `wings_n` NIKDY neodvodzuje, ci sa ma riadok smeru zobrazit;
+          # kresli VYHRADNE to, co je tu. Cista projekcia nad ulozenym
+          # `front_items` (ziadny zapis, ziadny prepocet planu).
+          params['front_slots'] = front_slots_payload(cfg['front_items'])
           # svetle (available) rozmery — view-only kontrola pre pouzivatela
           params['available_width'] = cfg['available_width']
           params['available_height'] = cfg['available_height']
@@ -77,6 +82,37 @@ module Noxun
           # predvolby) — ponuka + efektivny stav; server je autorita.
           params['hardware_set_options'] = hardware_set_options(cfg, params['hardware'])
           params
+        end
+
+        # KOV-A2a: mapa `front_id -> { 'wings_n' =>, 'slots' => [...] }` z JEDINEJ
+        # definicie aplikovatelnosti smeru (`Fronts.direction_slots`, KOV-A1).
+        #   `slots` neprazdne = presne tie kridla, na ktore sa smer PYTA
+        #   `slots` prazdne   = tu sa smer nepyta (dvojkridlo, zasuvka, vyklop,
+        #                       sklop, blenda, „Bez cela")
+        #   `state` nil       = LEGACY (kluc v configu nie je) — segrow bez
+        #                       aktivnej volby a BEZ nalezu; NIKDY sa nedopĺňa
+        # Codex #281 P2-A: `wings_n` ide von SPOLU so slotmi, lebo prazdne pole
+        # samo o sebe NEZNAMENA dvojkridlo — da ho aj velmi stary `front_items`
+        # (pred D-07, bez `wings_n`), kde server o pocte kridiel nevie NIC.
+        # Bez tohto rozlisenia by karta nad starym cache tvrdila „Dvojkrídlo…",
+        # co je lož. `nil` = neznamy pocet -> panel mlci.
+        # Kluce su STRINGY (JSON do panela); symbolove kluce slotu sa prekladaju
+        # TU, aby si JS nemusel pamatat dva tvary.
+        def front_slots_payload(front_items)
+          out = {}
+          Array(front_items).each do |it|
+            next unless it.is_a?(Hash)
+
+            fid = it['id'].to_s
+            next if fid.empty?
+
+            wn = it['wings_n'].to_i
+            slots = Fronts.direction_slots(it).map do |s|
+              { 'wing' => s[:wing].to_s, 'part_key' => s[:part_key].to_s, 'state' => s[:state] }
+            end
+            out[fid] = { 'wings_n' => (wn.positive? ? wn : nil), 'slots' => slots }
+          end
+          out
         end
 
         # V0.6 D-92: polozky kovania pre panel. Aditivne k ulozenemu configu:

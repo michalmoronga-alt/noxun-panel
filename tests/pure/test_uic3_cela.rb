@@ -103,7 +103,10 @@ end
 NxTest.test('N27: ikona typu cela ma svoj symbol v sprite (ziadne emoji)') do
   NxTest.assert(UIC3_ICONS_JS.include?("'door':"), 'kridlove dvierka maju vlastny symbol')
   NxTest.assert(UIC3_FORM_JS.include?('FRONT_TYPE_ICON'), 'mapa typ -> ikona je JEDINE miesto prekladu')
-  NxTest.assert(UIC3_FORM_JS.include?("NXIcons.set(ico, frontTypeIcon(sel.value))"),
+  # KOV-A2a: typ uz nie je hodnota rozbalovacky, ale STAV RIADKU
+  # (`dataset.frontType`) — meni ho dlazdica typegridu v karte cela. Pravidlo
+  # samo sa NEMENI: prepina sa `href` v <use>, nie innerHTML celeho uzla.
+  NxTest.assert(UIC3_FORM_JS.include?('NXIcons.set(ico, frontTypeIcon(type))'),
                 'zmena typu meni `href` v <use>, nie innerHTML celeho uzla')
 end
 
