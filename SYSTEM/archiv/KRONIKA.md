@@ -17,6 +17,36 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-A1 · ČELÁ — DÁTOVÁ VRSTVA (PR #280, v0.9.15, 3.9.2026):** prvá dávka bloku KOVANIE. **Typy:** `items[].type` pozná `lift` (výklop), `fall` (sklop) a `blind` (blenda)
+  popri `door`/`drawer_front`/`none`; lift+fall → rola **`flap`** (`front:F#/flap`, suffix `FLAP-#`), blind → **`false_front`** (`front:F#/blind`, `BLIND-#`), oba s identickou
+  panelovou matematikou ako zásuvkové čelo. **Štyri nové polia položky** (`direction` = strana pántov · `wing_directions` {p2,p3} · `opening_mode` · `drawer`) s **trojstavom**
+  a **dormant** pravidlom; nová čistá **`Fronts.direction_slots(resolved_item)`** je JEDINÁ definícia aplikovateľnosti smeru (rozhoduje efektívny `wings_n`, nie surové `wings`).
+  **Allowlisty rolí:** PART_TAGS · thickness_ok_for? · base_material_for · materialized_part · PartFaces::ROLE_AXES · AbsRules (EDGE_LABELS, edge_sides, SEED_RULES,
+  **SEED_VERSION 3**) · Validation::FRONT_ROLES · ROLE_LABELS · ABS_ROLE_ORDER · part_card.js. **CONFIG_SCHEMA 1 → 2** (R-12). **JS pass-through** nových polí cez
+  `dataset.frontExtra` **bez akéhokoľvek defaultu** + tri neaktívne voľby typu (nahradili „Výklop (fáza 3)"). **RED kanál:** aditívny `Bom.collect` kľúč `hardware_issues`
+  (kód `front_direction_unset`, čistá `Bom.front_direction_issues`, `owner_pid` = identita výskytu) → `Validation` kategória **`front_direction` bez exportnej brány**
+  (R-39 ostáva otvorená, brána pristane s D-95). `Bom.compute` kľúč ignoruje — výstupy sa nemenia ani o číslo.
+  **Rozhodnutia auditu #14 (B1–B5):** B1 trojstav smeru (kľúč chýba = legacy a nikdy sa nedopĺňa · `unset` = vedome neurčené · `left`/`right` vyriešené; poškodený string →
+  `unset` fail-visible, prázdny/iný typ → kľúč preč) · **B2 = variant a (Michal 3.9.)**: krajné krídla ODVODENÉ (nič sa neukladá), stredné (p2/p3) majú vlastný trojstav
+  a vlastný RED · B3 dormant (polia sa držia bez ohľadu na typ a počet krídel) · B4 zásuvka bez klasifikácie ostáva „neklasifikovaná" · B5 kanonické part_keys per kind
+  (overridy pri prepnutí typu ostávajú dormant pod starým kľúčom).
+  **Vedomé limity:** úchytkový profil je na `lift`/`fall`/`blind` normalizovaný na `none` (D-90 pravidlo pozná len dvierka a zásuvku — inak falošný `profile_rule_missing`;
+  profil na pohyblivom čele = KOV-E/F) · náhľad kreslí nové typy zatiaľ ako dvierka a UI voľba typu je neaktívna (celé = KOV-A2) · **názov roly `flap` je neutrálny
+  „Výklop/sklop"**, lebo tú istú rolu nesie výklop aj sklop — konkrétny text vie povedať len TYP čela.
+  **Proces:** `codex-audit` návrhu = checkpoint #14 (5 BLOCKER + 7 FIX + 3 NOTE, rez A1/A2) → **golden charakterizácia z NEZMENENÉHO mainu ako PRVÝ commit vetvy**
+  (15 configov: plán parts/hardware/warnings/front_items/wings + normalize_config) → implementácia Opus subagentom vo worktree → **Codex kolo 1 = 1×P1 + 2×P2**: P2-A
+  `owner_pid` nescopoval klik-select (dva korpusy so zdieľaným ID → označili sa dvierka oboch) — doplnená `scoped_owner_instance` + `pids_in_cabinet`, fail-open;
+  P2-B rola `flap` sa volala „Výklop" a klamala pri každom sklope → neutrálny label; P1 uzáver dávky nebol v PR → STAV/KRONIKA/PLAN/DOGFOODING doplnené **do toho istého PR**
+  (rozhodnutie orchestrátora — atomicky s kódom, zároveň bez priameho commitu do `main`).
+  **Testy:** headless **2384 → 2448**, JS 79 sád, **in-SU 1355/0** (z toho 58 v novej sekcii `run_kova`: build/rebuild/Ctrl+Z pre všetky tri typy, plán↔model 1:1, 19 mm čelo,
+  šablóna a kópia s novými poľami, dormant cez prestavbu, RED nad živým modelom, dup-ID, čítanie bez kroku Späť), **8 mutácií** — každá zhodená.
+  **Otvorené:** porovnanie pred/po na reálnej `.skp` (Majdiakova/KLINIKA) čaká na cestu od Michala — do vtedy platí golden charakterizácia + večerný smoke.
+  **Poučenie:** golden charakterizácia ako **prvý commit vetvy** je lacná a nenahraditeľná — mutácia „normalize materializuje `unset` pre legacy" zhodila 17 testov vrátane
+  goldenu, takže tichá zmena výstupu starej zákazky nemá kade prejsť. Druhé poučenie: **encoding guard nekryje `docs/architecture/*.md`** — cyrilický homoglyf tam prekĺzol
+  a odhalila ho až ručná kontrola. Kandidát na mini-dávku: rozšíriť glob — ale **nie naslepo**: dnešná mojibake heuristika (`\xC3\x84[\xC2\xC4\xC5]`) false-positívne chytá
+  legitímnu slovenčinu, kde po veľkom prehlasovanom A nasleduje ďalšie diakritické písmeno (`ui-lifecycle.md` taký nadpis má a to isté zhodilo jedno slovo v komentári
+  `form.js`, ktoré sme museli preformulovať). Glob teda treba rozšíriť **spolu** so spresnením vzoru, inak CI spadne na správnom texte.
+
 - **D-52b · UI UPDATERA — b1 (PR #278, v0.9.13) + b2 (PR #279, v0.9.14), 3.9.2026:** sekcia O plugine v Štúdiu: distribučný priečinok (`data-updater-edit`, ack s request
   tokenom, pole ide za uloženou cestou), asynchrónny `updater_check` (vlákno + deadline 4 s, token per cesta/inštancia, jeden worker na cestu), stavový riadok
   (novšia/rovnaká/staršia — downgrade neaktívny), doklad o kontrole (dir, token, state, **available**); apply flow: D-15 potvrdenie → bariéra (zatvoriť Inspector aj Štúdio,
