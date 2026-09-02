@@ -1874,16 +1874,24 @@ pred swapom** (staging trvá a medzitým mohla nabehnúť ďalšia inštancia).
 **Lease nesie identitu procesu, nie len PID.** Zapisuje sa `{std, pid, exe, started_at}` a `live_leases` overí cez `tasklist /FI "PID eq N" /FO CSV /NH`, že PID **stále** patrí
 procesu s tým istým image name **a** že je to inštancia SketchUpu (`sketchup` v mene, case-insensitive). Bez toho by po zatvorení SketchUpu ostala stopa, OS by to číslo pridelil
 inému programu a `chrome.exe` s recyklovaným PID by navždy blokoval aktualizáciu hláškou „zavri ostatné okná SketchUpu". Mimo Windows sa image name zistiť nedá — tam rozhoduje
-samotná živosť procesu (produkcia beží výhradne na Windows, headless CI na Linuxe). Výstup `tasklist` sa parsuje **binárne**: na slovenskom Windows chodí v konzolovej kódovej
-stránke, nie v UTF-8.
+samotná živosť procesu (produkcia beží výhradne na Windows, headless CI na Linuxe). Výstup `tasklist` sa parsuje **binárne** (na slovenskom Windows chodí v konzolovej kódovej stránke, nie v UTF-8) a **kontroluje sa jeho exit status**: zlyhaný dotaz vracia prázdny
+výstup, ktorý by sa bez tejto kontroly prečítal ako „PID nežije" — a zmazal by stopu **živej** inštancie. Za „mŕtvy PID" sa preto berie výhradne odpoveď bez CSV riadkov (informačná
+hláška, ktorej znenie je lokalizované, takže sa naň nespoliehame); prázdny alebo inak vyzerajúci výstup je `Refused`.
+
+**Cesty:** koncové lomítko sa strihá len tam, kde nejde o **koreň** — `/`, `X:/` a `//server/share` ostávajú nedotknuté (`chomp('/')` by z nich spravil prázdnu cestu, „aktuálny
+priečinok na disku X" a UNC koreň bez zdieľania; všetky tri sa môžu objaviť ako cieľ na sieťovej inštalácii).
 
 **Lease je fail-closed na oboch stranách.** Boot, ktorý si lease nedokáže zapísať (priečinok `noxun_engine.leases` je obyčajný súbor, chýbajú práva), vráti `:lease_failed`
 a **plugin sa nenačíta** — inštancia, ktorú nikto nevidí, je horšia než inštancia, ktorá nebeží. A `live_leases` pri nezistiteľnom stave (priečinok chýba, je to súbor, nedá sa
 prečítať) **nevracia ticho prázdny zoznam**, ale vyhodí `Refused`, takže `apply!` odmietne. Neistota pri overovaní PID sa rovnako **nevydáva za „mŕtvy"** — swap radšej neprebehne.
 
-**Restart latch (B2):** po úspešnom commite beží v pamäti STARÝ Ruby kód nad NOVÝMI súbormi. `Engine.restart_required!` preto zamkne **všetky** vstupné body — toolbar príkazy
-(`main.rb`), `Panel.show`, `Panel.show_insert`, `StudioDialog.show` — a každý z nich sa `Engine.update_restart_pending?` odmietne natívnou hláškou „Noxun Engine bol aktualizovaný —
-reštartuj SketchUp." (`UI.messagebox`, nikdy cez CEF: okno by načítalo nové HTML/JS proti starým callbackom). Latch je jednosmerný; zháša ho jedine reštart.
+**Restart latch (B2) — dve úrovne.** Po úspešnom commite beží v pamäti STARÝ Ruby kód nad NOVÝMI súbormi.
+**(1) Otváranie:** `Engine.update_restart_pending?` odmietne **všetky** vstupné body — toolbar príkazy (`main.rb`), `Panel.show`, `Panel.show_insert`, `StudioDialog.show` — natívnou
+hláškou „Noxun Engine bol aktualizovaný — reštartuj SketchUp." (`UI.messagebox`, nikdy cez CEF: okno by načítalo nové HTML/JS proti starým callbackom).
+**(2) Už otvorené okno:** guard v `show` chráni len otváranie, takže **oba generické `cb` wrappery** (`Panel.cb`, `StudioDialog.cb`) volajú `Engine.update_locked?(:panel/:studio)`
+hneď na začiatku callbacku — okno, ktoré bežalo v čase commitu, by inak starými handlermi mutovalo model nad novým balíkom a reload stránky by spároval nové HTML so starými
+callbackmi. Hláška ide **raz za okno**, nie pri každom callbacku (panel ich posiela desiatky za sekundu; rad modálov by SketchUp zablokoval). Po commite ešte `Engine.close_all_dialogs`
+best-effort zavrie Inspector aj Štúdio — **úplná bariéra (zavrieť okná PRED swapom a počkať na `set_on_closed`) je scope D-52b (F10)**. Latch je jednosmerný; zháša ho jedine reštart.
 
 **Nastavenie cesty k balíku (F11):** vlastný malý `updater_settings.json` v `%APPDATA%\NOXUN\Engine` (`{std, source_dir}`) cez `JsonFileStore` (+ `.bak`) — **nie** `SupplierSettings`
 (nepatrí pod jeho revízny zámok). Zápis beží pod `Materials.with_catalog_lock` (R-08) a nad **degradovaným** súborom sa odmieta (R-11, vzor `dim_series.rb`): čítanie zo zálohy +
@@ -1910,9 +1918,13 @@ verzia sa berie ako „nesedí" — rollback je bezpečnejší než dokončenie 
 Rename v rámci jedného priečinka je atomický, takže medzistav neexistuje. Po oprave sa ešte porovná `Engine::VERSION` (verzia práve vykonávaného loadera) s `VERSION` v strome —
 **nesúlad znamená, že sa plugin v tomto okne zámerne nenačíta**. Mazanie zvyškov je kozmetika a beží „naticho": jeho zlyhanie nesmie zhodiť štrukturálnu opravu.
 
+**Marker sa maže OVERENE.** `FileUtils.rm_f` chybu potlačí, takže „zmazané" sa nedalo odlíšiť od „ostalo ležať" — a marker, ktorý prežije, je trvalá brzda: každý ďalší `apply!` sa
+o neho zastaví hláškou o nedokončenej transakcii. `clear_marker` preto vracia výsledok overený na disku. Keď marker prežije po úspešnom commite, `apply!` vráti `state`
+`cleanup_pending` (aktualizácia prebehla, latch zapnutý, poznámka menuje súbor); v loaderi je to stav `:marker_stuck` a **plugin sa nenačíta** s hláškou, ktorá súbor pomenuje.
+
 **Boot vracia stav a ten rozhoduje, či sa plugin vôbec načíta:** `:idle` (nič sa nedialo) a `:done` (dorovnané, strom sedí) → extension sa registruje; `:busy` (**zámok drží iná
-inštancia, ktorá práve aktualizuje** — boot naň krátko počká, max ~5 s), `:restart` (strom nezodpovedá tomuto loaderu), `:lease_failed` (nedá sa zapísať stopa procesu) a `:error`
-(opravu sa nepodarilo dokončiť) → **extension sa NEregistruje** a používateľ dostane natívnu hlášku.
+inštancia, ktorá práve aktualizuje** — boot naň krátko počká, max ~5 s), `:restart` (strom nezodpovedá tomuto loaderu), `:lease_failed` (nedá sa zapísať stopa procesu), `:marker_stuck` (nedá sa zmazať
+marker) a `:error` (opravu sa nepodarilo dokončiť) → **extension sa NEregistruje** a používateľ dostane natívnu hlášku.
 
 **Porovnanie generácie beží VŽDY — aj na ceste `:idle`.** Je to presne stav po čakaní na zámok: cudzí proces medzitým aktualizáciu **dokončil a upratal**, takže na disku niet čo
 opravovať (`pending?` je false), ale náš loader v pamäti je starý a strom na disku nový. Bez tejto kontroly by sa starý loader zaregistroval nad cudzou generáciou. Blokuje sa len

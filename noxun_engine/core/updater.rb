@@ -46,6 +46,7 @@ require 'json'
 require 'fileutils'
 require 'digest'
 require 'rbconfig'
+require 'open3'
 
 module Noxun
   module Engine
@@ -66,6 +67,47 @@ module Noxun
     # LEN pre testy a rucny reload — v produkcnej ceste latch nikto nezhasina.
     def self.reset_restart_latch!
       @restart_required = false
+      @locked_announced = nil
+      true
+    end
+
+    # Guard pre CALLBACKY UZ OTVORENEHO okna (Codex #277 kolo 4, P1).
+    # `update_restart_pending?` chrani OTVARANIE; toto chrani okno, ktore v
+    # case commitu uz bezalo — jeho stare handlery by inak mutovali model nad
+    # NOVYM balikom. Hlaska ide RAZ ZA OKNO (`tag`), nie pri kazdom callbacku:
+    # panel ich posiela desiatky za sekundu a rad modalov by SketchUp zablokoval.
+    CB_LOCKED_MESSAGE = 'Noxun Engine bol aktualizovaný — zatvor okno a reštartuj SketchUp.'
+
+    def self.update_locked?(tag)
+      return false unless restart_required?
+
+      @locked_announced ||= {}
+      unless @locked_announced[tag]
+        @locked_announced[tag] = true
+        begin
+          ::UI.messagebox(CB_LOCKED_MESSAGE) if defined?(::UI) && ::UI.respond_to?(:messagebox)
+        rescue StandardError
+          nil
+        end
+      end
+      true
+    end
+
+    # Best-effort zatvorenie okien po commite. UPLNA bariera (zavriet okna
+    # PRED swapom a pockat na `set_on_closed`) je scope D-52b — tu ide len
+    # o to, aby okna nezostali visiet nad vymenenym balikom. Vynimky sa
+    # prehltnu: aktualizacia UZ presla a zlyhane zatvorenie z nej nesmie
+    # spravit neuspech (latch drzi vstupy aj tak).
+    def self.close_all_dialogs
+      [defined?(Panel) ? Panel : nil, defined?(StudioDialog) ? StudioDialog : nil].compact.each do |mod|
+        begin
+          mod.hide if mod.respond_to?(:hide)
+        rescue StandardError
+          nil
+        end
+      end
+      true
+    rescue StandardError
       true
     end
 
@@ -229,10 +271,19 @@ module Noxun
       end
 
       # --- kanonicke hranice (F9) -------------------------------------------
+      # Codex #277 kolo 4 (P2): koncove lomitko sa strihá LEN ked cesta nie je
+      # KOREN. `chomp('/')` nad korenom da nepouzitelny vysledok — `/` -> ``
+      # (prazdna cesta), `G:/` -> `G:` (na Windows to znamena „aktualny
+      # priecinok na disku G", nie koren disku) a `//server/share` -> UNC koren
+      # bez zdielania. Vsetky tri sa mozu objavit ako ciel `Engine.plugin_dir`
+      # na sietovej instalacii.
+      ROOT_PATH_RE = %r{\A(?:/|[A-Za-z]:/|//[^/]+/[^/]+)\z}.freeze
+
       def normalize_path(path)
         p = File.expand_path(path.to_s).tr('\\', '/')
-        p = p.chomp('/') unless p =~ %r{\A[A-Za-z]:/\z} || p == '/'
-        p
+        return p if p =~ ROOT_PATH_RE
+
+        p.chomp('/')
       end
 
       # Windows je case-insensitive; porovnavame preto znormalizovane malymi.
@@ -466,10 +517,18 @@ module Noxun
         {} # poskodeny marker = „nieco tu bezalo" (recovery rozhoduje podla disku)
       end
 
+      # Codex #277 kolo 4 (P2): `rm_f` chybu POTLACI, takze „zmazane" sa nedalo
+      # odlisit od „ostalo lezat". Marker, ktory prezil, pritom pri najblizsom
+      # `apply!` zablokuje aktualizaciu hlaskou o nedokoncenej transakcii.
+      # Vysledok sa preto OVERUJE na disku a volajuci sa o nom dozvie.
       def clear_marker(plugins_dir)
         @started_at = nil
-        FileUtils.rm_f(marker_path(plugins_dir))
-        true
+        begin
+          FileUtils.rm_f(marker_path(plugins_dir))
+        rescue StandardError => e
+          Engine.log_error(e, 'Updater.clear_marker') if Engine.respond_to?(:log_error)
+        end
+        !File.exist?(marker_path(plugins_dir))
       end
 
       # --- update lock (B3) --------------------------------------------------
@@ -559,20 +618,38 @@ module Noxun
           end
         end
 
-        out = begin
-          `tasklist /FI "PID eq #{n}" /NH /FO CSV 2>NUL`
+        # Codex #277 kolo 4 (P2): kontroluje sa EXIT STATUS. Zlyhany `tasklist`
+        # (chybajuci nastroj, obmedzene prava, zahlteny system) vracia prazdny
+        # vystup — a ten by sa bez tejto kontroly precital ako „PID nezije",
+        # takze by sa ZMAZALA stopa ZIVEJ instancie a swap by bezal pod nou.
+        out, status = begin
+          Open3.capture2e('tasklist', '/FI', "PID eq #{n}", '/NH', '/FO', 'CSV')
         rescue StandardError => e
           raise Refused, "`tasklist` sa nedá spustiť (#{e.class}) — nedá sa zistiť, " \
                          'či nebeží ďalšia inštancia SketchUpu'
         end
+        unless status.respond_to?(:success?) && status.success?
+          raise Refused, '`tasklist` skončil chybou — nedá sa zistiť, či nebeží ' \
+                         'ďalšia inštancia SketchUpu'
+        end
+
         # `tasklist` pise v KONZOLOVEJ kodovej stranke (na SK Windows CP852),
         # nie v UTF-8 — regex nad takym retazcom by hodil „invalid byte
         # sequence". Parsuje sa preto BINARNE a vysledok sa az potom ocisti.
         raw = out.to_s.dup.force_encoding(Encoding::BINARY)
         row = raw.lines.find { |l| l.include?("\"#{n}\"") }
-        return nil if row.nil? # ziadny taky proces (tasklist vypise INFO riadok)
+        return row[/\A"([^"]*)"/, 1].to_s.force_encoding(Encoding::UTF_8).scrub if row
 
-        row[/\A"([^"]*)"/, 1].to_s.force_encoding(Encoding::UTF_8).scrub
+        # Ziadny riadok pre nas PID. Jedina PLATNA podoba tejto odpovede je
+        # informacna hlaska bez CSV riadkov (lokalizovana, preto sa na jej
+        # ZNENIE nespoliehame). Prazdny alebo inak vyzerajuci vystup je
+        # NEZROZUMITELNY — a nezrozumitelny vystup nie je „mrtvy PID".
+        raise Refused, '`tasklist` nevrátil žiadnu odpoveď — nedá sa zistiť, či nebeží ' \
+                       'ďalšia inštancia SketchUpu' if raw.strip.empty?
+        raise Refused, '`tasklist` vrátil odpoveď, ktorej nerozumieme — nedá sa zistiť, ' \
+                       'či nebeží ďalšia inštancia SketchUpu' if raw.lines.any? { |l| l.start_with?('"') }
+
+        nil # informacna hlaska = proces NEZIJE
       end
 
       # Patri PID STALE tomu procesu, ktory si stopu zapisal?
@@ -902,23 +979,32 @@ module Noxun
         # zamknu (vynimka v upratovani by inak nechala okna otvorene nad novymi
         # subormi).
         Engine.restart_required!
+        # Okna, ktore bezali v case commitu, uz drzi latch v `cb` wrapperoch;
+        # tu sa este best-effort zavru, nech nad vymenenym balikom nevisia.
+        Engine.close_all_dialogs
 
         # (6) upratanie predchadzajucej generacie
         note = ''
+        state = 'done'
         begin
           write_marker!(plugins, 'loader_swapped', from: from_version, to: to_version)
           unless discard_previous!(plugins)
             note = 'starú verziu sa nepodarilo zmazať — upratá sa pri najbližšom štarte SketchUpu'
           end
           write_marker!(plugins, 'done', from: from_version, to: to_version)
-          clear_marker(plugins)
+          unless clear_marker(plugins)
+            state = 'cleanup_pending'
+            note = 'aktualizácia prebehla, ale stopu po nej sa nepodarilo zmazať ' \
+                   '(marker noxun_engine.update.json) — po reštarte sa upratá; ak nie, oprav práva ' \
+                   'k priečinku Plugins'
+          end
         rescue StandardError => e
           # Aktualizacia UZ PRESLA — chyba v upratovani z nej nesmie spravit
           # neuspech (volajuci by hlasil zlyhanie updatu, ktory sa NAOZAJ stal).
           Engine.log_error(e, 'Updater.swap! upratanie') if Engine.respond_to?(:log_error)
           note = 'aktualizácia prebehla, upratanie sa nedokončilo — dorovná sa pri najbližšom štarte SketchUpu'
         end
-        { 'ok' => true, 'from' => from_version, 'to' => to_version, 'note' => note }
+        { 'ok' => true, 'state' => state, 'from' => from_version, 'to' => to_version, 'note' => note }
       end
 
       # JEDINY vychod z chyby za krokom 3. Bud vrati predchadzajucu generaciu

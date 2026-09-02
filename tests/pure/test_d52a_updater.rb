@@ -62,7 +62,15 @@
 #  17. `generation_matches?` sa na ceste bez artefaktov preskoci
 #      -> „(#277/3 P1): boot po CAKANI na zamok pozna cudzi update (:restart)";
 #  18. lease neoveruje identitu procesu (staci zivy PID)
-#      -> „(#277/3 P2): recyklovany PID neblokuje aktualizaciu".
+#      -> „(#277/3 P2): recyklovany PID neblokuje aktualizaciu";
+#  19. `cb` wrappery panela a Studia bez latchu
+#      -> „(#277/4 P1): KAZDY cb wrapper cita restart_required?";
+#  20. `tasklist` bez kontroly exit statusu (prazdny vystup = mrtvy PID)
+#      -> „(#277/4 P2): zlyhany tasklist NIE JE mrtvy PID" (+ lease sada);
+#  21. `chomp('/')` aj nad korenovou cestou
+#      -> „(#277/4 P2): normalize_path nezmrza korenove cesty";
+#  22. `clear_marker` znova hlasi uspech vzdy
+#      -> „(#277/4 P2): nezmazatelny marker sa PRIZNA, nezamlci".
 #
 # CELA SADA BEZI NAD TEMP SANDBOXOM — nikdy nad zivym `Plugins` priecinkom.
 # Testy, ktore spustaju druhy Ruby proces alebo zapisuju do %APPDATA%, sa
@@ -72,6 +80,7 @@ require_relative '../helper' unless defined?(NxTest)
 require 'fileutils'
 require 'tmpdir'
 require 'rbconfig'
+require 'open3'
 
 module NxD52
   E = Noxun::Engine
@@ -176,6 +185,41 @@ module NxD52
     sc.send(:remove_method, :nx_d52_orig_rename)
   end
 
+  # Nahradny `Process::Status` pre stub `Open3.capture2e`.
+  FakeStatus = Struct.new(:ok) do
+    def success?
+      ok
+    end
+  end
+
+  # Stub `Open3.capture2e` — vracia pevnu dvojicu [vystup, stav].
+  def with_capture2e(result)
+    sc = Open3.singleton_class
+    sc.send(:alias_method, :nx_d52_orig_capture2e, :capture2e)
+    sc.send(:define_method, :capture2e) { |*_a, **_k| result }
+    yield
+  ensure
+    sc.send(:remove_method, :capture2e)
+    sc.send(:alias_method, :capture2e, :nx_d52_orig_capture2e)
+    sc.send(:remove_method, :nx_d52_orig_capture2e)
+  end
+
+  # Zablokuje `FileUtils.rm_f` pre jeden konkretny nazov suboru.
+  def with_rmf_block(basename)
+    sc = FileUtils.singleton_class
+    sc.send(:alias_method, :nx_d52_orig_rm_f, :rm_f)
+    sc.send(:define_method, :rm_f) do |list, **opts|
+      next nil if Array(list).any? { |p| File.basename(p.to_s) == basename }
+
+      nx_d52_orig_rm_f(list, **opts)
+    end
+    yield
+  ensure
+    sc.send(:remove_method, :rm_f)
+    sc.send(:alias_method, :rm_f, :nx_d52_orig_rm_f)
+    sc.send(:remove_method, :nx_d52_orig_rm_f)
+  end
+
   # Stub `Updater.process_image`: `map` je PID -> navratova hodnota
   # (String = image name, nil = proces nezije, :raise = nezistitelny stav).
   def with_process_image(map)
@@ -232,7 +276,7 @@ module NxD52
   # Vracia hash so stavom bootu: `status` (recovery), `version` (verzia loadera,
   # ktory sa PRAVE VYKONAL), `registered` (nacital sa plugin?) a `message`
   # (natívna hláška, ak nejaká bola).
-  def boot!(env)
+  def boot!(env, preload: nil)
     stubs = File.join(env[:root], 'stubs')
     write(File.join(stubs, 'sketchup.rb'), <<~RUBY)
       module Sketchup
@@ -252,6 +296,7 @@ module NxD52
     script = File.join(env[:root], 'boot.rb')
     write(script, <<~RUBY)
       $LOAD_PATH.unshift(#{stubs.inspect})
+      #{preload ? "require #{preload.inspect}" : ''}
       $nx_registered = false
       $nx_message = ''
       load #{File.join(env[:plugins], 'noxun_engine.rb').inspect}
@@ -1147,6 +1192,153 @@ NxTest.test('D-52a (#277/3 P1): zmieseny stav (novy loader, stary strom) sa doro
   NxTest.assert_equal('idle', again['status'])
   NxTest.assert(again['registered'], 'po restarte uz vsetko sedi')
   NxTest.assert_equal('0.9.4', again['version'])
+  FileUtils.rm_rf(env[:root])
+end
+
+# --- 5e) nalezy Codex review #277, kolo 4 ------------------------------------
+
+NxTest.test('D-52a (#277/4 P1): latch zastavi aj callback UZ OTVORENEHO okna') do
+  Noxun::Engine.reset_restart_latch!
+  NxTest.refute(Noxun::Engine.update_locked?(:panel), 'bez latchu callbacky bezia')
+
+  Noxun::Engine.restart_required!
+  NxTest.assert(Noxun::Engine.update_locked?(:panel), 'po commite sa callback MUSI zastavit')
+  NxTest.assert(Noxun::Engine.update_locked?(:studio), 'a to v KAZDOM okne')
+  # Hlaska ide RAZ ZA OKNO — panel posiela desiatky callbackov za sekundu.
+  NxTest.assert(Noxun::Engine.update_locked?(:panel), 'opakovany callback ostava zablokovany')
+  NxTest.assert_equal(%i[panel studio].sort,
+                      Noxun::Engine.instance_variable_get(:@locked_announced).keys.sort,
+                      'kazde okno ohlasilo prave raz')
+  Noxun::Engine.reset_restart_latch!
+  NxTest.assert_equal(nil, Noxun::Engine.instance_variable_get(:@locked_announced),
+                      'reset latchu vycisti aj priznaky hlasky')
+end
+
+NxTest.test('D-52a (#277/4 P1): KAZDY cb wrapper cita restart_required?') do
+  root = NxTest::ROOT
+  {
+    'panel.rb' => File.read(File.join(root, 'noxun_engine', 'ui', 'panel.rb'), encoding: 'UTF-8'),
+    'studio_dialog.rb' => File.read(File.join(root, 'noxun_engine', 'ui', 'studio_dialog.rb'), encoding: 'UTF-8')
+  }.each do |name, src|
+    body = src[/def cb\(dlg, name\).*?\n        end\n/m].to_s
+    NxTest.refute(body.empty?, "#{name}: generic cb wrapper sa nenasiel — uprav guard test")
+    NxTest.assert(body.include?('update_locked?'),
+                  "#{name}: cb wrapper nema latch — okno otvorene v case commitu by " \
+                  'starymi handlermi mutovalo model nad NOVYM balikom')
+  end
+
+  # Po commite sa okna este best-effort zavru (uplna bariera PRED swapom je D-52b).
+  upd = File.read(File.join(root, 'noxun_engine', 'core', 'updater.rb'), encoding: 'UTF-8')
+  NxTest.assert(upd.include?('Engine.close_all_dialogs'), 'swap! po commite zatvara okna')
+  NxTest.assert(Noxun::Engine.respond_to?(:close_all_dialogs), 'a metoda existuje')
+  NxTest.assert(Noxun::Engine.close_all_dialogs, 'bez otvorenych okien je to no-op bez vynimky')
+end
+
+NxTest.test('D-52a (#277/4 P2): zlyhany tasklist NIE JE „mrtvy PID"') do
+  NxTest.skip!('vetva sa tyka Windows volania tasklistu') unless NxD52::U.windows?
+
+  env = NxD52.sandbox
+  plugins = env[:plugins]
+  u = NxD52::U
+  cudzi = 424_243
+  u.write_lease!(plugins, cudzi, 'SketchUp.exe')
+
+  # (a) nenulovy exit
+  NxD52.with_capture2e(['', NxD52::FakeStatus.new(false)]) do
+    NxTest.assert_raise('skončil chybou') { u.live_leases(plugins) }
+  end
+  NxTest.assert(File.exist?(u.lease_path(plugins, cudzi)),
+                'stopa ZIVEJ instancie sa pri zlyhanom dotaze NESMIE zmazat')
+
+  # (b) prazdny vystup pri nulovom exite
+  NxD52.with_capture2e(['', NxD52::FakeStatus.new(true)]) do
+    NxTest.assert_raise('nevrátil žiadnu odpoveď') { u.live_leases(plugins) }
+  end
+  NxTest.assert(File.exist?(u.lease_path(plugins, cudzi)), 'ani tu')
+
+  # (c) informacna hlaska = proces naozaj NEZIJE (lokalizovana, bez CSV riadkov)
+  NxD52.with_capture2e(["INFORMACIE: Neboli najdene ziadne ulohy.\n", NxD52::FakeStatus.new(true)]) do
+    NxTest.assert_equal([], u.live_leases(plugins), 'informacna hlaska = mrtvy PID')
+  end
+  NxTest.refute(File.exist?(u.lease_path(plugins, cudzi)), 'az teraz sa stopa uprace')
+  FileUtils.rm_rf(env[:root])
+end
+
+NxTest.test('D-52a (#277/4 P2): normalize_path nezmrza korenove cesty') do
+  u = NxD52::U
+  # Jadro opravy je PREDIKAT — ten je platformovo nezavisly a bezi aj v CI.
+  re = Noxun::Engine::Updater::ROOT_PATH_RE
+  ['/', 'C:/', 'g:/', '//server/share'].each do |root|
+    NxTest.assert(root =~ re, "#{root} je KOREN — koncove lomitko sa strihat nesmie")
+  end
+  ['/opt', 'C:/Plugins', '//server/share/plugins', '//server'].each do |cesta|
+    NxTest.refute(cesta =~ re, "#{cesta} korenom NIE JE")
+  end
+
+  # A sprava sa podla neho aj sama metoda. `File.expand_path('/')` vrati na
+  # Windows koren AKTUALNEHO disku, preto sa hodnota nefixuje — kontroluje sa
+  # to, co je podstatne: koren si koncove lomitko UDRZI.
+  root = u.normalize_path('/')
+  NxTest.assert(root.end_with?('/'), "koren prisiel o koncove lomitko (#{root})")
+  if u.windows?
+    NxTest.assert_equal('c:/', u.normalize_path('C:/').downcase, 'koren disku ostava korenom')
+    NxTest.assert_equal('//server/share', u.normalize_path('//server/share'), 'UNC koren zdielania')
+    NxTest.assert_equal('//server/share/plugins', u.normalize_path('//server/share/plugins/'),
+                        'beznej ceste sa koncove lomitko stale strihá')
+    NxTest.assert(u.same_path?('C:/', 'C:\\'), 'oba zapisy korena disku su ta ista cesta')
+  else
+    NxTest.assert_equal('/', root, 'POSIX koren ostava korenom')
+    NxTest.assert_equal('/opt/plugins', u.normalize_path('/opt/plugins/'),
+                        'beznej ceste sa koncove lomitko stale strihá')
+  end
+  NxTest.assert(u.inside?('//server/share/plugins', '//server/share'),
+                'priecinok v koreni zdielania je „vnutri" — bez toho by hranice nefungovali')
+end
+
+NxTest.test('D-52a (#277/4 P2): nezmazatelny marker sa PRIZNA, nezamlci') do
+  env = NxD52.sandbox
+  plugins = env[:plugins]
+  Noxun::Engine.reset_restart_latch!
+
+  res = NxD52.with_rmf_block('noxun_engine.update.json') do
+    NxD52::U.apply!(env[:src], env[:tree])
+  end
+  NxTest.assert(res['ok'], 'aktualizacia PRESLA')
+  NxTest.assert_equal('cleanup_pending', res['state'], 'ale stav to priznava')
+  NxTest.assert(res['note'].include?('marker'), "poznamka pomenuje subor: #{res['note']}")
+  NxTest.assert(Noxun::Engine.restart_required?, 'latch je zapnuty')
+  NxTest.assert_equal('0.9.5', NxD52.generation(plugins, 'po commite'))
+  NxTest.assert(File.exist?(File.join(plugins, 'noxun_engine.update.json')), 'marker naozaj ostal')
+  NxTest.refute(NxD52::U.clear_marker(plugins) == 'true', 'clear_marker vracia BOOLEAN')
+  Noxun::Engine.reset_restart_latch!
+  FileUtils.rm_rf(env[:root])
+end
+
+NxTest.test('D-52a (#277/4 P2): boot s nezmazatelnym markerom plugin NENACITA') do
+  NxTest.skip!('potrebuje samostatny Ruby proces') unless NxTest.headless?
+
+  env = NxD52.sandbox
+  NxD52.crash_state!(env, 'staged')
+  # Marker sa da citat, ale nie zmazat (read-only priecinok sa na Windows
+  # nespravuje spolahlivo, preto sa mazanie zablokuje v samotnom loaderi).
+  NxD52.write(File.join(env[:root], 'stub_rm.rb'), <<-'RUBY2')
+    require 'fileutils'
+    module FileUtils
+      class << self
+        alias nx_orig_rm_f rm_f
+        def rm_f(list, **opts)
+          return nil if Array(list).any? { |p| File.basename(p.to_s) == 'noxun_engine.update.json' }
+
+          nx_orig_rm_f(list, **opts)
+        end
+      end
+    end
+  RUBY2
+  out = NxD52.boot!(env, preload: File.join(env[:root], 'stub_rm.rb'))
+  NxTest.assert_equal('marker_stuck', out['status'], 'stav priznava nezmazany marker')
+  NxTest.refute(out['registered'], 'plugin sa NENACITA — dalsi update by sa o marker zastavil')
+  NxTest.assert(out['message'].include?('noxun_engine.update.json'),
+                "hláška pomenuje súbor: #{out['message']}")
   FileUtils.rm_rf(env[:root])
 end
 

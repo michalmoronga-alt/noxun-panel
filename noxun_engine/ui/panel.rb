@@ -269,8 +269,14 @@ module Noxun
         end
 
         # Wrapper: begin/rescue + slovensky status pri chybe; nikdy 'return' v bloku (pouzi next).
+        # D-52a (Codex #277 kolo 4, P1): latch strazi aj UZ OTVORENE okno.
+        # Guard v `show` chrani len OTVARANIE — okno, ktore bezalo v case
+        # commitu, by inak starymi handlermi mutovalo model nad NOVYM balikom
+        # (a reload stranky by sparoval nove HTML so starymi callbackmi).
         def cb(dlg, name)
           dlg.add_action_callback(name) do |_ctx, *args|
+            next if Engine.update_locked?(:panel)
+
             begin
               yield(args.first)
             rescue StandardError => e

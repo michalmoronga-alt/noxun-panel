@@ -6,7 +6,7 @@ require 'extensions.rb'
 
 module Noxun
   module Engine
-    VERSION = '0.9.8'
+    VERSION = '0.9.9'
 
     class << self
       # Drzime kvoli UI::Notification (potrebuje registrovany extension objekt).
@@ -72,6 +72,10 @@ module Noxun
                         'plugin sa v tomto okne zámerne nenačítal.'
       BROKEN_MESSAGE = 'Noxun Engine nedokázal dorovnať nedokončenú aktualizáciu. ' \
                        'Reštartuj SketchUp; ak to nepomôže, spusti INSTALL_noxun_engine.ps1.'
+      MARKER_MESSAGE = 'Noxun Engine dorovnal nedokončenú aktualizáciu, ale nedokázal zmazať ' \
+                       'stopu po nej (noxun_engine.update.json v priečinku Plugins). Kým tam ' \
+                       'leží, ďalšia aktualizácia sa nespustí — zmaž ten súbor alebo oprav ' \
+                       'práva k priečinku Plugins.'
 
       LEASES_DIR = 'noxun_engine.leases'
 
@@ -102,12 +106,22 @@ module Noxun
           begin
             done = if pending?(paths)
                      repair!(paths)
-                     FileUtils.rm_f(paths[:marker])
-                     :done
+                     # Codex #277 kolo 4 (P2): `rm_f` chybu POTLACI. Marker,
+                     # ktory prezije, je pritom trvala brzda — kazdy dalsi
+                     # `apply!` sa o neho zastavi hlaskou o nedokoncenej
+                     # transakcii. Preto sa vysledok OVERUJE na disku.
+                     begin
+                       FileUtils.rm_f(paths[:marker])
+                     rescue StandardError => e
+                       puts "[NOXUN::Engine] marker sa neda zmazat: #{e.class}: #{e.message}"
+                     end
+                     File.exist?(paths[:marker]) ? :marker_stuck : :done
                    else
                      :idle
                    end
-            if !write_lease!(paths)
+            if done == :marker_stuck
+              :marker_stuck
+            elsif !write_lease!(paths)
               :lease_failed
             elsif generation_matches?(paths)
               done
@@ -332,6 +346,7 @@ module Noxun
               when :busy then BUSY_MESSAGE
               when :restart then RESTART_MESSAGE
               when :lease_failed then LEASE_MESSAGE
+              when :marker_stuck then MARKER_MESSAGE
               else BROKEN_MESSAGE
               end
         puts "[NOXUN::Engine] #{msg}"
@@ -349,7 +364,7 @@ end
 # nad zmiesanou generaciou.
 Noxun::Engine::Boot.status = Noxun::Engine::Boot.recover!(File.dirname(File.expand_path(__FILE__)))
 
-if %i[busy restart error lease_failed].include?(Noxun::Engine::Boot.status)
+if %i[busy restart error lease_failed marker_stuck].include?(Noxun::Engine::Boot.status)
   Noxun::Engine::Boot.announce(Noxun::Engine::Boot.status)
 else
   module Noxun
