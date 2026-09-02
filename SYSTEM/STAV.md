@@ -30,12 +30,12 @@ vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 **Blok 1b uzavretý až na D-51** (čaká na Michalove hodnoty) · **1c hotový** ([AUDIT_REGISTER.md](AUDIT_REGISTER.md)) · **1d beží** (hotové R-06/R-08/R-01+04/R-34/R-02(b)/R-03/R-07/R-23.1/R-11/R-12/R-14; ďalej R-18 + zvyšok; R-13 čaká na Michala).
 **1e HOTOVÁ** — posledný package KOVANIE vznikol 2.9. **Blok KOVANIE ŠTARTOVAL (2.9.):** architektúra V1 uzavretá po cross-audite (Codex/GLM/Opus) + reconcile + O1–O3
 ([zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md](zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md)), mockup schválený
-([zdroje/ui20/mockup_kovanie_v1.html](zdroje/ui20/mockup_kovanie_v1.html)), packages KOV-A/B/H v [PLAN.md](PLAN.md); **D-52a (jadro updatera) je v maine — PR #277, v0.9.9** (4 Codex kolá + slepá delta; 2 vedomé odchýlky od pravidla 3 kôl v KRONIKE); **D-52b (UI) je ďalšia dávka** — D-52 je tvrdý predpoklad prvého schema bumpu.
+([zdroje/ui20/mockup_kovanie_v1.html](zdroje/ui20/mockup_kovanie_v1.html)), packages KOV-A/B/H v [PLAN.md](PLAN.md); **D-52 UPDATER JE KOMPLET (v0.9.14)** — D-52a #277 (jadro) · D-52b1 #278 · D-52b2 #279 (UI, apply s bariérou); in-SU 1297/0; tvrdý predpoklad prvého schema bumpu SPLNENÝ → **KOV-A štartuje** (Codex audit návrhu beží).
 **Od 2.9. večer bez Fable** — orchestruje Opus, review Codex; vstupný bod je [zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md](zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md) + tento súbor; packages všetkých slices sú v PLAN. **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
 
-**Poradie (Michal 2.9.: „poradie je na tebe"):** ~~D-52a~~ (v maine) → **D-52b** (UI updatera — package v PLAN D-52; do nej aj 3× P3 z delta-verifikácie #277) → **KOV-A** čelá dátová vrstva
+**Poradie (Michal 2.9.: „poradie je na tebe"):** ~~D-52a~~ → ~~D-52b1/b2~~ (v maine) → **KOV-A** (čelá — dátová vrstva; audit → implementácia) → **KOV-A** čelá dátová vrstva
 → **KOV-B** katalóg+sety (paralelne **KOV-H** ad-hoc) → **KOV-C** context_for + recepty + odvodené dielce → **KOV-D** resolver + zámky + brány → E/F/G/I. Súbežne 1d podľa kapacity.
 Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` (KOV-A/B/C/D/H povinné) → subagent vo worktree → `codex-po-pr` → merge → uzáver. V1 checklist v [V1_VIZIA.md](V1_VIZIA.md).
 
@@ -51,7 +51,7 @@ Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` (KO
   v origináli zmaž pár znakov a ulož — v Štúdiu → Kovanie musia byť **sety stále vidieť** + **oranžový banner**, „+ Nový set / Upraviť / Zmazať" vypnuté, ale **predvoľby projektu fungujú**; po zmazaní pokazeného súboru je zase všetko po starom.
 - **1d/R-23.1 — Escape zatvára aj posledných šesť ručných modálov** (ABS páska v Inspectorovi; obnova zálohy, mazanie variantu, „Nahradiť UNI…", Demos diff a mazanie položky
   kovania v Štúdiu), **jedno stlačenie = jedna vrstva** — v0.9.1 (1.9.2026) · **Michal večer:** Štúdio → Kovanie, potvrdenie zmazania + **Esc** (musí sa zavrieť); nad **oknom prepočtu cien počas behu** sa Esc zavrieť NESMIE.
-- **D-52a — jadro updatera** (v0.9.9, 3.9.2026, PR #277): recovery bootstrap v loaderi, transakčný marker, update lock + lease, restart latch, downgrade zakázaný; bez UI (D-52b). · **Michal večer:** zatiaľ nič viditeľné — plugin sa len načíta ako doteraz (v koliesku verzia 0.9.9).
+- **D-52 — Aktualizovať jedným klikom** (v0.9.14, 3.9.2026, PR #277/#278/#279): Štúdio → O plugine → priečinok, kontrola verzie, tlačidlo; bariéra okien, atomický swap, restart latch; downgrade zakázaný. · **Michal večer:** cesta na NOVŠIU kópiu → Aktualizovať → okná sa zavrú → hláška → reštart → nová verzia; staršia kópia = tlačidlo neaktívne; odpojený disk = Štúdio nezamrzne.
 - **UZÁVER BLOKU GHOST VKLADANIE (v0.9.0, 31.8.2026)** — **Michal odškrtol CELÝ smoke checklist** (11 bodov), uzáver bol čisto dokumentačný (plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md)); tým istým sedením odškrtol aj staršie odložené testy **R-08 · R-01+R-04 · R-02 · R-07** — **všetky PASS**, žiadny nález.
 - **1d/R-07 — starší a novší plugin si už nepoškodia knižnicu setov kovania** (v0.8.21, 30.8., **overené Michalom 31.8.**) · **1d/R-02b — Ctrl+S už nezahadzuje rozpísanú prácu** (v0.8.23, 30.8.; **Michal večer:** uprav šírku skrinky a do sekundy daj **Ctrl+S** — zmena sa musí uložiť a rozpísané polia ostať).
 - **1d/R-02 — panel už nezapíše do nesprávneho dokumentu** · **1d/R-01+R-04 — observer veľkosti je multi-model bezpečný a už si nepamätá zmazané** — v0.8.17/v0.8.19 (30.8.), **overené Michalom 31.8.**; **R-03** (šev vkladania, v0.8.20) a **R-34** (brána exportov, v0.8.18) sú bez UI zmeny.

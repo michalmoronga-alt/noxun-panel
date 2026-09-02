@@ -77,7 +77,6 @@ v [PLAN.md](PLAN.md) — dnes už len **D-51** a položka „výklop ako samosta
 
 ## INFRA
 
-- **D-52 · Tlačidlo „Aktualizovať" (auto-update pluginu)** (Michal 31.7. večer) — jednoklikový update na najnovšiu verziu; hlavne pre Luciu (nech Michal nemusí posielať súbory).
   *Stav: na návrhovú dávku — od 26.8. SAMOSTATNE (bez väzby na D-48, ktorý je mimo V1); distribučný kanál jednoducho, napr. zdieľaný priečinok.*
 - **D-20 · Quick actions — bezpečný move plugin** (Michal 19.7., „pre budúceho Michala a Fable, keď bude základ top 😉") — zlúčiť funkčné pluginy noxun_mower + Snaper do jedného toolbar pluginu (rýchly
   pohyb, kopírovanie, rotácie, prisunutie na doraz). **Známy poznatok:** mower „rýchla kópia skrinky vedľa" vytvorí kópiu LEN ako geometriu — bez NOXUN identity kabinetu (kópia mimo observer/dedup

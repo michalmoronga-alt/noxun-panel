@@ -524,7 +524,7 @@ Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-
 **Cieľ:** aby plugin a knižnice fungovali na dvoch pracoviskách (Michal + Lucia).
 
 - *(**D-48 · Zdieľaná knižnica pre 2 PC** je od 26.8. MIMO V1 — presunutá do zásobníka Po V1; katalógy sa dovtedy zdieľajú ručne export/importom.)*
-- **D-52 · TASK PACKAGE „AKTUALIZOVAŤ JEDNÝM KLIKOM" (1e, zapísané 30.8.2026, rev. po slepom review #255; rev. po Codex audite 2.9.; ✅ D-52a JADRO v maine — PR #277, v0.9.9, 3.9.2026; ▶ D-52b UI = ďalšia dávka):**
+- **D-52 · TASK PACKAGE „AKTUALIZOVAŤ JEDNÝM KLIKOM" (1e, zapísané 30.8.2026, rev. po slepom review #255; rev. po Codex audite 2.9.; ✅ **D-52 KOMPLET 3.9.2026** — D-52a PR #277 (v0.9.9) · D-52b1 PR #278 (v0.9.13) · D-52b2 PR #279 (v0.9.14); plný text v archiv/DOGFOODING_vyriesene.md):**
   **Cieľ:** Lucia aj Michal zaktualizujú plugin bez kopírovania súborov — tlačidlo v sekcii O plugine Štúdia.
   BEZ väzby na D-48 sync.
   **Scope IN:** cesta k distribučnému priečinku = VLASTNÝ malý JSON v %APPDATA% (JsonFileStore + .bak; NIE

@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-52** — Aktualizovať jedným klikom (updater) — vyriešené 3.9.2026, PR #277 + #278 + #279, v0.9.14
 > **Presunuté zo živého zápisníka [../DOGFOODING.md](../DOGFOODING.md) 26.8.2026** (dávka
 > Docs cleanup B): index aj plné texty žijú od tejto dávky na jednom mieste — v tomto súbore.
 > Živý zápisník drží už len **otvorené** postrehy. Nový vyriešený postreh = plný text do
@@ -94,6 +95,23 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-52 — Tlačidlo „Aktualizovať" (auto-update pluginu) (vyriešené 3.9.2026, dávky D-52a PR #277 · D-52b1 PR #278 · D-52b2 PR #279, v0.9.9 → v0.9.14)
+
+**Pôvodný postreh (Michal 31.7. večer):** jednoklikový update na najnovšiu verziu; hlavne pre Luciu (nech Michal nemusí posielať súbory).
+
+**Riešenie:** Štúdio → Nastavenia → O plugine: pole „Distribučný priečinok" (uložené v `%APPDATA%\NOXUN\Engine\updater_settings.json`), asynchrónna kontrola verzie
+pri vstupe do sekcie (vlákno s deadline 4 s, token per cesta/inštancia, jeden beh na cestu) so stavovým riadkom (novšia → tlačidlo aktívne · rovnaká → neaktívne
+„aktuálna" · **staršia → neaktívne „reinštaluj ručne cez INSTALL"** — downgrade vo V1 zakázaný), tlačidlo „Aktualizovať" s D-15 potvrdením → bariéra: zatvorenie
+Inspectora aj Štúdia a čakanie na `set_on_closed` → príprava balíka vo vlákne (manifest SHA1, staging do `noxun_engine.new`, validácia byte-for-byte, viazanie na
+skontrolovanú verziu, nonce tiketu, single-flight) → commit v hlavnom vlákne (kópia zálohy + atomický replace-rename loadera, strom cez `.old`) → výsledok natívnym
+`UI.messagebox` → **restart latch** (všetky vstupy pluginu aj `cb` wrappery odmietnu do reštartu). Jadro `core/updater.rb` + **recovery bootstrap v loaderi
+`noxun_engine.rb`** (transakčný marker; pravidlo „strom = práve vykonávaný loader"), update lock + procesný lease (identita cez image name `tasklist`, fail-closed),
+settings store so `std` a R-11 bránou. Odsek modulu: `docs/architecture/ui-lifecycle.md`.
+
+**Proces:** codex-audit návrhu (4 BLOCKER + 7 FIX → revízia package) · D-52a: 4 kolá GH Codex + slepá delta (2 vedomé odchýlky od pravidla 3 kôl, KRONIKA) ·
+D-52b: po 3. kole **pravidlo 3 kôl uplatnené — PR rozdelený** na b1 (cesta/nastavenia/kontrola) a b2 (apply flow); b1 kolo 1 = len P2 → interná delta; b2 kolo 1 = 👍;
+in-SU beh nad hlavou b2: **1297 PASS / 0 FAIL** (33 D-52b scenárov: sandbox swap, latch, bariéra, klik bez dokladu). Michalov smoke: viď KRONIKA záznam D-52b.
 
 ### D-27 — Rýchle zobraziť/skryť tagy z panela (vyriešené 28.8.2026, dávka F/D-27: PR #249, v0.8.13)
 

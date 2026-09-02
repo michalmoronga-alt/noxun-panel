@@ -17,6 +17,19 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-52b · UI UPDATERA — b1 (PR #278, v0.9.13) + b2 (PR #279, v0.9.14), 3.9.2026:** sekcia O plugine v Štúdiu: distribučný priečinok (`data-updater-edit`, ack s request
+  tokenom, pole ide za uloženou cestou), asynchrónny `updater_check` (vlákno + deadline 4 s, token per cesta/inštancia, jeden worker na cestu), stavový riadok
+  (novšia/rovnaká/staršia — downgrade neaktívny), doklad o kontrole (dir, token, state, **available**); apply flow: D-15 potvrdenie → bariéra (zatvoriť Inspector aj Štúdio,
+  `dialog_closed?`, guard `show` počas in-flight, re-check pred commitom) → `Updater.prepare!` vo vlákne (60 s) → `commit!` v hlavnom vlákne → natívny messagebox; nonce
+  tiketu, viazanie na skontrolovanú verziu, single-flight. **Proces:** pôvodný PR #278 (celé UI) prešiel 3 Codex kolami (1×P1+2×P2 · 3×P1+3×P2 · 1×P1+3×P2) — po treťom kole
+  **pravidlo 3 kôl UPLATNENÉ: PR rozdelený** na b1 (cesta/nastavenia/kontrola/doklad; #278 prerobený) a b2 (apply flow; #279 stacked). b1 nové kolo 1 = len 3×P2 →
+  fix + slepá delta (CLEAN); b2 kolo 1 = 👍; slepá delta b2 chytila zhodený riadok z konfliktu v in-SU runneri (opravené). **In-SU:** beh nad main (D-52a) 1264/0;
+  beh nad b2 hlavou 1296/1 (jediný FAIL = zastaraný ŠT-4a assert whitelistu akcií — opravený) → **1297/0, 33 D-52b scenárov** (sandbox swap 9.9.0→9.9.9, jedna kompletná
+  generácia, žiadne siroty, latch odmietne okno, klik bez dokladu odmietnutý, bariéra + stubovaný messagebox). **Poučenia:** (1) delenie PR po 3. kole fungovalo presne
+  podľa lekcie #93 — po reze každá polovica konvergovala v jednom kole; (2) `git checkout <vetva>` v hlavnom repe zlyhá, keď vetvu drží worktree subagenta — in-SU beh
+  treba spúšťať z `--detach <sha>`; (3) merge konflikty v testovacom runneri sú rovnako nebezpečné ako v kóde (zhodený `state[:d52b_rec]` by assert zneplatnil natrvalo)
+  — slepá delta nad merge commitom sa oplatí. D-52 je tým **KOMPLET** (plný text v archiv/DOGFOODING_vyriesene.md); predpoklad prvého schema bumpu bloku KOVANIE splnený.
+
 - **D-52a · JADRO PLUGINOVÉHO UPDATERA (v0.9.9, 2.–3.9.2026, PR #277):** nový čistý modul `core/updater.rb` (manifest SHA1 + staging do `.new`, validácia
   STAGED stromu, swap s definovaným rollbackom, update lock + procesný lease s identitou image name, settings store `updater_settings.json` so `std` a R-11 bránou,
   **restart latch** vo všetkých vstupoch aj v `cb` wrapperoch) a **recovery bootstrap priamo v loaderi `noxun_engine.rb`** (transakčný marker; pravidlo „strom na disku
