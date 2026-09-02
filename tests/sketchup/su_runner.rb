@@ -10183,6 +10183,41 @@ module NoxunSuRunner
     log_line("INFO: D-52b1 teardown: #{ex.class}: #{ex.message}")
   end
 
+  # KANAL OKNA JE JEDINY SPOLAHLIVY POZOROVATEL (Codex #278/b1 P2).
+  # Sink z `dispatch` zije PRESNE jeden synchronny callback: ked vlakno stihne
+  # dobehnut este v prvom polle, vysledok ide nim — inak uz oknom
+  # (`StudioDialog.settings_js`). Test preto instrumentuje KANAL OKNA na CELY
+  # cas cakania a vysledok hlada v spolocnom zazname; nesmie zavisiet od toho,
+  # ci worker dobehol v prvom polle.
+  def d52b_watch_window!(state)
+    return if state[:d52b_win]
+
+    rec = []
+    state[:d52b_win] = rec
+    sd = e::StudioDialog
+    sd.singleton_class.send(:alias_method, :nx_d52b_orig_sjs, :settings_js)
+    sd.singleton_class.send(:define_method, :settings_js) do |script|
+      rec << script.to_s
+      true
+    end
+    rec
+  end
+
+  def d52b_unwatch_window!(state)
+    sc = e::StudioDialog.singleton_class
+    if sc.method_defined?(:nx_d52b_orig_sjs) || sc.private_method_defined?(:nx_d52b_orig_sjs)
+      sc.send(:remove_method, :settings_js)
+      sc.send(:alias_method, :settings_js, :nx_d52b_orig_sjs)
+      sc.send(:remove_method, :nx_d52b_orig_sjs)
+    end
+    state[:d52b_win] = nil
+  end
+
+  # Vsetko, co sekcia dostala — bez ohladu na to, ktorym kanalom to islo.
+  def d52b_pushes(state)
+    Array(state[:d52b_rec]) + Array(state[:d52b_win])
+  end
+
   def run_d52b_async(model, state, steps)
     steps << [0.5, lambda do
       cleanup(model)
@@ -10195,22 +10230,31 @@ module NoxunSuRunner
       sc.send(:alias_method, :nx_d52b_orig_src, :source_dir)
       sc.send(:define_method, :source_dir) { src }
       e::SupplierSettingsDialog.instance_variable_set(:@updater_check_ok, nil)
+      d52b_watch_window!(state) # POZOROVATEL BEZI UZ PRED dispatchom
       rec = []
       state[:d52b_rec] = rec
       e::SupplierSettingsDialog.dispatch('updater_check', '{}', ->(s) { rec << s.to_s })
       ok('D-52b1 (check): sekcia HNED hlasi „kontrolujem" a hlavne vlakno sa vratilo',
-         rec.any? { |x| x.include?('"state":"checking"') })
+         d52b_pushes(state).any? { |x| x.include?('"state":"checking"') })
+    end]
+    # Deadline kontroly su 4 s; dve cakania (2,5 + 2,5 s) su za nim, takze
+    # vysledok — uspech aj timeout — je v tej chvili UZ dorucený. Prve cakanie
+    # len ohlasi INFO, aby bolo v logu vidno, ci vlakno stihlo skorsi poll.
+    steps << [2.5, lambda do
+      done = e::SupplierSettingsDialog.instance_variable_get(:@updater_check_ok)
+      info("D-52b1 (check): po 2,5 s je vysledok #{done.nil? ? 'este NEDORUCENY' : 'uz dorucený'}")
     end]
     steps << [2.5, lambda do
       done = e::SupplierSettingsDialog.instance_variable_get(:@updater_check_ok)
       src = state[:d52b_env] ? state[:d52b_env][:src] : nil
+      pushes = d52b_pushes(state)
       ok("D-52b1 (check): REALNE vlakno dobehlo a timer nasadil vysledok (#{done.inspect})",
          done.is_a?(Hash) && done['state'] == 'newer' && done['dir'] == src)
       ok("D-52b1 (doklad): server si pamata CESTU, TOKEN aj VERZIU (#{done ? done['available'] : '-'})",
          done.is_a?(Hash) && done['available'] == D52B_SRC_VER && !done['token'].nil?)
-      rec = Array(state[:d52b_rec])
-      ok('D-52b1 (check): vysledok prisiel do sekcie kanalom okna',
-         rec.any? { |x| x.include?('"state":"newer"') })
+      ok("D-52b1 (check): vysledok prisiel do sekcie (pushov #{pushes.length})",
+         pushes.any? { |x| x.include?('"state":"newer"') })
+      d52b_unwatch_window!(state)
       d52b_teardown(state)
       cleanup(model)
     end]
@@ -11961,6 +12005,7 @@ module NoxunSuRunner
             stale_teardown(state) # a to iste pre sondu okna Studio (STALE)
             r12_restore_messagebox! # R-12 sonda: stub modalu nesmie prezit FAIL
             r12_restore_rejects!    # ani sonda pocitadla reject_scale
+            d52b_unwatch_window!(state) # D-52b1: instrumentacia kanala okna
             d52b_teardown(state)    # D-52b1: stub `source_dir` uz vobec nie
             cleanup(model)
           rescue StandardError

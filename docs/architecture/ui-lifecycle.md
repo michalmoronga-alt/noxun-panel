@@ -1836,7 +1836,9 @@ generácia) · `noxun_engine.update.json` (transakčný marker) · `noxun_engine
 bežalo v jednom volaní, robila to UI vrstva v hlavnom vlákne — visiaci UNC share tak zamrazil SketchUp na desiatky sekúnd. **`prepare!`** (kanonické hranice → zámok → marker →
 manifest → staging → validácia → rozhodnutie o verzii) je preto **worker-safe** — nesiaha na `Sketchup.*` ani `UI.*` a **živej generácie sa nedotýka**, mení výhradne `.new` — a
 vracia **tiket**. **`commit!`** (len renamey v `Plugins` + latch) beží v hlavnom vlákne. Medzi fázami sa **zámok pustí** a mutuálnu exkluzivitu drží **marker**: každý iný proces
-(aj druhý pokus) sa o neho zastaví, a `commit!` trvá na tom, že marker na disku je **náš** (pid + `started_at` + obe verzie) — inak odmietne a cudzích artefaktov sa nedotkne.
+(aj druhý pokus) sa o neho zastaví, a `commit!` trvá na tom, že marker na disku je **náš**. Rozhoduje **nonce** — náhodná identita konkrétnej prípravy zapísaná do markera aj do
+tiketu; pid, `started_at` a obe verzie sú len doplnková kontrola. Samy o sebe nestačia: `started_at` má sekundové rozlíšenie, takže dve prípravy v tej istej sekunde nad tými istými
+verziami by boli nerozoznateľné a oneskorený `commit!` prvého tiketu by nasadil balík toho druhého. Pri nezhode `commit!` odmietne a cudzích artefaktov sa nedotkne.
 Kto `prepare!` nedokončí commitom, musí zavolať **`abort_prepared!`** (UI to robí po deadline aj pri nezhode verzie); ten upratuje takisto len vlastný staging. `apply!` ostáva
 ako obal `prepare!` + `commit!` — používa ho headless sada aj in-SU sekcia.
 
@@ -1992,6 +1994,11 @@ očami. Každý `input` preto volá `updPaint()` — telo sekcie sa počas písa
 
 **Potvrdenie uloženia patrí TOMU, ČO SA ODOSLALO** (Codex #278 kolo 2, P2). Klient si pamätá odoslanú hodnotu (`UPD_SENT`) a `saved: true` zahodí rozpis a nasadí normalizovanú
 cestu **len keď je v poli stále ona**. Bez toho platilo: Enter uloží A, používateľ píše B, dorazí ack na A — a rozrobené B by zmizlo.
+
+**POLE IDE ZA ULOŽENOU CESTOU.** `SS.updater` prekresľuje len stavový riadok a tlačidlo (telo sa počas písania nesmie prepísať) — lenže cesta sa môže zmeniť **zvonku** (druhá
+inštancia, ručný zásah do `updater_settings.json`) a prísť aj bez plného payloadu. `updSyncField` preto nastaví `#updDir` na cestu zo servera vždy, keď nie je nič rozpísané; bez
+toho by sekcia hlásila kontrolu priečinka B, v poli by stálo A — a „Uložiť" by B prepísalo späť na A. **Rozpísaná cesta má prednosť vždy**: tá sa nechá a stavový riadok **menuje
+uloženú** („Uložená je „B""), takže je zrejmé, čoho sa kontrola týka.
 
 **Stavový riadok sa obnovuje CIELENE.** `updPaint()` prepíše len `#updState` a `#updBtn` — telo sekcie sa neprekresľuje, lebo používateľ môže mať kurzor v poli cesty. Trojstav
 jadra plus dva prevádzkové stavy: `newer` = tlačidlo aktívne · `same` = `aria-disabled` „máš aktuálnu verziu" · `older` = `aria-disabled` „staršiu verziu nainštaluj ručne cez

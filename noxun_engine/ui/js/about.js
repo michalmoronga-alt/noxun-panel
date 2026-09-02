@@ -49,7 +49,12 @@
     // ROZPÍSANÁ, NEULOŽENÁ cesta: stav v riadku patrí ešte tomu, čo je uložené,
     // a aktualizovalo by sa z NEHO — nie z toho, čo je práve v poli. Klik by
     // teda spravil niečo iné, než čo človek vidí, takže sa najprv ukladá.
-    if (d.dirty) return 'Cesta nie je uložená — ulož ju (Enter alebo tlačidlo Uložiť), potom sa overí verzia.';
+    if (d.dirty){
+      // Uložená cesta sa MENUJE: kontrola aj prípadné aktualizovanie patria
+      // JEJ, nie tomu, čo je práve rozpísané v poli.
+      return 'Cesta nie je uložená — ulož ju (Enter alebo tlačidlo Uložiť), potom sa overí verzia.' +
+             (d.saved_dir ? ' Uložená je „' + d.saved_dir + '".' : '');
+    }
     switch (String(d.state || 'idle')){
       case 'checking':
         return 'Kontrolujem priečinok ' + dir + '…';

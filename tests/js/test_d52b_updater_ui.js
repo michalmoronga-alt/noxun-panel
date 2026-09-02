@@ -350,6 +350,44 @@ function updEl(attrs, value){
   eq(T.updDirty(), null, '…až ack tej AKTUÁLNEJ');
 })();
 
+// --- 4f) POLE IDE ZA ULOŽENOU CESTOU (Codex #278/b1 P2) ---------------------
+
+(function(){
+  S.setStudioSection('about');
+  T.ssApplyState(STATE);
+  // Čistý štart: uložená aj zobrazená cesta je A.
+  T.SS.updater({ enabled: true, state: 'idle', source_dir: 'A:/prva', saved: true, current: '0.9.13' });
+  eq(ELS.updDir.value, 'A:/prva', 'východisko: v poli je uložená cesta A');
+
+  // Cestu zmenila DRUHÁ inštancia (alebo ruka v updater_settings.json) a server
+  // pošle výsledok kontroly pre B — BEZ plného payloadu (`saved` nie je).
+  ELS.secbody.innerHTML = 'TELO SEKCIE';
+  T.SS.updater({ enabled: true, state: 'newer', source_dir: 'B:/nova', current: '0.9.13',
+                 available: '0.9.14', token: 3 });
+  eq(ELS.secbody.innerHTML, 'TELO SEKCIE', 'telo sekcie sa pri tom NEPREKRESĽUJE');
+  eq(ELS.updDir.value, 'B:/nova',
+     'ale pole ide za ULOŽENOU cestou — inak by sekcia hlásila kontrolu B a ukazovala A');
+  eq(T.updMerged().source_dir, 'B:/nova', 'a rovnako aj stav, z ktorého sa kreslí');
+
+  // Uloženie z takto zosynchronizovaného poľa NEPREPÍŠE B späť na A.
+  SENT.length = 0;
+  T.updSaveDir();
+  eq(JSON.parse(SENT[0][1]).source_dir, 'B:/nova', '„Uložiť" pošle B, nie starú A');
+
+  // ROZPÍSANÁ cesta má prednosť VŽDY — push ju neprepíše, ale riadok povie,
+  // čo je naozaj uložené.
+  T.SS.updater({ enabled: true, state: 'idle', source_dir: 'B:/nova', saved: true, current: '0.9.13' });
+  ELS.updDir.value = 'C:/rozpisana';
+  fireInput(updEl({ 'data-updater-edit': 'source_dir' }, 'C:/rozpisana'));
+  T.SS.updater({ enabled: true, state: 'newer', source_dir: 'D:/zvonku', current: '0.9.13',
+                 available: '0.9.14', token: 4 });
+  eq(ELS.updDir.value, 'C:/rozpisana', 'rozpísaná cesta prežije aj cudziu zmenu');
+  eq(T.updMerged().saved_dir, 'D:/zvonku', 'stav pozná ULOŽENÚ cestu…');
+  ok(A.nxUpdaterText(T.updMerged()).indexOf('D:/zvonku') > -1,
+     '…a stavový riadok ju MENUJE (človek vidí, čo je naozaj v nastavení)');
+  T.SS.updater({ enabled: true, state: 'idle', source_dir: 'X:/dist', saved: true, current: '0.9.13' });
+})();
+
 // --- 5) VSTUP DO SEKCIE = PRESNE JEDEN CHECK ---------------------------------
 
 (function(){
