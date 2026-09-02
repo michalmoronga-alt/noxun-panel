@@ -866,8 +866,10 @@
   // --- KOV-A1: PASS-THROUGH polí, ktoré A1 ešte needituje --------------------
   // `direction` · `wing_directions` · `opening_mode` · `drawer` žijú v datasete
   // riadku a `collectFronts` ich posiela naspäť NEZMENENÉ. Ovládače prídu v A2.
-  // ŽELEZNÉ PRAVIDLO: kľúč, ktorý config nemá, sa tu NIKDY nevyrobí — žiadne
-  // `|| 'unset'`, žiadne `|| 'classic'`, žiadny default strany.
+  // ŽELEZNÉ PRAVIDLO: kľúč, ktorý config nemá, sa tu NIKDY nevyrobí — žiadny
+  // `||` fallback na neurčený stav, na klasické otváranie ani na stranu pántov.
+  // (Guard v tests/pure/test_kova1_cela.rb stráži aj tento súbor, preto tu
+  // taký literál nesmie stáť ani v komentári.)
   var FRONT_EXTRA_KEYS = ['direction', 'wing_directions', 'opening_mode', 'drawer'];
   function frontExtraStore(row, item){
     var out = {}, n = 0;
