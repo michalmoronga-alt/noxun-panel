@@ -109,6 +109,9 @@ je vedomé rozhodnutie auditu #14 (BLOCKER 5): kolízia so zásuvkovým čelom b
 pri prepnutí typu ostávajú **dormant pod starým kľúčom** (vzor `migrate_overrides`) a po návrate sa obnovia — nikdy sa neprenášajú.
 `human_label` má vetvy `/flap` → „F2 · **výklop**" alebo „**sklop**" (podľa `type` resolved čela; bez zhody neutrálne „výklop/sklop" — nikdy sa nič neodhaduje) a `/blind` → „F2 · blenda".
 
+**KOV-A2b — `front_id(key)`:** čistý parser, ktorý z kľúča dielca vytiahne ID čela (`front:F2/wing:single` → `F2`), inak `nil`. Formát kľúča je kontrakt tohto modulu, takže druhý
+parser inde by sa časom rozišiel; jediný čitateľ je zatiaľ deep-link „klik na RED nález otvorí kartu čela" (`ProductionCore.do_select` → `Panel.push_focus_front`).
+
 ### build_plan.rb
 
 **ZÁVÄZNÝ kontrakt plánu** (SCHEMA 2, MIN_DIM, validátor, `warnings[]`, hardware string-keyed s GENERIC_TYPES/limitmi/referenčnou integritou ownera). Geometria, kusovník aj VEPO

@@ -410,7 +410,11 @@ druhé (`nx_edge_menu_open` / `edge_menu_open` → `Engine.close_edge_menu(sourc
 pre smer kresby (`nx_grain_toggle` → `Engine.toggle_grain_check`, pull `grain_check`, push `NX.setGrainCheck`, prisvietenie z čistej `NXShell.grainRail`); detail je v odseku
 **grain_check**.
 
-**Tretia funkčná položka je od v0.8.13 „Viditeľnosť tagov" (D-27)** — `railTagy` v obale `.railmenu`, ikona `eye`/`eye-off`, kľúč merača `rail:tagy`. **Nie je to toggle:** celé
+**Pod ním stojí od KOV-A2b tretí funkčný prepínač „Smer otvárania"** (`railSmer`, ikona `direction`, kľúč merača `rail:smer`) — opäť ten istý vzor a tá istá zdieľaná logika, len
+pre smer otvárania čiel (`nx_direction_toggle` → `Panel.handle_direction_toggle` → `Engine.toggle_direction_check`, pull `direction_check`, push `NX.setDirectionCheck`,
+prisvietenie a bublina z čistej `NXShell.directionRail`); detail je v odseku **direction_check**.
+
+**Ďalšia funkčná položka je od v0.8.13 „Viditeľnosť tagov" (D-27)** — `railTagy` v obale `.railmenu`, ikona `eye`/`eye-off`, kľúč merača `rail:tagy`. **Nie je to toggle:** celé
 tlačidlo otvára **okno so zoznamom NOXUN tagov modelu** (`#railTagsMenu`, overlay pri raile — v obsahu panela nepribudol žiadny riadok), preto **nemá rohový trojuholník** a
 `aria-haspopup`/`aria-expanded` nesie samo; obal **nesmie** byť `.railfly` (ten kreslí `::after` trojuholník každému `.railbtn` v sebe). Markup kreslí čistý modul
 `ui/js/tag_menu.js` (`NXTagMenu.menuHtml` / `railState` / `togglePayload`) — **vlastný malý markup, nie zdieľaný `edge_menu.js`** (iné nastavenie; UI_DIZAJN §5.11: zdieľa sa zóna
@@ -1515,12 +1519,20 @@ jadro je `ProductionCore.do_select`), **ceruzka** = to isté + `focus_inspector`
 modal**, nie sľub), rozpočtový nález nemá entitu v modeli a **od ŠT-1c PR B1 vedie do SEKCIE Rozpočet toho istého okna** (`studioGoSection('budget')` + `budGoto(budget_section)` —
 server skladá adresu, klik zostáva v okne; premostenie do okna Výroba zaniklo spolu s ním).
 
-**Š10 lišta sekcie** nesie OBA prepínače: „Zvýrazniť hrany" ako tlačidlo s **rohovým trojuholníkom** (klik na telo prepína, klik na roh otvára 3-stavové nastavenie — zdieľaný
-`edge_menu.js`, od ŠT-1c PR B3 **druhá (a posledná) inštancia**, poloha cez `.ecmenu-studio`) a „Smer kresby" (K2/D-87). Zatvára ich **klik mimo aj Escape** (vzor `bindEdgeMenu` v
-raile) a otvorenie zavrie kópiu v raile (`edge_menu_open` → `Engine.close_edge_menu(:studio)`; tretia inštancia — okno Výroba — zanikla v ŠT-1c PR B3, takže sú už len dve).
+**Š10 lišta sekcie** nesie od KOV-A2b TRI prepínače: „Zvýrazniť hrany" ako tlačidlo s **rohovým trojuholníkom** (klik na telo prepína, klik na roh otvára 3-stavové nastavenie —
+zdieľaný `edge_menu.js`, od ŠT-1c PR B3 **druhá (a posledná) inštancia**, poloha cez `.ecmenu-studio`), „Smer kresby" (K2/D-87) a **„Smer otvárania"** (KOV-A2b, `dcBtn`/`data-dc`,
+`directionBtnHtml` + `directionCheckText` — obyčajné tlačidlá, nemajú čo nastavovať). Zostáva pri tom **JEDEN riadok a jeden text lišty** (vertikálny priestor je vzácny; stráži
+test). Rozbaľovacie okno hrán zatvára **klik mimo aj Escape** (vzor `bindEdgeMenu` v raile) a otvorenie zavrie kópiu v raile (`edge_menu_open` → `Engine.close_edge_menu(:studio)`;
+tretia inštancia — okno Výroba — zanikla v ŠT-1c PR B3, takže sú už len dve).
 
 **Š11 badge**: navigačná položka Kontrola nesie živé RED/ORANGE počty **z tých istých `counts`** ako semafor (čistá zákazka badge nekreslí). Payload sekcie chodí **v tom istom
-pushi ako Kusovník** (`control` · `counts` · `edge_check` · `grain_check`) — prepnutie sekcie je čisto zobrazovacie a nesmie chodiť na server.
+pushi ako Kusovník** (`control` · `counts` · `edge_check` · `grain_check` · `direction_check`) — prepnutie sekcie je čisto zobrazovacie a nesmie chodiť na server. Každý prepínač má
+navyše **lacné echo** (`push_edge_check` / `push_grain_check` / `push_direction_check`), ktorým sa po prepnutí odkiaľkoľvek prekreslí LEN lišta.
+
+**Deep-link Kontrola → karta čela (KOV-A2b):** ceruzka pri RED náleze „smer otvárania" najprv vyberie dielec v modeli (existujúca cesta `problem_key` → `pids_for_problem`
+s `owner_pid` scope) a potom — a **len keď je Inspector otvorený** — pošle `NX.focusFront(front_id)`. `front_id` vytiahne zo `part_key` zdieľaný `PartKeys.front_id`; klient prepne
+kontext na **Čelá**, otvorí kartu práve toho čela (`openFrontCardId` + `refreshFrontCards`) a doscrolluje riadok. **Žiadny nový stav na serveri** a pri neznámom ID sa neotvorí nič
+(cudzia otvorená karta by klamala). Opačný smer (panel → Štúdio) existoval už predtým.
 
 **Vedomé odchýlky:** režim „diel po diele" (D-95) je mimo dávky (blok KONTROLA+VÝROBA). Testy: `tests/pure/test_st1b_kontrola.rb`, `tests/js/test_st1b_kontrola.js` (+ presunuté
 sady `test_d104`/`test_d105`/`test_k2`/`test_abs_rail_3stav`), in-SketchUp sekcia `run_st1b`.

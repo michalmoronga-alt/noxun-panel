@@ -17,6 +17,25 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-A2b · SMER OTVÁRANIA V MODELI — UZÁVER SLICE A (PR #282, v0.9.17, 3.9.2026):** druhá polovica rezu A2 a s ňou **koniec celého slice KOV-A** (A1 #280 dátová vrstva ·
+  A2a #281 karta čela · A2b #282 overlay). Nový modul **`core/direction_check.rb`** je **presné zrkadlo `grain_check.rb`** — ten istý lifecycle overlayu, tá istá pamäť
+  prepínača v `%APPDATA%`, ten istý broadcast do oboch okien. Vlastný modul (nie ďalší stav K2) zámerne: K2 hovorí o smere **kresby dekoru**, toto o smere **otvárania**, a obe
+  prekrytia môžu byť zapnuté naraz nad tým istým čelom.
+  **Zdroj je ULOŽENÝ CONFIG, nikdy geometria:** per top-level inštancia sa číta `front_items` a `Fronts.direction_slots` (jediná definícia aplikovateľnosti z A1), dielec sa
+  dohľadá podľa `part_key`. Kreslí sa **per INŠTANCIA** — dve skrinky so zdieľaným `cabinet_id` majú každá svoj config a in-SU scenár dokazuje **dva rôzne symboly nad tým istým
+  vnoreným dielcom** (zdieľaná definícia = zhodné `entityID`). Trojstav R-39 platí bez výnimky: `left`/`right` → šípka · `unset` → prerušovaný kruh a „?" · **kľúč chýba
+  (legacy) → NIČ**. Výber symbolu je zrkadlom `frontDirSymbol`/`frontTypeSymbol`/`frontWingSymbols` v `ui/js/core.js` a dokazuje to **spoločná tabuľka fixtúr**
+  `tests/fixtures/kova2b_symbols.json`, ktorú čítajú OBE sady — rozchod modelu a náhľadu padne naraz (nový vzor pre budúce Ruby↔JS zrkadlá).
+  **Farby:** `#880e4f` pre vyriešené symboly (najbližší sused je smer kresby na vzdialenosť 99 v RGB — viac než už prijatá dvojica kresba/hover 81) a `#e65100` = token
+  `--nx-warn-fg` pre „?" a jeho kruh, teda **ten istý jantár, akým svieti badge „smer?"** v Inspectorovi. Priznaná blízkosť jantára k oranžovej `EdgeCheck::EXTRA` je **vedomá**:
+  rozhoduje odstup „neurčené" vs „vyriešené" (140), a stavy olepu sú tenké plôšky NA HRANÁCH, kým „?" je glyf v STREDE čela.
+  **Deep-link (otvorený bod z A2a) je uzavretý:** ceruzka pri RED náleze najprv vyberie dielec v modeli a potom pošle do Inspectora `NX.focusFront(front_id)` — **žiadny nový
+  stav na serveri**, `front_id` vytiahne zdieľaný `PartKeys.front_id` a rozhodnutie „prepni kontext, otvor kartu, doscrolluj" robí klient; zavretý Inspector nedostane nič.
+  **Testy:** 35 headless + 84 JS kontrol + **in-SU sekcia `run_kova2b`** (30 scenárov: lifecycle z oboch vstupov, žiadna zmena modelu ani krok Späť, symbol na správnom krídle
+  a na prednej ploche, prestavba a Ctrl+Z, prepnutie dokumentu, duplicate-ID). **Výkon: 36,8 ms** na 40 skrinkách / 486 dielcoch (cieľ < 300 ms) — sken beží len pri zapnutí a po
+  `ModelObserver` dirty, `draw` je lazy nad hotovými GL poľami. Mutácie: overlay zapisuje do modelu · JS odvodzuje stranu pre legacy · stav ide len jednému oknu — všetky tri
+  spadli na tom teste, ktorý ich má chytať.
+
 - **KOV-A2a · ČELÁ — KARTA ČELA A NÁHĽAD (PR #281, v0.9.16, 3.9.2026):** UI polovica slice A (package KOV-A2 sa vedome režal na **A2a karta** + **A2b overlay**, aby PR
   ostalo malé a bez in-SU povinnosti). **Rozbaľovačka typu `select.ftype` ZANIKLA** — typ žije v `dataset.frontType` (vzor D-90 `profile`) a vyberá sa **typegridom šiestich
   piktogramov** v **karte čela** `.fcard`. Karta je **tretí potomok stĺpca `.frow`** (za `.fmain` a `.fhw`), teda **priamo pod svojím riadkom** — *vedomá odchýlka od mockupu*,

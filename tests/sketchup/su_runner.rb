@@ -11695,9 +11695,11 @@ module NoxunSuRunner
 
       cid = e::Store.get(inst, 'cabinet_id').to_s
       cfg_before = e::Store.get(inst, 'config').to_s
-      ents_before = model.entities.length
       gen = e::StudioDialog.instance_variable_get(:@generation).to_i
+      # MARKER = posledna REALNA operacia pred prepnutim; pocet entit sa berie
+      # AZ PO nom (marker sam je entita — inak by test meral vlastnu stopu).
       marker = r03_marker(model, markers)
+      ents_before = model.entities.length
 
       # 2) ZAPNUTIE ZO STUDIA: overlay v modeli, kresli, MODEL SA NEZMENIL
       e::StudioDialog.do_direction_check({ 'gen' => gen, 'model_guid' => guid }.to_json)
