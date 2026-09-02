@@ -167,6 +167,13 @@ module Noxun
           false
         end
 
+        # D-52b (bariéra pred swapom): protajsok `Panel.dialog_closed?` —
+        # `true` az ked dobehol `set_on_closed` (referencia okna je `nil`).
+        # Viditelnost nestaci: CEF moze este drzat subory z `ui/`.
+        def dialog_closed?
+          @dialog.nil?
+        end
+
         # D-52b: identita PRAVE ZIJUCEJ instancie okna. Je sucastou tokenu
         # asynchronnej kontroly verzie — odpoved, ktora dobehne do INEJ
         # instancie (okno sa medzitym zavrelo a znovu otvorilo), sa zahadzuje.

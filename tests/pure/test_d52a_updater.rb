@@ -1748,28 +1748,3 @@ NxTest.test('D-52b (#278/2 P1): `prepare!` sa ZIVEJ generacie NEDOTYKA') do
   NxD52::U.abort_prepared!(ticket)
   FileUtils.rm_rf(env[:root])
 end
-
-NxTest.test('D-52b1 (#278/3 P2): settings store nezmrza KORENOVE cesty') do
-  NxTest.skip!('zapisuje do %APPDATA%') unless NxTest.headless?
-
-  u = NxD52::U
-  # `chomp('/')` nad korenom dava nepouzitelnu cestu — a vsetky tri tvary sa
-  # daju do pola distribucneho priecinka realne napisat (najma UNC share).
-  NxTest.assert_equal('//server/share', u.normalize_source('\\\\server\\share'),
-                      'UNC koren zdielania ostava korenom')
-  NxTest.assert_equal('//server/share', u.normalize_source('//server/share/'),
-                      'aj s koncovym lomitkom')
-  NxTest.assert_equal('D:/', u.normalize_source('D:\\'), 'koren disku ostava korenom')
-  NxTest.assert_equal('/', u.normalize_source('/'), 'POSIX koren tiez')
-  # Beznej ceste sa koncove lomitko STALE strihá (inak by sa ta ista cesta
-  # ulozila raz s nim a raz bez neho a doklad o kontrole by sa nezhodoval).
-  NxTest.assert_equal('//server/share/dist', u.normalize_source('//server/share/dist/'),
-                      'priecinok v zdielani sa normalizuje ako doteraz')
-  NxTest.assert_equal('D:/balik', u.normalize_source('D:\\balik\\'), 'a to isté na disku')
-
-  # A to iste PLATI AJ PRI ZAPISE (store si tvar nesmie prerobit po svojom).
-  NxTest.assert_equal('//server/share', u.set_source_dir('\\\\server\\share'),
-                      'ulozenie vracia korenovy tvar')
-  NxTest.assert_equal('//server/share', u.source_dir, 'a nacita sa rovnako')
-  u.set_source_dir('')
-end

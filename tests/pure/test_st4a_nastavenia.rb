@@ -88,11 +88,10 @@ NxTest.test('ŠT-4a: akcie sekcie maju JEDINY whitelist a prefixovane mena') do
   NxTest.assert(sd.const_defined?(:SECTION_ACTIONS), 'whitelist zije v module')
   actions = sd::SECTION_ACTIONS
   NxTest.assert(actions.frozen?, 'zoznam je uzavrety')
-  # D-52b1 pridala dve akcie updatera sekcie `about` (kontrola verzie a uloženie
-  # distribučného priečinka). Samotné aplikovanie (`updater_apply`) je dávka
-  # D-52b2 — presná rovnosť drží ďalej.
-  NxTest.assert_equal(%w[ss_save ss_reload updater_check updater_set_dir], actions,
-                      'ulozenie + nacitanie nanovo + dve akcie updatera — nic viac')
+  # D-52b pridala tri akcie updatera sekcie `about` (kontrola verzie, ulozenie
+  # distribucneho priecinka, samotna aktualizacia) — presna rovnost drzi dalej.
+  NxTest.assert_equal(%w[ss_save ss_reload updater_check updater_set_dir updater_apply], actions,
+                      'ulozenie + nacitanie nanovo + tri akcie updatera — nic viac')
   # `save`/`reload`/`ready` su prilis vseobecne mena na to, aby zili v JEDNOM
   # priestore callbackov okna vedla akcii ostatnych sekcii.
   %w[save reload ready].each do |bare|
