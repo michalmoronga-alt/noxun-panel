@@ -496,3 +496,89 @@ NxTest.test('H2 GH#133 P2: poskodene sety projektu = sablona sa ulozi BEZ kovani
 ensure
   NxH2.wipe_library!
 end
+
+# --- KOV-B1: BEZSTRATOVA BRANA DEFINICII SETOV (audit #17 BLOCKER 1) ---------
+#
+# H2 riesila bezstratove citanie MAPOVANIA sablony. Definicie setov
+# (`hardware_set_defs`) isli dovtedy len cez tolerantny `normalize_sets`, takze
+# sablona z novsej verzie by sa do .skp zmrazila UZ OREZANA (a nikto by uz
+# nevedel, ze tam nieco bolo). Od KOV-B1 ich obe cesty — VKLAD aj POUZITIE —
+# posudia `HardwareSets.assess_set_defs` a odmietnu BEZ zapisu do modelu.
+
+NxTest.test('KOV-B1/H2: definicie setov sa citaju BEZSTRATOVO alebo vobec') do
+  hws = NxH2::HWS
+  plain = NxH2.set_def('zaves-klasik', 'hinge', '104717')
+  klas = plain.merge('use_type' => 'door', 'opening_mode' => 'classic',
+                     'manufacturer' => 'Hettich')
+  NxTest.assert_equal([:ok, {}], hws.assess_set_defs(nil), 'legacy sablona bez definicii')
+  NxTest.assert_equal(:ok, hws.assess_set_defs('zaves-klasik' => plain)[0])
+  NxTest.assert_equal(:ok, hws.assess_set_defs('zaves-klasik' => klas)[0], 'nas vlastny tvar')
+  # tvary z NOVSEJ verzie / rucne upravena sablona
+  {
+    'neznamy kluc setu' => plain.merge('rating' => 3),
+    'neznamy typ pouzitia' => klas.merge('use_type' => 'sliding'),
+    'novy tvar `active`' => plain.merge('active' => 'zajtra'),
+    'neznamy kluc clena' => plain.merge('members' => [{ 'code' => 'X', 'per' => 'unit',
+                                                        'qty' => 1, 'per_length_mm' => 10 }])
+  }.each do |why, bad|
+    status, lost = hws.assess_set_defs('zaves-klasik' => bad)
+    NxTest.assert_equal(:lossy, status, "#{why}: musi sa ODMIETNUT")
+    NxTest.assert_equal(['zaves-klasik'], lost, "#{why}: hlaska menuje definiciu")
+  end
+  NxTest.assert_equal([:lossy, ['hardware_set_defs']], hws.assess_set_defs(42),
+                      'uplne cudzi tvar')
+end
+
+NxTest.test('KOV-B1/H2 vklad: sablona s novsimi definiciami sa ODMIETNE (model netknuty)') do
+  defs = { 'zaves-klasik' => NxH2.set_def('zaves-klasik', 'hinge', '104717')
+                                 .merge('use_type' => 'sliding') }
+  params = { 'type' => 'lower', 'hardware_sets' => { 'hinge' => 'zaves-klasik' },
+             'hardware_set_defs' => defs }
+  status, lost = NxH2::PANEL.take_insert_hardware!(params)
+  NxTest.assert_equal(:lossy_defs, status, 'vlastny status = vlastna hlaska pre pouzivatela')
+  NxTest.assert_equal(['zaves-klasik'], lost)
+  # Brana bezi PRED `prepare_insert` aj pred ghost session — v modeli sa
+  # nesmie stat NIC (kontrakt cesty; geometricka cast je in-SU `run_kovb1`).
+  s = File.binread(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_cabinet.rb'))
+          .force_encoding(Encoding::UTF_8).gsub("\r\n", "\n")
+  body = s[/^        def handle_insert.*?\n        end\n/m].to_s
+  NxTest.assert(!body.empty?, 'telo `handle_insert` sa naslo')
+  gate = body.index('take_insert_hardware!(params)')
+  prep = body.index('CabinetBuilder.prepare_insert(')
+  ghost = body.index('GhostTool.start(')
+  NxTest.assert(gate && prep && ghost, 'brana, priprava aj ghost su v tele')
+  NxTest.assert(gate < prep && gate < ghost, 'brana bezi PRVA — ziadna operacia sa neotvori')
+end
+
+NxTest.test('KOV-B1/H2 pouzitie: brana definicii bezi PRED prestavbou') do
+  s = File.binread(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'templates_dialog.rb'))
+          .force_encoding(Encoding::UTF_8).gsub("\r\n", "\n")
+  body = s[/^        def handle_apply.*?\n        end\n/m].to_s
+  NxTest.assert(!body.empty?, 'telo `handle_apply` sa naslo')
+  gate = body.index('HardwareSets.assess_set_defs(')
+  build = body.index('CabinetBuilder.rebuild_many(')
+  NxTest.assert(gate && build, 'brana aj prestavba su v tele')
+  NxTest.assert(gate < build, 'brana je PRED prestavbou (ziadny zapis do modelu)')
+  NxTest.assert(body.include?('Nepoužitá, nič sa nezmenilo'),
+                'a hlaska hovori, ze sa nic nestalo')
+end
+
+NxTest.test('KOV-B1/H2: platne definicie prechadzaju a zmrazuju sa ako doteraz') do
+  hws = NxH2::HWS
+  klas = NxH2.set_def('zaves-vlastny-b1', 'hinge', '104717')
+              .merge('use_type' => 'door', 'opening_mode' => 'classic',
+                     'manufacturer' => 'Hettich', 'series' => 'Sensys')
+  NxH2.wipe_library!
+  m = NxH2::Model.new
+  res = hws.freeze_template_sets!(m, { 'hinge' => 'zaves-vlastny-b1' }, { 'zaves-vlastny-b1' => klas })
+  NxTest.assert_equal(:ok, res['status'])
+  NxTest.assert_equal(['zaves-vlastny-b1'], res['added'])
+  frozen = m.snapshot_sets['zaves-vlastny-b1']
+  NxTest.assert_equal('door', frozen['use_type'], 'klasifikacia sa zmrazi CELA')
+  NxTest.assert_equal('Sensys', frozen['series'])
+  snap = JSON.parse(m.get_attribute(Noxun::Engine::Store::DICT, hws::MODEL_KEY))
+  NxTest.assert_equal(hws::STD_CLASSIFIED, snap['std'],
+                      'snapshot s klasifikaciou dostane std 3 (starsi plugin ho odmietne)')
+ensure
+  NxH2.wipe_library!
+end

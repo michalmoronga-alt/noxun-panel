@@ -405,3 +405,125 @@ NxTest.test('d2 katalog GH#128: redirect URL a cas fetchu putuju do zaznamu') do
   NxTest.assert_equal('2026-07-30T08:00:00Z', rec['price_checked_at'],
                       'datum overenia = cas FETCHU, nie kliku na Vytvorit')
 end
+
+# --- KOV-B1: vyrobca a rada polozky ------------------------------------------
+
+NxTest.test('KOV-B1 katalog: `manufacturer`/`series` su VOLITELNE a normalizuju sa') do
+  rec, err = HWC.normalize_item(hwc_item('manufacturer' => ' Hettich ', 'series' => ' Sensys '))
+  NxTest.assert_equal(nil, err)
+  NxTest.assert_equal('Hettich', rec['manufacturer'], 'trim')
+  NxTest.assert_equal('Sensys', rec['series'])
+  bez = HWC.normalize_item(hwc_item)[0]
+  NxTest.refute(bez.key?('manufacturer'), 'bez vyrobcu = kluc CHYBA (skrutky ho mat nemusia)')
+  NxTest.refute(bez.key?('series'))
+  prazdna = HWC.normalize_item(hwc_item('manufacturer' => 'Hettich', 'series' => '  '))[0]
+  NxTest.refute(prazdna.key?('series'), 'prazdna rada sa neuklada')
+  NxTest.assert(HWC::PATCHABLE.include?('manufacturer') && HWC::PATCHABLE.include?('series'),
+                'obe polia su editovatelne patchom (whitelist je KONTRAKT)')
+end
+
+NxTest.test('KOV-B1 katalog: marker schemy je LAZY podla obsahu') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  hwc_empty!
+  NxTest.assert_equal(HWC::SCHEMA_BASE, HWC.schema_for([]), 'prazdny katalog')
+  NxTest.assert_equal(HWC::SCHEMA_BASE, HWC.schema_for([hwc_item]), 'polozky bez vyrobcu')
+  NxTest.assert_equal(HWC::SCHEMA_CLASSIFIED,
+                      HWC.schema_for([hwc_item('manufacturer' => 'Hettich')]))
+  NxTest.assert_equal(HWC::SCHEMA_CLASSIFIED,
+                      HWC.schema_for([hwc_item('series' => 'Sensys')]), 'aj samotna rada')
+  # ostry zapis: kym nikto vyrobcu nema, subor ostava citatelny pre STARSI plugin
+  NxTest.assert_equal(:ok, HWC.create_item(hwc_item)[0])
+  stored = JSON.parse(File.binread(HWC.path))
+  NxTest.assert_equal(HWC::SCHEMA_BASE, stored['schema'], 'legacy obsah = schema 1')
+  rec = HWC.find('104717')
+  NxTest.assert_equal(:ok, HWC.patch_item('104717', { 'manufacturer' => 'Hettich' },
+                                          row_rev: HWC.record_rev(rec))[0])
+  stored2 = JSON.parse(File.binread(HWC.path))
+  NxTest.assert_equal(HWC::SCHEMA_CLASSIFIED, stored2['schema'],
+                      'prvy vyrobca marker POVYSI (starsi plugin subor odmietne)')
+  NxTest.assert_equal(:ok, HWC.assess!, 'a nas vlastny zapis je VZDY citatelny')
+end
+
+NxTest.test('KOV-B1 katalog: ne-String vyrobca/rada = necitatelne polozky (read-only)') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  hwc_empty!
+  bad = HWC.normalize_item(hwc_item)[0].merge('manufacturer' => { 'id' => 7 })
+  Noxun::Engine::JsonFileStore.write(HWC.path,
+                                     'std' => HWC::STD, 'schema' => HWC::SCHEMA_CLASSIFIED,
+                                     'items' => [bad])
+  Noxun::Engine::JsonFileStore.invalidate(HWC.path)
+  HWC.reset_state!
+  NxTest.assert_equal(:read_only, HWC.assess!, 'novsi TVAR znameho pola sa NEOREZE ticho')
+  NxTest.assert(HWC.state_reason.include?('nečitateľné'), HWC.state_reason)
+end
+
+NxTest.test('KOV-B1 katalog: hladanie indexuje vyrobcu aj radu') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  hwc_empty!
+  list = [HWC.normalize_item(hwc_item('manufacturer' => 'Hettich', 'series' => 'InnoTech Atira'))[0],
+          HWC.normalize_item(hwc_item('item_code' => '999111', 'name_sk' => 'Skrutka',
+                                      'category' => 'SPOJOVACI_MATERIAL'))[0]]
+  NxTest.assert_equal(['104717'], HWC.search(list, 'hettich').map { |i| i['item_code'] },
+                      'dotaz na vyrobcu najde polozku')
+  NxTest.assert_equal(['104717'], HWC.search(list, 'atira').map { |i| i['item_code'] },
+                      'aj na radu (diakritika/velkost sa normalizuje)')
+  NxTest.assert_equal([], HWC.search(list, 'blum'), 'cudzi vyrobca nic nenajde')
+end
+
+NxTest.test('KOV-B1 katalog: vyrobca polozky musi byt v TAXONOMII') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  tax = Noxun::Engine::HardwareTaxonomy
+  tax_path = tax.path
+  before = (File.binread(tax_path) if File.exist?(tax_path))
+  begin
+    hwc_empty!
+    FileUtils.rm_f(tax_path)
+    Noxun::Engine::JsonFileStore.invalidate(tax_path)
+    tax.reset_state!
+    NxTest.assert_equal(:ok, HWC.create_item(hwc_item)[0], 'polozka BEZ vyrobcu prejde vzdy')
+    status, msg = HWC.create_item(hwc_item('item_code' => '999222',
+                                           'manufacturer' => 'Vymyslena'))
+    NxTest.assert_equal(:invalid, status)
+    NxTest.assert(msg.to_s.include?('Vymyslena'), msg.to_s)
+    NxTest.assert_equal(:ok, HWC.create_item(hwc_item('item_code' => '999333',
+                                                      'manufacturer' => 'Hettich',
+                                                      'series' => 'Sensys'))[0],
+                        'seedovana dvojica prejde')
+    st2, msg2 = HWC.create_item(hwc_item('item_code' => '999444',
+                                         'manufacturer' => 'Blum', 'series' => 'Sensys'))
+    NxTest.assert_equal(:invalid, st2, 'rada musi patrit svojmu vyrobcovi')
+    NxTest.assert(msg2.to_s.include?('Hettich'), msg2.to_s)
+    # patch: kontroluje sa EFEKTIVNA dvojica (patch prebija ulozene)
+    rec = HWC.find('999333')
+    NxTest.assert_equal(:invalid,
+                        HWC.patch_item('999333', { 'series' => 'Neznama' },
+                                       row_rev: HWC.record_rev(rec))[0])
+    NxTest.assert_equal(:ok,
+                        HWC.patch_item('999333', { 'series' => 'Quadro' },
+                                       row_rev: HWC.record_rev(rec))[0],
+                        'ina rada TOHO ISTEHO vyrobcu prejde')
+  ensure
+    if before then File.binwrite(tax_path, before) else FileUtils.rm_f(tax_path) end
+    FileUtils.rm_f("#{tax_path}.bak")
+    Noxun::Engine::JsonFileStore.invalidate(tax_path)
+    tax.reset_state!
+  end
+end
+
+NxTest.test('KOV-B1 katalog: kontrola taxonomie bezi MIMO katalogoveho zamku') do
+  # Taxonomia ma vlastny sidecar (`materials.lock`); vnorit ho do katalogoveho
+  # by vyrobilo PORADIE zamkov a s nim riziko zaseknutia dvoch instancii.
+  src = File.binread(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'hardware_catalog.rb'))
+            .force_encoding(Encoding::UTF_8).gsub("\r\n", "\n")
+  %w[create_item patch_item].each do |m|
+    body = src[/^      def #{Regexp.escape(m)}.*?\n      end\n/m].to_s
+    NxTest.assert(!body.empty?, "telo `#{m}` sa naslo")
+    gate = body.index('taxonomy_refusal(')
+    lock = body.index('with_lock do')
+    NxTest.assert(gate && lock, "#{m}: kontrola aj zamok su v tele")
+    NxTest.assert(gate < lock, "#{m}: taxonomia sa pyta PRED katalogovym zamkom")
+  end
+  refusal = src[/^      def taxonomy_refusal.*?\n      end\n/m].to_s
+  NxTest.assert(refusal.include?('HardwareTaxonomy.read_only?'),
+                'fail-closed: nad nekompatibilnou taxonomiou sa polozka s vyrobcom neulozi')
+end
