@@ -59,7 +59,11 @@
   izolovaným `%APPDATA%`: std 3 v súbore aj v .skp, nákup s klasifikáciou totožný s legacy setom, šablóna z novšej verzie odmietnutá bez jedinej operácie, zápis výrobcu bez
   kroku Späť). **Mutácie (5, každá overená):** legacy setu sa doplní klasifikácia · `active` sa uloží aj ako `true` · brána šablón ignoruje stratu klasifikácie · triedny
   kľúč sa pri round-tripe zahodí · `save_set!` neurobí merge. Sada R-07 už marker „novšej verzie" nepíše ručne (`newer_std` = `STD_SUPPORTED.max + 1`) — std 3 je od tejto
-  dávky náš. **Codex review:** doplní uzáver po merge.
+  dávky náš. **Codex kolo 1 = 3×P2 → interná delta-verifikácia** (nové GH kolo sa nežiadalo, pravidlo z 29.8.): *(P2-A)* kontrola taxonómie prijímala „hettich" cez slug, ale
+  ukladala zápis volajúceho — `HardwareTaxonomy.resolve_classification` vracia kanonické mená a `save_set!` aj `create_item`/`patch_item` ukladajú výhradne tie (7314980);
+  *(P2-B)* `read_template_mapping` hľadal stratu v SUROVOM zápise kľúča, takže platný nekanonický triedny kľúč (` CLASS: Hinge | Classic `) šablónu falošne odmietol — porovnáva
+  sa kanonický tvar (`canonical_mapping_key`, 5922146); *(P2-C)* `assess_set_defs` pri dvoch definíciách s rovnakým `set_id` ticho prepísal prvú, kým `collect_set_defs` drží
+  prvú — duplicita je odteraz strata a šablóna sa odmietne (d8a4ba1). Každá oprava má vlastný test (headless 2615/0), delta overená orchestrátorom.
 
 - **KOV-H1 · AD-HOC KOVANIE — DÁTOVÁ VRSTVA (v0.9.18, 3.9.2026):** prvá polovica slice H (rez H1/H2 podľa Codex auditu #15). Pravidlá a sety pokrývajú len to, čo sa dá
   odvodiť; **zvyšok musí ísť pridať ručne** — zámok, špeciálny doraz, položka mimo katalógu. H1 prináša **celý dátový kontrakt bez štipky UI** (to je H2), takže navonok je
