@@ -987,6 +987,18 @@ module Noxun
         Array(collected.is_a?(Hash) ? collected[:newer_configs] : nil).map(&:to_s)
       end
 
+      # KOV-H1 (review #283 P2-B): hotova hlaska brany novsej schemy, alebo nil.
+      # Vola sa HNED po `fresh_collect` vo VSETKYCH TROCH exportoch — pred
+      # expanziou, pred rozpoctom aj pred ich skorymi navratmi. Dovod: zakazka
+      # z novsej verzie nemusi vyexpandovat ani jeden znamy riadok (alebo jej
+      # rozpocet vobec nevznikne), takze skory navrat by branu PREDBEHOL a
+      # pouzivatel by dostal „model nema kovanie" namiesto zoznamu skriniek
+      # a pokynu aktualizovat plugin.
+      def newer_config_stop(collected)
+        blockers = export_blockers(newer: newer_configs(collected))
+        blockers.empty? ? nil : export_blocked_status(blockers)
+      end
+
       # Strop na tri ID + „a ďalšie N" — jedno znenie pre sufix, zoznam dovodov
       # aj branu, aby sa tri texty o tej istej veci nemohli rozist.
       def dup_ids_text(dups)
@@ -1046,7 +1058,10 @@ module Noxun
       #             aj ponuka); varovacia polovica sem NEPATRI,
       #   `cp:`   — LEN ponuka (zaporna zostava, nesulad s rozpoctom),
       #   `newer:`— ID skriniek z NOVSEJ verzie pluginu (`Bom.collect`
-      #             `newer_configs`); nakupny CSV, rozpocet aj ponuka.
+      #             `newer_configs`); nakupny CSV, rozpocet aj ponuka. Posiela
+      #             ho VYHRADNE `newer_config_stop`, ktory bezi HNED po zbere —
+      #             pred expanziou aj pred skorymi navratmi (review #283 P2-B),
+      #             takze do tohto neskoreho volania uz `newer:` nepatri.
       # -> [dovod, ...]; prazdne pole = zapis smie prebehnut.
       #
       # KOV-H1 (audit #15 BLOCKER 3): NOVSIA SCHEMA CONFIGU je tvrdy dovod.
@@ -1511,6 +1526,14 @@ module Noxun
 
         refresh_vepo_settings # 1b-6c: nazov zakazky z CERSTVEHO suboru
         collected = fresh_collect(model)
+        # KOV-H1 / review #283 P2-B: brana NOVSEJ SCHEMY musi padnut HNED po
+        # zbere — pred expanziou aj pred „niet co exportovat". Skrinka z novsej
+        # verzie totiz nemusi vyexpandovat ani jeden znamy riadok a skory navrat
+        # by ju prekryl hlaskou o prazdnom modeli: pouzivatel by sa nedozvedel
+        # ani ID skriniek, ani to, ze ma aktualizovat plugin.
+        newer_stop = newer_config_stop(collected)
+        return status.call(newer_stop, true) if newer_stop
+
         exp = hardware_expansion(model, collected)
         return status.call('Nákupný zoznam sa nedá zostaviť (pozri Ruby konzolu).', true) if exp.nil?
 
@@ -1522,7 +1545,7 @@ module Noxun
         # podpocitane kovanie; toto CSV ide dodavatelovi, takze nesmie vzniknut.
         # Blokuje LEN skutocna kolizia (review #252 P2) — rozhoduje expanzia.
         blocking_dups, warn_dups = dup_partition(collected, exp)
-        blockers = export_blockers(dups: blocking_dups, newer: newer_configs(collected))
+        blockers = export_blockers(dups: blocking_dups)
         return status.call(export_blocked_status(blockers), true) unless blockers.empty?
 
         # audit #1: nazov projektu je SERVEROVA autorita (jeden nazov pre
@@ -2070,6 +2093,12 @@ module Noxun
 
         refresh_vepo_settings # 1b-6c: nazov zakazky z CERSTVEHO suboru
         collected = fresh_collect(model)
+        # KOV-H1 / review #283 P2-B: brana novsej schemy PRED vsetkym ostatnym —
+        # aj pred „rozpocet sa nepodarilo zostavit" a pred `budget_std_block`,
+        # ktore by nekompatibilnu zakazku prekryli inou hlaskou.
+        newer_stop = newer_config_stop(collected)
+        return status.call(newer_stop, true) if newer_stop
+
         bom = Bom.compute(collected)
         # Expanzia sa pocita RAZ a odovzda sa rozpoctu (inak by ju zostavil
         # sam) — brana z nej cita, ci duplicitne ID naozaj zlieva vlastnikov.
@@ -2088,7 +2117,7 @@ module Noxun
         # (riadky bez ceny) ho zastavi prvykrat a druhy klik ju s potvrdenim
         # prejde. Varovanie pod hotovym harkom bolo v oboch pripadoch neskoro.
         blocking_dups, warn_dups = dup_partition(collected, hw_exp)
-        blockers = export_blockers(dups: blocking_dups, newer: newer_configs(collected))
+        blockers = export_blockers(dups: blocking_dups)
         return status.call(export_blocked_status(blockers), true) unless blockers.empty?
 
         unpriced = export_confirmations(budget: budget)
@@ -2139,6 +2168,10 @@ module Noxun
 
         refresh_vepo_settings # 1b-6c: nazov zakazky z CERSTVEHO suboru
         collected = fresh_collect(model)
+        # KOV-H1 / review #283 P2-B: TA ISTA brana ako pri rozpocte — najprv.
+        newer_stop = newer_config_stop(collected)
+        return status.call(newer_stop, true) if newer_stop
+
         bom = Bom.compute(collected)
         smap = sheets_map
         hw_exp = hardware_expansion(model, collected)
@@ -2165,7 +2198,7 @@ module Noxun
         # a neblokuje) — vyhodnocuje sa az nad hotovym harkom a ide do
         # `cp_warnings`.
         blocking_dups, warn_dups = dup_partition(collected, hw_exp)
-        blockers = export_blockers(dups: blocking_dups, cp: cp, newer: newer_configs(collected))
+        blockers = export_blockers(dups: blocking_dups, cp: cp)
         return status.call(export_blocked_status(blockers), true) unless blockers.empty?
 
         unpriced = export_confirmations(budget: budget)

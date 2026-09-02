@@ -43,6 +43,14 @@
   dve katalógové položky rovnakého kódu = jeden riadok s jednou živou cenou, mŕtvy vlastník = ORANGE a položka ostáva v nákupe, čítanie bez kroku Späť, šablóna). Sada si
   testovací kód katalógu zakladá a po sebe maže. **Mutácie (5):** pole vypadne z `config_to_params` · cena katalógovej položky sa uloží · snapshot víťazí nad živým katalógom ·
   `note_manual` započíta ad-hoc · brána novšej schémy sa vynechá v CP exporte. **CONFIG_SCHEMA 2 → 3** — model uložený od v0.9.18 už starší plugin neprestaví ani nevyexportuje.
+  **Codex kolo 1 = 2×P2 → interná delta-verifikácia** (nové GH kolo sa nežiadalo, pravidlo delta-verifikácie z 29.8.). *(P2-A)* Prísna validácia bežala na **celom** zozname,
+  lenže panel posiela v každom `collectAll()` echo celého uloženého zoznamu — nezmenené položky sa teda posudzovali, akoby ich používateľ práve pridal: po zmiznutí kódu
+  z katalógu by neprešla žiadna ďalšia editácia skrinky a zmazanie čela-vlastníka by sa odmietlo namiesto toho, aby položka prežila ako `owner_missing` (teda presne proti
+  BLOCKERU 4). Oprava je čistá `manual_strict_subset(stored, submitted)` + parameter `strict_ids:`; odtlačok obsahu porovnáva **normalizované** hodnoty a pri katalógovej
+  položke **vynecháva `name`/`unit`** (vlastní ich server, takže premenovanie v katalógu nesmie vyzerať ako editácia). *(P2-B)* Brána novšej schémy stála **až za** skorým
+  návratom „model nemá kovanie" — zákazka z novšej verzie pritom nemusí vyexpandovať ani jeden známy riadok, takže hláška o skrinkách a pokyn aktualizovať plugin sa k človeku
+  vôbec nedostali. Brána sa presunula do `newer_config_stop(collected)` **hneď za `fresh_collect`** vo všetkých troch exportoch (a z neskorého `export_blockers` zmizla, aby
+  žila na jednom mieste). Obe opravy majú vlastné testy vrátane in-SU scenára „zmaž čelo-vlastníka cez `apply_all` → prestavba prejde, položka ostáva".
 
 - **KOV-A2b · SMER OTVÁRANIA V MODELI — UZÁVER SLICE A (PR #282, v0.9.17, 3.9.2026):** druhá polovica rezu A2 a s ňou **koniec celého slice KOV-A** (A1 #280 dátová vrstva ·
   A2a #281 karta čela · A2b #282 overlay). Nový modul **`core/direction_check.rb`** je **presné zrkadlo `grain_check.rb`** — ten istý lifecycle overlayu, tá istá pamäť

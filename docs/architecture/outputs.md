@@ -102,6 +102,11 @@ nemal ako zbadať. Zdrojom je aditívny `Bom.collect` kľúč **`newer_configs`*
 vedomie", dá sa len aktualizovať plugin. **VEPO bránu opäť nedostáva** — je to rezací výstup z rozmerov dielcov, ktoré staršia verzia číta správne (rovnaká výnimka ako pri
 duplicitách). Že sú to práve **tri** výstupy, stráži guard test v `tests/pure/test_kovh1_adhoc.rb`.
 
+**Táto brána sa vyhodnocuje HNEĎ po `fresh_collect`** — cez `newer_config_stop(collected)`, teda **pred expanziou, pred rozpočtom aj pred ich skorými návratmi** (review #283
+P2-B). Dôvod: zákazka z novšej verzie nemusí vyexpandovať ani jeden **známy** nákupný riadok (alebo jej rozpočet vôbec nevznikne), takže skorý návrat „model nemá žiadne
+kovanie" / „rozpočet sa nepodarilo zostaviť" by bránu **predbehol** a používateľ by sa nedozvedel ani ID skriniek, ani to, že má aktualizovať plugin. `newer:` preto do
+**neskorého** `export_blockers` (spolu s `dups:`/`cp:`) už nechodí — skladá ho výhradne `newer_config_stop`, jedno miesto pre všetky tri exporty.
+
 *(2) POTVRDITEĽNÁ — `export_confirmations(budget:)`.* Dnes jediný dôvod: **riadky bez ceny**. STANDARD §11.3 hovorí, že neznáma cena sa NIKDY nenahradí nulou, ale má sa **priznať**
 („medzisúčet je len zo známych cien a súhrn nahlas povie, že nie je úplný") — **rozpracovaný rozpočet je legitímny stav zákazky** a plošný tvrdý blok by používateľovi bral výstup,
 na ktorý má právo (nález Codex review PR #250 proti auditu). Default je teda zastavené, ale **cesta von existuje**: `export_confirm_status` ponúkne druhý klik, ten pošle

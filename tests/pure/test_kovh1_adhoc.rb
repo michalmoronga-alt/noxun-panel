@@ -173,8 +173,8 @@ module NxKovh1
       hardware_manual: [], newer_configs: newer }
   end
 
-  def export_stubs(collected)
-    exp = { 'rows' => [{ 'code' => 'KOVH-A', 'quantity' => 2, 'sources' => [] }], 'unmapped' => [] }
+  def export_stubs(collected, rows: [{ 'code' => 'KOVH-A', 'quantity' => 2, 'sources' => [] }])
+    exp = { 'rows' => rows, 'unmapped' => [] }
     budget = { 'totals' => { 'total' => 100.0, 'unknown_count_in_total' => 0 },
                'cp_preview' => { 'total' => 100.0, 'rows' => [], 'assembly' => 10.0,
                                  'assembly_negative' => false, 'consistent' => true, 'diff' => 0.0 } }
@@ -185,13 +185,14 @@ module NxKovh1
   end
 
   # -> [status, chyba?, subory v priecinku, volania pickera]
-  def run_export(method, collected, file_name)
+  def run_export(method, collected, file_name, rows: nil)
     msg = nil
     err = nil
     calls = []
     files = nil
+    stubs = rows.nil? ? export_stubs(collected) : export_stubs(collected, rows: rows)
     Dir.mktmpdir('nx-kovh1-') do |dir|
-      with_stubs(export_stubs(collected)) do
+      with_stubs(stubs) do
         with_ui(File.join(dir, file_name), calls) do
           PC.send(method, :model, { 'gen' => 1 }, generation: 1,
                                   status: ->(m, e = false) { msg = m; err = e },
@@ -559,10 +560,13 @@ NxTest.test('KOV-H1 (B3): `newer_configs` zastavi nakup aj obe cenove vystupy, V
   # Hlaska TVRDEJ brany hovori, ze subor NEVZNIKOL.
   NxTest.assert(pc.export_blocked_status(b).include?('nevytvoril'))
 
-  # VEPO branu nedostava — v zdroji sa `newer:` odovzdava PRAVE trom exportom.
+  # VEPO branu nedostava — branu vola PRAVE tri exporty a PRAVE cez jedno
+  # miesto (`newer_config_stop`), aby sa nedala v jednom z nich zabudnut.
   src = NxKovh1.src('ui/production_core.rb')
-  NxTest.assert_equal(3, src.scan('newer: newer_configs(collected)').length,
+  NxTest.assert_equal(3, src.scan('newer_stop = newer_config_stop(collected)').length,
                       'presne tri exporty: nakupny CSV, rozpocet XLSX, ponuka XLSX')
+  NxTest.assert_equal(1, src.scan('newer: newer_configs(collected)').length,
+                      'jedine miesto, kde sa `newer:` sklada — `newer_config_stop`')
 end
 
 NxTest.test('KOV-H1 (B3): `Bom.collect` nesie ID skriniek z NOVSEJ verzie (aditivny kluc)') do
@@ -593,6 +597,24 @@ NxTest.test('KOV-H1 (B3): pri novsej scheme SUBOR NEVZNIKNE — cielovy priecino
     NxTest.assert(err, "#{method}: status je cerveny")
     NxTest.assert(msg.include?('CAB-004'), "#{method}: hlaska menuje skrinku — #{msg}")
     NxTest.assert(msg.include?('nevytvoril'), "#{method}: a hovori, ze subor NEVZNIKOL — #{msg}")
+  end
+end
+
+NxTest.test('KOV-H1 (review #283 P2-B): brana padne aj ked zakazka NEEXPANDUJE ani jeden riadok') do
+  NxTest.skip!('exportne testy bezia len headless (fake UI)') unless NxTest.headless?
+  # Skrinka z novsej verzie nemusi dat ani jeden ZNAMY nakupny riadok. Skory
+  # navrat „model nema kovanie" ju predtym prekryl a pouzivatel sa nedozvedel
+  # ani ID skriniek, ani to, ze ma aktualizovat plugin.
+  { do_hw_csv: 'kovanie.csv', do_budget_xlsx: 'rozpocet.xlsx', do_cp_xlsx: 'ponuka.xlsx' }
+    .each do |method, name|
+    msg, err, files, calls = NxKovh1.run_export(method, NxKovh1.newer_collected, name, rows: [])
+    NxTest.assert_equal([], files, "#{method}: subor nesmie vzniknut")
+    NxTest.assert_equal([], calls, "#{method}: picker sa ani neotvoril")
+    NxTest.assert(err, "#{method}: status je cerveny")
+    NxTest.assert(msg.include?('CAB-004'), "#{method}: hlaska MENUJE skrinku — #{msg}")
+    NxTest.assert(msg.include?('aktualizuj plugin'), "#{method}: a hovori, co s tym — #{msg}")
+    NxTest.refute(msg.include?('niet čo exportovať'),
+                  "#{method}: skory navrat branu uz NEPREDBIEHA — #{msg}")
   end
 end
 
