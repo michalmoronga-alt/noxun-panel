@@ -448,6 +448,57 @@ function qa(sel){ return ROOT.querySelectorAll(sel); }
   eq(DOC.getElementById('nxm_qty').value, '4', 'rozpisane mnozstvo prezilo prepnutie');
   eq(DOC.getElementById('nxm_note').value, 'poznámka', 'aj poznamka');
 
+  // P2-F: DRAFT OBOCH ZDROJOV prezije prepinanie. Prepnutie meni sadu poli,
+  // takze hodnoty prave nevykresleneho zdroja musia zit v drafte — inak cesta
+  // „voľná -> katalóg -> voľná" zahodi napisany nazov aj cenu.
+  reset({ manual: [], view: [] });
+  HW.onHwManualAdd();
+  DOC.getElementById('nxm_qty').value = '3';
+  const src1 = DOC.getElementById('nxm_source');
+  src1.value = 'free';
+  dispatch(src1, 'change');
+  DOC.getElementById('nxm_name').value = 'Zámok Abloy';
+  DOC.getElementById('nxm_price').value = '12,50';
+  DOC.getElementById('nxm_unit').value = 'par';
+  const src2 = DOC.getElementById('nxm_source');
+  src2.value = 'catalog';
+  dispatch(src2, 'change');
+  ok(!!DOC.getElementById('nxm_code'), 'po prepnuti na katalog sa pyta kod');
+  const codeQ = q('[data-nxm-lkq="code"]');
+  codeQ.value = 'uholnik';                      // ROZPISANY dotaz BEZ vyberu
+  dispatch(codeQ, 'input');
+  const src3 = DOC.getElementById('nxm_source');
+  src3.value = 'free';
+  dispatch(src3, 'change');
+  eq(DOC.getElementById('nxm_name').value, 'Zámok Abloy',
+     'nazov volnej polozky PREZIL cestu voľná -> katalóg -> voľná');
+  eq(DOC.getElementById('nxm_price').value, '12,50', 'aj cena');
+  eq(DOC.getElementById('nxm_unit').value, 'par', 'aj MJ');
+  eq(DOC.getElementById('nxm_qty').value, '3', 'aj mnozstvo (spolocne pole)');
+  const src4 = DOC.getElementById('nxm_source');
+  src4.value = 'catalog';
+  dispatch(src4, 'change');
+  eq(q('[data-nxm-lkq="code"]').value, 'uholnik',
+     'a NEVYBRANY dotaz katalogu prezil prepnutie tam aj spat');
+  eq(global.NXModal.values().code, '', 'pritom nic vybrane nebolo');
+
+  // Hodnoty NEAKTIVNEHO zdroja sa do configu NEDOSTANU.
+  const rec = HW.hwManualRecord({ source: 'catalog', code: '93240', qty: '3',
+                                  name: 'Zámok Abloy', price: '12,50', unit: 'par' }, null);
+  ok(!('name' in rec) && !('price_eur_vat' in rec) && !('unit' in rec),
+     'katalogovy zaznam nesie LEN kod — draft druheho zdroja je len pre obrazovku');
+
+  // Cista funkcia zlucenia: chybajuce kluce sa NEPREPISUJU.
+  const merged = HW.hwManualMergeDraft({ name: 'A', price: '1', code: 'X', qty: '1' },
+                                       { qty: '9', source: 'free' }, null);
+  eq(merged.name, 'A', 'kluc, ktory vo `values()` nie je, ostava z draftu');
+  eq(merged.price, '1', 'aj cena');
+  eq(merged.qty, '9', 'a vykresleny sa prepise');
+  eq(merged.source, 'free', 'zdroj sa prevezme');
+  eq(HW.hwManualMergeDraft({ code_text: 'stary' }, {}, 'novy').code_text, 'novy',
+     'dotaz hladania sa berie z pola (vo `values()` nie je)');
+  reset({ manual: [], view: [] });
+
   // MAZANIE: bez potvrdzovacieho okna, jednym krokom Spat.
   reset({ manual: [{ id: 'H1', source: 'catalog', code: '93240', qty: 2 },
                    { id: 'H2', source: 'free', name: 'Zámok Abloy', unit: 'ks', qty: 1 }],

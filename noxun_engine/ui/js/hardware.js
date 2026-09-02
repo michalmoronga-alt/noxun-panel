@@ -1094,7 +1094,10 @@
     // AZ ZA `open`: kostra najprv zatvara predchadzajuci modal, takze jeho
     // `onClose` by novy stav hned vynuloval.
     HW_MAN = { id: item ? String(item.id) : null, kind: item ? 'edit' : 'add',
-               sent: false, token: null };
+               sent: false, token: null,
+               // P2-F: draft prezije prepinanie zdroja — su v nom aj hodnoty
+               // toho zdroja, ktory prave nie je vykresleny.
+               draft: draft || hwManualDraft(item) };
   }
   function onHwManualAdd(){ hwManualOpen(null, null); }
   function onHwManualEdit(btn){
@@ -1102,23 +1105,43 @@
     if (!it){ NX.setStatus('Položka sa medzitým zmenila — panel sa obnovil.', true); return; }
     hwManualOpen(it, null);
   }
+  // Vliatie VIDITELNYCH hodnot do draftu. Kluce, ktore prave vykreslene nie su
+  // (druhy zdroj), sa NEPREPISUJU — draft si ich drzi dalej. CISTA funkcia.
+  //
+  // Codex #285 kolo 2 P2-F: predtym sa draft skladal z ULOZENEJ polozky +
+  // prave vykreslenych poli, takze cesta „voľná -> katalóg -> voľná" zahodila
+  // napisany nazov aj cenu (a rovnako nevybrany dotaz katalogu). Hodnoty
+  // NEAKTIVNEHO zdroja ziju VYHRADNE v drafte — do `values()` ani do configu
+  // sa nedostanu (`hwManualRecord` cita len polia svojho zdroja).
+  var HW_MAN_DRAFT_KEYS = ['owner', 'qty', 'note', 'code', 'code_text', 'name', 'unit', 'price'];
+
+  function hwManualMergeDraft(base, values, queryText){
+    var d = {};
+    var b = base || {};
+    var k;
+    for (k in b){ if (Object.prototype.hasOwnProperty.call(b, k)) d[k] = b[k]; }
+    var v = values || {};
+    HW_MAN_DRAFT_KEYS.forEach(function(key){
+      if (v[key] != null) d[key] = String(v[key]);
+    });
+    if (v.source === 'free' || v.source === 'catalog') d.source = v.source;
+    // Nevybrany dotaz katalogu nie je vo `values()` (kontrakt `lookup` vracia
+    // LEN kod) — cita sa z pola hladania, inak by sa prepnutim stratil.
+    if (queryText != null) d.code_text = String(queryText);
+    return d;
+  }
+
   // Prepnutie „Zdroj" meni SADU POLI, a tu kostra D-15 za behu nevymiena —
-  // modal sa preto otvori znova s TYM, CO UZ POUZIVATEL NAPISAL (hodnoty
-  // nesie draft, nie pamat: pamat by sa spoliehala na porovnanie s defaultmi).
+  // modal sa preto otvori znova s TYM, CO UZ POUZIVATEL NAPISAL. Hodnoty nesie
+  // DRAFT MODALU (nie pamat: tá porovnava proti defaultom a hodnoty druheho,
+  // prave nevykresleneho zdroja by nemala proti comu merat).
   function hwManualCtxSwitch(){
     if (!HW_MAN || typeof NXModal === 'undefined' || !NXModal.isOpen || !NXModal.isOpen()) return;
     if (NXModal.isBusy && NXModal.isBusy()) return;   // bezi zapis — nesahat
-    var v = NXModal.values() || {};
     var item = HW_MAN.id ? hwManualFind(HW_MAN.id) : null;
-    var d = hwManualDraft(item);
-    d.owner = String(v.owner == null ? d.owner : v.owner);
-    d.source = (v.source === 'free') ? 'free' : 'catalog';
-    d.qty = String(v.qty == null ? d.qty : v.qty);
-    d.note = String(v.note == null ? d.note : v.note);
-    if (v.code != null) d.code = String(v.code);
-    if (v.name != null) d.name = String(v.name);
-    if (v.unit != null) d.unit = String(v.unit);
-    if (v.price != null) d.price = String(v.price);
+    var qn = (typeof el === 'function') ? el('nxm_code_q') : null;
+    var base = HW_MAN.draft || hwManualDraft(item);
+    var d = hwManualMergeDraft(base, NXModal.values(), qn ? qn.value : null);
     hwManualOpen(item, d);
   }
   if (typeof document !== 'undefined' && document.addEventListener){
@@ -1378,6 +1401,7 @@
       hwManualOwnerOptions: hwManualOwnerOptions,
       hwManualItemText: hwManualItemText, hwManualDraft: hwManualDraft,
       hwManualFields: hwManualFields, hwManualHit: hwManualHit,
+      hwManualMergeDraft: hwManualMergeDraft,
       hwManualValidate: hwManualValidate, hwManualParsePrice: hwManualParsePrice,
       hwManualRecord: hwManualRecord, hwManualNextList: hwManualNextList,
       // CELY tok modalu (mini-DOM): otvorenie -> hladanie -> odoslanie ->
