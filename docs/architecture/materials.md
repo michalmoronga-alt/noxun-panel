@@ -196,6 +196,12 @@ počet pások bez štruktúry a bez universal (banner O2). Seedy sú od 2A-4b na
 pravidlové ABS defaulty podľa roly (free_panel aj rail_front/rail_back = 1 pozdĺžna 1,0 mm). Rozsah je **GLOBÁLNY** (`%APPDATA%\NOXUN\Engine\abs_rules.json`) — spoločný pre všetky
 zákazky a zmena **neprestaví** už postavené skrinky (na rozdiel od pravidiel kovania, ktoré majú projektový snapshot).
 
+**KOV-A1 — `SEED_VERSION` 2 → 3** (história: 1 = `free_panel`, 2 = D-30 dlhá hrana výstuh, **3 = roly čiel `flap` a `false_front`**). Obe nové roly majú v `SEED_RULES` **4 hrany
+1,0 mm** ako dvierka a rovnaké `EDGE_LABELS` (Ľavá/Pravá/Dolná/Horná) aj `edge_sides` (`EDGE_SIDES_FRONT` — dĺžka čela beží zvisle). Bez bumpu by ich `merge_seed_roles` na
+existujúcich inštaláciách **nikdy nedoplnil** (`ensure_seeded` zapisuje len keď súbor chýba) a výklop by sa postavil bez olepu. Merge doplní **len chýbajúce roly** — používateľom
+upravené hodnoty ostávajú nedotknuté a jednorazová rail migrácia (`file_version < 2`) sa týmto bumpom **neopakuje**. V prehľade ABS pravidiel (sekcia `rules` Štúdia) sa nové roly
+volajú **„Výklop/sklop"** a **„Blenda"** — názov roly `flap` je zámerne neutrálny, lebo tú istú rolu nesie výklop aj sklop (detail v [outputs.md](outputs.md), `ROLE_LABELS`).
+
 **UI konzument od ŠT-3b-2a: skupina „ABS podľa roly dielca" v sekcii `rules` okna ŠTÚDIO — LEN NA ČÍTANIE** (editor pravidiel ABS v pluginu neexistuje a hint sekcie to priznáva).
 Riadok skladá SERVER (`RulesDialog.abs_rule_row`) z `EDGE_LABELS` + `ProductionCore.role_label`; hovorí o **HRÚBKE** („predná 1,0 mm"), **nikdy o páske ani dekore** — ten sa
 dopočíta z materiálu dielca až pri stavbe. Poradie rolí určuje `RulesDialog::ABS_ROLE_ORDER` (rola z novšej verzie sa pripojí na koniec, nezamlčí sa).

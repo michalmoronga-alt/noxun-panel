@@ -38,8 +38,13 @@ module Noxun
       # (free_panel, V0.4.7) na existujucich instalaciach nikdy neobjavila
       # (ensure_seeded zapisuje len ked subor chyba). Uz ulozene roly sa NEPREPISUJU;
       # jedina vynimka je jednorazova rail migracia pri bumpe na 2 (viz merge_seed_roles).
-      # Historia: 1 = free_panel; 2 = D-30 default dlhej hrany vystuh (rail_front/rail_back).
-      SEED_VERSION = 2
+      # Historia: 1 = free_panel; 2 = D-30 default dlhej hrany vystuh (rail_front/rail_back);
+      # 3 = KOV-A1 nove roly ciel flap (vyklop/sklop) a false_front (blenda) —
+      # bez bumpu by ich `merge_seed_roles` na existujucich instalaciach nikdy
+      # nedoplnil a vyklop by sa postavil BEZ olepu. Doplna sa LEN chybajuca
+      # rola; ulozene (pouzivatelske) hodnoty ostavaju nedotknute a jednorazova
+      # rail migracia (`file_version < 2`) sa tymto bumpom NEOPAKUJE.
+      SEED_VERSION = 3
       # Roly, ktore pri bumpe na SEED_VERSION 2 dostanu novy default aj v EXISTUJUCOM
       # subore, ale IBA ak su tam ulozene ako PRESNE prazdny hash {} (povodny stock stav).
       RAIL_MIGRATION_ROLES = %w[rail_front rail_back].freeze
@@ -59,6 +64,10 @@ module Noxun
         'divider_h'    => { 'L1' => 'Predná', 'L2' => 'Zadná',  'W1' => 'Ľavá',  'W2' => 'Pravá' },
         'front_door'   => { 'L1' => 'Ľavá',   'L2' => 'Pravá',  'W1' => 'Dolná', 'W2' => 'Horná' },
         'drawer_front' => { 'L1' => 'Ľavá',   'L2' => 'Pravá',  'W1' => 'Dolná', 'W2' => 'Horná' },
+        # KOV-A1: vyklop/sklop a blenda stoja v rovine ciel a maju rovnaku
+        # orientaciu dlzky (zvisle) — labely aj strany su ako u ciel.
+        'flap'         => { 'L1' => 'Ľavá',   'L2' => 'Pravá',  'W1' => 'Dolná', 'W2' => 'Horná' },
+        'false_front'  => { 'L1' => 'Ľavá',   'L2' => 'Pravá',  'W1' => 'Dolná', 'W2' => 'Horná' },
         'back'         => { 'L1' => 'Dolná',  'L2' => 'Horná',  'W1' => 'Ľavá',  'W2' => 'Pravá' },
         'plinth'       => { 'L1' => 'Dolná',  'L2' => 'Horná',  'W1' => 'Ľavá',  'W2' => 'Pravá' },
         # Vystuhy: labely NEUTRALNE (ako free_panel) — pri upright orientacii L1 NIE JE
@@ -84,8 +93,8 @@ module Noxun
 
       # Pravidlove defaulty ABS podla roly (hodnota = HRUBKA ABS v mm; dekor sa dopocita z materialu
       # dielca). Prazdna mapa = ziadne ABS. Standard 7.5 + zadanie V0.3 + D-30:
-      #   celo (front_door/drawer_front) -> vsetky 4 hrany 1.0 (olepenie dookola OSTAVA —
-      #                                     Michalove exporty: dvierka vzdy so 4 hranami)
+      #   celo (front_door/drawer_front,   -> vsetky 4 hrany 1.0 (olepenie dookola OSTAVA —
+      #         KOV-A1 + flap/false_front)    Michalove exporty: dvierka vzdy so 4 hranami)
       #   polica (shelf)                 -> predna 1.0 (viditelna celna hrana police)
       #   boky (side_left/right)         -> predna 1.0
       #   dno/vrch (bottom/top)          -> predna 1.0
@@ -97,6 +106,10 @@ module Noxun
       SEED_RULES = {
         'front_door'   => { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 },
         'drawer_front' => { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 },
+        # KOV-A1: vyklop/sklop (flap) a blenda (false_front) su cela -> olepenie
+        # dookola ako dvierka (SEED_VERSION 3).
+        'flap'         => { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 },
+        'false_front'  => { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 },
         'shelf'        => { 'L1' => 1.0 },
         'side_left'    => { 'L1' => 1.0 },
         'side_right'   => { 'L1' => 1.0 },
@@ -402,7 +415,7 @@ module Noxun
       # stranach; ostatne (lezace) L na vodorovnych. UI (SVG) kresli hrany + labely + klik podla tejto mapy.
       def edge_sides(role)
         case role.to_s
-        when 'front_door', 'drawer_front' then EDGE_SIDES_FRONT
+        when 'front_door', 'drawer_front', 'flap', 'false_front' then EDGE_SIDES_FRONT
         else EDGE_SIDES_LYING
         end
       end

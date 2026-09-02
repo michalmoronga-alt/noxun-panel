@@ -631,19 +631,36 @@ doskočí na **box vlastníka** (`hwBoxByGroup(hwFrontGroup(fid))` — kľúč s
 **Materiál čiel** má DRUHÝ ovládač (`cab_front_c`) priamo v zozname, lebo sektor Materiály patrí kontextu Korpus a tu je skrytý — tá istá hodnota, dva vstupné body, synchro drží
 každá cesta, ktorá siaha na `cab_front`.
 
-**Výklop** je v ponuke typov ako **disabled** voľba s upozornením (rola `flap` potrebuje vlastnú cestu cez builder/ABS/kusovník — vedomá odchýlka, dôvod v
-`SYSTEM/zdroje/ui20/UI20_KONTRAKT.md`); popis voľby je krátky zámerne — celá veta žije v `title` selectu a v hinte skupiny. *(Pôvodný dôvod „dlhý text by rad zalomil" po SMOKE
-PACKU 1 zanikol: `flex-basis` selectu je 0 a rad sa nezalamuje. Krátky popis ostáva preto, že select je najužší prvok riadku a orezaná voľba nič nepovie.)*
+**Výklop · Sklop · Blenda** sú v ponuke typov ako **tri disabled voľby** (KOV-A1 nahradila pôvodnú jedinú „Výklop (fáza 3)"). Dátovo už existujú — builder ich postaví, ABS
+olepí, kusovník aj VEPO ich nesú — ale **ovládač k nim príde až v KOV-A2** (typegrid s piktogramami), preto sú neaktívne. V ponuke stáť MUSIA: `select.value = typ` funguje aj na
+disabled voľbu, takže config z API si typ udrží a prvá editácia iného poľa ho neprepne späť na „Dvierka" (vzor D-90 P1 — projekcia nesmie stratiť pole). Popis voľby je krátky
+zámerne — celá veta žije v `title` selectu a v hinte skupiny. *(Pôvodný dôvod „dlhý text by rad zalomil" po SMOKE PACKU 1 zanikol: `flex-basis` selectu je 0 a rad sa nezalamuje.
+Krátky popis ostáva preto, že select je najužší prvok riadku a orezaná voľba nič nepovie.)*
+
+**KOV-A1 pass-through:** `addFrontRow` odkladá `direction`, `wing_directions`, `opening_mode` a `drawer` do `row.dataset.frontExtra` (**len prítomné kľúče**) a `collectFronts` ich
+vracia späť **bez akéhokoľvek defaultu** — vzor D-90 `profile`, ale s tvrdým rozdielom: kľúč, ktorý config nemal, sa tu nesmie objaviť, inak by legacy zákazka dostala RED nález
+o neurčenom smere. Guard v `tests/pure/test_kova1_cela.rb` stráži telo oboch funkcií aj prítomnosť troch neaktívnych volieb.
+
+**Popis typu v náhľade (Codex #280 P2-C):** `preview.js` má mapu **`PV_FRONT_TYPE_DESC`** + čistú `frontTypeDesc(type)` — jedno miesto, kde typ dostáva slovo
+(`dvierka · zásuvka · výklop · sklop · blenda`). Do KOV-A1 sa každé ne-zásuvkové a ne-`none` čelo popisovalo ako „dvierka", takže pri configu z API sa rozbaľovačka v riadku
+volala „Výklop" a náhľad vedľa nej tvrdil „dvierka". Fallback `'dvierka'` ostáva, ale **už len pre NEZNÁMY typ** (napr. z novšej verzie). **Výplň, symboly (∧ / ∨ / X)
+a smery sa tu zámerne nemenia — to je KOV-A2**; táto oprava rieši výhradne text, aby si UI neprotirečilo. Testuje `tests/js/test_uib2_nahlad.js`.
 
 ### Úchytky = D-96 (form.js refreshFrontProfileUI / onFrontProfilePick + čisté funkcie v core.js)
 
 profil sa už **necyklí ikonou v riadku** (pri viacerých profiloch a budúcej voľbe hrany osadenia by to bolo nepoužiteľné) — nastavuje sa v skupine pre **ROZSAH** (`all` / `door` /
-`drawer_front`). Čisté funkcie: `frontProfileScopeItems` (typ `none` do rozsahu NIKDY nepatrí — rovnako to robí Ruby normalize) · `frontProfileCommon` → `'<id>'` | `''` (prázdny
+`drawer_front`). Čisté funkcie: `frontProfileScopeItems` (**profileless typy do rozsahu NIKDY nepatria — ani v „všetky"**) · `frontProfileCommon` → `'<id>'` | `''` (prázdny
 rozsah) | `null` (rôzne → **disabled** voľba „(rôzne)", nikdy tichý výber) · `frontProfileStateText` (veta „UKW-7: F1, F2 · bez profilu: F3"). Zápis ide do **tých istých dát**
 (`row.dataset.frontProfile`) a ďalej `collectFronts` → `apply_all`, takže server ostáva autoritou a nepribudlo žiadne nové pole ani callback. Aktivita sekcie závisí **výhradne od
 obsahu rozsahu**, NIE od `selectedCabId` — `refreshFrontProfileUI` beží z `renderFronts`, teda ešte pred tým, než `loadSelected` nastaví identitu.
 
 **Hrana osadenia sa neponúka**, kým ju registry (`core/front_profiles.rb`) nepozná.
+
+**KOV-A1 — profileless typy (Codex #280 P2-D).** Zoznam čiel, ktoré úchytkový profil mať NEMÔŽU, žije v `core.js` ako **`PROFILELESS_FRONT_TYPES`** (`none`, `lift`, `fall`,
+`blind`) + predikát `frontProfileless(type)` — je to **zrkadlo servera** (`Fronts::PROFILELESS_TYPES`) a Ruby guard v `tests/pure/test_kova1_cela.rb` stráži, že sa zoznamy
+nerozídu. Používajú ho **všetci traja**: `frontProfileScopeItems` (rozsah), `frontProfileStateText` (veta stavu — inak by hlásila „bez profilu: F2" o výklope) a
+`onFrontTypeChange` vo `form.js` (skryje indikátor a zhodí `dataset.frontProfile` na `'none'`). Bez zrkadla by UI ponúklo UKW profil na výklope, spustilo prestavbu a Ruby
+`normalize` by voľbu **ticho zahodilo** — používateľ by videl nastavenie, ktoré sa nikdy nikde neprejaví.
 
 ### N26 medzery jantárovo (preview.js)
 

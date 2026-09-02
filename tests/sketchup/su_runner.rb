@@ -11509,6 +11509,321 @@ module NoxunSuRunner
     end]
   end
 
+  # ========= KOV-A1: DATOVA VRSTVA CIEL (vyklop, sklop, blenda, smer) =======
+  #
+  # PRECO TU (headless sada to nedokaze): kontrakt a normalizacia ziju v
+  # `tests/pure/test_kova1_*.rb`, ale ci sa vyklop naozaj POSTAVI (plan -> model
+  # 1:1), ci ho unesie 19 mm celny material, ci nove polia prezijú SABLONU,
+  # KOPIU a PRESTAVBU, a ci CITANIE nalezov nespravi krok Spat — to sa da
+  # overit vyhradne nad zivym modelom.
+  #
+  # Scenare:
+  #   1) build lift / fall / blind — plan vs. model 1:1 (origin, box, rola, tag)
+  #   2) rebuild je reprodukovatelny a 1x Spat vrati vsetko
+  #   3) 19 mm celny material na vyklope AJ blende (docasny dekor, upratuje sa)
+  #   4) sablona s vyklopom + `direction` + `wing_directions` — polia prezijú
+  #   5) kopia skrinky prenesie nove polia
+  #   6) prepnutie typu cez config a spat — DORMANT hodnota prezije prestavbu
+  #   7) `hardware_issues` nad zivym modelom: `unset` = RED, legacy = nic
+  #   8) dup-ID: dve skrinky so zdielanym ID = JEDEN riadok Kontroly
+  #   9) CITANIE (Bom.collect + Validation) NEROBI krok Spat
+
+  KOVA_DECOR = 'SU TEST KOVA'
+  KOVA_TPL   = 'SU TEST KOVA vyklop'
+
+  def kova_params(items, over = {})
+    { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0,
+      'thickness' => 18.0, 'floor_height' => 100.0,
+      'fronts' => { 'items' => items } }.merge(over)
+  end
+
+  def kova_item(type, over = {})
+    { 'id' => 'F1', 'type' => type, 'mode' => 'auto', 'wings' => '1' }.merge(over)
+  end
+
+  # Dielce korpusu ako mapa part_key => instancia.
+  def kova_parts(inst)
+    inst.definition.entities.grep(Sketchup::ComponentInstance)
+        .select { |i| e::Store.kind(i) == 'part' }
+        .each_with_object({}) { |i, out| out[e::Store.get(i, 'part_key').to_s] = i }
+  end
+
+  # Porovna VSETKY celne dielce planu s modelom (origin, box, rola, tag).
+  def kova_check_front(model, inst, params, label, want_key, want_role)
+    cid = e::Store.get(inst, 'cabinet_id')
+    plan = e::Construction.build_plan(e::CabinetBuilder.normalize(params), cid)
+    pd = plan[:parts].find { |x| x[:part_key].to_s == want_key }
+    parts = kova_parts(inst)
+    pi = parts[want_key]
+    return ok("#{label}: dielec #{want_key} je v plane aj v modeli", false) unless pd && pi
+
+    po = pi.transformation.origin
+    org = [mm(po.x), mm(po.y), mm(po.z)]
+    b = pi.definition.bounds
+    dims = [mm(b.width), mm(b.height), mm(b.depth)]
+    bad = []
+    bad << "origin #{org.map { |v| v.round(2) }} != #{pd[:origin]}" unless
+      org.zip(pd[:origin]).all? { |a, x| (a - x.to_f).abs <= TOL }
+    bad << "box #{dims.map { |v| v.round(2) }} != #{pd[:box]}" unless
+      dims.zip(pd[:box]).all? { |a, x| (a - x.to_f).abs <= TOL }
+    ok("#{label}: plan vs. model 1:1 (#{bad.length} nezhod)#{bad.empty? ? '' : ' — ' + bad.join('; ')}",
+       bad.empty?)
+    ok("#{label}: rola v snapshote je #{want_role} (#{e::Store.get(pi, 'role')})",
+       e::Store.get(pi, 'role').to_s == want_role)
+    ok("#{label}: tag dielca je Noxun/Čelá (#{pi.layer.name})", pi.layer.name == 'Noxun/Čelá')
+    # Celo stoji PRED korpusom: zadna rovina panelu je na y = 0, telo v zapornom Y.
+    ok("#{label}: panel lezi v rovine ciel (zadna rovina y = 0)", (org[1] + dims[1]).abs <= TOL)
+    pi
+  end
+
+  # Resolved celo z ULOZENEHO configu (to, co cita Bom aj nahlad).
+  def kova_front_item(inst, fid = 'F1')
+    Array((e::Store.config(inst) || {})['front_items']).find { |f| f['id'].to_s == fid }
+  end
+
+  # Nalezy Kontroly kategorie `front_direction` nad ZIVYM modelom (produkcna cesta).
+  def kova_dir_items(model)
+    collected = e::Bom.collect(model)
+    Array(e::ProductionCore.control_payload(collected)['items'])
+      .select { |i| i['category'] == 'front_direction' }
+  end
+
+  def kova_cleanup_catalog(res)
+    return unless res.is_a?(Hash)
+
+    Array(res['sheets']).each { |id| e::Materials.delete_sheet(id) }
+    Array(res['edges']).each { |id| e::Materials.delete_edge(id) }
+  rescue StandardError => ex
+    log_line("INFO: KOV-A1 cleanup katalogu: #{ex.class}: #{ex.message}")
+  end
+
+  def run_kova(model)
+    cleanup(model)
+    markers = []
+
+    # --- 1) build vyklop / sklop / blenda: plan vs. model 1:1 ----------------
+    { 'lift'  => ['front:F1/flap',  'flap',        'KOV-A1 vyklop'],
+      'fall'  => ['front:F1/flap',  'flap',        'KOV-A1 sklop'],
+      'blind' => ['front:F1/blind', 'false_front', 'KOV-A1 blenda'] }.each do |type, (key, role, label)|
+      params = kova_params([kova_item(type)])
+      inst = e::CabinetBuilder.build(model, params)
+      next ok("#{label}: vlozenie korpusu", false) unless inst
+
+      kova_check_front(model, inst, params, label, key, role)
+      it = kova_front_item(inst)
+      ok("#{label}: ulozeny front_items nesie typ #{type}", it && it['type'] == type)
+      if %w[lift fall].include?(type)
+        want = type == 'fall' ? 'down' : 'up'
+        ok("#{label}: flap_dir = #{want} (#{it && it['flap_dir']})", it && it['flap_dir'] == want)
+      else
+        ok("#{label}: blenda flap_dir NEMA", it && !it.key?('flap_dir'))
+      end
+      # Kovanie: nove roly ziadne pravidlo nemaju, ale ani ziadny warning
+      # `profile_rule_missing` (profil je na nich normalizovany na none).
+      cfg = e::Store.config(inst) || {}
+      ok("#{label}: ziadny falosny profile_rule_missing",
+         Array(cfg['warnings']).none? { |w| w.is_a?(Hash) && w['code'] == 'profile_rule_missing' })
+
+      # --- 2) rebuild reprodukovatelny + 1x Spat -----------------------------
+      before = kova_parts(inst)[key]
+      bbox = before ? [mm(before.transformation.origin.z), mm(before.definition.bounds.depth)] : nil
+      e::CabinetBuilder.rebuild(model, inst, e::CabinetBuilder.config_to_params(cfg))
+      after = kova_parts(inst)[key]
+      abox = after ? [mm(after.transformation.origin.z), mm(after.definition.bounds.depth)] : nil
+      ok("#{label}: rebuild je reprodukovatelny (rovnaky dielec na rovnakom mieste)",
+         bbox && abox && bbox.zip(abox).all? { |a, b2| (a - b2).abs <= TOL })
+      m = r03_marker(model, markers)
+      e::CabinetBuilder.rebuild(model, inst,
+                                e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+                                  .merge('height' => 800.0))
+      Sketchup.undo
+      ok("#{label}: 1x Spat vratil prestavbu (vyska spat na 720)",
+         ((e::Store.config(inst) || {})['height'].to_f - 720.0).abs <= TOL)
+      ok("#{label}: prestavba bola PRESNE jeden krok Spat", m.valid?)
+      cleanup(model)
+    end
+    r03_clear_markers(model, markers)
+
+    # --- 3) 19 mm celny material na vyklope AJ blende ------------------------
+    res = nil
+    if e::Materials.sheets.any? { |s| s['decor'] == KOVA_DECOR }
+      info("KOV-A1: dekor #{KOVA_DECOR} uz v katalogu existuje — 19 mm scenar preskoceny")
+    else
+      seeded, res = e::Materials.add_decor_batch(
+        'batch_schema' => 3, 'decor' => KOVA_DECOR, 'manufacturer' => 'SU TEST', 'type' => 'DTDL',
+        'sheet_variants' => [{ 'thickness' => 19.0, 'structure' => 'SM' }]
+      )
+      m19 = seeded && e::Materials.sheets.find { |s| s['decor'] == KOVA_DECOR }
+      if m19.nil?
+        info("KOV-A1: seed 19 mm dekoru zlyhal (#{res.inspect}) — scenar preskoceny")
+        kova_cleanup_catalog(res)
+        res = nil
+      else
+        id19 = m19['material_id']
+        { 'lift' => ['front:F1/flap', 'vyklop'], 'blind' => ['front:F1/blind', 'blenda'] }.each do |type, (key, nm)|
+          params = kova_params([kova_item(type)], 'front_material_id' => id19)
+          inst = e::CabinetBuilder.build(model, params)
+          pi = inst && kova_parts(inst)[key]
+          th = pi ? mm(pi.definition.bounds.height) : nil # Y = hrubka cela
+          ok("KOV-A1 19 mm: #{nm} sa postavil s hrubkou 19 mm (#{th && th.round(2)})",
+             th && (th - 19.0).abs <= TOL)
+          org_y = pi ? mm(pi.transformation.origin.y) : nil
+          ok("KOV-A1 19 mm: #{nm} sa posunul pred korpus o novu hrubku (y = #{org_y && org_y.round(2)})",
+             org_y && (org_y + 19.0).abs <= TOL)
+          snap = pi ? (e::Store.config(pi) || {}) : {}
+          ok("KOV-A1 19 mm: #{nm} nesie 19 mm aj vo VYROBNOM snapshote",
+             (snap['thickness'].to_f - 19.0).abs <= TOL && snap['material_id'].to_s == id19)
+          cleanup(model)
+        end
+      end
+    end
+
+    # --- 4) sablona: vyklop + direction + wing_directions --------------------
+    src_items = [kova_item('lift', 'direction' => 'left',
+                                   'wing_directions' => { 'p2' => 'right' },
+                                   'opening_mode' => 'tipon')]
+    src = e::CabinetBuilder.build(model, kova_params(src_items))
+    if src
+      tpl_cfg = e::Panel.template_config_from(e::Store.config(src) || {}, model: model)
+      tit = Array((tpl_cfg['fronts'] || {})['items']).first || {}
+      ok('KOV-A1 sablona: whitelist sablony nesie typ, smer aj stredne kridla',
+         tit['type'] == 'lift' && tit['direction'] == 'left' &&
+         tit['wing_directions'] == { 'p2' => 'right' } && tit['opening_mode'] == 'tipon')
+      e::TemplateStore.delete('cabinet', KOVA_TPL) if e::TemplateStore.find('cabinet', KOVA_TPL)
+      if e::TemplateStore.upsert('cabinet', KOVA_TPL, tpl_cfg)
+        target = e::CabinetBuilder.build(model, kova_params([kova_item('door')]))
+        model.selection.clear
+        model.selection.add(target)
+        e::TemplatesDialog.handle_apply({ 'template' => KOVA_TPL }.to_json)
+        tgt = kova_front_item(target)
+        ok('KOV-A1 sablona: POUZITIE prenieslo typ vyklop aj vsetky nove polia',
+           tgt && tgt['type'] == 'lift' && tgt['direction'] == 'left' &&
+           tgt['wing_directions'] == { 'p2' => 'right' } && tgt['opening_mode'] == 'tipon')
+        ok('KOV-A1 sablona: cielova skrinka ma po pouziti dielec vyklopu',
+           !kova_parts(target)['front:F1/flap'].nil?)
+        e::TemplateStore.delete('cabinet', KOVA_TPL)
+      else
+        info("KOV-A1: sablonu #{KOVA_TPL} sa nepodarilo zapisat — sablonovy scenar preskoceny")
+      end
+
+      # --- 5) kopia skrinky prenesie nove polia -----------------------------
+      model.selection.clear
+      model.selection.add(src)
+      e::Panel.handle_insert_copy(pg(model, 'cabinet_id' => e::Store.get(src, 'cabinet_id')))
+      copy = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' && i != src }
+      cit = copy && kova_front_item(copy)
+      ok('KOV-A1 kopia: nove polia prezili „Vložiť kópiu"',
+         cit && cit['type'] == 'lift' && cit['direction'] == 'left' &&
+         cit['wing_directions'] == { 'p2' => 'right' } && cit['opening_mode'] == 'tipon')
+    end
+    cleanup(model)
+
+    # --- 6) prepnutie typu cez config a spat (DORMANT prezije prestavbu) -----
+    inst = e::CabinetBuilder.build(model, kova_params([kova_item('door', 'direction' => 'right')]))
+    if inst
+      p2 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+      p2['fronts']['items'][0]['type'] = 'drawer_front'
+      e::CabinetBuilder.rebuild(model, inst, p2)
+      mid = kova_front_item(inst)
+      ok('KOV-A1 dormant: po prepnuti na zasuvku smer v configu OSTAVA',
+         mid && mid['type'] == 'drawer_front' && mid['direction'] == 'right')
+      ok('KOV-A1 dormant: zasuvkove celo sa naozaj postavilo',
+         !kova_parts(inst)['front:F1/panel'].nil?)
+      p3 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+      p3['fronts']['items'][0]['type'] = 'door'
+      e::CabinetBuilder.rebuild(model, inst, p3)
+      back = kova_front_item(inst)
+      ok('KOV-A1 dormant: navrat na dvierka hodnotu OBNOVIL',
+         back && back['type'] == 'door' && back['direction'] == 'right')
+      ok('KOV-A1 dormant: smer sa cita len na dvierkach (slot single)',
+         e::Fronts.direction_slots(back).map { |s| s[:wing] } == ['single'])
+    end
+    cleanup(model)
+
+    # --- 7) hardware_issues nad ZIVYM modelom -------------------------------
+    unset = e::CabinetBuilder.build(model, kova_params([kova_item('door', 'direction' => 'unset')]))
+    cid_u = unset && e::Store.get(unset, 'cabinet_id')
+    found = kova_dir_items(model)
+    ok("KOV-A1 RED: neurcený smer dal PRESNE jeden nalez (#{found.length})", found.length == 1)
+    hit = found.first
+    ok('KOV-A1 RED: nalez je RED, patri skrinke a menuje krídlo',
+       hit && hit['severity'] == 'red' && hit['owner_id'] == cid_u &&
+       hit['part_key'] == 'front:F1/wing:single')
+    ok('KOV-A1 RED: nalez nesie owner_pid instancie (adresa vyskytu)',
+       hit && hit['owner_pid'] == unset.persistent_id)
+    ok('KOV-A1 RED: hlaska menuje celo a priznava, ze export sa zatial nezastavi',
+       hit && hit['message_sk'].to_s.include?('F1') && hit['message_sk'].to_s.include?('neblokuje'))
+
+    # --- 9) CITANIE nalezov NEROBI krok Spat --------------------------------
+    m2 = r03_marker(model, markers)
+    3.times { kova_dir_items(model) }
+    Sketchup.undo
+    ok('KOV-A1: citanie nalezov (Bom.collect + Kontrola) NEZALOZILO ziadny krok Spat', !m2.valid?)
+    r03_clear_markers(model, markers)
+
+    # legacy skrinka (bez kluca `direction`) nalez NEDOSTANE
+    cleanup(model)
+    e::CabinetBuilder.build(model, kova_params([kova_item('door')]))
+    ok('KOV-A1 RED: legacy celo (bez kluca direction) nedostane ziadny nalez',
+       kova_dir_items(model).empty?)
+    cleanup(model)
+
+    # --- 8) dup-ID: dve skrinky so zdielanym ID = JEDEN riadok --------------
+    # Zdielane ID sa nastavuje RUCNE pod guardom — observer by kopiu vzapati
+    # dedupol a scenar by sa nemal na com odohrat.
+    e::ScaleWatch.guard do
+      a = e::CabinetBuilder.build(model, kova_params([kova_item('door', 'direction' => 'left')]))
+      b = e::CabinetBuilder.build(model, kova_params([kova_item('door', 'direction' => 'unset')]))
+      if a && b
+        cid_a = e::Store.get(a, 'cabinet_id')
+        model.start_operation('KOV-A1 dup id', true)
+        e::Store.write(b, 'cabinet_id' => cid_a)
+        model.commit_operation
+        dup = kova_dir_items(model)
+        ok("KOV-A1 dup-ID: zdielane ID dalo JEDEN riadok Kontroly (#{dup.length})", dup.length == 1)
+        ok('KOV-A1 dup-ID: owner_pid ukazuje na instanciu BEZ smeru',
+           dup.first && dup.first['owner_pid'] == b.persistent_id)
+        ok('KOV-A1 dup-ID: stable_key owner_pid NEOBSAHUJE',
+           dup.first && dup.first['stable_key'] == "front_direction|#{cid_a}|front:F1/wing:single")
+
+        # Codex #280 P2-A: klik na nalez smie oznacit dvierka LEN tej skrinky,
+        # ktora smer nema — inak by `owner_pid` (FIX 11) nerobil nic.
+        if dup.first
+          want = kova_parts(b)['front:F1/wing:single']
+          other = kova_parts(a)['front:F1/wing:single']
+          pids = e::ProductionCore.pids_for_problem(model, dup.first)
+          ok("KOV-A1 P2-A: klik oznaci PRESNE dvierka skrinky s `unset` (#{pids.length} ks)",
+             want && pids == [want.persistent_id])
+          ok('KOV-A1 P2-A: dvierka DRUHEJ (vyriesenej) skrinky sa NEOZNACIA',
+             other && !pids.include?(other.persistent_id))
+
+          # FAIL-OPEN: ked instancia z `owner_pid` zanikne, resolver sa vrati
+          # k dnesnemu spravaniu (podla owner_id) — NIKDY prazdny vyber.
+          stale = dup.first.dup
+          model.start_operation('KOV-A1 dup id erase', true)
+          b.erase!
+          model.commit_operation
+          back = e::ProductionCore.pids_for_problem(model, stale)
+          ok("KOV-A1 P2-A: po zmazani instancie sa resolver vrati k owner_id (#{back.length} ks)",
+             back == [other.persistent_id])
+          ok('KOV-A1 P2-A: fail-open NIKDY nevrati prazdny vyber', !back.empty?)
+        end
+      end
+    end
+
+    cleanup(model)
+    kova_cleanup_catalog(res)
+    ok('KOV-A1: cleanup (0 korpusov, testovaci dekor aj sablona prec)',
+       cabinets(model).empty? && e::TemplateStore.find('cabinet', KOVA_TPL).nil? &&
+       e::Materials.sheets.none? { |s| s['decor'] == KOVA_DECOR })
+  rescue StandardError => ex
+    log_line("FAIL: KOV-A1 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    r03_clear_markers(model, markers) if defined?(markers) && markers
+    e::TemplateStore.delete('cabinet', KOVA_TPL) if e::TemplateStore.find('cabinet', KOVA_TPL)
+    cleanup(model)
+    kova_cleanup_catalog(res) if defined?(res)
+  end
+
   def run_async(model, done)
     state = {}
     steps = []
@@ -12235,6 +12550,7 @@ module NoxunSuRunner
     run_st3c(model)          # ŠT-3c-1: sekcia Sablony v Studiu + zanik okna Sablony — apply = 1 krok Spat + typovy guard, fotenie bez undo kroku (kamera sa vrati), mazanie oboch druhov, vlastny PNG kanal sekcie
     run_st4a(model)          # ŠT-4a: sekcie Nastavenia v Studiu + zanik POSLEDNEHO satelitu — zapis sadzby prepocita rozpocet, baseline revizia odmietne stary zapis, ziadny krok Spat
     run_d52b(model)          # D-52b: updater v sekcii „O plugine" — trojstav nad realnym diskom, REALNY swap nad TEMP sandboxom (nikdy nad zivym Plugins), latch, opakovany pokus
+    run_kova(model)          # KOV-A1: cela — vyklop/sklop/blenda (plan vs. model 1:1, 19 mm celo), sablona/kopia/dormant s novymi polami, RED nalez smeru bez kroku Spat, dup-ID
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

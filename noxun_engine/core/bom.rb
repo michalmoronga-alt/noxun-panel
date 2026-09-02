@@ -12,7 +12,7 @@
 # API (Codex F5 — collector oddeleny od cisteho vypoctu):
 #   Bom.collect(model) -> {records:, hardware:, hardware_overrides:, manual_overrides:,
 #                          cabinet_sets:, cabinet_set_conflicts:, placements:, identities:,
-#                          warnings:, cabinets:, boards:}
+#                          hardware_issues:, warnings:, cabinets:, boards:}
 #   Bom.compute(collected) -> {rows:, sheets:, edging:, hardware:, warnings:, summary:}
 # Headless testy krmia compute() zaznamami priamo (collect je tenky a vyzaduje SketchUp).
 #
@@ -32,6 +32,14 @@
 #   (nikto by nevedel, k comu patri); paruje sa VYHRADNE s VNORENYM vyrobnym dielcom
 #   toho isteho korpusu — override zije v korpuse a odpojene dvojca by prestavba
 #   aj tak neprekreslila.
+#
+# KOV-A1 (audit #14 BLOCKER 1 + FIX 11): `hardware_issues` = novy ADITIVNY kluc
+# s TVRDYMI nalezmi kovania. V A1 ma jediny kod `front_direction_unset` (dvierka
+# s vedome NEURCENYM smerom otvarania). Kluc je aditivny: `compute()` ho — ako
+# ostatne aditivne kluce — IGNORUJE, takze kusovnik, nakup ani ceny sa nemenia
+# ani o cislo. Jediny citatel je `Validation.run` (RED kategoria `front_direction`,
+# ZIADNA exportna brana — brana je pre-committed v AUDIT_REGISTER R-39 a pristane
+# az s prvym vystupom, ktory smer realne spotrebuje, D-95).
 module Noxun
   module Engine
     module Bom
@@ -47,6 +55,7 @@ module Noxun
         hardware = []
         hardware_overrides = []
         manual_overrides = { 'abs' => [], 'hardware' => [] }
+        hardware_issues = [] # KOV-A1: tvrde nalezy kovania (zatial len smer dvierok)
         cabinet_sets = {}
         # R-34 (review #262 P1): `cabinet_sets` ma na ID JEDEN slot — pozri
         # `note_cabinet_sets`. `seen` drzi mapu PRVEJ instancie toho ID (nil =
@@ -83,6 +92,12 @@ module Noxun
             # V0.6 D1: cabinet override setov kovania (mapa generic_type=>set_id)
             # — expanzia setov ju berie per korpus (audit B1/F6). Aditivne pole,
             # compute() ho ignoruje.
+            # KOV-A1: smerove nalezy sa citaju z ULOZENEHO `front_items` (resolved
+            # cela) — presne ako kovanie z `config.hardware[]`: ZIADNE
+            # prepocitavanie planu, ziadne citanie geometrie.
+            hardware_issues.concat(
+              front_direction_issues(cid, inst.persistent_id, ccfg['front_items'])
+            )
             cs = ccfg['hardware_sets']
             note_cabinet_sets(cid, (cs.is_a?(Hash) && !cs.empty? ? cs : nil),
                               cabinet_sets, cabinet_sets_seen, cabinet_set_conflicts)
@@ -145,7 +160,41 @@ module Noxun
           manual_overrides: manual_overrides,
           cabinet_sets: cabinet_sets, cabinet_set_conflicts: cabinet_set_conflicts,
           placements: placements, identities: identities,
+          hardware_issues: hardware_issues,
           warnings: warnings, cabinets: cabinets, boards: boards }
+      end
+
+      # KOV-A1: nalezy „dvierka bez urceneho smeru" jedneho korpusu.
+      #
+      # CISTA funkcia (ziadny SketchUp objekt) — headless testovatelna; `collect`
+      # jej dodava uz nacitane `ccfg['front_items']`, takze nevznika druhy sken
+      # modelu. Aplikovatelnost rozhoduje VYHRADNE `Fronts.direction_slots`
+      # (jedina definicia, audit #14 BLOCKER 3) a nalez vznika VYHRADNE pri
+      # stave `unset`:
+      #   nil (kluc v configu chyba) = LEGACY -> ziadny nalez, NIKDY
+      #   'left'/'right'             = vyriesene -> ziadny nalez
+      #
+      # `owner_pid` (FIX 11) je `persistent_id` KONKRETNEJ instancie — pri dvoch
+      # skrinkach so zdielanym `cabinet_id` je to jediny udaj, ktorym sa da
+      # ukazat, KTORA z nich smer nema. Do `stable_key` nalezu NEVSTUPUJE
+      # (identita problemu je kategoria + vlastnik + dielec), nesie sa vedla.
+      def front_direction_issues(owner_id, owner_pid, front_items)
+        items = front_items.is_a?(Array) ? front_items : []
+        out = []
+        items.each do |item|
+          next unless item.is_a?(Hash)
+
+          Fronts.direction_slots(item).each do |slot|
+            next unless slot[:state].to_s == 'unset'
+
+            out << { 'code' => 'front_direction_unset', 'severity' => 'red',
+                     'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
+                     'part_key' => slot[:part_key].to_s,
+                     'front_id' => item['id'].to_s,
+                     'label' => PartKeys.human_label(slot[:part_key], fronts: items).to_s }
+          end
+        end
+        out
       end
 
       # R-34 (review #262 P1): `cabinet_sets` je mapa ID => override setov, teda

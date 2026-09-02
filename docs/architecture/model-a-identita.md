@@ -103,6 +103,12 @@ stabilná identita dielcov + `valid?` (aj `board/` prefix).
 **`migrate_overrides` kľúče neexistujúcich dielcov ZACHOVÁVA** (zmena konštrukcie nesmie zahodiť ručné nastavenia, kým sa dielec môže vrátiť) — dôsledok: zoznamy ručných zásahov
 musia mŕtve kľúče **odfiltrovať jointom s reálnymi dielcami** (`Bom.collect_manual_overrides`, ŠT-3b-2a), nie ich zobraziť.
 
+**KOV-A1 — dva nové `kind`-y čela:** `front:F#/flap` (výklop aj sklop — jedna rola `flap`, typ rozlišuje resolved čelo) a `front:F#/blind` (blenda, rola `false_front`).
+Sú **ADITÍVNE**, takže `PartKeys::SCHEMA` sa **nebumpuje** (staré kľúče sa nemenia) a `valid?` ich prijíma existujúcim `front:` pravidlom. Vlastný kľúč (namiesto `front:F#/panel`)
+je vedomé rozhodnutie auditu #14 (BLOCKER 5): kolízia so zásuvkovým čelom by po prepnutí typu ticho presmerovala override aj kovanie na iný dielec. **Overridy sú per kind**, takže
+pri prepnutí typu ostávajú **dormant pod starým kľúčom** (vzor `migrate_overrides`) a po návrate sa obnovia — nikdy sa neprenášajú.
+`human_label` má vetvy `/flap` → „F2 · **výklop**" alebo „**sklop**" (podľa `type` resolved čela; bez zhody neutrálne „výklop/sklop" — nikdy sa nič neodhaduje) a `/blind` → „F2 · blenda".
+
 ### build_plan.rb
 
 **ZÁVÄZNÝ kontrakt plánu** (SCHEMA 2, MIN_DIM, validátor, `warnings[]`, hardware string-keyed s GENERIC_TYPES/limitmi/referenčnou integritou ownera). Geometria, kusovník aj VEPO

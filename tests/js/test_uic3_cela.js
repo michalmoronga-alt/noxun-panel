@@ -6,7 +6,8 @@
 const assert = require('node:assert');
 const path = require('node:path');
 const { frontProfileOptionList, frontProfileScopeItems, frontProfileCommon,
-        frontProfileStateText, collectFrontHwBuy } =
+        frontProfileStateText, collectFrontHwBuy,
+        PROFILELESS_FRONT_TYPES, frontProfileless } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'core.js'));
 
 let n = 0;
@@ -35,6 +36,48 @@ eq(frontProfileScopeItems(F.concat([{ label: 'F4', type: 'none', profile: 'ukw7'
      .map(x => x.label), ['F1', 'F2', 'F3'], '„Bez čela" nikdy nie je v rozsahu');
 eq(frontProfileScopeItems([], 'all'), [], 'skrinka bez ciel = prazdny rozsah');
 eq(frontProfileScopeItems(null, 'all'), [], 'chybajuce data nespadnu');
+
+// --- KOV-A1 (Codex #280 P2-D): PROFILELESS typy ------------------------------
+// Vyklop, sklop a blenda profil MAT NEMOZU (Ruby normalize im ho zhodi na
+// 'none'), takze do rozsahu nepatria ANI v „všetky" — inak by UI ponukalo
+// nastavenie, ktore server ticho zahodi.
+eq(PROFILELESS_FRONT_TYPES, ['none', 'lift', 'fall', 'blind'],
+   'zoznam je ZRKADLO servera (Fronts::PROFILELESS_TYPES) — Ruby guard ho strazi');
+['none', 'lift', 'fall', 'blind'].forEach(t => {
+  eq(frontProfileless(t), true, `${t} profil mat nemoze`);
+});
+['door', 'drawer_front'].forEach(t => {
+  eq(frontProfileless(t), false, `${t} profil mat MOZE`);
+});
+eq(frontProfileless('sliding_2027'), false, 'neznamy typ sa nevydava za profileless');
+
+const FK = F.concat([
+  { label: 'F4', type: 'lift',  profile: 'ukw7' },
+  { label: 'F5', type: 'fall',  profile: 'ukw7' },
+  { label: 'F6', type: 'blind', profile: 'ukw7' },
+  { label: 'F7', type: 'none',  profile: 'ukw7' }
+]);
+eq(frontProfileScopeItems(FK, 'all').map(x => x.label), ['F1', 'F2', 'F3'],
+   'rozsah „všetky" vynecha vyklop, sklop, blendu aj „Bez čela"');
+eq(frontProfileScopeItems(FK, 'door').map(x => x.label), ['F3'], 'rozsah dvierok sa nemeni');
+eq(frontProfileScopeItems(FK, 'drawer_front').map(x => x.label), ['F1', 'F2'],
+   'rozsah zasuvkovych sa nemeni');
+// Spolocna hodnota ich TIEZ ignoruje — inak by select ukazal „(rôzne)" kvoli
+// celu, ktore v rozsahu vobec nie je.
+eq(frontProfileCommon(FK, 'all'), null, 'rozne profily DVIEROK a zasuviek = (rôzne)');
+eq(frontProfileCommon([{ label: 'F1', type: 'drawer_front', profile: 'ukw7' },
+                       { label: 'F2', type: 'lift', profile: 'none' }], 'all'), 'ukw7',
+   'profileless celo NEROBI z jednotneho rozsahu „(rôzne)"');
+eq(frontProfileCommon([{ label: 'F1', type: 'lift', profile: 'ukw7' },
+                       { label: 'F2', type: 'blind', profile: 'none' }], 'all'), '',
+   'skrinka so samymi profileless celami = prazdny rozsah');
+// Veta stavu ma TEN ISTY filter — nesmie tvrdit „bez profilu: F2" o vyklope.
+eq(frontProfileStateText([{ label: 'F1', type: 'door', profile: 'ukw7' },
+                          { label: 'F2', type: 'lift', profile: 'none' }], REG),
+   'UKW-7: F1', 'veta stavu profileless cela vobec nespomina');
+eq(frontProfileStateText([{ label: 'F1', type: 'blind', profile: 'ukw7' }], REG),
+   'Skrinka zatiaľ nemá čelá, na ktorých by profil sedel.',
+   'same profileless cela = to iste ako ziadne cela');
 
 // --- D-96: SPOLOCNA HODNOTA (co ukaze select) --------------------------------
 eq(frontProfileCommon(F, 'drawer_front'), 'ukw7', 'zhodny profil v rozsahu = jeho hodnota');

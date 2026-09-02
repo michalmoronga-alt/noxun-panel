@@ -9,7 +9,11 @@
 - **Korpus** — skrinka; `kind: cabinet`, identita CAB-xxx; nesie konfiguráciu (JSON v NOXUN dict), geometriu generuje Ruby (regenerate)
 - **Doska** — samostatný výrobný dielec mimo korpusu (krycia doska, blenda, výplň); `kind: board`, BRD-xxx, rola `free_panel`
 - **Zóna** — adresovateľný vnútorný priestor korpusu; vzniká delením priečkami (strom zón); klik cez 2D náhľad
-- **Čelo** — predný panel v rade čiel (dvierka/zásuvkové čelo/výplň/„bez čela" = nika); výška fixed alebo auto s 🔒 lockmi, kladie sa odspodu
+- **Čelo** — predný panel v rade čiel (dvierka/zásuvkové čelo/výklop/sklop/blenda/„bez čela" = nika); výška fixed alebo auto s 🔒 lockmi, kladie sa odspodu
+- **Výklop** (`lift`) — čelo, ktoré sa otvára NAHOR (AVENTOS a spol.). **Sklop** (`fall`) — čelo, ktoré sa sklápa NADOL. Obe nesú rolu `flap`; smer výklopu je `flap_dir` (`up`/`down`)
+- **Blenda** (`blind`, rola `false_front`) — nepohyblivé krycie čelo bez otvárania (pod drezom, pri umývačke); vyrába sa a olepuje ako čelo, kovanie nemá
+- **Smer otvárania** (`direction`) — **STRANA PÁNTOV** (Michal 3.9.2026): „Ľavé" = pánty vľavo. Pýta sa LEN pri jednokrídlových dvierkach a pri STREDNÝCH krídlach 3/4-krídlových
+  (krajné sú odvodené: prvé = pánty vľavo, posledné = pánty vpravo; dvojkrídlo je jednoznačné Ľ+P). Neurčený smer = RED nález v Kontrole, ktorý (zatiaľ) neblokuje export
 - **Dielec** — fyzický kus materiálu na výrobu; stabilná identita `part_key` (prežije rebuild)
 - **Rola** — funkcia dielca — určuje ABS defaulty a pravidlá kovania. **Kanonické hodnoty** (BuildPlan::ROLES, štandard §2.4):
   `side_left`/`side_right` (boky), `bottom` (dno), `top` (strop), `back` (chrbát), `shelf` (polica), `divider_v`/`divider_h` (priečky),

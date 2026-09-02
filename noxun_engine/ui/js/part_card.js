@@ -2,7 +2,11 @@
   function roleLabel(role){
     var m = { side_left:'Bok ľavý', side_right:'Bok pravý', bottom:'Dno', top:'Vrch', back:'Chrbát',
       shelf:'Polica', divider_v:'Priečka zvislá', divider_h:'Priečka vodorovná', front_door:'Dvierka',
-      drawer_front:'Zásuvkové čelo', plinth:'Sokel', rail_front:'Výstuha predná', rail_back:'Výstuha zadná' };
+      drawer_front:'Zásuvkové čelo', plinth:'Sokel', rail_front:'Výstuha predná', rail_back:'Výstuha zadná',
+      // KOV-A1: rola `flap` je SPOLOČNÁ pre výklop aj sklop, preto neutrálny
+      // názov — „Výklop" by pri každom sklope klamal. Konkrétny text povie až
+      // typ čela (server: PartKeys.flap_label; karta čela príde v KOV-A2).
+      flap:'Výklop/sklop', false_front:'Blenda' };
     return m[role] || role;
   }
   function sheetLabelOf(id){
@@ -41,7 +45,10 @@
     // FIX 2: material dielca len z hrubkovo kompatibilnych dosiek (nekompatibilne disabled).
     // D-45: cela beru KATALOGOVU hrubku sveho materialu (frontMatch = rozsah dosky),
     // ostatne dielce presnu hrubku dielca — tu ju meni material/hrubka celej skrinky.
-    var isFront = (pc.role === 'front_door' || pc.role === 'drawer_front');
+    // KOV-A1 (audit #14 FIX 9): bez flap/false_front by bol 19 mm materiál na
+    // výklope aj blende v pickeri neaktívny — server ich pritom postaví.
+    var isFront = (pc.role === 'front_door' || pc.role === 'drawer_front' ||
+                   pc.role === 'flap' || pc.role === 'false_front');
     var matFn = isFront ? frontMatch() : thMatch(pc.thickness);
     var selectedMaterial = pc.has_material_override ? (pc.material_id || '') : '';
     var inheritLabel = '(dedí: '+sheetLabelOf(pc.material_id)+')';

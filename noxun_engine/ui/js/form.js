@@ -34,9 +34,17 @@
       // UI-C3: ZAMOK PRI VYSKE ZANIKOL — zamknute ⇔ vypisane. Samostatny
       // checkbox (D-23) sa dal zapnut aj nad prazdnym polom a nerobil nic;
       // teraz je `locked` presne to, co pouzivatel vidi: vypisana hodnota drzi.
-      items.push({ id: r.dataset.frontId || newStableId('F'), type: type, mode: hasH ? 'fixed' : 'auto',
+      var item = { id: r.dataset.frontId || newStableId('F'), type: type, mode: hasH ? 'fixed' : 'auto',
         height: hasH ? (isNaN(hNum) ? null : hNum) : null, locked: hasH, wings: (type === 'door') ? wings : '1',
-        profile: r.dataset.frontProfile || 'none' });
+        profile: r.dataset.frontProfile || 'none' };
+      // KOV-A1: smer otvárania, spôsob otvárania a klasifikácia zásuvky NEMAJÚ
+      // v A1 ovládač (ten je A2) — musia však prežiť round-trip, inak by prvá
+      // editácia iného poľa poslala riadok bez nich a hodnota by ticho zmizla
+      // (vzor D-90 `profile`). ROZDIEL oproti profilu: ŽIADNY default sa
+      // nedopĺňa. Kľúč, ktorý v configu nebol, sa tu NESMIE objaviť — inak by
+      // legacy zákazka dostala RED nález o neurčenom smere.
+      frontExtraApply(item, r);
+      items.push(item);
     }
     return { split_axis: 'height', gap: frontGapVal('fr_gap', 3.0), gap_top: frontGapVal('fr_gap_top', 2.0),
              gap_bottom: frontGapVal('fr_gap_bottom', 2.0), gap_sides: frontGapVal('fr_gap_sides', 2.0),
@@ -847,8 +855,46 @@
   // UI-C3 (N27): IKONA TYPU CELA. Mapa je JEDINE miesto, kde typ -> symbol;
   // rozbalovacka typu ostava (ikona je odpoved na „co to je" skor, nez sa oko
   // dostane k textu, nie jej nahrada).
-  var FRONT_TYPE_ICON = { door: 'door', drawer_front: 'rows-2', none: 'front' };
-  var FRONT_TYPE_LABEL = { door: 'Dvierka', drawer_front: 'Zásuvkové čelo', none: 'Bez čela' };
+  // KOV-A1: nové typy majú zatiaľ fallback ikonu `front` (vlastné symboly
+  // prídu so sprite sadou v A2) — mapa je ale UŽ tu, aby config z API neukázal
+  // pri výklope popis „Čelo".
+  var FRONT_TYPE_ICON = { door: 'door', drawer_front: 'rows-2', none: 'front',
+                          lift: 'front', fall: 'front', blind: 'front' };
+  var FRONT_TYPE_LABEL = { door: 'Dvierka', drawer_front: 'Zásuvkové čelo', none: 'Bez čela',
+                           lift: 'Výklop', fall: 'Sklop', blind: 'Blenda' };
+
+  // --- KOV-A1: PASS-THROUGH polí, ktoré A1 ešte needituje --------------------
+  // `direction` · `wing_directions` · `opening_mode` · `drawer` žijú v datasete
+  // riadku a `collectFronts` ich posiela naspäť NEZMENENÉ. Ovládače prídu v A2.
+  // ŽELEZNÉ PRAVIDLO: kľúč, ktorý config nemá, sa tu NIKDY nevyrobí — žiadny
+  // `||` fallback na neurčený stav, na klasické otváranie ani na stranu pántov.
+  // (Guard v tests/pure/test_kova1_cela.rb stráži aj tento súbor, preto tu
+  // taký literál nesmie stáť ani v komentári.)
+  var FRONT_EXTRA_KEYS = ['direction', 'wing_directions', 'opening_mode', 'drawer'];
+  function frontExtraStore(row, item){
+    var out = {}, n = 0;
+    for (var i = 0; i < FRONT_EXTRA_KEYS.length; i++){
+      var k = FRONT_EXTRA_KEYS[i];
+      if (item[k] === undefined || item[k] === null) continue;
+      out[k] = item[k]; n++;
+    }
+    // Prázdny dataset sa NENASTAVUJE (legacy riadok nesmie niesť ani prázdny
+    // objekt — `collectFronts` by z neho aj tak nič nevrátil, ale rozdiel medzi
+    // „nemá" a „má prázdne" má ostať čitateľný aj v DOM).
+    if (n) row.dataset.frontExtra = JSON.stringify(out);
+  }
+  function frontExtraApply(item, row){
+    var raw = row.dataset.frontExtra;
+    if (!raw) return;
+    var obj;
+    try { obj = JSON.parse(raw); } catch (e) { return; } // poškodený dataset = akoby tam nebol
+    if (!obj || typeof obj !== 'object') return;
+    for (var i = 0; i < FRONT_EXTRA_KEYS.length; i++){
+      var k = FRONT_EXTRA_KEYS[i];
+      if (obj[k] === undefined || obj[k] === null) continue;
+      item[k] = obj[k];
+    }
+  }
   function frontTypeIcon(t){ return FRONT_TYPE_ICON[t] || 'front'; }
   function frontTypeLabel(t){ return FRONT_TYPE_LABEL[t] || 'Čelo'; }
 
@@ -870,6 +916,7 @@
     // riadku (cyklila by sa nepouzitelne pri viacerych profiloch), ale skupina
     // „Úchytky"; ikona ostala INDIKATOR.
     row.dataset.frontProfile = item.profile || 'none';
+    frontExtraStore(row, item); // KOV-A1: smer/otváranie/klasifikácia (bez defaultov)
     var fhId = frontHeightInputId(row.dataset.frontId);
     // SMOKE PACK 1: ovladace cela ziju v `.fmain` — PEVNOM, NEZALAMOVACOM rade.
     // `.frow` je od tejto davky STLPEC (rad ovladacov + riadok kovania pod nim),
@@ -885,13 +932,18 @@
         ' title="Typ čela. Výklop: AVENTOS sa zatiaľ pridáva ručne, automatika príde vo fáze 3."' +
         ' onchange="onFrontTypeChange(this); onField()">' +
         '<option value="door">Dvierka</option><option value="drawer_front">Zásuvkové čelo</option>' +
-        // Vyklop je v ponuke, aby bolo vidno, ze sa s nim rata — ale zatial sa
-        // NEDA zvolit: rola `flap` potrebuje vlastnu cestu cez builder, ABS a
-        // kusovnik (vedoma odchylka UI-C3, zapisana v UI20_KONTRAKT.md).
+        // KOV-A1: vyklop, sklop a blenda UZ EXISTUJU datovo (roly flap /
+        // false_front, builder ich postavi), ale ovladac k nim pride az v A2 —
+        // preto su volby NEAKTIVNE. Su tu ale MUSIA byt: `select.value = typ`
+        // funguje aj na disabled volbu, takze config z API si typ udrzi a prva
+        // editacia ineho pola ho neprepne spat na „Dvierka" (vzor D-90 P1:
+        // projekcia nesmie stratit pole).
         // Popis je KRATKY zamerne: select je najuzsi prvok radu (SMOKE PACK 1 mu
         // dal `flex-basis: 0`), takze dlha volba by sa len orezala a nic by
         // nepovedala — cela veta zije v `title` selectu a v hinte skupiny.
-        '<option value="flap" disabled>Výklop (fáza 3)</option>' +
+        '<option value="lift" disabled>Výklop</option>' +
+        '<option value="fall" disabled>Sklop</option>' +
+        '<option value="blind" disabled>Blenda</option>' +
         '<option value="none">Bez čela</option></select>' +
       // Uzke pole vysky (46 px) + sipka VYSKOVEHO RADU (N25). Rad len DOSADI
       // hodnotu a ohlasi ju povodnou udalostou — vyrazy, validacia aj debounce
@@ -982,9 +1034,12 @@
     if (hw) hw.style.display = (sel.value === 'none') ? 'none' : '';
     // D-90: „Bez čela" nemá na čom profil držať — indikátor zmizne a stav sa
     // zhodí na 'none' (rovnako to robí Ruby normalize; UI sa mu nesmie rozísť).
+    // KOV-A1 (Codex #280 P2-D): to isté platí pre výklop, sklop aj blendu —
+    // zoznam je JEDEN (`PROFILELESS_FRONT_TYPES` v core.js, zrkadlo servera),
+    // nie druhá podmienka, ktorá by sa časom rozišla.
     var pb = row.querySelector('.fprof');
     if (pb){
-      var off = (sel.value === 'none');
+      var off = frontProfileless(sel.value);
       pb.style.visibility = off ? 'hidden' : 'visible';
       if (off && row.dataset.frontProfile !== 'none'){
         row.dataset.frontProfile = 'none';

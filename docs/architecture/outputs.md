@@ -25,6 +25,15 @@ dva verejné pohľady — `duplicate_owner_ids` (len `KIND_CABINET`, teda kusy, 
 ešte preosieva `ProductionCore.dup_partition` cez skutočnú expanziu — detail v odseku `production_core.rb`. Kind-ová podmienka je tá istá, aká rozhoduje o znení nálezu
 v `duplicate_id_item`, takže sa hláška a brána nemôžu rozísť.)*
 
+**KOV-A1 — RED kategória `front_direction` (`CAT_FRONT_DIR`), jediný RED BEZ brány.** Vstupom je aditívny `collected[:hardware_issues]` z `Bom.collect` (`nil`/chýbajúci =
+kontrola sa preskočí, vzor `placements:`); `check_hardware_issues` spracuje **výhradne** kód `front_direction_unset` — ostatné kódy (KOV-C/D: `drawer_no_fit`, owner bez
+resolved setu…) sa zámerne ignorujú, aby sa do Kontroly nedostali skôr než ich vlastná brána. `stable_key` = `front_direction|owner_id|part_key`, takže klik-select po prestavbe
+nájde čerstvú entitu a dve inštancie so zdieľaným ID dajú **jeden** riadok; `owner_pid` sa nesie ako **extra pole mimo kľúča** (vzor `extra:` v `record_item`). Text (znenie podľa
+schváleného mockupu, scéna 4) menuje čelo serverovým `label`-om aj skrinku, hovorí, že smer = **strana pántov**, a otvorene priznáva, že export zatiaľ nezastaví.
+**Brána je pre-committed v [SYSTEM/AUDIT_REGISTER.md](../../SYSTEM/AUDIT_REGISTER.md) R-39** a pristane až s prvým výstupom, ktorý smer reálne spotrebuje (D-95 výrobné zadanie);
+dovtedy platia tvrdé podmienky O1 — žiadny default ani heuristika smeru nikde v kóde a legacy configy vyňaté (guard testy v `tests/pure/test_kova1_cela.rb`).
+`FRONT_ROLES` sa rozšírilo o `flap` a `false_front`, takže ORANGE „čelo bez ABS" a hrúbkové pravidlo čiel platia aj pre výklop, sklop a blendu.
+
 ### production_core.rb — zdieľané čisté jadro výstupov zákazky (ŠT-1a PR A)
 
 kusovník, súpisy platní/ABS a VEPO export sa sťahovali z okna Výroba do nového okna **Štúdio**; aby obe okná čítali **tie isté čísla**, čistí pomocníci prešli do jedného modulu
@@ -40,6 +49,11 @@ resolvery** klik→entita (`pids_for_problem` vrátane fallbacku na vlastníka p
 `pids_for_override`** — oko pri jantárovom riadku sekcie Pravidlá adresuje dvojicou **(owner_id, part_key)** a **znovupoužíva telo `pids_for_problem`** [prázdny kľúč = celý
 korpus]; vetva `rule_ref` v `do_select` je vlastná zámerne — override v kusovníku vlastný riadok mať nemusí, napr. vypnuté kovanie; od ŠT-3b-2b beží **bez `fresh_collect`** — hľadá
 podľa identity, takže plný sken modelu bol čistá réžia).
+
+**KOV-A1 — `owner_pid` scopuje klik na JEDEN výskyt.** Keď nález nesie `owner_pid` (Integer) a `scoped_owner_instance` overí, že ide o **živú top-level skrinku s tým istým
+`cabinet_id`**, `pids_for_problem` hľadá dielec `part_key` **len v nej** (`pids_in_cabinet`); inak beží dnešná všeobecná vetva. Bez toho by klik na RED „dvierka bez určeného
+smeru" pri dvoch skrinkách so zdieľaným ID označil dvierka v OBOCH a `owner_pid` (audit #14 FIX 11) by nerobil nič. Overenie je **fail-open**: chýbajúci/nečíselný kľúč, zaniknutá
+entita, iný druh alebo nezhodné `cabinet_id` → všeobecná vetva, takže scope smie výber len ZÚŽIŤ, nikdy ho nevyprázdni. `pids_for_override` `owner_pid` neposiela, takže sa nemení.
 
 **ZÁVÄZNÝ kontrakt modulu: žiadny okenný stav** — `@dialog`, `@generation` ani `@pending_*` sem nepatria (dve okná nad jedným jadrom by si ich prepisovali); stráži to guard test,
 ktorý v `production_core.rb` nepripustí ani jednu inštančnú premennú. Do ŠT-1c PR B3 si `ProductionDialog` ponechával **tenké obaly s pôvodnými menami, signatúrami AJ
@@ -179,7 +193,10 @@ menovky (`Budget.sheet_label`, `CpExport.material_label`) — sú v `core/`, kam
 
 **`rows_with_roles`** dopĺňa voliteľný stĺpec „Rola" **read-only obohatením** — záznamy sa zoskupia TÝM ISTÝM `Bom.row_key`, akým vznikli riadky, pretože pridať rolu do kľúča
 agregácie by zmenilo kusovník **aj VEPO** (a párovanie beží cez Ruby hash: kľúč riadku je POLE, v JSON by sa už nespárovalo). SK názvy rolí sú `ROLE_LABELS` — jedna autorita, JS
-žiadny preklad enumu nemá.
+žiadny preklad enumu nemá (`part_card.js` má vlastnú mapu len ako fallback popisu karty a musí s ňou byť zhodný).
+**KOV-A1:** rola **`flap` je spoločná pre výklop AJ sklop**, preto je jej názov neutrálny **„Výklop/sklop"** — „Výklop" by pri každom sklope klamal v stĺpci Rola kusovníka,
+v karte dielca aj v prehľade ABS pravidiel. Konkrétny text vie povedať len TYP čela, nie rola: server ho skladá v `PartKeys.flap_label` (rovnaký neutrálny tvar bez zhody)
+a od KOV-A2 aj karta čela. `false_front` = „Blenda" (blenda je jednoznačná).
 
 **ŠT-1b sem pridala celý zvyšok KONTROLY: `control_payload`** (Validation.run nad čerstvým zberom **+ zlúčenie s upozorneniami rozpočtu cez `Validation.with_budget`**) je **jediné
 miesto, kde vzniká číslo semaforu** — číta ho sekcia Kontrola v Štúdiu, badge navigácie **aj `do_export`** (status aj sekcia KONTROLA vo VEPO LOGu; do review #1 mal export vlastný
@@ -242,6 +259,15 @@ jantárových riadkov — čo je zdrojom ABS overridu, ako sa páruje kovanie a 
 **`identities` (1b-3):** `collect` nesie popri `placements` aj **jeden záznam na INŠTANCIU** top-level skrinky/dosky (`{kind, id}`, prázdne ID sa zahadzuje) — z toho `Validation`
 robí nález `duplicate_identity`. Kľúč je **aditívny** (kto ho nepozná, nič nestratí), zbiera sa v tom istom prechode a `compute()` ho ignoruje; pri doskách sa — rovnako ako
 `placements` — plní **pred** filtrom `manufactured`, lebo zdieľané ID je chyba identity aj pri dočasne nevyrábanej doske.
+
+**`hardware_issues` (KOV-A1):** ďalší **aditívny** kľúč — TVRDÉ nálezy kovania. V A1 má jediný kód `front_direction_unset` (dvierka s vedome neurčeným smerom otvárania).
+Zdrojom je **uložený `config['front_items']`** korpusu, presne ako kovanie z `config.hardware[]`: žiadne prepočítavanie plánu, žiadne čítanie geometrie, žiadny druhý prechod
+modelom. Výpočet je vyčlenený do čistej `Bom.front_direction_issues(owner_id, owner_pid, front_items)` (headless testovateľná), ktorá o aplikovateľnosti rozhoduje **výhradne**
+cez `Fronts.direction_slots` — jedinú definíciu (viď [construction.md](construction.md)). Nález vzniká LEN pri stave `unset`; legacy čelo (kľúč `direction` v configu nemá) má stav
+`nil` a nález **nikdy** nedostane. Záznam nesie `code`, `severity`, `owner_id`, **`owner_pid`**, `part_key`, `front_id` a serverový `label` (`PartKeys.human_label`).
+`owner_pid` = `persistent_id` konkrétnej inštancie (audit #14 FIX 11): pri dvoch skrinkách so zdieľaným `cabinet_id` je to jediný údaj, ktorým sa dá ukázať, KTORÁ z nich smer
+nemá. `compute()` kľúč **ignoruje** — kusovník, nákup ani ceny sa ním nemenia ani o číslo (dokazuje golden charakterizácia `tests/fixtures/kova_golden/`). Jediný čitateľ je
+`Validation.run`.
 
 ### sheet_estimate.rb
 

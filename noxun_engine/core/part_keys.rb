@@ -96,6 +96,13 @@ module Noxun
         if (m = k.match(%r{\Afront:([^/]+)/wing:(left|right|single|p[1-4])\z}))
           return "#{front_no(m[1], fronts)} · #{wing_label(m[2], m[1], fronts)}"
         end
+        # KOV-A1: vyklop/sklop (rola flap) a blenda (rola false_front).
+        if (m = k.match(%r{\Afront:([^/]+)/flap\z}))
+          return "#{front_no(m[1], fronts)} · #{flap_label(m[1], fronts)}"
+        end
+        if (m = k.match(%r{\Afront:([^/]+)/blind\z}))
+          return "#{front_no(m[1], fronts)} · blenda"
+        end
         if (m = k.match(%r{\Azone:[^/]+/(shelf|divider_v|divider_h):(\d+)\z}))
           return "#{ZONE_PART_LABELS[m[1]]} #{m[2]}"
         end
@@ -110,6 +117,18 @@ module Noxun
       def front_no(front_id, fronts)
         idx = Array(fronts).index { |f| f.is_a?(Hash) && f['id'].to_s == front_id.to_s }
         idx ? "F#{idx + 1}" : front_id.to_s
+      end
+
+      # KOV-A1: kluc `front:F#/flap` je pre vyklop AJ sklop (jedna rola `flap`,
+      # smer vyklapania je v `flap_dir`), takze SLOVO rozhoduje TYP resolved
+      # cela. Bez zhody sa NEHADA — vrati sa neutralne „výklop/sklop".
+      def flap_label(front_id, fronts)
+        f = Array(fronts).find { |x| x.is_a?(Hash) && x['id'].to_s == front_id.to_s }
+        case f && f['type'].to_s
+        when 'lift' then 'výklop'
+        when 'fall' then 'sklop'
+        else 'výklop/sklop'
+        end
       end
 
       # Kridlo dvierok. p1..p4 nesie aj celkovy pocet kridiel („krídlo 2/3"),

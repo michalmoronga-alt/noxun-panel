@@ -249,4 +249,21 @@ deq(PV.nxZoneSpans([
   'rovnake stlpce sa kotuju raz a nelistove zony vobec');
 deq(PV.nxZoneSpans([]), [], 'bez zon niet co kotovat');
 
+// --- KOV-A1 (Codex #280 P2-C): POPIS TYPU CELA v nahlade ---------------------
+// Do KOV-A1 sa kazde ne-zasuvkove a ne-`none` celo popisovalo ako „dvierka",
+// takze pri configu z API sa rozbalovacka v riadku volala „Výklop" a nahlad
+// vedla nej tvrdil „dvierka". Mapa je JEDNO miesto; symboly a smery su A2.
+eq(PV.frontTypeDesc('door'), 'dvierka', 'dvierka');
+eq(PV.frontTypeDesc('drawer_front'), 'zásuvka', 'zasuvkove celo');
+eq(PV.frontTypeDesc('lift'), 'výklop', 'vyklop uz nie je „dvierka"');
+eq(PV.frontTypeDesc('fall'), 'sklop', 'sklop uz nie je „dvierka"');
+eq(PV.frontTypeDesc('blind'), 'blenda', 'blenda uz nie je „dvierka"');
+// Fallback ostava — ale UZ LEN pre NEZNAMY typ (napr. z novsej verzie), nie
+// pre kazdy typ, ktory mapa nepozna.
+eq(PV.frontTypeDesc('sliding_2027'), 'dvierka', 'neznamy typ = konzervativny fallback');
+eq(PV.frontTypeDesc(undefined), 'dvierka', 'chybajuci typ nespadne');
+deq(Object.keys(PV.PV_FRONT_TYPE_DESC).sort(),
+    ['blind', 'door', 'drawer_front', 'fall', 'lift'],
+    'mapa pozna vsetkych PAT kreslenych typov (`none` ma vlastnu vetvu)');
+
 console.log(`OK test_uib2_nahlad.js — ${n} kontrol`);
