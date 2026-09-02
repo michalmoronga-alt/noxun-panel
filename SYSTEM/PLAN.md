@@ -193,6 +193,11 @@ Poradie slices: **0 (D-52 ✅) → A1 ✅ → A2 ✅ → H1 ✅ → B1 ✅ → H
 **KOV-A je KOMPLET a v maine** (A1 PR #280 · A2a PR #281 · A2b PR #282 — plné texty packages v git histórii a v checkpointe #14; záznamy dávok v [archiv/KRONIKA.md](archiv/KRONIKA.md)).
 Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-only), implementuje subagent v worktree, brány podľa CLAUDE.md.
 
+**Postrehy zo smoku 3.9. (Michal, v0.9.20; plné texty v [DOGFOODING.md](DOGFOODING.md), skupina KOVANIE):** **D-115** symboly smeru = čiary z rohov strany pántov (nie
+šípky), v náhľade aj vo viewporte — kandidát na **malú fix dávku hneď** · **D-116** úchytkové profily na tag Čelá (dnes Kovanie) — malá builder dávka, in-SU, môže ísť s D-115 ·
+**D-114** rad piktogramov namiesto „+ pridaj dvere/čelo" + upratanie kontextu Čelá — **UI/UX balík na koniec bloku**. Michal 3.9. potvrdil v smoku bez chýb: zmeny všetkých typov,
+trojkrídlo + Kontrola vedie na neurčené čelo, medzery, všetky voľby otvárania/konštrukcie.
+
 - **✅ HOTOVÉ (PR #284, v0.9.19)** — **KOV-B1 · TASK PACKAGE „KATALÓG A SETY — DÁTA, KLASIFIKÁCIA, TAXONÓMIA, STD" (slice B, rez B1 po Codex audite #17; štart po KOV-H1):**
   **Cieľ:** set aj položka katalógu nesú klasifikáciu (typ použitia · otváranie · konštrukcia zásuvky · výrobca · rada · aktívny), knižnica má verzovanú taxonómiu
   výrobcov/rád, downgrade brány držia aj pre šablóny, a KOV-D má hotový tvar mapovacieho kľúča — **bez UI** (B2/B3). Nákup existujúcich zákaziek CONTENT-identický.
