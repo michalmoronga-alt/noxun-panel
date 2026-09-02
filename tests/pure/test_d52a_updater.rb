@@ -1309,7 +1309,16 @@ NxTest.test('D-52a (#277/4 P2): nezmazatelny marker sa PRIZNA, nezamlci') do
   NxTest.assert(Noxun::Engine.restart_required?, 'latch je zapnuty')
   NxTest.assert_equal('0.9.5', NxD52.generation(plugins, 'po commite'))
   NxTest.assert(File.exist?(File.join(plugins, 'noxun_engine.update.json')), 'marker naozaj ostal')
-  NxTest.refute(NxD52::U.clear_marker(plugins) == 'true', 'clear_marker vracia BOOLEAN')
+  # D-52b (P3 z delta-verifikacie #277): povodny assert porovnaval navratovu
+  # hodnotu s RETAZCOM `'true'` — to nemohlo zlyhat ani vtedy, keby
+  # `clear_marker` vzdy klamal. Meria sa teda SPRAVANIE: pod blokovanym `rm_f`
+  # vrati `false` (marker ostal), po jeho uvolneni `true` a marker je prec.
+  NxTest.refute(NxD52.with_rmf_block('noxun_engine.update.json') { NxD52::U.clear_marker(plugins) },
+                'kym sa marker neda zmazat, `clear_marker` hlasi NEUSPECH')
+  NxTest.assert(File.exist?(File.join(plugins, 'noxun_engine.update.json')),
+                'a marker pri tom naozaj ostal lezat')
+  NxTest.assert(NxD52::U.clear_marker(plugins), 'ked sa zmazat DA, hlasi uspech')
+  NxTest.refute(File.exist?(File.join(plugins, 'noxun_engine.update.json')), 'a marker je prec')
   Noxun::Engine.reset_restart_latch!
   FileUtils.rm_rf(env[:root])
 end
@@ -1658,4 +1667,146 @@ NxTest.test('D-52a: modul je CISTY — pri nacitani ziadny Sketchup./UI.') do
   NxTest.assert(offenders.empty?,
                 "core/updater.rb sa dotyka SketchUp API na riadkoch #{offenders.join(', ')} — " \
                 'jadro musi ostat headless (cesty chodia ako parametre)')
+end
+
+# --- D-52b (Codex #278 kolo 2, P1): ROZDELENIE `apply!` NA DVE FAZY ---------
+#
+# `prepare!` (manifest + staging + validacia) je od kola 2 WORKER-SAFE a bezi
+# v UI vrstve vo vlakne; `commit!` (renamey) v hlavnom. Medzi fazami sa zamok
+# PUSTA, takze jedina vec, ktora drzi exkluzivitu, je MARKER — a `commit!` musi
+# trvat na tom, ze je NAS. Bez toho by sa dal commitnut cudzi (alebo starsi)
+# staging.
+
+NxTest.test('D-52b (#278/2 P1): `commit!` BEZ platnej pripravy ODMIETNE') do
+  env = NxD52.sandbox
+  before = NxD52.fingerprint(env[:plugins])
+  Noxun::Engine.reset_restart_latch!
+
+  # (a) ziadny tiket
+  NxTest.assert_raise('nie je pripravená') { NxD52::U.commit!(nil) }
+  NxTest.assert_raise('nie je pripravená') { NxD52::U.commit!({}) }
+
+  # (b) tiket bez pripravy na disku (nic sa nestagovalo)
+  bogus = { 'plugins' => env[:plugins], 'from' => '0.9.4', 'to' => '0.9.5', 'stamp' => 'X' }
+  err = NxTest.assert_raise { NxD52::U.commit!(bogus) }
+  NxTest.assert(err.message.include?('neplatí'), "dovod: #{err.message}")
+  NxD52.assert_untouched(env[:plugins], before, 'commit bez pripravy')
+
+  # (c) REALNA priprava — tiket z nej PLATI, cudzi (zmenena verzia/peciatka) NIE
+  ticket = NxD52::U.prepare!(env[:src], env[:tree])
+  NxTest.assert_equal('0.9.5', ticket['to'], 'priprava vrati verziu STAGED balika')
+  NxTest.assert(Dir.exist?(File.join(env[:plugins], 'noxun_engine.new')), 'a `.new` naozaj stoji')
+  NxTest.assert(File.file?(File.join(env[:plugins], 'noxun_engine.update.json')), 'marker tiez')
+  NxTest.assert(NxD52.generation(env[:plugins], 'po priprave') == '0.9.4',
+                'ZIVA generacia je po priprave NEDOTKNUTA')
+
+  foreign = ticket.merge('stamp' => 'cudzia-peciatka')
+  err2 = NxTest.assert_raise { NxD52::U.commit!(foreign) }
+  NxTest.assert(err2.message.include?('neplatí'), "cudzi tiket sa odmietne: #{err2.message}")
+  NxTest.assert(Dir.exist?(File.join(env[:plugins], 'noxun_engine.new')),
+                'a CUDZI staging sa pri tom NEMAZE')
+
+  res = NxD52::U.commit!(ticket)
+  NxTest.assert(res['ok'], 'nas tiket commitne')
+  NxTest.assert_equal('0.9.5', NxD52.generation(env[:plugins], 'po commite'))
+  NxTest.assert(Noxun::Engine.restart_required?, 'a latch je zapnuty')
+  Noxun::Engine.reset_restart_latch!
+  FileUtils.rm_rf(env[:root])
+end
+
+NxTest.test('D-52b (#278/2 P1): `abort_prepared!` uprace `.new` aj marker') do
+  env = NxD52.sandbox
+  before = NxD52.fingerprint(env[:plugins])
+  Noxun::Engine.reset_restart_latch!
+
+  ticket = NxD52::U.prepare!(env[:src], env[:tree])
+  # Cudzi tiket neuprace NIC — inak by si dva behy zmazali staging navzajom.
+  NxTest.refute(NxD52::U.abort_prepared!(ticket.merge('stamp' => 'ina')), 'cudzi tiket neuprace nic')
+  NxTest.assert(Dir.exist?(File.join(env[:plugins], 'noxun_engine.new')), 'staging ostal')
+
+  NxTest.assert(NxD52::U.abort_prepared!(ticket), 'nas tiket sa uprace')
+  NxD52.assert_untouched(env[:plugins], before, 'po zruseni pripravy')
+  NxTest.refute(Noxun::Engine.restart_required?, 'zrusena priprava latch NEZAPINA')
+
+  # A po zruseni sa da skusit ZNOVA (marker uz nebrzdi).
+  res = NxD52::U.apply!(env[:src], env[:tree])
+  NxTest.assert(res['ok'], 'druhy pokus po zruseni prejde')
+  Noxun::Engine.reset_restart_latch!
+  FileUtils.rm_rf(env[:root])
+end
+
+NxTest.test('D-52b (#278/2 P1): `prepare!` sa ZIVEJ generacie NEDOTYKA') do
+  env = NxD52.sandbox
+  before = NxD52.fingerprint(env[:plugins])
+  Noxun::Engine.reset_restart_latch!
+
+  ticket = NxD52::U.prepare!(env[:src], env[:tree])
+  live = NxD52.fingerprint(env[:plugins])
+  NxTest.assert_equal(before, live,
+                      'priprava (manifest + staging) meni VYHRADNE `.new` — ziva generacia je ' \
+                      'byte-identicka, takze zrusenie po deadline je bez nasledkov')
+  NxD52::U.abort_prepared!(ticket)
+  FileUtils.rm_rf(env[:root])
+end
+
+NxTest.test('D-52b1 (#278/3 P2): settings store nezmrza KORENOVE cesty') do
+  NxTest.skip!('zapisuje do %APPDATA%') unless NxTest.headless?
+
+  u = NxD52::U
+  # `chomp('/')` nad korenom dava nepouzitelnu cestu — a vsetky tri tvary sa
+  # daju do pola distribucneho priecinka realne napisat (najma UNC share).
+  NxTest.assert_equal('//server/share', u.normalize_source('\\\\server\\share'),
+                      'UNC koren zdielania ostava korenom')
+  NxTest.assert_equal('//server/share', u.normalize_source('//server/share/'),
+                      'aj s koncovym lomitkom')
+  NxTest.assert_equal('D:/', u.normalize_source('D:\\'), 'koren disku ostava korenom')
+  NxTest.assert_equal('/', u.normalize_source('/'), 'POSIX koren tiez')
+  # Beznej ceste sa koncove lomitko STALE strihá (inak by sa ta ista cesta
+  # ulozila raz s nim a raz bez neho a doklad o kontrole by sa nezhodoval).
+  NxTest.assert_equal('//server/share/dist', u.normalize_source('//server/share/dist/'),
+                      'priecinok v zdielani sa normalizuje ako doteraz')
+  NxTest.assert_equal('D:/balik', u.normalize_source('D:\\balik\\'), 'a to isté na disku')
+
+  # A to iste PLATI AJ PRI ZAPISE (store si tvar nesmie prerobit po svojom).
+  NxTest.assert_equal('//server/share', u.set_source_dir('\\\\server\\share'),
+                      'ulozenie vracia korenovy tvar')
+  NxTest.assert_equal('//server/share', u.source_dir, 'a nacita sa rovnako')
+  u.set_source_dir('')
+end
+
+NxTest.test('D-52b1 (#278/b1 P2): tiket nesie NONCE — commit cudzej pripravy neprejde') do
+  env = NxD52.sandbox
+  u = NxD52::U
+  Noxun::Engine.reset_restart_latch!
+
+  # PRVA priprava. Tiket si odlozime a stopu po nej UPRACEME — presne to sa
+  # deje, ked prvy beh skonci deadline-om a `abort_prepared!` po nom uprace.
+  first = u.prepare!(env[:src], env[:tree])
+  NxTest.assert(!first['nonce'].to_s.empty?, 'priprava vracia nonce')
+  stamp = first['stamp']
+  u.abort_prepared!(first)
+
+  # DRUHA priprava v TEJ ISTEJ sekunde a nad TYMI ISTYMI verziami: peciatku
+  # jej vnutime rovnaku, takze sa od prvej lisi UZ LEN nonce-om. (Realny
+  # scenar: dva pokusy tesne po sebe — `started_at` ma sekundove rozlisenie.)
+  u.instance_variable_set(:@started_at, stamp)
+  second = u.prepare!(env[:src], env[:tree])
+  NxTest.assert_equal(stamp, second['stamp'], 'obe pripravy maju ROVNAKU peciatku')
+  NxTest.assert_equal(first['from'], second['from'], 'aj rovnaku vychodziu verziu')
+  NxTest.assert_equal(first['to'], second['to'], 'aj rovnaku cielovu verziu')
+  NxTest.refute(first['nonce'] == second['nonce'], 'a lisia sa PRESNE nonce-om')
+
+  err = NxTest.assert_raise { u.commit!(first) }
+  NxTest.assert(err.message.include?('neplatí'),
+                "oneskoreny commit PRVEHO tiketu sa odmietne: #{err.message}")
+  NxTest.assert(Dir.exist?(File.join(env[:plugins], 'noxun_engine.new')),
+                'a pripravu DRUHEHO behu pri tom nezmaze')
+  NxTest.assert_equal('0.9.4', NxD52.generation(env[:plugins], 'po odmietnutom commite'),
+                      'ziva generacia je nedotknuta')
+
+  res = u.commit!(second)
+  NxTest.assert(res['ok'], 'tiket, ktory k markeru NAOZAJ patri, commitne')
+  NxTest.assert_equal('0.9.5', NxD52.generation(env[:plugins], 'po commite'))
+  Noxun::Engine.reset_restart_latch!
+  FileUtils.rm_rf(env[:root])
 end

@@ -720,7 +720,16 @@
             typeof hwOnLeaveSection === 'function'){
           hwOnLeaveSection();
         }
+        // D-52b: DEEP-LINK je jeden z DVOCH vstupov do sekcie „O plugine"
+        // (druhý je navigácia v `studioGoSection`) — a oba musia spustiť
+        // PRESNE JEDEN explicitný check verzie. Zo `settings_payload` check
+        // nechodí: plný push chodí pri každej zmene modelu a kontrola siaha na
+        // sieťový share (F5).
+        var wasAbout = (studioSec === 'about');
         studioSec = ST.open_section;
+        if (studioSec === 'about' && !wasAbout && typeof ssOnAboutEnter === 'function'){
+          ssOnAboutEnter();
+        }
         // Kotva predvyplna hladanie KUSOVNIKA (N13 posiela ID skrinky). Pri inej
         // sekcii by potichu prestavila filter, ktory pouzivatel ani nevidí —
         // preto sa aplikuje LEN so sekciou, do ktorej patri (review #7).
@@ -1516,7 +1525,12 @@
     if (studioSec === 'hw' && id !== 'hw' && typeof hwOnLeaveSection === 'function'){
       hwOnLeaveSection();
     }
+    // D-52b: NAVIGÁCIA je druhý vstup do sekcie „O plugine" — vstupný hook je
+    // protipólom odchodových hookov vyššie a spúšťa PRESNE JEDEN check verzie
+    // (znova otvorená tá istá sekcia check neopakuje).
+    var wasAbout = (studioSec === 'about');
     studioSec = id;
+    if (id === 'about' && !wasAbout && typeof ssOnAboutEnter === 'function') ssOnAboutEnter();
     render();
   }
   if (typeof window !== 'undefined') window.studioGoSection = studioGoSection;

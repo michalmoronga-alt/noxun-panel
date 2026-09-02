@@ -245,16 +245,182 @@
   // --- render sekcie `about` ----------------------------------------------
   // JEDEN OBSAH, DVA VSTUPY: markup stavia zdieľaný `js/about.js` (ten istý,
   // ktorý plní koliesko Inspectora). Kópia by sa pri prvej úprave rozišla.
+  //
+  // D-52b: updater sa podáva DRUHÝM argumentom, takže prvky vzniknú LEN tu —
+  // koliesko Inspectora `nxAboutFill(host, info)` volá bez neho.
   function ssRenderAboutInto(box){
     var fs = ssMk('fieldset');
     fs.appendChild(ssMk('legend', null, 'O plugine'));
     var host = ssMk('div');
     fs.appendChild(host);
     box.appendChild(fs);
-    if (typeof nxAboutFill === 'function') nxAboutFill(host, SS_STATE ? SS_STATE.about : null);
-    else host.appendChild(ssMk('div', 'muted', 'Obsah sa nenačítal (js/about.js).'));
+    if (typeof nxAboutFill === 'function'){
+      nxAboutFill(host, SS_STATE ? SS_STATE.about : null, updMerged());
+    } else {
+      host.appendChild(ssMk('div', 'muted', 'Obsah sa nenačítal (js/about.js).'));
+    }
     box.appendChild(ssMk('div', 'sshint',
-      'To isté nájdeš v koliesku Inspectora — je to jeden obsah s dvoma vstupmi.'));
+      'Obsah „O plugine" nájdeš aj v koliesku Inspectora — je to jeden obsah s dvoma vstupmi. ' +
+      'Aktualizácia je LEN tu: zatvára obe okná a prepisuje súbory pluginu, preto do ' +
+      'rozklikávacieho panela nepatrí. Po aktualizácii vždy reštartuj SketchUp.'));
+  }
+
+  // ============ D-52b: UPDATER (sekcia `about`) =============================
+  //
+  // Cesta k distribučnému priečinku má VLASTNÝ namespace `data-updater-edit`
+  // (F7) — NIE `data-ss`. Dôvod je vecný, nie kozmetický: `data-ss` nesie
+  // revíznu mechaniku dodávateľa (`SS_DIRTY`, pripnutá `SS_BASE_REV`,
+  // optimistický zámok pri ukladaní) a cesta pod ňu nepatrí — nemá revíziu,
+  // neukladá sa cez `ss_save` a jej uloženie nesmie vyzerať ako zápis sadzieb.
+  // Zdieľaná mechanika je tu ale JEDNA: rozpísaná hodnota PREŽIJE plný push
+  // (chodí pri každej zmene modelu) a zaniká výhradne na potvrdenie servera.
+  var UPD = null;         // posledný stav zo servera (`SS.updater`)
+  var UPD_DIRTY = null;   // ROZPÍSANÁ cesta (null = nič sa nepíše)
+  // POSLEDNÉ uloženie: jeho poradové číslo a odoslaná hodnota. Potvrdenie
+  // servera smie zahodiť rozpis LEN vtedy, keď (a) patrí TOMUTO uloženiu
+  // (`req`, Codex #278 kolo 3) a (b) v poli je stále odoslaná hodnota
+  // (Codex #278 kolo 2). Dve uloženia rýchlo za sebou tak nemôžu skončiť tak,
+  // že ack toho prvého zahodí rozpis patriaci druhému.
+  var UPD_REQ = 0;      // rastúce číslo požiadavky (0 = žiadna neodoslaná)
+  var UPD_SENT = null;  // hodnota, ktorú odoslala požiadavka `UPD_REQ`
+
+  // Stav, z ktorého sa kreslí: základ z payloadu (uložená cesta, bežiaca
+  // verzia, latch), navrch živý výsledok checku a úplne navrchu rozpísaná
+  // cesta. Payload cestu NIKDY neprepíše — presne to je „prežije push".
+  function updMerged(){
+    var about = (SS_STATE && SS_STATE.about) ? SS_STATE.about : null;
+    var base = (about && about.updater) ? about.updater : {};
+    var live = UPD || {};
+    var saved = (live.source_dir != null) ? live.source_dir : (base.source_dir || '');
+    var dir = (UPD_DIRTY !== null) ? UPD_DIRTY : saved;
+    return {
+      enabled: (live.enabled !== undefined) ? live.enabled : (base.enabled !== false),
+      source_dir: dir,
+      // Token POSLEDNEJ kontroly. Klik ho posiela späť a server aktualizuje
+      // LEN vtedy, keď sedí s jeho vlastným záznamom aj s uloženou cestou.
+      token: (live.token == null) ? null : live.token,
+      // ULOŽENÁ cesta (bez rozpisu). Pri rozpísanej ceste ju stavový riadok
+      // MENUJE — inak by človek nevedel, čo je naozaj v nastavení.
+      saved_dir: saved,
+      // Rozpísaná a NEULOŽENÁ cesta zamyká tlačidlo: aktualizovalo by sa
+      // z ULOŽENEJ cesty, nie z tej v poli — klik by spravil niečo iné, než
+      // čo má človek pred očami.
+      dirty: dir !== saved,
+      current: live.current || base.current || '',
+      locked: !!(live.locked || base.locked),
+      state: live.state || 'idle',
+      available: live.available || '',
+      reason: live.reason || ''
+    };
+  }
+
+  // CUDZIA ZMENA CESTY (Codex #278 P1). `updater_settings.json` je súbor
+  // POČÍTAČA — uložiť doň môže aj druhá inštancia SketchUpu alebo človek
+  // ručne. Plný push potom nesie NOVÚ cestu, ale živý výsledok kontroly
+  // (`UPD`) patrí tej STAREJ: tlačidlo by ostalo aktívne, potvrdenie by
+  // menovalo cestu A a aktualizovalo by sa z B. Preto sa výsledok ZAHODÍ
+  // a — ak je sekcia otvorená — rovno beží nová kontrola.
+  function updOnPayload(){
+    if (!UPD) return false;
+    var about = (SS_STATE && SS_STATE.about) ? SS_STATE.about : null;
+    var base = (about && about.updater) ? about.updater : null;
+    if (!base || base.source_dir === undefined) return false;
+    if (String(UPD.source_dir == null ? '' : UPD.source_dir) === String(base.source_dir || '')) return false;
+    UPD = null;
+    if (ssActive() === 'about') updSend('updater_check', {});
+    return true;
+  }
+
+  // POLE IDE ZA ULOŽENOU CESTOU (Codex #278/b1 P2). `SS.updater` prekresľuje
+  // len stavový riadok a tlačidlo (telo sa počas písania nesmie prepísať) —
+  // lenže cesta sa môže zmeniť ZVONKA (druhá inštancia, ručný zásah do
+  // `updater_settings.json`) a prísť aj BEZ plného payloadu. Bez tohto by
+  // sekcia hlásila kontrolu priečinka B, v poli by stálo A — a „Uložiť" by
+  // B prepísalo späť na A. Rozpísaná cesta má prednosť vždy: tá sa nechá
+  // a stavový riadok povie, čo je uložené.
+  function updSyncField(u){
+    if (!u || u.source_dir == null) return false;
+    if (UPD_DIRTY !== null) return false;
+    var inp = ssEl('updDir');
+    if (!inp) return false;
+    var next = String(u.source_dir);
+    if (String(inp.value == null ? '' : inp.value) === next) return false;
+    inp.value = next;
+    return true;
+  }
+
+  // Píše používateľ práve do poľa CESTY? Vtedy sa telo sekcie neprekresľuje
+  // (vzor `ssTyping`) — re-render by vzal fokus aj rozpísanú cestu.
+  function updTyping(){
+    if (typeof document === 'undefined') return false;
+    var a = document.activeElement;
+    return !!(a && a.getAttribute && a.getAttribute('data-updater-edit'));
+  }
+
+  function updSend(name, payload){
+    if (typeof window === 'undefined' || !window.sketchup || !sketchup[name]) return false;
+    sketchup[name](JSON.stringify(payload || {}));
+    return true;
+  }
+
+  // VSTUP DO SEKCIE = PRESNE JEDEN check. Volajú ho OBA vstupy do `about`
+  // (navigácia aj deep-link — `studio.js`), nikdy nie príchod payloadu:
+  // plný push chodí pri každej zmene modelu a kontrola verzie siaha na
+  // sieťový share (F5).
+  function ssOnAboutEnter(){
+    UPD = null;   // starý výsledok patril inému vstupu do sekcie
+    updSend('updater_check', {});
+  }
+
+  // Cielená obnova stavového riadku. Telo sekcie sa NEPREKRESĽUJE: používateľ
+  // môže mať kurzor v poli cesty a re-render by mu ho zobral (a s ním aj
+  // rozpísanú cestu). Mení sa preto LEN text stavu a stav tlačidla.
+  function updPaint(){
+    if (typeof document === 'undefined') return false;
+    if (ssActive() !== 'about') return false;
+    var st = ssEl('updState');
+    var btn = ssEl('updBtn');
+    if (!st || !btn) return false;
+    var u = updMerged();
+    var text = (typeof nxUpdaterText === 'function') ? nxUpdaterText(u) : '';
+    var on = (typeof nxUpdaterEnabled === 'function') ? nxUpdaterEnabled(u) : false;
+    st.textContent = text;
+    // `aria-disabled`, nikdy HTML `disabled` (D-78) — tlačidlo ostáva
+    // zamerateľné a klik naň povie dôvod.
+    if (on && btn.removeAttribute) btn.removeAttribute('aria-disabled');
+    else btn.setAttribute('aria-disabled', 'true');
+    btn.title = on ? 'Zatvorí Inspector aj Štúdio a nasadí novú verziu' : text;
+    return true;
+  }
+
+  function updSaveDir(){
+    var inp = ssEl('updDir');
+    var val = inp ? String(inp.value == null ? '' : inp.value) : (UPD_DIRTY || '');
+    UPD_DIRTY = val;
+    UPD_SENT = val;   // proti tomuto sa porovná obsah poľa, keď dorazí potvrdenie
+    UPD_REQ += 1;     // …a proti tomuto sa porovná, KTORÉMU uloženiu ack patrí
+    if (!updSend('updater_set_dir', { source_dir: val, req: UPD_REQ })){
+      SS.setStatus('Cestu sa nepodarilo odoslať.', true);
+    }
+  }
+
+  // Obsah poľa cesty PRÁVE TERAZ (bez DOM padá na rozpísanú hodnotu).
+  function updFieldValue(){
+    var inp = ssEl('updDir');
+    if (inp) return String(inp.value == null ? '' : inp.value);
+
+    return (UPD_DIRTY === null) ? null : UPD_DIRTY;
+  }
+
+  // D-52b1: tlačidlo „Aktualizovať" je zatiaľ NEAKTÍVNE — samotná výmena
+  // súborov (D-15 potvrdenie, zatvorenie oboch okien, príprava balíka, commit)
+  // je dávka D-52b2. Klik preto povie DÔVOD, nemlčí (D-78).
+  function updAct(action, _btn){
+    if (action === 'save-dir'){ updSaveDir(); return; }
+    if (action !== 'apply') return;
+
+    SS.setStatus((typeof nxUpdaterSoon === 'string') ? nxUpdaterSoon
+                                                    : 'Aktualizovanie príde v ďalšej dávke.', true);
   }
 
   // --- kreslenie do zdieľaných uzlov --------------------------------------
@@ -308,6 +474,10 @@
     // niekto tú stráž presunul alebo zrušil, uvoľní sa pin pod kurzorom
     // a padne test „pod kurzorom pin ostáva".
     if (!ssDirty()) SS_BASE_REV = null;
+    // D-52b: rozpísaná CESTA sa chráni rovnako ako rozpísané sadzby — telo sa
+    // neprekresľuje, kým do jej poľa niekto píše. Stráž je AŽ TU (za uvoľnením
+    // pinu), aby sa revíznej mechaniky `bset` vôbec nedotkla.
+    if (sec === 'about' && updTyping()) return;
     box.innerHTML = '';
     if (sec === 'bset') ssRenderBsetInto(box);
     else if (sec === 'sup') ssRenderSupInto(box);
@@ -429,6 +599,30 @@
       SS_DIRTY = {};
       SS_BASE_REV = null;   // rozpis skončil — ďalší začne od čerstvej revízie
       ssRenderBody();
+    },
+    // D-52b: stav updatera (výsledok checku, potvrdené uloženie cesty).
+    // `saved` je JEDINÉ miesto, kde zaniká rozpísaná cesta — presne ako
+    // `SS.saved()` pre sadzby.
+    updater: function(u){
+      UPD = u || null;
+      if (u && u.saved){
+        // Potvrdenie patrí TOMU, čo sa odoslalo — a to sa overuje DVAKRÁT:
+        // podľa čísla požiadavky (ack staršieho uloženia sa zahodí celý) a
+        // podľa obsahu poľa (používateľ mohol medzitým písať ďalej).
+        var stale = (u.req != null) && (Number(u.req) !== UPD_REQ);
+        var now = updFieldValue();
+        if (!stale && (UPD_SENT === null || now === null || now === UPD_SENT)){
+          UPD_DIRTY = null;
+          UPD_SENT = null;
+          var inp = ssEl('updDir');
+          // Server cestu NORMALIZUJE (lomítka, koncový oddeľovač) — pole musí
+          // ukázať to, čo je naozaj uložené, nie to, čo používateľ napísal.
+          if (inp) inp.value = (u.source_dir == null) ? '' : u.source_dir;
+        }
+      }
+      updSyncField(u);
+      if (updPaint()) return;
+      if (ssActive() === 'about') ssRenderBody();
     }
   };
   if (typeof window !== 'undefined') window.SS = SS;
@@ -455,6 +649,10 @@
     // cestu pushu; prekreslenie z navigácie by jej ušlo a zastaraný pin by
     // prežil návrat do sekcie (falošný konflikt → zahodená editácia).
     SS_STATE = s;
+    // D-52b (Codex #278 P1): cudzia zmena distribucnej cesty zneplatni zivy
+    // vysledok kontroly ? musi to bezat AJ ked sekcia  prave otvorena
+    // nie je, inak by sa do nej clovek vratil so stavom o inom priecinku.
+    updOnPayload();
     if (!ssActive()) return;
     ssRenderBody();
     ssRenderTools();
@@ -485,6 +683,18 @@
     document.addEventListener('input', function(ev){
       var t = ev.target;
       if (!t || !t.getAttribute) return;
+      // D-52b: VLASTNÝ namespace updatera. Vetva končí `return` ešte PRED
+      // celou revíznou mechanikou — písanie cesty sa nesmie dotknúť ani
+      // `SS_DIRTY`, ani pripnutej revízie dodávateľa (F7).
+      if (t.getAttribute('data-updater-edit')){
+        UPD_DIRTY = String(t.value == null ? '' : t.value);
+        // Codex #278 kolo 2 (P2): rozpísaná cesta MENÍ STAV tlačidla (kontrola
+        // patrí ULOŽENEJ ceste), ale telo sa počas písania neprekresľuje —
+        // tlačidlo by ostalo aktívne a klik by aktualizoval z inej cesty, než
+        // akú má človek pred očami. Preto sa stavový riadok obnoví CIELENE.
+        updPaint();
+        return;
+      }
       var key = t.getAttribute('data-ss');
       if (!key) return;
       // Prvé písmeno PRIPNE revíziu, nad ktorou sa formulár rozpisuje.
@@ -493,9 +703,21 @@
       var v = ssParse(t.value);
       t.classList.toggle('bad', typeof v === 'number' && isNaN(v));
     });
+    // D-52b: Enter v poli cesty = uloženie (druhá cesta je mini-tlačidlo).
+    // Pole žije mimo formulára, takže Enter by inak neurobil nič.
+    document.addEventListener('keydown', function(ev){
+      if (!ev || ev.key !== 'Enter') return;
+      var t = ev.target;
+      if (!t || !t.getAttribute || !t.getAttribute('data-updater-edit')) return;
+      if (ev.preventDefault) ev.preventDefault();
+      updSaveDir();
+    });
     document.addEventListener('click', function(ev){
-      var b = ev.target && ev.target.closest ? ev.target.closest('[data-action],[data-ssgo]') : null;
+      var b = ev.target && ev.target.closest
+        ? ev.target.closest('[data-action],[data-ssgo],[data-updater-act]') : null;
       if (!b) return;
+      var ua = b.getAttribute('data-updater-act');
+      if (ua){ updAct(ua, b); return; }
       var go = b.getAttribute('data-ssgo');
       // Deep-link vnútri okna je ČISTO klientsky — server o prepnutí sekcie
       // nevie a vedieť nemusí (vzor `studioGoSection` z Rozpočtu).
@@ -517,5 +739,13 @@
                        ssBaseRev: function(){ return SS_BASE_REV; },
                        ssTyping: ssTyping,
                        ssFailed: function(){ return SS_FAILED; },
+                       // D-52b (tests/js/test_d52b_updater_ui.js)
+                       ssOnAboutEnter: ssOnAboutEnter, updMerged: updMerged,
+                       updOnPayload: updOnPayload,
+                       updPaint: updPaint, updSaveDir: updSaveDir,
+                       updAct: updAct, updTyping: updTyping,
+                       updDirty: function(){ return UPD_DIRTY; },
+                       updSent: function(){ return UPD_SENT; },
+                       updReq: function(){ return UPD_REQ; },
                        SS_SECTIONS: SS_SECTIONS, SS: SS };
   }

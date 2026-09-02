@@ -1742,8 +1742,9 @@ mene kanála) a `sketchup.ready` z neho zaniklo.
 **Čo edituje:** GLOBÁLNE nastavenia aktívneho dodávateľa (`%APPDATA%\NOXUN\Engine\supplier_settings.json`) — sadzby služieb, režimové hodnoty €/€€/€€€, štandardné koncové riadky,
 prah veku cien, krok zaokrúhlenia; do zákazky sa **nemrazia** (rozpočet je pohyblivý obraz cien).
 
-**Uzavretý whitelist `SECTION_ACTIONS = ss_save · ss_reload`** — mená sú prefixované zámerne: `save`/`reload`/`ready` sú príliš všeobecné na to, aby žili v JEDNOM priestore
-callbackov okna vedľa akcií ostatných sekcií (`ready` by dokonca prepísal vlastný callback Štúdia).
+**Uzavretý whitelist `SECTION_ACTIONS = ss_save · ss_reload · updater_check · updater_set_dir · updater_apply`** — mená sú prefixované zámerne: `save`/`reload`/`ready` sú príliš
+všeobecné na to, aby žili v JEDNOM priestore callbackov okna vedľa akcií ostatných sekcií (`ready` by dokonca prepísal vlastný callback Štúdia). Tri `updater_*` akcie pribudli
+v D-52b — sú to akcie sekcie `about`, ktorej serverovou autoritou je tento modul (telo je nižšie, „updater.rb — UI vrstva").
 
 **Baseline revízia prežila presun** (optimistický zámok): payload nesie `revision` aktívneho dodávateľa, uloženie ju vracia a nezhoda = odmietnutie + načítanie nanovo — nikdy tichý
 prepis cudzej zmeny.
@@ -1810,14 +1811,20 @@ Dáta (verzia + priečinok nastavení) dáva VÝHRADNE server — do ŠT-4a stá
 by videl dva rôzne „O plugine". Tri pravidlá `.aboutrow`/`.aboutlogo`/`.aboutname` sa preto v `css/panel.css` **odscopovali z `.nx-inspector`** — v Štúdiu (root bez tej triedy) by
 sa obsah inak rozsypal.
 
+**D-52b: JEDEN OBSAH, ale updater LEN v jednom vstupe.** Builder má od D-52b druhý argument — stav updatera; `nxAboutHtml(info, updater)` pripojí blok `nxUpdaterHtml(updater)`
+**iba keď ho volajúci podá**. Podáva ho jedine sekcia `about` Štúdia (`nxAboutFill(host, about, updMerged())`); koliesko Inspectora volá builder ako doteraz (`nxAboutFill('cfgAbout',
+info)`) a updater v ňom neexistuje. Je to **vedomá odchýlka od zapísaného „sup/about sú čítanie"**, ktorú si vyžiadalo zadanie D-52 („aktualizovať jedným klikom zo sekcie
+O plugine"): sekcia má odteraz jediné zapisovateľné pole mimo `bset` (cestu k distribučnému priečinku) a tlačidlo, ktoré prepíše súbory pluginu. Do rozklikávacieho kolieska
+Inspectora to nepatrí — a mŕtve tlačidlo v druhom vstupe by bolo D-78.
+
 **Vedomá odchýlka od wireframu mockupu:** licencie tretích strán a diagnostika (`Debug.report`) sa **nepridávajú** — v koliesku dnes nie sú, takže by to nebolo zrkadlo, ale nový
 obsah v oboch vstupoch (patrí do vlastnej dávky).
 
-### updater.rb — aktualizácia pluginu jedným klikom (D-52a, jadro bez UI)
+### updater.rb — aktualizácia pluginu jedným klikom (D-52a jadro + D-52b1 UI kontroly)
 
-**Vstupný bod bude sekcia „O plugine" v Štúdiu (D-52b); tu je opísané ČISTÉ JADRO, ktoré tam sedí pod tlačidlom.** Modul je headless: pri načítaní nesiaha na `Sketchup.*` ani
-`UI.*` a **všetky cesty prijíma ako parametre** (`Engine.plugin_dir` / `find_support_file` patria UI vrstve). Vďaka tomu beží celá sada nad TEMP sandboxom a nikdy nad živým
-`Plugins`.
+**Vstupný bod je sekcia „O plugine" v Štúdiu; tu je najprv opísané ČISTÉ JADRO, ktoré tam sedí pod tlačidlom, a na konci UI vrstva nad ním.** Modul je headless: pri načítaní
+nesiaha na `Sketchup.*` ani `UI.*` a **všetky cesty prijíma ako parametre** (`Engine.plugin_dir` / `find_support_file` patria UI vrstve). Vďaka tomu beží celá sada nad TEMP
+sandboxom a nikdy nad živým `Plugins`.
 
 **Formát balíka = kópia repa:** `noxun_engine.rb` + strom `noxun_engine/`. **Jednotka atomicity je CELÝ BALIK** — loader a strom sú jedna generácia. *Nový strom so starým loaderom
 je zakázaný stav*: `main.rb` drží VERSION len ako fallback, takže by plugin hlásil starú verziu nad novým kódom.
@@ -1825,7 +1832,17 @@ je zakázaný stav*: `main.rb` drží VERSION len ako fallback, takže by plugin
 **Rozloženie v `Plugins`** (všetko súrodenci stromu): `noxun_engine.new/` + `noxun_engine.rb.new` (staging) · `noxun_engine.old/` + `noxun_engine.rb.old` (predchádzajúca
 generácia) · `noxun_engine.update.json` (transakčný marker) · `noxun_engine.update.lock` (zámok) · `noxun_engine.leases/<pid>.lease`.
 
-**Postup `apply!`:** kanonické hranice → zámok → *(marker existuje ⇒ odmietnuť)* → *(žije iná inštancia ⇒ odmietnuť)* → **manifest zo zdroja** (relatívna cesta → SHA1 + veľkosť) →
+**`apply!` má od D-52b DVE FÁZY** (Codex #278 kolo 2): `prepare!` a `commit!`. Dôvod je prevádzkový: manifest a **kopírovanie celého balíka** zo (sieťového) zdroja trvá, a kým to
+bežalo v jednom volaní, robila to UI vrstva v hlavnom vlákne — visiaci UNC share tak zamrazil SketchUp na desiatky sekúnd. **`prepare!`** (kanonické hranice → zámok → marker →
+manifest → staging → validácia → rozhodnutie o verzii) je preto **worker-safe** — nesiaha na `Sketchup.*` ani `UI.*` a **živej generácie sa nedotýka**, mení výhradne `.new` — a
+vracia **tiket**. **`commit!`** (len renamey v `Plugins` + latch) beží v hlavnom vlákne. Medzi fázami sa **zámok pustí** a mutuálnu exkluzivitu drží **marker**: každý iný proces
+(aj druhý pokus) sa o neho zastaví, a `commit!` trvá na tom, že marker na disku je **náš**. Rozhoduje **nonce** — náhodná identita konkrétnej prípravy zapísaná do markera aj do
+tiketu; pid, `started_at` a obe verzie sú len doplnková kontrola. Samy o sebe nestačia: `started_at` má sekundové rozlíšenie, takže dve prípravy v tej istej sekunde nad tými istými
+verziami by boli nerozoznateľné a oneskorený `commit!` prvého tiketu by nasadil balík toho druhého. Pri nezhode `commit!` odmietne a cudzích artefaktov sa nedotkne.
+Kto `prepare!` nedokončí commitom, musí zavolať **`abort_prepared!`** (UI to robí po deadline aj pri nezhode verzie); ten upratuje takisto len vlastný staging. `apply!` ostáva
+ako obal `prepare!` + `commit!` — používa ho headless sada aj in-SU sekcia.
+
+**Postup (obe fázy dokopy):** kanonické hranice → zámok → *(marker existuje ⇒ odmietnuť)* → *(žije iná inštancia ⇒ odmietnuť)* → **manifest zo zdroja** (relatívna cesta → SHA1 + veľkosť) →
 **staging KÓPIOU** do `.new` (nie rename — sieťový share vie streamovať useknutý súbor) → **validácia staged stromu proti manifestu byte-for-byte** → *(**opakovaná** kontrola
 lease — staging trvá a medzitým mohla nabehnúť ďalšia inštancia)* → **(3)** `noxun_engine` → `.old` → **(4)** `.new` → `noxun_engine` → **(5a)** záloha loadera **kópiou** `.rb` → `.rb.old`,
 **(5b)** jediný atomický `File.rename('.rb.new', '.rb')` → **(6)** `.old` sa maže až po úspechu. Každý krok má definovaný rollback; zlyhanie ktoréhokoľvek vracia **celý** swap. Zlyhanie mazania `.old` je **úspech
@@ -1921,6 +1938,9 @@ Rename v rámci jedného priečinka je atomický, takže medzistav neexistuje. P
 **Marker sa maže OVERENE.** `FileUtils.rm_f` chybu potlačí, takže „zmazané" sa nedalo odlíšiť od „ostalo ležať" — a marker, ktorý prežije, je trvalá brzda: každý ďalší `apply!` sa
 o neho zastaví hláškou o nedokončenej transakcii. `clear_marker` preto vracia výsledok overený na disku. Keď marker prežije po úspešnom commite, `apply!` vráti `state`
 `cleanup_pending` (aktualizácia prebehla, latch zapnutý, poznámka menuje súbor); v loaderi je to stav `:marker_stuck` a **plugin sa nenačíta** s hláškou, ktorá súbor pomenuje.
+**A od D-52b to isté platí aj pre ODMIETACIE a ROLLBACKOVÉ cesty** (P3 z delta-verifikácie #277): tam sa návratová hodnota zahadzovala, takže o zvyšnutom markeri sa človek
+dozvedel až z nasledujúceho pokusu — a úplne inou hláškou. `marker_note` preto pripája vetu o `noxun_engine.update.json` do každej `Refused` správy, ktorá vznikla na ceste
+mažúcej marker (zlyhaný staging, zlyhaný rename kroku 3, úspešný rollback v `abort_after_move!`).
 
 **Boot vracia stav a ten rozhoduje, či sa plugin vôbec načíta:** `:idle` (nič sa nedialo) a `:done` (dorovnané, strom sedí) → extension sa registruje; `:busy` (**zámok drží iná
 inštancia, ktorá práve aktualizuje** — boot naň krátko počká, max ~5 s), `:restart` (strom nezodpovedá tomuto loaderu), `:lease_failed` (nedá sa zapísať stopa procesu), `:marker_stuck` (nedá sa zmazať
@@ -1934,8 +1954,72 @@ opravovať (`pending?` je false), ale náš loader v pamäti je starý a strom n
 súboru. Boot, ktorý by sa v tom okne pozrel iba na artefakty, by nič nenašiel, načítal strom a updater by mu ho o pár sekúnd vymenil pod rukami. Bežný štart je tak jeden `flock`,
 zápis lease a päť `File.exist?` — zanedbateľná réžia.
 
-**Vedomé hranice D-52a:** žiadne UI (tlačidlo, stavový riadok, pole cesty), žiadny asynchrónny check s deadline, žiadna bariéra zatvárania okien pred swapom, žiadne natívne hlášky
-výsledku — to všetko je D-52b. Ďalej mimo rozsahu: podpisovanie balíka, auto-update na pozadí, G-Disk sync knižníc (D-48).
+#### UI vrstva (D-52b1) — sekcia „O plugine" v Štúdiu
+
+**Server je `supplier_settings_dialog.rb`** (autorita sekcie `about`), klient je `ui/js/about.js` (markup) + `ui/js/studio_settings.js` (stav a akcie) + dva vstupné hooky
+v `ui/js/studio.js`. Nový modul nevznikol zámerne: UI stojí nad hotovým kontraktom jadra a druhý server sekcie `about` by sa s prvým časom rozišiel.
+
+**Kontrola verzie je EXPLICITNÁ akcia, nie súčasť payloadu (F5).** `settings_payload` chodí pri KAŽDEJ zmene modelu — keby v ňom bol check, každý posun skrinky by siahol na
+sieťový share. Payload preto nesie len to, čo sa dá zistiť bez dotyku zdroja (`about.updater` = uložená cesta, bežiaca verzia, stav latchu) a samotný check posiela **vstup do
+sekcie**: `studioGoSection('about')` (navigácia) a vetva `ST.open_section` v `NX.setStudio` (deep-link) volajú ten istý hook `ssOnAboutEnter()`. Znova otvorená tá istá sekcia check
+neopakuje; odchod a návrat áno.
+
+**Check beží vo VLÁKNE s deadline (F6) a jeho výsledok nasadzuje TIMER.** Vo vlákne je LEN súborové I/O (`Updater.check`) — žiadne `Sketchup.*`, `UI.*` ani zápis do stavu okna;
+guard test nad zdrojom to stráži. Hlavné vlákno sa nikdy nečaká: `UI.start_timer` sa každých 0,2 s spýta, či je hotovo, a po 4 s ohlási „zdroj neodpovedal (cesta) — je pripojený?".
+**Vlákno sa pri deadline zámerne NEZABÍJA** (`Thread#kill` nad čítaním z odpojeného sieťového disku je nespoľahlivý) — jeho neskorá odpoveď zomrie na tokene.
+
+**TOKEN = (cesta, inštancia Štúdia, sekvencia).** Zahodí sa odpoveď prekonaného dotazu (medzitým prišiel novší), odpoveď o INOM priečinku (cesta sa medzitým uložila inak — inak by
+sekcia ukázala verziu úplne iného miesta) aj odpoveď patriaca ZANIKNUTEJ inštancii okna (`StudioDialog.instance_token` = `object_id` živého dialógu). Asynchrónna odpoveď už nemá
+sink (`with_client` žije presne jeden synchrónny callback) a ide kanálom okna — vzor asynchrónnych emitov Demosu.
+
+**JEDEN BEŽIACI DOTAZ NA JEDNU CESTU** (`updater_worker`, Codex #278 P2). Vlákno sa po deadline nezabíja, takže bez evidencie by každý návrat do sekcie pridal ďalšie zablokované
+vlákno na tú istú mŕtvu cestu a tie by sa hromadili až do reštartu SketchUpu. **Živý (visiaci) beh sa preto zdieľa** — nový dotaz na tú istú cestu sa naň len prihlási s vlastným
+tokenom. **Hotový beh sa naopak zahadzuje**: jeho výsledok je z iného okamihu a share sa medzitým mohol vrátiť, takže ďalšia kontrola musí zdroj prečítať nanovo. Iná cesta = vlastný
+beh.
+
+**DOKLAD O KONTROLE** (Codex #278 P1). `updater_settings.json` je súbor počítača — uložiť doň môže aj druhá inštancia SketchUpu alebo človek ručne. Bez
+dôkazu by stačilo, aby sa cesta medzi kontrolou a klikom zmenila: potvrdenie by menovalo priečinok A a nasadilo by sa B. Server si preto pri každom **úspešnom** doručení výsledku
+zapíše `{dir, token, state, dlg}`, posiela `token` klientovi a ten ho pri klike vracia v `checked_path` + `check_token`. `apply!` sa spustí len keď sedí **všetko**: zapísaný stav je
+`newer`, jeho cesta = práve uložená cesta, inštancia okna je tá istá a klientove hodnoty sa zhodujú so zápisom — **doklad spotrebúva až D-52b2**, tu sa iba ukladá a posiela klientovi.
+Klientská strana to zrkadlí: keď plný push prinesie inú `about.updater.source_dir`, než akej patrí živý výsledok, výsledok sa **zahodí** (tlačidlo zamkne) a v otvorenej sekcii sa
+rovno spustí nová kontrola.
+
+**Cesta má vlastný namespace `data-updater-edit` (F7), nie `data-ss`.** Dôvod je vecný: `data-ss` nesie revíznu mechaniku dodávateľa (`SS_DIRTY`, pripnutá `SS_BASE_REV`, optimistický
+zámok), a cesta pod ňu nepatrí — nemá revíziu a neukladá sa cez `ss_save`. Vetva v `input` listeneri končí `return` ešte pred celou tou mechanikou. Zdieľané je jedno: **rozpísaná
+cesta PREŽIJE plný push** (`UPD_DIRTY` vyhráva nad payloadom) a zaniká výhradne na potvrdenie servera (`SS.updater({saved:true})`, vzor `SS.saved()`); vtedy sa do poľa zapíše
+**normalizovaný** tvar, ktorý je naozaj uložený. Ukladá sa Enterom aj mini-tlačidlom a uloženie rovno spustí nový check (v novom priečinku je iná verzia).
+
+**Rozpísaná cesta zamyká tlačidlo OKAMŽITE.** Kontrola patrí **uloženej** ceste, takže kým je v poli niečo iné, klik by aktualizoval z iného priečinka, než aký má človek pred
+očami. Každý `input` preto volá `updPaint()` — telo sekcie sa počas písania neprekresľuje, takže bez toho by tlačidlo ostalo aktívne — a stav hovorí „cesta nie je uložená".
+
+**Potvrdenie uloženia patrí TOMU, ČO SA ODOSLALO** (Codex #278 kolo 2, P2). Klient si pamätá odoslanú hodnotu (`UPD_SENT`) a `saved: true` zahodí rozpis a nasadí normalizovanú
+cestu **len keď je v poli stále ona**. Bez toho platilo: Enter uloží A, používateľ píše B, dorazí ack na A — a rozrobené B by zmizlo.
+
+**POLE IDE ZA ULOŽENOU CESTOU.** `SS.updater` prekresľuje len stavový riadok a tlačidlo (telo sa počas písania nesmie prepísať) — lenže cesta sa môže zmeniť **zvonku** (druhá
+inštancia, ručný zásah do `updater_settings.json`) a prísť aj bez plného payloadu. `updSyncField` preto nastaví `#updDir` na cestu zo servera vždy, keď nie je nič rozpísané; bez
+toho by sekcia hlásila kontrolu priečinka B, v poli by stálo A — a „Uložiť" by B prepísalo späť na A. **Rozpísaná cesta má prednosť vždy**: tá sa nechá a stavový riadok **menuje
+uloženú** („Uložená je „B""), takže je zrejmé, čoho sa kontrola týka.
+
+**Stavový riadok sa obnovuje CIELENE.** `updPaint()` prepíše len `#updState` a `#updBtn` — telo sekcie sa neprekresľuje, lebo používateľ môže mať kurzor v poli cesty. Trojstav
+jadra plus dva prevádzkové stavy: `newer` = tlačidlo aktívne · `same` = `aria-disabled` „máš aktuálnu verziu" · `older` = `aria-disabled` „staršiu verziu nainštaluj ručne cez
+INSTALL" (B4) · `checking` a `error` (hláška nesie **cestu aj dôvod**). Vždy `aria-disabled`, **nikdy HTML `disabled`** (D-78) — tlačidlo ostáva zamerateľné a klik naň povie dôvod.
+
+**Testovacie seamy.** Asynchrónny check a bariéra stoja na troch veciach z prostredia — hodinách, vlákne a timeri (+ natívnej hláške). `SupplierSettingsDialog.test_clock /
+test_spawn / test_schedule / test_notify` ich v headless sade nahradia (vzor `Materials.test_dir_override`), takže token, deadline aj bariéra sa overia bez SketchUpu a bez čakania
+v reálnom čase. V produkcii sú `nil`.
+
+**Tlačidlo „Aktualizovať" je v D-52b1 zámerne NEAKTÍVNE.** Sekcia vie cestu nastaviť a verziu overiť; samotná výmena súborov (D-15 potvrdenie, zatvorenie oboch okien, príprava
+balíka vo vlákne, `commit!`, natívne hlášky) je **dávka D-52b2** — rez podľa pravidla 3 kôl (PR #278). Neaktívna akcia sa podľa D-78 nesmie skrývať ani mlčať: tlačidlo je
+`aria-disabled` s dôvodom (`NX_UPD_SOON`) a klik naň ho zopakuje do stavového riadku okna.
+
+**Potvrdenie uloženia sa páruje s POŽIADAVKOU** (Codex #278 kolo 3, P2). Klient posiela s cestou aj poradové číslo `req` a server ho vracia nedotknuté; rozpis zaniká len keď ack
+patrí **poslednej** požiadavke **a** v poli je stále odoslaná hodnota. Bez toho by ack skoršieho uloženia (A) ukončil rozpis, ktorý medzitým patril novšiemu (B).
+
+**Cesty sú root-aware** (Codex #278 kolo 3, P2). `Updater.normalize_source` strihá koncové lomítko len tam, kde nejde o **koreň** — `/`, `D:/` aj `//server/share` ostávajú
+nedotknuté (rovnaké pravidlo ako `normalize_path`). Všetky tri sa dajú do poľa distribučného priečinka reálne napísať a `chomp('/')` by z nich spravil nepoužiteľnú cestu.
+
+**Vedomé hranice D-52b1:** žiadne aplikovanie (D-52b2), žiadny auto-check na pozadí (kontrola je vždy vstup do sekcie alebo uloženie cesty — nedostupný share sa preto „opraví" odchodom a návratom do sekcie),
+žiadny auto-reload, žiadny downgrade, žiadne podpisovanie balíka, žiadny G-Disk sync knižníc (D-48).
 
 ### Veľkosť okna pri otvorení (D-77)
 

@@ -47,6 +47,7 @@ require 'fileutils'
 require 'digest'
 require 'rbconfig'
 require 'open3'
+require 'securerandom'
 
 module Noxun
   module Engine
@@ -485,6 +486,13 @@ module Noxun
           'from' => from.to_s,
           'to' => to.to_s,
           'started_at' => (@started_at ||= Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ')),
+          # NONCE = identita KONKRETNEJ pripravy (Codex #278/b1 P2). Dvojica
+          # (pid, `started_at`) nestaci: peciatka ma sekundove rozlisenie, takze
+          # dve pripravy v tej istej sekunde nad tymi istymi verziami by mali
+          # ROVNAKY „podpis" a oneskoreny `commit!` prveho tiketu by presiel
+          # proti markeru toho DRUHEHO. Nonce zije po cely cas transakcie
+          # (marker sa v nej prepisuje viackrat) a zanika s `clear_marker`.
+          'nonce' => (@nonce ||= SecureRandom.hex(8)),
           'pid' => Process.pid
         }
         path = marker_path(plugins_dir)
@@ -523,12 +531,28 @@ module Noxun
       # Vysledok sa preto OVERUJE na disku a volajuci sa o nom dozvie.
       def clear_marker(plugins_dir)
         @started_at = nil
+        @nonce = nil
         begin
           FileUtils.rm_f(marker_path(plugins_dir))
         rescue StandardError => e
           Engine.log_error(e, 'Updater.clear_marker') if Engine.respond_to?(:log_error)
         end
         !File.exist?(marker_path(plugins_dir))
+      end
+
+      # D-52b (P3 z delta-verifikacie #277): USPESNA cesta vysledok
+      # `clear_marker` uz priznavala (`state` = `cleanup_pending`), ODMIETACIA
+      # a ROLLBACKOVA nie — tam sa navratova hodnota zahadzovala. Marker, ktory
+      # prezije, je pritom TRVALA BRZDA: kazdy dalsi `apply!` sa o neho zastavi
+      # hlaskou „predchádzajúca aktualizácia sa nedokončila" a pouzivatel by
+      # netusil, odkial sa vzala. Poznamka sa preto pripaja do KAZDEJ `Refused`
+      # spravy, ktora vznikla na ceste mazajucej marker.
+      MARKER_STUCK_NOTE = ' (pozn.: stopa po pokuse — súbor noxun_engine.update.json ' \
+                          'v priečinku Plugins — sa nedala zmazať; ďalšia aktualizácia sa ' \
+                          'o ňu zastaví, kým ju nezmažeš alebo nereštartuješ SketchUp)'
+
+      def marker_note(cleared)
+        cleared ? '' : MARKER_STUCK_NOTE
       end
 
       # --- update lock (B3) --------------------------------------------------
@@ -747,11 +771,19 @@ module Noxun
         File.join(dir, SETTINGS_FILE)
       end
 
+      # Codex #278 kolo 3 (P2): koncove lomitko sa strihá LEN tam, kde nejde
+      # o KOREN — presne ako v `normalize_path`. `chomp('/')` nad korenom dava
+      # nepouzitelnu cestu (`/` -> prazdna, `D:/` -> „aktualny priecinok na
+      # disku D", `//server/share` -> UNC koren bez zdielania) a vsetky tri sa
+      # daju do pola distribucneho priecinka realne napisat.
       def normalize_source(value)
         v = value.to_s.strip
         return '' if v.empty?
 
-        v.tr('\\', '/').chomp('/')
+        p = v.tr('\\', '/')
+        return p if p =~ ROOT_PATH_RE
+
+        p.chomp('/')
       end
 
       def settings
@@ -826,10 +858,34 @@ module Noxun
           'available' => '', 'reason' => "zdroj sa nepodarilo prečítať (#{e.class})" }
       end
 
-      # --- samotna aktualizacia ---------------------------------------------
-      # Vracia hash `{'ok' => true, 'from', 'to', 'note'}`; kazde odmietnutie je
-      # `Refused` s dovodom a ciel ostava BYTE-IDENTICKY.
+      # --- samotna aktualizacia (DVE FAZY) -----------------------------------
+      #
+      # D-52b (Codex #278 kolo 2, P1): `apply!` robil VSETKO v jednom volani —
+      # vratane manifestu a KOPIROVANIA celeho balika zo (sietoveho) zdroja.
+      # V UI vrstve to bezalo v hlavnom vlakne, takze visiaci UNC share zamrazil
+      # SketchUp na desiatky sekund. Preto su fazy dve:
+      #
+      #   `prepare!` — VSETKO blokujuce I/O nad ZDROJOM (manifest, staging do
+      #                `.new`, validacia, rozhodnutie o verzii). Je WORKER-SAFE:
+      #                ziadne `Sketchup.*`, ziadne `UI.*` a ZIVEJ generacie sa
+      #                nedotyka — meni sa vyhradne `.new`. Vracia TIKET.
+      #   `commit!`  — LEN renamey v `Plugins` (lokalne, rychle) + latch. Bezi
+      #                VYHRADNE v hlavnom vlakne.
+      #
+      # Medzi fazami sa zamok PUSTA a mutualnu exkluziu drzi MARKER: kazdy iny
+      # proces (aj druhy pokus) sa o neho zastavi. `commit!` preto overi, ze
+      # marker na disku je NAS (pid + `started_at` + obe verzie) — inak odmietne
+      # a nic nesahne. Kto `prepare!` nedokonci commitom, MUSI zavolat
+      # `abort_prepared!` (UI to robi na deadline aj pri nezhode verzie).
+      #
+      # `apply!` ostava ako jednoduchy obal (headless sada aj in-SU sekcia ho
+      # pouzivaju) — je to presne `prepare!` + `commit!`.
       def apply!(source_dir_value, plugin_dir)
+        commit!(prepare!(source_dir_value, plugin_dir))
+      end
+
+      # FAZA 1 — bezpecna vo vlakne. Vracia tiket pre `commit!`.
+      def prepare!(source_dir_value, plugin_dir)
         source, plugins, = check_boundaries!(source_dir_value, plugin_dir)
 
         with_update_lock(plugins) do
@@ -843,12 +899,12 @@ module Noxun
           end
 
           cleanup_staging(plugins) # zvysky po pade, ktory recovery uz vyriesila
-          run_transaction!(source, plugins)
+          stage_transaction!(source, plugins)
         end
       end
 
-      # Telo transakcie — bezi VYHRADNE pod `with_update_lock`.
-      def run_transaction!(source, plugins)
+      # Telo pripravy — bezi VYHRADNE pod `with_update_lock`.
+      def stage_transaction!(source, plugins)
         current = read_version(loader_path(plugins))
         manifest = source_manifest(source)
 
@@ -881,21 +937,96 @@ module Noxun
           # P1 (#277): lease sa kontroluje ZNOVA, tesne pred swapom. Medzi
           # prvou kontrolou a koncom stagingu (kopirovanie zo share trva) mohla
           # nabehnut dalsia instancia SketchUpu — renamovat strom pod nou by jej
-          # zobralo subory spod ruk.
+          # zobralo subory spod ruk. (Druhy raz to robi `commit!`, lebo medzi
+          # fazami moze ubehnut cas.)
           late = live_leases(plugins)
           unless late.empty?
             raise Refused, "medzitým sa spustila ďalšia inštancia SketchUpu (PID #{late.join(', ')}) — " \
                            'zavri ostatné okná a skús znova'
           end
 
-          write_marker!(plugins, 'staged', from: current, to: target)
-        rescue StandardError
+          payload = write_marker!(plugins, 'staged', from: current, to: target)
+          { 'plugins' => plugins, 'source' => source, 'from' => current, 'to' => target,
+            'pid' => payload['pid'], 'stamp' => payload['started_at'],
+            'nonce' => payload['nonce'] }
+        rescue StandardError => e
+          cleanup_staging(plugins)
+          # D-52b (P3 #277): ked marker prezije, pouzivatel to musi vediet UZ
+          # TERAZ — inak sa o nom dozvie az z nasledujuceho pokusu, ktory sa
+          # o neho zastavi celkom inou hlaskou.
+          note = marker_note(clear_marker(plugins))
+          raise if note.empty?
+
+          raise Refused, "#{e.message}#{note}"
+        end
+      end
+
+      # FAZA 2 — LEN renamey (lokalne, rychle). Hlavne vlakno.
+      def commit!(ticket)
+        t = ticket.is_a?(Hash) ? ticket : {}
+        plugins = t['plugins'].to_s
+        raise Refused, 'aktualizácia nie je pripravená' if plugins.empty?
+
+        with_update_lock(plugins) do
+          # Marker je JEDINY doklad o tom, ze `.new` v priecinku je NAS. Ked
+          # nesedi (cudzi proces, iny pokus, medzitym upratane), NIC sa nedeje —
+          # cudzie artefakty sa nemazu.
+          unless own_prepared_marker?(read_marker(plugins), t)
+            raise Refused, 'pripravená aktualizácia už neplatí — skús znova'
+          end
+
+          unless Dir.exist?(staged_tree(plugins)) && File.file?(staged_loader(plugins))
+            note = marker_note(clear_marker(plugins))
+            raise Refused, "pripravený balík už v Plugins nie je — skús znova#{note}"
+          end
+
+          late = live_leases(plugins)
+          unless late.empty?
+            cleanup_staging(plugins)
+            note = marker_note(clear_marker(plugins))
+            raise Refused, "medzitým sa spustila ďalšia inštancia SketchUpu (PID #{late.join(', ')}) — " \
+                           "zavri ostatné okná a skús znova#{note}"
+          end
+
+          swap!(plugins, t['from'], t['to'])
+        end
+      end
+
+      # Zrusenie PRIPRAVENEJ aktualizacie (deadline, nezhoda verzie). Uprace
+      # `.new` aj marker — ale LEN ked su NASE. Vracia `true` pri upratani.
+      def abort_prepared!(ticket)
+        t = ticket.is_a?(Hash) ? ticket : {}
+        plugins = t['plugins'].to_s
+        return false if plugins.empty?
+
+        with_update_lock(plugins) do
+          next false unless own_prepared_marker?(read_marker(plugins), t)
+
           cleanup_staging(plugins)
           clear_marker(plugins)
-          raise
         end
+      rescue StandardError => e
+        Engine.log_error(e, 'Updater.abort_prepared!') if Engine.respond_to?(:log_error)
+        false
+      end
 
-        swap!(plugins, current, target)
+      # Marker patri TEJTO pripravenej transakcii? Rozhoduje NONCE — identita
+      # konkretnej pripravy. Pid, peciatka aj obe verzie ostavaju ako doplnkova
+      # kontrola, ale samy o sebe NESTACIA: peciatka ma sekundove rozlisenie,
+      # takze dve pripravy v tej istej sekunde nad tymi istymi verziami by boli
+      # nerozoznatelne a oneskoreny `commit!` prveho tiketu by nasadil balik
+      # toho druheho (Codex #278/b1 P2).
+      def own_prepared_marker?(marker, ticket)
+        return false unless marker.is_a?(Hash) && ticket.is_a?(Hash)
+        return false if ticket['nonce'].to_s.empty?
+
+        marker['nonce'].to_s == ticket['nonce'].to_s &&
+          marker['state'].to_s == 'staged' &&
+          marker['pid'].to_i == Process.pid &&
+          !ticket['stamp'].to_s.empty? &&
+          marker['started_at'].to_s == ticket['stamp'].to_s &&
+          marker['from'].to_s == ticket['from'].to_s &&
+          marker['to'].to_s == ticket['to'].to_s
       end
 
       # Kroky 3–6.
@@ -925,8 +1056,9 @@ module Noxun
           File.rename(tree, previous_tree(plugins))
         rescue StandardError => e
           cleanup_staging(plugins)
-          clear_marker(plugins)
-          raise Refused, "priečinok pluginu sa nedá presunúť (#{e.class}) — zavri SketchUp a skús znova"
+          note = marker_note(clear_marker(plugins)) # D-52b (P3 #277)
+          raise Refused, "priečinok pluginu sa nedá presunúť (#{e.class}) — " \
+                         "zavri SketchUp a skús znova#{note}"
         end
 
         # ----- OD TEJTO CHVILE PLATI PRAVIDLO (A) ALEBO (B) -----------------
@@ -1017,7 +1149,12 @@ module Noxun
       # nepoznacila.
       def abort_after_move!(plugins, reason)
         if restore_previous_generation!(plugins)
-          raise Refused, "#{reason} — nič sa nezmenilo, pôvodná verzia beží ďalej"
+          # D-52b (P3 #277): rollback vratil generaciu, ale marker po nom mohol
+          # ostat lezat (`clear_marker` vnutri `restore_previous_generation!`).
+          # Stav sa cita z DISKU — inak by hlaska tvrdila „nič sa nezmenilo"
+          # nad brzdou, ktora zastavi kazdy dalsi pokus.
+          note = marker_note(!File.exist?(marker_path(plugins)))
+          raise Refused, "#{reason} — nič sa nezmenilo, pôvodná verzia beží ďalej#{note}"
         end
 
         # Rollback ZLYHAL: marker, `.new` ani `.old` sa NESMU mazat — su to

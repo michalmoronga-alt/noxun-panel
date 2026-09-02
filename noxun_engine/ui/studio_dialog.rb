@@ -167,6 +167,13 @@ module Noxun
           false
         end
 
+        # D-52b: identita PRAVE ZIJUCEJ instancie okna. Je sucastou tokenu
+        # asynchronnej kontroly verzie — odpoved, ktora dobehne do INEJ
+        # instancie (okno sa medzitym zavrelo a znovu otvorilo), sa zahadzuje.
+        def instance_token
+          @dialog ? @dialog.object_id : nil
+        end
+
         # ŠT-2b: ohlasil uz klient `ready`? Rozhoduje o tom, ci sa odlozena
         # poziadavka („Nahradiť UNI…") smie spustit HNED, alebo pocka na `ready`
         # callback — CEF `execute_script` pred nacitanim HTML potichu zahodi.
