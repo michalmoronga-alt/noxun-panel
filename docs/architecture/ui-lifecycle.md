@@ -647,20 +647,31 @@ platný typ D-18, preto musí ostať voliteľný; popisky sú krátke, plný ná
 pohyblivých typoch · „Konštrukcia" + „Zásuvka" pri zásuvkovom čele · blenda a „Bez čela" majú len vetu, prečo ovládače nemajú. Riadky Závesy / zámky osí / resolved systém sú
 **KOV-C/D**, nie tu; karta to hovorí jednou vetou („Set kovania podľa otvárania príde s KOV-D."), než aby ponúkala voľbu bez účinku.
 
-**KDE sa smer pýta, rozhoduje VÝHRADNE SERVER** — `cabinet_payload` posiela `front_slots` (`front_id → [{ wing, part_key, state }]` z `Fronts.direction_slots`) a panel z `wings`
+**KDE sa smer pýta, rozhoduje VÝHRADNE SERVER** — `cabinet_payload` posiela `front_slots` (`front_id → { wings_n, slots }` z `Fronts.direction_slots`) a panel z `wings`
 ani `wings_n` **nič neodvodzuje**: keby si to odvodil, dvojkrídlo by sa začalo pýtať na stranu pántov a 3/4-krídlové dvierka aj na krajné krídla (tie sú odvodené — A1 kontrakt).
-Prázdne pole = „tu sa otázka nekladie" (namiesto riadku sa zobrazí veta o dvojkrídle); **chýbajúci kľúč čela** (nový riadok pred prvým echom, návrh vkladania) = karta smerový
-riadok nekreslí vôbec. `state` je len zdroj **badge „smer?"** — aktívnu voľbu čítajú riadky z položky, takže LEGACY čelo (kľúč v configu nie je) nemá zvýraznenú žiadnu voľbu
-a badge nedostane.
+**`wings_n` chodí SPOLU so slotmi (Codex #281 P2-A)**, lebo prázdny zoznam slotov sám o sebe dvojkrídlo **neznamená** — dá ho aj veľmi starý `front_items` (pred D-07), kde server
+o počte krídel nevie nič. Preto: neprázdne `slots` → presne tie krídla, na ktoré sa smer pýta · `slots == []` **a `wings_n == 2`** → veta o dvojkrídle namiesto riadku ·
+`slots == []` a `wings_n` **null** → karta **mlčí** (ani riadok, ani veta; tvrdiť „Dvojkrídlo…" nad starým cache by bola lož) · **chýbajúci kľúč čela** (nový riadok pred prvým
+echom, návrh vkladania) → to isté mlčanie. `state` je len zdroj **badge „smer?"** — aktívnu voľbu čítajú riadky z položky, takže LEGACY čelo (kľúč v configu nie je) nemá
+zvýraznenú žiadnu voľbu a badge nedostane.
 
 **„Neurčené" vzniká VÝHRADNE štyrmi používateľskými akciami** a vždy cez jednu z troch čistých funkcií v `core.js` (`frontExtraOnTypeChange` · `frontExtraOnWings` ·
 `frontExtraOnSegrow`, každá vracia **nový** objekt): (a) „+ pridaj dvere" · (b) prepnutie dlaždice na dvierka, keď smer uložený nie je · (c) klik na „Neurčené" · (d) prepnutie na
 3/4 krídla — a to len pre **chýbajúce stredné** krídla. Render, echo ani editácia iného poľa nezapíšu nič; návrat na 1/2/auto ani prepnutie na iný typ **nič nemaže** (dormant).
 Literál stavu preto žije **len v `core.js`** (`FRONT_DIR_UNSET`) — `form.js` číta hodnotu z tlačidla, `preview.js` symbol; allowlist stráži `tests/pure/test_kova1_cela.rb`.
 
+Pravidlo (a) sa **týka aj tlačidla „+ pridaj dvere"** (Codex #281 P1): nový riadok dvierok prejde tým istým výrobcom (`addFrontRow` pri `userAdd` volá
+`frontExtraOnTypeChange` s typom z datasetu), inak by každé nové čelo natrvalo obišlo RED nález, badge aj `?` v náhľade — Ruby by ho čítalo ako legacy. „+ pridaj čelo"
+(zásuvkové) nevyrobí nič, lebo o tom rozhoduje výrobca, nie volajúci.
+
 **Zápis ide POVODNOU cestou** — dlaždica aj segrow prepíšu `dataset.frontType` / `dataset.frontExtra` a zavolajú `onField()` → `collectFronts` → `apply_all`, teda **jeden krok
-Späť a žiadny nový callback servera**. Klik na už nasadený typ sa zahodí (žiadny prázdny krok Späť). Testuje `tests/js/test_kova2a_karta.js` (vrátane celej cesty nad mini-DOM)
-a `tests/pure/test_kova2a_karta.rb`.
+Späť a žiadny nový callback servera**. Klik na **už nasadenú hodnotu** (typ aj segment) sa zahodí — žiadny prázdny rebuild a žiadny prázdny krok Späť; segment to pozná podľa
+`aria-pressed`, ktoré karta kreslí z view-modelu (Codex #281 P2-C).
+
+**Otvorená karta patrí KONKRÉTNEJ SKRINKE** (Codex #281 P2-B). `front_id` (F1) má každá skrinka v zákazke, takže samotné ID čela identitu karty neurčuje — bez brány by sa po
+prepnutí výberu otvorila karta cudzieho čela. Čistá `frontCardKeepOpen(prevCabId, nextCabId, openId)` rozhodne, či prežije; `bridge.js` ju volá **pred** `renderFronts` a pri zmene
+**dokumentu** posiela predchodcu ako `null` (ID skriniek sa naprieč dokumentmi opakujú — tá istá zásada ako pri `keepGaps`). Doska, prázdny výber aj návrh vkladania kartu
+zatvárajú. Testuje `tests/js/test_kova2a_karta.js` (vrátane celej cesty nad mini-DOM) a `tests/pure/test_kova2a_karta.rb`.
 
 **KOV-A1 pass-through:** `addFrontRow` odkladá `direction`, `wing_directions`, `opening_mode` a `drawer` do `row.dataset.frontExtra` (**len prítomné kľúče**) a `collectFronts` ich
 vracia späť **bez akéhokoľvek defaultu** — vzor D-90 `profile`, ale s tvrdým rozdielom: kľúč, ktorý config nemal, sa tu nesmie objaviť, inak by legacy zákazka dostala RED nález
@@ -1008,10 +1019,11 @@ Centrálne callbacky Inspectora (`Panel.*`) — vstupný bod všetkých volaní 
 
 Doména panela: skladanie payloadov pre klienta. Kontrakt vkladacej karty a knižnice šablón je v odseku „Vkladacia karta — šablóny, typ a doska".
 
-**`front_slots` (KOV-A2a).** `cabinet_payload` posiela vedľa `front_items` aj mapu `front_id → [{ wing, part_key, state }]`, ktorú skladá `front_slots_payload` z **jedinej**
-definície aplikovateľnosti smeru (`Fronts.direction_slots`, KOV-A1) nad **uloženým** `front_items`. Je to **čistá projekcia**: žiadny zápis, žiadny prepočet plánu a `state`
-prechádza **nezmenený** (nil = legacy — kľúč v configu nie je, `unset` = vedome neurčené, `left`/`right` = vyriešené). Tým je server **autoritou na otázku „kde sa smer pýta"**;
-panel si ju z počtu krídel neodvodzuje. Legacy záznam bez `wings_n` (pred D-07) dá prázdne pole, takže stará zákazka nikdy nedostane smerový riadok touto cestou.
+**`front_slots` (KOV-A2a).** `cabinet_payload` posiela vedľa `front_items` aj mapu `front_id → { 'wings_n', 'slots' }`, ktorú skladá `front_slots_payload` z **jedinej** definície
+aplikovateľnosti smeru (`Fronts.direction_slots`, KOV-A1) nad **uloženým** `front_items`. Je to **čistá projekcia**: žiadny zápis, žiadny prepočet plánu a `state` prechádza
+**nezmenený** (nil = legacy — kľúč v configu nie je, `unset` = vedome neurčené, `left`/`right` = vyriešené). Tým je server **autoritou na otázku „kde sa smer pýta"**; panel si ju
+z počtu krídel neodvodzuje. **`wings_n` je súčasťou záznamu** (Codex #281 P2-A) a pri neznámom počte je `nil`: legacy záznam bez `wings_n` (pred D-07) tak dá `{ nil, [] }` —
+prázdne sloty **a priznané neznámo**, takže karta o ňom nepovie ani „pýtam sa", ani „je to dvojkrídlo".
 
 ### resolvers.rb
 

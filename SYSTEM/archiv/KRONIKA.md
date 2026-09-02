@@ -37,6 +37,13 @@
   **Kontrola v Štúdiu** funguje bez zmeny (RED riadok `front_direction` sa renderuje generálnou cestou, klik-select cez `owner_id` + `part_key` + `owner_pid` scope z A1);
   **deep-link „klik na nález otvorí Inspector kontext Čelá"** ostáva OTVORENÝ — dnes existuje len smer panel → Štúdio, opačný by bol nový serverový kanál (patrí k A2b).
   **Týmto zanikla odchýlka „Výklop je v ponuke, ale neaktívny"** (UI20_KONTRAKT §7) a s ňou aj dogfooding položka „Výklop ako samostatný typ čela".
+  **Codex kolo 1 = 1×P1 + 3×P2, všetky platné a opravené** (commit `d4a3a94`): **P1** — „+ pridaj dvere" nevyrobilo „neurčené", takže **každé nové čelo natrvalo obišlo RED nález,
+  badge aj `?` v náhľade** (Ruby ho čítalo ako legacy); `addFrontRow` pri `userAdd` teraz púšťa dataset tým istým výrobcom a typ rozhoduje ON (zásuvkové „+ pridaj čelo" nevyrobí
+  nič). **P2-A** — prázdny zoznam slotov **dvojkrídlo neznamená**: dá ho aj `front_items` spred D-07 bez `wings_n`, a karta z neho písala „Dvojkrídlo…"; payload preto nesie
+  ZÁZNAM `{ wings_n, slots }` a pri neznámom počte karta **mlčí**. **P2-B** — otvorená karta sa držala podľa `front_id`, ktoré má každá skrinka, takže po prepnutí výberu sa
+  otvorila **karta cudzieho čela**; rozhoduje čistá `frontCardKeepOpen` volaná **pred** `renderFronts` (pri zmene dokumentu s `null` predchodcom). **P2-C** — klik na už aktívny
+  segment robil prázdny rebuild aj prázdny krok Späť; guard cez `aria-pressed` (ten istý vzor ako dlaždica typu). Sada karty tým narástla na **168 kontrol** (matica `wings_n`
+  1/2/3/4/null, vlastník karty, obe tlačidlá „+ pridaj…", dvojklik na segment) a pribudli **4 mutácie** (spolu 9).
 
 - **KOV-A1 · ČELÁ — DÁTOVÁ VRSTVA (PR #280, v0.9.15, 3.9.2026):** prvá dávka bloku KOVANIE. **Typy:** `items[].type` pozná `lift` (výklop), `fall` (sklop) a `blind` (blenda)
   popri `door`/`drawer_front`/`none`; lift+fall → rola **`flap`** (`front:F#/flap`, suffix `FLAP-#`), blind → **`false_front`** (`front:F#/blind`, `BLIND-#`), oba s identickou
