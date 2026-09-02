@@ -202,6 +202,11 @@
     'dir-right': '<path d="M17 5 7 12l10 7" stroke-dasharray="3 2"/>',
     // Neurcene: prerusovany kruh s otaznikom — je to STAV, nie strana.
     'dir-unset': '<circle cx="12" cy="12" r="7" stroke-dasharray="3 2"/><path d="M12 9v3"/><path d="M12 15.5h.01"/>',
+    // KOV-A2b (rail + lista Kontroly): SMER OTVARANIA V MODELI. Ikona je
+    // MINIATURA toho, co overlay kresli — panel cela s prerusovanou sipkou na
+    // volnu hranu (rovnaky vzor ako 'grain' pri kresbe dekoru). Vlastny symbol
+    // v Lucide style; JEDNA kresba pre obe miesta.
+    'direction': '<rect x="3" y="3" width="18" height="18" rx="1.5"/><path d="m9 8 5 4-5 4" stroke-dasharray="3 2"/>',
     // ===== UI-D1: hrana dielca v karte (square-dashed-top) ==================
     // JEDNA ikona pre vsetky styri hrany — ktora hrana to je, povie ROTACIA
     // (CSS `.eic[data-rot]`), nie styri kresby. Plna hrubsia ciara = hrana, o

@@ -293,6 +293,8 @@
       if (typeof nxApplyEdgeCheck === 'function') nxApplyEdgeCheck(data.edge_check);
       // K2/D-87: to iste pre kontrolu smeru kresby (druha funkcna ikona raily).
       if (typeof nxApplyGrainCheck === 'function') nxApplyGrainCheck(data.grain_check);
+      // KOV-A2b: a to iste pre smer otvarania (tretia funkcna ikona raily).
+      if (typeof nxApplyDirectionCheck === 'function') nxApplyDirectionCheck(data.direction_check);
       // Codex #168 P2 (2. kolo): identita DOKUMENTU — chodi v kazdom pushi a
       // nesu ju identity guardy asynchronnych callbackov panela.
       if (typeof nxSetModelGuid === 'function') nxSetModelGuid(data.model_guid);
@@ -634,6 +636,13 @@
     // isty kanal pouziva ŠTÚDIO, takze prepnutie na jednom mieste je hned
     // vidiet aj na druhom (a naopak). Panel si nic nedrzi ani neprepocitava.
     setGrainCheck: function(state){ if (typeof nxApplyGrainCheck === 'function') nxApplyGrainCheck(state); },
+    // KOV-A2b: stav symbolov smeru otvarania do raily. Ten isty kanal pouziva
+    // ŠTÚDIO — prepnutie na jednom mieste je hned vidiet aj na druhom.
+    setDirectionCheck: function(state){ if (typeof nxApplyDirectionCheck === 'function') nxApplyDirectionCheck(state); },
+    // KOV-A2b DEEP-LINK: klik na RED nalez „smer otvárania" v Kontrole (Štúdio)
+    // otvori KARTU toho cela tu. Server posiela LEN ID cela — prepnutie
+    // kontextu, otvorenie karty aj doscrollovanie robi klient (form.js).
+    focusFront: function(frontId){ if (typeof nxFocusFront === 'function') nxFocusFront(frontId); },
     // D-27: viditelnost NOXUN tagov v modeli. Chodi po KAZDOM pushi vyberu
     // (Späť/Znova, prepnutie dokumentu, zmena vyberu) aj po kazdom prepnuti —
     // panel si ziadnu vlastnu kopiu stavu nedrzi.

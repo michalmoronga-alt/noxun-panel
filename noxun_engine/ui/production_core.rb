@@ -1539,6 +1539,7 @@ module Noxun
         # ŠT-3b-2b (review #221): zber sa robi AZ V TEJ VETVE, ktora ho naozaj
         # potrebuje. Vetva `rule_ref` hlada podla identity a s BOM nerobi nic —
         # plny sken modelu (a dedup tik v nom) bol pri nej cista rezia.
+        front_id = nil
         if data['problem_key']
           collected = fresh_collect(model)
           # GH #127 P2: klik-resolve MUSI ratat s rovnakym vstupom ako
@@ -1554,6 +1555,10 @@ module Noxun
             return status.call('Kontrola sa medzitým zmenila — obnovené, klikni znova.', true)
           end
           pids = pids_for_problem(model, item)
+          # KOV-A2b: nalez o CELE (kluc `front:…`) vie povedat, ktore celo to je
+          # — Inspector potom nemusi hladat riadok rucne. Parser kluca je
+          # ZDIELANY (`PartKeys.front_id`); ine kluce vratia nil a neposiela sa nic.
+          front_id = PartKeys.front_id(item['part_key'])
         elsif data['rule_ref']
           # ŠT-3b-2a: oko pri jantarovom riadku sekcie Pravidlá. Vlastna vetva
           # ZAMERNE: `refs_for` hlada v HOTOVOM bome podla klucov riadkov, kdezto
@@ -1582,11 +1587,23 @@ module Noxun
         Panel.push_selected(model, dedup: false) # B2: ziadna mutacia pri selecte
         focus = data['focus_inspector'] == true && Panel.dialog_alive?
         Panel.bring_to_front if focus
+        # KOV-A2b DEEP-LINK: pri náleze o čele sa v Inspectorovi rovno otvorí
+        # KARTA toho čela (kontext Čelá + rozbalený riadok). Ziadny novy stav na
+        # serveri — posiela sa jediny udaj a zvysok robi klient.
+        Panel.push_focus_front(front_id) if focus && front_id
         status.call("Vybraných #{targets.length} položiek v modeli." \
-                    "#{focus ? ' Inspector je vpredu — dielec sa dá hneď upraviť.' : ''}")
+                    "#{focus ? front_focus_note(front_id) : ''}")
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_select')
         status.call("Chyba výberu: #{e.message}", true)
+      end
+
+      # Doveta statusu po vybere s „ceruzkou". Pri náleze o čele povie, ze
+      # Inspector uz ma otvorenu jeho kartu — inak ostava povodne znenie.
+      def front_focus_note(front_id)
+        return ' Inspector je vpredu — dielec sa dá hneď upraviť.' if front_id.nil?
+
+        " Inspector je vpredu — karta čela #{front_id} je otvorená."
       end
 
       # --- ŠT-1b (audit #2): JEDNO CISLO KONTROLY PRE VSETKYCH ------------
@@ -1774,6 +1791,26 @@ module Noxun
         status.call("Chyba kresby smeru: #{e.message}", true)
       end
 
+      # KOV-A2b: prepinac „Smer otvárania". Identita kliku (gen + model_guid) je
+      # ZDIELANA so zvyraznenim hran; dostupnost Overlay API si vsak overuje
+      # VLASTNU (`DirectionCheck.available?`) a hlasi ju VLASTNOU vetou —
+      # pouzivatel klikol na smer otvarania, takze hlaska o hranach ci o kresbe
+      # by ho poslala hladat chybu inam.
+      def do_direction_check(model, data, generation:, status:, repush:, direction_echo:)
+        unless defined?(DirectionCheck) && DirectionCheck.available?(model)
+          direction_echo.call
+          return status.call('Smer otvárania vyžaduje SketchUp 2023 alebo novší.', true)
+        end
+        return unless identity_guard(data, model, generation: generation, status: status,
+                                                  repush: repush)
+
+        state = Engine.toggle_direction_check(model)
+        status.call(direction_check_status(state))
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.do_direction_check')
+        status.call("Chyba smeru otvárania: #{e.message}", true)
+      end
+
       def edge_check_status(state)
         st = state.is_a?(Hash) ? state : {}
         return 'Zvýraznenie hrán vypnuté — v modeli nič neostalo.' unless st['active']
@@ -1818,6 +1855,29 @@ module Noxun
         return 'dielce' if v >= 2 && v <= 4
 
         'dielcov'
+      end
+
+      # KOV-A2b: veta listy aj statusu. Cisla su VYHRADNE zo servera; „bez
+      # smeru (legacy)" sa priznava, ale NIE je to nalez — su to stare celá,
+      # ktorym sa smer nikdy nedopĺňa (R-39).
+      def direction_check_status(state)
+        st = state.is_a?(Hash) ? state : {}
+        return 'Smer otvárania vypnutý — v modeli nič neostalo.' unless st['active']
+
+        n = st['wings'].to_i
+        parts = ["#{n} #{direction_wing_plural(n)}"]
+        parts << "#{st['unknown'].to_i} neurčených" if st['unknown'].to_i.positive?
+        parts << "#{st['legacy'].to_i} bez smeru (legacy)" if st['legacy'].to_i.positive?
+        "Smer otvárania zapnutý — #{parts.join(' · ')}."
+      end
+
+      # 1 krídlo / 2–4 krídla / 5+ krídel
+      def direction_wing_plural(n)
+        v = n.abs
+        return 'krídlo' if v == 1
+        return 'krídla' if v >= 2 && v <= 4
+
+        'krídel'
       end
 
       # ==================== ŠT-1c PR B1: ROZPOCET ============================

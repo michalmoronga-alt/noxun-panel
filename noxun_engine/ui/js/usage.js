@@ -40,8 +40,11 @@
                     // D-27: `rail:tagy` = okno viditelnosti NOXUN tagov. Vlastny
                     // kluc — merac povie, ci sa tagy naozaj prepinaju z panela,
                     // alebo sa aj nadalej chodi do natívneho okna Tags.
+                    // KOV-A2b: `rail:smer` = symboly smeru otvarania ciel.
+                    // Vlastny kluc vedla `rail:kresba` — su to dve rozne
+                    // kontroly a merac musi vediet, ktoru Michal naozaj zapina.
                     'rail:zrusit', 'rail:abs', 'rail:abs-nastavenie', 'rail:kresba',
-                    'rail:tagy', 'rail:nastavenia', 'rail:studio',
+                    'rail:smer', 'rail:tagy', 'rail:nastavenia', 'rail:studio',
                     'pv:kamera', 'pv:fit',
                     'pv:vrstva:zony', 'pv:vrstva:cela', 'pv:vrstva:kovanie', 'pv:vrstva:olep',
                     'rad:sirka', 'rad:vyska', 'rad:hlbka', 'rad:sokel', 'rad:vyska_cela',

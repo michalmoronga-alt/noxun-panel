@@ -100,7 +100,8 @@ NxTest.test('ABS rail: styly okna su v ZDIELANOM panel.css (nie dve kopie)') do
                 'zdielany komponent musi mat styly v panel.css')
   # ŠT-1b: aj SPUSTACE (.ecbtn/.gcbtn) a rohova zona ziju v zdielanom
   # panel.css — studio.html ich kopiu mat NESMIE.
-  NxTest.assert(A3S_CSS.include?('.ecbtn, .gcbtn {') && A3S_CSS.include?('.cornerzone {'),
+  # KOV-A2b: k dvojici pribudol treti spustac (`.dcbtn` — „Smer otvárania").
+  NxTest.assert(A3S_CSS.include?('.ecbtn, .gcbtn, .dcbtn {') && A3S_CSS.include?('.cornerzone {'),
                 'spustace prepinacov maju styly v panel.css')
   [['studio.html', A3S_STUDIO_H]].each do |(name, html)|
     code = html.gsub(%r{/\*.*?\*/}m, ' ')

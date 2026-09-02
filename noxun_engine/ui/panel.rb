@@ -183,6 +183,10 @@ module Noxun
           # logiku ako lista sekcie Kontrola v Studiu (Engine.toggle_grain_check) — jeden zdroj
           # stavu, dva vstupne body; ziadny zapis do modelu.
           cb(dlg, 'nx_grain_toggle')       { |p| handle_grain_toggle(p) }
+          # KOV-A2b: SMER OTVARANIA z raily Inspectora. Ten isty vzor —
+          # zdielana Engine.toggle_direction_check, jeden zdroj stavu, dva
+          # vstupne body; ziadny zapis do modelu.
+          cb(dlg, 'nx_direction_toggle')   { |p| handle_direction_toggle(p) }
           # D-89a: hover nad hranou v karte dielca rozsvieti tu istu hranu v
           # MODELI. Overlay NAD modelom — ziadna operacia, ziadny krok Spat.
           cb(dlg, 'nx_hover_edge')         { |p| handle_hover_edge(p) }

@@ -140,6 +140,8 @@ module Noxun
           # sekcie hlásila vypnuté a v modeli by sa kreslilo. Do ŠT-1b to robilo
           # okno Výroba; odkedy je prepínač tu, musí to robiť aj toto okno.
           restore_grain_check
+          # KOV-A2b: to iste pre zapamätaný prepínač „Smer otvárania".
+          restore_direction_check
           if dlg.visible?
             dlg.bring_to_front
             push_state
@@ -198,6 +200,16 @@ module Noxun
           GrainCheck.restore!(Sketchup.active_model)
         rescue StandardError => e
           Engine.log_error(e, 'StudioDialog.restore_grain_check')
+        end
+
+        # KOV-A2b: obnova zapamataneho prepinaca smeru otvarania. Chranene
+        # vlastnym blokom — zlyhanie NESMIE zabranit otvoreniu okna.
+        def restore_direction_check
+          return unless defined?(DirectionCheck)
+
+          DirectionCheck.restore!(Sketchup.active_model)
+        rescue StandardError => e
+          Engine.log_error(e, 'StudioDialog.restore_direction_check')
         end
 
         # Bezpecny refresh — volaju ho editor materialov, nastavenia, katalog
@@ -454,6 +466,15 @@ module Noxun
                                                                      grain_echo: grain_echo_proc)
         end
 
+        # KOV-A2b: „Smer otvárania" — tretie tlacidlo listy sekcie Kontrola.
+        def do_direction_check(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          ProductionCore.do_direction_check(Sketchup.active_model, data, generation: @generation,
+                                                                         status: status_proc,
+                                                                         repush: repush_proc,
+                                                                         direction_echo: direction_echo_proc)
+        end
+
         # Maly echo push stavu prepinaca (bez prepoctu celej sekcie) — vola ho
         # `Engine.broadcast_edge_check` po prepnuti Z HOCIJAKEHO vstupneho bodu
         # (rail Inspectora aj lista tejto sekcie) aj EdgeCheck po prepocte cache.
@@ -473,6 +494,15 @@ module Noxun
           js("if (window.NX && NX.setGrainCheck) NX.setGrainCheck(#{st.to_json});")
         rescue StandardError => e
           Engine.log_error(e, 'StudioDialog.push_grain_check')
+        end
+
+        def push_direction_check(state = nil)
+          return unless defined?(DirectionCheck)
+
+          st = state || DirectionCheck.ui_state(Sketchup.active_model)
+          js("if (window.NX && NX.setDirectionCheck) NX.setDirectionCheck(#{st.to_json});")
+        rescue StandardError => e
+          Engine.log_error(e, 'StudioDialog.push_direction_check')
         end
 
         # To iste nastavenie ma DVA vstupne body (rail Inspectora · lista tejto
@@ -1092,6 +1122,10 @@ module Noxun
           -> { push_grain_check }
         end
 
+        def direction_echo_proc
+          -> { push_direction_check }
+        end
+
         def ensure_dialog
           return @dialog if @dialog
 
@@ -1178,6 +1212,7 @@ module Noxun
           # (nikdy dve naraz).
           cb(dlg, 'edge_menu_open')       { |_p| Engine.close_edge_menu(:studio) }
           cb(dlg, 'grain_check_toggle')   { |p| do_grain_check(p) }
+          cb(dlg, 'direction_check_toggle') { |p| do_direction_check(p) }
           # ŠT-1c PR B1, sekcia ROZPOCET. Mutacia (`budget_mutate`) ide PRIAMO —
           # nie je to export a flush handshake by pri kazdom prepise sumy
           # zbytocne prehnal rozpisane edity panela. Oba XLSX exporty naopak
@@ -1403,6 +1438,7 @@ module Noxun
             # Š10: stav oboch prepinacov listy. Vypnuty prepinac nic neskenuje.
             edge_check: (defined?(EdgeCheck) ? EdgeCheck.ui_state(model) : nil),
             grain_check: (defined?(GrainCheck) ? GrainCheck.ui_state(model) : nil),
+            direction_check: (defined?(DirectionCheck) ? DirectionCheck.ui_state(model) : nil),
             # ŠT-2a, sekcia MATERIALY: modelovy kontext (predvolby projektu,
             # pocet skriniek, identita dokumentu a pocty „Použité v projekte").
             # KATALOG v nom je LEN pri prvom pushi okna a po prepnuti dokumentu
