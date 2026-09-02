@@ -189,7 +189,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 (po cross-audite Codex/GLM/Opus + reconcile + rozhodnutia O1–O3) · **UX referencia:** [zdroje/ui20/mockup_kovanie_v1.html](zdroje/ui20/mockup_kovanie_v1.html)
 (schválený 2.9.) · vendor dáta: checkpoint #10 · detail fill: checkpoint #11. Otvorené postrehy D-109/D-110/D-111 sú v packages nižšie
 (D-109 mechanika = R-05 po V1, výsledok cez KOV-G). **Predpoklad prvého schema bumpu: D-52 updater** (blok 6 — štartovaný 2.9.).
-Poradie slices: **0 (D-52 ✅) → A1 ✅ → A2 ✅ → B ‖ H (AKTUÁLNE) → C → D → E → F → G → I** (KOV-A rezaná po Codex audite #14 na A1 dátová vrstva / A2 UI+overlay; otázka 3/4 krídel rozhodnutá Michalom 3.9. — variant a); C a D dostanú package po sonde Démos (kit vs atomic) a fixtures.
+Poradie slices: **0 (D-52 ✅) → A1 ✅ → A2 ✅ → H1 → H2 ‖ B (AKTUÁLNE; H po Codex audite #15 rezaná na H1 dáta / H2 UI) → C → D → E → F → G → I** (KOV-A rezaná po Codex audite #14 na A1 dátová vrstva / A2 UI+overlay; otázka 3/4 krídel rozhodnutá Michalom 3.9. — variant a); C a D dostanú package po sonde Démos (kit vs atomic) a fixtures.
 **KOV-A je KOMPLET a v maine** (A1 PR #280 · A2a PR #281 · A2b PR #282 — plné texty packages v git histórii a v checkpointe #14; záznamy dávok v [archiv/KRONIKA.md](archiv/KRONIKA.md)).
 Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-only), implementuje subagent v worktree, brány podľa CLAUDE.md.
 
@@ -224,35 +224,48 @@ Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-
   **Checklist uzáveru:** bump patch + `?v=` → testy → `docs/architecture/hardware.md` (`hardware_sets`, `hardware_catalog`, nový odsek taxonómie)
   + `ui-lifecycle.md` (sekcia hw, modaly) + ARCHITEKTURA router riadok → STANDARD §6 doplnok klasifikácie → D-110 do DOGFOODING_vyriesene → STAV/KRONIKA/PLAN.
 
-- **KOV-H · TASK PACKAGE „AD-HOC KOVANIE" (slice H; štart po KOV-A, nezávisle od B):**
-  **Cieľ:** ku skrinke, čelu alebo zóne sa dá pridať konkrétna položka kovania mimo setov (zámok, uholník, vešiak, HF komponenty…) a objaví sa v nákupe
-  a rozpočte s jasným pôvodom — bez zakladania umelých setov a bez zaprataného katalógu. Mockup scéna 2.
-  **Scope IN:** `config['hardware_manual'][]` = `{id, owner_part_key|nil, source: catalog|free, code, name, qty, unit, price_eur, note}`;
-  **serverová normalizácia** (whitelist, qty limity, cena Float ≥ 0, `owner_part_key` musí existovať v pláne alebo nil) v `CabinetBuilder.normalize` +
-  `cabinet_config` + `config_to_params` + `template_config_from` + **CONFIG_SCHEMA bump**; **plný snapshot** `code/name/unit/price` aj pri katalógovej
-  položke (cena v čase pridania; prepočet cien ju NEprepisuje — priznané); `Bom.collect` nesie aditívny kľúč `hardware_manual` s `owner_id`; **vlastný
-  pass-through kanál v expanzii** (vetva podľa pôvodu poľa PRED set rezolúciou — nikdy cez `resolve_set_id`, žiadny `generic_type custom`): riadok
-  nákupu s `source: 'manual'` a pôvodom (owner, human_label), agregácia podľa kódu s ostatnými riadkami, `Σ zdrojov = množstvo` invariant platí;
-  katalógový kód, ktorý v katalógu už nie je → `missing` flag (vzor `row_join`) + ORANGE; položka s mŕtvym `owner_part_key` → ORANGE „bez vlastníka",
-  v nákupe ostáva (nič sa ticho nestráca); zdieľané `cabinet_id` → položky vstupujú do `dup_partition` (blokujúca vetva iba pri zliatí per-owner —
-  manuálne položky sú per inštancia, takže varovná). **UI Inspector kontext Kovanie:** riadok „+ Pridať konkrétnu položku (mimo setov)" → modal
-  (Patrí k: skrinka/čelá/zóny · Zdroj: katalóg (existujúci combobox položiek) / voľná · množstvo · cena · poznámka); riadok s chipom „ručná",
-  úprava a zmazanie = **1 mutácia = 1 krok Späť** (`rebuild` netreba — zápis configu + push; položky nemenia geometriu). Šablóna nesie položky
-  s configom (explicitné rozhodnutie „Uložiť aj kovanie" = KOV-I; do vtedy položky cestujú vždy); kópia skrinky ich prenáša (nové id).
-  Rozpočet/CP: riadky prechádzajú existujúcou cestou z nákupu (žiadny nový výpočet).
-  **Scope OUT:** „uložiť do katalógu" bridge · prepočet cien manuálnych položiek z Démosu · dĺžkové položky (ostáva R-06a ORANGE) · položky na
-  úrovni zákazky bez skrinky (budget_custom_items existujú) · HF automatika.
-  **Audit: ÁNO** (config kontrakt + kontrakt zberu/expanzie + brána).
-  **Testy a DoD:** headless — normalizácia (odmietnutia), pass-through expanzia s pôvodom, agregácia s riadkom zo setu s rovnakým kódom, `missing`,
-  mŕtvy owner, dup gate (varovná vs blokujúca), round-trip 4 ciest + šablóna + kópia; JS — modal, riadok, delete; in-SU — pridať/upraviť/zmazať =
-  po jednom kroku Späť, prestavba skrinky položky drží, kópia `*2` prenáša, CSV nákupu obsahuje riadok s pôvodom. Mutácie min. 3.
-  **Riziká:** cena snapshot vs. živý katalóg (priznať v UI „cena z času pridania") · owner combobox pri veľa čelách · zliatie s riadkom setu (agregácia
-  podľa kódu je ŽELANÁ, pôvod ich rozlíši).
-  **Smoke pre Michala:** k F1 pridaj Bystricu 93240 ×2 z katalógu → Nákup ukáže riadok, rozklik pôvod „F1 dvierka ľavé · ručná" · pridaj voľnú položku
-  „zámok Abloy 12 €" ku skrinke · zmeň šírku skrinky → položky ostali · skopíruj skrinku → kópia ich má · zmaž katalógovú položku z katalógu →
-  riadok „chýba v katalógu" (ORANGE), CSV ju stále obsahuje · Ctrl+Z vráti každý krok.
-  **Checklist uzáveru:** bump patch + `?v=` → testy → `docs/architecture/hardware.md` (odsek ad-hoc v `hardware_sets`), `outputs.md` (zber, brána),
-  `ui-lifecycle.md` (modal) → STANDARD §6 (ad-hoc kanál) → STAV/KRONIKA/PLAN.
+- **KOV-H1 · TASK PACKAGE „AD-HOC KOVANIE — DÁTOVÁ VRSTVA" (slice H, rez H1 po Codex audite #15; štart 3.9.2026; nezávislé od B):**
+  **Cieľ:** ku skrinke, čelu alebo zónovému dielcu sa dá (dátovo — cez config/API, UI príde v H2) pridať konkrétna položka kovania mimo setov a objaví sa v nákupe a rozpočte
+  s jasným pôvodom; výstupy existujúcich zákaziek sú CONTENT-identické (golden). Rozhodnutia auditu v [zdroje/next_sessions/KOVANIE_KOVH_AUDIT_2026-09-03_15.md](zdroje/next_sessions/KOVANIE_KOVH_AUDIT_2026-09-03_15.md).
+  **Kontrakt (B1–B4, FIX 6/7/10/12/13):** `config['hardware_manual'][]` = `{id, owner_part_key|nil, source: 'catalog'|'free', code, name, unit, price_eur_vat?, qty, note}`.
+  `source: 'catalog'`: klientovi sa verí len `code`, `qty`, `owner_part_key`, `note`; `name`/`unit` doplní server z katalógu podľa kódu, **cena sa NEUKLADÁ** — položka sa oceňuje
+  ŽIVOU cenou katalógu ako každý riadok (agregácia podľa kódu, prepočet cien platí); kód mimo katalógu pri pridaní = odmietnutie (použi voľnú). `source: 'free'`: `name` povinné,
+  `unit` z `HardwareCatalog::UNITS`, `price_eur_vat` Float ≥ 0 alebo nil, vlastný riadok nákupu (kľúč `free:<cabinet_id>:<id>`), nikdy `missing`. `qty` Integer 1..999. `id` unikátne
+  v rámci skrinky (normalize doplní chýbajúce/kolidujúce, inak NEMENÍ); **`rekey_hardware_manual`** len pri vzniku novej skrinky (kópia, `dedup_copies`). `owner_part_key`: pri ADD/EDIT
+  (panelová cesta, `strict_owners`) musí existovať v aktuálnom pláne alebo byť nil; normalize/rebuild kľúč nikdy nezahodí. **ŽIADNY nový zápisový kanál** — pole ide cestou
+  `collectAll()` → `apply_all` → `normalize` → rebuild (1 krok Späť, guardy, R-12, `dedup: false`); `cabinet_config` stampuje **CONFIG_SCHEMA 2 → 3**. Round-trip: `normalize`,
+  `cabinet_config`, `config_to_params`, `template_config_from` + **JS pass-through** `NXInsert.HARDWARE_KEYS`/insert-state a `collectAll` (bez defaultov, vzor A1).
+  **R-12 exportná brána (B3):** `Bom.collect` aditívny kľúč `newer_configs` (ID skriniek s `config_schema > CONFIG_SCHEMA`); `ProductionCore.export_blockers` pri neprázdnom
+  zastaví nákupný CSV + rozpočet XLSX + CP XLSX (hláška menuje skrinky, žiada aktualizáciu pluginu); VEPO nie. Platí všeobecne.
+  **Zber a expanzia:** `Bom.collect` aditívny kľúč `hardware_manual` (položky + `owner_id`, `owner_pid`, `owner_missing` z joinu s vnorenými dielcami); `HardwareSets.expand(...,
+  manual_items:)` = vlastný pass-through kanál PRED set rezolúciou (nikdy `resolve_set_id`, žiadny `generic_type 'custom'`, nikdy `note_manual`): katalógová → `add_row` podľa kódu
+  (zdroj s **`origin: 'adhoc'`**, `set_id` nil, `rule_id` nil), voľná → vlastný riadok (`origin: 'adhoc'`, `free: true`, cena/MJ zo snapshotu); kód mimo katalógu → `catalog_missing:
+  true` (názov/MJ zo snapshotu, cena nil = „bez ceny"); invariant `Σ sources.quantity == row.quantity` platí; `owner_missing` → Validation ORANGE „bez vlastníka" (položka v nákupe
+  ostáva); zdieľané `cabinet_id` → položky vstupujú do `dup_partition` (varovná vetva — sú per inštancia). Rozpočet/CP: riadky prechádzajú existujúcou cestou, prenášajú `origin`;
+  voľné položky mimo stale-scan katalógu. **Nákupný CSV bez nového stĺpca** (pôvod = Nákup Štúdia/`sources`); voľná položka = riadok s prázdnym kódom.
+  **Scope OUT (H1):** celé UI (H2) · „uložiť do katalógu" · dĺžkové položky (R-06a) · položky bez skrinky (`budget_custom_items`) · HF automatika · logický vlastník „zóna" (FIX 5:
+  len konkrétne dielce) · zápis bez rebuildu (kandidát do registra).
+  **Audit:** HOTOVÝ (checkpoint #15). **Testy a DoD:** headless — normalizácia (whitelist, odmietnutia, katalógový snapshot zo servera, cena len pri free, ID doplnenie bez zmeny
+  existujúcich, `rekey` len v kópii), round-trip 4 ciest + JS pass-through guard (insert_state/collectAll bez defaultov), CONFIG_SCHEMA ≥ 3 pin + R-12 sada, `newer_configs` +
+  export_blockers (3 exporty blokované, VEPO nie; test „cieľový priečinok prázdny"), expanzia (katalógová položka zliata s riadkom setu rovnakého kódu — jedna cena, `sources` invariant;
+  voľná = vlastný riadok; `catalog_missing`; `origin` nikdy cez `note_manual`), Validation ORANGE `owner_missing`, dup gate varovná, **golden charakterizácia** (existujúce fixtures +
+  purchase CSV bajtovo identické bez manual položiek), rozpočet/CP prenos `origin`. **In-SU povinné** (`run_kovh1`): apply s položkou → rebuild = 1 krok Späť, položky prežijú
+  prestavbu (zmena šírky), kópia `*2` má nové ID, šablóna uložiť/vložiť nesie položky (aj cez quick-insert), mŕtvy vlastník po zmazaní čela → ORANGE, CSV nákupu obsahuje voľnú položku.
+  Mutácie min. 4 (položka stratí pole v jednej ceste · snapshot cena katalógovej položky použitá v cene · `note_manual` započíta ad-hoc · `rekey` v normalize).
+  **Riziká:** prestavba pri každej zmene položky (prijaté) · rozsah expanzie (nesmie zmeniť dnešné riadky) · JS insert-state kontrakt.
+  **Smoke pre Michala (H1 navonok neviditeľná):** existujúce zákazky — nákup/rozpočet/CP identické; H1 sa testuje spolu s H2.
+  **Checklist uzáveru (v PR):** bump patch + `?v=` → testy vrátane in-SU → `hardware.md` (odsek `hardware_sets`: ad-hoc kanál), `outputs.md` (`hardware_manual`, `newer_configs`,
+  brána), `construction.md` (cabinet_builder: `hardware_manual`, CONFIG_SCHEMA 3, rekey) → STANDARD §6 (ad-hoc kanál, R-12 exportná brána) → STAV/KRONIKA/PLAN (H1 ✅, H2 ďalšia).
+
+- **KOV-H2 · TASK PACKAGE „AD-HOC KOVANIE — INSPECTOR UI" (slice H, rez H2; štart po merge H1):**
+  **Cieľ:** v kontexte Kovanie riadok „+ Pridať konkrétnu položku (mimo setov)" → D-15 modal (Patrí k: skrinka / čelo / zónový dielec — `human_label`; Zdroj: katalóg (existujúci
+  combobox položiek, zobrazí živú cenu a MJ) / voľná (názov, MJ, cena, poznámka); množstvo); položky ako riadky s chipom „ručná", úprava a zmazanie = zmena configu cez apply
+  (1 krok Späť); pôvod v sekcii Nákup Štúdia (rozklik zdrojov, chip „ručná"). Mockup scéna 2. **Audit:** NIE (UI nad kontraktom H1); `codex-po-pr` povinné.
+  **Testy:** JS modal (validácia, kontextové polia, katalógový výber = len kód), riadky a chip, minidom round-trip cez `collectAll`; in-SU: pridať/upraviť/zmazať = po jednom kroku
+  Späť. Mutácie min. 3. **Smoke pre Michala:** k F1 pridaj Bystricu 93240 ×2 z katalógu → Nákup ukáže riadok zliaty s ostatnými, rozklik pôvod „F1 · dvierka · ručná" · pridaj voľnú
+  položku „zámok Abloy 12 €" ku skrinke → vlastný riadok, rozpočet ju započíta · zmeň šírku skrinky → položky ostali · kópia skrinky ich má · zmaž katalógovú položku z katalógu →
+  riadok „chýba v katalógu" bez ceny · Ctrl+Z vráti každý krok. **Checklist uzáveru (v PR):** bump + `?v=` → testy → `ui-lifecycle.md` (modal, riadky, Nákup) → STAV/KRONIKA/PLAN
+  (KOV-H komplet).
 
 - **KOV-C · TASK PACKAGE „RECEPTY, KONTEXT A ODVODENÉ DIELCE ZÁSUVIEK" (slice C; štart po KOV-A; audit-povinná; in-SU povinné; rez C1/C2):**
   **Cieľ:** zásuvkové čelo (klasifikované v KOV-A) dostane z receptu automaticky **vyrábané dielce** (Atira: dno + drevený chrbát; Quadro V6 EB23: 2 boky + dno +
