@@ -15,6 +15,10 @@
   // identitu ineho dokumentu. null = ziadne rozpisane edity.
   var applyPendingGuid = null;
   var frontItems = null;        // rozlozene cela z backendu
+  // KOV-A2a: `front_slots` z Ruby — mapa front_id -> [{ wing, part_key, state }].
+  // JEDINA odpoved na otazku „kde sa smer pyta"; panel si ju NEODVODZUJE
+  // z poctu kridiel. null = nic oznacene (alebo payload bez ciel).
+  var frontSlots = null;
   // UI-B2: posledny payload kovania (config.hardware oznacenej skrinky). Drzi sa
   // LEN preto, aby z neho vedel kreslit nahlad (projekcia Kovanie a ghost
   // vrstva) — je to TEN ISTY payload, ktory dostava sekcia kovania, ziadne nove
@@ -101,6 +105,239 @@
       return (rec ? rec.short || rec.name : 'bez profilu') + ': ' + byId[id].join(', ');
     }).join(' · ');
   }
+  // ===== KOV-A2a: KARTA CELA — ciste jadro ================================
+  //
+  // KLIENTSKY VYROBCA stavu „neurcene" je JEDNO MIESTO: tento subor. Literal
+  // smie zit LEN tu (Ruby guard `tests/pure/test_kova1_cela.rb` to strazi) —
+  // `form.js` cita konstantu a hodnoty tlacidiel, nikdy si stav nenapise sam.
+  // ZELEZNE PRAVIDLO A1 plati dalej: kluc, ktory config NEMA, sa tu NIKDY
+  // nevyrobi ako vedlajsi efekt renderu, echa ani editacie ineho pola —
+  // `unset` vznika VYHRADNE pouzivatelskou akciou (nove dvierka · prepnutie
+  // typu na dvierka bez ulozenej hodnoty · klik na „Neurčené" · 3/4 kridla).
+  var FRONT_DIR_UNSET = 'unset';
+  var FRONT_DIR_LEFT = 'left';
+  var FRONT_DIR_RIGHT = 'right';
+  // Poradie dlazdic typegridu (mockup scena 1 + D-18 „Bez čela" ako 6. volba:
+  // je to PLATNY typ riadku, takze musi ostat volitelny).
+  var FRONT_CARD_TYPES = ['door', 'drawer_front', 'lift', 'fall', 'blind', 'none'];
+  // Typy s pohyblivym celom = maju sposob otvarania (Klasicke/Tip-On).
+  var FRONT_OPENING_TYPES = ['door', 'drawer_front', 'lift', 'fall'];
+  // Volby smeru. `warn` = stav „Neurčené" sa kresli jantarovo (je to otvorena
+  // otazka, nie chyba stavby; RED nalez patri Kontrole v Studiu).
+  var FRONT_DIR_OPTIONS = [
+    { value: FRONT_DIR_LEFT, label: 'Ľavé', icon: 'dir-left',
+      title: 'Pánty vľavo — krídlo sa otvára doprava' },
+    { value: FRONT_DIR_UNSET, label: 'Neurčené', icon: 'dir-unset', warn: true,
+      title: 'Smer zatiaľ neurčený — nález v Kontrole, exporty to neblokuje' },
+    { value: FRONT_DIR_RIGHT, label: 'Pravé', icon: 'dir-right',
+      title: 'Pánty vpravo — krídlo sa otvára doľava' }
+  ];
+  var FRONT_OPENING_OPTIONS = [
+    { value: 'classic', label: 'Klasické' },
+    { value: 'tipon', label: 'Tip-On' }
+  ];
+  var FRONT_DRAWER_CONSTR_OPTIONS = [
+    { value: 'metal', label: 'Kovové bočnice' },
+    { value: 'wood', label: 'Drevený box' },
+    { value: 'other', label: 'Ostatné' }
+  ];
+  var FRONT_DRAWER_VARIANT_OPTIONS = [
+    { value: 'standard', label: 'Štandardná' },
+    { value: 'internal', label: 'Vnútorná' }
+  ];
+  // Popis stredneho kridla: p2 pri 3 kridlach = „Krídlo 2/3", pri 4 = „Krídlo 2/4".
+  function frontWingLabel(wing, total){
+    var n = String(wing || '').replace(/^p/, '');
+    return 'Krídlo ' + n + (total ? '/' + total : '');
+  }
+  // Aktivna hodnota smeru pre dany slot. Berie sa z POLOZKY (to, co posle
+  // `collectFronts`), nie zo `state` slotu — slot hovori LEN o tom, ci sa
+  // otazka vobec kladie. Chybajuca hodnota = ziadna aktivna volba (legacy).
+  function frontDirValue(item, wing){
+    var it = item || {};
+    if (wing === 'single') return it.direction == null ? null : it.direction;
+    var wd = it.wing_directions;
+    if (!wd || typeof wd !== 'object') return null;
+    return wd[wing] == null ? null : wd[wing];
+  }
+  // VIEW-MODEL karty. `item` = polozka cela (typ + dormant polia), `slots` =
+  // to, co poslal SERVER (`front_slots[front_id]`).
+  //   slots === null/undefined -> server sa k celu este nevyjadril (novy riadok
+  //     pred prvym echom) — smerovy riadok sa NEKRESLI a nic sa neodvodzuje.
+  //   slots === []             -> server povedal „tu sa smer nepyta".
+  // VSTUP SA NEMENI (ziadna materializacia pri renderi).
+  function frontCardModel(item, slots){
+    var it = item || {};
+    var type = it.type || 'door';
+    var known = FRONT_CARD_TYPES.indexOf(type) >= 0;
+    var tiles = FRONT_CARD_TYPES.map(function(t){ return { type: t, on: t === type }; });
+    var rows = [];
+    if (type === 'blind'){
+      rows.push({ kind: 'info', tone: 'muted',
+                  text: 'Blenda je pevný výrobný dielec — bez smeru, otvárania a kovania. ' +
+                        'Materiál, ABS a rozmery ako každý iný dielec.' });
+      return { type: type, known: known, tiles: tiles, rows: rows };
+    }
+    if (type === 'none'){
+      rows.push({ kind: 'info', tone: 'muted',
+                  text: 'Riadok drží výšku v rade, ale panel sa nepostaví — otvorená nika.' });
+      return { type: type, known: known, tiles: tiles, rows: rows };
+    }
+    if (type === 'door'){
+      var list = Array.isArray(slots) ? slots : null;
+      if (list && list.length){
+        var total = list.length + 2; // krajne kridla su odvodene, otazky su len stredne
+        list.forEach(function(s){
+          var wing = (s && s.wing) ? s.wing : '';
+          if (wing === 'single'){
+            rows.push({ kind: 'seg', key: 'direction', wing: wing, label: 'Smer',
+                        options: FRONT_DIR_OPTIONS, active: frontDirValue(it, wing) });
+          } else if (wing){
+            rows.push({ kind: 'seg', key: 'wing_direction', wing: wing,
+                        label: frontWingLabel(wing, total),
+                        options: FRONT_DIR_OPTIONS, active: frontDirValue(it, wing) });
+          }
+        });
+      } else if (list){
+        // Dvojkridlo (a kazdy iny pripad, kde server otazku nekladie): smer je
+        // ODVODENY z geometrie, preto sa nepyta — len sa povie, co plati.
+        rows.push({ kind: 'info', tone: 'muted',
+                    text: 'Dvojkrídlo: ľavé krídlo má pánty vľavo, pravé vpravo — smer sa neurčuje.' });
+      }
+    }
+    if (FRONT_OPENING_TYPES.indexOf(type) >= 0){
+      rows.push({ kind: 'seg', key: 'opening_mode', label: 'Otváranie',
+                  options: FRONT_OPENING_OPTIONS,
+                  active: it.opening_mode == null ? null : it.opening_mode,
+                  hint: it.opening_mode == null
+                    ? 'Neurčené — predvolene sa berie klasické otváranie.' : null });
+    }
+    if (type === 'drawer_front'){
+      var drw = (it.drawer && typeof it.drawer === 'object') ? it.drawer : {};
+      rows.push({ kind: 'seg', key: 'drawer_construction', label: 'Konštrukcia',
+                  options: FRONT_DRAWER_CONSTR_OPTIONS,
+                  active: drw.construction == null ? null : drw.construction });
+      rows.push({ kind: 'seg', key: 'drawer_variant', label: 'Zásuvka',
+                  options: FRONT_DRAWER_VARIANT_OPTIONS,
+                  active: drw.variant == null ? null : drw.variant });
+      if (drw.construction == null && drw.variant == null){
+        rows.push({ kind: 'info', tone: 'muted',
+                    text: 'Zásuvka bez klasifikácie (systém sa priradí až po klasifikácii — KOV-C).' });
+      }
+    }
+    if (type === 'door' || type === 'drawer_front'){
+      rows.push({ kind: 'hint', text: 'Set kovania podľa otvárania príde s KOV-D.' });
+    }
+    if (type === 'lift' || type === 'fall'){
+      rows.push({ kind: 'info', tone: 'muted',
+                  text: 'Mechanizmus (AVENTOS a spol.) sa zatiaľ pridáva ručne — automatika príde s KOV-E.' });
+    }
+    return { type: type, known: known, tiles: tiles, rows: rows };
+  }
+  // (b) Prepnutie dlazdice typu. Na dvierka BEZ ulozeneho smeru = pouzivatelska
+  // akcia -> smer sa PRIZNA ako neurceny. Prepnutie NA INY typ nic nemaze
+  // (dormant, A1 BLOCKER 3): po navrate na dvierka sa hodnota obnovi.
+  function frontExtraOnTypeChange(extra, newType){
+    var out = frontExtraCopy(extra);
+    if (newType === 'door' && out.direction == null) out.direction = FRONT_DIR_UNSET;
+    return out;
+  }
+  // (d) Zmena poctu kridiel. 3 kridla = jedno stredne (p2), 4 = dve (p2, p3).
+  // Uz ulozene hodnoty sa NEPREPISUJU a navrat na 1/2/auto NIC NEMAZE.
+  function frontExtraOnWings(extra, wings){
+    var out = frontExtraCopy(extra);
+    var need = (String(wings) === '3') ? ['p2'] : (String(wings) === '4' ? ['p2', 'p3'] : []);
+    if (!need.length) return out;
+    var wd = {};
+    if (out.wing_directions && typeof out.wing_directions === 'object'){
+      Object.keys(out.wing_directions).forEach(function(k){ wd[k] = out.wing_directions[k]; });
+    }
+    need.forEach(function(k){ if (wd[k] == null) wd[k] = FRONT_DIR_UNSET; });
+    out.wing_directions = wd;
+    return out;
+  }
+  // (c) Klik na segrow. `value` chodi z TLACIDLA (teda z `FRONT_*_OPTIONS`) —
+  // ziadny literal, ziadny default. Neznamy kluc nechava polozku nedotknutu.
+  function frontExtraOnSegrow(extra, key, value, wing){
+    var out = frontExtraCopy(extra);
+    if (key === 'direction'){
+      out.direction = value;
+    } else if (key === 'wing_direction'){
+      if (!wing) return out;
+      var wd = {};
+      if (out.wing_directions && typeof out.wing_directions === 'object'){
+        Object.keys(out.wing_directions).forEach(function(k){ wd[k] = out.wing_directions[k]; });
+      }
+      wd[wing] = value;
+      out.wing_directions = wd;
+    } else if (key === 'opening_mode'){
+      out.opening_mode = value;
+    } else if (key === 'drawer_construction' || key === 'drawer_variant'){
+      var drw = {};
+      if (out.drawer && typeof out.drawer === 'object'){
+        Object.keys(out.drawer).forEach(function(k){ drw[k] = out.drawer[k]; });
+      }
+      drw[key === 'drawer_construction' ? 'construction' : 'variant'] = value;
+      out.drawer = drw;
+    }
+    return out;
+  }
+  // Plytka kopia dormant poli — kazda z funkcii vyssie vracia NOVY objekt,
+  // aby sa vstup (dataset riadku) nedal zmenit omylom.
+  function frontExtraCopy(extra){
+    var out = {};
+    if (extra && typeof extra === 'object'){
+      Object.keys(extra).forEach(function(k){ out[k] = extra[k]; });
+    }
+    return out;
+  }
+  // Badge „smer?" v riadku. Rozhoduje VYHRADNE stav zo SERVERA — legacy (stav
+  // chyba) badge NIKDY nedostane.
+  function frontDirBadge(slots){
+    return Array.isArray(slots) && slots.some(function(s){
+      return s && s.state === FRONT_DIR_UNSET;
+    });
+  }
+  // ===== KOV-A2a: symboly 2D nahladu =====================================
+  // Prevod STAVU na SYMBOL. Nahlad kresli symboly, nie stavy — preto sa tu
+  // (a nikde inde) rozhoduje, co sa ma nakreslit.
+  //   'left' / 'right' = sipka na volnu hranu · 'unknown' = otaznik (jantar)
+  //   null = LEGACY (smer v configu nie je) — nekresli sa NIC.
+  function frontDirSymbol(state){
+    if (state === FRONT_DIR_LEFT) return 'left';
+    if (state === FRONT_DIR_RIGHT) return 'right';
+    if (state === FRONT_DIR_UNSET) return 'unknown';
+    return null;
+  }
+  // Symbol NEDVIEROKOVEHO typu (dvierka riesi `frontWingSymbols`).
+  // Zasuvka VEDOME zostava BEZ symbolu: mockupovy ∧ by splyval s vyklopom.
+  function frontTypeSymbol(type){
+    if (type === 'lift') return 'up';
+    if (type === 'fall') return 'down';
+    if (type === 'blind') return 'cross';
+    return null;
+  }
+  // Symboly VSETKYCH kridiel dvierok. KRAJNE kridla su ODVODENE (A1 kontrakt
+  // variant a: p1 = pánty vľavo, posledné = pánty vpravo — nič sa neukladá),
+  // STREDNE sa berú zo slotov servera. Jedno krídlo nemá čo odvodzovať —
+  // kreslí sa výhradne to, čo server pozná.
+  function frontWingSymbols(wingsN, slots){
+    var n = Number(wingsN) || 0;
+    if (n < 1) return [];
+    var byWing = {};
+    (Array.isArray(slots) ? slots : []).forEach(function(s){
+      if (s && s.wing) byWing[s.wing] = s.state;
+    });
+    if (n === 1) return [frontDirSymbol(byWing.single)];
+    var out = [];
+    for (var i = 1; i <= n; i++){
+      if (i === 1) out.push('left');
+      else if (i === n) out.push('right');
+      else out.push(frontDirSymbol(byWing['p' + i]));
+    }
+    return out;
+  }
+
   var partCard = null;                        // aktualna karta dielca (null = ziadny dielec)
   // D3: mapa front_id -> texty kovania ("4× záves", "NL 500") pre badge v riadkoch ciel.
   var HW_FRONT_BADGES = {};
@@ -774,6 +1011,17 @@
       PROFILELESS_FRONT_TYPES: PROFILELESS_FRONT_TYPES, frontProfileless: frontProfileless,
       frontProfileCommon: frontProfileCommon,
       frontProfileStateText: frontProfileStateText,
+      // KOV-A2a (tests/js/test_kova2a_karta.js) — ciste jadro karty cela:
+      // view-model, tri VYROBCOVIA stavu „neurcene" a symboly nahladu.
+      FRONT_DIR_UNSET: FRONT_DIR_UNSET, FRONT_CARD_TYPES: FRONT_CARD_TYPES,
+      FRONT_DIR_OPTIONS: FRONT_DIR_OPTIONS, FRONT_OPENING_OPTIONS: FRONT_OPENING_OPTIONS,
+      FRONT_DRAWER_CONSTR_OPTIONS: FRONT_DRAWER_CONSTR_OPTIONS,
+      FRONT_DRAWER_VARIANT_OPTIONS: FRONT_DRAWER_VARIANT_OPTIONS,
+      frontCardModel: frontCardModel, frontWingLabel: frontWingLabel,
+      frontExtraOnTypeChange: frontExtraOnTypeChange, frontExtraOnWings: frontExtraOnWings,
+      frontExtraOnSegrow: frontExtraOnSegrow, frontDirBadge: frontDirBadge,
+      frontDirSymbol: frontDirSymbol, frontTypeSymbol: frontTypeSymbol,
+      frontWingSymbols: frontWingSymbols,
       // D-100 (tests/js/test_d100_nazvy.js) — zrkadlo ocistenia nazvu skrinky
       cabNameValue: cabNameValue, CAB_NAME_MAX: CAB_NAME_MAX,
       // UI-B3 (tests/js/test_uib3_korpus.js) — texty informacneho stlpca a typ badge

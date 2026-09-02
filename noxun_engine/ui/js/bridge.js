@@ -489,6 +489,10 @@
       // D-23 (audit F5/4): frontItems PRED renderFronts — placeholder ≈ vysky
       // paruje s CERSTVYM payloadom (povodne poradie by parovalo so starou skrinkou).
       frontItems = c.front_items || [];
+      // KOV-A2a: front_slots chodia TYM ISTYM pushom — je to serverova odpoved
+      // na otazku „kde sa smer pyta" (Fronts.direction_slots). Panel si ju
+      // NEODVODZUJE z poctu kridiel.
+      frontSlots = c.front_slots || {};
       // D-07 Codex B2: echo apply toho isteho korpusu s dalsimi cakajucimi editmi
       // nesmie prepisat gap polia (selectedCabId sa meni az nizsie v setSelected).
       // D-22: pod tym istym guardom je aj zamok presahov (edge_limit_off) —
@@ -561,7 +565,7 @@
       // `loadSelected` to robi uz dlho, doska na to cakala.
       if (typeof absModalCloseSilent === 'function') absModalCloseSilent();
       setSelected(null);
-      activeZoneId = null; frontItems = null; hwItems = null;
+      activeZoneId = null; frontItems = null; frontSlots = null; hwItems = null;
       invalidateFrontPlaceholders(); // D-23: bez resolved dat ziadne ≈ odhady
       buildFrontHwBadges([]);
       setCabInfo(null); // UI-B3: kontext dosky — korpusove dopocty neplatia
@@ -586,7 +590,7 @@
       // D-32: identita prec PRED setUiMode — reset karty (materializeInsertCard
       // vnutri setUiMode) nesmie bezat nad zvyskami stareho vyberu.
       setSelected(null);
-      activeZoneId = null; frontItems = null; hwItems = null;
+      activeZoneId = null; frontItems = null; frontSlots = null; hwItems = null;
       buildFrontHwBadges([]); // Codex PR #30: badge patria oznacenej skrinke — bez nej ziadne
       setCabInfo(null);       // UI-B3: bez skrinky niet dielcov ani plochy
       setCtxNote(null);       // ani suhrn skrinky do kontextoveho riadku
