@@ -600,9 +600,13 @@ module NxTest
     #     „Neurčené" · 3/4 kridla), ale VYHRADNE cez `FRONT_DIR_UNSET` a tri
     #     ciste funkcie v tomto subore. `form.js` (DOM) ani `preview.js`
     #     (kresba) literal nepoznaju — citaju hodnotu z ponuky, resp. symbol.
+    #   core/direction_check.rb — KOV-A2b: CITATEL (nikdy vyrobca). Overlay musi
+    #     rozoznat „neurcene" (kruh + „?") od VYRIESENEHO smeru (sipka) a od
+    #     LEGACY (nekresli sa NIC) — je to jediny `case` nad stavom slotu
+    #     (`dir_symbol`, zrkadlo `frontDirSymbol` v core.js). Nic nezapisuje.
     # POZN.: kod `front_direction_unset` NIE JE literal `unset` (iny token),
     # takze validation.rb ani zvysok JS na allowliste byt nemusia.
-    allow = %w[modules/fronts.rb core/bom.rb ui/js/core.js]
+    allow = %w[modules/fronts.rb core/bom.rb core/direction_check.rb ui/js/core.js]
     literal = /['"]unset['"]/
     files = Dir[File.join(NxKovA1::SRC_DIR, '**', '*.rb')] +
             Dir[File.join(NxKovA1::SRC_DIR, 'ui', 'js', '*.js')]
