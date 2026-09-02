@@ -677,6 +677,15 @@ module Noxun
           rescue StandardError => e
             # Vynimka prestavby konci v `cb` wrapperi (log + status). Bez tejto
             # vetvy by ale modal ostal zamknuty a pouzivatel by nemal ako von.
+            #
+            # Codex #285 P2-B: PRED odpovedou musi ist RESYNC. Klient si totiz
+            # `hwManual` prepisal OPTIMISTICKY uz pred odoslanim, kym operacia
+            # sa zrusila a ULOZENA skrinka ostala nezmenena — bez pushu by si
+            # panel drzal ODMIETNUTY zoznam a najblizsia nesuvisiaca zmena
+            # skrinky by ho poslala znova (duplicitne pridanie, alebo dodatocne
+            # uplatnene „neuspesne" mazanie). Rovnako to robia obe preflight
+            # vetvy vyssie.
+            push_selected(model)
             push_manual_result(op, false, "Kovanie sa neuložilo — #{e.message}.")
             raise
           end

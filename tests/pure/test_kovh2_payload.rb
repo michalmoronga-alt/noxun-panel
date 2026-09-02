@@ -319,6 +319,24 @@ NxTest.test('KOV-H2: KAZDA vetva `handle_apply_all` odpoveda modalu') do
                 'pri odmietnuti ide signal AZ PO pushi — panel sa vrati na ULOZENY stav')
 end
 
+# Codex #285 P2-B: klient si `hwManual` prepisuje OPTIMISTICKY uz pred apply.
+# Ked prestavba vyhodi vynimku, operacia sa zrusi a ULOZENA skrinka ostane
+# nezmenena — bez `push_selected` by si panel drzal ODMIETNUTY zoznam a
+# najblizsia nesuvisiaca zmena skrinky by ho poslala znova (duplicitne
+# pridanie, alebo dodatocne uplatnene „neuspesne" mazanie).
+NxTest.test('KOV-H2: aj po VYNIMKE prestavby dostane panel ULOZENY stav') do
+  body = NxKovh2.src('ui/panel/actions_cabinet.rb')[/def handle_apply_all.*?\n        end\n/m].to_s
+  rescue_body = body[/rescue StandardError => e.*?raise/m].to_s
+  NxTest.refute(rescue_body.empty?, 'rescue vetva prestavby sa nasla')
+  NxTest.assert(rescue_body.include?('push_selected(model)'),
+                'po vynimke sa panel RESYNCUJE — inak si drzi odmietnuty zoznam')
+  NxTest.assert(rescue_body.index('push_selected(model)') <
+                rescue_body.index('push_manual_result'),
+                'a resync ide PRED odpovedou modalu (rovnako ako obe preflight vetvy)')
+  NxTest.assert(rescue_body.rindex('raise') > rescue_body.index('push_manual_result'),
+                'vynimka sa NEPREHLTNE — `cb` wrapper ju musi zalogovat')
+end
+
 # --- 5) povod nakupneho riadku ------------------------------------------------
 
 NxTest.test('KOV-H2: kazdy zdroj nakupneho riadku dostane LUDSKY popis vlastnika') do
