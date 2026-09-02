@@ -196,6 +196,12 @@ zmazalo rozpísaný formulár.
 server a vo fáze `run` sa Escapom zavrieť nesmie (beh by ostal visieť bez okna); a Escape handler Štúdia (`ecMenu`) je preto podmienený `!nxModalOpen()` — oba listenery visia na
 `document` a `stopPropagation` medzi nimi **nefunguje** (tá istá lekcia ako pri zatváraní `ecMenu` klikom mimo).
 
+**`onClose` JE SÚČASŤ KONTRAKTU (review #285 kolo 2, P2-G).** Volajúci si pri modali drží **vlastný stav** (čo odoslal, na čo čaká) a bez signálu o zatvorení mu ostane visieť aj
+po Escape, kliku na scrim, krížiku či „Zrušiť" — ďalšia akcia sa potom správa, akoby okno ešte žilo (ad-hoc kovanie takto hlásilo „okno sa zavrelo, nič sa neuložilo" po tom, čo ho
+používateľ zavrel sám). Volá sa **až po skutočnom zatvorení** (`OPEN` je už `null`), takže volajúci z neho smie bez rizika rekurzie čítať stav aj otvárať nové okno; výnimka
+v ňom sa **nikdy** nepremietne do kostry. Dôsledok pre volajúcich: stav sa nastavuje **až za** `NXModal.open`, lebo `open` najprv zatvára predchádzajúci modal a jeho `onClose` by
+čerstvý stav hneď vynuloval.
+
 **`submit` modal NEZATVÁRA** (audit #10): pošle hodnoty cez `onSubmit` a zatvorenie je rozhodnutie volajúceho — rozpočet ho zavrie **len** na `NX.budgetResult(op, true)`, takže
 odmietnutý zápis nechá používateľovi jeho hodnoty na mieste (opraviť číslo, nie písať formulár znova). Kotva `#nxModalRoot` žije **mimo `#secbody`**, takže prekreslenie sekcie po
 zápise modal nezhodí.
@@ -796,8 +802,11 @@ o nich nevie, takže sa **nikdy** nevracajú serveru — inak by sa cena z obraz
 **Modal je D-15 kostra** (`hw:manual:add` / `hw:manual:edit:<id>`): *Patrí k* · *Zdroj* (Z katalógu / Voľná položka) · pri katalógu **`lookup`** so serverovým hľadaním
 (`hw_manual_search` — čítacia cesta, žiadny krok Späť, poradie skladá server, odpoveď nesie `gen`), pri voľnej *Názov · MJ · Cena s DPH* · *Množstvo* · *Poznámka*. Cena
 **katalógovej** položky sa needituje ani neposiela (mockup mal „Cena s DPH (snapshot)" — **vedomá odchýlka**, je to len informácia z katalógu). Prepnutie *Zdroja* mení sadu polí
-a kostra ich za behu nevymieňa, preto sa modal **otvorí znova s tým, čo už používateľ napísal** (hodnoty nesie draft, nie pamäť — pamäť porovnáva proti defaultom a rozpísané
-hodnoty by v novom formulári nemala proti čomu merať). MJ sú **zrkadlom** serverovej `HardwareCatalog::UNITS` (nie payload — menia sa raz za rok; že sa nerozídu, stráži
+a kostra ich za behu nevymieňa, preto sa modal **otvorí znova s tým, čo už používateľ napísal**. Hodnoty nesie **draft modalu** (`HW_MAN.draft`), nie pamäť — pamäť porovnáva proti
+defaultom a hodnoty **druhého, práve nevykresleného** zdroja by nemala proti čomu merať. Draft preto **prežíva prekreslenie** (review #285 kolo 2, P2-F): pred prepnutím sa doň
+vlejú viditeľné hodnoty (`hwManualMergeDraft` — čistá funkcia; kľúče, ktoré práve vykreslené nie sú, sa **neprepisujú**) a po prekreslení sa vrátia, takže cesta *voľná → katalóg →
+voľná* už napísaný názov ani cenu nezahodí. **Nevybraný dotaz** katalógu sa číta z poľa hľadania, lebo vo `values()` nie je (kontrakt `lookup` vracia len kód). Hodnoty neaktívneho
+zdroja sú **výhradne pre obrazovku** — do `values()` ani do configu sa nedostanú, `hwManualRecord` číta len polia svojho zdroja. MJ sú **zrkadlom** serverovej `HardwareCatalog::UNITS` (nie payload — menia sa raz za rok; že sa nerozídu, stráži
 `tests/pure/test_kovh2_payload.rb`).
 
 **Zápis nemení kanál.** JS zostaví NOVÝ zoznam z `hwManual` (add = záznam s **prázdnym `id`**, prideľuje ho server; edit = nahradí práve jednu; delete = vynechá ju — a keď sa
@@ -809,7 +818,16 @@ navždy. Pri **odmietnutí** ide signál **až po `push_selected`**: modal ostá
 poradie je preto kontrakt, nie náhoda. Úspech modal **zatvorí** a zahodí pamäť draftu (`setBusy(false, {clear: true})`).
 
 **Mazanie ide bez potvrdzovacieho okna** — poistkou je jeden krok Späť (vzor „Vrátiť na pravidlo"); potvrdenie pri každom mazaní by bolo klik navyše pri každej oprave. Status
-**menuje**, čo sa odstránilo (`manual_removed_label` číta názov z **uloženého** zoznamu ešte pred preflightom — ten `params` už prepíše odoslaným zoznamom).
+**menuje**, čo sa odstránilo (`manual_removed_label` číta názov z **uloženého** zoznamu ešte pred preflightom — ten `params` už prepíše odoslaným zoznamom). **Hláška výsledku
+PREPÍŠE status prestavby** (klient ju posiela do `NX.setStatus`), takže nesie aj jeho **varovania** — inak by upozornenia z tej istej prestavby zmizli bez stopy (review #285
+kolo 2, P2-H). Prípona „· N upozornení" je **jedna funkcia** (`warn_suffix`), ktorú používa `status_with_warnings` aj `manual_ok_msg`: jeden zdroj textu, žiadne skladanie na
+klientovi.
+
+**NAŠEPKÁVAČ NEPONÚKA NEAKTÍVNE POLOŽKY (review #285 kolo 2, P2-I).** `HardwareCatalog.search_with_total` vracia neaktívny záznam pri **presnej zhode kódu** aj bez
+`include_inactive` — vedomý kontrakt katalógu (kto kód pozná, má právo ho tam nájsť). V našepkávači je to pasca: vykreslil by sa ako bežný výber a kto pozná starý kód, pridal by si
+do zákazky položku, ktorú katalóg vedie ako **už neobjednávanú**. Filter (`drop_inactive`) žije **výhradne v našepkávači** a `total` sa znižuje o to, čo zahodil (zásada „no silent
+caps" platí aj naopak). **Zápisová cesta sa nemení**: položka s neaktívnym kódom, ktorá v configu už je (legacy zákazka, šablóna), musí prestavbu prežiť — zahodiť ju by znamenalo
+ticho odobrať kus z objednávky.
 
 **MODAL PATRÍ JEDNEJ SKRINKE A ZMENU VÝBERU NEPREŽIJE (review #285 P1).** Držal rozpísaný zoznam, kým `loadSelected` pod ním vymenil `hwManual`/`hwManualView`/`hwManualOwners`
 aj `selectedCabId` — odoslanie starého formulára by potom postavilo zoznam z **novej** skrinky a opečiatkovalo ho **jej** identitou; položka by pristála na nesprávnej skrinke a pri

@@ -61,6 +61,15 @@
   čitateľov). *(P2-D)* **Ad-hoc riadky sa neobnovili po zmene katalógu** — a to pri riadkoch, ktorých jediný zmysel je ukazovať živú cenu; ľahký push `NX.setHardwareSets` teraz
   nesie aj `manual_view`. *(P2-E)* **Rozpísaný dotaz sa strácal** (a pri úprave pole vyzeralo vybraté nad prázdnym kódom) — pamäť kostry si drží aj text dotazu pod kľúčom, ktorý
   sa do `values()` nikdy nedostane. Kolo neprinieslo žiadnu zmenu dátového kontraktu; každý nález má vlastný commit a vlastný test, ktorý bez opravy padá (8/8 mutácií).
+  **KOLO 2: 4×P2, tentoraz o STAVE, KTORÝ PREŽIL SVOJU OBRAZOVKU.** *(P2-F)* Prepnutie „Z katalógu ↔ Voľná položka" prekresľuje modal a draft sa skladal z uloženej položky
+  + práve vykreslených polí — cesta *voľná → katalóg → voľná* teda zahodila napísaný názov, cenu aj nevybraný dotaz; draft odvtedy žije v stave modalu a prežíva prekreslenie
+  (hodnoty neaktívneho zdroja sú výhradne pre obrazovku, do configu sa nedostanú). *(P2-G)* Po Escape, scrime, krížiku či „Zrušiť" ostal `HW_MAN` visieť, takže najbližšia zmena
+  výberu hlásila „okno sa zavrelo, nič sa neuložilo" — hoci ho používateľ zavrel sám; kostra D-15 dostala do kontraktu **`onClose`** (volá sa až po skutočnom zatvorení, takže
+  volajúci z neho smie bez rizika rekurzie otvárať nové okno) a je to diera, ktorú mal **každý** volajúci držiaci si vlastný stav. *(P2-H)* Hláška výsledku prepisovala status
+  prestavby, takže **varovania z tej istej prestavby** používateľ nikdy neuvidel — prípona „· N upozornení" je odteraz jedna zdieľaná funkcia. *(P2-I)* Katalóg vracia neaktívnu
+  položku pri **presnej zhode kódu** (vedomý kontrakt); v našepkávači to znamenalo, že kto pozná starý kód, pridá si do zákazky už neobjednávanú položku — filter pribudol
+  **len do našepkávača** (a `total` sa o zahodené znižuje), zápisová cesta ostáva nedotknutá, aby legacy položka prežila prestavbu. Kolo 2 bolo len P2, takže tretie GH kolo sa
+  nevyžiadalo; 6/6 mutácií zhodilo assert.
 
 - **KOV-B1 · KATALÓG A SETY — KLASIFIKÁCIA, TAXONÓMIA, STD 3 (v0.9.19, 3.9.2026):** prvý rez slice B (B1/B2/B3 podľa Codex auditu #17). Set kovania bol dovtedy len
   „mapovanie generického typu na kódy" — nevedelo sa z neho, **na čo** je: či je to záves na dvierka alebo na výklop, či je klasický alebo TipOn, od koho je a z akej rady.
