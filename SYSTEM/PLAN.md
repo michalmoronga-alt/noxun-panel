@@ -524,7 +524,7 @@ Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-
 **Cieľ:** aby plugin a knižnice fungovali na dvoch pracoviskách (Michal + Lucia).
 
 - *(**D-48 · Zdieľaná knižnica pre 2 PC** je od 26.8. MIMO V1 — presunutá do zásobníka Po V1; katalógy sa dovtedy zdieľajú ručne export/importom.)*
-- **D-52 · TASK PACKAGE „AKTUALIZOVAŤ JEDNÝM KLIKOM" (1e, zapísané 30.8.2026, rev. po slepom review #255; štart na „štartuj"):**
+- **D-52 · TASK PACKAGE „AKTUALIZOVAŤ JEDNÝM KLIKOM" (1e, zapísané 30.8.2026, rev. po slepom review #255; rev. po Codex audite 2.9.; ✅ D-52a JADRO v maine — PR #277, v0.9.9, 3.9.2026; ▶ D-52b UI = ďalšia dávka):**
   **Cieľ:** Lucia aj Michal zaktualizujú plugin bez kopírovania súborov — tlačidlo v sekcii O plugine Štúdia.
   BEZ väzby na D-48 sync.
   **Scope IN:** cesta k distribučnému priečinku = VLASTNÝ malý JSON v %APPDATA% (JsonFileStore + .bak; NIE
@@ -601,7 +601,8 @@ Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-
   `docs/architecture/ui-lifecycle.md`** (vstupný bod je sekcia About; core helper popísať tamtiež; R-32 vzor:
   overiť proti kódu) + ARCHITEKTURA router riadok → STAV/KRONIKA/PLAN → D-52 do DOGFOODING_vyriesene
   (plný text + riadok navrch indexu).
-- **D-52b · TASK PACKAGE „UPDATER — UI V ŠTÚDIU" (po mergi D-52a / PR #277; štart na „štartuj D-52b"):**
+- **D-52b · TASK PACKAGE „UPDATER — UI V ŠTÚDIU" (D-52a je v maine — PR #277; ŠTARTOVATEĽNÁ;
+  3× P3 z delta-verifikácie #277 zapracovať: (1) `clear_marker` výsledok sa na rollback/refuse cestách zahadzuje — do `Refused` správy doplniť poznámku o markeri; (2) tautologický assert `clear_marker == 'true'` v `test_d52a_updater.rb:~1312` odstrániť; (3) `close_all_dialogs` overiť in-SU, headless ho nepokrýva):**
   **Cieľ:** Michal aj Lucia zaktualizujú plugin jedným klikom zo sekcie **O plugine** v Štúdiu; jadro (recovery, lock, lease, latch, swap) je z D-52a — táto dávka pridáva
   LEN UI a asynchrónny check. **Scope IN:** pole „Distribučný priečinok" v sekcii About (**vlastný namespace `data-updater-edit`** s vlastným focus/dirty/save — NIE `data-ss`,
   F7; uloženie cez `Updater` settings store z D-52a, Enter/mini-tlačidlo; rozpísaná cesta prežije plný push) · **explicitný `updater_check`** volaný z OBOCH vstupov do About

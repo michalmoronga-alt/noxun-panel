@@ -17,6 +17,23 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-52a · JADRO PLUGINOVÉHO UPDATERA (v0.9.9, 2.–3.9.2026, PR #277):** nový čistý modul `core/updater.rb` (manifest SHA1 + staging do `.new`, validácia
+  STAGED stromu, swap s definovaným rollbackom, update lock + procesný lease s identitou image name, settings store `updater_settings.json` so `std` a R-11 bránou,
+  **restart latch** vo všetkých vstupoch aj v `cb` wrapperoch) a **recovery bootstrap priamo v loaderi `noxun_engine.rb`** (transakčný marker; pravidlo „strom na disku
+  musí zodpovedať PRÁVE vykonávanému loaderu"; loader swap = kópia zálohy + JEDINÝ atomický replace-rename, takže bootovateľný `.rb` existuje v každom okamihu).
+  **Downgrade vo V1 zakázaný** (rozhodnutie orchestrátora — samotné VERSION nezaručí bezpečnosť voči novším `%APPDATA%` schémam; Michal môže vrátiť len s capability
+  markerom). Žiadne UI — to je D-52b. 61 headless testov (sandbox v TEMP, druhý Ruby proces pre boot recovery a `flock`, simulovaný pád na KAŽDEJ hranici transakcie),
+  22 mutácií zabitých. **Proces:** codex-audit návrhu (4 BLOCKER + 7 FIX → revízia package) → implementácia Opus subagentom vo worktree → **4 kolá GH Codex review**
+  (4×P1+1×P2 · 3×P1+1×P2 · 2×P1+1×P2 · 1×P1+3×P2 — nálezy sa monotónne zužovali v tej istej triede „crash boundary / concurrency") → **slepá delta-verifikácia**
+  (Opus, read-only, samostatný worktree: CLEAN, 3× P3 do D-52b) → merge s pripnutou hlavou `40952db`.
+  **Dve VEDOMÉ odchýlky od pravidla 3 kôl** (precedens UI-B1, KRONIKA): (1) po kole 3 sa PR nedelil, lebo nálezy sa zužovali v jednom súbore a delenie by tú istú swap
+  logiku len presunulo do iného PR s rovnakým review — s podmienkou „P1 v kole 4 = deliť"; (2) kolo 4 vrátilo P1 **mimo jadra** (okná už otvorené v čase commitu —
+  scenár D-52b, ktorá má bariéru zatvorenia okien pred swapom v package), opravený lacným guardom v `cb` wrapperoch, a namiesto 5. GH kola prebehla interná delta-verifikácia.
+  **Poučenia:** codex-audit PRED kódom chytil 4 blockery, GH review ďalších 10 P1 — pri kóde, ktorý prepisuje sám seba za behu, sa **každá výnimková cesta po prvom
+  rename musí dokázať testom** (guard test „počet rescue == počet abort_after_move!"); `tasklist` píše v konzolovej kódovej stránke (CP852 na SK Windows) — parsovať
+  binárne, inak by kontrola lease padla na Michalovom stroji a headless CI na Linuxe to nikdy neukáže; `String#sub` s `\\` v náhrade je backreference (subagent to dvakrát
+  chytil cez `ruby -c` hook); cyrilické homoglyfy sa dostali do commit message `cc73bf3` (zdroje čisté — guard drží). Odsek modulu: `docs/architecture/ui-lifecycle.md`.
+
 - **KOVANIE — ARCHITEKTÚRA V1 + CROSS-AUDIT + MOCKUP + ŠTART (1.–2.9.2026, docs commity `928a9d5…2fd6aac`, bez zmeny kódu; PR #277 = prvý kód):**
   najväčšie plánovacie sedenie projektu, celé pred koncom MAX plánu (Fable). **Reťaz:** USER-debata (checkpointy 01–09, Michal hlasom) → orchestrator review package →
   **Round 1** kritika (7 otázok, HF von / stavové zóny von / revízie von) → **Round 2** s nezávislým vendor researchom (checkpoint #10: Hettich TuI/Planning/MTA, Blum MA-513/
