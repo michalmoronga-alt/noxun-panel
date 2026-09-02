@@ -50,7 +50,7 @@
   model), JS sady serverovú stranu nevidia — chytila to až sekcia `run_kovh2` pri prvom behu. Oprava je nil-guard + regresný assert; je to učebnicová ukážka, prečo je in-SU beh
   pri zásahoch do zápisovej cesty povinný.
   **Testy:** `tests/js/test_kovh2_adhoc_ui.js` (152 kontrol, mini-DOM nad skutočnou kostrou; 6/6 mutácií zhodilo assert) · `tests/pure/test_kovh2_payload.rb` (4/4 mutácie) ·
-  in-SU sekcia `run_kovh2` (33 scenárov po review kole; celý beh **1480 PASS / 0 FAIL**) · headless spolu **2641**, JS **82 sád**.
+  in-SU sekcia `run_kovh2` (35 scenárov po dvoch review kolách; celý beh **1482 PASS / 0 FAIL**) · headless spolu **2644**, JS **82 sád**.
   **CODEX REVIEW (#285, kolo 1): 1×P1 + 5×P2, všetky reálne — a všetky o tom, čo sa deje MEDZI dvoma stavmi.** *(P1)* **Modal prežil zmenu výberu**: držal rozpísaný zoznam
   jednej skrinky, kým `loadSelected` pod ním vymenil dáta aj `selectedCabId` — odoslanie by položku pripísalo NESPRÁVNEJ skrinke (a pri zhode `id` prepísalo cudzí záznam).
   Zatvára sa výhradne pri zmene IDENTITY; echo tej istej skrinky, na ktoré modal práve čaká, ho zavrieť nesmie. *(P2-A)* **Odpoveď sa korelovala podľa `kind`** — lenže všetky
