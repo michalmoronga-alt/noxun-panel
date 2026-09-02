@@ -583,6 +583,30 @@
   .hwbox.hov { border-color: var(--nx-select); }
   .hwbox.hov > .hwboxh { background: var(--nx-select-bg-hover); color: var(--nx-select-strong); }
   .hwbox.hov > .hwboxh .ic { color: var(--nx-select-strong); }
+  /* ===== KOV-H2: RUCNE PRIDANE POLOZKY (ad-hoc kovanie mimo setov) =====
+     Blok stoji POD boxmi vlastnikov: su to INE data (`hardware_manual`), takze
+     nepatria do boxu, ktory zoskupuje polozky z pravidiel. Nadpis sa kresli LEN
+     ked polozky su — prazdny nadpis nad tlacidlom by zabral riadok a nepovedal
+     nic (vertikalny priestor panela je vzacny). */
+  .hwman { margin: 6px 0 0; }
+  .hwmanh { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+            color: var(--nx-ink-faint); margin: 8px 0 2px; }
+  .hwman-row .hwman-qty { flex: 0 0 auto; font-size: 11.5px; color: var(--nx-ink-muted);
+                          white-space: nowrap; }
+  /* Chip pri nazve. „ručná" je NEUTRALNY stitok (nie je to chyba), „bez
+     vlastníka" a „chýba v katalógu" su JANTAROVE stavy — semaforove
+     --nx-state-* su rezervovane pre Kontrolu a sem sa miesat nesmu. */
+  .hwchip { font-size: 9.5px; font-weight: 600; line-height: 1.6; padding: 0 5px;
+            border-radius: 9px; white-space: nowrap; color: var(--nx-ink-muted);
+            background: var(--nx-surface-sunken); border: 1px solid var(--nx-border); }
+  .hwchip.warn { color: var(--nx-warnchip-fg); background: var(--nx-warn-bg-soft);
+                 border-color: var(--nx-warnchip-border); }
+  /* Tlacidlo je POSLEDNE v sekcii a na celu sirku — je to vstup do modalu,
+     nie akcia riadku. */
+  .hwmanadd { margin: 6px 0 2px; }
+  .hwmanbtn { display: flex; width: 100%; align-items: center; justify-content: center; gap: 6px;
+              font-size: 12px; }
+  .hwmanbtn .ic { width: 13px; height: 13px; }
   /* PRAVIDLA KOVANIA (dialog) */
   .rrule { border: 1px solid var(--nx-border); border-radius: 6px; padding: 8px 10px; margin: 8px 0; background: var(--nx-surface); }
   .rrule .rhead { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }

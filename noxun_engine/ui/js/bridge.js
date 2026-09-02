@@ -468,6 +468,16 @@
       if (typeof refreshHardwareSets === 'function') refreshHardwareSets(d.options || []);
       if (typeof refreshHardwarePurchase === 'function') refreshHardwarePurchase(d.items || []);
     },
+    // KOV-H2: výsledok hľadania v katalógu pre modal ručnej položky. Odpoveď
+    // nesie generáciu dotazu — staršie kolo sa zahadzuje v `hardware.js`.
+    hwManualSearchResult: function(res){
+      if (typeof hwManualSearchResult === 'function') hwManualSearchResult(res);
+    },
+    // KOV-H2: výsledok ZÁPISU ručnej položky. Modal D-15 sa pri odoslaní zamkne
+    // a odomyká ho VÝHRADNE volajúci — preto server odpovedá v každej vetve.
+    hwManualResult: function(ok, msg, op){
+      if (typeof onHwManualResult === 'function') onHwManualResult(ok, msg, op);
+    },
     loadSelected: function(c){
       // R-02 (review #264 kolo 3): IDENTITA DOKUMENTU JE PRVA VEC V PUSHI.
       // Dovod je poradie: nizsie sa rozhoduje `keepGaps` (ci sa ZACHOVAJU
@@ -492,6 +502,12 @@
       // spat (`collectAll`). ZIADNY default: payload bez kluca = null = kluc sa
       // neposiela a `apply_all` si necha to, co je v configu.
       hwManual = Array.isArray(c.hardware_manual) ? c.hardware_manual : null;
+      // KOV-H2: dve ZOBRAZOVACIE projekcie tych istych poloziek. Tu `|| []`
+      // NIE JE zakazane — nejde o pass-through, ale o „co sa ma nakreslit":
+      // stary payload bez klucov = kreslit netreba nic (a `hwManual` vyssie
+      // ostava nedotknuty, takze sa polozky NEZMAZU).
+      hwManualView = Array.isArray(c.hardware_manual_view) ? c.hardware_manual_view : [];
+      hwManualOwners = Array.isArray(c.hardware_manual_owners) ? c.hardware_manual_owners : [];
       // D-23 (audit F5/4): frontItems PRED renderFronts — placeholder ≈ vysky
       // paruje s CERSTVYM payloadom (povodne poradie by parovalo so starou skrinkou).
       frontItems = c.front_items || [];
@@ -580,6 +596,7 @@
       setSelected(null);
       activeZoneId = null; frontItems = null; frontSlots = null; hwItems = null;
       hwManual = null; // KOV-H1: bez oznacenej skrinky niet ad-hoc poloziek (kluc sa neposiela)
+      hwManualView = []; hwManualOwners = []; // KOV-H2: niet co kreslit ani ponukat
       closeFrontCard(); // KOV-A2a: odchod z korpusu = karta cela zaniká
       invalidateFrontPlaceholders(); // D-23: bez resolved dat ziadne ≈ odhady
       buildFrontHwBadges([]);
@@ -607,6 +624,7 @@
       setSelected(null);
       activeZoneId = null; frontItems = null; frontSlots = null; hwItems = null;
       hwManual = null; // KOV-H1: bez oznacenej skrinky niet ad-hoc poloziek (kluc sa neposiela)
+      hwManualView = []; hwManualOwners = []; // KOV-H2: niet co kreslit ani ponukat
       closeFrontCard(); // KOV-A2a: odchod z korpusu = karta cela zaniká
       buildFrontHwBadges([]); // Codex PR #30: badge patria oznacenej skrinke — bez nej ziadne
       setCabInfo(null);       // UI-B3: bez skrinky niet dielcov ani plochy
