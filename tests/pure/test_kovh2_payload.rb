@@ -444,6 +444,41 @@ NxTest.test('KOV-H2: callback hladania je registrovany a je CITACI') do
   NxTest.assert(body.include?('NX.hwManualSearchResult'), 'odpoved chodi vlastnym kanalom')
 end
 
+# Codex #285 P2-D: zmena katalogu chodi LAHKYM pushom (`push_hardware_sets`),
+# nie plnym `push_selected` — ad-hoc riadky sa preto musia obnovit tade.
+NxTest.test('KOV-H2: lahky refresh po zmene katalogu nesie CERSTVE ad-hoc riadky') do
+  NxKovh2.catalog_ready!
+  cfg = { 'hardware_manual' => [NxKovh2.cat_item],
+          'front_items' => [{ 'id' => 'F1', 'type' => 'door', 'wings_n' => 2 }] }
+  rows = Noxun::Engine::Panel.manual_view_for_refresh(cfg, 'CAB-001')
+  NxTest.assert_equal 1, rows.length, 'riadok ad-hoc polozky je v lahkom payloade'
+  NxTest.assert_equal 1.14, rows.first['price_eur_vat'],
+                      'so ZIVOU cenou z katalogu (to je cely dovod refreshu)'
+  NxTest.assert_equal 'Rektifikačný uholník', rows.first['name'], 'aj so zivym nazvom'
+end
+
+NxTest.test('KOV-H2: skrinka BEZ rucnych poloziek plan pre refresh vobec nestavia') do
+  # Tento push chodi po KAZDEJ zmene katalogu — `plan_parts_by_key` je cely
+  # `build_plan`, takze sa nesmie volat zbytocne.
+  NxTest.assert_equal [], Noxun::Engine::Panel.manual_view_for_refresh({}, 'CAB-001'),
+                      'prazdny config = prazdny zoznam'
+  NxTest.assert_equal [], Noxun::Engine::Panel.manual_view_for_refresh(
+    { 'hardware_manual' => [] }, 'CAB-001'
+  ), 'prazdne pole tiez'
+  body = NxKovh2.src('ui/panel/sync.rb')[/def manual_view_for_refresh.*?\n        end\n/m].to_s
+  NxTest.assert(body.index('return []') < body.index('manual_plan_keys'),
+                'skory navrat je PRED stavbou planu')
+end
+
+NxTest.test('KOV-H2: lahky push obsahuje kluc `manual_view`') do
+  body = NxKovh2.src('ui/panel/sync.rb')[/def push_hardware_sets.*?\n        end\n/m].to_s
+  NxTest.assert(body.include?("'manual_view' => manual_view_for_refresh("),
+                'payload zivého refreshu nesie ad-hoc riadky')
+  NxTest.assert(body.include?('NX.setHardwareSets'), 'a chodi EXISTUJUCIM kanalom')
+  NxTest.refute(body.include?('push_selected'),
+                'ziadny plny push vyberu — je to refresh, nie prestavba')
+end
+
 NxTest.test('KOV-H2: payload skrinky nesie obe projekcie a stavia plan RAZ') do
   pay = NxKovh2.src('ui/panel/payloads.rb')
   body = pay[/def cabinet_payload.*?\n        end\n/m].to_s

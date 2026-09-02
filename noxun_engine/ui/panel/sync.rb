@@ -468,13 +468,35 @@ module Noxun
             else
               cfg = Store.config(cab) || {}
               items = hardware_items_payload(cfg)
-              { 'cabinet_id' => Store.get(cab, 'cabinet_id'),
+              cid = Store.get(cab, 'cabinet_id')
+              { 'cabinet_id' => cid,
                 'options' => hardware_set_options(cfg, items),
-                'items' => items.map { |h| hardware_purchase_row(h) }.compact }
+                'items' => items.map { |h| hardware_purchase_row(h) }.compact,
+                # KOV-H2 (Codex #285 P2-D): ad-hoc riadky sa oceňujú ZIVYM
+                # katalogom, takze uprava ci zmazanie polozky v subezne
+                # otvorenom Studiu ich musi obnovit TYM ISTYM lahkym pushom.
+                # Bez toho by v Inspectorovi svietila stara cena (alebo by
+                # chybal chip „chýba v katalógu") az do zmeny vyberu.
+                # Plan sa stavia LEN ked skrinka ad-hoc polozky naozaj ma —
+                # tento push chodi po KAZDEJ zmene katalogu.
+                'manual_view' => manual_view_for_refresh(cfg, cid) }
             end
           js("NX.setHardwareSets(#{data.to_json})")
         rescue StandardError => e
           Engine.log_error(e, 'Panel.push_hardware_sets')
+        end
+
+        # KOV-H2: ad-hoc riadky pre ZIVY refresh. Prazdny zoznam = skrinka
+        # ziadne ad-hoc polozky nema, takze sa `plan_parts_by_key` (cely
+        # `build_plan`) vobec nevola.
+        def manual_view_for_refresh(cfg, cab_id)
+          items = cfg['hardware_manual']
+          return [] unless items.is_a?(Array) && !items.empty?
+
+          hardware_manual_view(cfg, manual_plan_keys(CabinetBuilder.config_to_params(cfg)), cab_id)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.manual_view_for_refresh')
+          []
         end
 
         # D-92: minimalny tvar pre zivy refresh — identita riadku + to, co sa

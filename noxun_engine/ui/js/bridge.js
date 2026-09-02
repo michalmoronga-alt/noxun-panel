@@ -467,6 +467,13 @@
       if ((d.cabinet_id || '') !== (selectedCabId || '')) return;
       if (typeof refreshHardwareSets === 'function') refreshHardwareSets(d.options || []);
       if (typeof refreshHardwarePurchase === 'function') refreshHardwarePurchase(d.items || []);
+      // KOV-H2 (Codex #285 P2-D): ad-hoc riadky sú ocenené ŽIVÝM katalógom,
+      // takže ich musí obnoviť ten istý ľahký push. Kľúč chýba pri starom
+      // payloade aj vtedy, keď skrinka žiadne ručné položky nemá — vtedy sa
+      // neprekresľuje nič (zoznam je aj tak prázdny).
+      if (Array.isArray(d.manual_view) && typeof refreshHardwareManual === 'function'){
+        refreshHardwareManual(d.manual_view);
+      }
     },
     // KOV-H2: výsledok hľadania v katalógu pre modal ručnej položky. Odpoveď
     // nesie generáciu dotazu — staršie kolo sa zahadzuje v `hardware.js`.

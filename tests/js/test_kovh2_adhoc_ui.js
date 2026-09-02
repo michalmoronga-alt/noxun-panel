@@ -551,6 +551,52 @@ function qa(sel){ return ROOT.querySelectorAll(sel); }
   ok(empty.indexOf('Pridať konkrétnu položku') > -1, 'ale tlacidlo ostava');
 })();
 
+// ====== 6b) ZIVY REFRESH PO ZMENE KATALOGU (Codex #285 P2-D) ================
+// Ad-hoc riadky su ocenene ZIVYM katalogom. Uprava ci zmazanie polozky
+// v subezne otvorenom Studiu ich musi obnovit TYM ISTYM lahkym pushom —
+// inak by v Inspectorovi svietila stara cena (alebo by chybal chip
+// „chýba v katalógu") az do zmeny vyberu.
+
+(function(){
+  reset({ manual: [], view: [CAT_ITEM] });
+  const box = mkEl('div');
+  box.attrs.id = 'hwRows';
+  DOC.body.appendChild(box);
+  box.innerHTML = HW.hwManualHtml();
+  ok(textOf(box).indexOf('1,14 €') > -1, 'blok kresli povodnu cenu');
+
+  const cheaper = Object.assign({}, CAT_ITEM, { price_eur_vat: 2.5, name: 'Bystrica — nový názov' });
+  eq(HW.refreshHardwareManual([cheaper]), true, 'refresh nasiel blok a prekreslil ho');
+  ok(textOf(box).indexOf('2,50 €') > -1, 'riadok ukazuje NOVU cenu z katalogu');
+  ok(textOf(box).indexOf('Bystrica — nový názov') > -1, 'aj novy nazov');
+  ok(textOf(box).indexOf('1,14 €') === -1, 'a stara cena je prec');
+  eq(DOC.getElementById('hwManBlock') !== null, true,
+     'uzol bloku PREZIL (prepisuje sa len obsah — vzor repeatera kostry)');
+
+  // Zmazanie kodu z katalogu = chip „chýba v katalógu" bez ceny.
+  HW.refreshHardwareManual([Object.assign({}, CAT_ITEM,
+    { catalog_missing: true, price_eur_vat: null })]);
+  ok(textOf(box).indexOf('chýba v katalógu') > -1, 'zmiznuty kod sa PRIZNA hned');
+  ok(textOf(box).indexOf('€') === -1 || textOf(box).indexOf('— /') > -1,
+     'a riadok je bez ceny');
+
+  // Bez vykreslenej sekcie sa nic nedeje (Inspector je v inom kontexte).
+  DOC.body.children = DOC.body.children.filter(function(c){ return c !== box; });
+  eq(HW.refreshHardwareManual([CAT_ITEM]), false, 'bez vykreslenej sekcie refresh mlci');
+  reset({ manual: [], view: [] });
+})();
+
+// Zdrojovy guard: lahky push nesmie zdvihnut generaciu okna ani spustit plny
+// push vyberu — je to refresh, nie prestavba.
+(function(){
+  const fs = require('node:fs');
+  const src = fs.readFileSync(path.join(JS, 'bridge.js'), 'utf8');
+  const body = src.slice(src.indexOf('setHardwareSets: function(data)'),
+                         src.indexOf('loadSelected: function(c)'));
+  ok(body.indexOf('refreshHardwareManual') > -1, 'lahky push obnovuje aj ad-hoc riadky');
+  eq(body.indexOf('push_selected'), -1, 'a nevola plny push vyberu');
+})();
+
 // ===================== 7) NAKUP STUDIA: chip + rozklik povodu ================
 
 (function(){

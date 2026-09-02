@@ -926,15 +926,31 @@
 
   // Cely blok. Nadpis je LEN ked su polozky (prazdny nadpis nad tlacidlom by
   // zabral riadok a nepovedal nic — vertikalny priestor panela je vzacny).
-  function hwManualHtml(list){
+  // OBAL a OBSAH su ZVLAST (vzor `rowsHtml`/`rowsInnerHtml` v nx_modal.js):
+  // zivy refresh po zmene katalogu prepisuje LEN obsah, takze uzol bloku
+  // prezije a nic ine v sekcii sa nedotkne.
+  function hwManualInnerHtml(list){
     var items = list || ((typeof hwManualView !== 'undefined' && hwManualView) ? hwManualView : []);
     var rows = items.map(hwManualItemHtml).join('');
-    return '<div class="hwman" id="hwManBlock">'
-      + (rows ? '<div class="hwmanh">Ručne pridané</div>' + rows : '')
+    return (rows ? '<div class="hwmanh">Ručne pridané</div>' + rows : '')
       + '<div class="hwmanadd"><button type="button" class="ghostbtn hwmanbtn"'
       + ' title="Konkrétna položka mimo setov — pripne sa ku skrinke alebo k dielcu"'
       + ' onclick="onHwManualAdd()">' + NXIcons.svg('plus')
-      + ' Pridať konkrétnu položku (mimo setov)</button></div></div>';
+      + ' Pridať konkrétnu položku (mimo setov)</button></div>';
+  }
+  function hwManualHtml(list){
+    return '<div class="hwman" id="hwManBlock">' + hwManualInnerHtml(list) + '</div>';
+  }
+
+  // ZIVY refresh riadkov ad-hoc poloziek (Codex #285 P2-D) — bez plneho pushu
+  // vyberu. Prekresluje LEN vlastny blok: boxy vlastnikov, rozpisany pocet ani
+  // vyber setu sa nedotknu (vzor `refreshHardwarePurchase`).
+  function refreshHardwareManual(view){
+    hwManualView = Array.isArray(view) ? view : [];
+    var block = el('hwManBlock');
+    if (!block) return false;                        // sekcia nie je vykreslena
+    block.innerHTML = hwManualInnerHtml();
+    return true;
   }
 
   // ---- modal (D-15 kostra) -------------------------------------------------
@@ -1347,7 +1363,8 @@
       hwManualOwnerText: hwManualOwnerText, hwManualName: hwManualName,
       hwManualChips: hwManualChips, hwManualQtyText: hwManualQtyText,
       hwManualBuyText: hwManualBuyText, hwManualItemHtml: hwManualItemHtml,
-      hwManualHtml: hwManualHtml, hwManualOwnerOptions: hwManualOwnerOptions,
+      hwManualHtml: hwManualHtml, hwManualInnerHtml: hwManualInnerHtml,
+      hwManualOwnerOptions: hwManualOwnerOptions,
       hwManualItemText: hwManualItemText, hwManualDraft: hwManualDraft,
       hwManualFields: hwManualFields, hwManualHit: hwManualHit,
       hwManualValidate: hwManualValidate, hwManualParsePrice: hwManualParsePrice,
@@ -1361,5 +1378,6 @@
       onHwManualEdit: onHwManualEdit, onHwManualAdd: onHwManualAdd,
       hwManualDropModal: hwManualDropModal, HW_MAN_DROP_SK: HW_MAN_DROP_SK,
       hwManualDropIfForeign: hwManualDropIfForeign,
+      refreshHardwareManual: refreshHardwareManual,
       hwManualState: function(){ return HW_MAN; } };
   }
