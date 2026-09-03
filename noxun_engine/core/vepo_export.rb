@@ -16,8 +16,21 @@
 # CRLF), UTF-8 BEZ BOM, em-dash "—" ako UTF-8. LOG rovnako CRLF.
 #
 # Cisty modul: ziadny SketchUp, ziadne cesty — katalogove lookupy (label materialu,
-# hrubky ABS) dostava ako mapy, cas/verziu ako parametre. Zapis na disk robi
-# VepoExport.write s atomickou vymenou celej davky (Codex audit B5).
+# hrubky ABS, dekory dosiek a pasok) dostava ako mapy, cas/verziu ako parametre.
+# Zapis na disk robi VepoExport.write s atomickou vymenou celej davky (Codex audit B5).
+#
+# KONTRAKT v1.1 (D-112, 3.9.2026): CSV ma DEVIATY stlpec `poznamka`. Je VZDY
+# pritomny (prazdny retazec, ked riadok poznamku nema) a nesie ABS pasky, ktorych
+# DEKOR sa lisi od dekoru dosky — presne ten udaj, ktory sa do objednavky VEPO
+# prepisuje rucne do pola "Poznamka pre VEPO" (Michal na nom pri zakazke KLINIKA
+# zabudol). Overene importom 3.9.2026: VEPO 9-stlpcovy subor prijal a poznamku
+# zobrazilo pri riadku (na nalepky nejde). Vsetko ostatne bajtovo ako v1.0.
+#
+# D-113 (3.9.2026): nazov riadku nesie SKRATKY dielcov + skrinky (`Bok LP s1 s2`).
+# Dielec prichadza z VEPO oznaceny nazvom z CSV a bez skrinky sa pri skladani
+# nedalo povedat, kam patri. Nalepky VEPO tlacia ~20 znakov bez interpunkcie,
+# preto skratky a skrinky hned za nazvom. Plati LEN pre VEPO CSV a LOG —
+# kusovnik Studia ostava s plnymi nazvami.
 require 'csv'
 require 'fileutils'
 
@@ -30,8 +43,34 @@ module Noxun
       EDGE_BOTH   = '='
       NAME_MAX    = 60
       CRLF        = "\r\n"
+      EDGE_CODES  = %w[L1 L2 W1 W2].freeze
       # Windows si tieto mena rezervuje ako zariadenia — nesmu byt nazvom priecinka.
       RESERVED = /\A(con|prn|aux|nul|com[1-9]|lpt[1-9])\z/.freeze
+
+      # D-113: skratky nazvov dielcov. Kluce su PRESNE dnesne retazce builderov
+      # (construction.rb, zone_tree.rb, fronts.rb) — neznamy nazov ide bez zmeny.
+      SHORT_NAMES = {
+        'Bok lavy'           => 'Bok L',
+        'Bok pravy'          => 'Bok P',
+        'Vystuha predna'     => 'Vyst P',
+        'Vystuha zadna'      => 'Vyst Z',
+        'Sokel predny'       => 'Sokel',
+        'Priecka zvisla'     => 'Priecka Z',
+        'Priecka vodorovna'  => 'Priecka V'
+      }.freeze
+      DOOR_SIDE = /\ADvierka (\d+) (lave|prave)\z/.freeze
+      DOOR_WING = /\ADvierka (\d+) kridlo (\d+)\/\d+\z/.freeze
+      DOOR_ONE  = /\ADvierka (\d+)\z/.freeze
+      DRAWER    = /\AZasuvkove celo (\d+)\z/.freeze
+      # Dvojice, ktore sa v jednom riadku zluia do jedneho tokenu (zrkadlove
+      # dielce sa v kusovniku agreguju do JEDNEHO riadku — „Bok L/Bok P" je
+      # zbytocne dlhe pre 20-znakovu nalepku).
+      NAME_PAIRS = [['Bok L', 'Bok P', 'Bok LP'],
+                    ['Vyst P', 'Vyst Z', 'Vyst PZ']].freeze
+      DOOR_PAIR = /\ADv(\d+) L\z/.freeze
+      # Vlastnici riadku: CAB-001 -> s1, BRD-007 -> d7 (poradie s pred d).
+      OWNER_KINDS = { 'CAB' => ['s', 0], 'BRD' => ['d', 1] }.freeze
+      OWNER_ID    = /\A([A-Z]+)-(\d+)\z/.freeze
 
       module_function
 
@@ -97,13 +136,17 @@ module Noxun
       # rows: Bom.compute[:rows] (agregovane vyrobne riadky — uzamknute testom, N12).
       # materials: {material_id => {'label' => String}}; edge_thicknesses: {abs_id => Float}.
       # Vrati: { 'project_slug', 'groups' => [{filename, csv, rows, pieces, material_ids,
-      #          material_label, tag}], 'errors' => [{name, reason, owners}],
+      #          material_label, tag, notes}], 'errors' => [{name, reason, owners}],
       #          'log_text', 'total_rows', 'total_pieces' }
       # validation: vysledok Validation.run ({ 'items' => [...], 'counts' => {...} })
       # — sekcia KONTROLA v LOGu vznika z NEHO (nalez 5: ten isty cerstvy vysledok
       # ako status okna). Nahrada za povodny `warnings:` param a sekciu "Upozornenia
       # stavby" (nalez 9: KONTROLA je JEDINY kanonicky zoznam vratane build warnings).
+      # D-112: edge_decors {abs_id => {'decor','decor_name'}} a sheet_decors
+      # {material_id => decor} su VOLITELNE (default {} = ziadne poznamky, stary
+      # volajuci dostane presne dnesny obsah 9. stlpca — prazdny).
       def build(rows, project:, materials: {}, edge_thicknesses: {}, validation: nil,
+                edge_decors: {}, sheet_decors: {},
                 version: '', generated_at: nil, merge_18_36: true)
         pslug = project_slug(project)
         errors = []
@@ -131,11 +174,16 @@ module Noxun
           tag = merge_18_36 && [18, 36].include?(commercial) ? '18_36' : commercial.to_s
           key = [label, tag]
           b = buckets[key] ||= { rows: [], material_ids: [], label: label, tag: tag,
-                                 pieces: 0, displays: [] }
+                                 pieces: 0, displays: [], notes: [] }
           e = row['edges'] || {}
           qty = row['quantity'].to_i
-          b[:rows] << [row_name(raw), dims[0].round, edge_code(e['L1'], e['L2']),
-                       dims[1].round, edge_code(e['W1'], e['W2']), commercial, qty, label]
+          name = row_name(raw)
+          # D-112: poznamka sa cita z ORIENTOVANEHO riadku — poradie hran je to
+          # iste, s akym idu kody `—`/`=` do CSV.
+          note = abs_note(row, edge_decors, sheet_decors)
+          b[:rows] << [name, dims[0].round, edge_code(e['L1'], e['L2']),
+                       dims[1].round, edge_code(e['W1'], e['W2']), commercial, qty, label, note]
+          b[:notes] << { 'name' => name, 'note' => note } unless note.empty?
           b[:material_ids] << row['material_id'] unless b[:material_ids].include?(row['material_id'])
           # 2A-4b (audit F8): zobrazovaci label so strukturou ide VYHRADNE do
           # LOGu — exportny label (grouping/subor/CSV stlpec) sa NEMENI.
@@ -154,7 +202,7 @@ module Noxun
           { 'filename' => "#{pslug}_#{base}_#{b[:tag]}.csv", 'csv' => csv,
             'rows' => b[:rows].length, 'pieces' => b[:pieces],
             'material_ids' => b[:material_ids], 'material_label' => b[:label], 'tag' => b[:tag],
-            'display_labels' => b[:displays] }
+            'display_labels' => b[:displays], 'notes' => b[:notes] }
         end.sort_by { |g| g['filename'] }
         dedup_filenames!(groups)
 
@@ -245,12 +293,134 @@ module Noxun
           'material_id' => row['material_id'].to_s, 'owners' => owners }
       end
 
+      # D-113: nazov riadku pre VEPO CSV a LOG = "<kratke nazvy> <skrinky>",
+      # napr. "Bok LP s1 s2 s3". Kusovnik Studia sa NEMENI — plne nazvy tam
+      # ostavaju (toto je vylucne objednavkovy/nalepkovy tvar).
       def row_name(row)
         names = Array(row['names']).reject { |n| n.to_s.empty? }
         names = [row['name']] if names.empty? && row['name']
-        n = names.compact.join('/')
+        n = join_names(names.compact)
         n = 'dielec' if n.empty?
-        n.length > NAME_MAX ? "#{n[0, NAME_MAX - 1]}…" : n
+        # Samotne nazvy nad limit = dnesny orez; skrinky sa uz nezmestia.
+        return "#{n[0, NAME_MAX - 1]}…" if n.length > NAME_MAX
+        append_owners(n, owner_tokens(row['kde']))
+      end
+
+      # Skratka JEDNEHO nazvu dielca. Neznamy nazov (samostatna doska = volny
+      # text pouzivatela, novy builder) ide BEZ ZMENY — nikdy sa nehada.
+      def short_name(name)
+        n = name.to_s
+        return SHORT_NAMES[n] if SHORT_NAMES.key?(n)
+        if (m = DOOR_SIDE.match(n))
+          return "Dv#{m[1]} #{m[2] == 'lave' ? 'L' : 'P'}"
+        end
+        if (m = DOOR_WING.match(n))
+          return "Dv#{m[1]} k#{m[2]}"
+        end
+        if (m = DOOR_ONE.match(n))
+          return "Dv#{m[1]}"
+        end
+        if (m = DRAWER.match(n))
+          return "Zas celo #{m[1]}"
+        end
+        n
+      end
+
+      # Skratky + zdruzenie dvojic (Bok L+Bok P => Bok LP), zvysok cez '/'.
+      # Poradie = poradie v `names` (prvy clen paru drzi poziciu).
+      def join_names(names)
+        toks = names.map { |n| short_name(n) }.uniq
+        NAME_PAIRS.each { |a, b, merged| toks = merge_pair(toks, a, b, merged) }
+        door_pairs(toks).each { |num| toks = merge_pair(toks, "Dv#{num} L", "Dv#{num} P", "Dv#{num} LP") }
+        toks.join('/')
+      end
+
+      # Cisla dvierok, ktore maju v riadku OBE strany (Dv1 L aj Dv1 P).
+      def door_pairs(toks)
+        nums = toks.map { |t| (m = DOOR_PAIR.match(t)) && m[1] }.compact
+        nums.select { |num| toks.include?("Dv#{num} P") }
+      end
+
+      def merge_pair(toks, first, second, merged)
+        return toks unless toks.include?(first) && toks.include?(second)
+        toks.map { |t| t == first ? merged : t }.reject { |t| t == second }
+      end
+
+      # Skratky vlastnikov riadku z `kde` — unikatne, zoradene (skrinky, potom
+      # dosky, kazde podla cisla). Neznamy tvar ID ide cely a az za nimi:
+      # informaciu o mieste dielca radsej neorezeme, nez by sme ju zahodili.
+      def owner_tokens(kde)
+        seen = []
+        Array(kde).each do |k|
+          id = (k.is_a?(Hash) ? k['owner_id'] : k).to_s.strip
+          next if id.empty?
+          seen << id unless seen.include?(id)
+        end
+        seen.map { |id| owner_entry(id) }.sort_by { |e| [e[0], e[1], e[2]] }.map { |e| e[3] }
+      end
+
+      # [poradie druhu, cislo, ID (stabilny tie-break), token do nazvu]
+      def owner_entry(id)
+        m = OWNER_ID.match(id)
+        kind = m && OWNER_KINDS[m[1]]
+        return [2, 0, id, id] unless kind
+        [kind[1], m[2].to_i, id, "#{kind[0]}#{m[2].to_i}"]
+      end
+
+      # Skrinky sa pridavaju, kym sa zmestia do NAME_MAX; nezmestene zhrnie
+      # " +K" (nikdy odseknuta skratka v polovici). Ak sa nezmesti ani " +K",
+      # nazov ostava bez neho — limit je tvrdy.
+      def append_owners(base, tokens)
+        return base if tokens.empty?
+        out = base
+        used = 0
+        tokens.each_with_index do |t, i|
+          rest = tokens.length - i - 1
+          candidate = "#{out} #{t}#{rest.zero? ? '' : " +#{rest}"}"
+          break if candidate.length > NAME_MAX
+          out = "#{out} #{t}"
+          used = i + 1
+        end
+        left = tokens.length - used
+        return out if left.zero?
+        tail = " +#{left}"
+        out.length + tail.length <= NAME_MAX ? "#{out}#{tail}" : out
+      end
+
+      # D-112: poznamka pre VEPO — pasky, ktorych DEKOR sa lisi od dekoru dosky.
+      # VEPO odvodzuje pasku z materialu, takze KAZDU inu musi vidiet (aj
+      # `universal` — tie sa nevynimaju). Neznama paska, neznama doska alebo
+      # prazdny dekor = ZIADNA poznamka: odhad by sa dostal do objednavky a
+      # chybu uz aj tak hlasi KONTROLA (ABS mimo katalogu, material mimo
+      # katalogu, UNI material) a oddiel "Riadky vyradene z CSV".
+      def abs_note(row, edge_decors, sheet_decors)
+        return '' if edge_decors.nil? || edge_decors.empty?
+        sheet_key = decor_key((sheet_decors || {})[row['material_id']])
+        return '' if sheet_key.empty?
+        e = row['edges'] || {}
+        seen = []
+        parts = []
+        EDGE_CODES.each do |code|
+          id = e[code]
+          next if id.nil? || id.to_s.empty?
+          rec = edge_decors[id]
+          next unless rec.is_a?(Hash)
+          decor = rec['decor'].to_s.strip
+          key = decor_key(decor)
+          next if key.empty? || key == sheet_key || seen.include?(key)
+          seen << key
+          dn = rec['decor_name'].to_s.strip
+          parts << (dn.empty? ? "ABS #{decor}" : "ABS #{decor} #{dn}")
+        end
+        parts.join(', ')
+      end
+
+      # Normalizacia dekoru na POROVNANIE — zhodna s Materials.decor_norm_key
+      # (medzery uplne von, lowercase). Kopia je vedoma: modul je cisty (bez
+      # katalogu), ale porovnanie musi byt to iste, cim je viazany material
+      # na ABS (D-41: dekor = kluc skupiny).
+      def decor_key(decor)
+        decor.to_s.gsub(/\s+/, '').downcase
       end
 
       # VEPO stlpec material + zaklad nazvu suboru: label z katalogu, fallback id.
@@ -294,8 +464,26 @@ module Noxun
           owners = e['owners'].empty? ? '' : " @ #{e['owners'].join(', ')}"
           lines << "  ! #{e['name']} (#{e['material_id']})#{owners}: #{e['reason']}"
         end
+        log_notes(lines, groups)
         log_control(lines, validation)
         lines.join(CRLF) + CRLF
+      end
+
+      # D-112: kontrolny zoznam pred odoslanim objednavky — riadky, ktore maju
+      # pasku v INOM dekore, nez je doska. Presne toto sa do formulara VEPO
+      # prepisuje rucne do pola "Poznamka pre VEPO" (a presne na to sa da
+      # zabudnut — zakazka KLINIKA, 3.9.2026).
+      def log_notes(lines, groups)
+        rows = groups.flat_map do |g|
+          Array(g['notes']).map { |n| "  * #{n['name']} [#{g['filename']}]: #{n['note']}" }
+        end
+        lines << ('-' * 60)
+        lines << "Poznámky pre VEPO (#{rows.length} riadkov):"
+        if rows.empty?
+          lines << '  (žiadne — všetky pásky v dekore dosky)'
+        else
+          rows.each { |r| lines << r }
+        end
       end
 
       # Sekcia KONTROLA — semafor vyroby (nalez 5/9). Vypisuje TEN ISTY cerstvy
