@@ -363,7 +363,7 @@
   // ===== KOV-A2a: symboly 2D nahladu =====================================
   // Prevod STAVU na SYMBOL. Nahlad kresli symboly, nie stavy — preto sa tu
   // (a nikde inde) rozhoduje, co sa ma nakreslit.
-  //   'left' / 'right' = sipka na volnu hranu · 'unknown' = otaznik (jantar)
+  //   'left' / 'right' = ciary z rohov pantov · 'unknown' = otaznik (jantar)
   //   null = LEGACY (smer v configu nie je) — nekresli sa NIC.
   function frontDirSymbol(state){
     if (state === FRONT_DIR_LEFT) return 'left';
@@ -372,12 +372,50 @@
     return null;
   }
   // Symbol NEDVIEROKOVEHO typu (dvierka riesi `frontWingSymbols`).
-  // Zasuvka VEDOME zostava BEZ symbolu: mockupovy ∧ by splyval s vyklopom.
+  // D-115: zasuvkove celo uz symbol MA — prerusovane X ('xdash'); od PLNEHO X
+  // blendy ho lisi prave prerusovanie (prerusovana = pohyb, plna = dielec).
   function frontTypeSymbol(type){
     if (type === 'lift') return 'up';
     if (type === 'fall') return 'down';
     if (type === 'blind') return 'cross';
+    if (type === 'drawer_front') return 'xdash';
     return null;
+  }
+  // ===== D-115: TVAR symbolu — JEDINY ZDROJ v JS ==========================
+  // Stolarska konvencia (Michal 3.9.): CIARY Z ROHOV strany pantov do STREDU
+  // protilahlej (volnej) hrany. Suradnice su v JEDNOTKOVOM stvorci panelu:
+  //   u = po SIRKE  0 -> 1 zlava doprava
+  //   v = po VYSKE  0 -> 1 ZDOLA NAHOR (hore = 1)
+  // `dashed` nesie jedine pravidlo kresby: PRERUSOVANA = pohyb, PLNA = dielec.
+  // TA ISTA tabulka zije v `DirectionCheck::SHAPES` (core/direction_check.rb)
+  // a obe strany sa porovnavaju s TOU ISTOU fixturou
+  // (tests/fixtures/front_symbol_shapes.json) — nahlad a model sa uz nemozu
+  // rozist ani v TVARE, nielen v mene symbolu.
+  var FRONT_SYM_INSET = 0.05;   // odsadenie rohov (inak by ciary splynuli s obrysom a s vyberom)
+  var FRONT_SYM_FAR = 1 - FRONT_SYM_INSET;
+  var FRONT_SYM_SHAPES = {
+    // dvierka, panty VLAVO -> z lavych rohov do stredu pravej hrany
+    left: { dashed: true, lines: [[[FRONT_SYM_INSET, FRONT_SYM_INSET], [FRONT_SYM_FAR, 0.5]],
+                                  [[FRONT_SYM_INSET, FRONT_SYM_FAR], [FRONT_SYM_FAR, 0.5]]] },
+    // dvierka, panty VPRAVO -> presne zrkadlo
+    right: { dashed: true, lines: [[[FRONT_SYM_FAR, FRONT_SYM_INSET], [FRONT_SYM_INSET, 0.5]],
+                                   [[FRONT_SYM_FAR, FRONT_SYM_FAR], [FRONT_SYM_INSET, 0.5]]] },
+    // vyklop (panty HORE) -> „V" z hornych rohov do stredu DOLNEJ hrany
+    up: { dashed: true, lines: [[[FRONT_SYM_INSET, FRONT_SYM_FAR], [0.5, FRONT_SYM_INSET]],
+                                [[FRONT_SYM_FAR, FRONT_SYM_FAR], [0.5, FRONT_SYM_INSET]]] },
+    // sklop (panty DOLE) -> „Λ" z dolnych rohov do stredu HORNEJ hrany
+    down: { dashed: true, lines: [[[FRONT_SYM_INSET, FRONT_SYM_INSET], [0.5, FRONT_SYM_FAR]],
+                                  [[FRONT_SYM_FAR, FRONT_SYM_INSET], [0.5, FRONT_SYM_FAR]]] },
+    // blenda sa NEHYBE -> PLNE X
+    cross: { dashed: false, lines: [[[FRONT_SYM_INSET, FRONT_SYM_INSET], [FRONT_SYM_FAR, FRONT_SYM_FAR]],
+                                    [[FRONT_SYM_INSET, FRONT_SYM_FAR], [FRONT_SYM_FAR, FRONT_SYM_INSET]]] },
+    // zasuvkove celo -> to iste X, ale PRERUSOVANE
+    xdash: { dashed: true, lines: [[[FRONT_SYM_INSET, FRONT_SYM_INSET], [FRONT_SYM_FAR, FRONT_SYM_FAR]],
+                                   [[FRONT_SYM_INSET, FRONT_SYM_FAR], [FRONT_SYM_FAR, FRONT_SYM_INSET]]] }
+  };
+  // null = symbol nema usecky (dnes jedine 'unknown' — kruh + otaznik).
+  function frontSymbolShape(sym){
+    return Object.prototype.hasOwnProperty.call(FRONT_SYM_SHAPES, sym) ? FRONT_SYM_SHAPES[sym] : null;
   }
   // Symboly VSETKYCH kridiel dvierok. KRAJNE kridla su ODVODENE (A1 kontrakt
   // variant a: p1 = pánty vľavo, posledné = pánty vpravo — nič sa neukladá),
@@ -1086,6 +1124,9 @@
       frontExtraOnSegrow: frontExtraOnSegrow, frontDirBadge: frontDirBadge,
       frontDirSymbol: frontDirSymbol, frontTypeSymbol: frontTypeSymbol,
       frontWingSymbols: frontWingSymbols,
+      // D-115 (tests/js/test_kova2b_smer_overlay.js) — TVAR symbolu v jednotkovom
+      // stvorci; zrkadlo DirectionCheck::SHAPES nad spolocnou fixturou
+      frontSymbolShape: frontSymbolShape, FRONT_SYM_INSET: FRONT_SYM_INSET,
       // D-100 (tests/js/test_d100_nazvy.js) — zrkadlo ocistenia nazvu skrinky
       cabNameValue: cabNameValue, CAB_NAME_MAX: CAB_NAME_MAX,
       // UI-B3 (tests/js/test_uib3_korpus.js) — texty informacneho stlpca a typ badge

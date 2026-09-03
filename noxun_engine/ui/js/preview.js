@@ -20,17 +20,19 @@
   var PV_FRONT_TYPE_DESC = { door: 'dvierka', drawer_front: 'zásuvka',
                              lift: 'výklop', fall: 'sklop', blind: 'blenda' };
   function frontTypeDesc(type){ return PV_FRONT_TYPE_DESC[type] || 'dvierka'; }
-  // KOV-A2a: SYMBOLY OTVARANIA v nahlade. Kreslia sa PRERUSOVANE vo vyberovej
+  // KOV-A2a / D-115: SYMBOLY OTVARANIA v nahlade. Kreslia sa vo vyberovej
   // farbe (`PV_SELECT_ACCENT`) — prerusovana ciara = pohyb, plna = dielec;
   // to iste pravidlo maju sprite ikony typegridu. „Neurcene" je JEDINY symbol
   // v inej farbe: jantar `--nx-warn-fg` (je to otvorena otazka, nie chyba).
   // Jedina vynimka z prerusovania je BLENDA — plne X, lebo blenda sa NEHYBE.
-  // ZASUVKA symbol VEDOME NEMA: mockupovy ∧ by splyval s vyklopom.
   var PV_DIR_WARN = '#e65100';      // --nx-warn-fg (neurceny smer)
   var PV_SYM_DASH = 'stroke-dasharray="11 8" stroke-width="3" fill="none" stroke-linecap="round"';
+  var PV_SYM_SOLID = 'stroke-width="3" fill="none" stroke-linecap="round"';
   // Co sa ma nakreslit, rozhoduju CISTE funkcie v core.js (`frontWingSymbols` /
   // `frontTypeSymbol`) nad `front_slots` zo SERVERA — preview zo `wings` nikdy
-  // stranu neodvodzuje. Tu ostava uz len geometria symbolu (`pvSymPathXY`).
+  // stranu neodvodzuje. A AKO to vyzera, urcuje `frontSymbolShape` (core.js) —
+  // TA ISTA tabulka, akou kresli overlay v modeli. Tu ostava uz len prevod
+  // jednotkovych suradnic na suradnice nahladu.
   // UI-B2: koty su decentne — tenka ciara + tlmeny text. Zrkadlo tokenu
   // --nx-ink-faint (SVG atributy nevedia var(), rovnaky vzor ako farby vyssie).
   var PV_DIM = '#90a4ae';           // --nx-ink-faint (ciary a texty kot)
@@ -602,73 +604,66 @@
           S.push('<rect class="fprofband" x="'+rx(c.x)+'" y="'+ry(z+h)+'" width="'+c.w+'" height="'+red+'"/>');
         }
       });
-      // KOV-A2a: symboly otvarania. Kreslia sa PRED popisom, aby text ostal
-      // citatelny (SVG kresli v poradi zdroja) a su posunute k VOLNEJ hrane —
-      // sipka ukazuje, kam sa celo otvara, a zaroven nelezi na popise.
+      // KOV-A2a / D-115: symboly otvarania. Kreslia sa PRED popisom, aby text
+      // ostal navrchu (SVG kresli v poradi zdroja); ciary uz idu Z ROHOV cez
+      // cele kridlo, takze stredom panela naozaj prechadzaju.
       drawFrontSymbols(S, rx, ry, it, cols, z, ph > 0 ? ph : h);
       // popis do stredu PANELU (pri profile nesmie skoncit v jeho pruhu);
       // cislo ostava vyskou RIADKU — presne to, co je v zozname ciel.
-      S.push('<text x="'+rx(W/2)+'" y="'+ry(z+(ph > 0 ? ph : h)/2)+'" font-size="18" fill="'+PV_SELECT_ACCENT+'" text-anchor="middle" dominant-baseline="middle">'+fnum+' · '+frontTypeDesc(it.type)+' '+Math.round(h)+'</text>');
+      // D-115 HALO: text dostane obrys farbou VYPLNE panelu (`col`, PV_* zrkadlo
+      // tokenu), inak by ho X zasuvky/blendy preskrtlo. Ziadna nova farba.
+      S.push('<text x="'+rx(W/2)+'" y="'+ry(z+(ph > 0 ? ph : h)/2)+'" font-size="18" fill="'+PV_SELECT_ACCENT+'" paint-order="stroke" stroke="'+col+'" stroke-width="4" text-anchor="middle" dominant-baseline="middle">'+fnum+' · '+frontTypeDesc(it.type)+' '+Math.round(h)+'</text>');
       S.push('</g>');
     });
   }
 
-  // KOV-A2a: symboly otvarania jedneho cela. `cols` su uz spocitane stlpce
-  // (kridla), `z`/`ph` su spodok a vyska PANELA (bez pasma profilu).
+  // KOV-A2a / D-115: symboly otvarania jedneho cela. `cols` su uz spocitane
+  // stlpce (kridla), `z`/`ph` su spodok a vyska PANELA (bez pasma profilu).
   //
   // Dvierka: symbol je PER KRIDLO — jednokridlove podla slotu servera, krajne
   // kridla 2/3/4-kridloveho cela su ODVODENE (A1 kontrakt: p1 = panty vlavo,
   // posledne = vpravo; nic sa neuklada), stredne opat podla slotov. LEGACY
   // (kluc smeru v configu nie je) sa NEKRESLI vobec.
-  // Vyklop/sklop: jedno ∧ / ∨ cez cely otvor. Blenda: plne X (nehybe sa).
-  // Zasuvka: NIC (vedoma odchylka od mockupu — jeho ∧ by splyval s vyklopom).
+  // Vyklop/sklop/blenda/zasuvka = JEDEN panel cez cely otvor.
+  // Symbol vyplna CELE kridlo (ciary z jeho rohov), takze uz nema „velkost"
+  // ani posun k volnej hrane — tvar sam hovori, kde su panty.
   function drawFrontSymbols(S, rx, ry, it, cols, z, ph){
     if (ph <= 0 || !cols.length) return;
-    var cz = z + ph / 2;
     if (it.type === 'door'){
       var syms = frontWingSymbols(cols.length, frontSlotsFor(it.id));
       cols.forEach(function(c, i){
         var sym = syms[i];
         if (!sym) return;
-        var s = Math.max(18, Math.min(Math.min(c.w, ph) * 0.42, 90));
-        // Posun k VOLNEJ hrane: panty vlavo -> symbol vpravo a naopak.
-        // „Neurcene" nema stranu, takze ostava v strede kridla.
-        var off = (sym === 'unknown') ? 0 : (c.w / 2 - s / 2 - 6) * (sym === 'left' ? 1 : -1);
-        var cx = c.x + c.w / 2 + off;
         if (sym === 'unknown'){
+          // „Neurcene" nema stranu — ostava kruh + otaznik v strede kridla.
+          var s = Math.max(18, Math.min(Math.min(c.w, ph) * 0.42, 90));
+          var cx = c.x + c.w / 2, cz = z + ph / 2;
           S.push('<circle cx="'+rx(cx)+'" cy="'+ry(cz)+'" r="'+(s/2)+'" fill="none" stroke="'+PV_DIR_WARN+'" '+PV_SYM_DASH+'/>');
           S.push('<text x="'+rx(cx)+'" y="'+ry(cz)+'" font-size="'+Math.round(s*0.8)+'" font-weight="700" fill="'+PV_DIR_WARN+'" text-anchor="middle" dominant-baseline="middle">?</text>');
           return;
         }
-        S.push('<path d="'+pvSymPathXY(rx, ry, sym, cx, cz, s)+'" stroke="'+PV_SELECT_ACCENT+'" '+PV_SYM_DASH+'/>');
+        pvSymLines(S, rx, ry, sym, c.x, c.w, z, ph);
       });
       return;
     }
     var tsym = frontTypeSymbol(it.type);
     if (!tsym) return;
     var c0 = cols[0];
-    var cx0 = c0.x + c0.w / 2;
-    if (tsym === 'cross'){
-      // Blenda: plne X cez cely panel (odsadene od hran, aby nesplynulo s obrysom).
-      var ix = Math.min(c0.w * 0.18, 60), iz = Math.min(ph * 0.18, 60);
-      S.push('<line x1="'+rx(c0.x+ix)+'" y1="'+ry(z+iz)+'" x2="'+rx(c0.x+c0.w-ix)+'" y2="'+ry(z+ph-iz)+'" stroke="'+PV_SELECT_ACCENT+'" stroke-width="3"/>');
-      S.push('<line x1="'+rx(c0.x+c0.w-ix)+'" y1="'+ry(z+iz)+'" x2="'+rx(c0.x+ix)+'" y2="'+ry(z+ph-iz)+'" stroke="'+PV_SELECT_ACCENT+'" stroke-width="3"/>');
-      return;
-    }
-    var ss = Math.max(18, Math.min(Math.min(c0.w, ph) * 0.42, 90));
-    // Vyklop sa dviha hore, sklop padá dole — symbol ide k tej hrane, ktora sa
-    // otvara (a zaroven nelezi na popise v strede panela).
-    var czt = cz + (ph / 2 - ss / 2 - 6) * (tsym === 'up' ? 1 : -1);
-    S.push('<path d="'+pvSymPathXY(rx, ry, tsym, cx0, czt, ss)+'" stroke="'+PV_SELECT_ACCENT+'" '+PV_SYM_DASH+'/>');
+    pvSymLines(S, rx, ry, tsym, c0.x, c0.w, z, ph);
   }
-  // Prevod symbolu do SVG suradnic nahladu (ry preklapa Z).
-  function pvSymPathXY(rx, ry, sym, cx, cz, s){
-    var h = s / 2;
-    if (sym === 'left')  return 'M ' + rx(cx - h) + ' ' + ry(cz + h) + ' L ' + rx(cx + h) + ' ' + ry(cz) + ' L ' + rx(cx - h) + ' ' + ry(cz - h);
-    if (sym === 'right') return 'M ' + rx(cx + h) + ' ' + ry(cz + h) + ' L ' + rx(cx - h) + ' ' + ry(cz) + ' L ' + rx(cx + h) + ' ' + ry(cz - h);
-    if (sym === 'up')    return 'M ' + rx(cx - h) + ' ' + ry(cz - h) + ' L ' + rx(cx) + ' ' + ry(cz + h) + ' L ' + rx(cx + h) + ' ' + ry(cz - h);
-    if (sym === 'down')  return 'M ' + rx(cx - h) + ' ' + ry(cz + h) + ' L ' + rx(cx) + ' ' + ry(cz - h) + ' L ' + rx(cx + h) + ' ' + ry(cz + h);
-    return '';
+  // Prevod jednotkoveho tvaru (`frontSymbolShape` z core.js) na usecky nahladu:
+  // u -> x = x0 + u*w, v -> zz = z + v*ph (ry preklapa Z, takze „hore" v tabulke
+  // je hore aj na obrazovke). Neznamy symbol nenakresli nic.
+  function pvSymLines(S, rx, ry, sym, x0, w, z, ph){
+    var shape = frontSymbolShape(sym);
+    if (!shape) return;
+    var style = shape.dashed ? PV_SYM_DASH : PV_SYM_SOLID;
+    shape.lines.forEach(function(ln){
+      var a = ln[0], b = ln[1];
+      S.push('<line x1="'+rx(x0 + a[0]*w)+'" y1="'+ry(z + a[1]*ph)+
+             '" x2="'+rx(x0 + b[0]*w)+'" y2="'+ry(z + b[1]*ph)+
+             '" stroke="'+PV_SELECT_ACCENT+'" '+style+'/>');
+    });
   }
   // Sloty SERVERA pre dane celo — z jeho zaznamu `{ wings_n, slots }` (Codex
   // #281 P2-A). V rezime vkladania (`insert`) resolved cela neexistuju, takze
@@ -1435,6 +1430,9 @@
                        nxGrainArrows: nxGrainArrows, pvBoardScene: pvBoardScene,
                        nxFrontsExtent: nxFrontsExtent,
                        // KOV-A1 (P2-C): popis typu cela v nahlade
-                       frontTypeDesc: frontTypeDesc, PV_FRONT_TYPE_DESC: PV_FRONT_TYPE_DESC };
+                       frontTypeDesc: frontTypeDesc, PV_FRONT_TYPE_DESC: PV_FRONT_TYPE_DESC,
+                       // D-115 (tests/js/test_kova2b_smer_overlay.js) — kresba symbolov
+                       // otvarania; test ju vola nad hotovymi stlpcami kridiel
+                       drawFrontSymbols: drawFrontSymbols };
   }
 
