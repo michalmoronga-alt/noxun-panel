@@ -6583,8 +6583,13 @@ module NoxunSuRunner
     bom = e::Bom.compute(collected)
     mats = e::Materials.sheets.each_with_object({}) { |s, o| o[s['material_id']] = s }
     eths = e::Materials.edges.each_with_object({}) { |a, o| o[a['abs_id']] = a['thickness'].to_f }
+    # D-112: mapy dekorov skladame ROVNAKO ako ProductionCore (9. stlpec CSV) —
+    # inak by in-SU helper testoval iny kontrakt, nez chodi zo zivej aplikacie.
+    edec = e::ProductionCore.vepo_edge_decors
+    sdec = e::ProductionCore.vepo_sheet_decors
     res = e::VepoExport.build(bom[:rows], project: 'SU-TEST K1', materials: mats,
-                              edge_thicknesses: eths, version: e::VERSION,
+                              edge_thicknesses: eths, edge_decors: edec, sheet_decors: sdec,
+                              version: e::VERSION,
                               generated_at: '2026-08-21 00:00', merge_18_36: true)
     Array(res['groups']).map { |g| g['csv'].to_s }.join
   end

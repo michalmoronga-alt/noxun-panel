@@ -233,6 +233,27 @@ module Noxun
         Materials.edges.each_with_object({}) { |a, out| out[a['abs_id']] = a['thickness'].to_f }
       end
 
+      # D-112: dekor ABS pasky pre 9. stlpec VEPO CSV (poznamka). `universal`
+      # pasky sa NEVYNIMAJU — VEPO odvodzuje pasku z materialu, takze KAZDY
+      # odlisny dekor musi vidiet.
+      def vepo_edge_decors
+        Materials.edges.each_with_object({}) do |a, out|
+          out[a['abs_id']] = { 'decor' => a['decor'].to_s, 'decor_name' => a['decor_name'].to_s }
+        end
+      end
+
+      # D-112: dekor DOSKY (protistrana porovnania). UNI materialy sa vynechavaju
+      # — ich „dekor" je pracovny nazov („Korpus UNI"), nie dekor: porovnanie by
+      # oznacilo KAZDU pasku za odlisnu. Je to ta ista zasada, akou uz Validation
+      # potlaca ABS kontroly nad UNI doskou (material je NEURCENY a KONTROLA to
+      # hlasi samostatnou ORANGE polozkou) — bez dosky v mape poznamka nevznikne.
+      def vepo_sheet_decors
+        Materials.sheets.each_with_object({}) do |s, out|
+          next if s['uni'] == true
+          out[s['material_id']] = s['decor'].to_s
+        end
+      end
+
       # Default nazvu projektu z ULOZENEHO suboru (audit F10 — nie z titulku).
       def default_project_name(model)
         p = model.path.to_s
@@ -1501,6 +1522,9 @@ module Noxun
           materials: vepo_materials,
           edge_thicknesses: vepo_edge_thicknesses,
           validation: control,
+          # D-112: dekory pre 9. stlpec (poznamka o odlisnej ABS).
+          edge_decors: vepo_edge_decors,
+          sheet_decors: vepo_sheet_decors,
           version: Engine::VERSION,
           generated_at: Time.now.strftime('%Y-%m-%d %H:%M'),
           merge_18_36: merge
