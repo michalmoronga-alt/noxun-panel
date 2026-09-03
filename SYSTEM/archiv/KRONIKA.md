@@ -17,6 +17,29 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **VÝSTUPY · poznámka ABS pre VEPO + krátke názvy so skrinkami (v0.9.22, 4.9.2026, PR #287):** výrobná dávka z dvoch postrehov z dielne (Michal 3.9., skladanie zákazky
+  KLINIKA) — **D-112** a **D-113**. Obe menia to, čo ide do objednávky porezu, preto sa robili spolu a v jednom module (`core/vepo_export.rb`).
+  **Prečo deviaty stĺpec.** Pôvodný postreh D-112 sám konštatoval, že „VEPO CSV kontrakt nemá stĺpec poznámky", a ponúkal tri náhradné riešenia (oddiel v LOGu · príznak
+  v názve · súbor per dekor). Rozhodol **Michalov test 3.9.**: naimportoval do VEPO 9-stĺpcový súbor a VEPO ho **prijalo** — poznámka sa zobrazila v poli „Poznámka pre VEPO"
+  pri riadku, celá (31 znakov), a **na nálepky nejde**. Tým sa dá poslať priamo to, čo sa dovtedy prepisovalo rukou (a pri KLINIKE sa na to zabudlo → zlý olep z výroby).
+  Variant s príznakom v názve by navyše bojoval s `NAME_MAX` a s agregáciou riadkov, variant so súborom per dekor by rozbil grouping podľa materiálu. Kontrakt je preto
+  **v1.1**: stĺpec `poznamka` je **vždy prítomný** (prázdny reťazec, keď poznámka nie je), zvyšok formátu bajtovo nezmenený. Poznámku skladá čistá `abs_note` z dvoch
+  **voliteľných** máp dekorov (default `{}` = spätná kompatibilita) a hovorí len to, čo je **preukázateľné**: neznáma páska, neznáma doska ani prázdny dekor poznámku
+  nevymýšľajú — tie stavy hlási KONTROLA. `universal` pásky sa **nevynímajú** (VEPO odvodzuje pásku z materiálu, takže každý odlišný dekor musí vidieť). LOG dostal
+  oddiel „Poznámky pre VEPO" ako kontrolný zoznam pred odoslaním.
+  **Prečo skratky a nie prefix skrinky.** D-113 pýtal tvar „Cab1_Dno". Michalov fakt z dielne ho prepísal: **nálepky VEPO tlačia max 20 znakov bez interpunkcie** (medzeru
+  mení ich stroj na `_`), takže dlhý presný názov sa aj tak neprepíše. Preto skratky (`Bok LP`, `Vyst PZ`, `Dv2 k3`, `Zas celo 1`) a skrinky hneď za názvom (`s1 s12 d7`),
+  s orezom nezmestených do ` +K` — a preto sa riadok **nerozpadá per skrinka**: zhodné dielce ostávajú jedným riadkom kusovníka a nesú zoznam skriniek (rozpad by
+  zdvojnásobil počet riadkov objednávky). Neznámy názov ide vždy bez zmeny (samostatná doska nesie voľný text používateľa).
+  **Vedomá odchýlka — UNI dosky.** Doslovné „porovnaj dekor pásky s dekorom dosky" by na každý dielec neurčeného projektu nalepilo falošnú poznámku: UNI dosky majú ako
+  „dekor" pracovný názov (`Korpus UNI`, `Čelo UNI`), ktorému nezodpovedá žiadna páska. Do mapy dekorov preto nejdú — presne ako `Validation` už dnes potláča ABS kontroly
+  nad UNI doskou a materiál hlási vlastnou ORANGE položkou.
+  **Čo sa vedome NEZMENILO:** `Bom.row_key` a teda zlučovanie a počet riadkov, rozmery, kódy hrán, hrúbky, grouping, názvy súborov, atomický zápis, sekcia KONTROLA,
+  kusovník a Nákup v Štúdiu. Názov aj poznámka sú len **zobrazenie** riadku. Žiadny zápis do modelu, žiadna zmena UI.
+  **Testy:** headless 2671 (0 FAIL; +20 nová sada `test_d112_d113_vepo.rb`), JS 82 sád zelených, **5 mutácií** overených pádom a vrátených. Zlatá vzorka CSV prepísaná
+  **vedome, samostatným commitom s dôvodom**. **In-SketchUp sada v tejto dávke NEBEŽALA** (Michal pracoval v SketchUpe s pluginom z mainu, runner prepisuje živý Plugins
+  adresár) — helper `k1_vepo_csv` je upravený na nové mapy, runner treba pustiť pred merge.
+  **Codex review:** doplní orchestrátor po review.
 - **SMOKE 3.9. + KOV-A SMOKE FIX · D-115 symboly z rohov a D-116 tag úchytiek (v0.9.21, 3.9.2026, PR #286):** malá vizuálna dávka priamo z Michalovho smoku nad v0.9.20.
   **Smoke sám prešiel BEZ CHYBY**, body 1–6 PASS: (1) prepínač „Smer otvárania" funguje v raile Inspectora aj v lište sekcie Kontrola a na zákazke KLINIKA sa zapol hneď, bez
   zmeny modelu; (2) RED nález „neurčený smer" v Kontrole → ceruzka otvorí kartu **správneho** čela; (3) kópia skrinky aj šablóna držia typy čiel aj smer; (4) Inspector →

@@ -413,10 +413,11 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   ui-lifecycle.md odseky na mieste → STAV/KRONIKA/PLAN → D-94 do DOGFOODING_vyriesene (plný text + riadok
   navrch indexu).
 - **D-95 · Režim krížovej kontroly „diel po diele"** — riadený prechod zákazkou s odškrtávaním, stav uložený v zákazke; rozšírenie na rozmery a kovanie, šípky smeru dekoru, X-ray. *(Vizuálny základ pre olep už stojí: D-104 + D-105.)*
-- **D-112 · Zmenená ABS viditeľná vo VEPO exporte** (Michal 3.9., dielňa) — dielce s páskou odlišnou od dekoru sa do objednávky VEPO označujú ručne poznámkou (pri KLINIKE zabudnuté);
-  plugin rozdiel pozná — LOG oddiel / príznak v názve / skupina per ABS (rozhodnúť pri debate). **Výrobný nález — priorita.**
-- **D-113 · Krátky popis korpusu v názvoch dielcov** (Michal 3.9., dielňa) — štítky z VEPO nepovedia, ku ktorej skrinke dielec patrí („Cab1_Dno", „Cab2_Bok L/P"); rozhodnúť tvar
-  a dopad na agregáciu riadkov kusovníka.
+- ✅ **D-112 · Zmenená ABS viditeľná vo VEPO exporte** — VEPO CSV má **deviaty stĺpec `poznamka`** (`ABS H1181 Dub Halifax tabakový`), plnený automaticky, keď sa dekor pásky líši od
+  dekoru dosky; LOG dostal kontrolný oddiel „Poznámky pre VEPO" pred odoslaním objednávky. Variantu rozhodol Michalov import 3.9. — VEPO 9-stĺpcový súbor prijalo. Kontrakt je v1.1.
+  **PR #287, v0.9.22.**
+- ✅ **D-113 · Krátky popis korpusu v názvoch dielcov** — názov riadku vo VEPO CSV a LOGu nesie skratku dielca a skrinky (`Bok LP s1 s2`); riadok sa **nerozpadá per skrinka**
+  (nálepky VEPO tlačia ~20 znakov, agregácia kusovníka ostáva). Kusovník Štúdia má ďalej plné názvy. **PR #287, v0.9.22.**
 - **EN DANIELI textový export** výrobného zadania — supplier-agnostický výstup, vedome odložený z dávky E.
 - **Nárezový plán fáza 2** — guillotine, kerf, orezky, orientácia dekoru; vlastná heuristika v čistom Ruby (OpenCutList je GPL — algoritmus áno, kód nie), kontrakt D-19 pripravený.
 - **Stráž kolízií** — upozorniť, keď sa dielce prekrývajú alebo vyskočia mimo box (bbox check do validačnej vrstvy semaforu).

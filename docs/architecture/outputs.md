@@ -50,7 +50,8 @@ kusovník, súpisy platní/ABS a VEPO export sa sťahovali z okna Výroba do nov
 **Od ŠT-1c PR B3, keď okno Výroba zaniklo, je jadro JEDINOU implementáciou** — Štúdio aj rail Inspectora ho volajú priamo.
 
 Sú tam: **VEPO rodina** (`vepo_settings`/`save_vepo_settings` nad `%APPDATA%\NOXUN\Engine\vepo_settings.json`, `vepo_materials` s celou kaskádou rozlíšenia labelov,
-`vepo_base_label`, `vepo_disambiguate`/`vepo_disambiguate_variants`, `vepo_group_key`, `vepo_edge_thicknesses`, `default_project_name`), **mapy katalógov** pre `Validation.run`
+`vepo_base_label`, `vepo_disambiguate`/`vepo_disambiguate_variants`, `vepo_group_key`, `vepo_edge_thicknesses`, od v0.9.22 aj `vepo_edge_decors`/`vepo_sheet_decors` pre poznámku
+o odlišnej ABS — D-112, detail v odseku `vepo_export.rb`; `default_project_name`), **mapy katalógov** pre `Validation.run`
 (`sheets_map` → `{}` pri chybe, `edges_map` → **`nil`** pri chybe, lebo prázdna mapa by falošne označila každú olepenú hranu), identita dokumentu `model_guid` a **výberové
 resolvery** klik→entita (`pids_for_problem` vrátane fallbacku na vlastníka pri nepostavenom dielci, `pids_for_duplicate` pre D-103, `refs_for` — od ŠT-2d aj vetvy
 `material_key`/`abs_key` s nepovinným `owner_id`, ktoré hľadajú dielce podľa **efektívneho materiálu z BOM** pre „Kde sa používa"; detail v odseku sekcie MATERIÁLY; **od ŠT-3b-2a
@@ -389,7 +390,37 @@ z disku, I/O chyby vyletia ako neúspešný zápis) je v [model-a-identita.md](m
 
 ### vepo_export.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+**Čo to je.** Rezací výstup pre objednávkový systém VEPO — CSV skupiny + LOG, priamo z `Bom.compute[:rows]` (bez OCL medzikroku). Formát je zdroj pravdy v
+[SYSTEM/VEPO_KONTRAKT.md](../../SYSTEM/VEPO_KONTRAKT.md); modul je **čistý** (žiadny SketchUp, žiadne cesty pri stavbe) — katalógové lookupy dostáva ako mapy, čas a verziu ako
+parametre. Na disk zapisuje `write` **atomickou výmenou celej dávky** (staging → dvojkrokový swap, rollback pri zlyhaní, guard cudzích súborov v cieli).
+
+**Invarianty, ktoré sa nesmú porušiť.**
+- **Rozmery sú HOTOVÉ** — žiadna aritmetika, hrúbku ABS si VEPO odratáva samo z kódov hrán (`—`/`=`). Oprava z 20.7.2026, overená krížovou validáciou proti starému flow.
+- **Rotácia dekoru sa robí LEN tu** (`oriented`, grain `width` = swap dĺžka↔šírka A ZÁROVEŇ dvojíc hrán). Druhý swap kdekoľvek inde by znamenal objednať dielec otočený.
+- **Bajty CSV** vznikajú výhradne cez `CSV.generate(col_sep: ';', force_quotes: true, row_sep: CRLF)`, UTF-8 bez BOM, bez hlavičky. Žiadne ručné skladanie reťazca.
+- Riadok s neznámou ABS, chybnou hrúbkou, bez materiálu alebo s nekladným rozmerom **ide von z CSV** do `errors` (a do LOGu s dôvodom) — radšej neobjednať než objednať naslepo.
+
+**Poznámka pre VEPO — 9. stĺpec (D-112, v0.9.22).** CSV má deviaty stĺpec `poznamka`, **vždy prítomný** (prázdny reťazec, keď riadok poznámku nemá). Skladá ho čistá
+`abs_note(row, edge_decors, sheet_decors)`: pre každý kód hrany `L1 L2 W1 W2` porovná dekor pásky s dekorom dosky a pri **rozdiele** vypíše `ABS <dekor> <názov dekoru>` (viac
+rôznych pások oddelené `, `, bez duplicít, v poradí hrán orientovaného riadku). Porovnanie normalizuje `decor_key` — **zhodne s `Materials.decor_norm_key`** (medzery preč,
+lowercase); kópia je vedomá, modul nesmie siahať na katalóg, ale porovnanie musí byť to isté, ktorým je viazaný materiál na ABS (D-41). **Neznáma páska, neznáma doska ani
+prázdny dekor poznámku nevymýšľajú** — tie stavy hlási `validation` (ABS/materiál mimo katalógu, UNI) a oddiel vyradených riadkov. `universal` pásky sa **nevynímajú**: VEPO
+odvodzuje pásku z materiálu, takže každý odlišný dekor musí vidieť. Mapy sú **voliteľné parametre** `edge_decors:` / `sheet_decors:` s defaultom `{}` — starý volajúci dostane
+prázdny deviaty stĺpec. Skladá ich `ProductionCore.vepo_edge_decors` / `vepo_sheet_decors` (a zrkadlovo in-SU helper `k1_vepo_csv`); **UNI dosky sa do mapy nedávajú** — ich
+„dekor" je pracovný názov, porovnanie by označilo každú pásku za odlišnú (tá istá zásada, akou `Validation` potláča ABS kontroly nad UNI doskou).
+
+**Názov riadku (D-113, v0.9.22).** `row_name` skladá `"<krátke názvy> <skrinky>"` (napr. `Bok LP s1 s2`) a používa ho CSV **aj LOG** (chyby, poznámky). Tri čisté kroky:
+`short_name` (tabuľka skratiek na PRESNÉ reťazce builderov — `construction.rb`, `zone_tree.rb`, `fronts.rb`; **neznámy názov ide bez zmeny**, samostatná doska nesie voľný text
+používateľa), `join_names` (združenie dvojíc `Bok L`+`Bok P`→`Bok LP`, `Vyst P`+`Vyst Z`→`Vyst PZ`, `Dv<N> L`+`Dv<N> P`→`Dv<N> LP`, zvyšok cez `/`) a `owner_tokens`
+(`CAB-001`→`s1`, `BRD-007`→`d7`, unikátne a zoradené; neznámy tvar ID sa nezahadzuje, ide celý a až za nimi). `append_owners` drží `NAME_MAX = 60`: skrinky pridáva, kým sa
+zmestia, nezmestené zhrnie ` +K` — **nikdy odseknutá skratka v polovici**; keď je nad limit už samotná časť s názvami, platí pôvodný orez s `…`. Platí **len pre VEPO** —
+kusovník Štúdia nesie plné názvy.
+
+**Čo poznámka ani názov NEROBIA.** Sú to len **zobrazenie riadku**: `Bom.row_key` (a teda zlučovanie a počet riadkov), grouping podľa materiálu a hrúbkovej skupiny, názvy
+súborov, kódy hrán, obchodné hrúbky ani sekcia KONTROLA sa nemenia. Poradie oddielov LOGu: skupiny → vyradené riadky → **Poznámky pre VEPO** → KONTROLA.
+
+**Testy:** `tests/pure/test_vepo_export.rb` (bajtové vzorky vrátane zlatej — jediný „schválený" obraz formátu, mení sa VÝHRADNE samostatným commitom s dôvodom),
+`tests/pure/test_d112_d113_vepo.rb` (správanie poznámky, skratiek a orezu + mapy dekorov nad sandbox katalógom), in-SU `run_k1` (rotácia dekoru v reálnom CSV).
 
 ### cp_export.rb
 

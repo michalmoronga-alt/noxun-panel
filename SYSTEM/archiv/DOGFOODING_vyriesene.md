@@ -4,6 +4,8 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-112** — Odlišná ABS je vidieť vo VEPO objednávke: deviaty stĺpec `poznamka` + kontrolný oddiel v LOGu — vyriešené 4.9.2026, PR #287, v0.9.22
+- **D-113** — Názov dielca vo VEPO nesie skratku a skrinku (`Bok LP s1 s2`) — vyriešené 4.9.2026, PR #287, v0.9.22
 - **D-115** — Symboly smeru otvárania: čiary z rohov, nie šípky (náhľad aj viewport) — vyriešené 3.9.2026, PR #286, v0.9.21
 - **D-116** — Úchytkové profily (UKW) na tag Čelá, nie Kovanie — vyriešené 3.9.2026, PR #286, v0.9.21
 - **Výklop ako samostatný typ čela** *(bez D-čísla)* — typ je v paneli **voliteľný** (typegrid piktogramov v karte čela) — vyriešené 3.9.2026, KOV-A1 PR #280 + KOV-A2a PR #281, v0.9.16
@@ -98,6 +100,51 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-112 · Zmenená ABS (odlišná od dekoru dielca) musí byť viditeľná vo VEPO exporte (Michal 3.9.2026, dielňa — skladanie zákazky KLINIKA; vyriešené 4.9.2026, PR #287, v0.9.22)
+
+**Pôvodný postreh (plné znenie).** Dielce, kde ručne zmenil pásku (biely dielec, hnedá ABS), pri zadávaní objednávky do VEPO **zabudol označiť** — VEPO to zvyčajne dostáva ako
+poznámku v objednávkovom formulári. Plugin rozdiel pozná: hrana nesie `abs_id` a katalóg vie dekor pásky aj dosky, takže „ABS ≠ dekor dielca" je čisto odvodený údaj. VEPO CSV
+kontrakt **nemá stĺpec poznámky** (`nazov;dlzka;hrana_pozdlz;sirka;hrana_naprieč;hrubka;pocet_ks;material` — pásku VEPO odvodí z materiálu), takže kandidáti: (a) samostatný oddiel
+vo VEPO LOGu „dielce s odlišnou ABS — prepíš do poznámky objednávky" (najmenší zásah, CSV nezmenené), (b) príznak v stĺpci `nazov` („Dno · ABS hnedá" — pozor na `NAME_MAX`
+a agregáciu riadkov), (c) samostatná skupina/súbor per ABS dekor. **Výrobný dopad:** nesprávny olep dodaný z VEPO.
+
+**Čo rozhodlo výber varianty.** Michal 3.9. **naimportoval do VEPO testovací 9-stĺpcový súbor** — VEPO ho prijal a poznámka sa zobrazila v poli **„Poznámka pre VEPO" pri riadku**,
+celá (31 znakov). Tým padlo pôvodné „kontrakt nemá stĺpec poznámky": nebolo treba vyberať medzi (a), (b) a (c) — dá sa poslať priamo to, čo sa dovtedy prepisovalo rukou.
+Variant (b) by navyše musel bojovať s `NAME_MAX` a s agregáciou riadkov, variant (c) by rozbil grouping podľa materiálu.
+
+**Riešenie.** VEPO kontrakt je **v1.1**: CSV má **deviaty stĺpec `poznamka`**, vždy prítomný (prázdny reťazec, keď riadok poznámku nemá). Skladá ho čistá
+`VepoExport.abs_note(row, edge_decors, sheet_decors)` — pre každý kód hrany `L1 L2 W1 W2` porovná dekor pásky s dekorom dosky a pri **rozdiele** vypíše `ABS <dekor> <názov dekoru>`
+(viac rôznych pások oddelené `, `, bez duplicít). Porovnanie normalizuje rovnako, ako väzba materiál↔ABS (`decor_norm_key`: medzery preč, case-insensitive). **Neznáma páska,
+neznáma doska ani prázdny dekor poznámku nevymýšľajú** — tie stavy už hlási KONTROLA (ABS/materiál mimo katalógu, UNI) a oddiel „Riadky vyradené z CSV". `universal` pásky sa
+**nevynímajú**: VEPO odvodzuje pásku z materiálu, takže každý odlišný dekor musí vidieť. Mapy dekorov sú **voliteľné parametre** `build` (default `{}`), skladá ich
+`ProductionCore.vepo_edge_decors` / `vepo_sheet_decors` z katalógu — **bez UNI dosiek** (ich „dekor" je pracovný názov, porovnanie by označilo každú pásku za odlišnú; tá istá
+zásada, akou `Validation` potláča ABS kontroly nad UNI doskou). LOG dostal za oddielom vyradených riadkov oddiel `Poznámky pre VEPO (N riadkov):` — kontrolný zoznam pred
+odoslaním objednávky, pri nule `(žiadne — všetky pásky v dekore dosky)`.
+
+**Čo sa vedome NEZMENILO.** Zlučovanie riadkov kusovníka (`Bom.row_key`), rozmery, kódy hrán, hrúbky, grouping, názvy súborov ani sekcia KONTROLA — poznámka je len **zobrazenie**
+riadku a nesmie ovplyvniť, čo sa objedná. Žiadny nový zápis do modelu, žiadna zmena UI.
+
+### D-113 · Názvy korpusových dielcov nesú aspoň krátky popis korpusu (Michal 3.9.2026, dielňa — skladanie KLINIKY; vyriešené 4.9.2026, PR #287, v0.9.22)
+
+**Pôvodný postreh (plné znenie).** Dielce prídu z VEPO označené názvom z CSV („Dno", „Bok lavy"…), takže pri skladaní nie je vidno, **ku ktorej skrinke dielec patrí**; želaný tvar
+napr. „Cab1_Dno", „Cab2_Bok L/P". Dnes VEPO `row_name` spája názvy agregovaného riadku (`names` cez `/`, orez `NAME_MAX`) a kusovník riadky zhodných dielcov **zlučuje naprieč
+skrinkami** (rozmery + materiál + hrany) — pri prefixe skrinky by riadok „Dno" ×3 buď rozpadol, alebo niesol „Cab1/Cab2/Cab3", čo je pri zhodných dielcoch vlastne užitočné
+(ktorýkoľvek sedí). Zdroj krátkeho kódu: `cabinet_id` (CAB-xxx) alebo `CabinetBuilder.display_name` (D-100 — výstupy názov skrinky dnes nepoužívajú).
+
+**Čo rozhodlo tvar.** Michalov fakt z dielne: **nálepky VEPO tlačia max 20 znakov bez interpunkcie** (medzeru mení ich stroj na `_`), takže na orientáciu je použiteľných ±20 znakov
+názvu a dlhý presný tvar by sa aj tak neprepísal. Preto **skratky** namiesto plných názvov a **skrinky hneď za názvom** — a preto sa riadok **nerozpadá per skrinka** (variant, ktorý
+by zdvojnásobil počet riadkov objednávky): zhodné dielce ostávajú jedným riadkom a nesú zoznam skriniek, do ktorých patria. Orez ďalších skriniek Michalovi nevadí — prvé dve-tri
+stačia na zorientovanie.
+
+**Riešenie.** `VepoExport.row_name` skladá `"<krátke názvy> <skrinky>"` (napr. `Bok LP s1 s2 s3`) a používa ho **CSV aj LOG** (chyby, poznámky). Tri čisté kroky: `short_name`
+(tabuľka skratiek na PRESNÉ reťazce builderov — `Bok lavy`→`Bok L`, `Vystuha zadna`→`Vyst Z`, `Dvierka 2 lave`→`Dv2 L`, `Zasuvkove celo 1`→`Zas celo 1`…; **neznámy názov ide bez
+zmeny**, samostatná doska nesie voľný text používateľa), `join_names` (združenie dvojíc `Bok L`+`Bok P`→`Bok LP`, `Vyst P`+`Vyst Z`→`Vyst PZ`, `Dv<N> L`+`Dv<N> P`→`Dv<N> LP`,
+zvyšok cez `/`) a `owner_tokens` (`CAB-001`→`s1`, `BRD-007`→`d7`, unikátne a zoradené; neznámy tvar ID sa nezahadzuje). `NAME_MAX = 60` platí ďalej: skrinky sa pridávajú, kým sa
+zmestia, nezmestené zhrnie ` +K` — **nikdy odseknutá skratka v polovici**.
+
+**Rozsah.** Len **VEPO CSV a LOG**. Kusovník a štítky v Štúdiu ostávajú s plnými názvami — tam je miesta dosť a plný názov je presnejší. Súvisiace D-95 (kontrola diel po diele)
+a D-94 (pôvod riadku) ostávajú otvorené.
 
 ### D-115 · Symboly smeru otvárania: čiary z rohov, nie šípky — v náhľade panela AJ vo viewporte (Michal 3.9.2026, smoke v0.9.20; vyriešené 3.9.2026, PR #286, v0.9.21)
 
