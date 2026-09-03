@@ -3993,6 +3993,141 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # ===== D-116: UCHYTKOVE PROFILY NA TAGU CIEL ================================
+  #
+  # Michal 3.9. (smoke v0.9.20): po skryti tagu „Čelá" (pohlad dovnutra skrinky
+  # pri praci) uchytky VISELI VO VZDUCHU — proxy profilu mala tag „Kovanie"
+  # spolu s nohami. Od D-116 dostava tag SVOJHO CELA, takze zmizne s nim.
+  # Headless sada to neoveri (tag je zapis do SketchUp Layers pri stavbe),
+  # preto tento scenar zije TU: tag po stavbe, po prestavbe, po kopii, na
+  # STAREJ zakazke (preznacenie pri najblizsej prestavbe), nedotknute DATA
+  # proxy a skutocne skrytie cez `Tags.set_visible`.
+
+  CELA_TAG = 'Noxun/Čelá'
+  KOVANIE_TAG = 'Noxun/Kovanie'
+
+  # Vsetky proxy profilov v modeli (aj v kopiach) — hlada sa cez data, nie tag.
+  def d116_all_profiles(model)
+    cabinets(model).flat_map { |c| d90_profiles(c) }
+  end
+
+  def d116_tags(profs)
+    profs.map { |p| p.layer.name }.uniq.sort
+  end
+
+  def run_d116(model)
+    cleanup(model)
+    inst = e::CabinetBuilder.build(model, d90_params('ukw7'))
+    return ok('D116: vlozenie korpusu s profilom', false) unless inst
+
+    profs = d90_profiles(inst)
+    ok("D116: 2 kridla = 2 kusy profilu (#{profs.length})", profs.length == 2)
+    ok("D116: profil ma po STAVBE tag ciel (#{d116_tags(profs).join(', ')})",
+       profs.length == 2 && profs.all? { |p| p.layer.name == CELA_TAG })
+    ok("D116: je to TEN ISTY tag, aky ma jeho celo (#{d116_tags(d90_fronts(inst)).join(', ')})",
+       d90_fronts(inst).any? && d90_fronts(inst).all? { |f| f.layer.name == CELA_TAG })
+
+    # NOHY (a ostatny vizual kovania) ostavaju na Kovani — D-116 presunul
+    # VYHRADNE uchytky, ktore su s celom zrastene.
+    legs = inst.definition.entities.grep(Sketchup::ComponentInstance).select do |i|
+      e::Store.kind(i) == 'hardware' && (e::Store.config(i) || {})['profile'].nil?
+    end
+    info("D116: ostatny vizual kovania v korpuse: #{legs.length} ks #{d116_tags(legs).inspect}")
+    ok('D116: ostatny vizual kovania ostal na tagu Kovanie',
+       legs.all? { |p| p.layer.name == KOVANIE_TAG })
+
+    # DATA proxy sa NEMENIA — supis, nakup ani dlzka rezu sa z tagu necitaju.
+    p0 = profs.first
+    pcfg = e::Store.config(p0) || {}
+    ok('D116: DATA proxy nedotknute (kind hardware, role handle, none/false, generic_type, rez)',
+       e::Store.kind(p0) == 'hardware' && e::Store.get(p0, 'role').to_s == 'handle' &&
+       e::Store.get(p0, 'production_class').to_s == 'none' &&
+       e::Store.get(p0, 'manufactured') == false &&
+       pcfg['generic_type'] == 'handle' && pcfg['profile'] == 'ukw7' && pcfg['proxy'] == true &&
+       (pcfg['params'] || {})['cut_length_mm'].to_f.positive?)
+    hw = (e::Store.config(inst) || {})['hardware'] || []
+    ok("D116: supis kovania korpusu ostal datovy (#{hw.count { |h| (h['params'] || {})['profile'] == 'ukw7' }} polozky profilu)",
+       hw.count { |h| (h['params'] || {})['profile'] == 'ukw7' } == 2)
+
+    # PRESTAVBA (zmena sirky): profil vzniká nanovo a tag musi drzat.
+    wide = d90_params('ukw7')
+    wide['width'] = 900.0
+    e::CabinetBuilder.rebuild(model, inst, wide)
+    profs = d90_profiles(inst)
+    ok("D116: po PRESTAVBE (900 mm) drzi tag ciel (#{profs.length} ks, #{d116_tags(profs).join(', ')})",
+       profs.length == 2 && profs.all? { |p| p.layer.name == CELA_TAG })
+
+    # STARA ZAKAZKA: profil s tagom Kovanie sa preznaci pri NAJBLIZSEJ prestavbe
+    # (ziadna migracia — proxy sa pri kazdom rebuilde stavia nanovo).
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST D116 stara zakazka', true)
+      lay = model.layers[KOVANIE_TAG] || model.layers.add(KOVANIE_TAG)
+      d90_profiles(inst).each { |p| p.layer = lay }
+      model.commit_operation
+    end
+    ok("D116: simulacia STAREJ zakazky — profil je na tagu Kovanie (#{d116_tags(d90_profiles(inst)).join(', ')})",
+       d90_profiles(inst).all? { |p| p.layer.name == KOVANIE_TAG })
+    e::CabinetBuilder.rebuild(model, inst, d90_params('ukw7'))
+    profs = d90_profiles(inst)
+    ok("D116: najblizsia prestavba stary tag PREZNACILA (#{d116_tags(profs).join(', ')})",
+       profs.length == 2 && profs.all? { |p| p.layer.name == CELA_TAG })
+
+    # KOPIA + dedup tik: kopia dostane vlastne cabinet_id a jej uchytky musia
+    # byt na tagu ciel tiez (inak by sa v kopii zjavili „lietajuce" profily).
+    cid = e::Store.get(inst, 'cabinet_id').to_s
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST D116 kopia', true)
+      tr = inst.transformation * Geom::Transformation.translation(e::Units.vector(1500, 0, 0))
+      copy = model.entities.add_instance(inst.definition, tr)
+      %w[std kind id cabinet_id template_id role part_key_schema manufactured
+         production_class config].each do |k|
+        v = e::Store.get(inst, k)
+        copy.set_attribute('NOXUN', k, v) unless v.nil?
+      end
+      model.commit_operation
+    end
+    e::CabinetBuilder.dedup_copies(model)
+    ids = cabinets(model).map { |c| e::Store.get(c, 'cabinet_id').to_s }
+    all_profs = d116_all_profiles(model)
+    ok("D116: po KOPII (dedup tik) su vsetky uchytky na tagu ciel " \
+       "(#{all_profs.length} ks, #{d116_tags(all_profs).join(', ')})",
+       ids.uniq.length == 2 && ids.include?(cid) && all_profs.length >= 2 &&
+       all_profs.all? { |p| p.layer.name == CELA_TAG })
+
+    # SKRYTIE TAGU: uchytka zmizne s celami, a prepinac Kovanie ju uz NESCHOVA
+    # (vedomy dosledok D-116 — patri k celu, nie k noham).
+    begin
+      e::Tags.set_visible(model, 'cela', false)
+      ok('D116: skrytie tagu Čelá schova AJ uchytku (uz nevisi vo vzduchu)',
+         d116_all_profiles(model).any? && d116_all_profiles(model).none? { |p| p.layer.visible? })
+      e::Tags.set_visible(model, 'cela', true)
+      e::Tags.set_visible(model, 'kovanie', false)
+      ok('D116: prepinac Kovanie uchytku uz neschova (VEDOMY dosledok)',
+         d116_all_profiles(model).all? { |p| p.layer.visible? })
+    ensure
+      begin
+        e::Tags.set_visible(model, 'cela', true)
+        e::Tags.set_visible(model, 'kovanie', true)
+      rescue StandardError
+        nil
+      end
+    end
+    ok("D116: obe viditelnosti su po scenari obnovene (#{e::Tags.state(model)['hidden']} skrytych)",
+       e::Tags.state(model)['hidden'].to_i.zero?)
+
+    cleanup(model)
+    ok('D116: cleanup (0 korpusov)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: D116 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    begin
+      e::Tags.set_visible(model, 'cela', true)
+      e::Tags.set_visible(model, 'kovanie', true)
+    rescue StandardError
+      nil
+    end
+    cleanup(model)
+  end
+
   # --- D-93: rucny zamok nominalnej dlzky vysuvu ------------------------------
   #
   # Overuje sa to, co Michal robi rukou: zamkne dlzku vysuvu na 420, potom meni
@@ -12393,13 +12528,56 @@ module NoxunSuRunner
     Array(occ ? occ['lines'] : [])
   end
 
-  # Bod, v ktorom sa stretava NAJVIAC usecek — pri sipke je to HROT.
+  # Bod, v ktorom sa stretava NAJVIAC usecek — pri „V"/„Λ" je to VRCHOL
+  # (stred protilahlej hrany).
   def a2b_tip(part)
     pts = a2b_points(part)
     return nil if pts.empty?
 
     pts.group_by { |p| [mm(p.x).round(2), mm(p.y).round(2), mm(p.z).round(2)] }
        .max_by { |_, v| v.length }&.first
+  end
+
+  # D-115: kresba symbolu ako dvojice [sirka X, vyska Z] vo SVETOVYCH mm.
+  def a2b_xz(part)
+    a2b_points(part).map { |p| [mm(p.x), mm(p.z)] }
+  end
+
+  # OCAKAVANE koncove body symbolu: rohy strany PANTOV (odsadene o CORNER_INSET)
+  # + STRED protilahlej (volnej) hrany. Pocita sa z OBALU dielca v modeli, NIE
+  # zo `shape_unit` — in-SU tak overuje konvenciu nezavisle od tabulky tvarov.
+  def a2b_expected_xz(box, sym)
+    ins = e::DirectionCheck::CORNER_INSET
+    w = box[:x_max] - box[:x_min]
+    hh = box[:z_max] - box[:z_min]
+    xl = box[:x_min] + ins * w
+    xr = box[:x_max] - ins * w
+    zb = box[:z_min] + ins * hh
+    zt = box[:z_max] - ins * hh
+    xm = (box[:x_min] + box[:x_max]) / 2.0
+    zm = (box[:z_min] + box[:z_max]) / 2.0
+    case sym.to_s
+    when 'left'  then [[xl, zb], [xr, zm], [xl, zt], [xr, zm]]
+    when 'right' then [[xr, zb], [xl, zm], [xr, zt], [xl, zm]]
+    when 'up'    then [[xl, zt], [xm, zb], [xr, zt], [xm, zb]]
+    when 'down'  then [[xl, zb], [xm, zt], [xr, zb], [xm, zt]]
+    when 'cross', 'xdash' then [[xl, zb], [xr, zt], [xl, zt], [xr, zb]]
+    end
+  end
+
+  # Sedi kresba dielca s konvenciou D-115? Vracia [true|false, popis nezhody].
+  def a2b_shape_check(inst, part, sym)
+    want = a2b_expected_xz(a2b_world_box(inst, part), sym)
+    return [false, "neznamy symbol #{sym.inspect}"] if want.nil?
+
+    got = a2b_xz(part)
+    return [false, "#{got.length} bodov, cakam #{want.length}"] if got.length != want.length
+
+    key = ->(p) { [p[0].round(3), p[1].round(3)] }
+    bad = got.sort_by(&key).zip(want.sort_by(&key)).reject do |g, w|
+      (g[0] - w[0]).abs <= TOL && (g[1] - w[1]).abs <= TOL
+    end
+    [bad.empty?, bad.first(2).map { |g, w| "#{key.call(g)} != #{key.call(w)}" }.join('; ')]
   end
 
   def a2b_item(type, over = {})
@@ -12426,7 +12604,9 @@ module NoxunSuRunner
     hi = b.max.transform(tr)
     xs = [mm(lo.x), mm(hi.x)].sort
     ys = [mm(lo.y), mm(hi.y)].sort
-    { x_min: xs[0], x_max: xs[1], x_mid: (xs[0] + xs[1]) / 2.0, y_min: ys[0], y_max: ys[1] }
+    zs = [mm(lo.z), mm(hi.z)].sort
+    { x_min: xs[0], x_max: xs[1], x_mid: (xs[0] + xs[1]) / 2.0, y_min: ys[0], y_max: ys[1],
+      z_min: zs[0], z_max: zs[1], z_mid: (zs[0] + zs[1]) / 2.0 }
   end
 
   # Jedna skrinka s dvierkami daneho smeru; vrati [instancia, dielec kridla].
@@ -12503,27 +12683,32 @@ module NoxunSuRunner
          !marker.valid? && a2b_overlay_present?(model))
       e::DirectionCheck.refresh!(model)
 
-      # 3) SYMBOL SEDI NA SPRAVNOM KRIDLE A NA PREDNEJ PLOCHE
-      ok("KOV-A2b: „panty vlavo“ kresli sipku (#{a2b_symbol_of(wing).inspect})",
+      # 3) SYMBOL SEDI NA SPRAVNOM KRIDLE A NA PREDNEJ PLOCHE (D-115: ciary
+      #    z ROHOV strany pantov do STREDU protilahlej hrany)
+      ok("KOV-A2b: „panty vlavo“ kresli symbol smeru (#{a2b_symbol_of(wing).inspect})",
          a2b_symbol_of(wing) == 'left')
       pts = a2b_points(wing)
       box = a2b_world_box(inst, wing)
       face_y = box[:y_min] - e::DirectionCheck::OUT_MM
       ok('KOV-A2b: symbol lezi na PREDNEJ ploche cela, posunuty von z telesa',
          !pts.empty? && pts.all? { |p| (mm(p.y) - face_y).abs <= 0.05 })
-      xs = pts.map { |p| mm(p.x) }
-      tip = a2b_tip(wing)
-      ok("KOV-A2b: hrot sipky je pri VOLNEJ hrane vpravo (x #{tip && tip[0]} > stred #{box[:x_mid].round(1)})",
-         tip && tip[0] > box[:x_mid] && (xs.max - tip[0]).abs <= 0.05 &&
-         xs.min > box[:x_min] && xs.max < box[:x_max])
+      shape_ok, shape_why = a2b_shape_check(inst, wing, 'left')
+      ok("D-115: „panty vlavo“ = ciary z LAVYCH rohov do stredu pravej hrany#{shape_ok ? '' : " — #{shape_why}"}",
+         shape_ok)
+      free_edge = a2b_xz(wing).select { |p| (p[0] - (box[:x_max] - e::DirectionCheck::CORNER_INSET *
+                                                    (box[:x_max] - box[:x_min]))).abs <= TOL }
+      ok("D-115: obe ciary koncia v JEDNOM bode na volnej hrane vpravo (#{free_edge.length} z 4)",
+         free_edge.length == 2 && (free_edge[0][1] - free_edge[1][1]).abs <= TOL &&
+         (free_edge[0][1] - box[:z_mid]).abs <= TOL)
 
-      # 4) ZRKADLO: „panty vpravo" ma hrot pri LAVEJ hrane
+      # 4) ZRKADLO: „panty vpravo" ma ciary z PRAVYCH rohov
       inst2, wing2 = a2b_door(model, 'direction' => 'right')
       e::DirectionCheck.refresh!(model)
-      tip2 = a2b_tip(wing2)
       box2 = a2b_world_box(inst2, wing2)
-      ok("KOV-A2b: „panty vpravo“ ma hrot pri LAVEJ hrane (x #{tip2 && tip2[0]} < stred #{box2[:x_mid].round(1)})",
-         a2b_symbol_of(wing2) == 'right' && tip2 && tip2[0] < box2[:x_mid])
+      mirror_ok, mirror_why = a2b_shape_check(inst2, wing2, 'right')
+      ok("D-115: „panty vpravo“ je presnym ZRKADLOM (stred volnej hrany vlavo od #{box2[:x_mid].round(1)})" \
+         "#{mirror_ok ? '' : " — #{mirror_why}"}",
+         a2b_symbol_of(wing2) == 'right' && mirror_ok)
       inst2.erase! if inst2 && inst2.valid?
 
       # 5) NEURCENE = kruh + otaznik · LEGACY = NIC (R-39)
@@ -12552,20 +12737,45 @@ module NoxunSuRunner
          syms == %w[left unknown right])
       inst5.erase! if inst5 && inst5.valid?
 
-      # 7) VYKLOP ∧ · SKLOP ∨ · BLENDA X · ZASUVKA nic
+      # 7) VYKLOP „V" · SKLOP „Λ" · BLENDA plne X · ZASUVKA prerusovane X
+      #    (D-115: kazdy tvar sa overuje AJ geometricky, nielen menom)
       { 'lift' => %w[front:F1/flap up], 'fall' => %w[front:F1/flap down],
-        'blind' => %w[front:F1/blind cross] }.each do |type, (key, want)|
+        'blind' => %w[front:F1/blind cross],
+        'drawer_front' => %w[front:F1/panel xdash] }.each do |type, (key, want)|
         i = e::CabinetBuilder.build(model, a2b_params([a2b_item(type)]))
         e::DirectionCheck.refresh!(model)
-        got = a2b_symbol_of(a2b_part(i, key))
+        part = a2b_part(i, key)
+        got = a2b_symbol_of(part)
+        sok, swhy = a2b_shape_check(i, part, want)
         ok("KOV-A2b: #{type} kresli #{want} (#{got.inspect})", got == want)
+        ok("D-115: #{type} — ciary z rohov na spravnu hranu#{sok ? '' : " — #{swhy}"}",
+           got == want && sok)
         i.erase! if i && i.valid?
       end
-      i6 = e::CabinetBuilder.build(model, a2b_params([a2b_item('drawer_front')]))
+      # Zasuvka je PRERUSOVANA (bucket „move"), blenda PLNA (bucket „fixed") —
+      # inak by sa dva rovnake X nedali od seba odlisit.
       e::DirectionCheck.refresh!(model)
-      ok('KOV-A2b: zasuvkove celo je VEDOME bez symbolu',
-         a2b_occ(a2b_part(i6, 'front:F1/panel')).nil?)
+      st_pre = a2b_state(model)
+      i6 = e::CabinetBuilder.build(model, a2b_params([a2b_item('drawer_front')]))
+      i7 = e::CabinetBuilder.build(model, a2b_params([a2b_item('blind')], 'width' => 700.0))
+      e::DirectionCheck.refresh!(model)
+      st6 = a2b_state(model)
+      pay = e::DirectionCheck.view_payload || {}
+      drw = a2b_points(a2b_part(i6, 'front:F1/panel'))
+      bld = a2b_points(a2b_part(i7, 'front:F1/blind'))
+      ok("KOV-A2b: zasuvkove celo MA symbol (#{a2b_symbol_of(a2b_part(i6, 'front:F1/panel')).inspect})",
+         a2b_symbol_of(a2b_part(i6, 'front:F1/panel')) == 'xdash')
+      ok("D-115: X zasuvky je v PRERUSOVANOM poli, X blendy v PLNOM " \
+         "(#{Array(pay['move']).length}/#{Array(pay['fixed']).length} bodov)",
+         drw.length == 4 && bld.length == 4 &&
+         drw.all? { |p| Array(pay['move']).include?(p) } &&
+         bld.all? { |p| Array(pay['fixed']).include?(p) })
+      ok("D-115: dve nove cela = dva nove symboly, ale ZIADNE nove „krídlo“ " \
+         "(#{st_pre['marks']}->#{st6['marks']} symbolov, #{st_pre['wings']}->#{st6['wings']} kridel)",
+         st6['marks'].to_i == st_pre['marks'].to_i + 2 &&
+         st6['wings'].to_i == st_pre['wings'].to_i)
       i6.erase! if i6 && i6.valid?
+      i7.erase! if i7 && i7.valid?
 
       # 8) PRESTAVBA prekresli BEZ kroku Spat navyse; Spat kresbu vrati
       marker = r03_marker(model, markers)
@@ -12726,8 +12936,10 @@ module NoxunSuRunner
     info("KOV-A2b VYKON: #{built} skriniek / #{parts} dielcov -> zapnutie + prvy prepocet #{ms} ms " \
          "(#{st['wings']} kridel, #{st['marks']} symbolov, #{st['legacy']} legacy; ciel < 300 ms)")
     ok("KOV-A2b: vykon na velkej zakazke je pouzitelny (#{ms} ms)", ms < 1500.0)
-    ok("KOV-A2b: velka zakazka kresli vsetky symboly (#{st['marks']})",
-       st['marks'].to_i >= built * 5)
+    # D-115: zasuvkove celo (F4) uz svoj symbol MA, takze markov na skrinku
+    # pribudol jeden — dolna hranica sa zdvihla z 5 na 6.
+    ok("KOV-A2b: velka zakazka kresli vsetky symboly vratane zasuviek (#{st['marks']})",
+       st['marks'].to_i >= built * 6)
   rescue StandardError => ex
     log_line("FAIL: KOV-A2b vykon: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
   end
@@ -13660,6 +13872,7 @@ module NoxunSuRunner
     run_2a4(model)           # 2A-4b: OSTRY cutover — boot_cutover!, picker, universal, rollback+hold
     run_d40(model)           # D-40: selection eventy po builde (DC observer pasca)
     run_d90(model)           # D-90: vizual uchytkoveho profilu UKW-7 (kotva, undo, rebuild)
+    run_d116(model)          # D-116: uchytkovy profil na tagu SVOJHO CELA (stavba/prestavba/kopia, stara zakazka, skrytie tagu)
     run_d93(model)           # D-93: rucny zamok NL vysuvu (drzi cez zmenu hlbky, odomknutie)
     run_d88(model)           # D-88: farba ABS na bocnych plochach dielcov a dosky
     run_d104(model)          # D-104: overlay „hrany bez olepu" (lifecycle, pocty, ziadny undo krok)

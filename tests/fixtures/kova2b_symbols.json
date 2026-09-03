@@ -18,7 +18,7 @@
     { "case": "vyklop sa dviha nahor", "type": "lift", "expect": "up" },
     { "case": "sklop pada nadol", "type": "fall", "expect": "down" },
     { "case": "blenda sa NEHYBE", "type": "blind", "expect": "cross" },
-    { "case": "zasuvka je VEDOME bez symbolu", "type": "drawer_front", "expect": null },
+    { "case": "zasuvka ma od D-115 PRERUSOVANE X (od plneho X blendy ju lisi prave ciara)", "type": "drawer_front", "expect": "xdash" },
     { "case": "dvierka riesia kridla, nie typ", "type": "door", "expect": null },
     { "case": "Bez cela", "type": "none", "expect": null },
     { "case": "neznamy typ z novsej verzie", "type": "sliding_2027", "expect": null }

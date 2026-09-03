@@ -1366,7 +1366,17 @@ module Noxun
             pdef, Geom::Transformation.translation(Units.point(pl[:x], 0.0, pl[:z_base]))
           )
           inst.material = ensure_material(model, PROFILE_MATERIAL, PROFILE_RGB)
-          inst.layer = hardware_tag(model)
+          # D-116 (Michal 3.9.): tag VLASTNIKA, nie tag kovania. Uchytkovy profil
+          # je zrasteny s celom — pri skryti tagu „Čelá" (pohlad dovnutra
+          # skrinky) musi zmiznut S NIM, inak visi vo vzduchu. `pd[:role]` je
+          # rola PANELU cela (front_door / drawer_front / flap / false_front) a
+          # vsetky vedu cez PART_TAGS na „Noxun/Čelá"; profil vzniká LEN nad
+          # celom (`profile_placement` inak vrati nil). VEDOMY DOSLEDOK: prepinac
+          # tagu Kovanie uchytky uz neschova — patria k celu, nie k noham.
+          # DATA proxy sa NEMENIA (kind hardware, role handle) — supis, nakup ani
+          # dlzka rezu sa necitaju z tagu. Stare zakazky sa preznacia pri
+          # najblizsej prestavbe (profil vzniká pri kazdom rebuilde nanovo).
+          inst.layer = part_tag(model, pd[:role])
           hw_id = "#{cid}-HW-PROFILE-#{pd[:suffix]}"
           Store.write(inst, {
                         std: Store::STD, kind: 'hardware', id: hw_id, part_id: hw_id,

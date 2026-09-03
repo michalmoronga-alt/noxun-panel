@@ -1,0 +1,36 @@
+{
+  "note": "D-115: TVAR symbolov smeru otvarania v JEDNOTKOVOM stvorci panelu. u = po sirke 0->1 zlava doprava, v = po vyske 0->1 ZDOLA NAHOR (hore = v 1). Stolarska konvencia Michala 3.9.: ciary z ROHOV strany pantov do STREDU protilahlej (volnej) hrany; rohy odsadene o corner_inset (0,05), stredy hran presne 0,5. `dashed` je jedine pravidlo kresby: prerusovana = POHYB, plna = DIELEC (blenda sa nehybe). Tento subor cita RUBY overlay (DirectionCheck.shape_unit) aj JS nahlad (frontSymbolShape v core.js) — obe sady porovnavaju svoj vystup s TYM ISTYM 'lines'/'dashed', takze model a nahlad sa uz nemozu rozist v TVARE (do KOV-A2b bolo overene len MENO symbolu, a kresby sa naozaj rozisli: Ruby kreslilo sipku s hrotom, JS holy chevron). `unknown` tu NIE JE — je to kruh + otaznik, nie usecky.",
+  "corner_inset": 0.05,
+  "shapes": {
+    "left": {
+      "case": "dvierka, panty VLAVO -> ciary z lavych rohov do stredu pravej (volnej) hrany",
+      "dashed": true,
+      "lines": [[[0.05, 0.05], [0.95, 0.5]], [[0.05, 0.95], [0.95, 0.5]]]
+    },
+    "right": {
+      "case": "dvierka, panty VPRAVO -> presne zrkadlo laveho",
+      "dashed": true,
+      "lines": [[[0.95, 0.05], [0.05, 0.5]], [[0.95, 0.95], [0.05, 0.5]]]
+    },
+    "up": {
+      "case": "vyklop (panty HORE) -> „V\" z hornych rohov do stredu dolnej hrany",
+      "dashed": true,
+      "lines": [[[0.05, 0.95], [0.5, 0.05]], [[0.95, 0.95], [0.5, 0.05]]]
+    },
+    "down": {
+      "case": "sklop (panty DOLE) -> „Λ\" z dolnych rohov do stredu hornej hrany",
+      "dashed": true,
+      "lines": [[[0.05, 0.05], [0.5, 0.95]], [[0.95, 0.05], [0.5, 0.95]]]
+    },
+    "cross": {
+      "case": "blenda sa NEHYBE -> PLNE X (jediny plny symbol)",
+      "dashed": false,
+      "lines": [[[0.05, 0.05], [0.95, 0.95]], [[0.05, 0.95], [0.95, 0.05]]]
+    },
+    "xdash": {
+      "case": "zasuvkove celo -> to iste X, ale PRERUSOVANE (od blendy ho lisi prave ciara)",
+      "dashed": true,
+      "lines": [[[0.05, 0.05], [0.95, 0.95]], [[0.05, 0.95], [0.95, 0.05]]]
+    }
+  }
+}

@@ -10,8 +10,10 @@
 #   2. NAHLAD A MODEL musia kreslit TO ISTE. Vyber symbolu je cista funkcia na
 #      oboch stranach a obe sady citaju TU ISTU tabulku fixtur
 #      (tests/fixtures/kova2b_symbols.json) — rozchod padne naraz.
-#   3. GEOMETRIA symbolu (hrot pri VOLNEJ hrane, ∧ hore, ∨ dole) sa v modeli
-#      overuje az in-SketchUp behom; tu sa overuje pravidlo, ktore ju urcuje.
+#   3. GEOMETRIA symbolu (D-115: ciary z ROHOV strany pantov do stredu
+#      protilahlej hrany) zije v JEDNEJ tabulke tvarov per jazyk a obe sady ju
+#      porovnavaju s TOU ISTOU fixturou — do D-115 bolo overene len MENO
+#      symbolu a kresby sa naozaj rozisli (Ruby sipka s hrotom, JS holy chevron).
 #   4. FARBY prekryti sa nesmu miesat — a tri prekrytia uz v modeli ziju.
 require_relative '../helper' unless defined?(NxTest)
 
@@ -19,6 +21,10 @@ A2B = Noxun::Engine::DirectionCheck
 A2B_PF = Noxun::Engine::PartFaces
 A2B_FIX = JSON.parse(File.read(File.join(NxTest::ROOT, 'tests', 'fixtures', 'kova2b_symbols.json'),
                                encoding: 'UTF-8'))
+# D-115: SPOLOCNA tabulka TVAROV (jednotkovy stvorec) — cita ju Ruby aj JS.
+A2B_SHP = JSON.parse(File.read(File.join(NxTest::ROOT, 'tests', 'fixtures',
+                                         'front_symbol_shapes.json'), encoding: 'UTF-8'))
+A2B_TOL = 1e-9
 
 # Celo: dlzka = VYSKA (Z), sirka = sirka kridla (X), hrubka Y.
 A2B_AX = A2B_PF::AXES_FRONT
@@ -94,17 +100,28 @@ NxTest.test('KOV-A2b: 3 kridla bez ulozeneho stredneho — krajne ANO, stredne N
                        { key: 'front:F1/wing:p3', symbol: 'right' }], got)
 end
 
-NxTest.test('KOV-A2b: vyklop/sklop/blenda maju kanonicke kluce A1, zasuvka nic') do
+NxTest.test('KOV-A2b: vyklop/sklop/blenda/zasuvka maju kanonicke kluce A1') do
   NxTest.assert_equal([{ key: 'front:F1/flap', symbol: 'up' }],
                       A2B.marks('id' => 'F1', 'type' => 'lift'))
   NxTest.assert_equal([{ key: 'front:F1/flap', symbol: 'down' }],
                       A2B.marks('id' => 'F1', 'type' => 'fall'))
   NxTest.assert_equal([{ key: 'front:F1/blind', symbol: 'cross' }],
                       A2B.marks('id' => 'F1', 'type' => 'blind'))
-  NxTest.assert_equal([], A2B.marks('id' => 'F1', 'type' => 'drawer_front'))
+  # D-115: zasuvkove celo uz mark MA — kluc je ten, ktorym panel pomenoval
+  # `Fronts.panels_for` (`front:F#/panel`), ziadny novy sa nevymysla.
+  NxTest.assert_equal([{ key: 'front:F1/panel', symbol: 'xdash' }],
+                      A2B.marks('id' => 'F1', 'type' => 'drawer_front'))
   NxTest.assert_equal([], A2B.marks('id' => 'F1', 'type' => 'none'))
   NxTest.assert_equal([], A2B.marks('id' => '', 'type' => 'lift'), 'polozka bez ID nema adresu')
   NxTest.assert_equal([], A2B.marks(nil))
+end
+
+NxTest.test('KOV-A2b: zasuvka sa NEPOCITA medzi kridla (nema stranu ani stav)') do
+  NxTest.refute(A2B::WING_SYMBOLS.include?(A2B::SYM_XDASH),
+                'zasuvka by inak nafukla pocet „krídel" v liste Kontroly')
+  NxTest.assert(A2B::SYMBOLS.include?(A2B::SYM_XDASH), 'symbol musi byt kresllitelny')
+  NxTest.assert_equal(0, A2B.legacy_count('id' => 'F1', 'type' => 'drawer_front'),
+                      'zasuvka nie je legacy — na smer sa nikdy nepytala')
 end
 
 NxTest.test('KOV-A2b: „bez smeru (legacy)" sa POCITA, aj ked sa nekresli') do
@@ -133,46 +150,155 @@ NxTest.test('KOV-A2b: OUT_MM je medzi olepom a hoverom (poradie vrstiev)') do
                 'hover hrany musi ostat navrchu')
 end
 
-NxTest.test('KOV-A2b: sipka „panty vlavo" ma HROT pri VOLNEJ hrane vpravo') do
-  pts = a2b_points('left')
-  xs = pts.map { |p| p[0] }
-  NxTest.assert_equal(3, a2b_lines('left').length, 'driek + dve ramena hrotu')
-  NxTest.assert(xs.max > 300.0, "hrot nie je pri pravej hrane (max x #{xs.max})")
-  NxTest.assert(xs.min < 100.0, 'driek nezacina pri pantoch')
-  # Hrot je bod, v ktorom sa stretavaju VSETKY tri usecky.
-  tip = pts.group_by { |p| p.map { |v| v.round(3) } }.max_by { |_, v| v.length }
-  NxTest.assert_equal(3, tip[1].length, 'tri usecky sa musia stretat v jednom bode')
-  NxTest.assert_close(xs.max, tip[0][0], 0.01, 'a ten bod je hrot pri volnej hrane')
+# --- 3a) D-115: TVAR je JEDNA tabulka, zdielana s JS ------------------------
+#
+# `shape_unit` je JEDINY zdroj tvaru v Ruby. Ked sa rozide s fixturou, padne
+# TENTO test; ked sa s nou rozide JS, padne jeho protajsok — takze nahlad
+# a model sa uz nemozu rozist ani v TVARE, nielen v mene symbolu.
+
+NxTest.test('D-115: shape_unit sedi s fixturou 1:1 (spolocny kontrakt s JS)') do
+  rows = A2B_SHP['shapes']
+  NxTest.assert_equal(6, rows.length, 'fixtura musi popisat vsetkych 6 useckovych symbolov')
+  NxTest.assert_close(A2B::CORNER_INSET, A2B_SHP['corner_inset'].to_f, 1e-12,
+                      'odsadenie rohov je sucastou kontraktu')
+  rows.each do |sym, want|
+    got = A2B.shape_unit(sym)
+    NxTest.assert(got, "symbol #{sym} tvar nema")
+    NxTest.assert_equal(want['dashed'], got['dashed'],
+                        "#{sym}: prerusovanie (prerusovana = pohyb, plna = dielec)")
+    NxTest.assert_equal(want['lines'].length, got['lines'].length, "#{sym}: pocet usecek")
+    want['lines'].each_with_index do |ln, i|
+      ln.each_with_index do |pt, j|
+        pt.each_with_index do |v, k|
+          NxTest.assert_close(v, got['lines'][i][j][k], A2B_TOL,
+                              "#{sym}: usecka #{i} bod #{j} suradnica #{k}")
+        end
+      end
+    end
+  end
 end
 
-NxTest.test('KOV-A2b: sipka „panty vpravo" je presnym ZRKADLOM tej lavej') do
+NxTest.test('D-115: tabulku tvarov pozna KAZDY symbol okrem „neurceneho"') do
+  keys = A2B::SHAPES.keys.sort
+  NxTest.assert_equal((A2B::SYMBOLS - [A2B::SYM_UNKNOWN]).sort, keys,
+                      'symbol bez tvaru by sa ticho nekreslil')
+  NxTest.assert_equal(A2B_SHP['shapes'].keys.sort, keys, 'fixtura a kod maju rovnaku mnozinu')
+  NxTest.assert_equal(nil, A2B.shape_unit(A2B::SYM_UNKNOWN), '„neurcene" je kruh, nie usecky')
+  NxTest.assert_equal(nil, A2B.shape_unit('nonsense'))
+  NxTest.assert_equal(nil, A2B.shape_unit(nil))
+end
+
+NxTest.test('D-115: PLNA je LEN blenda — vsetko, co sa hybe, je prerusovane') do
+  solid = A2B::SHAPES.select { |_, v| v['dashed'] == false }.keys
+  NxTest.assert_equal([A2B::SYM_CROSS], solid,
+                      'blenda sa nehybe; zasuvka ma to iste X, ale PRERUSOVANE')
+  NxTest.assert_equal(A2B::SHAPES[A2B::SYM_CROSS]['lines'], A2B::SHAPES[A2B::SYM_XDASH]['lines'],
+                      'zasuvku od blendy lisi VYHRADNE ciara, nie tvar')
+end
+
+NxTest.test('D-115: MENA symbolov su kontrakt Ruby <-> JS (guard nad core.js)') do
+  js = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'core.js'), encoding: 'UTF-8')
+  block = js[/var FRONT_SYM_SHAPES = \{.*?\n  \};/m].to_s
+  NxTest.refute(block.empty?, 'tabulka tvarov v core.js sa nenasla')
+  NxTest.assert_equal(A2B::SHAPES.keys.sort, block.scan(/^    (\w+): \{ dashed:/).flatten.sort,
+                      'JS a Ruby kreslia INU mnozinu symbolov')
+  inset = js[/var FRONT_SYM_INSET = ([0-9.]+);/, 1]
+  NxTest.assert(inset, 'odsadenie rohov v core.js chyba')
+  NxTest.assert_close(A2B::CORNER_INSET, inset.to_f, 1e-12, 'rohy su odsadene INAK nez v Ruby')
+  # Mena, ktore netvori tabulka tvarov: „neurcene" (kruh) — musi byt v OBOCH.
+  NxTest.assert(js.include?("return 'unknown';"), 'JS musi poznat „neurcene"')
+  NxTest.assert(js.include?("if (type === 'drawer_front') return 'xdash';"),
+                'zasuvka musi mat v JS ten isty symbol ako v Ruby')
+  A2B::SYMBOLS.each do |sym|
+    NxTest.assert(js.include?("'#{sym}'"), "meno symbolu #{sym} v core.js chyba")
+  end
+end
+
+# --- 3b) TVAR PREMIETNUTY NA PANEL (plan_2d / symbol_mm) --------------------
+
+# Panel 400 x 700 mm — cisla z konvencie Michala 3.9. (rohy odsadene 5 %).
+A2B_SMALL_HI = [400.0, 18.0, 700.0].freeze
+
+NxTest.test('D-115: „panty vlavo" = ciary z LAVYCH rohov do stredu pravej hrany') do
+  segs = a2b_lines('left', A2B_LO, A2B_SMALL_HI)
+  NxTest.assert_equal(2, segs.length, 'dve ciary, jedna z kazdeho rohu pantov')
+  # [x (sirka), y (hlbka), z (vyska)] — os dlzky cela je Z.
+  got = segs.map { |a, b| [[a[0].round(3), a[2].round(3)], [b[0].round(3), b[2].round(3)]] }.sort
+  NxTest.assert_equal([[[20.0, 35.0], [380.0, 350.0]], [[20.0, 665.0], [380.0, 350.0]]].sort, got)
+end
+
+NxTest.test('D-115: „panty vpravo" je presnym ZRKADLOM tej lavej') do
   left = a2b_points('left').map { |p| [(400.0 - p[0]).round(3), p[1].round(3), p[2].round(3)] }.sort
   right = a2b_points('right').map { |p| p.map { |v| v.round(3) } }.sort
   NxTest.assert_equal(left, right, 'strany nie su zrkadlove — jedna z nich je nakreslena zle')
 end
 
-NxTest.test('KOV-A2b: ∧ vyklop mieri HORE, ∨ sklop DOLE (os dlzky cela)') do
-  up = a2b_points('up')
-  down = a2b_points('down')
-  NxTest.assert_equal(2, a2b_lines('up').length, 'dve ramena')
-  # Apex je spolocny bod oboch ramien.
-  apex_up = up.group_by { |p| p.map { |v| v.round(3) } }.max_by { |_, v| v.length }[0]
-  apex_down = down.group_by { |p| p.map { |v| v.round(3) } }.max_by { |_, v| v.length }[0]
-  NxTest.assert(apex_up[2] > 1000.0, 'vyklop musi mat hrot pri HORNEJ hrane')
-  NxTest.assert(apex_down[2] < 1000.0, 'sklop musi mat hrot pri DOLNEJ hrane')
-  NxTest.assert(up.all? { |p| p[2] <= apex_up[2] + 0.001 }, 'ramena vyklopu idu NADOL od hrotu')
-  NxTest.assert(down.all? { |p| p[2] >= apex_down[2] - 0.001 }, 'ramena sklopu idu NAHOR')
-  NxTest.assert_close(200.0, apex_up[0], 0.01, 'hrot je v strede sirky')
+NxTest.test('D-115: vyklop = „V" z HORNYCH rohov, sklop = „Λ" z DOLNYCH') do
+  # Vrchol je bod, kde sa obe ciary stretnu; lezi v STREDE protilahlej hrany.
+  apex = lambda do |sym|
+    a2b_points(sym).group_by { |p| p.map { |v| v.round(3) } }
+                   .find { |_, v| v.length == 2 }&.first
+  end
+  up = apex.call('up')
+  down = apex.call('down')
+  NxTest.assert(up && down, 'ciary sa musia stretnut v jednom bode')
+  NxTest.assert_close(200.0, up[0], 0.01, 'vrchol je v strede sirky')
+  NxTest.assert_close(100.0, up[2], 0.01, 'vyklop (panty hore) ma vrchol pri DOLNEJ hrane')
+  NxTest.assert_close(1900.0, down[2], 0.01, 'sklop (panty dole) ma vrchol pri HORNEJ hrane')
+  NxTest.assert(a2b_points('up').all? { |p| p[2] >= up[2] - 0.001 }, 'ciary vyklopu idu NAHOR')
+  NxTest.assert(a2b_points('down').all? { |p| p[2] <= down[2] + 0.001 }, 'ciary sklopu idu NADOL')
 end
 
-NxTest.test('KOV-A2b: blenda je PLNE X cez cely panel (nehybe sa)') do
-  segs = a2b_lines('cross')
-  NxTest.assert_equal(2, segs.length, 'dve uhloprieciek')
-  pts = segs.flatten(1)
-  NxTest.assert(pts.map { |p| p[0] }.min > 0.0 && pts.map { |p| p[0] }.max < 400.0,
-                'X je odsadene od hran')
-  NxTest.assert(pts.map { |p| p[2] }.max > 1500.0 && pts.map { |p| p[2] }.min < 500.0,
-                'X ide cez cely panel')
+NxTest.test('D-115: blenda aj zasuvka su X cez cely panel (lisi ich len ciara)') do
+  %w[cross xdash].each do |sym|
+    segs = a2b_lines(sym)
+    NxTest.assert_equal(2, segs.length, "#{sym}: dve uhloprieciek")
+    pts = segs.flatten(1)
+    NxTest.assert(pts.map { |p| p[0] }.min > 0.0 && pts.map { |p| p[0] }.max < 400.0,
+                  "#{sym}: X je odsadene od hran")
+    NxTest.assert(pts.map { |p| p[2] }.max > 1500.0 && pts.map { |p| p[2] }.min < 500.0,
+                  "#{sym}: X ide cez cely panel")
+  end
+  NxTest.assert_equal(a2b_lines('cross'), a2b_lines('xdash'), 'tvar je ten isty')
+end
+
+NxTest.test('D-115: ciary nezacinaju V ROHU (inak by splynuli s obrysom a s vyberom)') do
+  A2B::SHAPES.each_key do |sym|
+    pts = a2b_points(sym)
+    NxTest.assert(pts.map { |p| p[0] }.min >= 400.0 * A2B::CORNER_INSET - 0.001,
+                  "#{sym}: ciara sa dotyka lavej hrany")
+    NxTest.assert(pts.map { |p| p[0] }.max <= 400.0 * (1.0 - A2B::CORNER_INSET) + 0.001,
+                  "#{sym}: ciara sa dotyka pravej hrany")
+    NxTest.assert(pts.map { |p| p[2] }.min >= 2000.0 * A2B::CORNER_INSET - 0.001,
+                  "#{sym}: ciara sa dotyka dolnej hrany")
+    NxTest.assert(pts.map { |p| p[2] }.max <= 2000.0 * (1.0 - A2B::CORNER_INSET) + 0.001,
+                  "#{sym}: ciara sa dotyka hornej hrany")
+  end
+end
+
+NxTest.test('D-115: view_payload — zasuvka do PRERUSOVANEHO, blenda do PLNEHO') do
+  # Synteticka cache: jeden vyskyt kazdeho symbolu s jednou useckou.
+  occs = A2B::SYMBOLS.each_with_index.map do |sym, i|
+    { 'part' => i + 1, 'symbol' => sym, 'lines' => [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]],
+      'text' => nil }
+  end
+  begin
+    A2B.instance_variable_set(:@cache, { 'occurrences' => occs, 'legacy' => 2 })
+    A2B.instance_variable_set(:@payload, nil)
+    p = A2B.view_payload
+    # kazdy vyskyt prispel 2 bodmi (GL_LINES)
+    NxTest.assert_equal(2, p['fixed'].length, 'PLNE kresli LEN blenda')
+    NxTest.assert_equal(2, p['ask'].length, 'jantarovy kruh kresli LEN „neurcene"')
+    NxTest.assert_equal((A2B::SYMBOLS.length - 2) * 2, p['move'].length,
+                        'vsetko ostatne (vratane zasuvky) je PRERUSOVANE')
+    NxTest.assert_equal(3, p['wings'], 'medzi „krídla" sa ratau len left/right/unknown')
+    NxTest.assert_equal(1, p['unknown'])
+    NxTest.assert_equal(A2B::SYMBOLS.length, p['marks'], 'zasuvka ma od D-115 svoj mark')
+    NxTest.assert_equal(2, p['legacy'])
+  ensure
+    A2B.instance_variable_set(:@cache, nil)
+    A2B.instance_variable_set(:@payload, nil)
+  end
 end
 
 NxTest.test('KOV-A2b: „neurcene" je KRUH okolo stredu + kotva otaznika') do

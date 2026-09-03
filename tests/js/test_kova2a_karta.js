@@ -252,8 +252,8 @@ eq(C.frontDirSymbol(undefined), null, 'ani chybajuci stav');
 eq(C.frontTypeSymbol('lift'), 'up');
 eq(C.frontTypeSymbol('fall'), 'down');
 eq(C.frontTypeSymbol('blind'), 'cross');
-eq(C.frontTypeSymbol('drawer_front'), null,
-   'zasuvka je VEDOME bez symbolu (mockupovy ∧ by splyval s vyklopom)');
+eq(C.frontTypeSymbol('drawer_front'), 'xdash',
+   'D-115: zasuvka ma PRERUSOVANE X (od plneho X blendy ju lisi prave ciara)');
 eq(C.frontTypeSymbol('door'), null, 'dvierka riesia kridla, nie typ');
 eq(C.frontTypeSymbol('none'), null);
 

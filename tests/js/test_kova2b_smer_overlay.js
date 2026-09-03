@@ -21,6 +21,8 @@ function no(cond, msg){ n++; assert.ok(!cond, msg); }
 
 const JS = path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js');
 const FIX = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'kova2b_symbols.json'), 'utf8'));
+// D-115: spolocna tabulka TVAROV (jednotkovy stvorec) — cita ju Ruby aj JS.
+const SHP = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'front_symbol_shapes.json'), 'utf8'));
 const C = require(path.join(JS, 'core.js'));
 
 // ============ 1) SYMBOLY = spolocna tabulka fixtur s RUBY ====================
@@ -32,6 +34,37 @@ FIX.types.forEach(row => {
   eq(C.frontTypeSymbol(row.type), row.expect, row.case);
 });
 ok(FIX.wings.length >= 10, 'tabulka fixtur je podozrivo kratka');
+
+// ============ 1b) D-115: TVAR = ta ista fixtura ako v RUBY ==================
+// Do D-115 bolo overene len MENO symbolu — a kresby sa naozaj rozisli (Ruby
+// kreslilo sipku s hrotom, JS holy chevron). Odteraz obe strany porovnavaju
+// svoj tvar s TYM ISTYM suborom, takze rozchod padne naraz.
+(function(){
+  const TOL = 1e-9;
+  const names = Object.keys(SHP.shapes).sort();
+  eq(names.length, 6, 'fixtura musi popisat vsetkych 6 useckovych symbolov');
+  ok(Math.abs(C.FRONT_SYM_INSET - SHP.corner_inset) < 1e-12,
+     'odsadenie rohov je sucastou kontraktu');
+  names.forEach(sym => {
+    const want = SHP.shapes[sym];
+    const got = C.frontSymbolShape(sym);
+    ok(got, 'symbol ' + sym + ' tvar nema');
+    eq(got.dashed, want.dashed, sym + ': prerusovanie (prerusovana = pohyb, plna = dielec)');
+    eq(got.lines.length, want.lines.length, sym + ': pocet usecek');
+    want.lines.forEach((ln, i) => ln.forEach((pt, j) => pt.forEach((v, k) => {
+      n++;
+      assert.ok(Math.abs(got.lines[i][j][k] - v) < TOL,
+                sym + ': usecka ' + i + ' bod ' + j + ' suradnica ' + k +
+                ' — cakam ' + v + ', dostal ' + got.lines[i][j][k]);
+    })));
+  });
+  eq(C.frontSymbolShape('unknown'), null, '„neurcene" je kruh + otaznik, nie usecky');
+  eq(C.frontSymbolShape('nonsense'), null, 'neznamy symbol nekresli nic');
+  // PLNA je LEN blenda; zasuvka ma to iste X, ale prerusovane.
+  eq(names.filter(s => SHP.shapes[s].dashed === false), ['cross'], 'plny je jedine symbol blendy');
+  eq(C.frontSymbolShape('xdash').lines, C.frontSymbolShape('cross').lines,
+     'zasuvku od blendy lisi VYHRADNE ciara, nie tvar');
+})();
 
 // ============ 2) PREPINAC V LISTE SEKCIE KONTROLA (Studio) ==================
 
@@ -157,7 +190,7 @@ global.NXIcons = {
 };
 global.window.NXIcons = global.NXIcons;
 global.NXInsert = require(path.join(JS, 'insert_state.js'));
-require(path.join(JS, 'preview.js'));
+const PV = require(path.join(JS, 'preview.js'));
 require(path.join(JS, 'board_card.js'));
 Object.keys(C).forEach(k => { global[k] = C[k]; });
 global.FRONT_PROFILES = [];
@@ -221,5 +254,116 @@ ok(rowOf('F1').querySelector('.fcard'), 'a predchadzajuca karta ostava, ako bola
 no(FM.nxFocusFront(''), 'prazdna adresa');
 no(FM.nxFocusFront(null), 'chybajuca adresa');
 no(FM.nxFocusFront(undefined), 'ani undefined');
+
+// ============ 5) D-115: KRESBA symbolov v nahlade ===========================
+// `drawFrontSymbols` uz nema vlastnu geometriu — len premieta jednotkovy tvar
+// na kridlo: u -> x = x0 + u*w, v -> zz = z + v*ph. Overuje sa, ze koncove
+// body naozaj sedia v ROHOCH kridla (s odsadenim) a v STREDE protilahlej hrany,
+// a ze prerusovanie hovori „pohyb / dielec".
+(function(){
+  const PAD = 14, H = 2000;
+  const rx = x => PAD + x;              // zrkadlo renderPreview
+  const ry = z => PAD + (H - z);        // ry PREKLAPA Z (hore = mensie y)
+  const INS = C.FRONT_SYM_INSET, FAR = 1 - INS;
+
+  // vsetky <line> ako [x1, y1, x2, y2]; kazdy prvok je jeden SVG element
+  function draw(it, cols, z, ph){
+    const S = [];
+    PV.drawFrontSymbols(S, rx, ry, it, cols, z, ph);
+    return S;
+  }
+  function lines(S){
+    return S.filter(s => s.indexOf('<line') === 0).map(s => {
+      const m = s.match(/x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)"/);
+      return m.slice(1, 5).map(Number);
+    });
+  }
+  function pt(x, zz){ return [Number(rx(x).toFixed(6)), Number(ry(zz).toFixed(6))]; }
+  function segs(S){
+    return lines(S).map(l => [[Number(l[0].toFixed(6)), Number(l[1].toFixed(6))],
+                              [Number(l[2].toFixed(6)), Number(l[3].toFixed(6))]])
+                   .map(s => JSON.stringify(s)).sort();
+  }
+  function want(pairs){
+    return pairs.map(p => JSON.stringify([pt(p[0], p[1]), pt(p[2], p[3])])).sort();
+  }
+
+  // --- jednokridlove dvierka, panty VLAVO: kridlo x 0..400, panel z 0..700 ---
+  global.frontSlots = { D1: { wings_n: 1, slots: [{ wing: 'single', state: 'left' }] },
+                        D2: { wings_n: 1, slots: [{ wing: 'single', state: 'right' }] },
+                        D3: { wings_n: 1, slots: [{ wing: 'single', state: null }] } };
+  const COL1 = [{ x: 0, w: 400 }];
+  const L = draw({ id: 'D1', type: 'door' }, COL1, 0, 700);
+  eq(segs(L), want([[400*INS, 700*INS, 400*FAR, 700*0.5],
+                    [400*INS, 700*FAR, 400*FAR, 700*0.5]]),
+     'panty VLAVO: ciary z lavych rohov do stredu pravej hrany');
+  ok(L.every(s => s.indexOf('stroke-dasharray') >= 0), 'dvierka sa hybu -> PRERUSOVANE');
+
+  const R = draw({ id: 'D2', type: 'door' }, COL1, 0, 700);
+  eq(segs(R), want([[400*FAR, 700*INS, 400*INS, 700*0.5],
+                    [400*FAR, 700*FAR, 400*INS, 700*0.5]]),
+     'panty VPRAVO su presnym zrkadlom');
+
+  eq(draw({ id: 'D3', type: 'door' }, COL1, 0, 700), [], 'LEGACY kridlo sa nekresli VOBEC');
+  eq(draw({ id: 'DX', type: 'door' }, COL1, 0, 700), [],
+     'v rezime vkladania (bez zaznamu servera) sa JEDNO kridlo nekresli — strana sa NEHADA');
+
+  // --- 2 kridla: KRAJNE odvodene (p1 vlavo, posledne vpravo) ----------------
+  const COL2 = [{ x: 0, w: 300 }, { x: 320, w: 300 }];
+  const W2 = draw({ id: 'DX', type: 'door' }, COL2, 0, 700);
+  eq(segs(W2), want([[300*INS, 700*INS, 300*FAR, 350],
+                     [300*INS, 700*FAR, 300*FAR, 350],
+                     [320 + 300*FAR, 700*INS, 320 + 300*INS, 350],
+                     [320 + 300*FAR, 700*FAR, 320 + 300*INS, 350]]),
+     'dvojkridlo da „><" — kazde kridlo z vlastnych rohov');
+
+  // --- 3 kridla: stredne podla slotu (tu „neurcene" = kruh + otaznik) -------
+  global.frontSlots.T1 = { wings_n: 3, slots: [{ wing: 'p2', state: 'unset' }] };
+  const COL3 = [{ x: 0, w: 200 }, { x: 220, w: 200 }, { x: 440, w: 200 }];
+  const W3 = draw({ id: 'T1', type: 'door' }, COL3, 0, 700);
+  eq(lines(W3).length, 4, 'krajne kridla kreslia po dvoch ciarach');
+  eq(W3.filter(s => s.indexOf('<circle') === 0).length, 1, '„neurcene" ostava KRUH');
+  ok(W3.some(s => s.indexOf('>?<') >= 0), 'a otaznik v nom');
+  ok(W3.filter(s => s.indexOf('<circle') === 0 || s.indexOf('>?<') >= 0)
+      .every(s => s.indexOf('#e65100') >= 0), '„neurcene" je JEDINE v jantari');
+
+  // --- vyklop / sklop: „V" a „Λ" cez cely otvor -----------------------------
+  const UP = draw({ id: 'U1', type: 'lift' }, COL1, 0, 700);
+  eq(segs(UP), want([[400*INS, 700*FAR, 200, 700*INS], [400*FAR, 700*FAR, 200, 700*INS]]),
+     'vyklop (panty hore) = „V" z HORNYCH rohov do stredu dolnej hrany');
+  const APEX = pt(200, 700*INS);
+  ok(lines(UP).every(l => l[3] > l[1]),
+     'vrchol „V" je na obrazovke NIZSIE nez horne rohy (ry preklapa Z)');
+  ok(APEX[1] > ry(700*FAR), 'a hlbsie nez horna hrana panelu');
+
+  const DN = draw({ id: 'F1', type: 'fall' }, COL1, 0, 700);
+  eq(segs(DN), want([[400*INS, 700*INS, 200, 700*FAR], [400*FAR, 700*INS, 200, 700*FAR]]),
+     'sklop (panty dole) = „Λ" z DOLNYCH rohov do stredu hornej hrany');
+
+  // --- zasuvka vs. blenda: to iste X, ine pero ------------------------------
+  const DRW = draw({ id: 'S1', type: 'drawer_front' }, COL1, 0, 700);
+  const BLD = draw({ id: 'B1', type: 'blind' }, COL1, 0, 700);
+  const X = want([[400*INS, 700*INS, 400*FAR, 700*FAR], [400*INS, 700*FAR, 400*FAR, 700*INS]]);
+  eq(segs(DRW), X, 'zasuvkove celo = X cez cely panel (D-115: uz nie je bez symbolu)');
+  eq(segs(BLD), X, 'blenda ma TO ISTE X');
+  ok(DRW.every(s => s.indexOf('stroke-dasharray') >= 0), 'zasuvka sa VYSUVA -> prerusovane');
+  ok(BLD.every(s => s.indexOf('stroke-dasharray') < 0), 'blenda sa NEHYBE -> PLNE');
+  ok(BLD.every(s => s.indexOf('stroke-width="3"') >= 0), 'a ostava rovnako hruba');
+
+  // --- co sa nekresli -------------------------------------------------------
+  eq(draw({ id: 'N1', type: 'none' }, COL1, 0, 700), [], '„Bez čela" nema symbol');
+  eq(draw({ id: 'S1', type: 'drawer_front' }, COL1, 0, 0), [], 'nulova vyska panelu');
+  eq(draw({ id: 'S1', type: 'drawer_front' }, [], 0, 700), [], 'ziadne kridlo');
+
+  // --- symbol NEPRESAHUJE panel a NEDOTYKA sa jeho obrysu -------------------
+  ['left', 'right', 'up', 'down', 'cross', 'xdash'].forEach(sym => {
+    C.frontSymbolShape(sym).lines.forEach(ln => ln.forEach(p => {
+      n++;
+      assert.ok(p[0] >= INS - 1e-12 && p[0] <= FAR + 1e-12 &&
+                p[1] >= INS - 1e-12 && p[1] <= FAR + 1e-12,
+                sym + ': bod ' + JSON.stringify(p) + ' lezi na obryse panelu (alebo mimo)');
+    }));
+  });
+})();
 
 console.log(`test_kova2b_smer_overlay.js OK (${n} kontrol)`);

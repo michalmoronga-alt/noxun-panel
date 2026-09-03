@@ -1,9 +1,10 @@
 # frozen_string_literal: true
 # Noxun Engine — KOV-A2b: SMER OTVARANIA V MODELI. Zapnuty prepinac nakresli na
-# PREDNU plochu kazdeho cela symbol toho, ako sa celo otvara: prerusovana sipka
-# na volnu hranu (smer = STRANA PANTOV), `∧` vyklop, `∨` sklop, plne X blenda.
-# Jeden pohlad na celu zakazku — „ktore dvierka su lave" sa uz nemusi lustit
-# z kariet po jednom.
+# PREDNU plochu kazdeho cela symbol toho, ako sa celo otvara. Od D-115 je to
+# STOLARSKA KONVENCIA: dve ciary z ROHOV strany PANTOV do STREDU protilahlej
+# (volnej) hrany — dvierka `><`, vyklop `V`, sklop `Λ`, zasuvka prerusovane X,
+# blenda PLNE X (jediny plny symbol, lebo sa nehybe). Jeden pohlad na celu
+# zakazku — „ktore dvierka su lave" sa uz nemusi lustit z kariet po jednom.
 #
 # Je to PRESNE ZRKADLO `grain_check.rb` (K2/D-87): ten isty lifecycle overlayu,
 # ta ista pamat prepinaca, ten isty broadcast do oboch okien. Vlastny modul
@@ -15,7 +16,7 @@
 # `Fronts.direction_slots` (KOV-A1) — z GEOMETRIE sa NEODVODZUJE NIC a katalog
 # sa tu necita. Trojstav A1 plati bez vynimky (R-39: ziadny default, ziadna
 # heuristika — ani v overlayi):
-#   'left'/'right' — vyriesene   -> sipka na volnu hranu
+#   'left'/'right' — vyriesene   -> ciary z rohov pantov na volnu hranu
 #   'unset'        — vedome neurcene -> prerusovany kruh + „?" (jantar)
 #   kluc CHYBA     — LEGACY      -> NEKRESLI SA NIC (a nikdy sa nic nedoplna)
 # KRAJNE kridla 2/3/4-kridlovych dvierok su ODVODENE (A1 variant a: p1 = panty
@@ -36,7 +37,7 @@
 # zdielanym `cabinet_id` maju kazda svoj config a kazda svoju kresbu.
 #
 # ============================ FARBY (rozhodnutie A2b) =========================
-# COLOR = #880e4f (tmava malinova) pre VYRIESENE symboly (sipky, ∧, ∨, X):
+# COLOR = #880e4f (tmava malinova) pre VYRIESENE symboly (ciary z rohov, X):
 #   - NIE cervena/oranzova/zelena: to su tri stavy olepu (`EdgeCheck::COLORS`),
 #   - NIE #37474f: to je smer kresby (`GrainCheck::COLOR`) — oba prekrytia
 #     mozu byt zapnute naraz nad TYM ISTYM celom,
@@ -70,8 +71,10 @@ module Noxun
       SYM_UP = 'up'
       SYM_DOWN = 'down'
       SYM_CROSS = 'cross'
-      SYMBOLS = [SYM_LEFT, SYM_RIGHT, SYM_UNKNOWN, SYM_UP, SYM_DOWN, SYM_CROSS].freeze
+      SYM_XDASH = 'xdash'
+      SYMBOLS = [SYM_LEFT, SYM_RIGHT, SYM_UNKNOWN, SYM_UP, SYM_DOWN, SYM_CROSS, SYM_XDASH].freeze
       # Symboly kridiel dvierok (do poctu „kridel" v liste sa ratau len tieto).
+      # Zasuvka sa medzi „kridla" NERATA — nema stranu ani stav, len tvar.
       WING_SYMBOLS = [SYM_LEFT, SYM_RIGHT, SYM_UNKNOWN].freeze
 
       # Posun symbolu VON z telesa (mm) — bez neho by bojoval o hlbku s prednou
@@ -86,18 +89,56 @@ module Noxun
       TEXT_UNKNOWN = '?'
 
       # --- proporcie symbolov (podiely rozmerov panelu) ------------------------
-      ARROW_TAIL = 0.16   # zaciatok drieku od hrany pri pantoch
-      ARROW_TIP  = 0.86   # HROT pri VOLNEJ hrane
-      HEAD_FRAC  = 0.16   # velkost hrotu sipky
-      CHEVRON_FRAC = 0.22 # velkost ∧ / ∨
+      # D-115: ciary sa zacinaju v ROHOCH panelu, odsadenych o tento podiel —
+      # bez odsadenia by splynuli s obrysom dielca aj s modrym zvyraznenim
+      # vyberu. Stredy protilahlych hran su presne 0,5 (ziadne odsadenie).
+      CORNER_INSET = 0.05
       GLYPH_MIN  = 6.0    # mm — pod tym uz symbol nie je symbol
       GLYPH_MAX  = 45.0   # mm — nad tym by na velkom cele „krical"
-      EDGE_FRAC  = 0.16   # odsadenie ∧/∨ od hornej/dolnej hrany
-      CROSS_INSET = 0.12  # odsadenie X od hran (blenda)
       RING_FRAC  = 0.22   # polomer kruhu „neurcene"
       RING_MIN   = 8.0
       RING_MAX   = 60.0
       RING_SEGS  = 24     # polygon namiesto kruznice (GL_LINES)
+
+      # ================= TVAR SYMBOLU — JEDINY ZDROJ (D-115) ===================
+      # Stolarska konvencia (Michal 3.9.): CIARY Z ROHOV strany pantov do STREDU
+      # protilahlej (volnej) hrany. Suradnice su v JEDNOTKOVOM stvorci panelu:
+      #   u = po SIRKE  0 -> 1 zlava doprava
+      #   v = po VYSKE  0 -> 1 ZDOLA NAHOR (hore = 1)
+      # `dashed` nesie jedine pravidlo kresby: PRERUSOVANA = pohyb, PLNA =
+      # dielec — preto je blenda jediny plny symbol a zasuvka od nej odlisena
+      # prave tym prerusovanim (`xdash`).
+      #
+      # TA ISTA tabulka zije v `frontSymbolShape` (ui/js/core.js) a OBE strany
+      # sa porovnavaju s TOU ISTOU fixturou (tests/fixtures/front_symbol_shapes.json),
+      # takze model a nahlad sa uz nemozu rozist ani v TVARE (do D-115 bolo
+      # overene len MENO symbolu — a kresby sa naozaj rozisli).
+      SHAPES = {
+        # dvierka, panty VLAVO -> z lavych rohov do stredu pravej hrany
+        SYM_LEFT => { 'lines' => [[[CORNER_INSET, CORNER_INSET], [1.0 - CORNER_INSET, 0.5]],
+                                  [[CORNER_INSET, 1.0 - CORNER_INSET], [1.0 - CORNER_INSET, 0.5]]],
+                      'dashed' => true },
+        # dvierka, panty VPRAVO -> presne zrkadlo
+        SYM_RIGHT => { 'lines' => [[[1.0 - CORNER_INSET, CORNER_INSET], [CORNER_INSET, 0.5]],
+                                   [[1.0 - CORNER_INSET, 1.0 - CORNER_INSET], [CORNER_INSET, 0.5]]],
+                       'dashed' => true },
+        # vyklop (panty HORE) -> „V" z hornych rohov do stredu DOLNEJ hrany
+        SYM_UP => { 'lines' => [[[CORNER_INSET, 1.0 - CORNER_INSET], [0.5, CORNER_INSET]],
+                                [[1.0 - CORNER_INSET, 1.0 - CORNER_INSET], [0.5, CORNER_INSET]]],
+                    'dashed' => true },
+        # sklop (panty DOLE) -> „Λ" z dolnych rohov do stredu HORNEJ hrany
+        SYM_DOWN => { 'lines' => [[[CORNER_INSET, CORNER_INSET], [0.5, 1.0 - CORNER_INSET]],
+                                  [[1.0 - CORNER_INSET, CORNER_INSET], [0.5, 1.0 - CORNER_INSET]]],
+                      'dashed' => true },
+        # blenda sa NEHYBE -> PLNE X
+        SYM_CROSS => { 'lines' => [[[CORNER_INSET, CORNER_INSET], [1.0 - CORNER_INSET, 1.0 - CORNER_INSET]],
+                                   [[CORNER_INSET, 1.0 - CORNER_INSET], [1.0 - CORNER_INSET, CORNER_INSET]]],
+                       'dashed' => false },
+        # zasuvkove celo -> to iste X, ale PRERUSOVANE
+        SYM_XDASH => { 'lines' => [[[CORNER_INSET, CORNER_INSET], [1.0 - CORNER_INSET, 1.0 - CORNER_INSET]],
+                                   [[CORNER_INSET, 1.0 - CORNER_INSET], [1.0 - CORNER_INSET, CORNER_INSET]]],
+                       'dashed' => true }
+      }.freeze
 
       OVERLAY_ID = 'noxun.engine.direction_check'
       OVERLAY_NAME = 'Noxun — smer otvárania'
@@ -126,13 +167,15 @@ module Noxun
         end
       end
 
-      # Symbol NEDVIEROKOVEHO typu. Zrkadlo `frontTypeSymbol` — zasuvka je
-      # VEDOME bez symbolu (∧ by splyval s vyklopom).
+      # Symbol NEDVIEROKOVEHO typu. Zrkadlo `frontTypeSymbol`. D-115: zasuvkove
+      # celo uz symbol MA — prerusovane X (`xdash`); od plneho X blendy ho lisi
+      # prave prerusovanie (pravidlo „prerusovana = pohyb, plna = dielec").
       def type_symbol(type)
         case type.to_s
         when 'lift' then SYM_UP
         when 'fall' then SYM_DOWN
         when 'blind' then SYM_CROSS
+        when 'drawer_front' then SYM_XDASH
         end
       end
 
@@ -173,17 +216,19 @@ module Noxun
         end
       end
 
-      # part_key nedvierkoveho cela (KOV-A1 kanonicke kluce).
+      # part_key nedvierkoveho cela (KOV-A1 kanonicke kluce — presne tie, ktorymi
+      # dielce pomenoval `Fronts.panels_for`; zasuvkove celo je `front:F#/panel`).
       def type_key(front_id, type)
         case type.to_s
         when 'lift', 'fall' then PartKeys.front(front_id, 'flap')
         when 'blind' then PartKeys.front(front_id, 'blind')
+        when 'drawer_front' then PartKeys.front(front_id, 'panel')
         end
       end
 
       # Co sa ma pri JEDNEJ resolved polozke `front_items` nakreslit:
       #   [{ key: part_key, symbol: 'left'|… }]
-      # Prazdne pole = nic (legacy dvierka, zasuvka, „Bez cela").
+      # Prazdne pole = nic (legacy dvierka, „Bez cela").
       # CISTA funkcia — ziadne IO, ziadny SketchUp.
       def marks(item)
         return [] unless item.is_a?(Hash)
@@ -247,60 +292,29 @@ module Noxun
           'text' => (flat['text'] ? point_at(ti, depth, wi, flat['text'][0], li, flat['text'][1]) : nil) }
       end
 
-      # Symbol v rovine cela ako dvojice [sirka, dlzka] — cely tvar zije TU,
-      # aby sa dal testovat bez osi aj bez SketchUpu.
+      # TVAR symbolu v jednotkovom stvorci panelu:
+      #   { 'lines' => [[[u,v],[u,v]], …], 'dashed' => true|false }
+      # nil = symbol nema usecky (dnes jedine `unknown` — kruh + otaznik).
+      # CISTA funkcia bez IO: toto je JEDINE miesto, kde tvar zije (D-115).
+      def shape_unit(sym)
+        SHAPES[sym.to_s]
+      end
+
+      # Symbol v rovine cela ako dvojice [sirka, dlzka] — jednotkovy tvar
+      # premietnuty na panel: u po SIRKE, v po DLZKE (os `l` rastie NAHOR,
+      # takze „hore" v tabulke je hore aj v modeli).
       def plan_2d(sym, w0, span_w, l0, span_l)
-        case sym
-        when SYM_LEFT, SYM_RIGHT
-          { 'lines' => arrow_2d(sym, w0, span_w, l0, span_l), 'text' => nil }
-        when SYM_UP, SYM_DOWN
-          { 'lines' => chevron_2d(sym == SYM_UP, w0, span_w, l0, span_l), 'text' => nil }
-        when SYM_CROSS
-          { 'lines' => cross_2d(w0, span_w, l0, span_l), 'text' => nil }
-        else
-          c = [w0 + span_w / 2.0, l0 + span_l / 2.0]
-          { 'lines' => ring_2d(c[0], c[1], ring_radius(span_w, span_l)), 'text' => c }
+        shape = shape_unit(sym)
+        if shape
+          lines = shape['lines'].map do |a, b|
+            [[w0 + a[0] * span_w, l0 + a[1] * span_l],
+             [w0 + b[0] * span_w, l0 + b[1] * span_l]]
+          end
+          return { 'lines' => lines, 'text' => nil }
         end
-      end
 
-      # Sipka: driek po sirke cela v polovici vysky, HROT pri VOLNEJ hrane
-      # ('left' = panty vlavo -> hrot vpravo, teda v smere rastucej sirky).
-      def arrow_2d(sym, w0, span_w, l0, span_l)
-        mid = l0 + span_l / 2.0
-        if sym == SYM_LEFT
-          tail = w0 + span_w * ARROW_TAIL
-          tip  = w0 + span_w * ARROW_TIP
-        else
-          tail = w0 + span_w * (1.0 - ARROW_TAIL)
-          tip  = w0 + span_w * (1.0 - ARROW_TIP)
-        end
-        hs = glyph_size(span_w, span_l, HEAD_FRAC, (tip - tail).abs)
-        back = tip + (tip > tail ? -hs : hs)
-        [[[tail, mid], [tip, mid]],
-         [[tip, mid], [back, mid + hs]],
-         [[tip, mid], [back, mid - hs]]]
-      end
-
-      # ∧ (vyklop) pri HORNEJ hrane, ∨ (sklop) pri DOLNEJ — hrot ukazuje tam,
-      # kam sa celo pohne.
-      def chevron_2d(up, w0, span_w, l0, span_l)
-        mid = w0 + span_w / 2.0
-        hs = glyph_size(span_w, span_l, CHEVRON_FRAC, span_l * (1.0 - 2.0 * EDGE_FRAC))
-        apex = up ? l0 + span_l * (1.0 - EDGE_FRAC) : l0 + span_l * EDGE_FRAC
-        arm = up ? apex - hs : apex + hs
-        [[[mid, apex], [mid - hs, arm]],
-         [[mid, apex], [mid + hs, arm]]]
-      end
-
-      # Blenda sa NEHYBE — plne X cez cely panel (jediny PLNY symbol).
-      def cross_2d(w0, span_w, l0, span_l)
-        iw = span_w * CROSS_INSET
-        il = span_l * CROSS_INSET
-        a = w0 + iw
-        b = w0 + span_w - iw
-        c = l0 + il
-        d = l0 + span_l - il
-        [[[a, c], [b, d]], [[a, d], [b, c]]]
+        c = [w0 + span_w / 2.0, l0 + span_l / 2.0]
+        { 'lines' => ring_2d(c[0], c[1], ring_radius(span_w, span_l)), 'text' => c }
       end
 
       # „Neurcene" = prerusovany kruh (polygon) okolo otaznika. Je to STAV,
@@ -477,8 +491,9 @@ module Noxun
       # ================= PAYLOAD PRE KRESLENIE + CISLA =========================
       # Z hotovej scan cache spravi TRI ploche polia bodov (GL_LINES) a
       # deterministicke pocty. Bezi pri zmene cache, NIKDY per frame.
-      #   'move'  — prerusovane, COLOR: sipky a ∧/∨ (co sa hybe)
-      #   'fixed' — plne, COLOR: X blendy (co sa NEhybe)
+      #   'move'  — prerusovane, COLOR: dvierka, vyklop/sklop a X zasuvky
+      #             (`xdash`) — vsetko, co sa HYBE
+      #   'fixed' — plne, COLOR: X blendy (jediny symbol, ktory sa NEhybe)
       #   'ask'   — prerusovane, COLOR_UNSET: kruhy „neurcene"
       def view_payload
         return @payload if @payload

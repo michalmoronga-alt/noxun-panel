@@ -121,7 +121,10 @@ verzie pluginu) do configu neprejde.
 **Materiál bez smeru override IGNORUJE, ale NEMAŽE** — rozhodnutie používateľa prežije dočasný UNI/jednofarebný materiál a s dekorom ožije. Chýbajúci kľúč = dedenie, takže staré
 modely sú platné a ich otvorenie nezapisuje nič. Ďalej: regenerate; vizuál nôh **a úchytkových profilov (D-90)** ako **proxy** (kind hardware, production_class none, manufactured
 false — zdroj pravdy súpisu je VÝHRADNE `config.hardware[]` korpusu). Profil: definícia per (profil, dĺžka) `NOXUN_PROFILE_<ID>_L<dĺžka>` s recykláciou podľa mena + odtlačok
-`PROFILE_GEOM_REV` (zmena obrysu prekreslí staré definície), kotva = zadná rovina čela (Y 0) a vrch PÔVODNÉHO čela.
+`PROFILE_GEOM_REV` (zmena obrysu prekreslí staré definície), kotva = zadná rovina čela (Y 0) a vrch PÔVODNÉHO čela. **TAG profilu je tag jeho ČELA, nie Kovania** (D-116, Michal 3.9.):
+`part_tag(model, pd[:role])` — úchytka je s čelom zrastená, takže pri skrytí tagu „Čelá" musí zmiznúť s ním (predtým visela vo vzduchu). **Vedomý dôsledok: prepínač tagu Kovanie ju už
+neschová** — patrí k čelu, nie k nohám (tie na `hardware_tag` ostávajú). Dáta proxy sa tým NEMENIA (súpis, nákup ani dĺžka rezu sa tagu nedotýkajú) a staré zákazky sa preznačia pri
+najbližšej prestavbe — proxy vzniká pri každom rebuilde nanovo, takže žiadna migrácia netreba. Stráži in-SU sekcia `run_d116`.
 
 **PRERUŠENIE STAVBY** (`abort_safely`): výnimka kdekoľvek vnútri `build`/`rebuild` ruší CELÚ operáciu a **neprehĺta sa** — volajúci sa o nej dozvie. Rollback vracia geometriu
 (inštanciu aj definície dielcov) **a zároveň modelové atribúty**, teda aj projektové snapshoty kovania, ktoré `build_into` cestou `HardwareRules.ensure_project_rules!` /
@@ -449,19 +452,24 @@ in-SketchUp sekcia `run_k2`.
 ### direction_check.rb
 
 (+ `DirectionOverlay`/`DirectionModelWatch` v `edge_overlay.rb`) — **KOV-A2b: SMER OTVÁRANIA v modeli.** Prepínač „Smer otvárania" nakreslí na **prednú plochu každého čela** symbol toho, ako sa
-otvára: prerušovaná šípka na **voľnú hranu** (smer = strana pántov), `∧` výklop, `∨` sklop, **plné X** blenda, zásuvka **vedome nič** (mockupový ∧ by splýval s výklopom). Je to **POHĽAD, nie
+otvára. Od **D-115** je to stolárska konvencia: **dve čiary z ROHOV strany pántov do STREDU protiľahlej (voľnej) hrany** — dvierka `><`, výklop „V", sklop „Λ", zásuvka prerušované X, blenda
+**plné X** (jediný plný symbol, lebo sa nehýbe). Je to **POHĽAD, nie
 dáta**: `Sketchup::Overlay` NAD modelom — žiadna operácia, žiadny undo krok, nič v .skp; po vypnutí v modeli neostane nič. Vlastný modul (nie ďalší stav K2) zámerne: K2 hovorí o smere **kresby
 dekoru**, toto o smere **otvárania** — a obe sa dajú zapnúť naraz nad tým istým čelom.
 
 **ZDROJ JE ULOŽENÝ CONFIG, nikdy geometria:** pre každú top-level inštanciu `cabinet` sa číta `front_items` a `Fronts.direction_slots` (KOV-A1 = **jediná** definícia „kde sa smer pýta"); dielec sa
 dohľadá medzi vnorenými `kind: part` podľa `part_key` (tá istá cesta ako `ProductionCore.pids_in_cabinet`). Kreslí sa **per INŠTANCIA** — dve skrinky so zdieľaným `cabinet_id` majú každá svoj config
-a každá svoju kresbu. Trojstav A1 platí bez výnimky (**R-39: žiadny default ani heuristika — ani v overlayi**): `left`/`right` → šípka · `unset` → prerušovaný kruh + „?" · **kľúč chýba (legacy) →
+a každá svoju kresbu. Trojstav A1 platí bez výnimky (**R-39: žiadny default ani heuristika — ani v overlayi**): `left`/`right` → čiary z rohov pántov · `unset` → prerušovaný kruh + „?" · **kľúč chýba (legacy) →
 nekreslí sa NIČ**. Krajné krídla 2/3/4-krídlových dvierok sú **ODVODENÉ** (A1 variant a: p1 pánty vľavo, posledné vpravo). Výber symbolu (`dir_symbol`/`type_symbol`/`wing_symbols`) je **zrkadlo**
-`frontDirSymbol`/`frontTypeSymbol`/`frontWingSymbols` z `ui/js/core.js` — čo vidno v náhľade karty, to je aj v modeli (stráži test nad spoločnými fixtúrami).
+`frontDirSymbol`/`frontTypeSymbol`/`frontWingSymbols` z `ui/js/core.js` — čo vidno v náhľade karty, to je aj v modeli (stráži test nad spoločnými fixtúrami). **D-115: zásuvkové čelo už symbol MÁ**
+(`xdash`, kanonický kľúč `front:F#/panel` z `Fronts.panels_for`) — do „krídel" sa však NERÁTA (`WING_SYMBOLS`), takže počty v raile aj v lište Kontroly ostávajú o dvierkach.
 
 **Geometria:** symbol leží na ploche **MIN osi hrúbky** (tá, na ktorú sa pozerá používateľ) posunutej o `OUT_MM = 0,7` von — viac než `EdgeCheck::OUT_MM` (0,5), aby ho neprekryla plôška olepu, a
-menej než `HoverEdge::OUT_MM` (0,9), takže hover hrany ostáva navrchu. Osi určuje zdieľané `PartFaces.axes_for_snapshot` (čelo = `AXES_FRONT`); neoveriteľné osi = **nekreslí sa nič** (D-88). Celý tvar
-žije v čistej vrstve (`plan_2d` → `arrow_2d`/`chevron_2d`/`cross_2d`/`ring_2d` v mm roviny čela), takže sa dá testovať bez SketchUpu. Prerušované sa kreslí `line_stipple = '-'`; pero sa po kreslení
+menej než `HoverEdge::OUT_MM` (0,9), takže hover hrany ostáva navrchu. Osi určuje zdieľané `PartFaces.axes_for_snapshot` (čelo = `AXES_FRONT`); neoveriteľné osi = **nekreslí sa nič** (D-88). **TVAR má JEDINÝ zdroj** (D-115):
+`SHAPES` je tabuľka úsečiek v **jednotkovom štvorci** panelu (u po šírke 0→1 zľava doprava, v po výške 0→1 **zdola nahor**; rohy odsadené o `CORNER_INSET = 0,05`, stredy hrán presne 0,5) plus
+príznak `dashed` = jediné pravidlo kresby (**prerušovaná = pohyb, plná = dielec**); `shape_unit` ju vydá, `plan_2d` ju premietne na panel a pre `unknown` (bez úsečiek) padne na `ring_2d`. Tú istú
+tabuľku má JS (`frontSymbolShape` v `ui/js/core.js`) a **obe strany sa porovnávajú s fixtúrou `tests/fixtures/front_symbol_shapes.json`** — do D-115 bolo overené len MENO symbolu a kresby sa
+naozaj rozišli (Ruby šípka s hrotom, JS holý chevron). Celý tvar žije v čistej vrstve, takže sa dá testovať bez SketchUpu. Prerušované sa kreslí `line_stipple = '-'`; pero sa po kreslení
 **vracia do východzieho stavu**, inak by prerušovane kreslili aj prekrytia za nami.
 
 **Farby:** `COLOR = #880e4f` (tmavá malinová) pre vyriešené symboly — nie tri stavy olepu (`EdgeCheck::COLORS`), nie `GrainCheck::COLOR` (#37474f — obe prekrytia môžu byť zapnuté naraz), nie teal
