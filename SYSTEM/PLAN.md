@@ -449,6 +449,34 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
 - **V1.0 zostavy:** spájanie a zarovnávanie korpusov (čelné/zadné hrany, pripájacie body, snaper logika) · soklová lišta v celku pre segment · obklady a krycie prvky segmentu vrátane pilastra
   (priznaný vs. skrytý) · pracovné a horné krycie dosky na označený segment · migrácia a oprava starých modelov · test na kompletnej reálnej zákazke. **Mimo V1** (V1_VIZIA):
   plné segmenty s `attachment` dátovým kontraktom, automatické krycie dosky a PD cez segment — v zásobníku (koncept 02 je podklad).
+- **NÁSTROJE-1 · TASK PACKAGE „MOWER + SNAPER V BALÍKU NOXUN ENGINE" (D-20; V1 bod 1A „staré pluginy" — Michal 4.9.2026; Audit: ÁNO — nový modul; in-SU POVINNÉ):**
+  **Cieľ:** jeden inštalačný balík — oba nástroje sa presunú ako moduly do `noxun_engine/tools/` (`mower.rb`, `snaper.rb`; namespace `Noxun::Engine::Tools::*`), načíta ich `main.rb`,
+  dostanú **jeden spoločný toolbar „Noxun Nástroje"** (poradie: −90° · +90° · 180° · Z = 0 · Z posun… · Kópia vľavo · Kópia vpravo · Prisunúť vľavo · Prisunúť vpravo; slovenské tooltipy;
+  menu Extensions → Noxun Engine → Nástroje). Vlastné registrácie rozšírení a `VERSION` nástrojov zaniknú — verziu aj update (D-52) preberá engine. **Prečo samostatný toolbar:** toolbar
+  enginu má železné pravidlo „do modelu sa nezapisuje" (D-103/D-105); nástroje model menia, preto vlastný toolbar. UI nástrojov sa inak NEMENÍ (Michal: „nechať im svoj svet").
+  **Kópia (Mower) — oprava fantómu:** dnes `add_instance` tej istej definície bez atribútov inštancie → kópia bez identity (Inspector ju nevidí, nie je v kusovníku, pri prestavbe originálu
+  sa mení s ním). Pre NOXUN skrinku pôjde kópia **cestou „Vložiť kópiu"** (`Store.config` → `config_to_params` → `rekey_hardware_manual` → `CabinetBuilder.build(model, params,
+  transform: src.transformation * translation(±šírka, 0, 0))`): vlastná definícia, nové sekvenčné CAB číslo, 1 operácia = 1 Späť, výber = kópia, `push_selected`; brána R-12
+  `newer_config?` = kópia sa nevloží + hláška. Šírka kroku z configu (`width`), nie z bounds; pri parametrickej skrinke odpadajú odhady osi/znamienka podľa uhla (kópia sedí po VLASTNEJ osi X pri
+  akejkoľvek rotácii). **Názov kópie:** ručný názov + písmenová prípona („Dolná pri sporáku a", ďalšia „… b" — inkrement, ak už končí príponou); bez ručného názvu ostáva automatický.
+  Dosky (BRD): obdoba cez `BoardBuilder`, ak má build s polohou — inak SCOPE OUT s hláškou. Nie-NOXUN objekty (staré DC komponenty): dnešná cesta (DC `lenx` / bounds, `add_instance`).
+  **Rotácie ±90/180, Z = 0, Z posun:** logika bez zmeny (pivot = stred bbox, svetová Z; engine posun sleduje sám, žiadna prestavba); Z-posun dialog ostáva HtmlDialog (callbacky pred `show`).
+  **Snaper:** prevziať 1:1 (AABB sweep v lokálnom rámci cieľa, WARN 10 m, BLOCK 20 m, skryté/tag-off ignoruje, kontajnery do hĺbky 8) — hlásenia cez objekt rozšírenia enginu.
+  **Inštalátor + updater:** jednorazové odstránenie starých samostatných inštalácií (`noxun_mower_loader.rb`, `Noxun_Mower\`, `snaper.rb`, `snaper\`) s hláškou (inak dvojité načítanie
+  a dva toolbary); updater to spraví pri prvom štarte novej verzie (súbory po načítaní nie sú zamknuté), zlyhanie mazania = úspech s poznámkou (vzor D-52). Zdroj nástrojov sa presunie do
+  repa; pôvodné priečinky workspace (`..\snaper`, `Noxun_Mower`) ostanú ako archív (mapa workspace `..\CLAUDE.md` mimo repa).
+  **Scope OUT:** tlačidlo „Vložiť kópiu" v toolbare (Michal: nie) · nové funkcie nástrojov · zarovnanie výšky/hĺbky k susedovi (bod 1B) · Noxun_Pick/V2fable vkladanie · KOVANIE (starý) a
+  vepo_exporter (odstavia sa samostatne).
+  **Testy a DoD:** headless — čisté funkcie (vektor posunu z configu šírky a lokálnej osi, prípona názvu a → b, zoznam legacy súborov, výber cesty NOXUN/DC/iné); **in-SU sekcia
+  `run_tools1`** — kópia vľavo/vpravo NOXUN skrinky = nová inštancia s VLASTNOU definíciou a novým CAB id, `Panel` payload ju vidí, kusovník má o skrinku viac, 1 krok Späť ju odstráni;
+  kópia rotovanej skrinky (90°) sedí na doraz (dotyk bbox, bez medzery); názov s príponou a → b; ad-hoc položky rekeyed; R-12: kópia z novšej verzie odmietnutá bez zmeny modelu;
+  rotácie/Z = 1 krok Späť a žiadna prestavba (počet dielcov nezmenený); Snaper: prisunutie k susedovi (medzera 0), bez prekážky blokované, skrytá prekážka neblokuje; DC komponent (nie
+  NOXUN) → stará cesta bez pádu. Mutácie min. 3 (kópia cez `add_instance` · prípona bez inkrementu · legacy súbory neodstránené).
+  **Riziká:** kolízia namespace pri neodstránenej starej inštalácii (preto upratanie v OBOCH kanáloch) · rozsah (rez T1a presun + toolbar + kópia / T1b inštalátor + updater).
+  **Smoke pre Michala:** po inštalácii jeden toolbar „Noxun Nástroje", staré toolbary Mower/Snaper preč · označ skrinku → Kópia vpravo → nová skrinka vedľa, Inspector ju otvorí, v kusovníku
+  pribudla, Ctrl+Z ju odstráni · pomenovaná skrinka → kópia „… a" · rotuj 90° a skopíruj → sedí na doraz · Snaper prisunie k susedovi · Z = 0 a Z posun fungujú ako doteraz.
+  **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → nový odsek `tools` v `docs/architecture/ui-lifecycle.md` + riadok rozcestníka `docs/ARCHITEKTURA.md` (guard) → README
+  (inštalácia, upratanie starých pluginov) → D-20 do DOGFOODING_vyriesene (plný text + riadok indexu) → STAV/KRONIKA/PLAN.
 
 ### 5 · RENDER M-R
 
@@ -608,7 +636,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   ukáže „dostupná 0.9.x" → Aktualizovať → okná sa zavrú, hláška, reštart → nová verzia; skús so staršou kópiou → tlačidlo neaktívne s vysvetlením; vytiahni sieťový disk →
   sekcia hlási nedostupný zdroj, Štúdio nezamrzne. **Checklist uzáveru:** bump patch + `?v=` → testy → `ui-lifecycle.md` (odsek About + updater UI, vedomá odchýlka) →
   D-52 do DOGFOODING_vyriesene (plný text + riadok indexu) → STAV/KRONIKA/PLAN (blok 6 položka hotová).
-- **D-20 · Quick actions — bezpečný move plugin** — zlúčiť noxun_mower + Snaper do jedného toolbaru; kopírovanie musí prejsť štandardným dedup tickom (dnes vzniká kópia bez NOXUN identity).
+- **D-20 · Quick actions — bezpečný move plugin** — **ZARADENÉ do V1 (Michal 4.9.2026, bod 1A): package NÁSTROJE-1 v bloku 4.** Pôvodne: zlúčiť noxun_mower + Snaper do jedného toolbaru; kopírovanie musí prejsť štandardným dedup tickom (dnes vzniká kópia bez NOXUN identity).
 
 ## Po V1 — zásobník (nezaradené, nestratiť)
 
