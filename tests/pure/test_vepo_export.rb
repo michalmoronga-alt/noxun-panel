@@ -1,8 +1,14 @@
 # frozen_string_literal: true
-# Testy VEPO CSV exportu (core/vepo_export.rb) — format podla SYSTEM/03 kontraktu.
+# Testy VEPO CSV exportu (core/vepo_export.rb) — format podla SYSTEM/VEPO_KONTRAKT.md.
 # Uzamyka: obchodne hrubky, kody hran, rotaciu dekoru, ODPOCET ABS (prirez!),
 # presne bajty CSV (force quotes, ';', CRLF, bez hlavicky), grouping + merge 18/36,
 # chybne riadky mimo CSV, atomicky zapis davky s guardom cudzich suborov.
+#
+# KONTRAKT v1.1 (D-112 + D-113, 3.9.2026) — bajtove vzorky su tu VEDOME prepisane:
+#   * CSV ma DEVIATY stlpec `poznamka` (prazdny, ked riadok poznamku nema),
+#   * nazov riadku nesie skratky dielcov a skrinky ("Bok s1" namiesto "Bok").
+# Overene importom do VEPO 3.9.2026 (9-stlpcovy subor prijaty, poznamka sa
+# zobrazila pri riadku). Samotne D-112/D-113 spravanie testuje test_d112_d113_vepo.rb.
 require_relative '../helper' unless defined?(NxTest)
 
 module NxVepo
@@ -116,7 +122,9 @@ NxTest.test('vepo: CSV riadok — presne bajty (force quotes, ;, CRLF, bez hlavi
   g = out['groups'].first
   NxTest.assert_equal('kuchyna_novak_k009_pw_dtdl_18_36.csv', g['filename'])
   # sirka 560 = HOTOVY rozmer (ABS 1mm na L1 sa NEodratava — kod — to nesie)
-  expected = "\"Bok\";\"720\";\"—\";\"560\";\"\";\"18\";\"2\";\"K009 PW DTDL\"\r\n"
+  # v1.1: nazov nesie skrinku ("Bok s1", D-113) a na konci je 9. stlpec
+  # `poznamka` — tu prazdny, lebo mapy dekorov build nedostal (D-112).
+  expected = "\"Bok s1\";\"720\";\"—\";\"560\";\"\";\"18\";\"2\";\"K009 PW DTDL\";\"\"\r\n"
   NxTest.assert_equal(expected, g['csv'], 'byte-for-byte format riadku')
   NxTest.assert_equal('UTF-8', g['csv'].encoding.name)
   NxTest.refute(g['csv'].start_with?("﻿"), 'ziadny BOM')
@@ -156,7 +164,9 @@ NxTest.test('vepo: chybne riadky idu do errors a LOGu, nie do CSV') do
   reasons = out['errors'].map { |e| e['reason'] }.join(' | ')
   NxTest.assert(reasons.include?('počet') && reasons.include?('materiál') && reasons.include?('neznáma ABS'))
   NxTest.assert(out['log_text'].include?('ZlaABS'), 'LOG menuje chybny dielec')
-  NxTest.assert(out['errors'].find { |e| e['name'] == 'Zly' }['owners'].include?('CAB-1'))
+  # v1.1 (D-113): LOG aj `errors` pouzivaju TEN ISTY `row_name` ako CSV — nazov
+  # chybneho riadku preto nesie aj skrinku ("Zly s1").
+  NxTest.assert(out['errors'].find { |e| e['name'] == 'Zly s1' }['owners'].include?('CAB-1'))
 end
 
 NxTest.test('vepo: prazdne rows = ziadne skupiny; LOG existuje aj tak') do
@@ -284,6 +294,11 @@ end
 # Zlata vzorka: PRESNE bajty CSV (force quotes, ';', CRLF, em-dash) pre fixne
 # vstupne data. Kazda zmena exportneho formatu tento test zhodi — VEPO CSV a
 # nazvy suborov sa NEMENIA (dogfooding kontrakt).
+#
+# VEDOMY PREPIS 3.9.2026 — kontrakt v1.1 (D-112 + D-113): pribudol 9. stlpec
+# `poznamka` a nazov riadku nesie skratky + skrinky. Prijatie 9-stlpcoveho
+# suboru overil Michal importom priamo vo VEPO (poznamka sa zobrazila v poli
+# „Poznámka pre VEPO" pri riadku). Nazvy suborov ani grouping sa NEMENIA.
 NxTest.test('vepo 2A-4b: zlata vzorka — CSV bajty a nazvy suborov su NEMENNE (F8)') do
   rows = [
     NxVepo.vrow('edges' => { 'L1' => 'ABS1', 'L2' => nil, 'W1' => 'ABS2', 'W2' => 'ABS2' }),
@@ -300,11 +315,11 @@ NxTest.test('vepo 2A-4b: zlata vzorka — CSV bajty a nazvy suborov su NEMENNE (
                       out['groups'].map { |g| g['filename'] })
   hdf = out['groups'][0]
   k009 = out['groups'][1]
-  NxTest.assert_equal("\"Chrbát\";\"764\";\"\";\"564\";\"\";\"3\";\"1\";\"Biela HDF\"\r\n".b,
+  NxTest.assert_equal("\"Chrbát s1\";\"764\";\"\";\"564\";\"\";\"3\";\"1\";\"Biela HDF\";\"\"\r\n".b,
                       hdf['csv'].b, 'HDF CSV bajty')
   NxTest.assert_equal(
-    "\"Bok\";\"720\";\"—\";\"560\";\"=\";\"18\";\"2\";\"K009 PW DTDL\"\r\n" \
-    "\"Polica\";\"500\";\"\";\"964\";\"—\";\"36\";\"1\";\"K009 PW DTDL\"\r\n".b,
+    "\"Bok s1\";\"720\";\"—\";\"560\";\"=\";\"18\";\"2\";\"K009 PW DTDL\";\"\"\r\n" \
+    "\"Polica s2\";\"500\";\"\";\"964\";\"—\";\"36\";\"1\";\"K009 PW DTDL\";\"\"\r\n".b,
     k009['csv'].b, 'K009 CSV bajty (vratane rotacie dekoru a merge 18/36)'
   )
 end
