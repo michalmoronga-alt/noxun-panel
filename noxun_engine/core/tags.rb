@@ -6,6 +6,12 @@
 # .board_tag` a `Zones.sync_ghost`. Tento modul o nich vie len TOLKO, ze ich
 # vie NAJST a PREPNUT im viditelnost — geometriu sa nedotyka.
 #
+# ROZDELENIE VIZUALOV KOVANIA (D-116, Michal 3.9.): NOHY id na `hardware_tag`
+# (Kovanie), ale UCHYTKOVE PROFILY (D-90) na tag SVOJHO CELA cez `part_tag`
+# — su s celom zrastene, takze pri skryti tagu „Čelá" musia zmiznut s nim.
+# VEDOMY DOSLEDOK: prepinac tagu Kovanie uchytky uz neschova. Tento modul sa
+# tym NEMENI (mena tagov aj tu ostavaju z konstant builderov).
+#
 # STYRI ZASADY (draho zaplatene inde v repe a v Codex audite davky):
 #   1) MENA TAGOV MAJU JEDINY ZDROJ — konstanty builderov. Citaju sa az za
 #      behu (`const_defined?` guard), takze tu nie je opisany ani jeden
