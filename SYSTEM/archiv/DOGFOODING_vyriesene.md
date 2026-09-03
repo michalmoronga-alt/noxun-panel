@@ -4,6 +4,8 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-115** — Symboly smeru otvárania: čiary z rohov, nie šípky (náhľad aj viewport) — vyriešené 3.9.2026, PR #286, v0.9.21
+- **D-116** — Úchytkové profily (UKW) na tag Čelá, nie Kovanie — vyriešené 3.9.2026, PR #286, v0.9.21
 - **Výklop ako samostatný typ čela** *(bez D-čísla)* — typ je v paneli **voliteľný** (typegrid piktogramov v karte čela) — vyriešené 3.9.2026, KOV-A1 PR #280 + KOV-A2a PR #281, v0.9.16
 - **D-52** — Aktualizovať jedným klikom (updater) — vyriešené 3.9.2026, PR #277 + #278 + #279, v0.9.14
 > **Presunuté zo živého zápisníka [../DOGFOODING.md](../DOGFOODING.md) 26.8.2026** (dávka
@@ -96,6 +98,55 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-115 · Symboly smeru otvárania: čiary z rohov, nie šípky — v náhľade panela AJ vo viewporte (Michal 3.9.2026, smoke v0.9.20; vyriešené 3.9.2026, PR #286, v0.9.21)
+
+**Pôvodný postreh (plné znenie).** Dnešná kresba (KOV-A2a `drawFrontSymbols` v náhľade, KOV-A2b overlay `direction_check.rb` v modeli) používa **šípku k voľnej hrane**
+a `∧`/`∨` pri hrane. Michal chce **stolársku konvenciu „čiary z rohov"** (priložil obrázok 5 piktogramov): **dvierka** = dve prerušované čiary **z oboch rohov strany pántov
+do stredu protiľahlej (voľnej) hrany** — per krídlo (dvojkrídlo dá `><`, stredné krídla podľa slotov; na obrázku sú čiary z ľavých rohov = pánty vľavo) · **zásuvka** =
+prerušované X (uhlopriečky — dovtedy zásuvka symbol nemala) · **výklop** (pánty hore) = prerušované „V" z horných rohov do stredu dolnej hrany · **sklop** (pánty dole) =
+prerušované „Λ" z dolných rohov do stredu hornej hrany · **blenda** = plné X (nehýbe sa; od zásuvky ju líši plná čiara). Pravidlo „prerušovaná = pohyb, plná = dielec"
+ostáva. **Neurčený smer** ostáva jantárový „?". **Dlaždice typegridu a ikona v riadku sa NEMENIA** („piktogramy v buttonoch môžu ostať").
+
+**Príčina, prečo to bolo treba riešiť naraz v oboch svetoch.** Tvar symbolu bol napísaný **dvakrát** — v Ruby (`arrow_2d`/`chevron_2d`/`cross_2d`) a v JS (`pvSymPathXY`) —
+a strážené bolo len **MENO** symbolu (spoločná fixtúra `kova2b_symbols.json`). Kresby sa preto naozaj rozišli: Ruby kreslilo šípku **s hrotom** (driek + dve ramená),
+JS holý chevron `>` bez drieku. Zmena konvencie na jednom mieste by rozdiel len prehĺbila.
+
+**Riešenie.** Tvar má odteraz **JEDINÝ zdroj per jazyk** a **spoločný kontrakt**: `DirectionCheck.shape_unit(sym)` (Ruby, tabuľka `SHAPES`) a `frontSymbolShape(sym)`
+(JS, `core.js`) vracajú úsečky v **jednotkovom štvorci** panelu (u po šírke 0→1 zľava doprava, v po výške 0→1 **zdola nahor**; rohy odsadené o `CORNER_INSET = 0,05`, aby
+čiary nesplynuli s obrysom panelu ani s modrým výberom, stredy hrán presne 0,5) plus príznak `dashed`. **Obe implementácie sa porovnávajú s tou istou fixtúrou**
+`tests/fixtures/front_symbol_shapes.json` (tolerancia 1e-9), takže sa už nemôžu rozísť ani v tvare. `plan_2d` (Ruby) a `drawFrontSymbols` (JS) tvar už len premietajú;
+`arrow_2d`/`chevron_2d`/`cross_2d`/`pvSymPathXY` a konštanty proporcií šípky/chevronu zanikli.
+
+Pribudol symbol **`xdash`** = zásuvkové čelo: rovnaké úsečky ako blenda, ale **prerušované** (bucket `move`) — od plného X blendy ho líši výhradne čiara. Mark dostáva
+kanonický kľúč `front:F#/panel` z `Fronts.panels_for` (žiadny nový sa nevymýšľa) a **do „krídel" sa neráta** (`WING_SYMBOLS`), takže počty v raile Inspectora aj v lište
+Kontroly hovoria ďalej o dvierkach. „Neurčené" (jantárový kruh + „?"), farby, `OUT_MM`, lifecycle overlayu, observer a cache sa **nemenili**; overlay ostáva pohľadom nad
+modelom (žiadna operácia, žiadny krok Späť). Popis čela v strede panela dostal **halo** farbou výplne panelu (PV_* zrkadlo tokenu — žiadna nová farba), inak by ho X
+zásuvky alebo blendy preškrtlo. Dlaždice typegridu ani ikona v riadku čela sa nedotkli.
+
+**Overené:** headless `test_kova2b_smer_overlay.rb` (fixtúra ↔ `shape_unit`, guard zhody mien Ruby ↔ `core.js`, buckety cez `view_payload`, geometria na paneli
+400×700 mm), JS `test_kova2b_smer_overlay.js` (fixtúra ↔ `frontSymbolShape`, `drawFrontSymbols` pre Ľ/P a 2/3-krídlo, zásuvka vs. blenda), in-SketchUp `run_kova2b`
+(koncové body = rohy krídla a stred protiľahlej hrany na prednej ploche; výkon 40 skriniek / 486 dielcov = 25,3 ms).
+
+### D-116 · Úchytkové profily (UKW) na tag Čelá, nie Kovanie (Michal 3.9.2026, smoke v0.9.20; vyriešené 3.9.2026, PR #286, v0.9.21)
+
+**Pôvodný postreh (plné znenie).** Proxy profilu dostáva v `CabinetBuilder.render_front_profile` tag `Noxun/Kovanie` (spolu s nohami a ostatným vizuálom kovania), takže
+po skrytí tagu Čelá (pohľad dovnútra skrinky pri práci) **úchytky visia vo vzduchu**. Michal navrhuje priradiť **všetky úchytky k tagu čiel** (`Noxun/Čelá` — tag
+vlastníka), aby zmizli spolu s dverami. Dôsledok na priznanie: prepínač tagu **Kovanie** ich už neschová (úchytka patrí k čelu, nie k nohám) — Michalov návrh to vedome
+chce. Dáta (`kind: hardware`, `role: handle`, nákup, dĺžka rezu) sa nemenia — ide len o `inst.layer`; existujúce zákazky sa preznačia pri najbližšej prestavbe.
+
+**Riešenie.** `render_front_profile` používa `part_tag(model, pd[:role])` namiesto `hardware_tag(model)`. Rola je rola **panelu čela** (`front_door` · `drawer_front` ·
+`flap` · `false_front`) a všetky vedú cez `PART_TAGS` na `Noxun/Čelá`; profil vzniká len nad čelom (inak `profile_placement` vráti `nil`), takže sa iná rola nemôže
+priplietť. **Dáta proxy sa nedotkli** — `kind: 'hardware'`, `role: 'handle'`, `config` (generic_type, profil, dĺžka rezu, `owner_part_key`), `manufactured: false`,
+`production_class: 'none'` ostávajú, súpis kovania sa ďalej číta výhradne z `config.hardware[]` korpusu (golden testy bez regenerácie). `Tags::ROWS` ani `tag_name` sa
+nemenili — presunula sa jediná vec, `inst.layer`. **Žiadna migrácia:** proxy vzniká pri každom rebuilde nanovo, takže staré zákazky sa preznačia pri najbližšej
+prestavbe. **Nohy a ostatný vizuál kovania ostávajú na `hardware_tag`.**
+
+**Vedomý dôsledok (chcený):** prepínač tagu **Kovanie** úchytky už neschová.
+
+**Overené:** nová in-SketchUp sekcia `run_d116` — tag po stavbe, po prestavbe (zmena šírky), po kópii s dedup tikom, preznačenie simulovanej starej zákazky
+(`inst.layer = Kovanie` → prestavba → Čelá), nedotknuté dáta proxy a skutočné skrytie úchytky cez `Tags.set_visible('cela', false)` vrátane priznaného dôsledku, že
+prepínač Kovanie ju už neschová.
 
 ### Výklop ako samostatný typ čela *(bez D-čísla — vzišlo z kontraktu UI 2.0, otvorené dávkou UI-C3 19.8.2026)* (vyriešené 3.9.2026, dávky KOV-A1 PR #280 · KOV-A2a PR #281, v0.9.15 → v0.9.16)
 

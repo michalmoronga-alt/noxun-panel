@@ -718,13 +718,18 @@ o neurčenom smere. KOV-A2a k nim pridala **zápis z karty** (`frontExtraSet`, p
 (`dvierka · zásuvka · výklop · sklop · blenda`). Do KOV-A1 sa každé ne-zásuvkové a ne-`none` čelo popisovalo ako „dvierka", takže pri configu z API sa rozbaľovačka v riadku
 volala „Výklop" a náhľad vedľa nej tvrdil „dvierka". Fallback `'dvierka'` ostáva, ale **už len pre NEZNÁMY typ** (napr. z novšej verzie). Testuje `tests/js/test_uib2_nahlad.js`.
 
-**Symboly otvárania v projekcii Čelá (KOV-A2a, `drawFrontSymbols`).** Pravidlo je jedno: **prerušovaná čiara = pohyb, plná = dielec** (to isté hovoria sprite ikony typegridu).
-Kreslia sa vo výberovej farbe `PV_SELECT_ACCENT`, jediná výnimka je „neurčené" v jantári (`--nx-warn-fg`) — je to otvorená otázka, nie chyba stavby. **Dvierka: symbol je PER
-KRÍDLO** — jednokrídlové podľa slotu servera, krajné krídla 2/3/4-krídlového čela **odvodené** (A1 kontrakt: p1 = pánty vľavo, posledné vpravo — nič sa neukladá), stredné opäť
-podľa slotov; šípka mieri na **voľnú hranu** a je k nej aj posunutá, takže neleží na popise čela. **LEGACY čelo sa nekreslí vôbec** (žiadny fallback na stranu). Výklop `∧` a sklop
-`∨` idú k hrane, ktorá sa otvára; blenda je **plné X** (nehýbe sa). **Zásuvka symbol VEDOME nemá** — mockupový `∧` by splýval s výklopom. Čo sa má nakresliť, rozhodujú **čisté
-funkcie v `core.js`** (`frontWingSymbols` · `frontDirSymbol` · `frontTypeSymbol`) nad `front_slots`; `preview.js` stav smeru vôbec neinterpretuje (stráži guard). V režime
-vkladania sloty neexistujú, takže sa kreslia iba odvodené krajné krídla.
+**Symboly otvárania v projekcii Čelá (KOV-A2a → D-115, `drawFrontSymbols`).** Pravidlo je jedno: **prerušovaná čiara = pohyb, plná = dielec** (to isté hovoria sprite ikony
+typegridu). Kreslia sa vo výberovej farbe `PV_SELECT_ACCENT`, jediná výnimka je „neurčené" v jantári (`--nx-warn-fg`) — je to otvorená otázka, nie chyba stavby. **TVAR je od D-115
+stolárska konvencia** (Michal 3.9.): **dve čiary z ROHOV strany pántov do STREDU protiľahlej (voľnej) hrany**, cez celé krídlo — symbol tak nemá „veľkosť" ani posun k voľnej hrane,
+smer hovorí sám tvar. **Dvierka: symbol je PER KRÍDLO** — jednokrídlové podľa slotu servera, krajné krídla 2/3/4-krídlového čela **odvodené** (A1 kontrakt: p1 = pánty vľavo, posledné
+vpravo — nič sa neukladá), stredné opäť podľa slotov; dvojkrídlo tak dá `><`. **LEGACY čelo sa nekreslí vôbec** (žiadny fallback na stranu), „neurčené" ostáva **jantárový kruh + „?"**
+v strede krídla. Výklop = „V" z horných rohov, sklop = „Λ" z dolných; **zásuvka prerušované X**, blenda **plné X** (nehýbe sa) — dva rovnaké tvary, ktoré od seba odlišuje výhradne
+čiara. **Geometria má JEDINÝ zdroj:** `frontSymbolShape(sym)` v `core.js` vráti úsečky v **jednotkovom štvorci** (u po šírke, v po výške **zdola nahor**; rohy odsadené o
+`FRONT_SYM_INSET = 0,05`) + `dashed`; `drawFrontSymbols` už len premietne `u → x = x0 + u*w`, `v → zz = z + v*ph`. **Tú istú tabuľku má Ruby overlay** (`DirectionCheck::SHAPES`)
+a obe strany sa porovnávajú s fixtúrou `tests/fixtures/front_symbol_shapes.json` — do D-115 bolo overené len meno symbolu a kresby sa naozaj rozišli. Čo sa má nakresliť, rozhodujú
+**čisté funkcie v `core.js`** (`frontWingSymbols` · `frontDirSymbol` · `frontTypeSymbol`) nad `front_slots`; `preview.js` stav smeru vôbec neinterpretuje (stráži guard). V režime
+vkladania sloty neexistujú, takže sa kreslia iba odvodené krajné krídla. **Popis čela** (`fnum · typ · výška`) ostáva v strede panela a dostal **halo** farbou výplne panela (`col`,
+PV_* zrkadlo tokenu — žiadna nová farba), inak by ho X zásuvky/blendy preškrtlo. **Dlaždice typegridu ani ikona v riadku čela (`FRONT_TYPE_ICON`) sa nemenia.**
 
 ### Úchytky = D-96 (form.js refreshFrontProfileUI / onFrontProfilePick + čisté funkcie v core.js)
 

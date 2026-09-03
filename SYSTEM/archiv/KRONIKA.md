@@ -17,6 +17,27 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **SMOKE 3.9. + KOV-A SMOKE FIX · D-115 symboly z rohov a D-116 tag úchytiek (v0.9.21, 3.9.2026, PR #286):** malá vizuálna dávka priamo z Michalovho smoku nad v0.9.20.
+  **Smoke sám prešiel BEZ CHYBY**, body 1–6 PASS: (1) prepínač „Smer otvárania" funguje v raile Inspectora aj v lište sekcie Kontrola a na zákazke KLINIKA sa zapol hneď, bez
+  zmeny modelu; (2) RED nález „neurčený smer" v Kontrole → ceruzka otvorí kartu **správneho** čela; (3) kópia skrinky aj šablóna držia typy čiel aj smer; (4) Inspector →
+  Kovanie: ručné položky z katalógu aj voľné, úprava aj zmazanie, každý krok Späť, zmena šírky ich drží, chip „chýba v katalógu" sa zjavuje správne; (5) Štúdio → Nákup zlieva
+  ručné položky s automatickými, chip „ručná" a rozklik pôvodu sedia, Rozpočet započíta voľnú položku; (6) Štúdio → Kovanie ako doteraz + nová voľba „Výklop / sklop", nákup
+  KLINIKA identický. Z neho vzišli tri postrehy — **D-114** (rad piktogramov pridania) ostal otvorený ako UI/UX balík na koniec bloku KOVANIE, **D-115** a **D-116** urobila
+  táto dávka.
+  **D-115 — prečo to nebola kozmetika.** Michal chce **stolársku konvenciu**: čiary z rohov strany pántov do stredu protiľahlej hrany namiesto šípky a `∧`/`∨`. Pri hľadaní,
+  kde sa tvar mení, sa ukázalo, že tvar bol napísaný **dvakrát** (Ruby `arrow_2d`/`chevron_2d`/`cross_2d`, JS `pvSymPathXY`) a strážené bolo len **MENO** symbolu — takže sa
+  kresby **už rozišli**: overlay v modeli kreslil šípku s hrotom, náhľad panela holý chevron. Preto sa nemenil tvar na dvoch miestach, ale zaviedol sa **jeden zdroj tvaru per
+  jazyk nad SPOLOČNOU FIXTÚROU**: `DirectionCheck.shape_unit` / `frontSymbolShape` vracajú úsečky v jednotkovom štvorci panelu (u po šírke, v po výške zdola nahor, rohy
+  odsadené o 0,05) a **obe strany sa porovnávajú s `tests/fixtures/front_symbol_shapes.json`**. Rozchod odteraz padne naraz v oboch sadách. Zásuvkové čelo dostalo symbol
+  `xdash` (prerušované X) — od plného X blendy ho líši výhradne čiara, čo je presne pravidlo „prerušovaná = pohyb, plná = dielec"; do počtu „krídel" sa neráta, takže čísla
+  v raile aj v Kontrole hovoria ďalej o dvierkach. Popis čela v náhľade dostal halo farbou výplne panelu, inak by ho nové X preškrtlo.
+  **D-116 — tag vlastníka.** Úchytkový profil (D-90 proxy) mal tag `Noxun/Kovanie`, takže po skrytí tagu Čelá visel vo vzduchu. Dostáva `part_tag(model, pd[:role])` = tag
+  svojho čela. **Vedomý dôsledok, ktorý Michal chce:** prepínač tagu Kovanie úchytky už neschová — patria k čelu, nie k nohám. Dáta proxy sa nedotkli (nákup, dĺžka rezu ani
+  súpis sa z tagu nečítajú), migrácia netreba — proxy vzniká pri každom rebuilde nanovo, takže staré zákazky sa preznačia pri najbližšej prestavbe.
+  **Testy:** 2651 headless · 82 JS sád · plný in-SketchUp beh **1504 PASS** (nová sekcia `run_d116`, prepísané geometrické asserty v `run_kova2b`). Overené štyrmi
+  mutáciami: zámena `left`/`right` v Ruby aj v JS tabuľke, `xdash` do plného bucketu a návrat tagu na `hardware_tag` — každá zhodila práve ten test, ktorý ju má chytiť.
+  **Codex review:** doplní orchestrátor po review.
+
 - **KOV-H2 · AD-HOC KOVANIE — INSPECTOR UI (v0.9.20, 3.9.2026):** druhý rez slice H. Dátovú vrstvu dala H1 (položka mimo setov v `config['hardware_manual'][]`), ale **nebolo
   ju ako pridať** — jediná cesta bola ručne editovaný config. H2 jej dáva obrazovku: blok **„Ručne pridané"** v kontexte Kovanie, D-15 modal a **rozklik pôvodu** v sekcii Nákup
   Štúdia. **Dátový kontrakt H1 sa nezmenil ani o kľúč** — žiadny nový zápisový kanál, žiadna zmena `norm_hardware_manual`, CSV ani cien.

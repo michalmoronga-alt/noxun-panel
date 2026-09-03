@@ -36,21 +36,6 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   čela" rozhodnúť), klik = nový riadok daného typu (dvierka ďalej cez výrobcu smeru „neurčené", pravidlo (a) karty). Rad zaberie **ten istý jeden riadok** ako dnešné dve tlačidlá.
   Michal zároveň: „celkovo UI čiel bude treba po tomto zásahu upratať — necháme na koniec, opäť spravíme UI/UX balík". *Stav: ZAPÍSANÉ — UI/UX balík kontextu Čelá **na koniec
   bloku KOVANIE** (po KOV-D/E/F, keď bude známy celý obsah karty: zámky osí, závesy, resolved systém); dovtedy sa nerobí.*
-- **D-115 · Symboly smeru otvárania: čiary z rohov, nie šípky — v náhľade panela AJ vo viewporte** (Michal 3.9., smoke v0.9.20; priložený obrázok 5 piktogramov) — dnešná kresba
-  (KOV-A2a `drawFrontSymbols`, KOV-A2b overlay `direction_check.rb`) používa šípku k voľnej hrane a ∧/∨ pri hrane; Michal chce stolársku konvenciu **„čiary z rohov"**:
-  **dvierka** = dve prerušované čiary **z oboch rohov strany pántov do stredu protiľahlej (voľnej) hrany** — per krídlo (dvojkrídlo dá `><`, stredné krídla podľa slotov;
-  na obrázku sú čiary z ľavých rohov = pánty vľavo) · **zásuvka** = prerušované X (uhlopriečky — dnes zásuvka symbol nemá) · **výklop** (pánty hore) = prerušované V z horných
-  rohov do stredu dolnej hrany · **sklop** (pánty dole) = prerušované Λ z dolných rohov do stredu hornej hrany · **blenda** = plné X (nehýbe sa; od zásuvky ju líši plná čiara).
-  Pravidlo „prerušovaná = pohyb, plná = dielec" ostáva. **Neurčený smer** ostáva jantárový „?" (Michal nespomenul — potvrdiť). **Dlaždice typegridu a ikona v riadku sa NEMENIA**
-  („piktogramy v buttonoch môžu ostať"). Dotknuté: čisté funkcie `frontWingSymbols` · `frontDirSymbol` · `frontTypeSymbol` v `core.js` + `preview.js` + `core/direction_check.rb`
-  (jeden zdroj tvaru pre obe kresby, ak sa dá). *Stav: OTVORENÉ — kandidát na **malú fix dávku hneď** (čisto vizuál, žiadny zápis do modelu, žiadne dáta); in-SU odporúčané
-  (overlay), JS testy symbolov existujú (`test_kova2a_karta.js`, `test_uib2_nahlad.js`).*
-- **D-116 · Úchytkové profily (UKW) na tag Čelá, nie Kovanie** (Michal 3.9., smoke — „D mimo tohto packu") — proxy profilu dostáva v `CabinetBuilder.render_front_profile` tag
-  `Noxun/Kovanie` (spolu s nohami a ostatným vizuálom kovania), takže po skrytí tagu Čelá (pohľad dovnútra skrinky pri práci) **úchytky visia vo vzduchu**. Michal navrhuje
-  priradiť **všetky úchytky k tagu čiel** (`Noxun/Čelá` — tag vlastníka), aby zmizli spolu s dverami. Dôsledok na priznanie: prepínač tagu **Kovanie** ich už neschová (úchytka
-  patrí k čelu, nie k nohám) — Michalov návrh to vedome chce. Dáta (`kind: hardware`, `role: handle`, nákup, dĺžka rezu) sa nemenia — ide len o `inst.layer`; existujúce
-  zákazky sa preznačia pri najbližšej prestavbe. *Stav: OTVORENÉ — malá builder dávka (in-SU povinné: tag po stavbe, po prestavbe, po kópii; guard `tags.rb` bez zmeny),
-  môže ísť spolu s D-115.*
 
 ## KONTROLA + VÝROBA
 
