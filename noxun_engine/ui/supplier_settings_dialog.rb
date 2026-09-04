@@ -507,6 +507,9 @@ module Noxun
         def close_plugin_dialogs
           Panel.hide if defined?(Panel) && Panel.respond_to?(:hide)
           StudioDialog.hide if defined?(StudioDialog) && StudioDialog.respond_to?(:hide)
+          # NASTROJE-1: Z-dialog nastrojov je tretie okno pluginu — jeho callback
+          # zapisuje do modelu, takze pred swapom musi zmiznut ako ostatne.
+          Tools::ZDialog.hide if defined?(Tools::ZDialog) && Tools::ZDialog.respond_to?(:hide)
           true
         rescue StandardError => e
           Engine.log_error(e, 'SupplierSettingsDialog.close_plugin_dialogs')
@@ -517,7 +520,9 @@ module Noxun
         # `set_on_closed`, nie na neviditelne okno: CEF moze este drzat subory
         # z `ui/` a rename priecinka by na Windows zlyhal.
         def dialogs_closed?
-          [defined?(Panel) ? Panel : nil, defined?(StudioDialog) ? StudioDialog : nil]
+          [defined?(Panel) ? Panel : nil,
+           defined?(StudioDialog) ? StudioDialog : nil,
+           defined?(Tools::ZDialog) ? Tools::ZDialog : nil]
             .compact.all? { |mod| mod.respond_to?(:dialog_closed?) ? mod.dialog_closed? : true }
         end
 
