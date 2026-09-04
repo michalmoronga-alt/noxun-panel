@@ -73,10 +73,26 @@ NxTest.test('NASTROJE-1: hlada sa NAJBLIZSIA VOLNA pripona (diera po zmazanom a)
   NxTest.assert_equal('Skrinka c', MC.copy_name('Skrinka', ['Skrinka a', 'Skrinka b']))
 end
 
-NxTest.test('NASTROJE-1: po vycerpani pismen pokracuju cisla od 27') do
+NxTest.test('NASTROJE-1: po vycerpani jednopismenovych pripon pokracuju dvojpismenove (z -> aa)') do
   taken = MC::LETTERS.map { |l| "Rad #{l}" }
-  NxTest.assert_equal('Rad 27', MC.copy_name('Rad', taken))
-  NxTest.assert_equal('Rad 28', MC.copy_name('Rad 27', taken + ['Rad 27']))
+  NxTest.assert_equal('Rad aa', MC.copy_name('Rad', taken))
+  NxTest.assert_equal('Rad ab', MC.copy_name('Rad aa', taken + ['Rad aa']))
+end
+
+NxTest.test('NASTROJE-1: pripona NIKDY nie je cislo (bijektivna sustava a…z, aa…zz, aaa…)') do
+  NxTest.assert_equal(%w[a b z aa ab az ba zz aaa],
+                      [0, 1, 25, 26, 27, 51, 52, 701, 702].map { |i| MC.suffix_for(i) })
+  offenders = (0..800).map { |i| MC.suffix_for(i) }.reject { |s| s =~ /\A[a-z]+\z/ }
+  NxTest.assert(offenders.empty?, "necisto pismenove pripony: #{offenders.first(5).inspect}")
+end
+
+NxTest.test('NASTROJE-1: rucny nazov koniaci CISLOM sa nikdy neoreze (sirka nie je pripona)') do
+  # Rozhodnutie 4.9.2026: „Dolná 900" je sirka skrinky — kopia ju musi UDRZAT.
+  NxTest.assert_equal('Dolná 900 a', MC.copy_name('Dolná 900', ['Dolná 900']))
+  NxTest.assert_equal('Dolná 900 b', MC.copy_name('Dolná 900 a', ['Dolná 900', 'Dolná 900 a']))
+  # VELKE pismeno tiez nie je pripona — „Bok L" je oznacenie laveho boku.
+  NxTest.assert_equal('Bok L a', MC.copy_name('Bok L', ['Bok L']))
+  NxTest.assert_equal('Bok L b', MC.copy_name('Bok L a', ['Bok L', 'Bok L a']))
 end
 
 NxTest.test('NASTROJE-1: pripona PREZIJE 80-znakovy limit — zaklad sa oreze') do
@@ -91,10 +107,16 @@ NxTest.test('NASTROJE-1: pripona PREZIJE 80-znakovy limit — zaklad sa oreze') 
 end
 
 NxTest.test('NASTROJE-1: zaklad nazvu = nazov bez pripony, ktoru vyrobila kopia') do
+  # Odstranuje sa VYHRADNE medzera + 1-2 male pismena.
   NxTest.assert_equal('Skrinka', MC.copy_base_name('Skrinka a'))
-  NxTest.assert_equal('Skrinka', MC.copy_base_name('Skrinka 27'))
-  # Cislo POD 27 nikdy nevyrobila kopia — je to pouzivatelov nazov.
+  NxTest.assert_equal('Skrinka', MC.copy_base_name('Skrinka aa'))
+  NxTest.assert_equal('Skrinka', MC.copy_base_name('Skrinka zz'))
+  # Cisla NIKDY (sirka v nazve) a velke pismeno tiez nie.
+  NxTest.assert_equal('Dolná 900', MC.copy_base_name('Dolná 900'))
   NxTest.assert_equal('Linka 2', MC.copy_base_name('Linka 2'))
+  NxTest.assert_equal('Bok L', MC.copy_base_name('Bok L'))
+  # Tri a viac pismen uz nie je pripona — je to slovo.
+  NxTest.assert_equal('Skrinka pod', MC.copy_base_name('Skrinka pod'))
   NxTest.assert_equal('Skrinka', MC.copy_base_name('  Skrinka   '))
   NxTest.assert_equal('Pod drez', MC.copy_base_name('Pod drez'))
 end

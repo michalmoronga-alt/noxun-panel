@@ -45,9 +45,15 @@
   rodičoch (oficiálna dokumentácia), a legacy Mower počítal pivot v parent-relative ráme. Odmietnutie je **preflight nástroja** — musí prísť PRED `CabinetBuilder.build`, ktorý
   si edit kontext zatvára sám. Z-dialog dostal enginový lifecycle: callbacky pred `show`, `set_on_closed`, `Engine.update_locked?(:tools_z)` a účasť vo **všetkých troch**
   zoznamoch bariéry aktualizácie.
+  **Prípona názvu kópie — revízia FIX 10 (Michal 4.9. pri internej kontrole PR).** Prvá verzia brala za príponu aj **číslo ≥ 27** (package to tak mal). Lenže ručný názov skrinky
+  bežne končí **šírkou**: „Dolná 900" by kópia premenovala na „Dolná a" a informácia by zmizla. Prípony sú preto **výhradne písmenové** — `a`…`z`, po vyčerpaní `aa`…`zz`, ďalej
+  `aaa`… (bijektívna sústava so základom 26, ako stĺpce v tabuľkovom procesore) — a zo zdroja sa odstraňuje **len** *medzera + 1–2 malé písmená*. „Dolná 900" → „Dolná 900 a" →
+  „Dolná 900 b"; „Bok L" (veľké písmeno) ani „Skrinka pod" (slovo) sa nedotkne. **Poučenie:** pravidlo, ktoré si z názvu niečo odhryzne, treba testovať na REÁLNYCH názvoch
+  z dielne, nie na „Skrinka a" — package aj prvý návrh testov mali len umelé prípady.
   **Testy:** headless `test_nastroje1_tools.rb` (jadrá + guardy) a `test_nastroje1_observer.rb` (bariéra nad stubmi observera — timer, generácia, per-model `@requested`, strop,
-  rigidita), in-SU `run_tools1` + `run_tools1_async`. Mutácie (6): kópia cez `add_instance` · holé mm namiesto `Units.vector` · prípona bez hľadania voľnej · flush bez zastavenia
-  timera · cache bez kontroly rigidity · follow-up bez konkrétneho modelu — každá padne na inom teste. **In-SU beh dávka NESPÚŠŤALA** (Michal pracoval v SketchUpe) — pustiť pred merge.
+  rigidita), in-SU `run_tools1` + `run_tools1_async`. Mutácie (7): kópia cez `add_instance` · holé mm namiesto `Units.vector` · prípona bez hľadania voľnej · **prípona berie aj
+  číslo** · flush bez zastavenia timera · cache bez kontroly rigidity · follow-up bez konkrétneho modelu — každá padne na inom teste. **In-SU beh dávka NESPÚŠŤALA** (Michal
+  pracoval v SketchUpe) — pustiť pred merge.
   **Codex review:** doplní orchestrátor.
 - **KOV-B2 · KATALÓG KOVANIA: STROM, MODAL POLOŽKY, DÉMOS VÝROBCA (v0.9.23, 4.9.2026, PR #290):** UI polovica slice B — dáta a taxonómiu dala KOV-B1, táto dávka ich vytiahla
   na obrazovku a uzavrela **D-110** („pridávanie kovaní je neprehľadné", Michal 24.8. pri prvom teste v0.8.0).

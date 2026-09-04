@@ -14,14 +14,15 @@ module Noxun
         # konstanta a guard test, ktory ich drzi v synchro.
         NAME_MAX_LEN = 80
         LETTERS = ('a'..'z').to_a.freeze
-        # Po vycerpani pismen pokracuju CISLA — prve je 27 (26 pismen + 1).
-        FIRST_NUMBER_SUFFIX = LETTERS.length + 1
         # Poistka proti nekonecnemu hladaniu volnej pripony (poskodene data).
         MAX_SUFFIX_TRIES = 5000
 
-        # Pripona, ktoru vyrobila TATO cesta: jedno male ASCII pismeno alebo
-        # cislo od 27 vyssie. Vsetko ostatne je sucast pouzivatelovho nazvu.
-        COPY_SUFFIX_RE = /\A(.*\S)[ ](?:([a-z])|([0-9]+))\z/.freeze
+        # Pripona, ktoru vyrobila TATO cesta: medzera + JEDNO ALEBO DVE male
+        # ASCII pismena. CISLA NIKDY (rozhodnutie 4.9.2026): rucny nazov skrinky
+        # bezne konci sirkou — „Dolna 900" by sa inak skopirovala ako „Dolna a"
+        # a informacia by sa stratila. Velke pismeno tiez nie je pripona
+        # („Bok L" ostava cely), rovnako ako cokolvek dlhsie nez dve pismena.
+        COPY_SUFFIX_RE = /\A(.*\S)[ ]([a-z]{1,2})\z/.freeze
 
         module_function
 
@@ -69,19 +70,16 @@ module Noxun
         # Zaklad nazvu = rucny nazov zdroja BEZ pripony, ktoru vyrobila kopia.
         # Bez tohto by retaz „Skrinka" -> „Skrinka a" -> „Skrinka a a" rastla;
         # takto ide „Skrinka a" -> „Skrinka b".
-        # PRIZNANY DOSLEDOK: rucny nazov koniaci na jedno male pismeno alebo na
-        # cislo >= 27 sa berie ako pripona a v kopii sa nahradi. Nazov nema
-        # ziadny vyrobny dosah (D-100), takze je to lacnejsie nez rastuci chvost.
+        # PRIZNANY DOSLEDOK: rucny nazov koniaci na medzeru a JEDNO-DVE male
+        # pismena sa berie ako pripona a v kopii sa nahradi. Nazov nema ziadny
+        # vyrobny dosah (D-100), takze je to lacnejsie nez rastuci chvost.
+        # CISLO SA NEODSTRANI NIKDY — „Dolna 900" je sirka, nie pripona.
         def copy_base_name(name)
           s = squeeze(name)
           return s if s.empty?
 
           m = COPY_SUFFIX_RE.match(s)
-          return s if m.nil?
-          return m[1] if m[2]
-          return m[1] if m[3] && m[3].to_i >= FIRST_NUMBER_SUFFIX
-
-          s
+          m ? m[1] : s
         end
 
         # Nazov kopie: zaklad + NAJBLIZSIA VOLNA pripona v celom modeli.
@@ -103,12 +101,20 @@ module Noxun
           with_suffix(base, suffix_for(i))
         end
 
-        # i = 0..25 -> 'a'..'z'; i = 26 -> '27', 27 -> '28' …
+        # Pripony su VYHRADNE PISMENOVE (rozhodnutie 4.9.2026) — bijektivna
+        # sustava so zakladom 26, ako stlpce v tabulkovom procesore:
+        #   0..25 -> 'a'..'z' · 26 -> 'aa' · 51 -> 'az' · 52 -> 'ba' · 701 -> 'zz'
+        #   702 -> 'aaa' … CISLO sa v pripone NEOBJAVI nikdy.
         def suffix_for(index)
-          i = index.to_i
-          return LETTERS[i] if i < LETTERS.length
-
-          (i + 1).to_s
+          n = index.to_i + 1
+          n = 1 if n < 1
+          out = +''
+          while n.positive?
+            n -= 1
+            out.prepend(LETTERS[n % LETTERS.length])
+            n /= LETTERS.length
+          end
+          out
         end
 
         # Zaklad sa oreze tak, aby pripona VZDY prezila `sanitize_name`

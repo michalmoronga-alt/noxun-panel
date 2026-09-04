@@ -427,9 +427,12 @@ objektom rozšírenia enginu (`Engine.extension`); modal z tlačidla toolbaru je
 ### mower_calc.rb
 
 **Čisté jadro** Mowera (bez `UI::*` a `Sketchup::*`, mm Float, v zozname `tests/helper.rb`): znamienko a posun kópie po **lokálnej osi X**, `z_delta_mm`, `route` (`:edit_context`
-· `:nested` · `:cabinet` · `:board` · `:legacy`) a **prípona názvu kópie**. Prípona hľadá **najbližšiu voľnú** v celom modeli (`a`…`z`, po vyčerpaní `27`, `28`…); základ sa
-odvodí zo zdroja **bez prípony, ktorú vyrobila kópia** (jedno malé ASCII písmeno alebo číslo ≥ 27), takže reťaz ide „Skrinka a" → „Skrinka b", nie „Skrinka a a". Základ sa
-oreže tak, aby prípona vždy prežila `sanitize_name` (`NAME_MAX_LEN` 80 — guard test drží konštantu v synchro s `CabinetBuilder`).
+· `:nested` · `:cabinet` · `:board` · `:legacy`) a **prípona názvu kópie**. Prípona hľadá **najbližšiu voľnú** v celom modeli a je **VÝHRADNE PÍSMENOVÁ** (rozhodnutie 4.9.2026):
+`a`…`z`, po vyčerpaní `aa`…`zz`, ďalej `aaa`… — **bijektívna sústava so základom 26** (ako stĺpce v tabuľkovom procesore), takže **číslo sa v prípone neobjaví nikdy**. Základ sa
+odvodí zo zdroja **bez prípony, ktorú vyrobila kópia** — a to len v tvare **medzera + jedno alebo dve malé ASCII písmená** — takže reťaz ide „Skrinka a" → „Skrinka b", nie
+„Skrinka a a". **Číslo na konci názvu sa neodstráni nikdy:** ručný názov skrinky bežne končí šírkou, takže „Dolná 900" sa skopíruje ako „Dolná 900 a" (nie „Dolná a") a informácia
+sa nestratí; rovnako sa nedotkne veľkého písmena („Bok L" → „Bok L a") ani slova („Skrinka pod"). Základ sa oreže tak, aby prípona vždy prežila `sanitize_name` (`NAME_MAX_LEN` 80
+— guard test drží konštantu v synchro s `CabinetBuilder`).
 
 ### mower.rb
 
