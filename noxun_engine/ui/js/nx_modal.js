@@ -1471,10 +1471,36 @@
     // katalog) — kresli sa z neho „Začať odznova" a porovnava sa proti nemu
     // dirty stav. Kolizia sa v nom NEUKLADA (to bola P1 interneho review):
     // „proti comu pouzivatel pisal" nesie stav `OPEN.flags[...].wrote`.
+    // VYCHODISKOVA specifikacia (`base`). Volajuci ju smie PODAT cez
+    // `baseFields` — a je to jediny sposob, ako prezije PAMAT rozpisaneho
+    // konceptu VNUTORNE PREKRESLENIE (review #297 P2-1).
+    //
+    // Kostra si `base` inak berie z prave podanej specifikacie, takze pri
+    // prekresleni (zavisly select, zmenena sada poli) sa stane vychodiskom
+    // to, co uz pouzivatel napisal — `remember()` potom nema voci comu
+    // porovnavat, na Escape neulozi NIC a rozpisany formular zmizne. Volajuci,
+    // ktory to iste okno prekresluje, preto podava PRVOTNE polia; pamat sa tak
+    // pocita voci tomu, s cim pouzivatel zacal, a naprieč prekresleniami sa
+    // NEROZSYPE. „Začať odznova" (`memReset`) z nich kresli rovnako.
+    function baseSpec(s){
+      if (!s || !s.baseFields) return s;
+      var b = shallow(s);
+      b.fields = s.baseFields;
+      return b;
+    }
+
+    // `skipMemory: true` = VNUTORNE prekreslenie: pamat sa NEVLIEVA spat
+    // (hodnoty na obrazovke su cerstvejsie — a vliata pamat by vratila napr.
+    // radu, ktoru prekreslenie prave zahodilo, lebo uz nepatri vybranemu
+    // vyrobcovi) a pas „Predvyplnené z rozpísaného konceptu" sa NEROZSVIETI
+    // (pouzivatel pozera na to, co prave napisal, nie na stary koncept).
+    // ZAPIS do pamate bezi dalej — `memoryKey` ostava.
     function withMemory(s){
+      var base = baseSpec(s);
+      if (s.skipMemory === true) return { base: base, spec: s };
       dropForeign(s.memoryKey);
       var mem = memory(s.memoryKey);
-      if (!mem) return { base: s, spec: s };
+      if (!mem) return { base: base, spec: s };
       var out = shallow(s);
       out.fromMemory = true;
       out.fields = (s.fields || []).map(function(f){
@@ -1488,7 +1514,7 @@
         g.value = (f.type === 'rows') ? mergeRowsMemory(f, mem[f.key]) : mem[f.key];
         return g;
       });
-      return { base: s, spec: out };
+      return { base: base, spec: out };
     }
 
     // Vliatie pamate do pola `lookup` (P2-E). DVE veci naraz:
