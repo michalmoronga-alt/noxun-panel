@@ -444,6 +444,18 @@ originálu ju menila) — to je pointa D-20. Krok je **šírka korpusu z configu
 „dotyk bbox" neplatí a susednosť sa meria na **obálkach korpusov**. Kópia **dosky je SCOPE OUT** (`BoardBuilder.build` polohu neprijíma — šev príde s GHOST-D1), nie-NOXUN
 objekty idú dnešnou legacy cestou (DC `lenx` / bounds, odhad osi z RotZ, `add_instance`).
 
+**Kópia z toolbaru má DVE poistky, ktoré kópia z panela nepotrebuje** (Codex #293 kolo 1) — klik na tlačidlo nástroja ide **mimo JS**, takže si obe musí vybaviť server sám:
+
+1. **Bežiaca ghost session sa ruší** (`GhostTool.cancel_session('kópia nástrojom')`, presne ako `Panel.handle_insert_copy`). Iný spôsob vkladania = koniec životného cyklu session;
+   bez toho by ghost visiaci na kurzore ďalším klikom commitol **starý plán**.
+2. **Handshake s Inspectorom pred čítaním configu.** Auto-apply panela má **400 ms debounce**, takže rozpísaná zmena môže ešte visieť vo formulári a kópia by vznikla zo **starého**
+   configu. Keď je Inspector otvorený (`Panel.dialog_alive?`), server si drží **čakajúcu kópiu pod tokenom** (`start_cabinet_copy`) a pošle `NX.flushForNative(token, {kind, dir})`.
+   JS odpovedá **v každej vetve**: červené polia alebo rozpísaný výraz → `native_flush_done` s `'invalid'` (kópia sa **odmietne**) · niet čo flushnúť → `'nothing'` (server kopíruje
+   hneď) · rozpísané edity → `apply_all` s `native_op: {kind, dir, token}` a kópia beží **až v tom callbacku**, teda nad už zapísaným configom. **Smer kópie je vždy zo servera** —
+   echo klienta je iba korelačný kľúč (`resolve_native_op` ho ani nečíta; token čistí zdieľaná `manual_token`). Bez odpovede do **2 s** server kópiu odmietne hláškou „Inspector
+   neodpovedal" — **nikdy tichá kópia zo starého configu**. Čistá časť (token, rozhodovanie, lehota) je `MowerCalc.pending_decision`; JS vetvy stráži `tests/js/test_nastroje1_flush.js`,
+   ktorý funkciu číta **priamo zo `form.js`** (zrkadlo by od zdroja odbehlo).
+
 **`Tools::ZDialog`** (Z posun v mm) si necháva legacy vzhľad, ale má enginový lifecycle: callbacky **pred `show`**, unikátny `preferences_key`, `set_on_closed` → referencia
 `nil`, callback `applyZ` pod **`Engine.update_locked?(:tools_z)`** a účasť vo **VŠETKÝCH TROCH zoznamoch bariéry aktualizácie** — `SupplierSettingsDialog.close_plugin_dialogs`,
 `SupplierSettingsDialog.dialogs_closed?` a post-swap `Engine.close_all_dialogs` (guard test stráži všetky tri).
@@ -451,8 +463,12 @@ objekty idú dnešnou legacy cestou (DC `lenx` / bounds, odhad osi z RotZ, `add_
 ### snap_calc.rb
 
 **Čisté jadro** Snapera: AABB sweep nad odovzdanými obálkami v lokálnom ráme cieľa. Prekážka sa počíta, len keď sa jej rozsah kryje s cieľom v **hĺbke (Y) aj výške (Z)** — obyčajný
-dotyk nie je prekryv, takže podlaha ani už prisunutý sused bočný posun nebrzdia. Kontajner, ktorý cieľ **obklopuje**, sám kandidátom nie je: zostupuje sa doň (hĺbka 8, `children`
-smie byť `Proc` = lenivo). Prahy: `TOUCH` 0,2 mm · `WARN` 10 m · `BLOCK` 20 m; `verdict` vracia `:none` · `:touching` · `:ok` · `:far` · `:too_far` a rozhoduje podľa **svetovej**
+dotyk nie je prekryv, takže podlaha ani už prisunutý sused bočný posun nebrzdia. **Kontajner NIE JE nikdy kandidát** (Codex #293 kolo 1): jeho obálka je **zjednotenie detí**, takže by
+miešala X jedného dieťaťa s Y/Z iného — dve skupiny, jedna blízko ale **mimo koridoru** (`y = 1000…1200`) a druhá ďaleko v koridore (`y = 0…600`), by dali medzeru podľa tej blízkej,
+ktorá skrinke vôbec nestojí v ceste. Kontajner je preto len **schránka na zostup** a gap počítajú až jeho **listy**, každý s vlastným testom koridoru. Obálka kontajnera slúži iba na
+**predvýber** (koridor + `reaches?` = „siaha až k vedúcemu okraju?") a tam je bezpečná, lebo je **nadmnožinou** detí — zamietnutie preto nikdy nevynechá dieťa, ktoré by sa do koridoru
+trafilo. Na **strope hĺbky (8)** platí obálka ako kandidát; môže byť únia, takže medzera vyjde nanajvýš **pesimisticky** (skrinka zastane skôr, nikdy nie v kolízii). `children` smie byť
+`Proc` — zostup je lenivý a forsuje sa až po prejdení oboch brán. Prahy: `TOUCH` 0,2 mm · `WARN` 10 m · `BLOCK` 20 m; `verdict` vracia `:none` · `:touching` · `:ok` · `:far` · `:too_far` a rozhoduje podľa **svetovej**
 vzdialenosti (pri škálovanej cudzej inštancii sa líši od lokálnej medzery).
 
 ### snaper.rb

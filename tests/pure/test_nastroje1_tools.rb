@@ -179,6 +179,39 @@ NxTest.test('NASTROJE-1: celo so zapornym gap_sides presahuje sirku korpusu (a b
                 'bez fronts.items celo vzniknut NESMIE — scenar si ho musi vypytat vyslovne')
 end
 
+# --- handshake s Inspectorom pred kopiou (Codex #293 kolo 1, P2) ---------------
+
+NxTest.test('NASTROJE-1: handshake — token je JEDINY korelacny kluc odpovede') do
+  now = 1000.0
+  pending = { 'token' => 't1', 'dir' => :right, 'cabinet_id' => 'CAB-001', 'deadline' => now + 2.0 }
+  NxTest.assert_equal(:copy, MC.pending_decision(pending, 't1', 'nothing', now))
+  NxTest.assert_equal(:copy, MC.pending_decision(pending, 't1', 'flushed', now))
+  NxTest.assert_equal(:invalid, MC.pending_decision(pending, 't1', 'invalid', now))
+  # Cudzia, stara alebo prazdna odpoved sa TICHO zahodi — nikdy nespusti kopiu.
+  NxTest.assert_equal(:ignore, MC.pending_decision(pending, 't2', 'nothing', now))
+  NxTest.assert_equal(:ignore, MC.pending_decision(pending, '', 'nothing', now))
+  NxTest.assert_equal(:ignore, MC.pending_decision(nil, 't1', 'nothing', now))
+  # Neznamy vysledok = neplatny. Kopia zo stareho configu je horsia nez odmietnutie.
+  NxTest.assert_equal(:invalid, MC.pending_decision(pending, 't1', 'hocico', now))
+  NxTest.assert_equal(:invalid, MC.pending_decision(pending, 't1', nil, now))
+end
+
+NxTest.test('NASTROJE-1: handshake — po lehote sa kopia ODMIETNE, nie vykona') do
+  pending = { 'token' => 't1', 'deadline' => 1000.0 }
+  NxTest.assert_equal(:copy, MC.pending_decision(pending, 't1', 'nothing', 1000.0))
+  NxTest.assert_equal(:expired, MC.pending_decision(pending, 't1', 'nothing', 1000.01))
+  NxTest.assert_equal(:expired, MC.pending_decision(pending, 't1', 'flushed', 1500.0))
+  NxTest.assert_close(2.0, MC::FLUSH_TIMEOUT_S, 0.001)
+end
+
+NxTest.test('NASTROJE-1: handshake — token vyraba SERVER a dve kopie za sebou ho zdielat nesmu') do
+  a = MC.flush_token(1, 1_700_000_000)
+  b = MC.flush_token(2, 1_700_000_000)
+  NxTest.assert(a != b, "dva handshaky dostali ten isty token (#{a})")
+  NxTest.assert(a.start_with?('tcopy-'), a)
+  NxTest.assert_equal(%w[flushed nothing invalid], MC::FLUSH_RESULTS)
+end
+
 # --- snap_calc: sweep ----------------------------------------------------------
 
 def nx_box(x1, x2, y1 = 0.0, y2 = 600.0, z1 = 0.0, z2 = 720.0)
@@ -230,18 +263,32 @@ NxTest.test('NASTROJE-1: obalka miestnosti sa PRECHADZA — doraz dava az vnutor
   NxTest.assert_close(1900.0, SC.nearest_gap(NX_TARGET, [izba], :left), 0.001)
 end
 
-NxTest.test('NASTROJE-1: do kontajnera sa zostupuje LENIVO a len ked presahuje') do
-  calls = [0]
-  # Kontajner CELY za veducim okrajom je sam kandidat — deti sa necitaju.
-  ahead = { box: nx_box(800.0, 1200.0), container: true,
-            children: -> { calls[0] += 1; [] } }
-  NxTest.assert_close(200.0, SC.nearest_gap(NX_TARGET, [ahead], :right), 0.001)
-  NxTest.assert_equal(0, calls[0])
+NxTest.test('NASTROJE-1: kontajner NIE JE kandidat — gap dava az jeho LIST') do
+  # Codex #293 kolo 1 (P2): obalka kontajnera je UNIA deti, takze by miesala
+  # X jedneho dietata s Y/Z ineho. Dieta blizko, ale MIMO koridoru ciela,
+  # nesmie doraz skratit — plati az to daleke, ktore v koridore naozaj je.
+  mimo = { box: nx_box(700.0, 800.0, 1000.0, 1200.0), container: false } # y mimo 0..600
+  v_koridore = { box: nx_box(2000.0, 2100.0, 0.0, 600.0), container: false }
+  NxTest.assert_close(1400.0, SC.nearest_gap(NX_TARGET, [nx_container([mimo, v_koridore])], :right), 0.001,
+                      'unia deti dala medzeru podla prekazky, ktora skrinke vobec nestoji v ceste')
+  # Kontrola protikladom: to iste dieta V koridore doraz skratit MUSI.
+  v_ceste = { box: nx_box(700.0, 800.0, 0.0, 600.0), container: false }
+  NxTest.assert_close(100.0, SC.nearest_gap(NX_TARGET, [nx_container([v_ceste, v_koridore])], :right), 0.001)
+end
 
-  # Kontajner, ktory ciel obklopuje, deti POTREBUJE.
-  around = { box: nx_box(-500.0, 1500.0), container: true,
-             children: -> { calls[0] += 1; [{ box: nx_box(1000.0, 1400.0), container: false }] } }
-  NxTest.assert_close(400.0, SC.nearest_gap(NX_TARGET, [around], :right), 0.001)
+NxTest.test('NASTROJE-1: do kontajnera sa zostupuje LENIVO — len ked siaha k veducemu okraju') do
+  calls = [0]
+  # Kontajner CELY ZA cielom (v protismere) sa neprechadza vobec.
+  za_chrbtom = { box: nx_box(-900.0, -300.0), container: true,
+                 children: -> { calls[0] += 1; [{ box: nx_box(-900.0, -300.0), container: false }] } }
+  NxTest.assert_equal(nil, SC.nearest_gap(NX_TARGET, [za_chrbtom], :right))
+  NxTest.assert_equal(0, calls[0], 'deti kontajnera mimo smeru sa nesmu ani nacitat')
+
+  # Kontajner, ktory k veducemu okraju siaha, deti POTREBUJE — aj ked je cely
+  # pred cielom (jeho vlastna obalka uz kandidatom nie je).
+  vpredu = { box: nx_box(800.0, 1200.0), container: true,
+             children: -> { calls[0] += 1; [{ box: nx_box(900.0, 1200.0), container: false }] } }
+  NxTest.assert_close(300.0, SC.nearest_gap(NX_TARGET, [vpredu], :right), 0.001)
   NxTest.assert_equal(1, calls[0])
 end
 
@@ -358,4 +405,60 @@ NxTest.test('NASTROJE-1 guard: kopia ide cez sev enginu, nie cez add_instance') 
   NxTest.assert(cab.include?('Units.vector'), 'posun sa nesmie skladat z holych mm')
   NxTest.assert(cab.include?('dedup: false'),
                 'push_selected s predvolenym dedupom by zalozil zbytocnu poziadavku observera')
+end
+
+NxTest.test('NASTROJE-1 guard: kopia rusi ghost session a caka na Inspector') do
+  mower = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'tools', 'mower.rb'), encoding: 'UTF-8')
+  body = mower[/def copy\(dir\).*?\n          end/m].to_s
+  # Volanie musi byt SAMOSTATNY prikaz — `false && GhostTool.cancel_session(...)`
+  # by hole `include?` presiel a session by prezila.
+  NxTest.assert(body =~ /^\s*GhostTool\.cancel_session\('kópia nástrojom'\) if defined\?\(GhostTool\)$/,
+                'ghost visiaci na kurzore by dalsim klikom commitol STARY plan (vzor handle_insert_copy)')
+  NxTest.assert(body.index('cancel_session') < body.index('start_cabinet_copy'),
+                'session sa musi zrusit PRED vlozenim kopie')
+  start = mower[/def start_cabinet_copy.*?\n          end/m].to_s
+  NxTest.assert(start.include?('inspector_live?'), 'bez otvoreneho Inspectora niet co flushovat')
+  NxTest.assert(start.include?('Panel.request_native_flush'), 'handshake sa nevyziada')
+  NxTest.assert(start.include?('arm_flush_timeout'),
+                'bez timeoutu by cakajuca kopia visela navzdy')
+  fin = mower[/def finish_pending_copy.*?\n          end/m].to_s
+  NxTest.assert(fin.include?("pending['dir']"),
+                'smer kopie musi ist z cakajuceho zaznamu SERVERA, nie z echa klienta')
+end
+
+NxTest.test('NASTROJE-1 guard: `native_op` je uzavrety whitelist bez smeru z klienta') do
+  ac = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_cabinet.rb'),
+                 encoding: 'UTF-8')
+  body = ac[/def resolve_native_op.*?\n        end/m].to_s
+  NxTest.assert(body.include?('NATIVE_OPS.include?'), 'chyba whitelist druhu operacie')
+  NxTest.assert(body.include?('manual_token('), 'token z klienta sa musi ocistit')
+  NxTest.refute(body.include?("raw['dir']"),
+                'smer kopie sa z payloadu klienta citat NESMIE — autorita je server')
+  NxTest.assert(body.include?("'flushed'"), 'apply s native_op je pre server vysledok `flushed`')
+  # Dispatch AZ po uspesnej prestavbe: odmietnute vetvy maju vlastny `return`.
+  apply = ac[/def handle_apply_all.*?\n        end/m].to_s
+  NxTest.assert(apply.include?('resolve_native_op(data)'),
+                'handle_apply_all cakajucu kopiu vobec nespusta — server by cakal do timeoutu')
+  NxTest.assert(apply.index('resolve_native_op(data)') > apply.index('CabinetBuilder.rebuild'),
+                'kopia sa smie spustit AZ po zapise configu')
+  panel = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel.rb'), encoding: 'UTF-8')
+  NxTest.assert(panel.include?("cb(dlg, 'native_flush_done')"), 'callback odpovede nie je registrovany')
+end
+
+NxTest.test('NASTROJE-1 guard: JS odpovie serveru v KAZDEJ vetve flushu') do
+  form = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'form.js'), encoding: 'UTF-8')
+  fn = form[/function nxFlushForNative\(token, op\)\{.*?\n  \}/m].to_s
+  NxTest.refute(fn.empty?, 'nxFlushForNative sa v form.js nenasla')
+  %w[nothing invalid].each do |r|
+    NxTest.assert(fn.include?("nxNativeFlushDone(token, '#{r}')"), "chyba vetva '#{r}'")
+  end
+  NxTest.assert(fn.include?('flushCabinetEdits(selectedCabId'), 'rozpisane edity sa neflushnu')
+  flush = form[/function flushCabinetEdits\(cabSnapshot, guidSnapshot, nativeOp\)\{.*?\n    if \(nativeOp\) payload\.native_op = nativeOp;/m].to_s
+  NxTest.refute(flush.empty?, 'flushCabinetEdits neprijima nativeOp')
+  NxTest.assert_equal(3, flush.scan(/if \(nativeOp\) nxNativeFlushDone/).length,
+                      'kazda predcasna navratova vetva flushu musi serveru odpovedat')
+  bridge = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'bridge.js'), encoding: 'UTF-8')
+  NxTest.assert(bridge.include?('flushForNative: function(token, op)'), 'NX.flushForNative chyba')
+  NxTest.assert(bridge.include?("nxNativeFlushDone(token, 'nothing')"),
+                'bez formularovej vrstvy musi bridge odpovedat sam (inak server caka do timeoutu)')
 end

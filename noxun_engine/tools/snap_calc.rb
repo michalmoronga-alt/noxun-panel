@@ -38,6 +38,15 @@ module Noxun
         # Prechod jednej urovne. Prekazka sa pocita LEN ked sa jej rozsah kryje
         # s cielom v hlbke (Y) aj vo vyske (Z) — obycajny dotyk nie je prekryv,
         # takze podlaha ani uz prisunuty sused bocny posun neblokuju.
+        #
+        # KONTAJNER NIE JE NIKDY KANDIDAT (Codex #293 kolo 1, P2). Jeho obalka je
+        # ZJEDNOTENIE deti, takze by miesala X jedneho dietata s Y/Z ineho: dve
+        # skupiny — jedna blizko ale MIMO koridoru (`y = 1000..1200`), druha daleko
+        # v koridore (`y = 0..600`) — by dali medzeru podla tej BLIZKEJ, ktora
+        # skrinke vobec nestoji v ceste. Kontajner je preto len SCHRANKA na zostup
+        # a gap vzdy pocitaju az jeho LISTY, kazdy s vlastnym testom koridoru.
+        # Obalka kontajnera sa pouziva iba na PREDVYBER (koridor + „siaha az k
+        # veducemu okraju?") — a tam je bezpecna, lebo je nadmnozinou deti.
         def walk(nodes, target, dir, depth, best)
           Array(nodes).each do |node|
             next if node.nil?
@@ -47,20 +56,30 @@ module Noxun
             next unless overlap_1d(box[:min][1], box[:max][1], target[:min][1], target[:max][1])
             next unless overlap_1d(box[:min][2], box[:max][2], target[:min][2], target[:max][2])
 
-            gap = leading_gap(box, target, dir)
-            if gap >= -EPS_MM
-              gap = 0.0 if gap.negative?
-              best[0] = gap if best[0].nil? || gap < best[0]
+            if truthy(fetch(node, :container)) && depth < MAX_DEPTH
+              next unless reaches?(box, target, dir)
+
+              kids = children_of(node) # lenivy `Proc` sa vola az TU
+              # Deklarovany kontajner BEZ deti: obalka je vsetko, co o nom vieme.
+              kids.empty? ? take_gap(box, target, dir, best) : walk(kids, target, dir, depth + 1, best)
               next
             end
 
-            # Obalka kontajnera cielom PRECHADZA (importovana izba obklopuje
-            # skrinku) — pouzitelnu medzeru vedia dat az jeho vnutorne steny.
-            next unless truthy(fetch(node, :container)) && depth < MAX_DEPTH
-            next unless ahead?(box, target, dir)
-
-            walk(children_of(node), target, dir, depth + 1, best)
+            # Na STROPE hlbky plati obalka — moze byt unia, takze medzera vyjde
+            # nanajvys PESIMISTICKY (skrinka zastane skor, nikdy nie v kolizii).
+            take_gap(box, target, dir, best)
           end
+          best[0]
+        end
+
+        # Kandidat: medzera od veduceho okraja ciela. Zaporna (= prekryv v X) sa
+        # zahadzuje, tesne zaporna (v ramci EPS) sa berie ako dotyk = 0.
+        def take_gap(box, target, dir, best)
+          gap = leading_gap(box, target, dir)
+          return best[0] if gap < -EPS_MM
+
+          gap = 0.0 if gap.negative?
+          best[0] = gap if best[0].nil? || gap < best[0]
           best[0]
         end
 
@@ -70,12 +89,16 @@ module Noxun
           dir.to_sym == :right ? box[:min][0] - target[:max][0] : target[:min][0] - box[:max][0]
         end
 
-        # Lezi aspon cast obalky ZA veducim okrajom ciela? (podmienka zostupu)
-        def ahead?(box, target, dir)
+        # Siaha obalka aspon k veducemu okraju ciela? Podmienka ZOSTUPU do
+        # kontajnera — zamerne volnejsia nez „lezi za okrajom": prekazka tesne
+        # za okrajom (0,2 mm) je stale prekazka. Nadmnozinovy test, takze
+        # zamietnutie je vzdy bezpecne (ked obalka k okraju nesiaha, nesiaha
+        # k nemu ani ziadne dieta).
+        def reaches?(box, target, dir)
           if dir.to_sym == :right
-            box[:max][0] > target[:max][0] + EPS_MM
+            box[:max][0] > target[:max][0] - EPS_MM
           else
-            box[:min][0] < target[:min][0] - EPS_MM
+            box[:min][0] < target[:min][0] + EPS_MM
           end
         end
 
