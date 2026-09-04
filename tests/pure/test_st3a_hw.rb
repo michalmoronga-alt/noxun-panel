@@ -522,8 +522,15 @@ NxTest.test('ŠT-3a-1: modaly sekcie ziju MIMO tela sekcie') do
   NxTest.assert(!body.empty?, 'telo sekcie je SABLONA — klonuje sa RAZ')
   NxTest.refute(body.include?('nxmodal'),
                 'v tele sekcie nesmie byt ziadny modal — prekreslenie by ho zhodilo')
-  %w[hwList hwNewForm hwTabItems hwTabSets hwTabProj hwRoBanner].each do |id|
+  %w[hwList hwTabItems hwTabSets hwTabProj hwRoBanner].each do |id|
     NxTest.assert(body.include?(%(id="#{id}")), "uzol #{id} je v tele sekcie")
+  end
+  # KOV-B2 (D-110): staticky formular novej polozky v tele ZANIKOL — je to
+  # modal D-15 v `#nxModalRoot`. Keby sa vratil, mal by katalog DVE cesty
+  # k zapisu polozky a jedna z nich by nemala ani zamok odoslania.
+  %w[hwNewForm hn_code hn_name hn_category hn_unit hn_demos].each do |id|
+    NxTest.refute(body.include?(%(id="#{id}")),
+                  "uzol #{id} v tele sekcie uz byt NESMIE (KOV-B2)")
   end
   NxTest.refute(body.include?('id="hwSearch"'),
                 'hladanie patri do LISTY sekcie, nie do obsahu')

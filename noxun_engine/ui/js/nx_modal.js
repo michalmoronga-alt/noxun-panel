@@ -341,6 +341,14 @@
       lookupClose(key);
       if (OPEN) OPEN.memSkip = false;   // vyber je zasah do formulara
       if (q && q.focus){ try { q.focus(); } catch (e) { /* fokus nie je kriticky */ } }
+      // KOV-B2: VOLITELNY signal volajucemu, ze prave nieco vybral. Kostra sama
+      // nic nerobi (hodnota uz je v skrytom poli) — je to pre pripad, ked vyber
+      // nie je koncom, ale ZACIATKOM dalsieho serveroveho kroku (v katalogu
+      // kovania spusti nacitanie produktovej stranky z Demosu). Vynimka
+      // volajuceho sa do kostry NIKDY nepremietne.
+      if (typeof f.onPick === 'function'){
+        try { f.onPick(it); } catch (e) { warn('onPick volajuceho zlyhal.'); }
+      }
     }
 
     // Pisanie ZAHADZUJE predchadzajuci vyber (bod 2 kontraktu vyssie).
