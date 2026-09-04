@@ -190,36 +190,33 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   ok(body.children[0] === node, 'návrat do sekcie vráti TEN ISTÝ uzol');
   ok(node.children.indexOf(draft) >= 0, 'aj s rozpísaným formulárom');
 
-  // Review #218 P1: neprežiť MUSÍ len uzol, ale aj HODNOTA v ňom. `hwRenderBody`
-  // volá `mdhRenderEnums` pri KAŽDOM plnom pushi a ten `<select>` kategórie
-  // prestavia — bez zachovania hodnoty by sa rozpísanej novej položke ticho
-  // prepla kategória na PRVÚ v zozname a používateľ by to zistil až po uložení.
-  eq(ELS.hn_category.children.length, 2, 'select kategórie sa naplnil z katalógu');
-  eq(ELS.hn_unit.children.length, 2, 'a select MJ tiež');
-  // DRUHÁ hodnota v oboch zoznamoch: keby sa testálo prvou, „zachoval"
-  // a „nastavil prvú" by vyzerali rovnako a guard by nestrážil nič.
-  ELS.hn_category.value = 'výsuvy';         // používateľ vybral kategóriu
-  ELS.hn_unit.value = 'pár';               // a mernú jednotku
+  // Review #218 P1 (ŠT-3a-2/3a-3) strážil, že rozpísanej novej položke neprepne
+  // push kategóriu ani MJ na PRVÚ v zozname. KOV-B2: statický formulár zanikol
+  // (D-110) — enumy kreslí MODAL D-15 pri každom otvorení a rozpísané hodnoty
+  // drží pamäť kostry (D-15) (`hw:item:new`), takže tie uzly už v tele nie sú.
+  // Kontrakt, ktorý tu ostáva, je práve to: telo NESMIE mať vlastný formulár.
+  ok(!ELS.hn_category.parentNode && !ELS.hn_unit.parentNode,
+     'enum polia statického formulára už do tela sekcie nepatria');
   global.NX.setStudio(payload);              // medzitým príde plný push zo servera
   H.hwRenderBody();
-  eq(ELS.hn_category.value, 'výsuvy',
-     'rozpísaná kategória PREŽILA push (mdhRenderEnums ju nesmie prepnúť na prvú)');
-  eq(ELS.hn_unit.value, 'pár',
-     'ŠT-3a-3: a MJ tiež — je to údaj, ktorý ide rovno do objednávky');
-  ELS.hn_category.value = '';
-  ELS.hn_unit.value = '';
+  ok(node.children.indexOf(draft) >= 0,
+     'a rozpísaný obsah tela push aj tak PREŽIL (kontrakt „telo sa neprekresľuje")');
 })();
 
 // --- 3) prvý push si vypýta serverové poradie AŽ keď je telo v DOM ----------
 
 (function(){
-  const searches = SENT.filter(function(x){ return x[0] === 'hw_search'; });
+  // KOV-B2: pohľad Položky si pýta STROM (`hw_tree`), nie plochý `hw_search`.
+  const searches = SENT.filter(function(x){ return x[0] === 'hw_tree'; });
   ok(searches.length > 0, 'klient si vypýtal serverové poradie (JS si ho NIKDY nedopĺňa)');
   const q = JSON.parse(searches[searches.length - 1][1]);
   ok(Object.prototype.hasOwnProperty.call(q, 'query') &&
      Object.prototype.hasOwnProperty.call(q, 'category') &&
      Object.prototype.hasOwnProperty.call(q, 'include_inactive'),
      'dotaz nesie text, kategóriu aj prepínač neaktívnych');
+  ok(Object.prototype.hasOwnProperty.call(q, 'expand') &&
+     Object.prototype.hasOwnProperty.call(q, 'more'),
+     'a rozbalenie aj stránkovanie listov — o obsahu rozhoduje server');
 })();
 
 // --- 4) pohľad Sety schová položky a naopak ---------------------------------
@@ -247,20 +244,20 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   const idx = SENT.findIndex(function(x){ return x[0] === 'hw_leave'; });
   ok(idx >= 0, 'odchod sa hlási SERVERU (ten ruší bežiaci fetch a povie prečo)');
   eq(ELS.hwDelModal.style.display, 'none', 'a modál potvrdenia mazania sa zavrie');
-  // Review P2 #4 + kolo 2 P2-2: náhľad z Demosu NIE JE modál — žije v tele
-  // sekcie, ktoré sa pri odchode UCHOVÁ. Nedokončený beh sa zhodiť MUSÍ (inak
-  // v ňom navždy visí „Načítavam stránku…", hoci server beh už zrušil), ale
-  // DOKONČENÝ náhľad zhodiť NESMIE: serverový proposal (`pid`) žije ďalej
-  // a používateľ v ňom môže mať rozpísanú kategóriu a poznámku.
-  const leaveFn = fs.readFileSync(path.join(JS, 'hw_catalog.js'), 'utf8')
-    .match(/function hwCloseModals\(\)\{[\s\S]*?\n  \}/)[0];
-  ok(/MDH_DEMOS && MDH_DEMOS\.status === 'pending'/.test(leaveFn),
-     'zhadzuje sa LEN nedokončený beh');
-  const guarded = leaveFn.slice(leaveFn.indexOf("=== 'pending'"));
-  ok(/MDH_DEMOS = null/.test(guarded) && /mdhRenderDemosPreview\(\)/.test(guarded),
-     'reset aj prekreslenie sú POD tou podmienkou, nie pred ňou');
-  ok(!/MDH_DEMOS = null/.test(leaveFn.slice(0, leaveFn.indexOf("=== 'pending'"))),
-     'a mimo nej sa náhľad nezahadzuje (rozpísané polia by prišli nazmar)');
+  // KOV-B2: náhľad z Demosu už NEŽIJE v tele sekcie — je to prvé pole MODÁLU
+  // položky (`#nxModalRoot` MIMO `#secbody`). Odchod do inej sekcie by ho tam
+  // nechal visieť nad cudzím obsahom, takže sa zatvára — a jeho `onClose`
+  // (`hwItemClosed`) zruší nedokončený fetch aj naplánovaný dotaz.
+  const SRC = fs.readFileSync(path.join(JS, 'hw_catalog.js'), 'utf8');
+  const leaveFn = SRC.match(/function hwCloseModals\(\)\{[\s\S]*?\n  \}/)[0];
+  ok(/NXModal\.close\(\)/.test(leaveFn), 'modál položky sa pri odchode zatvorí');
+  ok(/NXModal\.isOpen\(\) && HW_ITEM/.test(leaveFn),
+     'ale LEN keď je otvorený a patrí kovaniu (cudzí modál sekcia zavrieť nesmie)');
+  const closedFn = SRC.match(/function hwItemClosed\(\)\{[\s\S]*?\n  \}/)[0];
+  ok(/HW_ITEM\.demosPending/.test(closedFn) && /hw_demos_cancel/.test(closedFn),
+     'nedokončený náhľad sa serveru RUŠÍ (inak by dobiehal do zavretého okna)');
+  ok(/clearTimeout\(mdhDemosTimer\)/.test(closedFn),
+     'a naplánovaný (debounced) dotaz do Demosu zomrie s oknom');
 })();
 
 // --- 6) kolízie globálov ----------------------------------------------------
@@ -434,30 +431,26 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   eq(H.hwToolsState(false).cat, '', 'a filter kateg\u00f3rie tie\u017e \u2014 jedna pravda s uzlom li\u0161ty');
 })();
 
-// --- 12) ŠT-3a-3: zhody Demosu sa dorovnajú pri NÁVRATE do sekcie -----------
+// --- 12) render tela: vstup do sekcie vs. bezny push ------------------------
 
 (function(){
   const src = fs.readFileSync(path.join(JS, 'hw_catalog.js'), 'utf8');
   const bodyFn = src.match(/function hwRenderBody\(\)\{[\s\S]*?\n  \}/)[0];
   ok(/var entered = node\.parentNode !== box/.test(bodyFn),
-     'render tela rozli\u0161uje VSTUP do sekcie od be\u017en\u00e9ho pushu');
-  const demosCall = bodyFn.match(/if \(entered[^;]*\) mdhDemosInput\(\);/);
-  ok(!!demosCall,
-     'zhody \u201ePrida\u0165 z Demosu\u201c sa dorovnaj\u00fa LEN pri n\u00e1vrate do sekcie');
-  // Review #219 P2-2: a LEN ked je pole naozaj VIDIET \u2014 dopyt do Demosu za
-  // skryte pole (pohlad Sety, zavrety formular novej polozky) by isiel za nic.
-  ok(/HW_VIEW !== 'sets'/.test(demosCall[0]), 'v poh\u013eade Sety sa nedopytuje');
-  ok(/hwNewFormOpen\(\)/.test(demosCall[0]),
-     'ani pri zavretom formul\u00e1ri novej polo\u017eky');
-  ok(bodyFn.indexOf(demosCall[0]) > bodyFn.indexOf('MDH_ORDER_PENDING'),
-     'a\u017e za vy\u017eiadan\u00edm serverov\u00e9ho poradia \u2014 nie namiesto neho');
-  // Naplanovany (debounced) dopyt MUSI zomriet s odchodom \u2014 inak dobehne do
-  // opustenej sekcie a najblizsi odchod vypise falosne \u201eZru\u0161en\u00e9\u2026\u201c.
+     'render tela rozlišuje VSTUP do sekcie od bežného pushu');
+  // ŠT-3a-3 tu dorovnávala zhody Demosu k hodnote poľa V TELE sekcie.
+  // KOV-B2: pole Démos je v MODÁLI, ktorý odchod zo sekcie zatvára — v tele
+  // po ňom nesmie zostať ani stopa (dopyt by šiel do neexistujúceho uzla).
+  ok(!/mdhDemosInput/.test(src) && !/hwNewFormOpen/.test(src),
+     'zhody ani formulár sa v tele sekcie už nedorovnávajú (D-110)');
+  ok(/if \(MDH_ORDER_PENDING\)\{/.test(bodyFn) && /mdhTreeNow\(\);/.test(bodyFn),
+     'telo si po pripojení vyžiada STROM zo servera');
+  // Naplanovany (debounced) dopyt MUSI zomriet s odchodom — inak dobehne do
+  // opustenej sekcie a najblizsi odchod vypise falosne „Zrušené…“.
   const leaveFn2 = src.match(/function hwOnLeaveSection\(\)\{[\s\S]*?\n  \}/)[0];
   ok(/clearTimeout\(mdhDemosTimer\)/.test(leaveFn2),
-     'odchod zo sekcie ru\u0161\u00ed aj napl\u00e1novan\u00fd dopyt do Demosu');
+     'odchod zo sekcie ruší aj naplánovaný dopyt do Demosu');
 })();
-
 
 // --- TEST-1: OREZANÝ zoznam a PRÁVE ZALOŽENÁ položka (DOM, nie grep) --------
 // Nález z prvého testu v0.8.0: základný zoznam je serverový search s prázdnym
@@ -512,7 +505,7 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   // (5) Klient pri hľadaní posiela `pin` serveru — poradie skladá SERVER.
   SENT.length = 0;
   H.MDH.created('NOVA001');
-  const search = SENT.filter(function(x){ return x[0] === 'hw_search'; });
+  const search = SENT.filter(function(x){ return x[0] === 'hw_tree'; });
   ok(search.length > 0, 'po založení si klient vypýta čerstvý zoznam');
   ok(JSON.parse(search[search.length - 1][1]).pin === 'NOVA001',
      'a povie serveru, ktorú položku má dať navrch (JS si poradie nedopĺňa sám)');
@@ -527,7 +520,7 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   const fireChange = function(target){ (LISTEN.change || []).forEach(function(fn){ fn({ target: target }); }); };
   fireChange({ id: 'hwInactive', checked: true, tagName: 'INPUT', type: 'checkbox',
                getAttribute: function(){ return null; }, hasAttribute: function(){ return false; } });
-  const second = SENT.filter(function(x){ return x[0] === 'hw_search'; });
+  const second = SENT.filter(function(x){ return x[0] === 'hw_tree'; });
   ok(second.length >= 1, 'zmena filtra poslala nové hľadanie');
   eq(JSON.parse(second[second.length - 1][1]).pin, '',
      'ale UŽ BEZ žiadosti o pin — nesúvisiaci dotaz novú položku navrch neťahá (je jednorazová)');

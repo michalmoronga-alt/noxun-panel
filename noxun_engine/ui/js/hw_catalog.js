@@ -764,7 +764,29 @@
     // STARYMI a prepisala by prave prijaty navrh zo servera. Pri otvoreni
     // z listy sa pamat NEZAHADZUJE (kontrakt D-15).
     if (o.dropMemory && typeof NXModal.clearMemory === 'function') NXModal.clearMemory(HW_ITEM_KEY);
-    NXModal.open({
+    // `NXModal.open` najprv ZATVARA predchadzajuci modal, takze pri PREKRESLENI
+    // (predvyplnenie z Demosu, novy vyrobca) by jeho `onClose` zahodil stav,
+    // ktory prave stavame — vratane serveroveho proposalu (`MDH_DEMOS`), a zapis
+    // by potom isiel rucnou cestou. Prekreslenie NIE JE zatvorenie.
+    HW_REOPEN = true;
+    try {
+      NXModal.open(hwItemSpec(item, d, edit));
+    } finally {
+      HW_REOPEN = false;
+    }
+    // AZ ZA `open`: kostra najprv zatvara predchadzajuci modal a jeho `onClose`
+    // by cerstvy stav hned vynuloval.
+    HW_ITEM = { code: edit ? String(item.item_code) : null,
+                edit: edit,
+                rowRev: edit ? String(item.row_rev || '') : '',
+                base: edit ? hwItemDraftOf(item) : null,
+                draft: d, sent: false, taxPending: null, demosPending: false };
+  }
+
+  var HW_REOPEN = false;
+
+  function hwItemSpec(item, d, edit){
+    return {
       title: edit ? 'Upraviť položku katalógu' : 'Nová položka katalógu',
       sub: edit ? ('Kód ' + String(item.item_code)) : 'z Démosu alebo ručne',
       size: 'md',
@@ -777,17 +799,11 @@
       fields: hwItemFields(d, { edit: edit }),
       onSubmit: function(vals){ hwItemSubmit(vals); },
       onClose: function(){ hwItemClosed(); }
-    });
-    // AZ ZA `open`: kostra najprv zatvara predchadzajuci modal a jeho `onClose`
-    // by cerstvy stav hned vynuloval.
-    HW_ITEM = { code: edit ? String(item.item_code) : null,
-                edit: edit,
-                rowRev: edit ? String(item.row_rev || '') : '',
-                base: edit ? hwItemDraftOf(item) : null,
-                draft: d, sent: false, taxPending: null, demosPending: false };
+    };
   }
 
   function hwItemClosed(){
+    if (HW_REOPEN) return;   // prekreslenie modalu nie je jeho zatvorenie
     // Nedokonceny nahlad musi zomriet s oknom — server bumpne generaciu
     // a dobiehajuci fetch uz nema komu prist.
     if (HW_ITEM && HW_ITEM.demosPending) mdhSend('hw_demos_cancel', {});

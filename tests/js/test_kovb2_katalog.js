@@ -1,0 +1,509 @@
+// KOV-B2 — KATALÓG KOVANIA: serverový strom + modal položky (D-15) + Démos.
+//
+// Preco su to testy a nie klikanie:
+//   1. „JS poradie NIKDY nedopĺňa" sa da rozbit jednym `sort()` — a rozbije sa
+//      TICHO: zoznam vyzera spravne, len uz nezodpoveda tomu, co server posiela
+//      inym volajucim (a KOV-D by na tom postavil filtre).
+//   2. „Ziadne tiche stropy": ked klient ignoruje `more`, polozka za poradim 50
+//      z UI zmizne BEZ SLOVA — presne to zhorelo pri prvom teste v0.8.0.
+//   3. Modal D-15 sa pri ODMIETNUTOM zapise NESMIE zatvorit a zamok odoslania
+//      odomyka VOLAJUCI. Keby to niekto obratil, pouzivatel by prisiel
+//      o rozpisanu polozku alebo by ostal navzdy so zosednutym tlacidlom.
+//   4. Rucne zmeneny udaj z Demosu NIE JE „overeny". Keby islo dalej cestou
+//      `hw_demos_create`, polozka by dostala vazbu a datum overenia k cene,
+//      ktoru nikto neoveril — a to je CENOVA chyba v ostrej objednavke.
+//   5. Rada patri presne jednemu vyrobcovi: zavisly select sa nesmie dat obist.
+//
+// MUTACIE OVERENE (kazda zhodila aspon jeden assert tejto sady):
+//   1. klient si strom TRIEDI sam (`groups.sort`) -> blok 1 „poradie je presne serverove";
+//   2. „Načítať ďalšie" neposiela `more` -> blok 2 „dalsia stranka listu";
+//   3. `hwDemosDirty` vzdy `false` (prepisana cena ide `hw_demos_create`)
+//      -> blok 6 „prepisana cena = RUCNA polozka";
+//   4. `hwItemSerOptions` ignoruje vyrobcu (ponuka vsetky rady)
+//      -> blok 4 „rada je ZAVISLA od vyrobcu".
+'use strict';
+const assert = require('node:assert');
+const path = require('node:path');
+
+let n = 0;
+function ok(c, msg){ n++; assert.ok(c, msg); }
+function eq(a, b, msg){ n++; assert.deepStrictEqual(a, b, msg); }
+
+const { mkEl, DOC, dispatch, textOf } = require(path.join(__dirname, 'minidom.js'));
+const JS = path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js');
+
+// --- prostredie sekcie -------------------------------------------------------
+function addEl(tag, id){
+  const e = mkEl(tag);
+  e.attrs.id = id;
+  DOC.body.appendChild(e);
+  return e;
+}
+const MODAL_ROOT = addEl('div', 'nxModalRoot');
+const LIST = addEl('div', 'hwList');
+addEl('div', 'sectools');
+addEl('div', 'secbody');
+addEl('div', 'status');
+addEl('div', 'hwline');
+
+const SENT = [];
+global.sketchup = new Proxy({}, {
+  get(_t, name){
+    if (typeof name !== 'string') return undefined;
+    return function(payload){ SENT.push([name, JSON.parse(payload || '{}')]); };
+  },
+  has(){ return true; }
+});
+global.window.sketchup = global.sketchup;
+global.window.NX_HW_SECTION = true;
+
+global.NXModal = require(path.join(JS, 'nx_modal.js'));
+global.window.NXModal = global.NXModal;
+const S = require(path.join(JS, 'studio.js'));
+global.NX = global.window.NX;
+const H = require(path.join(JS, 'hw_catalog.js'));
+
+function sent(name){ return SENT.filter(function(x){ return x[0] === name; }); }
+function last(name){ const l = sent(name); return l.length ? l[l.length - 1][1] : null; }
+function q(sel){ return DOC.querySelector(sel); }
+function qa(sel){ return DOC.querySelectorAll(sel); }
+
+const CATS = ['ZAVESY', 'VYSUVY', 'NOHY'];
+const LABELS = { ZAVESY: 'Závesy', VYSUVY: 'Výsuvy', NOHY: 'Nohy a montáž' };
+const TAX = {
+  manufacturers: ['Blum', 'Hettich'],
+  series: [{ name: 'Sensys', manufacturer: 'Hettich' },
+           { name: 'InnoTech Atira', manufacturer: 'Hettich' },
+           { name: 'TIP-ON', manufacturer: 'Blum' }],
+  read_only: false, state_reason: ''
+};
+const ITEMS = [
+  { item_code: '104717', name_sk: 'Sensys 8645i', category: 'ZAVESY', unit: 'ks',
+    price_eur_vat: 4.18, manufacturer: 'Hettich', series: 'Sensys', row_rev: 'r1' },
+  { item_code: '250831', name_sk: 'TipOn 76 mm', category: 'ZAVESY', unit: 'ks',
+    manufacturer: 'Blum', series: 'TIP-ON', row_rev: 'r2' },
+  { item_code: '82744', name_sk: 'Klzák 17 mm', category: 'NOHY', unit: 'ks',
+    price_eur_vat: 0.48, row_rev: 'r3' }
+];
+
+function boot(){
+  SENT.length = 0;
+  H.MDH.init({ items: ITEMS, state: 'ok', state_reason: '', revision: 'rev1',
+               version: '0.9.23', categories: CATS, category_labels: LABELS,
+               units: ['ks', 'set', 'par', 'bal', 'm'], taxonomy: TAX });
+}
+
+// Odpoved servera pre `hw_tree` — presne v tvare, aky posiela `build_tree`.
+function treeResp(over){
+  const base = {
+    q: '', gen: null, leaf_page: 50, pin: null, total: 3, shown: 3,
+    groups: [
+      { key: 'ZAVESY', label: 'Závesy', open: true, total: 2, shown: 2,
+        manufacturers: [
+          { key: 'ZAVESY|Blum', label: 'Blum', total: 1, shown: 1,
+            series: [{ key: 'ZAVESY|Blum|TIP-ON', label: 'TIP-ON', total: 1, shown: 1,
+                       codes: ['250831'], more: false }] },
+          { key: 'ZAVESY|Hettich', label: 'Hettich', total: 1, shown: 1,
+            series: [{ key: 'ZAVESY|Hettich|Sensys', label: 'Sensys', total: 1, shown: 1,
+                       codes: ['104717'], more: false }] }
+        ] },
+      { key: 'NOHY', label: 'Nohy a montáž', open: false, total: 1, shown: 0,
+        manufacturers: [
+          { key: 'NOHY|', label: '— bez výrobcu', total: 1, shown: 0,
+            series: [{ key: 'NOHY||', label: '— bez rady', total: 1, shown: 0,
+                       codes: [], more: false }] }
+        ] }
+    ]
+  };
+  return Object.assign(base, over || {});
+}
+
+// ===================== 1) STROM: render presne toho, co prislo ===============
+
+(function(){
+  boot();
+  ok(sent('hw_tree').length > 0,
+     'sekcia si po naplneni katalogu vypyta STROM (ploche hladanie uz nie)');
+  const req = last('hw_tree');
+  ok(Object.prototype.hasOwnProperty.call(req, 'expand') &&
+     Object.prototype.hasOwnProperty.call(req, 'more'),
+     'dotaz nesie rozbalenie aj stránkovanie — obsah rozhoduje server');
+
+  H.MDH.tree(treeResp({ gen: last('hw_tree').gen }));
+  const heads = qa('[data-action="hw-grp"]');
+  eq(heads.length, 2, 'kazda kategoria ma hlavicku');
+  eq(heads.map(function(h){ return h.getAttribute('data-hw-grp'); }), ['ZAVESY', 'NOHY'],
+     'poradie je presne serverove (JS netriedi ani nedopĺňa)');
+  ok(textOf(heads[0]).indexOf('Závesy') > -1, 'hlavicka ukazuje SK popisok, nie kod');
+  ok(textOf(heads[1]).indexOf('Nohy a montáž') > -1, 'aj druha');
+
+  const subs = qa('.hwsub');
+  eq(subs.map(textOf), ['Blum · TIP-ON', 'Hettich · Sensys'],
+     'pod hlavickou su podnadpisy „Výrobca · Rada" v serverovom poradí');
+  const rows = qa('[data-hw-row]');
+  eq(rows.map(function(r){ return r.getAttribute('data-hw-row'); }), ['250831', '104717'],
+     'riadky su v poradi kodov, ktore poslal server');
+
+  // ZBALENA kategoria = JEDEN riadok (vertikalny priestor je vzacny).
+  const nohy = heads[1].parent;
+  eq(nohy.querySelectorAll('[data-hw-row]').length, 0,
+     'zbalena kategoria nekresli ani jeden riadok');
+  ok(textOf(heads[1]).indexOf('1 položka') > -1,
+     'ale POCET vidno — inak by hlavicka mlcala o tom, co v nej je');
+})();
+
+// ===================== 2) ZIADNE TICHE STROPY ================================
+
+(function(){
+  boot();
+  const gen = last('hw_tree').gen;
+  const big = treeResp({ gen: gen });
+  big.groups[0].manufacturers[1].series[0] =
+    { key: 'ZAVESY|Hettich|Sensys', label: 'Sensys', total: 520, shown: 50,
+      codes: ['104717'], more: true };
+  H.MDH.tree(big);
+  const more = q('[data-action="hw-more"]');
+  ok(!!more, 'orezany list PONUKNE „Načítať ďalšie" (zasada „no silent caps")');
+  ok(textOf(more).indexOf('470') > -1, 'a povie, kolko ich este je (520 - 50)');
+
+  SENT.length = 0;
+  dispatch(more, 'click');
+  const req = last('hw_tree');
+  ok(req, 'klik si vypyta novy strom');
+  eq(req.more['ZAVESY|Hettich|Sensys'], 100,
+     'a poziada o DALSIU stranku LISTU (nasobok LEAF_PAGE) — nie o cely katalog');
+  ok(textOf(q('.hwgrpbody')).indexOf('Sensys') > -1, 'strom sa medzitym nezhodil');
+})();
+
+// ===================== 3) ROZBALENIE + generacia =============================
+
+(function(){
+  boot();
+  H.MDH.tree(treeResp({ gen: last('hw_tree').gen }));
+  SENT.length = 0;
+  const nohyHead = qa('[data-action="hw-grp"]')[1];
+  dispatch(nohyHead, 'click');
+  eq(last('hw_tree').expand.NOHY, true,
+     'klik na hlavicku posle ROZBALENIE serveru — obsah si klient nedokresluje');
+  dispatch(nohyHead, 'click');
+  ok(!last('hw_tree').expand.NOHY, 'druhy klik ho zase zbali');
+
+  // Server rozbaluje aj SAM (pin, hladanie). Pri PRAZDNOM dotaze si to klient
+  // zapamata; pri hladani NIE — inak by jedno hladanie roztvorilo katalog
+  // natrvalo.
+  SENT.length = 0;
+  H.MDH.tree(treeResp({ gen: last('hw_tree') ? last('hw_tree').gen : null, q: '' }));
+  const st = H.hwTreeState();
+  eq(st.expand.ZAVESY, true, 'pri prazdnom dotaze sa serverove rozbalenie zapamata');
+  H.MDH.tree(treeResp({ gen: st.gen, q: 'tipon' }));
+  ok(!H.hwTreeState().expand.NOHY,
+     'pri hladani sa rozbalenie NEZAPAMATA (hladanie roztvara len docasne)');
+
+  // STARSIA odpoved sa zahadzuje.
+  const cur = H.hwTreeState().gen;
+  const stale = treeResp({ gen: cur - 1 });
+  stale.groups = [];
+  H.MDH.tree(stale);
+  ok(qa('[data-action="hw-grp"]').length > 0,
+     'odpoved so STAROU generaciou strom neprepise (inak by blikal spatky)');
+})();
+
+// ===================== 4) MODAL: polia, poradie, zavisly select ==============
+
+(function(){
+  boot();
+  const f = H.hwItemFields({}, {});
+  eq(f.map(function(x){ return x.key; }),
+     ['demos', 'code', 'name', 'price', 'unit', 'category', 'manufacturer', 'series', 'notes'],
+     'poradie poli je poradie dodavatelskeho listu (mockup scena 3)');
+  eq(f[0].type, 'lookup', 'Démos je nasepkavac nad SERVEROVYM hladanim');
+  eq(f[5].options.map(function(o){ return o[1]; }), ['Závesy', 'Výsuvy', 'Nohy a montáž'],
+     'kategorie sa ponukaju SK popiskom, hodnota ostava kodom');
+  eq(f[5].options.map(function(o){ return o[0]; }), CATS, 'hodnota je kod');
+
+  // UPRAVA: kod je IDENTITA — nesmie sa dat prepisat.
+  const e = H.hwItemFields(H.hwItemDraftOf(ITEMS[0]), { edit: true });
+  ok(!e.some(function(x){ return x.key === 'code'; }),
+     'pri uprave sa kod needituje (server ho v PATCHABLE nema)');
+  ok(!e.some(function(x){ return x.key === 'demos'; }),
+     'ani Démos — proposal zaklada NOVU polozku');
+
+  // MUTACIA 4: rada je ZAVISLA od vyrobcu (rada patri presne jednemu).
+  const bez = H.hwItemSerOptions('');
+  eq(bez.map(function(o){ return o[0]; }), [''],
+     'bez vyrobcu sa rada vybrat NEDA — ani „+ Vytvoriť"');
+  const het = H.hwItemSerOptions('Hettich').map(function(o){ return o[0]; });
+  eq(het, ['', 'Sensys', 'InnoTech Atira', '__new__'],
+     'ponukaju sa LEN rady toho vyrobcu (+ moznost zalozit novu)');
+  ok(het.indexOf('TIP-ON') < 0, 'cudzia rada sa neponuka (server by ju aj tak odmietol)');
+
+  const mans = H.hwItemManOptions().map(function(o){ return o[0]; });
+  eq(mans, ['', 'Blum', 'Hettich', '__new__'], 'vyrobcovia + „+ Vytvoriť" ako POSLEDNA volba');
+
+  // Validacia: klient strazi LEN povinne polia (autorita je server).
+  eq(H.hwItemValidate({ code: '', name: '' }, {}).map(function(x){ return x.field; }),
+     ['code', 'name'], 'kod aj nazov su povinne');
+  eq(H.hwItemValidate({ code: 'X', name: 'Y' }, {}), [], 'vyplnene prejde');
+  eq(H.hwItemValidate({ name: 'Y' }, { edit: true }), [],
+     'pri uprave sa kod nepyta (nie je v poliach)');
+})();
+
+// ===================== 5) MODAL: zapis, chyby, busy lock ====================
+
+(function(){
+  boot();
+  H.MDH.tree(treeResp({ gen: last('hw_tree').gen }));
+  SENT.length = 0;
+  dispatch(q('#hwNewBtn') || DOC.body, 'click');   // lista sa v tomto teste nekresli
+  H.hwItemOpen(null, null, {});
+  ok(global.NXModal.isOpen(), 'tlacidlo „Nová položka" otvara MODAL, nie formular v tele');
+  ok(!DOC.getElementById('hwNewForm'), 'staticky formular v tele uz neexistuje (D-110)');
+
+  DOC.getElementById('nxm_code').value = '999111';
+  DOC.getElementById('nxm_name').value = 'Skrutka';
+  DOC.getElementById('nxm_category').value = 'NOHY';
+  DOC.getElementById('nxm_unit').value = 'ks';
+  global.NXModal.submit();
+  ok(global.NXModal.isBusy(), 'prve odoslanie ZAMKNE tlacidlo (dvojity Enter = dve polozky)');
+  const created = last('hw_create');
+  eq(created.fields.item_code, '999111', 'na server ide kod z modalu');
+  eq(created.fields.category, 'NOHY', 'aj kategoria');
+  ok(global.NXModal.isOpen(), 'submit modal NEZATVARA — zatvara az potvrdenie servera');
+
+  // ODMIETNUTIE: modal ostava otvoreny, chyba sadne PRI POLI, zamok sa pusti.
+  H.MDH.itemResult(false, 'Kód 999111 už v katalógu je.',
+                   [{ field: 'code', msg: 'Kód 999111 už v katalógu je.' }], 'create');
+  ok(global.NXModal.isOpen(), 'odmietnuty zapis necha rozpisane hodnoty na mieste');
+  ok(!global.NXModal.isBusy(), 'a ODOMKNE tlacidlo (inak by okno ostalo mrtve)');
+  eq(DOC.getElementById('nxm_code').value, '999111', 'hodnoty sa nestratili');
+  const errRow = q('[data-nxm-lkrow], .mrow');
+  ok(textOf(MODAL_ROOT).indexOf('už v katalógu je') > -1, 'hlaska je v karte');
+  ok(!!q('.bad'), 'a pole je oznacene ako chybne');
+  ok(!!errRow, 'karta ma riadky');
+
+  // Odpoved, na ktoru sa NECAKA, sa zahadzuje — inak by inline oprava bunky
+  // v riadku zatvorila rozpisany modal.
+  H.MDH.itemResult(true, 'Uložené.', [], 'patch');
+  ok(global.NXModal.isOpen(),
+     'signal bez cakania (napr. patch z bunky) modal NEZATVARA');
+
+  // POTVRDENIE vlastneho odoslania: modal sa zatvara.
+  DOC.getElementById('nxm_code').value = '999112';
+  global.NXModal.submit();
+  ok(global.NXModal.isBusy(), 'druhe odoslanie zase zamklo');
+  H.MDH.itemResult(true, 'Položka 999112 pridaná.', [], 'create');
+  ok(!global.NXModal.isOpen(), 'potvrdeny zapis modal ZATVORI');
+})();
+
+// ===================== 6) DÉMOS: predvyplnenie a ručná položka ==============
+
+const PROP = { ok: true, pid: 'p1', url: 'https://www.demos-trade.sk/k-atira/',
+               code: '357695', name_sk: 'K-InnoTech Atira 470', unit: 'set',
+               price_vat: 18.9, category_guess: 'VYSUVY',
+               manufacturer_guess: 'Hettich', exists: false,
+               related: [{ code: '294940', name: 'čelo' }] };
+
+(function(){
+  boot();
+  H.hwItemOpen(null, null, {});
+  // Pouzivatel napise poznamku, potom nacita produkt z Demosu.
+  DOC.getElementById('nxm_notes').value = 'moja poznamka';
+  H.MDH.demosPreview(PROP);
+  ok(global.NXModal.isOpen(), 'nahlad modal nezatvara — prekresli ho');
+  eq(DOC.getElementById('nxm_code').value, '357695', 'kod je z proposalu');
+  eq(DOC.getElementById('nxm_name').value, 'K-InnoTech Atira 470', 'nazov tiez');
+  eq(DOC.getElementById('nxm_price').value, '18.9', 'aj cena');
+  eq(DOC.getElementById('nxm_unit').value, 'set', 'aj MJ');
+  eq(DOC.getElementById('nxm_category').value, 'VYSUVY', 'kategoria je SERVEROVY navrh');
+  eq(DOC.getElementById('nxm_manufacturer').value, 'Hettich',
+     'vyrobca je navrh z TAXONOMIE (znacka stranky -> kanonicke meno)');
+  eq(DOC.getElementById('nxm_series').value, '',
+     'radu NEHADAME nikdy (inferencia z breadcrumbu je mimo tejto davky)');
+  eq(DOC.getElementById('nxm_notes').value, 'moja poznamka',
+     'a rozpisana poznamka sa NESTRATILA');
+  ok(textOf(MODAL_ROOT).indexOf('bez väzby na Démos') > -1,
+     'modal VETOU povie, co sa stane pri rucnej zmene');
+
+  // NEDOTKNUTY proposal = zapis z Demosu (server dopĺňa vazbu a datum).
+  SENT.length = 0;
+  global.NXModal.submit();
+  const dc = last('hw_demos_create');
+  ok(dc, 'nedotknuty proposal ide cestou `hw_demos_create`');
+  eq(dc.pid, 'p1', 'a nesie LEN pid');
+  eq(dc.manufacturer, 'Hettich', 'plus vyrobcu, ktoreho proposal nema');
+  ok(!Object.prototype.hasOwnProperty.call(dc, 'price_eur_vat'),
+     'cena z klienta NEODCHADZA (FIX 12 z KOV-H1)');
+  H.MDH.itemResult(true, 'ok', [], 'create');
+})();
+
+(function(){
+  boot();
+  H.hwItemOpen(null, null, {});
+  H.MDH.demosPreview(PROP);
+  // MUTACIA 3: pouzivatel PREPISE cenu -> uz to nie je overena polozka.
+  DOC.getElementById('nxm_price').value = '15,00';
+  SENT.length = 0;
+  global.NXModal.submit();
+  ok(!last('hw_demos_create'), 'prepisana cena UZ NEIDE cestou z Demosu');
+  const c = last('hw_create');
+  ok(c, 'ide beznou cestou — polozka je RUCNA');
+  eq(c.fields.price_eur_vat, '15,00', 'a plati rucna cena');
+  ok(!Object.prototype.hasOwnProperty.call(c.fields, 'demos_url'),
+     'bez vazby na Demos (server ju pri `create_item` aj tak zahadzuje)');
+
+  // Cista funkcia — porovnanie je odolne voci ciarke aj poctu desatin.
+  eq(H.hwDemosDirty(PROP, { code: '357695', name: 'K-InnoTech Atira 470',
+                            unit: 'set', price: '18,90' }), false,
+     '„18,90" a 18.9 je TA ISTA cena — polozka o vazbu neprichadza kvoli formatu');
+  eq(H.hwDemosDirty(PROP, { code: '357695', name: 'K-InnoTech Atira 470',
+                            unit: 'set', price: '15' }), true, 'ina cena = rucna');
+  eq(H.hwDemosDirty(PROP, { code: 'INY', name: 'K-InnoTech Atira 470',
+                            unit: 'set', price: '18.9' }), true, 'iny kod = rucna');
+  eq(H.hwDemosDirty(null, { code: 'X' }), true, 'bez proposalu je vzdy rucna');
+})();
+
+// ===================== 7) „+ Vytvoriť výrobcu/radu…" ========================
+
+(function(){
+  boot();
+  H.hwItemOpen(null, null, {});
+  DOC.getElementById('nxm_name').value = 'Rozpisana polozka';
+  const man = DOC.getElementById('nxm_manufacturer');
+  man.value = '__new__';
+  SENT.length = 0;
+  dispatch(man, 'change');
+  ok(!!DOC.getElementById('nxm_manufacturer_new'),
+     'volba „+ Vytvoriť výrobcu…" prida POLE na nazov (nic mimo kostry D-15)');
+  eq(DOC.getElementById('nxm_name').value, 'Rozpisana polozka',
+     'a rozpisane hodnoty prezili prekreslenie modalu');
+  ok(!sent('hw_tax_create_manufacturer').length,
+     'samotna volba este NIC nezaklada');
+
+  DOC.getElementById('nxm_manufacturer_new').value = 'Grass';
+  global.NXModal.submit();
+  const req = last('hw_tax_create_manufacturer');
+  ok(req, 'potvrdenie zaklada vyrobcu v TAXONOMII');
+  eq(req.name, 'Grass', 'a posiela jeho nazov');
+  ok(!last('hw_create'), 'polozka sa pritom NEUKLADA (dve veci naraz = tichy zapis)');
+
+  // Server vratil CERSTVU taxonomiu + kanonicke meno.
+  H.MDH.taxonomy({ ok: true, op: 'manufacturer', name: 'Grass', errors: [],
+                   taxonomy: { manufacturers: ['Blum', 'Grass', 'Hettich'],
+                               series: TAX.series, read_only: false, state_reason: '' } });
+  ok(global.NXModal.isOpen(), 'modal ostava otvoreny');
+  ok(!global.NXModal.isBusy(), 'a zamok odoslania je pusteny');
+  eq(DOC.getElementById('nxm_manufacturer').value, 'Grass',
+     'novy vyrobca je rovno VYBRANY (kanonicke meno zo servera)');
+  ok(!DOC.getElementById('nxm_manufacturer_new'), 'pole na nazov zmizlo');
+  eq(DOC.getElementById('nxm_name').value, 'Rozpisana polozka', 'a polozka sa nestratila');
+
+  // ODMIETNUTIE zapisu do taxonomie sadne PRI POLI.
+  DOC.getElementById('nxm_manufacturer').value = '__new__';
+  dispatch(DOC.getElementById('nxm_manufacturer'), 'change');
+  DOC.getElementById('nxm_manufacturer_new').value = 'x';
+  global.NXModal.submit();
+  H.MDH.taxonomy({ ok: false, op: 'manufacturer', name: '',
+                   errors: [{ field: 'manufacturer', msg: 'názov musí obsahovať písmeno' }],
+                   taxonomy: TAX });
+  ok(textOf(MODAL_ROOT).indexOf('musí obsahovať písmeno') > -1,
+     'chyba servera je v karte');
+  ok(!global.NXModal.isBusy(), 'a tlacidlo je odomknute');
+  global.NXModal.close();
+})();
+
+// ===================== 8) zavisly select po zmene vyrobcu ===================
+
+(function(){
+  boot();
+  H.hwItemOpen(null, null, {});
+  DOC.getElementById('nxm_manufacturer').value = 'Hettich';
+  dispatch(DOC.getElementById('nxm_manufacturer'), 'change');
+  DOC.getElementById('nxm_series').value = 'Sensys';
+  dispatch(DOC.getElementById('nxm_series'), 'change');
+  eq(DOC.getElementById('nxm_series').value, 'Sensys', 'rada sa vybrala');
+
+  DOC.getElementById('nxm_manufacturer').value = 'Blum';
+  dispatch(DOC.getElementById('nxm_manufacturer'), 'change');
+  eq(DOC.getElementById('nxm_series').value, '',
+     'zmena vyrobcu ZAHODI radu, ktora mu nepatri (server by ju odmietol)');
+  const opts = qa('#nxm_series option').map(function(o){ return o.getAttribute('value'); });
+  eq(opts, ['', 'TIP-ON', '__new__'], 'a ponuka sa zuzi na rady noveho vyrobcu');
+  global.NXModal.close();
+})();
+
+// ===================== 9) ÚPRAVA: len zmenené polia + row_rev ================
+
+(function(){
+  boot();
+  // Cista funkcia: patch nesie LEN to, co sa naozaj zmenilo. Posielat vsetko by
+  // pri kazdom ulozeni zmazalo `price_checked_at` (server F5).
+  const base = H.hwItemDraftOf(ITEMS[0]);
+  eq(H.hwItemPatch(base, base), {}, 'bez zmeny nie je co patchovat');
+  eq(H.hwItemPatch(base, Object.assign({}, base, { notes: 'nova' })), { notes: 'nova' },
+     'patchuje sa LEN zmenene pole');
+  eq(H.hwItemPatch(base, Object.assign({}, base, { price: '4,18' })), {},
+     '„4,18" a 4.18 je ta ista cena — datum overenia sa zbytocne nezahadzuje');
+  eq(H.hwItemPatch(base, Object.assign({}, base, { price: '5' })),
+     { price_eur_vat: '5' }, 'skutocna zmena ceny sa posle');
+
+  H.hwItemOpen(ITEMS[0], null, {});
+  ok(textOf(MODAL_ROOT).indexOf('104717') > -1, 'kod je v podtitule (je to identita)');
+  ok(!DOC.getElementById('nxm_code'), 'a NIE v poli, ktore by sa dalo prepisat');
+  DOC.getElementById('nxm_notes').value = 'upravena poznamka';
+  SENT.length = 0;
+  global.NXModal.submit();
+  const p = last('hw_patch');
+  ok(p, 'uprava ide patchom');
+  eq(p.code, '104717', 'identita ide zo stavu, nie z pola');
+  eq(p.row_rev, 'r1', 'a revizia riadku ide SKRYTO (optimisticky zamok)');
+  eq(p.from, 'modal', 'server vie, ze odpoved patri modalu (nie inline bunke)');
+  eq(p.patch, { notes: 'upravena poznamka' }, 'patch nesie LEN zmenu');
+
+  // Konflikt = hlaska + obnova, modal ostava otvoreny.
+  H.MDH.itemResult(false, 'Položka sa medzitým zmenila — hodnoty sa obnovili, uprav znova.',
+                   [{ msg: 'Položka sa medzitým zmenila — hodnoty sa obnovili, uprav znova.' }],
+                   'patch');
+  ok(global.NXModal.isOpen(), 'konflikt modal nezatvara');
+  ok(textOf(MODAL_ROOT).indexOf('medzitým zmenila') > -1, 'a povie preco');
+  global.NXModal.close();
+})();
+
+// ===================== 10) rozpísaná bunka a otvorený detail prežijú =========
+
+(function(){
+  boot();
+  H.MDH.tree(treeResp({ gen: last('hw_tree').gen }));
+  // Pouzivatel rozklikne detail a zacne prepisovat nazov v riadku.
+  const toggle = q('[data-action="hw-toggle"][data-hw-code="250831"]');
+  ok(!!toggle, 'riadok ma rozklik detailu');
+  dispatch(toggle, 'click');
+  ok(!!q('.hwdetail'), 'detail sa otvoril');
+
+  const cell = q('.mdcell[data-hw-code="250831"][data-hw-field="name_sk"]');
+  cell.value = 'Rozpisany novy nazov';
+  DOC.activeElement = cell;
+  cell.selectionStart = 5;
+  cell.selectionEnd = 5;
+
+  // Prisiel novy strom (napr. po prepocte kusovnika).
+  H.MDH.tree(treeResp({ gen: H.hwTreeState().gen }));
+  const after = q('.mdcell[data-hw-code="250831"][data-hw-field="name_sk"]');
+  eq(after.value, 'Rozpisany novy nazov',
+     'rozpisana bunka PREZILA prekreslenie stromu (inak by sa pisalo odznova)');
+  eq(after.getAttribute('data-orig'), 'TipOn 76 mm',
+     'a baseline ostal POVODNY — cudzia zmena skonci konfliktom, nie tichym prepisom');
+  ok(!!q('.hwdetail'), 'a otvoreny detail tiez prezil');
+  DOC.activeElement = null;
+})();
+
+// ===================== 11) prázdny výsledok = jeden riadok hlášky ============
+
+(function(){
+  boot();
+  H.MDH.tree(treeResp({ gen: last('hw_tree').gen, groups: [], total: 0, shown: 0, q: 'xyz' }));
+  eq(qa('[data-action="hw-grp"]').length, 0, 'ziadne skupiny');
+  ok(textOf(LIST).indexOf('Žiadne položky') > -1,
+     'prazdny vysledok je JEDEN riadok hlasky, nie prazdna plocha');
+})();
+
+console.log(`OK ${n} kontrol (KOV-B2 katalóg: strom + modal + Démos)`);

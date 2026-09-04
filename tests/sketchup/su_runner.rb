@@ -12496,6 +12496,143 @@ module NoxunSuRunner
     end
   end
 
+  # ===== KOV-B2: KATALOG — STROM, MODAL POLOZKY, TAXONOMIA ZO STUDIA ========
+  # Overuje to, co headless sada NEVIE: ze zapisove cesty katalogu a taxonomie
+  # bezia v ZIVOM SketchUpe nad SANDBOXOM (`Materials.test_dir_override`),
+  # NEROBIA krok Spat (su to GLOBALNE stores, nie model) a ze po nich sekcia
+  # dostane cerstvy strom (`push_items`).
+  KOVB2_CODE = 'SU-B2-001'
+  KOVB2_MAN  = 'SU B2 Výrobca'
+  KOVB2_SER  = 'SU B2 Rada'
+
+  def kovb2_tree(payload)
+    out = []
+    e::HardwareCatalogDialog.dispatch('hw_tree', payload.to_json, ->(s) { out << s })
+    js = out.find { |s| s.start_with?('MDH.tree(') }
+    js ? JSON.parse(js[9...-1]) : nil
+  end
+
+  def kovb2_codes(tree)
+    return [] unless tree
+
+    tree['groups'].flat_map { |g|
+      g['manufacturers'].flat_map { |m| m['series'].flat_map { |s| s['codes'] } }
+    }
+  end
+
+  def run_kovb2(model)
+    cleanup(model)
+    markers = []
+    tmp = File.join(Dir.tmpdir, "noxun_kovb2_#{Process.pid}")
+    FileUtils.mkdir_p(tmp)
+    e::Materials.test_dir_override = tmp
+    kovb1_reset_caches!
+    begin
+      ok('KOV-B2: sandbox %APPDATA% je aktivny (realny katalog sa nedotkne)',
+         e::HardwareCatalog.path.start_with?(tmp) && e::HardwareTaxonomy.path.start_with?(tmp))
+
+      # --- 1) STROM NAD SANDBOX KATALOGOM ----------------------------------
+      tree = kovb2_tree('gen' => 1)
+      ok('KOV-B2: `hw_tree` vratil STROM (a echol generaciu)',
+         tree.is_a?(Hash) && tree['gen'] == 1 && tree['groups'].is_a?(Array))
+      ok('KOV-B2: strom nesie velkost stranky listu zo SERVERA',
+         tree['leaf_page'] == e::HardwareCatalog::LEAF_PAGE)
+      ok('KOV-B2: seed katalog sa rozpadol do kategorii v poradi CATEGORIES',
+         tree['groups'].map { |g| g['key'] } ==
+           (e::HardwareCatalog::CATEGORIES & tree['groups'].map { |g| g['key'] }))
+      ok('KOV-B2: zbalena kategoria neposiela ziadne kody (jeden riadok)',
+         kovb2_codes(tree).empty? && tree['total'].positive?)
+      zav = tree['groups'].find { |g| g['key'] == 'ZAVESY' }
+      open_tree = kovb2_tree('gen' => 2, 'expand' => { 'ZAVESY' => true })
+      ozav = open_tree['groups'].find { |g| g['key'] == 'ZAVESY' }
+      ok('KOV-B2: rozbalena kategoria posle kody a `shown` sedi s ich poctom',
+         ozav && ozav['shown'] == ozav['manufacturers']
+                                     .flat_map { |m| m['series'] }.sum { |s| s['codes'].length })
+      ok('KOV-B2: a `total` sa rozbalenim NEMENI (pocet je pocet)',
+         zav && ozav && zav['total'] == ozav['total'])
+
+      # --- 2) ZALOZENIE POLOZKY S VYROBCOM = BEZ KROKU SPAT ----------------
+      tstatus, trec = e::HardwareTaxonomy.create_manufacturer!(KOVB2_MAN)
+      ok("KOV-B2: novy vyrobca zo Studia (#{tstatus.inspect})",
+         %i[ok exists].include?(tstatus) && trec.is_a?(Hash))
+      sstatus, = e::HardwareTaxonomy.create_series!(KOVB2_SER, KOVB2_MAN)
+      ok("KOV-B2: nova rada pod nim (#{sstatus.inspect})", %i[ok exists].include?(sstatus))
+
+      m1 = r03_marker(model, markers)
+      out = []
+      e::HardwareCatalogDialog.dispatch(
+        'hw_create',
+        { 'fields' => { 'item_code' => KOVB2_CODE, 'name_sk' => 'SU B2 položka',
+                        'category' => 'ZAVESY', 'unit' => 'ks',
+                        'price_eur_vat' => '1,50',
+                        'manufacturer' => KOVB2_MAN, 'series' => KOVB2_SER } }.to_json,
+        ->(s) { out << s }
+      )
+      rec = e::HardwareCatalog.find(KOVB2_CODE)
+      ok('KOV-B2: polozka s vyrobcom a radou sa ULOZILA',
+         rec && rec['manufacturer'] == KOVB2_MAN && rec['series'] == KOVB2_SER)
+      ok('KOV-B2: modal dostal potvrdenie (`MDH.itemResult`) — inak by ostal zamknuty',
+         out.any? { |s| s.start_with?('MDH.itemResult(true,') })
+      ok('KOV-B2: a kod novej polozky na pin (`MDH.created`)',
+         out.any? { |s| s.start_with?('MDH.created(') })
+      Sketchup.undo
+      ok('KOV-B2: zapis do GLOBALNEHO katalogu NEROBI krok Spat',
+         !m1.valid? && !e::HardwareCatalog.find(KOVB2_CODE).nil?)
+
+      # --- 3) PIN: nova polozka je navrchu SVOJHO listu a cesta je rozbalena
+      pinned = kovb2_tree('gen' => 3, 'pin' => KOVB2_CODE)
+      pin_group = pinned['groups'].find { |g| g['key'] == 'ZAVESY' }
+      ok('KOV-B2: server pin POTVRDIL a rozbalil jeho kategoriu',
+         pinned['pin'] == KOVB2_CODE && pin_group && pin_group['open'] == true)
+      leaf = pin_group['manufacturers']
+             .flat_map { |m| m['series'] }
+             .find { |s| s['codes'].include?(KOVB2_CODE) }
+      ok('KOV-B2: a je PRVY vo svojom liste (Vyrobca · Rada)',
+         leaf && leaf['codes'].first == KOVB2_CODE)
+
+      # --- 4) ZALOZENIE VYROBCU ZO SEKCIE = BEZ KROKU SPAT -----------------
+      m2 = r03_marker(model, markers)
+      tax_out = []
+      e::HardwareCatalogDialog.dispatch('hw_tax_create_manufacturer',
+                                        { 'name' => 'SU B2 Druhý' }.to_json,
+                                        ->(s) { tax_out << s })
+      ok('KOV-B2: server posiela CERSTVU taxonomiu (`MDH.taxonomy`)',
+         tax_out.any? { |s| s.start_with?('MDH.taxonomy(') })
+      Sketchup.undo
+      ok('KOV-B2: zapis do zoznamu vyrobcov ZO STUDIA NEROBI krok Spat',
+         !m2.valid? && !e::HardwareTaxonomy.find_manufacturer('SU B2 Druhý').nil?)
+
+      # --- 5) OBNOVA SEKCIE PO ZAPISE --------------------------------------
+      # `push_items` posiela katalogove echo aj do Studia; bez neho by sekcia
+      # drzala stary `row_rev` a dalsi patch by padol na konflikte.
+      payload = e::HardwareCatalogDialog.items_payload
+      ok('KOV-B2: `items_payload` nesie novu polozku aj s reviziou riadku',
+         payload['items'].any? { |i| i['item_code'] == KOVB2_CODE && !i['row_rev'].to_s.empty? })
+      state = e::HardwareCatalogDialog.state_payload
+      ok('KOV-B2: `state_payload` nesie SK popisky kategorii',
+         state['category_labels'] == e::HardwareCatalog::CATEGORY_LABELS)
+      ok('KOV-B2: a taxonomiu pre selecty modalu (rada nesie svojho vyrobcu)',
+         state['taxonomy']['manufacturers'].include?(KOVB2_MAN) &&
+         state['taxonomy']['series'].any? { |s|
+           s['name'] == KOVB2_SER && s['manufacturer'] == KOVB2_MAN
+         })
+    rescue StandardError => ex
+      log_line("FAIL: KOV-B2 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    ensure
+      r03_clear_markers(model, markers)
+      e::Materials.test_dir_override = nil
+      kovb1_reset_caches!
+      cleanup(model)
+      begin
+        FileUtils.rm_rf(tmp)
+      rescue StandardError
+        nil
+      end
+      ok('KOV-B2: cleanup (override prec, model prazdny, realne katalogy netknute)',
+         e::Materials.test_dir_override.nil? && cabinets(model).empty? && boards(model).empty?)
+    end
+  end
+
   # ===== KOV-A2b: SMER OTVARANIA V MODELI ===================================
   # Overuje to, co headless sada NEVIE: zivotny cyklus overlayu, ze zapnutie
   # NEVYROBI krok Spat ani nezmeni model, ze symbol sedi na SPRAVNOM kridle
@@ -13907,6 +14044,7 @@ module NoxunSuRunner
     run_kovh1(model)         # KOV-H1: ad-hoc kovanie — polozky prezijú prestavbu (1 krok Spat), kopia ma nove ID, sablona ich nesie, mrtvy vlastnik = ORANGE a polozka ostava v nakupe, CSV bez poloziek BAJTOVO nezmeneny
     run_kovh2(model)         # KOV-H2: ad-hoc kovanie UI — payload skrinky nesie zivu cenu a ponuku dielcov, hladanie bez kroku Spat, apply s manual_op = 1 krok Spat + signal modalu, odmietnutie 0 krokov, povod nakupneho riadku s ludskym popisom vlastnika
     run_kovb1(model)          # KOV-B1: klasifikacia setov + taxonomia — std 3 v subore aj v .skp, nakup TOTOZNY s legacy setom, sablona z novsej verzie odmietnuta BEZ operacie, zapis vyrobcu bez kroku Spat
+    run_kovb2(model)          # KOV-B2: strom katalogu (`hw_tree`) nad sandboxom, zalozenie polozky s vyrobcom + zalozenie vyrobcu ZO STUDIA = BEZ kroku Spat, pin navrchu svojho listu, payload sekcie s popiskami a taxonomiou
     run_kova2b(model)        # KOV-A2b: smer otvarania v modeli — lifecycle overlayu, symbol na spravnom kridle a prednej ploche, prestavba/Spat, dup-ID per instancia, vykon
     run_async(model, nil)
   rescue StandardError => ex
