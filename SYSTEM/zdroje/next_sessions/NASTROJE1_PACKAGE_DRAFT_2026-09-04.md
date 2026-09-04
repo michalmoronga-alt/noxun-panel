@@ -1,6 +1,6 @@
 # NÁSTROJE-1 — DRAFT package (4.9.2026, po Codex CLI audite + GH kolách #288 1–3)
 
-> Stav: KONCEPT — nezáväzný podklad (draft package); do PLANu sa vráti až po zapracovaní nálezov kola 3 (nižšie) a novom Codex CLI audite draftu, nie priamo do implementácie.
+> Stav: KONCEPT — HISTÓRIA auditov; package bol 4.9.2026 po audite 5 (SOUND) PRENESENÝ do `SYSTEM/PLAN.md` (blok 4) — autorita je PLAN, tento súbor je archív nálezov a rozhodnutí.
 
 > Rozhodnutia Michala 4.9.: jeden balík, spoločný toolbar „Noxun Nástroje", UI nástrojov nemeniť, kópia cez engine, názov kópie s písmenovou príponou, tlačidlo „Vložiť kópiu" NIE.
 > Outside-in packet: [NASTROJE_OUTSIDE_IN_2026-09-04.md](NASTROJE_OUTSIDE_IN_2026-09-04.md). Referenčný kód: `../archiv_kod/legacy_*.rb.txt`.
