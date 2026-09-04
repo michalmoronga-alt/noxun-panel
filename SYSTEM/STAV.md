@@ -24,7 +24,7 @@ robí **priamo v Inspectore**. **KOV-B1** dala setom **klasifikáciu** (na čo �
 **Pozor na kompatibilitu:** čo uloží v0.9.20, to **v0.9.18 už nepoužije** — model/šablóna (`CONFIG_SCHEMA` 4 + brána `assess_set_defs`), knižnica setov aj projektový snapshot
 (`std` 3) a katalóg kovania s výrobcom (`schema` 2). Pred prvou takou zákazkou aktualizovať **obe PC** (D-52 updater).
 
-**Testy k v0.9.22:** **2684 headless** · 82 JS sád · posledný plný in-SketchUp beh **1504 PASS** (v0.9.21; VEPO dávka #287 ho **nespúšťala** — Michal pracoval v SketchUpe, pustiť pred merge).
+**Testy k v0.9.22:** **2686 headless** · 82 JS sád · posledný plný in-SketchUp beh **1504 PASS** (v0.9.21; VEPO dávka #287 ho **nespúšťala** — Michal pracoval v SketchUpe, pustiť pred merge).
 
 ## Robí sa
 

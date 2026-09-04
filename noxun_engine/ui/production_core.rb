@@ -239,10 +239,14 @@ module Noxun
       # GH #287 P1: zaznam nesie AJ `group_id` — zavaznou identitou vazby
       # doska<->ABS je SKUPINA (D-41), nie text kodu dekoru; ten sa smie
       # opakovat u dvoch vyrobcov.
+      # GH #287 kolo 2: do mapy ide KANONICKY tvar kluca skupiny. `identity_norm`
+      # je TA ISTA normalizacia, akou zvysok materialoveho systemu porovnava
+      # identity (`Materials.record_group_key`) — „grp-x" a „GRP-X" su JEDNA
+      # skupina. Surova rovnost by z nich urobila dve a poznamka by klamala.
       def vepo_edge_decors
         Materials.edges.each_with_object({}) do |a, out|
           out[a['abs_id']] = { 'decor' => a['decor'].to_s, 'decor_name' => a['decor_name'].to_s,
-                               'group_id' => a['group_id'].to_s }
+                               'group_id' => Materials.identity_norm(a['group_id']) }
         end
       end
 
@@ -255,7 +259,8 @@ module Noxun
       def vepo_sheet_decors
         Materials.sheets.each_with_object({}) do |s, out|
           next if s['uni'] == true
-          out[s['material_id']] = { 'decor' => s['decor'].to_s, 'group_id' => s['group_id'].to_s }
+          out[s['material_id']] = { 'decor' => s['decor'].to_s,
+                                    'group_id' => Materials.identity_norm(s['group_id']) }
         end
       end
 

@@ -43,7 +43,7 @@
   **voľný text používateľa**, ale `aggregate_rows` vie zliať dosku a dielec skrinky do jedného riadku, takže `names` pôvod nepovedia — doska pomenovaná „Bok lavy" by sa
   skrátila na „Bok L" a dvojica (dielec „Bok lavy" + doska „Bok P") by sa spárovala do klamlivého „Bok LP". Riadok preto nesie **aditívny kľúč `free_names`** (pôvod z
   `part_key` `board/` alebo `owner_id` `BRD-`), voľné názvy idú pass-through a nikdy sa nepárujú; pri zhode reťazca z oboch svetov vyhráva konzervatívna cesta.
-  **Testy:** headless **2684** (0 FAIL; +33 nová sada `test_d112_d113_vepo.rb` vrátane oboch review nálezov), JS 82 sád zelených, **7 mutácií** overených pádom a vrátených.
+  **Testy:** headless **2686** (0 FAIL; +35 nová sada `test_d112_d113_vepo.rb` vrátane oboch review nálezov), JS 82 sád zelených, **7 mutácií** overených pádom a vrátených.
   Zlatá vzorka CSV prepísaná **vedome, samostatným commitom s dôvodom**. **In-SketchUp sada v tejto dávke NEBEŽALA** (Michal pracoval v SketchUpe s pluginom z mainu, runner
   prepisuje živý Plugins adresár) — helper `k1_vepo_csv` je upravený na nové mapy, runner treba pustiť pred merge.
   **Codex review:** doplní orchestrátor po review.

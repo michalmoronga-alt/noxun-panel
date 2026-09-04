@@ -28,6 +28,8 @@
   dvom výrobcom rovnaký kód v rôznych skupinách. Preto: keď **oba** záznamy majú `group_id`, rozhoduje **výhradne skupina** (rovnaký kód v inej skupine ⇒ poznámka JE; iný zápis
   kódu v tej istej skupine ⇒ poznámka nie je). Keď skupina na niektorej strane chýba (**legacy záznam**), platí **vedomý fallback** na normalizované porovnanie textu dekoru
   (`decor_norm_key`: medzery preč, case-insensitive) — je to jediný údaj, ktorý taký záznam nesie, a mlčať by znamenalo stratiť poznámku aj tam, kde je preukázateľná.
+  Skupiny sa porovnávajú v **kanonickom tvare** — tou istou normalizáciou (`Materials.identity_norm`: trim, viacnásobné medzery na jednu, case-insensitive), akou identity
+  porovnáva zvyšok materiálového systému, takže `grp-x` a `GRP-X` sú **jedna** skupina (surová rovnosť reťazcov by z nich urobila dve a poznámka by klamala).
 - **Tvar textu:** `ABS <dekor> <názov dekoru>` (napr. `ABS H1181 Dub Halifax tabakový`); bez názvu dekoru len `ABS H1181`. Viac RÔZNYCH pások na dielci → oddelené `, ` v poradí hrán L1 L2 W1 W2, bez opakovania toho istého dekoru. Diakritika ostáva (číta ju človek vo VEPO). Bez tvrdého orezu (na dielci sú najviac 4 pásky).
 - **`universal` pásky sa NEVYNÍMAJÚ** — VEPO odvodzuje pásku z materiálu, takže KAŽDÝ odlišný dekor musí vidieť.
 - **Dôkaz prijatia:** Michal 3.9.2026 naimportoval do VEPO testovací 9-stĺpcový súbor — VEPO ho prijal a poznámka sa zobrazila v poli **„Poznámka pre VEPO"** pri riadku, celá (31 znakov). **Na nálepky nejde** — je to výslovne poznámka pre VEPO.

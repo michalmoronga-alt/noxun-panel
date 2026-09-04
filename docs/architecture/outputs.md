@@ -419,6 +419,9 @@ a katalóg vedome dovolí dvom výrobcom rovnaký kód v rôznych skupinách. Ke
 na `decor_key` — normalizáciu **zhodnú s `Materials.decor_norm_key`** (medzery preč, lowercase), ktorej kópia v tomto module je zámerná (modul nesmie siahať na katalóg, ale
 porovnanie musí byť to isté). Bez skupiny **aj** bez dekoru je záznam neporovnateľný (`identifiable?` → žiadna poznámka). Porovnanie len podľa textu by dosku zo skupiny A a pásku
 zo skupiny B s rovnakým `W1000` vyhlásilo za zhodu — a poznámka by ticho chýbala, teda zlý olep z výroby.
+Skupiny sa porovnávajú **kanonicky, nie surovo**: `ProductionCore` vkladá do máp kľúč prehnaný cez `Materials.identity_norm` a `vepo_export` má nad tým obrannú vrstvu `group_key`
+s **tou istou** normalizáciou (trim, viacnásobné medzery na jednu, upcase) — rovnaký vzor, akým `decor_key` zrkadlí `decor_norm_key`. Bez nej by `grp-x` a `GRP-X` boli dve skupiny
+a export by nahlásil poznámku o inej ABS, ktorá tam nie je. **Pozor na rozdiel oproti `decor_key`:** `group_key` medzery len zlučuje, neodstraňuje (presne ako `identity_norm`).
 
 **Názov riadku (D-113, v0.9.22).** `row_name` skladá `"<krátke názvy> <skrinky>"` (napr. `Bok LP s1 s2`) a používa ho CSV **aj LOG** (chyby, poznámky). Tri čisté kroky:
 `short_name` (tabuľka skratiek na PRESNÉ reťazce builderov — `construction.rb`, `zone_tree.rb`, `fronts.rb`; **neznámy názov ide bez zmeny**), `join_names` (združenie dvojíc

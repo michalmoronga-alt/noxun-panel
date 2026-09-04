@@ -457,8 +457,8 @@ module Noxun
       #     text dekoru; je to jedina informacia, ktoru taky zaznam nesie, a
       #     mlcat by znamenalo stratit poznamku aj tam, kde je preukazatelna.
       def same_decor?(abs_rec, sheet_rec)
-        ag = abs_rec['group_id'].to_s.strip
-        sg = sheet_rec['group_id'].to_s.strip
+        ag = group_key(abs_rec['group_id'])
+        sg = group_key(sheet_rec['group_id'])
         return ag == sg unless ag.empty? || sg.empty?
         decor_key(abs_rec['decor']) == decor_key(sheet_rec['decor'])
       end
@@ -466,7 +466,21 @@ module Noxun
       # Zaznam sa da porovnat, ked nesie aspon skupinu ALEBO dekor. Bez oboch je
       # to prazdne miesto v katalogu — poznamka sa z neho nevymysla.
       def identifiable?(rec)
-        !rec['group_id'].to_s.strip.empty? || !decor_key(rec['decor']).empty?
+        !group_key(rec['group_id']).empty? || !decor_key(rec['decor']).empty?
+      end
+
+      # GH #287 kolo 2: normalizacia identity SKUPINY na POROVNANIE — zhodna s
+      # Materials.identity_norm (trim, viacnasobne medzery na jednu, upcase),
+      # ktorou zvysok materialoveho systemu porovnava identity zaznamov
+      # (`Materials.record_group_key`). Kopia je vedoma a je to OBRANNA vrstva:
+      # mapy uz kanonicky kluc nesu (ProductionCore), ale surova rovnost by z
+      # „grp-x" a „GRP-X" urobila DVE skupiny a export by nahlasil poznamku o
+      # inej ABS, ktora tam nie je. Rovnaky vzor ako `decor_key` voci
+      # `Materials.decor_norm_key`.
+      # POZOR na rozdiel: medzery sa NEODSTRANUJU (len zlucia) — presne tak sa
+      # sprava `identity_norm`; `decor_key` ich naopak odstranuje uplne.
+      def group_key(value)
+        value.to_s.strip.gsub(/\s+/, ' ').upcase
       end
 
       # Tolerancia k legacy volajucemu: holy String sa cita ako samotny dekor

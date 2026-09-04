@@ -104,6 +104,40 @@ NxTest.test('P1: rovnaka SKUPINA = ziadna poznamka, aj ked sa text kodu lisi') d
   NxTest.assert_equal('', NxD112.note({ 'edges' => NxD112.edges('ABS_A') }, edec, sdec))
 end
 
+NxTest.test('P1 kolo 2: identita skupiny je KANONICKA — „grp-x" a „GRP-X" su JEDNA skupina') do
+  # Zvysok materialoveho systemu porovnava identity cez `Materials.identity_norm`
+  # (trim, viacnasobne medzery na jednu, upcase) — surova rovnost retazcov by z
+  # dvoch zapisov TEJ ISTEJ skupiny urobila dve a vyrobila klamlivu poznamku.
+  sdec = { 'BIELA_18' => { 'decor' => 'W1000', 'group_id' => 'grp-x' } }
+  [['GRP-X', 'velkost pismen'], [' grp-x ', 'okrajove medzery'],
+   ["grp-x\t", 'biele znaky'], ['grp-x', 'presna zhoda']].each do |gid, why|
+    edec = { 'ABS_X' => { 'decor' => 'H1181', 'decor_name' => 'Dub', 'group_id' => gid } }
+    NxTest.assert_equal('', NxD112.note({ 'edges' => NxD112.edges('ABS_X') }, edec, sdec),
+                        "#{why}: #{gid.inspect} je ta ista skupina ako #{sdec['BIELA_18']['group_id'].inspect}")
+  end
+  # ...a INA skupina poznamku stale robi
+  edec_y = { 'ABS_Y' => { 'decor' => 'H1181', 'decor_name' => 'Dub', 'group_id' => 'grp-y' } }
+  NxTest.assert_equal('ABS H1181 Dub', NxD112.note({ 'edges' => NxD112.edges('ABS_Y') }, edec_y, sdec))
+end
+
+NxTest.test('P1 kolo 2: viacnasobna medzera vo vnutri kluca sa zlucuje (ako identity_norm)') do
+  # `identity_norm` medzery NEODSTRANUJE, len zlucuje — „GRP X" a „grp  x" su
+  # jedna skupina, ale „GRPX" je INA (zhodne s `Materials.identity_norm`).
+  sdec = { 'BIELA_18' => { 'decor' => 'W1000', 'group_id' => 'GRP X' } }
+  same = { 'ABS_A' => { 'decor' => 'H1181', 'decor_name' => 'Dub', 'group_id' => 'grp  x' } }
+  other = { 'ABS_B' => { 'decor' => 'H1181', 'decor_name' => 'Dub', 'group_id' => 'GRPX' } }
+  NxTest.assert_equal('', NxD112.note({ 'edges' => NxD112.edges('ABS_A') }, same, sdec))
+  NxTest.assert_equal('ABS H1181 Dub', NxD112.note({ 'edges' => NxD112.edges('ABS_B') }, other, sdec))
+  # a lokalna `group_key` sa spravaním kryje s Materials.identity_norm
+  v = NxD112.vepo
+  NxTest.assert_equal('GRP X', v.group_key(' grp  x '))
+  NxTest.assert_equal('', v.group_key("  \t "), 'same biele znaky = ziadna skupina')
+  if NxTest.headless?
+    NxTest.assert_equal(Noxun::Engine::Materials.identity_norm(' grp  x '), v.group_key(' grp  x '),
+                        'lokalna kopia sa NESMIE rozist s Materials.identity_norm')
+  end
+end
+
 NxTest.test('P1: legacy bez `group_id` (na oboch stranach) padne na text — oba smery') do
   # Chyba len skupina PASKY
   edec_a = { 'ABS_A' => { 'decor' => 'H1181', 'decor_name' => 'Dub' } }
@@ -386,14 +420,14 @@ NxTest.test('D-112: vepo_edge_decors a vepo_sheet_decors drzia kontrakt mapy') d
   catalog = {
     'schema' => 2,
     'sheets' => [
-      { 'material_id' => 'REAL_18', 'family' => 'DTDL', 'decor' => 'H1181', 'group_id' => 'G-H1181',
+      { 'material_id' => 'REAL_18', 'family' => 'DTDL', 'decor' => 'H1181', 'group_id' => ' g-h1181 ',
         'thickness' => 18.0, 'production_class' => 'sheet' },
       { 'material_id' => 'KORPUS_UNI_18', 'family' => 'UNI', 'decor' => 'Korpus UNI',
         'thickness' => 18.0, 'production_class' => 'sheet', 'uni' => true, 'uni_role' => 'body' }
     ],
     'edges' => [
       { 'abs_id' => 'ABS_H1181', 'decor' => 'H1181', 'decor_name' => 'Dub Halifax tabakový',
-        'group_id' => 'G-H1181', 'thickness' => 0.8, 'universal' => true },
+        'group_id' => ' g-h1181 ', 'thickness' => 0.8, 'universal' => true },
       { 'abs_id' => 'ABS_U750', 'decor' => 'U750', 'thickness' => 2.0 }
     ]
   }
@@ -407,6 +441,8 @@ NxTest.test('D-112: vepo_edge_decors a vepo_sheet_decors drzia kontrakt mapy') d
     NxTest.assert_equal('H1181', edec['ABS_H1181']['decor'])
     NxTest.assert_equal('Dub Halifax tabakový', edec['ABS_H1181']['decor_name'])
     NxTest.assert_equal('G-H1181', edec['ABS_H1181']['group_id'], 'P1: mapa nesie identitu skupiny')
+    NxTest.assert_equal(mat.identity_norm('g-h1181'), edec['ABS_H1181']['group_id'],
+                        'kolo 2: v mape je KANONICKY kluc (identity_norm), nie surovy zapis')
     NxTest.assert_equal('', edec['ABS_U750']['decor_name'], 'chybajuci nazov dekoru = prazdny retazec')
     NxTest.assert_equal('', edec['ABS_U750']['group_id'], 'chybajuca skupina = prazdny retazec (legacy)')
 
