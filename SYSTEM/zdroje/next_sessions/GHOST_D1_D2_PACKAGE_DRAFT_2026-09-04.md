@@ -1,7 +1,7 @@
 # GHOST-D1 / GHOST-D2 — DRAFT packages (4.9.2026, po Codex kolách #288)
 > Stav: KONCEPT — nezáväzný podklad (výskumný packet / draft packages); do PLANu sa prenáša len po reconcile a schválení, nie priamo do implementácie.
 
-> **Status: DRAFT — nezáväzný podklad.** Outside-in research je **ČIASTOČNÝ 4.9.2026** (WebFetch dokumentácie; predpísaný agy beh + probe v SU 2026 ešte chýbajú — Codex #292 P1) ([GHOST_OUTSIDE_IN_2026-09-04.md](GHOST_OUTSIDE_IN_2026-09-04.md)) — reconcile je v poslednej sekcii tohto
+> **Status: DRAFT — nezáväzný podklad.** Outside-in research: WebFetch + **Antigravity beh 4.9.2026 večer HOTOVÝ** (4 packety, reconcile v packete); **probe v SU 2026 čaká** (`_dev/probe_ghost_keys.rb`) — Codex #292 P1 ([GHOST_OUTSIDE_IN_2026-09-04.md](GHOST_OUTSIDE_IN_2026-09-04.md)) — reconcile je v poslednej sekcii tohto
 > súboru. Do `SYSTEM/PLAN.md` sa packages vrátia ako autorita po zapracovaní reconcile + nálezov Codex kola 2 (nižšie) a po Codex CLI audite draftu. Rozhodnutia Michala 4.9.: ↑/↓ = orientácia dosky
 > (nie voľná rotácia) · D1 pred D2 · jedno číslo na fázu · viazané diely/sektory po V1.
 
@@ -64,3 +64,11 @@
 3. **D2 vstup čísla:** VLASTNÝ čistý parser s ÚPLNOU zhodou po `strip` — `\A\d+([.,]\d+)?\s*(mm)?\z` (bodka aj čiarka, `mm` voliteľné), prefix/sufix odpad (`abc2400xyz`, `2400mmjunk`), tilda `~` a `;` odmietnuté — testy na všetko; nikdy `String#to_l`/`to_f` na surový text (pasca locale s desatinnou čiarkou); hodnota mm Float → `Units` do modelu; validácia `BoardBuilder::LIMITS` PRED prijatím.
 4. **D2 pravotočivý 2. ťah** (Codex kolo 2 P1): pri zápornom smere posun počiatku o −šírka po lokálnej Y, osi ostávajú pravotočivé — žiadne obrátenie `dir_y`.
 5. `Sketchup::Snap` (2025.0) = poznámka do bloku viazaných dielov po V1, nie do D1/D2.
+6. **Prázdny Enter (agy, MENÍ NÁVRH):** konštanta `VK_RETURN` v SketchUp API neexistuje — prázdny Enter chytiť v **`Tool#onReturn(view)`** (`onUserText` sa pri prázdnom poli nevolá); písané hodnoty
+   ostávajú v `onUserText`. Probe v SU 2026: či `onReturn` prichádza aj so zapnutým VCB a či `onKeyDown` dostane kód 13 (agy: regresia 2026.0, fix 2026.1 → overiť `Sketchup.version`).
+7. **Parser (agy, doplnenie):** `\A\s*(\d+(?:[.,]\d+)?)\s*(?:mm)?\s*\z/i` po `strip` (aj `MM`, medzery okolo); neplatný vstup = `UI.beep` + status + fáza ostáva (vzor Trimble `99_sphere_tool`, MIT).
+8. **Šípky (agy MISSED CONSTRAINT, ROZHODNUTIE MICHALA):** ↑←→↓ sú natívny zámok osí; ghost dosky ich pohltí. (a) nechať ako pri ghoste skrinky (←/→ rotácia, ↑/↓ orientácia) — konzistencia v plugine,
+   zámok osí v ghoste nemá zmysel, D2 ťahy idú po lokálnych osiach projekciou (odporúčanie orchestrátora) · (b) Tab = orientácia, R = rotácia (natívna konvencia, vzor s4u Panel).
+9. **Commit (agy):** `start_operation('Vložiť dosku', true)` bez vnorenia + `rescue → abort_operation` explicitne v package (zhodné s konvenciou enginu).
+10. **Vzory (licencie):** Trimble `02_custom_tool` (kostra) a `99_sphere_tool` (VCB chyby) — MIT · `Eneroth3/inference-lock-lib` (Shift lock) — MIT · OpenCutList 7.0 Smart Draw — GPL, len vzory ·
+    Rotated Rectangle = precedens „jedno číslo na fázu" · SketchList 3D = precedens 3 orientácií · `Sketchup::Snap` = NO ACTION pre V1 (poznámka do bloku viazaných dielov).

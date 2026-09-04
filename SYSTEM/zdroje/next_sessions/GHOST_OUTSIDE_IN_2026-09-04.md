@@ -1,7 +1,7 @@
 # GHOST-D1 / GHOST-D2 — OUTSIDE-IN / prior-art packet (4.9.2026)
 
 > Stav: KONCEPT — research packet + reconcile pre drafty GHOST-D1/D2 (`GHOST_D1_D2_PACKAGE_DRAFT_2026-09-04.md`); nie implementačný spec. **Rozsah: ČIASTOČNÝ** — kanál bol WebFetch
-> oficiálnej dokumentácie + fórum (agy kvóta 4.9. vyčerpaná); predpísaný Antigravity beh (skill `antigravity-outside-in`) ani **probe v SketchUpe 2026** ešte NEBEŽALI. Preto sú nálezy rozdelené na
+> oficiálnej dokumentácie + fórum (agy kvóta 4.9. vyčerpaná); **Antigravity beh PREBEHOL 4.9. večer** (4 packety Gemini 3.8 Flash, sekcia „Antigravity beh" nižšie); **probe v SketchUpe 2026 ešte čaká** (`_dev/probe_ghost_keys.rb`). Preto sú nálezy rozdelené na
 > **VERIFIED** (citované z oficiálnej API dokumentácie) a **UNVERIFIED** (bez probe); tvrdenia ALREADY EXISTS / SIMPLER NATIVE PATH (najmä `Sketchup::Snap`) platia až po probe. Research sa uzavrie
 > až agy behom + probe — do vtedy drafty GHOST-D1/D2 do PLANu NEJDÚ.
 
@@ -11,8 +11,8 @@
 | `InputPoint#pick` s druhým bodom, `degrees_of_freedom`, `View#lock_inference` | VERIFIED (API docs); správanie v SU 2026 = probe |
 | logické pixely od SU 2025.0 pre obrazovkové API | VERIFIED (API docs) |
 | `String#to_l` a desatinná čiarka | VERIFIED (fórum + thomthom), presné pravidlá parsovania = UNVERIFIED |
-| `Sketchup::Snap` ako SIMPLER NATIVE PATH pre zostavy | **UNVERIFIED — probe v SU 2026 čaká** |
-| prázdny Enter: `onKeyDown(VK_RETURN)` vs. VCB `onUserText` | **UNVERIFIED — probe v SU 2026 čaká** |
+| `Sketchup::Snap` ako SIMPLER NATIVE PATH pre zostavy | VERIFIED (agy, docs: perzistentná snap entita `Entities#add_snap` pre natívny Move) → **NO ACTION pre D1/D2**, poznámka pre zostavy po V1 |
+| prázdny Enter: `onKeyDown(VK_RETURN)` vs. VCB `onUserText` | VERIFIED (agy, docs): **`VK_RETURN` v API NEEXISTUJE** (kód 13); prázdny Enter = `Tool#onReturn(view)` → správanie pri zapnutom VCB = **probe čaká** |
 | prior art (Rectangle → Push/Pull, tilda) | VERIFIED (docs/článok) |
 
 ## 1 · `Sketchup::Tool` — kontrakt nástroja (nová plocha pre subjekt DOSKA)
@@ -74,3 +74,37 @@ Zdroje: [Sketchup::Tool](https://ruby.sketchup.com/Sketchup/Tool.html) · [Sketc
 [Sketchup (vcb_label=/vcb_value=)](https://ruby.sketchup.com/Sketchup.html) · [String#to_l](https://ruby.sketchup.com/String.html) · [RegionalSettings](https://ruby.sketchup.com/Sketchup/RegionalSettings.html) ·
 [thomthom: Dealing with Units](https://www.thomthom.net/thoughts/2012/08/dealing-with-units-in-sketchup/) · [fórum: comma delimiter to_l](https://forums.sketchup.com/t/htmldialog-users-system-expects-a-comma-delimiter-number-to-l-throws-an-error/193737) ·
 [Sketchup::Snap](https://ruby.sketchup.com/Sketchup/Snap.html) · [Handling the ~ mark](https://developer.sketchup.com/article-handlingthemark)
+
+## Antigravity beh (4.9.2026 večer, 4 packety `gemini-3.8-flash-high`, `--mode plan`; surové packety: [GHOST_OUTSIDE_IN_2026-09-04_agy_packety.md](GHOST_OUTSIDE_IN_2026-09-04_agy_packety.md))
+
+Štyri malé behy (1–2 otázky každý): `vcb` (meracie pole, parsovanie) · `infer` (inferencia, zámok osi, `Sketchup::Snap`) · `prec` (CAD precedensy, klávesy) · `life` (lifecycle náhľadu, undo).
+Pasca behu: prvý `life` beh skončil prázdny (agent skúsil `command` tool → headless auto-deny, exit 0) — opakovaný s pravidlom „no shell" v prompte.
+
+| # | Kategória | Nález (agy, všetko VERIFIED s URL + probe snippetom) | Dotknuté | Reconcile (orchestrátor) |
+|---|---|---|---|---|
+| 1 | SIMPLER NATIVE PATH | Prázdny Enter: `onUserText` sa nevolá, SketchUp volá `Tool#onReturn(view)` (Tool.html#onReturn) | D2 prázdny Enter = hodnota karty | **BERIEME** — `onReturn` namiesto `onKeyDown(VK_RETURN)`; správanie so zapnutým VCB v SU 2026 = probe |
+| 2 | MISSED CONSTRAINT | Konštanta `VK_RETURN` v SketchUp API neexistuje (top-level-namespace: len VK_UP/DOWN/LEFT/RIGHT/SHIFT/…); Enter = kód 13; agy uvádza regresiu `onKeyDown` pri Enter v 2026.0 (fix 2026.1) | D2, packet r. 43 | **MENÍ NÁVRH** — draft opravený (bod 6 reconcile); regresiu overí probe (`Sketchup.version`) |
+| 3 | MISSED CONSTRAINT | `String#to_l` na slovenskom Windows padá pri bodke, bez jednotky berie jednotky šablóny (`RegionalSettings.decimal_separator`) | D2 parser | **BERIEME** — potvrdzuje vlastný parser (už v drafte) |
+| 4 | GOOD CUSTOM SOLUTION | Vlastný parser je správny; doplniť `strip`, `/i` pre `MM`, medzery okolo (`\A\s*(\d+(?:[.,]\d+)?)\s*(?:mm)?\s*\z/i`) | D2 parser | **BERIEME** — draft bod 7 |
+| 5 | CAD PRECEDENT (MIT) | Trimble `99_sphere_tool`: neplatný VCB vstup = `UI.beep` + fáza ostáva, žiadny pád nástroja | D2 chybový stav | **BERIEME** ako vzor (status + beep) |
+| 6 | ALREADY EXISTS | `InputPoint#pick(view, x, y, ip_predošlý)` = inferencia relatívne k predošlému bodu vrátane „on axis from point" | D2 fázy 1–2 | **BERIEME** (už v drafte, bod 2) |
+| 7 | MISSED CONSTRAINT | `View#lock_inference` zamkne len globálne osi / nájdené natívne inferencie; lokálna os = projekcia `Point3d#project_to_line` | D2 lokálne osi | **BERIEME** (už v drafte, bod 2) — potvrdené |
+| 8 | CAD PRECEDENT (MIT) | `Eneroth3/inference-lock-lib` v1.0.0 — vzor spracovania Shift/šípok pre zámok inferencie v custom Tool | D2 Shift lock | **BERIEME** ako vzor pre Shift (nie kód) |
+| 9 | NO ACTION | `Sketchup::Snap` (2025.0) = perzistentná snap entita (`Entities#add_snap`) pre natívny Move — nie lifecycle pre custom tool | D1 prichytenie | **NEBERIEME pre V1**; poznámka pre viazané diely/zostavy po V1 (snap body na definíciách skriniek) |
+| 10 | CAD PRECEDENT | Natívny Rotated Rectangle = jedno číslo na fázu (dĺžka → šírka) s náhľadom; s4u Panel = doska z bodov s hrúbkou z predvoľby | D2 VCB | **BERIEME** — potvrdzuje rozhodnutie Michala (jedno číslo na fázu) |
+| 11 | CAD PRECEDENT (GPL) | OpenCutList 7.0.0 (9/2025) Smart Draw Tool — ťahanie dielcov z materiálových šablón s obálkou | D2 obálka | **VZORY ÁNO, KÓD NIE** (GPL) |
+| 12 | CAD PRECEDENT (proprietárne) | SketchList 3D definuje dosku 3 diskrétnymi orientáciami (Horizontal / Vertical / Front-to-Back); Polyboard len výplne zón | D1 orientácia | **BERIEME** — potvrdzuje 3 stavy `leziaca/stojaca/na_stenu` |
+| 13 | MISSED CONSTRAINT | Šípky ↑←→↓ sú od SU 2016 natívny zámok osí; custom Tool ich v `onKeyDown` pohltí (`true`), ale používateľ stráca natívny zámok; agy navrhuje Tab = orientácia, R/koliesko = rotácia (vzor s4u Panel) | D1/D2 klávesy | **OTÁZKA PRE MICHALA** (draft bod 8): (a) ako ghost skrinky — konzistencia v plugine, zámok osí v ghoste nemá zmysel (odporúčam) · (b) Tab/R podľa natívnej konvencie |
+| 14 | GOOD CUSTOM SOLUTION | Žiadne rozšírenie nemá živý ghost dosky s prepínaním 3 orientácií bez dialógu | D1 | **BERIEME** — staviame (žiadny ALREADY EXISTS) |
+| 15 | MISSED CONSTRAINT | `Tool#getExtents` povinný pre náhľad mimo obálky modelu / prázdny model; prekresľovať `View#invalidate` (nie `refresh`) | D1/D2 draw | **BERIEME** (už v drafte) |
+| 16 | MISSED CONSTRAINT | Logické pixely od 2025.0: `x,y` callbackov, `draw2d`, `vpwidth/vpheight`, `screen_coords`, vstup `pickray`, `PickHelper`, `InputPoint#pick`; modelové jednotky: `View#draw`, výstup `pickray`, `InputPoint#position` | D1/D2 | **BERIEME** (už v drafte po #292) — zoznam API doplnený sem |
+| 17 | MISSED CONSTRAINT | `Tool#onCancel` reason 0 = Esc, 1 = reaktivácia nástroja, 2 = Undo počas nástroja → reset session bez zápisu | D1/D2 session | **BERIEME** (už v drafte, bod 1) |
+| 18 | NO ACTION | `Sketchup::Overlay` je pasívna (bez vstupov, mutácia modelu = RuntimeError) — nenahradí Tool + InputPoint/PickHelper | architektúra | **NEBERIEME** — ostáva `Sketchup::Tool` |
+| 19 | MISSED CONSTRAINT | 1 krok Späť: `start_operation(name, true, false, false)` bez vnorenia, `rescue → abort_operation` | D1/D2 commit | **BERIEME** — explicitne do package (draft bod 9); zhodné s konvenciou enginu |
+| 20 | CAD PRECEDENT (MIT) | Trimble `sketchup-ruby-api-tutorials/02_custom_tool` — kanonická kostra Tool (getExtents, draw, InputPoint v onMouseMove, onCancel reset) | kostra | **BERIEME** ako referenčnú kostru |
+
+**RESEARCH GAP (agy):** žiadna open-source knižnica nahrádzajúca `to_l` VCB parserom (ekosystém: `to_l` + `rescue` alebo inline regex) · žiadne rozšírenie s ghostom dosky + 3 orientácie.
+
+**Čo ešte chýba pred návratom draftov do PLANu:** (1) probe v SU 2026 — `_dev/probe_ghost_keys.rb` (Michal ručne v testovacom okne: prázdny Enter → `onReturn`?, `600 Enter` → `onUserText`,
+šípky v `onKeyDown` + či pohltenie zruší natívny zámok, `Sketchup.version` kvôli regresii Enter v 2026.0, prítomnosť `Sketchup::Snap`); (2) rozhodnutie Michala k šípkam (r. 13);
+(3) prepis draftov podľa reconcile → `codex-audit` → PLAN.
