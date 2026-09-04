@@ -556,16 +556,15 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   uložený config dosky (Codex #296 P1):** prestavba uloženej dosky (`rebuild_in_operation`), zmena orientácie z karty, vloženie zo šablóny (uloženie DOSKY ako šablóny dnes NEEXISTUJE — `saveTemplateAs` je kabinetový, doskové
   šablóny vznikajú zo seedu/`TemplateStore.upsert` a uložený config nečítajú; mimo D1, Codex #296 kolo 4 P2) **a dávkové cesty, ktoré config normalizujú PRED prestavbou —
   najmä „Nahradiť UNI…" v `materials_dialog.rb` (~r. 873–886: `BoardBuilder.normalize(merged)` → `rebuild_in_operation`; normalizácia zahodí `config_schema` aj neznáme polia, takže brána MUSÍ
-  bežať nad RAW configom ešte pred `normalize`, Codex #296 kolo 2 P1)** — config s vyššou schémou sa ODMIETNE s hláškou (model nedotknutý, dávka danú dosku preskočí a prizná to), nikdy sa
-  ticho neznormalizuje cez `BoardBuilder.normalize` (rovnaký vzor ako `CabinetBuilder::CONFIG_SCHEMA` 4). **VŠEOBECNÉ PRAVIDLO (Codex #296 kolo 3 P1) — KAŽDÝ čitateľ configu dosky
+  bežať nad RAW configom ešte pred `normalize`, Codex #296 kolo 2 P1)** — config s vyššou schémou sa ODMIETNE s hláškou (model nedotknutý); v dávke „Nahradiť UNI" ide doska do `blocked` plánu a **CELÁ náhrada sa odmietne** (all-or-nothing kontrakt
+  `materials_replace_uni` v `materials.md` — žiadny čiastočne migrovaný projekt; Codex #296 kolo 6), nikdy sa ticho neznormalizuje cez `BoardBuilder.normalize` (rovnaký vzor ako `CabinetBuilder::CONFIG_SCHEMA` 4). **VŠEOBECNÉ PRAVIDLO (Codex #296 kolo 3 P1) — KAŽDÝ čitateľ configu dosky
   zaobchádza s vyššou schémou ako s „novším configom":** (1) mutácie a šablóny = odmietnutie (vyššie); (2) **výrobné výstupy: `Bom.collect` zaradí dosku s vyššou schémou do `newer_configs`** — záznamy nesú DRUH (`kind: cabinet | board`) a `Validation.check_newer_configs` aj
   `ProductionCore.export_blockers` hlásia „Skrinka/Doska <id>" + ÚPLNÝ zoznam blokovaných výstupov (vrátane kusovníka a VEPO), nie len tri kabinetové (Codex #296 kolo 4 P2; znenie
   hlášok pre dosku je v testovacej matici)
   (dnes vetva dosky r. ~151–172 skladá známe polia bez toho) a existujúca výrobná brána kompatibility platí pre VŠETKY výstupy, ktoré dosky konzumujú — kusovník, VEPO (`ProductionCore`
   `fresh_collect` → `Bom.compute`), nákup, rozpočet, cenová ponuka — rovnako ako pri skrinkách (fail-closed, žiadny tichý výpadok budúceho výrobného poľa); (3) zobrazenie v Inspectore/karte
   je read-only s upozornením. Testovacia matica: doska vyššej schémy × každá cesta (prestavba, orientácia, vloženie zo šablóny, Nahradiť UNI, kusovník, VEPO, nákup, rozpočet, ponuka — vrátane znenia hlášok „Doska <id>"). **kontrakt configu dosky
-  (marker, forward-version odmietnutie, cesty) sa zapíše do `SYSTEM/STANDARD.md`** v uzávere D1; D2 bránu dedí; testy: šablóna aj uložená doska s vyššou schémou = odmietnuté, bez pečiatky, bez session, bez zmeny modelu; dávka „Nahradiť UNI" nad modelom s doskou vyššej schémy = doska preskočená,
-  config nedotknutý.
+  (marker, forward-version odmietnutie, cesty) sa zapíše do `SYSTEM/STANDARD.md`** v uzávere D1; D2 bránu dedí; testy: šablóna aj uložená doska s vyššou schémou = odmietnuté, bez pečiatky, bez session, bez zmeny modelu; dávka „Nahradiť UNI" nad modelom s doskou vyššej schémy = CELÁ náhrada zablokovaná (`blocked` nesie dosku), model nedotknutý.
   **Jeden POUŽÍVATEĽSKÝ krok Späť, nie „jedna operácia" (Astra BLOCKER):** vytváracia operácia `start_operation('Vložiť dosku', true)` + existujúci transparentný follow-up scale-lock zápis
   (`dynamic_attributes/scaletool`, vzor `board_builder.rb` — presun do vytváracej operácie by vypol selection eventy, vynechanie by uvoľnilo scale úchopy) pod SPOLOČNÝM `ScaleWatch.guard`;
   follow-up sa nesmie abortovať, `attach_one` ostáva; `rescue → abort_operation` len pre vytváraciu operáciu. **Bariéra pred mutáciou (audit 3):** `ScaleWatch.flush_pending!(model)` beží PRED `begin_commit!` session (session ostáva v stave umiestňovania, nie `:committing`);
@@ -657,7 +656,9 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   status; testy čistej geometrie: skoro rovnobežné pohľady z OBOCH strán, nie len presná rovnobežnosť. In-SU: šírka pilastra ťahaná mimo geometrie v perspektíve
   a pri otočených drawing axes. **Pravotočivý 2. ťah (Codex #288 P1):** pri zápornom smere sa posunie POČIATOK o −šírka po lokálnej Y, osi ostávajú pravotočivé — žiadne obrátenie `dir_y`;
   in-SU prípady pre kladný aj záporný smer.
-  **Shift = natívny zámok inferencie (lifecycle, audit 1):** hold-to-lock (`onKeyDown` VK_SHIFT zamkne aktuálnu natívnu inferenciu `view.lock_inference(ip)`, `onKeyUp` odomkne); zámok sa
+  **Shift = natívny zámok inferencie (lifecycle, audit 1; Codex #296 kolo 6):** hold-to-lock (`onKeyDown` VK_SHIFT zamkne aktuálnu natívnu inferenciu `view.lock_inference(ip)`, `onKeyUp`
+  odomkne); **zamknutý smer platí aj vo fáze 1 a aj vo voľnom priestore:** zamknutý inferovaný InputPoint (os od počiatku bez vertexu/hrany/plochy) sa PRIJME, alebo sa `pickray` fallback
+  premietne na zamknutý smer — pohyb kurzora po zamknutí NESMIE zmeniť smer dosky; test overuje výsledný SMER, nie len `inference_locked?`; zámok sa
   VŽDY uvoľní pri zmene fázy, `suspend`/`resume`, `deactivate` a `onCancel` (zámok z 1. fázy nesmie obmedziť 2. ani visieť po nástroji); vzor `Eneroth3/inference-lock-lib` (MIT, len vzor);
   in-SU test skutočného `inference_locked?` (nie len projekčnej matematiky).
   **Klávesy od kliku počiatku (audit 1 + audit 2 NOTE — JEDNA hranica):** ←/→ a ↑/↓ platia LEN vo fáze 0; od kliku počiatku sú ZAMKNUTÉ (ignorované + status „orientáciu a rotáciu meň
