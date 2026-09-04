@@ -373,8 +373,16 @@ NxTest.test('GHOST-D1 sev: `commit_insert` pise config Z PLANU (ziadne druhe cit
                 'transform sa overuje PRED zatvorenim edit kontextu')
   NxTest.assert(body.index('ensure_root!') < body.index('Ids.next_board_id'),
                 'ID vznika az po root kontexte')
+  # Vlozenie MUSI bezat vo vlastnej pomenovanej operacii (jeden krok Spat).
+  NxTest.assert(body.include?('model.start_operation('), 'commit otvara VLASTNU operaciu')
+  NxTest.assert(body.include?('model.commit_operation'), 'a commituje ju')
   NxTest.assert(body.index('Ids.next_board_id') < body.index('start_operation'),
-                'a este pred operaciou')
+                'ID vznika este pred operaciou')
+  NxTest.assert(body.include?('guarded do'), 'operacia aj follow-up bezia pod ScaleWatch.guard')
+  NxTest.assert(body.include?('apply_scale_lock_op(model, inst)'),
+                'transparentny scale-lock follow-up ostava (DC pasca, D-40)')
+  NxTest.assert(body.index('model.commit_operation') < body.index('apply_scale_lock_op'),
+                'follow-up bezi AZ PO commite vytvaracej operacie')
   NxTest.assert(body.include?('abort_operation') || body.include?('abort_safely'),
                 'vytvaracia operacia sa pri chybe rusi')
 end
@@ -455,6 +463,7 @@ end
 NxTest.test('GHOST-D1 brana: doskova sablona z novsej verzie sa NEVLOZI a NEOPECIATKUJE') do
   ab = NxD1.src('noxun_engine', 'ui', 'panel', 'actions_board.rb')
   ins = ab[/def handle_insert_board\(payload\).*?\n        end\n/m].to_s
+  NxTest.assert(ins.include?('newer_template_refusal'), 'vkladanie dosky MA downgrade branu sablony')
   NxTest.assert(ins.index('newer_template_refusal') < ins.index('BoardBuilder.prepare_insert'),
                 'brana bezi PRED pripravou planu')
   NxTest.assert(ins.index('newer_template_refusal') < ins.index('GhostTool.start'),
@@ -516,6 +525,7 @@ end
 NxTest.test('GHOST-D1 bariera: bezi PRED `begin_commit!` (poradie v zdrojaku)') do
   s = NxD1.src('noxun_engine', 'core', 'ghost_tool.rb')
   body = s[/def commit!\(transform\).*?\n        end\n/m].to_s
+  NxTest.assert(body.include?('settle_observer!'), 'commit MA barieru observera')
   NxTest.assert(body.index('settle_observer!') < body.index('begin_commit!'),
                 'bariera je PRED vstupom do commitu')
   NxTest.assert(body.include?('return :blocked unless settle_observer!'))
@@ -713,6 +723,8 @@ NxTest.test('GHOST-D1 vystupy: zber prizna dosku z novsej verzie EST PRED filtro
   bom = NxD1.src('noxun_engine', 'core', 'bom.rb')
   brd = bom[/when 'board'(.*?)when 'part'/m, 1].to_s
   NxTest.assert(!brd.empty?, 'vetva dosky sa nasla')
+  NxTest.assert(brd.include?("note_newer_config(newer_configs, 'board', bid)"),
+                'zber dosku z novsej verzie PRIZNAVA')
   NxTest.assert(brd.index("note_newer_config(newer_configs, 'board', bid)") <
                 brd.index("next unless Store.get(inst, 'manufactured') == true"),
                 'brana bezi PRED filtrom manufactured (fail-closed)')
