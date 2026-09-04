@@ -261,19 +261,39 @@ a `hardware_catalog.rb` a v [ui-lifecycle.md](ui-lifecycle.md) (sekcia `hw` Št�
   sa doplní, nesediaci je chyba s vetou, ktorá menuje OBE strany. Je to jediná autorita vzťahu; dva protirečivé zápisy o tom istom sete sa uložiť nedajú.
 - **Čítanie je tolerantné, ale CELÉ-ALEBO-VÔBEC.** Neúplný, nekonzistentný alebo neznámy klasifikačný blok sa zahodí CELÝ (`log_skip`) a set sa číta ako nezaradený —
   `generic_type` (a teda EXPANZIA a NÁKUP) sa pritom **NIKDY nemení**. Tichý orez to nie je: stratu prizná 4. vrstva detektora nižšie.
-- **`active` je SPARSE** (audit #17 FIX 7): default je „aktívny", ukladá sa LEN `false`. **`expand`, `explain`, `resolve_set_id` ani `set_options` ho NEČÍTAJÚ** — existujúce
-  mapovanie, snapshot aj šablóna expandujú deep-equal so setom bez príznaku. Ponuku podľa neho filtruje až UI (KOV-B3).
-- **`save_set!` MERGUJE klasifikáciu z uloženého setu.** Editor posiela dnes len štyri kľúče (`set_id`, `name`, `generic_type`, `members`), takže bez merge by KAŽDÁ úprava člena
-  ticho zhodila zaradenie — presne tá trieda tichej straty, ktorú dávka rieši (a je to jedna z mutácií sady). Kľúč, ktorý vo vstupe VÔBEC NIE JE, sa preberie z uloženého setu;
-  kľúč prítomný s `nil`/`''` (a `active: true`) je VEDOMÉ vymazanie. Až merged tvar ide do validácie, takže all-or-nothing platí nad tým, čo sa naozaj uloží. Validácia preto beží
-  **až pod zámkom** (uložený set sa smie čítať len čerstvo — R-08).
+- **`active` je SPARSE** (audit #17 FIX 7): default je „aktívny", ukladá sa LEN `false`. **`expand`, `explain` ani `resolve_set_id` ho NEČÍTAJÚ** — existujúce mapovanie,
+  snapshot aj šablóna expandujú deep-equal so setom bez príznaku. Od KOV-B3 ho číta **jediné miesto: `set_options`**, teda PONUKA nového výberu (predvoľby projektu v Štúdiu
+  a override skrinky v paneli). Neaktívny set sa už nenúka — ale **referencovaný set v ponuke OSTÁVA** (`referenced_ids`), inak by select ukazoval prázdno tam, kde projekt
+  hodnotu má, a prvý klik vedľa by ju ticho prepísal. Globálnu tabuľku filtruje tá istá myšlienka v UI (`hwsGlobalOptions`).
+- **`save_set!` MERGUJE klasifikáciu z uloženého setu.** Do KOV-B3 posielal editor len štyri kľúče (`set_id`, `name`, `generic_type`, `members`), takže bez merge by KAŽDÁ úprava
+  člena ticho zhodila zaradenie — presne tá trieda tichej straty, ktorú dávka riešila (a je to jedna z mutácií sady). Kľúč, ktorý vo vstupe VÔBEC NIE JE, sa preberie z uloženého
+  setu; kľúč prítomný s `nil`/`''` (a `active: true`) je VEDOMÉ vymazanie. Až merged tvar ide do validácie, takže all-or-nothing platí nad tým, čo sa naozaj uloží. Validácia preto
+  beží **až pod zámkom** (uložený set sa smie čítať len čerstvo — R-08). **Modal KOV-B3 posiela klasifikáciu VŽDY CELÚ** (všetkých päť kľúčov, aj prázdnych) — vynechať
+  `drawer_construction` pri prepnutí zo zásuvky na dvierka by znamenalo prevziať starú hodnotu z uloženého setu a set by už nikdy neprešiel validáciou.
 - **Taxonómia sa kontroluje LEN v `save_set!`** (zápis do globálnej knižnice). `validate_set` ostáva ČISTÁ (žiadne IO) — používa ju aj zápis projektového snapshotu a čítanie
   šablón, ktoré cestujú medzi PC s INOU taxonómiou; vynútiť ju tam by znamenalo, že zákazku z iného počítača sa nedá otvoriť. Nekompatibilná taxonómia je fail-closed:
   klasifikovaný set sa uložiť nedá (`[:write_failed, dôvod taxonómie]`), legacy set áno; degradovaná taxonómia sa čítať smie, takže kontrola nad ňou beží normálne.
 
 **Chyby sú ŠTRUKTUROVANÉ** (kontrakt pre KOV-B3, audit #17 FIX 13): `validate_set_detailed` a `save_set!` vracajú `[{ 'row' => nil|index člena, 'field' => …, 'msg' => SK veta }]`,
-takže editor vie chybu ukázať PRI POLI. `save_set!` je odteraz TROJICA `[status, info, errors]` — dnešné dvojprvkové destruovanie u volajúcich (`status, info = …`) tým nie je
-dotknuté (Ruby prebytočný prvok zahodí) a stráži to test.
+takže editor vie chybu ukázať PRI POLI. `save_set!` je TROJICA `[status, info, errors]` — dvojprvkové destruovanie u volajúcich (`status, info = …`) tým nie je dotknuté
+(Ruby prebytočný prvok zahodí) a stráži to test. **Od KOV-B3 tretí prvok naozaj cestuje na obrazovku:** `handle_set_save` ho posiela ako `HWSETS.setResult(ok, msg, errors,
+token, conflict)` — `token` je identita JEDNÉHO odoslania (odpoveď zavretého okna nesmie zavrieť okno otvorené teraz) a `conflict` je vlastný príznak, pri ktorom modal draft
+NEZAHADZUJE, ale ponúkne obnovu.
+
+**ŽIVÝ NÁHĽAD EXPANZIE — `preview_expansion` (KOV-B3).** Editor setu ukazuje, ČO SA REÁLNE OBJEDNÁ, ešte pred uložením. Cesta je zámerne TÁ ISTÁ ako v nákupe: draft prejde
+`validate_set_detailed`, normalizovaný tvar sa vloží do **dočasného stavu** `{ 'mapping' => {gt => set_id}, 'sets' => {set_id => draft} }` nad **syntetickým vlastníkom**
+(`PREVIEW_OWNER`, `quantity 1`, vzorové `params`) a spustí sa **`expand`**. Výsledok je preto deep-equal s tým, čo by `expand` vydal PO uložení toho istého setu (test to porovnáva
+riadok po riadku) — druhý výklad nákupu nevzniká (lekcia R-06a „panel a súpis sa nesmú rozísť"). Tri veci sú kontrakt: **(1) žiadne IO** — funkcia je čistá, katalóg dostáva
+`catalog:`/`lookup:` od volajúceho a nikdy nevolá `save_set!`, snapshot ani zápis (stráži to stub zámku aj `write`, ktorý si volanie ZAPÍŠE — `save_set!` má vlastný `rescue`,
+v ktorom by sa výnimka stratila); **(2) počíta sa z DRAFTU**, nie z uloženého setu (mutácia sady: náhľad setu, ktorý v knižnici ešte nie je); **(3) chyby sú tá istá štruktúra
+`{row, field, msg}`**, takže editor ich ukáže pri poli. **Text skladá server** (`preview_text`): prvý riadok povie, NA ČOM sa počítalo, ďalšie sú nákupné riadky a ORANGE dôvody
+idú cez `unmapped_reason_sk` — teda presne tie vety, aké ukáže súpis. Vzorové parametre (`PREVIEW_SAMPLE`: NL 470, výška čela 176, výška sokla 100) smie klient prepísať, ale
+LEN kľúče z `PREVIEW_PARAM_KEYS` (cudzí kľúč by sa dostal do `it['params']` a mohol by obísť bránu dĺžkového kovania). Keď NL nepodal človek, vyberie sa **najbližšia vyššia
+existujúca** dĺžka radu (inak najdlhšia) — rad 260–350 by inak hlásil falošný ORANGE „nemá kód pre NL 470". UI vrstvu popisuje [ui-lifecycle.md](ui-lifecycle.md).
+
+**Popisky uzavretých slovníkov žijú v core** (`CLASS_OPTIONS` + `class_label`, KOV-B3): jeden zoznam pre select editora aj chip dlaždice, klient ho dostáva v payloade
+(`sets_payload['class_options']`) a vlastný nemá — druhý zoznam v JS by sa pri prvom pribudnutom type rozišiel s doménovou pravdou. `USE_TYPE_SK` (2./4. pád do vety servera)
+je iná vrstva a zostáva oddelene. Neznáma hodnota (obsah novšej verzie) sa **neprekladá** — vypíše sa tak, ako prišla.
 
 **Marker `std` má TRI hodnoty a je LAZY podľa obsahu.** `1` = len legacy tvary · `2` = pásma člena alebo selector v mapovaní (GH #131) · **`3` = set s KTORÝMKOĽVEK kľúčom mimo
 `LEGACY_SET_KEYS`** (každé klasifikačné pole aj `active` samostatne) **alebo mapovanie s triednym kľúčom `class:`**. Čisto legacy obsah ostáva na svojom pôvodnom std, takže
@@ -303,7 +323,8 @@ bránach** — `assess_library_doc`, `project_state_status` aj `assess_set_defs`
 :unknown_shape`, snapshot `:invalid` a šablóna odmietnutá, nikdy tichý orez.
 
 Testy klasifikácie: `tests/pure/test_kovb1_sety.rb` (vrátane charakterizácie „klasifikovaná kópia SEED knižnice nakupuje deep-equal" a piatich overených mutácií), golden
-odtlačok `tests/fixtures/kovh_golden/seed_kniznica.json` a in-SketchUp sekcia `run_kovb1`.
+odtlačok `tests/fixtures/kovh_golden/seed_kniznica.json` a in-SketchUp sekcia `run_kovb1`. Náhľad, štruktúru chýb a filter ponuky strážia `tests/pure/test_kovb3_nahlad.rb`,
+`tests/js/test_kovb3_modal.js` a in-SketchUp sekcia `run_kovb3` (dve okná nad tým istým setom, zápis do knižnice bez kroku Späť).
 
 **AD-HOC KANÁL: konkrétne kovanie MIMO setov (KOV-H1, v0.9.18).** `expand` má druhý vstup **`manual_items:`** — ad-hoc položky zákazky (`Bom.collect` kľúč `hardware_manual`, tvar
 drží `cabinet_builder.rb`). Sú to položky, ktoré do skrinky pridal človek: konkrétny katalógový kód alebo voľná položka s vlastným názvom a cenou. Kanál beží **PRED set
