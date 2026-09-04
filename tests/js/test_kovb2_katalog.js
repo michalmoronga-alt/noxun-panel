@@ -417,6 +417,7 @@ const PROP = { ok: true, pid: 'p1', url: 'https://www.demos-trade.sk/k-atira/',
 
   // Server vratil CERSTVU taxonomiu + kanonicke meno.
   H.MDH.taxonomy({ ok: true, op: 'manufacturer', name: 'Grass', errors: [],
+                   token: tok('hw_tax_create_manufacturer'),
                    taxonomy: { manufacturers: ['Blum', 'Grass', 'Hettich'],
                                series: TAX.series, read_only: false, state_reason: '' } });
   ok(global.NXModal.isOpen(), 'modal ostava otvoreny');
@@ -432,6 +433,7 @@ const PROP = { ok: true, pid: 'p1', url: 'https://www.demos-trade.sk/k-atira/',
   DOC.getElementById('nxm_manufacturer_new').value = 'x';
   dispatch(q('[data-action="hw-tax-create"][data-nxm-for="manufacturer"]'), 'click');
   H.MDH.taxonomy({ ok: false, op: 'manufacturer', name: '',
+                   token: tok('hw_tax_create_manufacturer'),
                    errors: [{ field: 'manufacturer', msg: 'názov musí obsahovať písmeno' }],
                    taxonomy: TAX });
   ok(textOf(MODAL_ROOT).indexOf('musí obsahovať písmeno') > -1,
@@ -662,15 +664,16 @@ const PROP = { ok: true, pid: 'p1', url: 'https://www.demos-trade.sk/k-atira/',
   SENT.length = 0;
   demosType('ab');
   eq(sent('hw_demos_preview').length, 0, 'krátky text nový náhľad nespúšťa');
+  eq(sent('hw_demos_cancel').length, 1,
+     'odchod od adresy bežiaci náhľad na serveri ZRUŠÍ');
   H.MDH.demosPreview(PROP);          // dobiehajúca odpoveď na STARÝ dotaz
   eq(DOC.getElementById('nxm_code').value, '',
      'stará odpoveď NEPREPÍŠE polia (inak by tam bol produkt, od ktorého odišiel)');
 
-  // A vymazanie poľa beží náhľad zruší.
+  // Vymazanie poľa už nemá čo rušiť — a druhýkrát to serveru neposiela.
   SENT.length = 0;
   demosType('');
-  eq(sent('hw_demos_cancel').length, 1,
-     'vymazanie poľa Démos ZRUŠÍ bežiaci náhľad na serveri');
+  eq(sent('hw_demos_cancel').length, 0, 'zrušenie sa neposiela dvakrát');
   global.NXModal.close();
 })();
 
@@ -720,6 +723,166 @@ const PROP = { ok: true, pid: 'p1', url: 'https://www.demos-trade.sk/k-atira/',
   H.hwItemOpen(null, null, {});
   eq(DOC.getElementById('nxm_code').value, '',
      'po uloženej položke je formulár čistý (proposal sa spotreboval)');
+  global.NXModal.close();
+})();
+
+// ==== 18) review #290/2 P1: UI-only prekreslenie NEHÝBE baseline ============
+// Cudzia zmena, ktorá dorazí počas otvoreného editora, sa NESMIE stať novým
+// „pôvodným stavom": inak by patch poslal cudzie zmeny ako vlastné a s revíziou,
+// ktorá prejde serverovou bránou — tichý prepis cudzej práce.
+
+(function(){
+  boot();
+  H.hwItemOpen(ITEMS[0], null, {});          // otvorené nad revíziou r1
+  DOC.getElementById('nxm_notes').value = 'moja poznámka';
+
+  // Medzitým príde push s NOVŠOU revíziou a zmeneným názvom.
+  H.MDH.setItems({ items: [{ item_code: '104717', name_sk: 'Sensys 8645i CUDZIA ZMENA',
+                             category: 'ZAVESY', unit: 'ks', price_eur_vat: 9.99,
+                             manufacturer: 'Hettich', series: 'Sensys', row_rev: 'r9' },
+                           ITEMS[1], ITEMS[2]],
+                   state: 'ok' });
+
+  // Používateľ len prepne výrobcu → UI-only prekreslenie.
+  const man = DOC.getElementById('nxm_manufacturer');
+  man.value = 'Blum';
+  dispatch(man, 'change');
+  ok(global.NXModal.isOpen(), 'modal po prekreslení žije');
+  eq(DOC.getElementById('nxm_notes').value, 'moja poznámka', 'rozpísané hodnoty prežili');
+
+  SENT.length = 0;
+  global.NXModal.submit();
+  const p = last('hw_patch');
+  ok(p, 'uloženie odišlo');
+  eq(p.row_rev, 'r1',
+     'posiela sa PÔVODNÁ revízia — server má konflikt odhaliť, nie ho obísť');
+  ok(!Object.prototype.hasOwnProperty.call(p.patch, 'name_sk'),
+     'cudzia zmena názvu sa NEPOSIELA ako moja (baseline sa neposunula)');
+  ok(!Object.prototype.hasOwnProperty.call(p.patch, 'price_eur_vat'),
+     'ani cudzia zmena ceny');
+  eq(p.patch.notes, 'moja poznámka', 'ide len to, čo používateľ naozaj zmenil');
+  eq(p.patch.manufacturer, 'Blum', 'a jeho vlastná zmena výrobcu');
+  global.NXModal.close();
+})();
+
+// ==== 19) review #290/2 P1: nedostupná taxonómia ZAMKNE klasifikáciu ========
+// Katalóg môže byť zapisovateľný, kým je taxonómia read-only alebo sa vôbec
+// nenačítala. Prázdny select by nad už zaradenou položkou pri uložení
+// hocijakej inej zmeny TICHO zmazal výrobcu aj radu.
+
+(function(){
+  boot();
+  // Server posiela prázdny zoznam + príznak (fail-closed vetva `taxonomy_payload`).
+  H.MDH.init({ items: ITEMS, state: 'ok', revision: 'rev1', version: '0.9.23',
+               categories: CATS, category_labels: LABELS, units: ['ks', 'set'],
+               taxonomy: { manufacturers: [], series: [], read_only: true,
+                           state_reason: 'súbor je z novšej verzie' } });
+  H.hwItemOpen(ITEMS[0], null, {});          // položka MÁ Hettich · Sensys
+
+  const man = DOC.getElementById('nxm_manufacturer');
+  const ser = DOC.getElementById('nxm_series');
+  eq(man.value, 'Hettich', 'uložený výrobca je VIDIEŤ (nie prázdno)');
+  eq(ser.value, 'Sensys', 'aj uložená rada');
+  ok(man.hasAttribute('disabled') && man.getAttribute('aria-disabled') === 'true',
+     'a select je ZAMKNUTÝ (pri `select` `aria-disabled` sám hodnotu neubráni)');
+  ok(ser.hasAttribute('disabled'), 'oba');
+  ok(textOf(MODAL_ROOT).indexOf('novšej verzie') > -1,
+     'dôvod je na obrazovke (D-78 — nie tiché zamknutie)');
+  const opts = qa('#nxm_manufacturer option').map(function(o){ return o.getAttribute('value'); });
+  eq(opts, ['', 'Hettich'], 'ponuka je uložená hodnota — žiadne „+ Vytvoriť"');
+
+  DOC.getElementById('nxm_notes').value = 'nesúvisiaca zmena';
+  SENT.length = 0;
+  global.NXModal.submit();
+  const p = last('hw_patch');
+  ok(p, 'uloženie prešlo — katalóg zapisovateľný je');
+  ok(!Object.prototype.hasOwnProperty.call(p.patch, 'manufacturer'),
+     'patch NEOBSAHUJE výrobcu (ani prázdneho) — klasifikácia sa nezmaže');
+  ok(!Object.prototype.hasOwnProperty.call(p.patch, 'series'), 'ani radu');
+  eq(p.patch.notes, 'nesúvisiaca zmena', 'ide len skutočná zmena');
+  global.NXModal.close();
+
+  // Čistá funkcia: prázdny zoznam bez príznaku je ten istý stav.
+  H.MDH.init({ items: ITEMS, state: 'ok', categories: CATS, category_labels: LABELS,
+               units: ['ks'], taxonomy: { manufacturers: [], series: [], read_only: false } });
+  eq(H.hwItemManOptions('Hettich').map(function(o){ return o[0]; }), ['', 'Hettich'],
+     'prázdny zoznam = to isté zamknutie (server ho nemusí označiť)');
+
+  // A naopak: s NAČÍTANOU taxonómiou klasifikácia do payloadu PATRÍ.
+  boot();
+  H.hwItemOpen(null, null, {});
+  DOC.getElementById('nxm_code').value = 'K1';
+  DOC.getElementById('nxm_name').value = 'S klasifikáciou';
+  const mm = DOC.getElementById('nxm_manufacturer');
+  mm.value = 'Hettich';
+  dispatch(mm, 'change');
+  const ss = DOC.getElementById('nxm_series');
+  ss.value = 'Sensys';
+  dispatch(ss, 'change');
+  SENT.length = 0;
+  global.NXModal.submit();
+  eq(last('hw_create').fields.manufacturer, 'Hettich',
+     'výrobca ide serveru na overenie proti taxonómii');
+  eq(last('hw_create').fields.series, 'Sensys', 'a rada tiež');
+  global.NXModal.close();
+})();
+
+// ==== 20) review #290/2 P2: hotový proposal po zmene lookupu ================
+
+(function(){
+  boot();
+  H.hwItemOpen(null, null, {});
+  demosType(PROP.url);
+  H.MDH.demosPreview(PROP);                  // proposal A je hotový
+  eq(DOC.getElementById('nxm_code').value, '357695', 'A predvyplnilo formulár');
+
+  // Používateľ vloží INÚ adresu a uloží skôr, než nová dobehne.
+  demosType('https://www.demos-trade.sk/iny-produkt/');
+  SENT.length = 0;
+  global.NXModal.submit();
+  eq(sent('hw_demos_create').length, 0,
+     'žiadny zápis s `pid` STARÉHO produktu (polia sa nezmenili, ale lookup áno)');
+  eq(sent('hw_create').length, 0, 'a ani ručná cesta — čaká sa na náhľad');
+  ok(global.NXModal.isOpen(), 'modal ostáva otvorený');
+  ok(textOf(MODAL_ROOT).indexOf('Načítavam produkt z Démosu') > -1,
+     'a povie, na čo sa čaká (aj ako z toho von)');
+
+  // Keď náhľad dobehne, zápis sa pustí — a je to už produkt B.
+  const PROP_B = { ok: true, pid: 'p2', url: 'https://www.demos-trade.sk/iny-produkt/',
+                   code: '999000', name_sk: 'Iný produkt', unit: 'ks', price_vat: 5.5,
+                   category_guess: 'NOHY', manufacturer_guess: '', exists: false, related: [] };
+  H.MDH.demosPreview(PROP_B);
+  eq(DOC.getElementById('nxm_code').value, '999000', 'formulár drží produkt B');
+  SENT.length = 0;
+  global.NXModal.submit();
+  eq(last('hw_demos_create').pid, 'p2', 'a ukladá sa `pid` produktu B');
+  H.MDH.itemResult(true, 'ok', [], 'create', tok('hw_demos_create'));
+})();
+
+// ==== 21) review #290/2 P2: token výsledku taxonómie ========================
+
+(function(){
+  boot();
+  H.hwItemOpen(null, null, {});
+  const m1 = DOC.getElementById('nxm_manufacturer');
+  m1.value = '__new__';
+  dispatch(m1, 'change');
+  DOC.getElementById('nxm_manufacturer_new').value = 'Okno A';
+  dispatch(q('[data-action="hw-tax-create"][data-nxm-for="manufacturer"]'), 'click');
+  const tokenA = tok('hw_tax_create_manufacturer');
+  ok(!!tokenA, 'požiadavka nesie vlastnú identitu');
+  global.NXModal.close();                    // okno A sa zavrelo
+
+  H.hwItemOpen(null, null, {});              // okno B
+  DOC.getElementById('nxm_name').value = 'Položka B';
+  H.MDH.taxonomy({ ok: true, op: 'manufacturer', name: 'Okno A', errors: [], token: tokenA,
+                   taxonomy: { manufacturers: ['Blum', 'Hettich', 'Okno A'],
+                               series: TAX.series, read_only: false, state_reason: '' } });
+  eq(DOC.getElementById('nxm_manufacturer').value, '',
+     'výsledok patriaci ZAVRETÉMU oknu nevyberie klasifikáciu v okne otvorenom teraz');
+  eq(DOC.getElementById('nxm_name').value, 'Položka B', 'a koncept B sa nezahodil');
+  ok(H.hwItemManOptions('').some(function(o){ return o[0] === 'Okno A'; }),
+     'zoznam sa napriek tomu obnovil — je to globálny stav');
   global.NXModal.close();
 })();
 

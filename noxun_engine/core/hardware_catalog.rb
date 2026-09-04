@@ -648,8 +648,16 @@ module Noxun
         want_more = more.is_a?(Hash) ? more : {}
         q = query.to_s
         searching = !q.strip.empty?
-        matched, = search_with_total(list, q, category: category, top: list.length,
+        # Review #290/2 P2: kategoriu filtrujeme TOU ISTOU mapou, akou strom
+        # polozky zaraduje (`tree_category_of`). `search_with_total` porovnava
+        # ULOZENU hodnotu doslovne, takze polozka s neznamou kategoriou (starsi
+        # alebo cudzi zapis) bola v skupine „Ostatné" vidiet, ale po zapnuti
+        # filtra „Ostatné" ZMIZLA — a to je presne ta polozka, ktoru pouzivatel
+        # hlada, ked filtruje.
+        matched, = search_with_total(list, q, category: nil, top: list.length,
                                               include_inactive: include_inactive)
+        cat_filter = category.to_s.strip.upcase
+        matched = matched.select { |i| tree_category_of(i) == cat_filter } unless cat_filter.empty?
         # Poradie zhod (score) si drzime ako RANK — v liste sa radi presne
         # podla neho, aby strom vracal to iste poradie ako ploche hladanie.
         rank = {}

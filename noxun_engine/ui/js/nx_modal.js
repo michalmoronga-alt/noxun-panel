@@ -124,7 +124,13 @@
       var hint = d.hint ? '<span class="munit">' + esc(d.hint) + '</span>' : '';
       var input;
       if (d.type === 'select'){
-        input = '<select id="' + id + '" data-nxm="' + key + '"' + cls + '>' +
+        // KOV-B2 (review #290/2 P1): VOLITELNE zamknutie pola. Pri `<select>`
+        // nestaci `aria-disabled` (hodnota sa da aj tak zmenit) — a tu ide
+        // prave o to, aby sa NEDALA: nad nedostupnou taxonomiou by prazdna
+        // volba ticho zmazala klasifikaciu polozky. Dovod patri na obrazovku
+        // (`hint`), nie do ticha.
+        input = '<select id="' + id + '" data-nxm="' + key + '"' + cls +
+                (d.disabled === true ? ' disabled aria-disabled="true"' : '') + '>' +
                 optionsHtml(d.options, d.value) + '</select>';
       } else if (d.type === 'checkbox'){
         // Zaskrtavatko ma popis VEDLA seba, nie pod stlpcom vstupov — inak by

@@ -301,6 +301,37 @@ end
 
 # --- 5) pin -------------------------------------------------------------------
 
+NxTest.test('KOV-B2: filter kategorie pouziva TU ISTU mapu ako strom (review #290/2 P2)') do
+  NxB2.taxonomy!(%w[Hettich], [])
+  # Polozka s NEZNAMOU ulozenou kategoriou (starsi alebo cudzi zapis). Strom ju
+  # zaraduje do „Ostatné" (`tree_category_of`), takze pri zapnutom filtri
+  # „Ostatné" tam MUSI ostat — inak zmizne prave to, co pouzivatel hlada.
+  FileUtils.mkdir_p(NxB2::HWC.dir)
+  recs = [NxB2::HWC.normalize_item(NxB2.item('A1', 'category' => 'ZAVESY'))[0],
+          NxB2::HWC.normalize_item(NxB2.item('X1', 'category' => 'OSTATNE'))[0]]
+  legacy = recs[1].merge('item_code' => 'L1', 'category' => 'KLUCKY')
+  NxB2::STORE.write(NxB2::HWC.path,
+                    'std' => NxB2::HWC::STD, 'schema' => NxB2::HWC::SCHEMA_BASE,
+                    'seed_version' => NxB2::HWC::SEED_SET_VERSION,
+                    'items' => recs + [legacy])
+  FileUtils.rm_f("#{NxB2::HWC.path}.bak")
+  NxB2::STORE.invalidate(NxB2::HWC.path)
+  NxB2::HWC.reset_state!
+
+  all = NxB2.tree('expand' => { 'OSTATNE' => true })
+  NxTest.assert(NxB2.codes(all).include?('L1'),
+                'BEZ filtra je polozka s neznamou kategoriou v skupine Ostatné')
+
+  filtered = NxB2.tree('category' => 'OSTATNE', 'expand' => { 'OSTATNE' => true })
+  NxTest.assert(NxB2.codes(filtered).include?('L1'),
+                'a po zapnuti filtra „Ostatné" tam OSTANE (nie doslovne porovnanie kategorie)')
+  NxTest.assert(NxB2.codes(filtered).include?('X1'), 'spolu s poriadne zaradenou polozkou')
+  NxTest.refute(NxB2.codes(filtered).include?('A1'), 'a zaves sa do filtra nedostane')
+
+  zav = NxB2.tree('category' => 'ZAVESY', 'expand' => { 'ZAVESY' => true })
+  NxTest.assert_equal(['A1'], NxB2.codes(zav), 'bezny filter funguje ako doteraz')
+end
+
 NxTest.test('KOV-B2: pin je navrchu SVOJHO listu, jeho kategoria je rozbalena a prezije aj filter') do
   NxB2.taxonomy!(%w[Hettich], [['Sensys', 'Hettich']])
   NxB2.catalog!([

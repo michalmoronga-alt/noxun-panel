@@ -956,7 +956,7 @@ module Noxun
           data = JSON.parse(payload.to_s)
           name = data['name'].to_s
           status, info = HardwareTaxonomy.create_manufacturer!(name)
-          tax_result(status, info, 'manufacturer', name)
+          tax_result(status, info, 'manufacturer', name, data['token'].to_s)
         end
 
         def handle_tax_series(payload)
@@ -964,36 +964,39 @@ module Noxun
           name = data['name'].to_s
           man = data['manufacturer'].to_s
           status, info = HardwareTaxonomy.create_series!(name, man)
-          tax_result(status, info, 'series', name)
+          tax_result(status, info, 'series', name, data['token'].to_s)
         end
 
         # Jedna odpoved pre obe cesty. Pri uspechu (aj pri `:exists`) posiela
         # CERSTVU taxonomiu a KANONICKE meno — modal si nim vyberie hodnotu
         # v selecte. Ulozit sa smie VYHRADNE kanonicky zapis zo zoznamu
         # (KOV-B1), takze meno berieme zo ZAZNAMU, nikdy z inputu.
-        def tax_result(status, rec, op, requested)
+        # `token` je identita poziadavky (review #290/2 P2, vzor `item_result`):
+        # klient prijme VYBER novej hodnoty len z odpovede, na ktoru caka —
+        # vysledok uz zavreteho okna by mu inak vybral cudziu klasifikaciu.
+        def tax_result(status, rec, op, requested, token = nil)
           case status
           when :ok, :exists
             name = rec.is_a?(Hash) ? rec['name'].to_s : requested
-            emit_tax(true, op, name, [])
+            emit_tax(true, op, name, [], token)
             set_status(status == :ok ? "#{op == 'series' ? 'Rada' : 'Výrobca'} #{name} pridaný do zoznamu."
                                      : "#{name} už v zozname je — vybraný.")
           when :invalid
-            emit_tax(false, op, '', [{ 'field' => op, 'msg' => rec.to_s }])
+            emit_tax(false, op, '', [{ 'field' => op, 'msg' => rec.to_s }], token)
           when :conflict
             emit_tax(false, op, '',
                      [{ 'field' => op,
-                        'msg' => 'zoznam sa medzitým zmenil — skús to znova' }])
+                        'msg' => 'zoznam sa medzitým zmenil — skús to znova' }], token)
           else
             emit_tax(false, op, '',
                      [{ 'field' => op,
-                        'msg' => "zápis zlyhal#{rec.to_s.empty? ? '' : ": #{rec}"}" }])
+                        'msg' => "zápis zlyhal#{rec.to_s.empty? ? '' : ": #{rec}"}" }], token)
           end
         end
 
-        def emit_tax(ok, op, name, errors)
+        def emit_tax(ok, op, name, errors, token = nil)
           js("MDH.taxonomy(#{{ 'ok' => ok, 'op' => op, 'name' => name,
-                               'errors' => errors,
+                               'errors' => errors, 'token' => token.to_s,
                                'taxonomy' => taxonomy_payload }.to_json})")
         end
 

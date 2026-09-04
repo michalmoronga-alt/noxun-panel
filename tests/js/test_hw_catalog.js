@@ -49,8 +49,12 @@ const c = hwItemCreatePayload({ code: ' 99 ', name: ' Test ', category: 'NOHY', 
 eq(c.fields.item_code, '99', 'kod z modalu (orezany — je to identita)');
 eq(c.fields.name_sk, 'Test', 'nazov orezany');
 eq(c.fields.category, 'NOHY', 'kategoria 1:1 (server enum validuje)');
-eq(c.fields.manufacturer, 'Hettich', 'vyrobca ide serveru na overenie proti taxonomii');
-eq(c.fields.series, 'Sensys', 'a rada tiez');
+// Review #290/2 P1: bez nacitanej taxonomie (tato sada bezi BEZ DOM, takze
+// `MDH_TAX` je prazdna) sa klasifikacia NEPOSIELA — prazdny retazec by nad
+// zaradenou polozkou zmazal vyrobcu aj radu. Nacitanu taxonomiu overuje
+// `test_kovb2_katalog.js` (blok 19).
+ok(!('manufacturer' in c.fields) && !('series' in c.fields),
+   'nad nedostupnou taxonomiou klasifikacia v payloade NIE JE');
 ok(!('demos_url' in c.fields) && !('price_checked_at' in c.fields),
    'create NIKDY neposiela cache polia (server ich aj tak ignoruje)');
 ok(!('row_rev' in c.fields) && !('use_count' in c.fields),
