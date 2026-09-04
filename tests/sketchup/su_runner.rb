@@ -13819,7 +13819,85 @@ module NoxunSuRunner
          !marker_s.valid?)
       info("NASTROJE-1: prekazky v scenari — #{[near, far].count { |g| g && g.valid? }} top-level + 1 vnorena")
 
-      # 12) REGISTRACIA: opakovany `install!` NEPRIDA druhy toolbar
+      # 12) GHOST SESSION: kopia nastrojom ju MUSI zrusit (Codex #293 kolo 1, P2)
+      cleanup(model)
+      g1 = e::CabinetBuilder.build(model, TOOLS1_PARAMS)
+      tools1_select(model, g1)
+      e::Panel.handle_insert(pg(model, TOOLS1_PARAMS.dup)) # „Vlozit" = ghost na kurzore
+      started = ghost_session && ghost_session.active?
+      ok('NASTROJE-1: ghost session naozaj bezi (inak by scenar nic nemeral)', started == true)
+      tools1_select(model, g1)
+      e::Tools::Mower.copy(:right)
+      ok('NASTROJE-1: kopia nastrojom ZRUSILA beziacu ghost session ' \
+         '(inak by dalsi klik commitol STARY plan)',
+         ghost_session.nil? || !ghost_session.active?)
+      ok('NASTROJE-1: a kopia sa aj tak vlozila', cabinets(model).length == 2)
+      e::GhostTool.cancel_session('SU-TEST teardown', deferred: false)
+      cleanup(model)
+
+      # 13) HANDSHAKE S INSPECTOROM: rozpisana zmena sirky sa musi dopisat PRED kopiou
+      # Panel v runneri otvoreny nie je — sondou sa zastupi PRESNE to, co robi:
+      # `dialog_alive?` hlasi zive okno a `request_native_flush` zachyti token.
+      sent = []
+      e::Panel.singleton_class.class_eval do
+        alias_method :nx_t1_orig_alive, :dialog_alive?
+        alias_method :nx_t1_orig_flush, :request_native_flush
+        define_method(:dialog_alive?) { true }
+        define_method(:request_native_flush) { |token, kind, dir| sent << [token, kind, dir]; nil }
+      end
+      begin
+        e::Tools::Mower.reset_pending!
+        hs = e::CabinetBuilder.build(model, TOOLS1_PARAMS)
+        hs_cid = e::Store.get(hs, 'cabinet_id')
+        tools1_select(model, hs)
+        e::Tools::Mower.copy(:right)
+        ok("NASTROJE-1: s otvorenym Inspectorom kopia CAKA (poziadaviek: #{sent.length}, skriniek: #{cabinets(model).length})",
+           sent.length == 1 && cabinets(model).length == 1 && !e::Tools::Mower.pending_copy.nil?)
+        token = sent.first[0]
+        ok('NASTROJE-1: poziadavka nesie druh operacie aj smer',
+           sent.first[1] == 'copy' && sent.first[2] == :right)
+
+        # Cudzi token sa musi TICHO zahodit — inak by kopiu spustila cudzia odpoved.
+        e::Tools::Mower.resolve_flush('cudzi-token', 'nothing')
+        ok('NASTROJE-1: cudzi token kopiu NESPUSTI a cakanie nezrusi',
+           cabinets(model).length == 1 && !e::Tools::Mower.pending_copy.nil?)
+
+        # Panel dopise rozpisanu zmenu sirky a prilepi `native_op` — kopia bezi
+        # az v TOMTO callbacku, teda uz nad zapisanym configom.
+        e::Panel.handle_apply_all(pg(model, 'cabinet_id' => hs_cid, 'width' => 800.0,
+                                            'native_op' => { 'kind' => 'copy', 'token' => token }))
+        ok("NASTROJE-1: zdroj ma NOVU sirku (#{(e::Store.config(hs) || {})['width']})",
+           ((e::Store.config(hs) || {})['width'].to_f - 800.0).abs <= TOL)
+        hs_copy = cabinets(model).find { |i| i.valid? && !i.equal?(hs) }
+        ok('NASTROJE-1: kopia vznikla AZ po flushi a nesie tiez NOVU sirku ' \
+           "(#{hs_copy && (e::Store.config(hs_copy) || {})['width']})",
+           !hs_copy.nil? && ((e::Store.config(hs_copy) || {})['width'].to_f - 800.0).abs <= TOL)
+        hs_rel = hs_copy ? tools1_rel(hs, hs_copy) : nil
+        ok("NASTROJE-1: a stoji o NOVU sirku vedla (#{hs_rel ? mm(hs_rel.origin.x).round(1) : 'nil'} mm)",
+           !hs_rel.nil? && (mm(hs_rel.origin.x) - 800.0).abs <= TOL)
+        ok('NASTROJE-1: po vykonani uz ziadna kopia neceka', e::Tools::Mower.pending_copy.nil?)
+
+        # Cervene polia: server kopiu ODMIETNE (nikdy ticha kopia zo starych hodnot).
+        sent.clear
+        cleanup(model)
+        inv = e::CabinetBuilder.build(model, TOOLS1_PARAMS)
+        tools1_select(model, inv)
+        e::Tools::Mower.copy(:left)
+        e::Tools::Mower.resolve_flush(sent.first && sent.first[0], 'invalid')
+        ok('NASTROJE-1: odpoved „invalid" kopiu ODMIETNE (a cakanie zrusi)',
+           cabinets(model).length == 1 && e::Tools::Mower.pending_copy.nil?)
+      ensure
+        e::Tools::Mower.reset_pending!
+        e::Panel.singleton_class.class_eval do
+          alias_method :dialog_alive?, :nx_t1_orig_alive
+          alias_method :request_native_flush, :nx_t1_orig_flush
+          remove_method :nx_t1_orig_alive
+          remove_method :nx_t1_orig_flush
+        end
+      end
+      cleanup(model)
+
+      # 14) REGISTRACIA: opakovany `install!` NEPRIDA druhy toolbar
       tb1 = e::Tools.install!(nil)
       tb2 = e::Tools.install!(nil)
       ok('NASTROJE-1: registrator je idempotentny (ta ista procesna referencia)',
@@ -13830,6 +13908,17 @@ module NoxunSuRunner
     ensure
       remove_js_recorder
       tools1_close_context(model)
+      # Ghost session ani cakajuca kopia nesmu prezit sekciu ani po vynimke.
+      begin
+        e::GhostTool.cancel_session('NASTROJE-1 teardown', deferred: false) if defined?(e::GhostTool)
+      rescue StandardError
+        nil
+      end
+      begin
+        e::Tools::Mower.reset_pending!
+      rescue StandardError
+        nil
+      end
       tools1_clear_markers(model, markers)
       cleanup(model)
       begin

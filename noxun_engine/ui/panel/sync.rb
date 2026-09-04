@@ -556,6 +556,18 @@ module Noxun
           Engine.log_error(e, 'Panel.js')
         end
 
+        # NASTROJE-1 (Codex #293 kolo 1, P2): HANDSHAKE PRED KOPIOU NASTROJOM.
+        # Auto-apply panela ma 400 ms debounce, takze rozpisana zmena moze este
+        # visiet vo formulari — kopia spustena z TOOLBARU (teda mimo JS) by
+        # vznikla zo STAREHO configu. Server si preto flush vyziada a caka na
+        # odpoved: `apply_all` s `native_op` (panel zmenu dopisal) alebo
+        # `native_flush_done` (nebolo co / cervene polia). Token je jediny
+        # korelacny kluc — vzor `manual_op` (KOV-H2).
+        def request_native_flush(token, kind, dir)
+          js("NX.flushForNative(#{token.to_s.to_json}, " \
+             "{kind: #{kind.to_s.to_json}, dir: #{dir.to_s.to_json}});")
+        end
+
         # V0.5 B: relay handshake satelitnych okien potrebuje vediet, ci panel zije.
         def dialog_alive?
           !!(@dialog && @dialog.visible?)

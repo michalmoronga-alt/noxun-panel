@@ -49,6 +49,9 @@ posun o **šírku korpusu z configu po VLASTNEJ osi X** zdroja. Preto pri akejko
 `gap_sides` alebo úchytka smie šírku korpusu presahovať, takže sľub „dotyk bbox" neplatí (Codex #288; in-SU `run_tools1` to meria X-rozsahom korpusov aj prekryvom bboxov).
 Kópia teda dostane vlastnú definíciu, nové sekvenčné CAB id a je **jeden krok Späť**. Toto je pointa D-20: legacy `add_instance(ent.definition, tr)` vyrábal kópiu **bez
 identity**. `rigid_matrix?` sa od tejto dávky používa aj mimo vkladu — je to autorita rigidity pre cache `ScaleWatch` aj pre preflight nástrojov (nižšie).
+**Kópia z toolbaru navyše nesmie čítať `Store.config` skôr, než Inspector dopíše rozpísanú zmenu** (auto-apply má 400 ms debounce): server si ju drží ako čakajúcu pod tokenom
+a `build` spustí až po flushi — detail handshaku je v odseku `tools.rb` ([ui-lifecycle.md](ui-lifecycle.md)). Rovnako sa pred vložením ruší bežiaca **ghost session**, aby ďalší klik
+vo viewporte necommitol starý plán.
 
 **DOPREDNÝ GUARD CONFIGU (R-12, v0.9.3): `CONFIG_SCHEMA` + `guard_newer_config!`.** Config korpusu je uzavretý whitelist (`normalize` + `cabinet_config`), takže zákazka
 z NOVŠIEHO pluginu prišla pri prvej prestavbe ticho o všetko, čomu táto verzia nerozumie — a uložením stratu zvečnila; `plan_schema` verzuje tranzientný tvar plánu

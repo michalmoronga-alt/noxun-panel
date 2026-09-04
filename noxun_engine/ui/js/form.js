@@ -186,15 +186,26 @@
   // na iny korpus sa ticho zahodi namiesto zasiahnutia nespravneho objektu).
   // `guidSnapshot` = dokument z času NAPLÁNOVANIA (R-02, review #264 P1).
   // `null`/`undefined` = žiadne rozpísané edity, platí aktuálny dokument.
-  function flushCabinetEdits(cabSnapshot, guidSnapshot){
+  // `nativeOp` (NASTROJE-1) = handshake pred kopiou nastrojom: apply nesie
+  // korelacny token a Ruby kopiu vykona AZ po nom. Kazda vetva, ktora apply
+  // NEODOSLE, musi Ruby odpovedat sama — inak by cakalo do timeoutu.
+  function flushCabinetEdits(cabSnapshot, guidSnapshot, nativeOp){
     applyTimer = null;
     applyPendingGuid = null;
     var ae = document.activeElement;
-    if (ae && isExprInput(ae) && isExprStr(ae.value)) return; // vyraz stale rozpisany
-    if (!selectedCabId) return;
-    if (!validateFields()) { NX.setStatus('Skontroluj červené polia (mimo rozsahu).', true); return; }
+    if (ae && isExprInput(ae) && isExprStr(ae.value)){
+      if (nativeOp) nxNativeFlushDone(nativeOp.token, 'invalid');
+      return; // vyraz stale rozpisany
+    }
+    if (!selectedCabId){ if (nativeOp) nxNativeFlushDone(nativeOp.token, 'nothing'); return; }
+    if (!validateFields()) {
+      NX.setStatus('Skontroluj červené polia (mimo rozsahu).', true);
+      if (nativeOp) nxNativeFlushDone(nativeOp.token, 'invalid');
+      return;
+    }
     var payload = collectAll();
     payload.cabinet_id = cabSnapshot || selectedCabId;
+    if (nativeOp) payload.native_op = nativeOp;
     cabEditsInFlight = true; // D-07 Codex B2: echo tohto apply nesmie prepisat novsi vstup
     if (window.sketchup && sketchup.apply_all) sketchup.apply_all(nxDocPayload(payload, guidSnapshot)); // R-02
   }
@@ -222,6 +233,37 @@
   function cancelCabinetEdits(){
     if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; }
     applyPendingGuid = null;
+  }
+
+  // NASTROJE-1 (Codex #293 kolo 1, P2): Ruby si pred kopiou spustenou z TOOLBARU
+  // vypyta flush rozpisanych editov — kopia by inak vznikla zo STAREHO configu
+  // (auto-apply ma 400 ms debounce a klik na tlacidlo nastroja cez JS nejde).
+  // Kontrakt: server dostane odpoved v KAZDEJ vetve.
+  //   'invalid' — cervene polia alebo rozpisany vyraz (kopia sa ODMIETNE)
+  //   'nothing' — niet co flushnut, server kopiruje hned
+  //   apply_all s `native_op` — zmena sa dopisuje, kopia bezi az v tom callbacku
+  function nxFlushForNative(token, op){
+    try {
+      if (!selectedCabId){ nxNativeFlushDone(token, 'nothing'); return; }
+      var ae = document.activeElement;
+      if (ae && isExprInput(ae) && isExprStr(ae.value)){
+        NX.setStatus('Dokonči rozpísaný výraz v poli — kópia by vznikla zo starých hodnôt.', true);
+        nxNativeFlushDone(token, 'invalid');
+        return;
+      }
+      if (typeof validateFields === 'function' && !validateFields()){
+        NX.setStatus('Skontroluj červené polia — kópia by vznikla zo starých hodnôt.', true);
+        nxNativeFlushDone(token, 'invalid');
+        return;
+      }
+      if (!applyTimer){ nxNativeFlushDone(token, 'nothing'); return; }
+      var g = applyPendingGuid;                       // R-02: dokument z casu naplanovania
+      cancelCabinetEdits();
+      flushCabinetEdits(selectedCabId, g, { kind: (op && op.kind) || 'copy',
+                                            dir: (op && op.dir) || '', token: token });
+    } catch (e){
+      nxNativeFlushDone(token, 'invalid'); // pad nesmie nechat Ruby visiet
+    }
   }
 
   function updateAvailable(){

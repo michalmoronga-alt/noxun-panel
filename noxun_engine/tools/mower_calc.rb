@@ -24,7 +24,35 @@ module Noxun
         # („Bok L" ostava cely), rovnako ako cokolvek dlhsie nez dve pismena.
         COPY_SUFFIX_RE = /\A(.*\S)[ ]([a-z]{1,2})\z/.freeze
 
+        # --- handshake s Inspectorom pred kopiou (Codex #293 kolo 1, P2) ------
+        # Panel ma auto-apply s 400 ms debounce, takze rozpisana zmena moze este
+        # visiet vo formulari — kopia by inak vznikla zo STAREHO configu. Server
+        # si flush vypyta a caka; token je JEDINY korelacny kluc odpovede.
+        FLUSH_TIMEOUT_S = 2.0
+        FLUSH_RESULTS = %w[flushed nothing invalid].freeze
+
         module_function
+
+        # Korelacny kluc jedneho handshaku. Vyraba HO SERVER (nie klient) a
+        # nesie poradove cislo aj cas — dve rychlo za sebou spustene kopie sa
+        # tak nemozu trafit do toho isteho tokenu.
+        def flush_token(seq, stamp)
+          "tcopy-#{seq.to_i}-#{stamp.to_i}"
+        end
+
+        # Cakajuca kopia + odpoved panela -> co ma nastroj spravit.
+        #   :ignore  — nic neceka, alebo prisiel CUDZI/STARY token (ticho zahodit)
+        #   :expired — token sedi, ale lehota vyprsala (nikdy ticha kopia)
+        #   :invalid — panel hlasi cervene polia / rozpisany vyraz
+        #   :copy    — config je cerstvy, mozeme kopirovat
+        def pending_decision(pending, token, result, now)
+          return :ignore unless pending.is_a?(Hash)
+          return :ignore if token.to_s.empty? || pending['token'].to_s != token.to_s
+          return :expired if now.to_f > pending['deadline'].to_f
+          return :invalid unless FLUSH_RESULTS.include?(result.to_s)
+
+          result.to_s == 'invalid' ? :invalid : :copy
+        end
 
         # Smer kopie/prisunutia -> znamienko po LOKALNEJ osi X objektu.
         # `:left` = -X, `:right` = +X. Ziadne hadanie osi ani uhla (legacy Mower

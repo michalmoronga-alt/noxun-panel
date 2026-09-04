@@ -15,6 +15,12 @@ module Noxun
         # NOTE 11 (SCOPE OUT): `BoardBuilder.build` polohu neprijima — sev pribudne
         # s vkladanim dosiek na klik (GHOST-D1), dovtedy kopia dosky nie je.
         MSG_BOARD_COPY = 'Noxun Nástroje: kópiu dosky zatiaľ nevieme — vlož ju z panela.'
+        # Handshake s Inspectorom (Codex #293 kolo 1, P2).
+        MSG_FLUSH_WAIT    = 'Noxun Nástroje: čakám, kým Inspector dopíše rozpísanú zmenu…'
+        MSG_FLUSH_INVALID = 'Noxun Nástroje: v Inspectore sú červené polia — oprav ich a skús znova ' \
+                            '(kópia by inak vznikla zo starých hodnôt).'
+        MSG_FLUSH_TIMEOUT = 'Noxun Nástroje: Inspector neodpovedal — skús znova.'
+        MSG_FLUSH_LOST    = 'Noxun Nástroje: skrinka sa medzitým stratila — kópia sa nevložila.'
 
         class << self
           # --- rotacie a vyska -----------------------------------------------
@@ -48,15 +54,121 @@ module Noxun
 
             route = Tools.route(model, inst)
             return nil if Tools.refused_context?(route)
+            return Tools.warn(MSG_BOARD_COPY) if route == :board
 
-            case route
-            when :cabinet then copy_cabinet(model, inst, dir)
-            when :board then Tools.warn(MSG_BOARD_COPY)
-            else copy_legacy(model, inst, dir)
+            # GHOST (V1-04, Codex #293 P2): iny sposob vkladania = koniec
+            # zivotneho cyklu beziacej session. Ghost visiaci na kurzore by inak
+            # dalsim klikom commitol STARY plan — vzor `Panel.handle_insert_copy`.
+            GhostTool.cancel_session('kópia nástrojom') if defined?(GhostTool)
+
+            return copy_legacy(model, inst, dir) unless route == :cabinet
+
+            start_cabinet_copy(model, inst, dir)
+          end
+
+          # --- handshake s Inspectorom (Codex #293 kolo 1, P2) -----------------
+          # Odpoved panela na `NX.flushForNative`. Prichadza DVOMA cestami:
+          #   * `native_flush_done` — panel nemal co flushnut (`nothing`) alebo
+          #     hlasi cervene polia (`invalid`);
+          #   * `apply_all` s `native_op` — panel rozpisanu zmenu DOPISAL, takze
+          #     kopia bezi az v tom callbacku (`flushed`), teda nad CERSTVYM
+          #     configom.
+          # Smer kopie sa berie VYHRADNE z cakajuceho zaznamu servera — echo
+          # klienta je len korelacny token, nie autorita.
+          def resolve_flush(token, result)
+            pending = @pending
+            case MowerCalc.pending_decision(pending, token, result, now)
+            when :copy
+              @pending = nil
+              finish_pending_copy(pending)
+            when :invalid
+              @pending = nil
+              Tools.warn(MSG_FLUSH_INVALID)
+            when :expired
+              @pending = nil
+              Tools.warn(MSG_FLUSH_TIMEOUT)
             end
+            nil
+          rescue StandardError => e
+            @pending = nil
+            Engine.log_error(e, 'Tools::Mower.resolve_flush')
+            nil
+          end
+
+          # LEN pre testy a diagnostiku — nikto na nu nespolieha v produkcii.
+          def pending_copy
+            @pending
+          end
+
+          def reset_pending!
+            @pending = nil
           end
 
           private
+
+          # Bez otvoreneho Inspectora niet co flushovat — kopia ide hned.
+          def start_cabinet_copy(model, src, dir)
+            cid = Store.get(src, 'cabinet_id').to_s
+            return copy_cabinet(model, src, dir) if cid.empty? || !inspector_live?
+
+            @flush_seq = (@flush_seq || 0) + 1
+            token = MowerCalc.flush_token(@flush_seq, now)
+            @pending = { 'token' => token, 'dir' => dir.to_sym, 'cabinet_id' => cid,
+                         'deadline' => now + MowerCalc::FLUSH_TIMEOUT_S }
+            Tools.info(MSG_FLUSH_WAIT)
+            Panel.request_native_flush(token, 'copy', dir)
+            arm_flush_timeout(token)
+            nil
+          end
+
+          def finish_pending_copy(pending)
+            model = Tools.active_model
+            return Tools.warn(MSG_FLUSH_LOST) unless model
+
+            src = cabinet_by_id(model, pending['cabinet_id'])
+            return Tools.warn(MSG_FLUSH_LOST) unless src && src.valid?
+            return nil if Tools.refused_context?(Tools.route(model, src))
+
+            copy_cabinet(model, src, pending['dir'])
+          end
+
+          # Nikdy ticha kopia zo stareho configu: ked panel neodpovie, prikaz padne.
+          def arm_flush_timeout(token)
+            return unless defined?(UI) && UI.respond_to?(:start_timer)
+
+            UI.start_timer(MowerCalc::FLUSH_TIMEOUT_S + 0.2, false) do
+              begin
+                p = @pending
+                if p.is_a?(Hash) && p['token'].to_s == token.to_s
+                  @pending = nil
+                  Tools.warn(MSG_FLUSH_TIMEOUT)
+                end
+              rescue StandardError => e
+                Engine.log_error(e, 'Tools::Mower flush timeout')
+              end
+            end
+          end
+
+          def inspector_live?
+            defined?(Panel) && Panel.respond_to?(:dialog_alive?) && Panel.dialog_alive?
+          rescue StandardError
+            false
+          end
+
+          def cabinet_by_id(model, cid)
+            found = nil
+            Ids.each_cabinet(model) do |inst|
+              found = inst if found.nil? && Store.get(inst, 'cabinet_id').to_s == cid.to_s
+            end
+            found
+          rescue StandardError => e
+            Engine.log_error(e, 'Tools::Mower.cabinet_by_id')
+            nil
+          end
+
+          def now
+            Time.now.to_f
+          end
 
           # Spolocna kostra prikazov, ktore len POSUVAJU/OTACAJU objekt.
           def with_target(op_name)

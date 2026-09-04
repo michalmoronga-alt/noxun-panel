@@ -66,6 +66,14 @@
   vždy). Duplicita sa teraz vyrába ako **reálna kópia** (nová inštancia + celý dictionary vrátane `cabinet_id` a `config`), stará **pod guardom** a čerstvá **mimo neho**, a do
   asserta pribudol **POČET** duplicít aj skriniek. Poučenie do ďalších dávok: **assert, ktorý je pravdivý aj nad prázdnym modelom, nie je dôkaz** — počet patrí do podmienky,
   nielen do hlášky; a príprava scenára sa musí overiť vlastným assertom skôr, než sa na nej postaví meranie.
+  **Codex kolo 1 vrátilo 3× P2 (žiadny P1) a všetky tri boli reálne diery, nie štylistika.** *(1) Obálka kontajnera ako kandidát prekážky:* je to **únia detí**, takže miešala X
+  jedného dieťaťa s Y/Z iného — dve skupiny, jedna blízko ale mimo koridoru a druhá ďaleko v ňom, dali medzeru podľa tej blízkej, ktorá skrinke vôbec nestojí v ceste. Kontajner je
+  odteraz len **schránka na zostup**, gap počítajú výhradne listy; obálka slúži už len na predvýber, kde je ako nadmnožina bezpečná. *(2) Bežiaca ghost session:* kópia z toolbaru ju
+  neukončila, takže ďalší klik vo viewporte by commitol **starý plán** — ruší sa presne ako pri „Vložiť kópiu". *(3) Rozpísaná úprava v Inspectore:* auto-apply má **400 ms debounce**
+  a klik na tlačidlo nástroja ide **mimo JS**, takže kópia mohla vzniknúť zo **starého configu**. Pribudol **handshake**: server drží čakajúcu kópiu pod tokenom, pošle
+  `NX.flushForNative`, a JS odpovie v každej vetve — červené polia či rozpísaný výraz kópiu **odmietnu**, „nič nečaká" ju pustí hneď, a rozpísané edity idú `apply_all`om s `native_op`,
+  po ktorom kópia beží až v tom callbacku. Bez odpovede do 2 s sa kópia odmietne. **Zásada, ktorá z toho ostáva:** smer kópie je vždy zo servera (echo klienta je len korelačný kľúč)
+  a **nikdy tichá kópia zo starého configu** — radšej hláška. JS vetvy stráži sada, ktorá funkciu číta priamo zo `form.js`, nie jej zrkadlo.
   **Codex review:** doplní orchestrátor.
 - **KOV-B2 · KATALÓG KOVANIA: STROM, MODAL POLOŽKY, DÉMOS VÝROBCA (v0.9.23, 4.9.2026, PR #290):** UI polovica slice B — dáta a taxonómiu dala KOV-B1, táto dávka ich vytiahla
   na obrazovku a uzavrela **D-110** („pridávanie kovaní je neprehľadné", Michal 24.8. pri prvom teste v0.8.0).

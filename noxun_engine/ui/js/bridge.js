@@ -266,7 +266,27 @@
     if (typeof openStudio === 'function') openStudio('ctrl');
   }
 
+  // NASTROJE-1 (Codex #293 kolo 1, P2): odpoved na handshake pred kopiou
+  // nastrojom. JEDEN argument (JSON) — `Panel.cb` podava callbacku len prvy.
+  function nxNativeFlushDone(token, result){
+    if (window.sketchup && sketchup.native_flush_done)
+      sketchup.native_flush_done(JSON.stringify({ token: token, result: result }));
+  }
+
   window.NX = {
+    // Ruby si pred kopiou z toolbaru vypyta flush rozpisanych editov (auto-apply
+    // ma 400 ms debounce). Odpoved je POVINNA v kazdej vetve — bez nej server
+    // caka do timeoutu a kopiu odmietne. Bez formularovej vrstvy niet co
+    // flushnut, takze `nothing`.
+    flushForNative: function(token, op){
+      try {
+        if (typeof nxFlushForNative === 'function'){ nxFlushForNative(token, op); return; }
+      } catch (e){
+        nxNativeFlushDone(token, 'invalid');
+        return;
+      }
+      nxNativeFlushDone(token, 'nothing');
+    },
     init: function(data){
       DEFAULTS = data.defaults || { lower: {}, upper: {} };
       TEMPLATES = data.templates || [];
