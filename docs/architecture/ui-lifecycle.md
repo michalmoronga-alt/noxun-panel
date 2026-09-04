@@ -204,6 +204,9 @@ vedieť, že ide o prekreslenie** (inak si zhodí vlastný stav — v katalógu 
 takže by fokus po zatvorení skončil na odpojenom uzle a klávesnicová cesta na `<body>`. Volajúci preto pri interných redrawoch podá **pôvodný** spúšťač (tlačidlo, ktoré okno
 otvorilo); pre ostatných volajúcich sa nemení nič — bez `trigger` platí staré správanie.
 
+**(3b) `disabled:` na `select` (review #290/2 P1).** Pri rozbaľovačke `aria-disabled` hodnotu neubráni — dá sa zmeniť ďalej. Keď je zámok invariant (v katalógu: klasifikácia
+nad nedostupnou taxonómiou), pole potrebuje **tvrdý `disabled`**; dôvod patrí na obrazovku (`hint`), nie do ticha.
+
 **(4) `action:` — akčné tlačidlo PRI POLI (review #290 P1).** Voliteľné `{ act, key, label, title }` na ploché pole vykreslí malé ghost tlačidlo za vstupom. Kostra o jeho význame
 nevie nič a klik jej delegáciou **neprejde** (`data-action`, nie `data-nxm-act`), takže ho spracuje volajúci. Vzniklo z konkrétnej chyby: zápis, ktorý sa **nedá vrátiť**
 (globálna taxonómia kovania — žiadny krok Späť, žiadny rename ani delete), visel na `change` textového poľa. Klik na „Zrušiť" pritom vyvolá **najprv blur poľa** a až potom svoj
@@ -1592,7 +1595,8 @@ až po odscrollovaní a rozpísanú položku mu prekryl zoznam.
   **výhradne** ono alebo Enter v poli — **nikdy `change`/blur** (review #290 P1: klik na „Zrušiť" vyvolá blur skôr než svoj klik, takže zrušený formulár by založil výrobcu,
   ktorého už nikto nezmaže). Zápis **položku pritom NEULOŽÍ** — dve veci naraz by boli tichý zápis. Server odpovie `MDH.taxonomy` s čerstvou taxonómiou a KANONICKÝM menom, modal
   sa prekreslí s novou hodnotou vybranou; chyba sadne na pole `manufacturer_new`/`series_new`. Rada je **závislý select**: bez výrobcu sa vybrať ani založiť nedá a zmena výrobcu
-  zahodí radu, ktorá mu nepatrí (KOV-B1: rada patrí presne jednému).
+  zahodí radu, ktorá mu nepatrí (KOV-B1: rada patrí presne jednému). Aj tu platí **token** (review #290/2 P2): výsledok patriaci už zavretému oknu zoznam obnoví, ale
+  klasifikáciu v otvorenom okne **nevyberie** — je to hodnota, ktorá ide do objednávky.
 - **Zámok odoslania odomyká VOLAJÚCI v OBOCH vetvách** — signál servera `MDH.itemResult(ok, msg, errors, op, token)`: `true` zavrie modal a zahodí pamäť konceptu, `false` ho
   nechá otvorený s hodnotami a chyby (`{field, msg}`) rozsype PRI POLIACH. **`token` je identita JEDNÉHO odoslania** (review #290 P2): klient ho generuje pri submite, server ho
   echuje a klient prijme **len presnú zhodu** — zdieľaný príznak „niečo som poslal" nestačil, lebo odpoveď okna, ktoré používateľ medzitým zavrel, zavrela okno otvorené teraz
@@ -1600,6 +1604,16 @@ až po odscrollovaní a rozpísanú položku mu prekryl zoznam.
 - **Konflikt úpravy modal REBASUJE** (review #290 P2): server pri konflikte najprv pushne čerstvý katalóg a až potom odpovie, takže `MDH_ITEMS` má novú revíziu. Ak sa líši od
   tej, ktorú modal drží (`hwItemStale`), okno sa **prekreslí z čerstvej položky** — nová baseline, serverové hodnoty v poliach, okno ostáva otvorené s hláškou. Bez toho by
   každé ďalšie „Uložiť" posielalo ten istý zastaraný `row_rev` a konflikt by trval donekonečna, hoci hláška tvrdí, že hodnoty sa obnovili.
+- **Rebase je VÝHRADNE táto cesta** (review #290/2 P1). UI-only prekreslenia (`hwItemRedraw` — zmena výrobcu/rady, predvyplnenie z Démosu) menia len to, čo je na obrazovke:
+  **baseline aj revíziu si podržia z otvorenia modalu**. Keby si ich vzali z `MDH_ITEMS`, cudzia zmena, ktorá dorazila počas otvoreného editora, by sa stala novým „pôvodným
+  stavom" — patch by potom poslal **cudzie zmeny ako vlastné** a s revíziou, ktorá serverovou bránou prejde. Tichý prepis cudzej práce. Vedomú obnovu robí `hwItemRebase`.
+- **Nedostupná taxonómia ZAMYKÁ klasifikáciu** (review #290/2 P1). Katalóg môže byť zapisovateľný, kým je taxonómia read-only alebo sa vôbec nenačítala (server vtedy posiela
+  prázdny zoznam + príznak). `hwTaxLocked()` v tom stave selecty výrobca/rada **zamkne**, ukáže **uloženú hodnotu ako jedinú voľbu** a dôvod napíše k poľu; payload
+  `manufacturer` ani `series` **neobsahuje vôbec** (ani prázdne). Prázdna dvojica totiž `taxonomy_refusal` prejde, takže uloženie nesúvisiacej zmeny by ticho zmazalo výrobcu
+  aj radu už zaradenej položky.
+- **Zmena poľa Démos ZNEPLATNÍ hotový proposal** (review #290/2 P2) — patrí textu, ktorý ho vyhľadal. Bez toho by `hwDemosDirty` (polia sa predsa nezmenili!) pustil uloženie
+  s `pid` **starého** produktu, hoci v poli svieti nový. A kým sa nový náhľad nedokončí (`HW_DEMOS_WAIT`), **zápis sa nepustí** — hláška pri poli povie aj cestu von (počkať,
+  alebo pole vymazať).
 - **Náhľad z Démosu má KLIENTSKU generáciu** (review #290 P2): každá zmena poľa ju zvýši a odpoveď so starou sa **zahodí**. Server svoju generáciu dvíha len pri NOVOM náhľade,
   takže scenár „vložím URL, potom pole prepíšem na text" by inak nechal dobiehajúcu odpoveď prepísať kód, názov, cenu, MJ, kategóriu aj výrobcu. **Vymazanie poľa** je výslovné
   „už to nechcem": pošle `hw_demos_cancel` a proposal zahodí.

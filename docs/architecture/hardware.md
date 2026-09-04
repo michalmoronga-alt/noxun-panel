@@ -159,6 +159,9 @@ položka za poradím `SEARCH_TOP` sa dala nájsť už LEN hľadaním.
   (50) kódov a orezaný list to prizná `more: true`. **Zbalená kategória neposiela kódy vôbec** (`shown` 0), ale `total` nesie ďalej — inak by hlavička mlčala o tom, čo v nej je.
 - **Poradie:** kategórie v poradí `CATEGORIES`; výrobcovia abecedne bez diakritiky, zberná značka „Ostatné" predposledná a **položky BEZ výrobcu úplne posledné** (`— bez výrobcu`);
   rady abecedne, `— bez rady` posledná. V liste platí poradie `score_item` (pri dotaze) alebo **podľa názvu** (prázdny dotaz) — nie `use_count`, ktorý v strome nič nehovorí.
+- **Filter kategórie používa TÚ ISTÚ mapu ako strom** (`tree_category_of`, review #290/2 P2) — nie doslovné porovnanie uloženej hodnoty. Položka s neznámou kategóriou (staršie
+  alebo cudzie zápisy, ktoré čítacia cesta zámerne drží čitateľné) sa v strome ukazuje pod „Ostatné"; keby filter porovnával doslovne, po zapnutí filtra „Ostatné" by **zmizla** —
+  a to je práve tá položka, ktorú človek filtrovaním hľadá.
 - **Hľadanie roztvára LEN zhody:** pri neprázdnom `q` sa vracajú iba skupiny so zhodami a majú `open: true`; pri prázdnom platí `expand` klienta. Klient si serverové rozbalenie
   zapamätá **iba pri prázdnom dotaze** — inak by jedno hľadanie roztvorilo katalóg natrvalo.
 - **`pin` je v odpovedi VŽDY** (aj keď filtru nevyhovuje), **navrchu SVOJHO listu** a jeho kategória je rozbalená; `gen` sa iba ECHUJE (hľadanie je debounced, pomalšie kolo

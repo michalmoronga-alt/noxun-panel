@@ -857,6 +857,23 @@ const PROP = { ok: true, pid: 'p1', url: 'https://www.demos-trade.sk/k-atira/',
   global.NXModal.submit();
   eq(last('hw_demos_create').pid, 'p2', 'a ukladá sa `pid` produktu B');
   H.MDH.itemResult(true, 'ok', [], 'create', tok('hw_demos_create'));
+
+  // A druhá cesta k tej istej pasci: text, ktorý ŽIADNY náhľad nespustí.
+  // Polia z proposalu ostanú nedotknuté, takže `hwDemosDirty` by povedal
+  // „nič sa nezmenilo" — a uložil by `pid` produktu, ktorý už v poli nie je.
+  boot();
+  H.hwItemOpen(null, null, {});
+  demosType(PROP.url);
+  H.MDH.demosPreview(PROP);
+  eq(DOC.getElementById('nxm_code').value, '357695', 'proposal predvyplnil formulár');
+  demosType('atira 470');                    // hľadanie názvom, nie adresa
+  SENT.length = 0;
+  global.NXModal.submit();
+  eq(sent('hw_demos_create').length, 0,
+     'zmena lookupu proposal ZNEPLATNILA — žiadny zápis s cudzím `pid`');
+  eq(last('hw_create').fields.item_code, '357695',
+     'ukladá sa RUČNE, s hodnotami, ktoré má používateľ na obrazovke');
+  H.MDH.itemResult(true, 'ok', [], 'create', tok('hw_create'));
 })();
 
 // ==== 21) review #290/2 P2: token výsledku taxonómie ========================
