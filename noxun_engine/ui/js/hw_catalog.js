@@ -530,6 +530,14 @@
   var HW_ITEM = null;
   var HW_DEMOS_DONE = null;  // callback naseptavaca (kostra ho poda pri hladani)
   var HW_DEMOS_Q = '';
+  // Generacia nahladu na strane KLIENTA (review #290 P2): rastie pri KAZDEJ
+  // zmene vstupu; `HW_DEMOS_SENT_GEN` je ta, s ktorou odisiel beziaci nahlad.
+  var HW_DEMOS_GEN = 0;
+  var HW_DEMOS_SENT_GEN = -1;
+  // Identita JEDNEHO odoslania (review #290 P2). Server ju echuje v
+  // `MDH.itemResult`, takze odpoved patriaca uz zavretemu oknu nezavrie to,
+  // ktore je otvorene teraz.
+  var HW_TOKEN_SEQ = 0;
   var HW_ITEM_KEY = 'hw:item:new';
   // Hodnota selectu, ktora NIE JE hodnotou — je to ziadost „vytvor novy zaznam
   // v taxonomii". Submit ju NIKDY neposle do katalogu.
@@ -557,18 +565,46 @@
 
   function mdhDemosLoad(url){
     MDH_DEMOS = { status: 'pending' };
+    // Generacia, s ktorou nahlad ODISIEL. Odpoved sa prijme LEN vtedy, ked sa
+    // vstup medzitym NEZMENIL (review #290 P2, vzor `gen` v `hw_manual_search`).
+    HW_DEMOS_SENT_GEN = HW_DEMOS_GEN;
     if (HW_ITEM) HW_ITEM.demosPending = true;
     mdhSend('hw_demos_preview', { url: url });
+  }
+
+  // Zrusenie ROZBEHNUTEHO nahladu: server bumpne svoju generaciu (dobiehajuci
+  // fetch uz nema komu prist) a klient zabudne, ze na nieco caka.
+  function hwDemosCancel(){
+    if (mdhDemosTimer){ clearTimeout(mdhDemosTimer); mdhDemosTimer = null; }
+    if (HW_ITEM && HW_ITEM.demosPending){
+      mdhSend('hw_demos_cancel', {});
+      HW_ITEM.demosPending = false;
+    }
+    HW_DEMOS_SENT_GEN = -1;
   }
 
   // Naseptavac Demosu v modale. Kostra `lookup` vola `search(query, done)` pri
   // KAZDOM pisani, takze debounce je na nas (rovnaky, aky mal formular).
   // Vlozena URL sa nehlada — nacita sa ako produktova stranka.
+  //
+  // Review #290 P2: KAZDA zmena vstupu zvysi generaciu nahladu. Bez toho by
+  // vlozena URL rozbehla fetch, pouzivatel by pole prepisal alebo vymazal —
+  // a dobiehajuca odpoved by mu prepisala kod, nazov, cenu, MJ, kategoriu aj
+  // vyrobcu produktom, od ktoreho uz odisiel.
   function hwDemosSearch(query, done){
     var q = String(query == null ? '' : query).trim();
     HW_DEMOS_Q = q;
     HW_DEMOS_DONE = done;
+    HW_DEMOS_GEN++;
     if (mdhDemosTimer){ clearTimeout(mdhDemosTimer); mdhDemosTimer = null; }
+    if (q === ''){
+      // VYMAZANIE pola je vyslovne „uz to nechcem": beziaci nahlad sa zrusi
+      // a hotovy proposal zanika (inak by ho ulozenie znovu pripojilo).
+      hwDemosCancel();
+      MDH_DEMOS = null;
+      done([], 0);
+      return;
+    }
     if (mdhDemosIsUrl(q)){
       done([], 0);
       mdhDemosTimer = setTimeout(function(){ mdhDemosLoad(q); }, 400);
@@ -641,8 +677,16 @@
     out.push({ key: 'manufacturer', type: 'select', label: 'Výrobca',
                options: hwItemManOptions(), value: String(d.manufacturer || '') });
     if (String(d.manufacturer || '') === HW_NEW_OPT){
+      // Review #290 P1: zapis do TAXONOMIE spusta VYHRADNE toto tlacidlo
+      // (alebo Enter v poli) — NIKDY udalost `change`/blur. Klik na „Zrušiť"
+      // najprv vyvola blur pola a az potom svoj vlastny klik, takze zruseny
+      // formular by inak stihol zalozit vyrobcu, ktoreho uz nikto nezmaze
+      // (taxonomia nema rename ani delete a zapis nerobi krok Spat).
       out.push({ key: 'manufacturer_new', label: 'Názov nového výrobcu',
                  value: String(d.manufacturer_new || ''),
+                 action: { act: 'hw-tax-create', key: 'manufacturer',
+                           label: 'Vytvoriť',
+                           title: 'Pridá výrobcu do zoznamu (globálne, bez kroku Späť)' },
                  hint: 'pridá sa do zoznamu (globálne)' });
     }
     out.push({ key: 'series', type: 'select', label: 'Rada',
@@ -650,6 +694,8 @@
     if (String(d.series || '') === HW_NEW_OPT){
       out.push({ key: 'series_new', label: 'Názov novej rady',
                  value: String(d.series_new || ''),
+                 action: { act: 'hw-tax-create', key: 'series', label: 'Vytvoriť',
+                           title: 'Pridá radu k výrobcovi vyššie (globálne, bez kroku Späť)' },
                  hint: 'priradí sa výrobcovi vyššie' });
     }
     out.push({ key: 'notes', label: 'Poznámka', value: String(d.notes || ''),
@@ -758,19 +804,31 @@
     if (typeof NXModal === 'undefined' || !NXModal || typeof NXModal.open !== 'function') return;
     var o = opts || {};
     var edit = !!item;
-    var d = draft || (edit ? hwItemDraftOf(item) : hwItemDraft({}));
+    // Review #290 P2: proposal z Demosu PREZIL zatvorenie okna, takze nove
+    // otvorenie „Nová položka" z neho formular znovu predvyplni — vyhladany
+    // produkt sa nezahadzuje len preto, ze pouzivatel medzitym stlacil Escape.
+    var d = draft ||
+      (edit ? hwItemDraftOf(item)
+            : hwItemDraftFromProposal({}, (MDH_DEMOS && MDH_DEMOS.ok) ? MDH_DEMOS : null));
     // VNUTORNE prekreslenie (predvyplnenie z Demosu, novy vyrobca) podava
     // KOMPLETNE hodnoty — pamat rozpisaneho konceptu by nad nimi vyhrala
     // STARYMI a prepisala by prave prijaty navrh zo servera. Pri otvoreni
     // z listy sa pamat NEZAHADZUJE (kontrakt D-15).
     if (o.dropMemory && typeof NXModal.clearMemory === 'function') NXModal.clearMemory(HW_ITEM_KEY);
+    // Review #290 P2: SPUSTAC si drzime SAMI. Pri PREKRESLENI je
+    // `document.activeElement` pole prave zanikajuceho formulara, takze kostra
+    // by si ho vzala za novy spusac a po zatvoreni vratila fokus na ODPOJENY
+    // uzol — klavesnicova cesta by skoncila na `<body>`. Vnutorne prekreslenia
+    // preto podavaju PODVODNY spusac (tlacidlo, ktore okno otvorilo).
+    var trigger = o.trigger ||
+      (typeof document !== 'undefined' ? document.activeElement : null);
     // `NXModal.open` najprv ZATVARA predchadzajuci modal, takze pri PREKRESLENI
     // (predvyplnenie z Demosu, novy vyrobca) by jeho `onClose` zahodil stav,
     // ktory prave stavame — vratane serveroveho proposalu (`MDH_DEMOS`), a zapis
     // by potom isiel rucnou cestou. Prekreslenie NIE JE zatvorenie.
     HW_REOPEN = true;
     try {
-      NXModal.open(hwItemSpec(item, d, edit));
+      NXModal.open(hwItemSpec(item, d, edit, trigger));
     } finally {
       HW_REOPEN = false;
     }
@@ -780,13 +838,24 @@
                 edit: edit,
                 rowRev: edit ? String(item.row_rev || '') : '',
                 base: edit ? hwItemDraftOf(item) : null,
-                draft: d, sent: false, taxPending: null, demosPending: false };
+                trigger: trigger,
+                draft: d, sent: false, token: '', taxPending: null,
+                demosPending: false };
   }
 
   var HW_REOPEN = false;
 
-  function hwItemSpec(item, d, edit){
+  // Vnutorne prekreslenie modalu: PODRZI povodny spusac (review #290 P2), aby
+  // sa fokus po zatvoreni vratil na tlacidlo, ktore okno otvorilo — nie na
+  // pole, ktore prekreslenim zaniklo.
+  function hwItemRedraw(item, d){
+    hwItemOpen(item, d, { dropMemory: true,
+                          trigger: HW_ITEM ? HW_ITEM.trigger : null });
+  }
+
+  function hwItemSpec(item, d, edit, trigger){
     return {
+      trigger: trigger,
       title: edit ? 'Upraviť položku katalógu' : 'Nová položka katalógu',
       sub: edit ? ('Kód ' + String(item.item_code)) : 'z Démosu alebo ručne',
       size: 'md',
@@ -804,13 +873,18 @@
 
   function hwItemClosed(){
     if (HW_REOPEN) return;   // prekreslenie modalu nie je jeho zatvorenie
-    // Nedokonceny nahlad musi zomriet s oknom — server bumpne generaciu
+    // NEDOKONCENY nahlad musi zomriet s oknom — server bumpne generaciu
     // a dobiehajuci fetch uz nema komu prist.
-    if (HW_ITEM && HW_ITEM.demosPending) mdhSend('hw_demos_cancel', {});
-    if (mdhDemosTimer){ clearTimeout(mdhDemosTimer); mdhDemosTimer = null; }
+    hwDemosCancel();
+    // Review #290 P2: DOKONCENY proposal zatvorenie NEZAHADZUJE. Kostra si
+    // pamata len to, co sa lisi od VYCHODISKOVYCH hodnot — a tie po
+    // predvyplneni z Demosu drzali prave hodnoty proposalu, takze Escape by
+    // zmazal cely vyhladany produkt a pouzivatel by lookup robil odznova.
+    // Proposal preto zije dalej a `hw-new` z neho formular znovu predvyplni;
+    // zanika az po USPESNOM zapise alebo po VYMAZANI pola Démos.
+    if (MDH_DEMOS && MDH_DEMOS.ok !== true) MDH_DEMOS = null;
     HW_ITEM = null;
     HW_DEMOS_DONE = null;
-    MDH_DEMOS = null;
   }
 
   // Ktore polia sa patchom naozaj menia. Posielat VSETKO by pri kazdej uprave
@@ -873,28 +947,56 @@
         MDH.setStatus('Nič sa nezmenilo.');
         return;
       }
-      HW_ITEM.sent = true;
       mdhSend('hw_patch', { code: HW_ITEM.code, row_rev: HW_ITEM.rowRev,
-                            from: 'modal', patch: patch });
+                            from: 'modal', token: hwItemArm(), patch: patch });
       return;
     }
-    HW_ITEM.sent = true;
     // Neporuseny proposal = zapis z Demosu (server doplna vazbu a datum
     // overenia). Cokolvek prepisane = bezna rucna polozka.
     if (MDH_DEMOS && MDH_DEMOS.ok && !hwDemosDirty(MDH_DEMOS, d)){
-      mdhSend('hw_demos_create', mdhDemosCreatePayload(
+      var pay = mdhDemosCreatePayload(
         MDH_DEMOS, String(d.category || ''), String(d.notes || '').trim(),
-        String(d.manufacturer || ''), String(d.series || '')));
+        String(d.manufacturer || ''), String(d.series || ''));
+      pay.token = hwItemArm();
+      mdhSend('hw_demos_create', pay);
       return;
     }
-    mdhSend('hw_create', hwItemCreatePayload(d));
+    var cpay = hwItemCreatePayload(d);
+    cpay.token = hwItemArm();
+    mdhSend('hw_create', cpay);
+  }
+
+  // Odoslanie dostane VLASTNU identitu (review #290 P2). Bez nej stacil jeden
+  // zdielany priznak `sent`: pouzivatel odosle okno A, zavrie ho, otvori
+  // a odosle B — a odpoved patriaca A zavrela B a zahodila jeho koncept,
+  // hoci vlastny zapis B este nedobehol.
+  // Drzi modal ZASTARALU reviziu riadku? (Katalog uz medzitym pushol novu.)
+  function hwItemStale(){
+    if (!HW_ITEM || !HW_ITEM.edit) return false;
+    var fresh = MDH_ITEMS[HW_ITEM.code];
+    if (!fresh) return true;   // polozka zmizla — modal drzi neplatny stav
+    return String(fresh.row_rev || '') !== String(HW_ITEM.rowRev || '');
+  }
+
+  function hwItemArm(){
+    HW_TOKEN_SEQ += 1;
+    var t = 'hw' + HW_TOKEN_SEQ + '-' + Date.now();
+    if (HW_ITEM){
+      HW_ITEM.sent = true;
+      HW_ITEM.token = t;
+    }
+    return t;
   }
 
   // Zalozenie vyrobcu/rady z modalu. Taxonomia je GLOBALNY subor, takze zapis
-  // do nej NEROBI krok Spat — a preto ho robime az na vyslovny pokyn.
-  function hwTaxCreate(v){
+  // do nej NEROBI krok Spat, nema rename ani delete — a preto ho robime
+  // VYHRADNE na vyslovny pokyn (tlacidlo „Vytvoriť" alebo Enter v poli),
+  // NIKDY na `change`/blur (review #290 P1).
+  function hwTaxCreate(v, forced){
     var d = v || {};
-    var op = (String(d.manufacturer || '') === HW_NEW_OPT) ? 'manufacturer' : 'series';
+    var op = (forced === 'manufacturer' || forced === 'series')
+      ? forced
+      : ((String(d.manufacturer || '') === HW_NEW_OPT) ? 'manufacturer' : 'series');
     var key = op + '_new';
     var name = String(d[key] || '').trim();
     if (!name){
@@ -928,7 +1030,7 @@
       if (d.series !== HW_NEW_OPT && mdhSeriesOf(d.manufacturer).indexOf(d.series) < 0) d.series = '';
       d.series_new = '';
     }
-    hwItemOpen(HW_ITEM.edit ? MDH_ITEMS[HW_ITEM.code] : null, d, { dropMemory: true });
+    hwItemRedraw(HW_ITEM.edit ? MDH_ITEMS[HW_ITEM.code] : null, d);
   }
 
   // Nevybrany dotaz naseptavaca nie je vo `values()` (kontrakt `lookup` vracia
@@ -1000,19 +1102,46 @@
     // VOLAJUCI v OBOCH vetvach (kontrakt D-15) a zatvara sa AZ na potvrdenie
     // servera — odmietnuty zapis musi pouzivatel najst s rozpisanymi
     // hodnotami na mieste.
-    itemResult: function(ok, msg, errors, op){
+    itemResult: function(ok, msg, errors, op, token){
       if (typeof NXModal === 'undefined' || !NXModal.isOpen || !NXModal.isOpen()) return;
       // Inline bunka riadku ziadny modal neotvara — jej odpoved sem nepatri.
       if (!HW_ITEM || !HW_ITEM.sent) return;
+      // Review #290 P2: odpoved musi patrit PRAVE TOMUTO odoslaniu. Zdielany
+      // priznak nestacil — odpoved okna, ktore pouzivatel medzitym zavrel, by
+      // zavrela okno otvorene teraz a zahodila jeho koncept.
+      if (String(token == null ? '' : token) !== String(HW_ITEM.token || '')){
+        if (typeof console !== 'undefined' && console && console.warn){
+          console.warn('MDH.itemResult: odpoveď patrí inému odoslaniu — ignorujem.');
+        }
+        return;
+      }
       HW_ITEM.sent = false;
+      HW_ITEM.token = '';
       if (ok === true){
-        // Server potvrdil: pamat rozpisaneho konceptu zanika a okno sa zatvara.
+        // Server potvrdil: proposal aj pamat rozpisaneho konceptu zanikaju
+        // a okno sa zatvara.
+        MDH_DEMOS = null;
         NXModal.setBusy(false, { clear: true });
         NXModal.close();
         return;
       }
       NXModal.setBusy(false);
       var list = (errors && errors.length) ? errors : [{ msg: String(msg == null ? '' : msg) }];
+      // Review #290 P2: pri KONFLIKTE uprav server uz pushol CERSTVY katalog,
+      // takze `MDH_ITEMS` ma novu reviziu. Keby si modal drzal tu svoju, kazde
+      // dalsie „Uložiť" by posielalo ten isty zastaraly `row_rev` a konflikt by
+      // sa opakoval donekonecna — hoci hlaska tvrdi, ze hodnoty sa obnovili.
+      if (op === 'patch' && HW_ITEM.edit && hwItemStale()){
+        var fresh = MDH_ITEMS[HW_ITEM.code];
+        if (!fresh){
+          NXModal.close();
+          MDH.setStatus('Položka sa medzitým zmazala — katalóg sa obnovil.', true);
+          return;
+        }
+        hwItemRedraw(fresh, null);   // nova baseline + serverove hodnoty v poliach
+        NXModal.showErrors(list);
+        return;
+      }
       NXModal.showErrors(list);
     },
     // KOV-B2: odpoved na „+ Vytvoriť výrobcu/radu…". Server posiela CERSTVU
@@ -1044,7 +1173,7 @@
         d.series = String(r.name || '');
         d.series_new = '';
       }
-      hwItemOpen(HW_ITEM.edit ? MDH_ITEMS[HW_ITEM.code] : null, d, { dropMemory: true });
+      hwItemRedraw(HW_ITEM.edit ? MDH_ITEMS[HW_ITEM.code] : null, d);
     },
     // V0.6 D2: zive zhody Demosu — od KOV-B2 idu do naseptavaca modalu.
     demosResults: function(d){
@@ -1064,6 +1193,11 @@
       if (q.length >= 3 && !mdhDemosIsUrl(q)) mdhSend('hw_demos_search', { query: q });
     },
     demosPreview: function(res){
+      // Review #290 P2: odpoved patri tomu, na co sa este CAKA. Ked pouzivatel
+      // medzitym pole prepisal alebo vymazal, dobiehajuci nahlad by mu prepisal
+      // kod, nazov, cenu, MJ, kategoriu aj vyrobcu produktom, od ktoreho odisiel.
+      if (HW_DEMOS_SENT_GEN !== HW_DEMOS_GEN) return;
+      HW_DEMOS_SENT_GEN = -1;
       MDH_DEMOS = res || { ok: false, error: 'prázdna odpoveď' };
       if (HW_ITEM) HW_ITEM.demosPending = false;
       if (typeof NXModal === 'undefined' || !NXModal.isOpen || !NXModal.isOpen()) return;
@@ -1076,8 +1210,7 @@
       }
       // Predvyplnenie prekresľuje modal — hodnoty, ktoré používateľ už napísal
       // (kategória, poznámka), sa čítajú z formulára a NESTRÁCAJÚ sa.
-      hwItemOpen(null, hwItemDraftFromProposal(NXModal.values(), MDH_DEMOS),
-                 { dropMemory: true });
+      hwItemRedraw(null, hwItemDraftFromProposal(NXModal.values(), MDH_DEMOS));
       if (MDH_DEMOS.exists === true){
         NXModal.showErrors([{ field: 'code',
                               msg: 'Tento kód už v katalógu je — cenu obnovíš cez „Overiť" ' +
@@ -1143,6 +1276,13 @@
         var lk = t.getAttribute('data-hw-leaf') || '';
         HW_MORE[lk] = (Number(HW_MORE[lk]) || MDH_LEAF_PAGE) + MDH_LEAF_PAGE;
         mdhTreeNow();
+      } else if (action === 'hw-tax-create'){
+        // Review #290 P1: JEDINY klikaci spusac zapisu do taxonomie. Kostra
+        // toto tlacidlo len vykresli (`data-action`, nie `data-nxm-act`),
+        // takze klik prebubla sem a nikam inam.
+        if (typeof NXModal !== 'undefined' && NXModal.isOpen && NXModal.isOpen() && HW_ITEM){
+          hwTaxCreate(NXModal.values(), t.getAttribute('data-nxm-for'));
+        }
       } else if (action === 'hw-new'){
         hwItemOpen(null, null, {});
       } else if (action === 'hw-edit'){
@@ -1208,13 +1348,11 @@
       // nazov v poli „+ Vytvoriť…" rovno zaklada zaznam v taxonomii.
       var nxm = t.getAttribute('data-nxm');
       if (nxm === 'manufacturer' || nxm === 'series'){ hwItemCtxSwitch(nxm); return; }
-      if (nxm === 'manufacturer_new' || nxm === 'series_new'){
-        if (String(t.value || '').trim() && typeof NXModal !== 'undefined' &&
-            NXModal.isOpen && NXModal.isOpen() && HW_ITEM){
-          hwTaxCreate(NXModal.values());
-        }
-        return;
-      }
+      // Review #290 P1: pole „Názov nového výrobcu/rady" tu ZAMERNE NIE JE.
+      // `change` na textovom poli je BLUR, a klik na „Zrušiť" vyvola blur
+      // PRED svojim vlastnym klikom — zruseny formular by tak zalozil zaznam
+      // v globalnej taxonomii, ktory sa uz neda ani premenovat, ani zmazat.
+      // Zapis spusta VYHRADNE tlacidlo „Vytvoriť" pri poli alebo Enter v nom.
       if (t.tagName === 'SELECT' && t.getAttribute('data-hw-field')) mdhChanged(t);
       else if (t.type === 'checkbox' && t.getAttribute('data-hw-field')) mdhChanged(t);
     });

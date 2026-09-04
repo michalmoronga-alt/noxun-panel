@@ -386,6 +386,7 @@ module Noxun
         # (bez `demos_url` aj bez `price_checked_at`).
         def handle_demos_create(payload)
           data = JSON.parse(payload.to_s)
+          token = data['token'].to_s
           status, info, field = HardwareCatalog.create_from_demos!(
             data['pid'].to_s, category: data['category'].to_s, notes: data['notes'].to_s,
             manufacturer: data['manufacturer'].to_s, series: data['series'].to_s
@@ -395,27 +396,27 @@ module Noxun
             push_items
             msg = "Položka #{info['item_code']} pridaná z Demosu" \
                   "#{info['price_eur_vat'] ? ' (cena s DPH overená dnes)' : ''}."
-            item_result(true, msg, [], 'create')
+            item_result(true, msg, [], 'create', token)
             js("MDH.demosCreated(#{info['item_code'].to_s.to_json})")
             set_status(msg)
           when :exists
             msg = "Kód #{info} už v katalógu je — cenu obnovíš cez Overiť na existujúcej položke."
             set_status(msg, true)
-            item_result(false, msg, item_errors(msg, 'item_code'), 'create')
+            item_result(false, msg, item_errors(msg, 'item_code'), 'create', token)
           when :no_proposal
             msg = 'Náhľad už nie je platný — načítaj stránku znova.'
             set_status(msg, true)
-            item_result(false, msg, item_errors(msg, 'demos'), 'create')
+            item_result(false, msg, item_errors(msg, 'demos'), 'create', token)
           when :invalid
             set_status("Nedá sa uložiť — #{info}.", true)
-            item_result(false, info.to_s, item_errors(info, field), 'create')
+            item_result(false, info.to_s, item_errors(info, field), 'create', token)
           when :read_only
             msg = "Katalóg je len na čítanie: #{HardwareCatalog.state_reason}"
             set_status(msg, true)
-            item_result(false, msg, item_errors(msg, nil), 'create')
+            item_result(false, msg, item_errors(msg, nil), 'create', token)
           else
             set_status('Uloženie zlyhalo.', true)
-            item_result(false, 'Uloženie zlyhalo.', item_errors('Uloženie zlyhalo.', nil), 'create')
+            item_result(false, 'Uloženie zlyhalo.', item_errors('Uloženie zlyhalo.', nil), 'create', token)
           end
         end
 
@@ -1002,9 +1003,14 @@ module Noxun
         # VYHRADNE volajuci (kontrakt D-15) — server preto musi ohlasit OBE
         # vetvy, nielen tu uspesnu. `errors` su STRUKTUROVANE (`field` + `msg`),
         # aby hlaska pristala pri tom poli, ktoreho sa tyka.
-        def item_result(ok, msg, errors, op)
+        # `token` je identita JEDNEHO odoslania (review #290 P2): klient si ju
+        # vygeneruje pri submite a prijme LEN odpoved, ktora ju nesie spat.
+        # Bez nej stacil zdielany priznak „nieco som poslal" — odpoved okna,
+        # ktore pouzivatel medzitym zavrel, zavrela okno otvorene teraz
+        # a zahodila jeho rozpisany koncept.
+        def item_result(ok, msg, errors, op, token = nil)
           js("MDH.itemResult(#{ok ? 'true' : 'false'}, #{msg.to_s.to_json}, " \
-             "#{Array(errors).to_json}, #{op.to_s.to_json})")
+             "#{Array(errors).to_json}, #{op.to_s.to_json}, #{token.to_s.to_json})")
         end
 
         # `[status, info, field]` z katalogu -> `[{field, msg}]` pre modal.
@@ -1017,6 +1023,7 @@ module Noxun
 
         def handle_create(payload)
           data = JSON.parse(payload.to_s)
+          token = data['token'].to_s
           status, info, field = HardwareCatalog.create_item(
             data['fields'].is_a?(Hash) ? data['fields'] : {}
           )
@@ -1026,23 +1033,23 @@ module Noxun
             set_status("Položka #{info['item_code']} pridaná.")
             # KOV-B2: modal sa zatvara AZ na potvrdenie servera (D-15) —
             # a odomknut ho musi tiez server, aj ked zapis presiel.
-            item_result(true, "Položka #{info['item_code']} pridaná.", [], 'create')
+            item_result(true, "Položka #{info['item_code']} pridaná.", [], 'create', token)
             # TEST-1: kod ide klientovi, aby si ho vypytal NAVRCH zoznamu
             # (`pin`) a zvyraznil ho — inak nova polozka utopi v katalogu.
             js("MDH.created(#{info['item_code'].to_s.to_json})")
           when :exists
             msg = "Kód #{info} už v katalógu je — kódy sú jedinečné."
             set_status(msg, true)
-            item_result(false, msg, item_errors(msg, field || 'item_code'), 'create')
+            item_result(false, msg, item_errors(msg, field || 'item_code'), 'create', token)
           when :invalid
             set_status("Nedá sa uložiť — #{info}.", true)
-            item_result(false, info.to_s, item_errors(info, field), 'create')
+            item_result(false, info.to_s, item_errors(info, field), 'create', token)
           when :read_only
             set_status("Katalóg je len na čítanie: #{info}", true)
-            item_result(false, info.to_s, item_errors("Katalóg je len na čítanie: #{info}", nil), 'create')
+            item_result(false, info.to_s, item_errors("Katalóg je len na čítanie: #{info}", nil), 'create', token)
           else
             set_status('Uloženie zlyhalo.', true)
-            item_result(false, 'Uloženie zlyhalo.', item_errors('Uloženie zlyhalo.', nil), 'create')
+            item_result(false, 'Uloženie zlyhalo.', item_errors('Uloženie zlyhalo.', nil), 'create', token)
             push_items
           end
         end
@@ -1054,6 +1061,7 @@ module Noxun
         def handle_patch(payload)
           data = JSON.parse(payload.to_s)
           from_modal = data['from'].to_s == 'modal'
+          token = data['token'].to_s
           status, info, field = HardwareCatalog.patch_item(
             data['code'].to_s, data['patch'].is_a?(Hash) ? data['patch'] : {},
             row_rev: data['row_rev'].to_s
@@ -1062,34 +1070,34 @@ module Noxun
           when :ok
             push_items
             set_status('Uložené.')
-            item_result(true, 'Uložené.', [], 'patch') if from_modal
+            item_result(true, 'Uložené.', [], 'patch', token) if from_modal
           when :conflict
             msg = 'Položka sa medzitým zmenila — hodnoty sa obnovili, uprav znova.'
             set_status(msg, true)
             push_items
-            item_result(false, msg, item_errors(msg, nil), 'patch') if from_modal
+            item_result(false, msg, item_errors(msg, nil), 'patch', token) if from_modal
           when :not_found
             msg = 'Položka sa nenašla — katalóg sa obnovil.'
             set_status(msg, true)
             push_items
-            item_result(false, msg, item_errors(msg, nil), 'patch') if from_modal
+            item_result(false, msg, item_errors(msg, nil), 'patch', token) if from_modal
           when :invalid
             msg = info.to_s.empty? ? 'Neplatná hodnota.' : info.to_s
             set_status(msg, true)
             push_items
-            item_result(false, msg, item_errors(msg, field), 'patch') if from_modal
+            item_result(false, msg, item_errors(msg, field), 'patch', token) if from_modal
           when :read_only
             set_status("Katalóg je len na čítanie: #{info}", true)
             push_items
             if from_modal
               item_result(false, info.to_s,
-                          item_errors("Katalóg je len na čítanie: #{info}", nil), 'patch')
+                          item_errors("Katalóg je len na čítanie: #{info}", nil), 'patch', token)
             end
           else
             set_status('Uloženie zlyhalo.', true)
             push_items
             item_result(false, 'Uloženie zlyhalo.',
-                        item_errors('Uloženie zlyhalo.', nil), 'patch') if from_modal
+                        item_errors('Uloženie zlyhalo.', nil), 'patch', token) if from_modal
           end
         end
 

@@ -147,7 +147,23 @@
                 ' value="' + esc(d.value == null ? '' : d.value) + '"' +
                 (d.placeholder ? ' placeholder="' + esc(d.placeholder) + '"' : '') + '>';
       }
-      return '<div class="mrow">' + lbl + input + hint + '</div>';
+      return '<div class="mrow">' + lbl + input + fieldActionHtml(d) + hint + '</div>';
+    }
+
+    // KOV-B2 (review #290 P1): VOLITELNE akcne tlacidlo PRI POLI. Kostra o jeho
+    // vyzname nevie nic — vykresli ho a klik necha prebublat volajucemu
+    // (`data-action`, NIE `data-nxm-act`, takze delegacia kostry ho ignoruje).
+    // Vzniklo preto, ze zapis, ktory sa neda vratit (globalna taxonomia
+    // kovania), NESMIE spustit udalost `change`/blur: klik na „Zrušiť" najprv
+    // vyvola blur pola a az potom svoj vlastny klik, takze zruseny formular by
+    // stihol nieco zapisat. Explicitne tlacidlo je jediny spolahlivy spusac.
+    function fieldActionHtml(d){
+      var a = (d || {}).action;
+      if (!a || !a.act) return '';
+      return '<button type="button" class="ghostbtn mrowbtn" data-action="' + esc(a.act) + '"' +
+             (a.key ? ' data-nxm-for="' + esc(a.key) + '"' : '') +
+             (a.title ? ' title="' + esc(a.title) + '"' : '') + '>' +
+             esc(a.label || 'OK') + '</button>';
     }
 
     // --- POLE `lookup` (KOV-H2) ----------------------------------------------
@@ -1437,7 +1453,14 @@
       if (!s || typeof document === 'undefined') return;
       var r = root();
       if (!r) return;
-      var trigger = document.activeElement || null;
+      // KOV-B2 (review #290 P2): volajuci smie spusac PODAT. Je to pre PREKRESLENIE
+      // modalu (`open` nad uz otvorenym oknom): vtedy je `activeElement` pole
+      // PRAVE ZANIKAJUCEHO formulara, takze fokus by sa po zatvoreni vracal na
+      // odpojeny uzol a klavesnicova cesta by skoncila na `<body>`. Volajuci
+      // v takom pripade posle PODVODNY spusac (tlacidlo, ktore okno otvorilo).
+      var trigger = (s.trigger !== undefined && s.trigger !== null)
+        ? s.trigger
+        : (document.activeElement || null);
       close(); // dva modaly naraz su vzdy chyba navrhu
       warnDupKeys(s);
       var eff = withMemory(s);

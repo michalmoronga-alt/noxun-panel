@@ -538,6 +538,34 @@ NxTest.test('KOV-B2: zapis z modalu odomyka busy lock v OBOCH vetvach (MDH.itemR
   NxTest.assert_equal('item_code', bad_args[2].first['field'], 'chyba nesie pole')
 end
 
+NxTest.test('KOV-B2: server ECHUJE token odoslania (review #290 P2)') do
+  NxB2.taxonomy!(%w[Hettich], [])
+  NxB2.catalog!([])
+  # Bez identity odoslania stacil zdielany priznak „nieco som poslal": odpoved
+  # okna, ktore pouzivatel medzitym zavrel, zavrela okno otvorene teraz
+  # a zahodila jeho rozpisany koncept.
+  scripts = NxB2.call('hw_create',
+                      'token' => 'tok-abc',
+                      'fields' => { 'item_code' => 'T1', 'name_sk' => 'Token',
+                                    'category' => 'ZAVESY', 'unit' => 'ks' })
+  args = NxB2.arg(scripts, 'MDH.itemResult')
+  NxTest.assert_equal('tok-abc', args[4], 'uspech nesie token spat')
+
+  bad = NxB2.arg(NxB2.call('hw_create',
+                           'token' => 'tok-xyz',
+                           'fields' => { 'item_code' => 'T1', 'name_sk' => 'Duplikat',
+                                         'category' => 'ZAVESY', 'unit' => 'ks' }),
+                 'MDH.itemResult')
+  NxTest.assert_equal('tok-xyz', bad[4], 'a ODMIETNUTIE tiez — inak by okno ostalo zamknute')
+
+  rev = NxB2::HWC.record_rev(NxB2::HWC.find('T1'))
+  pat = NxB2.arg(NxB2.call('hw_patch', 'code' => 'T1', 'row_rev' => rev,
+                                       'from' => 'modal', 'token' => 'tok-p',
+                                       'patch' => { 'notes' => 'x' }),
+                 'MDH.itemResult')
+  NxTest.assert_equal('tok-p', pat[4], 'aj patch z modalu')
+end
+
 NxTest.test('KOV-B2: patch z modalu ohlasi vysledok, patch z BUNKY nie') do
   NxB2.taxonomy!(%w[Hettich], [])
   recs = NxB2.catalog!([NxB2.item('104717')])

@@ -254,10 +254,17 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   ok(/NXModal\.isOpen\(\) && HW_ITEM/.test(leaveFn),
      'ale LEN keď je otvorený a patrí kovaniu (cudzí modál sekcia zavrieť nesmie)');
   const closedFn = SRC.match(/function hwItemClosed\(\)\{[\s\S]*?\n  \}/)[0];
-  ok(/HW_ITEM\.demosPending/.test(closedFn) && /hw_demos_cancel/.test(closedFn),
+  ok(/hwDemosCancel\(\)/.test(closedFn),
      'nedokončený náhľad sa serveru RUŠÍ (inak by dobiehal do zavretého okna)');
-  ok(/clearTimeout\(mdhDemosTimer\)/.test(closedFn),
-     'a naplánovaný (debounced) dotaz do Demosu zomrie s oknom');
+  const cancelFn = SRC.match(/function hwDemosCancel\(\)\{[\s\S]*?\n  \}/)[0];
+  ok(/HW_ITEM\.demosPending/.test(cancelFn) && /hw_demos_cancel/.test(cancelFn),
+     'a ruší sa LEN bežiaci beh (server dostane `hw_demos_cancel`)');
+  ok(/clearTimeout\(mdhDemosTimer\)/.test(cancelFn),
+     'aj naplánovaný (debounced) dotaz do Demosu zomrie s oknom');
+  // Review #290 P2: DOKONČENÝ proposal zatvorenie NEZAHADZUJE — inak by Escape
+  // zmazal vyhľadaný produkt a lookup by sa musel robiť odznova.
+  ok(/MDH_DEMOS && MDH_DEMOS\.ok !== true/.test(closedFn),
+     'hotový proposal zatvorenie okna PREŽIJE (ruší sa až po zápise alebo vymazaní poľa)');
 })();
 
 // --- 6) kolízie globálov ----------------------------------------------------
