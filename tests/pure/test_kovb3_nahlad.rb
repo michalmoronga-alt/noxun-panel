@@ -182,8 +182,12 @@ NxTest.test('KOV-B3 (M4): nahlad NIKDY nezapisuje — ani nesiahne na zamok kniz
   b = NxB3
   # Zamok berie KAZDA zapisova cesta setov (`write`, `save_set!`, `delete_set!`,
   # `set_global_mapping!`, seed-merge). Ked ho nahlad nepotrebuje, nezapisuje.
-  lock = proc { |*| raise 'KOV-B3: nahlad siahol na ZAMOK kniznice' }
-  write = proc { |*| raise 'KOV-B3: nahlad ZAPISAL do kniznice' }
+  # Stub ZAZNAMENAVA (nie len vybuchne): `save_set!` ma vlastny `rescue`, takze
+  # vynimka zo zamku by sa v nom stratila a mutacia „nahlad zapisuje" by cez
+  # tento test presla.
+  touched = []
+  lock = proc { |*| touched << :lock; raise 'KOV-B3: nahlad siahol na ZAMOK kniznice' }
+  write = proc { |*| touched << :write; raise 'KOV-B3: nahlad ZAPISAL do kniznice' }
   b.with_stub(:with_catalog_lock, lock) do
     b.with_stub(:write, write) do
       out, errors = b::HWS.preview_expansion(b.atira, catalog: b::CATALOG)
@@ -191,6 +195,8 @@ NxTest.test('KOV-B3 (M4): nahlad NIKDY nezapisuje — ani nesiahne na zamok kniz
       NxTest.assert_equal(['357696'], out['rows'].map { |r| r['code'] }, 'a spocital riadky')
     end
   end
+  NxTest.assert_equal([], touched,
+                      "nahlad nesiahol ani na zamok, ani na zapis: #{touched.inspect}")
 end
 
 NxTest.test('KOV-B3: nahlad je CISTA funkcia — vstupny draft sa NEMENI') do
