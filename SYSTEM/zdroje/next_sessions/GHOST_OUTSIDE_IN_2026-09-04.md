@@ -12,6 +12,7 @@
 | logické pixely od SU 2025.0 pre obrazovkové API | VERIFIED (API docs) |
 | `String#to_l` a desatinná čiarka | VERIFIED (fórum + thomthom), presné pravidlá parsovania = UNVERIFIED |
 | `Sketchup::Snap` ako SIMPLER NATIVE PATH pre zostavy | **UNVERIFIED — probe v SU 2026 čaká** |
+| prázdny Enter: `onKeyDown(VK_RETURN)` vs. VCB `onUserText` | **UNVERIFIED — probe v SU 2026 čaká** |
 | prior art (Rectangle → Push/Pull, tilda) | VERIFIED (docs/článok) |
 
 ## 1 · `Sketchup::Tool` — kontrakt nástroja (nová plocha pre subjekt DOSKA)
@@ -19,7 +20,9 @@
 - Nástroj je obyčajná trieda s callbackmi (nie podtrieda). Oficiálne: `onKeyDown/onKeyUp` — „Return `true` to prevent SketchUp from processing the event"; `onSetCursor` — vrátiť `true`, ak si
   nástroj kreslí vlastný kurzor; `onCancel(reason, view)` — `reason` 0 = Escape, 1 = nástroj znovu zvolený, 2 = undo; `suspend/resume` pri orbit/pan (ghost skriniek už rieši — `GhostTool`).
 - **VCB (Measurements):** `enableVCB?` → `true` zapne vstup (od SU 6.0; „If you do not implement this method, then the vcb is disabled by default"); text príde do **`onUserText(text, view)`** po Enter.
-  `Sketchup.vcb_label=`/`vcb_value=` nastavujú popis a hodnotu boxu (rovnaké ako `set_status_text` s `SB_VCB_LABEL`/`SB_VCB_VALUE`).
+  `Sketchup.vcb_label=`/`vcb_value=` nastavujú popis a hodnotu boxu (rovnaké ako `set_status_text` s `SB_VCB_LABEL`/`SB_VCB_VALUE`). **Prázdny Enter** (package: prázdny Enter vo fáze = prevezme
+  hodnotu karty) cez `onUserText` NEPRÍDE (bez textu sa callback nevolá; archívny Ghost 2.0 nechával `VK_RETURN` prejsť a prázdny text bral ako no-op) — D2 musí prázdny Enter chytiť v
+  `onKeyDown(VK_RETURN)` (vrátiť `true`) a písané hodnoty nechať `onUserText`; **správanie VK_RETURN vs. VCB v SU 2026 = probe (UNVERIFIED)**.
 - **Kreslenie:** metódy `View#draw`/`draw2d` fungujú **LEN v `Tool#draw`** („Calling them outside Tool#draw will have no effect"); ak kreslíš mimo obálky modelu, implementuj `getExtents`
   (inak sa časť kresby oreže). `line_stipple=` prijíma `"."`, `"-"`, `"_"`, `"-.-"`, `""`; `line_width=` od SU 2026.0 minimálne 1.0; `set_color_from_line` dá farbu osi (červená/zelená/modrá).
 - **Pixely (breaking 2025.0):** LEN obrazovkové API — `x, y` v callbackoch, `View#inputpoint`, `draw2d`, `vpwidth/vpheight/center/corner` — sú od SU 2025 **logické pixely** (Float), predtým fyzické
@@ -53,8 +56,9 @@
 
 ## 5 · Prior art (natívne vzory)
 
-- Natívny **Rectangle → Push/Pull** = presne „bod → rozmer → rozmer" s VCB (`600;18` je natívna syntax obdĺžnika, ale Michal chce **jedno číslo na fázu** — jednoduchšie a bez lokálnych pascí
-  oddeľovača zoznamu). Tilda `~` pred hodnotou = približná hodnota (článok „Handling the ~ mark") — v D2 sa nepodporuje (odmietnuť).
+- Natívny **Rectangle → Push/Pull** je NAJBLIŽŠÍ, ale NIE presný precedens: Rectangle berie OBA rovinné rozmery naraz druhým bodom (VCB `600;18`) a Push/Pull dodá tretí rozmer; D2 má **vedome
+  iný tok** — dĺžka a šírka ako dva samostatné ťahy/kliky po lokálnych osiach (každý s JEDNÝM číslom, Michal 4.9.) a hrúbku pevne z materiálu. Cena odchýlky = jeden klik navyše oproti Rectangle;
+  zisk = šírka sa ťahá/píše samostatne po lokálnej osi bez oddeľovača zoznamu a jeho locale pascí. UX audit má túto odchýlku posúdiť ako vedomú, nie ju prehliadnuť. Tilda `~` pred hodnotou = približná hodnota (článok „Handling the ~ mark") — v D2 sa nepodporuje (odmietnuť).
 - **Vlastný archív:** V2fable Ghost 2.0 (`archiv_kod/v2fable_ghost_tool2.rb.txt`) — fázy, `enableVCB?`/`onUserText`, `vcb_value`, axis snap, locks; pasca ľavotočivého 2. ťahu (Codex #288 kolo 2).
 - GHOST skriniek (V1-04, PR #265–#271) = domáci vzor lifecycle, snapov, kotiev, klávesov a `push_state` pásiku — subjekt DOSKA ho rozširuje, nekopíruje.
 

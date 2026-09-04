@@ -57,8 +57,10 @@
 
 ## Outside-in reconcile (4.9.2026, packet `GHOST_OUTSIDE_IN_2026-09-04.md`) — NA ZAPRACOVANIE pred návratom do PLANu
 
-1. **D1:** subjekt DOSKA v existujúcom `GhostTool` (jeden `Sketchup::Tool`), `getExtents` pri kreslení obálky mimo obálky modelu (prázdny model), všetky súradnice v LOGICKÝCH pixeloch (SU 2025+), `onCancel` reason 2 (undo) = zrušiť session bez zápisu.
-2. **D2:** fázy cez `InputPoint#pick(view, x, y, ip_predošlý)` (inferencia od predchádzajúceho bodu) + `View#lock_inference` pre zámok osi; `enableVCB?`/`onUserText` len vo fázach 1–2; `Sketchup.vcb_label=` „Dĺžka (mm)" / „Šírka (mm)".
+1. **D1:** subjekt DOSKA v existujúcom `GhostTool` (jeden `Sketchup::Tool`), `getExtents` pri kreslení obálky mimo obálky modelu (prázdny model), LOGICKÉ pixely LEN pre obrazovkové API (callback `x`/`y`, `draw2d`, rozmery viewportu; SU 2025+) — `InputPoint#position`, rohy obálky a `getExtents` ostávajú v modelových jednotkách, `onCancel` reason 2 (undo) = zrušiť session bez zápisu.
+2. **D2:** fázy cez `InputPoint#pick(view, x, y, ip_predošlý)` (inferencia od predchádzajúceho bodu); **lokálnu os šírky (kolmú na 1. ťah) definuje VLASTNÁ projekcia bodu na os** (vzor `axis snap`
+   archívneho Ghost 2.0) — `View#lock_inference` vie zamknúť len inferenciu, ktorú SketchUp sám našiel, takže sa použije LEN na dostupné natívne inferencie (os modelu, hrana), nie ako mechanizmus
+   lokálnej osi; `enableVCB?`/`onUserText` len vo fázach 1–2; `Sketchup.vcb_label=` „Dĺžka (mm)" / „Šírka (mm)".
 3. **D2 vstup čísla:** VLASTNÝ čistý parser s ÚPLNOU zhodou po `strip` — `\A\d+([.,]\d+)?\s*(mm)?\z` (bodka aj čiarka, `mm` voliteľné), prefix/sufix odpad (`abc2400xyz`, `2400mmjunk`), tilda `~` a `;` odmietnuté — testy na všetko; nikdy `String#to_l`/`to_f` na surový text (pasca locale s desatinnou čiarkou); hodnota mm Float → `Units` do modelu; validácia `BoardBuilder::LIMITS` PRED prijatím.
 4. **D2 pravotočivý 2. ťah** (Codex kolo 2 P1): pri zápornom smere posun počiatku o −šírka po lokálnej Y, osi ostávajú pravotočivé — žiadne obrátenie `dir_y`.
 5. `Sketchup::Snap` (2025.0) = poznámka do bloku viazaných dielov po V1, nie do D1/D2.
