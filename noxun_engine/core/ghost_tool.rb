@@ -951,7 +951,7 @@ module Noxun
             mark_failed!(ex.message)
             Engine.log_error(ex, 'GhostTool.commit')
             begin
-              Panel.ghost_insert_failed(ex) if defined?(Panel)
+              Panel.ghost_insert_failed(ex, self) if defined?(Panel)
             rescue StandardError => e2
               Engine.log_error(e2, 'GhostTool.commit (hlaska)')
             end

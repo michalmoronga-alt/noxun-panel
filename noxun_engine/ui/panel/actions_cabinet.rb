@@ -407,6 +407,15 @@ module Noxun
           s = GhostTool.session
           return GhostTool.push_state(nil) unless s && s.active?
 
+          # GHOST-D1: zamok vysky je KABINETOVY ovladac. Kontroluje sa SUBJEKT
+          # session, nie len „je nejaka aktivna" — HTML `disabled` ani skryty
+          # pasik nie su ochrana (oneskoreny callback, iny klient).
+          unless s.cabinet?
+            GhostTool.push_state(s)
+            return set_status('Zámok výšky platí len pre skrinku — doska sa prichytáva ' \
+                              'v celom priestore (↑/↓ menia umiestnenie).', true)
+          end
+
           v = GhostTool::Calc.lock_z_value(data['lock_z'])
           if v.nil?
             GhostTool.push_state(s)
@@ -438,8 +447,11 @@ module Noxun
         # GHOST: vklad zlyhal az v commite (guardy stavby). V modeli sa NIC
         # nezmenilo — hlaska je ta ista ako pred ghostom, vratane vymenovania
         # aktivnych zamkov vkladacej karty.
-        def ghost_insert_failed(err)
-          set_status("Chyba: #{err.message}#{insert_locks_hint}", true)
+        # GHOST-D1: zoznam aktivnych zamkov VKLADACEJ KARTY je kabinetovy
+        # (D-39 zamky rozmerov korpusu) — pri doske by len matiel.
+        def ghost_insert_failed(err, session = nil)
+          board = session.respond_to?(:board?) && session.board?
+          set_status("Chyba: #{err.message}#{board ? '' : insert_locks_hint}", true)
         end
 
         # GHOST: po USPESNOM commite — vyber, status, refresh panela a peciatka
@@ -450,6 +462,9 @@ module Noxun
         # `onTransactionCommit` sam.
         def ghost_after_commit(model, inst, session)
           return unless inst
+          # GHOST-D1: doska ma vlastny post-commit (iny status, ziadne dielce
+          # ani zony) — dispatch podla SUBJEKTU session.
+          return ghost_after_commit_board(model, inst, session) if session.respond_to?(:board?) && session.board?
 
           select_only(model, inst)
           cid = Store.get(inst, 'cabinet_id')
