@@ -5,7 +5,7 @@
 > Rozhodnutia Michala 4.9.: jeden balík, spoločný toolbar „Noxun Nástroje", UI nástrojov nemeniť, kópia cez engine, názov kópie s písmenovou príponou, tlačidlo „Vložiť kópiu" NIE.
 > Outside-in packet: [NASTROJE_OUTSIDE_IN_2026-09-04.md](NASTROJE_OUTSIDE_IN_2026-09-04.md). Referenčný kód: `../archiv_kod/legacy_*.rb.txt`.
 
-- **NÁSTROJE-1 · TASK PACKAGE „MOWER + SNAPER V BALÍKU NOXUN ENGINE" (D-20; V1 bod 1A — Michal 4.9.2026; Audit: HOTOVÝ — Codex CLI 4.9. (1 BLOCKER + 9 FIX + 1 NOTE) + Codex GH #288 kolá 1–2 zapracované; **kolo 3 (6 nálezov, 2×P1 — observer/update rasy) ČAKÁ na zapracovanie, sekcia na konci**; po zapracovaní nový CLI audit; in-SU POVINNÉ):**
+- **NÁSTROJE-1 · TASK PACKAGE „MOWER + SNAPER V BALÍKU NOXUN ENGINE" (D-20; V1 bod 1A — Michal 4.9.2026; Audit: HOTOVÝ — Codex CLI 4.9. (1 BLOCKER + 9 FIX + 1 NOTE) + Codex GH #288 kolá 1–3 zapracované (kolo 3 je v texte označené „kolo 3"); ČAKÁ na nový Codex CLI audit draftu; in-SU POVINNÉ):**
   **Cieľ:** jeden inštalačný balík — oba nástroje sa presunú ako moduly do `noxun_engine/tools/` (`mower.rb`, `snaper.rb` + ČISTÉ jadrá `mower_calc.rb`, `snap_calc.rb` bez `UI::*`; namespace
   `Noxun::Engine::Tools::*`), načíta ich `main.rb`, dostanú **jeden spoločný toolbar „Noxun Nástroje"** (poradie: −90° · +90° · 180° · Z = 0 · Z posun… · Kópia vľavo · Kópia vpravo · Prisunúť vľavo ·
   Prisunúť vpravo; slovenské tooltipy; menu Extensions → Noxun Engine → Nástroje). Vlastné registrácie rozšírení a `VERSION` nástrojov zaniknú — verziu aj update (D-52) preberá engine. **Prečo samostatný
@@ -26,17 +26,22 @@
   podľa uhla (kópia sedí po VLASTNEJ osi X pri akejkoľvek rotácii). **Názov kópie (FIX 10):** ručný názov + písmenová prípona: hľadá sa **najbližšia voľná** prípona v celom modeli (a, b, … z; po
   vyčerpaní číslo „ 27", „ 28"…), základ sa oreže tak, aby prípona vždy prežila `sanitize_name` (`NAME_MAX_LEN` 80); bez ručného názvu ostáva automatický. **Dosky (NOTE 11): SCOPE OUT** — `BoardBuilder.build`
   polohu neprijíma (šev príde s GHOST-D1); kópia dosky = hláška „zatiaľ nie". Nie-NOXUN objekty (staré DC komponenty): dnešná cesta (DC `lenx` / bounds, `add_instance`).
-  **Undo a ghost zóny (FIX 2):** každý zápis nástroja nad NOXUN objektom (rotácia, Z, snap, kópia) vo SVOJEJ operácii zavolá existujúci sync ghost zón, ktorý inak spúšťa `ScaleWatch` po debounce —
-  transparentná operácia observera sa tak nemôže prilepiť k ďalšiemu kroku používateľa. Povinný repro test: rotácia → okamžitá kópia (< debounce) → dobeh → Späť kópie vráti LEN kópiu, rotácia drží. **Scale race (Codex #288 kolo 2 P2):** ak `src.transformation` nie je rigidná (čakajúca zmena mierky v debounce okne), príkaz najprv synchrónne spustí TO ISTÉ spracovanie, ktoré robí
+  **Undo a ghost zóny (FIX 2 + kolo 3 P1/P2):** každá mutácia nástroja nad NOXUN objektom (rotácia, Z, snap, kópia) beží **celá pod existujúcim `ScaleWatch.guard`** (ako vlastné stavby
+  enginu) a v tej istej operácii zavolá existujúci sync ghost zón — guard zabráni, aby `notify_change` zaradil korpus do fronty, takže odložený `process_dirty` nemá čo commitnúť a transparentný
+  `move_ghost_op` sa nemôže prilepiť k ďalšiemu kroku používateľa. Po každom úspešnom commite nástroja sa volá **`ScaleWatch.remember_transform`** (pod guardom ho observer nedosiahne;
+  inak by neskôr odmietnutá šikmá mierka cez `reject_scale` obnovila polohu spred príkazu). Povinné testy: rotácia → okamžitá kópia (< debounce) → dobeh → Späť kópie vráti LEN kópiu, rotácia
+  drží **a vo fronte observera neostane dirty udalosť**; posun nástrojom → odmietnutá (šikmá) mierka → poloha z nástroja ostáva. **Scale race (Codex #288 kolo 2 P2):** ak `src.transformation` nie je rigidná (čakajúca zmena mierky v debounce okne), príkaz najprv synchrónne spustí TO ISTÉ spracovanie, ktoré robí
   `ScaleWatch` po debounce (mierka → config + prestavba), a číta transformáciu znova; ak ani potom nie je rigidná → kópia sa odmietne s hláškou (žiadny tichý neúspech). In-SU prípad: Scale → okamžitá Kópia.
-  **Rotácie ±90/180, Z = 0, Z posun:** logika bez zmeny (pivot = stred bbox, svetová Z — v root kontexte); Z-posun dialog ostáva HtmlDialog (callbacky pred `show`).
+  **Rotácie ±90/180, Z = 0, Z posun:** logika bez zmeny (pivot = stred bbox, svetová Z — v root kontexte); Z-posun dialog ostáva HtmlDialog (callbacky pred `show`). **Z-dialog počas update (kolo 3 P1):** callback `applyZ` je guardovaný
+  cez `Engine.update_locked?` (rovnako ako príkazy toolbaru) a dialog je zaradený do close/wait bariéry updatera, po zatvorení sa referencia uvoľní; test: update pri otvorenom Z dialogu = žiadny zápis do modelu.
   **Snaper (FIX 6):** AABB sweep v lokálnom rámci cieľa, WARN 10 m, BLOCK 20 m, kontajnery do hĺbky 8 — **efektívna viditeľnosť cez `Model#drawing_element_visible?`** (celá instance path + tag
   folder; pod `rescue` s fallbackom — pred SU 2026.0 hádže výnimku pre kontajner na konci cesty (viď outside-in packet), takže fallback je tam BEŽNÁ cesta: `hidden?` + `layer.visible?` +
-  **skrytý tag folder** po celej ceste (existujúca `Tags.folder_hidden?`, tags.rb — tag pod skrytým priečinkom ostáva `visible?`); test pre pre-2026 vetvu s prekážkou pod skrytým priečinkom), bbox kontajnera sa počíta len z jeho VIDITEĽNÝCH detí (1 úroveň), test so skrytým dieťaťom vo viditeľnom kontajneri; hlásenia cez objekt rozšírenia enginu.
+  **skrytý tag folder** po celej ceste (existujúca `Tags.folder_hidden?`, tags.rb — tag pod skrytým priečinkom ostáva `visible?`); test pre pre-2026 vetvu s prekážkou pod skrytým priečinkom), bbox kontajnera sa odvodzuje **rekurzívne** tou istou visibility-aware traverzou (len viditeľné listy, hĺbka 8) — jednoúrovňový výpočet by bral bounds vnoreného kontajnera so skrytou
+  geometriou (kolo 3 P2); testy so skrytým dieťaťom aj so skrytým VNUKOM vo viditeľnom kontajneri; hlásenia cez objekt rozšírenia enginu.
   **Upratanie starých inštalácií (FIX 7):** = **explicitná boot migrácia** v `main.rb` PRED registráciou toolbaru (pri aktualizácii vykonáva swap ešte starý kód, nový `updater.rb` beží až po reštarte):
-  odstráni `noxun_mower_loader.rb`, `Noxun_Mower\`, `snaper.rb`, `snaper\` v Plugins; marker žije MIMO swapovaného stromu (`%APPDATA%\NOXUN\Engine\legacy_cleanup.json`), pri zlyhaní mazania sa
-  NEoznačí ako hotové (zopakuje sa nabudúce) + hláška; inštalátor `INSTALL_noxun_engine.ps1` maže tie isté cesty. Zdroj nástrojov sa presunie do repa; pôvodné priečinky workspace ostanú ako archív. Referenčné kópie legacy zdrojov (nenačítavané, Codex #288 kolo 2): `SYSTEM/zdroje/archiv_kod/legacy_noxun_mower.rb.txt`, `legacy_snaper_main.rb.txt`,
-  `legacy_snaper_snap.rb.txt`.
+  odstráni `noxun_mower_loader.rb`, `Noxun_Mower\`, `snaper.rb`, `snaper\` v Plugins; marker žije MIMO swapovaného stromu (`%APPDATA%\NOXUN\Engine\legacy_cleanup.json`) a je **kľúčovaný normalizovanou cestou Plugins priečinka** (viac verzií SketchUpu = viac Plugins, každý sa uprace samostatne — kolo 3 P2); pri zlyhaní mazania sa
+  NEoznačí ako hotové (zopakuje sa nabudúce) + hláška; test s dvoma dočasnými Plugins koreňmi nad jedným app-data; inštalátor `INSTALL_noxun_engine.ps1` maže tie isté cesty. Zdroj nástrojov sa presunie do repa; pôvodné priečinky workspace ostanú ako archív. Referenčné kópie legacy zdrojov (nenačítavané, Codex #288 kolo 2): `SYSTEM/zdroje/archiv_kod/legacy_noxun_mower.rb.txt`, `legacy_snaper_main.rb.txt`,
+  `legacy_snaper_snap.rb.txt`. **Ikony (kolo 3 P2):** 7 PNG ikon Mowera a 2 SVG Snapera sa presunú do repa do `noxun_engine/ui/icons/tools/` (sledované assety, žiadna závislosť na workspace).
   **Headless (FIX 8):** čisté jadrá (`*_calc.rb`) sú v zozname `tests/helper.rb`; UI registrácia je oddelená a guardovaná (`defined?(UI::Toolbar)`), takže sa bez SketchUpu nenačíta.
   **Scope OUT:** tlačidlo „Vložiť kópiu" v toolbare (Michal: nie) · nové funkcie nástrojov · zarovnanie výšky/hĺbky k susedovi (bod 1B) · Noxun_Pick/V2fable vkladanie · KOVANIE (starý) a
   vepo_exporter (odstavia sa samostatne) · kópia dosky (GHOST-D1).
@@ -53,7 +58,7 @@
   **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → nový odsek `tools` v `docs/architecture/ui-lifecycle.md` + riadok rozcestníka `docs/ARCHITEKTURA.md` (guard) → README
   (inštalácia, upratanie starých pluginov) → D-20 do DOGFOODING_vyriesene (plný text + riadok indexu) → STAV/KRONIKA/PLAN.
 
-## Codex GH kolo 3 (#288, 4.9.2026) — nálezy NA ZAPRACOVANIE pred návratom do PLANu
+## Codex GH kolo 3 (#288, 4.9.2026) — nálezy ZAPRACOVANÉ v texte vyššie (kde: „kolo 3 P1/P2")
 
 1. **P1 — mutácie nástrojov pod `ScaleWatch.guard`:** rotácia/Z/snap nad NOXUN korpusom bez guardu zaradí korpus do fronty `notify_change`; `Zones.sync_ghost` v tej istej operácii frontu nevyčistí, takže
    odložený `process_dirty` aj tak commitne transparentný `move_ghost_op` a môže sa prilepiť k nasledujúcej kópii (presne rasa, ktorú má dávka riešiť). Celá mutácia + sync ghost zón musí bežať pod
