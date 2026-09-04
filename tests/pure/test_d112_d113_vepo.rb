@@ -27,14 +27,15 @@ module NxD112
 
   MATS = { 'BIELA_18' => { 'label' => 'Biela DTD' } }.freeze
   ETHS = { 'ABS_BIELA' => 1.0, 'ABS_DUB' => 1.0, 'ABS_TAUPE' => 2.0 }.freeze
-  # Mapy dekorov presne v tvare, aky sklada ProductionCore.
+  # Mapy dekorov presne v tvare, aky sklada ProductionCore — vratane `group_id`
+  # (GH #287 P1: zavazna identita vazby doska<->ABS je SKUPINA, nie text kodu).
   EDEC = {
-    'ABS_BIELA' => { 'decor' => 'W1000', 'decor_name' => 'Biela' },
-    'ABS_DUB'   => { 'decor' => 'H1181', 'decor_name' => 'Dub Halifax tabakový' },
-    'ABS_TAUPE' => { 'decor' => 'U750', 'decor_name' => 'Taupe sivá' },
-    'ABS_HOLY'  => { 'decor' => '', 'decor_name' => '' }
+    'ABS_BIELA' => { 'decor' => 'W1000', 'decor_name' => 'Biela', 'group_id' => 'G-BIELA' },
+    'ABS_DUB'   => { 'decor' => 'H1181', 'decor_name' => 'Dub Halifax tabakový', 'group_id' => 'G-DUB' },
+    'ABS_TAUPE' => { 'decor' => 'U750', 'decor_name' => 'Taupe sivá', 'group_id' => 'G-TAUPE' },
+    'ABS_HOLY'  => { 'decor' => '', 'decor_name' => '', 'group_id' => '' }
   }.freeze
-  SDEC = { 'BIELA_18' => 'W1000' }.freeze
+  SDEC = { 'BIELA_18' => { 'decor' => 'W1000', 'group_id' => 'G-BIELA' } }.freeze
 
   def row(over = {})
     { 'names' => ['Dno'], 'length' => 600.0, 'width' => 500.0, 'thickness' => 18.0,
@@ -75,10 +76,67 @@ NxTest.test('D-112: paska v dekore DOSKY poznamku NEROBI (bezny dielec ostava ti
   NxTest.assert_equal('', NxD112.note('edges' => NxD112.edges('ABS_BIELA', 'ABS_BIELA')))
 end
 
-NxTest.test('D-112: porovnanie dekoru je odolne voci medzeram a velkosti pismen') do
+NxTest.test('D-112: legacy zaznam bez skupiny — fallback na text je odolny voci medzeram a velkosti pismen') do
   # Zhodna normalizacia s Materials.decor_norm_key (D-41: dekor = kluc skupiny).
-  sdec = { 'BIELA_18' => ' w 1000 ' }
-  NxTest.assert_equal('', NxD112.note({ 'edges' => NxD112.edges('ABS_BIELA') }, NxD112::EDEC, sdec))
+  edec = { 'ABS_X' => { 'decor' => 'W1000', 'decor_name' => 'Biela' } }
+  sdec = { 'BIELA_18' => { 'decor' => ' w 1000 ' } }
+  NxTest.assert_equal('', NxD112.note({ 'edges' => NxD112.edges('ABS_X') }, edec, sdec))
+end
+
+# --- GH #287 P1: identita vazby je SKUPINA, nie text kodu -------------------
+
+NxTest.test('P1: rovnaky KOD dekoru v ROZNYCH skupinach = poznamka JE (dva vyrobcovia)') do
+  # Katalog vedome dovoli dvom vyrobcom rovnaky kod dekoru v roznych skupinach.
+  # Porovnanie len podla textu by ich vyhlasilo za zhodu a poznamka by TICHO
+  # chybala — presne to je vyrobna chyba (zly olep).
+  edec = { 'ABS_CUDZI' => { 'decor' => 'W1000', 'decor_name' => 'Biela iného výrobcu',
+                            'group_id' => 'G-INY' } }
+  sdec = { 'BIELA_18' => { 'decor' => 'W1000', 'group_id' => 'G-BIELA' } }
+  NxTest.assert_equal('ABS W1000 Biela iného výrobcu',
+                      NxD112.note({ 'edges' => NxD112.edges('ABS_CUDZI') }, edec, sdec))
+end
+
+NxTest.test('P1: rovnaka SKUPINA = ziadna poznamka, aj ked sa text kodu lisi') do
+  # Skupina je zdroj pravdy — inak zapisany kod v ramci JEDNEJ skupiny (D-41
+  # near-match guard ho aj tak nepusti dvakrat) nesmie robit falosnu poznamku.
+  edec = { 'ABS_A' => { 'decor' => 'W1000 ST9', 'decor_name' => 'Biela', 'group_id' => 'G-BIELA' } }
+  sdec = { 'BIELA_18' => { 'decor' => 'W1000', 'group_id' => 'G-BIELA' } }
+  NxTest.assert_equal('', NxD112.note({ 'edges' => NxD112.edges('ABS_A') }, edec, sdec))
+end
+
+NxTest.test('P1: legacy bez `group_id` (na oboch stranach) padne na text — oba smery') do
+  # Chyba len skupina PASKY
+  edec_a = { 'ABS_A' => { 'decor' => 'H1181', 'decor_name' => 'Dub' } }
+  sdec_g = { 'BIELA_18' => { 'decor' => 'W1000', 'group_id' => 'G-BIELA' } }
+  NxTest.assert_equal('ABS H1181 Dub', NxD112.note({ 'edges' => NxD112.edges('ABS_A') }, edec_a, sdec_g))
+  NxTest.assert_equal('', NxD112.note({ 'edges' => NxD112.edges('ABS_W') },
+                                      { 'ABS_W' => { 'decor' => 'W1000' } }, sdec_g))
+  # Chyba len skupina DOSKY
+  sdec_p = { 'BIELA_18' => { 'decor' => 'W1000' } }
+  NxTest.assert_equal('ABS H1181 Dub Halifax tabakový',
+                      NxD112.note({ 'edges' => NxD112.edges('ABS_DUB') }, NxD112::EDEC, sdec_p))
+  NxTest.assert_equal('', NxD112.note({ 'edges' => NxD112.edges('ABS_BIELA') }, NxD112::EDEC, sdec_p))
+end
+
+NxTest.test('P1: holy String v mape dosiek = legacy volajuci, cita sa ako samotny dekor') do
+  NxTest.assert_equal('ABS H1181 Dub Halifax tabakový',
+                      NxD112.note({ 'edges' => NxD112.edges('ABS_DUB') }, NxD112::EDEC,
+                                  { 'BIELA_18' => 'W1000' }))
+end
+
+NxTest.test('P1: zaznam bez skupiny AJ bez dekoru je neporovnatelny — ziadna poznamka') do
+  edec = { 'ABS_PRAZDNA' => { 'decor' => '', 'decor_name' => 'Nič', 'group_id' => '' } }
+  NxTest.assert_equal('', NxD112.note({ 'edges' => NxD112.edges('ABS_PRAZDNA') }, edec, NxD112::SDEC))
+  NxTest.assert_equal('', NxD112.note({ 'edges' => NxD112.edges('ABS_DUB') }, NxD112::EDEC,
+                                      { 'BIELA_18' => { 'decor' => '', 'group_id' => '' } }))
+end
+
+NxTest.test('P1: doska SO SKUPINOU, ale bez dekoru, sa stale porovnava (skupina staci)') do
+  sdec = { 'BIELA_18' => { 'decor' => '', 'group_id' => 'G-BIELA' } }
+  NxTest.assert_equal('', NxD112.note({ 'edges' => NxD112.edges('ABS_BIELA') }, NxD112::EDEC, sdec),
+                      'zhodna skupina mlci aj bez textu dekoru')
+  NxTest.assert_equal('ABS H1181 Dub Halifax tabakový',
+                      NxD112.note({ 'edges' => NxD112.edges('ABS_DUB') }, NxD112::EDEC, sdec))
 end
 
 NxTest.test('D-112: neznama paska, neznama doska ani prazdny dekor NEHADAJU poznamku') do
@@ -240,6 +298,77 @@ NxTest.test('D-113: samotny nazov nad limit = dnesny orez s vypustkou, skrinky s
   NxTest.refute(name.include?('s1'), 'na skrinky uz miesto nie je')
 end
 
+# --- GH #287 P2: volny nazov samostatnej dosky sa neskracuje ani nepari -----
+
+NxTest.test('P2: doska pomenovana ako dielec skrinky ide BEZ ZMENY') do
+  v = NxD112.vepo
+  row = { 'names' => ['Bok lavy'], 'free_names' => ['Bok lavy'],
+          'kde' => [{ 'owner_id' => 'BRD-003' }] }
+  NxTest.assert_equal('Bok lavy d3', v.row_name(row), 'volny text pouzivatela sa NESKRACUJE')
+  # ten isty nazov z BUILDERA sa skracuje ako doteraz
+  NxTest.assert_equal('Bok L s1', v.row_name('names' => ['Bok lavy'],
+                                             'kde' => [{ 'owner_id' => 'CAB-001' }]))
+end
+
+NxTest.test('P2: dielec skrinky + doska v jednom riadku sa NEPARUJU do „Bok LP"') do
+  # `Bom.aggregate_rows` zlucuje podla VYROBNYCH parametrov, takze dielec „Bok lavy"
+  # a doska „Bok P" mozu skoncit v jednom riadku. Par by tvrdil, ze ide o zrkadlovu
+  # dvojicu jednej skrinky — a to nie je pravda.
+  row = { 'names' => ['Bok lavy', 'Bok P'], 'free_names' => ['Bok P'],
+          'kde' => [{ 'owner_id' => 'CAB-001' }, { 'owner_id' => 'BRD-002' }] }
+  NxTest.assert_equal('Bok L/Bok P s1 d2', NxD112.vepo.row_name(row))
+end
+
+NxTest.test('P2: volny nazov, ktory skratku aj tak nema, ostava nezmeneny') do
+  v = NxD112.vepo
+  NxTest.assert_equal('Dno d1', v.row_name('names' => ['Dno'], 'free_names' => ['Dno'],
+                                           'kde' => [{ 'owner_id' => 'BRD-001' }]))
+  NxTest.assert_equal('Polička pod TV d1',
+                      v.row_name('names' => ['Polička pod TV'], 'free_names' => ['Polička pod TV'],
+                                 'kde' => [{ 'owner_id' => 'BRD-001' }]))
+end
+
+NxTest.test('P2: ten isty retazec od dosky AJ od skrinky = konzervativne pass-through') do
+  # Povod sa neda rozhodnut, tak sa nehada: nazov ostava cely a nepari sa.
+  row = { 'names' => ['Bok lavy', 'Bok pravy'], 'free_names' => ['Bok lavy'],
+          'kde' => [{ 'owner_id' => 'CAB-001' }, { 'owner_id' => 'BRD-002' }] }
+  NxTest.assert_equal('Bok lavy/Bok P s1 d2', NxD112.vepo.row_name(row))
+end
+
+NxTest.test('P2: `free_names` nie su, tak sa nic nemeni (legacy riadok)') do
+  NxTest.assert_equal('Bok LP', NxD112.vepo.row_name('names' => ['Bok lavy', 'Bok pravy']))
+end
+
+NxTest.test('P2: Bom.aggregate_rows zbiera `free_names` z DOSIEK a nemeni agregaciu') do
+  bom = Noxun::Engine::Bom
+  base = { 'length' => 600.0, 'width' => 500.0, 'thickness' => 18.0, 'material_id' => 'M1',
+           'grain_direction' => 'none', 'quantity' => 1,
+           'edges' => { 'L1' => nil, 'L2' => nil, 'W1' => nil, 'W2' => nil } }
+  records = [
+    base.merge('name' => 'Bok lavy', 'owner_id' => 'CAB-001', 'part_key' => 'cabinet/side:left', 'pid' => 1),
+    base.merge('name' => 'Bok P', 'owner_id' => 'BRD-002', 'part_key' => 'board/main', 'pid' => 2)
+  ]
+  rows = bom.aggregate_rows(records)
+  NxTest.assert_equal(1, rows.length, 'zhodne vyrobne parametre = JEDEN riadok (agregacia nezmenena)')
+  NxTest.assert_equal(['Bok lavy', 'Bok P'], rows.first['names'])
+  NxTest.assert_equal(['Bok P'], rows.first['free_names'], 'volny nazov je LEN ten z dosky')
+  NxTest.assert_equal(2, rows.first['quantity'])
+  NxTest.assert_equal('Bok L/Bok P s1 d2', NxD112.vepo.row_name(rows.first),
+                      'cela cesta BOM -> VEPO drzi povod nazvu')
+  # riadok bez dosky ma kluc prazdny (nikdy nil — citatel nemusi branit)
+  only_cab = bom.aggregate_rows([records.first])
+  NxTest.assert_equal([], only_cab.first['free_names'])
+end
+
+NxTest.test('P2: doska bez `part_key` sa pozna podla `owner_id` BRD-<cislo>') do
+  bom = Noxun::Engine::Bom
+  rec = { 'name' => 'Bok lavy', 'owner_id' => 'BRD-007', 'part_key' => '', 'pid' => 3,
+          'length' => 600.0, 'width' => 500.0, 'thickness' => 18.0, 'material_id' => 'M1',
+          'grain_direction' => 'none', 'quantity' => 1,
+          'edges' => { 'L1' => nil, 'L2' => nil, 'W1' => nil, 'W2' => nil } }
+  NxTest.assert_equal(['Bok lavy'], bom.aggregate_rows([rec]).first['free_names'])
+end
+
 NxTest.test('D-113: fallback „dielec" a `name` bez `names` platia dalej') do
   v = NxD112.vepo
   NxTest.assert_equal('dielec', v.row_name('names' => []))
@@ -257,14 +386,14 @@ NxTest.test('D-112: vepo_edge_decors a vepo_sheet_decors drzia kontrakt mapy') d
   catalog = {
     'schema' => 2,
     'sheets' => [
-      { 'material_id' => 'REAL_18', 'family' => 'DTDL', 'decor' => 'H1181',
+      { 'material_id' => 'REAL_18', 'family' => 'DTDL', 'decor' => 'H1181', 'group_id' => 'G-H1181',
         'thickness' => 18.0, 'production_class' => 'sheet' },
       { 'material_id' => 'KORPUS_UNI_18', 'family' => 'UNI', 'decor' => 'Korpus UNI',
         'thickness' => 18.0, 'production_class' => 'sheet', 'uni' => true, 'uni_role' => 'body' }
     ],
     'edges' => [
       { 'abs_id' => 'ABS_H1181', 'decor' => 'H1181', 'decor_name' => 'Dub Halifax tabakový',
-        'thickness' => 0.8, 'universal' => true },
+        'group_id' => 'G-H1181', 'thickness' => 0.8, 'universal' => true },
       { 'abs_id' => 'ABS_U750', 'decor' => 'U750', 'thickness' => 2.0 }
     ]
   }
@@ -277,11 +406,18 @@ NxTest.test('D-112: vepo_edge_decors a vepo_sheet_decors drzia kontrakt mapy') d
     NxTest.assert_equal(%w[ABS_H1181 ABS_U750], edec.keys.sort, 'mapa pokryva VSETKY pasky katalogu')
     NxTest.assert_equal('H1181', edec['ABS_H1181']['decor'])
     NxTest.assert_equal('Dub Halifax tabakový', edec['ABS_H1181']['decor_name'])
+    NxTest.assert_equal('G-H1181', edec['ABS_H1181']['group_id'], 'P1: mapa nesie identitu skupiny')
     NxTest.assert_equal('', edec['ABS_U750']['decor_name'], 'chybajuci nazov dekoru = prazdny retazec')
+    NxTest.assert_equal('', edec['ABS_U750']['group_id'], 'chybajuca skupina = prazdny retazec (legacy)')
 
     sdec = core.vepo_sheet_decors
     NxTest.assert_equal(['REAL_18'], sdec.keys, 'UNI doska v mape NIE JE — jej „dekor" nie je dekor')
-    NxTest.assert_equal('H1181', sdec['REAL_18'])
+    NxTest.assert_equal({ 'decor' => 'H1181', 'group_id' => 'G-H1181' }, sdec['REAL_18'],
+                        'P1: hodnota je ZAZNAM (dekor + skupina), nie holy String')
+    # skupina rozhoduje: paska tej istej skupiny mlci, cudzia s rovnakym kodom nie
+    NxTest.assert_equal('', NxD112.vepo.abs_note(
+      { 'material_id' => 'REAL_18', 'edges' => NxD112.edges('ABS_H1181') }, edec, sdec
+    ))
     # a preto UNI dielec s paskou ziadnu poznamku nedostane (KONTROLA ho hlasi zvlast)
     NxTest.assert_equal('', NxD112.vepo.abs_note(
       { 'material_id' => 'KORPUS_UNI_18', 'edges' => NxD112.edges('ABS_H1181') }, edec, sdec
