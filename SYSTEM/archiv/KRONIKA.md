@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **KOV-B2 · KATALÓG KOVANIA: STROM, MODAL POLOŽKY, DÉMOS VÝROBCA (v0.9.23, 4.9.2026, PR #KOVB2):** UI polovica slice B — dáta a taxonómiu dala KOV-B1, táto dávka ich vytiahla
+- **KOV-B2 · KATALÓG KOVANIA: STROM, MODAL POLOŽKY, DÉMOS VÝROBCA (v0.9.23, 4.9.2026, PR #290):** UI polovica slice B — dáta a taxonómiu dala KOV-B1, táto dávka ich vytiahla
   na obrazovku a uzavrela **D-110** („pridávanie kovaní je neprehľadné", Michal 24.8. pri prvom teste v0.8.0).
   **Prečo strom a nie lepšie usporiadaný plochý zoznam.** Katalóg reálnej dielne má stovky kódov a doterajší pohľad Položky bol plochý serverový search s **tichým stropom**
   (`SEARCH_TOP` 50 / `EMPTY_TOP` 200): položka za poradím 50 sa dala nájsť už **len** hľadaním. TEST-1 (PR #229) to sčasti zaplátal — `total`/`shown` a pin novej položky — ale

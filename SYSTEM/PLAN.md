@@ -231,7 +231,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   **Checklist uzáveru (v PR):** bump patch + `?v=` → testy vrátane in-SU → `hardware.md` (`hardware_sets`: klasifikácia, mapa, `class:` kľúč, std; nový odsek `hardware_taxonomy`;
   `hardware_catalog`) + ARCHITEKTURA router riadok → STANDARD §6 (klasifikácia, mapovací kľúč, taxonómia) → AUDIT_REGISTER (R-41 ostáva pre B3) → STAV/KRONIKA/PLAN (B1 ✅).
 
-- **✅ HOTOVÉ (PR #KOVB2, v0.9.23)** — **KOV-B2 · TASK PACKAGE „KATALÓG — ZOSKUPENIE, MODAL POLOŽKY, DÉMOS" (slice B, rez B2; Audit: NIE, `codex-po-pr` povinné):**
+- **✅ HOTOVÉ (PR #290, v0.9.23)** — **KOV-B2 · TASK PACKAGE „KATALÓG — ZOSKUPENIE, MODAL POLOŽKY, DÉMOS" (slice B, rez B2; Audit: NIE, `codex-po-pr` povinné):**
   **Scope IN (mockup scéna 3):** serverové zoskupenie Kategória → Výrobca → Rada so `shown/total` na každej úrovni + „načítať ďalšie" (žiadne tiché stropy; test 500+ položiek
   nájde položku za poradím 200, `pin` zachovaný); hľadanie roztvára len zhody; modal Nová/Upraviť položka (D-15 vzor: štruktúrované chyby, busy lock, draft bez `row_rev`) s poradím
   polí kód → názov → cena → MJ → kategória → výrobca → rada → poznámka; **Démos**: `pid` proposal flow ostáva server-owned (kód/názov/cena/MJ), klient nastavuje len kategóriu,

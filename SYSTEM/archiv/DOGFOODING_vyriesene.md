@@ -4,7 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
-- **D-110** — Pridávanie kovaní: strom Kategória → Výrobca → Rada namiesto plochého zoznamu + modal položky s poradím polí ako dodávateľský list — vyriešené 4.9.2026, PR #KOVB2, v0.9.23
+- **D-110** — Pridávanie kovaní: strom Kategória → Výrobca → Rada namiesto plochého zoznamu + modal položky s poradím polí ako dodávateľský list — vyriešené 4.9.2026, PR #290, v0.9.23
 - **D-112** — Odlišná ABS je vidieť vo VEPO objednávke: deviaty stĺpec `poznamka` + kontrolný oddiel v LOGu — vyriešené 4.9.2026, PR #287, v0.9.22
 - **D-113** — Názov dielca vo VEPO nesie skratku a skrinku (`Bok LP s1 s2`) — vyriešené 4.9.2026, PR #287, v0.9.22
 - **D-115** — Symboly smeru otvárania: čiary z rohov, nie šípky (náhľad aj viewport) — vyriešené 3.9.2026, PR #286, v0.9.21
@@ -102,7 +102,7 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené (plné texty)
 
-### D-110 · Pridávanie kovaní je neprehľadné (Michal 24.8.2026, prvý test v0.8.0; vyriešené 4.9.2026, PR #KOVB2, v0.9.23)
+### D-110 · Pridávanie kovaní je neprehľadné (Michal 24.8.2026, prvý test v0.8.0; vyriešené 4.9.2026, PR #290, v0.9.23)
 
 **Pôvodný postreh (plné znenie).** „Formulár novej položky je **dole pod zoznamom**, poradie polí nezodpovedá tomu, ako človek údaje prepisuje z dodávateľského listu, a po
 uložení sa položka stratí v zozname." *(Časť — aby nová položka bola hneď vidieť a orezanie zoznamu sa priznalo — vyriešená v TEST-1, PR #229; REDIZAJN formulára a zoradenia
