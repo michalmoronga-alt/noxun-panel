@@ -12651,6 +12651,7 @@ module NoxunSuRunner
   # NIKDY nedotknu; override sa v `ensure` VZDY vracia na nil.
   KOVB3_SID = 'su-b3-atira'
   KOVB3_LEG = 'su-b3-legacy'
+  KOVB3_LEG2 = 'su-b3-legacy2' # druhy zaves — NIKDY nemapovany
 
   def kovb3_draft(over = {})
     { 'set_id' => KOVB3_SID, 'name' => 'SU B3 Atira',
@@ -12777,15 +12778,41 @@ module NoxunSuRunner
          pay['taxonomy']['manufacturers'].include?('Hettich'))
 
       # --- 5) NEAKTIVNY SET SA UZ NENUKA (ale expanzia ho ignoruje) --------
+      #
+      # POZOR na vyber setu: `active` filtruje ponuku LEN pri sete, ktory
+      # projekt NEPOUZIVA. Referencovany set v ponuke ZAMERNE ostava (inak by
+      # select ukazoval prazdno tam, kde hodnota je, a prvy klik vedla by ju
+      # ticho prepisal) a navyse pre neho vyhrava definicia zo SNAPSHOTU,
+      # zmrazena este pred priznakom. Neaktivnym sa preto oznacuje DRUHY,
+      # NEMAPOVANY set; obe vetvy kryje aj headless `test_kovb3_nahlad.rb`.
       exp_active = kovb1_expand(model)
-      st_off, = e::HardwareSets.save_set!(kovb3_legacy('active' => false))
+      st_two, = e::HardwareSets.save_set!(kovb3_legacy('set_id' => KOVB3_LEG2,
+                                                       'name' => 'SU B3 druhy zaves'),
+                                          create: true)
+      ok("KOV-B3: druhy (NEMAPOVANY) zaves je v kniznici (#{st_two.inspect})", st_two == :ok)
+      pay_on = e::HardwareCatalogDialog.sets_payload(model)
+      ok('KOV-B3: kym je aktivny, ponuka ho obsahuje',
+         (pay_on['type_options']['hinge'] || []).any? { |s| s['set_id'] == KOVB3_LEG2 })
+
+      st_off, = e::HardwareSets.save_set!(kovb3_legacy('set_id' => KOVB3_LEG2,
+                                                       'name' => 'SU B3 druhy zaves',
+                                                       'active' => false))
       ok("KOV-B3: set sa da oznacit ako NEAKTIVNY (#{st_off.inspect})", st_off == :ok)
       pay_off = e::HardwareCatalogDialog.sets_payload(model)
       ok('KOV-B3: neaktivny set sa v ponuke UZ NENUKA',
-         (pay_off['type_options']['hinge'] || []).none? { |s|
-           s['set_id'] == KOVB3_LEG && !s['project_copy']
-         })
-      ok('KOV-B3: ale EXPANZIA je nezmenena — mapovanie projektu sa nedotklo',
+         (pay_off['type_options']['hinge'] || []).none? { |s| s['set_id'] == KOVB3_LEG2 })
+      ok('KOV-B3: ale v KNIZNICI zostava (nie je to mazanie)',
+         e::HardwareSets.load['sets'].any? { |s| s['set_id'] == KOVB3_LEG2 })
+      # A teraz to iste s MAPOVANYM setom: priznak dostane aj on — v ponuke
+      # napriek tomu OSTAT MUSI (inak by select ukazoval prazdno tam, kde
+      # projekt hodnotu ma). Toto je vetva `referenced_ids` v `set_options`.
+      st_used, = e::HardwareSets.save_set!(kovb3_legacy('active' => false))
+      ok("KOV-B3: mapovany set sa da oznacit ako NEAKTIVNY (#{st_used.inspect})",
+         st_used == :ok)
+      pay_used = e::HardwareCatalogDialog.sets_payload(model)
+      ok('KOV-B3: a set, ktory projekt PRAVE POUZIVA, v ponuke OSTAVA aj ako neaktivny',
+         (pay_used['type_options']['hinge'] || []).any? { |s| s['set_id'] == KOVB3_LEG })
+      ok('KOV-B3: EXPANZIA je nezmenena — mapovanie projektu sa nedotklo',
          JSON.generate(kovb1_expand(model)) == JSON.generate(exp_active))
     rescue StandardError => ex
       log_line("FAIL: KOV-B3 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

@@ -416,3 +416,41 @@ NxTest.test('KOV-B3: payload sekcie nesie slovniky, vzorove parametre aj taxonom
   NxTest.assert(src.include?("'taxonomy' => taxonomy_payload"),
                 'a taxonomia pre selecty modalu setu')
 end
+
+# ============================================================================
+# 7) PONUKA SETOV — `active` rozhoduje LEN tu (a referencovany set OSTAVA)
+# ============================================================================
+
+NxTest.test('KOV-B3: ponuka sekcie (`type_options`) neaktivny set UZ NENUKA') do
+  NxTest.skip!('UI vrstva sa nacitava len headless') unless NxTest.headless?
+  b = NxB3
+  off = { 'set_id' => 'b3-off', 'name' => 'B3 neaktivny', 'generic_type' => 'hinge',
+          'active' => false, 'members' => [{ 'code' => '104717', 'per' => 'unit', 'qty' => 1 }] }
+  on  = { 'set_id' => 'b3-on', 'name' => 'B3 aktivny', 'generic_type' => 'hinge',
+          'members' => [{ 'code' => '104717', 'per' => 'unit', 'qty' => 1 }] }
+  lib = { 'sets' => [on, off], 'mapping' => {} }
+
+  opts = b::DLG.project_type_options(lib, nil)
+  NxTest.assert_equal(['b3-on'], opts['hinge'].map { |s| s['set_id'] },
+                      'ponuka PROJEKTU neaktivny set preskoci')
+
+  # ...ALE ked ho projekt PRAVE POUZIVA, v ponuke OSTAT MUSI — inak by select
+  # ukazoval prazdno tam, kde hodnota je, a prvy klik vedla by ju prepisal.
+  # (Toto je presne scenar in-SU sekcie `run_kovb3`.)
+  state = { 'mapping' => { 'hinge' => 'b3-off' }, 'sets' => { 'b3-off' => off } }
+  used = b::DLG.project_type_options(lib, state)
+  NxTest.assert_equal(%w[b3-off b3-on].sort, used['hinge'].map { |s| s['set_id'] }.sort,
+                      'REFERENCOVANY neaktivny set v ponuke OSTAVA')
+end
+
+NxTest.test('KOV-B3: `sets_payload` ma filter na TEJ ISTEJ ceste ako panel') do
+  NxTest.skip!('UI vrstva sa nacitava len headless') unless NxTest.headless?
+  dlg = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'hardware_catalog_dialog.rb'))
+  pay = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'payloads.rb'))
+  # OBE UI ponuky (predvolby projektu v Studiu aj override skrinky v paneli)
+  # stavia TA ISTA funkcia — filter `active` preto nemoze mat dve pravdy.
+  NxTest.assert(dlg.include?('HardwareSets.set_options('),
+                'ponuka sekcie ide cez `set_options`')
+  NxTest.assert(pay.include?('HardwareSets.set_options('),
+                'a ponuka panela tiez (jedna cesta, jedno pravidlo)')
+end
