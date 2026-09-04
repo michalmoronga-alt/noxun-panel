@@ -49,7 +49,38 @@ module Noxun
 
       CATEGORIES = %w[ZAVESY VYSUVY VYKLOPY NOHY UCHYTKY SPOJOVACI_MATERIAL
                       VESIAKY OSVETLENIE OSTATNE].freeze
+      # KOV-B2: SK popisky kategorii — JEDINY zdroj (strom katalogu, filter
+      # v liste sekcie aj select v modale polozky). Kod ostava identitou
+      # (uklada sa on), popisok je LEN to, co pouzivatel cita; guard test
+      # strazi, ze mapa pokryva `CATEGORIES` presne (ziadny kod bez popisku
+      # a ziadny popisok bez kodu — inak by strom kreslil holy „SPOJOVACI_
+      # MATERIAL" alebo prazdnu hlavicku).
+      CATEGORY_LABELS = {
+        'ZAVESY' => 'Závesy',
+        'VYSUVY' => 'Výsuvy',
+        'VYKLOPY' => 'Výklopy',
+        'NOHY' => 'Nohy a montáž',
+        'UCHYTKY' => 'Úchytky',
+        'SPOJOVACI_MATERIAL' => 'Spojovací materiál',
+        'VESIAKY' => 'Vešiaky',
+        'OSVETLENIE' => 'Osvetlenie',
+        'OSTATNE' => 'Ostatné'
+      }.freeze
       UNITS = %w[ks set par bal m].freeze
+
+      # KOV-B2: strom Kategoria -> Vyrobca -> Rada. STRANKUJE SA LIST (rada),
+      # nie cely zoznam: „ziadne tiche stropy" (TEST-1) plati aj tu, takze
+      # kazda uroven nesie `total` (kolko ich je) aj `shown` (kolko ich prislo)
+      # a list, ktoremu sa nezmestili vsetky kody, to prizna `more`.
+      LEAF_PAGE = 50
+      # Synteticke uzly pre polozky bez klasifikacie. Su POSLEDNE vo svojej
+      # urovni — skrutky a podperky vyrobcu mat nemusia (KOV-B1) a nesmu
+      # zatlacit skutocnych vyrobcov pod zlom stranky.
+      TREE_NO_MANUFACTURER = '— bez výrobcu'
+      TREE_NO_SERIES = '— bez rady'
+      # Vyrobca DOSLOVNE menom „Ostatné" (seed taxonomie) patri na koniec
+      # zoznamu vyrobcov — je to zberna kategoria, nie znacka.
+      TREE_OTHER_MANUFACTURER = 'Ostatné'
       # Kanonizacia jednotky zo stranky Demosu / CSV (F6): cena sa navrhne LEN
       # pri zhode KANONICKEJ jednotky zaznamu a stranky — ziadne ks<->bal
       # prepocty. K-sada predavana za kus = 'ks'.
@@ -252,13 +283,13 @@ module Noxun
       # a MJ; cena cez Materials.normalize_price (jedna autorita nil!=0).
       def normalize_item(a)
         code = (a['item_code'] || a[:item_code]).to_s.strip
-        return [nil, 'položka bez kódu'] if code.empty?
+        return [nil, 'položka bez kódu', 'item_code'] if code.empty?
         name = (a['name_sk'] || a[:name_sk]).to_s.strip
-        return [nil, 'položka bez názvu'] if name.empty?
+        return [nil, 'položka bez názvu', 'name_sk'] if name.empty?
         category = (a['category'] || a[:category]).to_s.strip.upcase
-        return [nil, "neznáma kategória „#{category}“"] unless CATEGORIES.include?(category)
+        return [nil, "neznáma kategória „#{category}“", 'category'] unless CATEGORIES.include?(category)
         unit = canonical_unit((a['unit'] || a[:unit]).to_s)
-        return [nil, "neznáma merná jednotka „#{a['unit'] || a[:unit]}“"] unless unit
+        return [nil, "neznáma merná jednotka „#{a['unit'] || a[:unit]}“", 'unit'] unless unit
         out = { 'item_code' => code, 'name_sk' => name,
                 'category' => category, 'unit' => unit }
         price = Materials.normalize_price(a['price_eur_vat'] || a[:price_eur_vat])
@@ -266,7 +297,7 @@ module Noxun
         # by zhodilo JSON serializaciu — cena musi byt konecna a nezaporna
         # (0 je legalna; nil = nezadana, kluc chyba).
         if !price.nil? && (!price.finite? || price.negative?)
-          return [nil, 'cena musí byť nezáporné číslo']
+          return [nil, 'cena musí byť nezáporné číslo', 'price_eur_vat']
         end
         out['price_eur_vat'] = price unless price.nil?
         put_opt(out, 'supplier', a['supplier'] || a[:supplier])
@@ -321,6 +352,11 @@ module Noxun
       # nasiel „Hettich"), ale ulozit sa smie vyhradne kanonicky zapis zo
       # zoznamu — inak by v katalogu vyrastlo „hettich" vedla „Hettich"
       # a zoskupenie (KOV-B2) ani filtre (KOV-D) by na tom nesadli.
+      # KOV-B2: odmietnutie nesie AJ POLE, ktoreho sa tyka (`manufacturer` /
+      # `series`) — modal polozky (D-15) kresli chybu PRI POLI a bez neho by
+      # „rada nepatri vyrobcovi" pristala v zbernom pase nad formularom, kde
+      # ju pouzivatel k radu nepriradi. Pole dava `resolve_classification`,
+      # ktore ho uz vracia pre set (jedna autorita).
       # -> [refusal|nil, canon_manufacturer|nil, canon_series|nil]
       def taxonomy_refusal(manufacturer, series)
         man = manufacturer.to_s.strip
@@ -332,7 +368,9 @@ module Noxun
         return [[:invalid, HardwareTaxonomy.state_reason], nil, nil] if HardwareTaxonomy.read_only?
 
         canon_man, canon_ser, errs = HardwareTaxonomy.resolve_classification(man, ser)
-        return [[:invalid, errs.first['msg']], nil, nil] unless errs.empty?
+        unless errs.empty?
+          return [[:invalid, errs.first['msg'], errs.first['field']], nil, nil]
+        end
 
         [nil, canon_man, canon_ser]
       end
@@ -345,11 +383,14 @@ module Noxun
       # --- mutacie (vsetko pod zamkom, fresh load, revision guardy) -----------
 
       # CREATE — kod nesmie existovat (CI); patch existujuceho = patch_item.
-      # -> [:ok, rec] | [:exists|:invalid|:read_only|:write_failed, info]
+      # KOV-B2: odmietnutie nesie TRETIM prvkom POLE, ktoreho sa tyka (modal
+      # D-15 kresli chybu pri poli). Volajuci, ktory pole nepotrebuje, dalej
+      # rozbaluje len `status, info` — tvar je spatne kompatibilny.
+      # -> [:ok, rec] | [:exists|:invalid|:read_only|:write_failed, info, field]
       def create_item(attrs)
         return [:read_only, state_reason] if read_only?
-        rec, err = normalize_item(attrs)
-        return [:invalid, err] if rec.nil?
+        rec, err, field = normalize_item(attrs)
+        return [:invalid, err, field] if rec.nil?
         # create NIKDY nepreberie cache polia z klienta (F7) — vznikaju len
         # proposal flowom; seed ma vlastnu cestu (seed_write!).
         rec.delete('demos_url')
@@ -366,7 +407,7 @@ module Noxun
           JsonFileStore.invalidate(path)
           data = load
           if data['items'].any? { |i| i['item_code'].to_s.strip.downcase == rec['item_code'].downcase }
-            return [:exists, rec['item_code']]
+            return [:exists, rec['item_code'], 'item_code']
           end
           data['items'] = data['items'] + [rec]
           return [:write_failed, nil] unless write_unlocked(data)
@@ -378,19 +419,20 @@ module Noxun
       # Zmena ceny/MJ alebo vymazanie URL zmaze price_checked_at (F5); prazdna
       # hodnota demos_url vymaze vazbu, neprazdna sa patchom ODMIETNE
       # (URL zapisuje vyhradne proposal flow so sanitize).
-      # -> [:ok, rec] | [:not_found|:conflict|:invalid|:read_only|:write_failed, info]
+      # KOV-B2: `:invalid` nesie TRETIM prvkom pole (vzor `create_item`).
+      # -> [:ok, rec] | [:not_found|:conflict|:invalid|:read_only|:write_failed, info, field]
       def patch_item(code, patch, row_rev:)
         return [:read_only, state_reason] if read_only?
         clean = patch.is_a?(Hash) ? patch.select { |k, _| PATCHABLE.include?(k) } : {}
         return [:invalid, 'žiadne editovateľné pole'] if clean.empty?
         if !clean['demos_url'].to_s.strip.empty?
-          return [:invalid, 'adresu produktu nastavuje overenie ceny — vlož ju tam']
+          return [:invalid, 'adresu produktu nastavuje overenie ceny — vlož ju tam', 'demos_url']
         end
         # Necislo v cene = ODMIETNUT (prazdne = vedome vymazanie ceny);
         # normalize by necislo ticho zahodil a cena by zmizla bez varovania.
         if clean.key?('price_eur_vat') && !clean['price_eur_vat'].to_s.strip.empty? &&
            Materials.normalize_price(clean['price_eur_vat']).nil?
-          return [:invalid, 'cena musí byť číslo (alebo prázdna = nezadaná)']
+          return [:invalid, 'cena musí byť číslo (alebo prázdna = nezadaná)', 'price_eur_vat']
         end
         # KOV-B1: taxonomia sa overuje nad EFEKTIVNOU dvojicou (patch prebija
         # ulozene hodnoty) a MIMO zamku — viz `taxonomy_refusal`.
@@ -421,8 +463,8 @@ module Noxun
             merged.delete('price_checked_at')
           end
           merged.delete('demos_url') if clean.key?('demos_url') # prazdna = vymazat vazbu
-          rec, err = normalize_item(merged)
-          return [:invalid, err] if rec.nil?
+          rec, err, field = normalize_item(merged)
+          return [:invalid, err, field] if rec.nil?
           data['items'] = data['items'].map { |i| i.equal?(existing) ? rec : i }
           return [:write_failed, nil] unless write_unlocked(data)
           [:ok, rec]
@@ -550,6 +592,151 @@ module Noxun
         v = value.to_s.strip
         return '' if v.empty?
         Materials.slug(v).downcase.tr('_', ' ')
+      end
+
+      # --- KOV-B2: strom Kategoria -> Vyrobca -> Rada -------------------------
+
+      # SK popisok kategorie. Neznamy kod (starsi katalog, cudzi zapis) sa
+      # NEPREKLADA — vratime jeho kod, aby bolo VIDNO, co v katalogu je.
+      def category_label(code)
+        CATEGORY_LABELS[code.to_s] || code.to_s
+      end
+
+      # Poradie vyrobcov: kanonicke mena abecedne (bez diakritiky), zberna
+      # znacka „Ostatné" predposledna a polozky BEZ vyrobcu uplne posledne.
+      def tree_manufacturer_order(name)
+        n = name.to_s.strip
+        return [2, ''] if n.empty?
+        slug = norm_text(n)
+        return [1, slug] if slug == norm_text(TREE_OTHER_MANUFACTURER)
+
+        [0, slug]
+      end
+
+      # Poradie rad: abecedne, „bez rady" posledna.
+      def tree_series_order(name)
+        n = name.to_s.strip
+        n.empty? ? [1, ''] : [0, norm_text(n)]
+      end
+
+      # SERVEROVY strom katalogu (kontrakt „JS poradie nikdy nedoplna" —
+      # GH #100 P2): klient posiela dotaz, filter, rozbalene uzly a ziadost
+      # o dalsiu stranku listu; vykresli PRESNE to, co pride, vratane poradia.
+      #
+      # Preco strom a nie plochy zoznam (D-110): katalog realnej dielne ma
+      # stovky kodov a plochy zoznam s TICHYM stropom znamenal, ze polozka za
+      # poradim `SEARCH_TOP` sa dala najst uz LEN hladanim. Zasada „no silent
+      # caps" (TEST-1) preto plati na KAZDEJ urovni: `total` = kolko ich tam
+      # je, `shown` = kolko ich naozaj prislo, a list, ktoremu sa nezmestili
+      # vsetky kody, to prizna `more`.
+      #
+      #   `expand` = { kluc uzla => true } — pamat rozbalenia klienta. Plati
+      #              LEN pri prazdnom dotaze; hladanie roztvara VYHRADNE
+      #              skupiny so zhodami (inak by dotaz „tipon" nechal
+      #              najdenu polozku schovanu v zabalenej kategorii).
+      #   `more`   = { kluc listu => kolko kodov klient chce } (nasobky
+      #              `LEAF_PAGE`); strankuje sa LIST, nie cely strom.
+      #   `pin`    = kod prave zalozenej polozky — je v odpovedi VZDY (aj ked
+      #              filtru nevyhovuje), navrchu SVOJHO listu, a jeho kategoria
+      #              sa rozbali. Bez toho nova polozka zmizne bez slova.
+      #
+      # Kluc uzla je CESTA `KATEGORIA|Vyrobca|Rada` (kategoria = sam kod).
+      # -> { 'groups', 'total', 'shown', 'pin', 'leaf_page', 'q' }
+      def build_tree(list, query, category: nil, include_inactive: false,
+                     pin: nil, expand: nil, more: nil)
+        exp = expand.is_a?(Hash) ? expand : {}
+        want_more = more.is_a?(Hash) ? more : {}
+        q = query.to_s
+        searching = !q.strip.empty?
+        matched, = search_with_total(list, q, category: category, top: list.length,
+                                              include_inactive: include_inactive)
+        # Poradie zhod (score) si drzime ako RANK — v liste sa radi presne
+        # podla neho, aby strom vracal to iste poradie ako ploche hladanie.
+        rank = {}
+        matched.each_with_index { |i, idx| rank[i['item_code'].to_s] = idx }
+
+        pin_code = pin.to_s.strip
+        pin_item = pin_code.empty? ? nil : list.find { |i| i['item_code'].to_s == pin_code }
+        pin_code = '' if pin_item.nil?
+        pool = matched
+        pool += [pin_item] if pin_item && !rank.key?(pin_code)
+
+        by_cat = {}
+        pool.each do |item|
+          cat = tree_category_of(item)
+          man = item['manufacturer'].to_s.strip
+          ser = item['series'].to_s.strip
+          (((by_cat[cat] ||= {})[man] ||= {})[ser] ||= []) << item
+        end
+
+        pin_cat = pin_item ? tree_category_of(pin_item) : nil
+        groups = []
+        CATEGORIES.each do |cat|
+          mans = by_cat[cat]
+          next if mans.nil? || mans.empty?
+
+          open = searching || exp[cat] == true || cat == pin_cat
+          groups << tree_group(cat, mans, open: open, searching: searching,
+                                          rank: rank, pin_code: pin_code,
+                                          want_more: want_more)
+        end
+        { 'q' => q, 'groups' => groups,
+          'total' => groups.sum { |g| g['total'].to_i },
+          'shown' => groups.sum { |g| g['shown'].to_i },
+          'pin' => (pin_code.empty? ? nil : pin_code),
+          'leaf_page' => LEAF_PAGE }
+      end
+
+      # Kategoria, pod ktorou sa polozka v strome objavi. Neznamy kod (cudzi
+      # zapis, starsi katalog) padne do „Ostatné" — inak by polozka v strome
+      # NEBOLA VOBEC, hoci v katalogu je.
+      def tree_category_of(item)
+        cat = item['category'].to_s
+        CATEGORIES.include?(cat) ? cat : 'OSTATNE'
+      end
+
+      def tree_group(cat, mans, open:, searching:, rank:, pin_code:, want_more:)
+        nodes = mans.keys.sort_by { |m| tree_manufacturer_order(m) }.map do |man|
+          tree_manufacturer(cat, man, mans[man], open: open, searching: searching,
+                                                 rank: rank, pin_code: pin_code,
+                                                 want_more: want_more)
+        end
+        { 'key' => cat, 'label' => category_label(cat), 'open' => open,
+          'total' => nodes.sum { |n| n['total'].to_i },
+          'shown' => nodes.sum { |n| n['shown'].to_i },
+          'manufacturers' => nodes }
+      end
+
+      def tree_manufacturer(cat, man, sers, open:, searching:, rank:, pin_code:, want_more:)
+        nodes = sers.keys.sort_by { |s| tree_series_order(s) }.map do |ser|
+          tree_series(cat, man, ser, sers[ser], open: open, searching: searching,
+                                                rank: rank, pin_code: pin_code,
+                                                want_more: want_more)
+        end
+        { 'key' => "#{cat}|#{man}",
+          'label' => man.strip.empty? ? TREE_NO_MANUFACTURER : man,
+          'total' => nodes.sum { |n| n['total'].to_i },
+          'shown' => nodes.sum { |n| n['shown'].to_i },
+          'series' => nodes }
+      end
+
+      def tree_series(cat, man, ser, items, open:, searching:, rank:, pin_code:, want_more:)
+        sorted = if searching
+                   items.sort_by { |i| [rank[i['item_code'].to_s] || rank.length, i['item_code'].to_s] }
+                 else
+                   items.sort_by { |i| [norm_text(i['name_sk']), i['item_code'].to_s] }
+                 end
+        unless pin_code.empty?
+          pinned = sorted.find { |i| i['item_code'].to_s == pin_code }
+          sorted = [pinned] + sorted.reject { |i| i.equal?(pinned) } if pinned
+        end
+        key = "#{cat}|#{man}|#{ser}"
+        asked = want_more[key].to_i
+        limit = asked > LEAF_PAGE ? asked : LEAF_PAGE
+        codes = open ? sorted.first(limit).map { |i| i['item_code'].to_s } : []
+        { 'key' => key, 'label' => ser.strip.empty? ? TREE_NO_SERIES : ser,
+          'total' => sorted.length, 'shown' => codes.length, 'codes' => codes,
+          'more' => open && sorted.length > codes.length }
       end
 
       # --- pohybliva cenova cache (BLOCKER 1: serverovy proposal store) -------
@@ -703,6 +890,22 @@ module Noxun
         @create_proposals ||= {}
       end
 
+      # KOV-B2: znacka z Demosu -> KANONICKY vyrobca z taxonomie (alebo nil).
+      # Fail-closed: nad nekompatibilnou taxonomiou `load` nic nevyda, takze
+      # navrh by bol vzdy prazdny — vratime nil a modal necha pole na
+      # pouzivatelovi (nikdy nenavrhne meno, ktore by sa nedalo ulozit).
+      def manufacturer_guess(brand)
+        b = brand.to_s.strip
+        return nil if b.empty?
+        return nil if HardwareTaxonomy.read_only?
+
+        canon, = HardwareTaxonomy.resolve_classification(b, nil)
+        canon
+      rescue StandardError => e
+        Engine.log_error(e, 'HardwareCatalog.manufacturer_guess') if defined?(Engine)
+        nil
+      end
+
       # Async preview: URL -> fetch -> parse -> proposal (server pamat, pid).
       # result: {'ok'=>bool, 'error'=>.., pid/code/name_sk/unit/price_vat/
       #          category_guess/url/exists/related[]}
@@ -752,7 +955,14 @@ module Noxun
         prop = { 'pid' => pid, 'url' => final_url, 'code' => code, 'name_sk' => name,
                  'unit' => unit, 'price_vat' => price,
                  'fetched_at' => Time.now.utc.iso8601,
-                 'category_guess' => category_guess("#{final_url} #{name}") }
+                 'category_guess' => category_guess("#{final_url} #{name}"),
+                 # KOV-B2: znacka zo stranky (`itemprop="brand"`) prelozena cez
+                 # TAXONOMIU na kanonicke meno. Je to NAVRH, nie zapis: keby sa
+                 # ukladal surovy text zo stranky, vyrastol by v katalogu
+                 # „HETTICH" vedla „Hettich" a zoskupenie by na tom nesadlo.
+                 # Neznama znacka aj nekompatibilna taxonomia = nil (radu
+                 # NEHADAME vobec — inferencia z breadcrumbu je mimo B2).
+                 'manufacturer_guess' => manufacturer_guess(parsed['brand']) }
         create_proposals.clear if create_proposals.length > 8 # bounded pamat
         create_proposals[pid] = prop
         related = Array(parsed['related']).first(10).map do |r|
@@ -761,10 +971,16 @@ module Noxun
         prop.merge('ok' => true, 'exists' => !find(code).nil?, 'related' => related)
       end
 
-      # Zapis z proposalu (pid = navrh, ktory pouzivatel VIDEL). Kategoriu
-      # smie klient zmenit (enum gardi normalize_item), notes volitelne.
-      # -> [:ok, rec] | [:no_proposal|:exists|:invalid|:read_only|:write_failed, info]
-      def create_from_demos!(pid, category: nil, notes: nil)
+      # Zapis z proposalu (pid = navrh, ktory pouzivatel VIDEL). Kategoriu,
+      # poznamku a od KOV-B2 aj VYROBCU a RADU smie klient nastavit; kod,
+      # nazov, cena a MJ pochadzaju VZDY z proposalu — klientske hodnoty tychto
+      # poli sa IGNORUJU (FIX 12 z KOV-H1: klientovi sa veri len to, co si
+      # nemohol vymysliet). Ked pouzivatel niektory z nich v modale prepise,
+      # nie je to uz overena polozka z Demosu a klient ju posiela BEZNOU cestou
+      # `create_item` — teda bez `demos_url` a bez `price_checked_at`.
+      # Vyrobca a rada sa overuju cez taxonomiu presne ako v `create_item`.
+      # -> [:ok, rec] | [:no_proposal|:exists|:invalid|:read_only|:write_failed, info, field]
+      def create_from_demos!(pid, category: nil, notes: nil, manufacturer: nil, series: nil)
         prop = create_proposals[pid.to_s]
         return [:no_proposal, nil] unless prop
         attrs = { 'item_code' => prop['code'], 'name_sk' => prop['name_sk'],
@@ -773,8 +989,16 @@ module Noxun
         attrs['price_eur_vat'] = prop['price_vat'] unless prop['price_vat'].nil?
         n = notes.to_s.strip
         attrs['notes'] = n unless n.empty?
-        rec, err = normalize_item(attrs)
-        return [:invalid, err] if rec.nil?
+        put_opt(attrs, 'manufacturer', manufacturer)
+        put_opt(attrs, 'series', series)
+        rec, err, field = normalize_item(attrs)
+        return [:invalid, err, field] if rec.nil?
+
+        refusal, canon_man, canon_ser = taxonomy_refusal(rec['manufacturer'], rec['series'])
+        return refusal if refusal
+
+        rec['manufacturer'] = canon_man if canon_man
+        rec['series'] = canon_ser if canon_ser
         # Server-stamped vazba: URL aj cena pochadzaju z FETCHU (nie z kliku) —
         # datum overenia patri cene (bez ceny sa neuklada; "Overit" ho doplni).
         rec['demos_url'] = prop['url']

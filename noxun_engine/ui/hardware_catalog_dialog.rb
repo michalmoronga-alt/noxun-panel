@@ -44,9 +44,17 @@ module Noxun
       # by prestalo dostavat prvy push. Prvotny stav sekcie preto nesie
       # `push_state` Studia pod klucom `hw` (zapadka `@hw_full_pending`,
       # presny vzor `mat` zo ŠT-2a).
+      #
+      # KOV-B2: pribudol `hw_tree` (SERVEROVE zoskupenie Kategoria -> Vyrobca ->
+      # Rada, ktore v pohlade Polozky nahradilo ploche `hw_search`) a dve
+      # zapisove cesty do TAXONOMIE (`hw_tax_create_manufacturer` /
+      # `hw_tax_create_series`) pre tlacidla „+ Vytvoriť…" v modale polozky.
+      # `hw_search` ostava — je to verejny kontrakt katalogu a plochy zoznam
+      # moze potrebovat iny volajuci.
       SECTION_ACTIONS = %w[
-        hw_search hw_create hw_patch hw_delete
+        hw_search hw_tree hw_create hw_patch hw_delete
         hw_check_price hw_apply_price
+        hw_tax_create_manufacturer hw_tax_create_series
         hw_demos_search hw_demos_preview hw_demos_cancel hw_demos_create
         hws_save_set hws_delete_set hws_map_global
         hws_map_project hws_merge_seed hws_reset_project
@@ -80,6 +88,9 @@ module Noxun
         def run_section_action(key, payload)
           case key
           when 'hw_search'         then handle_search(payload)
+          when 'hw_tree'           then handle_tree(payload)
+          when 'hw_tax_create_manufacturer' then handle_tax_manufacturer(payload)
+          when 'hw_tax_create_series'       then handle_tax_series(payload)
           when 'hw_create'         then handle_create(payload)
           when 'hw_patch'          then handle_patch(payload)
           when 'hw_delete'         then handle_delete(payload)
@@ -237,8 +248,37 @@ module Noxun
           items_payload.merge(
             'version' => Engine::VERSION,
             'categories' => HardwareCatalog::CATEGORIES,
-            'units' => HardwareCatalog::UNITS
+            # KOV-B2: SK popisky kategorii maju JEDINY zdroj (`CATEGORY_LABELS`)
+            # a chodia klientovi hotove — filter v liste, hlavicka stromu aj
+            # select v modale kreslia to iste slovo.
+            'category_labels' => HardwareCatalog::CATEGORY_LABELS,
+            'units' => HardwareCatalog::UNITS,
+            'taxonomy' => taxonomy_payload
           )
+        end
+
+        # KOV-B2: vyrobcovia a rady pre selecty modalu polozky. Rada NESIE
+        # svojho vyrobcu — zavisly select ju bez toho nevie zuzit a „rada patri
+        # presne jednemu vyrobcovi" (KOV-B1) by sa v UI stratilo.
+        def taxonomy_payload
+          doc = HardwareTaxonomy.load
+          {
+            'manufacturers' => doc['manufacturers'].map { |m| m['name'].to_s },
+            'series' => doc['series'].map { |s|
+              { 'name' => s['name'].to_s, 'manufacturer' => s['manufacturer'].to_s }
+            },
+            'revision' => HardwareTaxonomy.revision,
+            'read_only' => HardwareTaxonomy.read_only?,
+            'state_reason' => HardwareTaxonomy.state_reason.to_s
+          }
+        rescue StandardError => e
+          Engine.log_error(e, 'HardwareCatalogDialog.taxonomy_payload')
+          # FAIL-CLOSED: prazdny zoznam s priznakom read_only. Modal potom
+          # vyrobcu ani radu neponuka (a nedovoli zalozit) — lepsie nez ponuka,
+          # z ktorej sa nic neda ulozit.
+          { 'manufacturers' => [], 'series' => [], 'revision' => '',
+            'read_only' => true,
+            'state_reason' => 'zoznam výrobcov sa nedá načítať' }
         end
 
         def items_payload
@@ -339,26 +379,43 @@ module Noxun
           clear_running
         end
 
+        # KOV-B2: kod, nazov, cena a MJ ostavaju SERVER-OWNED (z proposalu) —
+        # klient nastavuje LEN kategoriu, poznamku, vyrobcu a radu. Ked
+        # pouzivatel niektory z proposalovych udajov v modale prepise, nie je to
+        # uz overena polozka z Demosu a klient ju posiela beznym `hw_create`
+        # (bez `demos_url` aj bez `price_checked_at`).
         def handle_demos_create(payload)
           data = JSON.parse(payload.to_s)
-          status, info = HardwareCatalog.create_from_demos!(
-            data['pid'].to_s, category: data['category'].to_s, notes: data['notes'].to_s
+          status, info, field = HardwareCatalog.create_from_demos!(
+            data['pid'].to_s, category: data['category'].to_s, notes: data['notes'].to_s,
+            manufacturer: data['manufacturer'].to_s, series: data['series'].to_s
           )
           case status
           when :ok
             push_items
+            msg = "Položka #{info['item_code']} pridaná z Demosu" \
+                  "#{info['price_eur_vat'] ? ' (cena s DPH overená dnes)' : ''}."
+            item_result(true, msg, [], 'create')
             js("MDH.demosCreated(#{info['item_code'].to_s.to_json})")
-            set_status("Položka #{info['item_code']} pridaná z Demosu#{info['price_eur_vat'] ? ' (cena s DPH overená dnes)' : ''}.")
+            set_status(msg)
           when :exists
-            set_status("Kód #{info} už v katalógu je — cenu obnovíš cez Overiť na existujúcej položke.", true)
+            msg = "Kód #{info} už v katalógu je — cenu obnovíš cez Overiť na existujúcej položke."
+            set_status(msg, true)
+            item_result(false, msg, item_errors(msg, 'item_code'), 'create')
           when :no_proposal
-            set_status('Náhľad už nie je platný — načítaj stránku znova.', true)
+            msg = 'Náhľad už nie je platný — načítaj stránku znova.'
+            set_status(msg, true)
+            item_result(false, msg, item_errors(msg, 'demos'), 'create')
           when :invalid
             set_status("Nedá sa uložiť — #{info}.", true)
+            item_result(false, info.to_s, item_errors(info, field), 'create')
           when :read_only
-            set_status("Katalóg je len na čítanie: #{HardwareCatalog.state_reason}", true)
+            msg = "Katalóg je len na čítanie: #{HardwareCatalog.state_reason}"
+            set_status(msg, true)
+            item_result(false, msg, item_errors(msg, nil), 'create')
           else
             set_status('Uloženie zlyhalo.', true)
+            item_result(false, 'Uloženie zlyhalo.', item_errors('Uloženie zlyhalo.', nil), 'create')
           end
         end
 
@@ -864,31 +921,140 @@ module Noxun
           HardwareCatalog.items.any? { |i| i['item_code'].to_s == code } ? code : nil
         end
 
+        # --- KOV-B2: SERVEROVY STROM (pohlad Polozky) --------------------------
+        #
+        # Nahradilo ploche `hw_search` v Studiu: zoskupenie Kategoria -> Vyrobca
+        # -> Rada sklada SERVER a klient kresli presne to, co dostal (kontrakt
+        # „JS poradie nikdy nedopĺňa"). Strankuje sa LIST (rada), nie cely
+        # zoznam — `total`/`shown` su na kazdej urovni a orezany list to prizna
+        # `more`, takze polozka za poradim 50 uz nezmizne bez slova (D-110).
+        #
+        # `gen` je generacia dotazu KLIENTA a server ju len ECHUJE: hladanie je
+        # debounced a odpovede chodia asynchronne, takze pomalsie kolo by inak
+        # prepisalo cerstvejsi strom.
+        def handle_tree(payload)
+          data = JSON.parse(payload.to_s)
+          tree = HardwareCatalog.build_tree(
+            HardwareCatalog.items, data['query'].to_s,
+            category: data['category'].to_s,
+            include_inactive: data['include_inactive'] == true,
+            pin: pinned_code(data['pin'].to_s),
+            expand: data['expand'],
+            more: data['more']
+          )
+          js("MDH.tree(#{tree.merge('gen' => data['gen'].to_i).to_json})")
+        end
+
+        # --- KOV-B2: „+ Vytvoriť…" vyrobcu / radu z modalu polozky -------------
+        #
+        # Taxonomia je GLOBALNY subor (`%APPDATA%`), takze zapis do nej NEROBI
+        # krok Spat — a preto sem nepatri ziadna `start_operation`. API je LEN
+        # create (KOV-B1, register R-35): premenovanie ani mazanie vo V1
+        # neexistuje.
+        def handle_tax_manufacturer(payload)
+          data = JSON.parse(payload.to_s)
+          name = data['name'].to_s
+          status, info = HardwareTaxonomy.create_manufacturer!(name)
+          tax_result(status, info, 'manufacturer', name)
+        end
+
+        def handle_tax_series(payload)
+          data = JSON.parse(payload.to_s)
+          name = data['name'].to_s
+          man = data['manufacturer'].to_s
+          status, info = HardwareTaxonomy.create_series!(name, man)
+          tax_result(status, info, 'series', name)
+        end
+
+        # Jedna odpoved pre obe cesty. Pri uspechu (aj pri `:exists`) posiela
+        # CERSTVU taxonomiu a KANONICKE meno — modal si nim vyberie hodnotu
+        # v selecte. Ulozit sa smie VYHRADNE kanonicky zapis zo zoznamu
+        # (KOV-B1), takze meno berieme zo ZAZNAMU, nikdy z inputu.
+        def tax_result(status, rec, op, requested)
+          case status
+          when :ok, :exists
+            name = rec.is_a?(Hash) ? rec['name'].to_s : requested
+            emit_tax(true, op, name, [])
+            set_status(status == :ok ? "#{op == 'series' ? 'Rada' : 'Výrobca'} #{name} pridaný do zoznamu."
+                                     : "#{name} už v zozname je — vybraný.")
+          when :invalid
+            emit_tax(false, op, '', [{ 'field' => op, 'msg' => rec.to_s }])
+          when :conflict
+            emit_tax(false, op, '',
+                     [{ 'field' => op,
+                        'msg' => 'zoznam sa medzitým zmenil — skús to znova' }])
+          else
+            emit_tax(false, op, '',
+                     [{ 'field' => op,
+                        'msg' => "zápis zlyhal#{rec.to_s.empty? ? '' : ": #{rec}"}" }])
+          end
+        end
+
+        def emit_tax(ok, op, name, errors)
+          js("MDH.taxonomy(#{{ 'ok' => ok, 'op' => op, 'name' => name,
+                               'errors' => errors,
+                               'taxonomy' => taxonomy_payload }.to_json})")
+        end
+
+        # --- KOV-B2: vysledok zapisu polozky pre MODAL (D-15) ------------------
+        #
+        # Modal sa pri odmietnutom zapise NEZATVARA a zamok odoslania odomyka
+        # VYHRADNE volajuci (kontrakt D-15) — server preto musi ohlasit OBE
+        # vetvy, nielen tu uspesnu. `errors` su STRUKTUROVANE (`field` + `msg`),
+        # aby hlaska pristala pri tom poli, ktoreho sa tyka.
+        def item_result(ok, msg, errors, op)
+          js("MDH.itemResult(#{ok ? 'true' : 'false'}, #{msg.to_s.to_json}, " \
+             "#{Array(errors).to_json}, #{op.to_s.to_json})")
+        end
+
+        # `[status, info, field]` z katalogu -> `[{field, msg}]` pre modal.
+        # Bez `field` ide hlaska do zberneho pasu navrchu formulara.
+        def item_errors(msg, field)
+          e = { 'msg' => msg.to_s }
+          e['field'] = field.to_s unless field.to_s.strip.empty?
+          [e]
+        end
+
         def handle_create(payload)
           data = JSON.parse(payload.to_s)
-          status, info = HardwareCatalog.create_item(data['fields'].is_a?(Hash) ? data['fields'] : {})
+          status, info, field = HardwareCatalog.create_item(
+            data['fields'].is_a?(Hash) ? data['fields'] : {}
+          )
           case status
           when :ok
             push_items
             set_status("Položka #{info['item_code']} pridaná.")
+            # KOV-B2: modal sa zatvara AZ na potvrdenie servera (D-15) —
+            # a odomknut ho musi tiez server, aj ked zapis presiel.
+            item_result(true, "Položka #{info['item_code']} pridaná.", [], 'create')
             # TEST-1: kod ide klientovi, aby si ho vypytal NAVRCH zoznamu
             # (`pin`) a zvyraznil ho — inak nova polozka utopi v katalogu.
             js("MDH.created(#{info['item_code'].to_s.to_json})")
           when :exists
-            set_status("Kód #{info} už v katalógu je — kódy sú jedinečné.", true)
+            msg = "Kód #{info} už v katalógu je — kódy sú jedinečné."
+            set_status(msg, true)
+            item_result(false, msg, item_errors(msg, field || 'item_code'), 'create')
           when :invalid
             set_status("Nedá sa uložiť — #{info}.", true)
+            item_result(false, info.to_s, item_errors(info, field), 'create')
           when :read_only
             set_status("Katalóg je len na čítanie: #{info}", true)
+            item_result(false, info.to_s, item_errors("Katalóg je len na čítanie: #{info}", nil), 'create')
           else
             set_status('Uloženie zlyhalo.', true)
+            item_result(false, 'Uloženie zlyhalo.', item_errors('Uloženie zlyhalo.', nil), 'create')
             push_items
           end
         end
 
+        # `from` = 'modal' znamena, ze patch poslal MODAL polozky (D-15), nie
+        # rozpisana bunka v riadku. Rozlisenie je zamerne: inline bunka ziadny
+        # modal neodomyka a `MDH.itemResult` by jej odpoved posielala do okna,
+        # ktore vobec neexistuje.
         def handle_patch(payload)
           data = JSON.parse(payload.to_s)
-          status, info = HardwareCatalog.patch_item(
+          from_modal = data['from'].to_s == 'modal'
+          status, info, field = HardwareCatalog.patch_item(
             data['code'].to_s, data['patch'].is_a?(Hash) ? data['patch'] : {},
             row_rev: data['row_rev'].to_s
           )
@@ -896,21 +1062,34 @@ module Noxun
           when :ok
             push_items
             set_status('Uložené.')
+            item_result(true, 'Uložené.', [], 'patch') if from_modal
           when :conflict
-            set_status('Položka sa medzitým zmenila — hodnoty sa obnovili, uprav znova.', true)
+            msg = 'Položka sa medzitým zmenila — hodnoty sa obnovili, uprav znova.'
+            set_status(msg, true)
             push_items
+            item_result(false, msg, item_errors(msg, nil), 'patch') if from_modal
           when :not_found
-            set_status('Položka sa nenašla — katalóg sa obnovil.', true)
+            msg = 'Položka sa nenašla — katalóg sa obnovil.'
+            set_status(msg, true)
             push_items
+            item_result(false, msg, item_errors(msg, nil), 'patch') if from_modal
           when :invalid
-            set_status(info.to_s.empty? ? 'Neplatná hodnota.' : info.to_s, true)
+            msg = info.to_s.empty? ? 'Neplatná hodnota.' : info.to_s
+            set_status(msg, true)
             push_items
+            item_result(false, msg, item_errors(msg, field), 'patch') if from_modal
           when :read_only
             set_status("Katalóg je len na čítanie: #{info}", true)
             push_items
+            if from_modal
+              item_result(false, info.to_s,
+                          item_errors("Katalóg je len na čítanie: #{info}", nil), 'patch')
+            end
           else
             set_status('Uloženie zlyhalo.', true)
             push_items
+            item_result(false, 'Uloženie zlyhalo.',
+                        item_errors('Uloženie zlyhalo.', nil), 'patch') if from_modal
           end
         end
 
