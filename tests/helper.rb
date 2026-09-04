@@ -178,6 +178,8 @@ unless NxTest::IN_SKETCHUP
     core/xlsx_writer
     core/cp_export
     core/price_refresh
+    tools/mower_calc
+    tools/snap_calc
   ].each { |rel| require File.join(NxTest::ROOT, 'noxun_engine', rel) }
 end
 
