@@ -616,17 +616,33 @@ module Noxun
       # `placements:`). Na rozdiel od `front_direction` tento RED exportnu branu
       # MA — Kontrola ho ukazuje preto, aby sa o probleme vedelo skor, nez
       # pouzivatel dolaďuje rozpocet a naraz mu export odmietne vzniknut.
-      def check_newer_configs(ids, items)
-        Array(ids).each do |raw|
+      # GHOST-D1: zaznam nesie DRUH (`kind: 'cabinet' | 'board'`), takze nalez
+      # pomenuje „Skrinka"/„Doska". Holy String (legacy volania, headless testy)
+      # sa cita ako skrinka. Zoznam blokovanych vystupov je UPLNY — od GHOST-D1
+      # brana plati aj pre VEPO a kusovnik nad takym objektom je neuplny.
+      def newer_config_entry(raw)
+        if raw.is_a?(Hash)
+          kind = (raw['kind'] || raw[:kind]).to_s
+          id = (raw['id'] || raw[:id]).to_s.strip
+        else
+          kind = 'cabinet'
           id = raw.to_s.strip
+        end
+        [kind == 'board' ? 'board' : 'cabinet', id]
+      end
+
+      def check_newer_configs(entries, items)
+        Array(entries).each do |raw|
+          kind, id = newer_config_entry(raw)
           next if id.empty?
 
+          subject = kind == 'board' ? 'Doska' : 'Skrinka'
           items << { 'severity' => RED, 'category' => CAT_NEWER_CFG,
                      'owner_id' => id, 'part_key' => nil, 'hw_key' => nil,
-                     'message_sk' => "Skrinka #{id} je z novšej verzie Noxun — tento plugin jej " \
-                                     'nastavenia nepozná celé. Nákupný zoznam kovania, rozpočet ani ' \
-                                     'cenová ponuka sa nedajú vyexportovať (boli by neúplné); ' \
-                                     'aktualizuj plugin.',
+                     'message_sk' => "#{subject} #{id} je z novšej verzie Noxun — tento plugin jej " \
+                                     'nastavenia nepozná celé. Kusovník je neúplný a exporty sa ' \
+                                     'nevytvoria (VEPO, nákupný zoznam kovania, rozpočet, ' \
+                                     'cenová ponuka); aktualizuj plugin.',
                      'stable_key' => "#{CAT_NEWER_CFG}|#{id}" }
         end
       end

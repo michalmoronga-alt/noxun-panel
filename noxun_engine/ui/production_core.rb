@@ -1043,8 +1043,13 @@ module Noxun
 
       # KOV-H1: ID skriniek z NOVSEJ verzie pluginu (aditivny kluc zberu —
       # starsi zber ho nema a brana sa vtedy sprava presne ako pred KOV-H1).
+      # GHOST-D1: zaznamy nesu DRUH (`kind: 'cabinet' | 'board'`); holy String
+      # (legacy zber, headless testy) sa cita ako skrinka. Normalizuje sa TU,
+      # aby brana aj hlaska pracovali s jednym tvarom.
       def newer_configs(collected)
-        Array(collected.is_a?(Hash) ? collected[:newer_configs] : nil).map(&:to_s)
+        Array(collected.is_a?(Hash) ? collected[:newer_configs] : nil)
+          .map { |e| Validation.newer_config_entry(e) }
+          .reject { |(_kind, id)| id.empty? }
       end
 
       # KOV-H1 (review #283 P2-B): hotova hlaska brany novsej schemy, alebo nil.
@@ -1063,6 +1068,17 @@ module Noxun
       # aj branu, aby sa tri texty o tej istej veci nemohli rozist.
       def dup_ids_text(dups)
         ids_text(dups.map { |_kind, id, _n| id })
+      end
+
+      # GHOST-D1: „Skrinka CAB-004, Doska BRD-002" — druh pred kazdym ID, aby
+      # sa dalo hned povedat, CO v modeli treba hladat. Strop na tri je
+      # zdielany (`ids_text`). Prijima aj holy String (legacy = skrinka).
+      def newer_ids_text(newer)
+        labelled = Array(newer).map do |raw|
+          kind, id = raw.is_a?(Array) ? raw : Validation.newer_config_entry(raw)
+          "#{kind == 'board' ? 'Doska' : 'Skrinka'} #{id}"
+        end
+        ids_text(labelled)
       end
 
       # To iste nad HOLYM zoznamom ID (KOV-H1: brana novsej schemy) — jedno
@@ -1135,8 +1151,9 @@ module Noxun
       def export_blockers(dups: [], cp: nil, newer: [])
         out = []
         unless Array(newer).empty?
-          out << "skrinky #{ids_text(newer)} sú z novšej verzie pluginu — nákup a ceny by boli " \
-                 'neúplné; aktualizuj plugin'
+          out << "#{newer_ids_text(newer)} #{Array(newer).length == 1 ? 'je' : 'sú'} z novšej " \
+                 'verzie pluginu — kusovník aj exporty (VEPO, nákup kovania, rozpočet, cenová ' \
+                 'ponuka) by boli neúplné; aktualizuj plugin'
         end
         unless Array(dups).empty?
           out << "v modeli sú skrinky so spoločným ID (#{dup_ids_text(dups)}) — kovanie by sa " \
@@ -1490,8 +1507,9 @@ module Noxun
       # musel obchadzat cudzi okenny stav.
 
       # V0.5 C: export VEPO — vstup po relay z panela (edity flushnute) alebo
-      # priamo (panel nezije). Poradie: gen check -> flush guard -> vyber
-      # priecinka -> CERSTVY BOM -> build -> atomicky zapis -> ulozit settings.
+      # priamo (panel nezije). Poradie: gen check -> flush guard -> CERSTVY
+      # BOM + brana novsej schemy -> vyber priecinka -> build -> atomicky
+      # zapis -> ulozit settings.
       def do_export(model, data, generation:, status:, repush:)
         unless data['gen'].to_i == generation.to_i
           repush.call
@@ -1502,11 +1520,6 @@ module Noxun
         end
 
         refresh_vepo_settings # 1b-6c: nazov aj 18/36 z CERSTVEHO suboru
-        settings = vepo_settings
-        last = settings['last_dir']
-        start_dir = last.is_a?(String) && File.directory?(last) ? last : nil
-        dir = UI.select_directory(title: 'Priečinok pre VEPO export', directory: start_dir)
-        return status.call('Export zrušený.') if dir.nil? || dir.to_s.empty?
 
         # Nalez 5: JEDEN cerstvy RAW zber -> nad nim compute AJ kontrola;
         # validaciu EXPLICITNE odovzdame do build (prefix statusu + sekcia
@@ -1516,7 +1529,22 @@ module Noxun
         # teda VRATANE upozorneni rozpoctu. Bez toho by LOG a status exportu
         # hlasili ine cislo nez semafor sekcie Kontrola a badge navigacie —
         # a pouzivatel by nevedel, ktore z dvoch cisel plati.
+        #
+        # GHOST-D1: zber (a s nim BRANA NOVSEJ SCHEMY) bezi PRED vyberom
+        # priecinka. VEPO uz vynimku NEMA: skrinka ci doska z novsej verzie
+        # moze niest VYROBNE pole, ktoré tento plugin nevidi, takze aj rezaci
+        # vystup by bol ticho neuplny (predtym branu dostavali len tri cenove
+        # a nakupne exporty). Picker sa pri blokade ani neotvori.
         collected = fresh_collect(model)
+        newer_stop = newer_config_stop(collected)
+        return status.call(newer_stop, true) if newer_stop
+
+        settings = vepo_settings
+        last = settings['last_dir']
+        start_dir = last.is_a?(String) && File.directory?(last) ? last : nil
+        dir = UI.select_directory(title: 'Priečinok pre VEPO export', directory: start_dir)
+        return status.call('Export zrušený.') if dir.nil? || dir.to_s.empty?
+
         bom = Bom.compute(collected)
         smap = sheets_map
         hw_exp = hardware_expansion(model, collected)

@@ -98,8 +98,11 @@ module Noxun
             # ADITIVNYM klucom; branu drzi `ProductionCore.export_blockers`
             # (nakupny CSV + rozpocet + ponuka; VEPO nie) a Kontrola RED riadok.
             # `compute()` kluc — ako ostatne aditivne — IGNORUJE.
-            newer_configs << cid if !cid.empty? && !newer_configs.include?(cid) &&
-                                    defined?(CabinetBuilder) && CabinetBuilder.newer_config?(ccfg)
+            # GHOST-D1: zaznam nesie DRUH — od dosky s vlastnym markerom
+            # (`BoardBuilder::BOARD_CONFIG_SCHEMA`) uz `newer_configs` nie su
+            # len skrinky.
+            note_newer_config(newer_configs, 'cabinet', cid) if
+              defined?(CabinetBuilder) && CabinetBuilder.newer_config?(ccfg)
             Array(ccfg['hardware']).each { |h| hardware << h.merge('owner_id' => cid, 'owner_pid' => inst.persistent_id) }
             # KOV-H2: resolved cela pre popis vlastnika v povode nakupneho riadku.
             cabinet_fronts[cid] ||= (ccfg['front_items'].is_a?(Array) ? ccfg['front_items'] : [])
@@ -156,9 +159,15 @@ module Noxun
             # 1b-3: identita sa zbiera TIEZ pred filtrom manufactured — zdielane ID
             # je chyba identity aj vtedy, ked sa doska (docasne) nevyraba.
             add_identity(identities, 'board', Store.get(inst, 'id').to_s)
-            next unless Store.get(inst, 'manufactured') == true
             bcfg = Store.config(inst) || {}
             bid = Store.get(inst, 'id').to_s
+            # GHOST-D1 (fail-closed): doska z NOVSEJ verzie sa prizna EST PRED
+            # filtrom manufactured — tomu poľu uz nemusime rozumiet a tiche
+            # vynechanie budúceho vyrobneho pola je presne to, comu brana
+            # kompatibility zabranuje. Vetva nizsie skladá LEN zname polia.
+            note_newer_config(newer_configs, 'board', bid) if
+              defined?(BoardBuilder) && BoardBuilder.newer_config?(bcfg)
+            next unless Store.get(inst, 'manufactured') == true
             # 2A-3 (audit B2): warnings poslednej stavby DOSKY — doteraz sa
             # zbierali len z korpusov a warning vyberu ABS by sa pri samostatnej
             # doske stratil pred semaforom (config -> collect -> Validation.run).
@@ -191,6 +200,21 @@ module Noxun
           hardware_issues: hardware_issues, newer_configs: newer_configs,
           hardware_manual: hardware_manual, cabinet_fronts: cabinet_fronts,
           warnings: warnings, cabinets: cabinets, boards: boards }
+      end
+
+      # GHOST-D1: JEDEN zapisovac aditivneho kluca `newer_configs`. Zaznam je
+      # HASH s DRUHOM (`kind: 'cabinet' | 'board'`) a ID — konzumenti
+      # (`Validation.check_newer_configs`, `ProductionCore.export_blockers`)
+      # z neho vedia povedat „Skrinka CAB-001" vs. „Doska BRD-002". Starsi
+      # tvar (holy String = skrinka) citaju obaja dalej, takze legacy volania
+      # a headless testy sa nemenia. CISTA funkcia (ziadny SketchUp objekt).
+      def note_newer_config(list, kind, id)
+        s = id.to_s
+        return list if s.empty?
+        return list if list.any? { |e| e.is_a?(Hash) && e['kind'] == kind && e['id'] == s }
+
+        list << { 'kind' => kind, 'id' => s }
+        list
       end
 
       # KOV-H1: ad-hoc polozky JEDNEJ skrinky, obohatene o adresu vlastnika.

@@ -544,7 +544,7 @@ end
 # 5. R-12 EXPORTNA BRANA (B3)
 # =============================================================================
 
-NxTest.test('KOV-H1 (B3): `newer_configs` zastavi nakup aj obe cenove vystupy, VEPO nie') do
+NxTest.test('KOV-H1/GHOST-D1 (B3): `newer_configs` zastavi VSETKY STYRI exporty (aj VEPO)') do
   pc = Noxun::Engine::ProductionCore
   NxTest.assert_equal([], pc.export_blockers, 'cista zakazka nema dovod')
   NxTest.assert_equal([], pc.export_blockers(newer: []))
@@ -560,11 +560,17 @@ NxTest.test('KOV-H1 (B3): `newer_configs` zastavi nakup aj obe cenove vystupy, V
   # Hlaska TVRDEJ brany hovori, ze subor NEVZNIKOL.
   NxTest.assert(pc.export_blocked_status(b).include?('nevytvoril'))
 
-  # VEPO branu nedostava — branu vola PRAVE tri exporty a PRAVE cez jedno
-  # miesto (`newer_config_stop`), aby sa nedala v jednom z nich zabudnut.
+  # GHOST-D1: druh objektu je v hlaske — „Skrinka" vs. „Doska".
+  NxTest.assert(b.first.include?('Skrinka CAB-004'), "druh pred ID: #{b.first}")
+  bd = pc.export_blockers(newer: [{ 'kind' => 'board', 'id' => 'BRD-002' }])
+  NxTest.assert(bd.first.include?('Doska BRD-002'), "doska je pomenovana ako doska: #{bd.first}")
+  NxTest.assert(bd.first.include?('VEPO'), "zoznam blokovanych vystupov je uplny: #{bd.first}")
+
+  # GHOST-D1: branu vola PRAVE STYRI exporty (VEPO uz vynimku nema) a PRAVE
+  # cez jedno miesto (`newer_config_stop`), aby sa nedala v jednom zabudnut.
   src = NxKovh1.src('ui/production_core.rb')
-  NxTest.assert_equal(3, src.scan('newer_stop = newer_config_stop(collected)').length,
-                      'presne tri exporty: nakupny CSV, rozpocet XLSX, ponuka XLSX')
+  NxTest.assert_equal(4, src.scan('newer_stop = newer_config_stop(collected)').length,
+                      'styri exporty: VEPO, nakupny CSV, rozpocet XLSX, ponuka XLSX')
   NxTest.assert_equal(1, src.scan('newer: newer_configs(collected)').length,
                       'jedine miesto, kde sa `newer:` sklada — `newer_config_stop`')
 end
@@ -573,7 +579,9 @@ NxTest.test('KOV-H1 (B3): `Bom.collect` nesie ID skriniek z NOVSEJ verzie (aditi
   # `collect` vyzaduje SketchUp; overuje sa zdrojova cesta + `Validation` nad
   # tym istym klucom (in-SU sekcia `run_kovh1` to skusa nad zivym modelom).
   bom = NxKovh1.src('core/bom.rb')
-  NxTest.assert(bom.include?('newer_configs << cid'), 'zber kluc plni')
+  # GHOST-D1: zaznam nesie DRUH, zapisuje ho jeden helper (skrinka aj doska).
+  NxTest.assert(bom.include?("note_newer_config(newer_configs, 'cabinet', cid)"), 'zber kluc plni pre skrinku')
+  NxTest.assert(bom.include?("note_newer_config(newer_configs, 'board', bid)"), 'a pre dosku')
   NxTest.assert(bom.include?('newer_configs: newer_configs'), 'a vracia ho')
 
   items = []
@@ -581,7 +589,7 @@ NxTest.test('KOV-H1 (B3): `Bom.collect` nesie ID skriniek z NOVSEJ verzie (aditi
   NxTest.assert_equal(2, items.length)
   NxTest.assert_equal('red', items.first['severity'], 'novsia schema je RED')
   NxTest.assert_equal('newer_config', items.first['category'])
-  NxTest.assert(items.first['message_sk'].include?('CAB-004'))
+  NxTest.assert(items.first['message_sk'].start_with?('Skrinka CAB-004'), 'legacy String = skrinka')
   NxTest.assert(items.first['message_sk'].include?('aktualizuj plugin'))
   NxTest.assert_equal([], [].tap { |o| Noxun::Engine::Validation.check_newer_configs(nil, o) },
                       'chybajuci kluc (legacy volanie) = ziadny nalez')
