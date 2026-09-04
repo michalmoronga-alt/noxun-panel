@@ -887,13 +887,32 @@ Na rozdiel od korpusu (`reference`/`manufactured: false` — kontajner) je doska
     "material_id": "K009_PW_DTDL_18",
     "grain_direction": "length",
     "edges": { "L1": "ABS_K009_10", "L2": null, "W1": null, "W2": null },
-    "orientation": "leziaca"
+    "orientation": "leziaca",
+    "config_schema": 1
   }
 }
 ```
 
 Záväzné princípy dosky:
 
+- **KONTRAKT CONFIGU DOSKY — marker `config_schema` (GHOST-D1).** Config dosky je **uzavretý whitelist** (`normalize` + `board_config`), takže doska uložená **novším** pluginom
+  by pri prestavbe ticho prišla o polia, ktoré táto verzia nepozná (napr. budúci `attachment`). Preto nesie vlastné číslo kontraktu **`BoardBuilder::BOARD_CONFIG_SCHEMA`**
+  (dnes `1`), **nezávislé** od `CabinetBuilder::CONFIG_SCHEMA` — čísla sa navzájom **nikdy neporovnávajú**.
+  - **Marker zapisuje KAŽDÝ zapisovateľ:** vloženie a prestavba dosky (`board_config`), **seed doskových šablón** aj `TemplateStore.upsert` pre `kind: 'board'`
+    (**zápis bez markera sa ODMIETNE** — nie „legacy"), a budúce migrácie. Doskové šablóny bez markera dostanú pri prvom načítaní knižnice migráciu na `1` (dnešný tvar);
+    **explicitná hodnota, aj vyššia, ostáva nedotknutá.**
+  - **Disciplína bumpu:** číslo sa zvýši pri každom rozšírení whitelistu o pole, ktorého **tichá strata by poškodila výrobu alebo umiestnenie** (nová rola, väzba na vlastníka,
+    nové výrobné pole). Čisto odvodené/kozmetické pole bump nevyžaduje.
+  - **KAŽDÝ čitateľ uloženého configu berie vyššie číslo ako „novší config"** a rozhoduje sa **fail-closed**:
+    **(1) mutácie a šablóny = ODMIETNUTIE** — prestavba dosky (`rebuild` **pred `normalize`** aj `rebuild_in_operation` pre dávkové cesty), zmena orientácie z karty, vloženie
+    zo šablóny (autorita = **uložený RAW záznam**, nie payload z CEF) a dávka „Nahradiť UNI…" (doska ide do `blocked` plánu a **celá náhrada sa odmietne** — žiadny čiastočne
+    migrovaný projekt). Nikdy tichá normalizácia.
+    **(2) výrobné výstupy = BLOKÁDA:** `Bom.collect` zaradí dosku do `newer_configs` (záznam nesie `kind: cabinet | board`) **ešte pred filtrom `manufactured`**; brána zastaví
+    **VEPO, nákupný zoznam kovania, rozpočet aj cenovú ponuku** a Kontrola hlási RED „Doska &lt;id&gt;" s úplným zoznamom dotknutých výstupov (kusovník nad takým objektom je
+    neúplný, aj keď sa ďalej zobrazuje).
+    **(3) zobrazenie** v Inspectore a na karte ostáva **read-only s upozornením** — čítanie a výber sa nikdy neblokujú.
+  - Guard číta **RAW config z entity alebo zo záznamu šablóny, NIKDY payload z panela** (klientsky payload prechádza cez CEF a uzavreté whitelisty JS, takže marker v ňom už
+    nemusí byť). **Chýbajúci marker = 0 = legacy doska a NIKDY neblokuje.**
 - **Config dosky = superset configu dielca korpusu** — rovnaké výrobné polia (`quantity`/`length`/`width`/`thickness`/`material_id`/`grain_direction`/`edges`), navyše `engine_version`/`name`/`role` pre round-trip editácie a `orientation` pre umiestnenie (nižšie). Výstupy čítajú názov a rolu z **plochých** kľúčov (2.1), nie z configu.
 - **`orientation` je údaj UMIESTNENIA, nie výrobný údaj** (UI-C1c). Enum: `"leziaca"` (default) · `"stojaca"` · `"na_stenu"`.
   **Chýbajúci alebo prázdny kľúč = `"leziaca"`** (dosky vložené pred zavedením poľa sú platné a nemenia sa);
