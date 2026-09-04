@@ -171,7 +171,11 @@ položka za poradím `SEARCH_TOP` sa dala nájsť už LEN hľadaním.
 
 **Výsledok zápisu pre modal.** `MDH.itemResult(ok, msg, errors, op, token)` — `token` je identita JEDNÉHO odoslania: klient ho posiela v payloade `hw_create`/`hw_patch`/
 `hw_demos_create`, server ho iba **echuje** a klient prijme len presnú zhodu (review #290 P2 — inak odpoveď zavretého okna zavrela okno otvorené teraz). Patch z inline bunky
-riadku (`from` != `'modal'`) žiadny `itemResult` nedostáva.
+riadku (`from` != `'modal'`) žiadny `itemResult` nedostáva. **Pole chyby sa prekladá** na kľúč modalu (`item_code`→`code`, `name_sk`→`name`, `price_eur_vat`→`price`,
+`demos_url`→`demos`; zvyšok 1:1) — inak by `NXModal.showErrors` vstup nenašiel a bežné odmietnutia by pristáli v zbernom páse bez označeného poľa (review #290/3 P2).
+
+**Stav taxonómie v payloade** nesie DVA nezávislé príznaky: `read_only` (obsah sa nedá čítať — modal klasifikáciu **zamkne**) a `write_blocked` (obsah sa číta, ale zapísať sa
+nedá — modal skryje len „+ Vytvoriť…"). Degradovaná taxonómia je práve ten druhý stav a bez neho by UI ponúkalo akciu, ktorá vždy skončí `:write_failed`.
 
 **Štruktúrované chyby (KOV-B2).** `normalize_item`, `create_item`, `patch_item` aj `taxonomy_refusal` vracajú TRETÍM prvkom **pole**, ktorého sa odmietnutie týka (`item_code`,
 `name_sk`, `price_eur_vat`, `unit`, `category`, `manufacturer`, `series`) — modal D-15 ju kreslí PRI POLI a bez toho by „rada nepatrí výrobcovi" pristála v zbernom páse nad

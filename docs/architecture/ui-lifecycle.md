@@ -1596,7 +1596,8 @@ až po odscrollovaní a rozpísanú položku mu prekryl zoznam.
   ktorého už nikto nezmaže). Zápis **položku pritom NEULOŽÍ** — dve veci naraz by boli tichý zápis. Server odpovie `MDH.taxonomy` s čerstvou taxonómiou a KANONICKÝM menom, modal
   sa prekreslí s novou hodnotou vybranou; chyba sadne na pole `manufacturer_new`/`series_new`. Rada je **závislý select**: bez výrobcu sa vybrať ani založiť nedá a zmena výrobcu
   zahodí radu, ktorá mu nepatrí (KOV-B1: rada patrí presne jednému). Aj tu platí **token** (review #290/2 P2): výsledok patriaci už zavretému oknu zoznam obnoví, ale
-  klasifikáciu v otvorenom okne **nevyberie** — je to hodnota, ktorá ide do objednávky.
+  klasifikáciu v otvorenom okne **nevyberie** — je to hodnota, ktorá ide do objednávky. **Degradovaná taxonómia** (poškodený primár + platná `.bak`) sa *číta*, ale zapísať
+  sa do nej nedá; server to hlási samostatným `write_blocked` a modal vtedy skryje **iba „+ Vytvoriť…"** — výber existujúcich mien beží ďalej (review #290/3 P2).
 - **Zámok odoslania odomyká VOLAJÚCI v OBOCH vetvách** — signál servera `MDH.itemResult(ok, msg, errors, op, token)`: `true` zavrie modal a zahodí pamäť konceptu, `false` ho
   nechá otvorený s hodnotami a chyby (`{field, msg}`) rozsype PRI POLIACH. **`token` je identita JEDNÉHO odoslania** (review #290 P2): klient ho generuje pri submite, server ho
   echuje a klient prijme **len presnú zhodu** — zdieľaný príznak „niečo som poslal" nestačil, lebo odpoveď okna, ktoré používateľ medzitým zavrel, zavrela okno otvorené teraz
@@ -1613,7 +1614,15 @@ až po odscrollovaní a rozpísanú položku mu prekryl zoznam.
   aj radu už zaradenej položky.
 - **Zmena poľa Démos ZNEPLATNÍ hotový proposal** (review #290/2 P2) — patrí textu, ktorý ho vyhľadal. Bez toho by `hwDemosDirty` (polia sa predsa nezmenili!) pustil uloženie
   s `pid` **starého** produktu, hoci v poli svieti nový. A kým sa nový náhľad nedokončí (`HW_DEMOS_WAIT`), **zápis sa nepustí** — hláška pri poli povie aj cestu von (počkať,
-  alebo pole vymazať).
+  alebo pole vymazať). Príznak nastavuje **spoločný loader** `mdhDemosLoad`, takže blokuje **každý** zdroj náhľadu — vloženú URL aj výber zo šepkára (review #290/3 P2: cez
+  `onPick` sa dali uložiť hodnoty predchádzajúceho produktu ako ručná položka).
+- **Proposal zaniká, len keď ho zápis SPOTREBOVAL** (`usedProposal`, review #290/3 P2) — teda po potvrdenom `hw_demos_create`. Uložená úprava *cudzej* položky s ním nemá nič
+  spoločné a pripravený produkt po nej z „Nová položka" nezmizne.
+- **Editor ukazuje EFEKTÍVNU kategóriu** (`hwEffectiveCategory` — tá istá mapa ako `tree_category_of`, review #290/3 P2). Uložená hodnota mimo `CATEGORIES` v selecte možnosť
+  nemá, takže by prehliadač vybral prvú (`ZAVESY`) a uloženie nesúvisiacej zmeny by položku ticho preradilo medzi závesy. Baseline je preto `OSTATNE` a patch kategóriu pošle
+  len pri skutočnej zmene.
+- **Cena sa parsuje CELÁ** (`hwPriceKey`, review #290/3 P2): `parseFloat` berie číselnú predponu, takže „18.90abc" aj „18,90 €" mali ten istý kľúč ako 18.90 — úprava končila
+  „Nič sa nezmenilo" a proti proposalu to vyzeralo, že sa ceny nikto nedotkol. Neplatná hodnota je **štruktúrovaná chyba pri poli `price`**, nikdy tichý zápis.
 - **Náhľad z Démosu má KLIENTSKU generáciu** (review #290 P2): každá zmena poľa ju zvýši a odpoveď so starou sa **zahodí**. Server svoju generáciu dvíha len pri NOVOM náhľade,
   takže scenár „vložím URL, potom pole prepíšem na text" by inak nechal dobiehajúcu odpoveď prepísať kód, názov, cenu, MJ, kategóriu aj výrobcu. **Vymazanie poľa** je výslovné
   „už to nechcem": pošle `hw_demos_cancel` a proposal zahodí.
