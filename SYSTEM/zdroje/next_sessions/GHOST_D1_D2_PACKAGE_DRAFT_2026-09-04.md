@@ -102,3 +102,11 @@ Kolo 2: **4/4 RESOLVED**. **Nové (6 FIX, žiadny BLOCKER):** (1) `draw_board` b
 falošne `:committed`; (3) fáza 1 bez brány voľného priestoru pri otočených drawing axes → len reálna geometrická inferencia, inak `pickray` ∩ rovina Z počiatku; (4) `enableVCB?` viazané na
 fázy → `true` celý život nástroja, fáza riadi spracovanie; (5) pásik ghostu ponúka doske Z-zámok → board payload skryje `gbMode`/`gbLockWrap`, ukáže orientáciu; (6) chýba in-SU
 `onCancel(2)` pre dosku a výmena dokumentu počas session → doplnené do DoD D1. Kolo 4 (Sol, záverečné — ukončí sa aj pri drobných NOTE, pokračuje len pri BLOCKERi) = ČAKÁ.
+
+## Codex CLI audit kolo 4 (5.9.2026, Sol nad verziou 4 `5750942`) — SOUND, ZAPRACOVANÉ (verzia 5 = FINAL)
+
+Kolo 3: **6/6 RESOLVED**. **BLOCKER: žiadny → SOUND.** Zvyšné 3 FIX zapracované: (1) explicitný rozlišovač `interaction: placement | drawing` (D1 aj D2 majú subjekt `board`, ale nezlučiteľné
+správanie klikov/klávesov/VCB/pásika; charakterizácia cabinet → board placement → board drawing → cabinet); (2) downgrade brána doskových šablón pred `prepare_insert` (RAW záznam, vlastný
+`BOARD_CONFIG_SCHEMA`, vyššia schéma = odmietnutie bez pečiatky); (3) kontrakt degenerácie `pickray → os` (uhlový prah, `t >= 0`, konečné čísla, dosah; testy skoro rovnobežných pohľadov
+z oboch strán). Residual risks → DoD: `onCancel(2)` + výmena dokumentu vo fáze 2 so Shiftom; ALT na Windows = manuálny smoke.
+**Priebeh auditu:** 23 nálezov → 4 + 2 → 6 → 3 (SOUND). Packages GHOST-D1/D2 v `SYSTEM/PLAN.md` = autorita pre implementáciu (Audit: HOTOVÝ).
