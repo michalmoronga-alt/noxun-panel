@@ -695,6 +695,41 @@ module Noxun
           # `NX.setStatus`), takze musi niest aj jej varovania — inak by
           # upozornenia z TEJ ISTEJ prestavby zmizli bez stopy.
           push_manual_result(op, true, manual_ok_msg(op, removed, cab))
+          # NASTROJE-1: tento apply prisiel ako FLUSH pred kopiou nastrojom.
+          # Kopia bezi AZ TU — v tom istom callbacku, nad UZ ZAPISANYM configom
+          # a AZ PO vsetkych pushoch (jej vlastny status ma ostat posledny).
+          # Odmietnute vetvy vyssie sa sem nedostanu: kopirovat zo stareho
+          # configu by bolo presne to, comu handshake predchadza — server takú
+          # kópiu necha dobehnut do timeoutu a odmietne s hlaskou.
+          resolve_native_op(data)
+        end
+
+        # --- NASTROJE-1: handshake pred kopiou nastrojom ---------------------
+        # Uzavrety whitelist (vzor `manual_op`): server prijme LEN znamy druh
+        # operacie a token si ocisti. Smer kopie sa TU NECITA — autorita je
+        # cakajuci zaznam servera, klient posiela iba korelacny kluc.
+        NATIVE_OPS = %w[copy].freeze
+
+        def resolve_native_op(data)
+          raw = data['native_op']
+          return nil unless raw.is_a?(Hash)
+          return nil unless NATIVE_OPS.include?(raw['kind'].to_s)
+          return nil unless defined?(Tools::Mower)
+
+          Tools::Mower.resolve_flush(manual_token(raw['token']), 'flushed')
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.resolve_native_op')
+          nil
+        end
+
+        # Odpoved panela, ked NEBOLO co flushnut (`nothing`) alebo su v karte
+        # cervene polia / rozpisany vyraz (`invalid`). Bez nej by server cakal
+        # do timeoutu a kopiu odmietol — odpoved je preto POVINNA v kazdej vetve.
+        def handle_native_flush_done(payload)
+          data = parse(payload)
+          return nil unless defined?(Tools::Mower)
+
+          Tools::Mower.resolve_flush(manual_token(data['token']), data['result'].to_s)
         end
 
         # --- KOV-H2: signal vysledku pre modal rucnej polozky ----------------

@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.9.23' unless defined?(VERSION)
+    VERSION = '0.9.24' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -521,6 +521,15 @@ Sketchup.require 'noxun_engine/ui/materials_dialog' # V0.4.5 D2 projektove predv
 Sketchup.require 'noxun_engine/ui/hardware_catalog_dialog' # V0.6 C-2: okno Katalog kovania
 Sketchup.require 'noxun_engine/ui/supplier_settings_dialog' # ŠT-4a: serverova autorita sekcii Nastavenia (okno zaniklo)
 Sketchup.require 'noxun_engine/ui/templates_dialog' # V0.4.5 D2 sprava sablon
+# NASTROJE-1: nastroje Mower + Snaper v balíku enginu. Ciste jadra prve (headless
+# sada nacitava LEN ich), potom spolocna vrstva s registratorom a az nakoniec
+# moduly nastrojov — `tools.rb` sam pri nacitani nic neregistruje (legacy Mower
+# staval toolbar pri kazdom `load`), registraciu spusta init blok nizsie.
+Sketchup.require 'noxun_engine/tools/mower_calc'  # ciste jadro: posun, nazov kopie, vyber cesty
+Sketchup.require 'noxun_engine/tools/snap_calc'   # ciste jadro: AABB sweep a verdikty prisunutia
+Sketchup.require 'noxun_engine/tools/tools'       # spolocna vrstva + JEDINY registrator toolbaru/menu
+Sketchup.require 'noxun_engine/tools/mower'       # rotacie, Z, kopia (po cabinet_builder — pouziva sev vkladu)
+Sketchup.require 'noxun_engine/tools/snaper'      # prisunutie na doraz (po tags — cita folder_hidden?)
 
 module Noxun
   module Engine
@@ -575,6 +584,11 @@ module Noxun
         # ŠT-3c-1: zauzivana polozka ostava, ale otvara SEKCIU Sablony v Studiu
         # (satelitne okno Sablony zaniklo).
         menu.add_item('Šablóny') { StudioDialog.show(open_section: 'tpl') }
+
+        # NASTROJE-1: vlastny toolbar „Noxun Nástroje" + submenu Nástroje.
+        # Submenu sa podava UZ EXISTUJUCE — druhe `add_submenu('Noxun Engine')`
+        # by v SketchUpe vyrobilo DRUHE rovnomenne menu.
+        Tools.install!(menu)
 
         # Scale observer — attach na existujuce korpusy + AppObserver pre buduce modely.
         ScaleWatch.install

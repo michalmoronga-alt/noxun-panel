@@ -99,8 +99,12 @@ module Noxun
     # o to, aby okna nezostali visiet nad vymenenym balikom. Vynimky sa
     # prehltnu: aktualizacia UZ presla a zlyhane zatvorenie z nej nesmie
     # spravit neuspech (latch drzi vstupy aj tak).
+    # NASTROJE-1: zoznam nesie AJ maly Z-dialog nastrojov — jeho callback
+    # `applyZ` zapisuje do modelu, takze po swape nesmie ostat otvoreny.
     def self.close_all_dialogs
-      [defined?(Panel) ? Panel : nil, defined?(StudioDialog) ? StudioDialog : nil].compact.each do |mod|
+      [defined?(Panel) ? Panel : nil,
+       defined?(StudioDialog) ? StudioDialog : nil,
+       defined?(Tools::ZDialog) ? Tools::ZDialog : nil].compact.each do |mod|
         begin
           mod.hide if mod.respond_to?(:hide)
         rescue StandardError

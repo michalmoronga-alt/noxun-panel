@@ -17,6 +17,64 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **NÁSTROJE-1 · T1a — MOWER A SNAPER V BALÍKU NOXUN ENGINE (v0.9.24, 4.9.2026, PR #293):** prvá polovica dávky, ktorá rieši **D-20**. Dva pomocné pluginy Michala (Noxun Mower
+  a Snaper) prestali byť samostatné rozšírenia a stali sa modulmi enginu (`noxun_engine/tools/`); verziu, aktualizáciu (D-52) aj logovanie preberajú od neho, ich UI ostáva
+  zámerne také, aké bolo („nechať im svoj svet"). **T1b** — boot migrácia starých inštalácií a inštalátor — má vlastný PR; **D-20 preto ostáva otvorená**.
+  **Prečo vlastný toolbar.** Toolbar enginu má železné pravidlo „do modelu sa NEZAPISUJE" (lekcia D-103/D-105), kým nástroje model menia. Preto vzniká **druhý** panel
+  „Noxun Nástroje" s deviatimi príkazmi (−90° · +90° · 180° · Z = 0 · Z posun… · Kópia vľavo/vpravo · Prisunúť vľavo/vpravo) a rovnaké `UI::Command` objekty obsluhujú aj
+  submenu Extensions → Noxun Engine → Nástroje. Registrátor je **jeden a idempotentný** (`file_loaded?` + `@toolbar` memo) — legacy Mower staval toolbar pri každom `load` bez
+  guardu; trojstav (`get_last_state`) je vyslovený, takže skrytý panel po reštarte skrytý ostane.
+  **Jadro dávky: kópia už nie je fantóm.** Legacy `add_instance(ent.definition, tr)` vyrobil inštanciu **bez NOXUN identity** — Inspector ju nevidel, v kusovníku ani v cenách
+  nebola a prestavba originálu ju menila s ním. Kópia teraz ide **tým istým švom ako „Vložiť kópiu"** v paneli (`config_to_params` → `rekey_hardware_manual` →
+  `CabinetBuilder.build(..., transform:)`), takže má vlastnú definíciu, nové CAB číslo, ad-hoc kovanie s vlastným id a je **jeden krok Späť**. Krok je **šírka korpusu z configu
+  po VLASTNEJ osi X** zdroja — nie bbox inštancie: čelo so záporným `gap_sides` alebo úchytka smie šírku korpusu presahovať, takže sľub „dotyk bbox" neplatí (Codex #288).
+  Vedľajší efekt parametrickej cesty: odpadli legacy odhady osi a znamienka podľa RotZ — kópia sedí pri akejkoľvek rotácii.
+  **Nová plocha v observeri: `ScaleWatch.flush_pending!` (audit 2/3/4 BLOCKER).** `guard` zabráni len NOVÝM udalostiam; naplnené fronty a bežiaci debounce timer zostávajú, a keď
+  timer dobehne PO operácii nástroja, jeho **transparentná** reakcia sa prilepí na nesúvisiaci krok používateľa. Nástroj preto pred každou polohovou mutáciou NOXUN objektu počká
+  na **POKOJ** = žiadny timer a prázdne fronty **všetkých** dokumentov. Je to bariéra, nie jedno spracovanie: `process_dirty` môže pri čerstvej kópii nájsť staršiu duplicitu
+  a naplánovať follow-up — ten od tejto dávky zaraďuje **KONKRÉTNY model do `@requested` PRED `schedule`** (predtým plánoval iba čas, takže ďalšia iterácia by spracovala
+  `@last_model`, teda možno cudzí dokument). Strop 5 iterácií → nástroj operáciu **odmietne**, fronty ostávajú nedotknuté.
+  **Druhá tichá diera: rigidita.** `attach_one` kontroloval len `scaled?` (dĺžky osí), takže **šmyková** matica (jednotkové, ale nekolmé osi) sa do cache stabilných transformácií
+  dostala a `reject_scale` by ňou korpus „obnovil" do stavu, ktorému nezodpovedá žiadna platná geometria. Rigidita sa preto vynucuje **priamo na hranici cache** —
+  `remember_transform` uloží len maticu, ktorá prejde `CabinetBuilder.rigid_matrix?` — a nástroj po flushi číta transformáciu **znova**: nerigidnú odmietne s hláškou.
+  **Snaper a viditeľnosť (outside-in packet).** `Model#drawing_element_visible?` je presnejšia než ručná kontrola (pozná skryté tagy aj **tag priečinky**), ale **pred SU 2026.0
+  hádže výnimku, keď je posledným prvkom cesty kontajner** — a Snaper prechádza práve kontajnery. Volá sa preto pod `rescue` s fallbackom (`hidden?` + `layer.visible?` +
+  `Tags.folder_hidden?`), ktorý je tam **bežná**, nie okrajová cesta. Obálka kontajnera **aj cieľa** sa odvodzuje rekurzívne z **viditeľných listov**: surové `definition.bounds`
+  by nieslo skrytú geometriu a skrytý vnuk (alebo skrytý presahujúci potomok vybraného objektu) by zastavil prisunutie skôr, než treba.
+  **Kontext.** Nástroje pracujú **len v root kontexte a len s objektom na root úrovni**: `transform_entities` interpretuje transformáciu globálne iba v aktívnom kontexte a jeho
+  rodičoch (oficiálna dokumentácia), a legacy Mower počítal pivot v parent-relative ráme. Odmietnutie je **preflight nástroja** — musí prísť PRED `CabinetBuilder.build`, ktorý
+  si edit kontext zatvára sám. Z-dialog dostal enginový lifecycle: callbacky pred `show`, `set_on_closed`, `Engine.update_locked?(:tools_z)` a účasť vo **všetkých troch**
+  zoznamoch bariéry aktualizácie.
+  **Prípona názvu kópie — revízia FIX 10 (Michal 4.9. pri internej kontrole PR).** Prvá verzia brala za príponu aj **číslo ≥ 27** (package to tak mal). Lenže ručný názov skrinky
+  bežne končí **šírkou**: „Dolná 900" by kópia premenovala na „Dolná a" a informácia by zmizla. Prípony sú preto **výhradne písmenové** — `a`…`z`, po vyčerpaní `aa`…`zz`, ďalej
+  `aaa`… (bijektívna sústava so základom 26, ako stĺpce v tabuľkovom procesore) — a zo zdroja sa odstraňuje **len** *medzera + 1–2 malé písmená*. „Dolná 900" → „Dolná 900 a" →
+  „Dolná 900 b"; „Bok L" (veľké písmeno) ani „Skrinka pod" (slovo) sa nedotkne. **Poučenie:** pravidlo, ktoré si z názvu niečo odhryzne, treba testovať na REÁLNYCH názvoch
+  z dielne, nie na „Skrinka a" — package aj prvý návrh testov mali len umelé prípady.
+  **Testy:** headless `test_nastroje1_tools.rb` (jadrá + guardy) a `test_nastroje1_observer.rb` (bariéra nad stubmi observera — timer, generácia, per-model `@requested`, strop,
+  rigidita), in-SU `run_tools1` + `run_tools1_async`. Mutácie (7): kópia cez `add_instance` · holé mm namiesto `Units.vector` · prípona bez hľadania voľnej · **prípona berie aj
+  číslo** · flush bez zastavenia timera · cache bez kontroly rigidity · follow-up bez konkrétneho modelu · **rekey ad-hoc kovania ako no-op** — každá padne na inom teste.
+  **Prvý in-SU beh nad PR našiel 4 FAIL a všetky boli v TESTE, nie v produkte** — a stoja za zápis, lebo sú to opakovateľné pasce in-SU scenárov: *(1)* skrinka postavená bez
+  `fronts.items` **nemá čelo vôbec**, takže scenár so záporným `gap_sides` nemal na čom ukázať presah (obálka inštancie = obálka korpusu, prekryv 0) — parametre teraz čelo
+  vyžadujú a headless test drží aj premisu, aj to, že bez `items` čelo vzniknúť nesmie; *(2)* ad-hoc položka kovania je **uzavretý whitelist `MANUAL_KEYS`** (`source`/`qty`/
+  `price_eur_vat`) — s vymyslenými kľúčmi ju `norm_hardware_manual` ticho zahodí a scenár meria prázdno (pribudol headless test celej kópiovej cesty + assert, že zdroj položku
+  naozaj má); *(3)* **otvorenie aj zatvorenie komponentu je v SketchUpe samo krokom Späť**, takže marker-probe „príkaz neotvoril operáciu" cez ne nesmie siahať — inak `undo`
+  vráti zatvorenie kontextu; *(4)* dôsledok (3): model ostal vnútri skupiny a jej `erase!` padol na `cannot remove an instance in the active editing path`, čím **zakryl všetky
+  ďalšie asserty sekcie**. Poučenie: probe okno marker→undo musí obsahovať VÝHRADNE merané volanie, a scenár nesmie po sebe nechať otvorený edit kontext.
+  **Druhý beh (1579 PASS) našiel piaty — a najpoučnejší:** scenár bariéry si „starú duplicitu" vyrábal holým `add_instance(src.definition, tr)`. Lenže **identita žije na
+  INŠTANCII** (štandard 2.2), nie na definícii: bez skopírovaného `NOXUN` dictionary vráti `Store.kind` nil, `Ids.each_of_kind` inštanciu preskočí a observer ju cez
+  `notify_added` ignoruje — v modeli bola stále len jedna skrinka a **celý scenár prešiel nad prázdnom** (assert „každá skrinka má vlastné id" je pri jedinej skrinke pravdivý
+  vždy). Duplicita sa teraz vyrába ako **reálna kópia** (nová inštancia + celý dictionary vrátane `cabinet_id` a `config`), stará **pod guardom** a čerstvá **mimo neho**, a do
+  asserta pribudol **POČET** duplicít aj skriniek. Poučenie do ďalších dávok: **assert, ktorý je pravdivý aj nad prázdnym modelom, nie je dôkaz** — počet patrí do podmienky,
+  nielen do hlášky; a príprava scenára sa musí overiť vlastným assertom skôr, než sa na nej postaví meranie.
+  **Codex kolo 1 vrátilo 3× P2 (žiadny P1) a všetky tri boli reálne diery, nie štylistika.** *(1) Obálka kontajnera ako kandidát prekážky:* je to **únia detí**, takže miešala X
+  jedného dieťaťa s Y/Z iného — dve skupiny, jedna blízko ale mimo koridoru a druhá ďaleko v ňom, dali medzeru podľa tej blízkej, ktorá skrinke vôbec nestojí v ceste. Kontajner je
+  odteraz len **schránka na zostup**, gap počítajú výhradne listy; obálka slúži už len na predvýber, kde je ako nadmnožina bezpečná. *(2) Bežiaca ghost session:* kópia z toolbaru ju
+  neukončila, takže ďalší klik vo viewporte by commitol **starý plán** — ruší sa presne ako pri „Vložiť kópiu". *(3) Rozpísaná úprava v Inspectore:* auto-apply má **400 ms debounce**
+  a klik na tlačidlo nástroja ide **mimo JS**, takže kópia mohla vzniknúť zo **starého configu**. Pribudol **handshake**: server drží čakajúcu kópiu pod tokenom, pošle
+  `NX.flushForNative`, a JS odpovie v každej vetve — červené polia či rozpísaný výraz kópiu **odmietnu**, „nič nečaká" ju pustí hneď, a rozpísané edity idú `apply_all`om s `native_op`,
+  po ktorom kópia beží až v tom callbacku. Bez odpovede do 2 s sa kópia odmietne. **Zásada, ktorá z toho ostáva:** smer kópie je vždy zo servera (echo klienta je len korelačný kľúč)
+  a **nikdy tichá kópia zo starého configu** — radšej hláška. JS vetvy stráži sada, ktorá funkciu číta priamo zo `form.js`, nie jej zrkadlo.
+  **Codex review:** doplní orchestrátor.
 - **KOV-B2 · KATALÓG KOVANIA: STROM, MODAL POLOŽKY, DÉMOS VÝROBCA (v0.9.23, 4.9.2026, PR #290):** UI polovica slice B — dáta a taxonómiu dala KOV-B1, táto dávka ich vytiahla
   na obrazovku a uzavrela **D-110** („pridávanie kovaní je neprehľadné", Michal 24.8. pri prvom teste v0.8.0).
   **Prečo strom a nie lepšie usporiadaný plochý zoznam.** Katalóg reálnej dielne má stovky kódov a doterajší pohľad Položky bol plochý serverový search s **tichým stropom**

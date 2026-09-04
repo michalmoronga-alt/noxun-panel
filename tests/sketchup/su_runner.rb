@@ -13313,6 +13313,695 @@ module NoxunSuRunner
     kova_cleanup_catalog(res) if defined?(res)
   end
 
+  # --- NASTROJE-1 (T1a): Mower + Snaper v baliku enginu ----------------------
+  # Co sa tu dokazuje (headless sada geometriu ani undo neoveri):
+  #   * kopia NOXUN skrinky ide cez SEV ENGINU — vlastna definicia, nove CAB id,
+  #     Inspector ju vidi, kusovnik ma o skrinku viac, 1x Spat ju odstrani;
+  #   * krok kopie je SIRKA KORPUSU po VLASTNEJ osi X — plati aj po rotacii a aj
+  #     ked celo so zapornym `gap_sides` obalku INSTANCIE presahuje;
+  #   * rotacie a Z su PRESNE JEDEN krok Spat a NIE JE to prestavba;
+  #   * odmietnutia (edit kontext, vnoreny korpus, sikma matica) nechavaju model
+  #     bez zmeny a NEOTVORIA ziadnu operaciu;
+  #   * bariera `flush_pending!` dovedie observer do pokoja aj cez follow-up po
+  #     starsej duplicite — po nej ma kazda skrinka vlastne id a nebezi timer;
+  #   * Snaper prisunie na doraz; skryta prekazka (aj skryty VNUK vo viditelnom
+  #     kontajneri) neblokuje a skryty presahujuci potomok CIELA doraz nemeni.
+  # POZOR (nalez z prveho behu): bez `fronts.items` postavi builder skrinku
+  # UPLNE BEZ CELA (`Fronts.normalize` da prazdny zoznam), takze scenar so
+  # zapornym `gap_sides` nemal na com ukazat presah — obalka instancie sa
+  # rovnala obalke korpusu a prekryv vysiel 0. Skrinka preto ma celo VZDY.
+  TOOLS1_PARAMS = { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 560.0,
+                    'thickness' => 18.0, 'floor_height' => 100.0,
+                    'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'door',
+                                                'mode' => 'auto', 'wings' => '1' }] } }.freeze
+
+  # Marker vymedzuje probe okno („otvoril prikaz operaciu?"), takze observer
+  # musi byt PRED nim v pokoji — inak by jeho odlozeny transparentny tik pristal
+  # NAD markerom a `Sketchup.undo` by vratil jeho, nie marker.
+  # V otvorenom edit kontexte sa NEFLUSHUJE: `process_dirty` -> `dedup_copies`
+  # si zatvara root kontext a scenar edit kontextu by sa tym rozpadol.
+  def tools1_marker(model, bag)
+    tools1_settle(model) if tools1_root?(model)
+    model.start_operation('NASTROJE-1 marker', true)
+    cp = model.entities.add_cpoint(ORIGIN)
+    model.commit_operation
+    bag << cp
+    cp
+  end
+
+  def tools1_root?(model)
+    model.active_path.nil? || model.active_path.length.zero?
+  rescue StandardError
+    true
+  end
+
+  def tools1_settle(model)
+    e::ScaleWatch.flush_pending!(model)
+  rescue StandardError
+    nil
+  end
+
+  def tools1_clear_markers(model, bag)
+    live = bag.select { |c| c.respond_to?(:valid?) && c.valid? }
+    return if live.empty?
+
+    model.start_operation('NASTROJE-1 cleanup markers', true)
+    live.each(&:erase!)
+    model.commit_operation
+  rescue StandardError
+    nil
+  end
+
+  def tools1_select(model, inst)
+    model.selection.clear
+    model.selection.add(inst)
+  end
+
+  # Poloha B v LOKALNOM rame A. Pri kopii musi ist o CISTY posun po osi X — tym
+  # sa susednost meria na OBALKACH KORPUSOV, nie na bbox instancie (celo so
+  # zapornym `gap_sides` alebo uchytka smie sirku korpusu presahovat).
+  def tools1_rel(a, b)
+    a.transformation.inverse * b.transformation
+  end
+
+  def tools1_pure_translation?(tr)
+    m = tr.to_a
+    [[0, 1.0], [1, 0.0], [2, 0.0], [4, 0.0], [5, 1.0], [6, 0.0],
+     [8, 0.0], [9, 0.0], [10, 1.0]].all? { |(i, want)| (m[i] - want).abs < 1e-6 }
+  end
+
+  def tools1_same_matrix?(inst, values)
+    inst.transformation.to_a.each_with_index.all? { |v, i| (v - values[i]).abs < 1e-6 }
+  end
+
+  # Kvader ako SKUPINA. Smer pushpull sa riadi normalou plochy, takze vysledny
+  # rozsah Z je deterministicky.
+  def tools1_fill_block(ents, x0, x1, y0, y1, z0, z1)
+    pts = [e::Units.point(x0, y0, z0), e::Units.point(x1, y0, z0),
+           e::Units.point(x1, y1, z0), e::Units.point(x0, y1, z0)]
+    face = ents.add_face(pts)
+    h = e::Units.mm(z1 - z0)
+    face.pushpull(face.normal.z < 0 ? -h : h)
+    face
+  end
+
+  def tools1_block(model, parent_ents, x0, x1, y0 = 0.0, y1 = 300.0, z0 = 0.0, z1 = 500.0)
+    grp = nil
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST blok', true)
+      grp = parent_ents.add_group
+      tools1_fill_block(grp.entities, x0, x1, y0, y1, z0, z1)
+      model.commit_operation
+    end
+    grp
+  end
+
+  # Prekazka zanorena o dve urovne: outer > mid > inner(kvader). Cely retazec
+  # vznika v JEDNEJ operacii — prazdna skupina sa v SketchUpe cisti sama.
+  def tools1_nested_block(model, x0, x1)
+    outer = nil
+    inner = nil
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST vnorena prekazka', true)
+      outer = model.entities.add_group
+      mid = outer.entities.add_group
+      inner = mid.entities.add_group
+      tools1_fill_block(inner.entities, x0, x1, 0.0, 300.0, 0.0, 500.0)
+      model.commit_operation
+    end
+    { outer: outer, inner: inner }
+  end
+
+  def tools1_hide(model, ent, value)
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST viditelnost', true)
+      ent.hidden = value
+      model.commit_operation
+    end
+  end
+
+  # REALNA kopia instancie — presne to, co spravi Ctrl+C/V: nova instancia TEJ
+  # ISTEJ definicie PLUS skopirovany CELY `NOXUN` dictionary, teda aj zdielane
+  # `cabinet_id` a `config`.
+  # NALEZ Z DRUHEHO IN-SU BEHU: hole `add_instance(src.definition, tr)` duplicitu
+  # NEVYROBI — identita zije na INSTANCII (standard 2.2), takze bez atributov
+  # `Store.kind` vrati nil, `Ids.each_of_kind` instanciu preskoci a observer ju
+  # cez `notify_added` ignoruje. Scenar potom „presiel" nad prazdnom.
+  # `guarded: true` = observer o kopii NEVIE (stara, uz existujuca duplicita);
+  # `guarded: false` = zachyti ju `onElementAdded` (cerstva kopia pouzivatela).
+  def tools1_clone_cabinet(model, src, x_mm, guarded: true)
+    copy = nil
+    body = lambda do
+      model.start_operation('SU-TEST kopia instancie', true)
+      copy = model.entities.add_instance(
+        src.definition, Geom::Transformation.translation(e::Units.point(x_mm, 0, 0))
+      )
+      dict = src.attribute_dictionary(e::Store::DICT, false)
+      dict.each { |k, v| copy.set_attribute(e::Store::DICT, k, v) } if dict
+      model.commit_operation
+    end
+    guarded ? e::ScaleWatch.guard { body.call } : body.call
+    copy
+  end
+
+  def tools1_close_context(model)
+    model.close_active while model.active_path && model.active_path.length.positive?
+  rescue StandardError
+    nil
+  end
+
+  def run_tools1(model)
+    cleanup(model)
+    markers = []
+    begin
+      # 1) KOPIA VPRAVO: nova instancia s VLASTNOU definiciou a novym CAB id
+      src = e::CabinetBuilder.build(model, TOOLS1_PARAMS)
+      return ok('NASTROJE-1: vlozenie zdrojovej skrinky', false) unless src
+
+      src_cid = e::Store.get(src, 'cabinet_id')
+      bom_before = Array(e::Bom.collect(model)[:records]).length
+      tools1_select(model, src)
+      copy = e::Tools::Mower.copy(:right)
+      ok('NASTROJE-1: kopia vpravo vznikla', !copy.nil? && copy.valid?)
+      return ok('NASTROJE-1: bez kopie sa dalej testovat neda', false) unless copy && copy.valid?
+
+      copy_cid = e::Store.get(copy, 'cabinet_id')
+      ok("NASTROJE-1: kopia ma VLASTNE CAB id (#{src_cid} -> #{copy_cid})",
+         !copy_cid.nil? && copy_cid != src_cid)
+      ok('NASTROJE-1: kopia ma VLASTNU definiciu (legacy add_instance zdielal tu istu)',
+         !copy.definition.equal?(src.definition))
+      ok('NASTROJE-1: kopia je NOXUN korpus s vlastnym configom (Inspector ju otvori)',
+         e::Store.kind(copy).to_s == 'cabinet' && !e::Store.config(copy).nil?)
+      ok('NASTROJE-1: kopia je v modeli ako samostatna skrinka', cabinets(model).length == 2)
+      bom_after = Array(e::Bom.collect(model)[:records]).length
+      ok("NASTROJE-1: kusovnik ma o skrinku viac (#{bom_before} -> #{bom_after})",
+         bom_after > bom_before)
+      ok('NASTROJE-1: vyber je KOPIA (dalsi klik kopiruje dalej)', model.selection.to_a == [copy])
+
+      rel = tools1_rel(src, copy)
+      ok("NASTROJE-1: krok kopie je SIRKA KORPUSU po vlastnej osi X (#{mm(rel.origin.x).round(2)} mm)",
+         (mm(rel.origin.x) - 600.0).abs <= TOL && mm(rel.origin.y).abs <= TOL &&
+         mm(rel.origin.z).abs <= TOL && tools1_pure_translation?(rel))
+
+      rec = []
+      install_js_recorder(rec)
+      begin
+        e::Panel.push_selected(model, dedup: false)
+      ensure
+        remove_js_recorder
+      end
+      ok('NASTROJE-1: Inspector dostal kartu KOPIE (payload nesie jej CAB id)',
+         rec.any? { |s| s.include?(copy_cid.to_s) })
+
+      Sketchup.undo
+      ok('NASTROJE-1: 1x Spat odstranil PRESNE kopiu (zdroj ostal)',
+         cabinets(model).length == 1 && src.valid? && e::Store.get(src, 'cabinet_id') == src_cid)
+
+      # 2) KOPIA VLAVO
+      tools1_select(model, src)
+      left = e::Tools::Mower.copy(:left)
+      rel_l = left && left.valid? ? tools1_rel(src, left) : nil
+      ok("NASTROJE-1: kopia vlavo ide o -sirku (#{rel_l ? mm(rel_l.origin.x).round(2) : 'nil'} mm)",
+         !rel_l.nil? && (mm(rel_l.origin.x) + 600.0).abs <= TOL)
+      Sketchup.undo
+
+      # 3) NAZOV: rucny nazov dostane priponu a -> b
+      pn = e::CabinetBuilder.config_to_params(e::Store.config(src) || {})
+      pn['name'] = 'Drezová'
+      e::CabinetBuilder.rebuild(model, src, pn)
+      tools1_select(model, src)
+      c1 = e::Tools::Mower.copy(:right)
+      n1 = c1 && c1.valid? ? e::CabinetBuilder.manual_name(e::Store.config(c1) || {}) : nil
+      tools1_select(model, c1) if c1 && c1.valid?
+      c2 = c1 && c1.valid? ? e::Tools::Mower.copy(:right) : nil
+      n2 = c2 && c2.valid? ? e::CabinetBuilder.manual_name(e::Store.config(c2) || {}) : nil
+      ok("NASTROJE-1: nazov kopie ide a -> b (#{n1.inspect} / #{n2.inspect})",
+         n1 == 'Drezová a' && n2 == 'Drezová b')
+      Sketchup.undo
+      Sketchup.undo
+
+      # 4) AD-HOC KOVANIE: kopia dostane VLASTNE id polozky, obsah sa nemeni
+      # Tvar polozky je UZAVRETY whitelist `MANUAL_KEYS` (`source`/`qty`/
+      # `price_eur_vat`) — nalez z prveho behu: s vymyslenymi klucmi ju
+      # `norm_hardware_manual` ticho zahodila a scenar meral prazdno.
+      pm = e::CabinetBuilder.config_to_params(e::Store.config(src) || {})
+      pm['hardware_manual'] = [{ 'id' => 'MAN-SU-TOOLS1', 'source' => 'free',
+                                 'name' => 'Testovacia položka', 'qty' => 2,
+                                 'unit' => 'ks', 'price_eur_vat' => 1.5 }]
+      e::CabinetBuilder.rebuild(model, src, pm)
+      src_man = Array((e::Store.config(src) || {})['hardware_manual']).first
+      ok('NASTROJE-1: zdrojova skrinka ma ad-hoc polozku (inak by scenar meral prazdno)',
+         !src_man.nil? && src_man['name'] == 'Testovacia položka' && src_man['qty'] == 2)
+      tools1_select(model, src)
+      cman = e::Tools::Mower.copy(:right)
+      cop_man = cman && cman.valid? ? Array((e::Store.config(cman) || {})['hardware_manual']).first : nil
+      ok("NASTROJE-1: ad-hoc polozka kopie ma NOVE id, ale ten isty obsah " \
+         "(#{src_man && src_man['id']} -> #{cop_man && cop_man['id']})",
+         !cop_man.nil? && !src_man.nil? && cop_man['id'] != src_man['id'] &&
+         cop_man['name'] == src_man['name'] && cop_man['qty'] == src_man['qty'] &&
+         cop_man['unit'] == src_man['unit'] && cop_man['price_eur_vat'] == src_man['price_eur_vat'])
+      Sketchup.undo
+      pc = e::CabinetBuilder.config_to_params(e::Store.config(src) || {})
+      pc['hardware_manual'] = []
+      pc['name'] = nil
+      e::CabinetBuilder.rebuild(model, src, pc)
+
+      # 5) ROTACIA je PRESNE JEDEN krok Spat a NIE JE to prestavba
+      part_before = src.definition.entities.grep(Sketchup::ComponentInstance)
+                       .map { |i| e::Store.get(i, 'id') }.compact.sort
+      tr_before = src.transformation.to_a.dup
+      marker_rot = tools1_marker(model, markers)
+      tools1_select(model, src)
+      e::Tools::Mower.rotate(90)
+      rot = src.transformation
+      ok('NASTROJE-1: rotacia +90° otocila korpus okolo svetovej Z',
+         (rot.xaxis.y - 1.0).abs < 1e-6 && rot.xaxis.x.abs < 1e-6)
+      part_after = src.definition.entities.grep(Sketchup::ComponentInstance)
+                      .map { |i| e::Store.get(i, 'id') }.compact.sort
+      ok('NASTROJE-1: rotacia NIE JE prestavba (dielce maju to iste ID)',
+         !part_before.empty? && part_after == part_before)
+      Sketchup.undo
+      ok('NASTROJE-1: 1x Spat vratil rotaciu a marker PREZIL (bola to jedna operacia)',
+         tools1_same_matrix?(src, tr_before) && marker_rot.valid?)
+
+      # 6a) ZAPORNY gap_sides: obalky KORPUSOV sa dotykaju, obalky INSTANCII sa
+      #     prekryvaju — preto sa krok neriadi bboxom (Codex #288)
+      pf = e::CabinetBuilder.config_to_params(e::Store.config(src) || {})
+      pf['fronts'] = (pf['fronts'] || {}).merge('gap_sides' => -20.0)
+      e::CabinetBuilder.rebuild(model, src, pf)
+      tools1_select(model, src)
+      wide = e::Tools::Mower.copy(:right)
+      if wide && wide.valid?
+        wrel = tools1_rel(src, wide)
+        ok("NASTROJE-1: pri presahujucom cele je krok stale sirka korpusu (#{mm(wrel.origin.x).round(2)} mm)",
+           (mm(wrel.origin.x) - 600.0).abs <= TOL)
+        # Poistka premisy scenara: bez REALNEHO presahu cela by dalsi assert
+        # nemal co merat (presne to zhodilo prvy beh — skrinka bola bez cela).
+        overhang = mm(src.bounds.max.x) - (mm(src.transformation.origin.x) + 600.0)
+        ok("NASTROJE-1: celo so zapornym gap_sides presahuje korpus o #{overhang.round(1)} mm",
+           overhang > TOL)
+        overlap = mm(src.bounds.max.x) - mm(wide.bounds.min.x)
+        ok("NASTROJE-1: obalky INSTANCII sa pritom prekryvaju o #{overlap.round(1)} mm — " \
+           'sľub „dotyk bbox" neplatí', overlap > TOL)
+        Sketchup.undo
+      else
+        ok('NASTROJE-1: kopia pri zapornom gap_sides', false)
+      end
+
+      # 6b) KOPIA ROTOVANEJ SKRINKY ide po JEJ vlastnej osi X
+      tools1_select(model, src)
+      e::Tools::Mower.rotate(90)
+      tools1_select(model, src)
+      rcopy = e::Tools::Mower.copy(:right)
+      rrel = rcopy && rcopy.valid? ? tools1_rel(src, rcopy) : nil
+      ok("NASTROJE-1: kopia ROTOVANEJ skrinky ide po JEJ osi X (#{rrel ? mm(rrel.origin.x).round(2) : 'nil'} mm)",
+         !rrel.nil? && (mm(rrel.origin.x) - 600.0).abs <= TOL &&
+         mm(rrel.origin.y).abs <= TOL && tools1_pure_translation?(rrel))
+      Sketchup.undo
+      tools1_select(model, src)
+      e::Tools::Mower.rotate(-90)
+      pb = e::CabinetBuilder.config_to_params(e::Store.config(src) || {})
+      pb['fronts'] = (pb['fronts'] || {}).merge('gap_sides' => 2.0)
+      e::CabinetBuilder.rebuild(model, src, pb)
+
+      # 7) Z posun a Z = 0
+      tools1_select(model, src)
+      e::Tools::Mower.set_z(350.0)
+      ok("NASTROJE-1: Z posun polozil origin na 350 mm (#{mm(src.transformation.origin.z).round(1)})",
+         (mm(src.transformation.origin.z) - 350.0).abs <= TOL)
+      marker_z = tools1_marker(model, markers)
+      tools1_select(model, src)
+      e::Tools::Mower.set_z_zero
+      ok('NASTROJE-1: Z = 0 vratil origin na nulu', mm(src.transformation.origin.z).abs <= TOL)
+      Sketchup.undo
+      ok('NASTROJE-1: Z = 0 bol PRESNE jeden krok Spat',
+         (mm(src.transformation.origin.z) - 350.0).abs <= TOL && marker_z.valid?)
+      tools1_select(model, src)
+      e::Tools::Mower.set_z_zero
+
+      # 8) ODMIETNUTIA: vnoreny korpus a otvoreny edit kontext
+      grp = nil
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST vnoreny korpus', true)
+        grp = model.entities.add_group
+        grp.entities.add_instance(src.definition, IDENTITY)
+        model.commit_operation
+      end
+      nested = grp.valid? ? grp.entities.grep(Sketchup::ComponentInstance).first : nil
+      ok('NASTROJE-1: vnoreny korpus sa rozpozna (nie je na root urovni)',
+         !nested.nil? && e::Tools.top_level?(nested) == false &&
+         e::Tools.route(model, nested) == :nested)
+      ok('NASTROJE-1: korpus na root urovni prejde',
+         e::Tools.top_level?(src) == true && e::Tools.route(model, src) == :cabinet)
+
+      if model.respond_to?(:active_path=)
+        before_n = cabinets(model).length
+        model.active_path = [grp]
+        ok('NASTROJE-1: v otvorenom komponente sa odmieta VSETKO (este pred typom objektu)',
+           e::Tools.route(model, src) == :edit_context)
+        # Marker az TU a Spat este PRED zatvorenim kontextu (nalez z prveho behu):
+        # otvorenie aj zatvorenie komponentu je v SketchUpe SAMO krokom Spat, takze
+        # probe cez ne nesmie siahat — inak `Sketchup.undo` vrati zatvorenie
+        # kontextu (a model ostane vnutri skupiny, co potom zhodi aj jej mazanie).
+        marker_ctx = tools1_marker(model, markers)
+        tools1_select(model, src)
+        e::Tools::Mower.copy(:right)
+        e::Tools::Mower.rotate(90)
+        ok('NASTROJE-1: z otvoreneho komponentu nastroj nic nezmenil',
+           cabinets(model).length == before_n)
+        Sketchup.undo
+        ok('NASTROJE-1: a neotvoril ziadnu operaciu (1x Spat vratilo marker)', !marker_ctx.valid?)
+        tools1_close_context(model)
+      else
+        info('NASTROJE-1: `active_path=` v tomto SketchUpe nie je — edit kontext preskoceny')
+      end
+      # Skupina sa NEDA zmazat, kym je v aktivnej editacnej ceste — poistka.
+      tools1_close_context(model)
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST vnoreny korpus prec', true)
+        grp.erase! if grp && grp.valid?
+        model.commit_operation
+      end
+
+      # 9) SIKMA MATICA: nastroj odmietne, poloha ostava, ziadna operacia
+      marker_sh = tools1_marker(model, markers)
+      pre_shear = src.transformation.to_a.dup
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST shear', true)
+        shear = Geom::Transformation.new([1.0, 0.0, 0.0, 0.0,
+                                          0.5, Math.sqrt(0.75), 0.0, 0.0,
+                                          0.0, 0.0, 1.0, 0.0,
+                                          0.0, 0.0, 0.0, 1.0])
+        src.transformation = src.transformation * shear
+        model.commit_operation
+      end
+      ok('NASTROJE-1: sikma matica ma osi dlzky 1 — `scaled?` ju nechyti, rigidna nie je',
+         e::ScaleWatch.scaled?(src.transformation) == false &&
+         e::CabinetBuilder.rigid_matrix?(Array(src.transformation.to_a)) == false)
+      sheared = src.transformation.to_a.dup
+      tools1_select(model, src)
+      e::Tools::Mower.rotate(90)
+      e::Tools::Mower.copy(:right)
+      e::Tools::Snaper.snap(:right)
+      ok('NASTROJE-1: nad sikmou skrinkou nastroje ODMIETNU — poloha ani pocet sa nemenia',
+         tools1_same_matrix?(src, sheared) && cabinets(model).length == 1)
+      Sketchup.undo
+      ok('NASTROJE-1: odmietnutia neotvorili operaciu (Spat vratil shear, marker zije)',
+         tools1_same_matrix?(src, pre_shear) && marker_sh.valid?)
+
+      # 10) BARIERA: stara duplicita + cerstva kopia -> pokoj a OBE identity opravene
+      # Observer sa najprv upraci, aby `pending?` nizsie hovoril o TEJTO kopii
+      # a nie o zvysku z predoslych scenarov (Spat nad shearom zaradil `src`).
+      tools1_settle(model)
+      src_cid_now = e::Store.get(src, 'cabinet_id')
+      stale = tools1_clone_cabinet(model, src, 3000.0, guarded: true)
+      ok("NASTROJE-1: pripravena STARA duplicita so ZDIELANYM #{src_cid_now} " \
+         "(duplicit: #{e::Ids.duplicate_cabinets(model).length})",
+         !stale.nil? && stale.valid? && e::Store.get(stale, 'cabinet_id') == src_cid_now &&
+         e::Ids.duplicate_cabinets(model).length == 1)
+      ok('NASTROJE-1: stara duplicita vznikla POD guardom — observer o nej NEVIE',
+         e::ScaleWatch.pending? == false)
+
+      fresh = tools1_clone_cabinet(model, src, 4500.0, guarded: false)
+      ok("NASTROJE-1: cerstva kopia zalozila observeru pracu (duplicit: #{e::Ids.duplicate_cabinets(model).length})",
+         !fresh.nil? && fresh.valid? && e::ScaleWatch.pending? == true &&
+         e::Ids.duplicate_cabinets(model).length == 2)
+
+      settled = e::ScaleWatch.flush_pending!(model)
+      ok('NASTROJE-1: bariera dosla do POKOJA (aj cez follow-up po starsej duplicite)',
+         settled == true && e::ScaleWatch.pending? == false &&
+         e::ScaleWatch.instance_variable_get(:@timer).nil?)
+      ids_now = cabinets(model).map { |i| e::Store.get(i, 'cabinet_id') }
+      # POCET je sucast dokazu: pri jedinej skrinke by „kazda ma vlastne id"
+      # presla nad prazdnom (presne to skrylo chybu v druhom in-SU behu).
+      ok("NASTROJE-1: po bariere maju VSETKY TRI skrinky vlastne id (#{ids_now.compact.sort.join(', ')})",
+         ids_now.length == 3 && ids_now.compact.length == 3 &&
+         ids_now.uniq.length == 3 && e::Ids.duplicate_cabinets(model).empty?)
+      ok('NASTROJE-1: obe kopie prezili a su to NOXUN korpusy s vlastnym configom',
+         stale.valid? && fresh.valid? &&
+         !e::Store.config(stale).nil? && !e::Store.config(fresh).nil?)
+      info('NASTROJE-1: dva OTVORENE dokumenty naraz su MANUALNY scenar (macOS) — Windows drzi ' \
+           'jeden dokument na proces; per-model fronty kryje headless sada test_nastroje1_observer')
+      cleanup(model)
+
+      # 11) SNAPER
+      a = e::CabinetBuilder.build(model, TOOLS1_PARAMS, transform: IDENTITY)
+      return ok('NASTROJE-1: vlozenie skrinky pre Snaper', false) unless a
+
+      near = tools1_block(model, model.entities, 700.0, 800.0)
+      far = tools1_block(model, model.entities, 2000.0, 2100.0)
+      nested_obs = tools1_nested_block(model, 900.0, 1000.0)
+      tools1_hide(model, nested_obs[:outer], true) # zatial nech nezavadza
+
+      tools1_select(model, a)
+      e::Tools::Snaper.snap(:right)
+      ok("NASTROJE-1: Snaper prisunul na doraz (x = #{mm(a.transformation.origin.x).round(1)} mm)",
+         (mm(a.transformation.origin.x) - 100.0).abs <= TOL)
+      tools1_select(model, a)
+      e::Tools::Snaper.snap(:right)
+      ok('NASTROJE-1: uz prisunuta skrinka sa druhym klikom nehne',
+         (mm(a.transformation.origin.x) - 100.0).abs <= TOL)
+      Sketchup.undo
+      ok('NASTROJE-1: 1x Spat vratil prisunutie', mm(a.transformation.origin.x).abs <= TOL)
+
+      tools1_hide(model, near, true)
+      tools1_select(model, a)
+      e::Tools::Snaper.snap(:right)
+      ok("NASTROJE-1: SKRYTA prekazka neblokuje — doraz je az na dalsej (#{mm(a.transformation.origin.x).round(1)} mm)",
+         (mm(a.transformation.origin.x) - 1400.0).abs <= TOL)
+      Sketchup.undo
+
+      tools1_hide(model, nested_obs[:outer], false)
+      tools1_select(model, a)
+      e::Tools::Snaper.snap(:right)
+      ok("NASTROJE-1: doraz na dvakrat VNORENEJ prekazke (#{mm(a.transformation.origin.x).round(1)} mm)",
+         (mm(a.transformation.origin.x) - 300.0).abs <= TOL)
+      Sketchup.undo
+      tools1_hide(model, nested_obs[:inner], true)
+      tools1_select(model, a)
+      e::Tools::Snaper.snap(:right)
+      ok('NASTROJE-1: skryty VNUK vo VIDITELNOM kontajneri doraz neblokuje ' \
+         "(#{mm(a.transformation.origin.x).round(1)} mm)",
+         (mm(a.transformation.origin.x) - 1400.0).abs <= TOL)
+      Sketchup.undo
+      tools1_hide(model, nested_obs[:outer], true)
+      tools1_hide(model, near, false)
+
+      # presahujuci potomok CIELA posuva jeho obalku — a skryty uz nie
+      bump = tools1_block(model, a.definition.entities, 600.0, 650.0)
+      tools1_select(model, a)
+      e::Tools::Snaper.snap(:right)
+      ok('NASTROJE-1: presahujuci VIDITELNY potomok ciela skracuje doraz ' \
+         "(#{mm(a.transformation.origin.x).round(1)} mm)",
+         (mm(a.transformation.origin.x) - 50.0).abs <= TOL)
+      Sketchup.undo
+      tools1_hide(model, bump, true)
+      tools1_select(model, a)
+      e::Tools::Snaper.snap(:right)
+      ok('NASTROJE-1: SKRYTY presahujuci potomok ciela doraz uz neskracuje ' \
+         "(#{mm(a.transformation.origin.x).round(1)} mm)",
+         (mm(a.transformation.origin.x) - 100.0).abs <= TOL)
+      Sketchup.undo
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST bump prec', true)
+        bump.erase! if bump.valid?
+        model.commit_operation
+      end
+
+      marker_s = tools1_marker(model, markers)
+      pos_a = mm(a.transformation.origin.x)
+      tools1_select(model, a)
+      e::Tools::Snaper.snap(:left)
+      ok('NASTROJE-1: bez prekazky v smere sa presun ZABLOKUJE (poloha bez zmeny)',
+         (mm(a.transformation.origin.x) - pos_a).abs <= TOL)
+      Sketchup.undo
+      ok('NASTROJE-1: zablokovany presun neotvoril operaciu (1x Spat vratilo marker)',
+         !marker_s.valid?)
+      info("NASTROJE-1: prekazky v scenari — #{[near, far].count { |g| g && g.valid? }} top-level + 1 vnorena")
+
+      # 12) GHOST SESSION: kopia nastrojom ju MUSI zrusit (Codex #293 kolo 1, P2)
+      cleanup(model)
+      g1 = e::CabinetBuilder.build(model, TOOLS1_PARAMS)
+      tools1_select(model, g1)
+      e::Panel.handle_insert(pg(model, TOOLS1_PARAMS.dup)) # „Vlozit" = ghost na kurzore
+      started = ghost_session && ghost_session.active?
+      ok('NASTROJE-1: ghost session naozaj bezi (inak by scenar nic nemeral)', started == true)
+      tools1_select(model, g1)
+      e::Tools::Mower.copy(:right)
+      ok('NASTROJE-1: kopia nastrojom ZRUSILA beziacu ghost session ' \
+         '(inak by dalsi klik commitol STARY plan)',
+         ghost_session.nil? || !ghost_session.active?)
+      ok('NASTROJE-1: a kopia sa aj tak vlozila', cabinets(model).length == 2)
+      e::GhostTool.cancel_session('SU-TEST teardown', deferred: false)
+      cleanup(model)
+
+      # 13) HANDSHAKE S INSPECTOROM: rozpisana zmena sirky sa musi dopisat PRED kopiou
+      # Panel v runneri otvoreny nie je — sondou sa zastupi PRESNE to, co robi:
+      # `dialog_alive?` hlasi zive okno a `request_native_flush` zachyti token.
+      sent = []
+      e::Panel.singleton_class.class_eval do
+        alias_method :nx_t1_orig_alive, :dialog_alive?
+        alias_method :nx_t1_orig_flush, :request_native_flush
+        define_method(:dialog_alive?) { true }
+        define_method(:request_native_flush) { |token, kind, dir| sent << [token, kind, dir]; nil }
+      end
+      begin
+        e::Tools::Mower.reset_pending!
+        hs = e::CabinetBuilder.build(model, TOOLS1_PARAMS)
+        hs_cid = e::Store.get(hs, 'cabinet_id')
+        tools1_select(model, hs)
+        e::Tools::Mower.copy(:right)
+        ok("NASTROJE-1: s otvorenym Inspectorom kopia CAKA (poziadaviek: #{sent.length}, skriniek: #{cabinets(model).length})",
+           sent.length == 1 && cabinets(model).length == 1 && !e::Tools::Mower.pending_copy.nil?)
+        token = sent.first[0]
+        ok('NASTROJE-1: poziadavka nesie druh operacie aj smer',
+           sent.first[1] == 'copy' && sent.first[2] == :right)
+
+        # Cudzi token sa musi TICHO zahodit — inak by kopiu spustila cudzia odpoved.
+        e::Tools::Mower.resolve_flush('cudzi-token', 'nothing')
+        ok('NASTROJE-1: cudzi token kopiu NESPUSTI a cakanie nezrusi',
+           cabinets(model).length == 1 && !e::Tools::Mower.pending_copy.nil?)
+
+        # Panel dopise rozpisanu zmenu sirky a prilepi `native_op` — kopia bezi
+        # az v TOMTO callbacku, teda uz nad zapisanym configom.
+        e::Panel.handle_apply_all(pg(model, 'cabinet_id' => hs_cid, 'width' => 800.0,
+                                            'native_op' => { 'kind' => 'copy', 'token' => token }))
+        ok("NASTROJE-1: zdroj ma NOVU sirku (#{(e::Store.config(hs) || {})['width']})",
+           ((e::Store.config(hs) || {})['width'].to_f - 800.0).abs <= TOL)
+        hs_copy = cabinets(model).find { |i| i.valid? && !i.equal?(hs) }
+        ok('NASTROJE-1: kopia vznikla AZ po flushi a nesie tiez NOVU sirku ' \
+           "(#{hs_copy && (e::Store.config(hs_copy) || {})['width']})",
+           !hs_copy.nil? && ((e::Store.config(hs_copy) || {})['width'].to_f - 800.0).abs <= TOL)
+        hs_rel = hs_copy ? tools1_rel(hs, hs_copy) : nil
+        ok("NASTROJE-1: a stoji o NOVU sirku vedla (#{hs_rel ? mm(hs_rel.origin.x).round(1) : 'nil'} mm)",
+           !hs_rel.nil? && (mm(hs_rel.origin.x) - 800.0).abs <= TOL)
+        ok('NASTROJE-1: po vykonani uz ziadna kopia neceka', e::Tools::Mower.pending_copy.nil?)
+
+        # Cervene polia: server kopiu ODMIETNE (nikdy ticha kopia zo starych hodnot).
+        sent.clear
+        cleanup(model)
+        inv = e::CabinetBuilder.build(model, TOOLS1_PARAMS)
+        tools1_select(model, inv)
+        e::Tools::Mower.copy(:left)
+        e::Tools::Mower.resolve_flush(sent.first && sent.first[0], 'invalid')
+        ok('NASTROJE-1: odpoved „invalid" kopiu ODMIETNE (a cakanie zrusi)',
+           cabinets(model).length == 1 && e::Tools::Mower.pending_copy.nil?)
+      ensure
+        e::Tools::Mower.reset_pending!
+        e::Panel.singleton_class.class_eval do
+          alias_method :dialog_alive?, :nx_t1_orig_alive
+          alias_method :request_native_flush, :nx_t1_orig_flush
+          remove_method :nx_t1_orig_alive
+          remove_method :nx_t1_orig_flush
+        end
+      end
+      cleanup(model)
+
+      # 14) REGISTRACIA: opakovany `install!` NEPRIDA druhy toolbar
+      tb1 = e::Tools.install!(nil)
+      tb2 = e::Tools.install!(nil)
+      ok('NASTROJE-1: registrator je idempotentny (ta ista procesna referencia)',
+         !tb1.nil? && tb1.equal?(tb2))
+      load File.join(e.plugin_dir, 'tools', 'tools.rb')
+      ok('NASTROJE-1: ani po `load` suboru nevznikne druhy toolbar',
+         e::Tools.install!(nil).equal?(tb1))
+    ensure
+      remove_js_recorder
+      tools1_close_context(model)
+      # Ghost session ani cakajuca kopia nesmu prezit sekciu ani po vynimke.
+      begin
+        e::GhostTool.cancel_session('NASTROJE-1 teardown', deferred: false) if defined?(e::GhostTool)
+      rescue StandardError
+        nil
+      end
+      begin
+        e::Tools::Mower.reset_pending!
+      rescue StandardError
+        nil
+      end
+      tools1_clear_markers(model, markers)
+      cleanup(model)
+      begin
+        e::ScaleWatch.guard do
+          model.start_operation('NASTROJE-1 cleanup skupin', true)
+          model.entities.grep(Sketchup::Group).each { |g| g.erase! if g.valid? }
+          model.commit_operation
+          model.definitions.purge_unused
+        end
+      rescue StandardError
+        nil
+      end
+    end
+    ok('NASTROJE-1: cleanup (model prazdny)',
+       cabinets(model).empty? && model.entities.grep(Sketchup::Group).empty?)
+  rescue StandardError => ex
+    remove_js_recorder
+    log_line("FAIL: NASTROJE-1 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
+  # NASTROJE-1 (T1a) ASYNC: casovanie voci REALNEMU debounce tiku observera.
+  # Sync sekcia dokazuje spravanie nad pokojnym observerom; tu ide o presne ten
+  # pripad, ktory bariera `flush_pending!` rieši — pouzivatel spravi krok a HNED
+  # (do 0,2 s) klikne na nastroj. Bez bariery by odlozeny tik observera dobehol
+  # AZ PO operacii nastroja a jeho TRANSPARENTNA reakcia by sa prilepila na nu.
+  def run_tools1_async(model, state, steps)
+    # T1 (repro FIX 2): rotacia nastrojom -> OKAMZITA kopia -> dobeh -> Spat
+    steps << [0.3, lambda do
+      cleanup(model)
+      inst = e::CabinetBuilder.build(model, TOOLS1_PARAMS)
+      state[:t1] = inst
+      tools1_select(model, inst)
+      e::Tools::Mower.rotate(90)
+      state[:t1_tr] = inst.transformation.to_a.dup
+      tools1_select(model, inst)
+      state[:t1_copy] = e::Tools::Mower.copy(:right)
+    end]
+    steps << [SETTLE, lambda do
+      copy = state[:t1_copy]
+      ok('async NASTROJE-1: rotacia + okamzita kopia — observer ostal v POKOJI (prazdne fronty)',
+         e::ScaleWatch.pending? == false)
+      ok('async NASTROJE-1: kopia po rotacii ma vlastne CAB id',
+         !copy.nil? && copy.valid? && cabinets(model).length == 2 &&
+         e::Store.get(copy, 'cabinet_id') != e::Store.get(state[:t1], 'cabinet_id'))
+      Sketchup.undo
+    end]
+    steps << [SETTLE, lambda do
+      inst = state[:t1]
+      ok('async NASTROJE-1: Spat vratil LEN kopiu — rotacia drzi a fronta je prazdna',
+         cabinets(model).length == 1 && inst.valid? &&
+         tools1_same_matrix?(inst, state[:t1_tr]) && e::ScaleWatch.pending? == false)
+    end]
+
+    # T2: NATIVNY Move (observer NIE JE guardnuty) -> okamzita kopia -> dobeh -> Spat
+    steps << [0.3, lambda do
+      cleanup(model)
+      inst = e::CabinetBuilder.build(model, TOOLS1_PARAMS)
+      state[:t2] = inst
+      model.start_operation('SU-TEST nativny Move', true)
+      inst.transformation = inst.transformation *
+                            Geom::Transformation.translation(e::Units.point(1500, 0, 0))
+      model.commit_operation
+      state[:t2_pending] = e::ScaleWatch.pending?
+      tools1_select(model, inst)
+      state[:t2_copy] = e::Tools::Mower.copy(:right)
+      state[:t2_tr] = inst.transformation.to_a.dup
+    end]
+    steps << [SETTLE, lambda do
+      ok('async NASTROJE-1: nativny Move naozaj zalozil observeru pracu (inak by test nic nemeral)',
+         state[:t2_pending] == true)
+      ok('async NASTROJE-1: kopia HNED po nativnom Move vznikla a observer dosiel do pokoja',
+         cabinets(model).length == 2 && e::ScaleWatch.pending? == false)
+      Sketchup.undo
+    end]
+    steps << [SETTLE, lambda do
+      inst = state[:t2]
+      ok('async NASTROJE-1: Spat po nativnom Move vratil LEN kopiu (poloha zdroja drzi)',
+         cabinets(model).length == 1 && inst.valid? && tools1_same_matrix?(inst, state[:t2_tr]))
+      cleanup(model)
+    end]
+  end
+
   def run_async(model, done)
     state = {}
     steps = []
@@ -13908,6 +14597,10 @@ module NoxunSuRunner
     # nestretol s fake oknom sekcie STALE.
     run_d52b_async(model, state, steps)
 
+    # NASTROJE-1 (T1a): nastroj spusteny DO debounce okna po rotacii aj po nativnom
+    # Move ? bariera musi observer dotiahnut do pokoja EST PRED vlastnou operaciou.
+    run_tools1_async(model, state, steps)
+
     # S6b: zachytna siet v KONTROLE — ked uz dva kusy na jednom mieste vzniknu
     # (starsi projekt, paste-in-place), semafor ich MUSI ukazat. Overuje CELU
     # retaz Bom.collect -> Validation.run(placements:), nielen cistu funkciu.
@@ -14046,6 +14739,7 @@ module NoxunSuRunner
     run_kovb1(model)          # KOV-B1: klasifikacia setov + taxonomia — std 3 v subore aj v .skp, nakup TOTOZNY s legacy setom, sablona z novsej verzie odmietnuta BEZ operacie, zapis vyrobcu bez kroku Spat
     run_kovb2(model)          # KOV-B2: strom katalogu (`hw_tree`) nad sandboxom, zalozenie polozky s vyrobcom + zalozenie vyrobcu ZO STUDIA = BEZ kroku Spat, pin navrchu svojho listu, payload sekcie s popiskami a taxonomiou
     run_kova2b(model)        # KOV-A2b: smer otvarania v modeli — lifecycle overlayu, symbol na spravnom kridle a prednej ploche, prestavba/Spat, dup-ID per instancia, vykon
+    run_tools1(model)        # NASTROJE-1 (T1a): Mower + Snaper v baliku enginu (kopia cez sev, rotacie/Z ako 1 krok Spat, odmietnutia bez operacie, bariera observera, Snaper a viditelnost)
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

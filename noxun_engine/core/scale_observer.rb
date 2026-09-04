@@ -16,6 +16,10 @@ module Noxun
       SCALE_TOL = 0.001  # tolerancia: dlzka osi != 1.0 => scale
       DEBOUNCE  = 0.2    # s — cakanie na ustalenie po poslednej zmene
       MIN = { 'width' => 200.0, 'height' => 200.0, 'depth' => 150.0 }.freeze
+      # NASTROJE-1: strop iteracii bariery `flush_pending!`. Pokoj observera
+      # nastava spravidla v 1-2 iteraciach (follow-up po dedupe); vyssie cislo
+      # by uz znamenalo, ze si observer sam sebe planuje pracu donekonecna.
+      FLUSH_MAX_ITERATIONS = 5
 
       class << self
         # --- instalacia -----------------------------------------------------
@@ -71,12 +75,17 @@ module Noxun
         # ak uz nesie scale — cerstvo attachnuta ESTE NEabsorbovana kopia (paste +
         # scale v jednom ticku) by inak pri neskorsom rejecte obnovila skalovany
         # stav. Stabilny transform zapise az uspesna absorpcia / cisty stav.
+        # NASTROJE-1 (audit 2 FIX 2 + audit 3 FIX 2): podmienka `unless scaled?`
+        # tu ZANIKLA — kontrolovala LEN dlzky osi, takze SIKMA (shear) matica
+        # s jednotkovymi, ale nekolmymi osami sa do cache dostala. Rigidita sa
+        # od tejto davky vynucuje PRIAMO v `remember_transform` (jedno miesto
+        # pre vsetkych volajucich: attach, absorpcia, reject aj nastroje).
         def attach_one(inst)
           return unless inst && inst.valid?
           @entity_observer ||= CabinetEntityObserver.new
           safe { inst.remove_observer(@entity_observer) } # anti-double
           inst.add_observer(@entity_observer)
-          remember_transform(inst) unless scaled?(inst.transformation)
+          remember_transform(inst)
         rescue StandardError => e
           Engine.log_error(e, 'ScaleWatch.attach_one')
         end
@@ -206,6 +215,64 @@ module Noxun
           end
         end
 
+        # --- NASTROJE-1: BARIERA PRED MUTACIOU NASTROJA ---------------------
+        # `guard` zabrani len NOVYM udalostiam. Uz NAPLNENE fronty (`@dirty`,
+        # `@added`, `@requested`, `@prune_models`) a BEZIACI debounce timer
+        # zostavaju — a ked timer dobehne PO operacii nastroja, jeho
+        # TRANSPARENTNA reakcia (dedup kopii, presun ghost zon) sa prilepi na
+        # KROK POUZIVATELA, ktory s nou nema nic spolocne. Preto kazdy nastroj
+        # pred polohovou mutaciou NOXUN objektu pocka, kym je observer v POKOJI.
+        #
+        # POKOJ = ziadny naplanovany timer A prazdne fronty VSETKYCH dokumentov
+        # (audit 4: multi-model — bariera sa nesmie vyhlasit len podla
+        # `@last_model`). Je to BARIERA, nie jedno spracovanie (audit 3):
+        # `process_dirty` moze pri cerstvej kopii najst STARSIU duplicitu a
+        # naplanovat follow-up — novy timer s prazdnymi frontami by po operacii
+        # nastroja spustil transparentny dedup nad `@last_model`.
+        #
+        # Kazda iteracia najprv timer ZASTAVI (`@timer` na `nil`) a zvysi
+        # generaciu, takze ani prezivsi callback uz nic nespusti. Pri dosiahnuti
+        # stropu vrati `false` a nastroj operaciu ODMIETNE — fronty ostavaju
+        # NEDOTKNUTE (`@requested` aj `@prune_models` prezijú), lebo bariera
+        # sama do nich nikdy nesiaha; vyprazdnuje ich vyhradne `process_dirty`.
+        #
+        # `model` je dokument, ktory sa chysta zmenit volajuci — sluzi na
+        # diagnostiku (bariera je zamerne GLOBALNA, viz vyssie).
+        def flush_pending!(model = nil)
+          return true unless pending?
+
+          iterations = 0
+          while pending?
+            if iterations >= FLUSH_MAX_ITERATIONS
+              Engine.log("ScaleWatch.flush_pending!: pokoj nenastal ani po #{iterations} iteraciach " \
+                         "(dokument #{model ? model.object_id : '?'})")
+              return false
+            end
+            iterations += 1
+            stop_pending_timer!
+            process_dirty
+          end
+          true
+        rescue StandardError => e
+          Engine.log_error(e, 'ScaleWatch.flush_pending!')
+          false
+        end
+
+        # Je este nieco rozrobene? Timer ALEBO neprazdna fronta ktorehokolvek druhu.
+        def pending?
+          return true unless @timer.nil?
+
+          [@dirty, @added, @requested, @prune_models].any? { |q| q && !q.empty? }
+        end
+
+        # Zastavi debounce timer a ZNEPLATNI jeho generaciu — prezivsi callback
+        # (SketchUp ho uz mohol zaradit) najde `gen != @generation` a nespravi nic.
+        def stop_pending_timer!
+          safe { UI.stop_timer(@timer) } if @timer
+          @timer = nil
+          @generation = (@generation || 0) + 1
+        end
+
         def process_dirty
           dirty = @dirty || {}
           @dirty = {}
@@ -264,7 +331,17 @@ module Noxun
               # Follow-up bezpecny proti slucke: dalsi tick pride s prazdnym added
               # (fresh_ids prazdne) -> stale sa spracuju vetvou vyssie a schedule
               # sa uz nevola.
-              schedule if stale
+              # NASTROJE-1 (audit 4 BLOCKER): follow-up musi niest KONKRETNY
+              # dokument. Holy `schedule` planoval len cas — dalsia iteracia by
+              # nasla prazdne fronty a spracovala `@last_model`, teda mozno UPLNE
+              # INY dokument (dva otvorene subory, macOS). Model ide do
+              # `@requested` PRED `schedule`, aby bariera `flush_pending!` videla
+              # frontu neprazdnu uz v tej istej iteracii.
+              if stale
+                @requested ||= {}
+                @requested[mdl.object_id] = mdl
+                schedule
+              end
             end
             # D-103: po skutocnej zmene identity obnov Inspector — sync vyberu uz
             # dedup nespusta, takze bez tohto by karta drzala zdielane (povodne) ID
@@ -546,10 +623,34 @@ module Noxun
           false
         end
 
+        # NASTROJE-1 (audit 2 FIX 2 + audit 3 FIX 2): RIGIDITA SA VYNUCUJE
+        # PRIAMO NA HRANICI CACHE. Predtym sa ukladalo cokolvek, co volajuci
+        # podal — vetvy Move/Rotate aj verejny `remember_transform` tak vedeli
+        # zapamatat SIKMU (shear) maticu: jej osi maju dlzku 1, takze `scaled?`
+        # ju nezachyti. Odmietnuty scale by potom cez `reject_scale` „obnovil"
+        # korpus do skoseneho stavu, ktory zodpoveda ziadnej platnej geometrii.
+        # Cache preto drzi VYHRADNE rigidne (rotacia + posun) transformacie.
         def remember_transform(inst)
           return unless inst && inst.valid?
+          tr = inst.transformation
+          return unless rigid?(tr)
+
           @stable_transforms ||= {}
-          @stable_transforms[transform_key(inst)] = inst.transformation.to_a.dup
+          @stable_transforms[transform_key(inst)] = tr.to_a.dup
+        end
+
+        # Autorita rigidity je `CabinetBuilder.rigid_matrix?` (jednotkove a kolme
+        # osi, determinant +1, nulova perspektiva). `scale_observer.rb` sa nacita
+        # PRED builderom, preto fallback pre pripad, ze by cache niekto plnil
+        # este pred jeho nacitanim — ten kryje aspon mierku a skos.
+        def rigid?(tr)
+          return false unless tr && tr.respond_to?(:to_a)
+
+          return CabinetBuilder.rigid_matrix?(Array(tr.to_a)) if defined?(CabinetBuilder)
+
+          !scaled?(tr) && !sheared?(tr)
+        rescue StandardError
+          false
         end
 
         def stable_transform(inst)

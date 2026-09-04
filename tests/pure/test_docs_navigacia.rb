@@ -218,7 +218,10 @@ end
 # novy dialog prekizol vsetkymi tromi kontrolami (review #232 kolo 3).
 # Su to VYHRADNE .rb subory: js/html/css do inventara nepatria (mapa ich popisuje
 # v odsekoch, ale nemaju vlastne nadpisy).
-NX_ARCH_MODULE_DIRS = '{core,modules,ui}'
+# NASTROJE-1: `tools/` je od T1a plnohodnotny priecinok modulov (Mower, Snaper) —
+# patri do inventara rovnako ako core/ a ui/, inak by novy nastroj presiel bez
+# odseku v mape aj bez riadku v routri.
+NX_ARCH_MODULE_DIRS = '{core,modules,tools,ui}'
 
 def nx_arch_module_paths
   root = NxTest::ROOT.to_s.tr('\\', '/').chomp('/')

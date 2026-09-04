@@ -454,6 +454,12 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   **GHOST-D1 + GHOST-D2** (dosky vkladané a kreslené prichytením na skrinky, packages nižšie). **Agy outside-in research** „automatický pilaster / pracovná doska" (skill `antigravity-outside-in`)
   sa spraví, keď bude kvóta — podklad pre blok viazaných dielov po V1.
 - **NÁSTROJE-1 · TASK PACKAGE „MOWER + SNAPER V BALÍKU NOXUN ENGINE" (D-20; V1 bod 1A — Michal 4.9.2026; **Audit: HOTOVÝ** — Codex CLI 4.9. audity 1–5 (11 → 7 → 3 → 1 → 0 nálezov, posledný **SOUND**) + Codex GH #288 kolá 1–3, všetko zapracované; história v [zdroje/next_sessions/NASTROJE1_PACKAGE_DRAFT_2026-09-04.md](zdroje/next_sessions/NASTROJE1_PACKAGE_DRAFT_2026-09-04.md); in-SU POVINNÉ):**
+  **STAV IMPLEMENTÁCIE (4.9.2026): T1a je v maine (PR #293, v0.9.24)** — moduly `noxun_engine/tools/`, toolbar „Noxun Nástroje" + submenu, kópia cez šev enginu, `ScaleWatch.flush_pending!`
+  + rigidita na hranici cache, Z-dialog v bariére aktualizácie, ikony v repe, headless sady `test_nastroje1_tools`/`test_nastroje1_observer` a in-SU `run_tools1` + `run_tools1_async`.
+  **T1b ČAKÁ** (boot migrácia legacy inštalácií + inštalátor + README + in-SU test migrácie) — dovtedy sa staré pluginy `Noxun_Mower\` a `snaper\` NEODSTRAŇUJÚ a **D-20 ostáva otvorená**.
+  **REVÍZIA FIX 10 (Michal 4.9.2026, pri internej kontrole #293) — platí PRED znením nižšie:** prípony kópie sú **VÝHRADNE písmenové** — `a`…`z`, po vyčerpaní `aa`…`zz`
+  (a ďalej `aaa`…), **nikdy čísla**; zo zdroja sa odstraňuje **len** koncová prípona v tvare *medzera + 1–2 malé písmená*. Dôvod: ručný názov skrinky bežne končí šírkou, takže
+  „Dolná 900" by sa inak skopírovala ako „Dolná a" a informácia by sa stratila („Dolná 900" → „Dolná 900 a" → „Dolná 900 b"). Znenie „po vyčerpaní číslo „ 27"…" nižšie **neplatí**.
   **Cieľ:** jeden inštalačný balík — oba nástroje sa presunú ako moduly do `noxun_engine/tools/` (`mower.rb`, `snaper.rb` + ČISTÉ jadrá `mower_calc.rb`, `snap_calc.rb` bez `UI::*`; namespace
   `Noxun::Engine::Tools::*`), načíta ich `main.rb`, dostanú **jeden spoločný toolbar „Noxun Nástroje"** (poradie: −90° · +90° · 180° · Z = 0 · Z posun… · Kópia vľavo · Kópia vpravo · Prisunúť vľavo ·
   Prisunúť vpravo; slovenské tooltipy; menu Extensions → Noxun Engine → Nástroje). Vlastné registrácie rozšírení a `VERSION` nástrojov zaniknú — verziu aj update (D-52) preberá engine. **Prečo samostatný
