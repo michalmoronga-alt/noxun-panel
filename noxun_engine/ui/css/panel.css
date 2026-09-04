@@ -1221,7 +1221,14 @@
                          background: var(--nx-border-strong); }
   .nx-inspector .gbdot.on { background: var(--nx-select-strong); }
   .nx-inspector .gbtxt { white-space: nowrap; color: var(--nx-select-strong); font-weight: 600; }
+  .nx-inspector .gbtxt[hidden] { display: none; }
+  /* GHOST-D1: umiestnenie dosky stoji vpravo — na tom istom mieste, kde ma
+     skrinka pole zamknutej vysky (pasik nerastie o riadok). */
+  .nx-inspector .gbori { margin-left: auto; }
   .nx-inspector .gblock { display: flex; align-items: center; gap: 3px; margin-left: auto; }
+  /* Trieda `.gblock` prebija UA pravidlo pre `[hidden]` (display: flex) —
+     bez tohto by sa pole vysky pri doske neschovalo. */
+  .nx-inspector .gblock[hidden] { display: none; }
   .nx-inspector .gblock.dim { opacity: .55; }
   .nx-inspector .gblock input { width: 52px; padding: 2px 4px; font-size: 11px; text-align: right;
                                 border: 1px solid var(--nx-border-strong); border-radius: 6px; }
