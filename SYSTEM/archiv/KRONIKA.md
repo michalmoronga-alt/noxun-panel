@@ -17,6 +17,38 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **NÁSTROJE-1 · T1a — MOWER A SNAPER V BALÍKU NOXUN ENGINE (v0.9.24, 4.9.2026, PR #NN):** prvá polovica dávky, ktorá rieši **D-20**. Dva pomocné pluginy Michala (Noxun Mower
+  a Snaper) prestali byť samostatné rozšírenia a stali sa modulmi enginu (`noxun_engine/tools/`); verziu, aktualizáciu (D-52) aj logovanie preberajú od neho, ich UI ostáva
+  zámerne také, aké bolo („nechať im svoj svet"). **T1b** — boot migrácia starých inštalácií a inštalátor — má vlastný PR; **D-20 preto ostáva otvorená**.
+  **Prečo vlastný toolbar.** Toolbar enginu má železné pravidlo „do modelu sa NEZAPISUJE" (lekcia D-103/D-105), kým nástroje model menia. Preto vzniká **druhý** panel
+  „Noxun Nástroje" s deviatimi príkazmi (−90° · +90° · 180° · Z = 0 · Z posun… · Kópia vľavo/vpravo · Prisunúť vľavo/vpravo) a rovnaké `UI::Command` objekty obsluhujú aj
+  submenu Extensions → Noxun Engine → Nástroje. Registrátor je **jeden a idempotentný** (`file_loaded?` + `@toolbar` memo) — legacy Mower staval toolbar pri každom `load` bez
+  guardu; trojstav (`get_last_state`) je vyslovený, takže skrytý panel po reštarte skrytý ostane.
+  **Jadro dávky: kópia už nie je fantóm.** Legacy `add_instance(ent.definition, tr)` vyrobil inštanciu **bez NOXUN identity** — Inspector ju nevidel, v kusovníku ani v cenách
+  nebola a prestavba originálu ju menila s ním. Kópia teraz ide **tým istým švom ako „Vložiť kópiu"** v paneli (`config_to_params` → `rekey_hardware_manual` →
+  `CabinetBuilder.build(..., transform:)`), takže má vlastnú definíciu, nové CAB číslo, ad-hoc kovanie s vlastným id a je **jeden krok Späť**. Krok je **šírka korpusu z configu
+  po VLASTNEJ osi X** zdroja — nie bbox inštancie: čelo so záporným `gap_sides` alebo úchytka smie šírku korpusu presahovať, takže sľub „dotyk bbox" neplatí (Codex #288).
+  Vedľajší efekt parametrickej cesty: odpadli legacy odhady osi a znamienka podľa RotZ — kópia sedí pri akejkoľvek rotácii.
+  **Nová plocha v observeri: `ScaleWatch.flush_pending!` (audit 2/3/4 BLOCKER).** `guard` zabráni len NOVÝM udalostiam; naplnené fronty a bežiaci debounce timer zostávajú, a keď
+  timer dobehne PO operácii nástroja, jeho **transparentná** reakcia sa prilepí na nesúvisiaci krok používateľa. Nástroj preto pred každou polohovou mutáciou NOXUN objektu počká
+  na **POKOJ** = žiadny timer a prázdne fronty **všetkých** dokumentov. Je to bariéra, nie jedno spracovanie: `process_dirty` môže pri čerstvej kópii nájsť staršiu duplicitu
+  a naplánovať follow-up — ten od tejto dávky zaraďuje **KONKRÉTNY model do `@requested` PRED `schedule`** (predtým plánoval iba čas, takže ďalšia iterácia by spracovala
+  `@last_model`, teda možno cudzí dokument). Strop 5 iterácií → nástroj operáciu **odmietne**, fronty ostávajú nedotknuté.
+  **Druhá tichá diera: rigidita.** `attach_one` kontroloval len `scaled?` (dĺžky osí), takže **šmyková** matica (jednotkové, ale nekolmé osi) sa do cache stabilných transformácií
+  dostala a `reject_scale` by ňou korpus „obnovil" do stavu, ktorému nezodpovedá žiadna platná geometria. Rigidita sa preto vynucuje **priamo na hranici cache** —
+  `remember_transform` uloží len maticu, ktorá prejde `CabinetBuilder.rigid_matrix?` — a nástroj po flushi číta transformáciu **znova**: nerigidnú odmietne s hláškou.
+  **Snaper a viditeľnosť (outside-in packet).** `Model#drawing_element_visible?` je presnejšia než ručná kontrola (pozná skryté tagy aj **tag priečinky**), ale **pred SU 2026.0
+  hádže výnimku, keď je posledným prvkom cesty kontajner** — a Snaper prechádza práve kontajnery. Volá sa preto pod `rescue` s fallbackom (`hidden?` + `layer.visible?` +
+  `Tags.folder_hidden?`), ktorý je tam **bežná**, nie okrajová cesta. Obálka kontajnera **aj cieľa** sa odvodzuje rekurzívne z **viditeľných listov**: surové `definition.bounds`
+  by nieslo skrytú geometriu a skrytý vnuk (alebo skrytý presahujúci potomok vybraného objektu) by zastavil prisunutie skôr, než treba.
+  **Kontext.** Nástroje pracujú **len v root kontexte a len s objektom na root úrovni**: `transform_entities` interpretuje transformáciu globálne iba v aktívnom kontexte a jeho
+  rodičoch (oficiálna dokumentácia), a legacy Mower počítal pivot v parent-relative ráme. Odmietnutie je **preflight nástroja** — musí prísť PRED `CabinetBuilder.build`, ktorý
+  si edit kontext zatvára sám. Z-dialog dostal enginový lifecycle: callbacky pred `show`, `set_on_closed`, `Engine.update_locked?(:tools_z)` a účasť vo **všetkých troch**
+  zoznamoch bariéry aktualizácie.
+  **Testy:** headless `test_nastroje1_tools.rb` (jadrá + guardy) a `test_nastroje1_observer.rb` (bariéra nad stubmi observera — timer, generácia, per-model `@requested`, strop,
+  rigidita), in-SU `run_tools1` + `run_tools1_async`. Mutácie (6): kópia cez `add_instance` · holé mm namiesto `Units.vector` · prípona bez hľadania voľnej · flush bez zastavenia
+  timera · cache bez kontroly rigidity · follow-up bez konkrétneho modelu — každá padne na inom teste. **In-SU beh dávka NESPÚŠŤALA** (Michal pracoval v SketchUpe) — pustiť pred merge.
+  **Codex review:** doplní orchestrátor.
 - **KOV-B2 · KATALÓG KOVANIA: STROM, MODAL POLOŽKY, DÉMOS VÝROBCA (v0.9.23, 4.9.2026, PR #290):** UI polovica slice B — dáta a taxonómiu dala KOV-B1, táto dávka ich vytiahla
   na obrazovku a uzavrela **D-110** („pridávanie kovaní je neprehľadné", Michal 24.8. pri prvom teste v0.8.0).
   **Prečo strom a nie lepšie usporiadaný plochý zoznam.** Katalóg reálnej dielne má stovky kódov a doterajší pohľad Položky bol plochý serverový search s **tichým stropom**

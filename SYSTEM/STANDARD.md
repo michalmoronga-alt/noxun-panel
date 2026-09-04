@@ -931,6 +931,12 @@ Záväzné princípy dosky:
 ### 9.3 Kópia, rotácia, save/reopen
 
 - **Kópia skrinky** → nové `cabinet_id`; `template_id` a `part_key` môžu zostať, pretože kľúč je scoped korpusom. Nové `part_id` sa odvodia z nového `cabinet_id`. Kópia sa dá upraviť nezávisle od originálu.
+  Platí to pre **každú cestu, ktorá kópiu vyrába** — „Vložiť kópiu" v paneli, dedup natívnej kópie (Ctrl+C/V) aj **kópiu nástrojom** (toolbar „Noxun Nástroje"): všetky idú
+  cez ten istý šev buildera. Priama `add_instance` tej istej definície je zakázaná — vyrobí kópiu **bez identity** (Inspector ju nevidí, v kusovníku nie je, prestavba
+  originálu ju mení s ním).
+- **Mutácia polohy nástrojom** (rotácia, Z, prisunutie, kópia) je **jedna operácia = jeden krok Späť** a beží celá pod guardom observera; ghost zóny sa presúvajú v **tej istej**
+  operácii. Pred otvorením operácie musí byť observer v pokoji (`ScaleWatch.flush_pending!`) a transformácia **rigidná** — inak nástroj odmietne s hláškou a model sa nezmení
+  ani o krok Späť. Bez bariéry by odložený tik observera dobehol až PO operácii nástroja a jeho transparentná reakcia by sa prilepila na nesúvisiaci krok používateľa.
 - **Kópia dosky** (`kind: board`) → nové `id` (BRD-xxx), rovnaký princíp — `part_key` `board/main` zostáva (owner-scope). Sekvenčné id (CAB aj BRD) je **unikátne medzi živými entitami**: berie sa max existujúcich + 1, po zmazaní entity s najvyšším číslom sa číslo môže použiť znova (vedomé, platí od V0.1).
 - **Rotácia** v modeli **nemení** výrobné dáta (rozmery, hrany, dekor) — viď 3.3.
 - **Save/reopen** — dáta žijú v `NOXUN` dictionary na inštancii, prežijú uloženie a znovuotvorenie. `persistentId` je stabilný v rámci modelu; väzby sú aj tak logické (2.3), takže reopen nič nerozbije.

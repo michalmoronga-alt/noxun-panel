@@ -405,6 +405,63 @@ Po prepočte cache posiela stav obom oknám aj `EdgeCheck.notify_count_changed`;
 **Z toolbaru sa do modelu NEZAPISUJE** (lekcia D-103/D-105): žiadny `start_operation`, `Panel.show_insert` čistí výber pod `suspend_selection_sync` a panel obnovuje s `dedup:
 false`. Dvojitú registráciu pri reloade drží `@toolbar` memo (guard test `tests/pure/test_ui02_toolbar.rb`).
 
+## Nástroje v modeli — toolbar „Noxun Nástroje" (`noxun_engine/tools/`)
+
+### tools.rb
+
+**JEDINÝ registrátor** nástrojov (`Tools.install!(parent_menu)`) a ich **spoločná vrstva**. Toolbar je **zámerne druhý**: toolbar enginu má železné pravidlo „do modelu sa
+nezapisuje" (D-103/D-105), kým nástroje model **menia**. Poradie tlačidiel: −90° · +90° · 180° · Z = 0 · Z posun… · Kópia vľavo · Kópia vpravo · Prisunúť vľavo · Prisunúť vpravo;
+tie isté `UI::Command` objekty obsluhujú **toolbar aj submenu** Extensions → Noxun Engine → **Nástroje** (submenu sa podáva ako parameter — druhé `add_submenu('Noxun Engine')`
+by v SketchUpe vyrobilo druhé rovnomenné menu). Idempotenciu držia **`file_loaded?` guard + `@toolbar` memo**: legacy Mower staval toolbar pri každom `load` bez guardu a pridával
+ďalší rad tlačidiel. **Trojstav** je vyslovený (`get_last_state`): `TB_NEVER_SHOWN` → `show`, `TB_VISIBLE` → `restore`, `TB_HIDDEN` → nič (`Engine.install_toolbar` volá len
+`restore`). **Každý z 9 príkazov má D-52a restart latch** (`Engine.update_restart_pending?`) priamo v tele. Ikony sú sledované assety v `noxun_engine/ui/icons/tools/` (7 PNG
+Mowera v 16/24, 2 SVG Snapera).
+
+Spoločná vrstva drží **poradie preflightov** (kontrakt): výber jednej inštancie/skupiny → `route` (edit kontext → vnorený → druh objektu) → `settle!` → `mutate`.
+**`Tools.settle!`** je dvojkrok: (1) `ScaleWatch.flush_pending!(model)` dovedie observer do pokoja, (2) až potom sa transformácia číta **znova** a musí byť rigidná
+(`CabinetBuilder.rigid_matrix?`) — inak nástroj odmietne (žiadny tichý neúspech). **`Tools.mutate`** je jediné miesto, kde nástroje menia model: nad NOXUN objektom beží celá
+operácia pod `ScaleWatch.guard`, v **tej istej operácii** sa presunú ghost zóny (`Zones.move_ghost`) a **až po úspešnom commite** sa volá `ScaleWatch.remember_transform` (pod
+guardom ho observer nedosiahne; bez toho by neskôr odmietnutá šikmá mierka obnovila polohu spred príkazu). Hlásenia sú **nemodálne** — status bar + `UI::Notification` nad
+objektom rozšírenia enginu (`Engine.extension`); modal z tlačidla toolbaru je zlé UX.
+
+### mower_calc.rb
+
+**Čisté jadro** Mowera (bez `UI::*` a `Sketchup::*`, mm Float, v zozname `tests/helper.rb`): znamienko a posun kópie po **lokálnej osi X**, `z_delta_mm`, `route` (`:edit_context`
+· `:nested` · `:cabinet` · `:board` · `:legacy`) a **prípona názvu kópie**. Prípona hľadá **najbližšiu voľnú** v celom modeli (`a`…`z`, po vyčerpaní `27`, `28`…); základ sa
+odvodí zo zdroja **bez prípony, ktorú vyrobila kópia** (jedno malé ASCII písmeno alebo číslo ≥ 27), takže reťaz ide „Skrinka a" → „Skrinka b", nie „Skrinka a a". Základ sa
+oreže tak, aby prípona vždy prežila `sanitize_name` (`NAME_MAX_LEN` 80 — guard test drží konštantu v synchro s `CabinetBuilder`).
+
+### mower.rb
+
+SketchUp vrstva Mowera + **Z-dialog**. Rotácie (pivot = stred obálky, **svetová Z**) a Z posun sú prevzaté z legacy bez zmeny správania — platia však len v root kontexte
+(`transform_entities` interpretuje transformáciu globálne iba tam; outside-in packet). **Kópia NOXUN korpusu ide cestou „Vložiť kópiu"**: `Store.config` → `newer_config?` brána
+(R-12) → `config_to_params` → `rekey_hardware_manual` → `CabinetBuilder.build(model, params, transform: src.transformation * translation(Units.vector(±šírka, 0, 0)))` →
+`Panel.push_selected(model, dedup: false)`. Legacy `add_instance(ent.definition, tr)` vyrábal **kópiu bez identity** (Inspector ju nevidel, v kusovníku nebola, prestavba
+originálu ju menila) — to je pointa D-20. Krok je **šírka korpusu z configu**, nie bbox inštancie: čelo so záporným `gap_sides` alebo úchytka smie šírku presahovať, takže sľub
+„dotyk bbox" neplatí a susednosť sa meria na **obálkach korpusov**. Kópia **dosky je SCOPE OUT** (`BoardBuilder.build` polohu neprijíma — šev príde s GHOST-D1), nie-NOXUN
+objekty idú dnešnou legacy cestou (DC `lenx` / bounds, odhad osi z RotZ, `add_instance`).
+
+**`Tools::ZDialog`** (Z posun v mm) si necháva legacy vzhľad, ale má enginový lifecycle: callbacky **pred `show`**, unikátny `preferences_key`, `set_on_closed` → referencia
+`nil`, callback `applyZ` pod **`Engine.update_locked?(:tools_z)`** a účasť vo **VŠETKÝCH TROCH zoznamoch bariéry aktualizácie** — `SupplierSettingsDialog.close_plugin_dialogs`,
+`SupplierSettingsDialog.dialogs_closed?` a post-swap `Engine.close_all_dialogs` (guard test stráži všetky tri).
+
+### snap_calc.rb
+
+**Čisté jadro** Snapera: AABB sweep nad odovzdanými obálkami v lokálnom ráme cieľa. Prekážka sa počíta, len keď sa jej rozsah kryje s cieľom v **hĺbke (Y) aj výške (Z)** — obyčajný
+dotyk nie je prekryv, takže podlaha ani už prisunutý sused bočný posun nebrzdia. Kontajner, ktorý cieľ **obklopuje**, sám kandidátom nie je: zostupuje sa doň (hĺbka 8, `children`
+smie byť `Proc` = lenivo). Prahy: `TOUCH` 0,2 mm · `WARN` 10 m · `BLOCK` 20 m; `verdict` vracia `:none` · `:touching` · `:ok` · `:far` · `:too_far` a rozhoduje podľa **svetovej**
+vzdialenosti (pri škálovanej cudzej inštancii sa líši od lokálnej medzery).
+
+### snaper.rb
+
+SketchUp vrstva Snapera — zbiera geometriu a rozhoduje **viditeľnosť**. Primárna cesta je `Model#drawing_element_visible?` (od SU 2020.0; pozná skryté tagy, **tag priečinky** aj
+nastavenia modelu), ale **pred SU 2026.0 hádže výnimku, keď je posledným prvkom cesty skupina/komponent** — a Snaper prechádza práve kontajnery. Volá sa preto **pod `rescue`**
+s fallbackom `hidden?` + `layer.visible?` + `Tags.folder_hidden?` **po celej ceste**; po prvej výnimke sa natívna cesta vypne **jednosmerným zámkom** (`@native_visibility`), aby
+každá prekážka neplatila cenu výnimky. **Obálka kontajnera sa odvodzuje rekurzívne z jeho VIDITEĽNÝCH listov** (plochy, hĺbka 8) — surové `definition.bounds` by nieslo aj skrytú
+geometriu a skrytý vnuk vo viditeľnej skupine by zastavil prisunutie skôr. Lacný predvýber používa `definition.bounds` ako **nadmnožinu** (kontajner mimo koridoru alebo celý za
+vedúcim okrajom sa nemusí prechádzať vôbec). **Tou istou traverzou sa počítajú aj bounds CIEĽA** — legacy bral surové `definition.bounds`, takže skrytý presahujúci potomok
+vybraného objektu posúval doraz.
+
 ## Inspector — kostra a kontexty
 
 ### Inspector — kostra (UI-B1, ui/js/shell.js)

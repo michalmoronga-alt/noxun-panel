@@ -43,6 +43,13 @@ ho nepozná); kto by ho v params predsa len chcel, musí params poslať pozične
 na disku a logovať, a `Construction.build_plan` sa do prepare **nepresúva** (validačné chyby by sa zobrazili pred hardware blokom a pred commit-time snapshotmi). Súradnice
 obálky/kotvy (`bounds_mm`) plán zámerne **nenesie** — uzavrie ich až GHOST dávka proti `BuildPlan`u. In-SU dôkazy: sekcia `run_r03` + `run_r03_async` (`su_runner.rb`).
 
+**KÓPIA NÁSTROJOM (NÁSTROJE-1, v0.9.24)** ide **tým istým švom** ako „Vložiť kópiu" v paneli — `Store.config` → `newer_config?` (R-12) → `config_to_params` →
+`rekey_hardware_manual` → `build(model, params, transform:)`. Rozdiel je len v **polohe**: `transform` je `src.transformation * translation(Units.vector(±šírka, 0, 0))`, teda
+posun o **šírku korpusu z configu po VLASTNEJ osi X** zdroja. Preto pri akejkoľvek rotácii sedí susednosť **obálok korpusov** — a nie bbox inštancie: čelo so záporným
+`gap_sides` alebo úchytka smie šírku korpusu presahovať, takže sľub „dotyk bbox" neplatí (Codex #288; in-SU `run_tools1` to meria X-rozsahom korpusov aj prekryvom bboxov).
+Kópia teda dostane vlastnú definíciu, nové sekvenčné CAB id a je **jeden krok Späť**. Toto je pointa D-20: legacy `add_instance(ent.definition, tr)` vyrábal kópiu **bez
+identity**. `rigid_matrix?` sa od tejto dávky používa aj mimo vkladu — je to autorita rigidity pre cache `ScaleWatch` aj pre preflight nástrojov (nižšie).
+
 **DOPREDNÝ GUARD CONFIGU (R-12, v0.9.3): `CONFIG_SCHEMA` + `guard_newer_config!`.** Config korpusu je uzavretý whitelist (`normalize` + `cabinet_config`), takže zákazka
 z NOVŠIEHO pluginu prišla pri prvej prestavbe ticho o všetko, čomu táto verzia nerozumie — a uložením stratu zvečnila; `plan_schema` verzuje tranzientný tvar plánu
 a `part_key_schema` len kľúče dielcov, takže kompatibilitu **configu** nevyjadrí ani jeden. Marker `config_schema` sa preto zapisuje v **jedinom zápisovom bode** —
@@ -519,9 +526,23 @@ Súbor, v ktorom žijú triedy prekrytí (`Sketchup::Overlay`) — celý je pod 
 `scaletool`=120 aj na definícii = čisté osi. Mapovanie je **lokálne**, takže platí aj pre otočenú dosku (UI-C1c) — používateľov scale v globálnom Z stojacej dosky skončí v jej
 ŠÍRKE.
 
-**Stabilná transformácia** (`@stable_transforms`, z nej `reject_scale` obnovuje polohu) sa aktualizuje po každej úspešnej absorpcii, presune **aj po úspešnom commite orientačnej
-zmeny** (`Panel.handle_set_board_orientation` volá `remember_transform`) — bez toho by najbližší odmietnutý scale vrátil dosku do polohy PRED otočením, kým config už nesie novú
-orientáciu. Kľúč je `[model.object_id, entityID]` — **`guid` sa ako kľúč použiť NEDÁ** (review #261, P1): SketchUp ho mení **pri každom uložení** dokumentu (rovnaký dôvod, prečo
+**BARIÉRA PRED MUTÁCIOU NÁSTROJA — `flush_pending!(model)` (NÁSTROJE-1, v0.9.24).** `guard` zabráni len NOVÝM udalostiam; už naplnené fronty (`@dirty`, `@added`, `@requested`,
+`@prune_models`) a bežiaci debounce timer zostávajú — a keď timer dobehne PO operácii nástroja, jeho **transparentná** reakcia (dedup kópií, presun ghost zón) sa prilepí na krok
+používateľa, ktorý s ňou nemá nič spoločné. Každý nástroj preto pred polohovou mutáciou NOXUN objektu počká, kým je observer v **POKOJI** = žiadny naplánovaný timer **a** prázdne
+fronty **VŠETKÝCH** dokumentov (multi-model: pokoj sa nesmie vyhlásiť podľa `@last_model`). Je to **bariéra, nie jedno spracovanie**: `process_dirty` môže pri čerstvej kópii nájsť
+staršiu duplicitu a naplánovať follow-up — nový timer s prázdnymi frontami by po operácii nástroja spustil transparentný dedup nad `@last_model`. Preto follow-up od tejto dávky
+zaraďuje **KONKRÉTNY `mdl` do `@requested` PRED `schedule`** (predtým volal holý `schedule`, teda plánoval iba čas). Každá iterácia najprv timer **zastaví** (`@timer` na `nil`)
+a zvýši generáciu, takže ani prežívší callback už nič nespustí; strop je `FLUSH_MAX_ITERATIONS` (5) → vráti `false` a **nástroj operáciu odmietne**, pričom fronty ostávajú
+nedotknuté (bariéra do nich sama nikdy nesiaha — vyprázdňuje ich výhradne `process_dirty`). Headless dôkazy: `tests/pure/test_nastroje1_observer.rb`; in-SU `run_tools1`
+(stará duplicita + čerstvá kópia) a `run_tools1_async` (nástroj spustený DO debounce okna po rotácii aj po natívnom Move).
+
+**Stabilná transformácia** (`@stable_transforms`, z nej `reject_scale` obnovuje polohu) sa aktualizuje po každej úspešnej absorpcii, presune, **po úspešnom commite orientačnej
+zmeny** (`Panel.handle_set_board_orientation` volá `remember_transform`) **aj po úspešnej mutácii nástroja** (`Tools.mutate` — pod guardom ju observer nezachytí, takže bez toho by
+neskôr odmietnutá šikmá mierka obnovila polohu spred príkazu) — bez toho by najbližší odmietnutý scale vrátil dosku do polohy PRED otočením, kým config už nesie novú
+orientáciu. **RIGIDITA SA OD v0.9.24 VYNUCUJE PRIAMO NA HRANICI CACHE:** `remember_transform` uloží len maticu, ktorá prejde `CabinetBuilder.rigid_matrix?`, a `attach_one` sa už
+nespolieha na podmienku `unless scaled?`. Tá kontrolovala **iba dĺžky osí**, takže **šmyková** matica (jednotkové, ale nekolmé osi — nenulový skalárny súčin) do cache prešla
+a `reject_scale` by ňou korpus „obnovil" do stavu, ktorému nezodpovedá žiadna platná geometria (audit 2/3 FIX 2). Kľúč je `[model.object_id, entityID]` — **`guid` sa ako kľúč
+použiť NEDÁ** (review #261, P1): SketchUp ho mení **pri každom uložení** dokumentu (rovnaký dôvod, prečo
 kľúčom názvu zákazky je CESTA — `tests/pure/test_st1a_studio.rb`), takže by Ctrl+S naraz zneplatnil všetky zapamätané polohy a upratovanie by staré záznamy už ani nenašlo.
 Cache má **dve čistiace cesty** (R-04, v0.8.17): `forget_dead_transforms` na **erase tiku** (jeden prechod definíciami daného dokumentu; kľúče entít, ktoré už nežijú, padnú — a
 keď cache pre ten dokument nemá kľúč, model sa vôbec nečíta) a `forget_detached_models` pri **zmene dokumentu**, ktorá beží **výhradne na Windows/SDI** (`Sketchup.platform`):

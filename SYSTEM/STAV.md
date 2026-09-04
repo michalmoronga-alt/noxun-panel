@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.9.23 · 4.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.9.24 · 4.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -25,7 +25,7 @@ robí **priamo v Inspectore**. **KOV-B1** dala setom **klasifikáciu** (na čo �
 **Pozor na kompatibilitu:** čo uloží v0.9.20, to **v0.9.18 už nepoužije** — model/šablóna (`CONFIG_SCHEMA` 4 + brána `assess_set_defs`), knižnica setov aj projektový snapshot
 (`std` 3) a katalóg kovania s výrobcom (`schema` 2). Pred prvou takou zákazkou aktualizovať **obe PC** (D-52 updater).
 
-**Testy k v0.9.23:** **2714 headless** · 83 JS sád · posledný plný in-SketchUp beh **1504 PASS** (v0.9.21; dávky #287 a KOV-B2 ho **nespúšťali** — Michal pracoval v SketchUpe, pustiť pred merge; KOV-B2 pridala sekciu `run_kovb2`).
+**Testy k v0.9.24:** **2749 headless** · 83 JS sád · posledný plný in-SketchUp beh **1504 PASS** (v0.9.21; dávky #287, KOV-B2 a NÁSTROJE-1 ho **nespúšťali** — Michal pracoval v SketchUpe, pustiť pred merge; pribudli sekcie `run_kovb2`, `run_tools1` a `run_tools1_async`).
 
 ## Robí sa
 
@@ -43,6 +43,8 @@ Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` (KO
 
 ## Posledné uzávery
 
+- **NÁSTROJE-1 · T1a — MOWER A SNAPER SÚ V BALÍKU ENGINU** (v0.9.24): druhý toolbar **„Noxun Nástroje"** (rotácie · Z = 0 · Z posun… · Kópia vľavo/vpravo · Prisunúť vľavo/vpravo) + menu → **Nástroje**. Hlavná zmena: **kópia je plnohodnotná skrinka** (vlastné CAB číslo, Inspector, kusovník, ceny — doteraz „fantóm"), krok = **šírka korpusu po jeho vlastnej osi** (sedí aj otočenej).
+  **T1b** (upratanie starých inštalácií Mowera/Snapera + inštalátor) čaká, **D-20 ostáva otvorená**.
 - **KOV-B2 — KATALÓG KOVANIA MÁ STROM A MODAL (D-110 uzavretá)** (v0.9.23, 4.9.2026): položky sú **strom Kategória → „Výrobca · Rada"** — zbalená kategória je jeden riadok
   s počtom, hľadanie roztvorí **len** to, kde niečo našlo, a orezanie sa prizná číslom + **„Načítať ďalšie (N)"** (položka za dvojstovkou sa dá dokliknúť aj dohľadať). Zakladanie
   a úprava sú **modal** (nie formulár pod zoznamom) s poradím polí **Démos → kód → názov → cena → MJ → kategória → výrobca → rada → poznámka**; výrobcu aj radu založíš rovno z neho.
@@ -55,11 +57,9 @@ Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` (KO
   a tlačidlo **„Pridať konkrétnu položku (mimo setov)"**: k čomu patrí (skrinka / čelo / polica), z **katalógu** (živá cena) alebo **voľná**, množstvo a poznámka; riadky
   s chipom **„ručná"**, ceruzka a kôš, každá zmena **jeden krok Späť**. Priznajú sa stavy **„bez vlastníka"** a **„chýba v katalógu"**; v Štúdiu → **Nákup** klik na riadok ukáže
   **pôvod**. **Výstupy sa nemenia ani o znak.** Michal to večer prešiel celé (detail v [archiv/KRONIKA.md](archiv/KRONIKA.md)).
-- **KOV-B1 — klasifikácia setov, taxonómia, std 3** (v0.9.19): set vie, **na čo je** (typ použitia · otváranie · konštrukcia zásuvky · **výrobca a rada** z jediného zoznamu · „aktívny"); typ kovania sa **odvodzuje**, klasifikácia je **buď úplná, alebo žiadna** a **nákup sa nemení ani o kód**. Navonok vidieť jedinú vec — v zozname typov pribudol „Výklop / sklop".
-- **KOV-H1 — ad-hoc kovanie, DÁTOVÁ VRSTVA** (v0.9.18): položka mimo setov — z **katalógu** (živá cena) alebo **voľná**; prežije prestavbu, kópiu aj šablónu, po zániku dielca ostane v nákupe a Kontrola to prizná. Súčasť je **hardening R-12** (zákazka z novšej verzie nevyexportuje neúplný nákup/rozpočet/ponuku).
-- **KOV-A2b** (v0.9.17, #282): prepínač **„Smer otvárania"** kreslí symbol na každé čelo NAD modelom (bez zápisu aj bez kroku Späť; tvar prekreslila D-115); **A2a** (#281) dala kartu čela, **A1** (#280) dáta.
 - **1d/R-14 · R-12 · R-11 — zákazka či nastavenia z NOVŠIEHO pluginu sa už ticho nezmrzačia** (v0.9.2–v0.9.4) a **D-52 — Aktualizovať jedným klikom** (v0.9.14, PR #277–#279): Štúdio → O plugine → priečinok, kontrola verzie, tlačidlo; bariéra okien, atomický swap, restart latch, downgrade zakázaný.
-- **Staršie uzávery** (UZÁVER BLOKU GHOST VKLADANIE **v0.9.0** so smoke checklistom · 1d/R-02 · R-02b · R-01+R-04 · R-07 · R-08 · R-03 · R-34 · 1b-6a/6c · 1b-4 · 1b-3 ·
+- **Staršie uzávery** (**KOV-B1** klasifikácia setov a taxonómia v0.9.19 · **KOV-H1** ad-hoc kovanie dátová vrstva v0.9.18 · **KOV-A2b** smer otvárania v modeli v0.9.17 ·
+  UZÁVER BLOKU GHOST VKLADANIE **v0.9.0** so smoke checklistom · 1d/R-02 · R-02b · R-01+R-04 · R-07 · R-08 · R-03 · R-34 · 1b-6a/6c · 1b-4 · 1b-3 ·
   VEĽKÝ TEST 26.8. · DOCS CLEANUP · PICKER-1/-2/-3 · TEST-1 · ŠT-4b uzáver fázy ŠTÚDIO **v0.8.0** · blok KRESBA · UI-A…UI-D · ŠTART AUTONÓMIE · RETRO · UPRATANIE · séria KLINIKA · Materiály 2.0 a dávky D/E #89–#140) — plné texty v [archiv/KRONIKA.md](archiv/KRONIKA.md)
 
 ## Kam sa pozrieť
