@@ -67,7 +67,7 @@ module Noxun
           def nearest_gap(model, target, dir)
             inv = target.transformation.inverse
             t_box = target_box(model, target)
-            nodes = obstacle_nodes(model, model.entities, inv, [], target)
+            nodes = obstacle_nodes(model, model.entities, inv, [], target, t_box, dir.to_sym, 0)
             SnapCalc.nearest_gap(t_box, nodes, dir)
           end
 
@@ -80,28 +80,67 @@ module Noxun
           end
 
           # --- prekazky ----------------------------------------------------------
-          # Uzly su LENIVE: do kontajnera sa zostupuje az vtedy, ked jadro zisti,
-          # ze jeho obalka presahuje veduci okraj ciela (jednoduchsi kontajner sa
-          # tak vobec neprechadza).
-          def obstacle_nodes(model, entities, to_local, path, target)
+          # Obalka KONTAJNERA sa odvodzuje REKURZIVNE z jeho VIDITELNYCH listov
+          # (kolo 3 P2). Surove `definition.bounds` by nieslo aj SKRYTU geometriu
+          # — skryty vnuk vo viditelnej skupine by potom zastavil prisunutie skor,
+          # nez treba. Listy su PLOCHY: hrany su ich sucastou a kvader nimi
+          # vymedzeny nie je.
+          #
+          # LACNY PREDVYBER: `definition.bounds` je NADMNOZINA viditelnej obalky,
+          # takze kontajner, ktory sa nou nekryje s cielom v hlbke/vyske alebo lezi
+          # cely ZA veducim okrajom, sa nemusi prechadzat vobec.
+          def obstacle_nodes(model, entities, to_local, path, target, t_box, dir, depth)
             out = []
             entities.each do |ent|
               next if target && ent.equal?(target)
               next unless visible?(model, path + [ent])
 
-              if container?(ent)
-                child_tr = to_local * ent.transformation
-                out << { box: box_mm(transform_bounds(ent.definition.bounds, child_tr)),
-                         container: true,
-                         children: -> { obstacle_nodes(model, ent.definition.entities, child_tr, path + [ent], nil) } }
-              elsif ent.is_a?(Sketchup::Face)
-                out << { box: box_mm(transform_bounds(ent.bounds, to_local)), container: false }
-              end
+              node =
+                if container?(ent)
+                  container_node(model, ent, to_local, path, t_box, dir, depth)
+                elsif ent.is_a?(Sketchup::Face)
+                  { box: box_mm(transform_bounds(ent.bounds, to_local)), container: false }
+                end
+              out << node if node
             end
             out
           rescue StandardError => e
             Engine.log_error(e, 'Tools::Snaper.obstacle_nodes')
             out || []
+          end
+
+          def container_node(model, ent, to_local, path, t_box, dir, depth)
+            child_tr = to_local * ent.transformation
+            outer = box_mm(transform_bounds(ent.definition.bounds, child_tr))
+            return nil unless relevant?(outer, t_box, dir)
+            # Na strope hlbky sa uz nezanorujeme — plati vonkajsia obalka.
+            return { box: outer, container: false } if depth >= SnapCalc::MAX_DEPTH
+
+            kids = obstacle_nodes(model, ent.definition.entities, child_tr, path + [ent],
+                                  nil, t_box, dir, depth + 1)
+            return nil if kids.empty?
+
+            { box: union_box(kids), container: true, children: kids }
+          end
+
+          # Moze tento uzol vobec nieco ovplyvnit? Testuje sa nad NADMNOZINOU
+          # (vonkajsou obalkou), takze zamietnutie je vzdy bezpecne.
+          def relevant?(box, t_box, dir)
+            return false unless SnapCalc.overlap_1d(box[:min][1], box[:max][1], t_box[:min][1], t_box[:max][1])
+            return false unless SnapCalc.overlap_1d(box[:min][2], box[:max][2], t_box[:min][2], t_box[:max][2])
+
+            if dir == :right
+              box[:max][0] > t_box[:max][0] - SnapCalc::EPS_MM
+            else
+              box[:min][0] < t_box[:min][0] + SnapCalc::EPS_MM
+            end
+          end
+
+          def union_box(nodes)
+            lo = nodes.map { |n| n[:box][:min] }
+            hi = nodes.map { |n| n[:box][:max] }
+            { min: (0..2).map { |i| lo.map { |v| v[i] }.min },
+              max: (0..2).map { |i| hi.map { |v| v[i] }.max } }
           end
 
           # --- obalka CIELA -------------------------------------------------------
@@ -128,7 +167,7 @@ module Noxun
                 else
                   add_bounds(bb, ent.definition.bounds, child_tr)
                 end
-              elsif ent.is_a?(Sketchup::Face) || ent.is_a?(Sketchup::Edge)
+              elsif ent.is_a?(Sketchup::Face)
                 add_bounds(bb, ent.bounds, to_local)
               end
             end
