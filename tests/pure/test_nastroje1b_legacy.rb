@@ -422,7 +422,10 @@ end
 
 NxTest.test('T1b: main.rb spusta migraciu PRED registraciou toolbaru') do
   src = File.binread(File.join(NxTest::ROOT, 'noxun_engine', 'main.rb')).force_encoding(Encoding::UTF_8)
-  cleanup_at = src.index('Tools::LegacyCleanup.run!')
+  # Boot vola VYSLOVNE `boot!` — ten si zapamata POUZITU cestu markera. `run!`
+  # by ju nechal na neskorsom dopocitani (`path`), ktore uz moze ukazovat inam
+  # (test override, sandbox APPDATA).
+  cleanup_at = src.index('Tools::LegacyCleanup.boot!')
   toolbar_at = src.index('install_toolbar # UI-02')
   tools_at = src.index('Tools.install!(menu)')
   NxTest.assert(cleanup_at, 'main.rb nevola boot migraciu')
@@ -431,4 +434,33 @@ NxTest.test('T1b: main.rb spusta migraciu PRED registraciou toolbaru') do
                 'migracia bezi AZ PO registracii toolbaru — legacy by sa upratalo o boot neskor')
   NxTest.assert(src.include?("Sketchup.require 'noxun_engine/tools/legacy_cleanup'"),
                 'main.rb nenacitava tools/legacy_cleanup')
+end
+
+NxTest.test('T1b: `boot!` si zapamata VYSLEDOK aj POUZITU cestu markera') do
+  env = NxT1b.sandbox
+  begin
+    NxT1b.seed_legacy!(env[:plugins])
+    # Cestu markera si `boot!` vyberie SAM z `path` — a prave tu si musi
+    # zapamatat. Neskorsie presmerovanie `Materials.dir` (test override, sandbox
+    # APPDATA in-SU runnera) uz o nej nic nevie, takze kto sa spyta `path` az
+    # potom, hlada kluc v subore, ktory nikdy nevznikol.
+    expected = LC.path
+    res = LC.boot!(env[:plugins])
+    NxTest.assert_equal('done', res['state'])
+    NxTest.assert_equal(res, LC.boot_result)
+    NxTest.assert_equal(expected, LC.boot_marker_path)
+    NxTest.assert_equal(LC.normalize_key(env[:plugins]), LC.boot_result['plugins'])
+    NxTest.assert(File.exist?(LC.boot_marker_path), 'boot nezapisal marker na zapamatanu cestu')
+    NxTest.assert(NxT1b.marker_done(LC.boot_marker_path).key?(LC.normalize_key(env[:plugins])),
+                  'marker na zapamatanej ceste nenesie kluc bootovanej instalacie')
+
+    # Testy (a in-SU sekcie) volajuce `run!` priamo zaznam NEPREPISU.
+    second = File.join(env[:root], 'plugins2026')
+    FileUtils.mkdir_p(second)
+    LC.run!(second, marker_path: env[:marker])
+    NxTest.assert_equal(expected, LC.boot_marker_path, '`run!` prepisal boot zaznam')
+    NxTest.assert_equal(LC.normalize_key(env[:plugins]), LC.boot_result['plugins'])
+  ensure
+    FileUtils.rm_rf(env[:root])
+  end
 end

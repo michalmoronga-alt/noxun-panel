@@ -192,6 +192,33 @@ module Noxun
           result('error', reason: "#{e.class}: #{e.message}")
         end
 
+        # --- boot beh ----------------------------------------------------------
+        # JEDINY vstup pre `main.rb`. Cestu markera si vyberie SAM (`path`) a
+        # vysledok aj POUZITU cestu si zapamata — je to jediny spolahlivy zaznam
+        # o tom, kde boot naozaj zapisoval.
+        #
+        # PRECO TO NIE JE V `run!`: `Materials.dir` (a teda `path`) sa da v
+        # testoch presmerovat AZ PO boote (`test_dir_override`, sandbox APPDATA
+        # in-SU runnera). Kto sa neskor spyta `path`, dostane INU cestu, nez
+        # akou boot pisal — a hladal by kluc v subore, ktory nikdy nevznikol.
+        # Testy volaju `run!` priamo, takze tento zaznam NEPREPISU.
+        def boot!(plugins_dir)
+          marker = path
+          res = run!(plugins_dir, marker_path: marker)
+          @boot_result = res
+          @boot_marker_path = marker
+          res
+        end
+
+        # Read-only zaznam posledneho BOOT behu (`nil` = boot este nebezal).
+        def boot_result
+          @boot_result
+        end
+
+        def boot_marker_path
+          @boot_marker_path.to_s
+        end
+
         def result(state, removed: [], failed: [], key: '', stored: true, reason: '')
           { 'ok' => state == 'done' || state == 'skipped', 'state' => state,
             'removed' => removed, 'failed' => failed, 'plugins' => key,

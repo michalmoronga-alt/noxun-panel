@@ -13947,9 +13947,11 @@ module NoxunSuRunner
   #       dotyku zivej instalacie;
   #   (b) ZIVA instalacia — dokaz, ze boot hook v `main.rb` naozaj bezal: v
   #       priecinku `Plugins`, z ktoreho je engine nacitany, uz legacy ciele
-  #       NIE SU a realny marker nesie kluc tejto cesty. Tuto rovinu vie
-  #       dokazat LEN SketchUp (headless sada boot nema).
+  #       NIE SU a marker NA CESTE, KTORU BOOT POUZIL, nesie kluc tejto cesty.
+  #       Tuto rovinu vie dokazat LEN SketchUp (headless sada boot nema).
   # Model sa nedotyka: ziadna geometria, ziadna operacia, ziadny krok Spat.
+  # Sekcia NENASTAVUJE ziadny `test_dir_override` — rovina (a) si cestu markera
+  # podava PARAMETROM do TEMP suboru, takze po nej niet co vracat.
   def tools1b_seed(plugins)
     File.binwrite(File.join(plugins, 'noxun_mower_loader.rb'), "require 'Noxun_Mower/loader'\n")
     FileUtils.mkdir_p(File.join(plugins, 'Noxun_Mower', 'icons'))
@@ -14008,14 +14010,26 @@ module NoxunSuRunner
          lc::TARGETS.all? { |n| File.exist?(File.join(plugins, n)) })
 
       # --- (b) ZIVA instalacia: dokaz, ze boot hook bezal --------------------
+      # POZOR NA CESTU MARKERA: `lc.path` sa dopocitava z `Materials.dir`, ktoru
+      # runner (sandbox APPDATA, `test_dir_override`) presmeruje AZ PO boote —
+      # takze by sa kluc hladal v subore, do ktoreho boot nikdy nepisal. Preto
+      # sa cita ZAPAMATANY zaznam bootu (`boot_marker_path` / `boot_result`),
+      # nie aktualne dopocitana cesta.
       live = e::Updater.plugins_dir_of(e.plugin_dir)
       left = lc::TARGETS.select { |n| File.exist?(File.join(live, n)) }
       ok("T1b (b): ziva instalacia je BEZ legacy Mower/Snaper (#{left.empty? ? 'ciste' : left.join(', ')})",
          left.empty?)
       live_key = lc.normalize_key(live)
-      live_done = lc.load_marker(lc.path)
-      ok("T1b (b): realny marker nesie kluc zivej cesty Plugins (boot hook bezal; #{lc.path})",
-         live_done.is_a?(Hash) && live_done.key?(live_key))
+      boot = lc.boot_result
+      boot_marker = lc.boot_marker_path
+      ok("T1b (b): boot hook bezal a dobehol (stav #{boot.is_a?(Hash) ? boot['state'] : 'ziadny'})",
+         boot.is_a?(Hash) && %w[done skipped].include?(boot['state']))
+      ok('T1b (b): boot bezal nad ZIVOU cestou Plugins',
+         boot.is_a?(Hash) && boot['plugins'] == live_key)
+      e::JsonFileStore.reload!(boot_marker) unless boot_marker.empty?
+      boot_done = boot_marker.empty? ? {} : lc.load_marker(boot_marker)
+      ok("T1b (b): marker na ceste, ktoru boot POUZIL, nesie kluc zivej instalacie (#{boot_marker})",
+         File.exist?(boot_marker) && boot_done.is_a?(Hash) && boot_done.key?(live_key))
     ensure
       begin
         FileUtils.rm_rf(root)

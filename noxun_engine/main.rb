@@ -568,7 +568,7 @@ module Noxun
       # zobrazenie. Hlaska je jednorazova sama od seba: po uspesnom upratani ma
       # marker kluc tejto instalacie a dalsi boot skonci stavom `skipped`.
       begin
-        cleanup = Tools::LegacyCleanup.run!(Updater.plugins_dir_of(plugin_dir))
+        cleanup = Tools::LegacyCleanup.boot!(Updater.plugins_dir_of(plugin_dir))
         cleanup_msg = Tools::LegacyCleanup.message_for(cleanup)
         unless cleanup_msg.empty?
           log(cleanup_msg)

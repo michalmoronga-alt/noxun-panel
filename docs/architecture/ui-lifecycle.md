@@ -488,7 +488,9 @@ SketchUp zaregistruje dva toolbary navyše. Migrácia odstráni **presne štyri 
 `Plugins` a beží z `main.rb` **PRED registráciou toolbarov**, vo vlastnom chránenom bloku (vzor `Materials.boot_cutover!`) — zlyhanie migrácie nikdy nezhodí menu, toolbar ani
 observer. **Prečo boot a nie updater:** pri aktualizácii (D-52) vykonáva swap ešte STARÝ kód v pamäti, takže nový `updater.rb` sa k slovu dostane až po reštarte; upratanie preto
 patrí na začiatok bootu NOVÉHO balíka. Modul je **čisté jadro** (žiadne `Sketchup.*`/`UI.*`, všetky cesty ako parametre, hlášky len konštanty) — o zobrazení rozhoduje tenký boot
-hook cez `message_for`.
+hook cez `message_for`. Boot volá **`boot!`**, nie `run!`: `boot!` si cestu markera vyberie z `path` a **zapamätá si ju spolu s výsledkom** (`boot_marker_path` / `boot_result`,
+read-only). Bez toho sa nedá spätne zistiť, kam sa naozaj písalo — `Materials.dir` sa dá presmerovať až PO boote (`test_dir_override`, sandbox APPDATA in-SU runnera), takže
+neskoršie `path` už môže ukazovať inam. Testy volajú `run!` priamo a tento záznam neprepíšu.
 
 **Zlyhanie nie je hotovo.** `FileUtils.rm_rf` chybu potlačí a vráti sa bez výnimky, preto má **každý cieľ postkontrolu existencie** a kľúč do markera sa zapíše **až po overenej
 neprítomnosti všetkých štyroch**. Zamknutý súbor (bežiaci SketchUp, antivírus, indexer) tak neskončí ticho označený za uprataný — výsledok nesie stav `failed` s cestami a migrácia
