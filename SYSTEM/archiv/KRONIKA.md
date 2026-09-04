@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **NÁSTROJE-1 · T1a — MOWER A SNAPER V BALÍKU NOXUN ENGINE (v0.9.24, 4.9.2026, PR #NN):** prvá polovica dávky, ktorá rieši **D-20**. Dva pomocné pluginy Michala (Noxun Mower
+- **NÁSTROJE-1 · T1a — MOWER A SNAPER V BALÍKU NOXUN ENGINE (v0.9.24, 4.9.2026, PR #293):** prvá polovica dávky, ktorá rieši **D-20**. Dva pomocné pluginy Michala (Noxun Mower
   a Snaper) prestali byť samostatné rozšírenia a stali sa modulmi enginu (`noxun_engine/tools/`); verziu, aktualizáciu (D-52) aj logovanie preberajú od neho, ich UI ostáva
   zámerne také, aké bolo („nechať im svoj svet"). **T1b** — boot migrácia starých inštalácií a inštalátor — má vlastný PR; **D-20 preto ostáva otvorená**.
   **Prečo vlastný toolbar.** Toolbar enginu má železné pravidlo „do modelu sa NEZAPISUJE" (lekcia D-103/D-105), kým nástroje model menia. Preto vzniká **druhý** panel
