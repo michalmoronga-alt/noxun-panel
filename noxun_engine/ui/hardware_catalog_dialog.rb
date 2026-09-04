@@ -719,13 +719,19 @@ module Noxun
             {}
           end
           gen = data['gen'].to_i
+          # Review #297 P2-2: k GENERACII patri aj IDENTITA MODALU. Generacia
+          # startuje od nuly pri kazdom otvoreni editora, takze oneskorena
+          # odpoved uz zavreteho okna by v novom ukazala CUDZIU expanziu.
+          # Server ju len ECHUJE — autoritou poradia je klient, ktory ju vydal.
+          token = data['token'].to_s
           out, errors = HardwareSets.preview_expansion(
             data['set'].is_a?(Hash) ? data['set'] : {},
             catalog: preview_catalog,
             sample: data['sample'].is_a?(Hash) ? data['sample'] : {}
           )
-          js("HWSETS.preview(#{(out.nil? ? { 'gen' => gen, 'ok' => false, 'errors' => Array(errors) }
-                                          : out.merge('gen' => gen, 'ok' => true)).to_json})")
+          echo = { 'gen' => gen, 'token' => token }
+          js("HWSETS.preview(#{(out.nil? ? echo.merge('ok' => false, 'errors' => Array(errors))
+                                         : out.merge(echo).merge('ok' => true)).to_json})")
         end
 
         # Katalog pre nahlad — LEN CITANIE (nazvy a ceny kodov). Chyba

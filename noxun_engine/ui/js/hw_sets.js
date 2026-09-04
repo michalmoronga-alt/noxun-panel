@@ -515,11 +515,35 @@
     preview: function(data){
       var r = data || {};
       if (!HWS_SET) return;
+      // Review #297 P2-2: odpoved patriaca INEMU (uz zavretemu) modalu sa
+      // ZAHADZUJE — inak by v novom okne ukazala cudziu expanziu a zdvihla
+      // `seen` tak, ze by sa vlastne odpovede zahadzovali, kym pocitadlo
+      // nedobehne. Generacia sama nestaci: startuje od nuly per modal.
+      if (String(r.token == null ? '' : r.token) !== String(HWS_SET.previewToken || '')) return;
       if (hwsPreviewStale(r.gen, HWS_SET.seen)) return;
       HWS_SET.seen = Number(r.gen || 0);
       HWS_SET.previewBusy = false;
       HWS_SET.preview = r;
       hwsPreviewRedraw();
+      // Review #297 P2-5: nahlad validuje TEN ISTY draft ako zapis, takze jeho
+      // STRUKTUROVANE chyby patria PRI POLE — inak sa chybajuci kod clena
+      // alebo neuplna klasifikacia ukaze az pri realnom ulozeni.
+      if (typeof NXModal === 'undefined' || !NXModal.isOpen || !NXModal.isOpen()) return;
+      if (NXModal.isBusy && NXModal.isBusy()) return; // bezi zapis — jeho hlaska ma prednost
+      if (r.ok === true) NXModal.clearErrors();
+      else NXModal.showErrors(hwsServerErrors(r.errors, null));
+    },
+    // Review #297 P2-7: ODCHOD ZO SEKCIE musi zavriet AJ modal setu. Zije
+    // v zdielanom `#nxModalRoot` MIMO `#secbody`, takze bez toho by visel nad
+    // cudzou sekciou Studia — a s nim aj naplanovany nahlad. Cistiaca cesta
+    // sekcie (`hwCloseModals` v `hw_catalog.js`) pozna len svoj modal polozky,
+    // preto si zatvorenie riadi TENTO subor: `onClose` (`hwsSetClosed`) zrusi
+    // debounce nahladu a rozpisane hodnoty si zapamata (kontrakt D-15).
+    closeModal: function(){
+      if (typeof NXModal === 'undefined' || !NXModal || !NXModal.isOpen) return false;
+      if (!HWS_SET || !NXModal.isOpen()) return false;
+      NXModal.close();
+      return true;
     },
     // Echo zapisu do TAXONOMIE (`hw_tax_create_*`). Chodi aj vtedy, ked
     // zapis spustil modal POLOZKY — vtedy tu len obnovime zoznam, vybrat
@@ -907,6 +931,24 @@
     });
   }
 
+  // Ploché polia z PAMÄTE rozpísaného konceptu do draftu (review #297 P2-1).
+  // Členovia sem NEPATRIA — tie vlieva kostra priamo do vlastného uzla.
+  var HWS_DRAFT_KEYS = ['use_type', 'opening_mode', 'drawer_construction',
+                        'manufacturer', 'manufacturer_new', 'series', 'series_new',
+                        'generic_type', 'name'];
+
+  function hwsDraftFromMemory(d){
+    if (typeof NXModal === 'undefined' || !NXModal || typeof NXModal.memory !== 'function') return d;
+    var mem = NXModal.memory(HWS_KEY_NEW);
+    if (!mem) return d;
+    var out = hwsSetDraft(d);
+    HWS_DRAFT_KEYS.forEach(function(k){
+      if (Object.prototype.hasOwnProperty.call(mem, k)) out[k] = String(mem[k] == null ? '' : mem[k]);
+    });
+    if (Object.prototype.hasOwnProperty.call(mem, 'active')) out.active = mem.active !== false;
+    return out;
+  }
+
   function hwsTypeOptions(){
     return ((HWS_DATA && HWS_DATA.generic_types) || []).map(function(t){
       return [String(t.key), String(t.label)];
@@ -985,6 +1027,13 @@
     var o = opts || {};
     return {
       trigger: o.trigger,
+      // Review #297 P2-1: VNUTORNE prekreslenie (zmena kontextu polí, konflikt,
+      // nový výrobca) podáva PRVOTNÉ polia ako východisko pamäte a pamäť si
+      // NEVLIEVA späť. Bez toho by sa východiskom stalo to, čo používateľ
+      // práve napísal — Escape by potom neuložil NIC a „Nový set" by sa
+      // otvoril prázdny (stratilo by sa všetko spred poslednej zmeny selectu).
+      baseFields: o.baseFields,
+      skipMemory: o.internal === true,
       title: o.edit ? 'Upraviť set kovania' : 'Nový set kovania',
       sub: o.edit ? ('Identita ' + hwsTrim(d.set_id)) : 'klasifikácia → členovia → náhľad',
       size: 'wide',
@@ -1004,31 +1053,59 @@
     if (typeof NXModal === 'undefined' || !NXModal || typeof NXModal.open !== 'function') return;
     var o = opts || {};
     var edit = !!set;
-    var d = draft || (edit ? hwsSetDraftOf(set) : hwsSetDraft({ active: true }));
+    var d = draft || (edit ? hwsSetDraftOf(set)
+                          : hwsSetDraft({ active: true, generic_type: hwsDefaultType() }));
     var keep = (o.keep && HWS_SET) ? HWS_SET : null;
+    // Review #297 P2-1: pri NOVOM sete sa draft doplní z PAMÄTE rozpísaného
+    // konceptu EŠTE PRED stavbou polí. Kostra síce hodnoty do polí vlieva
+    // sama, ale ZÁVISLÝ select sa stavia z draftu: bez tohto by sa rada
+    // obnovila do zoznamu, ktorý ju (bez známeho výrobcu) vôbec neponúka,
+    // a prehliadač by ticho vybral prvú možnosť.
+    var fresh = d;                       // draft PRED vliatim pamate
+    if (!edit && !keep && !draft) d = hwsDraftFromMemory(d);
     var members = o.members || (keep ? keep.members : (edit ? hwsMembersOf(set) : []));
     // R-41: revizia a ZAKLADNA definicia sa PRIPINAJU pri OTVORENI a prezivaju
     // kazdy push. Vnutorne prekreslenie (zmena vyrobcu, konflikt) ich NESMIE
     // omladit — inak by guard servera prešiel nad stavom, ktorý používateľ
     // nikdy nevidel (presne to bola R-41).
-    var rev = keep ? keep.rev : hwsCurrentRev();
+    var rev = (keep && o.rebaseRev !== true) ? keep.rev : hwsCurrentRev();
     var base = keep ? keep.base : (edit ? set : null);
     if (o.dropMemory && typeof NXModal.clearMemory === 'function') NXModal.clearMemory(HWS_KEY_NEW);
     var trigger = o.trigger || (keep ? keep.trigger : null) ||
       (typeof document !== 'undefined' ? document.activeElement : null);
+    // Review #297 P2-2: identita MODALU pre náhľad. Generácia sama nestačí —
+    // štartuje od nuly pri každom otvorení, takže oneskorená odpoveď starého
+    // okna by v novom ukázala CUDZIU expanziu a zdvihla `seen` tak, že by sa
+    // vlastné odpovede zahadzovali, kým počítadlo nedobehne.
+    HWS_TOKEN_SEQ += 1;
+    var previewToken = 'hwsp' + HWS_TOKEN_SEQ + '-' + Date.now();
     // Stav MUSI stat pred `open` — render vlastneho pola (`members`,
     // `preview`) bezi uz vnutri neho a cita `HWS_SET`.
     HWS_SET = { edit: edit, set_id: hwsTrim(d.set_id), draft: d, members: members,
                 rev: rev, base: base, trigger: trigger,
-                nameTouched: keep ? keep.nameTouched : !!(edit && hwsTrim(d.name)),
+                // Neprázdny názov (uložený set aj obnovený koncept) je názov,
+                // ktorý si niekto vybral — auto-návrh ho už neprepíše.
+                nameTouched: keep ? keep.nameTouched : !!hwsTrim(d.name),
                 conflict: !!o.conflict, sent: false, token: '',
                 taxPending: null, taxToken: '',
                 gen: keep ? keep.gen : 0, seen: keep ? keep.seen : 0,
-                sample: (keep && keep.sample) || hwsSampleDefault(),
-                preview: keep ? keep.preview : null, previewBusy: false, timer: null };
+                previewToken: (keep && keep.previewToken) || previewToken,
+                // Review #297 P2-4: vzorové parametre nesú LEN to, čo naozaj
+                // zadal používateľ. Prázdne = server si vyberie PODPOROVANÚ
+                // hodnotu sám (rad bez NL 470 by inak hlásil falošný ORANGE).
+                sample: (keep && keep.sample) || {},
+                preview: keep ? keep.preview : null, previewBusy: false, timer: null,
+                baseFields: keep ? keep.baseFields : null };
+    // PRVOTNÉ polia si držíme z PRVÉHO otvorenia — voči nim počíta kostra
+    // pamäť rozpísaného konceptu naprieč všetkými prekresleniami a z nich
+    // kreslí „Začať odznova". Staviame ich z draftu PRED vliatím pamäte,
+    // takže reset vráti ČISTÝ formulár, nie ten istý koncept.
+    if (!HWS_SET.baseFields) HWS_SET.baseFields = hwsSetFields(fresh, { edit: edit });
+    var spec = hwsSetSpec(d, { edit: edit, trigger: trigger, conflict: !!o.conflict,
+                               internal: !!keep, baseFields: HWS_SET.baseFields });
     HWS_REOPEN = true;
     try {
-      NXModal.open(hwsSetSpec(d, { edit: edit, trigger: trigger, conflict: !!o.conflict }));
+      NXModal.open(spec);
     } finally {
       HWS_REOPEN = false;
     }
@@ -1045,8 +1122,11 @@
     var o = over || {};
     var edit = HWS_SET.edit;
     var stored = edit ? hwsSetById(HWS_SET.set_id) : null;
+    // Review #297 P2-1: pamäť sa pri prekreslení NEZAHADZUJE (`dropMemory`
+    // zmizol) — kostra ju len NEVLIEVA späť (`internal`) a počíta ju voči
+    // PRVOTNÝM poliam, ktoré jej podáva `hwsSetSpec`.
     hwsSetOpen(edit ? (stored || HWS_SET.base) : null, d,
-               { keep: true, dropMemory: true, edit: edit,
+               { keep: true, edit: edit, rebaseRev: o.rebaseRev === true,
                  conflict: o.conflict === undefined ? HWS_SET.conflict : o.conflict });
   }
 
@@ -1074,17 +1154,50 @@
   function hwsSetCtxSwitch(changedKey){
     if (!HWS_SET || typeof NXModal === 'undefined' || !NXModal.isOpen || !NXModal.isOpen()) return;
     if (NXModal.isBusy && NXModal.isBusy()) return; // bezi zapis — nesahat
+    var prev = HWS_SET.draft || {};
     var d = hwsSetDraft(NXModal.values(), { set_id: HWS_SET.set_id });
+    // Pole, ktore prave NIE JE na obrazovke, vo `values()` nie je — hodnotu
+    // si preto nesie DRAFT (inak by sa typ kovania pri prepnuti na
+    // „nezaradený" stratil a select by ticho vybral prvu moznost).
+    if (!hwsTrim(d.generic_type)) d.generic_type = hwsTrim(prev.generic_type) || hwsDefaultType();
     if (changedKey === 'manufacturer'){
       // Rada patri presne jednemu vyrobcovi — po zmene vyrobcu uz vybrana
       // rada platit nemusi.
       if (d.series !== HWS_NEW_OPT && hwsSeriesOf(d.manufacturer).indexOf(d.series) < 0) d.series = '';
       d.series_new = '';
     }
-    if (changedKey === 'use_type' && d.use_type !== 'drawer') d.drawer_construction = '';
+    if (changedKey === 'use_type') d = hwsApplyUseType(d);
     d.name = hwsApplyAutoName(d, HWS_SET.nameTouched);
     HWS_SET.draft = d;
     hwsSetRedraw(d);
+  }
+
+  // Dosledky zmeny TYPU POUZITIA na zvysok klasifikacie (CISTA funkcia).
+  //
+  // Review #297 P2-3: „— nezaradený —" znamena LEGACY set, teda klasifikaciu
+  // BEZ JEDINEHO kluca. Vymazat len konstrukciu nestaci — payload by odisiel
+  // s prazdnym `use_type` a neprazdnym vyrobcom, server by ho odmietol
+  // („ALL-OR-NOTHING") a pouzivatel by nemal ako zaradenie zrusit.
+  // `generic_type` OSTAVA: nezaradeny set ho musi niest sam.
+  function hwsApplyUseType(draft){
+    var d = draft || {};
+    if (hwsTrim(d.use_type) === ''){
+      d.opening_mode = '';
+      d.drawer_construction = '';
+      d.manufacturer = '';
+      d.manufacturer_new = '';
+      d.series = '';
+      d.series_new = '';
+      return d;
+    }
+    if (hwsTrim(d.use_type) !== 'drawer') d.drawer_construction = '';
+    return d;
+  }
+
+  // Prvy typ kovania zo serveroveho slovnika (fallback pre nezaradeny set).
+  function hwsDefaultType(){
+    var list = (HWS_DATA && HWS_DATA.generic_types) || [];
+    return list.length ? String(list[0].key) : '';
   }
 
   // Odoslanie setu. „+ Vytvoriť…" NIE JE hodnota setu — je to zapis do
@@ -1152,12 +1265,18 @@
 
   // --- KOV-B3: ZIVY NAHLAD ---------------------------------------------------
 
-  function hwsSampleDefault(){
-    var s = (HWS_DATA && HWS_DATA.preview_sample) || {};
-    var out = {};
-    var k;
-    for (k in s){ if (Object.prototype.hasOwnProperty.call(s, k)) out[k] = s[k]; }
-    return out;
+  // Hodnota vzoroveho parametra NA OBRAZOVKE. Poradie je kontrakt (review
+  // #297 P2-4): 1. co zadal POUZIVATEL · 2. co naozaj POUZIL server v poslednom
+  // nahlade (pri rade bez 470 to je najblizsia podporovana dlzka) · 3. serverovy
+  // default z payloadu. Odosiela sa VYHRADNE prvy pripad — inak by klient
+  // vnucoval 470 aj radu, ktory ju nema, a nahlad by hlasil falosny ORANGE.
+  function hwsSampleShown(field, state){
+    var st = state || HWS_SET || {};
+    var own = (st.sample || {})[field];
+    if (own !== undefined && own !== null && own !== '') return own;
+    var used = ((st.preview || {}).sample || {})[field];
+    if (used !== undefined && used !== null && used !== '') return used;
+    return ((HWS_DATA && HWS_DATA.preview_sample) || {})[field];
   }
 
   // Debounce pri pisani: kazdy znak by inak poslal vlastnu poziadavku.
@@ -1178,7 +1297,13 @@
     // Nahlad potrebuje IDENTITU (validacia ju vyzaduje) — pri novom sete ju
     // este nikto nezadal, takze sa odvodi z nazvu rovnako ako pri ulozeni.
     if (!hwsTrim(payload.set_id)) payload.set_id = hwsSlug(d.name);
-    hwsSend('hws_preview', { set: payload, gen: HWS_SET.gen, sample: HWS_SET.sample });
+    // Review #297 P2-2: k GENERACII ide aj IDENTITA MODALU — generacia sama
+    // startuje od nuly pri kazdom otvoreni.
+    // Review #297 P2-4: `sample` nesie LEN to, co pouzivatel naozaj zadal;
+    // prazdna hodnota necha vyber podporovanej dlzky na SERVERI.
+    hwsSend('hws_preview', { set: payload, gen: HWS_SET.gen,
+                             token: HWS_SET.previewToken || '',
+                             sample: HWS_SET.sample || {} });
   }
 
   function hwsPreviewRedraw(){
@@ -1197,8 +1322,9 @@
       row.appendChild(hwsMk('span', 'hwsed-mlbl', 'Vzorová NL'));
       var inp = hwsMk('input');
       inp.type = 'text'; inp.className = 'hwsed-band';
-      inp.value = hwsNum((st.sample || {}).nominal_length);
+      inp.value = hwsNum(hwsSampleShown('nominal_length', st));
       inp.setAttribute('data-hws-sample', 'nominal_length');
+      inp.title = 'Prázdne = podporovanú dĺžku vyberie server podľa radu.';
       row.appendChild(inp);
       row.appendChild(hwsMk('span', 'hwsed-mlbl', 'mm'));
       box.appendChild(row);
@@ -1223,14 +1349,24 @@
   }
 
   // Konfliktny pas (R-41): hlaska + VEDOMY druhy klik na obnovu.
+  //
+  // Review #297 P2-6: NOVY set ma INU cestu von. Konflikt pri nom neznamena
+  // „niekto zmenil TVOJ set" (ten este neexistuje), ale „kniznica sa medzitym
+  // zmenila" — nacitavat nie je co a pripnuta revizia by kolidovala donekonecna.
+  // Obnova preto LEN pripne cerstvu reviziu a rozpisany set NECHA byt.
   function hwsConflictRender(host){
     if (!host) return;
     host.textContent = '';
+    var isNew = !(HWS_SET && HWS_SET.edit);
     var box = hwsMk('div', 'mset-conf');
-    box.appendChild(hwsMk('div', null,
-      'Set medzitým zmenil niekto iný. Tvoje zmeny sú stále tu — ulož ich znova, ' +
-      'alebo si načítaj aktuálny set (tvoje zmeny sa pritom zahodia).'));
-    var btn = hwsMk('button', 'ghostbtn mset-confbtn', 'Obnoviť — načítať aktuálny set');
+    box.appendChild(hwsMk('div', null, isNew
+      ? 'Knižnica setov sa medzitým zmenila (iné okno). Tvoj rozpísaný set je celý tu — ' +
+        'stačí ho prevziať na aktuálny stav knižnice a uložiť znova.'
+      : 'Set medzitým zmenil niekto iný. Tvoje zmeny sú stále tu — ulož ich znova, ' +
+        'alebo si načítaj aktuálny set (tvoje zmeny sa pritom zahodia).'));
+    var btn = hwsMk('button', 'ghostbtn mset-confbtn', isNew
+      ? 'Prevziať aktuálny stav knižnice (rozpísaný set ostáva)'
+      : 'Obnoviť — načítať aktuálny set');
     btn.setAttribute('type', 'button');
     btn.setAttribute('data-action', 'hws-set-refresh');
     box.appendChild(btn);
@@ -1552,12 +1688,19 @@
         // R-41: VEDOMA obnova po konflikte — cerstvy set nahradi polia AZ TU,
         // teda az na druhy, vyslovny klik. Draft sa nikdy nezahadzuje sam.
         if (a === 'hws-set-refresh'){
-          if (HWS_SET && HWS_SET.edit){
+          if (!HWS_SET) return;
+          if (HWS_SET.edit){
             var fresh = hwsSetById(HWS_SET.set_id);
             var keepTrigger = HWS_SET.trigger;
             HWS_SET = null; // obnova zahadza PRIPNUTU reviziu aj stary draft
             if (fresh) hwsSetOpen(fresh, null, { trigger: keepTrigger, dropMemory: true });
+            return;
           }
+          // Review #297 P2-6: NOVY set — niet co nacitat, rozpisany obsah
+          // OSTAVA a len sa PRIPNE cerstva revizia kniznice. Bez tejto vetvy
+          // bolo tlacidlo no-op a kazde dalsie Uložiť konfliktovalo znova.
+          HWS_SET.conflict = false;
+          hwsSetRedraw(HWS_SET.draft, { conflict: false, rebaseRev: true });
           return;
         }
         // „+ Vytvoriť výrobcu/radu" z modalu setu (vzor KOV-B2). Kostra D-15
@@ -1783,7 +1926,12 @@
     if (!HWS_SET || !t || !t.getAttribute) return false;
     var sample = t.getAttribute('data-hws-sample');
     if (sample){
-      HWS_SET.sample[sample] = Number(hwsNumIn(t.value));
+      // Review #297 P2-4: PRAZDNE pole = „rozhodni ty" — kluc sa zo vzorky
+      // ODOBERIE a podporovanu dlzku vyberie server podla radu.
+      var raw = hwsTrim(t.value);
+      var num = Number(hwsNumIn(raw));
+      if (raw === '' || !isFinite(num)) delete HWS_SET.sample[sample];
+      else HWS_SET.sample[sample] = num;
       hwsPreviewSchedule();
       return true;
     }
@@ -1865,6 +2013,8 @@
       hwsTaxLocked: hwsTaxLocked, hwsSeriesOf: hwsSeriesOf,
       hwsAutoName: hwsAutoName, hwsApplyAutoName: hwsApplyAutoName,
       hwsSetFields: hwsSetFields, hwsSetDraft: hwsSetDraft, hwsSetDraftOf: hwsSetDraftOf,
+      hwsApplyUseType: hwsApplyUseType, hwsDefaultType: hwsDefaultType,
+      hwsSampleShown: hwsSampleShown,
       hwsChips: hwsChips, hwsServerErrors: hwsServerErrors,
       hwsPreviewLines: hwsPreviewLines, hwsPreviewStale: hwsPreviewStale,
       hwsGlobalOptions: hwsGlobalOptions,
