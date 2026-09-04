@@ -28,7 +28,7 @@ function eq(a, b, msg){ n++; assert.deepStrictEqual(a, b, msg); }
 // Mini-DOM (skutocne parsovanie HTML + bublanie udalosti) zije od ŠT-2c 2c-2a
 // v `tests/js/minidom.js` — pouziva ho aj sada editora dekoru. Nie je to
 // testovacia sada, CI beh `test_*.js` ju preto nespusta.
-const { mkEl, DOC, dispatch, fireScroll } = require(path.join(__dirname, 'minidom.js'));
+const { mkEl, DOC, dispatch, fireScroll, textOf } = require(path.join(__dirname, 'minidom.js'));
 
 const JS = path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js');
 const NXModal = require(path.join(JS, 'nx_modal.js'));
@@ -436,6 +436,62 @@ const M = require(path.join(JS, 'proj_materials.js'));
      'ani vlastnu kopiu karty kostry — pravidla ziju v zdielanom `panel.css`');
   ok(Number(scrim[2]) > Number(scrim[1]),
      'a nasepkavac je NAD scrimom (inak by bol v modali viditelny, ale neklikatelny)');
+})();
+
+// ============ 8) KOV-B3: typ pola `custom` (VLASTNY UZOL volajuceho) =========
+//
+// Preco to su testy a nie klikanie: `custom` je JEDINE rozsirenie kostry
+// v KOV-B3 a musi byt SPATNE KOMPATIBILNE — pole BEZ `read` sa do `values()`
+// nesmie dostat vobec (inak by server dostal kluc, ktoremu nerozumie),
+// a chyba servera adresovana `row = "<key>:<index>"` musi pristat v riadku
+// vlastneho uzla rovnako, ako v riadku repeatera.
+(function(){
+  let rendered = 0;
+  const spec = {
+    title: 'Vlastný uzol', okLabel: 'Uložiť',
+    fields: [
+      { key: 'name', label: 'Názov', value: 'A' },
+      { key: 'members', type: 'custom', label: 'Členovia', value: [{ code: '1' }],
+        render: function(host, value){
+          rendered++;
+          host.textContent = '';
+          (value || []).forEach(function(m, i){
+            const row = DOC.createElement('div');
+            row.setAttribute('data-nxm-row', i);
+            const inp = DOC.createElement('input');
+            inp.setAttribute('data-nxm-col', 'code');
+            inp.value = m.code;
+            row.appendChild(inp);
+            host.appendChild(row);
+          });
+        },
+        read: function(){ return [{ code: 'Z' }]; } },
+      { key: 'preview', type: 'custom', label: 'Náhľad',
+        render: function(host){ host.textContent = 'nahlad'; } }
+    ]
+  };
+  NXModal.open(spec);
+  ok(rendered === 1, '`render` volajuceho bezi HNED po vlozeni karty do DOM');
+  const host = NXModal.customBox('members');
+  ok(host && host.querySelectorAll('[data-nxm-row]').length === 1,
+     'a kresli do hostitela `#nxmc_<key>`');
+  const v = NXModal.values();
+  eq(v.members, [{ code: 'Z' }], '`read` vracia hodnotu do values()');
+  ok(!Object.prototype.hasOwnProperty.call(v, 'preview'),
+     'pole BEZ `read` hodnotu NEMA — zobrazovaci blok nema co odosielat');
+  eq(v.name, 'A', 'ploche polia ostavaju retazcami (kontrakt sa nemeni)');
+
+  NXModal.showErrors([{ row: 'members:0', field: 'code', msg: 'zlý kód' },
+                      { row: null, field: 'name', msg: 'zlý názov' }]);
+  const line = host.querySelectorAll('[data-nxm-row]')[0];
+  ok(textOf(line).indexOf('zlý kód') > -1,
+     'chyba servera s `row` pristane v RIADKU vlastneho uzla');
+  const nameRow = DOC.getElementById('nxm_name').closest('.mrow');
+  ok(textOf(nameRow).indexOf('zlý názov') > -1, 'a chyba pola pri poli (bez zmeny)');
+
+  NXModal.redrawCustom('members');
+  ok(rendered === 2, '`redrawCustom` prekresli LEN vlastny uzol (nie cely modal)');
+  NXModal.close();
 })();
 
 console.log('OK test_st2c_modal.js — ' + n + ' kontrol');

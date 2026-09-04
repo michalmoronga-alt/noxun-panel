@@ -196,19 +196,31 @@
       return (host.querySelector && host.querySelector('[data-nxm-cbody]')) || host;
     }
 
-    // Prekreslenie JEDNEHO vlastneho uzla (volajuci si tym obnovuje zoznam po
-    // pridani/odobrani polozky, bez toho aby prekresloval cely modal).
-    function redrawCustom(key){
-      var f = specFieldByKey(key);
-      if (!f || f.type !== 'custom' || typeof f.render !== 'function') return;
-      var box = customBox(key);
-      if (!box) return;
-      try { f.render(box, f.value); } catch (e) { warn('render vlastneho pola „' + key + '" zlyhal.'); }
+    function renderCustom(f, value){
+      var box = customBox(f.key);
+      if (!box || typeof f.render !== 'function') return;
+      try { f.render(box, value); }
+      catch (e){ warn('render vlastneho pola „' + f.key + '" zlyhal.'); }
     }
 
+    // Prekreslenie JEDNEHO vlastneho uzla NA ZIADOST VOLAJUCEHO (pridal riadok,
+    // odobral riadok). Kresli sa z `read()`, teda z toho, co ma volajuci PRAVE
+    // TERAZ — hodnota zo specifikacie je z casu otvorenia a prepisala by rozpisany
+    // riadok. `f.value` sa pritom NEPREPISUJE: pri prazdnej pamati je `spec`
+    // TEN ISTY objekt ako `base`, takze zapis by prepisal aj VYCHODISKOVE
+    // hodnoty a „Začať odznova" ani pamat by uz nemali proti comu porovnavat.
+    function redrawCustom(key){
+      var f = specFieldByKey(key);
+      if (!f || f.type !== 'custom') return;
+      var val = (typeof f.read === 'function') ? readCustom(f) : f.value;
+      renderCustom(f, val === undefined ? f.value : val);
+    }
+
+    // Prve vykreslenie po `open` / `memReset` — TU je autoritou SPECIFIKACIA
+    // (nesie vliatu pamat rozpisaneho konceptu, resp. vychodiskove hodnoty).
     function renderCustomFields(){
       ((OPEN && OPEN.spec && OPEN.spec.fields) || []).forEach(function(f){
-        if (f && f.type === 'custom') redrawCustom(f.key);
+        if (f && f.type === 'custom') renderCustom(f, f.value);
       });
     }
 

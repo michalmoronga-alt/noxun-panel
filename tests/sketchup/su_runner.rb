@@ -12633,6 +12633,177 @@ module NoxunSuRunner
     end
   end
 
+  # ===== KOV-B3: EDITOR SETU — NAHLAD, PRIPNUTA REVIZIA, DVE OKNA ===========
+  # Overuje to, co headless sada NEVIE:
+  #   1) ZIVY NAHLAD rozpracovaneho setu bezi v SketchUpe a NIC nezapisuje —
+  #      ani do kniznice, ani do modelu (ziadny krok Spat);
+  #   2) ULOZENIE setu je zapis do GLOBALNEHO suboru, takze v modeli NESMIE
+  #      vyrobit krok Spat (vzor KOV-B2);
+  #   3) DVE OKNA nad TYM ISTYM setom (vzor R-08): druhe ulozenie s PRIPNUTOU
+  #      (zastaralou) reviziou konci KONFLIKTOM s hlaskou, nikdy tichym
+  #      prepisom — a po vedomej obnove prejde;
+  #   4) LEGACY set ostava „nezaradeny" (payload nema klasifikacne kluce)
+  #      a NAKUP zakazky sa pridanim klasifikovaneho setu do kniznice NEMENI;
+  #   5) NEAKTIVNY set sa v ponuke uz NENUKA, ale expanzia ho ignoruje.
+  #
+  # SANDBOX: cela sekcia bezi nad IZOLOVANYM %APPDATA% (`Materials.test_dir_override`,
+  # vzor run_kovb1/run_kovb2), takze REALNA kniznica setov ani taxonomia sa
+  # NIKDY nedotknu; override sa v `ensure` VZDY vracia na nil.
+  KOVB3_SID = 'su-b3-atira'
+  KOVB3_LEG = 'su-b3-legacy'
+
+  def kovb3_draft(over = {})
+    { 'set_id' => KOVB3_SID, 'name' => 'SU B3 Atira',
+      'use_type' => 'drawer', 'opening_mode' => 'classic',
+      'drawer_construction' => 'metal', 'manufacturer' => 'Hettich',
+      'series' => 'InnoTech Atira', 'active' => true,
+      'members' => [{ 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
+                      'code_by_nl' => { '420' => '357695', '470' => '357696' } }] }.merge(over)
+  end
+
+  def kovb3_legacy(over = {})
+    { 'set_id' => KOVB3_LEG, 'name' => 'SU B3 legacy záves', 'generic_type' => 'hinge',
+      'members' => [{ 'code' => KOVB1_CODE, 'per' => 'unit', 'qty' => 1 }] }.merge(over)
+  end
+
+  def kovb3_call(action, payload)
+    out = []
+    e::HardwareCatalogDialog.dispatch(action, payload.to_json, ->(s) { out << s })
+    out
+  end
+
+  # `HWSETS.preview({...})` -> Hash (cita sa PRESNE to, co dostane klient).
+  def kovb3_arg(scripts, fn)
+    s = scripts.find { |x| x.start_with?("#{fn}(") }
+    s ? JSON.parse("[#{s[(fn.length + 1)...-1]}]") : nil
+  end
+
+  def run_kovb3(model)
+    cleanup(model)
+    markers = []
+    tmp = File.join(Dir.tmpdir, "noxun_kovb3_#{Process.pid}")
+    FileUtils.mkdir_p(tmp)
+    e::Materials.test_dir_override = tmp
+    kovb1_reset_caches!
+    begin
+      ok('KOV-B3: sandbox %APPDATA% je aktivny (realna kniznica sa nedotkne)',
+         e::HardwareSets.path.start_with?(tmp) && e::HardwareTaxonomy.path.start_with?(tmp))
+
+      # --- 1) ZIVY NAHLAD PRED ULOZENIM = ZIADNY ZAPIS ---------------------
+      m1 = r03_marker(model, markers)
+      ents_before = model.entities.length
+      prev = kovb3_arg(kovb3_call('hws_preview', 'gen' => 5, 'set' => kovb3_draft),
+                       'HWSETS.preview')&.first
+      ok('KOV-B3: `hws_preview` vratil nahlad a ECHOL generaciu poziadavky',
+         prev.is_a?(Hash) && prev['gen'] == 5 && prev['ok'] == true)
+      ok('KOV-B3: nahlad vybral kod podla vzorovej NL 470',
+         prev && prev['rows'].map { |r| r['code'] } == ['357696'])
+      ok('KOV-B3: a text sklada SERVER (menuje NL aj kod)',
+         prev && prev['text'].to_s.include?('NL 470') && prev['text'].to_s.include?('357696'))
+      ok('KOV-B3: NAHLAD NIC NEULOZIL — set v kniznici NIE JE',
+         e::HardwareSets.load['sets'].none? { |s| s['set_id'] == KOVB3_SID })
+      ok('KOV-B3: ani sa nedotkol MODELU (ziadny krok Spat, ziadna entita)',
+         m1.valid? && model.entities.length == ents_before)
+
+      # --- 2) ULOZENIE SETU = ZAPIS DO GLOBALNEHO SUBORU, BEZ KROKU SPAT ---
+      m2 = r03_marker(model, markers)
+      rev_a = e::HardwareSets.revision            # <- OKNO A si ju PRIPINA
+      saved = kovb3_call('hws_save_set', 'set' => kovb3_draft, 'revision' => rev_a,
+                                         'create' => true, 'token' => 'su-b3-1')
+      ok('KOV-B3: modal dostal POTVRDENIE zapisu (`HWSETS.setResult(true`)',
+         saved.any? { |s| s.start_with?('HWSETS.setResult(true,') && s.include?('su-b3-1') })
+      ok('KOV-B3: set je v kniznici aj s CELOU klasifikaciou',
+         (lib = e::HardwareSets.load['sets'].find { |s| s['set_id'] == KOVB3_SID }) &&
+         lib['use_type'] == 'drawer' && lib['drawer_construction'] == 'metal' &&
+         lib['series'] == 'InnoTech Atira')
+      Sketchup.undo
+      ok('KOV-B3: zapis do GLOBALNEJ kniznice NEROBI krok Spat',
+         !m2.valid? && e::HardwareSets.load['sets'].any? { |s| s['set_id'] == KOVB3_SID })
+
+      # --- 3) DVE OKNA NAD TYM ISTYM SETOM (R-08 vzor) ---------------------
+      # Okno A si reviziu PRIPLO pri otvoreni (`rev_a`). Okno B medzitym ulozi
+      # svoju zmenu — a A sa musi dozvediet KONFLIKT, nie prepisat ju.
+      rev_open = e::HardwareSets.revision         # <- OKNO A otvorilo editor TERAZ
+      st_b, = e::HardwareSets.save_set!(kovb3_draft('name' => 'Cudzia zmena z okna B'))
+      ok("KOV-B3: okno B svoju zmenu ULOZILO (#{st_b.inspect})", st_b == :ok)
+      conflict = kovb3_call('hws_save_set', 'set' => kovb3_draft('name' => 'Zmena z okna A'),
+                                            'revision' => rev_open, 'create' => false,
+                                            'token' => 'su-b3-2')
+      ok('KOV-B3: okno A dostalo KONFLIKT (a modal sa nezatvara)',
+         conflict.any? { |s| s.start_with?('HWSETS.setResult(false,') && s.include?('true)') })
+      ok('KOV-B3: hlaska hovori, ze set zmenil NIEKTO INY',
+         conflict.any? { |s| s.include?('niekto iný') })
+      ok('KOV-B3: a cudzia zmena OSTALA — ziadny tichy prepis',
+         e::HardwareSets.load['sets'].find { |s| s['set_id'] == KOVB3_SID }['name'] ==
+           'Cudzia zmena z okna B')
+      after = kovb3_call('hws_save_set', 'set' => kovb3_draft('name' => 'Zmena z okna A'),
+                                         'revision' => e::HardwareSets.revision,
+                                         'create' => false, 'token' => 'su-b3-3')
+      ok('KOV-B3: po VEDOMEJ obnove (cerstva revizia) zapis prejde',
+         after.any? { |s| s.start_with?('HWSETS.setResult(true,') } &&
+         e::HardwareSets.load['sets'].find { |s| s['set_id'] == KOVB3_SID }['name'] ==
+           'Zmena z okna A')
+
+      # --- 4) LEGACY SET „NEZARADENY" + NAKUP BEZ ZMENY --------------------
+      st_l, = e::HardwareSets.save_set!(kovb3_legacy, create: true)
+      ok("KOV-B3: legacy set (bez klasifikacie) sa ULOZI (#{st_l.inspect})", st_l == :ok)
+      inst = e::CabinetBuilder.build(model, kovb1_params)
+      return ok('KOV-B3: vlozenie skrinky so zavesmi', false) unless inst
+
+      model.start_operation('SU KOV-B3 mapovanie', true)
+      e::HardwareSets.set_project_mapping!(model, 'hinge', KOVB3_LEG, kovb3_legacy)
+      model.commit_operation
+      exp_before = kovb1_expand(model)
+      # Do kniznice pribudne KLASIFIKOVANY set (std suboru ide na 3) — nakup
+      # ZAKAZKY sa tym menit NESMIE (projekt drzi vlastnu kopiu).
+      e::HardwareSets.save_set!(kovb3_draft('set_id' => 'su-b3-druhy', 'name' => 'SU B3 druhý'),
+                                create: true)
+      exp_after = kovb1_expand(model)
+      ok('KOV-B3: NAKUP zakazky sa pridanim klasifikovaneho setu do kniznice NEMENI',
+         JSON.generate(exp_before) == JSON.generate(exp_after))
+
+      pay = e::HardwareCatalogDialog.sets_payload(model)
+      leg = pay['sets'].find { |s| s['set_id'] == KOVB3_LEG }
+      ok('KOV-B3: legacy set ide do UI BEZ klasifikacnych klucov (chip „nezaradený")',
+         leg && !leg.key?('use_type') && !leg.key?('manufacturer'))
+      cls = pay['sets'].find { |s| s['set_id'] == KOVB3_SID }
+      ok('KOV-B3: klasifikovany set nesie chipy (typ · otvaranie · konstrukcia · vyrobca · rada)',
+         cls && cls['use_type'] == 'drawer' && cls['opening_mode'] == 'classic' &&
+         cls['drawer_construction'] == 'metal' && cls['manufacturer'] == 'Hettich' &&
+         cls['series'] == 'InnoTech Atira')
+      ok('KOV-B3: payload nesie SLOVNIKY klasifikacie, vzorove parametre aj taxonomiu',
+         pay['class_options'].is_a?(Hash) && pay['class_options']['use_type'].is_a?(Array) &&
+         pay['preview_sample'].is_a?(Hash) && pay['taxonomy'].is_a?(Hash) &&
+         pay['taxonomy']['manufacturers'].include?('Hettich'))
+
+      # --- 5) NEAKTIVNY SET SA UZ NENUKA (ale expanzia ho ignoruje) --------
+      exp_active = kovb1_expand(model)
+      st_off, = e::HardwareSets.save_set!(kovb3_legacy('active' => false))
+      ok("KOV-B3: set sa da oznacit ako NEAKTIVNY (#{st_off.inspect})", st_off == :ok)
+      pay_off = e::HardwareCatalogDialog.sets_payload(model)
+      ok('KOV-B3: neaktivny set sa v ponuke UZ NENUKA',
+         (pay_off['type_options']['hinge'] || []).none? { |s|
+           s['set_id'] == KOVB3_LEG && !s['project_copy']
+         })
+      ok('KOV-B3: ale EXPANZIA je nezmenena — mapovanie projektu sa nedotklo',
+         JSON.generate(kovb1_expand(model)) == JSON.generate(exp_active))
+    rescue StandardError => ex
+      log_line("FAIL: KOV-B3 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    ensure
+      r03_clear_markers(model, markers)
+      e::Materials.test_dir_override = nil
+      kovb1_reset_caches!
+      cleanup(model)
+      begin
+        FileUtils.rm_rf(tmp)
+      rescue StandardError
+        nil
+      end
+      ok('KOV-B3: cleanup (override prec, model prazdny, realne katalogy netknute)',
+         e::Materials.test_dir_override.nil? && cabinets(model).empty? && boards(model).empty?)
+    end
+  end
+
   # ===== KOV-A2b: SMER OTVARANIA V MODELI ===================================
   # Overuje to, co headless sada NEVIE: zivotny cyklus overlayu, ze zapnutie
   # NEVYROBI krok Spat ani nezmeni model, ze symbol sedi na SPRAVNOM kridle
@@ -14841,6 +15012,7 @@ module NoxunSuRunner
     run_kovh2(model)         # KOV-H2: ad-hoc kovanie UI — payload skrinky nesie zivu cenu a ponuku dielcov, hladanie bez kroku Spat, apply s manual_op = 1 krok Spat + signal modalu, odmietnutie 0 krokov, povod nakupneho riadku s ludskym popisom vlastnika
     run_kovb1(model)          # KOV-B1: klasifikacia setov + taxonomia — std 3 v subore aj v .skp, nakup TOTOZNY s legacy setom, sablona z novsej verzie odmietnuta BEZ operacie, zapis vyrobcu bez kroku Spat
     run_kovb2(model)          # KOV-B2: strom katalogu (`hw_tree`) nad sandboxom, zalozenie polozky s vyrobcom + zalozenie vyrobcu ZO STUDIA = BEZ kroku Spat, pin navrchu svojho listu, payload sekcie s popiskami a taxonomiou
+    run_kovb3(model)          # KOV-B3: editor setu — zivy nahlad NIC nezapisuje (ani krok Spat), ulozenie setu bez kroku Spat, DVE OKNA nad tym istym setom = konflikt s hlaskou (nie tichy prepis) + vedoma obnova, legacy set „nezaradeny" a nakup nezmeneny, neaktivny sa uz nenuka
     run_kova2b(model)        # KOV-A2b: smer otvarania v modeli — lifecycle overlayu, symbol na spravnom kridle a prednej ploche, prestavba/Spat, dup-ID per instancia, vykon
     run_tools1(model)        # NASTROJE-1 (T1a): Mower + Snaper v baliku enginu (kopia cez sev, rotacie/Z ako 1 krok Spat, odmietnutia bez operacie, bariera observera, Snaper a viditelnost)
     run_tools1b(model)       # NASTROJE-1 (T1b): boot migracia starych instalacii — docasny Plugins strom (styri ciele, marker per cesta, druhy beh = no-op) + dokaz, ze boot hook upratal ZIVU instalaciu

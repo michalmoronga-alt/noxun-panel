@@ -731,8 +731,24 @@
   // patria delegacii TOHTO suboru (`data-action`), zapisy do poli chodia cez
   // `hwsWriteField` do `HWS_SET.members` — presne ako v zaniknutom inline
   // editore, len o poschodie vyssie.
-  function hwsMembersRender(host){
+  // Hlboka kopia clenov. Pouziva sa na hranici so specifikaciou modalu:
+  // kostra si drzi VYCHODISKOVE hodnoty (`base`), proti ktorym porovnava, ci
+  // pouzivatel nieco rozpisal — keby to bolo TO ISTE pole ako zivy stav,
+  // porovnavala by ho samo so sebou a rozpisany zoznam by Escape ticho zahodil.
+  function hwsCloneMembers(list){
+    try { return JSON.parse(JSON.stringify(list || [])); }
+    catch (e){ return (list || []).slice(); }
+  }
+
+  // `value` je AUTORITA: kostra ju podava z pamate rozpisaneho konceptu
+  // (`withMemory`), po „Začať odznova" z vychodiskovej specifikacie a pri
+  // prekresleni na ziadost zo `read()`. Cudzie pole sa PREBERA (a kopiruje —
+  // viz vyssie); vlastne zive pole je uz na mieste.
+  function hwsMembersRender(host, value){
     if (!host) return;
+    if (HWS_SET && value && typeof value.forEach === 'function' && value !== HWS_SET.members){
+      HWS_SET.members = hwsCloneMembers(value);
+    }
     host.textContent = '';
     var members = (HWS_SET && HWS_SET.members) || [];
     if (!members.length){
@@ -955,8 +971,10 @@
     out.push({ key: 'active', type: 'checkbox', label: 'Aktívny', value: v.active !== false,
                hint: 'neaktívny sa už neponúka ako nový výber' });
     out.push({ key: 'members', type: 'custom', label: '7 · Členovia setu',
-               value: (HWS_SET && HWS_SET.members) || [],
-               render: function(host){ hwsMembersRender(host); },
+               // KOPIA zamerne (viz `hwsCloneMembers`): specifikacia drzi
+               // VYCHODISKOVY stav, zivy zoznam je vedla neho.
+               value: hwsCloneMembers((HWS_SET && HWS_SET.members) || []),
+               render: function(host, val){ hwsMembersRender(host, val); },
                read: function(){ return (HWS_SET && HWS_SET.members) || []; } });
     out.push({ key: 'preview', type: 'custom', label: 'Náhľad expanzie',
                render: function(host){ hwsPreviewRender(host); } });
