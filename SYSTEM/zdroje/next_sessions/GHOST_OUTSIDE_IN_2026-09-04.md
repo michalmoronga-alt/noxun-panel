@@ -1,9 +1,9 @@
 # GHOST-D1 / GHOST-D2 — OUTSIDE-IN / prior-art packet (4.9.2026)
 
-> Stav: KONCEPT — research packet + reconcile pre drafty GHOST-D1/D2 (`GHOST_D1_D2_PACKAGE_DRAFT_2026-09-04.md`); nie implementačný spec. **Rozsah: ČIASTOČNÝ** — kanál bol WebFetch
-> oficiálnej dokumentácie + fórum (agy kvóta 4.9. vyčerpaná); **Antigravity beh PREBEHOL 4.9. večer** (4 packety Gemini 3.8 Flash, sekcia „Antigravity beh" nižšie); **probe v SketchUpe 2026 ešte čaká** (`_dev/probe_ghost_keys.rb`). Preto sú nálezy rozdelené na
-> **VERIFIED** (citované z oficiálnej API dokumentácie) a **UNVERIFIED** (bez probe); tvrdenia ALREADY EXISTS / SIMPLER NATIVE PATH (najmä `Sketchup::Snap`) platia až po probe. Research sa uzavrie
-> až agy behom + probe — do vtedy drafty GHOST-D1/D2 do PLANu NEJDÚ.
+> Stav: KONCEPT — research packet + reconcile pre drafty GHOST-D1/D2 (`GHOST_D1_D2_PACKAGE_DRAFT_2026-09-04.md`); nie implementačný spec. **Rozsah: HOTOVÝ (5.9.2026)** — pôvodne ČIASTOČNÝ; — kanál bol WebFetch
+> oficiálnej dokumentácie + fórum (agy kvóta 4.9. vyčerpaná); **Antigravity beh PREBEHOL 4.9. večer** (4 packety Gemini 3.8 Flash, sekcia „Antigravity beh" nižšie); **probe v SketchUpe 26.0.429 HOTOVÝ 5.9.** (`_dev/probe_ghost_keys.rb`, tabuľka výsledkov nižšie). Preto sú nálezy rozdelené na
+> **VERIFIED** (citované z oficiálnej API dokumentácie) a **UNVERIFIED** (bez probe); tvrdenia ALREADY EXISTS / SIMPLER NATIVE PATH boli probe overené. **Research je UZAVRETÝ (5.9.2026):** packages GHOST-D1/D2 sú v `SYSTEM/PLAN.md` ako autorita a Codex audit je
+> HOTOVÝ (4 kolá) — riadky nižšie so znením „probe čaká" sú HISTÓRIA stavu k 4.9.
 
 | Nález | Stav |
 |---|---|
@@ -12,7 +12,7 @@
 | logické pixely od SU 2025.0 pre obrazovkové API | VERIFIED (API docs) |
 | `String#to_l` a desatinná čiarka | VERIFIED (fórum + thomthom), presné pravidlá parsovania = UNVERIFIED |
 | `Sketchup::Snap` ako SIMPLER NATIVE PATH pre zostavy | VERIFIED (agy, docs: perzistentná snap entita `Entities#add_snap` pre natívny Move) → **NO ACTION pre D1/D2**, poznámka pre zostavy po V1 |
-| prázdny Enter: `onKeyDown(VK_RETURN)` vs. VCB `onUserText` | VERIFIED (agy, docs): **`VK_RETURN` v API NEEXISTUJE** (kód 13); prázdny Enter = `Tool#onReturn(view)` → správanie pri zapnutom VCB = **probe čaká** |
+| prázdny Enter: `onKeyDown(VK_RETURN)` vs. VCB `onUserText` | VERIFIED (agy, docs): **`VK_RETURN` v API NEEXISTUJE** (kód 13); prázdny Enter = `Tool#onReturn(view)` → správanie pri zapnutom VCB = probe ✔ 5.9. (`onReturn` prišiel, tabuľka Probe nižšie) |
 | prior art (Rectangle → Push/Pull, tilda) | VERIFIED (docs/článok) |
 
 ## 1 · `Sketchup::Tool` — kontrakt nástroja (nová plocha pre subjekt DOSKA)
@@ -105,7 +105,7 @@ Pasca behu: prvý `life` beh skončil prázdny (agent skúsil `command` tool →
 
 **RESEARCH GAP (agy):** žiadna open-source knižnica nahrádzajúca `to_l` VCB parserom (ekosystém: `to_l` + `rescue` alebo inline regex) · žiadne rozšírenie s ghostom dosky + 3 orientácie.
 
-**Čo ešte chýba pred návratom draftov do PLANu:** (1) probe v SU 2026 — `_dev/probe_ghost_keys.rb` (Michal ručne v testovacom okne: prázdny Enter → `onReturn`?, `600 Enter` → `onUserText`,
+**HISTÓRIA (k 4.9., uzavreté 5.9.2026 — všetko hotové):** pôvodne chýbalo: (1) probe v SU 2026 — `_dev/probe_ghost_keys.rb` (Michal ručne v testovacom okne: prázdny Enter → `onReturn`?, `600 Enter` → `onUserText`,
 šípky v `onKeyDown` + či pohltenie zruší natívny zámok, `Sketchup.version` kvôli regresii Enter v 2026.0, prítomnosť `Sketchup::Snap`); (2) šípky ROZHODNUTÉ (a) — Michal 4.9. (r. 13); (1b) probe `lock_inference(ip_a, ip_b)` so syntetickými InputPointmi na lokálnej osi (Codex #294);
 (3) prepis draftov podľa reconcile → `codex-audit` → PLAN.
 
