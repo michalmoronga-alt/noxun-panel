@@ -446,9 +446,10 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   chrbát s poldrážkou, „bez dielca" varianty s validáciou, per-dielec hrúbky a odsadenia.
 - *(Vkladanie na klik — V1-04 — sa 26.8. vyčlenilo do vlastného bloku **GHOST VKLADANIE**; ten je od 31.8.2026 **hotový** (v0.9.0), plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).)*
 - **D-10 · Presúvanie a úprava čiel priamo v náhľade** — ako drag priečok.
-- **V1.0 zostavy:** spájanie a zarovnávanie korpusov (čelné/zadné hrany, pripájacie body, snaper logika) · soklová lišta v celku pre segment · obklady a krycie prvky segmentu vrátane pilastra
-  (priznaný vs. skrytý) · pracovné a horné krycie dosky na označený segment · migrácia a oprava starých modelov · test na kompletnej reálnej zákazke. **Mimo V1** (V1_VIZIA):
-  plné segmenty s `attachment` dátovým kontraktom, automatické krycie dosky a PD cez segment — v zásobníku (koncept 02 je podklad).
+- **V1.0 zostavy — V1 rozsah PO ROZHODNUTÍ 4.9.2026:** prisunutie a kopírovanie korpusov po vlastnej osi (snaper + mower logika → draft NÁSTROJE-1) · dosky (pracovná doska, pilaster,
+  soklová lišta, krycí panel) vkladané a kreslené prichytením na rohy skriniek (drafty GHOST-D1/D2) · test na kompletnej reálnej zákazke. **PO V1** (rozhodnutie 4.9., koncept 02):
+  segmentová automatika — soklová lišta v celku pre segment, obklady a krycie prvky segmentu vrátane pilastra (priznaný vs. skrytý) ako generované diely, pracovné a horné krycie dosky
+  na označený segment, migrácia a oprava starých modelov, plné segmenty s `attachment` dátovým kontraktom, automatické krycie dosky a PD cez segment — v zásobníku.
   **Rozhodnutie 4.9.2026 (Michal, debata V1 bod 1B):** viazané diely a sektory (koncept 02) idú **PO V1** — „radšej raz a poriadne, než teraz kúskovať". Praktickú potrebu zostáv pokryjú v V1
   **GHOST-D1 + GHOST-D2** (dosky vkladané a kreslené prichytením na skrinky, packages nižšie). **Agy outside-in research** „automatický pilaster / pracovná doska" (skill `antigravity-outside-in`)
   sa spraví, keď bude kvóta — podklad pre blok viazaných dielov po V1.
@@ -615,7 +616,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   ukáže „dostupná 0.9.x" → Aktualizovať → okná sa zavrú, hláška, reštart → nová verzia; skús so staršou kópiou → tlačidlo neaktívne s vysvetlením; vytiahni sieťový disk →
   sekcia hlási nedostupný zdroj, Štúdio nezamrzne. **Checklist uzáveru:** bump patch + `?v=` → testy → `ui-lifecycle.md` (odsek About + updater UI, vedomá odchýlka) →
   D-52 do DOGFOODING_vyriesene (plný text + riadok indexu) → STAV/KRONIKA/PLAN (blok 6 položka hotová).
-- **D-20 · Quick actions — bezpečný move plugin** — **ZARADENÉ do V1 (Michal 4.9.2026, bod 1A): package NÁSTROJE-1 v bloku 4.** Pôvodne: zlúčiť noxun_mower + Snaper do jedného toolbaru; kopírovanie musí prejsť štandardným dedup tickom (dnes vzniká kópia bez NOXUN identity).
+- **D-20 · Quick actions — bezpečný move plugin** — **ZARADENÉ do V1 (Michal 4.9.2026, bod 1A) — zatiaľ LEN DRAFT NÁSTROJE-1** (odkaz v bloku 4; nie je autorita, kým sa nezapracuje kolo 3 a neprejde novým CLI auditom).** Pôvodne: zlúčiť noxun_mower + Snaper do jedného toolbaru; kopírovanie musí prejsť štandardným dedup tickom (dnes vzniká kópia bez NOXUN identity).
 
 ## Po V1 — zásobník (nezaradené, nestratiť)
 

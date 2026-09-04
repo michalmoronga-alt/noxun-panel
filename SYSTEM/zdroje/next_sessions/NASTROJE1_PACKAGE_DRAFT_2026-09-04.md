@@ -5,7 +5,7 @@
 > Rozhodnutia Michala 4.9.: jeden balík, spoločný toolbar „Noxun Nástroje", UI nástrojov nemeniť, kópia cez engine, názov kópie s písmenovou príponou, tlačidlo „Vložiť kópiu" NIE.
 > Outside-in packet: [NASTROJE_OUTSIDE_IN_2026-09-04.md](NASTROJE_OUTSIDE_IN_2026-09-04.md). Referenčný kód: `../archiv_kod/legacy_*.rb.txt`.
 
-- **NÁSTROJE-1 · TASK PACKAGE „MOWER + SNAPER V BALÍKU NOXUN ENGINE" (D-20; V1 bod 1A — Michal 4.9.2026; Audit: HOTOVÝ — Codex CLI 4.9. (1 BLOCKER + 9 FIX + 1 NOTE) + Codex GH #288, všetko zapracované nižšie; in-SU POVINNÉ):**
+- **NÁSTROJE-1 · TASK PACKAGE „MOWER + SNAPER V BALÍKU NOXUN ENGINE" (D-20; V1 bod 1A — Michal 4.9.2026; Audit: HOTOVÝ — Codex CLI 4.9. (1 BLOCKER + 9 FIX + 1 NOTE) + Codex GH #288 kolá 1–2 zapracované; **kolo 3 (6 nálezov, 2×P1 — observer/update rasy) ČAKÁ na zapracovanie, sekcia na konci**; po zapracovaní nový CLI audit; in-SU POVINNÉ):**
   **Cieľ:** jeden inštalačný balík — oba nástroje sa presunú ako moduly do `noxun_engine/tools/` (`mower.rb`, `snaper.rb` + ČISTÉ jadrá `mower_calc.rb`, `snap_calc.rb` bez `UI::*`; namespace
   `Noxun::Engine::Tools::*`), načíta ich `main.rb`, dostanú **jeden spoločný toolbar „Noxun Nástroje"** (poradie: −90° · +90° · 180° · Z = 0 · Z posun… · Kópia vľavo · Kópia vpravo · Prisunúť vľavo ·
   Prisunúť vpravo; slovenské tooltipy; menu Extensions → Noxun Engine → Nástroje). Vlastné registrácie rozšírení a `VERSION` nástrojov zaniknú — verziu aj update (D-52) preberá engine. **Prečo samostatný
@@ -31,7 +31,8 @@
   `ScaleWatch` po debounce (mierka → config + prestavba), a číta transformáciu znova; ak ani potom nie je rigidná → kópia sa odmietne s hláškou (žiadny tichý neúspech). In-SU prípad: Scale → okamžitá Kópia.
   **Rotácie ±90/180, Z = 0, Z posun:** logika bez zmeny (pivot = stred bbox, svetová Z — v root kontexte); Z-posun dialog ostáva HtmlDialog (callbacky pred `show`).
   **Snaper (FIX 6):** AABB sweep v lokálnom rámci cieľa, WARN 10 m, BLOCK 20 m, kontajnery do hĺbky 8 — **efektívna viditeľnosť cez `Model#drawing_element_visible?`** (celá instance path + tag
-  folder; pod `rescue` s fallbackom `hidden?`/`layer.visible?` — pred SU 2026.0 hádže výnimku pre kontajner na konci cesty, viď outside-in packet), bbox kontajnera sa počíta len z jeho VIDITEĽNÝCH detí (1 úroveň), test so skrytým dieťaťom vo viditeľnom kontajneri; hlásenia cez objekt rozšírenia enginu.
+  folder; pod `rescue` s fallbackom — pred SU 2026.0 hádže výnimku pre kontajner na konci cesty (viď outside-in packet), takže fallback je tam BEŽNÁ cesta: `hidden?` + `layer.visible?` +
+  **skrytý tag folder** po celej ceste (existujúca `Tags.folder_hidden?`, tags.rb — tag pod skrytým priečinkom ostáva `visible?`); test pre pre-2026 vetvu s prekážkou pod skrytým priečinkom), bbox kontajnera sa počíta len z jeho VIDITEĽNÝCH detí (1 úroveň), test so skrytým dieťaťom vo viditeľnom kontajneri; hlásenia cez objekt rozšírenia enginu.
   **Upratanie starých inštalácií (FIX 7):** = **explicitná boot migrácia** v `main.rb` PRED registráciou toolbaru (pri aktualizácii vykonáva swap ešte starý kód, nový `updater.rb` beží až po reštarte):
   odstráni `noxun_mower_loader.rb`, `Noxun_Mower\`, `snaper.rb`, `snaper\` v Plugins; marker žije MIMO swapovaného stromu (`%APPDATA%\NOXUN\Engine\legacy_cleanup.json`), pri zlyhaní mazania sa
   NEoznačí ako hotové (zopakuje sa nabudúce) + hláška; inštalátor `INSTALL_noxun_engine.ps1` maže tie isté cesty. Zdroj nástrojov sa presunie do repa; pôvodné priečinky workspace ostanú ako archív. Referenčné kópie legacy zdrojov (nenačítavané, Codex #288 kolo 2): `SYSTEM/zdroje/archiv_kod/legacy_noxun_mower.rb.txt`, `legacy_snaper_main.rb.txt`,
