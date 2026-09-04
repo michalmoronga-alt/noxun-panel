@@ -538,7 +538,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   (inštalácia, upratanie starých pluginov) → D-20 do DOGFOODING_vyriesene (plný text + riadok indexu) → STAV/KRONIKA/PLAN.
 - **GHOST-D1 · TASK PACKAGE „GHOST PRE DOSKY — ZÁKLAD" (V1 bod 1B — Michal 4.9.2026; outside-in HOTOVÝ: WebFetch + agy 4.9. + probe SU 26.0.429 5.9. —
   [zdroje/next_sessions/GHOST_OUTSIDE_IN_2026-09-04.md](zdroje/next_sessions/GHOST_OUTSIDE_IN_2026-09-04.md); Codex GH #288 kolá 1–2 zapracované; **Audit: Codex CLI kolo 1 (5.9.: Sol 4 BLOCKER
-  + 11 FIX, Astra 1 BLOCKER + 6 FIX + 1 NOTE) + kolo 2 (Astra: 21/23 vyriešené, 2 čiastočné, 1 nový FIX, 1 NOTE) ZAPRACOVANÉ — kolo 3 ČAKÁ** (história v [zdroje/next_sessions/GHOST_D1_D2_PACKAGE_DRAFT_2026-09-04.md](zdroje/next_sessions/GHOST_D1_D2_PACKAGE_DRAFT_2026-09-04.md));
+  + 11 FIX, Astra 1 BLOCKER + 6 FIX + 1 NOTE) + kolo 2 (Astra: 21/23 vyriešené, 2 čiastočné, 1 nový FIX, 1 NOTE) + kolo 3 (Sol: 4/4 vyriešené, 6 nových FIX bez BLOCKERa) ZAPRACOVANÉ — kolo 4 (Sol, záverečné) ČAKÁ** (história v [zdroje/next_sessions/GHOST_D1_D2_PACKAGE_DRAFT_2026-09-04.md](zdroje/next_sessions/GHOST_D1_D2_PACKAGE_DRAFT_2026-09-04.md));
   in-SU POVINNÉ; štart po KOV-B3 alebo podľa Michala):**
   **Cieľ:** vloženie dosky z karty Dosky ide cez ghost ako pri skrinke (doska na kurzore, prichytenie na geometriu, kotvy, klik = vloženie) — dnes sa doska kladie synchrónne na `Placement.next_x`.
   **Šev `BoardBuilder.prepare_insert` → `commit_insert(model, plan, transform:, orientation:)` — kontrakt rovnako silný ako R-03 (`CabinetBuilder.commit_insert`, audit 1):** plán je
@@ -549,8 +549,9 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   prepare → commit identický". `Ids.next_board_id`, definícia + `draw_board`, orientácia ako transformácia inštancie NAD polohou — vnútro definície ostáva ležiace, výrobné dáta nedotknuté.
   **Jeden POUŽÍVATEĽSKÝ krok Späť, nie „jedna operácia" (Astra BLOCKER):** vytváracia operácia `start_operation('Vložiť dosku', true)` + existujúci transparentný follow-up scale-lock zápis
   (`dynamic_attributes/scaletool`, vzor `board_builder.rb` — presun do vytváracej operácie by vypol selection eventy, vynechanie by uvoľnilo scale úchopy) pod SPOLOČNÝM `ScaleWatch.guard`;
-  follow-up sa nesmie abortovať, `attach_one` ostáva; `rescue → abort_operation` len pre vytváraciu operáciu. **Bariéra pred mutáciou:** `ScaleWatch.flush_pending!(model)` PRED vytváracou operáciou
-  (vzor NÁSTROJE-1 kópia); `false` = nevkladať + status (čakajúca kópia/scale by sa prilepila k vloženiu a poškodila Redo). Overiť výber, Undo AJ Redo so zapnutým DC rozšírením.
+  follow-up sa nesmie abortovať, `attach_one` ostáva; `rescue → abort_operation` len pre vytváraciu operáciu. **Bariéra pred mutáciou (audit 3):** `ScaleWatch.flush_pending!(model)` beží PRED `begin_commit!` session (session ostáva v stave umiestňovania, nie `:committing`);
+  `false` (limit AJ výnimka — API ich nerozlišuje) = šev vráti EXPLICITNÝ výsledok `:blocked` + status (čakajúca kópia/scale by sa prilepila k vloženiu a poškodila Redo) — žiadne ID,
+  geometria, krok Späť ani pečiatka a session NIKDY neskončí falošne `:committed`; test na `flush_pending! == false`. Overiť výber, Undo AJ Redo so zapnutým DC rozšírením.
   **Orientácia ide do commitu SAMOSTATNE** (Codex #288 P1): `stojaca` a `na_stenu` vedome zdieľajú maticu (STANDARD §orientácia), z `transform` sa odvodiť nedá — finálnu hodnotu zo session nesie
   argument a zapíše sa do `config['orientation']` (in-SU test to overuje v uloženom configu).
   **`GhostTool` dostane SUBJEKT (skrinka | doska):** `PlacementSession` číta obálku a kotvy zo subjektu, commit cez šev subjektu; **klasický tok skrinky sa NEMENÍ** (existujúce `run_ghost*`
@@ -559,15 +560,16 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   **Politika výšky dosky:** doska sa prichytáva plne v XYZ (`pick_free` sémantika s inferenciou; ŽIADNY Z-zámok z pamäte skrinky — inak roh hornej skrinky skončí na zamknutej výške), prázdny
   model = rovina Z = 0; test snapu na ZVÝŠENÝ roh skrinky. **Server odmieta kabinetové callbacky pre dosku** (`ghost_lock_z` a spol. kontrolujú subjekt session, nie len „aktívna session").
   **Kotvy dosky = AUTORITATÍVNA TABUĽKA** (nie odvodenie z helpera) — identifikátory a poradie ALT cyklu ZHODNÉ so skrinkou (`GhostTool::ANCHORS = fl_bottom → fr_bottom → fr_top → fl_top`,
-„predná" plocha = plocha s nižšou lokálnou Y, ako pri skrinke); body v LOKÁLNYCH súradniciach umiestnenej dosky (L = dĺžka, W = šírka, T = hrúbka, mm):
-`leziaca` (X = L, Y = W, Z = T): `fl_bottom (0,0,0)` · `fr_bottom (L,0,0)` · `fr_top (L,0,T)` · `fl_top (0,0,T)` — kotvy na PREDNEJ dlhej hrane, spodná/horná plocha;
-`stojaca` (X = L, Y = T, Z = W — doska stojí na spodnej hrane): `fl_bottom (0,0,0)` · `fr_bottom (L,0,0)` · `fr_top (L,0,W)` · `fl_top (0,0,W)` — kotvy na PREDNEJ zvislej ploche;
-`na_stenu`: TÁ ISTÁ tabuľka ako `stojaca` (STANDARD §orientácia: zdieľaná matica, rozdiel je len v configu). Nezávislý test: zvolená kotva COMMITNUTEJ geometrie skončí presne na
-kliknutom bode pre všetky 3 orientácie × 4 kotvy (nie porovnanie helper vs helper).
+  „predná" plocha = plocha s nižšou lokálnou Y, ako pri skrinke); body v LOKÁLNYCH súradniciach umiestnenej dosky (L = dĺžka, W = šírka, T = hrúbka, mm):
+  `leziaca` (X = L, Y = W, Z = T): `fl_bottom (0,0,0)` · `fr_bottom (L,0,0)` · `fr_top (L,0,T)` · `fl_top (0,0,T)` — kotvy na PREDNEJ dlhej hrane, spodná/horná plocha;
+  `stojaca` (X = L, Y = T, Z = W — doska stojí na spodnej hrane): `fl_bottom (0,0,0)` · `fr_bottom (L,0,0)` · `fr_top (L,0,W)` · `fl_top (0,0,W)` — kotvy na PREDNEJ zvislej ploche;
+  `na_stenu`: TÁ ISTÁ tabuľka ako `stojaca` (STANDARD §orientácia: zdieľaná matica, rozdiel je len v configu). Nezávislý test: zvolená kotva COMMITNUTEJ geometrie skončí presne na
+  kliknutom bode pre všetky 3 orientácie × 4 kotvy (nie porovnanie helper vs helper).
   **Klávesy (ROZHODNUTÉ (a) — Michal 4.9.):** ←/→ rotácia okolo Z (ako skrinka) · **↑/↓ = cyklus orientácie `leziaca → stojaca → na_stenu`** (vlastnosť dosky, nie voľná rotácia — kusovník,
   hrany a ABS ostávajú správne; Z-režim skrinky pre dosku nahrádza orientácia a XYZ prichytenie) · ALT = kotvy · natívny zámok osí (↑←→↓ od SU 2016) je v ghoste vedome pohltený
   (`onKeyDown` vracia `true`; probe 5.9.: šípky prídu s `VK_UP/DOWN/LEFT/RIGHT`, Shift s `VK_SHIFT`).
-  **Synchronizácia s kartou:** push ghostu nesie `orientation`; pásik ghostu ju ukazuje a JS aktualizuje `NXInsert.boardOrientation` BEZ materializácie/resetu karty (karta ukáže „stojaca"
+  **Synchronizácia s kartou a pásik (audit 3):** push ghostu nesie `subject` + `orientation`; pásik ghostu pre dosku SKRYJE kabinetové ovládače výšky (`gbMode`, `gbLockWrap` — pole
+  `ghost_lock_z` sa pre dosku z JS nikdy nepošle, server ho navyše odmietne), ukáže orientáciu a doskovú nápovedu; JS aktualizuje `NXInsert.boardOrientation` BEZ materializácie/resetu karty (karta ukáže „stojaca"
   hneď po ↑; ďalšia session štartuje z tejto hodnoty). Karta Dosky: „Vložiť dosku" štartuje ghost session (ako „Vložiť skrinku"), Esc = nič sa nevloží, 0 krokov Späť.
   **Callbacky:** `insert_board` = D1 ghost (aj dvojklik šablóny dosky); D2 dostane SAMOSTATNÝ serverom whitelistovaný callback `draw_board` — HTML `disabled` ani názov tlačidla nie sú ochrana.
   **Pečiatka šablóny (Codex #288 P2):** `template_ref` dosky nesie SESSION a `stamp_once!`/„Naposledy použité" sa volá **až po úspešnom commite** — Esc pečiatku NEzapíše.
@@ -581,7 +583,9 @@ kliknutom bode pre všetky 3 orientácie × 4 kotvy (nie porovnanie helper vs he
   subjekt (skrinka → doska → skrinka), pečiatka len po commite, **aktualizovaný `test_ghost_vkladanie.rb` (`handle_insert_board` = synchrónne ukončí session skrinky, založí session dosky,
   pred klikom žiadna doska ani krok Späť)**; **in-SU `run_ghost_d1`** — ghost dosky vloží dosku na kliknutý bod s prichytením na roh skrinky (aj ZVÝŠENÝ roh), ↑ zmení orientáciu (stojaca),
   karta ju ukáže a **uložený config ju nesie**, ←/→ rotácia, ALT kotva, Esc = model nezmenený, 0 krokov Späť a šablóna neopečiatkovaná, vloženie = 1 krok Späť **a Redo funguje**,
-  kusovník má dosku, ghost skrinky nezmenený (skrinka → doska → skrinka), `ghost_lock_z` pre dosku odmietnutý; **`run_ghost_d1_async`** — vloženie dosky počas čakajúcej kópie/scale
+  kusovník má dosku, ghost skrinky nezmenený (skrinka → doska → skrinka), `ghost_lock_z` pre dosku odmietnutý, pásik bez ovládačov výšky; **`onCancel(2)` pre dosku:** predchádzajúci
+  krok Späť → ghost dosky → Ctrl+Z → predchádzajúci krok sa vráti a doska/session/pečiatka nezanechajú stopu; **výmena dokumentu** (File > Open / prepnutie okna) počas board session =
+  session zrušená bez zápisu (aj pri recyklovanom `Sketchup::Model` objekte na Windows); **`run_ghost_d1_async`** — vloženie dosky počas čakajúcej kópie/scale
   (bariéra `flush_pending!`), potom Undo/Redo čisté (vzor `run_ghost_async`). Mutácie min. 5 (orientácia zapísaná do výrobných osí · commit mimo operácie · subjekt skrinky číta obálku dosky ·
   orientácia odvodená z matice · commit bez bariéry `flush_pending!`).
   **Smoke pre Michala:** karta Dosky → Vložiť → doska visí na kurzore, prichytí sa na roh skrinky (aj hore), ↑ ju postaví, klik vloží (karta ukáže „stojaca"), Ctrl+Z vráti, Ctrl+Y vráti späť;
@@ -590,20 +594,24 @@ kliknutom bode pre všetky 3 orientácie × 4 kotvy (nie porovnanie helper vs he
   klávesy, pečiatka, sync karty), ARCHITEKTURA router pri novom súbore → STAV/KRONIKA/PLAN.
 
 - **GHOST-D2 · TASK PACKAGE „KRESLENIE DOSKY NA ROZMER (Ghost 2.0)" (po D1; outside-in HOTOVÝ + probe SU 26.0.429 5.9.; Codex #288 kolá 1–2 zapracované; **Audit: Codex CLI kolo 1
-  (Sol + Astra, 5.9.) + kolo 2 (Astra) ZAPRACOVANÉ — kolo 3 ČAKÁ**; in-SU POVINNÉ):**
+  (Sol + Astra, 5.9.) + kolo 2 (Astra) + kolo 3 (Sol) ZAPRACOVANÉ — kolo 4 (Sol, záverečné) ČAKÁ**; in-SU POVINNÉ):**
   **Cieľ:** doska sa nakreslí **dvoma ťahmi**: klik = nulový bod → ťah dĺžky (prichytenie SketchUp inference ALEBO napísané číslo v mm do meracieho poľa) → klik → ťah šírky → klik = vloženie;
   hrúbka z materiálu karty. **Ťahy sledujú LOKÁLNE osi dosky podľa orientácie** (Codex #288 P2): dĺžka = lokálna X (pri ležiacej aj stojacej doske vodorovná), šírka = lokálna Y (pri stojacej
   zvislá) — pilaster: ↑ stojaca, 1. ťah = hĺbka (dĺžka), 2. ťah = výška (šírka); orientácia (↑/↓) a rotácia (←/→) sa menia LEN vo fáze 0 (pred klikom počiatku) — od kliku počiatku sú zamknuté (jedna hranica, viď Klávesy). Precedens: natívny Rotated Rectangle (jedno číslo
   na fázu — rozhodnutie Michala 4.9. potvrdené), OpenCutList 7.0 Smart Draw (GPL — len vzory), SketchList 3D (3 orientácie).
   **Predloha:** archívny V2fable Ghost 2.0 — `SYSTEM/zdroje/archiv_kod/v2fable_ghost_tool2.rb.txt` (fázy, `enableVCB?`/`onUserText`, axis snap, locks — port do subjektu dosky, nie kópia).
-  **Callback:** samostatný serverom whitelistovaný `draw_board` (D1 `insert_board` ostáva pre vloženie a dvojklik šablóny); tlačidlo karty „Nakresliť".
+  **Callback (R-02, audit 3):** samostatný serverom whitelistovaný `draw_board` (D1 `insert_board` ostáva pre vloženie a dvojklik šablóny); tlačidlo karty „Nakresliť" posiela `nxDocPayload`
+  a Ruby volá `foreign_document?` ako ÚPLNE PRVÝ krok (vzor `handle_insert_board`); záväzné poradie: doc guard → šablóna/zámky → prepare/replan → session — oneskorený CEF callback zo starého
+  Inspectora po prepnutí zákazky nesmie pripraviť `BoardPlan` nad novým modelom; test so starým `model_guid`.
   **Smer dosky (audit 1 BLOCKER, audit 2 FIX):** dve fázy majú ROZDIELNU geometriu — **fáza 1 HĽADÁ SMER**: kurzor (`InputPoint` s natívnou inferenciou) sa premieta do ROVINY 1. ŤAHU
-= vodorovná rovina Z = Z počiatku pre VŠETKY orientácie (dĺžka je vodorovná aj pri stojacej doske), smerový vektor = počiatok → premietnutý kurzor (voliteľný axis snap na osi modelu
-v tolerancii, vzor Ghost 2.0 — pomôcka, nie obmedzenie), dĺžka = |vektor| alebo napísané číslo (smer ostáva z kurzora); ŽIADNA projekcia na „lokálnu os" vo fáze 1 (kruhová závislosť:
-os ešte neexistuje — test šikmého 1. ťahu 45° v prázdnom modeli = rotácia 45°, nie 0°). **Rotáciu okolo Z určuje smerový vektor v okamihu POTVRDENIA 1. fázy** (klik, Enter s číslom,
-prázdny Enter alebo zamknutá dĺžka); ak je vektor nulový (kurzor sa od počiatku nepohol — číslo napísané hneď, obe fázy zamknuté), použije sa **kanonický smer = lokálna +X podľa
-rotácie session (←/→ vo fáze 0)** a status to povie; nulový vektor sa NIKDY nedostane do transformácie (test). **Fáza 2 MERIA po PEVNEJ osi** = lokálna Y kolmá na 1. ťah (ležiaca:
-vodorovná; stojaca/na_stenu: zvislá, svetová +Z) — projekcia + pickray fallback (nižšie). Fázový automat pokrýva **všetky 4 kombinácie zámkov** a číslo bez pohybu myšou.
+  = vodorovná rovina Z = Z počiatku pre VŠETKY orientácie (dĺžka je vodorovná aj pri stojacej doske), smerový vektor = počiatok → premietnutý kurzor (voliteľný axis snap na osi modelu
+  v tolerancii, vzor Ghost 2.0 — pomôcka, nie obmedzenie), dĺžka = |vektor| alebo napísané číslo (smer ostáva z kurzora); ŽIADNA projekcia na „lokálnu os" vo fáze 1 (kruhová závislosť:
+  os ešte neexistuje — test šikmého 1. ťahu 45° v prázdnom modeli = rotácia 45°, nie 0°). **Brána voľného priestoru vo fáze 1 (audit 3, vzor dnešného ghostu):** použije sa LEN reálna
+  geometrická inferencia (vertex/hrana/plocha) premietnutá na Z = Z počiatku; „voľný" InputPoint bez geometrie sa NEPOUŽIJE (pri otočených drawing axes leží mimo kurzora) → namiesto neho
+  priesečník `view.pickray(x, y)` s rovinou Z = Z počiatku, degenerovaný lúč (rovnobežný s rovinou) = fáza nepokročí + status; test aj s OTOČENÝMI drawing axes, nie len predvolenými. **Rotáciu okolo Z určuje smerový vektor v okamihu POTVRDENIA 1. fázy** (klik, Enter s číslom,
+  prázdny Enter alebo zamknutá dĺžka); ak je vektor nulový (kurzor sa od počiatku nepohol — číslo napísané hneď, obe fázy zamknuté), použije sa **kanonický smer = lokálna +X podľa
+  rotácie session (←/→ vo fáze 0)** a status to povie; nulový vektor sa NIKDY nedostane do transformácie (test). **Fáza 2 MERIA po PEVNEJ osi** = lokálna Y kolmá na 1. ťah (ležiaca:
+  vodorovná; stojaca/na_stenu: zvislá, svetová +Z) — projekcia + pickray fallback (nižšie). Fázový automat pokrýva **všetky 4 kombinácie zámkov** a číslo bez pohybu myšou.
   **Zámky fáz — prenos do Ruby (audit 1 BLOCKER, audit 2 PARTIAL):** `NXInsert.boardLocks` je súkromný JS stav („NIKDY do Ruby") → pri štarte D2 session JS pošle **ČÍSELNÝ snapshot
   `locks: { length: <mm>, width: <mm> }` cez existujúci `locksFlat('board')`** (vracia HODNOTY zamknutých polí, napr. `{length: 800}`; nezamknutý kľúč chýba) ako SAMOSTATNÉ pole payloadu —
   žiadny prevod na Boolean; Ruby whitelist LEN kľúče `length`/`width`, hodnota = Float mm validovaná proti `BoardBuilder::LIMITS` už pri štarte session (mimo limitu / nečíslo = session sa
@@ -626,7 +634,8 @@ vodorovná; stojaca/na_stenu: zvislá, svetová +Z) — projekcia + pickray fall
   **Klávesy od kliku počiatku (audit 1 + audit 2 NOTE — JEDNA hranica):** ←/→ a ↑/↓ platia LEN vo fáze 0; od kliku počiatku sú ZAMKNUTÉ (ignorované + status „orientáciu a rotáciu meň
   pred kliknutím počiatku") — rovina 1. ťahu aj os 2. ťahu závisia od orientácie, takže zmena uprostred by rozpracované rozmery preniesla do inej sústavy; ALT v režime kreslenia nemá
   význam (ignorovaný); Esc = reset celej session. Test intervalu „počiatok kliknutý, dĺžka nepotvrdená": šípky nič nemenia.
-  **Meracie pole (probe 5.9.):** `enableVCB?`/`onUserText` len vo fázach 1–2, `Sketchup.vcb_label=` „Dĺžka (mm)" / „Šírka (mm)"; **jedno číslo na fázu**, Enter potvrdí; písaná hodnota príde
+  **Meracie pole (probe 5.9., audit 3):** `enableVCB?` vracia `true` počas CELÉHO života D2 nástroja (vzor Ghost 2.0 — fázovo podmienené by nechalo Measurements pole po aktivácii
+  vypnuté a písané rozmery by po prvom kliku neprišli); fáza riadi LEN label/hodnotu a spracovanie: vo fáze 0 sa `onUserText`/`onReturn` ignorujú; `Sketchup.vcb_label=` „Dĺžka (mm)" / „Šírka (mm)"; **jedno číslo na fázu**, Enter potvrdí; písaná hodnota príde
   cez `onUserText("600")`; **prázdny Enter = `Tool#onReturn(view)`** (`VK_RETURN` v SketchUp API NEEXISTUJE; `onKeyDown` dostane kód 13 aj v 26.0 — bez regresie; pri prázdnom poli `onUserText`
   nepríde) = vedome prevezme hodnotu karty pre TÚTO fázu (explicitná akcia, status to povie).
   **Parser:** VLASTNÝ, úplná zhoda po `strip`: `\A\s*(\d+(?:[.,]\d+)?)\s*(?:mm)?\s*\z/i` (bodka aj čiarka, `mm`/`MM` voliteľné); `abc2400xyz`, `2400mmjunk`, `~600`, `600;18` = neplatné;

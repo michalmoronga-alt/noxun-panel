@@ -94,3 +94,11 @@ Kolo 1: **21/23 RESOLVED**, 2 PARTIAL — (Sol 1 / Astra 5) `locksFlat('board')`
 konkrétnych súradníc/ID/poradia ALT → doplnená tabuľka 3 orientácie × 4 kotvy s ID `fl_bottom/fr_bottom/fr_top/fl_top` a poradím ako skrinka. **Nové:** (1) FIX-IN-D2 — kruhová závislosť
 smer ↔ projekcia v 1. ťahu → fáza 1 HĽADÁ SMER v rovine 1. ťahu (vodorovná rovina Z počiatku pre všetky orientácie, žiadna projekcia na lokálnu os), fáza 2 MERIA po pevnej osi; test
 šikmého 1. ťahu 45°; (2) NOTE — dve hranice zákazu ↑/↓ → jedna hranica: klávesy len vo fáze 0 (od kliku počiatku zamknuté). Kolo 3 (Sol, delta) = ČAKÁ.
+
+## Codex CLI audit kolo 3 (5.9.2026, Sol nad verziou 3 `70293bf`) — ZAPRACOVANÉ (verzia 4)
+
+Kolo 2: **4/4 RESOLVED**. **Nové (6 FIX, žiadny BLOCKER):** (1) `draw_board` bez explicitnej R-02 ochrany dokumentu → `nxDocPayload` + `foreign_document?` ako prvý krok, poradie doc guard →
+šablóna/zámky → prepare/replan → session, test so starým `model_guid`; (2) `flush_pending! == false` bez stavovej semantiky → bariéra pred `begin_commit!`, explicitný `:blocked`, session nikdy
+falošne `:committed`; (3) fáza 1 bez brány voľného priestoru pri otočených drawing axes → len reálna geometrická inferencia, inak `pickray` ∩ rovina Z počiatku; (4) `enableVCB?` viazané na
+fázy → `true` celý život nástroja, fáza riadi spracovanie; (5) pásik ghostu ponúka doske Z-zámok → board payload skryje `gbMode`/`gbLockWrap`, ukáže orientáciu; (6) chýba in-SU
+`onCancel(2)` pre dosku a výmena dokumentu počas session → doplnené do DoD D1. Kolo 4 (Sol, záverečné — ukončí sa aj pri drobných NOTE, pokračuje len pri BLOCKERi) = ČAKÁ.
