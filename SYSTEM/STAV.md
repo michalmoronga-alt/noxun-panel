@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.9.21 · 3.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.9.22 · 4.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -24,7 +24,7 @@ robí **priamo v Inspectore**. **KOV-B1** dala setom **klasifikáciu** (na čo �
 **Pozor na kompatibilitu:** čo uloží v0.9.20, to **v0.9.18 už nepoužije** — model/šablóna (`CONFIG_SCHEMA` 4 + brána `assess_set_defs`), knižnica setov aj projektový snapshot
 (`std` 3) a katalóg kovania s výrobcom (`schema` 2). Pred prvou takou zákazkou aktualizovať **obe PC** (D-52 updater).
 
-**Testy k v0.9.21:** **2651 headless** · 82 JS sád · plný in-SketchUp beh **1504 PASS** (nová sekcia `run_d116`; KOV-H2 `run_kovh2` predtým **našla P1 v produkte**, ktorý headless nevidel).
+**Testy k v0.9.22:** **2686 headless** · 82 JS sád · posledný plný in-SketchUp beh **1504 PASS** (v0.9.21; VEPO dávka #287 ho **nespúšťala** — Michal pracoval v SketchUpe, pustiť pred merge).
 
 ## Robí sa
 
@@ -42,10 +42,10 @@ Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` (KO
 
 ## Posledné uzávery
 
-- **SMOKE 3.9. + D-115/D-116** (v0.9.21, PR #286): Michalov smoke nad v0.9.20 prešiel **bez chyby** (body 1–6 PASS) a dal tri postrehy. **D-115:** symbol otvárania je odteraz
-  **stolárska konvencia** — čiary z rohov strany pántov do stredu protiľahlej hrany, v náhľade **aj** vo viewporte, zásuvka dostala **prerušované X** (blenda ostáva plné); tvar
-  má jediný zdroj per jazyk nad spoločnou fixtúrou, takže sa náhľad a model už nemôžu rozísť (dovtedy sa reálne rozišli). **D-116:** úchytkový profil má tag **svojho čela** — pri
-  skrytí tagu Čelá už nevisí vo vzduchu (vedomý dôsledok: prepínač Kovanie ho už neschová). **D-114** ostáva otvorený na UI/UX balík konca bloku.
+- **VÝSTUPY · D-112 + D-113** (v0.9.22, PR #287): VEPO CSV má **deviaty stĺpec „poznámka"** — pásku v inom dekore než doska povie riadok sám (`ABS H1181 Dub Halifax tabakový`),
+  netreba ju do objednávky dopisovať rukou (pri KLINIKE zabudnuté); LOG má kontrolný zoznam. Názov nesie skratku a skrinky (`Bok LP s1 s2`) kvôli 20-znakovým nálepkám. Kontrakt **v1.1**.
+- **SMOKE 3.9. + D-115/D-116** (v0.9.21, PR #286): Michalov smoke nad v0.9.20 prešiel **bez chyby** (body 1–6 PASS). **D-115:** symbol otvárania je **stolárska konvencia** — čiary
+  z rohov strany pántov, v náhľade **aj** vo viewporte, jediný zdroj tvaru per jazyk. **D-116:** úchytka má tag **svojho čela**. **D-114** ostáva na UI/UX balík konca bloku.
 - **KOV-H2 — AD-HOC KOVANIE PRIAMO V INSPECTOROVI** (v0.9.20, 3.9.2026): dátovú vrstvu dala H1, **teraz to má obrazovku**. V kontexte **Kovanie** je blok **„Ručne pridané"**
   a tlačidlo **„Pridať konkrétnu položku (mimo setov)"**: k čomu patrí (skrinka / čelo / polica), z **katalógu** (živá cena) alebo **voľná**, množstvo a poznámka; riadky
   s chipom **„ručná"**, ceruzka a kôš, každá zmena **jeden krok Späť**. Priznajú sa stavy **„bez vlastníka"** a **„chýba v katalógu"**; v Štúdiu → **Nákup** klik na riadok ukáže

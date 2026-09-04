@@ -441,18 +441,39 @@ module Noxun
                                 'length' => r['length'], 'width' => r['width'],
                                 'thickness' => r['thickness'], 'material_id' => r['material_id'],
                                 'edges' => r['edges'], 'grain_direction' => r['grain_direction'],
-                                'quantity' => 0, 'names' => [], 'kde' => {}, 'refs' => [] }
+                                'quantity' => 0, 'names' => [], 'free_names' => [],
+                                'kde' => {}, 'refs' => [] }
           # 2B-1: vazba je v kluci — riadok skupiny ju len zrkadli (vsetky zdrojove
           # zaznamy skupiny ju maju zhodnu).
           g['material_source'] = r['material_source'] if r['material_source']
           g['quantity'] += r['quantity']
           g['names'] << r['name'] unless r['name'].empty? || g['names'].include?(r['name'])
+          # GH #287 P2 (aditivny kluc): ktore z `names` prispela SAMOSTATNA DOSKA.
+          # Nazov dosky je VOLNY TEXT pouzivatela, kdezto nazvy dielcov skrinky
+          # generuju buildery — a tento riadok moze byt zlatok oboch (kluc je z
+          # vyrobnych parametrov, nie z povodu). Bez tohto kluca nema VEPO ako
+          # rozoznat dosku pomenovanu "Bok lavy" od skutocneho boku a skratil by
+          # ju na "Bok L". Kluc je ADITIVNY: kusovnik, Studio ani ceny ho necitaju
+          # (jediny citatel je `VepoExport.row_name`), agregacia sa nim nemeni.
+          if free_board_record?(r) && !r['name'].empty? && !g['free_names'].include?(r['name'])
+            g['free_names'] << r['name']
+          end
           g['kde'][r['owner_id']] = (g['kde'][r['owner_id']] || 0) + r['quantity']
           g['refs'] << { 'pid' => r['pid'], 'owner_id' => r['owner_id'] } # klik-select adresy (davka B)
         end
         groups.values.map do |g|
           g.merge('kde' => g['kde'].map { |oid, q| { 'owner_id' => oid, 'quantity' => q } })
         end.sort_by { |g| [g['material_id'], -g['length'], -g['width']] }
+      end
+
+      # Je zaznam zo SAMOSTATNEJ DOSKY (kind 'board'), nie z korpusu? Pyta sa
+      # VYHRADNE na to, co zaznam UZ NESIE, a v konzervativnom smere (staci jeden
+      # znak — nesparovany nazov je vzdy mensia skoda nez skratena doska):
+      #   * `part_key` v namespace `board/` — formalny kontrakt `PartKeys.board`
+      #     (korpusove kluce su `cabinet/`, `zone:`, `front:`), a
+      #   * `owner_id` `BRD-<cislo>` — identita z `Ids.next_board_id`.
+      def free_board_record?(r)
+        r['part_key'].to_s.start_with?('board/') || r['owner_id'].to_s.match?(/\ABRD-\d/)
       end
 
       # Deterministicky kluc riadku — klik-select ho posiela NAMIESTO pids

@@ -981,7 +981,8 @@ Možnosti:
 - **Rozpočet zákazky** — materiál, ABS, kovanie, **služby** (olepovanie, porez, lepenie duplákov, opracovanie PD, montáž — množstvá počíta engine z kusovníka
   a odhadu platní, ceny berie zo sadzieb dodávateľa), štandardné koncové riadky s násobkom, vlastné položky, spotrebiče a zaokrúhlenie konečnej sumy.
 - **Cenová ponuka pre zákazníka** — pohľad NAD rozpočtom, nie druhý výpočet.
-- **VEPO CSV** — presne podľa `VEPO_KONTRAKT.md` (stĺpce `nazov;dlzka;hrana_pozdlz;sirka;hrana_naprieč;hrubka;pocet_ks;material`, oddeľovač `;`, úvodzovky, `—`/`=` kódy hrán dopočítané z L1/L2/W1/W2, normalizácia hrúbok 18/36, slug názvy súborov `<projekt>_<material>_<hrubka>.csv`). Priamo z dielcov, **bez OCL medzikroku**.
+- **VEPO CSV** — presne podľa `VEPO_KONTRAKT.md` (od v1.1 stĺpce `nazov;dlzka;hrana_pozdlz;sirka;hrana_naprieč;hrubka;pocet_ks;material;poznamka`, oddeľovač `;`, úvodzovky, `—`/`=` kódy hrán dopočítané z L1/L2/W1/W2, normalizácia hrúbok 18/36, slug názvy súborov `<projekt>_<material>_<hrubka>.csv`). Priamo z dielcov, **bez OCL medzikroku**.
+  Deviaty stĺpec `poznamka` (D-112) je vždy prítomný a nesie ABS pásky s **iným dekorom, než má doska** — odvodený údaj, žiadny nový zápis do modelu; názov riadku nesie od D-113 skratky dielcov a skrinky (`Bok LP s1 s2`) — **len vo VEPO**, kusovník Štúdia má plné názvy.
 
 ### 11.3 Peniaze — jeden výpočet, dva pohľady
 

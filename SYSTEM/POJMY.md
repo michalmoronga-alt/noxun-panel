@@ -111,6 +111,14 @@
   program **PRO 100**. „VEPO" je teda len zaužívaný NÁZOV formátu, nie väzba na firmu. Dôsledok pre nás: aj keby spolupráca s VEPO skončila (bod vyššie), export sa nezahadzuje — mení sa len príjemca súboru;
   supplier-agnostické výstupy sú tým skôr potvrdené než ohrozené.
 
+- **Nálepky VEPO a názov dielca (Michal 3.9.2026, dielňa — KLINIKA):** dielec sa vracia z porezu s **nálepkou, na ktorú sa tlačí max 20 znakov BEZ interpunkcie** — prepis robí ich stroj
+  (medzera → `_`). Na orientáciu v dielni je teda použiteľných ±20 znakov názvu z CSV a nič viac. Preto sú vo VEPO exporte **krátke názvy a skrinka hneď za názvom** (`Bok LP s1 s2`,
+  D-113) — dlhý presný názov by sa aj tak neprepísal. Orez ďalších skriniek do ` +K` Michalovi nevadí: prvé dve-tri stačia na zorientovanie.
+
+- **Poznámka pre VEPO (Michal 3.9.2026):** objednávkový formulár VEPO má **pri každom riadku pole „Poznámka pre VEPO"** — sem sa píše, čo tabuľka sama nepovie (typicky *páska v inom
+  dekore, než je doska*). Poznámka **nejde na nálepku** a nemá 20-znakový limit (overené importom: 31 znakov prešlo celých). Import 9-stĺpcového CSV VEPO **prijal** a poznámku pri
+  riadku zobrazil — preto ju od v0.9.22 posiela plugin sám (D-112), namiesto ručného dopisovania pri zadávaní objednávky.
+
 - **VEPO** (Ružomberok) = plošný materiál + porez + olep + kovanie; objednávky cez webformulár, CP s parsovateľnou tabuľkou.
   **Na firemnom Disku existuje `Cenník_Vepo_19` (XLSX, verzie 07/2024 a 10/2024)** — Egger/Kronospan/Getalit/Pfleiderer DTD + Velvet MDF fronty + ABS hrany; stĺpce značka/kategória/názov/MJ/cenníková vs.
   individuálna cena → **primárny zdroj nákupných cien pre seed katalógu** (čítať cez download+openpyxl, nie plain read). Sadzby služieb (porez/olep/lepenie) = vstup kalkulácie ponuky;
