@@ -83,8 +83,11 @@ eq(HWS.hwsLibBlocked(null), false, 'chýbajúci payload nič neblokuje (starší
 eq(HWS.hwsLibReason({ library_reason: RO_REASON }), RO_REASON, 'dôvod je hotová SK veta zo servera');
 ok(HWS.hwsLibReason({}).length > 10, 'bez dôvodu ostáva zmysluplný fallback');
 // Zoznam akcii je KONTRAKT: menia kniznicu, alebo z nej kopiruju do .skp.
+// KOV-B3: `hws-save` z neho ZMIZLA spolu s inline editorom — set sa uklada
+// tlacidlom MODALU, ktore sa bez `hws-new`/`hws-edit` neotvori (a serverova
+// brana `library_write_blocked?` je aj tak posledne slovo).
 eq(HWS.HWS_LIB_ACTIONS.slice().sort(),
-   ['hws-del', 'hws-edit', 'hws-merge-seed', 'hws-new', 'hws-reset-proj', 'hws-save'],
+   ['hws-del', 'hws-edit', 'hws-merge-seed', 'hws-new', 'hws-reset-proj'],
    'akcie viazané na knižnicu');
 
 // --- 2) zdrava kniznica: sekcia vyzera ako doteraz ---------------------------

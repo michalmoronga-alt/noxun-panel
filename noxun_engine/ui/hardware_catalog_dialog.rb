@@ -1098,10 +1098,19 @@ module Noxun
           end
         end
 
+        # KOV-B3: „+ Vytvoriť výrobcu/radu" ma UZ DVOCH volajucich — modal
+        # POLOZKY (`MDH`) aj modal SETU (`HWSETS`). Vysledok preto dostanu OBA
+        # prijimace: kazdy si sam overi TOKEN a novu hodnotu vyberie LEN to
+        # okno, ktore o nu ziadalo; druhemu sa aspon obnovi zoznam. Bez toho by
+        # modal setu na zalozeneho vyrobcu cakal donekonecna.
         def emit_tax(ok, op, name, errors, token = nil)
-          js("MDH.taxonomy(#{{ 'ok' => ok, 'op' => op, 'name' => name,
-                               'errors' => errors, 'token' => token.to_s,
-                               'taxonomy' => taxonomy_payload }.to_json})")
+          data = { 'ok' => ok, 'op' => op, 'name' => name,
+                   'errors' => errors, 'token' => token.to_s,
+                   'taxonomy' => taxonomy_payload }.to_json
+          # DVA samostatne skripty (nie jeden zliaty): kazdy prijimac ma tak
+          # vlastnu chybovu hranicu — vynimka v jednom nezhodi druhy.
+          js("MDH.taxonomy(#{data})")
+          js("HWSETS.taxonomy(#{data})")
         end
 
         # --- KOV-B2: vysledok zapisu polozky pre MODAL (D-15) ------------------

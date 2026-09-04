@@ -14,6 +14,11 @@
   // KOV-H2 pridala typ `lookup` (naseptavac nad SERVEROVYM hladanim) — je
   // GENERICKY: kostra nevie, ci hlada polozku katalogu kovania alebo cokolvek
   // ine, dostane len funkciu `search` a kresli, co jej vrati.
+  // KOV-B3 pridala typ `custom` (VLASTNY UZOL volajuceho vnutri karty) —
+  // rovnako genericky a rovnako uzky: kostra vykresli hostitela, zavola
+  // `render`, do `values()` vlozi `read` a doruci mu chyby servera. Vzniklo
+  // pre zoznam CLENOV setu, ktory je STROM (kod / rad NL / pasma parametra),
+  // teda nie tabulka s pevnymi stlpcami, akou je `rows`.
   //
   // KONTRAKT (audit #9): komponent spravuje VYHRADNE modaly, ktore si ho
   // vyziadaju cez `NXModal.open`. Fazove okno prepoctu cien (`#budPrModal`
@@ -107,7 +112,8 @@
     //   'checkbox' (hodnota je BOOLEAN) · 'color' (vzorka + textovy #RRGGBB) ·
     //   'group' (NADPIS sekcie formulara, hodnotu nema) ·
     //   'rows' (opakovatelne riadky, hodnota je POLE HASHOV) ·
-    //   'lookup' (KOV-H2: naseptavac so SERVEROVYM hladanim — nizsie).
+    //   'lookup' (KOV-H2: naseptavac so SERVEROVYM hladanim — nizsie) ·
+    //   'custom' (KOV-B3: VLASTNY UZOL volajuceho — nizsie).
     // `cls` je doplnkova trieda vstupu (napr. `mshort`).
     function fieldHtml(f){
       var d = f || {};
@@ -115,6 +121,7 @@
         return '<div class="mgroup"><h4>' + esc(d.label) + '</h4>' +
                (d.hint ? '<span>' + esc(d.hint) + '</span>' : '') + '</div>';
       }
+      if (d.type === 'custom') return customHtml(d);
       if (d.type === 'rows') return rowsHtml(d, d.value);
       if (d.type === 'lookup') return lookupHtml(d);
       var key = esc(d.key);
@@ -154,6 +161,71 @@
                 (d.placeholder ? ' placeholder="' + esc(d.placeholder) + '"' : '') + '>';
       }
       return '<div class="mrow">' + lbl + input + fieldActionHtml(d) + hint + '</div>';
+    }
+
+    // --- POLE `custom` (KOV-B3) ----------------------------------------------
+    // VLASTNY UZOL volajuceho vnutri karty. Vzniklo pre ZOZNAM CLENOV setu:
+    // clen nie je riadok s pevnymi stlpcami (`rows`), ale STROM — podla
+    // odpovede „Ako sa urci kod?" nesie bud jeden kod, alebo rad NL, alebo
+    // pasma parametra (a tie maju vlastny pocet riadkov). Repeater to
+    // vyjadrit nevie a druha modalova kostra v tom istom okne je presne to,
+    // comu sa D-15 vyhyba.
+    //
+    // Kostra o obsahu NEVIE NIC a robi len tri veci:
+    //   1. vykresli PRAZDNY hostitelsky uzol `#nxmc_<key>` a hned po vlozeni
+    //      karty do DOM zavola `render(host, value)` volajuceho;
+    //   2. do `values()` vlozi to, co vrati `read(host)` — pole BEZ `read`
+    //      hodnotu NEMA (je to cisto zobrazovaci blok, napr. zivy nahlad);
+    //   3. chyby servera adresovane `row = "<key>:<index>"` doruci na uzol
+    //      s `data-nxm-row` vnutri hostitela (rovnaka konvencia ako repeater),
+    //      takze hlaska pristane pri CLENOVI, ktoreho sa tyka.
+    // Kliky vnutri hostitela kostra NESPRACUVA (nemaju `data-nxm-act`) —
+    // patria delegacii volajuceho, presne ako pri `action:` tlacidle.
+    function customHtml(f){
+      var d = f || {};
+      var key = esc(d.key);
+      return '<div class="mrow mcustom" data-nxm-custom="' + key + '" id="nxmc_' + key + '">' +
+             (d.label ? '<div class="mcustom-lbl">' + esc(d.label) + '</div>' : '') +
+             '<div class="mcustom-body" data-nxm-cbody="' + key + '"></div></div>';
+    }
+
+    function customBox(key){
+      if (typeof document === 'undefined') return null;
+      var host = document.getElementById('nxmc_' + key);
+      if (!host) return null;
+      return (host.querySelector && host.querySelector('[data-nxm-cbody]')) || host;
+    }
+
+    // Prekreslenie JEDNEHO vlastneho uzla (volajuci si tym obnovuje zoznam po
+    // pridani/odobrani polozky, bez toho aby prekresloval cely modal).
+    function redrawCustom(key){
+      var f = specFieldByKey(key);
+      if (!f || f.type !== 'custom' || typeof f.render !== 'function') return;
+      var box = customBox(key);
+      if (!box) return;
+      try { f.render(box, f.value); } catch (e) { warn('render vlastneho pola „' + key + '" zlyhal.'); }
+    }
+
+    function renderCustomFields(){
+      ((OPEN && OPEN.spec && OPEN.spec.fields) || []).forEach(function(f){
+        if (f && f.type === 'custom') redrawCustom(f.key);
+      });
+    }
+
+    function specFieldByKey(key){
+      var found = null;
+      ((OPEN && OPEN.spec && OPEN.spec.fields) || []).forEach(function(f){
+        if (f && String(f.key) === String(key)) found = f;
+      });
+      return found;
+    }
+
+    // Hodnota vlastneho pola. BEZ `read` sa pole do `values()` VOBEC nedostane
+    // — zobrazovaci blok (nahlad) nema co odosielat.
+    function readCustom(f){
+      if (!f || typeof f.read !== 'function') return undefined;
+      try { return f.read(customBox(f.key), f); }
+      catch (e){ warn('read vlastneho pola „' + f.key + '" zlyhal.'); return f.value; }
     }
 
     // KOV-B2 (review #290 P1): VOLITELNE akcne tlacidlo PRI POLI. Kostra o jeho
@@ -793,7 +865,10 @@
         var rowKey = (e.row == null) ? '' : String(e.row);
         if (rowKey){
           var parts = rowKey.split(':');
-          var box = rowsBox(parts[0]);
+          // KOV-B3: riadok moze zit aj vo VLASTNOM uzle (`custom`) — konvencia
+          // `data-nxm-row` je pritom rovnaka ako v repeateri, takze adresovanie
+          // chyby servera („row": index clena setu) ma JEDNU cestu.
+          var box = rowsBox(parts[0]) || customBox(parts[0]);
           var lines = (box && box.querySelectorAll) ? box.querySelectorAll('[data-nxm-row]') : [];
           var line = lines[Number(parts[1])];
           if (line){
@@ -1086,6 +1161,11 @@
       if (!OPEN || typeof document === 'undefined') return out;
       (OPEN.spec.fields || []).forEach(function(f){
         if (!f || f.type === 'group') return;
+        if (f.type === 'custom'){
+          var cv = readCustom(f);
+          if (cv !== undefined) out[f.key] = cv;
+          return;
+        }
         if (f.type === 'rows'){ out[f.key] = readRows(f.key); return; }
         var node = document.getElementById('nxm_' + f.key);
         if (f.type === 'checkbox'){ out[f.key] = !!(node && node.checked); return; }
@@ -1125,6 +1205,12 @@
       var d = {};
       ((OPEN && OPEN.base && OPEN.base.fields) || []).forEach(function(f){
         if (!f || f.type === 'group') return;
+        if (f.type === 'custom'){
+          // Bez `read` pole hodnotu nema — nema sa teda ani proti comu
+          // porovnavat (nikdy nezaklada pamat).
+          if (typeof f.read === 'function') d[f.key] = f.value;
+          return;
+        }
         if (f.type === 'rows'){ d[f.key] = f.value || []; return; }
         if (f.type === 'checkbox'){ d[f.key] = f.value === true; return; }
         if (f.type === 'select'){
@@ -1161,6 +1247,14 @@
     function sameCell(a, b){
       if (a === true || a === false || b === true || b === false) return (a === true) === (b === true);
       return String(a == null ? '' : a) === String(b == null ? '' : b);
+    }
+
+    // Porovnanie CELEHO tvaru (vlastne pole `custom` nesie strom). Poradie
+    // klucov v objekte je v JSONe vyznamne, ale obe strany skladame TYM ISTYM
+    // kodom volajuceho, takze je stabilne.
+    function sameJson(a, b){
+      try { return JSON.stringify(a) === JSON.stringify(b); }
+      catch (e){ return a === b; }
     }
 
     function sameValue(a, b){
@@ -1309,8 +1403,14 @@
       var out = {};
       var any = false;
       Object.keys(v).forEach(function(k){
-        if (sameValue(v[k], def[k])) return;
         var f = baseFieldByKey(k);
+        // KOV-B3: vlastne pole nesie STROM (zoznam clenov setu s vnorenymi
+        // riadkami), takze plytke porovnanie `sameValue` by zmenu vnutri
+        // vnoreneho riadku nevidelo a rozpisany zoznam by Escape ticho
+        // zahodil. Porovnava sa preto CELY tvar.
+        if (f && f.type === 'custom'){
+          if (sameJson(v[k], def[k])) return;
+        } else if (sameValue(v[k], def[k])) return;
         if (f && f.type === 'rows'){
           var trimmed = trimRowsValue(f, v[k], f.value || [],
                                       (OPEN.flags && OPEN.flags[k]) || null);
@@ -1412,6 +1512,7 @@
       var r = document.getElementById(ROOT_ID);
       if (!r) return;
       r.innerHTML = modalHtml(OPEN.base);
+      renderCustomFields();
       focusFirst(r);
     }
 
@@ -1478,6 +1579,9 @@
         if (f && f.type === 'rows') OPEN.flags[f.key] = flagsOfRows(f, f.value);
       });
       r.innerHTML = modalHtml(eff.spec);
+      // KOV-B3: vlastne uzly sa kreslia AZ TERAZ — `modalHtml` je cisty
+      // retazec (testovatelny bez DOM) a volajuci potrebuje ZIVY uzol.
+      renderCustomFields();
       focusFirst(r);
     }
 
@@ -1668,6 +1772,10 @@
 
     var API = { ROOT_ID: ROOT_ID, modalHtml: modalHtml, fieldHtml: fieldHtml,
                 rowsHtml: rowsHtml, lookupHtml: lookupHtml, cardCls: cardCls,
+                // KOV-B3: vlastny uzol volajuceho (zoznam clenov setu, zivy
+                // nahlad) — `customBox` je jeho hostitel, `redrawCustom` ho
+                // prekresli bez toho, aby sa prekreslil cely modal.
+                customBox: customBox, redrawCustom: redrawCustom,
                 open: open, close: close, submit: submit,
                 isOpen: isOpen, isBusy: isBusy, setBusy: setBusy,
                 values: values, spec: spec, setRows: setRows,

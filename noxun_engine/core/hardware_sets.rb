@@ -2534,6 +2534,12 @@ module Noxun
         return [nil, errors] if norm.nil?
 
         params = preview_sample(sample)
+        # Ked NL nepodal pouzivatel, drzi ju set: rad, ktory 470 nema (napr.
+        # 260–350), by inak nahlad hlasil ORANGE „nemá kód pre dĺžku NL 470",
+        # hoci je uplne v poriadku. Vyberie sa NAJBLIZSIA VYSSIA existujuca
+        # dlzka, inak najdlhsia — deterministicky, nikdy nahodne.
+        params['nominal_length'] = preview_nl(norm, params['nominal_length']) unless
+          sample.is_a?(Hash) && num(sample['nominal_length'] || sample[:nominal_length])
         sid = norm['set_id']
         gt  = norm['generic_type']
         item = { 'generic_type' => gt, 'quantity' => 1, 'owner_id' => PREVIEW_OWNER,
@@ -2574,6 +2580,21 @@ module Noxun
 
       def uses_nl?(norm)
         Array(norm['members']).any? { |m| m['code_by_nl'].is_a?(Hash) }
+      end
+
+      # Vzorova NL, ked ju nepodal pouzivatel: default, ak ho rad pozna, inak
+      # najblizsia VYSSIA existujuca dlzka a v krajnom pripade najdlhsia.
+      def preview_nl(norm, default)
+        keys = []
+        Array(norm['members']).each do |m|
+          next unless m['code_by_nl'].is_a?(Hash)
+
+          m['code_by_nl'].each_key { |k| n = num(k); keys << n if n }
+        end
+        return default if keys.empty? || keys.include?(default)
+
+        keys.sort!
+        keys.find { |k| k >= default } || keys.last
       end
 
       def uses_param?(norm, param)

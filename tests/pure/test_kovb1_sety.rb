@@ -395,9 +395,15 @@ NxTest.test('KOV-B1 (R4): `expand` aj `explain` `active` IGNORUJU (nakup je toto
   NxTest.assert_equal(b::HWS.explain(b.hinge_item, st_on, catalog: cat),
                       b::HWS.explain(b.hinge_item, st_off, catalog: cat),
                       'aj rozpis polozky v paneli')
-  NxTest.assert_equal(['zaves-a'],
+  # KOV-B3: ponuka UZ filtruje — je to JEDINE miesto, kde `active` nieco
+  # rozhoduje. Expanzia, rozpis polozky ani resolver ostavaju nedotknute
+  # (dva asserty vyssie), takze existujuce mapovanie nakupuje IDENTICKY.
+  NxTest.assert_equal([],
                       b::HWS.set_options('hinge', [off], {}, []).map { |s| s['set_id'] },
-                      'ponuka setov `active` v B1 este nefiltruje (to je B3)')
+                      'ponuka setov NEAKTIVNY set uz nenuka (KOV-B3)')
+  NxTest.assert_equal(['zaves-a'],
+                      b::HWS.set_options('hinge', [off], {}, ['zaves-a']).map { |s| s['set_id'] },
+                      'ale REFERENCOVANY neaktivny set v ponuke OSTAVA (inak by select klamal)')
 end
 
 # ============================================================================
