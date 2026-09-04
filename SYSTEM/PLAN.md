@@ -449,6 +449,9 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
 - **V1.0 zostavy:** spájanie a zarovnávanie korpusov (čelné/zadné hrany, pripájacie body, snaper logika) · soklová lišta v celku pre segment · obklady a krycie prvky segmentu vrátane pilastra
   (priznaný vs. skrytý) · pracovné a horné krycie dosky na označený segment · migrácia a oprava starých modelov · test na kompletnej reálnej zákazke. **Mimo V1** (V1_VIZIA):
   plné segmenty s `attachment` dátovým kontraktom, automatické krycie dosky a PD cez segment — v zásobníku (koncept 02 je podklad).
+  **Rozhodnutie 4.9.2026 (Michal, debata V1 bod 1B):** viazané diely a sektory (koncept 02) idú **PO V1** — „radšej raz a poriadne, než teraz kúskovať". Praktickú potrebu zostáv pokryjú v V1
+  **GHOST-D1 + GHOST-D2** (dosky vkladané a kreslené prichytením na skrinky, packages nižšie). **Agy outside-in research** „automatický pilaster / pracovná doska" (skill `antigravity-outside-in`)
+  sa spraví, keď bude kvóta — podklad pre blok viazaných dielov po V1.
 - **NÁSTROJE-1 · TASK PACKAGE „MOWER + SNAPER V BALÍKU NOXUN ENGINE" (D-20; V1 bod 1A „staré pluginy" — Michal 4.9.2026; Audit: ÁNO — nový modul; in-SU POVINNÉ):**
   **Cieľ:** jeden inštalačný balík — oba nástroje sa presunú ako moduly do `noxun_engine/tools/` (`mower.rb`, `snaper.rb`; namespace `Noxun::Engine::Tools::*`), načíta ich `main.rb`,
   dostanú **jeden spoločný toolbar „Noxun Nástroje"** (poradie: −90° · +90° · 180° · Z = 0 · Z posun… · Kópia vľavo · Kópia vpravo · Prisunúť vľavo · Prisunúť vpravo; slovenské tooltipy;
@@ -477,6 +480,33 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   pribudla, Ctrl+Z ju odstráni · pomenovaná skrinka → kópia „… a" · rotuj 90° a skopíruj → sedí na doraz · Snaper prisunie k susedovi · Z = 0 a Z posun fungujú ako doteraz.
   **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → nový odsek `tools` v `docs/architecture/ui-lifecycle.md` + riadok rozcestníka `docs/ARCHITEKTURA.md` (guard) → README
   (inštalácia, upratanie starých pluginov) → D-20 do DOGFOODING_vyriesene (plný text + riadok indexu) → STAV/KRONIKA/PLAN.
+- **GHOST-D1 · TASK PACKAGE „GHOST PRE DOSKY — ZÁKLAD" (V1 bod 1B, Michal 4.9.2026; Audit: ÁNO — nový šev buildera dosiek + subjekt nástroja; in-SU POVINNÉ; štart po NÁSTROJE-1 / KOV-B2):**
+  **Cieľ:** vloženie dosky z karty Dosky ide cez ghost ako pri skrinke (doska na kurzore, prichytenie na geometriu, kotvy, klik = vloženie) — dnes sa doska kladie synchrónne na `Placement.next_x`.
+  **Scope IN:** `BoardBuilder.prepare_insert` / `commit_insert(model, plan, transform:)` (vzor R-03: zmrazený plán, ŽIADNA mutácia pred klikom; commit = jedna operácia, `Ids.next_board_id`, definícia +
+  `draw_board`, orientácia ako transformácia inštancie NAD polohou — vnútro definície ostáva ležiace, výrobné dáta nedotknuté) · `GhostTool` dostane **SUBJEKT** (skrinka | doska): `PlacementSession`
+  číta obálku a kotvy zo subjektu (`Calc.envelope_points`/`anchor_points` dosky z dĺžky × šírky × hrúbky + orientácie), commit cez šev subjektu; **klasický tok skrinky sa NEMENÍ** (existujúce
+  `run_ghost*` sekcie zelené bez úpravy = charakterizácia) · klávesy pre dosku: ←/→ rotácia okolo Z (ako skrinka) · **↑/↓ = cyklus orientácie `leziaca → stojaca → na_stenu`** (vlastnosť dosky,
+  nie voľná rotácia — Michal 4.9.: kusovník, hrany a ABS tak ostávajú správne; Z-režim skrinky pre dosku nahrádza orientácia) · ALT = kotvy · pásik ghostu ukazuje orientáciu · karta Dosky:
+  „Vložiť dosku" štartuje ghost session (ako „Vložiť skrinku"), Esc = nič sa nevloží, 0 krokov Späť; pamäť session (orientácia, rotácia, kotva) per doska.
+  **Scope OUT:** kreslenie na rozmer (D2) · roly dosiek (worktop/pilaster/plinth) · automatické generovanie · viazané diely (po V1).
+  **Testy a DoD:** headless — obálka a kotvy dosky per orientácia (3×), cyklus orientácie, plán zmrazený (žiadna mutácia), `commit_insert` = jedna operácia, subjekt skrinky nezmenený;
+  **in-SU `run_ghost_d1`** — ghost dosky vloží dosku na kliknutý bod s prichytením na roh skrinky, ↑ zmení orientáciu (stojaca), ←/→ rotácia, ALT kotva, Esc = model nezmenený a 0 krokov Späť,
+  vloženie = 1 krok Späť, kusovník má dosku, ghost skrinky nezmenený. Mutácie min. 3 (orientácia zapísaná do výrobných osí · commit mimo operácie · subjekt skrinky číta obálku dosky).
+  **Smoke pre Michala:** karta Dosky → Vložiť → doska visí na kurzore, prichytí sa na roh skrinky, ↑ ju postaví, klik vloží, Ctrl+Z vráti; vkladanie skriniek ako doteraz.
+  **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `construction.md` (šev board_builder), `ui-lifecycle.md` (ghost subjekt, klávesy), ARCHITEKTURA router pri novom súbore → STAV/KRONIKA/PLAN.
+
+- **GHOST-D2 · TASK PACKAGE „KRESLENIE DOSKY NA ROZMER (Ghost 2.0)" (po D1; Audit: ÁNO; in-SU POVINNÉ):**
+  **Cieľ:** doska sa nakreslí **dvoma ťahmi**: klik = nulový bod → ťah dĺžky (prichytenie SketchUp inference ALEBO napísané číslo v mm do natívneho merania) → klik → ťah šírky → klik = vloženie;
+  hrúbka z materiálu karty, orientácia z prvého ťahu (smer dĺžky) + ↑/↓ cyklus ako v D1. **Predloha:** `STARE/V2fable/core/ghost_tool2.rb` (fázy, `enableVCB?`/`onUserText`, `Sketchup.vcb_value`,
+  axis snap, locks) — port do subjektu dosky, nie kópia. Pokrýva praktickú potrebu zostáv: pracovná doska, pilaster, soklová lišta či krycí panel sa nakreslia prichytením na rohy skutočných skriniek.
+  **Scope IN:** fázy 0 (bod) → 1 (dĺžka) → 2 (šírka) → commit · VCB: **jedno číslo na fázu** (Michal 4.9.), Enter potvrdí, neplatné = fáza ostáva + status · rozmery vyplnené v karte = zamknuté fázy,
+  ktoré sa preskočia (klik + Enter = doska presne z karty) · prichytenie na osi (axis snap) + inference, obálka kreslená počas ťahu, kóty v tooltipe · Esc v hociktorej fáze = nič · karta Dosky:
+  dve tlačidlá „Vložiť" (D1) a „Nakresliť" (D2) — potvrdiť v audite/mockupe.
+  **Scope OUT:** viac čísel naraz („600;18") · tretí rozmer · roly dosiek · automatika pilastrov/PD (po V1, po agy researchi).
+  **Testy a DoD:** headless — parser čísla (mm, desatinné, neplatné), fázový automat (zamknuté fázy preskočené, Esc), orientácia z ťahu, obálka počas fázy; **in-SU `run_ghost_d2`** — nakresliť dosku
+  dvoma ťahmi s prichytením na rohy dvoch skriniek (dĺžka = presne súčet šírok), „2400 Enter" → dĺžka 2400, Esc vo fáze 2 = nič (0 krokov Späť), vloženie = 1 krok Späť, ↑ = stojaca. Mutácie min. 3.
+  **Smoke pre Michala:** pracovná doska od ľavého rohu prvej po pravý roh poslednej skrinky, šírku napíš 600, hotovo; pilaster: ↑ stojaca, ťah výšky.
+  **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `ui-lifecycle.md` (ghost D2), `docs/UI_DIZAJN.md` (tlačidlá karty Dosky) → STAV/KRONIKA/PLAN.
 
 ### 5 · RENDER M-R
 
