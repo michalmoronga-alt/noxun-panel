@@ -28,6 +28,8 @@ Tento priečinok obsahuje deväť hlavných kandidátov na budúce návrhové/im
 7. [07_KONSTRUKCIA_V1.md](07_KONSTRUKCIA_V1.md) — per-dielec konštrukčné odsadenia a budúce produktové typy čiel.
 8. [08_PONUKA_DOKUMENTY_CENY.md](08_PONUKA_DOKUMENTY_CENY.md) — DOCX/PDF dokumenty, manuálna cenová čerstvosť a obchodný workflow.
 9. [09_GHOST_VKLADANIE.md](09_GHOST_VKLADANIE.md) — V1-04 ghost placement: skrinka na kurzore, rotácia šípkami, floor/free Z a 4 predné anchory korpusu; obsahuje aj predbežný audit proti `main` v0.7.51. **Pravdepodobný prvý funkčný kandidát po hardeningu**, ak finálny audit nepotvrdí blokér.
+10. [GHOST_D1_D2_PACKAGE_DRAFT_2026-09-04.md](GHOST_D1_D2_PACKAGE_DRAFT_2026-09-04.md) — **DRAFT packages GHOST-D1/D2** (ghost pre dosky: subjekt nástroja, ↑/↓ = orientácia; kreslenie dosky na rozmer dvoma ťahmi + VCB) po Codex kolách #288 — do PLANu sa vrátia až po outside-in researchi a zapracovaní nálezov kola 2 (v dokumente). Archívne referencie kódu: `../archiv_kod/` (V2fable Ghost 2.0, legacy Mower a Snaper).
+11. [NASTROJE_OUTSIDE_IN_2026-09-04.md](NASTROJE_OUTSIDE_IN_2026-09-04.md) — **outside-in packet NÁSTROJE-1** (WebSearch/WebFetch, agy mimo): `drawing_element_visible?` pasca pred SU 2026.0, `transform_entities` a kontext, toolbar `restore`, natívne `Sketchup::Snap` (2025.0) ako kandidát pre zostavy, prior art (Move extension, Snap Connector).
 
 Externé auditné dodatky:
 

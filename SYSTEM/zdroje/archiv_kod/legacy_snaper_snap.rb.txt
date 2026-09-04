@@ -1,0 +1,183 @@
+# REFERENCIA (nie kod pluginu): legacy Snaper v0.1.0 core/snap.rb (Plugins/snaper/core/snap.rb). Skopirovane 4.9.2026. Subor sa NENACITAVA.
+# frozen_string_literal: true
+
+module Noxun
+  module Snaper
+    # Slides the selected instance along its OWN local X axis until it touches
+    # the nearest obstacle. The gap math is a port of the field-proven
+    # V2fable Placement.compute_gap: AABB sweep in the target's local frame,
+    # so rotated cabinets snap along their own axes, never the world axes.
+    module Snap
+      WARN_MM  = 10_000.0 # farther than this: still move, but warn
+      BLOCK_MM = 20_000.0 # farther than this (or nothing found): refuse
+      TOUCH_MM = 0.2      # closer than this: already touching, do nothing
+
+      class << self
+        # dir is :left (local -X) or :right (local +X).
+        def snap(dir)
+          model = Sketchup.active_model
+          return unless model
+          target = pick_target(model)
+          return unless target
+
+          gap = nearest_gap(model, target, dir)
+          if gap.nil?
+            return warn('Snaper: v smere nie je žiadna prekážka — presun zablokovaný.')
+          end
+
+          sign = (dir == :left ? -1 : 1)
+          # Transforming the local vector applies the target's rotation AND
+          # scale, so the world distance is correct even for scaled instances.
+          vec = Geom::Vector3d.new(sign * gap, 0, 0).transform(target.transformation)
+          dist_mm = vec.length.to_mm
+
+          return info('Snaper: skrinka už je na doraz ✓') if dist_mm <= TOUCH_MM
+          if dist_mm > BLOCK_MM
+            return warn(format('Snaper: najbližšia prekážka je %.1f m ďaleko — presun zablokovaný.',
+                               dist_mm / 1000.0))
+          end
+
+          move!(model, target, vec, dir)
+
+          if dist_mm > WARN_MM
+            warn(format('Snaper: prisunuté o %.1f m — skontroluj, či to bol zámer.', dist_mm / 1000.0))
+          else
+            info(format('Snaper: prisunuté o %d mm ✓', dist_mm.round))
+          end
+        rescue => e
+          Snaper.log_error(e, 'Snap.snap')
+          warn('Snaper: chyba pri presune — detail v Ruby konzole.')
+        end
+
+        private
+
+        # Exactly one instance/group in the selection; anything else gets a
+        # quick, click-free nag and returns nil.
+        def pick_target(model)
+          picks = model.selection.to_a.select do |e|
+            e.is_a?(Sketchup::ComponentInstance) || e.is_a?(Sketchup::Group)
+          end
+          return picks.first if picks.size == 1
+          warn(picks.empty? ? 'Snaper: najprv vyber skrinku.' : 'Snaper: vyber len jednu skrinku.')
+          nil
+        end
+
+        # Containers this deep still get their children inspected when their
+        # own box straddles the target (imported room shells nest a few levels).
+        MAX_DEPTH = 8
+
+        # Free distance (local units) from the target edge to the nearest
+        # obstacle along local +-X, or nil when nothing is in the way.
+        # An obstacle counts only when both its height (Z) and depth (Y)
+        # ranges overlap the target's — mere touching is not an overlap, so
+        # floors and already-snapped neighbours never block sideways moves.
+        def nearest_gap(model, target, dir)
+          ctx = { t: target.definition.bounds, dir: dir, eps: 0.5.mm, best: nil }
+          inv = target.transformation.inverse
+          model.active_entities.each do |e|
+            next if e.equal?(target)
+            consider(e, inv, ctx, 0)
+          end
+          ctx[:best]
+        end
+
+        # Walks one entity expressed in the target's local frame. Instances,
+        # groups and loose faces count; edges and the rest are ignored. A box
+        # cleanly ahead of the leading edge is a snap candidate. A CONTAINER
+        # whose box overlaps the target in X gets its children inspected
+        # instead: an imported room shell is one group whose bounds swallow
+        # the cabinet, so only its inner wall faces can yield a usable gap.
+        # Leaf faces overlapping in X are skipped (same as compute_gap).
+        def consider(e, tr_to_local, ctx, depth)
+          return if invisible?(e)
+          container = e.is_a?(Sketchup::ComponentInstance) || e.is_a?(Sketchup::Group)
+          bb =
+            if container
+              transform_bounds(e.definition.bounds, tr_to_local * e.transformation)
+            elsif e.is_a?(Sketchup::Face)
+              transform_bounds(e.bounds, tr_to_local)
+            else
+              return
+            end
+          t = ctx[:t]
+          return unless overlap_1d(bb.min.y, bb.max.y, t.min.y, t.max.y)
+          return unless overlap_1d(bb.min.z, bb.max.z, t.min.z, t.max.z)
+          g = (ctx[:dir] == :right ? bb.min.x - t.max.x : t.min.x - bb.max.x)
+          if g >= -ctx[:eps]
+            g = 0 if g < 0
+            ctx[:best] = g if ctx[:best].nil? || g < ctx[:best]
+            return
+          end
+          return unless container && depth < MAX_DEPTH
+          # Descend only when some part actually lies beyond the leading edge.
+          ahead = (ctx[:dir] == :right ? bb.max.x > t.max.x + ctx[:eps]
+                                       : bb.min.x < t.min.x - ctx[:eps])
+          return unless ahead
+          child_tr = tr_to_local * e.transformation
+          e.definition.entities.each { |c| consider(c, child_tr, ctx, depth + 1) }
+        rescue => ex
+          Snaper.log_error(ex, 'Snap.consider')
+          nil
+        end
+
+        # Hidden entities and entities on switched-off tags never block.
+        def invisible?(e)
+          return true if e.respond_to?(:hidden?) && e.hidden?
+          lay = e.respond_to?(:layer) ? e.layer : nil
+          !!(lay && !lay.visible?)
+        rescue
+          false
+        end
+
+        def transform_bounds(b, tr)
+          out = Geom::BoundingBox.new
+          8.times { |i| out.add(b.corner(i).transform(tr)) }
+          out
+        end
+
+        def overlap_1d(a1, a2, b1, b2, eps = 0.01.mm)
+          amin, amax = [a1, a2].minmax
+          bmin, bmax = [b1, b2].minmax
+          (amax - bmin) > eps && (bmax - amin) > eps
+        end
+
+        def move!(model, target, vec, dir)
+          label = (dir == :left ? 'Snaper — prisunúť vľavo' : 'Snaper — prisunúť vpravo')
+          model.start_operation(label, true)
+          target.transform!(Geom::Transformation.translation(vec))
+          model.commit_operation
+        rescue => e
+          begin
+            model.abort_operation
+          rescue
+            nil
+          end
+          raise e
+        end
+
+        # --- quick, click-free feedback --------------------------------------
+
+        def info(msg)
+          Sketchup.status_text = msg
+          nil
+        end
+
+        def warn(msg)
+          UI.beep
+          Sketchup.status_text = msg
+          show_notification(msg)
+          nil
+        end
+
+        # Keeps a reference in @note — otherwise GC dismisses the popup.
+        def show_notification(msg)
+          return unless defined?(UI::Notification) && Snaper.extension
+          @note = UI::Notification.new(Snaper.extension, msg)
+          @note.show
+        rescue => e
+          Snaper.log_error(e, 'Snap.show_notification')
+        end
+      end
+    end
+  end
+end

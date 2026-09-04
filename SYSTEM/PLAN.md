@@ -457,8 +457,10 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   `Noxun::Engine::Tools::*`), načíta ich `main.rb`, dostanú **jeden spoločný toolbar „Noxun Nástroje"** (poradie: −90° · +90° · 180° · Z = 0 · Z posun… · Kópia vľavo · Kópia vpravo · Prisunúť vľavo ·
   Prisunúť vpravo; slovenské tooltipy; menu Extensions → Noxun Engine → Nástroje). Vlastné registrácie rozšírení a `VERSION` nástrojov zaniknú — verziu aj update (D-52) preberá engine. **Prečo samostatný
   toolbar:** toolbar enginu má železné pravidlo „do modelu sa nezapisuje" (D-103/D-105); nástroje model menia. UI nástrojov sa inak NEMENÍ (Michal: „nechať im svoj svet").
-  **Outside-in (CLAUDE.md pravidlo):** vedome PRESKOČENÝ s dôvodom — ide o presun vlastných nástrojov používaných v produkcii od 7/2026, bez novej SketchUp API plochy (toolbar, `transform_entities`,
-  `add_instance` engine už má); prior art = tie isté pluginy. Nová API plocha príde až s GHOST-D1/D2, tam je research povinný.
+  **Outside-in (CLAUDE.md pravidlo): HOTOVÝ 4.9.2026** — packet [zdroje/next_sessions/NASTROJE_OUTSIDE_IN_2026-09-04.md](zdroje/next_sessions/NASTROJE_OUTSIDE_IN_2026-09-04.md)
+  (cez WebSearch/WebFetch oficiálnej API dokumentácie, agy kvóta vyčerpaná). Reconcile: `drawing_element_visible?` (od 2020.0) **hádže výnimku pred SU 2026.0, keď je posledný prvok cesty
+  skupina/komponent** → volať pod `rescue` s fallbackom na `hidden?` + `layer.visible?` po celej ceste, test oboch vetiev · `transform_entities` interpretuje transformáciu globálne LEN v aktívnom
+  kontexte a jeho rodičoch → nástroje výhradne v root kontexte · toolbar `show`/`restore` podľa `get_last_state` · natívne `Sketchup::Snap` (2025.0) = kandidát pre zostavy/GHOST, nie pre túto dávku.
   **Registrácia (audit FIX 9):** JEDEN idempotentný registrátor podľa vzoru `Engine.install_toolbar` (`@toolbar` procesná referencia, `file_loaded?` guard, jedna sada `UI::Command` zdieľaná menu aj
   toolbarom) — legacy `build_toolbar` pri load bez guardu sa NEprenáša. **Restart latch (FIX 3):** všetkých 9 príkazov ide cez ten istý guard ako toolbar enginu (`Updater` latch po swape = príkaz odmietne
   s hláškou). **Kontext (FIX 4, 5):** nástroje pracujú LEN v root kontexte a LEN s korpusom na root úrovni — otvorený edit komponentu alebo vnorený NOXUN korpus = hláška v statuse, žiadna operácia
@@ -472,13 +474,15 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   vyčerpaní číslo „ 27", „ 28"…), základ sa oreže tak, aby prípona vždy prežila `sanitize_name` (`NAME_MAX_LEN` 80); bez ručného názvu ostáva automatický. **Dosky (NOTE 11): SCOPE OUT** — `BoardBuilder.build`
   polohu neprijíma (šev príde s GHOST-D1); kópia dosky = hláška „zatiaľ nie". Nie-NOXUN objekty (staré DC komponenty): dnešná cesta (DC `lenx` / bounds, `add_instance`).
   **Undo a ghost zóny (FIX 2):** každý zápis nástroja nad NOXUN objektom (rotácia, Z, snap, kópia) vo SVOJEJ operácii zavolá existujúci sync ghost zón, ktorý inak spúšťa `ScaleWatch` po debounce —
-  transparentná operácia observera sa tak nemôže prilepiť k ďalšiemu kroku používateľa. Povinný repro test: rotácia → okamžitá kópia (< debounce) → dobeh → Späť kópie vráti LEN kópiu, rotácia drží.
+  transparentná operácia observera sa tak nemôže prilepiť k ďalšiemu kroku používateľa. Povinný repro test: rotácia → okamžitá kópia (< debounce) → dobeh → Späť kópie vráti LEN kópiu, rotácia drží. **Scale race (Codex #288 kolo 2 P2):** ak `src.transformation` nie je rigidná (čakajúca zmena mierky v debounce okne), príkaz najprv synchrónne spustí TO ISTÉ spracovanie, ktoré robí
+  `ScaleWatch` po debounce (mierka → config + prestavba), a číta transformáciu znova; ak ani potom nie je rigidná → kópia sa odmietne s hláškou (žiadny tichý neúspech). In-SU prípad: Scale → okamžitá Kópia.
   **Rotácie ±90/180, Z = 0, Z posun:** logika bez zmeny (pivot = stred bbox, svetová Z — v root kontexte); Z-posun dialog ostáva HtmlDialog (callbacky pred `show`).
   **Snaper (FIX 6):** AABB sweep v lokálnom rámci cieľa, WARN 10 m, BLOCK 20 m, kontajnery do hĺbky 8 — **efektívna viditeľnosť cez `Model#drawing_element_visible?`** (celá instance path + tag
-  folder), bbox kontajnera sa počíta len z jeho VIDITEĽNÝCH detí (1 úroveň), test so skrytým dieťaťom vo viditeľnom kontajneri; hlásenia cez objekt rozšírenia enginu.
+  folder; pod `rescue` s fallbackom `hidden?`/`layer.visible?` — pred SU 2026.0 hádže výnimku pre kontajner na konci cesty, viď outside-in packet), bbox kontajnera sa počíta len z jeho VIDITEĽNÝCH detí (1 úroveň), test so skrytým dieťaťom vo viditeľnom kontajneri; hlásenia cez objekt rozšírenia enginu.
   **Upratanie starých inštalácií (FIX 7):** = **explicitná boot migrácia** v `main.rb` PRED registráciou toolbaru (pri aktualizácii vykonáva swap ešte starý kód, nový `updater.rb` beží až po reštarte):
   odstráni `noxun_mower_loader.rb`, `Noxun_Mower\`, `snaper.rb`, `snaper\` v Plugins; marker žije MIMO swapovaného stromu (`%APPDATA%\NOXUN\Engine\legacy_cleanup.json`), pri zlyhaní mazania sa
-  NEoznačí ako hotové (zopakuje sa nabudúce) + hláška; inštalátor `INSTALL_noxun_engine.ps1` maže tie isté cesty. Zdroj nástrojov sa presunie do repa; pôvodné priečinky workspace ostanú ako archív.
+  NEoznačí ako hotové (zopakuje sa nabudúce) + hláška; inštalátor `INSTALL_noxun_engine.ps1` maže tie isté cesty. Zdroj nástrojov sa presunie do repa; pôvodné priečinky workspace ostanú ako archív. Referenčné kópie legacy zdrojov (nenačítavané, Codex #288 kolo 2): `SYSTEM/zdroje/archiv_kod/legacy_noxun_mower.rb.txt`, `legacy_snaper_main.rb.txt`,
+  `legacy_snaper_snap.rb.txt`.
   **Headless (FIX 8):** čisté jadrá (`*_calc.rb`) sú v zozname `tests/helper.rb`; UI registrácia je oddelená a guardovaná (`defined?(UI::Toolbar)`), takže sa bez SketchUpu nenačíta.
   **Scope OUT:** tlačidlo „Vložiť kópiu" v toolbare (Michal: nie) · nové funkcie nástrojov · zarovnanie výšky/hĺbky k susedovi (bod 1B) · Noxun_Pick/V2fable vkladanie · KOVANIE (starý) a
   vepo_exporter (odstavia sa samostatne) · kópia dosky (GHOST-D1).
@@ -494,45 +498,8 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   komponentu nástroj odmietne s hláškou.
   **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → nový odsek `tools` v `docs/architecture/ui-lifecycle.md` + riadok rozcestníka `docs/ARCHITEKTURA.md` (guard) → README
   (inštalácia, upratanie starých pluginov) → D-20 do DOGFOODING_vyriesene (plný text + riadok indexu) → STAV/KRONIKA/PLAN.
-- **GHOST-D1 · TASK PACKAGE „GHOST PRE DOSKY — ZÁKLAD" (V1 bod 1B, Michal 4.9.2026; stav: DRAFT — pred implementáciou POVINNÝ outside-in research (nová Tool/inference plocha; skill `antigravity-outside-in`, pri vyčerpanej agy kvóte cez WebSearch) + `codex-audit`; Codex GH #288 nálezy zapracované; in-SU POVINNÉ; štart po NÁSTROJE-1 / KOV-B2):**
-  **Cieľ:** vloženie dosky z karty Dosky ide cez ghost ako pri skrinke (doska na kurzore, prichytenie na geometriu, kotvy, klik = vloženie) — dnes sa doska kladie synchrónne na `Placement.next_x`.
-  **Scope IN:** `BoardBuilder.prepare_insert` / **`commit_insert(model, plan, transform:, orientation:)`** (vzor R-03: zmrazený plán, ŽIADNA mutácia pred klikom; commit = jedna operácia, `Ids.next_board_id`,
-  definícia + `draw_board`, orientácia ako transformácia inštancie NAD polohou — vnútro definície ostáva ležiace, výrobné dáta nedotknuté). **Orientácia ide do commitu SAMOSTATNE** (Codex #288 P1):
-  `stojaca` a `na_stenu` vedome zdieľajú maticu (STANDARD §orientácia), takže z `transform` sa odvodiť nedá — finálnu hodnotu zo session nesie argument a zapíše sa do `config['orientation']`
-  (in-SU test to overuje v uloženom configu; neskoršia zmena orientácie v karte tak počíta deltu zo správneho stavu). `GhostTool` dostane **SUBJEKT** (skrinka | doska): `PlacementSession` číta obálku
-  a kotvy zo subjektu (`Calc.envelope_points`/`anchor_points` dosky z dĺžky × šírky × hrúbky + orientácie), commit cez šev subjektu; **klasický tok skrinky sa NEMENÍ** (existujúce `run_ghost*` sekcie
-  zelené bez úpravy = charakterizácia) · klávesy pre dosku: ←/→ rotácia okolo Z (ako skrinka) · **↑/↓ = cyklus orientácie `leziaca → stojaca → na_stenu`** (vlastnosť dosky, nie voľná rotácia —
-  Michal 4.9.: kusovník, hrany a ABS tak ostávajú správne; Z-režim skrinky pre dosku nahrádza orientácia) · ALT = kotvy · pásik ghostu ukazuje orientáciu · karta Dosky: „Vložiť dosku" štartuje ghost
-  session (ako „Vložiť skrinku"), Esc = nič sa nevloží, 0 krokov Späť; pamäť session (orientácia, rotácia, kotva) per doska. **Pečiatka šablóny (Codex #288 P2):** `template_ref` dosky nesie SESSION a
-  `stamp_once!`/„Naposledy použité" sa volá **až po úspešnom commite** — Esc pečiatku NEzapíše (dnešný synchrónny `handle_insert_board` pečiatkuje po vložení; test Esc → poradie nezmenené).
-  **Scope OUT:** kreslenie na rozmer (D2) · roly dosiek (worktop/pilaster/plinth) · automatické generovanie · viazané diely (po V1).
-  **Testy a DoD:** headless — obálka a kotvy dosky per orientácia (3×), cyklus orientácie, plán zmrazený (žiadna mutácia), `commit_insert` = jedna operácia a `orientation` v configu, subjekt skrinky
-  nezmenený, pečiatka len po commite; **in-SU `run_ghost_d1`** — ghost dosky vloží dosku na kliknutý bod s prichytením na roh skrinky, ↑ zmení orientáciu (stojaca) a **uložený config ju nesie**, ←/→
-  rotácia, ALT kotva, Esc = model nezmenený, 0 krokov Späť a šablóna neopečiatkovaná, vloženie = 1 krok Späť, kusovník má dosku, ghost skrinky nezmenený. Mutácie min. 4 (orientácia zapísaná do výrobných
-  osí · commit mimo operácie · subjekt skrinky číta obálku dosky · orientácia odvodená z matice).
-  **Smoke pre Michala:** karta Dosky → Vložiť → doska visí na kurzore, prichytí sa na roh skrinky, ↑ ju postaví, klik vloží (karta ukáže „stojaca"), Ctrl+Z vráti; vkladanie skriniek ako doteraz.
-  **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `construction.md` (šev board_builder), `ui-lifecycle.md` (ghost subjekt, klávesy, pečiatka), ARCHITEKTURA router pri novom súbore → STAV/KRONIKA/PLAN.
-
-- **GHOST-D2 · TASK PACKAGE „KRESLENIE DOSKY NA ROZMER (Ghost 2.0)" (po D1; stav: DRAFT — outside-in research (natívny Tool, inference, Measurements/VCB) + `codex-audit` pred implementáciou; Codex GH #288 nálezy zapracované; in-SU POVINNÉ):**
-  **Cieľ:** doska sa nakreslí **dvoma ťahmi**: klik = nulový bod → ťah dĺžky (prichytenie SketchUp inference ALEBO napísané číslo v mm do natívneho merania) → klik → ťah šírky → klik = vloženie;
-  hrúbka z materiálu karty. **Ťahy sledujú LOKÁLNE osi dosky podľa orientácie** (Codex #288 P2): dĺžka = lokálna X (pri ležiacej aj stojacej doske vodorovná), šírka = lokálna Y (pri stojacej zvislá) —
-  pilaster sa teda kreslí: ↑ stojaca, 1. ťah = hĺbka (dĺžka), 2. ťah = výška (šírka); orientácia sa cyklí ↑/↓ ako v D1, smer 1. ťahu určí otočenie okolo Z.
-  **Predloha:** archívny V2fable Ghost 2.0 — kópia zdroja je v repe ako referencia `SYSTEM/zdroje/archiv_kod/v2fable_ghost_tool2.rb.txt` (Codex #288: mimo repa by implementátor nemal čo čítať): fázy,
-  `enableVCB?`/`onUserText`, `Sketchup.vcb_value`, axis snap, locks — port do subjektu dosky, nie kópia. Pokrýva praktickú potrebu zostáv: pracovná doska, pilaster, soklová lišta či krycí panel sa
-  nakreslia prichytením na rohy skutočných skriniek.
-  **Scope IN:** fázy 0 (bod) → 1 (dĺžka) → 2 (šírka) → commit · VCB: **jedno číslo na fázu** (Michal 4.9.), Enter potvrdí; **validácia proti `BoardBuilder::LIMITS` PRED prijatím** (dĺžka 10–5000,
-  šírka 10–3000 mm — Codex #288 P1: `normalize` inak ticho oreže a náhľad by ukázal iný rozmer, než sa vyrobí), mimo limitu = fáza ostáva + status s limitom; neplatný text = fáza ostáva ·
-  **zamknuté fázy LEN z explicitného stavu zámkov karty (`NXInsert.boardLocks`)** — NIE z toho, že pole má hodnotu (Codex #288 P1: polia karty sú vždy predvyplnené, 800 × 600, takže by sa preskočili
-  obe fázy); prázdny Enter vo fáze = vedome prevezme hodnotu karty pre TÚTO fázu (explicitná akcia, status to povie) · prichytenie na osi (axis snap) + inference, obálka kreslená počas ťahu, kóty v
-  tooltipe · Esc v hociktorej fáze = nič, 0 krokov Späť, šablóna neopečiatkovaná (D1 pravidlo) · karta Dosky: dve tlačidlá „Vložiť" (D1) a „Nakresliť" (D2) — potvrdiť v audite/mockupe.
-  **Scope OUT:** viac čísel naraz („600;18") · tretí rozmer · roly dosiek · automatika pilastrov/PD (po V1, po agy researchi).
-  **Testy a DoD:** headless — parser čísla (mm, desatinné, neplatné) + limity (9, 10, 5000, 5001; 3000/3001), fázový automat (zámky z `boardLocks`, prázdny Enter = hodnota karty, Esc), orientácia z ťahu
-  a lokálne osi per orientácia, obálka počas fázy; **in-SU `run_ghost_d2`** — nakresliť dosku dvoma ťahmi s prichytením na rohy dvoch skriniek (dĺžka = presne súčet šírok), „2400 Enter" → dĺžka 2400,
-  „6000 Enter" → odmietnuté a fáza ostáva, Esc vo fáze 2 = nič (0 krokov Späť), vloženie = 1 krok Späť, ↑ stojaca → pilaster (výška = 2. ťah) a uložený config nesie orientáciu aj presné rozmery
-  (náhľad = geometria = config). Mutácie min. 4 (limit neoverený pred Enter · zámok z vyplneného poľa · šírka pri stojacej po X · pečiatka pri Esc).
-  **Smoke pre Michala:** pracovná doska od ľavého rohu prvej po pravý roh poslednej skrinky, šírku napíš 600, hotovo; pilaster: ↑ stojaca, 1. ťah hĺbka, 2. ťah výška; napíš 6000 → plugin odmietne
-  s limitom.
-  **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `ui-lifecycle.md` (ghost D2), `docs/UI_DIZAJN.md` (tlačidlá karty Dosky) → STAV/KRONIKA/PLAN.
+- **GHOST-D1 · GHOST-D2 (ghost pre dosky, kreslenie na rozmer) — DRAFT MIMO PLANU:** packages sú po Codex kolách #288 v [zdroje/next_sessions/GHOST_D1_D2_PACKAGE_DRAFT_2026-09-04.md](zdroje/next_sessions/GHOST_D1_D2_PACKAGE_DRAFT_2026-09-04.md)
+  (nezáväzný podklad). Do PLANu sa vrátia ako autorita až po **outside-in researchi** (natívny Tool, inference, Measurements/VCB) a zapracovaní nálezov kola 2 — samostatným docs PR.
 
 ### 5 · RENDER M-R
 
