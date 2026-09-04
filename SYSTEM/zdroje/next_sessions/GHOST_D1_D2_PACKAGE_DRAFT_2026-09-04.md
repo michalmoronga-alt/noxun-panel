@@ -87,3 +87,10 @@ výšky + `ghost_lock_z` pre dosku + charakterizácia skrinka → doska → skri
 presnosť 0,01 mm parser vs `board_config`.
 **Reconcile:** všetko prijaté a zapracované do packages D1/D2 v PLANe (verzia 2, 5.9.); rozhodnutia orchestrátora: kanonický smer pri nulovom vektore = lokálna +X podľa rotácie session;
 klávesy po potvrdení 1. fázy zamknuté; ALT v D2 bez významu; presnosť 0,01 mm pri prijatí hodnoty; kotvy = tabuľka 3×4 v package. Kolo 2 auditu nad verziou 2 = ČAKÁ.
+
+## Codex CLI audit kolo 2 (5.9.2026, Astra nad verziou 2 `b9f7173`) — ZAPRACOVANÉ (verzia 3)
+
+Kolo 1: **21/23 RESOLVED**, 2 PARTIAL — (Sol 1 / Astra 5) `locksFlat('board')` vracia HODNOTY (`{length: 800}`), nie Boolean → kontrakt zámkov je ČÍSELNÝ snapshot; (Sol 7) tabuľka kotiev bez
+konkrétnych súradníc/ID/poradia ALT → doplnená tabuľka 3 orientácie × 4 kotvy s ID `fl_bottom/fr_bottom/fr_top/fl_top` a poradím ako skrinka. **Nové:** (1) FIX-IN-D2 — kruhová závislosť
+smer ↔ projekcia v 1. ťahu → fáza 1 HĽADÁ SMER v rovine 1. ťahu (vodorovná rovina Z počiatku pre všetky orientácie, žiadna projekcia na lokálnu os), fáza 2 MERIA po pevnej osi; test
+šikmého 1. ťahu 45°; (2) NOTE — dve hranice zákazu ↑/↓ → jedna hranica: klávesy len vo fáze 0 (od kliku počiatku zamknuté). Kolo 3 (Sol, delta) = ČAKÁ.
