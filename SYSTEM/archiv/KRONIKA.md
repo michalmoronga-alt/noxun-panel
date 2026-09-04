@@ -60,6 +60,12 @@
   naozaj má); *(3)* **otvorenie aj zatvorenie komponentu je v SketchUpe samo krokom Späť**, takže marker-probe „príkaz neotvoril operáciu" cez ne nesmie siahať — inak `undo`
   vráti zatvorenie kontextu; *(4)* dôsledok (3): model ostal vnútri skupiny a jej `erase!` padol na `cannot remove an instance in the active editing path`, čím **zakryl všetky
   ďalšie asserty sekcie**. Poučenie: probe okno marker→undo musí obsahovať VÝHRADNE merané volanie, a scenár nesmie po sebe nechať otvorený edit kontext.
+  **Druhý beh (1579 PASS) našiel piaty — a najpoučnejší:** scenár bariéry si „starú duplicitu" vyrábal holým `add_instance(src.definition, tr)`. Lenže **identita žije na
+  INŠTANCII** (štandard 2.2), nie na definícii: bez skopírovaného `NOXUN` dictionary vráti `Store.kind` nil, `Ids.each_of_kind` inštanciu preskočí a observer ju cez
+  `notify_added` ignoruje — v modeli bola stále len jedna skrinka a **celý scenár prešiel nad prázdnom** (assert „každá skrinka má vlastné id" je pri jedinej skrinke pravdivý
+  vždy). Duplicita sa teraz vyrába ako **reálna kópia** (nová inštancia + celý dictionary vrátane `cabinet_id` a `config`), stará **pod guardom** a čerstvá **mimo neho**, a do
+  asserta pribudol **POČET** duplicít aj skriniek. Poučenie do ďalších dávok: **assert, ktorý je pravdivý aj nad prázdnym modelom, nie je dôkaz** — počet patrí do podmienky,
+  nielen do hlášky; a príprava scenára sa musí overiť vlastným assertom skôr, než sa na nej postaví meranie.
   **Codex review:** doplní orchestrátor.
 - **KOV-B2 · KATALÓG KOVANIA: STROM, MODAL POLOŽKY, DÉMOS VÝROBCA (v0.9.23, 4.9.2026, PR #290):** UI polovica slice B — dáta a taxonómiu dala KOV-B1, táto dávka ich vytiahla
   na obrazovku a uzavrela **D-110** („pridávanie kovaní je neprehľadné", Michal 24.8. pri prvom teste v0.8.0).

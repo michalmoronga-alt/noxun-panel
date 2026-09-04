@@ -13440,6 +13440,30 @@ module NoxunSuRunner
     end
   end
 
+  # REALNA kopia instancie — presne to, co spravi Ctrl+C/V: nova instancia TEJ
+  # ISTEJ definicie PLUS skopirovany CELY `NOXUN` dictionary, teda aj zdielane
+  # `cabinet_id` a `config`.
+  # NALEZ Z DRUHEHO IN-SU BEHU: hole `add_instance(src.definition, tr)` duplicitu
+  # NEVYROBI — identita zije na INSTANCII (standard 2.2), takze bez atributov
+  # `Store.kind` vrati nil, `Ids.each_of_kind` instanciu preskoci a observer ju
+  # cez `notify_added` ignoruje. Scenar potom „presiel" nad prazdnom.
+  # `guarded: true` = observer o kopii NEVIE (stara, uz existujuca duplicita);
+  # `guarded: false` = zachyti ju `onElementAdded` (cerstva kopia pouzivatela).
+  def tools1_clone_cabinet(model, src, x_mm, guarded: true)
+    copy = nil
+    body = lambda do
+      model.start_operation('SU-TEST kopia instancie', true)
+      copy = model.entities.add_instance(
+        src.definition, Geom::Transformation.translation(e::Units.point(x_mm, 0, 0))
+      )
+      dict = src.attribute_dictionary(e::Store::DICT, false)
+      dict.each { |k, v| copy.set_attribute(e::Store::DICT, k, v) } if dict
+      model.commit_operation
+    end
+    guarded ? e::ScaleWatch.guard { body.call } : body.call
+    copy
+  end
+
   def tools1_close_context(model)
     model.close_active while model.active_path && model.active_path.length.positive?
   rescue StandardError
@@ -13686,27 +13710,36 @@ module NoxunSuRunner
          tools1_same_matrix?(src, pre_shear) && marker_sh.valid?)
 
       # 10) BARIERA: stara duplicita + cerstva kopia -> pokoj a OBE identity opravene
-      e::ScaleWatch.guard do
-        model.start_operation('SU-TEST stara duplicita', true)
-        model.entities.add_instance(src.definition,
-                                    Geom::Transformation.translation(e::Units.point(3000, 0, 0)))
-        model.commit_operation
-      end
-      ok('NASTROJE-1: pripravena STARA duplicita (zdielane cabinet_id)',
-         !e::Ids.duplicate_cabinets(model).empty?)
-      model.start_operation('SU-TEST cerstva kopia', true)
-      model.entities.add_instance(src.definition,
-                                  Geom::Transformation.translation(e::Units.point(4500, 0, 0)))
-      model.commit_operation
-      ok('NASTROJE-1: cerstva kopia zalozila observeru pracu', e::ScaleWatch.pending? == true)
+      # Observer sa najprv upraci, aby `pending?` nizsie hovoril o TEJTO kopii
+      # a nie o zvysku z predoslych scenarov (Spat nad shearom zaradil `src`).
+      tools1_settle(model)
+      src_cid_now = e::Store.get(src, 'cabinet_id')
+      stale = tools1_clone_cabinet(model, src, 3000.0, guarded: true)
+      ok("NASTROJE-1: pripravena STARA duplicita so ZDIELANYM #{src_cid_now} " \
+         "(duplicit: #{e::Ids.duplicate_cabinets(model).length})",
+         !stale.nil? && stale.valid? && e::Store.get(stale, 'cabinet_id') == src_cid_now &&
+         e::Ids.duplicate_cabinets(model).length == 1)
+      ok('NASTROJE-1: stara duplicita vznikla POD guardom — observer o nej NEVIE',
+         e::ScaleWatch.pending? == false)
+
+      fresh = tools1_clone_cabinet(model, src, 4500.0, guarded: false)
+      ok("NASTROJE-1: cerstva kopia zalozila observeru pracu (duplicit: #{e::Ids.duplicate_cabinets(model).length})",
+         !fresh.nil? && fresh.valid? && e::ScaleWatch.pending? == true &&
+         e::Ids.duplicate_cabinets(model).length == 2)
+
       settled = e::ScaleWatch.flush_pending!(model)
       ok('NASTROJE-1: bariera dosla do POKOJA (aj cez follow-up po starsej duplicite)',
          settled == true && e::ScaleWatch.pending? == false &&
          e::ScaleWatch.instance_variable_get(:@timer).nil?)
       ids_now = cabinets(model).map { |i| e::Store.get(i, 'cabinet_id') }
-      ok("NASTROJE-1: po bariere ma KAZDA skrinka vlastne id (#{ids_now.compact.sort.join(', ')})",
-         ids_now.compact.length == ids_now.length &&
-         ids_now.uniq.length == ids_now.length && e::Ids.duplicate_cabinets(model).empty?)
+      # POCET je sucast dokazu: pri jedinej skrinke by „kazda ma vlastne id"
+      # presla nad prazdnom (presne to skrylo chybu v druhom in-SU behu).
+      ok("NASTROJE-1: po bariere maju VSETKY TRI skrinky vlastne id (#{ids_now.compact.sort.join(', ')})",
+         ids_now.length == 3 && ids_now.compact.length == 3 &&
+         ids_now.uniq.length == 3 && e::Ids.duplicate_cabinets(model).empty?)
+      ok('NASTROJE-1: obe kopie prezili a su to NOXUN korpusy s vlastnym configom',
+         stale.valid? && fresh.valid? &&
+         !e::Store.config(stale).nil? && !e::Store.config(fresh).nil?)
       info('NASTROJE-1: dva OTVORENE dokumenty naraz su MANUALNY scenar (macOS) — Windows drzi ' \
            'jeden dokument na proces; per-model fronty kryje headless sada test_nastroje1_observer')
       cleanup(model)
