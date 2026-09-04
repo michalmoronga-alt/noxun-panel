@@ -1783,6 +1783,9 @@
                               background: var(--nx-surface); color: var(--nx-ink); }
   .mrow input.mshort, .mrow select.mshort { flex: 0 0 96px; }
   .mrow .munit { font-size: 11px; color: var(--nx-ink-faint); }
+  /* KOV-B2 (review #290 P1): akcne tlacidlo PRI POLI — nevratny zapis (nova
+     polozka taxonomie) potrebuje EXPLICITNY spusac, nie blur. */
+  .mrow .mrowbtn { flex: 0 0 auto; padding: 3px 8px; font-size: 12px; }
   /* ŠT-2c: typy polí pre dlhšie formuláre (D-69 editor materiálu).
      `group` = nadpis sekcie — dlhý formulár bez predelov sa číta ako jedna
      kopa políčok a používateľ v ňom stratí, kde končí identita a začínajú
