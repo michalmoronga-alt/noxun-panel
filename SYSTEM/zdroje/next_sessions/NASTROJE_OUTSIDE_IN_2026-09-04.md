@@ -1,4 +1,5 @@
 # NÁSTROJE-1 — OUTSIDE-IN / prior-art packet (4.9.2026)
+> Stav: KONCEPT — nezáväzný podklad (výskumný packet / draft packages); do PLANu sa prenáša len po reconcile a schválení, nie priamo do implementácie.
 
 > **Kanál:** Antigravity (agy) mal 4.9. vyčerpanú kvótu, packet vznikol cez WebSearch + WebFetch oficiálnej dokumentácie SketchUp Ruby API (ruby.sketchup.com) a fóra.
 > Rozsah je úmyselne úzky — NÁSTROJE-1 je presun vlastných nástrojov (Noxun Mower, Snaper) do balíka enginu; **nové API plochy v repe** sú `Model#drawing_element_visible?`

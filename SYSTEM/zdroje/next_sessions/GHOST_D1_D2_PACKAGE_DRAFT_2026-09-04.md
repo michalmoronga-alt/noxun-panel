@@ -1,4 +1,5 @@
 # GHOST-D1 / GHOST-D2 — DRAFT packages (4.9.2026, po Codex kolách #288)
+> Stav: KONCEPT — nezáväzný podklad (výskumný packet / draft packages); do PLANu sa prenáša len po reconcile a schválení, nie priamo do implementácie.
 
 > **Status: DRAFT — nezáväzný podklad.** Do `SYSTEM/PLAN.md` sa vrátia ako autorita až po outside-in researchi (natívny `Sketchup::Tool`,
 > inference/`InputPoint`, Measurements/VCB) a po zapracovaní nálezov Codex kola 2 (nižšie). Rozhodnutia Michala 4.9.: ↑/↓ = orientácia dosky
