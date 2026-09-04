@@ -32,6 +32,7 @@ require_relative '../helper' unless defined?(NxTest)
 require 'fileutils'
 require 'tmpdir'
 require 'json'
+require 'rbconfig'
 
 LC = Noxun::Engine::Tools::LegacyCleanup
 
@@ -168,16 +169,28 @@ NxTest.test('T1b: druha instalacia SketchUpu sa uprace SAMOSTATNE (dva kluce)') 
   end
 end
 
-NxTest.test('T1b: kluc je NORMALIZOVANY — `\\`, koncove lomitko a velke pismena su ta ista cesta') do
+NxTest.test('T1b: kluc je NORMALIZOVANY — koncove lomitko (a na Windowse aj `\\` a velkost pismen)') do
   env = NxT1b.sandbox
   begin
     NxT1b.seed_legacy!(env[:plugins])
     LC.run!(env[:plugins], marker_path: env[:marker])
+    key = LC.normalize_key(env[:plugins])
 
-    [env[:plugins].tr('/', '\\'), "#{env[:plugins]}/", env[:plugins].upcase].each do |variant|
-      res = LC.run!(variant, marker_path: env[:marker])
-      NxTest.assert_equal('skipped', res['state'])
+    # Koncove lomitko odstrani `File.expand_path` na KAZDEJ platforme, takze
+    # cely prechod cez `run!` sa da overit prenosne.
+    NxTest.assert_equal(key, LC.normalize_key("#{env[:plugins]}/"))
+    NxTest.assert_equal('skipped', LC.run!("#{env[:plugins]}/", marker_path: env[:marker])['state'])
+
+    # `\` ako oddelovac a case-insensitivita su vlastnosti WINDOWS filesystemu
+    # — cielovej platformy pluginu. Na Linuxe (CI) je `\` bezny znak v mene a
+    # `/TMP/...` je INA cesta, takze by sa tam netestovala normalizacia, ale
+    # rozdiel platforiem. Kluc je cista funkcia, preto sa testuje priamo.
+    if RbConfig::CONFIG['host_os'] =~ /mswin|mingw|cygwin/
+      NxTest.assert_equal(key, LC.normalize_key(env[:plugins].tr('/', '\\')))
+      NxTest.assert_equal(key, LC.normalize_key(env[:plugins].upcase))
+      NxTest.assert_equal('skipped', LC.run!(env[:plugins].upcase, marker_path: env[:marker])['state'])
     end
+
     NxTest.assert_equal(1, NxT1b.marker_done(env[:marker]).keys.length,
                         'ta ista cesta v inom zapise vyrobila DALSI kluc')
   ensure
