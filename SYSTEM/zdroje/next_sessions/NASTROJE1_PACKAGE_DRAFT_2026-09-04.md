@@ -5,7 +5,7 @@
 > Rozhodnutia Michala 4.9.: jeden balík, spoločný toolbar „Noxun Nástroje", UI nástrojov nemeniť, kópia cez engine, názov kópie s písmenovou príponou, tlačidlo „Vložiť kópiu" NIE.
 > Outside-in packet: [NASTROJE_OUTSIDE_IN_2026-09-04.md](NASTROJE_OUTSIDE_IN_2026-09-04.md). Referenčný kód: `../archiv_kod/legacy_*.rb.txt`.
 
-- **NÁSTROJE-1 · TASK PACKAGE „MOWER + SNAPER V BALÍKU NOXUN ENGINE" (D-20; V1 bod 1A — Michal 4.9.2026; Audit: HOTOVÝ — Codex CLI 4.9. (1 BLOCKER + 9 FIX + 1 NOTE) + Codex GH #288 kolá 1–3 + **Codex CLI audit 2 (4.9.: 1 BLOCKER + 5 FIX + 1 NOTE) zapracované** (v texte označené „audit 2"); **audit 3 (1 BLOCKER + 2 FIX) zapracovaný**; čaká na potvrdzujúci CLI audit 4; in-SU POVINNÉ):**
+- **NÁSTROJE-1 · TASK PACKAGE „MOWER + SNAPER V BALÍKU NOXUN ENGINE" (D-20; V1 bod 1A — Michal 4.9.2026; Audit: HOTOVÝ — Codex CLI 4.9. (1 BLOCKER + 9 FIX + 1 NOTE) + Codex GH #288 kolá 1–3 + **Codex CLI audit 2 (4.9.: 1 BLOCKER + 5 FIX + 1 NOTE) zapracované** (v texte označené „audit 2"); **audit 3 (1 BLOCKER + 2 FIX) a audit 4 (1 BLOCKER) zapracované**; čaká na potvrdzujúci CLI audit 5; in-SU POVINNÉ):**
   **Cieľ:** jeden inštalačný balík — oba nástroje sa presunú ako moduly do `noxun_engine/tools/` (`mower.rb`, `snaper.rb` + ČISTÉ jadrá `mower_calc.rb`, `snap_calc.rb` bez `UI::*`; namespace
   `Noxun::Engine::Tools::*`), načíta ich `main.rb`, dostanú **jeden spoločný toolbar „Noxun Nástroje"** (poradie: −90° · +90° · 180° · Z = 0 · Z posun… · Kópia vľavo · Kópia vpravo · Prisunúť vľavo ·
   Prisunúť vpravo; slovenské tooltipy; menu Extensions → Noxun Engine → Nástroje). Vlastné registrácie rozšírení a `VERSION` nástrojov zaniknú — verziu aj update (D-52) preberá engine. **Prečo samostatný
@@ -35,8 +35,10 @@
   `dedup_copies` a prilepil ho k ďalšej operácii): `flush_pending!` zastaví timer, zneplatní jeho generáciu a spracuje fronty (mierka → config + prestavba, ghost sync, dedup) PRED otvorením
   operácie nástroja — aj pri čakajúcom obyčajnom Move/Rotate, nielen pri mierke. **Je to skutočná BARIÉRA, nie jedno spracovanie (audit 3 BLOCKER):** `process_dirty` môže pri čerstvej kópii
   nájsť staršiu duplicitu a znova zavolať `schedule` — nový timer s prázdnymi frontami by cez `@last_model` vykonal transparentný dedup PO operácii nástroja. Preto flush opakuje spracovanie,
-  kým observer nie je v pokoji (žiadny naplánovaný timer, prázdne `@dirty/@added/@requested`), so stropom iterácií (napr. 5) — ak pokoj nenastane, nástroj operáciu ODMIETNE s hláškou; multi-model
-  požiadavky ani `@prune_models` sa flushom nestrácajú. Test: „stará duplicita + čerstvá kópia → flush → operácia nástroja → žiadny timer a OBE identity opravené". Po flushi sa transformácia číta znova; ak nie je rigidná (`CabinetBuilder.rigid_matrix?`), príkaz sa ODMIETNE
+  kým observer nie je v pokoji (žiadny naplánovaný timer, prázdne `@dirty/@added/@requested`), so stropom iterácií (napr. 5) — ak pokoj nenastane, nástroj operáciu ODMIETNE s hláškou. **Multi-model proveniencia (audit 4 BLOCKER):** keď `process_dirty` pri čerstvej kópii nájde
+  staršiu duplicitu, dnes volá len `schedule` bez cieľového modelu a ďalšia iterácia by spracovala iba `@last_model` — follow-up preto musí znovu zaradiť KONKRÉTNY `mdl` do `@requested`
+  (per-model fronta), bariéra vyhlási pokoj až keď sú prázdne fronty VŠETKÝCH modelov, a `@prune_models` sa flushom nestráca. Test s dvoma dokumentmi (A aj B majú duplicitu, `@last_model`
+  ukazuje len na B): po flushi sú obe identity opravené a žiadny timer nebeží. Test: „stará duplicita + čerstvá kópia → flush → operácia nástroja → žiadny timer a OBE identity opravené". Po flushi sa transformácia číta znova; ak nie je rigidná (`CabinetBuilder.rigid_matrix?`), príkaz sa ODMIETNE
   s hláškou (žiadny tichý neúspech) — platí pre rotáciu, Z, snap aj kópiu (audit 2 FIX 2 + audit 3 FIX 2: `attach_one` dnes kontroluje LEN `scaled?` — dĺžky osí — takže šmyková matica s jednotkovými, ale nekolmými osami prejde a vetvy Move/Rotate aj verejný
   `remember_transform` ju uložia bez kontroly; **rigidita sa preto vynúti PRIAMO na hranici cache** — `remember_transform`/`attach_one` uložia len `CabinetBuilder.rigid_matrix?` transform a
   `reject_scale` nerigidný stav nikdy „nepotvrdí"; test s maticou s jednotkovými osami a nenulovým skalárnym súčinom).
@@ -107,3 +109,8 @@
 1. **BLOCKER** — `flush_pending!` = bariéra do pokoja (opakované spracovanie so stropom, žiadny naplánovaný timer, prázdne fronty; inak odmietnutie), multi-model a `@prune_models` zachované.
 2. **FIX** — rigidita vynútená na hranici cache observera (`rigid_matrix?` v `remember_transform`/`attach_one`, `reject_scale` nerigidné nepotvrdí; test šmyku).
 3. **FIX** — inštalátor po uprataní: len „Reštartuj SketchUp", žiadny živý `load`; zlyhaná postkontrola = varovanie, nie „HOTOVO".
+
+
+## Codex CLI audit 4 (4.9.2026, `task-mtmymlug-koyl06`) — ZAPRACOVANÉ (kde: „audit 4")
+
+1. **BLOCKER** — follow-up práca bariéry musí znovu zaradiť konkrétny model do per-model fronty `@requested` (nie `@last_model`); pokoj = prázdne fronty všetkých modelov; test s dvoma dokumentmi.
