@@ -527,6 +527,7 @@ Sketchup.require 'noxun_engine/ui/templates_dialog' # V0.4.5 D2 sprava sablon
 # staval toolbar pri kazdom `load`), registraciu spusta init blok nizsie.
 Sketchup.require 'noxun_engine/tools/mower_calc'  # ciste jadro: posun, nazov kopie, vyber cesty
 Sketchup.require 'noxun_engine/tools/snap_calc'   # ciste jadro: AABB sweep a verdikty prisunutia
+Sketchup.require 'noxun_engine/tools/legacy_cleanup' # T1b: ciste jadro boot migracie starych instalacii (po core/updater — pouziva normalize_path)
 Sketchup.require 'noxun_engine/tools/tools'       # spolocna vrstva + JEDINY registrator toolbaru/menu
 Sketchup.require 'noxun_engine/tools/mower'       # rotacie, Z, kopia (po cabinet_builder — pouziva sev vkladu)
 Sketchup.require 'noxun_engine/tools/snaper'      # prisunutie na doraz (po tags — cita folder_hidden?)
@@ -552,6 +553,33 @@ module Noxun
         Materials.ensure_uni_records!
       rescue StandardError => e
         log_error(e, 'ensure_uni_records')
+      end
+
+      # NASTROJE-1 (T1b): jednorazove UPRATANIE STARYCH INSTALACII Mower/Snaper
+      # z priecinka `Plugins`. VLASTNY chraneny blok a bezi PRED registraciou
+      # toolbarov (vzor `boot_cutover!`) — zlyhanie migracie NESMIE zhodit menu,
+      # toolbar ani observer.
+      #
+      # PRECO TU a nie v aktualizatore: pri aktualizacii (D-52) vykonava swap
+      # este STARY kod v pamati, takze novy `updater.rb` sa k slovu dostane az
+      # po restarte. Migracia patri na zaciatok bootu NOVEHO balika.
+      #
+      # ROZHODOVANIE JE V JADRE (`LegacyCleanup.message_for`) — tu ostava len
+      # zobrazenie. Hlaska je jednorazova sama od seba: po uspesnom upratani ma
+      # marker kluc tejto instalacie a dalsi boot skonci stavom `skipped`.
+      begin
+        cleanup = Tools::LegacyCleanup.run!(Updater.plugins_dir_of(plugin_dir))
+        cleanup_msg = Tools::LegacyCleanup.message_for(cleanup)
+        unless cleanup_msg.empty?
+          log(cleanup_msg)
+          Sketchup.status_text = cleanup_msg
+          Tools.notify(cleanup_msg)
+        end
+        log("legacy cleanup: #{cleanup['reason']}") if cleanup['state'] == 'error'
+        log('legacy cleanup: marker sa nepodarilo zapisat — migracia sa zopakuje pri dalsom boote') if
+          cleanup['stored'] == false
+      rescue StandardError => e
+        log_error(e, 'legacy_cleanup')
       end
 
 # D-52a (B3): PROCESNY LEASE si zapisuje LOADER (`noxun_engine.rb`,
