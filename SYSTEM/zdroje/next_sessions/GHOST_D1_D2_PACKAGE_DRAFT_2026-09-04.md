@@ -1,5 +1,5 @@
 # GHOST-D1 / GHOST-D2 — DRAFT packages (4.9.2026, po Codex kolách #288)
-> Stav: KONCEPT — nezáväzný podklad (výskumný packet / draft packages); do PLANu sa prenáša len po reconcile a schválení, nie priamo do implementácie.
+> Stav: KONCEPT — HISTÓRIA: packages boli 5.9.2026 prenesené do `SYSTEM/PLAN.md` (blok 4, GHOST-D1 a GHOST-D2 = autorita); tento súbor je archív draftu, reconcile a nálezov — nemeniť a schválení, nie priamo do implementácie.
 
 > **Status: DRAFT — nezáväzný podklad.** Outside-in research: WebFetch + **Antigravity beh 4.9.2026 večer HOTOVÝ** (4 packety, reconcile v packete); **probe v SU 2026 čaká** (`_dev/probe_ghost_keys.rb`) — Codex #292 P1 ([GHOST_OUTSIDE_IN_2026-09-04.md](GHOST_OUTSIDE_IN_2026-09-04.md)) — reconcile je v poslednej sekcii tohto
 > súboru. Do `SYSTEM/PLAN.md` sa packages vrátia ako autorita po zapracovaní reconcile + nálezov Codex kola 2 (nižšie) a po Codex CLI audite draftu. Rozhodnutia Michala 4.9.: ↑/↓ = orientácia dosky

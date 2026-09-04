@@ -108,3 +108,18 @@ Pasca behu: prvý `life` beh skončil prázdny (agent skúsil `command` tool →
 **Čo ešte chýba pred návratom draftov do PLANu:** (1) probe v SU 2026 — `_dev/probe_ghost_keys.rb` (Michal ručne v testovacom okne: prázdny Enter → `onReturn`?, `600 Enter` → `onUserText`,
 šípky v `onKeyDown` + či pohltenie zruší natívny zámok, `Sketchup.version` kvôli regresii Enter v 2026.0, prítomnosť `Sketchup::Snap`); (2) šípky ROZHODNUTÉ (a) — Michal 4.9. (r. 13); (1b) probe `lock_inference(ip_a, ip_b)` so syntetickými InputPointmi na lokálnej osi (Codex #294);
 (3) prepis draftov podľa reconcile → `codex-audit` → PLAN.
+
+## Probe v SketchUpe 26.0.429 (Michal, 5.9.2026, `_dev/probe_ghost_keys.rb`) — VÝSLEDKY
+
+| Otázka | Výsledok | Dôsledok pre package |
+|---|---|---|
+| `VK_RETURN` | `defined?(VK_RETURN) = nil` | potvrdené — Enter = kód 13, prázdny Enter cez `Tool#onReturn` |
+| prázdny Enter so zapnutým VCB | `onKeyDown key=13` → **`onReturn`** → `onKeyUp 13`; `onUserText` nepríde | D2: prázdny Enter = `onReturn` (hodnota karty) |
+| „600 Enter" | číslice prídu aj do `onKeyDown` (numpad 102/96/96), potom `onKeyDown 13` → **`onUserText "600"`**; `onReturn` sa nevolá | D2: písané hodnoty = `onUserText`; regresia Enter v 26.0 (agy) sa NEPOTVRDILA |
+| šípky, Shift | `onKeyDown` s `VK_DOWN/RIGHT/LEFT/UP` (40/39/37/38), `VK_SHIFT` (16) | D1/D2 klávesy podľa (a) |
+| `lock_inference(ip_a, ip_b)` syntetické body | `inference_locked? = false` (3 pokusy) | **natívny zámok na vlastnú os NEFUNGUJE → projekcia je mechanizmus** (Codex #294 otázka uzavretá) |
+| Esc | `onKeyDown 27` → `onCancel reason=0` | potvrdené |
+| Ctrl+Z počas nástroja (bez operácie) | prídu len klávesy 17 + 90, `onCancel reason=2` nepotvrdený (nebolo čo vrátiť) | reason 2 ošetriť podľa docs, overí in-SU test D1 |
+| `Sketchup::Snap` | existuje (`direction`, `position`, `set`, `up`; `Entities#add_snap = true`) | NO ACTION pre V1, poznámka pre viazané diely |
+
+**Uzáver researchu:** outside-in HOTOVÝ (WebFetch + agy + probe). Packages GHOST-D1/D2 sú od 5.9.2026 v `SYSTEM/PLAN.md` (blok 4) ako autorita; ďalší krok = `codex-audit` pred implementáciou.
