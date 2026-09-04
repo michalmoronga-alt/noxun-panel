@@ -553,7 +553,11 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   uložený config dosky (Codex #296 P1):** prestavba uloženej dosky (`rebuild_in_operation`), zmena orientácie z karty, uloženie dosky ako šablóny, vloženie zo šablóny **a dávkové cesty, ktoré config normalizujú PRED prestavbou —
   najmä „Nahradiť UNI…" v `materials_dialog.rb` (~r. 873–886: `BoardBuilder.normalize(merged)` → `rebuild_in_operation`; normalizácia zahodí `config_schema` aj neznáme polia, takže brána MUSÍ
   bežať nad RAW configom ešte pred `normalize`, Codex #296 kolo 2 P1)** — config s vyššou schémou sa ODMIETNE s hláškou (model nedotknutý, dávka danú dosku preskočí a prizná to), nikdy sa
-  ticho neznormalizuje cez `BoardBuilder.normalize` (rovnaký vzor ako `CabinetBuilder::CONFIG_SCHEMA` 4); **kontrakt configu dosky
+  ticho neznormalizuje cez `BoardBuilder.normalize` (rovnaký vzor ako `CabinetBuilder::CONFIG_SCHEMA` 4). **VŠEOBECNÉ PRAVIDLO (Codex #296 kolo 3 P1) — KAŽDÝ čitateľ configu dosky
+  zaobchádza s vyššou schémou ako s „novším configom":** (1) mutácie a šablóny = odmietnutie (vyššie); (2) **výrobné výstupy: `Bom.collect` zaradí dosku s vyššou schémou do `newer_configs`**
+  (dnes vetva dosky r. ~151–172 skladá známe polia bez toho) a existujúca výrobná brána kompatibility platí pre VŠETKY výstupy, ktoré dosky konzumujú — kusovník, VEPO (`ProductionCore`
+  `fresh_collect` → `Bom.compute`), nákup, rozpočet, cenová ponuka — rovnako ako pri skrinkách (fail-closed, žiadny tichý výpadok budúceho výrobného poľa); (3) zobrazenie v Inspectore/karte
+  je read-only s upozornením. Testovacia matica: doska vyššej schémy × každá cesta (prestavba, orientácia, šablóna, vloženie zo šablóny, Nahradiť UNI, kusovník, VEPO, nákup, rozpočet, ponuka). **kontrakt configu dosky
   (marker, forward-version odmietnutie, cesty) sa zapíše do `SYSTEM/STANDARD.md`** v uzávere D1; D2 bránu dedí; testy: šablóna aj uložená doska s vyššou schémou = odmietnuté, bez pečiatky, bez session, bez zmeny modelu; dávka „Nahradiť UNI" nad modelom s doskou vyššej schémy = doska preskočená,
   config nedotknutý.
   **Jeden POUŽÍVATEĽSKÝ krok Späť, nie „jedna operácia" (Astra BLOCKER):** vytváracia operácia `start_operation('Vložiť dosku', true)` + existujúci transparentný follow-up scale-lock zápis
