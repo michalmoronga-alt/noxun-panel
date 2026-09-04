@@ -58,7 +58,95 @@ module Noxun
       ORIENTATION_LABELS = { 'leziaca' => 'Naležato', 'stojaca' => 'Nastojato',
                              'na_stenu' => 'Na stenu' }.freeze
 
+      # GHOST-D1: VERZIA KONTRAKTU CONFIGU DOSKY (vzor `CabinetBuilder::CONFIG_SCHEMA`).
+      # Config dosky je uzavrety whitelist (`normalize` + `board_config`), takze
+      # doska ulozena NOVSIM pluginom by pri prestavbe ticho prisla o polia,
+      # ktore tato verzia nepozna (napr. buduci `attachment`). Marker sa zapisuje
+      # pri KAZDOM zapise configu dosky a KAZDY citac ulozeneho configu berie
+      # vyssie cislo ako „novsi config": mutacie a sablony ODMIETNU, vyrobne
+      # vystupy zaradia dosku do `newer_configs` (fail-closed).
+      #
+      # DISCIPLINA BUMPU (SYSTEM/STANDARD.md 8.3): cislo sa zvysi pri KAZDOM
+      # rozsireni whitelistu o pole, ktoreho TICHA STRATA by poskodila vyrobu
+      # alebo umiestnenie (nova rola, vazba na vlastnika, nove vyrobne pole).
+      #
+      # HISTORIA:
+      #   1 = GHOST-D1 (zavedenie markera; dnesny tvar configu vratane
+      #       `orientation` z UI-C1c)
+      BOARD_CONFIG_SCHEMA = 1
+
+      # GHOST-D1: ZMRAZENY snapshot vkladu DOSKY (`prepare_insert` ->
+      # `commit_insert`). Kontrakt je zhodny s `CabinetBuilder::InsertPlan`
+      # (R-03) a navyse rieši VYROBNY snapshot:
+      #   * `config` = normalizovany cfg (symbolove kluce, mm Float) —
+      #     geometria, deskriptor a farbenie hran citaju VYHRADNE jeho,
+      #   * `stored_config` = HOTOVY zapisovy tvar (`board_config`) vyrieseny
+      #     RAZ proti katalogu; `commit_insert` uz katalog NECITA (dnesny
+      #     `board_config` pri dupláku uprednostni AKTUALNY zdroj, takze
+      #     zmena katalogu medzi pripravou a klikom by zmenila vyrobny zaznam),
+      #   * `orientation` = hodnota z karty pri priprave; finalnu urcuje az
+      #     argument commitu (session ju meni klavesami ↑/↓),
+      #   * `template_ref` = identita sablony na peciatku PO uspesnom commite,
+      #   * plan si pamata DOKUMENT ako REFERENCIU na `Sketchup::Model`
+      #     (nie `guid` — ten sa meni pri kazdom ulozeni, lekcia #261/#264),
+      #   * ziadne ID, ziadna entita, ziadny krok Spat — tie vznikaju v commite.
+      class BoardPlan
+        attr_reader :config, :stored_config, :orientation, :template_ref
+
+        def initialize(model, config, stored_config, orientation, template_ref = nil)
+          @model = model
+          @config = config
+          @stored_config = stored_config
+          @orientation = orientation
+          @template_ref = template_ref
+          freeze
+        end
+
+        # Patri plan TOMUTO dokumentu? Porovnava sa objekt modelu, nie guid.
+        def for_model?(model)
+          !model.nil? && @model.equal?(model)
+        end
+
+        # Referencia na dokument planu (diagnostika; commit ju necita).
+        def model_ref
+          @model
+        end
+      end
+
       class << self
+        # --- GHOST-D1: dopredny guard CONFIGU DOSKY -------------------------
+        # Guard cita RAW ULOZENY config (z entity alebo zo zaznamu sablony),
+        # NIKDY payload z panela: klientsky payload prechadza cez CEF a cez
+        # uzavrete whitelisty JS, takze marker v nom uz mohol vypadnut.
+
+        # Marker configu ako Integer. Chybajuci marker = 0 (doska spred
+        # GHOST-D1) a ten NIKDY neblokuje.
+        def config_schema_of(cfg)
+          return 0 unless cfg.is_a?(Hash)
+
+          (cfg['config_schema'] || cfg[:config_schema]).to_i
+        end
+
+        # Je ulozeny config z NOVSEJ verzie? Porovnanie je PRISNE vacsie —
+        # rovnaka schema je kompatibilna, starsia (aj 0) tiez.
+        def newer_config?(cfg)
+          config_schema_of(cfg) > BOARD_CONFIG_SCHEMA
+        end
+
+        # JEDINY textovy zdroj odmietnutia je zdielany s korpusom, aby
+        # pouzivatel cital vsade to iste.
+        def newer_config_message(consequence, subject = 'Doska')
+          CabinetBuilder.newer_config_message(subject, consequence)
+        end
+
+        # Guard nad ULOZENYM configom dosky. `raise` = volajuci sa nedostane
+        # k ziadnej mutacii (kontrola bezi PRED `normalize` aj pred operaciou).
+        def guard_newer_config!(cfg, consequence = 'prestavba by nastavenia stratila')
+          return unless newer_config?(cfg)
+
+          raise newer_config_message(consequence)
+        end
+
         # --- normalizacia ---------------------------------------------------
         # params (string alebo symbol kluce; typicky UI payload alebo ulozeny config)
         # -> cfg so symbolovymi klucmi, mm Float. NEvaliduje material (viz
@@ -193,6 +281,9 @@ module Noxun
         def board_config(cfg)
           out = {
             engine_version: Engine::VERSION,
+            # GHOST-D1: marker kontraktu configu — zapisuje ho KAZDY zapisovatel
+            # dosky (vklad, prestavba, seed a upsert doskovych sablon).
+            config_schema: BOARD_CONFIG_SCHEMA,
             name: cfg[:name].to_s,
             role: cfg[:role].to_s,
             quantity: cfg[:quantity].to_i,
@@ -302,10 +393,12 @@ module Noxun
           s.empty? ? DEFAULT_ORIENTATION : s
         end
 
-        # Vlozi novu dosku nalezato na Z=0 vedla najpravejsieho NOXUN objektu.
-        # Bez material_id v params sa doplni projektovy default (snapshot!).
-        # Vrati instanciu.
-        def build(model, params)
+        # --- GHOST-D1: sev prepare_insert -> commit_insert -------------------
+
+        # Vstupny payload -> params pripravene na `normalize` (projektovy
+        # default materialu + E-03 guard hrubky). JEDNO miesto pre `build`
+        # aj pre `prepare_insert`, aby sa vkladacie cesty nemohli rozist.
+        def insert_params(model, params)
           p = stringify(params)
           if present(p['material_id']).nil? && defined?(Materials)
             p['material_id'] = Materials.project_defaults(model)['default_material_id']
@@ -318,6 +411,93 @@ module Noxun
           else
             p['thickness'] = th
           end
+          p
+        end
+
+        # GHOST-D1 FAZA 1: ciste PRIPRAVENIE vkladu dosky. Vrati zmrazeny
+        # `BoardPlan`. ZIADNA mutacia modelu, entit, ID ani Undo stacku;
+        # `ensure_root!` sa TU NEVOLA — ghost hover nesmie pouzivatelovi
+        # zatvarat otvoreny komponent (rovnaka hranica ako R-03).
+        #
+        # VYROBNY SNAPSHOT JE SUCASTOU ZMRAZENIA: material, `material_source`
+        # aj nazov sa vyriesia proti katalogu PRAVE TU a plan nesie hotovy
+        # `board_config`; commit uz katalog necita. (Hranica ako R-03: sam
+        # `normalize` moze cez `Materials` siahnut na katalog na disku.)
+        def prepare_insert(model, params, template_ref: nil)
+          cfg = normalize(insert_params(model, params))
+          validate_config!(cfg)
+          stored = board_config(cfg)
+          BoardPlan.new(model,
+                        CabinetBuilder.deep_copy_cfg(cfg, freeze_result: true),
+                        CabinetBuilder.deep_copy_cfg(stored, freeze_result: true),
+                        cfg[:orientation].to_s, template_ref)
+        end
+
+        # GHOST-D1 FAZA 2: JEDINE miesto, kde ghost dosky meni model. Poradie
+        # krokov je sucastou kontraktu (vzor R-03 `CabinetBuilder.commit_insert`):
+        #   1. guard identity DOKUMENTU a TYPU planu — cudzi plan sa odmieta
+        #      EST PRED zatvorenim edit kontextu,
+        #   2. ORIENTACIA zo session (nie z `transform` — `stojaca` a `na_stenu`
+        #      vedome zdielaju maticu, STANDARD 8.3, takze sa odvodit neda),
+        #   3. validacia + SNAPSHOT transformu (mutovatelny `Geom::Transformation`
+        #      sa cita PRAVE RAZ; prijme sa len rigidna pravotociva matica),
+        #   4. `ensure_root!` + kontrola postcondition,
+        #   5. az teraz ID a jedna operacia + transparentny scale-lock follow-up,
+        #      OBOJE vnutri `guarded`.
+        # Odmietnutie je VYNIMKA (volajuci ju premieta do statusu) a v modeli
+        # sa pri nej nic nezmenilo.
+        def commit_insert(model, plan, transform:, orientation: nil)
+          unless plan.is_a?(BoardPlan) && plan.for_model?(model)
+            raise 'Pripravená doska patrí inému dokumentu — vlož ju v okne, v ktorom si ju pripravil.'
+          end
+
+          o = orientation.nil? || orientation.to_s.strip.empty? ? plan.orientation.to_s : orientation.to_s
+          raise "Neznáma orientácia dosky '#{o}'." unless ORIENTATIONS.include?(o)
+
+          placement = CabinetBuilder.snapshot_insert_transform!(transform)
+          ensure_root!(model)
+          unless CabinetBuilder.root_context?(model)
+            raise 'Nepodarilo sa zavrieť otvorený komponent — doska by sa vložila doň. Ukonči editáciu (Esc) a skús znova.'
+          end
+
+          # Z planu ide PRACOVNA (nezmrazena) kopia — `draw_board` aj
+          # `paint_edges` s cfg pracuju a plan musi ostat nemenny.
+          cfg = CabinetBuilder.deep_copy_cfg(plan.config)
+          cfg[:orientation] = o
+          stored = CabinetBuilder.deep_copy_cfg(plan.stored_config)
+          stored[:orientation] = o
+
+          bid = Ids.next_board_id(model)
+          inst = nil
+          guarded do
+            model.start_operation('Vložiť dosku', true)
+            begin
+              bdef = model.definitions.add(definition_name(bid))
+              bdef.entities.clear!
+              draw_board(bdef.entities, cfg)
+              # Orientacia je transformacia INSTANCIE NAD polohou ghostu —
+              # vnutro definicie ostava leziace (vyrobne data nedotknute).
+              inst = model.entities.add_instance(bdef, placement * orientation_matrix(o, cfg[:thickness]))
+              write_board_attrs(model, inst, bid, cfg, config: stored)
+              model.commit_operation
+            rescue StandardError => e
+              abort_safely(model)
+              raise e
+            end
+            # D-40: scale zamok az PO commite vlozenia, v transparentnom
+            # follow-upe (DC pasca — viz apply_scale_lock_op).
+            apply_scale_lock_op(model, inst)
+          end
+          ScaleWatch.attach_one(inst) if inst && defined?(ScaleWatch)
+          inst
+        end
+
+        # Vlozi novu dosku nalezato na Z=0 vedla najpravejsieho NOXUN objektu.
+        # Bez material_id v params sa doplni projektovy default (snapshot!).
+        # Vrati instanciu. PROGRAMATICKA cesta (testy, in-SU, kopia) — ghost
+        # ide vyhradne cez `prepare_insert` + `commit_insert`.
+        def build(model, params)
+          p = insert_params(model, params)
           cfg = normalize(p)
           validate_config!(cfg)
           ensure_root!(model)
@@ -354,7 +534,11 @@ module Noxun
         # (scale absorpcia V0.4.7d). transparent: pripoji operaciu k predchadzajucej.
         def rebuild(model, inst, params, transform: nil, op_name: 'NOXUN: Uprav dosku', transparent: false)
           bid = board_id!(inst)
-          stored = config_to_params(Store.config(inst) || {})
+          raw_cfg = Store.config(inst) || {}
+          # GHOST-D1: dopredny guard nad RAW ULOZENYM configom — PRED
+          # `normalize` (ta by neznamy marker aj nezname polia ticho zahodila).
+          guard_newer_config!(raw_cfg)
+          stored = config_to_params(raw_cfg)
           incoming = stringify(params)
           merged = stored.merge(incoming)
           # 2B-1 (GH #94 P2): vedoma zmena materialu = stara duplak vazba patri
@@ -380,7 +564,13 @@ module Noxun
         end
 
         # Vnutro rebuildu; volajuci drzi operaciu aj guard.
+        # GHOST-D1: guard je AJ TU — davkove cesty (napr. „Nahradiť UNI…"
+        # v `materials_dialog.rb`) volaju toto vnutro priamo s uz
+        # znormalizovanym cfg, takze marker by v nom uz nebol. Je to POSLEDNA
+        # zachytna siet; prvou je klasifikacia davky, ktora dosku vyssej
+        # schemy zaradi do `blocked` a CELU nahradu odmietne PRED operaciou.
         def rebuild_in_operation(model, inst, bid, cfg, transform: nil)
+          guard_newer_config!(Store.config(inst) || {})
           inst.make_unique if inst.definition.instances.size > 1
           bdef = inst.definition
           bdef.name = definition_name(bid) unless bdef.name == definition_name(bid)
@@ -473,13 +663,15 @@ module Noxun
           f
         end
 
-        def write_board_attrs(model, inst, bid, cfg)
+        # `config:` (GHOST-D1) = HOTOVY zapisovy snapshot z `BoardPlan`. Ked
+        # pride, katalog sa uz NECITA — presne to je zmysel zmrazeneho planu.
+        def write_board_attrs(model, inst, bid, cfg, config: nil)
           Store.write(inst, {
             std: Store::STD, kind: 'board', id: bid, part_id: bid,
             part_key: PART_KEY, part_key_schema: PartKeys::SCHEMA,
             role: cfg[:role], name: cfg[:name],
             manufactured: true, production_class: 'sheet',
-            config: board_config(cfg)
+            config: config || board_config(cfg)
           })
           inst.name = "Doska #{bid}"
           inst.material = Materials.ensure_su_material(model, cfg[:material_id], FALLBACK_RGB) if defined?(Materials)
