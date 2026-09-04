@@ -126,6 +126,59 @@ NxTest.test('NASTROJE-1: limit nazvu v jadre sedi s CabinetBuilder::NAME_MAX_LEN
   NxTest.assert_equal(Noxun::Engine::CabinetBuilder::NAME_MAX_LEN, MC::NAME_MAX_LEN)
 end
 
+# --- kopia: ad-hoc kovanie a premisa scenara s presahujucim celom ---------------
+# Obe veci zhodili PRVY in-SU beh — headless ich preto drzi natvrdo.
+
+NxTest.test('NASTROJE-1: kopia da ad-hoc kovaniu NOVE id, obsah ostava nedotknuty') do
+  cb = Noxun::Engine::CabinetBuilder
+  base = { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 560.0,
+           'hardware_manual' => [{ 'id' => 'MAN-001', 'source' => 'free', 'name' => 'Testovacia položka',
+                                   'qty' => 2, 'unit' => 'ks', 'price_eur_vat' => 1.5 }] }
+  # `Store.config` vracia STRINGOVE kluce — cesta kopie ich tak aj cita.
+  cfg = JSON.parse(JSON.generate(cb.send(:normalize, base)))
+  stored = Array(cfg['hardware_manual']).first
+  NxTest.refute(stored.nil?,
+                'polozka musi prejst uzavretym whitelistom MANUAL_KEYS (source/qty/price_eur_vat) — ' \
+                'vymyslene kluce norm_hardware_manual TICHO zahodi')
+
+  params = cb.config_to_params(cfg)
+  cb.rekey_hardware_manual(params) # presne poradie cesty „Vlozit kopiu" aj nastroja
+  copied = Array(JSON.parse(JSON.generate(cb.send(:normalize, params)))['hardware_manual']).first
+  NxTest.refute(copied.nil?, 'polozka sa pri kopii stratila')
+  NxTest.assert(copied['id'] != stored['id'],
+                "kopia je NOVA skrinka — polozka musi dostat vlastne id (#{stored['id']} -> #{copied['id']})")
+  %w[source name qty unit price_eur_vat owner_part_key].each do |k|
+    NxTest.assert_equal(stored[k], copied[k], "pole #{k} sa kopiou menit NESMIE")
+  end
+end
+
+NxTest.test('NASTROJE-1: celo so zapornym gap_sides presahuje sirku korpusu (a bez items celo nie je)') do
+  cb = Noxun::Engine::CabinetBuilder
+  front_of = lambda do |gap_sides|
+    params = { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 560.0,
+               'fronts' => { 'gap_sides' => gap_sides,
+                             'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'wings' => '1' }] } }
+    plan = Noxun::Engine::Construction.build_plan(cb.send(:normalize, params))
+    Array(plan[:parts]).find { |p| p[:part_key].to_s.start_with?('front') }
+  end
+
+  wide = front_of.call(-20.0)
+  NxTest.refute(wide.nil?, 'celo sa nepostavilo')
+  NxTest.assert(wide[:origin][0] < 0.0 && (wide[:origin][0] + wide[:box][0]) > 600.0,
+                "celo #{wide[:origin][0]}..#{wide[:origin][0] + wide[:box][0]} nepresahuje korpus 0..600 — " \
+                'bez presahu nema in-SU scenar co merat (obalka instancie = obalka korpusu)')
+  narrow = front_of.call(2.0)
+  NxTest.assert(narrow[:origin][0] > 0.0 && (narrow[:origin][0] + narrow[:box][0]) < 600.0,
+                'kladny gap_sides ma celo drzat VNUTRI sirky korpusu')
+
+  # PASCA z prveho in-SU behu: bez `fronts.items` postavi builder skrinku BEZ CELA.
+  bare = Noxun::Engine::Construction.build_plan(
+    cb.send(:normalize, { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 560.0 })
+  )
+  NxTest.assert(Array(bare[:parts]).none? { |p| p[:part_key].to_s.start_with?('front') },
+                'bez fronts.items celo vzniknut NESMIE — scenar si ho musi vypytat vyslovne')
+end
+
 # --- snap_calc: sweep ----------------------------------------------------------
 
 def nx_box(x1, x2, y1 = 0.0, y2 = 600.0, z1 = 0.0, z2 = 720.0)

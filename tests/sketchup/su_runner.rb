@@ -13326,15 +13326,39 @@ module NoxunSuRunner
   #     starsej duplicite — po nej ma kazda skrinka vlastne id a nebezi timer;
   #   * Snaper prisunie na doraz; skryta prekazka (aj skryty VNUK vo viditelnom
   #     kontajneri) neblokuje a skryty presahujuci potomok CIELA doraz nemeni.
+  # POZOR (nalez z prveho behu): bez `fronts.items` postavi builder skrinku
+  # UPLNE BEZ CELA (`Fronts.normalize` da prazdny zoznam), takze scenar so
+  # zapornym `gap_sides` nemal na com ukazat presah — obalka instancie sa
+  # rovnala obalke korpusu a prekryv vysiel 0. Skrinka preto ma celo VZDY.
   TOOLS1_PARAMS = { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 560.0,
-                    'thickness' => 18.0, 'floor_height' => 100.0 }.freeze
+                    'thickness' => 18.0, 'floor_height' => 100.0,
+                    'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'door',
+                                                'mode' => 'auto', 'wings' => '1' }] } }.freeze
 
+  # Marker vymedzuje probe okno („otvoril prikaz operaciu?"), takze observer
+  # musi byt PRED nim v pokoji — inak by jeho odlozeny transparentny tik pristal
+  # NAD markerom a `Sketchup.undo` by vratil jeho, nie marker.
+  # V otvorenom edit kontexte sa NEFLUSHUJE: `process_dirty` -> `dedup_copies`
+  # si zatvara root kontext a scenar edit kontextu by sa tym rozpadol.
   def tools1_marker(model, bag)
+    tools1_settle(model) if tools1_root?(model)
     model.start_operation('NASTROJE-1 marker', true)
     cp = model.entities.add_cpoint(ORIGIN)
     model.commit_operation
     bag << cp
     cp
+  end
+
+  def tools1_root?(model)
+    model.active_path.nil? || model.active_path.length.zero?
+  rescue StandardError
+    true
+  end
+
+  def tools1_settle(model)
+    e::ScaleWatch.flush_pending!(model)
+  rescue StandardError
+    nil
   end
 
   def tools1_clear_markers(model, bag)
@@ -13381,7 +13405,7 @@ module NoxunSuRunner
     face
   end
 
-  def tools1_block(model, parent_ents, x0, x1, y0, y1 = 300.0, z0 = 0.0, z1 = 500.0)
+  def tools1_block(model, parent_ents, x0, x1, y0 = 0.0, y1 = 300.0, z0 = 0.0, z1 = 500.0)
     grp = nil
     e::ScaleWatch.guard do
       model.start_operation('SU-TEST blok', true)
@@ -13493,18 +13517,25 @@ module NoxunSuRunner
       Sketchup.undo
 
       # 4) AD-HOC KOVANIE: kopia dostane VLASTNE id polozky, obsah sa nemeni
+      # Tvar polozky je UZAVRETY whitelist `MANUAL_KEYS` (`source`/`qty`/
+      # `price_eur_vat`) — nalez z prveho behu: s vymyslenymi klucmi ju
+      # `norm_hardware_manual` ticho zahodila a scenar meral prazdno.
       pm = e::CabinetBuilder.config_to_params(e::Store.config(src) || {})
-      pm['hardware_manual'] = [{ 'id' => 'MAN-SU-TOOLS1', 'kind' => 'free',
-                                 'name' => 'Testovacia položka', 'quantity' => 2,
-                                 'unit' => 'ks', 'unit_price' => 1.5 }]
+      pm['hardware_manual'] = [{ 'id' => 'MAN-SU-TOOLS1', 'source' => 'free',
+                                 'name' => 'Testovacia položka', 'qty' => 2,
+                                 'unit' => 'ks', 'price_eur_vat' => 1.5 }]
       e::CabinetBuilder.rebuild(model, src, pm)
       src_man = Array((e::Store.config(src) || {})['hardware_manual']).first
+      ok('NASTROJE-1: zdrojova skrinka ma ad-hoc polozku (inak by scenar meral prazdno)',
+         !src_man.nil? && src_man['name'] == 'Testovacia položka' && src_man['qty'] == 2)
       tools1_select(model, src)
       cman = e::Tools::Mower.copy(:right)
       cop_man = cman && cman.valid? ? Array((e::Store.config(cman) || {})['hardware_manual']).first : nil
-      ok('NASTROJE-1: ad-hoc polozka kopie ma NOVE id, ale ten isty obsah',
+      ok("NASTROJE-1: ad-hoc polozka kopie ma NOVE id, ale ten isty obsah " \
+         "(#{src_man && src_man['id']} -> #{cop_man && cop_man['id']})",
          !cop_man.nil? && !src_man.nil? && cop_man['id'] != src_man['id'] &&
-         cop_man['name'] == src_man['name'] && cop_man['quantity'] == src_man['quantity'])
+         cop_man['name'] == src_man['name'] && cop_man['qty'] == src_man['qty'] &&
+         cop_man['unit'] == src_man['unit'] && cop_man['price_eur_vat'] == src_man['price_eur_vat'])
       Sketchup.undo
       pc = e::CabinetBuilder.config_to_params(e::Store.config(src) || {})
       pc['hardware_manual'] = []
@@ -13540,6 +13571,11 @@ module NoxunSuRunner
         wrel = tools1_rel(src, wide)
         ok("NASTROJE-1: pri presahujucom cele je krok stale sirka korpusu (#{mm(wrel.origin.x).round(2)} mm)",
            (mm(wrel.origin.x) - 600.0).abs <= TOL)
+        # Poistka premisy scenara: bez REALNEHO presahu cela by dalsi assert
+        # nemal co merat (presne to zhodilo prvy beh — skrinka bola bez cela).
+        overhang = mm(src.bounds.max.x) - (mm(src.transformation.origin.x) + 600.0)
+        ok("NASTROJE-1: celo so zapornym gap_sides presahuje korpus o #{overhang.round(1)} mm",
+           overhang > TOL)
         overlap = mm(src.bounds.max.x) - mm(wide.bounds.min.x)
         ok("NASTROJE-1: obalky INSTANCII sa pritom prekryvaju o #{overlap.round(1)} mm — " \
            'sľub „dotyk bbox" neplatí', overlap > TOL)
@@ -13595,22 +13631,28 @@ module NoxunSuRunner
          e::Tools.top_level?(src) == true && e::Tools.route(model, src) == :cabinet)
 
       if model.respond_to?(:active_path=)
-        marker_ctx = tools1_marker(model, markers)
         before_n = cabinets(model).length
         model.active_path = [grp]
         ok('NASTROJE-1: v otvorenom komponente sa odmieta VSETKO (este pred typom objektu)',
            e::Tools.route(model, src) == :edit_context)
+        # Marker az TU a Spat este PRED zatvorenim kontextu (nalez z prveho behu):
+        # otvorenie aj zatvorenie komponentu je v SketchUpe SAMO krokom Spat, takze
+        # probe cez ne nesmie siahat — inak `Sketchup.undo` vrati zatvorenie
+        # kontextu (a model ostane vnutri skupiny, co potom zhodi aj jej mazanie).
+        marker_ctx = tools1_marker(model, markers)
         tools1_select(model, src)
         e::Tools::Mower.copy(:right)
         e::Tools::Mower.rotate(90)
-        tools1_close_context(model)
         ok('NASTROJE-1: z otvoreneho komponentu nastroj nic nezmenil',
            cabinets(model).length == before_n)
         Sketchup.undo
         ok('NASTROJE-1: a neotvoril ziadnu operaciu (1x Spat vratilo marker)', !marker_ctx.valid?)
+        tools1_close_context(model)
       else
         info('NASTROJE-1: `active_path=` v tomto SketchUpe nie je — edit kontext preskoceny')
       end
+      # Skupina sa NEDA zmazat, kym je v aktivnej editacnej ceste — poistka.
+      tools1_close_context(model)
       e::ScaleWatch.guard do
         model.start_operation('SU-TEST vnoreny korpus prec', true)
         grp.erase! if grp && grp.valid?

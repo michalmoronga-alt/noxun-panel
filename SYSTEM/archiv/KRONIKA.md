@@ -52,8 +52,14 @@
   z dielne, nie na „Skrinka a" — package aj prvý návrh testov mali len umelé prípady.
   **Testy:** headless `test_nastroje1_tools.rb` (jadrá + guardy) a `test_nastroje1_observer.rb` (bariéra nad stubmi observera — timer, generácia, per-model `@requested`, strop,
   rigidita), in-SU `run_tools1` + `run_tools1_async`. Mutácie (7): kópia cez `add_instance` · holé mm namiesto `Units.vector` · prípona bez hľadania voľnej · **prípona berie aj
-  číslo** · flush bez zastavenia timera · cache bez kontroly rigidity · follow-up bez konkrétneho modelu — každá padne na inom teste. **In-SU beh dávka NESPÚŠŤALA** (Michal
-  pracoval v SketchUpe) — pustiť pred merge.
+  číslo** · flush bez zastavenia timera · cache bez kontroly rigidity · follow-up bez konkrétneho modelu · **rekey ad-hoc kovania ako no-op** — každá padne na inom teste.
+  **Prvý in-SU beh nad PR našiel 4 FAIL a všetky boli v TESTE, nie v produkte** — a stoja za zápis, lebo sú to opakovateľné pasce in-SU scenárov: *(1)* skrinka postavená bez
+  `fronts.items` **nemá čelo vôbec**, takže scenár so záporným `gap_sides` nemal na čom ukázať presah (obálka inštancie = obálka korpusu, prekryv 0) — parametre teraz čelo
+  vyžadujú a headless test drží aj premisu, aj to, že bez `items` čelo vzniknúť nesmie; *(2)* ad-hoc položka kovania je **uzavretý whitelist `MANUAL_KEYS`** (`source`/`qty`/
+  `price_eur_vat`) — s vymyslenými kľúčmi ju `norm_hardware_manual` ticho zahodí a scenár meria prázdno (pribudol headless test celej kópiovej cesty + assert, že zdroj položku
+  naozaj má); *(3)* **otvorenie aj zatvorenie komponentu je v SketchUpe samo krokom Späť**, takže marker-probe „príkaz neotvoril operáciu" cez ne nesmie siahať — inak `undo`
+  vráti zatvorenie kontextu; *(4)* dôsledok (3): model ostal vnútri skupiny a jej `erase!` padol na `cannot remove an instance in the active editing path`, čím **zakryl všetky
+  ďalšie asserty sekcie**. Poučenie: probe okno marker→undo musí obsahovať VÝHRADNE merané volanie, a scenár nesmie po sebe nechať otvorený edit kontext.
   **Codex review:** doplní orchestrátor.
 - **KOV-B2 · KATALÓG KOVANIA: STROM, MODAL POLOŽKY, DÉMOS VÝROBCA (v0.9.23, 4.9.2026, PR #290):** UI polovica slice B — dáta a taxonómiu dala KOV-B1, táto dávka ich vytiahla
   na obrazovku a uzavrela **D-110** („pridávanie kovaní je neprehľadné", Michal 24.8. pri prvom teste v0.8.0).
