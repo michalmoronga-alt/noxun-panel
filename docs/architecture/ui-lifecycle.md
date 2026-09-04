@@ -278,6 +278,14 @@ zavolá `render(host, value)`; do `values()` vloží to, čo vráti `read(host)`
 a chybu servera adresovanú `row = "<key>:<index>"` doručí na uzol s `data-nxm-row` vnútri hostiteľa, teda **rovnakou konvenciou ako repeater**. Kliky vnútri hostiteľa kostra
 NESPRACÚVA (nemajú `data-nxm-act`) — patria delegácii volajúceho, presne ako pri `action:` tlačidle.
 
+**`baseFields` + `skipMemory` — aby pamäť prežila VNÚTORNÉ PREKRESLENIE (review #297 P2-1).** Kostra si východisko (`base`), voči ktorému počíta, či používateľ vôbec niečo
+rozpísal, brala z **práve podanej** špecifikácie. Pri prekreslení toho istého okna (závislý select, zmenená sada polí) sa tým východiskom stalo to, čo používateľ **už napísal** —
+`remember()` nemal voči čomu porovnávať, Escape neuložil NIC a „Nový set" sa otvoril prázdny: stratilo sa všetko spred poslednej zmeny selectu. Volajúci preto pri prekreslení
+podáva **`baseFields`** (polia z PRVÉHO otvorenia) a **`skipMemory: true`**: pamäť sa **nevlieva späť** (hodnoty na obrazovke sú čerstvejšie — a vliata pamäť by vrátila napr.
+radu, ktorú prekreslenie práve zahodilo, lebo už nepatrí vybranému výrobcovi) a pás „Predvyplnené z rozpísaného konceptu" sa **nerozsvieti** (používateľ pozerá na to, čo píše,
+nie na starý koncept). **Zápis do pamäte beží ďalej** — `memoryKey` ostáva, takže Escape po sérii prekreslení uloží celý koncept. Z `baseFields` kreslí aj **„Začať odznova"**,
+takže reset vracia ČISTÝ formulár, nie ten istý koncept. Obe polia sú **voliteľné**; bez nich sa kostra správa presne ako predtým.
+
 Dve veci sú v ňom **kontrakt, nie detail**: (1) **`renderCustomFields` po `open`/`memReset` kreslí zo ŠPECIFIKÁCIE** (tá nesie vliatu pamäť konceptu, resp. východiskové
 hodnoty), kým **`redrawCustom(key)` na žiadosť volajúceho kreslí z `read()`** — teda z toho, čo má volajúci práve teraz; opačne by pridanie riadku prepísalo rozpísaný riadok
 a „Začať odznova" by sa k volajúcemu nedostalo vôbec. (2) `f.value` sa pritom **nikdy neprepisuje**: pri prázdnej pamäti je `spec` TEN ISTÝ objekt ako `base`, takže zápis by
@@ -1765,16 +1773,30 @@ neomladzujú** — inak by guard prešiel nad stavom, ktorý používateľ nikdy
 - **Člen kladie DVE otázky:** „Ako sa určí kód?" (pevný · podľa NL · podľa pásma parametra) a „Koľko?" (`per: unit|owner`). Tri tlačidlá „+ člen / + rad / + pásma" nahradilo
   **jedno „+ Pridať člena"**; prepnutie spôsobu **zahodí polia druhého** (XOR je dátový kontrakt člena — `code_by_height` neexistuje a nevzniká). **Dátový tvar člena sa
   NEMENÍ.** Zoznam žije v poli `custom` kostry (vyššie), pásma a param selecty sú **presunuté**, nie skopírované (`hwsBandRow`/`hwsParamSelect` používa aj editor výberu setu).
-- **Živý náhľad expanzie** je pole `custom` bez `read` (nič neodosiela). Klient posiela `hws_preview` s **generáciou požiadavky** a odpoveď so **staršou generáciou zahodí** —
-  odpovede chodia asynchrónne a pomalšie kolo by prekreslilo náhľad späť na starý set. Písanie je **debouncované (~300 ms)**, „Počítam náhľad…" je v náhľade, **nie zámok
-  tlačidla Uložiť** (náhľad nesmie brániť uloženiu). Text skladá SERVER; set s radom NL ponúka **vzorovú NL**, ktorou sa dá náhľad prepočítať.
+- **Živý náhľad expanzie** je pole `custom` bez `read` (nič neodosiela). Klient posiela `hws_preview` s **generáciou požiadavky aj IDENTITOU MODALU** (`token`) a odpoveď
+  s **cudzím tokenom** alebo so **staršou generáciou zahodí**. Generácia sama nestačí (review #297 P2-2): štartuje od nuly pri každom otvorení, takže oneskorená odpoveď už
+  zavretého okna by v novom ukázala **cudziu expanziu** a zdvihla počítadlo tak, že by sa vlastné odpovede zahadzovali, kým ho nedobehnú. Písanie je **debouncované (~300 ms)**,
+  „Počítam náhľad…" je v náhľade, **nie zámok tlačidla Uložiť** (náhľad nesmie brániť uloženiu). Text skladá SERVER.
+  **Štruktúrované chyby náhľadu pristanú PRI POLI** (review #297 P2-5) — náhľad validuje TEN ISTÝ draft ako zápis, takže chýbajúci kód člena či neúplná klasifikácia sa ukáže
+  hneď, nie až pri uložení; keď sa draft opraví, zhasnú. Počas bežiaceho zápisu má prednosť jeho hláška.
+  **Vzorové parametre nesú LEN to, čo zadal človek** (review #297 P2-4): prázdna „vzorová NL" necháva výber podporovanej dĺžky na SERVERI (`preview_nl`) — klient, ktorý by 470
+  posielal vždy, by pri rade s 260/300 hlásil falošný ORANGE „nemá kód pre NL 470". Pole preto ukazuje hodnotu, ktorú server **naozaj použil**, a vymazanie poľa rozhodovanie
+  vráti jemu.
 - **Výsledok zápisu je `HWSETS.setResult(ok, msg, errors, token, conflict)`** (vzor `MDH.itemResult`): úspech modal zavrie a zahodí pamäť konceptu, odmietnutie ho nechá otvorený
   a chyby rozsype **PRI POLIACH** — chyba člena nesie `row` = index, takže pristane pri tom členovi. **Konflikt je vlastná vetva:** draft sa **nezahadzuje**, modal povie „Set
   medzitým zmenil niekto iný" a ponúkne **explicitné tlačidlo „Obnoviť"**, ktoré až na druhý, vedomý klik nahradí polia čerstvým setom a **pripne novú revíziu** (bez toho by
-  konflikt trval donekonečna). `token` platí ako v KOV-B2 — odpoveď zavretého okna nesmie zavrieť okno otvorené teraz.
+  konflikt trval donekonečna). Pri **NOVOM sete** vedie cesta von inak (review #297 P2-6): načítavať nie je čo (set ešte neexistuje), takže obnova **len prepne pripnutú revíziu
+  na čerstvú a rozpísaný set nechá celý** — inak bolo tlačidlo no-op a každé ďalšie „Uložiť" kolidovalo donekonečna. `token` platí ako v KOV-B2 — odpoveď zavretého okna nesmie
+  zavrieť okno otvorené teraz.
 - **„+ Vytvoriť výrobcu/radu…"** funguje ako v modale položky a ide **tou istou serverovou cestou** (`hw_tax_create_*`). Echo `emit_tax` preto posiela **DVA samostatné skripty**
   — `MDH.taxonomy` aj `HWSETS.taxonomy`; každý príjemca si overí vlastný token (novú hodnotu vyberie len okno, ktoré o ňu žiadalo) a druhému sa aspoň obnoví zoznam. Zliať ich
   do jedného skriptu by znamenalo, že výnimka v prvom zhodí druhý.
+- **Prechod na „— nezaradený —" maže CELÝ klasifikačný blok** (review #297 P2-3, `hwsApplyUseType`). Vymazať len konštrukciu nestačilo: payload odišiel s prázdnym `use_type`
+  a neprázdnym výrobcom, server ho odmietol (ALL-OR-NOTHING) a používateľ nemal ako zaradenie zrušiť. `generic_type` naopak **ostáva** — nezaradený set si ho nesie sám;
+  a pole, ktoré práve nie je na obrazovke, drží **draft** (inak by ho prekreslenie stratilo a select by ticho vybral prvú možnosť).
+- **Odchod zo sekcie zatvára AJ modal setu** (review #297 P2-7). Žije v zdieľanom `#nxModalRoot` mimo `#secbody`, ale čistiaca cesta sekcie (`hwCloseModals` v `hw_catalog.js`)
+  poznala len modal položky (`HW_ITEM`) — modal setu by tak visel nad cudzou sekciou Štúdia aj s naplánovaným náhľadom. Zatvorenie si riadi jeho **vlastník**:
+  `HWSETS.closeModal()` (jeho `onClose` zruší debounce náhľadu a rozpísané hodnoty si zapamätá).
 - **Pohľad Sety = DLAŽDICE:** názov · chipy klasifikácie (použitie · otváranie · konštrukcia · výrobca a rada stlmene) alebo chip **„nezaradený"** pre legacy set · chip
   „neaktívny" · Upraviť a Zmazať (existujúce dvojklikové potvrdenie). Je to **kompaktný riadok**, nie karta na výšku (vertikálny priestor je vzácny). **Neaktívny set sa už
   nenúka ako nový výber** — ponuku projektu filtruje server (`set_options`), globálnu tabuľku `hwsGlobalOptions`; **aktuálne použitý set v ponuke ostáva** a existujúce

@@ -141,7 +141,11 @@ function typeIn(id, value){
 function fieldKeys(){
   return ROOT.querySelectorAll('[data-nxm]').map(function(x){ return x.getAttribute('data-nxm'); });
 }
-function openNew(){
+// Pamat rozpisaneho konceptu PREZIJE zatvorenie (kontrakt D-15), takze
+// scenar, ktory ju NESKUMA, musi startovat z cistej — inak by mu do formulara
+// pritiekli hodnoty predchadzajucej sekcie.
+function openNew(keepMemory){
+  if (!keepMemory && typeof NXModal.clearMemory === 'function') NXModal.clearMemory(HWS.HWS_KEY_NEW);
   const btn = TABSETS.querySelectorAll('[data-action="hws-new"]')[0];
   click(btn);
   flush(); // prvy nahlad
@@ -154,6 +158,19 @@ function openEdit(sid){
   flush();
   SENT.length = 0;
 }
+// Vyvola CERSTVY nahlad (zmena kodu clena) a vrati jeho poziadavku.
+function bumpPreview(){
+  const code = NXModal.customBox('members')
+    .querySelectorAll('[data-hws-field="code"], [data-hws-s="0"][data-hws-field="code"]')[0];
+  assert.ok(code, 'clen s kodom v modale chyba');
+  code.value = String(Number(code.value || 0) + 1);
+  dispatch(code, 'input');
+  flush();
+  const reqs = SENT.filter(function(x){ return x.name === 'hws_preview'; });
+  assert.ok(reqs.length, 'nahlad sa neodoslal');
+  return reqs[reqs.length - 1];
+}
+
 function lastToken(){
   for (let i = SENT.length - 1; i >= 0; i--){
     if (SENT[i].name === 'hws_save_set') return SENT[i].data.token;
@@ -506,18 +523,28 @@ function lastToken(){
   eq(reqs.length, 1, 'a po dobehnutí odíde JEDNA');
   const gen = reqs[0].data.gen;
   ok(gen > 0, 'požiadavka nesie generáciu');
-  eq(reqs[0].data.sample.nominal_length, 470, 'a vzorové parametre vlastníka');
+  eq(reqs[0].data.sample, {},
+     'KOV-B3 (P2-4): vzorka je PRÁZDNA, kým NL nezadal človek — podporovanú dĺžku vyberie server');
+  ok(String(reqs[0].data.token || '').length > 4, 'a nesie IDENTITU MODALU (nielen generáciu)');
+  const ptok = reqs[0].data.token;
   ok(reqs[0].data.set.members.length === 1, 'náhľad počíta z DRAFTU, nie z uloženého setu');
 
-  HWS.HWSETS.preview({ gen: gen, ok: true, text: 'Príklad: Zásuvka · NL 470 mm:\n357696 × 1 — 19,60 €' });
+  HWS.HWSETS.preview({ gen: gen, token: ptok, ok: true, sample: { nominal_length: 470 },
+                       text: 'Príklad: Zásuvka · NL 470 mm:\n357696 × 1 — 19,60 €' });
   const box = NXModal.customBox('preview');
   ok(textOf(box).indexOf('357696') > -1, 'odpoveď sa vykreslí');
-  HWS.HWSETS.preview({ gen: gen - 1, ok: true, text: 'STARÝ VÝSLEDOK' });
+  HWS.HWSETS.preview({ gen: gen - 1, token: ptok, ok: true, text: 'STARÝ VÝSLEDOK' });
   ok(textOf(NXModal.customBox('preview')).indexOf('STARÝ') === -1,
      'KOV-B3: STARŠIA odpoveď náhľadu NIKDY neprepíše novšiu');
-  HWS.HWSETS.preview({ gen: gen + 1, ok: false, errors: [{ field: 'members', msg: 'x' }] });
+  HWS.HWSETS.preview({ gen: gen + 1, token: ptok, ok: false,
+                       errors: [{ row: null, field: 'manufacturer', msg: 'set nemá výrobcu' }] });
   ok(textOf(NXModal.customBox('preview')).indexOf('nedá spočítať') > -1,
      'neplatný draft náhľad prizná — a formulár nezablokuje');
+  ok(textOf(el('nxm_manufacturer').closest('.mrow')).indexOf('nemá výrobcu') > -1,
+     'KOV-B3 (P2-5): štruktúrované chyby NÁHĽADU pristanú PRI POLI, nie až pri uložení');
+  HWS.HWSETS.preview({ gen: gen + 2, token: ptok, ok: true, text: 'Príklad:\n357696 × 1' });
+  ok(textOf(el('nxm_manufacturer').closest('.mrow')).indexOf('nemá výrobcu') === -1,
+     'a keď sa draft opraví, zhasnú');
 
   eq(HWS.hwsPreviewStale(2, 3), true, 'staršia generácia = zahodiť');
   eq(HWS.hwsPreviewStale(4, 3), false, 'novšia = prijať');
@@ -535,6 +562,13 @@ function lastToken(){
   flush();
   eq(SENT.filter(function(s){ return s.name === 'hws_preview'; })[0].data.sample.nominal_length, 420,
      'zmena vzorovej NL prepočíta náhľad');
+  SENT.length = 0;
+  const nl2 = ROOT.querySelectorAll('[data-hws-sample="nominal_length"]')[0];
+  nl2.value = '';
+  dispatch(nl2, 'input');
+  flush();
+  eq(SENT.filter(function(s){ return s.name === 'hws_preview'; })[0].data.sample, {},
+     'KOV-B3 (P2-4): vymazaná NL vráti výber podporovanej dĺžky SERVERU');
   NXModal.close();
 })();
 
@@ -549,21 +583,173 @@ function lastToken(){
   code.value = '104717';
   dispatch(code, 'input');
   NXModal.close();               // Escape/krížik nesmie byť tichá strata
-  openNew();
+  openNew(true);                 // koncept sa ZAMERNE nezahadzuje
   eq(el('nxm_name').value, 'Rozpísaný set', 'rozpísaný názov prežije zatvorenie');
   const back = NXModal.customBox('members').querySelectorAll('[data-hws-field="code"]');
   eq(back.length, 1, 'aj ROZPÍSANÍ ČLENOVIA (vlastný uzol je súčasťou pamäte)');
   eq(back[0].value, '104717', 's hodnotami, ktoré do nich človek napísal');
   ok(textOf(ROOT).indexOf('rozpísaného konceptu') > -1,
      'a je to VIDNO — predvyplnenie z pamäte nesmie byť pasca');
-  // PRIZNANA HRANICA (rovnaka ako v modale polozky KOV-B2): zmena
-  // klasifikacie modal PREKRESLI a prekreslena podoba sa stava novym
-  // VYCHODISKOM, takze uz vybrana klasifikacia sa do pamate nezapisuje.
-  // Pas „Predvyplnené z rozpísaného konceptu" je preto povinny — pouzivatel
-  // musi vidiet, ze pozera na koncept a klasifikaciu si ma prejst znova.
-  eq(el('nxm_use_type').value, '', 'klasifikácia sa začína odznova (a je to vidieť)');
   NXModal.close();
   NXModal.clearMemory(HWS.HWS_KEY_NEW);
+})();
+
+// ====== 12) P2-1: PAMAT PREZIJE VNUTORNE PREKRESLENIE ========================
+//
+// Zmena klasifikácie modal PREKRESLÍ. Kým si kostra brala východisko z práve
+// podanej špecifikácie, stalo sa ním to, čo používateľ napísal — `remember()`
+// nemal voči čomu porovnávať, Escape neuložil NIC a „Nový set" sa otvoril
+// prázdny. Volajúci preto podáva PRVOTNÉ polia (`baseFields`) a pamäť sa
+// pri prekreslení NEVLIEVA späť ani nezahadzuje (`skipMemory`).
+(function(){
+  HWS.HWSETS.init(payload());
+  NXModal.clearMemory(HWS.HWS_KEY_NEW);
+  openNew();
+  setVal('nxm_use_type', 'door');          // 1. prekreslenie
+  typeIn('nxm_name', 'Set na chatu');
+  setVal('nxm_manufacturer', 'Hettich');   // 2. prekreslenie
+  setVal('nxm_series', 'Sensys');          // 3. prekreslenie
+  const code = NXModal.customBox('members').querySelectorAll('[data-hws-field="code"]')[0];
+  code.value = '104717';
+  dispatch(code, 'input');
+  ok(textOf(ROOT).indexOf('rozpísaného konceptu') === -1,
+     'počas písania sa pás pamäte NEROZSVIETI — používateľ pozerá na to, čo práve napísal');
+  NXModal.close();                          // Escape
+
+  openNew(true);                            // koncept sa ZAMERNE nezahadzuje
+  eq(el('nxm_use_type').value, 'door',
+     'KOV-B3 (P2-1): klasifikácia spred prekreslenia PREŽIJE zatvorenie');
+  eq(el('nxm_manufacturer').value, 'Hettich', 'aj výrobca');
+  eq(el('nxm_series').value, 'Sensys', 'aj rada');
+  eq(el('nxm_name').value, 'Set na chatu', 'aj ručne prepísaný názov');
+  eq(NXModal.customBox('members').querySelectorAll('[data-hws-field="code"]')[0].value,
+     '104717', 'aj rozpísaní členovia');
+  ok(textOf(ROOT).indexOf('rozpísaného konceptu') > -1, 'a pás pamäte to prizná');
+
+  // „Začať odznova" kreslí z PRVOTNÝCH polí, nie z posledného prekreslenia.
+  click(ROOT.querySelectorAll('[data-nxm-act="memreset"]')[0]);
+  eq(el('nxm_use_type').value, '', '„Začať odznova" vráti prázdny formulár');
+  eq(el('nxm_name').value, '', 'aj názov');
+  NXModal.close();
+  NXModal.clearMemory(HWS.HWS_KEY_NEW);
+})();
+
+// ====== 13) P2-3: „— nezaradený —" VYMAŽE CELÝ KLASIFIKAČNÝ BLOK =============
+(function(){
+  eq(HWS.hwsApplyUseType({ use_type: '', opening_mode: 'classic', drawer_construction: 'metal',
+                           manufacturer: 'Hettich', series: 'Sensys', manufacturer_new: 'X',
+                           series_new: 'Y', generic_type: 'slide', name: 'N' }),
+     { use_type: '', opening_mode: '', drawer_construction: '', manufacturer: '',
+       series: '', manufacturer_new: '', series_new: '', generic_type: 'slide', name: 'N' },
+     'KOV-B3 (P2-3): nezaradený set nemá ANI JEDEN klasifikačný kľúč (typ kovania ostáva)');
+  eq(HWS.hwsApplyUseType({ use_type: 'door', drawer_construction: 'metal' }).drawer_construction,
+     '', 'konštrukcia patrí výhradne zásuvke');
+  eq(HWS.hwsApplyUseType({ use_type: 'drawer', drawer_construction: 'metal' }).drawer_construction,
+     'metal', 'pri zásuvke ostáva');
+
+  HWS.HWSETS.init(payload());
+  openEdit('atira-h176');
+  setVal('nxm_use_type', '');
+  eq(el('nxm_manufacturer').value, '', 'v modale zmizne aj výrobca');
+  eq(el('nxm_series').value, '', 'aj rada');
+  eq(el('nxm_opening_mode').value, '', 'aj otváranie');
+  ok(fieldKeys().indexOf('generic_type') > -1, 'a nezaradený set si typ kovania nesie sám');
+  eq(el('nxm_generic_type').value, 'slide', 'typ kovania sa PRI PREKRESLENÍ nestratí');
+  SENT.length = 0;
+  NXModal.submit();
+  const set = SENT.filter(function(s){ return s.name === 'hws_save_set'; })[0].data.set;
+  eq([set.use_type, set.opening_mode, set.drawer_construction, set.manufacturer, set.series],
+     ['', '', '', '', ''],
+     'payload nesie ZÁMERNE prázdny CELÝ blok (server by polovičný odmietol)');
+  eq(set.generic_type, 'slide', 'a typ kovania, ktorý nemá z čoho odvodiť');
+  NXModal.close();
+})();
+
+// ====== 14) P2-2: ODPOVEĎ NÁHĽADU PATRIACA INÉMU MODALU SA ZAHODÍ ============
+(function(){
+  HWS.HWSETS.init(payload());
+  openEdit('atira-h176');
+  const oldToken = bumpPreview().data.token;
+  NXModal.close();
+
+  openNew();
+  const second = bumpPreview();
+  ok(second.data.token !== oldToken, 'každý modal má VLASTNÚ identitu náhľadu');
+  // Oneskorena odpoved STAREHO okna s VYSSOU generaciou (pocitadlo startuje
+  // od nuly per modal, takze samotna generacia by ju prepustila).
+  HWS.HWSETS.preview({ gen: 99, token: oldToken, ok: true, text: 'CUDZIA EXPANZIA' });
+  ok(textOf(NXModal.customBox('preview')).indexOf('CUDZIA') === -1,
+     'KOV-B3 (P2-2): odpoveď iného modalu sa ZAHODÍ (aj s vyššou generáciou)');
+  HWS.HWSETS.preview({ gen: second.data.gen, token: second.data.token, ok: true,
+                       text: 'Príklad:\n104717 × 1' });
+  ok(textOf(NXModal.customBox('preview')).indexOf('104717') > -1,
+     'a vlastná odpoveď sa vykreslí — počítadlo cudzia neposunula');
+  NXModal.close();
+  NXModal.clearMemory(HWS.HWS_KEY_NEW);
+})();
+
+// ====== 15) P2-6: KONFLIKT PRI NOVOM SETE MÁ CESTU VON =======================
+(function(){
+  HWS.HWSETS.init(payload());
+  NXModal.clearMemory(HWS.HWS_KEY_NEW);
+  openNew();
+  setVal('nxm_use_type', 'door');
+  typeIn('nxm_name', 'Nový záves');
+  const code = NXModal.customBox('members').querySelectorAll('[data-hws-field="code"]')[0];
+  code.value = '104717';
+  dispatch(code, 'input');
+  SENT.length = 0;
+  NXModal.submit();
+  const sent = SENT.filter(function(s){ return s.name === 'hws_save_set'; })[0];
+  eq(sent.data.revision, 'rev1', 'nový set posiela revíziu pripnutú pri otvorení');
+
+  // Iné okno medzitým zmenilo KNIŽNICU (nie náš set — ten ešte neexistuje).
+  HWS.HWSETS.setData(payload({ revision: 'rev2' }));
+  HWS.HWSETS.setResult(false, 'Knižnica sa medzitým zmenila.', [], sent.data.token, true);
+  ok(NXModal.isOpen(), 'konflikt modal nezatvára');
+  ok(textOf(ROOT).indexOf('Knižnica setov sa medzitým zmenila') > -1,
+     'hláška hovorí o KNIŽNICI, nie o cudzej zmene „tvojho" setu');
+  const btn = ROOT.querySelectorAll('[data-action="hws-set-refresh"]')[0];
+  ok(btn, 'a ponúka cestu von');
+  click(btn);
+  ok(NXModal.isOpen(), 'obnova modal NEZATVÁRA');
+  eq(el('nxm_name').value, 'Nový záves',
+     'KOV-B3 (P2-6): rozpísaný nový set ostáva CELÝ (nie je čo načítať)');
+  eq(el('nxm_use_type').value, 'door', 'aj klasifikácia');
+  eq(NXModal.customBox('members').querySelectorAll('[data-hws-field="code"]')[0].value,
+     '104717', 'aj členovia');
+  ok(textOf(ROOT).indexOf('Knižnica setov sa medzitým zmenila') === -1, 'pás konfliktu zhasol');
+  SENT.length = 0;
+  NXModal.submit();
+  eq(SENT.filter(function(s){ return s.name === 'hws_save_set'; })[0].data.revision, 'rev2',
+     'a ďalšie Uložiť ide s ČERSTVOU revíziou — konflikt sa už neopakuje donekonečna');
+  NXModal.close();
+  NXModal.clearMemory(HWS.HWS_KEY_NEW);
+})();
+
+// ====== 16) P2-7: ODCHOD ZO SEKCIE ZATVÁRA AJ MODAL SETU =====================
+(function(){
+  HWS.HWSETS.init(payload());
+  NXModal.clearMemory(HWS.HWS_KEY_NEW);
+  openNew();
+  const mc = NXModal.customBox('members').querySelectorAll('[data-hws-field="code"]')[0];
+  mc.value = '104717';
+  dispatch(mc, 'input');
+  ok(pending() > 0, 'náhľad je naplánovaný');
+  eq(HWS.HWSETS.closeModal(), true, 'sekcia si vie modal setu vypýtať zatvoriť');
+  ok(!NXModal.isOpen(), 'a modal sa naozaj zavrie');
+  eq(pending(), 0, 'KOV-B3 (P2-7): s ním zomrie aj naplánovaný náhľad');
+  eq(HWS.HWSETS.closeModal(), false, 'druhé volanie je no-op (nič otvorené nie je)');
+  NXModal.clearMemory(HWS.HWS_KEY_NEW);
+
+  // Zdrojovy guard: cistiaca cesta sekcie ho NAOZAJ vola. Bez toho by modal
+  // ostal visiet nad cudzou sekciou Studia (zije v zdielanom #nxModalRoot).
+  const fs = require('node:fs');
+  const cat = fs.readFileSync(path.join(JS, 'hw_catalog.js'), 'utf8');
+  const from = cat.indexOf('function hwCloseModals');
+  const body = cat.slice(from, cat.indexOf('\n  }', from));
+  ok(body.indexOf('HWSETS.closeModal') > -1,
+     '`hwCloseModals` v hw_catalog.js zatvára aj modal setu');
 })();
 
 console.log('OK test_kovb3_modal.js — ' + n + ' kontrol');
