@@ -17,6 +17,44 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-B3 — EDITOR SETU: KLASIFIKÁCIA, ČLENOVIA, ŽIVÝ NÁHĽAD (v0.9.26, 4.9.2026, PR #297):** posledný rez slice B; **KOVANIE slice B je KOMPLET a R-41 je uzavretá**.
+  Inline editor setu (`HWS_EDIT` + `hwsEditorNode` + akcia `hws-save`) **zanikol** a s ním celá cesta, na ktorej R-41 stála: draft žil v tele sekcie, prežíval každý push
+  a pri uložení posielal **čerstvú revíziu z posledného payloadu** — keď druhé okno medzitým ten istý set zmenilo, staré polia odišli s NOVOU revíziou a serverový CAS ich
+  pustil. Tichý prepis cudzej práce. Set sa odteraz upravuje v **D-15 modale**, ktorý si revíziu **PRIPÍNA pri otvorení** (vzor `hwsPinRev` z editora pásiem) spolu so
+  **základnou definíciou setu**; vnútorné prekreslenia ich neomladzujú a konflikt má **vlastnú vetvu**: draft sa nezahadzuje, modal povie „Set medzitým zmenil niekto iný"
+  a ponúkne **explicitné tlačidlo Obnoviť**, ktoré až na druhý, vedomý klik nahradí polia čerstvým setom a pripne novú revíziu (bez toho by konflikt trval donekonečna —
+  presne lekcia `HWSETS.mapConflict` z R-08).
+  **Kostra D-15 dostala JEDEN nový typ poľa — `custom`.** Zoznam členov nie je tabuľka s pevnými stĺpcami (`rows`), ale **strom**: podľa odpovede „Ako sa určí kód?" nesie
+  buď kód, alebo rad NL, alebo pásma parametra — a tie majú vlastný počet riadkov. Druhá modalová kostra v tom istom okne je presne to, čomu sa D-15 vyhýba, takže kostra
+  vykreslí hostiteľa, zavolá `render`, do `values()` vloží `read` a doručí chyby servera adresované `row = "<key>:<index>"` **tou istou konvenciou ako repeater**. Dve veci
+  sú v ňom kontrakt, obe vyšli z chýb odhalených testami: **prvé kreslenie ide zo ŠPECIFIKÁCIE** (nesie vliatu pamäť konceptu, resp. východiskové hodnoty), kým prekreslenie
+  na žiadosť volajúceho ide z **`read()`** — opačne by pridanie riadku prepísalo rozpísaný riadok a „Začať odznova" by sa k volajúcemu nedostalo; a **`f.value` sa nikdy
+  neprepisuje**, lebo pri prázdnej pamäti je `spec` TEN ISTÝ objekt ako `base`, takže zápis by zmazal aj východiskové hodnoty. Volajúci preto podáva **kópiu** svojho stavu
+  — inak by sa živé pole porovnávalo samo so sebou a Escape by rozpísaný zoznam členov ticho zahodil (to test odhalil ako prvé).
+  **Živý náhľad je server-owned a je to TÁ ISTÁ cesta ako nákup.** `HardwareSets.preview_expansion` je ČISTÁ funkcia: draft prejde `validate_set_detailed`, normalizovaný
+  tvar sa vloží do **dočasného stavu** nad **syntetickým vlastníkom** a spustí sa **`expand`** — výsledok je preto deep-equal s tým, čo `expand` vydá PO uložení toho istého
+  setu (test to porovnáva riadok po riadku). Druhý výklad nákupu nevzniká (R-06a „panel a súpis sa nesmú rozísť"). Žiadne IO: katalóg chodí parametrom, `save_set!` ani
+  snapshot sa nevolajú — a stráži to stub, ktorý si volanie **zapíše** namiesto výnimky, lebo `save_set!` má vlastný `rescue`, v ktorom by sa výnimka stratila (mutácia
+  „náhľad zapisuje" cez prvú verziu testu prešla). Poradie odpovedí drží **generácia požiadavky** (staršia sa zahadzuje), písanie je debouncované ~300 ms a busy indikátor
+  je v náhľade — **nie zámok tlačidla Uložiť**: náhľad nesmie brániť uloženiu.
+  **Klasifikácia sa posiela VŽDY CELÁ, aj prázdna** — vedomá odchýlka od doslovného znenia zadania („pri inom než zásuvke sa konštrukcia neposiela"). `save_set!` totiž
+  merguje z uloženého setu, takže vynechať `drawer_construction` pri prepnutí zo zásuvky na dvierka by znamenalo prevziať starú hodnotu a set by **už nikdy neprešiel**
+  validáciou („konštrukciu má len set na zásuvky"). Prázdna hodnota je vedomé vymazanie, úplná dvojica ALL-OR-NOTHING zaradenie. `generic_type` sa naopak neposiela vôbec —
+  pri zaradenom sete ho odvodzuje server (`USE_TYPE_GENERIC`) a druhá otázka by dovolila uložiť dva protirečivé zápisy o tom istom sete; explicitný select sa ukáže LEN pri
+  nezaradenom sete a pri použití „Iné".
+  **`active` konečne niečo rozhoduje — a len jednu vec.** Filter sedí v `set_options`, teda v PONUKE nového výberu (predvoľby projektu aj override skrinky); `expand`,
+  `explain` ani `resolve_set_id` ho ďalej nečítajú, takže existujúce mapovania, snapshoty a nákup sú nezmenené (mutácia „`expand` číta `active`" spadne na charakterizačnom
+  teste z KOV-B1). **Referencovaný set v ponuke ostáva** — inak by select ukazoval prázdno tam, kde projekt hodnotu má, a prvý klik vedľa by ju ticho prepísal.
+  **Popisky uzavretých slovníkov sa presťahovali do core** (`CLASS_OPTIONS`): jeden zoznam pre select editora aj chip dlaždice, klient ho dostáva v payloade a vlastný nemá
+  (stráži to zdrojový guard) — druhý zoznam v JS by sa pri prvom pribudnutom type rozišiel s doménovou pravdou. Echo taxonómie (`emit_tax`) posiela **dva samostatné
+  skripty** — `MDH.taxonomy` aj `HWSETS.taxonomy` — lebo „+ Vytvoriť výrobcu/radu" má odteraz dvoch volajúcich; zliať ich do jedného by znamenalo, že výnimka v prvom zhodí
+  druhý. **Priznaná hranica:** pamäť rozpísaného konceptu drží to, čo pribudlo od poslednej zmeny KONTEXTU polí (zmena klasifikácie modal prekresľuje a prekreslená podoba
+  sa stáva novým východiskom) — je to rovnaké správanie ako v modale položky KOV-B2 a pás „Predvyplnené z rozpísaného konceptu" ho robí viditeľným, nie tichým.
+  Testy: `tests/pure/test_kovb3_nahlad.rb`, `tests/js/test_kovb3_modal.js` (122 kontrol), rozšírený `test_st2c_modal.js`, in-SketchUp sekcia **`run_kovb3`**
+  (náhľad bez zápisu a bez kroku Späť · uloženie setu bez kroku Späť · **dve okná nad tým istým setom = konflikt s hláškou** · legacy set „nezaradený" a nákup nezmenený ·
+  neaktívny sa nenúka). Mutácie: nepripnutá revízia · náhľad číta uložený set · `expand` číta `active` · náhľad zapisuje — všetky štyri overené.
+
+- **NÁSTROJE-1 · T1b — STARÉ INŠTALÁCIE MOWER/SNAPER SA UPRATUJÚ SAMY (v0.9.25, 4.9.2026, PR #294):** druhá polovica dávky; **NÁSTROJE-1 je KOMPLET a D-20 uzavretá**.
 - **GHOST-D1/D2 — PACKAGES DO PLANU PO 4 KOLÁCH CLI AUDITU A 6 KOLÁCH GH REVIEW (docs, 5.9.2026, PR #296):** drafty ghostu pre dosky (vloženie cez ghost, kreslenie na rozmer
   dvoma ťahmi) sa vrátili do `SYSTEM/PLAN.md` ako autorita. Cesta: outside-in research (WebFetch + 4 Antigravity packety Gemini 3.8 Flash, #292/#294) → **probe v SketchUpe 26.0.429**
   (Michal: prázdny Enter → `onReturn`, `VK_RETURN` v API neexistuje, `lock_inference` so syntetickými bodmi nezamyká → projekcia) → **Codex CLI audit 4 kolá** (kolo 1 Sol 4 BLOCKER + 11 FIX

@@ -506,3 +506,8 @@ keď sa prestavba pri jednej položke ukáže ako reálna prekážka práce. **O
 Draft `HWS_EDIT` zámerne prežíva push, ale pri uložení posiela `HWS_DATA.revision` z posledného payloadu — keď druhé okno medzitým zmení ten istý set a prvé dostane refresh,
 staré polia odídu s NOVOU revíziou a serverový CAS prejde (tichý prepis medzi dvoma oknami; editor mapovania `hwsPinRev` ten vzor má správne). **Oprava = KOV-B3**
 (pripnutá revízia + základná definícia pri otvorení modalu, konflikt = obnova/riešenie). Do B3 sa nič nemení; riziko je len pri dvoch oknách nad tým istým setom.
+**✅ dávkou KOV-B3 (PR #297, v0.9.26)** — inline editor `HWS_EDIT`/`hwsEditorNode` ZANIKOL a s ním celá cesta, na ktorej nález stál. Set sa upravuje v **D-15 modale**, ktorý si
+revíziu **PRIPÍNA pri otvorení** (`HWS_SET.rev`) spolu so **základnou definíciou setu**; vnútorné prekreslenia (zmena klasifikácie, konflikt) ich neomladzujú a `Uložiť` posiela
+VÝHRADNE pripnutú hodnotu. Konflikt má vlastnú vetvu: draft sa **nezahadzuje**, modal povie „Set medzitým zmenil niekto iný" a ponúkne **explicitné tlačidlo Obnoviť**, ktoré až
+na druhý klik nahradí polia čerstvým setom a pripne novú revíziu. Mutácia „posiela sa čerstvá revízia" je overená v `tests/js/test_kovb3_modal.js`; dve okná nad tým istým setom
+kryje in-SketchUp sekcia `run_kovb3`.

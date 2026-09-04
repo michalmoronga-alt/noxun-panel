@@ -51,12 +51,17 @@ module Noxun
       # `hw_tax_create_series`) pre tlacidla „+ Vytvoriť…" v modale polozky.
       # `hw_search` ostava — je to verejny kontrakt katalogu a plochy zoznam
       # moze potrebovat iny volajuci.
+      #
+      # KOV-B3: pribudol `hws_preview` — ZIVY NAHLAD expanzie rozpracovaneho
+      # setu. Je to CITACIA cesta bez akehokolvek zapisu (`preview_expansion`
+      # je cista funkcia nad DRAFTOM), takze nema `model_guid` ani reviziu;
+      # identitu odpovede drzi `gen` (staršia odpoveď nikdy neprepíše novšiu).
       SECTION_ACTIONS = %w[
         hw_search hw_tree hw_create hw_patch hw_delete
         hw_check_price hw_apply_price
         hw_tax_create_manufacturer hw_tax_create_series
         hw_demos_search hw_demos_preview hw_demos_cancel hw_demos_create
-        hws_save_set hws_delete_set hws_map_global
+        hws_save_set hws_delete_set hws_preview hws_map_global
         hws_map_project hws_merge_seed hws_reset_project
       ].freeze
 
@@ -102,6 +107,7 @@ module Noxun
           when 'hw_demos_create'   then handle_demos_create(payload)
           when 'hws_save_set'      then handle_set_save(payload)
           when 'hws_delete_set'    then handle_set_delete(payload)
+          when 'hws_preview'       then handle_set_preview(payload)
           when 'hws_map_global'    then handle_map_global(payload)
           # ŠT-3a-2: MODELOVE zapisy (predvolby setov projektu). Kazdy z nich
           # otvara vlastnu operaciu (1 zmena = 1 krok Spat) a kazdy si overuje
@@ -497,6 +503,17 @@ module Noxun
             'type_options' => project_type_options(lib, state),
             # Parametre pasiem/selectora — jediny slovnik je v core.
             'params' => HardwareSets::PARAM_OPTIONS,
+            # KOV-B3: UZAVRETE slovniky klasifikacie + ich SK popisky. Jediny
+            # zoznam je v core (`CLASS_OPTIONS`) — vlastny zoznam v JS by sa
+            # pri prvom pribudnutom type rozisiel s domenovou pravdou.
+            'class_options' => HardwareSets::CLASS_OPTIONS,
+            # Vzorove parametre ZIVEHO NAHLADU (NL, vyska cela, vyska sokla) —
+            # editor ich ponuka ako predvolbu a smie ich prepisat.
+            'preview_sample' => HardwareSets::PREVIEW_SAMPLE,
+            # Taxonomia vyrobcov a rad pre selecty modalu setu (ten isty tvar
+            # ako v `state_payload` pre modal polozky — jedna cesta, jedna
+            # pravda o tom, ci sa da klasifikovat).
+            'taxonomy' => taxonomy_payload,
             'project' => { 'status' => status.to_s,
                            'mapping' => (state ? state['mapping'] : {}),
                            # GH #127 P2: zmrazene KOPIE projektu — mapovany set
@@ -612,31 +629,119 @@ module Noxun
           "#{HardwareSets.library_state_reason} — zmena sa neuložila."
         end
 
-        def handle_set_save(payload)
-          return set_status(library_blocked_txt, true) if HardwareSets.library_write_blocked?
+        # KOV-B3: vysledok zapisu SETU pre MODAL (D-15) — presny vzor
+        # `item_result` z KOV-B2. Modal sa pri odmietnuti NEZATVARA a zamok
+        # odoslania odomyka VYHRADNE volajuci, takze server musi ohlasit OBE
+        # vetvy — a `errors` su STRUKTUROVANE (`{row, field, msg}` zo
+        # `save_set!`), aby hlaska pristala PRI POLI, resp. pri clene.
+        # `token` je identita JEDNEHO odoslania: odpoved okna, ktore
+        # pouzivatel medzitym zavrel, nesmie zavriet okno otvorene teraz.
+        # `conflict` je vlastny priznak — modal pri nom ponuka „Obnoviť",
+        # nie tichy zanik rozpisaneho draftu.
+        def set_result(ok, msg, errors, token = nil, conflict = false)
+          js("HWSETS.setResult(#{ok ? 'true' : 'false'}, #{msg.to_s.to_json}, " \
+             "#{Array(errors).to_json}, #{token.to_s.to_json}, " \
+             "#{conflict ? 'true' : 'false'})")
+        end
 
-          data = JSON.parse(payload.to_s)
-          status, info = HardwareSets.save_set!(data['set'].is_a?(Hash) ? data['set'] : {},
-                                                revision: data['revision'].to_s,
-                                                create: data['create'] == true)
+        # Chyby servera niesu vzdy zo `save_set!` (brana kniznice, vynimka) —
+        # bez `field` sadnu do zberneho pasu navrchu formulara.
+        def set_errors(msg, field = nil)
+          e = { 'row' => nil, 'msg' => msg.to_s }
+          e['field'] = field.to_s unless field.to_s.strip.empty?
+          [e]
+        end
+
+        def handle_set_save(payload)
+          data = begin
+            JSON.parse(payload.to_s)
+          rescue StandardError
+            {}
+          end
+          token = data['token'].to_s
+          if HardwareSets.library_write_blocked?
+            set_result(false, library_blocked_txt, set_errors(library_blocked_txt), token)
+            return set_status(library_blocked_txt, true)
+          end
+
+          # KOV-B1: `save_set!` je TROJICA — treti prvok su STRUKTUROVANE chyby
+          # pre editor. Do KOV-B3 sa zahadzoval (dvojprvkove destruovanie),
+          # takze modal by chybu nemal kam ukazat.
+          status, info, errors = HardwareSets.save_set!(
+            data['set'].is_a?(Hash) ? data['set'] : {},
+            revision: data['revision'].to_s,
+            create: data['create'] == true
+          )
           case status
           when :ok
             after_sets_change # D-75: nový/upravený set je HNEĎ aj v selectoch panela
-            js('HWSETS.saved()') # GH #127 P2: editor sa zavrie az pri USPECHU
+            set_result(true, "Set „#{info['name']}“ uložený.", [], token)
             set_status("Set „#{info['name']}“ uložený.")
           when :exists
             # GH #127 P2: slug z nazvu trafil existujucu identitu — novy set
             # nesmie ticho prepisat globalnu definiciu.
-            set_status("Set s identitou „#{info}“ už existuje — zmeň názov (alebo uprav existujúci set).", true)
+            msg = "Set s identitou „#{info}“ už existuje — zmeň názov (alebo uprav existujúci set)."
+            set_result(false, msg, set_errors(msg, 'name'), token)
+            set_status(msg, true)
           when :conflict
+            # R-41: modal drzi PRIPNUTU reviziu z chvile otvorenia, takze
+            # konflikt je REALNA cudzia zmena — draft sa NEZAHADZUJE, modal
+            # ponukne „Obnoviť". Sekcia pod nim dostane cerstvy stav.
+            msg = 'Set medzitým zmenil niekto iný — tvoje zmeny sú stále tu.'
             resync_sets # P1: „obnovené" musi platit AJ pre sekciu (inak slucka konfliktov)
-            set_status('Knižnica setov sa medzitým zmenila — obnovené, uprav znova.', true)
+            set_result(false, msg, set_errors(msg), token, true)
+            set_status(msg, true)
           when :invalid
-            set_status(info.to_s.empty? ? 'Set sa nedá uložiť.' : info.to_s, true)
+            msg = info.to_s.empty? ? 'Set sa nedá uložiť.' : info.to_s
+            set_result(false, msg, Array(errors).empty? ? set_errors(msg) : errors, token)
+            set_status(msg, true)
           else
+            msg = info.to_s.empty? ? 'Uloženie setu zlyhalo.' : info.to_s
             resync_sets
-            set_status('Uloženie setu zlyhalo.', true)
+            set_result(false, msg, set_errors(msg), token)
+            set_status(msg, true)
           end
+        end
+
+        # KOV-B3: ZIVY NAHLAD expanzie rozpracovaneho setu. CITACIA cesta —
+        # `HardwareSets.preview_expansion` je CISTA funkcia nad DRAFTOM
+        # (ziadny `save_set!`, ziadny snapshot, ziadny zapis do kniznice);
+        # katalog sa berie LEN na CITANIE, aby nahlad vedel nazvy a ceny.
+        #
+        # `gen` je generacia POZIADAVKY (vzor F9 / `hw_check_price`): odpovede
+        # chodia asynchronne, takze klient zahodi tu, ktora je STARSIA nez
+        # posledna odoslana — pomalsie kolo inak prepise cerstvejsi nahlad.
+        # Server ju len ECHUJE (autorita poradia je klient, ktory ju vydal).
+        def handle_set_preview(payload)
+          data = begin
+            JSON.parse(payload.to_s)
+          rescue StandardError
+            {}
+          end
+          gen = data['gen'].to_i
+          # Review #297 P2-2: k GENERACII patri aj IDENTITA MODALU. Generacia
+          # startuje od nuly pri kazdom otvoreni editora, takze oneskorena
+          # odpoved uz zavreteho okna by v novom ukazala CUDZIU expanziu.
+          # Server ju len ECHUJE — autoritou poradia je klient, ktory ju vydal.
+          token = data['token'].to_s
+          out, errors = HardwareSets.preview_expansion(
+            data['set'].is_a?(Hash) ? data['set'] : {},
+            catalog: preview_catalog,
+            sample: data['sample'].is_a?(Hash) ? data['sample'] : {}
+          )
+          echo = { 'gen' => gen, 'token' => token }
+          js("HWSETS.preview(#{(out.nil? ? echo.merge('ok' => false, 'errors' => Array(errors))
+                                         : out.merge(echo).merge('ok' => true)).to_json})")
+        end
+
+        # Katalog pre nahlad — LEN CITANIE (nazvy a ceny kodov). Chyba
+        # katalogu nesmie nahlad zhodit: bez neho ukaze kody bez nazvov, co je
+        # stale uzitocnejsie nez prazdne okno.
+        def preview_catalog
+          HardwareCatalog.items
+        rescue StandardError => e
+          Engine.log_error(e, 'HardwareCatalogDialog.preview_catalog')
+          []
         end
 
         def handle_set_delete(payload)
@@ -999,10 +1104,19 @@ module Noxun
           end
         end
 
+        # KOV-B3: „+ Vytvoriť výrobcu/radu" ma UZ DVOCH volajucich — modal
+        # POLOZKY (`MDH`) aj modal SETU (`HWSETS`). Vysledok preto dostanu OBA
+        # prijimace: kazdy si sam overi TOKEN a novu hodnotu vyberie LEN to
+        # okno, ktore o nu ziadalo; druhemu sa aspon obnovi zoznam. Bez toho by
+        # modal setu na zalozeneho vyrobcu cakal donekonecna.
         def emit_tax(ok, op, name, errors, token = nil)
-          js("MDH.taxonomy(#{{ 'ok' => ok, 'op' => op, 'name' => name,
-                               'errors' => errors, 'token' => token.to_s,
-                               'taxonomy' => taxonomy_payload }.to_json})")
+          data = { 'ok' => ok, 'op' => op, 'name' => name,
+                   'errors' => errors, 'token' => token.to_s,
+                   'taxonomy' => taxonomy_payload }.to_json
+          # DVA samostatne skripty (nie jeden zliaty): kazdy prijimac ma tak
+          # vlastnu chybovu hranicu — vynimka v jednom nezhodi druhy.
+          js("MDH.taxonomy(#{data})")
+          js("HWSETS.taxonomy(#{data})")
         end
 
         # --- KOV-B2: vysledok zapisu polozky pre MODAL (D-15) ------------------

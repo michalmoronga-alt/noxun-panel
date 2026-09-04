@@ -242,7 +242,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   **Smoke pre Michala:** katalóg: Závesy zbalené/rozbalené, hľadanie „tipon" roztvorí len Blum · založ položku s novým výrobcom cez „+ Vytvoriť" · Démos URL predvyplní kód/názov/
   cenu/MJ, výrobcu podľa značky. **Uzáver (v PR):** `hardware.md` + `ui-lifecycle.md` (modal, strom) → STAV/KRONIKA/PLAN (B2 ✅).
 
-- **KOV-B3 · TASK PACKAGE „EDITOR SETU — KLASIFIKÁCIA, ČLENOVIA, ŽIVÝ NÁHĹAD" (slice B, rez B3; štart po merge B2; Audit: NIE, `codex-po-pr` povinné):**
+- **✅ HOTOVÉ (PR #297, v0.9.26) — KOV-B je tým KOMPLET a R-41 uzavretá** — **KOV-B3 · TASK PACKAGE „EDITOR SETU — KLASIFIKÁCIA, ČLENOVIA, ŽIVÝ NÁHĹAD" (slice B, rez B3; Audit: NIE, `codex-po-pr` povinné):**
   **Scope IN (mockup scéna 3):** modal Nový/Upraviť set: klasifikácia 1→6 kontextovo (`use_type` → odvodený `generic_type` zo servera, `drawer_construction` len pri zásuvke,
   rada podľa výrobcu), auto-návrh mena editovateľný; **pripnutá revízia + základná definícia pri otvorení** (R-41 — opravuje aj dnešný `HWS_EDIT`), konflikt = obnova/riešenie;
   editor člena: jedno „+ Pridať člena" → „Ako sa určí kód?" (pevný · `code_by_nl` · `param_bands`) + „Koľko?" (`per: unit|owner`), dátový tvar člena NEMENÍ (XOR, žiadne
@@ -254,6 +254,9 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   **Smoke pre Michala:** založ set: Zásuvka → Klasické → Kovové bočnice → Hettich → InnoTech Atira → navrhnuté meno → člen „K-sada podľa NL" → náhľad ukáže kód pre NL 470 ·
   starý set KLASIK má chip „nezaradený" a nákup KLINIKA dáva identické čísla · dve okná: úprava toho istého setu = konflikt s hláškou, nie tichý prepis.
   **Uzáver (v PR):** `hardware.md` + `ui-lifecycle.md` (editor, náhľad) → AUDIT_REGISTER R-41 ✅ → STAV/KRONIKA/PLAN (KOV-B komplet). *(D-110 je v archíve už od KOV-B2.)*
+  **Vedomé odchýlky (v PR aj v KRONIKE):** klasifikácia sa posiela VŽDY CELÁ (aj prázdna `drawer_construction`) — vynechať ju by pri prepnutí zo zásuvky nechalo starú hodnotu
+  z merge `save_set!` a set by už nikdy neprešiel validáciou; filter `active` sedí priamo v `set_options` (jediná UI ponuka, referencovaný set v nej ostáva), `expand`/`explain`/
+  `resolve_set_id` ho ďalej nečítajú.
 
 - **✅ HOTOVÉ (PR #285, v0.9.20)** — **KOV-H2 · TASK PACKAGE „AD-HOC KOVANIE — INSPECTOR UI" (slice H, rez H2; H1 je v maine od v0.9.18 — kontrakt `config['hardware_manual'][]` popisuje
   [../docs/architecture/construction.md](../docs/architecture/construction.md), expanziu [../docs/architecture/hardware.md](../docs/architecture/hardware.md)):**

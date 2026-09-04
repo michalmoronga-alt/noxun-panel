@@ -271,6 +271,28 @@ Enter vyberie zvýraznenú položku a formulár **nikdy** neodošle; orezanie sa
 scroll (`.mbody`) a plávajúca vrstva by ostala visieť nad cudzím riadkom (tá istá pasca ako `#mdSgBox`). Serverová chyba pri `lookup` sadá na pole **hľadania** (`nxm_<key>_q`),
 lebo červený okraj skrytého poľa nie je vidieť. Typ je **generický** — B2/B3 ho použijú pre kód člena setu.
 
+**Typ poľa `custom` (KOV-B3) — VLASTNÝ UZOL volajúceho vnútri karty.** Vznikol pre zoznam ČLENOV setu: člen nie je riadok s pevnými stĺpcami (`rows`), ale **strom** — podľa
+odpovede „Ako sa určí kód?" nesie buď jeden kód, alebo rad NL, alebo pásma parametra (a tie majú vlastný počet riadkov). Repeater to vyjadriť nevie a druhá modalová kostra
+v tom istom okne je presne to, čomu sa D-15 vyhýba. Kostra o obsahu nevie nič a robí **tri veci**: vykreslí prázdneho hostiteľa `#nxmc_<key>` a hneď po vložení karty do DOM
+zavolá `render(host, value)`; do `values()` vloží to, čo vráti `read(host)` — **pole bez `read` hodnotu NEMÁ** (čisto zobrazovací blok, napr. živý náhľad, sa neodosiela);
+a chybu servera adresovanú `row = "<key>:<index>"` doručí na uzol s `data-nxm-row` vnútri hostiteľa, teda **rovnakou konvenciou ako repeater**. Kliky vnútri hostiteľa kostra
+NESPRACÚVA (nemajú `data-nxm-act`) — patria delegácii volajúceho, presne ako pri `action:` tlačidle.
+
+**`baseFields` + `skipMemory` — aby pamäť prežila VNÚTORNÉ PREKRESLENIE (review #297 P2-1).** Kostra si východisko (`base`), voči ktorému počíta, či používateľ vôbec niečo
+rozpísal, brala z **práve podanej** špecifikácie. Pri prekreslení toho istého okna (závislý select, zmenená sada polí) sa tým východiskom stalo to, čo používateľ **už napísal** —
+`remember()` nemal voči čomu porovnávať, Escape neuložil NIC a „Nový set" sa otvoril prázdny: stratilo sa všetko spred poslednej zmeny selectu. Volajúci preto pri prekreslení
+podáva **`baseFields`** (polia z PRVÉHO otvorenia) a **`skipMemory: true`**: pamäť sa **nevlieva späť** (hodnoty na obrazovke sú čerstvejšie — a vliata pamäť by vrátila napr.
+radu, ktorú prekreslenie práve zahodilo, lebo už nepatrí vybranému výrobcovi) a pás „Predvyplnené z rozpísaného konceptu" sa **nerozsvieti** (používateľ pozerá na to, čo píše,
+nie na starý koncept). **Zápis do pamäte beží ďalej** — `memoryKey` ostáva, takže Escape po sérii prekreslení uloží celý koncept. Z `baseFields` kreslí aj **„Začať odznova"**,
+takže reset vracia ČISTÝ formulár, nie ten istý koncept. Obe polia sú **voliteľné**; bez nich sa kostra správa presne ako predtým.
+
+Dve veci sú v ňom **kontrakt, nie detail**: (1) **`renderCustomFields` po `open`/`memReset` kreslí zo ŠPECIFIKÁCIE** (tá nesie vliatu pamäť konceptu, resp. východiskové
+hodnoty), kým **`redrawCustom(key)` na žiadosť volajúceho kreslí z `read()`** — teda z toho, čo má volajúci práve teraz; opačne by pridanie riadku prepísalo rozpísaný riadok
+a „Začať odznova" by sa k volajúcemu nedostalo vôbec. (2) `f.value` sa pritom **nikdy neprepisuje**: pri prázdnej pamäti je `spec` TEN ISTÝ objekt ako `base`, takže zápis by
+zmazal aj východiskové hodnoty a pamäť by nemala proti čomu porovnávať. Preto volajúci podáva do `value` **kópiu** svojho stavu (`hwsCloneMembers`) — inak by sa živé pole
+porovnávalo samo so sebou a Escape by rozpísaný zoznam ticho zahodil. Do pamäte konceptu sa `custom` počíta cez **porovnanie celého tvaru** (`sameJson`), lebo plytké
+`sameValue` by zmenu vo vnorenom riadku nevidelo.
+
 **PAMÄŤ DRAFTU DRŽÍ AJ ROZPÍSANÝ DOTAZ (review #285 P2-E).** `values()` vracia len vybranú hodnotu, takže napísaný dotaz **bez výberu** by zatvorenie ticho zahodilo — a to je
 presne stav, v ktorom používateľ odchádza niečo overiť. Pamäť si ho preto drží pod prilepeným sufixom **`__q`**, ktorý sa do `values()` **nikdy** nedostane (`values` iteruje POLIA
 špecifikácie), takže kontrakt „lookup vracia len hodnotu" platí ďalej. Pri **úprave** bola pasca horšia: pamäť obnovila prázdnu skrytú hodnotu, ale `valueText` prekreslil pôvodnú
@@ -1669,6 +1691,7 @@ zastaraného UI platí „posledný vyhráva“, lebo snapshot predvolieb `revis
 `HWSETS.init` (dáta + render) ostáva pre ECHO, po ktorom už žiadny render nepríde (`NX.setHwSets` po odmietnutom zápise). Predtým sa zoznam setov aj predvolieb kreslil pri KAžDOM
 pushi **dvakrát**. `hwsRenderSets`/`hwsRenderProj` navyše držia **snapshot fokusu** (vzor `mdhRender`) — v okne sa prekresľovalo len po zápise, v sekcii pri každom pushi, takže
 používateľovi mizol kurzor z rozpísaného editora setu; chýbajúci atribút je súčasťou identity (`:not([…])`), inak by sa fokus vrátil do rovnomenného poľa v inom riadku.
+*(Od KOV-B3 sa to týka už LEN editora pásiem výberu setu — editor setu je modal a žije v `#nxModalRoot` MIMO prekresľovaného tela sekcie.)*
 
 **Hodnoty rozpísaného formulára prežijú push** — `#hn_category` aj `#hn_unit` mali `keep` (`mdhRenderEnums` bežal pri každom pushi a bez neho by sa kategória aj MJ prepli na PRVÚ v
 zozname), a `MDH.created` čistí filter **aj v premenných** `HW_Q`/`HW_CAT`, nielen v uzloch lišty — inak by najbližší push nakreslil lištu so STARÝM filtrom nad NEFILTROVANÝM
@@ -1732,6 +1755,54 @@ až po odscrollovaní a rozpísanú položku mu prekryl zoznam.
   práve hodnoty proposalu, takže Escape by zmazal celý vyhľadaný produkt. „Nová položka" z neho formulár znovu predvyplní; zaniká až po ÚSPEŠNOM zápise alebo vymazaní poľa.
 
 Testy: `tests/pure/test_kovb2_katalog.rb`, `tests/js/test_kovb2_katalog.js` (minidom), in-SketchUp sekcia **`run_kovb2`**.
+
+**KOV-B3 (v0.9.26) — pohľad Sety sú DLAŽDICE a editor setu je MODAL (D-110, R-41).** Inline editor (`HWS_EDIT`, `hwsEditorNode`, akcia `hws-save`) **ZANIKOL** — žil priamo
+v tele sekcie, takže rozpísaný set musel prežívať každý push, a hlavne posielal pri uložení **čerstvú revíziu z posledného pushu** (R-41): keď druhé okno medzitým ten istý set
+zmenilo, staré polia odišli s NOVOU revíziou a serverový CAS ich pustil — tichý prepis cudzej práce. Editor je od tejto dávky **modal kostry D-15**, ktorý si revíziu **PRIPÍNA
+pri otvorení** (presne vzor `hwsPinRev` z editora pásiem) a spolu s ňou drží aj **základnú definíciu setu**; vnútorné prekreslenia (zmena klasifikácie, konflikt) ich **NIKDY
+neomladzujú** — inak by guard prešiel nad stavom, ktorý používateľ nikdy nevidel.
+
+- **Poradie polí je poradie mockupu `#mSet` 1 → 6 a je KONTEXTOVÉ:** použitie → otváranie → **konštrukcia LEN pri zásuvke** → výrobca → **rada závislá od výrobcu a VOLITEĽNÁ**
+  → názov, plus prepínač **Aktívny/Neaktívny** a zoznam členov. `generic_type` sa pýta **iba vtedy, keď ho server nemá z čoho odvodiť** (nezaradený set alebo použitie „Iné") —
+  pri zaradenom sete je autoritou vzťahu `USE_TYPE_GENERIC` a druhá otázka by dovolila uložiť dva protirečivé zápisy o tom istom sete. Zmena klasifikácie mení SADU polí, takže
+  sa modal **prekresľuje** (vzor `hwItemCtxSwitch`) — prekreslenie **nie je zatvorenie** (`HWS_REOPEN`).
+- **Klasifikácia sa posiela VŽDY CELÁ, aj prázdna.** `save_set!` merguje z uloženého setu, takže vynechať `drawer_construction` pri prepnutí zo zásuvky na dvierka by znamenalo
+  prevziať starú hodnotu a set by už nikdy neprešiel validáciou. Prázdna hodnota = **vedomé vymazanie**, úplná dvojica = ALL-OR-NOTHING zaradenie; legacy set sa preto dá otvoriť,
+  nechať nezaradený a uložiť.
+- **Auto-návrh názvu** (`Výrobca · Rada · popis klasifikácie`) sa prepočítava **len kým ho človek neprepísal** — po ručnom zásahu ho ďalšia zmena klasifikácie už neprepíše.
+- **Člen kladie DVE otázky:** „Ako sa určí kód?" (pevný · podľa NL · podľa pásma parametra) a „Koľko?" (`per: unit|owner`). Tri tlačidlá „+ člen / + rad / + pásma" nahradilo
+  **jedno „+ Pridať člena"**; prepnutie spôsobu **zahodí polia druhého** (XOR je dátový kontrakt člena — `code_by_height` neexistuje a nevzniká). **Dátový tvar člena sa
+  NEMENÍ.** Zoznam žije v poli `custom` kostry (vyššie), pásma a param selecty sú **presunuté**, nie skopírované (`hwsBandRow`/`hwsParamSelect` používa aj editor výberu setu).
+- **Živý náhľad expanzie** je pole `custom` bez `read` (nič neodosiela). Klient posiela `hws_preview` s **generáciou požiadavky aj IDENTITOU MODALU** (`token`) a odpoveď
+  s **cudzím tokenom** alebo so **staršou generáciou zahodí**. Generácia sama nestačí (review #297 P2-2): štartuje od nuly pri každom otvorení, takže oneskorená odpoveď už
+  zavretého okna by v novom ukázala **cudziu expanziu** a zdvihla počítadlo tak, že by sa vlastné odpovede zahadzovali, kým ho nedobehnú. Písanie je **debouncované (~300 ms)**,
+  „Počítam náhľad…" je v náhľade, **nie zámok tlačidla Uložiť** (náhľad nesmie brániť uloženiu). Text skladá SERVER.
+  **Štruktúrované chyby náhľadu pristanú PRI POLI** (review #297 P2-5) — náhľad validuje TEN ISTÝ draft ako zápis, takže chýbajúci kód člena či neúplná klasifikácia sa ukáže
+  hneď, nie až pri uložení; keď sa draft opraví, zhasnú. Počas bežiaceho zápisu má prednosť jeho hláška.
+  **Vzorové parametre nesú LEN to, čo zadal človek** (review #297 P2-4): prázdna „vzorová NL" necháva výber podporovanej dĺžky na SERVERI (`preview_nl`) — klient, ktorý by 470
+  posielal vždy, by pri rade s 260/300 hlásil falošný ORANGE „nemá kód pre NL 470". Pole preto ukazuje hodnotu, ktorú server **naozaj použil**, a vymazanie poľa rozhodovanie
+  vráti jemu.
+- **Výsledok zápisu je `HWSETS.setResult(ok, msg, errors, token, conflict)`** (vzor `MDH.itemResult`): úspech modal zavrie a zahodí pamäť konceptu, odmietnutie ho nechá otvorený
+  a chyby rozsype **PRI POLIACH** — chyba člena nesie `row` = index, takže pristane pri tom členovi. **Konflikt je vlastná vetva:** draft sa **nezahadzuje**, modal povie „Set
+  medzitým zmenil niekto iný" a ponúkne **explicitné tlačidlo „Obnoviť"**, ktoré až na druhý, vedomý klik nahradí polia čerstvým setom a **pripne novú revíziu** (bez toho by
+  konflikt trval donekonečna). Pri **NOVOM sete** vedie cesta von inak (review #297 P2-6): načítavať nie je čo (set ešte neexistuje), takže obnova **len prepne pripnutú revíziu
+  na čerstvú a rozpísaný set nechá celý** — inak bolo tlačidlo no-op a každé ďalšie „Uložiť" kolidovalo donekonečna. `token` platí ako v KOV-B2 — odpoveď zavretého okna nesmie
+  zavrieť okno otvorené teraz.
+- **„+ Vytvoriť výrobcu/radu…"** funguje ako v modale položky a ide **tou istou serverovou cestou** (`hw_tax_create_*`). Echo `emit_tax` preto posiela **DVA samostatné skripty**
+  — `MDH.taxonomy` aj `HWSETS.taxonomy`; každý príjemca si overí vlastný token (novú hodnotu vyberie len okno, ktoré o ňu žiadalo) a druhému sa aspoň obnoví zoznam. Zliať ich
+  do jedného skriptu by znamenalo, že výnimka v prvom zhodí druhý.
+- **Prechod na „— nezaradený —" maže CELÝ klasifikačný blok** (review #297 P2-3, `hwsApplyUseType`). Vymazať len konštrukciu nestačilo: payload odišiel s prázdnym `use_type`
+  a neprázdnym výrobcom, server ho odmietol (ALL-OR-NOTHING) a používateľ nemal ako zaradenie zrušiť. `generic_type` naopak **ostáva** — nezaradený set si ho nesie sám;
+  a pole, ktoré práve nie je na obrazovke, drží **draft** (inak by ho prekreslenie stratilo a select by ticho vybral prvú možnosť).
+- **Odchod zo sekcie zatvára AJ modal setu** (review #297 P2-7). Žije v zdieľanom `#nxModalRoot` mimo `#secbody`, ale čistiaca cesta sekcie (`hwCloseModals` v `hw_catalog.js`)
+  poznala len modal položky (`HW_ITEM`) — modal setu by tak visel nad cudzou sekciou Štúdia aj s naplánovaným náhľadom. Zatvorenie si riadi jeho **vlastník**:
+  `HWSETS.closeModal()` (jeho `onClose` zruší debounce náhľadu a rozpísané hodnoty si zapamätá).
+- **Pohľad Sety = DLAŽDICE:** názov · chipy klasifikácie (použitie · otváranie · konštrukcia · výrobca a rada stlmene) alebo chip **„nezaradený"** pre legacy set · chip
+  „neaktívny" · Upraviť a Zmazať (existujúce dvojklikové potvrdenie). Je to **kompaktný riadok**, nie karta na výšku (vertikálny priestor je vzácny). **Neaktívny set sa už
+  nenúka ako nový výber** — ponuku projektu filtruje server (`set_options`), globálnu tabuľku `hwsGlobalOptions`; **aktuálne použitý set v ponuke ostáva** a existujúce
+  mapovania, snapshoty ani nákup sa nemenia.
+
+Testy: `tests/pure/test_kovb3_nahlad.rb`, `tests/js/test_kovb3_modal.js` (minidom), rozšírený `tests/js/test_st2c_modal.js` (typ `custom`), in-SketchUp sekcia **`run_kovb3`**.
 
 **ŠT-3b-1 — ôsma živá sekcia: PRAVIDLÁ (`rules`, tretia zo skupiny KATALÓGY).** Presun formulára zaniknutého okna „Pravidlá kovania" (Š17, skupina „Kovanie podľa rozmerov"): akcie
 **Uložiť a prestavať skrinky · „aj ako globálnu predvoľbu" · Načítať globálne · Doplniť nové predvolené** sú v LIŠTE sekcie (`rulesToolsHtml` — čistá funkcia, stav chodí

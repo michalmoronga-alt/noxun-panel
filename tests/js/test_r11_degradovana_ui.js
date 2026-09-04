@@ -82,8 +82,9 @@ eq(HWS.hwsLibWriteBlocked({ library_state: 'ok' }), false, 'zdravá knižnica sa
 eq(HWS.hwsLibWriteBlocked(null), false, 'chýbajúci payload nič neblokuje (starší server)');
 // Kontrakt: zápisové akcie sú PODMNOŽINOU akcií viazaných na knižnicu —
 // `hws-merge-seed` a `hws-reset-proj` medzi ne NEPATRIA (zapisujú do MODELU).
-eq(HWS.HWS_WRITE_ACTIONS.slice().sort(), ['hws-del', 'hws-edit', 'hws-new', 'hws-save'],
-   'zápis do globálneho súboru = nový/upraviť/zmazať/uložiť set');
+// KOV-B3: `hws-save` zanikla s inline editorom (set sa ukladá tlačidlom modalu).
+eq(HWS.HWS_WRITE_ACTIONS.slice().sort(), ['hws-del', 'hws-edit', 'hws-new'],
+   'zápis do globálneho súboru = nový/upraviť/zmazať set');
 ok(HWS.HWS_WRITE_ACTIONS.every(function(a){ return HWS.HWS_LIB_ACTIONS.indexOf(a) !== -1; }),
    'a všetky sú aj v širšom zozname R-07');
 

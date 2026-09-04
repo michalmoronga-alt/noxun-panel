@@ -1661,18 +1661,28 @@
 
 /* ===== V0.6 D1b: Katalog kovania — sety + predvolby projektu ===== */
 /* ŠT-3a-2: `#hwTabs` zanikol s oknom (pohlady su v liste sekcie). */
-.hwsset { border: 1px solid var(--nx-border); border-radius: 8px; padding: 7px 10px; margin: 6px 0; }
+/* KOV-B3: set je DLAZDICA — kompaktny riadok (nazov + chipy klasifikacie +
+   akcie) a pod nim clenovia. Vertikalny priestor je vzacny, preto to nie je
+   karta na vysku: chipy sa zalamuju do toho isteho bloku. */
+.hwsset { border: 1px solid var(--nx-border); border-radius: 8px; padding: 6px 10px; margin: 5px 0; }
+.hwsset.off { border-style: dashed; }
 .hwsset-head { display: flex; align-items: center; gap: 8px; }
 .hwsset-head b { flex: 1 1 auto; font-size: 13px; }
 .hwsset-type { color: var(--nx-ink-muted); font-size: 11.5px; white-space: nowrap; }
 .hwsbtn { padding: 1px 8px; font-size: 11.5px; }
-.hwsset-members { margin-top: 4px; }
+.hwsset-members { margin-top: 3px; }
 .hwsset-m { font-size: 12px; color: var(--nx-ink-muted); padding: 1px 0; }
-.hwseditor { border: 1px solid var(--nx-border-strong); border-radius: 8px; padding: 8px 10px; margin: 6px 0; }
-.hwsed-title { font-weight: 700; font-size: 12.5px; margin-bottom: 6px; }
-.hwsed-m { display: flex; align-items: center; gap: 6px; margin: 4px 0; flex-wrap: wrap; }
-.hwsed-m input[type="text"] { flex: 1 1 90px; min-width: 70px; }
-.hwsed-qty { width: 56px; flex: 0 0 auto; }
+/* Chipy klasifikacie: prve tri su OSI (typ · otvaranie · konstrukcia),
+   vyrobca a rada su stlmene (`dim`) — su to mena, nie rozhodnutia.
+   `none` = legacy set bez klasifikacie („nezaradený"), `off` = neaktivny. */
+.hwsset-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+.hwschip { font-size: 10.5px; line-height: 16px; padding: 0 7px; border-radius: 9px;
+           border: 1px solid var(--nx-border-strong); color: var(--nx-ink-soft);
+           background: var(--nx-surface); white-space: nowrap; }
+.hwschip.dim { color: var(--nx-ink-faint); border-color: var(--nx-border-soft); }
+.hwschip.none { color: var(--nx-warnchip-fg); border-color: var(--nx-warnchip-border);
+                background: var(--nx-warn-bg-soft); }
+.hwschip.off { color: var(--nx-ink-faint); border-style: dashed; }
 .hwsed-mlbl { font-size: 11.5px; color: var(--nx-ink-muted); flex: 0 0 auto; }
 .hwsed-series { flex: 1 1 auto; }
 .hwsed-srow { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
@@ -1888,3 +1898,36 @@
   .mlkitem:hover, .mlkitem.on { background: var(--nx-select-bg-hover); }
   .mlkempty, .mlkmore { font-size: 11.5px; color: var(--nx-ink-faint); padding: 4px 9px; }
   .mlkmore { border-top: 1px solid var(--nx-border-soft); }
+  /* KOV-B3: `custom` = VLASTNY UZOL volajuceho (zoznam clenov setu, zivy
+     nahlad). Je CELOSIRKOVY — clen nesie vnorene riadky (rad NL, pasma)
+     a stlpec s popiskom vlavo by mu zobral polovicu karty. Popisok je preto
+     NAD blokom, nie vedla neho. */
+  .mrow.mcustom { display: block; margin: 10px 0 6px; }
+  .mcustom-lbl { font-size: 12px; color: var(--nx-ink-label); margin-bottom: 4px; }
+  .mcustom-body { display: block; }
+  /* Riadok clena setu: prva linka = dve otazky („Ako sa urci kod?" + „Kolko?"),
+     pod nou telo podla zvoleneho sposobu. */
+  .mset-m { border: 1px solid var(--nx-border); border-radius: 6px;
+            padding: 5px 7px; margin: 4px 0; }
+  .mset-mtop { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .mset-mtop select { flex: 1 1 120px; min-width: 96px; padding: 4px 6px; font: inherit;
+                      font-size: 12px; }
+  .mset-mtop input.mset-qty { flex: 0 0 52px; padding: 4px 6px; font: inherit; font-size: 12px; }
+  .mset-mtop input.mset-lbl { flex: 1 1 100px; min-width: 80px; padding: 4px 6px; font: inherit;
+                              font-size: 12px; }
+  .mset-mtop .mset-del { flex: 0 0 auto; padding: 2px 7px; font-size: 12px; }
+  .mset-mbody { margin-top: 3px; }
+  .mset-m .merr { flex: none; }
+  .mset-empty { font-size: 11.5px; color: var(--nx-ink-faint); padding: 3px 2px; }
+  /* Zivy nahlad expanzie — text sklada SERVER, klient kresli riadky. */
+  .mset-prev { border: 1px solid var(--nx-border-soft); border-radius: 6px;
+               background: var(--nx-surface-sunken); padding: 5px 8px; font-size: 12px; }
+  .mset-prev .mset-prevline { padding: 1px 0; color: var(--nx-ink); }
+  .mset-prev .mset-prevline.head { color: var(--nx-ink-soft); font-size: 11.5px; }
+  .mset-prev .mset-prevline.warn { color: var(--nx-warnchip-fg); }
+  .mset-prev .mset-prevbusy { font-size: 11.5px; color: var(--nx-ink-faint); }
+  .mset-prev .mset-preverr { font-size: 11.5px; color: var(--nx-ink-soft); }
+  /* Konflikt revizie (R-41): draft ostava, obnova je VEDOMY druhy klik. */
+  .mset-conf { border: 1px solid var(--nx-danger-border); background: var(--nx-danger-bg-soft);
+               border-radius: 6px; padding: 5px 8px; font-size: 11.5px; color: var(--nx-danger); }
+  .mset-conf .mset-confbtn { margin-top: 4px; }

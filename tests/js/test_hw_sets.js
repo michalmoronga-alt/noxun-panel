@@ -6,7 +6,7 @@
 const assert = require('node:assert');
 const path = require('node:path');
 const { hwsSlug, hwsSetsForType, hwsMemberSummary, hwsBuildSetPayload,
-        hwsEditStateFrom, hwsNum, hwsParamLabel, hwsBandsSummary, hwsBuildBands,
+        hwsMembersOf, hwsNum, hwsParamLabel, hwsBandsSummary, hwsBuildBands,
         hwsSelectorFrom, hwsBuildSelector, hwsProjDraftKeys,
         hwsPinRev, hwsMapRev } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'hw_sets.js'));
@@ -46,16 +46,17 @@ eq(hwsMemberSummary({ code: '250831', qty: 1, per: 'owner' }),
 eq(hwsMemberSummary({ code_by_nl: { '470': '357696', '420': '357695' }, qty: 1, per: 'unit' }),
    'rad NL: 420→357695, 470→357696', 'rad zoradeny ciselne podla NL');
 
-// --- hwsBuildSetPayload -------------------------------------------------------
-const built = hwsBuildSetPayload({
-  set_id: 'zaves-p2o', name: ' Záves P2O ', generic_type: 'hinge',
-  members: [
+// --- hwsBuildSetPayload (KOV-B3: draft + cleny) --------------------------------
+const built = hwsBuildSetPayload(
+  { set_id: 'zaves-p2o', name: ' Záves P2O ', use_type: 'door',
+    opening_mode: 'classic', manufacturer: 'Hettich', series: 'Sensys', active: true },
+  [
     { is_series: false, per: 'unit', qty: '2', code: ' 245723 ', label: 'záves P2O' },
     { is_series: false, per: 'owner', qty: 1, code: '250831', label: '' },
     { is_series: true, per: 'unit', qty: 1,
       series: [{ nl: ' 420 ', code: ' 357695 ' }, { nl: '', code: 'x' }, { nl: '470', code: '' }] }
   ]
-});
+);
 eq(built.set_id, 'zaves-p2o', 'identita sa nesie');
 eq(built.name, 'Záves P2O', 'nazov trim');
 eq(built.members[0], { per: 'unit', qty: 2, label: 'záves P2O', code: '245723' },
@@ -64,27 +65,26 @@ eq(built.members[1], { per: 'owner', qty: 1, code: '250831' }, 'per owner bez la
 eq(built.members[2], { per: 'unit', qty: 1, code_by_nl: { '420': '357695' } },
    'rad: len kompletne riadky (NL aj kod), trim');
 
-// --- hwsEditStateFrom (round-trip s buildom) -----------------------------------
+// --- hwsMembersOf (round-trip s buildom) --------------------------------------
 const libSet = {
   set_id: 'vysuv-atira-biela-h70', name: 'Atira biela H70 (rad podľa NL)',
   generic_type: 'slide',
   members: [{ per: 'unit', qty: 1, label: 'K-sada',
               code_by_nl: { '470': '357696', '420': '357695' } }]
 };
-const edit = hwsEditStateFrom(libSet);
-eq(edit.existing, true, 'edit stav existujuceho setu');
-eq(edit.members[0].is_series, true, 'rad sa rozpozna');
-eq(edit.members[0].series, [{ nl: '420', code: '357695' }, { nl: '470', code: '357696' }],
+const edit = hwsMembersOf(libSet);
+eq(edit[0].is_series, true, 'rad sa rozpozna');
+eq(edit[0].series, [{ nl: '420', code: '357695' }, { nl: '470', code: '357696' }],
    'riadky radu zoradene podla NL');
-const round = hwsBuildSetPayload(edit);
+const round = hwsBuildSetPayload({ set_id: libSet.set_id, name: libSet.name }, edit);
 eq(round.members[0].code_by_nl, { '420': '357695', '470': '357696' },
-   'edit -> payload round-trip bez straty');
+   'cleny -> payload round-trip bez straty');
 eq(round.set_id, libSet.set_id, 'identita drzi');
 
-const plain = hwsEditStateFrom({ set_id: 'k', name: 'K', generic_type: 'hinge',
-                                 members: [{ code: '1', per: 'owner', qty: 3 }] });
-eq(plain.members[0], { is_series: false, per: 'owner', qty: 3, label: '', code: '1' },
-   'plochy clen do edit stavu');
+const plain = hwsMembersOf({ set_id: 'k', name: 'K', generic_type: 'hinge',
+                             members: [{ code: '1', per: 'owner', qty: 3 }] });
+eq(plain[0], { is_series: false, per: 'owner', qty: 3, label: '', code: '1' },
+   'plochy clen do stavu editora');
 
 // ============ H1b: pasma clena setu + vyber setu podla parametra ============
 
@@ -130,13 +130,14 @@ const legSet = {
                              bands: [{ min: 17.0, max: 21.0, code: '82744' },
                                      { min: 140.0, max: 160.0, code: '367823' }] } }]
 };
-const legEdit = hwsEditStateFrom(legSet);
+const legEdit = { members: hwsMembersOf(legSet) };
 eq(legEdit.members[0].is_bands, true, 'pasma sa rozpoznaju');
 eq(legEdit.members[0].param, 'height', 'parameter sa nesie');
 eq(legEdit.members[0].bands, [{ min: '17', max: '21', code: '82744' },
                               { min: '140', max: '160', code: '367823' }],
    'pasma do editora bez „.0" chvostov');
-const legPayload = hwsBuildSetPayload(legEdit);
+const legPayload = hwsBuildSetPayload({ set_id: legSet.set_id, name: legSet.name },
+                                      legEdit.members);
 eq(legPayload.members[0], { per: 'unit', qty: 1, label: 'noha',
                             param_bands: { param: 'height',
                                            bands: [{ min: '17', max: '21', code: '82744' },

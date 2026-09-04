@@ -1729,6 +1729,14 @@
         NXModal.isOpen() && HW_ITEM){
       NXModal.close();
     }
+    // KOV-B3 (review #297 P2-7): modal SETU je druhy obyvatel toho isteho
+    // `#nxModalRoot` a drzi ho `hw_sets.js` (`HWS_SET`), nie tento subor —
+    // podmienka `HW_ITEM` vyssie ho preto minie a pri odchode do inej sekcie
+    // by ostal visiet nad cudzim obsahom aj s naplanovanym nahladom.
+    // Zatvorenie si riadi jeho vlastnik.
+    if (typeof HWSETS !== 'undefined' && HWSETS && typeof HWSETS.closeModal === 'function'){
+      HWSETS.closeModal();
+    }
   }
 
   // Modelovy kontext sekcie z payloadu Studia (`ST.hw`). Katalog je v nom LEN
