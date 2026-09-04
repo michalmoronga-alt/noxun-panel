@@ -36,9 +36,16 @@
   nad UNI doskou a materiál hlási vlastnou ORANGE položkou.
   **Čo sa vedome NEZMENILO:** `Bom.row_key` a teda zlučovanie a počet riadkov, rozmery, kódy hrán, hrúbky, grouping, názvy súborov, atomický zápis, sekcia KONTROLA,
   kusovník a Nákup v Štúdiu. Názov aj poznámka sú len **zobrazenie** riadku. Žiadny zápis do modelu, žiadna zmena UI.
-  **Testy:** headless 2671 (0 FAIL; +20 nová sada `test_d112_d113_vepo.rb`), JS 82 sád zelených, **5 mutácií** overených pádom a vrátených. Zlatá vzorka CSV prepísaná
-  **vedome, samostatným commitom s dôvodom**. **In-SketchUp sada v tejto dávke NEBEŽALA** (Michal pracoval v SketchUpe s pluginom z mainu, runner prepisuje živý Plugins
-  adresár) — helper `k1_vepo_csv` je upravený na nové mapy, runner treba pustiť pred merge.
+  **Čo prinieslo 1. kolo Codex review (P1 + P2 — oba boli o TICHEJ chybe, nie o štýle).** **P1:** prvá verzia porovnávala pásku a dosku podľa **textu kódu dekoru**. Lenže
+  záväzná identita väzby doska↔ABS je **`group_id`** (D-41: dekor je kľúč SKUPINY) a katalóg vedome dovolí dvom výrobcom rovnaký kód v rôznych skupinách — doska zo skupiny A
+  a páska zo skupiny B s tým istým `W1000` by prešli ako zhoda a poznámka by **ticho chýbala**. Mapy preto nesú aj `group_id` a `same_decor?` rozhoduje skupinou; keď skupina
+  na niektorej strane chýba (legacy záznam), platí **vedomý fallback** na normalizovaný text — je to jediný údaj, ktorý taký záznam nesie. **P2:** názov samostatnej dosky je
+  **voľný text používateľa**, ale `aggregate_rows` vie zliať dosku a dielec skrinky do jedného riadku, takže `names` pôvod nepovedia — doska pomenovaná „Bok lavy" by sa
+  skrátila na „Bok L" a dvojica (dielec „Bok lavy" + doska „Bok P") by sa spárovala do klamlivého „Bok LP". Riadok preto nesie **aditívny kľúč `free_names`** (pôvod z
+  `part_key` `board/` alebo `owner_id` `BRD-`), voľné názvy idú pass-through a nikdy sa nepárujú; pri zhode reťazca z oboch svetov vyhráva konzervatívna cesta.
+  **Testy:** headless **2684** (0 FAIL; +33 nová sada `test_d112_d113_vepo.rb` vrátane oboch review nálezov), JS 82 sád zelených, **7 mutácií** overených pádom a vrátených.
+  Zlatá vzorka CSV prepísaná **vedome, samostatným commitom s dôvodom**. **In-SketchUp sada v tejto dávke NEBEŽALA** (Michal pracoval v SketchUpe s pluginom z mainu, runner
+  prepisuje živý Plugins adresár) — helper `k1_vepo_csv` je upravený na nové mapy, runner treba pustiť pred merge.
   **Codex review:** doplní orchestrátor po review.
 - **SMOKE 3.9. + KOV-A SMOKE FIX · D-115 symboly z rohov a D-116 tag úchytiek (v0.9.21, 3.9.2026, PR #286):** malá vizuálna dávka priamo z Michalovho smoku nad v0.9.20.
   **Smoke sám prešiel BEZ CHYBY**, body 1–6 PASS: (1) prepínač „Smer otvárania" funguje v raile Inspectora aj v lište sekcie Kontrola a na zákazke KLINIKA sa zapol hneď, bez

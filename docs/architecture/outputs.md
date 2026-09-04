@@ -261,9 +261,14 @@ Rozdiel medzi (1) a (3) je vecný a zámerný: **blokuje sa NEKOMPATIBILNÁ VERZ
 
 ### bom.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
-
 Zber modelu a agregácia riadkov kusovníka (`Bom.collect`, `Bom.compute`, `Bom.row_key`); správanie je popísané v odsekoch, ktoré ho volajú.
+
+**`aggregate_rows` — `free_names` (aditívny kľúč, GH #287 P2, v0.9.22).** Riadok sa zlučuje podľa **výrobných parametrov** (`row_key`), takže dielec skrinky a samostatná doska
+s rovnakými rozmermi, materiálom a hranami skončia v JEDNOM riadku — a `names` potom nepovedia, čo z toho je voľný text používateľa. Riadok preto nesie navyše `free_names`:
+názvy, ktoré prispel aspoň jeden záznam **dosky**. Pôvod sa poznáva z toho, čo záznam už nesie, a v konzervatívnom smere (stačí jeden znak): `part_key` v namespace `board/`
+(formálny kontrakt `PartKeys.board`; korpusové kľúče sú `cabinet/`, `zone:`, `front:`) **alebo** `owner_id` `BRD-<číslo>` (`Ids.next_board_id`). Kľúč je vždy prítomný (prázdne
+pole, keď doska neprispela — čitateľ nemusí brániť) a **`row_key`, poradie ani počet riadkov sa ním nemenia**. Jediný čitateľ je `VepoExport.row_name` (voľné názvy sa
+neskracujú ani nepárujú); kusovník, Štúdio ani ceny ho nečítajú.
 
 **Zber je JEDEN prechod modelu a jeho aditívne kľúče majú KAŽDÝ svojho čitateľa** — `collect` popri `records`/`hardware` vracia aj `hardware_overrides`, `manual_overrides`,
 `cabinet_sets`, **`cabinet_set_conflicts`**, `placements`, `identities` a `warnings`; `compute()` ich **ignoruje** (tvar výstupu ani SCHEMA `.skp` sa nimi nemenia), číta ich
@@ -401,20 +406,30 @@ parametre. Na disk zapisuje `write` **atomickou výmenou celej dávky** (staging
 - Riadok s neznámou ABS, chybnou hrúbkou, bez materiálu alebo s nekladným rozmerom **ide von z CSV** do `errors` (a do LOGu s dôvodom) — radšej neobjednať než objednať naslepo.
 
 **Poznámka pre VEPO — 9. stĺpec (D-112, v0.9.22).** CSV má deviaty stĺpec `poznamka`, **vždy prítomný** (prázdny reťazec, keď riadok poznámku nemá). Skladá ho čistá
-`abs_note(row, edge_decors, sheet_decors)`: pre každý kód hrany `L1 L2 W1 W2` porovná dekor pásky s dekorom dosky a pri **rozdiele** vypíše `ABS <dekor> <názov dekoru>` (viac
-rôznych pások oddelené `, `, bez duplicít, v poradí hrán orientovaného riadku). Porovnanie normalizuje `decor_key` — **zhodne s `Materials.decor_norm_key`** (medzery preč,
-lowercase); kópia je vedomá, modul nesmie siahať na katalóg, ale porovnanie musí byť to isté, ktorým je viazaný materiál na ABS (D-41). **Neznáma páska, neznáma doska ani
-prázdny dekor poznámku nevymýšľajú** — tie stavy hlási `validation` (ABS/materiál mimo katalógu, UNI) a oddiel vyradených riadkov. `universal` pásky sa **nevynímajú**: VEPO
-odvodzuje pásku z materiálu, takže každý odlišný dekor musí vidieť. Mapy sú **voliteľné parametre** `edge_decors:` / `sheet_decors:` s defaultom `{}` — starý volajúci dostane
-prázdny deviaty stĺpec. Skladá ich `ProductionCore.vepo_edge_decors` / `vepo_sheet_decors` (a zrkadlovo in-SU helper `k1_vepo_csv`); **UNI dosky sa do mapy nedávajú** — ich
-„dekor" je pracovný názov, porovnanie by označilo každú pásku za odlišnú (tá istá zásada, akou `Validation` potláča ABS kontroly nad UNI doskou).
+`abs_note(row, edge_decors, sheet_decors)`: pre každý kód hrany `L1 L2 W1 W2` porovná záznam pásky so záznamom dosky a pri **rozdiele** vypíše `ABS <dekor> <názov dekoru>` (viac
+rôznych pások oddelené `, `, bez opakovania toho istého textu, v poradí hrán orientovaného riadku). **Neznáma páska, neznáma doska ani záznam bez použiteľnej identity poznámku
+nevymýšľajú** — tie stavy hlási `validation` (ABS/materiál mimo katalógu, UNI) a oddiel vyradených riadkov. `universal` pásky sa **nevynímajú**: VEPO odvodzuje pásku z
+materiálu, takže každý odlišný dekor musí vidieť. Mapy sú **voliteľné parametre** `edge_decors:` (`{abs_id => {'decor','decor_name','group_id'}}`) / `sheet_decors:`
+(`{material_id => {'decor','group_id'}}`) s defaultom `{}` — starý volajúci dostane prázdny deviaty stĺpec (holý String v mape dosiek sa tolerantne prečíta ako samotný dekor,
+`decor_record`). Skladá ich `ProductionCore.vepo_edge_decors` / `vepo_sheet_decors`; **UNI dosky sa do mapy nedávajú** — ich „dekor" je pracovný názov, porovnanie by označilo
+každú pásku za odlišnú (tá istá zásada, akou `Validation` potláča ABS kontroly nad UNI doskou).
+
+**Porovnáva sa SKUPINA, nie text kódu (`same_decor?`, GH #287 P1).** Záväzná identita väzby doska↔ABS je `group_id`: dekor je kľúč **skupiny** (D-41), nie globálne unikátny kód,
+a katalóg vedome dovolí dvom výrobcom rovnaký kód v rôznych skupinách. Keď majú `group_id` **obe** strany, rozhoduje výhradne ono; inak (legacy záznam) platí **vedomý fallback**
+na `decor_key` — normalizáciu **zhodnú s `Materials.decor_norm_key`** (medzery preč, lowercase), ktorej kópia v tomto module je zámerná (modul nesmie siahať na katalóg, ale
+porovnanie musí byť to isté). Bez skupiny **aj** bez dekoru je záznam neporovnateľný (`identifiable?` → žiadna poznámka). Porovnanie len podľa textu by dosku zo skupiny A a pásku
+zo skupiny B s rovnakým `W1000` vyhlásilo za zhodu — a poznámka by ticho chýbala, teda zlý olep z výroby.
 
 **Názov riadku (D-113, v0.9.22).** `row_name` skladá `"<krátke názvy> <skrinky>"` (napr. `Bok LP s1 s2`) a používa ho CSV **aj LOG** (chyby, poznámky). Tri čisté kroky:
-`short_name` (tabuľka skratiek na PRESNÉ reťazce builderov — `construction.rb`, `zone_tree.rb`, `fronts.rb`; **neznámy názov ide bez zmeny**, samostatná doska nesie voľný text
-používateľa), `join_names` (združenie dvojíc `Bok L`+`Bok P`→`Bok LP`, `Vyst P`+`Vyst Z`→`Vyst PZ`, `Dv<N> L`+`Dv<N> P`→`Dv<N> LP`, zvyšok cez `/`) a `owner_tokens`
-(`CAB-001`→`s1`, `BRD-007`→`d7`, unikátne a zoradené; neznámy tvar ID sa nezahadzuje, ide celý a až za nimi). `append_owners` drží `NAME_MAX = 60`: skrinky pridáva, kým sa
-zmestia, nezmestené zhrnie ` +K` — **nikdy odseknutá skratka v polovici**; keď je nad limit už samotná časť s názvami, platí pôvodný orez s `…`. Platí **len pre VEPO** —
-kusovník Štúdia nesie plné názvy.
+`short_name` (tabuľka skratiek na PRESNÉ reťazce builderov — `construction.rb`, `zone_tree.rb`, `fronts.rb`; **neznámy názov ide bez zmeny**), `join_names` (združenie dvojíc
+`Bok L`+`Bok P`→`Bok LP`, `Vyst P`+`Vyst Z`→`Vyst PZ`, `Dv<N> L`+`Dv<N> P`→`Dv<N> LP`, zvyšok cez `/`) a `owner_tokens` (`CAB-001`→`s1`, `BRD-007`→`d7`, unikátne a zoradené;
+neznámy tvar ID sa nezahadzuje, ide celý a až za nimi). `append_owners` drží `NAME_MAX = 60`: skrinky pridáva, kým sa zmestia, nezmestené zhrnie ` +K` — **nikdy odseknutá
+skratka v polovici**; keď je nad limit už samotná časť s názvami, platí pôvodný orez s `…`. Platí **len pre VEPO** — kusovník Štúdia nesie plné názvy.
+
+**Voľné názvy dosiek sa neskracujú ani nepárujú (GH #287 P2).** Názov samostatnej dosky je **voľný text používateľa**, nie názov z buildera — tabuľka skratiek naň nesmie siahnuť
+(doska `Bok lavy` nie je bok skrinky) a nesmie sa spárovať s dielcom skrinky do klamlivého `Bok LP`. Pôvod nesie riadok v aditívnom kľúči **`free_names`** z `Bom.aggregate_rows`
+(riadok môže byť zliatok dosky a dielca skrinky, takže samotné `names` pôvod nepovedia); `join_names` drží pri každom tokene príznak „voľný" a páruje výhradne tokeny zo skratky
+generovaného názvu. Keď ten istý reťazec prispela doska **aj** skrinka, platí konzervatívna cesta: pass-through bez skratky a bez páru.
 
 **Čo poznámka ani názov NEROBIA.** Sú to len **zobrazenie riadku**: `Bom.row_key` (a teda zlučovanie a počet riadkov), grouping podľa materiálu a hrúbkovej skupiny, názvy
 súborov, kódy hrán, obchodné hrúbky ani sekcia KONTROLA sa nemenia. Poradie oddielov LOGu: skupiny → vyradené riadky → **Poznámky pre VEPO** → KONTROLA.
