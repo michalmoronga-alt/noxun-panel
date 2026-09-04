@@ -180,6 +180,22 @@ module Noxun
       USE_TYPE_GENERIC = { 'door' => 'hinge', 'drawer' => 'slide',
                            'lift' => 'lift', 'fall' => 'lift' }.freeze
 
+      # KOV-B3: POPISKY UZAVRETYCH SLOVNIKOV pre EDITOR (1. pad, tak ako ich
+      # cita pouzivatel v selecte a na chipe dlazdice). Ziju TU, lebo slovniky
+      # su uzavrete a ich obsah je doménová pravda — druhy zoznam v JS by sa
+      # pri prvom pribudnutom type rozisiel s tymto. `USE_TYPE_SK` (2./4. pad
+      # do vety servera) je INA vrstva a zostava oddelene.
+      # Poradie polozek = poradie v selecte (mockup scena 3 `#mSet`).
+      CLASS_OPTIONS = {
+        'use_type' => [%w[door Dvierka], %w[drawer Zásuvka], %w[lift Výklop],
+                       %w[fall Sklopné], %w[other Iné]],
+        'opening_mode' => [%w[classic Klasické], %w[tipon Tip-On],
+                           ['other', 'Ostatné / neuplatňuje sa']],
+        'drawer_construction' => [['metal', 'Kovové bočnice'],
+                                  ['wood', 'Drevený box / skrytý výsuv'],
+                                  ['other', 'Ostatné / atyp']]
+      }.freeze
+
       # Klasifikacne kluce su ALL-OR-NOTHING (audit #17 FIX 6): pri zapise su
       # bud VSETKY (kontextovo platne), alebo ZIADNY = legacy „nezaradeny" set.
       # Ciastocny tvar sa odmieta — polovicna klasifikacia by v B3 vyzerala ako
@@ -1634,6 +1650,15 @@ module Noxun
       # Ponuka setov jedneho generickeho typu pre UI select. Rovnaka
       # precedencia ako resolve_set_def: referencovane set_id sa beru zo
       # snapshotu, zvysok z globalu. Poradie deterministicke (nazov, set_id).
+      #
+      # KOV-B3: NEAKTIVNY set (`active: false`) sa v ponuke UZ NENUKA — je to
+      # JEDINE miesto, kde priznak nieco rozhoduje. `expand`, `explain` ani
+      # `resolve_set_id` ho dalej NECITAJU, takze existujuce mapovanie,
+      # snapshot aj sablona expanduju deep-equal ako predtym; menia sa VYHRADNE
+      # ponuky NOVEHO vyberu (predvolby projektu a override skrinky).
+      # REFERENCOVANY set v ponuke OSTAVA, aj ked je neaktivny — inak by select
+      # ukazoval prazdno tam, kde projekt hodnotu ma, a prvy klik vedla by ju
+      # ticho prepisal.
       def set_options(generic_type, globals, snapshot_sets, referenced_ids)
         gt = generic_type.to_s
         refs = Array(referenced_ids).map(&:to_s)
@@ -1647,7 +1672,8 @@ module Noxun
           next unless s.is_a?(Hash) && s['generic_type'] == gt
           by_id[sid] = s if refs.include?(sid.to_s) || !by_id.key?(sid)
         end
-        by_id.values.sort_by { |s| [s['name'].to_s, s['set_id'].to_s] }
+        by_id.reject { |sid, s| s['active'] == false && !refs.include?(sid.to_s) }
+             .values.sort_by { |s| [s['name'].to_s, s['set_id'].to_s] }
       end
 
       # --- cabinet override (H1a, audit FIX 7) --------------------------------
@@ -2452,6 +2478,124 @@ module Noxun
         end
       end
 
+      # --- KOV-B3: ZIVY NAHLAD EXPANZIE ROZPRACOVANEHO SETU --------------------
+      #
+      # Editor setu ukazuje, CO SA REALNE OBJEDNA — este predtym, nez sa set
+      # ulozi. Cesta je zamerne TA ISTA ako v nakupe (`expand`), nie druhy
+      # vyklad: keby nahlad pocital vlastnym kodom, ukazoval by cisla, ktore
+      # v supise nevzniknu (lekcia R-06a „panel a supis sa nesmu rozist").
+      #
+      # TRI VECI, KTORE SU KONTRAKT:
+      #   1. NIKDY ZIADNE IO. Funkcia je CISTA — dostane draft, vzorove
+      #      parametre a katalog (`catalog:`/`lookup:` od volajuceho). Ziadny
+      #      `save_set!`, ziadny snapshot, ziadny zapis do knizice ani katalogu:
+      #      nahlad je pohlad, nie ulozenie. (Mutacia sady: nahlad, ktory si
+      #      nacita ULOZENY set namiesto draftu, spadne na tom, ze draft
+      #      v kniznici NIE JE.)
+      #   2. POCITA SA Z DRAFTU. Set sa validuje `validate_set_detailed`
+      #      (rovnaka autorita ako zapis), a normalizovany DRAFT sa vlozi do
+      #      DOCASNEHO stavu `{mapping, sets}`. Vysledok je preto presne to,
+      #      co by `expand` vydal po ulozeni toho isteho setu.
+      #   3. CHYBY SU STRUKTUROVANE — ten isty tvar `{row, field, msg}`, aky
+      #      vracia `save_set!`, takze editor ich ukaze PRI POLI.
+      #
+      # -> [ {'rows','unmapped','summary','text','sample','set_id','set_name'}, [] ]
+      #    alebo [nil, errors] pri neplatnom drafte.
+      PREVIEW_OWNER = '__preview__'
+
+      # Vzorovy vlastnik nahladu: hodnoty, podla ktorych sa vyberaju kody
+      # (`code_by_nl` cita `nominal_length`, `param_bands` ktorykolvek kluc
+      # z `PARAM_OPTIONS`). Volajuci ich smie prepisat — editor ponuka NL
+      # a vysku cela.
+      PREVIEW_SAMPLE = { 'nominal_length' => 470.0, 'front_height' => 176.0,
+                         'height' => 100.0 }.freeze
+
+      # Ktore vzorove parametre smie poslat KLIENT. Uzavrety zoznam: cudzi kluc
+      # by sa dostal do `it['params']` a mohol by (v novsej verzii) prebit
+      # branu dlzkoveho kovania.
+      PREVIEW_PARAM_KEYS = (['nominal_length'] + PARAM_OPTIONS.map { |p| p['key'] }).freeze
+
+      def preview_sample(over = {})
+        out = PREVIEW_SAMPLE.dup
+        return out unless over.is_a?(Hash)
+
+        over.each do |k, v|
+          key = k.to_s
+          next unless PREVIEW_PARAM_KEYS.include?(key)
+
+          num = num(v)
+          out[key] = num if num
+        end
+        out
+      end
+
+      def preview_expansion(draft, catalog: nil, lookup: nil, sample: {})
+        norm, errors = validate_set_detailed(draft)
+        return [nil, errors] if norm.nil?
+
+        params = preview_sample(sample)
+        sid = norm['set_id']
+        gt  = norm['generic_type']
+        item = { 'generic_type' => gt, 'quantity' => 1, 'owner_id' => PREVIEW_OWNER,
+                 'owner_part_key' => nil, 'rule_id' => 'preview', 'params' => params }
+        state = { 'mapping' => { gt => sid }, 'sets' => { sid => norm } }
+        # `expand` si mapu kod=>polozka stavia sam (`catalog_lookup`) a HASH
+        # prijma priamo — volajuci, ktory ju uz ma (panel), ju posle ako
+        # `lookup:` a druhy raz sa nepremapuje.
+        exp = expand([item], state, catalog: (lookup.is_a?(Hash) ? lookup : catalog))
+        out = exp.merge('set_id' => sid, 'set_name' => norm['name'],
+                        'sample' => params, 'text' => preview_text(norm, params, exp))
+        [out, []]
+      end
+
+      # Text nahladu sklada SERVER (jedna autorita vykladu nakupu — klient by
+      # si inak vymyslel vlastne vety a pri prvej zmene expanzie by klamali).
+      # Prvy riadok povie, NA COM sa pocitalo; dalsie su riadky nakupu; na
+      # konci ORANGE dovody presne tymi vetami, ake ukaze supis.
+      def preview_text(norm, params, exp)
+        lines = [preview_head(norm, params)]
+        Array(exp['rows']).each { |r| lines << preview_row(r) }
+        Array(exp['unmapped']).each { |u| lines << "! #{unmapped_reason_sk(u)}" }
+        lines << 'Set zatiaľ neobjedná nič — doplň členom kód.' if lines.length == 1
+        total = exp['summary'].is_a?(Hash) ? exp['summary']['total_eur_vat'] : nil
+        lines << "Spolu #{price_cell(total)} € s DPH" if total.is_a?(Numeric) && total.positive?
+        lines.join("\n")
+      end
+
+      def preview_head(norm, params)
+        what = classified?(norm) ? class_label('use_type', norm['use_type'])
+                                 : HardwareRules.label_for(norm['generic_type'])
+        bits = ["Príklad: #{what}"]
+        bits << "NL #{fmt_mm(params['nominal_length'])} mm" if uses_nl?(norm)
+        bits << "výška čela #{fmt_mm(params['front_height'])} mm" if uses_param?(norm, 'front_height')
+        bits << "výška sokla #{fmt_mm(params['height'])} mm" if uses_param?(norm, 'height')
+        "#{bits.join(' · ')}:"
+      end
+
+      def uses_nl?(norm)
+        Array(norm['members']).any? { |m| m['code_by_nl'].is_a?(Hash) }
+      end
+
+      def uses_param?(norm, param)
+        Array(norm['members']).any? do |m|
+          m['param_bands'].is_a?(Hash) && m['param_bands']['param'].to_s == param
+        end
+      end
+
+      def preview_row(row)
+        name = row['name_sk'].to_s.strip
+        txt = "#{row['code']} × #{row['quantity']}"
+        txt += " — #{name}" unless name.empty?
+        if row['missing']
+          txt += ' — kód nie je v katalógu kovania'
+        elsif row['subtotal_eur_vat'].is_a?(Numeric)
+          txt += " — #{price_cell(row['subtotal_eur_vat'])} €"
+        else
+          txt += ' — cena nie je zadaná'
+        end
+        txt
+      end
+
       # --- normalizacia a validacia (audit F10 + H1a) --------------------------
 
       # PRISNA validacia JEDNEHO setu (zapisova cesta). ALL-OR-NOTHING:
@@ -2614,12 +2758,22 @@ module Noxun
                       "„#{derived}“ — set má „#{gt}“")]]
       end
 
-      # SK nazvy typov pouzitia — LEN pre hlasky servera (UI si ich sklada B3).
+      # SK nazvy typov pouzitia — LEN pre hlasky servera (veta v 1. pade sa do
+      # stredu vety nehodi). Popisky EDITORA drzi `CLASS_OPTIONS` nizsie.
       USE_TYPE_SK = { 'door' => 'dvierka', 'drawer' => 'zásuvka', 'lift' => 'výklop',
                       'fall' => 'sklop', 'other' => 'iné' }.freeze
 
       def use_type_sk(use_type)
         USE_TYPE_SK[use_type.to_s] || use_type.to_s
+      end
+
+      # Popisok jednej hodnoty klasifikacie (chip dlazdice, veta nahladu,
+      # select editora) — `CLASS_OPTIONS`. Neznama hodnota sa vrati tak, ako
+      # prisla: nikdy sa nevymyslia slova pre obsah novsej verzie.
+      def class_label(field, value)
+        v = value.to_s
+        row = Array(CLASS_OPTIONS[field.to_s]).find { |o| o[0] == v }
+        row ? row[1] : v
       end
 
       # PRISNA validacia pola setov. Duplicitne set_id = chyba (v citacej ceste
