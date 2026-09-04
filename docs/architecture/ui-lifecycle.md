@@ -481,6 +481,31 @@ geometriu a skrytý vnuk vo viditeľnej skupine by zastavil prisunutie skôr. La
 vedúcim okrajom sa nemusí prechádzať vôbec). **Tou istou traverzou sa počítajú aj bounds CIEĽA** — legacy bral surové `definition.bounds`, takže skrytý presahujúci potomok
 vybraného objektu posúval doraz.
 
+### legacy_cleanup.rb
+
+**Boot migrácia starých inštalácií (T1b).** Mower a Snaper sú od NÁSTROJE-1 súčasťou balíka enginu, takže ich samostatné inštalácie musia z priečinka `Plugins` zmiznúť — inak
+SketchUp zaregistruje dva toolbary navyše. Migrácia odstráni **presne štyri ciele** (`noxun_mower_loader.rb` · `Noxun_Mower/` · `snaper.rb` · `snaper/`) v **odovzdanom** priečinku
+`Plugins` a beží z `main.rb` **PRED registráciou toolbarov**, vo vlastnom chránenom bloku (vzor `Materials.boot_cutover!`) — zlyhanie migrácie nikdy nezhodí menu, toolbar ani
+observer. **Prečo boot a nie updater:** pri aktualizácii (D-52) vykonáva swap ešte STARÝ kód v pamäti, takže nový `updater.rb` sa k slovu dostane až po reštarte; upratanie preto
+patrí na začiatok bootu NOVÉHO balíka. Modul je **čisté jadro** (žiadne `Sketchup.*`/`UI.*`, všetky cesty ako parametre, hlášky len konštanty) — o zobrazení rozhoduje tenký boot
+hook cez `message_for`. Boot volá **`boot!`**, nie `run!`: `boot!` si cestu markera vyberie z `path` a **zapamätá si ju spolu s výsledkom** (`boot_marker_path` / `boot_result`,
+read-only). Bez toho sa nedá spätne zistiť, kam sa naozaj písalo — `Materials.dir` sa dá presmerovať až PO boote (`test_dir_override`, sandbox APPDATA in-SU runnera), takže
+neskoršie `path` už môže ukazovať inam. Testy volajú `run!` priamo a tento záznam neprepíšu.
+
+**Zlyhanie nie je hotovo.** `FileUtils.rm_rf` chybu potlačí a vráti sa bez výnimky, preto má **každý cieľ postkontrolu existencie** a kľúč do markera sa zapíše **až po overenej
+neprítomnosti všetkých štyroch**. Zamknutý súbor (bežiaci SketchUp, antivírus, indexer) tak neskončí ticho označený za uprataný — výsledok nesie stav `failed` s cestami a migrácia
+sa zopakuje pri ďalšom boote. **Marker žije MIMO swapovaného stromu** (`%APPDATA%\NOXUN\Engine\legacy_cleanup.json`, `JsonFileStore` + `.bak`, zápis pod `Materials.with_catalog_lock`
+podľa R-08): v `Plugins` by ho aktualizácia zmazala spolu so stromom. Kľúčom je **normalizovaná cesta priečinka `Plugins`** (`Updater.normalize_path` + `downcase`) — jeden počítač
+môže mať viac verzií SketchUpu a každá inštalácia sa upratuje samostatne. Migrácia beží aj nad čistou inštaláciou (kľúč s prázdnym `removed`), takže sa priečinok neprehľadáva pri
+každom boote. **Vedomá odchýlka od R-11:** poškodený marker s platnou `.bak` zápisy NEZASTAVÍ — obsahom je len zoznam už uprataných ciest, jeho strata stojí nanajvýš jeden
+bezvýsledný prechod, kým zastavenie zápisov by migráciu nechalo bežať navždy.
+
+**Reštart je povinný:** po úspešnom mazaní ostávajú legacy toolbary v pamäti bežiaceho SketchUpu, preto hláška (log + status + `UI::Notification`, nikdy modal blokujúci boot)
+hovorí o reštarte. Je jednorazová sama od seba — po zapísaní kľúča končí ďalší boot stavom `skipped`. **Druhý kanál** je `INSTALL_noxun_engine.ps1`: maže tie isté štyri cesty s
+rovnakou postkontrolou, pri zlyhaní vypíše varovanie s cestami namiesto „HOTOVO" a končí **len** pokynom „Reštartuj SketchUp" (živý `load "noxun_engine.rb"` zanikol — v bežiacom
+procese držia `@loaded`/`file_loaded?` registráciu preskočenú, takže by toolbar nezaregistroval ani legacy toolbary neodstránil). Testy: `tests/pure/test_nastroje1b_legacy.rb` +
+in-SU sekcia `run_tools1b`.
+
 ## Inspector — kostra a kontexty
 
 ### Inspector — kostra (UI-B1, ui/js/shell.js)

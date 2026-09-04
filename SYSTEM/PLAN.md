@@ -454,9 +454,12 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   **GHOST-D1 + GHOST-D2** (dosky vkladané a kreslené prichytením na skrinky, packages nižšie). **Agy outside-in research** „automatický pilaster / pracovná doska" (skill `antigravity-outside-in`)
   sa spraví, keď bude kvóta — podklad pre blok viazaných dielov po V1.
 - **NÁSTROJE-1 · TASK PACKAGE „MOWER + SNAPER V BALÍKU NOXUN ENGINE" (D-20; V1 bod 1A — Michal 4.9.2026; **Audit: HOTOVÝ** — Codex CLI 4.9. audity 1–5 (11 → 7 → 3 → 1 → 0 nálezov, posledný **SOUND**) + Codex GH #288 kolá 1–3, všetko zapracované; história v [zdroje/next_sessions/NASTROJE1_PACKAGE_DRAFT_2026-09-04.md](zdroje/next_sessions/NASTROJE1_PACKAGE_DRAFT_2026-09-04.md); in-SU POVINNÉ):**
-  **STAV IMPLEMENTÁCIE (4.9.2026): T1a je v maine (PR #293, v0.9.24)** — moduly `noxun_engine/tools/`, toolbar „Noxun Nástroje" + submenu, kópia cez šev enginu, `ScaleWatch.flush_pending!`
-  + rigidita na hranici cache, Z-dialog v bariére aktualizácie, ikony v repe, headless sady `test_nastroje1_tools`/`test_nastroje1_observer` a in-SU `run_tools1` + `run_tools1_async`.
-  **T1b ČAKÁ** (boot migrácia legacy inštalácií + inštalátor + README + in-SU test migrácie) — dovtedy sa staré pluginy `Noxun_Mower\` a `snaper\` NEODSTRAŇUJÚ a **D-20 ostáva otvorená**.
+  **STAV IMPLEMENTÁCIE: ✅ NÁSTROJE-1 KOMPLET (4.9.2026) — T1a PR #293 (v0.9.24) + T1b PR #294 (v0.9.25); D-20 uzavretá** (plný text v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md)).
+  **T1a:** moduly `noxun_engine/tools/`, toolbar „Noxun Nástroje" + submenu, kópia cez šev enginu, `ScaleWatch.flush_pending!` + rigidita na hranici cache, Z-dialog v bariére
+  aktualizácie, ikony v repe, headless sady `test_nastroje1_tools`/`test_nastroje1_observer` a in-SU `run_tools1` + `run_tools1_async`.
+  **T1b:** boot migrácia `Tools::LegacyCleanup` (čisté jadro + tenký hook v `main.rb` PRED registráciou toolbaru), marker `%APPDATA%\NOXUN\Engine\legacy_cleanup.json` kľúčovaný
+  normalizovanou cestou `Plugins`, kľúč až po overenej neprítomnosti všetkých štyroch cieľov, jednorazová hláška o reštarte; inštalátor maže tie isté cesty s rovnakou
+  postkontrolou a končí LEN pokynom „Reštartuj SketchUp"; headless `test_nastroje1b_legacy` + in-SU `run_tools1b`; README a `docs/architecture/ui-lifecycle.md` doplnené.
   **REVÍZIA FIX 10 (Michal 4.9.2026, pri internej kontrole #293) — platí PRED znením nižšie:** prípony kópie sú **VÝHRADNE písmenové** — `a`…`z`, po vyčerpaní `aa`…`zz`
   (a ďalej `aaa`…), **nikdy čísla**; zo zdroja sa odstraňuje **len** koncová prípona v tvare *medzera + 1–2 malé písmená*. Dôvod: ručný názov skrinky bežne končí šírkou, takže
   „Dolná 900" by sa inak skopírovala ako „Dolná a" a informácia by sa stratila („Dolná 900" → „Dolná 900 a" → „Dolná 900 b"). Znenie „po vyčerpaní číslo „ 27"…" nižšie **neplatí**.
@@ -694,7 +697,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   ukáže „dostupná 0.9.x" → Aktualizovať → okná sa zavrú, hláška, reštart → nová verzia; skús so staršou kópiou → tlačidlo neaktívne s vysvetlením; vytiahni sieťový disk →
   sekcia hlási nedostupný zdroj, Štúdio nezamrzne. **Checklist uzáveru:** bump patch + `?v=` → testy → `ui-lifecycle.md` (odsek About + updater UI, vedomá odchýlka) →
   D-52 do DOGFOODING_vyriesene (plný text + riadok indexu) → STAV/KRONIKA/PLAN (blok 6 položka hotová).
-- **D-20 · Quick actions — bezpečný move plugin** — **ZARADENÉ do V1 (Michal 4.9.2026, bod 1A) : package **NÁSTROJE-1** v bloku 4 (audit HOTOVÝ 4.9., 5 CLI auditov + 3 GH kolá).** Pôvodne: zlúčiť noxun_mower + Snaper do jedného toolbaru; kopírovanie musí prejsť štandardným dedup tickom (dnes vzniká kópia bez NOXUN identity).
+- ~~**D-20 · Quick actions — bezpečný move plugin**~~ — **✅ VYRIEŠENÁ 4.9.2026** package **NÁSTROJE-1** (T1a PR #293 v0.9.24 + T1b PR #294 v0.9.25); plný text v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).
 
 ## Po V1 — zásobník (nezaradené, nestratiť)
 

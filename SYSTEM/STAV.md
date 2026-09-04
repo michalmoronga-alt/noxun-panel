@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.9.24 · 4.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.9.25 · 4.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -25,7 +25,7 @@ robí **priamo v Inspectore**. **KOV-B1** dala setom **klasifikáciu** (na čo �
 **Pozor na kompatibilitu:** čo uloží v0.9.20, to **v0.9.18 už nepoužije** — model/šablóna (`CONFIG_SCHEMA` 4 + brána `assess_set_defs`), knižnica setov aj projektový snapshot
 (`std` 3) a katalóg kovania s výrobcom (`schema` 2). Pred prvou takou zákazkou aktualizovať **obe PC** (D-52 updater).
 
-**Testy k v0.9.24:** **2749 headless** · 83 JS sád · posledný plný in-SketchUp beh **1504 PASS** (v0.9.21; dávky #287, KOV-B2 a NÁSTROJE-1 ho **nespúšťali** — Michal pracoval v SketchUpe, pustiť pred merge; pribudli sekcie `run_kovb2`, `run_tools1` a `run_tools1_async`).
+**Testy k v0.9.25:** **2773 headless** · 84 JS sád · posledný plný in-SketchUp beh **1504 PASS** (v0.9.21; dávky #287, KOV-B2 a NÁSTROJE-1 ho **nespúšťali** — Michal pracoval v SketchUpe, pustiť pred merge; pribudli sekcie `run_kovb2`, `run_tools1`, `run_tools1_async` a `run_tools1b`).
 
 ## Robí sa
 
@@ -43,8 +43,8 @@ Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` (KO
 
 ## Posledné uzávery
 
-- **NÁSTROJE-1 · T1a — MOWER A SNAPER SÚ V BALÍKU ENGINU** (v0.9.24): druhý toolbar **„Noxun Nástroje"** (rotácie · Z = 0 · Z posun… · Kópia vľavo/vpravo · Prisunúť vľavo/vpravo) + menu → **Nástroje**. Hlavná zmena: **kópia je plnohodnotná skrinka** (vlastné CAB číslo, Inspector, kusovník, ceny — doteraz „fantóm"), krok = **šírka korpusu po jeho vlastnej osi** (sedí aj otočenej).
-  **T1b** (upratanie starých inštalácií Mowera/Snapera + inštalátor) čaká, **D-20 ostáva otvorená**.
+- **NÁSTROJE-1 KOMPLET — MOWER A SNAPER SÚ V BALÍKU ENGINU (D-20 uzavretá)** (T1a v0.9.24 + T1b v0.9.25): druhý toolbar **„Noxun Nástroje"** (rotácie · Z = 0 · Z posun… · Kópia vľavo/vpravo · Prisunúť vľavo/vpravo) + menu → **Nástroje**. **T1a:** kópia je **plnohodnotná skrinka** (vlastné CAB číslo, Inspector, kusovník, ceny — doteraz „fantóm"), krok = **šírka korpusu po vlastnej osi**.
+  **T1b:** staré samostatné inštalácie sa **odstraňujú samy** — raz inštalátorom, raz pri štarte pluginu (marker per priečinok `Plugins`); zamknutý súbor sa **neoznačí za hotový** a skúsi sa znova, staré toolbary zmiznú až po **reštarte**.
 - **KOV-B2 — KATALÓG KOVANIA MÁ STROM A MODAL (D-110 uzavretá)** (v0.9.23, 4.9.2026): položky sú **strom Kategória → „Výrobca · Rada"** — zbalená kategória je jeden riadok
   s počtom, hľadanie roztvorí **len** to, kde niečo našlo, a orezanie sa prizná číslom + **„Načítať ďalšie (N)"** (položka za dvojstovkou sa dá dokliknúť aj dohľadať). Zakladanie
   a úprava sú **modal** (nie formulár pod zoznamom) s poradím polí **Démos → kód → názov → cena → MJ → kategória → výrobca → rada → poznámka**; výrobcu aj radu založíš rovno z neho.

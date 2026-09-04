@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-20** — Quick actions: Mower + Snaper sú jeden toolbar v balíku enginu, kópia má plnú NOXUN identitu a staré inštalácie sa odstránia samy — vyriešené 4.9.2026, PR #293 + #294, v0.9.25
 - **D-110** — Pridávanie kovaní: strom Kategória → Výrobca → Rada namiesto plochého zoznamu + modal položky s poradím polí ako dodávateľský list — vyriešené 4.9.2026, PR #290, v0.9.23
 - **D-112** — Odlišná ABS je vidieť vo VEPO objednávke: deviaty stĺpec `poznamka` + kontrolný oddiel v LOGu — vyriešené 4.9.2026, PR #287, v0.9.22
 - **D-113** — Názov dielca vo VEPO nesie skratku a skrinku (`Bok LP s1 s2`) — vyriešené 4.9.2026, PR #287, v0.9.22
@@ -101,6 +102,41 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-20 · Quick actions — bezpečný move plugin (Michal 19.7.2026; vyriešené 4.9.2026, package NÁSTROJE-1, PR #293 + #294, v0.9.24 + v0.9.25)
+
+**Pôvodný postreh (plné znenie).** „**D-20 · Quick actions — bezpečný move plugin** (Michal 19.7., „pre budúceho Michala a Fable, keď bude základ top 😉") — zlúčiť funkčné
+pluginy noxun_mower + Snaper do jedného toolbar pluginu (rýchly pohyb, kopírovanie, rotácie, prisunutie na doraz). **Známy poznatok:** mower „rýchla kópia skrinky vedľa"
+vytvorí kópiu LEN ako geometriu — bez NOXUN identity kabinetu (kópia mimo observer/dedup flow). Pri stavbe quick actions kopírovanie prerobiť tak, aby kópia prešla štandardným
+dedup tickom (plná identita + config)." *(Zaradené do V1 Michalom 4.9.2026 ako bod 1A „staré pluginy"; príčina fantómu potvrdená čítaním kódu — `add_instance` tej istej
+definície bez atribútov inštancie = kópia bez identity, ktorá sa mení s originálom.)*
+
+**Čo sa zmenilo — T1a (PR #293, v0.9.24).** Mower aj Snaper prestali byť samostatné pluginy a stali sa modulmi enginu (`noxun_engine/tools/`, namespace
+`Noxun::Engine::Tools::*`). Majú **jeden spoločný toolbar „Noxun Nástroje"** a submenu Extensions → Noxun Engine → **Nástroje**: −90° · +90° · 180° · Z = 0 · Z posun… · Kópia
+vľavo · Kópia vpravo · Prisunúť vľavo · Prisunúť vpravo. Toolbar je zámerne **druhý** — toolbar enginu má železné pravidlo „do modelu sa nezapisuje" (D-103/D-105), kým nástroje
+model menia. Verziu, aktualizáciu (D-52) aj logovanie preberajú od enginu; vlastné registrácie rozšírení zanikli. **Kópia je konečne plnohodnotná skrinka:** ide cestou „Vložiť
+kópiu" cez šev enginu (vlastná definícia, nové CAB číslo, config, kusovník, ceny), krok = **šírka korpusu po jeho VLASTNEJ osi X** (sedí aj pri otočenej skrinke) a prípona
+názvu je výhradne písmenová („Dolná 900" → „Dolná 900 a" → „… b"). Pred každou mutáciou beží bariéra `ScaleWatch.flush_pending!` a kontrola rigidity, takže odložený tik
+observera sa neprilepí na krok používateľa a šikmá/škálovaná skrinka sa odmietne s hláškou namiesto tichého nezmyslu.
+
+**Čo sa zmenilo — T1b (PR #294, v0.9.25).** Staré samostatné inštalácie sa **odstraňujú samy**, aby v SketchUpe nezostali dva toolbary navyše. Robia to **dva kanály**:
+
+- **boot migrácia pluginu** (`noxun_engine/tools/legacy_cleanup.rb`) — beží z `main.rb` PRED registráciou toolbaru a odstráni `noxun_mower_loader.rb`, `Noxun_Mower/`,
+  `snaper.rb` a `snaper/` z priečinka `Plugins`, z ktorého je engine načítaný. Prečo boot a nie updater: pri aktualizácii (D-52) vykonáva swap ešte starý kód v pamäti, takže
+  nový `updater.rb` sa k slovu dostane až po reštarte;
+- **inštalátor** `INSTALL_noxun_engine.ps1` — maže tie isté štyri cesty hneď po skopírovaní balíka.
+
+**Zlyhanie nie je „hotovo".** `rm_rf` (aj `Remove-Item`) chybu potlačí a vráti sa bez výnimky, preto má **každý cieľ postkontrolu existencie**: kľúč do markera sa zapíše až po
+overenej neprítomnosti všetkých štyroch a inštalátor pri zamknutom súbore vypíše varovanie s cestami namiesto „HOTOVO". Marker `%APPDATA%\NOXUN\Engine\legacy_cleanup.json`
+žije **mimo swapovaného stromu** (v `Plugins` by ho aktualizácia zmazala) a je **kľúčovaný normalizovanou cestou `Plugins`** — jeden počítač môže mať viac verzií SketchUpu a
+každá inštalácia sa upratuje samostatne. Migrácia nikdy nezhodí boot enginu (vlastný chránený blok) a po úspechu ukáže **jednorazovú** hlášku „Staré pluginy Mower a Snaper boli
+odstránené — po reštarte SketchUpu ostane jeden toolbar Noxun Nástroje." (legacy toolbary ostávajú v pamäti bežiaceho SketchUpu do reštartu). Inštalátor preto končí **len**
+pokynom „Reštartuj SketchUp" — hint na živý `load "noxun_engine.rb"` zanikol, lebo v bežiacom procese držia `@loaded`/`file_loaded?` registráciu preskočenú.
+
+**Testy.** Headless `tests/pure/test_nastroje1_tools.rb`, `test_nastroje1_observer.rb` a `test_nastroje1b_legacy.rb` (migrácia nad dočasným `Plugins` stromom: plný prechod,
+idempotencia, dve inštalácie SketchUpu nad jedným app-data, normalizácia kľúča, „zmazanie sa nepodarilo" = nie je hotovo, poškodený marker, výnimka nezhodí volajúceho);
+in-SU sekcie `run_tools1`, `run_tools1_async` a `run_tools1b`. Architektúra: odseky `tools.rb` · `mower_calc.rb` · `mower.rb` · `snap_calc.rb` · `snaper.rb` ·
+`legacy_cleanup.rb` v [../../docs/architecture/ui-lifecycle.md](../../docs/architecture/ui-lifecycle.md).
 
 ### D-110 · Pridávanie kovaní je neprehľadné (Michal 24.8.2026, prvý test v0.8.0; vyriešené 4.9.2026, PR #290, v0.9.23)
 

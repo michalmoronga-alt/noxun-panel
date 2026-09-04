@@ -65,6 +65,7 @@ DC pasce [DC_PRAVIDLA.md](DC_PRAVIDLA.md) · UI dizajn [UI_DIZAJN.md](UI_DIZAJN.
 | `tools` (registrátor toolbaru „Noxun Nástroje" + spoločná vrstva: preflight, bariéra, mutácia) | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
 | `mower_calc` · `snap_calc` (čisté jadrá — posun, názov kópie, AABB sweep) | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
 | `mower` (rotácie, Z, kópia cez šev enginu, Z-dialog) · `snaper` (prisunutie na doraz, viditeľnosť) | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
+| `legacy_cleanup` (boot migrácia — odstránenie starých inštalácií Mower/Snaper, marker per Plugins) | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
 
 ### UI — Inspector + satelity (`noxun_engine/ui/`, V0.4.5+)
 

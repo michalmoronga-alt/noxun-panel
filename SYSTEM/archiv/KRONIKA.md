@@ -17,6 +17,29 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **NÁSTROJE-1 · T1b — STARÉ INŠTALÁCIE MOWER/SNAPER SA UPRATUJÚ SAMY (v0.9.25, 4.9.2026, PR #294):** druhá polovica dávky; **NÁSTROJE-1 je KOMPLET a D-20 uzavretá**.
+  Po T1a žili nástroje v balíku enginu, ale ich pôvodné samostatné inštalácie ostávali v `Plugins` — SketchUp by tak registroval dva toolbary navyše. Upratanie ide **dvoma
+  kanálmi**: **boot migrácia pluginu** (nový `noxun_engine/tools/legacy_cleanup.rb`, volaná z `main.rb` PRED registráciou toolbaru) a **inštalátor**
+  `INSTALL_noxun_engine.ps1`. Ciele sú štyri a doslovné: `noxun_mower_loader.rb` · `Noxun_Mower/` · `snaper.rb` · `snaper/`.
+  **Prečo boot, a nie updater.** Pri aktualizácii jedným klikom (D-52) vykonáva swap ešte **starý kód v pamäti** — nový `updater.rb` sa spustí až po reštarte. Kód, ktorý má
+  legacy upratať, teda musí bežať na začiatku bootu **nového** balíka, nie v aktualizátore. Hook má vlastný chránený blok (vzor `Materials.boot_cutover!`): zlyhanie migrácie
+  nikdy nezhodí menu, toolbar ani observer.
+  **Zlyhanie nie je „hotovo".** `FileUtils.rm_rf` aj `Remove-Item` chybu potlačia a vrátia sa bez výnimky, takže jediným dôkazom je **postkontrola existencie po mazaní**. Kľúč
+  do markera sa preto zapíše **až po overenej neprítomnosti všetkých štyroch** cieľov a inštalátor pri zamknutom súbore vypíše varovanie s cestami namiesto „HOTOVO";
+  migrácia sa pri ďalšom boote jednoducho zopakuje.
+  **Marker mimo swapovaného stromu, kľúčovaný cestou.** `%APPDATA%\NOXUN\Engine\legacy_cleanup.json` (JsonFileStore + `.bak`, zápis pod `Materials.with_catalog_lock` podľa
+  R-08) — v `Plugins` by ho aktualizácia zmazala spolu so stromom a migrácia by sa spúšťala donekonečna. Kľúčom je **normalizovaná cesta priečinka `Plugins`**
+  (`Updater.normalize_path` + `downcase`, Codex #288 kolo 3 P2): jeden počítač môže mať viac verzií SketchUpu a každá inštalácia sa upratuje samostatne. Vedomá odchýlka od
+  R-11: poškodený marker s platnou `.bak` zápisy **nezastaví** — obsahom je len zoznam už uprataných ciest, jeho strata stojí nanajvýš jeden bezvýsledný prechod, kým
+  zastavenie zápisov by migráciu nechalo bežať navždy.
+  **Reštart je súčasť sľubu.** Po úspešnom mazaní ostávajú legacy toolbary v pamäti bežiaceho SketchUpu, preto hláška (log + status + `UI::Notification`, nikdy modal
+  blokujúci boot) hovorí o reštarte — a je jednorazová sama od seba, lebo ďalší boot skončí stavom `skipped`. Z inštalátora zanikol hint na živý `load "noxun_engine.rb"`
+  (audit 3 FIX 3): v bežiacom procese držia `@loaded`/`file_loaded?` registráciu preskočenú, takže by toolbar nezaregistroval ani legacy toolbary neodstránil.
+  **Testy:** headless `tests/pure/test_nastroje1b_legacy.rb` (13 testov nad dočasným `Plugins` stromom — plný prechod, idempotencia, dve inštalácie nad jedným app-data,
+  normalizácia kľúča, „mazanie vrátilo bez výnimky, ale cesta ostala", poškodený marker, výnimka nezhodí volajúceho, zhoda oboch kanálov, poradie boot hooku) + in-SU sekcia
+  `run_tools1b` (dočasný strom + dôkaz, že boot hook upratal živú inštaláciu). Inštalátor overený manuálne nad dočasnou kópiou `Plugins` (`NOXUN_INSTALL_DEST`), vrátane
+  vetvy so zamknutým súborom. Mutácie: kľúč zapísaný pri zlyhaní mazania · marker bez cesty `Plugins` · `rescue` v `run!` odstránený · inštalátor hlási „HOTOVO" vždy.
+
 - **NÁSTROJE-1 · T1a — MOWER A SNAPER V BALÍKU NOXUN ENGINE (v0.9.24, 4.9.2026, PR #293):** prvá polovica dávky, ktorá rieši **D-20**. Dva pomocné pluginy Michala (Noxun Mower
   a Snaper) prestali byť samostatné rozšírenia a stali sa modulmi enginu (`noxun_engine/tools/`); verziu, aktualizáciu (D-52) aj logovanie preberajú od neho, ich UI ostáva
   zámerne také, aké bolo („nechať im svoj svet"). **T1b** — boot migrácia starých inštalácií a inštalátor — má vlastný PR; **D-20 preto ostáva otvorená**.

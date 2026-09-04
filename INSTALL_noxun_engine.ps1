@@ -1,4 +1,5 @@
-# Noxun Engine installer — skopiruje plugin do SketchUp 2026 Plugins zlozky.
+# Noxun Engine installer — skopiruje plugin do SketchUp 2026 Plugins zlozky
+# a odstrani stare samostatne instalacie Mower/Snaper (NASTROJE-1 T1b).
 # Bezpecne pre opakovane spustenie: prepise len kodove subory pluginu.
 
 $ErrorActionPreference = 'Stop'
@@ -13,10 +14,22 @@ if (-not (Test-Path $loader) -or -not (Test-Path $plugdir)) {
 }
 
 # Ciel: SketchUp 2026 Plugins (podla zadania). Ak chyba, skus najnovsiu verziu.
+#
+# NOXUN_INSTALL_DEST je VYHRADNE testovacia poistka (NASTROJE-1 T1b): dovoli
+# spustit skript nad DOCASNOU kopiou Plugins stromu a overit upratanie legacy
+# ciest bez toho, aby sa siahlo na zivu instalaciu. V beznom behu premenna
+# nastavena NIE JE a ciel ostava realny Plugins priecinok.
 $suRoot = Join-Path $env:APPDATA 'SketchUp'
 $dest   = Join-Path $suRoot 'SketchUp 2026\SketchUp\Plugins'
 
-if (-not (Test-Path $dest)) {
+if ($env:NOXUN_INSTALL_DEST) {
+  $dest = $env:NOXUN_INSTALL_DEST
+  if (-not (Test-Path -LiteralPath $dest)) {
+    New-Item -ItemType Directory -Path $dest -Force | Out-Null
+  }
+  Write-Host ('POZOR: ciel prepisany cez NOXUN_INSTALL_DEST (testovaci rezim): ' + $dest) -ForegroundColor Yellow
+}
+elseif (-not (Test-Path $dest)) {
   $fallback = @()
   if (Test-Path $suRoot) {
     $fallback = Get-ChildItem $suRoot -Directory |
@@ -85,6 +98,44 @@ Get-ChildItem $destPlug -Recurse -Directory |
     }
   }
 
-Write-Host 'HOTOVO. Plugin nainstalovany.' -ForegroundColor Green
-Write-Host 'Restartuj SketchUp, alebo v Ruby konzole: load "noxun_engine.rb"'
+# UPRATANIE STARYCH INSTALACII (NASTROJE-1 T1b): Mower a Snaper su od tejto
+# verzie sucastou balika enginu, takze ich samostatne instalacie musia z
+# `Plugins` zmiznut — inak by SketchUp registroval dva toolbary navyse.
+# Toto je DRUHY kanal upratania; prvy je boot migracia v samotnom plugine
+# (`noxun_engine/tools/legacy_cleanup.rb`), ktora bezi pri kazdom starte.
+#
+# POSTKONTROLA JE POVINNA: `Remove-Item` v try/catch chybu prehltne, takze
+# jediny dokaz o zmazani je opakovany `Test-Path`. Zamknuty subor (beziaci
+# SketchUp) preto NIE JE „HOTOVO" — vypise sa varovanie s cestami.
+$legacyTargets = @('noxun_mower_loader.rb', 'Noxun_Mower', 'snaper.rb', 'snaper')
+$legacyFailed = @()
+foreach ($name in $legacyTargets) {
+  $legacyPath = Join-Path $dest $name
+  if (-not (Test-Path -LiteralPath $legacyPath)) { continue }
+  try {
+    Remove-Item -LiteralPath $legacyPath -Recurse -Force -ErrorAction Stop
+  } catch {
+    # Chyba sa neriesi tu — rozhoduje az postkontrola nizsie.
+  }
+  if (Test-Path -LiteralPath $legacyPath) {
+    $legacyFailed += $legacyPath
+  } else {
+    Write-Host ('  odstraneny stary plugin: ' + $name) -ForegroundColor DarkYellow
+  }
+}
+
+Write-Host ''
+if ($legacyFailed.Count -gt 0) {
+  Write-Host 'POZOR: plugin je nainstalovany, ale STARE pluginy sa nepodarilo odstranit:' -ForegroundColor Yellow
+  foreach ($legacyPath in $legacyFailed) { Write-Host ('  ' + $legacyPath) -ForegroundColor Yellow }
+  Write-Host 'Zavri SketchUp a spusti skript znova, alebo cesty zmaz rucne.' -ForegroundColor Yellow
+  Write-Host 'Noxun Engine sa o to pokusi aj sam pri dalsom starte SketchUpu.' -ForegroundColor Yellow
+} else {
+  Write-Host 'HOTOVO. Plugin nainstalovany.' -ForegroundColor Green
+}
+# Ziadny hint na zivy `load "noxun_engine.rb"` (audit 3 FIX 3): po uprataní by
+# nacital loader do BEZIACEHO procesu, kde uz `@loaded`/`file_loaded?` drzia
+# registraciu preskocenu — takze by nezaregistroval toolbar enginu a legacy
+# toolbary by z pamate neodstranil. Jedina spravna odpoved je restart.
+Write-Host 'Restartuj SketchUp.'
 Write-Host ''

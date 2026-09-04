@@ -180,6 +180,7 @@ unless NxTest::IN_SKETCHUP
     core/price_refresh
     tools/mower_calc
     tools/snap_calc
+    tools/legacy_cleanup
   ].each { |rel| require File.join(NxTest::ROOT, 'noxun_engine', rel) }
 end
 

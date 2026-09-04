@@ -13940,6 +13940,109 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- NASTROJE-1 (T1b): BOOT MIGRACIA STARYCH INSTALACII ---------------------
+  # Sekcia bezi v DVOCH rovinach:
+  #   (a) DOCASNY `Plugins` strom — plny prechod migracie (styri ciele, marker
+  #       kluceny NORMALIZOVANOU cestou, druhy beh = no-op) bez akehokolvek
+  #       dotyku zivej instalacie;
+  #   (b) ZIVA instalacia — dokaz, ze boot hook v `main.rb` naozaj bezal: v
+  #       priecinku `Plugins`, z ktoreho je engine nacitany, uz legacy ciele
+  #       NIE SU a marker NA CESTE, KTORU BOOT POUZIL, nesie kluc tejto cesty.
+  #       Tuto rovinu vie dokazat LEN SketchUp (headless sada boot nema).
+  # Model sa nedotyka: ziadna geometria, ziadna operacia, ziadny krok Spat.
+  # Sekcia NENASTAVUJE ziadny `test_dir_override` — rovina (a) si cestu markera
+  # podava PARAMETROM do TEMP suboru, takze po nej niet co vracat.
+  def tools1b_seed(plugins)
+    File.binwrite(File.join(plugins, 'noxun_mower_loader.rb'), "require 'Noxun_Mower/loader'\n")
+    FileUtils.mkdir_p(File.join(plugins, 'Noxun_Mower', 'icons'))
+    File.binwrite(File.join(plugins, 'Noxun_Mower', 'loader.rb'), "# legacy\n")
+    File.binwrite(File.join(plugins, 'Noxun_Mower', 'icons', 'rot.png'), 'x')
+    File.binwrite(File.join(plugins, 'snaper.rb'), "# legacy loader\n")
+    FileUtils.mkdir_p(File.join(plugins, 'snaper'))
+    File.binwrite(File.join(plugins, 'snaper', 'main.rb'), "# legacy\n")
+    plugins
+  end
+
+  def tools1b_done(marker)
+    raw = JSON.parse(File.binread(marker))
+    raw.is_a?(Hash) && raw['done'].is_a?(Hash) ? raw['done'] : {}
+  rescue StandardError
+    {}
+  end
+
+  def run_tools1b(model)
+    cleanup(model)
+    return ok('T1b: modul boot migracie je nacitany', false) unless defined?(e::Tools::LegacyCleanup)
+
+    lc = e::Tools::LegacyCleanup
+    ents_before = model.entities.length
+    root = File.join(Dir.tmpdir, "noxun_t1b_#{Process.pid}")
+    plugins = File.join(root, 'plugins')
+    marker = File.join(root, 'marker.json')
+    begin
+      FileUtils.rm_rf(root)
+      FileUtils.mkdir_p(plugins)
+      tools1b_seed(plugins)
+      # Cudzi plugin = kontrola blast radiusu; zoznam cielov je uzavrety.
+      FileUtils.mkdir_p(File.join(plugins, 'Noxun_Pick'))
+
+      # --- (a) DOCASNY `Plugins` strom --------------------------------------
+      res = lc.run!(plugins, marker_path: marker)
+      ok("T1b (a): migracia prebehla (stav #{res['state']}, odstranene #{Array(res['removed']).length})",
+         res['state'] == 'done' && Array(res['removed']).length == lc::TARGETS.length)
+      alive = lc::TARGETS.select { |n| File.exist?(File.join(plugins, n)) }
+      ok("T1b (a): vsetky STYRI legacy ciele su prec (#{alive.empty? ? 'ziadny nezostal' : alive.join(', ')})",
+         alive.empty?)
+      ok('T1b (a): cudzi plugin v Plugins ostal nedotknuty',
+         Dir.exist?(File.join(plugins, 'Noxun_Pick')))
+      key = lc.normalize_key(plugins)
+      ok('T1b (a): marker nesie kluc TEJTO cesty Plugins', tools1b_done(marker).key?(key))
+      msg = lc.message_for(res)
+      ok("T1b (a): hlaska pyta RESTART — #{msg[0, 56]}", msg.include?('reštarte'))
+
+      # Legacy sa „vrati" (rucna reinstalacia): migracia je JEDNORAZOVA, nie
+      # strazca priecinka — druhy beh sa jej uz nedotkne a nic nehlasi.
+      tools1b_seed(plugins)
+      again = lc.run!(plugins, marker_path: marker)
+      ok("T1b (a): druhy beh nad tou istou cestou uz nerobi NIC (#{again['state']})",
+         again['state'] == 'skipped' && lc.message_for(again).empty?)
+      ok('T1b (a): a legacy subory po no-op behu naozaj ostali',
+         lc::TARGETS.all? { |n| File.exist?(File.join(plugins, n)) })
+
+      # --- (b) ZIVA instalacia: dokaz, ze boot hook bezal --------------------
+      # POZOR NA CESTU MARKERA: `lc.path` sa dopocitava z `Materials.dir`, ktoru
+      # runner (sandbox APPDATA, `test_dir_override`) presmeruje AZ PO boote —
+      # takze by sa kluc hladal v subore, do ktoreho boot nikdy nepisal. Preto
+      # sa cita ZAPAMATANY zaznam bootu (`boot_marker_path` / `boot_result`),
+      # nie aktualne dopocitana cesta.
+      live = e::Updater.plugins_dir_of(e.plugin_dir)
+      left = lc::TARGETS.select { |n| File.exist?(File.join(live, n)) }
+      ok("T1b (b): ziva instalacia je BEZ legacy Mower/Snaper (#{left.empty? ? 'ciste' : left.join(', ')})",
+         left.empty?)
+      live_key = lc.normalize_key(live)
+      boot = lc.boot_result
+      boot_marker = lc.boot_marker_path
+      ok("T1b (b): boot hook bezal a dobehol (stav #{boot.is_a?(Hash) ? boot['state'] : 'ziadny'})",
+         boot.is_a?(Hash) && %w[done skipped].include?(boot['state']))
+      ok('T1b (b): boot bezal nad ZIVOU cestou Plugins',
+         boot.is_a?(Hash) && boot['plugins'] == live_key)
+      e::JsonFileStore.reload!(boot_marker) unless boot_marker.empty?
+      boot_done = boot_marker.empty? ? {} : lc.load_marker(boot_marker)
+      ok("T1b (b): marker na ceste, ktoru boot POUZIL, nesie kluc zivej instalacie (#{boot_marker})",
+         File.exist?(boot_marker) && boot_done.is_a?(Hash) && boot_done.key?(live_key))
+    ensure
+      begin
+        FileUtils.rm_rf(root)
+      rescue StandardError
+        nil
+      end
+    end
+    ok('T1b: model sa nedotkol (ziadna geometria, ziadny krok Spat)',
+       model.entities.length == ents_before)
+  rescue StandardError => ex
+    log_line("FAIL: T1b sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
   # NASTROJE-1 (T1a) ASYNC: casovanie voci REALNEMU debounce tiku observera.
   # Sync sekcia dokazuje spravanie nad pokojnym observerom; tu ide o presne ten
   # pripad, ktory bariera `flush_pending!` rieši — pouzivatel spravi krok a HNED
@@ -14740,6 +14843,7 @@ module NoxunSuRunner
     run_kovb2(model)          # KOV-B2: strom katalogu (`hw_tree`) nad sandboxom, zalozenie polozky s vyrobcom + zalozenie vyrobcu ZO STUDIA = BEZ kroku Spat, pin navrchu svojho listu, payload sekcie s popiskami a taxonomiou
     run_kova2b(model)        # KOV-A2b: smer otvarania v modeli — lifecycle overlayu, symbol na spravnom kridle a prednej ploche, prestavba/Spat, dup-ID per instancia, vykon
     run_tools1(model)        # NASTROJE-1 (T1a): Mower + Snaper v baliku enginu (kopia cez sev, rotacie/Z ako 1 krok Spat, odmietnutia bez operacie, bariera observera, Snaper a viditelnost)
+    run_tools1b(model)       # NASTROJE-1 (T1b): boot migracia starych instalacii — docasny Plugins strom (styri ciele, marker per cesta, druhy beh = no-op) + dokaz, ze boot hook upratal ZIVU instalaciu
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
