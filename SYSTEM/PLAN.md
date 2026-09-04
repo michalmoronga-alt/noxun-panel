@@ -549,7 +549,10 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   prepare → commit identický". `Ids.next_board_id`, definícia + `draw_board`, orientácia ako transformácia inštancie NAD polohou — vnútro definície ostáva ležiace, výrobné dáta nedotknuté.
   **Downgrade brána doskových šablón (audit 4, vzor kabinetovej cesty):** pred `prepare_insert` sa znovu načíta AUTORITATÍVNY (RAW) záznam šablóny dosky a vyššia/neznáma schéma sa
   ODMIETNE (dnešný `handle_insert_board` skladá známe polia rovno z `template_ref` a starší plugin by budúcu šablónu, napr. s `attachment`, ticho zmenil na voľnú dosku a ešte ju
-  opečiatkoval) — `BoardBuilder` dostane vlastný doskový schema marker (`BOARD_CONFIG_SCHEMA`, zapísaný do configu KAŽDEJ dosky) a kontrolu RAW záznamu; **brána platí pre VŠETKY cesty, kde sa číta
+  opečiatkoval) — `BoardBuilder` dostane vlastný doskový schema marker (`BOARD_CONFIG_SCHEMA`, zapísaný do configu KAŽDEJ dosky) a kontrolu RAW záznamu; **marker píše a zachováva KAŽDÝ zapisovateľ
+  doskovej šablóny (Codex #296 kolo 5 P1):** seed dosiek, `TemplateStore.upsert` pre dosky (bez markera = zápis odmietnutý, nie „legacy"), budúce migrácie; existujúce doskové šablóny bez markera
+  dostanú pri prvom načítaní knižnice migráciu na marker `1` (= dnešný tvar); testy bežia nad PERZISTOVANÝMI záznamami (seed → načítanie, upsert → načítanie, migrácia), nie len nad umelo
+  označenou fixture; vyššia schéma v šablóne = odmietnutie vloženia; **brána platí pre VŠETKY cesty, kde sa číta
   uložený config dosky (Codex #296 P1):** prestavba uloženej dosky (`rebuild_in_operation`), zmena orientácie z karty, vloženie zo šablóny (uloženie DOSKY ako šablóny dnes NEEXISTUJE — `saveTemplateAs` je kabinetový, doskové
   šablóny vznikajú zo seedu/`TemplateStore.upsert` a uložený config nečítajú; mimo D1, Codex #296 kolo 4 P2) **a dávkové cesty, ktoré config normalizujú PRED prestavbou —
   najmä „Nahradiť UNI…" v `materials_dialog.rb` (~r. 873–886: `BoardBuilder.normalize(merged)` → `rebuild_in_operation`; normalizácia zahodí `config_schema` aj neznáme polia, takže brána MUSÍ
