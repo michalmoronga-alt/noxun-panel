@@ -566,7 +566,10 @@ NxTest.test('KOV-B2: zapis z modalu odomyka busy lock v OBOCH vetvach (MDH.itemR
   bad_args = NxB2.arg(bad_scripts, 'MDH.itemResult')
   NxTest.assert(bad_args, 'ODMIETNUTIE ohlasi tiez — inak by modal ostal zamknuty navzdy')
   NxTest.assert_equal(false, bad_args[0], 'ok = false (modal ostava otvoreny s hodnotami)')
-  NxTest.assert_equal('item_code', bad_args[2].first['field'], 'chyba nesie pole')
+  # Review #290/3 P2: kluc ULOZISKA sa preklada na pole MODALU — inak by
+  # `NXModal.showErrors` vstup nenasiel a hlaska skoncila v zbernom pase.
+  NxTest.assert_equal('code', bad_args[2].first['field'],
+                      'chyba nesie pole MODALU (`item_code` -> `code`)')
 end
 
 NxTest.test('KOV-B2: server ECHUJE token odoslania (review #290 P2)') do
@@ -674,4 +677,20 @@ NxTest.test('KOV-B2: state_payload nesie SK popisky a taxonomiu') do
   NxTest.assert_equal([{ 'name' => 'Sensys', 'manufacturer' => 'Hettich' }],
                       p['taxonomy']['series'], 'rady nesu svojho vyrobcu')
   NxTest.assert_equal(false, p['taxonomy']['read_only'], 'stav taxonomie chodi tiez')
+  # Review #290/3 P2: `read_only` a `write_blocked` su DVA rozne stavy —
+  # degradovana taxonomia sa CITA, ale zapisat sa do nej neda.
+  NxTest.assert_equal(false, p['taxonomy']['write_blocked'],
+                      'nad zdravou taxonomiou sa zapisat DA')
+  NxTest.assert(p['taxonomy'].key?('write_blocked'),
+                'priznak chodi vzdy — modal podla neho skryva „+ Vytvoriť"')
+end
+
+NxTest.test('KOV-B2: fail-closed payload taxonomie hlasi read_only AJ write_blocked') do
+  NxB2.catalog!([])
+  # Nekompatibilna taxonomia: `load` nic nevyda, zapisat sa neda.
+  NxB2.taxonomy_read_only!
+  p = NxB2::DLG.state_payload
+  NxTest.assert_equal(true, p['taxonomy']['read_only'], 'cudzi/novsi subor = read-only')
+  NxTest.assert_equal(true, p['taxonomy']['write_blocked'], 'a zapis je zablokovany')
+  NxTest.assert_equal([], p['taxonomy']['manufacturers'], 'zoznam je prazdny')
 end

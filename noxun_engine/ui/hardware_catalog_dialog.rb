@@ -269,6 +269,11 @@ module Noxun
             },
             'revision' => HardwareTaxonomy.revision,
             'read_only' => HardwareTaxonomy.read_only?,
+            # Review #290/3 P2: DEGRADOVANY stav (poskodeny primar + platna
+            # `.bak`) sa CITA — `read_only?` je `false` — ale kazdy zapis do
+            # suboru sa odmietne. Bez tohto priznaku by modal ponukal
+            # „+ Vytvoriť…", ktore vzdy skonci `:write_failed`.
+            'write_blocked' => HardwareTaxonomy.write_blocked?,
             'state_reason' => HardwareTaxonomy.state_reason.to_s
           }
         rescue StandardError => e
@@ -277,7 +282,7 @@ module Noxun
           # vyrobcu ani radu neponuka (a nedovoli zalozit) — lepsie nez ponuka,
           # z ktorej sa nic neda ulozit.
           { 'manufacturers' => [], 'series' => [], 'revision' => '',
-            'read_only' => true,
+            'read_only' => true, 'write_blocked' => true,
             'state_reason' => 'zoznam výrobcov sa nedá načítať' }
         end
 
@@ -1016,11 +1021,20 @@ module Noxun
              "#{Array(errors).to_json}, #{op.to_s.to_json}, #{token.to_s.to_json})")
         end
 
+        # Review #290/3 P2: katalog hlasi kluce ULOZISKA (`item_code`,
+        # `name_sk`, `price_eur_vat`), ale polia modalu sa volaju inak. Bez
+        # prekladu by `NXModal.showErrors` pole nenasiel a bezne odmietnutia
+        # (duplicitny kod, zaporna cena) by skoncili v zbernom pase nad
+        # formularom — bez oznaceneho vstupu. Ostatne kluce su 1:1.
+        MODAL_FIELDS = { 'item_code' => 'code', 'name_sk' => 'name',
+                         'price_eur_vat' => 'price', 'demos_url' => 'demos' }.freeze
+
         # `[status, info, field]` z katalogu -> `[{field, msg}]` pre modal.
         # Bez `field` ide hlaska do zberneho pasu navrchu formulara.
         def item_errors(msg, field)
           e = { 'msg' => msg.to_s }
-          e['field'] = field.to_s unless field.to_s.strip.empty?
+          key = field.to_s.strip
+          e['field'] = MODAL_FIELDS.fetch(key, key) unless key.empty?
           [e]
         end
 

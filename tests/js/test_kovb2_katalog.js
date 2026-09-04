@@ -81,6 +81,18 @@ function last(name){ const l = sent(name); return l.length ? l[l.length - 1][1] 
 // a klient prijme LEN zhodu (review #290 P2).
 function tok(name){ const p = last(name); return p ? p.token : ''; }
 function q(sel){ return DOC.querySelector(sel); }
+// Čistý modal „Nová položka" BEZ zvyškového proposalu z predchádzajúceho
+// bloku. Od review #290/3 P2 hotový proposal prežije aj úspešný zápis inej
+// položky, takže sady, ktoré očakávajú prázdny formulár, si ho musia zahodiť
+// tou istou cestou ako používateľ — vymazaním poľa Démos.
+function bootModal(){
+  boot();
+  H.hwItemOpen(null, null, {});
+  demosType('');
+  global.NXModal.close();
+  H.hwItemOpen(null, null, {});
+}
+
 // Napise do pola Démos hodnotu TAK, ako to robi pouzivatel (kostra `lookup`
 // -> `hwDemosSearch` -> debounce -> `hw_demos_preview`).
 function demosType(text){
@@ -92,8 +104,11 @@ function demosType(text){
 }
 function qa(sel){ return DOC.querySelectorAll(sel); }
 
-const CATS = ['ZAVESY', 'VYSUVY', 'NOHY'];
-const LABELS = { ZAVESY: 'Závesy', VYSUVY: 'Výsuvy', NOHY: 'Nohy a montáž' };
+// `OSTATNE` je v `CATEGORIES` vždy — je to zberná kategória a zároveň
+// EFEKTÍVNA hodnota pre položku s neznámym uloženým kódom (review #290/3 P2).
+const CATS = ['ZAVESY', 'VYSUVY', 'NOHY', 'OSTATNE'];
+const LABELS = { ZAVESY: 'Závesy', VYSUVY: 'Výsuvy', NOHY: 'Nohy a montáž',
+                 OSTATNE: 'Ostatné' };
 const TAX = {
   manufacturers: ['Blum', 'Hettich'],
   series: [{ name: 'Sensys', manufacturer: 'Hettich' },
@@ -241,7 +256,8 @@ function treeResp(over){
      ['demos', 'code', 'name', 'price', 'unit', 'category', 'manufacturer', 'series', 'notes'],
      'poradie poli je poradie dodavatelskeho listu (mockup scena 3)');
   eq(f[0].type, 'lookup', 'Démos je nasepkavac nad SERVEROVYM hladanim');
-  eq(f[5].options.map(function(o){ return o[1]; }), ['Závesy', 'Výsuvy', 'Nohy a montáž'],
+  eq(f[5].options.map(function(o){ return o[1]; }),
+     ['Závesy', 'Výsuvy', 'Nohy a montáž', 'Ostatné'],
      'kategorie sa ponukaju SK popiskom, hodnota ostava kodom');
   eq(f[5].options.map(function(o){ return o[0]; }), CATS, 'hodnota je kod');
 
@@ -653,8 +669,7 @@ const PROP = { ok: true, pid: 'p1', url: 'https://www.demos-trade.sk/k-atira/',
 // ====== 15) review #290 P2: rozbehnutý náhľad po zmene vstupu ================
 
 (function(){
-  boot();
-  H.hwItemOpen(null, null, {});
+  bootModal();
   demosType(PROP.url);
   ok(!!last('hw_demos_preview'), 'náhľad odišiel');
 
@@ -900,6 +915,154 @@ const PROP = { ok: true, pid: 'p1', url: 'https://www.demos-trade.sk/k-atira/',
   eq(DOC.getElementById('nxm_name').value, 'Položka B', 'a koncept B sa nezahodil');
   ok(H.hwItemManOptions('').some(function(o){ return o[0] === 'Okno A'; }),
      'zoznam sa napriek tomu obnovil — je to globálny stav');
+  global.NXModal.close();
+})();
+
+// ==== 22) review #290/3 P2: čaká sa aj na náhľad z NAŠEPKÁVAČA =============
+// Vložená URL zápis blokovala, výber zo zhôd (`onPick`) nie — a formulár
+// pritom stále držal PREDCHÁDZAJÚCI produkt, takže by sa uložil ako ručná
+// položka bez väzby.
+
+(function(){
+  bootModal();
+  demosType(PROP.url);
+  H.MDH.demosPreview(PROP);
+  eq(DOC.getElementById('nxm_code').value, '357695', 'formulár drží produkt A');
+
+  // Používateľ hľadá názvom a klikne na zhodu → náhľad B beží.
+  demosType('atira');
+  H.MDH.demosResults({ query: 'atira', results: [
+    { url: 'https://www.demos-trade.sk/atira-620/', label: 'K-Atira 620' }
+  ] });
+  const hit = q('[data-nxm-act="lookuppick"]');
+  ok(!!hit, 'zhoda je v ponuke');
+  SENT.length = 0;
+  dispatch(hit, 'click');
+  ok(!!last('hw_demos_preview'), 'výber zo zhôd spustil náhľad');
+
+  SENT.length = 0;
+  global.NXModal.submit();
+  eq(sent('hw_create').length, 0,
+     'zápis počas bežiaceho náhľadu z našepkávača NEPREJDE (žiadna ručná položka z A)');
+  eq(sent('hw_demos_create').length, 0, 'ani cestou z Démosu');
+  ok(textOf(MODAL_ROOT).indexOf('Načítavam produkt z Démosu') > -1, 'a povie, na čo sa čaká');
+  global.NXModal.close();
+})();
+
+// ==== 23) review #290/3 P2: kategória mimo CATEGORIES v editore =============
+
+(function(){
+  boot();
+  const legacy = { item_code: 'L1', name_sk: 'Legacy položka', category: 'KLUCKY',
+                   unit: 'ks', row_rev: 'rL' };
+  H.MDH.setItems({ items: [legacy], state: 'ok' });
+  H.hwItemOpen(legacy, null, {});
+  eq(DOC.getElementById('nxm_category').value, 'OSTATNE',
+     'neznáma uložená kategória sa ukáže ako EFEKTÍVNA („Ostatné"), nie ako prvá v zozname');
+
+  DOC.getElementById('nxm_notes').value = 'iba poznámka';
+  SENT.length = 0;
+  global.NXModal.submit();
+  const p = last('hw_patch');
+  ok(p, 'uloženie odišlo');
+  ok(!Object.prototype.hasOwnProperty.call(p.patch, 'category'),
+     'a kategóriu NEPOSIELA — položka sa úpravou poznámky neprepíše na „Závesy"');
+  eq(p.patch.notes, 'iba poznámka', 'ide len skutočná zmena');
+
+  // Keď ju používateľ NAOZAJ zmení, patch ju nesie.
+  H.hwItemOpen(legacy, null, {});
+  const cat = DOC.getElementById('nxm_category');
+  cat.value = 'NOHY';
+  SENT.length = 0;
+  global.NXModal.submit();
+  eq(last('hw_patch').patch.category, 'NOHY', 'vedomá zmena kategórie sa pošle');
+  global.NXModal.close();
+
+  // Čistá funkcia: bez načítaných kategórií sa hodnota nemení (nemáme podľa čoho).
+  eq(H.hwEffectiveCategory('KLUCKY'), 'OSTATNE', 'neznámy kód -> Ostatné');
+  eq(H.hwEffectiveCategory('ZAVESY'), 'ZAVESY', 'známy kód ostáva');
+})();
+
+// ==== 24) review #290/3 P2: prísne parsovanie ceny ==========================
+
+(function(){
+  boot();
+  eq(H.hwPriceKey('18,90'), '18.9', 'čiarka aj bodka sú tá istá cena');
+  eq(H.hwPriceKey('18.90'), '18.9', 'a formát nerozhoduje');
+  ok(H.hwPriceKey('18.90abc') !== H.hwPriceKey('18.90'),
+     'koncový odpad NIE JE tá istá cena (parseFloat bral iba predponu)');
+  ok(H.hwPriceKey('18,90 €') !== H.hwPriceKey('18.90'), 'ani mena za číslom');
+  eq(H.hwPriceKey(''), '', 'prázdna = nezadaná');
+
+  // Úprava: neplatná cena musí padnúť PRI POLI, nie skončiť „Nič sa nezmenilo".
+  H.hwItemOpen(ITEMS[0], null, {});
+  DOC.getElementById('nxm_price').value = '4,18 €';
+  SENT.length = 0;
+  global.NXModal.submit();
+  eq(sent('hw_patch').length, 0, 'neplatná cena sa neodošle');
+  ok(global.NXModal.isOpen(), 'modal ostáva otvorený');
+  ok(textOf(MODAL_ROOT).indexOf('Cena musí byť číslo') > -1, 'a hláška je pri poli');
+  global.NXModal.close();
+
+  // Nová položka proti proposalu: prepísaná (neplatná) cena nesmie prejsť ako
+  // „nedotknutá" a uložiť serverový návrh.
+  bootModal();
+  demosType(PROP.url);
+  H.MDH.demosPreview(PROP);
+  DOC.getElementById('nxm_price').value = '18.90abc';
+  SENT.length = 0;
+  global.NXModal.submit();
+  eq(sent('hw_demos_create').length, 0, 'proposal sa NEULOŽÍ pod cenou, ktorú nikto neoveril');
+  eq(sent('hw_create').length, 0, 'a ani ručná cesta s nezmyslom');
+  ok(textOf(MODAL_ROOT).indexOf('Cena musí byť číslo') > -1, 'hláška je pri poli');
+  global.NXModal.close();
+})();
+
+// ==== 25) review #290/3 P2: degradovaná taxonómia — bez „+ Vytvoriť" ========
+
+(function(){
+  boot();
+  // `read_only` je FALSE (mená sa čítajú zo zálohy), ale zápis je zablokovaný.
+  H.MDH.init({ items: ITEMS, state: 'ok', categories: CATS, category_labels: LABELS,
+               units: ['ks', 'set'],
+               taxonomy: { manufacturers: ['Blum', 'Hettich'], series: TAX.series,
+                           read_only: false, write_blocked: true,
+                           state_reason: 'poškodený súbor — čítam zo zálohy' } });
+  const mans = H.hwItemManOptions('').map(function(o){ return o[0]; });
+  eq(mans, ['', 'Blum', 'Hettich'],
+     'existujúce mená sa vyberať DAJÚ — „+ Vytvoriť" sa neponúka (skončilo by :write_failed)');
+  const sers = H.hwItemSerOptions('Hettich', '').map(function(o){ return o[0]; });
+  eq(sers, ['', 'Sensys', 'InnoTech Atira'], 'to isté pri rade');
+
+  H.hwItemOpen(null, null, {});
+  const man = DOC.getElementById('nxm_manufacturer');
+  ok(!man.hasAttribute('disabled'),
+     'select NIE JE zamknutý — degradovaná taxonómia sa čítať dá (na rozdiel od read-only)');
+  man.value = 'Hettich';
+  dispatch(man, 'change');
+  eq(DOC.getElementById('nxm_manufacturer').value, 'Hettich', 'a výber funguje');
+  global.NXModal.close();
+})();
+
+// ==== 26) review #290/3 P2: proposal po úspešnej úprave INEJ položky ========
+
+(function(){
+  bootModal();
+  demosType(PROP.url);
+  H.MDH.demosPreview(PROP);
+  eq(DOC.getElementById('nxm_code').value, '357695', 'proposal je pripravený');
+  global.NXModal.close();                    // používateľ ho odloží
+
+  // Medzitým upraví a uloží úplne inú položku.
+  H.hwItemOpen(ITEMS[1], null, {});
+  DOC.getElementById('nxm_notes').value = 'iná položka';
+  global.NXModal.submit();
+  H.MDH.itemResult(true, 'Uložené.', [], 'patch', tok('hw_patch'));
+  ok(!global.NXModal.isOpen(), 'úprava sa uložila a zavrela');
+
+  H.hwItemOpen(null, null, {});
+  eq(DOC.getElementById('nxm_code').value, '357695',
+     'pripravený produkt PREŽIL uloženie cudzej úpravy');
   global.NXModal.close();
 })();
 

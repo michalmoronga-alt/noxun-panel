@@ -450,6 +450,12 @@
     MDH_TAX = { manufacturers: tax.manufacturers || [],
                 series: tax.series || [],
                 read_only: tax.read_only === true,
+                // Review #290/3 P2: DEGRADOVANA taxonomia (poskodeny primar,
+                // platna `.bak`) sa CITA — `read_only` je `false` — ale KAZDY
+                // zapis do nej zlyha. „+ Vytvoriť…" by teda vzdy skoncilo
+                // `:write_failed`; ponuka sa preto skryje, vyber existujucich
+                // mien ostava.
+                write_blocked: tax.write_blocked === true,
                 state_reason: tax.state_reason || '' };
   }
 
@@ -569,6 +575,10 @@
 
   function mdhDemosLoad(url){
     MDH_DEMOS = { status: 'pending' };
+    // Review #290/3 P2: cakanie nastavuje SPOLOCNY loader, nie jednotlive
+    // volajuce — inak vyber zo naseptavaca (`onPick`) zapis nezablokoval
+    // a ulozil hodnoty PREDCHADZAJUCEHO produktu ako rucnu polozku.
+    HW_DEMOS_WAIT = true;
     // Generacia, s ktorou nahlad ODISIEL. Odpoved sa prijme LEN vtedy, ked sa
     // vstup medzitym NEZMENIL (review #290 P2, vzor `gen` v `hw_manual_search`).
     HW_DEMOS_SENT_GEN = HW_DEMOS_GEN;
@@ -621,7 +631,8 @@
       return;
     }
     if (mdhDemosIsUrl(q)){
-      // Nahlad sa CHYSTA — kym nedobehne, zapis sa nepusti (nizsie).
+      // Nahlad sa CHYSTA — kym nedobehne, zapis sa nepusti (priznak nastavi
+      // `mdhDemosLoad`, tu ho drzime uz pocas debounce).
       HW_DEMOS_WAIT = true;
       done([], 0);
       mdhDemosTimer = setTimeout(function(){ mdhDemosLoad(q); }, 400);
@@ -677,7 +688,7 @@
     if (hwTaxLocked()) return hwLockedOptions(current, '— bez výrobcu');
     var out = [['', '— bez výrobcu']];
     (MDH_TAX.manufacturers || []).forEach(function(m){ out.push([String(m), String(m)]); });
-    out.push([HW_NEW_OPT, '+ Vytvoriť výrobcu…']);
+    if (!MDH_TAX.write_blocked) out.push([HW_NEW_OPT, '+ Vytvoriť výrobcu…']);
     return out;
   }
   function hwItemSerOptions(manufacturer, current){
@@ -687,7 +698,7 @@
     mdhSeriesOf(m).forEach(function(s){ out.push([s, s]); });
     // Rada patri presne jednemu vyrobcovi (KOV-B1) — bez vybraneho vyrobcu
     // sa zalozit NEDA.
-    if (m && m !== HW_NEW_OPT) out.push([HW_NEW_OPT, '+ Vytvoriť radu…']);
+    if (m && m !== HW_NEW_OPT && !MDH_TAX.write_blocked) out.push([HW_NEW_OPT, '+ Vytvoriť radu…']);
     return out;
   }
 
@@ -760,17 +771,31 @@
     if (String(d.name || '').trim() === ''){
       out.push({ field: 'name', msg: 'Názov je povinný.' });
     }
+    // Neplatna cena musi PADNUT PRI POLI — inak by uprava skoncila hlaskou
+    // „Nič sa nezmenilo" a nova polozka by sa ulozila proti proposalu.
+    if (!hwPriceValid(d.price)){
+      out.push({ field: 'price',
+                 msg: 'Cena musí byť číslo (alebo prázdna = nezadaná) — bez meny a medzier.' });
+    }
     return out;
   }
 
   // Cena na porovnanie (2 desatinne miesta, ciarka aj bodka) — bez toho by
   // „18,90" vs. „18.9" vyzeralo ako rucna zmena a polozka by prisla o vazbu
   // na Demos.
+  // Review #290/3 P2: parsuje sa CELY retazec. `parseFloat` berie ciselnu
+  // PREDPONU, takze „18.90abc" aj „18,90 €" davali ten isty kluc ako 18.90 —
+  // uprava sa potom zavrela s „Nič sa nezmenilo" a proti proposalu z Demosu
+  // to vyzeralo, ze sa ceny nikto nedotkol (a ulozil sa serverovy navrh).
+  // Neplatna hodnota dostane vlastny kluc, ktory sa NIKDY nerovna platnemu.
   function hwPriceKey(v){
     var s = String(v == null ? '' : v).trim().replace(',', '.');
     if (s === '') return '';
-    var f = parseFloat(s);
-    return isFinite(f) ? String(Math.round(f * 100) / 100) : s;
+    if (!/^\d+(\.\d+)?$/.test(s)) return '!' + s;
+    return String(Math.round(parseFloat(s) * 100) / 100);
+  }
+  function hwPriceValid(v){
+    return hwPriceKey(v).charAt(0) !== '!';
   }
   // Prepisal pouzivatel niektory z udajov, ktore vlastni PROPOSAL? Potom to uz
   // nie je overena polozka z Demosu (R4) — uklada sa ako rucna.
@@ -801,13 +826,25 @@
     return out;
   }
 
+  // Review #290/3 P2: EFEKTIVNA kategoria — ta ista mapa, akou polozku
+  // zaraduje strom (`tree_category_of` na serveri). Ulozena hodnota mimo
+  // `CATEGORIES` (starsi alebo cudzi zapis) v selecte moznost nema, takze by
+  // prehliadac vybral PRVU (`ZAVESY`) a uprava poznamky by polozku ticho
+  // preradila medzi zavesy. Prazdny zoznam (neinicializovany klient) necha
+  // hodnotu tak, ako je — nemame podla coho rozhodovat.
+  function hwEffectiveCategory(value){
+    var c = String(value == null ? '' : value);
+    if (!(MDH_CATS || []).length) return c;
+    return MDH_CATS.indexOf(c) >= 0 ? c : 'OSTATNE';
+  }
+
   // Draft z ULOZENEJ polozky (uprava).
   function hwItemDraftOf(item){
     var i = item || {};
     return hwItemDraft({
       code: i.item_code, name: i.name_sk,
       price: (i.price_eur_vat == null) ? '' : i.price_eur_vat,
-      unit: i.unit, category: i.category,
+      unit: i.unit, category: hwEffectiveCategory(i.category),
       manufacturer: i.manufacturer, series: i.series, notes: i.notes
     });
   }
@@ -886,7 +923,7 @@
                 base: edit ? hwItemDraftOf(item) : null,
                 trigger: trigger,
                 draft: d, sent: false, token: '', taxPending: null, taxToken: '',
-                demosPending: false };
+                usedProposal: false, demosPending: false };
   }
 
   var HW_REOPEN = false;
@@ -1050,6 +1087,7 @@
         MDH_DEMOS, String(d.category || ''), String(d.notes || '').trim(),
         String(d.manufacturer || ''), String(d.series || ''));
       pay.token = hwItemArm();
+      HW_ITEM.usedProposal = true;   // tento zapis proposal SPOTREBUJE
       mdhSend('hw_demos_create', pay);
       return;
     }
@@ -1220,9 +1258,12 @@
       HW_ITEM.sent = false;
       HW_ITEM.token = '';
       if (ok === true){
-        // Server potvrdil: proposal aj pamat rozpisaneho konceptu zanikaju
-        // a okno sa zatvara.
-        MDH_DEMOS = null;
+        // Server potvrdil: pamat rozpisaneho konceptu zanika a okno sa zatvara.
+        // Review #290/3 P2: proposal sa zahadzuje LEN vtedy, ked ho potvrdeny
+        // zapis naozaj SPOTREBOVAL (`hw_demos_create`). Ulozena uprava CUDZEJ
+        // polozky s nim nema nic spolocne — a pripraveny produkt by po nej
+        // z „Nová položka" zmizol.
+        if (HW_ITEM.usedProposal === true) MDH_DEMOS = null;
         NXModal.setBusy(false, { clear: true });
         NXModal.close();
         return;
@@ -1760,6 +1801,7 @@
       hwItemDraftFromProposal: hwItemDraftFromProposal,
       hwItemCreatePayload: hwItemCreatePayload, hwItemPatch: hwItemPatch,
       hwItemNote: hwItemNote, hwDemosDirty: hwDemosDirty, hwPriceKey: hwPriceKey,
+      hwPriceValid: hwPriceValid, hwEffectiveCategory: hwEffectiveCategory,
       hwItemManOptions: hwItemManOptions, hwItemSerOptions: hwItemSerOptions,
       hwItemCatOptions: hwItemCatOptions, hwDemosHit: hwDemosHit,
       hwItemOpen: hwItemOpen, hwTreeState: hwTreeState,
