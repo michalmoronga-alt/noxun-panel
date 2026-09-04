@@ -95,15 +95,30 @@ module Noxun
           {}
         end
 
-        # Zapis je UPLNA NAHRADA suboru (vzor `DimSeries.set`): nacitany zoznam
-        # + novy kluc. Bezi pod tym istym medziprocesovym zamkom ako ostatne
-        # katalogy priecinka (R-08), aby si dve okna SketchUpu zoznam neprepisali.
+        # Zapis je UPLNA NAHRADA suboru (vzor `DimSeries.set`), preto musi byt
+        # CELY cyklus CITAJ -> ZLUC -> ZAPIS pod jednym medziprocesovym zamkom
+        # (R-08).
+        #
+        # Codex #295 kolo 1 (P2): povodne sa marker cital PRED zamkom. Dva
+        # sucasne bootujuce procesy (dve okna SketchUpu, dve verzie so
+        # zdielanym app-data) tak oba precitali STARY `done`, zamok ich zapisy
+        # len zoradil — a neskorsi zapis prepisal marker BEZ kluca toho
+        # druheho. Jednorazova garancia per Plugins cesta tym padla a ta
+        # instalacia sa migrovala znova.
+        #
+        # `JsonFileStore.read` navyse drzi SEKUNDOVU cache (`CHECK_INTERVAL`),
+        # ktora v tomto okne vrati snapshot spred cudzieho zapisu bez toho, aby
+        # sa vobec pozrela na disk. Cudzi PROCES nasu cache neinvaliduje, takze
+        # sa pred citanim pod zamkom vyslovne zahadzuje (`reload!`).
+        #
         # Zlyhanie vracia FALSE — volajuci to musi priznat, nie vydat za uspech.
         def remember!(key, removed, marker_path)
-          done = load_marker(marker_path)
-          done[key] = { 'at' => Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ'),
-                        'removed' => Array(removed) }
+          stamp = { 'at' => Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                    'removed' => Array(removed) }
           with_catalog_lock do
+            JsonFileStore.reload!(marker_path) # cudzi zapis nasu cache nezmaze
+            done = load_marker(marker_path)
+            done[key] = stamp
             JsonFileStore.write(marker_path, 'std' => STD, 'done' => done)
           end
           true

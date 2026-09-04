@@ -15,7 +15,10 @@
 #     sa cista instalacia neprehladavala pri kazdom boote);
 #   * poskodeny marker boot NEZHODI — cita sa `.bak`, inak sa zalozi novy;
 #   * vynimka v migracii NEUTECIE k volajucemu (boot enginu je nedotknutelny);
-#   * cudzie subory v Plugins sa NEDOTKNU.
+#   * cudzie subory v Plugins sa NEDOTKNU;
+#   * SUBOH DVOCH PROCESOV (Codex #295 P2): kym nas boot caka na zamok, cudzi
+#     proces zapise svoj kluc PRIAMO na disk — po nasom zapise musi marker
+#     niest OBA (citaj-zluc-zapis cele pod zamkom + zahodena cache store-u).
 #
 # MUTACIE OVERENE (kazda zhodila aspon jeden assert tejto sady):
 #   1. kluc sa zapise aj pri zlyhanom mazani (postkontrola vyhodena)
@@ -23,7 +26,9 @@
 #   2. marker je jeden zdielany priznak bez cesty Plugins (`done` = bool)
 #      -> „T1b: druha instalacia SketchUpu sa uprace SAMOSTATNE";
 #   3. `rescue` v `run!` odstraneny (vynimka uteka von)
-#      -> „T1b: vynimka v migracii NEZHODI volajuceho".
+#      -> „T1b: vynimka v migracii NEZHODI volajuceho";
+#   4. citanie a zlucenie markera SPAT pred zamok (stav pred Codex #295 P2)
+#      -> „T1b: sucasny boot druheho procesu NEPRIDE o svoj kluc".
 #
 # CELA SADA BEZI NAD DOCASNYM `Plugins` STROMOM — nikdy nad zivym priecinkom
 # SketchUpu. Marker sa vzdy podava ako parameter do TEMP suboru, takze sa
@@ -320,6 +325,68 @@ NxTest.test('T1b: neexistujuci alebo prazdny priecinok Plugins skonci chybou BEZ
     NxTest.assert(ghost['reason'].include?('niet'), "dovod neuvadza cestu: #{ghost['reason']}")
     NxTest.assert_equal('error', LC.run!('  ', marker_path: env[:marker])['state'])
     NxTest.assert(!File.exist?(env[:marker]), 'odmietnuta migracia zapisala marker')
+  ensure
+    FileUtils.rm_rf(env[:root])
+  end
+end
+
+# --- (8) suboh dvoch procesov nad zdielanym markerom (Codex #295 P2) ---------
+
+# Cudzi PROCES zapisuje PRIAMO na disk — nasa `JsonFileStore` cache o tom nevie.
+# Stub `with_catalog_lock` zrkadli realne casovanie: kym prvy proces caka na
+# zamok, druhy stihne dokoncit svoj zapis.
+module NxT1b
+  module_function
+
+  def with_foreign_write(marker, done_payload)
+    sc = LC.singleton_class
+    sc.send(:alias_method, :nx_t1b_orig_lock, :with_catalog_lock)
+    sc.send(:define_method, :with_catalog_lock) do |&blk|
+      File.binwrite(marker, JSON.pretty_generate('std' => LC::STD, 'done' => done_payload))
+      nx_t1b_orig_lock(&blk)
+    end
+    yield
+  ensure
+    sc = LC.singleton_class
+    if sc.method_defined?(:nx_t1b_orig_lock) || sc.private_method_defined?(:nx_t1b_orig_lock)
+      sc.send(:remove_method, :with_catalog_lock)
+      sc.send(:alias_method, :with_catalog_lock, :nx_t1b_orig_lock)
+      sc.send(:remove_method, :nx_t1b_orig_lock)
+    end
+  end
+end
+
+NxTest.test('T1b: sucasny boot druheho procesu NEPRIDE o svoj kluc (citaj-zluc-zapis pod zamkom)') do
+  env = NxT1b.sandbox
+  begin
+    NxT1b.seed_legacy!(env[:plugins])
+    other = '/c/sketchup 2025/plugins'
+    older = '/c/sketchup 2024/plugins'
+
+    # Marker uz nieco obsahuje — `run!` si ho precita hned na zaciatku (kontrola
+    # `skipped`) a tym si NAPLNI sekundovu cache `JsonFileStore`.
+    File.binwrite(env[:marker], JSON.pretty_generate(
+                                  'std' => LC::STD,
+                                  'done' => { older => { 'at' => '2026-09-01T00:00:00Z', 'removed' => [] } }
+                                ))
+    Noxun::Engine::JsonFileStore.reload!(env[:marker])
+
+    # Kym nas proces caka na zamok, CUDZI proces zapise svoj kluc priamo na disk.
+    res = NxT1b.with_foreign_write(env[:marker],
+                                   older => { 'at' => '2026-09-01T00:00:00Z', 'removed' => [] },
+                                   other => { 'at' => '2026-09-04T00:00:00Z', 'removed' => ['snaper.rb'] }) do
+      LC.run!(env[:plugins], marker_path: env[:marker])
+    end
+    NxTest.assert_equal('done', res['state'])
+
+    done = NxT1b.marker_done(env[:marker])
+    NxTest.assert(done.key?(LC.normalize_key(env[:plugins])), 'chyba kluc NASEJ instalacie')
+    NxTest.assert(done.key?(other),
+                  'kluc SUCASNE bootujuceho procesu sa stratil — marker sa cita pred zamkom ' \
+                  "alebo zo stale cache (#{done.keys.inspect})")
+    NxTest.assert(done.key?(older), "stratil sa starsi kluc (#{done.keys.inspect})")
+    NxTest.assert_equal(['snaper.rb'], done[other]['removed'], 'cudzi zaznam sa prepisal')
+    NxTest.assert_equal(3, done.keys.length, "marker ma kluce #{done.keys.inspect}")
   ensure
     FileUtils.rm_rf(env[:root])
   end
