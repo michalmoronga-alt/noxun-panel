@@ -122,4 +122,5 @@ Pasca behu: prvý `life` beh skončil prázdny (agent skúsil `command` tool →
 | Ctrl+Z počas nástroja (bez operácie) | prídu len klávesy 17 + 90, `onCancel reason=2` nepotvrdený (nebolo čo vrátiť) | reason 2 ošetriť podľa docs, overí in-SU test D1 |
 | `Sketchup::Snap` | existuje (`direction`, `position`, `set`, `up`; `Entities#add_snap = true`) | NO ACTION pre V1, poznámka pre viazané diely |
 
-**Uzáver researchu:** outside-in HOTOVÝ (WebFetch + agy + probe). Packages GHOST-D1/D2 sú od 5.9.2026 v `SYSTEM/PLAN.md` (blok 4) ako autorita; ďalší krok = `codex-audit` pred implementáciou.
+**Uzáver researchu:** outside-in HOTOVÝ (WebFetch + agy + probe). Packages GHOST-D1/D2 sú od 5.9.2026 v `SYSTEM/PLAN.md` (blok 4) ako autorita a **`codex-audit` je HOTOVÝ (4 kolá, kolo 4
+SOUND — história v `GHOST_D1_D2_PACKAGE_DRAFT_2026-09-04.md`)**; ďalší krok = implementácia GHOST-D1 (brief → subagent), potom D2.
