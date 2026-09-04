@@ -5,7 +5,7 @@
 > Rozhodnutia Michala 4.9.: jeden balík, spoločný toolbar „Noxun Nástroje", UI nástrojov nemeniť, kópia cez engine, názov kópie s písmenovou príponou, tlačidlo „Vložiť kópiu" NIE.
 > Outside-in packet: [NASTROJE_OUTSIDE_IN_2026-09-04.md](NASTROJE_OUTSIDE_IN_2026-09-04.md). Referenčný kód: `../archiv_kod/legacy_*.rb.txt`.
 
-- **NÁSTROJE-1 · TASK PACKAGE „MOWER + SNAPER V BALÍKU NOXUN ENGINE" (D-20; V1 bod 1A — Michal 4.9.2026; Audit: HOTOVÝ — Codex CLI 4.9. (1 BLOCKER + 9 FIX + 1 NOTE) + Codex GH #288 kolá 1–3 + **Codex CLI audit 2 (4.9.: 1 BLOCKER + 5 FIX + 1 NOTE) zapracované** (v texte označené „audit 2"); čaká na potvrdzujúci CLI audit 3; in-SU POVINNÉ):**
+- **NÁSTROJE-1 · TASK PACKAGE „MOWER + SNAPER V BALÍKU NOXUN ENGINE" (D-20; V1 bod 1A — Michal 4.9.2026; Audit: HOTOVÝ — Codex CLI 4.9. (1 BLOCKER + 9 FIX + 1 NOTE) + Codex GH #288 kolá 1–3 + **Codex CLI audit 2 (4.9.: 1 BLOCKER + 5 FIX + 1 NOTE) zapracované** (v texte označené „audit 2"); **audit 3 (1 BLOCKER + 2 FIX) zapracovaný**; čaká na potvrdzujúci CLI audit 4; in-SU POVINNÉ):**
   **Cieľ:** jeden inštalačný balík — oba nástroje sa presunú ako moduly do `noxun_engine/tools/` (`mower.rb`, `snaper.rb` + ČISTÉ jadrá `mower_calc.rb`, `snap_calc.rb` bez `UI::*`; namespace
   `Noxun::Engine::Tools::*`), načíta ich `main.rb`, dostanú **jeden spoločný toolbar „Noxun Nástroje"** (poradie: −90° · +90° · 180° · Z = 0 · Z posun… · Kópia vľavo · Kópia vpravo · Prisunúť vľavo ·
   Prisunúť vpravo; slovenské tooltipy; menu Extensions → Noxun Engine → Nástroje). Vlastné registrácie rozšírení a `VERSION` nástrojov zaniknú — verziu aj update (D-52) preberá engine. **Prečo samostatný
@@ -33,8 +33,13 @@
   `move_ghost_op` sa nemôže prilepiť k ďalšiemu kroku používateľa. **Pred KAŽDOU polohovou mutáciou NOXUN objektu** (rotácia, Z, snap, kópia) nástroj zavolá NOVÉ explicitné API **`ScaleWatch.flush_pending!(model)`** (audit 2 BLOCKER: dnešný `guard`
   zabráni len NOVÝM udalostiam, naplnené fronty `@dirty/@added/@requested` nevyčistí a ručný `process_dirty` nezastaví debounce timer — prázdny timer by cez `@last_model` znovu spustil globálny
   `dedup_copies` a prilepil ho k ďalšej operácii): `flush_pending!` zastaví timer, zneplatní jeho generáciu a spracuje fronty (mierka → config + prestavba, ghost sync, dedup) PRED otvorením
-  operácie nástroja — aj pri čakajúcom obyčajnom Move/Rotate, nielen pri mierke. Po flushi sa transformácia číta znova; ak nie je rigidná (`CabinetBuilder.rigid_matrix?`), príkaz sa ODMIETNE
-  s hláškou (žiadny tichý neúspech) — platí pre rotáciu, Z, snap aj kópiu (audit 2 FIX 2: `attach_one` ukladá stabilný transform len pri rigidnej matici, návrh to nesmie obísť).
+  operácie nástroja — aj pri čakajúcom obyčajnom Move/Rotate, nielen pri mierke. **Je to skutočná BARIÉRA, nie jedno spracovanie (audit 3 BLOCKER):** `process_dirty` môže pri čerstvej kópii
+  nájsť staršiu duplicitu a znova zavolať `schedule` — nový timer s prázdnymi frontami by cez `@last_model` vykonal transparentný dedup PO operácii nástroja. Preto flush opakuje spracovanie,
+  kým observer nie je v pokoji (žiadny naplánovaný timer, prázdne `@dirty/@added/@requested`), so stropom iterácií (napr. 5) — ak pokoj nenastane, nástroj operáciu ODMIETNE s hláškou; multi-model
+  požiadavky ani `@prune_models` sa flushom nestrácajú. Test: „stará duplicita + čerstvá kópia → flush → operácia nástroja → žiadny timer a OBE identity opravené". Po flushi sa transformácia číta znova; ak nie je rigidná (`CabinetBuilder.rigid_matrix?`), príkaz sa ODMIETNE
+  s hláškou (žiadny tichý neúspech) — platí pre rotáciu, Z, snap aj kópiu (audit 2 FIX 2 + audit 3 FIX 2: `attach_one` dnes kontroluje LEN `scaled?` — dĺžky osí — takže šmyková matica s jednotkovými, ale nekolmými osami prejde a vetvy Move/Rotate aj verejný
+  `remember_transform` ju uložia bez kontroly; **rigidita sa preto vynúti PRIAMO na hranici cache** — `remember_transform`/`attach_one` uložia len `CabinetBuilder.rigid_matrix?` transform a
+  `reject_scale` nerigidný stav nikdy „nepotvrdí"; test s maticou s jednotkovými osami a nenulovým skalárnym súčinom).
   **`ScaleWatch.remember_transform`** sa volá až po úspešnom commite a LEN po potvrdenej rigidite (pod guardom ho observer nedosiahne; inak by neskôr odmietnutá šikmá mierka cez
   `reject_scale` obnovila polohu spred príkazu). Povinné testy: rotácia → okamžitá kópia (< debounce) → dobeh → Späť kópie vráti LEN kópiu, rotácia
   drží **a vo fronte observera neostane dirty udalosť**; posun nástrojom → odmietnutá (šikmá) mierka → poloha z nástroja ostáva; natívny Move → okamžitá Kópia → dobeh → Späť vráti LEN kópiu (žiadny ghost sync zdroja);
@@ -50,7 +55,8 @@
   **Upratanie starých inštalácií (FIX 7):** = **explicitná boot migrácia** v `main.rb` PRED registráciou toolbaru (pri aktualizácii vykonáva swap ešte starý kód, nový `updater.rb` beží až po reštarte):
   odstráni `noxun_mower_loader.rb`, `Noxun_Mower\`, `snaper.rb`, `snaper\` v Plugins; marker žije MIMO swapovaného stromu (`%APPDATA%\NOXUN\Engine\legacy_cleanup.json`) a je **kľúčovaný normalizovanou cestou Plugins priečinka** (viac verzií SketchUpu = viac Plugins, každý sa uprace samostatne — kolo 3 P2); kľúč sa zapíše **AŽ po overenej neprítomnosti všetkých štyroch cieľov** (`!File.exist?`/`!Dir.exist?` po mazaní — `rm_f`/`rm_rf` chybu potláčajú, audit 2 FIX 5), inak sa
   NEoznačí ako hotové (zopakuje sa nabudúce) + hláška; test s dvoma dočasnými Plugins koreňmi nad jedným app-data a test „mazanie vrátilo bez výnimky, ale cesta ostala"; inštalátor má rovnakú
-  postkontrolu pred hláškou o upratanií; inštalátor `INSTALL_noxun_engine.ps1` maže tie isté cesty. Zdroj nástrojov sa presunie do repa; pôvodné priečinky workspace ostanú ako archív. Referenčné kópie legacy zdrojov (nenačítavané, Codex #288 kolo 2): `SYSTEM/zdroje/archiv_kod/legacy_noxun_mower.rb.txt`, `legacy_snaper_main.rb.txt`,
+  postkontrolu pred hláškou o upratanií a **po tejto dávke vypíše LEN „Reštartuj SketchUp"** (audit 3 FIX 3: živý `load "noxun_engine.rb"` legacy toolbary neodregistruje a už načítaný
+  loader/`main.rb` registráciu preskočí cez `@loaded`/`file_loaded?`); pri zlyhanej postkontrole legacy cieľov NIE „HOTOVO", ale varovanie s cestami; inštalátor `INSTALL_noxun_engine.ps1` maže tie isté cesty. Zdroj nástrojov sa presunie do repa; pôvodné priečinky workspace ostanú ako archív. Referenčné kópie legacy zdrojov (nenačítavané, Codex #288 kolo 2): `SYSTEM/zdroje/archiv_kod/legacy_noxun_mower.rb.txt`, `legacy_snaper_main.rb.txt`,
   `legacy_snaper_snap.rb.txt`. **Ikony (kolo 3 P2):** 7 PNG ikon Mowera a 2 SVG Snapera sa presunú do repa do `noxun_engine/ui/icons/tools/` (sledované assety, žiadna závislosť na workspace).
   **Headless (FIX 8):** čisté jadrá (`*_calc.rb`) sú v zozname `tests/helper.rb`; UI registrácia je oddelená a guardovaná (`defined?(UI::Toolbar)`), takže sa bez SketchUpu nenačíta.
   **Scope OUT:** tlačidlo „Vložiť kópiu" v toolbare (Michal: nie) · nové funkcie nástrojov · zarovnanie výšky/hĺbky k susedovi (bod 1B) · Noxun_Pick/V2fable vkladanie · KOVANIE (starý) a
@@ -94,3 +100,10 @@
 5. **FIX** — marker upratania až po overenej neprítomnosti všetkých cieľov (aj inštalátor).
 6. **FIX** — visibility-aware bounds aj pre cieľ Snapera.
 7. **NOTE** — trojstav toolbaru výslovne (`get_last_state`), `install_toolbar` len ako vzor referencie/idempotencie.
+
+
+## Codex CLI audit 3 (4.9.2026, `task-mtmy3qre-v8zlp6`) — ZAPRACOVANÉ (kde: „audit 3")
+
+1. **BLOCKER** — `flush_pending!` = bariéra do pokoja (opakované spracovanie so stropom, žiadny naplánovaný timer, prázdne fronty; inak odmietnutie), multi-model a `@prune_models` zachované.
+2. **FIX** — rigidita vynútená na hranici cache observera (`rigid_matrix?` v `remember_transform`/`attach_one`, `reject_scale` nerigidné nepotvrdí; test šmyku).
+3. **FIX** — inštalátor po uprataní: len „Reštartuj SketchUp", žiadny živý `load`; zlyhaná postkontrola = varovanie, nie „HOTOVO".
