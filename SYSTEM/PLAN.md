@@ -537,70 +537,108 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → nový odsek `tools` v `docs/architecture/ui-lifecycle.md` + riadok rozcestníka `docs/ARCHITEKTURA.md` (guard) → README
   (inštalácia, upratanie starých pluginov) → D-20 do DOGFOODING_vyriesene (plný text + riadok indexu) → STAV/KRONIKA/PLAN.
 - **GHOST-D1 · TASK PACKAGE „GHOST PRE DOSKY — ZÁKLAD" (V1 bod 1B — Michal 4.9.2026; outside-in HOTOVÝ: WebFetch + agy 4.9. + probe SU 26.0.429 5.9. —
-  [zdroje/next_sessions/GHOST_OUTSIDE_IN_2026-09-04.md](zdroje/next_sessions/GHOST_OUTSIDE_IN_2026-09-04.md); Codex GH #288 kolá 1–2 zapracované; **Audit: `codex-audit` PRED implementáciou
-  POVINNÝ** (nová Tool plocha) — **stav: ČAKÁ**; in-SU POVINNÉ; štart po KOV-B3 alebo podľa Michala; história draftu v
-  [zdroje/next_sessions/GHOST_D1_D2_PACKAGE_DRAFT_2026-09-04.md](zdroje/next_sessions/GHOST_D1_D2_PACKAGE_DRAFT_2026-09-04.md)):**
+  [zdroje/next_sessions/GHOST_OUTSIDE_IN_2026-09-04.md](zdroje/next_sessions/GHOST_OUTSIDE_IN_2026-09-04.md); Codex GH #288 kolá 1–2 zapracované; **Audit: Codex CLI kolo 1 (5.9.: Sol 4 BLOCKER
+  + 11 FIX, Astra 1 BLOCKER + 6 FIX + 1 NOTE) ZAPRACOVANÉ — kolo 2 ČAKÁ** (história v [zdroje/next_sessions/GHOST_D1_D2_PACKAGE_DRAFT_2026-09-04.md](zdroje/next_sessions/GHOST_D1_D2_PACKAGE_DRAFT_2026-09-04.md));
+  in-SU POVINNÉ; štart po KOV-B3 alebo podľa Michala):**
   **Cieľ:** vloženie dosky z karty Dosky ide cez ghost ako pri skrinke (doska na kurzore, prichytenie na geometriu, kotvy, klik = vloženie) — dnes sa doska kladie synchrónne na `Placement.next_x`.
-  **Scope IN:** `BoardBuilder.prepare_insert` / **`commit_insert(model, plan, transform:, orientation:)`** (vzor R-03: zmrazený plán, ŽIADNA mutácia pred klikom; commit = JEDNA operácia
-  `start_operation('Vložiť dosku', true)` bez vnorenia + `rescue → abort_operation`; `Ids.next_board_id`, definícia + `draw_board`, orientácia ako transformácia inštancie NAD polohou — vnútro
-  definície ostáva ležiace, výrobné dáta nedotknuté). **Orientácia ide do commitu SAMOSTATNE** (Codex #288 P1): `stojaca` a `na_stenu` vedome zdieľajú maticu (STANDARD §orientácia), z `transform`
-  sa odvodiť nedá — finálnu hodnotu zo session nesie argument a zapíše sa do `config['orientation']` (in-SU test to overuje v uloženom configu).
-  `GhostTool` dostane **SUBJEKT** (skrinka | doska): `PlacementSession` číta obálku a kotvy zo subjektu (`Calc.envelope_points`/`anchor_points` dosky z dĺžky × šírky × hrúbky + orientácie),
-  commit cez šev subjektu; **klasický tok skrinky sa NEMENÍ** (existujúce `run_ghost*` sekcie zelené bez úpravy = charakterizácia).
+  **Šev `BoardBuilder.prepare_insert` → `commit_insert(model, plan, transform:, orientation:)` — kontrakt rovnako silný ako R-03 (`CabinetBuilder.commit_insert`, audit 1):** plán je
+  EXPLICITNÝ zmrazený typ (`BoardPlan`, nie voľný Hash) viazaný na IDENTITU modelu (cudzí `Model` = odmietnutie), `Geom::Transformation` sa pri commite snapshotuje RAZ (mutovateľný objekt),
+  kontrola root kontextu (otvorený edit kontext = odmietnutie so statusom) a **rigidná pravotočivá matica** (`rigid_matrix?`) — ŽIADNA mutácia pred klikom. **Zmrazený = aj výrobný snapshot:**
+  `prepare_insert` vyrieši materiál/`material_source`/názov proti katalógu RAZ a plán nesie už FINALIZOVANÝ serializovateľný config; `commit_insert` (ani D2 `replan`) NIKDY nenormalizuje znova
+  proti živému katalógu (dnešný `board_config` katalóg pri zápise číta znova a pri dupláku uprednostní aktuálny zdroj — šev to obíde: config ide z plánu až na entitu); test „zmeň katalóg po
+  prepare → commit identický". `Ids.next_board_id`, definícia + `draw_board`, orientácia ako transformácia inštancie NAD polohou — vnútro definície ostáva ležiace, výrobné dáta nedotknuté.
+  **Jeden POUŽÍVATEĽSKÝ krok Späť, nie „jedna operácia" (Astra BLOCKER):** vytváracia operácia `start_operation('Vložiť dosku', true)` + existujúci transparentný follow-up scale-lock zápis
+  (`dynamic_attributes/scaletool`, vzor `board_builder.rb` — presun do vytváracej operácie by vypol selection eventy, vynechanie by uvoľnilo scale úchopy) pod SPOLOČNÝM `ScaleWatch.guard`;
+  follow-up sa nesmie abortovať, `attach_one` ostáva; `rescue → abort_operation` len pre vytváraciu operáciu. **Bariéra pred mutáciou:** `ScaleWatch.flush_pending!(model)` PRED vytváracou operáciou
+  (vzor NÁSTROJE-1 kópia); `false` = nevkladať + status (čakajúca kópia/scale by sa prilepila k vloženiu a poškodila Redo). Overiť výber, Undo AJ Redo so zapnutým DC rozšírením.
+  **Orientácia ide do commitu SAMOSTATNE** (Codex #288 P1): `stojaca` a `na_stenu` vedome zdieľajú maticu (STANDARD §orientácia), z `transform` sa odvodiť nedá — finálnu hodnotu zo session nesie
+  argument a zapíše sa do `config['orientation']` (in-SU test to overuje v uloženom configu).
+  **`GhostTool` dostane SUBJEKT (skrinka | doska):** `PlacementSession` číta obálku a kotvy zo subjektu, commit cez šev subjektu; **klasický tok skrinky sa NEMENÍ** (existujúce `run_ghost*`
+  sekcie zelené bez úpravy) + nová charakterizácia **skrinka → doska → skrinka** (pamäť a callbacky sa nepomiešajú). **Pamäť ghostu je oddelená per subjekt** (`cabinet` / `board`): doska si
+  pamätá LEN rotáciu a kotvu; **orientácia žije LEN v session** a každá nová session ju číta z karty Dosky (karta ju nastavuje pri každej materializácii, aj zo šablóny — Codex #288 P2).
+  **Politika výšky dosky:** doska sa prichytáva plne v XYZ (`pick_free` sémantika s inferenciou; ŽIADNY Z-zámok z pamäte skrinky — inak roh hornej skrinky skončí na zamknutej výške), prázdny
+  model = rovina Z = 0; test snapu na ZVÝŠENÝ roh skrinky. **Server odmieta kabinetové callbacky pre dosku** (`ghost_lock_z` a spol. kontrolujú subjekt session, nie len „aktívna session").
+  **Kotvy dosky = AUTORITATÍVNA TABUĽKA** (nie odvodenie z helpera): pre každú orientáciu 4 body v lokálnych súradniciach dosky — `leziaca`: rohy SPODNEJ plochy (Z = 0), predná = hrana s
+  nižšou lokálnou Y (ako skrinka); `stojaca`: rohy ZADNEJ zvislej plochy pri podlahe/vrchu (doska stojí na spodnej hrane, kotva sadá na podlahu); `na_stenu`: rohy plochy priľahlej k stene;
+  nezávislý test: zvolená kotva COMMITNUTEJ geometrie skončí presne na kliknutom bode (nie porovnanie helper vs helper).
   **Klávesy (ROZHODNUTÉ (a) — Michal 4.9.):** ←/→ rotácia okolo Z (ako skrinka) · **↑/↓ = cyklus orientácie `leziaca → stojaca → na_stenu`** (vlastnosť dosky, nie voľná rotácia — kusovník,
-  hrany a ABS ostávajú správne; Z-režim skrinky pre dosku nahrádza orientácia) · ALT = kotvy · natívny zámok osí (↑←→↓ od SU 2016) je v ghoste vedome pohltený (`onKeyDown` vracia `true`;
-  probe 5.9.: šípky prídu s `VK_UP/DOWN/LEFT/RIGHT`, Shift s `VK_SHIFT`) · pásik ghostu ukazuje orientáciu.
-  **Štart orientácie z karty (Codex #288 P2):** každá NOVÁ session sa inicializuje z hodnoty karty Dosky (karta ju nastavuje pri každej materializácii, aj zo šablóny — `insert_state.js`/`form.js`);
-  pamäť ghostu drží orientáciu LEN pre zmeny klávesmi v rámci session (rotácia a kotva per doska ako doteraz). Karta Dosky: „Vložiť dosku" štartuje ghost session (ako „Vložiť skrinku"),
-  Esc = nič sa nevloží, 0 krokov Späť. **Pečiatka šablóny (Codex #288 P2):** `template_ref` dosky nesie SESSION a `stamp_once!`/„Naposledy použité" sa volá **až po úspešnom commite** —
-  Esc pečiatku NEzapíše (dnešný synchrónny `handle_insert_board` pečiatkuje po vložení; test Esc → poradie nezmenené).
+  hrany a ABS ostávajú správne; Z-režim skrinky pre dosku nahrádza orientácia a XYZ prichytenie) · ALT = kotvy · natívny zámok osí (↑←→↓ od SU 2016) je v ghoste vedome pohltený
+  (`onKeyDown` vracia `true`; probe 5.9.: šípky prídu s `VK_UP/DOWN/LEFT/RIGHT`, Shift s `VK_SHIFT`).
+  **Synchronizácia s kartou:** push ghostu nesie `orientation`; pásik ghostu ju ukazuje a JS aktualizuje `NXInsert.boardOrientation` BEZ materializácie/resetu karty (karta ukáže „stojaca"
+  hneď po ↑; ďalšia session štartuje z tejto hodnoty). Karta Dosky: „Vložiť dosku" štartuje ghost session (ako „Vložiť skrinku"), Esc = nič sa nevloží, 0 krokov Späť.
+  **Callbacky:** `insert_board` = D1 ghost (aj dvojklik šablóny dosky); D2 dostane SAMOSTATNÝ serverom whitelistovaný callback `draw_board` — HTML `disabled` ani názov tlačidla nie sú ochrana.
+  **Pečiatka šablóny (Codex #288 P2):** `template_ref` dosky nesie SESSION a `stamp_once!`/„Naposledy použité" sa volá **až po úspešnom commite** — Esc pečiatku NEzapíše.
   **Tool kontrakt (outside-in):** jeden `Sketchup::Tool` (kostra Trimble `02_custom_tool`, MIT); `getExtents` = obálka ghostu (náhľad mimo obálky modelu / prázdny model), prekresľovať
   `View#invalidate`; obrazovkové API (`x,y` callbackov, `draw2d`, viewport, `PickHelper`, vstup `pickray`) v LOGICKÝCH pixeloch (SU 2025+), geometria (`InputPoint#position`, obálka,
   `getExtents`, `View#draw`) v modelových jednotkách; `onCancel` reason 0 (Esc — probe ✔) / 1 (iný nástroj) / 2 (Undo počas nástroja) = zrušiť session bez zápisu;
   `Sketchup::Overlay` a `Sketchup::Snap` = NO ACTION (Snap = perzistentná snap entita pre natívny Move, `Entities#add_snap` — poznámka pre viazané diely po V1).
   **Scope OUT:** kreslenie na rozmer (D2) · roly dosiek (worktop/pilaster/plinth) · automatické generovanie · viazané diely (po V1).
-  **Testy a DoD:** headless — obálka a kotvy dosky per orientácia (3×), cyklus orientácie, štart session z hodnoty karty (predvolená šablóna „stojaca" po predošlej ležiacej session), plán
-  zmrazený (žiadna mutácia), `commit_insert` = jedna operácia a `orientation` v configu, subjekt skrinky nezmenený, pečiatka len po commite; **in-SU `run_ghost_d1`** — ghost dosky vloží dosku
-  na kliknutý bod s prichytením na roh skrinky, ↑ zmení orientáciu (stojaca) a **uložený config ju nesie**, ←/→ rotácia, ALT kotva, Esc = model nezmenený, 0 krokov Späť a šablóna
-  neopečiatkovaná, vloženie = 1 krok Späť, kusovník má dosku, ghost skrinky nezmenený. Mutácie min. 4 (orientácia zapísaná do výrobných osí · commit mimo operácie · subjekt skrinky číta
-  obálku dosky · orientácia odvodená z matice).
-  **Smoke pre Michala:** karta Dosky → Vložiť → doska visí na kurzore, prichytí sa na roh skrinky, ↑ ju postaví, klik vloží (karta ukáže „stojaca"), Ctrl+Z vráti; vkladanie skriniek ako doteraz.
-  **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `construction.md` (šev board_builder), `ui-lifecycle.md` (ghost subjekt, klávesy, pečiatka), ARCHITEKTURA router pri
-  novom súbore → STAV/KRONIKA/PLAN.
+  **Testy a DoD:** headless — tabuľka kotiev per orientácia (3×4 body) + obálka, cyklus orientácie, štart session z hodnoty karty (predvolená šablóna „stojaca" po predošlej ležiacej session),
+  plán zmrazený (žiadna mutácia; zmena katalógu po prepare → commit identický), `commit_insert` odmietne cudzí model / otvorený kontext / nerigidnú maticu, `orientation` v configu, pamäť per
+  subjekt (skrinka → doska → skrinka), pečiatka len po commite, **aktualizovaný `test_ghost_vkladanie.rb` (`handle_insert_board` = synchrónne ukončí session skrinky, založí session dosky,
+  pred klikom žiadna doska ani krok Späť)**; **in-SU `run_ghost_d1`** — ghost dosky vloží dosku na kliknutý bod s prichytením na roh skrinky (aj ZVÝŠENÝ roh), ↑ zmení orientáciu (stojaca),
+  karta ju ukáže a **uložený config ju nesie**, ←/→ rotácia, ALT kotva, Esc = model nezmenený, 0 krokov Späť a šablóna neopečiatkovaná, vloženie = 1 krok Späť **a Redo funguje**,
+  kusovník má dosku, ghost skrinky nezmenený (skrinka → doska → skrinka), `ghost_lock_z` pre dosku odmietnutý; **`run_ghost_d1_async`** — vloženie dosky počas čakajúcej kópie/scale
+  (bariéra `flush_pending!`), potom Undo/Redo čisté (vzor `run_ghost_async`). Mutácie min. 5 (orientácia zapísaná do výrobných osí · commit mimo operácie · subjekt skrinky číta obálku dosky ·
+  orientácia odvodená z matice · commit bez bariéry `flush_pending!`).
+  **Smoke pre Michala:** karta Dosky → Vložiť → doska visí na kurzore, prichytí sa na roh skrinky (aj hore), ↑ ju postaví, klik vloží (karta ukáže „stojaca"), Ctrl+Z vráti, Ctrl+Y vráti späť;
+  vkladanie skriniek ako doteraz.
+  **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `construction.md` (šev board_builder, BoardPlan, jeden krok Späť), `ui-lifecycle.md` (ghost subjekt, pamäť per subjekt,
+  klávesy, pečiatka, sync karty), ARCHITEKTURA router pri novom súbore → STAV/KRONIKA/PLAN.
 
-- **GHOST-D2 · TASK PACKAGE „KRESLENIE DOSKY NA ROZMER (Ghost 2.0)" (po D1; outside-in HOTOVÝ + probe SU 26.0.429 5.9.; Codex #288 kolá 1–2 zapracované; **Audit: `codex-audit` PRED
-  implementáciou POVINNÝ** — **stav: ČAKÁ**; in-SU POVINNÉ):**
+- **GHOST-D2 · TASK PACKAGE „KRESLENIE DOSKY NA ROZMER (Ghost 2.0)" (po D1; outside-in HOTOVÝ + probe SU 26.0.429 5.9.; Codex #288 kolá 1–2 zapracované; **Audit: Codex CLI kolo 1
+  (Sol + Astra, 5.9.) ZAPRACOVANÉ — kolo 2 ČAKÁ**; in-SU POVINNÉ):**
   **Cieľ:** doska sa nakreslí **dvoma ťahmi**: klik = nulový bod → ťah dĺžky (prichytenie SketchUp inference ALEBO napísané číslo v mm do meracieho poľa) → klik → ťah šírky → klik = vloženie;
   hrúbka z materiálu karty. **Ťahy sledujú LOKÁLNE osi dosky podľa orientácie** (Codex #288 P2): dĺžka = lokálna X (pri ležiacej aj stojacej doske vodorovná), šírka = lokálna Y (pri stojacej
-  zvislá) — pilaster: ↑ stojaca, 1. ťah = hĺbka (dĺžka), 2. ťah = výška (šírka); orientácia sa cyklí ↑/↓ ako v D1, smer 1. ťahu určí otočenie okolo Z. Precedens: natívny Rotated Rectangle
-  (jedno číslo na fázu — rozhodnutie Michala 4.9. potvrdené), OpenCutList 7.0 Smart Draw (GPL — len vzory), SketchList 3D (3 orientácie).
+  zvislá) — pilaster: ↑ stojaca, 1. ťah = hĺbka (dĺžka), 2. ťah = výška (šírka); orientácia sa cyklí ↑/↓ ako v D1 LEN pred prvým klikom. Precedens: natívny Rotated Rectangle (jedno číslo
+  na fázu — rozhodnutie Michala 4.9. potvrdené), OpenCutList 7.0 Smart Draw (GPL — len vzory), SketchList 3D (3 orientácie).
   **Predloha:** archívny V2fable Ghost 2.0 — `SYSTEM/zdroje/archiv_kod/v2fable_ghost_tool2.rb.txt` (fázy, `enableVCB?`/`onUserText`, axis snap, locks — port do subjektu dosky, nie kópia).
-  **Odvodený plán (Codex #288 P1):** D1 šev beží nad plánom zmrazeným PRED štartom ghostu; D2 pozná rozmery až po ťahoch → čistý krok **`replan(plan, length:, width:)`** = NOVÝ zmrazený plán
-  s finálnymi rozmermi, ktorý zachová snapshot materiálu a šablóny zo session; test: náhľad = config = geometria z odvodeného plánu.
+  **Callback:** samostatný serverom whitelistovaný `draw_board` (D1 `insert_board` ostáva pre vloženie a dvojklik šablóny); tlačidlo karty „Nakresliť".
+  **Smer dosky (audit 1 BLOCKER):** klik počiatku fixuje bod; **rotáciu okolo Z určuje smerový vektor kurzora v okamihu POTVRDENIA 1. fázy** (klik, Enter s číslom, prázdny Enter alebo zamknutá
+  dĺžka) premietnutý do roviny kreslenia; ak je vektor nulový (kurzor sa od počiatku nepohol — číslo napísané hneď, obe fázy zamknuté), použije sa **kanonický smer = lokálna +X podľa rotácie
+  session (←/→ pred prvým klikom)** a status to povie; nulový vektor sa NIKDY nedostane do transformácie (test). Fázový automat pokrýva **všetky 4 kombinácie zámkov** a číslo bez pohybu myšou.
+  **Zámky fáz — prenos do Ruby (audit 1 BLOCKER):** `NXInsert.boardLocks` je súkromný JS stav („NIKDY do Ruby") → pri štarte D2 session JS pošle **snapshot `locks: {length, width}` cez
+  `locksFlat('board')` ako SAMOSTATNÉ pole payloadu**; Ruby whitelist LEN `length`/`width` (Boolean) + hodnoty zamknutých rozmerov validované proti `BoardBuilder::LIMITS` už pri štarte session
+  (mimo limitu = session sa nespustí + status); zámky NIKDY neskončia vo výrobnom configu. Zámok z toho, že pole má hodnotu, neexistuje (Codex #288 P1: polia sú vždy predvyplnené 800 × 600).
+  **Odvodený plán (Codex #288 P1):** D1 šev beží nad plánom zmrazeným PRED štartom ghostu; D2 pozná rozmery až po ťahoch → čistý krok **`replan(plan, length:, width:)`** = NOVÝ zmrazený `BoardPlan`
+  s finálnymi rozmermi, ktorý zachová vyriešený výrobný snapshot (materiál, `material_source`, šablóna) BEZ opätovného čítania katalógu; **názov:** plán rozlišuje explicitný vs automatický
+  názov — automatický („Doska 800×600") sa finalizuje z NOVÝCH rozmerov, explicitný ostáva; test: náhľad = config = geometria z odvodeného plánu.
+  **Presnosť (audit 1 NOTE):** rozmery sa zaokrúhľujú na 0,01 mm (2 desatinné miesta, ako `board_config`) UŽ pri prijatí hodnoty (parser aj potvrdenie ťahu myšou) — náhľad, config a geometria
+  nesú tú istú hodnotu (test `600,123` → 600,12 všade; rebuild nemení geometriu).
   **Inferencia a lokálne osi (outside-in + probe 5.9.):** fázy cez `InputPoint#pick(view, x, y, ip_predošlý)` (inferencia relatívne k predošlému bodu vrátane „on axis from point");
   **lokálnu os definuje VLASTNÁ projekcia** bodu na priamku (`Point3d#project_to_line`, vzor axis snap archívneho Ghost 2.0) — probe 5.9. v SU 26.0.429: `view.lock_inference(ip_a, ip_b)`
-  so syntetickými `InputPoint.new(pt)` vracia `inference_locked? = false` (3×), natívny zámok na vlastnú os NEFUNGUJE; `lock_inference` sa použije LEN na natívne inferencie
-  (Shift — vzor `Eneroth3/inference-lock-lib`, MIT, len vzor). **Pravotočivý 2. ťah (Codex #288 P1):** pri zápornom smere sa posunie POČIATOK o −šírka po lokálnej Y, osi ostávajú
-  pravotočivé — žiadne obrátenie `dir_y`; in-SU prípady pre kladný aj záporný smer.
+  so syntetickými `InputPoint.new(pt)` vracia `inference_locked? = false` (3×), natívny zámok na vlastnú os NEFUNGUJE. **Voľný priestor (audit 1):** ak InputPoint nemá geometrickú inferenciu
+  (voľný bod na rovine kreslenia), premietnutie z vodorovnej roviny dáva pri zvislej šírke pilastra konštantnú výšku → **fallback = najbližší bod medzi `view.pickray(x, y)` a priamkou lokálnej
+  osi** (alt. pomocná rovina obsahujúca os a natočená ku kamere); degenerovaný pohľad (lúč rovnobežný s osou) = fáza nepokročí + status. In-SU: šírka pilastra ťahaná mimo geometrie v perspektíve
+  a pri otočených drawing axes. **Pravotočivý 2. ťah (Codex #288 P1):** pri zápornom smere sa posunie POČIATOK o −šírka po lokálnej Y, osi ostávajú pravotočivé — žiadne obrátenie `dir_y`;
+  in-SU prípady pre kladný aj záporný smer.
+  **Shift = natívny zámok inferencie (lifecycle, audit 1):** hold-to-lock (`onKeyDown` VK_SHIFT zamkne aktuálnu natívnu inferenciu `view.lock_inference(ip)`, `onKeyUp` odomkne); zámok sa
+  VŽDY uvoľní pri zmene fázy, `suspend`/`resume`, `deactivate` a `onCancel` (zámok z 1. fázy nesmie obmedziť 2. ani visieť po nástroji); vzor `Eneroth3/inference-lock-lib` (MIT, len vzor);
+  in-SU test skutočného `inference_locked?` (nie len projekčnej matematiky).
+  **Klávesy po potvrdení 1. fázy (audit 1):** ←/→ a ↑/↓ sú od potvrdenia dĺžky ZAMKNUTÉ (ignorované + status „orientáciu a rotáciu meň pred prvým klikom"), ALT v režime kreslenia nemá
+  význam (ignorovaný) — rozpracované rozmery nikdy nepatria inej sústave než náhľad a commit; Esc = reset celej session.
   **Meracie pole (probe 5.9.):** `enableVCB?`/`onUserText` len vo fázach 1–2, `Sketchup.vcb_label=` „Dĺžka (mm)" / „Šírka (mm)"; **jedno číslo na fázu**, Enter potvrdí; písaná hodnota príde
   cez `onUserText("600")`; **prázdny Enter = `Tool#onReturn(view)`** (`VK_RETURN` v SketchUp API NEEXISTUJE; `onKeyDown` dostane kód 13 aj v 26.0 — bez regresie; pri prázdnom poli `onUserText`
   nepríde) = vedome prevezme hodnotu karty pre TÚTO fázu (explicitná akcia, status to povie).
   **Parser:** VLASTNÝ, úplná zhoda po `strip`: `\A\s*(\d+(?:[.,]\d+)?)\s*(?:mm)?\s*\z/i` (bodka aj čiarka, `mm`/`MM` voliteľné); `abc2400xyz`, `2400mmjunk`, `~600`, `600;18` = neplatné;
-  nikdy `String#to_l`/`to_f` na surový text (locale s desatinnou čiarkou); mm Float → `Units` do modelu; **validácia proti `BoardBuilder::LIMITS` PRED prijatím** (dĺžka 10–5000, šírka
-  10–3000 mm — `normalize` inak ticho oreže a náhľad by ukázal iný rozmer, než sa vyrobí); mimo limitu / neplatný text = `UI.beep` + status s limitom + fáza ostáva (vzor Trimble
-  `99_sphere_tool`, MIT).
-  **Zámky fáz LEN z explicitného stavu zámkov karty (`NXInsert.boardLocks`)** — NIE z toho, že pole má hodnotu (Codex #288 P1: polia karty sú vždy predvyplnené 800 × 600, preskočili by sa
-  obe fázy) · prichytenie na osi + inference, obálka kreslená počas ťahu (`getExtents`, `View#invalidate`), kóty v tooltipe · Esc v hociktorej fáze = nič, 0 krokov Späť, šablóna
-  neopečiatkovaná (D1 pravidlo) · commit ako D1 (jedna operácia, `rescue → abort_operation`) · karta Dosky: dve tlačidlá „Vložiť" (D1) a „Nakresliť" (D2) — potvrdiť v audite/mockupe.
+  nikdy `String#to_l`/`to_f` na surový text (locale s desatinnou čiarkou); mm Float → `Units` do modelu.
+  **Limity pre VŠETKY zdroje rozmeru (audit 1):** písané číslo, zamknutá hodnota, hodnota karty pri prázdnom Enter AJ dĺžka z myši sa validujú proti `BoardBuilder::LIMITS` (dĺžka 10–5000, šírka
+  10–3000 mm) PRED posunom fázy — `normalize` inak ticho oreže a náhľad by ukázal 6000, model dostal 5000; mimo limitu / neplatný text = `UI.beep` + status s limitom + fáza ostáva (vzor
+  Trimble `99_sphere_tool`, MIT); ťah myšou nad limit = náhľad orezaný na limit s výrazným statusom, klik mimo limitu odmietnutý.
+  Obálka kreslená počas ťahu (`getExtents`, `View#invalidate`), kóty v tooltipe · Esc v hociktorej fáze = nič, 0 krokov Späť, šablóna neopečiatkovaná (D1 pravidlo) · commit ako D1
+  (bariéra `flush_pending!`, vytváracia operácia + transparentný follow-up pod `guard`, `rescue → abort_operation`) · karta Dosky: dve tlačidlá „Vložiť" (D1) a „Nakresliť" (D2) — potvrdiť v audite/mockupe.
   **Scope OUT:** viac čísel naraz („600;18") · tretí rozmer · roly dosiek · automatika pilastrov/PD (po V1, po agy researchi) · `Sketchup::Snap`.
-  **Testy a DoD:** headless — parser (mm, desatinné, prefix/sufix, tilda, `;`, `MM`, medzery) + limity (9, 10, 5000, 5001; 3000/3001), fázový automat (zámky z `boardLocks`, prázdny Enter =
-  hodnota karty cez `onReturn`, Esc), `replan` (snapshot materiálu/šablóny zachovaný), orientácia z ťahu a lokálne osi per orientácia, pravotočivosť pri zápornom 2. ťahu, obálka počas fázy;
-  **in-SU `run_ghost_d2`** — nakresliť dosku dvoma ťahmi s prichytením na rohy dvoch skriniek (dĺžka = presne súčet šírok), „2400 Enter" → dĺžka 2400, „6000 Enter" → odmietnuté a fáza
-  ostáva, prázdny Enter → hodnota karty, Esc vo fáze 2 = nič (0 krokov Späť), vloženie = 1 krok Späť, ↑ stojaca → pilaster (výška = 2. ťah) a uložený config nesie orientáciu aj presné
-  rozmery (náhľad = geometria = config), záporný 2. ťah = pravotočivá doska. Mutácie min. 4 (limit neoverený pred Enter · zámok z vyplneného poľa · šírka pri stojacej po X · pečiatka pri Esc).
-  **Smoke pre Michala:** pracovná doska od ľavého rohu prvej po pravý roh poslednej skrinky, šírku napíš 600, hotovo; pilaster: ↑ stojaca, 1. ťah hĺbka, 2. ťah výška; napíš 6000 → plugin
-  odmietne s limitom.
-  **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `ui-lifecycle.md` (ghost D2), `docs/UI_DIZAJN.md` (tlačidlá karty Dosky) → STAV/KRONIKA/PLAN.
+  **Testy a DoD:** headless — parser (mm, desatinné, prefix/sufix, tilda, `;`, `MM`, medzery, zaokrúhlenie 0,01) + limity (9, 10, 5000, 5001; 3000/3001) pre všetky 4 zdroje, fázový automat
+  (4 kombinácie zámkov, číslo bez pohybu = kanonický smer, nulový vektor nikdy v transformácii, prázdny Enter = hodnota karty cez `onReturn`, klávesy po 1. fáze ignorované, Esc), whitelist
+  payloadu `locks`, `replan` (snapshot zachovaný, názov explicitný/automatický), orientácia z ťahu a lokálne osi per orientácia, pravotočivosť pri zápornom 2. ťahu, fallback `pickray` → os
+  (čistá geometria) a degenerovaný pohľad, obálka počas fázy; **in-SU `run_ghost_d2`** — nakresliť dosku dvoma ťahmi s prichytením na rohy dvoch skriniek (dĺžka = presne súčet šírok),
+  „2400 Enter" → dĺžka 2400, „6000 Enter" → odmietnuté a fáza ostáva, prázdny Enter → hodnota karty, zamknutá dĺžka z karty + „600 Enter" bez pohybu myšou → kanonický smer, Esc vo fáze 2 =
+  nič (0 krokov Späť), vloženie = 1 krok Späť + Redo, ↑ stojaca → pilaster (výška = 2. ťah ťahaná vo voľnom priestore v perspektíve) a uložený config nesie orientáciu aj presné rozmery
+  (náhľad = geometria = config), záporný 2. ťah = pravotočivá doska, Shift lock: `inference_locked?` true počas držania a false po zmene fázy/Esc. Mutácie min. 5 (limit neoverený pred Enter ·
+  zámok z vyplneného poľa · šírka pri stojacej po X · pečiatka pri Esc · nulový smerový vektor prepustený do transformácie).
+  **Smoke pre Michala:** pracovná doska od ľavého rohu prvej po pravý roh poslednej skrinky, šírku napíš 600, hotovo; pilaster: ↑ stojaca, 1. ťah hĺbka, 2. ťah výška ťahaná do vzduchu;
+  napíš 6000 → plugin odmietne s limitom; klikni počiatok a hneď napíš 2400 Enter → doska ide po osi podľa rotácie.
+  **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `ui-lifecycle.md` (ghost D2, `draw_board`, zámky, Shift), `docs/UI_DIZAJN.md` (tlačidlá karty Dosky) → STAV/KRONIKA/PLAN.
 
 ### 5 · RENDER M-R
 

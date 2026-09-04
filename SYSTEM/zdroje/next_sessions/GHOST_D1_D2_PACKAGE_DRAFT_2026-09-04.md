@@ -73,3 +73,17 @@
 9. **Commit (agy):** `start_operation('Vložiť dosku', true)` bez vnorenia + `rescue → abort_operation` explicitne v package (zhodné s konvenciou enginu).
 10. **Vzory (licencie):** Trimble `02_custom_tool` (kostra) a `99_sphere_tool` (VCB chyby) — MIT · `Eneroth3/inference-lock-lib` (Shift lock) — MIT · OpenCutList 7.0 Smart Draw — GPL, len vzory ·
     Rotated Rectangle = precedens „jedno číslo na fázu" · SketchList 3D = precedens 3 orientácií · `Sketchup::Snap` = NO ACTION pre V1 (poznámka do bloku viazaných dielov).
+
+## Codex CLI audit kolo 1 (5.9.2026) — Sol (`gpt-5.6-sol`) + Astra (`gpt-6-astra`), ZAPRACOVANÉ do PLANu (PR #296)
+
+**Sol — 4 BLOCKER + 11 FIX:** (1) `boardLocks` žijú len v JS („NIKDY do Ruby") → D2 nemá dátovú cestu pre zámky · (2) smer lokálnej X nedefinovaný, keď 1. fázu dokončí číslo/prázdny
+Enter/zámok bez ťahu · (3) kontrakt `commit_insert` slabší než R-03 (typ plánu, identita modelu, snapshot transformácie, root kontext, rigidná matica) · (4) zmrazený plán ≠ zmrazený
+materiálový snapshot (`normalize`/`board_config` čítajú živý katalóg) · (5) šípky/ALT po potvrdení 1. fázy · (6) chýba politika výšky dosky bez Z-režimu · (7) kotvy bez autoritatívneho
+kontraktu · (8) pamäť ghostu nie je per subjekt · (9) limity pre všetky zdroje rozmeru · (10) `replan` a automatický názov · (11) lifecycle Shift locku · (12) dve tlačidlá bez uzavretého
+callbacku / dvojklik · (13) „karta ukáže stojaca" bez sync mechanizmu · (14) `flush_pending!` bariéra pred vložením · (15) `test_ghost_vkladanie.rb:601` odporuje novému toku.
+**Astra — 1 BLOCKER + 6 FIX + 1 NOTE:** (1) „jedna operácia" odporuje transparentnému scale-lock follow-upu (`board_builder.rb:527`) → kontrakt „jeden používateľský krok Späť" · (2) politika
+výšky + `ghost_lock_z` pre dosku + charakterizácia skrinka → doska → skrinka · (3) bariéra pred čakajúcim `ScaleWatch` timerom · (4) projekcia vo voľnom priestore (pilaster zvislo) → fallback
+`pickray` → os · (5) zámky do Ruby cez `locksFlat('board')` + whitelist · (6) smer pri preskočení 1. ťahu (4 kombinácie zámkov) · (7) `board_config` pri zápise znova číta katalóg · (8) NOTE
+presnosť 0,01 mm parser vs `board_config`.
+**Reconcile:** všetko prijaté a zapracované do packages D1/D2 v PLANe (verzia 2, 5.9.); rozhodnutia orchestrátora: kanonický smer pri nulovom vektore = lokálna +X podľa rotácie session;
+klávesy po potvrdení 1. fázy zamknuté; ALT v D2 bez významu; presnosť 0,01 mm pri prijatí hodnoty; kotvy = tabuľka 3×4 v package. Kolo 2 auditu nad verziou 2 = ČAKÁ.
