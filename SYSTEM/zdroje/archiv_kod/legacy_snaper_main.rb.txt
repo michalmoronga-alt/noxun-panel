@@ -1,0 +1,66 @@
+# REFERENCIA (nie kod pluginu): legacy Snaper v0.1.0 main.rb (Plugins/snaper/main.rb). Skopirovane 4.9.2026. Subor sa NENACITAVA.
+# frozen_string_literal: true
+require 'sketchup.rb'
+
+module Noxun
+  module Snaper
+    PLUGIN_DIR = File.dirname(__FILE__)
+
+    def self.plugin_dir
+      PLUGIN_DIR
+    end
+
+    def self.log(msg)
+      puts "[Snaper] #{msg}"
+    end
+
+    def self.log_error(e, context = nil)
+      log("#{context}: #{e.class}: #{e.message}")
+      bt = e.respond_to?(:backtrace) ? e.backtrace : nil
+      bt.first(3).each { |line| puts "  #{line}" } if bt
+      nil
+    end
+  end
+end
+
+Sketchup.require 'snaper/core/snap'
+
+module Noxun
+  module Snaper
+    unless file_loaded?(__FILE__)
+      begin
+        cmd_left = UI::Command.new('Prisunúť vľavo') { Snap.snap(:left) }
+        cmd_left.tooltip = 'Prisunúť vľavo'
+        cmd_left.status_bar_text =
+          'Prisunie vybranú skrinku po jej vlastnej osi X doľava na doraz k najbližšej prekážke.'
+        icon_left = File.join(PLUGIN_DIR, 'icons', 'snap_left.svg')
+        if File.exist?(icon_left)
+          cmd_left.small_icon = icon_left
+          cmd_left.large_icon = icon_left
+        end
+
+        cmd_right = UI::Command.new('Prisunúť vpravo') { Snap.snap(:right) }
+        cmd_right.tooltip = 'Prisunúť vpravo'
+        cmd_right.status_bar_text =
+          'Prisunie vybranú skrinku po jej vlastnej osi X doprava na doraz k najbližšej prekážke.'
+        icon_right = File.join(PLUGIN_DIR, 'icons', 'snap_right.svg')
+        if File.exist?(icon_right)
+          cmd_right.small_icon = icon_right
+          cmd_right.large_icon = icon_right
+        end
+
+        toolbar = UI::Toolbar.new('Snaper')
+        toolbar.add_item(cmd_left)
+        toolbar.add_item(cmd_right)
+        toolbar.restore
+
+        menu = UI.menu('Extensions').add_submenu('Snaper')
+        menu.add_item('Prisunúť vľavo') { Snap.snap(:left) }
+        menu.add_item('Prisunúť vpravo') { Snap.snap(:right) }
+      rescue => e
+        log_error(e, 'main.rb init')
+      end
+      file_loaded(__FILE__)
+    end
+  end
+end

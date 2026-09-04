@@ -66,7 +66,7 @@
   súpis sa z tagu nečítajú), migrácia netreba — proxy vzniká pri každom rebuilde nanovo, takže staré zákazky sa preznačia pri najbližšej prestavbe.
   **Testy:** 2651 headless · 82 JS sád · plný in-SketchUp beh **1504 PASS** (nová sekcia `run_d116`, prepísané geometrické asserty v `run_kova2b`). Overené štyrmi
   mutáciami: zámena `left`/`right` v Ruby aj v JS tabuľke, `xdash` do plného bucketu a návrat tagu na `hardware_tag` — každá zhodila práve ten test, ktorý ju má chytiť.
-  **Codex review:** doplní orchestrátor po review.
+  **Codex review:** kolo 1 = 👍 bez nálezov (hlava `b4757cc`), CI zelené → merge `--match-head-commit`.
 
 - **KOV-H2 · AD-HOC KOVANIE — INSPECTOR UI (v0.9.20, 3.9.2026):** druhý rez slice H. Dátovú vrstvu dala H1 (položka mimo setov v `config['hardware_manual'][]`), ale **nebolo
   ju ako pridať** — jediná cesta bola ručne editovaný config. H2 jej dáva obrazovku: blok **„Ručne pridané"** v kontexte Kovanie, D-15 modal a **rozklik pôvodu** v sekcii Nákup

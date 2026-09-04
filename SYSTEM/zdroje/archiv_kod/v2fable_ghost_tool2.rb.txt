@@ -1,0 +1,607 @@
+# REFERENCIA (nie kod pluginu): archivny V2fable Ghost 2.0 "draw-to-size" (2026-07), predloha pre GHOST-D2.
+# Skopirovane 4.9.2026 z workspace STARE/V2fable/core/ghost_tool2.rb (mimo repa). Subor sa NENACITAVA.
+# frozen_string_literal: true
+
+module Noxun
+  module V2fable
+    # Ghost 2.0 "draw-to-size" (experimental, switchable). A subclass of the
+    # classic GhostTool so the class-level `active` tracking and every Bridge
+    # ghost_* helper (rotate/repeat/swap/cancel/dims) drive BOTH tools unchanged.
+    #
+    # Flow: click sets the zero point, then the user defines width -> depth ->
+    # height by dragging (with SketchUp inference) or by typing exact mm into the
+    # native Measurements box (VCB). Locked axes are pre-filled and skipped. The
+    # first width drag fixes the box ORIENTATION (there is no arrow rotation).
+    #
+    # Sketchup::Tool swallows callback exceptions silently, so every callback is
+    # wrapped to keep the tool alive.
+    class GhostTool2 < GhostTool
+      MM_PER_INCH = 25.4
+      MIN_MM      = 5.0 # committed axis below this is treated as degenerate
+
+      # Share the classic tool's active slot: the base class holds the single
+      # active reference so Bridge's hardcoded GhostTool.* callbacks reach us.
+      class << self
+        def active
+          GhostTool.active
+        end
+
+        def active=(tool)
+          GhostTool.active = tool
+        end
+      end
+
+      def initialize(defn, skp_path, dims_mm = nil, locks = nil)
+        super(defn, skp_path, dims_mm)
+        @dims  = normalize_dims(dims_mm)
+        @locks = normalize_locks(locks)
+        @phase = 0
+        @origin_pt = nil
+        @dir_x = Geom::Vector3d.new(1, 0, 0)
+        @dir_y = Geom::Vector3d.new(0, 1, 0)
+        @w_mm = nil
+        @d_mm = nil
+        @h_mm = nil
+        @mx = nil
+        @my = nil
+      end
+
+      # --- Sketchup::Tool protocol -------------------------------------------
+
+      def activate
+        @ip = Sketchup::InputPoint.new
+        self.class.active = self
+        Bridge.push_ghost(true)
+        reset_to_phase0
+      rescue => e
+        V2fable.log_error(e, 'GhostTool2.activate')
+      end
+
+      # deactivate is inherited (clears the shared active slot, hides the hint).
+
+      # Esc: phase > 0 discards the partial box and returns to the zero point;
+      # phase 0 ends the tool (the classic end-of-tool path via super).
+      def onCancel(reason, view)
+        if @phase.to_i > 0
+          reset_to_phase0
+          view.invalidate if view
+        else
+          super
+        end
+      rescue => e
+        V2fable.log_error(e, 'GhostTool2.onCancel')
+      end
+
+      def onMouseMove(flags, x, y, view)
+        @mx = x
+        @my = y
+        @ip ||= Sketchup::InputPoint.new
+        @ip.pick(view, x, y)
+        @position = @ip.position
+        update_live_value(view)
+        Sketchup.vcb_value = fmt(phase_value) if @phase.to_i > 0
+        view.invalidate
+      rescue => e
+        V2fable.log_error(e, 'GhostTool2.onMouseMove')
+      end
+
+      # Arrow keys are NOT consumed (orientation comes from the width drag).
+      # Enter repeats the last box ONLY in phase 0; in phases 1-3 Enter arrives
+      # through the VCB as onUserText, so we let it pass (return false).
+      def onKeyDown(key, repeat, flags, view)
+        if key == VK_RETURN
+          if @phase.to_i == 0
+            repeat_last
+            return true
+          end
+          return false
+        end
+        false
+      rescue => e
+        V2fable.log_error(e, 'GhostTool2.onKeyDown')
+        false
+      end
+
+      def onLButtonDown(flags, x, y, view)
+        if @phase.to_i == 0
+          return unless @position
+          @origin_pt = @position.clone
+          @dir_x = Geom::Vector3d.new(1, 0, 0)
+          @dir_y = Geom::Vector3d.new(0, 1, 0)
+          @phase = next_unlocked_phase(0)
+          if @phase > 3
+            build_box(view)
+          else
+            update_status
+            update_vcb
+            view.invalidate
+          end
+        else
+          update_live_value(view)
+          advance_after_commit(view)
+        end
+      rescue => e
+        V2fable.log_error(e, 'GhostTool2.onLButtonDown')
+      end
+
+      def enableVCB?
+        true
+      end
+
+      # A typed length commits the CURRENT phase and advances (skipping locked
+      # phases). Invalid text keeps the phase; phase 0 ignores typed text.
+      def onUserText(text, view)
+        return if @phase.to_i <= 0
+        return if text.to_s.strip.empty? # empty Enter = no-op, not an error
+        mm =
+          begin
+            parse_mm_text(text)
+          rescue StandardError
+            Sketchup.status_text = 'Neplatná dĺžka'
+            view.tooltip = 'Neplatná dĺžka' if view
+            return
+          end
+        return unless mm && mm > 0
+        commit_phase_value(mm)
+        advance_after_commit(view)
+      rescue => e
+        V2fable.log_error(e, 'GhostTool2.onUserText')
+      end
+
+      def draw(view)
+        # Phase 3 measures height against the vertical line, not the scene, so
+        # the InputPoint ground dots/tooltip would mislead — skip them there.
+        if @phase.to_i != 3 && @ip && @ip.valid?
+          @ip.draw(view)
+          view.tooltip = @ip.tooltip if @ip.tooltip
+        end
+        if @phase.to_i.zero?
+          draw_cursor_cross(view)
+        else
+          draw_box(view)
+          draw_dim_label(view)
+        end
+      rescue => e
+        V2fable.log_error(e, 'GhostTool2.draw')
+      end
+
+      def getExtents
+        bb = Geom::BoundingBox.new
+        model = Sketchup.active_model
+        bb.add(model.bounds) if model
+        if @origin_pt
+          bb.add(@origin_pt)
+          box_corners.each { |c| bb.add(c) }
+        end
+        bb.add(@position) if @position
+        bb
+      rescue => e
+        V2fable.log_error(e, 'GhostTool2.getExtents')
+        Geom::BoundingBox.new
+      end
+
+      # --- dialog-routed control (Bridge ghost_* callbacks) --------------------
+
+      # Orientation is defined by the width drag — rotation is a no-op here.
+      def rotate(_step_deg); end
+
+      # Live dims edit: update the pre-filled/locked values used for FUTURE boxes
+      # without disturbing an in-progress phase value.
+      def update_dims(dims_mm)
+        nd = normalize_dims(dims_mm)
+        @dims = nd if nd
+        prefill_locked if @phase.to_i.zero?
+        update_vcb
+        invalidate_view
+      rescue => e
+        V2fable.log_error(e, 'GhostTool2.update_dims')
+      end
+
+      # Live component swap mid-draw: replace the definition but KEEP the origin,
+      # phase and committed values so the box being drawn continues.
+      def swap_component(defn, skp_path, dims_mm)
+        return unless defn
+        @defn     = defn
+        @skp_path = skp_path
+        nd = normalize_dims(dims_mm)
+        @dims = nd if nd
+        invalidate_view
+      rescue => e
+        V2fable.log_error(e, 'GhostTool2.swap_component')
+      end
+
+      # repeat_last is inherited: in phase 0, Enter places the SAME component with
+      # the last drawn dims next to the last placed box (reuses the 1.5 flow).
+
+      # --- internals ---------------------------------------------------------
+
+      private
+
+      def reset_to_phase0
+        @phase = 0
+        @origin_pt = nil
+        @dir_x = Geom::Vector3d.new(1, 0, 0)
+        @dir_y = Geom::Vector3d.new(0, 1, 0)
+        prefill_locked
+        update_status
+        update_vcb
+        invalidate_view
+      end
+
+      # Locked axes (lock true AND a positive dims value) are pre-filled; every
+      # other axis is cleared so its phase will be asked.
+      def prefill_locked
+        @w_mm = locked_axis?('x') ? @dims['x'].to_f : nil
+        @d_mm = locked_axis?('y') ? @dims['y'].to_f : nil
+        @h_mm = locked_axis?('z') ? @dims['z'].to_f : nil
+      end
+
+      def locked_axis?(axis)
+        return false unless @locks.is_a?(Hash) && @dims.is_a?(Hash)
+        @locks[axis] && @dims[axis].to_f > 0
+      end
+
+      def axis_for_phase(phase)
+        { 1 => 'x', 2 => 'y', 3 => 'z' }[phase]
+      end
+
+      # The next phase >= from+1 whose axis is not locked; 4 means "build now".
+      def next_unlocked_phase(from)
+        p = from + 1
+        p += 1 while p <= 3 && locked_axis?(axis_for_phase(p))
+        p
+      end
+
+      def phase_value
+        case @phase.to_i
+        when 1 then @w_mm
+        when 2 then @d_mm
+        when 3 then @h_mm
+        end
+      end
+
+      # Recompute the live value for the current phase from the cursor position.
+      def update_live_value(view)
+        return unless @origin_pt
+        case @phase.to_i
+        when 1
+          return unless @position
+          v = @position - @origin_pt
+          horiz = Geom::Vector3d.new(v.x, v.y, 0)
+          if horiz.length > 1.0e-4
+            if axis_snap_on?
+              # Snap the width direction to the nearest world axis (±X/±Y) and
+              # measure width as the projection onto it. Read LIVE so flipping
+              # the panel switch changes even a running tool.
+              axis = best_world_axis(horiz)
+              @dir_x = axis
+              recompute_dir_y
+              @w_mm = in_to_mm(horiz.dot(axis).abs)
+            else
+              @dir_x = horiz.clone
+              @dir_x.normalize!
+              recompute_dir_y
+              @w_mm = in_to_mm(horiz.length)
+            end
+          else
+            @w_mm = in_to_mm(horiz.length)
+          end
+        when 2
+          return unless @position
+          v = @position - @origin_pt
+          proj = v.dot(@dir_y)
+          if proj < 0
+            @dir_y.reverse!
+            proj = -proj
+          end
+          @d_mm = in_to_mm(proj)
+        when 3
+          h = height_from_pointer(view)
+          @h_mm = h if h
+        end
+      end
+
+      # Phase-3 height comes from the pickray crossed with the vertical line
+      # through the base corner (the native Box-tool trick) — NOT from
+      # InputPoint, which snaps to the ground plane in empty space and freezes
+      # the height at zero. abs handles an under-horizon cursor gracefully.
+      # Returns mm (>= 0), or nil to keep the last value on a degenerate ray.
+      def height_from_pointer(view)
+        return nil unless view && @origin_pt && @mx && @my
+        ray = view.pickray(@mx, @my)
+        return nil unless ray && ray[0] && ray[1]
+        pts = Geom.closest_points([ray[0], ray[1]], [@origin_pt, Z_AXIS])
+        return nil unless pts && pts[1]
+        in_to_mm((pts[1].z - @origin_pt.z).abs)
+      rescue => e
+        V2fable.log_error(e, 'GhostTool2.height_from_pointer')
+        nil
+      end
+
+      # Width-direction axis snapping toggle, read LIVE from Settings. Default ON
+      # (only an explicit false disables it).
+      def axis_snap_on?
+        Settings.get('ghost2_axis_snap') != false
+      rescue => e
+        V2fable.log_error(e, 'GhostTool2.axis_snap_on?')
+        true
+      end
+
+      # The ±X/±Y unit vector whose dot product with the raw horizontal drag is
+      # largest (points most along the drag). Fresh vectors so frozen axis
+      # constants are never mutated.
+      def best_world_axis(horiz)
+        cands = [
+          Geom::Vector3d.new(1, 0, 0), Geom::Vector3d.new(-1, 0, 0),
+          Geom::Vector3d.new(0, 1, 0), Geom::Vector3d.new(0, -1, 0)
+        ]
+        best = cands.first
+        best_dot = -Float::INFINITY
+        cands.each do |c|
+          d = horiz.dot(c)
+          if d > best_dot
+            best_dot = d
+            best = c
+          end
+        end
+        best
+      end
+
+      # Perpendicular horizontal depth direction: Z x dir_x (unit).
+      def recompute_dir_y
+        dy = Z_AXIS * @dir_x
+        if dy.length > 0
+          dy.normalize!
+          @dir_y = dy
+        else
+          @dir_y = Geom::Vector3d.new(0, 1, 0)
+        end
+      end
+
+      def commit_phase_value(mm)
+        case @phase.to_i
+        when 1
+          @w_mm = mm
+          recompute_dir_y
+        when 2
+          @d_mm = mm
+        when 3
+          @h_mm = mm
+        end
+      end
+
+      def advance_after_commit(view)
+        @phase = next_unlocked_phase(@phase)
+        if @phase > 3
+          build_box(view)
+        else
+          update_status
+          update_vcb
+          view.invalidate if view
+        end
+      end
+
+      # Build the box: unscaled instance on an axes() transform (rotation +
+      # translation only), then DC-resize to w/d/h OUTSIDE the operation.
+      def build_box(view)
+        if [@w_mm, @d_mm, @h_mm].any? { |v| v.nil? || v.to_f < MIN_MM }
+          Bridge.push('placed', { 'ok' => false, 'msg' => 'Príliš malý rozmer.' })
+          reset_to_phase0
+          view.invalidate if view
+          return
+        end
+        model = view.model
+        tr = Geom::Transformation.axes(@origin_pt, @dir_x, @dir_y, Z_AXIS)
+        inst = nil
+        model.start_operation('Vložiť', true)
+        begin
+          inst = model.active_entities.add_instance(@defn, tr)
+          Placement.chain(model, inst)
+          model.commit_operation
+        rescue => e
+          model.abort_operation
+          V2fable.log_error(e, 'GhostTool2.build_box')
+          Bridge.push('placed', { 'ok' => false, 'msg' => e.message })
+          reset_to_phase0
+          view.invalidate if view
+          return
+        end
+        # Resize AFTER commit (DC redraw opens its own undo steps). Anchor :min
+        # keeps the local origin pinned at the picked zero point.
+        DC.apply_dims(inst, { 'x' => @w_mm, 'y' => @d_mm, 'z' => @h_mm }, :min) if DC.dc?(inst.definition)
+        Settings.note_usage(@skp_path)
+        @last_placed = inst
+        # Remember the drawn size as defaults + for Enter-repeat next to this box.
+        @dims = { 'x' => @w_mm, 'y' => @d_mm, 'z' => @h_mm }
+        Bridge.push('placed', { 'ok' => true, 'msg' => 'Vložené ✓' })
+        reset_to_phase0
+        view.invalidate if view
+      end
+
+      # --- drawing helpers ---------------------------------------------------
+
+      def draw_cursor_cross(view)
+        return unless @mx && @my
+        view.line_width = 2
+        view.drawing_color = Sketchup::Color.new(*GHOST_RGB)
+        s = 6
+        view.draw2d(GL_LINES, [
+          Geom::Point3d.new(@mx - s, @my, 0), Geom::Point3d.new(@mx + s, @my, 0),
+          Geom::Point3d.new(@mx, @my - s, 0), Geom::Point3d.new(@mx, @my + s, 0)
+        ])
+      end
+
+      def draw_box(view)
+        return unless @origin_pt
+        c = box_corners
+        view.drawing_color = Sketchup::Color.new(*GHOST_RGB)
+        # Completed wireframe of the current (possibly partial) box stays teal.
+        view.line_width = 2
+        pairs = [[0, 1], [1, 3], [3, 2], [2, 0],
+                 [4, 5], [5, 7], [7, 6], [6, 4],
+                 [0, 4], [1, 5], [2, 6], [3, 7]]
+        edges = []
+        pairs.each do |(a, b)|
+          edges << c[a]
+          edges << c[b]
+        end
+        view.draw(GL_LINES, edges) if edges.length >= 2
+        # Emphasize the axis being defined right now in its world-axis colour
+        # (X red / Y green / Z blue) or teal when the direction is free-angle.
+        active = active_axis_edge(c)
+        if active
+          view.line_width = 3
+          view.drawing_color = active_edge_color
+          view.draw(GL_LINES, active)
+        end
+      end
+
+      # The primary edge from the origin corner along the active axis.
+      def active_axis_edge(c)
+        case @phase.to_i
+        when 1 then [c[0], c[1]] # origin -> +x
+        when 2 then [c[0], c[2]] # origin -> +y
+        when 3 then [c[0], c[4]] # origin -> +z
+        end
+      end
+
+      # Active-edge colour: X red / Y green when the direction is locked to a
+      # world axis, always Z blue in the height phase, teal when free-angle.
+      def active_edge_color
+        case @phase.to_i
+        when 1 then axis_color(@dir_x)
+        when 2 then axis_color(@dir_y)
+        when 3 then Sketchup::Color.new(0, 0, 230)
+        else Sketchup::Color.new(*GHOST_RGB)
+        end
+      end
+
+      def axis_color(vec)
+        return Sketchup::Color.new(*GHOST_RGB) unless vec
+        ax = vec.x.abs
+        ay = vec.y.abs
+        az = vec.z.abs
+        if ax > 0.999 && ay < 1.0e-3 && az < 1.0e-3
+          Sketchup::Color.new(230, 0, 0)   # X red
+        elsif ay > 0.999 && ax < 1.0e-3 && az < 1.0e-3
+          Sketchup::Color.new(0, 150, 0)   # Y green
+        else
+          Sketchup::Color.new(*GHOST_RGB)  # teal (free-angle)
+        end
+      end
+
+      def draw_dim_label(view)
+        return unless @mx && @my
+        label =
+          case @phase.to_i
+          when 1 then "Šírka: #{fmt(@w_mm)} mm"
+          when 2 then "Hĺbka: #{fmt(@d_mm)} mm"
+          when 3 then "Výška: #{fmt(@h_mm)} mm"
+          end
+        return unless label
+        view.draw_text(Geom::Point3d.new(@mx + 18, @my + 14, 0), label)
+      end
+
+      # 8 corners of the current box (origin + w*dir_x + d*dir_y + h*Z). Corner
+      # index bit order: x=1, y=2, z=4.
+      def box_corners
+        o  = @origin_pt || ORIGIN
+        vx = scaled(@dir_x, @w_mm)
+        vy = scaled(@dir_y, @d_mm)
+        vz = scaled(Z_AXIS, @h_mm)
+        [
+          o,                     o + vx,
+          o + vy,                o + vx + vy,
+          o + vz,                o + vx + vz,
+          o + vy + vz,           o + vx + vy + vz
+        ]
+      end
+
+      # A vector along `vec` (unit) with the given mm length; zero vector when
+      # the length is not positive. Built component-wise so a frozen axis
+      # constant (Z_AXIS) is never mutated.
+      def scaled(vec, mm)
+        inch = (mm.to_f / MM_PER_INCH)
+        return Geom::Vector3d.new(0, 0, 0) if inch.abs < 1.0e-9
+        len = vec.length
+        return Geom::Vector3d.new(0, 0, 0) if len == 0
+        f = inch / len
+        Geom::Vector3d.new(vec.x * f, vec.y * f, vec.z * f)
+      rescue => e
+        V2fable.log_error(e, 'GhostTool2.scaled')
+        Geom::Vector3d.new(0, 0, 0)
+      end
+
+      # --- status / VCB / formatting -----------------------------------------
+
+      def update_status
+        msg =
+          case @phase.to_i
+          when 0 then 'Klikni bod nula…'
+          when 1 then 'Ťahaj šírku alebo napíš mm a Enter…'
+          when 2 then 'Hĺbka…'
+          when 3 then 'Výška…'
+          else ''
+          end
+        msg += ' | Esc = späť' if @phase.to_i > 0
+        Sketchup.status_text = msg
+      rescue => e
+        V2fable.log_error(e, 'GhostTool2.update_status')
+      end
+
+      def update_vcb
+        case @phase.to_i
+        when 1
+          Sketchup.vcb_label = 'Šírka (mm)'
+          Sketchup.vcb_value = fmt(@w_mm)
+        when 2
+          Sketchup.vcb_label = 'Hĺbka (mm)'
+          Sketchup.vcb_value = fmt(@d_mm)
+        when 3
+          Sketchup.vcb_label = 'Výška (mm)'
+          Sketchup.vcb_value = fmt(@h_mm)
+        else
+          Sketchup.vcb_label = ''
+          Sketchup.vcb_value = ''
+        end
+      rescue => e
+        V2fable.log_error(e, 'GhostTool2.update_vcb')
+      end
+
+      def fmt(mm)
+        format('%.1f', mm.to_f)
+      end
+
+      def in_to_mm(inches)
+        inches.to_f * MM_PER_INCH
+      end
+
+      # The VCB asks for millimetres (label "… (mm)"), so a bare number is
+      # millimetres regardless of the model's unit template. An explicit unit
+      # suffix (mm/cm/m/"/') is honoured. Returns the physical length in mm.
+      # Raises ArgumentError (via String#to_l) on unparseable text.
+      def parse_mm_text(text)
+        s = text.to_s.strip.tr(',', '.')
+        s += 'mm' if s =~ /\A[+\-]?\d+(?:\.\d+)?\z/
+        s.to_l.to_mm
+      end
+
+      def normalize_dims(dims)
+        return nil unless dims.is_a?(Hash)
+        out = {}
+        %w[x y z].each do |a|
+          v = dims[a]
+          out[a] = v.to_f if v.is_a?(Numeric) && v.to_f > 0
+        end
+        out.empty? ? nil : out
+      end
+
+      def normalize_locks(locks)
+        out = { 'x' => false, 'y' => false, 'z' => false }
+        return out unless locks.is_a?(Hash)
+        %w[x y z].each { |a| out[a] = !!locks[a] }
+        out
+      end
+    end
+  end
+end

@@ -1,0 +1,293 @@
+# REFERENCIA (nie kod pluginu): legacy Noxun Mower v0.5.2 (Plugins/Noxun_Mower/noxun_mower.rb), predloha pre NASTROJE-1. Skopirovane 4.9.2026. Subor sa NENACITAVA.
+
+# Noxun Mower — main (v0.5.2)
+require 'sketchup.rb'
+
+module Noxun
+  module Mower
+    extend self
+
+    # --- DC helpers ---
+    def dc_dict(ent); ent.attribute_dictionary('dynamic_attributes', false); end
+    def dc_lenx(ent); d=dc_dict(ent); return nil unless d; v=d['lenx']||d['LenX']||d['_lenx_formula']; v ? v.to_f : nil; end
+    def dc_rotz(ent); d=dc_dict(ent); return nil unless d; v=d['rotz']||d['RotZ']||d['_rotz_formula']; v ? v.to_f : nil; end
+
+    # --- Selection guard ---
+    def ensure_selection_component!
+      model = Sketchup.active_model
+      sel = model.selection
+      ent = sel.first
+      unless sel.count == 1 && (ent.is_a?(Sketchup::ComponentInstance) || ent.is_a?(Sketchup::Group))
+        UI.messagebox('Vyber presne jeden komponent alebo skupinu.')
+        return nil
+      end
+      ent
+    end
+
+    # --- Vectors / axes ---
+    def local_x_axis(ent); ent.transformation.xaxis; end
+    def local_y_axis(ent); ent.transformation.yaxis; end
+    def local_z_axis(ent); ent.transformation.zaxis; end
+    def bbox_center_world(ent); ent.bounds.center; end
+
+    def local_width_x(ent)
+      if ent.respond_to?(:definition) && ent.definition
+        ent.definition.bounds.width
+      else
+        ent.bounds.width
+      end
+    end
+
+    # Return RotZ in degrees, prefer DC if available, otherwise from transform.XAxis
+    def rotz_deg(ent)
+      rz = dc_rotz(ent)
+      return rz unless rz.nil?
+      lx = local_x_axis(ent)
+      Math.atan2(lx.y, lx.x) * 180.0 / Math::PI
+    end
+
+    # Decide axis (X or Y) from RotZ; Y when near ±90°
+    def axis_for_copy(ent, rz_deg)
+      r = ((rz_deg + 180.0) % 180.0) - 90.0  # maps to (-90..90]
+      use_y = r.abs < 45.0
+      use_y ? local_y_axis(ent) : local_x_axis(ent)
+    end
+
+    def sign(v); v >= 0 ? 1.0 : -1.0; end
+
+    def rotate_z(ent, degrees)
+      model = Sketchup.active_model
+      model.start_operation("Rotate Z #{degrees}°", true)
+      begin
+        center = bbox_center_world(ent)
+        axis = Z_AXIS
+        tr = Geom::Transformation.rotation(center, axis, degrees.degrees)
+        model.active_entities.transform_entities(tr, ent)
+        model.commit_operation
+      rescue => e
+        model.abort_operation
+        UI.messagebox("Chyba pri rotácii: #{e}")
+      end
+    end
+
+    def set_world_z0(ent)
+      model = Sketchup.active_model
+      model.start_operation('Set Z = 0', true)
+      begin
+        origin = ent.transformation.origin
+        dz = -origin.z
+        tr = Geom::Transformation.translation([0, 0, dz])
+        model.active_entities.transform_entities(tr, ent)
+        model.commit_operation
+      rescue => e
+        model.abort_operation
+        UI.messagebox("Chyba pri posune: #{e}")
+      end
+    end
+
+    def set_world_z(ent, z_mm)
+      model = Sketchup.active_model
+      model.start_operation("Set Z = #{z_mm}mm", true)
+      begin
+        zt = z_mm.to_f.mm
+        origin = ent.transformation.origin
+        dz = zt - origin.z
+        tr = Geom::Transformation.translation([0, 0, dz])
+        model.active_entities.transform_entities(tr, ent)
+        model.commit_operation
+      rescue => e
+        model.abort_operation
+        UI.messagebox("Chyba pri Z-move: #{e}")
+      end
+    end
+
+    def copy_lr(ent, dir)
+      model = Sketchup.active_model
+      model.start_operation("Copy #{dir}", true)
+      begin
+        step = dc_lenx(ent)
+        step = local_width_x(ent) if step.nil? || step == 0.0
+
+        rz = rotz_deg(ent)
+        axis = axis_for_copy(ent, rz)
+
+        # base left/right
+        base = (dir == :left) ? -1.0 : 1.0
+
+        # flip logic based on angle + chosen axis
+        ang = rz * Math::PI / 180.0
+        factor = if axis.parallel?(local_x_axis(ent))
+                   # X-axis move: flip when cos < 0 (i.e., around 180°)
+                   (Math.cos(ang) >= 0.0) ? 1.0 : -1.0
+                 else
+                   # Y-axis move: flip when sin > 0 (i.e., around +90°)
+                   (Math.sin(ang) > 0.0) ? -1.0 : 1.0
+                 end
+
+        offset = base * factor * step
+
+        unit = axis.clone
+        unit.length = 1.0 rescue nil
+        unit = unit.normalize
+        vec = Geom::Vector3d.new(unit.x * offset, unit.y * offset, unit.z * offset)
+
+        if ent.is_a?(Sketchup::ComponentInstance)
+          tr = ent.transformation * Geom::Transformation.translation(vec)
+          new_ent = ent.parent.entities.add_instance(ent.definition, tr)
+        else
+          new_ent = ent.copy
+          new_ent.transform!(Geom::Transformation.translation(vec))
+        end
+
+        model.selection.clear
+        model.selection.add(new_ent)
+        model.commit_operation
+      rescue => e
+        model.abort_operation
+        UI.messagebox("Chyba pri kopírovaní: #{e}")
+      end
+    end
+
+    def toolbar; @toolbar ||= UI::Toolbar.new('Noxun Mower'); end
+    def icon_small(key); File.join(__dir__, 'icons', "#{key}_16.png"); end
+    def icon_large(key); File.join(__dir__, 'icons', "#{key}_24.png"); end
+
+    def cmd_rotate_minus_90
+      @cmd_rn90 ||= UI::Command.new('-90°') {
+        ent = ensure_selection_component!
+        rotate_z(ent, -90) if ent
+      }.tap do |c|
+        c.tooltip = 'Rotate -90°'
+        c.status_bar_text = 'Rotate -90° (local Z, pivot = bbox center)'
+        c.status_bar_text = 'Rotate -90 (world Z, pivot = bbox center)'
+        c.small_icon = icon_small('rotate_ccw')
+        c.large_icon = icon_large('rotate_ccw')
+      end
+    end
+
+    def cmd_rotate_plus_90
+      @cmd_rp90 ||= UI::Command.new('+90°') {
+        ent = ensure_selection_component!
+        rotate_z(ent, 90) if ent
+      }.tap do |c|
+        c.tooltip = 'Rotate +90°'
+        c.status_bar_text = 'Rotate +90° (local Z, pivot = bbox center)'
+        c.status_bar_text = 'Rotate +90 (world Z, pivot = bbox center)'
+        c.small_icon = icon_small('rotate_cw')
+        c.large_icon = icon_large('rotate_cw')
+      end
+    end
+
+    def cmd_rotate_180
+      @cmd_r180 ||= UI::Command.new('180°') {
+        ent = ensure_selection_component!
+        rotate_z(ent, 180) if ent
+      }.tap do |c|
+        c.tooltip = 'Rotate 180°'
+        c.status_bar_text = 'Rotate 180° (local Z, pivot = bbox center)'
+        c.status_bar_text = 'Rotate 180 (world Z, pivot = bbox center)'
+        c.small_icon = icon_small('rotate_180')
+        c.large_icon = icon_large('rotate_180')
+      end
+    end
+
+    def cmd_z0
+      @cmd_z0 ||= UI::Command.new('z0') {
+        ent = ensure_selection_component!
+        set_world_z0(ent) if ent
+      }.tap do |c|
+        c.tooltip = 'Set Z to 0'
+        c.status_bar_text = 'Set Z position to 0 (world)'
+        c.small_icon = icon_small('z0')
+        c.large_icon = icon_large('z0')
+      end
+    end
+
+    def cmd_zmove_dialog
+      @cmd_zmove ||= UI::Command.new('Z move…') {
+        show_zmove_dialog
+      }.tap do |c|
+        c.tooltip = 'Set Z to a specific height (mm)'
+        c.status_bar_text = 'Open Z-move panel'
+        c.small_icon = icon_small('zmove')
+        c.large_icon = icon_large('zmove')
+      end
+    end
+
+    def cmd_copy_left
+      @cmd_cpl ||= UI::Command.new('Copy Left') {
+        ent = ensure_selection_component!
+        copy_lr(ent, :left) if ent
+      }.tap do |c|
+        c.tooltip = 'Copy Left by LenX (Auto axis, front-aware)'
+        c.status_bar_text = 'Copy left by LenX; axis X/Y auto + consistent left/right'
+        c.small_icon = icon_small('copy_left')
+        c.large_icon = icon_large('copy_left')
+      end
+    end
+
+    def cmd_copy_right
+      @cmd_cpr ||= UI::Command.new('Copy Right') {
+        ent = ensure_selection_component!
+        copy_lr(ent, :right) if ent
+      }.tap do |c|
+        c.tooltip = 'Copy Right by LenX (Auto axis, front-aware)'
+        c.status_bar_text = 'Copy right by LenX; axis X/Y auto + consistent left/right'
+        c.small_icon = icon_small('copy_right')
+        c.large_icon = icon_large('copy_right')
+      end
+    end
+
+    def build_toolbar
+      toolbar.add_item(cmd_rotate_minus_90)
+      toolbar.add_item(cmd_rotate_plus_90)
+      toolbar.add_item(cmd_rotate_180)
+      toolbar.add_item(cmd_z0)
+      toolbar.add_item(cmd_zmove_dialog)
+      toolbar.add_item(cmd_copy_left)
+      toolbar.add_item(cmd_copy_right)
+      toolbar.show
+    end
+
+    @last_zmove_mm = 0
+    def show_zmove_dialog
+      html = <<-HTML
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:12px}
+.row{display:flex;gap:8px;align-items:center}
+input{width:120px;padding:6px 8px;font-size:13px;border:1px solid #c8ccd0;border-radius:8px}
+button{padding:6px 10px;border-radius:8px;border:1px solid #c8ccd0;background:#f7f8fa;cursor:pointer}
+small{color:#59636e}
+</style></head><body>
+<div class="row"><button id="apply">Z move</button> <input id="zval" type="number" step="1" value="#{@last_zmove_mm}"/> <small>mm</small></div>
+<script>
+document.getElementById('apply').addEventListener('click', ()=>{
+  const v=parseFloat(document.getElementById('zval').value||'0');
+  if(window.sketchup&&window.sketchup.applyZ) window.sketchup.applyZ(v);
+});
+</script>
+</body></html>
+      HTML
+
+      @dlg ||= UI::HtmlDialog.new({
+        :dialog_title => "Noxun Mower — Z move",
+        :preferences_key => "noxun_mower_zmove_v052",
+        :scrollable => false,
+        :resizable => false,
+        :width => 260,
+        :height => 100,
+        :style => UI::HtmlDialog::STYLE_UTILITY
+      })
+      @dlg.set_html(html)
+      @dlg.add_action_callback('applyZ'){|_,val|
+        @last_zmove_mm = val.to_f
+        ent = ensure_selection_component!
+        set_world_z(ent, @last_zmove_mm) if ent
+      }
+      @dlg.show
+    end
+
+    build_toolbar
+  end
+end

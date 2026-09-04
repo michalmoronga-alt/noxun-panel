@@ -82,7 +82,7 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   *Stav: na návrhovú dávku — od 26.8. SAMOSTATNE (bez väzby na D-48, ktorý je mimo V1); distribučný kanál jednoducho, napr. zdieľaný priečinok.*
 - **D-20 · Quick actions — bezpečný move plugin** (Michal 19.7., „pre budúceho Michala a Fable, keď bude základ top 😉") — zlúčiť funkčné pluginy noxun_mower + Snaper do jedného toolbar pluginu (rýchly
   pohyb, kopírovanie, rotácie, prisunutie na doraz). **Známy poznatok:** mower „rýchla kópia skrinky vedľa" vytvorí kópiu LEN ako geometriu — bez NOXUN identity kabinetu (kópia mimo observer/dedup
-  flow). Pri stavbe quick actions kopírovanie prerobiť tak, aby kópia prešla štandardným dedup tickom (plná identita + config). *Stav: budúcnosť (po V1 / pri zostavách).*
+  flow). Pri stavbe quick actions kopírovanie prerobiť tak, aby kópia prešla štandardným dedup tickom (plná identita + config). *Stav: **ZARADENÉ do V1** (Michal 4.9.2026, bod 1A „staré pluginy") — package **NÁSTROJE-1** v [PLAN.md](PLAN.md) blok 4; príčina fantómu potvrdená čítaním kódu (`add_instance` tej istej definície bez atribútov inštancie = kópia bez identity, mení sa s originálom).*
 
 ## Po V1 — zásobník
 
