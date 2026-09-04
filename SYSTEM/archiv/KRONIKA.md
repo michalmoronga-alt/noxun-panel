@@ -55,6 +55,17 @@
   neaktívny sa nenúka). Mutácie: nepripnutá revízia · náhľad číta uložený set · `expand` číta `active` · náhľad zapisuje — všetky štyri overené.
 
 - **NÁSTROJE-1 · T1b — STARÉ INŠTALÁCIE MOWER/SNAPER SA UPRATUJÚ SAMY (v0.9.25, 4.9.2026, PR #294):** druhá polovica dávky; **NÁSTROJE-1 je KOMPLET a D-20 uzavretá**.
+- **GHOST-D1/D2 — PACKAGES DO PLANU PO 4 KOLÁCH CLI AUDITU A 6 KOLÁCH GH REVIEW (docs, 5.9.2026, PR #296):** drafty ghostu pre dosky (vloženie cez ghost, kreslenie na rozmer
+  dvoma ťahmi) sa vrátili do `SYSTEM/PLAN.md` ako autorita. Cesta: outside-in research (WebFetch + 4 Antigravity packety Gemini 3.8 Flash, #292/#294) → **probe v SketchUpe 26.0.429**
+  (Michal: prázdny Enter → `onReturn`, `VK_RETURN` v API neexistuje, `lock_inference` so syntetickými bodmi nezamyká → projekcia) → **Codex CLI audit 4 kolá** (kolo 1 Sol 4 BLOCKER + 11 FIX
+  a Astra 1 BLOCKER + 6 FIX — prvé nasadenie **GPT-6 Astra** ako audítora; kolo 2 Astra; kolá 3–4 Sol, kolo 4 SOUND) → **Codex GH review 6 kôl** (2× P1 + 2× P2 → 1× P1 + 3× P2 → 1× P1 →
+  1× P1 + 3× P2 → 1× P1 + 1× P2 → 2× P2). **Vedomá odchýlka od pravidla 3 kôl:** išlo o docs PR návrhu, nie kód — každé kolo prinieslo reálny nález do package (trieda „brána schémy dosky
+  `BOARD_CONFIG_SCHEMA` musí byť úplná na strane čitateľov AJ zapisovateľov": prestavba, orientácia, vloženie zo šablóny, dávka Nahradiť UNI ako atomický blocker, výrobné výstupy cez
+  `newer_configs` s druhom záznamu, seed/upsert/migrácia šablón), rozdelenie PR by nič nezlepšilo. **Rozhodnutia:** šípky ako pri ghoste skrinky (Michal), dve tlačidlá karty Dosky
+  „Vložiť"/„Nakresliť" v jednom riadku, `interaction: placement | drawing`, jeden POUŽÍVATEĽSKÝ krok Späť (vytváracia operácia + transparentný scale-lock follow-up), `BoardPlan` ako R-03.
+  **Modely Codexu:** predvolený Sol, Astra výslovne pre kontrakt/schému/nový modul (skill `codex-audit`). Ďalej: implementácia GHOST-D1 (brief `_dev/BRIEF_ghost_d1.md`).
+
+- **NÁSTROJE-1 · T1b — STARÉ INŠTALÁCIE MOWER/SNAPER SA UPRATUJÚ SAMY (v0.9.25, 4.9.2026, PR #295):** druhá polovica dávky; **NÁSTROJE-1 je KOMPLET a D-20 uzavretá**.
   Po T1a žili nástroje v balíku enginu, ale ich pôvodné samostatné inštalácie ostávali v `Plugins` — SketchUp by tak registroval dva toolbary navyše. Upratanie ide **dvoma
   kanálmi**: **boot migrácia pluginu** (nový `noxun_engine/tools/legacy_cleanup.rb`, volaná z `main.rb` PRED registráciou toolbaru) a **inštalátor**
   `INSTALL_noxun_engine.ps1`. Ciele sú štyri a doslovné: `noxun_mower_loader.rb` · `Noxun_Mower/` · `snaper.rb` · `snaper/`.

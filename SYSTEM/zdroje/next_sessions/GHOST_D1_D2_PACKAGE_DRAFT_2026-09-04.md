@@ -1,8 +1,8 @@
 # GHOST-D1 / GHOST-D2 — DRAFT packages (4.9.2026, po Codex kolách #288)
-> Stav: KONCEPT — nezáväzný podklad (výskumný packet / draft packages); do PLANu sa prenáša len po reconcile a schválení, nie priamo do implementácie.
+> Stav: KONCEPT — HISTÓRIA: packages boli 5.9.2026 prenesené do `SYSTEM/PLAN.md` (blok 4, GHOST-D1 a GHOST-D2 = autorita); tento súbor je archív draftu, reconcile a nálezov — nemeniť a schválení, nie priamo do implementácie.
 
-> **Status: DRAFT — nezáväzný podklad.** Outside-in research: WebFetch + **Antigravity beh 4.9.2026 večer HOTOVÝ** (4 packety, reconcile v packete); **probe v SU 2026 čaká** (`_dev/probe_ghost_keys.rb`) — Codex #292 P1 ([GHOST_OUTSIDE_IN_2026-09-04.md](GHOST_OUTSIDE_IN_2026-09-04.md)) — reconcile je v poslednej sekcii tohto
-> súboru. Do `SYSTEM/PLAN.md` sa packages vrátia ako autorita po zapracovaní reconcile + nálezov Codex kola 2 (nižšie) a po Codex CLI audite draftu. Rozhodnutia Michala 4.9.: ↑/↓ = orientácia dosky
+> **Status (HISTÓRIA k 4.9.2026 — uzavreté 5.9.2026: probe hotový, Codex audit HOTOVÝ 4 kolá, packages v `SYSTEM/PLAN.md` ako autorita):** pôvodne DRAFT — nezáväzný podklad. Outside-in research: WebFetch + **Antigravity beh 4.9.2026 večer HOTOVÝ** (4 packety, reconcile v packete); probe v SU 2026 vtedy čakal (`_dev/probe_ghost_keys.rb`; HOTOVÝ 5.9.) — Codex #292 P1 ([GHOST_OUTSIDE_IN_2026-09-04.md](GHOST_OUTSIDE_IN_2026-09-04.md)) — reconcile je v poslednej sekcii tohto
+> súboru. (HISTÓRIA) Packages sa mali vrátiť do `SYSTEM/PLAN.md` po reconcile + nálezoch Codex kola 2 a po Codex CLI audite — SPLNENÉ 5.9.2026, packages sú autorita. Rozhodnutia Michala 4.9.: ↑/↓ = orientácia dosky
 > (nie voľná rotácia) · D1 pred D2 · jedno číslo na fázu · viazané diely/sektory po V1.
 
 - **GHOST-D1 · TASK PACKAGE „GHOST PRE DOSKY — ZÁKLAD" (V1 bod 1B, Michal 4.9.2026; stav: DRAFT — pred implementáciou POVINNÝ outside-in research (nová Tool/inference plocha; skill `antigravity-outside-in`, pri vyčerpanej agy kvóte cez WebSearch) + `codex-audit`; Codex GH #288 nálezy zapracované; in-SU POVINNÉ; štart po NÁSTROJE-1 / KOV-B2):**
@@ -73,3 +73,40 @@
 9. **Commit (agy):** `start_operation('Vložiť dosku', true)` bez vnorenia + `rescue → abort_operation` explicitne v package (zhodné s konvenciou enginu).
 10. **Vzory (licencie):** Trimble `02_custom_tool` (kostra) a `99_sphere_tool` (VCB chyby) — MIT · `Eneroth3/inference-lock-lib` (Shift lock) — MIT · OpenCutList 7.0 Smart Draw — GPL, len vzory ·
     Rotated Rectangle = precedens „jedno číslo na fázu" · SketchList 3D = precedens 3 orientácií · `Sketchup::Snap` = NO ACTION pre V1 (poznámka do bloku viazaných dielov).
+
+## Codex CLI audit kolo 1 (5.9.2026) — Sol (`gpt-5.6-sol`) + Astra (`gpt-6-astra`), ZAPRACOVANÉ do PLANu (PR #296)
+
+**Sol — 4 BLOCKER + 11 FIX:** (1) `boardLocks` žijú len v JS („NIKDY do Ruby") → D2 nemá dátovú cestu pre zámky · (2) smer lokálnej X nedefinovaný, keď 1. fázu dokončí číslo/prázdny
+Enter/zámok bez ťahu · (3) kontrakt `commit_insert` slabší než R-03 (typ plánu, identita modelu, snapshot transformácie, root kontext, rigidná matica) · (4) zmrazený plán ≠ zmrazený
+materiálový snapshot (`normalize`/`board_config` čítajú živý katalóg) · (5) šípky/ALT po potvrdení 1. fázy · (6) chýba politika výšky dosky bez Z-režimu · (7) kotvy bez autoritatívneho
+kontraktu · (8) pamäť ghostu nie je per subjekt · (9) limity pre všetky zdroje rozmeru · (10) `replan` a automatický názov · (11) lifecycle Shift locku · (12) dve tlačidlá bez uzavretého
+callbacku / dvojklik · (13) „karta ukáže stojaca" bez sync mechanizmu · (14) `flush_pending!` bariéra pred vložením · (15) `test_ghost_vkladanie.rb:601` odporuje novému toku.
+**Astra — 1 BLOCKER + 6 FIX + 1 NOTE:** (1) „jedna operácia" odporuje transparentnému scale-lock follow-upu (`board_builder.rb:527`) → kontrakt „jeden používateľský krok Späť" · (2) politika
+výšky + `ghost_lock_z` pre dosku + charakterizácia skrinka → doska → skrinka · (3) bariéra pred čakajúcim `ScaleWatch` timerom · (4) projekcia vo voľnom priestore (pilaster zvislo) → fallback
+`pickray` → os · (5) zámky do Ruby cez `locksFlat('board')` + whitelist · (6) smer pri preskočení 1. ťahu (4 kombinácie zámkov) · (7) `board_config` pri zápise znova číta katalóg · (8) NOTE
+presnosť 0,01 mm parser vs `board_config`.
+**Reconcile:** všetko prijaté a zapracované do packages D1/D2 v PLANe (verzia 2, 5.9.); rozhodnutia orchestrátora: kanonický smer pri nulovom vektore = lokálna +X podľa rotácie session;
+klávesy po potvrdení 1. fázy zamknuté; ALT v D2 bez významu; presnosť 0,01 mm pri prijatí hodnoty; kotvy = tabuľka 3×4 v package. Kolo 2 auditu nad verziou 2 = ČAKÁ.
+
+## Codex CLI audit kolo 2 (5.9.2026, Astra nad verziou 2 `b9f7173`) — ZAPRACOVANÉ (verzia 3)
+
+Kolo 1: **21/23 RESOLVED**, 2 PARTIAL — (Sol 1 / Astra 5) `locksFlat('board')` vracia HODNOTY (`{length: 800}`), nie Boolean → kontrakt zámkov je ČÍSELNÝ snapshot; (Sol 7) tabuľka kotiev bez
+konkrétnych súradníc/ID/poradia ALT → doplnená tabuľka 3 orientácie × 4 kotvy s ID `fl_bottom/fr_bottom/fr_top/fl_top` a poradím ako skrinka. **Nové:** (1) FIX-IN-D2 — kruhová závislosť
+smer ↔ projekcia v 1. ťahu → fáza 1 HĽADÁ SMER v rovine 1. ťahu (vodorovná rovina Z počiatku pre všetky orientácie, žiadna projekcia na lokálnu os), fáza 2 MERIA po pevnej osi; test
+šikmého 1. ťahu 45°; (2) NOTE — dve hranice zákazu ↑/↓ → jedna hranica: klávesy len vo fáze 0 (od kliku počiatku zamknuté). Kolo 3 (Sol, delta) = ČAKÁ.
+
+## Codex CLI audit kolo 3 (5.9.2026, Sol nad verziou 3 `70293bf`) — ZAPRACOVANÉ (verzia 4)
+
+Kolo 2: **4/4 RESOLVED**. **Nové (6 FIX, žiadny BLOCKER):** (1) `draw_board` bez explicitnej R-02 ochrany dokumentu → `nxDocPayload` + `foreign_document?` ako prvý krok, poradie doc guard →
+šablóna/zámky → prepare/replan → session, test so starým `model_guid`; (2) `flush_pending! == false` bez stavovej semantiky → bariéra pred `begin_commit!`, explicitný `:blocked`, session nikdy
+falošne `:committed`; (3) fáza 1 bez brány voľného priestoru pri otočených drawing axes → len reálna geometrická inferencia, inak `pickray` ∩ rovina Z počiatku; (4) `enableVCB?` viazané na
+fázy → `true` celý život nástroja, fáza riadi spracovanie; (5) pásik ghostu ponúka doske Z-zámok → board payload skryje `gbMode`/`gbLockWrap`, ukáže orientáciu; (6) chýba in-SU
+`onCancel(2)` pre dosku a výmena dokumentu počas session → doplnené do DoD D1. Kolo 4 (Sol, záverečné — ukončí sa aj pri drobných NOTE, pokračuje len pri BLOCKERi) = ČAKÁ.
+
+## Codex CLI audit kolo 4 (5.9.2026, Sol nad verziou 4 `5750942`) — SOUND, ZAPRACOVANÉ (verzia 5 = FINAL)
+
+Kolo 3: **6/6 RESOLVED**. **BLOCKER: žiadny → SOUND.** Zvyšné 3 FIX zapracované: (1) explicitný rozlišovač `interaction: placement | drawing` (D1 aj D2 majú subjekt `board`, ale nezlučiteľné
+správanie klikov/klávesov/VCB/pásika; charakterizácia cabinet → board placement → board drawing → cabinet); (2) downgrade brána doskových šablón pred `prepare_insert` (RAW záznam, vlastný
+`BOARD_CONFIG_SCHEMA`, vyššia schéma = odmietnutie bez pečiatky); (3) kontrakt degenerácie `pickray → os` (uhlový prah, `t >= 0`, konečné čísla, dosah; testy skoro rovnobežných pohľadov
+z oboch strán). Residual risks → DoD: `onCancel(2)` + výmena dokumentu vo fáze 2 so Shiftom; ALT na Windows = manuálny smoke.
+**Priebeh auditu:** 23 nálezov → 4 + 2 → 6 → 3 (SOUND). Packages GHOST-D1/D2 v `SYSTEM/PLAN.md` = autorita pre implementáciu (Audit: HOTOVÝ).
