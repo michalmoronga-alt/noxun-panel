@@ -208,8 +208,13 @@ NxTest.test('UI-C1c seed: Diel stoji, Pracovna doska lezi, Zastena ide na stenu'
   end
 end
 
-NxTest.test('UI-C1c: marker suboru sablon je 3') do
-  NxTest.assert_equal(3, NxC1c::TS::STD)
+# GHOST-D1: marker suboru sa posunul na 4 (doskove sablony nesu
+# `config['config_schema']`). Krok 2 -> 3 (orientacia) je tym NEDOTKNUTY —
+# migracia je stupnovana, takze scenare nizsie startuju zo std 2 aj zo std 1.
+NxTest.test('UI-C1c/GHOST-D1: marker suboru sablon je 4 a krok orientacie ostava') do
+  NxTest.assert_equal(4, NxC1c::TS::STD)
+  NxTest.assert(NxC1c::TS.respond_to?(:fill_orientations), 'krok 2 -> 3 existuje')
+  NxTest.assert(NxC1c::TS.respond_to?(:fill_board_schema), 'krok 3 -> 4 existuje')
 end
 
 # ---------------------------------------------------------------------------
@@ -225,7 +230,7 @@ NxTest.test('UI-C1c migracia 2->3: cisty seed std 2 dostane KONTRAKTOVE hodnoty'
                                         NxC1c.seed_std2('Zástena', 10.0, 2600.0, 580.0)
                                       ]))
   NxC1c::TS.load
-  NxTest.assert_equal(3, NxC1c.raw['std'], 'marker posunuty na 3')
+  NxTest.assert_equal(NxC1c::TS::STD, NxC1c.raw['std'], 'marker posunuty na aktualny')
   NxTest.assert_equal('stojaca', NxC1c.board_orientation('Diel'))
   NxTest.assert_equal('leziaca', NxC1c.board_orientation('Pracovná doska'))
   NxTest.assert_equal('na_stenu', NxC1c.board_orientation('Zástena'))
@@ -292,7 +297,7 @@ NxTest.test('UI-C1c migracia 1->3: seed AJ orientacia JEDNYM zapisom (ziadny med
                      'templates' => [{ 'name' => 'Stara dolna', 'config' => { 'type' => 'lower' } }] })
   NxC1c::TS.load
   raw = NxC1c.raw
-  NxTest.assert_equal(3, raw['std'])
+  NxTest.assert_equal(NxC1c::TS::STD, raw['std'])
   NxTest.assert_equal(%w[leziaca na_stenu stojaca],
                       raw['templates'].select { |t| t['kind'] == 'board' }
                           .map { |t| t['config']['orientation'] }.sort)
@@ -302,14 +307,17 @@ NxTest.test('UI-C1c migracia 1->3: seed AJ orientacia JEDNYM zapisom (ziadny med
   NxTest.assert_equal(before, File.binread(NxC1c::TS.path), 'load nad aktualnym markerom nezapisuje')
 end
 
-NxTest.test('UI-C1c forward guard: subor std 4 je LEN NA CITANIE a ostane byte-nezmeneny') do
+NxTest.test('UI-C1c forward guard: subor z NOVSEJ verzie je LEN NA CITANIE a ostane byte-nezmeneny') do
   NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
   NxC1c.reset!
-  NxC1c.write_raw!({ 'std' => 4,
+  NxC1c.write_raw!({ 'std' => NxC1c::TS::STD + 1,
                      'templates' => [NxC1c.seed_std2('Diel', 18.0, 800.0, 600.0)] })
   before = File.binread(NxC1c::TS.path)
   NxC1c::TS.load
-  NxTest.assert_equal(false, NxC1c::TS.upsert('board', 'Nova', 'length' => 100.0), 'upsert odmietnuty')
+  NxTest.assert_equal(false,
+                      NxC1c::TS.upsert('board', 'Nova', 'length' => 100.0,
+                                       'config_schema' => NxC1c::BB::BOARD_CONFIG_SCHEMA),
+                      'upsert odmietnuty')
   NxTest.assert_equal(before, File.binread(NxC1c::TS.path), 'novsi subor sa NEPREPISUJE')
   NxTest.assert_equal(nil, NxC1c.board_orientation('Diel'), 'ani orientacia sa nedoplnila')
 end

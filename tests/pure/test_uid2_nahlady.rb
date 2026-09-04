@@ -64,6 +64,12 @@ module NxD2
   def cfg(width = 600.0)
     { 'type' => 'lower', 'width' => width }
   end
+
+  # GHOST-D1: doskovy config so ZAPISANYM markerom kontraktu.
+  def board_cfg
+    { 'length' => 800.0, 'width' => 600.0, 'thickness' => 18.0,
+      'config_schema' => Noxun::Engine::BoardBuilder::BOARD_CONFIG_SCHEMA }
+  end
 end
 
 # ---------------------------------------------------------------------------
@@ -193,7 +199,9 @@ NxTest.test('UI-D2 delete: mazanie PNG patri DO TemplateStore.delete') do
   NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
   NxD2.reset!
   NxD2::TS.upsert('cabinet', 'Dolná klasik', NxD2.cfg, NxD2.tmp!)
-  NxD2::TS.upsert('board', 'Zástena', NxD2.cfg, NxD2.tmp!)
+  # GHOST-D1: doskovy zaznam musi niest marker kontraktu configu, inak ho
+  # `upsert` odmietne (zapisovatel bez markera nikdy nezapise „legacy" dosku).
+  NxD2::TS.upsert('board', 'Zástena', NxD2.board_cfg, NxD2.tmp!)
 
   NxTest.assert_equal(true, NxD2::TS.delete('cabinet', 'Dolná klasik'))
   NxTest.assert_equal(false, File.exist?(NxD2::TP.path_for('cabinet', 'Dolná klasik')), 'PNG zmizol so zaznamom')

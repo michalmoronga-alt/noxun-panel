@@ -14,10 +14,15 @@
 #   1 = pred UI-C1a (len korpusove sablony, bez `kind`)
 #   2 = `kind` na zazname + seed 3 doskovych sablon
 #   3 = UI-C1c: doskove sablony nesu `config['orientation']`
+#   4 = GHOST-D1: doskove sablony nesu `config['config_schema']`
+#       (`BoardBuilder::BOARD_CONFIG_SCHEMA`) — bez markera by starsi plugin
+#       nevedel odmietnut doskovu sablonu z NOVSEJ verzie a ticho by z nej
+#       vlozil ocesanu dosku
 # Migracia je LAZY (pri prvom `load`) a STUPNOVANA (Codex audit C1c B2):
 # `migrate!` si precita STARY marker PRED zapisom a podla neho spusti
-#   old_std < 2 -> doseje doskove sablony (uz s orientaciou),
+#   old_std < 2 -> doseje doskove sablony (uz s orientaciou aj markerom),
 #   old_std < 3 -> doplni orientaciu existujucim doskovym sablonam,
+#   old_std < 4 -> doplni marker schemy existujucim doskovym sablonam,
 # VSETKO JEDNYM atomickym zapisom pod JEDNYM zamkom (ziadny medzistav na disku).
 # Seed je MARKEROVY, nie obsahovy: viaze sa na prechod markera, nie na
 # pritomnost zaznamov, takze sa uz nikdy neopakuje (zmazanu doskovu sablonu
@@ -44,7 +49,7 @@ require 'tmpdir'
 module Noxun
   module Engine
     module TemplateStore
-      STD  = 3
+      STD  = 4
       FILE = 'templates.json'
       KINDS = %w[cabinet board].freeze
       DEFAULT_KIND = 'cabinet'
@@ -115,6 +120,15 @@ module Noxun
         n = name.to_s
         with_lock do
           if refuse_write('upsert')
+            TemplatePreviews.discard(preview) unless preview == :keep
+            next false
+          end
+          # GHOST-D1: DOSKOVU sablonu smie zapisat len ten, kto nesie marker
+          # kontraktu configu. Bez markera by zaznam vyzeral ako „legacy"
+          # (marker 0) a downgrade brana by ho uz nikdy nevedela odlisit od
+          # skutocne stareho seedu — preto sa zapis ODMIETNE, nedopecatkuje.
+          if k == 'board' && !board_config_marked?(config)
+            Engine.log('TemplateStore: doskova sablona bez markera config_schema — upsert odmietnuty')
             TemplatePreviews.discard(preview) unless preview == :keep
             next false
           end
@@ -325,6 +339,7 @@ module Noxun
         list = normalize_list(raw.is_a?(Array) ? raw : build_predefined)
         list += missing_board_seed(list) if old_std < 2
         list = fill_orientations(list) if old_std < 3
+        list = fill_board_schema(list) if old_std < 4
         write_list(list)
       rescue StandardError => e
         Engine.log_error(e, 'TemplateStore.migrate!')
@@ -357,6 +372,35 @@ module Noxun
           rec['config'] = cfg.merge('orientation' => (want && seed_print?(cfg, want) ? want['orientation'] : fallback))
           rec
         end
+      end
+
+      # GHOST-D1 (std 3 -> 4): doskove sablony bez `config['config_schema']`
+      # dostanu marker `BOARD_CONFIG_SCHEMA` = 1 — teda „toto je DNESNY tvar
+      # configu". Je to bezpecne prave preto, ze tvar sa migraciou NEMENI:
+      # zaznam, ktory dnesny plugin vie precitat bezo zvysku, marker 1 aj
+      # popisuje. EXPLICITNA hodnota (aj vyssia, aj nezmyselna) ostava
+      # NEDOTKNUTA — zaznam z novsej verzie sa neprepisuje (rovnaka zasada
+      # ako pri `kind` a `orientation`). Korpusovych sablon sa netyka.
+      def fill_board_schema(list)
+        list.map do |rec|
+          next rec unless rec['kind'] == 'board'
+
+          cfg = rec['config'].is_a?(Hash) ? rec['config'] : {}
+          next rec if cfg.key?('config_schema')
+
+          rec = JsonFileStore.deep_copy(rec)
+          rec['config'] = cfg.merge('config_schema' => BoardBuilder::BOARD_CONFIG_SCHEMA)
+          rec
+        end
+      end
+
+      # Nesie config doskovej sablony marker kontraktu? (Zapisova brana
+      # `upsert` — citanie sa pyta `BoardBuilder.newer_config?`.)
+      def board_config_marked?(config)
+        return false unless config.is_a?(Hash)
+
+        v = config['config_schema'] || config[:config_schema]
+        v.is_a?(Integer) && v.positive?
       end
 
       # Odtlacok seedov std 2 podla mena (rozmery + kontraktova orientacia C1c).
@@ -520,10 +564,14 @@ module Noxun
       # bez tohto zapisaneho kontraktu by builder dosadil projektovy default
       # a `insert_thickness_for` (autorita realneho materialu) by hrubku
       # sablony zahodil — Pracovna doska aj Zastena by sa vlozili na 18 mm.
+      # GHOST-D1: seed nesie marker kontraktu configu — je to jeden zo
+      # ZAPISOVATELOV doskovej sablony a bez markera by cerstva instalacia
+      # zalozila zaznamy, ktore downgrade brana povazuje za legacy.
       def board_tpl(name, thickness, length, width, orientation)
         record('board', name, 'material_id' => nil, 'length' => length, 'width' => width,
                               'thickness' => thickness, 'grain_direction' => 'length',
-                              'orientation' => orientation)
+                              'orientation' => orientation,
+                              'config_schema' => BoardBuilder::BOARD_CONFIG_SCHEMA)
       end
 
       def lower_base(overrides = {})
