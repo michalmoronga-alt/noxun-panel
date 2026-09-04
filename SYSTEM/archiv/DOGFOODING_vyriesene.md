@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-110** — Pridávanie kovaní: strom Kategória → Výrobca → Rada namiesto plochého zoznamu + modal položky s poradím polí ako dodávateľský list — vyriešené 4.9.2026, PR #290, v0.9.23
 - **D-112** — Odlišná ABS je vidieť vo VEPO objednávke: deviaty stĺpec `poznamka` + kontrolný oddiel v LOGu — vyriešené 4.9.2026, PR #287, v0.9.22
 - **D-113** — Názov dielca vo VEPO nesie skratku a skrinku (`Bok LP s1 s2`) — vyriešené 4.9.2026, PR #287, v0.9.22
 - **D-115** — Symboly smeru otvárania: čiary z rohov, nie šípky (náhľad aj viewport) — vyriešené 3.9.2026, PR #286, v0.9.21
@@ -100,6 +101,25 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-110 · Pridávanie kovaní je neprehľadné (Michal 24.8.2026, prvý test v0.8.0; vyriešené 4.9.2026, PR #290, v0.9.23)
+
+**Pôvodný postreh (plné znenie).** „Formulár novej položky je **dole pod zoznamom**, poradie polí nezodpovedá tomu, ako človek údaje prepisuje z dodávateľského listu, a po
+uložení sa položka stratí v zozname." *(Časť — aby nová položka bola hneď vidieť a orezanie zoznamu sa priznalo — vyriešená v TEST-1, PR #229; REDIZAJN formulára a zoradenia
+ostal otvorený pre KOV-B2.)*
+
+**Čo sa zmenilo (KOV-B2).** Tri veci naraz:
+
+1. **Zoznam je STROM Kategória → „Výrobca · Rada".** Zoskupenie aj poradie skladá SERVER (`hw_tree`, `build_tree`) — klient kreslí presne to, čo dostal. Zbalená kategória je
+   jeden riadok s počtom; hľadanie roztvára LEN skupiny so zhodami (dotaz „tipon" otvorí Blum · TIP-ON). Kategórie sa píšu po slovensky (`CATEGORY_LABELS`), nie kódom.
+2. **„Žiadne tiché stropy" na každej úrovni.** Každá úroveň nesie `total` (koľko ich je) aj `shown` (koľko prišlo) a orezaná rada má pod sebou **„Načítať ďalšie (N)"**;
+   stránkuje sa LIST, nie celý strom (`LEAF_PAGE` 50). Položka za poradím 200 je tak dosiahnuteľná klikaním aj hľadaním — dovtedy sa dala nájsť už len hľadaním.
+3. **Zakladanie aj úprava sú MODAL (D-15), nie formulár pod zoznamom.** Poradie polí je poradie dodávateľského listu — **Démos → kód → názov → cena → MJ → kategória → výrobca →
+   rada → poznámka**. Démos vetva sa presunula do modalu ako prvé pole (našepkávanie aj URL), výrobca sa **predvyplní zo značky stránky** cez taxonómiu (rada sa nikdy neháda)
+   a „+ Vytvoriť výrobcu/radu…" založí záznam v zozname bez opúšťania formulára. Ručne prepísaný údaj z Démosu položku uloží ako **ručnú** — bez väzby a bez dátumu overenia.
+
+**Prečo takto.** Poradie a obsah zoznamu vlastní server (kontrakt „JS poradie nikdy nedopĺňa" z GH #100 P2), takže strom sa dá zopakovať aj pre iné volajúce a KOV-D naň postaví
+filtre. Modal beží nad zdieľanou kostrou D-15, čím dostal zadarmo zámok odoslania, štruktúrované chyby pri poliach a pamäť rozpísaného konceptu.
 
 ### D-112 · Zmenená ABS (odlišná od dekoru dielca) musí byť viditeľná vo VEPO exporte (Michal 3.9.2026, dielňa — skladanie zákazky KLINIKA; vyriešené 4.9.2026, PR #287, v0.9.22)
 

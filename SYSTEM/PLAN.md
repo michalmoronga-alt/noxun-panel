@@ -187,9 +187,9 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 
 **Autorita bloku:** [zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md](zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md)
 (po cross-audite Codex/GLM/Opus + reconcile + rozhodnutia O1–O3) · **UX referencia:** [zdroje/ui20/mockup_kovanie_v1.html](zdroje/ui20/mockup_kovanie_v1.html)
-(schválený 2.9.) · vendor dáta: checkpoint #10 · detail fill: checkpoint #11. Otvorené postrehy D-109/D-110/D-111 sú v packages nižšie
+(schválený 2.9.) · vendor dáta: checkpoint #10 · detail fill: checkpoint #11. Otvorené postrehy D-109/D-111 sú v packages nižšie (D-110 ✅ vyriešená KOV-B2)
 (D-109 mechanika = R-05 po V1, výsledok cez KOV-G). **Predpoklad prvého schema bumpu: D-52 updater** (blok 6 — štartovaný 2.9.).
-Poradie slices: **0 (D-52 ✅) → A1 ✅ → A2 ✅ → H1 ✅ → B1 ✅ → H2 ✅ → B2 (AKTUÁLNA) → B3 → C → D → E → F → G → I** (B po Codex audite #17 rezaná na B1 dáta+std / B2 katalóg UI / B3 editor setu) (KOV-A rezaná po Codex audite #14 na A1 dátová vrstva / A2 UI+overlay; otázka 3/4 krídel rozhodnutá Michalom 3.9. — variant a); C a D dostanú package po sonde Démos (kit vs atomic) a fixtures.
+Poradie slices: **0 (D-52 ✅) → A1 ✅ → A2 ✅ → H1 ✅ → B1 ✅ → H2 ✅ → B2 ✅ → B3 (AKTUÁLNA) → C → D → E → F → G → I** (B po Codex audite #17 rezaná na B1 dáta+std / B2 katalóg UI / B3 editor setu) (KOV-A rezaná po Codex audite #14 na A1 dátová vrstva / A2 UI+overlay; otázka 3/4 krídel rozhodnutá Michalom 3.9. — variant a); C a D dostanú package po sonde Démos (kit vs atomic) a fixtures.
 **KOV-A je KOMPLET a v maine** (A1 PR #280 · A2a PR #281 · A2b PR #282 — plné texty packages v git histórii a v checkpointe #14; záznamy dávok v [archiv/KRONIKA.md](archiv/KRONIKA.md)).
 Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-only), implementuje subagent v worktree, brány podľa CLAUDE.md.
 
@@ -231,7 +231,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   **Checklist uzáveru (v PR):** bump patch + `?v=` → testy vrátane in-SU → `hardware.md` (`hardware_sets`: klasifikácia, mapa, `class:` kľúč, std; nový odsek `hardware_taxonomy`;
   `hardware_catalog`) + ARCHITEKTURA router riadok → STANDARD §6 (klasifikácia, mapovací kľúč, taxonómia) → AUDIT_REGISTER (R-41 ostáva pre B3) → STAV/KRONIKA/PLAN (B1 ✅).
 
-- **KOV-B2 · TASK PACKAGE „KATALÓG — ZOSKUPENIE, MODAL POLOŽKY, DÉMOS" (slice B, rez B2; štart po merge B1; Audit: NIE, `codex-po-pr` povinné):**
+- **✅ HOTOVÉ (PR #290, v0.9.23)** — **KOV-B2 · TASK PACKAGE „KATALÓG — ZOSKUPENIE, MODAL POLOŽKY, DÉMOS" (slice B, rez B2; Audit: NIE, `codex-po-pr` povinné):**
   **Scope IN (mockup scéna 3):** serverové zoskupenie Kategória → Výrobca → Rada so `shown/total` na každej úrovni + „načítať ďalšie" (žiadne tiché stropy; test 500+ položiek
   nájde položku za poradím 200, `pin` zachovaný); hľadanie roztvára len zhody; modal Nová/Upraviť položka (D-15 vzor: štruktúrované chyby, busy lock, draft bez `row_rev`) s poradím
   polí kód → názov → cena → MJ → kategória → výrobca → rada → poznámka; **Démos**: `pid` proposal flow ostáva server-owned (kód/názov/cena/MJ), klient nastavuje len kategóriu,
@@ -253,7 +253,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   dvoch okien in-SU (R-08 vzor) + uloženie setu = bez kroku Späť. Mutácie min. 3 (revízia nepripnutá · náhľad číta uložený set namiesto draftu · `active` filtruje existujúce mapovanie).
   **Smoke pre Michala:** založ set: Zásuvka → Klasické → Kovové bočnice → Hettich → InnoTech Atira → navrhnuté meno → člen „K-sada podľa NL" → náhľad ukáže kód pre NL 470 ·
   starý set KLASIK má chip „nezaradený" a nákup KLINIKA dáva identické čísla · dve okná: úprava toho istého setu = konflikt s hláškou, nie tichý prepis.
-  **Uzáver (v PR):** `hardware.md` + `ui-lifecycle.md` (editor, náhľad) → D-110 do DOGFOODING_vyriesene → AUDIT_REGISTER R-41 ✅ → STAV/KRONIKA/PLAN (KOV-B komplet).
+  **Uzáver (v PR):** `hardware.md` + `ui-lifecycle.md` (editor, náhľad) → AUDIT_REGISTER R-41 ✅ → STAV/KRONIKA/PLAN (KOV-B komplet). *(D-110 je v archíve už od KOV-B2.)*
 
 - **✅ HOTOVÉ (PR #285, v0.9.20)** — **KOV-H2 · TASK PACKAGE „AD-HOC KOVANIE — INSPECTOR UI" (slice H, rez H2; H1 je v maine od v0.9.18 — kontrakt `config['hardware_manual'][]` popisuje
   [../docs/architecture/construction.md](../docs/architecture/construction.md), expanziu [../docs/architecture/hardware.md](../docs/architecture/hardware.md)):**

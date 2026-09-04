@@ -17,6 +17,53 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-B2 · KATALÓG KOVANIA: STROM, MODAL POLOŽKY, DÉMOS VÝROBCA (v0.9.23, 4.9.2026, PR #290):** UI polovica slice B — dáta a taxonómiu dala KOV-B1, táto dávka ich vytiahla
+  na obrazovku a uzavrela **D-110** („pridávanie kovaní je neprehľadné", Michal 24.8. pri prvom teste v0.8.0).
+  **Prečo strom a nie lepšie usporiadaný plochý zoznam.** Katalóg reálnej dielne má stovky kódov a doterajší pohľad Položky bol plochý serverový search s **tichým stropom**
+  (`SEARCH_TOP` 50 / `EMPTY_TOP` 200): položka za poradím 50 sa dala nájsť už **len** hľadaním. TEST-1 (PR #229) to sčasti zaplátal — `total`/`shown` a pin novej položky — ale
+  samotné usporiadanie ostalo. KOV-B2 zavádza **`hw_tree`**: server skladá CELÉ zoskupenie Kategória → Výrobca → Rada aj poradie na každej úrovni a klient kreslí presne to, čo
+  dostal (kontrakt „JS poradie nikdy nedopĺňa", GH #100 P2). Tým sa strom dá zopakovať aj pre iné volajúce a **KOV-D naň postaví filtre**, ktoré sa dajú overiť hľadaním.
+  **Kde býva chyba a čo ju drží.** „No silent caps" platí **na každej úrovni**: `total` = koľko ich je, `shown` = koľko ich prišlo. Stránkuje sa **LIST (rada)**, nie celý strom
+  (`LEAF_PAGE` 50) a orezaný list to prizná `more: true` → klient ponúkne „Načítať ďalšie (N)". Zbalená kategória neposiela kódy vôbec (jeden riadok — vertikálny priestor je
+  vzácny), ale `total` nesie ďalej, inak by hlavička mlčala o svojom obsahu. `pin` (práve založená položka) je v odpovedi **vždy**, navrchu SVOJHO listu a s rozbalenou cestou —
+  aj keď filtru nevyhovuje; inak by po založení opäť „zmizla bez slova". Hľadanie roztvára **len** skupiny so zhodami a klient si serverové rozbalenie pamätá **iba** pri prázdnom
+  dotaze, inak by jedno hľadanie roztvorilo katalóg natrvalo. Generácia dotazu sa iba echuje (hľadanie je debounced, pomalšie kolo nesmie prepísať čerstvejší strom).
+  **Formulár → modal (D-15).** Statický `#hwNewForm` žil DOLE POD zoznamom, takže ho používateľ našiel až po odscrollovaní a rozpísanú položku mu prekryl zoznam; zanikol celý
+  vrátane Démos vetvy v ňom. Nová aj upravovaná položka beží nad **zdieľanou kostrou** (`hw:item:new`), čím dostala zadarmo zámok odoslania, štruktúrované chyby pri poliach
+  a pamäť rozpísaného konceptu. Poradie polí je poradie **dodávateľského listu** (mockup scéna 3): Démos → kód → názov → cena → MJ → kategória → výrobca → rada → poznámka. Pri
+  úprave pole `kód` **chýba** (`item_code` je identita a v `PATCHABLE` nie je) — je v podtitule; úprava nemá pamäť (vzor D-69) a posiela `patch` **len so zmenenými poľami**:
+  posielať všetko by pri každom uložení zmazalo `price_checked_at` (server F5), aj keby sa ceny nikto nedotkol.
+  **Démos ostáva SERVER-OWNED, ale vie viac.** Proposal nesie navyše `manufacturer_guess` — značka stránky (`itemprop="brand"`) preložená cez taxonómiu na **kanonické** meno;
+  neznáma značka aj nekompatibilná taxonómia = `nil` (fail-closed: návrh, ktorý by sa nedal uložiť, sa nedáva) a **radu neháda nikto** (inferencia z breadcrumbu je mimo V1).
+  `create_from_demos!` prijíma výrobcu a radu a overuje ich rovnako ako `create_item`, kým kód, názov, cena a MJ pochádzajú **vždy** z proposalu (FIX 12 z KOV-H1). A tu je
+  rozhodnutie, ktoré stojí za zapamätanie: **ručne zmenený údaj nie je „overený"**. Keď používateľ v modale prepíše ktorýkoľvek z proposalových údajov, klient položku pošle
+  bežným `hw_create` — teda BEZ `demos_url` aj BEZ dátumu overenia. Nie je to serverová vetva navyše: `create_item` cache polia z klientskych atribútov aj tak zahadzuje, takže
+  jediná vec, ktorú bolo treba pridať, je **rozhodnutie klienta, ktorou cestou ide** — a veta v modale, ktorá to dopredu povie.
+  **„+ Vytvoriť výrobcu/radu…" bez opustenia formulára.** Posledná voľba selectu prekreslí modal s poľom na názov (nič mimo kostry) a potvrdenie pošle `hw_tax_create_*` —
+  **položku pritom NEULOŽÍ** (dve veci naraz by boli tichý zápis). Server vráti čerstvú taxonómiu a **kanonické** meno, modal sa prekreslí s vybranou novou hodnotou. Rada je
+  závislý select: bez výrobcu sa vybrať ani založiť nedá a zmena výrobcu zahodí radu, ktorá mu nepatrí (KOV-B1: rada patrí presne jednému). Zápis do taxonómie je zápis do
+  globálneho súboru, takže **nerobí krok Späť** — in-SU sekcia `run_kovb2` to stráži.
+  **Dve pasce, ktoré si vyžiadali fix v kostre aj v jej dokumentácii.** (1) `NXModal.open` najprv ZATVÁRA predchádzajúci modal, takže „prekreslenie" spustí `onClose` volajúceho —
+  a ten si v prvej verzii zhodil vlastný stav vrátane serverového proposalu, čím by zápis potichu prepadol na ručnú cestu. Prekreslenie preto `onClose` preskakuje (`HW_REOPEN`)
+  a pamäť konceptu sa pri ňom **zahadzuje**, lebo by nad čerstvým serverovým návrhom vyhrala starými hodnotami. (2) `lookup` dostal **voliteľný `onPick`** — kostra ním len ohlási
+  výber; je to pre prípad, keď výber nie je koncom, ale začiatkom ďalšieho serverového kroku (tu načítanie produktovej stránky). Oboje je zapísané v `ui-lifecycle.md` ako vzor
+  pre ďalšie pridávačky, nie ako lokálna oprava.
+  **Výsledok zápisu ohlasuje server (`MDH.itemResult`)** — zámok odoslania odomyká VOLAJÚCI v OBOCH vetvách (kontrakt D-15): `true` zavrie modal a zahodí pamäť, `false` ho nechá
+  otvorený s hodnotami a chyby `{field, msg}` rozsype PRI POLIACH. Aby signál nezavrel modal cudzej ceste, patch z inline bunky riadku ho **neposiela** (`from: 'modal'`) a klient
+  ho spracuje len keď na odpoveď naozaj čaká. Štruktúrované chyby si vyžiadali rozšírenie návratových hodnôt katalógu o **pole** (`[:invalid, msg, field]`) — tvar je spätne
+  kompatibilný, volajúci bez potreby poľa ďalej rozbaľuje len `status, info`.
+  **Čo sa vedome NEZMENILO:** `mdhRow`/`mdhDetail` (inline bunky, `row_rev` guard, snímka fokusu), `hw_search` a jeho prijímač `MDH.results` (verejný kontrakt katalógu),
+  kontrakt katalógu (SCHEMA, `PATCHABLE`, `record_rev`, sémantika `pin`), Démos sieťová vrstva, `hardware_sets` a pohľad Sety, KOV-H2 modal, nákup ani výstupy.
+  **Vedomé odchýlky od packagu:** pole **Dodávateľ** v modale nie je (R3 ho v zozname polí nemá) — ostáva editovateľné inline v riadku, takže sa nič nestratilo; pri ÚPRAVE nie je
+  pole **kód**, lebo je to identita, ktorú server v `PATCHABLE` nemá.
+  **Testy:** headless **2714** (0 FAIL; nová sada `test_kovb2_katalog.rb` — poradie, `total/shown`, 520 položiek a dosiahnuteľnosť položky za poradím 200, pin, hľadanie,
+  `CATEGORY_LABELS` guard, `manufacturer_guess`, štruktúrované chyby, taxonómia cez dispatch), **83 JS sád** (nová `test_kovb2_katalog.js` nad minidomom — render stromu, toggle,
+  „načítať ďalšie", modal, závislý select, „+ Vytvoriť", busy lock, Démos predvyplnenie, rozpísaná bunka a otvorený detail prežijú prekreslenie), **4 mutácie** overené pádom
+  a vrátené (klient si strom triedi · list nikdy neprizná orezanie · server preberie klientsku cenu · taxonómia sa neoveruje). **In-SketchUp sada v tejto dávke NEBEŽALA** (Michal
+  pracoval v SketchUpe s pluginom z mainu) — pribudla sekcia **`run_kovb2`** (strom nad sandboxom, založenie položky s výrobcom aj založenie výrobcu zo Štúdia = **bez kroku
+  Späť**, pin navrchu svojho listu, payload sekcie s popiskami a taxonómiou); pustiť pri najbližšom plnom behu.
+  **Codex review:** 3 kolá — kolo 1 = 1×P1 + 5×P2 (zápis do taxonómie z blur pri Zrušiť · konflikt patchu držal starý `row_rev` · in-flight Démos náhľad · korelácia `itemResult` tokenom · spúšťač fokusu pri redraw · proposal po zatvorení), kolo 2 = 2×P1 + 3×P2 (baseline pri UI-only redraw · klasifikácia pri read-only taxonómii · proposal po zmene lookupu · token taxonómie · filter Ostatné s fallbackom), kolo 3 = 6×P2 (čakanie na náhľad z každého zdroja · efektívna kategória v editore · mapa kľúčov chýb · `write_blocked` pri degradovanej taxonómii · prísne parsovanie ceny · proposal prežije patch inej položky) → interná delta-verifikácia orchestrátora namiesto 4. kola. **Vedomá odchýlka od pravidla 3 kôl:** tretie kolo opráv malo len P2 v jednom modale a rozdelenie PR by stálo dve ďalšie kolá; poučenie pre podobné dávky = rezať vopred „strom + server" vs. „modal položky". In-SU plný beh 1525 PASS ×3 (hlavy 94800cf, 9c3a61f, 14cfc54).
+
 - **VÝSTUPY · poznámka ABS pre VEPO + krátke názvy so skrinkami (v0.9.22, 4.9.2026, PR #287):** výrobná dávka z dvoch postrehov z dielne (Michal 3.9., skladanie zákazky
   KLINIKA) — **D-112** a **D-113**. Obe menia to, čo ide do objednávky porezu, preto sa robili spolu a v jednom module (`core/vepo_export.rb`).
   **Prečo deviaty stĺpec.** Pôvodný postreh D-112 sám konštatoval, že „VEPO CSV kontrakt nemá stĺpec poznámky", a ponúkal tri náhradné riešenia (oddiel v LOGu · príznak

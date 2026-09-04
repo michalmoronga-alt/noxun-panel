@@ -833,6 +833,21 @@
   .hwprice { align-items: center; }
   .hwtoggle .ic { transition: transform 0.12s ease; }
   .hwtoggle.hwopen .ic { transform: rotate(90deg); }
+  /* ===== KOV-B2: strom Kategoria -> Vyrobca -> Rada (mockup scena 3) =====
+     ZBALENA kategoria je JEDEN riadok — vertikalny priestor je vzacny. */
+  .hwgrp { border: 1px solid var(--nx-border); border-radius: 6px;
+           background: var(--nx-surface); margin-bottom: 6px; overflow: hidden; }
+  .hwgrphead { display: flex; align-items: center; gap: 7px; width: 100%;
+               padding: 4px 8px; background: var(--nx-surface-sunken);
+               border: 0; border-radius: 0; text-align: left; }
+  .hwgrphead .hwgn { font-weight: 600; font-size: 12px; color: var(--nx-ink-strong); }
+  .hwgrphead .hwgc { margin-left: auto; font-size: 11px; color: var(--nx-ink-faint); }
+  .hwgrphead .hwchev .ic { transition: transform 0.12s ease; }
+  .hwgrp.hwopen .hwgrphead .hwchev .ic { transform: rotate(90deg); }
+  .hwgrpbody { padding: 2px 8px 6px; }
+  .hwsub { margin: 5px 0 1px; font-size: 10.5px; font-weight: 600;
+           color: var(--nx-ink-faint); text-transform: uppercase; letter-spacing: 0.04em; }
+  .hwmore { margin: 2px 0 4px; font-size: 11.5px; }
   /* ===== V0.5 B: kusovnik/supisy (od ŠT-1a sekcie okna Studio) =====
      ŠT-1c PR B3: `.prodhead*`, `.prodsum`, `.prodtabs` a `.prodbody` tu ZANIKLI
      spolu s oknom Vyroba — obliekali VYHRADNE jeho hlavicku, suhrn, listu tabov
@@ -1699,17 +1714,11 @@
 .hwtab tr.hwsrc > td { font-size: 11.5px; color: var(--nx-ink-muted);
                        background: var(--nx-surface-sunken); }
 
-/* ===== V0.6 D2: Pridat z Demosu (katalog kovania) ===== */
-.hwdemos-hit { padding: 3px 8px; border: 1px solid var(--nx-border); border-radius: 6px;
-               margin: 2px 0; cursor: pointer; font-size: 12px; }
-.hwdemos-hit:hover { background: var(--nx-ghost-hover); }
-#hwDemosPreview { border: 1px solid var(--nx-border-strong); border-radius: 8px;
-                  padding: 7px 10px; margin: 6px 0; }
-.hwdemos-head { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; }
-.hwdemos-meta { color: var(--nx-ink-muted); font-size: 12px; margin: 2px 0; }
-.hwdemos-warn { background: var(--nx-warn-bg); border: 1px solid var(--nx-warnchip-border);
-                color: var(--nx-warn-fg); border-radius: 6px; padding: 4px 8px; margin: 4px 0; font-size: 12px; }
-.hwdemos-rel { color: var(--nx-ink-muted); font-size: 11.5px; margin: 3px 0; }
+/* ===== V0.6 D2: Pridat z Demosu (katalog kovania) =====
+   KOV-B2: `.hwdemos-*` a `#hwDemosPreview` tu ZANIKLI spolu so statickym
+   formularom novej polozky (D-110). Demos vetva je od tejto davky PRVE POLE
+   MODALU polozky (typ `lookup` kostry D-15), takze ponuku zhod aj hlasky
+   obliekaju `.mlk*` a `.merr` pravidla kostry — nie vlastne triedy sekcie. */
 
   /* ===== D-15: ZDIELANA KOSTRA MODALOV — presunute zo `studio.html` (KOV-H2) =====
      Do KOV-H2 zili tieto pravidla INLINE v `studio.html`, lebo kostru nacitalo
@@ -1774,6 +1783,9 @@
                               background: var(--nx-surface); color: var(--nx-ink); }
   .mrow input.mshort, .mrow select.mshort { flex: 0 0 96px; }
   .mrow .munit { font-size: 11px; color: var(--nx-ink-faint); }
+  /* KOV-B2 (review #290 P1): akcne tlacidlo PRI POLI — nevratny zapis (nova
+     polozka taxonomie) potrebuje EXPLICITNY spusac, nie blur. */
+  .mrow .mrowbtn { flex: 0 0 auto; padding: 3px 8px; font-size: 12px; }
   /* ŠT-2c: typy polí pre dlhšie formuláre (D-69 editor materiálu).
      `group` = nadpis sekcie — dlhý formulár bez predelov sa číta ako jedna
      kopa políčok a používateľ v ňom stratí, kde končí identita a začínajú

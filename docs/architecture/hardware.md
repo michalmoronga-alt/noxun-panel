@@ -149,6 +149,44 @@ katalóg kovania (V0.6 dávka C): položky s kódmi a cenami s DPH, serverové v
 by sa pin posielal pri každom ďalšom hľadaní a nesúvisiaci dotaz (iný text, iná kategória, prepnuté neaktívne) by novú položku ďalej ťahal navrch a zvýrazňoval až do znovuotvorenia
 okna — bez toho nová položka (`use_count` 0) prepadla za strop a z UI zmizla bez slova, cenový návrh z Demosu s `pid` (JS hodnoty NIKDY neposiela) a stav katalógu `ok`/`read_only`.
 
+**Strom Kategória → Výrobca → Rada (KOV-B2, v0.9.23) — `build_tree`.** Pohľad Položky v Štúdiu už neposiela `hw_search`, ale **`hw_tree`**: server skladá CELÉ zoskupenie
+aj poradie (kontrakt „JS poradie nikdy nedopĺňa" platí na každej úrovni) a klient kreslí presne to, čo dostal. Dôvod je D-110: plochý zoznam s tichým stropom znamenal, že
+položka za poradím `SEARCH_TOP` sa dala nájsť už LEN hľadaním.
+
+- **Kľúč uzla je CESTA** `KATEGÓRIA|Výrobca|Rada` (kategória = sám kód). Klient ňou pýta rozbalenie (`expand`) a ďalšiu stránku listu (`more`); odpoveď je
+  `{ q, gen, groups[], total, shown, pin, leaf_page }`, kde `groups[] = { key, label, open, total, shown, manufacturers[{ key, label, total, shown, series[{ key, label, total, shown, codes[], more }] }] }`.
+- **„Žiadne tiché stropy" na KAŽDEJ úrovni:** `total` = koľko ich tam je, `shown` = koľko ich naozaj prišlo. Stránkuje sa **LIST (rada)**, nie celý strom — najviac `LEAF_PAGE`
+  (50) kódov a orezaný list to prizná `more: true`. **Zbalená kategória neposiela kódy vôbec** (`shown` 0), ale `total` nesie ďalej — inak by hlavička mlčala o tom, čo v nej je.
+- **Poradie:** kategórie v poradí `CATEGORIES`; výrobcovia abecedne bez diakritiky, zberná značka „Ostatné" predposledná a **položky BEZ výrobcu úplne posledné** (`— bez výrobcu`);
+  rady abecedne, `— bez rady` posledná. V liste platí poradie `score_item` (pri dotaze) alebo **podľa názvu** (prázdny dotaz) — nie `use_count`, ktorý v strome nič nehovorí.
+- **Filter kategórie používa TÚ ISTÚ mapu ako strom** (`tree_category_of`, review #290/2 P2) — nie doslovné porovnanie uloženej hodnoty. Položka s neznámou kategóriou (staršie
+  alebo cudzie zápisy, ktoré čítacia cesta zámerne drží čitateľné) sa v strome ukazuje pod „Ostatné"; keby filter porovnával doslovne, po zapnutí filtra „Ostatné" by **zmizla** —
+  a to je práve tá položka, ktorú človek filtrovaním hľadá.
+- **Hľadanie roztvára LEN zhody:** pri neprázdnom `q` sa vracajú iba skupiny so zhodami a majú `open: true`; pri prázdnom platí `expand` klienta. Klient si serverové rozbalenie
+  zapamätá **iba pri prázdnom dotaze** — inak by jedno hľadanie roztvorilo katalóg natrvalo.
+- **`pin` je v odpovedi VŽDY** (aj keď filtru nevyhovuje), **navrchu SVOJHO listu** a jeho kategória je rozbalená; `gen` sa iba ECHUJE (hľadanie je debounced, pomalšie kolo
+  nesmie prepísať čerstvejší strom). `hw_search` a jeho prijímač `MDH.results` **ostávajú** ako verejný kontrakt katalógu.
+- **`CATEGORY_LABELS`** je JEDINÝ zdroj SK popiskov kategórií (strom, filter v lište, select v modale aj `state_payload`); kód ostáva identitou a neznámy kód sa NEPREKLADÁ.
+  Guard test stráži, že mapa pokrýva `CATEGORIES` presne.
+
+**Výsledok zápisu pre modal.** `MDH.itemResult(ok, msg, errors, op, token)` — `token` je identita JEDNÉHO odoslania: klient ho posiela v payloade `hw_create`/`hw_patch`/
+`hw_demos_create`, server ho iba **echuje** a klient prijme len presnú zhodu (review #290 P2 — inak odpoveď zavretého okna zavrela okno otvorené teraz). Patch z inline bunky
+riadku (`from` != `'modal'`) žiadny `itemResult` nedostáva. **Pole chyby sa prekladá** na kľúč modalu (`item_code`→`code`, `name_sk`→`name`, `price_eur_vat`→`price`,
+`demos_url`→`demos`; zvyšok 1:1) — inak by `NXModal.showErrors` vstup nenašiel a bežné odmietnutia by pristáli v zbernom páse bez označeného poľa (review #290/3 P2).
+
+**Stav taxonómie v payloade** nesie DVA nezávislé príznaky: `read_only` (obsah sa nedá čítať — modal klasifikáciu **zamkne**) a `write_blocked` (obsah sa číta, ale zapísať sa
+nedá — modal skryje len „+ Vytvoriť…"). Degradovaná taxonómia je práve ten druhý stav a bez neho by UI ponúkalo akciu, ktorá vždy skončí `:write_failed`.
+
+**Štruktúrované chyby (KOV-B2).** `normalize_item`, `create_item`, `patch_item` aj `taxonomy_refusal` vracajú TRETÍM prvkom **pole**, ktorého sa odmietnutie týka (`item_code`,
+`name_sk`, `price_eur_vat`, `unit`, `category`, `manufacturer`, `series`) — modal D-15 ju kreslí PRI POLI a bez toho by „rada nepatrí výrobcovi" pristála v zbernom páse nad
+formulárom. Tvar je spätne kompatibilný: volajúci, ktorý pole nepotrebuje, ďalej rozbaľuje len `status, info`.
+
+**Démos → výrobca (KOV-B2).** Proposal z `demos_preview!` nesie navyše **`manufacturer_guess`** = značka stránky (`itemprop="brand"`) preložená cez `HardwareTaxonomy
+.resolve_classification` na KANONICKÉ meno; neznáma značka aj nekompatibilná taxonómia = `nil` (fail-closed — návrh, ktorý by sa nedal uložiť, sa nedáva). **Radu neháda
+nikto** — inferencia z breadcrumbu je mimo V1. `create_from_demos!` prijíma `manufacturer:`/`series:` a overuje ich rovnako ako `create_item`, kým **kód, názov, cena a MJ
+pochádzajú VŽDY z proposalu** (FIX 12 z KOV-H1). Keď používateľ niektorý z nich v modale prepíše, **nie je to už overená položka**: klient ju posiela bežným `hw_create`, teda
+BEZ `demos_url` aj BEZ `price_checked_at` (tie `create_item` z klientskych atribútov aj tak zahadzuje).
+
 **Katalóg je GLOBÁLNY** (`%APPDATA%`), takže nezávisí od dokumentu — zákazky sa dotýka až cez sety (`hardware_sets`, projektový snapshot na modeli).
 
 **Od ŠT-3a-2 ho ukazuje JEDINÉ UI:** sekcia `hw` okna Štúdio (Š16 — pohľady Položky · Sety). Okno „Katalóg kovania" ZANIKLO; serverová autorita ostala v

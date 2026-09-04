@@ -757,6 +757,14 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Zones`).
 
 ### 5.6 Ostatné vzory
 
+- **Zbaliteľný strom so `shown/total` (KOV-B2, `.hwgrp` v sekcii Kovanie):**
+  dlhý katalóg sa nekreslí naplocho. **Zbalená skupina je PRESNE JEDEN riadok**
+  (chevron zo sprite + názov + počet vpravo) — vertikálny priestor je vzácny.
+  Poradie skupín aj položiek **skladá server**; klient kreslí, čo prišlo.
+  Orezanie sa nikdy nezamlčí: hlavička píše „zobrazených X" iba keď sa naozaj
+  orezalo, a orezaná vetva má pod sebou ghost tlačidlo **„Načítať ďalšie (N)"**
+  s presným počtom (zásada „no silent caps"). Prázdny výsledok je JEDEN riadok
+  hlášky, nie prázdna plocha.
 - **Sticky hlavička (Inspector):** jednoradová, zostáva pri scrollovaní
   (`position: sticky`, `z-index` pod modalom 60): logo + ID + názov s ceruzkou
   + ⚠ chip. Režimové taby aj satelitné tlačidlá (Materiály·Výroba·Kovanie)

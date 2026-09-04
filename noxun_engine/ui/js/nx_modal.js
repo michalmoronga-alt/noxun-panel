@@ -124,7 +124,13 @@
       var hint = d.hint ? '<span class="munit">' + esc(d.hint) + '</span>' : '';
       var input;
       if (d.type === 'select'){
-        input = '<select id="' + id + '" data-nxm="' + key + '"' + cls + '>' +
+        // KOV-B2 (review #290/2 P1): VOLITELNE zamknutie pola. Pri `<select>`
+        // nestaci `aria-disabled` (hodnota sa da aj tak zmenit) — a tu ide
+        // prave o to, aby sa NEDALA: nad nedostupnou taxonomiou by prazdna
+        // volba ticho zmazala klasifikaciu polozky. Dovod patri na obrazovku
+        // (`hint`), nie do ticha.
+        input = '<select id="' + id + '" data-nxm="' + key + '"' + cls +
+                (d.disabled === true ? ' disabled aria-disabled="true"' : '') + '>' +
                 optionsHtml(d.options, d.value) + '</select>';
       } else if (d.type === 'checkbox'){
         // Zaskrtavatko ma popis VEDLA seba, nie pod stlpcom vstupov — inak by
@@ -147,7 +153,23 @@
                 ' value="' + esc(d.value == null ? '' : d.value) + '"' +
                 (d.placeholder ? ' placeholder="' + esc(d.placeholder) + '"' : '') + '>';
       }
-      return '<div class="mrow">' + lbl + input + hint + '</div>';
+      return '<div class="mrow">' + lbl + input + fieldActionHtml(d) + hint + '</div>';
+    }
+
+    // KOV-B2 (review #290 P1): VOLITELNE akcne tlacidlo PRI POLI. Kostra o jeho
+    // vyzname nevie nic — vykresli ho a klik necha prebublat volajucemu
+    // (`data-action`, NIE `data-nxm-act`, takze delegacia kostry ho ignoruje).
+    // Vzniklo preto, ze zapis, ktory sa neda vratit (globalna taxonomia
+    // kovania), NESMIE spustit udalost `change`/blur: klik na „Zrušiť" najprv
+    // vyvola blur pola a az potom svoj vlastny klik, takze zruseny formular by
+    // stihol nieco zapisat. Explicitne tlacidlo je jediny spolahlivy spusac.
+    function fieldActionHtml(d){
+      var a = (d || {}).action;
+      if (!a || !a.act) return '';
+      return '<button type="button" class="ghostbtn mrowbtn" data-action="' + esc(a.act) + '"' +
+             (a.key ? ' data-nxm-for="' + esc(a.key) + '"' : '') +
+             (a.title ? ' title="' + esc(a.title) + '"' : '') + '>' +
+             esc(a.label || 'OK') + '</button>';
     }
 
     // --- POLE `lookup` (KOV-H2) ----------------------------------------------
@@ -341,6 +363,14 @@
       lookupClose(key);
       if (OPEN) OPEN.memSkip = false;   // vyber je zasah do formulara
       if (q && q.focus){ try { q.focus(); } catch (e) { /* fokus nie je kriticky */ } }
+      // KOV-B2: VOLITELNY signal volajucemu, ze prave nieco vybral. Kostra sama
+      // nic nerobi (hodnota uz je v skrytom poli) — je to pre pripad, ked vyber
+      // nie je koncom, ale ZACIATKOM dalsieho serveroveho kroku (v katalogu
+      // kovania spusti nacitanie produktovej stranky z Demosu). Vynimka
+      // volajuceho sa do kostry NIKDY nepremietne.
+      if (typeof f.onPick === 'function'){
+        try { f.onPick(it); } catch (e) { warn('onPick volajuceho zlyhal.'); }
+      }
     }
 
     // Pisanie ZAHADZUJE predchadzajuci vyber (bod 2 kontraktu vyssie).
@@ -1429,7 +1459,14 @@
       if (!s || typeof document === 'undefined') return;
       var r = root();
       if (!r) return;
-      var trigger = document.activeElement || null;
+      // KOV-B2 (review #290 P2): volajuci smie spusac PODAT. Je to pre PREKRESLENIE
+      // modalu (`open` nad uz otvorenym oknom): vtedy je `activeElement` pole
+      // PRAVE ZANIKAJUCEHO formulara, takze fokus by sa po zatvoreni vracal na
+      // odpojeny uzol a klavesnicova cesta by skoncila na `<body>`. Volajuci
+      // v takom pripade posle PODVODNY spusac (tlacidlo, ktore okno otvorilo).
+      var trigger = (s.trigger !== undefined && s.trigger !== null)
+        ? s.trigger
+        : (document.activeElement || null);
       close(); // dva modaly naraz su vzdy chyba navrhu
       warnDupKeys(s);
       var eff = withMemory(s);

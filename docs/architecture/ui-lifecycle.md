@@ -192,6 +192,26 @@ zmazalo rozpísaný formulár.
 **PRVÁ inštancia sú drafty rozpočtu** — „Pridať položku" a „Pridať spotrebič" (`budDraftFields` je čistá funkcia, validácia ostáva **serverová**, klient stráži len povinné pole);
 ďalšie (D-69 editor materiálu, položka/set kovania) sa napoja bez kopírovania.
 
+**KOV-B2 pridala inštanciu `hw:item:new`** (nová položka katalógu kovania; úprava beží **bez `memoryKey`** — vzor D-69) a s ňou dve veci, ktoré sú vzorom pre ďalšie pridávačky:
+**(1) `lookup` má voliteľný `onPick(item)`** — kostra ním len ohlási, že používateľ niečo vybral. Sama pritom nerobí NIČ navyše (hodnota už v skrytom poli je); je to pre prípad,
+keď výber nie je koncom, ale **začiatkom ďalšieho serverového kroku** (v katalógu spustí načítanie produktovej stránky z Démosu). Výnimka volajúceho sa do kostry nepremietne.
+**(2) „Prekreslenie modalu" je vzor, nie výnimka:** sada polí sa za behu vymieňať nedá (závislý select, pole „+ Vytvoriť…"), takže volajúci zavolá `open` znova s tým, čo už
+používateľ napísal (`hwManualCtxSwitch` v paneli, `hwItemCtxSwitch` v Štúdiu). Pozor na TRI pasce: `open` najprv ZATVÁRA predchádzajúci modal, takže **`onClose` volajúceho musí
+vedieť, že ide o prekreslenie** (inak si zhodí vlastný stav — v katalógu to bol serverový proposal Démosu); pamäť konceptu treba pri takom prekreslení **zahodiť**
+(`clearMemory`), lebo by nad čerstvým serverovým návrhom vyhrala starými hodnotami; a **spúšťač treba PODAŤ** (nižšie), inak sa fokus po zatvorení vráti na odpojený uzol.
+
+**(3) `trigger:` v specifikácii (review #290 P2).** Kostra si spúšťač normálne berie z `document.activeElement` — pri PREKRESLENÍ je to ale pole práve zanikajúceho formulára,
+takže by fokus po zatvorení skončil na odpojenom uzle a klávesnicová cesta na `<body>`. Volajúci preto pri interných redrawoch podá **pôvodný** spúšťač (tlačidlo, ktoré okno
+otvorilo); pre ostatných volajúcich sa nemení nič — bez `trigger` platí staré správanie.
+
+**(3b) `disabled:` na `select` (review #290/2 P1).** Pri rozbaľovačke `aria-disabled` hodnotu neubráni — dá sa zmeniť ďalej. Keď je zámok invariant (v katalógu: klasifikácia
+nad nedostupnou taxonómiou), pole potrebuje **tvrdý `disabled`**; dôvod patrí na obrazovku (`hint`), nie do ticha.
+
+**(4) `action:` — akčné tlačidlo PRI POLI (review #290 P1).** Voliteľné `{ act, key, label, title }` na ploché pole vykreslí malé ghost tlačidlo za vstupom. Kostra o jeho význame
+nevie nič a klik jej delegáciou **neprejde** (`data-action`, nie `data-nxm-act`), takže ho spracuje volajúci. Vzniklo z konkrétnej chyby: zápis, ktorý sa **nedá vrátiť**
+(globálna taxonómia kovania — žiadny krok Späť, žiadny rename ani delete), visel na `change` textového poľa. Klik na „Zrušiť" pritom vyvolá **najprv blur poľa** a až potom svoj
+vlastný klik, takže zrušený formulár stihol zapísať. **Pravidlo, ktoré z toho platí všeobecne: nevratný zápis nesmie spúšťať `change`/blur — potrebuje explicitné tlačidlo.**
+
 **KONTRAKT (audit #9):** komponent spravuje **výhradne modaly, ktoré si ho vyžiadajú** — fázové okno prepočtu cien `#budPrModal` ho **nepreberá**, lebo jeho životný cyklus riadi
 server a vo fáze `run` sa Escapom zavrieť nesmie (beh by ostal visieť bez okna); a Escape handler Štúdia (`ecMenu`) je preto podmienený `!nxModalOpen()` — oba listenery visia na
 `document` a `stopPropagation` medzi nimi **nefunguje** (tá istá lekcia ako pri zatváraní `ecMenu` klikom mimo).
@@ -1549,9 +1569,68 @@ zastaraného UI platí „posledný vyhráva“, lebo snapshot predvolieb `revis
 pushi **dvakrát**. `hwsRenderSets`/`hwsRenderProj` navyše držia **snapshot fokusu** (vzor `mdhRender`) — v okne sa prekresľovalo len po zápise, v sekcii pri každom pushi, takže
 používateľovi mizol kurzor z rozpísaného editora setu; chýbajúci atribút je súčasťou identity (`:not([…])`), inak by sa fokus vrátil do rovnomenného poľa v inom riadku.
 
-**Hodnoty rozpísaného formulára prežijú push** — `#hn_category` aj `#hn_unit` majú `keep` (`mdhRenderEnums` beží pri každom pushi a bez neho by sa kategória aj MJ prepli na PRVÚ v
+**Hodnoty rozpísaného formulára prežijú push** — `#hn_category` aj `#hn_unit` mali `keep` (`mdhRenderEnums` bežal pri každom pushi a bez neho by sa kategória aj MJ prepli na PRVÚ v
 zozname), a `MDH.created` čistí filter **aj v premenných** `HW_Q`/`HW_CAT`, nielen v uzloch lišty — inak by najbližší push nakreslil lištu so STARÝM filtrom nad NEFILTROVANÝM
-zoznamom.
+zoznamom. *(Od KOV-B2 tie dva selecty NEEXISTUJÚ — enumy kreslí modal a rozpísané hodnoty drží pamäť kostry D-15; čistenie filtra v premenných platí ďalej.)*
+
+**KOV-B2 (v0.9.23) — pohľad Položky je STROM a zakladanie je MODAL (D-110).** Telo sekcie je od tejto dávky **iba `#hwList`**: statický formulár `#hwNewForm` aj celá Démos vetva
+v ňom (`#hn_demos`, `#hwDemosHits`, `#hwDemosPreview`, `#hn_code`…`#hn_notes`) **ZANIKLI**. Žili DOLE POD zoznamom, takže pri katalógu s tromi stovkami kódov ich používateľ našiel
+až po odscrollovaní a rozpísanú položku mu prekryl zoznam.
+
+- **Strom kreslí `mdhRenderTree` z POSLEDNEJ odpovede servera** (`MDH.tree`): hlavička kategórie (`.hwgrphead`, chevron zo sprite + `total`, pri orezaní aj `shown`), pod ňou
+  `.hwsub` „Výrobca · Rada" a riadky `mdhRow` — **`mdhRow`/`mdhDetail` sa NEMENIA**, takže inline bunky, `row_rev` guard aj snímka fokusu (`keepFocus`) fungujú ako predtým;
+  rozpísaná bunka a otvorený detail prežijú prekreslenie stromu. Klik na hlavičku prepne `HW_EXPAND[key]` a **vypýta si nový strom** (obsah rozhoduje server), „Načítať ďalšie (N)"
+  zvýši `HW_MORE[leaf]` o `LEAF_PAGE`. Obe pamäte žijú v premenných sekcie (vzor `HW_Q`/`HW_CAT`), takže prežijú push aj odchod do inej sekcie.
+- **Plochý prijímač `MDH.results` ostáva** pre `hw_search` (verejný kontrakt katalógu) — `mdhRender` len rozhodne, ktorý tvar práve kreslí.
+- **Modal položky (D-15, `hw:item:new`)** otvára tlačidlo lišty „Nová položka" aj **„Upraviť"** v detaile riadku. Poradie polí je poradie dodávateľského listu:
+  **Démos → kód → názov → cena → MJ → kategória → výrobca → rada → poznámka**. Pri ÚPRAVE pole `kód` chýba (`item_code` je identita a v `PATCHABLE` nie je) — je v podtitule;
+  úprava **nemá pamäť** (vzor D-69) a posiela `patch` **len so zmenenými poľami** + `from: 'modal'`, `row_rev` ide SKRYTO v stave. Posielať všetko by pri každom uložení zmazalo
+  `price_checked_at` (server F5), aj keby sa ceny nikto nedotkol; prázdny patch modal zavrie s hláškou „Nič sa nezmenilo." namiesto serverového odmietnutia.
+- **Démos je PRVÉ pole modalu** (typ `lookup`): našepkávanie podľa názvu aj vložená URL vedú na SERVEROVÝ proposal (`pid`). Po `MDH.demosPreview` sa modal **prekreslí**
+  predvyplnený (kód/názov/cena/MJ z proposalu, kategória a **výrobca ako NÁVRH** z `manufacturer_guess`, rada nikdy) a rozpísané hodnoty používateľa sa čítajú z formulára, takže
+  sa nestratia. Prekreslenie **NIE JE zatvorenie** — `hwItemClosed` sa počas neho preskočí (`HW_REOPEN`), inak by `onClose` zahodil práve prijatý proposal a zápis by potichu
+  prepadol na ručnú cestu. Statická veta v `note` hovorí, že zmena kódu/názvu/ceny/MJ robí z položky **ručnú** (bez väzby a bez dátumu overenia) — a klient to aj vykoná: pošle
+  `hw_create` namiesto `hw_demos_create`.
+- **„+ Vytvoriť výrobcu/radu…"** je posledná voľba selectu. Voľba prekreslí modal s poľom na názov a **tlačidlom „Vytvoriť" pri ňom** (`action:` kostry); zápis spúšťa
+  **výhradne** ono alebo Enter v poli — **nikdy `change`/blur** (review #290 P1: klik na „Zrušiť" vyvolá blur skôr než svoj klik, takže zrušený formulár by založil výrobcu,
+  ktorého už nikto nezmaže). Zápis **položku pritom NEULOŽÍ** — dve veci naraz by boli tichý zápis. Server odpovie `MDH.taxonomy` s čerstvou taxonómiou a KANONICKÝM menom, modal
+  sa prekreslí s novou hodnotou vybranou; chyba sadne na pole `manufacturer_new`/`series_new`. Rada je **závislý select**: bez výrobcu sa vybrať ani založiť nedá a zmena výrobcu
+  zahodí radu, ktorá mu nepatrí (KOV-B1: rada patrí presne jednému). Aj tu platí **token** (review #290/2 P2): výsledok patriaci už zavretému oknu zoznam obnoví, ale
+  klasifikáciu v otvorenom okne **nevyberie** — je to hodnota, ktorá ide do objednávky. **Degradovaná taxonómia** (poškodený primár + platná `.bak`) sa *číta*, ale zapísať
+  sa do nej nedá; server to hlási samostatným `write_blocked` a modal vtedy skryje **iba „+ Vytvoriť…"** — výber existujúcich mien beží ďalej (review #290/3 P2).
+- **Zámok odoslania odomyká VOLAJÚCI v OBOCH vetvách** — signál servera `MDH.itemResult(ok, msg, errors, op, token)`: `true` zavrie modal a zahodí pamäť konceptu, `false` ho
+  nechá otvorený s hodnotami a chyby (`{field, msg}`) rozsype PRI POLIACH. **`token` je identita JEDNÉHO odoslania** (review #290 P2): klient ho generuje pri submite, server ho
+  echuje a klient prijme **len presnú zhodu** — zdieľaný príznak „niečo som poslal" nestačil, lebo odpoveď okna, ktoré používateľ medzitým zavrel, zavrela okno otvorené teraz
+  a zahodila jeho koncept. Inline oprava bunky v riadku (patch bez `from: 'modal'`) žiadny `itemResult` nedostane.
+- **Konflikt úpravy modal REBASUJE** (review #290 P2): server pri konflikte najprv pushne čerstvý katalóg a až potom odpovie, takže `MDH_ITEMS` má novú revíziu. Ak sa líši od
+  tej, ktorú modal drží (`hwItemStale`), okno sa **prekreslí z čerstvej položky** — nová baseline, serverové hodnoty v poliach, okno ostáva otvorené s hláškou. Bez toho by
+  každé ďalšie „Uložiť" posielalo ten istý zastaraný `row_rev` a konflikt by trval donekonečna, hoci hláška tvrdí, že hodnoty sa obnovili.
+- **Rebase je VÝHRADNE táto cesta** (review #290/2 P1). UI-only prekreslenia (`hwItemRedraw` — zmena výrobcu/rady, predvyplnenie z Démosu) menia len to, čo je na obrazovke:
+  **baseline aj revíziu si podržia z otvorenia modalu**. Keby si ich vzali z `MDH_ITEMS`, cudzia zmena, ktorá dorazila počas otvoreného editora, by sa stala novým „pôvodným
+  stavom" — patch by potom poslal **cudzie zmeny ako vlastné** a s revíziou, ktorá serverovou bránou prejde. Tichý prepis cudzej práce. Vedomú obnovu robí `hwItemRebase`.
+- **Nedostupná taxonómia ZAMYKÁ klasifikáciu** (review #290/2 P1). Katalóg môže byť zapisovateľný, kým je taxonómia read-only alebo sa vôbec nenačítala (server vtedy posiela
+  prázdny zoznam + príznak). `hwTaxLocked()` v tom stave selecty výrobca/rada **zamkne**, ukáže **uloženú hodnotu ako jedinú voľbu** a dôvod napíše k poľu; payload
+  `manufacturer` ani `series` **neobsahuje vôbec** (ani prázdne). Prázdna dvojica totiž `taxonomy_refusal` prejde, takže uloženie nesúvisiacej zmeny by ticho zmazalo výrobcu
+  aj radu už zaradenej položky.
+- **Zmena poľa Démos ZNEPLATNÍ hotový proposal** (review #290/2 P2) — patrí textu, ktorý ho vyhľadal. Bez toho by `hwDemosDirty` (polia sa predsa nezmenili!) pustil uloženie
+  s `pid` **starého** produktu, hoci v poli svieti nový. A kým sa nový náhľad nedokončí (`HW_DEMOS_WAIT`), **zápis sa nepustí** — hláška pri poli povie aj cestu von (počkať,
+  alebo pole vymazať). Príznak nastavuje **spoločný loader** `mdhDemosLoad`, takže blokuje **každý** zdroj náhľadu — vloženú URL aj výber zo šepkára (review #290/3 P2: cez
+  `onPick` sa dali uložiť hodnoty predchádzajúceho produktu ako ručná položka).
+- **Proposal zaniká, len keď ho zápis SPOTREBOVAL** (`usedProposal`, review #290/3 P2) — teda po potvrdenom `hw_demos_create`. Uložená úprava *cudzej* položky s ním nemá nič
+  spoločné a pripravený produkt po nej z „Nová položka" nezmizne.
+- **Editor ukazuje EFEKTÍVNU kategóriu** (`hwEffectiveCategory` — tá istá mapa ako `tree_category_of`, review #290/3 P2). Uložená hodnota mimo `CATEGORIES` v selecte možnosť
+  nemá, takže by prehliadač vybral prvú (`ZAVESY`) a uloženie nesúvisiacej zmeny by položku ticho preradilo medzi závesy. Baseline je preto `OSTATNE` a patch kategóriu pošle
+  len pri skutočnej zmene.
+- **Cena sa parsuje CELÁ** (`hwPriceKey`, review #290/3 P2): `parseFloat` berie číselnú predponu, takže „18.90abc" aj „18,90 €" mali ten istý kľúč ako 18.90 — úprava končila
+  „Nič sa nezmenilo" a proti proposalu to vyzeralo, že sa ceny nikto nedotkol. Neplatná hodnota je **štruktúrovaná chyba pri poli `price`**, nikdy tichý zápis.
+- **Náhľad z Démosu má KLIENTSKU generáciu** (review #290 P2): každá zmena poľa ju zvýši a odpoveď so starou sa **zahodí**. Server svoju generáciu dvíha len pri NOVOM náhľade,
+  takže scenár „vložím URL, potom pole prepíšem na text" by inak nechal dobiehajúcu odpoveď prepísať kód, názov, cenu, MJ, kategóriu aj výrobcu. **Vymazanie poľa** je výslovné
+  „už to nechcem": pošle `hw_demos_cancel` a proposal zahodí.
+- Odchod zo sekcie modal **zatvára** (`hwCloseModals`) — žije v `#nxModalRoot` MIMO `#secbody` a inak by visel nad cudzím obsahom; jeho `onClose` zruší nedokončený náhľad aj
+  naplánovaný dotaz. **Hotový proposal ale zatvorenie PREŽIJE** (review #290 P2) — kostra si pamätá len to, čo sa líši od východiskových hodnôt, a tie po predvyplnení držali
+  práve hodnoty proposalu, takže Escape by zmazal celý vyhľadaný produkt. „Nová položka" z neho formulár znovu predvyplní; zaniká až po ÚSPEŠNOM zápise alebo vymazaní poľa.
+
+Testy: `tests/pure/test_kovb2_katalog.rb`, `tests/js/test_kovb2_katalog.js` (minidom), in-SketchUp sekcia **`run_kovb2`**.
 
 **ŠT-3b-1 — ôsma živá sekcia: PRAVIDLÁ (`rules`, tretia zo skupiny KATALÓGY).** Presun formulára zaniknutého okna „Pravidlá kovania" (Š17, skupina „Kovanie podľa rozmerov"): akcie
 **Uložiť a prestavať skrinky · „aj ako globálnu predvoľbu" · Načítať globálne · Doplniť nové predvolené** sú v LIŠTE sekcie (`rulesToolsHtml` — čistá funkcia, stav chodí

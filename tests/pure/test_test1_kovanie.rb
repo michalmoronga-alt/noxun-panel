@@ -94,7 +94,9 @@ NxTest.test('TEST-1: PIN dava polozku navrch — ale sklada ho SERVER') do
   # navrch (az do znovuotvorenia okna). Su to preto DVA drziaky: ziadost
   # (`MDH_PIN_REQ`, spotrebuje ju najblizsi dotaz) a POTVRDENE zvyraznenie
   # (`MDH_PIN`, plati pre prave vykresleny zoznam).
-  send_fn = js[/function mdhSearchNow\(\).*?\n  \}/m].to_s
+  # KOV-B2: pohlad Polozky posiela `hw_tree` (strom), nie ploche `hw_search` —
+  # jednorazovost ZIADOSTI o pin plati na tej ceste, ktorou sa dnes chodi.
+  send_fn = js[/function mdhTreeNow\(\).*?\n  \}/m].to_s
   NxTest.assert(send_fn.include?("MDH_PIN_REQ = '';"),
                 'ziadost sa po odoslani HNED zabudne')
   NxTest.assert(send_fn.index('pin: MDH_PIN_REQ') < send_fn.index("MDH_PIN_REQ = '';"),
@@ -102,12 +104,16 @@ NxTest.test('TEST-1: PIN dava polozku navrch — ale sklada ho SERVER') do
   first_line = js[/created: function\(code\)\{\s*\n\s*([^\n]+)/m, 1].to_s
   NxTest.assert(first_line.include?('MDH_PIN_REQ ='),
                 'zalozenie nastavuje ZIADOST (prvy riadok tela), nie zvyraznenie')
-  # Zvyraznenie ma JEDINEHO pisatela — odpoved servera. Keby ho nastavoval aj
-  # `created`, riadok by svietil aj vtedy, ked server pin NEPOTVRDIL.
-  writers = js.scan(/^\s*MDH_PIN = /).length
-  NxTest.assert_equal(1, writers, 'zvyraznenie nastavuje PRESNE jedno miesto (prijimac `results`)')
-  NxTest.assert(js.include?(%q(MDH_PIN = data.pin || '')),
-                'a je to odpoved servera')
+  # Zvyraznenie pisu VYHRADNE PRIJIMACE ODPOVEDE SERVERA (`MDH.results` pre
+  # ploche `hw_search`, `MDH.tree` pre strom). Keby ho nastavoval aj `created`,
+  # riadok by svietil aj vtedy, ked server pin NEPOTVRDIL.
+  writers = js.scan(/^\s*MDH_PIN = ([^;]+);/).flatten.map(&:strip)
+  NxTest.assert_equal(2, writers.length,
+                      'zvyraznenie nastavuju PRESNE dva prijimace (`results` + `tree`)')
+  writers.each do |src|
+    NxTest.assert(src.start_with?('data.pin', 'd.pin'),
+                  "zvyraznenie musi prist z odpovede servera, nie z „#{src}\"")
+  end
 end
 
 NxTest.test('TEST-1: po zalozeni polozky ide jej KOD klientovi (obe cesty)') do

@@ -6,7 +6,7 @@
 const assert = require('node:assert');
 const path = require('node:path');
 const { mdhFmtPrice, mdhCheckedLabel, mdhPatchPayload, mdhOrderItems,
-        mdhCreatePayload, mdhCssEscape, mdhCapHint } =
+        hwItemCreatePayload, mdhCssEscape, mdhCapHint } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'hw_catalog.js'));
 
 let n = 0;
@@ -42,13 +42,23 @@ eq(xss.patch.name_sk, '<img src=x onerror=y>',
 ok(!('item_code' in xss.patch) && !('use_count' in xss.patch),
    'payload nikdy nenesie identitu ani use_count');
 
-// --- mdhCreatePayload --------------------------------------------------------
-const c = mdhCreatePayload({ code: '99', name: 'Test', category: 'NOHY', unit: 'ks',
-                             price: '1,5', supplier: 'Demos', notes: '' });
-eq(c.fields.item_code, '99', 'kod z formulara');
+// --- hwItemCreatePayload (KOV-B2: formular ZANIKOL, hodnoty dava MODAL) ------
+const c = hwItemCreatePayload({ code: ' 99 ', name: ' Test ', category: 'NOHY', unit: 'ks',
+                                price: '1,5', manufacturer: 'Hettich', series: 'Sensys',
+                                notes: '' });
+eq(c.fields.item_code, '99', 'kod z modalu (orezany — je to identita)');
+eq(c.fields.name_sk, 'Test', 'nazov orezany');
 eq(c.fields.category, 'NOHY', 'kategoria 1:1 (server enum validuje)');
+// Review #290/2 P1: bez nacitanej taxonomie (tato sada bezi BEZ DOM, takze
+// `MDH_TAX` je prazdna) sa klasifikacia NEPOSIELA — prazdny retazec by nad
+// zaradenou polozkou zmazal vyrobcu aj radu. Nacitanu taxonomiu overuje
+// `test_kovb2_katalog.js` (blok 19).
+ok(!('manufacturer' in c.fields) && !('series' in c.fields),
+   'nad nedostupnou taxonomiou klasifikacia v payloade NIE JE');
 ok(!('demos_url' in c.fields) && !('price_checked_at' in c.fields),
    'create NIKDY neposiela cache polia (server ich aj tak ignoruje)');
+ok(!('row_rev' in c.fields) && !('use_count' in c.fields),
+   'nova polozka nenesie ani reviziu, ani pocitadlo pouzitia');
 
 // --- mdhOrderItems (serverove poradie, F12) ----------------------------------
 const MAP = { A: { item_code: 'A' }, B: { item_code: 'B' }, C: { item_code: 'C' } };
@@ -77,9 +87,18 @@ eq(mdhDemosIsUrl('https://www.demos-trade.sk/zaves-x/'), true, 'URL sa pozna');
 eq(mdhDemosIsUrl('zaves sensys'), false, 'text nie je URL');
 eq(mdhDemosIsUrl('  HTTP://x  '), true, 'case/trim tolerantne');
 
-eq(mdhDemosCreatePayload({ pid: 'p1' }, 'ZAVESY', 'pozn'),
-   { pid: 'p1', category: 'ZAVESY', notes: 'pozn' }, 'payload nesie len pid+kategoriu+notes');
-eq(mdhDemosCreatePayload(null, '', ''), { pid: '', category: '', notes: '' },
+// KOV-B2: klient nastavuje LEN to, co proposal nema — kategoriu, poznamku,
+// vyrobcu a radu. Kod, nazov, cena a MJ ostavaju SERVER-OWNED (FIX 12).
+eq(mdhDemosCreatePayload({ pid: 'p1', code: '357695', price_vat: 18.9 },
+                         'ZAVESY', 'pozn', 'Hettich', 'Sensys'),
+   { pid: 'p1', category: 'ZAVESY', notes: 'pozn',
+     manufacturer: 'Hettich', series: 'Sensys' },
+   'payload nesie len pid + kategoriu + poznamku + vyrobcu + radu');
+ok(!('code' in mdhDemosCreatePayload({ pid: 'p1', code: '357695' }, '', '', '', '')) &&
+   !('price_vat' in mdhDemosCreatePayload({ pid: 'p1', price_vat: 1 }, '', '', '', '')),
+   'kod ani cena z klienta NIKDY neodchadzaju (FIX 12 z KOV-H1)');
+eq(mdhDemosCreatePayload(null, '', '', '', ''),
+   { pid: '', category: '', notes: '', manufacturer: '', series: '' },
    'bez proposalu bezpecne prazdne');
 
 eq(mdhRelatedLine([{ code: '106412', name: 'podložka' }, { code: '105408', name: '' }]),
