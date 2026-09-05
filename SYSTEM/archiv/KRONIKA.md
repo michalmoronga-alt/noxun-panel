@@ -17,7 +17,30 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **KOV-C ? PACKAGE v2 ?NEMENNÉ RECEPTY ZÁSUVIEK" (docs, PR #301, 5.9.2026):** package v13 z PR #300 po **4 CLI + 9 GH kolách** nekonvergoval (4–7 P1 každé kolo) — Michal
+- **KOV-C1 — NEMENNÉ RECEPTY ZÁSUVIEK, JADRO (PR #302, v0.9.29, 5.9.2026):** prvý rez package KOV-C v2. **Z pohľadu používateľa sa nezmenilo NIČ** — žiadny nový dielec, žiadna
+  položka v nákupe, kusovník a VEPO bajtovo rovnaké; dávka len **naučila plugin počítať** zásuvku. Nový modul `core/drawer_recipes.rb` (`Noxun::Engine::Recipes`, čisté Ruby bez
+  SketchUp API a bez zápisu) + dátový pack `noxun_engine/data/recipes/` so štyrmi receptami (`atira_sisy_v1`, `atira_p2o_v1`, `quadro_v6_sisy_v1`, `quadro_v6_p2o_v1`) a registrom
+  `RELEASED.json` (`recipe_id → sha256`). **Nemennosť je brána, nie dohoda:** načíta sa len registrovaný recept so sediacim odtlačkom, schéma sa validuje prísne pri načítaní
+  (chýbajúca bunka `min_depth_by_nl`, Quadro s `height_variants`, nepresná množina rolí rodiny = odmietnutie), inventár priečinka musí sedieť s registrom a **golden fixtúra**
+  (`tests/pure/fixtures/kovc1_golden.json`) fixuje výsledky `resolve` pre každý vydaný recept — SHA JSON-u by zmenu interpretácie v Ruby nezachytilo. Oprava = nový `_v2`.
+  **`Recipes.resolve`** dá jednu výšku, jednu NL, dielce, nosnosť a parametre budúcej položky výsuvu; pri akomkoľvek konflikte je emisia **atomicky prázdna** (10 kódov registra
+  `DRAWER_BLOCKERS`, zapojenie do brán je C2). **`Construction.context_for`** počíta svetlú šírku (listová zóna, nie `w − 2t`), výšku (prienik riadku s interiérom a zónou),
+  hĺbku (`back_front_y`) a prekážky.
+  **KROK 0 (audit mainu pred kódom) priniesol tri veci, ktoré tvar riešenia určili.** (1) `ZoneTree` aj projekcia `front_items` zaokrúhľujú na 2 desatinné miesta **a obe sa
+  ukladajú do configu skrinky** — surové hodnoty preto idú **bokom** (`raw_bounds` / `bounds` → `plan[:zone_bounds]` / `plan[:front_bounds]`), `merge_final` ich nekopíruje a
+  charakterizačné testy strážia, že zóny ani `front_items` nemajú **ani jeden nový kľúč**. Dôvod je vecný: recepty porovnávajú inkluzívne a bez tolerancie, takže 104,995 → 105,0
+  by ticho povolilo zásuvku, ktorá sa nezmestí. (2) Odtlačok receptu sa počíta nad obsahom s **normalizovanými koncami riadkov** — repo beží s `core.autocrlf=true`, takže surový
+  bajtový hash by lokálne (CRLF) a v CI (LF) nikdy nesedel. (3) `build_plan` sa v `build_into` volá **pred** `effective_materials`; C1 to nemení, ale C2 to pre drawer roly musí
+  obrátiť, inak by sa hrúbky dielcov (vstup receptu) nevedeli včas.
+  **Review:** GH Codex kolo 1 vrátilo **6× P2, žiadny P1** — všetky zapracované (samotný `variant internal` už neprepadne do legacy cesty · explicitný `drawer.system` sa proti
+  konštrukcii **overuje**, nesúlad je RED `drawer_unclassified` s hláškou namiesto tichého prepnutia systému · override s `disabled` nie je NL zámok, rovnaký kontrakt ako
+  `HardwareRules.override_nominal_length` · `thickness_supported` musí mať presnú množinu rolí rodiny · inventár vidí aj súbor s menom, ktoré parser nepozná · uzáver docs).
+  Podľa pravidla delta-verifikácie sa nové plné kolo nežiadalo. **Testy:** 2998 headless · 89 JS sád · plný in-SketchUp beh **1750 PASS** nad vetvou dávky.
+  **Do C2 ostáva:** volanie resolvera z `build_plan` a emisia dielcov · 4. materiálový kanál `:drawer` + ABS seed · jedna položka výsuvu (`source: recipe`, `locked`) a potlačenie
+  legacy `fit_series` · `drawer.system` / `recipe_refs` v `norm_drawer` + `CONFIG_SCHEMA` 5 · triedny výber setu a kódy kitov · napojenie kódov na `export_blockers`,
+  `hardware_issues` a Kontrolu · ORANGE sync tyč · Inspector.
+
+- **KOV-C — PACKAGE v2 „NEMENNÉ RECEPTY ZÁSUVIEK" (docs, PR #301, 5.9.2026):** package v13 z PR #300 po **4 CLI + 9 GH kolách** nekonvergoval (4–7 P1 každé kolo) — Michal
   požiadal o **simplification review**: rastie riešenie zbytočne univerzálne? Záver (checkpoint #19): áno — snapshot receptov + digest, kandidáti NL, osi na setoch, exact tabuľka, KD→EB
   mapa a sync capability boli zložitejšie než reálny use-case (~5 systémov za 10 rokov). **v2:** nemenné verzované JSON recepty (`atira_sisy_v1`…, CI SHA register = inventár),
   čelo nesie `drawer.recipe_refs` (mapa systém|otváranie), **fyzika v recepte / kódy v setoch KOV-B** (triedny kľúč + pásmový selektor na `height_variant` + `code_by_nl`),

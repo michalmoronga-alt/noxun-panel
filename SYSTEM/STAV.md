@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.9.28 · 5.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.9.29 · 5.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -25,29 +25,29 @@ robí **priamo v Inspectore**. **KOV-B1** dala setom **klasifikáciu** (na čo �
 **Pozor na kompatibilitu:** čo uloží v0.9.20, to **v0.9.18 už nepoužije** — model/šablóna (`CONFIG_SCHEMA` 4 + brána `assess_set_defs`), knižnica setov aj projektový snapshot
 (`std` 3) a katalóg kovania s výrobcom (`schema` 2). Pred prvou takou zákazkou aktualizovať **obe PC** (D-52 updater).
 
-**Testy k v0.9.28:** **2920 headless** · 89 JS sád · posledný plný in-SketchUp beh **1504 PASS** (v0.9.21; dávky #287, KOV-B2, NÁSTROJE-1 a GHOST-D1 ho **nespúšťali** — Michal pracoval v SketchUpe, pustiť pred merge; pribudli sekcie `run_kovb2`, `run_tools1`, `run_tools1_async`, `run_tools1b`, `run_kovb3`, `run_ghost_d1`, `run_ghost_d1_async`, `run_ghost_d2` a `run_ghost_d2_async`).
+**Testy k v0.9.29:** **2998 headless** · 89 JS sád · posledný plný in-SketchUp beh **1750 PASS** (nad vetvou KOV-C1, 5.9.; predtým 1504 PASS na v0.9.21 — dávky #287, KOV-B2, NÁSTROJE-1 a GHOST-D1 ho nespúšťali; pribudli sekcie `run_kovb2`, `run_tools1`, `run_tools1_async`, `run_tools1b`, `run_kovb3`, `run_ghost_d1`, `run_ghost_d1_async`, `run_ghost_d2` a `run_ghost_d2_async`).
 
 ## Robí sa
 
 **Blok 1b uzavretý až na D-51** (čaká na Michalove hodnoty) · **1c hotový** · **1d beží** (hotové R-06/R-08/R-01+04/R-34/R-02(b)/R-03/R-07/R-23.1/R-11/R-12/R-14; ďalej R-18 + zvyšok; R-13 čaká na Michala) · **1e HOTOVÁ** ([AUDIT_REGISTER.md](AUDIT_REGISTER.md)).
 **Blok KOVANIE beží (od 2.9.):** architektúra V1 uzavretá po cross-audite + O1–O3 ([zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md](zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md)),
 mockup schválený ([zdroje/ui20/mockup_kovanie_v1.html](zdroje/ui20/mockup_kovanie_v1.html)), packages v [PLAN.md](PLAN.md); **D-52 UPDATER KOMPLET (v0.9.14)**.
-**KOV-A KOMPLET** (#280–#282 + smoke fix #286), **KOV-H KOMPLET** (H1 #283 + H2 #285), **KOV-B1** (#284), **KOV-B2** (katalóg) aj **KOV-B3** (editor setu, R-41 uzavretá) hotové — **slice B je KOMPLET**. **KOV-C má package v2 (5.9., PR #301, checkpoint #19):** nemenné recepty, kódy v setoch, žiadny fallback NL; audity zapracované, ZMRAZENÝ — **ďalej implementácia C1**.
+**KOV-A KOMPLET** (#280–#282 + smoke fix #286), **KOV-H KOMPLET** (H1 #283 + H2 #285), **KOV-B1** (#284), **KOV-B2** (katalóg) aj **KOV-B3** (editor setu, R-41 uzavretá) hotové — **slice B je KOMPLET**. **KOV-C má package v2 (5.9., PR #301, #19):** nemenné recepty, kódy v setoch, žiadny fallback NL; ZMRAZENÝ. **C1 hotové (#302, v0.9.29) — ďalej C2 (aktivácia).**
 **Od 3.9. opäť Fable (Max, ~mesiac; priorita = uzavrieť V1)** — orchestruje Fable, implementujú Opus subagenti, review Codex; vstupný bod je [zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md](zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md) + tento súbor. **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
 
 **Poradie (Michal 2.9.: „poradie je na tebe"):** ~~D-52~~ → ~~KOV-A1/A2a/A2b~~ → ~~KOV-H1~~ → ~~KOV-B1~~ → ~~KOV-H2~~ → ~~KOV-B2~~ → ~~KOV-B3~~ (všetko v maine)
-→ **KOV-C** (package v2 zmrazený 5.9., checkpoint #19; C1 jadro → C2 aktivácia) → **KOV-D** resolver + zámky + brány → E/F/G/I. Súbežne 1d podľa kapacity.
+→ **KOV-C** (package v2 zmrazený 5.9., checkpoint #19; ~~C1 jadro #302~~ → **C2 aktivácia**) → **KOV-D** resolver + zámky + brány → E/F/G/I. Súbežne 1d podľa kapacity.
 Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` (KOV-A/B/C/D/H povinné) → subagent vo worktree → `codex-po-pr` → merge → uzáver. V1 checklist v [V1_VIZIA.md](V1_VIZIA.md).
 
 ## Posledné uzávery
 
-- **GHOST-D2 — DOSKA SA DÁ NAKRESLIŤ NA ROZMER** (v0.9.28, 5.9.2026): karta Dosky má vedľa „Vložiť" aj **„Nakresliť"** — doska vznikne **dvoma ťahmi**: klik určí **počiatok**
-  (prichytí sa na roh skrinky, aj zvýšený), prvý ťah dá **dĺžku a smer**, druhý **šírku**, klik vloží. **Čísla sa dajú napísať** do meracieho poľa SketchUpu (2400 Enter),
-  **prázdny Enter** prevezme hodnotu z karty a **Shift** drží smer. **Zamknuté pole karty ťah preskočí** (zamkni dĺžku 800 a kreslí sa už len šírka). Pracovná doska sa tak
-  ťahá **od rohu prvej po roh poslednej skrinky**, pilaster sa postaví **↑** a jeho výška sa ťahá **do vzduchu**. Rozmer nad limitom plugin **odmietne s hláškou** (nič sa
-  ticho neoreže), **Esc** nevloží nič a vloženie je **jeden krok Späť**. Vkladanie skriniek ani „Vložiť dosku" sa **nemenia**.
+- **KOV-C1 — JADRO RECEPTOV ZÁSUVIEK (bez viditeľnej zmeny)** (v0.9.29, 5.9.2026): plugin **vie**, ako sa počíta zásuvka Atira a Quadro V6 — nemenné verzované recepty
+  (`data/recipes/*.json` + SHA register `RELEASED.json`), výpočet svetlého priestoru okolo čela a výber **jednej výšky a jednej NL** s dielcami. **V SketchUpe sa zatiaľ nič
+  nezmenilo** (stavba, kusovník, nákup ani VEPO sa nedotkli) — zapnutie robí C2. Plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md).
+- **GHOST-D2 — DOSKA SA DÁ NAKRESLIŤ NA ROZMER** (v0.9.28, 5.9.2026): karta Dosky má vedľa „Vložiť" aj **„Nakresliť"** — doska vznikne **dvoma ťahmi** (klik = počiatok, ťah dĺžka a smer, ťah šírka), **čísla sa dajú napísať** do meracieho poľa (2400 Enter), **zamknuté pole karty ťah preskočí**, rozmer nad limitom plugin **odmietne s hláškou**,
+  **Esc** nevloží nič a vloženie je **jeden krok Späť**. Vkladanie skriniek ani „Vložiť dosku" sa **nemenia**. Plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **GHOST-D1 — DOSKA SA UŽ TIEŽ KLADIE KLIKOM** (v0.9.27, 5.9.2026): „Vložiť dosku" **už nevkladá vedľa poslednej skrinky** — doska **visí na kurzore**, prichytáva sa
   **v celom priestore** (aj na **zvýšený** roh skrinky), **←/→** ju otáčajú, **↑/↓** menia **umiestnenie**, **Alt** prepína kotvu, **Esc** nevloží nič a vloženie je **jeden krok
   Späť**. Doska má navyše vlastný **kontrakt configu** — zákazku z **novšieho** pluginu už nikto ticho neoreže. Plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md).

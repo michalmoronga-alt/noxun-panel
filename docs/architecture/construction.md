@@ -14,6 +14,18 @@ Plánovač, buildery, strom zón, modulové výpočty (police, čelá), kontrakt
 
 plánovač cfg→BuildPlan (kovanie sa vyhodnocuje po vyradení degenerovaných dielcov; `support_type`).
 
+**KOV-C1 — dva ADITÍVNE surové kanály v pláne.** `plan[:zone_bounds]` (`{ zone_id => {x0…z1} }` zo `ZoneTree`) a `plan[:front_bounds]`
+(`{ front_id => {z0, z1, height} }` z `Fronts.layout`) nesú **NEZAOKRÚHLENÉ** hranice. `CabinetBuilder.merge_final` kopíruje len menovitý zoznam kľúčov, takže do
+uloženého configu (a teda do modelu, kusovníka ani VEPO) sa **nedostanú** — `zones` aj `front_items` ostávajú presne také, aké boli. Dôvod: recepty zásuviek porovnávajú
+svetlé rozmery **inkluzívne a bez EPS**, takže `r2` hodnota 104,995 → 105,0 by ticho povolila zásuvku, ktorá sa nezmestí.
+
+**`Construction.context_for(owner, plan, cfg)`** = čistá funkcia (žiadne IO, žiadny zápis), ktorá z tých surových hraníc počíta svetlý priestor pre `Recipes.resolve`:
+`clear_width` = **listová zóna pretínajúca riadok čela** (nie `w − 2t`), `clear_height` = prienik z-intervalu riadku s **interiérom** (`z_lo = sokel + t … z_hi` podľa
+`rail_geometry`) a s tou zónou, `clear_depth` = `interior[:back_front_y]` (vnútorná hĺbka po **prednú plochu chrbta**, per režim chrbta), `side_thickness` = KD,
+`obstructions` = police a priečky s **kladným** prienikom s riadkom (C2 z nich robí conflict `drawer_obstruction`), plus `owner_part_key` (`front:<id>/panel` — identita
+NL zámku v `hardware_overrides`) a `front_id`. Typický 16 mm rozdiel medzi spodkom riadku (`sokel + gap_bottom`) a spodkom interiéru (`sokel + t`) sa zo svetlej výšky
+**odráta** — má vlastný pomenovaný test. Neznáme `front_id` = hlásna chyba, nikdy tichý default. **`build_plan` ju v C1 NEVOLÁ** — zapojenie resolvera je úloha rezu C2.
+
 ### cabinet_builder.rb
 
 **ŠEV VKLADANIA (R-03, v0.8.20): `prepare_insert` → `commit_insert`; `build` je len ich kompozícia** a správanie všetkých doterajších volajúcich je nezmenené.
@@ -452,6 +464,10 @@ rátal nahrubo — rozdiel 9 mm na boku). Zrkadlo žije v `ui/js/zone_tree.js` (
 **Vstup z panela sa validuje PRÍSNE** (`validate_cuts` + `strict_mm`): konečné číslo, `>= MIN_FIELD`, súčet na svetlý priestor s toleranciou `FIELD_EPS` 0,01 mm; `sanitize_cuts`
 ostáva zámerne tolerantná (je to **opravná** vrstva legacy stromov), ale zapisovacia cesta tolerantná byť nesmie — `'650-36'.to_f` by ticho vyrobilo 650 a stolár iný nábytok.
 `resolve_fields` drží kumulatívny clamp zamknutých polí; `validate_split!`/`validate_shelves!` rebuild radšej **odmietnu**, než by ticho zmenšovali.
+
+**KOV-C1 — `raw_bounds` (aditívne).** `compute` vracia popri `zones` aj `raw_bounds` = `{ zone_id => {x0, x1, y0, y1, z0, z1} }` s **nezaokrúhlenými** hranicami. Ploché
+zóny ostávajú **bez jediného nového kľúča** (idú do uloženého configu, takže by sa zmenil obsah modelu) a naďalej nesú `r2`; surový kanál číta výhradne
+`Construction.context_for`. To isté robí `Fronts.layout` cez `bounds` — `items` (= `front_items`) ostávajú nedotknuté.
 
 ### front_profiles.rb
 

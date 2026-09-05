@@ -282,6 +282,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   chýbajúci kód = RED a používateľ rozhodne; (4) **EB je pevné per recept** (Atira 10.5, Quadro 23) — zmena hrúbky boku mení len svetlú šírku, z ktorej sa dielce počítajú,
   engine nikdy nehľadá iný runner (KD → EB mapa NEEXISTUJE); (5) systém je **explicitná hodnota** `drawer.system` popri `construction` (V1: metal → jediný kandidát Atira,
   wood → Quadro; UI predvyplní, hodnota sa uloží); (6) malý počet stavov, každé pravidlo auditovateľné z jedného JSON súboru.
+  **C1 · jadro (čisté, bez zmeny výstupov) — ✅ HOTOVÉ (PR #302, v0.9.29, 5.9.2026):** modul + 4 recepty + register + `context_for` a raw hranice sú v maine; jediná vedomá odchýlka od textu nižšie je tvar konfliktu z `recipe_key_for` (`[:conflict, kód, hláška]` — kódy sa nerozšírili) a explicitný `drawer.system`, ktorý sa proti konštrukcii **overuje**, nie preberá. Nasleduje C2.
   **C1 · jadro (čisté, bez zmeny výstupov):** nový modul `core/drawer_recipes.rb` + recepty `noxun_engine/data/recipes/<recipe_id>.json`:
   `atira_sisy_v1`, `atira_p2o_v1`, `quadro_v6_sisy_v1`, `quadro_v6_p2o_v1` (jeden recept = jeden systém × jedno otváranie × verzia). Schéma receptu (validovaná pri načítaní,
   chýbajúca bunka = odmietnutie celého receptu, nikdy tichý default): `recipe_id` · `system` · `family` metal_box|wood_undermount · `opening` sisy|p2o · `eb` (číslo) ·

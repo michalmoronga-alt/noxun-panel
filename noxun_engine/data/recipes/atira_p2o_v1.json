@@ -1,0 +1,70 @@
+{
+  "recipe_id": "atira_p2o_v1",
+  "system": "atira",
+  "family": "metal_box",
+  "opening": "p2o",
+  "version": 1,
+  "eb": 10.5,
+  "kd_supported": [16, 18, 19],
+  "mounting": "slide_on",
+  "rear_type": "wooden",
+  "thickness_supported": {
+    "drawer_bottom": [16],
+    "drawer_back": [16]
+  },
+  "constants": {
+    "bottom_width_offset": 51.5,
+    "rear_width_offset": 63,
+    "bottom_length_plus": 10
+  },
+  "height_variants": {
+    "70": { "rear_height": 65.5, "min_clear_height": 108, "railing": 0 },
+    "144": { "rear_height": 144, "min_clear_height": 192, "railing": 2 },
+    "176": { "rear_height": 176, "min_clear_height": 224, "railing": 2 }
+  },
+  "nl_series_by_height": {
+    "70": [350, 420, 470, 520, 620],
+    "144": [350, 420, 470, 520, 620],
+    "176": [350, 420, 470, 520, 620]
+  },
+  "min_depth_by_nl": {
+    "350": 365,
+    "420": 435,
+    "470": 485,
+    "520": 535,
+    "620": 635
+  },
+  "load_by_cell": {
+    "default": 30,
+    "by_nl": { "620": 50 },
+    "by_height_nl": { "176/520": 50 }
+  },
+  "sync_min_width": 600,
+  "abs": {
+    "drawer_bottom": {},
+    "drawer_back": { "l1": 1.0 }
+  },
+  "formula_doc": {
+    "bottom_width": "LB - 2*EB - 51.5",
+    "bottom_length": "NL + 10",
+    "rear_width": "LB - 2*EB - 63",
+    "rear_height": "height_variants[H].rear_height",
+    "min_depth": "NL + 15"
+  },
+  "source": {
+    "eb": "USER",
+    "kd_supported": "USER",
+    "mounting": "OFFICIAL",
+    "rear_type": "USER",
+    "thickness_supported": "OFFICIAL",
+    "constants": "OFFICIAL",
+    "height_variants.rear_height": "SECONDARY",
+    "height_variants.min_clear_height": "OFFICIAL",
+    "height_variants.railing": "USER",
+    "nl_series_by_height": "USER",
+    "min_depth_by_nl": "OFFICIAL",
+    "load_by_cell": "OFFICIAL",
+    "sync_min_width": "SECONDARY",
+    "abs": "USER"
+  }
+}

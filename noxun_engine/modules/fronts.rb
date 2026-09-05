@@ -86,7 +86,7 @@ module Noxun
         # nesmu ulozit cez externy callback a vybuchnut az po pridani cela.
         validate_gap_ranges!(cfg)
         items = cfg['items']
-        return { parts: [], items: [], wings: 0, warnings: [] } if items.nil? || items.empty?
+        return { parts: [], items: [], wings: 0, warnings: [], bounds: {} } if items.nil? || items.empty?
 
         gap = cfg['gap']; gt = cfg['gap_top']; gb = cfg['gap_bottom']; gs = cfg['gap_sides']
         n = items.size
@@ -103,6 +103,12 @@ module Noxun
         parts = []
         resolved = []
         warnings = []
+        # KOV-C1: ADITIVNY kanal NEZAOKRUHLENYCH hranic riadkov ciel
+        # ({ front_id => { z0, z1, height } }). `items` (= ulozeny `front_items`)
+        # ostavaju NEDOTKNUTE — dalej nesu `round(2)`. Recepty zasuviek
+        # porovnavaju svetlu vysku inkluzivne a bez EPS, takze zaokruhlena
+        # hodnota by ticho povolila zasuvku, ktora sa nezmesti.
+        bounds = {}
         total_wings = 0
         z = floor_height + gb
         items.each_with_index do |it, i|
@@ -129,9 +135,10 @@ module Noxun
           # trojstav O1 sa tyka STRANY PANTOV, toto je smer vyklapania).
           res['flap_dir'] = (it['type'] == 'fall' ? 'down' : 'up') if FLAP_TYPES.include?(it['type'])
           resolved << res
+          bounds[res['id']] = { z0: z.to_f, z1: (z + h).to_f, height: h.to_f }
           z += h + gap
         end
-        { parts: parts, items: resolved, wings: total_wings, warnings: warnings }
+        { parts: parts, items: resolved, wings: total_wings, warnings: warnings, bounds: bounds }
       end
 
       # --- KOV-A1: JEDINA definicia „kde sa smer pyta" ------------------------

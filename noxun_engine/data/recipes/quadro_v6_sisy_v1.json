@@ -1,0 +1,64 @@
+{
+  "recipe_id": "quadro_v6_sisy_v1",
+  "system": "quadro_v6",
+  "family": "wood_undermount",
+  "opening": "sisy",
+  "version": 1,
+  "eb": 23,
+  "kd_supported": [16, 18, 19],
+  "mounting": "slide_on",
+  "rear_type": "wooden",
+  "thickness_supported": {
+    "drawer_bottom": [16, 18],
+    "box_side": [16, 18],
+    "drawer_inner_front": [16, 18],
+    "drawer_back": [16, 18]
+  },
+  "constants": {
+    "box_width_offset": 46,
+    "bottom_offset": 12,
+    "box_clearance": 40,
+    "min_front_back_height": 30
+  },
+  "nl_series": [350, 400, 450, 500, 550],
+  "min_depth_by_nl": {
+    "350": 363,
+    "400": 413,
+    "450": 463,
+    "500": 513,
+    "550": 563
+  },
+  "load_by_cell": {
+    "default": 30,
+    "by_nl": {},
+    "by_height_nl": {}
+  },
+  "sync_min_width": 600,
+  "abs": {
+    "drawer_bottom": {},
+    "box_side": { "l1": 1.0 },
+    "drawer_inner_front": { "l1": 1.0 },
+    "drawer_back": { "l1": 1.0 }
+  },
+  "formula_doc": {
+    "box_width": "SKW = LB - 46",
+    "box_height": "clear_height - 40",
+    "side": "NL x box_height",
+    "bottom": "SKW x NL",
+    "front_back": "SKW x (box_height - t_bottom - 12)",
+    "min_depth": "NL + 13"
+  },
+  "source": {
+    "eb": "OFFICIAL",
+    "kd_supported": "USER",
+    "mounting": "OFFICIAL",
+    "rear_type": "USER",
+    "thickness_supported": "OFFICIAL",
+    "constants": "OFFICIAL",
+    "nl_series": "OFFICIAL",
+    "min_depth_by_nl": "OFFICIAL",
+    "load_by_cell": "OFFICIAL",
+    "sync_min_width": "SECONDARY",
+    "abs": "USER"
+  }
+}
