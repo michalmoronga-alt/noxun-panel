@@ -355,7 +355,13 @@ NxTest.test('hw sety GH#127 P1: prva zmena v projekte BEZ snapshotu zmrazi VSETK
   NxTest.assert_equal('zaves-p2o', st['mapping']['hinge'], 'zmeneny typ plati')
   NxTest.assert_equal('nohy-podla-sokla', st['mapping']['leg'],
                       'OSTATNE typy ostali zmrazene z globalu (nie odmapovane)')
-  NxTest.assert_equal(HWS::SEED_MAPPING.length, st['mapping'].length, 'cely default zmrazeny')
+  # KOV-C2a: default uz nie je len `SEED_MAPPING` — cerstva kniznica nesie aj
+  # triedne mapovania zasuviek (`MAPPING_ADDITIONS`), takze „cely default"
+  # znamena OBE mnoziny.
+  NxTest.assert_equal(HWS::SEED_MAPPING.length + HWS::MAPPING_ADDITIONS.length,
+                      st['mapping'].length, 'cely default zmrazeny')
+  NxTest.assert(st['mapping'].key?('class:slide|classic|metal'),
+                'aj triedne mapovania (inak by nova zakazka zasuvky nemapovala)')
   NxTest.assert(st['sets'].key?('nohy-podla-sokla') && st['sets'].key?('zaves-p2o'),
                 'definicie zmrazene tiez (B2)')
 ensure

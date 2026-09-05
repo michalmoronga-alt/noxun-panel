@@ -42,7 +42,19 @@
   o triedne kľúče v tej istej dávke, v ktorej ich resolver začal čítať (Astra #19 F8) — inak by rozídená override mapa duplicitných kópií prešla ako „neškodná".
   **Marker `std` 4** je lazy podľa obsahu a testuje sa prvý: dostane ho len knižnica/snapshot, v ktorej niektorý set pole naozaj nesie. Dôsledok pre prax: po prvom načítaní
   v0.9.30 sa do globálnej knižnice doplnia nové sety a **staršia verzia pluginu do nej už nezapíše** (číta ju ako `:read_only`, snapshot ako `:invalid`) — teda ten istý
-  kompatibilný dopad, aký mali KOV-B1 a `CONFIG_SCHEMA` 4.
+  kompatibilný dopad, aký mali KOV-B1 a `CONFIG_SCHEMA` 4. Rovnaký marker dostane aj snapshot **nového** projektu (prvý zápis zmrazí všetky globálne predvoľby vrátane
+  triednych mapovaní); **existujúce projekty sa nemenia**.
+  **Čo odhalil in-SketchUp beh (opravené v tej istej vetve).** Sekcia `run_kovb1` spadla na „knižnica nesie std 3" — a pri hľadaní príčiny vyšlo najavo, že
+  **`ensure_seeded` seedovala zo samotnej `SEED_MAPPING`, nie cez `seed_library`**, takže *fresh install* by triedne mapovania NEDOSTAL, kým upgrade cez `merge_seed` áno.
+  Presne ten rozchod dvoch ciest, ktorému sa dávka vyhýbala — headless test to nechytil, lebo overoval accessor `seed_library`, nie súbor na disku. Opravené aj s testom,
+  ktorý číta **súbor**; in-SU očakávania (`std` knižnice aj snapshotu) posunuté na 4 a asercia „legacy snapshot ostáva na nižšom std" prepísaná na to, o čom naozaj bola
+  (neklasifikovaná definícia sa uloží ako nezaradená) — na celom snapshote sa už merať nedá, seed sety zásuviek sú v ňom vždy.
+  **Codex kolo 1 (2 P1 + 3 P2) — tri vecné spresnenia.** (1) `override_keys_in_use` registruje pre receptovú položku **výhradne** triedny kľúč: generický `slide` ani
+  `slide@owner` pre ňu resolver nečíta, takže rozdiel v nich jej kód nemení — zapísať ich by znamenalo zastaviť export kvôli ničomu (opačná chyba než tá, ktorú R-34 rieši).
+  (2) Stojace dielce zásuvky dostali **tretiu mapu strán `EDGE_SIDES_STANDING`** (`L1 → top`): dĺžka im beží vodorovne ako ležiacim, ale olepená hrana je HORE, takže lying
+  mapa by 2D kartu nakreslila na opačnú stranu, než hovorí pravidlo aj label. (3) `ensure_drawer_uni!` rozlišuje **dva druhy kolízie**: obsadené ID je v poriadku (fallback
+  na existujúci záznam ukazuje, marker sa zapíše), ale obsadený **dekor** pod iným ID by nechal `PROJECT_FALLBACK` visieť na neexistujúcom ID — to je fail-closed
+  (`:conflict`, marker sa nezapíše, ďalší štart to skúsi znova).
   **Vedomé odchýlky od package textu:** `height_variant` je uzavretý enum `[70, 144, 176]` (package hovoril „číslo") — ďalší kovový systém si svoje výšky pridá v dávke, ktorá
   ho zavedie; a `MAPPING_ADDITIONS` sa merguje aj do **čerstvej** knižnice (`seed_library`), inak by fresh install zásuvky nemapoval, kým upgrade áno.
   **Dátová oprava v tej istej dávke (sonda #12).** Completeness test si vypýtal kit kód pre KAŽDÚ bunku radu a pri tom vyšlo najavo, že kód **`357755`** stál v podklade
@@ -52,7 +64,7 @@
   C2b), takže v žiadnom modeli nestojí geometria, ktorú by oprava zmenila — recept sa opravil NA MIESTE aj s prepočítaným odtlačkom v `RELEASED.json`, dôvod je zapísaný
   v hlavičke `drawer_recipes.rb`. **Od chvíle, keď recept postaví prvý dielec, platí nemennosť bez výnimky** (oprava = nový `_v2`). Golden fixtúra dostala k tomu nový prípad
   „SiSy H144, hĺbka 700 → NL 470" — bez neho by rad nemal čo strážiť.
-  **Testy:** 2998 → **3021 headless** (nová sada `tests/pure/test_kovc2a_kanal_sety.rb`, 23 testov, 4 overené mutácie: fallback na `slide` · `MAPPING_ADDITIONS` prepíše
+  **Testy:** 2998 → **3023 headless** (nová sada `tests/pure/test_kovc2a_kanal_sety.rb`, 25 testov, 4 overené mutácie: fallback na `slide` · `MAPPING_ADDITIONS` prepíše
   používateľský kľúč · seed bez kódu pre bunku radu · strata `height_variant`), 89 JS sád zelených. Charakterizácia je dvojitá — vlastný test „položky bez klasifikácie sa
   správajú presne ako doteraz" (vrátane dôkazu, že **žiadne seed pravidlo `opening_mode`/`drawer_construction` neemituje**) a nezmenený golden `seed_kniznica`.
 - **KOV-C1 — NEMENNÉ RECEPTY ZÁSUVIEK, JADRO (PR #302, v0.9.29, 5.9.2026):** prvý rez package KOV-C v2. **Z pohľadu používateľa sa nezmenilo NIČ** — žiadny nový dielec, žiadna

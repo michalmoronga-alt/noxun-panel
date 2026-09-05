@@ -129,8 +129,10 @@ Zo splitu `materials_*`: CRUD+batch.
 **KOV-C2a — UNI záznam 4. kanála a `ensure_drawer_uni!` (v0.9.30).** `UNI_SEED` má šiesty riadok `UNI_ZASUVKA_16` / „Zásuvka UNI" / rola `drawer` / 16 mm; fresh install aj
 `UNI_APPEND_IDS` používajú **to isté ID** (je nové, žiadna legacy väzba naň neukazuje, takže dva tvary ako pri `K009`/`UNI_KORPUS_18` netreba). Pre EXISTUJÚCE inštalácie má
 kanál **vlastnú migráciu s vlastným markerom** `drawer_uni_seed.done`: `ensure_uni_records!` končí na prvom riadku pri `uni_seed.done`, takže cez ňu by sa nový záznam
-nedoplnil nikdy. `ensure_drawer_uni!` je idempotentná (2× beh = 1 záznam), beží z bootu `main.rb` vo VLASTNOM chránenom bloku a **nikdy neprepisuje**: obsadené ID ani
-kolízny dekor sa nepridá (zapíše sa len marker, ďalší štart už nič neskúša). Kto si UNI zásuvku vedome zmaže, tomu sa nevráti.
+nedoplnil nikdy. `ensure_drawer_uni!` je idempotentná (2× beh = 1 záznam), beží z bootu `main.rb` vo VLASTNOM chránenom bloku a **nikdy neprepisuje** — ale
+na dva druhy kolízie odpovedá RÔZNE (Codex #303 P2): **obsadené ID** znamená, že záznam pod `UNI_ZASUVKA_16` existuje, takže `PROJECT_FALLBACK` na niečo ukazuje a migrácia
+je hotová (`:noop`, marker sa zapíše); **obsadený dekor „Zásuvka UNI" pod iným ID** by nechal fallback ukazovať na neexistujúce ID, a to je **fail-closed**: marker sa
+**nezapíše**, vráti sa `:conflict` s hláškou a ďalší štart to skúsi znova (po premenovaní cudzieho záznamu sa doplní sám). Kto si UNI zásuvku vedome zmaže, tomu sa nevráti.
 
 ### materials_decor.rb
 
@@ -233,7 +235,9 @@ volajú **„Výklop/sklop"** a **„Blenda"** — názov roly `flap` je zámern
 
 **KOV-C2a — `SEED_VERSION` 3 → 4: roly dielcov zásuviek** (checkpoint #11). `drawer_bottom` je **bez ABS** (dno sadá na prírubu zargy, hrana nie je vidieť), `drawer_back`,
 `box_side` a `drawer_inner_front` majú **L1 1,0 mm = horná dlhá hrana**; ostatné hrany sú vedome bez olepu, sú skryté v boxe. `EDGE_LABELS` sú per rola úprimné: dno leží
-a prirodzenú „prednú" hranu nemá (neutrálne „Pozdĺžna/Priečna" ako doska), zvyšné tri STOJA a ich L1 je **Horná**. Bump verzie je nutný z rovnakého dôvodu ako pri
+a prirodzenú „prednú" hranu nemá (neutrálne „Pozdĺžna/Priečna" ako doska), zvyšné tri STOJA a ich L1 je **Horná**. K tomu patrí **tretia mapa strán
+`EDGE_SIDES_STANDING`** (`L1 → top`): stojace dielce majú dĺžku vodorovne ako ležiace, ale ich olepená hrana je HORE, takže v `EDGE_SIDES_LYING` (kde `L1 → bottom`) by 2D
+karta kreslila pásku na opačnú stranu, než hovorí pravidlo aj label. `drawer_bottom` leží a lying mapu si ponecháva. Bump verzie je nutný z rovnakého dôvodu ako pri
 `flap`/`false_front` — bez neho by `merge_seed_roles` roly na existujúcich inštaláciách nikdy nedoplnil a zásuvka by sa postavila BEZ olepu. Roly sú aj v
 `RulesDialog::ABS_ROLE_ORDER` (na konci, za čelami) a v `ProductionCore::ROLE_LABELS` („Dno zásuvky", „Chrbát zásuvky", „Bok boxu", „Vnútorné čelo zásuvky") — prehľad ABS
 pravidiel ich číta zo seedu, takže bez názvov by ukázal holé identifikátory. Dielce samotné ešte **nikto neemituje** (to je C2b).

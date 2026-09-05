@@ -329,7 +329,10 @@ charakterizačný test). Päť častí:
   hodnotu pri existujúcom kľúči, chýbajúci `class:` kľúč nevytvorí — preto druhý, užší kontrakt **`MAPPING_ADDITIONS` (add-if-absent)**: kľúč sa do globálu doplní LEN keď
   chýba (používateľské mapovanie sa NIKDY neprepíše) a LEN keď sú v knižnici VŠETKY sety, na ktoré hodnota ukazuje (čiastočný selektor by ticho menil výber). Do projektu ho
   prenesie až vedomé **„Doplniť nové predvoľby"** (`merge_project_sets_seed!`, existujúci mechanizmus — kľúče mapovania sú preň nepriehľadné reťazce, takže netreba nič nové).
-  `seed_library` ich merguje aj do ČERSTVEJ knižnice, inak by sa fresh install a upgrade rozišli. Hodnota pre Atiru **musí byť pásmový selektor podľa `height_variant`**;
+  `seed_library` ich merguje aj do ČERSTVEJ knižnice — a **`ensure_seeded` seeduje cez `seed_library`, nie cez samotnú `SEED_MAPPING`** (odhalil to in-SketchUp beh: pôvodná
+  cesta zapisovala len legacy kľúče, takže fresh install by zásuvky nemapoval, kým upgrade cez `merge_seed` áno — presne ten rozchod dvoch ciest, ktorému sa dávka vyhýba).
+  Dôsledok na `std`: čerstvá knižnica je **4** (seed nesie sety s `height_variant`) a **`global_default_state` zmrazí triedne mapovania aj drawer sety do snapshotu KAŽDÉHO
+  nového projektu**, takže aj ten je od tejto dávky std 4. Existujúce projekty sa nemenia — do nich ich prenesie až vedomé „Doplniť nové predvoľby". Hodnota pre Atiru **musí byť pásmový selektor podľa `height_variant`**;
   pevný `set_id` by po prerastení zásuvky H70 → H176 objednal H70 kit (klasifikácia opening/construction je pri oboch rovnaká), preto ho `resolve_set_id` odmietne ako
   `set_incompatible` / `height_selector`. Quadro (bez variantu) pevný `set_id` smie.
 - **Kompatibilita vybraného setu (`set_incompatible_info`)** beží v `expand` AJ v `explain` (panel a súpis sa nesmú rozísť) hneď za `set_type_mismatch` a porovnáva

@@ -216,8 +216,35 @@ NxTest.test('KOV-C2a (R1): `ensure_drawer_uni!` je idempotentna a nekoliduje s I
   NxTest.assert_equal(['drawer', true], [zas['uni_role'], mat.uni?(zas)])
   NxTest.assert_close(16.0, zas['thickness'], 0.01)
 
+  # Kolizia DEKORU pod INYM ID = FAIL-CLOSED: nas zaznam by nevznikol a
+  # `PROJECT_FALLBACK` by ukazoval na neexistujuce ID. Marker sa preto NEZAPISE
+  # a migracia sa pri kazdom dalsom starte skusi znova.
+  data = mat.load
+  data['sheets'] = data['sheets'].map do |s|
+    next s unless s['material_id'] == 'UNI_ZASUVKA_16'
+
+    mat.normalize_sheet('material_id' => 'CUDZI_16', 'manufacturer' => '',
+                        'decor' => 'Zásuvka UNI', 'type' => 'DTDL', 'thickness' => 16.0,
+                        'group_id' => mat.group_id_for('', 'Zásuvka UNI'))
+  end
+  NxTest.assert(mat.write(data))
+  FileUtils.rm_f(mat.drawer_uni_marker_path)
+  NxTest.assert_equal(:conflict, mat.ensure_drawer_uni!, 'kolizia dekoru = fail-closed')
+  NxTest.refute(File.exist?(mat.drawer_uni_marker_path), 'marker sa NEZAPISAL')
+  NxTest.assert_equal(nil, mat.sheet('UNI_ZASUVKA_16'), 'a ziadny zaznam nepribudol')
+  # Po premenovani cudzieho zaznamu sa druhy beh doplni sam.
+  data = mat.load
+  data['sheets'] = data['sheets'].map do |s|
+    next s unless s['material_id'] == 'CUDZI_16'
+
+    s.merge('decor' => 'Moja zásuvka', 'group_id' => mat.group_id_for('', 'Moja zásuvka'))
+  end
+  NxTest.assert(mat.write(data))
+  NxTest.assert_equal(:added, mat.ensure_drawer_uni!, 'po premenovani sa doplni')
+  NxTest.assert(mat.sheet('UNI_ZASUVKA_16'))
+
   # Kolizia ID: pouzivatel si ID obsadil vlastnym REALNYM materialom —
-  # zaznam sa NEPREPISE.
+  # zaznam sa NEPREPISE (a fallback na neho ukazuje, takze marker je v poriadku).
   data = mat.load
   data['sheets'] = data['sheets'].map do |s|
     next s unless s['material_id'] == 'UNI_ZASUVKA_16'
@@ -248,6 +275,23 @@ NxTest.test('KOV-C2a (R2): ABS seed dielcov zasuviek — dno bez olepu, ostatne 
     NxTest.assert_equal({ 'L1' => 1.0 }, c::ABS::SEED_RULES[role],
                         "#{role}: horna dlha hrana 1,0 mm")
   end
+end
+
+NxTest.test('KOV-C2a (R2): 2D karta kresli L1 dielcov zasuvky na HORNU stranu') do
+  c = NxC2a
+  # Pravidlo aj `EDGE_LABELS` hovoria „horna dlha hrana" — keby `edge_sides`
+  # vratilo lezacu mapu (L1 = bottom), karta by pasku nakreslila NA OPACNU
+  # stranu, nez sa reze. Dno LEZI, takze mu lezaca mapa ostava.
+  %w[drawer_back box_side drawer_inner_front].each do |role|
+    NxTest.assert_equal(c::ABS::EDGE_SIDES_STANDING, c::ABS.edge_sides(role), role)
+    NxTest.assert_equal('top', c::ABS.edge_sides(role)['L1'], "#{role}: L1 je HORNA strana")
+    NxTest.assert_equal('Horná', c::ABS.edge_labels(role)['L1'], "#{role}: aj label")
+  end
+  NxTest.assert_equal(c::ABS::EDGE_SIDES_LYING, c::ABS.edge_sides('drawer_bottom'),
+                      'dno LEZI — lezaca mapa ostava')
+  # Ostatne roly sa NEZMENILI.
+  NxTest.assert_equal(c::ABS::EDGE_SIDES_LYING, c::ABS.edge_sides('shelf'))
+  NxTest.assert_equal(c::ABS::EDGE_SIDES_FRONT, c::ABS.edge_sides('front_door'))
 end
 
 NxTest.test('KOV-C2a (R2): merge seedu do EXISTUJUCEHO suboru neprepise pouzivatelske pravidlo') do
@@ -426,6 +470,43 @@ NxTest.test('KOV-C2a (R4): cerstva kniznica ma 8 novych setov a 4 triedne mapova
   # Vsetky seed sety su platne aj podla PRISNEJ zapisovej validacie.
   _norm, errs = c::HWS.validate_sets(c::HWS::SEED_SETS)
   NxTest.assert_equal([], errs, errs.inspect)
+end
+
+NxTest.test('KOV-C2a (R4): SEEDNUTY SUBOR nesie triedne mapovania (nielen `seed_library`)') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  c = NxC2a
+  c.with_library do
+    # Fresh install = kniznica NEEXISTUJE. `ensure_seeded` ju zapise pri prvom
+    # `load`, a musi to urobit cez `seed_library` — inak by cerstva instalacia
+    # zasuvky NEMAPOVALA, kym upgrade (cez `merge_seed`) ano. Test cita SUBOR
+    # NA DISKU, nie accessor: prave ten rozdiel bol chybou, ktoru odhalil
+    # in-SketchUp beh (`ensure_seeded` seedovala zo samotnej `SEED_MAPPING`).
+    FileUtils.rm_f(c::HWS.path)
+    FileUtils.rm_f("#{c::HWS.path}.bak")
+    c::STORE.invalidate(c::HWS.path)
+    c::HWS.reset_library_state!
+
+    c::HWS.load
+    doc = c.raw_lib
+    c::HWS::MAPPING_ADDITIONS.each_key do |key|
+      NxTest.assert(doc['mapping'].key?(key), "seednuty subor musi mat #{key}")
+    end
+    NxTest.assert_equal('vysuv-atira-biela-h70', doc['mapping']['slide'],
+                        'legacy mapovanie `slide` ostava')
+    NxTest.assert_equal(c::HWS::STD_HEIGHT_VARIANT, doc['std'],
+                        'seed nesie drawer sety s `height_variant` -> std 4')
+    NxTest.assert_equal(:ok, c::HWS.library_state, 'a TA ISTA verzia si ho precita')
+
+    # Predvolby NOVEHO projektu (`global_default_state`) z toho zmrazia aj
+    # triedne mapovania a sety, na ktore ukazuju — inak by nova zakazka mala
+    # zasuvky nemapovane az do prveho „Doplniť nové predvoľby".
+    gd = c::HWS.global_default_state
+    NxTest.assert(gd['mapping'].key?('class:slide|classic|metal'))
+    NxTest.assert(gd['sets'].key?('atira-biela-h70-sisy'))
+    NxTest.assert_equal(c::HWS::STD_HEIGHT_VARIANT,
+                        c::HWS.snapshot_std(gd['mapping'], gd['sets'].values),
+                        'snapshot noveho projektu preto tiez nesie std 4')
+  end
 end
 
 NxTest.test('KOV-C2a (R4): `MAPPING_ADDITIONS` NEPREPISE pouzivatelsky kluc') do
@@ -694,6 +775,13 @@ NxTest.test('KOV-C2a (R7): `override_keys_in_use` vracia aj triedne kluce') do
   keys = c::PC.override_keys_in_use(collected)['CAB-1']
   NxTest.assert(keys['class:slide|classic|metal'],
                 'kluc, ktory resolver CITA, musi ochrana poznat (inak by rozidena mapa presla)')
-  NxTest.assert(keys['slide'], 'legacy kluce ostavaju')
+  NxTest.assert(keys['slide'], 'legacy polozka registruje legacy kluce')
   NxTest.assert(keys['slide@front:F1/panel'])
+
+  # A NAOPAK: klasifikovana polozka registruje LEN triedny kluc. Generic `slide`
+  # ani `slide@owner` pre nu resolver necita, takze rozdiel v nich jej kod
+  # NEZMENI — zapisat ich by znamenalo zastavit export kvoli nicomu.
+  only_class = c::PC.override_keys_in_use(hardware: [c.drawer_item])['CAB-1']
+  NxTest.assert_equal(['class:slide|classic|metal'], only_class.keys,
+                      'receptova polozka registruje VYHRADNE triedny kluc')
 end

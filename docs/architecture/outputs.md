@@ -143,9 +143,11 @@ správne a **export im prejde** (ORANGE nález Kontroly ostáva). So zhodným vl
 nedá ani dokázať, ani vyvrátiť. Také ID hlási zber v aditívnom kľúči **`cabinet_set_conflicts`** (`Bom.note_cabinet_sets`) a brána ich pridá k blokujúcim aj bez zliatia owner
 člena; **zhodné (alebo nijaké) mapy konflikt nie sú** — bežná kópia skrinky dá rovnaký výsledok nech vyhrá ktorákoľvek. **Blokuje sa len rozdiel, ktorý tej skrinke naozaj mení
 kód (review #262 P2):** záznam nesie KĽÚČE rozdielu a `conflict_matters?` ich porovná s kľúčmi, ktorými si skrinka kovanie skutočne mapuje — `override_keys_in_use` ich číta
-z `collected[:hardware]` ako `generic_type` a `generic_type@owner_part_key` (vzor `resolve_mapping_value`) — **a od KOV-C2a (v0.9.30) aj TRIEDNY kľúč `class:slide|…`**
-(`HardwareSets.class_key_for`): odkedy ho resolver číta, musí ho poznať aj táto ochrana, inak by sa rozídená override mapa v triednom kľúči prepašovala ako „neškodná" a
-duplicitné ID skriniek by objednalo iný kit, než ktorý sa naozaj postavil (Astra #19 F8). Rozídený `slide` na skrinke, ktorá má len závesy, teda neblokuje;
+z `collected[:hardware]` **presne tak, ako ich číta `resolve_mapping_value`**. Do KOV-C2a to boli `generic_type` a `generic_type@owner_part_key`; odvtedy platí vetvenie:
+**klasifikovaná (receptová) položka registruje VÝHRADNE triedny kľúč `class:slide|…`** (`HardwareSets.class_key_for`), legacy položka naďalej dvojicu legacy kľúčov. Obe
+strany sú nutné: bez triedneho kľúča by sa rozídená override mapa prepašovala ako „neškodná" a duplicitné ID skriniek by objednalo iný kit, než ktorý sa postavil
+(Astra #19 F8); a naopak — zapísať receptovej položke aj `slide`/`slide@owner`, ktoré pre ňu resolver ignoruje, by znamenalo blokovať export kvôli rozdielu, ktorý jej kód
+nijako nemení (Codex #303 P2). Rozídený `slide` na skrinke, ktorá má len závesy, teda neblokuje;
 **neznámy rozdiel (prázdny zoznam kľúčov) blokuje** — rovnaká logika ako pri neznámej expanzii. Kľúč je aditívny: starší zber bez neho sa správa ako predtým. Blokujúca hláška
 menuje **oba** dôsledky (TipOn započítaný raz · set podľa druhej skrinky). **Priznaný zvyšok:** či sa override rovná projektovej predvoľbe, brána nevie — mapovanie projektu
 nie je súčasťou zberu a druhý výklad precedencie (`HardwareSets.resolve_set_id` je jediná autorita) by bol presne ten druhý verdikt o tej istej veci, ktorému sa tu vyhýbame.

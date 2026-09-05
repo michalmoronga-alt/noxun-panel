@@ -632,8 +632,11 @@ NxTest.test('H1a merge: doplni CHYBAJUCE globalne mapovania bez prepisu existuju
                              'sets' => { 'nohy-klzak-17' => klzak })
   status, added_sets, added_map = hws.merge_project_sets_seed!(m)
   NxTest.assert_equal(:updated, status)
-  NxTest.assert_equal(%w[hinge shelf_pin slide wall_hanger], added_map.sort,
-                      'doplnene len CHYBAJUCE typy')
+  # KOV-C2a: „Doplniť nové predvoľby" prenesie do snapshotu aj TRIEDNE kluce
+  # (`MAPPING_ADDITIONS`) — bez toho by starej zakazke zasuvky ostali nemapovane
+  # a existujuca akcia by ich nemala ako opravit.
+  NxTest.assert_equal((%w[hinge shelf_pin slide wall_hanger] + hws::MAPPING_ADDITIONS.keys).sort,
+                      added_map.sort, 'doplnene len CHYBAJUCE typy (vratane triednych klucov)')
   NxTest.assert(added_sets.include?('zaves-klasik'))
   _, st = hws.project_state_status(m)
   NxTest.assert_equal('nohy-klzak-17', st['mapping']['leg'],

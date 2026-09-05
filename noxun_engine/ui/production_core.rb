@@ -1034,11 +1034,19 @@ module Noxun
           gt = it['generic_type'].to_s
           next if gt.empty?
           keys = (out[it['owner_id'].to_s] ||= {})
+          # Kluce sa registruju PRESNE tak, ako ich cita `resolve_mapping_value`:
+          # klasifikovana (receptova) polozka ma VLASTNU, kratsiu precedenciu a
+          # generic `slide` ani `slide@owner` pre nu NEEXISTUJU. Zapisat ich aj
+          # jej by znamenalo, ze rozdiel v legacy kluci — ktory jej kod nijako
+          # nemeni — oznaci brana za materialny a zastavi export (Codex #303 P2).
+          ck = HardwareSets.class_key_for(it, gt)
+          if ck
+            keys[ck] = true
+            next
+          end
           keys[gt] = true
           opk = it['owner_part_key'].to_s
           keys["#{gt}@#{opk}"] = true unless opk.empty?
-          ck = HardwareSets.class_key_for(it, gt)
-          keys[ck] = true if ck
         end
         out
       end

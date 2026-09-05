@@ -102,6 +102,13 @@ module Noxun
       # Priradenie strany SEDI s EDGE_LABELS (napr. celo L1='Ľavá' -> 'left', W2='Horná' -> 'top').
       EDGE_SIDES_LYING = { 'L1' => 'bottom', 'L2' => 'top', 'W1' => 'left', 'W2' => 'right' }.freeze
       EDGE_SIDES_FRONT = { 'L1' => 'left', 'L2' => 'right', 'W1' => 'bottom', 'W2' => 'top' }.freeze
+      # KOV-C2a: STOJACE dielce zasuvky (chrbat, bok boxu, vnutorne celo). Dlzka
+      # bezi vodorovne ako pri lezacich dielcoch, ale ich L1 je HORNA dlha hrana
+      # (tam ide olep) — v `EDGE_SIDES_LYING` je L1 dole, takze 2D karta by
+      # kreslila pasku na opacnu stranu, nez hovori pravidlo aj `EDGE_LABELS`.
+      EDGE_SIDES_STANDING = { 'L1' => 'top', 'L2' => 'bottom', 'W1' => 'left', 'W2' => 'right' }.freeze
+      # Roly, ktore tuto mapu pouzivaju (`drawer_bottom` LEZI a ostava lying).
+      STANDING_ROLES = %w[drawer_back box_side drawer_inner_front].freeze
 
       # Pravidlove defaulty ABS podla roly (hodnota = HRUBKA ABS v mm; dekor sa dopocita z materialu
       # dielca). Prazdna mapa = ziadne ABS. Standard 7.5 + zadanie V0.3 + D-30:
@@ -436,6 +443,7 @@ module Noxun
       def edge_sides(role)
         case role.to_s
         when 'front_door', 'drawer_front', 'flap', 'false_front' then EDGE_SIDES_FRONT
+        when *STANDING_ROLES then EDGE_SIDES_STANDING
         else EDGE_SIDES_LYING
         end
       end

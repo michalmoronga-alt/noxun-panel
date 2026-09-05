@@ -985,10 +985,18 @@ module Noxun
       # pravidlach. Novy marker `drawer_uni_seed.done` drzi jednorazovost
       # ODDELENE: kto si UNI zasuvku vedome zmaze, uz ju nedostane spat.
       #
-      # OCHRANA PRED KOLIZIOU ID (vzor `ensure_uni_records!`): existujuci zaznam
-      # s rovnakym ID ani s rovnakym dekorom sa NIKDY neprepise — pouzivatel mohol
-      # ID obsadit vlastnym materialom. Vtedy sa nepridava nic, len sa zapise
-      # marker (dalsi start uz nic neskusa).
+      # OCHRANA PRED KOLIZIOU (vzor `ensure_uni_records!`): existujuci zaznam
+      # s rovnakym ID ani s rovnakym dekorom sa NIKDY neprepise.
+      #
+      # DVA DRUHY KOLIZIE, DVE ODPOVEDE (Codex #303 P2):
+      #   * obsadene ID `UNI_ZASUVKA_16` — zaznam POD TYM ID existuje, takze
+      #     `PROJECT_FALLBACK` na neho ukazuje a kanal funguje; marker sa zapise
+      #     a migracia je hotova (`:noop`).
+      #   * obsadeny DEKOR „Zásuvka UNI" pod INYM ID — nas zaznam NEVZNIKNE a
+      #     fallback by ukazoval na neexistujuce ID. To je FAIL-CLOSED stav:
+      #     marker sa NEZAPISE, vrati sa `:conflict` s hlaskou a migracia sa
+      #     pri kazdom dalsom starte skusi znova (po premenovani cudzieho
+      #     zaznamu sa doplni sama).
       def drawer_uni_marker_path
         File.join(dir, 'drawer_uni_seed.done')
       end
@@ -1011,7 +1019,13 @@ module Noxun
           taken_id = data['sheets'].any? { |s| s['material_id'].to_s.casecmp?(id) }
           taken_decor = (data['sheets'] + data['edges'])
                         .any? { |r| decor_norm_key(r['decor']) == decor_norm_key(decor) }
-          unless taken_id || taken_decor
+          if !taken_id && taken_decor
+            # Fail-closed: bez markera, aby to dalsi start skusil znova.
+            Engine.log("materials: UNI zasuvka sa nedoplnila — dekor „#{decor}“ uz " \
+                       'pouziva iny zaznam; premenuj ho a spusti plugin znova') if defined?(Engine)
+            next :conflict
+          end
+          unless taken_id
             data['sheets'] << normalize_sheet(uni_seed_record(id, decor, role, thickness, color))
             added = true
           end

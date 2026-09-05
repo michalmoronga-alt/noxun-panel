@@ -487,7 +487,8 @@ Doplniť nové predvoľby"): **na generický `slide` sa NIKDY nepadá**, lebo H7
 (otváranie · konštrukcia · `manufacturer` + `series` ↔ `params.system` · `height_variant`) — nesúlad = nemapovaná položka s dôvodom `set_incompatible`, **nikdy iný set**.
 Hodnota mapovania pre položku s `height_variant` **musí byť výškový selektor** na každej úrovni; pevný `set_id` je nekompatibilný.
 
-**MARKER `std` KNIŽNICE A SNAPSHOTU:** `1` = legacy · `2` = pásma/selector · **`3` = klasifikácia alebo triedny kľúč** · **`4` = set s `height_variant`**. Marker je LAZY podľa
+**MARKER `std` KNIŽNICE A SNAPSHOTU:** `1` = legacy · `2` = pásma/selector · **`3` = klasifikácia alebo triedny kľúč** · **`4` = set s `height_variant`**. Od KOV-C2a je
+čerstvá knižnica aj snapshot NOVÉHO projektu na `4` (seed nesie sety zásuviek); existujúce projekty svoj marker nemenia, kým do nich používateľ predvoľby vedome nedoplní. Marker je LAZY podľa
 obsahu, takže čisto legacy dáta ostávajú čitateľné pre staršie verzie; obsah s vyšším `std`, než ktorý verzia pozná, je pre ňu read-only (knižnica) alebo `:invalid`
 (snapshot) — nikdy čiastočne prečítaný.
 

@@ -1042,11 +1042,17 @@ module Noxun
       # B zisti „subor chyba", zastavi sa, instancia A medzitym seedne a ulozi
       # REALNU zmenu, a B ju potom naslepo prepise seedom. Rychly check ostava
       # (hot cesta), ale ZAPIS ide az po DRUHOM checku POD zamkom.
+      # KOV-C2a: seeduje sa cez `seed_library`, NIE cez samotnu `SEED_MAPPING` —
+      # ta drzi len legacy kluce podla generickeho typu a triedne mapovania
+      # (`MAPPING_ADDITIONS`) by CERSTVEJ instalacii chybali. Fresh install by
+      # tak zasuvky nemapoval, kym upgrade (cez `merge_seed`) ano — presne ten
+      # rozchod dvoch ciest, ktoremu sa cela davka vyhyba.
       def ensure_seeded
         return if JsonFileStore.available?(path)
         with_catalog_lock do
           next true if JsonFileStore.available?(path)
-          write(deep_copy(SEED_SETS), SEED_MAPPING.dup)
+          lib = seed_library
+          write(lib['sets'], lib['mapping'])
         end
       rescue StandardError => e
         Engine.log_error(e, 'HardwareSets.ensure_seeded') if defined?(Engine)
