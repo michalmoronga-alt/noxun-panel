@@ -454,7 +454,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   segmentová automatika — soklová lišta v celku pre segment, obklady a krycie prvky segmentu vrátane pilastra (priznaný vs. skrytý) ako generované diely, pracovné a horné krycie dosky
   na označený segment, migrácia a oprava starých modelov, plné segmenty s `attachment` dátovým kontraktom, automatické krycie dosky a PD cez segment — v zásobníku.
   **Rozhodnutie 4.9.2026 (Michal, debata V1 bod 1B):** viazané diely a sektory (koncept 02) idú **PO V1** — „radšej raz a poriadne, než teraz kúskovať". Praktickú potrebu zostáv pokryjú v V1
-  **GHOST-D1 + GHOST-D2** (dosky vkladané a kreslené prichytením na skrinky, packages nižšie). **Agy outside-in research** „automatický pilaster / pracovná doska" (skill `antigravity-outside-in`)
+  **GHOST-D1 + GHOST-D2** (dosky vkladané a kreslené prichytením na skrinky, packages nižšie) — **oba ✅ hotové (v0.9.27 / v0.9.28)**. **Agy outside-in research** „automatický pilaster / pracovná doska" (skill `antigravity-outside-in`)
   sa spraví, keď bude kvóta — podklad pre blok viazaných dielov po V1.
 - **NÁSTROJE-1 · TASK PACKAGE „MOWER + SNAPER V BALÍKU NOXUN ENGINE" (D-20; V1 bod 1A — Michal 4.9.2026; **Audit: HOTOVÝ** — Codex CLI 4.9. audity 1–5 (11 → 7 → 3 → 1 → 0 nálezov, posledný **SOUND**) + Codex GH #288 kolá 1–3, všetko zapracované; história v [zdroje/next_sessions/NASTROJE1_PACKAGE_DRAFT_2026-09-04.md](zdroje/next_sessions/NASTROJE1_PACKAGE_DRAFT_2026-09-04.md); in-SU POVINNÉ):**
   **STAV IMPLEMENTÁCIE: ✅ NÁSTROJE-1 KOMPLET (4.9.2026) — T1a PR #293 (v0.9.24) + T1b PR #295 (v0.9.25); D-20 uzavretá** (plný text v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md)).
@@ -626,6 +626,11 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   ARCHITEKTURA router pri novom súbore → STAV/KRONIKA/PLAN.
 
 - **GHOST-D2 · TASK PACKAGE „KRESLENIE DOSKY NA ROZMER (Ghost 2.0)" (po D1; outside-in HOTOVÝ + probe SU 26.0.429 5.9.; Codex #288 kolá 1–2 zapracované; **Audit: HOTOVÝ — Codex CLI 5.9.2026, 4 kolá (Sol + Astra), kolo 4 SOUND**; in-SU POVINNÉ):**
+  **STAV IMPLEMENTÁCIE: ✅ GHOST-D2 KOMPLET (5.9.2026, v0.9.28)** — fázový automat `:origin → :length → :width → :done` so zámkami fáz, dve rozdielne geometrie ťahov
+  (rovina Z počiatku · pevná os per orientácia) s plným guardom degenerácie, kanonický smer pri nulovom vektore, pravotočivý záporný 2. ťah, vlastný parser meracieho poľa
+  + limity pre všetky 4 zdroje rozmeru, `enableVCB?`/`onUserText`/`onReturn`, Shift hold-to-lock so zamknutým smerom aj vo voľnom priestore, samostatný callback `draw_board`
+  so zámkami z karty, tlačidlo „Nakresliť" a fáza v pásiku, `BoardBuilder.replan`. Headless `test_ghost_d2_kreslenie.rb` (75), JS `test_ghost_d2_karta.js` +
+  `test_ghost_d2_pasik.js`, in-SU `run_ghost_d2` + `run_ghost_d2_async`. Znenie nižšie je autorita, podľa ktorej sa implementovalo.
   **Cieľ:** doska sa nakreslí **dvoma ťahmi**: klik = nulový bod → ťah dĺžky (prichytenie SketchUp inference ALEBO napísané číslo v mm do meracieho poľa) → klik → ťah šírky → klik = vloženie;
   hrúbka z materiálu karty. **Ťahy sledujú LOKÁLNE osi dosky podľa orientácie** (Codex #288 P2): dĺžka = lokálna X (pri ležiacej aj stojacej doske vodorovná), šírka = lokálna Y (pri stojacej
   zvislá) — pilaster: ↑ stojaca, 1. ťah = hĺbka (dĺžka), 2. ťah = výška (šírka); orientácia (↑/↓) a rotácia (←/→) sa menia LEN vo fáze 0 (pred klikom počiatku) — od kliku počiatku sú zamknuté (jedna hranica, viď Klávesy). Precedens: natívny Rotated Rectangle (jedno číslo
