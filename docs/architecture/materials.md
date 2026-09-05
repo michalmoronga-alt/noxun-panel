@@ -22,7 +22,16 @@ katalóg materiálov a dedenie projekt→skrinka→dielec (projektové defaulty 
 `part_override → skrinka → projekt → UNI 16` presne ako pri tele/čele/chrbte. Hrúbka je **VSTUP receptu**, nie odvodenina plánu: `CabinetBuilder.drawer_thicknesses(cfg, eff)`
 ju vyrieši **PRED** `Construction.build_plan` a pošle ju ako `part_thicknesses` (`{ part_key => mm }`) — bez toho by 18 mm materiál pri Atire ticho prešiel a Quadro by
 počítalo predok/chrbát z nesprávnej hrúbky dna (Codex #301 kolo 3 P1). Materiál mimo `thickness_supported` receptu = RED `drawer_thickness_unsupported`, žiadne dielce.
-**Výber v Štúdiu (`MaterialsDialog::TARGETS`) a D-46 preflight per systém ostávajú na C2c** — kanál sa dnes nastavuje len cez projektovú predvolbu a `part_override` dielca.
+**UI kanála doplnené v C2b (Codex #304 kolo 1 P1).** `MaterialsDialog::TARGETS` má štvrtý kľúč `default_drawer_material_id` → `['drawer_material_id', 'drawer_bottom', nil]`
+(rola je len zástupná — o prípustnosti hrúbky rozhoduje RECEPT, nie `thickness_ok_for?`) a Štúdio má **jeden riadok „Zásuvky"** v predvoľbách projektu, v tom istom vzore
+ako Čelá/Chrbát (vertikálny priestor je vzácny — žiadny nový blok). JS mapa `mdProjectSelectId` má `md_drawer`, kombo dostalo kontext `drawer` s predvolenou hrúbkou **16**
+(jediná, ktorú prijme každý vydaný systém). Guard test iteruje `TARGETS` a vyžaduje pre KAŽDÝ kľúč riadok v `studio.html` aj záznam v JS mape.
+
+**PREFLIGHT PER SYSTÉM (nie D-46 mechanicky).** D-46 vetva porovnáva hrúbku ČELA (18) a o receptoch nevie, takže sa sem nedá použiť. Namiesto nej:
+`drawer_thickness_any_system?` je **tvrdá** brána novej predvoľby — doska, ktorú neprijme ani jeden vydaný systém (napr. 25 mm), sa neuloží vôbec a hláška menuje povolené
+hrúbky (16 a 18). Keď dosku niektorý systém prijme, ale zákazka používa systém, ktorý ju **neprijme**, `drawer_change_plan` vráti zoznam systémov aj skriniek a predvoľba sa
+uloží **až po potvrdení** (`offer_drawer_change` — ten istý pending kontrakt a tá istá lišta ako D-46, líši sa len veta: menuje systém, jeho povolené hrúbky a počet skriniek).
+Zdrojom čísel je `Recipes.supported_thicknesses` ([hardware.md](hardware.md)), nikdy konštanta v UI.
 
 Kanál mal v C2a **len projektovú úroveň**: config kľúč skrinky ani výber v Štúdiu neexistovali. Preto ho
 `MaterialsDialog::TARGETS` **nepozná** a akcia `set_project_material` ho odmietne („Neznámy projektový materiál") — vedomá diera, nie opomenutie. Čo naň už reaguje:

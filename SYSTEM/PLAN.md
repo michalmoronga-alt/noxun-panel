@@ -334,10 +334,12 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   [350, 420, 470] a kód 620 vyhodený zo seed setu `atira-biela-h144-sisy` — `357755` je PTO kit, teda Tip-On, a pre SiSy H144/620 (ani H70/620) kit neexistuje. Recept sa
   opravil NA MIESTE aj s prepočítaným odtlačkom v `RELEASED.json`, lebo v1 ešte nestojí v žiadnom projekte (C2b nie je v maine); **od aktivácie platí nemennosť bez výnimky**
   a oprava = nový `_v2`.
-  **C2b · aktivácia — ✅ HOTOVÉ (PR TBD, v0.9.31, 5.9.2026):** v maine sú body **(a), (c), (d) zvyšok, (e), (f), (g)** — resolver v `Construction.build_plan` (`drawer_pass`),
+  **C2b · aktivácia — ✅ HOTOVÉ (PR #304, v0.9.31, 5.9.2026):** v maine sú body **(a), (b) UI časť, (c), (d) zvyšok, (e), (f), (g)** — resolver v `Construction.build_plan` (`drawer_pass`),
   dielce v pláne aj v modeli, JEDNA položka výsuvu `source: recipe` (+ `locked` pri zámku), R2 exkluzivita legacy `slide`, D-93 migrácia `rule_id`, RED `drawer_kit_missing`
   v nákupe, register `DRAWER_BLOCKERS` v `export_blockers` (`drawer_stop`, VEPO len na kit), uložený nosič `drawer_conflicts`, ORANGE `drawer_sync_recommended`,
-  `CONFIG_SCHEMA` 4 → 5 a `plan_schema` 3 → 4, `recipe_refs`/`system` ako SERVEROVÉ polia. **Vedomé odchýlky:** (1) `Fronts.norm_drawer` NEOVERUJE, či je ref registrovaný —
+  `CONFIG_SCHEMA` 4 → 5 a `plan_schema` 3 → 4, `recipe_refs`/`system` ako SERVEROVÉ polia. **Po Codex kole 1 pribudlo:** riadok „Zásuvky" v predvoľbách projektu Štúdia
+  + `MaterialsDialog::TARGETS` s **preflightom per systém** (Atira 16, Quadro 16/18 — pôvodne plánované na C2c) a **11. kód registra `drawer_stale`** = MIGRAČNÝ:
+  projekt uložený pred aktiváciou receptov, ktorý už má klasifikovanú zásuvku, je RED a blokuje VŠETKY exporty (vrátane VEPO), kým sa skrinka neprestaví. **Vedomé odchýlky:** (1) `Fronts.norm_drawer` NEOVERUJE, či je ref registrovaný —
   robí to až `Recipes.active_ref` pri stavbe (inak by stav `drawer_recipe_unknown` bol mŕtvy a starší plugin by ticho pripol iný recept); (2) server-only sú OBE polia
   (`recipe_refs` aj `system`) — panel ich v C2b ani neposiela a server `system` deterministicky odvodí z konštrukcie; (3) dielce zásuviek nenesú `axes:` (farbenie ABS plôšok
   by pri stojacom dielci vyšlo na zlú hranu — PartFaces zásada „radšej žiadna farba"; farbenie = C2c/D); (4) povýšenie na `drawer_kit_missing` platí pre **každý** dôvod

@@ -544,6 +544,15 @@ module Noxun
           next unless RECIPE_REF_KEY_RE.match?(key)
           id = v.to_s.strip
           next unless RECIPE_ID_RE.match?(id)
+          # Codex #304 kolo 1 P2: KLUC a HODNOTA musia hovorit o TOM ISTOM.
+          # `{"atira|sisy" => "quadro_v6_p2o_v1"}` je poskodeny (alebo podvrhnuty)
+          # zaznam — bez tejto kontroly by `active_ref` vratila stav `:known`
+          # a zasuvka by sa postavila podla CUDZIEHO receptu. Zahodenim zaznamu
+          # sa stav zmeni na `:missing`, teda surodenec/`latest_for` — nikdy
+          # cudzi system ani cudzie otvaranie.
+          m = RECIPE_ID_RE.match(id)
+          next unless key == "#{m[1]}|#{m[2]}"
+
           out[key] = id
         end
         out.empty? ? nil : out
@@ -567,6 +576,15 @@ module Noxun
       # CISTA funkcia: vracia NOVY normalizovany config, vstupy nemutuje.
       SERVER_DRAWER_KEYS = %w[system recipe_refs].freeze
 
+      # `system` a `recipe_refs` sa NEPRIPAJAJU rovnako (Codex #304 kolo 1 P1):
+      #   * `recipe_refs` je mapa kluceovana `system|otvaranie`, takze pripnute
+      #     verzie OBOCH systemov v nej mozu zit sucasne — pripaja sa VZDY;
+      #   * `system` je JEDNA hodnota viazana na KONSTRUKCIU. Ked pouzivatel
+      #     prepne konstrukciu (kov <-> drevo), stary `system` uz konstrukcii
+      #     NEZODPOVEDA a `recipe_key_for` by celo natrvalo oznacila
+      #     `drawer_unclassified` — a z toho stavu sa cez UI neda dostat, lebo
+      #     `system` sa v C2b z panela vobec neposiela. Preto sa pri ZMENENEJ
+      #     konstrukcii `system` nepripaja a server ho odvodi nanovo.
       def reattach_server_drawer_fields(incoming, saved)
         cfg = normalize_config(incoming)
         stored = server_drawer_fields(saved)
@@ -574,7 +592,13 @@ module Noxun
           drawer = it['drawer'].is_a?(Hash) ? it['drawer'] : {}
           drawer = drawer.reject { |k, _| SERVER_DRAWER_KEYS.include?(k) }
           keep = stored[it['id'].to_s]
-          drawer = drawer.merge(keep) if keep
+          if keep
+            # `construction` je v zazname LEN na porovnanie — do vysledku sa
+            # NIKDY nekopiruje (klientska klasifikacia je vola pouzivatela).
+            same_kind = keep['construction'].to_s == drawer['construction'].to_s
+            keep = keep.reject { |k, _| k == 'construction' || (!same_kind && k == 'system') }
+            drawer = drawer.merge(keep)
+          end
           if drawer.empty?
             it.delete('drawer')
           else
@@ -584,14 +608,20 @@ module Noxun
         cfg
       end
 
-      # { front_id => { 'system' =>…, 'recipe_refs' =>… } } z ULOZENEHO configu.
+      # { front_id => { 'system' =>…, 'recipe_refs' =>…, 'construction' =>… } }
+      # z ULOZENEHO configu. `construction` je v zazname LEN ako referencia pre
+      # porovnanie vyssie — do vysledku sa nikdy nekopiruje (klientska hodnota
+      # klasifikacie je autorita pouzivatela).
       def server_drawer_fields(saved)
         out = {}
         Array(normalize_config(saved)['items']).each do |it|
           d = it['drawer']
           next unless d.is_a?(Hash)
           keep = d.select { |k, _| SERVER_DRAWER_KEYS.include?(k) }
-          out[it['id'].to_s] = keep unless keep.empty?
+          next if keep.empty?
+
+          keep['construction'] = d['construction'] if d.key?('construction')
+          out[it['id'].to_s] = keep
         end
         out
       end

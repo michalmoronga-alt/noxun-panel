@@ -110,14 +110,20 @@ P2-B). Dôvod: zákazka z novšej verzie nemusí vyexpandovať ani jeden **znám
 kovanie" / „rozpočet sa nepodarilo zostaviť" by bránu **predbehol** a používateľ by sa nedozvedel ani ID skriniek, ani to, že má aktualizovať plugin. `newer:` preto do
 **neskorého** `export_blockers` (spolu s `dups:`/`cp:`) už nechodí — skladá ho výhradne `newer_config_stop`, jedno miesto pre všetky štyri exporty.
 
-**KOV-C2b (v0.9.31) — BRÁNA ZÁSUVIEK (`drawer:`).** Register `Recipes::DRAWER_BLOCKERS` (10 kódov) má dve polovice a každá blokuje **iné** výstupy:
+**KOV-C2b (v0.9.31) — BRÁNA ZÁSUVIEK (`drawer:`).** Register `Recipes::DRAWER_BLOCKERS` (11 kódov) má dve polovice a každá blokuje **iné** výstupy:
 **`BUILD_BLOCKERS` (9)** = fail-closed konflikty STAVBY — zásuvka nevydala ani dielec ani položku výsuvu, takže objednávka aj rozpočet by boli neúplné → nákupný CSV,
 rozpočet, cenová ponuka. VEPO bránu **nepotrebuje**: chrániť netreba to, čo sa vôbec nevydalo. **`drawer_kit_missing` (1)** vzniká až v NÁKUPE (receptová položka bez setu
 alebo bez kódu pre svoju NL) — dielce v modeli **ostávajú** (fyzika je správna), ale sú rezané na konkrétnu NL (BL = NL + 10, boky Quadro = NL), takže bez kitu tej NL sú
 odpad → blokuje **VŠETKY štyri exporty VRÁTANE VEPO**.
 
-Skladá to `drawer_blockers(collected, expansion, scope:)`: `scope: :all` číta konflikty stavby z aditívneho zberu `hardware_issues` (uložený nosič `drawer_conflicts`,
-nižšie) **aj** kit z expanzie, `scope: :kit` iba kit. Poradie dôvodov určuje register (deterministicky, bez ohľadu na poradie zberu) a text stavia
+**Tretia položka registra je MIGRAČNÁ: `drawer_stale`.** Projekt uložený **pred** aktiváciou receptov (`config_schema` < `CabinetBuilder::DRAWER_ACTIVATION_SCHEMA` = 5),
+ktorý už má klasifikovanú zásuvku (`construction` metal/wood v `front_items`), nemá v .skp receptové dielce a nesie legacy výsuv — kusovník, VEPO aj nákup by boli neúplné
+a **ticho**. `Bom.collect` ho preto priznáva RED nálezom (`drawer_stale_issue`) a brána zastaví **všetky štyri** výstupy. Nápravu robí **prestavba** skrinky (vtedy sa zapíše
+schéma 5 a resolver dobehne) — kód sa preto nikde nezapisuje do modelu, žije len ako čítanie stavu. Konštrukcia `other` ani čelo bez klasifikácie nález nerobia (legacy cesta
+je CONTENT-identická aj po aktivácii).
+
+Skladá to `drawer_blockers(collected, expansion, scope:)`: `scope: :all` číta z `hardware_issues` konflikty stavby **aj** `ALL_EXPORT_BLOCKERS` (uložený nosič
+`drawer_conflicts` a `drawer_stale`, nižšie) a k tomu kit z expanzie; `scope: :kit` (VEPO) číta z nálezov len `ALL_EXPORT_BLOCKERS` a kit. Poradie dôvodov určuje register (deterministicky, bez ohľadu na poradie zberu) a text stavia
 `Recipes::BLOCKER_LABELS` + `ids_text` (ten istý strop „tri ID + a ďalšie N"). Hotovú hlášku vydáva **`drawer_stop`**, ktorý beží — rovnako ako `newer_config_stop` —
 **pred pickerom**; VEPO si preto expanziu kovania počíta **hneď po zbere** a nižšie ju už len použije (žiadny druhý prepočet). Keď expanziu nemáme (chyba katalógu/setov)
 a zákazka **má** aspoň jednu receptovú položku, brána je **fail-closed** (`drawer_expansion_unproven?`) — nedokázateľný stav zastavujeme, rovnako ako neznámu expanziu duplicít.

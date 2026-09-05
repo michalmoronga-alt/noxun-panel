@@ -11,9 +11,12 @@
 #   M4 klientsky payload prepise `recipe_refs` -> „serverove polia: forged payload…"
 require_relative '../helper' unless defined?(NxTest)
 
-# UI vrstva (brany exportov) — headless nie je v require zozname helpera.
+# UI vrstva (brany exportov + dialog materialov) — headless nie je v require
+# zozname helpera, takze si ju sada pyta sama (vzor `test_kovc2a_kanal_sety.rb`).
 if NxTest.headless?
   require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core')
+  require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'materials_dialog')
+  require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'templates_dialog')
 end
 
 module NxC2bB
@@ -59,20 +62,29 @@ module NxC2bB
   def src(rel)
     File.read(File.join(NxTest::ROOT, 'noxun_engine', rel), encoding: 'UTF-8')
   end
+
+  def src_ui(rel)
+    File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', rel), encoding: 'UTF-8')
+  end
 end
 
 # ============================================================================
 # R4 — REGISTER BRAN
 # ============================================================================
 
-NxTest.test('KOV-C2b (R4): register ma 10 kodov a delí sa na stavbu (9) + nakup (1)') do
+NxTest.test('KOV-C2b (R4): register ma 11 kodov — 10 z resolvera + 1 MIGRACNY') do
   c = NxC2bB
-  NxTest.assert_equal(10, c::REC::DRAWER_BLOCKERS.length)
-  NxTest.assert_equal(c::REC::CONFLICT_CODES, c::REC::DRAWER_BLOCKERS,
-                      'register JE zoznam kodov konfliktov — ziadna druha kopia')
+  NxTest.assert_equal(11, c::REC::DRAWER_BLOCKERS.length)
+  NxTest.assert_equal(10, c::REC::CONFLICT_CODES.length, 'resolver produkuje 10')
+  NxTest.assert_equal(c::REC::CONFLICT_CODES + ['drawer_stale'], c::REC::DRAWER_BLOCKERS,
+                      '11. kod je MIGRACNY (`drawer_stale`) — resolver ho nevyraba')
   NxTest.assert_equal(9, c::REC::BUILD_BLOCKERS.length)
   NxTest.assert_equal('drawer_kit_missing', c::REC::KIT_MISSING)
+  NxTest.assert_equal('drawer_stale', c::REC::STALE)
+  NxTest.assert_equal(%w[drawer_kit_missing drawer_stale], c::REC::ALL_EXPORT_BLOCKERS,
+                      'kody, ktore blokuju AJ VEPO')
   NxTest.refute(c::REC::BUILD_BLOCKERS.include?(c::REC::KIT_MISSING))
+  NxTest.refute(c::REC::BUILD_BLOCKERS.include?(c::REC::STALE))
   # Kazdy kod ma slovensky nazov pre branu (inak by hlaska ukazala kod).
   c::REC::DRAWER_BLOCKERS.each do |code|
     NxTest.assert(c::REC::BLOCKER_LABELS[code].to_s.length > 5, "#{code}: chyba nazov")
@@ -410,4 +422,208 @@ NxTest.test('KOV-C2b: nemapovane dovody poloziek Z PRAVIDIEL ostavaju ORANGE') d
   items = c::VAL.run({ records: [], cabinets: 1 }, hardware_expansion: exp)['items']
   NxTest.assert_equal(['orange', 'hardware_unmapped'],
                       [items.first['severity'], items.first['category']])
+end
+
+# ============================================================================
+# CODEX #304 KOLO 1 — opravy
+# ============================================================================
+
+NxTest.test('Codex #304 P1: zmena konstrukcie NEPRIPINA stary `system` (metal <-> wood)') do
+  c = NxC2bB
+  base = { 'id' => 'F1', 'type' => 'drawer_front', 'mode' => 'fixed', 'height' => 175.0,
+           'opening_mode' => 'classic' }
+  saved = c::FR.normalize_config('items' => [base.merge(
+    'drawer' => { 'construction' => 'metal', 'system' => 'atira',
+                  'recipe_refs' => { 'atira|sisy' => 'atira_sisy_v1' } }
+  )])
+  # Pouzivatel prepol konstrukciu na drevo (system panel NEPOSIELA).
+  wood = { 'items' => [base.merge('drawer' => { 'construction' => 'wood' })] }
+  out = c::FR.reattach_server_drawer_fields(wood, saved)
+  d = out['items'].first['drawer']
+  NxTest.assert_equal(nil, d['system'], 'stary `system` by celo natrvalo zablokoval ako RED')
+  NxTest.assert_equal({ 'atira|sisy' => 'atira_sisy_v1' }, d['recipe_refs'],
+                      'mapa je klucovana system|otvaranie — pripina sa VZDY')
+  # Stavba nad novou konstrukciou = Quadro, a doplni si vlastny zaznam.
+  cfg = c::CB.normalize('width' => 900.0, 'height' => 720.0, 'depth' => 500.0,
+                        'fronts' => out)
+  cfg = c::CB.apply_drawer_writes(cfg, c::CN.build_plan(cfg, 'CAB-1'))
+  d2 = cfg[:fronts]['items'].first['drawer']
+  NxTest.assert_equal('quadro_v6', d2['system'])
+  NxTest.assert_equal({ 'atira|sisy' => 'atira_sisy_v1',
+                        'quadro_v6|sisy' => 'quadro_v6_sisy_v1' }, d2['recipe_refs'])
+  # Navrat na kov vrati POVODNY pripnuty recept Atiry.
+  back = { 'items' => [base.merge('drawer' => { 'construction' => 'metal' })] }
+  out2 = c::FR.reattach_server_drawer_fields(back, cfg[:fronts])
+  cfg2 = c::CB.normalize('width' => 900.0, 'height' => 720.0, 'depth' => 500.0, 'fronts' => out2)
+  cfg2 = c::CB.apply_drawer_writes(cfg2, c::CN.build_plan(cfg2, 'CAB-1'))
+  d3 = cfg2[:fronts]['items'].first['drawer']
+  NxTest.assert_equal('atira', d3['system'])
+  NxTest.assert_equal('atira_sisy_v1', d3['recipe_refs']['atira|sisy'], 'povodna verzia ostala')
+end
+
+NxTest.test('Codex #304 P1: NEZMENENA konstrukcia si ulozeny `system` PONECHA') do
+  c = NxC2bB
+  item = { 'id' => 'F1', 'type' => 'drawer_front', 'mode' => 'fixed', 'height' => 175.0,
+           'opening_mode' => 'classic', 'drawer' => { 'construction' => 'metal' } }
+  saved = c::FR.normalize_config('items' => [item.merge(
+    'drawer' => { 'construction' => 'metal', 'system' => 'atira' }
+  )])
+  out = c::FR.reattach_server_drawer_fields({ 'items' => [item] }, saved)
+  NxTest.assert_equal('atira', out['items'].first['drawer']['system'])
+end
+
+NxTest.test('Codex #304 P2: `recipe_refs` zaznam s NESEDIACIM klucom sa ZAHODI') do
+  c = NxC2bB
+  cfg = c::FR.normalize_config('items' => [{ 'id' => 'F1', 'type' => 'drawer_front',
+                                             'drawer' => { 'construction' => 'metal',
+                                                           'recipe_refs' => {
+                                                             'atira|sisy' => 'quadro_v6_p2o_v1',
+                                                             'atira|p2o' => 'atira_p2o_v1'
+                                                           } } }])
+  NxTest.assert_equal({ 'atira|p2o' => 'atira_p2o_v1' },
+                      cfg['items'].first['drawer']['recipe_refs'],
+                      'kluc a recept musia hovorit o TOM ISTOM systeme aj otvarani')
+  # A stavba potom pouzije SPRAVNY recept (stav `missing` -> surodenec/latest).
+  full = c::CB.normalize('width' => 900.0, 'height' => 720.0, 'depth' => 500.0,
+                         'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'drawer_front',
+                                                     'mode' => 'fixed', 'height' => 175.0,
+                                                     'opening_mode' => 'classic',
+                                                     'drawer' => { 'construction' => 'metal',
+                                                                   'recipe_refs' => { 'atira|sisy' => 'quadro_v6_p2o_v1' } } }] })
+  pl = c::CN.build_plan(full, 'CAB-1')
+  NxTest.assert_equal([], Array(pl[:drawer_conflicts]), pl[:drawer_conflicts].inspect)
+  NxTest.assert_equal('recipe:atira_sisy_v1',
+                      pl[:hardware].find { |h| h['generic_type'] == 'slide' }['rule_id'],
+                      'NIKDY cudzi recept')
+end
+
+NxTest.test('Codex #304 P1: sablona nesie `drawer_material_id` preserve-or-override') do
+  c = NxC2bB
+  target = { 'drawer_material_id' => 'MOJ_16', 'material_id' => 'TELO' }
+  # LEGACY sablona (kluc NEMA) override skrinky NEZMAZE.
+  legacy = c::E::TemplatesDialog.merge_template(target, { 'type' => 'lower' })
+  NxTest.assert_equal('MOJ_16', legacy['drawer_material_id'])
+  # Sablona s klucom ho PREPISE.
+  withkey = c::E::TemplatesDialog.merge_template(target, { 'type' => 'lower',
+                                                           'drawer_material_id' => 'SABLONA_18' })
+  NxTest.assert_equal('SABLONA_18', withkey['drawer_material_id'])
+end
+
+NxTest.test('Codex #304 P2: delete guard rata `drawer_material_id` (skrinky aj sablony)') do
+  c = NxC2bB
+  NxTest.assert_equal(%w[material_id front_material_id back_material_id drawer_material_id],
+                      c::E::Materials::CABINET_MATERIAL_KEYS,
+                      'jeden zoznam pre model AJ sablony')
+  used = Hash.new { |h, k| h[k] = [] }
+  # Priama kontrola zbernej slucky nad sablonovym configom (bez TemplateStore).
+  cfg = { 'drawer_material_id' => 'ZASUVKA_16' }
+  c::E::Materials::CABINET_MATERIAL_KEYS.each do |k|
+    v = cfg[k]
+    used[v.to_s] << 'x' if v && !v.to_s.empty?
+  end
+  NxTest.assert_equal(['x'], used['ZASUVKA_16'], 'referencia sa zapocita')
+end
+
+# --- MIGRACNY kod `drawer_stale` -------------------------------------------
+
+module NxC2bB
+  module_function
+
+  # Ulozeny config skrinky s danou schemou a (ne)klasifikovanou zasuvkou.
+  def stale_cfg(schema, construction)
+    drawer = construction ? { 'construction' => construction } : nil
+    item = { 'id' => 'F1', 'type' => 'drawer_front', 'height' => 175.0,
+             'opening_mode' => 'classic' }
+    item['drawer'] = drawer if drawer
+    { 'config_schema' => schema, 'front_items' => [item] }
+  end
+end
+
+NxTest.test('Codex #304 P1: schema < 5 s klasifikovanou zasuvkou = RED `drawer_stale`') do
+  c = NxC2bB
+  iss = c::E::Bom.drawer_stale_issue('CAB-1', 7, c.stale_cfg(4, 'metal'))
+  NxTest.assert_equal('drawer_stale', iss && iss['code'])
+  NxTest.assert_equal(['red', 'CAB-1', 7, 'front:F1/panel'],
+                      [iss['severity'], iss['owner_id'], iss['owner_pid'], iss['part_key']])
+  NxTest.assert(iss['message'].include?('prestav'), iss['message'])
+  # Aj legacy config BEZ markera (0) — klasifikacia existuje od schemy 2.
+  NxTest.assert(c::E::Bom.drawer_stale_issue('CAB-1', 1, c.stale_cfg(0, 'wood')))
+  # Schema 5 (uz prestavana) = ziadny nalez.
+  NxTest.assert_equal(nil, c::E::Bom.drawer_stale_issue('CAB-1', 1, c.stale_cfg(5, 'metal')))
+  # NEKLASIFIKOVANA zasuvka na schéme 4 = ziadny nalez (legacy cesta je OK).
+  NxTest.assert_equal(nil, c::E::Bom.drawer_stale_issue('CAB-1', 1, c.stale_cfg(4, nil)))
+  NxTest.assert_equal(nil, c::E::Bom.drawer_stale_issue('CAB-1', 1, c.stale_cfg(4, 'other')),
+                      'konstrukcia `other` ide legacy cestou aj po aktivacii')
+end
+
+NxTest.test('Codex #304 P1: `drawer_stale` je RED v Kontrole a blokuje VSETKY exporty') do
+  c = NxC2bB
+  iss = c::E::Bom.drawer_stale_issue('CAB-1', 7, c.stale_cfg(4, 'metal'))
+  items = c::VAL.run({ records: [], cabinets: 1, hardware_issues: [iss] })['items']
+  NxTest.assert_equal(['red', 'drawer'], [items.first['severity'], items.first['category']])
+  NxTest.assert(items.first['message_sk'].include?('neprestavíš'), items.first['message_sk'])
+  collected = { hardware_issues: [iss], hardware: [] }
+  %i[all kit].each do |scope|
+    out = c::PC.drawer_blockers(collected, c.expansion([]), scope: scope)
+    NxTest.assert_equal(1, out.length, "#{scope}: migracny kod zastavuje (aj VEPO)")
+    NxTest.assert(out.first.include?('CAB-1'))
+  end
+  # Po prestavbe (schema 5) je zelene.
+  NxTest.assert_equal(nil, c::E::Bom.drawer_stale_issue('CAB-1', 7, c.stale_cfg(5, 'metal')))
+end
+
+# --- UI 4. materialoveho kanala + preflight per system ----------------------
+
+NxTest.test('Codex #304 P1: `TARGETS` pozna 4. kanal a JS mapovanie s nim sedi') do
+  c = NxC2bB
+  md = c::E::MaterialsDialog
+  NxTest.assert_equal(%w[default_material_id default_front_material_id
+                         default_back_material_id default_drawer_material_id].sort,
+                      md::TARGETS.keys.sort)
+  NxTest.assert_equal(['drawer_material_id', 'drawer_bottom', nil],
+                      md::TARGETS['default_drawer_material_id'])
+  # Kazdy kluc TARGETS musi mat riadok v Studiu aj v JS mape (inak by sa dal
+  # nastavit len z konzoly, alebo by select po ponuke ostal na nepotvrdenom).
+  html = c.src_ui('studio.html')
+  js = c.src_ui(File.join('js', 'proj_materials.js'))
+  md::TARGETS.each_key do |key|
+    NxTest.assert(html.include?("onProjMaterial('#{key}'"), "#{key}: chyba riadok v Studiu")
+    NxTest.assert(js.include?("#{key}: 'md_"), "#{key}: chyba v JS mape selectov")
+  end
+  NxTest.assert(html.include?('id="md_drawer"'), 'riadok „Zásuvky" v predvolbach projektu')
+end
+
+NxTest.test('Codex #304 P1: povolene hrubky su Z RECEPTU (Atira 16, Quadro 16/18)') do
+  c = NxC2bB
+  NxTest.assert_equal([16.0], c::REC.supported_thicknesses('atira'))
+  NxTest.assert_equal([16.0, 18.0], c::REC.supported_thicknesses('quadro_v6'))
+  NxTest.assert_equal([], c::REC.supported_thicknesses('antaro'), 'neznamy system = ziadna hrubka')
+  NxTest.assert(c::REC.thickness_ok_for_system?('atira', 16.0))
+  NxTest.refute(c::REC.thickness_ok_for_system?('atira', 18.0), 'Atira 18 mm neprijme')
+  NxTest.assert(c::REC.thickness_ok_for_system?('quadro_v6', 18.0))
+  NxTest.refute(c::REC.thickness_ok_for_system?('quadro_v6', 25.0))
+end
+
+NxTest.test('Codex #304 P1: preflight predvolby zasuviek menuje SYSTEM aj skrinky') do
+  c = NxC2bB
+  md = c::E::MaterialsDialog
+  # Doska, ktoru neprijme ZIADEN system, sa neulozi vobec (ziadna ponuka).
+  NxTest.refute(md.drawer_thickness_any_system?(25.0))
+  NxTest.assert(md.drawer_thickness_any_system?(16.0))
+  NxTest.assert(md.drawer_thickness_any_system?(18.0), 'Quadro 18 prijme')
+  msg = md.drawer_reject_msg(25.0)
+  NxTest.assert(msg.include?('16') && msg.include?('18'), msg)
+  # Systemy skrinky sa citaju z ULOZENYCH ciel (legacy celo sa netyka).
+  params = { 'fronts' => { 'items' => [
+    { 'id' => 'F1', 'type' => 'drawer_front', 'opening_mode' => 'classic',
+      'drawer' => { 'construction' => 'metal' } },
+    { 'id' => 'F2', 'type' => 'drawer_front', 'opening_mode' => 'classic',
+      'drawer' => { 'construction' => 'wood' } },
+    { 'id' => 'F3', 'type' => 'door' }
+  ] } }
+  NxTest.assert_equal(%w[atira quadro_v6], md.drawer_systems_of(params).sort)
+  NxTest.assert_equal([], md.drawer_systems_of('fronts' => { 'items' => [{ 'type' => 'door' }] }))
+  # Veta ponuky menuje system AJ povolene hrubky.
+  txt = md.drawer_systems_txt(['atira'])
+  NxTest.assert(txt.include?('Atira') && txt.include?('16'), txt)
 end

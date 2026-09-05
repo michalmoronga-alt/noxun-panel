@@ -38,9 +38,21 @@
   dielce nenesú `axes:` (pri stojacom dielci by ABS farba vyšla na spodnú hranu, kým páska ide na hornú — PartFaces zásada „radšej žiadna farba"; farbenie = C2c/D) ·
   na `drawer_kit_missing` sa povyšuje **každý** dôvod nemapovania receptovej položky, nielen tri menované · `legacy_slide_suppressed` sa v Kontrole nezobrazuje
   (`Validation::BUILD_INFO_ONLY`) — je to konštatovanie, nie nález, a ORANGE riadok na každej zdravej zásuvke by bol falošný poplach.
-  **Testy:** 3063 headless (+40: `test_kovc2b_dielce.rb` 21 · `test_kovc2b_brany.rb` 19), 89 JS sád, nová in-SU sekcia **`run_kovc2b`** (plán vs. model 1:1, prestavba bez
-  duplicít, 1 krok Späť, kópia aj šablóna nesú pripnutý recept, plytká skrinka = žiadne dielce + RED + zastavený export s **prázdnym** priečinkom a neotvoreným pickerom).
-  **Zostáva C2c:** karta zásuvky v Inspectore, riadky Kontroly s navigáciou, labely Nákupu a UI 4. materiálového kanála (+ D-46 preflight per systém).
+  **Codex #304 kolo 1 (4 P1 + 2 P2) prinieslo do tej istej dávky ešte päť vecí.** (1) **Zmena konštrukcie kov ↔ drevo** už čelo natrvalo nezablokuje: `system` je jedna
+  hodnota viazaná na konštrukciu, takže sa pri jej zmene **nepripája** späť (server ho odvodí nanovo), kým mapa `recipe_refs` — kľúčovaná `systém|otváranie` — sa pripája
+  vždy a návrat k pôvodnému systému vráti pôvodnú pripnutú verziu. (2) **UI 4. kanála sa presunulo z C2c sem** (inak by projekt uviazol na UNI 16): jeden riadok „Zásuvky"
+  v predvoľbách projektu Štúdia + `MaterialsDialog::TARGETS`, a **preflight per systém** — D-46 vetva sa použiť nedala, lebo meria hrúbku ČELA a o receptoch nevie.
+  Doska, ktorú neprijme žiadny vydaný systém, sa neuloží vôbec; doska, ktorú neprijme systém reálne použitý v zákazke, sa uloží až po potvrdení a hláška menuje systém aj
+  jeho povolené hrúbky (čísla z `Recipes.supported_thicknesses`, nikdy konštanta v UI). (3) **Záznam mapy s nesediacim kľúčom** (`"atira|sisy" => "quadro_v6_p2o_v1"`) sa
+  zahadzuje — stavba potom ide cez súrodenca/`latest_for`, nikdy cez cudzí recept. (4) **Šablóna** nesie `drawer_material_id` tou istou preserve-or-override cestou ako
+  ostatné tri materiály a **delete guard** ho ráta (skrinky aj šablóny) — jeden zoznam `Materials::CABINET_MATERIAL_KEYS`. (5) **11. kód registra `drawer_stale`
+  (MIGRAČNÝ)**: projekt uložený PRED aktiváciou receptov, ktorý už má klasifikovanú zásuvku, nemá v .skp receptové dielce a nesie legacy výsuv — kusovník aj VEPO by boli
+  neúplné a ticho. `Bom.collect` to priznáva RED a brána zastaví **všetky štyri** výstupy; nápravou je prestavba skrinky. Register má odvtedy 11 kódov: 10 produkuje
+  resolver, 11. je migračný a nikdy sa nezapisuje do modelu.
+  **Testy:** 3074 headless (+51: `test_kovc2b_dielce.rb` 21 · `test_kovc2b_brany.rb` 30), 89 JS sád, in-SU sekcia **`run_kovc2b`** — **1782 PASS / 0 FAIL** (32 scenárov:
+  plán vs. model 1:1, prestavba bez duplicít, 1 krok Späť, prepnutie kov ↔ drevo a späť, kópia aj šablóna nesú pripnutý recept, plytká skrinka = žiadne dielce + RED
+  + zastavený export s **prázdnym** priečinkom a neotvoreným pickerom).
+  **Zostáva C2c:** karta zásuvky v Inspectore (systém · výška · NL · nosnosť · recept + `explain`), riadky Kontroly s navigáciou na čelo a labely v Nákupe.
 
 - **KOV-C2a — PRÍPRAVA AKTIVÁCIE ZÁSUVIEK: MATERIÁLOVÝ KANÁL, ABS A RECEPTOVÉ SETY (PR #303, v0.9.30, 5.9.2026):** druhý rez package KOV-C v2 a opäť **bez viditeľnej zmeny** —
   kusovník, nákup, VEPO ani rozpočet sa nehli (charakterizačný test + golden `seed_kniznica`). Dávka vedome vzala z bodov C2 (b) a (d) presne to, čo sa dá spraviť **pred**

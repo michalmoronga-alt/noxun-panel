@@ -531,9 +531,15 @@ mapovanie a zákaz typu by ju vzal tiež; nebezpečná je len položka s dĺžko
 **Od KOV-C2b (v0.9.31) je modul ZAPOJENÝ:** `Construction.build_plan` ho volá pre každé klasifikované zásuvkové čelo (`drawer_pass`, viď
 [construction.md](construction.md)) a z neho vznikajú dielce v pláne aj **jedna** položka výsuvu.
 
-**Register brány `DRAWER_BLOCKERS` (10 kódov) = `CONFLICT_CODES`** — žiadna druhá kópia zoznamu. Delí sa na `BUILD_BLOCKERS` (9 fail-closed konfliktov STAVBY: zásuvka
-nevydala ani dielec ani položku) a `KIT_MISSING` (`drawer_kit_missing`, vzniká až v NÁKUPE). `BLOCKER_LABELS` drží krátky slovenský názov pre bránu exportu — plnú vetu
-(ktorá hodnota kde nesedí) skladá recept a nesie ju nález Kontroly.
+**Register brány `DRAWER_BLOCKERS` (11 kódov)** = `CONFLICT_CODES` (10, ktoré produkuje resolver) **+ 1 MIGRAČNÝ**. Delí sa na `BUILD_BLOCKERS` (9 fail-closed konfliktov
+STAVBY: zásuvka nevydala ani dielec ani položku) a `ALL_EXPORT_BLOCKERS` = `drawer_kit_missing` (vzniká až v NÁKUPE) **+ `drawer_stale`** — jediný kód, ktorý neprodukuje
+resolver ani nákup, ale **čítanie modelu** (`Bom.collect`): skrinka uložená pred aktiváciou receptov (`config_schema < CabinetBuilder::DRAWER_ACTIVATION_SCHEMA`) má
+klasifikovanú zásuvku, takže v .skp **nie sú** receptové dielce a výsuv je legacy — kusovník aj VEPO by boli neúplné a ticho. Nápravou je **prestavba** skrinky.
+`BLOCKER_LABELS` drží krátky slovenský názov pre bránu exportu — plnú vetu (ktorá hodnota kde nesedí) skladá recept a nesie ju nález Kontroly.
+
+**`supported_thicknesses(system)` / `thickness_ok_for_system?`** = čisté funkcie nad najnovším vydaným receptom systému: **PRIENIK** `thickness_supported` cez všetky roly
+(jeden materiálový kanál kŕmi všetky roly naraz, takže hrúbka dobrá len pre dno by pri Quadre padla na boku). Atira → `[16]`, Quadro V6 → `[16, 18]`. Číta ich preflight
+projektovej predvoľby zásuviek ([materials.md](materials.md)); neznámy systém = `[]`, teda fail-closed.
 
 **Dve vrstvy, jedna zodpovednosť každá:** fyzika (rozmery dielcov, výšky, rad NL) žije v **recepte**, objednávacie kódy v **setoch** (`hardware_sets`). Nákup nikdy nemení
 fyzický návrh: rad NL v recepte = rad, ktorý Noxun reálne kupuje, žiadni kandidáti ani fallback. **EB je pevné per recept** (Atira 10,5 · Quadro V6 23) — zmena hrúbky boku

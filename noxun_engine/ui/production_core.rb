@@ -1208,15 +1208,17 @@ module Noxun
         return [] unless defined?(Recipes)
 
         codes = {}
-        if scope == :all
-          Array(collected.is_a?(Hash) ? collected[:hardware_issues] : nil).each do |iss|
-            next unless iss.is_a?(Hash)
+        # `scope: :kit` (VEPO) cita z nalezov LEN kody, ktore robia NEUPLNYMI aj
+        # REZACIE data — dnes migracny `drawer_stale` (dielce v .skp chybaju).
+        from_issues = scope == :all ? (Recipes::BUILD_BLOCKERS + Recipes::ALL_EXPORT_BLOCKERS)
+                                    : Recipes::ALL_EXPORT_BLOCKERS
+        Array(collected.is_a?(Hash) ? collected[:hardware_issues] : nil).each do |iss|
+          next unless iss.is_a?(Hash)
 
-            code = iss['code'].to_s
-            next unless Recipes::BUILD_BLOCKERS.include?(code)
+          code = iss['code'].to_s
+          next unless from_issues.include?(code)
 
-            note_drawer_code(codes, code, iss['owner_id'])
-          end
+          note_drawer_code(codes, code, iss['owner_id'])
         end
         Array(expansion.is_a?(Hash) ? expansion['unmapped'] : nil).each do |u|
           next unless u.is_a?(Hash) && u['reason'].to_s == Recipes::KIT_MISSING

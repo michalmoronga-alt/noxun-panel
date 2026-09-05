@@ -25,7 +25,11 @@ module Noxun
       TARGETS = {
         'default_material_id'       => ['material_id', 'side_left', 'thickness'],
         'default_front_material_id' => ['front_material_id', 'front_door', nil],
-        'default_back_material_id'  => ['back_material_id', 'back', 'back_thickness']
+        'default_back_material_id'  => ['back_material_id', 'back', 'back_thickness'],
+        # KOV-C2b: 4. kanal (dielce zasuviek). Rola je len ZASTUPNA (vsetky styri
+        # roly beru katalogovu hrubku rovnako) — o tom, ci je hrubka pripustna,
+        # rozhoduje RECEPT systemu, nie `thickness_ok_for?` (viz preflight nizsie).
+        'default_drawer_material_id' => ['drawer_material_id', 'drawer_bottom', nil]
       }.freeze
 
       # --- sekcia MATERIALY v Studiu (ŠT-2a kanal, ŠT-2b uplny presun) -------
@@ -995,6 +999,12 @@ module Noxun
             when 'default_back_material_id'
               # chrbat ma v UI dve podporovane hrubky (HDF 3 / pevny 18) — obe legalne
               [3.0, 18.0].any? { |t| CabinetBuilder.thickness_ok_for?(role, t, have) }
+            when 'default_drawer_material_id'
+              # KOV-C2b: predvolbu zasuviek NEMERIA hrubky korpusu, ale RECEPTY.
+              # Doska, ktoru NEPRIJME ZIADEN vydany system, sa neulozi vobec —
+              # taka zasuvka by sa uz nikdy nepostavila (`drawer_thickness_
+              # unsupported` na kazdom cele) a nebolo by co potvrdzovat.
+              drawer_thickness_any_system?(have)
             else
               CabinetBuilder.thickness_ok_for?(role, Fronts::FRONT_THICKNESS.to_f, have)
             end
@@ -1039,6 +1049,26 @@ module Noxun
             remap_lost = plan['remap']['lost']
             adopted_n = plan['adopting'].size
             recomputed_n = plan['recompute'].size
+          elsif key == 'default_drawer_material_id'
+            # --- KOV-C2b: PREFLIGHT PER SYSTEM. D-46 vetva sa sem NEDA pouzit
+            # mechanicky: tá porovnáva hrúbku ČELA (18) a o receptoch nevie.
+            # Tu rozhoduje, ktoré systémy zásuviek skrinky reálne používajú —
+            # Atira prijme 16, Quadro V6 16 aj 18. Nevyhovujúci výber sa NEULOŽÍ
+            # bez potvrdenia (hláška menuje systém aj povolené hrúbky).
+            plan = drawer_change_plan(model, affected, have)
+            unless plan['systems'].empty?
+              fresh = { 'model_guid' => model_guid(model), 'key' => key, 'value' => value,
+                        'old_default' => old_default,
+                        'adopting_ids' => [], 'recompute_ids' => plan['ids'] }
+              unless Materials.pending_default_ok?(data['confirm'], fresh)
+                return offer_drawer_change(fresh, have, plan, stale: !data['confirm'].nil?)
+              end
+            end
+            remap_changed = 0
+            remap_lost = []
+            adopted_n = 0
+            recomputed_n = affected.size
+            jobs = affected.map { |cabinet| [cabinet, Panel.existing_params(cabinet)] }
           else
             incompatible = affected.select do |cabinet|
               params = Panel.existing_params(cabinet)
@@ -1088,6 +1118,69 @@ module Noxun
           # ŠT-2b: predvolby nesie `mat` payload Studia (push nizsie).
           Panel.push_selected(model) # refresh Inspectora (korpusove selecty, karta dielca)
           refresh_studio_after_model_write
+        end
+
+        # --- KOV-C2b: predvolba ZASUVIEK a recepty ----------------------------
+        #
+        # Systemy, ktore su v zakazke REALNE pouzite (klasifikovane zasuvkove
+        # cela dediacich skriniek), a ktore danu hrubku NEPRIJMU.
+        # -> { 'systems' => ['atira'], 'ids' => ['CAB-001'] } (obe zoradene)
+        def drawer_change_plan(model, affected, have)
+          systems = {}
+          ids = []
+          affected.each do |cabinet|
+            params = Panel.existing_params(cabinet)
+            bad = drawer_systems_of(params).reject { |sys| Recipes.thickness_ok_for_system?(sys, have) }
+            next if bad.empty?
+
+            bad.each { |sys| systems[sys] = true }
+            id = Store.get(cabinet, 'cabinet_id').to_s
+            ids << id unless id.empty? || ids.include?(id)
+          end
+          { 'systems' => systems.keys.sort, 'ids' => ids.sort }
+        end
+
+        # Systemy zasuviek jednej skrinky (z ULOZENYCH ciel). Legacy cela
+        # a `construction other` sa netykaju — resolver sa na nich nevola.
+        def drawer_systems_of(params)
+          fronts = params.is_a?(Hash) ? params['fronts'] : nil
+          items = fronts.is_a?(Hash) ? fronts['items'] : nil
+          Array(items).filter_map do |it|
+            kind, key = Recipes.recipe_key_for(it)
+            kind == :ok ? key[:system] : nil
+          end.uniq
+        end
+
+        # Prijme hrubku ASPON JEDEN vydany system? (brana novej predvolby)
+        def drawer_thickness_any_system?(have)
+          Recipes::SYSTEMS.any? { |sys| Recipes.thickness_ok_for_system?(sys, have) }
+        end
+
+        # „Atira (16 mm)" / „Atira (16 mm), Quadro V6 (16 alebo 18 mm)"
+        def drawer_systems_txt(systems)
+          Array(systems).map do |sys|
+            th = Recipes.supported_thicknesses(sys).map { |v| Materials.fmt_mm(v) }
+            "#{Recipes.system_label(sys)} (#{th.join(' alebo ')} mm)"
+          end.join(', ')
+        end
+
+        def drawer_reject_msg(have)
+          allowed = Recipes::SYSTEMS.flat_map { |sys| Recipes.supported_thicknesses(sys) }
+                                    .uniq.sort.map { |v| Materials.fmt_mm(v) }
+          "Hrúbka #{Materials.fmt_mm(have)} mm sa nedá použiť na dielce zásuviek — " \
+            "recepty poznajú #{allowed.join(' a ')} mm. Vyber inú dosku."
+        end
+
+        # Ponuka na potvrdenie (rovnaky kanal ako D-46 — jedna lista, jeden
+        # pending kontrakt; lisi sa LEN veta).
+        def offer_drawer_change(fresh, have, plan, stale: false)
+          msg = "#{drawer_systems_txt(plan['systems'])} hrúbku #{Materials.fmt_mm(have)} mm neprijíma — " \
+                "zásuvky v #{cabs_phrase(plan['ids'].size, :future).sub(/ prevezm\S+\z/, '')} " \
+                'sa prestanú vyrábať (Kontrola ich ukáže červené). Potvrď nižšie.'
+          msg = "Stav sa medzitým zmenil — #{msg}" if stale
+          set_status(msg)
+          js("MD.confirmDefault(#{{ 'key' => fresh['key'], 'current' => fresh['old_default'],
+                                    'message' => msg, 'pending' => fresh }.to_json})")
         end
 
         # --- D-46: predvolba korpusu s inou hrubkou ---------------------------
@@ -1169,6 +1262,8 @@ module Noxun
               'ako predvoľbu korpusu ho nastaviť nejde. Tenké dosky sú materiál chrbta alebo konkrétneho dielca.'
           when 'default_back_material_id'
             "Materiál #{value} (#{Panel.fmt_mm(have)} mm) nesedí s podporovanými hrúbkami chrbta (3 alebo 18 mm)."
+          when 'default_drawer_material_id'
+            drawer_reject_msg(have)
           else
             "Materiál #{value} (#{Panel.fmt_mm(have)} mm) je mimo rozsahu hrúbky čela (#{lo}–#{hi} mm)."
           end

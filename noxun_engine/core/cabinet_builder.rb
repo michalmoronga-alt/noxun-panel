@@ -96,6 +96,11 @@ module Noxun
       #       exportov (`ProductionCore.export_blockers`).
       CONFIG_SCHEMA = 5
 
+      # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
+      # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri buducom bumpe na 6 by
+      # sa inak KAZDA skrinka schemy 5 zrazu tvarila ako nemigrovana.
+      DRAWER_ACTIVATION_SCHEMA = 5
+
       MIN = { width: 200.0, height: 200.0, depth: 150.0 }.freeze
       # D-45: povoleny rozsah hrubky korpusu (mm) — JEDINY zdroj pravdy pre clamp
       # v normalize, pre prevzatie hrubky z materialu aj pre projektovy guard.

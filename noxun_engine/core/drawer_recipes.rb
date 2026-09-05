@@ -80,19 +80,30 @@ module Noxun
         drawer_override_invalid drawer_kit_missing
       ].freeze
 
-      # KOV-C2b: REGISTER BRANY. `export_blockers` cita CELY tento zoznam —
-      # ziadny kod z neho nesmie prejst do vydaneho suboru.
-      DRAWER_BLOCKERS = CONFLICT_CODES
-
       # Jediny kod, ktory vznika az v NAKUPE (receptova polozka bez setu alebo
       # bez kodu pre svoju NL). Dielce v modeli OSTAVAJU (fyzika je spravna),
       # ale rez na NL bez kitu tej NL je nepouzitelny — preto blokuje AJ VEPO.
       KIT_MISSING = 'drawer_kit_missing'
 
+      # MIGRACNY kod (Codex #304 kolo 1 P1). NEVYRABA ho resolver — vznika pri
+      # CITANI modelu (`Bom.collect`): skrinka ulozena PRED aktivaciou receptov
+      # (config schema < 5) ma klasifikovanu zasuvku, takze v .skp NIE SU
+      # receptove dielce a vysuv je legacy. Kusovnik aj VEPO by boli NEUPLNE
+      # a ticho — preto blokuje VSETKY exporty. Napravou je PRESTAVBA skrinky.
+      STALE = 'drawer_stale'
+
+      # KOV-C2b: REGISTER BRANY (11 kodov). `export_blockers` cita CELY tento
+      # zoznam — ziadny kod z neho nesmie prejst do vydaneho suboru.
+      # 10 kodov produkuje resolver (`CONFLICT_CODES`), 11. je MIGRACNY.
+      DRAWER_BLOCKERS = (CONFLICT_CODES + [STALE]).freeze
+
       # Konflikty STAVBY (9): fail-closed, ziadne dielce ani polozka. Blokuju
       # nakupny CSV, rozpocet a cenovu ponuku; VEPO chrani prave to, ze sa
       # geometria vobec nevydala (niet co rezat).
       BUILD_BLOCKERS = (CONFLICT_CODES - [KIT_MISSING]).freeze
+
+      # Kody, pri ktorych by boli NEUPLNE aj REZACIE data — blokuju AJ VEPO.
+      ALL_EXPORT_BLOCKERS = [KIT_MISSING, STALE].freeze
 
       # Kratky slovensky nazov dovodu pre BRANU EXPORTU. Plnu vetu (ktora
       # hodnota kde nesedi) nesie nalez Kontroly; brana menuje LEN pricinu
@@ -107,7 +118,8 @@ module Noxun
         'drawer_recipe_unknown'       => 'zásuvka používa recept, ktorý plugin nepozná',
         'nl_lock_invalid'             => 'ručne zamknutá dĺžka výsuvu neplatí',
         'drawer_override_invalid'     => 'ručný zásah do výsuvu zásuvky je neplatný',
-        KIT_MISSING                   => 'nákup nenašiel kit výsuvu k postaveným dielcom'
+        KIT_MISSING                   => 'nákup nenašiel kit výsuvu k postaveným dielcom',
+        STALE                         => 'zásuvka je klasifikovaná ešte spred aktivovania receptov'
       }.freeze
 
       # Identita NL zamku v `hardware_overrides` (D-93). Zamok = existencia
@@ -436,6 +448,26 @@ module Noxun
           return v if v
         end
         lb[:by_nl][key_num(nl)] || lb[:default]
+      end
+
+      # KOV-C2b: hrubky, ktore system PRIJME pre VSETKY svoje vyrabane dielce
+      # (PRIENIK cez roly — jeden materialovy kanal krmi vsetky roly naraz, takze
+      # hrubka dobra len pre dno by pri Quadre aj tak padla na boku). Cita sa
+      # z NAJNOVSIEHO vydaneho receptu systemu; neznamy system = [].
+      # CISTA funkcia — pouziva ju preflight projektovej predvolby zasuviek.
+      def supported_thicknesses(system, dir: DIR)
+        id = OPENINGS.filter_map { |o| latest_for(system, o, dir: dir) }.first
+        return [] if id.nil?
+
+        lists = load(id, dir: dir)[:thickness_supported].values.map { |l| Array(l).map(&:to_f) }
+        return [] if lists.empty?
+
+        lists.reduce { |acc, l| acc.select { |v| l.any? { |x| same?(x, v) } } }.uniq.sort
+      end
+
+      def thickness_ok_for_system?(system, mm, dir: DIR)
+        th = supported_thicknesses(system, dir: dir)
+        !th.empty? && th.any? { |v| same?(v, mm) }
       end
 
       # Odporucanie synchronizacnej tyce (P2O nad prahom sirky). C1 hodnotu len

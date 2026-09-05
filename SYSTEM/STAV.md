@@ -22,7 +22,7 @@ a rád (`core/hardware_taxonomy.rb`) a vytiahla katalóg aj editor setu na obraz
 **Pozor na kompatibilitu:** čo uloží v0.9.20, to **v0.9.18 už nepoužije** — model/šablóna (`CONFIG_SCHEMA` 4 + brána `assess_set_defs`), knižnica setov aj projektový snapshot
 (`std` 3) a katalóg kovania s výrobcom (`schema` 2). Pred prvou takou zákazkou aktualizovať **obe PC** (D-52 updater).
 
-**Testy k v0.9.31:** **3063 headless** · 89 JS sád · posledný plný in-SketchUp beh **1750 PASS** (nad vetvou KOV-C1, 5.9.). **KOV-C2b pridala sekciu `run_kovc2b`, ktorá ešte NEBEŽALA** — spustiť ju treba pred mergom (mení buildery).
+**Testy k v0.9.31:** **3074 headless** · 89 JS sád · posledný plný in-SketchUp beh **1782 PASS / 0 FAIL** (nad vetvou KOV-C2b, 5.9. — 32 scenárov novej sekcie `run_kovc2b`).
 
 ## Robí sa
 
@@ -45,7 +45,8 @@ Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` →
 
 - **KOV-C2b — ZÁSUVKA UŽ NAOZAJ VZNIKNE (dielce + výsuv)** (v0.9.31, 5.9.2026): čelo označené ako zásuvka **Atira** alebo **Quadro V6** dostane automaticky **vyrábané dielce**
   (Atira dno + chrbát; Quadro 2 boky + dno + vnútorné čelo + chrbát) do modelu aj kusovníka a **jednu položku výsuvu** do nákupu. Nevyriešená zásuvka **nevyrobí nič**, je
-  **červená v Kontrole** a zastaví export; chýbajúci kit zastaví **aj VEPO**. **Zákazky bez zásuvkovej klasifikácie sa nemenia.** Karta zásuvky a výber materiálu = C2c.
+  **červená v Kontrole** a zastaví export; chýbajúci kit zastaví **aj VEPO**. Štúdio má **riadok „Zásuvky"** v predvoľbách projektu (Atira berie 16, Quadro aj 18).
+  **Zákazky bez zásuvkovej klasifikácie sa nemenia**; staršia zákazka s klasifikovanou zásuvkou je červená, kým ju neprestavíš. Karta zásuvky v Inspectore = C2c.
   Plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **KOV-C1 + KOV-C2a — JADRO A PRÍPRAVA ZÁSUVIEK (bez viditeľnej zmeny)** (v0.9.29 a v0.9.30, 5.9.2026): nemenné verzované recepty Atira/Quadro V6 (`data/recipes/*.json`
   + SHA register), výpočet svetlého priestoru okolo čela, **4. materiálový kanál „Zásuvky"** (UNI 16 mm), ABS pravidlá dielcov, **8 nových setov s kódmi** a predvoľby podľa

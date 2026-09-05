@@ -594,7 +594,8 @@ module Noxun
           code = iss['code'].to_s
           if code == 'front_direction_unset'
             items << front_direction_item(iss)
-          elsif defined?(Recipes) && Recipes::BUILD_BLOCKERS.include?(code)
+          elsif defined?(Recipes) &&
+                (Recipes::BUILD_BLOCKERS.include?(code) || code == Recipes::STALE)
             items << drawer_conflict_item(iss)
           end
         end
@@ -611,11 +612,14 @@ module Noxun
         label = pkey.empty? ? 'zásuvka' : pkey if label.empty?
         msg = iss['message'].to_s.strip
         msg = 'Zásuvka sa nedá vyriešiť.' if msg.empty?
+        # Migracny kod ma vlastny koniec vety: dielce nechybaju preto, ze sa
+        # nedali vyrobit, ale preto, ze skrinka este nepresla prestavbou.
+        tail = iss['code'].to_s == Recipes::STALE ? 'Export je zastavený, kým ju neprestavíš.'
+                                                  : 'Dielce ani výsuv sa nevyrobili — export je zastavený.'
         { 'severity' => RED, 'category' => CAT_DRAWER,
           'owner_id' => oid, 'part_key' => (pkey.empty? ? nil : pkey), 'hw_key' => nil,
           'owner_pid' => iss['owner_pid'],
-          'message_sk' => "#{label} (#{oid.empty? ? '—' : oid}): #{msg} " \
-                          'Dielce ani výsuv sa nevyrobili — export je zastavený.',
+          'message_sk' => "#{label} (#{oid.empty? ? '—' : oid}): #{msg} #{tail}",
           'stable_key' => "#{CAT_DRAWER}|#{oid}|#{pkey}|#{iss['code']}" }
       end
 

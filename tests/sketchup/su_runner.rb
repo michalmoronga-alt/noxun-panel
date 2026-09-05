@@ -15500,6 +15500,38 @@ module NoxunSuRunner
       r03_clear_markers(model, markers)
     end
 
+    # --- 9) Codex #304 kolo 1: zmena konstrukcie metal <-> wood -------------
+    cleanup(model)
+    sw = e::CabinetBuilder.build(model, kovc2b_params)
+    if sw
+      p_wood = e::CabinetBuilder.config_to_params(e::Store.config(sw) || {})
+      p_wood['fronts']['items'][0]['drawer'] = { 'construction' => 'wood' }
+      # Panel serverove polia NEPOSIELA — presne tak, ako ich zahadzuje handler.
+      p_wood['fronts'] = e::Fronts.reattach_server_drawer_fields(
+        p_wood['fronts'], (e::Store.config(sw) || {})['fronts']
+      )
+      e::CabinetBuilder.rebuild(model, sw, p_wood)
+      wfi = kovc2b_front(sw)
+      ok("KOV-C2b prepnutie: drevo dalo Quadro, nie RED (#{wfi && wfi['drawer'].inspect})",
+         wfi && wfi['drawer']['system'] == 'quadro_v6' &&
+         Array((e::Store.config(sw) || {})['drawer_conflicts']).empty?)
+      ok("KOV-C2b prepnutie: dreveny box ma 5 dielcov (#{kovc2b_parts(sw).length})",
+         kovc2b_parts(sw).length == 5)
+      # a spat na kov — POVODNY pripnuty recept Atiry sa vrati
+      p_metal = e::CabinetBuilder.config_to_params(e::Store.config(sw) || {})
+      p_metal['fronts']['items'][0]['drawer'] = { 'construction' => 'metal' }
+      p_metal['fronts'] = e::Fronts.reattach_server_drawer_fields(
+        p_metal['fronts'], (e::Store.config(sw) || {})['fronts']
+      )
+      e::CabinetBuilder.rebuild(model, sw, p_metal)
+      mfi = kovc2b_front(sw)
+      ok('KOV-C2b prepnutie: navrat na kov vratil POVODNY recept Atiry',
+         mfi && mfi['drawer']['system'] == 'atira' &&
+         mfi['drawer']['recipe_refs']['atira|sisy'] == 'atira_sisy_v1')
+      ok("KOV-C2b prepnutie: a zase 2 dielce (#{kovc2b_parts(sw).length})",
+         kovc2b_parts(sw).length == 2)
+    end
+
     cleanup(model)
     ok('KOV-C2b: cleanup (0 korpusov, sablona prec)',
        cabinets(model).empty? && e::TemplateStore.find('cabinet', KOVC2B_TPL).nil?)
