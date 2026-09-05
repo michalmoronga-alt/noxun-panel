@@ -818,6 +818,60 @@ end
 # 10) VYROBNE VYSTUPY: doska vyssej schemy zastavi VSETKY z nich
 # ---------------------------------------------------------------------------
 
+# Stub SketchUp tried, ktore `ProductionCore.pids_for_problem` pouziva na
+# rozlisenie „top-level NOXUN kus" (vzor `test_r01_observer_multimodel.rb`:
+# stub zije VNUTRI modulu, aby ho nasla lexikalna konstanta v jeho metodach).
+unless NxTest::IN_SKETCHUP
+  module Noxun
+    module Engine
+      module ProductionCore
+        module Sketchup
+          class ComponentInstance; end
+          class Model; end
+        end
+      end
+    end
+  end
+end
+
+if NxTest.headless?
+  NXD1_PC_SU = Noxun::Engine::ProductionCore::Sketchup
+  NXD1_ROOT = NXD1_PC_SU::Model.new
+
+  # Duck-typing top-level NOXUN kus. `root: false` = vnoreny (nie je cielom kliku).
+  class NxD1FakeEnt < NXD1_PC_SU::ComponentInstance
+    attr_reader :persistent_id, :parent
+
+    def initialize(pid, kind, id, root: true)
+      super()
+      @persistent_id = pid
+      @dicts = { 'NOXUN' => { 'kind' => kind, 'id' => id,
+                              'cabinet_id' => (kind == 'cabinet' ? id : nil) } }
+      @parent = root ? NXD1_ROOT : Object.new
+    end
+
+    def valid?
+      true
+    end
+
+    def get_attribute(dict, key, default = nil)
+      (@dicts[dict] || {}).fetch(key, default)
+    end
+  end
+
+  class NxD1FakeModel
+    attr_reader :entities
+
+    def initialize(entities)
+      @entities = entities
+    end
+
+    def find_entity_by_persistent_id(pid)
+      @entities.find { |e| e.persistent_id == pid }
+    end
+  end
+end
+
 NxTest.test('GHOST-D1 vystupy: zaznam `newer_configs` nesie DRUH a rozlisi Skrinku od Dosky') do
   bom = Noxun::Engine::Bom
   list = []
@@ -866,9 +920,9 @@ NxTest.test('GHOST-D1 vystupy: zber prizna dosku z novsej verzie EST PRED filtro
   bom = NxD1.src('noxun_engine', 'core', 'bom.rb')
   brd = bom[/when 'board'(.*?)when 'part'/m, 1].to_s
   NxTest.assert(!brd.empty?, 'vetva dosky sa nasla')
-  NxTest.assert(brd.include?("note_newer_config(newer_configs, 'board', newer_address(inst, bid))"),
+  NxTest.assert(brd.include?("note_newer_config(newer_configs, 'board', *newer_address(inst, bid))"),
                 'zber dosku z novsej verzie PRIZNAVA (a to aj bez vyrobneho ID)')
-  NxTest.assert(brd.index("note_newer_config(newer_configs, 'board', newer_address(inst, bid))") <
+  NxTest.assert(brd.index("note_newer_config(newer_configs, 'board', *newer_address(inst, bid))") <
                 brd.index("next unless Store.get(inst, 'manufactured') == true"),
                 'brana bezi PRED filtrom manufactured (fail-closed)')
 end
@@ -880,34 +934,80 @@ end
 NxTest.test('GHOST-D1 vystupy: blocker PREZIJE aj bez vyrobneho ID (stabilna adresa entity)') do
   bom = Noxun::Engine::Bom
   ent = Struct.new(:persistent_id, :entityID).new(987_654, 42) # rubocop:disable Naming/VariableName
-  NxTest.assert_equal('BRD-002', bom.newer_address(ent, 'BRD-002'), 'ID ma prednost')
-  NxTest.assert_equal('BRD-002', bom.newer_address(ent, '  BRD-002  '), 'a orezava sa')
-  addr = bom.newer_address(ent, '')
+  # `newer_address` vracia DVOJICU [id_do_hlasky, pid] — retazec pre cloveka,
+  # pid ako STRUKTUROVANA adresa pre resolver kliku (Codex #298 kolo 2).
+  NxTest.assert_equal(['BRD-002', 987_654], bom.newer_address(ent, 'BRD-002'), 'ID ma prednost')
+  NxTest.assert_equal(['BRD-002', 987_654], bom.newer_address(ent, '  BRD-002  '), 'a orezava sa')
+  addr, pid = bom.newer_address(ent, '')
   NxTest.assert_equal('bez ID (pid 987654)', addr, 'bez ID sa pouzije persistent_id')
-  NxTest.assert_equal(addr, bom.newer_address(ent, nil), 'nil aj prazdny retazec su to iste')
+  NxTest.assert_equal(987_654, pid, 'a pid ide aj SAMOSTATNE (nie len v retazci)')
+  NxTest.assert_equal([addr, pid], bom.newer_address(ent, nil), 'nil aj prazdny retazec su to iste')
 
   # A takyto zaznam sa NAOZAJ dostane do zoznamu (`note_newer_config` ho uz nezahodi)
   # a prejde celou retazou az k hlaske Kontroly aj k brane exportov.
   list = []
-  bom.note_newer_config(list, 'board', addr)
-  NxTest.assert_equal([{ 'kind' => 'board', 'id' => addr }], list, 'blocker sa NEZAHADZUJE')
+  bom.note_newer_config(list, 'board', addr, pid)
+  NxTest.assert_equal([{ 'kind' => 'board', 'id' => addr, 'owner_pid' => 987_654 }], list,
+                      'blocker sa NEZAHADZUJE a nesie strukturovanu adresu')
   items = []
   Noxun::Engine::Validation.check_newer_configs(list, items)
   NxTest.assert_equal(1, items.length, 'Kontrola nalez ukaze')
   NxTest.assert(items.first['message_sk'].start_with?("Doska #{addr}"), items.first['message_sk'])
+  NxTest.assert_equal(987_654, items.first['owner_pid'], 'nalez nesie adresu pre klik')
   b = Noxun::Engine::ProductionCore.export_blockers(newer: list)
   NxTest.assert_equal(1, b.length, 'a export sa zastavi')
   NxTest.assert(b.first.include?("Doska #{addr}"), b.first)
 
   # Entita bez `persistent_id` (starsie API / fake) spadne na `entityID`.
   old = Struct.new(:entityID).new(7) # rubocop:disable Naming/VariableName
-  NxTest.assert_equal('bez ID (pid 7)', bom.newer_address(old, ''))
-  NxTest.assert_equal('bez ID (pid ?)', bom.newer_address(Object.new, ''), 'a bez oboch sa nespadne')
+  NxTest.assert_equal(['bez ID (pid 7)', 7], bom.newer_address(old, ''))
+  NxTest.assert_equal(['bez ID (pid ?)', nil], bom.newer_address(Object.new, ''),
+                      'a bez oboch sa nespadne')
+  # Legacy zaznam (holy String) `owner_pid` nema — resolver vtedy hlada podla ID.
+  legacy = []
+  bom.note_newer_config(legacy, 'cabinet', 'CAB-009')
+  NxTest.assert_equal([{ 'kind' => 'cabinet', 'id' => 'CAB-009' }], legacy, 'bez pid sa kluc nepridava')
+  NxTest.assert_equal(['cabinet', 'CAB-009', nil], Noxun::Engine::Validation.newer_config_entry('CAB-009'))
+end
+
+# Codex #298 kolo 2 P2: klik na RED riadok Kontroly musi vybrat SPRAVNU entitu
+# aj pri objekte BEZ vyrobneho ID — `owner_id` je vtedy len ludsky retazec,
+# takze hladanie podla ulozeneho ID by nenaslo nic a pouzivatel by dostal
+# „zoznam sa medzitym zmenil" namiesto vyberu.
+NxTest.test('GHOST-D1 vystupy: klik na nalez „z novsej verzie" najde entitu podla `owner_pid`') do
+  NxTest.skip!('stub SketchUp tried bezi len headless') unless NxTest.headless?
+  pc = Noxun::Engine::ProductionCore
+  cat = Noxun::Engine::Validation::CAT_NEWER_CFG
+
+  board = NxD1FakeEnt.new(987_654, 'board', '')          # doska BEZ vyrobneho ID
+  cab   = NxD1FakeEnt.new(111, 'cabinet', 'CAB-001')
+  nested = NxD1FakeEnt.new(222, 'board', '', root: false) # vnoreny kus — NIE je ciel
+  model = NxD1FakeModel.new([board, cab, nested])
+
+  # Zber -> Kontrola -> resolver: cela retaz nad JEDNYM zaznamom.
+  list = []
+  addr, pid = Noxun::Engine::Bom.newer_address(board, Noxun::Engine::Store.get(board, 'id').to_s)
+  Noxun::Engine::Bom.note_newer_config(list, 'board', addr, pid)
+  items = []
+  Noxun::Engine::Validation.check_newer_configs(list, items)
+  item = items.first
+
+  NxTest.assert_equal([987_654], pc.pids_for_problem(model, item),
+                      'klik oznaci PRESNE tu dosku, o ktorej nalez hovori')
+  # Vnoreny kus s tym istym druhom sa nikdy nechyti (ciel je len TOP-LEVEL).
+  NxTest.assert_equal([], pc.pids_for_problem(model, item.merge('owner_pid' => 222)),
+                      'vnoreny kus nie je ciel')
+  NxTest.assert_equal([], pc.pids_for_problem(model, item.merge('owner_pid' => 999)),
+                      'zmiznuta entita = prazdny vyber (volajuci ukaze „zoznam sa zmenil")')
+  # Legacy zaznam bez `owner_pid` musi dalej fungovat cez ULOZENE ID.
+  legacy = { 'category' => cat, 'owner_id' => 'CAB-001', 'part_key' => nil }
+  NxTest.assert_equal([111], pc.pids_for_problem(model, legacy),
+                      'bez pid sa hlada podla ID (starsi zber, headless volania)')
 end
 
 NxTest.test('GHOST-D1 vystupy: to iste plati pre SKRINKU bez cabinet_id') do
   bom = NxD1.src('noxun_engine', 'core', 'bom.rb')
-  NxTest.assert(bom.include?("note_newer_config(newer_configs, 'cabinet', newer_address(inst, cid))"),
+  NxTest.assert(bom.include?("note_newer_config(newer_configs, 'cabinet', *newer_address(inst, cid))"),
                 'kabinetova vetva ma tu istu poistku (rovnaka trieda chyby)')
 end
 

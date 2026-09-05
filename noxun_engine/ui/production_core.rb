@@ -582,6 +582,17 @@ module Noxun
         dup_cats = [Validation::CAT_DUPLICATE, Validation::CAT_DUP_ID]
         return pids_for_duplicate(model, item) if dup_cats.include?(item['category'].to_s)
 
+        # GHOST-D1 (Codex #298 kolo 2 P2): nalez „z NOVSEJ verzie" adresuje
+        # KONKRETNU entitu cez `owner_pid`. Pri objekte BEZ vyrobneho ID je to
+        # JEDINA adresa, ktoru mame — `owner_id` je vtedy len ludsky retazec
+        # („bez ID (pid N)") a hladanie podla ulozeneho ID by nenaslo nic, takze
+        # klik na RED riadok by vzdy hlasil „zoznam sa medzitym zmenil".
+        # Vseobecna vetva nizsie ostava fallbackom pre legacy zaznamy bez pid.
+        if item['category'].to_s == Validation::CAT_NEWER_CFG
+          ent = newer_config_entity(model, item['owner_pid'])
+          return [ent.persistent_id] if ent
+        end
+
         oid = item['owner_id'].to_s
         pkey = item['part_key'].to_s
         # KOV-A1 (Codex #280 P2-A): nalez, ktory nesie `owner_pid`, adresuje
@@ -638,6 +649,23 @@ module Noxun
       # `cabinet_id` sa overuje ZAMERNE: `owner_pid` je adresa VYSKYTU, ale
       # identita problemu je (owner_id + part_key). Ked sa rozidu (prestavba,
       # dedup kopie, recyklovany PID), autoritou ostava IDENTITA.
+      # GHOST-D1: TOP-LEVEL korpus alebo doska podla `persistent_id`. Druh sa
+      # NEOVERUJE proti ID (objekt z novsej verzie ho nemusi mat citatelne) —
+      # staci, ze je to zivy NOXUN kus na root urovni.
+      def newer_config_entity(model, pid)
+        return nil unless pid.is_a?(Integer) && pid.positive?
+
+        ent = model.find_entity_by_persistent_id(pid)
+        return nil unless ent.is_a?(Sketchup::ComponentInstance) && ent.valid?
+        return nil unless ent.parent.is_a?(Sketchup::Model)
+        return nil unless %w[cabinet board].include?(Store.kind(ent).to_s)
+
+        ent
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.newer_config_entity')
+        nil
+      end
+
       def scoped_owner_instance(model, item, oid)
         pid = item['owner_pid']
         return nil unless pid.is_a?(Integer) && pid.positive?

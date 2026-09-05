@@ -620,25 +620,33 @@ module Noxun
       # pomenuje „Skrinka"/„Doska". Holy String (legacy volania, headless testy)
       # sa cita ako skrinka. Zoznam blokovanych vystupov je UPLNY — od GHOST-D1
       # brana plati aj pre VEPO a kusovnik nad takym objektom je neuplny.
+      # Vracia TROJICU `[kind, id, owner_pid]`. `owner_pid` (Codex #298 kolo 2)
+      # je STRUKTUROVANA adresa entity — pri objekte BEZ vyrobneho ID je to
+      # jediny udaj, podla ktoreho vie klik na nalez najst kus v modeli
+      # (`id` je vtedy len ludsky retazec „bez ID (pid N)"). Legacy zaznam
+      # (holy String) `owner_pid` nema — vtedy sa hlada podla ID ako doteraz.
       def newer_config_entry(raw)
+        pid = nil
         if raw.is_a?(Hash)
           kind = (raw['kind'] || raw[:kind]).to_s
           id = (raw['id'] || raw[:id]).to_s.strip
+          pid = raw['owner_pid'] || raw[:owner_pid]
         else
           kind = 'cabinet'
           id = raw.to_s.strip
         end
-        [kind == 'board' ? 'board' : 'cabinet', id]
+        [kind == 'board' ? 'board' : 'cabinet', id,
+         (pid.is_a?(Integer) && pid.positive? ? pid : nil)]
       end
 
       def check_newer_configs(entries, items)
         Array(entries).each do |raw|
-          kind, id = newer_config_entry(raw)
+          kind, id, pid = newer_config_entry(raw)
           next if id.empty?
 
           subject = kind == 'board' ? 'Doska' : 'Skrinka'
           items << { 'severity' => RED, 'category' => CAT_NEWER_CFG,
-                     'owner_id' => id, 'part_key' => nil, 'hw_key' => nil,
+                     'owner_id' => id, 'owner_pid' => pid, 'part_key' => nil, 'hw_key' => nil,
                      'message_sk' => "#{subject} #{id} je z novšej verzie Noxun — tento plugin jej " \
                                      'nastavenia nepozná celé. Kusovník je neúplný a exporty sa ' \
                                      'nevytvoria (VEPO, nákupný zoznam kovania, rozpočet, ' \

@@ -580,9 +580,9 @@ NxTest.test('KOV-H1 (B3): `Bom.collect` nesie ID skriniek z NOVSEJ verzie (aditi
   # tym istym klucom (in-SU sekcia `run_kovh1` to skusa nad zivym modelom).
   bom = NxKovh1.src('core/bom.rb')
   # GHOST-D1: zaznam nesie DRUH, zapisuje ho jeden helper (skrinka aj doska).
-  NxTest.assert(bom.include?("note_newer_config(newer_configs, 'cabinet', newer_address(inst, cid))"),
+  NxTest.assert(bom.include?("note_newer_config(newer_configs, 'cabinet', *newer_address(inst, cid))"),
                 'zber kluc plni pre skrinku')
-  NxTest.assert(bom.include?("note_newer_config(newer_configs, 'board', newer_address(inst, bid))"),
+  NxTest.assert(bom.include?("note_newer_config(newer_configs, 'board', *newer_address(inst, bid))"),
                 'a pre dosku')
   NxTest.assert(bom.include?('newer_configs: newer_configs'), 'a vracia ho')
 
