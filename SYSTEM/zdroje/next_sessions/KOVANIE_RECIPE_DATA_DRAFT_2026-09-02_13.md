@@ -13,9 +13,9 @@
   "thickness_supported_mm": [16],
   "height_variants": { "H70": {...}, "H144": {...}, "H176": {...} },
   "nl_series": [260,300,350,420,470,520,620],
-  "availability": { "loads_by_nl": {...}, "openings": ["sisy","p2o","p2os"], "p2os_10kg_nl": [260,300,350] },
-  "min_depth": { "sisy": {...}, "p2o": {...}, "p2os": {...} },
-  "extras": { "sync_shaft": { "trigger": "width_gt_600_and_opening_in[p2o,p2os]", "cut_formula_by_eb": {"9.5":"LW-64","10.5":"LW-66","12.5":"LW-70"} } },
+  "availability": { "loads_by_nl": {...}, "openings": ["sisy","p2o"] },
+  "min_depth": { "sisy": {...}, "p2o": {...} },
+  "extras": { "sync_shaft": { "trigger": "width_gt_600_and_opening_eq[p2o]", "cut_formula_by_eb": {"9.5":"LW-64","10.5":"LW-66","12.5":"LW-70"} } },
   "inner_supported": false }
 ```
 Vzorce sa NEinterpretujú ako jazyk — každý vzorec = pomenovaná konštanta v kóde (`c_bw`, `c_rw`, `c_bl`…), pack nesie hodnoty. Formula-string je len dokumentácia.
@@ -29,14 +29,14 @@ Vzorce sa NEinterpretujú ako jazyk — každý vzorec = pomenovaná konštanta 
 | šírka chrbta (drevený) | `LB − 2·EB − 63` → `LB − 84` (rovnaké pre H70/H144/H176) | OFFICIAL + USER |
 | dĺžka dna | `NL + 10` (drevený chrbát; oceľový by bol NL − 3 — mimo profilu) | OFFICIAL |
 | výška chrbta | H70 = **65.5** (výrobne 65) · H144 = **144** · H176 = **176** (H54 = 53 existuje, V1 neponúka) | SECONDARY (Démos) + USER |
-| min. svetlá výška niky | H70: **105 / 106 / 108** · H144: **189 / 190 / 192** · H176: **221 / 222 / 224** (SiSy / P2O / P2Os) — NIE 92! | OFFICIAL (#10, korekcia #11) |
+| min. svetlá výška niky | H70: **105 / 106** · H144: **189 / 190** · H176: **221 / 222** (SiSy / P2O) — NIE 92!; hodnoty P2Os (108/192/224) sú v #10, ale **P2Os je pre Noxun NESCHVÁLENÝ** (Michal 5.9.2026) | OFFICIAL (#10, korekcia #11) |
 | relingy | H70: 0 · H144: 1+1 · H176: 1+1 (súčasť K-sady …/176 resp. „relingy") | USER (#09) |
 | NL rad | 260 · 300 · 350 · 420 · 470 · 520 · 620 | OFFICIAL |
-| nosnosť per NL | 260 → [30] · 300–520 → [30, 50] · 620 → [50]; P2Os 10 kg len 260–350; **žiadna 60 kg** | OFFICIAL |
+| nosnosť per NL | 260 → [30] · 300–520 → [30, 50] · 620 → [50]; **žiadna 60 kg**; (P2Os 10 kg trieda vyhodená — NESCHVÁLENÝ typ) | OFFICIAL |
 | min. hĺbka korpusu | NL ≥ 300: `NL + 15` · **NL 260: 279 (SiSy) / 305 (P2O)** | OFFICIAL |
 | hrúbka dna/chrbta | 16 mm (bez drážky — dno sadá na prírubu zargy); iné UNCONFIRMED → `thickness_supported = [16]` | OFFICIAL detail + USER |
-| opening | SiSy · P2O · P2Os — geometria boxu identická; mení kit kód, min. výšku, dostupnosť | OFFICIAL |
-| sync tyč (P2O/P2Os) | povinná pri šírke > 600: rez EB 10.5 → `LW − 66` (dĺžková položka — R-06a ORANGE; chýbanie = blocker KOV-D) | SECONDARY |
+| opening | SiSy · P2O — geometria boxu identická; mení kit kód, min. výšku, dostupnosť. **P2Os (Push to open Silent) NEschválený pre Noxun** — Michal 5.9.2026: len 2 typy otvárania pre výsuvy aj závesy | OFFICIAL + rozhodnutie |
+| sync tyč (P2O) | povinná pri šírke > 600: rez EB 10.5 → `LW − 66` (dĺžková položka — R-06a ORANGE; chýbanie = blocker KOV-D) | SECONDARY |
 | vnútorná zásuvka | `inner_supported: false` (V1 len klasifikácia; doplnky = profil 2000 + príchyt — dĺžkové/pomerové) | USER + #12 |
 | vyrábané dielce | presne 2: dno + drevený chrbát; ABS: dno bez, chrbát horná dlhá hrana 1,0 | USER (#09, #11) |
 

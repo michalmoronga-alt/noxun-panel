@@ -141,6 +141,7 @@
 - **SET ZÁVES „KLASIK"** (Sensys 8645i 110° naložený): záves **104717** + platnička **106412** (podložka 8099 s excentrom) + krytka misky **105408** + krytka ramienka **105425** — pomer **1:1:1:1 na 1 ZÁVES**;
   počet závesov na dvierka určuje PRAVIDLO (bands podľa výšky: 2/3/4/5 — dva sú typický prípad z Disk sondy, NIE kontrakt), expanzia setu násobí členov množstvom z pravidla (GH #125 P2).
   Kódy krytiek doplnil Michal pri debate (dovtedy „otvorená diera č. 1" seed podkladu).
+- **Typy otvárania (Michal 5.9.2026):** pre výsuvy AJ závesy existujú v praxi LEN dva — **Tip-On** (Push to open, P2O, bez tlmenia) a **tlmenie** (Silent System, SiSy). Vendor variant „Push to open Silent" (P2Os) sa v Noxune NERIEŠI (dáta vyhodené); klasifikácia čela `opening_mode classic|tipon`.
 - **SET P2O** (Sensys 8675 k tip-onu, bez tlmenia): záves **245723** + platnička + krytky (1:1:1:1) + **1× TipOn 250831 na DVIERKA** — člen setu viazaný na VLASTNÍKA (čelo), nie na jednotku závesu. Strong tip-on 35000 = samostatný lacnejší set.
 - **Výsuvy: dĺžku vyberá SYSTÉM automaticky** (Michal 2.8.) — pravidlo `fit_series` už dnes počíta `nominal_length` zo svetlej hĺbky; set výsuvu je preto **RAD**: mapa NL → kód (Atira biela H70:
   420 → 357695, 470 → 357696…), nie jeden pevný kód. **Séria seed pravidla sa v D1 zladí s reálnym produktovým radom Atira** (napr.

@@ -15,8 +15,7 @@
    odmietnutie ako doteraz; výnimka „VEPO neblokovať" platí LEN pre drawer konflikty v podporovanej verzii, nikdy pre novší config. `PartKeys::SCHEMA` sa nebumpuje (tvar `front:<id>/<rola>` existuje).
 3. **Vstupná klasifikácia nevie pomenovať recept** — čelo drží len `drawer.construction` (`metal|wood|other`), `variant` (`standard|internal`), `opening_mode` (`classic|tipon`); `norm_drawer` ostatné zahodí
    (`fronts.rb:497`). → **ROZHODNUTÉ (C1 kontrakt, C2a persistencia):** záväzná mapa klasifikácia → kľúč receptu: `construction metal → system atira` · `wood → quadro_v6_eb23` · `other → BEZ receptu`
-   (legacy cesta, CONTENT-identická, žiadne dielce ani R2 potlačenie); `opening_mode classic → sisy` · `tipon → p2o` (**P2Os v V1 NEdosiahnuteľné** z klasifikácie — dáta v packu ostávajú, os pribudne
-   v KOV-D; Michal môže vetovať); `variant internal → tvrdý conflict `drawer_internal_unsupported`` (FINAL §3); `runner_variant` z KD korpusu (`eb_by_kd`), piny `mounting: slide_on`, `rear_type: wooden`.
+   (legacy cesta, CONTENT-identická, žiadne dielce ani R2 potlačenie); `opening_mode classic → sisy` · `tipon → p2o` (**P2Os vyhodené úplne — Michal 5.9.2026: „ešte som sa nestretol s P2Os; pre výsuvy aj závesy ostávajú len 2 typy: Tip-On a tlmenie (SiSy), tretí variant neriešiť"**); `variant internal → tvrdý conflict `drawer_internal_unsupported`` (FINAL §3); `runner_variant` z KD korpusu (`eb_by_kd`), piny `mounting: slide_on`, `rear_type: wooden`.
    Kľúč receptu sa **persistuje per čelo** ako `drawer.recipe = {system, runner_variant, mounting, rear_type, recipe_version}` pri stavbe (C2a, CONFIG_SCHEMA 5); čiastočná klasifikácia (chýba
    construction alebo opening) = bez receptu + ORANGE `drawer_unclassified`; dormant drawer polia na dvierkach sa ignorujú (DORMANT_KEYS).
 4. **Zrkadlo `ensure_project_rules!` porušuje fail-closed** — poškodený JSON = „chýba" → prepis globálnou predvoľbou (`hardware_rules.rb:324`); pri receptoch by rebuild zmenil výrobné rozmery.
@@ -28,7 +27,7 @@
    systému — zhoda = OK, rozdiel = vloženie odmietnuté PRED akoukoľvek operáciou s hláškou „recept X v šablóne (v2) sa líši od projektu (v1) — zlúč recepty explicitne" (`merge_recipes_seed!` UI = KOV-D);
    projekt bez snapshotu preberie šablónový. Ghost session nesie závislosti; zlyhanie/Undo vráti snapshot aj stavbu spoločne (jedna operácia). Verzované identity (system@version) = NIE v V1.
 6. **Sync tyč P2O sa odkladá spolu s bránou** — dátový draft ju pri širokých zásuvkách vyžaduje. → **ROZHODNUTÉ (C2b):** s prvou aktiváciou receptu P2O prichádza **detekcia povinnej súčasti**
-   (`extras.sync_shaft.trigger`: šírka > `sync_rod_min_width` receptu AND opening ∈ {p2o, p2os}) a **tvrdá nákupná brána** RED `drawer_sync_rod_missing`, kým položka nie je v nákupe; dĺžková položka
+   (`extras.sync_shaft.trigger`: šírka > `sync_rod_min_width` receptu AND opening = p2o) a **tvrdá nákupná brána** RED `drawer_sync_rod_missing`, kým položka nie je v nákupe; dĺžková položka
    a oceňovanie (R-06a) ostávajú KOV-D.
 
 ## FIX-IN-C1 (prijaté)
@@ -64,6 +63,6 @@
 
 ## Rozhodnutia pre Michala (predvolené; môže vetovať)
 
-- **P2Os (Push to open Silent) v V1 nedosiahnuteľný z klasifikácie** (`tipon → p2o`); dáta ostávajú, os pribudne v KOV-D.
+- ~~P2Os v V1 nedosiahnuteľný, dáta ostávajú~~ → **ROZHODNUTÉ (Michal 5.9.2026, voľba A): P2Os sa z dát AJ z návrhu vyhadzuje úplne** — pre výsuvy aj závesy existujú len 2 typy otvárania (Tip-On = P2O, tlmenie = SiSy); vendor riadky P2Os v #10/#13 sú označené ako NESCHVÁLENÉ pre Noxun.
 - **Kolízia receptov šablóna vs projekt = odmietnutie vloženia** s hláškou (explicitné zlúčenie v KOV-D), nie tichý prepis ani verzované identity.
 - **Smoke čísla:** skrinka 900×720×**500** (KD 18, chrbát naložený) + čelo 175 → H70 (chrbát 65,5), NL470; dno 791,5×480, chrbát 780×65,5; hĺbka **250** → RED bez riešenia (NL260 potrebuje 279).

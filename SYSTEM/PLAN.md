@@ -278,8 +278,8 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   **C1 · jadro (čisté, bez zmeny výstupov):** nový modul `core/drawer_recipes.rb` + data packy `noxun_engine/data/recipes/atira.json`, `quadro_v6_eb23.json`
   (schéma: `family` metal_box|wood_undermount · `system` · `runner_variants` {`eb_by_kd` 16→12.5/18→10.5/19→9.5, `orderable` flag} · piny `mounting: slide_on`,
   `rear_type: wooden` · konštanty vzorcov (Atira: `BB = LB−2EB−51.5`, `RB = LB−2EB−63`, `BL = NL+10`; Quadro: `SKW = LB−46`, `SKL = NL`, `bottom_offset 12`,
-  `box_clearance 40`) · `height_variants` {H70/H144/H176: rear_height 65.5/144/176, `min_clear_height` per opening SiSy/P2O/P2Os = 105/106/108 · 189/190/192 · 221/222/224,
-  railing 0/1+1/1+1} · `nl_series` 260…620 · `availability` {NL→loads: 260→[30], 300–520→[30,50], 620→[50]; P2Os 10 kg len 260–350} · `min_depth` (NL×opening) tabuľka
+  `box_clearance 40`) · `height_variants` {H70/H144/H176: rear_height 65.5/144/176, `min_clear_height` per opening SiSy/P2O = 105/106 · 189/190 · 221/222 (P2Os vyhodené — rozhodnutie Michala 5.9.2026: len 2 typy otvárania),
+  railing 0/1+1/1+1} · `nl_series` 260…620 · `availability` {NL→loads: 260→[30], 300–520→[30,50], 620→[50]} · `min_depth` (NL×opening) tabuľka
   (260: 279 SiSy / 305 P2O; ≥300: NL+15; Quadro NL+13) · `thickness_supported` (Atira [16]; Quadro [16,18]) · `inner_supported: false` · `recipe_version`).
   Čisté funkcie: `Recipes.load(system)` (validácia schémy pri načítaní — chýbajúca tabuľka = odmietnutie celého packu, nikdy tichý default) ·
   `Recipes.resolve(ctx, classification, overrides)` → `{variant, nl, load, opening, parts[], hardware_params, conflicts[], explain}` (najvyšší variant, ktorého
@@ -289,7 +289,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   a listovou zónou), clear_depth (= interior back_front_y — v schéme pomenované `interior_depth`; porovnáva sa s vendor Mindest-Korpustiefe ako VNÚTORNÁ hĺbka —
   overiť v audite), side_thickness (KD), obstructions[] (shelf / divider_h / divider_v pretínajúce riadok)}`; **named test: 16 mm offset riadok-vs-interiér**.
   **Klasifikácia → kľúč receptu (audit 1 B3, záväzná mapa):** `drawer.construction metal → system atira` · `wood → quadro_v6_eb23` · `other → BEZ receptu` (legacy cesta, CONTENT-identická, žiadne
-  dielce, žiadne R2 potlačenie); `opening_mode classic → sisy` · `tipon → p2o` (**P2Os v V1 z klasifikácie nedosiahnuteľný** — dáta v packu ostávajú, os pribudne v KOV-D); `variant internal` = tvrdý
+  dielce, žiadne R2 potlačenie); `opening_mode classic → sisy` · `tipon → p2o` (**P2Os (Push to open Silent) NEEXISTUJE v dátach ani v UI — rozhodnutie Michala 5.9.2026: pre výsuvy AJ závesy platia len 2 typy otvárania, Tip-On a tlmenie; tretí variant sa nerieši**); `variant internal` = tvrdý
   conflict `drawer_internal_unsupported`; `runner_variant` z KD korpusu (`eb_by_kd`), piny `mounting: slide_on`, `rear_type: wooden`; čiastočná klasifikácia = bez receptu + ORANGE `drawer_unclassified`;
   dormant drawer polia na dvierkach sa ignorujú. Kľúč receptu sa **persistuje per čelo** `drawer.recipe = {system, runner_variant, mounting, rear_type, recipe_version}` (C2a, CONFIG_SCHEMA 5).
   **Projektový snapshot receptov (audit 1 B4 — fail-closed, NIE zrkadlo `ensure_project_rules!`):** kľúč `drawer_recipes` v NOXUN dict modelu `{std, recipe_version, systems}`; snapshot má
@@ -326,7 +326,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   HTML disabled nie je ochrana); charakterizačný test „jedno zásuvkové čelo → presne jedna slide položka s množstvom 1"; **kompatibilita setu (audit 1 B1):** vybraný set sa overí proti VŠETKÝM
   rozhodujúcim osiam receptu (`system`, `height_variant`, `nominal_length`, `load`, `opening`) cez klasifikáciu setu a členov — neoveriteľný/nesúhlasný = ORANGE `set_incompatible` + tvrdá nákupná
   brána (plné ovládanie výberu = KOV-D); **sync tyč P2O (audit 1 B6):** s prvou aktiváciou receptu P2O detekcia povinnej súčasti (`extras.sync_shaft.trigger`: šírka > `sync_rod_min_width` AND
-  opening ∈ {p2o, p2os}) + RED `drawer_sync_rod_missing` s tvrdou nákupnou bránou, kým položka nie je v nákupe (dĺžka a oceňovanie = KOV-D, R-06a);
+  opening = p2o) + RED `drawer_sync_rod_missing` s tvrdou nákupnou bránou, kým položka nie je v nákupe (dĺžka a oceňovanie = KOV-D, R-06a);
   (d) **fail-closed**: `conflicts[]` neprázdne → ŽIADNE odvodené dielce, ŽIADNA slide položka; do `hardware_issues` (kľúč z KOV-A) RED s presným dôvodom; **jeden register `DRAWER_BLOCKERS`**
   (`drawer_no_fit` · `drawer_thickness_unsupported` · `drawer_obstruction` · `drawer_internal_unsupported` · `nl_lock_invalid` · `drawer_override_disabled` · `drawer_recipes_invalid` ·
   `set_incompatible` · `drawer_sync_rod_missing`), ktorý `export_blockers` číta CELÝ (HW CSV + rozpočet + CP; VEPO nie — výnimka platí len pre drawer konflikty v podporovanej verzii, nie pre novší
@@ -336,7 +336,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   zatiaľ expanduje cez dnešné mapovanie `slide` (set podľa NL — code_by_nl); **per-height sety a výber podľa klasifikácie = KOV-D** (do vtedy: ak set nemá kód pre
   NL/variant → ORANGE `nl_missing` ako dnes, nikdy tichá zámena).
   **Scope OUT:** per-height sety/selector a defaulty podľa klasifikácie (D) · zámky UI a zmena osí (D — v C platia len existujúce `nominal_length` overridy po migrácii) ·
-  „Doplniť nové recepty" UI (D) · Antaro/Strong/TANDEM (dáta pripravené) · vnútorné zásuvky (len klasifikácia + RED) · sync tyč P2O: dĺžková položka a oceňovanie (KOV-D, R-06a; detekcia + brána = C2b) · P2Os os (D) ·
+  „Doplniť nové recepty" UI (D) · Antaro/Strong/TANDEM (dáta pripravené) · vnútorné zásuvky (len klasifikácia + RED) · sync tyč P2O: dĺžková položka a oceňovanie (KOV-D, R-06a; detekcia + brána = C2b) ·
   editor receptov · dokonalý kolízny solver (obstruction z listovej zóny + police/priečky stačí; atyp = vizuálna kontrola, #09).
   **Audit: kolo 1 HOTOVÉ (Astra 5.9.), kolo 2 ČAKÁ** (nový modul + data pack, plan_schema/ROLES, CONFIG_SCHEMA 5, snapshot kľúč na modeli, hardware kontrakt, brány). **In-SU POVINNÉ** (buildery, plán↔model, undo).
   **Testy a DoD C2b:** headless — plán s odvodenými dielcami (PLNE zadané fixtúry, audit 1 F7: Atira 900×720×500, KD 18, naložený chrbát, čelo 175 → H70, NL470: dno 791,5×480, chrbát 780×65,5; Quadro 900 → SKW 854 = LB − 46, SKL = NL), 4. kanál (UNI

@@ -10,6 +10,8 @@
 
 ## 0. Rozhodnutia Michala po reconcile (2.9.2026)
 
+- **O4 (5.9.2026, KOV-C audit #18):** typy otvárania pre výsuvy AJ závesy sú LEN dva — **Tip-On (Push to open, P2O)** a **tlmenie (Silent System, SiSy)**;
+  vendor variant **P2Os (Push to open Silent) sa nerieši a z dát receptov sa vyhadzuje** (Michal: „ešte som sa s ním nestretol"). Klasifikácia `opening_mode classic|tipon` ostáva.
 - **O1 = a:** Neurčený smer dvierok = RED v Kontrole hneď; exportná brána AŽ s prvým výstupom, ktorý smer
   reálne nesie (D-95/výrobné zadanie). Tvrdé podmienky: ŽIADNY default ani heuristika smeru nikde v kóde
   (ani preview/overlay); legacy configy bez poľa sa negatujú; brána je pre-committed v AUDIT_REGISTER
