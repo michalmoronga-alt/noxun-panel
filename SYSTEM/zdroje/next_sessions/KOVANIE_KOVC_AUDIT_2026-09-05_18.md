@@ -132,3 +132,8 @@ zjednotenie (a pre kópiu doplnenie z packu len pri zhode digestu). (P1) Quadro 
 (P1) seed nemá kódy pre každú NL (Quadro 480, Atira H70/520) → `resolve` vráti `nl_candidates[]` zostupne a C2b vezme prvú objednateľnú (s `code_by_nl`); smoke prepísaný (Quadro 450, Atira 560 → ostáva 470).
 (P1) prepis `drawer.recipe` až po kontrole digestu toho istého systému voči snapshotu cieľa — nezhoda = `drawer_recipes_mismatch`, žiadny tichý rebase kópie.
 (P1) automatická migrácia na triednu tabuľku LEN pri nezmenenom seede; prispôsobený snapshot = `set_incompatible` + explicitne potvrdený merge.
+
+## Codex GH review PR #300 kolo 6 (5.9.2026, nad v10 `3482137`) — 2× P1, ZAPRACOVANÉ (verzia 11)
+
+(P1) `load` závisí od NL (620 → 50) → `resolve` vracia usporiadané dvojice `candidates[] = {nl, load}` a C2b potvrdí trojicu `(nl, load, set)` naraz cez triednu tabuľku + `code_by_nl`.
+(P1) C2b (e) ešte hovorilo „nákup cez generické `slide` mapovanie, výber podľa klasifikácie = KOV-D" → nákup ide cez set vybraný triednou tabuľkou; KOV-D = len UI a pásmové selektory.

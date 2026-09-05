@@ -388,8 +388,10 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   rieši VNÚTRI stavby PRED emisiou dielcov** (Codex #300 P1: `Construction.build_plan` po `Recipes.resolve` vyhľadá set **TOU ISTOU cestou výberu ako expanzia** —
   `HardwareSets.compatible_set_for(recipe, state, cabinet_overrides:)` cez `resolve_mapping_value` (owner/cabinet override má prednosť pred mapovaním projektu; Codex #300 kolo 2 P1) — a
   **overí aj člena — NL sa vyberá objednateľne** (Codex #300 kolo 5 P1: seed nemá kódy pre každú NL, napr. Quadro SiSy 350/400/450/500/550, Atira H70/520 prázdne): `Recipes.resolve` vráti
-  `nl_candidates[]` = všetky NL spĺňajúce hĺbku/otváranie/nosnosť ZOSTUPNE; C2b vezme PRVÚ, pre ktorú má mapovaný set `code_by_nl` kód (tá je `nl`; `explain` uvedie preskočené dlhšie NL
-  bez kódu); žiadna = `set_incompatible` (NIE downstream ORANGE `nl_missing`; Codex #300 kolo 2 P1);
+  `candidates[]` = usporiadané dvojice `{nl, load}` spĺňajúce hĺbku/otváranie (najdlhšia NL prvá; nosnosť podľa `loads_by_nl` — 620 len 50, inak 30 s alternatívou 50 pri
+  override/availability); C2b prechádza kandidátov cez triednu tabuľku (výška, `load`) A `code_by_nl` a **potvrdí trojicu `(nl, load, set)` naraz** (Codex #300 kolo 6 P1: `load` závisí od
+  NL, jeden vopred zvolený set by objednateľnú kombináciu preskočil; `explain` uvedie preskočených kandidátov); žiadna objednateľná = `set_incompatible` (NIE downstream ORANGE
+  `nl_missing`; Codex #300 kolo 2 P1);
   neoveriteľný/nesúhlasný/žiadny set/chýbajúci kód = conflict **RED `set_incompatible`** v `conflicts[]` → fail-closed: ŽIADNE dielce, ŽIADNA slide
   položka (invariant FINAL §0: owner bez resolved setu = tvrdý blocker; inak by dielce bez objednateľného kitu prišli do VEPO, ktoré brána nechráni); NL vnútri setu cez `code_by_nl` (plné
   ovládanie výberu = KOV-D); **sync tyč P2O (audit 1 B6, audit 2 #6 — strojová identita):** s prvou aktiváciou receptu P2O recept emituje pri splnenom triggeri
@@ -414,9 +416,9 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   novší
   config; audit 1 F11/B2) — prepočet ČERSTVÝ pri exporte cez **čistý preflight `Recipes.preflight(model)` nad projektovým snapshotom** (bez `ensure!`, zápisu či opravy modelu; dnešný zber číta len
   uložené `hardware`/`front_items`), hláška menuje zásuvku, dôvod, kam kliknúť; test „pri blockeri je cieľový priečinok prázdny";
-  (e) Inspector: karta zásuvky ukazuje resolved riadok + osi (read-only v C; zámky/prepínanie = KOV-D), Kontrola RED riadky s navigáciou; Nákup: slide položka
-  zatiaľ expanduje cez dnešné mapovanie `slide` (set podľa NL — code_by_nl); **per-height sety a výber podľa klasifikácie = KOV-D** (do vtedy: ak set nemá kód pre
-  NL/variant → ORANGE `nl_missing` ako dnes, nikdy tichá zámena).
+  (e) Inspector: karta zásuvky ukazuje resolved riadok + osi (read-only v C; zámky/prepínanie = KOV-D), Kontrola RED riadky s navigáciou; Nákup: slide položka expanduje cez set vybraný
+  TRIEDNOU TABUĽKOU v C2b (systém, otváranie, výška, `load`, člen `code_by_nl` — rovnaký výber ako pred emisiou, žiadny generický `slide` fallback pre zásuvky s receptom; Codex #300 kolo
+  6 P1); **KOV-D = len UI mapovania/defaulty a pásmové selektory** (nikdy tichá zámena; nemapovaná kombinácia je už pred emisiou `set_incompatible`).
   **Scope OUT:** per-height sety/selector a defaulty podľa klasifikácie (D) · zámky UI a zmena osí (D — v C platia len existujúce `nominal_length` overridy po migrácii) ·
   „Doplniť nové recepty" UI (D) · Antaro/Strong/TANDEM (dáta pripravené) · vnútorné zásuvky (len klasifikácia + RED) · sync tyč P2O: dĺžková položka a oceňovanie (KOV-D, R-06a; detekcia + brána = C2b) ·
   editor receptov · dokonalý kolízny solver (obstruction z listovej zóny + police/priečky stačí; atyp = vizuálna kontrola, #09).
