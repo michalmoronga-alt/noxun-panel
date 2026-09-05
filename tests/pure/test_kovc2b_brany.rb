@@ -11,8 +11,8 @@
 #   M4 klientsky payload prepise `recipe_refs` -> „serverove polia: forged payload…"
 require_relative '../helper' unless defined?(NxTest)
 
-# UI vrstva (brany exportov + dialog materialov) — headless nie je v require
-# zozname helpera, takze si ju sada pyta sama (vzor `test_kovc2a_kanal_sety.rb`).
+# UI vrstva (brany exportov + sablony) — headless nie je v require zozname
+# helpera, takze si ju sada pyta sama (vzor `test_kovc2a_kanal_sety.rb`).
 if NxTest.headless?
   require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core')
   require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'templates_dialog')
@@ -60,6 +60,10 @@ module NxC2bB
 
   def src(rel)
     File.read(File.join(NxTest::ROOT, 'noxun_engine', rel), encoding: 'UTF-8')
+  end
+
+  def src_ui(rel)
+    File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', rel), encoding: 'UTF-8')
   end
 
 end
@@ -617,3 +621,127 @@ NxTest.test('KOV-C2b: `drawer_material_id` prezije normalize -> config -> params
   NxTest.assert_equal(nil, c::CB.normalize('drawer_material_id' => '')[:drawer_material_id])
 end
 
+
+# ============================================================================
+# CODEX #304 (zredukovany PR) — OSIROTENY RUCNY ZASAH sa da zrusit
+# ============================================================================
+
+module NxC2bB
+  module_function
+
+  # Skrinka so zasuvkou a s legacy NL overridom (D-93 identita trojice).
+  def orphan_cfg(over = {})
+    front = { 'id' => 'F1', 'type' => 'drawer_front', 'mode' => 'fixed', 'height' => 175.0,
+              'opening_mode' => 'classic', 'drawer' => { 'construction' => 'metal' } }
+    CB.normalize({ 'width' => 900.0, 'height' => 720.0, 'depth' => 500.0,
+                   'fronts' => { 'items' => [front] } }.merge(over))
+  end
+
+  # Legacy zaznam `hardware_overrides` na zasuvkovom cele.
+  def slide_override(over = {})
+    [{ 'owner_part_key' => 'front:F1/panel', 'generic_type' => 'slide',
+       'rule_id' => 'vysuvy-nl-podla-hlbky' }.merge(over)]
+  end
+
+  # ULOZENY config po stavbe (to, z coho panel stavia payload Kovania).
+  def built_config(cfg)
+    plan = CN.build_plan(cfg, 'CAB-1')
+    stored = CB.cabinet_config(CB.apply_drawer_writes(CB.merge_final(cfg, plan), plan))
+    [JSON.parse(JSON.generate(stored)), plan]
+  end
+
+  # Presne to, co robi `Panel.hardware_overrides_payload` — klasifikator zije
+  # v `HardwareRules` (ciste, headless nacitatelne), panel uz len mapuje.
+  def orphan_rows(stored)
+    owners = Array(stored['drawer_conflicts']).map { |c| c['part_key'].to_s }
+    Array(stored['hardware_overrides']).map do |ov|
+      kind = E::HardwareRules.override_orphan_kind(ov, stored['hardware'], owners)
+      kind ? ov.merge('orphan' => true, 'orphan_kind' => kind) : ov
+    end
+  end
+end
+
+NxTest.test('Codex #304 P1: rucny POCET na zasuvke = osiroteny zaznam v payloade Kovania') do
+  c = NxC2bB
+  cfg = c.orphan_cfg('hardware_overrides' => c.slide_override('quantity' => 2))
+  stored, plan = c.built_config(cfg)
+  # Fail-closed: ZIADNA polozka vysuvu (ani receptova, ani legacy) — takze bez
+  # osiroteneho zoznamu by zaznam v paneli nemal kde byt.
+  NxTest.assert_equal('drawer_override_invalid', plan[:drawer_conflicts].first['code'])
+  NxTest.assert_equal([], plan[:hardware].select { |h| h['generic_type'] == 'slide' })
+
+  row = c.orphan_rows(stored).first
+  NxTest.assert_equal([true, 'invalid'], [row['orphan'], row['orphan_kind']],
+                      'zaznam MUSI byt v osirotenom zozname')
+  NxTest.assert_equal(['front:F1/panel', 'slide', 'vysuvy-nl-podla-hlbky'],
+                      [row['owner_part_key'], row['generic_type'], row['rule_id']],
+                      'identita trojice, ktorou ho panel resetuje')
+  # Hlaska konfliktu odkazuje PRESNE na ten riadok.
+  NxTest.assert(plan[:drawer_conflicts].first['message'].include?('neplatný ručný zásah'),
+                plan[:drawer_conflicts].first['message'])
+end
+
+NxTest.test('Codex #304 P1: RESET zaznamu odstrani konflikt (zelene)') do
+  c = NxC2bB
+  # Serverova akcia `reset` odstrani CELY zaznam — prestavba nad ocistenym
+  # configom uz konflikt nevyda a zasuvka dostane dielce aj vysuv.
+  after = c::CN.build_plan(c.orphan_cfg('hardware_overrides' => []), 'CAB-1')
+  NxTest.assert_equal([], Array(after[:drawer_conflicts]), after[:drawer_conflicts].inspect)
+  NxTest.assert_equal(1, after[:hardware].count { |h| h['generic_type'] == 'slide' },
+                      'zasuvka zase dostane svoj vysuv')
+  NxTest.assert_equal(2, after[:parts].count { |pd| pd[:material] == :drawer })
+  # Retaz „riadok -> serverova akcia -> zaznam prec" je kontrakt, nie nahoda.
+  js = c.src_ui(File.join('js', 'hardware.js'))
+  NxTest.assert(js.include?("onHwOrphanReset(this)"), 'riadok ponuka zrusenie')
+  NxTest.assert(js.include?("function onHwOrphanReset(btn){ hwSend(hwPayload(btn, { reset: true })); }"),
+                'a posiela EXISTUJUCU serverovu akciu `reset`')
+  NxTest.assert(js.include?("if (ov.orphan === true) return true;"),
+                'o osirotenosti rozhoduje SERVER')
+  act = c.src_ui(File.join('panel', 'actions_hardware.rb'))
+  NxTest.assert(act.include?("return [:all, nil, nil] if truthy?(data['reset'])"),
+                '`reset` zahadzuje CELY zaznam')
+  pay = c.src_ui(File.join('panel', 'payloads.rb'))
+  NxTest.assert(pay.include?("HardwareRules.override_orphan_kind(ov, items, owners)"),
+                'payload panela klasifikuje kazdy zaznam')
+end
+
+NxTest.test('Codex #304 P1: osiroteny je AJ `disabled` a AJ zamok NL mimo radu') do
+  c = NxC2bB
+  # (a) vypnuta polozka na zasuvke — `orphan_kind` je `disabled` (vypnutie je
+  #     silnejsi popis nez konflikt: naprava je „obnoviť", zaznam nic ine nenesie)
+  off = c.orphan_cfg('hardware_overrides' => c.slide_override('disabled' => true))
+  stored_off, plan_off = c.built_config(off)
+  NxTest.assert_equal('drawer_override_invalid', plan_off[:drawer_conflicts].first['code'])
+  row_off = c.orphan_rows(stored_off).first
+  NxTest.assert_equal([true, 'disabled'], [row_off['orphan'], row_off['orphan_kind']],
+                      'vypnuty zaznam sa v paneli objavi (doterajsie D-92 spravanie)')
+  # (b) zamok NL mimo radu (400 nie je v rade H70) — zaznam nesie LEN dlzku,
+  #     takze bez tejto vetvy by v paneli nebol vobec.
+  nl = c.orphan_cfg('hardware_overrides' => c.slide_override('nominal_length' => 400.0))
+  stored_nl, plan_nl = c.built_config(nl)
+  NxTest.assert_equal('nl_lock_invalid', plan_nl[:drawer_conflicts].first['code'])
+  row_nl = c.orphan_rows(stored_nl).first
+  NxTest.assert_equal([true, 'invalid'], [row_nl['orphan'], row_nl['orphan_kind']])
+  NxTest.assert(plan_nl[:drawer_conflicts].first['message'].include?('neplatný ručný zásah'))
+end
+
+NxTest.test('Codex #304 P1: bezny rucny zasah osiroteny NIE JE') do
+  c = NxC2bB
+  # Zamok 420 je V RADE — polozka vznikne, zaznam sa kresli PRI nej.
+  cfg = c.orphan_cfg('hardware_overrides' => c.slide_override('nominal_length' => 420.0))
+  stored, plan = c.built_config(cfg)
+  NxTest.assert_equal([], Array(plan[:drawer_conflicts]))
+  row = c.orphan_rows(stored).first
+  NxTest.refute(row.key?('orphan'), 'zaznam so zivou polozkou do zoznamu NEPATRI')
+  # D-92 spravanie ostava: `disabled` bez polozky je `disabled`, nie `invalid`.
+  hr = c::E::HardwareRules
+  legacy = { 'owner_part_key' => 'front:F9/wing:single', 'generic_type' => 'hinge',
+             'rule_id' => 'zavesy', 'disabled' => true }
+  NxTest.assert_equal('disabled', hr.override_orphan_kind(legacy, [], []))
+  NxTest.assert_equal(nil, hr.override_orphan_kind(legacy, [legacy], []),
+                      'so zivou polozkou to osiroteny zaznam nie je')
+  NxTest.assert_equal(nil, hr.override_orphan_kind({ 'owner_part_key' => 'front:F9/panel',
+                                                     'generic_type' => 'slide',
+                                                     'rule_id' => 'x', 'quantity' => 3 }, [], []),
+                      'rucny pocet BEZ konfliktu nie je osiroteny (legacy spravanie)')
+end

@@ -388,7 +388,8 @@ module Noxun
             reason = in_series ? "potrebuje hĺbku #{fmt(min_depth(recipe, lock))} mm (svetlá #{fmt(clear_d)} mm)" : 'nie je v rade tejto výšky'
             return fail_with(out, 'nl_lock_invalid',
                              "#{label(recipe)}: ručne zamknutá dĺžka #{fmt(lock)} mm #{reason} — " \
-                             'zámok sa nikdy nemení automaticky.')
+                             'zámok sa nikdy nemení automaticky. ' \
+                             'Inspector → Kovanie, riadok „neplatný ručný zásah" → Zrušiť.')
           end
           nl = lock
           out[:explain] << "NL: #{fmt(nl)} (ručný zámok)"

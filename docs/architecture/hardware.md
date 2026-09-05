@@ -18,6 +18,15 @@ s `output: 'slide'` sa na nich **nevyhodnocujú** — inak by zásuvka mala dva 
 warningom `legacy_slide_suppressed` na stavbu; Kontrola ho zámerne neukazuje (`Validation::BUILD_INFO_ONLY`) — používateľ nemá čo opravovať. Potlačenie platí aj vtedy,
 keď recept skončil **konfliktom** (fail-closed: čelo nedostane ani legacy výsuv).
 
+**KOV-C2b — OSIROTENÝ ručný zásah (Codex #304 P1).** Panel stavia editovateľné riadky Kovania z **emitovaných** položiek, takže záznam `hardware_overrides`, ku ktorému
+žiadna položka nevznikla, by nemal kde byť — a používateľ by ho nevedel zrušiť. Pri fail-closed zásuvke je to slepá ulička: `drawer_override_invalid` (ručný počet ≠ 1,
+vypnutie) aj `nl_lock_invalid` (zámok mimo radu) položku **nevydajú**, takže exporty ostanú zablokované, kým sa klasifikácia nevráti späť. Preto o osirotenosti rozhoduje
+**server**: `HardwareRules.override_orphan_kind(ov, items, conflict_owners)` je čistá funkcia, ktorá vráti `nil` (záznam má svoju položku), **`'disabled'`** (vypnutá
+kategória, D-92 — náprava „obnoviť") alebo **`'invalid'`** (vlastník je v uloženom `drawer_conflicts`, teda položka fail-closed nevznikla — náprava **zrušiť celý záznam**,
+lebo môže niesť počet aj zámok naraz). `Panel.hardware_overrides_payload` z nej robí `orphan`/`orphan_kind` v payloade, `hardware.js` filtruje **na `orphan`** (staré
+pravidlo „len `disabled`" ostáva len ako fallback pre payload bez kľúča) a riadok `invalid` volá **existujúcu** serverovú akciu `reset` — po nej prestavba konflikt
+už nevydá. Hlášky konfliktov na túto cestu odkazujú doslovne (`Construction::ORPHAN_HINT`), aby sa text riadku a text nálezu nemohli rozísť.
+
 **D-93 ručný NL výsuvu:** polia zásahu (`quantity` · `disabled` · `nominal_length`) sú NEZÁVISLÉ (zápis PO POLIACH, `disabled` ostatné polia nezahadzuje), **zámok = existencia poľa
 `nominal_length`**; `fit_series` emituje položku aj pri hĺbke pod minimom radu, ak zámok existuje (`rule_nominal_length` = hodnota automatu, nil = nevie) + ORANGE build warning
 `hardware_manual_no_fit`; SET validuje presnú zhodu s radom projektového snapshotu, uložená hodnota mimo radu sa NIKDY nemaže. Nákupné CSV bez zmeny — znamienko žije v sekcii Nákup

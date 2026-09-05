@@ -728,6 +728,39 @@ module Noxun
         override_nl(ov.key?('nominal_length') ? ov['nominal_length'] : ov[:nominal_length])
       end
 
+      # --- KOV-C2b: OSIROTENY rucny zasah (Codex #304 P1) ---------------------
+      #
+      # Panel stavia editovatelne riadky Kovania z EMITOVANYCH poloziek, takze
+      # zaznam `hardware_overrides`, ku ktoremu ziadna polozka nevznikla, by
+      # nemal kde byt — a pouzivatel by ho nevedel zrusit. Tato cista funkcia
+      # povie, ci a PRECO zaznam osirel; panel z nej robi riadok s akciou.
+      #
+      #   nil        — zaznam ma svoju polozku (kresli sa PRI nej)
+      #   'disabled' — vypnuta kategoria (D-92): naprava je „obnoviť"
+      #   'invalid'  — vlastnik je v ULOZENOM konflikte zasuvky, takze polozka
+      #                fail-closed NEVZNIKLA (rucny pocet != 1, vypnutie alebo
+      #                zamok NL mimo radu): naprava je ZRUSIT cely zaznam
+      #
+      # `items` = `config.hardware` (emitovane polozky), `conflict_owners` =
+      # `owner_part_key` ciel z `config.drawer_conflicts`.
+      def override_orphan_kind(ov, items, conflict_owners)
+        return nil unless ov.is_a?(Hash)
+
+        key = override_identity(ov)
+        return nil if Array(items).any? { |it| it.is_a?(Hash) && override_identity(it) == key }
+        return 'disabled' if ov['disabled'] == true || ov[:disabled] == true
+        return 'invalid' if Array(conflict_owners).map(&:to_s).include?(key[0])
+
+        nil
+      end
+
+      # Trojica (vlastnik, typ, pravidlo) — identita rucneho zasahu aj polozky.
+      def override_identity(rec)
+        [(rec['owner_part_key'] || rec[:owner_part_key]).to_s,
+         (rec['generic_type'] || rec[:generic_type]).to_s,
+         (rec['rule_id'] || rec[:rule_id]).to_s]
+      end
+
       def override_match?(ov, item)
         owner = ov.key?('owner_part_key') ? ov['owner_part_key'] : ov[:owner_part_key]
         owner = nil if owner.to_s.empty?

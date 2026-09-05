@@ -63,7 +63,11 @@
   Vhodnosť cieľovej dosky posudzuje **jeden** receptový predikát `Recipes.thickness_ok_for_any_system?` — číta ho selektor v Štúdiu aj „Nahradiť UNI…", inak by tá istá
   25 mm doska prešla jednou cestou a druhou nie. A migračná brána `drawer_stale` používa **ten istý** predikát „nie legacy" ako resolver (`Recipes.classified?`): čelo
   s **len** `opening_mode` alebo **len** `variant internal` je po prestavbe RED, takže pred ňou nesmie byť zelené.
-  **Testy:** 3079 headless (`test_kovc2b_dielce.rb` 25 · `test_kovc2b_brany.rb` 29 · 2 remap testy v `test_abs_remap.rb`), 89 JS sád, in-SU sekcia **`run_kovc2b`**
+  **Osirotený ručný zásah (kolo nad zredukovaným PR).** Panel stavia riadky Kovania z emitovaných položiek, takže po fail-closed konflikte zásuvky sa ručný zásah nemal kde
+  ukázať a používateľ ho nevedel zrušiť — exporty ostávali zablokované. O osirotenosti teraz rozhoduje SERVER (`HardwareRules.override_orphan_kind`): `disabled` = vypnutá
+  kategória („obnoviť", D-92), `invalid` = vlastník je v uloženom `drawer_conflicts` („zrušiť" = existujúca serverová akcia `reset`). Hlášky konfliktov odkazujú doslovne
+  na ten riadok (`Construction::ORPHAN_HINT`).
+  **Testy:** 3083 headless (`test_kovc2b_dielce.rb` 25 · `test_kovc2b_brany.rb` 33 · 2 remap testy v `test_abs_remap.rb`), 89 JS sád, in-SU sekcia **`run_kovc2b`**
   — **1786 PASS / 0 FAIL** (plán vs. model 1:1, prestavba bez duplicít, 1 krok Späť, prepnutie kov ↔ drevo a späť, kópia aj šablóna nesú pripnutý recept, plytká skrinka
   = žiadne dielce + RED + zastavený export s **prázdnym** priečinkom a neotvoreným pickerom).
   **Zostáva C2c:** karta zásuvky v Inspectore (systém · výška · NL · nosnosť · recept + `explain`), riadky Kontroly s navigáciou na čelo a labely v Nákupe.

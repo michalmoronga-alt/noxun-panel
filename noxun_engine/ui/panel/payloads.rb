@@ -331,16 +331,44 @@ module Noxun
         end
 
         # D-92: ludsky nazov vlastnika aj pri vypnutych kategoriach.
+        # D-92 + KOV-C2b (Codex #304 P1): OSIROTENE rucne zasahy. Panel stavia
+        # editovatelne riadky z EMITOVANYCH poloziek, takze zasah, ku ktoremu
+        # ziadna polozka nevznikla, by nemal ako zmiznut — pouzivatel by ho
+        # nevedel zrusit a exporty by ostali zablokovane.
+        #
+        # SERVER je autorita (JS uz nerozhoduje z `disabled`), lebo len tu je
+        # vidno OBE strany: emitovane polozky aj ulozene `drawer_conflicts`.
+        # Dva druhy:
+        #   `disabled` — vypnuta kategoria (D-92, doterajsie spravanie)
+        #   `invalid`  — celo so systemom skoncilo KONFLIKTOM, takze polozka
+        #                NEVZNIKLA (rucny pocet != 1, vypnutie alebo zamok NL
+        #                mimo radu na zasuvke z receptu). Riadok ponuka RESET
+        #                (odstranenie celeho zaznamu) — po nom prestavba
+        #                konflikt uz nevyda.
         def hardware_overrides_payload(cfg, overrides)
           fronts = payload_fronts(cfg)
+          items = cfg['hardware'].is_a?(Array) ? cfg['hardware'] : []
+          owners = drawer_conflict_owners(cfg)
           Array(overrides).map do |ov|
             next ov unless ov.is_a?(Hash)
 
-            ov.merge('owner_label' => PartKeys.human_label(ov['owner_part_key'], fronts: fronts))
+            row = ov.merge('owner_label' => PartKeys.human_label(ov['owner_part_key'], fronts: fronts))
+            kind = HardwareRules.override_orphan_kind(ov, items, owners)
+            kind ? row.merge('orphan' => true, 'orphan_kind' => kind) : row
           end
         rescue StandardError => e
           Engine.log_error(e, 'Panel.hardware_overrides_payload')
           overrides
+        end
+
+        # `owner_part_key` ciel, ktore skoncili fail-closed konfliktom zasuvky.
+        def drawer_conflict_owners(cfg)
+          Array(cfg['drawer_conflicts']).filter_map do |c|
+            next nil unless c.is_a?(Hash)
+
+            key = c['part_key'].to_s
+            key.empty? ? nil : key
+          end
         end
 
         # Resolved cela poslednej stavby — zdroj cisla „F2" (D-92).
