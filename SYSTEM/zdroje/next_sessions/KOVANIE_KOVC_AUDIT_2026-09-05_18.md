@@ -111,3 +111,10 @@ snapshot použitých systémov; D-46 preflight per systém (Atira 16, Quadro 16/
 `set_incompatible`, nie downstream `nl_missing`. (P1) signatúra `Recipes.resolve` = plochá číselná výška (`height_variant` 70|144|176 / `box_height`). (P2) EPS: inkluzívny vendor limit
 porovnaný priamo s raw hodnotou (105,00 platí, 104,995 padá). (P2) zastarané „C2a, CONFIG_SCHEMA 5" odstránené. (P1) `drawer_recipes_mismatch`/`drawer_recipes_invalid` blokujú AJ VEPO
 (prestavba odmietnutá = stará geometria v modeli). (P1) `load` je súčasť výberu setu (KOV-D selektor + os `load`), nie len kontroly po výbere.
+
+## Codex GH review PR #300 kolo 3 (5.9.2026, nad v7 `3d6e703`) — 4× P1, ZAPRACOVANÉ (verzia 8)
+
+(P1) viacosový výber setu bez mechanizmu → mapovanie pre `class:slide|<opening>|<construction>` nesie explicitnú tabuľku `[{height_variant, load, set_id}]` (exact match), rozšírenie `parse_mapping`;
+KOV-D dodá UI/defaulty/pásma. (P1) sync tyč sa zisťovala až v expanzii po emisii → resolver s `capabilities.sync_shaft_purchasable = false` vráti `drawer_sync_rod_missing` PRED emisiou.
+(P1) zmena mapovania/override/setu nechávala staré dielce → handler atomicky prestaví dotknuté zásuvky (rollback pri zlyhaní) + safety net `Recipes.preflight` = RED `drawer_stale` blokuje VŠETKY
+exporty vrátane VEPO. (P1) legacy override konflikty bez kódu → `drawer_override_quantity`, `nl_lock_conflict` v registri.

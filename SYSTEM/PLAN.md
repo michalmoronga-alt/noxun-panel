@@ -360,8 +360,9 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   BuildPlan validácia, klasifikácia setu (`height_variant` číselné), overridy, KOV-D selektor cez `numeric_param`; reťazce „H70" len v UI/`explain`
   + **R2 exkluzivita**: `HardwareRules.evaluate` potlačí `fit_series`/slide pravidlá pre drawer-klasifikované čelá (build warning `legacy_slide_suppressed`
   info, len prvý raz per zákazka) + **migrácia D-93 zámkov**: `nominal_length` override s `rule_id vysuvy-nl-podla-hlbky` sa premapuje na `recipe:<system>`
-  identitu (ak NL v rade — inak conflict `nl_lock_invalid`, nikdy tiché zmiznutie); legacy override s `disabled` = conflict `drawer_override_disabled`, `quantity ≠ 1` = conflict, kolízia
-  legacy + recipe zámku = conflict, **zmena systému** (metal ↔ wood) = zámky s `rule_id recipe:<starý>` sa premapujú na `recipe:<nový>` ak je NL v novom rade, inak conflict
+  identitu (ak NL v rade — inak conflict `nl_lock_invalid`, nikdy tiché zmiznutie); legacy override s `disabled` = conflict `drawer_override_disabled`, `quantity ≠ 1` = conflict
+  `drawer_override_quantity`, kolízia legacy + recipe zámku = conflict `nl_lock_conflict` (oba kódy v `DRAWER_BLOCKERS`; Codex #300 kolo 3 P1), **zmena systému** (metal ↔ wood) = zámky s
+  `rule_id recipe:<starý>` sa premapujú na `recipe:<nový>` ak je NL v novom rade, inak conflict
   `nl_lock_invalid` (dnešný matcher hľadá presnú trojicu vrátane `rule_id` — premapovanie je explicitný krok migrácie; audit 2 #10); **server odmieta `quantity`/`disabled` mutácie pre
   `rule_id` `recipe:*`** (`actions_hardware.rb` — read-only os;
   HTML disabled nie je ochrana); charakterizačný test „jedno zásuvkové čelo → presne jedna slide položka s množstvom 1"; **kompatibilita setu (audit 1 B1, audit 2 #1 — sety dnes nesú len
@@ -369,7 +370,10 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   pri `use_type drawer` (seed KOV-B sety per výška × opening ich dostanú), `std` setov podľa obsahu ako KOV-B1; C2b overí set proti receptu: `drawer_construction` ↔ system (metal = atira,
   wood = quadro), `opening_mode` ↔ opening, `manufacturer` = Hettich, `series` ↔ system, Atira navyše `height_variant` a `load` — chýbajúca os na sete = NEOVERITEĽNÝ; **`load` je súčasť
   VÝBERU setu, nie len kontroly po výbere** (Codex #300 kolo 2 P1: jeden set per výška nevie pokryť 30 aj 50 kg — NL 620 vynúti 50): C2b vyberá set podľa (systém, otváranie,
-  `height_variant`, `load`), KOV-D selektor dostane popri výške aj os `load` (`numeric_param`); **kompatibilita sa
+  `height_variant`, `load`) cez **KONKRÉTNY viacosový mechanizmus (Codex #300 kolo 3 P1 — dnešný `resolve_mapping_value` vyberá jedno mapovanie a `resolve_set_id` má jediný číselný
+  selektor):** mapovanie projektu pre triedny kľúč `class:slide|<opening>|<construction>` (kanonický tvar z KOV-B1) nesie **explicitnú tabuľku** `[{height_variant, load, set_id}]` (exact
+  match, bez pásiem; Quadro `{load, set_id}`), rozšírenie `parse_mapping` s round-tripom a whitelistom; chýbajúci riadok = `set_incompatible`; KOV-D dodá UI/defaulty a selektor s pásmami
+  cez `numeric_param` (výška + `load`); **kompatibilita sa
   rieši VNÚTRI stavby PRED emisiou dielcov** (Codex #300 P1: `Construction.build_plan` po `Recipes.resolve` vyhľadá set **TOU ISTOU cestou výberu ako expanzia** —
   `HardwareSets.compatible_set_for(recipe, state, cabinet_overrides:)` cez `resolve_mapping_value` (owner/cabinet override má prednosť pred mapovaním projektu; Codex #300 kolo 2 P1) — a
   **overí aj člena**: set musí mať `code_by_nl` kód pre resolved NL (chýbajúci kód = `set_incompatible`, NIE downstream ORANGE `nl_missing`; Codex #300 kolo 2 P1);
@@ -379,13 +383,19 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   (`extras.sync_shaft.trigger`: šírka > `sync_rod_min_width` AND opening = p2o) DRUHÚ položku kovania v ÚPLNOM validnom tvare (audit 3 B4): `generic_type: sync_shaft` (**nová hodnota
   BuildPlan enumu**, `plan_schema` bump), `rule_id: recipe:<system>:sync_shaft`, `owner_part_key: front:<id>/panel`, `quantity: 1`, `rule_quantity: 1`, `production_class`/`manufactured`
   ako existujúce dĺžkové položky, `source: recipe`, `params {cut_length_mm}` cez `HardwareRules::LENGTH_PARAM` (vzorec `cut_formula_by_eb`; nákup ju musí brať ako DĹŽKOVÚ, nie kusovú);
-  **fail-closed až do KOV-D (audit 4 B1):** položka `sync_shaft` nemapovaná (žiadny set/člen) ALEBO mapovaná, ale expanziou odklonená ako `length_unsupported` (dnešný
-  `HardwareSets.expand` dĺžkovú položku bez `per: length` nákupne nematerializuje) = RED `drawer_sync_rod_missing` + tvrdá brána nákupu CSV/rozpočtu/CP (nikdy informatívna sekcia
-  NEMAPOVANÉ); plný režim `per: length` s cenou za meter a oceňovanie = KOV-D (R-06a) — dovtedy je široká P2O zásuvka vedome NEOBJEDNATEĽNÁ;
+  **fail-closed až do KOV-D (audit 4 B1, Codex #300 kolo 3 P1 — PRED emisiou):** kým nákup nevie dĺžkovú položku materializovať (`capabilities.sync_shaft_purchasable = false`, vstup
+  resolvera zo stavu projektu; dnešný `HardwareSets.expand` ju odkloní ako `length_unsupported`), resolver pri splnenom triggeri vráti conflict `drawer_sync_rod_missing` UŽ v
+  `conflicts[]` → fail-closed bez dielcov a položiek (VEPO výnimka platí, prestavba je fail-closed); po KOV-D (`per: length` s cenou) sa položka emituje a nemapovaná = RED + tvrdá brána
+  nákupu CSV/rozpočtu/CP (nikdy informatívna sekcia NEMAPOVANÉ); plný režim `per: length` s cenou za meter a oceňovanie = KOV-D (R-06a) — dovtedy je široká P2O zásuvka vedome
+  NEOBJEDNATEĽNÁ;
   (d) **fail-closed**: `conflicts[]` neprázdne → ŽIADNE odvodené dielce, ŽIADNA slide položka; do `hardware_issues` (kľúč z KOV-A) RED s presným dôvodom; **jeden register `DRAWER_BLOCKERS`**
   (`drawer_no_fit` · `drawer_thickness_unsupported` · `drawer_obstruction` · `drawer_internal_unsupported` · `nl_lock_invalid` · `drawer_override_disabled` · `drawer_recipes_invalid` ·
-  `set_incompatible` · `drawer_sync_rod_missing` · `drawer_recipes_mismatch` · `drawer_unclassified`), ktorý `export_blockers` číta CELÝ (test: každý kód registra zastaví všetky tri
-  blokované exporty; audit 3 B1) (HW CSV + rozpočet + CP; VEPO nie — výnimka platí LEN pre konflikty, ktoré dokončili fail-closed prestavbu (geometria bez dielcov);
+  `set_incompatible` · `drawer_sync_rod_missing` · `drawer_recipes_mismatch` · `drawer_unclassified` · `drawer_override_quantity` · `nl_lock_conflict` · `drawer_stale`), ktorý
+  `export_blockers` číta CELÝ (test: každý kód registra zastaví všetky tri blokované exporty; audit 3 B1); **zmena mapovania projektu / override skrinky / klasifikácie setu (Codex #300
+  kolo 3 P1):** handler (`set_project_mapping!`, cabinet override, `save_set!` pre referencovaný set) v TEJ ISTEJ operácii atomicky prestaví všetky dotknuté zásuvkové skrinky (zlyhanie =
+  rollback); **safety net:** `Recipes.preflight(model)` pri KAŽDOM exporte nanovo vyhodnotí kompatibilitu a resolve každej zásuvky proti AKTUÁLNEMU mapovaniu/setom/snapshotu a porovná s
+  uloženým `drawer.recipe`/stavbou — rozdiel = RED `drawer_stale` (hláška „prestav skrinku"), ktorý blokuje VŠETKY exporty vrátane VEPO (HW CSV + rozpočet + CP; VEPO nie — výnimka platí
+  LEN pre konflikty, ktoré dokončili fail-closed prestavbu (geometria bez dielcov);
   **`drawer_recipes_mismatch` a `drawer_recipes_invalid` BLOKUJÚ AJ VEPO** — prestavba je odmietnutá a v modeli ostáva stará, neoverená receptová geometria (Codex #300 kolo 2 P1); nie pre
   novší
   config; audit 1 F11/B2) — prepočet ČERSTVÝ pri exporte cez **čistý preflight `Recipes.preflight(model)` nad projektovým snapshotom** (bez `ensure!`, zápisu či opravy modelu; dnešný zber číta len
