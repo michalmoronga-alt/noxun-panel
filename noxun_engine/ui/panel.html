@@ -155,6 +155,10 @@
        kabinetové ovládače výšky (tie sú pri doske skryté) — vertikálny
        priestor panela je vzácny a pásik nesmie narásť o riadok. -->
   <span class="gbtxt gbori" id="gbOri" hidden></span>
+  <!-- GHOST-D2: FÁZA kreslenia (Počiatok · Dĺžka 2400 mm · Šírka 600 mm).
+       Stojí na mieste kotvových bodiek (tie sú pri kreslení skryté — počiatok
+       je pevná kotva), takže pásik nerastie o riadok. -->
+  <span class="gbtxt gbphase" id="gbPhase" hidden></span>
   <span class="gblock" id="gbLockWrap">
     <input id="gbLockZ" type="text" inputmode="decimal" aria-label="Výška zámku v mm"
            onchange="onGhostLockZ()"><span class="unit">mm</span>
@@ -333,9 +337,15 @@
     <!-- UI-C1b: PRIMARNA AKCIA je POSLEDNA (vzor mockupu) — az za rozmermi aj
          materialom. Ktore z dvoch tlacidiel je vidiet, rozhoduje data-insert-kind
          (CSS); obe idu TOU ISTOU validovanou cestou ako dvojklik na dlazdicu. -->
+    <!-- GHOST-D2: doska ma DVE akcie v JEDNOM riadku — „Vložiť" (ghost D1,
+         doska visi na kurzore a klik ju polozi) a „Nakresliť" (dva tahy na
+         rozmer). Vertikalny priestor panela nerastie; kazde tlacidlo ide
+         VLASTNYM serverovym callbackom. -->
     <div id="insertGoRow">
       <button class="primary wide" id="insertGoCab" onclick="insertCabinet()">Vložiť korpus</button>
       <button class="primary wide" id="insertGoBoard" onclick="insertBoard()">Vložiť dosku</button>
+      <button class="primary wide" id="insertDrawBoard" onclick="drawBoard()"
+              title="Nakresli dosku dvoma ťahmi: klik = počiatok, ťah dĺžky, ťah šírky (číslo + Enter funguje tiež)">Nakresliť</button>
     </div>
   </div>
 </details>

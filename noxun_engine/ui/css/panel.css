@@ -1197,6 +1197,11 @@
   .nx-inspector body.mode-insert #insertGoRow { display: block; }
   .nx-inspector body:not([data-insert-kind="board"]) #insertGoBoard { display: none; }
   .nx-inspector body[data-insert-kind="board"] #insertGoCab { display: none; }
+  /* GHOST-D2: doska ma DVE akcie — „Vložiť" a „Nakresliť" — v JEDNOM riadku
+     (vertikálny priestor panela nerastie). Pri korpuse „Nakresliť" nie je. */
+  .nx-inspector body:not([data-insert-kind="board"]) #insertDrawBoard { display: none; }
+  .nx-inspector body.mode-insert[data-insert-kind="board"] #insertGoRow { display: flex; gap: 6px; }
+  .nx-inspector body.mode-insert[data-insert-kind="board"] #insertGoRow .wide { flex: 1 1 0; width: auto; }
 
   /* --- GHOST-FB4: Ghost pasik (len pocas beziacej session) ----------------
      JEDEN riadok, ziadny nadpis a ziadna vlastna karta — vertikalny priestor
@@ -1220,6 +1225,10 @@
   .nx-inspector .gbdot { width: 7px; height: 7px; border-radius: 50%;
                          background: var(--nx-border-strong); }
   .nx-inspector .gbdot.on { background: var(--nx-select-strong); }
+  /* GHOST-D2: pri kreslení je počiatok PEVNÁ kotva, takže piktogram kotiev
+     zmizne a na jeho mieste stojí fáza. Trieda `.gbanchor` prebíja UA
+     pravidlo pre `[hidden]` (display: grid) — bez tohto by sa neschovala. */
+  .nx-inspector .gbanchor[hidden] { display: none; }
   /* GHOST-D1: doska z novšej verzie — read-only karta s vysvetlením. Riadok
      existuje LEN v tomto stave (`hidden`), takže bežná karta nerastie. */
   .nx-inspector .bcnewer { margin: 0 0 6px; padding: 5px 7px; border-radius: 6px;
