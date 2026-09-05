@@ -96,3 +96,11 @@ Kolo 3: **7/8 RESOLVED**, 1 PARTIAL (spotrebitelia `locked`). **1 BLOCKER:** C2b
 položky u spotrebiteľov (`note_manual`, payloady Nákupu/Inspectora), legacy `source manual` bez zmeny, test viditeľnosti migrovaného D-93 zámku. **3 NOTE (prijaté):** šablóna nesie CELÝ validný
 snapshot použitých systémov; D-46 preflight per systém (Atira 16, Quadro 16/18); názvy schémy packu podľa package, nie draftu. Auditné otázky potvrdené (clear_depth, rez C1 → C2a → C2b).
 **Priebeh auditu:** 14 → 6 nových (+6 partial/unresolved) → 8 nových (6 BLOCKER presnosti) → 2 nové (1 BLOCKER rozhodnutím) = **HOTOVÝ**. Package KOV-C v `SYSTEM/PLAN.md` = autorita; ďalej brief C1 → subagent.
+
+## Codex GH review PR #300 kolo 1 (5.9.2026, nad v5 `30b187c`) — 5× P1 + 2× P2, ZAPRACOVANÉ (verzia 6)
+
+(P1) `CONFIG_SCHEMA` 5 v C2a by nechalo C2a build ticho zahodiť C2b dielce/kovanie → bump 4 → 5 AŽ v C2b pri aktivácii + test downgrade C2b → C2a; C2a persistuje `drawer.recipe` tolerantne bez bumpu.
+(P1) `set_incompatible` sa vyhodnocovalo až v expanzii, po emisii dielcov → VEPO by dostalo dielce bez kitu → kompatibilita setu sa rieši v `build_plan` PRED emisiou (`compatible_set_for`), RED v `conflicts[]`, fail-closed.
+(P2) `sync_rod_min_width` chýbal v schéme → číselné pole v `extras.sync_shaft`, validované, v digeste. (P1) Quadro čísla: LB = 864 → SKW 818 (nie 854), hĺbka 500 → NL 480 (470 nie je v Quadro rade).
+(P2) `merge_recipes_seed!` musí prestavať dotknuté čelá a prepísať digesty v jednej operácii (rollback pri zlyhaní). (P1) `runner_variant` per systém: Atira `eb_by_kd`, Quadro pevné `eb23`.
+(P1) jeden kanonický strojový tvar výšky: číselné `height_variant` 70|144|176 (Atira) / `box_height` (Quadro) naprieč resolverom, BuildPlan, setmi, overridmi a KOV-D selektorom.
