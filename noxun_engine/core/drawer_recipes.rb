@@ -286,6 +286,16 @@ module Noxun
          'Zásuvka je klasifikovaná len spolovice — chýba konštrukcia alebo spôsob otvárania.']
       end
 
+      # Je celo KLASIFIKOVANE ako zasuvka (= resolver sa nan vztahuje)?
+      # JEDINY predikat — cita ho `recipe_key_for` aj migracna brana
+      # `Bom.drawer_stale_issue` (Codex #304 kolo 3 P1). Druhy, uzsi predikat
+      # (napr. „construction je metal|wood") by prepasoval CIASTOCNU
+      # klasifikaciu, ktora po prestavbe skonci `drawer_unclassified`, a
+      # `variant internal`, ktora skonci `drawer_internal_unsupported`.
+      def classified?(front_item)
+        recipe_key_for(front_item).first != :legacy
+      end
+
       # --- resolve -------------------------------------------------------------
 
       # Jedna vyska + jedna NL + dielce + parametre polozky vysuvu.
@@ -468,6 +478,20 @@ module Noxun
       def thickness_ok_for_system?(system, mm, dir: DIR)
         th = supported_thicknesses(system, dir: dir)
         !th.empty? && th.any? { |v| same?(v, mm) }
+      end
+
+      # Prijme hrubku ASPON JEDEN vydany system? JEDINY predikat pre VSETKY
+      # cesty, ktorymi sa da nastavit material zasuviek (Codex #304 kolo 3 P2):
+      # selektor predvolby v Studiu (`MaterialsDialog`) aj hromadne „Nahradit
+      # UNI…" (`ru_project_target_issue`). Dva rozne predikaty by znamenali, ze
+      # ta ista doska prejde jednou cestou a druhou nie.
+      def thickness_ok_for_any_system?(mm, dir: DIR)
+        SYSTEMS.any? { |sys| thickness_ok_for_system?(sys, mm, dir: dir) }
+      end
+
+      # Vsetky hrubky, ktore pozna aspon jeden vydany system (do hlasok).
+      def all_supported_thicknesses(dir: DIR)
+        SYSTEMS.flat_map { |sys| supported_thicknesses(sys, dir: dir) }.uniq.sort
       end
 
       # Odporucanie synchronizacnej tyce (P2O nad prahom sirky). C1 hodnotu len

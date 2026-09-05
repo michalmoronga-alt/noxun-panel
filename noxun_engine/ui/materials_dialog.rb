@@ -1165,8 +1165,9 @@ module Noxun
         end
 
         # Prijme hrubku ASPON JEDEN vydany system? (brana novej predvolby)
+        # Predikat zije v `Recipes` — cita ho aj „Nahradit UNI…".
         def drawer_thickness_any_system?(have)
-          Recipes::SYSTEMS.any? { |sys| Recipes.thickness_ok_for_system?(sys, have) }
+          Recipes.thickness_ok_for_any_system?(have)
         end
 
         # „Atira (16 mm)" / „Atira (16 mm), Quadro V6 (16 alebo 18 mm)"
@@ -1178,8 +1179,7 @@ module Noxun
         end
 
         def drawer_reject_msg(have)
-          allowed = Recipes::SYSTEMS.flat_map { |sys| Recipes.supported_thicknesses(sys) }
-                                    .uniq.sort.map { |v| Materials.fmt_mm(v) }
+          allowed = Recipes.all_supported_thicknesses.map { |v| Materials.fmt_mm(v) }
           "Hrúbka #{Materials.fmt_mm(have)} mm sa nedá použiť na dielce zásuviek — " \
             "recepty poznajú #{allowed.join(' a ')} mm. Vyber inú dosku."
         end

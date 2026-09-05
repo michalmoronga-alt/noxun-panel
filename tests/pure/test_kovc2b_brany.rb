@@ -530,12 +530,22 @@ module NxC2bB
   module_function
 
   # Ulozeny config skrinky s danou schemou a (ne)klasifikovanou zasuvkou.
-  def stale_cfg(schema, construction)
-    drawer = construction ? { 'construction' => construction } : nil
-    item = { 'id' => 'F1', 'type' => 'drawer_front', 'height' => 175.0,
-             'opening_mode' => 'classic' }
-    item['drawer'] = drawer if drawer
-    { 'config_schema' => schema, 'front_items' => [item] }
+  # `over` = polia RESOLVED cela; LEGACY celo nesmie niest ZIADNE drawer pole
+  # (ani `opening_mode`) — presne to je hranica `Recipes.classified?`.
+  # Params skrinky tak, ako ich cita produkcia: normalize -> cabinet_config ->
+  # JSON (model) -> config_to_params.
+  def stored_params(over = {})
+    cfg = CB.normalize({ 'width' => 900.0, 'height' => 720.0, 'depth' => 500.0 }.merge(over))
+    CB.config_to_params(JSON.parse(JSON.generate(CB.cabinet_config(cfg))))
+  end
+
+  def stale_cfg(schema, construction, over = {})
+    item = { 'id' => 'F1', 'type' => 'drawer_front', 'height' => 175.0 }
+    if construction
+      item['opening_mode'] = 'classic'
+      item['drawer'] = { 'construction' => construction }
+    end
+    { 'config_schema' => schema, 'front_items' => [item.merge(over)] }
   end
 end
 
@@ -550,10 +560,34 @@ NxTest.test('Codex #304 P1: schema < 5 s klasifikovanou zasuvkou = RED `drawer_s
   NxTest.assert(c::E::Bom.drawer_stale_issue('CAB-1', 1, c.stale_cfg(0, 'wood')))
   # Schema 5 (uz prestavana) = ziadny nalez.
   NxTest.assert_equal(nil, c::E::Bom.drawer_stale_issue('CAB-1', 1, c.stale_cfg(5, 'metal')))
-  # NEKLASIFIKOVANA zasuvka na schéme 4 = ziadny nalez (legacy cesta je OK).
+  # LEGACY zasuvka na schéme 4 (ZIADNE drawer pole) = ziadny nalez.
   NxTest.assert_equal(nil, c::E::Bom.drawer_stale_issue('CAB-1', 1, c.stale_cfg(4, nil)))
   NxTest.assert_equal(nil, c::E::Bom.drawer_stale_issue('CAB-1', 1, c.stale_cfg(4, 'other')),
                       'konstrukcia `other` ide legacy cestou aj po aktivacii')
+end
+
+NxTest.test('Codex #304 kolo 3 P1: CIASTOCNA klasifikacia na schéme 4 je tiez `drawer_stale`') do
+  c = NxC2bB
+  # LEN `opening_mode` (bez konstrukcie) — po prestavbe skonci `drawer_unclassified`,
+  # takze pred nou nesmie byt zelena.
+  half = c.stale_cfg(4, nil, 'opening_mode' => 'classic')
+  NxTest.assert_equal('drawer_stale', c::E::Bom.drawer_stale_issue('CAB-1', 1, half)&.dig('code'),
+                      'celo s polovicnou klasifikaciou branou prejst nesmie')
+  # LEN `variant internal` — po prestavbe `drawer_internal_unsupported`.
+  internal = c.stale_cfg(4, nil, 'drawer' => { 'variant' => 'internal' })
+  NxTest.assert_equal('drawer_stale',
+                      c::E::Bom.drawer_stale_issue('CAB-1', 1, internal)&.dig('code'),
+                      'vnutorna zasuvka branou prejst nesmie')
+  # Predikat je JEDEN — `Bom` aj `Recipes` hovoria to iste.
+  NxTest.assert(c::REC.classified?(half['front_items'].first))
+  NxTest.assert(c::REC.classified?(internal['front_items'].first))
+  NxTest.refute(c::REC.classified?(c.stale_cfg(4, nil)['front_items'].first))
+  NxTest.refute(c::REC.classified?(c.stale_cfg(4, 'other')['front_items'].first))
+  NxTest.refute(c::REC.classified?('id' => 'F2', 'type' => 'door'), 'dvierka nikdy')
+  # Po prestavbe (schema 5) su oba stavy zelene z pohladu MIGRACNEJ brany
+  # (vlastny RED uz dava resolver).
+  NxTest.assert_equal(nil, c::E::Bom.drawer_stale_issue('CAB-1', 1,
+                                                        half.merge('config_schema' => 5)))
 end
 
 NxTest.test('Codex #304 P1: `drawer_stale` je RED v Kontrole a blokuje VSETKY exporty') do
@@ -626,4 +660,76 @@ NxTest.test('Codex #304 P1: preflight predvolby zasuviek menuje SYSTEM aj skrink
   # Veta ponuky menuje system AJ povolene hrubky.
   txt = md.drawer_systems_txt(['atira'])
   NxTest.assert(txt.include?('Atira') && txt.include?('16'), txt)
+end
+
+# ============================================================================
+# CODEX #304 KOLO 3 — propagacia `drawer_material_id`
+# ============================================================================
+
+NxTest.test('Codex #304 kolo 3 P1: vkladaci stav nesie `drawer_material_id`') do
+  c = NxC2bB
+  js = c.src_ui(File.join('js', 'insert_state.js'))
+  # JS kanal (zrkadlo serveroveho `normalize`) musi poznat VSETKY styri kanaly.
+  NxTest.assert(js.include?("'drawer_material_id'"),
+                'MATERIAL_KEYS bez 4. kanala = vlozena skrinka spadne na projektovu predvolbu')
+  # Server: `normalize` kluc pozna, takze `build` z insert payloadu ho ulozi.
+  cfg = c::CB.normalize('width' => 900.0, 'height' => 720.0, 'depth' => 500.0,
+                        'drawer_material_id' => 'ZO_SABLONY_18')
+  NxTest.assert_equal('ZO_SABLONY_18', cfg[:drawer_material_id])
+  NxTest.assert_equal('ZO_SABLONY_18', c::CB.cabinet_config(cfg)[:drawer_material_id])
+  # A round-trip cez ULOZENY config (sablona -> vklad -> prestavba).
+  back = c::CB.normalize(c::CB.config_to_params(JSON.parse(JSON.generate(c::CB.cabinet_config(cfg)))))
+  NxTest.assert_equal('ZO_SABLONY_18', back[:drawer_material_id])
+  # Prazdna hodnota = dedi z projektu (ziadny tichy default).
+  NxTest.assert_equal(nil, c::CB.normalize('drawer_material_id' => '')[:drawer_material_id])
+end
+
+NxTest.test('Codex #304 kolo 3 P1: „Nahradiť UNI…" pozna 4. kanal') do
+  c = NxC2bB
+  ru = c::E::Materials
+  NxTest.assert_equal('drawer', ru::RU_CAB_KEYS['drawer_material_id'])
+  NxTest.assert_equal('default_drawer_material_id', ru.ru_project_key_for('drawer'))
+  # Skrinka s EXPLICITNYM materialom zasuviek na UNI + skrinka, ktora kanal DEDI.
+  uni = { 'material_id' => 'UNI_ZASUVKA_16', 'thickness' => 16.0, 'decor' => 'UNI' }
+  target = { 'material_id' => 'BIELA_16', 'thickness' => 16.0, 'decor' => 'Biela' }
+  # `cabinet_config` vracia SYMBOLOVE kluce; do modelu ide cez JSON, takze
+  # `config_to_params` (a s nim cely `replace_uni`) cita STRINGY — round-trip
+  # je preto sucast testu, nie kozmetika.
+  explicit = c.stored_params('drawer_material_id' => 'UNI_ZASUVKA_16')
+  inherit = c.stored_params
+  eff_uni = { 'body' => 'K', 'front' => 'K', 'back' => 'K', 'drawer' => 'UNI_ZASUVKA_16' }
+  scan = { 'cabs' => [['CAB-1', explicit, eff_uni, '{}', :ref1],
+                      ['CAB-2', inherit, eff_uni, '{}', :ref2]],
+           'boards' => [], 'model_guid' => 'G',
+           'project' => { 'default_drawer_material_id' => 'UNI_ZASUVKA_16' } }
+  out = ru.replace_uni_classify(scan, uni, target)
+  NxTest.assert_equal({ 'default_drawer_material_id' => 'BIELA_16' }, out['project_writes'])
+  NxTest.assert_equal(%w[CAB-1 CAB-2], out['recompute'].sort,
+                      'explicitna AJ dediaca skrinka dostanu rebuild job')
+  NxTest.assert_equal('BIELA_16', explicit['drawer_material_id'], 'explicitny kluc sa prepisal')
+  NxTest.assert_equal([], out['blocked'], out['blocked'].inspect)
+end
+
+NxTest.test('Codex #304 kolo 3 P2: „Nahradiť UNI…" pouziva RECEPTOVY predikat') do
+  c = NxC2bB
+  ru = c::E::Materials
+  # 25 mm doskou sa dielce zasuviek nedaju vyrobit (Atira 16, Quadro 16/18) —
+  # ten isty predikat ako selektor v Studiu.
+  NxTest.assert_equal(:drawer, ru.ru_project_target_issue('default_drawer_material_id', 25.0))
+  NxTest.assert_equal(nil, ru.ru_project_target_issue('default_drawer_material_id', 16.0))
+  NxTest.assert_equal(nil, ru.ru_project_target_issue('default_drawer_material_id', 18.0))
+  NxTest.assert_equal(c::E::MaterialsDialog.drawer_thickness_any_system?(25.0),
+                      ru.ru_project_target_issue('default_drawer_material_id', 25.0).nil?,
+                      'JEDEN predikat pre obe cesty')
+  # A skrinka s dielcami zasuviek sa na taku dosku nenahradi (blokovana).
+  uni = { 'material_id' => 'UNI_ZASUVKA_16', 'thickness' => 16.0, 'decor' => 'UNI' }
+  fat = { 'material_id' => 'DOSKA_25', 'thickness' => 25.0, 'decor' => 'Hruba' }
+  params = c.stored_params('drawer_material_id' => 'UNI_ZASUVKA_16')
+  scan = { 'cabs' => [['CAB-1', params, { 'drawer' => 'UNI_ZASUVKA_16' }, '{}', :ref]],
+           'boards' => [], 'model_guid' => 'G', 'project' => {} }
+  out = ru.replace_uni_classify(scan, uni, fat)
+  NxTest.assert_equal([], out['jobs_cab'], 'ziadny job')
+  NxTest.assert_equal(:drawer, out['blocked'].first && out['blocked'].first[1])
+  NxTest.assert(ru.ru_blocked_line('CAB-1', :drawer, []).include?('zásuviek'),
+                ru.ru_blocked_line('CAB-1', :drawer, []))
 end

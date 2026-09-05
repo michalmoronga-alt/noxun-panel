@@ -55,7 +55,13 @@
   boky s rôznym materiálom sú **fail-closed** `drawer_thickness_unsupported` („boky zásuvky musia mať rovnakú hrúbku") a kontrolujú sa len roly, ktoré recept naozaj
   emituje (dormantný `box_side` override na Atire falošný konflikt nerobí). (2) Zmena predvoľby **zásuviek** prebieha tou istou remap slučkou ABS ako telo/čelá/chrbát —
   `old_eff`/`new_eff` dostali kľúč `drawer`, bez neho by drawer roly spadli v `base_material_for` do vetvy tela.
-  **Testy:** 3080 headless (+57: `test_kovc2b_dielce.rb` 25 · `test_kovc2b_brany.rb` 30 · 2 remap testy v `test_abs_remap.rb`), 89 JS sád, in-SU sekcia **`run_kovc2b`**
+  **Codex kolo 3 (3 P1 + 1 P2) uzavrelo propagáciu nového kľúča.** `drawer_material_id` musí cestovať **všetkými** cestami materiálu — pribudol do **vkladacej karty**
+  (`NXInsert.MATERIAL_KEYS`; bez neho vložená skrinka spadla na projektovú predvoľbu, teda na inú hrúbku, a ticho) a do **„Nahradiť UNI…"** (`RU_CAB_KEYS` +
+  `ru_project_key_for`; bez neho hromadná náhrada `UNI_ZASUVKA_16` nevytvorila rebuild joby pre skrinky, ktoré kanál dedia, takže snapshoty dielcov ostali na UNI).
+  Vhodnosť cieľovej dosky posudzuje **jeden** receptový predikát `Recipes.thickness_ok_for_any_system?` — číta ho selektor v Štúdiu aj „Nahradiť UNI…", inak by tá istá
+  25 mm doska prešla jednou cestou a druhou nie. A migračná brána `drawer_stale` používa **ten istý** predikát „nie legacy" ako resolver (`Recipes.classified?`): čelo
+  s **len** `opening_mode` alebo **len** `variant internal` je po prestavbe RED, takže pred ňou nesmie byť zelené.
+  **Testy:** 3084 headless (+61: `test_kovc2b_dielce.rb` 25 · `test_kovc2b_brany.rb` 34 · 2 remap testy v `test_abs_remap.rb`), 89 JS sád, in-SU sekcia **`run_kovc2b`**
   — **1786 PASS / 0 FAIL** (plán vs. model 1:1, prestavba bez duplicít, 1 krok Späť, prepnutie kov ↔ drevo a späť, kópia aj šablóna nesú pripnutý recept, plytká skrinka
   = žiadne dielce + RED + zastavený export s **prázdnym** priečinkom a neotvoreným pickerom).
   **Zostáva C2c:** karta zásuvky v Inspectore (systém · výška · NL · nosnosť · recept + `explain`), riadky Kontroly s navigáciou na čelo a labely v Nákupe.

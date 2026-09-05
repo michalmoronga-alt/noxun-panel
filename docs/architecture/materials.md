@@ -33,6 +33,16 @@ hrúbky (16 a 18). Keď dosku niektorý systém prijme, ale zákazka používa s
 uloží **až po potvrdení** (`offer_drawer_change` — ten istý pending kontrakt a tá istá lišta ako D-46, líši sa len veta: menuje systém, jeho povolené hrúbky a počet skriniek).
 Zdrojom čísel je `Recipes.supported_thicknesses` ([hardware.md](hardware.md)), nikdy konštanta v UI.
 
+**Kľúč `drawer_material_id` musí cestovať VŠETKÝMI cestami materiálu** (Codex #304 kolo 3). Sú štyri a každá je vlastný kanál: **normalize/config** (`CabinetBuilder`),
+**šablóna** (`template_config_from` + `merge_template` preserve-or-override), **vkladacia karta** (`NXInsert.MATERIAL_KEYS` v `ui/js/insert_state.js` → insert payload →
+`build`/`normalize`; bez neho vložená skrinka spadne na projektovú predvoľbu, teda na inú hrúbku — a ticho) a **„Nahradiť UNI…"** (`Materials::RU_CAB_KEYS` +
+`ru_project_key_for`; bez neho by hromadná náhrada `UNI_ZASUVKA_16` nevytvorila rebuild joby pre skrinky, ktoré kanál dedia, a snapshoty dielcov by ostali na UNI).
+Piata cesta je **delete guard** (`CABINET_MATERIAL_KEYS`). Nový materiálový kanál = pridať do všetkých piatich.
+
+**Jeden receptový predikát pre všetky cesty.** `Recipes.thickness_ok_for_any_system?` (a `all_supported_thicknesses` do hlášok) číta **selektor predvoľby v Štúdiu** aj
+**„Nahradiť UNI…"** (`ru_project_target_issue`, dôvod `:drawer`) — dva rôzne predikáty by znamenali, že tá istá 25 mm doska prejde jednou cestou a druhou nie. Náhrada
+UNI na dosku, ktorú nepozná ani jeden vydaný systém, je **blokovaná** aj na úrovni skrinky (rola `drawer` v `roles_now`), nielen projektovej predvoľby.
+
 **Remap ABS platí aj pre 4. kanál** (Codex #304 kolo 2 P2). Zmena predvoľby zásuviek prebehne tou istou slučkou `remap_part_edge_overrides!` ako telo/čelá/chrbát: ručný
 override zladený so **starým** efektívnym dekorom nasleduje nový, vedome kontrastný alebo `nil` ostáva. K tomu bolo treba, aby `old_eff`/`new_eff` niesli aj kľúč `drawer`
 — `base_material_for` bez neho spadne pri drawer rolách do vetvy tela, takže remap by dielce zásuviek buď prehliadol, alebo ich zladil s dekorom korpusu.

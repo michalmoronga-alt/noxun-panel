@@ -353,9 +353,15 @@ module Noxun
       # v modeli dielce zasuvky ani receptovy vysuv — a nikto by to nezbadal.
       # Naprava je PRESTAVBA (vtedy sa zapise schema 5 a resolver dobehne).
       # Konstrukcia `other` ani celo bez klasifikacie nalez NEROBIA (legacy cesta
-      # je CONTENT-identicka aj po aktivacii). -> nalez | nil
-      CLASSIFIED_DRAWER_CONSTRUCTIONS = %w[metal wood].freeze
-
+      # je CONTENT-identicka aj po aktivacii).
+      #
+      # Codex #304 kolo 3 P1: „klasifikovana" znamena PRESNE to, co `Recipes`
+      # (`classified?` = `recipe_key_for` nevratila `:legacy`) — teda AKEKOLVEK
+      # drawer pole, nie len `construction metal|wood`. Vlastny uzsi predikat by
+      # prepasoval celo s LEN `opening_mode` (po prestavbe `drawer_unclassified`)
+      # aj celo s LEN `variant internal` (po prestavbe `drawer_internal_
+      # unsupported`) — obe by po prestavbe boli RED, takze pred nou nesmu byt
+      # zelene. -> nalez | nil
       def drawer_stale_issue(owner_id, owner_pid, ccfg)
         return nil unless defined?(CabinetBuilder) && defined?(Recipes)
 
@@ -363,12 +369,7 @@ module Noxun
         return nil if CabinetBuilder.config_schema_of(cfg) >= CabinetBuilder::DRAWER_ACTIVATION_SCHEMA
 
         items = cfg['front_items'].is_a?(Array) ? cfg['front_items'] : []
-        hit = items.find do |it|
-          next false unless it.is_a?(Hash) && it['type'].to_s == 'drawer_front'
-
-          d = it['drawer']
-          d.is_a?(Hash) && CLASSIFIED_DRAWER_CONSTRUCTIONS.include?(d['construction'].to_s)
-        end
+        hit = items.find { |it| it.is_a?(Hash) && Recipes.classified?(it) }
         return nil if hit.nil?
 
         pkey = PartKeys.front(hit['id'].to_s, 'panel')

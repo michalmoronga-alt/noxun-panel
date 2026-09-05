@@ -339,7 +339,9 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   v nákupe, register `DRAWER_BLOCKERS` v `export_blockers` (`drawer_stop`, VEPO len na kit), uložený nosič `drawer_conflicts`, ORANGE `drawer_sync_recommended`,
   `CONFIG_SCHEMA` 4 → 5 a `plan_schema` 3 → 4, `recipe_refs`/`system` ako SERVEROVÉ polia. **Po Codex kole 1 pribudlo:** riadok „Zásuvky" v predvoľbách projektu Štúdia
   + `MaterialsDialog::TARGETS` s **preflightom per systém** (Atira 16, Quadro 16/18 — pôvodne plánované na C2c) a **11. kód registra `drawer_stale`** = MIGRAČNÝ:
-  projekt uložený pred aktiváciou receptov, ktorý už má klasifikovanú zásuvku, je RED a blokuje VŠETKY exporty (vrátane VEPO), kým sa skrinka neprestaví. **Vedomé odchýlky:** (1) `Fronts.norm_drawer` NEOVERUJE, či je ref registrovaný —
+  projekt uložený pred aktiváciou receptov, ktorý už má klasifikovanú zásuvku (**akékoľvek** drawer pole — predikát `Recipes.classified?`), je RED a blokuje VŠETKY exporty
+  (vrátane VEPO), kým sa skrinka neprestaví. **Po kole 2 a 3:** hrúbky bokov Quadro sa čítajú pod oboma emitovanými kľúčmi (rôzne = fail-closed), remap ABS platí aj pre
+  4. kanál a `drawer_material_id` cestuje vkladacou kartou aj „Nahradiť UNI…" (jeden receptový predikát pre selektor v Štúdiu aj pre náhradu UNI). **Vedomé odchýlky:** (1) `Fronts.norm_drawer` NEOVERUJE, či je ref registrovaný —
   robí to až `Recipes.active_ref` pri stavbe (inak by stav `drawer_recipe_unknown` bol mŕtvy a starší plugin by ticho pripol iný recept); (2) server-only sú OBE polia
   (`recipe_refs` aj `system`) — panel ich v C2b ani neposiela a server `system` deterministicky odvodí z konštrukcie; (3) dielce zásuviek nenesú `axes:` (farbenie ABS plôšok
   by pri stojacom dielci vyšlo na zlú hranu — PartFaces zásada „radšej žiadna farba"; farbenie = C2c/D); (4) povýšenie na `drawer_kit_missing` platí pre **každý** dôvod

@@ -119,8 +119,10 @@ odpad → blokuje **VŠETKY štyri exporty VRÁTANE VEPO**.
 **Tretia položka registra je MIGRAČNÁ: `drawer_stale`.** Projekt uložený **pred** aktiváciou receptov (`config_schema` < `CabinetBuilder::DRAWER_ACTIVATION_SCHEMA` = 5),
 ktorý už má klasifikovanú zásuvku (`construction` metal/wood v `front_items`), nemá v .skp receptové dielce a nesie legacy výsuv — kusovník, VEPO aj nákup by boli neúplné
 a **ticho**. `Bom.collect` ho preto priznáva RED nálezom (`drawer_stale_issue`) a brána zastaví **všetky štyri** výstupy. Nápravu robí **prestavba** skrinky (vtedy sa zapíše
-schéma 5 a resolver dobehne) — kód sa preto nikde nezapisuje do modelu, žije len ako čítanie stavu. Konštrukcia `other` ani čelo bez klasifikácie nález nerobia (legacy cesta
-je CONTENT-identická aj po aktivácii).
+schéma 5 a resolver dobehne) — kód sa preto nikde nezapisuje do modelu, žije len ako čítanie stavu. „Klasifikovaná" znamená **presne to isté, čo pre resolver** — `Recipes.classified?` (t. j. `recipe_key_for` nevrátila `:legacy`), teda **akékoľvek** drawer pole, nielen
+`construction metal|wood`. Vlastný užší predikát by prepustil čelo s **len** `opening_mode` (po prestavbe `drawer_unclassified`) aj čelo s **len** `variant internal`
+(po prestavbe `drawer_internal_unsupported`) — obe sú po prestavbe RED, takže pred ňou nesmú byť zelené (Codex #304 kolo 3 P1). Konštrukcia `other` ani čelo bez
+jediného drawer poľa nález nerobia (legacy cesta je CONTENT-identická aj po aktivácii).
 
 Skladá to `drawer_blockers(collected, expansion, scope:)`: `scope: :all` číta z `hardware_issues` konflikty stavby **aj** `ALL_EXPORT_BLOCKERS` (uložený nosič
 `drawer_conflicts` a `drawer_stale`, nižšie) a k tomu kit z expanzie; `scope: :kit` (VEPO) číta z nálezov len `ALL_EXPORT_BLOCKERS` a kit. Poradie dôvodov určuje register (deterministicky, bez ohľadu na poradie zberu) a text stavia
