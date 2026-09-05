@@ -125,3 +125,10 @@ exporty vrátane VEPO. (P1) legacy override konflikty bez kódu → `drawer_over
 existujúcich projektov pri prvej prestavbe. (P1) rozpor „drawer_stale blokuje VEPO … VEPO nie" → `drawer_stale` blokuje VŠETKY exporty vrátane VEPO; výnimka len pre dokončené fail-closed prestavby.
 (P1) `save_set!` globálneho setu projekt neprestavuje (zmrazený snapshot, reprodukovateľnosť); atomická prestavba len pri zmene stavu modelu. (P1) cieľový snapshot bez systému šablóny = atomické
 zjednotenie (a pre kópiu doplnenie z packu len pri zhode digestu). (P1) Quadro `t` v `box_h − t − 12` = hrúbka DNA; fixtúra zmiešaných hrúbok.
+
+## Codex GH review PR #300 kolo 5 (5.9.2026, nad v9 `be46077`) — 4× P1, ZAPRACOVANÉ (verzia 10)
+
+(P1) triedny kľúč sa skladá z klasifikačného slovníka `classic|tipon` (prevod `sisy → classic`, `p2o → tipon` explicitný), nie z receptového `sisy|p2o` (parser by ho neprijal).
+(P1) seed nemá kódy pre každú NL (Quadro 480, Atira H70/520) → `resolve` vráti `nl_candidates[]` zostupne a C2b vezme prvú objednateľnú (s `code_by_nl`); smoke prepísaný (Quadro 450, Atira 560 → ostáva 470).
+(P1) prepis `drawer.recipe` až po kontrole digestu toho istého systému voči snapshotu cieľa — nezhoda = `drawer_recipes_mismatch`, žiadny tichý rebase kópie.
+(P1) automatická migrácia na triednu tabuľku LEN pri nezmenenom seede; prispôsobený snapshot = `set_incompatible` + explicitne potvrdený merge.
