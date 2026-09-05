@@ -81,3 +81,15 @@ Prompt: adversarial review package v2 s explicitnou úlohou pri každom náleze 
 | P2 | Draft #13 §0 stále nesie tvar v13 (`runner_variants`, KD→EB, `orderable`, SiSy+P2O v jednom). | PRIJATÉ: §0 označená HISTORICKÁ s odkazom na kanonickú schému v PLAN; hodnoty §1–§2 platia. | draft #13 |
 
 Žiadny nález nevracia mechanizmus v13. P1 v kole 1 → opravy + nové plné GH kolo (`@codex review`) podľa pravidla delta-verifikácie.
+
+## 6. GH Codex kolo 2 nad PR #301 (commit `5f6aff2`, 5.9. 13:27 UTC) — 3 P1 + 2 P2, reconcile
+
+| # | Nález | Rozhodnutie | Kam |
+|---|---|---|---|
+| P1 | Súrodenec rovnakej verzie nestačí: systém, ktorý má len v2, uloží v2 a návrat k Atire nájde v2 súrodenca → tichý upgrade. | PRIJATÉ: `drawer.recipe_refs` = mapa systém|otváranie → recipe_id (namiesto jediného ref); návrat k skôr použitej kombinácii vráti pôvodný záznam; súrodenec/latest len pre NOVÚ kombináciu. | KOV-C C1 |
+| P1 | Owner-level selektor nemá reprezentovateľný kľúč (`class:…@owner` parser odmieta, `slide@owner` je zakázaný fallback). | PRIJATÉ: v C precedencia LEN cabinet override (triedny kľúč v `hardware_sets` configu) → projekt; owner-level `slide@…` sa pre receptové položky ignoruje; owner-scoped tvar = audit KOV-D. | KOV-C C2 (d); KOV-D (c) |
+| P1 | Oba merge ponechávajú existujúcu definíciu `vysuv-atira-biela-h70` bez klasifikácie → kompatibilita by padla. | PRIJATÉ: seed používa NOVÉ klasifikované set ID (`atira-biela-h70-sisy`, `-p2o` …), legacy set ostáva nedotknutý pre legacy mapovanie. | KOV-C C2 (d) |
+| P2 | Register SHA chráni len registrované súbory, neregistrovaný `_v2` by `latest_for` načítal. | PRIJATÉ: inventár `data/recipes/*.json` = množina registrovaných ID (test) + loader načíta výhradne registrované. | KOV-C C1 |
+| P2 | Package odkazuje na FINAL §3/§8, ktoré predpisujú snapshot, KD→EB a VEPO výnimku. | PRIJATÉ: poznámky PREKONANÉ/UPRESNENIE priamo v FINAL §3 a §8; PLAN odkazuje len na §4/§6. | FINAL, PLAN |
+
+Žiadny nález nevracia mechanizmus v13 (mapa refs je stále reťazce bez snapshotu/digestu). P1 → kolo 3 (`@codex review`); ak kolo 3 prinesie P1, platí pravidlo 3 kôl (rezať).
