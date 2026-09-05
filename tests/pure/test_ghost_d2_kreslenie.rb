@@ -318,6 +318,46 @@ NxTest.test('GHOST-D2 automat: Esc/zrusenie nechava session BEZ zapisu (terminal
   NxTest.refute(s.cancel!('Esc'), 'druhy cancel je no-op')
 end
 
+NxTest.test('GHOST-D2 peciatka: Esc v HOCIKTOREJ faze sablonu NEOPECIATKUJE') do
+  calls = 0
+  # Rozkreslena doska (pociatok + dlzka) — pouzivatel to vzda Esc-om.
+  s = NxGD2.session
+  s.begin_draw!([0.0, 0.0, 0.0])
+  s.confirm_draw!(:length, 2400.0)
+  NxTest.assert(s.cancel!('Esc'))
+  NxTest.assert_equal(0, calls, 'Esc peciatku NEZAPISE (volajuci pri zrusenej session nebezi)')
+  # A jedina cesta k peciatke je post-commit handler — nie start ani cancel.
+  ab = NxGD2.src('noxun_engine', 'ui', 'panel', 'actions_board.rb')
+  draw = ab[/def handle_draw_board\(payload\).*?\n        end\n/m].to_s
+  NxTest.refute(draw.include?('stamp'), 'start kreslenia peciatku NEZAPISUJE')
+  after = ab[/def ghost_after_commit_board\(model, inst, session\).*?\n        end\n/m].to_s
+  NxTest.assert(after.include?('session.stamp_once!'), 'peciatka az po USPESNOM commite')
+  # `stamp_once!` je aj tu presne raz.
+  s2 = NxGD2.session
+  NxTest.assert(s2.stamp_once! { calls += 1 })
+  NxTest.refute(s2.stamp_once! { calls += 1 }, 'druhy pokus je no-op')
+  NxTest.assert_equal(1, calls)
+end
+
+NxTest.test('GHOST-D2 bariera: `flush_pending! == false` vrati :blocked aj pri kresleni') do
+  s = NxGD2.session
+  s.begin_draw!([0.0, 0.0, 0.0])
+  s.confirm_draw!(:length, 2400.0)
+  s.confirm_draw!(:width, 600.0, sign: 1.0)
+  NxTest.assert(s.draw_ready?)
+  sc = NxGD2.e::ScaleWatch.singleton_class
+  sc.send(:alias_method, :flush_nxgd2_orig, :flush_pending!)
+  sc.send(:define_method, :flush_pending!) { |_m| false }
+  begin
+    NxTest.assert_equal(:blocked, s.commit!(:fake_transform), 'bariera zastavila commit')
+    NxTest.assert(s.active?, 'session ZIJE dalej (pouzivatel skusi klik znova)')
+    NxTest.assert_equal(:done, s.draw_phase, 'a rozkreslene rozmery ostali')
+  ensure
+    sc.send(:alias_method, :flush_pending!, :flush_nxgd2_orig)
+    sc.send(:remove_method, :flush_nxgd2_orig)
+  end
+end
+
 NxTest.test('GHOST-D2 automat: `drawing` je vyhradene DOSKE (skrinka spadne na placement)') do
   cab = { type: 'lower', width: 600.0, height: 720.0, depth: 510.0,
           thickness: 18.0, floor_height: 100.0, bottom_mode: 'under_sides' }
