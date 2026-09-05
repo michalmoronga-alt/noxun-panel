@@ -66,3 +66,15 @@
 - ~~P2Os v V1 nedosiahnuteľný, dáta ostávajú~~ → **ROZHODNUTÉ (Michal 5.9.2026, voľba A): P2Os sa z dát AJ z návrhu vyhadzuje úplne** — pre výsuvy aj závesy existujú len 2 typy otvárania (Tip-On = P2O, tlmenie = SiSy); vendor riadky P2Os v #10/#13 sú označené ako NESCHVÁLENÉ pre Noxun.
 - **Kolízia receptov šablóna vs projekt = odmietnutie vloženia** s hláškou (explicitné zlúčenie v KOV-D), nie tichý prepis ani verzované identity.
 - **Smoke čísla:** skrinka 900×720×**500** (KD 18, chrbát naložený) + čelo 175 → H70 (chrbát 65,5), NL470; dno 791,5×480, chrbát 780×65,5; hĺbka **250** → RED bez riešenia (NL260 potrebuje 279).
+
+## Kolo 2 (Sol, 5.9.2026, nad verziou 2 `10ef736` + P2Os `07011bf`) — ZAPRACOVANÉ (verzia 3)
+
+Kolo 1: **8/14 RESOLVED**, 5 PARTIAL (6 identita sync tyče · 7 Quadro smoke · 9 validácia bez výškovej osi · 10 remap `recipe:<old>` · 12 ABS hrany), **1 UNRESOLVED** (1 sety nenesú
+system/height/load). **Nové: 3 BLOCKER** — (B1) natívne Copy/Paste medzi `.skp` dokumentmi stráca pôvod receptu → `recipe_digest` v configu, porovnanie so snapshotom cieľa, nezhoda = RED
+`drawer_recipes_mismatch`; (B2) autorita `drawer.recipe` = SERVER (nanovo odvodené pri každej prestavbe, klient recept neprenáša); (B3) Quadro nemá `height_variant` → systémovo odlišná
+výšková os (Atira variant, Quadro numerická `box_height` = clear − 40). **3 FIX** — (F4) úplný tvar slide položky (`owner_part_key front:<id>/panel`, quantity 1, rule_quantity, production_class,
+manufactured, source recipe); (F5) hranice bez predčasného zaokrúhlenia (EPS 0,01 mm, nezaokrúhlená geometria); (F6) Quadro smoke: SKW = šírka dna/predku/chrbta, boky = NL × box_h.
+**Reconcile:** #1 → C2a rozšíri klasifikáciu setov o voliteľné `height_variant`/`load` (sparse, len drawer), C2b overuje set cez construction/opening/manufacturer/series (+ Atira výška, load),
+chýbajúca os = neoveriteľný → brána; #6 → recept emituje položku `sync_shaft` (`recipe:<system>:sync_shaft`, `cut_length`), nemapovaná = RED; #9 → validácia nad všetkými osami systému;
+#10 → premapovanie `recipe:<old>` → `recipe:<new>` ak NL v rade; #12 → `L1` = horná dlhá hrana pre box_side/inner_front/back, dno bez. Odpovede na auditné otázky potvrdené (clear_depth, rez C2a/C2b).
+Kolo 3 (Sol) nad verziou 3 = ČAKÁ.
