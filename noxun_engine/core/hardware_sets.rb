@@ -119,11 +119,22 @@ module Noxun
       # LAZY podla OBSAHU (`snapshot_std`): cisto legacy kniznica a snapshot
       # ostavaju na 1/2, takze spatna citatelnost sa zbytocne neblokuje.
       STD_CLASSIFIED  = 3
-      STD_SUPPORTED   = [STD, STD_PARAM_FORMS, STD_CLASSIFIED].freeze
+
+      # KOV-C2a: set drawer systemu s vyskovymi variantmi nesie `height_variant`.
+      # Starsi plugin (std 3) pozna whitelist BEZ neho, takze by pole ticho orezal
+      # a prvym zapisom stratu zvecnil — pasmovy selektor by potom vybral H70 kit
+      # k dielcom H176 (oba maju NL 470 a rovnake opening/construction, takze
+      # expanzia by nemala co odhalit). Marker je LAZY podla OBSAHU: std 4 dostane
+      # LEN kniznica/snapshot, v ktorej NIEKTORY set pole naozaj nesie; obsah
+      # s triednym klucom bez tohto pola ostava na 3.
+      STD_HEIGHT_VARIANT = 4
+      STD_SUPPORTED   = [STD, STD_PARAM_FORMS, STD_CLASSIFIED, STD_HEIGHT_VARIANT].freeze
 
       # v2 (H1a): +set „Nohy podla vysky sokla" (param_bands) a migracia
       # globalneho defaultu leg z 'nohy-klzak-17' na neho.
-      SEED_VERSION = 2
+      # v3 (KOV-C2a): +8 klasifikovanych drawer setov (Atira 3 vysky x 2 otvarania,
+      # Quadro V6 x 2 otvarania) a triedne mapovania cez `MAPPING_ADDITIONS`.
+      SEED_VERSION = 3
       FILE         = 'hardware_sets.json'
       MODEL_KEY    = 'hardware_sets' # kluc snapshotu v NOXUN dict na modeli
 
@@ -135,9 +146,16 @@ module Noxun
 
       # Dovody nemapovanej polozky (ORANGE) — jediny kanonicky zoznam; texty
       # semaforu mapuje Validation.check_hardware_expansion.
+      # KOV-C2a: `class_unmapped` = polozka nesie klasifikaciu zasuvky, ale
+      # triedny kluc namapovany NIE JE (a na genericky `slide` sa NIKDY nepada);
+      # `set_incompatible` = vybrany set klasifikaciou polozke NESEDI (ine
+      # otvaranie/konstrukcia/system/vyska, alebo pevny set_id tam, kde musi byt
+      # vyskovy selektor). Oba su ORANGE dovody; povysenie na RED
+      # `drawer_kit_missing` prinesie C2b.
       UNMAPPED_REASONS = %w[no_set set_missing set_type_mismatch nl_missing
                             param_band_missing selector_unresolved
-                            length_unsupported library_incompatible].freeze
+                            length_unsupported library_incompatible
+                            class_unmapped set_incompatible].freeze
 
       # --- 1d/R-07: whitelist ZNAMYCH klucov (detektor straty) ----------------
       # Normalizacia je TOLERANTNA (citanie nesmie zhodit prestavbu), takze
@@ -200,7 +218,21 @@ module Noxun
       # bud VSETKY (kontextovo platne), alebo ZIADNY = legacy „nezaradeny" set.
       # Ciastocny tvar sa odmieta — polovicna klasifikacia by v B3 vyzerala ako
       # hotove zaradenie a filtre KOV-D by nan nesadli.
-      CLASS_KEYS = %w[use_type opening_mode drawer_construction manufacturer series].freeze
+      # KOV-C2a: `height_variant` je SIESTE klasifikacne pole — a jedine
+      # VOLITELNE. Do `CLASS_KEYS` patri preto, ze ten zoznam je KONTRAKT troch
+      # veci naraz (whitelist `SET_KEYS`, typova kontrola v `incompatible_set?`
+      # a merge v `save_set!`); vynimka „vsetky alebo ziadne" pre neho ZIJE
+      # v `classify` — pole ma zmysel LEN pri `use_type: 'drawer'` a set bez neho
+      # (Quadro V6, ktory vyskove varianty nema) je uplne v poriadku.
+      # NIE JE to os vyberu setu — vyberom ostava pasmovy selektor mapovania;
+      # pole sluzi VYHRADNE na OVERENIE pri expanzii.
+      HEIGHT_VARIANT_KEY = 'height_variant'
+      # Uzavrety slovnik vysok (mm) — vysky Atiry z receptov v1. Dalsi kovovy
+      # system (Antaro, StrongBox) si svoje hodnoty prida v TEJ dávke, ktora ho
+      # zavedie; neznama hodnota = obsah novsej verzie, nie nova kategoria.
+      DRAWER_HEIGHT_VARIANTS = [70, 144, 176].freeze
+      CLASS_KEYS = %w[use_type opening_mode drawer_construction manufacturer series
+                      height_variant].freeze
 
       # POZOR: whitelist je KONTRAKT (viz odsek vyssie) — kazde nove pole setu
       # sa musi doplnit SEM, inak vlastny zapis vyrobi read-only stav.
@@ -210,7 +242,8 @@ module Noxun
       # kniznice aj snapshotu). Klasifikacne kluce su pritomne LEN pri
       # klasifikovanom sete, `series` a `active` len ked maju hodnotu.
       SET_KEY_ORDER = %w[set_id name generic_type use_type opening_mode
-                         drawer_construction manufacturer series active members].freeze
+                         drawer_construction manufacturer series height_variant
+                         active members].freeze
 
       # H1b: parametre, podla ktorych sa daju stavat pasma clena (param_bands)
       # a selector mapovania. JEDINA autorita ponuky pre UI — okno Katalog
@@ -272,6 +305,84 @@ module Noxun
             { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
               'code_by_nl' => { '420' => '357695', '470' => '357696' } }
           ] },
+        # === KOV-C2a: KLASIFIKOVANE SETY ZASUVIEK (recepty v1) ================
+        # Kody = draft #13 §1 (Atira SiSy + Tip-On) a §2 (Quadro V6). KAZDA
+        # bunka radu prislusneho receptu ma kod — completeness test to strazi
+        # a prazdne miesto sa riesi DATOVO (kod alebo NL mimo radu), NIKDY
+        # behovym fallbackom na susednu dlzku.
+        # Legacy `vysuv-atira-biela-h70` OSTAVA NEDOTKNUTY (drzi legacy
+        # mapovanie `slide`) — nove sety maju VLASTNE ID.
+        { 'set_id' => 'atira-biela-h70-sisy', 'name' => 'Atira biela H70 — klasické',
+          'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'classic',
+          'drawer_construction' => 'metal', 'manufacturer' => 'Hettich',
+          'series' => 'InnoTech Atira', 'height_variant' => 70,
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
+              'code_by_nl' => { '350' => '357694', '420' => '357695',
+                                '470' => '357696', '520' => '357697' } }
+          ] },
+        { 'set_id' => 'atira-biela-h144-sisy', 'name' => 'Atira biela H144 — klasické',
+          'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'classic',
+          'drawer_construction' => 'metal', 'manufacturer' => 'Hettich',
+          'series' => 'InnoTech Atira', 'height_variant' => 144,
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
+              'code_by_nl' => { '350' => '357734', '420' => '357735',
+                                '470' => '357736', '620' => '357755' } }
+          ] },
+        { 'set_id' => 'atira-biela-h176-sisy', 'name' => 'Atira biela H176 — klasické',
+          'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'classic',
+          'drawer_construction' => 'metal', 'manufacturer' => 'Hettich',
+          'series' => 'InnoTech Atira', 'height_variant' => 176,
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
+              'code_by_nl' => { '350' => '357773', '420' => '357774', '470' => '357775',
+                                '520' => '357777', '620' => '357783' } }
+          ] },
+        { 'set_id' => 'atira-biela-h70-p2o', 'name' => 'Atira biela H70 — Tip-On',
+          'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'tipon',
+          'drawer_construction' => 'metal', 'manufacturer' => 'Hettich',
+          'series' => 'InnoTech Atira', 'height_variant' => 70,
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
+              'code_by_nl' => { '350' => '357722', '420' => '357723', '470' => '357724',
+                                '520' => '357725', '620' => '357716' } }
+          ] },
+        { 'set_id' => 'atira-biela-h144-p2o', 'name' => 'Atira biela H144 — Tip-On',
+          'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'tipon',
+          'drawer_construction' => 'metal', 'manufacturer' => 'Hettich',
+          'series' => 'InnoTech Atira', 'height_variant' => 144,
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
+              'code_by_nl' => { '350' => '357761', '420' => '357762', '470' => '357763',
+                                '520' => '357764', '620' => '357755' } }
+          ] },
+        { 'set_id' => 'atira-biela-h176-p2o', 'name' => 'Atira biela H176 — Tip-On',
+          'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'tipon',
+          'drawer_construction' => 'metal', 'manufacturer' => 'Hettich',
+          'series' => 'InnoTech Atira', 'height_variant' => 176,
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
+              'code_by_nl' => { '350' => '357801', '420' => '357802', '470' => '357803',
+                                '520' => '357812', '620' => '357795' } }
+          ] },
+        # Quadro V6 vyskove varianty NEMA — `height_variant` preto CHYBA
+        # (a mapovanie na neho smie ukazovat pevnym `set_id`).
+        { 'set_id' => 'vysuv-quadro-v6-sisy', 'name' => 'Quadro V6 EB23 — klasické',
+          'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'classic',
+          'drawer_construction' => 'wood', 'manufacturer' => 'Hettich', 'series' => 'Quadro',
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
+              'code_by_nl' => { '350' => '317640', '400' => '317641', '450' => '317642',
+                                '500' => '317643', '550' => '367919' } }
+          ] },
+        { 'set_id' => 'vysuv-quadro-v6-p2o', 'name' => 'Quadro V6 EB23 — Tip-On',
+          'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'tipon',
+          'drawer_construction' => 'wood', 'manufacturer' => 'Hettich', 'series' => 'Quadro',
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
+              'code_by_nl' => { '350' => '343031', '400' => '343033', '450' => '317644' } }
+          ] },
         { 'set_id' => 'zavesenie-bystrica', 'name' => 'Zavesenie na stenu „Bystrica"',
           'generic_type' => 'wall_hanger',
           'members' => [{ 'code' => '93240', 'per' => 'unit', 'qty' => 1 }] },
@@ -310,6 +421,38 @@ module Noxun
       # PROJEKTOVE SNAPSHOTY sa NEMENIA NIKDY samy.
       MAPPING_MIGRATIONS = {
         'leg' => %w[nohy-klzak-17 nohy-podla-sokla]
+      }.freeze
+
+      # === KOV-C2a: DOPLNENIE CHYBAJUCICH MAPOVANI (add-if-absent) ============
+      #
+      # `MAPPING_MIGRATIONS` vie iba NAHRADIT hodnotu pri kluci, ktory uz
+      # existuje — chybajuci `class:` kluc nevytvori, takze „Doplniť nové
+      # predvoľby" by pri zásuvkach neopravilo NIC (Codex #301 kolo 1 P1,
+      # Astra #19 F7). Preto druhy, uzsi kontrakt: `{ kluc => hodnota }` sa
+      # do GLOBALNEJ kniznice doplni LEN ked kluc CHYBA. Pouzivatelske
+      # mapovanie sa NIKDY neprepise a projektove snapshoty sa nemenia samy —
+      # do projektu ich prenesie az VEDOME „Doplniť nové predvoľby"
+      # (`merge_project_sets_seed!`, existujuci mechanizmus).
+      #
+      # Hodnota pre Atiru MUSI byt pasmovy selektor podla `height_variant`:
+      # pevny `set_id` by po prerastenii zasuvky H70 -> H176 objednal H70 kit
+      # k dielcom H176 (klasifikacia opening/construction je pri oboch rovnaka).
+      # Quadro V6 vyskove varianty nema, preto tam pevny set_id staci.
+      MAPPING_ADDITIONS = {
+        'class:slide|classic|metal' => {
+          'param' => 'height_variant',
+          'bands' => [{ 'min' => 70.0, 'max' => 70.0, 'set_id' => 'atira-biela-h70-sisy' },
+                      { 'min' => 144.0, 'max' => 144.0, 'set_id' => 'atira-biela-h144-sisy' },
+                      { 'min' => 176.0, 'max' => 176.0, 'set_id' => 'atira-biela-h176-sisy' }]
+        },
+        'class:slide|tipon|metal' => {
+          'param' => 'height_variant',
+          'bands' => [{ 'min' => 70.0, 'max' => 70.0, 'set_id' => 'atira-biela-h70-p2o' },
+                      { 'min' => 144.0, 'max' => 144.0, 'set_id' => 'atira-biela-h144-p2o' },
+                      { 'min' => 176.0, 'max' => 176.0, 'set_id' => 'atira-biela-h176-p2o' }]
+        },
+        'class:slide|classic|wood' => 'vysuv-quadro-v6-sisy',
+        'class:slide|tipon|wood'   => 'vysuv-quadro-v6-p2o'
       }.freeze
 
       module_function
@@ -767,8 +910,13 @@ module Noxun
         library_read_only? ? blank_library : seed_library
       end
 
+      # KOV-C2a: CERSTVA kniznica dostane aj triedne mapovania. `MAPPING_ADDITIONS`
+      # su tu JEDINA autorita ich obsahu (SEED_MAPPING drzi len legacy kluce podla
+      # generickeho typu) — inak by sa fresh install a upgrade rozisli a nova
+      # instalacia by zasuvky nemapovala, kym stara ano.
       def seed_library
-        { 'sets' => deep_copy(SEED_SETS), 'mapping' => SEED_MAPPING.dup }
+        { 'sets' => deep_copy(SEED_SETS),
+          'mapping' => SEED_MAPPING.merge(deep_copy(MAPPING_ADDITIONS)) }
       end
 
       # CISTE citanie + seed-merge BEZ zapisu -> [kniznica, changed].
@@ -829,7 +977,29 @@ module Noxun
         sets.each { |s| have[s['set_id']] = true }
         missing = SEED_SETS.reject { |s| have[s['set_id']] }
         merged = sets + normalize_sets(missing)
-        [merged, migrate_mapping(merged, map), true]
+        [merged, add_mapping_seed(merged, migrate_mapping(merged, map)), true]
+      end
+
+      # KOV-C2a: doplni CHYBAJUCE kluce mapovania z `MAPPING_ADDITIONS`.
+      # Dve pravidla a obe su tvrde:
+      #   1) existujuci kluc sa NIKDY neprepise (pouzivatelske mapovanie ma
+      #      absolutnu prednost — to je rozdiel oproti `migrate_mapping`,
+      #      ktora prepis robi, ale len nad nedotknutym seed stavom),
+      #   2) kluc sa doplni LEN ked su VSETKY sety, na ktore hodnota ukazuje,
+      #      v kniznici (ciastocny selektor by ticho menil, co sa vyberie —
+      #      ta ista uvaha ako v `global_default_state`).
+      def add_mapping_seed(sets, mapping)
+        by_id = {}
+        sets.each { |s| by_id[s['set_id']] = true }
+        out = mapping.dup
+        MAPPING_ADDITIONS.each do |key, value|
+          next if out.key?(key)
+          refs = value_set_ids(value)
+          next if refs.empty? || refs.any? { |sid| !by_id[sid] }
+          out[key] = deep_copy(value)
+          Engine.log("hardware sets: doplnene mapovanie '#{key}'") if defined?(Engine)
+        end
+        out
       end
 
       # Prepis defaultu LEN pri nedotknutom seed stave (vzor F8/LEGACY_SEED_SHAPES):
@@ -1061,6 +1231,13 @@ module Noxun
 
           out[k] = stored[k] if stored.key?(k)
         end
+        # KOV-C2a: `height_variant` sa preberie LEN pokial set OSTAVA zasuvkou.
+        # Editor toto pole nepozna (neposiela ho vobec), takze pri prepnuti
+        # zasuvky na dvierka by ho merge prevzal a validacia by potom hlasila
+        # „výšku variantu má len set na zásuvky" — pouzivatel by nemal ako
+        # vyhoviet. Je to ta ista myslienka, akou modal posiela prazdny
+        # `drawer_construction`, len ju za neho musi urobit server.
+        out.delete(HEIGHT_VARIANT_KEY) if out['use_type'].to_s.strip != 'drawer'
         out
       end
 
@@ -1241,9 +1418,30 @@ module Noxun
           # POUZIT nesmie — radsej NIC nez nakup z orezanych dat.
           'knižnica setov kovania sa nedá bezpečne prečítať a projekt vlastné ' \
             'predvoľby ešte nemá — nemapuje sa nič'
+        when 'class_unmapped'
+          # KOV-C2a: zasuvka NIKDY nepada na generický `slide` — H70 kit
+          # k zásuvke H176 by bol zlý nákup, a mlčky.
+          'zásuvka nemá predvolený set pre svoje otváranie a konštrukciu — ' \
+            'Pravidlá → Doplniť nové predvoľby'
+        when 'set_incompatible'
+          "set „#{sid}“ nesedí so zásuvkou (#{incompatible_detail_sk(u['detail'])})"
         else
           'typ nemá priradený set'
         end
+      end
+
+      # KOV-C2a: CO presne na sete nesedi — jedna veta pre semafor aj pre panel.
+      # Neznamy detail sa nevymysla, len sa priznam, ze sedieť nemá klasifikácia.
+      INCOMPATIBLE_DETAIL_SK = {
+        'opening_mode' => 'iný spôsob otvárania',
+        'drawer_construction' => 'iná konštrukcia zásuvky',
+        'system' => 'iný systém výsuvu',
+        'height_variant' => 'iná výška zásuvky',
+        'height_selector' => 'výber setu nie je podľa výšky zásuvky'
+      }.freeze
+
+      def incompatible_detail_sk(detail)
+        INCOMPATIBLE_DETAIL_SK[detail.to_s] || 'nesedí klasifikácia setu'
       end
 
       # „ (člen 2)" / „ (noha)" — identita clena setu (H1a nesie index aj label).
@@ -1361,6 +1559,13 @@ module Noxun
           # o tej istej veci.
           next false if src.nil?
           next true if classified?(src) && CLASS_KEYS.none? { |k| norm.key?(k) }
+          # KOV-C2a: `height_variant` je VOLITELNE pole, takze zvysok
+          # klasifikacie mu prezije — kontrola vyssie („ZIADNY klasifikacny
+          # kluc") by jeho stratu prehliadla. A prave ta strata je najdrahsia:
+          # bez vysky by expanzia nemala co overit a k dielcom H176 by prisiel
+          # H70 kit. Preto ma VLASTNU vrstvu.
+          next true if !src[HEIGHT_VARIANT_KEY].to_s.strip.empty? &&
+                       !norm.key?(HEIGHT_VARIANT_KEY)
 
           src['active'] == false && norm['active'] != false
         end
@@ -1475,6 +1680,14 @@ module Noxun
       # obsah ostava na svojom povodnom std (1/2) — spatna citatelnost sa
       # zbytocne neblokuje.
       def snapshot_std(mapping, sets)
+        # KOV-C2a: NAJVYSSI marker vyhrava, preto sa `height_variant` testuje
+        # PRVY. Podmienka je uzka zamerne — std 4 dostane LEN obsah, v ktorom
+        # NIEKTORY set pole naozaj nesie; kniznica a snapshot s triednym klucom
+        # bez neho ostavaju na 3 a starsi plugin ich cita dalej.
+        if Array(sets).any? { |s| s.is_a?(Hash) && !s[HEIGHT_VARIANT_KEY].to_s.strip.empty? }
+          return STD_HEIGHT_VARIANT
+        end
+
         classified =
           Array(sets).any? do |s|
             s.is_a?(Hash) && !(s.keys.map(&:to_s) - LEGACY_SET_KEYS).empty?
@@ -1982,6 +2195,14 @@ module Noxun
             unmapped << unmapped_entry(it, sid, 'set_type_mismatch')
             next
           end
+          # KOV-C2a: klasifikacia setu vs. klasifikacia polozky (otvaranie,
+          # konstrukcia, system, vyska). Netyka sa poloziek bez klasifikacie —
+          # tie tuto vetvu nikdy neprejdu.
+          bad = set_incompatible_info(it, set)
+          if bad
+            unmapped << unmapped_entry(it, sid, 'set_incompatible', bad)
+            next
+          end
           # R-06 (brana 1d): dlzkove kovanie (uchytkovy profil D-90 nesie rez
           # v params) sa cez KUSOVY set nacenit NESMIE — cena katalogu je za
           # meter a subtotal by ju vynasobil poctom KUSOV. Radsej NIC (ORANGE
@@ -2011,8 +2232,19 @@ module Noxun
       # chybajuca hodnota / mimo pasiem = ORANGE, NIKDY hadanie.
       # -> [set_id|nil, reason|nil, info Hash]
       def resolve_set_id(generic_type, it, cabinet_overrides, mapping)
+        ck = class_key_for(it, generic_type)
         value = resolve_mapping_value(generic_type, it, cabinet_overrides, mapping)
-        return [nil, 'no_set', {}] if value.nil?
+        # KOV-C2a: klasifikovana polozka BEZ triedneho mapovania nie je „typ bez
+        # setu" — je to konkretny chybajuci riadok predvolieb a hlaska musi
+        # navigovat na „Pravidlá -> Doplniť nové predvoľby".
+        return [nil, (ck ? 'class_unmapped' : 'no_set'), (ck ? { 'class_key' => ck } : {})] if value.nil?
+        # Polozka s vyskovym variantom sa NESMIE vybrat pevnym `set_id` — po
+        # prerasteni zasuvky H70 -> H176 by override skrinky ticho objednal
+        # H70 kit k dielcom H176 (Astra #19 B1). Vyber MUSI byt selektor podla
+        # vysky, a to na KAZDEJ urovni (override skrinky aj projekt).
+        if ck && !numeric_param(it, HEIGHT_VARIANT_KEY).nil? && !height_selector?(value)
+          return [nil, 'set_incompatible', { 'detail' => 'height_selector' }]
+        end
         return [value, nil, {}] if value.is_a?(String)
         param = value['param'].to_s
         v = numeric_param(it, param)
@@ -2023,7 +2255,49 @@ module Noxun
         [band['set_id'].to_s, nil, {}]
       end
 
+      # === KOV-C2a: TRIEDNY KLUC POLOZKY =====================================
+      #
+      # Polozka, ktora nesie KLASIFIKACIU zasuvky (`params.opening_mode` +
+      # `params.drawer_construction`), si set vybera TRIEDNYM klucom
+      # `class:slide|<opening_mode>|<drawer_construction>`. Ziadne dnesne
+      # pravidlo tieto params neemituje (kontroluje to charakterizacny test),
+      # takze pre vsetky existujuce zakazky je tato vetva MRTVA a vystupy
+      # ostavaju identicke.
+      # -> kanonicky triedny kluc | nil (polozka klasifikaciu nenesie)
+      def class_key_for(it, generic_type)
+        params = it.is_a?(Hash) && it['params'].is_a?(Hash) ? it['params'] : {}
+        om = params['opening_mode'].to_s.strip
+        dc = params['drawer_construction'].to_s.strip
+        return nil if om.empty? || dc.empty?
+
+        canon, = parse_class_key("#{BuildPlan::HW_SET_CLASS_PREFIX}#{generic_type}|#{om}|#{dc}")
+        canon
+      end
+
+      # Je hodnota mapovania VYSKOVY selektor? (pasma podla `height_variant`)
+      def height_selector?(value)
+        value.is_a?(Hash) && value['param'].to_s == HEIGHT_VARIANT_KEY &&
+          value['bands'].is_a?(Array)
+      end
+
       def resolve_mapping_value(generic_type, it, cabinet_overrides, mapping)
+        # KOV-C2a: klasifikovana polozka ma VLASTNU, KRATSIU precedenciu —
+        # override skrinky s triednym klucom -> projekt. Owner-level `slide@…`
+        # sa pre nu VEDOME IGNORUJE (`class:…@owner` parser odmieta a generický
+        # `slide@owner` je prave zakazany fallback; owner-scoped tvar definuje
+        # az KOV-D) a na genericky `slide` sa NIKDY nepada — H70 set k zasuvke
+        # H176 by bol zly kit, a mlcky.
+        ck = class_key_for(it, generic_type)
+        if ck
+          ov = cabinet_overrides[it['owner_id'].to_s]
+          if ov.is_a?(Hash)
+            v = ov[ck]
+            return v if present_mapping_value?(v)
+          end
+          v = mapping[ck]
+          return present_mapping_value?(v) ? v : nil
+        end
+
         ov = cabinet_overrides[it['owner_id'].to_s]
         if ov.is_a?(Hash)
           opk = it['owner_part_key'].to_s
@@ -2040,6 +2314,61 @@ module Noxun
 
       def present_mapping_value?(v)
         (v.is_a?(String) && !v.strip.empty?) || (v.is_a?(Hash) && v['bands'].is_a?(Array))
+      end
+
+      # === KOV-C2a: KOMPATIBILITA VYBRANEHO SETU =============================
+      #
+      # Triedny kluc nesie LEN otvaranie a konstrukciu, takze SAM O SEBE
+      # nedokaze, ze vybrany set patri k TOMUTO systemu a TEJTO vyske:
+      #   * Antaro/StrongBox budu raz zdielat `class:slide|classic|metal`
+      #     s Atirou (Codex #301 kolo 1 P1),
+      #   * pasmo H176 vs. H70 ma rovnake opening/construction aj NL 470
+      #     (Codex #301 kolo 3 P1).
+      # Preto sa identita setu overuje EST RAZ pri expanzii — a nesulad je
+      # NEMAPOVANA polozka s dovodom, NIKDY iny set.
+      #
+      # Systemy su UZAVRETY slovnik: `params.system` -> [vyrobca, rada].
+      # Neznamy system = obsah novsej verzie -> nekompatibilne (fail-closed).
+      SYSTEM_IDENTITY = {
+        'atira'     => ['Hettich', 'InnoTech Atira'],
+        'quadro_v6' => %w[Hettich Quadro]
+      }.freeze
+
+      # -> nil (sedi / netyka sa) | info Hash s dovodom
+      def set_incompatible_info(it, set)
+        ck = class_key_for(it, it['generic_type'].to_s)
+        return nil if ck.nil? || !set.is_a?(Hash)
+
+        params = it['params'].is_a?(Hash) ? it['params'] : {}
+        %w[opening_mode drawer_construction].each do |k|
+          return { 'detail' => k } if set[k].to_s.strip != params[k].to_s.strip
+        end
+
+        sys = params['system'].to_s.strip
+        unless sys.empty?
+          want = SYSTEM_IDENTITY[sys]
+          return { 'detail' => 'system' } if want.nil?
+          return { 'detail' => 'system' } unless same_name?(set['manufacturer'], want[0]) &&
+                                                 same_name?(set['series'], want[1])
+        end
+
+        hv = numeric_param(it, HEIGHT_VARIANT_KEY)
+        set_hv = int_value(set[HEIGHT_VARIANT_KEY])
+        return { 'detail' => HEIGHT_VARIANT_KEY } if hv.nil? != set_hv.nil?
+        # Porovnava sa PRESNE (bez zaokruhlovania — rovnaka filozofia ako pri
+        # kluci radu NL): 70,5 nie je H70.
+        return { 'detail' => HEIGHT_VARIANT_KEY } if hv && set_hv && (hv - set_hv).abs > 1e-9
+
+        nil
+      end
+
+      # Zhoda mena vyrobcu/rady — case-insensitive a bez diakritiky (`Materials.slug`
+      # je jedina translit autorita v repe, rovnako ako v `HardwareTaxonomy.same_name?`).
+      def same_name?(a, b)
+        return false if a.nil? || b.nil?
+
+        ka = HardwareTaxonomy.key_of(a)
+        !ka.empty? && ka == HardwareTaxonomy.key_of(b)
       end
 
       def numeric_param(it, param)
@@ -2310,7 +2639,9 @@ module Noxun
           'params_label' => HardwareRules.params_label(params)
         }
         ex = extra.is_a?(Hash) ? extra : {}
-        %w[param value member_index member_label].each do |k|
+        # KOV-C2a: `detail` (co presne nesedi) a `class_key` (ktory riadok
+        # predvolieb chyba) — obe cestuju do vety semaforu.
+        %w[param value member_index member_label detail class_key].each do |k|
           out[k] = ex[k] if ex.key?(k)
         end
         out
@@ -2434,6 +2765,13 @@ module Noxun
         out['set_name'] = set['name']
         if set['generic_type'].to_s != gt
           out['problems'] << unmapped_reason_sk(unmapped_entry(it, sid, 'set_type_mismatch'))
+          return out
+        end
+        # KOV-C2a: TA ISTA kontrola ako v `expand` — panel a supis sa nesmu
+        # rozist (inak by panel rozpisal kody kitu, ktory v nakupe nevznikne).
+        bad = set_incompatible_info(it, set)
+        if bad
+          out['problems'] << unmapped_reason_sk(unmapped_entry(it, sid, 'set_incompatible', bad))
           return out
         end
         # R-06 (brana 1d): TA ISTA brana ako v expand — panel a supis sa nesmu
@@ -2743,6 +3081,29 @@ module Noxun
           errors << set_err('series', "set „#{sid}“ má neplatnú produktovú radu")
         end
 
+        # KOV-C2a: VOLITELNA vyska variantu. Pravidla su tri a vsetky su
+        # ZAPISOVE (citacia cesta ich cez `read_set_classification` zmeni na
+        # „set sa cita ako nezaradeny" a `classification_lost?` to prizna):
+        #   * pole ma zmysel LEN pri zasuvke — inde je to chyba zapisu,
+        #   * hodnota musi byt CELE cislo zo `DRAWER_HEIGHT_VARIANTS`,
+        #   * chybajuce pole je LEGITIMNE (Quadro V6 vyskove varianty nema).
+        hv_raw = s[HEIGHT_VARIANT_KEY]
+        hv = nil
+        unless hv_raw.nil? || hv_raw.to_s.strip.empty?
+          if ut != 'drawer'
+            errors << set_err(HEIGHT_VARIANT_KEY,
+                              "set „#{sid}“: výšku variantu má len set na zásuvky")
+          else
+            hv = int_value(hv_raw)
+            unless hv && DRAWER_HEIGHT_VARIANTS.include?(hv)
+              errors << set_err(HEIGHT_VARIANT_KEY,
+                                "set „#{sid}“ má neznámu výšku variantu „#{hv_raw}“ " \
+                                "(#{DRAWER_HEIGHT_VARIANTS.join(' · ')})")
+              hv = nil
+            end
+          end
+        end
+
         gt, gerrors = classified_generic_type(sid, ut, gt)
         errors.concat(gerrors)
         return [{}, gt, errors] unless errors.empty?
@@ -2757,7 +3118,21 @@ module Noxun
         # hodnota = kluc sa NEUKLADA (B3 ju ukaze ako „— bez rady —").
         st = ser.to_s.strip
         out['series'] = st unless st.empty?
+        out[HEIGHT_VARIANT_KEY] = hv unless hv.nil?
         [out, gt, []]
+      end
+
+      # Cele cislo z hodnoty setu (JSON ho moze niest ako Integer aj ako String
+      # z rucne upraveneho suboru). Float s desatinnou castou NIE JE cele cislo —
+      # „70.5" je obsah, ktoremu nerozumieme, nie zaokruhlitelna hodnota.
+      def int_value(raw)
+        case raw
+        when Integer then raw
+        when Float   then (raw % 1).zero? ? raw.to_i : nil
+        when String
+          s = raw.strip
+          s.match?(/\A-?\d+\z/) ? s.to_i : nil
+        end
       end
 
       # `generic_type` klasifikovaneho setu: odvodeny z `use_type` (mimo `other`).

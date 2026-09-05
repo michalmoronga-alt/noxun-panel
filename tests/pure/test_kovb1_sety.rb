@@ -144,6 +144,16 @@ module NxB1
     out['drawer_construction'] = 'metal' if ut == 'drawer'
     out
   end
+
+  # KOV-C2a: cast seed setov je klasifikovana UZ V ZDROJI (drawer sety
+  # zasuviek), takze „nezaradeny" pol charakterizacie R13 sa musi vyrobit
+  # ODOBRATIM klasifikacie — inak by test porovnaval dva klasifikovane stavy
+  # a o metadata-vs-nakup by nepovedal nic.
+  def strip_class(set)
+    out = set.dup
+    (HWS::CLASS_KEYS + ['active']).each { |k| out.delete(k) }
+    out
+  end
 end
 
 # ============================================================================
@@ -523,8 +533,11 @@ NxTest.test('KOV-B1 (R6): std 3 bumpne KAZDE nove pole samostatne, legacy ostava
   NxTest.assert_equal(b::HWS::STD_CLASSIFIED,
                       b::HWS.snapshot_std({ 'class:hinge|classic' => 'zaves-a' }, [legacy]),
                       'triedny kluc mapovania tiez')
-  NxTest.assert_equal(b::HWS::STD_SUPPORTED.max, b::HWS::STD_CLASSIFIED,
-                      'std 3 je najvyssi PODPOROVANY (nizsi by znamenal, ze si vlastny zapis neprecitame)')
+  # KOV-C2a: najvyssi marker uz nie je 3 (pribudol std 4 = `height_variant`),
+  # ale invariant plati dalej: KAZDY marker, ktory vieme SAMI opeciatkovat,
+  # musime vediet aj precitat — inak by si plugin vlastny zapis odmietol.
+  NxTest.assert(b::HWS::STD_SUPPORTED.include?(b::HWS::STD_CLASSIFIED),
+                'std 3 je PODPOROVANY (inak by sme si vlastny zapis neprecitali)')
 end
 
 NxTest.test('KOV-B1 (R6): zapis kniznice stampuje std 3 az podla obsahu') do
@@ -692,8 +705,8 @@ end
 
 NxTest.test('KOV-B1 (R13): klasifikovana kopia SEED kniznice nakupuje deep-equal') do
   b = NxB1
-  plain = b.seed_state(b::HWS::SEED_SETS)
-  klas  = b.seed_state(b::HWS::SEED_SETS.map { |s| b.classify_seed(s) })
+  plain = b.seed_state(b::HWS::SEED_SETS.map { |s| b.strip_class(s) })
+  klas  = b.seed_state(b::HWS::SEED_SETS.map { |s| b.classify_seed(b.strip_class(s)) })
   # fixture: klasifikacia sa naozaj precitala
   NxTest.assert(klas['sets'].each_value.all? { |s| s.key?('use_type') },
                 'vsetky seed sety su klasifikovane')
