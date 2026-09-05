@@ -341,7 +341,13 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   + `MaterialsDialog::TARGETS` s **preflightom per systém** (Atira 16, Quadro 16/18 — pôvodne plánované na C2c) a **11. kód registra `drawer_stale`** = MIGRAČNÝ:
   projekt uložený pred aktiváciou receptov, ktorý už má klasifikovanú zásuvku (**akékoľvek** drawer pole — predikát `Recipes.classified?`), je RED a blokuje VŠETKY exporty
   (vrátane VEPO), kým sa skrinka neprestaví. **Po kole 2 a 3:** hrúbky bokov Quadro sa čítajú pod oboma emitovanými kľúčmi (rôzne = fail-closed), remap ABS platí aj pre
-  4. kanál a `drawer_material_id` cestuje vkladacou kartou aj „Nahradiť UNI…" (jeden receptový predikát pre selektor v Štúdiu aj pre náhradu UNI). **Vedomé odchýlky:** (1) `Fronts.norm_drawer` NEOVERUJE, či je ref registrovaný —
+  4. kanál a `drawer_material_id` cestuje vkladacou kartou aj „Nahradiť UNI…".
+  **C2b-M · materiálový kanál zásuviek (samostatná dávka `feat/kov-c2b-material-kanal`, mergne sa hneď po #304 — rozdelenie po 4. kole review, pravidlo 3 kôl):** výber
+  **„Zásuvky"** v predvoľbách projektu Štúdia + `MaterialsDialog::TARGETS` + JS mapa `md_drawer` + kontext komba `drawer` = 16 · **preflight per systém** (Atira 16,
+  Quadro 16/18; čísla z `Recipes.supported_thicknesses`) na VŠETKÝCH cestách — nová predvoľba, existujúca zákazka (potvrdenie), **„Nahradiť UNI…"** (systém KAŽDÉHO
+  dotknutého čela, vrátane prípadu „UNI len v override dielca") a **vkladanie** (`MaterialsDialog.drawer_material_issue` pred ghostom) · `insert_state.js`
+  `MATERIAL_KEYS` + `drawer_material_id` · remap ABS pri zmene predvoľby zásuviek. V #304 ostala aktivácia v engine a serverové cesty kľúča nutné pre integritu dát.
+  **Vedomé odchýlky:** (1) `Fronts.norm_drawer` NEOVERUJE, či je ref registrovaný —
   robí to až `Recipes.active_ref` pri stavbe (inak by stav `drawer_recipe_unknown` bol mŕtvy a starší plugin by ticho pripol iný recept); (2) server-only sú OBE polia
   (`recipe_refs` aj `system`) — panel ich v C2b ani neposiela a server `system` deterministicky odvodí z konštrukcie; (3) dielce zásuviek nenesú `axes:` (farbenie ABS plôšok
   by pri stojacom dielci vyšlo na zlú hranu — PartFaces zásada „radšej žiadna farba"; farbenie = C2c/D); (4) povýšenie na `drawer_kit_missing` platí pre **každý** dôvod

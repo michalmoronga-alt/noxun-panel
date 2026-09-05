@@ -373,6 +373,13 @@ module Noxun
           return set_status("#{tf[:error]}#{insert_locks_hint}", true) if tf && tf[:error]
           pf = material_preflight(params, model)
           return set_status("#{pf[:error]}#{insert_locks_hint}", true) if pf && pf[:error]
+          # KOV-C2b (Codex #304 kolo 4 P1): material zasuviek proti systemom
+          # v ZLOZENEJ konfiguracii ciel — este PRED ghostom. Bez neho by vklad
+          # „uspel", skrinka by visela na kurzore a az po kliku by z nej boli
+          # RED zasuvky bez dielcov. Odmietnutie je hlaska, nie tichy uspech.
+          if (df = MaterialsDialog.drawer_material_issue(params, model))
+            return set_status("#{df}#{insert_locks_hint}", true)
+          end
           note = "#{tf ? tf[:note] : ''}#{pf ? pf[:note] : ''}"
           begin
             plan = CabinetBuilder.prepare_insert(model, params)

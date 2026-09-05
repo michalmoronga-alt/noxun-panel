@@ -1170,6 +1170,29 @@ module Noxun
           Recipes.thickness_ok_for_any_system?(have)
         end
 
+        # KOV-C2b (Codex #304 kolo 4 P1): efektivny material zasuviek
+        # (skrinka -> projekt -> UNI 16) proti systemom, ktore ZLOZENA
+        # konfiguracia ciel naozaj pouziva. CISTA funkcia (model smie byt nil).
+        # Vola ju VKLAD (`Panel.handle_insert`) EST PRED ghostom — bez toho by
+        # vklad „uspel", skrinka by visela na kurzore a az po kliku by z nej
+        # boli RED zasuvky bez dielcov. -> hlaska | nil
+        def drawer_material_issue(params, model)
+          return nil unless defined?(Recipes)
+
+          systems = drawer_systems_of('fronts' => Fronts.normalize_config(params['fronts']))
+          return nil if systems.empty?
+
+          mat = CabinetBuilder.effective_materials(model, params)['drawer']
+          sheet = mat && Materials.sheet(mat)
+          return nil unless sheet.is_a?(Hash)
+
+          th = sheet['thickness'].to_f
+          bad = systems.reject { |sys| Recipes.thickness_ok_for_system?(sys, th) }
+          return nil if bad.empty?
+
+          "Materiál zásuviek #{mat} (#{Materials.fmt_mm(th)} mm) sa nedá použiť: "             "#{drawer_systems_txt(bad)}. Zmeň materiál zásuviek alebo klasifikáciu čela. "             'Nič sa nevložilo.'
+        end
+
         # „Atira (16 mm)" / „Atira (16 mm), Quadro V6 (16 alebo 18 mm)"
         def drawer_systems_txt(systems)
           Array(systems).map do |sys|

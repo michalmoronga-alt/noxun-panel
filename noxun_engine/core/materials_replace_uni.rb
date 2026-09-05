@@ -107,9 +107,15 @@ module Noxun
         # fallbacky SÚ recyklované UNI id!) == uni_id -> predvoľba sa prepíše.
         # Kompatibilita cieľa s predvoľbou = D-46 pravidlá pre NOVÉ skrinky.
         project = scan['project'].is_a?(Hash) ? scan['project'] : {}
+        # KOV-C2b (Codex #304 kolo 4 P1): projektova predvolba zasuviek sa tyka
+        # KAZDEJ dediacej skrinky, takze cielova hrubka musi vyhoviet SYSTEMU
+        # KAZDEHO klasifikovaneho cela v zakazke — nie „niektoremu vydanemu
+        # systemu". 18 mm je platna hrubka pre Quadro, ale v ATIROVEJ zakazke
+        # by z kazdej zasuvky spravila RED `drawer_thickness_unsupported`.
+        scan_systems = ru_scan_drawer_systems(scan)
         project.each do |key, eff|
           next unless eff.to_s == uni_id
-          reason = ru_project_target_issue(key, target_th)
+          reason = ru_project_target_issue(key, target_th, scan_systems)
           if reason
             out['blocked'] << ['projektová predvoľba', reason, [RU_PROJECT_LABELS[key].to_s]]
           else
@@ -160,11 +166,19 @@ module Noxun
               blocked_names = Array(names)
             end
           end
-          if !blocked_reason && roles_now.include?('drawer') &&
-             !Recipes.thickness_ok_for_any_system?(target_th)
-            # KOV-C2b: dielce zasuviek beru hrubku CIELA — doska, ktoru nepozna
-            # ziaden vydany system, by z celej zakazky spravila RED zasuvky.
-            blocked_reason = :drawer
+          if blocked_reason.nil?
+            # KOV-C2b (Codex #304 kolo 4 P1): dielce zasuviek beru hrubku CIELA.
+            # Overuje sa system KAZDEHO DOTKNUTEHO cela — nie „niektory vydany
+            # system". Dotknute su bud VSETKY zasuvkove cela (meni sa kanal),
+            # alebo LEN tie, ktorych dielec ma vlastny UNI material v override
+            # (vtedy `roles_now` rolu `drawer` vobec nenesie a genericky rozsah
+            # doskoveho materialu by 25 mm ticho prepustil).
+            bad_sys = ru_drawer_systems_affected(params, roles_now, hit_ov_keys)
+                      .reject { |sys| Recipes.thickness_ok_for_system?(sys, target_th) }
+            unless bad_sys.empty?
+              blocked_reason = :drawer
+              blocked_names = bad_sys.map { |sys| Recipes.system_label(sys) }
+            end
           end
           if !blocked_reason && roles_now.include?('back') && params['back_mode'].to_s != 'none'
             # Chrbát: vlastná cesta (audit BLOCKER 3) — cieľ je daný, jeho
@@ -306,20 +320,64 @@ module Noxun
           'drawer' => 'default_drawer_material_id' }[role]
       end
 
+      # Systemy zasuviek jednej skrinky ako mapa `front_id => system`
+      # (KOV-C2b). Legacy cela a `construction other` sa netykaju — resolver
+      # sa na nich nevola, takze im material zasuviek nic nemeni.
+      def ru_drawer_system_map(params)
+        fronts = params.is_a?(Hash) ? params['fronts'] : nil
+        items = fronts.is_a?(Hash) ? fronts['items'] : nil
+        Array(items).each_with_object({}) do |it, acc|
+          next unless it.is_a?(Hash)
+
+          kind, key = Recipes.recipe_key_for(it)
+          acc[it['id'].to_s] = key[:system] if kind == :ok
+        end
+      end
+
+      # Systemy zasuviek v CELEJ zakazke (vstup pre projektovu predvolbu).
+      def ru_scan_drawer_systems(scan)
+        Array(scan.is_a?(Hash) ? scan['cabs'] : nil)
+          .flat_map { |entry| ru_drawer_system_map(entry[1]).values }.uniq.sort
+      end
+
+      # `front:<id>/<drawer rola>` -> id cela, inak nil.
+      def ru_drawer_key_front(part_key)
+        m = part_key.to_s.match(%r{\Afront:([^/]+)/([a-z_]+)(?::[a-z]+)?\z})
+        return nil unless m && CabinetBuilder::DRAWER_ROLES.include?(m[2])
+
+        m[1]
+      end
+
+      # Systemy, ktorych sa nahrada v TEJTO skrinke naozaj dotkne.
+      def ru_drawer_systems_affected(params, roles_now, hit_ov_keys)
+        map = ru_drawer_system_map(params)
+        return [] if map.empty?
+        return map.values.uniq.sort if Array(roles_now).include?('drawer')
+
+        Array(hit_ov_keys).filter_map { |k| map[ru_drawer_key_front(k).to_s] }.uniq.sort
+      end
+
       # D-46 pravidlá vhodnosti cieľa ako projektovej predvolby (nové skrinky).
-      def ru_project_target_issue(key, target_th)
+      # `systems` (KOV-C2b) = systemy zasuviek pouzite v zakazke; cielova hrubka
+      # musi vyhoviet KAZDEMU z nich. Prazdny zoznam = zakazka zasuvky nema,
+      # vtedy staci, ze hrubku pozna aspon jeden vydany system (inak by sa
+      # predvolba nedala nastavit dopredu).
+      def ru_project_target_issue(key, target_th, systems = nil)
         case key
         when 'default_material_id'
           CabinetBuilder.thickness_in_range?(target_th) ? nil : :range
         when 'default_back_material_id'
           [3.0, 18.0].any? { |t| CabinetBuilder.thickness_ok_for?('back', t, target_th) } ? nil : :range
         when 'default_drawer_material_id'
-          # KOV-C2b (Codex #304 kolo 3 P2): hrubka dielcov zasuvky je VSTUP
-          # receptu, takze o nej rozhoduje RECEPT — nie rozsah doskoveho
-          # materialu. Predikat je TEN ISTY ako pri selektore predvolby
-          # v Studiu (`Recipes.thickness_ok_for_any_system?`), inak by ta ista
-          # doska (25 mm) prehla jednou cestou a druhou nie.
-          Recipes.thickness_ok_for_any_system?(target_th) ? nil : :drawer
+          # KOV-C2b: hrubka dielcov zasuvky je VSTUP receptu, takze o nej
+          # rozhoduje RECEPT — nie rozsah doskoveho materialu.
+          used = Array(systems)
+          ok = if used.empty?
+                 Recipes.thickness_ok_for_any_system?(target_th)
+               else
+                 used.all? { |sys| Recipes.thickness_ok_for_system?(sys, target_th) }
+               end
+          ok ? nil : :drawer
         else
           CabinetBuilder.thickness_ok_for?('front_door', Fronts::FRONT_THICKNESS.to_f, target_th) ? nil : :front
         end
@@ -348,7 +406,9 @@ module Noxun
           when :parts then "dielce s vlastným materiálom inej hrúbky: #{Array(names).join(', ')}"
           when :range then 'hrúbka cieľa mimo rozsahu'
           when :front then 'hrúbka cieľa nesedí pre čelá'
-          when :drawer then 'hrúbka cieľa nesedí pre dielce zásuviek (recepty poznajú 16 a 18 mm)'
+          when :drawer
+            who = Array(names).empty? ? '' : " (#{Array(names).join(', ')})"
+            "hrúbka cieľa nesedí pre dielce zásuviek#{who}"
           # GHOST-D1: doska z novsej verzie pluginu — jej config sa nesmie
           # znormalizovat (stratil by polia, ktore tato verzia nepozna).
           when :board_schema then 'doska je z novšej verzie Noxun — aktualizuj plugin'

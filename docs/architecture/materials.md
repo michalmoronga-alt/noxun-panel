@@ -39,9 +39,17 @@ Zdrojom čísel je `Recipes.supported_thicknesses` ([hardware.md](hardware.md)),
 `ru_project_key_for`; bez neho by hromadná náhrada `UNI_ZASUVKA_16` nevytvorila rebuild joby pre skrinky, ktoré kanál dedia, a snapshoty dielcov by ostali na UNI).
 Piata cesta je **delete guard** (`CABINET_MATERIAL_KEYS`). Nový materiálový kanál = pridať do všetkých piatich.
 
-**Jeden receptový predikát pre všetky cesty.** `Recipes.thickness_ok_for_any_system?` (a `all_supported_thicknesses` do hlášok) číta **selektor predvoľby v Štúdiu** aj
-**„Nahradiť UNI…"** (`ru_project_target_issue`, dôvod `:drawer`) — dva rôzne predikáty by znamenali, že tá istá 25 mm doska prejde jednou cestou a druhou nie. Náhrada
-UNI na dosku, ktorú nepozná ani jeden vydaný systém, je **blokovaná** aj na úrovni skrinky (rola `drawer` v `roles_now`), nielen projektovej predvoľby.
+**Predikát podľa toho, ČO sa naozaj mení** (Codex #304 kolo 4). „Prijme aspoň jeden vydaný systém" stačí len tam, kde ešte niet čo pokaziť — pri **novej** predvoľbe
+v Štúdiu a v zákazke, ktorá zásuvky nemá. Všade inde sa hrúbka meria **systémom každého dotknutého čela**:
+- **„Nahradiť UNI…" — projektová predvoľba:** `ru_scan_drawer_systems(scan)` zozbiera systémy z **celej** zákazky a cieľ musí vyhovieť **každému** z nich. 18 mm je platná
+  hrúbka pre Quadro, ale v atirovej zákazke by z každej zásuvky spravila RED — preto sa taká predvoľba neprepíše.
+- **„Nahradiť UNI…" — skrinka:** `ru_drawer_systems_affected(params, roles_now, hit_ov_keys)`. Keď sa mení **kanál** (rola `drawer` v `roles_now`), sú dotknuté všetky
+  klasifikované čelá skrinky; keď UNI sedí **len v `part_override` dielca zásuvky**, `roles_now` rolu `drawer` vôbec nenesie — dotknuté sú vtedy len čelá tých dielcov
+  (`ru_drawer_key_front`). Bez tejto vetvy by 25 mm doska prešla generickým rozsahom doskového materiálu. Blokácia menuje **systém**, ktorý hrúbku neprijal.
+- **Vkladanie:** `MaterialsDialog.drawer_material_issue(params, model)` beží v `Panel.handle_insert` **pred** `prepare_insert`/ghostom — efektívny materiál zásuviek proti
+  systémom v **zloženej** konfigurácii čiel. Nekompatibilný = odmietnutie s hláškou („Nič sa nevložilo"), nie „úspech" a RED až po kliku.
+
+`Recipes.thickness_ok_for_any_system?` a `all_supported_thicknesses` ostávajú pre tie dve laxné miesta a pre texty hlášok; čísla nikde nestoja natvrdo.
 
 **Remap ABS platí aj pre 4. kanál** (Codex #304 kolo 2 P2). Zmena predvoľby zásuviek prebehne tou istou slučkou `remap_part_edge_overrides!` ako telo/čelá/chrbát: ručný
 override zladený so **starým** efektívnym dekorom nasleduje nový, vedome kontrastný alebo `nil` ostáva. K tomu bolo treba, aby `old_eff`/`new_eff` niesli aj kľúč `drawer`

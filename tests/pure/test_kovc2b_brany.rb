@@ -539,6 +539,16 @@ module NxC2bB
     CB.config_to_params(JSON.parse(JSON.generate(CB.cabinet_config(cfg))))
   end
 
+  # Zasuvkove celo danej konstrukcie (metal -> Atira, wood -> Quadro V6).
+  def drawer_front(construction = 'metal', id = 'F1')
+    { 'id' => id, 'type' => 'drawer_front', 'mode' => 'fixed', 'height' => 175.0,
+      'opening_mode' => 'classic', 'drawer' => { 'construction' => construction } }
+  end
+
+  def stored_params_with(construction, over = {})
+    stored_params({ 'fronts' => { 'items' => [drawer_front(construction)] } }.merge(over))
+  end
+
   def stale_cfg(schema, construction, over = {})
     item = { 'id' => 'F1', 'type' => 'drawer_front', 'height' => 175.0 }
     if construction
@@ -717,14 +727,15 @@ NxTest.test('Codex #304 kolo 3 P2: „Nahradiť UNI…" pouziva RECEPTOVY predik
   # ten isty predikat ako selektor v Studiu.
   NxTest.assert_equal(:drawer, ru.ru_project_target_issue('default_drawer_material_id', 25.0))
   NxTest.assert_equal(nil, ru.ru_project_target_issue('default_drawer_material_id', 16.0))
-  NxTest.assert_equal(nil, ru.ru_project_target_issue('default_drawer_material_id', 18.0))
+  NxTest.assert_equal(nil, ru.ru_project_target_issue('default_drawer_material_id', 18.0),
+                      'zakazka bez zasuviek: staci, ze hrubku pozna aspon jeden system')
   NxTest.assert_equal(c::E::MaterialsDialog.drawer_thickness_any_system?(25.0),
                       ru.ru_project_target_issue('default_drawer_material_id', 25.0).nil?,
                       'JEDEN predikat pre obe cesty')
   # A skrinka s dielcami zasuviek sa na taku dosku nenahradi (blokovana).
   uni = { 'material_id' => 'UNI_ZASUVKA_16', 'thickness' => 16.0, 'decor' => 'UNI' }
   fat = { 'material_id' => 'DOSKA_25', 'thickness' => 25.0, 'decor' => 'Hruba' }
-  params = c.stored_params('drawer_material_id' => 'UNI_ZASUVKA_16')
+  params = c.stored_params_with('metal', 'drawer_material_id' => 'UNI_ZASUVKA_16')
   scan = { 'cabs' => [['CAB-1', params, { 'drawer' => 'UNI_ZASUVKA_16' }, '{}', :ref]],
            'boards' => [], 'model_guid' => 'G', 'project' => {} }
   out = ru.replace_uni_classify(scan, uni, fat)
@@ -732,4 +743,117 @@ NxTest.test('Codex #304 kolo 3 P2: „Nahradiť UNI…" pouziva RECEPTOVY predik
   NxTest.assert_equal(:drawer, out['blocked'].first && out['blocked'].first[1])
   NxTest.assert(ru.ru_blocked_line('CAB-1', :drawer, []).include?('zásuviek'),
                 ru.ru_blocked_line('CAB-1', :drawer, []))
+end
+
+# ============================================================================
+# CODEX #304 KOLO 4 — system KAZDEHO dotknuteho cela + preflight vkladu
+# ============================================================================
+
+NxTest.test('Codex #304 kolo 4 P1: predvolba sa meria systemom KAZDEHO cela zakazky') do
+  c = NxC2bB
+  ru = c::E::Materials
+  # 18 mm pozna Quadro, ale NIE Atira. V ATIROVEJ zakazke sa preto predvolba
+  # zasuviek na 18 mm nesmie prepisat — spravila by RED z kazdej zasuvky.
+  atira = ['atira']
+  quadro = ['quadro_v6']
+  NxTest.assert_equal(:drawer, ru.ru_project_target_issue('default_drawer_material_id', 18.0, atira),
+                      'Atira 18 mm neprijme')
+  NxTest.assert_equal(nil, ru.ru_project_target_issue('default_drawer_material_id', 18.0, quadro))
+  NxTest.assert_equal(nil, ru.ru_project_target_issue('default_drawer_material_id', 16.0,
+                                                      atira + quadro),
+                      '16 mm prijmu OBA systemy')
+  NxTest.assert_equal(:drawer,
+                      ru.ru_project_target_issue('default_drawer_material_id', 18.0, atira + quadro),
+                      'zmiesana zakazka: staci JEDEN system, ktory hrubku neprijme')
+  # A cez CELU klasifikaciu: scan s Atirou -> 18 mm predvolba blokovana.
+  uni = { 'material_id' => 'UNI_ZASUVKA_16', 'thickness' => 16.0, 'decor' => 'UNI' }
+  t18 = { 'material_id' => 'BIELA_18', 'thickness' => 18.0, 'decor' => 'Biela' }
+  scan = { 'cabs' => [['CAB-1', c.stored_params_with('metal'), { 'drawer' => 'UNI_ZASUVKA_16' },
+                       '{}', :ref]],
+           'boards' => [], 'model_guid' => 'G',
+           'project' => { 'default_drawer_material_id' => 'UNI_ZASUVKA_16' } }
+  out = ru.replace_uni_classify(scan, uni, t18)
+  NxTest.assert_equal({}, out['project_writes'], 'predvolba sa NEPREPISALA')
+  NxTest.assert_equal('projektová predvoľba', out['blocked'].first && out['blocked'].first[0])
+  # Ta ista nahrada v DREVENEJ zakazke prejde.
+  scan2 = { 'cabs' => [['CAB-1', c.stored_params_with('wood'), { 'drawer' => 'UNI_ZASUVKA_16' },
+                        '{}', :ref]],
+            'boards' => [], 'model_guid' => 'G',
+            'project' => { 'default_drawer_material_id' => 'UNI_ZASUVKA_16' } }
+  out2 = ru.replace_uni_classify(scan2, uni, t18)
+  NxTest.assert_equal({ 'default_drawer_material_id' => 'BIELA_18' }, out2['project_writes'])
+end
+
+NxTest.test('Codex #304 kolo 4 P1: UNI LEN v override dielca zasuvky sa neprepasuje') do
+  c = NxC2bB
+  ru = c::E::Materials
+  uni = { 'material_id' => 'UNI_ZASUVKA_16', 'thickness' => 16.0, 'decor' => 'UNI' }
+  fat = { 'material_id' => 'DOSKA_25', 'thickness' => 25.0, 'decor' => 'Hruba' }
+  # Skrinka DEDI kanal (ziadny `drawer_material_id`), ale DIELEC dna ma vlastny
+  # UNI material — `roles_now` rolu `drawer` teda vobec nenesie a genericky
+  # rozsah doskoveho materialu by 25 mm ticho prepustil.
+  params = c.stored_params_with('metal',
+                                'part_overrides' => {
+                                  'front:F1/drawer_bottom' => { 'material_id' => 'UNI_ZASUVKA_16' }
+                                })
+  NxTest.assert_equal('UNI_ZASUVKA_16',
+                      params['part_overrides']['front:F1/drawer_bottom']['material_id'],
+                      'override prezil round-trip configu')
+  scan = { 'cabs' => [['CAB-1', params, { 'drawer' => 'BIELA_16' }, '{}', :ref]],
+           'boards' => [], 'model_guid' => 'G', 'project' => {} }
+  out = ru.replace_uni_classify(scan, uni, fat)
+  NxTest.assert_equal([], out['jobs_cab'], 'ziadny job — 25 mm sa na dno zasuvky nedostane')
+  NxTest.assert_equal(:drawer, out['blocked'].first && out['blocked'].first[1])
+  NxTest.assert(ru.ru_blocked_line('CAB-1', :drawer, ['Atira']).include?('Atira'),
+                'hlaska menuje SYSTEM, ktory hrubku neprijal')
+  # Ten isty override, ale cielova doska 16 mm -> prejde.
+  ok16 = { 'material_id' => 'BIELA_16', 'thickness' => 16.0, 'decor' => 'Biela' }
+  params2 = c.stored_params_with('metal',
+                                 'part_overrides' => {
+                                   'front:F1/drawer_bottom' => { 'material_id' => 'UNI_ZASUVKA_16' }
+                                 })
+  scan2 = { 'cabs' => [['CAB-1', params2, { 'drawer' => 'BIELA_16' }, '{}', :ref]],
+            'boards' => [], 'model_guid' => 'G', 'project' => {} }
+  out2 = ru.replace_uni_classify(scan2, uni, ok16)
+  NxTest.assert_equal(1, out2['jobs_cab'].length)
+  NxTest.assert_equal('BIELA_16',
+                      params2['part_overrides']['front:F1/drawer_bottom']['material_id'])
+end
+
+NxTest.test('Codex #304 kolo 4 P1: `ru_drawer_key_front` pozna LEN roly zasuviek') do
+  ru = NxC2bB::E::Materials
+  NxTest.assert_equal('F1', ru.ru_drawer_key_front('front:F1/drawer_bottom'))
+  NxTest.assert_equal('F2', ru.ru_drawer_key_front('front:F2/box_side:left'))
+  NxTest.assert_equal(nil, ru.ru_drawer_key_front('front:F1/panel'), 'celo nie je dielec zasuvky')
+  NxTest.assert_equal(nil, ru.ru_drawer_key_front('cabinet/side:left'))
+  NxTest.assert_equal(nil, ru.ru_drawer_key_front('zone:Z1/shelf:1'))
+end
+
+NxTest.test('Codex #304 kolo 4 P1: vklad odmietne nekompatibilny material zasuviek') do
+  c = NxC2bB
+  # `handle_insert` bez SketchUpu spustit nevieme — testuje sa PREFLIGHT,
+  # ktory je cista funkcia nad payloadom (model = nil => projektove predvolby
+  # padnu na UNI 16 fallback).
+  md = c::E::MaterialsDialog
+  mats = c::E::Materials
+  atira = { 'fronts' => { 'items' => [c.drawer_front('metal')] } }
+  wood  = { 'fronts' => { 'items' => [c.drawer_front('wood')] } }
+  # UNI 16 fallback vyhovuje obom systemom.
+  NxTest.assert_equal(nil, md.drawer_material_issue(atira, nil))
+  NxTest.assert_equal(nil, md.drawer_material_issue(wood, nil))
+  # Skrinka BEZ klasifikovanej zasuvky sa preflightu netyka nikdy.
+  NxTest.assert_equal(nil, md.drawer_material_issue(
+                             { 'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'door' }] },
+                               'drawer_material_id' => 'NEEXISTUJE' }, nil))
+  # 18 mm doska (Quadro ju pozna, Atira nie) — potrebujeme ju v katalogu.
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheet18 = mats.sheets.find { |sh| (sh['thickness'].to_f - 18.0).abs < 0.01 && !mats.uni?(sh) } ||
+            mats.sheets.find { |sh| (sh['thickness'].to_f - 18.0).abs < 0.01 }
+  NxTest.skip!('katalog nema 18 mm dosku') if sheet18.nil?
+  id18 = sheet18['material_id']
+  msg = md.drawer_material_issue(atira.merge('drawer_material_id' => id18), nil)
+  NxTest.assert(msg.to_s.include?('Atira'), "Atira 18 mm musi odmietnut: #{msg.inspect}")
+  NxTest.assert(msg.to_s.include?('Nič sa nevložilo'), msg.to_s)
+  NxTest.assert_equal(nil, md.drawer_material_issue(wood.merge('drawer_material_id' => id18), nil),
+                      'Quadro 18 mm prijme')
 end

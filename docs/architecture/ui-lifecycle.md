@@ -2113,7 +2113,8 @@ ho nikdy nepoužije (dôvod v `SYSTEM/archiv/KRONIKA.md`).
 **KOV-C2b (v0.9.31) — 4. materiálový kanál v predvoľbách projektu.** `TARGETS` má štvrtý kľúč `default_drawer_material_id` a Štúdio jeden riadok „Zásuvky" vedľa
 Korpus/Čelá/Chrbát (žiadny nový blok — vertikálny priestor je vzácny). Preflight je **per systém zásuvky** (Atira 16, Quadro V6 16/18 — čísla z receptu, nie z UI):
 doska, ktorú neprijme žiadny systém, sa neuloží vôbec; doska, ktorú neprijme systém reálne použitý v zákazke, sa uloží až po potvrdení v **existujúcej** lište
-`MD.confirmDefault` (ten istý pending kontrakt ako D-46, iná veta). Detail v [materials.md](materials.md).
+`MD.confirmDefault` (ten istý pending kontrakt ako D-46, iná veta). **Vkladanie** má vlastný preflight `MaterialsDialog.drawer_material_issue`, ktorý `Panel.handle_insert`
+volá **pred** `prepare_insert` a ghostom — nekompatibilný materiál zásuviek vklad odmietne hláškou, nie „úspechom" a RED po kliku. Detail v [materials.md](materials.md).
 
 **`materials_dialog.rb` — od ŠT-2b už NIE JE OKNO** (ostal serverový modul; obsah je sekcia `mat` Štúdia, popis je tu kvôli histórii): katalóg = mriežka dlaždíc podľa výrobcu + pás
 „Použité v projekte" — jediné echo je `push_catalog` BEZ scanu modelu; hľadanie názov/výrobca/kód/dodávateľ; klik na dlaždicu → detail dekoru s editovateľnými bunkami
