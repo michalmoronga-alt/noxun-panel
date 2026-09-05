@@ -87,3 +87,12 @@ RED `drawer_unclassified` v registri; (3) `source: recipe` by BuildPlan odmietol
 validovaným záznamom (SHA-256 kanonickej serializácie); (6) dôveryhodná cesta receptu → `Fronts.stored_recipe(raw)` pred normalizáciou + `Fronts.write_recipe!` po resolveri. **2 FIX:** (7)
 `context_for` z nezaokrúhlených zón (`raw_bounds`); (8) `materialized_part` sa pre drawer roly nepoužíva (rozpor C1/C2b odstránený). Residual: do KOV-D sa set vyberá len cez owner/generic
 mapovanie (C2b smie zablokovať, nikdy ticho priradiť H70); reálne in-SU testy povinné (kópia medzi dokumentmi, seed + Undo, part_overrides, duplikáty). Kolo 4 (Sol, záverečné) = ČAKÁ.
+
+## Kolo 4 (Sol, 5.9.2026, nad verziou 4 `60b52ea`) — ZÁVEREČNÉ, ZAPRACOVANÉ (verzia 5 = FINAL)
+
+Kolo 3: **7/8 RESOLVED**, 1 PARTIAL (spotrebitelia `locked`). **1 BLOCKER:** C2b by aktivovalo `sync_shaft` skôr, než ju nákup vie materializovať (`HardwareSets.expand` dĺžkovú položku bez
+`per: length` odkloní ako ORANGE `length_unsupported` → obídená brána). → **ROZHODNUTÉ:** až do KOV-D je každý recipe `sync_shaft`, ktorý skončí ako `length_unsupported` (nielen bez setu), RED
+`drawer_sync_rod_missing` + tvrdá brána — široká P2O zásuvka je vedome neobjednateľná, kým KOV-D neprinesie `per: length` s cenou za meter (R-06a). **1 FIX-C2:** `locked` = autorita pre recipe
+položky u spotrebiteľov (`note_manual`, payloady Nákupu/Inspectora), legacy `source manual` bez zmeny, test viditeľnosti migrovaného D-93 zámku. **3 NOTE (prijaté):** šablóna nesie CELÝ validný
+snapshot použitých systémov; D-46 preflight per systém (Atira 16, Quadro 16/18); názvy schémy packu podľa package, nie draftu. Auditné otázky potvrdené (clear_depth, rez C1 → C2a → C2b).
+**Priebeh auditu:** 14 → 6 nových (+6 partial/unresolved) → 8 nových (6 BLOCKER presnosti) → 2 nové (1 BLOCKER rozhodnutím) = **HOTOVÝ**. Package KOV-C v `SYSTEM/PLAN.md` = autorita; ďalej brief C1 → subagent.
