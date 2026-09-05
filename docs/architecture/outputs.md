@@ -321,6 +321,11 @@ kontrakty, čísla sa navzájom neporovnávajú). Doska sa priznáva **ešte pre
 poľa je presne to, čomu brána zabraňuje. **Legacy tvar (holý String) sa ďalej číta ako skrinka**, takže staršie volania a headless testy sa nemenia
 (`Validation.newer_config_entry` je jediný normalizátor).
 
+**Blocker NESMIE zaniknúť spolu s ID (Codex #298 P1).** `note_newer_config` prázdne ID ignoruje, lenže entita s poškodenou identitou **ďalej prispieva známymi poľami do
+`records`** — bez adresy by teda blocker vypadol a VEPO aj ostatné výstupy by pokračovali s ticho orezaným novším configom. Adresu preto skladá **`Bom.newer_address(inst, id)`**:
+výrobné ID je prvou voľbou, a keď chýba, použije sa **stabilná adresa entity** — `persistent_id` (prežije save/reopen), fallback `entityID` — v ľudskom tvare
+**„bez ID (pid 12345)"**, takže Kontrola aj hláška brány povedia, čo v modeli hľadať. Platí pre **dosku aj skrinku** (tá istá trieda chyby).
+
 Čitatelia: `ProductionCore.export_blockers(newer:)` — hlási „Skrinka CAB-001, Doska BRD-002" (`newer_ids_text`, ten istý strop „tri + a ďalšie N") a **zastaví VEPO, nákupný CSV,
 rozpočet aj ponuku** — a `Validation` (RED `newer_config`, hláška menuje **úplný** zoznam dotknutých výstupov vrátane kusovníka, ktorý je nad takým objektom neúplný, aj keď sa
 ďalej zobrazuje). `compute()` kľúč ignoruje.

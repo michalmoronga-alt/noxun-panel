@@ -907,10 +907,13 @@ Záväzné princípy dosky:
     **(1) mutácie a šablóny = ODMIETNUTIE** — prestavba dosky (`rebuild` **pred `normalize`** aj `rebuild_in_operation` pre dávkové cesty), zmena orientácie z karty, vloženie
     zo šablóny (autorita = **uložený RAW záznam**, nie payload z CEF) a dávka „Nahradiť UNI…" (doska ide do `blocked` plánu a **celá náhrada sa odmietne** — žiadny čiastočne
     migrovaný projekt). Nikdy tichá normalizácia.
-    **(2) výrobné výstupy = BLOKÁDA:** `Bom.collect` zaradí dosku do `newer_configs` (záznam nesie `kind: cabinet | board`) **ešte pred filtrom `manufactured`**; brána zastaví
+    **(2) výrobné výstupy = BLOKÁDA:** `Bom.collect` zaradí dosku do `newer_configs` (záznam nesie `kind: cabinet | board`) **ešte pred filtrom `manufactured`**, a keď výrobné
+    ID chýba či je poškodené, dostane **stabilnú adresu entity** („bez ID (pid N)") — blocker nesmie zaniknúť spolu s ID, kým entita ďalej prispieva do výstupov; brána zastaví
     **VEPO, nákupný zoznam kovania, rozpočet aj cenovú ponuku** a Kontrola hlási RED „Doska &lt;id&gt;" s úplným zoznamom dotknutých výstupov (kusovník nad takým objektom je
     neúplný, aj keď sa ďalej zobrazuje).
-    **(3) zobrazenie** v Inspectore a na karte ostáva **read-only s upozornením** — čítanie a výber sa nikdy neblokujú.
+    **(3) zobrazenie** v Inspectore a na karte ostáva **read-only s upozornením** — čítanie a výber sa nikdy neblokujú. Realizácia: server posiela v payloade karty
+    **`newer_config` + `newer_config_note`** (klient si stav ani text neodvodzuje), karta zamkne všetky ovládače a upozornenie ukáže; brána zápisu je na tom **nezávislá**
+    (`guarded_board`), takže read-only je UX vrstva, nie ochrana.
   - Guard číta **RAW config z entity alebo zo záznamu šablóny, NIKDY payload z panela** (klientsky payload prechádza cez CEF a uzavreté whitelisty JS, takže marker v ňom už
     nemusí byť). **Chýbajúci marker = 0 = legacy doska a NIKDY neblokuje.**
 - **Config dosky = superset configu dielca korpusu** — rovnaké výrobné polia (`quantity`/`length`/`width`/`thickness`/`material_id`/`grain_direction`/`edges`), navyše `engine_version`/`name`/`role` pre round-trip editácie a `orientation` pre umiestnenie (nižšie). Výstupy čítajú názov a rolu z **plochých** kľúčov (2.1), nie z configu.

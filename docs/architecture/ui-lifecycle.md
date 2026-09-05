@@ -1361,7 +1361,18 @@ kurzor; doska vznikne až **klikom** (`GhostTool` → `BoardBuilder.commit_inser
 callback zo starého Inspectora nesmie pripraviť plán nad novým modelom) → šablónový ref + **downgrade brána** (`newer_template_refusal` nad **uloženým RAW záznamom**, nie nad
 payloadom z CEF — v ňom marker nemusí byť; doskový záznam sa posudzuje proti `BoardBuilder::BOARD_CONFIG_SCHEMA`) → `prepare_insert` → session so `subject: :board` a orientáciou
 **z karty**. Vyššia schéma šablóny = odmietnutie **bez session a bez pečiatky**. Po úspešnom commite beží `ghost_after_commit_board` (výber, status s umiestnením,
-`push_selected`, `stamp_once!`). `handle_set_board_orientation` má **rovnakú bránu schémy pred výpočtom delty** — doska z novšej verzie sa neotočí a model ostane nedotknutý.
+`push_selected`, `stamp_once!`).
+
+**Brána schémy stojí vo VSTUPNEJ bráne karty `guarded_board`, nie až pri prestavbe (Codex #298 P2).** Cesty karty totiž pred rebuildom menia **globálny katalóg** —
+`handle_set_board_material` cez `resolve_virtual_material` → `ensure_duplak_for` a cez `ensure_missing_abs` (to isté robí „olep všetkých 4"), a to sa už **nedá vrátiť**. Guard
+preto beží hneď za identitou dokumentu, kontextom a echom `board_id`: doska z novšej verzie odmietne **každú** zápisovú cestu karty (polia · materiál · ABS hrana · olep všetkých
+4 · orientácia) **ešte pred prvým zápisom kamkoľvek**, a to **nahlas** (rovnako ako guard dokumentu — zmena sa neuložila a používateľ to musí vedieť).
+
+**Karta je pritom READ-ONLY, nie „padá na hlášky" (STANDARD 8.3 bod 3).** `Panel.board_payload` primieša cez `board_newer_flag` aditívne **`newer_config` + `newer_config_note`**
+(text je **serverový** — klient si stav ani znenie neodvodzuje) a `applyBoardReadOnly` v `board_card.js` zamkne **všetky** ovládače karty (`disabled`, nie len `readOnly` — pri
+selectoch a tlačidlách je to jediný spôsob, ako ich naozaj umlčať) a ukáže upozornenie `#bcNewer` (tokeny `--nx-warn*`, bez emoji; riadok existuje **len** v tomto stave, takže
+bežná karta nerastie). Zámok beží **až na konci** `renderBoardCard`, aby prebil aj to, čo karta vyššie odomkla (hrúbka UNI dosky, comboboxy hrán, odkaz na dekor).
+Testy: `tests/js/test_ghost_d1_karta.js`.
 
 ### actions_cabinet.rb
 
