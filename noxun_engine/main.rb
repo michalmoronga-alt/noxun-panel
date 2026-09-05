@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.9.29' unless defined?(VERSION)
+    VERSION = '0.9.30' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -554,6 +554,15 @@ module Noxun
         Materials.ensure_uni_records!
       rescue StandardError => e
         log_error(e, 'ensure_uni_records')
+      end
+
+      # KOV-C2a: UNI zaznam 4. kanala (dielce zasuviek, 16 mm). VLASTNA migracia
+      # s VLASTNYM markerom — `ensure_uni_records!` konci pri `uni_seed.done`,
+      # takze na existujucej instalacii by sa novy zaznam uz nikdy nedoplnil.
+      begin
+        Materials.ensure_drawer_uni!
+      rescue StandardError => e
+        log_error(e, 'ensure_drawer_uni')
       end
 
       # NASTROJE-1 (T1b): jednorazove UPRATANIE STARYCH INSTALACII Mower/Snaper

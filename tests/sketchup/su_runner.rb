@@ -13270,8 +13270,12 @@ module NoxunSuRunner
          rec.is_a?(Hash) && rec['use_type'] == 'door' && rec['manufacturer'] == 'Hettich' &&
          rec['series'] == 'Sensys')
       doc = JSON.parse(File.binread(e::HardwareSets.path))
-      ok("KOV-B1: subor kniznice nesie std 3 (#{doc['std']})",
-         doc['std'] == e::HardwareSets::STD_CLASSIFIED)
+      # KOV-C2a: cerstva kniznica uz NIE JE „len klasifikovana" — seed do nej
+      # dava receptove sety zasuviek s `height_variant`, a marker je LAZY podla
+      # OBSAHU, takze najvyssi vyhrava a subor dostane std 4. Klasifikovany set
+      # SAM O SEBE (nas `kovb1_class`) by dal 3 — to overuje headless sada.
+      ok("KOV-B1: subor kniznice nesie std 4 (#{doc['std']})",
+         doc['std'] == e::HardwareSets::STD_HEIGHT_VARIANT)
       e::JsonFileStore.invalidate(e::HardwareSets.path)
       e::HardwareSets.reset_library_state!
       ok('KOV-B1: a TA ISTA verzia si ho hned precita ako `:ok`',
@@ -13300,8 +13304,12 @@ module NoxunSuRunner
          state['sets'][KOVB1_SID]['use_type'] == 'door' &&
          state['sets'][KOVB1_SID]['series'] == 'Sensys')
       snap = JSON.parse(kovb1_snap_raw(model))
-      ok("KOV-B1: snapshot v NOXUN dict nesie std 3 (#{snap['std']})",
-         snap['std'] == e::HardwareSets::STD_CLASSIFIED)
+      # KOV-C2a: prvy zapis do projektu ZMRAZI VSETKY globalne predvolby
+      # (`global_default_state`) — a v nich su od tejto davky aj triedne
+      # mapovania a sety zasuviek s `height_variant`. Snapshot preto nesie std 4,
+      # nie 3; nas klasifikovany set je v nom tak ci tak (overuje sa vyssie).
+      ok("KOV-B1: snapshot v NOXUN dict nesie std 4 (#{snap['std']})",
+         snap['std'] == e::HardwareSets::STD_HEIGHT_VARIANT)
       exp_class = kovb1_expand(model)
       Sketchup.undo
       # POZOR: skrinka si pri stavbe zmrazila GLOBALNE predvolby, takze snapshot
@@ -13316,8 +13324,15 @@ module NoxunSuRunner
       e::HardwareSets.set_project_mapping!(model, 'hinge', KOVB1_SID, kovb1_set)
       model.commit_operation
       snap2 = JSON.parse(kovb1_snap_raw(model))
-      ok("KOV-B1: legacy snapshot ostava na povodnom std (#{snap2['std']})",
-         snap2['std'] != e::HardwareSets::STD_CLASSIFIED)
+      # KOV-C2a: povodne znenie („legacy snapshot ostava na nizsom std") uz nie
+      # je meratelne na CELOM snapshote — seed sety zasuviek su v nom vzdy, takze
+      # marker ostane 4 nech je NAS set klasifikovany alebo nie. Overuje sa preto
+      # to, o com veta naozaj bola: ze neklasifikovana definicia sa ulozila ako
+      # NEZARADENA a klasifikaciu si nikto ticho nedomyslel.
+      snap2_set = snap2['sets'].is_a?(Hash) ? snap2['sets'][KOVB1_SID] : nil
+      ok("KOV-B1: legacy definicia ostava NEZARADENA (std snapshotu #{snap2['std']})",
+         snap2_set.is_a?(Hash) && snap2_set['use_type'].nil? && snap2_set['series'].nil? &&
+         snap2['std'] == e::HardwareSets::STD_HEIGHT_VARIANT)
       exp_plain = kovb1_expand(model)
       ok('KOV-B1: NAKUP je s klasifikaciou aj bez nej TOTOZNY (kody, pocty, ceny)',
          JSON.generate(exp_class) == JSON.generate(exp_plain))

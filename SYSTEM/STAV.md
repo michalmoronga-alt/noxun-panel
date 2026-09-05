@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.9.29 · 5.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.9.30 · 5.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -25,38 +25,38 @@ robí **priamo v Inspectore**. **KOV-B1** dala setom **klasifikáciu** (na čo �
 **Pozor na kompatibilitu:** čo uloží v0.9.20, to **v0.9.18 už nepoužije** — model/šablóna (`CONFIG_SCHEMA` 4 + brána `assess_set_defs`), knižnica setov aj projektový snapshot
 (`std` 3) a katalóg kovania s výrobcom (`schema` 2). Pred prvou takou zákazkou aktualizovať **obe PC** (D-52 updater).
 
-**Testy k v0.9.29:** **2998 headless** · 89 JS sád · posledný plný in-SketchUp beh **1750 PASS** (nad vetvou KOV-C1, 5.9.; predtým 1504 PASS na v0.9.21 — dávky #287, KOV-B2, NÁSTROJE-1 a GHOST-D1 ho nespúšťali; pribudli sekcie `run_kovb2`, `run_tools1`, `run_tools1_async`, `run_tools1b`, `run_kovb3`, `run_ghost_d1`, `run_ghost_d1_async`, `run_ghost_d2` a `run_ghost_d2_async`).
+**Testy k v0.9.30:** **3023 headless** · 89 JS sád · posledný plný in-SketchUp beh **1750 PASS** (nad vetvou KOV-C1, 5.9.; predtým 1504 PASS na v0.9.21 — dávky #287, KOV-B2, NÁSTROJE-1 a GHOST-D1 ho nespúšťali; pribudli sekcie `run_kovb2`, `run_tools1`, `run_tools1_async`, `run_tools1b`, `run_kovb3`, `run_ghost_d1`, `run_ghost_d1_async`, `run_ghost_d2` a `run_ghost_d2_async`).
 
 ## Robí sa
 
 **Blok 1b uzavretý až na D-51** (čaká na Michalove hodnoty) · **1c hotový** · **1d beží** (hotové R-06/R-08/R-01+04/R-34/R-02(b)/R-03/R-07/R-23.1/R-11/R-12/R-14; ďalej R-18 + zvyšok; R-13 čaká na Michala) · **1e HOTOVÁ** ([AUDIT_REGISTER.md](AUDIT_REGISTER.md)).
 **Blok KOVANIE beží (od 2.9.):** architektúra V1 uzavretá po cross-audite + O1–O3 ([zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md](zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md)),
 mockup schválený ([zdroje/ui20/mockup_kovanie_v1.html](zdroje/ui20/mockup_kovanie_v1.html)), packages v [PLAN.md](PLAN.md); **D-52 UPDATER KOMPLET (v0.9.14)**.
-**KOV-A KOMPLET** (#280–#282 + smoke fix #286), **KOV-H KOMPLET** (H1 #283 + H2 #285), **KOV-B1** (#284), **KOV-B2** (katalóg) aj **KOV-B3** (editor setu, R-41 uzavretá) hotové — **slice B je KOMPLET**. **KOV-C má package v2 (5.9., PR #301, #19):** nemenné recepty, kódy v setoch, žiadny fallback NL; ZMRAZENÝ. **C1 hotové (#302, v0.9.29) — ďalej C2 (aktivácia).**
+**KOV-A KOMPLET** (#280–#282 + smoke fix #286), **KOV-H KOMPLET** (H1 #283 + H2 #285), **KOV-B1** (#284), **KOV-B2** (katalóg) aj **KOV-B3** (editor setu, R-41 uzavretá) hotové — **slice B je KOMPLET**. **KOV-C má package v2 (5.9., PR #301, #19):** nemenné recepty, kódy v setoch, žiadny fallback NL; ZMRAZENÝ. **C1 jadro (#302) aj C2a príprava (v0.9.30) hotové — ďalej C2b (aktivácia).**
 **Od 3.9. opäť Fable (Max, ~mesiac; priorita = uzavrieť V1)** — orchestruje Fable, implementujú Opus subagenti, review Codex; vstupný bod je [zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md](zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md) + tento súbor. **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
 
 **Poradie (Michal 2.9.: „poradie je na tebe"):** ~~D-52~~ → ~~KOV-A1/A2a/A2b~~ → ~~KOV-H1~~ → ~~KOV-B1~~ → ~~KOV-H2~~ → ~~KOV-B2~~ → ~~KOV-B3~~ (všetko v maine)
-→ **KOV-C** (package v2 zmrazený 5.9., checkpoint #19; ~~C1 jadro #302~~ → **C2 aktivácia**) → **KOV-D** resolver + zámky + brány → E/F/G/I. Súbežne 1d podľa kapacity.
+→ **KOV-C** (package v2 zmrazený 5.9., checkpoint #19; ~~C1 jadro~~ → ~~C2a príprava~~ → **C2b aktivácia**) → **KOV-D** resolver + zámky + brány → E/F/G/I. Súbežne 1d podľa kapacity.
 Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` (KOV-A/B/C/D/H povinné) → subagent vo worktree → `codex-po-pr` → merge → uzáver. V1 checklist v [V1_VIZIA.md](V1_VIZIA.md).
 
 ## Posledné uzávery
 
+- **KOV-C2a — PRÍPRAVA AKTIVÁCIE ZÁSUVIEK (bez viditeľnej zmeny)** (v0.9.30, 5.9.2026): pribudol **4. materiálový kanál „Zásuvky"** (UNI 16 mm, zatiaľ bez výberu v UI), **ABS
+  pravidlá pre dielce zásuviek** (dno bez olepu, ostatné horná hrana 1,0), **8 nových setov Atira/Quadro s kódmi** a **predvoľby podľa otvárania a konštrukcie** — do starých
+  zákaziek ich pridá až klik „Pravidlá → Doplniť nové predvoľby". **Kusovník, nákup, VEPO ani rozpočet sa nemenia**; dielce zásuviek začne stavať až C2b. Plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **KOV-C1 — JADRO RECEPTOV ZÁSUVIEK (bez viditeľnej zmeny)** (v0.9.29, 5.9.2026): plugin **vie**, ako sa počíta zásuvka Atira a Quadro V6 — nemenné verzované recepty
   (`data/recipes/*.json` + SHA register `RELEASED.json`), výpočet svetlého priestoru okolo čela a výber **jednej výšky a jednej NL** s dielcami. **V SketchUpe sa zatiaľ nič
   nezmenilo** (stavba, kusovník, nákup ani VEPO sa nedotkli) — zapnutie robí C2. Plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **GHOST-D2 — DOSKA SA DÁ NAKRESLIŤ NA ROZMER** (v0.9.28, 5.9.2026): karta Dosky má vedľa „Vložiť" aj **„Nakresliť"** — doska vznikne **dvoma ťahmi** (klik = počiatok, ťah dĺžka a smer, ťah šírka), **čísla sa dajú napísať** do meracieho poľa (2400 Enter), **zamknuté pole karty ťah preskočí**, rozmer nad limitom plugin **odmietne s hláškou**,
   **Esc** nevloží nič a vloženie je **jeden krok Späť**. Vkladanie skriniek ani „Vložiť dosku" sa **nemenia**. Plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md).
-- **GHOST-D1 — DOSKA SA UŽ TIEŽ KLADIE KLIKOM** (v0.9.27, 5.9.2026): „Vložiť dosku" **už nevkladá vedľa poslednej skrinky** — doska **visí na kurzore**, prichytáva sa
-  **v celom priestore** (aj na **zvýšený** roh skrinky), **←/→** ju otáčajú, **↑/↓** menia **umiestnenie**, **Alt** prepína kotvu, **Esc** nevloží nič a vloženie je **jeden krok
-  Späť**. Doska má navyše vlastný **kontrakt configu** — zákazku z **novšieho** pluginu už nikto ticho neoreže. Plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **KOV-B3 — SET SA UPRAVUJE V OKNE A HNEĎ VIDNO, ČO SA OBJEDNÁ (slice B KOMPLET, R-41 uzavretá)** (v0.9.26, 4.9.2026): **Sety** sú **dlaždice s chipmi** (starý set má chip
   **„nezaradený"**), zakladanie aj úprava sú **modal** (použitie → otváranie → konštrukcia len pri zásuvke → výrobca → rada → navrhnutý názov), člen sa pýta „Ako sa určí kód?"
   a „Koľko?" a pod formulárom beží **živý náhľad** („objedná sa 1× 357696 za 19,60 €"). **Neaktívny set sa už neponúka** (staré zákazky sa nemenia), **dve okná nad tým istým setom sa už neprepíšu** (hláška + Obnoviť), **nákup ani výstupy sa nemenia.**
 - **NÁSTROJE-1 KOMPLET — MOWER A SNAPER SÚ V BALÍKU ENGINU (D-20 uzavretá)** (T1a v0.9.24 + T1b v0.9.25): druhý toolbar **„Noxun Nástroje"** (rotácie · Z = 0 · Z posun… · Kópia vľavo/vpravo · Prisunúť vľavo/vpravo) + menu → **Nástroje**. **T1a:** kópia je **plnohodnotná skrinka** (vlastné CAB číslo, Inspector, kusovník, ceny — doteraz „fantóm"), krok = **šírka korpusu po vlastnej osi**.
   **T1b:** staré samostatné inštalácie sa **odstraňujú samy** — raz inštalátorom, raz pri štarte pluginu (marker per priečinok `Plugins`); zamknutý súbor sa **neoznačí za hotový** a skúsi sa znova, staré toolbary zmiznú až po **reštarte**.
-- **Staršie uzávery** (**KOV-B2** katalóg kovania so stromom a modalom v0.9.23 · **KOV-H2** ad-hoc kovanie priamo v Inspectorovi v0.9.20 · **1d/R-14 · R-12 · R-11** zákazka z novšieho pluginu sa už ticho nezmrzačí v0.9.2–v0.9.4 ·
+- **Staršie uzávery** (**GHOST-D1** doska sa kladie klikom, vlastný kontrakt configu v0.9.27 · **KOV-B2** katalóg kovania so stromom a modalom v0.9.23 · **KOV-H2** ad-hoc kovanie priamo v Inspectorovi v0.9.20 · **1d/R-14 · R-12 · R-11** zákazka z novšieho pluginu sa už ticho nezmrzačí v0.9.2–v0.9.4 ·
   **D-52** Aktualizovať jedným klikom v0.9.14 · **SMOKE 3.9. + D-115/D-116** symbol otvárania z rohov, tag úchytky, v0.9.21 · **VÝSTUPY D-112 + D-113** deviaty stĺpec „poznámka" vo VEPO CSV, v0.9.22 ·
   **KOV-B1** klasifikácia setov a taxonómia v0.9.19 · **KOV-H1** ad-hoc kovanie dátová vrstva v0.9.18 · **KOV-A2b** smer otvárania v modeli v0.9.17 ·
   UZÁVER BLOKU GHOST VKLADANIE **v0.9.0** so smoke checklistom · 1d/R-02 · R-02b · R-01+R-04 · R-07 · R-08 · R-03 · R-34 · 1b-6a/6c · 1b-4 · 1b-3 ·

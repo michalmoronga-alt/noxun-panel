@@ -75,10 +75,11 @@ end
 
 # --- seedy ----------------------------------------------------------------------
 
-NxTest.test('mb1 seed: fresh install = 5 UNI zaznamov, fallback ID recyklovane, bez ABS') do
+NxTest.test('mb1 seed: fresh install = 6 UNI zaznamov, fallback ID recyklovane, bez ABS') do
   NxTest.install_fresh_seed_catalog!
   cat = MB1.load
-  NxTest.assert_equal(5, cat['sheets'].length)
+  # KOV-C2a: 6. zaznam = UNI 16 mm pre dielce zasuviek (4. materialovy kanal).
+  NxTest.assert_equal(6, cat['sheets'].length)
   NxTest.assert_equal(0, cat['edges'].length, 'seed ABS pasky zanikli')
   NxTest.assert(cat['sheets'].all? { |s| MB1.uni?(s) })
   korpus = MB1.sheet('K009_PW_DTDL_18')
@@ -89,6 +90,9 @@ NxTest.test('mb1 seed: fresh install = 5 UNI zaznamov, fallback ID recyklovane, 
   NxTest.assert_close(3.0, MB1.sheet('HDF_WHITE_3')['thickness'], 0.01)
   NxTest.assert(MB1.sheet('UNI_DOSKA_18'))
   NxTest.assert(MB1.sheet('UNI_DEKOR2_18'))
+  zas = MB1.sheet('UNI_ZASUVKA_16')
+  NxTest.assert_equal(['Zásuvka UNI', 'drawer'], [zas['decor'], zas['uni_role']])
+  NxTest.assert_close(16.0, zas['thickness'], 0.01)
   # PROJECT_FALLBACK id existuju v katalogu (fresh projekt startuje na UNI)
   MB1::PROJECT_FALLBACK.each_value do |id|
     NxTest.assert(MB1.sheet(id), "fallback #{id} v katalogu")
@@ -99,7 +103,7 @@ ensure
   NxTest.install_fresh_seed_catalog!
 end
 
-NxTest.test('mb1 ensure_uni_records!: dopln 5 novych do SCHEMA2 katalogu, idempotent, kolizia dekoru skip') do
+NxTest.test('mb1 ensure_uni_records!: dopln nove do SCHEMA2 katalogu, idempotent, kolizia dekoru skip') do
   NxTest.install_fresh_seed_catalog!
   # simulacia ZIVEHO katalogu: realne materialy bez UNI + jeden kolizny dekor
   data = MB1.load
@@ -123,7 +127,9 @@ NxTest.test('mb1 ensure_uni_records!: dopln 5 novych do SCHEMA2 katalogu, idempo
   k = MB1.sheet('K009_PW_DTDL_18')
   NxTest.assert_equal(false, MB1.uni?(k), 'realny zaznam NEDOTKNUTY')
   NxTest.assert_equal('111', k['code'])
-  NxTest.assert_equal(6, cat['sheets'].length, '2 povodne + 4 nove UNI (HDF kolizia skip)')
+  # KOV-C2a: 5 novych (korpus, celo, dekor2, doska, ZASUVKA) — HDF kolizia skip.
+  NxTest.assert_equal(7, cat['sheets'].length, '2 povodne + 5 novych UNI (HDF kolizia skip)')
+  NxTest.assert(MB1.sheet('UNI_ZASUVKA_16'), 'UNI zasuvka pribudla aj tadeto')
   NxTest.assert(File.exist?(MB1.uni_marker_path))
   before = File.read(MB1.path)
   NxTest.assert_equal(:done, MB1.ensure_uni_records!, 'marker = druhy beh no-op')

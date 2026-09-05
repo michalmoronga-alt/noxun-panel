@@ -85,7 +85,10 @@ module Noxun
       PD_EDGE_SUBTYPES = %w[postforming abs].freeze
       # Roly UNI sady (M-B): body=Korpus, front=Celo, decor2=Dekor2, hdf=HDF,
       # board=Doska. PD zamerne BEZ UNI. Enum strazi put_uni_fields.
-      UNI_ROLES = %w[body front decor2 hdf board].freeze
+      # KOV-C2a: drawer=Zasuvka — 4. materialovy kanal (dielce zasuviek: dno,
+      # chrbat, boky boxu, vnutorne celo). UNI zaznam ma 16 mm, lebo obe rady
+      # receptov (Atira aj Quadro V6) stavaju na 16 mm doske.
+      UNI_ROLES = %w[body front decor2 hdf board drawer].freeze
       # Povoleny nasobic duplaku (2 = bezny pripad "36 z 2x18"; 3 = rezerva).
       DUPLAK_MULTIPLIERS = [2, 3].freeze
       # Nemenna PREDMIGRACNA zaloha (standard 7.1) — mimo bezneho .bak, ktory sa
@@ -168,11 +171,18 @@ module Noxun
       SEED_TYPES = TYPE_REGISTRY.keys.freeze
 
       # Projektove default kluce v NOXUN dict na modeli (koren dedenia projekt->korpus->dielec).
-      PROJECT_KEYS = %w[default_material_id default_front_material_id default_back_material_id].freeze
+      # KOV-C2a: 4. kanal `default_drawer_material_id` = material DIELCOV ZASUVIEK
+      # (dno, chrbat, boky boxu, vnutorne celo). Kanal ma zatiaľ LEN projektovu
+      # uroven — override na skrinke (config kluc) aj vyber v Studiu pridava C2b
+      # spolu s bumpom `CONFIG_SCHEMA`. Cita ho `effective_materials` ako
+      # `eff_drawer`; v C2a ho este NIC nekonzumuje (dielce emituje az C2b).
+      PROJECT_KEYS = %w[default_material_id default_front_material_id default_back_material_id
+                        default_drawer_material_id].freeze
       PROJECT_FALLBACK = {
         'default_material_id'       => 'K009_PW_DTDL_18', # korpus (doska 18)
         'default_front_material_id' => 'W1000_DTDL_18',   # cela (biela celova 18)
-        'default_back_material_id'  => 'HDF_WHITE_3'       # chrbat (HDF 3)
+        'default_back_material_id'  => 'HDF_WHITE_3',      # chrbat (HDF 3)
+        'default_drawer_material_id' => 'UNI_ZASUVKA_16'  # zasuvky (UNI 16)
       }.freeze
       # Davka 2 (Codex audit, blocker 1): fallback ID su NEDELETOVATELNE — novy model
       # ich pouzije aj bez ulozenych atributov; zmazanie by rozbilo prvy vklad.

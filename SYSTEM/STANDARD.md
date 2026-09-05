@@ -474,12 +474,23 @@ pridávaním (`create_manufacturer!` / `create_series!`); premenovanie a mazanie
 kontroluje pri zápise do **globálnych** úložísk (knižnica setov, katalóg položiek); validácia setu ostáva **čistá**, lebo snapshot v .skp a šablóny cestujú medzi počítačmi
 s inou taxonómiou.
 
-**MAPOVACÍ KĽÚČ `class:`.** Okrem `generic_type` a `generic_type@owner_part_key` pozná mapovanie aj **triedny kľúč**
-`class:<generic_type>|<opening_mode>[|<drawer_construction>]` (tretí segment len pri `slide`, žiadny `@owner` sufix). Je pripravený pre výber setu podľa spôsobu otvárania;
-v0.9.19 ho **nič nečíta** a zapisovacie cesty ho nepíšu — platí preň iba **bezstratový round-trip** a detekcia markera `std`.
+**`height_variant` — ŠIESTE, VOLITEĽNÉ KLASIFIKAČNÉ POLE (KOV-C2a, záväzné od v0.9.30).** Celé číslo z uzavretého zoznamu `70 · 144 · 176`, povolené **len pri
+`use_type: 'drawer'`** (Quadro V6 výškové varianty nemá a pole mu legitímne chýba). **Nie je os výberu** — set naďalej vyberá pásmový selektor mapovania; pole slúži výhradne
+na **overenie pri expanzii**, lebo pásmo H176 a H70 majú rovnaké otváranie, konštrukciu aj NL 470, takže inak by nesúlad nemal čo odhaliť. Jeho strata sa prizná rovnako ako
+strata celej klasifikácie (vlastná vrstva detektora).
 
-**MARKER `std` KNIŽNICE A SNAPSHOTU:** `1` = legacy · `2` = pásma/selector · **`3` = klasifikácia alebo triedny kľúč**. Marker je LAZY podľa obsahu, takže čisto legacy dáta
-ostávajú čitateľné pre staršie verzie; obsah so `std: 3` je pre staršiu verziu read-only (knižnica) alebo `:invalid` (snapshot) — nikdy čiastočne prečítaný.
+**MAPOVACÍ KĽÚČ `class:`.** Okrem `generic_type` a `generic_type@owner_part_key` pozná mapovanie aj **triedny kľúč**
+`class:<generic_type>|<opening_mode>[|<drawer_construction>]` (tretí segment len pri `slide`, žiadny `@owner` sufix). Do v0.9.19 preň platil iba bezstratový round-trip;
+**od KOV-C2a (v0.9.30) ho resolver ČÍTA** — a to pre položku, ktorá nesie `params.opening_mode` **aj** `params.drawer_construction`. Vtedy platí kratšia precedencia
+**cabinet override → projekt**, owner-level `slide@…` sa **ignoruje** a chýbajúce triedne mapovanie je vlastný ORANGE dôvod (`class_unmapped`, veta navádza na „Pravidlá →
+Doplniť nové predvoľby"): **na generický `slide` sa NIKDY nepadá**, lebo H70 kit k zásuvke H176 by bol zlý nákup, a mlčky. Expanzia navyše overí, že set klasifikáciou sedí
+(otváranie · konštrukcia · `manufacturer` + `series` ↔ `params.system` · `height_variant`) — nesúlad = nemapovaná položka s dôvodom `set_incompatible`, **nikdy iný set**.
+Hodnota mapovania pre položku s `height_variant` **musí byť výškový selektor** na každej úrovni; pevný `set_id` je nekompatibilný.
+
+**MARKER `std` KNIŽNICE A SNAPSHOTU:** `1` = legacy · `2` = pásma/selector · **`3` = klasifikácia alebo triedny kľúč** · **`4` = set s `height_variant`**. Od KOV-C2a je
+čerstvá knižnica aj snapshot NOVÉHO projektu na `4` (seed nesie sety zásuviek); existujúce projekty svoj marker nemenia, kým do nich používateľ predvoľby vedome nedoplní. Marker je LAZY podľa
+obsahu, takže čisto legacy dáta ostávajú čitateľné pre staršie verzie; obsah s vyšším `std`, než ktorý verzia pozná, je pre ňu read-only (knižnica) alebo `:invalid`
+(snapshot) — nikdy čiastočne prečítaný.
 
 **ŠABLÓNA NESIE DEFINÍCIE SETOV BEZSTRATOVO ALEBO VÔBEC.** `hardware_set_defs` sú dátový obsah mimo modelu (dá sa ručne upraviť aj priniesť z novšej verzie), takže pred
 každým vkladom a použitím šablóny beží **rovnaký detektor straty ako nad knižnicou** (`assess_set_defs`). Nečitateľné definície = odmietnutie **PRED akoukoľvek operáciou**,
@@ -653,6 +664,12 @@ projektový default → skrinka dedí → modul dedí → konkrétny dielec over
 
 Napr.: projekt `K009_PW_DTDL_18` → korpus zdedí → police zdedia → jedna polica ručný override na iný dekor/hrúbku.
 
+**Projektových kanálov sú ŠTYRI** (`Materials::PROJECT_KEYS`, NOXUN dict na modeli): `default_material_id` (korpus) · `default_front_material_id` (čelá) ·
+`default_back_material_id` (chrbát) · **`default_drawer_material_id` (dielce zásuviek — KOV-C2a, v0.9.30)**. Štvrtý kanál má fallback **UNI 16 mm** (`UNI_ZASUVKA_16`,
+cez `PROTECTED_SHEET_IDS` nemazateľný), lebo obe rady receptov (Atira aj Quadro V6) stavajú na 16 mm doske. Hrúbka dielcov zásuvky je **vstup receptu**, nie konštrukčná
+konštanta korpusu — či ju systém prijme, rozhoduje `thickness_supported` receptu. Kanál má zatiaľ **len projektovú úroveň**: override na skrinke aj výber v Štúdiu pribudnú
+v KOV-C2b spolu s bumpom `CabinetBuilder::CONFIG_SCHEMA`.
+
 #### `part_overrides` — vrstva ručných zásahov na dielci korpusu (ZÁVÄZNÝ TVAR)
 
 Žije v configu **korpusu** pod `part_overrides`, kľúčom je `part_key` (2.3). Doska (`kind: board`) túto vrstvu **nemá** — jej config je priamo zdroj pravdy (8.3).
@@ -739,6 +756,8 @@ Každý plošný dielec nesie hrany **per strana** ako dáta (nezávislé od viz
 **Pravidlové defaulty podľa roly dielca** + výnimky + ručný override:
 
 - Čelo: hranovanie dookola. Polica: len predná. Chrbát v drážke: nič.
+- **Dielce zásuviek (KOV-C2a, v0.9.30):** `drawer_bottom` **bez olepu** (dno sadá na prírubu zargy, hrana nie je vidieť); `drawer_back`, `box_side` a `drawer_inner_front`
+  majú **L1 = hornú dlhú hranu** („jednotka"), ostatné hrany sú skryté v boxe a ostávajú bez olepu.
 - Výnimky pravidlami: hrúbka < prah → nič; rola v zozname výnimiek → nič.
 - Ručný override per dielec vždy víťazí.
 

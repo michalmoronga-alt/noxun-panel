@@ -752,6 +752,18 @@ module Noxun
               cut_txt = cut.empty? ? '' : " (#{cut})"
               "#{label} (#{where}): položka#{cut_txt} sa reže na dĺžku, ale set „#{sid}“ počíta kusy — " \
                 'nie je nacenená. Dĺžkové kovanie sa zatiaľ do setu mapovať nedá — objednaj ho ručne.'
+            when 'class_unmapped'
+              # KOV-C2a: zasuvka si set vybera TRIEDNYM klucom a na genericky
+              # `slide` NIKDY nepada (H70 kit k zasuvke H176 by bol zly nakup).
+              # Veta preto navigje na EXISTUJUCU akciu, nie na „vyber set".
+              "#{label} (#{where}): zásuvka nemá predvolený set pre svoje otváranie a konštrukciu — " \
+                'otvor Pravidlá → Doplniť nové predvoľby.'
+            when 'set_incompatible'
+              # KOV-C2a: vybrany set klasifikaciou polozke nesedi (iny system,
+              # ina vyska, ine otvaranie/konstrukcia, alebo override skrinky
+              # nie je vyskovy selektor). NIKDY sa nesiahne po inom sete.
+              "#{label} (#{where}): set „#{sid}“ nesedí so zásuvkou " \
+                "(#{HardwareSets.incompatible_detail_sk(u['detail'])}) — uprav predvoľbu setu."
             when 'library_incompatible'
               # R-07 (brana 1d): globalna kniznica setov je z novsej verzie
               # alebo ma neznamy tvar — POUZIT sa nesmie (nakup z orezanych dat

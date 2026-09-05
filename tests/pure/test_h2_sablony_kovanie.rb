@@ -577,8 +577,12 @@ NxTest.test('KOV-B1/H2: platne definicie prechadzaju a zmrazuju sa ako doteraz')
   NxTest.assert_equal('door', frozen['use_type'], 'klasifikacia sa zmrazi CELA')
   NxTest.assert_equal('Sensys', frozen['series'])
   snap = JSON.parse(m.get_attribute(Noxun::Engine::Store::DICT, hws::MODEL_KEY))
-  NxTest.assert_equal(hws::STD_CLASSIFIED, snap['std'],
-                      'snapshot s klasifikaciou dostane std 3 (starsi plugin ho odmietne)')
+  # KOV-C2a: prvy zapis do prazdneho projektu zmrazi VSETKY globalne predvolby
+  # a v seede su od tejto davky sety zasuviek s `height_variant` — snapshot
+  # preto dostane std 4. Podstata testu je nezmenena: obsah, ktoremu starsia
+  # verzia nerozumie, je pre nu `:invalid`, NIKDY ciastocne precitany.
+  NxTest.assert_equal(hws::STD_HEIGHT_VARIANT, snap['std'],
+                      'snapshot s klasifikaciou dostane std 4 (starsi plugin ho odmietne)')
 ensure
   NxH2.wipe_library!
 end

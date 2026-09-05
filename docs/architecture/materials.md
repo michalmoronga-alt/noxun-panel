@@ -12,6 +12,23 @@ Katalóg materiálov a pások, dekorové skupiny, migrácia a zdravie katalógu,
 
 katalóg materiálov a dedenie projekt→skrinka→dielec (projektové defaulty v NOXUN dict na MODELI).
 
+#### KOV-C2a — 4. materiálový kanál `:drawer` (v0.9.30)
+
+`PROJECT_KEYS` má štvrtý kľúč **`default_drawer_material_id`** = materiál DIELCOV ZÁSUVIEK (dno · chrbát · boky boxu · vnútorné čelo). Fallback je **UNI 16 mm**
+(`UNI_ZASUVKA_16`) — obe rady receptov (Atira aj Quadro V6) stavajú na 16 mm doske — a keďže `PROTECTED_SHEET_IDS = PROJECT_FALLBACK.values`, je ID **nezmazateľné**.
+`CabinetBuilder.effective_materials` vracia navyše **`eff_drawer`**; v C2a ho **nič nekonzumuje** (dielce zásuviek emituje až C2b).
+
+Kanál má zatiaľ **len projektovú úroveň**: config kľúč skrinky ani výber v Štúdiu neexistujú — pribudnú v C2b spolu s bumpom `CabinetBuilder::CONFIG_SCHEMA`. Preto ho
+`MaterialsDialog::TARGETS` **nepozná** a akcia `set_project_material` ho odmietne („Neznámy projektový materiál") — vedomá diera, nie opomenutie. Čo naň už reaguje:
+`Materials.project_defaults`, delete guard (`used_material_ids`) a **„Nahradiť UNI…"** — `materials_replace_uni` má preň vlastný riadok v `RU_PROJECT_LABELS` („Zásuvky") aj
+vlastnú vetvu v `ru_project_target_issue` (rozsah doskového materiálu; bez nej by 4. kanál spadol do `else`, teda do pravidiel ČIEL). Či recept hrúbku prijme
+(Atira 16, Quadro V6 16/18), rozhoduje `thickness_supported` receptu — až v C2b.
+
+**`thickness_ok_for?` pozná 4 nové roly** (`CabinetBuilder::DRAWER_ROLES` = `drawer_bottom` · `drawer_back` · `box_side` · `drawer_inner_front`) a správa sa pri nich ako pri
+čelách: berú KATALÓGOVÚ hrúbku svojho materiálu, lebo hrúbka je **vstup receptu**, nie konštrukčná konštanta korpusu. V `BuildPlan::ROLES` roly ešte NIE SÚ (pridáva ich C2b
+s bumpom `plan_schema`), a keďže `cabinet_builder` sa načítava PRED `drawer_recipes`, väzbu na `Recipes::ROLE_*` drží **guard test**, nie referencia (rovnaký vzor ako
+`hardware_sets` ↔ `Fronts`).
+
 #### CRUD katalógu (V0.4.7)
 
 CRUD katalógu (V0.4.7): server-generované ID (transliterácia, kolízie -2/-3), hrúbka existujúceho materiálu NEMENNÁ (= nový variant), delete guard (PROTECTED_SHEET_IDS + scan
@@ -108,6 +125,16 @@ vedomý kontrakt).
 ### materials_catalog.rb
 
 Zo splitu `materials_*`: CRUD+batch.
+
+**KOV-C2a — UNI záznam 4. kanála a `ensure_drawer_uni!` (v0.9.30).** `UNI_SEED` má šiesty riadok `UNI_ZASUVKA_16` / „Zásuvka UNI" / rola `drawer` / 16 mm; fresh install aj
+`UNI_APPEND_IDS` používajú **to isté ID** (je nové, žiadna legacy väzba naň neukazuje, takže dva tvary ako pri `K009`/`UNI_KORPUS_18` netreba). Pre EXISTUJÚCE inštalácie má
+kanál **vlastnú migráciu s vlastným markerom** `drawer_uni_seed.done`: `ensure_uni_records!` končí na prvom riadku pri `uni_seed.done`, takže cez ňu by sa nový záznam
+nedoplnil nikdy. `ensure_drawer_uni!` je idempotentná (2× beh = 1 záznam), beží z bootu `main.rb` vo VLASTNOM chránenom bloku a **nikdy neprepisuje** — ale
+na dva druhy kolízie odpovedá RÔZNE (Codex #303 P2): **obsadené ID** znamená, že záznam pod `UNI_ZASUVKA_16` existuje, takže `PROJECT_FALLBACK` na niečo ukazuje a migrácia
+je hotová (`:noop`, marker sa zapíše); **obsadená SKUPINA pod iným ID** by nechala fallback ukazovať na neexistujúce ID, a to je **fail-closed**: marker sa **nezapíše**,
+vráti sa `:conflict` s hláškou a ďalší štart to skúsi znova (po premenovaní cudzieho záznamu sa doplní sám). Kolízia sa meria **celou identitou skupiny** (`group_identity_key`
+= výrobca + dekor, STANDARD §7.1), nie samotným dekorom (Codex #303 kolo 2 P2): „Egger + Zásuvka UNI" je INÁ skupina než seed („" + Zásuvka UNI), takže kolízia to nie je —
+inak by taký legitímny záznam vracal `:conflict` pri každom štarte a fallback ID by nevzniklo NIKDY. Porovnáva sa proti identite **seed záznamu**, nie proti konštante. Kto si UNI zásuvku vedome zmaže, tomu sa nevráti.
 
 ### materials_decor.rb
 
@@ -207,6 +234,15 @@ zákazky a zmena **neprestaví** už postavené skrinky (na rozdiel od pravidiel
 existujúcich inštaláciách **nikdy nedoplnil** (`ensure_seeded` zapisuje len keď súbor chýba) a výklop by sa postavil bez olepu. Merge doplní **len chýbajúce roly** — používateľom
 upravené hodnoty ostávajú nedotknuté a jednorazová rail migrácia (`file_version < 2`) sa týmto bumpom **neopakuje**. V prehľade ABS pravidiel (sekcia `rules` Štúdia) sa nové roly
 volajú **„Výklop/sklop"** a **„Blenda"** — názov roly `flap` je zámerne neutrálny, lebo tú istú rolu nesie výklop aj sklop (detail v [outputs.md](outputs.md), `ROLE_LABELS`).
+
+**KOV-C2a — `SEED_VERSION` 3 → 4: roly dielcov zásuviek** (checkpoint #11). `drawer_bottom` je **bez ABS** (dno sadá na prírubu zargy, hrana nie je vidieť), `drawer_back`,
+`box_side` a `drawer_inner_front` majú **L1 1,0 mm = horná dlhá hrana**; ostatné hrany sú vedome bez olepu, sú skryté v boxe. `EDGE_LABELS` sú per rola úprimné: dno leží
+a prirodzenú „prednú" hranu nemá (neutrálne „Pozdĺžna/Priečna" ako doska), zvyšné tri STOJA a ich L1 je **Horná**. K tomu patrí **tretia mapa strán
+`EDGE_SIDES_STANDING`** (`L1 → top`): stojace dielce majú dĺžku vodorovne ako ležiace, ale ich olepená hrana je HORE, takže v `EDGE_SIDES_LYING` (kde `L1 → bottom`) by 2D
+karta kreslila pásku na opačnú stranu, než hovorí pravidlo aj label. `drawer_bottom` leží a lying mapu si ponecháva. Bump verzie je nutný z rovnakého dôvodu ako pri
+`flap`/`false_front` — bez neho by `merge_seed_roles` roly na existujúcich inštaláciách nikdy nedoplnil a zásuvka by sa postavila BEZ olepu. Roly sú aj v
+`RulesDialog::ABS_ROLE_ORDER` (na konci, za čelami) a v `ProductionCore::ROLE_LABELS` („Dno zásuvky", „Chrbát zásuvky", „Bok boxu", „Vnútorné čelo zásuvky") — prehľad ABS
+pravidiel ich číta zo seedu, takže bez názvov by ukázal holé identifikátory. Dielce samotné ešte **nikto neemituje** (to je C2b).
 
 **UI konzument od ŠT-3b-2a: skupina „ABS podľa roly dielca" v sekcii `rules` okna ŠTÚDIO — LEN NA ČÍTANIE** (editor pravidiel ABS v pluginu neexistuje a hint sekcie to priznáva).
 Riadok skladá SERVER (`RulesDialog.abs_rule_row`) z `EDGE_LABELS` + `ProductionCore.role_label`; hovorí o **HRÚBKE** („predná 1,0 mm"), **nikdy o páske ani dekore** — ten sa

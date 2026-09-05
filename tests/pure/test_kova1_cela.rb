@@ -488,7 +488,10 @@ module NxTest
       assert_equal({ 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 }, ar::SEED_RULES[role],
                    "#{role}: olepenie dookola ako dvierka")
     end
-    assert_equal(3, ar::SEED_VERSION, 'bump na 3 doplni nove roly aj v EXISTUJUCOM subore')
+    # KOV-C2a: dalsie davky verziu dvihaju (4 = roly dielcov zasuviek), preto sa
+    # tu strazi UZ LEN to, ze bump na 3 nastal — presnu hodnotu drzi seed test
+    # svojej davky.
+    assert(ar::SEED_VERSION >= 3, 'bump na 3 doplni nove roly aj v EXISTUJUCOM subore')
   end
 
   test('KOV-A1: seed-merge v2 -> v3 doplni LEN chybajuce roly (pouzivatelske hodnoty nedotknute)') do
@@ -506,11 +509,11 @@ module NxTest
     assert_equal({ 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 }, out['false_front'])
     assert_equal({ 'L1' => 1.0 }, out['rail_front'], 'rail migracia sa NEOPAKUJE')
 
-    # Subor UZ na v3 sa nemerguje vobec.
+    # Subor UZ na AKTUALNEJ verzii sa nemerguje vobec.
     v3 = ar.deep_copy(ar::SEED_RULES)
     v3['flap'] = {}
-    same, stale3 = ar.merge_seed_roles(v3, 3, v3)
-    refute(stale3, 'v3 subor sa uz nemerguje')
+    same, stale3 = ar.merge_seed_roles(v3, ar::SEED_VERSION, v3)
+    refute(stale3, 'subor na aktualnej SEED_VERSION sa uz nemerguje')
     assert_equal({}, same['flap'], 'pouzivatelom vyprazdnena rola ostava prazdna')
 
     # v1 subor: rail migracia PLATI (file_version < 2) a nove roly pribudnu tiez.

@@ -92,6 +92,14 @@ module Noxun
       # v normalize, pre prevzatie hrubky z materialu aj pre projektovy guard.
       THICKNESS_RANGE = [6.0, 50.0].freeze
 
+      # KOV-C2a: roly dielcov, ktore emituju RECEPTY zasuviek (`drawer_recipes.rb`).
+      # V `BuildPlan::ROLES` este NIE SU — plan ich dostane az v C2b spolu
+      # s bumpom `plan_schema`. Tu su preto ako RETAZCE (nie referencia na
+      # `DrawerRecipes::ROLE_*`): `cabinet_builder` sa nacitava PRED
+      # `drawer_recipes` a jednu doménovú pravdu drzi GUARD TEST, nie poradie
+      # requirov (rovnaky vzor ako vazba `hardware_sets` <-> `Fronts`).
+      DRAWER_ROLES = %w[drawer_bottom drawer_back box_side drawer_inner_front].freeze
+
       # Fallback farby SketchUp materialu, ak material_id nie je v katalogu (Materials preberie color).
       FALLBACK_RGB_KORPUS = [216, 196, 160].freeze
       FALLBACK_RGB_FRONT  = [245, 245, 245].freeze
@@ -880,6 +888,14 @@ module Noxun
           # hrubku sveho materialu (18 / 18,6 / 19 mm).
           when 'front_door', 'drawer_front', 'flap', 'false_front'
             thickness_in_range?(have) || (have - want).abs < 0.05
+          # KOV-C2a: dielce zasuviek beru KATALOGOVU hrubku sveho materialu
+          # rovnako ako cela — hrubka je VSTUP receptu, nie konstrukcna
+          # konstanta korpusu. Ci je 18 mm pre Atiru pripustna, rozhoduje
+          # `thickness_supported` receptu (conflict `drawer_thickness_unsupported`,
+          # aktivuje C2b), nie tato funkcia. Roly drzi `DRAWER_ROLES` (guard test
+          # ich porovnava s `DrawerRecipes::ROLE_*`).
+          when *DRAWER_ROLES
+            thickness_in_range?(have) || (have - want).abs < 0.05
           else
             (have - want).abs < 0.05
           end
@@ -899,7 +915,12 @@ module Noxun
           {
             'body'  => present(raw(params, :material_id))       || defaults['default_material_id'],
             'front' => present(raw(params, :front_material_id)) || defaults['default_front_material_id'],
-            'back'  => present(raw(params, :back_material_id))  || defaults['default_back_material_id']
+            'back'  => present(raw(params, :back_material_id))  || defaults['default_back_material_id'],
+            # KOV-C2a: 4. kanal (dielce zasuviek). Uroven SKRINKY zatiaľ NEEXISTUJE
+            # — config kluc pribudne v C2b spolu s bumpom `CONFIG_SCHEMA`, takze
+            # tu sa vedome cita LEN projektova predvolba (s UNI 16 fallbackom).
+            # Cita ju zatiaľ NIKTO: dielce zasuviek emituje az C2b.
+            'drawer' => defaults['default_drawer_material_id']
           }
         end
 

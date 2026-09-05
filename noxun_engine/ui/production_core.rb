@@ -1023,6 +1023,10 @@ module Noxun
       # Kluce, ktorymi si polozky kovania TEJ skrinky naozaj vedia vybrat set —
       # `generic_type` a `generic_type@owner_part_key` (vzor `resolve_mapping_value`
       # v HardwareSets; poradie tu nehra rolu, staci ci sa kluc vobec pouziva).
+      # KOV-C2a (Astra #19 F8): od chvile, ked resolver cita TRIEDNY kluc
+      # `class:slide|…`, musi ho poznat aj tato ochrana — inak by sa rozidena
+      # override mapa v triednom kluci prepasovala ako „neskodna" a duplicitne
+      # ID skriniek by objednalo iny kit, nez ktory sa naozaj postavil.
       def override_keys_in_use(collected)
         out = {}
         Array(collected.is_a?(Hash) ? collected[:hardware] : nil).each do |it|
@@ -1030,6 +1034,16 @@ module Noxun
           gt = it['generic_type'].to_s
           next if gt.empty?
           keys = (out[it['owner_id'].to_s] ||= {})
+          # Kluce sa registruju PRESNE tak, ako ich cita `resolve_mapping_value`:
+          # klasifikovana (receptova) polozka ma VLASTNU, kratsiu precedenciu a
+          # generic `slide` ani `slide@owner` pre nu NEEXISTUJU. Zapisat ich aj
+          # jej by znamenalo, ze rozdiel v legacy kluci — ktory jej kod nijako
+          # nemeni — oznaci brana za materialny a zastavi export (Codex #303 P2).
+          ck = HardwareSets.class_key_for(it, gt)
+          if ck
+            keys[ck] = true
+            next
+          end
           keys[gt] = true
           opk = it['owner_part_key'].to_s
           keys["#{gt}@#{opk}"] = true unless opk.empty?
@@ -1455,7 +1469,13 @@ module Noxun
         # dielca klamal pri kazdom sklope. Konkretny text (vyklop vs. sklop) vie
         # povedat len TYP cela, nie rola: `PartKeys.flap_label` (rovnaky neutralny
         # tvar bez zhody) a od KOV-A2 karta cela s piktogramami.
-        'flap' => 'Výklop/sklop', 'false_front' => 'Blenda'
+        'flap' => 'Výklop/sklop', 'false_front' => 'Blenda',
+        # KOV-C2a: roly dielcov zasuviek. V pláne ich este NIC neemituje
+        # (to je C2b) — nazvy tu su UZ TERAZ, lebo prehlad ABS pravidiel
+        # (Pravidlá -> ABS) cita roly zo seedu a bez nich by ukazal holé
+        # identifikatory `drawer_bottom`.
+        'drawer_bottom' => 'Dno zásuvky', 'drawer_back' => 'Chrbát zásuvky',
+        'box_side' => 'Bok boxu', 'drawer_inner_front' => 'Vnútorné čelo zásuvky'
       }.freeze
 
       def role_label(role)

@@ -54,6 +54,15 @@ module Noxun
       DIR           = File.expand_path(File.join(__dir__, '..', 'data', 'recipes'))
       RELEASED_FILE = 'RELEASED.json'
 
+      # NEMENNOST PLATI OD AKTIVACIE (jedina vedoma vynimka, KOV-C2a 5.9.2026).
+      # Recepty v1 vydal C1, ale ZIADEN projekt na nich este nestoji — resolver
+      # sa z `build_plan` nevola (to zapina az C2b), takze v modeli neexistuje
+      # geometria, ktoru by oprava zmenila. Datova chyba v rade `atira_sisy_v1`
+      # (H144 mala NL 620, lenze kit 357755 je PTO = Tip-On; pre SiSy H144/620
+      # kit NEEXISTUJE — sonda #12) sa preto opravila NA MIESTE aj s prepocitanym
+      # odtlackom v registri. Od chvile, ked recept postavi prvy dielec, plati
+      # nemennost bez vynimky: oprava = NOVY subor `_v2`, stary sa NIKDY nemeni.
+
       SYSTEMS  = %w[atira quadro_v6].freeze
       OPENINGS = %w[sisy p2o].freeze
       FAMILIES = %w[metal_box wood_undermount].freeze
