@@ -3,7 +3,12 @@
 > Stav: KONCEPT / dátový draft pre KOV-C data packy (`noxun_engine/data/recipes/*.json`) — nie implementačný spec. Hodnoty len s tagom
 > OFFICIAL/SECONDARY/USER z checkpointu #10 a #11; UNCONFIRMED sa do packu NEZAPISUJE. Kódy K-sád z checkpointu #12 (✓ = reálne objednané).
 
-## 0. Schéma packu (návrh — KOV-C C1 ju finalizuje a validuje pri načítaní)
+## 0. Schéma packu — HISTORICKÁ (tvar v13, prekonaný 5.9.2026 package KOV-C v2)
+
+> **Kanonická schéma v2 = `SYSTEM/PLAN.md`, KOV-C C1** (Codex #301 P2): jeden recept per systém × otváranie × verzia (`atira_sisy_v1`, `atira_p2o_v1`,
+> `quadro_v6_sisy_v1`, `quadro_v6_p2o_v1`), pevné `eb`, `kd_supported`, `thickness_supported` per rola, `nl_series_by_height`, `min_depth_by_nl`, `load_by_nl`,
+> `min_box_height`, `sync_min_width`, `abs` per rola, `source` tagy. `runner_variants`, KD→EB mapa, `orderable`, `openings_by_nl`, `extras.sync_shaft` a zlúčené
+> SiSy/P2O v jednom recepte v v2 NEEXISTUJÚ. Ukážka nižšie ostáva len ako história rozhodnutia; **hodnoty v §1–§2 (vzorce, tabuľky, kódy) platia ďalej.**
 
 ```json
 { "recipe_version": 1, "system": "atira", "family": "metal_box_drawer", "vendor": "Hettich",

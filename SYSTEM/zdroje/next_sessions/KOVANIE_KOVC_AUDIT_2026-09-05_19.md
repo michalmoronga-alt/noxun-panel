@@ -69,3 +69,14 @@ Prompt: adversarial review package v2 s explicitnou úlohou pri každom náleze 
 
 - Kódy Démos pre bunky bez kitu: Atira biela H70/350, H144/470 (dnes „š" = na objednávku) — doplniť kód alebo NL z radu vyradiť pred mergom seedu.
 - Kódy Atira Tip-On kitov pre NL ≠ 620 (kým nie sú, `atira_p2o_v1` má rad [620]).
+
+## 5. GH Codex kolo 1 nad PR #301 (Sol cloud, commit `b29bdd5`, 5.9. 13:04 UTC) — 3 P1 + 1 P2, reconcile
+
+| # | Nález | Rozhodnutie | Kam |
+|---|---|---|---|
+| P1 | Set vybraný triednym kľúčom sa neoveruje proti systému receptu — Antaro/StrongBox budú zdieľať `class:slide|classic|metal` s Atirou. | PRIJATÉ (menší z dvoch návrhov): kompatibilita setu zahŕňa `manufacturer` + `series` ↔ `system` receptu, overené pri expanzii; rozšírenie kľúča o systém až v dávke, ktorá pridá druhý kovový systém. | KOV-C C2 (d) |
+| P1 | Prepnutie SiSy → P2O → SiSy by cez `latest_for` ticho povýšilo v1 na v2. | PRIJATÉ: pri zmene klasifikácie súrodenecký recept ROVNAKEJ verzie (`Recipes.sibling`), `latest_for` len ak neexistuje; zmena verzie = výhradne KOV-D. | KOV-C C1 `recipe_ref` |
+| P1 | `MAPPING_MIGRATIONS` vie len nahradiť existujúci kľúč, chýbajúci `class:` kľúč nevytvorí → „Doplniť nové predvolené" by nič neopravilo. | PRIJATÉ: nový malý kontrakt `MAPPING_ADDITIONS` (add-if-absent) v `merge_seed`, prenos do snapshotu cez `merge_project_sets_seed!`; test starý globál + starý snapshot. | KOV-C C2 (d) |
+| P2 | Draft #13 §0 stále nesie tvar v13 (`runner_variants`, KD→EB, `orderable`, SiSy+P2O v jednom). | PRIJATÉ: §0 označená HISTORICKÁ s odkazom na kanonickú schému v PLAN; hodnoty §1–§2 platia. | draft #13 |
+
+Žiadny nález nevracia mechanizmus v13. P1 v kole 1 → opravy + nové plné GH kolo (`@codex review`) podľa pravidla delta-verifikácie.
