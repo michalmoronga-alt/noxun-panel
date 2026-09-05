@@ -3171,6 +3171,11 @@ module NoxunSuRunner
        rows.any? { |r| (r['length'].to_f - 700.0).abs <= TOL && (r['width'].to_f - 500.0).abs <= TOL })
     ok('GHOST-D1 6: šablóna sa opečiatkovala AŽ PO úspešnom vložení',
        seq6.nil? || board_tpl_seq.to_i > seq6.to_i)
+    # POZOR: Späť a Znova musia ostať TESNE ZA SEBOU. Zmazanie dosky založí
+    # observeru prácu (`notify_erase`) a jeho upratovanie ghost zón otvára
+    # operáciu BEZPODMIENEČNE (`ScaleWatch.prune_ghosts`) — commit zahodí redo
+    # stack SketchUpu. Akékoľvek čakanie medzi týmito dvomi riadkami scenár
+    # rozbije (a nie je to chyba vkladu — platí pri každej NOXUN entite).
     Sketchup.undo
     ok('GHOST-D1 6: 1x Späť vrátil CELÝ vklad (jeden používateľský krok)',
        boards(model).empty?)
@@ -3289,6 +3294,28 @@ module NoxunSuRunner
   # `flush_pending!` by odlozeny tik dobehol AZ PO vytvaracej operacii a jeho
   # TRANSPARENTNA reakcia by sa na nu prilepila — Redo by potom vratilo nieco
   # ine, nez pouzivatel vratil. Vzor: `run_ghost_async` + `run_tools1_async`.
+  # SONDA BARIERY (oprava po in-SU behu #298): `ScaleWatch.pending?` sa NESMIE
+  # merat AZ PO vlozeni — post-commit refresh panela (`ghost_after_commit_board`
+  # -> `push_selected` -> `ScaleWatch.request_dedup`, sync.rb:237) observeru
+  # LEGITIMNE zalozi novu poziadavku, takze by fronta bola neprazdna aj pri
+  # dokonale funkcnej bariere. Meria sa preto PRESNE ten okamih, na ktorom
+  # zalezi: vstup do `BoardBuilder.commit_insert`. Tam sa nastroj dostane LEN
+  # ked `flush_pending!` vratil true (`commit!` inak vracia `:blocked`) a este
+  # PRED otvorenim vytvaracej operacie.
+  def board_barrier_probe!(state)
+    sc = e::BoardBuilder.singleton_class
+    sc.send(:alias_method, :commit_insert_gd1_orig, :commit_insert)
+    probe = ->(v) { state[:gd1_at_commit] = v }
+    sc.send(:define_method, :commit_insert) do |model, plan, transform:, orientation: nil|
+      probe.call(defined?(ScaleWatch) ? ScaleWatch.pending? : nil)
+      commit_insert_gd1_orig(model, plan, transform: transform, orientation: orientation)
+    end
+    yield
+  ensure
+    sc.send(:alias_method, :commit_insert, :commit_insert_gd1_orig)
+    sc.send(:remove_method, :commit_insert_gd1_orig)
+  end
+
   def run_ghost_d1_async(model, state, steps)
     # A) NATIVNY Move skrinky (observer NIE JE guardnuty) -> HNED vlozenie dosky
     steps << [0.4, lambda do
@@ -3301,36 +3328,41 @@ module NoxunSuRunner
                             Geom::Transformation.translation(e::Units.point(1500, 0, 0))
       model.commit_operation
       state[:gd1_pending] = e::ScaleWatch.pending?
-      state[:gd1_board] = board_ghost_place!(model, nil, [2600.0, 300.0, 0.0])
-      state[:gd1_settled] = e::ScaleWatch.pending?
+      board_barrier_probe!(state) do
+        state[:gd1_board] = board_ghost_place!(model, nil, [2600.0, 300.0, 0.0])
+      end
     end]
     steps << [SETTLE, lambda do
       ok('async GHOST-D1: natívny Move naozaj založil observeru prácu (inak by test nič nemeral)',
          state[:gd1_pending] == true)
-      ok('async GHOST-D1: bariéra dotiahla observer do POKOJA ešte PRED vložením dosky',
-         state[:gd1_settled] == false)
+      ok('async GHOST-D1: bariéra dotiahla observer do POKOJA ešte PRED vytváracou operáciou',
+         state[:gd1_at_commit] == false)
       ok('async GHOST-D1: doska sa vložila a po ustálení je v modeli PRESNE JEDNA',
          !state[:gd1_board].nil? && boards(model).length == 1)
       ok('async GHOST-D1: identita dosky je jediná a stabilná (žiadna „kópia“)',
          boards(model).map { |i| e::Store.get(i, 'id').to_s }.uniq.length == 1)
+      # Späť a Znova IHNEĎ ZA SEBOU — medzi ne sa NESMIE zmestiť debounce tik
+      # observera: zmazanie dosky mu cez `notify_erase` založí prácu a jeho
+      # upratovanie ghost zón otvára operáciu BEZPODMIENEČNE
+      # (`ScaleWatch.prune_ghosts`, scale_observer.rb:430) — každý commit
+      # zahodí redo stack SketchUpu. Nie je to chyba vkladu: rovnaké to je pri
+      # zmazaní hocijakej NOXUN entity. Sekcia `run_ghost_d1` (bod 6) meria to
+      # isté rovnako tesne.
+      state[:gd1_after_undo] = nil
       Sketchup.undo
+      state[:gd1_after_undo] = [boards(model).length, cabinets(model).length]
+      state[:gd1_redo] = Sketchup.respond_to?(:redo)
+      Sketchup.redo if state[:gd1_redo]
     end]
     steps << [SETTLE, lambda do
-      ok('async GHOST-D1: 1x Späť vrátil CELÝ vklad dosky (nič sa naň neprilepilo)',
-         boards(model).empty?)
-      ok('async GHOST-D1: a poloha skrinky z natívneho Move ostala',
-         cabinets(model).length == 1)
-      if Sketchup.respond_to?(:redo)
-        Sketchup.redo
-      else
-        info('async GHOST-D1: Sketchup.redo nedostupné — Redo vetva netestovaná')
-      end
-    end]
-    steps << [SETTLE, lambda do
-      if Sketchup.respond_to?(:redo)
+      ok('async GHOST-D1: 1x Späť vrátil CELÝ vklad dosky (nič sa naň neprilepilo) ' \
+         "a poloha skrinky z natívneho Move ostala (#{state[:gd1_after_undo].inspect})",
+         state[:gd1_after_undo] == [0, 1])
+      if state[:gd1_redo]
         ok('async GHOST-D1: Redo vrátilo dosku späť a NIČ iné (undo stack je čistý)',
            boards(model).length == 1 && cabinets(model).length == 1)
-        Sketchup.undo
+      else
+        info('async GHOST-D1: Sketchup.redo nedostupné — Redo vetva netestovaná')
       end
       cleanup(model)
       ghost_teardown!(model)
@@ -3346,7 +3378,10 @@ module NoxunSuRunner
       inst.transformation = inst.transformation * Geom::Transformation.scaling(ORIGIN, 1.5, 1.0, 1.0)
       model.commit_operation
       state[:gd1b_pending] = e::ScaleWatch.pending?
-      state[:gd1b_board] = board_ghost_place!(model, nil, [3200.0, 300.0, 0.0])
+      board_barrier_probe!(state) do
+        state[:gd1b_board] = board_ghost_place!(model, nil, [3200.0, 300.0, 0.0])
+      end
+      state[:gd1b_at_commit] = state[:gd1_at_commit]
     end]
     steps << [SETTLE, lambda do
       cab = state[:gd1b_cab]
@@ -3354,7 +3389,9 @@ module NoxunSuRunner
       ok('async GHOST-D1: Scale naozaj založil observeru prácu', state[:gd1b_pending] == true)
       ok("async GHOST-D1: bariéra absorbovala Scale PRED vložením (šírka #{cfg['width']})",
          (cfg['width'].to_f - 900.0).abs < 0.01)
-      ok('async GHOST-D1: doska sa vložila a observer je v pokoji',
+      ok('async GHOST-D1: a observer bol v POKOJI ešte pred vytváracou operáciou',
+         state[:gd1b_at_commit] == false)
+      ok('async GHOST-D1: doska sa vložila a observer je po ustálení v pokoji',
          !state[:gd1b_board].nil? && boards(model).length == 1 && e::ScaleWatch.pending? == false)
       Sketchup.undo
     end]
