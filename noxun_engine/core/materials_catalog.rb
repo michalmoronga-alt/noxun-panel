@@ -889,12 +889,16 @@ module Noxun
       # Definicia UNI sady na JEDNOM mieste: [id, decor(=nazov), rola, hrubka,
       # farba]. Pouziva ju fresh seed AJ jednorazove doplnenie do existujucich
       # katalogov (ensure_uni_records!) — obe cesty daju identicke zaznamy.
+      # KOV-C2a: 6. zaznam `drawer` (dielce zasuviek) ma UZ PRI FRESH SEEDE
+      # rovnake ID ako pri doplneni do existujuceho katalogu (`UNI_APPEND_IDS`) —
+      # je to NOVE ID bez legacy vazby, takze dva tvary netreba.
       UNI_SEED = [
         ['K009_PW_DTDL_18', 'Korpus UNI', 'body',   18.0, [169, 169, 178]],
         ['W1000_DTDL_18',   'Čelo UNI',   'front',  18.0, [125, 167, 217]],
         ['UNI_DEKOR2_18',   'Dekor2 UNI', 'decor2', 18.0, [143, 191, 159]],
         ['HDF_WHITE_3',     'HDF UNI',    'hdf',     3.0, [217, 201, 154]],
-        ['UNI_DOSKA_18',    'Doska UNI',  'board',  18.0, [201, 167, 217]]
+        ['UNI_DOSKA_18',    'Doska UNI',  'board',  18.0, [201, 167, 217]],
+        ['UNI_ZASUVKA_16',  'Zásuvka UNI', 'drawer', 16.0, [217, 186, 154]]
       ].freeze
 
       def uni_seed_record(id, decor, role, thickness, color)
@@ -924,7 +928,9 @@ module Noxun
       # Volane z main.rb bootu (vlastny chraneny blok, vzor boot_cutover!).
       UNI_APPEND_IDS = {
         'body' => 'UNI_KORPUS_18', 'front' => 'UNI_CELO_18',
-        'decor2' => 'UNI_DEKOR2_18', 'hdf' => 'UNI_HDF_3', 'board' => 'UNI_DOSKA_18'
+        'decor2' => 'UNI_DEKOR2_18', 'hdf' => 'UNI_HDF_3', 'board' => 'UNI_DOSKA_18',
+        # KOV-C2a: rovnake ID ako v `UNI_SEED` (nove ID bez legacy vazby).
+        'drawer' => 'UNI_ZASUVKA_16'
       }.freeze
 
       def uni_marker_path
@@ -966,6 +972,63 @@ module Noxun
 
       def write_uni_marker
         JsonFileStore.write(uni_marker_path, 'done_at' => Time.now.utc.iso8601)
+      rescue StandardError
+        nil
+      end
+
+      # === KOV-C2a: UNI zaznam 4. kanala (dielce zasuviek) =====================
+      #
+      # PRECO VLASTNA MIGRACIA A VLASTNY MARKER: `ensure_uni_records!` konci na
+      # prvom riadku pri `uni_seed.done`, takze na KAZDEJ existujucej instalacii
+      # (a to su vsetky, kde uz plugin raz bezal) by sa novy zaznam nikdy
+      # nedoplnil — presne ta chyba, ktoru riesil SEED_VERSION bump pri ABS
+      # pravidlach. Novy marker `drawer_uni_seed.done` drzi jednorazovost
+      # ODDELENE: kto si UNI zasuvku vedome zmaze, uz ju nedostane spat.
+      #
+      # OCHRANA PRED KOLIZIOU ID (vzor `ensure_uni_records!`): existujuci zaznam
+      # s rovnakym ID ani s rovnakym dekorom sa NIKDY neprepise — pouzivatel mohol
+      # ID obsadit vlastnym materialom. Vtedy sa nepridava nic, len sa zapise
+      # marker (dalsi start uz nic neskusa).
+      def drawer_uni_marker_path
+        File.join(dir, 'drawer_uni_seed.done')
+      end
+
+      def ensure_drawer_uni!
+        return :done if File.exist?(drawer_uni_marker_path)
+        return :skip if catalog_read_only?
+        return :skip if catalog_schema < SCHEMA_GROUPS
+
+        seed = UNI_SEED.find { |(_id, _decor, role, _th, _color)| role == 'drawer' }
+        return :skip if seed.nil?
+
+        added = false
+        with_catalog_lock do
+          JsonFileStore.invalidate(path)
+          data = load
+          return :skip if catalog_schema_on_disk < SCHEMA_GROUPS
+          id = UNI_APPEND_IDS['drawer'].to_s
+          _seed_id, decor, role, thickness, color = seed
+          taken_id = data['sheets'].any? { |s| s['material_id'].to_s.casecmp?(id) }
+          taken_decor = (data['sheets'] + data['edges'])
+                        .any? { |r| decor_norm_key(r['decor']) == decor_norm_key(decor) }
+          unless taken_id || taken_decor
+            data['sheets'] << normalize_sheet(uni_seed_record(id, decor, role, thickness, color))
+            added = true
+          end
+          if !added || write_unlocked(data)
+            write_drawer_uni_marker
+            added ? :added : :noop
+          else
+            :write_failed
+          end
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'Materials.ensure_drawer_uni!') if defined?(Engine)
+        :error
+      end
+
+      def write_drawer_uni_marker
+        JsonFileStore.write(drawer_uni_marker_path, 'done_at' => Time.now.utc.iso8601)
       rescue StandardError
         nil
       end

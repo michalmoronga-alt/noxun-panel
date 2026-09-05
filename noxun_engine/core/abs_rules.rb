@@ -44,7 +44,11 @@ module Noxun
       # nedoplnil a vyklop by sa postavil BEZ olepu. Doplna sa LEN chybajuca
       # rola; ulozene (pouzivatelske) hodnoty ostavaju nedotknute a jednorazova
       # rail migracia (`file_version < 2`) sa tymto bumpom NEOPAKUJE.
-      SEED_VERSION = 3
+      # 4 = KOV-C2a roly dielcov zasuviek (drawer_bottom · drawer_back ·
+      # box_side · drawer_inner_front) — bez bumpu by ich `merge_seed_roles`
+      # na existujucich instalaciach nikdy nedoplnil a zasuvka by sa postavila
+      # BEZ olepu (rovnaka lekcia ako flap/false_front pri bumpe na 3).
+      SEED_VERSION = 4
       # Roly, ktore pri bumpe na SEED_VERSION 2 dostanu novy default aj v EXISTUJUCOM
       # subore, ale IBA ak su tam ulozene ako PRESNE prazdny hash {} (povodny stock stav).
       RAIL_MIGRATION_ROLES = %w[rail_front rail_back].freeze
@@ -76,7 +80,15 @@ module Noxun
         'rail_back'    => { 'L1' => 'Pozdĺžna 1', 'L2' => 'Pozdĺžna 2', 'W1' => 'Priečna 1', 'W2' => 'Priečna 2' },
         # Samostatna doska (V0.4.7): nema prirodzene predna/zadna — neutralne labely,
         # orientaciu ukazuje 2D karta (edge_sides -> lying mapa).
-        'free_panel'   => { 'L1' => 'Pozdĺžna 1', 'L2' => 'Pozdĺžna 2', 'W1' => 'Priečna 1', 'W2' => 'Priečna 2' }
+        'free_panel'   => { 'L1' => 'Pozdĺžna 1', 'L2' => 'Pozdĺžna 2', 'W1' => 'Priečna 1', 'W2' => 'Priečna 2' },
+        # KOV-C2a — dielce zasuviek. Dno lezi vodorovne a prirodzenu „prednu"
+        # hranu nema (neutralne labely ako pri doske); chrbat, bok boxu aj
+        # vnutorne celo STOJA a ich L1 je HORNA dlha hrana (tam ide olep).
+        'drawer_bottom'      => { 'L1' => 'Pozdĺžna 1', 'L2' => 'Pozdĺžna 2',
+                                  'W1' => 'Priečna 1', 'W2' => 'Priečna 2' },
+        'drawer_back'        => { 'L1' => 'Horná', 'L2' => 'Dolná', 'W1' => 'Ľavá', 'W2' => 'Pravá' },
+        'box_side'           => { 'L1' => 'Horná', 'L2' => 'Dolná', 'W1' => 'Predná', 'W2' => 'Zadná' },
+        'drawer_inner_front' => { 'L1' => 'Horná', 'L2' => 'Dolná', 'W1' => 'Ľavá', 'W2' => 'Pravá' }
       }.freeze
       EDGE_LABELS_DEFAULT = { 'L1' => 'Hrana 1', 'L2' => 'Hrana 2', 'W1' => 'Hrana 3', 'W2' => 'Hrana 4' }.freeze
 
@@ -121,7 +133,15 @@ module Noxun
         'plinth'       => {},
         'rail_front'   => { 'L1' => 1.0 }, # D-30: dlha hrana vystuhy
         'rail_back'    => { 'L1' => 1.0 }, # D-30: dlha hrana vystuhy
-        'free_panel'   => { 'L1' => 1.0 } # doska: 1 pozdlzna hrana 1.0 (Michal 18.7.2026)
+        'free_panel'   => { 'L1' => 1.0 }, # doska: 1 pozdlzna hrana 1.0 (Michal 18.7.2026)
+        # KOV-C2a (checkpoint #11, SEED_VERSION 4): dielce zasuviek.
+        #   dno                       -> BEZ ABS (sada na prirubu zargy, hrana nie je vidiet)
+        #   chrbat / bok boxu / vnutorne celo -> L1 1,0 mm = HORNA DLHA hrana
+        # Ostatne hrany (L2/W1/W2) su vedome bez olepu — su skryte v boxe.
+        'drawer_bottom'      => {},
+        'drawer_back'        => { 'L1' => 1.0 },
+        'box_side'           => { 'L1' => 1.0 },
+        'drawer_inner_front' => { 'L1' => 1.0 }
       }.freeze
 
       module_function

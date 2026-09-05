@@ -181,11 +181,13 @@ NxTest.test('materials: prvy pristup seedne katalog v APPDATA sandboxe (M-B1: UN
   NxTest.refute(File.exist?(mat.path), 'reset mal zmazat materials.json')
   sheets = mat.sheets # prvy pristup -> ensure_seeded
   NxTest.assert(File.exist?(mat.path), 'prvy pristup mal vytvorit materials.json')
-  NxTest.assert_equal(5, sheets.size)
+  # KOV-C2a: 6. zaznam = UNI 16 mm pre dielce zasuviek (4. materialovy kanal).
+  NxTest.assert_equal(6, sheets.size)
   NxTest.assert_equal(0, mat.edges.size, 'UNI sada je bez pasok')
   parsed = JSON.parse(File.binread(mat.path))
   NxTest.assert_equal(1, parsed['std'])
-  NxTest.assert_equal(%w[HDF_WHITE_3 K009_PW_DTDL_18 UNI_DEKOR2_18 UNI_DOSKA_18 W1000_DTDL_18],
+  NxTest.assert_equal(%w[HDF_WHITE_3 K009_PW_DTDL_18 UNI_DEKOR2_18 UNI_DOSKA_18
+                         UNI_ZASUVKA_16 W1000_DTDL_18],
                       parsed['sheets'].map { |s| s['material_id'] }.sort)
   NxTest.assert(parsed['sheets'].all? { |s| s['uni'] == true })
 end
@@ -322,7 +324,13 @@ NxTest.test('abs_rules: seed pravidla — ZAMOK presnej mapy VSETKYCH roli (D-30
     'plinth'       => {},
     'rail_front'   => { 'L1' => 1.0 },
     'rail_back'    => { 'L1' => 1.0 },
-    'free_panel'   => { 'L1' => 1.0 }
+    'free_panel'   => { 'L1' => 1.0 },
+    # KOV-C2a (SEED_VERSION 4): dielce zasuviek — dno BEZ olepu (sada na
+    # prirubu zargy), chrbat/bok boxu/vnutorne celo horna dlha hrana L1 1,0.
+    'drawer_bottom'      => {},
+    'drawer_back'        => { 'L1' => 1.0 },
+    'box_side'           => { 'L1' => 1.0 },
+    'drawer_inner_front' => { 'L1' => 1.0 }
   }
   NxTest.assert_equal(expected, rules::SEED_RULES, 'SEED_RULES sa lisia od zamknutej mapy')
   NxTest.assert_equal(expected, rules.load, 'cerstvy subor musi vratit presne seed mapu')
@@ -333,10 +341,11 @@ NxTest.test('abs_rules: seed pravidla — ZAMOK presnej mapy VSETKYCH roli (D-30
     th.each_value { |v| NxTest.assert_close(1.0, v) }
   end
   %w[shelf side_left side_right bottom top divider_v divider_h
-     rail_front rail_back free_panel].each do |role|
+     rail_front rail_back free_panel
+     drawer_back box_side drawer_inner_front].each do |role|
     NxTest.assert_equal({ 'L1' => 1.0 }, rules.thicknesses_for(role), "rola #{role} ma mat len L1 1.0")
   end
-  %w[back plinth].each do |role|
+  %w[back plinth drawer_bottom].each do |role|
     NxTest.assert_equal({}, rules.thicknesses_for(role), "rola #{role} nema mat ABS")
   end
   # Neznama rola -> prazdna mapa, ziadna vynimka.

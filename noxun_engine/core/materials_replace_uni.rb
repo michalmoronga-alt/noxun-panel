@@ -35,7 +35,8 @@ module Noxun
       RU_PROJECT_LABELS = {
         'default_material_id'       => 'Korpus',
         'default_front_material_id' => 'Čelá',
-        'default_back_material_id'  => 'Chrbát'
+        'default_back_material_id'  => 'Chrbát',
+        'default_drawer_material_id' => 'Zásuvky' # KOV-C2a: 4. kanál
       }.freeze
 
       RU_PENDING_KEYS = %w[model_guid uni_id target_id catalog_rev digest].freeze
@@ -299,6 +300,13 @@ module Noxun
           CabinetBuilder.thickness_in_range?(target_th) ? nil : :range
         when 'default_back_material_id'
           [3.0, 18.0].any? { |t| CabinetBuilder.thickness_ok_for?('back', t, target_th) } ? nil : :range
+        when 'default_drawer_material_id'
+          # KOV-C2a: hrubka dielcov zasuvky je VSTUP receptu, nie konstrukcna
+          # konstanta — tu sa preto strazi len rozsah doskoveho materialu
+          # (3 mm HDF ako material zasuvky = stop). Ci recept hrubku prijme
+          # (Atira 16, Quadro V6 16/18) rozhoduje `thickness_supported` az v C2b.
+          # Bez vlastnej vetvy by 4. kanal spadol do `else`, teda do pravidiel CIEL.
+          CabinetBuilder.thickness_in_range?(target_th) ? nil : :range
         else
           CabinetBuilder.thickness_ok_for?('front_door', Fronts::FRONT_THICKNESS.to_f, target_th) ? nil : :front
         end
