@@ -211,9 +211,15 @@ module Noxun
 
       # tree: strukturny strom; box: { x0,x1,y0,y1,z0,z1 } vnutro korpusu (mm); t: hrubka; cabinet_id.
       # Vrati: { zones:[ploche objekty s geometriou], dividers:[deskriptory], shelves:[deskriptory],
-      #          warnings:[BuildPlan.warning] } — nefatalne stavy (napr. preskocene police).
+      #          warnings:[BuildPlan.warning], raw_bounds:{ zone_id => box } } — nefatalne stavy
+      #          (napr. preskocene police).
+      #
+      # KOV-C1: `raw_bounds` je ADITIVNY kanal NEZAOKRUHLENYCH hraníc zón
+      # (`zones` naďalej nesú `r2` hodnoty a IDENTICKY sa ukladajú do configu).
+      # Recepty zásuviek porovnávajú svetlé rozmery INKLUZÍVNE a bez EPS —
+      # zaokrúhlená 104.995 -> 105.0 by ticho povolila zásuvku, ktorá sa nezmestí.
       def compute(tree, box, t, cabinet_id)
-        acc = { zones: [], dividers: [], shelves: [], warnings: [] }
+        acc = { zones: [], dividers: [], shelves: [], warnings: [], raw_bounds: {} }
         walk(sanitize(tree), [1], box, t, cabinet_id, acc, 'Celé vnútro')
         acc
       end
@@ -232,6 +238,11 @@ module Noxun
           width: r2(box[:x1] - box[:x0]), height: r2(box[:z1] - box[:z0]), depth: r2(box[:y1] - box[:y0]),
           split: nil, shelves: (leaf ? node['shelves'].to_i : 0), leaf: leaf
         }
+        # KOV-C1: surove hranice zony BOKOM (do `zones` nevstupujú — ukladany
+        # config sa nemeni ani o jedno pole).
+        (acc[:raw_bounds] ||= {})[zid] = { x0: box[:x0].to_f, x1: box[:x1].to_f,
+                                           y0: box[:y0].to_f, y1: box[:y1].to_f,
+                                           z0: box[:z0].to_f, z1: box[:z1].to_f }
 
         if leaf
           validate_shelves!(node['shelves'].to_i, box, t, zid)

@@ -170,9 +170,10 @@ NxTest.test('fronts: layout bez items vrati prazdny vysledok') do
   f = Noxun::Engine::Fronts
   out = f.layout(nil, 600.0, 720.0, 100.0, 18.0)
   # D-90: layout nesie aj kanal warnings (BuildPlan.warning) — bez ciel prazdny.
-  NxTest.assert_equal({ parts: [], items: [], wings: 0, warnings: [] }, out)
-  NxTest.assert_equal({ parts: [], items: [], wings: 0, warnings: [] },
-                      f.layout('none', 600.0, 720.0, 100.0, 18.0))
+  # KOV-C1: + aditivny kanal `bounds` (surove hranice riadkov pre context_for).
+  empty = { parts: [], items: [], wings: 0, warnings: [], bounds: {} }
+  NxTest.assert_equal(empty, out)
+  NxTest.assert_equal(empty, f.layout('none', 600.0, 720.0, 100.0, 18.0))
 end
 
 NxTest.test('fronts: layout 2 auto dvierka — auto_h, z postupnost, origin, box, prod') do

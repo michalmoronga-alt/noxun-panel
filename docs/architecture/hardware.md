@@ -475,3 +475,48 @@ nevznikne). Rozpočet aj cenová ponuka čítajú tie isté `rows`, takže sa k 
 Brána je **serverová zámerne**: kontrola v editore setov by nedosiahla na sety už uložené v staršom `.skp`. Typ `handle` sa v editore **nezakazuje** — kusová úchytka je legitímne
 mapovanie a zákaz typu by ju vzal tiež; nebezpečná je len položka s dĺžkou rezu. **Plný režim `per: 'length'`** (Σ mm, MJ „m") patrí k R-05 v bloku KOVANIE a bránu smie stlmiť
 **až tá istá dávka**, ktorá prinesie dĺžkovú materializáciu — inak sa položka vráti presne do kusového násobenia.
+
+### drawer_recipes.rb
+
+**KOV-C1 — nemenné recepty zásuviek** (`Noxun::Engine::Recipes`). Čisté Ruby: žiadne SketchUp API, žiadny zápis do modelu ani na disk. Modul je v C1 **odpojený od stavby** —
+`build_plan` ho nevolá, config, `BuildPlan` schéma ani výstupy sa nemenia; zapojenie je úloha rezu C2.
+
+**Dve vrstvy, jedna zodpovednosť každá:** fyzika (rozmery dielcov, výšky, rad NL) žije v **recepte**, objednávacie kódy v **setoch** (`hardware_sets`). Nákup nikdy nemení
+fyzický návrh: rad NL v recepte = rad, ktorý Noxun reálne kupuje, žiadni kandidáti ani fallback. **EB je pevné per recept** (Atira 10,5 · Quadro V6 23) — zmena hrúbky boku
+mení iba svetlú šírku, engine nikdy nehľadá iný runner (mapa KD → EB neexistuje).
+
+**Dátový pack `noxun_engine/data/recipes/`.** Jeden recept = jeden systém × jedno otváranie × verzia; `recipe_id` = `<system>_<opening>_v<version>` (validuje sa proti
+poliam v súbore). V1 vydáva `atira_sisy_v1` · `atira_p2o_v1` · `quadro_v6_sisy_v1` · `quadro_v6_p2o_v1`. JSON nesie **len čísla, reťazcové enumy a polia** — vzorce sú
+pomenované konštanty v Ruby, v súbore je nanajvýš dokumentačný `formula_doc`.
+
+**Nemennosť.** `RELEASED.json` = register `{ recipe_id => sha256 }`. `load` číta **výhradne** registrované recepty a odtlačok súboru musí sedieť — nezhoda, neregistrované ID
+aj chýbajúca bunka schémy končia výnimkou `Recipes::RecipeError`, **nikdy tichým defaultom**. Odtlačok sa počíta nad obsahom s normalizovanými koncami riadkov (repo beží
+s `core.autocrlf=true`, surový bajtový hash by v CI padal). Testy navyše strážia, že **inventár `data/recipes/*_v*.json` == množina kľúčov registra**, a **golden fixtúra**
+(`tests/pure/fixtures/kovc1_golden.json`) fixuje výsledky `resolve` pre KAŽDÝ vydaný recept — SHA JSON-u zmenu interpretácie v Ruby nezachytí. Oprava alebo rozšírenie =
+**nový súbor `_v2`**; vydané verzie sa nikdy nemažú ani nemenia (reprodukovateľnosť starých zákaziek bez projektového snapshotu).
+
+**Čisté funkcie.** `load` · `released` · `inventory` · `latest_for(system, opening)` (najvyššia vydaná verzia) · `sibling(recipe_id, system, opening)` (**rovnaká** verzia pre
+inú kombináciu, inak `nil` — prepnutie klasifikácie tam a späť nikdy ticho nepovýši pripnutý recept) · `active_ref(refs_map, system, opening)` → `[:known, id]` ·
+`[:unknown, id]` (RED `drawer_recipe_unknown`) · `[:missing, nil]`.
+
+**`recipe_key_for(front_item)` = rozhodovacia tabuľka, nikdy dve cesty naraz.** `[:legacy, nil]` pre iný typ než zásuvka, zásuvku **bez jediného** klasifikačného poľa
+(`construction`, `opening_mode` aj `system` chýbajú) a pre `construction other` — legacy cesta ostáva CONTENT-identická a resolver sa nevolá. `[:ok, {system, opening}]` keď
+je `construction` **aj** `opening_mode` (`metal → atira`, `wood → quadro_v6`, explicitný `drawer.system` má prednosť; `classic → sisy`, `tipon → p2o`).
+`[:conflict, 'drawer_unclassified']` pri **akejkoľvek čiastočnej** klasifikácii (polia sa editujú nezávisle) a `[:conflict, 'drawer_internal_unsupported']` pri
+`variant internal`.
+
+**`resolve(recipe, ctx, part_thicknesses, overrides)`** → `{height_variant, box_height, nl, load, parts, hardware_params, conflicts, explain}`. Poradie krokov: KD mimo
+`kd_supported` → `drawer_kd_unsupported` · hrúbka role mimo `thickness_supported` (`part_thicknesses` je **VSTUP**, nie odvodená hodnota) → `drawer_thickness_unsupported` ·
+neprázdne `ctx[:obstructions]` → `drawer_obstruction` · **jedna výška** (Atira: najvyšší variant s `min_clear_height ≤ clear_height`; Quadro: `box_height = clear_height − 40`
+a čelo/chrbát `box_height − t_dna − 12 ≥ 30`) · **jedna NL** (najdlhšia z radu TEJ výšky s `min_depth ≤ clear_depth`) · **NL zámok** z `hardware_overrides`
+(`generic_type slide`, `rule_id` `vysuvy-nl-podla-hlbky` alebo `recipe:<id>`, pole `nominal_length`): v rade a zmestí sa → drží, inak `nl_lock_invalid` — **nikdy tichá
+zmena** · nosnosť bunky · dielce · kontrola každého rozmeru proti `MIN_DIM`. Porovnania sú **inkluzívne a bez EPS** nad nezaokrúhlenou hodnotou z `context_for`
+(105,00 platí, 104,995 padá). **Atomicita:** akýkoľvek konflikt ⇒ `parts = []` a `hardware_params = {}`.
+
+**Dielce.** Atira presne 2: `drawer_bottom` `(LB − 2·EB − 51,5) × (NL + 10)` a `drawer_back` `(LB − 2·EB − 63) × rear_height`. Quadro 5: `box_side` ×2 `NL × box_height`,
+`drawer_bottom` `SKW × NL`, `drawer_inner_front` a `drawer_back` `SKW × (box_height − t_dna − 12)`, kde `SKW = LB − 46`. ABS per rola z receptu (dno bez, ostatné horná dlhá
+hrana 1,0). `hardware_params` (`recipe_id`, `system`, `height_variant` | `box_height`, `nominal_length`, `load`, `opening`) je podklad pre **jednu** položku výsuvu, ktorú
+skladá C2. `explain` sú slovenské vety pre Inspector.
+
+**`CONFLICT_CODES`** = register 10 kódov brány `DRAWER_BLOCKERS` z package KOV-C. C1 ich len **produkuje**; napojenie na `export_blockers`, `hardware_issues` a Kontrolu je
+úloha C2 — v C1 preto `drawer_kit_missing` ani `drawer_override_invalid` nikto nevyrába, sú tu len ako jediné miesto pravdy o množine kódov.

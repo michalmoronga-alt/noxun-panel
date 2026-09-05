@@ -106,9 +106,107 @@ module Noxun
             depth:  interior[:back_front_y]
           },
           wings: fr[:wings],
-          interior: interior
+          interior: interior,
+          # KOV-C1: ADITIVNE surove (NEZAOKRUHLENE) hranice pre `context_for`.
+          # Do configu sa NEUKLADAJU — `CabinetBuilder.merge_final` kopiruje len
+          # menovity zoznam klucov, takze model ani vystupy sa nemenia.
+          zone_bounds: zres[:raw_bounds] || {},
+          front_bounds: fr[:bounds] || {}
         }
         BuildPlan.validate!(plan)
+      end
+
+      # --- KOV-C1: svetly priestor pre recept zasuvky --------------------------
+      #
+      # CISTA funkcia (ziadne IO, ziadny zapis): z NEZAOKRUHLENYCH hranic riadku
+      # cela, interieru a listovej zony vrati kontext, ktory `Recipes.resolve`
+      # potrebuje. `build_plan` ju v C1 NEVOLA — zapojenie je uloha rezu C2.
+      #
+      #   owner — resolved polozka cela (`plan[:front_items]`) alebo jej `id`
+      #   plan  — vysledok `build_plan` (nesie `zone_bounds` a `front_bounds`)
+      #   cfg   — config korpusu (symbolove kluce, mm Float)
+      #
+      # Vracia:
+      #   clear_width     svetla sirka LISTOVEJ zony pretinajucej riadok (NIE w-2t)
+      #   clear_height    prienik z-intervalu riadku s interierom A listovou zonou
+      #   clear_depth     interior[:back_front_y] — vnutorna hlbka od prednej
+      #                   hrany po PREDNU PLOCHU chrbta (per rezim chrbta)
+      #   side_thickness  hrubka boku korpusu (KD)
+      #   obstructions    police a priecky pretinajuce riadok (C2 z nich robi
+      #                   conflict `drawer_obstruction`)
+      #   owner_part_key  kluc panela cela (identita NL zamku v hardware_overrides)
+      #   front_id        id riadku cela
+      def context_for(owner, plan, cfg)
+        front_id = owner.is_a?(Hash) ? owner['id'].to_s : owner.to_s
+        fb = (plan[:front_bounds] || {})[front_id]
+        raise "Construction.context_for: plan nema surove hranice cela #{front_id}." if fb.nil?
+
+        interior = interior_dims(cfg)
+        t = cfg[:thickness].to_f
+        # Riadok cela orezany INTERIEROM (celo prekryva aj dno/vrch korpusu).
+        row_lo = [fb[:z0].to_f, interior[:z_lo].to_f].max
+        row_hi = [fb[:z1].to_f, interior[:z_hi].to_f].min
+
+        zone = leaf_zone_for_row(plan, row_lo, row_hi)
+        if zone
+          clear_width = zone[:x1] - zone[:x0]
+          lo = [row_lo, zone[:z0]].max
+          hi = [row_hi, zone[:z1]].min
+        else
+          # Bez listovej zony (velmi stary plan bez `zone_bounds`) ostava svetla
+          # sirka korpusu — vzdy sa PRIZNA, nikdy sa nehada uzsia hodnota.
+          clear_width = cfg[:width].to_f - (2 * t)
+          lo = row_lo
+          hi = row_hi
+        end
+
+        { clear_width: [clear_width, 0.0].max,
+          clear_height: [hi - lo, 0.0].max,
+          clear_depth: interior[:back_front_y].to_f,
+          side_thickness: t,
+          obstructions: row_obstructions(plan, row_lo, row_hi),
+          owner_part_key: PartKeys.front(front_id, 'panel'),
+          front_id: front_id }
+      end
+
+      # Listova zona s NAJVACSIM zvislym prienikom s riadkom (pri zhode lavejsia).
+      # Viac zon s kladnym prienikom = zvisla priecka cez riadok — tu sa vyberie
+      # jedna, obstruction ju prizna samostatne.
+      def leaf_zone_for_row(plan, row_lo, row_hi)
+        bounds = plan[:zone_bounds] || {}
+        best = nil
+        best_overlap = 0.0
+        Array(plan[:zones]).each do |z|
+          next unless z[:leaf]
+
+          b = bounds[z[:id]]
+          next if b.nil?
+
+          overlap = [row_hi, b[:z1]].min - [row_lo, b[:z0]].max
+          next if overlap <= 0.0
+
+          if overlap > best_overlap || (overlap == best_overlap && best && b[:x0] < best[:x0])
+            best = b
+            best_overlap = overlap
+          end
+        end
+        best
+      end
+
+      # Police a priecky, ktorych zvisly rozsah pretina riadok (kladny prienik).
+      OBSTRUCTION_ROLES = %w[shelf divider_h divider_v].freeze
+
+      def row_obstructions(plan, row_lo, row_hi)
+        Array(plan[:parts]).each_with_object([]) do |pd, acc|
+          role = pd[:role].to_s
+          next unless OBSTRUCTION_ROLES.include?(role)
+
+          z0 = pd[:origin][2].to_f
+          z1 = z0 + pd[:box][2].to_f
+          next if ([row_hi, z1].min - [row_lo, z0].max) <= 0.0
+
+          acc << { role: role, part_key: pd[:part_key].to_s, z0: z0, z1: z1 }
+        end
       end
 
       # D-80 (F3): ked vystuhy znizia strop vnutra, stare clenenie (police, delenia,

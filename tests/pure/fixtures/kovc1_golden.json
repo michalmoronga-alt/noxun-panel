@@ -1,0 +1,263 @@
+{
+  "comment": "KOV-C1 golden: vstup -> ocakavany vysledok Recipes.resolve pre KAZDY vydany recept. SHA JSON receptu nezachyti zmenu interpretacie v Ruby — toto ano.",
+  "cases": [
+    {
+      "recipe_id": "atira_sisy_v1",
+      "name": "skrinka 900 / KD 18, celo 175, hlbka 497",
+      "ctx": {
+        "clear_width": 864.0,
+        "clear_height": 175.0,
+        "clear_depth": 497.0,
+        "side_thickness": 18.0,
+        "obstructions": [
+
+        ],
+        "owner_part_key": "front:F1/panel"
+      },
+      "part_thicknesses": {
+        "drawer_bottom": 16.0,
+        "drawer_back": 16.0
+      },
+      "overrides": [
+
+      ],
+      "conflicts": [
+
+      ],
+      "height_variant": 70,
+      "box_height": null,
+      "nl": 470.0,
+      "load": 30.0,
+      "parts": [
+        {
+          "role": "drawer_bottom",
+          "side": null,
+          "width": 791.5,
+          "height": 480.0,
+          "thickness": 16.0
+        },
+        {
+          "role": "drawer_back",
+          "side": null,
+          "width": 780.0,
+          "height": 65.5,
+          "thickness": 16.0
+        }
+      ]
+    },
+    {
+      "recipe_id": "atira_sisy_v1",
+      "name": "plytka skrinka — bez riesenia",
+      "ctx": {
+        "clear_width": 864.0,
+        "clear_height": 175.0,
+        "clear_depth": 300.0,
+        "side_thickness": 18.0,
+        "obstructions": [
+
+        ],
+        "owner_part_key": "front:F1/panel"
+      },
+      "part_thicknesses": {
+        "drawer_bottom": 16.0,
+        "drawer_back": 16.0
+      },
+      "overrides": [
+
+      ],
+      "conflicts": [
+        "drawer_no_fit"
+      ],
+      "height_variant": 70,
+      "box_height": null,
+      "nl": null,
+      "load": null,
+      "parts": [
+
+      ]
+    },
+    {
+      "recipe_id": "atira_p2o_v1",
+      "name": "celo 300 (H176), hlbka 560",
+      "ctx": {
+        "clear_width": 864.0,
+        "clear_height": 300.0,
+        "clear_depth": 560.0,
+        "side_thickness": 18.0,
+        "obstructions": [
+
+        ],
+        "owner_part_key": "front:F1/panel"
+      },
+      "part_thicknesses": {
+        "drawer_bottom": 16.0,
+        "drawer_back": 16.0
+      },
+      "overrides": [
+
+      ],
+      "conflicts": [
+
+      ],
+      "height_variant": 176,
+      "box_height": null,
+      "nl": 520.0,
+      "load": 50.0,
+      "parts": [
+        {
+          "role": "drawer_bottom",
+          "side": null,
+          "width": 791.5,
+          "height": 530.0,
+          "thickness": 16.0
+        },
+        {
+          "role": "drawer_back",
+          "side": null,
+          "width": 780.0,
+          "height": 176.0,
+          "thickness": 16.0
+        }
+      ]
+    },
+    {
+      "recipe_id": "quadro_v6_sisy_v1",
+      "name": "skrinka 900 / KD 18, svetla 200, hlbka 497",
+      "ctx": {
+        "clear_width": 864.0,
+        "clear_height": 200.0,
+        "clear_depth": 497.0,
+        "side_thickness": 18.0,
+        "obstructions": [
+
+        ],
+        "owner_part_key": "front:F1/panel"
+      },
+      "part_thicknesses": {
+        "drawer_bottom": 16.0,
+        "box_side": 16.0,
+        "drawer_inner_front": 16.0,
+        "drawer_back": 16.0
+      },
+      "overrides": [
+
+      ],
+      "conflicts": [
+
+      ],
+      "height_variant": null,
+      "box_height": 160.0,
+      "nl": 450.0,
+      "load": 30.0,
+      "parts": [
+        {
+          "role": "box_side",
+          "side": "left",
+          "width": 450.0,
+          "height": 160.0,
+          "thickness": 16.0
+        },
+        {
+          "role": "box_side",
+          "side": "right",
+          "width": 450.0,
+          "height": 160.0,
+          "thickness": 16.0
+        },
+        {
+          "role": "drawer_bottom",
+          "side": null,
+          "width": 818.0,
+          "height": 450.0,
+          "thickness": 16.0
+        },
+        {
+          "role": "drawer_inner_front",
+          "side": null,
+          "width": 818.0,
+          "height": 132.0,
+          "thickness": 16.0
+        },
+        {
+          "role": "drawer_back",
+          "side": null,
+          "width": 818.0,
+          "height": 132.0,
+          "thickness": 16.0
+        }
+      ]
+    },
+    {
+      "recipe_id": "quadro_v6_p2o_v1",
+      "name": "svetla 220, hlbka 470, zamok NL 400",
+      "ctx": {
+        "clear_width": 864.0,
+        "clear_height": 220.0,
+        "clear_depth": 470.0,
+        "side_thickness": 18.0,
+        "obstructions": [
+
+        ],
+        "owner_part_key": "front:F1/panel"
+      },
+      "part_thicknesses": {
+        "drawer_bottom": 16.0,
+        "box_side": 16.0,
+        "drawer_inner_front": 16.0,
+        "drawer_back": 16.0
+      },
+      "overrides": [
+        {
+          "owner_part_key": "front:F1/panel",
+          "generic_type": "slide",
+          "rule_id": "vysuvy-nl-podla-hlbky",
+          "nominal_length": 400.0
+        }
+      ],
+      "conflicts": [
+
+      ],
+      "height_variant": null,
+      "box_height": 180.0,
+      "nl": 400.0,
+      "load": 30.0,
+      "parts": [
+        {
+          "role": "box_side",
+          "side": "left",
+          "width": 400.0,
+          "height": 180.0,
+          "thickness": 16.0
+        },
+        {
+          "role": "box_side",
+          "side": "right",
+          "width": 400.0,
+          "height": 180.0,
+          "thickness": 16.0
+        },
+        {
+          "role": "drawer_bottom",
+          "side": null,
+          "width": 818.0,
+          "height": 400.0,
+          "thickness": 16.0
+        },
+        {
+          "role": "drawer_inner_front",
+          "side": null,
+          "width": 818.0,
+          "height": 152.0,
+          "thickness": 16.0
+        },
+        {
+          "role": "drawer_back",
+          "side": null,
+          "width": 818.0,
+          "height": 152.0,
+          "thickness": 16.0
+        }
+      ]
+    }
+  ]
+}
