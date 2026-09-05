@@ -137,3 +137,10 @@ zjednotenie (a pre kópiu doplnenie z packu len pri zhode digestu). (P1) Quadro 
 
 (P1) `load` závisí od NL (620 → 50) → `resolve` vracia usporiadané dvojice `candidates[] = {nl, load}` a C2b potvrdí trojicu `(nl, load, set)` naraz cez triednu tabuľku + `code_by_nl`.
 (P1) C2b (e) ešte hovorilo „nákup cez generické `slide` mapovanie, výber podľa klasifikácie = KOV-D" → nákup ide cez set vybraný triednou tabuľkou; KOV-D = len UI a pásmové selektory.
+
+## Codex GH review PR #300 kolo 7 (5.9.2026, nad v11 `6ed81eb`) — 7× P1, ZAPRACOVANÉ (verzia 12)
+
+(P1) kandidáti nesú PLNE materializované dielce/hardware pre svoju NL (fallback 520 → 470 nesmie nechať dno 530). (P1) Atira P2O kity sú v #12 len pri NL 620 → `availability.openings_by_nl` p2o = [620],
+bežná Tip-On zásuvka je RED `drawer_no_fit` s hláškou, kým Michal nedodá Démos kódy. (P1) Scope OUT zúžený na UI/defaulty/pásmové selektory. (P1) `runner_variant` v klasifikácii setu a tabuľke
++ `orderable_kd` → `runner_not_orderable`. (P1) prah sync tyče inkluzívny (≥ 600). (P1) `compatible_set_for` dostáva `owner_id`/`owner_part_key`. (P1) kandidáti predfiltrovaní osovými zámkami,
+zamknutá NL bez kódu = `nl_lock_invalid`.

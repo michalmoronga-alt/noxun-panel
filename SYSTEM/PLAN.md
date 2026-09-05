@@ -301,7 +301,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   overiť v audite), side_thickness (KD), obstructions[] (shelf / divider_h / divider_v pretínajúce riadok)}`; **named test: 16 mm offset riadok-vs-interiér**.
   **Klasifikácia → kľúč receptu (audit 1 B3, záväzná mapa):** `drawer.construction metal → system atira` · `wood → quadro_v6_eb23` · `other → BEZ receptu` (legacy cesta, CONTENT-identická, žiadne
   dielce, žiadne R2 potlačenie); `opening_mode classic → sisy` · `tipon → p2o` (**P2Os (Push to open Silent) NEEXISTUJE v dátach ani v UI — rozhodnutie Michala 5.9.2026: pre výsuvy AJ závesy platia len 2 typy otvárania, Tip-On a tlmenie; tretí variant sa nerieši**); `variant internal` = tvrdý
-  conflict `drawer_internal_unsupported`; `runner_variant` SYSTÉMOVO (Codex #300 P1): Atira z KD korpusu cez `eb_by_kd` (16 → 12.5, 18 → 10.5, 19 → 9.5; KD mimo mapy = conflict), Quadro
+  conflict `drawer_internal_unsupported`; `runner_variant` SYSTÉMOVO (Codex #300 P1): Atira z KD korpusu cez `eb_by_kd` (16 → 12.5, 18 → 10.5, 19 → 9.5; KD mimo mapy = conflict; **KD mimo `orderable_kd` packu (Démos sklad len EB10.5 = KD 18) = conflict `runner_not_orderable` v `DRAWER_BLOCKERS` — Codex #300 kolo 7 P1**), Quadro
   V6 EB23 = pevné `eb23` (`runner_variants: {fixed: "eb23"}`, KD sa neprekladá) — fixtúry pre oba kľúče; piny `mounting: slide_on`, `rear_type: wooden`; čiastočná klasifikácia (chýba
   construction alebo opening pri type zásuvka) = **RED `drawer_unclassified` v `DRAWER_BLOCKERS`** (tvrdá brána — nevyriešená zásuvka nikdy nie je vyrobiteľná; audit 3 B2), bez dielcov a
   slide položky;
@@ -373,29 +373,35 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   `nl_lock_invalid` (dnešný matcher hľadá presnú trojicu vrátane `rule_id` — premapovanie je explicitný krok migrácie; audit 2 #10); **server odmieta `quantity`/`disabled` mutácie pre
   `rule_id` `recipe:*`** (`actions_hardware.rb` — read-only os;
   HTML disabled nie je ochrana); charakterizačný test „jedno zásuvkové čelo → presne jedna slide položka s množstvom 1"; **kompatibilita setu (audit 1 B1, audit 2 #1 — sety dnes nesú len
-  `use_type/opening_mode/drawer_construction/manufacturer/series`):** C2a rozšíri klasifikáciu setu o VOLITEĽNÉ osi `height_variant` (ČÍSELNÉ 70|144|176) a `load` (30|50) — sparse, len
+  `use_type/opening_mode/drawer_construction/manufacturer/series`):** C2a rozšíri klasifikáciu setu o VOLITEĽNÉ osi `height_variant` (ČÍSELNÉ 70|144|176), `load` (30|50) a `runner_variant` (Atira `eb10.5|eb12.5|eb9.5`; Codex #300 kolo 7 P1 — kompatibilita aj tabuľka výberu ho overujú, seed EB10.5 sa nesmie vybrať pre geometriu počítanú s iným EB) — sparse, len
   pri `use_type drawer` (seed KOV-B sety per výška × opening ich dostanú), `std` setov podľa obsahu ako KOV-B1; C2b overí set proti receptu: `drawer_construction` ↔ system (metal = atira,
   wood = quadro), `opening_mode` ↔ opening, `manufacturer` = Hettich, `series` ↔ system, Atira navyše `height_variant` a `load` — chýbajúca os na sete = NEOVERITEĽNÝ; **`load` je súčasť
   VÝBERU setu, nie len kontroly po výbere** (Codex #300 kolo 2 P1: jeden set per výška nevie pokryť 30 aj 50 kg — NL 620 vynúti 50): C2b vyberá set podľa (systém, otváranie,
   `height_variant`, `load`) cez **KONKRÉTNY viacosový mechanizmus (Codex #300 kolo 3 P1 — dnešný `resolve_mapping_value` vyberá jedno mapovanie a `resolve_set_id` má jediný číselný
   selektor):** mapovanie projektu pre triedny kľúč `class:slide|<opening_mode>|<drawer_construction>` (kanonický tvar z KOV-B1 v KLASIFIKAČNOM slovníku `classic|tipon` × `metal|wood` — kľúč sa skladá z klasifikácie čela, nie z receptového `sisy|p2o`; prevod `sisy → classic`, `p2o → tipon` je explicitný; Codex #300 kolo 5 P1) nesie **explicitnú tabuľku** `[{height_variant, load, set_id}]` (exact
   match, bez pásiem; Quadro `{load, set_id}`), rozšírenie `parse_mapping` s round-tripom a whitelistom, **`resolve_set_id`/`resolve_mapping_value` čítajú triedny kľúč a tabuľku exact
-  match UŽ v C2b** (dnes čítajú len `mapping[generic_type]`), **seed mapovania a setov v C2b** pokrýva bežné kombinácie (Atira per výška × nosnosť × otváranie z #12, Quadro per nosnosť) a
+  match UŽ v C2b** (dnes čítajú len `mapping[generic_type]`), **seed mapovania a setov v C2b** pokrýva bežné kombinácie (Atira per výška × nosnosť × otváranie z #12, Quadro per nosnosť) —
+  **P2O dostupnosť v recepte = LEN NL s overenými kit kódmi** (#12 má Atira P2O/PTO kity len pri NL 620 → kým Michal nedodá Démos kódy P2O kitov pre ostatné NL/výšky, pack Atira deklaruje
+  `availability.openings_by_nl` p2o = [620] a bežná Tip-On zásuvka je RED `drawer_no_fit` s hláškou „P2O kit pre NL … nie je v katalógu", nie sľúbená a neobjednateľná; Codex #300 kolo 7
+  P1) a
   existujúce projekty dostanú triedne mapovanie automaticky LEN ak ich generické `slide` mapovanie aj referencovaná definícia setu PRESNE sedia so starým seedom (nezmenený snapshot; v tej
   istej operácii pri prvej prestavbe zásuvky); prispôsobený snapshot = ŽIADNA automatika — zásuvka je `set_incompatible` s hláškou „potvrď prechod na triedne mapovanie" a prechod je
   explicitne potvrdený merge (Codex #300 kolo 4 + 5 P1);
   chýbajúci riadok = `set_incompatible`; KOV-D dodá UI a selektor s pásmami cez `numeric_param` (výška + `load`); **kompatibilita sa
   rieši VNÚTRI stavby PRED emisiou dielcov** (Codex #300 P1: `Construction.build_plan` po `Recipes.resolve` vyhľadá set **TOU ISTOU cestou výberu ako expanzia** —
-  `HardwareSets.compatible_set_for(recipe, state, cabinet_overrides:)` cez `resolve_mapping_value` (owner/cabinet override má prednosť pred mapovaním projektu; Codex #300 kolo 2 P1) — a
+  `HardwareSets.compatible_set_for(recipe, state, cabinet_overrides:, owner_id:, owner_part_key: 'front:<id>/panel')` cez `resolve_mapping_value` (identita ownera je nutná pre `cabinet_overrides[owner_id]` a `slide@front:…/panel` override; Codex #300 kolo 7 P1 — testy pre obe úrovne override) (owner/cabinet override má prednosť pred mapovaním projektu; Codex #300 kolo 2 P1) — a
   **overí aj člena — NL sa vyberá objednateľne** (Codex #300 kolo 5 P1: seed nemá kódy pre každú NL, napr. Quadro SiSy 350/400/450/500/550, Atira H70/520 prázdne): `Recipes.resolve` vráti
-  `candidates[]` = usporiadané dvojice `{nl, load}` spĺňajúce hĺbku/otváranie (najdlhšia NL prvá; nosnosť podľa `loads_by_nl` — 620 len 50, inak 30 s alternatívou 50 pri
-  override/availability); C2b prechádza kandidátov cez triednu tabuľku (výška, `load`) A `code_by_nl` a **potvrdí trojicu `(nl, load, set)` naraz** (Codex #300 kolo 6 P1: `load` závisí od
+  `candidates[]` = usporiadané záznamy `{nl, load, parts[], hardware_params}` — KAŽDÝ kandidát nesie svoje PLNE materializované výstupy (dielce z vzorcov pre SVOJU NL, napr. Atira dno 480
+  pri 470 vs 530 pri 520; Codex #300 kolo 7 P1), spĺňajúce hĺbku/otváranie (najdlhšia NL prvá; nosnosť podľa `loads_by_nl` — 620 len 50, inak 30 s alternatívou 50 pri
+  override/availability) a **PREDFILTROVANÉ cez prítomné osové zámky** (`nominal_length` override z `hardware_overrides`, budúci `load` override: zamknutá hodnota = jediný kandidát; Codex
+  #300 kolo 7 P1); C2b prechádza kandidátov cez triednu tabuľku (výška, `load`, `runner_variant`) A `code_by_nl` a **potvrdí trojicu `(nl, load, set)` naraz vrátane jej dielcov** —
+  zamknutý kandidát bez objednateľného kódu = `nl_lock_invalid` (osový zámok nikdy ticho nepadá na inú NL) (Codex #300 kolo 6 P1: `load` závisí od
   NL, jeden vopred zvolený set by objednateľnú kombináciu preskočil; `explain` uvedie preskočených kandidátov); žiadna objednateľná = `set_incompatible` (NIE downstream ORANGE
   `nl_missing`; Codex #300 kolo 2 P1);
   neoveriteľný/nesúhlasný/žiadny set/chýbajúci kód = conflict **RED `set_incompatible`** v `conflicts[]` → fail-closed: ŽIADNE dielce, ŽIADNA slide
   položka (invariant FINAL §0: owner bez resolved setu = tvrdý blocker; inak by dielce bez objednateľného kitu prišli do VEPO, ktoré brána nechráni); NL vnútri setu cez `code_by_nl` (plné
   ovládanie výberu = KOV-D); **sync tyč P2O (audit 1 B6, audit 2 #6 — strojová identita):** s prvou aktiváciou receptu P2O recept emituje pri splnenom triggeri
-  (`extras.sync_shaft.trigger`: šírka > `sync_rod_min_width` AND opening = p2o) DRUHÚ položku kovania v ÚPLNOM validnom tvare (audit 3 B4): `generic_type: sync_shaft` (**nová hodnota
+  (`extras.sync_shaft.trigger`: šírka **≥** `sync_rod_min_width` receptu AND opening = p2o — inkluzívne, Hettich P2O „od 600 mm"; fixtúra presne 600; Codex #300 kolo 7 P1) DRUHÚ položku kovania v ÚPLNOM validnom tvare (audit 3 B4): `generic_type: sync_shaft` (**nová hodnota
   BuildPlan enumu**, `plan_schema` bump), `rule_id: recipe:<system>:sync_shaft`, `owner_part_key: front:<id>/panel`, `quantity: 1`, `rule_quantity: 1`, `production_class`/`manufactured`
   ako existujúce dĺžkové položky, `source: recipe`, `params {cut_length_mm}` cez `HardwareRules::LENGTH_PARAM` (vzorec `cut_formula_by_eb`; nákup ju musí brať ako DĹŽKOVÚ, nie kusovú);
   **fail-closed až do KOV-D (audit 4 B1, Codex #300 kolo 3 P1 — PRED emisiou):** kým nákup nevie dĺžkovú položku materializovať (`capabilities.sync_shaft_purchasable = false`, vstup
@@ -405,7 +411,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   NEOBJEDNATEĽNÁ;
   (d) **fail-closed**: `conflicts[]` neprázdne → ŽIADNE odvodené dielce, ŽIADNA slide položka; do `hardware_issues` (kľúč z KOV-A) RED s presným dôvodom; **jeden register `DRAWER_BLOCKERS`**
   (`drawer_no_fit` · `drawer_thickness_unsupported` · `drawer_obstruction` · `drawer_internal_unsupported` · `nl_lock_invalid` · `drawer_override_disabled` · `drawer_recipes_invalid` ·
-  `set_incompatible` · `drawer_sync_rod_missing` · `drawer_recipes_mismatch` · `drawer_unclassified` · `drawer_override_quantity` · `nl_lock_conflict` · `drawer_stale`), ktorý
+  `set_incompatible` · `drawer_sync_rod_missing` · `drawer_recipes_mismatch` · `drawer_unclassified` · `drawer_override_quantity` · `nl_lock_conflict` · `drawer_stale` · `runner_not_orderable`), ktorý
   `export_blockers` číta CELÝ (test: každý kód registra zastaví všetky tri blokované exporty; audit 3 B1); **zmena mapovania projektu / override skrinky / klasifikácie setu (Codex #300
   kolo 3 P1):** handler zmeny STAVU MODELU (`set_project_mapping!`, cabinet override, explicitne potvrdené zlúčenie projektového snapshotu setov) v TEJ ISTEJ operácii atomicky prestaví
   všetky dotknuté zásuvkové skrinky (zlyhanie = rollback); **uloženie GLOBÁLNEHO setu (`save_set!`) projekt NEprestavuje** — projekt expanduje zo svojho zmrazeného snapshotu setov
@@ -419,7 +425,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   (e) Inspector: karta zásuvky ukazuje resolved riadok + osi (read-only v C; zámky/prepínanie = KOV-D), Kontrola RED riadky s navigáciou; Nákup: slide položka expanduje cez set vybraný
   TRIEDNOU TABUĽKOU v C2b (systém, otváranie, výška, `load`, člen `code_by_nl` — rovnaký výber ako pred emisiou, žiadny generický `slide` fallback pre zásuvky s receptom; Codex #300 kolo
   6 P1); **KOV-D = len UI mapovania/defaulty a pásmové selektory** (nikdy tichá zámena; nemapovaná kombinácia je už pred emisiou `set_incompatible`).
-  **Scope OUT:** per-height sety/selector a defaulty podľa klasifikácie (D) · zámky UI a zmena osí (D — v C platia len existujúce `nominal_length` overridy po migrácii) ·
+  **Scope OUT:** UI mapovania, defaulty podľa klasifikácie a PÁSMOVÉ selektory (D — triedna tabuľka, jej seed a čítanie v `resolve_set_id` sú C2b) · zámky UI a zmena osí (D — v C platia len existujúce `nominal_length` overridy po migrácii) ·
   „Doplniť nové recepty" UI (D) · Antaro/Strong/TANDEM (dáta pripravené) · vnútorné zásuvky (len klasifikácia + RED) · sync tyč P2O: dĺžková položka a oceňovanie (KOV-D, R-06a; detekcia + brána = C2b) ·
   editor receptov · dokonalý kolízny solver (obstruction z listovej zóny + police/priečky stačí; atyp = vizuálna kontrola, #09).
   **Audit: HOTOVÝ — 4 kolá 5.9.2026 (Astra + Sol), záznam checkpoint #18** (nový modul + data pack, plan_schema/ROLES, CONFIG_SCHEMA 5, snapshot kľúč na modeli, hardware kontrakt, brány). **In-SU POVINNÉ** (buildery, plán↔model, undo).
