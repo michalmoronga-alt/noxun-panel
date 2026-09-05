@@ -593,10 +593,16 @@ NxTest.test('GHOST-D1 karta: payload dosky z NOVSEJ verzie nesie priznak aj vysv
   src = NxD1.src('noxun_engine', 'ui', 'panel', 'payloads.rb')
   body = src[/def board_payload\(inst\).*?\n        end\n/m].to_s
   NxTest.assert(body.include?('board_newer_flag(cfg)'), 'board_payload priznak posiela')
+  # POZOR (mutacia 10): hladat `applyBoardReadOnly(bc)` v CELOM subore nestaci —
+  # vyhovel by uz jej vlastnej DEFINICII. Meria sa VOLANIE vo vnutri
+  # `renderBoardCard`, teda ze zamok naozaj bezi pri kazdom prekresleni karty.
   js = NxD1.src('noxun_engine', 'ui', 'js', 'board_card.js')
-  NxTest.assert(js.include?('applyBoardReadOnly(bc)'), 'karta ho aplikuje')
-  NxTest.assert(js.index('nxComboSync(box)') < js.index('applyBoardReadOnly(bc)'),
+  render = js[/function renderBoardCard\(bc\)\{.*?\n  \}\n/m].to_s
+  NxTest.assert(!render.empty?, 'renderBoardCard sa nasla')
+  NxTest.assert(render.include?('applyBoardReadOnly(bc);'), 'karta zamok APLIKUJE pri prekresleni')
+  NxTest.assert(render.index('nxComboSync(box)') < render.index('applyBoardReadOnly(bc);'),
                 'zamok bezi AZ NAKONIEC (prebije vsetko, co karta vyssie odomkla)')
+  NxTest.assert(js.include?('function applyBoardReadOnly(bc)'), 'a funkcia existuje')
 end
 
 NxTest.test('GHOST-D1: karta Dosky ma v D1 JEDNO tlacidlo — `draw_board` NIE JE whitelistovany') do
