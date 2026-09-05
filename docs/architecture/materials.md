@@ -22,14 +22,38 @@ katalóg materiálov a dedenie projekt→skrinka→dielec (projektové defaulty 
 `part_override → skrinka → projekt → UNI 16` presne ako pri tele/čele/chrbte. Hrúbka je **VSTUP receptu**, nie odvodenina plánu: `CabinetBuilder.drawer_thicknesses(cfg, eff)`
 ju vyrieši **PRED** `Construction.build_plan` a pošle ju ako `part_thicknesses` (`{ part_key => mm }`) — bez toho by 18 mm materiál pri Atire ticho prešiel a Quadro by
 počítalo predok/chrbát z nesprávnej hrúbky dna (Codex #301 kolo 3 P1). Materiál mimo `thickness_supported` receptu = RED `drawer_thickness_unsupported`, žiadne dielce.
-**Kľúč `drawer_material_id` musí cestovať VŠETKÝMI cestami materiálu.** V tejto dávke sú to **tri serverové**: **normalize/config** (`CabinetBuilder.normalize` +
-`cabinet_config` + `config_to_params`), **šablóna** (`template_config_from` + `merge_template` preserve-or-override) a **delete guard**
-(`Materials::CABINET_MATERIAL_KEYS` — jeden zoznam pre model aj šablóny). **UI kanála a hromadné cesty (výber v Štúdiu, vkladacia karta, „Nahradiť UNI…") sú
-v samostatnom PR** — dovtedy sa materiál zásuviek nastavuje projektovou predvoľbou v NOXUN dict a `part_override`-om dielca.
+**UI kanála doplnené v C2b (Codex #304 kolo 1 P1).** `MaterialsDialog::TARGETS` má štvrtý kľúč `default_drawer_material_id` → `['drawer_material_id', 'drawer_bottom', nil]`
+(rola je len zástupná — o prípustnosti hrúbky rozhoduje RECEPT, nie `thickness_ok_for?`) a Štúdio má **jeden riadok „Zásuvky"** v predvoľbách projektu, v tom istom vzore
+ako Čelá/Chrbát (vertikálny priestor je vzácny — žiadny nový blok). JS mapa `mdProjectSelectId` má `md_drawer`, kombo dostalo kontext `drawer` s predvolenou hrúbkou **16**
+(jediná, ktorú prijme každý vydaný systém). Guard test iteruje `TARGETS` a vyžaduje pre KAŽDÝ kľúč riadok v `studio.html` aj záznam v JS mape.
 
-**Remap ABS pozná 4. kanál** (Codex #304 kolo 2 P2). `remap_part_edge_overrides!` dostáva `old_eff`/`new_eff` aj s kľúčom `drawer` a odovzdáva ho do `base_material_for`
-ako šiesty argument — bez neho by drawer roly spadli do vetvy tela, takže remap by ich pri zmene predvoľby **zásuviek** prehliadol a pri zmene predvoľby **korpusu**
-naopak zladil s dekorom korpusu.
+**PREFLIGHT PER SYSTÉM (nie D-46 mechanicky).** D-46 vetva porovnáva hrúbku ČELA (18) a o receptoch nevie, takže sa sem nedá použiť. Namiesto nej:
+`drawer_thickness_any_system?` je **tvrdá** brána novej predvoľby — doska, ktorú neprijme ani jeden vydaný systém (napr. 25 mm), sa neuloží vôbec a hláška menuje povolené
+hrúbky (16 a 18). Keď dosku niektorý systém prijme, ale zákazka používa systém, ktorý ju **neprijme**, `drawer_change_plan` vráti zoznam systémov aj skriniek a predvoľba sa
+uloží **až po potvrdení** (`offer_drawer_change` — ten istý pending kontrakt a tá istá lišta ako D-46, líši sa len veta: menuje systém, jeho povolené hrúbky a počet skriniek).
+Zdrojom čísel je `Recipes.supported_thicknesses` ([hardware.md](hardware.md)), nikdy konštanta v UI.
+
+**Kľúč `drawer_material_id` musí cestovať VŠETKÝMI cestami materiálu** (Codex #304 kolo 3). Sú štyri a každá je vlastný kanál: **normalize/config** (`CabinetBuilder`),
+**šablóna** (`template_config_from` + `merge_template` preserve-or-override), **vkladacia karta** (`NXInsert.MATERIAL_KEYS` v `ui/js/insert_state.js` → insert payload →
+`build`/`normalize`; bez neho vložená skrinka spadne na projektovú predvoľbu, teda na inú hrúbku — a ticho) a **„Nahradiť UNI…"** (`Materials::RU_CAB_KEYS` +
+`ru_project_key_for`; bez neho by hromadná náhrada `UNI_ZASUVKA_16` nevytvorila rebuild joby pre skrinky, ktoré kanál dedia, a snapshoty dielcov by ostali na UNI).
+Piata cesta je **delete guard** (`CABINET_MATERIAL_KEYS`). Nový materiálový kanál = pridať do všetkých piatich.
+
+**Predikát podľa toho, ČO sa naozaj mení** (Codex #304 kolo 4). „Prijme aspoň jeden vydaný systém" stačí len tam, kde ešte niet čo pokaziť — pri **novej** predvoľbe
+v Štúdiu a v zákazke, ktorá zásuvky nemá. Všade inde sa hrúbka meria **systémom každého dotknutého čela**:
+- **„Nahradiť UNI…" — projektová predvoľba:** `ru_scan_drawer_systems(scan)` zozbiera systémy z **celej** zákazky a cieľ musí vyhovieť **každému** z nich. 18 mm je platná
+  hrúbka pre Quadro, ale v atirovej zákazke by z každej zásuvky spravila RED — preto sa taká predvoľba neprepíše.
+- **„Nahradiť UNI…" — skrinka:** `ru_drawer_systems_affected(params, roles_now, hit_ov_keys)`. Keď sa mení **kanál** (rola `drawer` v `roles_now`), sú dotknuté všetky
+  klasifikované čelá skrinky; keď UNI sedí **len v `part_override` dielca zásuvky**, `roles_now` rolu `drawer` vôbec nenesie — dotknuté sú vtedy len čelá tých dielcov
+  (`ru_drawer_key_front`). Bez tejto vetvy by 25 mm doska prešla generickým rozsahom doskového materiálu. Blokácia menuje **systém**, ktorý hrúbku neprijal.
+- **Vkladanie:** `MaterialsDialog.drawer_material_issue(params, model)` beží v `Panel.handle_insert` **pred** `prepare_insert`/ghostom — efektívny materiál zásuviek proti
+  systémom v **zloženej** konfigurácii čiel. Nekompatibilný = odmietnutie s hláškou („Nič sa nevložilo"), nie „úspech" a RED až po kliku.
+
+`Recipes.thickness_ok_for_any_system?` a `all_supported_thicknesses` ostávajú pre tie dve laxné miesta a pre texty hlášok; čísla nikde nestoja natvrdo.
+
+**Remap ABS platí aj pre 4. kanál** (Codex #304 kolo 2 P2). Zmena predvoľby zásuviek prebehne tou istou slučkou `remap_part_edge_overrides!` ako telo/čelá/chrbát: ručný
+override zladený so **starým** efektívnym dekorom nasleduje nový, vedome kontrastný alebo `nil` ostáva. K tomu bolo treba, aby `old_eff`/`new_eff` niesli aj kľúč `drawer`
+— `base_material_for` bez neho spadne pri drawer rolách do vetvy tela, takže remap by dielce zásuviek buď prehliadol, alebo ich zladil s dekorom korpusu.
 
 Kanál mal v C2a **len projektovú úroveň**: config kľúč skrinky ani výber v Štúdiu neexistovali. Preto ho
 `MaterialsDialog::TARGETS` **nepozná** a akcia `set_project_material` ho odmietne („Neznámy projektový materiál") — vedomá diera, nie opomenutie. Čo naň už reaguje:

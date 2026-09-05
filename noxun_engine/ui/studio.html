@@ -700,7 +700,7 @@
   <!-- D-42 PR B: predvoľby zbalené do <details> — sekcia je primárne KATALÓG,
        projektové predvoľby sa nastavujú občas (vertikálny priestor). -->
   <details>
-    <summary>Predvoľby projektu (korpus · čelá · chrbát)</summary>
+    <summary>Predvoľby projektu (korpus · čelá · chrbát · zásuvky)</summary>
     <div class="body">
       <div class="hint">Predvolené materiály pre <b>všetky skrinky projektu</b>, ktoré nemajú vlastný materiál (dedenie projekt → skrinka → dielec). Zmena sa hneď premietne do všetkých dediacich skriniek (1 krok Späť).</div>
       <div class="matrow"><label>Korpus</label><select id="md_body" data-nx-combo="decor" data-nx-combo-ctx="body" onchange="onProjMaterial('default_material_id', this.value)"></select></div>
@@ -712,6 +712,9 @@
       </div>
       <div class="matrow"><label>Čelá</label><select id="md_front" data-nx-combo="decor" data-nx-combo-ctx="front" onchange="onProjMaterial('default_front_material_id', this.value)"></select></div>
       <div class="matrow"><label>Chrbát</label><select id="md_back" data-nx-combo="decor" data-nx-combo-ctx="back" onchange="onProjMaterial('default_back_material_id', this.value)"></select></div>
+      <!-- KOV-C2b: 4. materiálový kanál — dielce zásuviek (dno · chrbát · boky boxu · vnútorné čelo).
+           JEDEN riadok v tom istom vzore ako Čelá/Chrbát (vertikálny priestor je vzácny). -->
+      <div class="matrow"><label>Zásuvky</label><select id="md_drawer" data-nx-combo="decor" data-nx-combo-ctx="drawer" onchange="onProjMaterial('default_drawer_material_id', this.value)"></select></div>
     </div>
   </details>
 

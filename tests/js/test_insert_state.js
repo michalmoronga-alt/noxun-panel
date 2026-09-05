@@ -87,16 +87,28 @@ eq(src2.width, 450, 'nezamknute pole ostava zo sablony');
 eq(TPL.height, 900, 'applyLocks nemutuje sablonu (bezi na compose kopii)');
 
 // --- materialsOf: sablonove materialy / prazdne = null (dedenie z projektu) ---
-eq(ins.materialsOf({}), { material_id: null, front_material_id: null, back_material_id: null },
-  'bez sablony ziadne materialy (dedenie)');
-eq(ins.materialsOf({ material_id: 'K009', front_material_id: '', back_material_id: null }),
-  { material_id: 'K009', front_material_id: null, back_material_id: null },
-  'prazdny string = null (dedenie), hodnota sa nesie');
+// KOV-C2b: STYRI kanaly — `drawer_material_id` (dielce zasuviek) musi cestovat
+// vkladacim stavom rovnako ako telo/cela/chrbat, inak vlozena skrinka spadne na
+// projektovu predvolbu zasuviek, teda na INU hrubku, a to ticho.
+const EMPTY_MATS = { material_id: null, front_material_id: null, back_material_id: null,
+  drawer_material_id: null };
+eq(ins.MATERIAL_KEYS, ['material_id', 'front_material_id', 'back_material_id',
+  'drawer_material_id'], 'zrkadlo serveroveho normalize (styri materialove kanaly)');
+eq(ins.materialsOf({}), EMPTY_MATS, 'bez sablony ziadne materialy (dedenie)');
+eq(ins.materialsOf({ material_id: 'K009', front_material_id: '', back_material_id: null,
+  drawer_material_id: 'BIELA_16' }),
+  { material_id: 'K009', front_material_id: null, back_material_id: null,
+    drawer_material_id: 'BIELA_16' },
+  'prazdny string = null (dedenie), hodnota sa nesie — vratane 4. kanala');
+eq(ins.materialsOf({ drawer_material_id: '  ' }).drawer_material_id, null,
+  'samé medzery = dedenie, nikdy tichy „materiál" z medzier');
 ins.setMaterials(TPL);
 eq(ins.state.materials.material_id, 'K009_PW_DTDL_18', 'setMaterials do stavu karty');
+ins.setMaterials({ drawer_material_id: 'ZASUVKA_18' });
+eq(ins.state.materials.drawer_material_id, 'ZASUVKA_18',
+  'material zasuviek zo sablony prezije v stave vkladacej karty');
 ins.setMaterials(null);
-eq(ins.state.materials, { material_id: null, front_material_id: null, back_material_id: null },
-  'setMaterials(null) = cisty draft');
+eq(ins.state.materials, EMPTY_MATS, 'setMaterials(null) = cisty draft');
 
 // --- N11: cela cesta compose+locks+materials NAD ZAMRAZENOU sablonou nehodi
 //     vynimku a sablona ostava byte-identicka (JS strana imutability) ---
