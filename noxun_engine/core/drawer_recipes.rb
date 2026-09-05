@@ -125,12 +125,14 @@ module Noxun
         validate!(parse_json(path), id)
       end
 
-      # Inventar suborov receptov v priecinku (bez registra) — pouziva ho test
-      # nemennosti: mnozina suborov MUSI sediet s mnozinou klucov registra.
+      # Inventar VSETKYCH suborov v priecinku receptov okrem registra — pouziva
+      # ho test nemennosti: mnozina suborov MUSI sediet s mnozinou klucov registra.
+      # ZAMERNE sa NEFILTRUJE cez `parse_id` (Codex #302 kolo 1 P2): subor s menom,
+      # ktore parser nepozna (`antaro_sisy_v1.json`), je prave ten pripad, ktory ma
+      # test odhalit — odfiltrovanie by ho ticho prepasovalo.
       def inventory(dir: DIR)
         Dir.glob(File.join(dir, '*.json')).map { |p| File.basename(p, '.json') }
            .reject { |b| b == File.basename(RELEASED_FILE, '.json') }
-           .select { |b| parse_id(b) }
            .sort
       end
 
@@ -178,7 +180,10 @@ module Noxun
       #                                    zasuvka bez JEDINEHO drawer pola,
       #                                    alebo `construction other`
       #   [:ok, {system:, opening:}]     — construction AJ opening_mode su tu
-      #   [:conflict, kod]               — ciastocna klasifikacia / vnutorna zasuvka
+      #   [:conflict, kod, hlaska]       — ciastocna klasifikacia / nesulad
+      #                                    system-konstrukcia / vnutorna zasuvka
+      #                                    (kod je VZDY z CONFLICT_CODES; hlaska
+      #                                    je slovenska veta pre Kontrolu v C2)
       def recipe_key_for(front_item)
         return [:legacy, nil] unless front_item.is_a?(Hash)
         return [:legacy, nil] unless front_item['type'].to_s == 'drawer_front'
@@ -190,23 +195,41 @@ module Noxun
         opening_mode = str_or_nil(front_item['opening_mode'])
 
         # Legacy: ziadne z klasifikacnych poli neexistuje -> nedotknute stare celo.
-        return [:legacy, nil] if construction.nil? && opening_mode.nil? && explicit_sys.nil?
+        # `variant` sa RATA MEDZI NE (Codex #302 kolo 1 P2): celo, ktore nesie LEN
+        # `variant internal`, je klasifikovane — nesmie prepadnut do legacy cesty
+        # skor, nez sa vnutorna zasuvka prizna.
+        return [:legacy, nil] if construction.nil? && opening_mode.nil? && explicit_sys.nil? && variant.nil?
         # `other` = konstrukcia mimo receptov -> legacy cesta (nie chyba).
         return [:legacy, nil] if construction == 'other'
         # Vnutorna zasuvka: V1 ju vie len klasifikovat.
-        return [:conflict, 'drawer_internal_unsupported'] if variant == 'internal'
+        if variant == 'internal'
+          return [:conflict, 'drawer_internal_unsupported',
+                  'Vnútorná zásuvka: V1 ju vie iba klasifikovať — dielce ani výsuv sa nevyrábajú.']
+        end
 
         if construction && opening_mode
-          system = explicit_sys && SYSTEMS.include?(explicit_sys) ? explicit_sys : CONSTRUCTION_TO_SYSTEM[construction]
+          expected = CONSTRUCTION_TO_SYSTEM[construction]
           opening = OPENING_MODE_TO_OPENING[opening_mode]
-          return [:conflict, 'drawer_unclassified'] if system.nil? || opening.nil?
+          if expected.nil? || opening.nil?
+            return [:conflict, 'drawer_unclassified',
+                    'Zásuvka nie je klasifikovaná: konštrukcia alebo spôsob otvárania má neznámu hodnotu.']
+          end
+          # Explicitny `system` je hodnota z configu (stale/podvrhnuty payload).
+          # NIKDY neprepise mapu konstrukcie (Codex #302 kolo 1 P2): kov je Atira,
+          # drevo Quadro — nesulad je RED, nie tiche prepnutie systemu.
+          if explicit_sys && explicit_sys != expected
+            return [:conflict, 'drawer_unclassified',
+                    "Zásuvka nie je klasifikovaná: systém „#{explicit_sys}\" nezodpovedá konštrukcii " \
+                    "„#{construction}\" (očakávaný #{expected})."]
+          end
 
-          return [:ok, { system: system, opening: opening }]
+          return [:ok, { system: expected, opening: opening }]
         end
 
         # Polia sa edituju NEZAVISLE — ciastocna klasifikacia je RED, nikdy
         # sa nedopĺňa druha polovica (Codex #301 kolo 3 P1).
-        [:conflict, 'drawer_unclassified']
+        [:conflict, 'drawer_unclassified',
+         'Zásuvka je klasifikovaná len spolovice — chýba konštrukcia alebo spôsob otvárania.']
       end
 
       # --- resolve -------------------------------------------------------------
@@ -422,11 +445,16 @@ module Noxun
                .find { |v| v[:min_clear_height].to_f <= clear_h }
       end
 
+      # Rovnaky kontrakt ako `HardwareRules.override_nominal_length`:
+      # `disabled` VITAZI — vypnuty zaznam zamok NENESIE (Codex #302 kolo 1 P2),
+      # inak by vypnuta polozka riadila NL dielcov. Ako polozka s `disabled`
+      # naklada receptova cesta (RED `drawer_override_invalid`) rozhoduje C2.
       def lock_value(recipe, ctx, overrides)
         owner = ctx[:owner_part_key]
         rule_ids = [LOCK_LEGACY_RULE_ID, "recipe:#{recipe[:recipe_id]}"]
         rec = Array(overrides).reverse.find do |ov|
           next false unless ov.is_a?(Hash)
+          next false if get(ov, 'disabled') == true
           next false unless get(ov, 'generic_type').to_s == LOCK_GENERIC_TYPE
           next false unless rule_ids.include?(get(ov, 'rule_id').to_s)
           next false if owner && get(ov, 'owner_part_key').to_s != owner.to_s
@@ -553,7 +581,7 @@ module Noxun
         r[:eb] = pos_num!(raw['eb'], id, 'eb')
         r[:sync_min_width] = pos_num!(raw['sync_min_width'], id, 'sync_min_width')
         r[:kd_supported] = num_list!(raw['kd_supported'], id, 'kd_supported')
-        r[:thickness_supported] = thickness_map!(raw['thickness_supported'], id)
+        r[:thickness_supported] = thickness_map!(raw['thickness_supported'], id, r[:family])
         r[:constants] = constants!(raw['constants'], id, r[:system])
         r[:abs] = abs_map!(raw['abs'], id, r[:thickness_supported].keys)
         r[:load_by_cell] = load_by_cell!(raw['load_by_cell'], id)
@@ -622,8 +650,27 @@ module Noxun
         out
       end
 
-      def thickness_map!(raw, id)
+      # Roly, ktore recept danej rodiny vyraba — PRESNA mnozina, nie minimum.
+      # Chybajuca aj prebytocna rola = odmietnutie receptu UZ PRI NACITANI
+      # (Codex #302 kolo 1 P2): recept bez `drawer_back` by inak presiel a chyba
+      # by vyplavala az ako `drawer_no_fit` nad hotovou zakazkou.
+      FAMILY_ROLES = {
+        'metal_box' => [ROLE_BOTTOM, ROLE_BACK].freeze,
+        'wood_undermount' => [ROLE_BOTTOM, ROLE_BOX_SIDE, ROLE_INNER_FRONT, ROLE_BACK].freeze
+      }.freeze
+
+      def thickness_map!(raw, id, family)
         raise RecipeError, "Recept #{id}: chyba 'thickness_supported'." unless raw.is_a?(Hash) && !raw.empty?
+
+        want = FAMILY_ROLES[family]
+        raise RecipeError, "Recept #{id}: nezname family '#{family}'." if want.nil?
+
+        got = raw.keys.map(&:to_s).sort
+        unless got == want.sort
+          raise RecipeError,
+                "Recept #{id}: 'thickness_supported' musi mat PRESNE roly rodiny #{family} " \
+                "(#{want.sort.join(', ')}), dostal #{got.join(', ')}."
+        end
 
         out = {}
         raw.each { |role, list| out[role.to_s] = num_list!(list, id, "thickness_supported.#{role}") }

@@ -225,6 +225,20 @@ NxTest.test('KOV-C1: zamok patriaci INEMU celu sa ignoruje') do
   NxTest.assert_close(470.0, res[:nl], 0.001)
 end
 
+NxTest.test('KOV-C1: zaznam s disabled NIE je zamok (rovnaky kontrakt ako HardwareRules)') do
+  overrides = NxKovC1R.lock(420.0)
+  overrides[0]['disabled'] = true
+  res = NxKovC1R.r.resolve(NxKovC1R.rec('atira_sisy_v1'), NxKovC1R.ctx, NxKovC1R.th_atira, overrides)
+  NxTest.assert_equal([], NxKovC1R.codes(res))
+  NxTest.assert_close(470.0, res[:nl], 0.001, 'vypnuty zaznam nesmie riadit NL — plati automat')
+  NxTest.refute(res[:explain].any? { |e| e.include?('zámok') }, 'vypnuty zaznam nie je rucny zamok')
+  # disabled MIMO radu tiez nesmie vyrobit nl_lock_invalid
+  bad = NxKovC1R.lock(400.0)
+  bad[0]['disabled'] = true
+  ok = NxKovC1R.r.resolve(NxKovC1R.rec('atira_sisy_v1'), NxKovC1R.ctx, NxKovC1R.th_atira, bad)
+  NxTest.assert_equal([], NxKovC1R.codes(ok))
+end
+
 NxTest.test('KOV-C1: zaznam override BEZ nominal_length nie je zamok') do
   overrides = [{ 'owner_part_key' => 'front:F1/panel', 'generic_type' => 'slide',
                  'rule_id' => 'vysuvy-nl-podla-hlbky', 'quantity' => 2 }]

@@ -155,6 +155,45 @@ NxTest.test('KOV-C1: Atira bez radu NL pre vysku = odmietnutie') do
   end
 end
 
+NxTest.test('KOV-C1: thickness_supported musi mat PRESNE roly rodiny (chybajuca rola = odmietnutie)') do
+  # metal_box bez `drawer_back` — bez tejto brany by chyba vyplavala az ako
+  # `drawer_no_fit` nad hotovou zakazkou.
+  body = NxKovC1.base
+  body['thickness_supported'].delete('drawer_back')
+  NxKovC1.with_tmp({ 'atira_sisy_v1' => body }) do |d|
+    NxTest.assert_raise('thickness_supported') { NxKovC1.r.load('atira_sisy_v1', dir: d) }
+  end
+  # rola NAVYSE je rovnako chyba
+  extra = NxKovC1.base
+  extra['thickness_supported']['box_side'] = [16]
+  NxKovC1.with_tmp({ 'atira_sisy_v1' => extra }) do |d|
+    NxTest.assert_raise('PRESNE roly') { NxKovC1.r.load('atira_sisy_v1', dir: d) }
+  end
+  # wood_undermount potrebuje vsetky styri
+  q = NxKovC1.base('quadro_v6_sisy_v1')
+  q['thickness_supported'].delete('box_side')
+  NxKovC1.with_tmp({ 'quadro_v6_sisy_v1' => q }) do |d|
+    NxTest.assert_raise('thickness_supported') { NxKovC1.r.load('quadro_v6_sisy_v1', dir: d) }
+  end
+end
+
+NxTest.test('KOV-C1: vydane recepty maju presne roly svojej rodiny') do
+  NxTest.assert_equal(%w[drawer_back drawer_bottom],
+                      NxKovC1.r.load('atira_sisy_v1')[:thickness_supported].keys.sort)
+  NxTest.assert_equal(%w[box_side drawer_back drawer_bottom drawer_inner_front],
+                      NxKovC1.r.load('quadro_v6_p2o_v1')[:thickness_supported].keys.sort)
+end
+
+NxTest.test('KOV-C1: inventar vidi AJ subor s neznamym menom systemu') do
+  NxKovC1.with_tmp({ 'atira_sisy_v1' => NxKovC1.base }) do |d|
+    File.write(File.join(d, 'antaro_sisy_v1.json'), '{}')
+    NxTest.assert_equal(%w[antaro_sisy_v1 atira_sisy_v1], NxKovC1.r.inventory(dir: d),
+                        'neregistrovany subor s neparsovatelnym menom sa NESMIE odfiltrovat')
+    NxTest.refute(NxKovC1.r.inventory(dir: d) == NxKovC1.r.released(dir: d).keys.sort,
+                  'test „inventar == register" musi nad takym priecinkom padnut')
+  end
+end
+
 NxTest.test('KOV-C1: recipe_id musi sediet s nazvom suboru aj s poliami system/opening/version') do
   body = NxKovC1.base.merge('opening' => 'p2o')
   NxKovC1.with_tmp({ 'atira_sisy_v1' => body }) do |d|
@@ -227,29 +266,63 @@ NxTest.test('KOV-C1: recipe_key_for ok — metal+classic -> atira|sisy, wood+tip
                       r.recipe_key_for(NxKovC1.item(drawer: { 'construction' => 'wood' }, opening_mode: 'tipon')))
 end
 
-NxTest.test('KOV-C1: explicitny drawer.system ma prednost pred defaultom konstrukcie') do
-  key = NxKovC1.r.recipe_key_for(
+NxTest.test('KOV-C1: explicitny drawer.system MUSI sediet s konstrukciou (inak konflikt)') do
+  r = NxKovC1.r
+  # zhodny system je v poriadku (a nic nemeni)
+  NxTest.assert_equal([:ok, { system: 'atira', opening: 'sisy' }],
+                      r.recipe_key_for(NxKovC1.item(drawer: { 'construction' => 'metal', 'system' => 'atira' },
+                                                    opening_mode: 'classic')))
+  NxTest.assert_equal([:ok, { system: 'quadro_v6', opening: 'p2o' }],
+                      r.recipe_key_for(NxKovC1.item(drawer: { 'construction' => 'wood', 'system' => 'quadro_v6' },
+                                                    opening_mode: 'tipon')))
+  # stale/podvrhnuty config: kov + Quadro sa NIKDY ticho neprijme
+  kind, code, msg = r.recipe_key_for(
     NxKovC1.item(drawer: { 'construction' => 'metal', 'system' => 'quadro_v6' }, opening_mode: 'classic')
   )
-  NxTest.assert_equal([:ok, { system: 'quadro_v6', opening: 'sisy' }], key)
+  NxTest.assert_equal(:conflict, kind)
+  NxTest.assert_equal('drawer_unclassified', code)
+  NxTest.assert(msg.to_s.include?('nezodpovedá konštrukcii'), "hlaska musi povedat dovod (#{msg.inspect})")
+  # neznamy system rovnako
+  NxTest.assert_equal('drawer_unclassified',
+                      r.recipe_key_for(NxKovC1.item(drawer: { 'construction' => 'wood', 'system' => 'antaro' },
+                                                    opening_mode: 'classic'))[1])
 end
 
 NxTest.test('KOV-C1: CIASTOCNA klasifikacia je RED drawer_unclassified (obe strany)') do
   r = NxKovC1.r
-  NxTest.assert_equal([:conflict, 'drawer_unclassified'],
-                      r.recipe_key_for(NxKovC1.item(drawer: { 'construction' => 'metal' })))
-  NxTest.assert_equal([:conflict, 'drawer_unclassified'],
-                      r.recipe_key_for(NxKovC1.item(opening_mode: 'classic')))
-  # samotny `system` bez klasifikacie tiez nie je legacy
-  NxTest.assert_equal([:conflict, 'drawer_unclassified'],
-                      r.recipe_key_for(NxKovC1.item(drawer: { 'system' => 'atira' })))
+  [{ drawer: { 'construction' => 'metal' } },
+   { opening_mode: 'classic' },
+   # samotny `system` bez klasifikacie tiez nie je legacy
+   { drawer: { 'system' => 'atira' } }].each do |args|
+    kind, code = r.recipe_key_for(NxKovC1.item(**args))
+    NxTest.assert_equal([:conflict, 'drawer_unclassified'], [kind, code], args.inspect)
+  end
 end
 
-NxTest.test('KOV-C1: vnutorna zasuvka = drawer_internal_unsupported') do
-  NxTest.assert_equal([:conflict, 'drawer_internal_unsupported'],
-                      NxKovC1.r.recipe_key_for(NxKovC1.item(drawer: { 'construction' => 'metal',
-                                                                      'variant' => 'internal' },
-                                                            opening_mode: 'classic')))
+NxTest.test('KOV-C1: vnutorna zasuvka = drawer_internal_unsupported (aj bez inej klasifikacie)') do
+  r = NxKovC1.r
+  full = r.recipe_key_for(NxKovC1.item(drawer: { 'construction' => 'metal', 'variant' => 'internal' },
+                                       opening_mode: 'classic'))
+  NxTest.assert_equal([:conflict, 'drawer_internal_unsupported'], full[0, 2])
+  # SAMOTNY `variant internal` nesmie prepadnut do legacy cesty
+  only = r.recipe_key_for(NxKovC1.item(drawer: { 'variant' => 'internal' }))
+  NxTest.assert_equal([:conflict, 'drawer_internal_unsupported'], only[0, 2])
+  NxTest.assert(only[2].to_s.include?('Vnútorná'), 'internal ma niest hlasku')
+  # `variant standard` sam o sebe je len klasifikacia bez konstrukcie -> unclassified
+  NxTest.assert_equal([:conflict, 'drawer_unclassified'],
+                      r.recipe_key_for(NxKovC1.item(drawer: { 'variant' => 'standard' }))[0, 2])
+end
+
+NxTest.test('KOV-C1: konflikt z recipe_key_for nesie kod z CONFLICT_CODES a slovensku hlasku') do
+  r = NxKovC1.r
+  [NxKovC1.item(drawer: { 'construction' => 'metal' }),
+   NxKovC1.item(drawer: { 'variant' => 'internal' }),
+   NxKovC1.item(drawer: { 'construction' => 'metal', 'system' => 'quadro_v6' }, opening_mode: 'classic')].each do |it|
+    kind, code, msg = r.recipe_key_for(it)
+    NxTest.assert_equal(:conflict, kind)
+    NxTest.assert(r::CONFLICT_CODES.include?(code), "neznamy kod #{code.inspect}")
+    NxTest.assert(msg.is_a?(String) && !msg.empty?, 'konflikt musi niest hlasku')
+  end
 end
 
 NxTest.test('KOV-C1: register kodov konfliktov ma presne 10 poloziek z package') do

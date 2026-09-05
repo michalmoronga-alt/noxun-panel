@@ -491,7 +491,10 @@ pomenované konštanty v Ruby, v súbore je nanajvýš dokumentačný `formula_d
 
 **Nemennosť.** `RELEASED.json` = register `{ recipe_id => sha256 }`. `load` číta **výhradne** registrované recepty a odtlačok súboru musí sedieť — nezhoda, neregistrované ID
 aj chýbajúca bunka schémy končia výnimkou `Recipes::RecipeError`, **nikdy tichým defaultom**. Odtlačok sa počíta nad obsahom s normalizovanými koncami riadkov (repo beží
-s `core.autocrlf=true`, surový bajtový hash by v CI padal). Testy navyše strážia, že **inventár `data/recipes/*_v*.json` == množina kľúčov registra**, a **golden fixtúra**
+s `core.autocrlf=true`, surový bajtový hash by v CI padal). **Schéma sa validuje prísne pri načítaní**, nie až pri výpočte: `thickness_supported` musí mať **presnú** množinu
+rolí svojej rodiny (`metal_box` = dno + chrbát; `wood_undermount` = dno + 2 boky + vnútorné čelo + chrbát) — chýbajúca aj prebytočná rola je odmietnutie receptu, inak by
+chyba vyplávala až ako `drawer_no_fit` nad hotovou zákazkou. Testy navyše strážia, že **inventár `data/recipes/*.json` (všetko okrem registra, aj súbor s menom, ktoré parser
+nepozná) == množina kľúčov registra**, a **golden fixtúra**
 (`tests/pure/fixtures/kovc1_golden.json`) fixuje výsledky `resolve` pre KAŽDÝ vydaný recept — SHA JSON-u zmenu interpretácie v Ruby nezachytí. Oprava alebo rozšírenie =
 **nový súbor `_v2`**; vydané verzie sa nikdy nemažú ani nemenia (reprodukovateľnosť starých zákaziek bez projektového snapshotu).
 
@@ -500,17 +503,22 @@ inú kombináciu, inak `nil` — prepnutie klasifikácie tam a späť nikdy tich
 `[:unknown, id]` (RED `drawer_recipe_unknown`) · `[:missing, nil]`.
 
 **`recipe_key_for(front_item)` = rozhodovacia tabuľka, nikdy dve cesty naraz.** `[:legacy, nil]` pre iný typ než zásuvka, zásuvku **bez jediného** klasifikačného poľa
-(`construction`, `opening_mode` aj `system` chýbajú) a pre `construction other` — legacy cesta ostáva CONTENT-identická a resolver sa nevolá. `[:ok, {system, opening}]` keď
-je `construction` **aj** `opening_mode` (`metal → atira`, `wood → quadro_v6`, explicitný `drawer.system` má prednosť; `classic → sisy`, `tipon → p2o`).
-`[:conflict, 'drawer_unclassified']` pri **akejkoľvek čiastočnej** klasifikácii (polia sa editujú nezávisle) a `[:conflict, 'drawer_internal_unsupported']` pri
-`variant internal`.
+(`construction`, `opening_mode`, `system` **aj `variant`** chýbajú) a pre `construction other` — legacy cesta ostáva CONTENT-identická a resolver sa nevolá.
+`[:ok, {system, opening}]` keď je `construction` **aj** `opening_mode` (`metal → atira`, `wood → quadro_v6`; `classic → sisy`, `tipon → p2o`).
+`[:conflict, kód, hláška]` inak — kód je vždy z `CONFLICT_CODES`, hláška je slovenská veta pre Kontrolu v C2: `drawer_unclassified` pri **akejkoľvek čiastočnej**
+klasifikácii (polia sa editujú nezávisle) a `drawer_internal_unsupported` pri `variant internal` (aj keď je `variant` **jediné** vyplnené pole).
+
+**Explicitný `drawer.system` je kontrolovaný, nie autoritatívny.** Je to hodnota z configu, teda aj zo stale alebo podvrhnutého payloadu, preto **nikdy neprepíše mapu
+konštrukcie**: `metal` musí byť `atira`, `wood` musí byť `quadro_v6`, nesúlad (aj neznámy systém) = `drawer_unclassified` s hláškou „systém nezodpovedá konštrukcii".
+Tiché prepnutie systému by k dielcom jedného systému objednalo kovanie druhého.
 
 **`resolve(recipe, ctx, part_thicknesses, overrides)`** → `{height_variant, box_height, nl, load, parts, hardware_params, conflicts, explain}`. Poradie krokov: KD mimo
 `kd_supported` → `drawer_kd_unsupported` · hrúbka role mimo `thickness_supported` (`part_thicknesses` je **VSTUP**, nie odvodená hodnota) → `drawer_thickness_unsupported` ·
 neprázdne `ctx[:obstructions]` → `drawer_obstruction` · **jedna výška** (Atira: najvyšší variant s `min_clear_height ≤ clear_height`; Quadro: `box_height = clear_height − 40`
 a čelo/chrbát `box_height − t_dna − 12 ≥ 30`) · **jedna NL** (najdlhšia z radu TEJ výšky s `min_depth ≤ clear_depth`) · **NL zámok** z `hardware_overrides`
 (`generic_type slide`, `rule_id` `vysuvy-nl-podla-hlbky` alebo `recipe:<id>`, pole `nominal_length`): v rade a zmestí sa → drží, inak `nl_lock_invalid` — **nikdy tichá
-zmena** · nosnosť bunky · dielce · kontrola každého rozmeru proti `MIN_DIM`. Porovnania sú **inkluzívne a bez EPS** nad nezaokrúhlenou hodnotou z `context_for`
+zmena**; záznam s `disabled: true` zámok **nenesie** (ten istý kontrakt ako `HardwareRules.override_nominal_length`) · nosnosť bunky · dielce · kontrola každého rozmeru
+proti `MIN_DIM`. Porovnania sú **inkluzívne a bez EPS** nad nezaokrúhlenou hodnotou z `context_for`
 (105,00 platí, 104,995 padá). **Atomicita:** akýkoľvek konflikt ⇒ `parts = []` a `hardware_params = {}`.
 
 **Dielce.** Atira presne 2: `drawer_bottom` `(LB − 2·EB − 51,5) × (NL + 10)` a `drawer_back` `(LB − 2·EB − 63) × rear_height`. Quadro 5: `box_side` ×2 `NL × box_height`,
