@@ -78,3 +78,12 @@ manufactured, source recipe); (F5) hranice bez predčasného zaokrúhlenia (EPS 
 chýbajúca os = neoveriteľný → brána; #6 → recept emituje položku `sync_shaft` (`recipe:<system>:sync_shaft`, `cut_length`), nemapovaná = RED; #9 → validácia nad všetkými osami systému;
 #10 → premapovanie `recipe:<old>` → `recipe:<new>` ak NL v rade; #12 → `L1` = horná dlhá hrana pre box_side/inner_front/back, dno bez. Odpovede na auditné otázky potvrdené (clear_depth, rez C2a/C2b).
 Kolo 3 (Sol) nad verziou 3 = ČAKÁ.
+
+## Kolo 3 (Sol, 5.9.2026, nad verziou 3 `9d3e00b`) — ZAPRACOVANÉ (verzia 4)
+
+Kolo 2: **6/11 RESOLVED**, 5 PARTIAL. **6 nových BLOCKER (presnosť kontraktu):** (1) `drawer_recipes_mismatch` chýbal v registri → doplnený; (2) čiastočná klasifikácia bola ORANGE (fail-open) →
+RED `drawer_unclassified` v registri; (3) `source: recipe` by BuildPlan odmietol a D-93 mení source na manual → enum rozšírený o `recipe`, zámok = `locked: true` (pôvod ≠ zámok),
+`rule_nominal_length` povolené; (4) `sync_shaft` bez validného tvaru → nová enum hodnota, úplný tvar, `cut_length_mm` (`LENGTH_PARAM`) = dĺžková položka; (5) `recipe_digest` nad celým
+validovaným záznamom (SHA-256 kanonickej serializácie); (6) dôveryhodná cesta receptu → `Fronts.stored_recipe(raw)` pred normalizáciou + `Fronts.write_recipe!` po resolveri. **2 FIX:** (7)
+`context_for` z nezaokrúhlených zón (`raw_bounds`); (8) `materialized_part` sa pre drawer roly nepoužíva (rozpor C1/C2b odstránený). Residual: do KOV-D sa set vyberá len cez owner/generic
+mapovanie (C2b smie zablokovať, nikdy ticho priradiť H70); reálne in-SU testy povinné (kópia medzi dokumentmi, seed + Undo, part_overrides, duplikáty). Kolo 4 (Sol, záverečné) = ČAKÁ.
