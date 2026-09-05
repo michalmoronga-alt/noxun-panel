@@ -32,13 +32,13 @@ robí **priamo v Inspectore**. **KOV-B1** dala setom **klasifikáciu** (na čo �
 **Blok 1b uzavretý až na D-51** (čaká na Michalove hodnoty) · **1c hotový** · **1d beží** (hotové R-06/R-08/R-01+04/R-34/R-02(b)/R-03/R-07/R-23.1/R-11/R-12/R-14; ďalej R-18 + zvyšok; R-13 čaká na Michala) · **1e HOTOVÁ** ([AUDIT_REGISTER.md](AUDIT_REGISTER.md)).
 **Blok KOVANIE beží (od 2.9.):** architektúra V1 uzavretá po cross-audite + O1–O3 ([zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md](zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md)),
 mockup schválený ([zdroje/ui20/mockup_kovanie_v1.html](zdroje/ui20/mockup_kovanie_v1.html)), packages v [PLAN.md](PLAN.md); **D-52 UPDATER KOMPLET (v0.9.14)**.
-**KOV-A KOMPLET** (#280–#282 + smoke fix #286), **KOV-H KOMPLET** (H1 #283 + H2 #285), **KOV-B1** (#284), **KOV-B2** (katalóg) aj **KOV-B3** (editor setu, R-41 uzavretá) hotové — **slice B je KOMPLET, ďalej KOV-C**.
+**KOV-A KOMPLET** (#280–#282 + smoke fix #286), **KOV-H KOMPLET** (H1 #283 + H2 #285), **KOV-B1** (#284), **KOV-B2** (katalóg) aj **KOV-B3** (editor setu, R-41 uzavretá) hotové — **slice B je KOMPLET**. **KOV-C má package v2 (5.9., PR #301, checkpoint #19):** nemenné recepty, kódy v setoch, žiadny fallback NL; audity zapracované, ZMRAZENÝ — **ďalej implementácia C1**.
 **Od 3.9. opäť Fable (Max, ~mesiac; priorita = uzavrieť V1)** — orchestruje Fable, implementujú Opus subagenti, review Codex; vstupný bod je [zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md](zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md) + tento súbor. **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
 
 **Poradie (Michal 2.9.: „poradie je na tebe"):** ~~D-52~~ → ~~KOV-A1/A2a/A2b~~ → ~~KOV-H1~~ → ~~KOV-B1~~ → ~~KOV-H2~~ → ~~KOV-B2~~ → ~~KOV-B3~~ (všetko v maine)
-→ **KOV-C** context_for + recepty → **KOV-D** resolver + zámky + brány → E/F/G/I. Súbežne 1d podľa kapacity.
+→ **KOV-C** (package v2 zmrazený 5.9., checkpoint #19; C1 jadro → C2 aktivácia) → **KOV-D** resolver + zámky + brány → E/F/G/I. Súbežne 1d podľa kapacity.
 Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` (KOV-A/B/C/D/H povinné) → subagent vo worktree → `codex-po-pr` → merge → uzáver. V1 checklist v [V1_VIZIA.md](V1_VIZIA.md).
 
 ## Posledné uzávery

@@ -93,3 +93,15 @@ Prompt: adversarial review package v2 s explicitnou úlohou pri každom náleze 
 | P2 | Package odkazuje na FINAL §3/§8, ktoré predpisujú snapshot, KD→EB a VEPO výnimku. | PRIJATÉ: poznámky PREKONANÉ/UPRESNENIE priamo v FINAL §3 a §8; PLAN odkazuje len na §4/§6. | FINAL, PLAN |
 
 Žiadny nález nevracia mechanizmus v13 (mapa refs je stále reťazce bez snapshotu/digestu). P1 → kolo 3 (`@codex review`); ak kolo 3 prinesie P1, platí pravidlo 3 kôl (rezať).
+
+## 7. GH Codex kolo 3 nad PR #301 (commit `0490def`, 5.9. 13:46 UTC) — 4 P1, reconcile + ROZHODNUTIE MICHALA
+
+| # | Nález | Rozhodnutie | Kam |
+|---|---|---|---|
+| P1 | Recept nemá vstup hrúbok drawer materiálu; `build_into` volá `build_plan` PRED `effective_materials` (overené v kóde). | PRIJATÉ: hrúbky kanála `:drawer` + `part_overrides` sa vyriešia pred plánom a idú receptu ako `part_thicknesses`. | KOV-C C1 resolve, C2 (a) |
+| P1 | Panel nahrádza `params['fronts']` vcelku → mapa `recipe_refs` sa dá prepísať/vymazať. | PRIJATÉ: handler ju z payloadu zahodí a uloženú mapu pripojí späť podľa ID čela; test stale/forged payload. | KOV-C C1 |
+| P1 | Čiastočná klasifikácia (opening bez construction) by šla legacy cestou. | PRIJATÉ: legacy len pre čelo bez akéhokoľvek drawer poľa; akékoľvek čiastočné = RED. | KOV-C C1 tabuľka |
+| P1 | Pásmo selektora H176 → H70 set: sety nemajú výškovú metadátu, expanzia nemá čo overiť. | PRIJATÉ (Michal 5.9.: „výškové pole áno"): klasifikačné pole `height_variant` na drawer setoch = overenie pri expanzii, NIE os výberu; lazy std 4 obsahom. | KOV-C C2 (d) |
+
+**Rozhodnutie Michala 5.9. (po kole 3):** zapracovať kolo 3, package ZMRAZIŤ, PR mergnuť BEZ ďalšieho GH kola (pravidlo 3 kôl: review dokumentu produkuje nové hypotetické okraje
+každé kolo bez ohľadu na kvalitu návrhu — pri v13 aj v2). Ďalšia brána = implementácia C1 s testami a in-SU behom. Dátové commity po kole 2 (Atira kódy, rename `recipe_refs`) = docs, delta overená orchestrátorom.
