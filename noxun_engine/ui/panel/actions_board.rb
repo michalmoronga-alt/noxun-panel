@@ -19,6 +19,16 @@ module Noxun
       # materiali hrubku dalej urcuje katalog (D-45).
       BOARD_FIELD_KEYS = %w[name length width quantity grain_direction thickness].freeze
 
+      # GHOST-D2: whitelist parametrov VKLADACEJ KARTY — JEDEN pre vloženie
+      # (D1 `insert_board`) aj kreslenie (D2 `draw_board`), aby sa dve
+      # vkladacie cesty nemohli rozísť. `orientation` je v ňom vedome: karta
+      # ju posiela pri KAŽDEJ materializácii explicitne (default 'leziaca'),
+      # takže „Bez šablóny" nikdy nezdedí starý draft; neznámu hodnotu
+      # odmietne `BoardBuilder.norm_orientation` výnimkou.
+      # ZÁMKY fáz sem NEPATRIA — nikdy nesmú doputovať do `normalize`.
+      BOARD_INSERT_PARAM_KEYS = %w[name length width material_id grain_direction
+                                   thickness orientation].freeze
+
       class << self
         # GHOST-D1: „Vložiť dosku" UZ NEVKLADA — pripravi ZMRAZENY `BoardPlan`
         # (`BoardBuilder.prepare_insert`) a zavesi ghost na kurzor; doska
@@ -120,14 +130,6 @@ module Noxun
           end
           "Zamknuté z karty: #{parts.join(' · ')} (tieto ťahy sa preskočia). "
         end
-
-        # UI-C1c: `orientation` je vo whiteliste vkladania — karta ju posiela
-        # pri KAZDEJ materializacii explicitne (default 'leziaca'), takze
-        # „Bez šablóny" nikdy nezdedi starý draft. Neznamu hodnotu odmietne
-        # BoardBuilder.norm_orientation vynimkou (cb ju ukaze v statuse).
-        # JEDEN whitelist pre vlozenie (D1) aj kreslenie (D2).
-        BOARD_INSERT_PARAM_KEYS = %w[name length width material_id grain_direction
-                                     thickness orientation].freeze
 
         def board_insert_params(data)
           params = {}

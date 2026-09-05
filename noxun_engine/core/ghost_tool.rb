@@ -425,11 +425,13 @@ module Noxun
             'Kreslenie dosky — klikni a doska sa vloží.'
           end
         end
-
-        # GHOST-D2: hlaska po ZAMKNUTYCH klavesach (od kliku pociatku).
-        DRAW_KEYS_LOCKED_MSG = 'Orientáciu a rotáciu meň PRED kliknutím počiatku — rovina aj os ťahu ' \
-                               'závisia od nich (Esc zruší a začni znova).'
       end
+
+      # GHOST-D2: hlaska po ZAMKNUTYCH klavesach (od kliku pociatku). Zije na
+      # MODULE (nie v `class << self`) — konstanta v singleton triede by sa
+      # `GhostTool::DRAW_KEYS_LOCKED_MSG` necitala.
+      DRAW_KEYS_LOCKED_MSG = 'Orientáciu a rotáciu meň PRED kliknutím počiatku — rovina aj os ťahu ' \
+                             'závisia od nich (Esc zruší a začni znova).'
 
       # =====================================================================
       # CISTA MATEMATIKA — ziadny SketchUp, ziadne jednotky mimo mm.
