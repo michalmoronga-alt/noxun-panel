@@ -288,27 +288,30 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   `kd_supported` (Atira [16, 18, 19]; Quadro [16, 18, 19]) · `mounting: slide_on` · `rear_type: wooden` · `thickness_supported` per rola (Atira dno aj chrbát [16]; Quadro každý dielec
   [16, 18]) · vzorce ako konštanty (Atira: `BB = LB − 2EB − 51.5`, `RB = LB − 2EB − 63`, `BL = NL + 10`; Quadro: `SKW = LB − 46`, `SKL = NL`, `bottom_offset 12`, `box_clearance 40`,
   výška predku/chrbta `box_height − t_dna − 12`) · `height_variants` (Atira 70/144/176: `rear_height` 65.5/144/176, `min_clear_height` pre otváranie receptu — SiSy 105/189/221,
-  P2O 106/190/222, `railing` 0/1+1/1+1; Quadro bez variantov: `box_height = clear_height − 40`) · **`nl_series_by_height`** = Noxun rad podľa K-sád z #12 (atira_sisy: H70 [350, 420, 470] ·
+  P2O 106/190/222, `railing` 0/1+1/1+1; Quadro bez variantov: `box_height = clear_height − 40`, `min_box_height` tak, aby predok/chrbát `box_height − t − 12` ≥ 30 mm — Astra #19 F3: svetlá výška 60 by dala −8 mm) · **`nl_series_by_height`** = Noxun rad podľa K-sád z #12 (atira_sisy: H70 [350, 420, 470] ·
   H144 [470, 620] · H176 [350, 420, 470, 520, 620]; atira_p2o: [620] per výška, kým Michal nedodá kódy; quadro_v6_sisy [350, 400, 450, 500, 550]; quadro_v6_p2o [350, 400, 450]) ·
   `min_depth_by_nl` explicitná tabuľka (Atira NL + 15; Quadro NL + 13) · `load_by_nl` (Atira 30, pri 620 → 50; Quadro 30) · `sync_min_width` 600 · `abs` per rola (dno bez;
-  chrbát/boky/vnútorné čelo L1 1,0 mm horná dlhá hrana) · `source` tagy per hodnota. **Nemennosť:** test v `tests/pure` drží SHA-256 každého `*_v1.json` — zmena obsahu zhodí CI;
+  chrbát/boky/vnútorné čelo L1 1,0 mm horná dlhá hrana) · `source` tagy per hodnota. **Nemennosť:** register vydaných receptov `data/recipes/RELEASED.json` `{recipe_id → sha256}` — test v `tests/pure` overuje, že KAŽDÝ zaregistrovaný súbor existuje a sedí na SHA (nie len `_v1`; Astra #19 F10) + **golden test výsledkov `resolve` per vydaná verzia** (fixtúra vstup → dielce/NL),
+  lebo SHA JSON nezachytí zmenu interpretácie v Ruby; zmena obsahu zhodí CI;
   oprava alebo rozšírenie = nový súbor `_v2`, staré verzie sa NIKDY nemažú ani nemenia (reprodukovateľnosť starých zákaziek bez snapshotu).
   Čisté funkcie: `Recipes.load(recipe_id)` · `Recipes.latest_for(system, opening)` · `Recipes.resolve(recipe, ctx, overrides)` → `{height_variant (Atira číselné 70|144|176) |
   box_height (Quadro mm), nl, load, parts[], hardware_params, conflicts[], explain}` — **jedna výška** (najvyšší variant s `min_clear_height ≤ clear_height_raw`), **jedna NL**
   (najdlhšia z radu TEJ výšky s `min_depth ≤ clear_depth_raw`; porovnania inkluzívne s NEZAOKRÚHLENOU hodnotou, bez EPS: 105,00 platí, 104,995 padá); NL zámok
   z `hardware_overrides.nominal_length` (v rade výšky a zmestí sa → použije sa; inak conflict `nl_lock_invalid`, nikdy tichá zmena); hrúbka mimo `thickness_supported` =
   conflict `drawer_thickness_unsupported`; KD mimo `kd_supported` = `drawer_kd_unsupported`; žiadna výška/NL = `drawer_no_fit` s hláškou (napr. „Atira P2O v1 má rad len 620,
-  hĺbka 500 nestačí"); emisia dielcov ATOMICKÁ (všetky alebo žiadny). `context_for(owner, plan, cfg)` v `construction.rb`: čistá fn z NEZAOKRÚHLENÝCH listových zón
+  hĺbka 500 nestačí"); emisia dielcov ATOMICKÁ (všetky alebo žiadny); **každý rozmer každého dielca sa PRED emisiou overí proti `BuildPlan::MIN_DIM` a receptovému minimu — jediný neplatný rozmer = `drawer_no_fit` pre celú zásuvku** (existujúci per-dielec filter `part_skipped_degenerate` by atomicitu porušil; Astra #19 F3). `context_for(owner, plan, cfg)` v `construction.rb`:
+  čistá fn z NEZAOKRÚHLENÝCH listových zón
   (`ZoneTree` odovzdá `raw_bounds`; projekcia `front_items` raw) → `{clear_width (listová zóna pretínajúca riadok), clear_height (prienik z-intervalu riadku s interiérom
   z_lo = floor + t … z_hi = height − t / rail_geometry a listovou zónou), clear_depth (= `back_front_y`), side_thickness (KD), obstructions[] (shelf / divider pretínajúci riadok →
   conflict `drawer_obstruction`)}`; named test: 16 mm offset riadok-vs-interiér.
-  **Klasifikácia → recept:** `construction metal → system atira` · `wood → quadro_v6` · `other → BEZ receptu` (legacy cesta, CONTENT-identická); `opening_mode classic → sisy` ·
+  **Klasifikácia → recept — rozhodovacia tabuľka (Astra #19 F9, nikdy dve cesty naraz):** (1) typ ≠ zásuvka, `construction other` alebo chýba → legacy cesta, CONTENT-identická, resolver sa nevolá; (2) `construction metal|wood` + `opening_mode` prítomné → resolver (`metal → system atira`, `wood → quadro_v6`; chýbajúci `drawer.system` server doplní default per construction a
+  ZAPÍŠE = migrácia čiel klasifikovaných pred v2, vo V1 jediný kandidát); (3) `construction metal|wood` BEZ `opening_mode` → RED `drawer_unclassified`, žiadne dielce, žiadna slide položka ani legacy pravidlo; `opening_mode classic → sisy` ·
   `tipon → p2o` (len 2 typy otvárania — rozhodnutie 5.9.); `variant internal` = conflict `drawer_internal_unsupported`; čiastočná klasifikácia pri type zásuvka = RED
   `drawer_unclassified`; dormant drawer polia na dvierkach sa ignorujú. **`recipe_ref` per čelo** `drawer.recipe_ref = "atira_sisy_v1"` (reťazec): **3 stavy** — chýbajúci
   (nové čelo alebo zmena system/opening/construction používateľom) → `latest_for` a zápis; známy → použi presne ten; neznámy → RED `drawer_recipe_unknown` („aktualizuj plugin"),
-  bez dielcov. Autorita SERVER: klientsky payload ref nikdy neprenáša (`norm_drawer` zahodí), čítanie zo SUROVÉHO configu pred normalizáciou (`Fronts.stored_recipe_ref(raw)`),
-  zápis len `Fronts.write_recipe_ref!` po resolveri; šablóna aj natívny Copy/Paste nesú ref ako reťazec vo whiteliste (`normalize_config`, `template_config_from`) — ten istý
-  nemenný recept v každom dokumente, preto **žiadny projektový snapshot receptov, digest ani merge** (zavedú sa až keby recepty boli používateľsky editovateľné).
+  bez dielcov. Autorita SERVER — DVE cesty, nie jedna normalizácia (Astra #19 B2): (i) **klientsky payload** z panela — handler akcie (`actions_*`) zahodí `recipe_ref` PRED zlúčením do configu (klientsky whitelist ho nepozná); (ii) **uložený config** — `Fronts.normalize_config` ref BEZSTRATOVO zachováva (server-side whitelist), preto ho prežije prestavba, šablóna
+  (`template_config_from`) aj natívny Copy/Paste; server pri prestavbe overí, že ref patrí k systému/otváraniu klasifikácie čela — nesúlad = explicitná zmena klasifikácie → nový `latest_for`; zápis len `Fronts.write_recipe_ref!` v TEJ ISTEJ operácii ako geometria; test: strata ref pri normalizácii = FAIL (po vydaní `_v2` by stav „chýbajúci → latest" ticho zmenil geometriu) —
+  ten istý nemenný recept v každom dokumente, preto **žiadny projektový snapshot receptov, digest ani merge** (zavedú sa až keby recepty boli používateľsky editovateľné).
   Testy C1: tabuľkové testy vzorcov proti #10/#13 bez zaokrúhľovania (900/KD18 → LB 864, BB 791,5, RB 780, BL = NL + 10; **KD 16 → LB 868, BB 795,5 s EB stále 10.5**),
   hranice výšky/NL (175 → H70; H70 hĺbka 500 → 470, 560 → 470 lebo rad H70 končí; H176 560 → 520; Quadro 497 → 450, 500 potrebuje 513), zámok v rade / mimo, context
   (offset, obstruction, listová zóna), stavy `recipe_ref` (3), validácia receptu (chýbajúca bunka), nemennosť (SHA), `latest_for` pri dvoch verziách.
@@ -320,27 +323,31 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   idempotentná; `ensure_uni_records!` končí pri `uni_seed.done`; ochrana ID), `UNI_ROLES` + drawer, `thickness_ok_for?` pre nové roly, D-46 reuse pre kanál len cez preflight
   per systém; ABS seed per rola z #11 (`SEED_VERSION` bump); **hrúbka = vstup receptu** — materiál mimo `thickness_supported` = conflict;
   (c) **jedna položka výsuvu** v úplnom tvare `BuildPlan`: `generic_type: slide`, `rule_id: recipe:<recipe_id>`, `owner_part_key: front:<id>/panel`, `quantity: 1`,
-  `rule_quantity: 1`, `source: recipe` (enum bump), **`locked: true` oddelené od `source`** (spotrebitelia `note_manual` a payloady Nákupu/Inspectora berú `locked` ako dnešné
-  `source manual`), `params {recipe_id, system, height_variant (číselné) | box_height, nominal_length, load, opening, opening_mode, drawer_construction}`; **R2 exkluzivita**:
+  `rule_quantity: 1`, `source: recipe` (enum bump), **`locked: true` LEN pri položke s platným osovým zámkom** (`nominal_length` override), nie na každej receptovej položke (Astra #19 N11: inak falošné „ručne prepísané"); zákaz zmeny množstva plynie zo `source: recipe`; spotrebitelia `note_manual` a payloady Nákupu/Inspectora berú `locked` ako dnešné
+  `source manual`, `params {recipe_id, system, height_variant (číselné) | box_height, nominal_length, load, opening, opening_mode, drawer_construction}`; **R2 exkluzivita**:
   `HardwareRules.evaluate` potlačí `fit_series`/slide pravidlá pre čelá so systémom (warning `legacy_slide_suppressed` raz per zákazka); **migrácia D-93**: existujúci
   `nominal_length` override s `rule_id vysuvy-nl-podla-hlbky` na drawer čele sa v tej istej prestavbe premapuje na `recipe:<recipe_id>` a platí ako zámok (mimo radu →
   `nl_lock_invalid`); server odmieta `quantity`/`disabled` mutácie pre `rule_id recipe:*` (`actions_hardware.rb`); legacy override s `disabled` alebo `quantity ≠ 1` na recipe
   položke = RED `drawer_override_invalid` (jeden kód); charakterizačný test „jedno zásuvkové čelo → presne jedna slide položka s množstvom 1";
   (d) **výber setu = NÁKUP, nie stavba:** `HardwareSets.resolve_mapping_value` pre položky, ktoré nesú `opening_mode` + `drawer_construction` v params, číta **triedny kľúč**
-  `class:slide|<opening_mode>|<drawer_construction>` (KOV-B1 ho už parsuje a round-tripuje; precedencia owner override → cabinet override → projekt ostáva; odhad < 30 riadkov)
+  `class:slide|<opening_mode>|<drawer_construction>` (KOV-B1 ho už parsuje a round-tripuje; precedencia owner override → cabinet override → projekt ostáva; odhad < 30 riadkov); **hodnota mapovania pre receptové položky so `height_variant` musí byť na KAŽDEJ úrovni (owner / cabinet / projekt) selektor podľa `height_variant`** (Astra #19 B1: pevný `set_id` v override skrinky by
+  po prerastení zásuvky H70 → H176 objednal H70 kit k dielcom H176, lebo klasifikácia opening/construction je pri oboch rovnaká) — pevný `set_id` pre Atiru = RED `drawer_kit_missing` „override nie je selektor podľa výšky"; farba / 50 kg = ALTERNATÍVNY selektor (antracit per výška); Quadro (bez variantu) smie pevný `set_id`; expanzia navyše overí kód pre `nominal_length`;
+  `override_keys_in_use` (R-34 ochrana kolidujúcich kópií v `production_core.rb`) rozšírená o triedne kľúče, ktoré resolver číta (Astra #19 F8)
   a pre `source: recipe` **NIKDY nepadá na generické `slide`** (set H70 pre zásuvku H176 by bol zlý kit) — chýbajúce triedne mapovanie = RED `drawer_kit_missing` s hláškou
   „Pravidlá → Doplniť nové predvolené" (existujúca akcia `merge_project_sets_seed!`, vždy explicitná, nikdy automatická migrácia snapshotu); **seed** (`SEED_VERSION` bump; std 3
-  obsahom už existuje): `class:slide|classic|metal` → selektor `{param: height_variant, bands: [70–70 → vysuv-atira-biela-h70, 144–144 → …-h144, 176–176 → …-h176]}`
+  obsahom už existuje; **+ záznamy v `MAPPING_MIGRATIONS` pre triedne kľúče** — Astra #19 F7: globálny `merge_seed` dopĺňa len sety, mapovania mení výhradne cez migrácie, inak by starý globál dostal sety bez `class:` kľúčov a „Doplniť nové predvolené" by nič neopravilo; test: upgrade zo starého globálu aj zo starého snapshotu): `class:slide|classic|metal` → selektor `{param:
+  height_variant, bands: [70–70 → vysuv-atira-biela-h70, 144–144 → …-h144, 176–176 → …-h176]}`
   (existujúci mechanizmus D-81 — žiadny nový tvar), `class:slide|tipon|metal` → P2O sety per výška, `class:slide|classic|wood` → `vysuv-quadro-v6-sisy`, `class:slide|tipon|wood` →
   `vysuv-quadro-v6-p2o`; sety nesú klasifikáciu (KOV-B1: `use_type drawer`, opening, construction, Hettich, rada) a `code_by_nl` z #12 (H70: 420 → 357695, 470 → 357696;
   H176: 420 → 357774, 470 → 357775, 620 → 357783; Quadro SiSy 400 → 317641, 450 → 317642, 500 → 317643; P2O 350 → 343031, 400 → 343033, 450 → 317644 …); **žiadne nové osi na setoch**
-  (50 kg alebo antracit = iný set vybraný overridom skrinky — nemení geometriu); kompatibilita = existujúca klasifikácia setu ↔ params položky (nesúlad opening/construction = RED
+  (50 kg alebo antracit = alternatívny selektor per výška v override skrinky — nemení geometriu); kompatibilita = existujúca klasifikácia setu ↔ params položky (nesúlad opening/construction = RED
   `drawer_kit_missing` s dôvodom); **completeness test (GLM M6):** každá bunka výška × NL z radov receptov v1 má v seede kód — bunka bez kódu (H70/350 š, H144/470 š) sa pred
   mergom vyrieši DÁTOVO (kód od Michala alebo vyradenie NL z radu), nikdy behovým fallbackom; chýbajúci kód pre vybranú NL v projekte = RED `drawer_kit_missing`;
   (e) **brány — jeden register `DRAWER_BLOCKERS` (10 kódov):** `drawer_unclassified` · `drawer_no_fit` · `drawer_obstruction` · `drawer_internal_unsupported` ·
   `drawer_thickness_unsupported` · `drawer_kd_unsupported` · `drawer_recipe_unknown` · `nl_lock_invalid` · `drawer_override_invalid` · `drawer_kit_missing`; `export_blockers` číta
   CELÝ register (test: každý kód zastaví blokované exporty, priečinok ostáva prázdny). Konflikty STAVBY (prvých 9) = fail-closed: žiadne dielce ani položka + RED do
-  `hardware_issues` (kľúč z KOV-A) → blokujú HW CSV + rozpočet + CP, VEPO chráni fail-closed geometria. **`drawer_kit_missing` vzniká v NÁKUPE** (`Bom`/`HardwareSets.expand`:
+  `hardware_issues` (kľúč z KOV-A); **uložený nosič (Astra #19 F6):** builder zapíše konflikty per čelo do configu v `merge_final` ako `drawer_conflicts` (vedľa `warnings`/`hardware`; tvar `[{front_id, code, message}]`), `Bom.collect` ich zlúči do `hardware_issues` — po fail-closed stavbe nezostane položka, z ktorej by sa dôvod obnovil; test save/reopen aj Undo (Kontrola ukáže
+  RED aj po znovuotvorení) → blokujú HW CSV + rozpočet + CP, VEPO chráni fail-closed geometria. **`drawer_kit_missing` vzniká v NÁKUPE** (`Bom`/`HardwareSets.expand`:
   receptová položka bez setu alebo bez kódu pre svoju NL — dnešné ORANGE `no_set`/`nl_missing` sa pre `source: recipe` povyšuje na RED), dielce v modeli OSTÁVAJÚ (fyzika je správna),
   ale **blokuje VŠETKY exporty VRÁTANE VEPO** (BL = NL + 10, boky Quadro = NL — dielce rezané na NL bez kitu tej NL sú nepoužiteľné); prepočet ČERSTVÝ pri exporte z uložených
   položiek plánu + aktuálneho snapshotu setov projektu (existujúci vzor R9, žiadny nový preflight, žiadny `drawer_stale` — stavba sety nečíta, takže rozdiel nemôže vzniknúť);
@@ -356,7 +363,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   v #12; kontrakt sa nemení) · vnútorné zásuvky (len klasifikácia + RED) · editor receptov · projektový snapshot receptov, digest, merge (len ak recepty budú editovateľné) ·
   KD → EB mapa, `runner_variant`, `orderable` · kandidáti / fallback NL · osi `height_variant`/`load`/`runner_variant` na setoch a exact tabuľka · `drawer_stale` preflight ·
   dokonalý kolízny solver (obstruction stačí; atyp = vizuálna kontrola, #09).
-  **Audit:** Astra predaudit návrhu v2 (checkpoint #19) → reconcile → implementácia; nový modul + data pack, `plan_schema`/ROLES, `CONFIG_SCHEMA` 5, hardware kontrakt
+  **Audit: HOTOVÝ — Astra predaudit 5.9.2026** (2 BLOCKER + 8 FIX + 1 NOTE, všetky zapracované malými pravidlami, ŽIADNY návrat k mechanizmu v13; záznam [zdroje/next_sessions/KOVANIE_KOVC_AUDIT_2026-09-05_19.md](zdroje/next_sessions/KOVANIE_KOVC_AUDIT_2026-09-05_19.md)) → implementácia; nový modul + data pack, `plan_schema`/ROLES, `CONFIG_SCHEMA` 5, hardware kontrakt
   (`source recipe`, `locked`), brány. **In-SU POVINNÉ** (buildery, plán↔model, undo).
   **Testy a DoD C2:** headless — plán s dielcami (Atira 900×720×500, KD 18, čelo 175 → H70/470: dno 791,5×480, chrbát 780×65,5; **KD 16 → dno 795,5×480**; Quadro 900/KD18
   hĺbka 500 → NL 450: SKW 818, boky 450 × box_height, vnútorné čelo/chrbát 818 × (box_height − 16 − 12); hĺbka 560 Atira H176 čelo 300 → NL 520), 4. kanál (UNI fallback, override,
@@ -367,7 +374,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   Ctrl+Z, kópia `*2` (ref prežije), šablóna uložiť/vložiť (drawer config + ref), plytká skrinka → žiadne dielce + RED + export zastavený s prázdnym priečinkom.
   Mutácie min. 4 (legacy nepotlačené · zámok mimo radu ticho padne na inú NL · dielce emitované pri conflict · recipe položka padne na generické `slide` mapovanie).
   **Riziká:** rozsah C2 (ak PR narastie, oddeliť C2a = materiálový kanál + ABS seed bez zmeny výstupov) · dátová úplnosť seedu (bunky bez kódu — rozhodnúť pred mergom) ·
-  reálne .skp fixtures (D-93 zámok, legacy snapshot setov) treba vyrobiť PRED C2.
+  reálne .skp fixtures (D-93 zámok, legacy snapshot setov) treba vyrobiť PRED C2 · šablóna dnes neprenáša `hardware_overrides` (NL zámok) — vložená zásuvka sa rieši automatom (dielce aj kit konzistentne z tej istej NL), prenos zámkov = KOV-I R12 (Astra #19 F5, vedomé; test to potvrdí).
   **Smoke pre Michala:** skrinka 900×720×500 (KD 18), F2 zásuvkové čelo 175 (Kovové bočnice → Atira) → kusovník: dno 791,5×480 + chrbát 780×65,5 (H70), Kontrola bez nálezov,
   nákup 1× K-Atira 470 (357696) · zmeň bok na 16 → dno 795,5×480, kód rovnaký · zmeň hĺbku na 560 → ostáva NL 470 (rad H70 končí pri 470, explain to povie), žiadny duplicitný
   riadok · drevený box (Quadro) → 5 dielcov: SKW 818, boky 450 × (svetlá výška − 40), nákup K-set V6 SiSy 450 (317642) · materiál zásuviek v projekte na bielu 16 → všetky dielce
@@ -388,9 +395,9 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   (`nominal_length` existuje; + `height_variant`), D-93 sémantika, jantárové riadky v Pravidlách + „vrátiť na pravidlo" existujúcou cestou; UI: chipy osí s ikonou zámku v karte čela
   aj v kontexte Kovanie (jeden stav), klik = zamknúť aktuálnu hodnotu / odomknúť; **nekompatibilný zámok** po zmene geometrie = RED conflict + návrh náhrady + potvrdenie (náhrada
   ostáva zamknutá; nikdy tiché prepnutie) — bez diff-modal frameworku (status + Kontrola + potvrdzovací D-15 modal); (c) **prepnutie setu per skrinka/čelo** (antracit, 50 kg)
-  cez existujúci cabinet override `slide@front:<id>/panel` s ponukou LEN kompatibilných setov (klasifikácia setu ↔ params položky); (d) **explain**: server skladá text „prečo
+  cez cabinet override triedneho kľúča s hodnotou = selektor per výška (Astra #19 B1) a ponukou LEN kompatibilných selektorov/setov (klasifikácia setu ↔ params položky); (d) **explain**: server skladá text „prečo
   táto výška/NL" (z `Recipes.resolve.explain`) + „čo je v balení" (členovia + kódy) — `HardwareSets.explain` rozšírený; (e) **verzia receptu**: info „dostupný recept v2" pri čele
-  s `recipe_ref` staršej verzie + akcia „Prejsť na v2" s textovým diffom konštánt (per čelo alebo celý projekt; JEDNA operácia: prepis ref + prestavba dotknutých čiel; zlyhanie =
+  s `recipe_ref` staršej verzie + akcia „Prejsť na v2" s textovým diffom konštánt (per čelo alebo celý projekt; JEDNA operácia: prepis ref + **atomické preadresovanie zámkov `rule_id recipe:<v1> → recipe:<v2>`** (identita override obsahuje `rule_id` — Astra #19 F4; zámok mimo radu v2 = konflikt, nikdy tiché uvoľnenie) + prestavba dotknutých čiel; zlyhanie =
   rollback; 1 Späť) — recepty ostávajú nemenné, snapshot sa nezavádza; (f) **Kontrola navigátor**: klik na RED/ORANGE riadok = select + `focus_inspector` + otvorenie sekcie
   Čelá/Kovanie + highlight riadku (malé JS); (g) prepnutie typu zásuvky späť na dvierka: zjednotené pravidlo pamäte (drawer klasifikácia + overridy sa DRŽIA;
   `prune_none_front_overrides` len pre `none`) — Opus I-4; (h) Tip-On dvierka → set podľa klasifikácie `class:hinge|tipon` (P2O záves + piest per owner) — dáta zo seedu;
