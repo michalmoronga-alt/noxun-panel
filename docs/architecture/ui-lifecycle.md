@@ -1354,7 +1354,25 @@ aj rozpísané gap hodnoty. `nxDropDocState` navyše **zhodí fokus** (`document
 Doména panela: vloženie samostatnej dosky (`handle_insert_board`) a zápisové cesty jej karty (polia · materiál · ABS hrana · olep všetkých 4 · orientácia). Kontrakt karty je
 v odseku „UI-C1c (orientácia dosky v paneli)" a vo „Vkladacej karte". **Dve úrovne identity so zámerne rôznou hlasnosťou** (R-02): identitu **dokumentu** overuje spoločná brána
 `guarded_board` cez `foreign_document?` **nahlas** (zápis do cudzej zákazky by sa našiel až v objednávke), zatiaľ čo echo `board_id`, výber bez dosky a „v Inspectore vyhrala
-skrinka" sa ďalej zahadzujú **ticho** (len log) — používateľ už medzitým robí niečo iné a hláška by ho mýlila. `handle_insert_board` má guard vlastný, pred `BoardBuilder.build`.
+skrinka" sa ďalej zahadzujú **ticho** (len log) — používateľ už medzitým robí niečo iné a hláška by ho mýlila. `handle_insert_board` má guard vlastný.
+
+**GHOST-D1: „Vložiť dosku" už NEVKLADÁ.** Synchrónna cesta cez `BoardBuilder.build` (`Placement.next_x`) tu zanikla — callback pripraví **zmrazený `BoardPlan`** a zavesí ghost na
+kurzor; doska vznikne až **klikom** (`GhostTool` → `BoardBuilder.commit_insert`). **Poradie je súčasťou kontraktu:** `foreign_document?` ako **úplne prvý** krok (oneskorený CEF
+callback zo starého Inspectora nesmie pripraviť plán nad novým modelom) → šablónový ref + **downgrade brána** (`newer_template_refusal` nad **uloženým RAW záznamom**, nie nad
+payloadom z CEF — v ňom marker nemusí byť; doskový záznam sa posudzuje proti `BoardBuilder::BOARD_CONFIG_SCHEMA`) → `prepare_insert` → session so `subject: :board` a orientáciou
+**z karty**. Vyššia schéma šablóny = odmietnutie **bez session a bez pečiatky**. Po úspešnom commite beží `ghost_after_commit_board` (výber, status s umiestnením,
+`push_selected`, `stamp_once!`).
+
+**Brána schémy stojí vo VSTUPNEJ bráne karty `guarded_board`, nie až pri prestavbe (Codex #298 P2).** Cesty karty totiž pred rebuildom menia **globálny katalóg** —
+`handle_set_board_material` cez `resolve_virtual_material` → `ensure_duplak_for` a cez `ensure_missing_abs` (to isté robí „olep všetkých 4"), a to sa už **nedá vrátiť**. Guard
+preto beží hneď za identitou dokumentu, kontextom a echom `board_id`: doska z novšej verzie odmietne **každú** zápisovú cestu karty (polia · materiál · ABS hrana · olep všetkých
+4 · orientácia) **ešte pred prvým zápisom kamkoľvek**, a to **nahlas** (rovnako ako guard dokumentu — zmena sa neuložila a používateľ to musí vedieť).
+
+**Karta je pritom READ-ONLY, nie „padá na hlášky" (STANDARD 8.3 bod 3).** `Panel.board_payload` primieša cez `board_newer_flag` aditívne **`newer_config` + `newer_config_note`**
+(text je **serverový** — klient si stav ani znenie neodvodzuje) a `applyBoardReadOnly` v `board_card.js` zamkne **všetky** ovládače karty (`disabled`, nie len `readOnly` — pri
+selectoch a tlačidlách je to jediný spôsob, ako ich naozaj umlčať) a ukáže upozornenie `#bcNewer` (tokeny `--nx-warn*`, bez emoji; riadok existuje **len** v tomto stave, takže
+bežná karta nerastie). Zámok beží **až na konci** `renderBoardCard`, aby prebil aj to, čo karta vyššie odomkla (hrúbka UNI dosky, comboboxy hrán, odkaz na dekor).
+Testy: `tests/js/test_ghost_d1_karta.js`.
 
 ### actions_cabinet.rb
 
@@ -1385,14 +1403,23 @@ hoci sa nezapisuje do modelu, mení stav session a panel inej zákazky do nej si
 vstup nič nemení** — pole sa vráti na poslednú platnú hodnotu a status povie prečo. Ostatné položky pásika sú informačné (jediná cesta ich zmeny sú klávesy v modeli).
 Kontrakt pamäte nastavení a zamknutej výšky: [construction.md § ghost_tool.rb](construction.md).
 
+**Pásik pre DOSKU (GHOST-D1).** Push nesie navyše `subject` + `interaction` + `orientation` (+ popisok). Pri `subject: 'board'` sa **skryjú kabinetové ovládače výšky**
+(`gbMode`, `gbLockWrap`) a na ich mieste — **v tom istom riadku**, pásik nesmie narásť o riadok — stojí **umiestnenie** (`gbOri`); nápoveda „i" je dosková (↑/↓ menia
+umiestnenie, o zámku výšky ani slovo). Push **bez** `subject` (staršie payloady) sa naďalej správa ako skrinka. **`ghost_lock_z` sa pre dosku z JS nikdy neposiela** a server ho
+navyše odmieta kontrolou **subjektu session** (`unless s.cabinet?`) — HTML `disabled` ani skrytý ovládač nie sú ochrana. **Synchronizácia s kartou Dosky:** po ↑/↓ v modeli
+klient prestaví `NXInsert.boardOrientation` a prekreslí zrkadlo segmentov — **žiadna materializácia ani reset karty**, takže rozpísané rozmery, materiál aj šablóna prežijú
+a *ďalšia* session štartuje z tejto hodnoty. Testy: `tests/js/test_ghost_d1_pasik.js`.
+
 Zmeny vo vkladacej karte sa do **bežiacej** session NEPREMIETAJÚ (snapshot je zmrazený; status to prizná) a **druhé „Vložiť" starú session zruší** a založí novú s čerstvým
 snapshotom. **Poznámku preflightov** (D-45 prevzatá hrúbka, materiálové noty) vypisuje **až `ghost_after_commit`** — pri stlačení „Vložiť" sa ešte nič nestalo, takže hlásiť ju
 vtedy by bolo predčasné a po kliku by sa zopakovala druhý raz.
 
 **Konce životného cyklu session** (všetky = 0 mutácií modelu a 0 krokov Späť): druhé „Vložiť" · **zavretie Inspectora** (`set_on_closed`) · **File > New / Open**
 (`PanelAppObserver`, **bezpodmienečne** — pozri nižšie) · **aktivácia iného dokumentu** (`Panel.on_model_switched`, hneď pred guardom `@dialog`) · `onCancel` 0/1/2 ·
-`deactivate` · **iný spôsob vloženia**: `handle_insert_copy` aj `handle_insert_board` rušia bežiacu session hneď na začiatku (kladú synchrónne, ghost by už nemal čo dokončiť) —
-inak sa **ich správanie nemení**. Kontrakt nástroja, kotiev a transformu: [construction.md § ghost_tool.rb](construction.md).
+`deactivate` (**prepnutie na iný nástroj chodí TADIALTO, nie cez `onCancel`** — session končí, viewport aj pásik sa vyčistia) · **iný spôsob vloženia**: `handle_insert_copy`
+ruší bežiacu session hneď na začiatku (kladie synchrónne, ghost by už nemal čo dokončiť). **GHOST-D1: `handle_insert_board` už session neruší zvlášť** — zakladá **vlastnú**
+(doskovú) a starú ukončí prvý krok `GhostTool.start` (jeden vlastník session). Inak sa **správanie oboch nemení**. Kontrakt nástroja, kotiev a transformu:
+[construction.md § ghost_tool.rb](construction.md).
 
 **Poradie guardov pri vklade (R-02):** identita **dokumentu** je prvá — pred šablónovým refom, preflightmi aj pred `CabinetBuilder.prepare_insert` (od GHOSTu je príprava plánu
 prvým krokom smerom k modelu; druhou obranou zostáva guard v `commit_insert`, ktorý plán z iného dokumentu odmietne). Auto-apply hlási nezhodu dokumentu **nahlas** (na rozdiel od

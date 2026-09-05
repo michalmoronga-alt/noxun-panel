@@ -130,6 +130,12 @@ používa"; obe SCHEMA-aware, aby počty a zoznam ukazovali na tú istú skupinu
 
 **M-B2 „Nahradiť UNI…"** (`materials_replace_uni`): scan+čistá klasifikácia, rozpis dopadu pred potvrdením, SHA256 odtlačok plánu, all-or-nothing, 1 undo (skrinky+dosky+predvoľby).
 
+**GHOST-D1 — brána schémy PRED normalizáciou.** Dávka dosku najprv `BoardBuilder.normalize`-uje a až potom prestavuje (`rebuild_in_operation`), lenže normalizácia je uzavretý
+whitelist: zahodí `config_schema` **aj neznáme polia**, takže doska z novšej verzie by prešla ticho a projekt by skončil **čiastočne migrovaný**. Kontrola preto beží už
+v `replace_uni_classify` — nad **RAW uloženým configom** zo scanu, pred akoukoľvek prácou s ním — a doska s vyššou schémou ide do `blocked` plánu (dôvod `:board_schema`,
+hláška „doska je z novšej verzie Noxun — aktualizuj plugin"). Keďže apply je **all-or-nothing** (neprázdny `blocked` zastaví celú náhradu ešte pred operáciou), znamená to:
+model sa nedotkne **vôbec**, nie „doska sa preskočí". Poslednou záchytnou sieťou je ten istý guard priamo v `BoardBuilder.rebuild_in_operation`.
+
 **Korelácia otázky a odpovede (R-23.1, review #273):** rozpis dopadu prichádza **asynchrónne** (`MD.replaceUniOffer`) a modál si otvára sám, takže Escape medzi otázkou
 a odpoveďou by ho vrátil späť aj s rozpisom, ktorý používateľ práve zahodil. Otázka (`replace_uni_preview` aj `replace_uni_apply`) preto nesie číslo `gen` a server ho vracia
 v **každej** odpovedi — klient zobrazí len odpoveď na **poslednú** otázku. **`gen` je per-request, nie per-relácia** (review kolo 2): rastie pri otvorení, zatvorení **aj pri každej

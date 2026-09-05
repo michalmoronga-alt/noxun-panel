@@ -123,9 +123,16 @@ NxTest.test('R-02: guard bezi PRED akymkolvek zapisom aj pred echo identitou') d
                 'handle_insert: guard pred pripravou vkladu')
   NxTest.assert(ins.index('foreign_document?') < ins.index('GhostTool.start'),
                 'handle_insert: guard pred zalozenim ghost session')
+  # GHOST-D1: aj doska ide cez ghost — prvym krokom smerom k modelu je
+  # `prepare_insert`, guard musi byt pred NIM aj pred zalozenim session
+  # a pred citanim ULOZENEJ sablony (downgrade brana).
   insb = r02_body(R02_BOARD_RB, 'handle_insert_board')
-  NxTest.assert(insb.index('foreign_document?') < insb.index('BoardBuilder.build'),
-                'handle_insert_board: guard pred stavbou')
+  NxTest.assert(insb.index('foreign_document?') < insb.index('newer_template_refusal'),
+                'handle_insert_board: guard pred citanim sablony')
+  NxTest.assert(insb.index('foreign_document?') < insb.index('BoardBuilder.prepare_insert'),
+                'handle_insert_board: guard pred pripravou vkladu')
+  NxTest.assert(insb.index('foreign_document?') < insb.index('GhostTool.start'),
+                'handle_insert_board: guard pred zalozenim ghost session')
 end
 
 NxTest.test('R-02: klient posiela model_guid z JEDNEHO miesta (nxDocPayload)') do

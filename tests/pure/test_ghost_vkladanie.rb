@@ -598,17 +598,30 @@ NxTest.test('ghost sev: New/Open vetva AppObservera rusi session pred prepnutim 
                 'onActivateModel nesmie rušiť bezpodmienecne — Ctrl+S ghost drzi')
 end
 
-NxTest.test('ghost sev: iné spôsoby vkladania (kópia, doska) session ukončia') do
+# GHOST-D1 (prepisany scenar): doska UZ NEVKLADA synchronne — zaklada VLASTNU
+# ghost session. Stara session (skrinky aj dosky) preto konci nie zvlast
+# volanym cancelom, ale prvym krokom `GhostTool.start` — je to JEDEN vlastnik
+# session. Synchronnu cestu si drzi uz len KOPIA korpusu (`Placement.next_x`).
+NxTest.test('ghost sev: kópia ruší session, doska ju NAHRADZUJE svojou (GHOST-D1)') do
   cab = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_cabinet.rb'), encoding: 'UTF-8')
   copy = cab[/def handle_insert_copy\(payload\).*?\n        end\n/m].to_s
   NxTest.assert(copy.include?('GhostTool.cancel_session'), 'handle_insert_copy nerusi ghost session')
   NxTest.assert(copy.index('GhostTool.cancel_session') < copy.index('CabinetBuilder.build'),
                 'kopia musi zrusit ghost PRED stavbou')
+
   brd = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_board.rb'), encoding: 'UTF-8')
   ins = brd[/def handle_insert_board\(payload\).*?\n        end\n/m].to_s
-  NxTest.assert(ins.include?('GhostTool.cancel_session'), 'handle_insert_board nerusi ghost session')
-  NxTest.assert(ins.index('GhostTool.cancel_session') < ins.index('BoardBuilder.build'),
-                'vlozenie dosky musi zrusit ghost PRED stavbou')
+  NxTest.refute(ins.include?('BoardBuilder.build'), 'synchronna cesta vkladania dosky ZANIKLA')
+  NxTest.assert(ins.include?('BoardBuilder.prepare_insert') && ins.include?('GhostTool.start'),
+                'doska ide cez zmrazeny plan a ghost session')
+  NxTest.assert(ins.index('BoardBuilder.prepare_insert') < ins.index('GhostTool.start'),
+                'plan vznika PRED session')
+  NxTest.assert(ins.include?('subject: :board'), 'session dosky nesie subjekt')
+
+  gt = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'ghost_tool.rb'), encoding: 'UTF-8')
+  st = gt[/def start\(model, plan.*?\n        end\n/m].to_s
+  NxTest.assert(st.index('cancel_session') < st.index('PlacementSession.new'),
+                'start rusi STARU session PRED vznikom novej (jeden vlastnik)')
 end
 
 NxTest.test('ghost sev: poznamka preflightov ide do statusu PRAVE RAZ (po vlozeni)') do

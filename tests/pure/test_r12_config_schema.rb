@@ -191,10 +191,14 @@ module NxTest
            'oba dopredne guardy stoja v rebuild_in_operation')
     assert(NxR12.order?(s, 'guard_newer_config!(inst)', 'inst.make_unique'),
            'guard bezi PRED make_unique aj pred clear! definicie (ziadna mutacia)')
-    # Guard sa NESMIE dostat do citacich/exportnych ciest.
-    others = Dir[File.join(NxR12::SRC_DIR, '**', '*.rb')].reject { |f| f.end_with?('cabinet_builder.rb') }
+    # Guard sa NESMIE dostat do citacich/exportnych ciest. GHOST-D1: doska ma
+    # VLASTNY guard nad VLASTNYM markerom (`BoardBuilder::BOARD_CONFIG_SCHEMA`)
+    # — je to ten isty kontrakt pre druhy typ objektu, nie rozsirenie tohto.
+    owners = %w[cabinet_builder.rb board_builder.rb]
+    others = Dir[File.join(NxR12::SRC_DIR, '**', '*.rb')]
+             .reject { |f| owners.any? { |o| f.end_with?(o) } }
     users = others.select { |f| File.read(f, encoding: 'UTF-8').include?('guard_newer_config!') }
-    assert_equal([], users, 'guard vola VYHRADNE cabinet_builder (citanie/exporty sa neblokuju)')
+    assert_equal([], users, 'guard volaju VYHRADNE buildery (citanie/exporty sa neblokuju)')
   end
 
   # --- 4) dedup: novsia kopia sa PRESKOCI, cyklus pokracuje ------------------

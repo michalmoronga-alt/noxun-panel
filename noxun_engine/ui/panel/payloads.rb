@@ -36,7 +36,21 @@ module Noxun
             'edge_labels' => AbsRules.edge_labels(role),
             'edge_sides' => AbsRules.edge_sides(role),
             'quantity' => cfg['quantity'] || 1
-          }.merge(board_edge_texts(role, cfg))
+          }.merge(board_edge_texts(role, cfg)).merge(board_newer_flag(cfg))
+        end
+
+        # GHOST-D1 (Codex #298 P2): doska z NOVSEJ verzie pluginu sa v karte
+        # zobrazuje READ-ONLY s vysvetlenim (STANDARD 8.3 bod 3). Server je
+        # jedina autorita — karta si to z niceho neodvodzuje. Aditivne polia:
+        # starsi klient ich ignoruje, novy podla nich zamkne vsetky ovladace.
+        # Zapisove cesty su chranene NEZAVISLE (`guarded_board`), takze toto je
+        # cisto UX vrstva: pouzivatel ma vidiet PRECO nemoze nic menit.
+        def board_newer_flag(cfg)
+          return {} unless BoardBuilder.newer_config?(cfg)
+
+          { 'newer_config' => true,
+            'newer_config_note' => 'Doska je z novšej verzie Noxun — tento plugin jej nastavenia ' \
+                                   'nepozná celé, preto sa nedá upraviť. Aktualizuj plugin.' }
         end
 
         def cabinet_payload(cab)

@@ -200,6 +200,15 @@ module Noxun
         boards = []
         digest_boards = []
         Array(scan['boards']).each do |bid, cfg, raw, ref|
+          # GHOST-D1: doska z NOVSEJ verzie ide do `blocked` a tym sa CELA
+          # nahrada odmietne (all-or-nothing kontrakt nizsie). Brana bezi nad
+          # RAW ULOZENYM configom PRED `BoardBuilder.normalize` — normalizacia
+          # by marker aj nezname polia ticho zahodila a projekt by skoncil
+          # ciastocne migrovany.
+          if defined?(BoardBuilder) && BoardBuilder.newer_config?(cfg)
+            out['blocked'] << [bid, :board_schema, []]
+            next
+          end
           merged = ru_deep_copy(cfg)
           merged['material_id'] = target_id
           # Vzor BoardBuilder.rebuild: vedomá zmena materiálu ruší duplák väzbu.
@@ -318,6 +327,9 @@ module Noxun
           when :parts then "dielce s vlastným materiálom inej hrúbky: #{Array(names).join(', ')}"
           when :range then 'hrúbka cieľa mimo rozsahu'
           when :front then 'hrúbka cieľa nesedí pre čelá'
+          # GHOST-D1: doska z novsej verzie pluginu — jej config sa nesmie
+          # znormalizovat (stratil by polia, ktore tato verzia nepozna).
+          when :board_schema then 'doska je z novšej verzie Noxun — aktualizuj plugin'
           else why.to_s
           end
         "#{id} — #{reason}"

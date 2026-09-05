@@ -20,8 +20,19 @@ module Noxun
       BOARD_FIELD_KEYS = %w[name length width quantity grain_direction thickness].freeze
 
       class << self
-        # Vlozenie novej dosky z vkladacej karty. Material doplni BoardBuilder
-        # z projektoveho defaultu, ak vo formulari chyba.
+        # GHOST-D1: „Vložiť dosku" UZ NEVKLADA — pripravi ZMRAZENY `BoardPlan`
+        # (`BoardBuilder.prepare_insert`) a zavesi ghost na kurzor; doska
+        # vznikne az KLIKOM v modeli (`GhostTool` -> `BoardBuilder.commit_insert`).
+        # Synchronna cesta cez `BoardBuilder.build` (`Placement.next_x`) tu
+        # ZANIKLA — ostava programatickym volajucim (testy, in-SU, nastroje).
+        #
+        # PORADIE JE SUCASTOU KONTRAKTU (R-02 + audit 4):
+        #   1. `foreign_document?` ako UPLNE PRVY krok — oneskoreny CEF callback
+        #      zo stareho Inspectora nesmie pripravit plan nad NOVYM modelom,
+        #   2. sablonovy ref + DOWNGRADE BRANA (autoritou je ULOZENY RAW zaznam
+        #      sablony, nie payload z CEF — v nom marker uz nemusi byt),
+        #   3. `prepare_insert` (ziadna mutacia, ziadne ID, ziadny krok Spat),
+        #   4. session (`GhostTool.start` rusi pripadnu STARU session ako prvy krok).
         # E-03: thickness sa LEN prepusti — o tom, ci sa pouzije, rozhoduje
         # BoardBuilder.insert_thickness_for (material je znamy az po doplneni
         # projektoveho defaultu, preto guard sedi v builderi, nie tu).
@@ -29,13 +40,13 @@ module Noxun
           model = Sketchup.active_model
           data = parse(payload)
           return if foreign_document?(data, model, 'Doska sa nevložila') # R-02
-          # GHOST (V1-04): vlozenie DOSKY je iny sposob vkladania a beziacu
-          # ghost session skrinky ukoncuje (doska sa kladie synchronne).
-          GhostTool.cancel_session('vloženie dosky') if defined?(GhostTool)
           # UI-C1a: metadata sablony (`template_kind`/`template_name`) su MIMO
           # whitelistu poli, takze sa do buildera nedostanu tak ci tak — vyberu
           # sa vsak vyslovne, aby bolo jasne, ze ide o identitu na peciatku.
           tpl_ref = take_template_ref!(data, 'board')
+          if (tpl_msg = newer_template_refusal(tpl_ref, 'vloženie by nastavenia stratilo'))
+            return set_status("#{tpl_msg} Nič sa nevložilo.", true)
+          end
           params = {}
           # UI-C1c: `orientation` je vo whiteliste vkladania — karta ju posiela
           # pri KAZDEJ materializacii explicitne (default 'leziaca'), takze
@@ -45,11 +56,32 @@ module Noxun
             v = data[k]
             params[k] = v unless v.nil? || v.to_s.strip.empty?
           end
-          inst = BoardBuilder.build(model, params)
+          begin
+            plan = BoardBuilder.prepare_insert(model, params, template_ref: tpl_ref)
+          rescue StandardError => e
+            Engine.log_error(e, 'Panel.handle_insert_board')
+            return set_status("Chyba: #{e.message}", true)
+          end
+          # Orientacia session pochadza z KARTY (payload), nie z pamate ghostu —
+          # karta ju nastavuje pri kazdej materializacii, aj zo sablony.
+          if GhostTool.start(model, plan, template_ref: tpl_ref, subject: :board,
+                                          orientation: plan.orientation).nil?
+            return set_status('Ghost vkladanie sa nepodarilo spustiť — skús to znova.', true)
+          end
+          set_status('Doska visí na kurzore — klikni, kam ju položiť. ' \
+                     'Šípky ←/→ otáčajú, ↑/↓ menia umiestnenie, Alt prepína kotvu, Esc zruší.')
+        end
+
+        # GHOST-D1: po USPESNOM commite dosky — vyber, status, refresh panela
+        # a peciatka sablony. Bezi MIMO operacie vlozenia; zlyhanie
+        # ktorehokolvek kroku nesmie zabranit zatvoreniu committed session.
+        def ghost_after_commit_board(model, inst, session)
           select_only(model, inst)
-          set_status("Doska #{Store.get(inst, 'id')} vložená.")
+          label = BoardBuilder::ORIENTATION_LABELS[session.orientation.to_s].to_s.downcase
+          bid = Store.get(inst, 'id')
+          set_status(label.empty? ? "Doska #{bid} vložená." : "Doska #{bid} vložená — #{label}.")
           push_selected(model)
-          stamp_template_used(tpl_ref) # UI-C1a: az PO vlozeni, mimo operacie
+          session.stamp_once! { stamp_template_used(session.template_ref) } # az PO vlozeni
         end
 
         # Hromadny zapis obycajnych poli karty (name/length/width/quantity/grain).
@@ -92,6 +124,9 @@ module Noxun
           want = data['orientation'].to_s
           return set_status('Neznáma orientácia dosky.', true) unless BoardBuilder::ORIENTATIONS.include?(want)
 
+          # GHOST-D1: dopredna brana schemy uz bezala v `guarded_board` — teda
+          # PRED akymkolvek zapisom (aj do globalneho katalogu). Sem sa doska
+          # z novsej verzie nedostane.
           cfg = Store.config(board) || {}
           old = BoardBuilder.stored_orientation(cfg)
           unless BoardBuilder::ORIENTATIONS.include?(old)
@@ -288,6 +323,19 @@ module Noxun
           echo = data['board_id'].to_s
           unless echo == Store.get(board, 'id').to_s
             Engine.log("board edit zahodeny — echo #{echo} nesedi s vyberom #{Store.get(board, 'id')}")
+            return [nil, nil]
+          end
+          # GHOST-D1 (Codex #298 P2): dopredna brana schemy je SUCASTOU vstupnej
+          # brany, nie az pri prestavbe. Cesty karty totiz PRED rebuildom menia
+          # GLOBALNY KATALOG (`resolve_virtual_material` -> `ensure_duplak_for`,
+          # `ensure_missing_abs` -> dovytvorenie ABS pasky) — a to sa uz nedá
+          # vrátiť. Guard preto stoji tu: doska z novsej verzie odmietne KAZDU
+          # zapisovu cestu karty (polia, material, hrana, olep vsetkych 4,
+          # orientacia) EST PRED prvym zapisom kamkolvek. NAHLAS ako guard
+          # dokumentu — pouzivatel musi vediet, ze sa zmena neulozila.
+          if BoardBuilder.newer_config?(Store.config(board) || {})
+            set_status("#{BoardBuilder.newer_config_message('zmena by nastavenia stratila')} " \
+                       'Doska sa nezmenila.', true)
             return [nil, nil]
           end
           [model, board]

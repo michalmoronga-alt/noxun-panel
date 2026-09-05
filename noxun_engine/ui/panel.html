@@ -12,7 +12,7 @@
      Vsetky nove CSS pravidla kostry visia pod nou, aby panel.css ostal
      bezpecne zdielatelny so satelitnymi oknami. -->
 <script>document.documentElement.className = 'nx-inspector';</script>
-<link rel="stylesheet" href="css/panel.css?v=0.9.26">
+<link rel="stylesheet" href="css/panel.css?v=0.9.27">
 
 <!-- ===== RAIL (A9: staticke ID pre merac D-25) =============================
      Kontexty su platne LEN nad oznacenym korpusom — pri dielci/doske/vkladani
@@ -151,6 +151,10 @@
   </span>
   <span class="gbtxt" id="gbRot">0°</span>
   <span class="gbtxt" id="gbMode">zámok</span>
+  <!-- GHOST-D1: UMIESTNENIE vkladanej dosky. Zije v TOM ISTOM riadku ako
+       kabinetové ovládače výšky (tie sú pri doske skryté) — vertikálny
+       priestor panela je vzácny a pásik nesmie narásť o riadok. -->
+  <span class="gbtxt gbori" id="gbOri" hidden></span>
   <span class="gblock" id="gbLockWrap">
     <input id="gbLockZ" type="text" inputmode="decimal" aria-label="Výška zámku v mm"
            onchange="onGhostLockZ()"><span class="unit">mm</span>
@@ -693,6 +697,11 @@
     <!-- --- rezim DOSKA (V0.4.7c, mode-board) — editor samostatneho dielca --- -->
     <fieldset id="boardCard" style="display:none">
       <div class="pchead" id="bcHead"></div>
+      <!-- GHOST-D1: doska z NOVŠEJ verzie pluginu — karta je READ-ONLY a povie
+           prečo (STANDARD 8.3). Text posiela SERVER (`newer_config_note`), klient
+           si ho neodvodzuje; mimo tohto stavu riadok vôbec neexistuje, takže
+           vertikálny priestor panela nerastie. -->
+      <div class="bcnewer" id="bcNewer" hidden></div>
       <div class="row"><label>Názov</label><input id="bc_name" type="text" oninput="onBoardField('name', this.value)"><span class="unit"></span></div>
       <div class="row"><label>Dĺžka</label><input id="bc_length" type="text" oninput="onBoardField('length', this.value)"><span class="unit">mm</span></div>
       <div class="row"><label>Šírka</label><input id="bc_width" type="text" oninput="onBoardField('width', this.value)"><span class="unit">mm</span></div>
@@ -872,53 +881,53 @@
      musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.9.26"></script>
+<script src="js/errors.js?v=0.9.27"></script>
 <!-- D-77 / A7: minimalna OBSAHOVA velkost okna pri otvoreni. UI-B1 stanovil
      jednu pravdu sirky Inspectora — 470 px OBSAHU (rail 44 + karta). Vyska 810
      pokryva nahlad + dva rozbalene sektory. Dorovnava sa oboma smermi, raz pri
      nacitani a nikdy nad plochu obrazovky (js/win_fit.js). -->
 <script>window.NX_FIT_MIN = { w: 470, h: 810 };</script>
-<script src="js/win_fit.js?v=0.9.26"></script>
-<script src="js/icons.js?v=0.9.26"></script>
+<script src="js/win_fit.js?v=0.9.27"></script>
+<script src="js/icons.js?v=0.9.27"></script>
 <!-- R-23.1: JEDEN dokumentový Escape handler s prioritným zoznamom vrstiev
      (ten istý súbor načítava aj studio.html). Musí byť PRED skriptami, ktoré
      modály otvárajú — jeho listener má bežať ako PRVÝ, aby vedel udalosť
      spotrebovať skôr, než ju dostane handler okna. -->
-<script src="js/nx_esc.js?v=0.9.26"></script>
+<script src="js/nx_esc.js?v=0.9.27"></script>
 <!-- KOV-H2: zdieľaná kostra modalov D-15 (ten istý súbor načítava aj
      studio.html). Musí byť ZA nx_esc.js (reťaz Escape má bežať prvá) a PRED
      core.js/hardware.js — modal ručnej položky kovania ju volá menom. -->
-<script src="js/nx_modal.js?v=0.9.26"></script>
+<script src="js/nx_modal.js?v=0.9.27"></script>
 <!-- ŠT-4a: zdieľaný obsah „O plugine" (rovnaký súbor načítava aj studio.html). -->
-<script src="js/about.js?v=0.9.26"></script>
+<script src="js/about.js?v=0.9.27"></script>
 <!-- D-85 (UI-03): zdielany combobox. Musi byt PRED core/part/board — tie ho pri
      renderi kariet volaju (NXCombo.scan). Sam na nikom nezavisi (ikony si berie
      defenzivne cez NXIcons, ak sprite existuje). -->
-<script src="js/nx_combo.js?v=0.9.26"></script>
+<script src="js/nx_combo.js?v=0.9.27"></script>
 <!-- v0.7.28: ZDIELANE 3-stavove nastavenie kontroly hran (rohovy trojuholnik pri
      ABS kontrole v raile). TEN ISTY subor nacitava aj okno Studio — jeden markup,
      jeden stav. Musi byt PRED shell.js (rohove okno kresli NXEdgeMenu). -->
-<script src="js/edge_menu.js?v=0.9.26"></script>
-<script src="js/tag_menu.js?v=0.9.26"></script>
-<script src="js/core.js?v=0.9.26"></script>
-<script src="js/expr.js?v=0.9.26"></script>
-<script src="js/insert_state.js?v=0.9.26"></script>
-<script src="js/form.js?v=0.9.26"></script>
-<script src="js/zone_tree.js?v=0.9.26"></script>
-<script src="js/preview.js?v=0.9.26"></script>
+<script src="js/edge_menu.js?v=0.9.27"></script>
+<script src="js/tag_menu.js?v=0.9.27"></script>
+<script src="js/core.js?v=0.9.27"></script>
+<script src="js/expr.js?v=0.9.27"></script>
+<script src="js/insert_state.js?v=0.9.27"></script>
+<script src="js/form.js?v=0.9.27"></script>
+<script src="js/zone_tree.js?v=0.9.27"></script>
+<script src="js/preview.js?v=0.9.27"></script>
 <!-- UI-B1: kostra Inspectora — stavovy stroj vyber x kontext, rail, sektory. -->
-<script src="js/shell.js?v=0.9.26"></script>
-<script src="js/actions.js?v=0.9.26"></script>
+<script src="js/shell.js?v=0.9.27"></script>
+<script src="js/actions.js?v=0.9.27"></script>
 <!-- GHOST-FB4: Ghost pasik vkladacej karty. Musi byt PRED bridge.js
      (NX.setGhost vola nxGhostApply); sam na nikom nezavisi. -->
-<script src="js/ghost_bar.js?v=0.9.26"></script>
+<script src="js/ghost_bar.js?v=0.9.27"></script>
 <!-- UI-B3: nastavenia Inspectora (koliesko) + rozmerove rady N6. Musi byt PRED
      bridge.js (NX.setUiSettings volá nxApplyUiSettings) a za core.js (el/esc). -->
-<script src="js/settings.js?v=0.9.26"></script>
-<script src="js/bridge.js?v=0.9.26"></script>
-<script src="js/materials.js?v=0.9.26"></script>
-<script src="js/part_card.js?v=0.9.26"></script>
-<script src="js/board_card.js?v=0.9.26"></script>
-<script src="js/hardware.js?v=0.9.26"></script>
-<script src="js/usage.js?v=0.9.26"></script>
-<script src="js/boot.js?v=0.9.26"></script>
+<script src="js/settings.js?v=0.9.27"></script>
+<script src="js/bridge.js?v=0.9.27"></script>
+<script src="js/materials.js?v=0.9.27"></script>
+<script src="js/part_card.js?v=0.9.27"></script>
+<script src="js/board_card.js?v=0.9.27"></script>
+<script src="js/hardware.js?v=0.9.27"></script>
+<script src="js/usage.js?v=0.9.27"></script>
+<script src="js/boot.js?v=0.9.27"></script>

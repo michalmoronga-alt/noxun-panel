@@ -158,7 +158,27 @@ meria `async S6`).
 (**čistá matematika bez SketchUpu** — kotvy, obálka, kanonická matica, ray × rovina zámku; testovateľná headless), `PlacementSession` (stav jedného vkladu) a `GhostTool::Tool`
 (SketchUp `Tool`). Ghost je **výhradne viewport grafika `draw`** — žiadna dočasná `ComponentInstance`, žiadna entita, žiadne ID a **žiadny krok Späť pred klikom**.
 
-**JEDEN vlastník session.** Modul drží NAJVIAC JEDNU session (`GhostTool.session`). Nesie: zmrazený `InsertPlan` (R-03 `prepare_insert`) · snapshot kovania zo šablóny
+**SUBJEKT a INTERAKCIA (GHOST-D1).** Session nesie **`subject`** (`:cabinet | :board`) a **`interaction`** (`:placement`; D2 pridá `:drawing`) — obe sú **explicitné**, neodvodzujú
+sa z tvaru plánu ani z prítomnosti fázy, a neznáma hodnota spadne na `:cabinet` / `:placement`. Podľa subjektu sa berie **obálka a kotvy** (`Calc.board_envelope_points` /
+`board_anchor_points` namiesto kabinetových), **klávesy**, **payload pásika** aj **šev commitu** (`BoardBuilder.commit_insert` namiesto `CabinetBuilder.commit_insert`). Klasický
+tok skrinky sa nemení — charakterizáciou je celá existujúca sekcia `run_ghost`.
+
+**Doska: kotvy sú DÁTOVÁ tabuľka, nie odvodenie.** `Calc::BOARD_AXES` hovorí, ktorý výrobný rozmer leží na ktorej lokálnej osi **umiestnenej** dosky (`leziaca` = L×W×T,
+`stojaca`/`na_stenu` = L×T×W — zdieľaná matica, rozdiel je len v configu), `Calc::BOARD_ANCHOR_TABLE` je 3 orientácie × 4 kotvy s **rovnakými ID a rovnakým poradím ALT cyklu ako
+skrinka** a „predná" plocha je pri všetkých rovina lokálne Y = 0. Obálka aj kotvy sa počítajú v ráme **už otočenej** dosky, takže transformácia ghostu je čistá poloha
+a orientácia sa skladá až v commite. Nezávislý dôkaz (headless): zvolená kotva **commitnutej** geometrie sadne presne na kliknutý bod pre 3 orientácie × 4 kotvy × 4 rotácie.
+
+**Doska sa prichytáva plne v XYZ.** Žiadny zámok výšky (`z_mode` je vždy `:free`, `set_z_mode!` ju odmieta) — inak by roh **hornej** skrinky skončil na zamknutej výške. V úplne
+prázdnom modeli (InputPoint nedal nič) sadne na **rovinu Z = 0** cez ten istý guardovaný priesečník lúča ako zámok skrinky (`MIN_SIN` / `t >= 0` / `MAX_REACH`); voľný režim
+**skrinky** fallback nemá a ostáva nezmenený. **Klávesy dosky:** ←/→ rotácia okolo Z (ako skrinka), **↑/↓ = cyklus umiestnenia** `leziaca → stojaca → na_stenu` (prepočíta obálku
+aj kotvy), Alt = kotvy; šípky vracajú `true`, natívny zámok osí je v ghoste **vedome pohltený**.
+
+**Bariéra pred mutáciou.** `commit!` volá `ScaleWatch.flush_pending!(model)` **PRED `begin_commit!`** (`settle_observer!`). Pri `false` (limit aj výnimka — API ich nerozlišuje) sa
+vracia **explicitný `:blocked`**: session **ostáva v stave umiestňovania** (nikdy nekončí falošne `:committed`), nevzniklo žiadne ID, geometria, krok Späť ani pečiatka a Tool
+ukáže status „o chvíľu klikni znova". Bez nej by čakajúca kópia/scale dobehla **po** vytváracej operácii a jej transparentná reakcia by sa na ňu prilepila — Redo by potom vrátilo
+niečo iné, než používateľ vrátil.
+
+**JEDEN vlastník session.** Modul drží NAJVIAC JEDNU session (`GhostTool.session`). Nesie: zmrazený `InsertPlan` (R-03 `prepare_insert`) alebo `BoardPlan` (GHOST-D1) · snapshot kovania zo šablóny
 (`take_insert_hardware!`) · šablónový ref · pôvodný model · **stav `:active` → `:committing` → `:committed` | `:cancelled`** · `rotation_index` (0..3) · `anchor` · `z_mode` ·
 poslednú platnú polohu s príznakom `placeable`. **Terminálne stavy sú idempotentné** — druhý klik aj druhý cancel sú no-op, takže dvojklik nikdy nevyrobí dve skrinky.
 Identita dokumentu je **objekt `Sketchup::Model`, nie `guid`** (mení sa pri každom uložení — lekcia #261/#264), takže Ctrl+S ghost nezruší.
@@ -205,6 +225,9 @@ ghost aj pre commit. Kotva, rotácia, režim výšky a zamknuté výšky (**per 
 SketchUpu, **bez zápisu na disk aj do modelu**: je to pracovný návyk jedného sedenia, nie údaj zákazky (inak by sa cudzia zákazka otvorila s cudzími kotvami). Nová session
 z nej štartuje; `reset_memory!` (testy, in-SU teardown) vráti továrenské hodnoty. Stav session ide do panela cez `GhostTool.push_state` → `Panel.push_ghost` → `NX.setGhost`
 — pri každom konci session s `active = false`, takže pásik zmizne.
+**GHOST-D1: pamäť je kľúčovaná dvojicou `[subject, interaction]`** (`GhostTool.memory(:board)` vs. `memory(:cabinet)`) — skrinka a doska si navzájom kotvu ani rotáciu neprepíšu
+a budúce kreslenie dosky (D2) má pevný počiatok, takže pamätaná kotva placementu doň nepresiakne. Doska drží **len rotáciu a kotvu**; **orientácia v pamäti NEŽIJE** — každá nová
+session ju číta z **karty Dosky** (payload `insert_board`), lebo karta ju nastavuje pri každej materializácii, aj zo šablóny.
 
 **Degenerované lúče** (`Calc.ray_plane`) majú **dve nezávislé brány** — samotné „`|dir.z|` nad epsilon" je mŕtvy strážca: pri normalizovanom vektore ho prejde aj lúč jeden
 pixel pod horizontom (`dz` ≈ 1e-4) a `t` vyjde rádovo 10⁶, takže by klik položil korpus **kilometre od originu** (`rigid_matrix?` transláciu nijako neobmedzuje). Priesečník preto
@@ -247,11 +270,41 @@ a jeho zlyhanie NESMIE zabrániť zatvoreniu committed session. **Žiadny ručn�
 pri KLIKU, nie pri stlačení „Vložiť" (hláška je tá istá — `Panel.ghost_insert_failed`); `Construction.build_plan` sa do `prepare_insert` zámerne nepresúva (hranica R-03).
 Zlyhaný commit session **končí** (preflighty už prebehli, opakovaný klik by zlyhal rovnako). Programatická cesta `CabinetBuilder.build` (`Placement.next_x` fallback)
 a `handle_insert_copy` sú GHOSTom **nedotknuté**. Testy: `tests/pure/test_ghost_vkladanie.rb`, in-SketchUp sekcie `run_ghost` a `run_ghost_async`.
+**GHOST-D1:** commit dosky ide cez `commit_subject!` → `BoardBuilder.commit_insert(…, orientation: @orientation)`; po úspechu `Panel.ghost_after_commit` dispatchuje na
+`ghost_after_commit_board` (výber, status s umiestnením, `push_selected`, pečiatka cez `stamp_once!` — **až po úspešnom commite**, Esc ani `:blocked` ju nezapíšu).
+Testy: `tests/pure/test_ghost_d1_dosky.rb`, `tests/js/test_ghost_d1_pasik.js`, in-SketchUp sekcie `run_ghost_d1` a `run_ghost_d1_async`.
 
 ### board_builder.rb
 
 samostatná doska (V0.4.7): `kind: board`, id BRD-xxx, rola `free_panel`, config = superset dielca korpusu (kusovník/VEPO majú jeden svet); materiál snapshot z katalógu, hrúbka VŽDY
 z materiálu; manufactured true + production_class sheet na inštancii.
+
+**ŠEV VKLADANIA (GHOST-D1): `prepare_insert` → `commit_insert(model, plan, transform:, orientation:)`.** Doska sa od GHOST-D1 kladie **klikom** (ghost), takže potrebuje ten istý
+kontrakt ako R-03 pri korpuse. `BoardPlan` je **explicitný zmrazený typ** (nie voľný Hash) a nesie: normalizovaný `config` (geometria, deskriptor, farbenie hrán), **`stored_config`
+= hotový zápisový tvar** (`board_config`) vyriešený proti katalógu **RAZ**, `orientation` z karty, `template_ref` na pečiatku a **referenciu na `Sketchup::Model`** (nie `guid` —
+mení sa každým uložením). `prepare_insert` **nič nemutuje**: žiadne ID, žiadna entita, žiadny krok Späť, a **`ensure_root!` sa v nej NEVOLÁ** — ghost hover nesmie používateľovi
+zatvárať otvorený komponent (rovnaká hranica ako R-03).
+
+**Prečo zmrazený VÝROBNÝ snapshot, nie len rozmery:** dnešný `board_config` číta katalóg **pri zápise** a pri dupláku uprednostní **aktuálny** zdroj — zmena katalógu medzi
+prípravou a klikom by teda ticho zmenila výrobný záznam. `commit_insert` preto katalóg **už nečíta**: config ide z plánu (`write_board_attrs(..., config: stored)`) až na entitu.
+Poradie krokov commitu je súčasťou kontraktu: **identita dokumentu a typ plánu → orientácia → validácia + SNAPSHOT transformu (`CabinetBuilder.snapshot_insert_transform!`, prijme
+len rigidnú pravotočivú maticu, `to_a` sa číta práve raz) → `ensure_root!` + kontrola postcondition → ID → operácia**. Odmietnutie je výnimka a v modeli sa pri nej nezmenilo nič.
+
+**Orientácia ide do commitu SAMOSTATNE** (nie z `transform`): `stojaca` a `na_stenu` vedome zdieľajú maticu (STANDARD 8.3), takže sa z transformácie odvodiť nedá — finálnu hodnotu
+nesie argument zo session a zapíše sa do `config['orientation']`. Skladá sa **nad** polohou ghostu: `inst.transformation = placement × orientation_matrix(o, thickness)`, takže
+vnútro definície ostáva ležiace a výrobné dáta sú nedotknuté.
+
+**JEDEN POUŽÍVATEĽSKÝ krok Späť, nie „jedna operácia".** Vytváracia operácia `start_operation('Vložiť dosku', true)` **+ existujúci transparentný scale-lock follow-up**
+(`apply_scale_lock_op` — DC atribút `dynamic_attributes/scaletool` nesmie vzniknúť v operácii, ktorá entity vytvára; D-40) bežia pod **spoločným `ScaleWatch.guard`**; follow-up sa
+**nikdy neabortuje** a `attach_one` ostáva. `rescue → abort_operation` platí len pre vytváraciu operáciu. Programatická cesta `build` (`Placement.next_x`) ostáva nedotknutá pre
+testy, in-SU a nástroje; s `prepare_insert` zdieľa `insert_params` (projektový default materiálu + E-03 guard hrúbky).
+
+**`BOARD_CONFIG_SCHEMA` = kontrakt configu dosky** (vzor `CabinetBuilder::CONFIG_SCHEMA`, ale **nezávislé** číslo — hodnoty sa navzájom neporovnávajú). Marker sa zapisuje pri
+**každom** zápise configu dosky (`board_config`) a **každý čitateľ uloženého configu** berie vyššie číslo ako „novší config": `newer_config?` / `guard_newer_config!` čítajú
+**RAW config z entity, nikdy payload z panela** (marker cez CEF vypadne). Guard stojí v `rebuild` **pred `normalize`** (normalizácia by marker aj neznáme polia zahodila) **a znovu
+v `rebuild_in_operation`** — dávkové cesty (napr. „Nahradiť UNI…") volajú vnútro priamo s už znormalizovaným cfg. Ďalšie brány: vloženie zo šablóny (RAW záznam v
+`Panel.newer_template_refusal`), zmena orientácie z karty, klasifikácia „Nahradiť UNI" a výrobné výstupy (`Bom.collect` → `newer_configs`, viď `outputs.md`). Zoznam ciest je
+záväzný a žije v `SYSTEM/STANDARD.md` §8.3.
 
 **ORIENTÁCIA (UI-C1c, `config['orientation']`: `leziaca` | `stojaca` | `na_stenu`) je VÝHRADNE TRANSFORMÁCIA INŠTANCIE** — geometria v definícii ostáva ležiaca (`draw_board`: dĺžka
 X, šírka Y, hrúbka Z), takže osi deskriptora (`PartFaces::AXES_LYING`), mapa hrán D-88, farbenie ABS, kusovník aj VEPO sú orientáciou **nedotknuté**; do `descriptor.prod`,

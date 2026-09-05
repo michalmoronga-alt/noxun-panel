@@ -239,12 +239,20 @@ module Noxun
         # Sablona, ktora medzitym zmizla, vklad NEBLOKUJE (rovnaka zasada ako
         # `stamp_template_used`) — chyba zaznamu nie je dokaz nekompatibility.
         # Vracia SK hlasku, alebo nil, ked je vsetko v poriadku.
+        # GHOST-D1: DRUH sablony rozhoduje, ktory marker sa cita — korpusova
+        # `CabinetBuilder::CONFIG_SCHEMA`, doskova `BoardBuilder::BOARD_CONFIG_SCHEMA`.
+        # Su to dva NEZAVISLE kontrakty (cisla sa nikdy neporovnavaju medzi sebou).
         def newer_template_refusal(ref, consequence)
           return nil if ref.nil?
 
           kind, name = ref
           tpl = TemplateStore.find(kind, name)
           return nil if tpl.nil?
+          if kind.to_s == 'board'
+            return nil unless BoardBuilder.newer_config?(tpl['config'])
+
+            return CabinetBuilder.newer_config_message('Šablóna dosky', consequence)
+          end
           return nil unless CabinetBuilder.newer_config?(tpl['config'])
 
           CabinetBuilder.newer_config_message('Šablóna', consequence)

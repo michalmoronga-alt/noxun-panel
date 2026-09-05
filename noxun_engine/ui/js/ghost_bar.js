@@ -17,6 +17,17 @@
     fl_bottom: 'ľavá dolná', fr_bottom: 'pravá dolná',
     fr_top: 'pravá horná', fl_top: 'ľavá horná'
   };
+  // GHOST-D1: popisky umiestnenia dosky. Zrkadlo `BoardBuilder::ORIENTATION_LABELS`
+  // — server ich posiela v pushi, toto je len fallback pre starší payload.
+  var NX_GHOST_ORIENTATIONS = {
+    leziaca: 'Naležato', stojaca: 'Nastojato', na_stenu: 'Na stenu'
+  };
+  // Nápoveda ovládania — pre KAŽDÝ subjekt vlastná (doska nemá zámok výšky,
+  // má umiestnenie).
+  var NX_GHOST_HELP = {
+    cabinet: '←/→ otočí o 90° · Alt prepne kotvu · ↓ zámok výšky · ↑ voľná výška · Esc zruší · klik vloží',
+    board: '←/→ otočí o 90° · ↑/↓ zmení umiestnenie · Alt prepne kotvu · Esc zruší · klik vloží'
+  };
   // Posledny STAV zo servera — drzi sa LEN preto, aby sa dalo pole vratit na
   // platnu hodnotu, ked pouzivatel napise nezmysel (nikdy nespadne na 0).
   var nxGhostState = null;
@@ -38,6 +49,18 @@
 
   function nxGhostAnchorLabel(anchor){
     return NX_GHOST_ANCHORS[anchor] || NX_GHOST_ANCHORS.fl_bottom;
+  }
+
+  // Subjekt session: 'cabinet' (default) | 'board'. Starší push subjekt
+  // nenesie — vtedy platí skrinka, presne ako pred GHOST-D1.
+  function nxGhostSubject(state){
+    return (state && state.subject === 'board') ? 'board' : 'cabinet';
+  }
+
+  function nxGhostOriLabel(state){
+    if (!state) return '';
+    if (state.orientation_label) return String(state.orientation_label);
+    return NX_GHOST_ORIENTATIONS[state.orientation] || '';
   }
 
   // Zrkadlo `GhostTool::Calc.lock_z_value`: cislo v mm v rozumnom rozsahu,
@@ -90,15 +113,27 @@
       rot.textContent = nxGhostRotLabel(state.rotation);
       rot.setAttribute('title', 'Otočenie okolo kotvy — ←/→ o 90°');
     }
+    // GHOST-D1: kabinetové ovládače výšky sú pri DOSKE skryté (prichytáva sa
+    // plne v XYZ) a na ich mieste stojí UMIESTNENIE. Pole `ghost_lock_z` sa
+    // pre dosku z JS nikdy neposiela a server ho navyše odmieta.
+    var isBoard = nxGhostSubject(state) === 'board';
     var mode = nxGhostEl('gbMode');
     if (mode){
+      mode.hidden = isBoard;
       mode.textContent = nxGhostModeLabel(state.z_mode);
       mode.setAttribute('title', '↓ drží skrinku na zamknutej výške · ↑ ju pustí do voľnej výšky');
+    }
+    var ori = nxGhostEl('gbOri');
+    if (ori){
+      ori.hidden = !isBoard;
+      ori.textContent = nxGhostOriLabel(state);
+      ori.setAttribute('title', 'Umiestnenie dosky — ↑/↓ ho prepínajú (naležato · nastojato · na stenu)');
     }
     var inp = nxGhostEl('gbLockZ');
     if (inp) inp.value = nxGhostMm(state.lock_z);
     var wrap = nxGhostEl('gbLockWrap');
     if (wrap){
+      wrap.hidden = isBoard;
       // Vo volnej vyske pole hodnotu drzi (plati po stlaceni ↓), len je
       // stlmene — ovladac ostava pouzitelny, nie `disabled` (vzor D-78).
       wrap.className = state.z_mode === 'free' ? 'gblock dim' : 'gblock';
@@ -106,6 +141,21 @@
         ? 'Výška zámku (mm) — použije sa, keď stlačíš ↓'
         : 'Výška, na ktorej ghost sedí (mm)');
     }
+    var info = nxGhostEl('gbInfo');
+    if (info) info.setAttribute('title', NX_GHOST_HELP[isBoard ? 'board' : 'cabinet']);
+    if (isBoard) nxGhostSyncCard(state);
+    return true;
+  }
+
+  // GHOST-D1: karta Dosky ukáže umiestnenie HNEĎ po ↑/↓ v modeli. Mení sa LEN
+  // stav `NXInsert` + zrkadlo segmentov — ŽIADNA materializácia ani reset
+  // karty (rozpísané rozmery, materiál a šablóna zostávajú nedotknuté).
+  // Ďalšia session potom štartuje z tejto hodnoty.
+  function nxGhostSyncCard(state){
+    if (typeof NXInsert === 'undefined' || !NXInsert || !NXInsert.setBoardOrientation) return false;
+    if (!state || !state.orientation) return false;
+    if (!NXInsert.setBoardOrientation(state.orientation)) return false; // uz je nastavena
+    if (typeof syncInsertOrientation === 'function') syncInsertOrientation();
     return true;
   }
 
@@ -117,6 +167,9 @@
     // Bez BEZIACEJ session nie je co menit — pasik je vtedy schovany a
     // (napr. oneskorena) udalost pola by hovorila o niecom, co uz skoncilo.
     if (!nxGhostState) return;
+    // GHOST-D1: pri DOSKE sa `ghost_lock_z` z JS neposiela NIKDY (pole je
+    // skryte, ale skrytie nie je ochrana — server subjekt kontroluje tiez).
+    if (nxGhostSubject(nxGhostState) === 'board') return;
     var v = nxGhostLockValue(inp.value);
     if (v === null){
       if (nxGhostState) inp.value = nxGhostMm(nxGhostState.lock_z);
@@ -146,6 +199,10 @@
       lockValue: nxGhostLockValue,
       mm: nxGhostMm,
       apply: nxGhostApply,
-      onLockZ: onGhostLockZ
+      onLockZ: onGhostLockZ,
+      subject: nxGhostSubject,
+      oriLabel: nxGhostOriLabel,
+      syncCard: nxGhostSyncCard,
+      HELP: NX_GHOST_HELP
     };
   }

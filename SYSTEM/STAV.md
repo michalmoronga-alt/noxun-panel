@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.9.26 · 4.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.9.27 · 5.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -25,7 +25,7 @@ robí **priamo v Inspectore**. **KOV-B1** dala setom **klasifikáciu** (na čo �
 **Pozor na kompatibilitu:** čo uloží v0.9.20, to **v0.9.18 už nepoužije** — model/šablóna (`CONFIG_SCHEMA` 4 + brána `assess_set_defs`), knižnica setov aj projektový snapshot
 (`std` 3) a katalóg kovania s výrobcom (`schema` 2). Pred prvou takou zákazkou aktualizovať **obe PC** (D-52 updater).
 
-**Testy k v0.9.26:** **2795 headless** · 85 JS sád · posledný plný in-SketchUp beh **1504 PASS** (v0.9.21; dávky #287, KOV-B2 a NÁSTROJE-1 ho **nespúšťali** — Michal pracoval v SketchUpe, pustiť pred merge; pribudli sekcie `run_kovb2`, `run_tools1`, `run_tools1_async` a `run_tools1b`; pribúda `run_kovb3`).
+**Testy k v0.9.27:** **2845 headless** · 87 JS sád · posledný plný in-SketchUp beh **1504 PASS** (v0.9.21; dávky #287, KOV-B2, NÁSTROJE-1 a GHOST-D1 ho **nespúšťali** — Michal pracoval v SketchUpe, pustiť pred merge; pribudli sekcie `run_kovb2`, `run_tools1`, `run_tools1_async`, `run_tools1b`, `run_kovb3`, `run_ghost_d1` a `run_ghost_d1_async`).
 
 ## Robí sa
 
@@ -43,6 +43,10 @@ Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` (KO
 
 ## Posledné uzávery
 
+- **GHOST-D1 — DOSKA SA UŽ TIEŽ KLADIE KLIKOM** (v0.9.27, 5.9.2026): „Vložiť dosku" **už nevkladá vedľa poslednej skrinky** — doska **visí na kurzore**, prichytáva sa
+  **v celom priestore** (aj na **zvýšený** roh skrinky), **←/→** ju otáčajú, **↑/↓** menia **umiestnenie** (naležato · nastojato · na stenu) a karta to hneď ukáže, **Alt**
+  prepína kotvu, **Esc** nevloží nič (ani krok Späť, ani pečiatku šablóny), vloženie je **jeden krok Späť** a **Ctrl+Y** ho vráti; vkladanie skriniek sa **nemení**. Doska má
+  navyše vlastný **kontrakt configu** — zákazku z **novšieho** pluginu už nikto ticho neoreže (prestavba, otočenie, šablóna aj „Nahradiť UNI" ju odmietnu; VEPO, nákup, rozpočet ani ponuka nad ňou nevzniknú).
 - **KOV-B3 — SET SA UPRAVUJE V OKNE A HNEĎ VIDNO, ČO SA OBJEDNÁ (slice B KOMPLET, R-41 uzavretá)** (v0.9.26, 4.9.2026): **Sety** sú **dlaždice s chipmi** (starý set má chip
   **„nezaradený"**), zakladanie aj úprava sú **modal** (použitie → otváranie → konštrukcia len pri zásuvke → výrobca → rada → navrhnutý názov), člen sa pýta „Ako sa určí kód?"
   a „Koľko?" a pod formulárom beží **živý náhľad** („objedná sa 1× 357696 za 19,60 €"). **Neaktívny set sa už neponúka** (staré zákazky sa nemenia), **dve okná nad tým istým setom sa už neprepíšu** (hláška + Obnoviť), **nákup ani výstupy sa nemenia.**
@@ -52,12 +56,8 @@ Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` (KO
   s počtom, hľadanie roztvorí **len** to, kde niečo našlo, a orezanie sa prizná číslom + **„Načítať ďalšie (N)"**. Zakladanie a úprava sú **modal** (nie formulár pod zoznamom)
   s poradím **Démos → kód → názov → cena → MJ → kategória → výrobca → rada → poznámka**; Démos predvyplní kód/názov/cenu/MJ **a výrobcu podľa značky** — ručne prepísaný údaj
   uloží položku ako **ručnú** (bez väzby a bez dátumu overenia). Nákup ani výstupy sa nemenia.
-- **KOV-H2 — AD-HOC KOVANIE PRIAMO V INSPECTOROVI** (v0.9.20, 3.9.2026): dátovú vrstvu dala H1, **teraz to má obrazovku**. V kontexte **Kovanie** je blok **„Ručne pridané"**
-  a tlačidlo **„Pridať konkrétnu položku (mimo setov)"**: k čomu patrí (skrinka / čelo / polica), z **katalógu** (živá cena) alebo **voľná**, množstvo a poznámka; riadky
-  s chipom **„ručná"**, ceruzka a kôš, každá zmena **jeden krok Späť**. Priznajú sa stavy **„bez vlastníka"** a **„chýba v katalógu"**; v Štúdiu → **Nákup** klik na riadok ukáže
-  **pôvod**. **Výstupy sa nemenia ani o znak.** Michal to večer prešiel celé (detail v [archiv/KRONIKA.md](archiv/KRONIKA.md)).
-- **1d/R-14 · R-12 · R-11 — zákazka či nastavenia z NOVŠIEHO pluginu sa už ticho nezmrzačia** (v0.9.2–v0.9.4) a **D-52 — Aktualizovať jedným klikom** (v0.9.14, PR #277–#279): Štúdio → O plugine → priečinok, kontrola verzie, tlačidlo; bariéra okien, atomický swap, restart latch, downgrade zakázaný.
-- **Staršie uzávery** (**SMOKE 3.9. + D-115/D-116** symbol otvárania z rohov, tag úchytky, v0.9.21 · **VÝSTUPY D-112 + D-113** deviaty stĺpec „poznámka" vo VEPO CSV, v0.9.22 ·
+- **Staršie uzávery** (**KOV-H2** ad-hoc kovanie priamo v Inspectorovi v0.9.20 · **1d/R-14 · R-12 · R-11** zákazka z novšieho pluginu sa už ticho nezmrzačí v0.9.2–v0.9.4 ·
+  **D-52** Aktualizovať jedným klikom v0.9.14 · **SMOKE 3.9. + D-115/D-116** symbol otvárania z rohov, tag úchytky, v0.9.21 · **VÝSTUPY D-112 + D-113** deviaty stĺpec „poznámka" vo VEPO CSV, v0.9.22 ·
   **KOV-B1** klasifikácia setov a taxonómia v0.9.19 · **KOV-H1** ad-hoc kovanie dátová vrstva v0.9.18 · **KOV-A2b** smer otvárania v modeli v0.9.17 ·
   UZÁVER BLOKU GHOST VKLADANIE **v0.9.0** so smoke checklistom · 1d/R-02 · R-02b · R-01+R-04 · R-07 · R-08 · R-03 · R-34 · 1b-6a/6c · 1b-4 · 1b-3 ·
   VEĽKÝ TEST 26.8. · DOCS CLEANUP · PICKER-1/-2/-3 · TEST-1 · ŠT-4b uzáver fázy ŠTÚDIO **v0.8.0** · blok KRESBA · UI-A…UI-D · ŠTART AUTONÓMIE · RETRO · UPRATANIE · séria KLINIKA · Materiály 2.0 a dávky D/E #89–#140) — plné texty v [archiv/KRONIKA.md](archiv/KRONIKA.md)

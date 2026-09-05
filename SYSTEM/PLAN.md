@@ -543,6 +543,10 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   [zdroje/next_sessions/GHOST_OUTSIDE_IN_2026-09-04.md](zdroje/next_sessions/GHOST_OUTSIDE_IN_2026-09-04.md); Codex GH #288 kolá 1–2 zapracované; **Audit: HOTOVÝ — Codex CLI 5.9.2026, 4 kolá (kolo 1 Sol 4 BLOCKER + 11 FIX a Astra 1 BLOCKER + 6 FIX + 1 NOTE → kolo 2 Astra 21/23 vyriešené + 1 FIX + 1 NOTE → kolo 3 Sol 6 FIX →
   kolo 4 Sol **SOUND**, 3 FIX zapracované, žiadny BLOCKER)** (história v [zdroje/next_sessions/GHOST_D1_D2_PACKAGE_DRAFT_2026-09-04.md](zdroje/next_sessions/GHOST_D1_D2_PACKAGE_DRAFT_2026-09-04.md));
   in-SU POVINNÉ; štart po KOV-B3 alebo podľa Michala):**
+  **STAV IMPLEMENTÁCIE: ✅ GHOST-D1 KOMPLET (5.9.2026, v0.9.27)** — šev `BoardPlan` + `prepare_insert`/`commit_insert`, subjekt a interakcia session, dátová tabuľka kotiev,
+  plne XYZ prichytenie, ↑/↓ umiestnenie, bariéra `flush_pending!` s `:blocked`, kontrakt configu dosky `BOARD_CONFIG_SCHEMA` (vrátane `std` 4 knižnice šablón) a rozšírená
+  výrobná brána (`newer_configs` s druhom, VEPO už výnimku nemá). Headless sada `test_ghost_d1_dosky.rb`, JS `test_ghost_d1_pasik.js`, in-SU `run_ghost_d1` +
+  `run_ghost_d1_async`. **Zostáva GHOST-D2** (kreslenie na rozmer). Znenie nižšie je autorita, podľa ktorej sa implementovalo.
   **Cieľ:** vloženie dosky z karty Dosky ide cez ghost ako pri skrinke (doska na kurzore, prichytenie na geometriu, kotvy, klik = vloženie) — dnes sa doska kladie synchrónne na `Placement.next_x`.
   **Šev `BoardBuilder.prepare_insert` → `commit_insert(model, plan, transform:, orientation:)` — kontrakt rovnako silný ako R-03 (`CabinetBuilder.commit_insert`, audit 1):** plán je
   EXPLICITNÝ zmrazený typ (`BoardPlan`, nie voľný Hash) viazaný na IDENTITU modelu (cudzí `Model` = odmietnutie), `Geom::Transformation` sa pri commite snapshotuje RAZ (mutovateľný objekt),

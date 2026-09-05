@@ -167,7 +167,15 @@ end
 NxTest.test('UI-C1a: upsert doskovej sablony dopise config.type = board (ochrana stareho klienta)') do
   NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
   NxC1a.reset!
-  NxC1a::TS.upsert('board', 'Rucna doska', 'length' => 500.0, 'width' => 400.0)
+  # GHOST-D1: zapisovatel doskovej sablony MUSI niest marker kontraktu configu
+  # — bez neho sa zapis odmietne (zaznam by inak vyzeral ako legacy seed).
+  NxTest.assert_equal(false,
+                      NxC1a::TS.upsert('board', 'Bez markera', 'length' => 500.0, 'width' => 400.0),
+                      'doskova sablona bez config_schema sa NEZAPISE')
+  NxTest.assert_equal(nil, NxC1a::TS.find('board', 'Bez markera'), 'a v knizniciach nie je')
+  NxC1a::TS.upsert('board', 'Rucna doska',
+                   'length' => 500.0, 'width' => 400.0,
+                   'config_schema' => Noxun::Engine::BoardBuilder::BOARD_CONFIG_SCHEMA)
   rec = NxC1a::TS.find('board', 'Rucna doska')
   NxTest.assert_equal('board', rec['config']['type'], 'redundantny marker doplnil store')
 end

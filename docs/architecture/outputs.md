@@ -34,7 +34,7 @@ schváleného mockupu, scéna 4) menuje čelo serverovým `label`-om aj skrinku,
 dovtedy platia tvrdé podmienky O1 — žiadny default ani heuristika smeru nikde v kóde a legacy configy vyňaté (guard testy v `tests/pure/test_kova1_cela.rb`).
 `FRONT_ROLES` sa rozšírilo o `flap` a `false_front`, takže ORANGE „čelo bez ABS" a hrúbkové pravidlo čiel platia aj pre výklop, sklop a blendu.
 
-**KOV-H1 — dve nové kategórie.** **RED `newer_config` (`CAT_NEWER_CFG`)**, na rozdiel od `front_direction` **bránu MÁ**: číta aditívny `collected[:newer_configs]` a hovorí, že
+**KOV-H1 — dve nové kategórie** (GHOST-D1: `newer_config` už menuje **Skrinku aj Dosku**). **RED `newer_config` (`CAT_NEWER_CFG`)**, na rozdiel od `front_direction` **bránu MÁ**: číta aditívny `collected[:newer_configs]` a hovorí, že
 nákupný CSV, rozpočet ani cenová ponuka sa nedajú vyexportovať a treba aktualizovať plugin. V Kontrole je preto, aby to bolo vidno **skôr**, než používateľ doladí rozpočet a naraz
 mu export odmietne vzniknúť; `stable_key` = `newer_config|owner_id`, klik mieri na skrinku. **ORANGE `hardware_adhoc` (`CAT_HW_ADHOC`)** číta aditívny `collected[:hardware_manual]`
 a má jediný nález — **mŕtvy vlastník** (`owner_missing`): ručná položka je pripnutá na dielec, ktorý už neexistuje. Text menuje položku, hovorí, že **ostáva v nákupe**, a ponúka dve
@@ -100,13 +100,15 @@ a **prečo + kde to opraviť**. Zoznamy ID majú **jedno znenie stropu** („tri
 **`newer:` je KOV-H1 hardening R-12 (audit #15 BLOCKER 3), a platí VŠEOBECNE** — aj pre zákazku bez ad-hoc kovania. R-12 dovtedy chránil len **prestavbu**: staršia verzia pluginu
 zákazku so schémou vyššou než vlastná normálne **vyexportovala**, len bez toho, čomu nerozumie (pole configu je pre ňu neviditeľné), takže objednávka aj cena boli neúplné a nikto to
 nemal ako zbadať. Zdrojom je aditívny `Bom.collect` kľúč **`newer_configs`** (`ProductionCore.newer_configs(collected)`). Potvrdiť sa to nedá: chýbajúce dáta sa nedajú „vziať na
-vedomie", dá sa len aktualizovať plugin. **VEPO bránu opäť nedostáva** — je to rezací výstup z rozmerov dielcov, ktoré staršia verzia číta správne (rovnaká výnimka ako pri
-duplicitách). Že sú to práve **tri** výstupy, stráži guard test v `tests/pure/test_kovh1_adhoc.rb`.
+vedomie", dá sa len aktualizovať plugin. **GHOST-D1 zmena: VEPO už výnimku NEMÁ.** Odkedy má aj **doska** vlastný kontrakt configu (`BoardBuilder::BOARD_CONFIG_SCHEMA`), môže
+objekt z novšej verzie niesť **výrobné** pole, ktoré tento plugin nevidí — takže rezací výstup by bol ticho neúplný rovnako ako nákup. `do_export` (VEPO) preto volá
+`newer_config_stop` **hneď po `fresh_collect` a pred `UI.select_directory`** (pri blokáde sa picker ani neotvorí). Že sú to práve **štyri** výstupy, stráži guard test
+v `tests/pure/test_kovh1_adhoc.rb`.
 
 **Táto brána sa vyhodnocuje HNEĎ po `fresh_collect`** — cez `newer_config_stop(collected)`, teda **pred expanziou, pred rozpočtom aj pred ich skorými návratmi** (review #283
 P2-B). Dôvod: zákazka z novšej verzie nemusí vyexpandovať ani jeden **známy** nákupný riadok (alebo jej rozpočet vôbec nevznikne), takže skorý návrat „model nemá žiadne
 kovanie" / „rozpočet sa nepodarilo zostaviť" by bránu **predbehol** a používateľ by sa nedozvedel ani ID skriniek, ani to, že má aktualizovať plugin. `newer:` preto do
-**neskorého** `export_blockers` (spolu s `dups:`/`cp:`) už nechodí — skladá ho výhradne `newer_config_stop`, jedno miesto pre všetky tri exporty.
+**neskorého** `export_blockers` (spolu s `dups:`/`cp:`) už nechodí — skladá ho výhradne `newer_config_stop`, jedno miesto pre všetky štyri exporty.
 
 *(2) POTVRDITEĽNÁ — `export_confirmations(budget:)`.* Dnes jediný dôvod: **riadky bez ceny**. STANDARD §11.3 hovorí, že neznáma cena sa NIKDY nenahradí nulou, ale má sa **priznať**
 („medzisúčet je len zo známych cien a súhrn nahlas povie, že nie je úplný") — **rozpracovaný rozpočet je legitímny stav zákazky** a plošný tvrdý blok by používateľovi bral výstup,
@@ -309,10 +311,31 @@ ISTOM prechode z už načítaného `ccfg` (žiadny druhý sken modelu) a **prvá
 `rows[].sources` expanzie (`nil` = kovanie celej skrinky). Je to **aditívne pole zdroja**: nákupný CSV, `Budget.hardware_section` ani cenová ponuka ho nečítajú, takže výstup
 zákazky sa nemení ani o znak (drží to golden odtlačok `test_kovh_golden.rb`). `compute()` kľúč ignoruje.
 
-**`newer_configs` (KOV-H1, R-12 exportná brána):** aditívny zoznam ID skriniek, ktorých uložený `config_schema` je **vyšší** než `CabinetBuilder::CONFIG_SCHEMA`
-(`CabinetBuilder.newer_config?` — jedno kritérium pre prestavbovú aj exportnú bránu). Vzniklo z auditu #15 BLOCKER 3: R-12 chránil len **prestavbu**, takže staršia verzia pluginu
-zákazku zo schémy 3 normálne **vyexportovala** — len bez toho, čomu nerozumie, a objednávka aj cena boli neúplné bez slova. Čitatelia: `ProductionCore.export_blockers(newer:)`
-(zastaví nákupný CSV, rozpočet aj ponuku; VEPO nie) a `Validation` (RED `newer_config`). `compute()` kľúč ignoruje.
+**`newer_configs` (KOV-H1, R-12 exportná brána; rozšírené GHOST-D1):** aditívny zoznam objektov, ktorých uložený `config_schema` je **vyšší** než kontrakt tejto verzie. Vzniklo
+z auditu #15 BLOCKER 3: R-12 chránil len **prestavbu**, takže staršia verzia pluginu zákazku zo schémy 3 normálne **vyexportovala** — len bez toho, čomu nerozumie, a objednávka
+aj cena boli neúplné bez slova.
+
+**Záznam nesie DRUH:** `{ 'kind' => 'cabinet' | 'board', 'id' => … }`. Zapisuje ho jediný helper `Bom.note_newer_config` (idempotentný, prázdne ID ignoruje) pre **skrinku**
+(`CabinetBuilder.newer_config?` proti `CabinetBuilder::CONFIG_SCHEMA`) aj pre **dosku** (`BoardBuilder.newer_config?` proti `BoardBuilder::BOARD_CONFIG_SCHEMA` — dva **nezávislé**
+kontrakty, čísla sa navzájom neporovnávajú). Doska sa priznáva **ešte pred filtrom `manufactured: true`**: tomu poľu už nemusíme rozumieť a tiché vynechanie budúceho výrobného
+poľa je presne to, čomu brána zabraňuje. **Legacy tvar (holý String) sa ďalej číta ako skrinka**, takže staršie volania a headless testy sa nemenia
+(`Validation.newer_config_entry` je jediný normalizátor).
+
+**Blocker NESMIE zaniknúť spolu s ID (Codex #298 P1).** `note_newer_config` prázdne ID ignoruje, lenže entita s poškodenou identitou **ďalej prispieva známymi poľami do
+`records`** — bez adresy by teda blocker vypadol a VEPO aj ostatné výstupy by pokračovali s ticho orezaným novším configom. Adresu preto skladá **`Bom.newer_address(inst, id)`**,
+ktoré vracia **dvojicu `[id_do_hlášky, pid]`**: výrobné ID je prvou voľbou, a keď chýba, použije sa **stabilná adresa entity** — `persistent_id` (prežije save/reopen), fallback
+`entityID` (`Bom.entity_pid`) — v ľudskom tvare **„bez ID (pid 12345)"**, takže Kontrola aj hláška brány povedia, čo v modeli hľadať. Platí pre **dosku aj skrinku** (tá istá
+trieda chyby).
+
+**PID sa nesie aj ŠTRUKTUROVANE, nie len v texte (Codex #298 kolo 2).** Záznam má `owner_pid` (a nesie ho **vždy**, aj keď ID existuje — pri dvoch objektoch so zdieľaným ID je
+to jediný údaj, ktorým sa dá povedať, ktorý z nich to je; ten istý vzor ako `owner_pid` v KOV-A1). `Validation.newer_config_entry` preto vracia trojicu `[kind, id, owner_pid]`
+a nález ho ďalej podáva klik-resolveru. Bez toho by `ProductionCore.pids_for_problem` hľadal entitu so **stored ID rovným ľudskému reťazcu** — nenašiel by nič a klik na RED
+riadok by vždy skončil hláškou „zoznam sa medzitým zmenil". Resolver má preto pre `CAT_NEWER_CFG` vlastnú vetvu (**`newer_config_entity`**): nájde **top-level** NOXUN kus podľa
+`persistent_id` a druh proti ID **neoveruje** (objekt z novšej verzie ho nemusí mať čitateľné). Legacy záznam bez `owner_pid` sa ďalej hľadá podľa ID.
+
+Čitatelia: `ProductionCore.export_blockers(newer:)` — hlási „Skrinka CAB-001, Doska BRD-002" (`newer_ids_text`, ten istý strop „tri + a ďalšie N") a **zastaví VEPO, nákupný CSV,
+rozpočet aj ponuku** — a `Validation` (RED `newer_config`, hláška menuje **úplný** zoznam dotknutých výstupov vrátane kusovníka, ktorý je nad takým objektom neúplný, aj keď sa
+ďalej zobrazuje). `compute()` kľúč ignoruje.
 
 ### sheet_estimate.rb
 

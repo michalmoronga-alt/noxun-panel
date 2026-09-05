@@ -17,6 +17,56 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **GHOST-D1 — GHOST PRE DOSKY: ZÁKLAD (v0.9.27, 5.9.2026):** doska sa od tejto dávky kladie **klikom** ako skrinka. „Vložiť dosku" už nevkladá synchrónne na
+  `Placement.next_x` — pripraví **zmrazený `BoardPlan`** a zavesí ghost na kurzor; `BoardBuilder.build` ostáva len programatickým volajúcim (testy, in-SU, nástroje).
+  Package (`SYSTEM/PLAN.md`, blok 4) je výsledkom **4 kôl Codex CLI auditu** (Sol + Astra, kolo 4 SOUND) a outside-in packetu s probe v SU 26.0.429.
+  **Šev je rovnako silný ako R-03:** `prepare_insert` nič nemutuje (žiadne ID, entita ani krok Späť, a **`ensure_root!` sa v ňom NEVOLÁ** — ghost hover nesmie zatvárať
+  otvorený komponent), `commit_insert(model, plan, transform:, orientation:)` odmietne cudzí dokument, zlý typ plánu, otvorený edit kontext aj nerigidnú maticu a transformáciu
+  **snapshotuje raz**.
+  **Zmrazený plán = aj VÝROBNÝ snapshot (Astra/Sol audit).** Dnešný `board_config` číta katalóg **pri zápise** a pri dupláku uprednostní **aktuálny** zdroj — zmena katalógu
+  medzi prípravou a klikom by teda ticho zmenila výrobný záznam dosky. Plán preto nesie hotový zápisový tvar a commit katalóg **už nečíta**; config ide z plánu **až na entitu**.
+  **Orientácia ide do commitu samostatným argumentom:** `stojaca` a `na_stenu` vedome zdieľajú maticu (STANDARD §8.3), takže z transformácie sa odvodiť **nedá** — hodnotu
+  nesie session (mení ju ↑/↓) a skladá sa **nad** polohou ghostu.
+  **„Jeden používateľský krok Späť", nie „jedna operácia" (Astra BLOCKER).** Vytváracia operácia + **existujúci transparentný scale-lock follow-up** (DC pasca D-40 — presun do
+  vytváracej operácie by vypol selection eventy, vynechanie by uvoľnilo scale úchopy) bežia pod **spoločným `ScaleWatch.guard`**; follow-up sa nikdy neabortuje. Pred
+  `begin_commit!` beží **bariéra `ScaleWatch.flush_pending!`**: pri `false` vracia šev **explicitný `:blocked`** — session ostáva v stave umiestňovania (nikdy nekončí falošne
+  `:committed`) a nevzniká žiadne ID, geometria, krok Späť ani pečiatka. Bez nej by čakajúca kópia/scale dobehla **po** vklade a Redo by vrátilo niečo iné.
+  **`GhostTool` dostal SUBJEKT a INTERAKCIU** (`:cabinet | :board` × `:placement`; D2 pridá `:drawing`) — sú **explicitné**, nie odvodené z tvaru plánu, a riadia obálku, kotvy,
+  klávesy, payload pásika aj šev commitu. **Pamäť je kľúčovaná dvojicou `[subjekt, interakcia]`**: doska si pamätá len rotáciu a kotvu, **orientácia v pamäti nežije** a každá
+  nová session ju číta z **karty**. Kotvy sú **dátová tabuľka** (3 orientácie × 4 kotvy, ID a poradie ALT cyklu zhodné so skrinkou) — headless dôkaz meria **commitnutú
+  geometriu proti kliknutému bodu**, nie helper proti helperu. Doska sa prichytáva **plne v XYZ** (žiadny Z-zámok z pamäte skrinky — inak by roh hornej skrinky skončil na
+  zamknutej výške); v prázdnom modeli sadne na rovinu Z = 0 cez ten istý guardovaný priesečník lúča.
+  **Doska dostala vlastný kontrakt configu `BOARD_CONFIG_SCHEMA`** (nezávislý od kabinetového; čísla sa neporovnávajú). Marker píše **každý** zapisovateľ vrátane **seedu
+  doskových šablón** a `TemplateStore.upsert` — a zápis **bez markera sa odmieta**, nie tvári ako „legacy" (Codex #296 kolo 5). Knižnica šablón preto ide na `std` 4
+  s migráciou, ktorá existujúcim doskám dopíše `1` a **explicitnú hodnotu nechá tak**. Bránu majú **všetky** cesty, kde sa číta uložený config: prestavba (**nad RAW configom
+  PRED `normalize`** — inak by whitelist marker aj neznáme polia zahodil), zmena orientácie, vloženie zo šablóny (autorita = uložený RAW záznam, nie payload z CEF) a dávka
+  **„Nahradiť UNI…"**, kde doska ide do `blocked` plánu, takže sa odmietne **celá** náhrada (all-or-nothing — žiadny čiastočne migrovaný projekt).
+  **Výrobná brána sa tým rozšírila** (Codex #296 kolo 3/4): `newer_configs` už nie sú len skrinky — záznam nesie `kind`, hlášky menujú „Skrinka/Doska &lt;id&gt;" + úplný zoznam
+  dotknutých výstupov, doska sa priznáva **ešte pred filtrom `manufactured`** a **VEPO už výnimku nemá** (objekt z novšej verzie môže niesť výrobné pole, ktoré tento plugin
+  nevidí, takže aj rezací výstup by bol ticho neúplný). Brána beží **pred** výberom priečinka — picker sa pri blokáde ani neotvorí.
+  **UI:** pásik ghostu pri doske **skryje** kabinetové ovládače výšky a na ich mieste — v tom istom riadku — ukáže **umiestnenie**; `ghost_lock_z` sa z JS pre dosku
+  neposiela a server ho odmieta **kontrolou subjektu session** (HTML `disabled` nie je ochrana). Karta Dosky sa po ↑/↓ synchronizuje **bez materializácie a bez resetu**.
+  **Testy:** +47 headless (`test_ghost_d1_dosky.rb`, spolu 2842), nové JS sady `test_ghost_d1_pasik.js` a `test_ghost_d1_karta.js`, in-SU sekcie `run_ghost_d1` (11 scenárov)
+  a `run_ghost_d1_async`; prepísaný charakterizačný test „iné spôsoby vkladania" (doska už session neruší — **nahrádza ju svojou**). 10 mutácií, všetky chytené.
+  **Review kolo 1 (Codex #298, in-SU beh 1684 PASS / 4 FAIL) — čo sa doučilo:**
+  (1) **Zápisová brána si musí odchytiť aj vlastné fixtury.** Nový guard „doskový `upsert` bez markera sa odmietne" zhodil sekciu ŠT-3c-1, lebo jej fixture marker nemala.
+  Odteraz to stráži **grep test nad celým repom** — žiadny `upsert('board', …)` v `noxun_engine/` ani `tests/` nesmie byť bez markera.
+  (2) **Blocker nesmie zaniknúť spolu s ID.** Doska s vyššou schémou, ale poškodenou identitou, sa do `newer_configs` nedostala (prázdne ID sa ignoruje), pritom do `records`
+  ďalej prispievala — výstupy by pokračovali s ticho orezaným configom. `Bom.newer_address` dáva takému záznamu **stabilnú adresu entity** („bez ID (pid N)").
+  (3) **Guard patrí na vstup, nie pred prestavbu.** Karta dosky mení pred rebuildom **globálny katalóg** (`ensure_duplak_for`, `ensure_missing_abs`) — nevratne. Guard sa
+  presunul do `guarded_board`, teda pred prvý zápis kamkoľvek.
+  (4) **Sľub v STANDARDe treba aj implementovať:** read-only karta dosky z novšej verzie existovala len na papieri; teraz ju nesie serverový `newer_config` + text.
+  **Kolo 2 (1× P2):** blocker síce prežil bez ID, ale PID žil len v **texte** hlášky — klik na RED riadok Kontroly potom hľadal entitu so stored ID rovným reťazcu „bez ID (pid N)"
+  a vždy skončil na „zoznam sa medzitým zmenil". Adresa sa preto nesie aj **štruktúrovane** (`owner_pid` v zázname aj v náleze) a klik-resolver má pre `newer_config` vlastnú vetvu
+  podľa `persistent_id`. **Poučenie:** keď sa identifikátor dostane do hlášky, ešte to neznamená, že sa dostal do **dát** — čokoľvek, na čo sa dá kliknúť, potrebuje adresu, nie vetu.
+  **Dva in-SU FAILy boli v TESTE, nie v produkte** (obe hypotézy o bariére sa nepotvrdili): `ScaleWatch.pending?` sa meralo **až po vložení**, kde observeru legitímne zakladá
+  prácu post-commit refresh panela (`push_selected` → `request_dedup`) — sonda teraz meria vstup do `commit_insert`, teda medzi úspešným `flush_pending!` a vytváracou operáciou.
+  A medzi Späť a Znova sa nesmie zmestiť debounce tik: upratovanie ghost zón (`prune_ghosts`) otvára operáciu **bezpodmienečne** a každý commit zahodí redo stack — platí to pri
+  zmazaní **hocijakej** NOXUN entity, nie len dosky.
+  **Beh 2 pridal tretiu lekciu — aj sonda je kód.** Nová sonda bariéry hlásila „observer nie je v pokoji", ale merala `nil`: blok `define_method` sa vyhodnocuje v lexikálnom rámci
+  **`su_runner.rb`**, takže holá konštanta `ScaleWatch` sa v ňom nerozloží a `defined?` vráti nil — assercia `== false` potom padne bez ohľadu na skutočný stav. Modul sa zachytáva
+  do lokálnej premennej a assercie vypisujú **nameranú hodnotu**. Kontrakt poradia (medzi bariérou a operáciou nič observer nenaarmuje) má odvtedy **headless dôkaz**, nie iba in-SU.
+
 - **KOV-B3 — EDITOR SETU: KLASIFIKÁCIA, ČLENOVIA, ŽIVÝ NÁHĽAD (v0.9.26, 4.9.2026, PR #297):** posledný rez slice B; **KOVANIE slice B je KOMPLET a R-41 je uzavretá**.
   Inline editor setu (`HWS_EDIT` + `hwsEditorNode` + akcia `hws-save`) **zanikol** a s ním celá cesta, na ktorej R-41 stála: draft žil v tele sekcie, prežíval každý push
   a pri uložení posielal **čerstvú revíziu z posledného payloadu** — keď druhé okno medzitým ten istý set zmenilo, staré polia odišli s NOVOU revíziou a serverový CAS ich

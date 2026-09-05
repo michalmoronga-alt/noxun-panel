@@ -98,8 +98,11 @@ module Noxun
             # ADITIVNYM klucom; branu drzi `ProductionCore.export_blockers`
             # (nakupny CSV + rozpocet + ponuka; VEPO nie) a Kontrola RED riadok.
             # `compute()` kluc — ako ostatne aditivne — IGNORUJE.
-            newer_configs << cid if !cid.empty? && !newer_configs.include?(cid) &&
-                                    defined?(CabinetBuilder) && CabinetBuilder.newer_config?(ccfg)
+            # GHOST-D1: zaznam nesie DRUH — od dosky s vlastnym markerom
+            # (`BoardBuilder::BOARD_CONFIG_SCHEMA`) uz `newer_configs` nie su
+            # len skrinky.
+            note_newer_config(newer_configs, 'cabinet', *newer_address(inst, cid)) if
+              defined?(CabinetBuilder) && CabinetBuilder.newer_config?(ccfg)
             Array(ccfg['hardware']).each { |h| hardware << h.merge('owner_id' => cid, 'owner_pid' => inst.persistent_id) }
             # KOV-H2: resolved cela pre popis vlastnika v povode nakupneho riadku.
             cabinet_fronts[cid] ||= (ccfg['front_items'].is_a?(Array) ? ccfg['front_items'] : [])
@@ -156,9 +159,15 @@ module Noxun
             # 1b-3: identita sa zbiera TIEZ pred filtrom manufactured — zdielane ID
             # je chyba identity aj vtedy, ked sa doska (docasne) nevyraba.
             add_identity(identities, 'board', Store.get(inst, 'id').to_s)
-            next unless Store.get(inst, 'manufactured') == true
             bcfg = Store.config(inst) || {}
             bid = Store.get(inst, 'id').to_s
+            # GHOST-D1 (fail-closed): doska z NOVSEJ verzie sa prizna EST PRED
+            # filtrom manufactured — tomu poľu uz nemusime rozumiet a tiche
+            # vynechanie budúceho vyrobneho pola je presne to, comu brana
+            # kompatibility zabranuje. Vetva nizsie skladá LEN zname polia.
+            note_newer_config(newer_configs, 'board', *newer_address(inst, bid)) if
+              defined?(BoardBuilder) && BoardBuilder.newer_config?(bcfg)
+            next unless Store.get(inst, 'manufactured') == true
             # 2A-3 (audit B2): warnings poslednej stavby DOSKY — doteraz sa
             # zbierali len z korpusov a warning vyberu ABS by sa pri samostatnej
             # doske stratil pred semaforom (config -> collect -> Validation.run).
@@ -191,6 +200,57 @@ module Noxun
           hardware_issues: hardware_issues, newer_configs: newer_configs,
           hardware_manual: hardware_manual, cabinet_fronts: cabinet_fronts,
           warnings: warnings, cabinets: cabinets, boards: boards }
+      end
+
+      # GHOST-D1: JEDEN zapisovac aditivneho kluca `newer_configs`. Zaznam je
+      # HASH s DRUHOM (`kind: 'cabinet' | 'board'`) a ID — konzumenti
+      # (`Validation.check_newer_configs`, `ProductionCore.export_blockers`)
+      # z neho vedia povedat „Skrinka CAB-001" vs. „Doska BRD-002". Starsi
+      # tvar (holy String = skrinka) citaju obaja dalej, takze legacy volania
+      # a headless testy sa nemenia. CISTA funkcia (ziadny SketchUp objekt).
+      # `pid` (Codex #298 kolo 2 P2): STRUKTUROVANA adresa entity. Bez nej by
+      # PID zil len v zobrazovacom retazci („bez ID (pid N)") a resolver kliku
+      # (`ProductionCore.pids_for_problem`) by ho nemal odkial vziat — hladal
+      # by entitu s ulozenym ID rovnym tomu retazcu, nenasiel by nic a klik na
+      # RED riadok Kontroly by vzdy hlasil „zoznam sa medzitym zmenil".
+      # Nesie sa VZDY (aj ked ID existuje) — pri dvoch objektoch so zdielanym
+      # ID je to jediny udaj, ktorym sa da povedat, KTORY z nich to je
+      # (rovnaky vzor ako `owner_pid` v KOV-A1).
+      def note_newer_config(list, kind, id, pid = nil)
+        s = id.to_s
+        return list if s.empty?
+        return list if list.any? { |e| e.is_a?(Hash) && e['kind'] == kind && e['id'] == s }
+
+        rec = { 'kind' => kind, 'id' => s }
+        rec['owner_pid'] = pid if pid.is_a?(Integer) && pid.positive?
+        list << rec
+        list
+      end
+
+      # GHOST-D1 (Codex #298 P1): ADRESA objektu z novsej verzie do `newer_configs`.
+      # Vyrobne ID je prvou volbou, ale blocker sa NESMIE stratit, ked ID chyba
+      # alebo je poskodene — entita totiz DALEJ prispieva znamymi polami do
+      # `records`, takze by VEPO a ostatne vystupy pokracovali s TICHO orezanym
+      # novsim configom (presne to, comu ma brana zabranit). Bez ID sa preto
+      # pouzije STABILNA adresa entity: `persistent_id` (prezije save/reopen),
+      # fallback `entityID`. Text je citatelny aj pre cloveka — „Doska bez ID
+      # (pid 12345)" v Kontrole aj v hlaske brany povie, co treba v modeli hladat.
+      # Vracia DVOJICU `[id_do_hlasky, pid]` — retazec je pre cloveka, `pid` je
+      # STRUKTUROVANA adresa pre resolver kliku (Codex #298 kolo 2 P2).
+      def newer_address(inst, id)
+        pid = entity_pid(inst)
+        s = id.to_s.strip
+        return [s, pid] unless s.empty?
+
+        ["bez ID (pid #{pid || '?'})", pid]
+      end
+
+      # `persistent_id` prezije save/reopen, `entityID` je fallback pre starsie
+      # API a headless fakes. Nepouzitelnu hodnotu vracia ako nil.
+      def entity_pid(inst)
+        v = (inst.persistent_id if inst.respond_to?(:persistent_id)) rescue nil
+        v = (inst.entityID if inst.respond_to?(:entityID)) rescue nil unless v.is_a?(Integer)
+        v.is_a?(Integer) && v.positive? ? v : nil
       end
 
       # KOV-H1: ad-hoc polozky JEDNEJ skrinky, obohatene o adresu vlastnika.

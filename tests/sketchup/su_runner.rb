@@ -2992,6 +2992,428 @@ module NoxunSuRunner
     end]
   end
 
+  # =========================================================================
+  # GHOST-D1 — DOSKA NA KURZORE (vkladanie dosky ide cez ghost)
+  #
+  # Headless sada dokaze tabulku kotiev, stavovy automat aj brany schemy nad
+  # CISTYMI datami. Tu sa meria to, co bez SketchUpu dokazat NEDA:
+  #   * prichytenie na REALNU geometriu (aj na ZVYSENY roh skrinky) — doska
+  #     sa kladie plne v XYZ, ziadny zamok vysky,
+  #   * ze kotva COMMITNUTEJ geometrie sadla presne na kliknuty bod,
+  #   * ze vlozenie je JEDEN pouzivatelsky krok Spat a Redo ho vrati,
+  #   * ze Esc / onCancel(2) / vymena dokumentu nezanechaju ziadnu stopu
+  #     (ani krok Spat, ani peciatku sablony),
+  #   * ze ghost SKRINKY ostal nezmeneny (pamat sa nepomiesa).
+  # =========================================================================
+
+  BOARD_GHOST_MAT = 'K009_PW_DTDL_18'
+  BOARD_GHOST_PARAMS = { 'material_id' => BOARD_GHOST_MAT, 'length' => 700.0,
+                         'width' => 500.0, 'orientation' => 'leziaca',
+                         'name' => 'GHOST-D1 doska' }.freeze
+  BOARD_GHOST_TPL = 'Zástena' # doskova sablona zo seedu (peciatka „naposledy pouzite")
+
+  # „Vlozit dosku" presne ako panel (vratane R-02 identity dokumentu).
+  def board_ghost_start!(model, params = nil)
+    e::Panel.handle_insert_board(pg(model, (params || BOARD_GHOST_PARAMS).dup))
+    ghost_session
+  end
+
+  # „Vlozit dosku" + synteticky klik na 3D bod. Vracia novu instanciu (alebo nil).
+  def board_ghost_place!(model, params = nil, at_mm = [1400.0, 300.0, 0.0])
+    z = at_mm[2] || 0.0
+    return nil unless board_ghost_start!(model, params) && ghost_tool
+
+    ghost_camera!(model, at_mm, z)
+    ghost_click!(model, [at_mm[0], at_mm[1], z])
+    model.selection.to_a.find { |i| e::Store.kind(i) == 'board' }
+  end
+
+  # Kde vo SVETE lezi zvolena kotva UZ VLOZENEJ dosky. Pocita sa z REALNEJ
+  # transformacie instancie (nie z helpera, ktory polohu urcil) — orientacna
+  # matica sa odmocni, takze ostane cista poloha ghostu.
+  def board_anchor_world_mm(inst, anchor)
+    cfg = e::Store.config(inst) || {}
+    o = cfg['orientation'].to_s
+    a = e::GhostTool::Calc.board_anchor_point(cfg, o, anchor)
+    om = e::BoardBuilder.orientation_matrix(o, cfg['thickness'].to_f)
+    p = inst.transformation * om.inverse * e::Units.point(a[0], a[1], a[2])
+    [mm(p.x), mm(p.y), mm(p.z)]
+  end
+
+  # Sadla kotva PRESNE na bod, ktory si ghost vzal z inference? (vsetky 3 osi —
+  # doska nema zamknute Z)
+  def board_anchor_on_used?(inst, anchor)
+    u = ghost_used
+    return false if u.nil? || inst.nil? || !inst.valid?
+
+    w = board_anchor_world_mm(inst, anchor)
+    (0..2).all? { |i| (w[i] - u[i]).abs <= TOL }
+  end
+
+  def board_tpl_seq
+    e::TemplateUsage.seq_for('board', BOARD_GHOST_TPL)
+  rescue StandardError
+    nil
+  end
+
+  def run_ghost_d1(model)
+    cleanup(model)
+    e::GhostTool.reset_memory!
+    markers = []
+    alt_key = defined?(VK_MENU) ? VK_MENU : VK_ALT
+
+    # --- 1) PRED KLIKOM: ziadna entita, ziadne ID, ziadny krok Spat ---------
+    m1 = r03_marker(model, markers)
+    s = board_ghost_start!(model)
+    ok('GHOST-D1 1: „Vložiť dosku“ nevložilo NIC — doska visí na kurzore',
+       !s.nil? && s.active? && boards(model).empty?)
+    ok('GHOST-D1 1: session je DOSKOVÁ a v režime umiestňovania',
+       !s.nil? && s.subject == :board && s.interaction == :placement)
+    ok('GHOST-D1 1: plán je ZMRAZENÝ, doskový a patrí TOMUTO dokumentu',
+       !s.nil? && s.plan.is_a?(e::BoardBuilder::BoardPlan) && s.plan.for_model?(model) &&
+       s.plan.config.frozen? && s.plan.stored_config.frozen?)
+    ok('GHOST-D1 1: doska sa prichytáva plne v XYZ (žiadny zámok výšky)',
+       !s.nil? && s.z_mode == :free)
+    ok('GHOST-D1 1: nástroj je aktívny (push_tool, nie select_tool)',
+       !ghost_tool.nil? && ghost_tool.attached?)
+    ghost_teardown!(model)
+    Sketchup.undo
+    ok('GHOST-D1 1: celý cyklus bez kliku nezaložil ŽIADEN krok Späť (1x Späť vrátil marker)',
+       !m1.valid?)
+    ok('GHOST-D1 1: a v modeli nepribudla žiadna doska', boards(model).empty?)
+
+    # --- 2) PRICHYTENIE NA ZVYSENY ROH SKRINKY (plne XYZ) -------------------
+    cleanup(model)
+    cab = e::CabinetBuilder.build(model, GHOST_PARAMS.dup)
+    cb = cab.bounds
+    corner = [mm(cb.max.x), mm(cb.min.y), mm(cb.max.z)] # pravý predný HORNÝ roh
+    b2 = board_ghost_place!(model, nil, corner)
+    ok("GHOST-D1 2: doska sa prichytila na ZVÝŠENÝ roh skrinky (Z = #{ghost_used && ghost_used[2].round(1)})",
+       !b2.nil? && !ghost_used.nil? && ghost_used[2] > 100.0 &&
+       (0..2).all? { |i| (ghost_used[i] - corner[i]).abs <= GHOST_PIX_TOL })
+    ok('GHOST-D1 2: kotva COMMITNUTEJ dosky sadla PRESNE na ten bod (všetky tri osi)',
+       board_anchor_on_used?(b2, :fl_bottom))
+    ok('GHOST-D1 2: doska je TOP-LEVEL a je OZNAČENÁ',
+       !b2.nil? && b2.parent.is_a?(Sketchup::Model) && model.selection.to_a.include?(b2))
+    ghost_teardown!(model)
+
+    # --- 3) ↑ MENI UMIESTNENIE a ULOZENY CONFIG ho nesie --------------------
+    cleanup(model)
+    s3 = board_ghost_start!(model)
+    ghost_camera!(model, [1400.0, 300.0], 0.0)
+    ghost_move!(model, [1400.0, 300.0, 0.0])
+    ok('GHOST-D1 3: ↑/↓ sú VLASTNENÉ klávesy (Tool ich pohltí)',
+       ghost_key!(model, VK_UP) == true && ghost_key!(model, VK_DOWN) == true)
+    ghost_key!(model, VK_UP)
+    ok("GHOST-D1 3: ↑ prepla umiestnenie na „nastojato“ (#{s3.orientation})",
+       s3.orientation == 'stojaca')
+    pay = e::GhostTool.state_payload(s3)
+    ok('GHOST-D1 3: pásik nesie subjekt aj umiestnenie (karta ho z pushu ukáže)',
+       pay['subject'] == 'board' && pay['orientation'] == 'stojaca' &&
+       pay['orientation_label'].to_s == 'Nastojato')
+    ok('GHOST-D1 3: obálka ghostu sa prepočítala (výška = šírka dosky)',
+       (s3.corners_mm.map { |p| p[2] }.max - 500.0).abs <= TOL)
+    ghost_click!(model, [1400.0, 300.0, 0.0])
+    b3 = boards(model).first
+    cfg3 = b3 ? (e::Store.config(b3) || {}) : {}
+    ok('GHOST-D1 3: ULOŽENÝ config nesie orientáciu zo session', cfg3['orientation'] == 'stojaca')
+    ok('GHOST-D1 3: inštancia naozaj stojí (dekorová plocha mieri dopredu, -Y)',
+       !b3.nil? && vec_near?(b3.transformation.zaxis, 0, -1, 0))
+    ok('GHOST-D1 3: geometria DEFINÍCIE ostala ležiaca (otočila sa INŠTANCIA)',
+       !b3.nil? && (mm(b3.definition.bounds.depth) - 18.0).abs <= TOL)
+    ok('GHOST-D1 3: marker kontraktu configu je zapísaný',
+       cfg3['config_schema'] == e::BoardBuilder::BOARD_CONFIG_SCHEMA)
+    ghost_teardown!(model)
+
+    # --- 4) ROTACIA a ALT KOTVA: kotva ostava na kliknutom bode -------------
+    cleanup(model)
+    s4 = board_ghost_start!(model)
+    ghost_camera!(model, [1400.0, 300.0], 0.0)
+    ghost_move!(model, [1400.0, 300.0, 0.0])
+    ok('GHOST-D1 4: Alt je VLASTNENÝ a cykluje kotvy',
+       ghost_key!(model, alt_key) == true && s4.anchor == :fr_bottom)
+    ok('GHOST-D1 4: ←/→ otáčajú o 90°',
+       ghost_key!(model, VK_RIGHT) == true && s4.rotation_index == 1)
+    ghost_click!(model, [1400.0, 300.0, 0.0])
+    b4 = boards(model).first
+    ok('GHOST-D1 4: AKTÍVNA kotva (pravá dolná) sadla presne na kliknutý bod aj po otočení',
+       board_anchor_on_used?(b4, :fr_bottom))
+    ok('GHOST-D1 4: otočenie o 90° prežilo vklad',
+       !b4.nil? && vec_near?(b4.transformation.xaxis, 0, 1, 0))
+    ghost_teardown!(model)
+
+    # --- 5) ESC: model nezmeneny, 0 krokov Spat, sablona NEOPECIATKOVANA ----
+    cleanup(model)
+    seq_before = board_tpl_seq
+    m5 = r03_marker(model, markers)
+    board_ghost_start!(model, BOARD_GHOST_PARAMS.merge('template_kind' => 'board',
+                                                       'template_name' => BOARD_GHOST_TPL))
+    ghost_camera!(model, [1400.0, 300.0], 0.0)
+    ghost_move!(model, [1400.0, 300.0, 0.0])
+    ghost_tool.onCancel(0, model.active_view) # reason 0 = Esc
+    ok('GHOST-D1 5: Esc zrušil session a model ostal NEZMENENÝ',
+       ghost_session.nil? && boards(model).empty?)
+    ok('GHOST-D1 5: šablóna NEOPEČIATKOVANÁ (poradie „naposledy použité“ sa nezmenilo)',
+       board_tpl_seq == seq_before)
+    Sketchup.undo
+    ok('GHOST-D1 5: Esc nezaložil ŽIADEN krok Späť (1x Späť vrátil marker)', !m5.valid?)
+    ghost_teardown!(model)
+
+    # --- 6) VLOZENIE = 1 krok Spat + REDO + kusovnik + PECIATKA -------------
+    cleanup(model)
+    seq6 = board_tpl_seq
+    b6 = board_ghost_place!(model, BOARD_GHOST_PARAMS.merge('template_kind' => 'board',
+                                                            'template_name' => BOARD_GHOST_TPL),
+                            [1400.0, 300.0, 0.0])
+    ok('GHOST-D1 6: klik položil PRESNE JEDNU dosku', boards(model).length == 1 && !b6.nil?)
+    rows = bom_rows(model)
+    ok("GHOST-D1 6: kusovník má dosku (#{rows.length} riadkov)",
+       rows.any? { |r| (r['length'].to_f - 700.0).abs <= TOL && (r['width'].to_f - 500.0).abs <= TOL })
+    ok('GHOST-D1 6: šablóna sa opečiatkovala AŽ PO úspešnom vložení',
+       seq6.nil? || board_tpl_seq.to_i > seq6.to_i)
+    # POZOR: Späť a Znova musia ostať TESNE ZA SEBOU. Zmazanie dosky založí
+    # observeru prácu (`notify_erase`) a jeho upratovanie ghost zón otvára
+    # operáciu BEZPODMIENEČNE (`ScaleWatch.prune_ghosts`) — commit zahodí redo
+    # stack SketchUpu. Akékoľvek čakanie medzi týmito dvomi riadkami scenár
+    # rozbije (a nie je to chyba vkladu — platí pri každej NOXUN entite).
+    Sketchup.undo
+    ok('GHOST-D1 6: 1x Späť vrátil CELÝ vklad (jeden používateľský krok)',
+       boards(model).empty?)
+    if Sketchup.respond_to?(:redo)
+      Sketchup.redo
+      ok('GHOST-D1 6: Redo vrátilo dosku späť (undo stack je čistý)', boards(model).length == 1)
+    else
+      info('GHOST-D1 6: Sketchup.redo nedostupné — Redo vetva sa overuje v ASYNC časti')
+    end
+    ghost_teardown!(model)
+
+    # --- 7) CHARAKTERIZACIA skrinka -> doska -> skrinka (pamat per subjekt) --
+    cleanup(model)
+    e::GhostTool.reset_memory!
+    e::Panel.handle_insert(pg(model, GHOST_PARAMS.dup))
+    cs = ghost_session
+    ghost_camera!(model, [1000.0, 200.0], 0.0)
+    ghost_move!(model, [1000.0, 200.0, 0.0])
+    ghost_key!(model, VK_RIGHT)
+    ghost_key!(model, alt_key)
+    cab_rot = cs.rotation_index
+    cab_anchor = cs.anchor
+    cab_mode = cs.z_mode
+    e::GhostTool.cancel_session('SU-TEST prepnutie subjektu', deferred: false)
+    bs = board_ghost_start!(model)
+    ok('GHOST-D1 7: doska má VLASTNÚ pamäť — štartuje na továrenských hodnotách',
+       !bs.nil? && bs.rotation_index.zero? && bs.anchor == :fl_bottom)
+    ghost_camera!(model, [1400.0, 300.0], 0.0)
+    ghost_move!(model, [1400.0, 300.0, 0.0])
+    ghost_key!(model, VK_LEFT)
+    board_rot = bs.rotation_index
+    e::GhostTool.cancel_session('SU-TEST prepnutie subjektu', deferred: false)
+    e::Panel.handle_insert(pg(model, GHOST_PARAMS.dup))
+    cs2 = ghost_session
+    ok('GHOST-D1 7: skrinka si pamätá SVOJU rotáciu, kotvu aj režim výšky (doska ich neprepísala)',
+       !cs2.nil? && cs2.rotation_index == cab_rot && cs2.anchor == cab_anchor &&
+       cs2.z_mode == cab_mode)
+    e::GhostTool.cancel_session('SU-TEST prepnutie subjektu', deferred: false)
+    bs2 = board_ghost_start!(model)
+    ok('GHOST-D1 7: a doska si pamätá svoju', !bs2.nil? && bs2.rotation_index == board_rot)
+    ghost_teardown!(model)
+
+    # --- 8) `ghost_lock_z` je pre dosku ODMIETNUTY (kontrola SUBJEKTU) ------
+    cleanup(model)
+    s8 = board_ghost_start!(model)
+    e::Panel.handle_ghost_lock_z(pg(model, 'lock_z' => 1400.0))
+    ok('GHOST-D1 8: `ghost_lock_z` pre dosku ODMIETNUTÝ — rovina ani režim sa nezmenili',
+       !s8.nil? && s8.active? && s8.z_mode == :free && s8.lock_plane_z.abs <= TOL)
+    ghost_teardown!(model)
+
+    # --- 9) onCancel(2) = Undo POCAS nastroja -------------------------------
+    cleanup(model)
+    m9 = r03_marker(model, markers)
+    board_ghost_start!(model)
+    ghost_camera!(model, [1400.0, 300.0], 0.0)
+    ghost_move!(model, [1400.0, 300.0, 0.0])
+    ghost_tool.onCancel(2, model.active_view) # reason 2 = Undo pocas nastroja
+    ok('GHOST-D1 9: onCancel(2) zrušil session bez zápisu',
+       ghost_session.nil? && boards(model).empty?)
+    Sketchup.undo
+    ok('GHOST-D1 9: predchádzajúci krok sa vrátil bez stopy po ghoste', !m9.valid?)
+    ghost_teardown!(model)
+
+    # --- 10) VYMENA DOKUMENTU pocas session ---------------------------------
+    cleanup(model)
+    board_ghost_start!(model)
+    e::GhostTool.on_document_replaced('SU-TEST výmena dokumentu')
+    ok('GHOST-D1 10: výmena dokumentu zrušila session bez zápisu',
+       ghost_session.nil? && boards(model).empty?)
+    ghost_teardown!(model)
+
+    # --- 11) BRANA SCHEMY nad ZIVOU doskou (testovacia matica) --------------
+    cleanup(model)
+    b11 = e::BoardBuilder.build(model, BOARD_GHOST_PARAMS.dup)
+    cfg11 = e::Store.config(b11) || {}
+    ok('GHOST-D1 11: čerstvá doska nesie marker kontraktu configu',
+       cfg11['config_schema'] == e::BoardBuilder::BOARD_CONFIG_SCHEMA)
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST doska z novsej verzie', true)
+      e::Store.write(b11, { config: cfg11.merge('config_schema' => 99, 'buduce_pole' => 'X') })
+      model.commit_operation
+    end
+    err = nil
+    begin
+      e::BoardBuilder.rebuild(model, b11, { 'name' => 'PREPISANE' })
+    rescue StandardError => ex
+      err = ex
+    end
+    ok('GHOST-D1 11: prestavba dosky z NOVŠEJ verzie je ODMIETNUTÁ',
+       !err.nil? && err.message.include?('novšej verzie'))
+    ok('GHOST-D1 11: a model ostal NEDOTKNUTÝ (neznáme pole prežilo)',
+       (e::Store.config(b11) || {})['buduce_pole'] == 'X' &&
+       (e::Store.config(b11) || {})['name'] != 'PREPISANE')
+    e::Panel.select_only(model, b11)
+    e::Panel.handle_set_board_orientation(pg(model, 'board_id' => e::Store.get(b11, 'id').to_s,
+                                                    'orientation' => 'stojaca'))
+    ok('GHOST-D1 11: zmena orientácie z karty je ODMIETNUTÁ (žiadna tichá normalizácia)',
+       (e::Store.config(b11) || {})['orientation'] != 'stojaca')
+    col = e::Bom.collect(model)
+    nc = Array(col[:newer_configs])
+    ok("GHOST-D1 11: zber zaradil dosku do `newer_configs` s DRUHOM (#{nc.inspect})",
+       nc.any? { |x| x.is_a?(Hash) && x['kind'] == 'board' })
+    items = e::Validation.run(col, sheets: {})['items']
+    hit = items.find { |i| i['category'] == e::Validation::CAT_NEWER_CFG }
+    ok("GHOST-D1 11: KONTROLA hlási RED nález „Doska …“ (#{hit && hit['message_sk'].to_s[0, 40]})",
+       !hit.nil? && hit['severity'] == 'red' && hit['message_sk'].to_s.start_with?('Doska '))
+    stop = e::ProductionCore.newer_config_stop(col)
+    ok('GHOST-D1 11: brána exportov ju zastaví (vrátane VEPO) a menuje ju ako Dosku',
+       !stop.nil? && stop.include?('Doska '))
+    cleanup(model)
+    r03_clear_markers(model, markers)
+    e::GhostTool.reset_memory!
+  end
+
+  # GHOST-D1 ASYNC: vlozenie dosky POCAS cakajucej prace observera. Bez bariery
+  # `flush_pending!` by odlozeny tik dobehol AZ PO vytvaracej operacii a jeho
+  # TRANSPARENTNA reakcia by sa na nu prilepila — Redo by potom vratilo nieco
+  # ine, nez pouzivatel vratil. Vzor: `run_ghost_async` + `run_tools1_async`.
+  # SONDA BARIERY (oprava po in-SU behu #298): `ScaleWatch.pending?` sa NESMIE
+  # merat AZ PO vlozeni — post-commit refresh panela (`ghost_after_commit_board`
+  # -> `push_selected` -> `ScaleWatch.request_dedup`, sync.rb:237) observeru
+  # LEGITIMNE zalozi novu poziadavku, takze by fronta bola neprazdna aj pri
+  # dokonale funkcnej bariere. Meria sa preto PRESNE ten okamih, na ktorom
+  # zalezi: vstup do `BoardBuilder.commit_insert`. Tam sa nastroj dostane LEN
+  # ked `flush_pending!` vratil true (`commit!` inak vracia `:blocked`) a este
+  # PRED otvorenim vytvaracej operacie.
+  #
+  # OPRAVA PO BEHU 2: prva verzia sondy citala HOLU konstantu `ScaleWatch`.
+  # Blok `define_method` sa vsak vyhodnocuje v LEXIKALNOM ramci TOHTO suboru
+  # (`NoxunSuRunner`), nie v `Noxun::Engine` — `defined?(ScaleWatch)` tam vrati
+  # nil a sonda zapisala nil namiesto true/false. Assercia `== false` potom
+  # padla BEZ OHLADU na skutocny stav observera (dokaz: `nil == false` je
+  # false). Modul sa preto zachyti DOPREDU do lokalnej premennej (`watch`),
+  # ktoru closure vidi vzdy — rovnako ako `probe`.
+  def board_barrier_probe!(state)
+    sc = e::BoardBuilder.singleton_class
+    watch = e::ScaleWatch # zachytene v closure — ziadne hladanie konstanty v bloku
+    sc.send(:alias_method, :commit_insert_gd1_orig, :commit_insert)
+    probe = ->(v) { state[:gd1_at_commit] = v }
+    sc.send(:define_method, :commit_insert) do |model, plan, transform:, orientation: nil|
+      probe.call(watch.pending?)
+      commit_insert_gd1_orig(model, plan, transform: transform, orientation: orientation)
+    end
+    yield
+  ensure
+    sc.send(:alias_method, :commit_insert, :commit_insert_gd1_orig)
+    sc.send(:remove_method, :commit_insert_gd1_orig)
+  end
+
+  def run_ghost_d1_async(model, state, steps)
+    # A) NATIVNY Move skrinky (observer NIE JE guardnuty) -> HNED vlozenie dosky
+    steps << [0.4, lambda do
+      cleanup(model)
+      ghost_teardown!(model)
+      inst = e::CabinetBuilder.build(model, GHOST_PARAMS.dup)
+      state[:gd1_cab] = inst
+      model.start_operation('SU-TEST nativny Move pred doskou', true)
+      inst.transformation = inst.transformation *
+                            Geom::Transformation.translation(e::Units.point(1500, 0, 0))
+      model.commit_operation
+      state[:gd1_pending] = e::ScaleWatch.pending?
+      board_barrier_probe!(state) do
+        state[:gd1_board] = board_ghost_place!(model, nil, [2600.0, 300.0, 0.0])
+      end
+    end]
+    steps << [SETTLE, lambda do
+      ok('async GHOST-D1: natívny Move naozaj založil observeru prácu (inak by test nič nemeral)',
+         state[:gd1_pending] == true)
+      ok('async GHOST-D1: bariéra dotiahla observer do POKOJA ešte PRED vytváracou operáciou ' \
+         "(pending? na vstupe do commit_insert = #{state[:gd1_at_commit].inspect})",
+         state[:gd1_at_commit] == false)
+      ok('async GHOST-D1: doska sa vložila a po ustálení je v modeli PRESNE JEDNA',
+         !state[:gd1_board].nil? && boards(model).length == 1)
+      ok('async GHOST-D1: identita dosky je jediná a stabilná (žiadna „kópia“)',
+         boards(model).map { |i| e::Store.get(i, 'id').to_s }.uniq.length == 1)
+      # Späť a Znova IHNEĎ ZA SEBOU — medzi ne sa NESMIE zmestiť debounce tik
+      # observera: zmazanie dosky mu cez `notify_erase` založí prácu a jeho
+      # upratovanie ghost zón otvára operáciu BEZPODMIENEČNE
+      # (`ScaleWatch.prune_ghosts`, scale_observer.rb:430) — každý commit
+      # zahodí redo stack SketchUpu. Nie je to chyba vkladu: rovnaké to je pri
+      # zmazaní hocijakej NOXUN entity. Sekcia `run_ghost_d1` (bod 6) meria to
+      # isté rovnako tesne.
+      state[:gd1_after_undo] = nil
+      Sketchup.undo
+      state[:gd1_after_undo] = [boards(model).length, cabinets(model).length]
+      state[:gd1_redo] = Sketchup.respond_to?(:redo)
+      Sketchup.redo if state[:gd1_redo]
+    end]
+    steps << [SETTLE, lambda do
+      ok('async GHOST-D1: 1x Späť vrátil CELÝ vklad dosky (nič sa naň neprilepilo) ' \
+         "a poloha skrinky z natívneho Move ostala (#{state[:gd1_after_undo].inspect})",
+         state[:gd1_after_undo] == [0, 1])
+      if state[:gd1_redo]
+        ok('async GHOST-D1: Redo vrátilo dosku späť a NIČ iné (undo stack je čistý)',
+           boards(model).length == 1 && cabinets(model).length == 1)
+      else
+        info('async GHOST-D1: Sketchup.redo nedostupné — Redo vetva netestovaná')
+      end
+      cleanup(model)
+      ghost_teardown!(model)
+    end]
+
+    # B) SCALE skrinky (cakajuca absorpcia) -> HNED vlozenie dosky
+    steps << [0.4, lambda do
+      cleanup(model)
+      ghost_teardown!(model)
+      inst = e::CabinetBuilder.build(model, GHOST_PARAMS.dup)
+      state[:gd1b_cab] = inst
+      model.start_operation('SU-TEST user scale pred doskou', true)
+      inst.transformation = inst.transformation * Geom::Transformation.scaling(ORIGIN, 1.5, 1.0, 1.0)
+      model.commit_operation
+      state[:gd1b_pending] = e::ScaleWatch.pending?
+      board_barrier_probe!(state) do
+        state[:gd1b_board] = board_ghost_place!(model, nil, [3200.0, 300.0, 0.0])
+      end
+      state[:gd1b_at_commit] = state[:gd1_at_commit]
+    end]
+    steps << [SETTLE, lambda do
+      cab = state[:gd1b_cab]
+      cfg = cab && cab.valid? ? (e::Store.config(cab) || {}) : {}
+      ok('async GHOST-D1: Scale naozaj založil observeru prácu', state[:gd1b_pending] == true)
+      ok("async GHOST-D1: bariéra absorbovala Scale PRED vložením (šírka #{cfg['width']})",
+         (cfg['width'].to_f - 900.0).abs < 0.01)
+      ok('async GHOST-D1: a observer bol v POKOJI ešte pred vytváracou operáciou ' \
+         "(pending? na vstupe do commit_insert = #{state[:gd1b_at_commit].inspect})",
+         state[:gd1b_at_commit] == false)
+      ok('async GHOST-D1: doska sa vložila a observer je po ustálení v pokoji',
+         !state[:gd1b_board].nil? && boards(model).length == 1 && e::ScaleWatch.pending? == false)
+      Sketchup.undo
+    end]
+    steps << [SETTLE, lambda do
+      ok('async GHOST-D1: 1x Späť vrátil LEN dosku — absorpcia Scale drží',
+         boards(model).empty? && cabinets(model).length == 1)
+      cleanup(model)
+      ghost_teardown!(model)
+    end]
+  end
+
   # --- SYNC-D45: hrubka <-> material tela (deadlock 18,6 mm) -----------------
   # Bloker z testovania: katalogovy material 18,6 mm sa nedal pouzit. Tu sa overuju
   # VSETKY tri cesty von + odmietnutia. Katalog: docasny testovaci dekor (18 + 18,6),
@@ -9746,8 +10168,12 @@ module NoxunSuRunner
     ok('ŠT-3c-1: fixture — korpusova sablona ulozena', cab_ok)
     # DOSKOVA sablona: dnes ju nevytvara ziadne UI, ale sklad ju pozna a sekcia
     # ju musi vediet ZMAZAT (audit N29 — prva sprava doskovych).
-    brd_ok = e::TemplateStore.upsert('board', ST3C_BRD, { 'width' => 2600.0, 'height' => 600.0,
-                                                         'thickness' => 38.0 })
+    # GHOST-D1: KAZDY zapisovatel doskovej sablony nesie marker kontraktu configu
+    # (`BOARD_CONFIG_SCHEMA`) — bez neho `upsert` zapis ODMIETNE (zaznam by inak
+    # vyzeral ako legacy seed a downgrade brana by ho uz nerozlisila).
+    brd_ok = e::TemplateStore.upsert('board', ST3C_BRD,
+                                     { 'width' => 2600.0, 'height' => 600.0, 'thickness' => 38.0,
+                                       'config_schema' => e::BoardBuilder::BOARD_CONFIG_SCHEMA })
     @st3c_created << ['board', ST3C_BRD] if brd_ok
     ok('ŠT-3c-1: fixture — doskova sablona ulozena', brd_ok)
 
@@ -14893,6 +15319,12 @@ module NoxunSuRunner
     # skrinkach = dedup cesta).
     run_ghost_async(model, state, steps)
 
+    # GHOST-D1: vlozenie DOSKY do debounce okna po nativnom Move aj po Scale —
+    # bariera `flush_pending!` musi observer dotiahnut do pokoja EST PRED
+    # vytvaracou operaciou, inak by sa jeho transparentna reakcia prilepila
+    # na vklad a Redo by vratilo nieco ine.
+    run_ghost_d1_async(model, state, steps)
+
     # D-52b: `close_all_dialogs` a BARIERA pred swapom — obe stoja na
     # `set_on_closed`, ktory CEF vola ASYNCHRONNE. Bezi az tu, aby sa scenar
     # nestretol s fake oknom sekcie STALE.
@@ -14997,6 +15429,7 @@ module NoxunSuRunner
     run_r14(model)           # 1d/R-14: verzia formatu dat rozpoctu — marker v TEJ ISTEJ operacii (1x Spat vrati oboje), odmietnutie novsej zakazky bez zapisu a bez kroku Spat, citanie a priznak v payloade
     run_dockey(model)        # 1d/R-02b: identita dokumentu — `valid?` probe, rotacia pri onOpenModel nad RECYKLOVANYM objektom, onActivateModel nerotuje, fail-closed
     run_ghost(model)         # GHOST V1-04: vkladanie na klik — 0 mutacii pred klikom, zamok/free vyska, rotacia a kotvy, degenerovany luc, undo/prepnutie/druhe „Vlozit", sablona a peciatka
+    run_ghost_d1(model)      # GHOST-D1: ghost pre DOSKY — prichytenie na zvyseny roh (plne XYZ), ↑ umiestnenie v ulozenom configu, ALT kotva na kliknutom bode, Esc/onCancel(2)/vymena dokumentu bez stopy, 1 krok Spat + Redo, pamat per subjekt, brana schemy dosky az po VEPO
     run_d45(model)           # D-45: hrubka <-> material tela (18,6 mm deadlock)
     run_d46(model)           # D-46: projektova predvolba korpusu s inou hrubkou (potvrdenie)
     # ŠT-2b bezi ESTE PRED sekciami 2A: `run_2a4` konci ROLLBACKOM katalogu na

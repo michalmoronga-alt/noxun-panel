@@ -36,6 +36,15 @@ module Noxun
       }.freeze
       Z_MODES = %i[locked free].freeze
 
+      # GHOST-D1: SUBJEKT session — CO visi na kurzore. Subjekt urcuje obalku,
+      # kotvy, klavesy aj sev commitu; klasicky tok skrinky sa NEMENI.
+      SUBJECTS = %i[cabinet board].freeze
+      # GHOST-D1: INTERAKCIA session — AKO sa subjekt kladie. Je to EXPLICITNY
+      # rozlisovac (nie hadanie podla pritomnosti fazy): `placement` = 1. klik
+      # commituje. GHOST-D2 pridá `drawing` (klik = pociatok, 3 fazy, VCB).
+      INTERACTIONS = %i[placement].freeze
+      DEFAULT_INTERACTION = :placement
+
       # GHOST-FB4: rozumny rozsah locknutej vysky (mm). Horna hranica je
       # „este nabytok" — nad 3 m uz nejde o skrinku, ale o preklep.
       LOCK_Z_MIN_MM = 0.0
@@ -69,8 +78,26 @@ module Noxun
         # Locknute vysky su per TYP skrinky ('lower' / 'upper'); PRVA session
         # daneho typu si default vezme z `plan.home_z` (dolna 0, horna
         # `UPPER_HANG_Z` = 1400) — hodnota sa nikde neduplikuje.
-        def memory
-          @memory ||= { anchor: ANCHORS.first, z_mode: :locked, rotation_index: 0, lock_z: {} }
+        #
+        # GHOST-D1: pamat je KLUCOVANA DVOJICOU [subjekt, interakcia]. Skrinka
+        # a doska maju odlisne ovladanie (doska nema rezim vysky, ma orientaciu)
+        # a buduce kreslenie dosky (D2) ma PEVNY pociatok, takze pamatana kotva
+        # placementu doň nesmie presiakuť. ORIENTACIA v pamati NEZIJE — kazda
+        # nova session ju cita z karty Dosky (karta ju nastavuje pri kazdej
+        # materializacii, aj zo sablony).
+        def memory(subject = :cabinet, interaction = DEFAULT_INTERACTION)
+          s = SUBJECTS.include?(subject) ? subject : :cabinet
+          i = INTERACTIONS.include?(interaction) ? interaction : DEFAULT_INTERACTION
+          store = (@memory ||= {})
+          store[[s, i]] ||= default_memory(s)
+        end
+
+        # Tovarenske hodnoty pamate per subjekt. Skrinka drzi aj rezim vysky
+        # a locknute vysky PER TYP; doska LEN rotaciu a kotvu.
+        def default_memory(subject)
+          return { anchor: ANCHORS.first, rotation_index: 0 } if subject == :board
+
+          { anchor: ANCHORS.first, z_mode: :locked, rotation_index: 0, lock_z: {} }
         end
 
         # Naspat na tovarenske hodnoty (nova „prva session"). Pouzivaju testy
@@ -85,13 +112,16 @@ module Noxun
         # aktivuje Tool. Stara session sa rusi PRED vznikom novej.
         # `push_tool` (NIE `select_tool`) — po vlozeni sa pouzivatel vrati
         # k nastroju, ktory mal predtym.
-        def start(model, plan, hardware: nil, template_ref: nil, note: nil)
+        def start(model, plan, hardware: nil, template_ref: nil, note: nil,
+                  subject: :cabinet, interaction: DEFAULT_INTERACTION, orientation: nil)
           # Stara session KONCI PRED vznikom novej a jej nastroj sa popne
           # SYNCHRONNE — inak by nam odlozeny `pop_tool` zhodil prave
           # pushnuty novy nastroj (dva ghosty na stacku).
           cancel_session('nové vloženie', deferred: false)
           s = PlacementSession.new(model: model, plan: plan, hardware: hardware,
-                                   template_ref: template_ref, note: note)
+                                   template_ref: template_ref, note: note,
+                                   subject: subject, interaction: interaction,
+                                   orientation: orientation)
           @session = s
           model.tools.push_tool(Tool.new)
           # CEF si po navrate z HtmlDialog callbacku vezme fokus spat — bez
@@ -147,10 +177,15 @@ module Noxun
         def state_payload(s)
           return { 'active' => false } unless s && s.active?
 
+          # GHOST-D1: `subject` + `interaction` + `orientation` — pasik podla
+          # nich rozhoduje, CO kresli (doska nema ovladace vysky, ma umiestnenie).
           { 'active' => true, 'type' => s.type_key,
+            'subject' => s.subject.to_s, 'interaction' => s.interaction.to_s,
             'anchor' => s.anchor.to_s, 'anchor_label' => ANCHOR_LABELS[s.anchor].to_s,
             'rotation' => s.rotation_index * 90, 'z_mode' => s.z_mode.to_s,
-            'lock_z' => s.lock_plane_z.to_f }
+            'lock_z' => s.lock_plane_z.to_f,
+            'orientation' => s.orientation.to_s,
+            'orientation_label' => s.orientation_label }
         end
 
         def push_state(s = @session)
@@ -316,8 +351,16 @@ module Noxun
         def status_text(s)
           return '' unless s
 
-          lock = s.z_mode == :locked ? "výška #{fmt_mm(s.lock_plane_z)} mm" : 'voľná výška'
           warn = s.placeable ? '' : ' · POLOHA NEČITATEĽNÁ — otoč pohľad'
+          if s.board?
+            # GHOST-D1: doska nema rezim vysky (prichytava sa plne v XYZ) —
+            # miesto neho ma UMIESTNENIE, ktore cykli ↑/↓.
+            return 'Ghost: klik položí dosku · ←/→ otočiť · ↑/↓ umiestnenie · Alt kotva · Esc zruší ' \
+                   "| kotva #{ANCHOR_LABELS[s.anchor]} · #{s.orientation_label.to_s.downcase} · " \
+                   "otočenie #{s.rotation_index * 90}°#{warn}"
+          end
+
+          lock = s.z_mode == :locked ? "výška #{fmt_mm(s.lock_plane_z)} mm" : 'voľná výška'
           "Ghost: klik položí skrinku · ←/→ otočiť · Alt kotva · ↓ zámok výšky · ↑ voľná výška · Esc zruší " \
             "| kotva #{ANCHOR_LABELS[s.anchor]} · #{lock} · otočenie #{s.rotation_index * 90}°#{warn}"
         end
@@ -412,6 +455,96 @@ module Noxun
           z0 = body_bottom_z(cfg)
           [[0.0, 0.0, z0], [w, 0.0, z0], [w, d, z0], [0.0, d, z0],
            [0.0, 0.0, h],  [w, 0.0, h],  [w, d, h],  [0.0, d, h]]
+        end
+
+        # =================================================================
+        # GHOST-D1 — DOSKA. Doska sa do sveta kladie UZ OTOCENA (orientacia je
+        # transformacia instancie NAD polohou ghostu), takze obalka aj kotvy sa
+        # pocitaju v ramci UMIESTNENEJ dosky.
+        # =================================================================
+
+        # ZAVAZNA tabulka rozmerovych osi (package GHOST-D1): ktory VYROBNY
+        # rozmer lezi na ktorej lokalnej osi umiestnenej dosky.
+        #   leziaca  -> X = dlzka, Y = sirka,  Z = hrubka
+        #   stojaca  -> X = dlzka, Y = hrubka, Z = sirka  (doska stoji na hrane)
+        #   na_stenu -> TA ISTA tabulka ako stojaca (STANDARD 8.3: zdielana
+        #               matica, rozdiel je len v configu — nikdy nie bboxom)
+        # Hodnoty su NAZVY rozmerov, nie cisla — je to data, nie kod.
+        BOARD_AXES = {
+          'leziaca'  => %i[length width thickness].freeze,
+          'stojaca'  => %i[length thickness width].freeze,
+          'na_stenu' => %i[length thickness width].freeze
+        }.freeze
+        BOARD_DEFAULT_ORIENTATION = 'leziaca'
+
+        # ZAVAZNA tabulka kotiev dosky (package GHOST-D1). ID aj poradie ALT
+        # cyklu su ZHODNE so skrinkou (`ANCHORS`: fl_bottom -> fr_bottom ->
+        # fr_top -> fl_top) a „predna" plocha je plocha s NIZSOU lokalnou Y
+        # (rovina Y = 0), presne ako pri skrinke. Suradnice su LOKALNE
+        # (v ramci umiestnenej dosky) a zapisane NAZVAMI rozmerov:
+        #   leziaca  (L, W, T): (0,0,0) · (L,0,0) · (L,0,T) · (0,0,T)
+        #   stojaca  (L, T, W): (0,0,0) · (L,0,0) · (L,0,W) · (0,0,W)
+        #   na_stenu           : ta ista tabulka ako stojaca
+        BOARD_ANCHOR_TABLE = {
+          'leziaca' => {
+            fl_bottom: %i[zero zero zero].freeze,
+            fr_bottom: %i[length zero zero].freeze,
+            fr_top:    %i[length zero thickness].freeze,
+            fl_top:    %i[zero zero thickness].freeze
+          }.freeze,
+          'stojaca' => {
+            fl_bottom: %i[zero zero zero].freeze,
+            fr_bottom: %i[length zero zero].freeze,
+            fr_top:    %i[length zero width].freeze,
+            fl_top:    %i[zero zero width].freeze
+          }.freeze,
+          'na_stenu' => {
+            fl_bottom: %i[zero zero zero].freeze,
+            fr_bottom: %i[length zero zero].freeze,
+            fr_top:    %i[length zero width].freeze,
+            fl_top:    %i[zero zero width].freeze
+          }.freeze
+        }.freeze
+
+        # Neznama orientacia (config z novsej verzie) sa TU nepreklasifikuje
+        # ticho do modelu — sem sa uz dostane len hodnota, ktoru pustil
+        # `BoardBuilder.norm_orientation`; fallback je poistka kresby.
+        def norm_board_orientation(orientation)
+          o = orientation.to_s
+          BOARD_AXES.key?(o) ? o : BOARD_DEFAULT_ORIENTATION
+        end
+
+        def board_dim(cfg, name)
+          name == :zero ? 0.0 : cfg_num(cfg, name)
+        end
+
+        # 8 rohov obalky dosky (mm) v poradi kontraktu kreslenia (EDGES /
+        # FRONT_FACE) — rovnaka schema ako `envelope_points` skrinky.
+        def board_envelope_points(cfg, orientation)
+          ax = BOARD_AXES[norm_board_orientation(orientation)]
+          x = board_dim(cfg, ax[0])
+          y = board_dim(cfg, ax[1])
+          z = board_dim(cfg, ax[2])
+          [[0.0, 0.0, 0.0], [x, 0.0, 0.0], [x, y, 0.0], [0.0, y, 0.0],
+           [0.0, 0.0, z],   [x, 0.0, z],   [x, y, z],   [0.0, y, z]]
+        end
+
+        def board_anchor_point(cfg, orientation, anchor)
+          row = BOARD_ANCHOR_TABLE[norm_board_orientation(orientation)]
+          spec = row[anchor] || row[ANCHORS.first]
+          spec.map { |n| board_dim(cfg, n) }
+        end
+
+        def board_anchor_points(cfg, orientation)
+          ANCHORS.each_with_object({}) { |a, h| h[a] = board_anchor_point(cfg, orientation, a).freeze }
+        end
+
+        # Cyklus umiestnenia (↑/↓): leziaca -> stojaca -> na_stenu -> leziaca.
+        # Poradie je poradim klucov tabulky osi — jeden zdroj pravdy.
+        def next_board_orientation(orientation, step = 1)
+          list = BOARD_AXES.keys
+          i = list.index(norm_board_orientation(orientation)) || 0
+          list[(i + step.to_i) % list.length]
         end
 
         def norm_rotation(k)
@@ -546,42 +679,107 @@ module Noxun
       class PlacementSession
         attr_reader :model, :plan, :hardware, :template_ref, :note, :state,
                     :rotation_index, :anchor, :z_mode, :last_point, :corners_mm,
-                    :anchors_mm, :cancel_reason, :hardware_note, :type_key
+                    :anchors_mm, :cancel_reason, :hardware_note, :type_key,
+                    :subject, :interaction, :orientation
 
-        def initialize(model:, plan:, hardware: nil, template_ref: nil, note: nil, memory: nil)
+        def initialize(model:, plan:, hardware: nil, template_ref: nil, note: nil, memory: nil,
+                       subject: :cabinet, interaction: DEFAULT_INTERACTION, orientation: nil)
           @model = model
           @plan = plan
           @hardware = hardware
           @template_ref = template_ref
           @note = note.to_s
           @state = :active
+          # GHOST-D1: subjekt a interakcia su EXPLICITNE (neodvodzuju sa z tvaru
+          # planu ani z pritomnosti fazy) — riadia obalku, kotvy, klavesy,
+          # payload pasika aj sev commitu.
+          @subject = SUBJECTS.include?(subject) ? subject : :cabinet
+          @interaction = INTERACTIONS.include?(interaction) ? interaction : DEFAULT_INTERACTION
           # GHOST-FB3: session STARTUJE Z PAMATE modulu (kotva, rotacia, rezim
           # vysky, locknute vysky) — do vypnutia SketchUpu si nastroj pamata,
           # ako s nim pouzivatel naposledy pracoval. Prva session v behu
           # dostane tovarenske hodnoty: lava dolna kotva, 0°, zamok.
-          @memory = memory || GhostTool.memory
+          # GHOST-D1: pamat je per [subjekt, interakcia] — skrinka a doska si
+          # navzajom kotvu ani rotaciu neprepisuju.
+          @memory = memory || GhostTool.memory(@subject, @interaction)
           @rotation_index = Calc.norm_rotation(@memory[:rotation_index])
           @anchor = ANCHORS.include?(@memory[:anchor]) ? @memory[:anchor] : ANCHORS.first
+          @last_point = nil
+          @placeable = false
+          @commit_started = false
+          @stamp_attempted = false
+          @hardware_note = ''
+          # Orientacia prichadza z KARTY (payload `insert_board`) — session je
+          # jej jediny drzitel; do pamate modulu sa NEZAPISUJE.
+          @orientation = orientation
+          board? ? init_board! : init_cabinet!
+        end
+
+        # --- subjekt ---------------------------------------------------------
+
+        def board?
+          @subject == :board
+        end
+
+        def cabinet?
+          @subject == :cabinet
+        end
+
+        def placement?
+          @interaction == :placement
+        end
+
+        # GHOST-D1: doska sa prichytava PLNE V XYZ (`pick_free` semantika) —
+        # ziadny zamok vysky z pamate skrinky, inak by roh hornej skrinky
+        # skoncil na zamknutej vyske. Orientacia zije LEN v session a kazda
+        # nova ju cita z karty Dosky.
+        def init_board!
+          o = @orientation = norm_orientation(@orientation)
+          @z_mode = :free
+          @lock_z = 0.0
+          @type_key = 'board'
+          refresh_board_geometry!(o)
+        end
+
+        def init_cabinet!
           # OBA typy startuju v ZAMKU svojej domacej vysky (horna nikdy
           # nestartuje vo free Z — zachovava dnesne spravanie buildera), kym
           # si pouzivatel v tomto behu nezvolil inak.
           @z_mode = Z_MODES.include?(@memory[:z_mode]) ? @memory[:z_mode] : :locked
           # Locknuta vyska je per TYP skrinky. Default sa NEDUPLIKUJE — berie
           # sa z planu (`home_z`: dolna 0, horna UPPER_HANG_Z = 1400).
-          t = Calc.cfg_str(plan.config, :type)
+          t = Calc.cfg_str(@plan.config, :type)
           @type_key = t.empty? ? 'lower' : t
           store = (@memory[:lock_z] ||= {})
-          store[@type_key] = plan.home_z.to_f unless store.key?(@type_key)
+          store[@type_key] = @plan.home_z.to_f unless store.key?(@type_key)
           @lock_z = store[@type_key].to_f
           # Obalka aj kotvy sa pocitaju RAZ zo ZMRAZENEHO configu (audit FIX 5)
           # — v `draw` sa uz nikdy nic neplanuje.
-          @corners_mm = Calc.envelope_points(plan.config).map(&:freeze).freeze
-          @anchors_mm = Calc.anchor_points(plan.config).freeze
-          @last_point = nil
-          @placeable = false
-          @commit_started = false
-          @stamp_attempted = false
-          @hardware_note = ''
+          @corners_mm = Calc.envelope_points(@plan.config).map(&:freeze).freeze
+          @anchors_mm = Calc.anchor_points(@plan.config).freeze
+        end
+
+        # Obalka aj kotvy dosky zavisia od ORIENTACIE — prepocitavaju sa pri
+        # jej zmene (↑/↓), inak ostavaju zmrazene ako pri skrinke.
+        def refresh_board_geometry!(o)
+          @corners_mm = Calc.board_envelope_points(@plan.config, o).map(&:freeze).freeze
+          @anchors_mm = Calc.board_anchor_points(@plan.config, o).freeze
+        end
+
+        def norm_orientation(o)
+          s = o.to_s
+          Calc::BOARD_AXES.key?(s) ? s : Calc::BOARD_DEFAULT_ORIENTATION
+        end
+
+        # Popisok umiestnenia do pasika a statusu (prazdny pre skrinku).
+        def orientation_label
+          return '' unless board?
+
+          if defined?(BoardBuilder)
+            lbl = BoardBuilder::ORIENTATION_LABELS[@orientation.to_s]
+            return lbl.to_s unless lbl.nil?
+          end
+          @orientation.to_s
         end
 
         # --- stavovy automat (audit BLOCKER 2) ------------------------------
@@ -681,12 +879,28 @@ module Noxun
           @memory[:anchor] = @anchor
         end
 
+        # Rezim vysky ma LEN skrinka — doska sa prichytava plne v XYZ.
         def set_z_mode!(mode)
+          return false if board?
           return false unless Z_MODES.include?(mode)
           return false if @z_mode == mode
 
           @z_mode = mode
           @memory[:z_mode] = mode
+          true
+        end
+
+        # GHOST-D1: cyklus UMIESTNENIA dosky (↑/↓). Meni obalku aj kotvy —
+        # doska sa do sveta kladie uz otocena. Do pamate modulu sa NEZAPISUJE:
+        # orientacia patri karte, nie pracovnemu navyku nastroja.
+        def cycle_orientation!(step = 1)
+          return false unless board?
+
+          o = Calc.next_board_orientation(@orientation, step)
+          return false if o == @orientation
+
+          @orientation = o
+          refresh_board_geometry!(o)
           true
         end
 
@@ -710,25 +924,34 @@ module Noxun
         end
 
         def anchor_point_mm
-          @anchors_mm[@anchor] || Calc.anchor_point(@plan.config, @anchor)
+          return @anchors_mm[@anchor] if @anchors_mm[@anchor]
+
+          board? ? Calc.board_anchor_point(@plan.config, @orientation, @anchor)
+                 : Calc.anchor_point(@plan.config, @anchor)
         end
 
         # --- commit ---------------------------------------------------------
-        # JEDINA zapisova cesta ghostu — sev R-03. Sprievodny blok (H2/D-76)
-        # zmrazi sety kovania zo sablony v TEJ ISTEJ operacii.
+        # JEDINA zapisova cesta ghostu — sev SUBJEKTU (R-03 pre skrinku,
+        # GHOST-D1 pre dosku). Sprievodny blok (H2/D-76) zmrazi sety kovania
+        # zo sablony v TEJ ISTEJ operacii.
+        #
+        # BARIERA PRED MUTACIOU (GHOST-D1): `ScaleWatch.flush_pending!` bezi
+        # PRED `begin_commit!` — cakajuca kopia/scale by sa inak prilepila
+        # k vlozeniu a poskodila Redo. Pri `false` (limit AJ vynimka — API ich
+        # nerozlisuje) sa vracia EXPLICITNY `:blocked`: session ZOSTAVA v stave
+        # umiestnovania a nevzniklo ziadne ID, geometria, krok Spat ani peciatka.
         def commit!(transform)
+          return :blocked unless settle_observer!
           return nil unless begin_commit!
 
           inst = nil
           begin
-            inst = CabinetBuilder.commit_insert(@model, @plan, transform: transform) do
-              @hardware_note = Panel.ghost_freeze_hardware(@model, @hardware) if @hardware && defined?(Panel)
-            end
+            inst = commit_subject!(transform)
           rescue StandardError => ex
             mark_failed!(ex.message)
             Engine.log_error(ex, 'GhostTool.commit')
             begin
-              Panel.ghost_insert_failed(ex) if defined?(Panel)
+              Panel.ghost_insert_failed(ex, self) if defined?(Panel)
             rescue StandardError => e2
               Engine.log_error(e2, 'GhostTool.commit (hlaska)')
             end
@@ -746,6 +969,30 @@ module Noxun
           end
           GhostTool.release_session(self)
           inst
+        end
+
+        # Sev podla SUBJEKTU. Doske ide orientacia SAMOSTATNYM argumentom —
+        # `stojaca` a `na_stenu` vedome zdielaju maticu (STANDARD 8.3), takze
+        # z transformacie sa odvodit neda.
+        def commit_subject!(transform)
+          if board?
+            BoardBuilder.commit_insert(@model, @plan, transform: transform, orientation: @orientation)
+          else
+            CabinetBuilder.commit_insert(@model, @plan, transform: transform) do
+              @hardware_note = Panel.ghost_freeze_hardware(@model, @hardware) if @hardware && defined?(Panel)
+            end
+          end
+        end
+
+        # Observer do POKOJA pred otvorenim vlastnej operacie. `true` aj ked
+        # ScaleWatch v tomto behu neexistuje (headless harness).
+        def settle_observer!
+          return true unless defined?(ScaleWatch) && ScaleWatch.respond_to?(:flush_pending!)
+
+          ScaleWatch.flush_pending!(@model) ? true : false
+        rescue StandardError => e
+          Engine.log_error(e, 'GhostTool.settle_observer!')
+          false
         end
       end
 
@@ -892,11 +1139,7 @@ module Noxun
             s = live_session
             next unless s && s.active?
 
-            if s.z_mode == :locked
-              pick_locked(s, x, y, view)
-            else
-              pick_free(s, x, y, view)
-            end
+            pick_point(s, x, y, view)
             refresh_status
             view.invalidate if view
           end
@@ -909,7 +1152,7 @@ module Noxun
 
             # Poloha sa este raz precita z aktualnej pozicie kurzora — klik
             # bez predchadzajuceho pohybu mysou tak nie je slepy.
-            s.z_mode == :locked ? pick_locked(s, x, y, view) : pick_free(s, x, y, view)
+            pick_point(s, x, y, view)
             unless s.placeable
               Sketchup.status_text = 'Poloha sa z tohto pohľadu nedá určiť — otoč pohľad (Esc zruší vloženie).'
               begin
@@ -923,7 +1166,14 @@ module Noxun
             tr = GhostTool.world_transform(s)
             next unless tr
 
-            s.commit!(tr)
+            res = s.commit!(tr)
+            # GHOST-D1: `:blocked` = bariera observera nedosiahla pokoj. Nic
+            # sa nezapisalo, session ZIJE dalej — pouzivatel skusi klik znova.
+            if res == :blocked
+              blocked_status(s)
+              view.invalidate if view
+              next
+            end
             view.invalidate if view
             # Po commite (aj po neuspesnom) nastroj KONCI — jedno odlozene
             # `pop_tool` a pouzivatel je spat pri svojom povodnom nastroji.
@@ -950,8 +1200,11 @@ module Noxun
             case owned
             when :left  then s.rotate!(-1)
             when :right then s.rotate!(1)
-            when :down  then s.set_z_mode!(:locked)
-            when :up    then s.set_z_mode!(:free)
+            # GHOST-D1: ↑/↓ znamenaju pri doske CYKLUS UMIESTNENIA (leziaca ->
+            # stojaca -> na_stenu), nie rezim vysky — doska sa prichytava plne
+            # v XYZ a vlastnost „ako lezi" je jej vyrobne citatelna vlastnost.
+            when :down  then s.board? ? board_orientation!(s, -1) : s.set_z_mode!(:locked)
+            when :up    then s.board? ? board_orientation!(s, 1)  : s.set_z_mode!(:free)
             # GHOST-FB2: prepnutie kotvy NEMENI kliknuty bod — translacia sa
             # prepocita s NOVOU kotvou, takze skrinka „preskoci" tak, aby nova
             # kotva sadla pod kurzor. Jedno pravidlo pre cele ovladanie:
@@ -1074,6 +1327,23 @@ module Noxun
         # ZAMKU (world ram, nie drawing axes), takze ghost sedi pod kurzorom aj
         # v uplne prazdnom modeli. Degenerovane guardy (MIN_SIN / MAX_REACH)
         # plati fallback; zdravotny strop plati OBOM.
+        # GHOST-D1: JEDEN vstup do prichytavania. Doska nema zamok vysky —
+        # ide vzdy `pick_free` (plne XYZ s inferenciou), takze sa prichyti aj
+        # na ZVYSENY roh skrinky. Skrinka ostava nezmenena.
+        def pick_point(s, x, y, view)
+          if s.z_mode == :locked
+            pick_locked(s, x, y, view)
+          else
+            pick_free(s, x, y, view)
+          end
+        end
+
+        # GHOST-D1: zmena umiestnenia dosky. Pasik aj karta Dosky sa
+        # aktualizuju z pushu session (`push_state` nizsie v onKeyDown).
+        def board_orientation!(s, step)
+          s.cycle_orientation!(step)
+        end
+
         def pick_locked(s, x, y, view)
           pt = pick_ip_locked(s, x, y, view) || pick_ray_locked(s, x, y, view)
           s.set_point(pt, !pt.nil?)
@@ -1110,12 +1380,16 @@ module Noxun
         end
 
         def pick_ray_locked(s, x, y, view)
+          pick_ray_plane(x, y, view, s.lock_plane_z)
+        end
+
+        def pick_ray_plane(x, y, view, plane_z)
           ray = view.pickray(x, y)
           return nil unless ray
 
           origin = to_mm_triplet(ray[0])
           dir = [ray[1].x.to_f, ray[1].y.to_f, ray[1].z.to_f]
-          Calc.ray_plane(origin, dir, s.lock_plane_z)
+          Calc.ray_plane(origin, dir, plane_z)
         end
 
         # Volna vyska: plny inference point SketchUpu. Aj tu plati ZDRAVOTNY
@@ -1125,6 +1399,11 @@ module Noxun
           pos = pick_ip(x, y, view)
           pt = pos ? to_mm_triplet(pos) : nil
           pt = nil unless pt.nil? || Calc.sane_point?(pt)
+          # GHOST-D1: doska v UPLNE PRAZDNOM modeli (InputPoint nedal nic)
+          # sadne na ROVINU Z = 0 — ten isty guardovany priesecnik luca ako
+          # pri zamku (MIN_SIN / t >= 0 / MAX_REACH). Skrinka fallback NEMA:
+          # jej volny rezim ostava presne taky, aky bol.
+          pt = pick_ray_plane(x, y, view, 0.0) if pt.nil? && s.board?
           s.set_point(pt, !pt.nil?)
         end
 
@@ -1176,6 +1455,24 @@ module Noxun
           Sketchup.status_text = GhostTool.status_text(live_session)
         rescue StandardError
           nil
+        end
+
+        # GHOST-D1: bariera observera nedosiahla pokoj — v modeli sa NIC
+        # nezmenilo a session ZIJE. Hlaska je rovnaka v statusbare aj v paneli.
+        def blocked_status(s)
+          msg = 'Plugin ešte dokončuje predchádzajúcu zmenu — o chvíľu klikni znova ' \
+                '(nič sa nevložilo).'
+          begin
+            Sketchup.status_text = msg
+          rescue StandardError
+            nil
+          end
+          begin
+            Panel.set_status(msg, true) if defined?(Panel)
+          rescue StandardError
+            nil
+          end
+          GhostTool.push_state(s)
         end
 
         def guarded(label)
