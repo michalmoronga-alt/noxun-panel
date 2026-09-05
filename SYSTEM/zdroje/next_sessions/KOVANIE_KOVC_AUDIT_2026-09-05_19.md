@@ -69,7 +69,7 @@ Prompt: adversarial review package v2 s explicitnou úlohou pri každom náleze 
 
 - Kódy Démos pre bunky bez kitu: Atira biela H70/350, H144/470 (dnes „š" = na objednávku) — doplniť kód alebo NL z radu vyradiť pred mergom seedu.
 - ~~Kódy Atira Tip-On kitov pre NL ≠ 620~~ — **DODANÉ 5.9. popoludní** (13 kódov PTOs, draft #13 nová tabuľka): `atira_p2o_v1` má rady H70/H144 [350–620], H176 [350, 420, 470, 620];
-  kity sú vendor variant PTOs → min. svetlá výška Tip-On receptu = 108/192/224 (prísnejšia). Ostáva bez kódu: SiSy H70/520, H144/350, H144/420; Tip-On H176/520.
+  kity sú vendor variant PTOs → min. svetlá výška Tip-On receptu = 108/192/224 (prísnejšia). Neskôr 5.9. dodané aj SiSy H70/520 (357697), H144/350 (357734), H144/420 (357735) a Tip-On H176/520 (357812, len 50 kg) — **všetky bunky radov v1 majú kód**.
 
 ## 5. GH Codex kolo 1 nad PR #301 (Sol cloud, commit `b29bdd5`, 5.9. 13:04 UTC) — 3 P1 + 1 P2, reconcile
 

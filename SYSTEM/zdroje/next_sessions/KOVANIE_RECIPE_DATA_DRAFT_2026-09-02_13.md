@@ -49,8 +49,8 @@ Vzorce sa NEinterpretujú ako jazyk — každý vzorec = pomenovaná konštanta 
 
 | výška | NL 350 | NL 420 | NL 470 | NL 520 | NL 620 |
 |---|---|---|---|---|---|
-| H70 SiSy 30 | 357694 š | **357695 ✓** | **357696 ✓** | — | 357716 (PTO 50) š |
-| H144 SiSy relingy | — | — | 357736 š | — | **357755 ✓** (620/50 PTO) |
+| H70 SiSy 30 | 357694 š | **357695 ✓** | **357696 ✓** | 357697 (Michal 5.9.) | 357716 (PTO 50) š |
+| H144 SiSy relingy | 357734 (Michal 5.9.) | 357735 (Michal 5.9.) | 357736 š | — | **357755 ✓** (620/50 PTO) |
 | H176 SiSy relingy | 357773 š · 341609 š | **357774 ✓** | **357775 ✓** · 357781 ✓ (50 kg) | 357777 š · 357782 (50) š | **357783 ✓** (620/50) · 357795 ✓ (50 PTO) |
 | antracit | 357887 ✓ (350/70) | 357969 ✓ (420/70/176) | 348777 ✓ (470/70) · 357970 ✓ (470/70/176) · 341626 ✓ | — | — |
 
@@ -61,11 +61,11 @@ používateľsky = jeden typ „Tip-On", min. svetlá výška preto PRÍSNEJŠIA
 |---|---|---|---|---|---|
 | H70 30 kg | 357722 (PTOs) | 357723 (PTOs) | 357724 (PTOs) | 357725 (PTOs) | 357716 (PTO, 50 kg) š |
 | H144 30 kg relingy | 357761 (PTOs) | 357762 (PTOs) | 357763 (PTOs) | 357764 (PTOs) | 357755 ✓ (PTO, 50 kg) |
-| H176 30 kg relingy | 357801 (PTOs) | 357802 (PTOs) | 357803 (PTOs) | — | 357795 ✓ (PTO, 50 kg) |
+| H176 relingy | 357801 (PTOs) | 357802 (PTOs) | 357803 (PTOs) | 357812 (PTOs, **50 kg** — 30 kg len na objednávku; hodnota `load` bunky, geometriu nemení) | 357795 ✓ (PTO, 50 kg) |
 
-Rady receptov v2 z týchto tabuliek: `atira_sisy_v1` H70 [350, 420, 470] · H144 [470, 620] · H176 [350, 420, 470, 520, 620]; `atira_p2o_v1` H70 [350, 420, 470, 520, 620] ·
-H144 [350, 420, 470, 520, 620] · H176 [350, 420, 470, 620]. Bez kódu ostávajú: SiSy H70/520, H144/350 a H144/420, Tip-On H176/520 — NL nie je v rade (RED `drawer_no_fit`
-až kým Michal kód nedodá), nikdy tichá zámena.
+Rady receptov v2 z týchto tabuliek: `atira_sisy_v1` H70 [350, 420, 470, 520] · H144 [350, 420, 470, 620] · H176 [350, 420, 470, 520, 620]; `atira_p2o_v1` H70, H144, H176
+zhodne [350, 420, 470, 520, 620]. **Každá bunka radov v1 má kit kód** (doplnené Michalom 5.9. popoludní: 357697, 357734, 357735, 357812); SiSy H144/520 v rade nie je (bez kódu).
+`load` bunky: 30 kg okrem NL 620 (50) a Tip-On H176/520 (50) — informatívne pre nákup, geometriu nemení.
 
 ## 2. Hettich Quadro V6 EB23 (WOOD_DRAWER_UNDERMOUNT) — Noxun profil: EB23, slide-on, 16 mm (18 valid), 30 kg
 
