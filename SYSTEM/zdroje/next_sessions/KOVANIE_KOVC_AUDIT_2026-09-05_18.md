@@ -118,3 +118,10 @@ porovnaný priamo s raw hodnotou (105,00 platí, 104,995 padá). (P2) zastarané
 KOV-D dodá UI/defaulty/pásma. (P1) sync tyč sa zisťovala až v expanzii po emisii → resolver s `capabilities.sync_shaft_purchasable = false` vráti `drawer_sync_rod_missing` PRED emisiou.
 (P1) zmena mapovania/override/setu nechávala staré dielce → handler atomicky prestaví dotknuté zásuvky (rollback pri zlyhaní) + safety net `Recipes.preflight` = RED `drawer_stale` blokuje VŠETKY
 exporty vrátane VEPO. (P1) legacy override konflikty bez kódu → `drawer_override_quantity`, `nl_lock_conflict` v registri.
+
+## Codex GH review PR #300 kolo 4 (5.9.2026, nad v8 `16122af`) — 5× P1, ZAPRACOVANÉ (verzia 9)
+
+(P1) triedna tabuľka bez čítania a bez seedu by blokovala bežné kombinácie → `resolve_set_id`/`resolve_mapping_value` čítajú `class:` kľúč a tabuľku už v C2b + seed mapovaní/setov + prechod
+existujúcich projektov pri prvej prestavbe. (P1) rozpor „drawer_stale blokuje VEPO … VEPO nie" → `drawer_stale` blokuje VŠETKY exporty vrátane VEPO; výnimka len pre dokončené fail-closed prestavby.
+(P1) `save_set!` globálneho setu projekt neprestavuje (zmrazený snapshot, reprodukovateľnosť); atomická prestavba len pri zmene stavu modelu. (P1) cieľový snapshot bez systému šablóny = atomické
+zjednotenie (a pre kópiu doplnenie z packu len pri zhode digestu). (P1) Quadro `t` v `box_h − t − 12` = hrúbka DNA; fixtúra zmiešaných hrúbok.

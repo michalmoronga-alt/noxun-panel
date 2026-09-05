@@ -320,7 +320,9 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   ich `recipe_digest`; zlyhanie ktorejkoľvek prestavby = rollback snapshotu** (Codex #300 P2; test: schválený merge nikdy nespustí `drawer_recipes_mismatch`). Testy: poškodenie / novšia
   schéma / Undo prvého vloženia nikdy nespustia tiché preseedovanie pri čítaní ani exporte.
   **Hrúbky dielcov = vstup geometrie (audit 1 F8):** `part_thicknesses` per rola (default kanál `:drawer`, override z `part_overrides`), prípustnosť zmiešaných hrúbok podľa `thickness_supported`
-  (Atira: dno aj chrbát 16; Quadro: každý dielec v rade, override mimo = conflict); C2 ich rieši PRED plánovaním; `materialized_part` sa NEpreberá (mení os Y) — nový čistý `drawer_part`.
+  (Atira: dno aj chrbát 16; Quadro: každý dielec v rade, override mimo = conflict); **Quadro výška predku/chrbta = `box_height − t − bottom_offset(12)`, kde `t` = hrúbka DNA**
+  (`part_thicknesses[:drawer_bottom]`, nie vlastná hrúbka dielca — zvislé miesto určuje dno; fixtúra so zmiešanými hrúbkami 16/18; Codex #300 kolo 4 P1); C2 ich rieši PRED plánovaním;
+  `materialized_part` sa NEpreberá (mení os Y) — nový čistý `drawer_part`.
   **Validácia packu (audit 1 F9, audit 2):** úplnosť DEKLAROVANÝCH kombinácií nad VŠETKÝMI osami systému (Atira: `height_variant × nl × opening × load` — každá má `min_clear_height`, `min_depth`, `loads_by_nl`; Quadro: `nl × opening × load` + `box_clearance` a rozsah `box_height`), Quadro má VLASTNÝ `nl_series`, odkazy medzi tabuľkami, konečné čísla, kladné rozmery;
   výber nad KOMPATIBILNÝMI kombináciami (nie najdlhšia NL a až potom opening); emisia dielcov ATOMICKÁ (všetky alebo žiadny).
   Testy C1: headless nad PLNE zadanými fixtúrami (KD, chrbát, výška riadku — audit 1 F7; očakávané hodnoty odvodené zo vzorcov/tabuliek BEZ zaokrúhľovania na celé mm: 900/KD18/EB10,5 → BB 791,5,
@@ -336,7 +338,10 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   recipe`/`locked` + odvodené roly) s forward-version odmietnutím a **testom downgrade C2b → C2a** (C2a build skrinku s configom 5 odmietne, nikdy ticho neodstráni dielce a kovanie;
   `PartKeys::SCHEMA` sa nebumpuje), **šablónová kolízia receptov (audit 1 B5)**: šablóna nesie `hardware_recipe_defs` = CELÝ validný snapshot použitých systémov (nie len recept konkrétnej
   skrinky — cieľ bez snapshotu inak vznikne v stave `:incomplete`, ktorý sa už nesmie automaticky doplniť; audit 4 NOTE), bezstratovo (`assess_*` vzor setov); pri vložení porovnanie so
-  snapshotom projektu TOHO ISTÉHO systému — zhoda OK, projekt bez snapshotu preberie šablónový, rozdiel = vloženie ODMIETNUTÉ pred akoukoľvek operáciou s hláškou (zlúčenie explicitne v KOV-D);
+  snapshotom projektu TOHO ISTÉHO systému — zhoda OK, projekt bez snapshotu preberie šablónový, **cieľ s platným snapshotom, ktorému chýba LEN systém šablóny (napr. projekt má Quadro,
+  šablóna Atira) = atomické ZJEDNOTENIE** (záznam chýbajúceho systému sa pridá do snapshotu v tej istej operácii, digest sedí; Codex #300 kolo 4 P1 — to isté pre medzidokumentovú kópiu:
+  chýbajúci systém sa doplní z packu na disku len ak digest kópie = digest packu, inak RED), rozdiel v TOM ISTOM systéme = vloženie ODMIETNUTÉ pred akoukoľvek operáciou s hláškou
+  (zlúčenie explicitne v KOV-D); testy: vloženie šablóny aj paste do snapshotu s iným systémom;
   ghost session nesie závislosti, zlyhanie/Undo vráti snapshot aj stavbu spoločne. **Medzidokumentová kópia (natívne Copy/Paste `.skp` → `.skp`, audit 2 B1):** vložená skrinka nesie v
   configu `drawer.recipe.recipe_digest`; dedup/prestavba v cieľovom dokumente porovná digest so snapshotom cieľového projektu TOHO ISTÉHO systému — zhoda = OK; rozdiel = prestavba
   ODMIETNUTÁ (RED `drawer_recipes_mismatch`, brána; hláška menuje skrinku a systém); cieľ bez snapshotu: digest = digest aktuálneho packu na disku → seed z disku, inak RED (config nesie
@@ -372,8 +377,10 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   VÝBERU setu, nie len kontroly po výbere** (Codex #300 kolo 2 P1: jeden set per výška nevie pokryť 30 aj 50 kg — NL 620 vynúti 50): C2b vyberá set podľa (systém, otváranie,
   `height_variant`, `load`) cez **KONKRÉTNY viacosový mechanizmus (Codex #300 kolo 3 P1 — dnešný `resolve_mapping_value` vyberá jedno mapovanie a `resolve_set_id` má jediný číselný
   selektor):** mapovanie projektu pre triedny kľúč `class:slide|<opening>|<construction>` (kanonický tvar z KOV-B1) nesie **explicitnú tabuľku** `[{height_variant, load, set_id}]` (exact
-  match, bez pásiem; Quadro `{load, set_id}`), rozšírenie `parse_mapping` s round-tripom a whitelistom; chýbajúci riadok = `set_incompatible`; KOV-D dodá UI/defaulty a selektor s pásmami
-  cez `numeric_param` (výška + `load`); **kompatibilita sa
+  match, bez pásiem; Quadro `{load, set_id}`), rozšírenie `parse_mapping` s round-tripom a whitelistom, **`resolve_set_id`/`resolve_mapping_value` čítajú triedny kľúč a tabuľku exact
+  match UŽ v C2b** (dnes čítajú len `mapping[generic_type]`), **seed mapovania a setov v C2b** pokrýva bežné kombinácie (Atira per výška × nosnosť × otváranie z #12, Quadro per nosnosť) a
+  existujúce projekty dostanú triedne mapovanie z generického `slide` mapovania + seed tabuľky pri prvej prestavbe zásuvky (explicitne, v tej istej operácii; Codex #300 kolo 4 P1);
+  chýbajúci riadok = `set_incompatible`; KOV-D dodá UI a selektor s pásmami cez `numeric_param` (výška + `load`); **kompatibilita sa
   rieši VNÚTRI stavby PRED emisiou dielcov** (Codex #300 P1: `Construction.build_plan` po `Recipes.resolve` vyhľadá set **TOU ISTOU cestou výberu ako expanzia** —
   `HardwareSets.compatible_set_for(recipe, state, cabinet_overrides:)` cez `resolve_mapping_value` (owner/cabinet override má prednosť pred mapovaním projektu; Codex #300 kolo 2 P1) — a
   **overí aj člena**: set musí mať `code_by_nl` kód pre resolved NL (chýbajúci kód = `set_incompatible`, NIE downstream ORANGE `nl_missing`; Codex #300 kolo 2 P1);
@@ -392,10 +399,11 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   (`drawer_no_fit` · `drawer_thickness_unsupported` · `drawer_obstruction` · `drawer_internal_unsupported` · `nl_lock_invalid` · `drawer_override_disabled` · `drawer_recipes_invalid` ·
   `set_incompatible` · `drawer_sync_rod_missing` · `drawer_recipes_mismatch` · `drawer_unclassified` · `drawer_override_quantity` · `nl_lock_conflict` · `drawer_stale`), ktorý
   `export_blockers` číta CELÝ (test: každý kód registra zastaví všetky tri blokované exporty; audit 3 B1); **zmena mapovania projektu / override skrinky / klasifikácie setu (Codex #300
-  kolo 3 P1):** handler (`set_project_mapping!`, cabinet override, `save_set!` pre referencovaný set) v TEJ ISTEJ operácii atomicky prestaví všetky dotknuté zásuvkové skrinky (zlyhanie =
-  rollback); **safety net:** `Recipes.preflight(model)` pri KAŽDOM exporte nanovo vyhodnotí kompatibilitu a resolve každej zásuvky proti AKTUÁLNEMU mapovaniu/setom/snapshotu a porovná s
-  uloženým `drawer.recipe`/stavbou — rozdiel = RED `drawer_stale` (hláška „prestav skrinku"), ktorý blokuje VŠETKY exporty vrátane VEPO (HW CSV + rozpočet + CP; VEPO nie — výnimka platí
-  LEN pre konflikty, ktoré dokončili fail-closed prestavbu (geometria bez dielcov);
+  kolo 3 P1):** handler zmeny STAVU MODELU (`set_project_mapping!`, cabinet override, explicitne potvrdené zlúčenie projektového snapshotu setov) v TEJ ISTEJ operácii atomicky prestaví
+  všetky dotknuté zásuvkové skrinky (zlyhanie = rollback); **uloženie GLOBÁLNEHO setu (`save_set!`) projekt NEprestavuje** — projekt expanduje zo svojho zmrazeného snapshotu setov
+  (reprodukovateľnosť), prevzatie zmeny = samostatná explicitne potvrdená akcia merge snapshotu (Codex #300 kolo 4 P1); **safety net:** `Recipes.preflight(model)` pri KAŽDOM exporte
+  nanovo vyhodnotí kompatibilitu a resolve každej zásuvky proti AKTUÁLNEMU mapovaniu/setom/snapshotu a porovná s
+  uloženým `drawer.recipe`/stavbou — rozdiel = RED `drawer_stale` (hláška „prestav skrinku"), ktorý blokuje VŠETKY exporty VRÁTANE VEPO (stará receptová geometria ostáva v modeli; Codex #300 kolo 4 P1). Ostatné kódy registra: HW CSV + rozpočet + CP; VEPO výnimka platí LEN pre konflikty, ktoré dokončili fail-closed prestavbu (geometria bez dielcov);
   **`drawer_recipes_mismatch` a `drawer_recipes_invalid` BLOKUJÚ AJ VEPO** — prestavba je odmietnutá a v modeli ostáva stará, neoverená receptová geometria (Codex #300 kolo 2 P1); nie pre
   novší
   config; audit 1 F11/B2) — prepočet ČERSTVÝ pri exporte cez **čistý preflight `Recipes.preflight(model)` nad projektovým snapshotom** (bez `ensure!`, zápisu či opravy modelu; dnešný zber číta len
