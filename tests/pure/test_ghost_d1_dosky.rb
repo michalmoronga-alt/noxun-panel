@@ -194,7 +194,7 @@ NxTest.test('GHOST-D1: subjekt a interakcia su EXPLICITNE (nie odvodene z planu)
   NxTest.assert_equal(:placement, s.interaction)
   NxTest.assert(s.board? && !s.cabinet? && s.placement?)
   NxTest.assert_equal(%i[cabinet board], NxD1.gt::SUBJECTS)
-  NxTest.assert_equal(%i[placement], NxD1.gt::INTERACTIONS, 'D2 sem pridá `drawing`')
+  NxTest.assert_equal(%i[placement drawing], NxD1.gt::INTERACTIONS, 'GHOST-D2 pridal `drawing`')
   # Neznamy subjekt sa NEPREBERIE — session by inak citala obalku zleho typu.
   cab = { type: 'lower', width: 600.0, height: 720.0, depth: 510.0,
           thickness: 18.0, floor_height: 100.0, bottom_mode: 'under_sides' }
@@ -628,7 +628,10 @@ end
 NxTest.test('GHOST-D1 sev: commit ide podla SUBJEKTU (orientacia SAMOSTATNYM argumentom)') do
   s = NxD1.src('noxun_engine', 'core', 'ghost_tool.rb')
   body = s[/def commit_subject!\(transform\).*?\n        end\n/m].to_s
-  NxTest.assert(body.include?('BoardBuilder.commit_insert(@model, @plan, transform: transform, orientation: @orientation)'),
+  # GHOST-D2: plan uz nie je vzdy `@plan` — kreslenie z neho ODVODI novy
+  # zmrazeny plan (`commit_plan` -> `BoardBuilder.replan`). Orientacia ide
+  # samostatnym argumentom NEZMENENE.
+  NxTest.assert(body.include?('BoardBuilder.commit_insert(@model, commit_plan, transform: transform, orientation: @orientation)'),
                 'doska: orientacia zo SESSION ide samostatne (z matice sa odvodit neda)')
   NxTest.assert(body.include?('CabinetBuilder.commit_insert(@model, @plan, transform: transform)'),
                 'skrinka: sev R-03 nezmeneny')
