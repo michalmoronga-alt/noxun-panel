@@ -802,7 +802,7 @@ NxTest.test('GHOST-D2 VCB: potvrdenie MYSOU priznak umiestnitelnosti NEPREPISUJE
   NxTest.refute(s.placeable, 'ale klik ostava odmietnuty — poloha je stale necitatelna')
 end
 
-NxTest.test('GHOST-D2 VCB: obe VCB cesty posielaju `typed: true`, klik nie') do
+NxTest.test('GHOST-D2 VCB: obe VCB cesty posielaju `typed: true`') do
   s = NxGD2.src('noxun_engine', 'core', 'ghost_tool.rb')
   ut = s[/def onUserText\(text, view\).*?\n        end\n/m].to_s
   NxTest.assert(ut.include?('typed: true'), 'napisane cislo')
@@ -810,6 +810,40 @@ NxTest.test('GHOST-D2 VCB: obe VCB cesty posielaju `typed: true`, klik nie') do
   NxTest.assert(ret.include?('typed: true'), 'prazdny Enter (hodnota karty)')
   click = s[/def draw_click\(s, x, y, view\).*?\n        end\n/m].to_s
   NxTest.refute(click.include?('typed: true'), 'klik mysou priznak NEPOSIELA')
+end
+
+# Codex #299 P2: bez stvrteho argumentu `pick` nedostane SketchUp referencny
+# bod a neponukne relativne inferencie („on axis from point").
+NxTest.test('GHOST-D2 inferencia: obe fazy podavaju REFERENCNY bod do `InputPoint#pick`') do
+  s = NxGD2.src('noxun_engine', 'core', 'ghost_tool.rb')
+  pick = s[/def pick_ip\(x, y, view, ref = nil\).*?\n        end\n/m].to_s
+  NxTest.assert(!pick.empty?, 'pick_ip prijima referenciu')
+  NxTest.assert(pick.include?('@ip.pick(view, x, y, ref)'), 'a podava ju ako 4. argument')
+  NxTest.assert(pick.include?('!ref.equal?(@ip)'), 'nikdy nie sam seba')
+  ref = s[/def draw_ref_ip\(s\).*?\n        end\n/m].to_s
+  NxTest.assert(ref.include?('when :length then @ip_origin'), 'faza 1: referencia = POCIATOK')
+  NxTest.assert(ref.include?('when :width  then @ip_length || @ip_origin'),
+                'faza 2: koniec dlzky (ak vznikol klikom), inak pociatok')
+  plane = s[/def draw_plane_point\(s, x, y, view, plane_z\).*?\n        end\n/m].to_s
+  NxTest.assert(plane.include?('pick_ip(x, y, view, draw_ref_ip(s))'), 'faza 1 ju posiela')
+  axis = s[/def draw_axis_point\(s, x, y, view, origin, axis\).*?\n        end\n/m].to_s
+  NxTest.assert(axis.include?('pick_ip(x, y, view, draw_ref_ip(s))'), 'faza 2 tiez')
+  # UMIESTNOVANIE (skrinka aj doska) referenciu NEDAVA — jeho spravanie sa nemeni.
+  free = s[/def pick_free\(s, x, y, view\).*?\n        end\n/m].to_s
+  NxTest.assert(free.include?('pick_ip(x, y, view)'), 'volny rezim ostal bez referencie')
+  lock = s[/def pick_ip_locked\(s, x, y, view\).*?\n        end\n/m].to_s
+  NxTest.assert(lock.include?('pick_ip(x, y, view)'), 'zamok vysky tiez')
+end
+
+NxTest.test('GHOST-D2 inferencia: referencne body su KOPIE realnych pickov, nie syntetické') do
+  s = NxGD2.src('noxun_engine', 'core', 'ghost_tool.rb')
+  len = s[/def capture_length_ip!.*?\n        end\n/m].to_s
+  NxTest.assert(len.include?('@ip_length.copy!(@ip)'), 'koniec dlzky je KOPIA pickovaneho bodu')
+  click = s[/def draw_click\(s, x, y, view\).*?\n        end\n/m].to_s
+  NxTest.assert(click.include?("capture_length_ip! if dim == :length"),
+                'a vznika LEN pri potvrdeni dlzky KLIKOM')
+  deact = s[/def deactivate\(view\).*?\n        end\n/m].to_s
+  NxTest.assert(deact.include?('@ip_length = nil'), 's nastrojom zanika')
 end
 
 NxTest.test('GHOST-D2 VCB: hodnota karty pre fazu je z ZMRAZENEHO planu') do

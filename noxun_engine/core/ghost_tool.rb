@@ -1344,7 +1344,7 @@ module Noxun
         # Limit sa overuje PRED posunom fazy pre KAZDY zdroj rozmeru.
         # Vracia true = faza sa posunula, false = hodnota odmietnuta.
         # `typed:` = hodnota prisla ZO VSTUPU (napisane cislo, hodnota karty
-        # pri prazdnom Enteri), nie z projekcie kurzora.
+        # pri prazdnom Enteri, zamok karty), nie z projekcie kurzora.
         def confirm_draw!(dim, mm, sign: nil, typed: false)
           return false unless drawing?
           return false unless draw_dim == dim.to_sym
@@ -1365,13 +1365,13 @@ module Noxun
             @draw_width_mm = v
           end
           # Codex #299 P2: NAPISANE cislo (a hodnota karty pri prazdnom
-          # Enteri) urcuje rozmer UPLNE — projekcia kurzora doň uz nevstupuje.
+          # Enteri) urcuje rozmer UPLNE — projekcia kurzora uz doň nevstupuje.
           # Ked teda degenerovany pohlad (takmer rovnobezny luc, rovina za
           # kamerou) predtym oznacil session za NEUMIESTNITELNU, cislo ju
           # znova umiestnitelnou UROBI: inak by pouzivatel musel hybat mysou
-          # a klikat v presne tej situacii, ktoru mal cislom obist. Pociatok
-          # je uz kliknuty a smer je bud z tahu, alebo KANONICKY, takze
-          # transformacia je plne urcena.
+          # a klikat v presne tej situacii, ktoru mal cislom obist.
+          # Pociatok je uz kliknuty a smer je bud z tahu, alebo KANONICKY,
+          # takze transformacia je plne urcena.
           set_placeable!(true) if typed
           advance_draw!(@draw_phase)
           true
@@ -1833,6 +1833,7 @@ module Noxun
             # nastrojom, ktore prídu po nas).
             release_inference!(view)
             @ip_origin = nil
+            @ip_length = nil
             @attached = false
             @on_top = false
             @finish_pending = false
@@ -2307,6 +2308,9 @@ module Noxun
               draw_status_beep("#{Calc.dim_limit_message(dim)} Hodnota sa neprijala — ťahaj ďalej alebo napíš číslo.")
               return false
             end
+            # Koniec dlzky potvrdeny KLIKOM je REALNY pickovany bod —
+            # 2. tah z neho dostane relativne inferencie (Codex #299 P2).
+            capture_length_ip! if dim == :length
             after_draw_step(s, view)
           else
             true
@@ -2388,14 +2392,14 @@ module Noxun
         end
 
         def draw_plane_point(s, x, y, view, plane_z)
-          pos = pick_ip(x, y, view)
+          # Referencia = POCIATOK: SketchUp vdaka nej ponukne „on axis from
+          # point" a dalsie RELATIVNE inferencie (Codex #299 P2).
+          pos = pick_ip(x, y, view, draw_ref_ip(s))
           if pos && (ip_on_geometry? || inference_locked?(view))
             p = to_mm_triplet(pos)
             flat = [p[0], p[1], plane_z.to_f]
             return flat if Calc.sane_point?(flat)
           end
-          # `s` sa tu necita — parameter drzi symetriu s `draw_axis_point`.
-          _ = s
           pick_ray_plane(x, y, view, plane_z)
         end
 
@@ -2427,8 +2431,10 @@ module Noxun
           s.preview_width!(proj)
         end
 
-        def draw_axis_point(_s, x, y, view, origin, axis)
-          pos = pick_ip(x, y, view)
+        def draw_axis_point(s, x, y, view, origin, axis)
+          # Referencia = koniec potvrdenej dlzky (ked vznikol klikom), inak
+          # pociatok — relativne inferencie platia aj v 2. tahu.
+          pos = pick_ip(x, y, view, draw_ref_ip(s))
           if pos && (ip_on_geometry? || inference_locked?(view))
             p = to_mm_triplet(pos)
             return p if Calc.sane_point?(p)
@@ -2491,6 +2497,20 @@ module Noxun
         rescue StandardError => e
           Engine.log_error(e, 'GhostTool.Tool#capture_origin_ip!')
           @ip_origin = nil
+        end
+
+        # Koniec potvrdenej DLZKY ako realny InputPoint — LEN ked ho urcil
+        # KLIK. Ked dlzka prisla cislom, ziadny realny bod na jej konci nie
+        # je a referenciou 2. fazy ostava pociatok.
+        def capture_length_ip!
+          return nil unless @ip && @ip.valid?
+
+          @ip_length ||= Sketchup::InputPoint.new
+          @ip_length.copy!(@ip)
+          @ip_length
+        rescue StandardError => e
+          Engine.log_error(e, 'GhostTool.Tool#capture_length_ip!')
+          @ip_length = nil
         end
 
         def release_inference!(view)
@@ -2612,13 +2632,38 @@ module Noxun
         # JEDINE miesto, kde sa pyta inference engine — plati pre OBA rezimy,
         # takze `@ip` je v oboch cerstvy a `draw` z neho vie vykreslit natívne
         # zvyraznenie snapu aj tooltip (GHOST-FB1).
-        def pick_ip(x, y, view)
+        # `ref` (Codex #299 P2) = REFERENCNY InputPoint fazy. So stvrtym
+        # argumentom ponuka SketchUp RELATIVNE inferencie („on axis from
+        # point", „from point") — bez neho ostane len priamy zasah geometrie
+        # a nas vlastny axis snap. Umiestnovanie (skrinka aj doska) referenciu
+        # NEDAVA — jeho spravanie sa nemeni.
+        def pick_ip(x, y, view, ref = nil)
           @ip ||= Sketchup::InputPoint.new
-          @ip.pick(view, x, y)
+          if ref && ref.valid? && !ref.equal?(@ip)
+            @ip.pick(view, x, y, ref)
+          else
+            @ip.pick(view, x, y)
+          end
           @ip.valid? ? @ip.position : nil
         rescue StandardError => e
           Engine.log_error(e, 'GhostTool.Tool#pick_ip')
           nil
+        end
+
+        # REFERENCNY bod AKTUALNEJ fazy kreslenia:
+        #   :length -> POCIATOK (inferencia od neho urcuje smer),
+        #   :width  -> KONIEC POTVRDENEJ DLZKY, ak vznikol KLIKOM (realny
+        #              pickovany bod); inak pociatok — dlzka mohla prist
+        #              cislom a vtedy ziadny realny bod na jej konci nie je.
+        # Syntetický `InputPoint.new(pt)` sa TU nepouziva: probe 5.9. ukazal,
+        # ze sa neviaze na inferencny kontext.
+        def draw_ref_ip(s)
+          return nil unless s && s.drawing?
+
+          case s.draw_phase
+          when :length then @ip_origin
+          when :width  then @ip_length || @ip_origin
+          end
         end
 
         def to_mm_triplet(pt)
