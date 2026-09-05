@@ -50,11 +50,22 @@ Vzorce sa NEinterpretujú ako jazyk — každý vzorec = pomenovaná konštanta 
 | výška | NL 350 | NL 420 | NL 470 | NL 520 | NL 620 |
 |---|---|---|---|---|---|
 | H70 SiSy 30 | 357694 š | **357695 ✓** | **357696 ✓** | — | 357716 (PTO 50) š |
-| H144 relingy | — | — | 357736 š | — | **357755 ✓** (620/50 PTO) |
-| H176 relingy | 357773 š · 341609 š | **357774 ✓** | **357775 ✓** · 357781 ✓ (50 kg) | 357777 š · 357782 (50) š | **357783 ✓** (620/50) · 357795 ✓ (50 PTO) |
+| H144 SiSy relingy | — | — | 357736 š | — | **357755 ✓** (620/50 PTO) |
+| H176 SiSy relingy | 357773 š · 341609 š | **357774 ✓** | **357775 ✓** · 357781 ✓ (50 kg) | 357777 š · 357782 (50) š | **357783 ✓** (620/50) · 357795 ✓ (50 PTO) |
 | antracit | 357887 ✓ (350/70) | 357969 ✓ (420/70/176) | 348777 ✓ (470/70) · 357970 ✓ (470/70/176) · 341626 ✓ | — | — |
 
-Chýbajúce kombinácie (napr. H144 NL 420/520) = **ORANGE `nl_missing`** ako dnes — nikdy tichá zámena; doplní sa pri seede z Démosu.
+**Tip-On kity Atira biela (Michal, Démos katalóg 5.9.2026 — recept `atira_p2o_v1`; kity sú vendor variant PTOs = Push to open Silent, len 176/470 čisté PTO;
+používateľsky = jeden typ „Tip-On", min. svetlá výška preto PRÍSNEJŠIA z oboch = PTOs 108/192/224):**
+
+| výška | NL 350 | NL 420 | NL 470 | NL 520 | NL 620 |
+|---|---|---|---|---|---|
+| H70 30 kg | 357722 (PTOs) | 357723 (PTOs) | 357724 (PTOs) | 357725 (PTOs) | 357716 (PTO, 50 kg) š |
+| H144 30 kg relingy | 357761 (PTOs) | 357762 (PTOs) | 357763 (PTOs) | 357764 (PTOs) | 357755 ✓ (PTO, 50 kg) |
+| H176 30 kg relingy | 357801 (PTOs) | 357802 (PTOs) | 357803 (PTO) | — | 357795 ✓ (PTO, 50 kg) |
+
+Rady receptov v2 z týchto tabuliek: `atira_sisy_v1` H70 [350, 420, 470] · H144 [470, 620] · H176 [350, 420, 470, 520, 620]; `atira_p2o_v1` H70 [350, 420, 470, 520, 620] ·
+H144 [350, 420, 470, 520, 620] · H176 [350, 420, 470, 620]. Bez kódu ostávajú: SiSy H70/520, H144/350 a H144/420, Tip-On H176/520 — NL nie je v rade (RED `drawer_no_fit`
+až kým Michal kód nedodá), nikdy tichá zámena.
 
 ## 2. Hettich Quadro V6 EB23 (WOOD_DRAWER_UNDERMOUNT) — Noxun profil: EB23, slide-on, 16 mm (18 valid), 30 kg
 

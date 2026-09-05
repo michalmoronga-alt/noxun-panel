@@ -288,8 +288,8 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   `kd_supported` (Atira [16, 18, 19]; Quadro [16, 18, 19]) · `mounting: slide_on` · `rear_type: wooden` · `thickness_supported` per rola (Atira dno aj chrbát [16]; Quadro každý dielec
   [16, 18]) · vzorce ako konštanty (Atira: `BB = LB − 2EB − 51.5`, `RB = LB − 2EB − 63`, `BL = NL + 10`; Quadro: `SKW = LB − 46`, `SKL = NL`, `bottom_offset 12`, `box_clearance 40`,
   výška predku/chrbta `box_height − t_dna − 12`) · `height_variants` (Atira 70/144/176: `rear_height` 65.5/144/176, `min_clear_height` pre otváranie receptu — SiSy 105/189/221,
-  P2O 106/190/222, `railing` 0/1+1/1+1; Quadro bez variantov: `box_height = clear_height − 40`, `min_box_height` tak, aby predok/chrbát `box_height − t − 12` ≥ 30 mm — Astra #19 F3: svetlá výška 60 by dala −8 mm) · **`nl_series_by_height`** = Noxun rad podľa K-sád z #12 (atira_sisy: H70 [350, 420, 470] ·
-  H144 [470, 620] · H176 [350, 420, 470, 520, 620]; atira_p2o: [620] per výška, kým Michal nedodá kódy; quadro_v6_sisy [350, 400, 450, 500, 550]; quadro_v6_p2o [350, 400, 450]) ·
+  Tip-On 108/192/224 (kity Démos sú vendor variant PTOs — prísnejšia z oboch tabuliek; Michal 5.9.), `railing` 0/1+1/1+1; Quadro bez variantov: `box_height = clear_height − 40`, `min_box_height` tak, aby predok/chrbát `box_height − t − 12` ≥ 30 mm — Astra #19 F3: svetlá výška 60 by dala −8 mm) · **`nl_series_by_height`** = Noxun rad podľa K-sád z #12 (atira_sisy: H70 [350, 420, 470] ·
+  H144 [470, 620] · H176 [350, 420, 470, 520, 620]; atira_p2o: H70 [350, 420, 470, 520, 620] · H144 [350, 420, 470, 520, 620] · H176 [350, 420, 470, 620] (kódy Démos od Michala 5.9., draft #13); quadro_v6_sisy [350, 400, 450, 500, 550]; quadro_v6_p2o [350, 400, 450]) ·
   `min_depth_by_nl` explicitná tabuľka (Atira NL + 15; Quadro NL + 13) · `load_by_nl` (Atira 30, pri 620 → 50; Quadro 30) · `sync_min_width` 600 · `abs` per rola (dno bez;
   chrbát/boky/vnútorné čelo L1 1,0 mm horná dlhá hrana) · `source` tagy per hodnota. **Nemennosť:** register vydaných receptov `data/recipes/RELEASED.json` `{recipe_id → sha256}` — test v `tests/pure` overuje, že KAŽDÝ zaregistrovaný súbor existuje a sedí na SHA (nie len `_v1`; Astra #19 F10) + **golden test výsledkov `resolve` per vydaná verzia** (fixtúra vstup → dielce/NL),
   lebo SHA JSON nezachytí zmenu interpretácie v Ruby; zmena obsahu zhodí CI;
@@ -298,8 +298,8 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   box_height (Quadro mm), nl, load, parts[], hardware_params, conflicts[], explain}` — **jedna výška** (najvyšší variant s `min_clear_height ≤ clear_height_raw`), **jedna NL**
   (najdlhšia z radu TEJ výšky s `min_depth ≤ clear_depth_raw`; porovnania inkluzívne s NEZAOKRÚHLENOU hodnotou, bez EPS: 105,00 platí, 104,995 padá); NL zámok
   z `hardware_overrides.nominal_length` (v rade výšky a zmestí sa → použije sa; inak conflict `nl_lock_invalid`, nikdy tichá zmena); hrúbka mimo `thickness_supported` =
-  conflict `drawer_thickness_unsupported`; KD mimo `kd_supported` = `drawer_kd_unsupported`; žiadna výška/NL = `drawer_no_fit` s hláškou (napr. „Atira P2O v1 má rad len 620,
-  hĺbka 500 nestačí"); emisia dielcov ATOMICKÁ (všetky alebo žiadny); **každý rozmer každého dielca sa PRED emisiou overí proti `BuildPlan::MIN_DIM` a receptovému minimu — jediný neplatný rozmer = `drawer_no_fit` pre celú zásuvku** (existujúci per-dielec filter `part_skipped_degenerate` by atomicitu porušil; Astra #19 F3). `context_for(owner, plan, cfg)` v `construction.rb`:
+  conflict `drawer_thickness_unsupported`; KD mimo `kd_supported` = `drawer_kd_unsupported`; žiadna výška/NL = `drawer_no_fit` s hláškou (napr. „Quadro P2O v1: hĺbka 300, najkratšia NL 350 potrebuje 363"); emisia dielcov ATOMICKÁ (všetky alebo žiadny); **každý rozmer každého dielca sa PRED emisiou overí proti `BuildPlan::MIN_DIM` a receptovému minimu — jediný neplatný rozmer =
+  `drawer_no_fit` pre celú zásuvku** (existujúci per-dielec filter `part_skipped_degenerate` by atomicitu porušil; Astra #19 F3). `context_for(owner, plan, cfg)` v `construction.rb`:
   čistá fn z NEZAOKRÚHLENÝCH listových zón
   (`ZoneTree` odovzdá `raw_bounds`; projekcia `front_items` raw) → `{clear_width (listová zóna pretínajúca riadok), clear_height (prienik z-intervalu riadku s interiérom
   z_lo = floor + t … z_hi = height − t / rail_geometry a listovou zónou), clear_depth (= `back_front_y`), side_thickness (KD), obstructions[] (shelf / divider pretínajúci riadok →
@@ -344,8 +344,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   H176: 420 → 357774, 470 → 357775, 620 → 357783; Quadro SiSy 400 → 317641, 450 → 317642, 500 → 317643; P2O 350 → 343031, 400 → 343033, 450 → 317644 …); **žiadne nové osi na setoch**
   (50 kg alebo antracit = alternatívny selektor per výška v override skrinky — nemení geometriu); kompatibilita = existujúca klasifikácia setu ↔ params položky **VRÁTANE systému: `manufacturer` + `series` setu ↔ `system` receptu** (Codex #301 P1: Antaro/StrongBox budú zdieľať `class:slide|classic|metal` s Atirou — kým je v mape jeden systém per konštrukciu, triedny kľúč stačí a
   identita setu sa overí pri expanzii; rozšírenie kľúča o systém patrí dávke, ktorá pridá druhý kovový systém) (nesúlad opening/construction/system = RED
-  `drawer_kit_missing` s dôvodom); **completeness test (GLM M6):** každá bunka výška × NL z radov receptov v1 má v seede kód — bunka bez kódu (H70/350 š, H144/470 š) sa pred
-  mergom vyrieši DÁTOVO (kód od Michala alebo vyradenie NL z radu), nikdy behovým fallbackom; chýbajúci kód pre vybranú NL v projekte = RED `drawer_kit_missing`;
+  `drawer_kit_missing` s dôvodom); **completeness test (GLM M6):** každá bunka výška × NL z radov receptov v1 má v seede kód — bunka bez kódu (SiSy H70/520, H144/350, H144/420; Tip-On H176/520 — NIE sú v radoch v1) sa pred mergom vyrieši DÁTOVO (kód od Michala alebo NL ostáva mimo radu), nikdy behovým fallbackom; chýbajúci kód pre vybranú NL v projekte = RED `drawer_kit_missing`;
   (e) **brány — jeden register `DRAWER_BLOCKERS` (10 kódov):** `drawer_unclassified` · `drawer_no_fit` · `drawer_obstruction` · `drawer_internal_unsupported` ·
   `drawer_thickness_unsupported` · `drawer_kd_unsupported` · `drawer_recipe_unknown` · `nl_lock_invalid` · `drawer_override_invalid` · `drawer_kit_missing`; `export_blockers` číta
   CELÝ register (test: každý kód zastaví blokované exporty, priečinok ostáva prázdny). Konflikty STAVBY (prvých 9) = fail-closed: žiadne dielce ani položka + RED do
@@ -381,8 +380,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   **Smoke pre Michala:** skrinka 900×720×500 (KD 18), F2 zásuvkové čelo 175 (Kovové bočnice → Atira) → kusovník: dno 791,5×480 + chrbát 780×65,5 (H70), Kontrola bez nálezov,
   nákup 1× K-Atira 470 (357696) · zmeň bok na 16 → dno 795,5×480, kód rovnaký · zmeň hĺbku na 560 → ostáva NL 470 (rad H70 končí pri 470, explain to povie), žiadny duplicitný
   riadok · drevený box (Quadro) → 5 dielcov: SKW 818, boky 450 × (svetlá výška − 40), nákup K-set V6 SiSy 450 (317642) · materiál zásuviek v projekte na bielu 16 → všetky dielce
-  ju dedia · override skrinky na antracit set → iný kód, dielce rovnaké · plytká skrinka 250 → RED „bez riešenia", dielce zmiznú, CSV odmietne · Tip-On Atira pri hĺbke 500 → RED
-  „P2O rad Atira v1 = 620" · P2O šírka 900 → ORANGE „pridaj synchronizačný set" · starý projekt bez triedneho mapovania → RED „Doplniť nové predvolené", po kliku zelené ·
+  ju dedia · override skrinky na antracit set → iný kód, dielce rovnaké · plytká skrinka 250 → RED „bez riešenia", dielce zmiznú, CSV odmietne · Tip-On Atira pri hĺbke 500 → NL 470, nákup 357724 (PTOs kit), dielce rovnaké ako pri SiSy · P2O šírka 900 → ORANGE „pridaj synchronizačný set" · starý projekt bez triedneho mapovania → RED „Doplniť nové predvolené", po kliku zelené ·
   otvor KLINIKA → čísla identické.
   **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `construction.md` (context_for, roly, resolver hook), `hardware.md` (recipes, R2, triedny kľúč, seed),
   `materials.md` (4. kanál), `outputs.md` (blockery, hardware_issues kódy, VEPO brána), `model-a-identita.md` (part_keys drawer, recipe_ref), ARCHITEKTURA router riadok
