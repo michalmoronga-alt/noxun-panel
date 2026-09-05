@@ -16,13 +16,7 @@
     // zamok drzi hodnotu LEN v UI pri prepnuti sablony (presne ako korpusovy
     // pred odoslanim). Do `locksFlat()` (kanal do Ruby) sa preto NIKDY nedostane.
     var BOARD_LOCK_FIELDS = ['length', 'width'];
-    // KOV-C2b (Codex #304 kolo 3 P1): `drawer_material_id` je 4. materialovy
-    // kanal (dielce zasuviek) a MUSI cestovat vkladacim stavom rovnako ako
-    // ostatne tri — bez neho by vlozena skrinka spadla na projektovu predvolbu
-    // zasuviek, teda na INU hrubku (Quadro by prepocitalo dielce, Atira by
-    // skoncila konfliktom) — a to ticho, bez jedineho naleza.
-    var MATERIAL_KEYS = ['material_id', 'front_material_id', 'back_material_id',
-                         'drawer_material_id'];
+    var MATERIAL_KEYS = ['material_id', 'front_material_id', 'back_material_id'];
     // H2 (D-76): kovanie zo sablony — mapovanie setov + zmrazene definicie.
     var HARDWARE_KEYS = ['hardware_sets', 'hardware_set_defs'];
     // KOV-H1: ad-hoc polozky sablony su POLE, nie mapa — `plainMap()` vracia

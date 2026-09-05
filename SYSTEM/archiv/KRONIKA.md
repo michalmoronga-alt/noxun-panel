@@ -38,12 +38,14 @@
   dielce nenesú `axes:` (pri stojacom dielci by ABS farba vyšla na spodnú hranu, kým páska ide na hornú — PartFaces zásada „radšej žiadna farba"; farbenie = C2c/D) ·
   na `drawer_kit_missing` sa povyšuje **každý** dôvod nemapovania receptovej položky, nielen tri menované · `legacy_slide_suppressed` sa v Kontrole nezobrazuje
   (`Validation::BUILD_INFO_ONLY`) — je to konštatovanie, nie nález, a ORANGE riadok na každej zdravej zásuvke by bol falošný poplach.
+  **ROZDELENIE PO KOLE 4 (Michal, pravidlo 3 kôl).** Štvrté kolo prinieslo ďalšie dva P1 — oba v UI a hromadných cestách 4. materiálového kanála, nie v aktivácii samotnej.
+  Kanál sa preto **odrezal do samostatnej dávky** `feat/kov-c2b-material-kanal` (mergne sa hneď po tejto): výber „Zásuvky" v Štúdiu + preflight per systém, „Nahradiť UNI…",
+  vkladacia karta a remap vetva predvoľby zásuviek. V tejto dávke ostáva **aktivácia v engine** plus serverové cesty kľúča `drawer_material_id`, ktoré sú nutné pre
+  integritu dát (normalize/config/params, šablóna preserve-or-override, delete guard `CABINET_MATERIAL_KEYS`, kontrakt `old_eff['drawer']` v remape).
   **Codex #304 kolo 1 (4 P1 + 2 P2) prinieslo do tej istej dávky ešte päť vecí.** (1) **Zmena konštrukcie kov ↔ drevo** už čelo natrvalo nezablokuje: `system` je jedna
   hodnota viazaná na konštrukciu, takže sa pri jej zmene **nepripája** späť (server ho odvodí nanovo), kým mapa `recipe_refs` — kľúčovaná `systém|otváranie` — sa pripája
-  vždy a návrat k pôvodnému systému vráti pôvodnú pripnutú verziu. (2) **UI 4. kanála sa presunulo z C2c sem** (inak by projekt uviazol na UNI 16): jeden riadok „Zásuvky"
-  v predvoľbách projektu Štúdia + `MaterialsDialog::TARGETS`, a **preflight per systém** — D-46 vetva sa použiť nedala, lebo meria hrúbku ČELA a o receptoch nevie.
-  Doska, ktorú neprijme žiadny vydaný systém, sa neuloží vôbec; doska, ktorú neprijme systém reálne použitý v zákazke, sa uloží až po potvrdení a hláška menuje systém aj
-  jeho povolené hrúbky (čísla z `Recipes.supported_thicknesses`, nikdy konštanta v UI). (3) **Záznam mapy s nesediacim kľúčom** (`"atira|sisy" => "quadro_v6_p2o_v1"`) sa
+  vždy a návrat k pôvodnému systému vráti pôvodnú pripnutú verziu. (2) **UI 4. kanála sa presunulo z C2c sem** (inak by projekt uviazol na UNI 16) — a po kole 4 ďalej do
+  **samostatnej dávky** (viď vyššie). (3) **Záznam mapy s nesediacim kľúčom** (`"atira|sisy" => "quadro_v6_p2o_v1"`) sa
   zahadzuje — stavba potom ide cez súrodenca/`latest_for`, nikdy cez cudzí recept. (4) **Šablóna** nesie `drawer_material_id` tou istou preserve-or-override cestou ako
   ostatné tri materiály a **delete guard** ho ráta (skrinky aj šablóny) — jeden zoznam `Materials::CABINET_MATERIAL_KEYS`. (5) **11. kód registra `drawer_stale`
   (MIGRAČNÝ)**: projekt uložený PRED aktiváciou receptov, ktorý už má klasifikovanú zásuvku, nemá v .skp receptové dielce a nesie legacy výsuv — kusovník aj VEPO by boli
@@ -61,7 +63,7 @@
   Vhodnosť cieľovej dosky posudzuje **jeden** receptový predikát `Recipes.thickness_ok_for_any_system?` — číta ho selektor v Štúdiu aj „Nahradiť UNI…", inak by tá istá
   25 mm doska prešla jednou cestou a druhou nie. A migračná brána `drawer_stale` používa **ten istý** predikát „nie legacy" ako resolver (`Recipes.classified?`): čelo
   s **len** `opening_mode` alebo **len** `variant internal` je po prestavbe RED, takže pred ňou nesmie byť zelené.
-  **Testy:** 3084 headless (+61: `test_kovc2b_dielce.rb` 25 · `test_kovc2b_brany.rb` 34 · 2 remap testy v `test_abs_remap.rb`), 89 JS sád, in-SU sekcia **`run_kovc2b`**
+  **Testy:** 3079 headless (`test_kovc2b_dielce.rb` 25 · `test_kovc2b_brany.rb` 29 · 2 remap testy v `test_abs_remap.rb`), 89 JS sád, in-SU sekcia **`run_kovc2b`**
   — **1786 PASS / 0 FAIL** (plán vs. model 1:1, prestavba bez duplicít, 1 krok Späť, prepnutie kov ↔ drevo a späť, kópia aj šablóna nesú pripnutý recept, plytká skrinka
   = žiadne dielce + RED + zastavený export s **prázdnym** priečinkom a neotvoreným pickerom).
   **Zostáva C2c:** karta zásuvky v Inspectore (systém · výška · NL · nosnosť · recept + `explain`), riadky Kontroly s navigáciou na čelo a labely v Nákupe.

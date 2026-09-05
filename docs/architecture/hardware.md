@@ -537,10 +537,6 @@ resolver ani nákup, ale **čítanie modelu** (`Bom.collect`): skrinka uložená
 klasifikovanú zásuvku, takže v .skp **nie sú** receptové dielce a výsuv je legacy — kusovník aj VEPO by boli neúplné a ticho. Nápravou je **prestavba** skrinky.
 `BLOCKER_LABELS` drží krátky slovenský názov pre bránu exportu — plnú vetu (ktorá hodnota kde nesedí) skladá recept a nesie ju nález Kontroly.
 
-**`supported_thicknesses(system)` / `thickness_ok_for_system?`** = čisté funkcie nad najnovším vydaným receptom systému: **PRIENIK** `thickness_supported` cez všetky roly
-(jeden materiálový kanál kŕmi všetky roly naraz, takže hrúbka dobrá len pre dno by pri Quadre padla na boku). Atira → `[16]`, Quadro V6 → `[16, 18]`. Číta ich preflight
-projektovej predvoľby zásuviek ([materials.md](materials.md)); neznámy systém = `[]`, teda fail-closed.
-
 **Dve vrstvy, jedna zodpovednosť každá:** fyzika (rozmery dielcov, výšky, rad NL) žije v **recepte**, objednávacie kódy v **setoch** (`hardware_sets`). Nákup nikdy nemení
 fyzický návrh: rad NL v recepte = rad, ktorý Noxun reálne kupuje, žiadni kandidáti ani fallback. **EB je pevné per recept** (Atira 10,5 · Quadro V6 23) — zmena hrúbky boku
 mení iba svetlú šírku, engine nikdy nehľadá iný runner (mapa KD → EB neexistuje).

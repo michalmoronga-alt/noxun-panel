@@ -19,10 +19,6 @@ function eq(actual, expected, msg){
 eq(mdProjectSelectId('default_material_id'), 'md_body', 'korpus');
 eq(mdProjectSelectId('default_front_material_id'), 'md_front', 'cela');
 eq(mdProjectSelectId('default_back_material_id'), 'md_back', 'chrbat');
-// KOV-C2b: 4. kanal (dielce zasuviek). Bez mapovania by sa select po ponuke
-// (preflight per system) nevratil na skutocny default a ostal by vizualne na
-// nepotvrdenom materiali.
-eq(mdProjectSelectId('default_drawer_material_id'), 'md_drawer', 'zasuvky');
 eq(mdProjectSelectId('bogus'), null, 'neznamy kluc = ziadny select (nic sa neprepisuje)');
 eq(mdProjectSelectId(''), null, 'prazdny kluc');
 eq(mdProjectSelectId(null), null, 'chybajuci kluc');
