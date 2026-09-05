@@ -322,9 +322,16 @@ poľa je presne to, čomu brána zabraňuje. **Legacy tvar (holý String) sa ďa
 (`Validation.newer_config_entry` je jediný normalizátor).
 
 **Blocker NESMIE zaniknúť spolu s ID (Codex #298 P1).** `note_newer_config` prázdne ID ignoruje, lenže entita s poškodenou identitou **ďalej prispieva známymi poľami do
-`records`** — bez adresy by teda blocker vypadol a VEPO aj ostatné výstupy by pokračovali s ticho orezaným novším configom. Adresu preto skladá **`Bom.newer_address(inst, id)`**:
-výrobné ID je prvou voľbou, a keď chýba, použije sa **stabilná adresa entity** — `persistent_id` (prežije save/reopen), fallback `entityID` — v ľudskom tvare
-**„bez ID (pid 12345)"**, takže Kontrola aj hláška brány povedia, čo v modeli hľadať. Platí pre **dosku aj skrinku** (tá istá trieda chyby).
+`records`** — bez adresy by teda blocker vypadol a VEPO aj ostatné výstupy by pokračovali s ticho orezaným novším configom. Adresu preto skladá **`Bom.newer_address(inst, id)`**,
+ktoré vracia **dvojicu `[id_do_hlášky, pid]`**: výrobné ID je prvou voľbou, a keď chýba, použije sa **stabilná adresa entity** — `persistent_id` (prežije save/reopen), fallback
+`entityID` (`Bom.entity_pid`) — v ľudskom tvare **„bez ID (pid 12345)"**, takže Kontrola aj hláška brány povedia, čo v modeli hľadať. Platí pre **dosku aj skrinku** (tá istá
+trieda chyby).
+
+**PID sa nesie aj ŠTRUKTUROVANE, nie len v texte (Codex #298 kolo 2).** Záznam má `owner_pid` (a nesie ho **vždy**, aj keď ID existuje — pri dvoch objektoch so zdieľaným ID je
+to jediný údaj, ktorým sa dá povedať, ktorý z nich to je; ten istý vzor ako `owner_pid` v KOV-A1). `Validation.newer_config_entry` preto vracia trojicu `[kind, id, owner_pid]`
+a nález ho ďalej podáva klik-resolveru. Bez toho by `ProductionCore.pids_for_problem` hľadal entitu so **stored ID rovným ľudskému reťazcu** — nenašiel by nič a klik na RED
+riadok by vždy skončil hláškou „zoznam sa medzitým zmenil". Resolver má preto pre `CAT_NEWER_CFG` vlastnú vetvu (**`newer_config_entity`**): nájde **top-level** NOXUN kus podľa
+`persistent_id` a druh proti ID **neoveruje** (objekt z novšej verzie ho nemusí mať čitateľné). Legacy záznam bez `owner_pid` sa ďalej hľadá podľa ID.
 
 Čitatelia: `ProductionCore.export_blockers(newer:)` — hlási „Skrinka CAB-001, Doska BRD-002" (`newer_ids_text`, ten istý strop „tri + a ďalšie N") a **zastaví VEPO, nákupný CSV,
 rozpočet aj ponuku** — a `Validation` (RED `newer_config`, hláška menuje **úplný** zoznam dotknutých výstupov vrátane kusovníka, ktorý je nad takým objektom neúplný, aj keď sa

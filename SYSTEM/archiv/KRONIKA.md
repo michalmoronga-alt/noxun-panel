@@ -56,10 +56,16 @@
   (3) **Guard patrí na vstup, nie pred prestavbu.** Karta dosky mení pred rebuildom **globálny katalóg** (`ensure_duplak_for`, `ensure_missing_abs`) — nevratne. Guard sa
   presunul do `guarded_board`, teda pred prvý zápis kamkoľvek.
   (4) **Sľub v STANDARDe treba aj implementovať:** read-only karta dosky z novšej verzie existovala len na papieri; teraz ju nesie serverový `newer_config` + text.
+  **Kolo 2 (1× P2):** blocker síce prežil bez ID, ale PID žil len v **texte** hlášky — klik na RED riadok Kontroly potom hľadal entitu so stored ID rovným reťazcu „bez ID (pid N)"
+  a vždy skončil na „zoznam sa medzitým zmenil". Adresa sa preto nesie aj **štruktúrovane** (`owner_pid` v zázname aj v náleze) a klik-resolver má pre `newer_config` vlastnú vetvu
+  podľa `persistent_id`. **Poučenie:** keď sa identifikátor dostane do hlášky, ešte to neznamená, že sa dostal do **dát** — čokoľvek, na čo sa dá kliknúť, potrebuje adresu, nie vetu.
   **Dva in-SU FAILy boli v TESTE, nie v produkte** (obe hypotézy o bariére sa nepotvrdili): `ScaleWatch.pending?` sa meralo **až po vložení**, kde observeru legitímne zakladá
   prácu post-commit refresh panela (`push_selected` → `request_dedup`) — sonda teraz meria vstup do `commit_insert`, teda medzi úspešným `flush_pending!` a vytváracou operáciou.
   A medzi Späť a Znova sa nesmie zmestiť debounce tik: upratovanie ghost zón (`prune_ghosts`) otvára operáciu **bezpodmienečne** a každý commit zahodí redo stack — platí to pri
   zmazaní **hocijakej** NOXUN entity, nie len dosky.
+  **Beh 2 pridal tretiu lekciu — aj sonda je kód.** Nová sonda bariéry hlásila „observer nie je v pokoji", ale merala `nil`: blok `define_method` sa vyhodnocuje v lexikálnom rámci
+  **`su_runner.rb`**, takže holá konštanta `ScaleWatch` sa v ňom nerozloží a `defined?` vráti nil — assercia `== false` potom padne bez ohľadu na skutočný stav. Modul sa zachytáva
+  do lokálnej premennej a assercie vypisujú **nameranú hodnotu**. Kontrakt poradia (medzi bariérou a operáciou nič observer nenaarmuje) má odvtedy **headless dôkaz**, nie iba in-SU.
 
 - **KOV-B3 — EDITOR SETU: KLASIFIKÁCIA, ČLENOVIA, ŽIVÝ NÁHĽAD (v0.9.26, 4.9.2026, PR #297):** posledný rez slice B; **KOVANIE slice B je KOMPLET a R-41 je uzavretá**.
   Inline editor setu (`HWS_EDIT` + `hwsEditorNode` + akcia `hws-save`) **zanikol** a s ním celá cesta, na ktorej R-41 stála: draft žil v tele sekcie, prežíval každý push

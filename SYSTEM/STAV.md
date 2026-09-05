@@ -25,7 +25,7 @@ robí **priamo v Inspectore**. **KOV-B1** dala setom **klasifikáciu** (na čo �
 **Pozor na kompatibilitu:** čo uloží v0.9.20, to **v0.9.18 už nepoužije** — model/šablóna (`CONFIG_SCHEMA` 4 + brána `assess_set_defs`), knižnica setov aj projektový snapshot
 (`std` 3) a katalóg kovania s výrobcom (`schema` 2). Pred prvou takou zákazkou aktualizovať **obe PC** (D-52 updater).
 
-**Testy k v0.9.27:** **2842 headless** · 87 JS sád · posledný plný in-SketchUp beh **1504 PASS** (v0.9.21; dávky #287, KOV-B2, NÁSTROJE-1 a GHOST-D1 ho **nespúšťali** — Michal pracoval v SketchUpe, pustiť pred merge; pribudli sekcie `run_kovb2`, `run_tools1`, `run_tools1_async`, `run_tools1b`, `run_kovb3`, `run_ghost_d1` a `run_ghost_d1_async`).
+**Testy k v0.9.27:** **2845 headless** · 87 JS sád · posledný plný in-SketchUp beh **1504 PASS** (v0.9.21; dávky #287, KOV-B2, NÁSTROJE-1 a GHOST-D1 ho **nespúšťali** — Michal pracoval v SketchUpe, pustiť pred merge; pribudli sekcie `run_kovb2`, `run_tools1`, `run_tools1_async`, `run_tools1b`, `run_kovb3`, `run_ghost_d1` a `run_ghost_d1_async`).
 
 ## Robí sa
 
