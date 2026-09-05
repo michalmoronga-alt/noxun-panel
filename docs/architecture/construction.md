@@ -158,10 +158,66 @@ meria `async S6`).
 (**čistá matematika bez SketchUpu** — kotvy, obálka, kanonická matica, ray × rovina zámku; testovateľná headless), `PlacementSession` (stav jedného vkladu) a `GhostTool::Tool`
 (SketchUp `Tool`). Ghost je **výhradne viewport grafika `draw`** — žiadna dočasná `ComponentInstance`, žiadna entita, žiadne ID a **žiadny krok Späť pred klikom**.
 
-**SUBJEKT a INTERAKCIA (GHOST-D1).** Session nesie **`subject`** (`:cabinet | :board`) a **`interaction`** (`:placement`; D2 pridá `:drawing`) — obe sú **explicitné**, neodvodzujú
-sa z tvaru plánu ani z prítomnosti fázy, a neznáma hodnota spadne na `:cabinet` / `:placement`. Podľa subjektu sa berie **obálka a kotvy** (`Calc.board_envelope_points` /
-`board_anchor_points` namiesto kabinetových), **klávesy**, **payload pásika** aj **šev commitu** (`BoardBuilder.commit_insert` namiesto `CabinetBuilder.commit_insert`). Klasický
+**SUBJEKT a INTERAKCIA (GHOST-D1, rozšírené D2).** Session nesie **`subject`** (`:cabinet | :board`) a **`interaction`** (`:placement | :drawing`) — obe sú **explicitné**, neodvodzujú
+sa z tvaru plánu ani z prítomnosti fázy, a neznáma hodnota spadne na `:cabinet` / `:placement`. **`:drawing` je vyhradené DOSKE** — skrinka s ním spadne na `:placement` (jej šev ani
+obálka fázy nepoznajú). Podľa subjektu sa berie **obálka a kotvy** (`Calc.board_envelope_points` /
+`board_anchor_points` namiesto kabinetových), **klávesy**, **payload pásika** aj **šev commitu** (`BoardBuilder.commit_insert` namiesto `CabinetBuilder.commit_insert`); podľa
+interakcie sa vetví **klik** (placement: 1. klik commituje; drawing: 1. klik je počiatok), **klávesy**, **`enableVCB?`** aj **transformácia**. Klasický
 tok skrinky sa nemení — charakterizáciou je celá existujúca sekcia `run_ghost`.
+
+**KRESLENIE DOSKY NA ROZMER (GHOST-D2): dva ťahy, dve ROZDIELNE geometrie.** Fázový automat session je `:origin → :length → :width → :done`:
+
+- **fáza `:origin`** — doska visí na kurzore ako pri umiestňovaní (plné XYZ prichytenie, `pick_free`), **len tu** menia ←/→ rotáciu a ↑/↓ orientáciu. Klik určí **počiatok**;
+  kotva je **pevná `fl_bottom`** a pamätaná kotva placementu sa **ignoruje** (ALT v kreslení význam nemá).
+- **fáza `:length` HĽADÁ SMER** — kurzor sa premieta do **vodorovnej roviny Z = Z počiatku** pre **všetky** orientácie (dĺžka je vodorovná aj pri stojacej doske), smerový vektor je
+  `počiatok → premietnutý kurzor` (`Calc.horizontal_dir`), dĺžka `|vektor|`. **Žiadna projekcia na „lokálnu os"** — os v tejto chvíli ešte neexistuje (kruhová závislosť); dôkazom je
+  test šikmého ťahu 45° v prázdnom modeli = rotácia 45°, nie 0°. **Axis snap** (`Calc.axis_snap`, 3°) je **pomôcka, nie obmedzenie**.
+- **fáza `:width` MERIA po PEVNEJ osi** (`Calc.board_measure_axis`): `leziaca` → vodorovná kolmica na 1. ťah (`Z × dir_x`), `stojaca`/`na_stenu` → **svetová +Z** (výška pilastra).
+  Meria sa **znamienková** projekcia (`Calc.project_on_axis`).
+
+**Brána voľného priestoru je v oboch fázach, ale INÁ.** Vo fáze `:length` sa použije len **reálna geometrická inferencia** (vertex/hrana/plocha) premietnutá na rovinu — inak
+`Calc.ray_plane` (ten istý guard ako zámok skrinky: `MIN_SIN` / `t >= 0` / konečné / `MAX_REACH_MM`). Vo fáze `:width` by premietnutie z vodorovnej roviny dalo pri **zvislej**
+šírke pilastra **konštantnú výšku**, preto je fallbackom **najbližší bod lúča a PRIAMKY osi** (`Calc.ray_axis_point`) s **rovnakým kontraktom degenerácie**: uhlový prah medzi lúčom
+a osou (takmer rovnobežný lúč = takmer nulový menovateľ → výsledok odletí alebo zmení znamienko šírky), `t >= 0`, konečné čísla, `MAX_REACH_MM`. Porušenie = **fáza nepokročí**,
+`placeable = false` a status povie prečo. Testy idú z **oboch strán** (skoro rovnobežný pohľad zdola aj zhora), nie len presná rovnobežnosť.
+
+**Rotáciu určuje smer v okamihu POTVRDENIA** (klik · číslo + Enter · prázdny Enter · zámok). Ak je vektor **nulový** (kurzor sa nepohol, číslo napísané hneď, fáza preskočená),
+použije sa **kanonický smer = lokálna +X podľa rotácie session** (`Calc.canonical_dir_x`) a status to povie — **nulový vektor sa NIKDY nedostane do transformácie**.
+Transformácia kreslenia je vlastná (`Calc.draw_matrix`): rotácia okolo svetovej Z o uhol jednotkového vodorovného smeru + translácia na počiatok, teda **ortonormálna pravotočivá**
+matica, ktorú `CabinetBuilder.rigid_matrix?` (R-03) prijme aj pri šikmom ťahu. **Pravotočivosť pri zápornom 2. ťahu:** posunie sa **POČIATOK** o `−šírka` po osi merania
+(`draw_placement_origin`), osi ostávajú pravotočivé — **žiadne obrátenie `dir_y`**.
+
+**Zámky fáz z karty.** Pri štarte session JS posiela **číselný snapshot** `locks: { length:, width: }` (`locksFlat('board')`; nezamknutý kľúč **chýba**, žiadny Boolean). Ruby ich
+whitelistuje (`Calc.draw_locks`: len `length`/`width`, hodnota **Numeric**, mm Float, validácia proti `BoardBuilder::LIMITS`) **už pri štarte** — mimo limitu alebo nečíslo znamená,
+že sa **session vôbec nespustí**. Zamknutá fáza sa **preskočí** (pri preskočenej dĺžke je smer kanonický); pri oboch zamknutých commituje už **klik počiatku**. Zámky žijú **len
+v session** a do výrobného configu sa **nikdy** nedostanú.
+
+**Limity platia pre VŠETKY štyri zdroje rozmeru** — písané číslo, zamknutá hodnota, hodnota karty pri prázdnom Enter aj ťah myšou — a kontrolujú sa **pred posunom fázy**
+(`Calc.dim_ok?`); inak by `normalize` ticho orezal a náhľad by ukázal 6000, kým model dostane 5000. Neplatný text alebo hodnota mimo limitu = `UI.beep` + status s rozsahom
+a **fáza ostáva** (vzor Trimble `99_sphere_tool`). Ťah myšou nad limit sa v **náhľade oreže** (`Calc.dim_clamp`) s výrazným statusom a **klik mimo limitu sa odmietne**.
+Každá prijatá hodnota sa zaokrúhli na **0,01 mm** (`Calc.round_mm`, rovnako ako `board_config`), takže **náhľad = config = geometria**.
+
+**Obálka náhľadu sa počíta ZO ŽIVÝCH rozmerov** (`draw_corners_mm`), nie zo zmrazeného configu: neznámy rozmer drží hodnotu karty, takže doska je čitateľná už pri prvom ťahu.
+`corners_mm` je preto jeden čítač pre `draw`, `getExtents` aj `world_corners`. **Pri zvislej osi 2. ťahu sa natívne body inference nekreslia** (`vertical_width_phase?`) — merajú
+sa proti priamke, nie proti scéne, takže body na podlahe by klamali (vzor archívneho Ghost 2.0).
+
+**Meracie pole (VCB).** `enableVCB?` vracia hodnotu **zmrazenú v `activate`** (`@vcb`) — fázovo podmienené by nechalo Measurements po aktivácii vypnuté a písané rozmery by po
+prvom kliku neprišli (probe 5.9.). Fáza riadi **len** label (`Sketchup.vcb_label = "Dĺžka (mm)" / "Šírka (mm)"`), hodnotu a spracovanie; vo fáze `:origin` sa `onUserText`
+aj `onReturn` **ignorujú**. **Písané** číslo príde cez `onUserText` a parsuje ho **vlastný** parser (`Calc.parse_mm`, úplná zhoda po `strip`, bodka aj čiarka, `mm` voliteľné) —
+`String#to_l` na slovenskom Windows padne pri bodke a bez jednotky si vezme šablónu modelu, `to_f` by z `abc2400xyz` spravilo 0.0. **Prázdny Enter** ide cez **`Tool#onReturn`**
+(konštanta `VK_RETURN` v SketchUp API **neexistuje**; pri prázdnom poli `onUserText` nepríde) a je to **vedomá** akcia: prevezme hodnotu **karty** pre túto fázu a status to povie.
+Číslo, hodnota karty aj zámok znamenajú vždy **kladný** smer 2. ťahu — znamienko nesie len myš.
+
+**Klávesy majú JEDNU hranicu: klik počiatku.** ←/→ a ↑/↓ platia len vo fáze `:origin`; od kliku sú **zamknuté** (klávesa sa pohltí, status `DRAW_KEYS_LOCKED_MSG` povie prečo) —
+rovina 1. ťahu aj os 2. ťahu závisia od orientácie, takže zmena uprostred by rozpracované rozmery preniesla do inej sústavy. ALT je v kreslení bez významu. **Shift = hold-to-lock**
+natívnej inferencie: `onKeyDown` volá `view.lock_inference(@ip)`, `onKeyUp` odomkne. Zamknutý smer platí **aj vo fáze 1 a aj vo voľnom priestore** — session si drží
+`@draw_locked_dir` a `pickray` fallback sa naň premieta, takže **pohyb kurzora po zamknutí smer dosky nezmení** (test meria SMER, nie len `inference_locked?`). Zámok sa **vždy**
+uvoľní pri zmene fázy, `suspend`/`resume`, `deactivate` a `onCancel`. Esc = koniec **celej** session (0 krokov Späť, bez pečiatky).
+
+**Commit kreslenia ide TOU ISTOU cestou ako vloženie**, len s odvodeným plánom: `commit_plan` vráti `@plan` pre umiestňovanie a `BoardBuilder.replan(@plan, length:, width:)`
+pre kreslenie (`replan` nič nemutuje, takže smie bežať až za bariérou `flush_pending!`). `commit_session` je jediný vstup do commitu z Toolu — volá ho klik aj potvrdenie
+meracieho poľa v poslednej fáze. Testy: `tests/pure/test_ghost_d2_kreslenie.rb`, `tests/js/test_ghost_d2_karta.js`, `tests/js/test_ghost_d2_pasik.js`, in-SketchUp sekcie
+`run_ghost_d2` a `run_ghost_d2_async`.
 
 **Doska: kotvy sú DÁTOVÁ tabuľka, nie odvodenie.** `Calc::BOARD_AXES` hovorí, ktorý výrobný rozmer leží na ktorej lokálnej osi **umiestnenej** dosky (`leziaca` = L×W×T,
 `stojaca`/`na_stenu` = L×T×W — zdieľaná matica, rozdiel je len v configu), `Calc::BOARD_ANCHOR_TABLE` je 3 orientácie × 4 kotvy s **rovnakými ID a rovnakým poradím ALT cyklu ako
@@ -293,6 +349,13 @@ len rigidnú pravotočivú maticu, `to_a` sa číta práve raz) → `ensure_root
 **Orientácia ide do commitu SAMOSTATNE** (nie z `transform`): `stojaca` a `na_stenu` vedome zdieľajú maticu (STANDARD 8.3), takže sa z transformácie odvodiť nedá — finálnu hodnotu
 nesie argument zo session a zapíše sa do `config['orientation']`. Skladá sa **nad** polohou ghostu: `inst.transformation = placement × orientation_matrix(o, thickness)`, takže
 vnútro definície ostáva ležiace a výrobné dáta sú nedotknuté.
+
+**ODVODENÝ PLÁN (GHOST-D2): `replan(plan, length:, width:)`.** Kreslenie pozná finálne rozmery až po dvoch ťahoch, ale šev D1 beží nad plánom zmrazeným **pred** štartom ghostu —
+`replan` je preto **čistý** krok medzi nimi: vyrobí **nový zmrazený `BoardPlan`** s novou dĺžkou a šírkou a všetko ostatné (materiál, `material_source`, hrany, smer dekoru, hrúbku,
+marker schémy, orientáciu, `template_ref`, identitu dokumentu) prenesie **bez opätovného čítania katalógu** — presne to, čo zmrazený plán vylučuje: zmena katalógu medzi štartom
+kreslenia a klikom nesmie ticho zmeniť výrobný záznam. Rozmery sa **orežú na `LIMITS`** a zaokrúhlia na 0,01 mm, takže do plánu sa nikdy nedostane hodnota, ktorú by `normalize`
+neskôr ticho zmenil. **Názov:** `BoardPlan` nesie príznak `auto_name?` (čítaný zo **vstupu** `prepare_insert`, lebo po `normalize` sú explicitný aj automatický názov len String) —
+automatický („Doska 800×600", jedno miesto `auto_board_name`) sa prepočíta z **nových** rozmerov, explicitný ostáva nedotknutý. Cudzí objekt (nie `BoardPlan`) sa odmietne výnimkou.
 
 **JEDEN POUŽÍVATEĽSKÝ krok Späť, nie „jedna operácia".** Vytváracia operácia `start_operation('Vložiť dosku', true)` **+ existujúci transparentný scale-lock follow-up**
 (`apply_scale_lock_op` — DC atribút `dynamic_attributes/scaletool` nesmie vzniknúť v operácii, ktorá entity vytvára; D-40) bežia pod **spoločným `ScaleWatch.guard`**; follow-up sa

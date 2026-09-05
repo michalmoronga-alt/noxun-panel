@@ -705,6 +705,19 @@ Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html`
   ako tam už funguje „Použiť na označený".
 - **Primárna akcia je posledná** — zelené „Vložiť" stojí až za rozmermi *aj* za
   materiálom (rovnaký dôvod, prečo tam už stálo „Vložiť dosku").
+- **Doska má DVE akcie v JEDNOM riadku (GHOST-D2, 5.9.2026):** „Vložiť dosku"
+  (doska visí na kurzore, klik ju položí) a **„Nakresliť"** (dva ťahy na rozmer:
+  klik = počiatok → ťah dĺžky → ťah šírky; číslo + Enter funguje v oboch fázach).
+  Sú to **dva rovnocenné spôsoby vloženia tej istej dosky**, nie akcia a jej
+  variant — preto stoja **vedľa seba** a delia si šírku riadku, nie pod sebou:
+  vertikálny priestor panela je vzácny a druhý riadok tlačidiel by ho zožral
+  bez toho, aby čokoľvek pribudlo. Pri korpuse „Nakresliť" **nie je** (kresliť
+  sa dá len doska). Každé tlačidlo ide **vlastným serverovým callbackom**
+  (`insert_board` / `draw_board`) — názov ani `disabled` nie sú ochrana.
+- **Pásik ghostu pri kreslení mení OBSAH, nie výšku.** Piktogram kotiev zmizne
+  (počiatok je pevná kotva, Alt nemá čo prepínať) a na jeho mieste stojí **fáza
+  s hodnotou** („Dĺžka 2400 mm"); zamknutá fáza to prizná. Neznáma hodnota je
+  **„—"**, nikdy nula — nula by klamala, že rozmer už je zmeraný.
 - **Odhad namiesto ticha:** dopočítané údaje, ktoré pre nevložený návrh nemá kto
   spočítať presne, sa ukazujú so značkou **≈** a s vysvetlením v tooltipe —
   nikdy nie pomlčka a nikdy nie číslo, ktoré sa tvári ako presné.

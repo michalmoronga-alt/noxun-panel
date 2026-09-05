@@ -1363,6 +1363,20 @@ payloadom z CEF — v ňom marker nemusí byť; doskový záznam sa posudzuje pr
 **z karty**. Vyššia schéma šablóny = odmietnutie **bez session a bez pečiatky**. Po úspešnom commite beží `ghost_after_commit_board` (výber, status s umiestnením,
 `push_selected`, `stamp_once!`).
 
+**GHOST-D2: „Nakresliť" je SAMOSTATNÝ serverom whitelistovaný callback `draw_board`.** `insert_board` (D1) ostáva pre vloženie **aj pre dvojklik doskovej šablóny** — HTML `disabled`
+ani názov tlačidla nie sú ochrana, preto má kreslenie vlastnú cestu. **Poradie je súčasťou kontraktu:** `foreign_document?` ako **úplne prvý** krok (oneskorený CEF callback zo starého
+Inspectora nesmie pripraviť `BoardPlan` nad novým modelom) → šablónový ref + downgrade brána nad **uloženým RAW** záznamom → **zámky fáz** → `prepare_insert` → session
+s `interaction: :drawing`. **Zámky** prídu ako **samostatné pole `locks`** = číselný snapshot `locksFlat('board')`; Ruby ich whitelistuje (`GhostTool::Calc.draw_locks`: len
+`length`/`width`, hodnota **Numeric**, mm Float validovaná proti `BoardBuilder::LIMITS`) **už pri štarte** — mimo limitu alebo nečíslo znamená, že sa session **vôbec nespustí**
+(status povie prečo). Zámky žijú len v session a do výrobného configu sa nikdy nedostanú; whitelist parametrov karty (`BOARD_INSERT_PARAM_KEYS`) je **jeden pre obe** vkladacie
+cesty, aby sa nemohli rozísť, a `locks` v ňom **nie sú**. Po úspešnom commite hlási `ghost_after_commit_board` pri kreslení aj **rozmery** (používateľ ich nikde nenapísal —
+vznikli z ťahov). Kontrakt fáz, geometrie a klávesov: [construction.md § ghost_tool.rb](construction.md).
+
+**Karta Dosky má DVE akcie v JEDNOM riadku** (rozhodnuté 5.9.2026, bez samostatného mockupu — vertikálny priestor panela nerastie): **„Vložiť dosku"** (D1 ghost) a **„Nakresliť"**
+(D2). Pri korpuse je „Nakresliť" skryté (`body:not([data-insert-kind="board"])`), pri doske sa riadok prepne na `display: flex` a obe tlačidlá si delia šírku. Obe idú **tou istou**
+validovanou cestou payloadu (`buildInsertBoardPayload`), kreslenie ju len rozšíri o `locks` (`buildDrawBoardPayload` — prijme **len konečné čísla**, takže súkromný tvar
+`{locked, value}`, Boolean ani text sa do Ruby nedostanú). Testy: `tests/js/test_ghost_d2_karta.js`.
+
 **Brána schémy stojí vo VSTUPNEJ bráne karty `guarded_board`, nie až pri prestavbe (Codex #298 P2).** Cesty karty totiž pred rebuildom menia **globálny katalóg** —
 `handle_set_board_material` cez `resolve_virtual_material` → `ensure_duplak_for` a cez `ensure_missing_abs` (to isté robí „olep všetkých 4"), a to sa už **nedá vrátiť**. Guard
 preto beží hneď za identitou dokumentu, kontextom a echom `board_id`: doska z novšej verzie odmietne **každú** zápisovú cestu karty (polia · materiál · ABS hrana · olep všetkých
@@ -1409,6 +1423,12 @@ umiestnenie, o zámku výšky ani slovo). Push **bez** `subject` (staršie paylo
 navyše odmieta kontrolou **subjektu session** (`unless s.cabinet?`) — HTML `disabled` ani skrytý ovládač nie sú ochrana. **Synchronizácia s kartou Dosky:** po ↑/↓ v modeli
 klient prestaví `NXInsert.boardOrientation` a prekreslí zrkadlo segmentov — **žiadna materializácia ani reset karty**, takže rozpísané rozmery, materiál aj šablóna prežijú
 a *ďalšia* session štartuje z tejto hodnoty. Testy: `tests/js/test_ghost_d1_pasik.js`.
+
+**Pásik pri KRESLENÍ (GHOST-D2).** Push nesie navyše `phase` · `phase_label` · `phase_value` · `phase_locked`. Pri `interaction: 'drawing'` sa **skryje piktogram kotiev**
+(`gbAnchor` — počiatok je pevná kotva `fl_bottom` a ALT význam nemá) a na jeho mieste stojí **fáza s hodnotou** (`gbPhase`: „Počiatok" · „Dĺžka 2400 mm" · „Šírka 600 mm";
+zamknutá fáza to prizná — ťah sa preskočí, neznáma hodnota ukáže „—", nie klamlivú nulu). Pásik **nerastie o riadok** — mení sa len obsah toho istého. Nápoveda „i" je pre
+kreslenie vlastná (počiatok, ťahy, meracie pole, Shift; o ALT ani o zámku výšky ani slovo) a `ghost_lock_z` sa neposiela ani odtiaľto. Starší push bez `interaction` sa naďalej
+správa ako umiestňovanie. Testy: `tests/js/test_ghost_d2_pasik.js`.
 
 Zmeny vo vkladacej karte sa do **bežiacej** session NEPREMIETAJÚ (snapshot je zmrazený; status to prizná) a **druhé „Vložiť" starú session zruší** a založí novú s čerstvým
 snapshotom. **Poznámku preflightov** (D-45 prevzatá hrúbka, materiálové noty) vypisuje **až `ghost_after_commit`** — pri stlačení „Vložiť" sa ešte nič nestalo, takže hlásiť ju
