@@ -981,10 +981,14 @@ module Noxun
             next if fid.empty?
 
             DRAWER_ROLES.each do |role|
-              key = PartKeys.front(fid, role)
-              ov = overrides[key].is_a?(Hash) ? overrides[key]['material_id'] : nil
-              th = present(ov) ? sheet_thickness(ov) : base
-              out[key] = th if th
+              # Codex #304 kolo 2 P1: tvar klucov drzi `Construction` (box_side
+              # sa emituje ako `:left` aj `:right`) — druhy opisany zoznam by sa
+              # rozisiel a override boku by sa do receptu nedostal.
+              Construction.drawer_thickness_keys(fid, role).each do |key|
+                ov = overrides[key].is_a?(Hash) ? overrides[key]['material_id'] : nil
+                th = present(ov) ? sheet_thickness(ov) : base
+                out[key] = th if th
+              end
             end
           end
           out
@@ -1249,6 +1253,10 @@ module Noxun
         # old_overrides — deep kopia overridov PRED zmenou (part material case);
         #   default = aktualne overridy (korpus/projekt case ich nemenia)
         # Vrati {'changed'=>pocet dielcov, 'lost'=>['Bok lavy L1', ...]}.
+        # KOV-C2b (Codex #304 kolo 2 P2): `old_eff`/`new_eff` nesu aj kluc
+        # `drawer` — bez neho by dielce zasuviek spadli v `base_material_for`
+        # do vetvy tela a remap ABS by ich pri zmene predvolby ZASUVIEK
+        # prehliadol (alebo zladil s dekorom korpusu).
         def remap_part_edge_overrides!(params, old_eff, new_eff, old_overrides: nil)
           result = { 'changed' => 0, 'lost' => [] }
           ov = params['part_overrides']
@@ -1265,9 +1273,11 @@ module Noxun
             next unless pd
             old_rec = old_ov[rk].is_a?(Hash) ? old_ov[rk] : {}
             old_mat = present(old_rec['material_id']) ||
-                      base_material_for(pd[:role], pd[:material], old_eff['body'], old_eff['front'], old_eff['back'])
+                      base_material_for(pd[:role], pd[:material], old_eff['body'], old_eff['front'],
+                                        old_eff['back'], old_eff['drawer'])
             new_mat = present(rec['material_id']) ||
-                      base_material_for(pd[:role], pd[:material], new_eff['body'], new_eff['front'], new_eff['back'])
+                      base_material_for(pd[:role], pd[:material], new_eff['body'], new_eff['front'],
+                                        new_eff['back'], new_eff['drawer'])
             new_sheet = Materials.sheet(new_mat)
             # Cielova hrubka: katalogova hrubka noveho sheetu (cela 18/19 sa jej
             # prisposobia — FIX 10), fallback konstrukcna hrubka dielca.

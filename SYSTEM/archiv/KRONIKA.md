@@ -49,9 +49,15 @@
   (MIGRAČNÝ)**: projekt uložený PRED aktiváciou receptov, ktorý už má klasifikovanú zásuvku, nemá v .skp receptové dielce a nesie legacy výsuv — kusovník aj VEPO by boli
   neúplné a ticho. `Bom.collect` to priznáva RED a brána zastaví **všetky štyri** výstupy; nápravou je prestavba skrinky. Register má odvtedy 11 kódov: 10 produkuje
   resolver, 11. je migračný a nikdy sa nezapisuje do modelu.
-  **Testy:** 3074 headless (+51: `test_kovc2b_dielce.rb` 21 · `test_kovc2b_brany.rb` 30), 89 JS sád, in-SU sekcia **`run_kovc2b`** — **1782 PASS / 0 FAIL** (32 scenárov:
-  plán vs. model 1:1, prestavba bez duplicít, 1 krok Späť, prepnutie kov ↔ drevo a späť, kópia aj šablóna nesú pripnutý recept, plytká skrinka = žiadne dielce + RED
-  + zastavený export s **prázdnym** priečinkom a neotvoreným pickerom).
+  **Codex kolo 2 (1 P1 + 1 P2) doplnilo dve veci k materiálom.** (1) Hrúbky dielcov zásuviek sa čítali pod **neexistujúcim** kľúčom `front:<id>/box_side`, hoci plán emituje
+  `box_side:left` a `:right` — override materiálu na boku sa preto do receptu nikdy nedostal (recept počítal so zdedenou hrúbkou a `resolve_part` potom aplikoval iný
+  materiál, takže snapshot hlásil 16 mm z dosky 18). Tvar kľúčov drží odteraz **jediná** funkcia `Construction.drawer_thickness_keys`; hrúbka je jedna na rolu, takže dva
+  boky s rôznym materiálom sú **fail-closed** `drawer_thickness_unsupported` („boky zásuvky musia mať rovnakú hrúbku") a kontrolujú sa len roly, ktoré recept naozaj
+  emituje (dormantný `box_side` override na Atire falošný konflikt nerobí). (2) Zmena predvoľby **zásuviek** prebieha tou istou remap slučkou ABS ako telo/čelá/chrbát —
+  `old_eff`/`new_eff` dostali kľúč `drawer`, bez neho by drawer roly spadli v `base_material_for` do vetvy tela.
+  **Testy:** 3080 headless (+57: `test_kovc2b_dielce.rb` 25 · `test_kovc2b_brany.rb` 30 · 2 remap testy v `test_abs_remap.rb`), 89 JS sád, in-SU sekcia **`run_kovc2b`**
+  — **1786 PASS / 0 FAIL** (plán vs. model 1:1, prestavba bez duplicít, 1 krok Späť, prepnutie kov ↔ drevo a späť, kópia aj šablóna nesú pripnutý recept, plytká skrinka
+  = žiadne dielce + RED + zastavený export s **prázdnym** priečinkom a neotvoreným pickerom).
   **Zostáva C2c:** karta zásuvky v Inspectore (systém · výška · NL · nosnosť · recept + `explain`), riadky Kontroly s navigáciou na čelo a labely v Nákupe.
 
 - **KOV-C2a — PRÍPRAVA AKTIVÁCIE ZÁSUVIEK: MATERIÁLOVÝ KANÁL, ABS A RECEPTOVÉ SETY (PR #303, v0.9.30, 5.9.2026):** druhý rez package KOV-C v2 a opäť **bez viditeľnej zmeny** —

@@ -218,7 +218,18 @@ module Noxun
 
         recipe = Recipes.load(ref)
         ctx = context_for(item, ctx_plan, cfg)
-        th = drawer_thickness_map(front_id, part_thicknesses)
+        # Hrubka je JEDNA na rolu (recept z nej pocita vsetky dielce tej roly),
+        # takze dva boky s ROZNYM materialom su fail-closed konflikt — inak by
+        # sa jeden bok vyrobil s hrubkou toho druheho.
+        th, mismatch = drawer_thickness_map(front_id, part_thicknesses,
+                                            recipe[:thickness_supported].keys)
+        if mismatch
+          return out[:conflicts] << drawer_conflict(
+            front_id, 'drawer_thickness_unsupported',
+            "#{Recipes.label(recipe)}: boky zásuvky musia mať rovnakú hrúbku — ľavý a pravý majú " \
+            'iný materiál. Zjednoť im materiál (karta dielca), alebo zruš ručný materiál jedného z nich.'
+          )
+        end
         overrides = Array(cfg[:hardware_overrides])
 
         # Legacy NL override (D-93) sa premapuje na receptovu identitu; vypnuty
@@ -263,14 +274,35 @@ module Noxun
         Recipes.latest_for(key[:system], key[:opening])
       end
 
+      # KOV-C2b: part_key(e) JEDNEJ roly dielca zasuvky (Codex #304 kolo 2 P1).
+      # `box_side` sa emituje DVAKRAT — `box_side:left` a `box_side:right` —
+      # takze pod holym `front:<id>/box_side` nikdy ziadny override neexistuje
+      # a hrubka bokov by sa citala len ako zdedena. JEDINY zdroj tvaru klucov:
+      # cita ho `drawer_thickness_map` aj `CabinetBuilder.drawer_thicknesses`.
+      BOX_SIDES = %w[left right].freeze
+
+      def drawer_thickness_keys(front_id, role)
+        return [PartKeys.front(front_id, role)] unless role.to_s == Recipes::ROLE_BOX_SIDE
+
+        BOX_SIDES.map { |side| PartKeys.front(front_id, role, side) }
+      end
+
       # Hrubky VYRABANYCH dielcov jedneho cela (rola -> mm). `part_thicknesses`
       # je mapa part_key -> mm od buildera; chybajuci kluc = UNI 16 fallback.
-      def drawer_thickness_map(front_id, part_thicknesses)
+      # `roles` = roly, ktore recept naozaj emituje — dormantny override na role
+      # INEHO systemu (napr. `box_side` na Atire po prepnuti z Quadra) tak
+      # nemoze vyrobit falosny konflikt.
+      # -> [ { rola => mm }, rola_s_NEZHODOU | nil ]
+      def drawer_thickness_map(front_id, part_thicknesses, roles = Recipes::PART_ROLES)
         src = part_thicknesses.is_a?(Hash) ? part_thicknesses : {}
-        Recipes::PART_ROLES.each_with_object({}) do |role, acc|
-          v = src[PartKeys.front(front_id, role)]
-          acc[role] = (v.is_a?(Numeric) && v.to_f.positive? ? v.to_f : DRAWER_DEFAULT_THICKNESS)
+        mismatch = nil
+        out = Array(roles).each_with_object({}) do |role, acc|
+          vals = drawer_thickness_keys(front_id, role).map { |k| src[k] }
+                                                      .filter_map { |v| v.to_f if v.is_a?(Numeric) && v.to_f.positive? }
+          mismatch ||= role if vals.map { |v| v.round(4) }.uniq.length > 1
+          acc[role] = vals.first || DRAWER_DEFAULT_THICKNESS
         end
+        [out, mismatch]
       end
 
       # Legacy / receptovy NL override, ktory zasuvku ZASTAVUJE: vypnuta polozka

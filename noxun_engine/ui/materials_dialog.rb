@@ -1020,7 +1020,8 @@ module Noxun
           # VSETKYCH dediacich skriniek — rucne ABS overridy zladene so starym
           # dekorom sa preladia (stary default este plati, novy je len v `value`).
           eff_key = { 'default_material_id' => 'body', 'default_front_material_id' => 'front',
-                      'default_back_material_id' => 'back' }[key]
+                      'default_back_material_id' => 'back',
+                      'default_drawer_material_id' => 'drawer' }[key]
           # Snapshot PRED zapisom: baseline kontraktu potvrdenia aj hodnota, na
           # ktoru sa vrati select pri odmietnuti/ponuke.
           old_default = Materials.project_defaults(model)[key].to_s
@@ -1064,11 +1065,23 @@ module Noxun
                 return offer_drawer_change(fresh, have, plan, stale: !data['confirm'].nil?)
               end
             end
+            # Codex #304 kolo 2 P2: ABS overridy dielcov zasuviek sa preladia
+            # PRESNE ako pri tele/celach/chrbte — paska zladena so STARYM
+            # efektivnym dekorom nasleduje novy, vedome kontrastna alebo nil
+            # ostava. Rovnaka slucka ako vo vetve `else` nizsie.
             remap_changed = 0
             remap_lost = []
             adopted_n = 0
             recomputed_n = affected.size
-            jobs = affected.map { |cabinet| [cabinet, Panel.existing_params(cabinet)] }
+            jobs = affected.map do |cabinet|
+              p = Panel.existing_params(cabinet)
+              old_eff = Panel.effective_materials(model, p)
+              remap = CabinetBuilder.remap_part_edge_overrides!(p, old_eff,
+                                                                old_eff.merge(eff_key => value))
+              remap_changed += remap['changed'].to_i
+              remap_lost.concat(remap['lost'])
+              [cabinet, p]
+            end
           else
             incompatible = affected.select do |cabinet|
               params = Panel.existing_params(cabinet)

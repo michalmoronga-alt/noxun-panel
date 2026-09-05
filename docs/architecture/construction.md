@@ -37,6 +37,12 @@ ich minimá stráži recept sám (jediný neplatný rozmer = `drawer_no_fit` pre
 vyriešené z materiálového kanála `:drawer` + `part_overrides` **PRED** plánom (Codex #301 kolo 3 P1). Bez kľúča platí `DRAWER_DEFAULT_THICKNESS = 16.0` (UNI 16 fallback
 kanála) — pomocné volania `build_plan` (migrácia identity, panelové resolvery) hrúbky nepotrebujú, part_key ani suffix od nich nezávisia.
 
+**Tvar kľúčov drží `drawer_thickness_keys(front_id, role)` — jediný zdroj** (číta ho `drawer_thickness_map` aj `CabinetBuilder.drawer_thicknesses`). `box_side` sa emituje
+**dvakrát** (`box_side:left` a `box_side:right`), takže pod holým `front:<id>/box_side` nikdy žiadny dielec — a teda ani žiadny override — neexistuje; druhý opísaný zoznam
+by presne toto prehliadol a override boku by sa do receptu nedostal (Codex #304 kolo 2 P1). Hrúbka je **jedna na rolu** (recept z nej počíta všetky dielce tej roly), preto
+sú dva boky s rôznym materiálom **fail-closed** konflikt `drawer_thickness_unsupported` („boky zásuvky musia mať rovnakú hrúbku"). Kontrolujú sa **len roly, ktoré recept
+naozaj emituje** (`recipe[:thickness_supported].keys`) — dormantný override `box_side` na Atire (pozostatok po prepnutí z Quadra) tak nevyrobí falošný konflikt.
+
 **Geometria dielcov.** `prod[:length]` = rozmer `width` receptu (dlhá hrana), `prod[:width]` = `height` — vďaka tomu ABS L1/L2 ležia na dlhej hrane presne podľa seedu 4.
 Box je vycentrovaný v svetlej šírke, hĺbka začína na prednej rovine vnútra (y = 0), spodok je `ctx[:z0]`; predok a chrbát stoja NA dne. **`axes:` sa vedome neuvádzajú** —
 slúžia len na farbenie ABS plôšok (D-88) a pri stojacom dielci by L1 vyšla na spodnú hranu, kým páska ide na hornú; PartFaces má vlastnú zásadu „radšej žiadna farba".

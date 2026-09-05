@@ -169,8 +169,15 @@ NxTest.test('KOV-C2b (R1): builder pocita hrubky Z KANALA :drawer PRED planom') 
   eff = NxC2bD::CB.effective_materials(nil, cfg)
   NxTest.assert_equal('UNI_ZASUVKA_16', eff['drawer'])
   th = NxC2bD::CB.drawer_thicknesses(cfg, eff)
-  NxTest.assert_equal(NxC2bD::CB::DRAWER_ROLES.map { |r| NxC2bD::E::PartKeys.front('F1', r) }.sort,
-                      th.keys.sort, 'kluc pre KAZDU rolu KAZDEHO zasuvkoveho cela')
+  # Codex #304 kolo 2 P1: `box_side` sa emituje DVAKRAT, takze hrubka sa musi
+  # citat pod OBOMA klucmi — pod holym `front:F1/box_side` neexistuje ziadny
+  # dielec a teda ani ziadny override.
+  want = NxC2bD::CB::DRAWER_ROLES.flat_map { |r| NxC2bD::CN.drawer_thickness_keys('F1', r) }
+  NxTest.assert_equal(%w[front:F1/box_side:left front:F1/box_side:right],
+                      NxC2bD::CN.drawer_thickness_keys('F1', 'box_side'))
+  NxTest.assert_equal(['front:F1/drawer_bottom'],
+                      NxC2bD::CN.drawer_thickness_keys('F1', 'drawer_bottom'))
+  NxTest.assert_equal(want.sort, th.keys.sort, 'kluc pre KAZDY emitovany dielec zasuvky')
   # Poradie v `build_into` je zavazne: efektivne materialy PRED planom.
   src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'cabinet_builder.rb'),
                   encoding: 'UTF-8')
@@ -346,4 +353,58 @@ NxTest.test('KOV-C2b (R5): P2O nad 600 mm = ORANGE `drawer_sync_recommended`, ni
                 'svetla sirka 599 uz nie')
   # SiSy synchronizaciu nikdy neodporuca.
   NxTest.refute(c.plan[:warnings].any? { |x| x['code'] == 'drawer_sync_recommended' })
+end
+
+# ============================================================================
+# CODEX #304 KOLO 2 — hrubky bokov Quadro
+# ============================================================================
+
+NxTest.test('Codex #304 P1: override na BOKU Quadra sa dostane do receptu') do
+  c = NxC2bD
+  # Oba boky 18 mm (a dno 16) — boky sa POSTAVIA na 18, cielo/chrbat sa ratia
+  # z hrubky DNA (119 - 16 - 12 = 91), nie z hrubky bokov.
+  th = c.th_for('F1', 16.0,
+                'front:F1/box_side:left' => 18.0, 'front:F1/box_side:right' => 18.0)
+  pl = c.plan({ 'drawer' => { 'construction' => 'wood' } }, {}, th)
+  NxTest.assert_equal([], Array(pl[:drawer_conflicts]), pl[:drawer_conflicts].inspect)
+  NxTest.assert_close(18.0, c.part(pl, 'front:F1/box_side:left')[:prod][:thickness], 0.001)
+  NxTest.assert_close(18.0, c.part(pl, 'front:F1/box_side:right')[:prod][:thickness], 0.001)
+  NxTest.assert_close(16.0, c.part(pl, 'front:F1/drawer_bottom')[:prod][:thickness], 0.001)
+  NxTest.assert_close(91.0, c.part(pl, 'front:F1/drawer_inner_front')[:prod][:width], 0.001,
+                      'celo/chrbat sa ratia z hrubky DNA')
+  # Vonkajsia sirka boxu rastie s hrubkou bokov (dno ostava 818).
+  NxTest.assert_close(818.0, c.part(pl, 'front:F1/drawer_bottom')[:prod][:length], 0.001)
+end
+
+NxTest.test('Codex #304 P1: ROZNE hrubky bokov = fail-closed conflict') do
+  c = NxC2bD
+  th = c.th_for('F1', 16.0,
+                'front:F1/box_side:left' => 18.0, 'front:F1/box_side:right' => 16.0)
+  pl = c.plan({ 'drawer' => { 'construction' => 'wood' } }, {}, th)
+  NxTest.assert_equal('drawer_thickness_unsupported', c.conflict(pl)['code'])
+  NxTest.assert(c.conflict(pl)['message'].include?('rovnakú hrúbku'), c.conflict(pl)['message'])
+  NxTest.assert_equal([], c.drawer_parts(pl), 'ziadne dielce')
+  NxTest.assert_equal([], c.slides(pl), 'ziadna polozka vysuvu')
+end
+
+NxTest.test('Codex #304 P1: nepodporovana hrubka BOKA uz naozaj padne') do
+  c = NxC2bD
+  # Oba boky 25 mm — Quadro pozna 16/18, takze `drawer_thickness_unsupported`.
+  th = c.th_for('F1', 16.0,
+                'front:F1/box_side:left' => 25.0, 'front:F1/box_side:right' => 25.0)
+  pl = c.plan({ 'drawer' => { 'construction' => 'wood' } }, {}, th)
+  NxTest.assert_equal('drawer_thickness_unsupported', c.conflict(pl)['code'])
+  NxTest.assert_equal([], c.drawer_parts(pl))
+end
+
+NxTest.test('Codex #304 P1: dormantny override boku NEBLOKUJE Atiru') do
+  c = NxC2bD
+  # Po prepnuti Quadro -> Atira ostanu overridy `box_side` v configu (kluce
+  # neexistujucich dielcov sa ZACHOVAVAJU). Atira boky nevyraba, takze rozdiel
+  # medzi nimi ju nesmie zastavit.
+  th = c.th_for('F1', 16.0,
+                'front:F1/box_side:left' => 18.0, 'front:F1/box_side:right' => 25.0)
+  pl = c.plan({}, {}, th)
+  NxTest.assert_equal([], Array(pl[:drawer_conflicts]), pl[:drawer_conflicts].inspect)
+  NxTest.assert_equal(2, c.drawer_parts(pl).length)
 end
