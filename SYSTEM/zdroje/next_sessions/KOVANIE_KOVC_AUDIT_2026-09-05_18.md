@@ -104,3 +104,10 @@ snapshot použitých systémov; D-46 preflight per systém (Atira 16, Quadro 16/
 (P2) `sync_rod_min_width` chýbal v schéme → číselné pole v `extras.sync_shaft`, validované, v digeste. (P1) Quadro čísla: LB = 864 → SKW 818 (nie 854), hĺbka 500 → NL 480 (470 nie je v Quadro rade).
 (P2) `merge_recipes_seed!` musí prestavať dotknuté čelá a prepísať digesty v jednej operácii (rollback pri zlyhaní). (P1) `runner_variant` per systém: Atira `eb_by_kd`, Quadro pevné `eb23`.
 (P1) jeden kanonický strojový tvar výšky: číselné `height_variant` 70|144|176 (Atira) / `box_height` (Quadro) naprieč resolverom, BuildPlan, setmi, overridmi a KOV-D selektorom.
+
+## Codex GH review PR #300 kolo 2 (5.9.2026, nad v6 `06a52fb`) — 5× P1 + 2× P2, ZAPRACOVANÉ (verzia 7)
+
+(P1) `compatible_set_for` musí ísť TOU ISTOU cestou výberu ako expanzia (`resolve_mapping_value`, owner/cabinet override) a overiť člena `code_by_nl` pre resolved NL — chýbajúci kód =
+`set_incompatible`, nie downstream `nl_missing`. (P1) signatúra `Recipes.resolve` = plochá číselná výška (`height_variant` 70|144|176 / `box_height`). (P2) EPS: inkluzívny vendor limit
+porovnaný priamo s raw hodnotou (105,00 platí, 104,995 padá). (P2) zastarané „C2a, CONFIG_SCHEMA 5" odstránené. (P1) `drawer_recipes_mismatch`/`drawer_recipes_invalid` blokujú AJ VEPO
+(prestavba odmietnutá = stará geometria v modeli). (P1) `load` je súčasť výberu setu (KOV-D selektor + os `load`), nie len kontroly po výbere.
