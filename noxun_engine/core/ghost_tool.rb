@@ -159,6 +159,14 @@ module Noxun
           changed = false
           if s
             changed = s.cancel!(reason)
+            # GHOST-D2: natívny zámok inferencie (Shift) sa uvolnuje pri
+            # KAZDOM konci session, nie az v `Tool#deactivate`. Ten totiz
+            # pride az PO `pop_tool` — a ked nastroj prave nie je vrchom
+            # stacku, `pop_tool` sa ODLOZI a zamok by na view visel dalej
+            # (napr. vymena dokumentu s drzanym Shiftom). Odomyka sa LEN pre
+            # kreslenie: iba ono zamyka, takze cudzi zamok pouzivatela
+            # (iny nastroj pod nami) sa nesmie zhodit.
+            release_inference(s) if s.respond_to?(:drawing?) && s.drawing?
             # Slot sa uvolnuje aj nad `:committing` (review #268 P3-10): ked by
             # z commitu vybublala vynimka MIMO `StandardError`, session by
             # ostala navzdy „rozrobena" a drzala by slot az do restartu.
@@ -357,6 +365,20 @@ module Noxun
         end
 
         # --- pomocne --------------------------------------------------------
+
+        # GHOST-D2: uvolnenie natívneho zámku inferencie pre session, ktora
+        # ho mohla drzat (kreslenie). Bezargumentove `lock_inference`
+        # odomyka; volanie je idempotentne a nikdy nesmie zhodit cancel.
+        def release_inference(s)
+          m = s.respond_to?(:model) ? s.model : nil
+          v = m && m.respond_to?(:active_view) ? m.active_view : nil
+          return false unless v && v.respond_to?(:lock_inference)
+
+          v.lock_inference
+          true
+        rescue StandardError
+          false
+        end
 
         def invalidate_view(model)
           v = (model && model.respond_to?(:active_view) ? model.active_view : nil)
@@ -1799,6 +1821,7 @@ module Noxun
             # z drzaneho Shiftu nesmie prezit nastroj (visel by aj natívnym
             # nastrojom, ktore prídu po nas).
             release_inference!(view)
+            @ip_origin = nil
             @attached = false
             @on_top = false
             @finish_pending = false
@@ -2254,6 +2277,10 @@ module Noxun
             end
 
             s.begin_draw!(s.last_point)
+            # KOPIA REALNE pickovaneho bodu pociatku — natívny zámok smeru
+            # (Shift) potrebuje DVA skutocne InputPointy; syntetický
+            # `InputPoint.new(pt)` podla probe 5.9. nezamyka.
+            capture_origin_ip!
             after_draw_step(s, view)
           when :length, :width
             # Klik potvrdzuje hodnotu, ktoru prave ukazuje NAHLAD.
@@ -2413,7 +2440,7 @@ module Noxun
           return nil unless view
 
           begin
-            view.lock_inference(@ip) if @ip && @ip.valid?
+            native_lock(s, view)
           rescue StandardError => e
             Engine.log_error(e, 'GhostTool.Tool#lock_inference!')
           end
@@ -2421,6 +2448,38 @@ module Noxun
           refresh_status
           view.invalidate
           nil
+        end
+
+        # NATÍVNY zámok. Vo faze HLADANIA SMERU zamykame PRIAMKU pociatok ->
+        # kurzor dvojicou InputPointov (vzor Trimble LineTool) — presne to
+        # znamena „drz smer". Probe 5.9. ukazal, ze SYNTETICKE body
+        # (`InputPoint.new(pt)`) nezamykaju; `@ip_origin` je preto KOPIA
+        # REALNE pickovaneho bodu z kliku pociatku (`InputPoint#copy!`), nie
+        # bod poskladany zo suradnic. Ked dvojica nie je k dispozicii (alebo
+        # sme vo faze merania sirky), zamyka sa jednobodovo.
+        # POZOR: ked kurzor nema ziadnu natívnu inferenciu (volny bod v
+        # prazdnom priestore), SketchUp NEZAMKNE — smer vtedy drzi VLASTNY
+        # zamok session (`lock_draw_dir!`), preto sa oba pouzivaju spolu.
+        def native_lock(s, view)
+          if s.drawing? && s.draw_phase == :length &&
+             @ip_origin && @ip_origin.valid? && @ip && @ip.valid?
+            view.lock_inference(@ip, @ip_origin)
+          elsif @ip && @ip.valid?
+            view.lock_inference(@ip)
+          end
+        end
+
+        # Bod POCIATKU ako REALNY InputPoint (kopia, nie novy z suradnic).
+        # Zije len pocas kreslenia; `deactivate` ho zahodi.
+        def capture_origin_ip!
+          return nil unless @ip && @ip.valid?
+
+          @ip_origin ||= Sketchup::InputPoint.new
+          @ip_origin.copy!(@ip)
+          @ip_origin
+        rescue StandardError => e
+          Engine.log_error(e, 'GhostTool.Tool#capture_origin_ip!')
+          @ip_origin = nil
         end
 
         def release_inference!(view)

@@ -636,6 +636,77 @@ NxTest.test('GHOST-D2 Shift: `release_draw_dir!` je idempotentny (Esc, deactivat
   NxTest.assert_equal(nil, s.draw_locked_dir)
 end
 
+# In-SU beh #299: `inference_locked?` bol po Shifte FALSE. Natívny zámok
+# potrebuje bod so SKUTOCNOU inferenciou; vo faze HLADANIA SMERU je spravnou
+# natívnou operaciou zamok PRIAMKY pociatok -> kurzor, teda DVOJICA REALNYCH
+# InputPointov (vzor Trimble LineTool). Syntetické body podla probe 5.9.
+# nezamykaju, preto sa pociatok KOPIRUJE z realne pickovaneho bodu.
+NxTest.test('GHOST-D2 Shift: vo faze SMERU zamyka PRIAMKU pociatok -> kurzor (dva REALNE body)') do
+  s = NxGD2.src('noxun_engine', 'core', 'ghost_tool.rb')
+  body = s[/def native_lock\(s, view\).*?\n        end\n/m].to_s
+  NxTest.assert(!body.empty?, 'native_lock sa nasla')
+  NxTest.assert(body.include?('s.draw_phase == :length'), 'dvojbodovy zamok patri faze SMERU')
+  NxTest.assert(body.include?('view.lock_inference(@ip, @ip_origin)'), 'zamyka sa PRIAMKA')
+  NxTest.assert(body.include?('view.lock_inference(@ip)'), 'inde jednobodovy zamok')
+  cap = s[/def capture_origin_ip!.*?\n        end\n/m].to_s
+  NxTest.assert(cap.include?('@ip_origin.copy!(@ip)'),
+                'pociatok je KOPIA realne pickovaneho bodu, nie `InputPoint.new(pt)`')
+  NxTest.refute(cap.include?('InputPoint.new(@'), 'ziadny synteticky bod zo suradnic')
+  click = s[/def draw_click\(s, x, y, view\).*?\n          when :length, :width/m].to_s
+  NxTest.assert(click.include?('capture_origin_ip!'), 'kopia vznikne pri kliku POCIATKU')
+  deact = s[/def deactivate\(view\).*?\n        end\n/m].to_s
+  NxTest.assert(deact.include?('@ip_origin = nil'), 'a s nastrojom zanikne')
+end
+
+# In-SU beh #299 (FAIL „GHOST suspend"): `Tool#deactivate` pride az PO
+# `pop_tool` — a ked nastroj nie je vrchom stacku, pop sa ODLOZI. Zamok
+# inferencie by dovtedy na view VISEL (vymena dokumentu s drzanym Shiftom).
+NxTest.test('GHOST-D2 Shift: zamok pusti UZ `cancel_session`, nielen `deactivate`') do
+  view = Class.new do
+    attr_reader :unlocked
+
+    def initialize
+      @unlocked = false
+    end
+
+    # Bezargumentove volanie = ODOMKNUTIE (SketchUp API).
+    def lock_inference(*args)
+      @unlocked = args.empty?
+      true
+    end
+  end.new
+  model = Class.new do
+    attr_reader :view
+
+    def initialize(v)
+      @view = v
+    end
+
+    def active_view
+      @view
+    end
+  end.new(view)
+
+  s = NxGD2.gt::PlacementSession.new(model: model, plan: NxGD2.plan, subject: :board,
+                                     interaction: :drawing, memory: NxGD2.fresh_memory,
+                                     orientation: 'leziaca')
+  NxTest.assert(s.drawing?)
+  NxTest.assert(NxGD2.gt.release_inference(s), 'uvolnenie prebehlo')
+  NxTest.assert(view.unlocked, 'a bolo to BEZARGUMENTOVE `lock_inference` = odomknutie')
+  # Cudzi zamok pouzivatela (session, ktora nikdy nezamykala) sa NEZHADZUJE.
+  src = NxGD2.src('noxun_engine', 'core', 'ghost_tool.rb')
+  cancel = src[/def cancel_session\(reason = nil, deferred: true\).*?\n        end\n/m].to_s
+  NxTest.assert(cancel.include?('release_inference(s) if s.respond_to?(:drawing?) && s.drawing?'),
+                'odomyka sa LEN po kresleni (umiestnovanie nikdy nezamyka)')
+  NxTest.assert(cancel.index('release_inference(s)') < cancel.index('end_tool'),
+                'a este PRED (odlozenym) ukoncenim nastroja')
+end
+
+NxTest.test('GHOST-D2 Shift: `release_inference` nepadne na modeli bez view (headless)') do
+  s = NxGD2.session
+  NxTest.assert_equal(false, NxGD2.gt.release_inference(s), 'ziadne view = ziadne odomknutie, ziadna vynimka')
+end
+
 NxTest.test('GHOST-D2 Shift: Tool uvolnuje zamok vo VSETKYCH koncoch (lifecycle)') do
   s = NxGD2.src('noxun_engine', 'core', 'ghost_tool.rb')
   %w[deactivate onCancel suspend resume].each do |cb|
