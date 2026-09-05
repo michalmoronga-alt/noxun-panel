@@ -101,7 +101,7 @@ module Noxun
             # GHOST-D1: zaznam nesie DRUH — od dosky s vlastnym markerom
             # (`BoardBuilder::BOARD_CONFIG_SCHEMA`) uz `newer_configs` nie su
             # len skrinky.
-            note_newer_config(newer_configs, 'cabinet', cid) if
+            note_newer_config(newer_configs, 'cabinet', newer_address(inst, cid)) if
               defined?(CabinetBuilder) && CabinetBuilder.newer_config?(ccfg)
             Array(ccfg['hardware']).each { |h| hardware << h.merge('owner_id' => cid, 'owner_pid' => inst.persistent_id) }
             # KOV-H2: resolved cela pre popis vlastnika v povode nakupneho riadku.
@@ -165,7 +165,7 @@ module Noxun
             # filtrom manufactured — tomu poľu uz nemusime rozumiet a tiche
             # vynechanie budúceho vyrobneho pola je presne to, comu brana
             # kompatibility zabranuje. Vetva nizsie skladá LEN zname polia.
-            note_newer_config(newer_configs, 'board', bid) if
+            note_newer_config(newer_configs, 'board', newer_address(inst, bid)) if
               defined?(BoardBuilder) && BoardBuilder.newer_config?(bcfg)
             next unless Store.get(inst, 'manufactured') == true
             # 2A-3 (audit B2): warnings poslednej stavby DOSKY — doteraz sa
@@ -215,6 +215,23 @@ module Noxun
 
         list << { 'kind' => kind, 'id' => s }
         list
+      end
+
+      # GHOST-D1 (Codex #298 P1): ADRESA objektu z novsej verzie do `newer_configs`.
+      # Vyrobne ID je prvou volbou, ale blocker sa NESMIE stratit, ked ID chyba
+      # alebo je poskodene — entita totiz DALEJ prispieva znamymi polami do
+      # `records`, takze by VEPO a ostatne vystupy pokracovali s TICHO orezanym
+      # novsim configom (presne to, comu ma brana zabranit). Bez ID sa preto
+      # pouzije STABILNA adresa entity: `persistent_id` (prezije save/reopen),
+      # fallback `entityID`. Text je citatelny aj pre cloveka — „Doska bez ID
+      # (pid 12345)" v Kontrole aj v hlaske brany povie, co treba v modeli hladat.
+      def newer_address(inst, id)
+        s = id.to_s.strip
+        return s unless s.empty?
+
+        pid = (inst.persistent_id if inst.respond_to?(:persistent_id)) rescue nil
+        pid ||= (inst.entityID if inst.respond_to?(:entityID)) rescue nil
+        "bez ID (pid #{pid || '?'})"
       end
 
       # KOV-H1: ad-hoc polozky JEDNEJ skrinky, obohatene o adresu vlastnika.

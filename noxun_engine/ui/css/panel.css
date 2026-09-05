@@ -1220,6 +1220,13 @@
   .nx-inspector .gbdot { width: 7px; height: 7px; border-radius: 50%;
                          background: var(--nx-border-strong); }
   .nx-inspector .gbdot.on { background: var(--nx-select-strong); }
+  /* GHOST-D1: doska z novšej verzie — read-only karta s vysvetlením. Riadok
+     existuje LEN v tomto stave (`hidden`), takže bežná karta nerastie. */
+  .nx-inspector .bcnewer { margin: 0 0 6px; padding: 5px 7px; border-radius: 6px;
+                           font-size: 11px; line-height: 1.35;
+                           color: var(--nx-warnrow-fg); background: var(--nx-warn-bg-soft);
+                           border: 1px solid var(--nx-warnrow-border); }
+  .nx-inspector .bcnewer[hidden] { display: none; }
   .nx-inspector .gbtxt { white-space: nowrap; color: var(--nx-select-strong); font-weight: 600; }
   .nx-inspector .gbtxt[hidden] { display: none; }
   /* GHOST-D1: umiestnenie dosky stoji vpravo — na tom istom mieste, kde ma

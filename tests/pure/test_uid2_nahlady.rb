@@ -338,7 +338,9 @@ end
 NxTest.test('SMOKE1 set_preview: doskova sablona rovnakeho mena je INA sablona (identita kind+name)') do
   NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
   NxD2.reset!
-  NxD2::TS.upsert('board', 'Zástena', NxD2.cfg)
+  # GHOST-D1: doskovy zapis MUSI niest marker kontraktu configu (inak `upsert`
+  # vrati false a fixture by ticho neexistovala).
+  NxTest.assert_equal(true, NxD2::TS.upsert('board', 'Zástena', NxD2.board_cfg))
 
   tmp = NxD2.tmp!
   NxTest.assert_equal(false, NxD2::TS.set_preview('cabinet', 'Zástena', tmp),

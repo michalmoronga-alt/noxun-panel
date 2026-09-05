@@ -124,14 +124,10 @@ module Noxun
           want = data['orientation'].to_s
           return set_status('Neznáma orientácia dosky.', true) unless BoardBuilder::ORIENTATIONS.include?(want)
 
+          # GHOST-D1: dopredna brana schemy uz bezala v `guarded_board` — teda
+          # PRED akymkolvek zapisom (aj do globalneho katalogu). Sem sa doska
+          # z novsej verzie nedostane.
           cfg = Store.config(board) || {}
-          # GHOST-D1: dopredna brana schemy PRED akoukolvek zmenou — config
-          # z novsej verzie by prestavba ocesala (`normalize` je uzavrety
-          # whitelist). Model ostava nedotknuty, ziadny krok Spat.
-          if BoardBuilder.newer_config?(cfg)
-            return set_status("#{BoardBuilder.newer_config_message('otočenie by nastavenia stratilo')} " \
-                              'Doska sa neotočila.', true)
-          end
           old = BoardBuilder.stored_orientation(cfg)
           unless BoardBuilder::ORIENTATIONS.include?(old)
             return set_status("Doska má neznámu uloženú orientáciu „#{old}“ — pochádza z novšej verzie pluginu.", true)
@@ -327,6 +323,19 @@ module Noxun
           echo = data['board_id'].to_s
           unless echo == Store.get(board, 'id').to_s
             Engine.log("board edit zahodeny — echo #{echo} nesedi s vyberom #{Store.get(board, 'id')}")
+            return [nil, nil]
+          end
+          # GHOST-D1 (Codex #298 P2): dopredna brana schemy je SUCASTOU vstupnej
+          # brany, nie az pri prestavbe. Cesty karty totiz PRED rebuildom menia
+          # GLOBALNY KATALOG (`resolve_virtual_material` -> `ensure_duplak_for`,
+          # `ensure_missing_abs` -> dovytvorenie ABS pasky) — a to sa uz nedá
+          # vrátiť. Guard preto stoji tu: doska z novsej verzie odmietne KAZDU
+          # zapisovu cestu karty (polia, material, hrana, olep vsetkych 4,
+          # orientacia) EST PRED prvym zapisom kamkolvek. NAHLAS ako guard
+          # dokumentu — pouzivatel musi vediet, ze sa zmena neulozila.
+          if BoardBuilder.newer_config?(Store.config(board) || {})
+            set_status("#{BoardBuilder.newer_config_message('zmena by nastavenia stratila')} " \
+                       'Doska sa nezmenila.', true)
             return [nil, nil]
           end
           [model, board]

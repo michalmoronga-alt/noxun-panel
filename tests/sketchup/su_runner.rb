@@ -10120,8 +10120,12 @@ module NoxunSuRunner
     ok('ŠT-3c-1: fixture — korpusova sablona ulozena', cab_ok)
     # DOSKOVA sablona: dnes ju nevytvara ziadne UI, ale sklad ju pozna a sekcia
     # ju musi vediet ZMAZAT (audit N29 — prva sprava doskovych).
-    brd_ok = e::TemplateStore.upsert('board', ST3C_BRD, { 'width' => 2600.0, 'height' => 600.0,
-                                                         'thickness' => 38.0 })
+    # GHOST-D1: KAZDY zapisovatel doskovej sablony nesie marker kontraktu configu
+    # (`BOARD_CONFIG_SCHEMA`) — bez neho `upsert` zapis ODMIETNE (zaznam by inak
+    # vyzeral ako legacy seed a downgrade brana by ho uz nerozlisila).
+    brd_ok = e::TemplateStore.upsert('board', ST3C_BRD,
+                                     { 'width' => 2600.0, 'height' => 600.0, 'thickness' => 38.0,
+                                       'config_schema' => e::BoardBuilder::BOARD_CONFIG_SCHEMA })
     @st3c_created << ['board', ST3C_BRD] if brd_ok
     ok('ŠT-3c-1: fixture — doskova sablona ulozena', brd_ok)
 

@@ -454,10 +454,25 @@ NxTest.test('GHOST-D1 brana: mutacne cesty dosky citaju RAW config PRED normaliz
   NxTest.assert(md.include?("unless plan['blocked'].empty?"),
                 'apply je all-or-nothing — neprazdny blocked zastavi CELU nahradu')
 
+  # Codex #298 P2: brana zapisovych ciest KARTY stoji vo VSTUPNEJ brane
+  # (`guarded_board`), nie az pri prestavbe — `handle_set_board_material` totiz
+  # PRED rebuildom zapisuje do GLOBALNEHO KATALOGU (`resolve_virtual_material` ->
+  # `ensure_duplak_for`, `ensure_missing_abs`), co sa uz nedá vrátiť.
   ab = NxD1.src('noxun_engine', 'ui', 'panel', 'actions_board.rb')
+  gb = ab[/def guarded_board\(data\).*?\n        end\n/m].to_s
+  NxTest.assert(gb.include?('BoardBuilder.newer_config?'), 'vstupna brana karty pozna schemu')
+  NxTest.assert(gb.index('BoardBuilder.newer_config?') < gb.index('[model, board]'),
+                'a odmietne EST PRED tym, nez volajuci cokolvek spravi')
+  mat = ab[/def handle_set_board_material\(payload\).*?\n        end\n/m].to_s
+  NxTest.assert(mat.index('guarded_board(data)') < mat.index('resolve_virtual_material'),
+                'material: brana bezi PRED dovytvorenim duplaku v katalogu')
+  NxTest.assert(mat.index('guarded_board(data)') < mat.index('ensure_missing_abs'),
+                'material: brana bezi PRED dovytvorenim ABS pasky v katalogu')
+  bulk = ab[/def handle_set_board_edges_all\(payload\).*?\n        end\n/m].to_s
+  NxTest.assert(bulk.index('guarded_board(data)') < bulk.index('ensure_missing_abs'),
+                'olep vsetkych 4: brana bezi PRED zapisom do katalogu')
   ori = ab[/def handle_set_board_orientation\(payload\).*?\n        end\n/m].to_s
-  NxTest.assert(ori.index('BoardBuilder.newer_config?') < ori.index('orientation_delta'),
-                'zmena orientacie: brana pred vypoctom delty')
+  NxTest.assert(ori.include?('guarded_board(data)'), 'orientacia ide cez tu istu vstupnu branu')
 end
 
 NxTest.test('GHOST-D1 brana: doskova sablona z novsej verzie sa NEVLOZI a NEOPECIATKUJE') do
@@ -558,6 +573,32 @@ NxTest.test('GHOST-D1: `ghost_lock_z` je pre board session ODMIETNUTY (kontrola 
                 'klient pole vysky pre dosku neposiela')
 end
 
+# Codex #298 P2: STANDARD 8.3 slubuje READ-ONLY kartu s vysvetlenim. Server je
+# jedina autorita — payload nesie priznak aj TEXT, klient si neodvodzuje nic.
+NxTest.test('GHOST-D1 karta: payload dosky z NOVSEJ verzie nesie priznak aj vysvetlenie') do
+  NxTest.skip!('payloads.rb sa headless nacita zvlast') unless NxTest.headless?
+  pay = Noxun::Engine::Panel
+  NxTest.assert_equal({}, pay.board_newer_flag({}), 'legacy doska priznak NEMA')
+  NxTest.assert_equal({}, pay.board_newer_flag('config_schema' => NxD1.bb::BOARD_CONFIG_SCHEMA),
+                      'aktualna doska tiez nie')
+  flag = pay.board_newer_flag('config_schema' => NxD1.bb::BOARD_CONFIG_SCHEMA + 1)
+  NxTest.assert_equal(true, flag['newer_config'], 'vyssia schema priznak MA')
+  note = flag['newer_config_note'].to_s
+  NxTest.assert(note.include?('novšej verzie'), note)
+  NxTest.assert(note.include?('nedá upraviť'), "hlaska povie, ze karta je read-only: #{note}")
+  NxTest.assert(note.include?('Aktualizuj plugin'), "a kam ist: #{note}")
+  # Jazyk je slovencina a symboly patria do sprite — v texte ziadne emoji.
+  NxTest.refute(note.match?(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/), 'hlaska je bez emoji')
+  # Priznak sa PRIMIESAVA do board_payload (jedno miesto, aditivne polia).
+  src = NxD1.src('noxun_engine', 'ui', 'panel', 'payloads.rb')
+  body = src[/def board_payload\(inst\).*?\n        end\n/m].to_s
+  NxTest.assert(body.include?('board_newer_flag(cfg)'), 'board_payload priznak posiela')
+  js = NxD1.src('noxun_engine', 'ui', 'js', 'board_card.js')
+  NxTest.assert(js.include?('applyBoardReadOnly(bc)'), 'karta ho aplikuje')
+  NxTest.assert(js.index('nxComboSync(box)') < js.index('applyBoardReadOnly(bc)'),
+                'zamok bezi AZ NAKONIEC (prebije vsetko, co karta vyssie odomkla)')
+end
+
 NxTest.test('GHOST-D1: karta Dosky ma v D1 JEDNO tlacidlo — `draw_board` NIE JE whitelistovany') do
   panel = NxD1.src('noxun_engine', 'ui', 'panel.rb')
   NxTest.refute(panel.include?('draw_board'), 'callback kreslenia (D2) sa v D1 neregistruje')
@@ -639,6 +680,29 @@ NxTest.test('GHOST-D1 sablony: UPSERT bez markera je ODMIETNUTY (nie „legacy" 
   NxTest.assert_equal(NxD1.bb::BOARD_CONFIG_SCHEMA, NxD1Tpl.schema_of('S markerom'))
   # KORPUSOVA sablona sa touto branou NEDOTKNE (ma vlastny kontrakt).
   NxTest.assert_equal(true, NxD1Tpl::TS.upsert('cabinet', 'Bez markera', 'type' => 'lower'))
+end
+
+# Codex #298 P1 (in-SU FAIL ŠT-3c-1): zapis doskovej sablony BEZ markera sa
+# odmietne — takze KAZDY volajuci v repe ho musi niest. Grep je tu preto, aby
+# sa dalsia fixture nedostala do maina a nezhodila sekciu az v SketchUpe.
+NxTest.test('GHOST-D1 sablony: ZIADNY volajuci `upsert(board, …)` v repe nie je bez markera') do
+  root = NxTest::ROOT
+  files = Dir[File.join(root, 'noxun_engine', '**', '*.rb')] +
+          Dir[File.join(root, 'tests', '**', '*.rb')]
+  offenders = []
+  files.each do |f|
+    next if f.end_with?('test_ghost_d1_dosky.rb') # scenare brany nizsie testuju PRAVE odmietnutie
+
+    # Komentare sa vyhadzuju — `templates.rb` v nich cituje volanie ako priklad.
+    code = File.read(f, encoding: 'UTF-8').lines.reject { |l| l =~ /\A\s*#/ }.join
+    code.scan(/upsert\(\s*'board'.{0,400}?\)\n/m) do |snippet|
+      next if snippet.include?('config_schema') || snippet.include?('BOARD_CONFIG_SCHEMA')
+      next if snippet.include?('board_cfg') # helper, ktory marker nesie
+
+      offenders << "#{File.basename(f)}: #{snippet.strip[0, 70]}"
+    end
+  end
+  NxTest.assert_equal([], offenders, 'doskovy upsert bez markera by sklad ODMIETOL')
 end
 
 NxTest.test('GHOST-D1 sablony: MIGRACIA std 3 -> 4 dopise marker existujucim doskam') do
@@ -723,11 +787,49 @@ NxTest.test('GHOST-D1 vystupy: zber prizna dosku z novsej verzie EST PRED filtro
   bom = NxD1.src('noxun_engine', 'core', 'bom.rb')
   brd = bom[/when 'board'(.*?)when 'part'/m, 1].to_s
   NxTest.assert(!brd.empty?, 'vetva dosky sa nasla')
-  NxTest.assert(brd.include?("note_newer_config(newer_configs, 'board', bid)"),
-                'zber dosku z novsej verzie PRIZNAVA')
-  NxTest.assert(brd.index("note_newer_config(newer_configs, 'board', bid)") <
+  NxTest.assert(brd.include?("note_newer_config(newer_configs, 'board', newer_address(inst, bid))"),
+                'zber dosku z novsej verzie PRIZNAVA (a to aj bez vyrobneho ID)')
+  NxTest.assert(brd.index("note_newer_config(newer_configs, 'board', newer_address(inst, bid))") <
                 brd.index("next unless Store.get(inst, 'manufactured') == true"),
                 'brana bezi PRED filtrom manufactured (fail-closed)')
+end
+
+# Codex #298 P1: entita `kind: board` s VYSSOU schemou, ale CHYBAJUCIM alebo
+# poskodenym `id`, sa dalej podiela na `records` (zname polia), takze VEPO
+# a ostatne vystupy by pokracovali s TICHO orezanym novsim configom. Blocker
+# preto nesmie zaniknut spolu s ID — dostane STABILNU adresu entity.
+NxTest.test('GHOST-D1 vystupy: blocker PREZIJE aj bez vyrobneho ID (stabilna adresa entity)') do
+  bom = Noxun::Engine::Bom
+  ent = Struct.new(:persistent_id, :entityID).new(987_654, 42) # rubocop:disable Naming/VariableName
+  NxTest.assert_equal('BRD-002', bom.newer_address(ent, 'BRD-002'), 'ID ma prednost')
+  NxTest.assert_equal('BRD-002', bom.newer_address(ent, '  BRD-002  '), 'a orezava sa')
+  addr = bom.newer_address(ent, '')
+  NxTest.assert_equal('bez ID (pid 987654)', addr, 'bez ID sa pouzije persistent_id')
+  NxTest.assert_equal(addr, bom.newer_address(ent, nil), 'nil aj prazdny retazec su to iste')
+
+  # A takyto zaznam sa NAOZAJ dostane do zoznamu (`note_newer_config` ho uz nezahodi)
+  # a prejde celou retazou az k hlaske Kontroly aj k brane exportov.
+  list = []
+  bom.note_newer_config(list, 'board', addr)
+  NxTest.assert_equal([{ 'kind' => 'board', 'id' => addr }], list, 'blocker sa NEZAHADZUJE')
+  items = []
+  Noxun::Engine::Validation.check_newer_configs(list, items)
+  NxTest.assert_equal(1, items.length, 'Kontrola nalez ukaze')
+  NxTest.assert(items.first['message_sk'].start_with?("Doska #{addr}"), items.first['message_sk'])
+  b = Noxun::Engine::ProductionCore.export_blockers(newer: list)
+  NxTest.assert_equal(1, b.length, 'a export sa zastavi')
+  NxTest.assert(b.first.include?("Doska #{addr}"), b.first)
+
+  # Entita bez `persistent_id` (starsie API / fake) spadne na `entityID`.
+  old = Struct.new(:entityID).new(7) # rubocop:disable Naming/VariableName
+  NxTest.assert_equal('bez ID (pid 7)', bom.newer_address(old, ''))
+  NxTest.assert_equal('bez ID (pid ?)', bom.newer_address(Object.new, ''), 'a bez oboch sa nespadne')
+end
+
+NxTest.test('GHOST-D1 vystupy: to iste plati pre SKRINKU bez cabinet_id') do
+  bom = NxD1.src('noxun_engine', 'core', 'bom.rb')
+  NxTest.assert(bom.include?("note_newer_config(newer_configs, 'cabinet', newer_address(inst, cid))"),
+                'kabinetova vetva ma tu istu poistku (rovnaka trieda chyby)')
 end
 
 NxTest.test('GHOST-D1 vystupy: VEPO uz vynimku NEMA — brana bezi PRED vyberom priecinka') do

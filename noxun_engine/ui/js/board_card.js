@@ -264,6 +264,38 @@
       nxDecorLinkApply(el('bcMatLink'), nxDecorLinkState(bc.material_id));
     }
     nxComboSync(box); // D-85: materialovy combobox + 4 comboboxy hran dosky
+    // GHOST-D1: AZ NAKONIEC — read-only prebije vsetko, co karta vyssie
+    // odomkla (hrubka UNI dosky, comboboxy hran, odkaz na dekor).
+    applyBoardReadOnly(bc);
+  }
+
+  // GHOST-D1 (STANDARD 8.3 bod 3): doska z NOVSEJ verzie pluginu sa ZOBRAZUJE,
+  // ale NEUPRAVUJE. O stave rozhoduje VYHRADNE server (`newer_config`) — karta
+  // si ho z niceho neodvodzuje. Zapisove cesty su chranene nezavisle
+  // (`guarded_board`), takze toto je UX vrstva: pouzivatel ma vidiet PRECO
+  // nemoze nic menit, nie naraziť na hlasku pri kazdom kliknuti.
+  // `disabled` (nie len `readOnly`) — pri selectoch a tlacidlach je to jediny
+  // sposob, ako ovladac naozaj umlcat.
+  function applyBoardReadOnly(bc){
+    var box = el('boardCard'); if (!box) return false;
+    var lock = !!(bc && bc.newer_config);
+    var note = el('bcNewer');
+    if (note){
+      note.hidden = !lock;
+      note.textContent = lock ? String(bc.newer_config_note || '') : '';
+    }
+    var nodes = box.querySelectorAll('input, select, textarea, button');
+    for (var i = 0; i < nodes.length; i++){
+      var n = nodes[i];
+      if (n === note) continue;
+      n.disabled = lock;
+      if (lock) n.setAttribute('aria-disabled', 'true');
+      else n.removeAttribute('aria-disabled');
+    }
+    // Hrubka UNI dosky ostava `readOnly` aj bez zamku — jej pravidlo riadi
+    // `renderBoardCard` vyssie a zamok ho nesmie prepisat spat na editovatelne.
+    box.classList.toggle('locked', lock);
+    return lock;
   }
 
   function openBoardDecor(){
@@ -698,5 +730,8 @@
                        // UI-C1b: doskova sablona vo vkladacej karte
                        uniBoardSheetId: uniBoardSheetId,
                        boardTemplateMaterialId: boardTemplateMaterialId,
-                       nxBoardArea: nxBoardArea };
+                       nxBoardArea: nxBoardArea,
+                       // GHOST-D1: read-only karta pri doske z novsej verzie
+                       // (sada tests/js/test_ghost_d1_karta.js nad mini-DOM).
+                       applyBoardReadOnly: applyBoardReadOnly };
   }
