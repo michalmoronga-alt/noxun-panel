@@ -24,7 +24,31 @@ svetlé rozmery **inkluzívne a bez EPS**, takže `r2` hodnota 104,995 → 105,0
 `rail_geometry`) a s tou zónou, `clear_depth` = `interior[:back_front_y]` (vnútorná hĺbka po **prednú plochu chrbta**, per režim chrbta), `side_thickness` = KD,
 `obstructions` = police a priečky s **kladným** prienikom s riadkom (C2 z nich robí conflict `drawer_obstruction`), plus `owner_part_key` (`front:<id>/panel` — identita
 NL zámku v `hardware_overrides`) a `front_id`. Typický 16 mm rozdiel medzi spodkom riadku (`sokel + gap_bottom`) a spodkom interiéru (`sokel + t`) sa zo svetlej výšky
-**odráta** — má vlastný pomenovaný test. Neznáme `front_id` = hlásna chyba, nikdy tichý default. **`build_plan` ju v C1 NEVOLÁ** — zapojenie resolvera je úloha rezu C2.
+**odráta** — má vlastný pomenovaný test. Neznáme `front_id` = hlásna chyba, nikdy tichý default. **KOV-C2b (v0.9.31) — `build_plan` resolver VOLÁ.** `context_for` navyše vracia aditívne kotvy `x0`/`x1`/`z0`/`z1` (rozsah svetlého priestoru), z ktorých sa umiestňujú dielce.
+
+**KOV-C2b — AKTIVÁCIA RECEPTOV V PLÁNE (`drawer_pass`).** Beží **po** vyradení degenerovaných dielcov a **pred** `HardwareRules.evaluate` (z nej vychádza množina čiel,
+na ktorých sa legacy `slide` pravidlo potlačí). Pre každé čelo: `Recipes.recipe_key_for` → `[:legacy, nil]` = stará cesta, nič sa nevolá (zákazka bez klasifikácie je
+CONTENT-identická) · `[:conflict, kód, hláška]` = fail-closed · `[:ok, {system, opening}]` → aktívny záznam mapy `drawer.recipe_refs` (`Recipes.active_ref`; chýbajúci =
+súrodenec ROVNAKEJ verzie, inak `latest_for` — nikdy tichý upgrade; neznámy = RED `drawer_recipe_unknown`) → `Recipes.load` → `context_for` → `Recipes.resolve`.
+Výstup je **atomický**: buď všetky dielce + jedna položka výsuvu, alebo nič a záznam v `plan[:drawer_conflicts]`. Dielce sa pripájajú **za** partition degenerovaných —
+ich minimá stráži recept sám (jediný neplatný rozmer = `drawer_no_fit` pre celú zásuvku, nikdy per-dielec `part_skipped_degenerate`).
+
+**Hrúbka je VSTUP, nie odvodenina.** `build_plan(cfg, cid, hardware_rules:, part_thicknesses:)` — `part_thicknesses` je `{ part_key => mm }` a posiela ho **builder**,
+vyriešené z materiálového kanála `:drawer` + `part_overrides` **PRED** plánom (Codex #301 kolo 3 P1). Bez kľúča platí `DRAWER_DEFAULT_THICKNESS = 16.0` (UNI 16 fallback
+kanála) — pomocné volania `build_plan` (migrácia identity, panelové resolvery) hrúbky nepotrebujú, part_key ani suffix od nich nezávisia.
+
+**Tvar kľúčov drží `drawer_thickness_keys(front_id, role)` — jediný zdroj** (číta ho `drawer_thickness_map` aj `CabinetBuilder.drawer_thicknesses`). `box_side` sa emituje
+**dvakrát** (`box_side:left` a `box_side:right`), takže pod holým `front:<id>/box_side` nikdy žiadny dielec — a teda ani žiadny override — neexistuje; druhý opísaný zoznam
+by presne toto prehliadol a override boku by sa do receptu nedostal (Codex #304 kolo 2 P1). Hrúbka je **jedna na rolu** (recept z nej počíta všetky dielce tej roly), preto
+sú dva boky s rôznym materiálom **fail-closed** konflikt `drawer_thickness_unsupported` („boky zásuvky musia mať rovnakú hrúbku"). Kontrolujú sa **len roly, ktoré recept
+naozaj emituje** (`recipe[:thickness_supported].keys`) — dormantný override `box_side` na Atire (pozostatok po prepnutí z Quadra) tak nevyrobí falošný konflikt.
+
+**Geometria dielcov.** `prod[:length]` = rozmer `width` receptu (dlhá hrana), `prod[:width]` = `height` — vďaka tomu ABS L1/L2 ležia na dlhej hrane presne podľa seedu 4.
+Box je vycentrovaný v svetlej šírke, hĺbka začína na prednej rovine vnútra (y = 0), spodok je `ctx[:z0]`; predok a chrbát stoja NA dne. **`axes:` sa vedome neuvádzajú** —
+slúžia len na farbenie ABS plôšok (D-88) a pri stojacom dielci by L1 vyšla na spodnú hranu, kým páska ide na hornú; PartFaces má vlastnú zásadu „radšej žiadna farba".
+
+**Zápisy, ktoré má vykonať builder,** cestujú v pláne ako `drawer_writes` (chýbajúci `drawer.system` a chýbajúci záznam mapy) a `drawer_override_writes` (D-93 migrácia
+legacy `rule_id` na `recipe:<recipe_id>`). Aplikuje ich `CabinetBuilder.apply_drawer_writes` v **tej istej operácii** ako geometriu, takže Undo vráti oboje naraz.
 
 ### cabinet_builder.rb
 
@@ -87,6 +111,9 @@ takým modelom aktualizujú **obe PC** (D-52 updater). K bumpu 3 patrí **EXPORT
 .skp OREZANÝ set a nikto by už nevedel, že tam niečo bolo. Čísla sa prideľujú **sekvenčne podľa poradia mergov** (audit #17 FIX 5 — KOV-H1 vzala 3). K bumpu 4 patrí **DOPREDNÁ
 brána** `HardwareSets.assess_set_defs` ([hardware.md](hardware.md)): R-12 marker odmietne novšiu šablónu SPÄTNE, `assess_set_defs` odmietne nečitateľné definície DOPREDU —
 pri vklade aj pri použití, vždy PRED akoukoľvek operáciou, takže model sa nezmení ani o krok Späť.
+· **`5` = KOV-C2b** (zásuvky z receptu: `drawer.system`, `drawer.recipe_refs`, `drawer_material_id`, uložené `drawer_conflicts`, položky kovania so `source: 'recipe'`) —
+starší plugin recepty nepozná, takže by pri prestavbe **ticho odobral dielce zásuviek aj položku výsuvu**, teda časť objednávky. K bumpu 5 patrí aj **exportná brána**
+`ProductionCore.drawer_blockers` ([outputs.md](outputs.md)) — tá však chráni inú vec (nevyriešenú zásuvku v TEJTO verzii), forward guard chráni pred STARŠOU verziou.
 
 **AD-HOC KOVANIE `hardware_manual[]` (KOV-H1, v0.9.18).** Ďalšie pole configu, nie nový zápisový kanál (audit #15 BLOCKER 1): panel ho posiela v `collectAll()` presne ako čelá,
 takže ide cestou `apply_all` → `normalize` → **rebuild** — jeden krok Späť, guardy dokumentu aj skrinky, R-12, `push_selected(dedup: false)`. Cena je prestavba geometrie pri

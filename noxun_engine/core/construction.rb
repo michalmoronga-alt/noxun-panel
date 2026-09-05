@@ -29,12 +29,22 @@ module Noxun
 
       module_function
 
-      # Hlavny vstup: cfg (symbolove kluce, mm Float) + cabinet_id (pre ID zon) -> plan.
       # Vystup MUSI prejst BuildPlan.validate! — chybny plan nikdy neopusti planovac.
       # hardware_rules: normalizovane pole pravidiel kovania. Builder posiela PROJEKTOVY
       # snapshot (HardwareRules.ensure_project_rules!); nil = globalna kniznica (headless
       # testy a pomocne volania bez modelu — migracia identity, panel resolvery).
-      def build_plan(cfg, cabinet_id = 'CAB-000', hardware_rules: nil)
+      # KOV-C2b: hrubka dielca zasuvky, ked ju volajuci NEDODA. Je to hodnota
+      # UNI 16 fallbacku 4. materialoveho kanala (`Materials::UNI_ZASUVKA_16`),
+      # teda to iste, co dostane cerstvy projekt bez vlastnej predvolby.
+      # Autoritativne hrubky posiela BUILDER (`part_thicknesses:`) — vyriesene
+      # PRED planom z kanala `:drawer` + `part_overrides`. Pomocne volania
+      # `build_plan` (migracia identity, panelove resolvery) hrubky nepotrebuju:
+      # part_key ani suffix od nich nezavisia.
+      DRAWER_DEFAULT_THICKNESS = 16.0
+
+      # Hlavny vstup: cfg (symbolove kluce, mm Float) + cabinet_id (pre ID zon) -> plan.
+      # part_thicknesses: { part_key => mm } pre roly zasuviek (viz vyssie).
+      def build_plan(cfg, cabinet_id = 'CAB-000', hardware_rules: nil, part_thicknesses: nil)
         w = cfg[:width]; h = cfg[:height]; t = cfg[:thickness]
 
         interior = interior_dims(cfg)
@@ -76,6 +86,21 @@ module Noxun
                                         data: { 'box' => pd[:box].map(&:to_f) })
         end
 
+        # KOV-C2b: AKTIVACIA RECEPTOV ZASUVIEK. Bezi PRED pravidlami kovania,
+        # lebo z nej vychadza aj mnozina ciel, na ktorych sa legacy `slide`
+        # pravidlo POTLACI (R2 exkluzivita) — inak by zasuvka mala dve polozky
+        # vysuvu. Kontext potrebuje UZ POSTAVENE zony, hranice a dielce, preto az
+        # tu; a dielce zasuviek sa pripajaju AZ ZA touto partition, lebo ich
+        # atomicitu strazi recept sam (jediny neplatny rozmer = `drawer_no_fit`
+        # pre CELU zasuvku, nikdy per-dielec `part_skipped_degenerate`).
+        drawer = drawer_pass(cfg, {
+                               zone_bounds: zres[:raw_bounds] || {},
+                               front_bounds: fr[:bounds] || {},
+                               zones: zres[:zones], parts: parts,
+                               front_items: fr[:items]
+                             }, part_thicknesses)
+        warnings.concat(drawer[:warnings])
+
         # Kovanie z pravidiel — az PO vyradeni degenerovanych dielcov (na dielec,
         # ktory v modeli nestoji, nesmie vzniknut polozka). Kontext string-keyed.
         hw_ctx = {
@@ -89,13 +114,14 @@ module Noxun
           # 'none' nerozlisuje hornu od spodnej bez noh (GH #125 P2).
           'cabinet_type' => cfg[:type].to_s
         }
-        hw = HardwareRules.evaluate(cfg, parts, hw_ctx, rules: hardware_rules || HardwareRules.load)
+        hw = HardwareRules.evaluate(cfg, parts, hw_ctx, rules: hardware_rules || HardwareRules.load,
+                                                        suppress_slide_owners: drawer[:suppress])
         warnings.concat(hw[:warnings])
 
         plan = {
           schema: BuildPlan::SCHEMA,
-          parts: parts,
-          hardware: hw[:items],
+          parts: parts + drawer[:parts],
+          hardware: hw[:items] + drawer[:hardware],
           warnings: warnings,
           zones: zres[:zones],
           zone_tree: ZoneTree.sanitize(cfg[:zone_tree]),
@@ -111,9 +137,351 @@ module Noxun
           # Do configu sa NEUKLADAJU — `CabinetBuilder.merge_final` kopiruje len
           # menovity zoznam klucov, takze model ani vystupy sa nemenia.
           zone_bounds: zres[:raw_bounds] || {},
-          front_bounds: fr[:bounds] || {}
+          front_bounds: fr[:bounds] || {},
+          # KOV-C2b: fail-closed dovody zasuviek (ULOZENY NOSIC — po fail-closed
+          # stavbe nezostane polozka, z ktorej by sa dovod dal obnovit) a zapisy,
+          # ktore ma builder vykonat v TEJ ISTEJ operacii ako geometriu.
+          drawer_conflicts: drawer[:conflicts],
+          drawer_writes: drawer[:writes],
+          drawer_override_writes: drawer[:override_writes]
         }
         BuildPlan.validate!(plan)
+      end
+
+      # --- KOV-C2b: aktivacia receptov zasuviek --------------------------------
+      #
+      # CISTA funkcia (ziadne IO okrem citania datoveho packu receptov). Pre kazde
+      # celo klasifikovane ako zasuvka SO SYSTEMOM vrati dielce, JEDNU polozku
+      # vysuvu a pripadne konflikty. Legacy cela (`[:legacy, nil]`) sa jej vobec
+      # netykaju — zakazka bez klasifikacie je CONTENT-IDENTICKA.
+      #
+      # ctx_plan = { zone_bounds:, front_bounds:, zones:, parts:, front_items: }
+      # -> { parts:, hardware:, conflicts:, warnings:, suppress:, writes:,
+      #      override_writes: }
+      def drawer_pass(cfg, ctx_plan, part_thicknesses)
+        out = { parts: [], hardware: [], conflicts: [], warnings: [],
+                suppress: {}, writes: [], override_writes: [] }
+        return out unless defined?(Recipes)
+
+        Array(ctx_plan[:front_items]).each do |item|
+          next unless item.is_a?(Hash)
+
+          kind, a, b = Recipes.recipe_key_for(item)
+          next if kind == :legacy
+
+          front_id = item['id'].to_s
+          # Klasifikovane celo NIKDY nedostane legacy `slide` pravidlo — ani ked
+          # skonci konfliktom. Inak by fail-closed zasuvka ticho objednala vysuv
+          # z pravidla, ku ktoremu neexistuju dielce.
+          out[:suppress][PartKeys.front(front_id, 'panel')] = true
+          if kind == :conflict
+            out[:conflicts] << drawer_conflict(front_id, a, b)
+            next
+          end
+
+          resolve_drawer_front(cfg, ctx_plan, item, a, part_thicknesses, out)
+        end
+        out
+      end
+
+      def drawer_conflict(front_id, code, message)
+        { 'front_id' => front_id.to_s, 'code' => code.to_s, 'message' => message.to_s,
+          'part_key' => PartKeys.front(front_id, 'panel') }
+      end
+
+      # Jedno klasifikovane celo: aktivny recept -> kontext -> resolve -> emisia.
+      def resolve_drawer_front(cfg, ctx_plan, item, key, part_thicknesses, out)
+        front_id = item['id'].to_s
+        drawer_cfg = item['drawer'].is_a?(Hash) ? item['drawer'] : {}
+        ref_key = "#{key[:system]}|#{key[:opening]}"
+
+        state, ref = Recipes.active_ref(drawer_cfg['recipe_refs'], key[:system], key[:opening])
+        if state == :unknown
+          return out[:conflicts] << drawer_conflict(
+            front_id, 'drawer_recipe_unknown',
+            "Zásuvka používa recept „#{ref}\", ktorý tento plugin nepozná — aktualizuj plugin."
+          )
+        end
+        if state == :missing
+          ref = pick_recipe_ref(drawer_cfg['recipe_refs'], key)
+          if ref.nil?
+            return out[:conflicts] << drawer_conflict(
+              front_id, 'drawer_recipe_unknown',
+              "Pre zásuvku #{key[:system]} / #{key[:opening]} nemá plugin žiadny vydaný recept — aktualizuj plugin."
+            )
+          end
+        end
+        # Chybajuci `system` aj chybajuci zaznam mapy sa ZAPISU (migracia ciel
+        # klasifikovanych pred v2) — v TEJ ISTEJ operacii ako geometria.
+        out[:writes] << { 'front_id' => front_id, 'system' => key[:system],
+                          'ref_key' => ref_key, 'recipe_id' => ref }
+
+        recipe = Recipes.load(ref)
+        ctx = context_for(item, ctx_plan, cfg)
+        # Hrubka je JEDNA na rolu (recept z nej pocita vsetky dielce tej roly),
+        # takze dva boky s ROZNYM materialom su fail-closed konflikt — inak by
+        # sa jeden bok vyrobil s hrubkou toho druheho.
+        th, mismatch = drawer_thickness_map(front_id, part_thicknesses,
+                                            recipe[:thickness_supported].keys)
+        if mismatch
+          return out[:conflicts] << drawer_conflict(
+            front_id, 'drawer_thickness_unsupported',
+            "#{Recipes.label(recipe)}: boky zásuvky musia mať rovnakú hrúbku — ľavý a pravý majú " \
+            'iný materiál. Zjednoť im materiál (karta dielca), alebo zruš ručný materiál jedného z nich.'
+          )
+        end
+        overrides = Array(cfg[:hardware_overrides])
+
+        # Legacy NL override (D-93) sa premapuje na receptovu identitu; vypnuty
+        # alebo mnozstvom prepisany zaznam je RED (fail-closed).
+        bad = drawer_override_problem(front_id, ref, overrides)
+        if bad
+          return out[:conflicts] << drawer_conflict(front_id, 'drawer_override_invalid', bad)
+        end
+        migrate = drawer_override_migration(front_id, ref, overrides)
+        out[:override_writes] << migrate if migrate
+
+        res = Recipes.resolve(recipe, ctx, th, overrides)
+        unless res[:conflicts].empty?
+          c = res[:conflicts].first
+          return out[:conflicts] << drawer_conflict(front_id, c[:code], c[:message])
+        end
+
+        out[:parts].concat(drawer_part_descriptors(front_id, res[:parts], ctx))
+        out[:hardware] << drawer_hardware_item(front_id, item, recipe, res, ctx, overrides)
+        if Recipes.sync_recommended?(recipe, ctx[:clear_width])
+          out[:warnings] << BuildPlan.warning(
+            'drawer_sync_recommended',
+            "Zásuvka #{front_id} (šírka #{Recipes.fmt(ctx[:clear_width])} mm) vyžaduje synchronizáciu — " \
+            'pridaj synchronizačný set cez ad-hoc kovanie.',
+            part_key: ctx[:owner_part_key],
+            data: { 'front_id' => front_id, 'clear_width' => ctx[:clear_width].to_f }
+          )
+        end
+        out
+      end
+
+      # Recept pre NOVU kombinaciu system|otvaranie: SURODENEC rovnakej verzie
+      # ako uz pripnute zaznamy (prepnutie klasifikacie nikdy ticho nepovysi
+      # verziu), inak `latest_for`.
+      def pick_recipe_ref(refs_map, key)
+        if refs_map.is_a?(Hash)
+          refs_map.each_value do |id|
+            sib = Recipes.sibling(id, key[:system], key[:opening])
+            return sib if sib
+          end
+        end
+        Recipes.latest_for(key[:system], key[:opening])
+      end
+
+      # KOV-C2b: part_key(e) JEDNEJ roly dielca zasuvky (Codex #304 kolo 2 P1).
+      # `box_side` sa emituje DVAKRAT — `box_side:left` a `box_side:right` —
+      # takze pod holym `front:<id>/box_side` nikdy ziadny override neexistuje
+      # a hrubka bokov by sa citala len ako zdedena. JEDINY zdroj tvaru klucov:
+      # cita ho `drawer_thickness_map` aj `CabinetBuilder.drawer_thicknesses`.
+      BOX_SIDES = %w[left right].freeze
+
+      def drawer_thickness_keys(front_id, role)
+        return [PartKeys.front(front_id, role)] unless role.to_s == Recipes::ROLE_BOX_SIDE
+
+        BOX_SIDES.map { |side| PartKeys.front(front_id, role, side) }
+      end
+
+      # Hrubky VYRABANYCH dielcov jedneho cela (rola -> mm). `part_thicknesses`
+      # je mapa part_key -> mm od buildera; chybajuci kluc = UNI 16 fallback.
+      # `roles` = roly, ktore recept naozaj emituje — dormantny override na role
+      # INEHO systemu (napr. `box_side` na Atire po prepnuti z Quadra) tak
+      # nemoze vyrobit falosny konflikt.
+      # -> [ { rola => mm }, rola_s_NEZHODOU | nil ]
+      def drawer_thickness_map(front_id, part_thicknesses, roles = Recipes::PART_ROLES)
+        src = part_thicknesses.is_a?(Hash) ? part_thicknesses : {}
+        mismatch = nil
+        out = Array(roles).each_with_object({}) do |role, acc|
+          vals = drawer_thickness_keys(front_id, role).map { |k| src[k] }
+                                                      .filter_map { |v| v.to_f if v.is_a?(Numeric) && v.to_f.positive? }
+          mismatch ||= role if vals.map { |v| v.round(4) }.uniq.length > 1
+          acc[role] = vals.first || DRAWER_DEFAULT_THICKNESS
+        end
+        [out, mismatch]
+      end
+
+      # Legacy / receptovy NL override, ktory zasuvku ZASTAVUJE: vypnuta polozka
+      # alebo prepisane mnozstvo (recept vydava vzdy PRAVE JEDEN vysuv).
+      def drawer_override_problem(front_id, recipe_id, overrides)
+        owner = PartKeys.front(front_id, 'panel')
+        rec = Array(overrides).reverse.find { |ov| drawer_override?(ov, owner, recipe_id) }
+        return nil if rec.nil?
+
+        if rec['disabled'] == true || rec[:disabled] == true
+          return 'Zásuvka má vypnutú položku výsuvu — výsuv z receptu sa vypnúť nedá; ' \
+                 'zruš ručný zásah v Kovaní.'
+        end
+        q = rec['quantity'].nil? ? rec[:quantity] : rec['quantity']
+        return nil if q.nil?
+        return nil if q.is_a?(Numeric) && q.to_i == 1
+
+        "Zásuvka má ručne prepísaný počet výsuvov (#{q}) — recept vydáva vždy jeden; " \
+        'zruš ručný zásah v Kovaní.'
+      end
+
+      def drawer_override?(ov, owner, recipe_id)
+        return false unless ov.is_a?(Hash)
+        gt = (ov['generic_type'] || ov[:generic_type]).to_s
+        return false unless gt == Recipes::LOCK_GENERIC_TYPE
+        rid = (ov['rule_id'] || ov[:rule_id]).to_s
+        return false unless [Recipes::LOCK_LEGACY_RULE_ID, "recipe:#{recipe_id}"].include?(rid)
+        (ov['owner_part_key'] || ov[:owner_part_key]).to_s == owner.to_s
+      end
+
+      # D-93 migracia: legacy `vysuvy-nl-podla-hlbky` zaznam na zasuvkovom cele
+      # sa premenuje na receptovu identitu `recipe:<recipe_id>`. Zamok tym
+      # NEMENI hodnotu — meni sa len to, ku ktorej polozke patri.
+      def drawer_override_migration(front_id, recipe_id, overrides)
+        owner = PartKeys.front(front_id, 'panel')
+        legacy = Array(overrides).find do |ov|
+          ov.is_a?(Hash) &&
+            (ov['generic_type'] || ov[:generic_type]).to_s == Recipes::LOCK_GENERIC_TYPE &&
+            (ov['rule_id'] || ov[:rule_id]).to_s == Recipes::LOCK_LEGACY_RULE_ID &&
+            (ov['owner_part_key'] || ov[:owner_part_key]).to_s == owner.to_s
+        end
+        return nil if legacy.nil?
+
+        { 'owner_part_key' => owner, 'generic_type' => Recipes::LOCK_GENERIC_TYPE,
+          'from_rule_id' => Recipes::LOCK_LEGACY_RULE_ID, 'to_rule_id' => "recipe:#{recipe_id}" }
+      end
+
+      # --- KOV-C2b: dielce zasuvky do planu ------------------------------------
+      #
+      # Recept vracia CISTE rozmery ({ role, width, height, thickness, side }).
+      # Tu z nich vznikaju PLNE deskriptory `BuildPlan` — vratane polohy v korpuse.
+      #
+      # KONVENCIA (rovnaka pre vsetky roly): `prod[:length]` = rozmer `width`
+      # receptu (dlha, „cez skrinku" resp. pozdlzna hrana), `prod[:width]` =
+      # rozmer `height`. Vdaka tomu ABS L1/L2 lezia na DLHEJ hrane presne tak,
+      # ako to popisuje seed 4 (`drawer_back`/`box_side`/`drawer_inner_front`
+      # maju L1 = horna dlha hrana).
+      #
+      # OSI (`axes:`) sa VEDOME NEUVADZAJU. `axes` sluzia VYHRADNE na farbenie
+      # ABS plosiek (D-88) a PartFaces ma vlastnu zasadu „radsej ziadna farba nez
+      # farba na zlej hrane": pri stojacom dielci by L1 vysla na SPODNU hranu,
+      # kym paska ide na HORNU. Farbenie hran zasuviek preto pride az s vlastnou
+      # osovou mapou (KOV-C2c / D); geometria, vyrobne rozmery ani ABS kody od
+      # osi nezavisia.
+      #
+      # UMIESTNENIE: box je vycentrovany v svetlej sirke (`ctx[:x0]`..`x1`),
+      # zaciatok hlbky je predna rovina vnutra (y = 0) a spodok riadku `ctx[:z0]`.
+      # Je to VIZUAL zasuvky v korpuse — vyrobne cisla urcuje recept.
+      def drawer_part_descriptors(front_id, parts, ctx)
+        return [] if parts.empty?
+
+        anchor = { cx: (ctx[:x0].to_f + ctx[:x1].to_f) / 2.0, z0: ctx[:z0].to_f,
+                   outer: drawer_outer_width(parts), lift: drawer_bottom_lift(parts),
+                   depth: drawer_box_depth(parts), bottom_th: drawer_bottom_thickness(parts) }
+        parts.each_with_index.map { |p, i| drawer_part_descriptor(front_id, p, i, anchor) }
+      end
+
+      # Vonkajsia sirka boxu — pri Quadre dno lezi MEDZI bokmi, takze celkova
+      # sirka je dno + 2 boky. Pri Atire (bez vyrabanych bokov) je to sirka dna.
+      def drawer_outer_width(parts)
+        bottom = parts.find { |p| p[:role] == Recipes::ROLE_BOTTOM }
+        return 0.0 if bottom.nil?
+
+        side = parts.find { |p| p[:role] == Recipes::ROLE_BOX_SIDE }
+        bottom[:width].to_f + (side ? 2 * side[:thickness].to_f : 0.0)
+      end
+
+      # Zvisle odsadenie dna nad spodkom boxu (Quadro `bottom_offset` = 12 mm;
+      # pri Atire dno lezi rovno na dne boxu). Odvodi sa z toho, ci recept
+      # vyraba boky — druhy zdroj konstanty (12) by sa s receptom rozisiel.
+      def drawer_bottom_lift(parts)
+        side = parts.find { |p| p[:role] == Recipes::ROLE_BOX_SIDE }
+        return 0.0 if side.nil?
+
+        fb = parts.find { |p| p[:role] == Recipes::ROLE_INNER_FRONT }
+        bottom = parts.find { |p| p[:role] == Recipes::ROLE_BOTTOM }
+        return 0.0 if fb.nil? || bottom.nil?
+
+        # box_height - (vyska predku) - (hrubka dna) = bottom_offset receptu
+        [side[:height].to_f - fb[:height].to_f - bottom[:thickness].to_f, 0.0].max
+      end
+
+      # Hlbka boxu = dlzka dna (Atira BL = NL + 10, Quadro NL). Ziadna druha
+      # konstanta — je to presne to cislo, na ktore sa dielec reze.
+      def drawer_box_depth(parts)
+        bottom = parts.find { |p| p[:role] == Recipes::ROLE_BOTTOM }
+        bottom ? bottom[:height].to_f : 0.0
+      end
+
+      def drawer_bottom_thickness(parts)
+        bottom = parts.find { |p| p[:role] == Recipes::ROLE_BOTTOM }
+        bottom ? bottom[:thickness].to_f : 0.0
+      end
+
+      def drawer_part_descriptor(front_id, p, index, anchor)
+        role = p[:role].to_s
+        wd = p[:width].to_f
+        ht = p[:height].to_f
+        th = p[:thickness].to_f
+        side = p[:side].to_s
+        cx = anchor[:cx]
+        z_lift = anchor[:z0] + anchor[:lift]
+        prod = { length: wd, width: ht, thickness: th }
+
+        case role
+        when Recipes::ROLE_BOX_SIDE
+          # Zvisly panel pozdlz hlbky: hrubka v X, dlzka (NL) v Y, vyska v Z.
+          outer = anchor[:outer].positive? ? anchor[:outer] : (wd + 2 * th)
+          x_out = cx - outer / 2.0
+          box = [th, wd, ht]
+          origin = [(side == 'right' ? (x_out + outer - th) : x_out), 0.0, anchor[:z0]]
+          suffix = "DRWSIDE-#{side == 'right' ? 'R' : 'L'}"
+          key = PartKeys.front(front_id, 'box_side', side)
+          name = "Bok boxu #{side == 'right' ? 'pravy' : 'lavy'} #{front_id}"
+        when Recipes::ROLE_BOTTOM
+          box = [wd, ht, th]
+          origin = [cx - wd / 2.0, 0.0, z_lift]
+          suffix = 'DRWBOT'
+          key = PartKeys.front(front_id, 'drawer_bottom')
+          name = "Dno zasuvky #{front_id}"
+        when Recipes::ROLE_INNER_FRONT
+          # Predok aj chrbat stoja NA dne (recept ich vysku tak aj pocita:
+          # box_height - hrubka dna - odsadenie dna).
+          box = [wd, th, ht]
+          origin = [cx - wd / 2.0, 0.0, z_lift + anchor[:bottom_th]]
+          suffix = 'DRWIFR'
+          key = PartKeys.front(front_id, 'drawer_inner_front')
+          name = "Vnutorne celo zasuvky #{front_id}"
+        else # ROLE_BACK
+          box = [wd, th, ht]
+          origin = [cx - wd / 2.0, [anchor[:depth] - th, 0.0].max, z_lift + anchor[:bottom_th]]
+          suffix = 'DRWBACK'
+          key = PartKeys.front(front_id, 'drawer_back')
+          name = "Chrbat zasuvky #{front_id}"
+        end
+        { suffix: "#{suffix}-#{front_id}-#{index + 1}", part_key: key, role: role, name: name,
+          material: :drawer, box: box, origin: origin, prod: prod }
+      end
+
+      # --- KOV-C2b: JEDNA polozka vysuvu ---------------------------------------
+      #
+      # `rule_id` = `recipe:<recipe_id>` (identita, ktorou si polozku najde aj
+      # NL zamok), `source: 'recipe'` (nakup ju cita TRIEDNYM klucom a chybajuci
+      # set je RED, nie ORANGE), `locked` LEN pri platnom zamku.
+      def drawer_hardware_item(front_id, item, recipe, res, ctx, overrides)
+        params = { 'recipe_id' => recipe[:recipe_id].to_s, 'system' => recipe[:system].to_s,
+                   'nominal_length' => res[:nl].to_f, 'load' => res[:load].to_f,
+                   'opening' => recipe[:opening].to_s,
+                   'opening_mode' => item['opening_mode'].to_s,
+                   'drawer_construction' => (item['drawer'] || {})['construction'].to_s }
+        params['height_variant'] = res[:height_variant].to_i if res[:height_variant]
+        params['box_height'] = res[:box_height].to_f if res[:box_height]
+
+        out = { 'owner_part_key' => ctx[:owner_part_key], 'generic_type' => 'slide',
+                'quantity' => 1, 'rule_id' => "recipe:#{recipe[:recipe_id]}",
+                'variant_id' => nil, 'production_class' => 'counted', 'manufactured' => true,
+                'params' => params, 'source' => BuildPlan::HW_SOURCE_RECIPE, 'rule_quantity' => 1 }
+        out['locked'] = true if Recipes.lock_value(recipe, ctx, overrides)
+        out
       end
 
       # --- KOV-C1: svetly priestor pre recept zasuvky --------------------------
@@ -160,13 +528,21 @@ module Noxun
           hi = row_hi
         end
 
+        # KOV-C2b: ADITIVNE kotvy pre UMIESTNENIE dielcov zasuvky v korpuse.
+        # `x0`/`x1` je vodorovny rozsah svetleho priestoru (listova zona alebo
+        # cely vnutorny box), `z0` spodok riadku. Su to TIE ISTE cisla, z ktorych
+        # sa pocita `clear_width`/`clear_height` — druhy vypocet inde by sa
+        # casom rozisiel a dielec by v modeli stal inde, nez ho plan vyratal.
+        x0 = zone ? zone[:x0].to_f : t
+        x1 = zone ? zone[:x1].to_f : (cfg[:width].to_f - t)
         { clear_width: [clear_width, 0.0].max,
           clear_height: [hi - lo, 0.0].max,
           clear_depth: interior[:back_front_y].to_f,
           side_thickness: t,
           obstructions: row_obstructions(plan, row_lo, row_hi),
           owner_part_key: PartKeys.front(front_id, 'panel'),
-          front_id: front_id }
+          front_id: front_id,
+          x0: x0, x1: x1, z0: lo, z1: hi }
       end
 
       # Listova zona s NAJVACSIM zvislym prienikom s riadkom (pri zhode lavejsia).

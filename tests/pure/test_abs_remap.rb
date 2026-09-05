@@ -44,6 +44,17 @@ def rm_key_for(params, role)
   RCB.plan_parts_by_key(params).find { |_k, pd| pd[:role].to_s == role }&.first
 end
 
+# KOV-C2b: params so ZASUVKOU klasifikovanou ako Atira (plan emituje dno
+# a chrbat, teda dielce 4. materialoveho kanala).
+def rm_drawer_params(overrides = {})
+  rm_params(overrides).merge(
+    'width' => 900.0, 'depth' => 500.0,
+    'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'drawer_front', 'mode' => 'fixed',
+                                'height' => 175.0, 'opening_mode' => 'classic',
+                                'drawer' => { 'construction' => 'metal' } }] }
+  )
+end
+
 # ---------------------------------------------------------------------------
 # Materials.remap_edges (jadro)
 # ---------------------------------------------------------------------------
@@ -220,6 +231,53 @@ NxTest.test('abs-remap: celo berie cielovu hrubku z noveho sheetu (18->36 target
     NxTest.assert_equal(1, result['changed'])
     NxTest.assert_equal('ABS_REMAPFRONT_43X10', params['part_overrides'][front]['edges']['W1'],
                         '36 mm sheet -> 43-ka (nie 22)')
+  ensure
+    rm_cleanup(res)
+  end
+end
+
+# ---------------------------------------------------------------------------
+# KOV-C2b (Codex #304 kolo 2 P2): 4. materialovy kanal `:drawer`
+# ---------------------------------------------------------------------------
+
+NxTest.test('abs-remap: zmena predvolby ZASUVIEK preladi override dielca zasuvky') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  res = rm_seed_decor('RemapDrawer')
+  begin
+    params = rm_drawer_params
+    key = rm_key_for(params, 'drawer_back')
+    NxTest.assert_equal('front:F1/drawer_back', key, 'plan emituje chrbat zasuvky')
+    params['part_overrides'] = {
+      key => { 'edges' => { 'L1' => 'ABS_K009_10', 'L2' => nil, 'W1' => 'ABS_W1000_10' } }
+    }
+    old_eff = { 'body' => 'K009_PW_DTDL_18', 'front' => 'W1000_DTDL_18',
+                'back' => 'HDF_WHITE_3', 'drawer' => 'K009_PW_DTDL_18' }
+    new_eff = old_eff.merge('drawer' => res['sheets'][0]) # RemapDrawer DTDL 18
+    result = RCB.remap_part_edge_overrides!(params, old_eff, new_eff)
+    NxTest.assert_equal(1, result['changed'], 'zladena hrana nasleduje novy dekor zasuviek')
+    edges = params['part_overrides'][key]['edges']
+    NxTest.assert_equal('ABS_REMAPDRAWER_22X10', edges['L1'])
+    NxTest.assert_equal(nil, edges['L2'], 'vedome „bez ABS" ostava nil')
+    NxTest.assert_equal('ABS_W1000_10', edges['W1'], 'vedome kontrastna hrana ostava')
+  ensure
+    rm_cleanup(res)
+  end
+end
+
+NxTest.test('abs-remap: zmena predvolby KORPUSU sa dielca zasuvky NEDOTKNE') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  res = rm_seed_decor('RemapDrawer2')
+  begin
+    params = rm_drawer_params
+    key = rm_key_for(params, 'drawer_bottom')
+    params['part_overrides'] = { key => { 'edges' => { 'L1' => 'ABS_K009_10' } } }
+    old_eff = { 'body' => 'K009_PW_DTDL_18', 'front' => 'W1000_DTDL_18',
+                'back' => 'HDF_WHITE_3', 'drawer' => 'W1000_DTDL_18' }
+    # Meni sa TELO — dielec zasuvky dedi z kanala `:drawer`, takze sa nemeni.
+    result = RCB.remap_part_edge_overrides!(params, old_eff,
+                                            old_eff.merge('body' => res['sheets'][0]))
+    NxTest.assert_equal(0, result['changed'], 'dielec zasuvky nesleduje material tela')
+    NxTest.assert_equal('ABS_K009_10', params['part_overrides'][key]['edges']['L1'])
   ensure
     rm_cleanup(res)
   end

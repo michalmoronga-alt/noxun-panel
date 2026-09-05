@@ -150,12 +150,18 @@ module Noxun
       # triedny kluc namapovany NIE JE (a na genericky `slide` sa NIKDY nepada);
       # `set_incompatible` = vybrany set klasifikaciou polozke NESEDI (ine
       # otvaranie/konstrukcia/system/vyska, alebo pevny set_id tam, kde musi byt
-      # vyskovy selektor). Oba su ORANGE dovody; povysenie na RED
-      # `drawer_kit_missing` prinesie C2b.
+      # vyskovy selektor). Oba su ORANGE dovody pre polozky z PRAVIDIEL.
+      # KOV-C2b: pre polozku Z RECEPTU (`source: 'recipe'`) sa KAZDY dovod
+      # povysuje na RED `drawer_kit_missing` — dielce su uz postavene na
+      # konkretnu NL, takze chybajuci kit nie je „nenacenene", ale nevyrobitelne.
       UNMAPPED_REASONS = %w[no_set set_missing set_type_mismatch nl_missing
                             param_band_missing selector_unresolved
                             length_unsupported library_incompatible
-                            class_unmapped set_incompatible].freeze
+                            class_unmapped set_incompatible drawer_kit_missing].freeze
+
+      # KOV-C2b: RED dovod receptovej polozky (viz `unmapped_entry`). Retazec
+      # sa nesmie rozist s `Recipes::KIT_MISSING` — strazi to guard test.
+      DRAWER_KIT_MISSING = 'drawer_kit_missing'
 
       # --- 1d/R-07: whitelist ZNAMYCH klucov (detektor straty) ----------------
       # Normalizacia je TOLERANTNA (citanie nesmie zhodit prestavbu), takze
@@ -1390,7 +1396,17 @@ module Noxun
       def unmapped_reason_sk(u)
         return '' unless u.is_a?(Hash)
         sid = u['set_id'].to_s
-        case u['reason'].to_s
+        # KOV-C2b: RED dovod receptovej polozky je len INE ZAVAZNOSTNE ZARADENIE
+        # toho isteho zistenia — text sa preto sklada z POVODNEHO dovodu
+        # (`base_reason`). Druhy preklad tych istych pricin by sa casom rozisiel.
+        reason = u['reason'].to_s
+        if reason == DRAWER_KIT_MISSING
+          base = u['base_reason'].to_s
+          return 'nákup nenašiel kit výsuvu k postaveným dielcom' if base.empty?
+
+          return unmapped_reason_sk(u.merge('reason' => base))
+        end
+        case reason
         when 'nl_missing'
           # GH #132 P2: NL sa NEZAOKRUHLUJE — frakcna dlzka (419,6) je vedome
           # NEMAPOVANA (rad ma presne celociselne kluce); „NL 420" by poslalo
@@ -2573,8 +2589,12 @@ module Noxun
       # D-93 (audit B4): nakupny riadok nesie ZNAMIENKO rucneho zasahu — pocet
       # kusov z poloziek so source 'manual' + hodnoty, ktore by dal automat.
       # Nakupny CSV kontrakt sa TYM NEMENI (znamienko zije v sekcii Nakup Studia).
+      # KOV-C2b: receptova polozka s PLATNYM osovym zamkom (`locked: true`) je
+      # z pohladu nakupu to iste znamienko ako dnesne `source: 'manual'` —
+      # dlzka je rucne urcena. Bez zamku receptova polozka znamienko NEMA
+      # (Astra #19 N11: inak by kazda zasuvka hlasila „rucne prepisane").
       def note_manual(row, it, quantity)
-        return unless it.is_a?(Hash) && it['source'].to_s == 'manual'
+        return unless it.is_a?(Hash) && (it['source'].to_s == 'manual' || it['locked'] == true)
         row['manual_quantity'] = row['manual_quantity'].to_i + quantity
         return unless it.key?('rule_nominal_length')
         rnl = it['rule_nominal_length']
@@ -2651,6 +2671,22 @@ module Noxun
         # predvolieb chyba) — obe cestuju do vety semaforu.
         %w[param value member_index member_label detail class_key].each do |k|
           out[k] = ex[k] if ex.key?(k)
+        end
+        # === KOV-C2b: POVYSENIE NA RED `drawer_kit_missing` ==================
+        #
+        # Polozka vysuvu Z RECEPTU (`source: 'recipe'`) ma v modeli POSTAVENE
+        # dielce rezane na KONKRETNU NL. Ked k nej nakup nenajde kit, nie je to
+        # „nenacenene kovanie" (ORANGE), ale objednavka, ktora sa NEDA vyrobit:
+        # dielce na NL 470 bez kitu 470 su odpad. VSETKY dovody sa preto
+        # povysuju (fail-closed vyklad — package menuje `class_unmapped`,
+        # `set_incompatible` a chybajuci kod pre NL, ale ziadny iny dovod nedava
+        # receptovej polozke lepsi vysledok), povodny dovod cestuje v
+        # `base_reason` a vetu semaforu sklada `Validation`.
+        if it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE && reason.to_s != DRAWER_KIT_MISSING
+          out['base_reason'] = reason.to_s
+          out['reason'] = DRAWER_KIT_MISSING
+          out['system'] = params['system'].to_s
+          out['height_variant'] = params['height_variant'] if params['height_variant'].is_a?(Numeric)
         end
         out
       end

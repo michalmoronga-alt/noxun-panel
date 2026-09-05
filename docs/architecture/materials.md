@@ -18,15 +18,27 @@ katalóg materiálov a dedenie projekt→skrinka→dielec (projektové defaulty 
 (`UNI_ZASUVKA_16`) — obe rady receptov (Atira aj Quadro V6) stavajú na 16 mm doske — a keďže `PROTECTED_SHEET_IDS = PROJECT_FALLBACK.values`, je ID **nezmazateľné**.
 `CabinetBuilder.effective_materials` vracia navyše **`eff_drawer`**; v C2a ho **nič nekonzumuje** (dielce zásuviek emituje až C2b).
 
-Kanál má zatiaľ **len projektovú úroveň**: config kľúč skrinky ani výber v Štúdiu neexistujú — pribudnú v C2b spolu s bumpom `CabinetBuilder::CONFIG_SCHEMA`. Preto ho
+**KOV-C2b (v0.9.31) — kanál sa ZAPOJIL.** Pribudla ÚROVEŇ SKRINKY (config kľúč **`drawer_material_id`**, `CONFIG_SCHEMA` 5) a plná reťaz dedenia
+`part_override → skrinka → projekt → UNI 16` presne ako pri tele/čele/chrbte. Hrúbka je **VSTUP receptu**, nie odvodenina plánu: `CabinetBuilder.drawer_thicknesses(cfg, eff)`
+ju vyrieši **PRED** `Construction.build_plan` a pošle ju ako `part_thicknesses` (`{ part_key => mm }`) — bez toho by 18 mm materiál pri Atire ticho prešiel a Quadro by
+počítalo predok/chrbát z nesprávnej hrúbky dna (Codex #301 kolo 3 P1). Materiál mimo `thickness_supported` receptu = RED `drawer_thickness_unsupported`, žiadne dielce.
+**Kľúč `drawer_material_id` musí cestovať VŠETKÝMI cestami materiálu.** V tejto dávke sú to **tri serverové**: **normalize/config** (`CabinetBuilder.normalize` +
+`cabinet_config` + `config_to_params`), **šablóna** (`template_config_from` + `merge_template` preserve-or-override) a **delete guard**
+(`Materials::CABINET_MATERIAL_KEYS` — jeden zoznam pre model aj šablóny). **UI kanála a hromadné cesty (výber v Štúdiu, vkladacia karta, „Nahradiť UNI…") sú
+v samostatnom PR** — dovtedy sa materiál zásuviek nastavuje projektovou predvoľbou v NOXUN dict a `part_override`-om dielca.
+
+**Remap ABS pozná 4. kanál** (Codex #304 kolo 2 P2). `remap_part_edge_overrides!` dostáva `old_eff`/`new_eff` aj s kľúčom `drawer` a odovzdáva ho do `base_material_for`
+ako šiesty argument — bez neho by drawer roly spadli do vetvy tela, takže remap by ich pri zmene predvoľby **zásuviek** prehliadol a pri zmene predvoľby **korpusu**
+naopak zladil s dekorom korpusu.
+
+Kanál mal v C2a **len projektovú úroveň**: config kľúč skrinky ani výber v Štúdiu neexistovali. Preto ho
 `MaterialsDialog::TARGETS` **nepozná** a akcia `set_project_material` ho odmietne („Neznámy projektový materiál") — vedomá diera, nie opomenutie. Čo naň už reaguje:
 `Materials.project_defaults`, delete guard (`used_material_ids`) a **„Nahradiť UNI…"** — `materials_replace_uni` má preň vlastný riadok v `RU_PROJECT_LABELS` („Zásuvky") aj
 vlastnú vetvu v `ru_project_target_issue` (rozsah doskového materiálu; bez nej by 4. kanál spadol do `else`, teda do pravidiel ČIEL). Či recept hrúbku prijme
 (Atira 16, Quadro V6 16/18), rozhoduje `thickness_supported` receptu — až v C2b.
 
 **`thickness_ok_for?` pozná 4 nové roly** (`CabinetBuilder::DRAWER_ROLES` = `drawer_bottom` · `drawer_back` · `box_side` · `drawer_inner_front`) a správa sa pri nich ako pri
-čelách: berú KATALÓGOVÚ hrúbku svojho materiálu, lebo hrúbka je **vstup receptu**, nie konštrukčná konštanta korpusu. V `BuildPlan::ROLES` roly ešte NIE SÚ (pridáva ich C2b
-s bumpom `plan_schema`), a keďže `cabinet_builder` sa načítava PRED `drawer_recipes`, väzbu na `Recipes::ROLE_*` drží **guard test**, nie referencia (rovnaký vzor ako
+čelách: berú KATALÓGOVÚ hrúbku svojho materiálu, lebo hrúbka je **vstup receptu**, nie konštrukčná konštanta korpusu. V `BuildPlan::ROLES` roly **od C2b sú** (`plan_schema` 4), a keďže `cabinet_builder` sa načítava PRED `drawer_recipes`, väzbu na `Recipes::ROLE_*` drží **guard test**, nie referencia (rovnaký vzor ako
 `hardware_sets` ↔ `Fronts`).
 
 #### CRUD katalógu (V0.4.7)

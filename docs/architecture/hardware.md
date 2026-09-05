@@ -13,6 +13,11 @@ Pravidlá kovania (projektový snapshot na modeli), globálny katalóg položiek
 pravidlá kovania (V0.4): Ruby vzory `fixed`/`bands`/`fit_series` parametrizované JSON pravidlami; **projektový snapshot na modeli** (kľúč `hardware_rules` — rebuild
 reprodukovateľný z .skp; globál `%APPDATA%` len default nových projektov + seed-merge); `hardware_overrides` v configu korpusu s identitou (owner_part_key, generic_type, rule_id).
 
+**KOV-C2b (v0.9.31) — R2 EXKLUZIVITA.** `evaluate(..., suppress_slide_owners:)` dostáva množinu `owner_part_key` čiel, ktoré už majú položku výsuvu **z receptu**, a pravidlá
+s `output: 'slide'` sa na nich **nevyhodnocujú** — inak by zásuvka mala dva výsuvy (jeden s kitom, jeden legacy bez dielcov). Potlačenie sa priznáva **jedným** `info`
+warningom `legacy_slide_suppressed` na stavbu; Kontrola ho zámerne neukazuje (`Validation::BUILD_INFO_ONLY`) — používateľ nemá čo opravovať. Potlačenie platí aj vtedy,
+keď recept skončil **konfliktom** (fail-closed: čelo nedostane ani legacy výsuv).
+
 **D-93 ručný NL výsuvu:** polia zásahu (`quantity` · `disabled` · `nominal_length`) sú NEZÁVISLÉ (zápis PO POLIACH, `disabled` ostatné polia nezahadzuje), **zámok = existencia poľa
 `nominal_length`**; `fit_series` emituje položku aj pri hĺbke pod minimom radu, ak zámok existuje (`rule_nominal_length` = hodnota automatu, nil = nevie) + ORANGE build warning
 `hardware_manual_no_fit`; SET validuje presnú zhodu s radom projektového snapshotu, uložená hodnota mimo radu sa NIKDY nemaže. Nákupné CSV bez zmeny — znamienko žije v sekcii Nákup
@@ -307,8 +312,14 @@ uzavretý: tretí segment má LEN `slide`, `@owner` sufix je zakázaný (výber 
 **bezstratový round-trip** a správny marker, takže KOV-D už nebude potrebovať ďalší bump. `BuildPlan.hardware_set_key_type` z neho vracia prvý segment (starší plugin prefix
 nepozná, takže mu z toho istého kľúča vyjde neznámy typ a prestavbu zablokuje — presne to chceme), `BuildPlan.parse_hardware_set_key` vracia `nil`.
 
+**KOV-C2b (v0.9.31) — RECEPTOVÁ POLOŽKA A RED `drawer_kit_missing`.** Zásuvkovú položku už **emituje** `Construction` (`source: 'recipe'`, `rule_id: recipe:<recipe_id>`,
+`quantity: 1`, voliteľné `locked: true` pri platnom NL zámku). Pre výber setu platí presne mechanika C2a nižšie; navyše: **každý** dôvod nemapovania sa pre `source: 'recipe'`
+povyšuje na **RED `drawer_kit_missing`** (`unmapped_entry`), pôvodný dôvod cestuje v `base_reason` a text skladá `unmapped_reason_sk` z NEHO (žiadny druhý preklad tých istých
+príčin). Dôvod: dielce sú už postavené na konkrétnu NL — chýbajúci kit nie je „nenacenené kovanie", ale **nevyrobiteľná** objednávka, preto blokuje aj VEPO.
+`note_manual` berie `locked: true` ako dnešné `source: 'manual'` (dĺžka je ručne určená); bez zámku receptová položka znamienko NEMÁ (Astra #19 N11).
+
 **KOV-C2a (v0.9.30) — TRIEDNY KĽÚČ SA ZAČAL ČÍTAŤ, `height_variant`, `MAPPING_ADDITIONS`, `std` 4.** Príprava aktivácie zásuviek: mení sa výber setu pre položku, ktorá nesie
-klasifikáciu zásuvky, ale **žiadne dnešné pravidlo ju nenesie**, takže výstupy existujúcich zákaziek sú CONTENT-identické (stráži to golden `seed_kniznica` aj vlastný
+klasifikáciu zásuvky, ale **žiadne dnešné pravidlo ju nenesie**, takže výstupy existujúcich zákaziek boli CONTENT-identické (stráži to golden `seed_kniznica` aj vlastný
 charakterizačný test). Päť častí:
 
 - **Kto je „zásuvková" položka.** `class_key_for(it, gt)` = položka má v `params` OBE polia `opening_mode` a `drawer_construction` → kanonický kľúč
@@ -516,8 +527,15 @@ mapovanie a zákaz typu by ju vzal tiež; nebezpečná je len položka s dĺžko
 
 ### drawer_recipes.rb
 
-**KOV-C1 — nemenné recepty zásuviek** (`Noxun::Engine::Recipes`). Čisté Ruby: žiadne SketchUp API, žiadny zápis do modelu ani na disk. Modul je v C1 **odpojený od stavby** —
-`build_plan` ho nevolá, config, `BuildPlan` schéma ani výstupy sa nemenia; zapojenie je úloha rezu C2.
+**KOV-C1 — nemenné recepty zásuviek** (`Noxun::Engine::Recipes`). Čisté Ruby: žiadne SketchUp API, žiadny zápis do modelu ani na disk.
+**Od KOV-C2b (v0.9.31) je modul ZAPOJENÝ:** `Construction.build_plan` ho volá pre každé klasifikované zásuvkové čelo (`drawer_pass`, viď
+[construction.md](construction.md)) a z neho vznikajú dielce v pláne aj **jedna** položka výsuvu.
+
+**Register brány `DRAWER_BLOCKERS` (11 kódov)** = `CONFLICT_CODES` (10, ktoré produkuje resolver) **+ 1 MIGRAČNÝ**. Delí sa na `BUILD_BLOCKERS` (9 fail-closed konfliktov
+STAVBY: zásuvka nevydala ani dielec ani položku) a `ALL_EXPORT_BLOCKERS` = `drawer_kit_missing` (vzniká až v NÁKUPE) **+ `drawer_stale`** — jediný kód, ktorý neprodukuje
+resolver ani nákup, ale **čítanie modelu** (`Bom.collect`): skrinka uložená pred aktiváciou receptov (`config_schema < CabinetBuilder::DRAWER_ACTIVATION_SCHEMA`) má
+klasifikovanú zásuvku, takže v .skp **nie sú** receptové dielce a výsuv je legacy — kusovník aj VEPO by boli neúplné a ticho. Nápravou je **prestavba** skrinky.
+`BLOCKER_LABELS` drží krátky slovenský názov pre bránu exportu — plnú vetu (ktorá hodnota kde nesedí) skladá recept a nesie ju nález Kontroly.
 
 **Dve vrstvy, jedna zodpovednosť každá:** fyzika (rozmery dielcov, výšky, rad NL) žije v **recepte**, objednávacie kódy v **setoch** (`hardware_sets`). Nákup nikdy nemení
 fyzický návrh: rad NL v recepte = rad, ktorý Noxun reálne kupuje, žiadni kandidáti ani fallback. **EB je pevné per recept** (Atira 10,5 · Quadro V6 23) — zmena hrúbky boku

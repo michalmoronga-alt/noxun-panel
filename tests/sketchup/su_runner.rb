@@ -15228,6 +15228,318 @@ module NoxunSuRunner
     end]
   end
 
+  # ==========================================================================
+  # KOV-C2b — AKTIVACIA RECEPTOV ZASUVIEK (dielce v modeli, polozka vysuvu,
+  # fail-closed brany, serverove `recipe_refs`)
+  #
+  # Co dokazuje LEN in-SketchUp beh (headless sada na to nema ako):
+  #   1) plan vs. MODEL 1:1 — dielce zasuvky naozaj stoja v svetlom priestore
+  #      niky (origin + kvader + tag + vyrobny snapshot);
+  #   2) PRESTAVBA po zmene hlbky/vysky = iny variant/NL BEZ duplicit a
+  #      s prezitim `part_overrides`;
+  #   3) Ctrl+Z je PRESNE jeden krok (geometria + zapis `recipe_refs`
+  #      + migracia zamku su JEDNA operacia);
+  #   4) kopia a sablona prenesu klasifikaciu aj pripnuty recept;
+  #   5) plytka skrinka = ZIADNE dielce, RED nalez a ZASTAVENY export
+  #      s PRAZDNYM cielovym priecinkom.
+  # ==========================================================================
+
+  KOVC2B_TPL = 'SU TEST KOVC2B zasuvka'
+
+  def kovc2b_params(over = {}, front = {})
+    item = { 'id' => 'F1', 'type' => 'drawer_front', 'mode' => 'fixed', 'height' => 175.0,
+             'opening_mode' => 'classic', 'drawer' => { 'construction' => 'metal' } }.merge(front)
+    { 'type' => 'lower', 'width' => 900.0, 'height' => 720.0, 'depth' => 500.0,
+      'thickness' => 18.0, 'floor_height' => 100.0,
+      'fronts' => { 'items' => [item] } }.merge(over)
+  end
+
+  # Dielce zasuvky v MODELI ako mapa part_key => instancia.
+  def kovc2b_parts(inst)
+    kova_parts(inst).select { |k, _| k.to_s =~ %r{\Afront:[^/]+/(drawer_|box_side)} }
+  end
+
+  def kovc2b_front(inst, fid = 'F1')
+    Array((e::Store.config(inst) || {})['front_items']).find { |f| f['id'].to_s == fid }
+  end
+
+  def kovc2b_slides(inst)
+    Array((e::Store.config(inst) || {})['hardware'])
+      .select { |h| h.is_a?(Hash) && h['generic_type'] == 'slide' }
+  end
+
+  # Plan pre ULOZENY config skrinky (s hrubkami kanala `:drawer` — presne tak,
+  # ako ho pocita `build_into`).
+  def kovc2b_plan(model, inst)
+    cfg = e::Store.config(inst) || {}
+    norm = e::CabinetBuilder.normalize(e::CabinetBuilder.config_to_params(cfg))
+    eff = e::CabinetBuilder.effective_materials(model, cfg)
+    e::Construction.build_plan(norm, e::Store.get(inst, 'cabinet_id'),
+                               part_thicknesses: e::CabinetBuilder.drawer_thicknesses(norm, eff))
+  end
+
+  # Sonda vyberu suboru (vzor r12_restore_messagebox!): `UI.savepanel` vrati
+  # PEVNU cestu a prizna, ze sa vobec otvoril. Idempotentne obnovenie.
+  def kovc2b_stub_savepanel!(path, &on_open)
+    return if UI.respond_to?(:noxun_kovc2b_orig_savepanel)
+
+    UI.singleton_class.send(:alias_method, :noxun_kovc2b_orig_savepanel, :savepanel)
+    UI.define_singleton_method(:savepanel) do |*_args|
+      on_open&.call
+      path
+    end
+  end
+
+  def kovc2b_restore_savepanel!
+    return unless UI.respond_to?(:noxun_kovc2b_orig_savepanel)
+
+    UI.singleton_class.send(:alias_method, :savepanel, :noxun_kovc2b_orig_savepanel)
+    UI.singleton_class.send(:remove_method, :noxun_kovc2b_orig_savepanel)
+  end
+
+  # Prazdny docasny priecinok pre dokaz „export sa nezapisal".
+  def kovc2b_tmpdir
+    dir = File.join(Dir.tmpdir, "noxun_kovc2b_#{Time.now.to_i}_#{rand(9999)}")
+    FileUtils.mkdir_p(dir)
+    dir
+  end
+
+  def run_kovc2b(model)
+    cleanup(model)
+    markers = []
+
+    # --- 1) stavba: plan vs. MODEL 1:1 --------------------------------------
+    inst = e::CabinetBuilder.build(model, kovc2b_params)
+    return ok('KOV-C2b: vlozenie korpusu so zasuvkou', false) unless inst
+
+    plan = kovc2b_plan(model, inst)
+    want = plan[:parts].select { |pd| pd[:material] == :drawer }
+    got = kovc2b_parts(inst)
+    ok("KOV-C2b: Atira dala PRAVE 2 vyrabane dielce (plan #{want.length}, model #{got.length})",
+       want.length == 2 && got.length == 2)
+    bad = []
+    want.each do |pd|
+      pi = got[pd[:part_key].to_s]
+      next bad << "#{pd[:part_key]} chyba v modeli" if pi.nil?
+
+      po = pi.transformation.origin
+      org = [mm(po.x), mm(po.y), mm(po.z)]
+      b = pi.definition.bounds
+      dims = [mm(b.width), mm(b.height), mm(b.depth)]
+      bad << "#{pd[:part_key]} origin #{org.map { |v| v.round(2) }} != #{pd[:origin]}" unless
+        org.zip(pd[:origin]).all? { |a, x| (a - x.to_f).abs <= TOL }
+      bad << "#{pd[:part_key]} box #{dims.map { |v| v.round(2) }} != #{pd[:box]}" unless
+        dims.zip(pd[:box]).all? { |a, x| (a - x.to_f).abs <= TOL }
+      bad << "#{pd[:part_key]} tag #{pi.layer.name}" unless pi.layer.name == 'Noxun/Vnútro'
+    end
+    ok("KOV-C2b: plan vs. model 1:1 (#{bad.length} nezhod)#{bad.empty? ? '' : ' — ' + bad.join('; ')}",
+       bad.empty?)
+    bottom = got['front:F1/drawer_bottom']
+    snap = bottom ? (e::Store.config(bottom) || {}) : {}
+    ok("KOV-C2b: dno nesie vyrobny snapshot 791,5 x 480 x 16 (#{snap['length']} x #{snap['width']})",
+       (snap['length'].to_f - 791.5).abs <= TOL && (snap['width'].to_f - 480.0).abs <= TOL &&
+       (snap['thickness'].to_f - 16.0).abs <= TOL)
+    ok('KOV-C2b: dielec zasuvky je VYRABANY (kusovnik ho vidi)',
+       bottom && e::Store.get(bottom, 'manufactured') == true &&
+       e::Store.get(bottom, 'production_class').to_s == 'sheet')
+    sl = kovc2b_slides(inst)
+    ok("KOV-C2b: PRESNE jedna polozka vysuvu z receptu (#{sl.length})",
+       sl.length == 1 && sl.first['source'] == 'recipe' &&
+       sl.first['rule_id'] == 'recipe:atira_sisy_v1' && sl.first['quantity'] == 1)
+    ok("KOV-C2b: params nesu vysku 70 a NL 470 (#{sl.first && sl.first['params'].inspect})",
+       sl.first && sl.first['params']['height_variant'].to_i == 70 &&
+       (sl.first['params']['nominal_length'].to_f - 470.0).abs <= TOL)
+
+    # --- 2) serverovy zapis `recipe_refs` v TEJ ISTEJ operacii --------------
+    fi = kovc2b_front(inst)
+    ok('KOV-C2b: server doplnil `drawer.system` aj pripnuty recept',
+       fi && fi['drawer'].is_a?(Hash) && fi['drawer']['system'] == 'atira' &&
+       fi['drawer']['recipe_refs'] == { 'atira|sisy' => 'atira_sisy_v1' })
+    ok("KOV-C2b: ulozeny config ma schemu #{e::CabinetBuilder::CONFIG_SCHEMA}",
+       (e::Store.config(inst) || {})['config_schema'].to_i == e::CabinetBuilder::CONFIG_SCHEMA)
+
+    # --- 3) prestavba: ina hlbka = ina NL, ziadna duplicita ----------------
+    m = r03_marker(model, markers)
+    e::CabinetBuilder.rebuild(model, inst,
+                              e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+                                .merge('depth' => 560.0))
+    got2 = kovc2b_parts(inst)
+    sl2 = kovc2b_slides(inst)
+    ok("KOV-C2b prestavba: hlbka 560 dala NL 520 (#{sl2.first && sl2.first['params']['nominal_length']})",
+       sl2.length == 1 && (sl2.first['params']['nominal_length'].to_f - 520.0).abs <= TOL)
+    ok("KOV-C2b prestavba: stale PRAVE 2 dielce, ziadna duplicita (#{got2.length})",
+       got2.length == 2)
+    nb = got2['front:F1/drawer_bottom']
+    ok("KOV-C2b prestavba: dno sa prepocitalo na 530 mm (#{nb && (e::Store.config(nb) || {})['width']})",
+       nb && ((e::Store.config(nb) || {})['width'].to_f - 530.0).abs <= TOL)
+    Sketchup.undo
+    ok('KOV-C2b prestavba: 1x Spat vratil hlbku aj NL',
+       ((e::Store.config(inst) || {})['depth'].to_f - 500.0).abs <= TOL &&
+       (kovc2b_slides(inst).first['params']['nominal_length'].to_f - 470.0).abs <= TOL)
+    ok('KOV-C2b prestavba: bola PRESNE jeden krok Spat', m.valid?)
+    r03_clear_markers(model, markers)
+
+    # --- 4) part_overrides dielca zasuvky prezije prestavbu -----------------
+    ov = { 'front:F1/drawer_bottom' => { 'edges' => { 'L1' => nil } } }
+    e::CabinetBuilder.rebuild(model, inst,
+                              e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+                                .merge('part_overrides' => ov, 'height' => 760.0))
+    saved = (e::Store.config(inst) || {})['part_overrides'] || {}
+    ok('KOV-C2b: part_override dielca zasuvky prezil prestavbu',
+       saved.key?('front:F1/drawer_bottom'))
+
+    # --- 5) vyssie celo = iny variant (H176) --------------------------------
+    p2 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    p2['height'] = 900.0
+    p2['depth'] = 560.0
+    p2['fronts']['items'][0]['height'] = 300.0
+    e::CabinetBuilder.rebuild(model, inst, p2)
+    sl3 = kovc2b_slides(inst)
+    ok("KOV-C2b: vyssie celo dalo variant H176 / NL 520 (#{sl3.first && sl3.first['params'].inspect})",
+       sl3.length == 1 && sl3.first['params']['height_variant'].to_i == 176 &&
+       (sl3.first['params']['nominal_length'].to_f - 520.0).abs <= TOL)
+    ok("KOV-C2b: po zmene vysky stale PRAVE 2 dielce (#{kovc2b_parts(inst).length})",
+       kovc2b_parts(inst).length == 2)
+
+    # --- 6) kopia prenesie klasifikaciu aj pripnuty recept ------------------
+    model.selection.clear
+    model.selection.add(inst)
+    e::Panel.handle_insert_copy(pg(model, 'cabinet_id' => e::Store.get(inst, 'cabinet_id')))
+    copy = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' && i != inst }
+    cfi = copy && kovc2b_front(copy)
+    ok('KOV-C2b kopia: klasifikacia aj `recipe_refs` prezili „Vložiť kópiu"',
+       cfi && cfi['drawer'].is_a?(Hash) &&
+       cfi['drawer']['recipe_refs'] == { 'atira|sisy' => 'atira_sisy_v1' })
+    ok("KOV-C2b kopia: kopia ma dielce zasuvky (#{copy ? kovc2b_parts(copy).length : 0})",
+       copy && kovc2b_parts(copy).length == 2)
+    if copy && copy.valid?
+      model.start_operation('KOV-C2b erase copy', true)
+      copy.erase!
+      model.commit_operation
+    end
+
+    # --- 7) sablona ulozit / vlozit ----------------------------------------
+    tpl_cfg = e::Panel.template_config_from(e::Store.config(inst) || {}, model: model)
+    tit = Array((tpl_cfg['fronts'] || {})['items']).first || {}
+    ok('KOV-C2b sablona: whitelist nesie klasifikaciu aj pripnuty recept',
+       tit['drawer'].is_a?(Hash) && tit['drawer']['construction'] == 'metal' &&
+       tit['drawer']['recipe_refs'] == { 'atira|sisy' => 'atira_sisy_v1' })
+    e::TemplateStore.delete('cabinet', KOVC2B_TPL) if e::TemplateStore.find('cabinet', KOVC2B_TPL)
+    if e::TemplateStore.upsert('cabinet', KOVC2B_TPL, tpl_cfg)
+      target = e::CabinetBuilder.build(model, kovc2b_params({}, 'type' => 'door',
+                                                                'opening_mode' => nil,
+                                                                'drawer' => nil))
+      model.selection.clear
+      model.selection.add(target)
+      e::TemplatesDialog.handle_apply({ 'template' => KOVC2B_TPL }.to_json)
+      tfi = kovc2b_front(target)
+      ok('KOV-C2b sablona: POUZITIE prenieslo klasifikaciu aj ref',
+         tfi && tfi['drawer'].is_a?(Hash) &&
+         tfi['drawer']['recipe_refs'] == { 'atira|sisy' => 'atira_sisy_v1' })
+      ok("KOV-C2b sablona: cielova skrinka ma dielce zasuvky (#{kovc2b_parts(target).length})",
+         kovc2b_parts(target).length == 2)
+      e::TemplateStore.delete('cabinet', KOVC2B_TPL)
+      if target && target.valid?
+        model.start_operation('KOV-C2b erase tpl target', true)
+        target.erase!
+        model.commit_operation
+      end
+    else
+      info("KOV-C2b: sablonu #{KOVC2B_TPL} sa nepodarilo zapisat — scenar preskoceny")
+    end
+
+    # --- 8) plytka skrinka: ZIADNE dielce + RED + ZASTAVENY export ---------
+    cleanup(model)
+    shallow = e::CabinetBuilder.build(model, kovc2b_params('depth' => 250.0))
+    if shallow
+      ok("KOV-C2b plytka: ZIADNE dielce zasuvky (#{kovc2b_parts(shallow).length})",
+         kovc2b_parts(shallow).empty?)
+      ok("KOV-C2b plytka: ZIADNA polozka vysuvu (#{kovc2b_slides(shallow).length})",
+         kovc2b_slides(shallow).empty?)
+      conf = Array((e::Store.config(shallow) || {})['drawer_conflicts'])
+      ok("KOV-C2b plytka: dovod je ULOZENY v configu (#{conf.map { |x| x['code'] }.inspect})",
+         conf.length == 1 && conf.first['code'] == 'drawer_no_fit')
+      collected = e::Bom.collect(model)
+      red = Array(e::ProductionCore.control_payload(collected)['items'])
+            .select { |i| i['category'] == 'drawer' }
+      ok("KOV-C2b plytka: Kontrola ukazuje RED nalez zasuvky (#{red.length})",
+         red.length == 1 && red.first['severity'] == 'red')
+      stop = e::ProductionCore.drawer_stop(collected,
+                                           e::ProductionCore.hardware_expansion(model, collected))
+      ok("KOV-C2b plytka: brana exportu zastavuje (#{stop.to_s[0, 60]})", !stop.nil?)
+      ok('KOV-C2b plytka: VEPO branu STAVBY nedostava (geometria sa nevydala)',
+         e::ProductionCore.drawer_blockers(collected, nil, scope: :kit).empty?)
+
+      # Realny export. `UI.savepanel` je NASTRCENY tak, aby vratil cestu do
+      # PRAZDNEHO docasneho priecinka — keby brana pretiekla, subor by tam
+      # vznikol a test to zbada. Sonda sa VZDY vrati spat (aj pri vynimke).
+      dir = kovc2b_tmpdir
+      status = nil
+      picked = false
+      kovc2b_stub_savepanel!(File.join(dir, 'kovanie.csv')) { picked = true }
+      begin
+        e::ProductionCore.do_hw_csv(model, { 'gen' => 1 }, generation: 1,
+                                    status: ->(msg, *_r) { status = msg },
+                                    repush: -> {})
+      rescue StandardError => ex
+        status = "vynimka #{ex.class}: #{ex.message}"
+      ensure
+        kovc2b_restore_savepanel!
+      end
+      files = Dir.glob(File.join(dir, '*'))
+      ok("KOV-C2b plytka: cielovy priecinok ostal PRAZDNY (#{files.length} suborov)", files.empty?)
+      ok('KOV-C2b plytka: vyber suboru sa ani NEOTVORIL (brana padla skor)', !picked)
+      ok("KOV-C2b plytka: status hovori PRECO (#{status.to_s[0, 80]})",
+         status.to_s.include?('zásuvka'))
+      FileUtils.rm_rf(dir)
+
+      # CITANIE Kontroly nesmie robit krok Spat.
+      m2 = r03_marker(model, markers)
+      e::ProductionCore.control_payload(e::Bom.collect(model))
+      ok('KOV-C2b: citanie Kontroly nespravilo krok Spat', m2.valid?)
+      r03_clear_markers(model, markers)
+    end
+
+    # --- 9) Codex #304 kolo 1: zmena konstrukcie metal <-> wood -------------
+    cleanup(model)
+    sw = e::CabinetBuilder.build(model, kovc2b_params)
+    if sw
+      p_wood = e::CabinetBuilder.config_to_params(e::Store.config(sw) || {})
+      p_wood['fronts']['items'][0]['drawer'] = { 'construction' => 'wood' }
+      # Panel serverove polia NEPOSIELA — presne tak, ako ich zahadzuje handler.
+      p_wood['fronts'] = e::Fronts.reattach_server_drawer_fields(
+        p_wood['fronts'], (e::Store.config(sw) || {})['fronts']
+      )
+      e::CabinetBuilder.rebuild(model, sw, p_wood)
+      wfi = kovc2b_front(sw)
+      ok("KOV-C2b prepnutie: drevo dalo Quadro, nie RED (#{wfi && wfi['drawer'].inspect})",
+         wfi && wfi['drawer']['system'] == 'quadro_v6' &&
+         Array((e::Store.config(sw) || {})['drawer_conflicts']).empty?)
+      ok("KOV-C2b prepnutie: dreveny box ma 5 dielcov (#{kovc2b_parts(sw).length})",
+         kovc2b_parts(sw).length == 5)
+      # a spat na kov — POVODNY pripnuty recept Atiry sa vrati
+      p_metal = e::CabinetBuilder.config_to_params(e::Store.config(sw) || {})
+      p_metal['fronts']['items'][0]['drawer'] = { 'construction' => 'metal' }
+      p_metal['fronts'] = e::Fronts.reattach_server_drawer_fields(
+        p_metal['fronts'], (e::Store.config(sw) || {})['fronts']
+      )
+      e::CabinetBuilder.rebuild(model, sw, p_metal)
+      mfi = kovc2b_front(sw)
+      ok('KOV-C2b prepnutie: navrat na kov vratil POVODNY recept Atiry',
+         mfi && mfi['drawer']['system'] == 'atira' &&
+         mfi['drawer']['recipe_refs']['atira|sisy'] == 'atira_sisy_v1')
+      ok("KOV-C2b prepnutie: a zase 2 dielce (#{kovc2b_parts(sw).length})",
+         kovc2b_parts(sw).length == 2)
+    end
+
+    cleanup(model)
+    ok('KOV-C2b: cleanup (0 korpusov, sablona prec)',
+       cabinets(model).empty? && e::TemplateStore.find('cabinet', KOVC2B_TPL).nil?)
+  rescue StandardError => ex
+    log_line("FAIL: run_kovc2b vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
   def run_async(model, done)
     state = {}
     steps = []
@@ -15980,6 +16292,7 @@ module NoxunSuRunner
     run_kova2b(model)        # KOV-A2b: smer otvarania v modeli — lifecycle overlayu, symbol na spravnom kridle a prednej ploche, prestavba/Spat, dup-ID per instancia, vykon
     run_tools1(model)        # NASTROJE-1 (T1a): Mower + Snaper v baliku enginu (kopia cez sev, rotacie/Z ako 1 krok Spat, odmietnutia bez operacie, bariera observera, Snaper a viditelnost)
     run_tools1b(model)       # NASTROJE-1 (T1b): boot migracia starych instalacii — docasny Plugins strom (styri ciele, marker per cesta, druhy beh = no-op) + dokaz, ze boot hook upratal ZIVU instalaciu
+    run_kovc2b(model)        # KOV-C2b: zasuvky z receptu — dielce v modeli 1:1 s planom, JEDNA polozka vysuvu, prestavba (ina hlbka/vyska = ina NL/variant, ziadna duplicita, part_overrides prezijú), 1 krok Spat, kopia a sablona nesu pripnuty recept, plytka skrinka = ziadne dielce + RED + export zastaveny s PRAZDNYM priecinkom
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

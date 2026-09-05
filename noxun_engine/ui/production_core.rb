@@ -1190,8 +1190,84 @@ module Noxun
       # sa nedaju „vziat na vedomie", da sa len aktualizovat plugin.
       # VEPO branu opat NEDOSTAVA — je to rezaci vystup z rozmerov dielcov,
       # ktore starsia verzia cita spravne (rovnaka logika ako pri duplicitach).
-      def export_blockers(dups: [], cp: nil, newer: [])
+      # --- KOV-C2b: BRANA ZASUVIEK ------------------------------------------
+      #
+      # Register `Recipes::DRAWER_BLOCKERS` (10 kodov) ma DVE polovice a kazda
+      # blokuje INE vystupy:
+      #   * `BUILD_BLOCKERS` (9) = fail-closed konflikty STAVBY. Zasuvka nevydala
+      #     ani dielec ani polozku vysuvu, takze objednavka aj rozpocet by boli
+      #     NEUPLNE -> nakupny CSV, rozpocet, cenova ponuka. VEPO branu
+      #     nepotrebuje: chranit ho netreba, ked sa geometria vobec nevydala.
+      #   * `KIT_MISSING` (1) = dielce STOJA (rezane na konkretnu NL), ale kit
+      #     k nej neexistuje -> blokuje VSETKY styri vystupy VRATANE VEPO
+      #     (BL = NL + 10, boky Quadro = NL — bez kitu su to odpadove rezy).
+      #
+      # `scope: :kit` posiela VEPO (len druha polovica), `:all` ostatne exporty.
+      # Vysledok = pole hotovych dovodov pre `export_blockers(drawer:)`.
+      def drawer_blockers(collected, expansion, scope: :all)
+        return [] unless defined?(Recipes)
+
+        codes = {}
+        # `scope: :kit` (VEPO) cita z nalezov LEN kody, ktore robia NEUPLNYMI aj
+        # REZACIE data — dnes migracny `drawer_stale` (dielce v .skp chybaju).
+        from_issues = scope == :all ? (Recipes::BUILD_BLOCKERS + Recipes::ALL_EXPORT_BLOCKERS)
+                                    : Recipes::ALL_EXPORT_BLOCKERS
+        Array(collected.is_a?(Hash) ? collected[:hardware_issues] : nil).each do |iss|
+          next unless iss.is_a?(Hash)
+
+          code = iss['code'].to_s
+          next unless from_issues.include?(code)
+
+          note_drawer_code(codes, code, iss['owner_id'])
+        end
+        Array(expansion.is_a?(Hash) ? expansion['unmapped'] : nil).each do |u|
+          next unless u.is_a?(Hash) && u['reason'].to_s == Recipes::KIT_MISSING
+
+          note_drawer_code(codes, Recipes::KIT_MISSING, u['cabinet_id'])
+        end
+        # Poradie podla registra — deterministicke bez ohladu na poradie zberu.
+        Recipes::DRAWER_BLOCKERS.filter_map do |code|
+          ids = codes[code]
+          next nil if ids.nil?
+
+          label = Recipes::BLOCKER_LABELS[code] || code
+          "#{label} (#{ids_text(ids)}) — oprav to v sekcii Kontrola"
+        end
+      end
+
+      def note_drawer_code(codes, code, owner_id)
+        list = (codes[code] ||= [])
+        id = owner_id.to_s
+        list << id unless id.empty? || list.include?(id)
+      end
+
+      # Cerstva expanzia kovania nedostupna (chyba katalogu/setov) A zakazka MA
+      # aspon jednu receptovu polozku = nedokazatelny stav. Fail-closed:
+      # zastavime, rovnako ako pri neznamej expanzii duplicit.
+      def drawer_expansion_unproven?(collected, expansion)
+        return false unless expansion.nil?
+
+        Array(collected.is_a?(Hash) ? collected[:hardware] : nil).any? do |it|
+          it.is_a?(Hash) && it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE
+        end
+      end
+
+      # Hotova hlaska brany zasuviek, alebo nil. Vola sa PRED vyberom priecinka
+      # / suboru — picker sa pri blokade ani neotvori (vzor `newer_config_stop`).
+      def drawer_stop(collected, expansion, scope: :all)
+        if drawer_expansion_unproven?(collected, expansion)
+          return export_blocked_status(
+            ['nákupný zoznam kovania sa nedá zostaviť, takže sa nedá overiť kit zásuviek ' \
+             '(pozri Ruby konzolu)']
+          )
+        end
+        reasons = drawer_blockers(collected, expansion, scope: scope)
+        reasons.empty? ? nil : export_blocked_status(export_blockers(drawer: reasons))
+      end
+
+      def export_blockers(dups: [], cp: nil, newer: [], drawer: [])
         out = []
+        out.concat(Array(drawer))
         unless Array(newer).empty?
           out << "#{newer_ids_text(newer)} #{Array(newer).length == 1 ? 'je' : 'sú'} z novšej " \
                  'verzie pluginu — kusovník aj exporty (VEPO, nákup kovania, rozpočet, cenová ' \
@@ -1587,6 +1663,16 @@ module Noxun
         newer_stop = newer_config_stop(collected)
         return status.call(newer_stop, true) if newer_stop
 
+        # KOV-C2b: VEPO uz ma branu zasuviek — ale LEN pre chybajuci kit
+        # (`scope: :kit`). Dielce su rezane na konkretnu NL, takze bez kitu tej
+        # NL su odpad; fail-closed konflikty STAVBY branu nepotrebuju (zasuvka
+        # v takom pripade nevydala ziadnu geometriu). Expanzia sa preto pocita
+        # UZ TU — picker sa pri blokade ani neotvori (vzor `newer_config_stop`)
+        # a nizsie sa uz LEN pouzije (ziadny druhy prepocet).
+        hw_exp = hardware_expansion(model, collected)
+        drawer_stop_msg = drawer_stop(collected, hw_exp, scope: :kit)
+        return status.call(drawer_stop_msg, true) if drawer_stop_msg
+
         settings = vepo_settings
         last = settings['last_dir']
         start_dir = last.is_a?(String) && File.directory?(last) ? last : nil
@@ -1595,7 +1681,6 @@ module Noxun
 
         bom = Bom.compute(collected)
         smap = sheets_map
-        hw_exp = hardware_expansion(model, collected)
         control = control_payload(collected, hardware_expansion: hw_exp,
                                              budget: budget_payload(model, bom, collected,
                                                                     nil, hw_exp, smap),
@@ -1683,6 +1768,10 @@ module Noxun
         # P0-HF-02: FINALNA BRANA PRED VYBEROM SUBORU. Zliati vlastnici =
         # podpocitane kovanie; toto CSV ide dodavatelovi, takze nesmie vzniknut.
         # Blokuje LEN skutocna kolizia (review #252 P2) — rozhoduje expanzia.
+        # KOV-C2b: brana zasuviek (fail-closed konflikty stavby + chybajuci kit).
+        drawer_stop_msg = drawer_stop(collected, exp)
+        return status.call(drawer_stop_msg, true) if drawer_stop_msg
+
         blocking_dups, warn_dups = dup_partition(collected, exp)
         blockers = export_blockers(dups: blocking_dups)
         return status.call(export_blocked_status(blockers), true) unless blockers.empty?
@@ -2255,6 +2344,9 @@ module Noxun
         # TVRDA (zliati vlastnici kovania) zapis nepusti nikdy; POTVRDITELNA
         # (riadky bez ceny) ho zastavi prvykrat a druhy klik ju s potvrdenim
         # prejde. Varovanie pod hotovym harkom bolo v oboch pripadoch neskoro.
+        drawer_stop_msg = drawer_stop(collected, hw_exp)
+        return status.call(drawer_stop_msg, true) if drawer_stop_msg
+
         blocking_dups, warn_dups = dup_partition(collected, hw_exp)
         blockers = export_blockers(dups: blocking_dups)
         return status.call(export_blocked_status(blockers), true) unless blockers.empty?
@@ -2336,6 +2428,9 @@ module Noxun
         # FIREWALL interných pojmov branou NIE JE (STANDARD §11.3: hlasi
         # a neblokuje) — vyhodnocuje sa az nad hotovym harkom a ide do
         # `cp_warnings`.
+        drawer_stop_msg = drawer_stop(collected, hw_exp)
+        return status.call(drawer_stop_msg, true) if drawer_stop_msg
+
         blocking_dups, warn_dups = dup_partition(collected, hw_exp)
         blockers = export_blockers(dups: blocking_dups, cp: cp)
         return status.call(export_blocked_status(blockers), true) unless blockers.empty?

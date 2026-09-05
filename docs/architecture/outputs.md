@@ -92,7 +92,7 @@ uložil.** Rozpočet aj cenová ponuka sa zapísali na disk a AŽ POTOM sa vyhod
 nákupný CSV rovnako vznikol aj nad zliatymi vlastníkmi kovania. Súbor, ktorý už existuje, sa dá odoslať dodávateľovi aj zákazníkovi — červený status pod ním prišiel neskoro. Brána
 sa volá **pred `savepanel`** (picker sa pri chybe ani neotvorí) a má **dve vetvy**, ktorých rozdiel je záväzný:
 
-*(1) TVRDÁ — `export_blockers(dups:, cp:, newer:)`.* Stavy, ktoré sú VŽDY chyba a **nedajú sa potvrdiť**: duplicitné ID **skrinky** (`dups:` — CSV kovania, rozpočet, ponuka),
+*(1) TVRDÁ — `export_blockers(dups:, cp:, newer:, drawer:)`.* Stavy, ktoré sú VŽDY chyba a **nedajú sa potvrdiť**: duplicitné ID **skrinky** (`dups:` — CSV kovania, rozpočet, ponuka),
 záporná „Nábytková zostava" a nesúlad ponuky s rozpočtom (`cp:` — len ponuka) a **zákazka z NOVŠEJ verzie pluginu** (`newer:` — CSV kovania, rozpočet, ponuka). Nedáva zmysel poslať
 dodávateľovi objednávku, o ktorej vieme, že je podpočítaná. Hláška `export_blocked_status` musí povedať **oboje**: že súbor NEVZNIKOL (inak ho používateľ ide hľadať na disk)
 a **prečo + kde to opraviť**. Zoznamy ID majú **jedno znenie stropu** („tri ID + a ďalšie N") — `ids_text`, ktoré používa aj `dup_ids_text`.
@@ -109,6 +109,32 @@ v `tests/pure/test_kovh1_adhoc.rb`.
 P2-B). Dôvod: zákazka z novšej verzie nemusí vyexpandovať ani jeden **známy** nákupný riadok (alebo jej rozpočet vôbec nevznikne), takže skorý návrat „model nemá žiadne
 kovanie" / „rozpočet sa nepodarilo zostaviť" by bránu **predbehol** a používateľ by sa nedozvedel ani ID skriniek, ani to, že má aktualizovať plugin. `newer:` preto do
 **neskorého** `export_blockers` (spolu s `dups:`/`cp:`) už nechodí — skladá ho výhradne `newer_config_stop`, jedno miesto pre všetky štyri exporty.
+
+**KOV-C2b (v0.9.31) — BRÁNA ZÁSUVIEK (`drawer:`).** Register `Recipes::DRAWER_BLOCKERS` (11 kódov) má dve polovice a každá blokuje **iné** výstupy:
+**`BUILD_BLOCKERS` (9)** = fail-closed konflikty STAVBY — zásuvka nevydala ani dielec ani položku výsuvu, takže objednávka aj rozpočet by boli neúplné → nákupný CSV,
+rozpočet, cenová ponuka. VEPO bránu **nepotrebuje**: chrániť netreba to, čo sa vôbec nevydalo. **`drawer_kit_missing` (1)** vzniká až v NÁKUPE (receptová položka bez setu
+alebo bez kódu pre svoju NL) — dielce v modeli **ostávajú** (fyzika je správna), ale sú rezané na konkrétnu NL (BL = NL + 10, boky Quadro = NL), takže bez kitu tej NL sú
+odpad → blokuje **VŠETKY štyri exporty VRÁTANE VEPO**.
+
+**Tretia položka registra je MIGRAČNÁ: `drawer_stale`.** Projekt uložený **pred** aktiváciou receptov (`config_schema` < `CabinetBuilder::DRAWER_ACTIVATION_SCHEMA` = 5),
+ktorý už má klasifikovanú zásuvku (`construction` metal/wood v `front_items`), nemá v .skp receptové dielce a nesie legacy výsuv — kusovník, VEPO aj nákup by boli neúplné
+a **ticho**. `Bom.collect` ho preto priznáva RED nálezom (`drawer_stale_issue`) a brána zastaví **všetky štyri** výstupy. Nápravu robí **prestavba** skrinky (vtedy sa zapíše
+schéma 5 a resolver dobehne) — kód sa preto nikde nezapisuje do modelu, žije len ako čítanie stavu. „Klasifikovaná" znamená **presne to isté, čo pre resolver** — `Recipes.classified?` (t. j. `recipe_key_for` nevrátila `:legacy`), teda **akékoľvek** drawer pole, nielen
+`construction metal|wood`. Vlastný užší predikát by prepustil čelo s **len** `opening_mode` (po prestavbe `drawer_unclassified`) aj čelo s **len** `variant internal`
+(po prestavbe `drawer_internal_unsupported`) — obe sú po prestavbe RED, takže pred ňou nesmú byť zelené (Codex #304 kolo 3 P1). Konštrukcia `other` ani čelo bez
+jediného drawer poľa nález nerobia (legacy cesta je CONTENT-identická aj po aktivácii).
+
+Skladá to `drawer_blockers(collected, expansion, scope:)`: `scope: :all` číta z `hardware_issues` konflikty stavby **aj** `ALL_EXPORT_BLOCKERS` (uložený nosič
+`drawer_conflicts` a `drawer_stale`, nižšie) a k tomu kit z expanzie; `scope: :kit` (VEPO) číta z nálezov len `ALL_EXPORT_BLOCKERS` a kit. Poradie dôvodov určuje register (deterministicky, bez ohľadu na poradie zberu) a text stavia
+`Recipes::BLOCKER_LABELS` + `ids_text` (ten istý strop „tri ID + a ďalšie N"). Hotovú hlášku vydáva **`drawer_stop`**, ktorý beží — rovnako ako `newer_config_stop` —
+**pred pickerom**; VEPO si preto expanziu kovania počíta **hneď po zbere** a nižšie ju už len použije (žiadny druhý prepočet). Keď expanziu nemáme (chyba katalógu/setov)
+a zákazka **má** aspoň jednu receptovú položku, brána je **fail-closed** (`drawer_expansion_unproven?`) — nedokázateľný stav zastavujeme, rovnako ako neznámu expanziu duplicít.
+
+**Uložený nosič `drawer_conflicts` (Astra #19 F6).** Po fail-closed stavbe v modeli nezostane ani dielec ani položka, z ktorej by sa dôvod dal obnoviť — musí teda prežiť
+v **configu**: `Construction.build_plan` ho vydá v `plan[:drawer_conflicts]` (tvar `{front_id, code, message, part_key}`, validuje `BuildPlan.validate_drawer_conflicts!`),
+`CabinetBuilder.merge_final` ho uloží vedľa `warnings`/`hardware`, `Bom.drawer_conflict_issues` ho zlúči do `hardware_issues` a `Validation.check_hardware_issues` z neho
+robí RED kategóriu **`drawer`**. Prežije tak save/reopen aj Undo. Neznámy kód (config z novšej verzie) sa **preskočí** — o takú zákazku sa stará brána `newer_configs`.
+RED kategória **`drawer_kit`** vzniká paralelne z expanzie (`drawer_kit_item`) a veta menuje čelo, systém, výšku, NL aj dôvod.
 
 *(2) POTVRDITEĽNÁ — `export_confirmations(budget:)`.* Dnes jediný dôvod: **riadky bez ceny**. STANDARD §11.3 hovorí, že neznáma cena sa NIKDY nenahradí nulou, ale má sa **priznať**
 („medzisúčet je len zo známych cien a súhrn nahlas povie, že nie je úplný") — **rozpracovaný rozpočet je legitímny stav zákazky** a plošný tvrdý blok by používateľovi bral výstup,
@@ -224,12 +250,12 @@ agregácie by zmenilo kusovník **aj VEPO** (a párovanie beží cez Ruby hash: 
 **KOV-A1:** rola **`flap` je spoločná pre výklop AJ sklop**, preto je jej názov neutrálny **„Výklop/sklop"** — „Výklop" by pri každom sklope klamal v stĺpci Rola kusovníka,
 v karte dielca aj v prehľade ABS pravidiel. Konkrétny text vie povedať len TYP čela, nie rola: server ho skladá v `PartKeys.flap_label` (rovnaký neutrálny tvar bez zhody)
 a od KOV-A2 aj karta čela. `false_front` = „Blenda" (blenda je jednoznačná).
-**KOV-C2a:** pribudli názvy štyroch rolí dielcov zásuviek — **„Dno zásuvky" · „Chrbát zásuvky" · „Bok boxu" · „Vnútorné čelo zásuvky"**. V pláne ich zatiaľ nič neemituje (to je
-C2b), ale prehľad ABS pravidiel (Pravidlá → ABS) číta roly zo seedu `AbsRules`, takže bez názvov by ukázal holé identifikátory `drawer_bottom`.
+**KOV-C2a:** pribudli názvy štyroch rolí dielcov zásuviek — **„Dno zásuvky" · „Chrbát zásuvky" · „Bok boxu" · „Vnútorné čelo zásuvky"**. **Od KOV-C2b ich plán emituje**,
+takže tie isté názvy nesie kusovník aj VEPO; `PartKeys.human_label` k nim pridáva číslo čela („F2 · dno zásuvky", pri boku aj stranu).
 **Nové ORANGE dôvody nemapovaného kovania** (`Validation.check_hardware_expansion`): **`class_unmapped`** = zásuvka nemá predvolený set pre svoje otváranie a konštrukciu (veta
 navádza na existujúcu akciu „Pravidlá → Doplniť nové predvoľby"; na generický `slide` sa NIKDY nepadá) a **`set_incompatible`** = vybraný set klasifikáciou položke nesedí
 (iný systém · iná výška · iné otváranie/konštrukcia · override skrinky nie je výškový selektor — dôvod pomenúva `HardwareSets.incompatible_detail_sk`). Povýšenie oboch na RED
-`drawer_kit_missing` s bránou exportov prinesie C2b.
+`drawer_kit_missing` (a s ňou bránu exportov) priniesla C2b — pre položku so `source: 'recipe'` sa **každý** dôvod povyšuje na RED, pôvodný cestuje v `base_reason`.
 
 **ŠT-1b sem pridala celý zvyšok KONTROLY: `control_payload`** (Validation.run nad čerstvým zberom **+ zlúčenie s upozorneniami rozpočtu cez `Validation.with_budget`**) je **jediné
 miesto, kde vzniká číslo semaforu** — číta ho sekcia Kontrola v Štúdiu, badge navigácie **aj `do_export`** (status aj sekcia KONTROLA vo VEPO LOGu; do review #1 mal export vlastný

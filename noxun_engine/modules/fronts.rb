@@ -66,6 +66,21 @@ module Noxun
       # whitelistuju NEZAVISLE; hash bez jedineho platneho pod-pola -> kluc prec.
       DRAWER_CONSTRUCTIONS = %w[metal wood other].freeze
       DRAWER_VARIANTS      = %w[standard internal].freeze
+      # KOV-C2b: EXPLICITNY system zasuvky (zasada 5) — hodnota zije popri
+      # konstrukcii, server ju pri prestavbe doplni podla konstrukcie a zapise.
+      DRAWER_SYSTEMS       = %w[atira quadro_v6].freeze
+      # KOV-C2b: mapa pripnutych receptov `"<system>|<otvaranie>" => recipe_id`.
+      # Kluc je UZAVRETY (systemy x otvarania), hodnota MUSI mat tvar
+      # `<system>_<otvaranie>_v<cislo>`. Ci je recept naozaj VYDANY, sa TU
+      # NEOVERUJE a je to vedome (fail-closed vyklad KOV-C2b): register receptov
+      # je datovy pack, ktory sa medzi verziami LISI, a keby normalizacia
+      # neregistrovany ref ticho zahodila, `Recipes.active_ref` by nikdy
+      # nevratila stav `[:unknown, id]` a stary projekt by sa pri starsom plugine
+      # TICHO prepol na `latest_for` — teda prave ta ticha zmena geometrie,
+      # ktorej ma nemennost zabranit. Neznamy (ale tvarovo platny) ref preto
+      # PREZIJE normalizaciu a stavba ho prizna ako RED `drawer_recipe_unknown`.
+      RECIPE_REF_KEY_RE = /\A(#{DRAWER_SYSTEMS.join('|')})\|(sisy|p2o)\z/.freeze
+      RECIPE_ID_RE      = /\A(#{DRAWER_SYSTEMS.join('|')})_(sisy|p2o)_v\d+\z/.freeze
       # Polia, ktore su DORMANT (audit #14 BLOCKER 3): v configu sa drzia VZDY
       # bez ohladu na aktualny typ a pocet kridiel, takze po navrate na
       # dvierka/1 kridlo sa ulozena hodnota obnovi. Aplikovatelnost urcuje
@@ -508,7 +523,146 @@ module Noxun
         out['construction'] = c if c
         v = norm_enum(raw['variant'] || raw[:variant], DRAWER_VARIANTS)
         out['variant'] = v if v
+        # KOV-C2b: system + mapa pripnutych receptov. Obe polia su SERVEROVE
+        # (panel ich neposiela; `strip_server_drawer_fields` ich z klientskeho
+        # payloadu zahadzuje), ale normalizacia ich musi BEZSTRATOVO preniest —
+        # inak by ich prestavba, sablona aj Copy/Paste ticho zmazali.
+        s = norm_enum(raw['system'] || raw[:system], DRAWER_SYSTEMS)
+        out['system'] = s if s
+        refs = norm_recipe_refs(raw['recipe_refs'] || raw[:recipe_refs])
+        out['recipe_refs'] = refs if refs
         out.empty? ? nil : out
+      end
+
+      # Mapa `"<system>|<otvaranie>" => recipe_id`. Neplatny kluc alebo hodnota
+      # mimo tvaru = zaznam prec (nikdy sa NEHADA); prazdna mapa = kluc prec.
+      def norm_recipe_refs(raw)
+        return nil unless raw.is_a?(Hash)
+        out = {}
+        raw.each do |k, v|
+          key = k.to_s.strip
+          next unless RECIPE_REF_KEY_RE.match?(key)
+          id = v.to_s.strip
+          next unless RECIPE_ID_RE.match?(id)
+          # Codex #304 kolo 1 P2: KLUC a HODNOTA musia hovorit o TOM ISTOM.
+          # `{"atira|sisy" => "quadro_v6_p2o_v1"}` je poskodeny (alebo podvrhnuty)
+          # zaznam — bez tejto kontroly by `active_ref` vratila stav `:known`
+          # a zasuvka by sa postavila podla CUDZIEHO receptu. Zahodenim zaznamu
+          # sa stav zmeni na `:missing`, teda surodenec/`latest_for` — nikdy
+          # cudzi system ani cudzie otvaranie.
+          m = RECIPE_ID_RE.match(id)
+          next unless key == "#{m[1]}|#{m[2]}"
+
+          out[key] = id
+        end
+        out.empty? ? nil : out
+      end
+
+      # --- KOV-C2b: SERVEROVE polia klasifikacie zasuvky ----------------------
+      #
+      # `drawer.system` a `drawer.recipe_refs` su AUTORITA SERVERA. Klientsky
+      # payload panela nahradza `params['fronts']` VCELKU (Codex #301 kolo 3 P1),
+      # takze stale alebo podvrhnute cela by ulozenu mapu prepisali alebo
+      # vymazali — a s nou by sa ticho zmenila pripnuta verzia receptu, teda
+      # GEOMETRIA uz postavenej zakazky.
+      #
+      # Preto DVE cesty (Astra #19 B2), nie jedna normalizacia:
+      #   (i)  klientsky payload -> `reattach_server_drawer_fields` (tu):
+      #        polia sa z prichadzajucich ciel ZAHODIA a ULOZENE sa pripoja
+      #        spat PODLA ID CELA. Celo s NOVYM ID mapu nema (a ma ju dostat az
+      #        od servera pri prestavbe);
+      #   (ii) ulozeny config -> `normalize_config` ich zachova BEZSTRATOVO.
+      #
+      # CISTA funkcia: vracia NOVY normalizovany config, vstupy nemutuje.
+      SERVER_DRAWER_KEYS = %w[system recipe_refs].freeze
+
+      # `system` a `recipe_refs` sa NEPRIPAJAJU rovnako (Codex #304 kolo 1 P1):
+      #   * `recipe_refs` je mapa kluceovana `system|otvaranie`, takze pripnute
+      #     verzie OBOCH systemov v nej mozu zit sucasne — pripaja sa VZDY;
+      #   * `system` je JEDNA hodnota viazana na KONSTRUKCIU. Ked pouzivatel
+      #     prepne konstrukciu (kov <-> drevo), stary `system` uz konstrukcii
+      #     NEZODPOVEDA a `recipe_key_for` by celo natrvalo oznacila
+      #     `drawer_unclassified` — a z toho stavu sa cez UI neda dostat, lebo
+      #     `system` sa v C2b z panela vobec neposiela. Preto sa pri ZMENENEJ
+      #     konstrukcii `system` nepripaja a server ho odvodi nanovo.
+      def reattach_server_drawer_fields(incoming, saved)
+        cfg = normalize_config(incoming)
+        stored = server_drawer_fields(saved)
+        cfg['items'].each do |it|
+          drawer = it['drawer'].is_a?(Hash) ? it['drawer'] : {}
+          drawer = drawer.reject { |k, _| SERVER_DRAWER_KEYS.include?(k) }
+          keep = stored[it['id'].to_s]
+          if keep
+            # `construction` je v zazname LEN na porovnanie — do vysledku sa
+            # NIKDY nekopiruje (klientska klasifikacia je vola pouzivatela).
+            same_kind = keep['construction'].to_s == drawer['construction'].to_s
+            keep = keep.reject { |k, _| k == 'construction' || (!same_kind && k == 'system') }
+            drawer = drawer.merge(keep)
+          end
+          if drawer.empty?
+            it.delete('drawer')
+          else
+            it['drawer'] = drawer
+          end
+        end
+        cfg
+      end
+
+      # { front_id => { 'system' =>…, 'recipe_refs' =>…, 'construction' =>… } }
+      # z ULOZENEHO configu. `construction` je v zazname LEN ako referencia pre
+      # porovnanie vyssie — do vysledku sa nikdy nekopiruje (klientska hodnota
+      # klasifikacie je autorita pouzivatela).
+      def server_drawer_fields(saved)
+        out = {}
+        Array(normalize_config(saved)['items']).each do |it|
+          d = it['drawer']
+          next unless d.is_a?(Hash)
+          keep = d.select { |k, _| SERVER_DRAWER_KEYS.include?(k) }
+          next if keep.empty?
+
+          keep['construction'] = d['construction'] if d.key?('construction')
+          out[it['id'].to_s] = keep
+        end
+        out
+      end
+
+      # Zapise SERVEROVE polia klasifikacie do NORMALIZOVANEHO configu ciel
+      # (in-place). Jediny zapisovy kanal — builder ho vola v TEJ ISTEJ
+      # operacii ako geometriu, takze Undo vrati oboje naraz.
+      #   writes = [{ 'front_id' =>…, 'system' =>…, 'ref_key' =>…, 'recipe_id' =>… }]
+      # Vrati true, ak sa config naozaj zmenil.
+      def write_drawer_fields!(fronts_cfg, writes)
+        return false unless fronts_cfg.is_a?(Hash) && fronts_cfg['items'].is_a?(Array)
+
+        changed = false
+        Array(writes).each do |w|
+          next unless w.is_a?(Hash)
+          it = fronts_cfg['items'].find { |i| i.is_a?(Hash) && i['id'].to_s == w['front_id'].to_s }
+          next if it.nil?
+
+          drawer = it['drawer'].is_a?(Hash) ? it['drawer'] : {}
+          # Zapis je vyhradne DOPLNENIE CHYBAJUCEHO. Uz ulozeny system ani uz
+          # pripnuty recept sa TU NIKDY neprepisuju — zmena verzie je vyhradne
+          # explicitna akcia KOV-D (Codex #301 kolo 1 + 2 P1), a nesediaci
+          # system je RED `drawer_unclassified`, nie tiche prepnutie.
+          sys = norm_enum(w['system'], DRAWER_SYSTEMS)
+          if sys && drawer['system'].nil?
+            drawer['system'] = sys
+            changed = true
+          end
+          key = w['ref_key'].to_s
+          rid = w['recipe_id'].to_s
+          if RECIPE_REF_KEY_RE.match?(key) && RECIPE_ID_RE.match?(rid)
+            refs = drawer['recipe_refs'].is_a?(Hash) ? drawer['recipe_refs'] : {}
+            if refs[key].nil?
+              refs[key] = rid
+              drawer['recipe_refs'] = refs
+              changed = true
+            end
+          end
+          it['drawer'] = drawer unless drawer.empty?
+        end
+        changed
       end
 
       # Uzavrety zoznam hodnot: mimo zoznamu (aj prazdne/iny typ) -> nil = kluc

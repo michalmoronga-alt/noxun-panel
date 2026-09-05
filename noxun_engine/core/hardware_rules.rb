@@ -412,10 +412,19 @@ module Noxun
       #   rules — normalizovane pole pravidiel (projektovy snapshot / test injection)
       # Vrati { items: [hw string-keyed], warnings: [] }. Poradie deterministicke:
       # pravidla v poradi kniznice, dielce v poradi planu.
-      def evaluate(cfg, parts, ctx, rules:)
+      # KOV-C2b (R2 exkluzivita): `suppress_slide_owners` = { owner_part_key => true }
+      # pre cela, ktore uz maju polozku vysuvu Z RECEPTU. Pravidla typu `slide`
+      # sa na nich NEVYHODNOCUJU — inak by zasuvka mala dva vysuvy (jeden
+      # z receptu s kitom, jeden legacy bez dielcov). Potlacenie sa prizna
+      # JEDNYM info warningom na stavbu (nie na kazde celo).
+      SLIDE_OUTPUT = 'slide'
+
+      def evaluate(cfg, parts, ctx, rules:, suppress_slide_owners: {})
         items = []
         warnings = []
         seen_ids = {}
+        suppress = suppress_slide_owners.is_a?(Hash) ? suppress_slide_owners : {}
+        suppressed = [] # kluce ciel, na ktorych legacy pravidlo vysuvu nebezalo
         Array(rules).each do |rule|
           next unless rule.is_a?(Hash)
           rid = rule['rule_id'].to_s
@@ -436,9 +445,17 @@ module Noxun
                                                   'output' => rule['output'].to_s })
             next
           end
-          apply_rule(rule, cfg || {}, parts, ctx, items, warnings)
+          apply_rule(rule, cfg || {}, parts, ctx, items, warnings, suppress, suppressed)
         end
         warnings.concat(profile_rule_warnings(parts, rules))
+        unless suppressed.empty?
+          warnings << BuildPlan.warning(
+            'legacy_slide_suppressed',
+            "Zásuvky s receptom (#{suppressed.length} ks) dostali výsuv z receptu — pôvodné pravidlo " \
+            'výsuvov sa na ne nepoužilo (jeden výsuv na zásuvku).',
+            severity: 'info', data: { 'owners' => suppressed }
+          )
+        end
         { items: apply_overrides(items, cfg[:hardware_overrides]), warnings: warnings }
       end
 
@@ -476,7 +493,7 @@ module Noxun
 
       # Aplikuje jedno pravidlo: korpusova uroven (owner nil) alebo per dielec roly.
       # cfg putuje az do compute — fit_series musi vediet o rucnom NL zamku (D-93).
-      def apply_rule(rule, cfg, parts, ctx, items, warnings)
+      def apply_rule(rule, cfg, parts, ctx, items, warnings, suppress = {}, suppressed = [])
         role = (rule['applies_to'] || {})['role'].to_s
         if role == 'cabinet'
           supports = Array((rule['applies_to'] || {})['support']).map(&:to_s)
@@ -487,9 +504,17 @@ module Noxun
           return if kinds.any? && !kinds.include?(ctx['cabinet_type'].to_s)
           emit(rule, nil, ctx, nil, items, warnings, cfg)
         else
+          slide = rule['output'].to_s == SLIDE_OUTPUT
           parts.each do |pd|
             next unless pd[:role].to_s == role
-            emit(rule, PartKeys.for_descriptor(pd), ctx, pd, items, warnings, cfg)
+            owner = PartKeys.for_descriptor(pd)
+            # KOV-C2b R2: celo s receptovym vysuvom legacy `slide` pravidlo
+            # NEDOSTANE (ani ked recept skoncil konfliktom — fail-closed).
+            if slide && suppress[owner]
+              suppressed << owner unless suppressed.include?(owner)
+              next
+            end
+            emit(rule, owner, ctx, pd, items, warnings, cfg)
           end
         end
       end

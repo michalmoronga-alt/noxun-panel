@@ -488,11 +488,18 @@ module Noxun
         used
       end
 
+      # Korpusove materialove kluce configu = JEDEN zoznam pre model AJ sablony
+      # (dva opisane zoznamy by sa pri dalsom kanali rozisli).
+      CABINET_MATERIAL_KEYS = %w[material_id front_material_id back_material_id
+                                 drawer_material_id].freeze
+
       def collect_model_usage(model, used)
         Ids.each_of_kind(model, 'cabinet') do |inst|
           cid = Store.get(inst, 'cabinet_id') || Store.get(inst, 'id')
           cfg = Store.config(inst) || {}
-          %w[material_id front_material_id back_material_id].each do |k|
+          # KOV-C2b: `drawer_material_id` (4. kanal) je REFERENCIA ako ostatne tri —
+          # bez neho by delete guard pustil zmazanie materialu, ktory drzi zasuvka.
+          CABINET_MATERIAL_KEYS.each do |k|
             v = cfg[k]
             used[v.to_s] << cid if v && !v.to_s.empty?
           end
@@ -520,7 +527,7 @@ module Noxun
         # payloadu materialov a nesmie spustit lazy migraciu suboru sablon.
         TemplateStore.load(migrate: false).each do |t|
           cfg = t['config'] || {}
-          %w[material_id front_material_id back_material_id].each do |k|
+          CABINET_MATERIAL_KEYS.each do |k|
             v = cfg[k]
             used[v.to_s] << "šablóna #{t['name']}" if v && !v.to_s.empty?
           end
