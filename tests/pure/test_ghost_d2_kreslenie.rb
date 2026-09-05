@@ -775,6 +775,43 @@ NxTest.test('GHOST-D2 VCB: prazdny Enter ide cez `onReturn` (VK_RETURN v API NEE
   NxTest.assert(body.include?('card_taken_status'), 'a status to povie (vedoma akcia)')
 end
 
+# Codex #299 P2: cislo ma OBIST necitatelnu projekciu, nie na nej uviaznut.
+NxTest.test('GHOST-D2 VCB: NAPISANE cislo urobi session umiestnitelnou aj po DEGENEROVANOM luci') do
+  s = NxGD2.session
+  s.begin_draw!([0.0, 0.0, 0.0])
+  # Degenerovany pohlad: `track_length` neurcil polohu -> session je
+  # NEUMIESTNITELNA a klik by neprešiel.
+  s.set_placeable!(false)
+  NxTest.refute(s.placeable, 'vychodisko: poloha z tohto pohladu necitatelna')
+  NxTest.assert(s.confirm_draw!(:length, 2400.0, sign: 1.0, typed: true), 'cislo sa prijalo')
+  NxTest.assert_equal(:width, s.draw_phase, 'faza POKROCILA')
+  NxTest.assert(s.placeable, 'a session je znova UMIESTNITELNA (cislo urcuje rozmer uplne)')
+  s.set_placeable!(false)
+  NxTest.assert(s.confirm_draw!(:width, 600.0, sign: 1.0, typed: true))
+  NxTest.assert_equal(:done, s.draw_phase)
+  NxTest.assert(s.placeable, 'commit prejde bez pohybu mysou')
+  NxTest.assert(s.draw_ready? && !s.draw_matrix_vals.nil?, 'transformacia je plne urcena')
+end
+
+NxTest.test('GHOST-D2 VCB: potvrdenie MYSOU priznak umiestnitelnosti NEPREPISUJE') do
+  s = NxGD2.session
+  s.begin_draw!([0.0, 0.0, 0.0])
+  s.preview_length!([1000.0, 0.0, 0.0])
+  s.set_placeable!(false) # degenerovany luc tesne pred klikom
+  NxTest.assert(s.confirm_draw!(:length, 1000.0), 'hodnota z NAHLADU sa prijala')
+  NxTest.refute(s.placeable, 'ale klik ostava odmietnuty — poloha je stale necitatelna')
+end
+
+NxTest.test('GHOST-D2 VCB: obe VCB cesty posielaju `typed: true`, klik nie') do
+  s = NxGD2.src('noxun_engine', 'core', 'ghost_tool.rb')
+  ut = s[/def onUserText\(text, view\).*?\n        end\n/m].to_s
+  NxTest.assert(ut.include?('typed: true'), 'napisane cislo')
+  ret = s[/def onReturn\(view\).*?\n        end\n/m].to_s
+  NxTest.assert(ret.include?('typed: true'), 'prazdny Enter (hodnota karty)')
+  click = s[/def draw_click\(s, x, y, view\).*?\n        end\n/m].to_s
+  NxTest.refute(click.include?('typed: true'), 'klik mysou priznak NEPOSIELA')
+end
+
 NxTest.test('GHOST-D2 VCB: hodnota karty pre fazu je z ZMRAZENEHO planu') do
   s = NxGD2.session(NxGD2.cfg(length: 1234.56, width: 789.01))
   NxTest.assert_equal(1234.56, s.draw_card_value(:length))

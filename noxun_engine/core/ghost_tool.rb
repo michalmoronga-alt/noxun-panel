@@ -1343,7 +1343,9 @@ module Noxun
         # POTVRDENIE fazy (klik / cislo + Enter / prazdny Enter / zamok).
         # Limit sa overuje PRED posunom fazy pre KAZDY zdroj rozmeru.
         # Vracia true = faza sa posunula, false = hodnota odmietnuta.
-        def confirm_draw!(dim, mm, sign: nil)
+        # `typed:` = hodnota prisla ZO VSTUPU (napisane cislo, hodnota karty
+        # pri prazdnom Enteri), nie z projekcie kurzora.
+        def confirm_draw!(dim, mm, sign: nil, typed: false)
           return false unless drawing?
           return false unless draw_dim == dim.to_sym
 
@@ -1362,6 +1364,15 @@ module Noxun
             @draw_width_sign = sign.to_f unless sign.nil?
             @draw_width_mm = v
           end
+          # Codex #299 P2: NAPISANE cislo (a hodnota karty pri prazdnom
+          # Enteri) urcuje rozmer UPLNE — projekcia kurzora doň uz nevstupuje.
+          # Ked teda degenerovany pohlad (takmer rovnobezny luc, rovina za
+          # kamerou) predtym oznacil session za NEUMIESTNITELNU, cislo ju
+          # znova umiestnitelnou UROBI: inak by pouzivatel musel hybat mysou
+          # a klikat v presne tej situacii, ktoru mal cislom obist. Pociatok
+          # je uz kliknuty a smer je bud z tahu, alebo KANONICKY, takze
+          # transformacia je plne urcena.
+          set_placeable!(true) if typed
           advance_draw!(@draw_phase)
           true
         end
@@ -2068,7 +2079,7 @@ module Noxun
             end
 
             # Napisane cislo znamena VZDY kladny smer 2. tahu.
-            next unless s.confirm_draw!(dim, mm, sign: 1.0)
+            next unless s.confirm_draw!(dim, mm, sign: 1.0, typed: true)
 
             commit_session(s, view) if after_draw_step(s, view)
           end
@@ -2090,7 +2101,7 @@ module Noxun
               draw_status_beep("#{Calc.dim_limit_message(dim)} Hodnota karty sa neprijala.")
               next
             end
-            next unless s.confirm_draw!(dim, mm, sign: 1.0)
+            next unless s.confirm_draw!(dim, mm, sign: 1.0, typed: true)
 
             card_taken_status(dim, mm)
             commit_session(s, view) if after_draw_step(s, view)
