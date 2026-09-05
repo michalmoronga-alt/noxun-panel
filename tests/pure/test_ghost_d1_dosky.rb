@@ -681,10 +681,12 @@ NxTest.test('GHOST-D1 karta: payload dosky z NOVSEJ verzie nesie priznak aj vysv
   NxTest.assert(js.include?('function applyBoardReadOnly(bc)'), 'a funkcia existuje')
 end
 
-NxTest.test('GHOST-D1: karta Dosky ma v D1 JEDNO tlacidlo — `draw_board` NIE JE whitelistovany') do
+# GHOST-D2: kreslenie dostalo VLASTNY whitelistovany callback — vkladanie
+# (a dvojklik doskovej sablony) ostava na `insert_board` NEZMENENE.
+NxTest.test('GHOST-D1: `insert_board` ostava samostatnym doskovym vstupom (D2 pridal `draw_board`)') do
   panel = NxD1.src('noxun_engine', 'ui', 'panel.rb')
-  NxTest.refute(panel.include?('draw_board'), 'callback kreslenia (D2) sa v D1 neregistruje')
-  NxTest.assert(panel.include?("cb(dlg, 'insert_board')"), 'vkladanie ostava jediny doskovy vstup')
+  NxTest.assert(panel.include?("cb(dlg, 'insert_board')"), 'vkladanie ostava vlastnym callbackom')
+  NxTest.assert(panel.include?("cb(dlg, 'draw_board')"), 'kreslenie ma SAMOSTATNY callback (D2)')
 end
 
 # ---------------------------------------------------------------------------
