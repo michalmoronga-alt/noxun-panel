@@ -992,11 +992,18 @@ module Noxun
       #   * obsadene ID `UNI_ZASUVKA_16` — zaznam POD TYM ID existuje, takze
       #     `PROJECT_FALLBACK` na neho ukazuje a kanal funguje; marker sa zapise
       #     a migracia je hotova (`:noop`).
-      #   * obsadeny DEKOR „Zásuvka UNI" pod INYM ID — nas zaznam NEVZNIKNE a
-      #     fallback by ukazoval na neexistujuce ID. To je FAIL-CLOSED stav:
+      #   * obsadena SKUPINA (vyrobca + dekor) pod INYM ID — nas zaznam NEVZNIKNE
+      #     a fallback by ukazoval na neexistujuce ID. To je FAIL-CLOSED stav:
       #     marker sa NEZAPISE, vrati sa `:conflict` s hlaskou a migracia sa
       #     pri kazdom dalsom starte skusi znova (po premenovani cudzieho
       #     zaznamu sa doplni sama).
+      #
+      # KOLIZIA SA MERIA CELOU IDENTITOU SKUPINY (standard 7.1: vyrobca + dekor),
+      # nie samotnym dekorom (Codex #303 kolo 2 P2). „Egger + Zásuvka UNI" je INA
+      # skupina nez nas seed („" + Zásuvka UNI) — kolizia to NIE JE a zablokovat
+      # nou migraciu by znamenalo, ze fallback ID nevznikne NIKDY (`:conflict`
+      # pri kazdom starte). Porovnava sa proti IDENTITE SEED ZAZNAMU, nie proti
+      # konstante, takze zmena seedu ostane s kontrolou v synchro.
       def drawer_uni_marker_path
         File.join(dir, 'drawer_uni_seed.done')
       end
@@ -1015,18 +1022,20 @@ module Noxun
           data = load
           return :skip if catalog_schema_on_disk < SCHEMA_GROUPS
           id = UNI_APPEND_IDS['drawer'].to_s
-          _seed_id, decor, role, thickness, color = seed
+          rec = uni_seed_record(id, *seed[1..])
+          want = group_identity_key(rec['manufacturer'], rec['decor'])
           taken_id = data['sheets'].any? { |s| s['material_id'].to_s.casecmp?(id) }
-          taken_decor = (data['sheets'] + data['edges'])
-                        .any? { |r| decor_norm_key(r['decor']) == decor_norm_key(decor) }
-          if !taken_id && taken_decor
+          taken_group = (data['sheets'] + data['edges']).any? do |r|
+            group_identity_key(r['manufacturer'], r['decor']) == want
+          end
+          if !taken_id && taken_group
             # Fail-closed: bez markera, aby to dalsi start skusil znova.
-            Engine.log("materials: UNI zasuvka sa nedoplnila — dekor „#{decor}“ uz " \
-                       'pouziva iny zaznam; premenuj ho a spusti plugin znova') if defined?(Engine)
+            Engine.log("materials: UNI zasuvka sa nedoplnila — skupina „#{rec['decor']}“ uz " \
+                       'patri inemu zaznamu; premenuj ho a spusti plugin znova') if defined?(Engine)
             next :conflict
           end
           unless taken_id
-            data['sheets'] << normalize_sheet(uni_seed_record(id, decor, role, thickness, color))
+            data['sheets'] << normalize_sheet(rec)
             added = true
           end
           if !added || write_unlocked(data)

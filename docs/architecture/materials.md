@@ -131,8 +131,10 @@ Zo splitu `materials_*`: CRUD+batch.
 kanál **vlastnú migráciu s vlastným markerom** `drawer_uni_seed.done`: `ensure_uni_records!` končí na prvom riadku pri `uni_seed.done`, takže cez ňu by sa nový záznam
 nedoplnil nikdy. `ensure_drawer_uni!` je idempotentná (2× beh = 1 záznam), beží z bootu `main.rb` vo VLASTNOM chránenom bloku a **nikdy neprepisuje** — ale
 na dva druhy kolízie odpovedá RÔZNE (Codex #303 P2): **obsadené ID** znamená, že záznam pod `UNI_ZASUVKA_16` existuje, takže `PROJECT_FALLBACK` na niečo ukazuje a migrácia
-je hotová (`:noop`, marker sa zapíše); **obsadený dekor „Zásuvka UNI" pod iným ID** by nechal fallback ukazovať na neexistujúce ID, a to je **fail-closed**: marker sa
-**nezapíše**, vráti sa `:conflict` s hláškou a ďalší štart to skúsi znova (po premenovaní cudzieho záznamu sa doplní sám). Kto si UNI zásuvku vedome zmaže, tomu sa nevráti.
+je hotová (`:noop`, marker sa zapíše); **obsadená SKUPINA pod iným ID** by nechala fallback ukazovať na neexistujúce ID, a to je **fail-closed**: marker sa **nezapíše**,
+vráti sa `:conflict` s hláškou a ďalší štart to skúsi znova (po premenovaní cudzieho záznamu sa doplní sám). Kolízia sa meria **celou identitou skupiny** (`group_identity_key`
+= výrobca + dekor, STANDARD §7.1), nie samotným dekorom (Codex #303 kolo 2 P2): „Egger + Zásuvka UNI" je INÁ skupina než seed („" + Zásuvka UNI), takže kolízia to nie je —
+inak by taký legitímny záznam vracal `:conflict` pri každom štarte a fallback ID by nevzniklo NIKDY. Porovnáva sa proti identite **seed záznamu**, nie proti konštante. Kto si UNI zásuvku vedome zmaže, tomu sa nevráti.
 
 ### materials_decor.rb
 

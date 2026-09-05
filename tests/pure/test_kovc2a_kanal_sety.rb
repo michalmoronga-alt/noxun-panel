@@ -216,20 +216,33 @@ NxTest.test('KOV-C2a (R1): `ensure_drawer_uni!` je idempotentna a nekoliduje s I
   NxTest.assert_equal(['drawer', true], [zas['uni_role'], mat.uni?(zas)])
   NxTest.assert_close(16.0, zas['thickness'], 0.01)
 
-  # Kolizia DEKORU pod INYM ID = FAIL-CLOSED: nas zaznam by nevznikol a
-  # `PROJECT_FALLBACK` by ukazoval na neexistujuce ID. Marker sa preto NEZAPISE
-  # a migracia sa pri kazdom dalsom starte skusi znova.
+  # ROVNAKY DEKOR, INY VYROBCA = INA SKUPINA (standard 7.1), teda ZIADNA kolizia.
+  # Keby sa merala len zhoda dekoru, „Egger + Zásuvka UNI" by blokoval migraciu
+  # pri KAZDOM starte a fallback ID by nevzniklo NIKDY (Codex #303 kolo 2 P2).
   data = mat.load
-  data['sheets'] = data['sheets'].map do |s|
-    next s unless s['material_id'] == 'UNI_ZASUVKA_16'
-
-    mat.normalize_sheet('material_id' => 'CUDZI_16', 'manufacturer' => '',
-                        'decor' => 'Zásuvka UNI', 'type' => 'DTDL', 'thickness' => 16.0,
-                        'group_id' => mat.group_id_for('', 'Zásuvka UNI'))
-  end
+  data['sheets'] = data['sheets'].reject { |s| s['material_id'] == 'UNI_ZASUVKA_16' }
+  data['sheets'] << mat.normalize_sheet('material_id' => 'EGGER_ZAS_16',
+                                        'manufacturer' => 'Egger', 'decor' => 'Zásuvka UNI',
+                                        'type' => 'DTDL', 'thickness' => 16.0,
+                                        'group_id' => mat.group_id_for('Egger', 'Zásuvka UNI'))
   NxTest.assert(mat.write(data))
   FileUtils.rm_f(mat.drawer_uni_marker_path)
-  NxTest.assert_equal(:conflict, mat.ensure_drawer_uni!, 'kolizia dekoru = fail-closed')
+  NxTest.assert_equal(:added, mat.ensure_drawer_uni!, 'iny vyrobca NIE JE kolizia')
+  NxTest.assert(mat.sheet('UNI_ZASUVKA_16'), 'fallback ID vzniklo')
+  NxTest.assert_equal('Egger', mat.sheet('EGGER_ZAS_16')['manufacturer'], 'cudzi zaznam NEDOTKNUTY')
+
+  # Kolizia CELEJ identity skupiny (rovnaky vyrobca AJ dekor) pod INYM ID =
+  # FAIL-CLOSED: nas zaznam by nevznikol a `PROJECT_FALLBACK` by ukazoval na
+  # neexistujuce ID. Marker sa preto NEZAPISE a dalsi start to skusi znova.
+  data = mat.load
+  data['sheets'] = data['sheets'].reject { |s| s['material_id'] == 'UNI_ZASUVKA_16' }
+  data['sheets'] << mat.normalize_sheet('material_id' => 'CUDZI_16', 'manufacturer' => '',
+                                        'decor' => 'Zásuvka UNI', 'type' => 'DTDL',
+                                        'thickness' => 16.0,
+                                        'group_id' => mat.group_id_for('', 'Zásuvka UNI'))
+  NxTest.assert(mat.write(data))
+  FileUtils.rm_f(mat.drawer_uni_marker_path)
+  NxTest.assert_equal(:conflict, mat.ensure_drawer_uni!, 'ta ista skupina = fail-closed')
   NxTest.refute(File.exist?(mat.drawer_uni_marker_path), 'marker sa NEZAPISAL')
   NxTest.assert_equal(nil, mat.sheet('UNI_ZASUVKA_16'), 'a ziadny zaznam nepribudol')
   # Po premenovani cudzieho zaznamu sa druhy beh doplni sam.
