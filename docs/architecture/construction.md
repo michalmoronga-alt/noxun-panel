@@ -210,9 +210,21 @@ aj `onReturn` **ignorujú**. **Písané** číslo príde cez `onUserText` a pars
 
 **Klávesy majú JEDNU hranicu: klik počiatku.** ←/→ a ↑/↓ platia len vo fáze `:origin`; od kliku sú **zamknuté** (klávesa sa pohltí, status `DRAW_KEYS_LOCKED_MSG` povie prečo) —
 rovina 1. ťahu aj os 2. ťahu závisia od orientácie, takže zmena uprostred by rozpracované rozmery preniesla do inej sústavy. ALT je v kreslení bez významu. **Shift = hold-to-lock**
-natívnej inferencie: `onKeyDown` volá `view.lock_inference(@ip)`, `onKeyUp` odomkne. Zamknutý smer platí **aj vo fáze 1 a aj vo voľnom priestore** — session si drží
-`@draw_locked_dir` a `pickray` fallback sa naň premieta, takže **pohyb kurzora po zamknutí smer dosky nezmení** (test meria SMER, nie len `inference_locked?`). Zámok sa **vždy**
-uvoľní pri zmene fázy, `suspend`/`resume`, `deactivate` a `onCancel`. Esc = koniec **celej** session (0 krokov Späť, bez pečiatky).
+natívnej inferencie (`native_lock`): vo fáze `:length` sa zamyká **PRIAMKA počiatok → kurzor** dvojicou InputPointov (`view.lock_inference(@ip, @ip_origin)`, vzor Trimble LineTool) —
+presne to znamená „drž smer"; inde jednobodovo. **Oba referenčné body sú KÓPIE reálne pickovaných bodov** (`InputPoint#copy!`): `@ip_origin` vzniká pri kliku počiatku a `@ip_length`
+pri potvrdení dĺžky **klikom** — syntetický `InputPoint.new(pt)` sa podľa probe 5.9. na inferenčný kontext neviaže. Keď kurzor nemá žiadnu natívnu inferenciu (voľný bod v prázdnom
+priestore), SketchUp **nezamkne** — smer vtedy drží **vlastný** zámok session (`@draw_locked_dir`), na ktorý sa `pickray` fallback premieta, takže **pohyb kurzora po zamknutí smer
+dosky nezmení** (test meria SMER, nie len `inference_locked?`). Zámok sa **vždy** uvoľní pri zmene fázy, `suspend`/`resume`, `deactivate`, `onCancel` — a navyše už v
+**`GhostTool.cancel_session`** (len pre `drawing`): `deactivate` totiž prichádza až **po** `pop_tool`, a keď nástroj nie je vrchom stacku, pop sa **odloží** a zámok by na view visel
+ďalej (výmena dokumentu s držaným Shiftom). Esc = koniec **celej** session (0 krokov Späť, bez pečiatky).
+
+**Inferencia dostáva REFERENČNÝ bod fázy** (`pick_ip(x, y, view, ref)`, `draw_ref_ip`): fáza 1 → počiatok, fáza 2 → koniec potvrdenej dĺžky (ak vznikol klikom), inak počiatok.
+Bez štvrtého argumentu by `InputPoint#pick` neponúkol **relatívne** inferencie („on axis from point", „from point") a ostal by len priamy zásah geometrie plus vlastný axis snap.
+**Umiestňovanie** (skrinka aj doska) referenciu **nedáva** — jeho správanie sa nemení.
+
+**Hodnota zo VSTUPU robí session položiteľnou** (`confirm_draw!(..., typed: true)`). Keď degenerovaný pohľad označil session za nepoložiteľnú, napísané číslo (a hodnota karty pri
+prázdnom Enteri) rozmer **určuje úplne** — počiatok je kliknutý a smer je z ťahu alebo kanonický, takže transformácia je plne určená a klik by inak zlyhal presne v situácii, ktorú
+mal používateľ číslom obísť. Potvrdenie **myšou** príznak neprepisuje (poloha je vtedy stále nečitateľná).
 
 **Commit kreslenia ide TOU ISTOU cestou ako vloženie**, len s odvodeným plánom: `commit_plan` vráti `@plan` pre umiestňovanie a `BoardBuilder.replan(@plan, length:, width:)`
 pre kreslenie (`replan` nič nemutuje, takže smie bežať až za bariérou `flush_pending!`). `commit_session` je jediný vstup do commitu z Toolu — volá ho klik aj potvrdenie
