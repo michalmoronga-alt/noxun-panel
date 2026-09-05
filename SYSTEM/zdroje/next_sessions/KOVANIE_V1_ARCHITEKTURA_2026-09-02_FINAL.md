@@ -10,6 +10,9 @@
 
 ## 0. Rozhodnutia Michala po reconcile (2.9.2026)
 
+- **O4 (5.9.2026, KOV-C audit #18):** typy otvárania pre výsuvy AJ závesy sú LEN dva — **Tip-On (Push to open, P2O)** a **tlmenie (Silent System, SiSy)**;
+  vendor variant **P2Os (Push to open Silent) sa nerieši a z dát receptov sa vyhadzuje** (Michal: „ešte som sa s ním nestretol"). Klasifikácia `opening_mode classic|tipon` ostáva.
+  *Upresnenie 5.9. popoludní (KOV-C v2, checkpoint #19):* Tip-On kity Atira od Démosu sú vendor variant PTOs — recept `atira_p2o_v1` ich používa pod jediným typom „Tip-On“ a berie min. svetlú výšku PTOs (108/192/224); tretí typ otvárania nevzniká.
 - **O1 = a:** Neurčený smer dvierok = RED v Kontrole hneď; exportná brána AŽ s prvým výstupom, ktorý smer
   reálne nesie (D-95/výrobné zadanie). Tvrdé podmienky: ŽIADNY default ani heuristika smeru nikde v kóde
   (ani preview/overlay); legacy configy bez poľa sa negatujú; brána je pre-committed v AUDIT_REGISTER
@@ -56,6 +59,8 @@
   pamäte, zapísané v package (Opus I-4).
 
 ## 3. Recepty (slice C) — dáta s projektovým snapshotom
+
+> **PREKONANÉ 5.9.2026 (KOV-C package v2, checkpoint #19):** projektový snapshot receptov, `recipe_version` zmrazená v modeli, KD→EB/runner-variant mapa a `orderable` flag sa NEIMPLEMENTUJÚ. Recepty sú nemenné verzované JSON súbory (`atira_sisy_v1`…), čelo nesie `drawer.recipe_refs` (mapa systém|otváranie → recipe_id), EB je pevné per recept. Autorita = `SYSTEM/PLAN.md` KOV-C v2; tento odsek ostáva ako história.
 
 - Recept = verzované dáta v repe (data pack Atira + Quadro; bez editora — H3). Pri stavbe sa recept
   **zmrazí do modelu** (zrkadlo `ensure_project_rules!`): `recipe_version` + použité konštanty; snapshot sa
@@ -125,6 +130,8 @@ produktová otázka v detail fill). BOM/VEPO/kusovník automaticky. Atira emituj
   Kategória→Výrobca→Rada.
 
 ## 8. Validácia a brány (slice D)
+
+> **UPRESNENIE 5.9.2026 (KOV-C v2):** `drawer_kit_missing` (receptová zásuvka bez setu/kódu pre svoju NL) blokuje AJ VEPO — dielce zásuvky (BL = NL + 10, boky = NL) bez kitu tej NL sú nepoužiteľné; VEPO výnimka platí len pre konflikty stavby, ktoré skončili fail-closed bez dielcov. Sync tyč P2O je vo V1 ORANGE (ad-hoc set), nie blocker.
 
 - **Nový ADITÍVNY collected kľúč** pre hard hardware konflikty (precedens identities/cabinet_set_conflicts);
   čitatelia: Kontrola (RED) + brána; prepočet ČERSTVÝ pri exporte, nikdy z DOM (R9). Build-warning kanál

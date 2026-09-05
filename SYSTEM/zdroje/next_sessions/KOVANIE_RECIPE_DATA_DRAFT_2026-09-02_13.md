@@ -3,19 +3,24 @@
 > Stav: KONCEPT / dátový draft pre KOV-C data packy (`noxun_engine/data/recipes/*.json`) — nie implementačný spec. Hodnoty len s tagom
 > OFFICIAL/SECONDARY/USER z checkpointu #10 a #11; UNCONFIRMED sa do packu NEZAPISUJE. Kódy K-sád z checkpointu #12 (✓ = reálne objednané).
 
-## 0. Schéma packu (návrh — KOV-C C1 ju finalizuje a validuje pri načítaní)
+## 0. Schéma packu — HISTORICKÁ (tvar v13, prekonaný 5.9.2026 package KOV-C v2)
+
+> **Kanonická schéma v2 = `SYSTEM/PLAN.md`, KOV-C C1** (Codex #301 P2): jeden recept per systém × otváranie × verzia (`atira_sisy_v1`, `atira_p2o_v1`,
+> `quadro_v6_sisy_v1`, `quadro_v6_p2o_v1`), pevné `eb`, `kd_supported`, `thickness_supported` per rola, `nl_series_by_height`, `min_depth_by_nl`, `load_by_nl`,
+> `min_box_height`, `sync_min_width`, `abs` per rola, `source` tagy. `runner_variants`, KD→EB mapa, `orderable`, `openings_by_nl`, `extras.sync_shaft` a zlúčené
+> SiSy/P2O v jednom recepte v v2 NEEXISTUJÚ. Ukážka nižšie ostáva len ako história rozhodnutia; **hodnoty v §1–§2 (vzorce, tabuľky, kódy) platia ďalej.**
 
 ```json
 { "recipe_version": 1, "system": "atira", "family": "metal_box_drawer", "vendor": "Hettich",
-  "runner_variants": { "eb_by_kd": { "16": 12.5, "18": 10.5, "19": 9.5 }, "orderable_kd": [18] },
+  "runner_variants": { "eb_by_kd": { "16": 12.5, "18": 10.5, "19": 9.5 }, "orderable": { "10.5": true, "12.5": false, "9.5": false } },
   "pins": { "mounting": "slide_on", "rear_type": "wooden" },
   "formulas": { "bottom_width": "LB - 2*EB - 51.5", "rear_width": "LB - 2*EB - 63", "bottom_length": "NL + 10" },
   "thickness_supported_mm": [16],
   "height_variants": { "H70": {...}, "H144": {...}, "H176": {...} },
   "nl_series": [260,300,350,420,470,520,620],
-  "availability": { "loads_by_nl": {...}, "openings": ["sisy","p2o","p2os"], "p2os_10kg_nl": [260,300,350] },
-  "min_depth": { "sisy": {...}, "p2o": {...}, "p2os": {...} },
-  "extras": { "sync_shaft": { "trigger": "width_gt_600_and_opening_in[p2o,p2os]", "cut_formula_by_eb": {"9.5":"LW-64","10.5":"LW-66","12.5":"LW-70"} } },
+  "availability": { "loads_by_nl": {...}, "openings_by_nl": { "260": ["sisy"], "300": ["sisy"], "350": ["sisy"], "420": ["sisy"], "470": ["sisy"], "520": ["sisy"], "620": ["sisy","p2o"] } },
+  "min_depth": { "sisy": {...}, "p2o": {...} },
+  "extras": { "sync_shaft": { "trigger": "width_gte_600_and_opening_eq[p2o]", "cut_formula_by_eb": {"9.5":"LW-64","10.5":"LW-66","12.5":"LW-70"} } },
   "inner_supported": false }
 ```
 Vzorce sa NEinterpretujú ako jazyk — každý vzorec = pomenovaná konštanta v kóde (`c_bw`, `c_rw`, `c_bl`…), pack nesie hodnoty. Formula-string je len dokumentácia.
@@ -29,14 +34,14 @@ Vzorce sa NEinterpretujú ako jazyk — každý vzorec = pomenovaná konštanta 
 | šírka chrbta (drevený) | `LB − 2·EB − 63` → `LB − 84` (rovnaké pre H70/H144/H176) | OFFICIAL + USER |
 | dĺžka dna | `NL + 10` (drevený chrbát; oceľový by bol NL − 3 — mimo profilu) | OFFICIAL |
 | výška chrbta | H70 = **65.5** (výrobne 65) · H144 = **144** · H176 = **176** (H54 = 53 existuje, V1 neponúka) | SECONDARY (Démos) + USER |
-| min. svetlá výška niky | H70: **105 / 106 / 108** · H144: **189 / 190 / 192** · H176: **221 / 222 / 224** (SiSy / P2O / P2Os) — NIE 92! | OFFICIAL (#10, korekcia #11) |
+| min. svetlá výška niky | SiSy: **105 / 189 / 221** · Tip-On: **108 / 192 / 224** (= vendor PTOs, lebo Tip-On kity od Démosu sú PTOs — prísnejšia z P2O 106/190/222 a P2Os) — NIE 92!; P2Os NIE JE samostatný typ otvárania v Noxune (Michal 5.9.2026: len 2 typy), len vendor variant kitu | OFFICIAL (#10, korekcia #11) |
 | relingy | H70: 0 · H144: 1+1 · H176: 1+1 (súčasť K-sady …/176 resp. „relingy") | USER (#09) |
 | NL rad | 260 · 300 · 350 · 420 · 470 · 520 · 620 | OFFICIAL |
-| nosnosť per NL | 260 → [30] · 300–520 → [30, 50] · 620 → [50]; P2Os 10 kg len 260–350; **žiadna 60 kg** | OFFICIAL |
+| nosnosť per NL | 260 → [30] · 300–520 → [30, 50] · 620 → [50]; **žiadna 60 kg**; 10 kg trieda sa nepoužíva | OFFICIAL |
 | min. hĺbka korpusu | NL ≥ 300: `NL + 15` · **NL 260: 279 (SiSy) / 305 (P2O)** | OFFICIAL |
 | hrúbka dna/chrbta | 16 mm (bez drážky — dno sadá na prírubu zargy); iné UNCONFIRMED → `thickness_supported = [16]` | OFFICIAL detail + USER |
-| opening | SiSy · P2O · P2Os — geometria boxu identická; mení kit kód, min. výšku, dostupnosť | OFFICIAL |
-| sync tyč (P2O/P2Os) | povinná pri šírke > 600: rez EB 10.5 → `LW − 66` (dĺžková položka — R-06a ORANGE; chýbanie = blocker KOV-D) | SECONDARY |
+| opening | SiSy · P2O — geometria boxu identická; mení kit kód, min. výšku, dostupnosť. **P2Os nie je tretí typ otvárania** (Michal 5.9.2026: len 2 typy pre výsuvy aj závesy) — je to vendor variant Tip-On kitu, ktorý Démos predáva; recept `atira_p2o_v1` ho používa | OFFICIAL + rozhodnutie |
+| sync tyč (P2O) | povinná pri šírke ≥ 600 (inkluzívne): rez EB 10.5 → `LW − 66` (dĺžková položka — R-06a ORANGE; chýbanie = blocker KOV-D) | SECONDARY |
 | vnútorná zásuvka | `inner_supported: false` (V1 len klasifikácia; doplnky = profil 2000 + príchyt — dĺžkové/pomerové) | USER + #12 |
 | vyrábané dielce | presne 2: dno + drevený chrbát; ABS: dno bez, chrbát horná dlhá hrana 1,0 | USER (#09, #11) |
 
@@ -44,12 +49,23 @@ Vzorce sa NEinterpretujú ako jazyk — každý vzorec = pomenovaná konštanta 
 
 | výška | NL 350 | NL 420 | NL 470 | NL 520 | NL 620 |
 |---|---|---|---|---|---|
-| H70 SiSy 30 | 357694 š | **357695 ✓** | **357696 ✓** | — | 357716 (PTO 50) š |
-| H144 relingy | — | — | 357736 š | — | **357755 ✓** (620/50 PTO) |
-| H176 relingy | 357773 š · 341609 š | **357774 ✓** | **357775 ✓** · 357781 ✓ (50 kg) | 357777 š · 357782 (50) š | **357783 ✓** (620/50) · 357795 ✓ (50 PTO) |
+| H70 SiSy 30 | 357694 š | **357695 ✓** | **357696 ✓** | 357697 (Michal 5.9.) | 357716 (PTO 50) š |
+| H144 SiSy relingy | 357734 (Michal 5.9.) | 357735 (Michal 5.9.) | 357736 š | — | **357755 ✓** (620/50 PTO) |
+| H176 SiSy relingy | 357773 š · 341609 š | **357774 ✓** | **357775 ✓** · 357781 ✓ (50 kg) | 357777 š · 357782 (50) š | **357783 ✓** (620/50) · 357795 ✓ (50 PTO) |
 | antracit | 357887 ✓ (350/70) | 357969 ✓ (420/70/176) | 348777 ✓ (470/70) · 357970 ✓ (470/70/176) · 341626 ✓ | — | — |
 
-Chýbajúce kombinácie (napr. H144 NL 420/520) = **ORANGE `nl_missing`** ako dnes — nikdy tichá zámena; doplní sa pri seede z Démosu.
+**Tip-On kity Atira biela (Michal, Démos katalóg 5.9.2026 — recept `atira_p2o_v1`; kity sú vendor variant PTOs = Push to open Silent (všetky NL 350–520);
+používateľsky = jeden typ „Tip-On", min. svetlá výška preto PRÍSNEJŠIA z oboch = PTOs 108/192/224):**
+
+| výška | NL 350 | NL 420 | NL 470 | NL 520 | NL 620 |
+|---|---|---|---|---|---|
+| H70 30 kg | 357722 (PTOs) | 357723 (PTOs) | 357724 (PTOs) | 357725 (PTOs) | 357716 (PTO, 50 kg) š |
+| H144 30 kg relingy | 357761 (PTOs) | 357762 (PTOs) | 357763 (PTOs) | 357764 (PTOs) | 357755 ✓ (PTO, 50 kg) |
+| H176 relingy | 357801 (PTOs) | 357802 (PTOs) | 357803 (PTOs) | 357812 (PTOs, **50 kg** — 30 kg len na objednávku; hodnota `load` bunky, geometriu nemení) | 357795 ✓ (PTO, 50 kg) |
+
+Rady receptov v2 z týchto tabuliek: `atira_sisy_v1` H70 [350, 420, 470, 520] · H144 [350, 420, 470, 620] · H176 [350, 420, 470, 520, 620]; `atira_p2o_v1` H70, H144, H176
+zhodne [350, 420, 470, 520, 620]. **Každá bunka radov v1 má kit kód** (doplnené Michalom 5.9. popoludní: 357697, 357734, 357735, 357812); SiSy H144/520 v rade nie je (bez kódu).
+`load` bunky: 30 kg okrem NL 620 (50) a Tip-On H176/520 (50) — informatívne pre nákup, geometriu nemení.
 
 ## 2. Hettich Quadro V6 EB23 (WOOD_DRAWER_UNDERMOUNT) — Noxun profil: EB23, slide-on, 16 mm (18 valid), 30 kg
 

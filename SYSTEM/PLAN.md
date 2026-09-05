@@ -189,7 +189,8 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 (po cross-audite Codex/GLM/Opus + reconcile + rozhodnutia O1–O3) · **UX referencia:** [zdroje/ui20/mockup_kovanie_v1.html](zdroje/ui20/mockup_kovanie_v1.html)
 (schválený 2.9.) · vendor dáta: checkpoint #10 · detail fill: checkpoint #11. Otvorené postrehy D-109/D-111 sú v packages nižšie (D-110 ✅ vyriešená KOV-B2)
 (D-109 mechanika = R-05 po V1, výsledok cez KOV-G). **Predpoklad prvého schema bumpu: D-52 updater** (blok 6 — štartovaný 2.9.).
-Poradie slices: **0 (D-52 ✅) → A1 ✅ → A2 ✅ → H1 ✅ → B1 ✅ → H2 ✅ → B2 ✅ → B3 (AKTUÁLNA) → C → D → E → F → G → I** (B po Codex audite #17 rezaná na B1 dáta+std / B2 katalóg UI / B3 editor setu) (KOV-A rezaná po Codex audite #14 na A1 dátová vrstva / A2 UI+overlay; otázka 3/4 krídel rozhodnutá Michalom 3.9. — variant a); C a D dostanú package po sonde Démos (kit vs atomic) a fixtures.
+Poradie slices: **0 (D-52 ✅) → A1 ✅ → A2 ✅ → H1 ✅ → B1 ✅ → H2 ✅ → B2 ✅ → B3 ✅ → C (AKTUÁLNA, package v2) → D → E → F → G → I** (B po Codex audite #17 rezaná na B1 dáta+std / B2 katalóg UI / B3 editor setu)
+(KOV-A rezaná po Codex audite #14 na A1 dátová vrstva / A2 UI+overlay; otázka 3/4 krídel rozhodnutá Michalom 3.9. — variant a); **KOV-C package v2 (5.9.2026)** nahradil v13 z PR #300 po simplification review (zásady: nemenné recepty, kódy v setoch, žiadny fallback NL, pevné EB) — KOV-D revidovaná podľa neho.
 **KOV-A je KOMPLET a v maine** (A1 PR #280 · A2a PR #281 · A2b PR #282 — plné texty packages v git histórii a v checkpointe #14; záznamy dávok v [archiv/KRONIKA.md](archiv/KRONIKA.md)).
 Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-only), implementuje subagent v worktree, brány podľa CLAUDE.md.
 
@@ -269,94 +270,156 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   riadok „chýba v katalógu" bez ceny · Ctrl+Z vráti každý krok. **Checklist uzáveru (v PR):** bump + `?v=` → testy → `ui-lifecycle.md` (modal, riadky, Nákup) → STAV/KRONIKA/PLAN
   (KOV-H komplet).
 
-- **KOV-C · TASK PACKAGE „RECEPTY, KONTEXT A ODVODENÉ DIELCE ZÁSUVIEK" (slice C; štart po KOV-A; audit-povinná; in-SU povinné; rez C1/C2):**
-  **Cieľ:** zásuvkové čelo (klasifikované v KOV-A) dostane z receptu automaticky **vyrábané dielce** (Atira: dno + drevený chrbát; Quadro V6 EB23: 2 boky + dno +
-  vnútorné čelo + chrbát), **resolved systém** (výškový variant · NL · nosnosť · otváranie) z počítaného kontextu a **jednu položku kovania** s parametrami; recepty sú
-  dáta zmrazené v projekte; nevyriešená zásuvka neemituje nič a je RED + tvrdý blocker (O2). Dáta: FINAL §3/§4/§6, checkpointy #10 (vzorce, tabuľky), #11 (ABS, UNI 16, H70=105),
-  #12 (kódy K-sád), draft `zdroje/next_sessions/KOVANIE_RECIPE_DATA_DRAFT_2026-09-02_13.md`.
-  **C1 · jadro (čisté, bez zmeny výstupov):** nový modul `core/drawer_recipes.rb` + data packy `noxun_engine/data/recipes/atira.json`, `quadro_v6_eb23.json`
-  (schéma: `family` metal_box|wood_undermount · `system` · `runner_variants` {`eb_by_kd` 16→12.5/18→10.5/19→9.5, `orderable` flag} · piny `mounting: slide_on`,
-  `rear_type: wooden` · konštanty vzorcov (Atira: `BB = LB−2EB−51.5`, `RB = LB−2EB−63`, `BL = NL+10`; Quadro: `SKW = LB−46`, `SKL = NL`, `bottom_offset 12`,
-  `box_clearance 40`) · `height_variants` {H70/H144/H176: rear_height 65.5/144/176, `min_clear_height` per opening SiSy/P2O/P2Os = 105/106/108 · 189/190/192 · 221/222/224,
-  railing 0/1+1/1+1} · `nl_series` 260…620 · `availability` {NL→loads: 260→[30], 300–520→[30,50], 620→[50]; P2Os 10 kg len 260–350} · `min_depth` (NL×opening) tabuľka
-  (260: 279 SiSy / 305 P2O; ≥300: NL+15; Quadro NL+13) · `thickness_supported` (Atira [16]; Quadro [16,18]) · `inner_supported: false` · `recipe_version`).
-  Čisté funkcie: `Recipes.load(system)` (validácia schémy pri načítaní — chýbajúca tabuľka = odmietnutie celého packu, nikdy tichý default) ·
-  `Recipes.resolve(ctx, classification, overrides)` → `{variant, nl, load, opening, parts[], hardware_params, conflicts[], explain}` (najvyšší variant, ktorého
-  `min_clear_height[opening] ≤ clear_height`; najdlhšia NL s `min_depth[nl][opening] ≤ clear_depth`; load = default 30 / 50 pri NL 620; override polia z
-  `hardware_overrides` majú prednosť — nekompatibilný override = conflict, nikdy tichá zmena) · `context_for(owner, plan, cfg)` v `construction.rb`: čistá fn →
-  `{clear_width (listová zóna pretínajúca riadok, nie w−2t), clear_height (prienik z-intervalu riadku čela s interiérom z_lo=floor+t … z_hi=height−t / rail_geometry
-  a listovou zónou), clear_depth (= interior back_front_y — v schéme pomenované `interior_depth`; porovnáva sa s vendor Mindest-Korpustiefe ako VNÚTORNÁ hĺbka —
-  overiť v audite), side_thickness (KD), obstructions[] (shelf / divider_h / divider_v pretínajúce riadok)}`; **named test: 16 mm offset riadok-vs-interiér**.
-  **Projektový snapshot receptov:** kľúč `drawer_recipes` v NOXUN dict modelu `{std, recipe_version, systems}` — zrkadlo `HardwareRules.ensure_project_rules!`
-  (zápis VNÚTRI operácie buildera, prestavba číta VÝHRADNE snapshot, nikdy auto-merge); `merge_recipes_seed!` = explicitná akcia s diffom (UI v KOV-D).
-  Testy C1: headless nad fixtúrami — vzorce Atira/Quadro proti #10 hodnotám (tabuľkový test každého riadku), výber variantu/NL (hranice, opening závislé
-  min_depth NL260, 620 → 50 kg), overridy (kompatibilný drží / nekompatibilný conflict), context (16 mm offset, priečka cez riadok = obstruction, listová zóna),
-  snapshot (nemení sa sám, merge len explicitne), schéma packu (chýbajúca tabuľka = odmietnutie).
-  **C2 · integrácia (mení výstupy — VŠETKY zmeny len pre čelá klasifikované ako zásuvka so systémom; ostatné zákazky CONTENT-identické):**
-  (a) `Construction.build_plan` volá resolver pre každé drawer-klasifikované čelo → **odvodené dielce** do `plan.parts` s part_key `front:<id>/drawer_bottom` ·
-  `/drawer_back` · `/box_side:left|right` · `/drawer_inner_front`, nové ROLES + `plan_schema` bump + `material signals` enum (`:drawer`) + `human_label` vetvy;
-  (b) **4. materiálový kanál** `:drawer`: `PROJECT_KEYS` + `default_drawer_material_id` (fallback **UNI 16 mm** — nemazateľný), `eff_drawer` v `effective_materials`,
-  D-46 pending-confirmation reuse; `thickness_ok_for?` + `materialized_part` pre nové roly; **hrúbka = vstup receptu** — materiál mimo `thickness_supported` = conflict;
-  ABS per rola z #11 (`drawer_bottom` bez; `drawer_side`/`drawer_inner_front`/`drawer_back` horná dlhá hrana 1,0 mm) ako explicitné `AbsRules` seed záznamy;
-  (c) **jedna položka kovania** `generic_type: slide`, `rule_id: 'recipe:<system>'`, `params {system, height_variant, nominal_length, load, opening, runner_variant}`
-  + **R2 exkluzivita**: `HardwareRules.evaluate` potlačí `fit_series`/slide pravidlá pre drawer-klasifikované čelá (build warning `legacy_slide_suppressed`
-  info, len prvý raz per zákazka) + **migrácia D-93 zámkov**: `nominal_length` override s `rule_id vysuvy-nl-podla-hlbky` sa premapuje na `recipe:<system>`
-  identitu (ak NL v rade — inak conflict `nl_lock_invalid`, nikdy tiché zmiznutie); charakterizačný test „jedno zásuvkové čelo → presne jedna slide položka";
-  (d) **fail-closed**: `conflicts[]` neprázdne → ŽIADNE odvodené dielce, ŽIADNA slide položka; do `hardware_issues` (kľúč z KOV-A) RED `drawer_no_fit` /
-  `drawer_thickness_unsupported` / `drawer_obstruction` / `drawer_internal_unsupported` s presným dôvodom a `export_blockers` rozšírené o tieto kódy (HW CSV + rozpočet + CP;
-  VEPO nie) — prepočet ČERSTVÝ pri exporte (vzor `dup_partition`), hláška menuje zásuvku, dôvod, kam kliknúť; test „pri blockeri je cieľový priečinok prázdny";
-  (e) Inspector: karta zásuvky ukazuje resolved riadok + osi (read-only v C; zámky/prepínanie = KOV-D), Kontrola RED riadky s navigáciou; Nákup: slide položka
-  zatiaľ expanduje cez dnešné mapovanie `slide` (set podľa NL — code_by_nl); **per-height sety a výber podľa klasifikácie = KOV-D** (do vtedy: ak set nemá kód pre
-  NL/variant → ORANGE `nl_missing` ako dnes, nikdy tichá zámena).
-  **Scope OUT:** per-height sety/selector a defaulty podľa klasifikácie (D) · zámky UI a zmena osí (D — v C platia len existujúce `nominal_length` overridy po migrácii) ·
-  „Doplniť nové recepty" UI (D) · Antaro/Strong/TANDEM (dáta pripravené) · vnútorné zásuvky (len klasifikácia + RED) · sync tyč P2O (KOV-D, dĺžková ostáva R-06a) ·
-  editor receptov · dokonalý kolízny solver (obstruction z listovej zóny + police/priečky stačí; atyp = vizuálna kontrola, #09).
-  **Audit: ÁNO** (nový modul + data pack, plan_schema/ROLES, snapshot kľúč na modeli, hardware kontrakt, brány). **In-SU POVINNÉ** (buildery, plán↔model, undo).
-  **Testy a DoD C2:** headless — plán s odvodenými dielcami (rozmery Atira 900×560×175 → dno 791×480, chrbát 779,5×144 pri H144; Quadro 950 → SKW 868…), 4. kanál (UNI
-  fallback, override, hrúbka 18 pri Atire = conflict), ABS per rola, R2 (jedna slide položka; legacy potlačené; D-93 migrácia s NL v rade aj mimo radu), fail-closed
-  (nič sa neemituje + RED + blocker), **charakterizácia**: zákazky bez drawer klasifikácie CONTENT-identické (kusovník/VEPO/nákup/rozpočet); JS — karta resolved riadok,
-  Kontrola riadky; **in-SU** — stavba zásuvky s dielcami, rebuild po zmene hĺbky/výšky (iný variant/NL, žiadna duplicita dielcov, part_overrides prežijú), Ctrl+Z,
-  kópia `*2`, šablóna uložiť/vložiť (drawer config + snapshot receptov), plytká skrinka → žiadne dielce + RED + export zastavený s prázdnym priečinkom.
-  Mutácie min. 4 (legacy nepotlačené · migrácia zámku zahodí hodnotu · dielce emitované pri conflict · snapshot auto-merge). **Riziká:** rozsah (preto C1/C2; C2 sa smie
-  ďalej rezať na C2a dielce+materiál / C2b kovanie+brány) · definícia hĺbky (audit) · reálne .skp fixtures (D-93 zámok, legacy snapshot) treba vyrobiť PRED C2.
-  **Smoke pre Michala:** skrinka 900×720×560, F2 zásuvkové čelo 175 (Kovové bočnice) → v kusovníku pribudnú dno 791×480 a chrbát 779,5×144 (H144), Kontrola bez nálezov,
-  nákup 1× K-Atira 470 · zmeň hĺbku na 500 → NL 470→420, dielce sa prepočítajú, žiadny duplicitný riadok · drevený box (Quadro) → 5 dielcov, boky 450×135 · nastav materiál
-  zásuviek v projekte na bielu 16 → všetky dielce ju dedia · plytká skrinka 300 → RED „bez riešenia", dielce zmiznú, nákupný CSV odmietne s hláškou · otvor KLINIKA →
-  čísla identické.
-  **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `construction.md` (context_for, roly, resolver hook), `hardware.md` (recipes, R2, snapshot),
-  `materials.md` (4. kanál), `outputs.md` (blockery, hardware_issues kódy), `model-a-identita.md` (part_keys drawer), ARCHITEKTURA router riadok (drawer_recipes)
-  → STANDARD §5/§6/§7 doplnky (roly, drawer materiál, recepty) → STAV/KRONIKA/PLAN.
+- **KOV-C · TASK PACKAGE „NEMENNÉ RECEPTY ZÁSUVIEK A ODVODENÉ DIELCE" (slice C; **v2 z 5.9.2026** — simplification review Michal + Claude nahradil package v13 z PR #300
+  (4 CLI + 9 GH kôl nekonvergovalo; záznam [zdroje/next_sessions/KOVANIE_KOVC_AUDIT_2026-09-05_18.md](zdroje/next_sessions/KOVANIE_KOVC_AUDIT_2026-09-05_18.md));
+  predaudit Astra = checkpoint #19; in-SU povinné; rez C1 → C2):**
+  **Cieľ:** zásuvkové čelo (klasifikované v KOV-A) dostane z **nemenného receptu** automaticky **vyrábané dielce** (Atira: dno + drevený chrbát; Quadro V6 EB23: 2 boky +
+  dno + vnútorné čelo + chrbát), **jednu položku výsuvu** s číselnými parametrami (výška · NL · nosnosť · otváranie) a nákup k nej nájde kit kód v setoch z KOV-B.
+  Nevyriešená zásuvka neemituje nič a je RED + tvrdý blocker (O2). Dáta: FINAL §4/§6 (FINAL §3 snapshot receptov + KD→EB a §8 VEPO výnimka pre chýbajúci set sú v2 PREKONANÉ — poznámka priamo v FINAL; Codex #301 kolo 2 P2), checkpointy #10 (vzorce), #11 (ABS, UNI 16, H70 = 105), #12 (kódy K-sád), draft #13 (§1 tabuľky kódov SiSy + Tip-On).
+  **Zásady v2 (Michal 5.9.2026, záväzné):** (1) explicitné **nemenné recepty pre ~5 systémov** (Atira, Quadro, neskôr Antaro, TANDEM, StrongBox/Max), žiadny univerzálny
+  resolver ani framework pre hypotetické systémy; (2) **fyzika v recepte, objednávacie kódy v setoch** (KOV-B) — dve vrstvy, každá s jednou zodpovednosťou;
+  (3) **nákup nikdy nemení fyzický návrh**: žiadne kandidáty, žiadny fallback na inú NL kvôli chýbajúcemu kódu — rad NL v recepte = rad, ktorý Noxun reálne kupuje,
+  chýbajúci kód = RED a používateľ rozhodne; (4) **EB je pevné per recept** (Atira 10.5, Quadro 23) — zmena hrúbky boku mení len svetlú šírku, z ktorej sa dielce počítajú,
+  engine nikdy nehľadá iný runner (KD → EB mapa NEEXISTUJE); (5) systém je **explicitná hodnota** `drawer.system` popri `construction` (V1: metal → jediný kandidát Atira,
+  wood → Quadro; UI predvyplní, hodnota sa uloží); (6) malý počet stavov, každé pravidlo auditovateľné z jedného JSON súboru.
+  **C1 · jadro (čisté, bez zmeny výstupov):** nový modul `core/drawer_recipes.rb` + recepty `noxun_engine/data/recipes/<recipe_id>.json`:
+  `atira_sisy_v1`, `atira_p2o_v1`, `quadro_v6_sisy_v1`, `quadro_v6_p2o_v1` (jeden recept = jeden systém × jedno otváranie × verzia). Schéma receptu (validovaná pri načítaní,
+  chýbajúca bunka = odmietnutie celého receptu, nikdy tichý default): `recipe_id` · `system` · `family` metal_box|wood_undermount · `opening` sisy|p2o · `eb` (číslo) ·
+  `kd_supported` (Atira [16, 18, 19]; Quadro [16, 18, 19]) · `mounting: slide_on` · `rear_type: wooden` · `thickness_supported` per rola (Atira dno aj chrbát [16]; Quadro každý dielec
+  [16, 18]) · vzorce ako konštanty (Atira: `BB = LB − 2EB − 51.5`, `RB = LB − 2EB − 63`, `BL = NL + 10`; Quadro: `SKW = LB − 46`, `SKL = NL`, `bottom_offset 12`, `box_clearance 40`,
+  výška predku/chrbta `box_height − t_dna − 12`) · `height_variants` (Atira 70/144/176: `rear_height` 65.5/144/176, `min_clear_height` pre otváranie receptu — SiSy 105/189/221,
+  Tip-On 108/192/224 (kity Démos sú vendor variant PTOs — prísnejšia z oboch tabuliek; Michal 5.9.), `railing` 0/1+1/1+1; Quadro bez variantov: `box_height = clear_height − 40`, `min_box_height` tak, aby predok/chrbát `box_height − t − 12` ≥ 30 mm — Astra #19 F3: svetlá výška 60 by dala −8 mm) · **`nl_series_by_height`** = Noxun rad podľa K-sád z #12 (atira_sisy: H70 [350, 420,
+  470, 520] · H144 [350, 420, 470, 620] · H176 [350, 420, 470, 520, 620]; atira_p2o: H70, H144, H176 zhodne [350, 420, 470, 520, 620] (kódy Démos od Michala 5.9. — KAŽDÁ bunka radov v1 má kit kód, draft #13 §1); quadro_v6_sisy [350, 400, 450, 500, 550]; quadro_v6_p2o [350, 400, 450]) ·
+  `min_depth_by_nl` explicitná tabuľka (Atira NL + 15; Quadro NL + 13) · `load_by_cell` (Atira 30; 620 → 50; Tip-On H176/520 → 50, lebo kit existuje len ako 50 kg — hodnota bunky pre nákup/Inspector, geometriu nemení; Quadro 30) · `sync_min_width` 600 · `abs` per rola (dno bez;
+  chrbát/boky/vnútorné čelo L1 1,0 mm horná dlhá hrana) · `source` tagy per hodnota. **Nemennosť:** register vydaných receptov `data/recipes/RELEASED.json` `{recipe_id → sha256}` — test v `tests/pure` overuje, že KAŽDÝ zaregistrovaný súbor existuje a sedí na SHA A že inventár `data/recipes/*.json` = množina registrovaných ID (nie len `_v1`; Astra #19 F10 + Codex #301 kolo 2
+  P2); `Recipes.load`/`latest_for` načítajú VÝHRADNE registrované recepty + **golden test výsledkov `resolve` per vydaná verzia** (fixtúra vstup → dielce/NL),
+  lebo SHA JSON nezachytí zmenu interpretácie v Ruby; zmena obsahu zhodí CI;
+  oprava alebo rozšírenie = nový súbor `_v2`, staré verzie sa NIKDY nemažú ani nemenia (reprodukovateľnosť starých zákaziek bez snapshotu).
+  Čisté funkcie: `Recipes.load(recipe_id)` · `Recipes.latest_for(system, opening)` · `Recipes.resolve(recipe, ctx, part_thicknesses, overrides)` (`part_thicknesses` per rola = VSTUP, nie odvodené z plánu) → `{height_variant (Atira číselné 70|144|176) |
+  box_height (Quadro mm), nl, load, parts[], hardware_params, conflicts[], explain}` — **jedna výška** (najvyšší variant s `min_clear_height ≤ clear_height_raw`), **jedna NL**
+  (najdlhšia z radu TEJ výšky s `min_depth ≤ clear_depth_raw`; porovnania inkluzívne s NEZAOKRÚHLENOU hodnotou, bez EPS: 105,00 platí, 104,995 padá); NL zámok
+  z `hardware_overrides.nominal_length` (v rade výšky a zmestí sa → použije sa; inak conflict `nl_lock_invalid`, nikdy tichá zmena); hrúbka mimo `thickness_supported` =
+  conflict `drawer_thickness_unsupported`; KD mimo `kd_supported` = `drawer_kd_unsupported`; žiadna výška/NL = `drawer_no_fit` s hláškou (napr. „Quadro P2O v1: hĺbka 300, najkratšia NL 350 potrebuje 363"); emisia dielcov ATOMICKÁ (všetky alebo žiadny); **každý rozmer každého dielca sa PRED emisiou overí proti `BuildPlan::MIN_DIM` a receptovému minimu — jediný neplatný rozmer =
+  `drawer_no_fit` pre celú zásuvku** (existujúci per-dielec filter `part_skipped_degenerate` by atomicitu porušil; Astra #19 F3). `context_for(owner, plan, cfg)` v `construction.rb`:
+  čistá fn z NEZAOKRÚHLENÝCH listových zón
+  (`ZoneTree` odovzdá `raw_bounds`; projekcia `front_items` raw) → `{clear_width (listová zóna pretínajúca riadok), clear_height (prienik z-intervalu riadku s interiérom
+  z_lo = floor + t … z_hi = height − t / rail_geometry a listovou zónou), clear_depth (= `back_front_y`), side_thickness (KD), obstructions[] (shelf / divider pretínajúci riadok →
+  conflict `drawer_obstruction`)}`; named test: 16 mm offset riadok-vs-interiér.
+  **Klasifikácia → recept — rozhodovacia tabuľka (Astra #19 F9, nikdy dve cesty naraz):** (1) typ ≠ zásuvka, alebo zásuvka BEZ AKÉHOKOĽVEK drawer poľa (`construction`, `opening_mode` aj `system` chýbajú = nedotknuté legacy čelo), alebo `construction other` → legacy cesta, CONTENT-identická, resolver sa nevolá; (2) `construction metal|wood` + `opening_mode` prítomné → resolver
+  (`metal → system atira`, `wood → quadro_v6`; chýbajúci `drawer.system` server doplní default per construction a
+  ZAPÍŠE = migrácia čiel klasifikovaných pred v2, vo V1 jediný kandidát); (3) akákoľvek ČIASTOČNÁ klasifikácia (`construction` bez `opening_mode` ALEBO `opening_mode` bez `construction` — polia sa editujú nezávisle; Codex #301 kolo 3 P1) → RED `drawer_unclassified`, žiadne dielce, žiadna slide položka ani legacy pravidlo; `opening_mode classic → sisy` ·
+  `tipon → p2o` (len 2 typy otvárania — rozhodnutie 5.9.); `variant internal` = conflict `drawer_internal_unsupported`; čiastočná klasifikácia pri type zásuvka = RED
+  `drawer_unclassified`; dormant drawer polia na dvierkach sa ignorujú. **`recipe_refs` per čelo** `drawer.recipe_refs = {"atira|sisy": "atira_sisy_v1", …}` (mapa systém|otváranie → `recipe_id`; aktívny záznam = aktuálna klasifikácia; Codex #301 kolo 2 P1: prepínanie klasifikácie tam a späť NIKDY nezmení už pripnutú verziu, lebo pôvodný záznam v mape ostáva): **3 stavy
+  aktívneho záznamu** — chýbajúci
+  (nové čelo → `latest_for`; NOVÁ kombinácia systém|otváranie na existujúcom čele → súrodenec ROVNAKEJ verzie ako už pripnuté záznamy, inak `latest_for`; návrat k skôr použitej kombinácii → jej PÔVODNÝ záznam z mapy) a zápis; známy → použi presne ten; neznámy → RED `drawer_recipe_unknown` („aktualizuj plugin"),
+  bez dielcov. Autorita SERVER — DVE cesty, nie jedna normalizácia (Astra #19 B2): (i) **klientsky payload** z panela — handler akcie (`actions_*`) zahodí `recipe_refs` PRED zlúčením do configu (klientsky whitelist ho nepozná) **a uloženú mapu pripojí späť podľa ID čela** — `handle_apply_fronts`/`handle_apply_all` nahrádzajú `params['fronts']` vcelku (Codex #301 kolo 3 P1);
+  test: stale/forged payload nikdy nezmení ani nevymaže mapu, čelo s novým ID mapu nemá; (ii) **uložený config** — `Fronts.normalize_config` ref BEZSTRATOVO zachováva (server-side whitelist), preto ho prežije prestavba, šablóna
+  (`template_config_from`) aj natívny Copy/Paste; server pri prestavbe overí, že ref patrí k systému/otváraniu klasifikácie čela — aktívny záznam sa vyberá podľa klasifikácie čela z mapy `recipe_refs` (chýbajúci → súrodenec ROVNAKEJ verzie cez `Recipes.sibling`, inak `latest_for`; existujúci → presne ten); zmena verzie = VÝHRADNE explicitná akcia KOV-D (Codex #301 kolo 1 + 2
+  P1: ani prepnutie SiSy → P2O → SiSy, ani systém s inou najnovšou verziou nesmie ticho povýšiť pripnutý recept); zápis len `Fronts.write_recipe_refs!` v TEJ ISTEJ operácii ako geometria; test: strata ref pri normalizácii = FAIL (po vydaní `_v2` by stav „chýbajúci → latest" ticho zmenil geometriu) —
+  ten istý nemenný recept v každom dokumente, preto **žiadny projektový snapshot receptov, digest ani merge** (zavedú sa až keby recepty boli používateľsky editovateľné).
+  Testy C1: tabuľkové testy vzorcov proti #10/#13 bez zaokrúhľovania (900/KD18 → LB 864, BB 791,5, RB 780, BL = NL + 10; **KD 16 → LB 868, BB 795,5 s EB stále 10.5**),
+  hranice výšky/NL (175 → H70; H70 hĺbka 500 → 470, 560 → 520 (535 ≤ 560); H176 560 → 520; Quadro 497 → 450, 500 potrebuje 513), zámok v rade / mimo, context
+  (offset, obstruction, listová zóna), stavy aktívneho záznamu `recipe_refs` (3) + návrat ku skôr použitej kombinácii vráti pôvodný záznam, validácia receptu (chýbajúca bunka), nemennosť (SHA), `latest_for` pri dvoch verziách.
+  **C2 · aktivácia (mení výstupy LEN pre čelá so systémom; ostatné zákazky CONTENT-identické; NARAZ a–h):**
+  (a) `Construction.build_plan` volá resolver pre každé drawer čelo so systémom → dielce do `plan.parts` s part_key `front:<id>/drawer_bottom` · `/drawer_back` ·
+  `/box_side:left|right` · `/drawer_inner_front`; nové ROLES + `plan_schema` bump + `material signals` enum `:drawer` + `human_label` vetvy; `materialized_part` sa NEPOUŽÍVA
+  (nový `drawer_part` s finálnou geometriou); **poradie stavby (Codex #301 kolo 3 P1):** `CabinetBuilder.build_into` dnes volá `Construction.build_plan` PRED `effective_materials` — pre drawer roly sa hrúbky kanála `:drawer` (+ `part_overrides`) vyriešia PRED plánom a odovzdajú receptu ako `part_thicknesses`; bez nich by 18 mm materiál pri Atire prešiel a Quadro by počítalo
+  predok/chrbát s nesprávnou hrúbkou dna; test: override materiálu 18 → conflict, Quadro dno 18 → predok o 2 mm nižší;
+  (b) **4. materiálový kanál `:drawer`**: `PROJECT_KEYS` + `default_drawer_material_id` (fallback UNI 16 mm, nemazateľný), `eff_drawer`, `ensure_drawer_uni!` (samostatná
+  idempotentná; `ensure_uni_records!` končí pri `uni_seed.done`; ochrana ID), `UNI_ROLES` + drawer, `thickness_ok_for?` pre nové roly, D-46 reuse pre kanál len cez preflight
+  per systém; ABS seed per rola z #11 (`SEED_VERSION` bump); **hrúbka = vstup receptu** — materiál mimo `thickness_supported` = conflict;
+  (c) **jedna položka výsuvu** v úplnom tvare `BuildPlan`: `generic_type: slide`, `rule_id: recipe:<recipe_id>`, `owner_part_key: front:<id>/panel`, `quantity: 1`,
+  `rule_quantity: 1`, `source: recipe` (enum bump), **`locked: true` LEN pri položke s platným osovým zámkom** (`nominal_length` override), nie na každej receptovej položke (Astra #19 N11: inak falošné „ručne prepísané"); zákaz zmeny množstva plynie zo `source: recipe`; spotrebitelia `note_manual` a payloady Nákupu/Inspectora berú `locked` ako dnešné
+  `source manual`, `params {recipe_id, system, height_variant (číselné) | box_height, nominal_length, load, opening, opening_mode, drawer_construction}`; **R2 exkluzivita**:
+  `HardwareRules.evaluate` potlačí `fit_series`/slide pravidlá pre čelá so systémom (warning `legacy_slide_suppressed` raz per zákazka); **migrácia D-93**: existujúci
+  `nominal_length` override s `rule_id vysuvy-nl-podla-hlbky` na drawer čele sa v tej istej prestavbe premapuje na `recipe:<recipe_id>` a platí ako zámok (mimo radu →
+  `nl_lock_invalid`); server odmieta `quantity`/`disabled` mutácie pre `rule_id recipe:*` (`actions_hardware.rb`); legacy override s `disabled` alebo `quantity ≠ 1` na recipe
+  položke = RED `drawer_override_invalid` (jeden kód); charakterizačný test „jedno zásuvkové čelo → presne jedna slide položka s množstvom 1";
+  (d) **výber setu = NÁKUP, nie stavba:** `HardwareSets.resolve_mapping_value` pre položky, ktoré nesú `opening_mode` + `drawer_construction` v params, číta **triedny kľúč**
+  `class:slide|<opening_mode>|<drawer_construction>` (KOV-B1 ho už parsuje a round-tripuje; precedencia cabinet override (config `hardware_sets` s triednym kľúčom) → projekt; **owner-level override pre receptové položky v C NEEXISTUJE** — Codex #301 kolo 2 P1: `class:…@owner` parser odmieta a generický `slide@owner` je práve zakázaný fallback; owner-scoped tvar kľúča definuje
+  KOV-D, ak bude per-čelo prepnutie potrebné; odhad < 30 riadkov); **hodnota mapovania pre receptové položky so `height_variant` musí byť na KAŽDEJ úrovni (cabinet / projekt) selektor podľa `height_variant`** (Astra #19 B1: pevný `set_id` v override skrinky by
+  po prerastení zásuvky H70 → H176 objednal H70 kit k dielcom H176, lebo klasifikácia opening/construction je pri oboch rovnaká) — pevný `set_id` pre Atiru = RED `drawer_kit_missing` „override nie je selektor podľa výšky"; farba / 50 kg = ALTERNATÍVNY selektor (antracit per výška); Quadro (bez variantu) smie pevný `set_id`; expanzia navyše overí kód pre `nominal_length`;
+  `override_keys_in_use` (R-34 ochrana kolidujúcich kópií v `production_core.rb`) rozšírená o triedne kľúče, ktoré resolver číta (Astra #19 F8)
+  a pre `source: recipe` **NIKDY nepadá na generické `slide`** (set H70 pre zásuvku H176 by bol zlý kit) — chýbajúce triedne mapovanie = RED `drawer_kit_missing` s hláškou
+  „Pravidlá → Doplniť nové predvolené" (existujúca akcia `merge_project_sets_seed!`, vždy explicitná, nikdy automatická migrácia snapshotu); **seed** (`SEED_VERSION` bump; std 3
+  obsahom už existuje; **+ nový malý kontrakt `MAPPING_ADDITIONS` (add-if-absent) v `merge_seed`** — Astra #19 F7 + Codex #301 P1: `MAPPING_MIGRATIONS` vie len nahradiť `[from_set_id, to_set_id]` pri existujúcom kľúči a chýbajúci `class:` kľúč nevytvorí, takže „Doplniť nové predvolené" by nič neopravilo; `MAPPING_ADDITIONS = {class_key → hodnota}` sa do globálu doplní LEN ak
+  kľúč chýba (používateľské mapovanie sa nikdy neprepíše), `merge_project_sets_seed!` ho prenesie do snapshotu projektu; test: starý globál + starý snapshot → po oboch mergoch triedny kľúč prítomný a zásuvka zelená): `class:slide|classic|metal` → selektor `{param:
+  height_variant, bands: [70–70 → atira-biela-h70-sisy, 144–144 → atira-biela-h144-sisy, 176–176 → atira-biela-h176-sisy]}` — **NOVÉ klasifikované set ID**; legacy `vysuv-atira-biela-h70` ostáva NEDOTKNUTÝ pre legacy `slide` mapovanie (Codex #301 kolo 2 P1: oba merge ponechávajú existujúcu definíciu s rovnakým ID bez klasifikácie, kompatibilita by padla)
+  (existujúci mechanizmus D-81 — žiadny nový tvar), `class:slide|tipon|metal` → selektor na `atira-biela-h70-p2o` / `-h144-p2o` / `-h176-p2o` (kódy PTOs z draftu #13), `class:slide|classic|wood` → `vysuv-quadro-v6-sisy`, `class:slide|tipon|wood` →
+  `vysuv-quadro-v6-p2o`; sety nesú klasifikáciu (KOV-B1: `use_type drawer`, opening, construction, Hettich, rada + nové `height_variant` pri Atire) a `code_by_nl` z #12 (H70: 420 → 357695, 470 → 357696;
+  H176: 420 → 357774, 470 → 357775, 620 → 357783; Quadro SiSy 400 → 317641, 450 → 317642, 500 → 317643; P2O 350 → 343031, 400 → 343033, 450 → 317644 …); **jediná nová klasifikačná metadáta na setoch: `height_variant` (číslo 70|144|176) pri `use_type drawer` výškového systému (Michal 5.9.: áno)** — NIE os výberu, len OVERENIE: expanzia odmietne set, ktorého `height_variant` ≠
+  `params.height_variant` (Codex #301 kolo 3 P1: pásmo H176 → H70 set inak nemá čo odhaliť, oba majú NL 470); nové pole starší plugin orezáva → **lazy `std` 4 obsahom** (vzor KOV-B1 std 3; knižnica/snapshot bez poľa ostávajú na std ≤ 3, `classification_lost?` ho stráži); žiadne iné osi (`load`, `runner_variant`) na setoch
+  (50 kg alebo antracit = alternatívny selektor per výška v override skrinky — nemení geometriu); kompatibilita = existujúca klasifikácia setu ↔ params položky **VRÁTANE systému a výšky: `manufacturer` + `series` setu ↔ `system` receptu, `height_variant` setu ↔ `params.height_variant`** (Codex #301 P1: Antaro/StrongBox budú zdieľať `class:slide|classic|metal` s Atirou — kým je
+  v mape jeden systém per konštrukciu, triedny kľúč stačí a
+  identita setu sa overí pri expanzii; rozšírenie kľúča o systém patrí dávke, ktorá pridá druhý kovový systém) (nesúlad opening/construction/system/height_variant = RED
+  `drawer_kit_missing` s dôvodom); **completeness test (GLM M6):** každá bunka výška × NL z radov receptov v1 má v seede kód — všetky bunky radov v1 majú kit kód (Michal 5.9., draft #13 §1); budúca bunka bez kódu sa rieši DÁTOVO (kód alebo NL mimo radu), nikdy behovým fallbackom; chýbajúci kód pre vybranú NL v projekte = RED `drawer_kit_missing`;
+  (e) **brány — jeden register `DRAWER_BLOCKERS` (10 kódov):** `drawer_unclassified` · `drawer_no_fit` · `drawer_obstruction` · `drawer_internal_unsupported` ·
+  `drawer_thickness_unsupported` · `drawer_kd_unsupported` · `drawer_recipe_unknown` · `nl_lock_invalid` · `drawer_override_invalid` · `drawer_kit_missing`; `export_blockers` číta
+  CELÝ register (test: každý kód zastaví blokované exporty, priečinok ostáva prázdny). Konflikty STAVBY (prvých 9) = fail-closed: žiadne dielce ani položka + RED do
+  `hardware_issues` (kľúč z KOV-A); **uložený nosič (Astra #19 F6):** builder zapíše konflikty per čelo do configu v `merge_final` ako `drawer_conflicts` (vedľa `warnings`/`hardware`; tvar `[{front_id, code, message}]`), `Bom.collect` ich zlúči do `hardware_issues` — po fail-closed stavbe nezostane položka, z ktorej by sa dôvod obnovil; test save/reopen aj Undo (Kontrola ukáže
+  RED aj po znovuotvorení) → blokujú HW CSV + rozpočet + CP, VEPO chráni fail-closed geometria. **`drawer_kit_missing` vzniká v NÁKUPE** (`Bom`/`HardwareSets.expand`:
+  receptová položka bez setu alebo bez kódu pre svoju NL — dnešné ORANGE `no_set`/`nl_missing` sa pre `source: recipe` povyšuje na RED), dielce v modeli OSTÁVAJÚ (fyzika je správna),
+  ale **blokuje VŠETKY exporty VRÁTANE VEPO** (BL = NL + 10, boky Quadro = NL — dielce rezané na NL bez kitu tej NL sú nepoužiteľné); prepočet ČERSTVÝ pri exporte z uložených
+  položiek plánu + aktuálneho snapshotu setov projektu (existujúci vzor R9, žiadny nový preflight, žiadny `drawer_stale` — stavba sety nečíta, takže rozdiel nemôže vzniknúť);
+  (f) **sync tyč P2O (Michal 5.9.2026 — MIMO V1 mechanika):** recept nesie `sync_min_width`; pri `opening p2o` a `clear_width ≥ prah` (inkluzívne, Hettich „od 600") stavba pridá
+  **ORANGE** warning `drawer_sync_recommended` („zásuvka vyžaduje synchronizáciu — pridaj set cez ad-hoc kovanie", KOV-H kanál) — potvrditeľné pri exporte existujúcim dvojklikom;
+  žiadny blocker, žiadny nový `generic_type`, žiadna dĺžka, capability ani cena za meter (plný režim `per: length` po V1, R-06a);
+  (g) `CabinetBuilder::CONFIG_SCHEMA` 4 → 5 (`recipe_refs`, `source: recipe`, drawer roly) s forward-version odmietnutím a testom downgrade (starší plugin config 5 odmietne, nikdy
+  ticho neodstráni dielce ani položku; `PartKeys::SCHEMA` sa nebumpuje); whitelisty šablón a `normalize_config` doplnené o `drawer.recipe_refs` a `drawer.system` (aditívne);
+  (h) Inspector: karta zásuvky read-only riadok (systém · výška · NL · nosnosť · otváranie · recept v1) + `explain`; Kontrola RED/ORANGE riadky s dôvodom a navigáciou; Nákup:
+  položka expanduje cez triedny kľúč (kód podľa výšky a NL, `note_manual` pri zámku).
+  **Scope OUT:** zámky UI a zmena osí (D — v C platia len existujúce `nominal_length` overridy po migrácii) · prepínanie setu / systému / verzie receptu UI (D) · upgrade `recipe_refs`
+  na novšiu verziu (D, explicitná akcia s textovým diffom konštánt) · sync tyč dĺžková a cenová (po V1) · Antaro/TANDEM/StrongBox/Max/Legrabox (recepty v ďalších dávkach, dáta
+  v #12; kontrakt sa nemení) · vnútorné zásuvky (len klasifikácia + RED) · editor receptov · projektový snapshot receptov, digest, merge (len ak recepty budú editovateľné) ·
+  KD → EB mapa, `runner_variant`, `orderable` · kandidáti / fallback NL · osi `load`/`runner_variant` na setoch a exact tabuľka (`height_variant` na sete je len overovacia metadáta, nie os výberu) · `drawer_stale` preflight ·
+  dokonalý kolízny solver (obstruction stačí; atyp = vizuálna kontrola, #09).
+  **Audit: HOTOVÝ — Astra predaudit 5.9.2026** (2 BLOCKER + 8 FIX + 1 NOTE, všetky zapracované malými pravidlami, ŽIADNY návrat k mechanizmu v13; záznam [zdroje/next_sessions/KOVANIE_KOVC_AUDIT_2026-09-05_19.md](zdroje/next_sessions/KOVANIE_KOVC_AUDIT_2026-09-05_19.md)) → implementácia; nový modul + data pack, `plan_schema`/ROLES, `CONFIG_SCHEMA` 5, hardware kontrakt
+  (`source recipe`, `locked`), brány. **In-SU POVINNÉ** (buildery, plán↔model, undo).
+  **Testy a DoD C2:** headless — plán s dielcami (Atira 900×720×500, KD 18, čelo 175 → H70/470: dno 791,5×480, chrbát 780×65,5; **KD 16 → dno 795,5×480**; Quadro 900/KD18
+  hĺbka 500 → NL 450: SKW 818, boky 450 × box_height, vnútorné čelo/chrbát 818 × (box_height − 16 − 12); hĺbka 560 Atira H176 čelo 300 → NL 520), 4. kanál (UNI fallback, override,
+  hrúbka 18 pri Atire = conflict), ABS per rola, R2 (jedna položka; legacy potlačené; D-93 v rade aj mimo), fail-closed (nič sa neemituje + RED + blocker), **triedny výber**
+  (H70 vs H176 iný set; wood iný set; chýbajúce triedne mapovanie = RED, NIE fallback na `slide`; cabinet override má prednosť; owner-level `slide@…` sa pre receptové položky IGNORUJE), `drawer_kit_missing` blokuje VEPO aj CSV
+  s prázdnym priečinkom, completeness seedu, downgrade schémy 5, **charakterizácia**: zákazky bez drawer klasifikácie CONTENT-identické (kusovník/VEPO/nákup/rozpočet);
+  JS — karta resolved riadok, Kontrola riadky; **in-SU** — stavba zásuvky s dielcami, rebuild po zmene hĺbky/výšky (iný variant/NL, žiadna duplicita, part_overrides prežijú),
+  Ctrl+Z, kópia `*2` (ref prežije), šablóna uložiť/vložiť (drawer config + ref), plytká skrinka → žiadne dielce + RED + export zastavený s prázdnym priečinkom.
+  Mutácie min. 4 (legacy nepotlačené · zámok mimo radu ticho padne na inú NL · dielce emitované pri conflict · recipe položka padne na generické `slide` mapovanie).
+  **Riziká:** rozsah C2 (ak PR narastie, oddeliť C2a = materiálový kanál + ABS seed bez zmeny výstupov) · dátová úplnosť seedu (completeness test nad radmi v1) ·
+  reálne .skp fixtures (D-93 zámok, legacy snapshot setov) treba vyrobiť PRED C2 · šablóna dnes neprenáša `hardware_overrides` (NL zámok) — vložená zásuvka sa rieši automatom (dielce aj kit konzistentne z tej istej NL), prenos zámkov = KOV-I R12 (Astra #19 F5, vedomé; test to potvrdí).
+  **Smoke pre Michala:** skrinka 900×720×500 (KD 18), F2 zásuvkové čelo 175 (Kovové bočnice → Atira) → kusovník: dno 791,5×480 + chrbát 780×65,5 (H70), Kontrola bez nálezov,
+  nákup 1× K-Atira 470 (357696) · zmeň bok na 16 → dno 795,5×480, kód rovnaký · zmeň hĺbku na 560 → NL 520, nákup 357697, dielce prepočítané, žiadny duplicitný riadok · drevený box (Quadro) → 5 dielcov: SKW 818, boky 450 × (svetlá výška − 40), nákup K-set V6 SiSy 450 (317642) · materiál zásuviek v projekte na bielu 16 → všetky dielce
+  ju dedia · override skrinky na antracit set → iný kód, dielce rovnaké · plytká skrinka 250 → RED „bez riešenia", dielce zmiznú, CSV odmietne · Tip-On Atira pri hĺbke 500 → NL 470, nákup 357724 (PTOs kit), dielce rovnaké ako pri SiSy · P2O šírka 900 → ORANGE „pridaj synchronizačný set" · starý projekt bez triedneho mapovania → RED „Doplniť nové predvolené", po kliku zelené ·
+  otvor KLINIKA → čísla identické.
+  **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `construction.md` (context_for, roly, resolver hook), `hardware.md` (recipes, R2, triedny kľúč, seed),
+  `materials.md` (4. kanál), `outputs.md` (blockery, hardware_issues kódy, VEPO brána), `model-a-identita.md` (part_keys drawer, recipe_refs), ARCHITEKTURA router riadok
+  (drawer_recipes) → STANDARD §5/§6/§7 doplnky (roly, drawer materiál, recepty) → STAV/KRONIKA/PLAN.
 
-- **KOV-D · TASK PACKAGE „RESOLVER — SETY PODĽA KLASIFIKÁCIE, OSI, ZÁMKY A NAVIGÁCIA" (slice D; štart po KOV-B a KOV-C; audit-povinná):**
-  **Cieľ:** kovanie sa vyberá automaticky **podľa klasifikácie čela** (typ × otváranie [× konštrukcia]) a **výškový variant vyberá set** (kit kód podľa NL vnútri);
-  používateľ vidí resolved systém s osami, môže **zamknúť os** (NL, výškový variant, nosnosť) alebo prepnúť na iný kompatibilný set; resolver nikdy nemení potichu;
-  „Doplniť nové recepty" s diffom; Kontrola je navigátor. Mockup scény 1–2. FINAL §5/§7/§8.
-  **Scope IN:** (a) **defaulty podľa klasifikácie**: mapovanie setov rozšírené z `generic_type[@owner]` o kľúč klasifikácie `slide|hinge|lift × opening_mode
-  [× drawer_construction]` (globál → projekt → čelo; `resolve_set_id` = jediná autorita; neaktívny set sa nenúka; starý projekt bez mapovania = dnešné správanie);
-  (b) **per-height sety cez selector pásma** (`resolve_set_id` už vyberá set podľa numerického parametra — precedens D-81/nohy-podla-sokla): parameter položky
-  `height_variant` (70/144/176) → set „Atira · H70 / H144 / H176" s `code_by_nl` (seed zo sondy #12: 357695/357696/… vs 357774/357775/357783…; Quadro K-sety SiSy vs
-  P2O podľa opening); **žiadny nový tvar člena** (R4); seed setov generovaný Z recipe NL série + completeness test (GLM M6); (c) **zámky per os** = polia
-  `hardware_overrides` (`nominal_length` existuje; + `height_variant`, `load`), D-93 sémantika, jantárové riadky v Pravidlách + „vrátiť na pravidlo" existujúcou cestou;
-  UI: chipy osí s ikonou zámku v karte čela aj v kontexte Kovanie (jeden stav), klik = zamknúť aktuálnu hodnotu / odomknúť; **nekompatibilný zámok** po zmene geometrie
-  = RED conflict + návrh náhrady + potvrdenie (náhrada ostáva zamknutá; nikdy tiché prepnutie) — bez diff-modal frameworku (status + Kontrola + potvrdzovací D-15 modal);
-  (d) **explain**: server skladá text „prečo tento variant/NL" + „čo je v balení" (členovia + kódy) — `HardwareSets.explain` rozšírený; (e) **„Doplniť nové recepty"** v sekcii
-  Pravidlá Štúdia (`merge_recipes_seed!` s textovým diffom pred potvrdením; snapshot inak nemenný) + info „dostupná novšia verzia setu" (record_rev porovnanie);
-  (f) **Kontrola navigátor**: klik na RED/ORANGE riadok = select + `focus_inspector` + otvorenie sekcie Čelá/Kovanie + highlight riadku (malé JS); (g) **P2O/TIP-ON sync tyč**
-  člen (dĺžková položka; trigger = parameter receptu/systému `sync_rod_min_width` × `opening==tipon` — outside-in #16: Blum TIP-ON od ≥ 300 mm, Hettich P2O od ≥ 600 mm,
-  potvrdiť v oficiálnych PDF pri detail fill) — ostáva za R-06a ORANGE, ale jej chýbanie = **blocker** nákupu (Codex C4) cez `hardware_issues`;
-  (h) prepnutie typu zásuvky späť na dvierka: zjednotené pravidlo pamäte (drawer klasifikácia + overridy sa DRŽIA; `prune_none_front_overrides` len pre `none`) — Opus I-4;
-  (i) Tip-On dvierka → set podľa klasifikácie (P2O záves + piest per owner) — dáta zo seedu; hinge počet = KOV-F.
-  **Scope OUT:** viacosový diff-modal · pomer D-109 · lifty (E) · závesy MAX (F) · linear pricing · šablóny 🔧 (I).
-  **Audit: ÁNO** (mapovací kľúč = kontrakt setov + snapshot; overrides schéma; brány).
-  **Testy a DoD:** headless — resolve_set_id s klasifikačným kľúčom (precedencia globál/projekt/čelo, neaktívny set, starý projekt), selector pásma per variant + code_by_nl
-  (každá kombinácia zo seedu má kód — completeness), zámky (drží/konflikt/náhrada ostáva zamknutá), explain text, merge_recipes_seed diff + nemennosť snapshotu, sync tyč
-  blocker; JS — chipy zámkov, potvrdzovací modal, Kontrola navigácia; in-SU — zámok NL prežije prestavbu, zmena hĺbky s nekompatibilným zámkom = RED + potvrdenie,
-  „Doplniť recepty" = 1 krok Späť; mutácie min. 3 (zámok ticho prepísaný · neaktívny set ponúknutý · seed bez kódu prejde). **Riziká:** kolízia s R-35 (úplná náhrada
-  mapovania) · rozsah UI (rezať D1 dáta/mapovanie, D2 zámky+UI, D3 navigácia+recepty UI).
-  **Smoke pre Michala:** vlož skrinku so zásuvkou → Nákup ukáže K-Atira kód podľa NL A výšky (H144 = 357774 rad) · prepni na Tip-On → P2O kit + pri šírke 900 blocker
-  sync tyč (ORANGE riadok + zastavený CSV) · zamkni NL 420, zmeň hĺbku na 600 → NL ostáva 420 · zmenši hĺbku na 400 → RED konflikt s návrhom 350, potvrď → 350 zamknuté ·
-  Kontrola: klik na riadok otvorí správne čelo · Pravidlá → „Doplniť nové recepty" ukáže diff, potvrdenie = 1 Späť.
-  **Checklist uzáveru:** bump patch + `?v=` → testy → `hardware.md` (mapovanie, per-height sety, zámky, explain, recepty merge), `ui-lifecycle.md` (chipy, modal, navigácia),
+- **KOV-D · TASK PACKAGE „OVLÁDANIE ZÁSUVIEK — ZÁMKY OSÍ, PREPÍNANIE SETU, VERZIA RECEPTU, NAVIGÁCIA" (slice D; štart po KOV-C; audit-povinná; revízia 5.9.2026 podľa KOV-C v2):**
+  **Cieľ:** používateľ vidí resolved zásuvku (systém · výška · NL · nosnosť · otváranie · recept) s vysvetlením, môže **zamknúť os** (NL, výškový variant) alebo prepnúť na iný
+  kompatibilný set (farba, 50 kg); resolver nikdy nemení potichu; Kontrola je navigátor; prechod na novšiu verziu receptu je explicitná akcia. Mockup scény 1–2. FINAL §5/§7/§8.
+  **Už hotové v KOV-C v2 (NIE scope D):** triedny kľúč `class:slide|…` čítaný v `resolve_mapping_value`, per-height sety cez existujúci selektor pásma, seed setov + completeness,
+  `drawer_kit_missing` brána, sync tyč ako ORANGE.
+  **Scope IN:** (a) **UI mapovania podľa klasifikácie** v Pravidlách Štúdia: pre kľúče `class:slide|…` (a neskôr `hinge|lift × opening`) výber setu globál → projekt → skrinka
+  (`resolve_set_id` ostáva jediná autorita; neaktívny set sa nenúka; existujúce projekty menia mapovanie len explicitne); (b) **zámky per os** = polia `hardware_overrides`
+  (`nominal_length` existuje; + `height_variant`), D-93 sémantika, jantárové riadky v Pravidlách + „vrátiť na pravidlo" existujúcou cestou; UI: chipy osí s ikonou zámku v karte čela
+  aj v kontexte Kovanie (jeden stav), klik = zamknúť aktuálnu hodnotu / odomknúť; **nekompatibilný zámok** po zmene geometrie = RED conflict + návrh náhrady + potvrdenie (náhrada
+  ostáva zamknutá; nikdy tiché prepnutie) — bez diff-modal frameworku (status + Kontrola + potvrdzovací D-15 modal); (c) **prepnutie setu per skrinka/čelo** (antracit, 50 kg)
+  cez cabinet override triedneho kľúča s hodnotou = selektor per výška (Astra #19 B1) a ponukou LEN kompatibilných selektorov/setov (klasifikácia setu ↔ params položky); per-ČELO prepnutie vyžaduje nový owner-scoped tvar kľúča (`class:…@owner` dnes parser odmieta — Codex #301 kolo 2 P1) = súčasť auditu D; (d) **explain**: server skladá text „prečo
+  táto výška/NL" (z `Recipes.resolve.explain`) + „čo je v balení" (členovia + kódy) — `HardwareSets.explain` rozšírený; (e) **verzia receptu**: info „dostupný recept v2" pri čele
+  s `recipe_refs` staršej verzie + akcia „Prejsť na v2" s textovým diffom konštánt (per čelo alebo celý projekt; JEDNA operácia: prepis ref + **atomické preadresovanie zámkov `rule_id recipe:<v1> → recipe:<v2>`** (identita override obsahuje `rule_id` — Astra #19 F4; zámok mimo radu v2 = konflikt, nikdy tiché uvoľnenie) + prestavba dotknutých čiel; zlyhanie =
+  rollback; 1 Späť) — recepty ostávajú nemenné, snapshot sa nezavádza; (f) **Kontrola navigátor**: klik na RED/ORANGE riadok = select + `focus_inspector` + otvorenie sekcie
+  Čelá/Kovanie + highlight riadku (malé JS); (g) prepnutie typu zásuvky späť na dvierka: zjednotené pravidlo pamäte (drawer klasifikácia + overridy sa DRŽIA;
+  `prune_none_front_overrides` len pre `none`) — Opus I-4; (h) Tip-On dvierka → set podľa klasifikácie `class:hinge|tipon` (P2O záves + piest per owner) — dáta zo seedu;
+  hinge počet = KOV-F.
+  **Scope OUT:** viacosový diff-modal · pomer D-109 · lifty (E) · závesy MAX (F) · linear pricing a sync tyč dĺžková (po V1) · šablóny 🔧 (I) · editor receptov · snapshot receptov.
+  **Audit: ÁNO** (overrides schéma `height_variant`; akcia zmeny `recipe_refs`; brány).
+  **Testy a DoD:** headless — UI mapovanie triednych kľúčov (precedencia globál/projekt/skrinka, neaktívny set), zámky (drží/konflikt/náhrada ostáva zamknutá), prepnutie setu len
+  kompatibilný, explain text, prechod ref v1 → v2 (diff, atomicita, Späť, v1 súbor nedotknutý), navigácia; JS — chipy zámkov, potvrdzovací modal, Kontrola navigácia; in-SU — zámok NL
+  prežije prestavbu, zmena hĺbky s nekompatibilným zámkom = RED + potvrdenie, „Prejsť na v2" = 1 krok Späť; mutácie min. 3 (zámok ticho prepísaný · neaktívny set ponúknutý ·
+  nekompatibilný set ponúknutý). **Riziká:** kolízia s R-35 (úplná náhrada mapovania) · rozsah UI (rezať D1 mapovanie+prepnutie setu, D2 zámky+UI, D3 navigácia+verzia receptu).
+  **Smoke pre Michala:** vlož skrinku so zásuvkou → Nákup ukáže K-Atira kód podľa NL A výšky (H176 = 357774 rad) · prepni set skrinky na antracit → iný kód, dielce rovnaké ·
+  zamkni NL 420, zmeň hĺbku na 600 → NL ostáva 420 · zmenši hĺbku na 400 → RED konflikt s návrhom 350, potvrď → 350 zamknuté · Kontrola: klik na riadok otvorí správne čelo ·
+  Pravidlá → „Prejsť na recept v2" ukáže diff, potvrdenie = 1 Späť.
+  **Checklist uzáveru:** bump patch + `?v=` → testy → `hardware.md` (UI mapovania, zámky, explain, verzia receptu), `ui-lifecycle.md` (chipy, modal, navigácia),
   `outputs.md` (blockery) → STANDARD §6 → D-109/D-111 stav v DOGFOODING → STAV/KRONIKA/PLAN.
 
 - **KOV-E · „VÝKLOPY HK/HL" (po C, D):** `GENERIC_TYPES + lift` (plan_schema bump, `guard_unknown_hardware!` už chráni starší plugin) · roly `flap` z KOV-A dostanú

@@ -17,6 +17,17 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-C ? PACKAGE v2 ?NEMENNÉ RECEPTY ZÁSUVIEK" (docs, PR #301, 5.9.2026):** package v13 z PR #300 po **4 CLI + 9 GH kolách** nekonvergoval (4–7 P1 každé kolo) — Michal
+  požiadal o **simplification review**: rastie riešenie zbytočne univerzálne? Záver (checkpoint #19): áno — snapshot receptov + digest, kandidáti NL, osi na setoch, exact tabuľka, KD→EB
+  mapa a sync capability boli zložitejšie než reálny use-case (~5 systémov za 10 rokov). **v2:** nemenné verzované JSON recepty (`atira_sisy_v1`…, CI SHA register = inventár),
+  čelo nesie `drawer.recipe_refs` (mapa systém|otváranie), **fyzika v recepte / kódy v setoch KOV-B** (triedny kľúč + pásmový selektor na `height_variant` + `code_by_nl`),
+  **nákup nikdy nemení fyzický návrh** (jedna výška + jedna NL z Noxun radu; chýbajúci kód = RED `drawer_kit_missing`, blokuje aj VEPO), **EB pevné per recept** (Atira 10.5 pri KD 16/18/19),
+  sync tyč ORANGE + ad-hoc, register blockerov 15 → 10, KOV-D revidovaná. **Audit:** Astra predaudit (2 BLOCKER + 8 FIX + 1 NOTE) + GH Codex kolá 1–3 (3+1, 3+2, 4 nálezov) —
+  všetko zapracované malými pravidlami (mapa refs, bez owner-level override v C, nové ID receptových setov, `height_variant` metadáta na drawer setoch = lazy std 4, hrúbky
+  drawer materiálu PRED build_plan, čiastočná klasifikácia fail-closed); **žiadny nález nevrátil mechanizmus v13**. **Rozhodnutie Michala:** po kole 3 package ZMRAZIŤ a merge bez
+  ďalšieho GH kola (pravidlo 3 kôl — review textu produkuje nové hypotetické okraje každé kolo). Dáta: všetky bunky radov v1 Atira majú Démos kit kód (Michal 5.9.; Tip-On kity = vendor
+  variant PTOs → min. svetlá výška 108/192/224; P2Os nie je tretí typ). Poučenie: **predaudit dokumentu má strop — od určitej hranice je lacnejšia brána kód + testy.**
+
 - **GHOST-D2 — KRESLENIE DOSKY NA ROZMER (Ghost 2.0) (v0.9.28, 5.9.2026):** doska sa od tejto dávky dá **nakresliť dvoma ťahmi**: klik určí počiatok, prvý ťah dĺžku a smer,
   druhý šírku, klik vloží. Karta Dosky má preto **dve tlačidlá v jednom riadku** — „Vložiť" (D1 ghost) a **„Nakresliť"** (D2, samostatný serverom whitelistovaný callback
   `draw_board`; `insert_board` ostáva pre vloženie aj pre dvojklik doskovej šablóny — HTML `disabled` ani názov tlačidla nie sú ochrana). Package (`SYSTEM/PLAN.md`, blok 4) je
