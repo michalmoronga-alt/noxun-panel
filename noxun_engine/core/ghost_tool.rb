@@ -1714,6 +1714,13 @@ module Noxun
           @finish_pending = false
           @model_ref = nil
           @session = nil # SVOJA session (priradi ju `activate`)
+          # GHOST-D2: meracie pole sa rozhoduje UZ TU, nie v `activate` —
+          # SketchUp smie zavolat `enableVCB?` EST PRED aktivaciou a vtedy by
+          # nezmrazena hodnota nechala Measurements na cely zivot nastroja
+          # vypnute. `Tool.new` vznika v `GhostTool.start` HNED za priradenim
+          # session, takze globalna session je tu uz ta spravna.
+          s = GhostTool.session
+          @vcb = !s.nil? && s.respond_to?(:drawing?) && s.drawing?
         end
 
         def attached?
@@ -1767,8 +1774,9 @@ module Noxun
             # GHOST-D2: meracie pole je zapnute pocas CELEHO zivota nastroja
             # (probe 5.9.: fazovo podmienene `enableVCB?` by Measurements po
             # aktivacii nechalo vypnute a pisane rozmery by po prvom kliku
-            # neprisli). Interakcia sa pocas session nemeni, takze staci raz.
-            @vcb = !s.nil? && s.drawing?
+            # neprisli). Hodnota vznikla uz v `initialize` — TU sa len potvrdi
+            # nad session, na ktoru sa nastroj naozaj naviazal.
+            @vcb = !s.nil? && s.respond_to?(:drawing?) && s.drawing? unless s.nil?
             refresh_status
             refresh_vcb
             view = @model_ref.active_view

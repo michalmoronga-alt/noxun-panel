@@ -679,10 +679,13 @@ end
 # 11) MERACIE POLE — `enableVCB?`, `onUserText`, `onReturn`
 # ---------------------------------------------------------------------------
 
-NxTest.test('GHOST-D2 VCB: `enableVCB?` je zmrazene z `activate` (nie fazovo podmienene)') do
+NxTest.test('GHOST-D2 VCB: `enableVCB?` je ZMRAZENE uz pri vzniku nastroja (nie fazovo)') do
   s = NxGD2.src('noxun_engine', 'core', 'ghost_tool.rb')
-  act = s[/def activate\n.*?\n        end\n/m].to_s
-  NxTest.assert(act.include?('@vcb = !s.nil? && s.drawing?'), 'hodnota vznikne RAZ pri aktivacii')
+  # SketchUp smie zavolat `enableVCB?` EST PRED `activate` — hodnota preto
+  # vznika uz v `initialize`, inak by Measurements ostali vypnute nastalo.
+  init = s[/def initialize\n          \@ip = nil.*?\n        end\n/m].to_s
+  NxTest.assert(init.include?('@vcb = !s.nil? && s.respond_to?(:drawing?) && s.drawing?'),
+                'hodnota vznikne uz pri vzniku nastroja')
   vcb = s[/def enableVCB\?.*?\n        end\n/m].to_s
   NxTest.assert(vcb.include?('@vcb ? true : false'), 'a uz sa nemeni')
   NxTest.refute(vcb.include?('draw_phase'), 'fazovo podmienene by nechalo Measurements vypnute')
