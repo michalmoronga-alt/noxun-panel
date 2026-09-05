@@ -27,6 +27,12 @@ lebo môže niesť počet aj zámok naraz). `Panel.hardware_overrides_payload` z
 pravidlo „len `disabled`" ostáva len ako fallback pre payload bez kľúča) a riadok `invalid` volá **existujúcu** serverovú akciu `reset` — po nej prestavba konflikt
 už nevydá. Hlášky konfliktov na túto cestu odkazujú doslovne (`Construction::ORPHAN_HINT`), aby sa text riadku a text nálezu nemohli rozísť.
 
+**Tretí druh: `part_material`.** Do toho istého zoznamu patrí aj **materiálový override dielca zásuvky**, ktorého čelo je v `drawer_conflicts`
+(`Panel.orphan_part_material_rows`). Dôvod je ten istý a ešte tvrdší: karta dielca sa dá otvoriť len pre dielec **vo výbere**, ale po fail-closed konflikte ten dielec
+**neexistuje** — zlý záznam z uloženého modelu by teda nemal cestu von a exporty by ostali zablokované aj po reopen. Riadok volá vlastnú serverovú akciu
+`reset_part_override`, ktorá si osirotenosť **znovu overí** (drawer rola · čelo v konflikte · part_key nie je v aktuálnom pláne), takže živý override nezmaže nikdy.
+Živý dielec sa do zoznamu nedostane — ten sa mení na svojej karte.
+
 **D-93 ručný NL výsuvu:** polia zásahu (`quantity` · `disabled` · `nominal_length`) sú NEZÁVISLÉ (zápis PO POLIACH, `disabled` ostatné polia nezahadzuje), **zámok = existencia poľa
 `nominal_length`**; `fit_series` emituje položku aj pri hĺbke pod minimom radu, ak zámok existuje (`rule_nominal_length` = hodnota automatu, nil = nevie) + ORANGE build warning
 `hardware_manual_no_fit`; SET validuje presnú zhodu s radom projektového snapshotu, uložená hodnota mimo radu sa NIKDY nemaže. Nákupné CSV bez zmeny — znamienko žije v sekcii Nákup

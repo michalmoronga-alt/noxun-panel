@@ -355,10 +355,43 @@ module Noxun
             row = ov.merge('owner_label' => PartKeys.human_label(ov['owner_part_key'], fronts: fronts))
             kind = HardwareRules.override_orphan_kind(ov, items, owners)
             kind ? row.merge('orphan' => true, 'orphan_kind' => kind) : row
-          end
+          end + orphan_part_material_rows(cfg, owners, fronts)
         rescue StandardError => e
           Engine.log_error(e, 'Panel.hardware_overrides_payload')
           overrides
+        end
+
+        # KOV-C2b (Codex #304 P1): OSIROTENY materialovy override dielca zasuvky.
+        # Zly zaznam (napr. 16,03 mm z modelu ulozeneho pred touto verziou) drzi
+        # zasuvku vo fail-closed konflikte, dielec teda NEEXISTUJE — a karta
+        # dielca sa da otvorit len pre dielec VO VYBERE. Bez tohto riadku by
+        # zaznam nemal cestu von a exporty by ostali blokovane aj po reopen.
+        # Riadok zije v TOM ISTOM zozname ako osirotene rucne zasahy kovania:
+        # sekcia Kovanie je miesto, kam pouzivatela posiela hlaska konfliktu.
+        def orphan_part_material_rows(cfg, owners, fronts)
+          ov = cfg['part_overrides']
+          return [] unless ov.is_a?(Hash) && !ov.empty? && !owners.empty?
+
+          plan = CabinetBuilder.plan_parts_by_key(CabinetBuilder.config_to_params(cfg))
+          ov.filter_map do |rk, rec|
+            next nil unless rec.is_a?(Hash) && present_str(rec['material_id'])
+
+            role = drawer_part_role(rk)
+            next nil unless role
+
+            owner = PartKeys.front(PartKeys.front_id(rk).to_s, 'panel')
+            next nil unless owners.include?(owner)
+            next nil if plan.key?(rk) # dielec ZIJE — override sa meni na jeho karte
+
+            { 'orphan' => true, 'orphan_kind' => 'part_material', 'part_key' => rk,
+              'owner_part_key' => owner, 'generic_type' => '', 'rule_id' => '',
+              'material_id' => rec['material_id'],
+              'orphan_label' => "Ručný materiál · #{Recipes.role_label(role)}",
+              'owner_label' => PartKeys.human_label(owner, fronts: fronts) }
+          end
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.orphan_part_material_rows')
+          []
         end
 
         # `owner_part_key` ciel, ktore skoncili fail-closed konfliktom zasuvky.

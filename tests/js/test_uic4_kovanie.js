@@ -6,7 +6,7 @@
 const assert = require('node:assert');
 const path = require('node:path');
 const { hwGroupKeyOf, hwLabelHead, hwLabelTail, hwRowOwnerText, hwGroupTitle,
-        hwGroupCountText, hwGroupOrder, hwGroups, hwDisabledOffs, hwOffLabel,
+        hwGroupCountText, hwGroupOrder, hwGroups, hwDisabledOffs, hwOffLabel, hwOffName,
         HW_GROUP_CAB, HW_GROUP_INSIDE } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'hardware.js'));
 
@@ -136,6 +136,11 @@ const ORPHANS = [
 eq(hwDisabledOffs(ITEMS, ORPHANS).map(o => o.rule_id), ['vysuvy-nl-podla-hlbky'],
    'server je autorita: `orphan` rozhoduje, nie `disabled`');
 eq(hwOffLabel({ orphan_kind: 'invalid' }), 'neplatný ručný zásah', 'vlastny popis riadku');
+eq(hwOffLabel({ orphan_kind: 'part_material' }), 'neplatný ručný materiál',
+   'materialovy override dielca zasuvky ma vlastny popis');
+eq(hwOffName({ orphan_label: 'Ručný materiál · dno' }), 'Ručný materiál · dno',
+   'nazov riadku posiela SERVER (materialovy override nema genericky typ)');
+eq(hwOffName({ generic_type: 'slide' }), 'Výsuv', 'inak platí nazov typu kovania');
 eq(hwOffLabel({ orphan_kind: 'disabled' }), 'vypnuté', 'vypnuta kategoria ostava „vypnuté"');
 eq(hwOffLabel(null), 'vypnuté', 'bez druhu = povodny popis');
 

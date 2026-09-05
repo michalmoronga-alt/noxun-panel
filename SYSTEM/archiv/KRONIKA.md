@@ -66,9 +66,12 @@
   **Osirotený ručný zásah (kolo nad zredukovaným PR).** Panel stavia riadky Kovania z emitovaných položiek, takže po fail-closed konflikte zásuvky sa ručný zásah nemal kde
   ukázať a používateľ ho nevedel zrušiť — exporty ostávali zablokované. O osirotenosti teraz rozhoduje SERVER (`HardwareRules.override_orphan_kind`): `disabled` = vypnutá
   kategória („obnoviť", D-92), `invalid` = vlastník je v uloženom `drawer_conflicts` („zrušiť" = existujúca serverová akcia `reset`). Hlášky konfliktov odkazujú doslovne
-  na ten riadok (`Construction::ORPHAN_HINT`).
-  **Testy:** 3083 headless (`test_kovc2b_dielce.rb` 25 · `test_kovc2b_brany.rb` 33 · 2 remap testy v `test_abs_remap.rb`), 89 JS sád, in-SU sekcia **`run_kovc2b`**
-  — **1786 PASS / 0 FAIL** (plán vs. model 1:1, prestavba bez duplicít, 1 krok Späť, prepnutie kov ↔ drevo a späť, kópia aj šablóna nesú pripnutý recept, plytká skrinka
+  na ten riadok (`Construction::ORPHAN_HINT`). Do toho istého zoznamu pribudol aj **materiálový override dielca zásuvky** (`part_material`): karta dielca sa dá otvoriť len
+  pre dielec vo výbere, ale po fail-closed konflikte ten dielec neexistuje — zlý záznam z uloženého modelu by nemal cestu von. A druhá strana tej istej diery: hrúbka
+  dielca zásuvky sa NEDEDÍ, takže `part_material_conflict` ju pre drawer roly meria proti `thickness_supported` **aktívneho receptu** (presná zhoda) — 16,03 mm sa už
+  neuloží, hoci picker má toleranciu 0,05 a starý guard púšťal celý rozsah dosky.
+  **Testy:** 3087 headless (`test_kovc2b_dielce.rb` 25 · `test_kovc2b_brany.rb` 33 · 2 remap testy v `test_abs_remap.rb`), 89 JS sád, in-SU sekcia **`run_kovc2b`**
+  — **1793 PASS / 0 FAIL** (plán vs. model 1:1, prestavba bez duplicít, 1 krok Späť, prepnutie kov ↔ drevo a späť, kópia aj šablóna nesú pripnutý recept, plytká skrinka
   = žiadne dielce + RED + zastavený export s **prázdnym** priečinkom a neotvoreným pickerom).
   **Zostáva C2c:** karta zásuvky v Inspectore (systém · výška · NL · nosnosť · recept + `explain`), riadky Kontroly s navigáciou na čelo a labely v Nákupe.
 

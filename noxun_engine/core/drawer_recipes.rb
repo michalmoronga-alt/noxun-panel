@@ -225,6 +225,45 @@ module Noxun
         released(dir: dir).key?(id) ? [:known, id] : [:unknown, id]
       end
 
+      # Aktivny recept pre kombinaciu system|otvaranie z mapy `recipe_refs`.
+      # JEDINA implementacia troch stavov (`active_ref`) — cita ju stavba
+      # (`Construction.drawer_pass`) aj panelove guardy. `nil` = neznamy ref
+      # (RED `drawer_recipe_unknown` vyda stavba) alebo systém bez receptu.
+      def pick_ref(refs_map, system, opening, dir: DIR)
+        state, ref = active_ref(refs_map, system, opening, dir: dir)
+        return nil if state == :unknown
+        return ref if state == :known
+
+        # NOVA kombinacia: surodenec ROVNAKEJ verzie, inak najnovsi vydany.
+        if refs_map.is_a?(Hash)
+          refs_map.each_value do |id|
+            sib = sibling(id, system, opening, dir: dir)
+            return sib if sib
+          end
+        end
+        latest_for(system, opening, dir: dir)
+      end
+
+      # KOV-C2b (Codex #304 P1): hrubky, ktore AKTIVNY recept TOHTO cela
+      # pripusta pre danu rolu. Pouziva ju panelovy guard materialu dielca —
+      # semantika MUSI byt zhodna s `resolve` (presna zhoda, ziadna tolerancia),
+      # inak by sa override ulozil a recept ho vzapati odmietol.
+      # -> [recipe, [mm, ...]] | nil (legacy celo, neznamy ref, ina rola)
+      def thicknesses_for(front_item, role, dir: DIR)
+        kind, key = recipe_key_for(front_item)
+        return nil unless kind == :ok
+
+        drawer = front_item['drawer'].is_a?(Hash) ? front_item['drawer'] : {}
+        id = pick_ref(drawer['recipe_refs'], key[:system], key[:opening], dir: dir)
+        return nil unless id
+
+        recipe = load(id, dir: dir)
+        list = recipe[:thickness_supported][role.to_s]
+        list ? [recipe, list.map(&:to_f)] : nil
+      rescue RecipeError
+        nil
+      end
+
       # --- klasifikacia cela ---------------------------------------------------
 
       # Rozhodovacia tabulka „ktory recept pre toto celo" (package KOV-C C1).

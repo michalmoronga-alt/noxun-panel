@@ -270,15 +270,10 @@ module Noxun
 
       # Recept pre NOVU kombinaciu system|otvaranie: SURODENEC rovnakej verzie
       # ako uz pripnute zaznamy (prepnutie klasifikacie nikdy ticho nepovysi
-      # verziu), inak `latest_for`.
+      # verziu), inak `latest_for`. Implementacia zije v `Recipes` — cita ju aj
+      # panelovy guard materialu dielca (jedna pravda o „ktory recept plati").
       def pick_recipe_ref(refs_map, key)
-        if refs_map.is_a?(Hash)
-          refs_map.each_value do |id|
-            sib = Recipes.sibling(id, key[:system], key[:opening])
-            return sib if sib
-          end
-        end
-        Recipes.latest_for(key[:system], key[:opening])
+        Recipes.pick_ref(refs_map, key[:system], key[:opening])
       end
 
       # KOV-C2b: part_key(e) JEDNEJ roly dielca zasuvky (Codex #304 kolo 2 P1).

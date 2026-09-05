@@ -18,6 +18,13 @@ if NxTest.headless?
   require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'templates_dialog')
 end
 
+# Hrubky VSETKYCH roli jedneho cela + bodova zmena (vstup `build_plan`).
+NxC2bD_TH = lambda do |over = {}|
+  Noxun::Engine::CabinetBuilder::DRAWER_ROLES.each_with_object({}) do |role, acc|
+    acc[Noxun::Engine::PartKeys.front('F1', role)] = 16.0
+  end.merge(over)
+end
+
 module NxC2bB
   E   = Noxun::Engine
   REC = E::Recipes
@@ -744,4 +751,94 @@ NxTest.test('Codex #304 P1: bezny rucny zasah osiroteny NIE JE') do
                                                      'generic_type' => 'slide',
                                                      'rule_id' => 'x', 'quantity' => 3 }, [], []),
                       'rucny pocet BEZ konfliktu nie je osiroteny (legacy spravanie)')
+end
+
+# ============================================================================
+# CODEX #304 — ZLA HRUBKA OVERRIDU DIELCA ZASUVKY (16,03 mm)
+# ============================================================================
+
+NxTest.test('Codex #304 P1: recept ma pre celo PRESNE dane hrubky (bez tolerancie)') do
+  c = NxC2bB
+  front = { 'id' => 'F1', 'type' => 'drawer_front', 'opening_mode' => 'classic',
+            'drawer' => { 'construction' => 'metal' } }
+  recipe, allowed = c::REC.thicknesses_for(front, 'drawer_bottom')
+  NxTest.assert_equal([16.0], allowed, 'Atira dno: iba 16 mm')
+  NxTest.assert(c::REC.label(recipe).include?('Atira'), c::REC.label(recipe))
+  # 16,03 je V TOLERANCII pickera (0,05), ale recept ju NEPOZNA — presna zhoda.
+  NxTest.refute(allowed.any? { |v| (v - 16.03).abs < 1e-9 },
+                'presna zhoda: 16,03 nie je 16')
+  NxTest.assert(c::CB.thickness_ok_for?('drawer_bottom', 16.0, 16.03),
+                'stary guard (rozsah dosky) by ju PUSTIL — preto vlastna vetva')
+  # Drevo pripusta 16 aj 18, ostatne roly ma tiez.
+  wood = { 'id' => 'F1', 'type' => 'drawer_front', 'opening_mode' => 'classic',
+           'drawer' => { 'construction' => 'wood' } }
+  _r2, w_allowed = c::REC.thicknesses_for(wood, 'box_side')
+  NxTest.assert_equal([16.0, 18.0], w_allowed)
+  # Legacy celo a rola mimo receptu = ziadny guard (nic sa nevymysla).
+  NxTest.assert_equal(nil, c::REC.thicknesses_for({ 'id' => 'F1', 'type' => 'door' }, 'drawer_bottom'))
+  NxTest.assert_equal(nil, c::REC.thicknesses_for(front, 'box_side'), 'Atira boky nevyraba')
+end
+
+NxTest.test('Codex #304 P1: `pick_ref` je JEDINA pravda o aktivnom recepte') do
+  c = NxC2bB
+  # pripnuty -> presne ten; chybajuci -> surodenec rovnakej verzie; neznamy -> nil
+  NxTest.assert_equal('atira_sisy_v1',
+                      c::REC.pick_ref({ 'atira|sisy' => 'atira_sisy_v1' }, 'atira', 'sisy'))
+  NxTest.assert_equal('quadro_v6_sisy_v1',
+                      c::REC.pick_ref({ 'atira|sisy' => 'atira_sisy_v1' }, 'quadro_v6', 'sisy'),
+                      'surodenec ROVNAKEJ verzie')
+  NxTest.assert_equal('atira_p2o_v1', c::REC.pick_ref(nil, 'atira', 'p2o'), 'inak najnovsi')
+  NxTest.assert_equal(nil, c::REC.pick_ref({ 'atira|sisy' => 'atira_sisy_v9' }, 'atira', 'sisy'),
+                      'neznamy ref = nevieme, ktory recept plati')
+  # Stavba cita TU ISTU funkciu.
+  src = c.src(File.join('core', 'construction.rb'))
+  NxTest.assert(src.include?('Recipes.pick_ref(refs_map, key[:system], key[:opening])'),
+                'Construction pouziva JEDINU implementaciu')
+end
+
+NxTest.test('Codex #304 P1: zly override hrubky dielca = fail-closed konflikt') do
+  c = NxC2bB
+  # Presne scenar z nalezu: 16,03 mm na dne zasuvky Atira.
+  th = NxC2bD_TH.call('front:F1/drawer_bottom' => 16.03)
+  cfg = c.orphan_cfg('part_overrides' => { 'front:F1/drawer_bottom' => { 'material_id' => 'X_1603' } })
+  plan = c::CN.build_plan(cfg, 'CAB-1', part_thicknesses: th)
+  NxTest.assert_equal('drawer_thickness_unsupported', plan[:drawer_conflicts].first['code'])
+  NxTest.assert_equal([], plan[:parts].select { |pd| pd[:material] == :drawer },
+                      'dielce zmizli — override patri zaniknutemu dielcu')
+  NxTest.assert_equal([], plan[:hardware].select { |h| h['generic_type'] == 'slide' })
+  # Guard panela ho preto NESMIE ulozit — retaz je kontrakt.
+  src = c.src(File.join('ui', 'panel', 'actions_parts.rb'))
+  NxTest.assert(src.include?('drawer_part_material_conflict(params, rk, sheet)'),
+                'guard bezi v `part_material_conflict`')
+  NxTest.assert(src.index('drawer_part_material_conflict(params, rk, sheet)') <
+                src.index('return nil if Materials.uni?(sheet)'),
+                'a bezi PRED UNI vetvou aj pred `thickness_ok_for?`')
+  NxTest.assert(src.include?('Recipes.thicknesses_for(item, role)'),
+                'meria proti AKTIVNEMU receptu cela')
+end
+
+NxTest.test('Codex #304 P1: osiroteny materialovy override ma cestu von') do
+  c = NxC2bB
+  src = c.src(File.join('ui', 'panel', 'payloads.rb'))
+  NxTest.assert(src.include?("'orphan_kind' => 'part_material'"),
+                'osiroteny zoznam nesie aj materialove overridy dielcov zasuviek')
+  NxTest.assert(src.include?('next nil if plan.key?(rk)'),
+                'ZIVY dielec sa do zoznamu nedostane — ten sa meni na svojej karte')
+  NxTest.assert(src.include?('next nil unless owners.include?(owner)'),
+                'a len celo, ktore je naozaj v konflikte')
+  act = c.src(File.join('ui', 'panel', 'actions_parts.rb'))
+  NxTest.assert(act.include?('def handle_reset_part_override(payload)'),
+                'vlastna serverova akcia (dielec sa NEDA oznacit — neexistuje)')
+  NxTest.assert(act.include?('def orphan_part_override?(cfg, params, rk)'),
+                'server si osirotenost znovu overi (fail-closed)')
+  NxTest.assert(act.include?("ov.delete(rk)"), 'reset = ODSTRANENIE override')
+  pnl = c.src(File.join('ui', 'panel.rb'))
+  NxTest.assert(pnl.include?("cb(dlg, 'reset_part_override')"), 'akcia je registrovana')
+  js = c.src_ui(File.join('js', 'hardware.js'))
+  NxTest.assert(js.include?('sketchup.reset_part_override'), 'riadok vola tu akciu')
+  NxTest.assert(js.include?("data-part=\"'+esc(ov.part_key||'')+'\""), 'a nesie part_key')
+  # Po odstraneni override je zasuvka ZELENA.
+  after = c::CN.build_plan(c.orphan_cfg('part_overrides' => {}), 'CAB-1')
+  NxTest.assert_equal([], Array(after[:drawer_conflicts]))
+  NxTest.assert_equal(2, after[:parts].count { |pd| pd[:material] == :drawer })
 end

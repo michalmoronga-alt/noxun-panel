@@ -27,6 +27,12 @@ počítalo predok/chrbát z nesprávnej hrúbky dna (Codex #301 kolo 3 P1). Mate
 (`Materials::CABINET_MATERIAL_KEYS` — jeden zoznam pre model aj šablóny). **UI kanála a hromadné cesty (výber v Štúdiu, vkladacia karta, „Nahradiť UNI…") sú
 v samostatnom PR** — dovtedy sa materiál zásuviek nastavuje projektovou predvoľbou v NOXUN dict a `part_override`-om dielca.
 
+**Hrúbka dielca zásuvky sa NEDEDÍ, takže guard nemôže byť tolerantný** (Codex #304 P1). `part_material_conflict` má pre drawer roly vlastnú vetvu
+(`drawer_part_material_conflict`) a beží **pred** UNI vetvou aj pred `thickness_ok_for?`: tá pri drawer rolách púšťa celý rozsah dosky 6–50 mm, takže materiál
+s 16,03 mm (picker má toleranciu 0,05) by sa uložil a recept by ho vzápätí odmietol **presnou** zhodou — dielce aj výsuv by zmizli a override by patril zaniknutému
+dielcu. Guard preto meria proti `thickness_supported` **aktívneho receptu toho čela** (`Recipes.thicknesses_for`, rovnaká sémantika ako `resolve` — žiadna tolerancia)
+a hláška menuje systém aj povolené hrúbky. Ktorý recept je „aktívny", hovorí **jediná** funkcia `Recipes.pick_ref` — číta ju stavba aj tento guard.
+
 **Remap ABS pozná 4. kanál** (Codex #304 kolo 2 P2). `remap_part_edge_overrides!` dostáva `old_eff`/`new_eff` aj s kľúčom `drawer` a odovzdáva ho do `base_material_for`
 ako šiesty argument — bez neho by drawer roly spadli do vetvy tela, takže remap by ich pri zmene predvoľby **zásuviek** prehliadol a pri zmene predvoľby **korpusu**
 naopak zladil s dekorom korpusu.

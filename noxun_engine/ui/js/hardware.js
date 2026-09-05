@@ -426,20 +426,32 @@
   // Prvy sa OBNOVUJE (zrusi sa pole `disabled`), druhy sa CELY ZRUSI: zaznam
   // moze niest pocet aj zamok naraz a po konflikte nema co z neho zostat.
   function hwOffLabel(ov){
+    if (ov && ov.orphan_kind === 'part_material') return 'neplatný ručný materiál';
     return (ov && ov.orphan_kind === 'invalid') ? 'neplatný ručný zásah' : 'vypnuté';
+  }
+  // Nazov riadku: server ho pri materialovom override posiela hotovy
+  // (`orphan_label`) — genericky typ kovania taky zaznam nema.
+  function hwOffName(ov){
+    return (ov && ov.orphan_label) ? ov.orphan_label : hwLabel(ov && ov.generic_type);
   }
   function hwOffHtml(ov, cabId, groupKey){
     var full = ov.owner_label || hwOwnerDesc(ov.owner_part_key); // D-92
     var owner = hwRowOwnerText(groupKey, full);
     var ext = hwOffLabel(ov);
-    var btn = (ov.orphan_kind === 'invalid')
-      ? '<button class="ghostbtn hwbtn" title="Zrušiť ručný zásah (obnoví sa výpočet)" onclick="onHwOrphanReset(this)">'+NXIcons.svg('rotate-ccw')+' zrušiť</button>'
-      : '<button class="ghostbtn hwbtn" title="Obnoviť (platí pravidlo)" onclick="onHwEnable(this)">'+NXIcons.svg('rotate-ccw')+' obnoviť</button>';
-    return '<div class="hwrow hwoff" data-owner="'+esc(ov.owner_part_key||'')+'" data-type="'+esc(ov.generic_type)+'" data-rule="'+esc(ov.rule_id)+'" data-cab="'+esc(cabId||'')+'">'
+    var name = hwOffName(ov);
+    var btn;
+    if (ov.orphan_kind === 'part_material'){
+      btn = '<button class="ghostbtn hwbtn" title="Zrušiť ručný materiál (dielec ho zdedí)" onclick="onHwOrphanPartReset(this)">'+NXIcons.svg('rotate-ccw')+' zrušiť</button>';
+    } else if (ov.orphan_kind === 'invalid'){
+      btn = '<button class="ghostbtn hwbtn" title="Zrušiť ručný zásah (obnoví sa výpočet)" onclick="onHwOrphanReset(this)">'+NXIcons.svg('rotate-ccw')+' zrušiť</button>';
+    } else {
+      btn = '<button class="ghostbtn hwbtn" title="Obnoviť (platí pravidlo)" onclick="onHwEnable(this)">'+NXIcons.svg('rotate-ccw')+' obnoviť</button>';
+    }
+    return '<div class="hwrow hwoff" data-owner="'+esc(ov.owner_part_key||'')+'" data-type="'+esc(ov.generic_type||'')+'" data-rule="'+esc(ov.rule_id||'')+'" data-part="'+esc(ov.part_key||'')+'" data-cab="'+esc(cabId||'')+'">'
       // SMOKE PACK 1: nazov je jednoriadkovy s ellipsis, takze plny text MUSI
       // niest `title` — inak by sa orezany popis nedal precitat vobec.
-      + '<span class="hwname" title="'+esc(hwLabel(ov.generic_type)+(full?' · '+full:'')+' · '+ext)+'">'
-      + esc(hwLabel(ov.generic_type))+(owner?' <span class="hwown">'+esc(owner)+'</span>':'')
+      + '<span class="hwname" title="'+esc(name+(full?' · '+full:'')+' · '+ext)+'">'
+      + esc(name)+(owner?' <span class="hwown">'+esc(owner)+'</span>':'')
       + ' <span class="hwext">'+esc(ext)+'</span></span>'
       + btn
       + '</div>';
@@ -791,6 +803,16 @@
   // KOV-C2b: zrusi CELY zaznam rucneho zasahu (serverova akcia `reset`) —
   // po nej prestavba konflikt zasuvky uz nevyda.
   function onHwOrphanReset(btn){ hwSend(hwPayload(btn, { reset: true })); }
+  // KOV-C2b: zrusi OSIROTENY materialovy override dielca zasuvky (vlastna
+  // serverova akcia — dielec po fail-closed konflikte neexistuje, takze sa
+  // neda oznacit a karta dielca na neho nevie).
+  function onHwOrphanPartReset(btn){
+    var row = btn.closest('.hwrow'); if (!row) return;
+    if (window.sketchup && sketchup.reset_part_override){
+      sketchup.reset_part_override(nxDocPayload({
+        cabinet_id: row.dataset.cab || '', part_key: row.dataset.part || '' }));
+    }
+  }
   function onHwNl(sel){
     var v = parseFloat(sel.value);
     if (isNaN(v)){ NX.setStatus('Neplatná dĺžka výsuvu.', true); return; }
@@ -1401,6 +1423,7 @@
       hwRowOwnerText: hwRowOwnerText, hwGroupTitle: hwGroupTitle,
       hwGroupCountText: hwGroupCountText, hwGroupOrder: hwGroupOrder,
       hwGroups: hwGroups, hwDisabledOffs: hwDisabledOffs, hwOffLabel: hwOffLabel,
+      hwOffName: hwOffName,
       HW_GROUP_CAB: HW_GROUP_CAB, HW_GROUP_INSIDE: HW_GROUP_INSIDE,
       // SMOKE PACK 1: suhrnne podperky polic (tests/js/test_smoke1_ui.js) —
       // ciste zoskupenie a texty, ziadny DOM.
