@@ -3496,9 +3496,18 @@ module NoxunSuRunner
     ok('GHOST-D2 6: inštancia naozaj stojí (dekorová plocha mieri dopredu, -Y)',
        !d6.nil? && vec_near?(d6.transformation.zaxis, 0, -1, 0))
     # NAHLAD = GEOMETRIA = CONFIG: obalka instancie musi mat rozmery configu.
+    # POZOR NA OSI `Geom::BoundingBox` (beh #299): `width` = X, `height` = Y,
+    # `depth` = Z. Prva verzia merala `height` a dostavala 18,0 — to je
+    # HRUBKA, lebo STOJACA doska ma X = dlzka, Y = hrubka, Z = SIRKA. Merame
+    # preto rozsahy osi priamo, a rovno vsetky tri (to je cely dokaz
+    # „nahlad = geometria = config").
     bb6 = d6 ? d6.bounds : nil
-    ok("GHOST-D2 6: geometria sedí s configom (výška #{bb6 && mm(bb6.height).round(1)})",
-       !bb6.nil? && (mm(bb6.height) - dims6[1]).abs <= TOL)
+    ext6 = bb6 ? [mm(bb6.max.x - bb6.min.x), mm(bb6.max.y - bb6.min.y),
+                  mm(bb6.max.z - bb6.min.z)] : nil
+    th6 = cfg6['thickness'].to_f
+    ok("GHOST-D2 6: geometria sedí s configom — X = dĺžka, Y = hrúbka, Z = ŠÍRKA (#{ext6.inspect})",
+       !ext6.nil? && (ext6[0] - dims6[0]).abs <= TOL && (ext6[1] - th6).abs <= TOL &&
+       (ext6[2] - dims6[1]).abs <= TOL)
     ghost_teardown!(model)
 
     # --- 7) ZAPORNY 2. TAH = PRAVOTOCIVA doska ------------------------------
@@ -3519,21 +3528,31 @@ module NoxunSuRunner
     ghost_teardown!(model)
 
     # --- 8) SHIFT: natívny zamok inferencie (skutocny `inference_locked?`) --
+    # POZOR (beh #299): `view.lock_inference(ip)` potrebuje bod so SKUTOCNOU
+    # natívnou inferenciou. Prva verzia scenara stala kurzorom v PRAZDNOM
+    # priestore — SketchUp nemal co zamknut a `inference_locked?` ostal
+    # false. POCIATOK aj kurzor preto stoja na REALNEJ geometrii (rohy
+    # skrinky); zamok smeru vo faze 1 je navyse DVOJBODOVY (pociatok +
+    # kurzor), presne ako v natívnom Line tool.
     cleanup(model)
-    e::CabinetBuilder.build(model, GHOST_PARAMS.dup)
+    cab8 = e::CabinetBuilder.build(model, GHOST_PARAMS.dup)
+    cb8 = cab8.bounds
+    o8 = [mm(cb8.min.x), mm(cb8.min.y), mm(cb8.max.z)] # lavy predny horny roh
+    p8 = [mm(cb8.max.x), mm(cb8.min.y), mm(cb8.max.z)] # pravy predny horny roh
     s8 = board_draw_start!(model)
-    ghost_camera!(model, [1400.0, 300.0], 0.0)
-    draw_click!(model, [1400.0, 300.0, 0.0])
-    ghost_move!(model, [2400.0, 300.0, 0.0])
-    ghost_key!(model, shift_key)
+    ghost_camera!(model, [(o8[0] + p8[0]) / 2.0, o8[1]], o8[2])
+    draw_click!(model, o8)     # POCIATOK na realnom vrchole
+    ghost_move!(model, p8)     # a kurzor tiez na realnom vrchole
     view8 = model.active_view
+    ghost_key!(model, shift_key)
     ok('GHOST-D2 8: Shift je VLASTNENÁ klávesa v kreslení',
        ghost_tool.onKeyUp(shift_key, 1, 0, view8) == true)
+    ghost_move!(model, p8)
     ghost_key!(model, shift_key)
     ok("GHOST-D2 8: pod Shiftom je inferencia ZAMKNUTÁ (inference_locked? = #{view8.inference_locked?})",
        view8.inference_locked? == true)
     dir8 = s8.draw_dir_x && s8.draw_dir_x.dup
-    ghost_move!(model, [1400.0, 1400.0, 0.0]) # kurzor odbehol o 90°
+    ghost_move!(model, [o8[0], o8[1] + 1000.0, o8[2]]) # kurzor odbehol o 90°
     ok('GHOST-D2 8: pohyb kurzora po zamknutí SMER dosky NEZMENIL',
        !dir8.nil? && !s8.draw_dir_x.nil? &&
        (0..2).all? { |i| (s8.draw_dir_x[i] - dir8[i]).abs <= 1e-6 })
@@ -3564,20 +3583,27 @@ module NoxunSuRunner
     ok('GHOST-D2 9: predchádzajúci krok sa vrátil bez stopy po kreslení', !m9.valid?)
     ghost_teardown!(model)
 
+    # VYMENA DOKUMENTU vo faze 2 s drzanym Shiftom. `on_document_replaced`
+    # rusi session a ukoncenie nastroja ODKLADA na timer (ten v synchronnej
+    # sekcii nedobehne) — upratanie preto dokonci `ghost_teardown!`, ktory
+    # popne SYNCHRONNE a SketchUp na nasom nastroji zavola `deactivate`.
+    # POZOR (beh #299): `deactivate` sa NESMIE volat rucne — oznaci nastroj
+    # za odpojeny, ale z tool stacku SketchUpu ho NEODOBERIE, takze tam
+    # ostane visiet RubyTool a zhodi neskorsiu sekciu „GHOST suspend".
     cleanup(model)
     s9b = board_draw_start!(model)
     ghost_camera!(model, [1400.0, 300.0], 0.0)
     draw_click!(model, [1400.0, 300.0, 0.0])
     draw_type!(model, '1000')
     ghost_key!(model, shift_key)
-    tool9b = ghost_tool
     e::GhostTool.on_document_replaced('SU-TEST výmena dokumentu vo fáze 2')
-    tool9b.deactivate(model.active_view) if tool9b && tool9b.attached?
     ok('GHOST-D2 9: výmena dokumentu vo fáze 2 zrušila session bez zápisu',
        ghost_session.nil? && boards(model).empty? && !s9b.active?)
-    ok('GHOST-D2 9: a zámok inferencie po nástroji NEVISÍ',
+    ok('GHOST-D2 9: zámok inferencie pustil UŽ koniec session (nečaká sa na `deactivate`)',
        model.active_view.inference_locked? == false)
     ghost_teardown!(model)
+    ok('GHOST-D2 9: po upratovaní nezostal na stacku žiadny ghost nástroj',
+       ghost_tool.nil? && ghost_session.nil?)
 
     # --- 10) PLACEMENT s ALT `fr_top` -> kreslenie zacina PRESNE v pociatku -
     # Kreslenie ma PEVNU kotvu `fl_bottom` a pamatanu kotvu placementu IGNORUJE.
@@ -3586,7 +3612,9 @@ module NoxunSuRunner
     ps = board_ghost_start!(model)
     ghost_camera!(model, [1000.0, 200.0], 0.0)
     ghost_move!(model, [1000.0, 200.0, 0.0])
-    3.times { ghost_key!(model, defined?(VK_MENU) ? VK_MENU : VK_ALT) }
+    # ANCHORS = fl_bottom -> fr_bottom -> fr_top -> fl_top; z fl_bottom su to
+    # na `fr_top` presne DVE stlacenia ALT (beh #299: tri dali fl_top).
+    2.times { ghost_key!(model, defined?(VK_MENU) ? VK_MENU : VK_ALT) }
     ok("GHOST-D2 10: placement session si pamätá kotvu `fr_top` (#{ps.anchor})",
        ps.anchor == :fr_top)
     e::GhostTool.cancel_session('SU-TEST prepnutie na kreslenie', deferred: false)
