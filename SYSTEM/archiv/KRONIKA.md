@@ -40,7 +40,7 @@
   legacy `fit_series` · `drawer.system` / `recipe_refs` v `norm_drawer` + `CONFIG_SCHEMA` 5 · triedny výber setu a kódy kitov · napojenie kódov na `export_blockers`,
   `hardware_issues` a Kontrolu · ORANGE sync tyč · Inspector.
 
-- **KOV-C ? PACKAGE v2 ?NEMENNÉ RECEPTY ZÁSUVIEK" (docs, PR #301, 5.9.2026):** package v13 z PR #300 po **4 CLI + 9 GH kolách** nekonvergoval (4–7 P1 každé kolo) — Michal
+- **KOV-C — PACKAGE v2 „NEMENNÉ RECEPTY ZÁSUVIEK" (docs, PR #301, 5.9.2026):** package v13 z PR #300 po **4 CLI + 9 GH kolách** nekonvergoval (4–7 P1 každé kolo) — Michal
   požiadal o **simplification review**: rastie riešenie zbytočne univerzálne? Záver (checkpoint #19): áno — snapshot receptov + digest, kandidáti NL, osi na setoch, exact tabuľka, KD→EB
   mapa a sync capability boli zložitejšie než reálny use-case (~5 systémov za 10 rokov). **v2:** nemenné verzované JSON recepty (`atira_sisy_v1`…, CI SHA register = inventár),
   čelo nesie `drawer.recipe_refs` (mapa systém|otváranie), **fyzika v recepte / kódy v setoch KOV-B** (triedny kľúč + pásmový selektor na `height_variant` + `code_by_nl`),
