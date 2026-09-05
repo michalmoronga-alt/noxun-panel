@@ -327,8 +327,10 @@ module Noxun
           'series' => 'InnoTech Atira', 'height_variant' => 144,
           'members' => [
             { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
+              # SiSy H144 konci na NL 470: kit „144 620/50 relingy" (357755) je
+              # PTO, teda TIP-ON — pre SiSy H144/620 kit NEEXISTUJE (sonda #12).
               'code_by_nl' => { '350' => '357734', '420' => '357735',
-                                '470' => '357736', '620' => '357755' } }
+                                '470' => '357736' } }
           ] },
         { 'set_id' => 'atira-biela-h176-sisy', 'name' => 'Atira biela H176 — klasické',
           'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'classic',

@@ -45,6 +45,13 @@
   kompatibilný dopad, aký mali KOV-B1 a `CONFIG_SCHEMA` 4.
   **Vedomé odchýlky od package textu:** `height_variant` je uzavretý enum `[70, 144, 176]` (package hovoril „číslo") — ďalší kovový systém si svoje výšky pridá v dávke, ktorá
   ho zavedie; a `MAPPING_ADDITIONS` sa merguje aj do **čerstvej** knižnice (`seed_library`), inak by fresh install zásuvky nemapoval, kým upgrade áno.
+  **Dátová oprava v tej istej dávke (sonda #12).** Completeness test si vypýtal kit kód pre KAŽDÚ bunku radu a pri tom vyšlo najavo, že kód **`357755`** stál v podklade
+  (draft #13 §1) v dvoch bunkách naraz. Sonda do katalógu #12 ukázala prečo: `357755` = „zás. 144 620/50 relingy **PTO**" a `357716` = „zás. 70 620/50 **PTO**" — **oba sú
+  Tip-On kity**, takže pre SiSy H70/620 ani H144/620 kit **neexistuje** (SiSy H176/620 = `357783` existuje). Rad `atira_sisy_v1` H144 sa preto skrátil na **[350, 420, 470]**
+  a zo seed setu `atira-biela-h144-sisy` vypadol kód 620. Je to **jediná vedomá výnimka z nemennosti receptov**: v1 vydal C1, ale `build_plan` resolver ešte nevolá (to zapína
+  C2b), takže v žiadnom modeli nestojí geometria, ktorú by oprava zmenila — recept sa opravil NA MIESTE aj s prepočítaným odtlačkom v `RELEASED.json`, dôvod je zapísaný
+  v hlavičke `drawer_recipes.rb`. **Od chvíle, keď recept postaví prvý dielec, platí nemennosť bez výnimky** (oprava = nový `_v2`). Golden fixtúra dostala k tomu nový prípad
+  „SiSy H144, hĺbka 700 → NL 470" — bez neho by rad nemal čo strážiť.
   **Testy:** 2998 → **3021 headless** (nová sada `tests/pure/test_kovc2a_kanal_sety.rb`, 23 testov, 4 overené mutácie: fallback na `slide` · `MAPPING_ADDITIONS` prepíše
   používateľský kľúč · seed bez kódu pre bunku radu · strata `height_variant`), 89 JS sád zelených. Charakterizácia je dvojitá — vlastný test „položky bez klasifikácie sa
   správajú presne ako doteraz" (vrátane dôkazu, že **žiadne seed pravidlo `opening_mode`/`drawer_construction` neemituje**) a nezmenený golden `seed_kniznica`.

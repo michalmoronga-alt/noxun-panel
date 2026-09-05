@@ -290,7 +290,9 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   [16, 18]) · vzorce ako konštanty (Atira: `BB = LB − 2EB − 51.5`, `RB = LB − 2EB − 63`, `BL = NL + 10`; Quadro: `SKW = LB − 46`, `SKL = NL`, `bottom_offset 12`, `box_clearance 40`,
   výška predku/chrbta `box_height − t_dna − 12`) · `height_variants` (Atira 70/144/176: `rear_height` 65.5/144/176, `min_clear_height` pre otváranie receptu — SiSy 105/189/221,
   Tip-On 108/192/224 (kity Démos sú vendor variant PTOs — prísnejšia z oboch tabuliek; Michal 5.9.), `railing` 0/1+1/1+1; Quadro bez variantov: `box_height = clear_height − 40`, `min_box_height` tak, aby predok/chrbát `box_height − t − 12` ≥ 30 mm — Astra #19 F3: svetlá výška 60 by dala −8 mm) · **`nl_series_by_height`** = Noxun rad podľa K-sád z #12 (atira_sisy: H70 [350, 420,
-  470, 520] · H144 [350, 420, 470, 620] · H176 [350, 420, 470, 520, 620]; atira_p2o: H70, H144, H176 zhodne [350, 420, 470, 520, 620] (kódy Démos od Michala 5.9. — KAŽDÁ bunka radov v1 má kit kód, draft #13 §1); quadro_v6_sisy [350, 400, 450, 500, 550]; quadro_v6_p2o [350, 400, 450]) ·
+  470, 520] · H144 [350, 420, 470] (oprava 5.9. večer, sonda #12: SiSy H144/620 kit NEEXISTUJE — 357755 je PTO, teda Tip-On; rovnako SiSy H70/620) ·
+  H176 [350, 420, 470, 520, 620]; atira_p2o: H70, H144, H176 zhodne [350, 420, 470, 520, 620] (kódy Démos od Michala 5.9. — KAŽDÁ bunka radov v1 má kit kód, draft #13 §1);
+  quadro_v6_sisy [350, 400, 450, 500, 550]; quadro_v6_p2o [350, 400, 450]) ·
   `min_depth_by_nl` explicitná tabuľka (Atira NL + 15; Quadro NL + 13) · `load_by_cell` (Atira 30; 620 → 50; Tip-On H176/520 → 50, lebo kit existuje len ako 50 kg — hodnota bunky pre nákup/Inspector, geometriu nemení; Quadro 30) · `sync_min_width` 600 · `abs` per rola (dno bez;
   chrbát/boky/vnútorné čelo L1 1,0 mm horná dlhá hrana) · `source` tagy per hodnota. **Nemennosť:** register vydaných receptov `data/recipes/RELEASED.json` `{recipe_id → sha256}` — test v `tests/pure` overuje, že KAŽDÝ zaregistrovaný súbor existuje a sedí na SHA A že inventár `data/recipes/*.json` = množina registrovaných ID (nie len `_v1`; Astra #19 F10 + Codex #301 kolo 2
   P2); `Recipes.load`/`latest_for` načítajú VÝHRADNE registrované recepty + **golden test výsledkov `resolve` per vydaná verzia** (fixtúra vstup → dielce/NL),
@@ -328,7 +330,10 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   v `resolve_mapping_value`/`resolve_set_id` a kompatibilita setu v `expand`/`explain` (ORANGE `class_unmapped` a `set_incompatible`) · `override_keys_in_use` + triedne kľúče ·
   completeness test nad radmi receptov. **Kanál nemá UI** (`MaterialsDialog::TARGETS` ho nepozná) a **nikto ho nekonzumuje** — dielce, položku výsuvu, blockery a RED
   `drawer_kit_missing` prináša C2b. Vedomé odchýlky od textu nižšie: `height_variant` je uzavretý enum `[70, 144, 176]` (nie voľné číslo) a `MAPPING_ADDITIONS` sa merguje aj do
-  ČERSTVEJ knižnice (`seed_library`), inak by sa fresh install a upgrade rozišli.
+  ČERSTVEJ knižnice (`seed_library`), inak by sa fresh install a upgrade rozišli. **Dátová oprava v tej istej dávke (sonda #12):** rad `atira_sisy_v1` H144 skrátený na
+  [350, 420, 470] a kód 620 vyhodený zo seed setu `atira-biela-h144-sisy` — `357755` je PTO kit, teda Tip-On, a pre SiSy H144/620 (ani H70/620) kit neexistuje. Recept sa
+  opravil NA MIESTE aj s prepočítaným odtlačkom v `RELEASED.json`, lebo v1 ešte nestojí v žiadnom projekte (C2b nie je v maine); **od aktivácie platí nemennosť bez výnimky**
+  a oprava = nový `_v2`.
   **C2b · aktivácia (mení výstupy LEN pre čelá so systémom; ostatné zákazky CONTENT-identické; NARAZ a–h — z (b) a (d) ostáva len to, čo C2a vedome neurobila):**
   (a) `Construction.build_plan` volá resolver pre každé drawer čelo so systémom → dielce do `plan.parts` s part_key `front:<id>/drawer_bottom` · `/drawer_back` ·
   `/box_side:left|right` · `/drawer_inner_front`; nové ROLES + `plan_schema` bump + `material signals` enum `:drawer` + `human_label` vetvy; `materialized_part` sa NEPOUŽÍVA

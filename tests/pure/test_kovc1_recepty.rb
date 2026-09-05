@@ -227,7 +227,10 @@ end
 NxTest.test('KOV-C1: rady NL sedia s package v2') do
   a = NxKovC1.r.load('atira_sisy_v1')
   NxTest.assert_equal([350.0, 420.0, 470.0, 520.0], a[:nl_series_by_height]['70'])
-  NxTest.assert_equal([350.0, 420.0, 470.0, 620.0], a[:nl_series_by_height]['144'])
+  # KOV-C2a (sonda #12): SiSy H144 konci na NL 470. Kit „144 620/50 relingy"
+  # (357755) je PTO, teda TIP-ON — pre SiSy H144/620 kit NEEXISTUJE, takze rad
+  # nesmie ponukat dlzku, ktoru Noxun nevie kupit (zasada v2 c. 3).
+  NxTest.assert_equal([350.0, 420.0, 470.0], a[:nl_series_by_height]['144'])
   NxTest.assert_equal([350.0, 420.0, 470.0, 520.0, 620.0], a[:nl_series_by_height]['176'])
   p2o = NxKovC1.r.load('atira_p2o_v1')
   %w[70 144 176].each { |h| NxTest.assert_equal([350.0, 420.0, 470.0, 520.0, 620.0], p2o[:nl_series_by_height][h]) }

@@ -77,6 +77,50 @@
       ]
     },
     {
+      "recipe_id": "atira_sisy_v1",
+      "name": "svetla 200 (H144), hlbka 700 — rad H144 konci na NL 470",
+      "ctx": {
+        "clear_width": 864.0,
+        "clear_height": 200.0,
+        "clear_depth": 700.0,
+        "side_thickness": 18.0,
+        "obstructions": [
+
+        ],
+        "owner_part_key": "front:F1/panel"
+      },
+      "part_thicknesses": {
+        "drawer_bottom": 16.0,
+        "drawer_back": 16.0
+      },
+      "overrides": [
+
+      ],
+      "conflicts": [
+
+      ],
+      "height_variant": 144,
+      "box_height": null,
+      "nl": 470.0,
+      "load": 30.0,
+      "parts": [
+        {
+          "role": "drawer_bottom",
+          "side": null,
+          "width": 791.5,
+          "height": 480.0,
+          "thickness": 16.0
+        },
+        {
+          "role": "drawer_back",
+          "side": null,
+          "width": 780.0,
+          "height": 144.0,
+          "thickness": 16.0
+        }
+      ]
+    },
+    {
       "recipe_id": "atira_p2o_v1",
       "name": "celo 300 (H176), hlbka 560",
       "ctx": {
