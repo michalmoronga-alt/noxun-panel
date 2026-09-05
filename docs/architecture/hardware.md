@@ -307,6 +307,41 @@ uzavretý: tretí segment má LEN `slide`, `@owner` sufix je zakázaný (výber 
 **bezstratový round-trip** a správny marker, takže KOV-D už nebude potrebovať ďalší bump. `BuildPlan.hardware_set_key_type` z neho vracia prvý segment (starší plugin prefix
 nepozná, takže mu z toho istého kľúča vyjde neznámy typ a prestavbu zablokuje — presne to chceme), `BuildPlan.parse_hardware_set_key` vracia `nil`.
 
+**KOV-C2a (v0.9.30) — TRIEDNY KĽÚČ SA ZAČAL ČÍTAŤ, `height_variant`, `MAPPING_ADDITIONS`, `std` 4.** Príprava aktivácie zásuviek: mení sa výber setu pre položku, ktorá nesie
+klasifikáciu zásuvky, ale **žiadne dnešné pravidlo ju nenesie**, takže výstupy existujúcich zákaziek sú CONTENT-identické (stráži to golden `seed_kniznica` aj vlastný
+charakterizačný test). Päť častí:
+
+- **Kto je „zásuvková" položka.** `class_key_for(it, gt)` = položka má v `params` OBE polia `opening_mode` a `drawer_construction` → kanonický kľúč
+  `class:slide|<opening_mode>|<drawer_construction>`. Inak `nil` a celá vetva je mŕtva.
+- **Precedencia je KRATŠIA a bez fallbacku.** Pre takú položku číta `resolve_mapping_value` **cabinet override s triednym kľúčom → projekt**, a keď mapovanie chýba, vráti
+  `nil` s dôvodom **`class_unmapped`** („Pravidlá → Doplniť nové predvoľby"). Na generický `slide` **NIKDY nepadne** — H70 kit k zásuvke H176 by bol zlý nákup, a mlčky.
+  Owner-level `slide@…` sa pre ňu vedome IGNORUJE (`class:…@owner` parser odmieta a generický `slide@owner` je práve ten zakázaný fallback; owner-scoped tvar definuje až KOV-D).
+- **`height_variant` = šieste klasifikačné pole, jediné VOLITEĽNÉ.** Celé číslo z uzavretého `DRAWER_HEIGHT_VARIANTS` (70 · 144 · 176), povolené LEN pri `use_type: 'drawer'`
+  (Quadro V6 varianty nemá a pole mu legitímne chýba). Je v `CLASS_KEYS`, lebo ten zoznam je kontrakt troch vecí naraz (whitelist `SET_KEYS`, typová kontrola
+  v `incompatible_set?`, merge v `save_set!`) — výnimku „všetky alebo žiadne" pre neho drží `classify`. **Nie je os výberu** (tou ostáva pásmový selektor mapovania), slúži
+  výhradne na OVERENIE pri expanzii. Round-trip prežije všetkými zápisovými cestami: globálny `save_set!` (editor pole nepozná, takže ho `merge_class_keys` preberie
+  z uloženého setu — a pri prepnutí zo zásuvky na dvierka ho SERVER odstráni, inak by set už nikdy neprešiel validáciou), projektový snapshot, cabinet override aj šablóna.
+  Stratu chytá **piata vrstva detektora** v `classification_lost?` (kontrola „žiadny klasifikačný kľúč" by ju prehliadla — zvyšok klasifikácie pole prežije).
+- **`std` 4 (`STD_HEIGHT_VARIANT`) je LAZY podľa obsahu** a testuje sa PRVÝ (najvyšší marker vyhráva): dostane ho len knižnica/snapshot, v ktorej NIEKTORÝ set pole naozaj
+  nesie. Obsah s triednym kľúčom bez neho ostáva na 3, čisto legacy na 1/2. Pre starší plugin je std 4 `:read_only` (knižnica) a `:invalid` (snapshot).
+- **Seed `SEED_VERSION` 2 → 3 a nový kontrakt `MAPPING_ADDITIONS`.** Pribudlo **8 klasifikovaných drawer setov** (Atira 3 výšky × 2 otvárania s `code_by_nl` z draftu #13 §1,
+  Quadro V6 × 2 z §2) — legacy `vysuv-atira-biela-h70` ostáva **nedotknutý** pre legacy mapovanie `slide`, nové sety majú vlastné ID. `MAPPING_MIGRATIONS` vie iba NAHRADIŤ
+  hodnotu pri existujúcom kľúči, chýbajúci `class:` kľúč nevytvorí — preto druhý, užší kontrakt **`MAPPING_ADDITIONS` (add-if-absent)**: kľúč sa do globálu doplní LEN keď
+  chýba (používateľské mapovanie sa NIKDY neprepíše) a LEN keď sú v knižnici VŠETKY sety, na ktoré hodnota ukazuje (čiastočný selektor by ticho menil výber). Do projektu ho
+  prenesie až vedomé **„Doplniť nové predvoľby"** (`merge_project_sets_seed!`, existujúci mechanizmus — kľúče mapovania sú preň nepriehľadné reťazce, takže netreba nič nové).
+  `seed_library` ich merguje aj do ČERSTVEJ knižnice, inak by sa fresh install a upgrade rozišli. Hodnota pre Atiru **musí byť pásmový selektor podľa `height_variant`**;
+  pevný `set_id` by po prerastení zásuvky H70 → H176 objednal H70 kit (klasifikácia opening/construction je pri oboch rovnaká), preto ho `resolve_set_id` odmietne ako
+  `set_incompatible` / `height_selector`. Quadro (bez variantu) pevný `set_id` smie.
+- **Kompatibilita vybraného setu (`set_incompatible_info`)** beží v `expand` AJ v `explain` (panel a súpis sa nesmú rozísť) hneď za `set_type_mismatch` a porovnáva
+  `opening_mode`, `drawer_construction`, **`manufacturer` + `series` ↔ `params.system`** (uzavretý `SYSTEM_IDENTITY`: `atira` → Hettich/InnoTech Atira, `quadro_v6` →
+  Hettich/Quadro; neznámy systém = fail-closed) a **`height_variant` setu ↔ `params.height_variant`** (presne, bez zaokrúhľovania). Bez toho by triedny kľúč sám nedokázal, že
+  set patrí k TOMUTO systému a TEJTO výške — Antaro/StrongBox raz budú zdieľať `class:slide|classic|metal` s Atirou a pásmo H176 vs. H70 má rovnaké NL 470. Nesúlad =
+  **nemapovaná položka s dôvodom, NIKDY iný set**; nové ORANGE dôvody `class_unmapped` a `set_incompatible` majú vety v `unmapped_reason_sk` aj vo
+  `Validation.check_hardware_expansion`. Povýšenie na RED `drawer_kit_missing` prinesie C2b.
+
+Testy: `tests/pure/test_kovc2a_kanal_sety.rb` (23 testov + 4 overené mutácie vrátane completeness nad radmi receptov: pre KAŽDÚ bunku `nl_series_by_height`/`nl_series` každého
+vydaného receptu existuje v seede set vybraný triednym kľúčom a v ňom kit kód).
+
 **BEZSTRATOVÁ BRÁNA DEFINÍCIÍ SETOV V ŠABLÓNE — `assess_set_defs` (audit #17 BLOCKER 1).** `hardware_set_defs` išli doteraz LEN cez tolerantný `normalize_sets`, teda cez cestu,
 ktorá neznámy obsah ticho oreže; od KOV-B1 by starší plugin zmrazil do .skp set BEZ klasifikácie. Šablóna je dátový súbor MIMO modelu (môže byť ručne upravená alebo z novšej
 verzie), takže sa číta **bezstratovo alebo vôbec** — rovnako ako mapovanie v `read_template_mapping`. Čistá funkcia vracia `[:ok, {set_id => norm}]` alebo `[:lossy, [názvy]]`
@@ -316,7 +351,7 @@ o krok Späť"; poradie stráži zdrojový guard a in-SketchUp sekcia `run_kovb1
 ktorý tú istú šablónu odmietne aj SPÄTNE. **Opakovaný `set_id` v poli definícií je tiež strata, nikdy prepis:** brána by inak posúdila POSLEDNÚ definíciu, kým
 `collect_set_defs` (cez `normalize_sets`) drží PRVÚ — do .skp by teda sadli iné kódy, než ktoré prešli kontrolou.
 
-**Detektor straty má ŠTYRI vrstvy** — tri pôvodné (nižšie, R-07) plus **`classification_lost?`**: `use_type` je ZNÁMY kľúč so SKALÁRNOU hodnotou, takže whitelist aj počty by
+**Detektor straty má ŠTYRI vrstvy** (od KOV-C2a päť — piata je `height_variant` v tej istej funkcii, viď vyššie) — tri pôvodné (nižšie, R-07) plus **`classification_lost?`**: `use_type` je ZNÁMY kľúč so SKALÁRNOU hodnotou, takže whitelist aj počty by
 hodnotu z novšej verzie (`use_type: 'sliding'`) prepustili a tolerantné čítanie by celý blok ticho zahodilo. Porovnáva sa RAW definícia s výsledkom `normalize_sets`: raw má
 neprázdny ktorýkoľvek klasifikačný kľúč a normalizovaný set klasifikáciu nemá → STRATA; rovnako raw `active: false` bez príznaku v normalizovanom. Beží vo **VŠETKÝCH TROCH
 bránach** — `assess_library_doc`, `project_state_status` aj `assess_set_defs` — tri cesty k tým istým dátam sa nesmú rozísť. Dôsledok: knižnica z novšej verzie je `:read_only

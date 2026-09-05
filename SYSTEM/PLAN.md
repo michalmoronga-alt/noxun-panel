@@ -321,7 +321,15 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   Testy C1: tabuľkové testy vzorcov proti #10/#13 bez zaokrúhľovania (900/KD18 → LB 864, BB 791,5, RB 780, BL = NL + 10; **KD 16 → LB 868, BB 795,5 s EB stále 10.5**),
   hranice výšky/NL (175 → H70; H70 hĺbka 500 → 470, 560 → 520 (535 ≤ 560); H176 560 → 520; Quadro 497 → 450, 500 potrebuje 513), zámok v rade / mimo, context
   (offset, obstruction, listová zóna), stavy aktívneho záznamu `recipe_refs` (3) + návrat ku skôr použitej kombinácii vráti pôvodný záznam, validácia receptu (chýbajúca bunka), nemennosť (SHA), `latest_for` pri dvoch verziách.
-  **C2 · aktivácia (mení výstupy LEN pre čelá so systémom; ostatné zákazky CONTENT-identické; NARAZ a–h):**
+  **C2a · príprava aktivácie (bez zmeny výstupov) — ✅ HOTOVÉ (PR #303, v0.9.30, 5.9.2026):** z bodov (b) a (d) nižšie je v maine všetko, čo sa dá spraviť BEZ zapnutia:
+  4. materiálový kanál `:drawer` (`PROJECT_KEYS` + `default_drawer_material_id`, UNI 16 fallback `UNI_ZASUVKA_16` nemazateľný, `eff_drawer`, samostatná `ensure_drawer_uni!`
+  s vlastným markerom, `thickness_ok_for?` pre 4 roly cez `CabinetBuilder::DRAWER_ROLES`) · ABS seed per rola (`SEED_VERSION` 4) · klasifikačné pole `height_variant` na setoch
+  s lazy `std` 4 a piatou vrstvou `classification_lost?` · seed 8 klasifikovaných setov s kódmi + nový kontrakt `MAPPING_ADDITIONS` (add-if-absent) · čítanie triedneho kľúča
+  v `resolve_mapping_value`/`resolve_set_id` a kompatibilita setu v `expand`/`explain` (ORANGE `class_unmapped` a `set_incompatible`) · `override_keys_in_use` + triedne kľúče ·
+  completeness test nad radmi receptov. **Kanál nemá UI** (`MaterialsDialog::TARGETS` ho nepozná) a **nikto ho nekonzumuje** — dielce, položku výsuvu, blockery a RED
+  `drawer_kit_missing` prináša C2b. Vedomé odchýlky od textu nižšie: `height_variant` je uzavretý enum `[70, 144, 176]` (nie voľné číslo) a `MAPPING_ADDITIONS` sa merguje aj do
+  ČERSTVEJ knižnice (`seed_library`), inak by sa fresh install a upgrade rozišli.
+  **C2b · aktivácia (mení výstupy LEN pre čelá so systémom; ostatné zákazky CONTENT-identické; NARAZ a–h — z (b) a (d) ostáva len to, čo C2a vedome neurobila):**
   (a) `Construction.build_plan` volá resolver pre každé drawer čelo so systémom → dielce do `plan.parts` s part_key `front:<id>/drawer_bottom` · `/drawer_back` ·
   `/box_side:left|right` · `/drawer_inner_front`; nové ROLES + `plan_schema` bump + `material signals` enum `:drawer` + `human_label` vetvy; `materialized_part` sa NEPOUŽÍVA
   (nový `drawer_part` s finálnou geometriou); **poradie stavby (Codex #301 kolo 3 P1):** `CabinetBuilder.build_into` dnes volá `Construction.build_plan` PRED `effective_materials` — pre drawer roly sa hrúbky kanála `:drawer` (+ `part_overrides`) vyriešia PRED plánom a odovzdajú receptu ako `part_thicknesses`; bez nich by 18 mm materiál pri Atire prešiel a Quadro by počítalo

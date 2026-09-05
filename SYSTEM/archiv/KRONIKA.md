@@ -17,6 +17,37 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-C2a — PRÍPRAVA AKTIVÁCIE ZÁSUVIEK: MATERIÁLOVÝ KANÁL, ABS A RECEPTOVÉ SETY (PR #303, v0.9.30, 5.9.2026):** druhý rez package KOV-C v2 a opäť **bez viditeľnej zmeny** —
+  kusovník, nákup, VEPO ani rozpočet sa nehli (charakterizačný test + golden `seed_kniznica`). Dávka vedome vzala z bodov C2 (b) a (d) presne to, čo sa dá spraviť **pred**
+  zapnutím, aby samotná aktivácia (C2b) bola malý PR: riziko „C2 narastie" bolo v package menované vopred.
+  **Čo pribudlo.** (1) **4. materiálový kanál `:drawer`** — `PROJECT_KEYS` + `default_drawer_material_id`, fallback **UNI 16 mm** (`UNI_ZASUVKA_16`, cez
+  `PROTECTED_SHEET_IDS` nemazateľný), `eff_drawer` v `effective_materials` a nové roly v `thickness_ok_for?` (`CabinetBuilder::DRAWER_ROLES`, správajú sa ako čelá — hrúbka je
+  **vstup receptu**, nie konštanta korpusu). (2) **ABS seed per rola** (`SEED_VERSION` 3 → 4): dno bez olepu, chrbát/bok boxu/vnútorné čelo **L1 1,0 mm** (horná dlhá hrana).
+  (3) **`height_variant` na setoch** — šieste klasifikačné pole, jediné voliteľné, uzavretý enum 70/144/176, len pri `use_type: 'drawer'`. (4) **Seed 8 klasifikovaných setov**
+  Atira (3 výšky × 2 otvárania) a Quadro V6 (× 2) s kit kódmi z draftu #13 + **4 triedne mapovania**. (5) **Resolver číta triedny kľúč** `class:slide|<opening>|<construction>`
+  a expanzia overuje kompatibilitu setu.
+  **Štyri rozhodnutia, ktoré tvar dávky určili — všetky z KROK 0 auditu mainu.** (a) `ensure_uni_records!` končí na prvom riadku pri markeri `uni_seed.done`, takže cez ňu by sa
+  nový UNI záznam na **žiadnej existujúcej inštalácii** nedoplnil; kanál má preto **vlastnú migráciu `ensure_drawer_uni!` s vlastným markerom** `drawer_uni_seed.done` — a tá
+  nikdy neprepisuje (obsadené ID ani kolízny dekor sa nepridá, zapíše sa len marker). (b) `MAPPING_MIGRATIONS` vie iba **nahradiť** hodnotu pri existujúcom kľúči — chýbajúci
+  `class:` kľúč nevytvorí, takže „Doplniť nové predvoľby" by pri zásuvkách neopravilo nič (Codex #301 kolo 1 P1). Preto druhý, užší kontrakt **`MAPPING_ADDITIONS`
+  (add-if-absent)**: doplní sa LEN chýbajúci kľúč a LEN keď sú v knižnici všetky sety, na ktoré ukazuje; používateľské mapovanie sa nikdy neprepíše, `merge_project_sets_seed!`
+  ho prenesie do projektu bez zmeny (kľúče mapovania sú preň nepriehľadné reťazce). (c) Modal editora setu posiela klasifikáciu vždy celú, ale `height_variant` **nepozná** —
+  merge ho preberie z uloženého setu, a pri prepnutí zo zásuvky na dvierka ho **server odstráni**, inak by taký set už nikdy neprešiel validáciou. (d) `classification_lost?`
+  dostala **piatu vrstvu**: kontrola „žiadny klasifikačný kľúč" by stratu voliteľného poľa prehliadla — a práve tá je najdrahšia (bez výšky by expanzia nemala čo overiť
+  a k dielcom H176 by prišiel H70 kit).
+  **Prečo `set_incompatible` a `class_unmapped` namiesto tichého fallbacku.** Receptová položka **nikdy nepadá na generický `slide`** a owner-level `slide@…` sa pre ňu
+  ignoruje: H70 kit k zásuvke H176 by bol zlý nákup, a mlčky. Chýbajúce triedne mapovanie je preto vlastný ORANGE dôvod s vetou „Pravidlá → Doplniť nové predvoľby", a set,
+  ktorý klasifikáciou nesedí (iné otváranie/konštrukcia · iný systém cez `manufacturer` + `series` ↔ `params.system` · iná výška · pevný `set_id` tam, kde musí byť výškový
+  selektor), je nemapovaná položka s dôvodom — **nikdy iný set**. Povýšenie oboch na RED `drawer_kit_missing` s bránou exportov robí C2b. `override_keys_in_use` sa rozšíril
+  o triedne kľúče v tej istej dávke, v ktorej ich resolver začal čítať (Astra #19 F8) — inak by rozídená override mapa duplicitných kópií prešla ako „neškodná".
+  **Marker `std` 4** je lazy podľa obsahu a testuje sa prvý: dostane ho len knižnica/snapshot, v ktorej niektorý set pole naozaj nesie. Dôsledok pre prax: po prvom načítaní
+  v0.9.30 sa do globálnej knižnice doplnia nové sety a **staršia verzia pluginu do nej už nezapíše** (číta ju ako `:read_only`, snapshot ako `:invalid`) — teda ten istý
+  kompatibilný dopad, aký mali KOV-B1 a `CONFIG_SCHEMA` 4.
+  **Vedomé odchýlky od package textu:** `height_variant` je uzavretý enum `[70, 144, 176]` (package hovoril „číslo") — ďalší kovový systém si svoje výšky pridá v dávke, ktorá
+  ho zavedie; a `MAPPING_ADDITIONS` sa merguje aj do **čerstvej** knižnice (`seed_library`), inak by fresh install zásuvky nemapoval, kým upgrade áno.
+  **Testy:** 2998 → **3021 headless** (nová sada `tests/pure/test_kovc2a_kanal_sety.rb`, 23 testov, 4 overené mutácie: fallback na `slide` · `MAPPING_ADDITIONS` prepíše
+  používateľský kľúč · seed bez kódu pre bunku radu · strata `height_variant`), 89 JS sád zelených. Charakterizácia je dvojitá — vlastný test „položky bez klasifikácie sa
+  správajú presne ako doteraz" (vrátane dôkazu, že **žiadne seed pravidlo `opening_mode`/`drawer_construction` neemituje**) a nezmenený golden `seed_kniznica`.
 - **KOV-C1 — NEMENNÉ RECEPTY ZÁSUVIEK, JADRO (PR #302, v0.9.29, 5.9.2026):** prvý rez package KOV-C v2. **Z pohľadu používateľa sa nezmenilo NIČ** — žiadny nový dielec, žiadna
   položka v nákupe, kusovník a VEPO bajtovo rovnaké; dávka len **naučila plugin počítať** zásuvku. Nový modul `core/drawer_recipes.rb` (`Noxun::Engine::Recipes`, čisté Ruby bez
   SketchUp API a bez zápisu) + dátový pack `noxun_engine/data/recipes/` so štyrmi receptami (`atira_sisy_v1`, `atira_p2o_v1`, `quadro_v6_sisy_v1`, `quadro_v6_p2o_v1`) a registrom
