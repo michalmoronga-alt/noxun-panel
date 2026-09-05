@@ -34,13 +34,13 @@ Vzorce sa NEinterpretujú ako jazyk — každý vzorec = pomenovaná konštanta 
 | šírka chrbta (drevený) | `LB − 2·EB − 63` → `LB − 84` (rovnaké pre H70/H144/H176) | OFFICIAL + USER |
 | dĺžka dna | `NL + 10` (drevený chrbát; oceľový by bol NL − 3 — mimo profilu) | OFFICIAL |
 | výška chrbta | H70 = **65.5** (výrobne 65) · H144 = **144** · H176 = **176** (H54 = 53 existuje, V1 neponúka) | SECONDARY (Démos) + USER |
-| min. svetlá výška niky | H70: **105 / 106** · H144: **189 / 190** · H176: **221 / 222** (SiSy / P2O) — NIE 92!; hodnoty P2Os (108/192/224) sú v #10, ale **P2Os je pre Noxun NESCHVÁLENÝ** (Michal 5.9.2026) | OFFICIAL (#10, korekcia #11) |
+| min. svetlá výška niky | SiSy: **105 / 189 / 221** · Tip-On: **108 / 192 / 224** (= vendor PTOs, lebo Tip-On kity od Démosu sú PTOs — prísnejšia z P2O 106/190/222 a P2Os) — NIE 92!; P2Os NIE JE samostatný typ otvárania v Noxune (Michal 5.9.2026: len 2 typy), len vendor variant kitu | OFFICIAL (#10, korekcia #11) |
 | relingy | H70: 0 · H144: 1+1 · H176: 1+1 (súčasť K-sady …/176 resp. „relingy") | USER (#09) |
 | NL rad | 260 · 300 · 350 · 420 · 470 · 520 · 620 | OFFICIAL |
-| nosnosť per NL | 260 → [30] · 300–520 → [30, 50] · 620 → [50]; **žiadna 60 kg**; (P2Os 10 kg trieda vyhodená — NESCHVÁLENÝ typ) | OFFICIAL |
+| nosnosť per NL | 260 → [30] · 300–520 → [30, 50] · 620 → [50]; **žiadna 60 kg**; 10 kg trieda sa nepoužíva | OFFICIAL |
 | min. hĺbka korpusu | NL ≥ 300: `NL + 15` · **NL 260: 279 (SiSy) / 305 (P2O)** | OFFICIAL |
 | hrúbka dna/chrbta | 16 mm (bez drážky — dno sadá na prírubu zargy); iné UNCONFIRMED → `thickness_supported = [16]` | OFFICIAL detail + USER |
-| opening | SiSy · P2O — geometria boxu identická; mení kit kód, min. výšku, dostupnosť. **P2Os (Push to open Silent) NEschválený pre Noxun** — Michal 5.9.2026: len 2 typy otvárania pre výsuvy aj závesy | OFFICIAL + rozhodnutie |
+| opening | SiSy · P2O — geometria boxu identická; mení kit kód, min. výšku, dostupnosť. **P2Os nie je tretí typ otvárania** (Michal 5.9.2026: len 2 typy pre výsuvy aj závesy) — je to vendor variant Tip-On kitu, ktorý Démos predáva; recept `atira_p2o_v1` ho používa | OFFICIAL + rozhodnutie |
 | sync tyč (P2O) | povinná pri šírke ≥ 600 (inkluzívne): rez EB 10.5 → `LW − 66` (dĺžková položka — R-06a ORANGE; chýbanie = blocker KOV-D) | SECONDARY |
 | vnútorná zásuvka | `inner_supported: false` (V1 len klasifikácia; doplnky = profil 2000 + príchyt — dĺžkové/pomerové) | USER + #12 |
 | vyrábané dielce | presne 2: dno + drevený chrbát; ABS: dno bez, chrbát horná dlhá hrana 1,0 | USER (#09, #11) |

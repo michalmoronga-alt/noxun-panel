@@ -12,6 +12,7 @@
 
 - **O4 (5.9.2026, KOV-C audit #18):** typy otvárania pre výsuvy AJ závesy sú LEN dva — **Tip-On (Push to open, P2O)** a **tlmenie (Silent System, SiSy)**;
   vendor variant **P2Os (Push to open Silent) sa nerieši a z dát receptov sa vyhadzuje** (Michal: „ešte som sa s ním nestretol"). Klasifikácia `opening_mode classic|tipon` ostáva.
+  *Upresnenie 5.9. popoludní (KOV-C v2, checkpoint #19):* Tip-On kity Atira od Démosu sú vendor variant PTOs — recept `atira_p2o_v1` ich používa pod jediným typom „Tip-On“ a berie min. svetlú výšku PTOs (108/192/224); tretí typ otvárania nevzniká.
 - **O1 = a:** Neurčený smer dvierok = RED v Kontrole hneď; exportná brána AŽ s prvým výstupom, ktorý smer
   reálne nesie (D-95/výrobné zadanie). Tvrdé podmienky: ŽIADNY default ani heuristika smeru nikde v kóde
   (ani preview/overlay); legacy configy bez poľa sa negatujú; brána je pre-committed v AUDIT_REGISTER
