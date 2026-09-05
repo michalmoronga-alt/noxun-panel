@@ -25,10 +25,16 @@ module Noxun
       module_function
 
       # Roly korpusového configu, v ktorých môže UNI materiál sedieť.
+      # KOV-C2b (Codex #304 kolo 3 P1): `drawer_material_id` je 4. kanal —
+      # bez neho by „Nahradit UNI…" pri nahrade `UNI_ZASUVKA_16` nevytvorilo
+      # rebuild joby pre skrinky, ktore kanal DEDIA, a ignorovalo by explicitny
+      # material zasuviek na skrinke; snapshoty dielcov (a s nimi BOM aj VEPO)
+      # by ostali na UNI.
       RU_CAB_KEYS = {
         'material_id'       => 'body',
         'front_material_id' => 'front',
-        'back_material_id'  => 'back'
+        'back_material_id'  => 'back',
+        'drawer_material_id' => 'drawer'
       }.freeze
 
       # Čitateľné mená projektových predvolieb do rozpisu/statusu.
@@ -153,6 +159,12 @@ module Noxun
               blocked_reason = :parts
               blocked_names = Array(names)
             end
+          end
+          if !blocked_reason && roles_now.include?('drawer') &&
+             !Recipes.thickness_ok_for_any_system?(target_th)
+            # KOV-C2b: dielce zasuviek beru hrubku CIELA — doska, ktoru nepozna
+            # ziaden vydany system, by z celej zakazky spravila RED zasuvky.
+            blocked_reason = :drawer
           end
           if !blocked_reason && roles_now.include?('back') && params['back_mode'].to_s != 'none'
             # Chrbát: vlastná cesta (audit BLOCKER 3) — cieľ je daný, jeho
@@ -290,7 +302,8 @@ module Noxun
 
       def ru_project_key_for(role)
         { 'body' => 'default_material_id', 'front' => 'default_front_material_id',
-          'back' => 'default_back_material_id' }[role]
+          'back' => 'default_back_material_id',
+          'drawer' => 'default_drawer_material_id' }[role]
       end
 
       # D-46 pravidlá vhodnosti cieľa ako projektovej predvolby (nové skrinky).
@@ -301,12 +314,12 @@ module Noxun
         when 'default_back_material_id'
           [3.0, 18.0].any? { |t| CabinetBuilder.thickness_ok_for?('back', t, target_th) } ? nil : :range
         when 'default_drawer_material_id'
-          # KOV-C2a: hrubka dielcov zasuvky je VSTUP receptu, nie konstrukcna
-          # konstanta — tu sa preto strazi len rozsah doskoveho materialu
-          # (3 mm HDF ako material zasuvky = stop). Ci recept hrubku prijme
-          # (Atira 16, Quadro V6 16/18) rozhoduje `thickness_supported` az v C2b.
-          # Bez vlastnej vetvy by 4. kanal spadol do `else`, teda do pravidiel CIEL.
-          CabinetBuilder.thickness_in_range?(target_th) ? nil : :range
+          # KOV-C2b (Codex #304 kolo 3 P2): hrubka dielcov zasuvky je VSTUP
+          # receptu, takze o nej rozhoduje RECEPT — nie rozsah doskoveho
+          # materialu. Predikat je TEN ISTY ako pri selektore predvolby
+          # v Studiu (`Recipes.thickness_ok_for_any_system?`), inak by ta ista
+          # doska (25 mm) prehla jednou cestou a druhou nie.
+          Recipes.thickness_ok_for_any_system?(target_th) ? nil : :drawer
         else
           CabinetBuilder.thickness_ok_for?('front_door', Fronts::FRONT_THICKNESS.to_f, target_th) ? nil : :front
         end
@@ -335,6 +348,7 @@ module Noxun
           when :parts then "dielce s vlastným materiálom inej hrúbky: #{Array(names).join(', ')}"
           when :range then 'hrúbka cieľa mimo rozsahu'
           when :front then 'hrúbka cieľa nesedí pre čelá'
+          when :drawer then 'hrúbka cieľa nesedí pre dielce zásuviek (recepty poznajú 16 a 18 mm)'
           # GHOST-D1: doska z novsej verzie pluginu — jej config sa nesmie
           # znormalizovat (stratil by polia, ktore tato verzia nepozna).
           when :board_schema then 'doska je z novšej verzie Noxun — aktualizuj plugin'
