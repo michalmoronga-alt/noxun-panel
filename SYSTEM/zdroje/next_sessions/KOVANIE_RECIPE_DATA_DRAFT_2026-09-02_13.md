@@ -7,15 +7,15 @@
 
 ```json
 { "recipe_version": 1, "system": "atira", "family": "metal_box_drawer", "vendor": "Hettich",
-  "runner_variants": { "eb_by_kd": { "16": 12.5, "18": 10.5, "19": 9.5 }, "orderable_kd": [18] },
+  "runner_variants": { "eb_by_kd": { "16": 12.5, "18": 10.5, "19": 9.5 }, "orderable": { "10.5": true, "12.5": false, "9.5": false } },
   "pins": { "mounting": "slide_on", "rear_type": "wooden" },
   "formulas": { "bottom_width": "LB - 2*EB - 51.5", "rear_width": "LB - 2*EB - 63", "bottom_length": "NL + 10" },
   "thickness_supported_mm": [16],
   "height_variants": { "H70": {...}, "H144": {...}, "H176": {...} },
   "nl_series": [260,300,350,420,470,520,620],
-  "availability": { "loads_by_nl": {...}, "openings": ["sisy","p2o"] },
+  "availability": { "loads_by_nl": {...}, "openings_by_nl": { "260": ["sisy"], "300": ["sisy"], "350": ["sisy"], "420": ["sisy"], "470": ["sisy"], "520": ["sisy"], "620": ["sisy","p2o"] } },
   "min_depth": { "sisy": {...}, "p2o": {...} },
-  "extras": { "sync_shaft": { "trigger": "width_gt_600_and_opening_eq[p2o]", "cut_formula_by_eb": {"9.5":"LW-64","10.5":"LW-66","12.5":"LW-70"} } },
+  "extras": { "sync_shaft": { "trigger": "width_gte_600_and_opening_eq[p2o]", "cut_formula_by_eb": {"9.5":"LW-64","10.5":"LW-66","12.5":"LW-70"} } },
   "inner_supported": false }
 ```
 Vzorce sa NEinterpretujú ako jazyk — každý vzorec = pomenovaná konštanta v kóde (`c_bw`, `c_rw`, `c_bl`…), pack nesie hodnoty. Formula-string je len dokumentácia.
@@ -36,7 +36,7 @@ Vzorce sa NEinterpretujú ako jazyk — každý vzorec = pomenovaná konštanta 
 | min. hĺbka korpusu | NL ≥ 300: `NL + 15` · **NL 260: 279 (SiSy) / 305 (P2O)** | OFFICIAL |
 | hrúbka dna/chrbta | 16 mm (bez drážky — dno sadá na prírubu zargy); iné UNCONFIRMED → `thickness_supported = [16]` | OFFICIAL detail + USER |
 | opening | SiSy · P2O — geometria boxu identická; mení kit kód, min. výšku, dostupnosť. **P2Os (Push to open Silent) NEschválený pre Noxun** — Michal 5.9.2026: len 2 typy otvárania pre výsuvy aj závesy | OFFICIAL + rozhodnutie |
-| sync tyč (P2O) | povinná pri šírke > 600: rez EB 10.5 → `LW − 66` (dĺžková položka — R-06a ORANGE; chýbanie = blocker KOV-D) | SECONDARY |
+| sync tyč (P2O) | povinná pri šírke ≥ 600 (inkluzívne): rez EB 10.5 → `LW − 66` (dĺžková položka — R-06a ORANGE; chýbanie = blocker KOV-D) | SECONDARY |
 | vnútorná zásuvka | `inner_supported: false` (V1 len klasifikácia; doplnky = profil 2000 + príchyt — dĺžkové/pomerové) | USER + #12 |
 | vyrábané dielce | presne 2: dno + drevený chrbát; ABS: dno bez, chrbát horná dlhá hrana 1,0 | USER (#09, #11) |
 

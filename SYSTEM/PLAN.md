@@ -278,16 +278,17 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   dáta zmrazené v projekte; nevyriešená zásuvka neemituje nič a je RED + tvrdý blocker (O2). Dáta: FINAL §3/§4/§6, checkpointy #10 (vzorce, tabuľky), #11 (ABS, UNI 16, H70=105),
   #12 (kódy K-sád), draft `zdroje/next_sessions/KOVANIE_RECIPE_DATA_DRAFT_2026-09-02_13.md`.
   **C1 · jadro (čisté, bez zmeny výstupov):** nový modul `core/drawer_recipes.rb` + data packy `noxun_engine/data/recipes/atira.json`, `quadro_v6_eb23.json`
-  (schéma: `family` metal_box|wood_undermount · `system` · `runner_variants` {`eb_by_kd` 16→12.5/18→10.5/19→9.5, `orderable` flag} · piny `mounting: slide_on`,
+  (schéma: `family` metal_box|wood_undermount · `system` · `runner_variants` {`eb_by_kd` 16→12.5/18→10.5/19→9.5, **`orderable` = mapa EB → Boolean (10.5 true, 12.5/9.5 false; jediné strojové pole objednateľnosti — Codex #300 kolo 8)**; Quadro `{fixed: "eb23", orderable: {"eb23": true}}`} · piny `mounting: slide_on`,
   `rear_type: wooden` · konštanty vzorcov (Atira: `BB = LB−2EB−51.5`, `RB = LB−2EB−63`, `BL = NL+10`; Quadro: `SKW = LB−46`, `SKL = NL`, `bottom_offset 12`,
   `box_clearance 40`) · `height_variants` {H70/H144/H176: rear_height 65.5/144/176, `min_clear_height` per opening SiSy/P2O = 105/106 · 189/190 · 221/222 (P2Os vyhodené — rozhodnutie Michala 5.9.2026: len 2 typy otvárania),
-  railing 0/1+1/1+1} · `nl_series` 260…620 · `availability` {NL→loads: 260→[30], 300–520→[30,50], 620→[50]} · `min_depth` (NL×opening) tabuľka
+  railing 0/1+1/1+1} · `nl_series` 260…620 · `availability` {`loads_by_nl`: 260→[30], 300–520→[30,50], 620→[50]; **`openings_by_nl`**: NL → [sisy|p2o] (Atira p2o len [620], kým nie sú overené kódy; JEDINÝ tvar dostupnosti otvárania — globálny zoznam `openings` NEexistuje; Codex #300 kolo 8)} · `min_depth` (NL×opening) tabuľka
   (260: 279 SiSy / 305 P2O; ≥300: NL+15; Quadro NL+13) · `thickness_supported` (Atira [16]; Quadro [16,18]) · `inner_supported: false` · `recipe_version` · `schema` · `extras.sync_shaft
-  {sync_rod_min_width: 600 (ČÍSELNÉ, validované, v digeste — trigger ho číta; Codex #300 P2), cut_formula_by_eb}`). **Názvy schémy packu = tento package** (draft #13 používa staršie
-  `metal_box_drawer`, `thickness_supported_mm`, `orderable_kd` — loader aj fixtúry nasledujú package; audit 4 NOTE).
+  {sync_rod_min_width: 600 (ČÍSELNÉ, validované, v digeste — trigger ho číta; Codex #300 P2), cut_formula_by_eb}`). **Názvy schémy packu = tento package** (draft #13 používal staršie `metal_box_drawer`, `thickness_supported_mm`, `orderable_kd` — loader aj fixtúry nasledujú package: `orderable` mapa, `openings_by_nl`; audit 4 NOTE, Codex #300 kolo 8).
   Čisté funkcie: `Recipes.load(system)` (validácia schémy pri načítaní — chýbajúca tabuľka = odmietnutie celého packu, nikdy tichý default) ·
-  `Recipes.resolve(ctx, classification, snapshot, overrides)` → `{system, height_variant (Atira: ČÍSELNÉ 70|144|176, inak nil), box_height (Quadro: číselné mm, inak nil), nl, load,
-  opening, parts[], hardware_params, conflicts[], explain}` — **výšková os je systémovo odlišná (audit 2 B3) a PLOCHÁ ČÍSELNÁ v celom reťazci (Codex #300 kolo 2):** Atira = diskrétny
+  `Recipes.resolve(ctx, classification, snapshot, overrides)` → `{system, height_variant (Atira: ČÍSELNÉ 70|144|176, inak nil), box_height (Quadro: číselné mm, inak nil), opening,
+  candidates[] = [{nl, load, parts[], hardware_params}], conflicts[], explain}` — **ŽIADNE top-level `nl`/`load`/`parts`/`hardware_params`**: vyberá a materializuje ich až C2b po
+  katalógovom výbere (`selected = {nl, load, set_id, parts, hardware_params}`), aby geometria a nákup nikdy nepatrili rôznym NL (Codex #300 kolo 8 P1) — **výšková os je systémovo odlišná
+  (audit 2 B3) a PLOCHÁ ČÍSELNÁ v celom reťazci (Codex #300 kolo 2):** Atira = diskrétny
   `height_variant` 70/144/176 z `height_variants` (reťazce „H70" len v `explain`/UI); Quadro = numerická `box_height` = `clear_height − box_clearance`
   (40, parameter receptu; ručný override) bez variantov, availability len po NL rade (EB23 od 250, SiSy 280–600, P2O sklad 300–500); (najvyšší variant, ktorého `min_clear_height[opening]
   ≤ clear_height_raw`; najdlhšia NL s `min_depth[nl][opening] ≤ clear_depth_raw` — **INKLUZÍVNY vendor limit porovnaný priamo s NEZAOKRÚHLENOU hodnotou, bez odpočítania EPS** (Codex #300
@@ -301,7 +302,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   overiť v audite), side_thickness (KD), obstructions[] (shelf / divider_h / divider_v pretínajúce riadok)}`; **named test: 16 mm offset riadok-vs-interiér**.
   **Klasifikácia → kľúč receptu (audit 1 B3, záväzná mapa):** `drawer.construction metal → system atira` · `wood → quadro_v6_eb23` · `other → BEZ receptu` (legacy cesta, CONTENT-identická, žiadne
   dielce, žiadne R2 potlačenie); `opening_mode classic → sisy` · `tipon → p2o` (**P2Os (Push to open Silent) NEEXISTUJE v dátach ani v UI — rozhodnutie Michala 5.9.2026: pre výsuvy AJ závesy platia len 2 typy otvárania, Tip-On a tlmenie; tretí variant sa nerieši**); `variant internal` = tvrdý
-  conflict `drawer_internal_unsupported`; `runner_variant` SYSTÉMOVO (Codex #300 P1): Atira z KD korpusu cez `eb_by_kd` (16 → 12.5, 18 → 10.5, 19 → 9.5; KD mimo mapy = conflict; **KD mimo `orderable_kd` packu (Démos sklad len EB10.5 = KD 18) = conflict `runner_not_orderable` v `DRAWER_BLOCKERS` — Codex #300 kolo 7 P1**), Quadro
+  conflict `drawer_internal_unsupported`; `runner_variant` SYSTÉMOVO (Codex #300 P1): Atira z KD korpusu cez `eb_by_kd` (16 → 12.5, 18 → 10.5, 19 → 9.5; KD mimo mapy = conflict; **EB s `runner_variants.orderable[eb] == false` (Démos sklad len EB10.5 = KD 18) = conflict `runner_not_orderable` v `DRAWER_BLOCKERS` — Codex #300 kolo 7 P1**), Quadro
   V6 EB23 = pevné `eb23` (`runner_variants: {fixed: "eb23"}`, KD sa neprekladá) — fixtúry pre oba kľúče; piny `mounting: slide_on`, `rear_type: wooden`; čiastočná klasifikácia (chýba
   construction alebo opening pri type zásuvka) = **RED `drawer_unclassified` v `DRAWER_BLOCKERS`** (tvrdá brána — nevyriešená zásuvka nikdy nie je vyrobiteľná; audit 3 B2), bez dielcov a
   slide položky;
@@ -381,8 +382,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   selektor):** mapovanie projektu pre triedny kľúč `class:slide|<opening_mode>|<drawer_construction>` (kanonický tvar z KOV-B1 v KLASIFIKAČNOM slovníku `classic|tipon` × `metal|wood` — kľúč sa skladá z klasifikácie čela, nie z receptového `sisy|p2o`; prevod `sisy → classic`, `p2o → tipon` je explicitný; Codex #300 kolo 5 P1) nesie **explicitnú tabuľku** `[{height_variant, load, set_id}]` (exact
   match, bez pásiem; Quadro `{load, set_id}`), rozšírenie `parse_mapping` s round-tripom a whitelistom, **`resolve_set_id`/`resolve_mapping_value` čítajú triedny kľúč a tabuľku exact
   match UŽ v C2b** (dnes čítajú len `mapping[generic_type]`), **seed mapovania a setov v C2b** pokrýva bežné kombinácie (Atira per výška × nosnosť × otváranie z #12, Quadro per nosnosť) —
-  **P2O dostupnosť v recepte = LEN NL s overenými kit kódmi** (#12 má Atira P2O/PTO kity len pri NL 620 → kým Michal nedodá Démos kódy P2O kitov pre ostatné NL/výšky, pack Atira deklaruje
-  `availability.openings_by_nl` p2o = [620] a bežná Tip-On zásuvka je RED `drawer_no_fit` s hláškou „P2O kit pre NL … nie je v katalógu", nie sľúbená a neobjednateľná; Codex #300 kolo 7
+  **P2O dostupnosť v recepte = LEN NL s overenými kit kódmi** (#12 má Atira P2O/PTO kity len pri NL 620 → kým Michal nedodá Démos kódy P2O kitov pre ostatné NL/výšky, pack Atira deklaruje `availability.openings_by_nl` p2o len pri [620] a bežná Tip-On zásuvka je RED `drawer_no_fit` s hláškou „P2O kit pre NL … nie je v katalógu", nie sľúbená a neobjednateľná; Codex #300 kolo 7
   P1) a
   existujúce projekty dostanú triedne mapovanie automaticky LEN ak ich generické `slide` mapovanie aj referencovaná definícia setu PRESNE sedia so starým seedom (nezmenený snapshot; v tej
   istej operácii pri prvej prestavbe zásuvky); prispôsobený snapshot = ŽIADNA automatika — zásuvka je `set_incompatible` s hláškou „potvrď prechod na triedne mapovanie" a prechod je

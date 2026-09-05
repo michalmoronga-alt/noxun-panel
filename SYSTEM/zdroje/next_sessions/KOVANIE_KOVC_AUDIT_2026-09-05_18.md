@@ -144,3 +144,9 @@ zjednotenie (a pre kópiu doplnenie z packu len pri zhode digestu). (P1) Quadro 
 bežná Tip-On zásuvka je RED `drawer_no_fit` s hláškou, kým Michal nedodá Démos kódy. (P1) Scope OUT zúžený na UI/defaulty/pásmové selektory. (P1) `runner_variant` v klasifikácii setu a tabuľke
 + `orderable_kd` → `runner_not_orderable`. (P1) prah sync tyče inkluzívny (≥ 600). (P1) `compatible_set_for` dostáva `owner_id`/`owner_part_key`. (P1) kandidáti predfiltrovaní osovými zámkami,
 zamknutá NL bez kódu = `nl_lock_invalid`.
+
+## Codex GH review PR #300 kolo 8 (5.9.2026, nad v12 `e7a7533`) — 4× P1 (konzistencia schémy), ZAPRACOVANÉ (verzia 13)
+
+(P1) `availability.openings_by_nl` v kanonickej schéme C1 (validácia, digest, fixtúry), globálny `openings` zoznam zrušený aj v drafte. (P1) jediné pole objednateľnosti = `runner_variants.orderable`
+mapa EB → Boolean (draft opravený, `orderable_kd` preč). (P1) formálna signatúra `Recipes.resolve` = `candidates[]`, bez top-level `nl/load/parts/hardware_params` (materializuje C2b po výbere).
+(P1) draft #13 trigger `width_gte_600` + riadok „≥ 600 (inkluzívne)".
