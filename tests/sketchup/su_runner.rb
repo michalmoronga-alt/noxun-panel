@@ -3302,12 +3302,21 @@ module NoxunSuRunner
   # zalezi: vstup do `BoardBuilder.commit_insert`. Tam sa nastroj dostane LEN
   # ked `flush_pending!` vratil true (`commit!` inak vracia `:blocked`) a este
   # PRED otvorenim vytvaracej operacie.
+  #
+  # OPRAVA PO BEHU 2: prva verzia sondy citala HOLU konstantu `ScaleWatch`.
+  # Blok `define_method` sa vsak vyhodnocuje v LEXIKALNOM ramci TOHTO suboru
+  # (`NoxunSuRunner`), nie v `Noxun::Engine` — `defined?(ScaleWatch)` tam vrati
+  # nil a sonda zapisala nil namiesto true/false. Assercia `== false` potom
+  # padla BEZ OHLADU na skutocny stav observera (dokaz: `nil == false` je
+  # false). Modul sa preto zachyti DOPREDU do lokalnej premennej (`watch`),
+  # ktoru closure vidi vzdy — rovnako ako `probe`.
   def board_barrier_probe!(state)
     sc = e::BoardBuilder.singleton_class
+    watch = e::ScaleWatch # zachytene v closure — ziadne hladanie konstanty v bloku
     sc.send(:alias_method, :commit_insert_gd1_orig, :commit_insert)
     probe = ->(v) { state[:gd1_at_commit] = v }
     sc.send(:define_method, :commit_insert) do |model, plan, transform:, orientation: nil|
-      probe.call(defined?(ScaleWatch) ? ScaleWatch.pending? : nil)
+      probe.call(watch.pending?)
       commit_insert_gd1_orig(model, plan, transform: transform, orientation: orientation)
     end
     yield
@@ -3335,7 +3344,8 @@ module NoxunSuRunner
     steps << [SETTLE, lambda do
       ok('async GHOST-D1: natívny Move naozaj založil observeru prácu (inak by test nič nemeral)',
          state[:gd1_pending] == true)
-      ok('async GHOST-D1: bariéra dotiahla observer do POKOJA ešte PRED vytváracou operáciou',
+      ok('async GHOST-D1: bariéra dotiahla observer do POKOJA ešte PRED vytváracou operáciou ' \
+         "(pending? na vstupe do commit_insert = #{state[:gd1_at_commit].inspect})",
          state[:gd1_at_commit] == false)
       ok('async GHOST-D1: doska sa vložila a po ustálení je v modeli PRESNE JEDNA',
          !state[:gd1_board].nil? && boards(model).length == 1)
@@ -3389,7 +3399,8 @@ module NoxunSuRunner
       ok('async GHOST-D1: Scale naozaj založil observeru prácu', state[:gd1b_pending] == true)
       ok("async GHOST-D1: bariéra absorbovala Scale PRED vložením (šírka #{cfg['width']})",
          (cfg['width'].to_f - 900.0).abs < 0.01)
-      ok('async GHOST-D1: a observer bol v POKOJI ešte pred vytváracou operáciou',
+      ok('async GHOST-D1: a observer bol v POKOJI ešte pred vytváracou operáciou ' \
+         "(pending? na vstupe do commit_insert = #{state[:gd1b_at_commit].inspect})",
          state[:gd1b_at_commit] == false)
       ok('async GHOST-D1: doska sa vložila a observer je po ustálení v pokoji',
          !state[:gd1b_board].nil? && boards(model).length == 1 && e::ScaleWatch.pending? == false)

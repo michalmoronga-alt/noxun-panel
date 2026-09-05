@@ -537,6 +537,79 @@ NxTest.test('GHOST-D1 bariera: `flush_pending! == false` vrati :blocked bez akej
   NxTest.assert(Noxun::Engine::ScaleWatch.flush_pending!(nil), 'original je spat (pokoj = true)')
 end
 
+# In-SU beh 2 (#298): sonda hlasila, ze observer NIE JE v pokoji na vstupe do
+# `commit_insert`. Sonda merala zle (hola konstanta v `define_method` bloku ->
+# nil), ale ORDER kontrakt si zasluzi vlastny headless dokaz — bez neho by sa
+# to zistilo az v SketchUpe. Meria sa PRESNE to, co ma platit: medzi barierou
+# a otvorenim vytvaracej operacie NESMIE nic observer znovu naarmovat.
+NxTest.test('GHOST-D1 bariera: medzi barierou a commitom observer UZ NIKTO nenaarmuje') do
+  sw = Noxun::Engine::ScaleWatch.singleton_class
+  bb = Noxun::Engine::BoardBuilder.singleton_class
+  order = []
+  seen_pending = :NEBEZALO
+  queue = [:cakajuca_praca] # observer MA co robit, inak by test nic nemeral
+
+  sw.send(:alias_method, :flush_pending_ord_orig, :flush_pending!)
+  sw.send(:alias_method, :pending_ord_orig, :pending?)
+  sw.send(:alias_method, :request_dedup_ord_orig, :request_dedup)
+  bb.send(:alias_method, :commit_insert_ord_orig, :commit_insert)
+  begin
+    # Stub observera: `flush_pending!` frontu vyprazdni (dosiahne pokoj),
+    # `request_dedup` ju znovu naplni — presne ako `push_selected` v paneli.
+    sw.send(:define_method, :flush_pending!) { |_m = nil| order << :flush; queue.clear; true }
+    sw.send(:define_method, :pending?) { !queue.empty? }
+    sw.send(:define_method, :request_dedup) { |_m| order << :request_dedup; queue << :dedup; nil }
+    # Stub sevu: zaznamena stav observera PRESNE na vstupe (= tesne pred tym,
+    # nez by sa otvorila vytvaracia operacia).
+    watch = Noxun::Engine::ScaleWatch
+    bb.send(:define_method, :commit_insert) do |_model, _plan, transform:, orientation: nil|
+      order << :commit_insert
+      seen_pending = watch.pending?
+      :fake_board
+    end
+
+    s = NxD1.session
+    s.set_point([100.0, 200.0, 300.0])
+    NxTest.assert(Noxun::Engine::ScaleWatch.pending?, 'vychodisko: observer MA pracu')
+    s.commit!(:fake_transform)
+
+    NxTest.assert_equal(false, seen_pending,
+                        'na vstupe do sevu je observer v POKOJI (bariera dobehla a nikto ju nezrusil)')
+    NxTest.assert_equal(%i[flush commit_insert], order.first(2),
+                        "bariera bezi PRVA a hned za nou sev — poradie: #{order.inspect}")
+    NxTest.refute(order[0...order.index(:commit_insert)].include?(:request_dedup),
+                  'PRED sevom sa observer nesmie znovu naarmovat (ziadny push panela)')
+  ensure
+    sw.send(:alias_method, :flush_pending!, :flush_pending_ord_orig)
+    sw.send(:alias_method, :pending?, :pending_ord_orig)
+    sw.send(:alias_method, :request_dedup, :request_dedup_ord_orig)
+    bb.send(:alias_method, :commit_insert, :commit_insert_ord_orig)
+    %i[flush_pending_ord_orig pending_ord_orig request_dedup_ord_orig].each { |m| sw.send(:remove_method, m) }
+    bb.send(:remove_method, :commit_insert_ord_orig)
+  end
+end
+
+NxTest.test('GHOST-D1 bariera: preflighty sevu su LEN CITANIE (nic, co by observer naarmovalo)') do
+  s = NxD1.src('noxun_engine', 'core', 'board_builder.rb')
+  body = s[/def commit_insert\(model, plan, transform:, orientation: nil\).*?\n        end\n/m].to_s
+  pre = body[0...body.index('guarded do')].to_s
+  NxTest.assert(!pre.empty?, 'preflightova cast sevu sa nasla')
+  # `ensure_root!` (close_active) a `Ids.next_board_id` (sken atributov) su
+  # jedine, co tu bezi — ani jedno nezapisuje do entit.
+  %w[Panel. push_selected request_dedup select_only push_state notify_ set_attribute].each do |bad|
+    NxTest.refute(pre.include?(bad), "preflight sevu nesmie volat `#{bad}` (naarmoval by observer)")
+  end
+  gt = NxD1.src('noxun_engine', 'core', 'ghost_tool.rb')
+  cm = gt[/def commit!\(transform\).*?\n        end\n/m].to_s
+  head = cm[0...cm.index('commit_subject!(transform)')].to_s
+  %w[Panel. push_state push_selected request_dedup].each do |bad|
+    NxTest.refute(head.include?(bad), "medzi barierou a sevom nesmie byt `#{bad}`")
+  end
+  # Push panela patri AZ za commit (dnes `ghost_after_commit`).
+  NxTest.assert(cm.index('commit_subject!(transform)') < cm.index('Panel.ghost_after_commit'),
+                'refresh panela bezi AZ PO commite')
+end
+
 NxTest.test('GHOST-D1 bariera: bezi PRED `begin_commit!` (poradie v zdrojaku)') do
   s = NxD1.src('noxun_engine', 'core', 'ghost_tool.rb')
   body = s[/def commit!\(transform\).*?\n        end\n/m].to_s
