@@ -95,6 +95,16 @@ module Noxun
       # ticho odobrat kus z objednavky) — len sa prizna, aby ju clovek vedel
       # prepnut na iny dielec alebo zmazat.
       CAT_HW_ADHOC    = 'hardware_adhoc'
+      # RED — KOV-C2b: zasuvka sa nedala vyriesit (fail-closed konflikt stavby:
+      # neklasifikovana, bez riesenia, prekazka, nepodporovana hrubka/KD, neznamy
+      # recept, zamok mimo radu, neplatny rucny zasah). ZIADNE dielce, ZIADNA
+      # polozka vysuvu — a EXPORTNA BRANA (nakupny CSV, rozpocet, ponuka).
+      CAT_DRAWER      = 'drawer'
+      # RED — KOV-C2b: zasuvka MA dielce, ale nakup k nej nenasiel kit (chybajuce
+      # triedne mapovanie, nekompatibilny set, set bez kodu pre vybranu NL).
+      # Dielce v modeli OSTAVAJU, ale rezu na NL bez kitu tej NL sa nedaru —
+      # preto blokuje VSETKY exporty VRATANE VEPO.
+      CAT_DRAWER_KIT  = 'drawer_kit'
 
       # Druh top-level kusu, ktory MA KOVANIE. Zdielana konstanta preto, ze
       # „skrinka vs. doska" nie je kozmetika textu: len pri skrinke zliatie
@@ -580,10 +590,33 @@ module Noxun
       def check_hardware_issues(issues, items)
         Array(issues).each do |iss|
           next unless iss.is_a?(Hash)
-          next unless iss['code'].to_s == 'front_direction_unset'
 
-          items << front_direction_item(iss)
+          code = iss['code'].to_s
+          if code == 'front_direction_unset'
+            items << front_direction_item(iss)
+          elsif defined?(Recipes) && Recipes::BUILD_BLOCKERS.include?(code)
+            items << drawer_conflict_item(iss)
+          end
         end
+      end
+
+      # RED riadok „zasuvka bez riesenia". Vetu sklada STAVBA (recept ju pozna
+      # presne — ktora hodnota kde nesedi), Kontrola k nej doplni len adresu.
+      # Exportnu branu drzi `ProductionCore.export_blockers` nad TYM ISTYM
+      # registrom kodov (`Recipes::DRAWER_BLOCKERS`).
+      def drawer_conflict_item(iss)
+        oid = iss['owner_id'].to_s
+        pkey = iss['part_key'].to_s
+        label = iss['label'].to_s.strip
+        label = pkey.empty? ? 'zásuvka' : pkey if label.empty?
+        msg = iss['message'].to_s.strip
+        msg = 'Zásuvka sa nedá vyriešiť.' if msg.empty?
+        { 'severity' => RED, 'category' => CAT_DRAWER,
+          'owner_id' => oid, 'part_key' => (pkey.empty? ? nil : pkey), 'hw_key' => nil,
+          'owner_pid' => iss['owner_pid'],
+          'message_sk' => "#{label} (#{oid.empty? ? '—' : oid}): #{msg} " \
+                          'Dielce ani výsuv sa nevyrobili — export je zastavený.',
+          'stable_key' => "#{CAT_DRAWER}|#{oid}|#{pkey}|#{iss['code']}" }
       end
 
       # RED riadok „dvierka bez urceneho smeru". Znenie podla mockupu (scena 4):
@@ -704,6 +737,44 @@ module Noxun
         }
       end
 
+      # RED (KOV-C2b): zasuvka MA dielce, ale nakup k nej nenasiel kit. Veta
+      # menuje CELO, SYSTEM, VYSKU, NL a DOVOD — a navigje na EXISTUJUCU akciu
+      # (Pravidlá → Doplniť nové predvoľby), lebo naprava je datova, nikdy nie
+      # fallback na iny set. Zdroj vsetkych udajov je nemapovany zaznam expanzie.
+      SYSTEM_LABELS_SK = { 'atira' => 'Atira', 'quadro_v6' => 'Quadro V6' }.freeze
+
+      def drawer_kit_item(u, where, sid, opk, gt, oid)
+        sys = SYSTEM_LABELS_SK[u['system'].to_s] || u['system'].to_s
+        parts = []
+        parts << sys unless sys.empty?
+        parts << "H#{u['height_variant'].to_i}" if u['height_variant'].is_a?(Numeric)
+        nl = u['nominal_length']
+        parts << "NL #{HardwareSets.fmt_mm(nl)}" if nl.is_a?(Numeric)
+        what = parts.empty? ? '' : " (#{parts.join(' · ')})"
+        reason =
+          case u['base_reason'].to_s
+          when 'class_unmapped'
+            'projekt nemá predvolený set pre toto otváranie a konštrukciu — ' \
+            'otvor Pravidlá → Doplniť nové predvoľby'
+          when 'nl_missing'
+            "set „#{sid}“ nemá kód pre túto dĺžku — doplň rad setu"
+          when 'set_incompatible'
+            "set „#{sid}“ nesedí so zásuvkou (#{HardwareSets.incompatible_detail_sk(u['detail'])}) — " \
+            'uprav predvoľbu setu'
+          when 'set_missing'
+            "projekt odkazuje na set „#{sid}“, ktorý v ňom nie je — vyber set nanovo"
+          else
+            "nákup nenašiel kit (#{u['base_reason']})"
+          end
+        { 'severity' => RED, 'category' => CAT_DRAWER_KIT,
+          'owner_id' => oid, 'part_key' => (opk.empty? ? nil : opk), 'hw_key' => nil,
+          'message_sk' => "Zásuvka (#{where})#{what}: #{reason}. " \
+                          'Dielce sú postavené na túto dĺžku — bez kitu sa nedajú vyrobiť, ' \
+                          'preto sú zastavené všetky exporty vrátane VEPO.',
+          'stable_key' => [CAT_DRAWER_KIT, oid, opk, gt, u['rule_id'].to_s, sid,
+                           u['base_reason'].to_s].join('|') }
+      end
+
       # ORANGE (D1): sety kovania. Stable key nesie plnu identitu zdroja
       # (audit F7 — kategoria|korpus|vlastnik|generic|rule|set|kod): jedna
       # chybajuca polozka na 3 skrinkach = 3 klik-selectovatelne riadky.
@@ -722,6 +793,12 @@ module Noxun
           # chybajuce pasma v jednom sete su DVA problemy (a dva klik-selecty).
           member = u['member_label'].to_s
           member = "člen #{u['member_index'].to_i + 1}" if member.empty? && u.key?('member_index')
+          # KOV-C2b: receptova polozka bez kitu je RED (dielce su postavene na
+          # konkretnu NL) a ma VLASTNU kategoriu aj branu — VRATANE VEPO.
+          if u['reason'].to_s == 'drawer_kit_missing'
+            items << drawer_kit_item(u, where, sid, opk, gt, oid)
+            next
+          end
           msg =
             case u['reason'].to_s
             when 'nl_missing'
@@ -836,11 +913,19 @@ module Noxun
       # ORANGE: build warning stavby (kategoria "stavba"). KONTROLA je JEDINY
       # kanonicky zoznam (nalez 9) — povodna sekcia "Upozornenia stavby" zmizla.
       # Build warnings maju owner_id a PRIPADNE part_key (owner_pid neexistuje).
+      # KOV-C2b: build warning, ktory NIE JE nalezom. `legacy_slide_suppressed`
+      # len KONSTATUJE, ze zasuvka dostala vysuv z receptu (a legacy pravidlo sa
+      # preto nepouzilo) — pouzivatel nema co opravovat a ORANGE riadok na KAZDEJ
+      # zdravej zasuvke by bol falosny poplach. Warning ostava v plane a v LOGu
+      # (diagnostika R2 exkluzivity), do Kontroly nejde.
+      BUILD_INFO_ONLY = %w[legacy_slide_suppressed].freeze
+
       def check_build(w, items, uni_parts = {})
         return unless w.is_a?(Hash)
         oid  = w['owner_id'].to_s
         pkey = w['part_key'].to_s
         code = w['code'].to_s
+        return if BUILD_INFO_ONLY.include?(code)
         # V0.6 M-B1 (audit F4): ulozene ABS warnings dielca, ktory je AKTUALNE
         # na UNI, sa potlacaju — hlasi sa len CAT_UNI (jedna sprava, nie tri).
         return if code.start_with?('abs_') && uni_parts["#{oid}|#{pkey}"]

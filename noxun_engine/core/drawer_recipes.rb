@@ -80,6 +80,36 @@ module Noxun
         drawer_override_invalid drawer_kit_missing
       ].freeze
 
+      # KOV-C2b: REGISTER BRANY. `export_blockers` cita CELY tento zoznam —
+      # ziadny kod z neho nesmie prejst do vydaneho suboru.
+      DRAWER_BLOCKERS = CONFLICT_CODES
+
+      # Jediny kod, ktory vznika az v NAKUPE (receptova polozka bez setu alebo
+      # bez kodu pre svoju NL). Dielce v modeli OSTAVAJU (fyzika je spravna),
+      # ale rez na NL bez kitu tej NL je nepouzitelny — preto blokuje AJ VEPO.
+      KIT_MISSING = 'drawer_kit_missing'
+
+      # Konflikty STAVBY (9): fail-closed, ziadne dielce ani polozka. Blokuju
+      # nakupny CSV, rozpocet a cenovu ponuku; VEPO chrani prave to, ze sa
+      # geometria vobec nevydala (niet co rezat).
+      BUILD_BLOCKERS = (CONFLICT_CODES - [KIT_MISSING]).freeze
+
+      # Kratky slovensky nazov dovodu pre BRANU EXPORTU. Plnu vetu (ktora
+      # hodnota kde nesedi) nesie nalez Kontroly; brana menuje LEN pricinu
+      # a skrinky. KAZDY kod registra tu MUSI mat zaznam — strazi to guard test.
+      BLOCKER_LABELS = {
+        'drawer_unclassified'         => 'zásuvka nie je klasifikovaná',
+        'drawer_no_fit'               => 'zásuvka sa do skrinky nezmestí',
+        'drawer_obstruction'          => 'v riadku zásuvky je polica alebo priečka',
+        'drawer_internal_unsupported' => 'vnútorná zásuvka sa zatiaľ nevyrába',
+        'drawer_thickness_unsupported' => 'materiál zásuvky má nepodporovanú hrúbku',
+        'drawer_kd_unsupported'       => 'hrúbka boku skrinky nie je pre systém podporovaná',
+        'drawer_recipe_unknown'       => 'zásuvka používa recept, ktorý plugin nepozná',
+        'nl_lock_invalid'             => 'ručne zamknutá dĺžka výsuvu neplatí',
+        'drawer_override_invalid'     => 'ručný zásah do výsuvu zásuvky je neplatný',
+        KIT_MISSING                   => 'nákup nenašiel kit výsuvu k postaveným dielcom'
+      }.freeze
+
       # Identita NL zamku v `hardware_overrides` (D-93). Zamok = existencia
       # platneho pola `nominal_length`; `rule_id` smie byt legacy pravidlo aj
       # receptova identita `recipe:<recipe_id>` (migraciu robi C2).
@@ -92,6 +122,9 @@ module Noxun
       ROLE_BACK        = 'drawer_back'
       ROLE_BOX_SIDE    = 'box_side'
       ROLE_INNER_FRONT = 'drawer_inner_front'
+      # Vsetky roly, ktore recepty emituju — zhodne s `BuildPlan::ROLES` novou
+      # stvoricou aj s `CabinetBuilder::DRAWER_ROLES` (guard test to porovnava).
+      PART_ROLES = [ROLE_BOTTOM, ROLE_BACK, ROLE_BOX_SIDE, ROLE_INNER_FRONT].freeze
 
       # Najmensi vyrobitelny rozmer — zdiela sa s planom (jediny prah v systeme).
       MIN_DIM = 0.01

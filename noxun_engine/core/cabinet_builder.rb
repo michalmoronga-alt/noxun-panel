@@ -85,7 +85,16 @@ module Noxun
       #       odmietne sablonu z novsej verzie SPATNE, a nova
       #       `HardwareSets.assess_set_defs` chrani DOPREDU — definicie, ktore
       #       sa nedaju precitat bezstratovo, sa do modelu nezapisu vobec.
-      CONFIG_SCHEMA = 4
+      #   5 = KOV-C2b — ZASUVKY Z RECEPTU. Config nesie `drawer.system`
+      #       a `drawer.recipe_refs` (pripnuta verzia receptu per kombinacia
+      #       system|otvaranie), `drawer_material_id` (4. materialovy kanal),
+      #       ulozene `drawer_conflicts` a polozky kovania so `source: 'recipe'`.
+      #       Starsi plugin by taku zakazku prestavat NESMEL: recepty nepozna,
+      #       takze by ticho ODOBRAL dielce zasuviek aj polozku vysuvu (a s nimi
+      #       cast objednavky) — presne to, comu forward-guard brani. Guard je
+      #       existujuci `newer_config?` (prestavba, sablony, kopia) + brana
+      #       exportov (`ProductionCore.export_blockers`).
+      CONFIG_SCHEMA = 5
 
       MIN = { width: 200.0, height: 200.0, depth: 150.0 }.freeze
       # D-45: povoleny rozsah hrubky korpusu (mm) — JEDINY zdroj pravdy pre clamp
@@ -137,7 +146,13 @@ module Noxun
         'false_front'  => 'Noxun/Čelá',
         'shelf'        => 'Noxun/Vnútro',
         'divider_v'    => 'Noxun/Vnútro',
-        'divider_h'    => 'Noxun/Vnútro'
+        'divider_h'    => 'Noxun/Vnútro',
+        # KOV-C2b: vyrabane dielce zasuvky su VNUTRO skrinky (jeden tag, aby sa
+        # dali hromadne skryt spolu s policami — vzor D-27).
+        'drawer_bottom'      => 'Noxun/Vnútro',
+        'drawer_back'        => 'Noxun/Vnútro',
+        'box_side'           => 'Noxun/Vnútro',
+        'drawer_inner_front' => 'Noxun/Vnútro'
       }.freeze
       PART_TAG_DEFAULT = 'Noxun/Korpus'
       HARDWARE_TAG     = 'Noxun/Kovanie'
@@ -666,15 +681,27 @@ module Noxun
           # takze sa do .skp NEZMRAZI orezany stav. Stavba bezi dalej, len bez
           # snapshotu; supis kovania to prizna ORANGE `library_incompatible`.
           HardwareSets.ensure_project_state!(model) if defined?(HardwareSets)
-          plan = Construction.build_plan(cfg, cid, hardware_rules: rules) # validuje interne
+          # KOV-C2b (Codex #301 kolo 3 P1): PORADIE. Dielce zasuviek dostavaju
+          # hrubku ako VSTUP receptu, nie ako odvodeninu planu — a `build_plan`
+          # bezi PRED `effective_materials`. Preto sa 4. materialovy kanal
+          # (`:drawer` + `part_overrides`) vyriesi UZ TU: bez toho by 18 mm
+          # material pri Atire ticho presiel a Quadro by ratalo predok/chrbat
+          # z nespravnej hrubky dna.
+          eff = effective_materials(model, cfg)
+          plan = Construction.build_plan(cfg, cid, hardware_rules: rules,
+                                                   part_thicknesses: drawer_thicknesses(cfg, eff)) # validuje interne
+          # KOV-C2b: doplnenie CHYBAJUCEHO systemu a pripnutia receptu je zapis
+          # do configu — bezi v TEJ ISTEJ operacii ako geometria (volajuci nas
+          # obalil `start_operation`), takze Undo vrati oboje naraz.
+          cfg = apply_drawer_writes(cfg, plan)
           ents = cdef.entities
           tid = template_id_for(cfg[:type])
 
           # Efektivne korpusove materialy = korpus config, inak dedenie z projektovych defaultov (model).
-          eff = effective_materials(model, cfg)
           eff_body  = eff['body']
           eff_front = eff['front']
           eff_back  = eff['back']
+          eff_drawer = eff['drawer']
           overrides = PartKeys.migrate_overrides(cfg[:part_overrides], plan[:parts])
           cfg = cfg.merge(part_overrides: overrides, part_key_schema: PartKeys::SCHEMA)
 
@@ -687,7 +714,8 @@ module Noxun
           plan[:parts].each do |pd|
             next unless positive_box?(pd[:box]) # ochrana proti degenerovanym dielcom (uzke zony)
             resolved = resolve_part(pd, eff_body, eff_front, eff_back, overrides,
-                                    abs_issues: abs_issues, legacy_sources: legacy_sources)
+                                    abs_issues: abs_issues, legacy_sources: legacy_sources,
+                                    eff_drawer: eff_drawer)
             add_part(model, ents, pd, resolved, cid, tid)
             # D-90: uchytkovy profil na hornej hrane cela — PROXY vizual v pasme
             # nad skratenym panelom (rovnaky kontrakt ako nohy, viz nizsie).
@@ -720,10 +748,12 @@ module Noxun
         # {part_key:, name:, code:, reason:} pre agregaciu do plan[:warnings].
         # Hrany PREPISANE overridom (aj vedome nil) sa NEHLASIA — override je
         # rozhodnutie pouzivatela, warning by klamal.
-        def resolve_part(pd, eff_body, eff_front, eff_back, overrides, abs_issues: nil, legacy_sources: {})
+        def resolve_part(pd, eff_body, eff_front, eff_back, overrides, abs_issues: nil,
+                         legacy_sources: {}, eff_drawer: nil)
           part_key = PartKeys.for_descriptor(pd)
           ov = overrides[part_key].is_a?(Hash) ? overrides[part_key] : {}
-          base_mat = base_material_for(pd[:role], pd[:material], eff_body, eff_front, eff_back)
+          base_mat = base_material_for(pd[:role], pd[:material], eff_body, eff_front, eff_back,
+                                       eff_drawer)
           mat_id = present(ov['material_id']) || base_mat
           # Jeden lookup doskoveho materialu — pouzity na dekor (ABS) aj hrubkovu kontrolu (V0.3 FIX 2).
           sheet = (defined?(Materials) && mat_id) ? Materials.sheet(mat_id) : nil
@@ -916,12 +946,115 @@ module Noxun
             'body'  => present(raw(params, :material_id))       || defaults['default_material_id'],
             'front' => present(raw(params, :front_material_id)) || defaults['default_front_material_id'],
             'back'  => present(raw(params, :back_material_id))  || defaults['default_back_material_id'],
-            # KOV-C2a: 4. kanal (dielce zasuviek). Uroven SKRINKY zatiaľ NEEXISTUJE
-            # — config kluc pribudne v C2b spolu s bumpom `CONFIG_SCHEMA`, takze
-            # tu sa vedome cita LEN projektova predvolba (s UNI 16 fallbackom).
-            # Cita ju zatiaľ NIKTO: dielce zasuviek emituje az C2b.
-            'drawer' => defaults['default_drawer_material_id']
+            # KOV-C2b: 4. kanal (dielce zasuviek) — UROVEN SKRINKY (config kluc
+            # `drawer_material_id`, pribudol s `CONFIG_SCHEMA` 5), inak
+            # projektova predvolba s UNI 16 fallbackom. Rovnaka retaz dedenia
+            # ako telo/celo/chrbat (standard 7.2).
+            'drawer' => present(raw(params, :drawer_material_id)) || defaults['default_drawer_material_id']
           }
+        end
+
+        # --- KOV-C2b: hrubky dielcov zasuviek PRED planom --------------------
+        #
+        # Recept berie hrubku ako VSTUP (`part_thicknesses`), nie ako odvodeninu
+        # planu — a `build_plan` bezi PRED `resolve_part`. Preto sa retaz
+        # „part_override -> skrinka -> projekt -> UNI 16" vyhodnoti uz tu, nad
+        # ULOZENYM configom ciel: kluce dielcov su deterministicke (id cela +
+        # rola), takze na ne plan netreba.
+        #
+        # -> { part_key => mm } pre KAZDU rolu KAZDEHO zasuvkoveho cela.
+        def drawer_thicknesses(cfg, eff)
+          items = (cfg[:fronts].is_a?(Hash) ? cfg[:fronts]['items'] : nil)
+          return {} unless items.is_a?(Array)
+
+          overrides = cfg[:part_overrides].is_a?(Hash) ? cfg[:part_overrides] : {}
+          base = sheet_thickness(eff['drawer'])
+          out = {}
+          items.each do |it|
+            next unless it.is_a?(Hash) && it['type'].to_s == 'drawer_front'
+            fid = it['id'].to_s
+            next if fid.empty?
+
+            DRAWER_ROLES.each do |role|
+              key = PartKeys.front(fid, role)
+              ov = overrides[key].is_a?(Hash) ? overrides[key]['material_id'] : nil
+              th = present(ov) ? sheet_thickness(ov) : base
+              out[key] = th if th
+            end
+          end
+          out
+        end
+
+        # Katalogova hrubka materialu, alebo nil (bez katalogu / neznamy zaznam).
+        # nil = volajuci (Construction) pouzije UNI 16 fallback.
+        def sheet_thickness(material_id)
+          return nil unless material_id && defined?(Materials)
+
+          sheet = Materials.sheet(material_id)
+          return nil unless sheet.is_a?(Hash)
+
+          th = sheet['thickness'].to_f
+          th.positive? ? th : nil
+        end
+
+        # --- KOV-C2b: serverove zapisy klasifikacie zasuvky ------------------
+        #
+        # Plan vrati, ktorym celam CHYBA `drawer.system` alebo zaznam mapy
+        # `recipe_refs`, a ktore legacy NL overridy sa maju premapovat na
+        # receptovu identitu (D-93). Oboje sa zapise SEM, do configu, ktory
+        # ide na entitu — teda v TEJ ISTEJ operacii ako geometria.
+        def apply_drawer_writes(cfg, plan)
+          out = cfg
+          writes = Array(plan[:drawer_writes])
+          unless writes.empty?
+            fronts = Fronts.normalize_config(cfg[:fronts])
+            if Fronts.write_drawer_fields!(fronts, writes)
+              out = out.merge(fronts: fronts)
+              # `front_items` je SIESTA projekcia configu a vznikla EST PRED
+              # tymto zapisom (plan sa pocital nad povodnym cfg). Bez zosuladenia
+              # by ULOZENY config niesol ref v `fronts`, ale nie v `front_items`
+              # — a citatelia projekcie (`Bom`, `human_label`, karta cela) by ho
+              # pri PRVEJ stavbe nevideli. Prenasa sa VYHRADNE pole `drawer`
+              # (pass-through, nic sa tu nevymysla — vzor `DORMANT_KEYS`).
+              sync_front_items_drawer!(plan[:front_items], fronts)
+            end
+          end
+          mig = Array(plan[:drawer_override_writes])
+          return out if mig.empty?
+
+          list = (out[:hardware_overrides].is_a?(Array) ? out[:hardware_overrides] : []).map do |ov|
+            next ov unless ov.is_a?(Hash)
+
+            hit = mig.find do |m|
+              ov['owner_part_key'].to_s == m['owner_part_key'] &&
+                ov['generic_type'].to_s == m['generic_type'] &&
+                ov['rule_id'].to_s == m['from_rule_id']
+            end
+            hit ? ov.merge('rule_id' => hit['to_rule_id']) : ov
+          end
+          out.merge(hardware_overrides: list)
+        end
+
+        # Zosuladi pole `drawer` v resolved celach (`front_items`) s configom
+        # ciel PO serverovom zapise. In-place — `front_items` ide priamo do
+        # `merge_final`.
+        def sync_front_items_drawer!(items, fronts_cfg)
+          return unless items.is_a?(Array) && fronts_cfg.is_a?(Hash)
+
+          by_id = {}
+          Array(fronts_cfg['items']).each { |i| by_id[i['id'].to_s] = i if i.is_a?(Hash) }
+          items.each do |it|
+            next unless it.is_a?(Hash)
+
+            src = by_id[it['id'].to_s]
+            next if src.nil?
+
+            if src['drawer'].is_a?(Hash)
+              it['drawer'] = src['drawer']
+            else
+              it.delete('drawer')
+            end
+          end
         end
 
         # Je hrubka v povolenom rozsahu korpusu (6–50 mm)? nil/necislo = nie.
@@ -1084,11 +1217,16 @@ module Noxun
 
         # Base material dielca podla roly: cela -> front, chrbat -> back, ostatne -> body (korpus).
         # pd[:material] (:front/:korpus) z Construction je sekundarny signal (cela maju :front).
-        def base_material_for(role, mat_sym, eff_body, eff_front, eff_back)
+        def base_material_for(role, mat_sym, eff_body, eff_front, eff_back, eff_drawer = nil)
           case role.to_s
           when 'front_door', 'drawer_front', 'flap', 'false_front' then eff_front
           when 'back' then eff_back
-          else mat_sym == :front ? eff_front : eff_body
+          # KOV-C2b: 4. kanal — dielce zasuviek dedia PREDVOLBU ZASUVIEK
+          # (skrinka -> projekt -> UNI 16), nie telo ani celo.
+          when *DRAWER_ROLES then eff_drawer || eff_body
+          else
+            return eff_drawer || eff_body if mat_sym == :drawer
+            mat_sym == :front ? eff_front : eff_body
           end
         end
 
@@ -1628,6 +1766,8 @@ module Noxun
             plan_schema: cfg[:plan_schema] || BuildPlan::SCHEMA,
             warnings: cfg[:warnings].is_a?(Array) ? cfg[:warnings] : [],
             hardware: cfg[:hardware].is_a?(Array) ? cfg[:hardware] : [],
+            # KOV-C2b: fail-closed dovody zasuviek (viz merge_final).
+            drawer_conflicts: cfg[:drawer_conflicts].is_a?(Array) ? cfg[:drawer_conflicts] : [],
             type: cfg[:type],
             # D-100: uklada sa LEN rucny nazov (nil = zivy default z display_name).
             # Zapecenim defaultu by nazov prestal sledovat sirku/typ skrinky.
@@ -1655,6 +1795,8 @@ module Noxun
             material_id: cfg[:material_id],
             front_material_id: cfg[:front_material_id],
             back_material_id: cfg[:back_material_id],
+            # KOV-C2b: 4. kanal na urovni SKRINKY (nil = dedi z projektu).
+            drawer_material_id: cfg[:drawer_material_id],
             part_overrides: cfg[:part_overrides].is_a?(Hash) ? cfg[:part_overrides] : {},
             hardware_overrides: cfg[:hardware_overrides].is_a?(Array) ? cfg[:hardware_overrides] : [],
             hardware_sets: cfg[:hardware_sets].is_a?(Hash) ? cfg[:hardware_sets] : {},
@@ -1736,6 +1878,11 @@ module Noxun
             plan_schema: plan[:schema],     # verzia tvaru planu (nezavisla od part_key_schema)
             warnings: plan[:warnings],      # nefatalne upozornenia — panel/vystupy ich zobrazia
             hardware: plan[:hardware],      # kovanie (V0.4+); tvar uz zavazny
+            # KOV-C2b (Astra #19 F6): ULOZENY NOSIC fail-closed dovodov zasuviek.
+            # Po fail-closed stavbe nezostane ani dielec ani polozka, z ktorej by
+            # sa dovod dal obnovit — musi teda prezit v configu (a s nim aj
+            # save/reopen a Undo). `Bom.collect` ho zlucuje do `hardware_issues`.
+            drawer_conflicts: Array(plan[:drawer_conflicts]),
             available_width: plan[:available][:width].round(2),
             available_height: plan[:available][:height].round(2),
             available_depth: plan[:available][:depth].round(2),
@@ -1783,6 +1930,8 @@ module Noxun
             material_id: present(raw(p, :material_id)),
             front_material_id: present(raw(p, :front_material_id)),
             back_material_id: present(raw(p, :back_material_id)),
+            # KOV-C2b: 4. kanal (dielce zasuviek) na urovni skrinky.
+            drawer_material_id: present(raw(p, :drawer_material_id)),
             part_overrides: norm_overrides(raw(p, :part_overrides)),
             # V0.4 kovanie: rucne zasahy do poctov (pravidlo = default, override vitazi)
             hardware_overrides: prune_profile_overrides(
@@ -2273,6 +2422,9 @@ module Noxun
             'material_id'       => v03?(cfg) ? cfg['material_id'] : nil,
             'front_material_id' => v03?(cfg) ? cfg['front_material_id'] : nil,
             'back_material_id'  => v03?(cfg) ? cfg['back_material_id'] : nil,
+            # KOV-C2b: 4. kanal. Kluc pribudol az so schemou 5, takze starsi
+            # config ho nema — a `v03?` sa ho netyka (nikdy nebol natvrdo).
+            'drawer_material_id' => cfg['drawer_material_id'],
             'part_key_schema'   => cfg['part_key_schema'].to_i,
             'part_overrides'    => cfg['part_overrides'].is_a?(Hash) ? cfg['part_overrides'] : {},
             # V0.4 kovanie (pole neexistovalo pred V0.4 -> stare configy dostanu []).

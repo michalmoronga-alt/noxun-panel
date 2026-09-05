@@ -556,7 +556,9 @@ module Noxun
           # V0.3 FIX 1: korpusove materialy do sablony LEN ak su na zdroji nastavene (non-nil).
           # part_overrides do sablony NEUKLADAME — su viazane na konkretne dielce/zony zdroja
           # (pri aplikacii sablony sa zachovaju z cieloveho korpusu).
-          %w[material_id front_material_id back_material_id].each do |k|
+          # KOV-C2b: `drawer_material_id` (4. kanal) cestuje so sablonou
+          # rovnako ako ostatne korpusove materialy — LEN ked je nastaveny.
+          %w[material_id front_material_id back_material_id drawer_material_id].each do |k|
             v = present_str(cfg[k])
             tc[k] = v if v
           end

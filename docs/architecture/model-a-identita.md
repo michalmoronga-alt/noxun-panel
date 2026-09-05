@@ -109,12 +109,17 @@ je vedomé rozhodnutie auditu #14 (BLOCKER 5): kolízia so zásuvkovým čelom b
 pri prepnutí typu ostávajú **dormant pod starým kľúčom** (vzor `migrate_overrides`) a po návrate sa obnovia — nikdy sa neprenášajú.
 `human_label` má vetvy `/flap` → „F2 · **výklop**" alebo „**sklop**" (podľa `type` resolved čela; bez zhody neutrálne „výklop/sklop" — nikdy sa nič neodhaduje) a `/blind` → „F2 · blenda".
 
+**KOV-C2b — štyri kľúče vyrábaných dielcov zásuvky:** `front:F#/drawer_bottom` · `/drawer_back` · `/drawer_inner_front` a `/box_side:left|right` (variant nesie stranu — bez
+neho by dva boky Quadro boxu mali rovnaký kľúč). Sú **ADITÍVNE**, takže `PartKeys::SCHEMA` sa **znova nebumpuje**; `human_label` k nim pridáva číslo čela („F2 · dno zásuvky",
+„F2 · bok boxu ľavý"). Kľúče sú deterministické z `front_id` + roly, preto sa dajú zložiť **bez plánu** — na tom stojí výpočet hrúbok kanála `:drawer` PRED plánom
+(`CabinetBuilder.drawer_thicknesses`, [materials.md](materials.md)).
+
 **KOV-A2b — `front_id(key)`:** čistý parser, ktorý z kľúča dielca vytiahne ID čela (`front:F2/wing:single` → `F2`), inak `nil`. Formát kľúča je kontrakt tohto modulu, takže druhý
 parser inde by sa časom rozišiel; jediný čitateľ je zatiaľ deep-link „klik na RED nález otvorí kartu čela" (`ProductionCore.do_select` → `Panel.push_focus_front`).
 
 ### build_plan.rb
 
-**ZÁVÄZNÝ kontrakt plánu** (SCHEMA 3, MIN_DIM, validátor, `warnings[]`, hardware string-keyed s GENERIC_TYPES/limitmi/referenčnou integritou ownera). Geometria, kusovník aj VEPO
+**ZÁVÄZNÝ kontrakt plánu** (SCHEMA 4, MIN_DIM, validátor, `warnings[]`, hardware string-keyed s GENERIC_TYPES/limitmi/referenčnou integritou ownera). Geometria, kusovník aj VEPO
 čítajú TEN ISTÝ plán.
 
 **`GENERIC_TYPES` + `lift` a `SCHEMA` 2 → 3 (KOV-B1, v0.9.19).** Slovník typov kovania dostal `lift` (výklopy a sklopy) — presunuté z KOV-E podľa auditu #17 BLOCKER 2, lebo
@@ -122,6 +127,13 @@ kanonická mapa `use_type → generic_type` v `hardware_sets.rb` ho potrebuje U�
 prinesie KOV-E; slovník je tu preto, aby už nebol potrebný ďalší bump kontraktu. Rozšírenie je pre STARŠÍ plugin neznámy typ, ktorý jeho `guard_unknown_hardware!` odmietne, takže
 plán, ktorý ho môže niesť, už nie je plánom schémy 2 — odtiaľ bump. Slovenský názov („Výklop / sklop") žije v troch mapách naraz (`HardwareRules.label_for`,
 `Validation::HW_LABELS`, `ui/js/rules.js`) a paritu stráži guard, ktorý iteruje `GENERIC_TYPES` — nie opísaný zoznam.
+
+**`SCHEMA` 3 → 4 (KOV-C2b, v0.9.31): DIELCE ZÁSUVIEK.** `ROLES` dostali `drawer_bottom` · `drawer_back` · `box_side` · `drawer_inner_front` (zhodné s `Recipes::ROLE_*`
+aj `CabinetBuilder::DRAWER_ROLES` — väzbu drží guard test), materiálový signál dielca pozná **`:drawer`** (4. kanál) a `HW_SOURCES` má **`recipe`**. Položka výsuvu z receptu
+smie navyše niesť voliteľné **`locked: true`** — a to VÝHRADNE pri `source: 'recipe'` a len keď existuje platný NL zámok (Astra #19 N11: inak by každá zásuvka hlásila „ručne
+prepísané"). Plán má aditívny kľúč **`drawer_conflicts`** (fail-closed dôvody; validuje `validate_drawer_conflicts!` proti registru `Recipes::DRAWER_BLOCKERS`) a dva
+zápisové kanály pre builder — `drawer_writes` a `drawer_override_writes`. Rozšírenie je pre STARŠÍ plugin neznáma rola aj neznámy `source`, takže plán, ktorý ich môže niesť,
+už nie je plánom schémy 3 — odtiaľ bump.
 
 **`hardware_set_key_type` pozná prefix `class:`** (triedny kľúč mapovania setov, [hardware.md](hardware.md)): vracia z neho prvý segment, takže `class:lift|classic` prestavbu
 neblokuje a `class:sliding|classic` z novšej verzie áno. `parse_hardware_set_key` pre triedny kľúč vracia `nil` — nie je to výber podľa typu ani podľa dielca.

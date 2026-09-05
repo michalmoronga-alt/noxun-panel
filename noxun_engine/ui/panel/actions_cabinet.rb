@@ -614,7 +614,14 @@ module Noxun
             return
           end
           params = existing_params(cab)
-          params['fronts'] = data['fronts'] || Fronts.empty_config
+          # KOV-C2b: `drawer.system` a `drawer.recipe_refs` su SERVEROVE.
+          # Payload panela nahradza cela VCELKU, takze stale alebo podvrhnute
+          # pole by pripnutu verziu receptu prepisalo — a s nou GEOMETRIU uz
+          # postavenej zakazky. Klientske hodnoty sa preto zahadzuju a ULOZENE
+          # sa pripajaju spat podla ID cela (Codex #301 kolo 3 P1).
+          params['fronts'] = Fronts.reattach_server_drawer_fields(
+            data['fronts'] || Fronts.empty_config, params['fronts']
+          )
           CabinetBuilder.rebuild(model, cab, params)
           finish_cab(model, cab, "Cela aktualizovane — #{Store.get(cab, 'cabinet_id')}.")
         end
@@ -654,7 +661,11 @@ module Noxun
           PARAM_KEYS.each do |k|
             params[k] = data[k] if data.key?(k)
           end
-          params['fronts'] = data['fronts'] if data.key?('fronts')
+          # KOV-C2b: to iste ako v `handle_apply_fronts` — serverove polia
+          # klasifikacie zasuvky sa z payloadu zahadzuju a pripajaju spat.
+          if data.key?('fronts')
+            params['fronts'] = Fronts.reattach_server_drawer_fields(data['fronts'], params['fronts'])
+          end
           # KOV-H1: ad-hoc kovanie ide TOU ISTOU cestou ako cela (audit #15
           # BLOCKER 1: ziadny novy zapisovy kanal — `collectAll` -> `apply_all`
           # -> `normalize` -> rebuild = 1 krok Spat, guardy, R-12).

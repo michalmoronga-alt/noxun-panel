@@ -20,7 +20,12 @@
 #                          3 = KOV-B1 (slovnik GENERIC_TYPES sa rozsiril o `lift` — vyklopy
 #                          a sklopy; polozka s nim je pre STARSI plugin neznamy typ a jeho
 #                          `guard_unknown_hardware!` prestavbu odmietne, takze plan, ktory ho
-#                          moze niest, uz nie je plan schemy 2).
+#                          moze niest, uz nie je plan schemy 2);
+#                          4 = KOV-C2b (dielce zasuviek: nove roly `drawer_bottom`/`drawer_back`/
+#                          `box_side`/`drawer_inner_front`, materialovy signal `:drawer`, polozka
+#                          vysuvu so `source: 'recipe'` a volitelnym `locked`, aditivny kluc
+#                          `drawer_conflicts`. Starsi plugin tieto roly ani source nepozna —
+#                          plan, ktory ich moze niest, uz nie je plan schemy 3).
 #   parts       [dielec] — deskriptory REALNE POSTAVITELNYCH dielcov. Degenerovane dielce
 #                          (nekladny rozmer boxu, napr. z extremne uzkych zon) sa do parts
 #                          NEdostanu — plan ich vyradi s warningom part_skipped_degenerate,
@@ -77,7 +82,7 @@
 module Noxun
   module Engine
     module BuildPlan
-      SCHEMA = 3
+      SCHEMA = 4
 
       # Najmensi vyrobitelny rozmer (mm). JEDINY prah degenerovanosti v systeme:
       # plan (partition v Construction.build_plan) aj builder (positive_box?) ho zdielaju —
@@ -87,10 +92,14 @@ module Noxun
       # Slovnik roli dielcov (standard 2.4) — validator odmietne nezname roly.
       # free_panel = samostatna doska (V0.4.7, kind board); buduce roly dosiek
       # (cover_side/cover_top/filler/worktop/plinth_board) pribudnu pri implementacii.
+      # KOV-C2b: dielce zasuviek z receptu (`drawer_bottom` · `drawer_back` ·
+      # `box_side` · `drawer_inner_front`) — roly su ZHODNE s `Recipes::ROLE_*`
+      # (guard test ich porovnava) a s ABS seedom 4 aj `CabinetBuilder::DRAWER_ROLES`.
       ROLES = %w[
         side_left side_right bottom top back shelf divider_v divider_h
         front_door drawer_front flap cover_panel false_front rail_front rail_back
         plinth gola_profile free_panel
+        drawer_bottom drawer_back box_side drawer_inner_front
       ].freeze
 
       PRODUCTION_CLASSES = %w[sheet linear counted reference none].freeze
@@ -187,7 +196,12 @@ module Noxun
       # (quantity priamo riadi pocet kreslenych noh; 100000 valcov nesmie byt mozne).
       MAX_HW_QUANTITY = 999
 
-      HW_SOURCES = %w[rule manual].freeze
+      # KOV-C2b: `recipe` = polozka vysuvu z NEMENNEHO receptu zasuvky. Nie je to
+      # ani pravidlo (rule engine ju neemituje) ani rucny zasah (pouzivatel ju
+      # nezadal) — a nakup ju cita INAK: triedny kluc namiesto genericheho
+      # `slide`, a chybajuci set je RED, nie ORANGE.
+      HW_SOURCES = %w[rule manual recipe].freeze
+      HW_SOURCE_RECIPE = 'recipe'
 
       module_function
 
@@ -209,6 +223,7 @@ module Noxun
         seen = {}
         plan[:parts].each { |pd| validate_part!(pd, seen) }
         plan[:hardware].each { |hw| validate_hardware!(hw, seen) }
+        validate_drawer_conflicts!(plan[:drawer_conflicts]) if plan.key?(:drawer_conflicts)
         plan
       end
 
@@ -227,7 +242,9 @@ module Noxun
         # :korpus/:front = signal dedenia materialu v korpuse (resolve_part);
         # :concrete (V0.4.7) = material je uz KONKRETNY v configu (samostatne dosky,
         # snapshot bez dedenia) — descriptor s :concrete NIKDY nejde cez resolve_part.
-        unless %i[korpus front concrete].include?(pd[:material])
+        # KOV-C2b: `:drawer` = 4. materialovy kanal (dielce zasuviek) — dedi
+        # projektovu/korpusovu predvolbu zasuviek, nie telo ani celo.
+        unless %i[korpus front concrete drawer].include?(pd[:material])
           raise "BuildPlan: dielec #{key} ma neplatny material #{pd[:material].inspect}."
         end
         validate_triplet!(key, 'box', pd[:box], positive: true)
@@ -332,7 +349,37 @@ module Noxun
             raise "BuildPlan: hardware #{gt} nesie rule_nominal_length bez source 'manual'."
           end
         end
+        # KOV-C2b: `locked` znaci PLATNY osovy zamok (rucne zamknuta NL) na
+        # receptovej polozke. Kluc EXISTUJE len vtedy — nie na kazdej receptovej
+        # polozke (Astra #19 N11: inak by kazda zasuvka hlasila „rucne
+        # prepisane"). Hodnota smie byt VYHRADNE `true` a VYHRADNE pri
+        # `source: 'recipe'`; pravidlove ani rucne polozky ho niest nesmu.
+        if hw.key?('locked')
+          raise "BuildPlan: hardware #{gt} ma neplatny locked (#{hw['locked'].inspect})." unless hw['locked'] == true
+          unless hw['source'].to_s == HW_SOURCE_RECIPE
+            raise "BuildPlan: hardware #{gt} nesie locked bez source '#{HW_SOURCE_RECIPE}'."
+          end
+        end
         hw
+      end
+
+      # KOV-C2b: aditivny kluc planu `drawer_conflicts` — fail-closed dovody,
+      # pre ktore zasuvka NEVYDALA ani dielce ani polozku vysuvu. Builder ich
+      # uklada do configu korpusu (`merge_final`), `Bom.collect` ich zlucuje do
+      # `hardware_issues`. STRING kluce (JSON round-trip cez config, ako warnings).
+      def validate_drawer_conflicts!(list)
+        raise 'BuildPlan: drawer_conflicts musi byt pole.' unless list.is_a?(Array)
+
+        list.each do |c|
+          raise 'BuildPlan: drawer_conflicts polozka musi byt Hash.' unless c.is_a?(Hash)
+          raise 'BuildPlan: drawer_conflicts polozka nema front_id.' if c['front_id'].to_s.strip.empty?
+          code = c['code'].to_s
+          unless Recipes::DRAWER_BLOCKERS.include?(code)
+            raise "BuildPlan: drawer_conflicts ma neznamy kod '#{code}'."
+          end
+          raise "BuildPlan: drawer_conflicts #{code} nema hlasku." if c['message'].to_s.strip.empty?
+        end
+        list
       end
 
       # params: plochy Hash so String klucmi a skalarnymi hodnotami (JSON round-trip).

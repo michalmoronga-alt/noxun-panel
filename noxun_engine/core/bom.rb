@@ -123,6 +123,14 @@ module Noxun
             hardware_issues.concat(
               front_direction_issues(cid, inst.persistent_id, ccfg['front_items'])
             )
+            # KOV-C2b: fail-closed dovody zasuviek. Citaju sa z ULOZENEHO
+            # `drawer_conflicts` (nosic v configu) — po fail-closed stavbe
+            # neexistuje dielec ani polozka, z ktorej by sa dovod dal odvodit,
+            # takze bez neho by sa RED po znovuotvoreni .skp stratil.
+            hardware_issues.concat(
+              drawer_conflict_issues(cid, inst.persistent_id, ccfg['drawer_conflicts'],
+                                     ccfg['front_items'])
+            )
             cs = ccfg['hardware_sets']
             note_cabinet_sets(cid, (cs.is_a?(Hash) && !cs.empty? ? cs : nil),
                               cabinet_sets, cabinet_sets_seen, cabinet_set_conflicts)
@@ -308,6 +316,28 @@ module Noxun
           end
         end
         out
+      end
+
+      # KOV-C2b: ulozene `drawer_conflicts` -> tvrde nalezy kovania. Tvar zaznamu
+      # je kontrakt `BuildPlan.validate_drawer_conflicts!` ({front_id, code,
+      # message, part_key}); tu sa k nemu doplni len ADRESA (vlastnik, instancia)
+      # a LUDSKY popis cela. Neznamy kod (config z novsej verzie) sa PRESKOCI —
+      # o taku zakazku sa stara vlastna brana `newer_configs`.
+      def drawer_conflict_issues(owner_id, owner_pid, conflicts, front_items)
+        items = front_items.is_a?(Array) ? front_items : []
+        Array(conflicts).filter_map do |c|
+          next nil unless c.is_a?(Hash)
+
+          code = c['code'].to_s
+          next nil unless defined?(Recipes) && Recipes::DRAWER_BLOCKERS.include?(code)
+
+          pkey = c['part_key'].to_s
+          { 'code' => code, 'severity' => 'red',
+            'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
+            'part_key' => pkey, 'front_id' => c['front_id'].to_s,
+            'message' => c['message'].to_s,
+            'label' => PartKeys.human_label(pkey, fronts: items).to_s }
+        end
       end
 
       # R-34 (review #262 P1): `cabinet_sets` je mapa ID => override setov, teda

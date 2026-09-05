@@ -334,7 +334,16 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   [350, 420, 470] a kód 620 vyhodený zo seed setu `atira-biela-h144-sisy` — `357755` je PTO kit, teda Tip-On, a pre SiSy H144/620 (ani H70/620) kit neexistuje. Recept sa
   opravil NA MIESTE aj s prepočítaným odtlačkom v `RELEASED.json`, lebo v1 ešte nestojí v žiadnom projekte (C2b nie je v maine); **od aktivácie platí nemennosť bez výnimky**
   a oprava = nový `_v2`.
-  **C2b · aktivácia (mení výstupy LEN pre čelá so systémom; ostatné zákazky CONTENT-identické; NARAZ a–h — z (b) a (d) ostáva len to, čo C2a vedome neurobila):**
+  **C2b · aktivácia — ✅ HOTOVÉ (PR TBD, v0.9.31, 5.9.2026):** v maine sú body **(a), (c), (d) zvyšok, (e), (f), (g)** — resolver v `Construction.build_plan` (`drawer_pass`),
+  dielce v pláne aj v modeli, JEDNA položka výsuvu `source: recipe` (+ `locked` pri zámku), R2 exkluzivita legacy `slide`, D-93 migrácia `rule_id`, RED `drawer_kit_missing`
+  v nákupe, register `DRAWER_BLOCKERS` v `export_blockers` (`drawer_stop`, VEPO len na kit), uložený nosič `drawer_conflicts`, ORANGE `drawer_sync_recommended`,
+  `CONFIG_SCHEMA` 4 → 5 a `plan_schema` 3 → 4, `recipe_refs`/`system` ako SERVEROVÉ polia. **Vedomé odchýlky:** (1) `Fronts.norm_drawer` NEOVERUJE, či je ref registrovaný —
+  robí to až `Recipes.active_ref` pri stavbe (inak by stav `drawer_recipe_unknown` bol mŕtvy a starší plugin by ticho pripol iný recept); (2) server-only sú OBE polia
+  (`recipe_refs` aj `system`) — panel ich v C2b ani neposiela a server `system` deterministicky odvodí z konštrukcie; (3) dielce zásuviek nenesú `axes:` (farbenie ABS plôšok
+  by pri stojacom dielci vyšlo na zlú hranu — PartFaces zásada „radšej žiadna farba"; farbenie = C2c/D); (4) povýšenie na `drawer_kit_missing` platí pre **každý** dôvod
+  nemapovania receptovej položky, nielen pre tri menované (fail-closed — iný dôvod jej lepší výsledok nedá); (5) `legacy_slide_suppressed` sa v Kontrole zámerne
+  NEZOBRAZUJE (`Validation::BUILD_INFO_ONLY`) — je to konštatovanie, nie nález. **Bod (h) = C2c.**
+  **C2b · aktivácia — pôvodné zadanie (mení výstupy LEN pre čelá so systémom; ostatné zákazky CONTENT-identické; NARAZ a–h):**
   (a) `Construction.build_plan` volá resolver pre každé drawer čelo so systémom → dielce do `plan.parts` s part_key `front:<id>/drawer_bottom` · `/drawer_back` ·
   `/box_side:left|right` · `/drawer_inner_front`; nové ROLES + `plan_schema` bump + `material signals` enum `:drawer` + `human_label` vetvy; `materialized_part` sa NEPOUŽÍVA
   (nový `drawer_part` s finálnou geometriou); **poradie stavby (Codex #301 kolo 3 P1):** `CabinetBuilder.build_into` dnes volá `Construction.build_plan` PRED `effective_materials` — pre drawer roly sa hrúbky kanála `:drawer` (+ `part_overrides`) vyriešia PRED plánom a odovzdajú receptu ako `part_thicknesses`; bez nich by 18 mm materiál pri Atire prešiel a Quadro by počítalo

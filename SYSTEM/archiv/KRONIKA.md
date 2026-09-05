@@ -17,6 +17,31 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-C2b — AKTIVÁCIA RECEPTOV ZÁSUVIEK: DIELCE, POLOŽKA VÝSUVU, BRÁNY, SCHÉMA 5 (v0.9.31, 5.9.2026):** tretí rez package KOV-C v2 a **prvý, ktorý mení výstupy** —
+  ale výhradne pre čelo klasifikované ako zásuvka **so systémom**. Zákazka bez takej klasifikácie je content-identická (vlastný charakterizačný test: žiadny dielec s
+  materiálovým signálom `:drawer`, žiadna položka `source: recipe`, legacy `slide` pravidlo naďalej beží, nové kľúče configu prázdne).
+  **Čo pribudlo.** (1) **`Construction.drawer_pass`** — beží po vyradení degenerovaných dielcov a **pred** `HardwareRules.evaluate`: klasifikácia (`recipe_key_for`) →
+  aktívny záznam mapy `drawer.recipe_refs` (`active_ref`; chýbajúci = súrodenec **rovnakej** verzie, inak `latest_for`; neznámy = RED) → `context_for` → `Recipes.resolve`.
+  Emisia je **atomická**: buď všetky dielce a jedna položka výsuvu, alebo nič a záznam v `plan[:drawer_conflicts]`. (2) **Dielce v pláne aj v modeli** — nové roly
+  `drawer_bottom`/`drawer_back`/`box_side`/`drawer_inner_front`, materiálový signál `:drawer`, `plan_schema` 3 → 4, tag `Noxun/Vnútro`, `human_label` s číslom čela.
+  (3) **Hrúbka je VSTUP receptu:** builder rieši kanál `:drawer` + `part_overrides` **pred** plánom a posiela ho ako `part_thicknesses` (Codex #301 kolo 3 P1) — bez toho by
+  18 mm materiál pri Atire ticho prešiel a Quadro by počítalo predok/chrbát z nesprávnej hrúbky dna. (4) **Jedna položka výsuvu** `source: recipe`,
+  `rule_id: recipe:<recipe_id>`, voliteľné `locked: true` **len pri platnom NL zámku**; legacy `slide` pravidlá sú na takom čele potlačené (**R2 exkluzivita**, jeden `info`
+  warning na stavbu). (5) **D-93 migrácia** legacy `rule_id` na receptovú identitu v tej istej operácii ako geometria; `disabled` alebo počet ≠ 1 = RED
+  `drawer_override_invalid` a server takú mutáciu odmieta už v paneli. (6) **Brány:** register `Recipes::DRAWER_BLOCKERS` (10 kódov) — 9 konfliktov stavby zastaví nákupný
+  CSV, rozpočet a ponuku, `drawer_kit_missing` (vzniká v nákupe) zastaví **aj VEPO**, lebo dielce sú už rezané na konkrétnu NL. `drawer_stop` beží **pred pickerom**.
+  (7) **Uložený nosič `drawer_conflicts`** (Astra #19 F6) — po fail-closed stavbe niet položky, z ktorej by sa dôvod obnovil, takže žije v configu a prežije save/reopen aj
+  Undo. (8) **`CONFIG_SCHEMA` 4 → 5** + `drawer_material_id` (úroveň skrinky) + `drawer.system`/`drawer.recipe_refs` ako **serverové** polia (handler ich z payloadu zahodí
+  a uloženú mapu pripojí späť podľa ID čela). (9) **ORANGE `drawer_sync_recommended`** pri P2O nad prahom šírky — žiadny blocker, žiadny nový `generic_type`.
+  **Vedomé odchýlky od textu package (všetky fail-closed):** `norm_drawer` neoveruje register receptov (robí to `active_ref` — inak by stav `drawer_recipe_unknown` bol mŕtvy
+  a starší plugin by ticho pripol iný recept) · server-only sú **obe** polia, nielen `recipe_refs` (panel `system` v C2b neposiela a server ho odvodí z konštrukcie) ·
+  dielce nenesú `axes:` (pri stojacom dielci by ABS farba vyšla na spodnú hranu, kým páska ide na hornú — PartFaces zásada „radšej žiadna farba"; farbenie = C2c/D) ·
+  na `drawer_kit_missing` sa povyšuje **každý** dôvod nemapovania receptovej položky, nielen tri menované · `legacy_slide_suppressed` sa v Kontrole nezobrazuje
+  (`Validation::BUILD_INFO_ONLY`) — je to konštatovanie, nie nález, a ORANGE riadok na každej zdravej zásuvke by bol falošný poplach.
+  **Testy:** 3063 headless (+40: `test_kovc2b_dielce.rb` 21 · `test_kovc2b_brany.rb` 19), 89 JS sád, nová in-SU sekcia **`run_kovc2b`** (plán vs. model 1:1, prestavba bez
+  duplicít, 1 krok Späť, kópia aj šablóna nesú pripnutý recept, plytká skrinka = žiadne dielce + RED + zastavený export s **prázdnym** priečinkom a neotvoreným pickerom).
+  **Zostáva C2c:** karta zásuvky v Inspectore, riadky Kontroly s navigáciou, labely Nákupu a UI 4. materiálového kanála (+ D-46 preflight per systém).
+
 - **KOV-C2a — PRÍPRAVA AKTIVÁCIE ZÁSUVIEK: MATERIÁLOVÝ KANÁL, ABS A RECEPTOVÉ SETY (PR #303, v0.9.30, 5.9.2026):** druhý rez package KOV-C v2 a opäť **bez viditeľnej zmeny** —
   kusovník, nákup, VEPO ani rozpočet sa nehli (charakterizačný test + golden `seed_kniznica`). Dávka vedome vzala z bodov C2 (b) a (d) presne to, čo sa dá spraviť **pred**
   zapnutím, aby samotná aktivácia (C2b) bola malý PR: riziko „C2 narastie" bolo v package menované vopred.
