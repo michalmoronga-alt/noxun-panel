@@ -90,16 +90,28 @@ module Noxun
       #   * plan si pamata DOKUMENT ako REFERENCIU na `Sketchup::Model`
       #     (nie `guid` — ten sa meni pri kazdom ulozeni, lekcia #261/#264),
       #   * ziadne ID, ziadna entita, ziadny krok Spat — tie vznikaju v commite.
+      #
+      # GHOST-D2: plan navyse pozna, ci je nazov EXPLICITNY (napisal ho
+      # pouzivatel na karte) alebo AUTOMATICKY („Doska 800×600" z rozmerov).
+      # `replan` automaticky nazov prepocita z NOVYCH rozmerov, explicitny
+      # necha tak — bez tohto priznaku by sa po `normalize` nedal odlisit
+      # (oba su len String).
       class BoardPlan
         attr_reader :config, :stored_config, :orientation, :template_ref
 
-        def initialize(model, config, stored_config, orientation, template_ref = nil)
+        def initialize(model, config, stored_config, orientation, template_ref = nil, auto_name = false)
           @model = model
           @config = config
           @stored_config = stored_config
           @orientation = orientation
           @template_ref = template_ref
+          @auto_name = auto_name ? true : false
           freeze
+        end
+
+        # Je nazov dosky AUTOMATICKY (odvodeny z rozmerov)?
+        def auto_name?
+          @auto_name
         end
 
         # Patri plan TOMUTO dokumentu? Porovnava sa objekt modelu, nie guid.
@@ -424,13 +436,49 @@ module Noxun
         # `board_config`; commit uz katalog necita. (Hranica ako R-03: sam
         # `normalize` moze cez `Materials` siahnut na katalog na disku.)
         def prepare_insert(model, params, template_ref: nil)
-          cfg = normalize(insert_params(model, params))
+          p = insert_params(model, params)
+          # GHOST-D2: priznak sa cita zo VSTUPU, nie z vysledku — po `normalize`
+          # su explicitny aj automaticky nazov len String.
+          auto = present(raw(p, :name)).nil?
+          cfg = normalize(p)
           validate_config!(cfg)
           stored = board_config(cfg)
           BoardPlan.new(model,
                         CabinetBuilder.deep_copy_cfg(cfg, freeze_result: true),
                         CabinetBuilder.deep_copy_cfg(stored, freeze_result: true),
-                        cfg[:orientation].to_s, template_ref)
+                        cfg[:orientation].to_s, template_ref, auto)
+        end
+
+        # GHOST-D2: ODVODENY PLAN. Kreslenie pozna finalne rozmery az po dvoch
+        # tahoch, ale sev D1 bezi nad planom ZMRAZENYM PRED startom ghostu —
+        # `replan` je preto cisty krok medzi nimi: vyrobi NOVY zmrazeny
+        # `BoardPlan` s novou dlzkou a sirkou a VSETKO ostatne prenesie BEZ
+        # opatovneho citania katalogu (material, `material_source`, hrany,
+        # sablonu, orientaciu, hrubku). Keby sa volal `board_config` znova,
+        # zmena katalogu medzi startom kreslenia a klikom by ticho zmenila
+        # vyrobny zaznam — presne to, co zmrazeny plan (D1) vylucuje.
+        #
+        # Rozmery sa zaokruhluju na 0,01 mm (rovnako ako `board_config`) a
+        # ORIEZAVAJU sa na `LIMITS` — do planu sa nikdy nedostane rozmer,
+        # ktory by `normalize` neskor ticho zmenil. Automaticky nazov sa
+        # prepocita z NOVYCH rozmerov, explicitny ostava.
+        def replan(plan, length:, width:)
+          raise 'Odvodiť sa dá len pripravená doska.' unless plan.is_a?(BoardPlan)
+
+          l = clampf(length.to_f, *LIMITS[:length]).round(2)
+          w = clampf(width.to_f, *LIMITS[:width]).round(2)
+          cfg = CabinetBuilder.deep_copy_cfg(plan.config)
+          cfg[:length] = l
+          cfg[:width] = w
+          cfg[:name] = auto_board_name(l, w) if plan.auto_name?
+          stored = CabinetBuilder.deep_copy_cfg(plan.stored_config)
+          stored[:length] = l
+          stored[:width] = w
+          stored[:name] = cfg[:name].to_s if plan.auto_name?
+          BoardPlan.new(plan.model_ref,
+                        CabinetBuilder.deep_copy_cfg(cfg, freeze_result: true),
+                        CabinetBuilder.deep_copy_cfg(stored, freeze_result: true),
+                        plan.orientation, plan.template_ref, plan.auto_name?)
         end
 
         # GHOST-D1 FAZA 2: JEDINE miesto, kde ghost dosky meni model. Poradie
@@ -775,9 +823,15 @@ module Noxun
           v = raw(p, :name)
           s = v.to_s.strip
           return s unless s.empty?
-          l = fetchf(p, :length, DEFAULTS[:length]).round
-          w = fetchf(p, :width, DEFAULTS[:width]).round
-          "Doska #{l}×#{w}"
+          auto_board_name(fetchf(p, :length, DEFAULTS[:length]),
+                          fetchf(p, :width, DEFAULTS[:width]))
+        end
+
+        # AUTOMATICKY nazov dosky. JEDNO miesto pre `normalize` aj GHOST-D2
+        # `replan` — inak by nakreslena doska dostala inak formatovany nazov
+        # nez vlozena.
+        def auto_board_name(length, width)
+          "Doska #{length.to_f.round}×#{width.to_f.round}"
         end
 
         def norm_grain(p, sheet)

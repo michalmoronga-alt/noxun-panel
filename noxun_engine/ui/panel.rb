@@ -253,6 +253,10 @@ module Noxun
           cb(dlg, 'ghost_lock_z')       { |p| handle_ghost_lock_z(p) }
           # V0.4.7c: samostatna doska — vlozenie + karta (fields/material/ABS hrana)
           cb(dlg, 'insert_board')       { |p| handle_insert_board(p) }
+          # GHOST-D2: „Nakresliť" — SAMOSTATNY callback (kreslenie dvoma tahmi).
+          # Whitelist je TU, nie v HTML: `disabled` ani nazov tlacidla nie su
+          # ochrana pred oneskorenym alebo cudzim volanim.
+          cb(dlg, 'draw_board')         { |p| handle_draw_board(p) }
           cb(dlg, 'set_board_fields')   { |p| handle_set_board_fields(p) }
           cb(dlg, 'set_board_material') { |p| handle_set_board_material(p) }
           cb(dlg, 'set_board_orientation') { |p| handle_set_board_orientation(p) } # UI-C1c orientacia dosky

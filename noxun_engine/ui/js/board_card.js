@@ -632,6 +632,48 @@
     if (window.sketchup && sketchup.insert_board) sketchup.insert_board(nxDocPayload(res.payload)); // R-02
   }
 
+  // GHOST-D2: „Nakresliť" — doska sa nakreslí DVOMA ŤAHMI (klik = počiatok,
+  // ťah dĺžky, ťah šírky). Payload je ten istý ako pri vložení, navyše nesie
+  // ČÍSELNÝ SNAPSHOT ZÁMKOV karty ako SAMOSTATNÉ pole:
+  //   `NXInsert.boardLocks` je súkromný JS stav („NIKDY do Ruby"), preto ide
+  //   cez `locksFlat('board')` = HODNOTY zamknutých polí ({length: 800});
+  //   nezamknutý kľúč v mape CHÝBA. Žiadny prevod na Boolean — zámok z toho,
+  //   že pole má hodnotu, NEEXISTUJE (polia sú vždy predvyplnené 800 × 600).
+  // Server hodnoty znova overí (whitelist + limity) a zámky nikdy nezapíše
+  // do výrobného configu.
+  function buildDrawBoardPayload(payload, locks){
+    var out = payload || {};
+    var flat = locks || {};
+    var keep = {};
+    ['length', 'width'].forEach(function(k){
+      var v = flat[k];
+      if (typeof v === 'number' && isFinite(v)) keep[k] = v;
+    });
+    out.locks = keep;
+    return out;
+  }
+  function drawBoard(){
+    var ms = el('ib_material');
+    var res = buildInsertBoardPayload({
+      name: el('ib_name') ? el('ib_name').value : '',
+      length: el('ib_length') ? el('ib_length').value : '',
+      width: el('ib_width') ? el('ib_width').value : '',
+      material_id: ms ? ms.value : '',
+      grain_direction: el('ib_grain') ? el('ib_grain').value : '',
+      thickness: el('ib_thickness') ? el('ib_thickness').value : '',
+      orientation: (typeof NXInsert !== 'undefined') ? NXInsert.boardOrientation() : 'leziaca'
+    }, findSheetIn(MATERIALS.sheets, ms ? ms.value : ''));
+    if (!res.ok){ NX.setStatus(res.error, true); return; }
+    var ref = (typeof NXInsert !== 'undefined') ? NXInsert.templateRef() : null;
+    if (ref && ref.kind === 'board'){
+      res.payload.template_kind = ref.kind;
+      res.payload.template_name = ref.name;
+    }
+    var locks = (typeof NXInsert !== 'undefined') ? NXInsert.locksFlat('board') : {};
+    var payload = buildDrawBoardPayload(res.payload, locks);
+    if (window.sketchup && sketchup.draw_board) sketchup.draw_board(nxDocPayload(payload)); // R-02
+  }
+
   // ===== UI-C1b: DOSKOVA SABLONA VO VKLADACEJ KARTE =========================
   // KONTRAKT HRUBKY (Codex #174 P2, zapisany v core/templates.rb board_tpl):
   // doskova sablona ma `material_id` EXPLICITNE nil => vklada sa cez UNI
@@ -733,5 +775,8 @@
                        nxBoardArea: nxBoardArea,
                        // GHOST-D1: read-only karta pri doske z novsej verzie
                        // (sada tests/js/test_ghost_d1_karta.js nad mini-DOM).
-                       applyBoardReadOnly: applyBoardReadOnly };
+                       applyBoardReadOnly: applyBoardReadOnly,
+                       // GHOST-D2: ciselny snapshot zamkov do payloadu `draw_board`
+                       // (sada tests/js/test_ghost_d2_karta.js).
+                       buildDrawBoardPayload: buildDrawBoardPayload };
   }

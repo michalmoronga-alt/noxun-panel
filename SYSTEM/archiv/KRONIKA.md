@@ -17,6 +17,47 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **GHOST-D2 — KRESLENIE DOSKY NA ROZMER (Ghost 2.0) (v0.9.28, 5.9.2026):** doska sa od tejto dávky dá **nakresliť dvoma ťahmi**: klik určí počiatok, prvý ťah dĺžku a smer,
+  druhý šírku, klik vloží. Karta Dosky má preto **dve tlačidlá v jednom riadku** — „Vložiť" (D1 ghost) a **„Nakresliť"** (D2, samostatný serverom whitelistovaný callback
+  `draw_board`; `insert_board` ostáva pre vloženie aj pre dvojklik doskovej šablóny — HTML `disabled` ani názov tlačidla nie sú ochrana). Package (`SYSTEM/PLAN.md`, blok 4) je
+  výsledkom **4 kôl Codex CLI auditu** (Sol + Astra, kolo 4 SOUND) a outside-in packetu s probe v SU 26.0.429.
+  **Dve fázy = dve ROZDIELNE geometrie, nie jedna s prepínačom (audit 1 BLOCKER).** Fáza 1 **hľadá smer** v **vodorovnej rovine Z = Z počiatku** pre všetky orientácie (dĺžka je
+  vodorovná aj pri stojacej doske) — **žiadna projekcia na „lokálnu os"**, tá v tej chvíli ešte neexistuje (kruhová závislosť; dôkaz je test šikmého ťahu 45° v prázdnom modeli
+  = rotácia 45°, nie 0°). Fáza 2 **meria po PEVNEJ osi**: ležiaca vodorovne (`Z × dir_x`), stojaca a na stenu po **svetovej +Z** (výška pilastra). Rotáciu okolo Z určuje smer
+  **v okamihu potvrdenia**; nulový vektor (číslo napísané hneď, preskočená fáza) sa nahradí **kanonickým smerom = lokálna +X podľa rotácie session** a **NIKDY sa nedostane do
+  transformácie**. Pri **zápornom 2. ťahu** sa posunie **POČIATOK** o −šírka po osi merania — osi ostávajú pravotočivé, žiadne obracanie `dir_y` (Codex #288 P1).
+  **Brána voľného priestoru je v oboch fázach, ale iná (audit 3 + audit 4).** Vo fáze 1 sa použije len **reálna** geometrická inferencia premietnutá na rovinu, inak
+  `pickray ∩ rovina` s **plným guardom dnešného ghostu** (`t >= 0`, konečné čísla, uhlový prah `MIN_SIN`, `MAX_REACH_MM`). Vo fáze 2 by premietnutie z vodorovnej roviny dalo pri
+  zvislej šírke pilastra **konštantnú výšku**, preto je fallbackom **najbližší bod lúča a PRIAMKY osi** — s rovnakým kontraktom degenerácie (takmer rovnobežný lúč = takmer nulový
+  menovateľ → výsledok odletí alebo zmení znamienko šírky). Testy idú z **oboch strán**, nie len presná rovnobežnosť.
+  **Odvodený plán `BoardBuilder.replan` (Codex #288 P1).** Šev D1 beží nad plánom zmrazeným **pred** štartom ghostu, ale kreslenie pozná rozmery až po ťahoch — `replan` je čistý
+  krok medzi nimi: nový **zmrazený** `BoardPlan` s finálnymi rozmermi, ktorý zachová vyriešený **výrobný snapshot** (materiál, `material_source`, hrany, marker schémy) **bez
+  opätovného čítania katalógu**. `BoardPlan` preto nesie aj príznak **`auto_name?`** — automatický názov („Doska 800×600") sa prepočíta z nových rozmerov, **explicitný ostáva**;
+  po `normalize` sú oba len String, takže sa príznak číta zo **vstupu** `prepare_insert`.
+  **Zámky fáz z karty (audit 1 BLOCKER, audit 2 PARTIAL).** `NXInsert.boardLocks` je súkromný JS stav („NIKDY do Ruby") → pri štarte session ide **číselný snapshot**
+  `locks: { length:, width: }` cez existujúci `locksFlat('board')` ako **samostatné pole** payloadu; nezamknutý kľúč **chýba**, žiadny prevod na Boolean. Ruby whitelistuje len
+  `length`/`width`, hodnota musí byť **Numeric** a prejsť `BoardBuilder::LIMITS` **už pri štarte** — mimo limitu alebo nečíslo znamená, že sa **session vôbec nespustí**.
+  Zamknutá fáza sa **preskočí** (pri preskočenej dĺžke je smer kanonický); pri oboch zamknutých commituje už klik počiatku. Zámky **nikdy** neskončia vo výrobnom configu.
+  **Limity platia pre VŠETKY štyri zdroje rozmeru** (písané číslo, zámok, hodnota karty pri prázdnom Enter, ťah myšou) a kontrolujú sa **pred posunom fázy** — inak by `normalize`
+  ticho orezal a náhľad by ukázal 6000, kým model dostane 5000. Neplatný vstup = `UI.beep` + status s rozsahom a **fáza ostáva** (vzor Trimble `99_sphere_tool`, MIT); ťah nad limit
+  sa v náhľade **oreže** a klik mimo limitu sa **odmietne**. Každá prijatá hodnota sa zaokrúhli na **0,01 mm**, takže **náhľad = config = geometria**.
+  **Meracie pole (probe 5.9.).** `enableVCB?` vracia hodnotu **zmrazenú v `activate`** — fázovo podmienené by nechalo Measurements po aktivácii vypnuté a písané rozmery by po prvom
+  kliku neprišli. Písané číslo príde cez `onUserText` a parsuje ho **vlastný** parser (úplná zhoda po `strip`, bodka aj čiarka, `mm` voliteľné): `String#to_l` na slovenskom Windows
+  padne pri bodke a bez jednotky si vezme šablónu modelu, `to_f` by z `abc2400xyz` spravilo 0.0 a z `2400mmjunk` 2400.0. **Prázdny Enter ide cez `Tool#onReturn`** — konštanta
+  `VK_RETURN` v SketchUp API **NEEXISTUJE** (probe: Enter = kód 13, pri prázdnom poli `onUserText` nepríde) — a je to **vedomá** akcia: prevezme hodnotu karty a status to povie.
+  **Klávesy majú JEDNU hranicu: klik počiatku (audit 1 + audit 2 NOTE).** ←/→ a ↑/↓ platia len vo fáze 0; od kliku sú zamknuté (klávesa sa pohltí + status povie prečo), lebo
+  rovina 1. ťahu aj os 2. ťahu závisia od orientácie. ALT v kreslení význam nemá (počiatok je pevná kotva `fl_bottom` a pamätaná kotva placementu sa ignoruje).
+  **Shift = hold-to-lock** natívnej inferencie (`view.lock_inference(ip)` / `onKeyUp` odomkne); **zamknutý smer platí aj vo fáze 1 a aj vo voľnom priestore** — session si drží
+  zamknutý smer a `pickray` fallback sa naň premieta, takže pohyb kurzora po zamknutí **smer dosky nezmení**. Zámok sa **vždy** uvoľní pri zmene fázy, `suspend`/`resume`,
+  `deactivate` a `onCancel` — probe 5.9. potvrdil, že `lock_inference(ip_a, ip_b)` so **syntetickými** bodmi nezamyká, takže lokálna os je **projekcia**, nie natívny zámok.
+  **Commit ide tou istou cestou ako vloženie** (bariéra `flush_pending!` → vytváracia operácia + transparentný scale-lock follow-up pod `guard`, `:blocked` bez stopy), len
+  s odvodeným plánom. Esc v ktorejkoľvek fáze = koniec celej session, 0 krokov Späť, šablóna neopečiatkovaná.
+  **Testy:** 75 nových headless (`tests/pure/test_ghost_d2_kreslenie.rb`), 2 nové JS sady (`test_ghost_d2_karta.js`, `test_ghost_d2_pasik.js`), in-SU `run_ghost_d2` (12 scenárov)
+  a `run_ghost_d2_async`. **Overené 6 mutáciami** (limit neoverený pred Enter · zámok z vyplneného poľa · šírka pri stojacej po X · pečiatka pri štarte kreslenia · nulový smerový
+  vektor prepustený do transformácie · JS zámok ako truthy hodnota) — každá zhodila práve ten test, ktorý ju má chytiť.
+  **Poučenie z implementácie:** konštanta definovaná vnútri `class << self` (`DRAW_KEYS_LOCKED_MSG`, `BOARD_INSERT_PARAM_KEYS`) patrí **singleton triede**, nie modulu — cez
+  `Modul::KONSTANTA` sa nečíta. A v Ruby 3 sa holý hash so **string** kľúčmi posiela metóde s keyword parametrom ako **keywords** (ArgumentError), takže v testoch musí byť `{}`.
+
 - **GHOST-D1 — GHOST PRE DOSKY: ZÁKLAD (v0.9.27, 5.9.2026):** doska sa od tejto dávky kladie **klikom** ako skrinka. „Vložiť dosku" už nevkladá synchrónne na
   `Placement.next_x` — pripraví **zmrazený `BoardPlan`** a zavesí ghost na kurzor; `BoardBuilder.build` ostáva len programatickým volajúcim (testy, in-SU, nástroje).
   Package (`SYSTEM/PLAN.md`, blok 4) je výsledkom **4 kôl Codex CLI auditu** (Sol + Astra, kolo 4 SOUND) a outside-in packetu s probe v SU 26.0.429.

@@ -19,6 +19,16 @@ module Noxun
       # materiali hrubku dalej urcuje katalog (D-45).
       BOARD_FIELD_KEYS = %w[name length width quantity grain_direction thickness].freeze
 
+      # GHOST-D2: whitelist parametrov VKLADACEJ KARTY — JEDEN pre vloženie
+      # (D1 `insert_board`) aj kreslenie (D2 `draw_board`), aby sa dve
+      # vkladacie cesty nemohli rozísť. `orientation` je v ňom vedome: karta
+      # ju posiela pri KAŽDEJ materializácii explicitne (default 'leziaca'),
+      # takže „Bez šablóny" nikdy nezdedí starý draft; neznámu hodnotu
+      # odmietne `BoardBuilder.norm_orientation` výnimkou.
+      # ZÁMKY fáz sem NEPATRIA — nikdy nesmú doputovať do `normalize`.
+      BOARD_INSERT_PARAM_KEYS = %w[name length width material_id grain_direction
+                                   thickness orientation].freeze
+
       class << self
         # GHOST-D1: „Vložiť dosku" UZ NEVKLADA — pripravi ZMRAZENY `BoardPlan`
         # (`BoardBuilder.prepare_insert`) a zavesi ghost na kurzor; doska
@@ -47,15 +57,7 @@ module Noxun
           if (tpl_msg = newer_template_refusal(tpl_ref, 'vloženie by nastavenia stratilo'))
             return set_status("#{tpl_msg} Nič sa nevložilo.", true)
           end
-          params = {}
-          # UI-C1c: `orientation` je vo whiteliste vkladania — karta ju posiela
-          # pri KAZDEJ materializacii explicitne (default 'leziaca'), takze
-          # „Bez šablóny" nikdy nezdedi starý draft. Neznamu hodnotu odmietne
-          # BoardBuilder.norm_orientation vynimkou (cb ju ukaze v statuse).
-          %w[name length width material_id grain_direction thickness orientation].each do |k|
-            v = data[k]
-            params[k] = v unless v.nil? || v.to_s.strip.empty?
-          end
+          params = board_insert_params(data)
           begin
             plan = BoardBuilder.prepare_insert(model, params, template_ref: tpl_ref)
           rescue StandardError => e
@@ -72,6 +74,72 @@ module Noxun
                      'Šípky ←/→ otáčajú, ↑/↓ menia umiestnenie, Alt prepína kotvu, Esc zruší.')
         end
 
+        # GHOST-D2: „Nakresliť" — SAMOSTATNY serverom whitelistovany callback.
+        # `insert_board` (D1) ostava pre vlozenie aj pre dvojklik doskovej
+        # sablony; HTML `disabled` ani nazov tlacidla nie su ochrana, preto
+        # ma kreslenie vlastnu cestu.
+        #
+        # PORADIE JE SUCASTOU KONTRAKTU (R-02 + audit 3), zhodne s D1 a
+        # rozsirene o zamky:
+        #   1. `foreign_document?` ako UPLNE PRVY krok — oneskoreny CEF
+        #      callback zo stareho Inspectora nesmie pripravit `BoardPlan`
+        #      nad NOVYM modelom,
+        #   2. sablonovy ref + DOWNGRADE BRANA (autorita = ULOZENY RAW zaznam),
+        #   3. ZAMKY faz z karty — ciselny snapshot `locksFlat('board')`;
+        #      whitelist LEN `length`/`width`, hodnota Float mm overena proti
+        #      `BoardBuilder::LIMITS` UZ TU (zamknuta faza sa preskakuje,
+        #      takze neplatna hodnota by inak siahla az do geometrie),
+        #   4. `prepare_insert` (ziadna mutacia, ziadne ID, ziadny krok Spat),
+        #   5. session s `interaction: :drawing`.
+        # Zamky ziju LEN v session — do vyrobneho configu sa NIKDY nedostanu.
+        def handle_draw_board(payload)
+          model = Sketchup.active_model
+          data = parse(payload)
+          return if foreign_document?(data, model, 'Doska sa nenakreslila') # R-02
+
+          tpl_ref = take_template_ref!(data, 'board')
+          if (tpl_msg = newer_template_refusal(tpl_ref, 'kreslenie by nastavenia stratilo'))
+            return set_status("#{tpl_msg} Nič sa nenakreslilo.", true)
+          end
+          locks, lock_err = GhostTool::Calc.draw_locks(data['locks'])
+          return set_status(lock_err, true) if lock_err
+
+          params = board_insert_params(data)
+          begin
+            plan = BoardBuilder.prepare_insert(model, params, template_ref: tpl_ref)
+          rescue StandardError => e
+            Engine.log_error(e, 'Panel.handle_draw_board')
+            return set_status("Chyba: #{e.message}", true)
+          end
+          if GhostTool.start(model, plan, template_ref: tpl_ref, subject: :board,
+                                          interaction: :drawing, orientation: plan.orientation,
+                                          locks: locks).nil?
+            return set_status('Kreslenie dosky sa nepodarilo spustiť — skús to znova.', true)
+          end
+          set_status("#{draw_locks_note(locks)}Klikni počiatok dosky · potom ťahaj dĺžku a šírku " \
+                     '(číslo + Enter, prázdny Enter = hodnota karty) · ←/→ a ↑/↓ menia smer a ' \
+                     'umiestnenie PRED prvým klikom · Esc zruší.')
+        end
+
+        # Zamky do statusu — pouzivatel musi vediet, ze sa faza preskoci.
+        def draw_locks_note(locks)
+          return '' if !locks.is_a?(Hash) || locks.empty?
+
+          parts = locks.map do |k, v|
+            "#{GhostTool::Calc.dim_label(k).downcase} #{GhostTool::Calc.fmt_dim(v)} mm"
+          end
+          "Zamknuté z karty: #{parts.join(' · ')} (tieto ťahy sa preskočia). "
+        end
+
+        def board_insert_params(data)
+          params = {}
+          BOARD_INSERT_PARAM_KEYS.each do |k|
+            v = data[k]
+            params[k] = v unless v.nil? || v.to_s.strip.empty?
+          end
+          params
+        end
+
         # GHOST-D1: po USPESNOM commite dosky — vyber, status, refresh panela
         # a peciatka sablony. Bezi MIMO operacie vlozenia; zlyhanie
         # ktorehokolvek kroku nesmie zabranit zatvoreniu committed session.
@@ -79,9 +147,24 @@ module Noxun
           select_only(model, inst)
           label = BoardBuilder::ORIENTATION_LABELS[session.orientation.to_s].to_s.downcase
           bid = Store.get(inst, 'id')
-          set_status(label.empty? ? "Doska #{bid} vložená." : "Doska #{bid} vložená — #{label}.")
+          # GHOST-D2: nakreslena doska hlasi ROZMERY (pouzivatel ich nikde
+          # nenapisal — vznikli z tahov, takze ich musi vidiet potvrdene).
+          drawn = session.respond_to?(:drawing?) && session.drawing?
+          verb = drawn ? 'nakreslená' : 'vložená'
+          dims = drawn ? " · #{drawn_dims_note(inst)}" : ''
+          set_status(label.empty? ? "Doska #{bid} #{verb}.#{dims}" : "Doska #{bid} #{verb} — #{label}.#{dims}")
           push_selected(model)
           session.stamp_once! { stamp_template_used(session.template_ref) } # az PO vlozeni
+        end
+
+        # Rozmery ULOZENEJ dosky do statusu (nahlad = config = geometria).
+        def drawn_dims_note(inst)
+          cfg = Store.config(inst) || {}
+          l = GhostTool::Calc.fmt_dim(cfg['length'].to_f)
+          w = GhostTool::Calc.fmt_dim(cfg['width'].to_f)
+          "#{l} × #{w} mm"
+        rescue StandardError
+          ''
         end
 
         # Hromadny zapis obycajnych poli karty (name/length/width/quantity/grain).

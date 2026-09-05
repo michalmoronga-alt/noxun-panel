@@ -3290,6 +3290,381 @@ module NoxunSuRunner
     e::GhostTool.reset_memory!
   end
 
+  # =========================================================================
+  # GHOST-D2 — KRESLENIE DOSKY NA ROZMER (dva tahy)
+  #
+  # Headless sada dokaze fazovy automat, parser, limity aj cistu geometriu.
+  # Tu sa meria to, co bez SketchUpu dokazat NEDA:
+  #   * ze sa POCIATOK aj koniec 1. tahu prichytia na REALNU geometriu
+  #     (rohy dvoch skriniek) a dlzka vyjde presne na sucet ich sirok,
+  #   * ze meracie pole naozaj chodi (`onUserText` / `onReturn`) a ze limit
+  #     zastavi fazu,
+  #   * ze 2. tah vo VOLNOM PRIESTORE (vyska pilastra v perspektive) meria
+  #     proti PRIAMKE osi, nie proti podlahe,
+  #   * ze `View#inference_locked?` je pod Shiftom naozaj true a po zmene
+  #     fazy / Esc naozaj false,
+  #   * ze nakreslena doska je JEDEN pouzivatelsky krok Spat a jej ULOZENY
+  #     config nesie PRESNE tie rozmery, ktore ukazoval nahlad.
+  # =========================================================================
+
+  # Karta Dosky pre kreslenie: rozmery su „hodnota karty" (prazdny Enter).
+  BOARD_DRAW_PARAMS = { 'material_id' => BOARD_GHOST_MAT, 'length' => 900.0,
+                        'width' => 400.0, 'orientation' => 'leziaca',
+                        'name' => 'GHOST-D2 doska' }.freeze
+
+  # „Nakresliť" presne ako karta (vratane R-02 identity dokumentu a zamkov).
+  def board_draw_start!(model, params = nil, locks = nil)
+    data = (params || BOARD_DRAW_PARAMS).dup
+    data['locks'] = locks if locks
+    e::Panel.handle_draw_board(pg(model, data))
+    ghost_session
+  end
+
+  # Presun kurzora na 3D bod + klik (bez zapamatania `ghost_used` — pri
+  # kresleni je zaujimava FAZA, nie posledna poloha).
+  def draw_click!(model, pt_mm)
+    v = model.active_view
+    sc = ghost_screen(model, pt_mm)
+    ghost_tool.onMouseMove(0, sc.x, sc.y, v)
+    ghost_tool.onLButtonDown(0, sc.x, sc.y, v)
+  end
+
+  def draw_type!(model, text)
+    ghost_tool.onUserText(text, model.active_view)
+  end
+
+  def draw_return!(model)
+    ghost_tool.onReturn(model.active_view)
+  end
+
+  # Rozmery ULOZENEJ dosky (mm) — proti nim sa meria „nahlad = config".
+  def board_cfg_dims(inst)
+    cfg = inst && inst.valid? ? (e::Store.config(inst) || {}) : {}
+    [cfg['length'].to_f, cfg['width'].to_f]
+  end
+
+  # Perspektivna kamera nad cielom — 2. tah pilastra sa MUSI dat tahat aj
+  # tam, kde ziadna geometria nie je (fallback luc x priamka osi).
+  def draw_camera!(model, target_mm, eye_dz = 1200.0)
+    tgt = e::Units.point(target_mm[0], target_mm[1], target_mm[2] || 0.0)
+    eye = e::Units.point(target_mm[0] - 2200.0, target_mm[1] - 3200.0, (target_mm[2] || 0.0) + eye_dz)
+    cam = Sketchup::Camera.new(eye, tgt, Z_AXIS)
+    cam.perspective = true
+    model.active_view.camera = cam
+    model.active_view
+  end
+
+  def run_ghost_d2(model)
+    cleanup(model)
+    e::GhostTool.reset_memory!
+    markers = []
+    shift_key = defined?(VK_SHIFT) ? VK_SHIFT : 16
+
+    # --- 1) DVA TAHY S PRICHYTENIM NA ROHY DVOCH SKRINIEK -------------------
+    # Dve skrinky vedla seba: pracovna doska ma ist od laveho rohu prvej po
+    # pravy roh druhej, teda dlzka = SUCET ich sirok.
+    cleanup(model)
+    c1 = e::CabinetBuilder.build(model, GHOST_PARAMS.dup)
+    c2 = e::CabinetBuilder.build(model, GHOST_PARAMS.dup)
+    b1 = c1.bounds
+    b2 = c2.bounds
+    left = [mm(b1.min.x), mm(b1.min.y), mm(b1.max.z)]  # lavy predny HORNY roh prvej
+    right = [mm(b2.max.x), mm(b2.min.y), mm(b2.max.z)] # pravy predny HORNY roh druhej
+    span = right[0] - left[0]
+    s1 = board_draw_start!(model)
+    ok('GHOST-D2 1: „Nakresliť“ NEVLOŽILO nič — session je v režime KRESLENIA',
+       !s1.nil? && s1.active? && s1.drawing? && s1.draw_phase == :origin && boards(model).empty?)
+    ghost_camera!(model, [left[0], left[1]], left[2])
+    draw_click!(model, left)
+    ok('GHOST-D2 1: klik určil POČIATOK a fáza sa posunula na dĺžku',
+       s1.draw_phase == :length && !s1.draw_origin.nil?)
+    ok("GHOST-D2 1: počiatok sadol na ZVÝŠENÝ roh skrinky (Z = #{s1.draw_origin && s1.draw_origin[2].round(1)})",
+       !s1.draw_origin.nil? && (s1.draw_origin[2] - left[2]).abs <= GHOST_PIX_TOL &&
+       (s1.draw_origin[0] - left[0]).abs <= GHOST_PIX_TOL)
+    draw_click!(model, right)
+    got_len = s1.draw_length_mm
+    ok("GHOST-D2 1: dĺžka = vzdialenosť rohov dvoch skriniek (#{got_len} vs #{span.round(1)})",
+       !got_len.nil? && (got_len - span).abs <= GHOST_PIX_TOL)
+    ok('GHOST-D2 1: a fáza je teraz ŠÍRKA', s1.draw_phase == :width)
+    draw_type!(model, '600')
+    d2b = boards(model).first
+    ok('GHOST-D2 1: napísaná šírka dokončila kreslenie — v modeli je PRESNE JEDNA doska',
+       boards(model).length == 1 && !d2b.nil?)
+    dims = board_cfg_dims(d2b)
+    ok("GHOST-D2 1: ULOŽENÝ config nesie presne nakreslené rozmery (#{dims.inspect})",
+       (dims[0] - got_len.to_f).abs <= TOL && (dims[1] - 600.0).abs <= TOL)
+    ghost_teardown!(model)
+
+    # --- 2) MERACIE POLE: cislo, limit, prazdny Enter -----------------------
+    cleanup(model)
+    s2 = board_draw_start!(model)
+    ghost_camera!(model, [1400.0, 300.0], 0.0)
+    draw_click!(model, [1400.0, 300.0, 0.0])
+    ghost_move!(model, [2000.0, 300.0, 0.0]) # smer +X
+    draw_type!(model, '6000')
+    ok('GHOST-D2 2: „6000 Enter“ je nad limitom — fáza OSTALA a dĺžka sa nezapísala',
+       s2.draw_phase == :length && s2.draw_length_mm.nil? && boards(model).empty?)
+    draw_type!(model, 'abc2400xyz')
+    ok('GHOST-D2 2: neplatný zápis fázu tiež neposunie',
+       s2.draw_phase == :length && s2.draw_length_mm.nil?)
+    draw_type!(model, '2400')
+    ok("GHOST-D2 2: „2400 Enter“ prijaté (#{s2.draw_length_mm})",
+       s2.draw_phase == :width && (s2.draw_length_mm.to_f - 2400.0).abs <= TOL)
+    draw_return!(model) # prazdny Enter = hodnota karty (400)
+    d2 = boards(model).first
+    dims2 = board_cfg_dims(d2)
+    ok("GHOST-D2 2: prázdny Enter prevzal ŠÍRKU z karty (#{dims2.inspect})",
+       !d2.nil? && (dims2[0] - 2400.0).abs <= TOL && (dims2[1] - 400.0).abs <= TOL)
+    ghost_teardown!(model)
+
+    # --- 3) ZAMKNUTA DLZKA + cislo BEZ POHYBU MYSOU = KANONICKY smer --------
+    cleanup(model)
+    s3 = board_draw_start!(model, nil, 'length' => 1500.0)
+    ghost_camera!(model, [1400.0, 300.0], 0.0)
+    draw_click!(model, [1400.0, 300.0, 0.0])
+    ok('GHOST-D2 3: zamknutá dĺžka PRESKOČILA 1. ťah a dosadila hodnotu karty',
+       s3.draw_phase == :width && (s3.draw_length_mm.to_f - 1500.0).abs <= TOL)
+    ok('GHOST-D2 3: smer je KANONICKÝ (lokálna +X podľa rotácie session)',
+       s3.draw_canonical_dir? && (s3.draw_dir_x[0] - 1.0).abs <= 1e-6)
+    draw_type!(model, '600')
+    d3 = boards(model).first
+    ok('GHOST-D2 3: doska vznikla bez jediného ťahu myšou',
+       !d3.nil? && (board_cfg_dims(d3)[0] - 1500.0).abs <= TOL)
+    ok('GHOST-D2 3: a leží po osi X (kanonický smer sa dostal do transformácie)',
+       vec_near?(d3.transformation.xaxis, 1, 0, 0))
+    ghost_teardown!(model)
+
+    # --- 4) ESC vo FAZE 2 = nic, 0 krokov Spat, sablona NEOPECIATKOVANA -----
+    cleanup(model)
+    seq4 = board_tpl_seq
+    m4 = r03_marker(model, markers)
+    s4 = board_draw_start!(model, BOARD_DRAW_PARAMS.merge('template_kind' => 'board',
+                                                          'template_name' => BOARD_GHOST_TPL))
+    ghost_camera!(model, [1400.0, 300.0], 0.0)
+    draw_click!(model, [1400.0, 300.0, 0.0])
+    draw_type!(model, '1200')
+    ok('GHOST-D2 4: sme vo fáze ŠÍRKA (doska je rozkreslená)', s4.draw_phase == :width)
+    ghost_tool.onCancel(0, model.active_view) # Esc
+    ok('GHOST-D2 4: Esc zrušil CELÚ session a model ostal NEZMENENÝ',
+       ghost_session.nil? && boards(model).empty?)
+    ok('GHOST-D2 4: šablóna NEOPEČIATKOVANÁ', board_tpl_seq == seq4)
+    Sketchup.undo
+    ok('GHOST-D2 4: Esc nezaložil ŽIADEN krok Späť (1x Späť vrátil marker)', !m4.valid?)
+    ghost_teardown!(model)
+
+    # --- 5) VLOZENIE = 1 krok Spat + REDO -----------------------------------
+    cleanup(model)
+    s5 = board_draw_start!(model)
+    ghost_camera!(model, [1400.0, 300.0], 0.0)
+    draw_click!(model, [1400.0, 300.0, 0.0])
+    draw_type!(model, '1200')
+    draw_type!(model, '500')
+    ok('GHOST-D2 5: doska sa nakreslila', boards(model).length == 1 && s5.terminal?)
+    # POZOR: Späť a Znova musia ostať TESNE ZA SEBOU (viď GHOST-D1 6).
+    Sketchup.undo
+    ok('GHOST-D2 5: 1x Späť vrátil CELÝ vklad (jeden používateľský krok)', boards(model).empty?)
+    if Sketchup.respond_to?(:redo)
+      Sketchup.redo
+      ok('GHOST-D2 5: Redo vrátilo dosku späť (undo stack je čistý)', boards(model).length == 1)
+    else
+      info('GHOST-D2 5: Sketchup.redo nedostupné — Redo vetva sa overuje v ASYNC časti')
+    end
+    ghost_teardown!(model)
+
+    # --- 6) PILASTER: ↑ stojaca, 2. tah VO VOLNOM PRIESTORE v perspektive ---
+    cleanup(model)
+    s6 = board_draw_start!(model)
+    ghost_camera!(model, [1400.0, 300.0], 0.0)
+    ghost_move!(model, [1400.0, 300.0, 0.0])
+    ok('GHOST-D2 6: ↑ je VLASTNENÁ klávesa a mení umiestnenie PRED klikom počiatku',
+       ghost_key!(model, VK_UP) == true && s6.orientation == 'stojaca')
+    draw_click!(model, [1400.0, 300.0, 0.0])
+    ok('GHOST-D2 6: po kliku počiatku sú ↑/↓ aj ←/→ ZAMKNUTÉ (orientácia sa nemení)',
+       ghost_key!(model, VK_UP) == true && s6.orientation == 'stojaca' &&
+       ghost_key!(model, VK_RIGHT) == true && s6.rotation_index.zero?)
+    draw_type!(model, '600') # hlbka pilastra = dlzka (vodorovna)
+    ok('GHOST-D2 6: 1. ťah je hĺbka (vodorovná dĺžka)', s6.draw_phase == :width)
+    # 2. tah = VYSKA, tahana VO VZDUCHU (ziadna geometria) v PERSPEKTIVE.
+    draw_camera!(model, [1400.0, 300.0, 1100.0])
+    draw_click!(model, [1400.0, 300.0, 2200.0])
+    d6 = boards(model).first
+    dims6 = board_cfg_dims(d6)
+    cfg6 = d6 ? (e::Store.config(d6) || {}) : {}
+    ok("GHOST-D2 6: výška pilastra sa zmerala vo voľnom priestore (#{dims6.inspect})",
+       !d6.nil? && (dims6[1] - 2200.0).abs <= GHOST_PIX_TOL)
+    ok('GHOST-D2 6: uložený config nesie ORIENTÁCIU zo session', cfg6['orientation'] == 'stojaca')
+    ok('GHOST-D2 6: inštancia naozaj stojí (dekorová plocha mieri dopredu, -Y)',
+       !d6.nil? && vec_near?(d6.transformation.zaxis, 0, -1, 0))
+    # NAHLAD = GEOMETRIA = CONFIG: obalka instancie musi mat rozmery configu.
+    # POZOR NA OSI `Geom::BoundingBox` (beh #299): `width` = X, `height` = Y,
+    # `depth` = Z. Prva verzia merala `height` a dostavala 18,0 — to je
+    # HRUBKA, lebo STOJACA doska ma X = dlzka, Y = hrubka, Z = SIRKA. Merame
+    # preto rozsahy osi priamo, a rovno vsetky tri (to je cely dokaz
+    # „nahlad = geometria = config").
+    bb6 = d6 ? d6.bounds : nil
+    ext6 = bb6 ? [mm(bb6.max.x - bb6.min.x), mm(bb6.max.y - bb6.min.y),
+                  mm(bb6.max.z - bb6.min.z)] : nil
+    th6 = cfg6['thickness'].to_f
+    ok("GHOST-D2 6: geometria sedí s configom — X = dĺžka, Y = hrúbka, Z = ŠÍRKA (#{ext6.inspect})",
+       !ext6.nil? && (ext6[0] - dims6[0]).abs <= TOL && (ext6[1] - th6).abs <= TOL &&
+       (ext6[2] - dims6[1]).abs <= TOL)
+    ghost_teardown!(model)
+
+    # --- 7) ZAPORNY 2. TAH = PRAVOTOCIVA doska ------------------------------
+    cleanup(model)
+    s7 = board_draw_start!(model)
+    ghost_camera!(model, [1400.0, 300.0], 0.0)
+    draw_click!(model, [1400.0, 300.0, 0.0])
+    draw_type!(model, '1000') # smer je kanonicky +X
+    draw_click!(model, [1400.0, -300.0, 0.0]) # 2. tah na OPACNU stranu (−Y)
+    d7 = boards(model).first
+    ok('GHOST-D2 7: záporný 2. ťah dosku vytvoril', !d7.nil? && boards(model).length == 1)
+    ok('GHOST-D2 7: osi ostali PRAVOTOČIVÉ (žiadne obrátenie lokálnej Y)',
+       !d7.nil? && vec_near?(d7.transformation.xaxis, 1, 0, 0) &&
+       vec_near?(d7.transformation.yaxis, 0, 1, 0))
+    o7 = ghost_origin_mm(d7)
+    ok("GHOST-D2 7: POČIATOK sa posunul o −šírka po lokálnej Y (#{o7.inspect})",
+       !d7.nil? && o7[1] < 300.0 - 1.0)
+    ghost_teardown!(model)
+
+    # --- 8) SHIFT: natívny zamok inferencie (skutocny `inference_locked?`) --
+    # POZOR (beh #299): `view.lock_inference(ip)` potrebuje bod so SKUTOCNOU
+    # natívnou inferenciou. Prva verzia scenara stala kurzorom v PRAZDNOM
+    # priestore — SketchUp nemal co zamknut a `inference_locked?` ostal
+    # false. POCIATOK aj kurzor preto stoja na REALNEJ geometrii (rohy
+    # skrinky); zamok smeru vo faze 1 je navyse DVOJBODOVY (pociatok +
+    # kurzor), presne ako v natívnom Line tool.
+    cleanup(model)
+    cab8 = e::CabinetBuilder.build(model, GHOST_PARAMS.dup)
+    cb8 = cab8.bounds
+    o8 = [mm(cb8.min.x), mm(cb8.min.y), mm(cb8.max.z)] # lavy predny horny roh
+    p8 = [mm(cb8.max.x), mm(cb8.min.y), mm(cb8.max.z)] # pravy predny horny roh
+    s8 = board_draw_start!(model)
+    ghost_camera!(model, [(o8[0] + p8[0]) / 2.0, o8[1]], o8[2])
+    draw_click!(model, o8)     # POCIATOK na realnom vrchole
+    ghost_move!(model, p8)     # a kurzor tiez na realnom vrchole
+    view8 = model.active_view
+    ghost_key!(model, shift_key)
+    ok('GHOST-D2 8: Shift je VLASTNENÁ klávesa v kreslení',
+       ghost_tool.onKeyUp(shift_key, 1, 0, view8) == true)
+    ghost_move!(model, p8)
+    ghost_key!(model, shift_key)
+    ok("GHOST-D2 8: pod Shiftom je inferencia ZAMKNUTÁ (inference_locked? = #{view8.inference_locked?})",
+       view8.inference_locked? == true)
+    dir8 = s8.draw_dir_x && s8.draw_dir_x.dup
+    ghost_move!(model, [o8[0], o8[1] + 1000.0, o8[2]]) # kurzor odbehol o 90°
+    ok('GHOST-D2 8: pohyb kurzora po zamknutí SMER dosky NEZMENIL',
+       !dir8.nil? && !s8.draw_dir_x.nil? &&
+       (0..2).all? { |i| (s8.draw_dir_x[i] - dir8[i]).abs <= 1e-6 })
+    ghost_tool.onKeyUp(shift_key, 1, 0, view8)
+    ok('GHOST-D2 8: pustenie Shiftu inferenciu ODOMKLO', view8.inference_locked? == false)
+    # Zamok sa uvolni aj pri ZMENE FAZY.
+    ghost_key!(model, shift_key)
+    draw_type!(model, '1000')
+    ok('GHOST-D2 8: zmena fázy zámok VŽDY pustí (nesmie obmedziť 2. ťah)',
+       s8.draw_phase == :width && view8.inference_locked? == false)
+    ghost_teardown!(model)
+
+    # --- 9) onCancel(2) a VYMENA DOKUMENTU vo faze 2 s drzanym Shiftom -----
+    cleanup(model)
+    m9 = r03_marker(model, markers)
+    s9 = board_draw_start!(model)
+    ghost_camera!(model, [1400.0, 300.0], 0.0)
+    draw_click!(model, [1400.0, 300.0, 0.0])
+    draw_type!(model, '1000')
+    ghost_move!(model, [1400.0, 700.0, 0.0])
+    ghost_key!(model, shift_key)
+    view9 = model.active_view
+    ok('GHOST-D2 9: sme vo fáze 2 s DRŽANÝM Shiftom', s9.draw_phase == :width)
+    ghost_tool.onCancel(2, view9) # Undo pocas nastroja
+    ok('GHOST-D2 9: onCancel(2) zrušil session bez zápisu a UVOĽNIL zámok inferencie',
+       ghost_session.nil? && boards(model).empty? && view9.inference_locked? == false)
+    Sketchup.undo
+    ok('GHOST-D2 9: predchádzajúci krok sa vrátil bez stopy po kreslení', !m9.valid?)
+    ghost_teardown!(model)
+
+    # VYMENA DOKUMENTU vo faze 2 s drzanym Shiftom. `on_document_replaced`
+    # rusi session a ukoncenie nastroja ODKLADA na timer (ten v synchronnej
+    # sekcii nedobehne) — upratanie preto dokonci `ghost_teardown!`, ktory
+    # popne SYNCHRONNE a SketchUp na nasom nastroji zavola `deactivate`.
+    # POZOR (beh #299): `deactivate` sa NESMIE volat rucne — oznaci nastroj
+    # za odpojeny, ale z tool stacku SketchUpu ho NEODOBERIE, takze tam
+    # ostane visiet RubyTool a zhodi neskorsiu sekciu „GHOST suspend".
+    cleanup(model)
+    s9b = board_draw_start!(model)
+    ghost_camera!(model, [1400.0, 300.0], 0.0)
+    draw_click!(model, [1400.0, 300.0, 0.0])
+    draw_type!(model, '1000')
+    ghost_key!(model, shift_key)
+    e::GhostTool.on_document_replaced('SU-TEST výmena dokumentu vo fáze 2')
+    ok('GHOST-D2 9: výmena dokumentu vo fáze 2 zrušila session bez zápisu',
+       ghost_session.nil? && boards(model).empty? && !s9b.active?)
+    ok('GHOST-D2 9: zámok inferencie pustil UŽ koniec session (nečaká sa na `deactivate`)',
+       model.active_view.inference_locked? == false)
+    ghost_teardown!(model)
+    ok('GHOST-D2 9: po upratovaní nezostal na stacku žiadny ghost nástroj',
+       ghost_tool.nil? && ghost_session.nil?)
+
+    # --- 10) PLACEMENT s ALT `fr_top` -> kreslenie zacina PRESNE v pociatku -
+    # Kreslenie ma PEVNU kotvu `fl_bottom` a pamatanu kotvu placementu IGNORUJE.
+    cleanup(model)
+    e::GhostTool.reset_memory!
+    ps = board_ghost_start!(model)
+    ghost_camera!(model, [1000.0, 200.0], 0.0)
+    ghost_move!(model, [1000.0, 200.0, 0.0])
+    # ANCHORS = fl_bottom -> fr_bottom -> fr_top -> fl_top; z fl_bottom su to
+    # na `fr_top` presne DVE stlacenia ALT (beh #299: tri dali fl_top).
+    2.times { ghost_key!(model, defined?(VK_MENU) ? VK_MENU : VK_ALT) }
+    ok("GHOST-D2 10: placement session si pamätá kotvu `fr_top` (#{ps.anchor})",
+       ps.anchor == :fr_top)
+    e::GhostTool.cancel_session('SU-TEST prepnutie na kreslenie', deferred: false)
+    s10 = board_draw_start!(model)
+    ok('GHOST-D2 10: kreslenie ŠTARTUJE s pevnou kotvou `fl_bottom` (ALT v ňom význam nemá)',
+       !s10.nil? && s10.anchor == :fl_bottom)
+    ghost_camera!(model, [1400.0, 300.0], 0.0)
+    draw_click!(model, [1400.0, 300.0, 0.0])
+    origin10 = s10.draw_origin && s10.draw_origin.dup
+    draw_type!(model, '1000')
+    draw_type!(model, '500')
+    d10 = boards(model).first
+    o10 = d10 ? ghost_origin_mm(d10) : nil
+    ok("GHOST-D2 10: doska ZAČÍNA presne v kliknutom počiatku (#{o10.inspect})",
+       !o10.nil? && !origin10.nil? && (0..2).all? { |i| (o10[i] - origin10[i]).abs <= TOL })
+    ghost_teardown!(model)
+
+    # --- 11) PASIK a KARTA: payload kreslenia nesie FAZU --------------------
+    cleanup(model)
+    s11 = board_draw_start!(model)
+    pay0 = e::GhostTool.state_payload(s11)
+    ok("GHOST-D2 11: pásik nesie interakciu aj fázu (#{pay0['interaction']}/#{pay0['phase']})",
+       pay0['interaction'] == 'drawing' && pay0['phase'] == 'origin')
+    ghost_camera!(model, [1400.0, 300.0], 0.0)
+    draw_click!(model, [1400.0, 300.0, 0.0])
+    ghost_move!(model, [2400.0, 300.0, 0.0])
+    pay1 = e::GhostTool.state_payload(s11)
+    ok("GHOST-D2 11: vo fáze dĺžky nesie LABEL aj HODNOTU (#{pay1['phase_label']} #{pay1['phase_value']})",
+       pay1['phase'] == 'length' && pay1['phase_label'] == 'Dĺžka' &&
+       pay1['phase_value'].to_f > 900.0)
+    e::Panel.handle_ghost_lock_z(pg(model, 'lock_z' => 1400.0))
+    ok('GHOST-D2 11: `ghost_lock_z` je pri kreslení odmietnutý rovnako ako pri umiestňovaní',
+       s11.active? && s11.z_mode == :free && s11.lock_plane_z.abs <= TOL)
+    ghost_teardown!(model)
+
+    # --- 12) NEPLATNY ZAMOK z karty session NESPUSTI ------------------------
+    cleanup(model)
+    e::GhostTool.cancel_session('SU-TEST pred zamkom', deferred: false)
+    board_draw_start!(model, nil, 'length' => 6000.0)
+    ok('GHOST-D2 12: zámok mimo limitu kreslenie NESPUSTIL (žiadna session, žiadna doska)',
+       ghost_session.nil? && boards(model).empty?)
+    board_draw_start!(model, nil, 'length' => '800')
+    ok('GHOST-D2 12: nečíselný zámok kreslenie tiež nespustil', ghost_session.nil?)
+    ghost_teardown!(model)
+
+    cleanup(model)
+    r03_clear_markers(model, markers)
+    e::GhostTool.reset_memory!
+  end
+
   # GHOST-D1 ASYNC: vlozenie dosky POCAS cakajucej prace observera. Bez bariery
   # `flush_pending!` by odlozeny tik dobehol AZ PO vytvaracej operacii a jeho
   # TRANSPARENTNA reakcia by sa na nu prilepila — Redo by potom vratilo nieco
@@ -3408,6 +3783,115 @@ module NoxunSuRunner
     end]
     steps << [SETTLE, lambda do
       ok('async GHOST-D1: 1x Späť vrátil LEN dosku — absorpcia Scale drží',
+         boards(model).empty? && cabinets(model).length == 1)
+      cleanup(model)
+      ghost_teardown!(model)
+    end]
+  end
+
+  # „Nakresliť" + cele kreslenie bez mysi (pociatok klikom, obe hodnoty
+  # napisane) — pre ASYNC scenare, kde ide o BARIERU, nie o presnost tahu.
+  def board_draw_place!(model, at_mm, length_mm, width_mm)
+    return nil unless board_draw_start!(model) && ghost_tool
+
+    ghost_camera!(model, [at_mm[0], at_mm[1]], at_mm[2] || 0.0)
+    draw_click!(model, at_mm)
+    draw_type!(model, length_mm.to_s)
+    draw_type!(model, width_mm.to_s)
+    model.selection.to_a.find { |i| e::Store.kind(i) == 'board' }
+  end
+
+  # GHOST-D2 ASYNC: commit NAKRESLENEJ dosky POCAS cakajucej prace observera.
+  # Kreslenie ide TOU ISTOU zapisovou cestou ako vlozenie (`commit_insert`),
+  # ale dostane sa k nej AZ po dvoch fazach — medzitym stihne dobehnut
+  # debounce tik observera. Bez bariery `flush_pending!` by sa jeho
+  # TRANSPARENTNA reakcia prilepila na vytvaraciu operaciu a Redo by vratilo
+  # nieco ine, nez pouzivatel vratil. Vzor: `run_ghost_d1_async`.
+  # POZOR (poucenie D1): v blokoch `define_method` sa hola konstanta
+  # NEROZLOZI — sonda je preto v `board_barrier_probe!` a zachytava modul
+  # DOPREDU do lokalnej premennej.
+  def run_ghost_d2_async(model, state, steps)
+    # A) NATIVNY Move skrinky (observer NIE JE guardnuty) -> HNED kreslenie
+    steps << [0.4, lambda do
+      cleanup(model)
+      ghost_teardown!(model)
+      inst = e::CabinetBuilder.build(model, GHOST_PARAMS.dup)
+      state[:gd2_cab] = inst
+      model.start_operation('SU-TEST nativny Move pred kreslenim', true)
+      inst.transformation = inst.transformation *
+                            Geom::Transformation.translation(e::Units.point(1500, 0, 0))
+      model.commit_operation
+      state[:gd2_pending] = e::ScaleWatch.pending?
+      board_barrier_probe!(state) do
+        state[:gd2_board] = board_draw_place!(model, [2600.0, 300.0, 0.0], 1200, 500)
+      end
+      state[:gd2_at_commit] = state[:gd1_at_commit]
+    end]
+    steps << [SETTLE, lambda do
+      ok('async GHOST-D2: natívny Move naozaj založil observeru prácu (inak by test nič nemeral)',
+         state[:gd2_pending] == true)
+      ok('async GHOST-D2: bariéra dotiahla observer do POKOJA ešte PRED vytváracou operáciou ' \
+         "(pending? na vstupe do commit_insert = #{state[:gd2_at_commit].inspect})",
+         state[:gd2_at_commit] == false)
+      ok('async GHOST-D2: nakreslená doska je v modeli PRESNE JEDNA',
+         !state[:gd2_board].nil? && boards(model).length == 1)
+      d = boards(model).first
+      cfg = d && d.valid? ? (e::Store.config(d) || {}) : {}
+      ok("async GHOST-D2: a nesie NAKRESLENÉ rozmery (#{cfg['length']} × #{cfg['width']})",
+         (cfg['length'].to_f - 1200.0).abs < 0.01 && (cfg['width'].to_f - 500.0).abs < 0.01)
+      # Späť a Znova IHNEĎ ZA SEBOU — medzi ne sa NESMIE zmestiť debounce tik
+      # observera (zmazanie NOXUN entity mu založí prácu a jeho upratovanie
+      # ghost zón otvára operáciu bezpodmienečne = redo stack zaniká).
+      state[:gd2_after_undo] = nil
+      Sketchup.undo
+      state[:gd2_after_undo] = [boards(model).length, cabinets(model).length]
+      state[:gd2_redo] = Sketchup.respond_to?(:redo)
+      Sketchup.redo if state[:gd2_redo]
+    end]
+    steps << [SETTLE, lambda do
+      ok('async GHOST-D2: 1x Späť vrátil CELÉ kreslenie (nič sa naň neprilepilo) ' \
+         "a poloha skrinky z natívneho Move ostala (#{state[:gd2_after_undo].inspect})",
+         state[:gd2_after_undo] == [0, 1])
+      if state[:gd2_redo]
+        ok('async GHOST-D2: Redo vrátilo dosku späť a NIČ iné (undo stack je čistý)',
+           boards(model).length == 1 && cabinets(model).length == 1)
+      else
+        info('async GHOST-D2: Sketchup.redo nedostupné — Redo vetva netestovaná')
+      end
+      cleanup(model)
+      ghost_teardown!(model)
+    end]
+
+    # B) SCALE skrinky (cakajuca absorpcia) -> HNED kreslenie
+    steps << [0.4, lambda do
+      cleanup(model)
+      ghost_teardown!(model)
+      inst = e::CabinetBuilder.build(model, GHOST_PARAMS.dup)
+      state[:gd2b_cab] = inst
+      model.start_operation('SU-TEST user scale pred kreslenim', true)
+      inst.transformation = inst.transformation * Geom::Transformation.scaling(ORIGIN, 1.5, 1.0, 1.0)
+      model.commit_operation
+      state[:gd2b_pending] = e::ScaleWatch.pending?
+      board_barrier_probe!(state) do
+        state[:gd2b_board] = board_draw_place!(model, [3200.0, 300.0, 0.0], 900, 450)
+      end
+      state[:gd2b_at_commit] = state[:gd1_at_commit]
+    end]
+    steps << [SETTLE, lambda do
+      cab = state[:gd2b_cab]
+      cfg = cab && cab.valid? ? (e::Store.config(cab) || {}) : {}
+      ok('async GHOST-D2: Scale naozaj založil observeru prácu', state[:gd2b_pending] == true)
+      ok("async GHOST-D2: bariéra absorbovala Scale PRED kreslením (šírka #{cfg['width']})",
+         (cfg['width'].to_f - 900.0).abs < 0.01)
+      ok('async GHOST-D2: a observer bol v POKOJI ešte pred vytváracou operáciou ' \
+         "(pending? na vstupe do commit_insert = #{state[:gd2b_at_commit].inspect})",
+         state[:gd2b_at_commit] == false)
+      ok('async GHOST-D2: doska sa nakreslila a observer je po ustálení v pokoji',
+         !state[:gd2b_board].nil? && boards(model).length == 1 && e::ScaleWatch.pending? == false)
+      Sketchup.undo
+    end]
+    steps << [SETTLE, lambda do
+      ok('async GHOST-D2: 1x Späť vrátil LEN dosku — absorpcia Scale drží',
          boards(model).empty? && cabinets(model).length == 1)
       cleanup(model)
       ghost_teardown!(model)
@@ -15325,6 +15809,10 @@ module NoxunSuRunner
     # na vklad a Redo by vratilo nieco ine.
     run_ghost_d1_async(model, state, steps)
 
+    # GHOST-D2: commit NAKRESLENEJ dosky do debounce okna po nativnom Move aj
+    # po Scale — tá istá bariéra, ale dosiahnutá az po dvoch fazach kreslenia.
+    run_ghost_d2_async(model, state, steps)
+
     # D-52b: `close_all_dialogs` a BARIERA pred swapom — obe stoja na
     # `set_on_closed`, ktory CEF vola ASYNCHRONNE. Bezi az tu, aby sa scenar
     # nestretol s fake oknom sekcie STALE.
@@ -15430,6 +15918,7 @@ module NoxunSuRunner
     run_dockey(model)        # 1d/R-02b: identita dokumentu — `valid?` probe, rotacia pri onOpenModel nad RECYKLOVANYM objektom, onActivateModel nerotuje, fail-closed
     run_ghost(model)         # GHOST V1-04: vkladanie na klik — 0 mutacii pred klikom, zamok/free vyska, rotacia a kotvy, degenerovany luc, undo/prepnutie/druhe „Vlozit", sablona a peciatka
     run_ghost_d1(model)      # GHOST-D1: ghost pre DOSKY — prichytenie na zvyseny roh (plne XYZ), ↑ umiestnenie v ulozenom configu, ALT kotva na kliknutom bode, Esc/onCancel(2)/vymena dokumentu bez stopy, 1 krok Spat + Redo, pamat per subjekt, brana schemy dosky az po VEPO
+    run_ghost_d2(model)      # GHOST-D2: KRESLENIE dosky dvoma tahmi - prichytenie pociatku aj konca na rohy dvoch skriniek, meracie pole (cislo/limit/prazdny Enter), zamknuta dlzka + kanonicky smer, pilaster vo volnom priestore v perspektive, zaporny 2. tah, Shift inference_locked?, Esc/onCancel(2)/vymena dokumentu bez stopy, 1 krok Spat + Redo
     run_d45(model)           # D-45: hrubka <-> material tela (18,6 mm deadlock)
     run_d46(model)           # D-46: projektova predvolba korpusu s inou hrubkou (potvrdenie)
     # ŠT-2b bezi ESTE PRED sekciami 2A: `run_2a4` konci ROLLBACKOM katalogu na

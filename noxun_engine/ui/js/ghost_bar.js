@@ -26,7 +26,16 @@
   // má umiestnenie).
   var NX_GHOST_HELP = {
     cabinet: '←/→ otočí o 90° · Alt prepne kotvu · ↓ zámok výšky · ↑ voľná výška · Esc zruší · klik vloží',
-    board: '←/→ otočí o 90° · ↑/↓ zmení umiestnenie · Alt prepne kotvu · Esc zruší · klik vloží'
+    board: '←/→ otočí o 90° · ↑/↓ zmení umiestnenie · Alt prepne kotvu · Esc zruší · klik vloží',
+    // GHOST-D2: kreslenie má inú nápovedu — kotva je pevná (počiatok), zato
+    // pribudlo meracie pole a Shift.
+    drawing: 'klik určí počiatok · ťahaj dĺžku a šírku · číslo + Enter · prázdny Enter = hodnota karty · ' +
+      'Shift drží smer · ←/→ a ↑/↓ len PRED prvým klikom · Esc zruší'
+  };
+  // GHOST-D2: názvy fáz kreslenia. Zrkadlo `GhostTool::DRAW_PHASES` — server
+  // posiela `phase_label`, toto je len fallback pre starší payload.
+  var NX_GHOST_PHASES = {
+    origin: 'Počiatok', length: 'Dĺžka', width: 'Šírka', done: 'Hotovo'
   };
   // Posledny STAV zo servera — drzi sa LEN preto, aby sa dalo pole vratit na
   // platnu hodnotu, ked pouzivatel napise nezmysel (nikdy nespadne na 0).
@@ -61,6 +70,25 @@
     if (!state) return '';
     if (state.orientation_label) return String(state.orientation_label);
     return NX_GHOST_ORIENTATIONS[state.orientation] || '';
+  }
+
+  // GHOST-D2: kreslí sa (dva ťahy), alebo sa len umiestňuje? Starší push
+  // `interaction` nenesie — vtedy platí umiestňovanie, presne ako pred D2.
+  function nxGhostDrawing(state){
+    return !!(state && state.interaction === 'drawing');
+  }
+
+  // Text fázy do pásika: „Dĺžka 2400 mm" / „Šírka — mm" / „Počiatok".
+  // Zamknutá fáza to prizná (ťah sa preskočí).
+  function nxGhostPhaseText(state){
+    if (!nxGhostDrawing(state)) return '';
+    var ph = String(state.phase || 'origin');
+    var label = state.phase_label ? String(state.phase_label) : (NX_GHOST_PHASES[ph] || '');
+    if (ph === 'origin') return NX_GHOST_PHASES.origin;
+    if (ph === 'done') return NX_GHOST_PHASES.done;
+    var v = (state.phase_value === null || state.phase_value === undefined) ? '' : nxGhostMm(state.phase_value);
+    var txt = label + ' ' + (v === '' ? '—' : v) + ' mm';
+    return state.phase_locked ? txt + ' (zamknutá)' : txt;
   }
 
   // Zrkadlo `GhostTool::Calc.lock_z_value`: cislo v mm v rozumnom rozsahu,
@@ -98,8 +126,19 @@
     nxGhostState = state;
     bar.hidden = false;
 
+    // GHOST-D2: pri KRESLENÍ je počiatok pevná kotva (Alt nemá význam), takže
+    // kotvové bodky sa skryjú a na ich mieste stojí FÁZA. Pásik nerastie
+    // o riadok — mení sa len obsah toho istého.
+    var drawing = nxGhostDrawing(state);
     var anchor = nxGhostEl('gbAnchor');
-    if (anchor){
+    if (anchor) anchor.hidden = drawing;
+    var phase = nxGhostEl('gbPhase');
+    if (phase){
+      phase.hidden = !drawing;
+      phase.textContent = nxGhostPhaseText(state);
+      phase.setAttribute('title', 'Fáza kreslenia — číslo napíš a potvrď Enterom');
+    }
+    if (anchor && !drawing){
       var label = state.anchor_label || nxGhostAnchorLabel(state.anchor);
       anchor.setAttribute('aria-label', 'Aktívna kotva: ' + label);
       anchor.setAttribute('title', 'Kotva ' + label + ' — Alt ju prepne (skrinka skočí pod kurzor)');
@@ -142,7 +181,7 @@
         : 'Výška, na ktorej ghost sedí (mm)');
     }
     var info = nxGhostEl('gbInfo');
-    if (info) info.setAttribute('title', NX_GHOST_HELP[isBoard ? 'board' : 'cabinet']);
+    if (info) info.setAttribute('title', NX_GHOST_HELP[drawing ? 'drawing' : (isBoard ? 'board' : 'cabinet')]);
     if (isBoard) nxGhostSyncCard(state);
     return true;
   }
@@ -203,6 +242,9 @@
       subject: nxGhostSubject,
       oriLabel: nxGhostOriLabel,
       syncCard: nxGhostSyncCard,
-      HELP: NX_GHOST_HELP
+      drawing: nxGhostDrawing,
+      phaseText: nxGhostPhaseText,
+      HELP: NX_GHOST_HELP,
+      PHASES: NX_GHOST_PHASES
     };
   }

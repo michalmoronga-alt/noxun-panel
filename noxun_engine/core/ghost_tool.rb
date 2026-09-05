@@ -41,9 +41,18 @@ module Noxun
       SUBJECTS = %i[cabinet board].freeze
       # GHOST-D1: INTERAKCIA session — AKO sa subjekt kladie. Je to EXPLICITNY
       # rozlisovac (nie hadanie podla pritomnosti fazy): `placement` = 1. klik
-      # commituje. GHOST-D2 pridá `drawing` (klik = pociatok, 3 fazy, VCB).
-      INTERACTIONS = %i[placement].freeze
+      # commituje. GHOST-D2: `drawing` = klik je POCIATOK a nasleduju dva tahy
+      # (dlzka, sirka) s meracim polom.
+      INTERACTIONS = %i[placement drawing].freeze
       DEFAULT_INTERACTION = :placement
+
+      # GHOST-D2: FAZY KRESLENIA. `:origin` = pred klikom pociatku (LEN tu sa
+      # menia orientacia a rotacia), `:length` = hlada sa SMER v rovine Z
+      # pociatku, `:width` = meria sa po PEVNEJ lokalnej osi, `:done` = obe
+      # hodnoty su znama a commit moze prebehnut.
+      DRAW_PHASES = %i[origin length width done].freeze
+      # Ktory rozmer patri ktorej faze — data, nie kod.
+      DRAW_PHASE_DIM = { length: :length, width: :width }.freeze
 
       # GHOST-FB4: rozumny rozsah locknutej vysky (mm). Horna hranica je
       # „este nabytok" — nad 3 m uz nejde o skrinku, ale o preklep.
@@ -113,7 +122,8 @@ module Noxun
         # `push_tool` (NIE `select_tool`) — po vlozeni sa pouzivatel vrati
         # k nastroju, ktory mal predtym.
         def start(model, plan, hardware: nil, template_ref: nil, note: nil,
-                  subject: :cabinet, interaction: DEFAULT_INTERACTION, orientation: nil)
+                  subject: :cabinet, interaction: DEFAULT_INTERACTION, orientation: nil,
+                  locks: nil)
           # Stara session KONCI PRED vznikom novej a jej nastroj sa popne
           # SYNCHRONNE — inak by nam odlozeny `pop_tool` zhodil prave
           # pushnuty novy nastroj (dva ghosty na stacku).
@@ -121,7 +131,7 @@ module Noxun
           s = PlacementSession.new(model: model, plan: plan, hardware: hardware,
                                    template_ref: template_ref, note: note,
                                    subject: subject, interaction: interaction,
-                                   orientation: orientation)
+                                   orientation: orientation, locks: locks)
           @session = s
           model.tools.push_tool(Tool.new)
           # CEF si po navrate z HtmlDialog callbacku vezme fokus spat — bez
@@ -149,6 +159,14 @@ module Noxun
           changed = false
           if s
             changed = s.cancel!(reason)
+            # GHOST-D2: natívny zámok inferencie (Shift) sa uvolnuje pri
+            # KAZDOM konci session, nie az v `Tool#deactivate`. Ten totiz
+            # pride az PO `pop_tool` — a ked nastroj prave nie je vrchom
+            # stacku, `pop_tool` sa ODLOZI a zamok by na view visel dalej
+            # (napr. vymena dokumentu s drzanym Shiftom). Odomyka sa LEN pre
+            # kreslenie: iba ono zamyka, takze cudzi zamok pouzivatela
+            # (iny nastroj pod nami) sa nesmie zhodit.
+            release_inference(s) if s.respond_to?(:drawing?) && s.drawing?
             # Slot sa uvolnuje aj nad `:committing` (review #268 P3-10): ked by
             # z commitu vybublala vynimka MIMO `StandardError`, session by
             # ostala navzdy „rozrobena" a drzala by slot az do restartu.
@@ -179,13 +197,22 @@ module Noxun
 
           # GHOST-D1: `subject` + `interaction` + `orientation` — pasik podla
           # nich rozhoduje, CO kresli (doska nema ovladace vysky, ma umiestnenie).
-          { 'active' => true, 'type' => s.type_key,
-            'subject' => s.subject.to_s, 'interaction' => s.interaction.to_s,
-            'anchor' => s.anchor.to_s, 'anchor_label' => ANCHOR_LABELS[s.anchor].to_s,
-            'rotation' => s.rotation_index * 90, 'z_mode' => s.z_mode.to_s,
-            'lock_z' => s.lock_plane_z.to_f,
-            'orientation' => s.orientation.to_s,
-            'orientation_label' => s.orientation_label }
+          out = { 'active' => true, 'type' => s.type_key,
+                  'subject' => s.subject.to_s, 'interaction' => s.interaction.to_s,
+                  'anchor' => s.anchor.to_s, 'anchor_label' => ANCHOR_LABELS[s.anchor].to_s,
+                  'rotation' => s.rotation_index * 90, 'z_mode' => s.z_mode.to_s,
+                  'lock_z' => s.lock_plane_z.to_f,
+                  'orientation' => s.orientation.to_s,
+                  'orientation_label' => s.orientation_label }
+          # GHOST-D2: pasik kreslenia ukazuje FAZU a jej hodnotu (ziadne
+          # ovladace vysky ani kotvy — pociatok je pevny).
+          if s.drawing?
+            out['phase'] = s.draw_phase.to_s
+            out['phase_label'] = s.draw_phase_label
+            out['phase_value'] = s.draw_phase_value
+            out['phase_locked'] = s.draw_phase_locked?
+          end
+          out
         end
 
         def push_state(s = @session)
@@ -293,6 +320,17 @@ module Noxun
         def world_transform(s)
           return nil unless s && s.last_point
 
+          # GHOST-D2: kreslenie ma VLASTNU maticu — rotacia okolo Z o uhol
+          # smeroveho vektora, pociatok uz nesie posun zaporneho 2. tahu.
+          # Pred klikom pociatku plati este placement matica (doska visi na
+          # kurzore v kanonickom smere), aby nahlad nezmizol.
+          if s.drawing? && s.draw_started?
+            vals = s.draw_matrix_vals
+            return nil unless vals
+
+            return Geom::Transformation.new(to_inch_matrix(vals))
+          end
+
           # GHOST-FB4: v zamku plati LOCKNUTA vyska session (`lock_plane_z`) —
           # default je domaca vyska typu (`plan.home_z`), ale pole v pasiku ju
           # smie prestavit a zmena plati OKAMZITE aj pre commit.
@@ -328,6 +366,20 @@ module Noxun
 
         # --- pomocne --------------------------------------------------------
 
+        # GHOST-D2: uvolnenie natívneho zámku inferencie pre session, ktora
+        # ho mohla drzat (kreslenie). Bezargumentove `lock_inference`
+        # odomyka; volanie je idempotentne a nikdy nesmie zhodit cancel.
+        def release_inference(s)
+          m = s.respond_to?(:model) ? s.model : nil
+          v = m && m.respond_to?(:active_view) ? m.active_view : nil
+          return false unless v && v.respond_to?(:lock_inference)
+
+          v.lock_inference
+          true
+        rescue StandardError
+          false
+        end
+
         def invalidate_view(model)
           v = (model && model.respond_to?(:active_view) ? model.active_view : nil)
           v ||= (defined?(Sketchup) ? Sketchup.active_model.active_view : nil)
@@ -352,6 +404,8 @@ module Noxun
           return '' unless s
 
           warn = s.placeable ? '' : ' · POLOHA NEČITATEĽNÁ — otoč pohľad'
+          return draw_status_text(s, warn) if s.drawing?
+
           if s.board?
             # GHOST-D1: doska nema rezim vysky (prichytava sa plne v XYZ) —
             # miesto neho ma UMIESTNENIE, ktore cykli ↑/↓.
@@ -369,7 +423,37 @@ module Noxun
           f = v.to_f
           (f - f.round).abs < 0.05 ? f.round.to_s : format('%.1f', f)
         end
+
+        # GHOST-D2: status kreslenia. Faza 0 este pripusta ←/→ a ↑/↓, od kliku
+        # pociatku uz nie (jedna hranica) — hlaska to hovori priamo.
+        def draw_status_text(s, warn = '')
+          case s.draw_phase
+          when :origin
+            'Kreslenie dosky: klik určí počiatok · ←/→ otočiť · ↑/↓ umiestnenie · Esc zruší ' \
+              "| #{s.orientation_label.to_s.downcase} · otočenie #{s.rotation_index * 90}°#{warn}"
+          when :length, :width
+            dim = s.draw_dim
+            val = s.draw_phase_value
+            over = s.draw_over_limit
+            note = if over
+                     " · #{Calc.dim_limit_message(dim)} (ťah #{Calc.fmt_dim(over)} mm orezaný)"
+                   else
+                     ''
+                   end
+            "#{Calc.dim_label(dim)}: ťahaj myšou alebo napíš číslo a Enter · prázdny Enter = hodnota karty " \
+              "(#{Calc.fmt_dim(s.draw_card_value(dim))} mm) · Shift drží smer · Esc zruší " \
+              "| #{Calc.fmt_dim(val)} mm#{note}#{warn}"
+          else
+            'Kreslenie dosky — klikni a doska sa vloží.'
+          end
+        end
       end
+
+      # GHOST-D2: hlaska po ZAMKNUTYCH klavesach (od kliku pociatku). Zije na
+      # MODULE (nie v `class << self`) — konstanta v singleton triede by sa
+      # `GhostTool::DRAW_KEYS_LOCKED_MSG` necitala.
+      DRAW_KEYS_LOCKED_MSG = 'Orientáciu a rotáciu meň PRED kliknutím počiatku — rovina aj os ťahu ' \
+                             'závisia od nich (Esc zruší a začni znova).'
 
       # =====================================================================
       # CISTA MATEMATIKA — ziadny SketchUp, ziadne jednotky mimo mm.
@@ -664,6 +748,310 @@ module Noxun
           i = ANCHORS.index(anchor) || 0
           ANCHORS[(i + step) % ANCHORS.length]
         end
+
+        # =================================================================
+        # GHOST-D2 — KRESLENIE DOSKY NA ROZMER. Cista matematika dvoch tahov:
+        # faza 1 HLADA SMER v rovine Z pociatku, faza 2 MERIA po PEVNEJ osi.
+        # Ziadny SketchUp; vsetko v mm.
+        # =================================================================
+
+        # Presnost prijatej hodnoty (mm). Rovnaka ako `board_config`, aby
+        # nahlad, config aj geometria niesli TU ISTU hodnotu.
+        DIM_ROUND = 2
+        # Popisky rozmerov do meracieho pola a statusu.
+        DIM_LABELS = { length: 'Dĺžka', width: 'Šírka' }.freeze
+        # Zalozne limity, ked `BoardBuilder` este nie je nacitany (harness).
+        FALLBACK_DIM_LIMITS = { length: [10.0, 5000.0], width: [10.0, 3000.0] }.freeze
+        # Tolerancia axis snapu 1. tahu (POMOCKA, nie obmedzenie): smer blizsi
+        # nez 3° k svetovej osi sa na nu prilepi. 45° tah sa nesnapne — presne
+        # to overuje test sikmeho tahu.
+        AXIS_SNAP_SIN = Math.sin(3.0 * Math::PI / 180.0)
+        # Svetove osi, na ktore sa 1. tah smie prilepit (v rovine tahu).
+        SNAP_AXES = [[1.0, 0.0, 0.0], [-1.0, 0.0, 0.0],
+                     [0.0, 1.0, 0.0], [0.0, -1.0, 0.0]].freeze
+        # Kluce zamkov, ktore smu prist z karty (whitelist payloadu `draw_board`).
+        DRAW_LOCK_KEYS = %i[length width].freeze
+
+        # --- rozmery: parser, limity, zaokruhlenie -------------------------
+
+        # VLASTNY parser meracieho pola. UPLNA zhoda po `strip`: cislo (bodka
+        # aj ciarka) s volitelnym `mm`. NIKDY `String#to_l` ani `to_f` na
+        # surovy text — `to_l` na slovenskom Windows padne pri bodke a bez
+        # jednotky si vezme sablonu modelu, `to_f` by z „abc2400xyz" spravilo
+        # 0.0 a z „2400mmjunk" 2400.0. Vracia Float mm zaokruhleny na 0,01,
+        # alebo nil (= neplatny vstup, faza ostava).
+        DIM_TEXT_RE = /\A\s*(\d+(?:[.,]\d+)?)\s*(?:mm)?\s*\z/i.freeze
+
+        def parse_mm(text)
+          return nil if text.nil?
+
+          m = DIM_TEXT_RE.match(text.to_s.strip)
+          return nil unless m
+
+          v = m[1].tr(',', '.').to_f
+          return nil unless v.finite?
+
+          round_mm(v)
+        end
+
+        # Presnost prijatej hodnoty. Plati pre KAZDY zdroj rozmeru (pisane
+        # cislo, zamok, hodnota karty aj tah mysou).
+        def round_mm(v)
+          f = v.to_f
+          return nil unless f.finite?
+
+          f.round(DIM_ROUND)
+        end
+
+        # Limity rozmeru z `BoardBuilder::LIMITS` — JEDEN zdroj pravdy s
+        # `normalize`, inak by nahlad ukazal 6000 a model dostal 5000.
+        def dim_limits(key)
+          k = key.to_sym
+          if defined?(BoardBuilder) && BoardBuilder.const_defined?(:LIMITS)
+            lim = BoardBuilder::LIMITS[k]
+            return [lim[0].to_f, lim[1].to_f] if lim
+          end
+          (FALLBACK_DIM_LIMITS[k] || FALLBACK_DIM_LIMITS[:length]).map(&:to_f)
+        end
+
+        def dim_ok?(key, mm)
+          v = mm.to_f
+          return false unless v.finite?
+
+          lo, hi = dim_limits(key)
+          v >= lo && v <= hi
+        end
+
+        # Orezanie NAHLADU na limit (tah mysou nad limit ukaze limit, nie
+        # 6000). Klik mimo limitu sa odmieta samostatne — orezany nahlad
+        # nie je prijatim hodnoty.
+        def dim_clamp(key, mm)
+          v = mm.to_f
+          return nil unless v.finite?
+
+          lo, hi = dim_limits(key)
+          return round_mm(lo) if v < lo
+          return round_mm(hi) if v > hi
+
+          round_mm(v)
+        end
+
+        def dim_label(key)
+          DIM_LABELS[key.to_sym] || DIM_LABELS[:length]
+        end
+
+        def dim_limit_message(key)
+          lo, hi = dim_limits(key)
+          "#{dim_label(key)} musí byť od #{lo.round} do #{hi.round} mm."
+        end
+
+        # --- zamky faz z karty ---------------------------------------------
+
+        # WHITELIST payloadu `draw_board`. Prijme LEN `length`/`width`,
+        # hodnotu ako Float mm, a UZ PRI STARTE ju overi proti limitom —
+        # zamknuta faza sa preskakuje, takze neplatna hodnota by sa inak
+        # dostala az do geometrie. Vracia [hash, chyba_alebo_nil]; chyba =
+        # session sa NESPUSTI.
+        def draw_locks(raw)
+          return [{}, nil] unless raw.is_a?(Hash)
+
+          out = {}
+          DRAW_LOCK_KEYS.each do |k|
+            v = raw.key?(k) ? raw[k] : raw[k.to_s]
+            next if v.nil?
+            # Zamok je CISLO z karty (`locksFlat`), nie text ani Boolean.
+            return [{}, "#{dim_label(k)} zamknutá na karte nie je číslo — kreslenie sa nespustilo."] unless v.is_a?(Numeric)
+
+            mm = round_mm(v)
+            return [{}, "#{dim_label(k)} zamknutá na karte nie je číslo — kreslenie sa nespustilo."] if mm.nil?
+            unless dim_ok?(k, mm)
+              return [{}, "#{dim_limit_message(k)} Zamknutá hodnota #{fmt_dim(mm)} mm je mimo — kreslenie sa nespustilo."]
+            end
+
+            out[k] = mm
+          end
+          [out, nil]
+        end
+
+        # Cislo do statusu / meracieho pola. Slovenske zobrazenie: desatinna
+        # CIARKA a bez zbytocnej koncovej nuly (parser prijima oboje).
+        def fmt_dim(v)
+          f = v.to_f
+          return '' unless f.finite?
+          return f.round.to_s if (f - f.round).abs < 0.005
+
+          format('%.2f', f).sub(/0\z/, '').tr('.', ',')
+        end
+
+        # --- geometria faz --------------------------------------------------
+
+        def vec_len(v)
+          Math.sqrt((v[0].to_f * v[0].to_f) + (v[1].to_f * v[1].to_f) + (v[2].to_f * v[2].to_f))
+        end
+
+        def normalize_vec(v)
+          return nil unless v.is_a?(Array) && v.length == 3
+          return nil unless v.all? { |c| c.is_a?(Numeric) && c.to_f.finite? }
+
+          len = vec_len(v)
+          return nil unless len.finite? && len > EPS
+
+          [v[0].to_f / len, v[1].to_f / len, v[2].to_f / len]
+        end
+
+        def vec_dot(a, b)
+          (a[0].to_f * b[0].to_f) + (a[1].to_f * b[1].to_f) + (a[2].to_f * b[2].to_f)
+        end
+
+        # FAZA 1 — SMEROVY VEKTOR. Rovina 1. tahu je VODOROVNA rovina
+        # Z = Z pociatku pre VSETKY orientacie (dlzka je vodorovna aj pri
+        # stojacej doske), takze zo vzdialenosti pociatok -> kurzor ostane
+        # LEN vodorovna zlozka. Nil = nulovy vektor (kurzor sa nepohol) —
+        # volajuci potom pouzije KANONICKY smer, nikdy nulu.
+        def horizontal_dir(origin, point)
+          return nil unless origin && point
+
+          normalize_vec([point[0].to_f - origin[0].to_f, point[1].to_f - origin[1].to_f, 0.0])
+        end
+
+        # Vodorovna dlzka 1. tahu (mm) — rovnaka projekcia ako `horizontal_dir`.
+        def horizontal_length(origin, point)
+          return 0.0 unless origin && point
+
+          dx = point[0].to_f - origin[0].to_f
+          dy = point[1].to_f - origin[1].to_f
+          l = Math.sqrt((dx * dx) + (dy * dy))
+          l.finite? ? l : 0.0
+        end
+
+        # POMOCKA (vzor archivneho Ghost 2.0): smer blizsi nez `AXIS_SNAP_SIN`
+        # k svetovej osi sa na nu prilepi. Nie je to obmedzenie — sikmy tah
+        # ostava sikmy (test 45°).
+        def axis_snap(dir)
+          d = normalize_vec(dir)
+          return nil unless d
+
+          best = nil
+          best_sin = nil
+          SNAP_AXES.each do |ax|
+            dot = vec_dot(d, ax)
+            next if dot <= 0.0
+            # sinus odchylky od osi (vektory su jednotkove)
+            s = Math.sqrt([1.0 - (dot * dot), 0.0].max)
+            if best_sin.nil? || s < best_sin
+              best_sin = s
+              best = ax
+            end
+          end
+          return d if best.nil? || best_sin > AXIS_SNAP_SIN
+
+          [best[0], best[1], best[2]]
+        end
+
+        # KANONICKY smer = lokalna +X podla rotacie session (←/→ vo faze 0).
+        # Pouzije sa, ked je smerovy vektor NULOVY (cislo napisane hned, obe
+        # fazy zamknute) — nulovy vektor sa NIKDY nedostane do transformacie.
+        def canonical_dir_x(rotation_index)
+          i = norm_rotation(rotation_index)
+          [COS[i], SIN[i], 0.0]
+        end
+
+        # FAZA 2 — PEVNA os merania sirky v ramci UMIESTNENEJ dosky:
+        #   leziaca             -> vodorovna kolmica na 1. tah (Z x dir_x)
+        #   stojaca / na_stenu  -> svetova +Z (sirka je vyska pilastra)
+        # Vracia jednotkovy vektor, alebo nil pri degenerovanom `dir_x`.
+        def board_measure_axis(orientation, dir_x)
+          o = norm_board_orientation(orientation)
+          return [0.0, 0.0, 1.0] unless o == BOARD_DEFAULT_ORIENTATION
+
+          d = normalize_vec(dir_x)
+          return nil unless d
+
+          # Z x d — vodorovna, pravotociva ku dvojici (d, Z).
+          normalize_vec([-d[1], d[0], 0.0])
+        end
+
+        # Znamienkova projekcia bodu na priamku (mm). Zaporna hodnota = 2. tah
+        # ide na opacnu stranu; POCIATOK sa vtedy posunie o −sirka po tej istej
+        # osi a osi ostavaju pravotocive (ziadne obratenie `dir_y`).
+        def project_on_axis(origin, axis, point)
+          return nil unless origin && point
+
+          a = normalize_vec(axis)
+          return nil unless a
+
+          v = [point[0].to_f - origin[0].to_f, point[1].to_f - origin[1].to_f,
+               point[2].to_f - origin[2].to_f]
+          return nil unless v.all?(&:finite?)
+
+          p = vec_dot(v, a)
+          p.finite? ? p : nil
+        end
+
+        # FALLBACK FAZY 2 vo VOLNOM PRIESTORE: najblizsi bod PRIAMKY
+        # (pociatok + s*os) k lucu z kamery. Premietnutie z vodorovnej roviny
+        # by pri zvislej sirke pilastra dalo konstantnu vysku, preto sa meria
+        # proti lucu — s TYM ISTYM kontraktom degeneracie ako `ray_plane`:
+        #   * konecne a nenulove vektory,
+        #   * UHLOVY PRAH medzi lucom a osou (takmer rovnobezny luc =
+        #     takmer nulovy menovatel -> vysledok odleti alebo zmeni
+        #     znamienko sirky),
+        #   * parameter luca `t >= 0` (polpriamka OD kamery, nie za nou),
+        #   * vysledok v zdravom dosahu (`MAX_REACH_MM`).
+        # Nil = faza NEPOKROCI a status to povie.
+        def ray_axis_point(ray_origin, ray_dir, line_origin, line_axis)
+          return nil unless ray_origin && line_origin
+
+          d = normalize_vec(ray_dir)
+          a = normalize_vec(line_axis)
+          return nil unless d && a
+
+          # sin uhla medzi lucom a osou; |d x a| pri jednotkovych vektoroch
+          cross = [(d[1] * a[2]) - (d[2] * a[1]),
+                   (d[2] * a[0]) - (d[0] * a[2]),
+                   (d[0] * a[1]) - (d[1] * a[0])]
+          sin_ang = vec_len(cross)
+          return nil unless sin_ang.finite? && sin_ang > MIN_SIN
+
+          w0 = [ray_origin[0].to_f - line_origin[0].to_f,
+                ray_origin[1].to_f - line_origin[1].to_f,
+                ray_origin[2].to_f - line_origin[2].to_f]
+          return nil unless w0.all?(&:finite?)
+
+          b = vec_dot(d, a)
+          denom = 1.0 - (b * b) # = sin^2, uz overene proti MIN_SIN
+          return nil unless denom.finite? && denom > EPS
+
+          dw = vec_dot(d, w0)
+          aw = vec_dot(a, w0)
+          t = ((b * aw) - dw) / denom
+          s = (aw - (b * dw)) / denom
+          return nil unless t.finite? && s.finite?
+          return nil unless t >= 0.0
+          return nil unless t <= MAX_REACH_MM
+
+          pt = [line_origin[0].to_f + (s * a[0]),
+                line_origin[1].to_f + (s * a[1]),
+                line_origin[2].to_f + (s * a[2])]
+          sane_point?(pt) ? pt : nil
+        end
+
+        # KANONICKA transformacia KRESLENEJ dosky. Rotacia je okolo svetovej
+        # osi Z o uhol smeroveho vektora (`dir_x` je jednotkovy a vodorovny),
+        # takze matica je ortonormalna a PRAVOTOCIVA — `rigid_matrix?` (R-03)
+        # ju prijme. Pociatok uz nesie posun zaporneho 2. tahu.
+        # Vystup: 16 cisel v SketchUp poradi (po stlpcoch), mm.
+        def draw_matrix(origin:, dir_x:)
+          d = normalize_vec([dir_x[0], dir_x[1], 0.0])
+          return nil unless d && origin && sane_point?(origin)
+
+          c = d[0]
+          s = d[1]
+          [c,   s,   0.0, 0.0,
+           -s,  c,   0.0, 0.0,
+           0.0, 0.0, 1.0, 0.0,
+           origin[0].to_f, origin[1].to_f, origin[2].to_f, 1.0]
+        end
       end
 
       # Hrany obalky (indexy do `Calc.envelope_points`) — 12 hran kvadra.
@@ -678,12 +1066,13 @@ module Noxun
       # =====================================================================
       class PlacementSession
         attr_reader :model, :plan, :hardware, :template_ref, :note, :state,
-                    :rotation_index, :anchor, :z_mode, :last_point, :corners_mm,
+                    :rotation_index, :anchor, :z_mode, :last_point,
                     :anchors_mm, :cancel_reason, :hardware_note, :type_key,
                     :subject, :interaction, :orientation
 
         def initialize(model:, plan:, hardware: nil, template_ref: nil, note: nil, memory: nil,
-                       subject: :cabinet, interaction: DEFAULT_INTERACTION, orientation: nil)
+                       subject: :cabinet, interaction: DEFAULT_INTERACTION, orientation: nil,
+                       locks: nil)
           @model = model
           @plan = plan
           @hardware = hardware
@@ -695,6 +1084,9 @@ module Noxun
           # payload pasika aj sev commitu.
           @subject = SUBJECTS.include?(subject) ? subject : :cabinet
           @interaction = INTERACTIONS.include?(interaction) ? interaction : DEFAULT_INTERACTION
+          # GHOST-D2: kreslenie existuje LEN pre dosku — skrinka spadne spat
+          # na umiestnovanie (jej sev ani obalka fazy nepoznaju).
+          @interaction = DEFAULT_INTERACTION if @interaction == :drawing && @subject != :board
           # GHOST-FB3: session STARTUJE Z PAMATE modulu (kotva, rotacia, rezim
           # vysky, locknute vysky) — do vypnutia SketchUpu si nastroj pamata,
           # ako s nim pouzivatel naposledy pracoval. Prva session v behu
@@ -712,7 +1104,12 @@ module Noxun
           # Orientacia prichadza z KARTY (payload `insert_board`) — session je
           # jej jediny drzitel; do pamate modulu sa NEZAPISUJE.
           @orientation = orientation
+          # GHOST-D2: CISELNY snapshot zamkov karty (`locksFlat('board')`),
+          # uz zvalidovany volajucim proti `BoardBuilder::LIMITS`. Zamky ziju
+          # LEN v session — do vyrobneho configu sa NIKDY nedostanu.
+          @draw_locks = normalize_locks(locks)
           board? ? init_board! : init_cabinet!
+          init_draw! if drawing?
         end
 
         # --- subjekt ---------------------------------------------------------
@@ -727,6 +1124,335 @@ module Noxun
 
         def placement?
           @interaction == :placement
+        end
+
+        def drawing?
+          @interaction == :drawing
+        end
+
+        # =================================================================
+        # GHOST-D2 — FAZOVY AUTOMAT KRESLENIA
+        #   :origin -> klik urci POCIATOK (pevna kotva `fl_bottom`)
+        #   :length -> hlada sa SMER v rovine Z pociatku (dlzka = |vektor|)
+        #   :width  -> meria sa po PEVNEJ osi (leziaca vodorovne, stojaca +Z)
+        #   :done   -> obe hodnoty su znama, commit moze prebehnut
+        # Zamknuta faza sa PRESKAKUJE; ked sa preskoci faza dlzky, smer je
+        # KANONICKY (lokalna +X podla rotacie session).
+        # =================================================================
+
+        attr_reader :draw_phase, :draw_origin, :draw_dir_x, :draw_length_mm,
+                    :draw_width_mm, :draw_locks
+
+        # Pociatok kreslenia je PEVNY (`fl_bottom`) a pamatanu kotvu
+        # placementu IGNORUJE — ALT v kresleni nema vyznam.
+        def init_draw!
+          @anchor = ANCHORS.first
+          @draw_phase = :origin
+          @draw_origin = nil
+          @draw_dir_x = nil
+          @draw_locked_dir = nil
+          @draw_length_mm = nil
+          @draw_width_mm = nil
+          @draw_preview_length = nil
+          @draw_preview_width = nil
+          @draw_over_limit = nil
+          @draw_canonical = false
+          @draw_width_sign = 1.0
+        end
+
+        def normalize_locks(raw)
+          return {} unless raw.is_a?(Hash)
+
+          out = {}
+          Calc::DRAW_LOCK_KEYS.each do |k|
+            v = raw.key?(k) ? raw[k] : raw[k.to_s]
+            next unless v.is_a?(Numeric)
+
+            mm = Calc.round_mm(v)
+            out[k] = mm if mm && Calc.dim_ok?(k, mm)
+          end
+          out
+        end
+
+        def draw_locked?(dim)
+          @draw_locks.key?(dim.to_sym)
+        end
+
+        def draw_started?
+          drawing? && !@draw_origin.nil?
+        end
+
+        def draw_ready?
+          drawing? && @draw_phase == :done &&
+            !@draw_origin.nil? && !@draw_dir_x.nil? &&
+            !@draw_length_mm.nil? && !@draw_width_mm.nil?
+        end
+
+        # Bol smer 1. tahu KANONICKY (nulovy vektor / preskocena faza)?
+        # Status to hovori pouzivatelovi.
+        def draw_canonical_dir?
+          @draw_canonical ? true : false
+        end
+
+        # Rozmer, ktory AKTUALNA faza meria (nil mimo faz merania).
+        def draw_dim
+          DRAW_PHASE_DIM[@draw_phase]
+        end
+
+        def draw_phase_label
+          d = draw_dim
+          d ? Calc.dim_label(d) : ''
+        end
+
+        def draw_phase_locked?
+          d = draw_dim
+          !d.nil? && draw_locked?(d)
+        end
+
+        # ZIVA hodnota aktualnej fazy (nahlad) — do pasika aj meracieho pola.
+        def draw_phase_value
+          case @draw_phase
+          when :length then (@draw_preview_length || @draw_length_mm)
+          when :width  then (@draw_preview_width || @draw_width_mm)
+          end
+        end
+
+        # Hodnota KARTY pre danu fazu (prazdny Enter ju vedome prevezme).
+        def draw_card_value(dim)
+          Calc.round_mm(Calc.cfg_num(@plan.config, dim.to_sym))
+        end
+
+        # KLIK POCIATKU. Pociatok je bod, ktory ghost prave drzi (plne XYZ
+        # prichytenie ako pri umiestnovani). Vrati novy stav fazy.
+        def begin_draw!(pt_mm)
+          return false unless drawing? && @draw_phase == :origin
+          return false unless pt_mm && Calc.sane_point?(pt_mm)
+
+          @draw_origin = [pt_mm[0].to_f, pt_mm[1].to_f, pt_mm[2].to_f].freeze
+          @last_point = @draw_origin
+          advance_draw!(:origin)
+          true
+        end
+
+        # Posun na dalsiu NEZAMKNUTU fazu. Zamknuta faza sa vyplni hodnotou
+        # zamku; pri preskocenej faze dlzky je smer KANONICKY.
+        def advance_draw!(from)
+          phase = from
+          if phase == :origin
+            phase = :length
+            if draw_locked?(:length)
+              apply_canonical_dir!
+              @draw_length_mm = @draw_locks[:length]
+              phase = :width
+            end
+          elsif phase == :length
+            phase = :width
+          elsif phase == :width
+            phase = :done
+          end
+          if phase == :width && draw_locked?(:width)
+            @draw_width_mm = @draw_locks[:width]
+            @draw_width_sign = 1.0
+            phase = :done
+          end
+          @draw_phase = phase
+          reset_phase_preview!
+          phase
+        end
+
+        # Zmena fazy: nahlad predoslej fazy zanika a ZAMOK SMERU sa VZDY
+        # uvolnuje (zamok z 1. fazy nesmie obmedzit 2.). Priznak kanonickeho
+        # smeru ani znamienko sirky sa TU NEMENIA — patria uz POTVRDENEJ
+        # hodnote, nie nahladu.
+        def reset_phase_preview!
+          @draw_preview_length = nil
+          @draw_preview_width = nil
+          @draw_over_limit = nil
+          @draw_locked_dir = nil
+        end
+
+        # Smer bez tahu = lokalna +X podla rotacie session (←/→ vo faze 0).
+        # NULOVY vektor sa NIKDY nedostane do transformacie.
+        def apply_canonical_dir!
+          @draw_dir_x = Calc.canonical_dir_x(@rotation_index).freeze
+          @draw_canonical = true
+          @draw_dir_x
+        end
+
+        # ZIVY NAHLAD 1. fazy: smer + dlzka z bodu pod kurzorom. Nulovy tah
+        # necha smer nedotknuty (kanonicky sa dosadi az pri POTVRDENI).
+        # `over_limit` = tah presiahol limit -> nahlad OREZANY, status hlasi.
+        def preview_length!(pt_mm, snap: true)
+          return false unless drawing? && @draw_phase == :length
+
+          if @draw_locked_dir
+            # SHIFT: smer je ZAMKNUTY — pohyb kurzora ho uz nesmie zmenit,
+            # meria sa LEN priemet na zamknuty smer.
+            @draw_dir_x = @draw_locked_dir
+            @draw_canonical = false
+            proj = Calc.project_on_axis(@draw_origin, @draw_locked_dir, pt_mm)
+            raw = proj.nil? ? 0.0 : [proj, 0.0].max
+          else
+            dir = Calc.horizontal_dir(@draw_origin, pt_mm)
+            dir = Calc.axis_snap(dir) if dir && snap
+            if dir
+              @draw_dir_x = dir.freeze
+              @draw_canonical = false
+            end
+            raw = Calc.horizontal_length(@draw_origin, pt_mm)
+          end
+          store_preview(:length, raw)
+        end
+
+        # ZIVY NAHLAD 2. fazy: znamienkovy priemet na PEVNU os. Zaporny tah
+        # posunie POCIATOK (osi ostavaju pravotocive) — riesi to transformacia.
+        def preview_width!(signed_mm)
+          return false unless drawing? && @draw_phase == :width
+          return false if signed_mm.nil?
+
+          @draw_width_sign = signed_mm.to_f.negative? ? -1.0 : 1.0
+          store_preview(:width, signed_mm.to_f.abs)
+        end
+
+        # Poloha sa z tohto pohladu nedala urcit (degenerovany luc) — ghost
+        # DRZI poslednu platnu polohu, len sa nesmie polozit. `set_point` sa
+        # v kresleni pouzit neda: `@last_point` je POCIATOK, nie kurzor.
+        def set_placeable!(flag)
+          @placeable = flag ? true : false
+        end
+
+        def store_preview(dim, raw)
+          v = Calc.round_mm(raw)
+          return false if v.nil?
+
+          @draw_over_limit = Calc.dim_ok?(dim, v) ? nil : v
+          shown = Calc.dim_clamp(dim, v)
+          if dim == :length
+            @draw_preview_length = shown
+          else
+            @draw_preview_width = shown
+          end
+          true
+        end
+
+        # Presiahol ZIVY tah limit? (nahlad je orezany, klik sa odmietne)
+        def draw_over_limit
+          @draw_over_limit
+        end
+
+        # POTVRDENIE fazy (klik / cislo + Enter / prazdny Enter / zamok).
+        # Limit sa overuje PRED posunom fazy pre KAZDY zdroj rozmeru.
+        # Vracia true = faza sa posunula, false = hodnota odmietnuta.
+        # `typed:` = hodnota prisla ZO VSTUPU (napisane cislo, hodnota karty
+        # pri prazdnom Enteri, zamok karty), nie z projekcie kurzora.
+        def confirm_draw!(dim, mm, sign: nil, typed: false)
+          return false unless drawing?
+          return false unless draw_dim == dim.to_sym
+
+          v = Calc.round_mm(mm)
+          return false if v.nil? || !Calc.dim_ok?(dim, v)
+
+          if dim.to_sym == :length
+            # Rotaciu okolo Z urcuje smerovy vektor v okamihu POTVRDENIA.
+            # NULOVY vektor sa NIKDY nedostane do transformacie — namiesto
+            # neho plati KANONICKY smer (lokalna +X podla rotacie session).
+            apply_canonical_dir! if @draw_dir_x.nil?
+            @draw_length_mm = v
+          else
+            # Znamienko nesie MYS; napisane cislo, hodnota karty aj zamok
+            # znamenaju vzdy KLADNY smer (inak by stary tah prezil do textu).
+            @draw_width_sign = sign.to_f unless sign.nil?
+            @draw_width_mm = v
+          end
+          # Codex #299 P2: NAPISANE cislo (a hodnota karty pri prazdnom
+          # Enteri) urcuje rozmer UPLNE — projekcia kurzora uz doň nevstupuje.
+          # Ked teda degenerovany pohlad (takmer rovnobezny luc, rovina za
+          # kamerou) predtym oznacil session za NEUMIESTNITELNU, cislo ju
+          # znova umiestnitelnou UROBI: inak by pouzivatel musel hybat mysou
+          # a klikat v presne tej situacii, ktoru mal cislom obist.
+          # Pociatok je uz kliknuty a smer je bud z tahu, alebo KANONICKY,
+          # takze transformacia je plne urcena.
+          set_placeable!(true) if typed
+          advance_draw!(@draw_phase)
+          true
+        end
+
+        # Znamienko posledneho 2. tahu (−1 = doska rastie na opacnu stranu).
+        def draw_width_sign
+          @draw_width_sign.nil? ? 1.0 : @draw_width_sign
+        end
+
+        # SHIFT: zamkne SMER, ktory je prave na obrazovke. Zamknuty smer plati
+        # aj vo VOLNOM PRIESTORE — fallback sa nan premietne, takze pohyb
+        # kurzora po zamknuti smer dosky uz nezmeni.
+        def lock_draw_dir!(dir = nil)
+          return false unless drawing? && @draw_phase == :length
+
+          d = Calc.normalize_vec(dir || @draw_dir_x || Calc.canonical_dir_x(@rotation_index))
+          return false unless d
+
+          @draw_locked_dir = [d[0], d[1], 0.0]
+          @draw_locked_dir = Calc.normalize_vec(@draw_locked_dir)
+          return false unless @draw_locked_dir
+
+          @draw_locked_dir.freeze
+          @draw_dir_x = @draw_locked_dir
+          true
+        end
+
+        def release_draw_dir!
+          @draw_locked_dir = nil
+          true
+        end
+
+        def draw_locked_dir
+          @draw_locked_dir
+        end
+
+        # POCIATOK POUZITY V TRANSFORMACII. Zaporny 2. tah posunie pociatok
+        # o −sirka po osi merania; osi ostavaju PRAVOTOCIVE (ziadne obratenie
+        # `dir_y`, Codex #288 P1).
+        def draw_placement_origin
+          return nil unless @draw_origin && @draw_dir_x
+
+          w = @draw_width_mm || @draw_preview_width
+          return @draw_origin if w.nil? || draw_width_sign >= 0.0
+
+          ax = Calc.board_measure_axis(@orientation, @draw_dir_x)
+          return @draw_origin unless ax
+
+          [@draw_origin[0] - (ax[0] * w), @draw_origin[1] - (ax[1] * w),
+           @draw_origin[2] - (ax[2] * w)]
+        end
+
+        # 16 cisel transformacie kreslenej dosky (mm). Nil = este niet smeru.
+        def draw_matrix_vals
+          dir = @draw_dir_x || (@draw_phase == :origin ? nil : Calc.canonical_dir_x(@rotation_index))
+          o = draw_placement_origin
+          return nil unless dir && o
+
+          Calc.draw_matrix(origin: o, dir_x: dir)
+        end
+
+        # Rozmery ZIVEHO nahladu — obalka sa kresli z NICH, nie zo zmrazeneho
+        # configu (ten drzi hodnoty karty). Nezname rozmery drzia hodnotu
+        # karty, aby bola doska citatelna uz pri prvom tahu.
+        def draw_preview_dims
+          { length: @draw_length_mm || @draw_preview_length || draw_card_value(:length),
+            width: @draw_width_mm || @draw_preview_width || draw_card_value(:width),
+            thickness: Calc.cfg_num(@plan.config, :thickness) }
+        end
+
+        # Obalka ZIVEHO nahladu (8 rohov, mm) — `draw` aj `getExtents`.
+        def draw_corners_mm
+          Calc.board_envelope_points(draw_preview_dims, @orientation)
+        end
+
+        # Obalka ghostu. Pri UMIESTNOVANI je zmrazena (spocitana RAZ zo
+        # zmrazeneho configu), pri KRESLENI sa meni s kazdym tahom — preto
+        # jeden citac pre oboje (`draw`, `getExtents`, `world_corners`).
+        def corners_mm
+          drawing? ? draw_corners_mm : @corners_mm
         end
 
         # GHOST-D1: doska sa prichytava PLNE V XYZ (`pick_free` semantika) —
@@ -971,12 +1697,23 @@ module Noxun
           inst
         end
 
+        # GHOST-D2: plan, ktory ide do commitu. Umiestnovanie pouzije plan
+        # zmrazeny PRED startom ghostu; kreslenie z neho ODVODI novy zmrazeny
+        # plan s nakreslenymi rozmermi (`BoardBuilder.replan` — bez opatovneho
+        # citania katalogu, vyrobny snapshot ostava). `replan` NIC nemutuje,
+        # takze smie bezat az za barierou observera.
+        def commit_plan
+          return @plan unless drawing? && draw_ready?
+
+          BoardBuilder.replan(@plan, length: @draw_length_mm, width: @draw_width_mm)
+        end
+
         # Sev podla SUBJEKTU. Doske ide orientacia SAMOSTATNYM argumentom —
         # `stojaca` a `na_stenu` vedome zdielaju maticu (STANDARD 8.3), takze
         # z transformacie sa odvodit neda.
         def commit_subject!(transform)
           if board?
-            BoardBuilder.commit_insert(@model, @plan, transform: transform, orientation: @orientation)
+            BoardBuilder.commit_insert(@model, commit_plan, transform: transform, orientation: @orientation)
           else
             CabinetBuilder.commit_insert(@model, @plan, transform: transform) do
               @hardware_note = Panel.ghost_freeze_hardware(@model, @hardware) if @hardware && defined?(Panel)
@@ -1010,6 +1747,13 @@ module Noxun
           @finish_pending = false
           @model_ref = nil
           @session = nil # SVOJA session (priradi ju `activate`)
+          # GHOST-D2: meracie pole sa rozhoduje UZ TU, nie v `activate` —
+          # SketchUp smie zavolat `enableVCB?` EST PRED aktivaciou a vtedy by
+          # nezmrazena hodnota nechala Measurements na cely zivot nastroja
+          # vypnute. `Tool.new` vznika v `GhostTool.start` HNED za priradenim
+          # session, takze globalna session je tu uz ta spravna.
+          s = GhostTool.session
+          @vcb = !s.nil? && s.respond_to?(:drawing?) && s.drawing?
         end
 
         def attached?
@@ -1060,10 +1804,23 @@ module Noxun
             @on_top = true
             GhostTool.register_tool(self)
             @ip = Sketchup::InputPoint.new
+            # GHOST-D2: meracie pole je zapnute pocas CELEHO zivota nastroja
+            # (probe 5.9.: fazovo podmienene `enableVCB?` by Measurements po
+            # aktivacii nechalo vypnute a pisane rozmery by po prvom kliku
+            # neprisli). Hodnota vznikla uz v `initialize` — TU sa len potvrdi
+            # nad session, na ktoru sa nastroj naozaj naviazal.
+            @vcb = !s.nil? && s.respond_to?(:drawing?) && s.drawing? unless s.nil?
             refresh_status
+            refresh_vcb
             view = @model_ref.active_view
             view.invalidate if view
           end
+        end
+
+        # GHOST-D2: `true` = SketchUp zapne pole Measurements a posle nam
+        # `onUserText` / `onReturn`. Hodnota je zmrazena z `activate`.
+        def enableVCB? # rubocop:disable Naming/MethodName — SketchUp API
+          @vcb ? true : false
         end
 
         # Prepnutie na INY nastroj chodi TADIALTO (nie cez onCancel) — session
@@ -1071,12 +1828,19 @@ module Noxun
         # dalsi `pop_tool` (nastroj prave odchadza).
         def deactivate(view)
           guarded('deactivate') do
+            # GHOST-D2: natívny zamok inferencie sa uvolnuje AKO PRVE — zamok
+            # z drzaneho Shiftu nesmie prezit nastroj (visel by aj natívnym
+            # nastrojom, ktore prídu po nas).
+            release_inference!(view)
+            @ip_origin = nil
+            @ip_length = nil
             @attached = false
             @on_top = false
             @finish_pending = false
             GhostTool.unregister_tool(self)
             GhostTool.cancel_session('nástroj skončil')
             Sketchup.status_text = ''
+            clear_vcb
             view.invalidate if view
           end
         end
@@ -1085,7 +1849,11 @@ module Noxun
         # pocas nastroja. Vo vsetkych troch: session konci, undo sa NEBLOKUJE.
         def onCancel(reason, view)
           guarded('onCancel') do
+            # GHOST-D2: Esc / Undo / opatovny vyber = koniec CELEJ session
+            # (0 krokov Spat, bez peciatky) a zamok inferencie sa uvolni.
+            release_inference!(view)
             GhostTool.cancel_session(cancel_label(reason), deferred: true)
+            clear_vcb
             view.invalidate if view
           end
           true
@@ -1095,6 +1863,9 @@ module Noxun
         # NIE SME VRCH stacku a nesmieme z neho nic odoberat.
         def suspend(view)
           guarded('suspend') do
+            # GHOST-D2: Orbit/Pan nad nami — zamok inferencie sa uvolni (inak
+            # by po navrate drzal smer, ktory uz nikto nedrzi).
+            release_inference!(view)
             @on_top = false
             view.invalidate if view
           end
@@ -1111,12 +1882,14 @@ module Noxun
         # a registraciu noveho ghostu sa ani nedotkne.
         def resume(view)
           guarded('resume') do
+            release_inference!(view)
             @on_top = true
             if @finish_pending
               @finish_pending = false
               finish_self_soon
             else
               refresh_status
+              refresh_vcb
             end
             view.invalidate if view
           end
@@ -1139,8 +1912,16 @@ module Noxun
             s = live_session
             next unless s && s.active?
 
-            pick_point(s, x, y, view)
+            @mx = x
+            @my = y
+            if s.drawing? && s.draw_started?
+              track_draw(s, x, y, view)
+            else
+              pick_point(s, x, y, view)
+            end
             refresh_status
+            refresh_vcb
+            GhostTool.push_state(s) if s.drawing?
             view.invalidate if view
           end
         end
@@ -1150,35 +1931,50 @@ module Noxun
             s = live_session
             next unless s && s.active?
 
+            @mx = x
+            @my = y
+            # GHOST-D2: v kresleni klik NEcommituje hned — najprv urci
+            # pociatok, potom potvrdzuje fazy. Commit robi az posledna faza.
+            if s.drawing?
+              next unless draw_click(s, x, y, view)
+            end
+
             # Poloha sa este raz precita z aktualnej pozicie kurzora — klik
             # bez predchadzajuceho pohybu mysou tak nie je slepy.
-            pick_point(s, x, y, view)
-            unless s.placeable
-              Sketchup.status_text = 'Poloha sa z tohto pohľadu nedá určiť — otoč pohľad (Esc zruší vloženie).'
-              begin
-                Panel.set_status('Z tohto pohľadu sa poloha nedá určiť — otoč pohľad a klikni znova.', true) if defined?(Panel)
-              rescue StandardError
-                nil
-              end
-              next
-            end
-
-            tr = GhostTool.world_transform(s)
-            next unless tr
-
-            res = s.commit!(tr)
-            # GHOST-D1: `:blocked` = bariera observera nedosiahla pokoj. Nic
-            # sa nezapisalo, session ZIJE dalej — pouzivatel skusi klik znova.
-            if res == :blocked
-              blocked_status(s)
-              view.invalidate if view
-              next
-            end
-            view.invalidate if view
-            # Po commite (aj po neuspesnom) nastroj KONCI — jedno odlozene
-            # `pop_tool` a pouzivatel je spat pri svojom povodnom nastroji.
-            GhostTool.end_tool(deferred: true) if s.terminal?
+            pick_point(s, x, y, view) unless s.drawing?
+            commit_session(s, view)
           end
+        end
+
+        # JEDINA cesta z Toolu do commitu — vola ju klik aj potvrdenie
+        # meracieho pola (`onUserText` / `onReturn` v poslednej faze).
+        def commit_session(s, view)
+          unless s.placeable
+            Sketchup.status_text = 'Poloha sa z tohto pohľadu nedá určiť — otoč pohľad (Esc zruší vloženie).'
+            begin
+              Panel.set_status('Z tohto pohľadu sa poloha nedá určiť — otoč pohľad a klikni znova.', true) if defined?(Panel)
+            rescue StandardError
+              nil
+            end
+            return false
+          end
+
+          tr = GhostTool.world_transform(s)
+          return false unless tr
+
+          res = s.commit!(tr)
+          # GHOST-D1: `:blocked` = bariera observera nedosiahla pokoj. Nic
+          # sa nezapisalo, session ZIJE dalej — pouzivatel skusi klik znova.
+          if res == :blocked
+            blocked_status(s)
+            view.invalidate if view
+            return false
+          end
+          view.invalidate if view
+          # Po commite (aj po neuspesnom) nastroj KONCI — jedno odlozene
+          # `pop_tool` a pouzivatel je spat pri svojom povodnom nastroji.
+          GhostTool.end_tool(deferred: true) if s.terminal?
+          true
         end
 
         # --- klavesnica -----------------------------------------------------
@@ -1195,7 +1991,26 @@ module Noxun
 
             res = true
             # Repeat (drzana klavesa) NEMENI stav — reaguje sa na PRVY down.
+            # SHIFT je vynimka: drzanie klavesy je jeho CELY vyznam, ale
+            # zamykat sa ma raz (opakovany down uz nic nemeni).
             next if repeat.to_i > 1
+
+            # GHOST-D2: SHIFT = HOLD-TO-LOCK natívnej inferencie. Plati vo
+            # VSETKYCH fazach kreslenia; v skrinke ani v umiestnovani dosky
+            # vyznam nema (klavesu vtedy nevlastnime).
+            if owned == :shift
+              next lock_inference!(s, view)
+            end
+
+            if s.drawing?
+              next unless draw_key(s, owned, view)
+
+              refresh_status
+              refresh_vcb
+              GhostTool.push_state(s)
+              view.invalidate if view
+              next
+            end
 
             case owned
             when :left  then s.rotate!(-1)
@@ -1223,13 +2038,76 @@ module Noxun
         # kotiev je jedna volatelna metoda `PlacementSession#cycle_anchor!`.)
         # Klavesu vlastnime LEN so ZIVOU session — symetria s `onKeyDown`
         # (review #268 P3-6): po commite/cancele uz nesmieme SketchUpu nic brat.
-        def onKeyUp(key, _repeat, _flags, _view)
+        def onKeyUp(key, _repeat, _flags, view)
           res = false
           guarded('onKeyUp') do
             s = live_session
-            res = !s.nil? && s.active? && !owned_key(key).nil?
+            owned = s.nil? || !s.active? ? nil : owned_key(key)
+            res = !owned.nil?
+            # GHOST-D2: pustenie Shiftu ODOMKNE inferenciu (hold-to-lock).
+            next unless owned == :shift
+
+            release_inference!(view)
+            refresh_status
+            view.invalidate if view
           end
           res
+        end
+
+        # --- meracie pole (GHOST-D2) ----------------------------------------
+
+        # PISANA hodnota. Parser je VLASTNY (`Calc.parse_mm`) — `String#to_l`
+        # na slovenskom Windows padne pri bodke a bez jednotky si vezme
+        # sablonu modelu, `to_f` by z „abc2400xyz" spravilo 0.0. Neplatny
+        # text ani hodnota mimo limitu fazu NEPOSUNU (vzor Trimble
+        # `99_sphere_tool`: `UI.beep` + status, nastroj nepadne).
+        def onUserText(text, view) # rubocop:disable Naming/MethodName — SketchUp API
+          guarded('onUserText') do
+            s = live_session
+            next unless s && s.active? && s.drawing?
+
+            dim = s.draw_dim
+            next if dim.nil? # faza 0 pisane cislo IGNORUJE
+
+            mm = Calc.parse_mm(text)
+            if mm.nil?
+              draw_status_beep("Zadaj číslo v mm (napr. 2400 alebo 600,5) — „#{text.to_s.strip}“ sa neprijalo.")
+              next
+            end
+            unless Calc.dim_ok?(dim, mm)
+              draw_status_beep("#{Calc.dim_limit_message(dim)} Hodnota #{Calc.fmt_dim(mm)} mm sa neprijala.")
+              next
+            end
+
+            # Napisane cislo znamena VZDY kladny smer 2. tahu.
+            next unless s.confirm_draw!(dim, mm, sign: 1.0, typed: true)
+
+            commit_session(s, view) if after_draw_step(s, view)
+          end
+        end
+
+        # PRAZDNY Enter (probe 5.9.: `onUserText` vtedy NEPRIDE, SketchUp vola
+        # `onReturn`; konstanta `VK_RETURN` v API NEEXISTUJE). Je to VEDOMA
+        # akcia: prevezme hodnotu KARTY pre TUTO fazu a status to povie.
+        def onReturn(view) # rubocop:disable Naming/MethodName — SketchUp API
+          guarded('onReturn') do
+            s = live_session
+            next unless s && s.active? && s.drawing?
+
+            dim = s.draw_dim
+            next if dim.nil? # faza 0 Enter IGNORUJE
+
+            mm = s.draw_card_value(dim)
+            unless mm && Calc.dim_ok?(dim, mm)
+              draw_status_beep("#{Calc.dim_limit_message(dim)} Hodnota karty sa neprijala.")
+              next
+            end
+            next unless s.confirm_draw!(dim, mm, sign: 1.0, typed: true)
+
+            card_taken_status(dim, mm)
+            commit_session(s, view) if after_draw_step(s, view)
+          end
+          true
         end
 
         # --- kreslenie ------------------------------------------------------
@@ -1297,11 +2175,25 @@ module Noxun
         def draw_inference(view)
           ip = @ip
           return unless ip && ip.valid? && ip.display?
+          # GHOST-D2 (vzor archivneho Ghost 2.0): pri ZVISLEJ osi 2. tahu
+          # (pilaster) sa sirka meria proti PRIAMKE, nie proti scene — body
+          # inference na podlahe by klamali, preto sa v tejto faze nekreslia.
+          return if vertical_width_phase?
 
           ip.draw(view)
           view.tooltip = ip.tooltip
         rescue StandardError
           nil
+        end
+
+        def vertical_width_phase?
+          s = live_session
+          return false unless s && s.drawing? && s.draw_phase == :width
+
+          ax = Calc.board_measure_axis(s.orientation, s.draw_dir_x)
+          !ax.nil? && ax[2].abs > 0.5
+        rescue StandardError
+          false
         end
 
         def draw_anchor(view, s, dim)
@@ -1342,6 +2234,336 @@ module Noxun
         # aktualizuju z pushu session (`push_state` nizsie v onKeyDown).
         def board_orientation!(s, step)
           s.cycle_orientation!(step)
+        end
+
+        # =================================================================
+        # GHOST-D2 — KRESLENIE: klavesy, kliky, sledovanie tahu, meracie pole
+        # =================================================================
+
+        # Klavesy v kresleni. ←/→ a ↑/↓ platia LEN vo faze 0 (pred klikom
+        # pociatku): rovina 1. tahu aj os 2. tahu zavisia od orientacie, takze
+        # zmena uprostred by rozpracovane rozmery preniesla do inej sustavy.
+        # Od kliku pociatku su ZAMKNUTE — klavesu POHLTIME (`true` uz vratil
+        # volajuci) a povieme preco. ALT v kresleni vyznam NEMA (pociatok je
+        # pevna kotva `fl_bottom`), len sa pohlti kvoli menu liste Windows.
+        # Vracia true = stav sa zmenil a treba prekreslit.
+        def draw_key(s, owned, _view)
+          return false if owned == :alt
+
+          unless s.draw_phase == :origin
+            draw_locked_keys_status
+            return false
+          end
+
+          case owned
+          when :left  then s.rotate!(-1)
+          when :right then s.rotate!(1)
+          when :down  then board_orientation!(s, -1)
+          when :up    then board_orientation!(s, 1)
+          else return false
+          end
+          true
+        end
+
+        def draw_locked_keys_status
+          Sketchup.status_text = GhostTool::DRAW_KEYS_LOCKED_MSG
+          begin
+            Panel.set_status(GhostTool::DRAW_KEYS_LOCKED_MSG, true) if defined?(Panel)
+          rescue StandardError
+            nil
+          end
+          nil
+        end
+
+        # KLIK v kresleni. Vracia true LEN vtedy, ked su obe hodnoty zname a
+        # volajuci ma pokracovat commitom.
+        def draw_click(s, x, y, view)
+          case s.draw_phase
+          when :origin
+            # Pociatok sa berie z PLNEHO XYZ prichytenia (ako umiestnovanie) —
+            # doska tak zacne presne na rohu skrinky, aj na zvysenom.
+            pick_point(s, x, y, view)
+            unless s.placeable && s.last_point
+              draw_status_beep('Poloha počiatku sa z tohto pohľadu nedá určiť — otoč pohľad.')
+              return false
+            end
+
+            s.begin_draw!(s.last_point)
+            # KOPIA REALNE pickovaneho bodu pociatku — natívny zámok smeru
+            # (Shift) potrebuje DVA skutocne InputPointy; syntetický
+            # `InputPoint.new(pt)` podla probe 5.9. nezamyka.
+            capture_origin_ip!
+            after_draw_step(s, view)
+          when :length, :width
+            # Klik potvrdzuje hodnotu, ktoru prave ukazuje NAHLAD.
+            track_draw(s, x, y, view)
+            dim = s.draw_dim
+            if s.draw_over_limit
+              draw_status_beep("#{Calc.dim_limit_message(dim)} Klik mimo limitu sa neprijal.")
+              return false
+            end
+            val = s.draw_phase_value
+            sign = dim == :width ? s.draw_width_sign : nil
+            unless val && s.confirm_draw!(dim, val, sign: sign)
+              draw_status_beep("#{Calc.dim_limit_message(dim)} Hodnota sa neprijala — ťahaj ďalej alebo napíš číslo.")
+              return false
+            end
+            # Koniec dlzky potvrdeny KLIKOM je REALNY pickovany bod —
+            # 2. tah z neho dostane relativne inferencie (Codex #299 P2).
+            capture_length_ip! if dim == :length
+            after_draw_step(s, view)
+          else
+            true
+          end
+        end
+
+        # Po kazdom posune fazy: status, meracie pole, pasik, prekreslenie.
+        # `true` = faza je `:done` a volajuci ma commitovat.
+        def after_draw_step(s, view)
+          release_inference!(view)
+          refresh_status
+          refresh_vcb
+          GhostTool.push_state(s)
+          view.invalidate if view
+          s.draw_phase == :done
+        end
+
+        # Prazdny Enter je VEDOMA akcia — pouzivatel musi vediet, ze sa prevzala
+        # hodnota z karty (nie z tahu).
+        def card_taken_status(dim, mm)
+          msg = "#{Calc.dim_label(dim)} #{Calc.fmt_dim(mm)} mm prevzatá z karty (prázdny Enter)."
+          begin
+            Panel.set_status(msg) if defined?(Panel)
+          rescue StandardError
+            nil
+          end
+          begin
+            Sketchup.status_text = msg
+          rescue StandardError
+            nil
+          end
+          nil
+        end
+
+        def draw_status_beep(msg)
+          begin
+            UI.beep
+          rescue StandardError
+            nil
+          end
+          begin
+            Sketchup.status_text = msg
+          rescue StandardError
+            nil
+          end
+          begin
+            Panel.set_status(msg, true) if defined?(Panel)
+          rescue StandardError
+            nil
+          end
+          nil
+        end
+
+        # ZIVE SLEDOVANIE TAHU. Faza 1 hlada SMER v rovine Z pociatku, faza 2
+        # MERIA po pevnej osi — dve ROZDIELNE geometrie, nie jedna s prepinacom.
+        def track_draw(s, x, y, view)
+          case s.draw_phase
+          when :length then track_length(s, x, y, view)
+          when :width  then track_width(s, x, y, view)
+          else s.set_placeable!(true)
+          end
+        end
+
+        # FAZA 1: kurzor sa premieta do VODOROVNEJ roviny Z = Z pociatku.
+        # Brana volneho priestoru (vzor dnesneho ghostu): pouzije sa LEN
+        # REALNA geometricka inferencia (vertex/hrana/plocha) — alebo bod so
+        # ZAMKNUTOU inferenciou (Shift) — inak priesecnik luca s rovinou
+        # s PLNYM guardom (`t >= 0` / konecne / `MIN_SIN` / `MAX_REACH_MM`).
+        def track_length(s, x, y, view)
+          o = s.draw_origin
+          pt = draw_plane_point(s, x, y, view, o[2])
+          if pt.nil?
+            s.set_placeable!(false)
+            return false
+          end
+
+          s.set_placeable!(true)
+          s.preview_length!(pt)
+        end
+
+        def draw_plane_point(s, x, y, view, plane_z)
+          # Referencia = POCIATOK: SketchUp vdaka nej ponukne „on axis from
+          # point" a dalsie RELATIVNE inferencie (Codex #299 P2).
+          pos = pick_ip(x, y, view, draw_ref_ip(s))
+          if pos && (ip_on_geometry? || inference_locked?(view))
+            p = to_mm_triplet(pos)
+            flat = [p[0], p[1], plane_z.to_f]
+            return flat if Calc.sane_point?(flat)
+          end
+          pick_ray_plane(x, y, view, plane_z)
+        end
+
+        # FAZA 2: meria sa po PEVNEJ osi (leziaca = vodorovna kolmica na
+        # 1. tah, stojaca/na_stenu = svetova +Z). Premietnutie z vodorovnej
+        # roviny by pri zvislej sirke pilastra dalo KONSTANTNU vysku, preto
+        # je vo volnom priestore fallbackom najblizsi bod luca a PRIAMKY osi.
+        def track_width(s, x, y, view)
+          o = s.draw_origin
+          axis = Calc.board_measure_axis(s.orientation, s.draw_dir_x)
+          if axis.nil?
+            s.set_placeable!(false)
+            return false
+          end
+
+          pt = draw_axis_point(s, x, y, view, o, axis)
+          if pt.nil?
+            s.set_placeable!(false)
+            return false
+          end
+
+          proj = Calc.project_on_axis(o, axis, pt)
+          if proj.nil?
+            s.set_placeable!(false)
+            return false
+          end
+
+          s.set_placeable!(true)
+          s.preview_width!(proj)
+        end
+
+        def draw_axis_point(s, x, y, view, origin, axis)
+          # Referencia = koniec potvrdenej dlzky (ked vznikol klikom), inak
+          # pociatok — relativne inferencie platia aj v 2. tahu.
+          pos = pick_ip(x, y, view, draw_ref_ip(s))
+          if pos && (ip_on_geometry? || inference_locked?(view))
+            p = to_mm_triplet(pos)
+            return p if Calc.sane_point?(p)
+          end
+          ray = view.pickray(x, y)
+          return nil unless ray
+
+          r_origin = to_mm_triplet(ray[0])
+          r_dir = [ray[1].x.to_f, ray[1].y.to_f, ray[1].z.to_f]
+          Calc.ray_axis_point(r_origin, r_dir, origin, axis)
+        end
+
+        # --- natívny zamok inferencie (Shift) -------------------------------
+
+        # HOLD-TO-LOCK: zamkne inferenciu, ktoru SketchUp prave drzi. Zaroven
+        # si zapamatame SMER — zamknuty smer musi platit aj vo VOLNOM
+        # PRIESTORE, kde fallback ide cez `pickray` (bez toho by pohyb kurzora
+        # po zamknuti smer dosky zmenil).
+        def lock_inference!(s, view)
+          return nil unless view
+
+          begin
+            native_lock(s, view)
+          rescue StandardError => e
+            Engine.log_error(e, 'GhostTool.Tool#lock_inference!')
+          end
+          s.lock_draw_dir! if s.drawing?
+          refresh_status
+          view.invalidate
+          nil
+        end
+
+        # NATÍVNY zámok. Vo faze HLADANIA SMERU zamykame PRIAMKU pociatok ->
+        # kurzor dvojicou InputPointov (vzor Trimble LineTool) — presne to
+        # znamena „drz smer". Probe 5.9. ukazal, ze SYNTETICKE body
+        # (`InputPoint.new(pt)`) nezamykaju; `@ip_origin` je preto KOPIA
+        # REALNE pickovaneho bodu z kliku pociatku (`InputPoint#copy!`), nie
+        # bod poskladany zo suradnic. Ked dvojica nie je k dispozicii (alebo
+        # sme vo faze merania sirky), zamyka sa jednobodovo.
+        # POZOR: ked kurzor nema ziadnu natívnu inferenciu (volny bod v
+        # prazdnom priestore), SketchUp NEZAMKNE — smer vtedy drzi VLASTNY
+        # zamok session (`lock_draw_dir!`), preto sa oba pouzivaju spolu.
+        def native_lock(s, view)
+          if s.drawing? && s.draw_phase == :length &&
+             @ip_origin && @ip_origin.valid? && @ip && @ip.valid?
+            view.lock_inference(@ip, @ip_origin)
+          elsif @ip && @ip.valid?
+            view.lock_inference(@ip)
+          end
+        end
+
+        # Bod POCIATKU ako REALNY InputPoint (kopia, nie novy z suradnic).
+        # Zije len pocas kreslenia; `deactivate` ho zahodi.
+        def capture_origin_ip!
+          return nil unless @ip && @ip.valid?
+
+          @ip_origin ||= Sketchup::InputPoint.new
+          @ip_origin.copy!(@ip)
+          @ip_origin
+        rescue StandardError => e
+          Engine.log_error(e, 'GhostTool.Tool#capture_origin_ip!')
+          @ip_origin = nil
+        end
+
+        # Koniec potvrdenej DLZKY ako realny InputPoint — LEN ked ho urcil
+        # KLIK. Ked dlzka prisla cislom, ziadny realny bod na jej konci nie
+        # je a referenciou 2. fazy ostava pociatok.
+        def capture_length_ip!
+          return nil unless @ip && @ip.valid?
+
+          @ip_length ||= Sketchup::InputPoint.new
+          @ip_length.copy!(@ip)
+          @ip_length
+        rescue StandardError => e
+          Engine.log_error(e, 'GhostTool.Tool#capture_length_ip!')
+          @ip_length = nil
+        end
+
+        def release_inference!(view)
+          s = GhostTool.session
+          s.release_draw_dir! if s.respond_to?(:drawing?) && s.drawing?
+          return nil unless view
+
+          begin
+            view.lock_inference if view.respond_to?(:lock_inference)
+          rescue StandardError => e
+            Engine.log_error(e, 'GhostTool.Tool#release_inference!')
+          end
+          nil
+        end
+
+        def inference_locked?(view)
+          return false unless view && view.respond_to?(:inference_locked?)
+
+          view.inference_locked? ? true : false
+        rescue StandardError
+          false
+        end
+
+        # --- meracie pole (VCB) ---------------------------------------------
+
+        def refresh_vcb
+          return nil unless @vcb
+
+          s = live_session
+          return clear_vcb unless s && s.drawing?
+
+          dim = s.draw_dim
+          if dim.nil?
+            Sketchup.vcb_label = ''
+            Sketchup.vcb_value = ''
+            return nil
+          end
+          Sketchup.vcb_label = "#{Calc.dim_label(dim)} (mm)"
+          v = s.draw_phase_value
+          Sketchup.vcb_value = v.nil? ? '' : Calc.fmt_dim(v)
+          nil
+        rescue StandardError
+          nil
+        end
+
+        def clear_vcb
+          return nil unless @vcb
+
+          Sketchup.vcb_label = ''
+          Sketchup.vcb_value = ''
+          nil
+        rescue StandardError
+          nil
         end
 
         def pick_locked(s, x, y, view)
@@ -1410,13 +2632,38 @@ module Noxun
         # JEDINE miesto, kde sa pyta inference engine — plati pre OBA rezimy,
         # takze `@ip` je v oboch cerstvy a `draw` z neho vie vykreslit natívne
         # zvyraznenie snapu aj tooltip (GHOST-FB1).
-        def pick_ip(x, y, view)
+        # `ref` (Codex #299 P2) = REFERENCNY InputPoint fazy. So stvrtym
+        # argumentom ponuka SketchUp RELATIVNE inferencie („on axis from
+        # point", „from point") — bez neho ostane len priamy zasah geometrie
+        # a nas vlastny axis snap. Umiestnovanie (skrinka aj doska) referenciu
+        # NEDAVA — jeho spravanie sa nemeni.
+        def pick_ip(x, y, view, ref = nil)
           @ip ||= Sketchup::InputPoint.new
-          @ip.pick(view, x, y)
+          if ref && ref.valid? && !ref.equal?(@ip)
+            @ip.pick(view, x, y, ref)
+          else
+            @ip.pick(view, x, y)
+          end
           @ip.valid? ? @ip.position : nil
         rescue StandardError => e
           Engine.log_error(e, 'GhostTool.Tool#pick_ip')
           nil
+        end
+
+        # REFERENCNY bod AKTUALNEJ fazy kreslenia:
+        #   :length -> POCIATOK (inferencia od neho urcuje smer),
+        #   :width  -> KONIEC POTVRDENEJ DLZKY, ak vznikol KLIKOM (realny
+        #              pickovany bod); inak pociatok — dlzka mohla prist
+        #              cislom a vtedy ziadny realny bod na jej konci nie je.
+        # Syntetický `InputPoint.new(pt)` sa TU nepouziva: probe 5.9. ukazal,
+        # ze sa neviaze na inferencny kontext.
+        def draw_ref_ip(s)
+          return nil unless s && s.drawing?
+
+          case s.draw_phase
+          when :length then @ip_origin
+          when :width  then @ip_length || @ip_origin
+          end
         end
 
         def to_mm_triplet(pt)
@@ -1429,8 +2676,16 @@ module Noxun
           return :up    if vk(:VK_UP) == key
           return :down  if vk(:VK_DOWN) == key
           return :alt   if alt_key?(key)
+          # GHOST-D2: Shift vlastnime LEN v kresleni — v umiestnovani (skrinka
+          # aj doska) sa sprava presne ako doteraz (SketchUp si ho spracuje sam).
+          return :shift if drawing_session? && vk(:VK_SHIFT) == key
 
           nil
+        end
+
+        def drawing_session?
+          s = live_session
+          !s.nil? && s.drawing?
         end
 
         def alt_key?(key)
