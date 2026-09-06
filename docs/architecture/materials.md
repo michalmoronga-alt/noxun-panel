@@ -287,7 +287,10 @@ volajú **„Výklop/sklop"** a **„Blenda"** — názov roly `flap` je zámern
 `box_side` a `drawer_inner_front` majú **L1 1,0 mm = horná dlhá hrana**; ostatné hrany sú vedome bez olepu, sú skryté v boxe. `EDGE_LABELS` sú per rola úprimné: dno leží
 a prirodzenú „prednú" hranu nemá (neutrálne „Pozdĺžna/Priečna" ako doska), zvyšné tri STOJA a ich L1 je **Horná**. K tomu patrí **tretia mapa strán
 `EDGE_SIDES_STANDING`** (`L1 → top`): stojace dielce majú dĺžku vodorovne ako ležiace, ale ich olepená hrana je HORE, takže v `EDGE_SIDES_LYING` (kde `L1 → bottom`) by 2D
-karta kreslila pásku na opačnú stranu, než hovorí pravidlo aj label. `drawer_bottom` leží a lying mapu si ponecháva. Bump verzie je nutný z rovnakého dôvodu ako pri
+karta kreslila pásku na opačnú stranu, než hovorí pravidlo aj label. `drawer_bottom` leží a lying mapu si ponecháva. **KOV-D5:** zoznam stojacich rolí už nie je vlastný literál —
+`STANDING_ROLES` je **alias `PartFaces::STANDING_ROLES`**, teda presne tie roly, ktorým sa v modeli otáča dvojica L1/L2 (`STANDING_EDGE_FACES`, L1 = horná plocha). Dva zoznamy by
+sa časom rozišli a 2D karta by kreslila pásku na inú hranu, než akú vidno zafarbenú v modeli a než akú zvýrazní Kontrola olepov. Pravidlá (seed 4) sa tým **nemenia** — L1 = 1,0 mm
+platí ďalej, mení sa len to, KTORÚ plochu kvádra kód L1 pomenúva. Bump verzie je nutný z rovnakého dôvodu ako pri
 `flap`/`false_front` — bez neho by `merge_seed_roles` roly na existujúcich inštaláciách nikdy nedoplnil a zásuvka by sa postavila BEZ olepu. Roly sú aj v
 `RulesDialog::ABS_ROLE_ORDER` (na konci, za čelami) a v `ProductionCore::ROLE_LABELS` („Dno zásuvky", „Chrbát zásuvky", „Bok boxu", „Vnútorné čelo zásuvky") — prehľad ABS
 pravidiel ich číta zo seedu, takže bez názvov by ukázal holé identifikátory. Dielce samotné ešte **nikto neemituje** (to je C2b).

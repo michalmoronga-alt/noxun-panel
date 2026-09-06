@@ -1850,7 +1850,9 @@ module Noxun
           box = pd[:box]
           sheet_rgb = Materials.color_of(material_id)
           ents.grep(Sketchup::Face).each do |f|
-            code = PartFaces.edge_code_for_center(face_center_mm(f), box, ax)
+            # ROLA rozhoduje o orientacii dvojice L1/L2 (KOV-D5: stojace dielce
+            # zasuvky maju L1 HORE) — mapa je v PartFaces, tu sa nekopiruje.
+            code = PartFaces.edge_code_for_center(face_center_mm(f), box, ax, pd[:role])
             next if code.nil?
             abs_id = edges[code]
             next if abs_id.nil? || abs_id.to_s.strip.empty?

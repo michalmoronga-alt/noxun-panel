@@ -58,8 +58,10 @@ sú dva boky s rôznym materiálom **fail-closed** konflikt `drawer_thickness_un
 naozaj emituje** (`recipe[:thickness_supported].keys`) — dormantný override `box_side` na Atire (pozostatok po prepnutí z Quadra) tak nevyrobí falošný konflikt.
 
 **Geometria dielcov.** `prod[:length]` = rozmer `width` receptu (dlhá hrana), `prod[:width]` = `height` — vďaka tomu ABS L1/L2 ležia na dlhej hrane presne podľa seedu 4.
-Box je vycentrovaný v svetlej šírke, hĺbka začína na prednej rovine vnútra (y = 0), spodok je `ctx[:z0]`; predok a chrbát stoja NA dne. **`axes:` sa vedome neuvádzajú** —
-slúžia len na farbenie ABS plôšok (D-88) a pri stojacom dielci by L1 vyšla na spodnú hranu, kým páska ide na hornú; PartFaces má vlastnú zásadu „radšej žiadna farba".
+Box je vycentrovaný v svetlej šírke, hĺbka začína na prednej rovine vnútra (y = 0), spodok je `ctx[:z0]`; predok a chrbát stoja NA dne. **`axes:` nesie od KOV-D5 KAŽDÝ dielec
+zásuvky** — pomenovanou konštantou podľa umiestnenia boxu: dno `AXES_LYING`, chrbát a vnútorné čelo `AXES_WALL` (stoja v rovine XZ), bok boxu `AXES_WALL_DEPTH` (rovina YZ,
+dĺžka = NL po hĺbke Y). Bez osí sa hrany nezafarbia a Kontrola olepov ich nezvýrazní. Otázku „pri stojacom dielci by L1 vyšla na spodnú hranu, kým páska ide na hornú" rieši
+`PartFaces::STANDING_EDGE_FACES` (otočená dvojica L1/L2 pre `STANDING_ROLES`) — recept, ABS pravidlá ani výrobné rozmery sa nemenia.
 
 **Zápisy, ktoré má vykonať builder,** cestujú v pláne ako `drawer_writes` (chýbajúci `drawer.system` a chýbajúci záznam mapy) a `drawer_override_writes` (D-93 migrácia
 legacy `rule_id` na `recipe:<recipe_id>`). Aplikuje ich `CabinetBuilder.apply_drawer_writes` v **tej istej operácii** ako geometriu, takže Undo vráti oboje naraz.
@@ -562,9 +564,17 @@ Resolved položka navyše nesie `flap_dir` (`up` pre `lift`, `down` pre `fall`) 
 
 **D-88: JEDINÝ kontrakt „hrana → plocha kvádra"** (+ **D-104** `axes_for_snapshot`/`face_rect_mm` — vedomá legacy výnimka pre ČÍTANIE už postavenej zákazky: kandidáti podľa ROLY,
 overené proti kvádru, akceptuje sa výhradne jednoznačná zhoda). Osi dielca (ktorá os boxu je dĺžka/šírka/hrúbka) sú **EXPLICITNÝ údaj deskriptora** (`axes:` z konštánt
-`AXES_UPRIGHT/LYING/FRONT/WALL`) — zapisuje ich ten, kto box stavia (construction, zone_tree, fronts, board_builder), NIKDY sa neodvodzujú z hodnôt rozmerov (štvorcové čelo je
-nerozhodnuteľné). Mapovanie: L1/L2 = min/max osi ŠÍRKY, W1/W2 = min/max osi DĹŽKY, plochy kolmé na hrúbku = veľké dekorové. `BuildPlan` tvar osí validuje; `verified_axes` navyše
-kontroluje zhodu s box/prod — pri nezhode sa **nefarbí nič** (radšej žiadna farba než farba na zlej hrane).
+`AXES_UPRIGHT/LYING/FRONT/WALL/WALL_DEPTH`) — zapisuje ich ten, kto box stavia (construction, zone_tree, fronts, board_builder), NIKDY sa neodvodzujú z hodnôt rozmerov (štvorcové
+čelo je nerozhodnuteľné). Mapovanie: L1/L2 = min/max osi ŠÍRKY, W1/W2 = min/max osi DĹŽKY, plochy kolmé na hrúbku = veľké dekorové. `BuildPlan` tvar osí validuje; `verified_axes`
+navyše kontroluje zhodu s box/prod — pri nezhode sa **nefarbí nič** (radšej žiadna farba než farba na zlej hrane).
+
+**KOV-D5 — orientácia hrán STOJACICH rolí (Astra #20 F15).** Preklad kódu hrany na stenu kvádra žije v DVOCH pomenovaných mapách: `EDGE_FACES` (default, hore) a
+`STANDING_EDGE_FACES`, kde je **L1 = MAXIMUM osi šírky = HORNÁ plocha** a L2 dolná (W1/W2 sa nemenia). Druhú mapu dostávajú výhradne roly v `PartFaces::STANDING_ROLES`
+(`drawer_back` · `box_side` · `drawer_inner_front`) — dielce zásuvky, ktoré STOJA a ich olepená „jednotka" je hore (`AbsRules::EDGE_LABELS` L1 = Horná, seed 4 L1 = 1,0 mm).
+`AbsRules::STANDING_ROLES` je **alias** tejto konštanty, takže zoznam existuje raz; `drawer_bottom` leží a ostáva na defaulte. Mapu čítajú `edge_code_for_center` (farbenie plôšok
+v `CabinetBuilder.paint_edge_faces`) aj `rect_axis_side`/`face_rect_mm` (zvýraznenie Kontroly `EdgeCheck` a hover `HoverEdge`) — všetky posielajú ROLU dielca, žiadny z nich
+nemá vlastnú kópiu mapy (stráži zdrojový guard). `ROLE_AXES` pozná všetky štyri roly zásuvky (jeden kandidát na rolu), takže osi sa dopočítajú aj pri **starej zákazke**
+postavenej ešte bez `axes` v pláne.
 
 ### edge_check.rb
 
@@ -577,6 +587,9 @@ nič v .skp**, sken je read-only (žiadny dedup tik).
 `Validation.abs_impossible?`/`uni_sheet?` (KOMPAKT nikdy nesvieti oranžovo). `flagged_edges` = kontrakt D-104 (`missing`). Všetky tri stavy sa kreslia PLNOU plôškou (`OUTLINE_ONLY`
 prázdne — Michalov test 11.8. vyvrátil predpoklad o „mazanici": tenká linka je pri dieloch vedľa seba nečitateľná a prekrýva ju modré zvýraznenie výberu); farby `COLORS` sú
 zrkadlom tokenov `--nx-edge-*` (stráži test). Identita výskytu = (skrinka, dielec) cez `entityID`, NIKDY `persistent_id` (kópie pred dedup tikom ho zdieľajú).
+
+**Plôška hrany ide VŽDY cez `PartFaces` a spolu s osami sa posiela aj ROLA dielca** (KOV-D5): stojace dielce zásuvky majú L1 hore, takže bez roly by Kontrola zvýraznila inú hranu,
+než akú v modeli farbí `paint_edge_faces`. Vlastnú mapu „kód hrany → stena kvádra" tu preto niet — a nesmie vzniknúť (stráži zdrojový guard `test_kovd5_abs_zasuvky.rb`).
 
 **Filter „len vybrané"** patrí VÝHRADNE zelenej — `build_selection_filter` berie výber + **`model.active_path`** (kópie zdieľajú definíciu, takže vnorený dielec má rovnaké
 `entityID` — kontext rozhoduje, ktorý výskyt); prázdny výber = zelená sa nekreslí + hint. Prepínače žijú v `%APPDATA%\NOXUN\Engine\edge_check.json` (`set_option` = whitelist +
@@ -698,7 +711,7 @@ dáta**: `Sketchup::Overlay` NAD modelom — žiadna operácia, žiadny zápis, 
 
 **Nič sa nehľadá:** zvýrazňuje sa hrana toho dielca, ktorý je práve VYBRATÝ (karta je jeho zrkadlo), takže žiadny scan modelu — jedna plôška, nulová cena. Svetová transformácia ide
 cez `model.edit_transform * ent.transformation` (vnorený dielec po dvojkliku do skrinky). Geometria hrany používa **zdieľaný kontrakt `PartFaces`** (`axes_for_snapshot` +
-`face_rect_mm`) — ten istý, akým kreslí D-104; neoveriteľné osi = **nekreslí sa nič** („radšej žiadna farba než farba na zlej hrane"). `OUT_MM = 0,9` je **väčšie** než
+`face_rect_mm` **s rolou dielca** — KOV-D5) — ten istý, akým kreslí D-104; neoveriteľné osi = **nekreslí sa nič** („radšej žiadna farba než farba na zlej hrane"). `OUT_MM = 0,9` je **väčšie** než
 `EdgeCheck::OUT_MM` (0,5), aby bol hover vidno aj nad zapnutou kontrolou olepu; farba `COLOR` je **výber** (`--nx-select`), zámerne NIE `EdgeCheck::COLORS` (tie hovoria o stave
 olepu a nesmú sa miešať).
 
