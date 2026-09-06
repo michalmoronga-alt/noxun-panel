@@ -541,25 +541,29 @@ module Noxun
       #   * kluc MIMO uzavreteho slovnika (`zly|kluc`) = zaznam, ktory ziadnu
       #     realnu kombinaciu system|otvaranie nepripina -> vypadne (nie je co
       #     stratit; drzat ho vecne v configu by bola len spina),
-      #   * PRITOMNA hodnota pod PLATNYM klucom sa ZACHOVA VZDY — aj ked ma zly
-      #     tvar alebo hovori o inom systeme/otvarani nez kluc. Zahodenie by
-      #     `active_ref` posunulo do stavu `:missing`, teda surodenec/`latest_for`
-      #     — a poskodeny pin by TICHO ZMENIL FYZIKU zakazky. Platnost hodnoty
-      #     rozhoduje `Recipes.active_ref`: nesediaci alebo neznamy ref je
-      #     `[:unknown, id]` -> RED `drawer_recipe_unknown` bez dielcov.
-      #   * hodnota, ktora nie je retazec (cislo, objekt), nie je ref v ziadnom
-      #     tvare -> vypadne.
+      #   * KAZDA PRITOMNA hodnota pod PLATNYM klucom sa ZACHOVA — aj ked ma zly
+      #     tvar, hovori o inom systeme/otvarani nez kluc, je prazdna, cislo,
+      #     objekt alebo `null`. Zahodenie by `active_ref` posunulo do stavu
+      #     `:missing`, teda surodenec/`latest_for` — a poskodeny pin by TICHO
+      #     ZMENIL FYZIKU zakazky (Codex #308 kolo 1 P1). Platnost hodnoty
+      #     rozhoduje VYHRADNE `Recipes.active_ref`: cokolvek, co nie je vydany
+      #     ref TEJTO kombinacie, je `[:unknown, …]` -> RED `drawer_recipe_unknown`
+      #     bez dielcov.
+      #   * Hodnota sa normalizuje na RETAZEC (skalar `to_s`, cokolvek ine na
+      #     prazdny retazec) — config tak ostava JSON-cisty a `active_ref` ma
+      #     jeden tvar vstupu. Prazdny retazec je PLATNY ULOZENY STAV: znamena
+      #     „pin tu je, ale je poskodeny", nie „pin chyba".
       def norm_recipe_refs(raw)
         return nil unless raw.is_a?(Hash)
         out = {}
         raw.each do |k, v|
           key = k.to_s.strip
           next unless RECIPE_REF_KEY_RE.match?(key)
-          next unless v.is_a?(String) || v.is_a?(Symbol)
-          id = v.to_s.strip
-          next if id.empty?
 
-          out[key] = id
+          out[key] = case v
+                     when String, Symbol, Numeric then v.to_s.strip
+                     else '' # Hash, Array, true/false, nil — pin bez pouzitelnej hodnoty
+                     end
         end
         out.empty? ? nil : out
       end

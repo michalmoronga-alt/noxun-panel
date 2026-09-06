@@ -523,9 +523,13 @@ Hodnota mapovania pre položku s `height_variant` **musí byť výškový selekt
 - **Triedny kľúč (bez ownera) prijímajú aj `set_global_mapping!`/`set_project_mapping!`** — mení sa vždy JEDEN kľúč, ostatné mapovania ostávajú a definície všetkých setov
   selektora sa zmrazia do snapshotu v tom istom zápise.
 
-**NEAKTÍVNY SET (KOV-D1a).** `active: false` znamená „už sa NEDÁ NOVO vybrať" — na všetkých zapisovacích cestách (globál, projekt, override skrinky). **Už uložená hodnota sa
-zobrazuje a zachováva** a expanzia je na príznak naďalej slepá, takže deaktivácia setu **nemení nákup existujúcej zákazky**. Neplatná aktuálna hodnota ostáva s chybou —
-nikdy sa nenahradí prvou kompatibilnou.
+**NEAKTÍVNY SET (KOV-D1a).** `active: false` znamená „už sa NEDÁ NOVO vybrať" — na všetkých zapisovacích cestách (globál, projekt, override skrinky) a **bez ohľadu na to, či
+je položka klasifikovaná**. **Už uložená hodnota sa zobrazuje a zachováva** a expanzia je na príznak naďalej slepá, takže deaktivácia setu **nemení nákup existujúcej
+zákazky**. Neplatná aktuálna hodnota ostáva s chybou — nikdy sa nenahradí prvou kompatibilnou.
+
+**PRIPNUTÁ VERZIA RECEPTU: PRÍTOMNOSŤ KĽÚČA JE PIN (KOV-D1a).** V mape `drawer.recipe_refs` rozhoduje o stave „chýba" **výhradne prítomnosť kľúča**, nikdy použiteľnosť
+hodnoty. Prázdna, číselná, objektová aj `null` hodnota je **poškodený pin** → RED `drawer_recipe_unknown` bez dielcov. Opačný výklad (zahodiť nečitateľnú hodnotu) znamená
+„pin chýba", teda súrodenca alebo najnovší recept — a to je **tichá zmena fyziky** už postavenej zákazky.
 
 **MARKER `std` KNIŽNICE A SNAPSHOTU:** `1` = legacy · `2` = pásma/selector · **`3` = klasifikácia alebo triedny kľúč** · **`4` = set s `height_variant`**. Od KOV-C2a je
 čerstvá knižnica aj snapshot NOVÉHO projektu na `4` (seed nesie sety zásuviek); existujúce projekty svoj marker nemenia, kým do nich používateľ predvoľby vedome nedoplní. Marker je LAZY podľa

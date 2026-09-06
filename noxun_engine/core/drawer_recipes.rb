@@ -219,10 +219,15 @@ module Noxun
         return [:missing, nil] unless refs_map.is_a?(Hash)
 
         key = "#{system}|#{opening}"
-        id = refs_map[key] || refs_map[key.to_sym]
-        return [:missing, nil] unless id.is_a?(String) && !id.strip.empty?
+        # KOV-D1a (Codex #308 kolo 1 P1): o stave `:missing` rozhoduje VYHRADNE
+        # PRITOMNOST KLUCA, nikdy použitelnost hodnoty. Prazdna, ciselna alebo
+        # objektova hodnota je PIN, ktory je poskodeny — nie pin, ktory chyba.
+        # Rozdiel je materialny: `:missing` znamena surodenec/`latest_for`, teda
+        # TICHU ZMENU FYZIKY uz postavenej zakazky.
+        return [:missing, nil] unless refs_map.key?(key) || refs_map.key?(key.to_sym)
 
-        id = id.strip
+        raw = refs_map.key?(key) ? refs_map[key] : refs_map[key.to_sym]
+        id = raw.is_a?(String) || raw.is_a?(Symbol) || raw.is_a?(Numeric) ? raw.to_s.strip : ''
         # KOV-D1a (Astra #20 B4): PRITOMNY zaznam sa uz nezahadzuje pri
         # normalizacii — platnost rozhoduje TU, na jedinom mieste. Zaznam,
         # ktoreho hodnota nema tvar recipe_id alebo hovori o INOM systeme/

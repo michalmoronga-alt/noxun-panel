@@ -15352,11 +15352,40 @@ module NoxunSuRunner
     ok("KOV-D1a: vychodiskovy nakup = seed kit H70/NL470 (#{base.inspect})",
        base == ['357696'])
 
-    # Fixturnu definiciu zmrazime do PROJEKTOVEHO snapshotu (nie do zivej
-    # kniznice v %APPDATA% — testovaci model si ju nesie sam).
-    model.start_operation('KOV-D1a fixture set', true)
-    e::HardwareSets.add_project_sets!(model, [kovd1a_alt_set])
-    model.commit_operation
+    # Fixturna alternativa ide do GLOBALNEJ kniznice — teda do ZDROJA
+    # RESOLVERA, nie do projektoveho snapshotu (Codex #308 kolo 1 P2).
+    # Predchadzajuci tvar scenara ju do snapshotu prednacital vlastnou
+    # operaciou, takze akcia uz nemala co zmrazit a Redo assercia by presla,
+    # aj keby `add_project_sets!` z `rebuild_many` vypadlo. Vzor upratovania
+    # je `run_kovb3` (seed + `ensure delete_set!`).
+    sets = e::HardwareSets
+    sets.delete_set!(KOVD1A_ALT_SET, revision: sets.revision) # zvysok z predosleho behu
+    seed_status, = sets.save_set!(kovd1a_alt_set, revision: sets.revision, create: true)
+    unless seed_status == :ok
+      info("KOV-D1a: fixturny set sa nepodarilo zapisat (#{seed_status}) — scenar preskoceny")
+      return cleanup(model)
+    end
+
+    begin
+      kovd1a_scenar(model, inst, cid, markers)
+    ensure
+      r03_clear_markers(model, markers)
+      sets.delete_set!(KOVD1A_ALT_SET, revision: sets.revision)
+      cleanup(model)
+      ok('KOV-D1a: cleanup (0 korpusov, fixturny set prec)',
+         cabinets(model).empty? && sets.load['sets'].none? { |s| s['set_id'] == KOVD1A_ALT_SET })
+    end
+  rescue StandardError => ex
+    log_line("FAIL: run_kovd1a vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
+  def kovd1a_scenar(model, inst, cid, markers)
+    # Snapshot projektu fixturnu definiciu ESTE NEMA — to je predpoklad celeho
+    # scenara: zmrazit ju musi AZ akcia, v tej istej operacii ako prestavbu.
+    _, st0 = e::HardwareSets.project_state_status(model)
+    ok('KOV-D1a: snapshot projektu fixturny set PRED akciou NEMA',
+       st0.nil? || !st0['sets'].is_a?(Hash) || !st0['sets'].key?(KOVD1A_ALT_SET))
 
     # --- 1) zapis owner triedneho kluca cez REALNU akciu panela ------------
     model.selection.clear
@@ -15383,8 +15412,14 @@ module NoxunSuRunner
 
     # --- 2) Spat = JEDEN krok pre mapovanie, snapshot aj prestavbu ---------
     Sketchup.undo
+    _, st_undo = e::HardwareSets.project_state_status(model)
     ok('KOV-D1a Spat: mapovanie aj nakupny kod sa vratili NARAZ',
        kovd1a_map(inst).empty? && kovd1a_codes(model) == ['357696'])
+    # Toto je dokaz, ze zmrazenie definicie je V TEJ ISTEJ operacii ako
+    # geometria: keby `add_project_sets!` bezalo mimo nej, definicia by v
+    # snapshote po Spat OSTALA.
+    ok('KOV-D1a Spat: snapshot definiciu fixturneho setu STRATIL',
+       st_undo.nil? || !st_undo['sets'].is_a?(Hash) || !st_undo['sets'].key?(KOVD1A_ALT_SET))
     ok('KOV-D1a Spat: bol to PRESNE jeden krok', m.valid?)
 
     # --- 3) Redo obnovi VSETKO konzistentne --------------------------------
@@ -15446,13 +15481,6 @@ module NoxunSuRunner
     else
       info("KOV-D1a prerastenie: vyska cela dala variant H#{grown.inspect} — vetva preskocena")
     end
-
-    cleanup(model)
-    ok('KOV-D1a: cleanup (0 korpusov)', cabinets(model).empty?)
-  rescue StandardError => ex
-    log_line("FAIL: run_kovd1a vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
-    r03_clear_markers(model, markers || [])
-    cleanup(model)
   end
 
   def run_kovc2b(model)

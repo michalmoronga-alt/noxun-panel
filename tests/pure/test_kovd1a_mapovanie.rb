@@ -438,6 +438,82 @@ NxTest.test('KOV-D1a (R5b): duplicitne ID skriniek s roznym owner overridom = BL
   NxTest.refute(c::PC.conflict_matters?(['hinge'], keys), 'rozdiel v nepouzitom kluci nie')
 end
 
+NxTest.test('KOV-D1a (R4/Codex #308 P1): neaktivny set odmietne AJ LEGACY zapis override') do
+  c = NxD1a
+  h = c::HWS
+  dead = c.seed_set('zaves-p2o').merge('active' => false)
+  legacy = [{ 'owner_id' => 'CAB-1', 'owner_part_key' => nil, 'generic_type' => 'hinge',
+              'quantity' => 2, 'rule_id' => 'r', 'params' => {}, 'source' => 'rule' }]
+  cfg = c.cfg_with({}, legacy)
+  st, msg, = h.apply_cabinet_override(cfg, 'hinge', nil, 'zaves-p2o', known_sets: [dead])
+  NxTest.assert_equal(:invalid, st, 'brana F10 nesmie zavisiet od klasifikacie polozky')
+  NxTest.assert(msg.include?('neaktívny'), msg)
+  # Aktivny set tou istou cestou prejde.
+  NxTest.assert_equal(:ok, h.apply_cabinet_override(cfg, 'hinge', nil, 'zaves-p2o',
+                                                    known_sets: [c.seed_set('zaves-p2o')])[0])
+  # A UZ ULOZENY neaktivny set sa zapisom NA SEBA nestrati.
+  had = c.cfg_with({ 'hinge' => 'zaves-p2o' }, legacy)
+  NxTest.assert_equal(:ok, h.apply_cabinet_override(had, 'hinge', nil, 'zaves-p2o',
+                                                    known_sets: [dead])[0])
+end
+
+NxTest.test('KOV-D1a (Codex #308 P2): override skrinky sa overuje proti VSETKYM zasuvkam') do
+  c = NxD1a
+  h = c::HWS
+  # Dve zasuvky ROVNAKEJ triedy, ale roznej vysky (H70 a H144).
+  items = [c.atira_item,
+           c.atira_item('owner_part_key' => 'front:F2/panel',
+                        'params' => { 'height_variant' => 144.0 })]
+  defs = %w[atira-biela-h70-sisy atira-biela-h144-sisy].map { |s| c.seed_set(s) }
+  cfg = c.cfg_with({}, items)
+  # Selektor, ktory vyhovuje PRVEJ zasuvke, ale druhej nie.
+  len = c.height_selector([[70, 'atira-biela-h70-sisy']])
+  st, msg, = h.apply_cabinet_override(cfg, 'slide', nil, len, known_sets: defs)
+  NxTest.assert_equal(:invalid, st, 'nesmie sa ulozit vyber, ktory druhu zasuvku necha bez kitu')
+  NxTest.assert(msg.include?('H144'), msg)
+  NxTest.assert(msg.include?('front:F2/panel'), "hlaska musi povedat KTOREJ zasuvky sa tyka: #{msg}")
+  # Selektor s OBOMA pasmami prejde a zapise sa TRIEDNY (bezownerovy) kluc.
+  ok = c.height_selector([[70, 'atira-biela-h70-sisy'], [144, 'atira-biela-h144-sisy']])
+  st2, map2, = h.apply_cabinet_override(cfg, 'slide', nil, ok, known_sets: defs)
+  NxTest.assert_equal([:ok, [c::CLASSK]], [st2, map2.keys])
+end
+
+NxTest.test('KOV-D1a (Codex #308 P2): pasmo smie vydat LEN set s vyskovym variantom') do
+  c = NxD1a
+  h = c::HWS
+  # Quadro set variant NEMA — vo vyskovom selektore nemá čo hľadať.
+  bez = c.height_selector([[70, 'vysuv-quadro-v6-sisy']])
+  st, msg, = h.apply_cabinet_override(c.cfg_with({}), 'slide', c::OWNER, bez,
+                                      known_sets: [c.seed_set('vysuv-quadro-v6-sisy')])
+  NxTest.assert_equal(:invalid, st, 'inak by zapis prešiel a expanzia dala `drawer_kit_missing`')
+  NxTest.assert(msg.include?('nemá výškový variant'), msg)
+end
+
+NxTest.test('KOV-D1a (Codex #308 P2): klasifikovany owner vyber uprace LEGACY kluc') do
+  c = NxD1a
+  h = c::HWS
+  # Skrinka po upgrade: v configu ostal legacy owner kluc z predchadzajucej verzie.
+  legacy_key = "slide@#{c::OWNER}"
+  cfg = c.cfg_with({ legacy_key => 'atira-biela-h70-sisy' })
+  sel = c.height_selector([[70, 'atira-biela-h70-sisy']])
+  st, map, = h.apply_cabinet_override(cfg, 'slide', c::OWNER, sel,
+                                      known_sets: [c.seed_set('atira-biela-h70-sisy')])
+  NxTest.assert_equal([:ok, [c::OWNK]], [st, map.keys],
+                      'mrtvy legacy kluc nesmie ostat — karta by ho ukazovala ako volbu')
+  # A pri ZRUSENI volby zmiznu OBA.
+  st2, map2, = h.apply_cabinet_override(c.cfg_with(map.merge(legacy_key => 'atira-biela-h70-sisy')),
+                                        'slide', c::OWNER, nil)
+  NxTest.assert_equal([:ok, {}], [st2, map2])
+  # LEGACY polozka (bez klasifikacie) si svoj kluc PONECHA — jej ho resolver číta.
+  plain = [{ 'owner_id' => 'CAB-1', 'owner_part_key' => c::OWNER, 'generic_type' => 'slide',
+             'quantity' => 1, 'rule_id' => 'r', 'params' => { 'nominal_length' => 470.0 },
+             'source' => 'rule' }]
+  st3, map3, = h.apply_cabinet_override(c.cfg_with({}, plain), 'slide', c::OWNER,
+                                        'atira-biela-h70-sisy',
+                                        known_sets: [c.seed_set('atira-biela-h70-sisy')])
+  NxTest.assert_equal([:ok, [legacy_key]], [st3, map3.keys])
+end
+
 # ============================================================================
 # R3 — CONFIG_SCHEMA 6
 # ============================================================================
@@ -561,8 +637,39 @@ NxTest.test('KOV-D1a (R5): neplatny `recipe_refs` zaznam je RED, nie surodenec')
 
   # (f) kluc mimo uzavreteho slovnika ziadnu kombinaciu nepripina -> vypadne
   NxTest.assert_equal(nil, c::FR.norm_recipe_refs('zly|kluc' => 'atira_sisy_v1'))
-  NxTest.assert_equal(nil, c::FR.norm_recipe_refs('atira|sisy' => { 'a' => 1 }),
-                      'hodnota, ktora nie je retazec, nie je ref v ziadnom tvare')
+
+  # (g) Codex #308 kolo 1 P1: KAZDA pritomna hodnota pod platnym klucom je PIN.
+  # Cislo, prazdny retazec, objekt aj `null` = pin, ktory je POSKODENY —
+  # NIKDY „pin chyba" (to by bol surodenec/latest, teda ticha zmena fyziky).
+  { 42 => '42', '' => '', '   ' => '', nil => '', { 'a' => 1 } => '',
+    [1] => '', true => '' }.each do |raw, want|
+    refs = c::FR.norm_recipe_refs('atira|sisy' => raw)
+    NxTest.assert_equal({ 'atira|sisy' => want }, refs, "#{raw.inspect} ostava ako pin")
+    NxTest.assert_equal([:unknown, want], c::REC.active_ref(refs, 'atira', 'sisy'),
+                        "#{raw.inspect} je NEPLATNY pin, nie chybajuci")
+    NxTest.assert_equal(nil, c::REC.pick_ref(refs, 'atira', 'sisy'),
+                        "#{raw.inspect}: ziadny nahradny recept")
+  end
+  # Idempotencia: druhy prechod normalizaciou pin nestrati.
+  once = c::FR.norm_recipe_refs('atira|sisy' => nil)
+  NxTest.assert_equal(once, c::FR.norm_recipe_refs(once), 'prestavba pin NESTRATI')
+end
+
+NxTest.test('KOV-D1a (R5): pin BEZ citatelnej hodnoty ma zrozumitelnu vetu, nie prazdne uvodzovky') do
+  c = NxD1a
+  full = c::CB.normalize(
+    'width' => 900.0, 'height' => 720.0, 'depth' => 500.0,
+    'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'drawer_front', 'mode' => 'fixed',
+                                'height' => 175.0, 'opening_mode' => 'classic',
+                                'drawer' => { 'construction' => 'metal',
+                                              'recipe_refs' => { 'atira|sisy' => nil } } }] }
+  )
+  pl = c::CN.build_plan(full, 'CAB-1')
+  cf = Array(pl[:drawer_conflicts]).first
+  NxTest.assert_equal('drawer_recipe_unknown', cf && cf['code'])
+  NxTest.assert(cf['message'].include?('bez čitateľnej hodnoty'), cf['message'])
+  NxTest.refute(cf['message'].include?('„“'), 'ziadne prazdne uvodzovky v hlaske')
+  NxTest.assert_equal(nil, pl[:hardware].find { |x| x['generic_type'] == 'slide' })
 end
 
 NxTest.test('KOV-D1a (R5): poskodeny pin = `drawer_recipe_unknown` bez dielcov aj vysuvu') do

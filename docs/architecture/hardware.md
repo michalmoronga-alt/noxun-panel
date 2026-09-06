@@ -349,13 +349,19 @@ chceme), `BuildPlan.parse_hardware_set_key` vracia `nil` (preto sa kľúč mapov
 - **Triedne zapisovacie operácie (Astra #20 F9).** `set_global_mapping!` aj `set_project_mapping!` prijímajú **kľúč mapovania** (generický typ ALEBO validovaný triedny kľúč;
   owner triedny NIE) cez `write_mapping_key`; typ pre kontrolu setov číta jediná autorita `mapping_key_type` — kľúč sa nikdy neskladá z typu ani naopak. Mení sa **JEDEN**
   kľúč, ostatné mapovania aj definície ostávajú a definície všetkých pásiem selektora sa zmrazia v tom istom zápise. Globál ostáva predvoľbou nových projektov.
-- **Neaktívny set (Astra #20 F10).** `new_inactive_ref?` odmietne NOVÝ výber setu s `active: false` na všetkých troch zapisovacích cestách; **už uložená hodnota sa zachová**
-  (prepis toho istého kľúča na seba prejde) a `expand`/`explain` sú na `active` naďalej slepé — deaktivácia setu teda NEMENÍ nákup existujúcej zákazky.
+- **Neaktívny set (Astra #20 F10).** `inactive_ref` je **jediná autorita** otázky „dá sa tento set novo vybrať" a beží na všetkých troch zapisovacích cestách — pri override
+  skrinky **pred** vetvením na klasifikovaný/legacy, takže neaktívny set neprejde ani na legacy položke (Codex #308 kolo 1 P1). **Už uložená hodnota sa zachová** (prepis toho
+  istého kľúča na seba prejde) a `expand`/`explain` sú na `active` naďalej slepé — deaktivácia setu teda NEMENÍ nákup existujúcej zákazky.
+- **Validácia platí pre VŠETKY dotknuté položky, nie pre prvú** (Codex #308 kolo 1 P2). Override skrinky bez ownera platí pre všetky zásuvky tej triedy, a tie môžu mať rôzne
+  výšky: selektor, ktorý vyhovuje H70, ale nie H144, sa **neuloží** a hláška povie, ktorého dielca sa to týka. Vo výškovom selektore navyše smie stáť **len set s platným
+  `height_variant`** — set bez neho by prešiel (probe by výšku zhodila, kontrola pásma by sa preskočila) a expanzia by ho vzápätí odmietla ako `drawer_kit_missing`.
+- **Owner výber upratuje LEGACY kľúč** (Codex #308 kolo 1 P2). Pri zápise aj zrušení klasifikovaného owner výberu sa z mapy odstráni aj `typ@owner` — pre klasifikovanú
+  položku je mŕtvy (resolver ho nečíta), no po upgrade skrinky by v configu ostal a karta čela by ho ďalej ukazovala ako aktuálnu voľbu. Legacy položka si svoj kľúč ponecháva.
 - **Šablóny a duplicitné ID (Codex #307 kolo 2).** `TemplatesDialog.merge_hardware_sets` sa už nepýta `BuildPlan.parse_hardware_set_key` (pre `class:` vracia nil, záznam by
   vypadol a kit by sa ticho zmenil), ale `HardwareSets.owner_scoped_key?` — jediná autorita otázky „patrí tento záznam cieľu". `ProductionCore.override_keys_in_use` registruje
   pri klasifikovanej položke triedny AJ owner triedny kľúč, takže dve skrinky so spoločným ID a rôznym owner overridom bránu duplicít nepodliezajú.
 - **`CONFIG_SCHEMA` 5 → 6** ([construction.md](construction.md)) — starší plugin owner kľúč zahodí, no `unknown_generic_types` z neho stále prečíta podporovaný `slide`, takže
-  by prestavbu nezastavil (Astra #20 B1). `DRAWER_ACTIVATION_SCHEMA` ostáva 5. Testy: `tests/pure/test_kovd1a_mapovanie.rb` (20 testov + 4 overené mutácie) a in-SU sekcia
+  by prestavbu nezastavil (Astra #20 B1). `DRAWER_ACTIVATION_SCHEMA` ostáva 5. Testy: `tests/pure/test_kovd1a_mapovanie.rb` (25 testov + 6 overených mutácií) a in-SU sekcia
   `run_kovd1a` (Undo aj Redo vracajú mapovanie, snapshot a nákupný kód naraz).
 
 **KOV-C2b (v0.9.31) — RECEPTOVÁ POLOŽKA A RED `drawer_kit_missing`.** Zásuvkovú položku už **emituje** `Construction` (`source: 'recipe'`, `rule_id: recipe:<recipe_id>`,

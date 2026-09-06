@@ -1451,14 +1451,20 @@ module Noxun
         BuildPlan::GENERIC_TYPES.include?(key) ? key : nil
       end
 
-      # F10: odkazuje NOVA hodnota na NEAKTIVNY set, ktory doteraz ulozeny
-      # NEBOL? (Uz ulozeny neaktivny set sa smie zachovat aj prepisat na seba.)
-      def new_inactive_ref?(refs, defs, current_value)
+      # F10: PRVY set novej hodnoty, ktory je NEAKTIVNY a doteraz ulozeny NEBOL
+      # (uz ulozeny neaktivny set sa smie zachovat aj prepisat na seba) — inak
+      # nil. JEDINA autorita otazky „da sa tento set novo vybrat"; pouzivaju ju
+      # VSETKY tri zapisove cesty (globál, projekt, override skrinky).
+      def inactive_ref(refs, defs, current_value)
         kept = value_set_ids(current_value)
-        Array(refs).any? do |sid|
+        Array(refs).find do |sid|
           d = defs[sid]
           d.is_a?(Hash) && d['active'] == false && !kept.include?(sid)
         end
+      end
+
+      def new_inactive_ref?(refs, defs, current_value)
+        !inactive_ref(refs, defs, current_value).nil?
       end
 
       # --- nakupny CSV (D1b, audit N11) ----------------------------------------
@@ -2080,8 +2086,14 @@ module Noxun
         map = normalize_mapping(base, nil, allow_owner: true)
         ck = override_class_key(items, gt, owner)
         key = ck || (owner ? "#{gt}@#{owner}" : gt)
+        # KOV-D1a (Codex #308 kolo 1 P2): pri KLASIFIKOVANOM owner vybere je
+        # LEGACY kluc `typ@owner` uz mrtvy (resolver ho pre taku polozku necita).
+        # Zapis aj zrusenie ho preto odpratu — inak by po upgrade skrinky ostal
+        # v configu a karta cela by ho dalej ukazovala ako aktualnu volbu.
+        stale = ck && owner ? "#{gt}@#{owner}" : nil
         if value.nil? || (value.is_a?(String) && value.strip.empty?)
           map.delete(key)
+          map.delete(stale) if stale
           return [:ok, map, []]
         end
         status, norm, refs = parse_mapping_value(value)
@@ -2090,12 +2102,24 @@ module Noxun
           defs = collect_set_defs(known_sets)
           bad = refs.find { |sid| defs[sid].nil? || defs[sid]['generic_type'] != gt }
           return [:invalid, "set „#{bad}“ sa nenašiel alebo je iného typu", nil] if bad
+
+          # F10 plati pre KAZDY zapis override, nielen pre klasifikovany
+          # (Codex #308 kolo 1 P1): neaktivny set sa NOVO vybrat neda ani na
+          # legacy polozke. Uz ulozena hodnota ostava (vynimka pre `map[key]`).
+          dead = inactive_ref(refs, defs, map[key])
+          if dead
+            return [:invalid, "set „#{defs[dead]['name']}“ je neaktívny — nedá sa vybrať", nil]
+          end
           if ck
-            problem = classified_value_problem(items.first, norm, defs, map[key])
+            # Triedny override plati pre VSETKY polozky tej triedy, nielen pre
+            # prvu (Codex #308 kolo 1 P2) — pri override skrinky su to vsetky
+            # zasuvky rovnakej klasifikacie, a tie mozu mat RÔZNE vysky.
+            problem = classified_value_problem(items, norm, defs)
             return [:invalid, problem, nil] if problem
           end
         end
         map[key] = norm
+        map.delete(stale) if stale
         [:ok, map, refs]
       end
 
@@ -2122,7 +2146,25 @@ module Noxun
       #     po prerasteni zasuvky objednal zly kit — Astra #19 B1) a ten musi mat
       #     pasmo pre AKTUALNU vysku cela.
       # -> SK dovod | nil (v poriadku)
-      def classified_value_problem(item, value, defs, current)
+      def classified_value_problem(items, value, defs)
+        list = Array(items)
+        bands = value.is_a?(Hash) ? Array(value['bands']) : [nil]
+
+        # Pasma sa overuju proti KAZDEJ dotknutej polozke — override skrinky
+        # plati pre vsetky zasuvky tej triedy a tie mozu mat rozne vysky aj
+        # (raz) rozne systemy. Prva chyba vyhrava a pri viacerych polozkach
+        # povie AJ KTOREJ sa tyka.
+        list.each do |item|
+          problem = item_value_problem(item, value, bands, defs)
+          next if problem.nil?
+
+          return list.length > 1 ? "#{problem} (dielec #{item['owner_part_key']})" : problem
+        end
+        nil
+      end
+
+      # Hodnota proti JEDNEJ klasifikovanej polozke.
+      def item_value_problem(item, value, bands, defs)
         hv = numeric_param(item, HEIGHT_VARIANT_KEY)
         if hv && !height_selector?(value)
           return 'zásuvka má výškový variant — vyber musí byť podľa výšky, nie pevný set'
@@ -2131,10 +2173,9 @@ module Noxun
           return 'táto zásuvka výškový variant nemá — vyber konkrétny set'
         end
 
-        bands = value.is_a?(Hash) ? Array(value['bands']) : [nil]
         bands.each do |band|
           sid = band ? band['set_id'].to_s : value.to_s
-          problem = band_set_problem(item, band, defs[sid], sid, current)
+          problem = band_set_problem(item, band, defs[sid], sid)
           return problem if problem
         end
         if hv && !bands.any? { |b| hv >= b['min'].to_f && hv <= b['max'].to_f }
@@ -2145,18 +2186,25 @@ module Noxun
       end
 
       # Jedno pasmo selektora (alebo pevny set, `band` = nil) proti klasifikacii cela.
-      def band_set_problem(item, band, set, sid, current)
+      # Neaktivny set tu uz NEKONTROLUJEME — tá brána je spolocna pre VSETKY
+      # zapisy override (jedno miesto, `inactive_ref`).
+      def band_set_problem(item, band, set, sid)
         return "set „#{sid}“ sa nenašiel" if set.nil?
-        if set['active'] == false && !value_set_ids(current).include?(sid)
-          return "set „#{set['name']}“ je neaktívny — nedá sa vybrať"
-        end
 
         set_hv = int_value(set[HEIGHT_VARIANT_KEY])
+        # Vyskovy selektor smie vydavat LEN sety s platnym `height_variant`
+        # (Codex #308 kolo 1 P2): set bez neho by prešiel — probe by polozke
+        # vysku zhodila a kontrola pasma by sa preskocila — a expanzia by ho
+        # vzapati odmietla ako `drawer_kit_missing`.
+        if band && set_hv.nil?
+          return "set „#{set['name']}“ nemá výškový variant — do výberu podľa výšky nepatrí"
+        end
+
         bad = set_incompatible_info(probe_item(item, set_hv), set)
         if bad
           return "set „#{set['name']}“ nesedí klasifikácii čela (#{incompatible_detail_sk(bad['detail'])})"
         end
-        if band && set_hv && !(set_hv >= band['min'].to_f && set_hv <= band['max'].to_f)
+        if band && !(set_hv >= band['min'].to_f && set_hv <= band['max'].to_f)
           return "set „#{set['name']}“ nepatrí do pásma, ktoré ho vydáva"
         end
 

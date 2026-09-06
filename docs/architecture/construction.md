@@ -34,7 +34,9 @@ súrodenec ROVNAKEJ verzie, inak `latest_for` — nikdy tichý upgrade; neznámy
 nesúlad kľúča a receptu alebo zlý tvar hodnoty znamenal `:missing`, teda súrodenca/`latest_for` — a poškodený pin tak ticho menil fyziku hotovej zákazky). O platnosti
 rozhoduje **jediné miesto — `Recipes.active_ref`**: hodnota musí mať tvar `recipe_id` a hovoriť o TOM ISTOM systéme aj otváraní ako jej kľúč, inak je `[:unknown, id]` → RED
 `drawer_recipe_unknown` bez dielcov aj bez výsuvu. Hľadanie súrodenca v `pick_ref` berie **len validované záznamy** mapy (Codex #307 kolo 2 P1). Kľúč mimo uzavretého
-slovníka žiadnu kombináciu nepripína, takže vypadáva ďalej.
+slovníka žiadnu kombináciu nepripína, takže vypadáva ďalej. **O stave `:missing` rozhoduje výhradne PRÍTOMNOSŤ KĽÚČA, nikdy použiteľnosť hodnoty** (Codex #308 kolo 1 P1):
+prázdna, číselná, objektová aj `null` hodnota je **poškodený pin**, nie chýbajúci — `norm_recipe_refs` ju preto normalizuje na reťazec (nečitateľné na `''`) a záznam
+**zachová**. Prázdny reťazec je platný uložený stav „pin tu je, ale je poškodený" a veta konfliktu ho pomenuje ako „bez čitateľnej hodnoty", nie prázdnymi úvodzovkami.
 Výstup je **atomický**: buď všetky dielce + jedna položka výsuvu, alebo nič a záznam v `plan[:drawer_conflicts]`. Dielce sa pripájajú **za** partition degenerovaných —
 ich minimá stráži recept sám (jediný neplatný rozmer = `drawer_no_fit` pre celú zásuvku, nikdy per-dielec `part_skipped_degenerate`).
 

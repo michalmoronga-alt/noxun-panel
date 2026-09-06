@@ -204,9 +204,14 @@ module Noxun
 
         state, ref = Recipes.active_ref(drawer_cfg['recipe_refs'], key[:system], key[:opening])
         if state == :unknown
+          # KOV-D1a: pin moze byt aj BEZ pouzitelnej hodnoty (prazdny, cislo,
+          # objekt) — veta to musi povedat zrozumitelne, nie ukazat prazdne
+          # uvodzovky.
+          which = ref.to_s.strip.empty? ? 'bez čitateľnej hodnoty' : "„#{ref}“"
           return out[:conflicts] << drawer_conflict(
             front_id, 'drawer_recipe_unknown',
-            "Zásuvka používa recept „#{ref}\", ktorý tento plugin nepozná — aktualizuj plugin."
+            "Zásuvka má pripnutú verziu receptu #{which}, ktorá nie je platná — " \
+            'oprav klasifikáciu čela alebo aktualizuj plugin.'
           )
         end
         if state == :missing
