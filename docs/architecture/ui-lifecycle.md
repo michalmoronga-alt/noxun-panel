@@ -1315,6 +1315,14 @@ s vetou **stavby** (panel žiadnu vlastnú neskladá); `config_schema < DRAWER_A
 neznámy alebo nečitateľný recept vráti **prázdny zoznam** — karta radšej nekreslí nič, než by tvrdila číslo, ktoré nevie dokázať. Zlyhanie kdekoľvek tu vráti `{}`, takže
 karta čela nikdy nespadne kvôli riadku zásuvky.
 
+**`hardware_set_options` a owner výbery (KOV-D1a).** Typ kovania z kľúča override mapy aj rozpoznanie „výberu na úrovni vlastníka" idú cez **jediné autority**
+`HardwareSets.mapping_key_type` a `owner_scoped_key?` — nie cez `BuildPlan.parse_hardware_set_key`, ktorý pre `class:` kľúče vracia `nil`. Bez toho by karta čela pri
+owner **triednom** override (`class:slide|…@front:F1/panel`) ukázala prázdny select, hoci uložený výber existuje — a prvý klik vedľa by ho ticho prepísal. Payload sa inak
+**nemení**; ponuku a ovládanie prináša D1b.
+**Emituje sa LEN kľúč, ktorý resolver pre ten dielec naozaj číta** (Codex #308 kolo 2 P2): owner triedny kľúč zhodný s **aktívnou** triedou položky (`active_class_by_owner`
+z `config.hardware`), a legacy `typ@owner` iba tam, kde položka klasifikáciu nemá. Bez toho by po zmene otvárania či konštrukcie karta ukázala **dormantný** výber starej
+triedy ako vybraný a mazanie by cielilo na iný kľúč. Poškodená hodnota sa priznáva príznakom `invalid` — karta nesmie ukázať prázdny select ani hodnotu z nižšej úrovne.
+
 ### resolvers.rb
 
 Doména panela: rozlíšenie virtuálnych materiálov (`resolve_virtual_material`). Fan-out cesta po zápise do katalógu je v [materials.md](materials.md), odsek

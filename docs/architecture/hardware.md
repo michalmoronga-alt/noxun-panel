@@ -325,12 +325,63 @@ je iná vrstva a zostáva oddelene. Neznáma hodnota (obsah novšej verzie) sa *
 spätná čitateľnosť sa zbytočne neblokuje; obsah so `std: 3` je pre starší plugin `:read_only` (knižnica) a `:invalid` (snapshot) — NIKDY čiastočné čítanie. Tú istú funkciu
 (`snapshot_std`) používa zápis knižnice aj zápis snapshotu: marker musí hovoriť o obsahu rovnako v `%APPDATA%` aj v .skp.
 
-**TRIEDNY kľúč mapovania `class:<generic_type>|<opening_mode>[|<drawer_construction>]`** (KOV-B1, pripravené pre KOV-D — „výsuvy TipOn majú iný set než klasické"). Tvar je
-uzavretý: tretí segment má LEN `slide`, `@owner` sufix je zakázaný (výber na úrovni dielca je iný pojem), segmenty sa trimujú a downcasujú. Pozná ho **jediný parser**
-(`parse_mapping` ho rozpozná PRED `parse_hardware_set_key`), prijímajú ho všetky mapy (globálna, snapshot aj cabinet override), počíta s ním whitelist brány, `snapshot_std`,
-`referenced_set_ids` aj `mapping_types_by_set` — ale **`resolve_set_id`, `expand` ani `explain` ho NEČÍTAJÚ** a zapisovacie cesty ho nepíšu. Účelom tejto dávky je výhradne
-**bezstratový round-trip** a správny marker, takže KOV-D už nebude potrebovať ďalší bump. `BuildPlan.hardware_set_key_type` z neho vracia prvý segment (starší plugin prefix
-nepozná, takže mu z toho istého kľúča vyjde neznámy typ a prestavbu zablokuje — presne to chceme), `BuildPlan.parse_hardware_set_key` vracia `nil`.
+**TRIEDNY kľúč mapovania `class:<generic_type>|<opening_mode>[|<drawer_construction>]`** (KOV-B1 zaviedol tvar, KOV-C2a čítanie, KOV-D1a zápis). Tvar je uzavretý: tretí
+segment má LEN `slide`, segmenty sa trimujú a downcasujú. Pozná ho **jediný parser** (`parse_mapping` ho rozpozná PRED `parse_hardware_set_key`), prijímajú ho všetky mapy
+(globálna, snapshot aj cabinet override), počíta s ním whitelist brány, `snapshot_std`, `referenced_set_ids` aj `mapping_types_by_set`.
+`BuildPlan.hardware_set_key_type` z neho vracia prvý segment (starší plugin prefix nepozná, takže mu z toho istého kľúča vyjde neznámy typ a prestavbu zablokuje — presne to
+chceme), `BuildPlan.parse_hardware_set_key` vracia `nil` (preto sa kľúč mapovania nikde nečíta cez neho, ale cez `HardwareSets.mapping_key_type` / `owner_scoped_key?`).
+
+**KOV-D1a (v0.9.34) — OWNER TRIEDNY KĽÚČ, TRIEDNE ZÁPISY, NEAKTÍVNY SET.** K triednemu kľúču smie pribudnúť sufix **`@front:<id>/panel`** — vlastný kit pre JEDNO čelo:
+
+- **Kde smie žiť.** VÝHRADNE v `config.hardware_sets` skrinky (`parse_mapping(allow_owner: true)`). Globálna knižnica aj projektový snapshot ho pri zápise ODMIETNU a pri
+  čítaní zahodia s logom. Triedna časť sa normalizuje, **owner ostáva doslovne** (part_key je identita dielca, nie enum) a musí mať tvar panela čela — override na zóne či
+  doske by resolver nikdy neprečítal. Pri normalizácii configu skrinky sa navyše kontroluje **existencia čela**: kľúč na zmazané čelo vypadne s logom (`prune_missing_owners`,
+  vzor `prune_none_front_overrides`); legacy composite `typ@owner` sa nedotýka.
+- **Precedencia pre receptovú položku je TROJÚROVŇOVÁ:** owner triedny → triedny (skrinka) → projektový snapshot. Na nižšiu úroveň sa ide **LEN pri NEPRÍTOMNOM kľúči**;
+  prítomná hodnota, ktorá sa nedá rozložiť (chýbajúce pásmo, nekompatibilný set), končí ako `unmapped` s dôvodom → RED `drawer_kit_missing`. Na generický `slide`/`slide@owner`
+  sa naďalej NIKDY nepadá.
+- **Zápis (`apply_cabinet_override`).** Pre KLASIFIKOVANÉ položky sa už nepíše generický `slide@owner` (resolver by ho neprečítal — tichý no-op), ale owner triedny kľúč;
+  kľúč zloží **`override_class_key`** a len vtedy, keď všetky položky tej identity nesú ROVNAKÚ klasifikáciu (zmiešaná skrinka ostáva na generickom kľúči). Hodnotou smie byť
+  aj **selektor podľa `height_variant`** (Atira; Quadro pevný `set_id`) — akcia panela `handle_set_hardware_set` ho prijme v poli `value` a do snapshotu zmrazí KAŽDÝ
+  referencovaný set. **Validácia beží PRED zápisom** (`classified_value_problem` / `band_set_problem`): každé pásmo sa overí proti klasifikácii cieľového čela (otváranie,
+  konštrukcia, systém), výška setu musí patriť do pásma, ktoré ho vydáva, selektor musí mať pásmo pre AKTUÁLNU výšku a neaktívna definícia sa odmietne — forged payload sa do
+  configu nedostane vôbec.
+- **Triedne zapisovacie operácie (Astra #20 F9).** `set_global_mapping!` aj `set_project_mapping!` prijímajú **kľúč mapovania** (generický typ ALEBO validovaný triedny kľúč;
+  owner triedny NIE) cez `write_mapping_key`; typ pre kontrolu setov číta jediná autorita `mapping_key_type` — kľúč sa nikdy neskladá z typu ani naopak. Mení sa **JEDEN**
+  kľúč, ostatné mapovania aj definície ostávajú a definície všetkých pásiem selektora sa zmrazia v tom istom zápise. Globál ostáva predvoľbou nových projektov.
+- **Neaktívny set (Astra #20 F10).** `inactive_ref` je **jediná autorita** otázky „dá sa tento set novo vybrať" a beží na všetkých troch zapisovacích cestách — pri override
+  skrinky **pred** vetvením na klasifikovaný/legacy, takže neaktívny set neprejde ani na legacy položke (Codex #308 kolo 1 P1). **Už uložená hodnota sa zachová** (prepis toho
+  istého kľúča na seba prejde) a `expand`/`explain` sú na `active` naďalej slepé — deaktivácia setu teda NEMENÍ nákup existujúcej zákazky.
+- **Validácia platí pre VŠETKY dotknuté položky, nie pre prvú** (Codex #308 kolo 1 P2). Override skrinky bez ownera platí pre všetky zásuvky tej triedy, a tie môžu mať rôzne
+  výšky: selektor, ktorý vyhovuje H70, ale nie H144, sa **neuloží** a hláška povie, ktorého dielca sa to týka. Vo výškovom selektore navyše smie stáť **len set s platným
+  `height_variant`** — set bez neho by prešiel (probe by výšku zhodila, kontrola pásma by sa preskočila) a expanzia by ho vzápätí odmietla ako `drawer_kit_missing`.
+- **Owner výber upratuje LEGACY kľúč** (Codex #308 kolo 1 P2). Pri zápise aj zrušení klasifikovaného owner výberu sa z mapy odstráni aj `typ@owner` — pre klasifikovanú
+  položku je mŕtvy (resolver ho nečíta), no po upgrade skrinky by v configu ostal a karta čela by ho ďalej ukazovala ako aktuálnu voľbu. Legacy položka si svoj kľúč ponecháva.
+- **PRÍTOMNÝ kľúč s nepoužiteľnou hodnotou = `mapping_invalid`, nikdy nižšia úroveň** (Codex #308 kolo 2 P1). Čítacia normalizácia cabinet override mapy takú položku
+  **nezahadzuje**, ale nechá ako **marker** `{ 'invalid' => dôvod }` (jediný tvar s týmto významom; zapisovacia cesta ho nikdy nezapíše ako voľbu, `parse_mapping_value` ho
+  odmieta, a **neodstráni** ho — odstránením je len explicitné vymazanie kľúča používateľom). `present_mapping_value?` ho považuje za prítomný, takže **precedencia sa na ňom
+  zastaví**, `value_set_ids` z neho nevydá nič a `resolve_set_id` vráti nový dôvod `mapping_invalid` (pri receptovej položke povýšený na RED). Normalizácia je idempotentná.
+  Je to presne to isté pravidlo ako pri `recipe_refs`: **o „chýba" rozhoduje prítomnosť kľúča, nie použiteľnosť hodnoty**.
+- **Marker sa NEZAPÍNA prepínačom — plynie z `allow_owner`** (Codex #308 kolo 3 P1). Samostatný `keep_invalid` flag stačilo zabudnúť na jednom z pätnástich volaní
+  `normalize_mapping`/`parse_mapping` (`apply_cabinet_override`, `Panel.cabinet_set_overrides`, `HardwareSets.explain`, `TemplatesDialog.merge_hardware_sets` ho aj naozaj
+  zabudli) a marker sa **ticho stratil pri prvej úprave iného kovania** — teda presne tá tichá zmena, ktorej má brániť. Preto parameter neexistuje a platí väzba:
+  **`allow_owner: true` má PRÁVE cabinet override mapa**, jediná mapa s nižšou úrovňou pod sebou. Knižnica, projektový snapshot a šablóna (`allow_owner: false`) nižšiu
+  úroveň nemajú a ich detektory strát (`map_errors`, `norm_map.length != mapping.length`, `read_template_mapping`) by marker naopak **rozbil** — preto tam nepatrí. Väzbu
+  strážia dva testy aj dve mutácie (marker nikde / marker všade).
+- **Neaktívny set sa porovnáva ZÁVÄZKOM, nie ID** (Codex #308 kolo 2 P2). `mapping_commitments` rozloží hodnotu na `[param, min, max, set_id]` (pevná voľba na
+  `['fixed', set_id]`) a uložená neaktívna referencia sa zachová, len **kým sa jej efektívne mapovanie nezmení**. Posun či rozšírenie pásma alebo prechod z pevnej voľby na
+  selektor je **nový výber** — inak by sa neaktívny set ticho objednal do zákaziek, pre ktoré nebol vybraný.
+- **Triedny zápis validuje sety proti klasifikácii kľúča** (`class_key_value_problem`, Codex #308 kolo 2 P2) — v `set_global_mapping!` aj `set_project_mapping!`: otváranie,
+  konštrukcia, `height_variant` vo vnútri svojho pásma a zákaz **pevnej** voľby setu s výškovým variantom. Je to vlastná funkcia, nie `classified_value_problem`: tá porovnáva
+  set s konkrétnou položkou (jej `system` a aktuálnou výškou), kým triedny kľúč nesie len otváranie a konštrukciu; zdieľajú sa spodné pravidlá, nie vstup.
+- **Zmiešaná skrinka sa jedným kľúčom zapísať nedá** (vlastný prechod diffu). Keď položky tej identity nesú rôznu klasifikáciu (alebo klasifikované + legacy), `override_class_key`
+  vráti dôvod a zápis sa **odmietne** s vetou „vyber set na konkrétnom čele" — generický kľúč by klasifikované položky nečítali (tichý no-op) a triedny by minul legacy.
+- **Šablóny a duplicitné ID (Codex #307 kolo 2).** `TemplatesDialog.merge_hardware_sets` sa už nepýta `BuildPlan.parse_hardware_set_key` (pre `class:` vracia nil, záznam by
+  vypadol a kit by sa ticho zmenil), ale `HardwareSets.owner_scoped_key?` — jediná autorita otázky „patrí tento záznam cieľu". `ProductionCore.override_keys_in_use` registruje
+  pri klasifikovanej položke triedny AJ owner triedny kľúč, takže dve skrinky so spoločným ID a rôznym owner overridom bránu duplicít nepodliezajú.
+- **`CONFIG_SCHEMA` 5 → 6** ([construction.md](construction.md)) — starší plugin owner kľúč zahodí, no `unknown_generic_types` z neho stále prečíta podporovaný `slide`, takže
+  by prestavbu nezastavil (Astra #20 B1). `DRAWER_ACTIVATION_SCHEMA` ostáva 5. Testy: `tests/pure/test_kovd1a_mapovanie.rb` (34 testov + 8 overených mutácií) a in-SU sekcia
+  `run_kovd1a` (Undo aj Redo vracajú mapovanie, snapshot a nákupný kód naraz).
 
 **KOV-C2b (v0.9.31) — RECEPTOVÁ POLOŽKA A RED `drawer_kit_missing`.** Zásuvkovú položku už **emituje** `Construction` (`source: 'recipe'`, `rule_id: recipe:<recipe_id>`,
 `quantity: 1`, voliteľné `locked: true` pri platnom NL zámku). Pre výber setu platí presne mechanika C2a nižšie; navyše: **každý** dôvod nemapovania sa pre `source: 'recipe'`
@@ -349,7 +400,8 @@ charakterizačný test). Päť častí:
   `class:slide|<opening_mode>|<drawer_construction>`. Inak `nil` a celá vetva je mŕtva.
 - **Precedencia je KRATŠIA a bez fallbacku.** Pre takú položku číta `resolve_mapping_value` **cabinet override s triednym kľúčom → projekt**, a keď mapovanie chýba, vráti
   `nil` s dôvodom **`class_unmapped`** („Pravidlá → Doplniť nové predvoľby"). Na generický `slide` **NIKDY nepadne** — H70 kit k zásuvke H176 by bol zlý nákup, a mlčky.
-  Owner-level `slide@…` sa pre ňu vedome IGNORUJE (`class:…@owner` parser odmieta a generický `slide@owner` je práve ten zakázaný fallback; owner-scoped tvar definuje až KOV-D).
+  Owner-level `slide@…` sa pre ňu vedome IGNORUJE (generický `slide@owner` je práve ten zakázaný fallback). **Od KOV-D1a** je pred cabinet triednym kľúčom ešte OWNER triedny
+  `class:…@front:<id>/panel` — precedencia je teda trojúrovňová (viď odsek KOV-D1a vyššie).
 - **`height_variant` = šieste klasifikačné pole, jediné VOLITEĽNÉ.** Celé číslo z uzavretého `DRAWER_HEIGHT_VARIANTS` (70 · 144 · 176), povolené LEN pri `use_type: 'drawer'`
   (Quadro V6 varianty nemá a pole mu legitímne chýba). Je v `CLASS_KEYS`, lebo ten zoznam je kontrakt troch vecí naraz (whitelist `SET_KEYS`, typová kontrola
   v `incompatible_set?`, merge v `save_set!`) — výnimku „všetky alebo žiadne" pre neho drží `classify`. **Nie je os výberu** (tou ostáva pásmový selektor mapovania), slúži

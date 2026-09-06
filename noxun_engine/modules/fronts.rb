@@ -534,26 +534,36 @@ module Noxun
         out.empty? ? nil : out
       end
 
-      # Mapa `"<system>|<otvaranie>" => recipe_id`. Neplatny kluc alebo hodnota
-      # mimo tvaru = zaznam prec (nikdy sa NEHADA); prazdna mapa = kluc prec.
+      # Mapa `"<system>|<otvaranie>" => recipe_id`. Prazdna mapa = kluc prec.
+      #
+      # KOV-D1a (Astra #20 B4 — OPRAVA z C): rozlisuje sa NEPRITOMNY zaznam od
+      # PRITOMNEHO NEPLATNEHO.
+      #   * kluc MIMO uzavreteho slovnika (`zly|kluc`) = zaznam, ktory ziadnu
+      #     realnu kombinaciu system|otvaranie nepripina -> vypadne (nie je co
+      #     stratit; drzat ho vecne v configu by bola len spina),
+      #   * KAZDA PRITOMNA hodnota pod PLATNYM klucom sa ZACHOVA — aj ked ma zly
+      #     tvar, hovori o inom systeme/otvarani nez kluc, je prazdna, cislo,
+      #     objekt alebo `null`. Zahodenie by `active_ref` posunulo do stavu
+      #     `:missing`, teda surodenec/`latest_for` — a poskodeny pin by TICHO
+      #     ZMENIL FYZIKU zakazky (Codex #308 kolo 1 P1). Platnost hodnoty
+      #     rozhoduje VYHRADNE `Recipes.active_ref`: cokolvek, co nie je vydany
+      #     ref TEJTO kombinacie, je `[:unknown, …]` -> RED `drawer_recipe_unknown`
+      #     bez dielcov.
+      #   * Hodnota sa normalizuje na RETAZEC (skalar `to_s`, cokolvek ine na
+      #     prazdny retazec) — config tak ostava JSON-cisty a `active_ref` ma
+      #     jeden tvar vstupu. Prazdny retazec je PLATNY ULOZENY STAV: znamena
+      #     „pin tu je, ale je poskodeny", nie „pin chyba".
       def norm_recipe_refs(raw)
         return nil unless raw.is_a?(Hash)
         out = {}
         raw.each do |k, v|
           key = k.to_s.strip
           next unless RECIPE_REF_KEY_RE.match?(key)
-          id = v.to_s.strip
-          next unless RECIPE_ID_RE.match?(id)
-          # Codex #304 kolo 1 P2: KLUC a HODNOTA musia hovorit o TOM ISTOM.
-          # `{"atira|sisy" => "quadro_v6_p2o_v1"}` je poskodeny (alebo podvrhnuty)
-          # zaznam — bez tejto kontroly by `active_ref` vratila stav `:known`
-          # a zasuvka by sa postavila podla CUDZIEHO receptu. Zahodenim zaznamu
-          # sa stav zmeni na `:missing`, teda surodenec/`latest_for` — nikdy
-          # cudzi system ani cudzie otvaranie.
-          m = RECIPE_ID_RE.match(id)
-          next unless key == "#{m[1]}|#{m[2]}"
 
-          out[key] = id
+          out[key] = case v
+                     when String, Symbol, Numeric then v.to_s.strip
+                     else '' # Hash, Array, true/false, nil — pin bez pouzitelnej hodnoty
+                     end
         end
         out.empty? ? nil : out
       end

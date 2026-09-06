@@ -481,10 +481,24 @@ NxTest.test('builder round-trip: hardware_sets prezije config_to_params aj norma
   cfg = cb.normalize(params)
   NxTest.assert_equal({ 'hinge' => 'zaves-p2o' }, cfg[:hardware_sets],
                       'normalize ho zachova')
+  # KOV-D1a (Codex #308 kolo 2 P1) ZMENIL kontrakt: NEPLATNY KLUC (neznamy typ)
+  # ide von ako doteraz, ale PLATNY kluc s nepouzitelnou hodnotou uz NEVYPADNE —
+  # ostava ako MARKER neplatneho mapovania. Zahodenie by z pritomneho kluca
+  # spravilo nepritomny a expanzia by ticho pouzila predvolbu projektu, hoci
+  # v configu skrinky je vyber (poskodeny). Marker konci ako `mapping_invalid`.
   messy = cb.normalize('hardware_sets' => { 'hinge' => ' zaves-p2o ', 'vymysleny' => 'x',
                                             'slide' => '', 'leg' => nil })
-  NxTest.assert_equal({ 'hinge' => 'zaves-p2o' }, messy[:hardware_sets],
-                      'neznamy typ / prazdne set_id von, trim')
+  NxTest.assert_equal(%w[hinge leg slide], messy[:hardware_sets].keys.sort,
+                      'neznamy TYP von, platny kluc s pokazenou hodnotou OSTAVA')
+  NxTest.assert_equal('zaves-p2o', messy[:hardware_sets]['hinge'], 'trim platnej hodnoty')
+  %w[slide leg].each do |k|
+    NxTest.assert(Noxun::Engine::HardwareSets.invalid_mapping_value?(messy[:hardware_sets][k]),
+                  "#{k}: marker neplatneho mapovania")
+  end
+  # Normalizacia je IDEMPOTENTNA — druhy prechod marker neprepise (inak by sa
+  # config menil pri kazdej prestavbe bez zasahu pouzivatela).
+  again = cb.normalize('hardware_sets' => messy[:hardware_sets])
+  NxTest.assert_equal(messy[:hardware_sets], again[:hardware_sets], 'druhy prechod nic nezmeni')
 end
 
 # --- katalog: seed patch F8 ------------------------------------------------------

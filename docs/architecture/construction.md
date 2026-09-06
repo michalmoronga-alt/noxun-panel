@@ -30,6 +30,13 @@ NL zámku v `hardware_overrides`) a `front_id`. Typický 16 mm rozdiel medzi spo
 na ktorých sa legacy `slide` pravidlo potlačí). Pre každé čelo: `Recipes.recipe_key_for` → `[:legacy, nil]` = stará cesta, nič sa nevolá (zákazka bez klasifikácie je
 CONTENT-identická) · `[:conflict, kód, hláška]` = fail-closed · `[:ok, {system, opening}]` → aktívny záznam mapy `drawer.recipe_refs` (`Recipes.active_ref`; chýbajúci =
 súrodenec ROVNAKEJ verzie, inak `latest_for` — nikdy tichý upgrade; neznámy = RED `drawer_recipe_unknown`) → `Recipes.load` → `context_for` → `Recipes.resolve`.
+**KOV-D1a (v0.9.34, Astra #20 B4) opravil hranicu „chýbajúci vs. neplatný":** `Fronts.norm_recipe_refs` už PRÍTOMNÝ záznam pod platným kľúčom **nezahadzuje** (predtým
+nesúlad kľúča a receptu alebo zlý tvar hodnoty znamenal `:missing`, teda súrodenca/`latest_for` — a poškodený pin tak ticho menil fyziku hotovej zákazky). O platnosti
+rozhoduje **jediné miesto — `Recipes.active_ref`**: hodnota musí mať tvar `recipe_id` a hovoriť o TOM ISTOM systéme aj otváraní ako jej kľúč, inak je `[:unknown, id]` → RED
+`drawer_recipe_unknown` bez dielcov aj bez výsuvu. Hľadanie súrodenca v `pick_ref` berie **len validované záznamy** mapy (Codex #307 kolo 2 P1). Kľúč mimo uzavretého
+slovníka žiadnu kombináciu nepripína, takže vypadáva ďalej. **O stave `:missing` rozhoduje výhradne PRÍTOMNOSŤ KĽÚČA, nikdy použiteľnosť hodnoty** (Codex #308 kolo 1 P1):
+prázdna, číselná, objektová aj `null` hodnota je **poškodený pin**, nie chýbajúci — `norm_recipe_refs` ju preto normalizuje na reťazec (nečitateľné na `''`) a záznam
+**zachová**. Prázdny reťazec je platný uložený stav „pin tu je, ale je poškodený" a veta konfliktu ho pomenuje ako „bez čitateľnej hodnoty", nie prázdnymi úvodzovkami.
 Výstup je **atomický**: buď všetky dielce + jedna položka výsuvu, alebo nič a záznam v `plan[:drawer_conflicts]`. Dielce sa pripájajú **za** partition degenerovaných —
 ich minimá stráži recept sám (jediný neplatný rozmer = `drawer_no_fit` pre celú zásuvku, nikdy per-dielec `part_skipped_degenerate`).
 
@@ -114,6 +121,10 @@ pri vklade aj pri použití, vždy PRED akoukoľvek operáciou, takže model sa 
 · **`5` = KOV-C2b** (zásuvky z receptu: `drawer.system`, `drawer.recipe_refs`, `drawer_material_id`, uložené `drawer_conflicts`, položky kovania so `source: 'recipe'`) —
 starší plugin recepty nepozná, takže by pri prestavbe **ticho odobral dielce zásuviek aj položku výsuvu**, teda časť objednávky. K bumpu 5 patrí aj **exportná brána**
 `ProductionCore.drawer_blockers` ([outputs.md](outputs.md)) — tá však chráni inú vec (nevyriešenú zásuvku v TEJTO verzii), forward guard chráni pred STARŠOU verziou.
+· **`6` = KOV-D1a** (OWNER TRIEDNY kľúč v `hardware_sets` skrinky — `class:slide|classic|metal@front:F1/panel`, teda vlastný kit pre JEDNO čelo): starší plugin taký kľúč pri
+normalizácii **zahodí** (jeho `parse_class_key` sufix `@` odmieta), no `unknown_generic_types` z neho stále prečíta podporovaný `slide`, takže by prestavbu **nezastavil**
+a zásuvka by ticho dostala set z projektu namiesto vybraného (Astra #20 B1). Brány sú tie isté ako pri 5 (prestavba, šablóny, kópia, export).
+**`DRAWER_ACTIVATION_SCHEMA` ostáva 5** — je to VLASTNÁ konštanta práve preto, aby bump na 6 nespravil z každej skrinky schémy 5 „nemigrovanú" (`drawer_stale`).
 
 **AD-HOC KOVANIE `hardware_manual[]` (KOV-H1, v0.9.18).** Ďalšie pole configu, nie nový zápisový kanál (audit #15 BLOCKER 1): panel ho posiela v `collectAll()` presne ako čelá,
 takže ide cestou `apply_all` → `normalize` → **rebuild** — jeden krok Späť, guardy dokumentu aj skrinky, R-12, `push_selected(dedup: false)`. Cena je prestavba geometrie pri

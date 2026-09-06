@@ -94,11 +94,19 @@ module Noxun
       #       cast objednavky) — presne to, comu forward-guard brani. Guard je
       #       existujuci `newer_config?` (prestavba, sablony, kopia) + brana
       #       exportov (`ProductionCore.export_blockers`).
-      CONFIG_SCHEMA = 5
+      #   6 = KOV-D1a — OWNER TRIEDNY kluc v `hardware_sets` skrinky
+      #       (`class:slide|classic|metal@front:F1/panel`): vyber kitu pre JEDNO
+      #       celo. Starsi plugin taky kluc pri normalizacii ZAHODI (jeho
+      #       `parse_class_key` sufix `@` odmieta), pricom `unknown_generic_types`
+      #       z neho stale precita podporovany `slide` — teda by prestavbu
+      #       NEZASTAVIL a zasuvka by ticho dostala set z projektu namiesto
+      #       vybraneho (Astra #20 B1). Brany su rovnake ako pri 5: dopredny
+      #       guard prestavby/sablon/kopie (`newer_config?`) a exportna brana.
+      CONFIG_SCHEMA = 6
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
-      # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri buducom bumpe na 6 by
-      # sa inak KAZDA skrinka schemy 5 zrazu tvarila ako nemigrovana.
+      # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a) by
+      # sa inak KAZDA skrinka schemy 5 zrazu tvarila ako nemigrovana. Zostava 5.
       DRAWER_ACTIVATION_SCHEMA = 5
 
       MIN = { width: 200.0, height: 200.0, depth: 150.0 }.freeze
@@ -2019,7 +2027,7 @@ module Noxun
             ),
             # V0.6 D1 (audit B1): cabinet override setov kovania — mapa
             # {generic_type => set_id}; bez round-tripu by ju rebuild zmazal.
-            hardware_sets: norm_hardware_sets(raw(p, :hardware_sets)),
+            hardware_sets: norm_hardware_sets(raw(p, :hardware_sets), fronts_cfg),
             # KOV-H1: ad-hoc polozky kovania mimo setov. CITACIA cesta
             # (`strict_owners: false`) — kluc vlastnika sa NIKDY nezahadzuje,
             # striktnu kontrolu robi panelova ADD/EDIT cesta PRED rebuildom.
@@ -2094,9 +2102,25 @@ module Noxun
         # takze neplatna polozka vypadne s logom (rebuild nikdy nespadne na
         # cudzom/legacy configu). Ze snapshot definiciu setu NESIE, gardi
         # zapisova cesta HardwareSets (audit B2), nie builder.
-        def norm_hardware_sets(raw_map)
+        # KOV-D1a: `fronts_cfg` (ked je dany) navyse zahodi OWNER TRIEDNE kluce
+        # ukazujuce na celo, ktore v skrinke uz neexistuje.
+        def norm_hardware_sets(raw_map, fronts_cfg = nil)
           return {} unless raw_map.is_a?(Hash)
-          HardwareSets.normalize_mapping(raw_map, nil, allow_owner: true)
+          # KOV-D1a (Codex #308 kolo 2 P1): pritomny kluc s NEPOUZITELNOU
+          # hodnotou ostava v configu ako marker neplatneho mapovania. Zahodit
+          # ho by znamenalo spravit z pritomneho kluca nepritomny — a zasuvka by
+          # ticho dostala set z projektu namiesto RED hlasky.
+          map = HardwareSets.normalize_mapping(raw_map, nil, allow_owner: true)
+          return map if fronts_cfg.nil?
+
+          # Riadok `type: 'none'` v configu ZOSTAVA (Fronts ho drzi zamerne),
+          # ale ZIADNE celo nema — owner kluc na nom je mrtvy vyber a po navrate
+          # na zasuvku by sa ticho reaktivoval (Codex #308 kolo 2 P2; presne
+          # vzor `prune_none_front_overrides`).
+          ids = Array(fronts_cfg.is_a?(Hash) ? fronts_cfg['items'] : nil)
+                .reject { |it| it.is_a?(Hash) && it['type'].to_s == 'none' }
+                .map { |it| it.is_a?(Hash) ? it['id'].to_s : '' }
+          HardwareSets.prune_missing_owners(map, ids)
         end
 
         # D-93 (audit B2): polia zaznamu su NEZAVISLE — 'disabled' uz NESMIE

@@ -767,6 +767,9 @@ module Noxun
             'uprav predvoľbu setu'
           when 'set_missing'
             "projekt odkazuje na set „#{sid}“, ktorý v ňom nie je — vyber set nanovo"
+          when 'mapping_invalid'
+            'výber setu na tejto skrinke je poškodený — vyber ho nanovo (predvoľba ' \
+            'projektu sa zámerne nepoužije)'
           else
             "nákup nenašiel kit (#{u['base_reason']})"
           end
@@ -845,6 +848,12 @@ module Noxun
               # nie je vyskovy selektor). NIKDY sa nesiahne po inom sete.
               "#{label} (#{where}): set „#{sid}“ nesedí so zásuvkou " \
                 "(#{HardwareSets.incompatible_detail_sk(u['detail'])}) — uprav predvoľbu setu."
+            when 'mapping_invalid'
+              # KOV-D1a: kluc vyberu JE v configu skrinky, ale hodnota sa neda
+              # pouzit. Predvolba projektu sa ZAMERNE nepouzije — pouzivatel tu
+              # nieco vedome vybral a tichy navrat by zmenil objednany kit.
+              "#{label} (#{where}): výber setu na tejto skrinke je poškodený — vyber ho nanovo " \
+                '(predvoľba projektu sa zámerne nepoužije).'
             when 'library_incompatible'
               # R-07 (brana 1d): globalna kniznica setov je z novsej verzie
               # alebo ma neznamy tvar — POUZIT sa nesmie (nakup z orezanych dat

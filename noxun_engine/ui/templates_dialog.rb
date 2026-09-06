@@ -559,6 +559,12 @@ module Noxun
         #     a nikdy ich nemaze ani neprepisuje.
         # Mapa zo sablony sa VZDY normalizuje s allow_owner: false — rucne
         # upraveny JSON s composite klucom sa cez sablonu do skrinky nedostane.
+        # KOV-D1a (Codex #307 kolo 2 P1): „kluc na urovni dielca" uz nie je len
+        # composite `typ@owner`, ale aj OWNER TRIEDNY kluc
+        # `class:slide|classic|metal@front:F1/panel`. Rozhoduje o tom
+        # `HardwareSets.owner_scoped_key?` — bez neho by `parse_hardware_set_key`
+        # vratil pre `class:` nil, zaznam by vypadol a zasuvka ciela by po
+        # aplikacii sablony TICHO dostala iny kit.
         def merge_hardware_sets(target_params, tpl_config)
           target = target_params['hardware_sets'].is_a?(Hash) ? target_params['hardware_sets'] : {}
           target = HardwareSets.normalize_mapping(target, nil, allow_owner: true)
@@ -566,8 +572,7 @@ module Noxun
 
           out = HardwareSets.normalize_mapping(tpl_config['hardware_sets'], nil, allow_owner: false)
           target.each do |key, value|
-            parsed = BuildPlan.parse_hardware_set_key(key)
-            out[key] = value if parsed && parsed[1] # composite = override na dielci
+            out[key] = value if HardwareSets.owner_scoped_key?(key)
           end
           out
         end

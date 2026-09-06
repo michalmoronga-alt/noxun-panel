@@ -170,7 +170,8 @@ nedá ani dokázať, ani vyvrátiť. Také ID hlási zber v aditívnom kľúči 
 člena; **zhodné (alebo nijaké) mapy konflikt nie sú** — bežná kópia skrinky dá rovnaký výsledok nech vyhrá ktorákoľvek. **Blokuje sa len rozdiel, ktorý tej skrinke naozaj mení
 kód (review #262 P2):** záznam nesie KĽÚČE rozdielu a `conflict_matters?` ich porovná s kľúčmi, ktorými si skrinka kovanie skutočne mapuje — `override_keys_in_use` ich číta
 z `collected[:hardware]` **presne tak, ako ich číta `resolve_mapping_value`**. Do KOV-C2a to boli `generic_type` a `generic_type@owner_part_key`; odvtedy platí vetvenie:
-**klasifikovaná (receptová) položka registruje VÝHRADNE triedny kľúč `class:slide|…`** (`HardwareSets.class_key_for`), legacy položka naďalej dvojicu legacy kľúčov. Obe
+**klasifikovaná (receptová) položka registruje VÝHRADNE triedne kľúče — od KOV-D1a dvojicu `class:slide|…` a `class:slide|…@<owner_part_key>`** (owner triedny kľúč číta
+resolver ako PRVÝ, takže rozdiel v ňom kód mení; Codex #307 kolo 2 P1), legacy položka naďalej dvojicu legacy kľúčov. Obe
 strany sú nutné: bez triedneho kľúča by sa rozídená override mapa prepašovala ako „neškodná" a duplicitné ID skriniek by objednalo iný kit, než ktorý sa postavil
 (Astra #19 F8); a naopak — zapísať receptovej položke aj `slide`/`slide@owner`, ktoré pre ňu resolver ignoruje, by znamenalo blokovať export kvôli rozdielu, ktorý jej kód
 nijako nemení (Codex #303 P2). Rozídený `slide` na skrinke, ktorá má len závesy, teda neblokuje;
