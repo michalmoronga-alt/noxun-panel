@@ -438,6 +438,16 @@ charakterizačný test). Päť častí:
   nového projektu**, takže aj ten je od tejto dávky std 4. Existujúce projekty sa nemenia — do nich ich prenesie až vedomé „Doplniť nové predvoľby". Hodnota pre Atiru **musí byť pásmový selektor podľa `height_variant`**;
   pevný `set_id` by po prerastení zásuvky H70 → H176 objednal H70 kit (klasifikácia opening/construction je pri oboch rovnaká), preto ho `resolve_set_id` odmietne ako
   `set_incompatible` / `height_selector`. Quadro (bez variantu) pevný `set_id` smie.
+- **Seed `SEED_VERSION` 3 → 4 (KOV-D1c, v0.9.36) — ALTERNATÍVNA RODINA „Atira antracit".** Pribudlo **6 setov** `atira-antracit-h{70,144,176}-{sisy,p2o}` s kódmi z draftu
+  #13 §1 (tabuľka „Antracit kity Atira", Démos 6.9.2026). Klasifikácia je ZHODNÁ s bielou (farbu ani vyhotovenie klasifikácia nenesie), takže rodiny odlišuje **výhradne názov**
+  („Atira antracit H70 — klasické" → `family_stem` „Atira antracit — klasické"); `class_set_options` preto od tejto dávky ponúka pre `class:slide|classic|metal`
+  a `class:slide|tipon|metal` **dve rodiny**. **`MAPPING_ADDITIONS` sa NEMENÍ** — predvoľba nového projektu ostáva biela a antracit si používateľ vyberá vedome (Pravidlá Štúdia
+  alebo karta čela). Katalóg kovania sa nemení tiež (kódy v ňom nie sú ani pri bielej — položka bez katalógu je „bez ceny", `catalog_missing`).
+- **Čiastočná rodina je LEGITÍMNY dátový stav.** Antracit nemá kód pre každú bunku radov receptov v1 (SiSy H176 350/520/620, všetky NL 620) — taká bunka má v `code_by_nl`
+  kľúč **NEPRÍTOMNÝ**, nikdy prázdny reťazec a nikdy kód inej farby či dĺžky. Expanzia z nej urobí RED `drawer_kit_missing` (`base_reason` `nl_missing`, „nákup nenašiel kit
+  výsuvu k postaveným dielcom") a export stojí — to je ZÁMER: tichá zámena by objednala bielu K-sadu k antracitovej zákazke. **Completeness test** („KAŽDÁ bunka radov v1 má kit
+  kód", `tests/pure/test_kovc2a_kanal_sety.rb`) preto platí LEN pre predvolenú bielu rodinu; antracit stráži vlastná sada `tests/pure/test_kovd1c_antracit.rb` (tabuľková fixtúra
+  = druhý, nezávislý zápis kódov + kontrola SUROVÉHO literálu `SEED_SETS`, lebo normalizácia prázdnu hodnotu ticho zahodí). NL 260/300 z tabuľky sa neseedujú — sú mimo radov v1.
 - **Kompatibilita vybraného setu (`set_incompatible_info`)** beží v `expand` AJ v `explain` (panel a súpis sa nesmú rozísť) hneď za `set_type_mismatch` a porovnáva
   `opening_mode`, `drawer_construction`, **`manufacturer` + `series` ↔ `params.system`** (uzavretý `SYSTEM_IDENTITY`: `atira` → Hettich/InnoTech Atira, `quadro_v6` →
   Hettich/Quadro; neznámy systém = fail-closed) a **`height_variant` setu ↔ `params.height_variant`** (presne, bez zaokrúhľovania). Bez toho by triedny kľúč sám nedokázal, že

@@ -134,7 +134,10 @@ module Noxun
       # globalneho defaultu leg z 'nohy-klzak-17' na neho.
       # v3 (KOV-C2a): +8 klasifikovanych drawer setov (Atira 3 vysky x 2 otvarania,
       # Quadro V6 x 2 otvarania) a triedne mapovania cez `MAPPING_ADDITIONS`.
-      SEED_VERSION = 3
+      # v4 (KOV-D1c): +6 setov Atira ANTRACIT (3 vysky x 2 otvarania). LEN sety —
+      # `MAPPING_ADDITIONS` sa NEMENI, predvolba ostava biela; antracit si
+      # pouzivatel vybera vedome v Pravidlach Studia alebo na karte cela.
+      SEED_VERSION = 4
       FILE         = 'hardware_sets.json'
       MODEL_KEY    = 'hardware_sets' # kluc snapshotu v NOXUN dict na modeli
 
@@ -384,6 +387,80 @@ module Noxun
             { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
               'code_by_nl' => { '350' => '357801', '420' => '357802', '470' => '357803',
                                 '520' => '357812', '620' => '357795' } }
+          ] },
+        # === KOV-D1c: ATIRA ANTRACIT (alternativna rodina, NIE predvolba) =====
+        # Kody = draft #13 §1 tabulka „Antracit kity Atira" (Demos 6.9.2026).
+        # Klasifikacia je ZHODNA s bielou rodinou (farbu ani vyhotovenie
+        # klasifikacia nenesie) — rodiny odlisi VYHRADNE nazov: `family_stem`
+        # zahodi token `H<cislo>`, takze „Atira antracit — klasické" je iny kmen
+        # nez „Atira biela — klasické" a selektor Studia ponukne dve rodiny.
+        #
+        # RODINA NIE JE UPLNA (na rozdiel od bielej): antracit ma kod LEN pre
+        # bunky, ktore Demos naozaj predava. Chybajuca bunka = kluc v `code_by_nl`
+        # NEPRITOMNY — expanzia da RED `drawer_kit_missing` („nákup nenašiel kit
+        # výsuvu k postaveným dielcom"). NIKDY sa sem nepise prazdny retazec ani
+        # kod susednej dlzky/farby: ticha zamena by objednala biely kit k
+        # antracitovej zakazke. Completeness test (`test_kovc2a_kanal_sety`) preto
+        # plati LEN pre predvolenu bielu rodinu.
+        # NL 260/300 z tabulky sa NEZAPISUJU — su mimo radov receptov v1.
+        { 'set_id' => 'atira-antracit-h70-sisy', 'name' => 'Atira antracit H70 — klasické',
+          'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'classic',
+          'drawer_construction' => 'metal', 'manufacturer' => 'Hettich',
+          'series' => 'InnoTech Atira', 'height_variant' => 70,
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
+              # 350 = 357887 (Michal overil 6.9. v Demose), 470 = 348777 (kod
+              # mimo cislenej rady antracitu — je to tak v katalogu).
+              'code_by_nl' => { '350' => '357887', '420' => '357888',
+                                '470' => '348777', '520' => '357890' } }
+          ] },
+        { 'set_id' => 'atira-antracit-h144-sisy', 'name' => 'Atira antracit H144 — klasické',
+          'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'classic',
+          'drawer_construction' => 'metal', 'manufacturer' => 'Hettich',
+          'series' => 'InnoTech Atira', 'height_variant' => 144,
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
+              # Rad SiSy H144 konci na 470 (rovnako ako biela) — 357929 z tabulky
+              # je NL 520, ktora v recepte NIE JE, preto sa nezapisuje.
+              'code_by_nl' => { '350' => '357926', '420' => '357927',
+                                '470' => '357928' } }
+          ] },
+        { 'set_id' => 'atira-antracit-h176-sisy', 'name' => 'Atira antracit H176 — klasické',
+          'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'classic',
+          'drawer_construction' => 'metal', 'manufacturer' => 'Hettich',
+          'series' => 'InnoTech Atira', 'height_variant' => 176,
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
+              # NL 350, 520 a 620 antracit v tejto vyske NEMA -> RED.
+              'code_by_nl' => { '420' => '357969', '470' => '357970' } }
+          ] },
+        { 'set_id' => 'atira-antracit-h70-p2o', 'name' => 'Atira antracit H70 — Tip-On',
+          'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'tipon',
+          'drawer_construction' => 'metal', 'manufacturer' => 'Hettich',
+          'series' => 'InnoTech Atira', 'height_variant' => 70,
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
+              # NL 620 antracit nema v ziadnej vyske -> RED.
+              'code_by_nl' => { '350' => '357914', '420' => '357915',
+                                '470' => '357916', '520' => '357917' } }
+          ] },
+        { 'set_id' => 'atira-antracit-h144-p2o', 'name' => 'Atira antracit H144 — Tip-On',
+          'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'tipon',
+          'drawer_construction' => 'metal', 'manufacturer' => 'Hettich',
+          'series' => 'InnoTech Atira', 'height_variant' => 144,
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
+              'code_by_nl' => { '350' => '357955', '420' => '357956',
+                                '470' => '357957', '520' => '357958' } }
+          ] },
+        { 'set_id' => 'atira-antracit-h176-p2o', 'name' => 'Atira antracit H176 — Tip-On',
+          'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'tipon',
+          'drawer_construction' => 'metal', 'manufacturer' => 'Hettich',
+          'series' => 'InnoTech Atira', 'height_variant' => 176,
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
+              'code_by_nl' => { '350' => '357996', '420' => '357997',
+                                '470' => '357998', '520' => '357999' } }
           ] },
         # Quadro V6 vyskove varianty NEMA — `height_variant` preto CHYBA
         # (a mapovanie na neho smie ukazovat pevnym `set_id`).
