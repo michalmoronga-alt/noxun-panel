@@ -80,6 +80,48 @@ module Noxun
         drawer_override_invalid drawer_kit_missing
       ].freeze
 
+      # Jediny kod, ktory vznika az v NAKUPE (receptova polozka bez setu alebo
+      # bez kodu pre svoju NL). Dielce v modeli OSTAVAJU (fyzika je spravna),
+      # ale rez na NL bez kitu tej NL je nepouzitelny — preto blokuje AJ VEPO.
+      KIT_MISSING = 'drawer_kit_missing'
+
+      # MIGRACNY kod (Codex #304 kolo 1 P1). NEVYRABA ho resolver — vznika pri
+      # CITANI modelu (`Bom.collect`): skrinka ulozena PRED aktivaciou receptov
+      # (config schema < 5) ma klasifikovanu zasuvku, takze v .skp NIE SU
+      # receptove dielce a vysuv je legacy. Kusovnik aj VEPO by boli NEUPLNE
+      # a ticho — preto blokuje VSETKY exporty. Napravou je PRESTAVBA skrinky.
+      STALE = 'drawer_stale'
+
+      # KOV-C2b: REGISTER BRANY (11 kodov). `export_blockers` cita CELY tento
+      # zoznam — ziadny kod z neho nesmie prejst do vydaneho suboru.
+      # 10 kodov produkuje resolver (`CONFLICT_CODES`), 11. je MIGRACNY.
+      DRAWER_BLOCKERS = (CONFLICT_CODES + [STALE]).freeze
+
+      # Konflikty STAVBY (9): fail-closed, ziadne dielce ani polozka. Blokuju
+      # nakupny CSV, rozpocet a cenovu ponuku; VEPO chrani prave to, ze sa
+      # geometria vobec nevydala (niet co rezat).
+      BUILD_BLOCKERS = (CONFLICT_CODES - [KIT_MISSING]).freeze
+
+      # Kody, pri ktorych by boli NEUPLNE aj REZACIE data — blokuju AJ VEPO.
+      ALL_EXPORT_BLOCKERS = [KIT_MISSING, STALE].freeze
+
+      # Kratky slovensky nazov dovodu pre BRANU EXPORTU. Plnu vetu (ktora
+      # hodnota kde nesedi) nesie nalez Kontroly; brana menuje LEN pricinu
+      # a skrinky. KAZDY kod registra tu MUSI mat zaznam — strazi to guard test.
+      BLOCKER_LABELS = {
+        'drawer_unclassified'         => 'zásuvka nie je klasifikovaná',
+        'drawer_no_fit'               => 'zásuvka sa do skrinky nezmestí',
+        'drawer_obstruction'          => 'v riadku zásuvky je polica alebo priečka',
+        'drawer_internal_unsupported' => 'vnútorná zásuvka sa zatiaľ nevyrába',
+        'drawer_thickness_unsupported' => 'materiál zásuvky má nepodporovanú hrúbku',
+        'drawer_kd_unsupported'       => 'hrúbka boku skrinky nie je pre systém podporovaná',
+        'drawer_recipe_unknown'       => 'zásuvka používa recept, ktorý plugin nepozná',
+        'nl_lock_invalid'             => 'ručne zamknutá dĺžka výsuvu neplatí',
+        'drawer_override_invalid'     => 'ručný zásah do výsuvu zásuvky je neplatný',
+        KIT_MISSING                   => 'nákup nenašiel kit výsuvu k postaveným dielcom',
+        STALE                         => 'zásuvka je klasifikovaná ešte spred aktivovania receptov'
+      }.freeze
+
       # Identita NL zamku v `hardware_overrides` (D-93). Zamok = existencia
       # platneho pola `nominal_length`; `rule_id` smie byt legacy pravidlo aj
       # receptova identita `recipe:<recipe_id>` (migraciu robi C2).
@@ -92,6 +134,9 @@ module Noxun
       ROLE_BACK        = 'drawer_back'
       ROLE_BOX_SIDE    = 'box_side'
       ROLE_INNER_FRONT = 'drawer_inner_front'
+      # Vsetky roly, ktore recepty emituju — zhodne s `BuildPlan::ROLES` novou
+      # stvoricou aj s `CabinetBuilder::DRAWER_ROLES` (guard test to porovnava).
+      PART_ROLES = [ROLE_BOTTOM, ROLE_BACK, ROLE_BOX_SIDE, ROLE_INNER_FRONT].freeze
 
       # Najmensi vyrobitelny rozmer — zdiela sa s planom (jediny prah v systeme).
       MIN_DIM = 0.01
@@ -180,6 +225,45 @@ module Noxun
         released(dir: dir).key?(id) ? [:known, id] : [:unknown, id]
       end
 
+      # Aktivny recept pre kombinaciu system|otvaranie z mapy `recipe_refs`.
+      # JEDINA implementacia troch stavov (`active_ref`) — cita ju stavba
+      # (`Construction.drawer_pass`) aj panelove guardy. `nil` = neznamy ref
+      # (RED `drawer_recipe_unknown` vyda stavba) alebo systém bez receptu.
+      def pick_ref(refs_map, system, opening, dir: DIR)
+        state, ref = active_ref(refs_map, system, opening, dir: dir)
+        return nil if state == :unknown
+        return ref if state == :known
+
+        # NOVA kombinacia: surodenec ROVNAKEJ verzie, inak najnovsi vydany.
+        if refs_map.is_a?(Hash)
+          refs_map.each_value do |id|
+            sib = sibling(id, system, opening, dir: dir)
+            return sib if sib
+          end
+        end
+        latest_for(system, opening, dir: dir)
+      end
+
+      # KOV-C2b (Codex #304 P1): hrubky, ktore AKTIVNY recept TOHTO cela
+      # pripusta pre danu rolu. Pouziva ju panelovy guard materialu dielca —
+      # semantika MUSI byt zhodna s `resolve` (presna zhoda, ziadna tolerancia),
+      # inak by sa override ulozil a recept ho vzapati odmietol.
+      # -> [recipe, [mm, ...]] | nil (legacy celo, neznamy ref, ina rola)
+      def thicknesses_for(front_item, role, dir: DIR)
+        kind, key = recipe_key_for(front_item)
+        return nil unless kind == :ok
+
+        drawer = front_item['drawer'].is_a?(Hash) ? front_item['drawer'] : {}
+        id = pick_ref(drawer['recipe_refs'], key[:system], key[:opening], dir: dir)
+        return nil unless id
+
+        recipe = load(id, dir: dir)
+        list = recipe[:thickness_supported][role.to_s]
+        list ? [recipe, list.map(&:to_f)] : nil
+      rescue RecipeError
+        nil
+      end
+
       # --- klasifikacia cela ---------------------------------------------------
 
       # Rozhodovacia tabulka „ktory recept pre toto celo" (package KOV-C C1).
@@ -239,6 +323,16 @@ module Noxun
         # sa nedopĺňa druha polovica (Codex #301 kolo 3 P1).
         [:conflict, 'drawer_unclassified',
          'Zásuvka je klasifikovaná len spolovice — chýba konštrukcia alebo spôsob otvárania.']
+      end
+
+      # Je celo KLASIFIKOVANE ako zasuvka (= resolver sa nan vztahuje)?
+      # JEDINY predikat — cita ho `recipe_key_for` aj migracna brana
+      # `Bom.drawer_stale_issue` (Codex #304 kolo 3 P1). Druhy, uzsi predikat
+      # (napr. „construction je metal|wood") by prepasoval CIASTOCNU
+      # klasifikaciu, ktora po prestavbe skonci `drawer_unclassified`, a
+      # `variant internal`, ktora skonci `drawer_internal_unsupported`.
+      def classified?(front_item)
+        recipe_key_for(front_item).first != :legacy
       end
 
       # --- resolve -------------------------------------------------------------
@@ -333,7 +427,8 @@ module Noxun
             reason = in_series ? "potrebuje hĺbku #{fmt(min_depth(recipe, lock))} mm (svetlá #{fmt(clear_d)} mm)" : 'nie je v rade tejto výšky'
             return fail_with(out, 'nl_lock_invalid',
                              "#{label(recipe)}: ručne zamknutá dĺžka #{fmt(lock)} mm #{reason} — " \
-                             'zámok sa nikdy nemení automaticky.')
+                             'zámok sa nikdy nemení automaticky. ' \
+                             'Inspector → Kovanie, riadok „neplatný ručný zásah" → Zrušiť.')
           end
           nl = lock
           out[:explain] << "NL: #{fmt(nl)} (ručný zámok)"

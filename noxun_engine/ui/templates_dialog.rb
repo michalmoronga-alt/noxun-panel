@@ -536,8 +536,15 @@ module Noxun
           # Sablona, ktora kluc MA, svoje polozky prenasa (vratane prazdneho
           # zoznamu = „tato sablona ziadne nema").
           merged['hardware_manual'] = target_params['hardware_manual'] unless tpl_config.key?('hardware_manual')
-          %w[material_id front_material_id back_material_id].each do |k|
-            tv = Panel.present_str(tpl_config[k])
+          # KOV-C2b (Codex #304 kolo 1 P1): `drawer_material_id` (4. kanal) ide TOU
+          # ISTOU preserve-or-override cestou — legacy sablona bez kluca override
+          # cielovej skrinky NEZMAZE, sablona s klucom ho prepise.
+          # `CabinetBuilder.present` je BAJT NA BAJT ta ista funkcia ako
+          # `Panel.present_str` (nil / prazdny retazec -> nil), len zije vo
+          # vrstve, ktora sa da nacitat aj headless — merge materialov sa tym
+          # stava testovatelnym bez celeho panela. Spravanie sa NEMENI.
+          %w[material_id front_material_id back_material_id drawer_material_id].each do |k|
+            tv = CabinetBuilder.present(tpl_config[k])
             merged[k] = tv || target_params[k]
           end
           merged

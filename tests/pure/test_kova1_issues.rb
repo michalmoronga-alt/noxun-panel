@@ -193,10 +193,10 @@ module NxTest
     assert_equal([], I.run_items(['nieco', nil, 7]), 'poskodene zaznamy sa preskocia')
   end
 
-  test('KOV-A1 RED: ine kody hardware_issues sa v A1 ZAMERNE ignoruju (KOV-C/D)') do
-    future = [{ 'code' => 'drawer_no_fit', 'severity' => 'red', 'owner_id' => 'CAB-2',
-                'part_key' => 'front:F1/panel' },
-              { 'code' => 'owner_without_set', 'severity' => 'red', 'owner_id' => 'CAB-3' }]
+  # KOV-C2b: kody zasuviek (`Recipes::BUILD_BLOCKERS`) uz SVOJU BRANU MAJU,
+  # takze do Kontroly patria — zostava plati pre kody BEZ brany (KOV-D).
+  test('KOV-A1 RED: kod hardware_issues BEZ svojej brany sa ZAMERNE ignoruje (KOV-D)') do
+    future = [{ 'code' => 'owner_without_set', 'severity' => 'red', 'owner_id' => 'CAB-3' }]
     assert_equal([], I.run_items(future), 'kod bez svojej brany sa do Kontroly nedostane')
     mixed = future + I.issues([I.front('direction' => 'unset')])
     items = I.run_items(mixed)

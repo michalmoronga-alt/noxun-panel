@@ -116,8 +116,13 @@ Rola dielca/modulu je **explicitná hodnota** v `NOXUN/role`, nikdy sa neodvodzu
 ```
 side_left · side_right · bottom · top · back · shelf · divider_v · divider_h ·
 front_door · drawer_front · flap · cover_panel · false_front · rail_front · rail_back · plinth ·
-gola_profile · hinge · slide · leg · handle · shelf_pin · connector · free_panel
+gola_profile · hinge · slide · leg · handle · shelf_pin · connector · free_panel ·
+drawer_bottom · drawer_back · box_side · drawer_inner_front
 ```
+
+**Dielce zásuvky (KOV-C2b, v0.9.31):** `drawer_bottom` (dno) · `drawer_back` (chrbát) · `box_side` (bok boxu — kľúč nesie stranu `:left`/`:right`) ·
+`drawer_inner_front` (vnútorné čelo). Emituje ich **recept** (`Recipes.resolve`), nie zóny ani čelá; ich materiál je **4. kanál** (`:drawer`, §7.2) a ABS
+seed `AbsRules` `SEED_VERSION` 4. Roly žijú na troch miestach naraz (`BuildPlan::ROLES`, `Recipes::ROLE_*`, `CabinetBuilder::DRAWER_ROLES`) a paritu drží guard test.
 
 `free_panel` = voľná samostatná doska (V0.4.7, `kind: board`). Plánované roly dosiek (pribudnú **až s implementáciou** ich správania, vzor „rola pilaster do štandardu pri implementácii"): `cover_side` (pilaster), `cover_top`, `filler` (výplň), `worktop` (pracovná doska), `plinth_board` (soklová doska/lišta — môže byť `production_class: linear`).
 
@@ -164,6 +169,12 @@ gola_profile · hinge · slide · leg · handle · shelf_pin · connector · fre
 - **Disciplína bumpu:** číslo sa zvýši pri **každom rozšírení whitelistu configu o pole, ktorého tichá strata by poškodila výrobu** (nové konštrukčné pole, nový typ čela, nová rola). Čisto odvodené alebo kozmetické pole bump nevyžaduje. `plan_schema` (tvar tranzientného plánu) ani `part_key_schema` (kľúče dielcov) kompatibilitu configu **nevyjadrujú** a nenahrádzajú ho.
 - **Čísla sa prideľujú SEKVENČNE podľa poradia mergov, nie podľa poradia návrhov** (audit #17 FIX 5): dve dávky rozpracované naraz si nesmú nárokovať to isté číslo. Bump patrí do dávky, ktorá pole reálne zavádza, a jeho dôvod sa zapisuje do komentára `HISTORIA` pri konštante.
 - **Bump chráni SPÄTNE** (staršia verzia novší config odmietne). Keď dávka prináša aj obsah, ktorý sa dá do modelu zapísať zvonku (napr. definície setov zo šablóny), potrebuje **navyše DOPREDNÚ bránu**, ktorá taký obsah odmietne PRED zápisom — `4 = KOV-B1` je presne tento prípad (`HardwareSets.assess_set_defs`).
+- **`5 = KOV-C2b` (v0.9.31): zásuvky z receptu.** Config nesie `drawer.system`, `drawer.recipe_refs` (pripnutá verzia receptu per kombinácia systém|otváranie),
+  `drawer_material_id` (4. materiálový kanál), uložené `drawer_conflicts` a položky kovania so `source: "recipe"`. Starší plugin recepty nepozná, takže by pri prestavbe
+  ticho **odobral dielce zásuviek aj položku výsuvu** — teda časť objednávky. **`drawer.recipe_refs` a `drawer.system` sú SERVEROVÉ polia:** klientsky payload panela ich
+  nesmie zapísať (handler ich zahodí a uloženú mapu pripojí späť podľa ID čela), `Fronts.normalize_config` ich zachováva **bezstratovo** a jediný zápisový kanál je
+  `Fronts.write_drawer_fields!` v tej istej operácii ako geometria. Zápis je vždy len **doplnenie chýbajúceho** — už pripnutá verzia sa nikdy neprepisuje (zmena verzie
+  je výhradne explicitná akcia KOV-D).
 
 **Zóna** (`kind: zone`; nevýrobná — ghost):
 
@@ -420,9 +431,17 @@ brána existuje preto, že odmietnuť ho **raz pri uložení** je lacnejšie ne�
 stavba je reprodukovateľná zo samotného .skp (iné PC, zmeny globálu, kópie skriniek) a undo vracia pravidlá aj geometriu naraz.
 Globálna knižnica `%APPDATA%\NOXUN\Engine\hardware_rules.json` je len default pre nové projekty (so seed-merge novej verzie seedov podľa `rule_id`).
 
-**Položka kovania v pláne** (BuildPlan schema 2, string kľúče kvôli JSON round-trip): `owner_part_key` (nil = korpus; inak musí existovať v parts), `generic_type` (slovník),
+**Položka kovania v pláne** (BuildPlan schema 4, string kľúče kvôli JSON round-trip): `owner_part_key` (nil = korpus; inak musí existovať v parts), `generic_type` (slovník),
 `quantity` (1–999), `rule_id`, `variant_id` (nil vo fáze 1), `production_class: "counted"`, `manufactured: true`, `params` (napr. výška nohy, NL výsuvu),
-`source` (`rule`/`manual`), `rule_quantity`. Voliteľne `rule_nominal_length` (viď nižšie).
+`source` (`rule`/`manual`/**`recipe`**), `rule_quantity`. Voliteľne `rule_nominal_length` (viď nižšie) a **`locked`** (viď nižšie).
+
+**Položka výsuvu z RECEPTU (KOV-C2b, v0.9.31).** Zásuvkové čelo klasifikované systémom dostáva **práve jednu** položku: `generic_type: "slide"`,
+`rule_id: "recipe:<recipe_id>"`, `owner_part_key: "front:<id>/panel"`, `quantity: 1`, `rule_quantity: 1`, `source: "recipe"`,
+`params {recipe_id, system, height_variant | box_height, nominal_length, load, opening, opening_mode, drawer_construction}`.
+Voliteľné **`locked: true`** smie niesť VÝHRADNE položka so `source: "recipe"` a len keď existuje platný NL zámok — spotrebitelia (`note_manual`, payloady Nákupu
+a Inspectora) ho čítajú ako dnešné `source: "manual"`. Zákaz zmeny množstva plynie zo `source: "recipe"`: server odmieta `quantity`/`disabled` mutácie pre `rule_id recipe:*`,
+a taký zásah v uloženom configu = RED `drawer_override_invalid`. Legacy `slide` pravidlá sa na takom čele **nevyhodnocujú** (R2 exkluzivita) — jedna zásuvka = jeden výsuv.
+Nákup si k nej hľadá set **triednym kľúčom** a na generický `slide` **nikdy nepadá**; chýbajúci kit = RED `drawer_kit_missing`, ktorý blokuje **všetky** exporty vrátane VEPO.
 **Ručné zásahy** žijú v configu korpusu ako `hardware_overrides` — identita zásahu = trojica **(owner_part_key, generic_type, rule_id)**;
 `quantity` prepíše počet, `disabled` položku vyradí, `nominal_length` prepíše dĺžku; šablóny korpusov zásahy zachovávajú.
 
@@ -667,8 +686,9 @@ Napr.: projekt `K009_PW_DTDL_18` → korpus zdedí → police zdedia → jedna p
 **Projektových kanálov sú ŠTYRI** (`Materials::PROJECT_KEYS`, NOXUN dict na modeli): `default_material_id` (korpus) · `default_front_material_id` (čelá) ·
 `default_back_material_id` (chrbát) · **`default_drawer_material_id` (dielce zásuviek — KOV-C2a, v0.9.30)**. Štvrtý kanál má fallback **UNI 16 mm** (`UNI_ZASUVKA_16`,
 cez `PROTECTED_SHEET_IDS` nemazateľný), lebo obe rady receptov (Atira aj Quadro V6) stavajú na 16 mm doske. Hrúbka dielcov zásuvky je **vstup receptu**, nie konštrukčná
-konštanta korpusu — či ju systém prijme, rozhoduje `thickness_supported` receptu. Kanál má zatiaľ **len projektovú úroveň**: override na skrinke aj výber v Štúdiu pribudnú
-v KOV-C2b spolu s bumpom `CabinetBuilder::CONFIG_SCHEMA`.
+konštanta korpusu — či ju systém prijme, rozhoduje `thickness_supported` receptu. **KOV-C2b (v0.9.31)** doplnila ÚROVEŇ SKRINKY (config kľúč `drawer_material_id`, `CONFIG_SCHEMA` 5), takže platí plná reťaz
+dedenia ako pri ostatných troch kanáloch. Hrúbka sa vyhodnocuje **PRED plánom** a receptu sa odovzdáva ako vstup `part_thicknesses` — bez toho by 18 mm materiál pri Atire
+ticho prešiel. Výber v Štúdiu (`MaterialsDialog::TARGETS`) a D-46 preflight per systém ostávajú na KOV-C2c.
 
 #### `part_overrides` — vrstva ručných zásahov na dielci korpusu (ZÁVÄZNÝ TVAR)
 

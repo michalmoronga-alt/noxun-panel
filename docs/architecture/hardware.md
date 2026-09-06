@@ -13,6 +13,31 @@ Pravidlá kovania (projektový snapshot na modeli), globálny katalóg položiek
 pravidlá kovania (V0.4): Ruby vzory `fixed`/`bands`/`fit_series` parametrizované JSON pravidlami; **projektový snapshot na modeli** (kľúč `hardware_rules` — rebuild
 reprodukovateľný z .skp; globál `%APPDATA%` len default nových projektov + seed-merge); `hardware_overrides` v configu korpusu s identitou (owner_part_key, generic_type, rule_id).
 
+**KOV-C2b (v0.9.31) — R2 EXKLUZIVITA.** `evaluate(..., suppress_slide_owners:)` dostáva množinu `owner_part_key` čiel, ktoré už majú položku výsuvu **z receptu**, a pravidlá
+s `output: 'slide'` sa na nich **nevyhodnocujú** — inak by zásuvka mala dva výsuvy (jeden s kitom, jeden legacy bez dielcov). Potlačenie sa priznáva **jedným** `info`
+warningom `legacy_slide_suppressed` na stavbu; Kontrola ho zámerne neukazuje (`Validation::BUILD_INFO_ONLY`) — používateľ nemá čo opravovať. Potlačenie platí aj vtedy,
+keď recept skončil **konfliktom** (fail-closed: čelo nedostane ani legacy výsuv).
+
+**KOV-C2b — OSIROTENÝ ručný zásah (Codex #304 P1).** Panel stavia editovateľné riadky Kovania z **emitovaných** položiek, takže záznam `hardware_overrides`, ku ktorému
+žiadna položka nevznikla, by nemal kde byť — a používateľ by ho nevedel zrušiť. Pri fail-closed zásuvke je to slepá ulička: `drawer_override_invalid` (ručný počet ≠ 1,
+vypnutie) aj `nl_lock_invalid` (zámok mimo radu) položku **nevydajú**, takže exporty ostanú zablokované, kým sa klasifikácia nevráti späť. Preto o osirotenosti rozhoduje
+**server**: `HardwareRules.override_orphan_kind(ov, items, conflict_owners)` je čistá funkcia, ktorá vráti `nil` (záznam má svoju položku), **`'disabled'`** (vypnutá
+kategória, D-92 — náprava „obnoviť") alebo **`'invalid'`** (vlastník je v uloženom `drawer_conflicts`, teda položka fail-closed nevznikla — náprava **zrušiť celý záznam**,
+lebo môže niesť počet aj zámok naraz). `Panel.hardware_overrides_payload` z nej robí `orphan`/`orphan_kind` v payloade, `hardware.js` filtruje **na `orphan`** (staré
+pravidlo „len `disabled`" ostáva len ako fallback pre payload bez kľúča) a riadok `invalid` volá **existujúcu** serverovú akciu `reset` — po nej prestavba konflikt
+už nevydá. Hlášky konfliktov na túto cestu odkazujú doslovne (`Construction::ORPHAN_HINT`), aby sa text riadku a text nálezu nemohli rozísť.
+
+**Tretí druh: `part_material`.** Do toho istého zoznamu patrí aj **materiálový override dielca zásuvky**, ktorého čelo je v `drawer_conflicts`
+(`Panel.orphan_part_material_rows`). Dôvod je ten istý a ešte tvrdší: karta dielca sa dá otvoriť len pre dielec **vo výbere**, ale po fail-closed konflikte ten dielec
+**neexistuje** — zlý záznam z uloženého modelu by teda nemal cestu von a exporty by ostali zablokované aj po reopen. Riadok volá vlastnú serverovú akciu
+`reset_part_override`, ktorá si osirotenosť **znovu overí** — a to nad **uloženým** configom (`CabinetBuilder.orphan_drawer_part_overrides`: drawer rola · čelo
+v `drawer_conflicts`), takže živý override nezmaže nikdy: keď čelo v konflikte nie je, jeho dielce stoja a override sa mení na karte dielca.
+
+**Prečo NIE „part_key nie je v pláne" (Codex #304, in-SU FAIL).** Prvá verzia sa pýtala `plan_parts_by_key`, lenže ten stavia plán **bez** `part_thicknesses`, teda
+s UNI 16 fallbackom — a práve ten dielec, ktorého 18 mm override konflikt spôsobil, v takom pláne **vždy existuje**. Riadok sa preto odfiltroval a reset sa odmietol
+(headless to neodhalilo, lebo test bol len source-guard). Autorita je uložený `drawer_conflicts`: zapisuje sa v tej istej operácii ako geometria, emisia je per čelo
+**atomická**, takže „čelo je v konflikte" znamená „žiadny jeho dielec neexistuje" — presnejšie, než sa dá dopočítať.
+
 **D-93 ručný NL výsuvu:** polia zásahu (`quantity` · `disabled` · `nominal_length`) sú NEZÁVISLÉ (zápis PO POLIACH, `disabled` ostatné polia nezahadzuje), **zámok = existencia poľa
 `nominal_length`**; `fit_series` emituje položku aj pri hĺbke pod minimom radu, ak zámok existuje (`rule_nominal_length` = hodnota automatu, nil = nevie) + ORANGE build warning
 `hardware_manual_no_fit`; SET validuje presnú zhodu s radom projektového snapshotu, uložená hodnota mimo radu sa NIKDY nemaže. Nákupné CSV bez zmeny — znamienko žije v sekcii Nákup
@@ -307,8 +332,14 @@ uzavretý: tretí segment má LEN `slide`, `@owner` sufix je zakázaný (výber 
 **bezstratový round-trip** a správny marker, takže KOV-D už nebude potrebovať ďalší bump. `BuildPlan.hardware_set_key_type` z neho vracia prvý segment (starší plugin prefix
 nepozná, takže mu z toho istého kľúča vyjde neznámy typ a prestavbu zablokuje — presne to chceme), `BuildPlan.parse_hardware_set_key` vracia `nil`.
 
+**KOV-C2b (v0.9.31) — RECEPTOVÁ POLOŽKA A RED `drawer_kit_missing`.** Zásuvkovú položku už **emituje** `Construction` (`source: 'recipe'`, `rule_id: recipe:<recipe_id>`,
+`quantity: 1`, voliteľné `locked: true` pri platnom NL zámku). Pre výber setu platí presne mechanika C2a nižšie; navyše: **každý** dôvod nemapovania sa pre `source: 'recipe'`
+povyšuje na **RED `drawer_kit_missing`** (`unmapped_entry`), pôvodný dôvod cestuje v `base_reason` a text skladá `unmapped_reason_sk` z NEHO (žiadny druhý preklad tých istých
+príčin). Dôvod: dielce sú už postavené na konkrétnu NL — chýbajúci kit nie je „nenacenené kovanie", ale **nevyrobiteľná** objednávka, preto blokuje aj VEPO.
+`note_manual` berie `locked: true` ako dnešné `source: 'manual'` (dĺžka je ručne určená); bez zámku receptová položka znamienko NEMÁ (Astra #19 N11).
+
 **KOV-C2a (v0.9.30) — TRIEDNY KĽÚČ SA ZAČAL ČÍTAŤ, `height_variant`, `MAPPING_ADDITIONS`, `std` 4.** Príprava aktivácie zásuviek: mení sa výber setu pre položku, ktorá nesie
-klasifikáciu zásuvky, ale **žiadne dnešné pravidlo ju nenesie**, takže výstupy existujúcich zákaziek sú CONTENT-identické (stráži to golden `seed_kniznica` aj vlastný
+klasifikáciu zásuvky, ale **žiadne dnešné pravidlo ju nenesie**, takže výstupy existujúcich zákaziek boli CONTENT-identické (stráži to golden `seed_kniznica` aj vlastný
 charakterizačný test). Päť častí:
 
 - **Kto je „zásuvková" položka.** `class_key_for(it, gt)` = položka má v `params` OBE polia `opening_mode` a `drawer_construction` → kanonický kľúč
@@ -516,8 +547,15 @@ mapovanie a zákaz typu by ju vzal tiež; nebezpečná je len položka s dĺžko
 
 ### drawer_recipes.rb
 
-**KOV-C1 — nemenné recepty zásuviek** (`Noxun::Engine::Recipes`). Čisté Ruby: žiadne SketchUp API, žiadny zápis do modelu ani na disk. Modul je v C1 **odpojený od stavby** —
-`build_plan` ho nevolá, config, `BuildPlan` schéma ani výstupy sa nemenia; zapojenie je úloha rezu C2.
+**KOV-C1 — nemenné recepty zásuviek** (`Noxun::Engine::Recipes`). Čisté Ruby: žiadne SketchUp API, žiadny zápis do modelu ani na disk.
+**Od KOV-C2b (v0.9.31) je modul ZAPOJENÝ:** `Construction.build_plan` ho volá pre každé klasifikované zásuvkové čelo (`drawer_pass`, viď
+[construction.md](construction.md)) a z neho vznikajú dielce v pláne aj **jedna** položka výsuvu.
+
+**Register brány `DRAWER_BLOCKERS` (11 kódov)** = `CONFLICT_CODES` (10, ktoré produkuje resolver) **+ 1 MIGRAČNÝ**. Delí sa na `BUILD_BLOCKERS` (9 fail-closed konfliktov
+STAVBY: zásuvka nevydala ani dielec ani položku) a `ALL_EXPORT_BLOCKERS` = `drawer_kit_missing` (vzniká až v NÁKUPE) **+ `drawer_stale`** — jediný kód, ktorý neprodukuje
+resolver ani nákup, ale **čítanie modelu** (`Bom.collect`): skrinka uložená pred aktiváciou receptov (`config_schema < CabinetBuilder::DRAWER_ACTIVATION_SCHEMA`) má
+klasifikovanú zásuvku, takže v .skp **nie sú** receptové dielce a výsuv je legacy — kusovník aj VEPO by boli neúplné a ticho. Nápravou je **prestavba** skrinky.
+`BLOCKER_LABELS` drží krátky slovenský názov pre bránu exportu — plnú vetu (ktorá hodnota kde nesedí) skladá recept a nesie ju nález Kontroly.
 
 **Dve vrstvy, jedna zodpovednosť každá:** fyzika (rozmery dielcov, výšky, rad NL) žije v **recepte**, objednávacie kódy v **setoch** (`hardware_sets`). Nákup nikdy nemení
 fyzický návrh: rad NL v recepte = rad, ktorý Noxun reálne kupuje, žiadni kandidáti ani fallback. **EB je pevné per recept** (Atira 10,5 · Quadro V6 23) — zmena hrúbky boku

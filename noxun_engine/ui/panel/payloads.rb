@@ -331,16 +331,59 @@ module Noxun
         end
 
         # D-92: ludsky nazov vlastnika aj pri vypnutych kategoriach.
+        # D-92 + KOV-C2b (Codex #304 P1): OSIROTENE rucne zasahy. Panel stavia
+        # editovatelne riadky z EMITOVANYCH poloziek, takze zasah, ku ktoremu
+        # ziadna polozka nevznikla, by nemal ako zmiznut — pouzivatel by ho
+        # nevedel zrusit a exporty by ostali zablokovane.
+        #
+        # SERVER je autorita (JS uz nerozhoduje z `disabled`), lebo len tu je
+        # vidno OBE strany: emitovane polozky aj ulozene `drawer_conflicts`.
+        # Dva druhy:
+        #   `disabled` — vypnuta kategoria (D-92, doterajsie spravanie)
+        #   `invalid`  — celo so systemom skoncilo KONFLIKTOM, takze polozka
+        #                NEVZNIKLA (rucny pocet != 1, vypnutie alebo zamok NL
+        #                mimo radu na zasuvke z receptu). Riadok ponuka RESET
+        #                (odstranenie celeho zaznamu) — po nom prestavba
+        #                konflikt uz nevyda.
         def hardware_overrides_payload(cfg, overrides)
           fronts = payload_fronts(cfg)
+          items = cfg['hardware'].is_a?(Array) ? cfg['hardware'] : []
+          owners = drawer_conflict_owners(cfg)
           Array(overrides).map do |ov|
             next ov unless ov.is_a?(Hash)
 
-            ov.merge('owner_label' => PartKeys.human_label(ov['owner_part_key'], fronts: fronts))
-          end
+            row = ov.merge('owner_label' => PartKeys.human_label(ov['owner_part_key'], fronts: fronts))
+            kind = HardwareRules.override_orphan_kind(ov, items, owners)
+            kind ? row.merge('orphan' => true, 'orphan_kind' => kind) : row
+          end + orphan_part_material_rows(cfg, fronts)
         rescue StandardError => e
           Engine.log_error(e, 'Panel.hardware_overrides_payload')
           overrides
+        end
+
+        # KOV-C2b (Codex #304 P1): OSIROTENY materialovy override dielca zasuvky.
+        # Zly zaznam (napr. 16,03 mm z modelu ulozeneho pred touto verziou) drzi
+        # zasuvku vo fail-closed konflikte, dielec teda NEEXISTUJE — a karta
+        # dielca sa da otvorit len pre dielec VO VYBERE. Bez tohto riadku by
+        # zaznam nemal cestu von a exporty by ostali blokovane aj po reopen.
+        # Riadok zije v TOM ISTOM zozname ako osirotene rucne zasahy kovania:
+        # sekcia Kovanie je miesto, kam pouzivatela posiela hlaska konfliktu.
+        def orphan_part_material_rows(cfg, fronts)
+          CabinetBuilder.orphan_drawer_part_overrides(cfg).map do |r|
+            { 'orphan' => true, 'orphan_kind' => 'part_material', 'part_key' => r['part_key'],
+              'owner_part_key' => r['owner_part_key'], 'generic_type' => '', 'rule_id' => '',
+              'material_id' => r['material_id'],
+              'orphan_label' => "Ručný materiál · #{Recipes.role_label(r['role'])}",
+              'owner_label' => PartKeys.human_label(r['owner_part_key'], fronts: fronts) }
+          end
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.orphan_part_material_rows')
+          []
+        end
+
+        # `owner_part_key` ciel v konflikte — autorita je `CabinetBuilder`.
+        def drawer_conflict_owners(cfg)
+          CabinetBuilder.drawer_conflict_owners(cfg)
         end
 
         # Resolved cela poslednej stavby — zdroj cisla „F2" (D-92).
@@ -556,7 +599,9 @@ module Noxun
           # V0.3 FIX 1: korpusove materialy do sablony LEN ak su na zdroji nastavene (non-nil).
           # part_overrides do sablony NEUKLADAME — su viazane na konkretne dielce/zony zdroja
           # (pri aplikacii sablony sa zachovaju z cieloveho korpusu).
-          %w[material_id front_material_id back_material_id].each do |k|
+          # KOV-C2b: `drawer_material_id` (4. kanal) cestuje so sablonou
+          # rovnako ako ostatne korpusove materialy — LEN ked je nastaveny.
+          %w[material_id front_material_id back_material_id drawer_material_id].each do |k|
             v = present_str(cfg[k])
             tc[k] = v if v
           end

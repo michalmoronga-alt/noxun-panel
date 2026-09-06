@@ -17,6 +17,19 @@ module Noxun
         # reset true (= zahodi CELY zaznam).
         # Zapis + rebuild v jednej operacii (override zije v configu korpusu).
         OVERRIDE_FIELDS = %w[quantity disabled nominal_length].freeze
+        # KOV-C2b: identita receptovej polozky vysuvu (`Construction`
+        # `drawer_hardware_item`). Pocet ani vypnutie sa na nej menit nedaju.
+        RECIPE_RULE_PREFIX = 'recipe:'
+
+        # Meni payload POCET alebo VYPNUTIE? Pozna OBA tvary (`field` + hodnota
+        # aj stary `quantity`/`disabled`); `reset` (zahodenie CELEHO zaznamu)
+        # sa nezakazuje — ten polozku vracia do stavu z receptu.
+        def recipe_count_mutation?(data)
+          return %w[quantity disabled].include?(data['field'].to_s) if data.key?('field')
+          return false if truthy?(data['reset'])
+
+          truthy?(data['disabled']) || !data['quantity'].nil?
+        end
 
         def handle_set_hardware_override(payload)
           model = Sketchup.active_model
@@ -41,6 +54,14 @@ module Noxun
           end
 
           owner = present_str(data['owner_part_key'])
+          # KOV-C2b: polozka vysuvu Z RECEPTU (`rule_id` „recipe:…") sa poctom
+          # ani vypnutim menit NEDA — recept vydava PRAVE JEDEN vysuv ku
+          # KONKRETNYM dielcom. Rucny zasah by rozbil dvojicu „dielce + kit"
+          # (a fail-closed brana by zakazku aj tak zastavila).
+          if rid.start_with?(RECIPE_RULE_PREFIX) && recipe_count_mutation?(data)
+            return set_status('Výsuv zásuvky vydáva recept — počet ani vypnutie sa meniť nedá. ' \
+                              'Zmeň klasifikáciu čela alebo jeho rozmery.', true)
+          end
           field, value, err = override_change(data, model, owner, gt, rid)
           return set_status(err, true) if err
 

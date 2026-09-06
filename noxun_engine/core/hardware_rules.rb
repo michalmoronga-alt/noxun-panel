@@ -412,10 +412,19 @@ module Noxun
       #   rules — normalizovane pole pravidiel (projektovy snapshot / test injection)
       # Vrati { items: [hw string-keyed], warnings: [] }. Poradie deterministicke:
       # pravidla v poradi kniznice, dielce v poradi planu.
-      def evaluate(cfg, parts, ctx, rules:)
+      # KOV-C2b (R2 exkluzivita): `suppress_slide_owners` = { owner_part_key => true }
+      # pre cela, ktore uz maju polozku vysuvu Z RECEPTU. Pravidla typu `slide`
+      # sa na nich NEVYHODNOCUJU — inak by zasuvka mala dva vysuvy (jeden
+      # z receptu s kitom, jeden legacy bez dielcov). Potlacenie sa prizna
+      # JEDNYM info warningom na stavbu (nie na kazde celo).
+      SLIDE_OUTPUT = 'slide'
+
+      def evaluate(cfg, parts, ctx, rules:, suppress_slide_owners: {})
         items = []
         warnings = []
         seen_ids = {}
+        suppress = suppress_slide_owners.is_a?(Hash) ? suppress_slide_owners : {}
+        suppressed = [] # kluce ciel, na ktorych legacy pravidlo vysuvu nebezalo
         Array(rules).each do |rule|
           next unless rule.is_a?(Hash)
           rid = rule['rule_id'].to_s
@@ -436,9 +445,17 @@ module Noxun
                                                   'output' => rule['output'].to_s })
             next
           end
-          apply_rule(rule, cfg || {}, parts, ctx, items, warnings)
+          apply_rule(rule, cfg || {}, parts, ctx, items, warnings, suppress, suppressed)
         end
         warnings.concat(profile_rule_warnings(parts, rules))
+        unless suppressed.empty?
+          warnings << BuildPlan.warning(
+            'legacy_slide_suppressed',
+            "Zásuvky s receptom (#{suppressed.length} ks) dostali výsuv z receptu — pôvodné pravidlo " \
+            'výsuvov sa na ne nepoužilo (jeden výsuv na zásuvku).',
+            severity: 'info', data: { 'owners' => suppressed }
+          )
+        end
         { items: apply_overrides(items, cfg[:hardware_overrides]), warnings: warnings }
       end
 
@@ -476,7 +493,7 @@ module Noxun
 
       # Aplikuje jedno pravidlo: korpusova uroven (owner nil) alebo per dielec roly.
       # cfg putuje az do compute — fit_series musi vediet o rucnom NL zamku (D-93).
-      def apply_rule(rule, cfg, parts, ctx, items, warnings)
+      def apply_rule(rule, cfg, parts, ctx, items, warnings, suppress = {}, suppressed = [])
         role = (rule['applies_to'] || {})['role'].to_s
         if role == 'cabinet'
           supports = Array((rule['applies_to'] || {})['support']).map(&:to_s)
@@ -487,9 +504,17 @@ module Noxun
           return if kinds.any? && !kinds.include?(ctx['cabinet_type'].to_s)
           emit(rule, nil, ctx, nil, items, warnings, cfg)
         else
+          slide = rule['output'].to_s == SLIDE_OUTPUT
           parts.each do |pd|
             next unless pd[:role].to_s == role
-            emit(rule, PartKeys.for_descriptor(pd), ctx, pd, items, warnings, cfg)
+            owner = PartKeys.for_descriptor(pd)
+            # KOV-C2b R2: celo s receptovym vysuvom legacy `slide` pravidlo
+            # NEDOSTANE (ani ked recept skoncil konfliktom — fail-closed).
+            if slide && suppress[owner]
+              suppressed << owner unless suppressed.include?(owner)
+              next
+            end
+            emit(rule, owner, ctx, pd, items, warnings, cfg)
           end
         end
       end
@@ -701,6 +726,39 @@ module Noxun
         ov = Array(list).select { |o| o.is_a?(Hash) && override_match?(o, probe) }.last
         return nil if ov.nil? || ov['disabled'] == true
         override_nl(ov.key?('nominal_length') ? ov['nominal_length'] : ov[:nominal_length])
+      end
+
+      # --- KOV-C2b: OSIROTENY rucny zasah (Codex #304 P1) ---------------------
+      #
+      # Panel stavia editovatelne riadky Kovania z EMITOVANYCH poloziek, takze
+      # zaznam `hardware_overrides`, ku ktoremu ziadna polozka nevznikla, by
+      # nemal kde byt — a pouzivatel by ho nevedel zrusit. Tato cista funkcia
+      # povie, ci a PRECO zaznam osirel; panel z nej robi riadok s akciou.
+      #
+      #   nil        — zaznam ma svoju polozku (kresli sa PRI nej)
+      #   'disabled' — vypnuta kategoria (D-92): naprava je „obnoviť"
+      #   'invalid'  — vlastnik je v ULOZENOM konflikte zasuvky, takze polozka
+      #                fail-closed NEVZNIKLA (rucny pocet != 1, vypnutie alebo
+      #                zamok NL mimo radu): naprava je ZRUSIT cely zaznam
+      #
+      # `items` = `config.hardware` (emitovane polozky), `conflict_owners` =
+      # `owner_part_key` ciel z `config.drawer_conflicts`.
+      def override_orphan_kind(ov, items, conflict_owners)
+        return nil unless ov.is_a?(Hash)
+
+        key = override_identity(ov)
+        return nil if Array(items).any? { |it| it.is_a?(Hash) && override_identity(it) == key }
+        return 'disabled' if ov['disabled'] == true || ov[:disabled] == true
+        return 'invalid' if Array(conflict_owners).map(&:to_s).include?(key[0])
+
+        nil
+      end
+
+      # Trojica (vlastnik, typ, pravidlo) — identita rucneho zasahu aj polozky.
+      def override_identity(rec)
+        [(rec['owner_part_key'] || rec[:owner_part_key]).to_s,
+         (rec['generic_type'] || rec[:generic_type]).to_s,
+         (rec['rule_id'] || rec[:rule_id]).to_s]
       end
 
       def override_match?(ov, item)

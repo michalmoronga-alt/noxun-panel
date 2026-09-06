@@ -160,9 +160,11 @@ NxTest.test('KOV-C2a (R1): `eff_drawer` = projektova predvolba, inak UNI 16') do
   NxTest.assert_equal('UNI_ZASUVKA_16', eff['drawer'],
                       'bez modelu aj bez predvolby padne kanal na UNI 16')
   # Uroven skrinky pre tento kanal v C2a NEEXISTUJE — config kluc pridava C2b.
+  # KOV-C2b: uroven SKRINKY uz EXISTUJE (config kluc `drawer_material_id`
+  # pribudol s `CONFIG_SCHEMA` 5) a ma prednost pred projektovou predvolbou.
   eff2 = c::CB.effective_materials(nil, 'drawer_material_id' => 'CUDZI')
-  NxTest.assert_equal('UNI_ZASUVKA_16', eff2['drawer'],
-                      'override na skrinke sa v C2a este NECITA (C2b + CONFIG_SCHEMA bump)')
+  NxTest.assert_equal('CUDZI', eff2['drawer'],
+                      'override na skrinke vyhrava (retaz dedenia ako telo/celo/chrbat)')
   m = NxTest::FakeEntity.new
   m.set_attribute(c::E::Store::DICT, 'default_drawer_material_id', 'REALNY_16')
   NxTest.assert_equal('REALNY_16', c::CB.effective_materials(m, {})['drawer'],
@@ -659,7 +661,10 @@ NxTest.test('KOV-C2a (R5): chybajuce triedne mapovanie = `class_unmapped`, NIKDY
   exp = c::HWS.expand([c.drawer_item], state)
   NxTest.assert_equal([], exp['rows'], 'ziadny riadok — H70 kit „len tak" sa neobjedna')
   u = exp['unmapped'].first
-  NxTest.assert_equal('class_unmapped', u['reason'])
+  # KOV-C2b: receptovej polozke sa dovod POVYSUJE na RED `drawer_kit_missing`
+  # (dielce uz stoja na konkretnej NL); povodny dovod cestuje v `base_reason`.
+  NxTest.assert_equal('drawer_kit_missing', u['reason'])
+  NxTest.assert_equal('class_unmapped', u['base_reason'])
   NxTest.assert_equal('class:slide|classic|metal', u['class_key'])
   NxTest.assert(c::HWS.unmapped_reason_sk(u).include?('Doplniť nové predvoľby'),
                 'hlaska navaguje na EXISTUJUCU akciu')
@@ -726,7 +731,8 @@ NxTest.test('KOV-C2a (R5): nesedici set = nemapovane s dovodom, NIKDY iny set') 
     exp = c::HWS.expand([item], state)
     NxTest.assert_equal([], exp['rows'], "#{detail}: ziadny riadok")
     u = exp['unmapped'].first
-    NxTest.assert_equal(['set_incompatible', detail], [u['reason'], u['detail']], u.inspect)
+    NxTest.assert_equal(['drawer_kit_missing', 'set_incompatible', detail],
+                        [u['reason'], u['base_reason'], u['detail']], u.inspect)
     # Panel (`explain`) hovori TO ISTE, co supis.
     ex = c::HWS.explain(item, state)
     NxTest.assert_equal([], ex['members'], "#{detail}: panel nesmie rozpisat kody")
@@ -740,7 +746,8 @@ NxTest.test('KOV-C2a (R5): triedny kluc si ziada KLASIFIKOVANY set (legacy set n
                      { 'class:slide|classic|metal' => 'vysuv-atira-biela-h70' })
   exp = c::HWS.expand([c.drawer_item], state)
   NxTest.assert_equal([], exp['rows'])
-  NxTest.assert_equal('set_incompatible', exp['unmapped'].first['reason'],
+  NxTest.assert_equal(['drawer_kit_missing', 'set_incompatible'],
+                      [exp['unmapped'].first['reason'], exp['unmapped'].first['base_reason']],
                       'nezaradeny set nedokaze, ze patri k tejto zasuvke')
 end
 

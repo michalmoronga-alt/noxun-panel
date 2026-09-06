@@ -123,6 +123,20 @@ module Noxun
             hardware_issues.concat(
               front_direction_issues(cid, inst.persistent_id, ccfg['front_items'])
             )
+            # KOV-C2b: fail-closed dovody zasuviek. Citaju sa z ULOZENEHO
+            # `drawer_conflicts` (nosic v configu) — po fail-closed stavbe
+            # neexistuje dielec ani polozka, z ktorej by sa dovod dal odvodit,
+            # takze bez neho by sa RED po znovuotvoreni .skp stratil.
+            hardware_issues.concat(
+              drawer_conflict_issues(cid, inst.persistent_id, ccfg['drawer_conflicts'],
+                                     ccfg['front_items'])
+            )
+            # KOV-C2b (Codex #304 kolo 1 P1): skrinka ULOZENA PRED aktivaciou
+            # receptov, ktora UZ MA klasifikovanu zasuvku. V .skp nie su
+            # receptove dielce (a vysuv je legacy), takze kusovnik, VEPO aj
+            # nakup by boli NEUPLNE — a ticho. Fail-closed RED + brana.
+            st = drawer_stale_issue(cid, inst.persistent_id, ccfg)
+            hardware_issues << st if st
             cs = ccfg['hardware_sets']
             note_cabinet_sets(cid, (cs.is_a?(Hash) && !cs.empty? ? cs : nil),
                               cabinet_sets, cabinet_sets_seen, cabinet_set_conflicts)
@@ -308,6 +322,64 @@ module Noxun
           end
         end
         out
+      end
+
+      # KOV-C2b: ulozene `drawer_conflicts` -> tvrde nalezy kovania. Tvar zaznamu
+      # je kontrakt `BuildPlan.validate_drawer_conflicts!` ({front_id, code,
+      # message, part_key}); tu sa k nemu doplni len ADRESA (vlastnik, instancia)
+      # a LUDSKY popis cela. Neznamy kod (config z novsej verzie) sa PRESKOCI —
+      # o taku zakazku sa stara vlastna brana `newer_configs`.
+      def drawer_conflict_issues(owner_id, owner_pid, conflicts, front_items)
+        items = front_items.is_a?(Array) ? front_items : []
+        Array(conflicts).filter_map do |c|
+          next nil unless c.is_a?(Hash)
+
+          code = c['code'].to_s
+          next nil unless defined?(Recipes) && Recipes::DRAWER_BLOCKERS.include?(code)
+
+          pkey = c['part_key'].to_s
+          { 'code' => code, 'severity' => 'red',
+            'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
+            'part_key' => pkey, 'front_id' => c['front_id'].to_s,
+            'message' => c['message'].to_s,
+            'label' => PartKeys.human_label(pkey, fronts: items).to_s }
+        end
+      end
+
+      # KOV-C2b: NEMIGROVANA zasuvka. Skrinka ma config z casov PRED aktivaciou
+      # receptov (`config_schema < CabinetBuilder::DRAWER_ACTIVATION_SCHEMA`),
+      # ale v `front_items` uz je celo klasifikovane ako zasuvka s konstrukciou
+      # kov/drevo (KOV-A klasifikacia existuje od schemy 2). Taka skrinka NEMA
+      # v modeli dielce zasuvky ani receptovy vysuv — a nikto by to nezbadal.
+      # Naprava je PRESTAVBA (vtedy sa zapise schema 5 a resolver dobehne).
+      # Konstrukcia `other` ani celo bez klasifikacie nalez NEROBIA (legacy cesta
+      # je CONTENT-identicka aj po aktivacii).
+      #
+      # Codex #304 kolo 3 P1: „klasifikovana" znamena PRESNE to, co `Recipes`
+      # (`classified?` = `recipe_key_for` nevratila `:legacy`) — teda AKEKOLVEK
+      # drawer pole, nie len `construction metal|wood`. Vlastny uzsi predikat by
+      # prepasoval celo s LEN `opening_mode` (po prestavbe `drawer_unclassified`)
+      # aj celo s LEN `variant internal` (po prestavbe `drawer_internal_
+      # unsupported`) — obe by po prestavbe boli RED, takze pred nou nesmu byt
+      # zelene. -> nalez | nil
+      def drawer_stale_issue(owner_id, owner_pid, ccfg)
+        return nil unless defined?(CabinetBuilder) && defined?(Recipes)
+
+        cfg = ccfg.is_a?(Hash) ? ccfg : {}
+        return nil if CabinetBuilder.config_schema_of(cfg) >= CabinetBuilder::DRAWER_ACTIVATION_SCHEMA
+
+        items = cfg['front_items'].is_a?(Array) ? cfg['front_items'] : []
+        hit = items.find { |it| it.is_a?(Hash) && Recipes.classified?(it) }
+        return nil if hit.nil?
+
+        pkey = PartKeys.front(hit['id'].to_s, 'panel')
+        { 'code' => Recipes::STALE, 'severity' => 'red',
+          'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
+          'part_key' => pkey, 'front_id' => hit['id'].to_s,
+          'message' => "Skrinka #{owner_id} má zásuvku klasifikovanú pred aktivovaním receptov — " \
+                       'prestav ju (zmeň a vráť rozmer alebo klikni Prestavať), inak jej v kusovníku ' \
+                       'chýbajú dielce zásuvky a v nákupe správny výsuv.',
+          'label' => PartKeys.human_label(pkey, fronts: items).to_s }
       end
 
       # R-34 (review #262 P1): `cabinet_sets` je mapa ID => override setov, teda

@@ -103,6 +103,14 @@ module Noxun
         if (m = k.match(%r{\Afront:([^/]+)/blind\z}))
           return "#{front_no(m[1], fronts)} · blenda"
         end
+        # KOV-C2b: vyrabane dielce zasuvky z receptu. `box_side` nesie stranu
+        # (left/right) — bez nej by dva boky Quadro boxu mali rovnaky popis.
+        if (m = k.match(%r{\Afront:([^/]+)/box_side:(left|right)\z}))
+          return "#{front_no(m[1], fronts)} · bok boxu #{m[2] == 'left' ? 'ľavý' : 'pravý'}"
+        end
+        if (m = k.match(%r{\Afront:([^/]+)/(drawer_bottom|drawer_back|drawer_inner_front)\z}))
+          return "#{front_no(m[1], fronts)} · #{DRAWER_PART_LABELS[m[2]]}"
+        end
         if (m = k.match(%r{\Azone:[^/]+/(shelf|divider_v|divider_h):(\d+)\z}))
           return "#{ZONE_PART_LABELS[m[1]]} #{m[2]}"
         end
@@ -112,6 +120,12 @@ module Noxun
 
       ZONE_PART_LABELS = { 'shelf' => 'Polica', 'divider_v' => 'Zvislá priečka',
                            'divider_h' => 'Vodorovná priečka' }.freeze
+
+      # KOV-C2b: ludske nazvy vyrabanych dielcov zasuvky (rovnake slova ako
+      # `Recipes.role_label`, len zo strany identity dielca).
+      DRAWER_PART_LABELS = { 'drawer_bottom' => 'dno zásuvky',
+                             'drawer_back' => 'chrbát zásuvky',
+                             'drawer_inner_front' => 'vnútorné čelo zásuvky' }.freeze
 
       # KOV-A2b: ID CELA z kluca dielca (`front:F2/wing:single` -> „F2"), inak
       # nil. Pouziva ju deep-link „klik na RED nález otvorí kartu čela" — kluc
