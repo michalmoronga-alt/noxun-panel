@@ -881,9 +881,13 @@ module Noxun
         # H1b (audit FIX 9 UI): dovod dostane SK text uz na SERVERI — tab
         # Kovanie aj CSV citaju to iste 'reason_sk' (JS ziadny vlastny preklad
         # enumu nema).
-        exp['unmapped'] = Array(exp['unmapped']).map do |u|
-          u.is_a?(Hash) ? u.merge('reason_sk' => HardwareSets.unmapped_reason_sk(u)) : u
-        end
+        # KOV-D4: k dovodu pribuda LUDSKY POPIS VLASTNIKA — sekcia „Bez kódov"
+        # ukazovala surovy `part_key` („front:Fmsi0wnix-1-3a3kxe/panel“), z ktoreho
+        # sa neda zistit, o ktore celo ide. Zdroj je TEN ISTY ako pri nakupnych
+        # riadkoch (KOV-H2 `decorate_source_owners`), takze sa oba zoznamy
+        # nemozu rozist. Aditivne pole: identita (`cabinet_id + owner_part_key`),
+        # dedup ani `blocks_export` sa nemenia a CSV/VEPO ho necitaju.
+        exp['unmapped'] = decorate_unmapped(exp['unmapped'], collected)
         # KOV-H2: kazdy ZDROJ nakupneho riadku dostane LUDSKY popis vlastnika,
         # aby sa dal v sekcii Nakup rozkliknut povod („CAB-2 · F1 · dvierka
         # ľavé · ručná ×2"). Je to ADITIVNE pole zdroja: nakupny CSV, rozpocet
@@ -903,20 +907,48 @@ module Noxun
       # CISTA funkcia nad uz nacitanymi datami (ziadny druhy sken modelu, ziadny
       # zapis). Starsi zber bez `cabinet_fronts` = popis sa neda zlozit a pole
       # ostane `nil` — nikdy sa NEHADA surovy kluc.
+      # KOV-D4: SK dovod + ludsky popis vlastnika k NEMAPOVANEJ polozke.
+      # Obe polia su ADITIVNE a CITACIE: identita zaznamu (`cabinet_id +
+      # owner_part_key`), `blocks_export` ani poradie sa nemenia, CSV ma pevne
+      # stlpce a popis do neho nepretecie. CISTA funkcia nad uz nacitanymi
+      # datami (ziadny druhy sken modelu) — headless testovatelna.
+      def decorate_unmapped(list, collected)
+        by_cab = front_index(collected)
+        Array(list).map do |u|
+          next u unless u.is_a?(Hash)
+
+          u.merge('reason_sk' => HardwareSets.unmapped_reason_sk(u),
+                  'owner_label' => owner_label_for(u['owner_part_key'], u['cabinet_id'], by_cab))
+        end
+      end
+
       def decorate_source_owners(rows, collected)
-        fronts = collected.is_a?(Hash) ? collected[:cabinet_fronts] : nil
-        by_cab = fronts.is_a?(Hash) ? fronts : {}
+        by_cab = front_index(collected)
         Array(rows).each do |row|
           next unless row.is_a?(Hash)
 
           Array(row['sources']).each do |src|
             next unless src.is_a?(Hash)
 
-            src['owner_label'] = PartKeys.human_label(src['owner_part_key'],
-                                                     fronts: Array(by_cab[src['cabinet_id'].to_s]))
+            src['owner_label'] = owner_label_for(src['owner_part_key'], src['cabinet_id'], by_cab)
           end
         end
         rows
+      end
+
+      # KOV-D4: JEDINY zdroj ludskeho popisu vlastnika pre nakupny zoznam —
+      # nakupne riadky (KOV-H2) aj „Bez kódov" ho beru odtialto, aby to iste
+      # celo nebolo v dvoch tabulkach jedneho okna pomenovane inak.
+      # `nil` = kovanie patri CELEJ skrinke, alebo zber `cabinet_fronts` nema
+      # (starsi payload) — surovy kluc sa NIKDY nehada.
+      # CISTE funkcie nad uz nacitanymi datami (ziadny druhy sken modelu).
+      def front_index(collected)
+        fronts = collected.is_a?(Hash) ? collected[:cabinet_fronts] : nil
+        fronts.is_a?(Hash) ? fronts : {}
+      end
+
+      def owner_label_for(part_key, cabinet_id, by_cab)
+        PartKeys.human_label(part_key, fronts: Array(by_cab[cabinet_id.to_s]))
       end
 
       # --- ŠT-1c (audit #3): generika kovania s POPISKAMI --------------------
@@ -1831,6 +1863,7 @@ module Noxun
         # rozhoduje aj o tom, CO sa v modeli oznaci (nizsie).
         focus = data['focus_inspector'] == true && Panel.dialog_alive?
         front_id = nil
+        hw_row = nil
         if data['problem_key']
           collected = fresh_collect(model)
           # GH #127 P2: klik-resolve MUSI ratat s rovnakym vstupom ako
@@ -1849,7 +1882,11 @@ module Noxun
           # — Inspector potom nemusi hladat riadok rucne. Parser kluca je
           # ZDIELANY (`PartKeys.front_id`); ine kluce vratia nil a neposiela sa nic.
           front_id = PartKeys.front_id(item['part_key'])
-          pids = pids_for_problem(model, select_target_item(item, front_id, focus))
+          # KOV-D4: ADRESA riadku v sekcii Kovanie. Sklada ju VALIDACIA
+          # (`item['data']` — owner_part_key + generic_type + rule_id + orphan);
+          # tu sa len prepise klientovi. Nalez bez nej sa sprava ako doteraz.
+          hw_row = hw_focus_target(item)
+          pids = pids_for_problem(model, select_target_item(item, front_id, focus, hw_row))
         elsif data['rule_ref']
           # ŠT-3b-2a: oko pri jantarovom riadku sekcie Pravidlá. Vlastna vetva
           # ZAMERNE: `refs_for` hlada v HOTOVOM bome podla klucov riadkov, kdezto
@@ -1877,6 +1914,14 @@ module Noxun
         end
         Panel.push_selected(model, dedup: false) # B2: ziadna mutacia pri selecte
         Panel.bring_to_front if focus
+        # KOV-D4 DEEP-LINK: nalez, ktory ma v Kovani KONKRETNY riadok (ziva
+        # polozka alebo osiroteny zasah), vedie ROVNO nan — kontext Kovanie,
+        # doscrollovanie a kratke prisvietenie robi klient. Ide PRED kartou
+        # cela: pri kovani je cielom riadok zasahu, nie karta.
+        if focus && hw_row
+          Panel.push_focus_hardware(hw_row)
+          return status.call(hw_focus_status(targets.length, hw_row))
+        end
         # KOV-A2b DEEP-LINK: pri náleze o čele sa v Inspectorovi rovno otvorí
         # KARTA toho čela (kontext Čelá + rozbalený riadok). Ziadny novy stav na
         # serveri — posiela sa jediny udaj a zvysok robi klient.
@@ -1904,8 +1949,13 @@ module Noxun
       # rozlisovania: `pids_for_problem` ostava jediny resolver.
       # Obycajny klik na riadok (bez ceruzky) sa NEMENI — oznaci dielec.
       # CISTA funkcia (ziadne IO) — headless testovatelna.
-      def select_target_item(item, front_id, focus)
-        return item unless focus && !front_id.to_s.empty? && item.is_a?(Hash)
+      #
+      # KOV-D4: to iste plati pre KOVANIE — sekcia Kovanie tiez zije len nad
+      # oznacenou SKRINKOU, takze nalez s adresou riadku (`hw_row`) vybera
+      # vlastnika presne tak ako nalez o cele. Ziadna nova cesta vyberu.
+      def select_target_item(item, front_id, focus, hw_row = nil)
+        return item unless focus && item.is_a?(Hash)
+        return item if front_id.to_s.empty? && hw_row.nil?
 
         item.merge('part_key' => nil)
       end
@@ -1916,6 +1966,32 @@ module Noxun
         n = count.to_i
         what = n == 1 ? 'Vybraná skrinka' : "Vybraných #{n} skriniek"
         "#{what} v modeli — Inspector je vpredu, karta čela #{front_id} je otvorená."
+      end
+
+      # KOV-D4: ADRESA riadku v sekcii Kovanie z nalezu. Sklada ju VALIDACIA
+      # (`item['data']`) — tu sa len OVERI tvar a prepise klientovi; nic sa
+      # neodvodzuje z `part_key` ani z kategorie nalezu (druha pravda o tom,
+      # kam nalez vedie, by sa casom rozisla).
+      # nil = nalez adresu riadku nema (sprava sa presne ako pred D4).
+      # CISTA funkcia (ziadne IO) — headless testovatelna.
+      def hw_focus_target(item)
+        d = item.is_a?(Hash) ? item['data'] : nil
+        return nil unless d.is_a?(Hash)
+        return nil if d['generic_type'].to_s.empty? || d['rule_id'].to_s.empty?
+
+        { 'owner_part_key' => d['owner_part_key'].to_s,
+          'generic_type' => d['generic_type'].to_s,
+          'rule_id' => d['rule_id'].to_s,
+          'orphan' => d['orphan'] == true }
+      end
+
+      # Veta po kliku s ceruzkou na nalez s riadkom v Kovani. Priznava, CI ide
+      # o osiroteny zasah — pouzivatel inak hlada zivy riadok, ktory neexistuje.
+      def hw_focus_status(count, hw_row)
+        n = count.to_i
+        what = n == 1 ? 'Vybraná skrinka' : "Vybraných #{n} skriniek"
+        kind = hw_row.is_a?(Hash) && hw_row['orphan'] ? 'riadok ručného zásahu' : 'riadok položky'
+        "#{what} v modeli — Inspector je vpredu, v sekcii Kovanie svieti #{kind}."
       end
 
       # --- ŠT-1b (audit #2): JEDNO CISLO KONTROLY PRE VSETKYCH ------------

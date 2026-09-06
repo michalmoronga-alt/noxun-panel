@@ -188,7 +188,11 @@ module Noxun
         end
         Array(collected[:records]).each { |r| check_record(r, smap, emap, items) }
         Array(collected[:hardware_overrides]).each { |ov| check_hardware(ov, items) }
-        check_hardware_issues(collected[:hardware_issues], items)
+        # KOV-D4: konflikt zasuvky posiela pouzivatela na RIADOK OSIROTENEHO
+        # ZASAHU v Kovani — identitu toho riadku pozna len server (raw zoznam
+        # zasahov), preto sa sem posiela.
+        check_hardware_issues(collected[:hardware_issues], items,
+                              collected[:hardware_overrides])
         check_newer_configs(collected[:newer_configs], items)
         check_hardware_manual(collected[:hardware_manual], items)
         check_hardware_expansion(hardware_expansion, items)
@@ -587,7 +591,7 @@ module Noxun
       # JEDINY kod — ostatne (KOV-C/D: drawer_no_fit, owner bez setu…) sa
       # ZAMERNE ignoruju, aby ich prve verzie neprepadli do Kontroly skor, nez
       # bude hotova ich brana.
-      def check_hardware_issues(issues, items)
+      def check_hardware_issues(issues, items, overrides = nil)
         Array(issues).each do |iss|
           next unless iss.is_a?(Hash)
 
@@ -596,7 +600,7 @@ module Noxun
             items << front_direction_item(iss)
           elsif defined?(Recipes) &&
                 (Recipes::BUILD_BLOCKERS.include?(code) || code == Recipes::STALE)
-            items << drawer_conflict_item(iss)
+            items << drawer_conflict_item(iss, overrides)
           end
         end
       end
@@ -605,22 +609,66 @@ module Noxun
       # presne — ktora hodnota kde nesedi), Kontrola k nej doplni len adresu.
       # Exportnu branu drzi `ProductionCore.export_blockers` nad TYM ISTYM
       # registrom kodov (`Recipes::DRAWER_BLOCKERS`).
-      def drawer_conflict_item(iss)
+      def drawer_conflict_item(iss, overrides = nil)
         oid = iss['owner_id'].to_s
         pkey = iss['part_key'].to_s
         label = iss['label'].to_s.strip
         label = pkey.empty? ? 'zásuvka' : pkey if label.empty?
         msg = iss['message'].to_s.strip
         msg = 'Zásuvka sa nedá vyriešiť.' if msg.empty?
+        data = drawer_conflict_target(oid, pkey, overrides)
         # Migracny kod ma vlastny koniec vety: dielce nechybaju preto, ze sa
         # nedali vyrobit, ale preto, ze skrinka este nepresla prestavbou.
         tail = iss['code'].to_s == Recipes::STALE ? 'Export je zastavený, kým ju neprestavíš.'
                                                   : 'Dielce ani výsuv sa nevyrobili — export je zastavený.'
-        { 'severity' => RED, 'category' => CAT_DRAWER,
-          'owner_id' => oid, 'part_key' => (pkey.empty? ? nil : pkey), 'hw_key' => nil,
-          'owner_pid' => iss['owner_pid'],
-          'message_sk' => "#{label} (#{oid.empty? ? '—' : oid}): #{msg} #{tail}",
-          'stable_key' => "#{CAT_DRAWER}|#{oid}|#{pkey}|#{iss['code']}" }
+        out = { 'severity' => RED, 'category' => CAT_DRAWER,
+                'owner_id' => oid, 'part_key' => (pkey.empty? ? nil : pkey), 'hw_key' => nil,
+                'owner_pid' => iss['owner_pid'],
+                'message_sk' => "#{label} (#{oid.empty? ? '—' : oid}): #{msg} #{tail}",
+                'stable_key' => "#{CAT_DRAWER}|#{oid}|#{pkey}|#{iss['code']}" }
+        data ? out.merge('data' => data) : out
+      end
+
+      # KOV-D4: KTORY riadok osiroteneho zasahu ma ceruzka Kontroly prisvietit.
+      #
+      # Veta konfliktu posiela pouzivatela do Kovania na riadok „neplatný ručný
+      # zásah" (`Construction::ORPHAN_HINT`) — adresu toho riadku ale pozna LEN
+      # server: identita zasahu je `owner_part_key + generic_type + rule_id`
+      # a `rule_id` (`recipe:<verzia>`) nie je v ulozenom `drawer_conflicts`.
+      # Cita sa preto z RAW zoznamu zasahov (ten isty zdroj, z ktoreho panel
+      # osirotene riadky stavia).
+      #
+      # FAIL-CLOSED: adresa sa vrati LEN pri JEDINOM zasahu vysuvu tohto
+      # vlastnika. Ked ich lezi viac (dormantny zamok stareho receptu vedla
+      # zamku aktualneho), server nevie povedat, ktory z nich pouzivatela pali —
+      # a prisvietit ten druhy je horsie nez neprisvietit nic (nalez vtedy
+      # ostava „bez identity zaznamu" a sprava sa ako dnes).
+      # CISTA funkcia (ziadne IO) — headless testovatelna.
+      def drawer_conflict_target(owner_id, part_key, overrides)
+        return nil if part_key.to_s.empty? || !defined?(Recipes)
+
+        gt = Recipes::LOCK_GENERIC_TYPE
+        hits = Array(overrides).select do |ov|
+          ov.is_a?(Hash) && ov['owner_id'].to_s == owner_id.to_s &&
+            ov['owner_part_key'].to_s == part_key.to_s && ov['generic_type'].to_s == gt
+        end
+        return nil unless hits.length == 1
+
+        hw_target(part_key, gt, hits.first['rule_id'], orphan: true)
+      end
+
+      # KOV-D4: ADRESA riadku v sekcii Kovanie — presne tie tri polia, ktorymi
+      # je zasah/polozka adresovana vsade inde (`HardwareRules.override_identity`).
+      # `orphan` hovori, ci je cielom OSIROTENY zaznam (riadok `hwoff`) alebo
+      # ziva polozka; klient si to NEODVODZUJE.
+      # nil = identita nie je uplna -> nalez sa sprava ako dnes.
+      def hw_target(owner_part_key, generic_type, rule_id, orphan:)
+        gt = generic_type.to_s
+        rid = rule_id.to_s
+        return nil if gt.empty? || rid.empty?
+
+        { 'owner_part_key' => owner_part_key.to_s, 'generic_type' => gt,
+          'rule_id' => rid, 'orphan' => orphan }
       end
 
       # RED riadok „dvierka bez urceneho smeru". Znenie podla mockupu (scena 4):
@@ -733,12 +781,16 @@ module Noxun
         label = HW_LABELS[gt] || (gt.empty? ? 'kovanie' : gt)
         where = oid.empty? ? '—' : oid
         where += " · #{opk}" unless opk.empty?
-        items << {
+        item = {
           'severity' => ORANGE, 'category' => CAT_HARDWARE,
           'owner_id' => oid, 'part_key' => (opk.empty? ? nil : opk), 'hw_key' => nil,
           'message_sk' => "Kovanie „#{label}“ (#{where}) je vypnuté — skontroluj, či zámerne.",
           'stable_key' => "#{CAT_HARDWARE}|#{oid}|#{opk}|#{gt}|#{rid}"
         }
+        # KOV-D4: vypnuty zasah NEMA zivu polozku (evaluate ju vyradil), takze
+        # v Kovani zije ako OSIROTENY riadok („vypnuté" + Obnoviť).
+        target = hw_target(opk, gt, rid, orphan: true)
+        items << (target ? item.merge('data' => target) : item)
       end
 
       # RED (KOV-C2b): zasuvka MA dielce, ale nakup k nej nenasiel kit. Veta
@@ -773,13 +825,17 @@ module Noxun
           else
             "nákup nenašiel kit (#{u['base_reason']})"
           end
-        { 'severity' => RED, 'category' => CAT_DRAWER_KIT,
-          'owner_id' => oid, 'part_key' => (opk.empty? ? nil : opk), 'hw_key' => nil,
-          'message_sk' => "Zásuvka (#{where})#{what}: #{reason}. " \
-                          'Dielce sú postavené na túto dĺžku — bez kitu sa nedajú vyrobiť, ' \
-                          'preto sú zastavené všetky exporty vrátane VEPO.',
-          'stable_key' => [CAT_DRAWER_KIT, oid, opk, gt, u['rule_id'].to_s, sid,
-                           u['base_reason'].to_s].join('|') }
+        item = { 'severity' => RED, 'category' => CAT_DRAWER_KIT,
+                 'owner_id' => oid, 'part_key' => (opk.empty? ? nil : opk), 'hw_key' => nil,
+                 'message_sk' => "Zásuvka (#{where})#{what}: #{reason}. " \
+                                 'Dielce sú postavené na túto dĺžku — bez kitu sa nedajú vyrobiť, ' \
+                                 'preto sú zastavené všetky exporty vrátane VEPO.',
+                 'stable_key' => [CAT_DRAWER_KIT, oid, opk, gt, u['rule_id'].to_s, sid,
+                                  u['base_reason'].to_s].join('|') }
+        # KOV-D4: polozka vysuvu v Kovani ZIJE (dielce su postavene) — ceruzka
+        # mieri na jej ZIVY riadok, nie na osiroteny zaznam.
+        target = hw_target(opk, gt, u['rule_id'], orphan: false)
+        target ? item.merge('data' => target) : item
       end
 
       # ORANGE (D1): sety kovania. Stable key nesie plnu identitu zdroja
@@ -864,13 +920,16 @@ module Noxun
             else
               "#{label} (#{where}) nemá priradený set — kovanie je bez kódov (nenacenené)."
             end
-          items << {
+          hw_item = {
             'severity' => ORANGE, 'category' => CAT_HW_UNMAPPED,
             'owner_id' => oid, 'part_key' => (opk.empty? ? nil : opk), 'hw_key' => nil,
             'message_sk' => msg,
             'stable_key' => [CAT_HW_UNMAPPED, oid, opk, gt, u['rule_id'].to_s, sid,
                              u['reason'].to_s, u['member_index'].to_s].join('|')
           }
+          # KOV-D4: nenacenena polozka je v Kovani ZIVY riadok (chyba jej len kod).
+          hw_target_data = hw_target(opk, gt, u['rule_id'], orphan: false)
+          items << (hw_target_data ? hw_item.merge('data' => hw_target_data) : hw_item)
         end
         Array(exp['rows']).each do |row|
           next unless row.is_a?(Hash)

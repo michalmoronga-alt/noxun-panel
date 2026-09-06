@@ -220,6 +220,23 @@ module Noxun
           Engine.log_error(e, 'Panel.push_focus_front')
         end
 
+        # KOV-D4 DEEP-LINK: klik s ceruzkou na nalez, ktory ma v sekcii Kovanie
+        # KONKRETNY riadok (ziva polozka alebo osiroteny rucny zasah). Posiela
+        # sa LEN ADRESA riadku — `owner_part_key` + `generic_type` + `rule_id`
+        # + `orphan`, teda tie iste tri polia, ktorymi je zasah adresovany
+        # vsade inde. Prepnutie kontextu, doscrollovanie aj kratke prisvietenie
+        # robi KLIENT (hardware.js); server si o tom nic nepamata a nic
+        # nezapisuje. Zavrety Inspector = neposiela sa nic.
+        def push_focus_hardware(target)
+          return unless target.is_a?(Hash)
+          return if target['generic_type'].to_s.empty? || target['rule_id'].to_s.empty?
+          return unless dialog_alive?
+
+          js("if (window.NX && NX.focusHardware) NX.focusHardware(#{target.to_json});")
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.push_focus_hardware')
+        end
+
         # dedup: false = refresh po programovom selecte zo Studia (V0.5 B,
         # Codex B2) — vyber NESMIE mutovat model (dedup meni ID a stavia).
         #

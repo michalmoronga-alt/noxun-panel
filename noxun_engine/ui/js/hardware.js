@@ -840,10 +840,68 @@
   }
   // Kratke prisvietenie ciela skoku — bez neho pouzivatel po skoku hlada, KTORY
   // box je ten jeho (poloziek kovania byva viac, nez sa zmesti na obraz).
+  //
+  // KOV-D4: prisvieteny je VZDY NAJVIAC JEDEN uzol. Dalsi skok stary highlight
+  // SNIME HNED (nie az po jeho vlastnom casovaci) — inak by po dvoch skokoch
+  // za sebou svietili dva riadky a pouzivatel by nevedel, ktory je „jeho".
+  // Trvanie ostava rovnake ako doteraz (1600 ms).
+  var HW_FLASH_MS = 1600;
+  var hwFlashNode = null;
+  var hwFlashTimer = null;
+  function hwFlashClear(){
+    if (hwFlashTimer){ clearTimeout(hwFlashTimer); hwFlashTimer = null; }
+    if (hwFlashNode && hwFlashNode.classList) hwFlashNode.classList.remove('hwfocus');
+    hwFlashNode = null;
+  }
   function hwFlash(target){
     if (!target || !target.classList) return;
+    hwFlashClear();
+    hwFlashNode = target;
     target.classList.add('hwfocus');
-    setTimeout(function(){ target.classList.remove('hwfocus'); }, 1600);
+    hwFlashTimer = setTimeout(function(){ hwFlashClear(); }, HW_FLASH_MS);
+  }
+
+  // ---- KOV-D4: DEEP-LINK Z KONTROLY NA KONKRETNY RIADOK KOVANIA -----------
+  // Server posiela LEN ADRESU riadku (`NX.focusHardware`): `owner_part_key`
+  // + `generic_type` + `rule_id` + `orphan`. Klient si NIC neodvodzuje —
+  // ani to, ci je cielom osiroteny zaznam, ani z ktoreho `part_key` by sa dal
+  // poskladat. Ked riadok neexistuje (medzitym prestavana skrinka, iny vyber),
+  // NEROBI SA NIC: prisvietit cudzi riadok by klamalo.
+  // Vracia true/false, aby sa cesta dala overit v Node testoch.
+  function hwRowSelector(t){
+    if (!t || !t.generic_type || !t.rule_id) return '';
+    return '.hwrow' + (t.orphan === true ? '.hwoff' : '')
+         + '[data-owner="' + cssEsc(t.owner_part_key == null ? '' : t.owner_part_key) + '"]'
+         + '[data-type="' + cssEsc(t.generic_type) + '"]'
+         + '[data-rule="' + cssEsc(t.rule_id) + '"]';
+  }
+  // Riadok naozaj TOHO druhu, aky server pomenoval. Identita (vlastnik + typ +
+  // pravidlo) je v paneli jedinecna — osiroteny zaznam a ziva polozka nikdy
+  // neziju sucasne — takze rozdiel triedy je KONTROLA, nie hladanie: ked sa
+  // nezhoduje, payload je zastarany a prisvieti sa RADSEJ NIC.
+  function hwRowKindOk(row, t){
+    if (!row || !row.classList) return false;
+    return row.classList.contains('hwoff') === (t.orphan === true);
+  }
+  // Prisvieti sa CELA polozka (`.hwitem`), ked existuje: nesie aj chipy osi
+  // a nakupny riadok, takze samotny `.hwrow` by zvyraznil len jej vrsok.
+  function hwFlashTargetOf(row){
+    if (!row) return null;
+    var item = row.closest ? row.closest('.hwitem') : null;
+    return item || row;
+  }
+  function nxFocusHardware(target){
+    var sel = hwRowSelector(target);
+    if (!sel) return false;
+    var box = el('hwRows');
+    var row = box ? box.querySelector(sel) : null;
+    if (!row || !hwRowKindOk(row, target)) return false;
+    if (typeof setViewContext === 'function') setViewContext('kovanie');
+    var node = hwFlashTargetOf(row);
+    if (typeof nxRevealTarget === 'function') nxRevealTarget(node);
+    if (node.scrollIntoView) node.scrollIntoView({ block: 'nearest' });
+    hwFlash(node);
+    return true;
   }
   // Box vlastnika podla owner_part_key (klik na znacku v nahlade). Vracia uzol
   // alebo null.
@@ -2050,6 +2108,11 @@
       hwGroupCountText: hwGroupCountText, hwGroupOrder: hwGroupOrder,
       hwGroups: hwGroups, hwDisabledOffs: hwDisabledOffs, hwOffLabel: hwOffLabel,
       hwOffName: hwOffName,
+      // KOV-D4 deep-link z Kontroly (tests/js/test_kovd4_ui.js) — selektor
+      // riadku je cisty, `nxFocusHardware` a `hwFlash` sa testuju cez mini-DOM.
+      HW_FLASH_MS: HW_FLASH_MS, hwRowSelector: hwRowSelector, hwRowKindOk: hwRowKindOk,
+      hwFlashTargetOf: hwFlashTargetOf, hwFlash: hwFlash, hwFlashClear: hwFlashClear,
+      nxFocusHardware: nxFocusHardware,
       HW_GROUP_CAB: HW_GROUP_CAB, HW_GROUP_INSIDE: HW_GROUP_INSIDE,
       // SMOKE PACK 1: suhrnne podperky polic (tests/js/test_smoke1_ui.js) —
       // ciste zoskupenie a texty, ziadny DOM.
