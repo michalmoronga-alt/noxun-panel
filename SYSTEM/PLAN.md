@@ -643,6 +643,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
 **Cieľ:** synchronizácia panela s modelom a okrajové situácie observerov. *(D-101 — panel po Späť/Znova — je vyriešená, PR #162.)*
 
 - **D-99 · Glitch názvov kópií pri premenovaní dielca** — nereprodukované pozorovanie, dáta boli správne; sleduje sa.
+- **D-117 · Nestabilný in-SU test „GHOST suspend: aktívny nástroj po upratovaní"** — raz zlyhal (MeasureTool namiesto SelectionTool), opakovaný beh prešiel; asercia má overovať návrat PÔVODNÉHO nástroja (ghost používa `push_tool`), nie SelectionTool.
 - **Redo po zlúčených transparentných operáciách** — manuálne overiť Ctrl+Y (Ruby API nemá na Windows spoľahlivú redo akciu); otvorené od 17.7.
 - **Prepínanie typu HORNÁ/DOLNÁ na označenom korpuse občas zlyhá** — odložené, rieši sa s knižnicou/editorom typov.
 
