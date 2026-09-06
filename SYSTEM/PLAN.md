@@ -505,7 +505,17 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   os v `conflict` už **nemá ponuku** (jediná cesta = náhrada s potvrdením) · chipy dostali **`data-axc`**, takže fokus prežije prekreslenie karty.
   Testy: `tests/pure/test_kovd2b_payload.rb`, `tests/js/test_kovd2b_ui.js` (mini-DOM) + `test_kova2a_karta.js` (fokus nad celou kartou) + in-SU sekcia **`run_kovd2b`**;
   8 overených mutácií.
-  **D3a · UPGRADE RECEPTU — jedno čelo, jadro (audit-povinné):** akcia mení **jeden záznam mapy `system|opening` jedného čela** (Astra #20 F12/F13; ostatné refs a dormant zámky
+  **D3a · UPGRADE RECEPTU — jedno čelo, jadro — ✅ HOTOVÉ (v0.9.39, 6.9.2026):** akcia `handle_upgrade_drawer_recipe` (payload `{cabinet_id, front_id, from, to}`, mapu klient
+  neposiela) mení **jeden záznam** mapy jedného čela cez jediný prepisovací kanál `Fronts.set_recipe_ref!` (stavbová `write_drawer_fields!` naďalej len **dopĺňa chýbajúce**);
+  overuje `:known` záznam == `from`, vydaný cieľ a `Recipes.upgrade?` (rovnaký systém aj otváranie + **vyššia** verzia). **Preflight PRED zápisom** (Astra #20 B3 — konflikt je
+  DÁTA, `rebuild` ho commitne) beží tými istými funkciami ako stavba (`normalize` → `drawer_thicknesses` → `build_plan` → `resolve`) a **tou istou expanziou ako nákup**
+  (`HardwareSets.expand`): hrúbka · preadresované zámky `recipe:<v1>` → `recipe:<v2>` s **kolíznou bránou** (iný alebo dormantný záznam na cieľovom `rule_id` = odmietnutie,
+  nikdy tiché zlúčenie) · konflikt výšky/NL · chýbajúci kit ⇒ **neuloží sa NIČ a nevznikne krok Späť**. Úspech = jedna operácia (ref + zámky + prestavba), 1 Späť, Redo
+  obnoví všetko súčasne. `pick_ref` má stabilné pravidlo (**najnižšia** dostupná súrodenecká verzia LEN z validovaných záznamov) a `release_note` je voliteľné pole schémy
+  (≤ 400 znakov, prítomné sa validuje prísne). **Latentný rámec:** UI ani registrácia callbacku **nie sú** (D3b), produkčný register **žiadnu v2 nemá** (guard test) — všetko
+  sa overuje nad fixtúrnym registrom `tests/fixtures/recipes_d3a` cez jediný len-testovací seam `Recipes.with_test_dir`. Testy: `tests/pure/test_kovd3a_upgrade.rb`
+  (25 testov, 4 overené mutácie) + in-SU sekcia **`run_kovd3a`** (odmietnutie bez kroku Späť · upgrade s preadresovaným zámkom a geometriou v2 · Späť = 1 krok · Redo · kópia).
+  **Pôvodné zadanie:** akcia mení **jeden záznam mapy `system|opening` jedného čela** (Astra #20 F12/F13; ostatné refs a dormant zámky
   nedotknuté); server overí očakávaný starý ref + cieľ rovnakého systému/otvárania; **preflight cieľa PRED zápisom**: hrúbky, oba zámky (preadresovanie `rule_id recipe:<v1> →
   recipe:<v2>`; kolidujúci override na cieľovom rule_id s inou hodnotou = odmietnutie), expanzia setu — **konflikt cieľového receptu alebo chýbajúci kit = upgrade sa NEULOŽÍ, ostáva
   v1 aj pôvodné zámky** (Astra #20 B3: `rebuild_many` konflikt receptu ako dáta commitne — preto preflight, nie rollback); úspešný výsledok = jedna operácia (ref + zámky + prestavba),

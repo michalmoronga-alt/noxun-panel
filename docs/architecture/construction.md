@@ -39,6 +39,13 @@ prázdna, číselná, objektová aj `null` hodnota je **poškodený pin**, nie c
 **zachová**. Prázdny reťazec je platný uložený stav „pin tu je, ale je poškodený" a veta konfliktu ho pomenuje ako „bez čitateľnej hodnoty", nie prázdnymi úvodzovkami.
 Výstup je **atomický**: buď všetky dielce + jedna položka výsuvu, alebo nič a záznam v `plan[:drawer_conflicts]`. Dielce sa pripájajú **za** partition degenerovaných —
 ich minimá stráži recept sám (jediný neplatný rozmer = `drawer_no_fit` pre celú zásuvku, nikdy per-dielec `part_skipped_degenerate`).
+**KOV-D3a (v0.9.39): konflikt receptu je DÁTA, nie výnimka** — `merge_final` ho uloží do configu a `rebuild` operáciu **commitne**. Preto sa zmena pripnutej verzie nikdy
+nerobí „skús a vráť späť", ale **preflightom pred zápisom** (viď `handle_upgrade_drawer_recipe` v [ui-lifecycle.md](ui-lifecycle.md)).
+
+**DVA zapisovacie kanály `recipe_refs` — a každý smie niečo iné.** `Fronts.write_drawer_fields!` (migračná cesta stavby, volá ju `CabinetBuilder.apply_drawer_writes`
+v tej istej operácii ako geometriu) **výhradne DOPĹŇA chýbajúce**: už uložený `system` ani už pripnutý recept neprepíše nikdy — tichý prepis by zmenil fyziku hotovej
+zákazky. `Fronts.set_recipe_ref!(fronts_cfg, front_id, ref_key, recipe_id, expect:)` (KOV-D3a) je jediná cesta, ktorá záznam **prepíše** — a robí to len na **explicitnú
+akciu používateľa**, pre **jeden** kľúč **jedného** čela a len keď stará hodnota sedí s `expect` (inak sa stav medzitým zmenil a nezapíše sa nič).
 
 **Hrúbka je VSTUP, nie odvodenina.** `build_plan(cfg, cid, hardware_rules:, part_thicknesses:)` — `part_thicknesses` je `{ part_key => mm }` a posiela ho **builder**,
 vyriešené z materiálového kanála `:drawer` + `part_overrides` **PRED** plánom (Codex #301 kolo 3 P1). Bez kľúča platí `DRAWER_DEFAULT_THICKNESS = 16.0` (UNI 16 fallback

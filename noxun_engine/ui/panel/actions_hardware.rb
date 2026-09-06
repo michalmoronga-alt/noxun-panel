@@ -422,6 +422,218 @@ module Noxun
           ov_owner == owner && ov['generic_type'].to_s == gt && ov['rule_id'].to_s == rid
         end
 
+        # === KOV-D3a: UPGRADE RECEPTU — JEDNO CELO, JEDNA OPERACIA ===========
+        #
+        # Meni PRESNE JEDEN zaznam mapy `recipe_refs` PRESNE JEDNEHO cela
+        # (Astra #20 F12/F13). Ostatne zaznamy mapy (druhy system, druhe
+        # otvaranie) aj dormantne zamky INYCH receptov ostavaju nedotknute.
+        #
+        # PRECO PREFLIGHT, A NIE ROLLBACK (Astra #20 B3): konflikt receptu NIE
+        # JE vynimka — `Construction.build_plan` ho vrati ako DATA
+        # (`plan[:drawer_conflicts]`), `merge_final` ho ulozi do configu
+        # a `rebuild` operaciu normalne COMMITNE. Zapis by teda „uspel"
+        # a zasuvka by ostala bez dielcov na novej verzii. Preto sa cielovy
+        # stav najprv postavi NASUCHO (bez zapisu do modelu) TYMI ISTYMI
+        # funkciami ako stavba — a ked nesedi, NEZAPISE SA NIC: v modeli
+        # ostava v1 aj povodne zamky.
+        #
+        # Payload: { cabinet_id, front_id, from: <stary ref>, to: <cielovy id> }.
+        # Mapu `recipe_refs` klient NIKDY neposiela (`SERVER_DRAWER_KEYS`) —
+        # posiela len OCAKAVANY stary ref, aby sa dala odhalit medzicasna zmena.
+        UPGRADE_OP_NAME = 'NOXUN: nová verzia receptu zásuvky'
+        UPGRADE_STALE = 'Stav zásuvky sa medzitým zmenil — panel sa obnoví, skús znova.'
+
+        def handle_upgrade_drawer_recipe(payload)
+          model = Sketchup.active_model
+          data = parse(payload)
+          return if foreign_document?(data, model, 'Verzia receptu sa nezmenila') # R-02
+
+          cab = find_cabinet(model)
+          return set_status('Najprv označ NOXUN korpus.', true) if cab.nil?
+
+          rendered = data['cabinet_id'].to_s
+          if !rendered.empty? && rendered != Store.get(cab, 'cabinet_id').to_s
+            push_selected(model)
+            return set_status('Výber sa medzitým zmenil — panel sa obnovil, skús znova.', true)
+          end
+
+          prep, err = drawer_upgrade_prepare(model, cab, data)
+          return set_status(err, true) if err
+
+          # JEDNA operacia: novy ref v mape + preadresovane zamky + prestavba.
+          # Spat vrati vsetko naraz, Redo to isto obnovi (vzor D2a).
+          suspend_selection_sync do
+            CabinetBuilder.rebuild(model, cab, prep[:params], op_name: UPGRADE_OP_NAME)
+            reselect(model, cab)
+          end
+          status_with_warnings(cab, "Zásuvka prešla na #{Recipes.label(prep[:recipe])} — " \
+                                    "#{Store.get(cab, 'cabinet_id')}.")
+          push_selected(model)
+        end
+
+        # Overenie + cielovy config BEZ zapisu do modelu.
+        # -> [{ params:, recipe: }, nil] | [nil, hlaska]
+        def drawer_upgrade_prepare(model, cab, data)
+          cfg = Store.config(cab) || {}
+          fid = present_str(data['front_id'])
+          return [nil, 'Chýba čelo, ktorého recept sa má zmeniť.'] if fid.nil?
+
+          item = Array(cfg['front_items']).find { |f| f.is_a?(Hash) && f['id'].to_s == fid }
+          kind, key = Recipes.recipe_key_for(item)
+          return [nil, 'Toto čelo nie je klasifikovaná zásuvka — verzia receptu sa naň nevzťahuje.'] unless kind == :ok
+
+          from = data['from'].to_s
+          to = data['to'].to_s
+          err = drawer_upgrade_target_problem(item, key, from, to)
+          return [nil, err] if err
+
+          owner = PartKeys.front(fid, 'panel')
+          params = existing_params(cab)
+          overrides, err = readdress_recipe_locks(Array(params['hardware_overrides']), owner, from, to)
+          return [nil, err] if err
+
+          fronts = Fronts.normalize_config(params['fronts'])
+          unless Fronts.set_recipe_ref!(fronts, fid, "#{key[:system]}|#{key[:opening]}", to, expect: from)
+            return [nil, UPGRADE_STALE]
+          end
+
+          next_params = params.merge('fronts' => fronts, 'hardware_overrides' => overrides)
+          err = drawer_upgrade_preflight(model, cab, next_params, fid, owner)
+          return [nil, err] if err
+
+          [{ params: next_params, recipe: Recipes.load(to) }, nil]
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.drawer_upgrade_prepare')
+          [nil, 'Novú verziu receptu sa nepodarilo overiť — nezmenilo sa nič.']
+        end
+
+        # Smie sa TENTO zaznam mapy prepnut z `from` na `to`? (hlaska | nil)
+        def drawer_upgrade_target_problem(item, key, from, to)
+          drawer = item['drawer'].is_a?(Hash) ? item['drawer'] : {}
+          state, ref = Recipes.active_ref(drawer['recipe_refs'], key[:system], key[:opening])
+          # FAIL-CLOSED: upgrade ma zmysel LEN nad PLATNYM pripnutym receptom.
+          # `:missing` (zaznam este nie je) ani `:unknown` (pin je poskodeny)
+          # sa neopravuju upgradom — chybajuci doplni stavba, poskodeny je RED
+          # `drawer_recipe_unknown` s vlastnou cestou napravy.
+          return UPGRADE_STALE unless state == :known && !from.empty? && ref.to_s == from
+          return 'Cieľová verzia receptu nie je vydaná — aktualizuj plugin.' unless released_recipe?(to)
+
+          # `upgrade?` drzi OBE pravidla naraz: rovnaky system aj otvaranie
+          # a VYSSIA verzia (rovnaka alebo nizsia = ziadny downgrade).
+          return nil if Recipes.upgrade?(from, to)
+
+          'Prejsť sa dá len na novšiu verziu toho istého systému a spôsobu otvárania.'
+        end
+
+        def released_recipe?(id)
+          !id.to_s.empty? && Recipes.released.key?(id.to_s)
+        rescue Recipes::RecipeError
+          false
+        end
+
+        # PREADRESOVANIE ZAMKOV `recipe:<v1>` -> `recipe:<v2>` (hodnoty sa
+        # zachovavaju, meni sa LEN to, ku ktorej polozke patria — vzor
+        # `drawer_override_migration`).
+        #
+        # KOLIZNA BRANA: ked na CIELOVOM `rule_id` uz zaznam TOHO ISTEHO
+        # vlastnika lezi (dormantny zamok z davnejsieho upgradu) a jeho obsah
+        # NIE JE totozny s preadresovanym, upgrade sa ODMIETNE. Zlucenie by
+        # ticho aktivovalo cudziu hodnotu (napr. davno zamknutu vysku), a to je
+        # presne ta tichá zmena, ktorej cely package brani.
+        # -> [nove pole overridov, nil] | [nil, hlaska]
+        def readdress_recipe_locks(all, owner, from, to)
+          gt = Recipes::LOCK_GENERIC_TYPE
+          from_rid = "#{RECIPE_RULE_PREFIX}#{from}"
+          to_rid = "#{RECIPE_RULE_PREFIX}#{to}"
+          # `.last` = ta ista volba ako `norm_hardware_overrides` (z duplicitnej
+          # identity plati POSLEDNY zaznam) — brana nesmie merat iny zaznam,
+          # nez ktory nakoniec plati.
+          src = Array(all).select { |ov| ov_match?(ov, owner, gt, from_rid) }.last
+          dst = Array(all).select { |ov| ov_match?(ov, owner, gt, to_rid) }.last
+          if dst && lock_content(dst) != lock_content(src)
+            return [nil, 'Na novej verzii receptu už leží iný ručný zásah do výsuvu — ' \
+                         'najprv ho zruš v Kovaní, potom prejdi na novú verziu.']
+          end
+
+          rest = Array(all).reject do |ov|
+            ov_match?(ov, owner, gt, from_rid) || ov_match?(ov, owner, gt, to_rid)
+          end
+          [src ? rest + [src.merge('rule_id' => to_rid)] : rest, nil]
+        end
+
+        # Obsah zamku BEZ identity — porovnava sa nim kolizia na cielovom
+        # `rule_id`. Chybajuce aj `nil` pole = pole nie je (rovnaky kontrakt
+        # ako `merge_override`).
+        def lock_content(rec)
+          return {} unless rec.is_a?(Hash)
+
+          OVERRIDE_FIELDS.each_with_object({}) do |k, out|
+            out[k] = rec[k] if rec.key?(k) && !rec[k].nil?
+          end
+        end
+
+        # CIELOVY STAV NASUCHO: tie iste funkcie ako stavba (`build_plan`
+        # s hrubkami dielcov -> `Recipes.resolve`) a ten isty nakup
+        # (`HardwareSets.expand`). Ziadny druhy vypocet, ziadny zapis do
+        # modelu, ziadna operacia. -> hlaska | nil
+        def drawer_upgrade_preflight(model, cab, params, fid, owner)
+          cid = Store.get(cab, 'cabinet_id').to_s
+          norm = CabinetBuilder.normalize(params)
+          eff = CabinetBuilder.effective_materials(model, norm)
+          # Pravidla kovania sa citaju LEN NA CITANIE (`panel_hardware_rules`):
+          # stavba pouziva `ensure_project_rules!`, ktory pri prvom builde
+          # snapshot ZAPISE — preflight nesmie do modelu zapisat nic.
+          plan = Construction.build_plan(norm, cid,
+                                         hardware_rules: panel_hardware_rules(model),
+                                         part_thicknesses: CabinetBuilder.drawer_thicknesses(norm, eff))
+          bad = Array(plan[:drawer_conflicts]).find do |c|
+            c.is_a?(Hash) && c['front_id'].to_s == fid.to_s
+          end
+          return "Nová verzia receptu na túto zásuvku nesadne: #{bad['message']}" if bad
+
+          item = Array(plan[:hardware]).find do |h|
+            h.is_a?(Hash) && h['source'].to_s == BuildPlan::HW_SOURCE_RECIPE &&
+              h['owner_part_key'].to_s == owner.to_s
+          end
+          return 'Nová verzia receptu nevydala výsuv zásuvky — nezmenilo sa nič.' if item.nil?
+
+          drawer_upgrade_kit_problem(model, cid, norm, item)
+        end
+
+        # Najde NAKUP kit vysuvu pre vyslednu vysku a NL? Ide TOU ISTOU cestou
+        # ako nakupny zoznam (`ProductionCore.hardware_expansion`), takze sa
+        # nemozu rozist. -> hlaska | nil
+        def drawer_upgrade_kit_problem(model, cid, norm, item)
+          state, err = drawer_upgrade_sets_state(model)
+          return err if err
+
+          sets = norm[:hardware_sets].is_a?(Hash) ? norm[:hardware_sets] : {}
+          exp = HardwareSets.expand([item.merge('owner_id' => cid)], state,
+                                    cabinet_overrides: (sets.empty? ? {} : { cid => sets }),
+                                    catalog: HardwareCatalog.items)
+          u = Array(exp['unmapped']).first
+          return nil if u.nil?
+
+          "Na novú verziu receptu nákup nenašiel kit výsuvu: #{HardwareSets.unmapped_reason_sk(u)}."
+        end
+
+        # Snapshot setov projektu, inak globalna kniznica LEN NA CITANIE
+        # (vzor `ProductionCore.hardware_expansion`). -> [state, nil] | [nil, hlaska]
+        def drawer_upgrade_sets_state(model)
+          status, state = HardwareSets.project_state_status(model)
+          return [nil, 'Sety projektu sú poškodené — obnov ich v Katalógu kovania (Predvoľby projektu).'] \
+            if status == :invalid
+          return [state, nil] unless status == :missing
+
+          lib = HardwareSets.load
+          return [nil, "#{HardwareSets.library_state_reason} — kit výsuvu sa overiť nedá."] \
+            if HardwareSets.library_read_only?
+
+          by_id = {}
+          Array(lib['sets']).each { |s| by_id[s['set_id']] = s if s.is_a?(Hash) }
+          [{ 'mapping' => lib['mapping'], 'sets' => by_id }, nil]
+        end
+
         # V0.6 D1b: vyber setu kovania NA SKRINKE (override projektovej
         # predvolby). set_id prazdne = spat na predvolbu projektu. Zapis
         # overridu + definicia setu do snapshotu (audit B2) + rebuild =
