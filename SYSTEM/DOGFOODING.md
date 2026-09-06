@@ -34,6 +34,11 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   Michal zároveň: „celkovo UI čiel bude treba po tomto zásahu upratať — necháme na koniec, opäť spravíme UI/UX balík". *Stav: ZAPÍSANÉ — UI/UX balík kontextu Čelá **na koniec
   bloku KOVANIE** (po KOV-D/E/F, keď bude známy celý obsah karty: zámky osí, závesy, resolved systém); dovtedy sa nerobí.*
 
+- **D-118 · Kódy setov bez väzby na katalóg — plošný seed katalógu z Démosu** (Michal 7.9., smoke KOV-D krok 2) — receptové sety (biela aj antracit Atira, Quadro) nesú
+  objednávacie kódy, ale katalóg kovania ich nepozná (položka „bez ceny", názov len z kódu) — Michal ich dnes dopĺňa ručne po jednom. Želanie: **jedna dátová dávka**, ktorá pre
+  KAŽDÝ kód zo seed setov doplní do katalógu názov, cenu a URL Démosu (kód → URL/názov/cenu môže vyhľadať Antigravity, výsledok = seed riadky s odkazom na zdroj a dátumom),
+  s pravidlom „existujúcu používateľskú položku neprepisovať". *Stav: OTVORENÉ — kandidát na dátovú dávku po smoke KOV-D (pred KOV-E/F); rozhodne Michal v novom okne.*
+
 ## KONTROLA + VÝROBA
 
 - **D-94 · Traceability v celkovom súpise kovania — rozklik položky na miesta použitia** (Michal 9.8., test kovania na reálnej zákazke) — nákupný zoznam v okne Výroba povie „357695 × 12", ale nie

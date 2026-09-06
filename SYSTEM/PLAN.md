@@ -572,6 +572,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   **Checklist uzáveru (per PR):** bump patch + `?v=` → testy (+ in-SU pri D2/D3/D5) → `hardware.md` (mapovanie owner kľúč, zámky per os, upgrade), `ui-lifecycle.md` (chipy,
   modal, highlight), `model-a-identita.md` (CONFIG_SCHEMA 6 v D1a, 7 v D2a; `recipe_refs` neplatný záznam), `outputs.md`, **`construction.md` pri D5** (osi deskriptora, orientácia hrán `PartFaces`) → STANDARD §6/§8.3 → D-109/D-111 stav v DOGFOODING → STAV/KRONIKA/PLAN.
 
+- **D-118 · Katalógový seed pre kódy setov** (Michal 7.9.) — kandidát na dátovú dávku: pre každý kód zo seed setov názov + cena + URL Démosu (dáta z Antigravity), používateľské položky neprepisovať; poradie rozhodne Michal.
 - **KOV-E · „VÝKLOPY HK/HL" (po C, D):** `GENERIC_TYPES + lift` (plan_schema bump, `guard_unknown_hardware!` už chráni starší plugin) · roly `flap` z KOV-A dostanú
   pravidlo kind `weight_bands` (hmotnosť čela = rozmery × hrúbka × `Materials.density_for(typ)`; hustota nil → konzervatívny odhad + ORANGE) s tabuľkou HK top / HL top
   (data pack `lifts.json` z OFICIÁLNYCH Blum hodnôt — PDF follow-up pred zápisom; UNCONFIRMED sa nezapíše) · sety klasifikácia `lift × opening` (Tip-On = piest per owner)
