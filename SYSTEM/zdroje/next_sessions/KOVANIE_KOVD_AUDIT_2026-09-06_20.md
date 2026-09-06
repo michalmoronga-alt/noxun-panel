@@ -99,3 +99,5 @@
 
 **Uzáver (orchestrátor, 6.9.):** po 2 kolách nad textom package platí rovnaké rozhodnutie ako pri KOV-C v2 (Michal 5.9.): package ZMRAZIŤ, docs PR mergnúť bez ďalšieho kola,
 brána = kód + testy + in-SU per rez; každý implementačný PR dostane vlastné GH kolá. Review textu produkuje implementačný spec (kolo 2 > kolo 1) — ďalšie upresnenia patria do briefov rezov.
+
+**Odpovede Michala 6.9. ~11:00 UTC:** (1) antracit kódy DODANÉ (26 kódov, tabuľka v drafte #13 §1) — rodina je nekompletná nad radmi v1 (chýba H70/350?, H176/350, H176/520, NL 620); (2) recept v2: **žiadny dôvod, v2 neexistuje** → D3a/D3b ostávajú latentný rámec.

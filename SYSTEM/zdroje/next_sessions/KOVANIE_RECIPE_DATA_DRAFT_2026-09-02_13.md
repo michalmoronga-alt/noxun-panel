@@ -70,6 +70,20 @@ zhodne [350, 420, 470, 520, 620]. **Každá bunka radov v1 má kit kód** (dopln
 `atira-biela-h144-sisy` vypadol kód 620. Tip-On sety ostávajú nedotknuté (357716 H70/620, 357755 H144/620, 357795 H176/620 sú správne); SiSy H176/620 = `357783` existuje.
 `load` bunky: 30 kg okrem NL 620 (50) a Tip-On H176/520 (50) — informatívne pre nákup, geometriu nemení.
 
+**Antracit kity Atira (Michal, Démos katalóg 6.9.2026 — alternatívna rodina pre D1b prepnutie setu; kity Tip-On = PTOs, min. svetlá výška 108/192/224):**
+
+| výška | NL 260 | NL 300 | NL 350 | NL 420 | NL 470 | NL 520 | NL 620 |
+|---|---|---|---|---|---|---|---|
+| H70 SiSy | — | — | 357887 (#12 „čelný antracit 350/70" — overiť) | 357888 | 348777 (#12 „sada 470/70 antracit") | 357890 | — |
+| H144 SiSy relingy | 357924 | 357925 | 357926 | 357927 | 357928 | 357929 | — |
+| H176 SiSy relingy | — | — | — | 357969 (#12) | 357970 (#12) | — | — |
+| H70 Tip-On (PTOs) | 357912 | 357913 | 357914 | 357915 | 357916 | 357917 | — |
+| H144 Tip-On relingy | 357953 | 357954 | 357955 | 357956 | 357957 | 357958 | — |
+| H176 Tip-On relingy | 357994 | 357995 | 357996 | 357997 | 357998 | 357999 | — |
+
+Dôsledok pre seed (D1b/dátová dávka): antracit rodina NIE JE kompletná nad radmi receptov v1 — SiSy H70/350 (overiť „čelný"), H176/350, H176/520 a všetky NL 620 chýbajú;
+selektor „Atira antracit" preto pre tieto bunky dá RED `drawer_kit_missing` (nikdy tichá zámena). NL 260/300 sú mimo radov v1 (nekupujú sa). Recept v2: Michal 6.9. — **žiadny dôvod, v2 neexistuje**.
+
 ## 2. Hettich Quadro V6 EB23 (WOOD_DRAWER_UNDERMOUNT) — Noxun profil: EB23, slide-on, 16 mm (18 valid), 30 kg
 
 | Pole | Hodnota | Tag |
