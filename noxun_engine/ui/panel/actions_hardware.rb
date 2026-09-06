@@ -70,6 +70,7 @@ module Noxun
 
           params = existing_params(cab)
           all = params['hardware_overrides'].is_a?(Array) ? params['hardware_overrides'] : []
+          all = consolidate_legacy_lock(all, owner, gt, rid)
           list = merge_override(all, owner, gt, rid, field, value)
 
           params['hardware_overrides'] = list
@@ -142,43 +143,41 @@ module Noxun
         # starsi nez model a zamok by potom drzal cislo z iného radu.
         # Projektove `fit_series` pravidla ostavaju pre NE-receptove polozky.
         #
-        # -> [recipe, vysledna_vyska|nil, chyba|nil, dovod_chybajucej_vysky|nil]
+        # -> [{ recipe:, ctx:, height:, height_reason: }, chyba|nil]
         def recipe_lock_context(cab, owner, rid)
           cfg = (cab && Store.config(cab)) || {}
           fid = PartKeys.front_id(owner.to_s)
-          return [nil, nil, 'Zámok sa dá uložiť len na zásuvkovom čele.'] if fid.nil?
+          return [nil, 'Zámok sa dá uložiť len na zásuvkovom čele.'] if fid.nil?
 
           item = Array(cfg['front_items']).find { |f| f.is_a?(Hash) && f['id'].to_s == fid }
           kind, key = Recipes.recipe_key_for(item)
-          return [nil, nil, 'Toto čelo nie je klasifikovaná zásuvka — zámok sa uložiť nedá.'] unless kind == :ok
+          return [nil, 'Toto čelo nie je klasifikovaná zásuvka — zámok sa uložiť nedá.'] unless kind == :ok
 
           drawer = item['drawer'].is_a?(Hash) ? item['drawer'] : {}
           state, ref = Recipes.active_ref(drawer['recipe_refs'], key[:system], key[:opening])
           ref = Recipes.pick_ref(drawer['recipe_refs'], key[:system], key[:opening]) if state == :missing
-          return [nil, nil, 'Zásuvka má pripnutú verziu receptu, ktorú plugin nepozná.'] if state == :unknown || ref.nil?
+          return [nil, 'Zásuvka má pripnutú verziu receptu, ktorú plugin nepozná.'] if state == :unknown || ref.nil?
           # Identita zamku MUSI sediet s PRIPNUTYM receptom. Nesulad = panel
           # posiela zaznam k inej verzii, nez ktora teraz plati (stary payload).
-          return [nil, nil, 'Položka výsuvu sa medzitým zmenila — panel sa obnoví, skús znova.'] \
+          return [nil, 'Položka výsuvu sa medzitým zmenila — panel sa obnoví, skús znova.'] \
             unless rid.to_s == "#{RECIPE_RULE_PREFIX}#{ref}"
 
           recipe = Recipes.load(ref)
-          height, why = recipe_result_height(cfg, owner, recipe)
-          [recipe, height, nil, why]
+          # Svetle rozmery sa citaju RAZ a pouzivaju ich OBE osi (vyska aj NL) —
+          # jeden vypocet, ziadne dva zdroje cisel.
+          ctx = Recipes.atira?(recipe) ? drawer_axis_ctx(cfg, owner) : nil
+          height, why = recipe_result_height(cfg, owner, recipe, ctx)
+          [{ recipe: recipe, ctx: ctx, height: height, height_reason: why }, nil]
         rescue StandardError => e
           Engine.log_error(e, 'Panel.recipe_lock_context')
-          [nil, nil, 'Zámok sa nepodarilo overiť proti receptu.', nil]
+          [nil, 'Zámok sa nepodarilo overiť proti receptu.']
         end
 
         # VYSLEDNA vyska zasuvky z CERSTVEHO serveroveho stavu. Quadro vysku
         # nema -> [nil, nil] (os neexistuje, rad NL je jediny).
         # -> [vyska|nil, dovod_ked_nil|nil]
-        def recipe_result_height(cfg, owner, recipe)
+        def recipe_result_height(cfg, owner, recipe, ctx)
           return [nil, nil] unless Recipes.atira?(recipe)
-
-          # Svetle rozmery sa citaju RAZ, TOU ISTOU cestou ako payload osi
-          # (`drawer_axis_contexts`) — ponuka aj zapis tak stoja na JEDNOM
-          # vypocte a nemozu si protirecit.
-          ctx = drawer_axis_ctx(cfg, owner)
 
           # (1) ZAMKNUTA vyska je najsilnejsia pravda: rad NL sa berie z vysky,
           #     ktora naozaj plati. Zamok v KONFLIKTE ale vyslednou vyskou NIE
@@ -231,11 +230,14 @@ module Noxun
         # vysky. Ci sa zmesti do hlbky, rozhoduje az resolver (RED
         # `nl_lock_invalid`) — presne ako pri projektovom rade.
         def recipe_nl_value(cab, owner, rid, nl)
-          recipe, height, err, why = recipe_lock_context(cab, owner, rid)
+          info, err = recipe_lock_context(cab, owner, rid)
           return [nil, nil, err] if err
 
+          recipe = info[:recipe]
+          height = info[:height]
           if Recipes.atira?(recipe) && height.nil?
-            return [nil, nil, why || 'Výšku zásuvky sa nepodarilo určiť — dĺžka sa uložiť nedá.']
+            return [nil, nil, info[:height_reason] ||
+                              'Výšku zásuvky sa nepodarilo určiť — dĺžka sa uložiť nedá.']
           end
 
           series = Recipes.series_for(recipe, height)
@@ -255,15 +257,31 @@ module Noxun
 
           # Vyskovy zamok sa ZAPISUJE aj vtedy, ked vysledna vyska urcitelna
           # NIE JE — je to prave cesta, ktorou sa neplatny zamok opravuje.
-          recipe, _height, err = recipe_lock_context(cab, owner, rid)
+          info, err = recipe_lock_context(cab, owner, rid)
           return [nil, nil, err] if err
+
+          recipe = info[:recipe]
           unless Recipes.atira?(recipe)
             return [nil, nil, 'Tento systém zásuviek výškové varianty nemá — výška plynie z rozmeru čela.']
           end
 
-          known = (recipe[:height_variants] || {}).keys.map(&:to_i)
+          variants = recipe[:height_variants] || {}
+          known = variants.keys.map(&:to_i)
           unless known.include?(hv)
             return [nil, nil, "Recept pozná len výšky #{known.sort.map { |h| "H#{h}" }.join(' · ')}."]
+          end
+
+          # KOV-D2a (Codex #312 kolo 2 P2): kandidat sa overuje proti CERSTVEJ
+          # svetlej vyske, nie len proti receptu. Payload chipu moze byt starsi
+          # nez model (celo sa medzitym znizilo) a bez tejto brany by akcia
+          # „uspela", prestavba vzapati vydala `height_lock_invalid` a dielce
+          # zmizli — fail-closed az PO zmene modelu.
+          ctx = info[:ctx]
+          need = (variants[Recipes.key_num(hv)] || {})[:min_clear_height].to_f
+          if ctx && need > ctx[:clear_height].to_f
+            return [nil, nil, "Výška H#{hv} sa už do svetlej výšky " \
+                              "#{Recipes.fmt(ctx[:clear_height])} mm nezmestí " \
+                              "(potrebuje #{Recipes.fmt(need)} mm)."]
           end
 
           ['height_variant', hv, nil]
@@ -278,6 +296,34 @@ module Noxun
           end
           return false unless rule && rule['kind'].to_s == 'fit_series'
           Array(rule['series']).any? { |s| (s.to_f - nl).abs < 0.001 }
+        end
+
+        # KOV-D2a (Codex #312 kolo 2 P1): LEGACY zamok NL (`rule_id`
+        # `vysuvy-nl-podla-hlbky`) a receptovy zaznam su DVE identity, takze
+        # `merge_override` sa legacy zaznamu nedotkne. Po zapise druhej osi by
+        # tak na jednom vlastnikovi zili DVA zaznamy — a `apply_drawer_writes`
+        # by pri prestavbe legacy premenoval na TU ISTU receptovu identitu.
+        # `norm_hardware_overrides` z nich necha POSLEDNY, takze `nominal_length`
+        # by ticho zmizol a zasuvka by zmenila dlzku AJ kit.
+        #
+        # Preto sa pri zapise na receptovu identitu legacy zaznam TOHO ISTEHO
+        # vlastnika najprv ZLUCI: legacy polia su zaklad, receptove ich
+        # prebijaju (nikdy ticha strata) a legacy zaznam zanikne.
+        def consolidate_legacy_lock(all, owner, gt, rid)
+          return all unless recipe_rule?(rid) && gt.to_s == Recipes::LOCK_GENERIC_TYPE
+
+          legacy = Array(all).select { |ov| ov_match?(ov, owner, gt, Recipes::LOCK_LEGACY_RULE_ID) }
+          return all if legacy.empty?
+
+          rest = Array(all).reject { |ov| ov_match?(ov, owner, gt, Recipes::LOCK_LEGACY_RULE_ID) }
+          rec = rest.select { |ov| ov_match?(ov, owner, gt, rid) }.last
+          merged = { 'owner_part_key' => owner, 'generic_type' => gt, 'rule_id' => rid }
+          [legacy.last, rec].each do |src|
+            next unless src.is_a?(Hash)
+
+            OVERRIDE_FIELDS.each { |k| merged[k] = src[k] if src.key?(k) && !src[k].nil? }
+          end
+          rest.reject { |ov| ov_match?(ov, owner, gt, rid) } + [merged]
         end
 
         # Merge do zaznamu identity: prazdny zaznam zanikne, ostatne polia ostanu.

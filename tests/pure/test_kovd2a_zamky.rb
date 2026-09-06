@@ -25,6 +25,14 @@
 #      -> „KOV-D2a (R5): odomknutie jednej osi necha druhy zamok zit"
 #   M4 zapisova cesta nedopocita AUTOMATICKU vysku, ked polozka chyba
 #      -> „KOV-D2a (R3): navrh nahrady NL sa da ulozit AJ BEZ zamku vysky"
+#   M5 legacy NL zaznam sa pri zapise osi NEkonsoliduje
+#      -> „KOV-D2a (P1): legacy NL a novy vyskovy zamok su JEDEN zaznam"
+#   M6 `apply_drawer_writes` premenuje legacy zaznam BEZ zlucenia
+#      -> „KOV-D2a (P1): prestavba zluci premenovany legacy zamok s receptovym"
+#   M7 zapisova cesta neoveri, ci sa vyska do svetlej vysky ZMESTI
+#      -> „KOV-D2a (P2): vyskovy zamok, ktory sa uz nezmesti, sa ODMIETNE"
+#   M8 `drawer_contexts` prehltne necakanu vynimku bez logu
+#      -> „KOV-D2a (P2): necakana vynimka v kontexte osi sa ZALOGUJE"
 require_relative '../helper' unless defined?(NxTest)
 
 # Panelove akcie nie su v require zozname helpera (vzor KOV-D1a).
@@ -337,7 +345,9 @@ end
 
 NxTest.test('KOV-D2a (R3): vyskovy zamok prijme LEN vysku pripnuteho receptu') do
   c = NxD2a
-  cfg = c.cfg_for(c.params)
+  # Skrinka, v ktorej sa H144 este zmesti (svetla 204) — tento test meria
+  # ZOZNAM receptu, nie geometriu (tu meria test „uz sa nezmesti" nizsie).
+  cfg = c.cfg_for(c.params(front_height: 220.0, cabinet_height: 900.0))
   field, value, err = c.write_value(cfg, 'height_variant', 144)
   NxTest.assert_equal(nil, err, err.to_s)
   NxTest.assert_equal(['height_variant', 144], [field, value])
@@ -605,4 +615,114 @@ NxTest.test('KOV-D2a (R3): pri KONFLIKTE vysky ostava nahrada NL odmietnuta') do
   field, value, herr = c.write_value(cfg, 'height_variant', 70)
   NxTest.assert_equal(nil, herr, herr.to_s)
   NxTest.assert_equal(['height_variant', 70], [field, value])
+end
+
+# ============================================================================
+# CODEX #312 KOLO 2 — P1 (legacy zamok) a P2 (zmestitelnost, diagnostika)
+# ============================================================================
+
+NxTest.test('KOV-D2a (P1): legacy NL a novy vyskovy zamok su JEDEN zaznam') do
+  c = NxD2a
+  # Skrinka nesie zamok NL este pod LEGACY identitou (D-93). Zapis DRUHEJ osi
+  # ide na receptovu identitu, takze bez konsolidacie by vznikli DVA zaznamy
+  # jedneho vlastnika — a prestavba by z nich spravila dva zaznamy TEJ ISTEJ
+  # identity, z ktorych normalizacia necha len posledny.
+  legacy = [{ 'owner_part_key' => c::OWNER, 'generic_type' => 'slide',
+              'rule_id' => 'vysuvy-nl-podla-hlbky', 'nominal_length' => 420.0 }]
+  all = c.panel.consolidate_legacy_lock(legacy, c::OWNER, 'slide', c::RID)
+  list = c.panel.merge_override(all, c::OWNER, 'slide', c::RID, 'height_variant', 70)
+
+  NxTest.assert_equal(1, list.length, 'jeden vlastnik = jeden zaznam, nie dve identity')
+  NxTest.assert_equal(c::RID, list.first['rule_id'])
+  NxTest.assert_close(420.0, list.first['nominal_length'], 0.001, 'NL sa nesmie stratit')
+  NxTest.assert_equal(70, list.first['height_variant'])
+
+  # Ne-receptovy zapis sa legacy zaznamu NEDOTKNE (projektove pravidla ziju dalej).
+  same = c.panel.consolidate_legacy_lock(legacy, c::OWNER, 'slide', 'vysuvy-nl-podla-hlbky')
+  NxTest.assert_equal(legacy, same)
+
+  # PORADIE v zapisovej akcii je sucastou opravy: konsolidacia MUSI bezat PRED
+  # `merge_override`, inak by sa legacy zaznam do noveho zoznamu vobec nedostal.
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_hardware.rb'),
+                  encoding: 'UTF-8')
+  NxTest.assert(src.include?("all = consolidate_legacy_lock(all, owner, gt, rid)\n" \
+                             "          list = merge_override(all, owner, gt, rid, field, value)"),
+                'konsolidacia legacy zamku musi stat PRED merge_override v akcii zapisu')
+end
+
+NxTest.test('KOV-D2a (P1): prestavba zluci premenovany legacy zamok s receptovym') do
+  c = NxD2a
+  overrides = [{ 'owner_part_key' => c::OWNER, 'generic_type' => 'slide',
+                 'rule_id' => 'vysuvy-nl-podla-hlbky', 'nominal_length' => 420.0 },
+               { 'owner_part_key' => c::OWNER, 'generic_type' => 'slide',
+                 'rule_id' => c::RID, 'height_variant' => 70 }]
+  norm = c.cb.normalize(c.params.merge('hardware_overrides' => overrides))
+  plan = c.e::Construction.build_plan(norm, 'CAB-1',
+                                      part_thicknesses: c.cb.drawer_thicknesses(norm, {}))
+  NxTest.assert_equal(1, Array(plan[:drawer_override_writes]).length,
+                      'predpoklad: legacy zaznam sa migruje')
+
+  out = c.cb.apply_drawer_writes(norm, plan)
+  ovs = Array(out[:hardware_overrides])
+  NxTest.assert_equal(1, ovs.length, 'po premenovani ostane JEDEN zaznam')
+  NxTest.assert_close(420.0, ovs.first['nominal_length'], 0.001, 'NL sa nesmie ticho stratit')
+  NxTest.assert_equal(70, ovs.first['height_variant'])
+  NxTest.assert_equal(1, c.cb.norm_hardware_overrides(ovs).length, 'a normalizaciu to prezije')
+
+  # Dopad na VYROBU a NAKUP: zasuvka drzi zamknutu 420, nie automat 470.
+  cfg2 = c.cfg_for(c.params, ovs)
+  NxTest.assert_close(420.0, c.slide_item(cfg2)['params']['nominal_length'], 0.001)
+  NxTest.assert_equal(70, c.slide_item(cfg2)['params']['height_variant'].to_i)
+  NxTest.assert_close(470.0, c.slide_item(c.cfg_for(c.params))['params']['nominal_length'], 0.001,
+                      'automat by dal 470 — preto je strata zamku merateľna')
+end
+
+NxTest.test('KOV-D2a (P2): vyskovy zamok, ktory sa uz nezmesti, sa ODMIETNE') do
+  c = NxD2a
+  # Chip mohol byt vyskladany nad vyssim celom; medzitym sa celo znizilo.
+  # Bez brany by akcia „uspela" a prestavba vzapati zahodila dielce.
+  cfg = c.cfg_for(c.params)
+  _f, _v, err = c.write_value(cfg, 'height_variant', 144)
+  NxTest.assert(err.to_s.include?('nezmestí'), err.to_s)
+  NxTest.assert(err.to_s.include?('159'), "hlaska menuje CERSTVU svetlu vysku: #{err}")
+  NxTest.assert(err.to_s.include?('189'), "aj potrebnu vysku: #{err}")
+
+  # V skrinke, kde sa H144 zmesti, ten isty zapis PREJDE.
+  big = c.cfg_for(c.params(front_height: 220.0, cabinet_height: 900.0))
+  field, value, ok_err = c.write_value(big, 'height_variant', 144)
+  NxTest.assert_equal(nil, ok_err, ok_err.to_s)
+  NxTest.assert_equal(['height_variant', 144], [field, value])
+end
+
+NxTest.test('KOV-D2a (P2): necakana vynimka v kontexte osi sa ZALOGUJE, nie prehltne') do
+  c = NxD2a
+  norm = c.cb.normalize(c.params)
+  plan = c.e::Construction.build_plan(norm, 'CAB-1',
+                                      part_thicknesses: c.cb.drawer_thicknesses(norm, {}))
+  NxTest.assert(plan[:front_bounds].key?('F1'), 'predpoklad: plan hranice cela ma')
+
+  con = c.e::Construction
+  logged = []
+  con.singleton_class.send(:alias_method, :nx_d2a_ctx, :context_for)
+  c.e.singleton_class.send(:alias_method, :nx_d2a_log, :log_error)
+  begin
+    con.define_singleton_method(:context_for) { |*_a| raise ArgumentError, 'sonda' }
+    c.e.define_singleton_method(:log_error) { |ex, where = nil| logged << [ex.class, where.to_s] }
+
+    NxTest.assert_equal({}, con.drawer_contexts(norm, plan), 'zlyhane celo sa do mapy nedostane')
+    NxTest.assert_equal(1, logged.length, 'chyba MUSI byt v diagnostike')
+    NxTest.assert_equal(ArgumentError, logged.first[0])
+    NxTest.assert(logged.first[1].include?('F1'), logged.first[1])
+
+    # OCAKAVANY pripad — plan NEMA surove hranice cela (velmi stary plan) —
+    # je TICHY: nie je to chyba, len sa nema z coho pocitat.
+    logged.clear
+    NxTest.assert_equal({}, con.drawer_contexts(norm, plan.merge(front_bounds: {})))
+    NxTest.assert_equal([], logged, 'chybajuce hranice sa neloguju ako chyba')
+  ensure
+    con.singleton_class.send(:alias_method, :context_for, :nx_d2a_ctx)
+    con.singleton_class.send(:remove_method, :nx_d2a_ctx)
+    c.e.singleton_class.send(:alias_method, :log_error, :nx_d2a_log)
+    c.e.singleton_class.send(:remove_method, :nx_d2a_log)
+  end
 end

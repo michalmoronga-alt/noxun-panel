@@ -502,18 +502,27 @@ module Noxun
       # Cita ju panel, aby vedel ponuknut „zamknut inu vysku/NL" — svetla vyska
       # ani hlbka sa do configu neukladaju.
       # Celo, ktoreho hranice plan nema, sa VYNECHA (nikdy sa nehada).
+      #
+      # Zlyhania sa NEZAHADZUJU naslepo (Codex #312 kolo 2 P2): chybajuce
+      # surove hranice su OCAKAVANY pripad (velmi stary plan) a riesia sa
+      # explicitnou podmienkou, kazda INA vynimka sa ZALOGUJE. Siroky tichy
+      # rescue by fail-closed zasuvku vypustil z mapy osi — riadok osiroteneho
+      # zasahu by prisiel o stav osi (a s nim o cestu opravy) a v diagnostike
+      # by po chybe nebola ani stopa.
       def drawer_contexts(cfg, plan)
+        bounds = plan[:front_bounds].is_a?(Hash) ? plan[:front_bounds] : {}
         Array(plan[:front_items]).each_with_object({}) do |item, acc|
           next unless item.is_a?(Hash)
           next unless Recipes.recipe_key_for(item).first == :ok
 
           fid = item['id'].to_s
           next if fid.empty?
+          next unless bounds.key?(fid)
 
           begin
             acc[fid] = context_for(item, plan, cfg)
-          rescue StandardError
-            next
+          rescue StandardError => e
+            Engine.log_error(e, "Construction.drawer_contexts #{fid}") if defined?(Engine)
           end
         end
       end

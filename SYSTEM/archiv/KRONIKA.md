@@ -24,8 +24,10 @@
   v pripnutom recepte **a zmestiť sa**, inak je zásuvka **červená** (`height_lock_invalid`) bez dielcov aj výsuvu; zamknutá dĺžka sa meria proti radu **výslednej**
   výšky — zamknutých 520 po automatickom prechode H70 → H144 (rad H144 520 nemá) ostáva konfliktom a **nikdy** nevyvolá návrat na H70 ani zmenu dĺžky.
   **Zapisovacia cesta bola dovtedy slepá** (Astra #20 F5): D-93 validácia hľadala hodnotu výhradne v projektovom pravidle `fit_series`, ktorým receptová položka nie je,
-  takže zámok dĺžky zásuvky sa z panela **uložiť nedal**. Pribudla preto úzka serverová vetva *vlastník → pripnutý recept → výsledná výška → rad tej výšky*, ktorá číta
-  **čerstvý serverový stav** (uložený config), nikdy payload — chip na obrazovke môže byť o generáciu starší než model.
+  takže zámok dĺžky zásuvky sa **uložiť nedal**. Pribudla preto úzka serverová vetva *vlastník → pripnutý recept → výsledná výška → rad tej výšky*, ktorá číta
+  **čerstvý serverový stav** (uložený config), nikdy payload — chip na obrazovke môže byť o generáciu starší než model. Je to však **serverová akcia**: Inspector
+  receptovej položke dodnes nekreslí ani editor dĺžky (`hwItemHtml` ho viaže na blok `nl`, ktorý receptová položka nemá) a `axes` ešte nečíta, takže **z panela sa zámok
+  zapnúť nedá až do D2b** — táto dávka pripravuje jadro, nie ovládanie.
   Položka výsuvu **ostáva `source: 'recipe'`** a `locked` je odteraz **súhrn** „aspoň jedna os je zamknutá"; receptový zámok **nikdy** neprechádza
   `HardwareRules.apply_overrides` — ten by pri dĺžke prepol zdroj na `manual` a nákup by prestal povyšovať chýbajúci kit na blocker (Astra #20 F7). Stav **každej osi**
   (`auto` | `locked` | `conflict`, hodnota, ponuka, pri konflikte uložená hláška a návrh náhrady) skladá server do nového payloadu `axes` a vešia ho na položku **aj**

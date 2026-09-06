@@ -43,9 +43,9 @@ Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` →
 
 ## Posledné uzávery
 
-- **KOV-D2a — ZÁMKY OSÍ ZÁSUVKY (jadro)** (v0.9.37, 6.9.2026): server vie **udržať ručne určenú výšku zásuvky aj dĺžku výsuvu** — zámok sa nikdy nezmení sám. **Čo vidno
-  už teraz:** zámok dĺžky výsuvu sa **konečne dá uložiť** (dovtedy ho panel odmietal) a zásuvka so **zamknutou výškou, ktorá sa nezmestí alebo v recepte nie je**, je
-  **červená** bez dielcov aj výsuvu. **Chipy a návrh náhrady prídu v D2b**; `CONFIG_SCHEMA` 7 = staršia verzia takú zákazku **neprestaví**. [KRONIKA](archiv/KRONIKA.md).
+- **KOV-D2a — ZÁMKY OSÍ ZÁSUVKY (SERVEROVÉ JADRO, v paneli zatiaľ nič)** (v0.9.37, 6.9.2026): server vie **udržať ručne určenú výšku zásuvky aj dĺžku výsuvu** — zámok sa
+  nikdy nezmení sám — a zásuvka so **zamknutou výškou, ktorá sa nezmestí alebo v recepte nie je**, je **červená** bez dielcov aj výsuvu. **Zámok sa dá uložiť akciou
+  (server), ovládanie v Inspectorovi príde až v D2b** — dovtedy nie je čo klikať. `CONFIG_SCHEMA` 7 = staršia verzia takú zákazku **neprestaví**. [KRONIKA](archiv/KRONIKA.md).
 - **KOV-D1b — SET ZÁSUVKY SA DÁ VYBRAŤ (Štúdio aj karta)** (v0.9.35, 6.9.2026): **Štúdio → Kovanie → Predvoľby projektu** má v tej istej tabuľke **štyri riadky
   zásuviek** (výsuv × klasické/Tip-On × kovové bočnice/drevený box) a ponúka **len to, čo naozaj sadne**: Atira ako **rodina „podľa výšky“** (H70 · H144 · H176 naraz),
   Quadro ako pevný set, **neaktívny set už nie** (uložený výber ostane vidno). V **Inspectorovi → Kovanie** sa ten istý výber prepne **pre skrinku** aj **pre jedno čelo**

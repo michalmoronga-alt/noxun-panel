@@ -1053,17 +1053,44 @@ module Noxun
           mig = Array(plan[:drawer_override_writes])
           return out if mig.empty?
 
-          list = (out[:hardware_overrides].is_a?(Array) ? out[:hardware_overrides] : []).map do |ov|
-            next ov unless ov.is_a?(Hash)
-
-            hit = mig.find do |m|
+          kept = []
+          renamed = []
+          (out[:hardware_overrides].is_a?(Array) ? out[:hardware_overrides] : []).each do |ov|
+            hit = ov.is_a?(Hash) && mig.find do |m|
               ov['owner_part_key'].to_s == m['owner_part_key'] &&
                 ov['generic_type'].to_s == m['generic_type'] &&
                 ov['rule_id'].to_s == m['from_rule_id']
             end
-            hit ? ov.merge('rule_id' => hit['to_rule_id']) : ov
+            hit ? renamed << ov.merge('rule_id' => hit['to_rule_id']) : kept << ov
           end
-          out.merge(hardware_overrides: list)
+          out.merge(hardware_overrides: merge_migrated_overrides(kept, renamed))
+        end
+
+        # KOV-D2a (Codex #312 kolo 2 P1): premenovanim legacy zamku na
+        # receptovu identitu mozu vzniknut DVA zaznamy TEJ ISTEJ identity —
+        # legacy `nominal_length` a novy `height_variant`, ktore panel zapisal
+        # samostatne. `norm_hardware_overrides` by z nich nechal POSLEDNY,
+        # takze v beznom poradi (legacy, potom vyskovy) by `nominal_length`
+        # TICHO zmizol a zasuvka by zmenila dlzku aj objednany kit.
+        # Polia sa preto ZLUCIA do jedneho zaznamu; pri kolizii toho isteho
+        # pola vyhrava UZ EXISTUJUCI receptovy zaznam (premenovany legacy je
+        # historia, nie novsia pravda) — nikdy tichá strata.
+        def merge_migrated_overrides(kept, renamed)
+          return kept if renamed.empty?
+
+          out = kept.dup
+          renamed.each do |ren|
+            key = HardwareRules.override_identity(ren)
+            idx = out.index { |ov| ov.is_a?(Hash) && HardwareRules.override_identity(ov) == key }
+            if idx.nil?
+              out << ren
+              next
+            end
+            merged = ren.dup
+            out[idx].each { |k, v| merged[k] = v unless v.nil? }
+            out[idx] = merged
+          end
+          out
         end
 
         # Zosuladi pole `drawer` v resolved celach (`front_items`) s configom
