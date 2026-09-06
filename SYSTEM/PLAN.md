@@ -342,7 +342,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   projekt uložený pred aktiváciou receptov, ktorý už má klasifikovanú zásuvku (**akékoľvek** drawer pole — predikát `Recipes.classified?`), je RED a blokuje VŠETKY exporty
   (vrátane VEPO), kým sa skrinka neprestaví. **Po kole 2 a 3:** hrúbky bokov Quadro sa čítajú pod oboma emitovanými kľúčmi (rôzne = fail-closed), remap ABS platí aj pre
   4. kanál a `drawer_material_id` cestuje vkladacou kartou aj „Nahradiť UNI…".
-  **C2b-M · materiálový kanál zásuviek (samostatná dávka `feat/kov-c2b-material-kanal`, mergne sa hneď po #304 — rozdelenie po 4. kole review, pravidlo 3 kôl):** výber
+  **C2b-M · materiálový kanál zásuviek — ✅ HOTOVÉ (PR #305, v0.9.32, 6.9.2026; rozdelenie po 4. kole review, pravidlo 3 kôl):** bod C2 **(b) UI časť** je tým uzavretý. Výber
   **„Zásuvky"** v predvoľbách projektu Štúdia + `MaterialsDialog::TARGETS` + JS mapa `md_drawer` + kontext komba `drawer` = 16 · **preflight per systém** (Atira 16,
   Quadro 16/18; čísla z `Recipes.supported_thicknesses`) na VŠETKÝCH cestách — nová predvoľba, existujúca zákazka (potvrdenie), **„Nahradiť UNI…"** (systém KAŽDÉHO
   dotknutého čela, vrátane prípadu „UNI len v override dielca") a **vkladanie** (`MaterialsDialog.drawer_material_issue` pred ghostom) · `insert_state.js`

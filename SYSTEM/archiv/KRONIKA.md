@@ -17,6 +17,25 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-C2b-M — MATERIÁLOVÝ KANÁL ZÁSUVIEK: VÝBER V ŠTÚDIU, PREFLIGHT PER SYSTÉM, HROMADNÉ CESTY (PR #305, v0.9.32, 6.9.2026):** odrezaná polovica PR #304. Po **4. kole**
+  review priniesli oba P1 nálezy UI a hromadné cesty 4. materiálového kanála (nie aktiváciu samotnú), takže Michal podľa **pravidla 3 kôl** rozhodol PR rozdeliť: #304
+  zostal aktiváciou v engine (v0.9.31), kanál dostal vlastnú dávku. Vetva stojí na #304 a mergne sa hneď po ňom.
+  **Čo z toho má používateľ.** (1) **Riadok „Zásuvky"** v predvoľbách projektu Štúdia vedľa Korpus/Čelá/Chrbát — jeden riadok, žiadny nový blok (vertikálny priestor je
+  vzácny). Bez neho by každý projekt uviazol na UNI 16 mm. (2) **Plugin nepustí dosku, ktorou sa zásuvka nedá vyrobiť** — a čísla nie sú v UI napísané natvrdo, čítajú sa
+  z receptu (Atira 16, Quadro V6 16/18). Kontroluje sa to na **všetkých** cestách: nová predvoľba (doska mimo všetkých systémov sa neuloží vôbec), existujúca zákazka
+  (doska, ktorú použitý systém neprijme, až po **potvrdení** v tej istej lište ako D-46), **„Nahradiť UNI…"** a **vkladanie**. (3) Materiál zásuviek **zo šablóny prežije
+  vloženie** a (4) **zmena predvoľby preladí ABS** dielcov zásuviek rovnako ako pri ostatných kanáloch.
+  **Kolo 4 (2 P1).** „Nahradiť UNI" merala hrúbku proti *niektorému* vydanému systému — 18 mm tak prešlo v atirovej zákazke, a 25 mm prešlo cez override dielca, keď
+  `roles_now` rolu `drawer` vôbec nenieslo. Odteraz sa meria **systémom každého dotknutého čela**: projektová predvoľba proti systémom **celej** zákazky
+  (`ru_scan_drawer_systems`), skrinka proti `ru_drawer_systems_affected` (zmena kanála → všetky klasifikované čelá; UNI len v `part_override` → len čelá tých dielcov,
+  `ru_drawer_key_front`). Blokácia menuje systém. Druhý P1: **vkladanie nemalo drawer preflight**, takže vklad „uspel", skrinka visela na kurzore a RED zásuvky sa ukázali
+  až po kliku — `MaterialsDialog.drawer_material_issue` (čistá funkcia, model smie byť `nil`) beží v `Panel.handle_insert` **pred** `prepare_insert` aj ghostom nad
+  **zloženou** konfiguráciou čiel a nekompatibilný materiál odmietne hláškou „Nič sa nevložilo".
+  **Vedomá odchýlka:** predikát „prijme aspoň jeden vydaný systém" zostal na dvoch miestach — pri **novej** predvoľbe v Štúdiu a v zákazke bez zásuviek. Prísny prienik
+  naprieč systémami by nechal len 16 a blokoval by 18 mm dosku aj v čisto drevenej zákazke, kde je legitímna. Kde už existuje klasifikované čelo, je predikát prísny.
+  **Testy:** 3096 headless (+9 tejto dávky), 89 JS sád (`test_insert_state.js` štyri kanály, `test_proj_confirm.js` mapa `md_drawer`, `test_picker3_kontext.js` kontext
+  komba). In-SU sekcia sa nepridávala — `run_kovc2b` z #304 beží nad tým istým enginom a UI kanála je serverovo pokrytá headless testami.
+
 - **KOV-C2b — AKTIVÁCIA RECEPTOV ZÁSUVIEK: DIELCE, POLOŽKA VÝSUVU, BRÁNY, SCHÉMA 5 (v0.9.31, 5.9.2026):** tretí rez package KOV-C v2 a **prvý, ktorý mení výstupy** —
   ale výhradne pre čelo klasifikované ako zásuvka **so systémom**. Zákazka bez takej klasifikácie je content-identická (vlastný charakterizačný test: žiadny dielec s
   materiálovým signálom `:drawer`, žiadna položka `source: recipe`, legacy `slide` pravidlo naďalej beží, nové kľúče configu prázdne).
