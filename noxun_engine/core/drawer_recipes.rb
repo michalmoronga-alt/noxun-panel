@@ -77,7 +77,7 @@ module Noxun
         drawer_unclassified drawer_no_fit drawer_obstruction
         drawer_internal_unsupported drawer_thickness_unsupported
         drawer_kd_unsupported drawer_recipe_unknown nl_lock_invalid
-        drawer_override_invalid drawer_kit_missing
+        height_lock_invalid drawer_override_invalid drawer_kit_missing
       ].freeze
 
       # Jediny kod, ktory vznika az v NAKUPE (receptova polozka bez setu alebo
@@ -92,12 +92,12 @@ module Noxun
       # a ticho — preto blokuje VSETKY exporty. Napravou je PRESTAVBA skrinky.
       STALE = 'drawer_stale'
 
-      # KOV-C2b: REGISTER BRANY (11 kodov). `export_blockers` cita CELY tento
-      # zoznam — ziadny kod z neho nesmie prejst do vydaneho suboru.
-      # 10 kodov produkuje resolver (`CONFLICT_CODES`), 11. je MIGRACNY.
+      # KOV-C2b: REGISTER BRANY (12 kodov od KOV-D2a). `export_blockers` cita
+      # CELY tento zoznam — ziadny kod z neho nesmie prejst do vydaneho suboru.
+      # 11 kodov produkuje resolver (`CONFLICT_CODES`), posledny je MIGRACNY.
       DRAWER_BLOCKERS = (CONFLICT_CODES + [STALE]).freeze
 
-      # Konflikty STAVBY (9): fail-closed, ziadne dielce ani polozka. Blokuju
+      # Konflikty STAVBY (10): fail-closed, ziadne dielce ani polozka. Blokuju
       # nakupny CSV, rozpocet a cenovu ponuku; VEPO chrani prave to, ze sa
       # geometria vobec nevydala (niet co rezat).
       BUILD_BLOCKERS = (CONFLICT_CODES - [KIT_MISSING]).freeze
@@ -117,6 +117,7 @@ module Noxun
         'drawer_kd_unsupported'       => 'hrúbka boku skrinky nie je pre systém podporovaná',
         'drawer_recipe_unknown'       => 'zásuvka používa recept, ktorý plugin nepozná',
         'nl_lock_invalid'             => 'ručne zamknutá dĺžka výsuvu neplatí',
+        'height_lock_invalid'         => 'ručne zamknutá výška zásuvky neplatí',
         'drawer_override_invalid'     => 'ručný zásah do výsuvu zásuvky je neplatný',
         KIT_MISSING                   => 'nákup nenašiel kit výsuvu k postaveným dielcom',
         STALE                         => 'zásuvka je klasifikovaná ešte spred aktivovania receptov'
@@ -127,6 +128,17 @@ module Noxun
       # receptova identita `recipe:<recipe_id>` (migraciu robi C2).
       LOCK_GENERIC_TYPE   = 'slide'
       LOCK_LEGACY_RULE_ID = 'vysuvy-nl-podla-hlbky'
+
+      # KOV-D2a: DRUHA os zamku — VYSKOVY VARIANT (pole `height_variant`
+      # v tom istom zazname `hardware_overrides`). Zamok = existencia platneho
+      # pola, presne ako pri NL. Os existuje LEN pre Atiru (Quadro vyskove
+      # varianty nema — `box_height` plynie z geometrie), preto ju
+      # `height_lock_value` pre iny system NIKDY neprecita.
+      LOCK_HEIGHT_FIELD = 'height_variant'
+      # Receptova identita zamku sa viaze na PRIPNUTY recept: legacy
+      # `rule_id` (`vysuvy-nl-podla-hlbky`) vysku nikdy nedrzal, takze
+      # vyskovy zamok existuje VYHRADNE pod `recipe:<recipe_id>`.
+      LOCK_RECIPE_PREFIX = 'recipe:'
 
       # Roly dielcov, ktore recepty emituju. `box_side` / `drawer_inner_front`
       # do `BuildPlan::ROLES` pridava az C2 (C1 plan nemeni).
@@ -366,7 +378,8 @@ module Noxun
       #   ctx              — vysledok `Construction.context_for`
       #   part_thicknesses — { rola => mm } VSTUP (C2 ho berie z materialoveho
       #                      kanala :drawer PRED stavbou planu), nie odvodeny
-      #   overrides        — pole zaznamov `hardware_overrides` (NL zamok)
+      #   overrides        — pole zaznamov `hardware_overrides` (zamky OSI:
+      #                      `nominal_length` a KOV-D2a `height_variant`)
       # Vracia:
       #   { height_variant, box_height, nl, load, parts, hardware_params,
       #     conflicts, explain }
@@ -407,17 +420,28 @@ module Noxun
         clear_w = ctx[:clear_width].to_f
         clear_d = ctx[:clear_depth].to_f
 
-        # (4) JEDNA vyska
+        # (4) JEDNA vyska — ZAMKNUTA alebo automaticka (KOV-D2a, Astra #20 B2).
+        #     Poradie je zavazne: vyska rozhoduje PRED radom NL, lebo rad NL JE
+        #     per vyska. Opacne poradie by pri zmene vysky ticho posunulo NL.
         if atira?(recipe)
-          variant = pick_height_variant(recipe, clear_h)
-          if variant.nil?
-            lowest = recipe[:height_variants].values.map { |v| v[:min_clear_height] }.min
-            return fail_with(out, 'drawer_no_fit',
-                             "#{label(recipe)}: svetlá výška #{fmt(clear_h)} mm nestačí ani na najnižší variant " \
-                             "(potrebných #{fmt(lowest)} mm).")
+          hlock = height_lock_value(recipe, ctx, overrides)
+          if hlock
+            fail_msg = height_lock_problem(recipe, hlock, clear_h)
+            return fail_with(out, 'height_lock_invalid', fail_msg) if fail_msg
+
+            out[:height_variant] = key_num(hlock).to_i
+            out[:explain] << "Výška: H#{out[:height_variant]} (ručný zámok)"
+          else
+            variant = pick_height_variant(recipe, clear_h)
+            if variant.nil?
+              lowest = recipe[:height_variants].values.map { |v| v[:min_clear_height] }.min
+              return fail_with(out, 'drawer_no_fit',
+                               "#{label(recipe)}: svetlá výška #{fmt(clear_h)} mm nestačí ani na najnižší variant " \
+                               "(potrebných #{fmt(lowest)} mm).")
+            end
+            out[:height_variant] = variant[:height]
+            out[:explain] << "Výška: H#{variant[:height]} (svetlá #{fmt(clear_h)} ≥ #{fmt(variant[:min_clear_height])})"
           end
-          out[:height_variant] = variant[:height]
-          out[:explain] << "Výška: H#{variant[:height]} (svetlá #{fmt(clear_h)} ≥ #{fmt(variant[:min_clear_height])})"
         else
           c = recipe[:constants]
           box_h = clear_h - c[:box_clearance].to_f
@@ -431,32 +455,37 @@ module Noxun
           out[:explain] << "Výška boxu: #{fmt(box_h)} (svetlá #{fmt(clear_h)} − vôľa #{fmt(c[:box_clearance])})"
         end
 
-        # (5) JEDNA NL — najdlhsia z radu TEJ vysky, ktora sa zmesti do hlbky.
-        #     Porovnanie je INKLUZIVNE nad NEZAOKRUHLENOU hodnotou, bez EPS.
+        # (5) JEDNA NL — z radu VYSLEDNEJ vysky (zamknutej aj automatickej).
+        #     ZAMKNUTA NL sa overuje proti radu TEJ vysky a NIKDY sa nemeni:
+        #     zamknuta 520 po automatickom prechode H70 -> H144 (rad H144 520
+        #     nema) je `nl_lock_invalid` — nie navrat na H70 ani ina dlzka.
+        #     Porovnania su INKLUZIVNE nad NEZAOKRUHLENOU hodnotou, bez EPS.
         series = series_for(recipe, out[:height_variant])
-        nl = series.select { |v| min_depth(recipe, v) <= clear_d }.max
-        if nl.nil?
-          shortest = series.min
-          return fail_with(out, 'drawer_no_fit',
-                           "#{label(recipe)}: hĺbka #{fmt(clear_d)} mm, najkratšia NL #{fmt(shortest)} potrebuje " \
-                           "#{fmt(min_depth(recipe, shortest))} mm.")
-        end
-
-        # (6) NL zamok z hardware_overrides — nikdy tichá zmena.
         lock = lock_value(recipe, ctx, overrides)
         if lock
           in_series = series.any? { |v| same?(v, lock) }
           fits = in_series && min_depth(recipe, lock) <= clear_d
           unless fits
-            reason = in_series ? "potrebuje hĺbku #{fmt(min_depth(recipe, lock))} mm (svetlá #{fmt(clear_d)} mm)" : 'nie je v rade tejto výšky'
+            reason = if in_series
+                       "potrebuje hĺbku #{fmt(min_depth(recipe, lock))} mm (svetlá #{fmt(clear_d)} mm)"
+                     else
+                       "nie je v rade #{series_label(out[:height_variant])}"
+                     end
             return fail_with(out, 'nl_lock_invalid',
                              "#{label(recipe)}: ručne zamknutá dĺžka #{fmt(lock)} mm #{reason} — " \
                              'zámok sa nikdy nemení automaticky. ' \
-                             'Inspector → Kovanie, riadok „neplatný ručný zásah" → Zrušiť.')
+                             "#{LOCK_HINT}")
           end
           nl = lock
           out[:explain] << "NL: #{fmt(nl)} (ručný zámok)"
         else
+          nl = series.select { |v| min_depth(recipe, v) <= clear_d }.max
+          if nl.nil?
+            shortest = series.min
+            return fail_with(out, 'drawer_no_fit',
+                             "#{label(recipe)}: hĺbka #{fmt(clear_d)} mm, najkratšia NL #{fmt(shortest)} potrebuje " \
+                             "#{fmt(min_depth(recipe, shortest))} mm.")
+          end
           rad = out[:height_variant] ? "rad H#{out[:height_variant]} " : 'rad '
           longer = series.select { |v| v > nl }.min
           tail = longer ? "; #{fmt(longer)} potrebuje #{fmt(min_depth(recipe, longer))}" : ''
@@ -699,6 +728,89 @@ module Noxun
         recipe[:height_variants].map { |k, v| v.merge(height: k.to_i) }
                .sort_by { |v| -v[:height] }
                .find { |v| v[:min_clear_height].to_f <= clear_h }
+      end
+
+      # --- KOV-D2a: VYSKOVY zamok (druha os) -----------------------------------
+      #
+      # JEDINA veta, ktorou sa pouzivatel dostane k naprave neplatneho zamku.
+      # Zhodna s `Construction::ORPHAN_HINT` — riadok, na ktory ukazuje, stavia
+      # panel z osiroteneho zoznamu; dva rozne texty by ho poslali inam.
+      LOCK_HINT = 'Inspector → Kovanie, riadok „neplatný ručný zásah" → Zrušiť.'
+
+      # Platny VYSKOVY zamok pre TENTO recept a TOTO celo, alebo nil.
+      #
+      # Tri zamerne obmedzenia (fail-closed):
+      #   * LEN Atira — Quadro vyskove varianty nema, `box_height` plynie
+      #     z geometrie, takze vyskovy zamok pre nu neexistuje (ani ked ho
+      #     podvrhnuty config nesie);
+      #   * LEN receptova identita `recipe:<recipe_id>` PRIPNUTEHO receptu —
+      #     legacy pravidlo `vysuvy-nl-podla-hlbky` vysku nikdy nedrzalo;
+      #   * `disabled` VITAZI (rovnaky kontrakt ako `lock_value`).
+      def height_lock_value(recipe, ctx, overrides)
+        return nil unless atira?(recipe)
+
+        owner = ctx[:owner_part_key]
+        rid = "#{LOCK_RECIPE_PREFIX}#{recipe[:recipe_id]}"
+        rec = Array(overrides).reverse.find do |ov|
+          next false unless ov.is_a?(Hash)
+          next false if get(ov, 'disabled') == true
+          next false unless get(ov, 'generic_type').to_s == LOCK_GENERIC_TYPE
+          next false unless get(ov, 'rule_id').to_s == rid
+          next false if owner && get(ov, 'owner_part_key').to_s != owner.to_s
+
+          height_value(get(ov, LOCK_HEIGHT_FIELD))
+        end
+        rec && height_value(get(rec, LOCK_HEIGHT_FIELD))
+      end
+
+      # Tvar hodnoty vyskoveho zamku (STRICT): kladne CELE cislo. Cokolvek ine
+      # (String, Float s desatinami, nula) nie je zamok — ci taku vysku recept
+      # pozna, rozhoduje az `height_lock_problem`.
+      def height_value(v)
+        return nil unless v.is_a?(Numeric)
+
+        f = v.to_f
+        return nil unless f.finite? && f.positive? && (f - f.round).abs < 1e-9
+
+        f.round
+      end
+
+      # Preco zamknuta vyska neplati (alebo nil, ked plati). Dva dovody:
+      # v recepte neexistuje · nezmesti sa do svetlej vysky.
+      def height_lock_problem(recipe, height, clear_h)
+        v = recipe[:height_variants][key_num(height)]
+        if v.nil?
+          known = recipe[:height_variants].keys.sort_by(&:to_i).map { |k| "H#{k}" }.join(' · ')
+          return "#{label(recipe)}: ručne zamknutá výška H#{key_num(height)} v recepte neexistuje " \
+                 "(#{known}). #{LOCK_HINT}"
+        end
+        return nil if v[:min_clear_height].to_f <= clear_h.to_f
+
+        "#{label(recipe)}: ručne zamknutá výška H#{key_num(height)} potrebuje svetlú výšku " \
+          "#{fmt(v[:min_clear_height])} mm (svetlá #{fmt(clear_h)} mm) — " \
+          "zámok sa nikdy nemení automaticky. #{LOCK_HINT}"
+      end
+
+      # Vysky, ktore sa do svetlej vysky ZMESTIA (vzostupne). Prazdne pole =
+      # zasuvka sa nezmesti ani na najnizsi variant. Quadro: prazdne (os neexistuje).
+      def height_options(recipe, clear_h)
+        return [] unless atira?(recipe)
+
+        recipe[:height_variants].select { |_k, v| v[:min_clear_height].to_f <= clear_h.to_f }
+               .keys.map(&:to_i).sort
+      end
+
+      # NL z radu DANEJ vysky, ktore sa zmestia do svetlej hlbky (vzostupne).
+      def nl_options(recipe, height_variant, clear_d)
+        series_for(recipe, height_variant).select { |v| min_depth(recipe, v) <= clear_d.to_f }
+                                          .map(&:to_f).sort
+      rescue RecipeError
+        []
+      end
+
+      # Popis radu do hlasky: „radu H144" pri Atire, „radu receptu" pri Quadre.
+      def series_label(height_variant)
+        height_variant ? "H#{key_num(height_variant)}" : 'receptu'
       end
 
       # Rovnaky kontrakt ako `HardwareRules.override_nominal_length`:

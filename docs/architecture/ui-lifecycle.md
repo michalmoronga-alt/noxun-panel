@@ -1320,6 +1320,17 @@ aplikovateľnosti smeru (`Fronts.direction_slots`, KOV-A1) nad **uloženým** `f
 z počtu krídel neodvodzuje. **`wings_n` je súčasťou záznamu** (Codex #281 P2-A) a pri neznámom počte je `nil`: legacy záznam bez `wings_n` (pred D-07) tak dá `{ nil, [] }` —
 prázdne sloty **a priznané neznámo**, takže karta o ňom nepovie ani „pýtam sa", ani „je to dvojkrídlo".
 
+**`axes` — stav osí zámku (KOV-D2a, Astra #20 F7).** `drawer_axes_map` skladá pre každé klasifikované zásuvkové čelo mapu
+`owner_part_key → { height?: {...}, nl: {...} }` a vešia ju **na obe strany**: na emitovanú položku výsuvu (`attach_drawer_axes`, len `source: 'recipe'`) **aj** na riadok
+ručného zásahu (`attach_override_axes`) — pri konflikte totiž položka fail-closed **nevznikne** a odomknúť sa musí dať aj tak. Každá os nesie
+`state` (`auto` | `locked` | `conflict`), `value`, `options` (hodnoty, ktoré sa **dajú** zamknúť: výšky receptu, ktoré sa zmestia do svetlej výšky; NL z radu **výslednej**
+výšky, ktoré sa zmestia do hĺbky), pri konflikte `message` (**uložený** dôvod z `drawer_conflicts`, nikdy druhý text) a `proposal` — návrh náhrady **z receptu a geometrie**,
+nikdy z dostupných kódov. Návrh mení **len opravovanú os**: druhý zámok ostáva a znova sa overí, a keď pri ňom platná náhrada neexistuje, `proposal` je `nil`
+(D2b potvrdenie neponúkne). **Quadro nemá kľúč `height` vôbec** (nie `state: 'auto'`) — os, ktorá neexistuje, sa neponúka. Pri konflikte **výšky** je ponuka NL prázdna
+a riadok to prizná (`blocked_by: 'height'`): rad NL je per výška, takže sa nemá z čoho počítať. Svetlú výšku ani hĺbku config **neukladá**, preto sa `ctx` prepočítava
+z plánu (`CabinetBuilder.drawer_axis_contexts` → `Construction.drawer_contexts`) — tými **istými** číslami, z ktorých počíta `Recipes.resolve`; druhý výpočet inde by sa
+časom rozišiel a ponuka by sľubovala hodnotu, ktorú resolver odmietne. Existujúce `nl` bloky D-93 a súhrnné `locked` ostávajú **nedotknuté** (payload je aditívny).
+
 **`front_drawer` (KOV-C2c).** Druhý — **vlastný** — kanál toho istého pushu: mapa `front_id → záznam riadku zásuvky` pre čelá, ktoré `Recipes.classified?` pozná ako zásuvku.
 Do `front_slots` sa **nezlučuje** zámerne: ten odpovedá výhradne na otázku „kde sa pýta smer". Záznam skladá `front_drawer_payload` **čítacím** spôsobom z uloženého configu —
 položka výsuvu `source: 'recipe'` (legacy `slide` sa za recept **nevydáva**) dá `state: 'ok'` + hotový `text` a `detail`; `drawer_conflicts` toho čela dá `state: 'conflict'`
@@ -1516,6 +1527,17 @@ tichého echa výberu): zmena, ktorú používateľ práve napísal, sa neuloži
 Doména panela: ručné zásahy do počtov kovania (`handle_set_hardware_override`, D-93 — zápis PO POLIACH `quantity` / `disabled` / `nominal_length` s merge záznamu identity)
 a výber setu na skrinke (`handle_set_hardware_set`, V0.6 D1b, H1b/D-81 aj per-dielec). Pravidlá a sety sú v [hardware.md](hardware.md), UI v odseku „Kontext Kovanie (UI-C4…)".
 Obe cesty overujú identitu **dokumentu** (`foreign_document?`, R-02) **pred** identitou rendrovanej skrinky (`cabinet_id`) a zápis vždy beží ako jeden rebuild = jeden krok Späť.
+
+**RECEPTOVÁ zapisovacia cesta zámkov osí (KOV-D2a, Astra #20 F5).** `OVERRIDE_FIELDS` má od tejto dávky štyri polia (`quantity` · `disabled` · `nominal_length` ·
+`height_variant`) a **musí sa zhodovať** s `CabinetBuilder::OVERRIDE_CONTENT_KEYS` (stráži guard test) — inak by panel uložil pole, ktoré normalizácia zahodí.
+Validácia hodnoty sa **rozdvojuje podľa `rule_id`**: projektové pravidlo ide ako dosiaľ cez `series_value?` (rad `fit_series` zo snapshotu), receptová položka
+(`rule_id recipe:<id>`) ide **úzkou serverovou vetvou** `recipe_lock_context` — *vlastník (čelo) → jeho **pripnutý** recept (`Recipes.active_ref` nad uloženými
+`recipe_refs`) → **výsledná výška** (uložený výškový zámok má prednosť, inak `params.height_variant` emitovanej položky `source: 'recipe'`) → rad tej výšky*.
+D-93 `series_value?` hľadá výhradne projektové `fit_series`, takže zámok NL zásuvky sa dovtedy z panela uložiť **nedal**. Každý článok reťaze sa číta z **čerstvého
+serverového stavu** (uložený config skrinky), nikdy z payloadu: chip na obrazovke môže byť o generáciu starší než model. `rule_id`, ktorý nesedí s pripnutým receptom,
+sa **odmieta** („položka sa medzitým zmenila"), Quadro výškový zámok odmieta hláškou (systém výškové varianty nemá) a výška mimo `height_variants` receptu tiež.
+**Odomknutie osi** je `field` + `value: null`: `merge_override` zmaže **jedno** pole a druhý zámok tej istej identity prežije; záznam zaniká až prázdny. Reset **celého**
+záznamu (`reset: true`) ostáva pre `disabled`/`quantity` a pre osirotené zásahy.
 
 ### actions_materials.rb
 

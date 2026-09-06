@@ -487,8 +487,35 @@ module Noxun
                 'quantity' => 1, 'rule_id' => "recipe:#{recipe[:recipe_id]}",
                 'variant_id' => nil, 'production_class' => 'counted', 'manufactured' => true,
                 'params' => params, 'source' => BuildPlan::HW_SOURCE_RECIPE, 'rule_quantity' => 1 }
-        out['locked'] = true if Recipes.lock_value(recipe, ctx, overrides)
+        # KOV-D2a: `locked` je SUHRN „aspon jedna os je rucne zamknuta"
+        # (Astra #20 F7). Nakup (`HardwareSets.note_manual`) ho cita ako
+        # znamienko rucneho zasahu; ktora os to je, hovori az payload `axes`.
+        out['locked'] = true if Recipes.lock_value(recipe, ctx, overrides) ||
+                                Recipes.height_lock_value(recipe, ctx, overrides)
         out
+      end
+
+      # --- KOV-D2a: svetle rozmery zasuvkovych ciel pre PAYLOAD osi ------------
+      #
+      # CISTA funkcia (ziadne IO, ziadny zapis): pre KAZDE klasifikovane
+      # zasuvkove celo planu vrati ten isty `ctx`, s ktorym pocital resolver.
+      # Cita ju panel, aby vedel ponuknut „zamknut inu vysku/NL" — svetla vyska
+      # ani hlbka sa do configu neukladaju.
+      # Celo, ktoreho hranice plan nema, sa VYNECHA (nikdy sa nehada).
+      def drawer_contexts(cfg, plan)
+        Array(plan[:front_items]).each_with_object({}) do |item, acc|
+          next unless item.is_a?(Hash)
+          next unless Recipes.recipe_key_for(item).first == :ok
+
+          fid = item['id'].to_s
+          next if fid.empty?
+
+          begin
+            acc[fid] = context_for(item, plan, cfg)
+          rescue StandardError
+            next
+          end
+        end
       end
 
       # --- KOV-C1: svetly priestor pre recept zasuvky --------------------------

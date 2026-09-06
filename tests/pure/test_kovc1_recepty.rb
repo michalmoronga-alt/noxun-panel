@@ -328,11 +328,11 @@ NxTest.test('KOV-C1: konflikt z recipe_key_for nesie kod z CONFLICT_CODES a slov
   end
 end
 
-NxTest.test('KOV-C1: register kodov konfliktov ma presne 10 poloziek z package') do
-  NxTest.assert_equal(10, NxKovC1.r::CONFLICT_CODES.size)
+NxTest.test('KOV-C1: register kodov konfliktov ma presne 11 poloziek (D2a: +height_lock_invalid)') do
+  NxTest.assert_equal(11, NxKovC1.r::CONFLICT_CODES.size)
   %w[drawer_unclassified drawer_no_fit drawer_obstruction drawer_internal_unsupported
      drawer_thickness_unsupported drawer_kd_unsupported drawer_recipe_unknown
-     nl_lock_invalid drawer_override_invalid drawer_kit_missing].each do |code|
+     nl_lock_invalid height_lock_invalid drawer_override_invalid drawer_kit_missing].each do |code|
     NxTest.assert(NxKovC1.r::CONFLICT_CODES.include?(code), "chyba kod #{code}")
   end
 end

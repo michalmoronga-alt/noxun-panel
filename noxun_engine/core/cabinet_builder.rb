@@ -102,11 +102,20 @@ module Noxun
       #       NEZASTAVIL a zasuvka by ticho dostala set z projektu namiesto
       #       vybraneho (Astra #20 B1). Brany su rovnake ako pri 5: dopredny
       #       guard prestavby/sablon/kopie (`newer_config?`) a exportna brana.
-      CONFIG_SCHEMA = 6
+      #   7 = KOV-D2a — VYSKOVY ZAMOK zasuvky: zaznam `hardware_overrides`
+      #       s `rule_id recipe:<id>` smie niest pole `height_variant` (druha os
+      #       zamku popri `nominal_length`). Starsi plugin (D1a/D1b, schema 6)
+      #       ho pri normalizacii ZAHODI whitelistom `norm_hardware_overrides`
+      #       — zasuvka by sa ticho vratila na AUTOMATICKU vysku, teda na INE
+      #       dielce a INY kit (Codex #307 P1). Brany su rovnake ako pri 5 a 6:
+      #       dopredny guard prestavby/sablon/kopie (`newer_config?`) a exportna
+      #       brana (`ProductionCore.export_blockers`).
+      CONFIG_SCHEMA = 7
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
-      # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a) by
-      # sa inak KAZDA skrinka schemy 5 zrazu tvarila ako nemigrovana. Zostava 5.
+      # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)
+      # ani na 7 (KOV-D2a) sa nesmie kazda skrinka schemy 5 zrazu tvarit ako
+      # nemigrovana. Zostava 5.
       DRAWER_ACTIVATION_SCHEMA = 5
 
       MIN = { width: 200.0, height: 200.0, depth: 150.0 }.freeze
@@ -121,6 +130,11 @@ module Noxun
       # `drawer_recipes` a jednu doménovú pravdu drzi GUARD TEST, nie poradie
       # requirov (rovnaky vzor ako vazba `hardware_sets` <-> `Fronts`).
       DRAWER_ROLES = %w[drawer_bottom drawer_back box_side drawer_inner_front].freeze
+
+      # KOV-D2a: obsahove polia zaznamu `hardware_overrides`. JEDINE miesto
+      # pravdy o tom, kedy je zaznam bezobsazny (a teda zanika) — panelovy
+      # `Panel::OVERRIDE_FIELDS` je ten isty zoznam a guard test ich porovnava.
+      OVERRIDE_CONTENT_KEYS = %w[disabled quantity nominal_length height_variant].freeze
 
       # Fallback farby SketchUp materialu, ak material_id nie je v katalogu (Materials preberie color).
       FALLBACK_RGB_KORPUS = [216, 196, 160].freeze
@@ -1405,6 +1419,24 @@ module Noxun
           m[1]
         end
 
+        # KOV-D2a: svetle rozmery KLASIFIKOVANYCH zasuvkovych ciel
+        # (`front_id => ctx`) pre PAYLOAD osi. Config svetlu vysku ani hlbku
+        # NEUKLADA, takze ponuku „zamknut inu vysku/NL" nemozno postavit
+        # z ulozeneho stavu — musi sa prepocitat z planu, presne z tych istych
+        # cisel, z ktorych ju pocita `Recipes.resolve` (druhy vypocet inde by
+        # sa casom rozisiel a ponuka by slubovala hodnotu, ktoru resolver
+        # odmietne). CITACIA cesta: ziadny zapis, ziadna operacia.
+        def drawer_axis_contexts(params)
+          cfg = normalize(params)
+          items = cfg[:fronts].is_a?(Hash) ? cfg[:fronts]['items'] : nil
+          return {} unless Array(items).any? { |it| it.is_a?(Hash) && it['type'].to_s == 'drawer_front' }
+
+          Construction.drawer_contexts(cfg, Construction.build_plan(cfg))
+        rescue StandardError => e
+          Engine.log_error(e, 'drawer_axis_contexts') if defined?(Engine)
+          {}
+        end
+
         def plan_parts_by_key(params)
           cfg = normalize(params)
           Construction.build_plan(cfg)[:parts].each_with_object({}) do |pd, map|
@@ -2127,6 +2159,15 @@ module Noxun
         # zahodit quantity ani nominal_length (zmena jedneho pola by inak ticho
         # zmazala ostatne rucne zasahy tej istej identity). Zaznam bez jedineho
         # obsahoveho pola je bezobsazny -> zahodi sa.
+        #
+        # KOV-D2a: pribudlo pole `height_variant` (VYSKOVY zamok, `CONFIG_SCHEMA`
+        # 7). Prijima sa LEN na zazname s receptovou identitou `rule_id
+        # recipe:<recipe_id>` a LEN pre ATIRU — Quadro vyskove varianty nema
+        # (`box_height` plynie z geometrie), takze jeho zamok by nemal co drzat.
+        # Tvar hodnoty rozhoduje `Recipes.height_value` (kladne cele cislo);
+        # ci taku vysku PRIPNUTY recept naozaj pozna a ci sa zmesti, rozhoduje
+        # az resolver (RED `height_lock_invalid`) — presne ako pri NL, kde rad
+        # taktiez overuje az `Recipes.resolve`.
         def norm_hardware_overrides(raw_ov)
           return [] unless raw_ov.is_a?(Array)
           out = {}
@@ -2147,10 +2188,39 @@ module Noxun
             # NL: JEDINA autorita tvaru je HardwareRules.override_nl (strict Float).
             nl = HardwareRules.override_nl(ov['nominal_length'] || ov[:nominal_length])
             rec['nominal_length'] = nl if nl
-            next unless rec.key?('disabled') || rec.key?('quantity') || rec.key?('nominal_length')
+            hv = norm_height_lock(rid, ov['height_variant'] || ov[:height_variant])
+            rec['height_variant'] = hv if hv
+            next unless OVERRIDE_CONTENT_KEYS.any? { |k| rec.key?(k) }
             out[[owner, gt, rid]] = rec
           end
           out.values
+        end
+
+
+        # Vyskovy zamok prezije normalizaciu LEN na receptovej identite ATIRY.
+        # Pritomna, ale neprijatelna hodnota sa zahadzuje S LOGOM — tichy drop
+        # by z ruceneho zamku spravil automat bez jedineho stopy.
+        def norm_height_lock(rule_id, raw)
+          return nil if raw.nil?
+          return nil unless defined?(Recipes)
+
+          rid = rule_id.to_s
+          unless rid.start_with?(Recipes::LOCK_RECIPE_PREFIX)
+            log_dropped_height_lock(rid, 'vyskovy zamok existuje len na receptovej polozke')
+            return nil
+          end
+          parsed = Recipes.parse_id(rid.sub(Recipes::LOCK_RECIPE_PREFIX, ''))
+          if parsed.nil? || parsed[:system] != 'atira'
+            log_dropped_height_lock(rid, 'system nema vyskove varianty')
+            return nil
+          end
+          v = Recipes.height_value(raw)
+          log_dropped_height_lock(rid, "neplatny tvar #{raw.inspect}") if v.nil?
+          v
+        end
+
+        def log_dropped_height_lock(rule_id, why)
+          Engine.log("norm_hardware_overrides: height_variant zahodeny (#{rule_id}) — #{why}") if defined?(Engine)
         end
 
         # --- KOV-H1: ad-hoc kovanie -----------------------------------------

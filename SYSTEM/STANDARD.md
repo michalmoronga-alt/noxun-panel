@@ -177,6 +177,9 @@ seed `AbsRules` `SEED_VERSION` 4. Roly žijú na troch miestach naraz (`BuildPla
   je výhradne explicitná akcia KOV-D). **KOV-D1a (v0.9.34):** prítomný, ale NEPLATNÝ záznam `recipe_refs` (nesúlad kľúča a receptu, zlý tvar hodnoty) sa už **nezahadzuje** —
   zostáva v configu a `Recipes.active_ref` ho vráti ako `[:unknown, id]` → RED `drawer_recipe_unknown`. Zahodenie by zo záznamu spravilo „chýbajúci" a poškodený pin by ticho
   zmenil fyziku hotovej zákazky.
+- **`7 = KOV-D2a` (v0.9.37): výškový zámok zásuvky.** Záznam `hardware_overrides` s `rule_id recipe:<id>` smie niesť pole **`height_variant`** — druhú os zámku popri
+  `nominal_length`. Starší plugin (schéma 6) ho pri normalizácii **zahodí** whitelistom `norm_hardware_overrides`, takže zásuvka by sa ticho vrátila na **automatickú
+  výšku** — teda na iné dielce a iný kit. `DRAWER_ACTIVATION_SCHEMA` ostáva **5**.
 - **`6 = KOV-D1a` (v0.9.34): owner triedny kľúč v `hardware_sets` skrinky.** Config smie niesť kľúč `class:<generic_type>|<opening_mode>[|<drawer_construction>]@front:<id>/panel`
   — vlastný kit pre JEDNO čelo. Starší plugin taký kľúč pri normalizácii zahodí, no typová kontrola z neho stále prečíta podporovaný `slide`, takže by prestavbu **nezastavil**
   a zásuvka by ticho dostala set z projektu namiesto vybraného. `DRAWER_ACTIVATION_SCHEMA` (aktivácia receptov) ostáva **5** — je to vlastná konštanta práve preto, aby bump
@@ -444,12 +447,22 @@ Globálna knižnica `%APPDATA%\NOXUN\Engine\hardware_rules.json` je len default 
 **Položka výsuvu z RECEPTU (KOV-C2b, v0.9.31).** Zásuvkové čelo klasifikované systémom dostáva **práve jednu** položku: `generic_type: "slide"`,
 `rule_id: "recipe:<recipe_id>"`, `owner_part_key: "front:<id>/panel"`, `quantity: 1`, `rule_quantity: 1`, `source: "recipe"`,
 `params {recipe_id, system, height_variant | box_height, nominal_length, load, opening, opening_mode, drawer_construction}`.
-Voliteľné **`locked: true`** smie niesť VÝHRADNE položka so `source: "recipe"` a len keď existuje platný NL zámok — spotrebitelia (`note_manual`, payloady Nákupu
-a Inspectora) ho čítajú ako dnešné `source: "manual"`. Zákaz zmeny množstva plynie zo `source: "recipe"`: server odmieta `quantity`/`disabled` mutácie pre `rule_id recipe:*`,
+Voliteľné **`locked: true`** smie niesť VÝHRADNE položka so `source: "recipe"` a len keď existuje platný zámok **niektorej osi** (KOV-D2a: je to **súhrn**
+„aspoň jedna os je ručne zamknutá"; ktorá os to je, hovorí až payload `axes`) — spotrebitelia (`note_manual`, payloady Nákupu a Inspectora) ho čítajú ako dnešné
+`source: "manual"`. Zákaz zmeny množstva plynie zo `source: "recipe"`: server odmieta `quantity`/`disabled` mutácie pre `rule_id recipe:*`,
 a taký zásah v uloženom configu = RED `drawer_override_invalid`. Legacy `slide` pravidlá sa na takom čele **nevyhodnocujú** (R2 exkluzivita) — jedna zásuvka = jeden výsuv.
 Nákup si k nej hľadá set **triednym kľúčom** a na generický `slide` **nikdy nepadá**; chýbajúci kit = RED `drawer_kit_missing`, ktorý blokuje **všetky** exporty vrátane VEPO.
 **Ručné zásahy** žijú v configu korpusu ako `hardware_overrides` — identita zásahu = trojica **(owner_part_key, generic_type, rule_id)**;
 `quantity` prepíše počet, `disabled` položku vyradí, `nominal_length` prepíše dĺžku; šablóny korpusov zásahy zachovávajú.
+
+**ZÁMKY OSÍ ZÁSUVKY (KOV-D2a, v0.9.37).** Zásuvka z receptu má **dve** osi ručného zámku a obe žijú v tom istom zázname `hardware_overrides`:
+**`nominal_length`** (dĺžka výsuvu, D-93) a **`height_variant`** (výškový variant; celé číslo, **výhradne** pri `rule_id recipe:<id>` a **výhradne pre Atiru** — Quadro
+výškové varianty nemá, `box_height` plynie z geometrie). Zámok = **existencia platného poľa**; `disabled: true` zámok nenesie. Poradie resolvera je záväzné, lebo
+**rad NL JE per výška**: *zamknutá alebo automatická výška → rad NL tej výšky → zamknutá alebo automatická NL → dielce → nákupný selektor*. Zamknutá výška musí
+existovať v pripnutom recepte **a zmestiť sa**, inak RED `height_lock_invalid` bez dielcov aj výsuvu; zamknutá NL sa overuje proti radu **výslednej** výšky
+(zamknutá 520 po automatickom prechode H70 → H144 = `nl_lock_invalid`, **nikdy návrat na nižšiu výšku ani zmena NL**). Zápis ide **serverovou receptovou cestou**
+(vlastník → pripnutý recept → výsledná výška → jej rad; hodnoty z čerstvého serverového stavu, nikdy z payloadu) a **odomknutie osi maže LEN jedno pole** — druhý
+zámok tej istej identity prežije. Receptový zámok **nikdy** neprechádza `HardwareRules.apply_overrides` (prepol by `source` na `manual`).
 
 **Ručná nominálna dĺžka výsuvu (D-93, V0.5.61).** Pole `nominal_length` v zázname `hardware_overrides` (Float mm > 0) je **zámok**: samotná **existencia platného poľa** znamená „drží sa ručná hodnota", žiadny ďalší príznak neexistuje. Pravidlá kontraktu:
 
