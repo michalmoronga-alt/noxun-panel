@@ -16268,28 +16268,33 @@ module NoxunSuRunner
     ok("KOV-D3b dopad: nesie ODTLACOK potvrdeneho nahladu (#{fp.inspect})", !fp.empty?)
 
     # --- ZMENA SKRINKY PO NAHLADE = ZAPIS SA ODMIETNE (Codex #315 P1) ------
-    # Medzi „ukáž dopad" a „Prejsť" sa skrinka zmeni (hlbka 500 -> 400, teda
-    # INE dielce aj NL). Bez odtlacku by server zapisal INY dopad, nez ktory
-    # pouzivatel videl — `from` to nechyti, ten strazi len pripnuty recept.
-    mstale = r03_marker(model, markers)
+    # Medzi „ukáž dopad" a „Prejsť" sa skrinka zmeni. Zmena je ZAMERNE MIERNA
+    # (sirka, nie hlbka): pri hlbke by na novom stave prestal platit zamok NL
+    # a zapis by odmietol uz PREFLIGHT — tu ma odmietnut POROVNANIE ODTLACKU.
+    # Sirka meni rozmery dielcov (a teda dopad), ale vysku, NL ani kit nie,
+    # takze prepare prejde. `from` to nechyti: ten strazi len pripnuty recept.
     par = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
-    deep = par['depth'].to_f
-    par['depth'] = deep - 100.0
+    wide = par['width'].to_f
+    par['width'] = wide - 50.0
     e::CabinetBuilder.rebuild(model, inst, par)
+    # MARKER AZ TERAZ: prestavba sirky je sama o sebe krok Spat, takze marker
+    # polozeny PRED nou by meral ju, nie odmietnuty zapis (to bola pricina
+    # FAIL-u „odmietnutie nenechalo ZIADNY krok Spat" v behu nad `615a92f`).
+    mstale = r03_marker(model, markers)
     stale = kovd3b_write(model, inst, up, fp, 'w0')
-    ok("KOV-D3b zastaraly nahlad: zapis ODMIETNUTY s hlaskou (#{stale.inspect})",
+    ok("KOV-D3b zastaraly nahlad: zapis ODMIETNUTY hlaskou o zmene stavu (#{stale.inspect})",
        stale.is_a?(Array) && stale.first == false && stale[1].to_s.include?('medzitým'))
     ok('KOV-D3b zastaraly nahlad: v mape ostava v1 a zamok je nedotknuty',
        kovd3a_ref(inst) == KOVD3B_V1 &&
        kovd2a_overrides(inst).any? { |o| o['rule_id'].to_s == KOVD2A_RID })
-    # Marker je POSLEDNY krok PO prestavbe hlbky — odmietnuty zapis do undo
-    # stacku nepridal nic.
+    # Marker je POSLEDNY krok — odmietnuty zapis do undo stacku nepridal nic.
     Sketchup.undo
     ok('KOV-D3b zastaraly nahlad: odmietnutie nenechalo ZIADNY krok Spat', !mstale.valid?)
-    # Spat na povodnu hlbku (undo vratil prestavbu) — dalej scenar pokracuje
-    # nad TOU ISTOU skrinkou ako predtym.
-    ok("KOV-D3b zastaraly nahlad: Spat vratil hlbku #{deep.to_i}",
-       (e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})['depth'].to_f - deep).abs <= TOL)
+    # Druhy Spat vrati sirku — dalej scenar pokracuje nad TOU ISTOU skrinkou
+    # ako pred zmenou.
+    Sketchup.undo
+    ok("KOV-D3b zastaraly nahlad: Spat vratil sirku #{wide.to_i}",
+       (e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})['width'].to_f - wide).abs <= TOL)
     r03_clear_markers(model, markers)
 
     # --- POTVRDENY ZAPIS = JEDNA operacia + odpoved cakajucemu oknu -------

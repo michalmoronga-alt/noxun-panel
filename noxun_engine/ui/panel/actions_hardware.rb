@@ -490,13 +490,24 @@ module Noxun
             return upgrade_fail(tok, 'Výber sa medzitým zmenil — panel sa obnovil, skús znova.')
           end
 
+          # ZAPISAT SA SMIE LEN TO, CO POUZIVATEL NAOZAJ VIDEL. Ked payload nesie
+          # odtlacok, potvrdzoval KONKRETNY nahlad — a vtedy je jedno, ci zmenu
+          # stavu odhalilo POROVNANIE ODTLACKU, alebo az preflight nad NOVYM
+          # stavom padol: odpoved musi byt JEDNA a ta ista veta (Codex #315
+          # kolo 1 P1, in-SU beh nad `615a92f`). Holy text preflightu by hovoril
+          # o stave, ktory pouzivatel nikdy nevidel — a znel by ako chyba jeho
+          # zasuvky, nie ako „medzitym sa nieco zmenilo".
+          # Panel sa pri odmietnuti PREKRESLI, takze ponuka aj karta ukazuju
+          # cerstvy stav a druhy pokus uz ide nad novym nahladom.
           prep, err = drawer_upgrade_prepare(model, cab, data)
-          return upgrade_fail(tok, err) if err
+          from_preview = !present_str(data['fingerprint']).nil?
+          if err
+            return upgrade_fail(tok, err) unless from_preview
 
-          # AZ POTOM: zapisat sa smie LEN to, co pouzivatel naozaj videl.
-          # Panel sa pri nezhode PREKRESLI, aby ponuka aj karta ukazovali
-          # cerstvy stav — modal ostane otvoreny s hlaskou a druhy pokus uz ide
-          # nad novym nahladom.
+            push_selected(model)
+            return upgrade_fail(tok, upgrade_stale_reason(err))
+          end
+
           err = drawer_upgrade_preview_problem(model, cab, prep, data)
           if err
             push_selected(model)
@@ -637,6 +648,14 @@ module Noxun
         # Chybajuci odtlacok je odmietnutie rovnako ako nesediaci: zapis smie
         # prist VYHRADNE z potvrdeneho nahladu (fail-closed).
         UPGRADE_STALE_PREVIEW = 'Stav skrinky sa medzitým zmenil — otvor náhľad znova.'
+
+        # TA ISTA veta aj vtedy, ked zmenu odhalil az preflight nad novym stavom
+        # — dovod sa PRIPOJI (pouzivatel ma vediet, co na novom stave nesadlo),
+        # ale hlavna sprava ostava „stav sa zmenil", nie „tvoja zasuvka je zla".
+        def upgrade_stale_reason(reason)
+          r = reason.to_s.strip
+          r.empty? ? UPGRADE_STALE_PREVIEW : "#{UPGRADE_STALE_PREVIEW.chomp('.')} — #{r}"
+        end
 
         def drawer_upgrade_preview_problem(model, cab, prep, data)
           sent = present_str(data['fingerprint'])

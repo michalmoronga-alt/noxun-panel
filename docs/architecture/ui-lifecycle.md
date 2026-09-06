@@ -861,6 +861,13 @@ a server ho **pred zápisom prepočíta tou istou funkciou**. Nezhoda **aj chýb
 (fail-closed: zápis smie prísť výhradne z potvrdeného náhľadu). Pri odmietnutí sa panel **prekreslí** (`push_selected`), takže ponuka aj karta ukazujú čerstvý stav a druhý
 pokus ide už nad novým náhľadom; modal ostáva otvorený s hláškou.
 
+**Keď zmenu odhalí až preflight, hláška je TÁ ISTÁ** (in-SU beh nad `615a92f`). Zmenený stav môže padnúť **skôr**, než sa k porovnaniu odtlačku vôbec príde: `prepare` nad
+novým stavom zlyhá (napr. zamknutá NL sa do menšej hĺbky nezmestí) a odtlačok, ktorý sa počíta **z dopadu**, vtedy neexistuje. Surový text preflightu by ale hovoril o stave,
+ktorý používateľ **nikdy nevidel**, a znel by ako chyba jeho zásuvky namiesto „medzitým sa niečo zmenilo". Preto: keď payload **nesie** odtlačok (`from_preview`), každé
+zlyhanie `prepare` sa prevedie na **tú istú** stale vetu a pôvodný dôvod sa **pripojí** za pomlčkou (`upgrade_stale_reason`). Bez odtlačku — teda mimo cesty z potvrdenia
+(testy, in-SU sekcia D3a) — sa dôvod **neprepisuje**. **Odmietnutie nezapíše nič a neotvorí operáciu:** jediné `start_operation` tejto cesty je v `CabinetBuilder.rebuild`
+za oboma bránami (stráži to headless test s počítadlom prestavieb).
+
 **KOV-D1b doplnil do TOHO ISTÉHO rozkliku „čo je v balení"** — za vety receptu pribudne „Balenie: &lt;názov setu&gt;", riadok každého člena („· K-sada 357696 — Súprava Atira 470
 biela (1 ks)") a pri probléme priznaný dôvod („Bez kódu: …"). Žiadny nový blok a **žiadny druhý explain**: zdrojom je **jediný existujúci rozpis** `HardwareSets.explain`, ten
 istý, z ktorého žije nákupný riadok D-92 aj súpis — panel a súpis sa rozísť nesmú. **NOSNOSŤ v balení nie je a byť nesmie**: vydáva ju výhradne recept (riadok „Nosnosť bunky"

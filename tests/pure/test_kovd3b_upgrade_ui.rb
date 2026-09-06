@@ -552,6 +552,65 @@ NxTest.test('KOV-D3b (P1): CHYBAJUCI odtlacok je odmietnutie (fail-closed)') do
   end
 end
 
+NxTest.test('KOV-D3b (P1): ked payload nesie odtlacok, aj ZLYHANY PREFLIGHT hlasi „stav sa zmenil"') do
+  c = NxD3b
+  # In-SU beh nad `615a92f`: scenar zmensil hlbku tak, ze na novom stave uz
+  # neplatil zamok NL — zapis odmietol PREFLIGHT a pouzivatel dostal jeho
+  # SUROVY text („ručne zamknutá dĺžka 470 mm potrebuje hĺbku 485 mm…").
+  # Lenze to je veta o stave, ktory NIKDY nevidel: on potvrdzoval nahlad nad
+  # POVODNOU skrinkou. Odpoved musi byt ta ista ako pri nesediacom odtlacku.
+  base = c.panel.singleton_class::UPGRADE_STALE_PREVIEW
+  NxTest.assert_equal(base, c.panel.upgrade_stale_reason(nil), 'bez dovodu ostava hlaska sama')
+  NxTest.assert_equal(base, c.panel.upgrade_stale_reason('   '))
+  msg = c.panel.upgrade_stale_reason('Nová verzia receptu na túto zásuvku nesadne: hrúbka.')
+  NxTest.assert(msg.start_with?(base.chomp('.')),
+                "hlavna sprava ostava veta o zmene stavu: #{msg.inspect}")
+  NxTest.assert(msg.include?('medzitým') && msg.include?('hrúbka'),
+                "dovod sa PRIPOJI, nie nahradi: #{msg.inspect}")
+
+  # Zdrojovy guard poradia: bez odtlacku ostava surovy dovod (cesta z testov
+  # a in-SU sekcie D3a), s odtlackom sa prevedie na stale hlasku.
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_hardware.rb'),
+                  encoding: 'UTF-8')
+  body = src[/def handle_upgrade_drawer_recipe.*?\n        rescue StandardError/m].to_s
+  NxTest.assert(body.include?("from_preview = !present_str(data['fingerprint']).nil?"), body)
+  NxTest.assert(body.include?('return upgrade_fail(tok, err) unless from_preview'),
+                'bez odtlacku sa dovod NEPREPISUJE')
+  NxTest.assert(body.include?('upgrade_fail(tok, upgrade_stale_reason(err))'),
+                's odtlackom je odpoved JEDNA veta')
+end
+
+NxTest.test('KOV-D3b (P1): ODMIETNUTA cesta neotvori operaciu (ziadny krok Spat)') do
+  c = NxD3b
+  # In-SU beh nad `615a92f` hlasil aj „odmietnutie nenechalo ZIADNY krok Spat".
+  # Bola to CHYBA SCENARA (marker lezal PRED prestavbou hlbky, takze `undo`
+  # zrusil prestavbu, nie marker) — nie produktovy bug. Tento test to drzi
+  # deterministicky: cela odmietnuta cesta (preflight AJ nesediaci odtlacok)
+  # nesmie zavolat `CabinetBuilder.rebuild`, jedine miesto v tomto handleri,
+  # ktore operaciu otvara.
+  cfg = c.cfg_for(c.params)
+  before = JSON.generate(cfg)
+  c.with_v2 do
+    cab = c.cab_with(cfg)
+    prep, = c.panel.drawer_upgrade_prepare(nil, cab, 'front_id' => 'F1',
+                                                     'from' => NxD3b::V1, 'to' => NxD3b::V2)
+    builds = NxD3bOps.count do
+      # (a) nesediaci odtlacok
+      NxTest.assert(c.panel.drawer_upgrade_preview_problem(nil, cab, prep,
+                                                           'fingerprint' => 'cudzi'))
+      # (b) chybajuci odtlacok
+      NxTest.assert(c.panel.drawer_upgrade_preview_problem(nil, cab, prep, {}))
+      # (c) preflight nad cielom, ktory nesadne
+      _p, e2 = c.panel.drawer_upgrade_prepare(nil, cab, 'front_id' => 'F1',
+                                                        'from' => NxD3b::V1, 'to' => NxD3b::BAD)
+      NxTest.assert(!e2.nil?)
+    end
+    NxTest.assert_equal(0, builds,
+                        "odmietnutie NESMIE prestavat skrinku (#{builds} volani `rebuild`)")
+  end
+  NxTest.assert_equal(before, JSON.generate(cfg), 'a config skrinky ostava bajtovo rovnaky')
+end
+
 NxTest.test('KOV-D3b (P1): dopad NESIE odtlacok, ktory klient len vracia') do
   src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_hardware.rb'),
                   encoding: 'UTF-8')
@@ -627,6 +686,24 @@ end
 # ============================================================================
 # P2 (Codex #315 kolo 1) — REGISTER RECEPTOV SA CITA RAZ ZA PUSH
 # ============================================================================
+
+# Pocitadlo PRESTAVIEB. `CabinetBuilder.rebuild` je jedine miesto zapisovej
+# cesty upgradu, ktore otvara `start_operation` — ked ho odmietnuta vetva
+# nezavola, nemohla vzniknut ani polozka undo stacku.
+module NxD3bOps
+  def self.count
+    sc = Noxun::Engine::CabinetBuilder.singleton_class
+    n = 0
+    sc.send(:alias_method, :d3b_orig_rebuild, :rebuild)
+    sc.send(:define_method, :rebuild) { |*_a, **_kw| n += 1 }
+    yield
+    n
+  ensure
+    sc.send(:remove_method, :rebuild)
+    sc.send(:alias_method, :rebuild, :d3b_orig_rebuild)
+    sc.send(:remove_method, :d3b_orig_rebuild)
+  end
+end
 
 module NxD3bIo
   # Pocitadlo REALNYCH citani `RELEASED.json` (z cache sa vracia skor).

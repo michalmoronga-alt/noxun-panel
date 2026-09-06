@@ -57,8 +57,16 @@
   **(P2) Quadro nemá `height_variant`:** výška emituje `kind` (`variant` = „H144", `box` = mm z `box_height`) — bez toho by modal ukázal „Výška — → —" a zmenu výšky boxu
   zamlčal. **(P2) Register receptov sa číta raz za prechod:** `Recipes.with_register_cache` (cache **neprežije** blok, poškodený register sa nezakešuje) + memo cieľa per
   `system|opening` — desať zásuviek znamenalo 20+ synchrónnych čítaní disku pri **každom** pushi vrátane echa po edite.
-  **Testy:** headless **3302 PASS** (3273 pred dávkou, +29 v `tests/pure/test_kovd3b_upgrade_ui.rb`), **93 JS sád** (+`tests/js/test_kovd3b_ui.js`, 93 assertov v mini-DOM cez
-  celý tok klik → dopad → potvrdenie → odpoveď), **14 overených mutácií** (7 JS, 7 Ruby) a in-SU sekcia **`run_kovd3b`** (napísaná, spúšťa orchestrátor).
+  **Prvý in-SU beh (nad `615a92f`) našiel dve veci.** (1) **Hláška:** zmenený stav môže padnúť **skôr**, než sa k porovnaniu odtlačku vôbec príde — `prepare` nad novým stavom
+  zlyhá (zamknutá NL sa do menšej hĺbky nezmestí) a odtlačok, ktorý sa počíta **z dopadu**, vtedy neexistuje. Používateľ tak dostal **surový text preflightu**, teda vetu
+  o stave, ktorý nikdy nevidel, znejúcu ako chyba jeho zásuvky. Odteraz: keď payload **nesie** odtlačok, každé zlyhanie `prepare` sa prevedie na **tú istú** stale vetu
+  a pôvodný dôvod sa **pripojí** za pomlčkou (`upgrade_stale_reason`); bez odtlačku (testy, in-SU D3a) sa dôvod neprepisuje. (2) **„Krok Späť po odmietnutí" bola chyba
+  SCENÁRA, nie produktu:** marker ležal **pred** prestavbou šírky/hĺbky, takže `Sketchup.undo` zrušil tú prestavbu a marker prežil. Odmietnutá cesta nezapisuje nič — jediné
+  `start_operation` je v `CabinetBuilder.rebuild` za oboma bránami, a drží to headless test s **počítadlom prestavieb** (odmietnutie cez odtlačok aj cez preflight = 0 volaní).
+  Scenár má marker **až za** zmenou a mení **šírku** (mierna zmena: dopad sa zmení, ale preflight prejde, takže odmieta naozaj **porovnanie odtlačku**); veľkú zmenu, pri
+  ktorej padne preflight, pokrýva headless.
+  **Testy:** headless **3304 PASS** (3273 pred dávkou, +31 v `tests/pure/test_kovd3b_upgrade_ui.rb`), **93 JS sád** (+`tests/js/test_kovd3b_ui.js`, 93 assertov v mini-DOM cez
+  celý tok klik → dopad → potvrdenie → odpoveď), **16 overených mutácií** (7 JS, 9 Ruby) a in-SU sekcia **`run_kovd3b`** (napísaná, spúšťa orchestrátor).
 
 - **KOV-D3a — UPGRADE RECEPTU: JEDNO ČELO, JADRO (v0.9.39, 6.9.2026).**
   Recepty zásuviek sú **nemenné**: oprava alebo nová hodnota od výrobcu neprepíše starý súbor, ale vydá `_v2`. Dovtedy však chýbal mechanizmus, ktorým sa už postavená
