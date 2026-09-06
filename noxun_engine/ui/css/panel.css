@@ -247,6 +247,26 @@
   .nx-inspector .fcard .inforow b { color: var(--nx-ink-strong); font-weight: 600; font-size: inherit; }
   .nx-inspector .fcard .inforow.warn { color: var(--nx-warnchip-fg); }
   .nx-inspector .fcard .inforow.err { color: var(--nx-err-fg); }
+  /* KOV-C2c: ikona pri cervenom/jantarovom riadku karty — dedi farbu textu
+     (`currentColor` v sprite), takze nepribuda ziadny novy token. */
+  .nx-inspector .fcard .inforow .ic { width: 12px; height: 12px; margin-right: 4px;
+                   vertical-align: -2px; }
+  /* KOV-C2c: RIADOK VYRIESENEJ ZASUVKY. Read-only, tvarom sa drzi `.prow`
+     (popis vlavo pevne, hodnota vpravo), ale hodnota nie je ovladac — preto
+     ziadny ramik ani hover. Vertikalny priestor: JEDEN riadok, detail az po
+     rozkliknuti. */
+  .nx-inspector .fcard .drow { display: flex; align-items: baseline; gap: 6px; margin-top: 6px; }
+  .nx-inspector .fcard .drow .dl { flex: 0 0 74px; font-size: 11px; color: var(--nx-ink-label); }
+  .nx-inspector .fcard .drow .dv { flex: 1 1 0; min-width: 0; font-size: 11px; font-weight: 600;
+                   color: var(--nx-ink-strong); line-height: 1.35; }
+  .nx-inspector .fcard .ddet { margin-top: 4px; font-size: 10.5px; color: var(--nx-ink-muted); }
+  .nx-inspector .fcard .ddet summary { cursor: pointer; color: var(--nx-select);
+                   list-style: none; }
+  .nx-inspector .fcard .ddet summary::-webkit-details-marker { display: none; }
+  .nx-inspector .fcard .ddet summary::before { content: '+'; margin-right: 4px; font-weight: 700; }
+  .nx-inspector .fcard .ddet[open] summary::before { content: '−'; }
+  .nx-inspector .fcard .ddet summary:focus-visible { outline: 2px solid var(--nx-select); outline-offset: 1px; }
+  .nx-inspector .fcard .ddet ul { margin: 3px 0 0; padding-left: 16px; line-height: 1.45; }
   /* Hint v karte je uz odsadeny kartou — nepotrebuje vlastny spodny odstup. */
   .nx-inspector .fcard .hint { margin: 5px 0 0; }
   /* D-22: zamok limitu presahov (v riadku medzier sekcie Cela) — ikona + text v rade */

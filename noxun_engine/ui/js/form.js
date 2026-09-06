@@ -698,6 +698,9 @@
     // smer pýta — sloty sú preto prázdne a karta smerový riadok nekreslí.
     // Odvodiť si ho z počtu krídel by znamenalo druhú pravdu (pasca FIX 11).
     frontSlots = null;
+    // KOV-C2c: to iste plati pre riadok zasuvky — navrh vkladania nema za sebou
+    // stavbu, takze server o systeme, vyske ani NL nic nevie.
+    frontDrawer = null;
     closeFrontCard();                        // ani otvorena karta cela (Codex #281 P2-B)
     renderFronts(insertFrontsOf(src));       //         cela + medzery + edge_limit_off
     currentZoneTree = src.zone_tree ? sanitizeTree(src.zone_tree) : defaultTree();
@@ -988,6 +991,14 @@
   function frontSlotsOf(fid){
     if (!frontSlots || !fid) return undefined;
     return Object.prototype.hasOwnProperty.call(frontSlots, fid) ? frontSlots[fid] : undefined;
+  }
+
+  // KOV-C2c: ZAZNAM SERVERA o zasuvke daneho cela (`front_drawer[fid]`).
+  // `undefined` = server sa k nej nevyjadril (celo bez klasifikacie, navrh
+  // vkladania, stary payload) — karta riadok zasuvky nekresli.
+  function frontDrawerOf(fid){
+    if (!frontDrawer || !fid) return undefined;
+    return Object.prototype.hasOwnProperty.call(frontDrawer, fid) ? frontDrawer[fid] : undefined;
   }
 
   // UI-C3: pole vysky ma svoje ID kvoli vyskovemu radu (N25) — `nxDimPick`
@@ -1294,7 +1305,8 @@
   function frontCardHtml(row){
     var item = frontExtraOf(row);
     item.type = row.dataset.frontType || 'door';
-    var m = frontCardModel(item, frontSlotsOf(row.dataset.frontId));
+    var m = frontCardModel(item, frontSlotsOf(row.dataset.frontId),
+                           frontDrawerOf(row.dataset.frontId));
     var h = '<div class="typegrid" role="group" aria-label="Typ čela">';
     m.tiles.forEach(function(t){
       h += '<button type="button" class="typetile' + (t.on ? ' on' : '') + '"' +
@@ -1306,11 +1318,28 @@
     h += '</div>';
     m.rows.forEach(function(r){
       if (r.kind === 'info'){
-        h += '<div class="inforow' + (r.tone === 'muted' ? '' : ' ' + r.tone) + '">' + esc(r.text) + '</div>';
+        // KOV-C2c: ikona LEN ked ju view-model vyslovne ziada (cerveny dovod,
+        // jantarove odporucanie) — informacne vety karty ostavaju bez nej.
+        h += '<div class="inforow' + (r.tone === 'muted' ? '' : ' ' + r.tone) + '">' +
+             (r.icon ? NXIcons.svg(r.icon) : '') + esc(r.text) + '</div>';
         return;
       }
       if (r.kind === 'hint'){
         h += '<div class="hint">' + esc(r.text) + '</div>';
+        return;
+      }
+      // KOV-C2c: JEDEN read-only riadok vyriesenej zasuvky + rozbalitelny
+      // technicky detail (vety receptu). Ziadne tlacidla, ziadny zapis —
+      // hodnoty su vysledok stavby a menia sa klasifikaciou nad nou.
+      if (r.kind === 'resolved'){
+        h += '<div class="drow"><span class="dl">' + esc(r.label) + '</span>' +
+             '<span class="dv">' + esc(r.text) + '</span></div>';
+        if (r.note) h += '<div class="hint">' + esc(r.note) + '</div>';
+        if (r.detail && r.detail.length){
+          h += '<details class="ddet"><summary>Technický detail</summary><ul>';
+          r.detail.forEach(function(t){ h += '<li>' + esc(t) + '</li>'; });
+          h += '</ul></details>';
+        }
         return;
       }
       h += '<div class="prow"><span class="pl">' + esc(r.label) + '</span>' +

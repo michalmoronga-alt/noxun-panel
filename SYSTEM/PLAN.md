@@ -353,6 +353,24 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   by pri stojacom dielci vyšlo na zlú hranu — PartFaces zásada „radšej žiadna farba"; farbenie = C2c/D); (4) povýšenie na `drawer_kit_missing` platí pre **každý** dôvod
   nemapovania receptovej položky, nielen pre tri menované (fail-closed — iný dôvod jej lepší výsledok nedá); (5) `legacy_slide_suppressed` sa v Kontrole zámerne
   NEZOBRAZUJE (`Validation::BUILD_INFO_ONLY`) — je to konštatovanie, nie nález. **Bod (h) = C2c.**
+  **C2c · UI zásuviek — ✅ HOTOVÉ (PR #306, v0.9.33, 6.9.2026): tým je SLICE C KOMPLET.** Bod C2 **(h)** je uzavretý.
+  `cabinet_payload` posiela nový VLASTNÝ kanál `front_drawer` (`front_id → { state, text, detail[], sync, message,
+  locked_note }`) — karta čela z neho kreslí **jediný read-only riadok** „Atira · H70 · NL 470 · 30 kg · SiSy · recept v1“
+  (Quadro = výška boxu) a vety receptu v **rozbaliteľnom** `<details>`. Vety skladá `Recipes.explain_stored` z ULOŽENÝCH
+  `params` a PRIPNUTÉHO receptu, nikdy z prepočítanej geometrie; neznámy recept = prázdny zoznam. Konflikt **nahrádza**
+  hodnoty červenou vetou stavby, `drawer_sync_recommended` pridáva jantárový riadok, config spred aktivácie receptov
+  hovorí „prestav skrinku“. V **Nákupe** dostal záznam `drawer_kit_missing` serverový príznak `blocks_export` a jeho
+  riadok je **červený** + veta, že sa nevytvorí ani VEPO.
+  **Zistené v KROKu 0 a preto NEROBENÉ (už existovalo):** Kontrola RED/ORANGE riadky zásuviek aj preklik na čelo
+  (ceruzka → výber skrinky + otvorená karta čela, KOV-A2b deep-link — `part_key` konfliktu je kľúč PANELA čela) ·
+  značka ručného zámku v Nákupe (`note_manual` číta `locked: true` od #304) · materiálový kanál „Zásuvky“ a D-46
+  preflight (#305, overené 1:1 — bez zmeny). **Vedomé odchýlky:** (1) `front_drawer` je samostatný kľúč, NIE rozšírenie
+  `front_slots` (ten odpovedá výhradne na „kde sa pýta smer“); (2) `explain` sa NEUKLADÁ do configu ani do plánu —
+  schéma sa v C2c nemení, preto sa vety skladajú znova a sú UŽŠIE než `explain` v `resolve` (svetlé rozmery skrinky sa
+  neukladajú, takže sa netvrdia); (3) `blocks_export` je LEN zobrazovací príznak — bránu exportu drží ďalej
+  `export_blockers`; (4) chipy zámkov osí z mockupu scény 1 sa NEROBILI (KOV-D), ručný zámok priznáva len veta pod
+  riadkom. **Odložené na KOV-D:** highlight riadku Kontroly, UI mapovaní podľa klasifikácie, farbenie ABS hrán dielcov
+  zásuviek (`axes:`), `owner_label` namiesto surového `part_key` v zozname „Bez kódov“ Nákupu.
   **C2b · aktivácia — pôvodné zadanie (mení výstupy LEN pre čelá so systémom; ostatné zákazky CONTENT-identické; NARAZ a–h):**
   (a) `Construction.build_plan` volá resolver pre každé drawer čelo so systémom → dielce do `plan.parts` s part_key `front:<id>/drawer_bottom` · `/drawer_back` ·
   `/box_side:left|right` · `/drawer_inner_front`; nové ROLES + `plan_schema` bump + `material signals` enum `:drawer` + `human_label` vetvy; `materialized_part` sa NEPOUŽÍVA

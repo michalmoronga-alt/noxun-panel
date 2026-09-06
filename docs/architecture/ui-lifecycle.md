@@ -818,8 +818,23 @@ vzácny). Z toho istého dôvodu karta **nemá hlavičku** — F-číslo, typ aj
 Obsah karty skladá **čistý view-model `frontCardModel(item, slots)`** (core.js): **typegrid** = 6 dlaždíc (Dvierka · Zásuvka · Výklop · Sklop · Blenda · **Bez čela** — `none` je
 platný typ D-18, preto musí ostať voliteľný; popisky sú krátke, plný názov nesie `title`) + **kontextové riadky `.prow`**: „Smer" (Ľavé · **Neurčené ⚠** · Pravé) pri slote
 `single` · „Krídlo 2/3" (resp. 2/4 a 3/4) **per stredné krídlo** pri slotoch `p2`/`p3` — *vedomé rozšírenie mockupu, variant a z BLOCKERA 2* · „Otváranie" (Klasické · Tip-On) na
-pohyblivých typoch · „Konštrukcia" + „Zásuvka" pri zásuvkovom čele · blenda a „Bez čela" majú len vetu, prečo ovládače nemajú. Riadky Závesy / zámky osí / resolved systém sú
-**KOV-C/D**, nie tu; karta to hovorí jednou vetou („Set kovania podľa otvárania príde s KOV-D."), než aby ponúkala voľbu bez účinku.
+pohyblivých typoch · „Konštrukcia" + „Zásuvka" pri zásuvkovom čele · blenda a „Bez čela" majú len vetu, prečo ovládače nemajú. Riadky Závesy a zámky osí sú **KOV-D**, nie tu;
+karta to hovorí jednou vetou („Set kovania podľa otvárania príde s KOV-D."), než aby ponúkala voľbu bez účinku.
+
+**RIADOK VYRIEŠENEJ ZÁSUVKY (KOV-C2c).** Pod klasifikáciou stojí **jediný read-only riadok** — „Atira · H70 · NL 470 · 30 kg · SiSy · recept v1" (Quadro namiesto H-variantu
+menuje **výšku boxu**). Vertikálny priestor panela je vzácny, preto to **nie je blok**: vety receptu („potrebná svetlá výška od…", „rad 350–520 mm, potrebná svetlá hĺbka…")
+žijú v **rozbaliteľnom** `<details>` „Technický detail". Chipy zámkov osí (mockup scéna 1) sem **nepatria** — sú KOV-D; ručný zámok dĺžky priznáva len veta pod riadkom.
+
+Zdroj je **výhradne server**: `cabinet_payload` posiela `front_drawer` (nižšie, odsek `payloads.rb`) a karta z klasifikácie ani z `config.hardware` **nič neodvodzuje** — keby si
+text skladala sama, pri fail-closed zásuvke by tvrdila, že zásuvka existuje. Stavy: `ok` → riadok + detail (+ jantárový riadok pri odporúčaní synchronizácie) · `conflict` →
+**červená veta STAVBY namiesto hodnôt** (dve tvrdenia vedľa seba by si odporovali) · `stale` → červená veta „prestav skrinku" · `pending` a **chýbajúci kľúč** → karta mlčí.
+Ikonu (`alert` zo sprite, nikdy emoji) nesie len červený a jantárový riadok.
+
+Muted veta **„Zásuvka bez klasifikácie"** sa kreslí len vtedy, keď **chýbajú VŠETKY** klasifikačné polia (konštrukcia · variant · otváranie) **a** server o zásuvke nič nepovedal (Codex #306
+P2). Čelo, ktoré nesie už len otváranie, je pre server **klasifikované** (`Recipes.recipe_key_for` nedá `:legacy`) a vydá k nemu konflikt — pôvodná podmienka „construction aj variant sú
+null" preto ukázala vetu „bez klasifikácie" **nad** červeným dôvodom, teda dve tvrdenia naraz. Predikát panela musí byť ten istý ako predikát servera.
+
+Testy: `tests/pure/test_kovc2c_karta.rb`, `tests/js/test_kovc2c_karta.js`.
 
 **KDE sa smer pýta, rozhoduje VÝHRADNE SERVER** — `cabinet_payload` posiela `front_slots` (`front_id → { wings_n, slots }` z `Fronts.direction_slots`) a panel z `wings`
 ani `wings_n` **nič neodvodzuje**: keby si to odvodil, dvojkrídlo by sa začalo pýtať na stranu pántov a 3/4-krídlové dvierka aj na krajné krídla (tie sú odvodené — A1 kontrakt).
@@ -1291,6 +1306,14 @@ aplikovateľnosti smeru (`Fronts.direction_slots`, KOV-A1) nad **uloženým** `f
 **nezmenený** (nil = legacy — kľúč v configu nie je, `unset` = vedome neurčené, `left`/`right` = vyriešené). Tým je server **autoritou na otázku „kde sa smer pýta"**; panel si ju
 z počtu krídel neodvodzuje. **`wings_n` je súčasťou záznamu** (Codex #281 P2-A) a pri neznámom počte je `nil`: legacy záznam bez `wings_n` (pred D-07) tak dá `{ nil, [] }` —
 prázdne sloty **a priznané neznámo**, takže karta o ňom nepovie ani „pýtam sa", ani „je to dvojkrídlo".
+
+**`front_drawer` (KOV-C2c).** Druhý — **vlastný** — kanál toho istého pushu: mapa `front_id → záznam riadku zásuvky` pre čelá, ktoré `Recipes.classified?` pozná ako zásuvku.
+Do `front_slots` sa **nezlučuje** zámerne: ten odpovedá výhradne na otázku „kde sa pýta smer". Záznam skladá `front_drawer_payload` **čítacím** spôsobom z uloženého configu —
+položka výsuvu `source: 'recipe'` (legacy `slide` sa za recept **nevydáva**) dá `state: 'ok'` + hotový `text` a `detail`; `drawer_conflicts` toho čela dá `state: 'conflict'`
+s vetou **stavby** (panel žiadnu vlastnú neskladá); `config_schema < DRAWER_ACTIVATION_SCHEMA` dá `state: 'stale'`; inak `pending`. `sync` sa viaže na **konkrétne čelo** cez
+`warnings[].data.front_id`, nie na skrinku. Vety detailu skladá `Recipes.explain_stored(params)` z uložených parametrov a **pripnutého** receptu (nie z prepočítanej geometrie);
+neznámy alebo nečitateľný recept vráti **prázdny zoznam** — karta radšej nekreslí nič, než by tvrdila číslo, ktoré nevie dokázať. Zlyhanie kdekoľvek tu vráti `{}`, takže
+karta čela nikdy nespadne kvôli riadku zásuvky.
 
 ### resolvers.rb
 
@@ -1977,6 +2000,15 @@ set zaves-klasik ×4"). Žiadny nový stĺpec (horizontálny priestor) a stav ro
 ukázal pôvod cudzieho riadku. Popis vlastníka skladá **server**: `ProductionCore.decorate_source_owners` doplní do každého zdroja `owner_label` z resolved čiel **tej** skrinky
 (zber nesie nový aditívny kľúč `cabinet_fronts`), lebo z generovaného id čela („front:Fmsi0wnix-1-3a3kxe") sa nedá prečítať, o ktoré čelo ide; `nil` = kovanie celej skrinky.
 Nákupný CSV, rozpočet ani ponuka pole nečítajú — **výstup zákazky sa nemení ani o znak**.
+
+**KOV-C2c — ZASTAVUJÚCI riadok „Bez kódov".** Sekcia vysvetľuje nemapované položky ako **nenacenené** (jantárovo) — lenže položka výsuvu **z receptu** bez kitu je niečo iné:
+dielce zásuvky sú už narezané na konkrétnu NL, takže bez kitu sa nedajú vyrobiť a zastavené sú **všetky** exporty vrátane VEPO. Taký riadok je preto **červený** (`tr.hwstop`)
+a nad tabuľkou stojí veta, koľkých zásuviek sa to týka a kam ísť po nápravu (Kontrola). Závažnosť určuje **server** aditívnym príznakom `blocks_export`
+(`HardwareSets.unmapped_entry`) — klient enum dôvodov nepozná a druhé miesto rozhodovania by sa časom rozišlo. Dôvod vo vete ostáva `reason_sk` skladaný z `base_reason`.
+
+**Veta počíta ZÁSUVKY, tabuľka RIADKY** (Codex #306 P2). Jedna zásuvka môže vydať viac nemapovaných záznamov — set s viacerými členmi bez kódu ich emituje **per člen** (`expand_members`),
+takže naivný `filter(...).length` by pri jednej zásuvke hlásil „2× zásuvka". `hwStopOwners` preto dedupuje podľa **identity zásuvky** (`cabinet_id` + `owner_part_key`) a `hwStopCount` vracia
+jej dĺžku; riadky tabuľky sa nededupujú — každý z nich je naozaj chýbajúci kód a každý treba doplniť.
 
 Riadok generiky sa v0.7.58 premenoval z `tr.hwrow` na `tr.hwgen`: `.hwrow` je v zdieľanom panel.css **flex riadok** kovania Inspectora/Katalógu a `<tr>` s `display: flex` strácal
 zarovnanie stĺpcov s hlavičkou (guard `tests/pure/test_tr_flex_kolizia.rb` stráži, že žiadny `<tr>` nenesie triedu, ktorej panel.css dáva flex/grid). Export ide **vlastným kanálom

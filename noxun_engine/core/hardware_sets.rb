@@ -2687,6 +2687,11 @@ module Noxun
           out['reason'] = DRAWER_KIT_MISSING
           out['system'] = params['system'].to_s
           out['height_variant'] = params['height_variant'] if params['height_variant'].is_a?(Numeric)
+          # KOV-C2c: sekcia Nakup vysvetluje NEMAPOVANE polozky ako „nenacenene"
+          # (jantarove). Receptova polozka je ale ZASTAVENY EXPORT — vratane
+          # VEPO. Priznak nesie SERVER, aby JS nemusel poznat enum dovodov
+          # a aby sa zavaznost neurcovala na dvoch miestach.
+          out['blocks_export'] = true
         end
         out
       end

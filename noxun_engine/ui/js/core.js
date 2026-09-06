@@ -19,6 +19,11 @@
   // JEDINA odpoved na otazku „kde sa smer pyta"; panel si ju NEODVODZUJE
   // z poctu kridiel. null = nic oznacene (alebo payload bez ciel).
   var frontSlots = null;
+  // KOV-C2c: `front_drawer` z Ruby — mapa front_id -> zaznam riadku zasuvky
+  // ({ state, text, detail[], sync, message, locked_note }). SERVER je jedina
+  // autorita: panel z klasifikacie ani z kovania NIC neodvodzuje a text si
+  // NESKLADA. null = nic oznacene (alebo payload bez zasuviek).
+  var frontDrawer = null;
   // UI-B2: posledny payload kovania (config.hardware oznacenej skrinky). Drzi sa
   // LEN preto, aby z neho vedel kreslit nahlad (projekcia Kovanie a ghost
   // vrstva) — je to TEN ISTY payload, ktory dostava sekcia kovania, ziadne nove
@@ -176,6 +181,33 @@
     if (!wd || typeof wd !== 'object') return null;
     return wd[wing] == null ? null : wd[wing];
   }
+  // KOV-C2c: RIADKY ZASUVKY v karte cela. Vertikalny priestor panela je vzacny,
+  // preto je vyriesena zasuvka JEDINY read-only riadok (system · vyska · NL ·
+  // nosnost · otvaranie · recept) a vety receptu ziju v ROZBALITELNOM detaile.
+  // Konflikt hodnoty NAHRADZA (cervena veta stavby), sync odporucanie je
+  // jantarovy riadok NAVIAC. Ziadne chipy zamkov — tie patria do KOV-D.
+  // Text NIKDY nesklada panel: vsetko su hotove retazce zo servera.
+  function frontDrawerRows(drawer){
+    var d = (drawer && typeof drawer === 'object') ? drawer : null;
+    if (!d) return [];
+    var st = String(d.state || '');
+    if (st === 'conflict'){
+      var msg = String(d.message || '');
+      return msg ? [{ kind: 'info', tone: 'err', icon: 'alert', text: msg }] : [];
+    }
+    if (st === 'stale'){
+      return [{ kind: 'info', tone: 'err', icon: 'alert',
+                text: 'Zásuvka je klasifikovaná ešte spred aktivovania receptov — ' +
+                      'prestav skrinku (zmeň a vráť rozmer alebo klikni Prestavať).' }];
+    }
+    if (st !== 'ok') return [];
+    var out = [{ kind: 'resolved', label: 'Zásuvka', text: String(d.text || ''),
+                 detail: Array.isArray(d.detail) ? d.detail.map(String) : [],
+                 note: d.locked_note ? String(d.locked_note) : null }];
+    if (d.sync) out.push({ kind: 'info', tone: 'warn', icon: 'alert', text: String(d.sync) });
+    return out;
+  }
+
   // VIEW-MODEL karty. `item` = polozka cela (typ + dormant polia), `entry` =
   // ZAZNAM SERVERA `front_slots[front_id]` v tvare `{ wings_n, slots }`.
   //   entry == null            -> server sa k celu este nevyjadril (novy riadok
@@ -187,7 +219,11 @@
   //     `front_items` pred D-07 bez `wings_n`). Prazdne pole samo o sebe teda
   //     dvojkridlo NEZNAMENA — vtedy sa nekresli ANI riadok, ANI veta.
   // VSTUP SA NEMENI (ziadna materializacia pri renderi).
-  function frontCardModel(item, entry){
+  // KOV-C2c: `drawer` = ZAZNAM SERVERA `front_drawer[front_id]`. `undefined`
+  // / null = server o zasuvke nic nepovedal (nove celo pred prvym echom, celo
+  // bez klasifikacie) — karta vtedy riadok zasuvky NEKRESLI a nic si
+  // neodvodzuje. Vstup sa NEMENI.
+  function frontCardModel(item, entry, drawer){
     var it = item || {};
     var type = it.type || 'door';
     var known = FRONT_CARD_TYPES.indexOf(type) >= 0;
@@ -243,10 +279,21 @@
       rows.push({ kind: 'seg', key: 'drawer_variant', label: 'Zásuvka',
                   options: FRONT_DRAWER_VARIANT_OPTIONS,
                   active: drw.variant == null ? null : drw.variant });
-      if (drw.construction == null && drw.variant == null){
+      // KOV-C2c (Codex #306 P2): „bez klasifikacie" znamena PRESNE to, co pod tym
+      // rozumie server (`Recipes.recipe_key_for` == `:legacy`) — teda ze CHYBAJU
+      // VSETKY klasifikacne polia, nie len dve z troch. Celo s otvaranim a bez
+      // konstrukcie je pre server UZ klasifikovane (a vyda k nemu konflikt), takze
+      // povodna podmienka ukazala vetu „bez klasifikácie" NAD cervenym dovodom —
+      // dve tvrdenia naraz. Druha poistka: ked server o zasuvke cokolvek povedal,
+      // veta sa nekresli (autoritou je ON, nie odvodenie z datasetu).
+      var drawerRows = frontDrawerRows(drawer);
+      if (!drawerRows.length && drw.construction == null && drw.variant == null &&
+          it.opening_mode == null){
         rows.push({ kind: 'info', tone: 'muted',
-                    text: 'Zásuvka bez klasifikácie (systém sa priradí až po klasifikácii — KOV-C).' });
+                    text: 'Zásuvka bez klasifikácie — dielce zásuvky sa nevyrobia. ' +
+                          'Vyber konštrukciu a otváranie.' });
       }
+      drawerRows.forEach(function(r){ rows.push(r); });
     }
     if (type === 'door' || type === 'drawer_front'){
       rows.push({ kind: 'hint', text: 'Set kovania podľa otvárania príde s KOV-D.' });
@@ -1118,6 +1165,8 @@
       FRONT_DRAWER_CONSTR_OPTIONS: FRONT_DRAWER_CONSTR_OPTIONS,
       FRONT_DRAWER_VARIANT_OPTIONS: FRONT_DRAWER_VARIANT_OPTIONS,
       frontCardModel: frontCardModel, frontWingLabel: frontWingLabel,
+      // KOV-C2c (tests/js/test_kovc2c_karta.js): riadky zasuvky v karte cela.
+      frontDrawerRows: frontDrawerRows,
       frontCardKeepOpen: frontCardKeepOpen,
       frontCardFocusKey: frontCardFocusKey, frontCardFocusSelector: frontCardFocusSelector,
       frontExtraOnTypeChange: frontExtraOnTypeChange, frontExtraOnWings: frontExtraOnWings,

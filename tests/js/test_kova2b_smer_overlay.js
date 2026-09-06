@@ -196,6 +196,7 @@ Object.keys(C).forEach(k => { global[k] = C[k]; });
 global.FRONT_PROFILES = [];
 global.frontItems = null;
 global.frontSlots = null;
+global.frontDrawer = null;   // KOV-C2c: riadok zasuvky karty (druhy serverovy kanal)
 global.selectedCabId = null;
 global.applyTimer = null;
 global.newStableId = p => p + (++global.__nxid || (global.__nxid = 1));

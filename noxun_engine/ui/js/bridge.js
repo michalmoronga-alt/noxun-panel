@@ -548,6 +548,9 @@
       // na otazku „kde sa smer pyta" (Fronts.direction_slots). Panel si ju
       // NEODVODZUJE z poctu kridiel.
       frontSlots = c.front_slots || {};
+      // KOV-C2c: riadok zasuvky karty cela — TEN ISTY push, vlastny kluc.
+      // Stary payload bez kluca = mapa je prazdna a karta riadok nekresli.
+      frontDrawer = c.front_drawer || {};
       // D-07 Codex B2: echo apply toho isteho korpusu s dalsimi cakajucimi editmi
       // nesmie prepisat gap polia (selectedCabId sa meni az nizsie v setSelected).
       // D-22: pod tym istym guardom je aj zamok presahov (edge_limit_off) —
@@ -627,7 +630,7 @@
       // `loadSelected` to robi uz dlho, doska na to cakala.
       if (typeof absModalCloseSilent === 'function') absModalCloseSilent();
       setSelected(null);
-      activeZoneId = null; frontItems = null; frontSlots = null; hwItems = null;
+      activeZoneId = null; frontItems = null; frontSlots = null; frontDrawer = null; hwItems = null;
       // KOV-H2 (Codex #285 P1): odchod z korpusu (doska alebo prazdny vyber) je
       // ZMENA IDENTITY — otvoreny modal by odoslal zoznam skrinky, ktora uz nie
       // je oznacena.
@@ -659,7 +662,7 @@
       // D-32: identita prec PRED setUiMode — reset karty (materializeInsertCard
       // vnutri setUiMode) nesmie bezat nad zvyskami stareho vyberu.
       setSelected(null);
-      activeZoneId = null; frontItems = null; frontSlots = null; hwItems = null;
+      activeZoneId = null; frontItems = null; frontSlots = null; frontDrawer = null; hwItems = null;
       // KOV-H2 (Codex #285 P1): odchod z korpusu (doska alebo prazdny vyber) je
       // ZMENA IDENTITY — otvoreny modal by odoslal zoznam skrinky, ktora uz nie
       // je oznacena.
