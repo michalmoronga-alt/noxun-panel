@@ -123,6 +123,23 @@ eq(HW.hwSetPayload(null, 'atira', 'slide', '', 'CAB-1'),
    { generic_type: 'slide', owner_part_key: null, set_id: 'atira', cabinet_id: 'CAB-1' },
    'bez compat ostáva pôvodná cesta (plochý zoznam setov) nedotknutá');
 
+// --- zmiešaná skrinka: `compat` JE, ale `cab` je null (Codex #310 P2-3) ----
+// Server to posiela zámerne — jeden kľúč by platil len na časť položiek
+// a `apply_cabinet_override` taký zápis odmieta. Riadok skrinky sa preto
+// nesmie vykresliť VÔBEC; pôvodný plochý zoznam setov by ponúkal samé chyby.
+const MIXED = clone(ENTRY);
+MIXED.compat.cab = null;
+eq(HW.hwCabRowOff(MIXED), true, 'KOV-D1b (P2-3): prítomný `compat` s `cab: null` = riadok skrinky OFF');
+eq(HW.hwCabRowOff(ENTRY), false, 'jedna trieda → riadok skrinky beží');
+eq(HW.hwCabRowOff({ generic_type: 'hinge' }), false,
+   'NEPRÍTOMNÝ `compat` (legacy) sa nesmie zameniť za `cab: null`');
+eq(HW.hwCabOptionList(MIXED), null, 'a ponuka pre skrinku sa NESTAVIA');
+eq(flat(HW.hwOwnerOptionList(MIXED, 'front:F1/panel')).length, 3,
+   'výber na konkrétnom čele ostáva funkčný');
+eq(flat(HW.hwCabOptionList({ generic_type: 'hinge', options: [], project_label: 'podľa projektu' })),
+   [['', 'podľa projektu', true, false]],
+   'legacy záznam bez `compat` kreslí pôvodný plochý zoznam');
+
 ok(HW.hwCabTitle(ENTRY).indexOf('Set pre túto skrinku — Výsuv · Klasické · Kovové bočnice') === 0,
    'tooltip menuje rozsah aj triedu');
 ok(HW.hwOwnerTitle(ENTRY, 'front:F1/panel').indexOf('Set pre toto čelo') === 0,
@@ -242,5 +259,34 @@ eq(HWS.hwsMapClassValue(CLASS_ROW, 'sel:white'), WHITE, 'a hodnotou je jej selek
 eq(HWS.hwsMapClassValue(CLASS_ROW, ''), '', 'prázdne ID = zrušenie');
 eq(HWS.hwsMapClassValue(CLASS_ROW, 'nic'), null, 'neznáme ID nemá hodnotu');
 eq(HWS.hwsMapClassRows('global').length, 1, 'globálne riadky sú vlastný zoznam');
+
+// ===========================================================================
+// C) ĽAHKÝ PUSH obnovuje aj detail zásuvky (Codex #310 P2-5)
+// ===========================================================================
+// `NX.setHardwareSets` (zmena mapovania alebo katalógu v Štúdiu) mení názov
+// setu a kódy — teda presne obsah rozkliku „Technický detail". Kontrakt sa
+// overuje na zdrojoch: server ho do payloadu priloží, bridge ho posunie
+// ďalej a `refreshFrontDrawer` prekreslí LEN otvorenú kartu.
+const fs = require('node:fs');
+const bridgeSrc = fs.readFileSync(path.join(JS, 'bridge.js'), 'utf8');
+const formSrc = fs.readFileSync(path.join(JS, 'form.js'), 'utf8');
+const hwSrc = fs.readFileSync(path.join(JS, 'hardware.js'), 'utf8');
+
+const setHw = bridgeSrc.match(/setHardwareSets: function\(data\)\{[\s\S]*?\n    \},/)[0];
+ok(/refreshFrontDrawer\(d\.front_drawer\)/.test(setHw),
+   'KOV-D1b (P2-5): ľahký push obnoví aj detail zásuvky');
+ok(/d\.front_drawer && typeof d\.front_drawer === 'object'/.test(setHw),
+   'starý payload bez kľúča sa nedotkne ničoho (a `{}` je legitímna hodnota)');
+ok(setHw.indexOf('refreshHardwareSets') < setHw.indexOf('refreshFrontDrawer'),
+   'poradie ostáva: ponuky a nákup najprv, detail za nimi');
+
+const refreshFd = formSrc.match(/function refreshFrontDrawer\(map\)\{[\s\S]*?\n  \}/)[0];
+ok(/frontDrawer = map \|\| \{\}/.test(refreshFd), 'záznam sa vymení celý (server je autorita)');
+ok(/if \(openFrontCardId\) refreshFrontCards\(\)/.test(refreshFd),
+   'prekresľuje sa LEN otvorená karta — riadky čiel sa neprestavujú');
+
+const refreshSets = hwSrc.match(/function refreshHardwareSets\(options\)\{[\s\S]*?\n  \}\n/)[0];
+ok(/if \(!list\)\{ hwDropSetRow\(sel\); continue; \}/.test(refreshSets),
+   'KOV-D1b (P2-3): živý push odstráni nepoužiteľný riadok skrinky, nedopĺňa doň plochý zoznam');
 
 console.log('KOV-D1b UI: ' + n + ' assertov OK');

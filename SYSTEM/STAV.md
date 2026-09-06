@@ -22,7 +22,7 @@ a rád (`core/hardware_taxonomy.rb`) a vytiahla katalóg aj editor setu na obraz
 **Pozor na kompatibilitu:** čo uloží v0.9.20, to **v0.9.18 už nepoužije** — model/šablóna (`CONFIG_SCHEMA` 4 + brána `assess_set_defs`), knižnica setov aj projektový snapshot
 (`std` 3) a katalóg kovania s výrobcom (`schema` 2). Pred prvou takou zákazkou aktualizovať **obe PC** (D-52 updater).
 
-**Testy k v0.9.35:** **3174 headless** · 91 JS sád · posledný plný in-SketchUp beh **1815 PASS** (nad vetvou KOV-D1a, 6.9. — nová sekcia `run_kovd1a`: Undo aj Redo owner mapovania).
+**Testy k v0.9.35:** **3178 headless** · 91 JS sád · posledný plný in-SketchUp beh **1815 PASS** (nad vetvou KOV-D1a, 6.9. — nová sekcia `run_kovd1a`: Undo aj Redo owner mapovania).
 
 ## Robí sa
 

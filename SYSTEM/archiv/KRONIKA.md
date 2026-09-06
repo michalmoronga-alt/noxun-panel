@@ -61,7 +61,18 @@
   (38 assertov: render riadkov do existujúcej tabuľky, payload odoslania, `disabled` uložená voľba, ponuka karty).
   **Päť mutácií** overených ručne (filter otvárania · neaktívny set · pevná voľba namiesto rodiny · nosnosť v balení ·
   generický kľúč v karte) plus tri v JS (ID namiesto hodnoty · `disabled` · chýbajúci `mapping_key`).
-  Headless **3174**, JS **91 sád**.
+  **Codex review kolo 1 (PR #310) vrátilo 5× P2, žiadny P1** — všetkých päť zapracovaných v jednom fix commite
+  a každý má vlastný test + mutáciu: (1) **detail zásuvky sa rozchádzal s Nákupom** pri projekte bez snapshotu
+  a nepoužiteľnej knižnici — kontext teraz počíta `blocked` tou istou podmienkou, override skrinky sa neuplatní
+  a `blocked:` putuje do `item_purchase`; (2) **klasifikovaná zásuvka vedľa LEGACY výsuvu** je tiež zmiešaná
+  skrinka — `compact` ju maskoval a karta ponúkala skrinkový ovládač, ktorého každá voľba by skončila
+  odmietnutím; (3) panel **rozlišuje neprítomný `compat` od prítomného s `cab: null`** (`hwCabRowOff`) — riadok
+  skrinky sa vtedy nekreslí a živý push ho odstráni, namiesto pádu na plochý zoznam setov; (4) **trieda
+  nepomenúva systém**, preto pribudla brána `set_system` (reverzné čítanie `SYSTEM_IDENTITY`) do ponuky
+  **aj do zápisu** — set cudzej rady (Blum Legrabox, metal/classic) by inak prešiel výberom a padol až expanziou
+  ako RED; (5) **ľahký push** (`push_hardware_sets`) nesie odteraz aj `front_drawer`, takže rozklik detailu
+  nezastarne po zmene mapovania či katalógu v Štúdiu.
+  Headless **3178**, JS **91 sád** (nová sada má 19 testov / 50 assertov).
 
 - **KOV-D1a — MAPOVANIE, JADRO: VLASTNÝ KIT PRE JEDNO ČELO, TRIEDNE ZÁPISY, SCHÉMA 6 (v0.9.34, 6.9.2026).**
   Prvý rez package KOV-D v2 (checkpoint #20, PR #307) — **serverové jadro bez UI**; ovládanie v paneli prináša D1b.

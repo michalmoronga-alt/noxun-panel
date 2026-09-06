@@ -1522,6 +1522,14 @@ module Noxun
           if dc && set['drawer_construction'].to_s.strip != dc
             return "set „#{set['name']}“ má inú konštrukciu zásuvky, než pomenúva kľúč"
           end
+          # KOV-D1b (Codex #310 kolo 1 P2-4): trieda system NEPOMENUVA, ale
+          # receptova polozka ho vzdy nesie — set cudzieho vyrobcu/rady by
+          # prešiel zápisom a padol až pri expanzii (`set_incompatible_info`
+          # `detail: 'system'`), teda RED nad hotovou zákazkou. Brána je preto
+          # aj TU, nielen vo filtri ponuky.
+          if set_system(set).nil?
+            return "set „#{set['name']}“ nepatrí k žiadnemu vydanému systému zásuviek"
+          end
 
           set_hv = int_value(set[HEIGHT_VARIANT_KEY])
           if selector
@@ -2179,7 +2187,8 @@ module Noxun
         gt, om, dc = segs
         sets = set_options(gt, globals, snapshot_sets, referenced_ids).select do |s|
           s['active'] != false && s['opening_mode'].to_s.strip == om.to_s &&
-            (dc.nil? || s['drawer_construction'].to_s.strip == dc)
+            (dc.nil? || s['drawer_construction'].to_s.strip == dc) &&
+            !set_system(s).nil?
         end
         fixed, variant = sets.partition { |s| int_value(s[HEIGHT_VARIANT_KEY]).nil? }
         out = fixed.map do |s|
@@ -2194,6 +2203,26 @@ module Noxun
                    'selector' => sel }
         end
         out.sort_by { |o| [o['label'].to_s, o['id'].to_s] }
+      end
+
+      # KOV-D1b (Codex #310 kolo 1 P2-4): SYSTEM, ktoremu set patri, podla jeho
+      # vyrobcu a rady — reverzna citacia `SYSTEM_IDENTITY` (jedina autorita
+      # vztahu system <-> vyrobca/rada, tá istá, podľa ktorej rozhoduje
+      # `set_incompatible_info` pri expanzii).
+      #
+      # Set, ktoreho vyrobca a rada nepatria ZIADNEMU vydanemu systemu, sa pre
+      # triedny kluc ponuknut ani ulozit NESMIE: receptova polozka vzdy nesie
+      # `params['system']` a expanzia by taku definiciu odmietla (`detail:
+      # 'system'`) — zasuvka by skoncila RED nad hotovou zakazkou a export by
+      # stal. Klasifikacia setu system nenesie, preto sa cita z dvojice mien.
+      # -> system | nil (ziadny vydany system tomu setu nezodpoveda)
+      def set_system(set)
+        return nil unless set.is_a?(Hash)
+
+        SYSTEM_IDENTITY.each do |sys, (man, ser)|
+          return sys if same_name?(set['manufacturer'], man) && same_name?(set['series'], ser)
+        end
+        nil
       end
 
       # SK popisok TRIEDNEHO kluca do riadku Pravidiel a karty:

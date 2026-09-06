@@ -312,10 +312,21 @@ module Noxun
         end
 
         # Kontext rozpisu nakupu pre karty zasuviek — postaveny RAZ.
+        #
+        # R-07 (Codex #310 kolo 1 P2-1): detail sa musi spravat PRESNE ako
+        # nakupny riadok (`decorate_hardware_purchase`) a ako supis. Pri projekte
+        # BEZ snapshotu a NEKOMPATIBILNEJ kniznici sa override skrinky
+        # NEUPLATNUJE (ukazuje na set_id, ktoreho definicia by musela prist prave
+        # z tej kniznice) a dovod je `library_incompatible`. Bez toho by rozklik
+        # hlasil „chýba mapovanie" a navadzal na „Doplniť nové predvoľby" —
+        # cestu, ktora sa v tomto stave otvorit neda — kym Nakup vedla hovori
+        # pravdu (lekcia R-06a „panel a supis sa nesmu rozist").
         def drawer_buy_ctx(cfg)
           status, state = hardware_read_state
+          blocked = status == :missing && HardwareSets.library_read_only?
           { 'status' => status, 'state' => state,
-            'overrides' => cabinet_set_overrides(cfg),
+            'overrides' => (blocked ? {} : cabinet_set_overrides(cfg)),
+            'blocked' => blocked,
             'lookup' => HardwareSets.catalog_lookup(HardwareCatalog.items) }
         rescue StandardError => e
           Engine.log_error(e, 'Panel.drawer_buy_ctx')
@@ -354,7 +365,8 @@ module Noxun
         def drawer_buy_lines(hw, buy)
           return [] unless buy.is_a?(Hash) && hw.is_a?(Hash)
 
-          exp = item_purchase(hw, buy['status'], buy['state'], buy['overrides'], buy['lookup'])
+          exp = item_purchase(hw, buy['status'], buy['state'], buy['overrides'], buy['lookup'],
+                              blocked: buy['blocked'] == true)
           out = []
           out << "Balenie: #{exp['set_name'] || exp['set_id']}" if exp['set_name'] || exp['set_id']
           Array(exp['members']).each { |m| out << drawer_member_line(m) }
@@ -715,15 +727,19 @@ module Noxun
         # -> { 'cab' => scope, 'owners' => { owner => scope } } | nil
         def class_compat_payload(gt, hardware, overrides, proj_map, globals, snap_sets, refs)
           active = active_class_by_owner(hardware, gt)
-          classes = active.values.compact.uniq
-          return nil if classes.empty?
+          classes = active.values.uniq
+          return nil if classes.compact.empty?
 
           defs = compat_defs(globals, snap_sets)
           out = { 'cab' => nil, 'owners' => {} }
           # Skrinkovy riadok len pri JEDNEJ triede — pri zmiesanych triedach by
           # jeden kluc platil len na cast poloziek (`override_class_key` taky
           # zapis odmietne, takze ho karta ani nesmie ponukat).
-          if classes.length == 1
+          # Codex #310 kolo 1 P2-2: ZMIESANA je aj skrinka, kde vedla
+          # klasifikovanej zasuvky stoji LEGACY neklasifikovany vysuv — v `active`
+          # je vtedy `nil`. `compact` by ho zahodil a karta by vykreslila
+          # skrinkovy ovladac, ktoreho KAZDA volba by skoncila odmietnutim.
+          if classes.length == 1 && !classes.first.nil?
             out['cab'] = compat_scope(classes.first, nil, overrides, proj_map,
                                       globals, snap_sets, refs, defs)
           end

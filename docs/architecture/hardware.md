@@ -301,6 +301,12 @@ a `hardware_catalog.rb` a v [ui-lifecycle.md](ui-lifecycle.md) (sekcia `hw` Št�
   funkcie: `mapping_option_id` (stabilný token hodnoty pre `<select>`; rovnaká hodnota = rovnaký token), `mapping_value_text` (ľudský text uloženej hodnoty — chýbajúcu
   definíciu PRIZNÁ, nikdy nenahradí), `class_key_label` (popisok kľúča z `HardwareRules.label_for` + `CLASS_OPTIONS`), `CLASS_MAPPING_KEYS` (= kľúče `MAPPING_ADDITIONS`,
   jediný zoznam tried, na ktoré sa dá mapovať). `height_variant` v `PARAM_OPTIONS` nie je (nie je to os výberu člena), preto má vlastný 2. pád v `selector_by`.
+- **Trieda nepomenúva SYSTÉM — bránou je `set_system`** (Codex #310 kolo 1 P2-4). Triedny kľúč nesie len otváranie a konštrukciu, ale **receptová položka vždy nesie
+  `params['system']`**, a `set_incompatible_info` podľa neho porovnáva výrobcu a radu (`SYSTEM_IDENTITY`). Set cudzej rady s rovnakým otváraním aj konštrukciou (napr. Blum
+  Legrabox, `metal`/`classic`) by teda prešiel výberom aj zápisom a padol by až pri expanzii — zásuvka RED, export stojí. `set_system(set)` je **reverzné čítanie tej istej
+  jedinej autority** `SYSTEM_IDENTITY` (`[výrobca, rada] → system`, `same_name?` bez diakritiky) a stojí na OBOCH miestach: `class_set_options` taký set **neponúkne**
+  a `class_key_value_problem` ho **odmietne pred zápisom** (globál aj projekt). Legacy set bez klasifikácie systém nemá (`nil`) — pre triedny kľúč sa aj tak neponúka, lebo
+  neprejde už kontrolou otvárania.
 - **`save_set!` MERGUJE klasifikáciu z uloženého setu.** Do KOV-B3 posielal editor len štyri kľúče (`set_id`, `name`, `generic_type`, `members`), takže bez merge by KAŽDÁ úprava
   člena ticho zhodila zaradenie — presne tá trieda tichej straty, ktorú dávka riešila (a je to jedna z mutácií sady). Kľúč, ktorý vo vstupe VÔBEC NIE JE, sa preberie z uloženého
   setu; kľúč prítomný s `nil`/`''` (a `active: true`) je VEDOMÉ vymazanie. Až merged tvar ide do validácie, takže all-or-nothing platí nad tým, čo sa naozaj uloží. Validácia preto

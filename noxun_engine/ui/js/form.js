@@ -1001,6 +1001,19 @@
     return Object.prototype.hasOwnProperty.call(frontDrawer, fid) ? frontDrawer[fid] : undefined;
   }
 
+  // KOV-D1b (Codex #310 kolo 1 P2-5): ĽAHKÝ refresh záznamu zásuvky
+  // (`NX.setHardwareSets` po zmene mapovania alebo katalógu v Štúdiu).
+  // Rozklik „Technický detail" nesie NÁZOV SETU a KÓDY, ktoré presne tento
+  // push mení — bez neho by riadok Kovania ukazoval nový kit a detail vedľa
+  // starý. Riadky čiel sa **neprestavujú**: prekreslí sa len OTVORENÁ karta
+  // (rovnaká úspornosť ako `refreshHardwarePurchase`, ktorý mení len
+  // sekundárne riadky). Zatvorená karta sa vykreslí z čerstvých dát pri
+  // najbližšom otvorení.
+  function refreshFrontDrawer(map){
+    frontDrawer = map || {};
+    if (openFrontCardId) refreshFrontCards();
+  }
+
   // UI-C3: pole vysky ma svoje ID kvoli vyskovemu radu (N25) — `nxDimPick`
   // zapisuje hodnotu cez `el(id)` a ohlasuje ju POVODNOU udalostou.
   function frontHeightInputId(fid){ return 'fh_' + fid; }

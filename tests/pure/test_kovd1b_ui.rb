@@ -367,3 +367,131 @@ NxTest.test('KOV-D1b (R3): riadok karty spaja vety receptu a balenie') do
   plain = c::E::Panel.drawer_card_row(cfg, 'F1')
   NxTest.assert_equal(c::E::Recipes.explain_stored(c.slide_item['params']), plain['detail'])
 end
+
+# ============================================================================
+# CODEX #310 KOLO 1 — P2 NALEZY
+# ============================================================================
+
+module NxD1b
+  module_function
+
+  # Rodina CUDZIEHO systemu: rovnake otvaranie aj konstrukcia ako Atira, ale
+  # vyrobca a rada nezodpovedaju ZIADNEMU vydanemu systemu receptov.
+  def foreign_family
+    [[70, 'X1'], [144, 'X2']].map do |hv, code|
+      { 'set_id' => "legrabox-h#{hv}-sisy", 'name' => "Legrabox H#{hv} — klasické",
+        'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'classic',
+        'drawer_construction' => 'metal', 'manufacturer' => 'Blum', 'series' => 'Legrabox',
+        'height_variant' => hv,
+        'members' => [{ 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
+                        'code_by_nl' => { '470' => code } }] }
+    end
+  end
+
+  # Legacy (NEklasifikovany) vysuv — stara zakazka, genericky kluc `slide`.
+  def legacy_slide(owner)
+    { 'owner_part_key' => owner, 'generic_type' => 'slide', 'quantity' => 1,
+      'rule_id' => 'vysuvy-zakladne', 'params' => { 'nominal_length' => 470.0 } }
+  end
+
+  def src(*parts)
+    File.read(File.join(NxTest::ROOT, *parts), encoding: 'UTF-8')
+  end
+end
+
+NxTest.test('KOV-D1b (P2-1): detail hovorí to isté čo Nákup aj pri nepoužiteľnej knižnici') do
+  c = NxD1b
+  # `blocked` = projekt BEZ snapshotu + NEKOMPATIBILNA kniznica: `load` z nej
+  # nic nevyda, takze stav je prazdny. Detail sa vtedy musi spravat PRESNE ako
+  # nakupny riadok (`decorate_hardware_purchase`) — inak by panel a supis
+  # hovorili o tej istej polozke dve rozne veci (lekcia R-06a).
+  empty = { 'mapping' => {}, 'sets' => {} }
+  blocked = { 'status' => :missing, 'state' => empty, 'overrides' => {},
+              'blocked' => true, 'lookup' => {} }
+  plain = blocked.merge('blocked' => false)
+
+  # (1) Priznak sa DOSTANE do rozpisu: dovod je „knižnica sa nedá prečítať",
+  #     nie vseobecne „bez setu".
+  lines = c::E::Panel.drawer_buy_lines(c.legacy_slide(c::OWNER), blocked)
+  NxTest.assert(lines.any? { |l| l.include?('knižnica setov kovania') },
+                "dovod je nepouzitelna kniznica (#{lines})")
+  NxTest.refute(c::E::Panel.drawer_buy_lines(c.legacy_slide(c::OWNER), plain)
+                  .any? { |l| l.include?('knižnica setov kovania') },
+                'bez priznaku ostava povodny (vseobecny) dovod')
+
+  # (2) Rozpis je ZHODNY s tym, co pre tu istu polozku vyda nakupny riadok
+  #     panela — jedna cesta (`item_purchase`), jeden vyklad.
+  %w[legacy classified].each do |kind|
+    item = kind == 'legacy' ? c.legacy_slide(c::OWNER) : c.slide_item
+    buy = c::E::Panel.item_purchase(item, :missing, empty, {}, {}, blocked: true)
+    NxTest.assert_equal(Array(buy['problems']).map { |p| "Bez kódu: #{p}" },
+                        c::E::Panel.drawer_buy_lines(item, blocked),
+                        "detail a nakupny riadok hovoria to iste (#{kind})")
+  end
+
+  # (3) Kontext sa stavia ROVNAKO ako nakupny riadok — ta ista podmienka
+  #     a pri `blocked` sa override skrinky NEUPLATNI (ukazuje na definiciu,
+  #     ktora by musela prist prave z tej nepouzitelnej kniznice).
+  ctx = c.src('noxun_engine', 'ui', 'panel',
+              'payloads.rb')[/def drawer_buy_ctx.*?\n        end\n/m].to_s
+  NxTest.assert(ctx.include?('status == :missing && HardwareSets.library_read_only?'),
+                'ta ista podmienka ako v `decorate_hardware_purchase`')
+  NxTest.assert(ctx.include?('(blocked ? {} : cabinet_set_overrides(cfg))'),
+                'override skrinky sa pri nepouzitelnej kniznici NEUPLATNI')
+  NxTest.assert(c.src('noxun_engine', 'ui', 'panel', 'payloads.rb')
+                 .include?("blocked: buy['blocked'] == true"),
+                'priznak putuje az do `item_purchase`')
+end
+
+NxTest.test('KOV-D1b (P2-2): klasifikovaná zásuvka vedľa legacy výsuvu = zmiešaná skrinka') do
+  c = NxD1b
+  hw = [c.slide_item, c.legacy_slide('front:F2/panel')]
+  out = c::E::Panel.class_compat_payload('slide', hw, {}, {}, c.library, {}, [])
+  NxTest.assert_equal(nil, out['cab'],
+                      'skrinkovy ovladac by `apply_cabinet_override` odmietol — neponuka sa')
+  NxTest.assert_equal([c::OWNER], out['owners'].keys, 'ponuku dostane LEN klasifikovane celo')
+
+  # Serverova zapisova cesta to vidi rovnako (jedna autorita `override_class_key`).
+  st, msg, = c::HWS.apply_cabinet_override({ 'hardware' => hw }, 'slide', nil,
+                                           c.white_selector, known_sets: c.library)
+  NxTest.assert_equal(:invalid, st, 'zapis na celu skrinku je odmietnuty')
+  NxTest.assert(msg.to_s.include?('konkrétnom čele'), msg.to_s)
+end
+
+NxTest.test('KOV-D1b (P2-4): rodina cudzieho systému sa neponúka ANI neuloží') do
+  c = NxD1b
+  sets = c.library(c.foreign_family)
+  opts = c::HWS.class_set_options(c::CLASSIC_METAL, sets, {}, [])
+  NxTest.assert_equal(['Atira biela — klasické · podľa výšky zásuvky (H70 · H144 · H176)'],
+                      opts.map { |o| o['label'] },
+                      'Legrabox ma rovnake otvaranie aj konstrukciu, ale ziadny recept ho nevyda')
+
+  # Zapisova brana (global aj projekt idu cez `class_key_value_problem`).
+  foreign = { 'param' => 'height_variant',
+              'bands' => [{ 'min' => 70.0, 'max' => 70.0, 'set_id' => 'legrabox-h70-sisy' },
+                          { 'min' => 144.0, 'max' => 144.0, 'set_id' => 'legrabox-h144-sisy' }] }
+  problem = c::HWS.class_key_value_problem(c::CLASSIC_METAL, foreign, c.defs_of(sets))
+  NxTest.assert(problem.to_s.include?('vydanému systému'), problem.to_s)
+  NxTest.assert_equal(nil, c::HWS.class_key_value_problem(c::CLASSIC_METAL, c.white_selector,
+                                                          c.defs_of(sets)),
+                      'domaca rodina prechadza dalej')
+
+  # `set_system` je reverzne citanie JEDINEJ autority `SYSTEM_IDENTITY`.
+  NxTest.assert_equal('atira', c::HWS.set_system(c.seed_set('atira-biela-h70-sisy')))
+  NxTest.assert_equal('quadro_v6', c::HWS.set_system(c.seed_set('vysuv-quadro-v6-sisy')))
+  NxTest.assert_equal(nil, c::HWS.set_system(c.foreign_family.first))
+  NxTest.assert_equal(nil, c::HWS.set_system(c.seed_set('vysuv-atira-biela-h70')),
+                      'legacy set bez klasifikacie systemu nema')
+end
+
+NxTest.test('KOV-D1b (P2-5): ľahký push nesie aj detail zásuvky') do
+  c = NxD1b
+  push = c.src('noxun_engine', 'ui', 'panel',
+               'sync.rb')[/def push_hardware_sets.*?\n        end\n/m].to_s
+  NxTest.assert(push.include?("'front_drawer' => front_drawer_payload(cfg)"),
+                'zmena mapovania/katalogu obnovi aj „co je v baleni"')
+  NxTest.assert(push.include?("'options' => hardware_set_options(cfg, items)"),
+                'a povodny obsah lahkeho pushu ostava')
+  # Cesta je CITACIA — ziadna operacia, ziadny zapis (rovnako ako doteraz).
+  NxTest.refute(push.include?('start_operation'), 'lahky push model nemeni')
+end

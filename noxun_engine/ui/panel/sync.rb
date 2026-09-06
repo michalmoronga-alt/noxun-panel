@@ -479,7 +479,16 @@ module Noxun
                 # chybal chip „chýba v katalógu") az do zmeny vyberu.
                 # Plan sa stavia LEN ked skrinka ad-hoc polozky naozaj ma —
                 # tento push chodi po KAZDEJ zmene katalogu.
-                'manual_view' => manual_view_for_refresh(cfg, cid) }
+                'manual_view' => manual_view_for_refresh(cfg, cid),
+                # KOV-D1b (Codex #310 kolo 1 P2-5): rozklik „Technický detail"
+                # na karte zasuvky nesie „co je v baleni" — teda NAZOV SETU
+                # a KODY, ktore prave tento push meni (zmena mapovania alebo
+                # katalogu v Studiu). Bez neho by riadok Kovania ukazoval novy
+                # kit a detail vedla stary, kym pouzivatel neprepne vyber.
+                # Je to TA ISTA citacia projekcia ako v plnom pushi (`params`
+                # polozky vysuvu + `HardwareSets.explain`) — ziadny prepocet
+                # receptu, ziadny zapis, ziadny krok Spat.
+                'front_drawer' => front_drawer_payload(cfg) }
             end
           js("NX.setHardwareSets(#{data.to_json})")
         rescue StandardError => e

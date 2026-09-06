@@ -332,8 +332,20 @@
     return hwSetOptionList(entry, (ov && ov.set_id) || '', '(podľa skrinky/projektu)',
                            (ov && ov.selector) ? (ov.label || 'podľa parametra') : null);
   }
+  // KOV-D1b (Codex #310 kolo 1 P2-3): server ZÁMERNE pošle `compat.cab = null`,
+  // keď má skrinka klasifikované zásuvky VIACERÝCH tried (alebo klasifikovanú
+  // vedľa legacy) — jeden kľúč by platil len na časť položiek a
+  // `apply_cabinet_override` taký zápis odmieta. Riadok skrinky sa vtedy
+  // NEKRESLÍ vôbec; inak by sa vykreslil plochý zoznam setov, z ktorého by
+  // KAŽDÁ voľba skončila hláškou. Rozlišuje sa **neprítomný** `compat`
+  // (legacy/neklasifikovaná skrinka → pôvodná cesta) od prítomného s `cab: null`.
+  function hwCabRowOff(entry){
+    return !!(entry && entry.compat) && !entry.compat.cab;
+  }
   // Ponuka pre riadok SKRINKY (override projektovej predvolby).
+  // -> null = riadok sa nemá kresliť vôbec (zmiešaná skrinka)
   function hwCabOptionList(entry){
+    if (hwCabRowOff(entry)) return null;
     var sc = hwCompatScope(entry, null);
     if (sc) return hwCompatOptionList(sc);
     return hwSetOptionList(entry, (entry && entry.override_set_id) || '',
@@ -361,6 +373,13 @@
          + '" data-cab="' + esc(cabId || '') + '" title="' + esc(title) + '" onchange="onHwSet(this)">'
          + hwOptionsHtml(list) + '</select>';
   }
+  // Odstranenie skrinkoveho riadku setu — cely `.hwsetrow` aj s popiskom
+  // (samotny select by nechal visiet holy nadpis bez ovladaca).
+  function hwDropSetRow(sel){
+    var row = (sel && sel.closest) ? sel.closest('.hwsetrow') : null;
+    var node = row || sel;
+    if (node && node.parentNode) node.parentNode.removeChild(node);
+  }
   // D-75: zivy refresh ponuky bez prekreslenia riadkov (rozpisany pocet
   // ostava). Vybranu hodnotu urcuje SERVER — payload nesie aktualne overridy.
   function refreshHardwareSets(options){
@@ -374,7 +393,12 @@
         var sel = sels[i];
         var entry = hwSetEntry(sel.getAttribute('data-gt'));
         var owner = sel.getAttribute('data-owner') || '';
-        sel.innerHTML = hwOptionsHtml(owner ? hwOwnerOptionList(entry, owner) : hwCabOptionList(entry));
+        var list = owner ? hwOwnerOptionList(entry, owner) : hwCabOptionList(entry);
+        // KOV-D1b: skrinkový riadok sa medzitým mohol stať nepoužiteľným
+        // (pribudla zásuvka inej triedy) — ľahký push preto odstráni CELÝ
+        // riadok, nedopĺňa doň plochý zoznam, z ktorého by každá voľba zlyhala.
+        if (!list){ hwDropSetRow(sel); continue; }
+        sel.innerHTML = hwOptionsHtml(list);
         sel.title = owner ? hwOwnerTitle(entry, owner) : hwCabTitle(entry);
       }
     });
@@ -681,13 +705,20 @@
     // skrinka naozaj ma) — inak by sa prvy novy set typu neobjavil hned, ale
     // az po novom vybere (zivy push obnovuje EXISTUJUCE selecty).
     if (!setBox) return;
-    var sets = (setOptions || []).filter(function(o){ return !!o; }).map(function(o){
+    // KOV-D1b: typ, ktorého skrinkový výber je nepoužiteľný (zmiešané triedy
+    // zásuviek), sa v skupine Sety NEKRESLÍ — set sa vtedy vyberá pri
+    // konkrétnom čele a ovládač na skrinke by len ponúkal chybu.
+    var all = (setOptions || []).filter(function(o){ return !!o; });
+    var perFront = all.length > 0 && all.every(hwCabRowOff);
+    var sets = all.filter(function(o){ return !hwCabRowOff(o); }).map(function(o){
       return '<div class="hwrow hwsetrow"><span class="hwname">'+esc(o.label)
            + ' <span class="hwown">set</span></span>'
            + hwSetSelectHtml(hwCabOptionList(o), o.generic_type, '', cabId, hwCabTitle(o))
            + '</div>';
     }).join('');
-    setBox.innerHTML = sets || '<div class="muted">Táto skrinka nemá kovanie, pre ktoré by sa dal vybrať set.</div>';
+    setBox.innerHTML = sets || (perFront
+      ? '<div class="muted">Zásuvky tejto skrinky sú rôznych druhov — set sa vyberá pri konkrétnom čele.</div>'
+      : '<div class="muted">Táto skrinka nemá kovanie, pre ktoré by sa dal vybrať set.</div>');
   }
 
   // ---- UI-C4: klik na hlavicku boxu = OZNAC VLASTNIKA V MODELI -------------
@@ -1483,7 +1514,7 @@
       HW_SET_PARAM: HW_SET_PARAM,
       // KOV-D1b: ponuka setu pre KLASIFIKOVANU zasuvku (server posiela hotovy
       // rozsah `entry.compat`) — tests/js/test_kovd1b_ui.js
-      HW_SET_STORED: HW_SET_STORED, hwCompatScope: hwCompatScope,
+      HW_SET_STORED: HW_SET_STORED, hwCompatScope: hwCompatScope, hwCabRowOff: hwCabRowOff,
       hwCompatPick: hwCompatPick, hwCompatOptionList: hwCompatOptionList,
       hwCompatTitle: hwCompatTitle, hwSetPayload: hwSetPayload,
       hwOwnerTitle: hwOwnerTitle, hwCabTitle: hwCabTitle,

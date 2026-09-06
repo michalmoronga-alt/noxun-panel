@@ -1022,6 +1022,12 @@ aj `manual_view` a JS ním prekreslí **len vlastný blok** (`refreshHardwareMan
 na **obal a obsah** (vzor `rowsHtml`/`rowsInnerHtml` v kostre) a keď skrinka žiadne ad-hoc položky nemá, `plan_parts_by_key` sa **nevolá vôbec** — tento push chodí po každej zmene
 katalógu.
 
+**KOV-D1b — ten istý ľahký push nesie aj `front_drawer`** (Codex #310 kolo 1 P2-5). Rozklik „Technický detail" na karte zásuvky ukazuje **názov setu a kódy**, teda presne to,
+čo tento push mení (úspešné projektové/globálne mapovanie, zmena katalógu). Bez toho by riadok Kovania už ukazoval nový kit a detail vedľa starý, kým používateľ neprepne
+výber. Payload nesie **tú istú čítaciu projekciu** ako plný push (`front_drawer_payload` — uložené `params` + `HardwareSets.explain`), takže **žiadny prepočet receptu,
+žiadny zápis, žiadny krok Späť**. Na klientovi ho preberá `refreshFrontDrawer` (`form.js`): vymení záznam a prekreslí **len OTVORENÚ kartu** (`openFrontCardId`) — riadky
+čiel sa neprestavujú, rovnaká úspornosť ako `refreshHardwarePurchase`. Chýbajúci kľúč (starý payload) sa nedotkne ničoho; `{}` je legitímna hodnota „skrinka zásuvky nemá".
+
 Testy: `tests/js/test_kovh2_adhoc_ui.js`, `tests/pure/test_kovh2_payload.rb`, in-SketchUp sekcia `run_kovh2`.
 
 **Klik na hlavičku → `nx_select_hw_owner` → `Panel.handle_select_hw_owner`** (`ui/panel/selection.rb`): prázdne `part_keys` = celá skrinka (`reselect`), inak `parts_by_keys` =
@@ -1322,7 +1328,10 @@ s vetou **stavby** (panel žiadnu vlastnú neskladá); `config_schema < DRAWER_A
 neznámy alebo nečitateľný recept vráti **prázdny zoznam** — karta radšej nekreslí nič, než by tvrdila číslo, ktoré nevie dokázať. Zlyhanie kdekoľvek tu vráti `{}`, takže
 karta čela nikdy nespadne kvôli riadku zásuvky. **KOV-D1b** pripája k detailu ešte vety „čo je v balení" (`drawer_buy_lines` → `item_purchase` → `HardwareSets.explain`);
 kontext (stav setov + mapa kód → položka katalógu) sa stavia **raz pre celý payload** (`drawer_buy_ctx`, lenivo — až pri prvej klasifikovanej zásuvke), nie per čelo, a keď
-chýba, detail ostáva presne taký, aký bol v C2c.
+chýba, detail ostáva presne taký, aký bol v C2c. **Kontext je ZHODNÝ s nákupným riadkom** (Codex #310 kolo 1 P2-1): pri projekte bez snapshotu a **nepoužiteľnej knižnici**
+(`status == :missing && library_read_only?`) sa override skrinky **neuplatní** a do `item_purchase` ide `blocked: true` — tá istá podmienka aj to isté správanie ako
+v `decorate_hardware_purchase`. Bez toho by rozklik uplatnil override na definíciu, ktorá by musela prísť práve z tej knižnice, a panel by o jednej položke hovoril niečo
+iné než súpis (lekcia R-06a).
 
 **`hardware_set_options` a owner výbery (KOV-D1a).** Typ kovania z kľúča override mapy aj rozpoznanie „výberu na úrovni vlastníka" idú cez **jediné autority**
 `HardwareSets.mapping_key_type` a `owner_scoped_key?` — nie cez `BuildPlan.parse_hardware_set_key`, ktorý pre `class:` kľúče vracia `nil`. Bez toho by karta čela pri
@@ -1337,10 +1346,17 @@ setov). Nesie **hotový rozsah** pre celú skrinku (`cab`) a pre **každé čelo
 „Set pre toto čelo") · `none_label` (čo platí BEZ vlastného výberu — na čele priznáva, či hodnota prichádza zo **skrinky** alebo z **projektu**, poradie ako
 `resolve_set_id`) · `options` (`HardwareSets.class_set_options` — len kompatibilné, neaktívne nikdy) · `current` (ID uloženej voľby, keď je v ponuke) · `stored` + `value_text`
 (uložená hodnota **mimo** ponuky — zobrazí sa ako `disabled`, vybrať sa nedá; F10). **Skrinkový rozsah vzniká len pri JEDNEJ triede** — pri zmiešaných triedach by jeden kľúč
-platil len na časť položiek a `override_class_key` taký zápis odmieta, takže ho karta ani nesmie ponúkať. Efektívna projektová hodnota sa číta pod **triednym** kľúčom, nikdy
-pod generickým (resolver ho pre takú položku nečíta). **Kľúč sa v paneli neskladá:** JS pošle existujúcou akciou `set_hardware_set` buď `set_id` (pevný set), alebo `value`
-(selektor rodiny), a kľúč z toho zloží `HardwareSets.apply_cabinet_override` (D1a). Neznáme ID sa **neodosiela** vôbec. Testy: `tests/pure/test_kovd1b_ui.rb`,
-`tests/js/test_kovd1b_ui.js`.
+platil len na časť položiek a `override_class_key` taký zápis odmieta, takže ho karta ani nesmie ponúkať. **Zmiešaná je aj skrinka, kde vedľa klasifikovanej zásuvky stojí
+LEGACY neklasifikovaný výsuv** (Codex #310 kolo 1 P2-2): `active_class_by_owner` má vtedy pri tom vlastníkovi `nil` a `compact` by ho zahodil — preto sa `cab` emituje len
+vtedy, keď je hodnôt práve jedna **a nie je `nil`**. Efektívna projektová hodnota sa číta pod **triednym** kľúčom, nikdy pod generickým (resolver ho pre takú položku
+nečíta). **Kľúč sa v paneli neskladá:** JS pošle existujúcou akciou `set_hardware_set` buď `set_id` (pevný set), alebo `value` (selektor rodiny), a kľúč z toho zloží
+`HardwareSets.apply_cabinet_override` (D1a). Neznáme ID sa **neodosiela** vôbec.
+
+**`cab: null` je VÝROK, nie chýbajúci údaj** (Codex #310 kolo 1 P2-3). Panel preto rozlišuje **neprítomný** `compat` (legacy/neklasifikovaná skrinka → pôvodný plochý zoznam
+setov) od prítomného s `cab: null` (zmiešaná skrinka → riadok skrinky sa **nekreslí vôbec**). Jediné miesto rozhodnutia je `hwCabRowOff`; `hwCabOptionList` vtedy vracia
+`null`, `renderHardware` typ zo skupiny **Sety vynechá** (a keď z nej nezostane nič, povie prečo: „set sa vyberá pri konkrétnom čele") a živý `refreshHardwareSets` taký
+riadok **odstráni** (`hwDropSetRow` — celý `.hwsetrow` aj s popiskom), namiesto aby doň doplnil zoznam, z ktorého by každá voľba skončila hláškou. Výber na konkrétnom čele
+beží ďalej. Testy: `tests/pure/test_kovd1b_ui.rb`, `tests/js/test_kovd1b_ui.js`.
 
 ### resolvers.rb
 
