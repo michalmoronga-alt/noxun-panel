@@ -31,7 +31,7 @@ a rád (`core/hardware_taxonomy.rb`) a vytiahla katalóg aj editor setu na obraz
 **KOV-A KOMPLET** (#280–#282 + fix #286), **KOV-H KOMPLET** (#283 + #285), **KOV-B1** (#284), **KOV-B2** aj **KOV-B3** hotové — **slice B je KOMPLET**.
 **KOV-C má package v2 (5.9., PR #301, #19):** nemenné recepty, kódy v setoch, žiadny fallback NL; ZMRAZENÝ.
 **KOV-C KOMPLET:** C1 jadro (#302), C2a príprava (v0.9.30), C2b aktivácia (#304, v0.9.31), C2b-M materiálový kanál (#305, v0.9.32) a **C2c UI zásuviek** (v0.9.33).
-**KOV-D má package v2 (6.9., PR #307, checkpoint #20): ZMRAZENÝ**, rez na malé série. Hotové: **D1a** (v0.9.34) · **D1b** (v0.9.35) · **D1c** (v0.9.36) · **D2a** (v0.9.37) · **D2b** (v0.9.38) · **D3a/D3b** (v0.9.39/40) · **D4** (v0.9.41) · **D5** (v0.9.42) — všetky rezy slice D sú hotové, uzáver bloku (minor bump) rozhodne orchestrátor.
+**KOV-D má package v2 (6.9., PR #307, checkpoint #20): ZMRAZENÝ**, rez na malé série. Hotové: **D1a** (v0.9.34) · **D1b** (v0.9.35) · **D1c** (v0.9.36) · **D2a** (v0.9.37) · **D2b** (v0.9.38) · **D3a/D3b** (v0.9.39/40) · **D4** (v0.9.41) · **D5** (v0.9.42) — **slice D je KOMPLET (v0.9.42, 7.9.2026)** — 8 PR za jeden deň (#310–#317). Blok KOVANIE pokračuje E/F/G/I (package + debata s Michalom pred štartom); minor bump až pri uzávere celého bloku.
 **Od 3.9. opäť Fable (Max, ~mesiac; priorita = uzavrieť V1)** — orchestruje Fable, implementujú Opus subagenti, review Codex; vstupný bod je [zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md](zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md) + tento súbor.
 **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
