@@ -58,7 +58,7 @@
   zamlčal. **(P2) Register receptov sa číta raz za prechod:** `Recipes.with_register_cache` (cache **neprežije** blok, poškodený register sa nezakešuje) + memo cieľa per
   `system|opening` — desať zásuviek znamenalo 20+ synchrónnych čítaní disku pri **každom** pushi vrátane echa po edite.
   **Testy:** headless **3302 PASS** (3273 pred dávkou, +29 v `tests/pure/test_kovd3b_upgrade_ui.rb`), **93 JS sád** (+`tests/js/test_kovd3b_ui.js`, 93 assertov v mini-DOM cez
-  celý tok klik → dopad → potvrdenie → odpoveď), **11 overených mutácií** (5 JS, 6 Ruby) a in-SU sekcia **`run_kovd3b`** (napísaná, spúšťa orchestrátor).
+  celý tok klik → dopad → potvrdenie → odpoveď), **14 overených mutácií** (7 JS, 7 Ruby) a in-SU sekcia **`run_kovd3b`** (napísaná, spúšťa orchestrátor).
 
 - **KOV-D3a — UPGRADE RECEPTU: JEDNO ČELO, JADRO (v0.9.39, 6.9.2026).**
   Recepty zásuviek sú **nemenné**: oprava alebo nová hodnota od výrobcu neprepíše starý súbor, ale vydá `_v2`. Dovtedy však chýbal mechanizmus, ktorým sa už postavená

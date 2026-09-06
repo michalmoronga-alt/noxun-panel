@@ -535,7 +535,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   Potvrdzovacie okno je počas zápisu zamknuté aj **proti zatvoreniu** (`busyLock` v kostre D-15, opt-in; zapnuté aj pre náhradu osi z D2b, ktorá dostala chýbajúci `rescue`).
   Dielce sú kľúčované `part_key` (Quadro má **dva** boky boxu) a výška emituje `kind` (`variant` pre Atiru, `box` v mm pre Quadro). Register receptov sa číta **raz za prechod**
   (`Recipes.with_register_cache` + memo cieľa per `system|opening`). Testy: `tests/pure/test_kovd3b_upgrade_ui.rb` (29), `tests/js/test_kovd3b_ui.js` (93 assertov, mini-DOM),
-  11 overených mutácií + in-SU sekcia **`run_kovd3b`**.
+  14 overených mutácií + in-SU sekcia **`run_kovd3b`**.
   **Pôvodné zadanie:** info „dostupný recept v2" pri čele + ponuka s konkrétnym dopadom na TOTO čelo (výška, NL, rozmery dielcov, zachovanie zámkov; nie textový diff konštánt —
   verzia môže meniť prahy/rad/hrúbky/ABS bez zmeny `constants`, Astra #20 F13) + autorská poznámka vydania z receptu (`release_note`) + potvrdenie; **In-SU povinné: 1 Späť A Redo (Ctrl+Y) — po redo ref v2, preadresované zámky aj geometria konzistentné** (Codex #307 P2); to isté pre zámky v D2b.
   **D4 · UI DROBNOSTI (dlh z C, Astra #20 F18/N17):** highlight riadku Kontroly po ceruzke (a smerovanie na konkrétny osirotený záznam v Kovaní); `owner_label` (ľudský názov čela)
