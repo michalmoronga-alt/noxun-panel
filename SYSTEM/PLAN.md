@@ -500,7 +500,11 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   `front_drawer[fid]` nesie `axes` + `lock` (identita zápisu vrátane `cabinet_id`) — `drawer_axes_index` dáva stav aj identitu **jedným** prechodom (druhý by znamenal
   druhé `Recipes.load` na každý push) a **ľahký push** (`front_drawer_refresh`) nesie to isté, inak by zmena mapovania zmazala chipy z otvorenej karty.
   **Vedomá odchýlka od mockupu:** chipy „otváranie" a „nosnosť" sa nepridali (riadok zhrnutia ich už nesie) — zapísané v `zdroje/ui20/UI20_KONTRAKT.md` §7 bod 10.
-  Testy: `tests/pure/test_kovd2b_payload.rb`, `tests/js/test_kovd2b_ui.js` (mini-DOM, 3 overené mutácie) + in-SU sekcia **`run_kovd2b`**.
+  **Codex kolo 1 (4× P2):** modal náhrady sa zatváral **pred** potvrdením servera → odteraz sa len zamkne a čaká na `NX.hwAxResult` s **korelačným tokenom** (`ax_token`,
+  vzor KOV-H2), odmietnutie ho odomkne a hlášku ukáže v ňom · pri zámkovom konflikte sa **veta nekreslila dvakrát** (vonkajšia sa potlačí, keď ju os doslovne opakuje) ·
+  os v `conflict` už **nemá ponuku** (jediná cesta = náhrada s potvrdením) · chipy dostali **`data-axc`**, takže fokus prežije prekreslenie karty.
+  Testy: `tests/pure/test_kovd2b_payload.rb`, `tests/js/test_kovd2b_ui.js` (mini-DOM) + `test_kova2a_karta.js` (fokus nad celou kartou) + in-SU sekcia **`run_kovd2b`**;
+  8 overených mutácií.
   **D3a · UPGRADE RECEPTU — jedno čelo, jadro (audit-povinné):** akcia mení **jeden záznam mapy `system|opening` jedného čela** (Astra #20 F12/F13; ostatné refs a dormant zámky
   nedotknuté); server overí očakávaný starý ref + cieľ rovnakého systému/otvárania; **preflight cieľa PRED zápisom**: hrúbky, oba zámky (preadresovanie `rule_id recipe:<v1> →
   recipe:<v2>`; kolidujúci override na cieľovom rule_id s inou hodnotou = odmietnutie), expanzia setu — **konflikt cieľového receptu alebo chýbajúci kit = upgrade sa NEULOŽÍ, ostáva

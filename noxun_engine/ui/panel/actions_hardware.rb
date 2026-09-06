@@ -34,26 +34,65 @@ module Noxun
           truthy?(data['disabled']) || !data['quantity'].nil?
         end
 
+        # KOV-D2b: KORELACNY TOKEN jedneho odoslania z modalu nahrady (kostra
+        # D-15). Server ho NEVYRABA ani neinterpretuje — len ho vracia v echu,
+        # aby klient spoznal, ci odpoved patri PRAVE tomu oknu, ktore zapis
+        # poslalo (vzor `manual_token`, Codex #285 P2-A). Uzavrety tvar: len
+        # String/Integer a orezana dlzka — payload je verejny kanal a do
+        # `execute_script` sa nesmie dostat lubovolny objekt.
+        AXIS_TOKEN_MAX = 40
+
+        def axis_token(raw)
+          return nil unless raw.is_a?(String) || raw.is_a?(Integer)
+
+          t = raw.to_s[0, AXIS_TOKEN_MAX]
+          t.empty? ? nil : t
+        end
+
+        # Odpoved cakajucemu modalu. BEZ tokenu (klik na chip — ziadne okno
+        # neceka) sa neposiela nic: `NX.hwAxResult` by nemal komu patrit.
+        def push_axis_result(token, ok, msg)
+          return nil if token.nil?
+
+          js("NX.hwAxResult(#{ok ? 'true' : 'false'}, #{msg.to_s.to_json}, #{token.to_json})")
+          nil
+        end
+
+        # Odmietnutie: hlaska do statusu (ak ju uz nenastavil volajuci) A do
+        # cakajuceho modalu. Modal sa ODOMKNE a rozhodnutie zostane na
+        # obrazovke — kontrakt D-15 „zapis okno nezatvara".
+        def axis_fail(token, msg, status: true)
+          set_status(msg, true) if status
+          push_axis_result(token, false, msg)
+          nil
+        end
+
         def handle_set_hardware_override(payload)
           model = Sketchup.active_model
           data = parse(payload)
+          # KOV-D2b: token cakajuceho modalu nahrady sa cita PRED prvym
+          # navratom — inak by odmietnutie nechalo okno zamknute navzdy.
+          tok = axis_token(data['ax_token'])
           # R-02: identita DOKUMENTU pred identitou skrinky — `cabinet_id` nizsie
           # prepnutie dokumentu nezachyti (CAB-001 je v kazdej zakazke).
-          return if foreign_document?(data, model, 'Kovanie sa nezmenilo')
+          if foreign_document?(data, model, 'Kovanie sa nezmenilo')
+            return axis_fail(tok, 'Kovanie sa nezmenilo — panel patrí inému dokumentu.',
+                             status: false)
+          end
 
           cab = find_cabinet(model)
-          return set_status('Najprv označ NOXUN korpus.', true) if cab.nil?
+          return axis_fail(tok, 'Najprv označ NOXUN korpus.') if cab.nil?
 
           gt = data['generic_type'].to_s
           rid = data['rule_id'].to_s
-          return set_status('Neznáma položka kovania.', true) if gt.empty? || rid.empty?
+          return axis_fail(tok, 'Neznáma položka kovania.') if gt.empty? || rid.empty?
 
           # F6: payload nesie identitu RENDROVANEJ skrinky — zmena vyberu pred
           # obsluhou callbacku nesmie prepisat inu skrinku (vzor callbacku setov).
           rendered = data['cabinet_id'].to_s
           if !rendered.empty? && rendered != Store.get(cab, 'cabinet_id').to_s
             push_selected(model)
-            return set_status('Výber sa medzitým zmenil — panel sa obnovil, skús znova.', true)
+            return axis_fail(tok, 'Výber sa medzitým zmenil — panel sa obnovil, skús znova.')
           end
 
           owner = present_str(data['owner_part_key'])
@@ -62,11 +101,11 @@ module Noxun
           # KONKRETNYM dielcom. Rucny zasah by rozbil dvojicu „dielce + kit"
           # (a fail-closed brana by zakazku aj tak zastavila).
           if rid.start_with?(RECIPE_RULE_PREFIX) && recipe_count_mutation?(data)
-            return set_status('Výsuv zásuvky vydáva recept — počet ani vypnutie sa meniť nedá. ' \
-                              'Zmeň klasifikáciu čela alebo jeho rozmery.', true)
+            return axis_fail(tok, 'Výsuv zásuvky vydáva recept — počet ani vypnutie sa meniť nedá. ' \
+                                  'Zmeň klasifikáciu čela alebo jeho rozmery.')
           end
           field, value, err = override_change(data, model, cab, owner, gt, rid)
-          return set_status(err, true) if err
+          return axis_fail(tok, err) if err
 
           params = existing_params(cab)
           all = params['hardware_overrides'].is_a?(Array) ? params['hardware_overrides'] : []
@@ -80,6 +119,8 @@ module Noxun
           end
           status_with_warnings(cab, override_status_msg(cab, field, value))
           push_selected(model)
+          # AZ TU: zapis prebehol a panel je prekresleny — modal sa smie zavriet.
+          push_axis_result(tok, true, '')
         end
 
         # Zisti, ktore POLE sa meni a na aku hodnotu. -> [field, value, error]

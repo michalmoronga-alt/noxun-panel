@@ -200,8 +200,15 @@
     var ax = frontDrawerAxesRow(d);
     var st = String(d.state || '');
     if (st === 'conflict'){
+      // Codex #313 kolo 1 P2-2: pri `height_lock_invalid`/`nl_lock_invalid` je
+      // veta stavby a hlaska osi TEN ISTY ulozeny retazec (`axis_message` ho
+      // berie z `drawer_conflicts`) — karta by ju vypisala DVAKRAT, raz ako
+      // cerveny riadok a raz v bloku chipu. Vonkajsia veta sa preto potlaci,
+      // ale LEN pri doslovnej zhode: konflikt, o ktorom os nevie (prekazka,
+      // hrubka, KD…), ostava jedinym miestom, kde sa dovod da precitat.
       var msg = String(d.message || '');
-      var conf = msg ? [{ kind: 'info', tone: 'err', icon: 'alert', text: msg }] : [];
+      var conf = (msg && !frontDrawerAxesSay(ax, msg))
+        ? [{ kind: 'info', tone: 'err', icon: 'alert', text: msg }] : [];
       if (ax) conf.push(ax);
       return conf;
     }
@@ -226,6 +233,19 @@
     var lock = (d && d.lock && typeof d.lock === 'object') ? d.lock : null;
     if (!ax || !lock) return null;
     return { kind: 'axes', axes: ax, ident: lock };
+  }
+  // Povie NIEKTORA os v konflikte PRESNE tu istu vetu? Porovnava sa doslovne
+  // (server posiela ten isty ulozeny retazec na obe strany) — ziadne
+  // „podobne" ani prefix, aby sa nepotlacil dovod, ktory hovori nieco ine.
+  function frontDrawerAxesSay(row, msg){
+    var ax = row && row.axes;
+    if (!ax || !msg) return false;
+    for (var k in ax){
+      if (!Object.prototype.hasOwnProperty.call(ax, k)) continue;
+      var a = ax[k];
+      if (a && a.state === 'conflict' && String(a.message || '') === String(msg)) return true;
+    }
+    return false;
   }
 
   // VIEW-MODEL karty. `item` = polozka cela (typ + dormant polia), `entry` =
@@ -420,6 +440,11 @@
     var a = attrs || {};
     if (a.t) return 't:' + a.t;
     if (a.k && a.v != null && a.v !== '') return 's:' + a.k + '|' + a.v + '|' + (a.w || '');
+    // KOV-D2b: ovladace chipov osi. Identita je (os, druh ovladaca) — v karte
+    // je prave jeden rad chipov, takze dvojica je jednoznacna a `data-val`
+    // sa do kluca zamerne NEBERIE: po zamknuti sa hodnota chipu ZMENI a fokus
+    // by uz nemal co najst.
+    if (a.ax && a.axc) return 'a:' + a.ax + '|' + a.axc;
     return null;
   }
   // Inverzna cesta: z kluca spat SELEKTOR, ktorym sa tlacidlo najde v cerstvo
@@ -428,6 +453,11 @@
   function frontCardFocusSelector(key){
     if (!key) return null;
     if (key.indexOf('t:') === 0) return key.length > 2 ? '[data-t="' + key.slice(2) + '"]' : null;
+    if (key.indexOf('a:') === 0){
+      var q = key.slice(2).split('|');
+      if (q.length !== 2 || !q[0] || !q[1]) return null;
+      return '[data-ax="' + q[0] + '"][data-axc="' + q[1] + '"]';
+    }
     if (key.indexOf('s:') !== 0) return null;
     var p = key.slice(2).split('|');
     if (p.length !== 3 || !p[0] || !p[1]) return null;
@@ -1194,6 +1224,7 @@
       frontCardModel: frontCardModel, frontWingLabel: frontWingLabel,
       // KOV-C2c (tests/js/test_kovc2c_karta.js): riadky zasuvky v karte cela.
       frontDrawerRows: frontDrawerRows, frontDrawerAxesRow: frontDrawerAxesRow,
+      frontDrawerAxesSay: frontDrawerAxesSay,
       frontCardKeepOpen: frontCardKeepOpen,
       frontCardFocusKey: frontCardFocusKey, frontCardFocusSelector: frontCardFocusSelector,
       frontExtraOnTypeChange: frontExtraOnTypeChange, frontExtraOnWings: frontExtraOnWings,

@@ -1047,7 +1047,10 @@
     var cls = 'axchip' + (st === 'locked' ? ' locked' : '') + (st === 'conflict' ? ' err' : '');
     var d = hwAxDef(kind);
     var val = (ax && ax.value != null) ? String(ax.value) : '';
-    var h = '<button type="button" class="'+cls+'" data-ax="'+esc(kind)+'"'
+    // `data-axc` = DRUH ovladaca. Je to logicka identita pre obnovu fokusu po
+    // prekresleni karty cela (`frontCardFocusKey`) — `data-ax` sama nestaci,
+    // lebo tu istu os nesie chip, ponuka aj obe tlacidla konfliktu.
+    var h = '<button type="button" class="'+cls+'" data-ax="'+esc(kind)+'" data-axc="chip"'
           + ' data-state="'+esc(st)+'" data-val="'+esc(val)+'"'
           + ' aria-pressed="'+(st === 'auto' ? 'false' : 'true')+'"'
           + ' title="'+esc(hwAxChipTitle(kind, ax))+'" onclick="onHwAxChip(this)">'
@@ -1055,13 +1058,19 @@
           + '<b>'+esc(hwAxText(kind, ax))+'</b>'
           + ((d && d.suffix) ? '<span class="axsuf">'+esc(d.suffix)+'</span>' : '')
           + '</button>';
-    var opts = hwAxOptionList(kind, ax);
+    // KONFLIKT NEMA PONUKU (Codex #313 kolo 1 P2-3). Server pri konflikte
+    // `options` stale posiela (su to hodnoty, ktore by sa dali zamknut), ale
+    // select vedla cerveneho chipu by bol DRUHA cesta k tej istej zmene — a to
+    // BEZ potvrdenia, ktore vedla neho vyzaduje tlacidlo „Nahradiť za …".
+    // Jedina cesta z konfliktu je preto nahrada (D-15) alebo odomknutie.
+    var opts = (st === 'conflict') ? [] : hwAxOptionList(kind, ax);
     if (opts.length < HW_AX_OPTS_MIN) return h;   // `blocked_by` = prazdne options = ziadna ponuka
     var oh = '';
     opts.forEach(function(o){
       oh += '<option value="'+esc(o.value)+'"'+(o.selected?' selected':'')+'>'+esc(o.text)+'</option>';
     });
-    return h + '<select class="axsel" data-ax="'+esc(kind)+'" aria-label="'+esc(hwAxSelTitle(kind))+'"'
+    return h + '<select class="axsel" data-ax="'+esc(kind)+'" data-axc="sel"'
+             + ' aria-label="'+esc(hwAxSelTitle(kind))+'"'
              + ' title="'+esc(hwAxSelTitle(kind))+'" onchange="onHwAxPick(this)">'+oh+'</select>';
   }
   // CERVENY riadok konfliktu (veta je SERVEROVA — panel ziadnu vlastnu
@@ -1073,13 +1082,13 @@
       var msg = String((ax && ax.message) || '');
       var btns = '';
       if (ax && ax.proposal != null){
-        btns += '<button type="button" class="ghostbtn hwbtn" data-ax="'+esc(kind)+'"'
+        btns += '<button type="button" class="ghostbtn hwbtn" data-ax="'+esc(kind)+'" data-axc="fix"'
               + ' data-val="'+esc(String(ax.proposal))+'"'
               + ' data-sub="'+esc(hwAxFixSub(kind, ax))+'"'
               + ' title="'+esc(hwAxFixSub(kind, ax))+'" onclick="onHwAxFix(this)">'
               + esc(hwAxFixLabel(kind, ax))+'</button>';
       }
-      btns += '<button type="button" class="ghostbtn hwbtn" data-ax="'+esc(kind)+'"'
+      btns += '<button type="button" class="ghostbtn hwbtn" data-ax="'+esc(kind)+'" data-axc="unlock"'
             + ' title="Odomknúť — platí automat" onclick="onHwAxUnlock(this)">'
             + NXIcons.svg('lock-open')+' Odomknúť</button>';
       return '<div class="axconf">'+NXIcons.svg('alert')
@@ -1126,6 +1135,23 @@
     hwAxSend(sel, sel.getAttribute('data-ax'), v);
   }
   function onHwAxUnlock(btn){ hwAxSend(btn, btn.getAttribute('data-ax'), null); }
+
+  // ---- KOV-D2b: NAHRADA = D-15 POTVRDENIE SO ZAMKOM ODOSIELANIA -----------
+  // Kontrakt kostry D-15: **zapis okno NEZATVARA** — zatvorit ho smie az
+  // volajuci, ked SERVER zapis POTVRDI (GH #138 P2 / audit #10). Predtym sa
+  // okno zatvaralo hned v `onSubmit`, takze odmietnutie servera (napr. navrh
+  // medzitym zastaral, lebo pouzivatel zmenil vyber v SketchUpe) pouzivatel
+  // uvidel uz len ako status pod prazdnou kartou — bez kontextu rozhodnutia
+  // a bez nahrady (Codex #313 kolo 1 P2-1).
+  //
+  // Korelacia je TOKENOM, nie druhom operacie (lekcia KOV-H2, Codex #285
+  // P2-A): kazde odoslanie ma vlastny rastuci token, server ho vracia v echu
+  // a klient porovnava JEHO — inak by odpoved na starsie odoslanie zavrela
+  // okno, ktore uz caka na nieco ine.
+  var HW_AX_MODAL = null;   // { token, sent } | null = ziadne nase okno nebezi
+  var HW_AX_SEQ = 0;
+  function hwAxToken(){ HW_AX_SEQ += 1; return 'a' + HW_AX_SEQ; }
+
   // Nahrada je JEDNO rozhodnutie => kostra D-15 (potvrdenie bez poli).
   // Identita aj hodnota sa citaju PRED otvorenim okna — modal prekresluje
   // `#nxModalRoot`, nie panel, ale spoliehat sa na to by bola zbytocna vazba.
@@ -1148,12 +1174,39 @@
       okLabel: 'Nahradiť',
       fields: [],
       onSubmit: function(){
-        NXModal.close();
+        if (!HW_AX_MODAL || HW_AX_MODAL.sent) return;   // dvojklik nezapise dvakrat
+        var tok = hwAxToken();
+        HW_AX_MODAL.token = tok;
+        HW_AX_MODAL.sent = true;
+        NXModal.clearErrors();
+        NXModal.setBusy(true);
         id.field = d.field;
         id.value = v;
+        id.ax_token = tok;
         hwSend(id);
-      }
+      },
+      // Zatvorenie (Escape, scrim, krizik, „Zrušiť" aj nase vlastne) stav
+      // VZDY vycisti — inak by odpoved na uz zavrete okno hlasila do prazdna.
+      onClose: function(){ HW_AX_MODAL = null; }
     });
+    // AZ ZA `open`: kostra najprv zatvara predchadzajuci modal, takze jeho
+    // `onClose` by novy stav hned vynuloval.
+    HW_AX_MODAL = { token: null, sent: false };
+  }
+  // Odpoved servera na zapis Z MODALU. Uspech okno zatvara, zlyhanie ho
+  // ODOMKNE a hlasku ukaze V NOM — rozhodnutie tak ostane na obrazovke.
+  function onHwAxResult(ok, msg, token){
+    if (!HW_AX_MODAL || String(token || '') !== String(HW_AX_MODAL.token || '')) return;
+    if (typeof NXModal === 'undefined' || !NXModal) return;
+    if (ok){
+      HW_AX_MODAL = null;
+      NXModal.setBusy(false, { clear: true });   // server potvrdil -> pamat zaniká
+      NXModal.close();
+      return;
+    }
+    HW_AX_MODAL.sent = false;
+    NXModal.setBusy(false);
+    NXModal.showErrors([{ msg: msg || 'Náhrada sa neuložila.' }]);
   }
 
   // ŠT-3b-1: `openRulesDialog` ZANIKOL spolu s oknom „Pravidlá kovania" —
@@ -1757,7 +1810,8 @@
       hwAxOptionList: hwAxOptionList, hwAxChipTitle: hwAxChipTitle,
       hwAxFixSub: hwAxFixSub, hwAxFixLabel: hwAxFixLabel, hwAxHtml: hwAxHtml,
       hwAxIdent: hwAxIdent, onHwAxChip: onHwAxChip, onHwAxPick: onHwAxPick,
-      onHwAxUnlock: onHwAxUnlock, onHwAxFix: onHwAxFix,
+      onHwAxUnlock: onHwAxUnlock, onHwAxFix: onHwAxFix, onHwAxResult: onHwAxResult,
+      hwAxModalState: function(){ return HW_AX_MODAL; },
       // UI-C4 boxy vlastnikov (tests/js/test_uic4_kovanie.js) — ciste skladanie
       // skupin z owner dat, ziadny DOM.
       hwGroupKeyOf: hwGroupKeyOf, hwLabelHead: hwLabelHead, hwLabelTail: hwLabelTail,

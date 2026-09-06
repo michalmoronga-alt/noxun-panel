@@ -324,6 +324,11 @@ global.nxDraftStats = () => ({});
 global.setCabInfo = () => {};
 global.frontHwBadge = () => '';
 global.frontHwBuy = () => '';
+// KOV-D2b: karta kresli chipy osi TYM ISTYM rendererom ako sekcia Kovanie.
+// V prehliadaci je `hwAxHtml` obycajny globalny symbol (skripty nie su moduly),
+// v Node ho preto treba podstrcit — inak by sa cesta „chip v karte" nedala
+// prejst vobec a fokus po prekresleni by ostal neoveren.
+global.hwAxHtml = require(path.join(JS, 'hardware.js')).hwAxHtml;
 const FM = require(path.join(JS, 'form.js'));
 
 const rows = mkEl('div');
@@ -558,5 +563,38 @@ const fh = rowOf('F1').querySelector('.fh');
 fh.focus();
 FM.refreshFrontCards();
 ok(DOC.activeElement === fh, 'fokus mimo karty ostava, kde bol');
+
+// --- 6l) KOV-D2b (Codex #313 kolo 1 P2-4): fokus na CHIPE OSI prezije redraw
+// Chipy zamkov su klavesove ovladace ako kazde ine tlacidlo karty. Bez vlastnej
+// logickej identity (`data-ax` + `data-axc`) by po kazdom pushi — a ten pride
+// po KAZDOM zamknuti — fokus spadol na dokument.
+resetRows();
+FM.addFrontRow({ id: 'F1', type: 'drawer_front',
+                 drawer: { construction: 'metal' }, opening_mode: 'classic' });
+global.frontSlots = { F1: entry(1, []) };
+global.frontDrawer = { F1: { state: 'ok', text: 'Atira · H144 · NL 470', detail: [],
+                             axes: { height: { state: 'auto', value: 144, options: [70, 144] },
+                                     nl: { state: 'auto', value: 470, options: [420, 470] } },
+                             lock: { owner_part_key: 'front:F1/panel', generic_type: 'slide',
+                                     rule_id: 'recipe:atira_sisy_v1', cabinet_id: 'CAB-1' } } };
+openCard('F1');
+const axChip = rowOf('F1').querySelector('.axchip[data-ax="height"][data-axc="chip"]');
+ok(axChip, 'karta cela naozaj vykreslila chip vysky');
+axChip.focus();
+ok(DOC.activeElement === axChip, 'fokus je na chipe pred prekreslenim');
+FM.refreshFrontCards();
+ok(DOC.activeElement !== axChip, 'fokus NEostal na uzle, ktory prekreslenim zanikol');
+eq(DOC.activeElement && DOC.activeElement.dataset.ax, 'height',
+   'fokus sa vratil na chip TEJ ISTEJ osi');
+eq(DOC.activeElement && DOC.activeElement.dataset.axc, 'chip',
+   'a na ten isty DRUH ovladaca (nie na ponuku vedla neho)');
+ok(DOC.activeElement.closest('.fcard') === rowOf('F1').querySelector('.fcard'),
+   'a je v ZIVEJ karte');
+// Ponuka vedla chipu je vlastna identita — fokus si ich nesmie zamenit.
+const axSel = rowOf('F1').querySelector('.axsel[data-ax="height"]');
+axSel.focus();
+FM.refreshFrontCards();
+eq(DOC.activeElement && DOC.activeElement.dataset.axc, 'sel',
+   'fokus na ponuke ostava na ponuke');
 
 console.log(`OK test_kova2a_karta.js — ${n} kontrol`);

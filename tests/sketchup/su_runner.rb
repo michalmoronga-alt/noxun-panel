@@ -15733,16 +15733,18 @@ module NoxunSuRunner
   # KLIK NA CHIP tak, ako ho posiela `hardware.js`: identita z `lock`, pole
   # z osi, hodnota z parametra (chip posiela `axes.value`, ponuka hodnotu
   # z `options`, tlacidlo nahrady `proposal`, odomknutie `nil`).
-  def kovd2b_click(model, inst, card, kind, value)
+  # `token` posiela LEN cesta cez modal nahrady (D-15) — chip ho nema, lebo
+  # ziadne okno na odpoved neceka (Codex #313 kolo 1 P2-1).
+  def kovd2b_click(model, inst, card, kind, value, token = nil)
     lock = card['lock'] || {}
+    body = { 'owner_part_key' => lock['owner_part_key'],
+             'generic_type' => lock['generic_type'], 'rule_id' => lock['rule_id'],
+             'field' => KOVD2B_FIELDS[kind], 'value' => value,
+             'cabinet_id' => lock['cabinet_id'] }
+    body['ax_token'] = token if token
     model.selection.clear
     model.selection.add(inst)
-    e::Panel.handle_set_hardware_override(
-      pg(model, 'owner_part_key' => lock['owner_part_key'],
-                'generic_type' => lock['generic_type'], 'rule_id' => lock['rule_id'],
-                'field' => KOVD2B_FIELDS[kind], 'value' => value,
-                'cabinet_id' => lock['cabinet_id'])
-    )
+    e::Panel.handle_set_hardware_override(pg(model, body))
   end
 
   def kovd2b_axis(inst, kind, fid = 'F1')
@@ -15856,8 +15858,9 @@ module NoxunSuRunner
     return if prop.nil?
 
     # --- 6) NAHRADA (po D-15 potvrdeni) = zamknuta nahrada, druhy zamok zije
+    # Payload nesie `ax_token` — presne to, co posiela potvrdene okno D-15.
     m = r03_marker(model, markers)
-    kovd2b_click(model, inst, card, 'height', prop)
+    kovd2b_click(model, inst, card, 'height', prop, 'a1')
     ok("KOV-D2b nahrada: H#{prop} je ZAMKNUTA (nie automat) a zasuvka sa postavila",
        kovd2b_axis(inst, 'height')['state'] == 'locked' &&
        kovd2a_variant(inst) == prop.to_i && !kovd2a_slide(inst).nil?)

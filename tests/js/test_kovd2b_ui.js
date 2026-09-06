@@ -22,6 +22,18 @@
 //      -> „KOV-D2b (R3): nahrada sa BEZ potvrdenia neodosle"
 //   M3 `onHwAxChip` posle pri odomykani `reset: true` (cely zaznam)
 //      -> „KOV-D2b (R2): klik na `locked` odomkne LEN TUTO os"
+// Codex #313 kolo 1 (P2):
+//   M4 `onSubmit` zatvara okno hned (namiesto `setBusy`)
+//      -> „KOV-D2b (P2-1): okno ostava OTVORENE, kym server zapis nepotvrdi"
+//   M5 `onHwAxResult` netestuje token
+//      -> „odpoved s CUDZIM tokenom okno nezatvori"
+//   M6 chip v konflikte kresli ponuku
+//      -> „KOV-D2b (P2-3): os v KONFLIKTE nemá ponuku…"
+//   M7 vonkajsia veta konfliktu sa nepotlaci
+//      -> „KOV-D2b (P2-2): zhodna veta sa nekresli DVAKRAT…"
+//   M8 `frontCardFocusOf` necita `data-ax`/`data-axc`
+//      -> „karta cita identitu osi z datasetu fokusovaneho ovladaca"
+//      (+ v `test_kova2a_karta.js`: „fokus NEostal na uzle, ktory prekreslenim zanikol")
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
@@ -152,6 +164,10 @@ ok(bLock.innerHTML.indexOf('#i-lock"') >= 0, 'a ZATVORENY zamok');
 
 const bConf = render(CONFLICT);
 ok(chipOf(bConf, 'height').getAttribute('class').indexOf('err') >= 0, 'konflikt je CERVENY chip');
+eq(bConf.querySelectorAll('.axsel[data-ax="height"]').length, 0,
+   'KOV-D2b (P2-3): os v KONFLIKTE nemá ponuku — jediná cesta je náhrada s potvrdením');
+ok(CONFLICT.height.options.length >= 2,
+   '(a nie je to tým, že by server ponuku neposlal — poslal ju)');
 const conf = bConf.querySelector('.axconf');
 ok(conf, 'konflikt ma vlastny riadok s dovodom');
 ok(textOf(conf).indexOf(CONFLICT.height.message) >= 0,
@@ -253,17 +269,47 @@ ok(textOf(modal).indexOf('Nahradiť za H144') >= 0 || textOf(modal).indexOf('H14
 ok(textOf(modal).indexOf('Zámok druhej osi sa nemení') >= 0,
    'a hovori, ze druhy zamok ostava');
 global.NXModal.submit();
-eq(lastSent(), { owner_part_key: 'front:F1/panel', generic_type: 'slide',
-                 rule_id: 'recipe:atira_sisy_v1', cabinet_id: 'CAB-1',
-                 field: 'height_variant', value: 144 },
+const fixSent = lastSent();
+const TOK = fixSent && fixSent.ax_token;
+ok(TOK, 'KOV-D2b (P2-1): odoslanie nesie KORELACNY token (nie len druh operacie)');
+eq(Object.assign({}, fixSent, { ax_token: undefined }),
+   { owner_part_key: 'front:F1/panel', generic_type: 'slide',
+     rule_id: 'recipe:atira_sisy_v1', cabinet_id: 'CAB-1',
+     field: 'height_variant', value: 144, ax_token: undefined },
    'po potvrdeni sa zapise NAVRH SERVERA — a ostava ZAMKNUTY');
-ok(!global.NXModal.isOpen(), 'potvrdenie okno zatvara');
+ok(global.NXModal.isOpen(),
+   'KOV-D2b (P2-1): okno ostava OTVORENE, kym server zapis nepotvrdi (kontrakt D-15)');
+ok(global.NXModal.isBusy(), 'a je ZAMKNUTE — druhy submit uz nezapise');
+
+// Cudzi token (odpoved na STARSIE odoslanie) sa zahodi.
+global.NXModal.showErrors([]);
+HW.onHwAxResult(true, '', 'a-cudzi');
+ok(global.NXModal.isOpen(), 'odpoved s CUDZIM tokenom okno nezatvori');
+
+// ODMIETNUTIE servera: okno sa odomkne a hlaska je V NOM (nie pod prazdnou kartou).
+HW.onHwAxResult(false, 'Návrh sa medzitým zmenil — skús znova.', TOK);
+ok(global.NXModal.isOpen(), 'KOV-D2b (P2-1): odmietnuty zapis okno NEZATVARA');
+ok(!global.NXModal.isBusy(), 'a odomkne ho — rozhodnutie sa da poslat znova');
+ok(textOf(DOC.getElementById('nxModalRoot')).indexOf('Návrh sa medzitým zmenil') >= 0,
+   'dovod odmietnutia je V MODALI, nie len v statuse');
+
+// Druhy pokus + USPECH: az teraz sa okno zatvara.
+SENT.length = 0;
+global.NXModal.submit();
+const TOK2 = lastSent() && lastSent().ax_token;
+ok(TOK2 && TOK2 !== TOK, 'kazde odoslanie ma VLASTNY token');
+HW.onHwAxResult(true, '', TOK2);
+ok(!global.NXModal.isOpen(), 'potvrdeny zapis okno zatvara');
+eq(HW.hwAxModalState(), null, 'a stav volajuceho zaniká');
 
 // Zrusenie potvrdenia nezapise nic.
 SENT.length = 0;
 HW.onHwAxFix(fixBtn);
 global.NXModal.close();
 eq(SENT.length, 0, 'zavrete okno = ziadny zapis');
+eq(HW.hwAxModalState(), null, 'a `onClose` stav vycisti (odpoved nemá komu patriť)');
+HW.onHwAxResult(true, '', TOK2);
+ok(!global.NXModal.isOpen(), 'oneskorena odpoved na zavrete okno nic neotvara');
 
 // ===========================================================================
 // E) OBE MIESTA KRESLIA TEN ISTY RAD
@@ -301,6 +347,20 @@ const confRows = C.frontDrawerRows({ state: 'conflict', message: 'Nezmestí sa.'
                                      axes: CONFLICT, lock: IDENT });
 eq(confRows.map(r => r.kind), ['info', 'axes'],
    'KOV-D2b (R3): aj KONFLIKTNA karta ma chipy — inak sa neda odomknut');
+eq(confRows[0].text, 'Nezmestí sa.',
+   'konflikt, o ktorom os NEVIE (prekazka, hrubka, KD), ostava jedinym miestom s dovodom');
+
+// P2-2: pri zamkovom konflikte je veta stavby a hlaska osi TEN ISTY retazec —
+// karta ju nesmie vypisat dvakrat.
+const dupRows = C.frontDrawerRows({ state: 'conflict', message: CONFLICT.height.message,
+                                    axes: CONFLICT, lock: IDENT });
+eq(dupRows.map(r => r.kind), ['axes'],
+   'KOV-D2b (P2-2): zhodna veta sa nekresli DVAKRAT (vonkajsia sa potlaci)');
+eq(C.frontDrawerAxesSay(confRows[1], CONFLICT.height.message), true,
+   'zhoda sa pozna doslovne z hlasky OSI V KONFLIKTE');
+eq(C.frontDrawerAxesSay(confRows[1], 'Nezmestí sa.'), false, 'ina veta zhoda nie je');
+eq(C.frontDrawerAxesSay({ axes: { nl: { state: 'auto', message: 'x' } } }, 'x'), false,
+   'hlaska osi, ktora NIE JE v konflikte, vonkajsiu vetu nepotlaci');
 
 eq(C.frontDrawerRows({ state: 'ok', text: 'x', detail: [], axes: AUTO }).map(r => r.kind),
    ['resolved'], 'bez identity zapisu sa chipy nekreslia (klik do prazdna)');
@@ -312,6 +372,39 @@ eq(C.frontDrawerRows({ state: 'stale' }).map(r => r.kind), ['info'],
 const cardFn = formSrc.match(/function frontCardHtml\(row\)\{[\s\S]*?\n  \}\n/)[0];
 ok(/r\.kind === 'axes'/.test(cardFn) && /hwAxHtml\(r\.axes, r\.ident\)/.test(cardFn),
    'karta cela kresli TEN ISTY markup ako sekcia Kovanie (jeden renderer)');
+
+// ===========================================================================
+// F) FOKUS PREZIJE PREKRESLENIE KARTY (P2-4)
+// ===========================================================================
+// Karta sa pri kazdom pushi prepisuje CELA, takze ovladac s fokusom zanikne.
+// Bez logickej identity by fokus po klavesovej zmene osi spadol na dokument —
+// teda presne tam, kde je to najdrahsie.
+eq(C.frontCardFocusKey({ ax: 'height', axc: 'chip' }), 'a:height|chip',
+   'KOV-D2b (P2-4): chip osi MA logicku identitu fokusu');
+eq(C.frontCardFocusSelector('a:height|chip'), '[data-ax="height"][data-axc="chip"]',
+   'a z nej sa da zlozit selektor do cerstvo vykreslenej karty');
+eq(C.frontCardFocusKey({ ax: 'nl', axc: 'sel' }), 'a:nl|sel', 'to iste pre ponuku');
+eq(C.frontCardFocusKey({ ax: 'height' }), null,
+   'sama os nestaci — tu istu os nesie chip, ponuka aj obe tlacidla konfliktu');
+eq(C.frontCardFocusSelector('a:height'), null, 'poskodeny kluc = ziadny fokus naslepo');
+eq(C.frontCardFocusKey({ t: 'door', ax: 'height', axc: 'chip' }), 't:door',
+   'dlazdica typu ma prednost — povodne kluce sa nemenia');
+
+// Selektor musi v REALNOM markupe nájsť práve jeden uzol (a ten správny).
+[['height', 'chip'], ['nl', 'chip'], ['height', 'sel'], ['nl', 'sel']].forEach(function(p){
+  const sel2 = C.frontCardFocusSelector(C.frontCardFocusKey({ ax: p[0], axc: p[1] }));
+  eq(bAuto.querySelectorAll(sel2).length, 1,
+     'v rade chipov je „' + p[0] + '/' + p[1] + '" prave jeden uzol');
+});
+[['height', 'fix'], ['height', 'unlock']].forEach(function(p){
+  const sel3 = C.frontCardFocusSelector(C.frontCardFocusKey({ ax: p[0], axc: p[1] }));
+  eq(bConf.querySelectorAll(sel3).length, 1,
+     'a v konfliktnom bloku „' + p[0] + '/' + p[1] + '" tiez');
+});
+
+const focusOf = formSrc.match(/function frontCardFocusOf\(card\)\{[\s\S]*?\n  \}\n/)[0];
+ok(/ax: d\.ax, axc: d\.axc/.test(focusOf),
+   'karta cita identitu osi z datasetu fokusovaneho ovladaca');
 
 // Chipy „otváranie" a „nosnosť" z mockupu sa VEDOME nepridali (vertikalny
 // priestor; riadok zhrnutia ich uz nesie) — strazi to pocet osi.

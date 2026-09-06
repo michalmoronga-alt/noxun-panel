@@ -23,6 +23,11 @@
 #      -> „KOV-D2b (R2): identita zapisu je RECEPTOVA a ide zo servera"
 #   M3 lahky push vrati holy `front_drawer_payload` (bez osi)
 #      -> „KOV-D2b (R4): lahky push nesie stav osi TIEZ"
+# Codex #313 kolo 1 (P2-1 — odpoved cakajucemu modalu):
+#   M4 vetva handlera skonci len `set_status` (modal ostane zamknuty navzdy)
+#      -> „KOV-D2b (P2-1): KAZDA vetva handlera odpoveda cakajucemu modalu"
+#   M5 `push_axis_result` posiela odpoved aj BEZ tokenu
+#      -> „KOV-D2b (P2-1): odpoved sa posiela LEN k tokenu a nesie ho spat"
 require_relative '../helper' unless defined?(NxTest)
 
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core') if NxTest.headless?
@@ -201,6 +206,97 @@ NxTest.test('KOV-D2b (R5): `stale` zaznam ostava BEZ osi') do
   row = c.panel.front_drawer_payload(cfg)['F1']
   NxTest.assert_equal('stale', row['state'])
   NxTest.refute(row.key?('axes'), 'stary zaznam nema co zamykat')
+end
+
+# ============================================================================
+# P2-1 — ODPOVED CAKAJUCEMU MODALU NAHRADY (korelacny token)
+# ============================================================================
+#
+# Kostra D-15: zapis okno NEZATVARA — zatvorit ho smie az volajuci, ked server
+# zapis POTVRDI. Server preto musi odpovedat v KAZDEJ vetve, a to tokenom,
+# ktory mu klient poslal (vzor KOV-H2 `manual_token`).
+
+# Zachytenie serveroveho kanala. Alias + navrat je JEDINY bezpecny sposob:
+# `js` aj `set_status` su SKUTOCNE metody panela, takze `remove_method` bez
+# obnovy by ich zmazal aj vsetkym nasledujucim sadam (vzor `NxKovh2Js`).
+module NxD2bJs
+  def self.capture(*names)
+    sc = Noxun::Engine::Panel.singleton_class
+    out = { js: [], status: [] }
+    names.each { |m| sc.send(:alias_method, :"d2b_orig_#{m}", m) }
+    sc.send(:define_method, :js) { |script| out[:js] << script } if names.include?(:js)
+    if names.include?(:set_status)
+      sc.send(:define_method, :set_status) { |msg, err = false| out[:status] << [msg, err] }
+    end
+    yield out
+  ensure
+    names.each do |m|
+      sc.send(:remove_method, m)
+      sc.send(:alias_method, m, :"d2b_orig_#{m}")
+      sc.send(:remove_method, :"d2b_orig_#{m}")
+    end
+  end
+end
+
+NxTest.test('KOV-D2b (P2-1): token je uzavrety tvar — String/Integer, orezany') do
+  c = NxD2b
+  NxTest.assert_equal('a7', c.panel.axis_token('a7'))
+  NxTest.assert_equal('12', c.panel.axis_token(12), 'cele cislo je platny token')
+  NxTest.assert_equal(nil, c.panel.axis_token(nil), 'bez tokenu ziadne okno neceka')
+  NxTest.assert_equal(nil, c.panel.axis_token(''), 'prazdny retazec nie je token')
+  NxTest.assert_equal(nil, c.panel.axis_token({ 'x' => 1 }),
+                      'do `execute_script` sa nesmie dostat lubovolny objekt')
+  NxTest.assert_equal(nil, c.panel.axis_token(['a']))
+  max = c.panel.singleton_class::AXIS_TOKEN_MAX
+  NxTest.assert_equal(max, c.panel.axis_token('x' * 100).length,
+                      'token sa oreze na pevnu dlzku')
+end
+
+NxTest.test('KOV-D2b (P2-1): odpoved sa posiela LEN k tokenu a nesie ho spat') do
+  c = NxD2b
+  NxD2bJs.capture(:js) do |out|
+    c.panel.push_axis_result(nil, false, 'nieco')
+    NxTest.assert_equal([], out[:js], 'klik na chip ziadne okno neceka — nic sa neposiela')
+    c.panel.push_axis_result('a3', false, 'Návrh sa medzitým zmenil.')
+    NxTest.assert_equal(1, out[:js].length)
+    NxTest.assert(out[:js].first.start_with?('NX.hwAxResult(false,'), out[:js].first)
+    NxTest.assert(out[:js].first.include?('"a3"'),
+                  'echo nesie TOKEN — inak by odpoved nemal komu patrit')
+    NxTest.assert(out[:js].first.include?('Návrh sa medzitým zmenil.'),
+                  'a dovod, ktory sa ukaze V MODALI')
+    c.panel.push_axis_result('a4', true, '')
+    NxTest.assert(out[:js].last.start_with?('NX.hwAxResult(true,'), out[:js].last)
+  end
+end
+
+NxTest.test('KOV-D2b (P2-1): odmietnutie odomkne modal aj bez vlastneho statusu') do
+  c = NxD2b
+  NxD2bJs.capture(:js, :set_status) do |out|
+    c.panel.axis_fail('a9', 'Najprv označ NOXUN korpus.')
+    NxTest.assert_equal([['Najprv označ NOXUN korpus.', true]], out[:status])
+    NxTest.assert_equal(1, out[:js].length, 'a modal dostane odpoved TIEZ')
+    out[:status].clear
+    out[:js].clear
+    # `foreign_document?` si status nastavuje sam — druhy by ten prvy prekryl.
+    c.panel.axis_fail('a9', 'Kovanie sa nezmenilo.', status: false)
+    NxTest.assert_equal([], out[:status], 'status uz nastavil volajuci')
+    NxTest.assert_equal(1, out[:js].length, 'modal sa aj tak odomkne')
+  end
+end
+
+NxTest.test('KOV-D2b (P2-1): KAZDA vetva handlera odpoveda cakajucemu modalu') do
+  c = NxD2b
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_hardware.rb'),
+                  encoding: 'UTF-8')
+  body = src[/def handle_set_hardware_override.*?\n        end\n/m].to_s
+  NxTest.assert(body.include?("tok = axis_token(data['ax_token'])"),
+                'token sa cita PRED prvym navratom')
+  NxTest.refute(body.include?('return set_status('),
+                'ziadna vetva nesmie skoncit len statusom — modal by ostal zamknuty navzdy')
+  NxTest.assert(body.include?("push_axis_result(tok, true, '')"),
+                'uspech sa hlasi AZ za `push_selected` (panel je vtedy prekresleny)')
+  NxTest.assert(body.rindex("push_axis_result(tok, true, '')") > body.rindex('push_selected(model)'),
+                'poradie: najprv prekreslenie, potom „modal sa smie zavriet"')
 end
 
 # ============================================================================

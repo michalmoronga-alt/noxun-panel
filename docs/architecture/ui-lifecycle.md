@@ -830,8 +830,10 @@ menuje **výšku boxu**). Vertikálny priestor panela je vzácny, preto to **nie
 **CHIPY ZÁMKOV OSÍ (KOV-D2b).** Pod riadkom stojí rad chipov — `H144 výška` a `NL 470` — a je to **ten istý markup** (`hwAxHtml` v `hardware.js`), aký kreslí sekcia Kovanie:
 karta si vlastnú verziu nekreslí, inak by sa obe miesta časom rozišli. Kreslí ich `frontCardHtml` z riadku `kind: 'axes'`, ktorý pridáva **čistá** `frontDrawerAxesRow` (`core.js`)
 — a **len keď server poslal OBOJE**: stav osí (`axes`) aj identitu zápisu (`lock`). Chipy bez identity by boli klikateľné do prázdna a `recipe:<id>` panel skladať nesmie.
-Chipy dostáva aj **konfliktná** karta (stav `conflict`) — práve z nej sa musí dať odomknúť, keď položka výsuvu fail-closed nevznikla. Kontrakt chipov, kliku a náhrady je
-v odseku „Kontext Kovanie" nižšie. **Chipy „otváranie" a „nosnosť" z mockupu sa VEDOME nepridali** (vertikálny priestor — riadok zhrnutia ich už nesie; `UI20_KONTRAKT.md` §7).
+Chipy dostáva aj **konfliktná** karta (stav `conflict`) — práve z nej sa musí dať odomknúť, keď položka výsuvu fail-closed nevznikla; vtedy sa ale **vonkajšia červená veta
+potlačí, ak ju doslovne opakuje niektorá os v konflikte** (`frontDrawerAxesSay`, Codex #313 kolo 1 P2-2): pri `height_lock_invalid` / `nl_lock_invalid` je to ten istý uložený
+reťazec z `drawer_conflicts` a karta by ho vypísala dvakrát. Zhoda sa porovnáva **doslovne** — konflikt, o ktorom os nevie (prekážka, hrúbka, KD), ostáva jediným miestom, kde
+sa dôvod dá prečítať. Kontrakt chipov, kliku a náhrady je v odseku „Kontext Kovanie" nižšie. **Chipy „otváranie" a „nosnosť" z mockupu sa VEDOME nepridali** (vertikálny priestor — riadok zhrnutia ich už nesie; `UI20_KONTRAKT.md` §7).
 Ručný zámok dĺžky priznáva navyše veta `locked_note` pod riadkom.
 
 **KOV-D1b doplnil do TOHO ISTÉHO rozkliku „čo je v balení"** — za vety receptu pribudne „Balenie: &lt;názov setu&gt;", riadok každého člena („· K-sada 357696 — Súprava Atira 470
@@ -1050,11 +1052,21 @@ zámer: karta čela žiadny `.hwrow` nemá.
 - **Klik na `auto` chip zamkne práve zobrazenú hodnotu**, klik na `locked` alebo `conflict` chip pošle `value: null` = odomknutie **LEN tejto osi** (`reset: true` by zahodil
   celý záznam a s ním platný druhý zámok). Iná hodnota sa vyberá z `<select class="axsel">` s **výhradne** serverovými `options`; pri prázdnej ponuke (`blocked_by: 'height'`)
   sa select nekreslí vôbec a chip sprevádza tlmená veta „najprv vyrieš výšku".
+- **Os v `conflict` NEMÁ ponuku** (Codex #313 kolo 1 P2-3). Server `options` posiela aj vtedy, ale select vedľa červeného chipu by bol **druhá cesta k tej istej zmene, a to bez
+  potvrdenia**, ktoré vedľa neho vyžaduje tlačidlo „Nahradiť za …". Jediné cesty z konfliktu sú preto náhrada (D-15) a odomknutie.
 - **Konflikt** dostane červený riadok s **vetou zo servera** (`axes[os].message` — panel žiadnu vlastnú neskladá) a dve cesty von: **„Nahradiť za …"** len keď server dal
   `proposal`, a **„Odomknúť"** vždy. Náhrada je jedno rozhodnutie, takže ide cez **kostru D-15** (`NXModal.open` bez polí, `okLabel: 'Nahradiť'`); bez kostry sa neodošle nič —
   zmena zamknutej hodnoty bez potvrdenia je presne to, čomu sa dávka vyhýba. Po potvrdení sa zapíše `proposal` a náhrada **ostáva zamknutá**; druhý zámok server nemení.
 - **Zápis ide EXISTUJÚCOU akciou** `set_hardware_override` (`field` `height_variant` / `nominal_length`) cez `hwSend` → `nxDocPayload`, teda s guardom dokumentu aj skrinky.
   Žiadny nový callback, žiadny druhý tvar payloadu. Po zápise príde plný push a chipy sa prekreslia z nového `axes` — panel si stav osi **nikdy nepamätá**.
+- **Modal náhrady zatvára AŽ potvrdenie servera** (Codex #313 kolo 1 P2-1; kontrakt D-15 „zápis okno nezatvára", GH #138 P2 / audit #10). `onSubmit` len **zamkne** okno
+  (`NXModal.setBusy(true)`) a pripne k odoslaniu **korelačný token** (`ax_token`, rastúci `a<N>`); server ho vracia v `NX.hwAxResult(ok, msg, token)` a `onHwAxResult` porovnáva
+  **jeho** — korelovať podľa druhu operácie nestačí, odpoveď na staršie odoslanie by zavrela okno, ktoré už čaká na niečo iné (lekcia KOV-H2, Codex #285 P2-A). Úspech okno
+  zatvorí, **odmietnutie ho odomkne a hlášku ukáže V ŇOM** — inak by používateľ pri zastaranom `proposal` (medzitým zmenený výber) videl len status pod prázdnou kartou.
+  Server odpovedá **v každej vetve** `handle_set_hardware_override` (`axis_fail` / `push_axis_result`) a **len keď token prišiel** — klik na chip žiadne okno nečaká.
+- **Fokus prežije prekreslenie karty** (Codex #313 kolo 1 P2-4). Každý ovládač chipov nesie okrem `data-ax` (os) aj **`data-axc`** (druh: `chip` · `sel` · `fix` · `unlock`);
+  `frontCardFocusKey` z dvojice skladá kľúč `a:<os>|<druh>` a `frontCardFocusSelector` z neho selektor. Hodnota (`data-val`) v kľúči **nie je** — po zamknutí sa mení, takže by
+  fokus nemal čo nájsť. Bez toho by fokus padol na dokument po každom pushi, teda po **každom** zamknutí — presne pri klávesovej práci so zámkom.
 
 Testy: `tests/js/test_kovd2b_ui.js` (chipy, klik, náhrada nad mini-DOM), `tests/pure/test_kovd2b_payload.rb`, in-SketchUp sekcia `run_kovd2b`.
 
@@ -1581,6 +1593,12 @@ serverového stavu** (uložený config skrinky), nikdy z payloadu: chip na obraz
 sa **odmieta** („položka sa medzitým zmenila"), Quadro výškový zámok odmieta hláškou (systém výškové varianty nemá) a výška mimo `height_variants` receptu tiež.
 **Odomknutie osi** je `field` + `value: null`: `merge_override` zmaže **jedno** pole a druhý zámok tej istej identity prežije; záznam zaniká až prázdny. Reset **celého**
 záznamu (`reset: true`) ostáva pre `disabled`/`quantity` a pre osirotené zásahy.
+
+**ODPOVEĎ ČAKAJÚCEMU MODÁLU (KOV-D2b, Codex #313 kolo 1 P2-1).** Keď zápis prišiel z potvrdenia náhrady (kostra D-15), payload nesie **`ax_token`** — korelačný kľúč JEDNÉHO
+odoslania. Server ho **nevyrába ani neinterpretuje**, len ho vracia v `NX.hwAxResult(ok, msg, token)`; tvar je uzavretý (`axis_token`: len String/Integer, orezaný na
+`AXIS_TOKEN_MAX` — payload je verejný kanál a do `execute_script` sa nesmie dostať ľubovoľný objekt; vzor `manual_token`, KOV-H2). Odpoveď ide **v každej vetve** handlera
+(`axis_fail` pri odmietnutí, `push_axis_result(tok, true, '')` **až za** `push_selected`, keď je panel prekreslený) — vetva, ktorá skončí len statusom, by nechala okno
+zamknuté navždy. **Bez tokenu sa neposiela nič**: klik na chip žiadne okno nečaká.
 
 ### actions_materials.rb
 
