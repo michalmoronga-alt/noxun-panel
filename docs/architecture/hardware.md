@@ -355,7 +355,7 @@ chceme), `BuildPlan.parse_hardware_set_key` vracia `nil` (preto sa kľúč mapov
   vypadol a kit by sa ticho zmenil), ale `HardwareSets.owner_scoped_key?` — jediná autorita otázky „patrí tento záznam cieľu". `ProductionCore.override_keys_in_use` registruje
   pri klasifikovanej položke triedny AJ owner triedny kľúč, takže dve skrinky so spoločným ID a rôznym owner overridom bránu duplicít nepodliezajú.
 - **`CONFIG_SCHEMA` 5 → 6** ([construction.md](construction.md)) — starší plugin owner kľúč zahodí, no `unknown_generic_types` z neho stále prečíta podporovaný `slide`, takže
-  by prestavbu nezastavil (Astra #20 B1). `DRAWER_ACTIVATION_SCHEMA` ostáva 5. Testy: `tests/pure/test_kovd1a_mapovanie.rb` (19 testov + 4 overené mutácie) a in-SU sekcia
+  by prestavbu nezastavil (Astra #20 B1). `DRAWER_ACTIVATION_SCHEMA` ostáva 5. Testy: `tests/pure/test_kovd1a_mapovanie.rb` (20 testov + 4 overené mutácie) a in-SU sekcia
   `run_kovd1a` (Undo aj Redo vracajú mapovanie, snapshot a nákupný kód naraz).
 
 **KOV-C2b (v0.9.31) — RECEPTOVÁ POLOŽKA A RED `drawer_kit_missing`.** Zásuvkovú položku už **emituje** `Construction` (`source: 'recipe'`, `rule_id: recipe:<recipe_id>`,

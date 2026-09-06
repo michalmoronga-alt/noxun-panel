@@ -223,6 +223,34 @@ NxTest.test('KOV-D1a (R1): Atira pod owner klucom potrebuje vyskovy selektor, Qu
                                        { 'CAB-1' => { q_owner => 'vysuv-quadro-v6-sisy' } }, {})[0])
 end
 
+# In-SU beh nad `b59cd47` ukazal, ze tento tvar sa v ZIVOM modeli naozaj vyskytne
+# (zasuvka prerastie z H70 na H176, owner selektor ostane s pasmom 70). Headless
+# ho preto strazi PRIAMO — in-SU meria nakup CELEHO modelu, takze sa tam da
+# vysledok prekryt inou skrinkou; tu sa neda.
+NxTest.test('KOV-D1a (R1): prerastena zasuvka bez pasma = RED bez kitu, NIKDY nizsia uroven') do
+  c = NxD1a
+  h = c::HWS
+  # Owner selektor pozna LEN pasmo 70; zasuvka medzitym prerastla na H176.
+  own = { c::OWNK => c.height_selector([[70, 'atira-biela-h70-sisy']]) }
+  # Nizsie urovne ponukaju PLATNE pasmo 176 — a predsa sa na ne NESMIE padnut:
+  # kluc na vyssej urovni JE pritomny, len sa nedá rozlozit.
+  cab  = { c::CLASSK => c.height_selector([[176, 'atira-biela-h176-sisy']]) }
+  proj = { c::CLASSK => c.height_selector([[176, 'atira-biela-h176-sisy']]) }
+  it = c.atira_item('params' => { 'height_variant' => 176.0 })
+
+  sid, reason, = h.resolve_set_id('slide', it, { 'CAB-1' => cab.merge(own) }, proj)
+  NxTest.assert_equal([nil, 'selector_unresolved'], [sid, reason],
+                      'pritomny kluc bez pasma NIKDY nepadne na skrinku ani projekt')
+
+  state = c.state_of([c.seed_set('atira-biela-h70-sisy'), c.seed_set('atira-biela-h176-sisy')], proj)
+  exp = h.expand([it], state, cabinet_overrides: { 'CAB-1' => cab.merge(own) })
+  NxTest.assert_equal([], exp['rows'], 'ZIADNY kit — ani ten z pasma 70, ani ten z nizsej urovne')
+  u = exp['unmapped'].first
+  NxTest.assert_equal(['drawer_kit_missing', 'selector_unresolved', true],
+                      [u['reason'], u['base_reason'], u['blocks_export']],
+                      'receptova polozka = RED, ktore zastavuje export')
+end
+
 NxTest.test('KOV-D1a (R1): owner triedny kluc na NEEXISTUJUCE celo sa zahodi') do
   c = NxD1a
   fronts = { 'items' => [{ 'id' => 'F1', 'type' => 'drawer_front', 'mode' => 'fixed',

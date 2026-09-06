@@ -15412,8 +15412,16 @@ module NoxunSuRunner
        copy && kovd1a_map(copy).keys == [kovd1a_owner_key])
     ok("KOV-D1a kopia: obe skrinky objednavaju alternativny kod (#{kovd1a_codes(model).inspect})",
        kovd1a_codes(model) == [KOVD1A_ALT_CODE])
+    # Kopiu treba ZMAZAT (vzor `run_kovc2b`): dalsi krok meria nakup CELEHO
+    # modelu, a kopia ostava na H70, takze by jej legitimny kit prekryl vysledok
+    # prerastenej skrinky.
+    if copy && copy.valid?
+      model.start_operation('KOV-D1a erase copy', true)
+      copy.erase!
+      model.commit_operation
+    end
 
-    # --- 5) prestavba na H144 = RED, NIKDY kit H70 -------------------------
+    # --- 5) prerastenie na vyssi variant = RED, NIKDY kit povodneho pasma --
     p2 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
     p2['height'] = 900.0
     p2['fronts']['items'][0]['height'] = 250.0
@@ -15421,9 +15429,20 @@ module NoxunSuRunner
     sl = kovc2b_slides(inst)
     grown = sl.first && sl.first['params']['height_variant'].to_i
     if grown && grown != 70
+      # Predpoklad kroku sa overuje SAMOSTATNE — inak by sa nedalo odlisit
+      # „resolver ostal na H70" od „nakup zobral zly kit".
+      ok("KOV-D1a prerastenie: zasuvka naozaj prerastla na variant H#{grown}", true)
       codes = kovd1a_codes(model)
-      ok("KOV-D1a prerastenie: variant H#{grown} bez pasma = ziadny kit H70 v nakupe (#{codes.inspect})",
-         !codes.include?(KOVD1A_ALT_CODE) && !codes.include?('357696'))
+      ok("KOV-D1a prerastenie: ZIADNY kit vysuvu v nakupe (#{codes.inspect})", codes.empty?)
+      exp = e::ProductionCore.hardware_expansion(model, e::Bom.collect(model))
+      red = Array(exp && exp['unmapped']).select do |u|
+        u.is_a?(Hash) && u['cabinet_id'].to_s == cid.to_s && u['generic_type'].to_s == 'slide'
+      end
+      ok("KOV-D1a prerastenie: RED `drawer_kit_missing` s dovodom `selector_unresolved` " \
+         "(#{red.map { |u| [u['reason'], u['base_reason']] }.inspect})",
+         red.length == 1 && red.first['reason'] == 'drawer_kit_missing' &&
+         red.first['base_reason'] == 'selector_unresolved' &&
+         red.first['blocks_export'] == true)
     else
       info("KOV-D1a prerastenie: vyska cela dala variant H#{grown.inspect} — vetva preskocena")
     end

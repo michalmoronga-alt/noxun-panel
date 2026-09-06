@@ -36,7 +36,7 @@
   ho pozná (Codex #307 kolo 2).
   **Kompatibilita.** `CONFIG_SCHEMA` **5 → 6**: starší plugin owner kľúč zahodí, ale typová kontrola z neho stále prečíta
   známy `slide`, takže by prestavbu nezastavil — preto marker. `DRAWER_ACTIVATION_SCHEMA` ostáva **5** (inak by sa každá
-  skrinka schémy 5 tvárila ako nemigrovaná). Testy: **3144 headless** (nová sada `test_kovd1a_mapovanie.rb`, 19 testov +
+  skrinka schémy 5 tvárila ako nemigrovaná). Testy: **3145 headless** (nová sada `test_kovd1a_mapovanie.rb`, 20 testov +
   4 overené mutácie), 90 JS sád, in-SU sekcia `run_kovd1a` (Undo aj Redo vracajú mapovanie, snapshot aj nákupný kód naraz).
   Dva testy z KOV-C boli **vedome prepísané** (schéma 5 → relatívne číslo; zahodenie neplatného `recipe_refs` → RED).
 
