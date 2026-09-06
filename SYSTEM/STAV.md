@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.9.31 · 5.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.9.32 · 6.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -22,16 +22,15 @@ a rád (`core/hardware_taxonomy.rb`) a vytiahla katalóg aj editor setu na obraz
 **Pozor na kompatibilitu:** čo uloží v0.9.20, to **v0.9.18 už nepoužije** — model/šablóna (`CONFIG_SCHEMA` 4 + brána `assess_set_defs`), knižnica setov aj projektový snapshot
 (`std` 3) a katalóg kovania s výrobcom (`schema` 2). Pred prvou takou zákazkou aktualizovať **obe PC** (D-52 updater).
 
-**Testy k v0.9.31:** **3087 headless** · 89 JS sád · posledný plný in-SketchUp beh **1793 PASS / 0 FAIL** (nad vetvou KOV-C2b, 5.9. — nová sekcia `run_kovc2b`).
+**Testy k v0.9.32:** **3100 headless** · 89 JS sád · posledný plný in-SketchUp beh **1798 PASS / 0 FAIL** (nad vetvou KOV-C2b, 5.9. — nová sekcia `run_kovc2b`).
 
 ## Robí sa
 
 **Blok 1b uzavretý až na D-51** · **1c hotový** · **1d beží** (hotové R-06/R-08/R-01+04/R-34/R-02(b)/R-03/R-07/R-23.1/R-11/R-12/R-14; ďalej R-18; R-13 čaká na Michala) · **1e HOTOVÁ** ([AUDIT_REGISTER.md](AUDIT_REGISTER.md)).
-**Blok KOVANIE beží (od 2.9.):** architektúra V1 uzavretá po cross-audite + O1–O3 ([zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md](zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md)),
-mockup schválený ([zdroje/ui20/mockup_kovanie_v1.html](zdroje/ui20/mockup_kovanie_v1.html)), packages v [PLAN.md](PLAN.md); **D-52 UPDATER KOMPLET (v0.9.14)**.
+**Blok KOVANIE beží (od 2.9.):** architektúra V1 uzavretá po cross-audite + O1–O3 ([zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md](zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md)), mockup schválený ([zdroje/ui20/mockup_kovanie_v1.html](zdroje/ui20/mockup_kovanie_v1.html)), packages v [PLAN.md](PLAN.md); **D-52 UPDATER KOMPLET (v0.9.14)**.
 **KOV-A KOMPLET** (#280–#282 + fix #286), **KOV-H KOMPLET** (#283 + #285), **KOV-B1** (#284), **KOV-B2** aj **KOV-B3** hotové — **slice B je KOMPLET**.
 **KOV-C má package v2 (5.9., PR #301, #19):** nemenné recepty, kódy v setoch, žiadny fallback NL; ZMRAZENÝ.
-**C1 jadro (#302), C2a príprava (v0.9.30) aj C2b aktivácia (v0.9.31) hotové — ďalej C2c (Inspector karta, Kontrola riadky, Nákup labely, UI 4. kanála).**
+**C1 jadro (#302), C2a príprava (v0.9.30), C2b aktivácia (#304, v0.9.31) aj C2b-M materiálový kanál (#305, v0.9.32) hotové — ďalej C2c (Inspector karta, Kontrola riadky, Nákup labely).**
 **Od 3.9. opäť Fable (Max, ~mesiac; priorita = uzavrieť V1)** — orchestruje Fable, implementujú Opus subagenti, review Codex;
 vstupný bod je [zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md](zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md) + tento súbor.
 **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
@@ -43,14 +42,15 @@ Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` →
 
 ## Posledné uzávery
 
-- **KOV-C2b — ZÁSUVKA UŽ NAOZAJ VZNIKNE (dielce + výsuv)** (v0.9.31, 5.9.2026): čelo označené ako zásuvka **Atira** alebo **Quadro V6** dostane automaticky **vyrábané dielce**
-  (Atira dno + chrbát; Quadro 2 boky + dno + vnútorné čelo + chrbát) do modelu aj kusovníka a **jednu položku výsuvu** do nákupu. Nevyriešená zásuvka **nevyrobí nič**, je
-  **červená v Kontrole** a zastaví export; chýbajúci kit zastaví **aj VEPO**. **Zákazky bez zásuvkovej klasifikácie sa nemenia**; staršia zákazka s klasifikovanou
-  zásuvkou je červená, kým ju neprestavíš. Materiál zásuviek sa zatiaľ nastavuje projektovou predvoľbou (UNI 16) — **výber v Štúdiu je samostatný PR** (mergne sa hneď
-  po tomto), karta zásuvky v Inspectore = C2c. Plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md).
-- **KOV-C1 + KOV-C2a — JADRO A PRÍPRAVA ZÁSUVIEK (bez viditeľnej zmeny)** (v0.9.29 a v0.9.30, 5.9.2026): nemenné verzované recepty Atira/Quadro V6 (`data/recipes/*.json`
-  + SHA register), výpočet svetlého priestoru okolo čela, **4. materiálový kanál „Zásuvky"** (UNI 16 mm), ABS pravidlá dielcov, **8 nových setov s kódmi** a predvoľby podľa
-  otvárania a konštrukcie. Výstupy sa vtedy ešte nemenili — zapla ich až C2b. Plné texty v [archiv/KRONIKA.md](archiv/KRONIKA.md).
+- **KOV-C2b-M — MATERIÁL ZÁSUVIEK SA DÁ NASTAVIŤ** (v0.9.32, 6.9.2026): Štúdio → Materiály → Predvoľby projektu má riadok **„Zásuvky"**. Plugin nepustí dosku, ktorou sa
+  zásuvka nedá vyrobiť (Atira **16**, Quadro V6 **16 alebo 18** — čísla z receptu): nová predvoľba mimo systémov sa neuloží, predvoľba, ktorú niektorá zásuvka v zákazke
+  neprijme, až po **potvrdení**, **„Nahradiť UNI…"** meria systém každého dotknutého čela a **vkladanie** nekompatibilnú skrinku odmietne hláškou (nie „úspech" a RED až
+  po kliku). Materiál zásuviek zo šablóny prežije vloženie a zmena predvoľby preladí ABS. Plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md).
+- **KOV-C2b — ZÁSUVKA UŽ NAOZAJ VZNIKNE (dielce + výsuv)** (v0.9.31, 5.9.2026): čelo označené ako **Atira** alebo **Quadro V6** dostane **vyrábané dielce** do modelu aj
+  kusovníka a **jednu položku výsuvu** do nákupu. Nevyriešená zásuvka **nevyrobí nič**, je **červená v Kontrole** a zastaví export; chýbajúci kit zastaví **aj VEPO**.
+  **Zákazky bez zásuvkovej klasifikácie sa nemenia.** Karta zásuvky v Inspectore = C2c. Plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md).
+- **KOV-C1 + KOV-C2a — JADRO A PRÍPRAVA ZÁSUVIEK (bez viditeľnej zmeny)** (v0.9.29 a v0.9.30): nemenné verzované recepty Atira/Quadro V6 + SHA register, svetlý priestor
+  okolo čela, **4. materiálový kanál** (UNI 16 mm), ABS pravidlá dielcov a **8 setov s kódmi**. Výstupy sa vtedy ešte nemenili. Plné texty v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **GHOST-D2 — DOSKA SA DÁ NAKRESLIŤ NA ROZMER** (v0.9.28, 5.9.2026): karta Dosky má vedľa „Vložiť" aj **„Nakresliť"** — doska vznikne **dvoma ťahmi** (klik = počiatok, ťah dĺžka a smer, ťah šírka), **čísla sa dajú napísať** do meracieho poľa (2400 Enter), **zamknuté pole karty ťah preskočí**, rozmer nad limitom plugin **odmietne s hláškou**,
   **Esc** nevloží nič a vloženie je **jeden krok Späť**. Vkladanie skriniek ani „Vložiť dosku" sa **nemenia**. Plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **KOV-B3 — SET SA UPRAVUJE V OKNE A HNEĎ VIDNO, ČO SA OBJEDNÁ (slice B KOMPLET, R-41 uzavretá)** (v0.9.26, 4.9.2026): **Sety** sú **dlaždice s chipmi** (starý set má chip

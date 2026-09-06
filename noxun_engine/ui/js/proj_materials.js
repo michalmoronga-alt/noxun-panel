@@ -2443,7 +2443,9 @@
   // Cista funkcia (Node test): kluc projektovej predvolby -> id selectu.
   function mdProjectSelectId(key){
     return { default_material_id: 'md_body', default_front_material_id: 'md_front',
-             default_back_material_id: 'md_back' }[String(key || '')] || null;
+             default_back_material_id: 'md_back',
+             // KOV-C2b: 4. kanal — dielce zasuviek.
+             default_drawer_material_id: 'md_drawer' }[String(key || '')] || null;
   }
   // Cista funkcia (Node test): payload potvrdenia. Nesie CELY pending kontrakt
   // spat (key/value z NEHO, nie z DOM selectu — ten je uz vrateny na default).
@@ -2595,6 +2597,9 @@
     fillSelect(mdEl('md_body'), MD_SHEETS, MD_PROJECT.default_material_id);
     fillSelect(mdEl('md_front'), frontSheets(), MD_PROJECT.default_front_material_id);
     fillSelect(mdEl('md_back'), MD_SHEETS, MD_PROJECT.default_back_material_id);
+    // KOV-C2b: zasuvky beru CELY katalog dosiek — ci je hrubka pripustna,
+    // rozhoduje RECEPT systemu az na serveri (preflight per system).
+    fillSelect(mdEl('md_drawer'), MD_SHEETS, MD_PROJECT.default_drawer_material_id);
     // PICKER-1: predvoľby projektu používajú TEN ISTÝ vyhľadávač ako karta
     // dielca a dosky (`nx_combo`) — jeden komponent, jedna pravda. Stačí
     // atribút v HTML a toto pripojenie: `scan` nové polia pripojí a už

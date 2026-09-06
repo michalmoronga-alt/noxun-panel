@@ -500,6 +500,76 @@ module Noxun
         lb[:by_nl][key_num(nl)] || lb[:default]
       end
 
+      # KOV-C2b: hrubky, ktore AKTIVNY recept TOHTO cela prijme pre VSETKY svoje
+      # vyrabane dielce (PRIENIK cez roly — jeden materialovy kanal krmi vsetky
+      # roly naraz, takze hrubka dobra len pre dno by pri Quadre padla na boku).
+      #
+      # TOTO je jediny SPRAVNY vstup preflightu, ked zasuvky uz existuju
+      # (Codex #305 kolo 1 P2): `supported_thicknesses(system)` nizsie cita
+      # NAJNOVSI recept PRVEHO otvarania systemu, takze celo pripnute na starsiu
+      # verziu alebo na ine otvaranie by sa merala cudzimi cislami.
+      # -> [recipe, [mm, ...]] | nil (legacy celo, ciastocna klasifikacia,
+      #    neznamy pripnuty recept — vtedy sa preflight necha na stavbu)
+      def thicknesses_for_front(front_item, dir: DIR)
+        kind, key = recipe_key_for(front_item)
+        return nil unless kind == :ok
+
+        drawer = front_item['drawer'].is_a?(Hash) ? front_item['drawer'] : {}
+        id = pick_ref(drawer['recipe_refs'], key[:system], key[:opening], dir: dir)
+        return nil unless id
+
+        recipe = load(id, dir: dir)
+        lists = recipe[:thickness_supported].values.map { |l| Array(l).map(&:to_f) }
+        return nil if lists.empty?
+
+        [recipe, lists.reduce { |acc, l| acc.select { |v| l.any? { |x| same?(x, v) } } }.uniq.sort]
+      rescue RecipeError
+        nil
+      end
+
+      # Prijme AKTIVNY recept tohto cela danu hrubku? Celo, ktoreho recept
+      # nepoznáme (legacy, neznamy ref), preflight NEBLOKUJE — jeho stav rieši
+      # stavba vlastnym RED nalezom.
+      def thickness_ok_for_front?(front_item, mm, dir: DIR)
+        pair = thicknesses_for_front(front_item, dir: dir)
+        return true if pair.nil?
+
+        pair[1].any? { |v| same?(v, mm) }
+      end
+
+      # PRIBLIZENIE pre pripad, ked este ZIADNA zasuvka neexistuje: hrubky
+      # NAJNOVSIEHO receptu systemu. Pouziva sa VYHRADNE tam, kde niet co
+      # pokazit (nova projektova predvolba v zakazke bez zasuviek) a v textoch
+      # hlasok. Kde uz klasifikovane celo je, plati `thicknesses_for_front`.
+      def supported_thicknesses(system, dir: DIR)
+        id = OPENINGS.filter_map { |o| latest_for(system, o, dir: dir) }.first
+        return [] if id.nil?
+
+        lists = load(id, dir: dir)[:thickness_supported].values.map { |l| Array(l).map(&:to_f) }
+        return [] if lists.empty?
+
+        lists.reduce { |acc, l| acc.select { |v| l.any? { |x| same?(x, v) } } }.uniq.sort
+      end
+
+      def thickness_ok_for_system?(system, mm, dir: DIR)
+        th = supported_thicknesses(system, dir: dir)
+        !th.empty? && th.any? { |v| same?(v, mm) }
+      end
+
+      # Prijme hrubku ASPON JEDEN vydany system? JEDINY predikat pre VSETKY
+      # cesty, ktorymi sa da nastavit material zasuviek (Codex #304 kolo 3 P2):
+      # selektor predvolby v Studiu (`MaterialsDialog`) aj hromadne „Nahradit
+      # UNI…" (`ru_project_target_issue`). Dva rozne predikaty by znamenali, ze
+      # ta ista doska prejde jednou cestou a druhou nie.
+      def thickness_ok_for_any_system?(mm, dir: DIR)
+        SYSTEMS.any? { |sys| thickness_ok_for_system?(sys, mm, dir: dir) }
+      end
+
+      # Vsetky hrubky, ktore pozna aspon jeden vydany system (do hlasok).
+      def all_supported_thicknesses(dir: DIR)
+        SYSTEMS.flat_map { |sys| supported_thicknesses(sys, dir: dir) }.uniq.sort
+      end
+
       # Odporucanie synchronizacnej tyce (P2O nad prahom sirky). C1 hodnotu len
       # pocita — ORANGE warning zapaja C2.
       def sync_recommended?(recipe, clear_width)

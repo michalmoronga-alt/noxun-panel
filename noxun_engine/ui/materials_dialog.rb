@@ -25,7 +25,11 @@ module Noxun
       TARGETS = {
         'default_material_id'       => ['material_id', 'side_left', 'thickness'],
         'default_front_material_id' => ['front_material_id', 'front_door', nil],
-        'default_back_material_id'  => ['back_material_id', 'back', 'back_thickness']
+        'default_back_material_id'  => ['back_material_id', 'back', 'back_thickness'],
+        # KOV-C2b: 4. kanal (dielce zasuviek). Rola je len ZASTUPNA (vsetky styri
+        # roly beru katalogovu hrubku rovnako) — o tom, ci je hrubka pripustna,
+        # rozhoduje RECEPT systemu, nie `thickness_ok_for?` (viz preflight nizsie).
+        'default_drawer_material_id' => ['drawer_material_id', 'drawer_bottom', nil]
       }.freeze
 
       # --- sekcia MATERIALY v Studiu (ŠT-2a kanal, ŠT-2b uplny presun) -------
@@ -995,11 +999,21 @@ module Noxun
             when 'default_back_material_id'
               # chrbat ma v UI dve podporovane hrubky (HDF 3 / pevny 18) — obe legalne
               [3.0, 18.0].any? { |t| CabinetBuilder.thickness_ok_for?(role, t, have) }
+            when 'default_drawer_material_id'
+              # KOV-C2b: predvolbu zasuviek NEMERIA hrubky korpusu, ale RECEPTY.
+              # Doska, ktoru NEPRIJME ZIADEN vydany system, sa neulozi vobec —
+              # taka zasuvka by sa uz nikdy nepostavila (`drawer_thickness_
+              # unsupported` na kazdom cele) a nebolo by co potvrdzovat.
+              drawer_thickness_any_system?(have)
             else
               CabinetBuilder.thickness_ok_for?(role, Fronts::FRONT_THICKNESS.to_f, have)
             end
           unless new_ok
-            return set_status(project_thickness_msg(key, value, have), true)
+            # Codex #305 kolo 1 P2: bez tohto by select (a s nim NXCombo) ostal
+            # na ODMIETNUTEJ hodnote — pouzivatel by videl material, ktory sa
+            # neulozil. Rovnaka cesta ako pri odmietnuti D-46 ponuky.
+            set_status(project_thickness_msg(key, value, have), true)
+            return reset_project_select(key, Materials.project_defaults(model)[key].to_s)
           end
           selected = Panel.find_cabinet(model)
           affected = Panel.all_cabinets(model).select do |cabinet|
@@ -1010,7 +1024,8 @@ module Noxun
           # VSETKYCH dediacich skriniek — rucne ABS overridy zladene so starym
           # dekorom sa preladia (stary default este plati, novy je len v `value`).
           eff_key = { 'default_material_id' => 'body', 'default_front_material_id' => 'front',
-                      'default_back_material_id' => 'back' }[key]
+                      'default_back_material_id' => 'back',
+                      'default_drawer_material_id' => 'drawer' }[key]
           # Snapshot PRED zapisom: baseline kontraktu potvrdenia aj hodnota, na
           # ktoru sa vrati select pri odmietnuti/ponuke.
           old_default = Materials.project_defaults(model)[key].to_s
@@ -1039,6 +1054,38 @@ module Noxun
             remap_lost = plan['remap']['lost']
             adopted_n = plan['adopting'].size
             recomputed_n = plan['recompute'].size
+          elsif key == 'default_drawer_material_id'
+            # --- KOV-C2b: PREFLIGHT PER SYSTEM. D-46 vetva sa sem NEDA pouzit
+            # mechanicky: tá porovnáva hrúbku ČELA (18) a o receptoch nevie.
+            # Tu rozhoduje, ktoré systémy zásuviek skrinky reálne používajú —
+            # Atira prijme 16, Quadro V6 16 aj 18. Nevyhovujúci výber sa NEULOŽÍ
+            # bez potvrdenia (hláška menuje systém aj povolené hrúbky).
+            plan = drawer_change_plan(model, affected, have)
+            unless plan['recipes'].empty?
+              fresh = { 'model_guid' => model_guid(model), 'key' => key, 'value' => value,
+                        'old_default' => old_default,
+                        'adopting_ids' => [], 'recompute_ids' => plan['ids'] }
+              unless Materials.pending_default_ok?(data['confirm'], fresh)
+                return offer_drawer_change(fresh, have, plan, stale: !data['confirm'].nil?)
+              end
+            end
+            # Codex #304 kolo 2 P2: ABS overridy dielcov zasuviek sa preladia
+            # PRESNE ako pri tele/celach/chrbte — paska zladena so STARYM
+            # efektivnym dekorom nasleduje novy, vedome kontrastna alebo nil
+            # ostava. Rovnaka slucka ako vo vetve `else` nizsie.
+            remap_changed = 0
+            remap_lost = []
+            adopted_n = 0
+            recomputed_n = affected.size
+            jobs = affected.map do |cabinet|
+              p = Panel.existing_params(cabinet)
+              old_eff = Panel.effective_materials(model, p)
+              remap = CabinetBuilder.remap_part_edge_overrides!(p, old_eff,
+                                                                old_eff.merge(eff_key => value))
+              remap_changed += remap['changed'].to_i
+              remap_lost.concat(remap['lost'])
+              [cabinet, p]
+            end
           else
             incompatible = affected.select do |cabinet|
               params = Panel.existing_params(cabinet)
@@ -1088,6 +1135,96 @@ module Noxun
           # ŠT-2b: predvolby nesie `mat` payload Studia (push nizsie).
           Panel.push_selected(model) # refresh Inspectora (korpusove selecty, karta dielca)
           refresh_studio_after_model_write
+        end
+
+        # --- KOV-C2b: predvolba ZASUVIEK a recepty ----------------------------
+        #
+        # Cela dediacich skriniek, ktorych AKTIVNY recept danu hrubku NEPRIJME.
+        # Codex #305 kolo 1 P2: meria sa receptom KONKRETNEHO cela (jeho
+        # otvaranie + pripnuta verzia), nie „najnovsim receptom systemu" —
+        # celo pripnute na starsiu verziu ma vlastne hrubky.
+        # -> { 'recipes' => ['Atira SiSy v1 (16 mm)'], 'ids' => ['CAB-001'] }
+        def drawer_change_plan(model, affected, have)
+          labels = {}
+          ids = []
+          affected.each do |cabinet|
+            params = Panel.existing_params(cabinet)
+            bad = drawer_fronts_of(params).filter_map { |it| drawer_front_reject(it, have) }
+            next if bad.empty?
+
+            bad.each { |txt| labels[txt] = true }
+            id = Store.get(cabinet, 'cabinet_id').to_s
+            ids << id unless id.empty? || ids.include?(id)
+          end
+          { 'recipes' => labels.keys.sort, 'ids' => ids.sort }
+        end
+
+        # Klasifikovane zasuvkove cela (z ULOZENYCH ciel). Legacy cela
+        # a `construction other` sa netykaju — resolver sa na nich nevola.
+        def drawer_fronts_of(params)
+          fronts = params.is_a?(Hash) ? params['fronts'] : nil
+          items = fronts.is_a?(Hash) ? fronts['items'] : nil
+          Array(items).select { |it| Recipes.recipe_key_for(it).first == :ok }
+        end
+
+        # „Atira SiSy v1 (16 mm)" ked celo hrubku NEPRIJME, inak nil.
+        def drawer_front_reject(front_item, have)
+          pair = Recipes.thicknesses_for_front(front_item)
+          return nil if pair.nil?
+
+          recipe, allowed = pair
+          return nil if allowed.any? { |v| (v - have).abs < 1e-9 }
+
+          "#{Recipes.label(recipe)} (#{allowed.map { |v| Materials.fmt_mm(v) }.join(' alebo ')} mm)"
+        end
+
+        # Prijme hrubku ASPON JEDEN vydany system? (brana novej predvolby)
+        # Predikat zije v `Recipes` — cita ho aj „Nahradit UNI…".
+        def drawer_thickness_any_system?(have)
+          Recipes.thickness_ok_for_any_system?(have)
+        end
+
+        # KOV-C2b (Codex #304 kolo 4 P1): efektivny material zasuviek
+        # (skrinka -> projekt -> UNI 16) proti systemom, ktore ZLOZENA
+        # konfiguracia ciel naozaj pouziva. CISTA funkcia (model smie byt nil).
+        # Vola ju VKLAD (`Panel.handle_insert`) EST PRED ghostom — bez toho by
+        # vklad „uspel", skrinka by visela na kurzore a az po kliku by z nej
+        # boli RED zasuvky bez dielcov. -> hlaska | nil
+        def drawer_material_issue(params, model)
+          return nil unless defined?(Recipes)
+
+          items = drawer_fronts_of('fronts' => Fronts.normalize_config(params['fronts']))
+          return nil if items.empty?
+
+          mat = CabinetBuilder.effective_materials(model, params)['drawer']
+          sheet = mat && Materials.sheet(mat)
+          return nil unless sheet.is_a?(Hash)
+
+          th = sheet['thickness'].to_f
+          bad = items.filter_map { |it| drawer_front_reject(it, th) }.uniq.sort
+          return nil if bad.empty?
+
+          "Materiál zásuviek #{mat} (#{Materials.fmt_mm(th)} mm) sa nedá použiť: " \
+            "#{bad.join(', ')}. Zmeň materiál zásuviek alebo klasifikáciu čela. " \
+            'Nič sa nevložilo.'
+        end
+
+        def drawer_reject_msg(have)
+          allowed = Recipes.all_supported_thicknesses.map { |v| Materials.fmt_mm(v) }
+          "Hrúbka #{Materials.fmt_mm(have)} mm sa nedá použiť na dielce zásuviek — " \
+            "recepty poznajú #{allowed.join(' a ')} mm. Vyber inú dosku."
+        end
+
+        # Ponuka na potvrdenie (rovnaky kanal ako D-46 — jedna lista, jeden
+        # pending kontrakt; lisi sa LEN veta).
+        def offer_drawer_change(fresh, have, plan, stale: false)
+          msg = "#{plan['recipes'].join(', ')} hrúbku #{Materials.fmt_mm(have)} mm neprijíma — " \
+                "zásuvky v #{cabs_phrase(plan['ids'].size, :future).sub(/ prevezm\S+\z/, '')} " \
+                'sa prestanú vyrábať (Kontrola ich ukáže červené). Potvrď nižšie.'
+          msg = "Stav sa medzitým zmenil — #{msg}" if stale
+          set_status(msg)
+          js("MD.confirmDefault(#{{ 'key' => fresh['key'], 'current' => fresh['old_default'],
+                                    'message' => msg, 'pending' => fresh }.to_json})")
         end
 
         # --- D-46: predvolba korpusu s inou hrubkou ---------------------------
@@ -1169,6 +1306,8 @@ module Noxun
               'ako predvoľbu korpusu ho nastaviť nejde. Tenké dosky sú materiál chrbta alebo konkrétneho dielca.'
           when 'default_back_material_id'
             "Materiál #{value} (#{Panel.fmt_mm(have)} mm) nesedí s podporovanými hrúbkami chrbta (3 alebo 18 mm)."
+          when 'default_drawer_material_id'
+            drawer_reject_msg(have)
           else
             "Materiál #{value} (#{Panel.fmt_mm(have)} mm) je mimo rozsahu hrúbky čela (#{lo}–#{hi} mm)."
           end

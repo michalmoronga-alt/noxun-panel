@@ -223,7 +223,10 @@
     // a kurzor po dopísaní dotazu sadá na PRVÝ kontextový riadok. Filter by
     // legitímne voľby SCHOVAL — chrbát z 18 mm je nezvyklý, nie zakázaný,
     // a semafor v tomto repe varuje, nikdy neblokuje.
-    var CTX_THICKNESS = { back: 3, worktop: 38 };
+    // KOV-C2b: `drawer` = dielce zasuviek. Recepty poznaju 16 (Atira aj Quadro)
+    // a 18 (len Quadro), takze kontextova predvolba je 16 — jedina hrubka,
+    // ktoru prijme KAZDY vydany system.
+    var CTX_THICKNESS = { back: 3, worktop: 38, drawer: 16 };
 
     function nxComboCtxThickness(ctx){
       var w = CTX_THICKNESS[String(ctx == null ? '' : ctx)];
