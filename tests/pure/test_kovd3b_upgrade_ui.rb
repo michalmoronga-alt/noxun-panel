@@ -69,17 +69,37 @@ module NxD3b
     "recipe:#{id}"
   end
 
+  # Recept sa berie z fixtury D3a, a ked tam nie je (produkcna v1 Quadra),
+  # z PRODUKCNEHO priecinka — v oboch pripadoch BAJT PO BAJTE aj s odtlackom
+  # z prislusneho registra, takze `load` odtlacok overi bez vynimky.
+  def source_of(id)
+    File.file?(File.join(SRC, "#{id}.json")) ? SRC : r::DIR
+  end
+
   def with_reg(ids)
-    src_reg = r.released(dir: SRC)
     Dir.mktmpdir('noxun-kovd3b-') do |d|
       reg = {}
       ids.each do |id|
-        File.binwrite(File.join(d, "#{id}.json"), File.binread(File.join(SRC, "#{id}.json")))
-        reg[id] = src_reg.fetch(id)
+        src = source_of(id)
+        File.binwrite(File.join(d, "#{id}.json"), File.binread(File.join(src, "#{id}.json")))
+        reg[id] = r.released(dir: src).fetch(id)
       end
       File.write(File.join(d, 'RELEASED.json'), "#{JSON.pretty_generate(reg)}\n")
       yield d
     end
+  end
+
+  # Zakazka s QUADRO zasuvkou (dreveny box) — vydava PAT dielcov, z toho
+  # `box_side` DVAKRAT (vlavo a vpravo) a vysku nesie `box_height`, nie
+  # `height_variant`.
+  def quadro_params(front_height: 220.0, refs: { 'quadro_v6|sisy' => 'quadro_v6_sisy_v1' })
+    drawer = { 'construction' => 'wood', 'system' => 'quadro_v6' }
+    drawer['recipe_refs'] = refs if refs
+    { 'type' => 'lower', 'width' => 900.0, 'height' => 720.0, 'depth' => 500.0,
+      'thickness' => 18.0, 'floor_height' => 100.0, 'hardware_overrides' => [],
+      'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'drawer_front', 'mode' => 'fixed',
+                                  'height' => front_height, 'opening_mode' => 'classic',
+                                  'drawer' => drawer }] } }
   end
 
   # Register, v ktorom je v2 NAJNOVSIA — presne stav, ktory ponuku vydava.
@@ -313,8 +333,9 @@ NxTest.test('KOV-D3b (R2): dopad sklada cisla z PREPARE, nie z druheho vypoctu')
     NxTest.assert_equal(prep[:side][:params]['nominal_length'], imp['nl']['to'])
     NxTest.assert_equal(prep[:side][:params]['height_variant'], imp['height']['to'])
     NxTest.assert_equal(prep[:side][:codes], imp['kit']['to'])
-    to_back = prep[:side][:parts]['drawer_back']
-    NxTest.assert_equal(to_back,
+    # Dielce su v `side` klucovane `part_key` (Quadro vydava `box_side` dvakrat).
+    to_back = prep[:side][:parts]['front:F1/drawer_back']
+    NxTest.assert_equal(to_back[:dims],
                         Array(imp['parts']).find { |p| p['role'] == 'drawer_back' }['to'])
     NxTest.assert_equal(NxD3b::V2, prep[:params]['fronts']['items'][0]['drawer']['recipe_refs']['atira|sisy'],
                         'a je to naozaj ten config, ktory by sa zapisal')
@@ -450,5 +471,241 @@ NxTest.test('KOV-D3b: produkcny register sa touto davkou NEZMENIL') do
   reg.each_key do |id|
     NxTest.assert_equal(1, c.r.parse_id(id)[:version],
                         "#{id}: v2 vznika az s realnou datovou zmenou, nie s UI davkou")
+  end
+end
+
+# ============================================================================
+# P1 (Codex #315 kolo 1) — ODTLACOK POTVRDENEHO NAHLADU
+# ============================================================================
+#
+# Payload zapisu nesie len refy a identitu, takze medzi „ukáž dopad" a „Prejsť"
+# sa skrinka moze zmenit (rozmery, materialy, mapovanie, Spat/Redo) a server by
+# zapisal INY dopad, nez ktory pouzivatel potvrdil. `from` to nechyti — ten
+# strazi len PRIPNUTY RECEPT.
+
+NxTest.test('KOV-D3b (P1): nezmeneny stav = odtlacok sedi a zapis prejde') do
+  c = NxD3b
+  cfg = c.cfg_for(c.params)
+  c.with_v2 do
+    cab = c.cab_with(cfg)
+    prep, err = c.panel.drawer_upgrade_prepare(nil, cab, 'front_id' => 'F1',
+                                                         'from' => NxD3b::V1, 'to' => NxD3b::V2)
+    NxTest.assert(err.nil?, err.to_s)
+    imp = c.panel.drawer_upgrade_impact(nil, cab, prep)
+    fp = c.panel.drawer_upgrade_fingerprint(cab, prep, imp)
+    NxTest.assert(fp.is_a?(String) && fp.length == 32, fp.inspect)
+    NxTest.assert_equal(nil,
+                        c.panel.drawer_upgrade_preview_problem(nil, cab, prep, 'fingerprint' => fp),
+                        'nad NEZMENENOU skrinkou musi zapis prejst')
+    # Odtlacok je STABILNY: druhy vypocet nad tym istym stavom da to iste.
+    imp2 = c.panel.drawer_upgrade_impact(nil, cab, prep)
+    NxTest.assert_equal(fp, c.panel.drawer_upgrade_fingerprint(cab, prep, imp2))
+  end
+end
+
+NxTest.test('KOV-D3b (P1): ZMENA skrinky medzi nahladom a zapisom = odmietnutie') do
+  c = NxD3b
+  c.with_v2 do
+    # 1) nahlad nad povodnou skrinkou
+    old = c.cab_with(c.cfg_for(c.params))
+    prep, = c.panel.drawer_upgrade_prepare(nil, old, 'front_id' => 'F1',
+                                                     'from' => NxD3b::V1, 'to' => NxD3b::V2)
+    fp = c.panel.drawer_upgrade_fingerprint(old, prep,
+                                            c.panel.drawer_upgrade_impact(nil, old, prep))
+
+    # 2) medzitym sa skrinka zmenila (hlbka 500 -> 400 = INE dielce aj NL)
+    changed = c.cfg_for(c.params(depth: 400.0))
+    before = JSON.generate(changed)
+    cab2 = c.cab_with(changed)
+    prep2, err = c.panel.drawer_upgrade_prepare(nil, cab2, 'front_id' => 'F1',
+                                                           'from' => NxD3b::V1, 'to' => NxD3b::V2)
+    NxTest.assert(err.nil?, "zmenena skrinka sa musi dat postavit, inak test meria ine: #{err}")
+    msg = c.panel.drawer_upgrade_preview_problem(nil, cab2, prep2, 'fingerprint' => fp)
+    NxTest.assert(msg.to_s.include?('medzitým'),
+                  "stary odtlacok nad novym stavom musi PADNUT: #{msg.inspect}")
+    NxTest.assert_equal(before, JSON.generate(changed), 'overenie nezapisalo NIC')
+
+    # A naopak: cerstvy odtlacok nad tym istym novym stavom prejde.
+    fp2 = c.panel.drawer_upgrade_fingerprint(cab2, prep2,
+                                             c.panel.drawer_upgrade_impact(nil, cab2, prep2))
+    NxTest.assert_equal(nil, c.panel.drawer_upgrade_preview_problem(nil, cab2, prep2,
+                                                                    'fingerprint' => fp2))
+    NxTest.assert(fp != fp2, 'ina skrinka = iny odtlacok')
+  end
+end
+
+NxTest.test('KOV-D3b (P1): CHYBAJUCI odtlacok je odmietnutie (fail-closed)') do
+  c = NxD3b
+  cfg = c.cfg_for(c.params)
+  c.with_v2 do
+    cab = c.cab_with(cfg)
+    prep, = c.panel.drawer_upgrade_prepare(nil, cab, 'front_id' => 'F1',
+                                                     'from' => NxD3b::V1, 'to' => NxD3b::V2)
+    NxTest.assert(c.panel.drawer_upgrade_preview_problem(nil, cab, prep, {}).to_s.include?('medzitým'),
+                  'zapis smie prist VYHRADNE z potvrdeneho nahladu')
+    NxTest.assert(c.panel.drawer_upgrade_preview_problem(
+      nil, cab, prep, 'fingerprint' => ''
+    ).to_s.include?('medzitým'))
+    NxTest.assert(c.panel.drawer_upgrade_preview_problem(
+      nil, cab, prep, 'fingerprint' => 'cudzi'
+    ).to_s.include?('medzitým'))
+  end
+end
+
+NxTest.test('KOV-D3b (P1): dopad NESIE odtlacok, ktory klient len vracia') do
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_hardware.rb'),
+                  encoding: 'UTF-8')
+  read = src[/def handle_drawer_upgrade_impact.*?\n        end\n/m].to_s
+  NxTest.assert(read.include?("impact['fingerprint'] = drawer_upgrade_fingerprint"),
+                'citaci callback musi odtlacok POSLAT — inak ho klient nema odkial vratit')
+  body = src[/def handle_upgrade_drawer_recipe.*?\n        end\n/m].to_s
+  NxTest.assert(body.include?('drawer_upgrade_preview_problem'),
+                'zapisova cesta musi odtlacok OVERIT')
+  NxTest.assert(body.index('drawer_upgrade_preview_problem') < body.index('CabinetBuilder.rebuild'),
+                'overenie musi byt PRED zapisom, nie po nom')
+  js = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'hardware.js'),
+                 encoding: 'UTF-8')
+  NxTest.assert(js.include?('fingerprint: String((HW_UP.impact && HW_UP.impact.fingerprint)'),
+                'klient odtlacok LEN vracia — nic z neho neskladá')
+end
+
+# ============================================================================
+# P2 (Codex #315 kolo 1) — QUADRO: DVA BOKY BOXU A VYSKA BOXU
+# ============================================================================
+
+NxTest.test('KOV-D3b (P2): QUADRO ma v dopade OBA boky boxu (kluc je part_key, nie rola)') do
+  c = NxD3b
+  v1 = 'quadro_v6_sisy_v1'
+  v2 = 'quadro_v6_sisy_v2'
+  c.with_reg([v1, v2]) do |d|
+    c.r.with_test_dir(d) do
+      cab = c.cab_with(c.cfg_for(c.quadro_params))
+      prep, err = c.panel.drawer_upgrade_prepare(nil, cab, 'front_id' => 'F1',
+                                                           'from' => v1, 'to' => v2)
+      NxTest.assert(err.nil?, err.to_s)
+      imp = c.panel.drawer_upgrade_impact(nil, cab, prep)
+      sides = Array(imp['parts']).select { |p| p['role'] == 'box_side' }
+      NxTest.assert_equal(2, sides.length,
+                          "Quadro vydava DVA boky — mapa klucovana rolou by jeden zahodila: #{imp['parts'].inspect}")
+      NxTest.assert_equal(5, Array(imp['parts']).length, 'a spolu PAT dielcov')
+      NxTest.assert_equal(['bok boxu — pravý', 'bok boxu — ľavý'].sort,
+                          sides.map { |p| p['label'] }.sort,
+                          'oba riadky musia byt rozlisitelne')
+      NxTest.assert(sides.all? { |p| Array(p['to']).length == 3 }, sides.inspect)
+    end
+  end
+end
+
+NxTest.test('KOV-D3b (P2): QUADRO vysku nesie `box_height` (nie H variant)') do
+  c = NxD3b
+  v1 = 'quadro_v6_sisy_v1'
+  v2 = 'quadro_v6_sisy_v2'
+  c.with_reg([v1, v2]) do |d|
+    c.r.with_test_dir(d) do
+      cab = c.cab_with(c.cfg_for(c.quadro_params))
+      prep, = c.panel.drawer_upgrade_prepare(nil, cab, 'front_id' => 'F1', 'from' => v1, 'to' => v2)
+      h = c.panel.drawer_upgrade_impact(nil, cab, prep)['height']
+      NxTest.assert_equal('box', h['kind'], "Quadro nema `height_variant`: #{h.inspect}")
+      NxTest.assert(h['from'].is_a?(Numeric) && h['to'].is_a?(Numeric),
+                    "bez toho by modal ukazal prazdnu vysku: #{h.inspect}")
+    end
+  end
+end
+
+NxTest.test('KOV-D3b (P2): ATIRA vysku nesie ako H variant') do
+  c = NxD3b
+  c.with_v2 do
+    cab = c.cab_with(c.cfg_for(c.params))
+    prep, = c.panel.drawer_upgrade_prepare(nil, cab, 'front_id' => 'F1',
+                                                     'from' => NxD3b::V1, 'to' => NxD3b::V2)
+    h = c.panel.drawer_upgrade_impact(nil, cab, prep)['height']
+    NxTest.assert_equal('variant', h['kind'], h.inspect)
+    NxTest.assert_equal(144, h['to'].to_i, h.inspect)
+  end
+end
+
+# ============================================================================
+# P2 (Codex #315 kolo 1) — REGISTER RECEPTOV SA CITA RAZ ZA PUSH
+# ============================================================================
+
+module NxD3bIo
+  # Pocitadlo REALNYCH citani `RELEASED.json` (z cache sa vracia skor).
+  def self.count
+    sc = Noxun::Engine::Recipes.singleton_class
+    n = 0
+    sc.send(:alias_method, :d3b_orig_parse_json, :parse_json)
+    sc.send(:define_method, :parse_json) do |path|
+      n += 1 if File.basename(path.to_s) == 'RELEASED.json'
+      d3b_orig_parse_json(path)
+    end
+    yield
+    n
+  ensure
+    sc.send(:remove_method, :parse_json)
+    sc.send(:alias_method, :parse_json, :d3b_orig_parse_json)
+    sc.send(:remove_method, :d3b_orig_parse_json)
+  end
+end
+
+NxTest.test('KOV-D3b (P2): ponuka cita register RAZ, aj ked ma skrinka viac zasuviek') do
+  c = NxD3b
+  # Tri zasuvkove cela — bez zdielania by kazde spustilo `active_ref`
+  # + `latest_for` (a s v2 aj `load` s odtlackom) samostatne.
+  items = %w[F1 F2 F3].map do |fid|
+    { 'id' => fid, 'type' => 'drawer_front', 'mode' => 'fixed', 'height' => 220.0,
+      'opening_mode' => 'classic',
+      'drawer' => { 'construction' => 'metal', 'system' => 'atira',
+                    'recipe_refs' => { 'atira|sisy' => NxD3b::V1 } } }
+  end
+  par = c.params
+  par['height'] = 1200.0
+  par['fronts'] = { 'items' => items }
+  cfg = c.cfg_for(par)
+  c.with_v2 do
+    map = c.panel.front_drawer_payload(cfg)
+    NxTest.assert_equal(3, map.keys.length, 'test potrebuje TRI zasuvky')
+    reads = NxD3bIo.count { c.panel.attach_front_drawer_upgrade(map, cfg, 'CAB-1') }
+    NxTest.assert_equal(1, reads,
+                        "register sa smie precitat RAZ za prechod, nie per zasuvka (#{reads})")
+    NxTest.assert(map.values.all? { |row| row['upgrade'].is_a?(Hash) },
+                  'a vsetky tri zasuvky musia ponuku dostat')
+  end
+end
+
+NxTest.test('KOV-D3b (P2): cache registra NEPREZIJE blok (zmena medzi pushmi sa prejavi)') do
+  c = NxD3b
+  NxTest.assert_equal(nil, c.r.instance_variable_get(:@register_cache),
+                      'mimo bloku sa nekesuje nic')
+  c.r.with_register_cache do
+    NxTest.assert(c.r.instance_variable_get(:@register_cache).is_a?(Hash))
+    c.r.released
+    c.r.released
+  end
+  NxTest.assert_equal(nil, c.r.instance_variable_get(:@register_cache),
+                      'po bloku cache zaniká — dalsi push cita register znova')
+  begin
+    c.r.with_register_cache { raise 'boom' }
+  rescue StandardError
+    nil
+  end
+  NxTest.assert_equal(nil, c.r.instance_variable_get(:@register_cache),
+                      'cache zaniká AJ po vynimke')
+end
+
+NxTest.test('KOV-D3b (P2): poskodeny register sa NEZAKESUJE ako platny') do
+  c = NxD3b
+  Dir.mktmpdir('noxun-kovd3b-bad-') do |d|
+    File.write(File.join(d, 'RELEASED.json'), "{\"nieco\": \"zle\"}\n")
+    c.r.with_register_cache do
+      2.times do
+        raised = begin
+          c.r.released(dir: d)
+          false
+        rescue c.r::RecipeError
+          true
+        end
+        NxTest.assert(raised, 'poskodeny register musi padnut POKAZDE, nie len prvykrat')
+      end
+    end
   end
 end

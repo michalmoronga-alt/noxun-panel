@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+require 'digest' # KOV-D3b: odtlacok potvrdeneho nahladu upgradu
 # Noxun Engine - Panel: kovanie (V0.4 faza 1) — rucne zasahy do poctov.
 # Cast modulu Panel (reopen) - zdiela ivary (dialog, active_zone_id, suspend guard)
 # cez class << self. Nacitava panel.rb; ziadna logika mimo modulu.
@@ -121,6 +122,12 @@ module Noxun
           push_selected(model)
           # AZ TU: zapis prebehol a panel je prekresleny — modal sa smie zavriet.
           push_axis_result(tok, true, '')
+        rescue StandardError => e
+          # KOV-D3b (Codex #315 kolo 1 P2): odkedy je modal nahrady zamknuty aj
+          # proti ZATVORENIU (`busyLock`), musi odpoved prist AJ z vetvy vynimky
+          # — inak by ho zdielany `cb` wrapper nechal viset zamknuty navzdy.
+          Engine.log_error(e, 'Panel.handle_set_hardware_override')
+          axis_fail(tok, 'Kovanie sa nezmenilo — zásah sa nepodarilo uložiť.')
         end
 
         # Zisti, ktore POLE sa meni a na aku hodnotu. -> [field, value, error]
@@ -486,6 +493,16 @@ module Noxun
           prep, err = drawer_upgrade_prepare(model, cab, data)
           return upgrade_fail(tok, err) if err
 
+          # AZ POTOM: zapisat sa smie LEN to, co pouzivatel naozaj videl.
+          # Panel sa pri nezhode PREKRESLI, aby ponuka aj karta ukazovali
+          # cerstvy stav — modal ostane otvoreny s hlaskou a druhy pokus uz ide
+          # nad novym nahladom.
+          err = drawer_upgrade_preview_problem(model, cab, prep, data)
+          if err
+            push_selected(model)
+            return upgrade_fail(tok, err)
+          end
+
           # JEDNA operacia: novy ref v mape + preadresovane zamky + prestavba.
           # Spat vrati vsetko naraz, Redo to isto obnovi (vzor D2a).
           suspend_selection_sync do
@@ -541,7 +558,10 @@ module Noxun
           prep, err = drawer_upgrade_prepare(model, cab, data)
           return push_upgrade_impact(tok, false, err) if err
 
-          push_upgrade_impact(tok, true, nil, drawer_upgrade_impact(model, cab, prep))
+          impact = drawer_upgrade_impact(model, cab, prep)
+          # Odtlacok ide S dopadom: klient ho pri „Prejsť" LEN vrati spat.
+          impact['fingerprint'] = drawer_upgrade_fingerprint(cab, prep, impact)
+          push_upgrade_impact(tok, true, nil, impact)
         rescue StandardError => e
           # Bez odpovede by klient cakal navzdy a tlacidlo ponuky by ostalo
           # mrtve (stav otazky cisti az odpoved). Fail-closed: `ok: false`.
@@ -578,8 +598,7 @@ module Noxun
         def drawer_upgrade_impact(model, cab, prep)
           now = drawer_upgrade_side(model, cab, existing_params(cab), prep[:fid], prep[:owner])
           to = prep[:side]
-          out = { 'height' => upgrade_pair(now[:params]['height_variant'],
-                                           to[:params]['height_variant']),
+          out = { 'height' => drawer_upgrade_height(now[:params], to[:params]),
                   'nl' => upgrade_pair(now[:params]['nominal_length'],
                                        to[:params]['nominal_length']),
                   'parts' => drawer_upgrade_parts(now[:parts], to[:parts]),
@@ -595,8 +614,54 @@ module Noxun
           out
         end
 
+        # ODTLACOK POTVRDENEHO NAHLADU (Codex #315 kolo 1 P1).
+        #
+        # Payload zapisu nesie len refy a identitu, takze medzi „ukáž dopad"
+        # a „Prejsť" sa skrinka moze zmenit (rozmery, materialy, mapovanie
+        # kovania, Spat/Redo) — `drawer_upgrade_prepare` by potom bezal nad NOVYM
+        # stavom a zapisal INY dopad, nez ktory pouzivatel videl a potvrdil.
+        # `from` to nechyti: ten strazi len to, ze sa medzitym nezmenil PRIPNUTY
+        # RECEPT.
+        #
+        # Odtlacok sa berie z CELEHO dopadu (obe strany porovnania + identita),
+        # nie z vybranych vstupov: co sa v dopade neprejavi, na potvrdeni
+        # nezalezi — a co sa prejavi, odtlacok zmeni. Klient ho LEN VRACIA
+        # (nic neskladá) a server ho pred zapisom prepocita TOU ISTOU funkciou.
+        def drawer_upgrade_fingerprint(cab, prep, impact)
+          raw = { 'cab' => Store.get(cab, 'cabinet_id').to_s, 'fid' => prep[:fid].to_s,
+                  'impact' => impact }
+          Digest::SHA256.hexdigest(JSON.generate(raw))[0, 32]
+        end
+
+        # Sedi odtlacok, ktory klient poslal, s TERAJSIM stavom? -> hlaska | nil
+        # Chybajuci odtlacok je odmietnutie rovnako ako nesediaci: zapis smie
+        # prist VYHRADNE z potvrdeneho nahladu (fail-closed).
+        UPGRADE_STALE_PREVIEW = 'Stav skrinky sa medzitým zmenil — otvor náhľad znova.'
+
+        def drawer_upgrade_preview_problem(model, cab, prep, data)
+          sent = present_str(data['fingerprint'])
+          return UPGRADE_STALE_PREVIEW if sent.nil?
+
+          now = drawer_upgrade_fingerprint(cab, prep, drawer_upgrade_impact(model, cab, prep))
+          sent == now ? nil : UPGRADE_STALE_PREVIEW
+        end
+
         def upgrade_pair(from, to)
           { 'from' => from, 'to' => to }
+        end
+
+        # VYSKA zasuvky. Atira nesie VYSKOVY VARIANT (`height_variant`, „H144"),
+        # QUADRO ho NEMA VOBEC a vysku boxu nesie v `box_height` (mm) — presne
+        # ako riadok zhrnutia karty (`drawer_row_text`). Ktore pole plati,
+        # rozhoduje SERVER podla toho, co polozka vysuvu naozaj nesie; JS len
+        # podla `kind` zvoli popisok a jednotku. Bez toho by Quadro ukazalo
+        # „Výška — → —" a zmenu vysky boxu by ZAMLCALO (Codex #315 kolo 1 P2).
+        def drawer_upgrade_height(now, to)
+          if now['height_variant'].is_a?(Numeric) || to['height_variant'].is_a?(Numeric)
+            upgrade_pair(now['height_variant'], to['height_variant']).merge('kind' => 'variant')
+          else
+            upgrade_pair(now['box_height'], to['box_height']).merge('kind' => 'box')
+          end
         end
 
         # Dielce TOHTO cela: rola -> vyrobne rozmery [dlzka, sirka, hrubka].
@@ -605,11 +670,23 @@ module Noxun
         # `nil` — priznat sa musi aj to.
         def drawer_upgrade_parts(now, target)
           (target.keys + now.keys).uniq.map do |k|
-            a = now[k]
-            b = target[k]
-            { 'role' => k, 'label' => Recipes.role_label(k),
-              'from' => a, 'to' => b }
+            a = target[k] || now[k]
+            { 'role' => a[:role], 'label' => drawer_part_label(a[:role], a[:side]),
+              'from' => now[k] && now[k][:dims], 'to' => target[k] && target[k][:dims] }
           end
+        end
+
+        # Popisok riadku tabulky. QUADRO vydava DVA boky boxu (`box_side` vlavo
+        # a vpravo) — bez rozlisenia by tabulka mala dva rovnako pomenovane
+        # riadky a pouzivatel by nevedel, ktory je ktory.
+        DRAWER_SIDE_SK = { 'left' => 'ľavý', 'right' => 'pravý' }.freeze
+
+        def drawer_part_label(role, side)
+          base = Recipes.role_label(role)
+          s = side.to_s
+          return base if s.empty?
+
+          "#{base} — #{DRAWER_SIDE_SK[s] || s}"
         end
 
         # Zamky, ktore prechod PRENESIE. Hodnoty sa nemenia (kolizna brana D3a
@@ -647,19 +724,34 @@ module Noxun
           end
         end
 
-        # VYRABANE dielce TOHTO cela z planu: rola -> [dlzka, sirka, hrubka].
-        # Kluc je ROLA (nie `part_key`): rola je to, co pouzivatel v tabulke
-        # cita, a jej rozmery su presne to, co sa meni. Cielove celo sa pozna
-        # cez `PartKeys.front_id` — jediny parser tvaru kluca.
+        # VYRABANE dielce TOHTO cela z planu: `part_key` -> { rola, strana,
+        # rozmery [dlzka, sirka, hrubka] }.
+        #
+        # KLUC JE `part_key`, NIE ROLA (Codex #315 kolo 1 P2): QUADRO vydava
+        # `box_side` DVAKRAT (vlavo a vpravo) s rovnakou rolou — mapa klucovana
+        # rolou by prvy dielec prepisala a tabulka by mala 4 riadky namiesto 5.
+        # `part_key` je zaroven STABILNA identita naprie verziami receptu, takze
+        # sa obe strany porovnania paruju spravne. Cielove celo sa pozna cez
+        # `PartKeys.front_id` — jediny parser tvaru kluca.
         def drawer_plan_parts(plan, fid)
           Array(plan[:parts]).each_with_object({}) do |pd, out|
             next unless pd.is_a?(Hash) && pd[:material] == :drawer
             next unless PartKeys.front_id(pd[:part_key]).to_s == fid.to_s
 
             pr = pd[:prod] || {}
-            out[pd[:role].to_s] = [pr[:length].to_f.round(2), pr[:width].to_f.round(2),
-                                   pr[:thickness].to_f.round(2)]
+            out[pd[:part_key].to_s] =
+              { role: pd[:role].to_s, side: drawer_part_side(pd[:part_key]),
+                dims: [pr[:length].to_f.round(2), pr[:width].to_f.round(2),
+                       pr[:thickness].to_f.round(2)] }
           end
+        end
+
+        # Variant kluca dielca (`front:F1/box_side:left` -> „left"), inak „".
+        # Tvar kluca sklada `PartKeys.front(front_id, kind, variant)`.
+        def drawer_part_side(part_key)
+          seg = part_key.to_s.split('/').last.to_s
+          i = seg.index(':')
+          i ? seg[(i + 1)..].to_s : ''
         end
 
         # Overenie + cielovy config BEZ zapisu do modelu.

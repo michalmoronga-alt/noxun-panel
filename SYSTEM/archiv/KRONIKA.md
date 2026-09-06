@@ -46,8 +46,19 @@
   je príležitosť. Markup aj klik žijú v `hardware.js` pri ostatných zápisových cestách kovania, karta je len renderer (`r.kind === 'upgrade'` → `hwUpHtml`) — rovnaká deľba ako
   pri chipoch osí v D2b. Tlačidlo nesie `data-ax`/`data-axc`, takže fokus prežije prekreslenie karty **ľahkým** pushom; ten istý ľahký push nesie aj ponuku
   (`front_drawer_refresh`), inak by z otvorenej karty po zmene mapovania zmizla.
-  **Testy:** headless **3292 PASS** (3273 pred dávkou, +19 v `tests/pure/test_kovd3b_upgrade_ui.rb`), **93 JS sád** (+`tests/js/test_kovd3b_ui.js`, 82 assertov v mini-DOM cez
-  celý tok klik → dopad → potvrdenie → odpoveď), **6 overených mutácií** (3 JS, 3 Ruby) a in-SU sekcia **`run_kovd3b`** (napísaná, spúšťa orchestrátor).
+  **Codex kolo 1 (1× P1 + 4× P2) — čo sa doplnilo.** **(P1) Zápis presadí len to, čo používateľ videl.** Payload zápisu nesie iba refy a identitu, takže medzi „ukáž dopad"
+  a „Prejsť" sa skrinka môže zmeniť (rozmery, materiály, mapovanie kovania, Späť/Redo) a server by zapísal **iný** dopad než potvrdený; `from` stráži len **pripnutý recept**.
+  Dopad preto nesie **odtlačok** (`Digest::SHA256` nad identitou a **celým** dopadom — čo sa v dopade neprejaví, na potvrdení nezáleží), klient ho **len vracia** a server ho
+  pred zápisom prepočíta tou istou funkciou; nezhoda **aj chýbajúci** odtlačok = odmietnutie „stav skrinky sa medzitým zmenil" + prekreslenie panela, modal ostáva otvorený
+  s hláškou. **(P2) Okno sa počas zápisu nedá zavrieť.** Zámok odoslania sám nestačil: Esc/scrim/krížik/„Zrušiť" ostávali aktívne a zatvorenie vyčistilo len stav klienta —
+  mutácia bežala ďalej a „zrušená" akcia model aj tak zmenila. Kostra D-15 dostala **opt-in** `busyLock`; zapnutý je pre prechod **aj** pre náhradu osi z D2b, ktorá mala tú
+  istú pascu — a spolu s ním **chýbajúci `rescue`** v `handle_set_hardware_override`, bez ktorého by výnimka nechala zamknuté okno neodstrániteľné. **(P2) Quadro má dva boky
+  boxu:** dielce sú kľúčované `part_key`, nie rolou (mapa kľúčovaná rolou by jeden prepísala → 4 riadky namiesto 5), a riadky sa rozlišujú „bok boxu — ľavý/pravý".
+  **(P2) Quadro nemá `height_variant`:** výška emituje `kind` (`variant` = „H144", `box` = mm z `box_height`) — bez toho by modal ukázal „Výška — → —" a zmenu výšky boxu
+  zamlčal. **(P2) Register receptov sa číta raz za prechod:** `Recipes.with_register_cache` (cache **neprežije** blok, poškodený register sa nezakešuje) + memo cieľa per
+  `system|opening` — desať zásuviek znamenalo 20+ synchrónnych čítaní disku pri **každom** pushi vrátane echa po edite.
+  **Testy:** headless **3302 PASS** (3273 pred dávkou, +29 v `tests/pure/test_kovd3b_upgrade_ui.rb`), **93 JS sád** (+`tests/js/test_kovd3b_ui.js`, 93 assertov v mini-DOM cez
+  celý tok klik → dopad → potvrdenie → odpoveď), **11 overených mutácií** (5 JS, 6 Ruby) a in-SU sekcia **`run_kovd3b`** (napísaná, spúšťa orchestrátor).
 
 - **KOV-D3a — UPGRADE RECEPTU: JEDNO ČELO, JADRO (v0.9.39, 6.9.2026).**
   Recepty zásuviek sú **nemenné**: oprava alebo nová hodnota od výrobcu neprepíše starý súbor, ale vydá `_v2`. Dovtedy však chýbal mechanizmus, ktorým sa už postavená

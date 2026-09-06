@@ -15924,12 +15924,39 @@ module NoxunSuRunner
 
   # REALNA akcia panela (nie priamy zapis do configu) — inak by sa nedalo
   # overit, ze ref, zamky a geometria su JEDEN krok Spat.
+  #
+  # KOV-D3b (Codex #315 kolo 1 P1): zapis vyzaduje ODTLACOK POTVRDENEHO
+  # NAHLADU. Runner ide TOU ISTOU cestou ako panel — najprv si ho vypyta
+  # z citacieho callbacku dopadu. Ked dopad ciel odmietne (scenar odmietnutia),
+  # odtlacok neexistuje a zapis padne UZ NA PREFLIGHTE, teda z toho isteho
+  # dovodu ako predtym.
   def kovd3a_upgrade(model, inst, cid, from, to)
+    fp = kovd3a_fingerprint(model, inst, cid, from, to)
     model.selection.clear
     model.selection.add(inst)
     e::Panel.handle_upgrade_drawer_recipe(
-      pg(model, 'cabinet_id' => cid, 'front_id' => 'F1', 'from' => from, 'to' => to)
+      pg(model, 'cabinet_id' => cid, 'front_id' => 'F1', 'from' => from, 'to' => to,
+                'fingerprint' => fp)
     )
+  end
+
+  # Odtlacok z citacieho callbacku dopadu (`NX.hwUpgradeImpact`). Prazdny
+  # retazec = dopad ciel odmietol.
+  def kovd3a_fingerprint(model, inst, cid, from, to)
+    model.selection.clear
+    model.selection.add(inst)
+    rec = []
+    install_js_recorder(rec)
+    begin
+      e::Panel.handle_drawer_upgrade_impact(
+        pg(model, 'cabinet_id' => cid, 'front_id' => 'F1', 'from' => from, 'to' => to,
+                  'up_token' => 'fp')
+      )
+    ensure
+      remove_js_recorder
+    end
+    res = Array(kovd3b_channel(rec, 'hwUpgradeImpact', 'fp')).first
+    res.is_a?(Hash) ? res['fingerprint'].to_s : ''
   end
 
   def run_kovd3a(model)
@@ -16110,22 +16137,23 @@ module NoxunSuRunner
     Array(kovd3b_channel(rec, 'hwUpgradeImpact', token)).first
   end
 
-  # ZAPIS z potvrdeneho okna (nesie `up_token`, presne ako `onSubmit`).
-  # -> [ok, hlaska] | nil (ziadna odpoved = modal by ostal zamknuty)
-  def kovd3b_write(model, inst, up, token = 'u2')
-    rec = kovd3b_call(model, inst, :handle_upgrade_drawer_recipe, up, token)
+  # ZAPIS z potvrdeneho okna (nesie `up_token` AJ `fingerprint`, presne ako
+  # `onSubmit`). -> [ok, hlaska] | nil (ziadna odpoved = modal by ostal zamknuty)
+  def kovd3b_write(model, inst, up, fp, token = 'u2')
+    rec = kovd3b_call(model, inst, :handle_upgrade_drawer_recipe, up, token, fp)
     kovd3b_channel(rec, 'hwUpgradeResult', token)
   end
 
-  def kovd3b_call(model, inst, handler, up, token)
+  def kovd3b_call(model, inst, handler, up, token, fp = nil)
     model.selection.clear
     model.selection.add(inst)
+    body = { 'cabinet_id' => up['cabinet_id'], 'front_id' => up['front_id'],
+             'from' => up['from'], 'to' => up['to'], 'up_token' => token }
+    body['fingerprint'] = fp unless fp.nil?
     rec = []
     install_js_recorder(rec)
     begin
-      e::Panel.send(handler,
-                    pg(model, 'cabinet_id' => up['cabinet_id'], 'front_id' => up['front_id'],
-                              'from' => up['from'], 'to' => up['to'], 'up_token' => token))
+      e::Panel.send(handler, pg(model, body))
     ensure
       remove_js_recorder
     end
@@ -16236,10 +16264,46 @@ module NoxunSuRunner
        Array(imp['kit']['to']) == kovd1a_codes(model))
     ok('KOV-D3b dopad: NIC sa nezapisalo — v mape stale v1',
        kovd3a_ref(inst) == KOVD3B_V1)
+    fp = imp['fingerprint'].to_s
+    ok("KOV-D3b dopad: nesie ODTLACOK potvrdeneho nahladu (#{fp.inspect})", !fp.empty?)
+
+    # --- ZMENA SKRINKY PO NAHLADE = ZAPIS SA ODMIETNE (Codex #315 P1) ------
+    # Medzi „ukáž dopad" a „Prejsť" sa skrinka zmeni (hlbka 500 -> 400, teda
+    # INE dielce aj NL). Bez odtlacku by server zapisal INY dopad, nez ktory
+    # pouzivatel videl — `from` to nechyti, ten strazi len pripnuty recept.
+    mstale = r03_marker(model, markers)
+    par = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    deep = par['depth'].to_f
+    par['depth'] = deep - 100.0
+    e::CabinetBuilder.rebuild(model, inst, par)
+    stale = kovd3b_write(model, inst, up, fp, 'w0')
+    ok("KOV-D3b zastaraly nahlad: zapis ODMIETNUTY s hlaskou (#{stale.inspect})",
+       stale.is_a?(Array) && stale.first == false && stale[1].to_s.include?('medzitým'))
+    ok('KOV-D3b zastaraly nahlad: v mape ostava v1 a zamok je nedotknuty',
+       kovd3a_ref(inst) == KOVD3B_V1 &&
+       kovd2a_overrides(inst).any? { |o| o['rule_id'].to_s == KOVD2A_RID })
+    # Marker je POSLEDNY krok PO prestavbe hlbky — odmietnuty zapis do undo
+    # stacku nepridal nic.
+    Sketchup.undo
+    ok('KOV-D3b zastaraly nahlad: odmietnutie nenechalo ZIADNY krok Spat', !mstale.valid?)
+    # Spat na povodnu hlbku (undo vratil prestavbu) — dalej scenar pokracuje
+    # nad TOU ISTOU skrinkou ako predtym.
+    ok("KOV-D3b zastaraly nahlad: Spat vratil hlbku #{deep.to_i}",
+       (e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})['depth'].to_f - deep).abs <= TOL)
+    r03_clear_markers(model, markers)
 
     # --- POTVRDENY ZAPIS = JEDNA operacia + odpoved cakajucemu oknu -------
+    # Odtlacok sa berie ZNOVA: po Spat je stav skrinky opat ten povodny, ale
+    # scenar nesmie stat na predpoklade, ze mu stary odtlacok „nahodou" sedi.
+    up = kovd3b_offer(inst)
+    fresh = up && kovd3b_impact(model, inst, up, 'i2')
+    ok('KOV-D3b: po Spat je ponuka aj dopad opat k dispozicii',
+       fresh.is_a?(Hash) && fresh['ok'] == true)
+    return unless fresh.is_a?(Hash) && fresh['ok'] == true
+
+    fp = fresh['fingerprint'].to_s
     m = r03_marker(model, markers)
-    res = kovd3b_write(model, inst, up, 'w1')
+    res = kovd3b_write(model, inst, up, fp, 'w1')
     ok("KOV-D3b zapis: cakajuce okno dostalo odpoved `ok: true` (#{res.inspect})",
        res.is_a?(Array) && res.first == true)
     ok("KOV-D3b zapis: v mape je #{KOVD3B_V2} (#{kovd3a_ref(inst).inspect})",
@@ -17360,7 +17424,7 @@ module NoxunSuRunner
     run_kovd2a(model)        # KOV-D2a: zamky osi zasuvky — akcia panela zamkne VYSKU proti automatu (H144 -> H70) a prestava v JEDNEJ operacii (Spat aj Redo vratia zamok, dielce v modeli aj nakupny kit naraz), NL mimo radu = RED bez dielcov a bez kitu, odomknutie JEDNEJ osi necha druhy zamok zit, kopia zamky nesie
     run_kovd2b(model)        # KOV-D2b: chipy osi — kazdy zapis ide z PAYLOADU KARTY (identita `lock`, hodnoty `axes`): klik na `auto` pripne aktualnu vysku bez zmeny geometrie, volba z ponuky prestava dielce aj kit (Spat = 1 krok), odomknutie JEDNEJ osi necha druhu zit, konfliktna karta nesie identitu aj bez polozky a nahrada zo servera je zamknuta pri zachovanom druhom zamku (Spat aj Redo)
     run_kovd3a(model)        # KOV-D3a: upgrade receptu jedneho cela nad FIXTURNYM registrom (`with_test_dir`) — ciel s nesediacou hrubkou preflight odmietne BEZ kroku Spat (v mape ostava v1 aj zamok), uspesny upgrade meni ref, PREADRESUJE zamok NL a prestava dielce v JEDNEJ operacii (Spat aj Redo vratia vsetko naraz), kopia nesie novy ref
-    run_kovd3b(model)        # KOV-D3b: CESTA Z KARTY nad dvojprvkovym fixturnym registrom — bez v2 karta ponuku nedostane vobec; s v2 nesie `upgrade.available` (plny aj lahky push), citaci callback dopadu vrati cisla (chrbat v1->v2, preneseny zamok NL, kod kitu) a NEZAPISE nic, potvrdeny zapis s tokenom vymeni ref, preadresuje zamok a prestava dielce v JEDNEJ operacii (Spat = 1 krok, Redo obnovi ref+zamok+geometriu sucasne), odmietnuty preflight odpovie `ok:false` a nenechá ZIADNY krok Spat
+    run_kovd3b(model)        # KOV-D3b: CESTA Z KARTY nad dvojprvkovym fixturnym registrom — bez v2 karta ponuku nedostane vobec; s v2 nesie `upgrade.available` (plny aj lahky push), citaci callback dopadu vrati cisla (chrbat v1->v2, preneseny zamok NL, kod kitu) + ODTLACOK a NEZAPISE nic; ZMENA SKRINKY po nahlade zapis ODMIETNE bez kroku Spat (Codex #315 P1), potvrdeny zapis s tokenom a cerstvym odtlackom vymeni ref, preadresuje zamok a prestava dielce v JEDNEJ operacii (Spat = 1 krok, Redo obnovi ref+zamok+geometriu sucasne), odmietnuty preflight odpovie `ok:false` a nenechá ZIADNY krok Spat
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

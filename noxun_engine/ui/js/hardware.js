@@ -1172,6 +1172,11 @@
       sub: btn.getAttribute('data-sub') || '',
       note: HW_AX_FIX_NOTE,
       okLabel: 'Nahradiť',
+      // KOV-D3b (Codex #315 kolo 1 P2): TA ISTA pasca ako pri prechode na novu
+      // verziu — zatvorenie okna POCAS zapisu vycisti len nas stav, ale mutacia
+      // na serveri bezi dalej a zasuvku aj tak prestavi. Zapnute az teraz, lebo
+      // az teraz odpoveda `handle_set_hardware_override` aj z vetvy vynimky.
+      busyLock: true,
       fields: [],
       onSubmit: function(){
         if (!HW_AX_MODAL || HW_AX_MODAL.sent) return;   // dvojklik nezapise dvakrat
@@ -1307,6 +1312,11 @@
       note: String(imp.release_note || ''),
       okLabel: 'Prejsť',
       size: 'md',
+      // Kym zapis bezi, okno sa NEDA zavriet: zatvorenie by vycistilo len nas
+      // stav, ale mutacia by na serveri prebehla dalej — „zrušená" akcia by aj
+      // tak prestavala zasuvku (Codex #315 kolo 1 P2). Smieme to zapnut, lebo
+      // server odpoveda v KAZDEJ vetve vratane vynimky.
+      busyLock: true,
       // Tabulka dopadu je ZOBRAZOVACI blok (`custom` bez `read`) — do
       // `values()` sa nedostane a odoslat sa z nej neda nic. Odosielaju sa
       // VYHRADNE `from`/`to` z payloadu.
@@ -1322,9 +1332,15 @@
         HW_UP.sent = true;
         NXModal.clearErrors();
         NXModal.setBusy(true);
+        // `fingerprint` = ODTLACOK NAHLADU zo servera. Klient ho LEN VRACIA
+        // (nic z neho neskladá a nic si nedopocitava); server ho pred zapisom
+        // prepocita a pri nezhode zapis odmietne — bez neho by sa dal zapisat
+        // iny dopad, nez ktory pouzivatel potvrdil (Codex #315 kolo 1 P1).
         sketchup.upgrade_drawer_recipe(nxDocPayload({
           cabinet_id: offer.cabinet_id, front_id: offer.front_id,
-          from: offer.from, to: offer.to, up_token: tok }));
+          from: offer.from, to: offer.to,
+          fingerprint: String((HW_UP.impact && HW_UP.impact.fingerprint) || ''),
+          up_token: tok }));
       },
       onClose: function(){ HW_UP = null; }
     });
@@ -1355,8 +1371,9 @@
   function hwUpImpactRender(host, imp){
     if (!host) return;
     var rows = '';
-    rows += hwUpRow('Výška', hwUpVal(imp.height, 'H'), hwUpVal(imp.height, 'H', true));
-    rows += hwUpRow('Dĺžka výsuvu (NL)', hwUpVal(imp.nl, ''), hwUpVal(imp.nl, '', true));
+    rows += hwUpRow(hwUpHeightLabel(imp.height),
+                    hwUpVal(imp.height), hwUpVal(imp.height, true));
+    rows += hwUpRow('Dĺžka výsuvu (NL)', hwUpVal(imp.nl), hwUpVal(imp.nl, true));
     (Array.isArray(imp.parts) ? imp.parts : []).forEach(function(p){
       rows += hwUpRow(hwUpCap(p && p.label), hwUpDims(p && p.from), hwUpDims(p && p.to));
     });
@@ -1377,9 +1394,19 @@
     return '<tr' + (same ? ' class="same"' : '') + '><th>' + esc(label) + '</th>'
          + '<td>' + esc(a) + '</td><td>' + esc(b) + '</td></tr>';
   }
-  function hwUpVal(pair, prefix, wantTo){
+  // Hodnota jednej osi. Ktore pole os nesie a v akej jednotke, hovori SERVER
+  // (`kind`): Atira ma vyskovy VARIANT („H144"), QUADRO vysku boxu v mm
+  // (Codex #315 kolo 1 P2) — panel si to neodvodzuje zo systemu.
+  function hwUpVal(pair, wantTo){
     var v = pair ? (wantTo ? pair.to : pair.from) : null;
-    return (v == null || v === '') ? '—' : (prefix + String(v));
+    if (v == null || v === '') return '—';
+    var k = pair && pair.kind;
+    if (k === 'variant') return 'H' + String(v);
+    if (k === 'box') return String(v).replace('.', ',') + ' mm';
+    return String(v).replace('.', ',');
+  }
+  function hwUpHeightLabel(pair){
+    return (pair && pair.kind === 'box') ? 'Výška boxu' : 'Výška';
   }
   // „791,5 × 480 × 16 mm" — rozmery su Cisla zo servera, formatuje sa len
   // desatinna ciarka (slovensky zapis, rovnako ako zvysok panela).
@@ -2011,6 +2038,7 @@
       HW_UP_NOMODAL: HW_UP_NOMODAL,
       hwUpHtml: hwUpHtml, hwUpOffer: hwUpOffer, hwUpDims: hwUpDims,
       hwUpCodes: hwUpCodes, hwUpLockLabel: hwUpLockLabel, hwUpImpactRender: hwUpImpactRender,
+      hwUpVal: hwUpVal, hwUpHeightLabel: hwUpHeightLabel,
       onDrawerUpgrade: onDrawerUpgrade, onHwUpgradeImpact: onHwUpgradeImpact,
       onHwUpgradeResult: onHwUpgradeResult,
       hwUpAskState: function(){ return HW_UP_ASK; },

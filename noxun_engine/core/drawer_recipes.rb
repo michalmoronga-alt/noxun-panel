@@ -167,6 +167,16 @@ module Noxun
       # takze plati `DIR`.
       @test_dir = nil
 
+      # KOV-D3b (Codex #315 kolo 1 P2): register receptov je maly subor, ale
+      # `active_ref`, `latest_for` aj `load` ho citaju KAZDY ZVLAST — pri desiatich
+      # zasuvkach je to 20+ synchronnych citani disku na JEDEN push panela
+      # (vratane echa po kazdom edite). Tato premenna drzi uz precitany register
+      # po dobu JEDNEHO prechodu (`with_register_cache`) a nic viac: mimo bloku
+      # je `nil`, takze zmena registra MEDZI pushmi sa vzdy prejavi.
+      # Nemennost OBSAHU receptu tym netrpi — `load` odtlacok suboru overuje
+      # aj proti registru z cache.
+      @register_cache = nil
+
       module_function
 
       # Priecinok, z ktoreho sa recepty citaju TERAZ (default vsetkych `dir:`).
@@ -193,10 +203,25 @@ module Noxun
         @test_dir = prev
       end
 
+      # Docasna pamat REGISTRA na dobu jedneho prechodu (payload karty). Mimo
+      # bloku sa nekesuje nic — cache nikdy neprezije jeden push. Vnorene
+      # volanie prevezme uz existujucu pamat, takze sa neresetuje uprostred.
+      # Vratena mapa sa NEMENI (ziadny volajuci do nej nezapisuje).
+      def with_register_cache
+        prev = @register_cache
+        @register_cache ||= {}
+        yield
+      ensure
+        @register_cache = prev
+      end
+
       # --- register a nacitanie ------------------------------------------------
 
       # Register vydanych receptov: { recipe_id => sha256 hex }.
       def released(dir: active_dir)
+        hit = @register_cache && @register_cache[dir]
+        return hit if hit
+
         path = File.join(dir, RELEASED_FILE)
         raise RecipeError, "Register receptov #{RELEASED_FILE} chyba (#{dir})." unless File.file?(path)
 
@@ -207,6 +232,8 @@ module Noxun
           raise RecipeError, "Register: kluc #{id.inspect} nie je platne recipe_id." unless parse_id(id)
           raise RecipeError, "Register: odtlacok pre #{id} nie je sha256 hex." unless sha.is_a?(String) && sha =~ /\A[0-9a-f]{64}\z/
         end
+        # AZ ZA validaciou: poskodeny register sa nesmie zakesovat ako platny.
+        @register_cache[dir] = data if @register_cache
         data
       end
 

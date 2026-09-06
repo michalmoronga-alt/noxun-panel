@@ -749,18 +749,28 @@ module Noxun
         #
         # `cabinet_id` a `front_id` su V BLOKU zamerne: identitu zapisu sklada
         # SERVER (rovnaka zasada ako `lock` v D2b), panel ju z niceho neodvodzuje.
+        # NAKLAD (Codex #315 kolo 1 P2): register receptov sa cita RAZ na cely
+        # prechod (`Recipes.with_register_cache`) a metadata CIELA sa zdielaju
+        # medzi zasuvkami s rovnakou kombinaciou `system|opening` (`seen`).
+        # Bez toho by kazda zasuvka spustila `active_ref` + `latest_for` (a s v2
+        # aj `load` s odtlackom) samostatne — desat zasuviek = 20+ synchronnych
+        # citani disku pri KAZDOM pushi, vratane echa po kazdom edite.
+        # Ziadna trvala cache: mimo tohto bloku sa nekesuje nic.
         def attach_front_drawer_upgrade(map, cfg, cab_id)
           return map unless map.is_a?(Hash) && !map.empty?
           return map unless defined?(Recipes)
 
-          Array(cfg['front_items']).each do |it|
-            next unless it.is_a?(Hash)
+          seen = {}
+          Recipes.with_register_cache do
+            Array(cfg['front_items']).each do |it|
+              next unless it.is_a?(Hash)
 
-            row = map[it['id'].to_s]
-            next unless row.is_a?(Hash) && row['state'].to_s == 'ok'
+              row = map[it['id'].to_s]
+              next unless row.is_a?(Hash) && row['state'].to_s == 'ok'
 
-            up = drawer_upgrade_offer(it, cab_id)
-            row['upgrade'] = up if up
+              up = drawer_upgrade_offer(it, cab_id, seen)
+              row['upgrade'] = up if up
+            end
           end
           map
         rescue StandardError => e
@@ -773,7 +783,12 @@ module Noxun
         # nakoniec pustia (`active_ref` == `:known` · vydany ciel ·
         # `Recipes.upgrade?`) — ponuka sa preto nemoze objavit tam, kde by ju
         # server vzapati odmietol.
-        def drawer_upgrade_offer(item, cab_id)
+        #
+        # `seen` = memo CIELA per `system|opening` (najnovsi vydany + jeho
+        # popisok a poznamka vydania). Zavisi VYHRADNE od kombinacie, nie od
+        # cela, takze sa smie zdielat; `from` sa cita per celo (kazde ma vlastnu
+        # mapu `recipe_refs` a smie byt na inej verzii).
+        def drawer_upgrade_offer(item, cab_id, seen = {})
           kind, key = Recipes.recipe_key_for(item)
           return nil unless kind == :ok
 
@@ -781,17 +796,27 @@ module Noxun
           state, from = Recipes.active_ref(drawer['recipe_refs'], key[:system], key[:opening])
           return nil unless state == :known
 
-          to = Recipes.latest_for(key[:system], key[:opening])
-          return nil unless Recipes.upgrade?(from, to)
+          tgt = drawer_upgrade_target(key, seen)
+          return nil unless tgt && Recipes.upgrade?(from, tgt['to'])
 
-          ver = Recipes.parse_id(to)
-          { 'available' => true, 'from' => from.to_s, 'to' => to.to_s,
-            'to_label' => "v#{ver[:version]}",
-            'release_note' => Recipes.load(to)[:release_note].to_s,
-            'cabinet_id' => cab_id.to_s, 'front_id' => item['id'].to_s }
+          tgt.merge('available' => true, 'from' => from.to_s,
+                    'cabinet_id' => cab_id.to_s, 'front_id' => item['id'].to_s)
         rescue StandardError => e
           Engine.log_error(e, 'Panel.drawer_upgrade_offer')
           nil
+        end
+
+        # Najnovsi VYDANY recept kombinacie + jeho popisok a poznamka vydania.
+        # `nil` = kombinacia ziadny vydany recept nema. Memo `seen` drzi aj
+        # zaporny vysledok, aby sa nehladal opakovane.
+        def drawer_upgrade_target(key, seen)
+          k = "#{key[:system]}|#{key[:opening]}"
+          return seen[k] if seen.key?(k)
+
+          to = Recipes.latest_for(key[:system], key[:opening])
+          ver = to && Recipes.parse_id(to)
+          seen[k] = ver && { 'to' => to.to_s, 'to_label' => "v#{ver[:version]}",
+                             'release_note' => Recipes.load(to)[:release_note].to_s }
         end
 
         def attach_front_drawer_axes(map, index, cab_id)

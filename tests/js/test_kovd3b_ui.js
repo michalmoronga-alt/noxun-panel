@@ -72,12 +72,14 @@ const OFFER = { available: true, from: 'atira_sisy_v1', to: 'atira_sisy_v2',
 const IMPACT = {
   ok: true, from: 'atira_sisy_v1', to: 'atira_sisy_v2', to_title: 'Atira SiSy v2',
   release_note: 'Chrbát H144 má 120 mm.',
-  height: { from: 144, to: 144 },
+  height: { from: 144, to: 144, kind: 'variant' },
   nl: { from: 470, to: 470 },
   parts: [{ role: 'drawer_bottom', label: 'dno', from: [791.5, 480, 16], to: [787.5, 480, 16] },
           { role: 'drawer_back', label: 'chrbát', from: [780, 144, 16], to: [780, 120, 16] }],
   locks: [{ axis: 'nl', value: 470, kept: true }],
-  kit: { from: ['357696'], to: ['357696'] }
+  kit: { from: ['357696'], to: ['357696'] },
+  // Codex #315 kolo 1 P1: odtlacok potvrdeneho nahladu. Klient ho LEN vracia.
+  fingerprint: 'fp-abc123'
 };
 
 function reset(){
@@ -240,12 +242,20 @@ const wTok = WRITE[0].up_token;
 ok(wTok && wTok !== tok2, 'zapis ma VLASTNY token (nie ten z citacej otazky)');
 eq(Object.assign({}, WRITE[0], { up_token: undefined }),
    { cabinet_id: 'CAB-1', front_id: 'F1', from: 'atira_sisy_v1', to: 'atira_sisy_v2',
-     up_token: undefined },
+     fingerprint: 'fp-abc123', up_token: undefined },
    'zapis nesie PRESNE to, co dal server — ziadne cislo z obrazovky');
 ok(global.NXModal.isOpen(), 'okno ostava OTVORENE, kym server zapis nepotvrdi');
 ok(global.NXModal.isBusy(), 'a je ZAMKNUTE — druhy submit uz nezapise');
 global.NXModal.submit();
 eq(WRITE.length, 1, 'dvojklik na „Prejsť" nezapise dvakrat');
+
+// KOV-D3b (Codex #315 kolo 1 P2): kym zapis BEZI, okno sa NEDA zavriet.
+// Zatvorenie by vycistilo len nas stav — mutacia na serveri by bezala dalej
+// a „zrušená" akcia by zasuvku aj tak prestavala (a nechala krok Spat).
+ok(global.NXModal.busyLocked(), 'okno je ZAMKNUTE aj proti zatvoreniu');
+global.NXModal.close();
+ok(global.NXModal.isOpen(), 'KOV-D3b (P2): „Zrušiť"/krížik/Esc/scrim okno POCAS zapisu nezavru');
+ok(HW.hwUpModalState(), 'a stav volajuceho zostava — odpoved ma komu patrit');
 
 // Cudzi token (odpoved na starsie odoslanie) sa zahodi.
 HW.onHwUpgradeResult(true, '', 'u-cudzi');
@@ -255,6 +265,7 @@ ok(global.NXModal.isOpen(), 'odpoved s CUDZIM tokenom okno nezatvori');
 HW.onHwUpgradeResult(false, 'Stav zásuvky sa medzitým zmenil — skús znova.', wTok);
 ok(global.NXModal.isOpen(), 'odmietnuty zapis okno NEZATVARA');
 ok(!global.NXModal.isBusy(), 'a odomkne ho — rozhodnutie sa da poslat znova');
+ok(!global.NXModal.busyLocked(), 'a s nim aj zamok proti zatvoreniu — okno sa uz zavriet DA');
 ok(modalText().indexOf('Stav zásuvky sa medzitým zmenil') >= 0,
    'dovod odmietnutia je V MODALI, nie len v statuse');
 
@@ -281,6 +292,18 @@ ok(!global.NXModal.isOpen(), 'oneskorena odpoved na zavrete okno nic neotvara');
 // ===========================================================================
 // F) TABULKA DOPADU — ciste formatovanie
 // ===========================================================================
+
+// KOV-D3b (Codex #315 kolo 1 P2): ktore pole os nesie a v akej jednotke,
+// hovori SERVER (`kind`) — panel si to zo systemu NEODVODZUJE. Atira ma
+// vyskovy VARIANT, QUADRO vysku boxu v mm.
+eq(HW.hwUpVal({ from: 144, to: 176, kind: 'variant' }), 'H144', 'Atira: H pred cislom');
+eq(HW.hwUpVal({ from: 144, to: 176, kind: 'variant' }, true), 'H176');
+eq(HW.hwUpHeightLabel({ kind: 'variant' }), 'Výška');
+eq(HW.hwUpVal({ from: 199.5, to: 224, kind: 'box' }), '199,5 mm', 'Quadro: vyska boxu v mm');
+eq(HW.hwUpHeightLabel({ kind: 'box' }), 'Výška boxu',
+   'a riadok sa aj INAK VOLA — inak by tvrdil nieco, co Quadro nema');
+eq(HW.hwUpVal({ from: null, to: 176, kind: 'variant' }), '—', 'chybajuca strana sa PRIZNA');
+eq(HW.hwUpVal({ from: 470, to: 470 }), '470', 'NL je cislo bez prefixu');
 
 eq(HW.hwUpDims([791.5, 480, 16]), '791,5 × 480 × 16 mm',
    'rozmery su cisla SERVERA, panel meni len desatinnu ciarku');

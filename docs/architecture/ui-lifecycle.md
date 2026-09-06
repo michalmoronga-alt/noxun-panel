@@ -851,7 +851,15 @@ to, čo sa naozaj mení. Je to zobrazovací blok (`type: 'custom'` bez `read`), 
 Tabuľka **nie je textový diff konštánt** (Astra #20 F13) — verzia smie zmeniť prahy, rad NL, hrúbky aj ABS bez zmeny `constants`, takže sa ukazuje výsledok, nie recept.
 Potvrdenie ide na `upgrade_drawer_recipe` s vlastným tokenom a **okno sa nezatvára**, kým server zápis nepotvrdí (`NX.hwUpgradeResult`) — odmietnutie ho odomkne a hlášku
 ukáže **v ňom**. Sú to zámerne **dva kanály**, nie jeden zdieľaný s D2b: okno náhrady osi a okno prechodu sú dva rôzne modaly s vlastným stavom a jeden kanál by zavrel to
-nesprávne.
+nesprávne. Kým odoslanie beží, okno je **zamknuté aj proti zatvoreniu** (`busyLock`, nižšie).
+
+**ZÁPIS SMIE PRESADIŤ LEN TO, ČO POUŽÍVATEĽ VIDEL (`fingerprint`, Codex #315 kolo 1 P1).** Payload zápisu nesie iba refy a identitu, takže medzi „ukáž dopad" a „Prejsť" sa
+skrinka môže zmeniť (rozmery, materiály, mapovanie kovania, Späť/Redo) — `drawer_upgrade_prepare` by potom bežal nad **novým** stavom a zapísal **iný** dopad než ten
+potvrdený. `from` to nechytí: ten stráži len to, že sa nezmenil **pripnutý recept**. Server preto k dopadu pribalí **odtlačok** (`Digest::SHA256` nad identitou a **celým**
+dopadom — čo sa v dopade neprejaví, na potvrdení nezáleží; čo sa prejaví, odtlačok zmení), klient ho pri „Prejsť" **len vráti** (nič neskladá a nič si nedopočítava)
+a server ho **pred zápisom prepočíta tou istou funkciou**. Nezhoda **aj chýbajúci** odtlačok = odmietnutie „stav skrinky sa medzitým zmenil — otvor náhľad znova"
+(fail-closed: zápis smie prísť výhradne z potvrdeného náhľadu). Pri odmietnutí sa panel **prekreslí** (`push_selected`), takže ponuka aj karta ukazujú čerstvý stav a druhý
+pokus ide už nad novým náhľadom; modal ostáva otvorený s hláškou.
 
 **KOV-D1b doplnil do TOHO ISTÉHO rozkliku „čo je v balení"** — za vety receptu pribudne „Balenie: &lt;názov setu&gt;", riadok každého člena („· K-sada 357696 — Súprava Atira 470
 biela (1 ks)") a pri probléme priznaný dôvod („Bez kódu: …"). Žiadny nový blok a **žiadny druhý explain**: zdrojom je **jediný existujúci rozpis** `HardwareSets.explain`, ten
@@ -1636,7 +1644,11 @@ pri odmietnutí, vtedy sa potvrdenie neponúkne vôbec).
 
 Dopad skladá **server** a berie ho z **TOHO ISTÉHO** nasucho postaveného stavu, ktorý by sa aj zapísal: `drawer_upgrade_prepare` vracia **aditívne** aj `side` (cieľová položka
 výsuvu, dielce čela z plánu, objednávacie kódy z expanzie), `lock` (už **preadresovaný** záznam zámku) a identitu (`fid`, `owner`, `from`, `to`); zápisová cesta číta naďalej
-len `params` a `recipe`. **Terajšiu** stranu stavia **ten istý** helper `drawer_dry_plan` nad **nezmenenými** parametrami skrinky — dve rôzne cesty by ukázali rozdiel, ktorý
+len `params` a `recipe`. Dielce sú kľúčované **`part_key`, nie rolou** (Codex #315 kolo 1 P2): Quadro vydáva `box_side` **dvakrát** (vľavo a vpravo) s tou istou rolou, takže
+mapa kľúčovaná rolou by jeden dielec prepísala a tabuľka by mala 4 riadky namiesto 5; `part_key` je zároveň stabilná identita naprieč verziami, takže sa obe strany porovnania
+párujú správne. Výšku emituje `drawer_upgrade_height`: Atira nesie **výškový variant** (`height_variant`, „H144"), Quadro ho **nemá vôbec** a nesie výšku boxu v mm
+(`box_height`) — presne ako riadok zhrnutia karty. Ktoré pole platí, hovorí server cez `kind` (`variant` / `box`) a JS podľa neho volí popisok aj jednotku; bez toho by
+Quadro ukázalo „Výška — → —" a zmenu výšky boxu **zamlčalo**. **Terajšiu** stranu stavia **ten istý** helper `drawer_dry_plan` nad **nezmenenými** parametrami skrinky — dve rôzne cesty by ukázali rozdiel, ktorý
 v skutočnosti spôsobil len iný spôsob výpočtu. Preto ani preflight, ani kit nemajú druhú implementáciu: `drawer_upgrade_preflight` vracia `[chyba, side]` a
 `drawer_upgrade_kit_problem` `[chyba, kódy]` — tá istá expanzia, ktorá rozhoduje o prijatí, dáva aj kódy do tabuľky.
 
