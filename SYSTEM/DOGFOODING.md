@@ -59,8 +59,9 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 
 - **D-117 · Nestabilný in-SU test „GHOST suspend: aktívny nástroj po upratovaní"** (orchestrátor 6.9., beh nad KOV-D4 hlavou f611bcb) — raz zlyhal s aktívnym `MeasureTool`
   (id 21024) namiesto `SelectionTool`, opakovaný beh nad tou istou hlavou prešiel (1927 PASS); dávka sa nástrojov nedotýkala a ten istý test prešiel v ~12 behoch toho dňa. Príčina
-  = časová: asercia číta aktívny nástroj po jednom `SETTLE` za `model.tools.pop_tool`. *Stav: OTVORENÉ — návrh: v sekcii čakať na `SelectionTool` s krátkym timeoutom (poll) namiesto
-  jedného `SETTLE`; ak sa zopakuje, hlásiť s ID nástroja, ktorý ostal navrchu.*
+  = asercia predpokladá `SelectionTool`, ale `GhostTool.start` používa `push_tool`, takže po upratovaní sa vráti NÁSTROJ AKTÍVNY PRED scenárom (`ghost_tool.rb` ~r. 122) — keď beh
+  štartuje s Tape Measure, `SelectionTool` sa neobjaví nikdy (poll by len časoval). *Stav: OTVORENÉ — návrh (Codex #318): v setupe sekcie si zapamätať aktívny nástroj a tvrdiť návrat
+  PRÁVE NEHO, alebo pred štartom explicitne zvoliť Výber (`select_tool(nil)`); pri opakovaní hlásiť ID nástroja navrchu.*
 
 ## V1 DOTIAHNUTIE
 
