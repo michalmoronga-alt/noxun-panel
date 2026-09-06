@@ -17,6 +17,52 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-D1b — MAPOVANIE, UI: SET ZÁSUVKY SA DÁ VYBRAŤ V ŠTÚDIU AJ NA KARTE (v0.9.35, 6.9.2026).**
+  Druhý rez package KOV-D v2 — **výhradne UI a payload**; jadro (resolver, zámky, upgrade, schéma, seed) sa nedotklo.
+  D1a zaviedlo triedne a owner triedne kľúče, ale ovládanie k nim neexistovalo: v Pravidlách Štúdia sa zásuvka dala
+  namapovať len pod generickým `slide`, ktorý resolver pre klasifikovanú položku vôbec nečíta, a karta ponúkala plochý
+  zoznam setov typu — teda aj sety inej triedy a pri Atire aj **pevný set** tam, kde sa smie uložiť len výber podľa
+  výškového variantu.
+  **Čo z toho má používateľ.** (1) **Štúdio → Kovanie → Predvoľby projektu** má v TEJ ISTEJ tabuľke mapovaní štyri nové
+  riadky — výsuv × klasické/Tip-On × kovové bočnice/drevený box (globálne predvoľby aj projekt). Ponuka je **len to, čo
+  naozaj sadne**: Atira ako jedna voľba „rodina podľa výšky" (H70 · H144 · H176 naraz), Quadro ako pevný set. Nenamapovaná
+  zásuvka priznáva **RED** („bez setu — zásuvka bez kitu"), nie ORANGE ako ostatné kovanie: je to fail-closed
+  `drawer_kit_missing`. (2) **Inspector → Kovanie** vie ten istý výber prepnúť **pre celú skrinku** aj **pre jedno čelo**
+  a prvá voľba selectu vždy povie, čo platí bez vlastného výberu („podľa projektu — Atira biela…", na čele aj „podľa
+  skrinky — …"); výber sa zruší návratom na tú prvú voľbu. (3) Rozklik **Technický detail** na karte zásuvky ukazuje za
+  vetami receptu aj **„čo je v balení"** — názov setu, kódy členov, ich názvy z katalógu a počty.
+  **Rozhodnutia a ich dôvody.** **Ponuku skladá výhradne server** (`HardwareSets.class_set_options`) — JS nefiltruje,
+  neprekladá a kľúč neskladá; posiela späť len ID voľby, ktoré dostal, a neznáme ID **neodošle vôbec**. **Rodina** je
+  `(výrobca, rada, názov bez tokenu H<číslo>)`: klasifikácia setu farbu ani vyhotovenie nenesie (Atira biela a antracit
+  majú všetkých päť klasifikačných polí zhodných), takže jediný údaj, ktorý ich odlíši, je názov. Je to **pohľad, nie
+  pravda** — uložená hodnota je vždy zoznam reálnych `set_id` a každé pásmo znovu validuje zápisová cesta
+  (`class_key_value_problem` v globále/projekte, `classified_value_problem` v override skrinky), takže zle zgrupovaná
+  ponuka nevie vyrobiť zlý nákup, najhoršie zle popísanú voľbu. **Dôsledok pre antracit seed:** tá dávka musí dať rodine
+  vlastný názov („Atira antracit H70 — klasické"), inak sa zlúči s bielou; zapísané je to v PLAN aj v `hardware.md`.
+  **Neaktívny set** sa v ponuke NOVÉHO výberu neobjaví ani vtedy, keď naň projekt ukazuje (`set_options` ho zámerne drží,
+  `class_set_options` ho odfiltruje) — uložená voľba sa zobrazí ako `disabled` „(uložený výber)" a odoslať sa nedá (F10).
+  **Editor pásiem sa pre triedne riadky neponúka**: hodnotou je vždy celá voľba z ponuky, takže sa nedá zostaviť selektor,
+  ktorý by triede nesedel. **Žiadna nová zapisovacia cesta** — Pravidlá idú existujúcimi `handle_map_project`/
+  `handle_map_global` (payload dostal aditívne pole `mapping_key`; starý tvar `generic_type` ostáva funkčný, typ číta
+  `mapping_key_type`), karta existujúcou akciou `set_hardware_set`, ktorá kľúč skladá sama (`apply_cabinet_override`).
+  **Skrinkový riadok vzniká len pri JEDNEJ triede** — pri zmiešaných triedach by jeden kľúč platil len na časť položiek
+  a `override_class_key` taký zápis odmieta, takže ho karta ani nesmie ponúkať. **Nosnosť** v rozpise balenia **nie je
+  a byť nesmie**: vydáva ju výhradne recept (Astra #20 F11) a nákupná voľba setu ju nikdy nezvyšuje — stráži to vlastná
+  mutácia sady. **Explain** je jediný existujúci (`HardwareSets.explain`, ten istý, z ktorého žije nákupný riadok D-92
+  aj súpis) — žiadny druhý výklad, žiadny nový snapshot a žiadny prepočet pri otvorení karty (Astra #20 N16); kontext sa
+  stavia raz pre celý payload a lenivo, až pri prvej klasifikovanej zásuvke.
+  **Vedomé odchýlky.** Texty „Set pre túto skrinku" / „Set pre toto čelo" z package sú v **tooltipe** selectu, nie ako
+  nový viditeľný nadpis riadku — vertikálny priestor panela je vzácny a riadok kovania už popisok má. Karta čela ostáva
+  bez výberu setu a len naň **ukazuje** vetou („Set výsuvu vyberieš v kontexte Kovanie — pri riadku tohto čela."), lebo
+  výber patrí k položke kovania, nie ku klasifikácii čela; veta pre dvierka sa zmenila na KOV-F (závesové položky
+  nenesú `opening_mode`).
+  **Testy.** `tests/pure/test_kovd1b_ui.rb` (15 testov: ponuka per trieda, rodiny, neaktívny set, riadky Pravidiel,
+  token hodnoty, texty, rozsahy karty, zmiešané triedy, charakterizácia, explain) a `tests/js/test_kovd1b_ui.js`
+  (38 assertov: render riadkov do existujúcej tabuľky, payload odoslania, `disabled` uložená voľba, ponuka karty).
+  **Päť mutácií** overených ručne (filter otvárania · neaktívny set · pevná voľba namiesto rodiny · nosnosť v balení ·
+  generický kľúč v karte) plus tri v JS (ID namiesto hodnoty · `disabled` · chýbajúci `mapping_key`).
+  Headless **3174**, JS **91 sád**.
+
 - **KOV-D1a — MAPOVANIE, JADRO: VLASTNÝ KIT PRE JEDNO ČELO, TRIEDNE ZÁPISY, SCHÉMA 6 (v0.9.34, 6.9.2026).**
   Prvý rez package KOV-D v2 (checkpoint #20, PR #307) — **serverové jadro bez UI**; ovládanie v paneli prináša D1b.
   **Čo z toho má používateľ.** (1) Výber setu **pre konkrétne čelo** sa konečne uplatní: doteraz akcia zapísala generický

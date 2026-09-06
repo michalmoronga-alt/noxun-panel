@@ -819,11 +819,18 @@ Obsah karty skladá **čistý view-model `frontCardModel(item, slots)`** (core.j
 platný typ D-18, preto musí ostať voliteľný; popisky sú krátke, plný názov nesie `title`) + **kontextové riadky `.prow`**: „Smer" (Ľavé · **Neurčené ⚠** · Pravé) pri slote
 `single` · „Krídlo 2/3" (resp. 2/4 a 3/4) **per stredné krídlo** pri slotoch `p2`/`p3` — *vedomé rozšírenie mockupu, variant a z BLOCKERA 2* · „Otváranie" (Klasické · Tip-On) na
 pohyblivých typoch · „Konštrukcia" + „Zásuvka" pri zásuvkovom čele · blenda a „Bez čela" majú len vetu, prečo ovládače nemajú. Riadky Závesy a zámky osí sú **KOV-D**, nie tu;
-karta to hovorí jednou vetou („Set kovania podľa otvárania príde s KOV-D."), než aby ponúkala voľbu bez účinku.
+karta to hovorí jednou vetou, než aby ponúkala voľbu bez účinku — **od KOV-D1b vetvenou podľa typu**: zásuvkové čelo ukazuje na miesto, kde sa výber naozaj robí („Set výsuvu
+vyberieš v kontexte Kovanie — pri riadku tohto čela."), dvierka ostávajú pri prísľube („Set závesov podľa otvárania príde s KOV-F." — závesové položky nenesú `opening_mode`,
+preto potrebujú dvojsegmentový hinge resolver). Výber setu patrí k **položke kovania**, nie ku klasifikácii čela, takže sa do karty čela nepresúva.
 
 **RIADOK VYRIEŠENEJ ZÁSUVKY (KOV-C2c).** Pod klasifikáciou stojí **jediný read-only riadok** — „Atira · H70 · NL 470 · 30 kg · SiSy · recept v1" (Quadro namiesto H-variantu
 menuje **výšku boxu**). Vertikálny priestor panela je vzácny, preto to **nie je blok**: vety receptu („potrebná svetlá výška od…", „rad 350–520 mm, potrebná svetlá hĺbka…")
-žijú v **rozbaliteľnom** `<details>` „Technický detail". Chipy zámkov osí (mockup scéna 1) sem **nepatria** — sú KOV-D; ručný zámok dĺžky priznáva len veta pod riadkom.
+žijú v **rozbaliteľnom** `<details>` „Technický detail". Chipy zámkov osí (mockup scéna 1) sem **nepatria** — sú KOV-D2b; ručný zámok dĺžky priznáva len veta pod riadkom.
+
+**KOV-D1b doplnil do TOHO ISTÉHO rozkliku „čo je v balení"** — za vety receptu pribudne „Balenie: &lt;názov setu&gt;", riadok každého člena („· K-sada 357696 — Súprava Atira 470
+biela (1 ks)") a pri probléme priznaný dôvod („Bez kódu: …"). Žiadny nový blok a **žiadny druhý explain**: zdrojom je **jediný existujúci rozpis** `HardwareSets.explain`, ten
+istý, z ktorého žije nákupný riadok D-92 aj súpis — panel a súpis sa rozísť nesmú. **NOSNOSŤ v balení nie je a byť nesmie**: vydáva ju výhradne recept (riadok „Nosnosť bunky"
+z `explain_stored`) a nákupná voľba setu ju nikdy nezvyšuje (Astra #20 F11). Bez kontextu (nedostupný stav setov) sa **nedopisuje nič**.
 
 Zdroj je **výhradne server**: `cabinet_payload` posiela `front_drawer` (nižšie, odsek `payloads.rb`) a karta z klasifikácie ani z `config.hardware` **nič neodvodzuje** — keby si
 text skladala sama, pri fail-closed zásuvke by tvrdila, že zásuvka existuje. Stavy: `ok` → riadok + detail (+ jantárový riadok pri odporúčaní synchronizácie) · `conflict` →
@@ -1313,7 +1320,9 @@ položka výsuvu `source: 'recipe'` (legacy `slide` sa za recept **nevydáva**) 
 s vetou **stavby** (panel žiadnu vlastnú neskladá); `config_schema < DRAWER_ACTIVATION_SCHEMA` dá `state: 'stale'`; inak `pending`. `sync` sa viaže na **konkrétne čelo** cez
 `warnings[].data.front_id`, nie na skrinku. Vety detailu skladá `Recipes.explain_stored(params)` z uložených parametrov a **pripnutého** receptu (nie z prepočítanej geometrie);
 neznámy alebo nečitateľný recept vráti **prázdny zoznam** — karta radšej nekreslí nič, než by tvrdila číslo, ktoré nevie dokázať. Zlyhanie kdekoľvek tu vráti `{}`, takže
-karta čela nikdy nespadne kvôli riadku zásuvky.
+karta čela nikdy nespadne kvôli riadku zásuvky. **KOV-D1b** pripája k detailu ešte vety „čo je v balení" (`drawer_buy_lines` → `item_purchase` → `HardwareSets.explain`);
+kontext (stav setov + mapa kód → položka katalógu) sa stavia **raz pre celý payload** (`drawer_buy_ctx`, lenivo — až pri prvej klasifikovanej zásuvke), nie per čelo, a keď
+chýba, detail ostáva presne taký, aký bol v C2c.
 
 **`hardware_set_options` a owner výbery (KOV-D1a).** Typ kovania z kľúča override mapy aj rozpoznanie „výberu na úrovni vlastníka" idú cez **jediné autority**
 `HardwareSets.mapping_key_type` a `owner_scoped_key?` — nie cez `BuildPlan.parse_hardware_set_key`, ktorý pre `class:` kľúče vracia `nil`. Bez toho by karta čela pri
@@ -1322,6 +1331,16 @@ owner **triednom** override (`class:slide|…@front:F1/panel`) ukázala prázdny
 **Emituje sa LEN kľúč, ktorý resolver pre ten dielec naozaj číta** (Codex #308 kolo 2 P2): owner triedny kľúč zhodný s **aktívnou** triedou položky (`active_class_by_owner`
 z `config.hardware`), a legacy `typ@owner` iba tam, kde položka klasifikáciu nemá. Bez toho by po zmene otvárania či konštrukcie karta ukázala **dormantný** výber starej
 triedy ako vybraný a mazanie by cielilo na iný kľúč. Poškodená hodnota sa priznáva príznakom `invalid` — karta nesmie ukázať prázdny select ani hodnotu z nižšej úrovne.
+
+**KOV-D1b — `compat`: PONUKA pre klasifikovanú zásuvku.** K záznamu typu pribudol kľúč `compat` (`nil` = typ klasifikovanú položku nemá a karta kreslí pôvodný plochý zoznam
+setov). Nesie **hotový rozsah** pre celú skrinku (`cab`) a pre **každé čelo** (`owners[owner_part_key]`): `class_key` · `class_label` · `scope_label` („Set pre túto skrinku" /
+„Set pre toto čelo") · `none_label` (čo platí BEZ vlastného výberu — na čele priznáva, či hodnota prichádza zo **skrinky** alebo z **projektu**, poradie ako
+`resolve_set_id`) · `options` (`HardwareSets.class_set_options` — len kompatibilné, neaktívne nikdy) · `current` (ID uloženej voľby, keď je v ponuke) · `stored` + `value_text`
+(uložená hodnota **mimo** ponuky — zobrazí sa ako `disabled`, vybrať sa nedá; F10). **Skrinkový rozsah vzniká len pri JEDNEJ triede** — pri zmiešaných triedach by jeden kľúč
+platil len na časť položiek a `override_class_key` taký zápis odmieta, takže ho karta ani nesmie ponúkať. Efektívna projektová hodnota sa číta pod **triednym** kľúčom, nikdy
+pod generickým (resolver ho pre takú položku nečíta). **Kľúč sa v paneli neskladá:** JS pošle existujúcou akciou `set_hardware_set` buď `set_id` (pevný set), alebo `value`
+(selektor rodiny), a kľúč z toho zloží `HardwareSets.apply_cabinet_override` (D1a). Neznáme ID sa **neodosiela** vôbec. Testy: `tests/pure/test_kovd1b_ui.rb`,
+`tests/js/test_kovd1b_ui.js`.
 
 ### resolvers.rb
 
@@ -2270,6 +2289,15 @@ zapamätaná veľkosť okna, ktoré už neexistuje, a SketchUp ho nikdy nepouži
 pribalil a jeden krok Späť by vrátil OBA), a bezpodmienečný `abort_operation` v `handle_merge_seed` mohol naopak zrušiť zápis, ktorý už bol commitnutý.
 
 **Odmietnutý `reset_project` ide na `resync_sets`**, nie na plný push — nič sa nezapísalo.
+
+**KOV-D1b — MAPOVANIE PODĽA TRIEDY v Predvoľbách projektu.** Zásuvka sa nemapuje podľa generického typu `slide` (resolver ho pre klasifikovanú položku nečíta), ale podľa
+**triedneho kľúča**. `sets_payload` preto nesie `class_rows = { project: [...], global: [...] }` — **hotové riadky** pre všetky `HardwareSets::CLASS_MAPPING_KEYS`
+(= kľúče `MAPPING_ADDITIONS`, jediný zoznam): popisok, `options` (`class_set_options` — len kompatibilné, neaktívne nikdy), `current`, `stored` + `value_text` (uložená hodnota
+mimo ponuky = `disabled`, F10) a `none_label` **„— bez setu (RED — zásuvka bez kitu)"** (nenamapovaná klasifikovaná zásuvka je fail-closed RED `drawer_kit_missing`, nie ORANGE
+ako ostatné kovanie). JS ich kreslí do **tej istej tabuľky** `.hwsmap` za generické typy — žiadny nový blok ani nadpis (vertikálny priestor je vzácny) — a nefiltruje ani
+neprekladá nič. Zápis ide **existujúcimi** handlermi `handle_map_project`/`handle_map_global`: payload nesie nové pole **`mapping_key`** (starý tvar `generic_type` ostáva
+funkčný), typ pre kontrolu setov číta `HardwareSets.mapping_key_type` a triedu proti hodnote validuje `class_key_value_problem` v `set_*_mapping!`. Editor pásiem sa pre triedne
+riadky **neponúka** — hodnotou je vždy celá voľba z ponuky (pevný set alebo rodina), takže sa nedá zostaviť selektor, ktorý by triede nesedel.
 
 ### rules_dialog.rb
 
