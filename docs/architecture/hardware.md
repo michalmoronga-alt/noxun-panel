@@ -337,6 +337,9 @@ nepozná, takže mu z toho istého kľúča vyjde neznámy typ a prestavbu zablo
 povyšuje na **RED `drawer_kit_missing`** (`unmapped_entry`), pôvodný dôvod cestuje v `base_reason` a text skladá `unmapped_reason_sk` z NEHO (žiadny druhý preklad tých istých
 príčin). Dôvod: dielce sú už postavené na konkrétnu NL — chýbajúci kit nie je „nenacenené kovanie", ale **nevyrobiteľná** objednávka, preto blokuje aj VEPO.
 `note_manual` berie `locked: true` ako dnešné `source: 'manual'` (dĺžka je ručne určená); bez zámku receptová položka znamienko NEMÁ (Astra #19 N11).
+**KOV-C2c (v0.9.33)** k tomu pridáva aditívny príznak **`blocks_export: true`** na TOM ISTOM zázname: sekcia Nákup z neho kreslí červený riadok namiesto jantárového
+„nenacenené" (detail v [ui-lifecycle.md](ui-lifecycle.md)). Je to **len zobrazovací príznak** — bránu exportu drží ďalej `ProductionCore.export_blockers` nad
+`Recipes::DRAWER_BLOCKERS`; nákupný CSV kontrakt sa nemení.
 
 **KOV-C2a (v0.9.30) — TRIEDNY KĽÚČ SA ZAČAL ČÍTAŤ, `height_variant`, `MAPPING_ADDITIONS`, `std` 4.** Príprava aktivácie zásuviek: mení sa výber setu pre položku, ktorá nesie
 klasifikáciu zásuvky, ale **žiadne dnešné pravidlo ju nenesie**, takže výstupy existujúcich zákaziek boli CONTENT-identické (stráži to golden `seed_kniznica` aj vlastný
@@ -560,6 +563,11 @@ klasifikovanú zásuvku, takže v .skp **nie sú** receptové dielce a výsuv je
 **`supported_thicknesses(system)` / `thickness_ok_for_system?`** = čisté funkcie nad najnovším vydaným receptom systému: **PRIENIK** `thickness_supported` cez všetky roly
 (jeden materiálový kanál kŕmi všetky roly naraz, takže hrúbka dobrá len pre dno by pri Quadre padla na boku). Atira → `[16]`, Quadro V6 → `[16, 18]`. Číta ich preflight
 projektovej predvoľby zásuviek ([materials.md](materials.md)); neznámy systém = `[]`, teda fail-closed.
+
+**`explain_stored(params)` (KOV-C2c, v0.9.33)** = vety „prečo práve tieto čísla" pre **kartu čela**. `resolve` skladá `explain` počas stavby, ale plán ho nenesie a do configu
+sa neukladá (schéma sa v C2c nemení), preto sa detail skladá **znova** — a to výhradne z toho, čo sa dá **dokázať**: z uložených `params` položky výsuvu a z **pripnutého**
+receptu (`load(params['recipe_id'])`). Preto sú vety **užšie** než `explain` v `resolve`: svetlé rozmery skrinky sa neukladajú, takže sa netvrdia. Neznámy alebo nečitateľný
+recept vráti **prázdny zoznam** — karta radšej nekreslí nič, než by ukázala vymyslené číslo. Čistá funkcia (číta len dátový pack), takže je headless testovateľná.
 
 **Dve vrstvy, jedna zodpovednosť každá:** fyzika (rozmery dielcov, výšky, rad NL) žije v **recepte**, objednávacie kódy v **setoch** (`hardware_sets`). Nákup nikdy nemení
 fyzický návrh: rad NL v recepte = rad, ktorý Noxun reálne kupuje, žiadni kandidáti ani fallback. **EB je pevné per recept** (Atira 10,5 · Quadro V6 23) — zmena hrúbky boku

@@ -17,6 +17,43 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-C2c — UI ZÁSUVIEK: KARTA V INSPECTOROVI, ZASTAVUJÚCI RIADOK V NÁKUPE (PR #306, v0.9.33, 6.9.2026): SLICE C KOMPLET.**
+  Posledný rez KOV-C — čisto zobrazovacia vrstva nad tým, čo #304 a #305 už postavili. Žiadna zmena builderov, plánu, schémy,
+  receptov ani setov; všetko, čo pribudlo, je **čítanie** existujúceho configu.
+  **Čo z toho má používateľ.** (1) **Karta zásuvkového čela konečne povie, čo vzniklo:** pod klasifikáciou stojí jediný
+  read-only riadok „Atira · H70 · NL 470 · 30 kg · SiSy · recept v1“ (Quadro namiesto výškového variantu ukáže výšku boxu)
+  a pod ním rozbaliteľný **Technický detail** s vetami receptu („potrebná svetlá výška od 105 mm“, „rad 350–520 mm, potrebná
+  svetlá hĺbka 485 mm“). (2) **Zásuvka bez riešenia namiesto hodnôt ukáže červenú vetu, prečo** sa nedá postaviť — tú istú,
+  ktorú hlási Kontrola. (3) Široká Tip-On zásuvka dostane **jantárový** riadok s odporúčaním synchronizácie. (4) Skrinka
+  uložená pred aktiváciou receptov povie „prestav skrinku“. (5) V **Nákupe** je zásuvka s postavenými dielcami, ku ktorej sa
+  nenašiel kit, **červená** — s vetou, že sú zastavené všetky exporty vrátane VEPO (dovtedy splývala s jantárovým
+  „nenacenené“).
+  **Ako je to postavené.** `cabinet_payload` posiela **nový vlastný kanál** `front_drawer` (`front_id → { state, text,
+  detail[], sync, message, locked_note }`). Do `front_slots` sa zámerne nezlučuje — ten odpovedá výhradne na otázku „kde sa
+  pýta smer“. Server je jediná autorita: panel z klasifikácie ani z `config.hardware` nič neodvodzuje a text neskladá, inak
+  by pri fail-closed zásuvke tvrdil, že zásuvka existuje. Stavy: `ok` (položka výsuvu `source: 'recipe'` — legacy `slide` sa
+  za recept **nevydáva**) · `conflict` (veta zo `drawer_conflicts`, **nahrádza** hodnoty) · `stale` (`config_schema` pod
+  `DRAWER_ACTIVATION_SCHEMA`) · `pending` (mlčí). `sync` sa viaže na konkrétne čelo cez `warnings[].data.front_id`.
+  **Vety detailu nevznikli uložením `explain`** — plán ho nenesie a schéma sa v C2c nemení. `Recipes.explain_stored(params)`
+  ich skladá znova z uložených parametrov a **pripnutého** receptu, takže sú užšie než `explain` v `resolve`: svetlé rozmery
+  skrinky sa neukladajú, preto sa netvrdia. Neznámy alebo nečitateľný recept vráti prázdny zoznam — karta radšej nekreslí
+  nič, než by ukázala číslo, ktoré nevie dokázať. V Nákupe nesie závažnosť **server**: `HardwareSets.unmapped_entry` pridal
+  aditívny `blocks_export`, klient enum dôvodov nepozná. Je to len zobrazovací príznak — bránu exportu drží ďalej
+  `ProductionCore.export_blockers` a CSV kontrakt sa nemení.
+  **KROK 0 ušetril polovicu dávky.** Kontrola už RED aj ORANGE riadky zásuviek mala (#304) a preklik na čelo tiež —
+  ceruzka pri náleze, ktorého `part_key` je kľúč **panela čela**, vyberie skrinku a otvorí kartu toho čela (KOV-A2b
+  deep-link, `front:<id>/panel` je presne ten tvar). Značka ručného zámku v Nákupe funguje od #304 (`note_manual` číta
+  `locked: true`) a materiálový kanál „Zásuvky“ aj D-46 preflight priniesol #305 — overené 1:1 proti mockupu, bez zmeny.
+  Dávka teda urobila len to, čo naozaj chýbalo.
+  **Vedomé odchýlky.** Chipy zámkov osí z mockupu scény 1 sa **nerobili** (KOV-D) — ručný zámok priznáva len veta pod
+  riadkom; ikona je zo sprite (`alert`), nikdy emoji; CSS je scopnuté pod `.nx-inspector .fcard` a používa výhradne tokeny
+  `--nx-*`. **Odložené na KOV-D:** highlight riadku Kontroly, UI mapovaní podľa klasifikácie, farbenie ABS hrán dielcov
+  zásuviek (`axes:`) a `owner_label` namiesto surového `part_key` v zozname „Bez kódov“ Nákupu.
+  **Testované:** 3125 headless (bolo 3100 — nová sada `test_kovc2c_karta.rb`, 25 testov) a 90 JS sád, každá zvlášť
+  (nová `test_kovc2c_karta.js`, 53 assertov). Päť mutácií zhodilo testy: ignorovaný konflikt · `drawer_item_for` bez
+  kontroly `source` · `sync` ignorujúci `front_id` · nenastavený `blocks_export` · `explain_stored` bez fail-safe.
+  In-SketchUp beh sa **nespúšťal** — dávka nemení buildery ani observery, celá zmena je čítacia UI vrstva.
+
 - **KOV-C2b-M — MATERIÁLOVÝ KANÁL ZÁSUVIEK: VÝBER V ŠTÚDIU, PREFLIGHT PER SYSTÉM, HROMADNÉ CESTY (PR #305, v0.9.32, 6.9.2026):** odrezaná polovica PR #304. Po **4. kole**
   review priniesli oba P1 nálezy UI a hromadné cesty 4. materiálového kanála (nie aktiváciu samotnú), takže Michal podľa **pravidla 3 kôl** rozhodol PR rozdeliť: #304
   zostal aktiváciou v engine (v0.9.31), kanál dostal vlastnú dávku. Vetva stojí na #304 a mergne sa hneď po ňom.

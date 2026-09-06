@@ -70,6 +70,10 @@ module Noxun
           # kresli VYHRADNE to, co je tu. Cista projekcia nad ulozenym
           # `front_items` (ziadny zapis, ziadny prepocet planu).
           params['front_slots'] = front_slots_payload(cfg['front_items'])
+          # KOV-C2c: RIADOK ZASUVKY karty cela (system · vyska · NL · nosnost ·
+          # otvaranie · recept, alebo RED dovod / ORANGE sync). Vlastny kluc —
+          # `front_slots` odpoveda VYHRADNE na otazku „kde sa pyta smer".
+          params['front_drawer'] = front_drawer_payload(cfg)
           # svetle (available) rozmery — view-only kontrola pre pouzivatela
           params['available_width'] = cfg['available_width']
           params['available_height'] = cfg['available_height']
@@ -261,6 +265,119 @@ module Noxun
             out[fid] = { 'wings_n' => (wn.positive? ? wn : nil), 'slots' => slots }
           end
           out
+        end
+
+        # --- KOV-C2c: RIADOK ZASUVKY v karte cela -----------------------------
+        #
+        # Mapa `front_id => zaznam` pre cela, ktore su KLASIFIKOVANE ako zasuvka
+        # (`Recipes.classified?`). Karta z nej kresli JEDEN read-only riadok —
+        # ziadny novy vertikalny blok (vertikalny priestor panela je vzacny).
+        #
+        # SERVER je jedina autorita: text riadku aj vety detailu sa skladaju TU,
+        # panel ich len vypise (`esc`). Vsetko je CITACIE — ziadny zapis, ziadna
+        # zmena schemy; zdroje su ULOZENY config (polozka vysuvu `source:
+        # 'recipe'`, `drawer_conflicts`, `warnings`) a datovy pack receptov.
+        #
+        # Stavy zaznamu (`state`):
+        #   'ok'       — zasuvka je vyriesena; `text` = zhrnutie, `detail` = vety
+        #                receptu (rozbalitelne), `sync` = ORANGE odporucanie
+        #   'conflict' — fail-closed dovod zo stavby; `message` = veta stavby
+        #   'stale'    — skrinka je ulozena PRED aktivaciou receptov (schema < 5),
+        #                takze polozka vysuvu v configu chyba; naprava = prestavba
+        #   'pending'  — klasifikovane celo bez polozky aj bez dovodu (napr.
+        #                konstrukcia, ktoru recepty neriesia) — karta mlci
+        DRAWER_SYNC_CODE = 'drawer_sync_recommended'
+
+        def front_drawer_payload(cfg)
+          return {} unless defined?(Recipes)
+
+          out = {}
+          Array(cfg['front_items']).each do |it|
+            next unless it.is_a?(Hash) && Recipes.classified?(it)
+
+            fid = it['id'].to_s
+            next if fid.empty?
+
+            out[fid] = drawer_card_row(cfg, fid)
+          end
+          out
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.front_drawer_payload')
+          {}
+        end
+
+        def drawer_card_row(cfg, fid)
+          conflict = drawer_conflict_for(cfg, fid)
+          return { 'state' => 'conflict', 'message' => conflict['message'].to_s } if conflict
+
+          hw = drawer_item_for(cfg, fid)
+          if hw.nil?
+            return { 'state' => 'stale' } if drawer_stale_cfg?(cfg)
+
+            return { 'state' => 'pending' }
+          end
+          params = hw['params'].is_a?(Hash) ? hw['params'] : {}
+          row = { 'state' => 'ok', 'text' => drawer_row_text(params),
+                  'detail' => Recipes.explain_stored(params) }
+          row['locked_note'] = 'Dĺžka výsuvu je ručne zamknutá (Inspector → Kovanie).' if hw['locked'] == true
+          sync = drawer_sync_note(cfg, fid)
+          row['sync'] = sync if sync
+          row
+        end
+
+        # Zhrnutie do JEDNEHO riadku: „Atira · H70 · NL 470 · 30 kg · SiSy ·
+        # recept v1". Kazdy udaj pochadza z ULOZENYCH `params` polozky vysuvu —
+        # nic sa nedopocitava a chybajuci udaj sa VYNECHA (nikdy sa nehada).
+        def drawer_row_text(params)
+          p = params.is_a?(Hash) ? params : {}
+          parts = []
+          sys = Recipes.system_label(p['system'])
+          parts << sys unless sys.empty?
+          parts << "H#{p['height_variant'].to_i}" if p['height_variant'].is_a?(Numeric)
+          parts << "box #{Recipes.fmt(p['box_height'])} mm" if p['box_height'].is_a?(Numeric)
+          parts << "NL #{Recipes.fmt(p['nominal_length'])}" if p['nominal_length'].is_a?(Numeric)
+          parts << "#{Recipes.fmt(p['load'])} kg" if p['load'].is_a?(Numeric)
+          parts << (p['opening'].to_s == 'p2o' ? 'Tip-On' : 'SiSy') unless p['opening'].to_s.empty?
+          ver = Recipes.parse_id(p['recipe_id'].to_s)
+          parts << "recept v#{ver[:version]}" if ver
+          parts.join(' · ')
+        end
+
+        # Polozka vysuvu Z RECEPTU pre dane celo. Identita je `owner_part_key`
+        # panela cela + `source: 'recipe'` — legacy `slide` polozka (stara
+        # zakazka) sa VEDOME neberie, karta by o nej tvrdila cisla receptu.
+        def drawer_item_for(cfg, fid)
+          owner = PartKeys.front(fid, 'panel')
+          Array(cfg['hardware']).find do |h|
+            h.is_a?(Hash) && h['owner_part_key'].to_s == owner &&
+              h['source'].to_s == BuildPlan::HW_SOURCE_RECIPE
+          end
+        end
+
+        def drawer_conflict_for(cfg, fid)
+          Array(cfg['drawer_conflicts']).find do |c|
+            c.is_a?(Hash) && c['front_id'].to_s == fid && !c['message'].to_s.strip.empty?
+          end
+        end
+
+        # ORANGE odporucanie synchronizacie (P2O nad prahom sirky). Warning je
+        # v `cfg['warnings']` a nesie `data.front_id` — viaze sa teda na KONKRETNE
+        # celo, nie na skrinku.
+        def drawer_sync_note(cfg, fid)
+          w = Array(cfg['warnings']).find do |x|
+            next false unless x.is_a?(Hash) && x['code'].to_s == DRAWER_SYNC_CODE
+
+            d = x['data'].is_a?(Hash) ? x['data'] : {}
+            d['front_id'].to_s == fid
+          end
+          w && !w['message'].to_s.strip.empty? ? w['message'].to_s : nil
+        end
+
+        # Skrinka ulozena PRED aktivaciou receptov (`Bom.drawer_stale_issue` robi
+        # z toho RED nalez) — karta ma povedat to iste, len kratsie.
+        def drawer_stale_cfg?(cfg)
+          defined?(CabinetBuilder) &&
+            CabinetBuilder.config_schema_of(cfg) < CabinetBuilder::DRAWER_ACTIVATION_SCHEMA
         end
 
         # V0.6 D-92: polozky kovania pre panel. Aditivne k ulozenemu configu:

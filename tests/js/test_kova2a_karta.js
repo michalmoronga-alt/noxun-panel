@@ -294,6 +294,7 @@ Object.keys(C).forEach(k => { global[k] = C[k]; });
 global.FRONT_PROFILES = [];
 global.frontItems = null;
 global.frontSlots = null;
+global.frontDrawer = null;   // KOV-C2c: riadok zasuvky karty (druhy serverovy kanal)
 global.selectedCabId = null;
 global.applyTimer = null;
 // Cudzie zavislosti riadku (rady rozmerov, vyrazy, materialy, informacny stlpec).
@@ -328,7 +329,7 @@ const FM = require(path.join(JS, 'form.js'));
 const rows = mkEl('div');
 rows.attrs.id = 'frontRows';
 DOC.body.appendChild(rows);
-function resetRows(){ rows.children = []; global.frontSlots = null; }
+function resetRows(){ rows.children = []; global.frontSlots = null; global.frontDrawer = null; }
 function rowOf(fid){
   return rows.querySelectorAll('.frow').find(r => r.dataset.frontId === fid);
 }

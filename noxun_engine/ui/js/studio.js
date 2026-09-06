@@ -481,6 +481,25 @@
     var txt = parts.length ? parts.join(' · ') : '—';
     return txt + ((isFinite(q) && q > 0) ? ' ×' + q : '');
   }
+  // ---- KOV-C2c: nemapovaná položka, ktorá ZASTAVUJE exporty ---------------
+  // Príznak nesie SERVER (`blocks_export` z `HardwareSets.unmapped_entry`) —
+  // klient nepozná enum dôvodov a závažnosť neurčuje na druhom mieste.
+  // Čisté funkcie (Node testy).
+  function hwRowStops(u){ return !!(u && u.blocks_export === true); }
+  function hwStopCount(list){
+    return (list || []).filter(hwRowStops).length;
+  }
+  // Veta nad tabuľkou — bez nej by červené riadky vyzerali ako ostatné
+  // „nenacenené" a nebolo by vidieť, že sa nevytvorí ANI VEPO.
+  function hwStopNoteHtml(list){
+    var n = hwStopCount(list);
+    if (!n) return '';
+    return '<div class="hwbanner hwbanner-stop">' + num(n) + '× zásuvka má postavené dielce, '
+         + 'ale nákup k nej nenašiel kit. Dielce sú narezané na konkrétnu dĺžku výsuvu — bez kitu '
+         + 'sa nedajú vyrobiť, preto sú zastavené VŠETKY exporty vrátane VEPO. Nápravu menuje '
+         + 'sekcia Kontrola pri každom červenom riadku.</div>';
+  }
+
   function hwSourcesHtml(r){
     var list = (r && r.sources) || [];
     if (!list.length){
@@ -537,6 +556,7 @@
         // ŠT-1c: pôvodný text hovoril „detail v tabe Kontrola" — Kontrola je od
         // ŠT-1b SEKCIA tohto okna, takže by veta klamala o mieste.
         h += '<div class="hwsec hwsec-warn"><span>Bez kódov (' + un.length + ') — nenacenené, detail v sekcii Kontrola</span></div>'
+           + hwStopNoteHtml(un)
            + '<table class="bomtab hwtab"><tbody>';
         un.forEach(function(u){
           // H1b: krátky SK text dôvodu skladá SERVER (HardwareSets.unmapped_reason_sk
@@ -549,7 +569,11 @@
           // `length_unsupported` ho tam má, aby ho videl aj panel, ktorý
           // params_label nepripája) — vtedy sa NEpridáva druhýkrát.
           if (u.params_label && reason.indexOf(u.params_label) === -1) reason += ' · ' + u.params_label;
-          h += '<tr class="hwmiss"><td>' + esc(u.generic_type) + '</td>'
+          // KOV-C2c: položka, ktorá ZASTAVUJE exporty (dielce zásuvky sú už
+          // narezané na konkrétnu NL), je červená — nie jantárová „nenacenené".
+          // Rozhoduje SERVEROVÝ príznak `blocks_export`, nie enum dôvodu v JS.
+          h += '<tr class="hwmiss' + (hwRowStops(u) ? ' hwstop' : '') + '">'
+             + '<td>' + esc(u.generic_type) + '</td>'
              + '<td>' + esc(u.cabinet_id + (u.owner_part_key ? ' · ' + u.owner_part_key : '')) + '</td>'
              + '<td>' + num(u.quantity) + '</td><td>' + esc(reason) + '</td></tr>';
         });
@@ -1833,6 +1857,8 @@
       buySection: buySection, price: price, hwManualMark: hwManualMark,
       // KOV-H2: chip „ručná" + rozklik pôvodu (tests/js/test_kovh2_adhoc_ui.js)
       hwRowManual: hwRowManual, hwSourceText: hwSourceText, hwSourcesHtml: hwSourcesHtml,
+      // KOV-C2c (tests/js/test_kovc2c_karta.js): zastavujuce nemapovane polozky.
+      hwRowStops: hwRowStops, hwStopCount: hwStopCount, hwStopNoteHtml: hwStopNoteHtml,
       setBuyOpen: function(m){ buyOpen = m || {}; },
       // Š10 prepinace (sady D-104 / D-105 / K2 / ABS rail 3-stav)
       edgeCheckBarHtml: edgeCheckBarHtml, edgeCheckText: edgeCheckText,

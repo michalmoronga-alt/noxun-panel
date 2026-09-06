@@ -576,6 +576,64 @@ module Noxun
         recipe[:opening] == 'p2o' && clear_width.to_f >= recipe[:sync_min_width].to_f
       end
 
+      # --- KOV-C2c: vety „preco prave tieto cisla" pre KARTU zasuvky -----------
+      #
+      # `resolve` sklada `explain` POCAS stavby a plan ho NENESIE (do configu sa
+      # neuklada — schema sa v C2c nemeni). Karta cela ho preto sklada NANOVO
+      # z dvoch zdrojov, ktore UZ MA: z ULOZENYCH `params` polozky vysuvu
+      # (system, vyska, NL, nosnost, recept) a z PRIPNUTEHO receptu. Ziadny
+      # prepocet geometrie, ziadne citanie modelu, ziadny zapis — cista funkcia
+      # nad datovym packom, takze sa da testovat headless.
+      #
+      # Vety su UZSIE nez `explain` v `resolve`: uvadzaju len to, co sa da
+      # z ulozeneho stavu DOKAZAT (svetle rozmery skrinky sa neukladaju, preto
+      # sa netvrdia). Nenacitatelny alebo neznamy recept = PRAZDNY zoznam —
+      # karta vtedy detail vobec nekresli (radsej nic nez vymyslene cislo).
+      def explain_stored(params, dir: DIR)
+        p = params.is_a?(Hash) ? params : {}
+        id = p['recipe_id'].to_s
+        return [] if id.empty?
+
+        recipe = load(id, dir: dir)
+        out = ["Recept: #{label(recipe)} (#{id})"]
+        out.concat(explain_height(recipe, p))
+        out.concat(explain_nl(recipe, p))
+        out << "Nosnosť bunky: #{fmt(p['load'])} kg" if p['load'].is_a?(Numeric)
+        out
+      rescue StandardError
+        []
+      end
+
+      # Vyskovy variant (Atira) alebo vyska boxu (Quadro) — kazdy system povie
+      # to svoje a nikdy oboje.
+      def explain_height(recipe, params)
+        hv = params['height_variant']
+        if hv.is_a?(Numeric)
+          v = (recipe[:height_variants] || {})[key_num(hv)]
+          return ["Výška H#{key_num(hv)}"] if v.nil?
+
+          return ["Výška H#{key_num(hv)}: potrebná svetlá výška od #{fmt(v[:min_clear_height])} mm"]
+        end
+        bh = params['box_height']
+        return [] unless bh.is_a?(Numeric)
+
+        clear = recipe[:constants][:box_clearance]
+        ["Výška boxu #{fmt(bh)} mm (svetlá výška zóny − vôľa #{fmt(clear)} mm)"]
+      end
+
+      # NL: rad TEJ vysky + minimalna svetla hlbka, ktoru zvolena NL potrebuje.
+      def explain_nl(recipe, params)
+        nl = params['nominal_length']
+        return [] unless nl.is_a?(Numeric)
+
+        hv = params['height_variant']
+        series = series_for(recipe, hv.is_a?(Numeric) ? hv : nil)
+        rng = series.empty? ? '' : " (rad #{fmt(series.min)}–#{fmt(series.max)} mm)"
+        md = (recipe[:min_depth_by_nl] || {})[key_num(nl)]
+        dep = md ? ", potrebná svetlá hĺbka #{fmt(md)} mm" : ''
+        ["Dĺžka výsuvu NL #{fmt(nl)} mm#{rng}#{dep}"]
+      end
+
       # --- vnutorne ------------------------------------------------------------
 
       # Atira: presne 2 vyrabane dielce — dno + dreveny chrbat.
