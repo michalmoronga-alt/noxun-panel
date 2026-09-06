@@ -189,13 +189,20 @@
   // `disabled` overridy, ktorym uz nezodpoveda ziadna polozka (evaluate ju
   // vyradil) — presne ta ista podmienka ako doteraz, len vytiahnuta zvlast,
   // aby sa dala zaradit do boxu vlastnika (a testovat bez DOM).
+  // KOV-C2b (Codex #304 P1): o tom, ktory rucny zasah je OSIROTENY, rozhoduje
+  // SERVER (`orphan` v payloade) — len on vidi aj ulozene `drawer_conflicts`.
+  // Fallback (payload bez kluca) je povodne pravidlo D-92: vypnuta kategoria
+  // bez zodpovedajucej zivej polozky.
   function hwDisabledOffs(items, overrides){
     var present = {};
     (items || []).forEach(function(it){
       if (it) present[hwKey(it.owner_part_key, it.generic_type, it.rule_id)] = true;
     });
     return (overrides || []).filter(function(ov){
-      if (!ov || ov.disabled !== true) return false;
+      if (!ov) return false;
+      if (ov.orphan === true) return true;
+      if (ov.orphan !== undefined) return false;
+      if (ov.disabled !== true) return false;
       return !present[hwKey(ov.owner_part_key, ov.generic_type, ov.rule_id)];
     });
   }
@@ -414,17 +421,39 @@
       + hwBuyHtml(it.purchase)
       + '</div>';
   }
-  // Vypnuta kategoria (disabled override bez zodpovedajucej polozky).
+  // Osiroteny rucny zasah: „vypnuté" (D-92) alebo „neplatný ručný zásah"
+  // (KOV-C2b — celo so systemom skoncilo konfliktom, polozka NEVZNIKLA).
+  // Prvy sa OBNOVUJE (zrusi sa pole `disabled`), druhy sa CELY ZRUSI: zaznam
+  // moze niest pocet aj zamok naraz a po konflikte nema co z neho zostat.
+  function hwOffLabel(ov){
+    if (ov && ov.orphan_kind === 'part_material') return 'neplatný ručný materiál';
+    return (ov && ov.orphan_kind === 'invalid') ? 'neplatný ručný zásah' : 'vypnuté';
+  }
+  // Nazov riadku: server ho pri materialovom override posiela hotovy
+  // (`orphan_label`) — genericky typ kovania taky zaznam nema.
+  function hwOffName(ov){
+    return (ov && ov.orphan_label) ? ov.orphan_label : hwLabel(ov && ov.generic_type);
+  }
   function hwOffHtml(ov, cabId, groupKey){
     var full = ov.owner_label || hwOwnerDesc(ov.owner_part_key); // D-92
     var owner = hwRowOwnerText(groupKey, full);
-    return '<div class="hwrow hwoff" data-owner="'+esc(ov.owner_part_key||'')+'" data-type="'+esc(ov.generic_type)+'" data-rule="'+esc(ov.rule_id)+'" data-cab="'+esc(cabId||'')+'">'
+    var ext = hwOffLabel(ov);
+    var name = hwOffName(ov);
+    var btn;
+    if (ov.orphan_kind === 'part_material'){
+      btn = '<button class="ghostbtn hwbtn" title="Zrušiť ručný materiál (dielec ho zdedí)" onclick="onHwOrphanPartReset(this)">'+NXIcons.svg('rotate-ccw')+' zrušiť</button>';
+    } else if (ov.orphan_kind === 'invalid'){
+      btn = '<button class="ghostbtn hwbtn" title="Zrušiť ručný zásah (obnoví sa výpočet)" onclick="onHwOrphanReset(this)">'+NXIcons.svg('rotate-ccw')+' zrušiť</button>';
+    } else {
+      btn = '<button class="ghostbtn hwbtn" title="Obnoviť (platí pravidlo)" onclick="onHwEnable(this)">'+NXIcons.svg('rotate-ccw')+' obnoviť</button>';
+    }
+    return '<div class="hwrow hwoff" data-owner="'+esc(ov.owner_part_key||'')+'" data-type="'+esc(ov.generic_type||'')+'" data-rule="'+esc(ov.rule_id||'')+'" data-part="'+esc(ov.part_key||'')+'" data-cab="'+esc(cabId||'')+'">'
       // SMOKE PACK 1: nazov je jednoriadkovy s ellipsis, takze plny text MUSI
       // niest `title` — inak by sa orezany popis nedal precitat vobec.
-      + '<span class="hwname" title="'+esc(hwLabel(ov.generic_type)+(full?' · '+full:'')+' · vypnuté')+'">'
-      + esc(hwLabel(ov.generic_type))+(owner?' <span class="hwown">'+esc(owner)+'</span>':'')
-      + ' <span class="hwext">vypnuté</span></span>'
-      + '<button class="ghostbtn hwbtn" title="Obnoviť (platí pravidlo)" onclick="onHwEnable(this)">'+NXIcons.svg('rotate-ccw')+' obnoviť</button>'
+      + '<span class="hwname" title="'+esc(name+(full?' · '+full:'')+' · '+ext)+'">'
+      + esc(name)+(owner?' <span class="hwown">'+esc(owner)+'</span>':'')
+      + ' <span class="hwext">'+esc(ext)+'</span></span>'
+      + btn
       + '</div>';
   }
   // UI-C4: box vlastnika. Hlavicka je TLACIDLO (klavesnica aj citacka) a nesie
@@ -771,6 +800,19 @@
   function onHwDisable(btn){ hwSend(hwPayload(btn, { field: 'disabled', value: true })); }
   function onHwReset(btn){ hwSend(hwPayload(btn, { field: 'quantity', value: null })); }
   function onHwEnable(btn){ hwSend(hwPayload(btn, { field: 'disabled', value: null })); }
+  // KOV-C2b: zrusi CELY zaznam rucneho zasahu (serverova akcia `reset`) —
+  // po nej prestavba konflikt zasuvky uz nevyda.
+  function onHwOrphanReset(btn){ hwSend(hwPayload(btn, { reset: true })); }
+  // KOV-C2b: zrusi OSIROTENY materialovy override dielca zasuvky (vlastna
+  // serverova akcia — dielec po fail-closed konflikte neexistuje, takze sa
+  // neda oznacit a karta dielca na neho nevie).
+  function onHwOrphanPartReset(btn){
+    var row = btn.closest('.hwrow'); if (!row) return;
+    if (window.sketchup && sketchup.reset_part_override){
+      sketchup.reset_part_override(nxDocPayload({
+        cabinet_id: row.dataset.cab || '', part_key: row.dataset.part || '' }));
+    }
+  }
   function onHwNl(sel){
     var v = parseFloat(sel.value);
     if (isNaN(v)){ NX.setStatus('Neplatná dĺžka výsuvu.', true); return; }
@@ -1380,7 +1422,8 @@
       hwGroupKeyOf: hwGroupKeyOf, hwLabelHead: hwLabelHead, hwLabelTail: hwLabelTail,
       hwRowOwnerText: hwRowOwnerText, hwGroupTitle: hwGroupTitle,
       hwGroupCountText: hwGroupCountText, hwGroupOrder: hwGroupOrder,
-      hwGroups: hwGroups, hwDisabledOffs: hwDisabledOffs,
+      hwGroups: hwGroups, hwDisabledOffs: hwDisabledOffs, hwOffLabel: hwOffLabel,
+      hwOffName: hwOffName,
       HW_GROUP_CAB: HW_GROUP_CAB, HW_GROUP_INSIDE: HW_GROUP_INSIDE,
       // SMOKE PACK 1: suhrnne podperky polic (tests/js/test_smoke1_ui.js) —
       // ciste zoskupenie a texty, ziadny DOM.

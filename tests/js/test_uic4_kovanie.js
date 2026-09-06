@@ -6,7 +6,7 @@
 const assert = require('node:assert');
 const path = require('node:path');
 const { hwGroupKeyOf, hwLabelHead, hwLabelTail, hwRowOwnerText, hwGroupTitle,
-        hwGroupCountText, hwGroupOrder, hwGroups, hwDisabledOffs,
+        hwGroupCountText, hwGroupOrder, hwGroups, hwDisabledOffs, hwOffLabel, hwOffName,
         HW_GROUP_CAB, HW_GROUP_INSIDE } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'hardware.js'));
 
@@ -121,6 +121,28 @@ const onlyOff = hwGroups([], [{ owner_part_key: 'front:Fc/wing:single',
                          FRONT_IDS, 'CAB-005');
 eq(onlyOff.map(x => x.key), ['front:Fc'], 'box vznikne aj len z vypnutej polozky');
 eq(onlyOff[0].ownerKeys, ['front:Fc/wing:single'], 'a vie, koho ma oznacit');
+
+// --- 7b) KOV-C2b: o osirotenosti rozhoduje SERVER (`orphan`) -------------------
+// Rucny POCET na zasuvke, ktorej polozka fail-closed NEVZNIKLA: podla stareho
+// pravidla (`disabled`) by riadok vobec nebol a zasah by sa nedal zrusit.
+const ORPHANS = [
+  { owner_part_key: 'front:Fb/panel', owner_label: 'F2 · zásuvkové čelo',
+    generic_type: 'slide', rule_id: 'vysuvy-nl-podla-hlbky', quantity: 2,
+    orphan: true, orphan_kind: 'invalid' },
+  // server povedal „nie je osiroteny" — JS uz `disabled` NEPREHODNOCUJE
+  { owner_part_key: 'front:Fb/panel', owner_label: 'F2 · zásuvkové čelo',
+    generic_type: 'handle', rule_id: 'ine', disabled: true, orphan: false }
+];
+eq(hwDisabledOffs(ITEMS, ORPHANS).map(o => o.rule_id), ['vysuvy-nl-podla-hlbky'],
+   'server je autorita: `orphan` rozhoduje, nie `disabled`');
+eq(hwOffLabel({ orphan_kind: 'invalid' }), 'neplatný ručný zásah', 'vlastny popis riadku');
+eq(hwOffLabel({ orphan_kind: 'part_material' }), 'neplatný ručný materiál',
+   'materialovy override dielca zasuvky ma vlastny popis');
+eq(hwOffName({ orphan_label: 'Ručný materiál · dno' }), 'Ručný materiál · dno',
+   'nazov riadku posiela SERVER (materialovy override nema genericky typ)');
+eq(hwOffName({ generic_type: 'slide' }), 'Výsuv', 'inak platí nazov typu kovania');
+eq(hwOffLabel({ orphan_kind: 'disabled' }), 'vypnuté', 'vypnuta kategoria ostava „vypnuté"');
+eq(hwOffLabel(null), 'vypnuté', 'bez druhu = povodny popis');
 
 // --- 8) prazdne / poskodene vstupy nesmu padnut -------------------------------
 eq(hwGroups(null, null, null, ''), [], 'ziadne data = ziadne boxy');

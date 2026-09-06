@@ -15500,6 +15500,91 @@ module NoxunSuRunner
       r03_clear_markers(model, markers)
     end
 
+    # --- 8b) Codex #304: osiroteny rucny zasah sa da ZRUSIT ----------------
+    cleanup(model)
+    ov = e::CabinetBuilder.build(model, kovc2b_params('hardware_overrides' => [
+                                   { 'owner_part_key' => 'front:F1/panel',
+                                     'generic_type' => 'slide',
+                                     'rule_id' => 'vysuvy-nl-podla-hlbky',
+                                     'quantity' => 2 }
+                                 ]))
+    if ov
+      conf = Array((e::Store.config(ov) || {})['drawer_conflicts'])
+      ok("KOV-C2b osiroteny: rucny pocet dal `drawer_override_invalid` (#{conf.map { |x| x['code'] }.inspect})",
+         conf.length == 1 && conf.first['code'] == 'drawer_override_invalid')
+      ok("KOV-C2b osiroteny: ZIADNE dielce ani vysuv (#{kovc2b_parts(ov).length})",
+         kovc2b_parts(ov).empty? && kovc2b_slides(ov).empty?)
+      # Panel MUSI zaznam ukazat — inak ho pouzivatel nema ako zrusit.
+      cfg_ov = e::Store.config(ov) || {}
+      rows = e::Panel.hardware_overrides_payload(cfg_ov, cfg_ov['hardware_overrides'])
+      row = rows.find { |r| r['generic_type'] == 'slide' }
+      ok("KOV-C2b osiroteny: payload Kovania nesie riadok neplatneho rucneho zasahu (#{row && row['orphan_kind']})",
+         row && row['orphan'] == true && row['orphan_kind'] == 'invalid')
+      ok('KOV-C2b osiroteny: riadok nesie identitu trojice aj popis vlastnika',
+         row && row['owner_part_key'] == 'front:F1/panel' &&
+         row['rule_id'] == 'vysuvy-nl-podla-hlbky' && row['owner_label'].to_s.include?('F1'))
+      # RESET cez SERVEROVU akciu (to iste, co spusti tlacidlo v riadku).
+      model.selection.clear
+      model.selection.add(ov)
+      m3 = r03_marker(model, markers)
+      e::Panel.handle_set_hardware_override(pg(model,
+                                               'cabinet_id' => e::Store.get(ov, 'cabinet_id'),
+                                               'owner_part_key' => 'front:F1/panel',
+                                               'generic_type' => 'slide',
+                                               'rule_id' => 'vysuvy-nl-podla-hlbky',
+                                               'reset' => true))
+      after = e::Store.config(ov) || {}
+      ok("KOV-C2b osiroteny: reset odstranil zaznam (#{Array(after['hardware_overrides']).length})",
+         Array(after['hardware_overrides']).empty?)
+      ok("KOV-C2b osiroteny: po resete je ZELENE — dielce aj vysuv su spat (#{kovc2b_parts(ov).length})",
+         Array(after['drawer_conflicts']).empty? && kovc2b_parts(ov).length == 2 &&
+         kovc2b_slides(ov).length == 1)
+      ok('KOV-C2b osiroteny: reset bol PRESNE jeden krok Spat', m3.valid?)
+      r03_clear_markers(model, markers)
+    end
+
+    # --- 8c) Codex #304: zly RUCNY MATERIAL dielca zasuvky ------------------
+    cleanup(model)
+    pm = e::CabinetBuilder.build(model, kovc2b_params)
+    if pm
+      # Ulozeny model spred tejto verzie: override s hrubkou, ktoru recept
+      # nepozna. Simulujeme ho ZAPISOM DO CONFIGU (panel by ho uz neulozil —
+      # to je prava polovica opravy) a prestavbou.
+      p_bad = e::CabinetBuilder.config_to_params(e::Store.config(pm) || {})
+      sheet = e::Materials.sheets.find { |sh| (sh['thickness'].to_f - 18.0).abs < 0.01 }
+      if sheet
+        p_bad['part_overrides'] = { 'front:F1/drawer_bottom' => { 'material_id' => sheet['material_id'] } }
+        e::CabinetBuilder.rebuild(model, pm, p_bad)
+        cfg_bad = e::Store.config(pm) || {}
+        ok("KOV-C2b materialovy override: 18 mm pri Atire dal RED (#{Array(cfg_bad['drawer_conflicts']).map { |x| x['code'] }.inspect})",
+           Array(cfg_bad['drawer_conflicts']).length == 1 &&
+           cfg_bad['drawer_conflicts'].first['code'] == 'drawer_thickness_unsupported')
+        ok("KOV-C2b materialovy override: dielce zmizli (#{kovc2b_parts(pm).length})",
+           kovc2b_parts(pm).empty?)
+        rows = e::Panel.hardware_overrides_payload(cfg_bad, cfg_bad['hardware_overrides'])
+        row = rows.find { |r| r['orphan_kind'] == 'part_material' }
+        ok("KOV-C2b materialovy override: payload nesie osiroteny riadok (#{row && row['part_key']})",
+           row && row['part_key'] == 'front:F1/drawer_bottom' &&
+           row['owner_part_key'] == 'front:F1/panel')
+        # RESET cez SERVEROVU akciu (to iste, co spusti tlacidlo v riadku).
+        model.selection.clear
+        model.selection.add(pm)
+        m4 = r03_marker(model, markers)
+        e::Panel.handle_reset_part_override(pg(model,
+                                               'cabinet_id' => e::Store.get(pm, 'cabinet_id'),
+                                               'part_key' => 'front:F1/drawer_bottom'))
+        after = e::Store.config(pm) || {}
+        ok('KOV-C2b materialovy override: reset odstranil zaznam a zasuvka je ZELENA',
+           Array(after['drawer_conflicts']).empty? &&
+           !(after['part_overrides'] || {}).key?('front:F1/drawer_bottom') &&
+           kovc2b_parts(pm).length == 2)
+        ok('KOV-C2b materialovy override: reset bol PRESNE jeden krok Spat', m4.valid?)
+        r03_clear_markers(model, markers)
+      else
+        info('KOV-C2b: katalog nema 18 mm dosku — scenar materialoveho override preskoceny')
+      end
+    end
+
     # --- 9) Codex #304 kolo 1: zmena konstrukcie metal <-> wood -------------
     cleanup(model)
     sw = e::CabinetBuilder.build(model, kovc2b_params)

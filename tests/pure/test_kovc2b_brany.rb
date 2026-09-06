@@ -11,12 +11,19 @@
 #   M4 klientsky payload prepise `recipe_refs` -> „serverove polia: forged payload…"
 require_relative '../helper' unless defined?(NxTest)
 
-# UI vrstva (brany exportov + dialog materialov) — headless nie je v require
-# zozname helpera, takze si ju sada pyta sama (vzor `test_kovc2a_kanal_sety.rb`).
+# UI vrstva (brany exportov + sablony) — headless nie je v require zozname
+# helpera, takze si ju sada pyta sama (vzor `test_kovc2a_kanal_sety.rb`).
 if NxTest.headless?
   require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core')
   require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'materials_dialog')
   require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'templates_dialog')
+end
+
+# Hrubky VSETKYCH roli jedneho cela + bodova zmena (vstup `build_plan`).
+NxC2bD_TH = lambda do |over = {}|
+  Noxun::Engine::CabinetBuilder::DRAWER_ROLES.each_with_object({}) do |role, acc|
+    acc[Noxun::Engine::PartKeys.front('F1', role)] = 16.0
+  end.merge(over)
 end
 
 module NxC2bB
@@ -59,6 +66,23 @@ module NxC2bB
     { 'rows' => [], 'unmapped' => unmapped }
   end
 
+  # Zasuvkove celo danej konstrukcie (metal -> Atira, wood -> Quadro V6).
+  def drawer_front(construction = 'metal', id = 'F1')
+    { 'id' => id, 'type' => 'drawer_front', 'mode' => 'fixed', 'height' => 175.0,
+      'opening_mode' => 'classic', 'drawer' => { 'construction' => construction } }
+  end
+
+  def stored_params_with(construction, over = {})
+    stored_params({ 'fronts' => { 'items' => [drawer_front(construction)] } }.merge(over))
+  end
+
+  # Params skrinky tak, ako ich cita produkcia: normalize -> cabinet_config ->
+  # JSON (model) -> config_to_params.
+  def stored_params(over = {})
+    cfg = CB.normalize({ 'width' => 900.0, 'height' => 720.0, 'depth' => 500.0 }.merge(over))
+    CB.config_to_params(JSON.parse(JSON.generate(CB.cabinet_config(cfg))))
+  end
+
   def src(rel)
     File.read(File.join(NxTest::ROOT, 'noxun_engine', rel), encoding: 'UTF-8')
   end
@@ -66,6 +90,7 @@ module NxC2bB
   def src_ui(rel)
     File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', rel), encoding: 'UTF-8')
   end
+
 end
 
 # ============================================================================
@@ -532,23 +557,6 @@ module NxC2bB
   # Ulozeny config skrinky s danou schemou a (ne)klasifikovanou zasuvkou.
   # `over` = polia RESOLVED cela; LEGACY celo nesmie niest ZIADNE drawer pole
   # (ani `opening_mode`) — presne to je hranica `Recipes.classified?`.
-  # Params skrinky tak, ako ich cita produkcia: normalize -> cabinet_config ->
-  # JSON (model) -> config_to_params.
-  def stored_params(over = {})
-    cfg = CB.normalize({ 'width' => 900.0, 'height' => 720.0, 'depth' => 500.0 }.merge(over))
-    CB.config_to_params(JSON.parse(JSON.generate(CB.cabinet_config(cfg))))
-  end
-
-  # Zasuvkove celo danej konstrukcie (metal -> Atira, wood -> Quadro V6).
-  def drawer_front(construction = 'metal', id = 'F1')
-    { 'id' => id, 'type' => 'drawer_front', 'mode' => 'fixed', 'height' => 175.0,
-      'opening_mode' => 'classic', 'drawer' => { 'construction' => construction } }
-  end
-
-  def stored_params_with(construction, over = {})
-    stored_params({ 'fronts' => { 'items' => [drawer_front(construction)] } }.merge(over))
-  end
-
   def stale_cfg(schema, construction, over = {})
     item = { 'id' => 'F1', 'type' => 'drawer_front', 'height' => 175.0 }
     if construction
@@ -618,6 +626,290 @@ end
 
 # --- UI 4. materialoveho kanala + preflight per system ----------------------
 
+# ============================================================================
+# CODEX #304 KOLO 3 — propagacia `drawer_material_id`
+# ============================================================================
+
+NxTest.test('KOV-C2b: `drawer_material_id` prezije normalize -> config -> params') do
+  c = NxC2bB
+  # Serverovy kanal 4. materialu: `normalize` kluc pozna, takze ho `build`
+  # (vklad) aj `rebuild` ulozia a prestavba ho neztrati. UI kanala (vkladacia
+  # karta, vyber v Studiu, „Nahradit UNI…") je v SAMOSTATNOM PR.
+  cfg = c::CB.normalize('width' => 900.0, 'height' => 720.0, 'depth' => 500.0,
+                        'drawer_material_id' => 'ZO_SABLONY_18')
+  NxTest.assert_equal('ZO_SABLONY_18', cfg[:drawer_material_id])
+  NxTest.assert_equal('ZO_SABLONY_18', c::CB.cabinet_config(cfg)[:drawer_material_id])
+  # A round-trip cez ULOZENY config (sablona -> vklad -> prestavba).
+  back = c::CB.normalize(c::CB.config_to_params(JSON.parse(JSON.generate(c::CB.cabinet_config(cfg)))))
+  NxTest.assert_equal('ZO_SABLONY_18', back[:drawer_material_id])
+  # Prazdna hodnota = dedi z projektu (ziadny tichy default).
+  NxTest.assert_equal(nil, c::CB.normalize('drawer_material_id' => '')[:drawer_material_id])
+end
+
+# ============================================================================
+# CODEX #304 (zredukovany PR) — OSIROTENY RUCNY ZASAH sa da zrusit
+# ============================================================================
+
+module NxC2bB
+  module_function
+
+  # Skrinka so zasuvkou a s legacy NL overridom (D-93 identita trojice).
+  def orphan_cfg(over = {})
+    front = { 'id' => 'F1', 'type' => 'drawer_front', 'mode' => 'fixed', 'height' => 175.0,
+              'opening_mode' => 'classic', 'drawer' => { 'construction' => 'metal' } }
+    CB.normalize({ 'width' => 900.0, 'height' => 720.0, 'depth' => 500.0,
+                   'fronts' => { 'items' => [front] } }.merge(over))
+  end
+
+  # Legacy zaznam `hardware_overrides` na zasuvkovom cele.
+  def slide_override(over = {})
+    [{ 'owner_part_key' => 'front:F1/panel', 'generic_type' => 'slide',
+       'rule_id' => 'vysuvy-nl-podla-hlbky' }.merge(over)]
+  end
+
+  # ULOZENY config po stavbe (to, z coho panel stavia payload Kovania).
+  def built_config(cfg)
+    plan = CN.build_plan(cfg, 'CAB-1')
+    stored = CB.cabinet_config(CB.apply_drawer_writes(CB.merge_final(cfg, plan), plan))
+    [JSON.parse(JSON.generate(stored)), plan]
+  end
+
+  # Presne to, co robi `Panel.hardware_overrides_payload` — klasifikator zije
+  # v `HardwareRules` (ciste, headless nacitatelne), panel uz len mapuje.
+  def orphan_rows(stored)
+    owners = Array(stored['drawer_conflicts']).map { |c| c['part_key'].to_s }
+    Array(stored['hardware_overrides']).map do |ov|
+      kind = E::HardwareRules.override_orphan_kind(ov, stored['hardware'], owners)
+      kind ? ov.merge('orphan' => true, 'orphan_kind' => kind) : ov
+    end
+  end
+end
+
+NxTest.test('Codex #304 P1: rucny POCET na zasuvke = osiroteny zaznam v payloade Kovania') do
+  c = NxC2bB
+  cfg = c.orphan_cfg('hardware_overrides' => c.slide_override('quantity' => 2))
+  stored, plan = c.built_config(cfg)
+  # Fail-closed: ZIADNA polozka vysuvu (ani receptova, ani legacy) — takze bez
+  # osiroteneho zoznamu by zaznam v paneli nemal kde byt.
+  NxTest.assert_equal('drawer_override_invalid', plan[:drawer_conflicts].first['code'])
+  NxTest.assert_equal([], plan[:hardware].select { |h| h['generic_type'] == 'slide' })
+
+  row = c.orphan_rows(stored).first
+  NxTest.assert_equal([true, 'invalid'], [row['orphan'], row['orphan_kind']],
+                      'zaznam MUSI byt v osirotenom zozname')
+  NxTest.assert_equal(['front:F1/panel', 'slide', 'vysuvy-nl-podla-hlbky'],
+                      [row['owner_part_key'], row['generic_type'], row['rule_id']],
+                      'identita trojice, ktorou ho panel resetuje')
+  # Hlaska konfliktu odkazuje PRESNE na ten riadok.
+  NxTest.assert(plan[:drawer_conflicts].first['message'].include?('neplatný ručný zásah'),
+                plan[:drawer_conflicts].first['message'])
+end
+
+NxTest.test('Codex #304 P1: RESET zaznamu odstrani konflikt (zelene)') do
+  c = NxC2bB
+  # Serverova akcia `reset` odstrani CELY zaznam — prestavba nad ocistenym
+  # configom uz konflikt nevyda a zasuvka dostane dielce aj vysuv.
+  after = c::CN.build_plan(c.orphan_cfg('hardware_overrides' => []), 'CAB-1')
+  NxTest.assert_equal([], Array(after[:drawer_conflicts]), after[:drawer_conflicts].inspect)
+  NxTest.assert_equal(1, after[:hardware].count { |h| h['generic_type'] == 'slide' },
+                      'zasuvka zase dostane svoj vysuv')
+  NxTest.assert_equal(2, after[:parts].count { |pd| pd[:material] == :drawer })
+  # Retaz „riadok -> serverova akcia -> zaznam prec" je kontrakt, nie nahoda.
+  js = c.src_ui(File.join('js', 'hardware.js'))
+  NxTest.assert(js.include?("onHwOrphanReset(this)"), 'riadok ponuka zrusenie')
+  NxTest.assert(js.include?("function onHwOrphanReset(btn){ hwSend(hwPayload(btn, { reset: true })); }"),
+                'a posiela EXISTUJUCU serverovu akciu `reset`')
+  NxTest.assert(js.include?("if (ov.orphan === true) return true;"),
+                'o osirotenosti rozhoduje SERVER')
+  act = c.src_ui(File.join('panel', 'actions_hardware.rb'))
+  NxTest.assert(act.include?("return [:all, nil, nil] if truthy?(data['reset'])"),
+                '`reset` zahadzuje CELY zaznam')
+  pay = c.src_ui(File.join('panel', 'payloads.rb'))
+  NxTest.assert(pay.include?("HardwareRules.override_orphan_kind(ov, items, owners)"),
+                'payload panela klasifikuje kazdy zaznam')
+end
+
+NxTest.test('Codex #304 P1: osiroteny je AJ `disabled` a AJ zamok NL mimo radu') do
+  c = NxC2bB
+  # (a) vypnuta polozka na zasuvke — `orphan_kind` je `disabled` (vypnutie je
+  #     silnejsi popis nez konflikt: naprava je „obnoviť", zaznam nic ine nenesie)
+  off = c.orphan_cfg('hardware_overrides' => c.slide_override('disabled' => true))
+  stored_off, plan_off = c.built_config(off)
+  NxTest.assert_equal('drawer_override_invalid', plan_off[:drawer_conflicts].first['code'])
+  row_off = c.orphan_rows(stored_off).first
+  NxTest.assert_equal([true, 'disabled'], [row_off['orphan'], row_off['orphan_kind']],
+                      'vypnuty zaznam sa v paneli objavi (doterajsie D-92 spravanie)')
+  # (b) zamok NL mimo radu (400 nie je v rade H70) — zaznam nesie LEN dlzku,
+  #     takze bez tejto vetvy by v paneli nebol vobec.
+  nl = c.orphan_cfg('hardware_overrides' => c.slide_override('nominal_length' => 400.0))
+  stored_nl, plan_nl = c.built_config(nl)
+  NxTest.assert_equal('nl_lock_invalid', plan_nl[:drawer_conflicts].first['code'])
+  row_nl = c.orphan_rows(stored_nl).first
+  NxTest.assert_equal([true, 'invalid'], [row_nl['orphan'], row_nl['orphan_kind']])
+  NxTest.assert(plan_nl[:drawer_conflicts].first['message'].include?('neplatný ručný zásah'))
+end
+
+NxTest.test('Codex #304 P1: bezny rucny zasah osiroteny NIE JE') do
+  c = NxC2bB
+  # Zamok 420 je V RADE — polozka vznikne, zaznam sa kresli PRI nej.
+  cfg = c.orphan_cfg('hardware_overrides' => c.slide_override('nominal_length' => 420.0))
+  stored, plan = c.built_config(cfg)
+  NxTest.assert_equal([], Array(plan[:drawer_conflicts]))
+  row = c.orphan_rows(stored).first
+  NxTest.refute(row.key?('orphan'), 'zaznam so zivou polozkou do zoznamu NEPATRI')
+  # D-92 spravanie ostava: `disabled` bez polozky je `disabled`, nie `invalid`.
+  hr = c::E::HardwareRules
+  legacy = { 'owner_part_key' => 'front:F9/wing:single', 'generic_type' => 'hinge',
+             'rule_id' => 'zavesy', 'disabled' => true }
+  NxTest.assert_equal('disabled', hr.override_orphan_kind(legacy, [], []))
+  NxTest.assert_equal(nil, hr.override_orphan_kind(legacy, [legacy], []),
+                      'so zivou polozkou to osiroteny zaznam nie je')
+  NxTest.assert_equal(nil, hr.override_orphan_kind({ 'owner_part_key' => 'front:F9/panel',
+                                                     'generic_type' => 'slide',
+                                                     'rule_id' => 'x', 'quantity' => 3 }, [], []),
+                      'rucny pocet BEZ konfliktu nie je osiroteny (legacy spravanie)')
+end
+
+# ============================================================================
+# CODEX #304 — ZLA HRUBKA OVERRIDU DIELCA ZASUVKY (16,03 mm)
+# ============================================================================
+
+NxTest.test('Codex #304 P1: recept ma pre celo PRESNE dane hrubky (bez tolerancie)') do
+  c = NxC2bB
+  front = { 'id' => 'F1', 'type' => 'drawer_front', 'opening_mode' => 'classic',
+            'drawer' => { 'construction' => 'metal' } }
+  recipe, allowed = c::REC.thicknesses_for(front, 'drawer_bottom')
+  NxTest.assert_equal([16.0], allowed, 'Atira dno: iba 16 mm')
+  NxTest.assert(c::REC.label(recipe).include?('Atira'), c::REC.label(recipe))
+  # 16,03 je V TOLERANCII pickera (0,05), ale recept ju NEPOZNA — presna zhoda.
+  NxTest.refute(allowed.any? { |v| (v - 16.03).abs < 1e-9 },
+                'presna zhoda: 16,03 nie je 16')
+  NxTest.assert(c::CB.thickness_ok_for?('drawer_bottom', 16.0, 16.03),
+                'stary guard (rozsah dosky) by ju PUSTIL — preto vlastna vetva')
+  # Drevo pripusta 16 aj 18, ostatne roly ma tiez.
+  wood = { 'id' => 'F1', 'type' => 'drawer_front', 'opening_mode' => 'classic',
+           'drawer' => { 'construction' => 'wood' } }
+  _r2, w_allowed = c::REC.thicknesses_for(wood, 'box_side')
+  NxTest.assert_equal([16.0, 18.0], w_allowed)
+  # Legacy celo a rola mimo receptu = ziadny guard (nic sa nevymysla).
+  NxTest.assert_equal(nil, c::REC.thicknesses_for({ 'id' => 'F1', 'type' => 'door' }, 'drawer_bottom'))
+  NxTest.assert_equal(nil, c::REC.thicknesses_for(front, 'box_side'), 'Atira boky nevyraba')
+end
+
+NxTest.test('Codex #304 P1: `pick_ref` je JEDINA pravda o aktivnom recepte') do
+  c = NxC2bB
+  # pripnuty -> presne ten; chybajuci -> surodenec rovnakej verzie; neznamy -> nil
+  NxTest.assert_equal('atira_sisy_v1',
+                      c::REC.pick_ref({ 'atira|sisy' => 'atira_sisy_v1' }, 'atira', 'sisy'))
+  NxTest.assert_equal('quadro_v6_sisy_v1',
+                      c::REC.pick_ref({ 'atira|sisy' => 'atira_sisy_v1' }, 'quadro_v6', 'sisy'),
+                      'surodenec ROVNAKEJ verzie')
+  NxTest.assert_equal('atira_p2o_v1', c::REC.pick_ref(nil, 'atira', 'p2o'), 'inak najnovsi')
+  NxTest.assert_equal(nil, c::REC.pick_ref({ 'atira|sisy' => 'atira_sisy_v9' }, 'atira', 'sisy'),
+                      'neznamy ref = nevieme, ktory recept plati')
+  # Stavba cita TU ISTU funkciu.
+  src = c.src(File.join('core', 'construction.rb'))
+  NxTest.assert(src.include?('Recipes.pick_ref(refs_map, key[:system], key[:opening])'),
+                'Construction pouziva JEDINU implementaciu')
+end
+
+NxTest.test('Codex #304 P1: zly override hrubky dielca = fail-closed konflikt') do
+  c = NxC2bB
+  # Presne scenar z nalezu: 16,03 mm na dne zasuvky Atira.
+  th = NxC2bD_TH.call('front:F1/drawer_bottom' => 16.03)
+  cfg = c.orphan_cfg('part_overrides' => { 'front:F1/drawer_bottom' => { 'material_id' => 'X_1603' } })
+  plan = c::CN.build_plan(cfg, 'CAB-1', part_thicknesses: th)
+  NxTest.assert_equal('drawer_thickness_unsupported', plan[:drawer_conflicts].first['code'])
+  NxTest.assert_equal([], plan[:parts].select { |pd| pd[:material] == :drawer },
+                      'dielce zmizli — override patri zaniknutemu dielcu')
+  NxTest.assert_equal([], plan[:hardware].select { |h| h['generic_type'] == 'slide' })
+  # Guard panela ho preto NESMIE ulozit — retaz je kontrakt.
+  src = c.src(File.join('ui', 'panel', 'actions_parts.rb'))
+  NxTest.assert(src.include?('drawer_part_material_conflict(params, rk, sheet)'),
+                'guard bezi v `part_material_conflict`')
+  NxTest.assert(src.index('drawer_part_material_conflict(params, rk, sheet)') <
+                src.index('return nil if Materials.uni?(sheet)'),
+                'a bezi PRED UNI vetvou aj pred `thickness_ok_for?`')
+  NxTest.assert(src.include?('Recipes.thicknesses_for(item, role)'),
+                'meria proti AKTIVNEMU receptu cela')
+end
+
+NxTest.test('Codex #304 P1: osiroteny materialovy override ma cestu von') do
+  c = NxC2bB
+  # ZIVY TVAR DAT: normalize -> build_plan S HRUBKAMI (18 mm override na dne)
+  # -> merge_final -> cabinet_config -> JSON (model). Presne to, co po zlej
+  # prestavbe lezi na entite a co cita panel.
+  cfg = c.orphan_cfg('part_overrides' => {
+                       'front:F1/drawer_bottom' => { 'material_id' => 'DOSKA_18' }
+                     })
+  th = NxC2bD_TH.call('front:F1/drawer_bottom' => 18.0)
+  plan = c::CN.build_plan(cfg, 'CAB-1', part_thicknesses: th)
+  stored = JSON.parse(JSON.generate(c::CB.cabinet_config(c::CB.merge_final(cfg, plan))))
+  NxTest.assert_equal('drawer_thickness_unsupported', stored['drawer_conflicts'].first['code'])
+  NxTest.assert_equal('front:F1/panel', stored['drawer_conflicts'].first['part_key'])
+
+  rows = c::CB.orphan_drawer_part_overrides(stored)
+  NxTest.assert_equal(1, rows.length, "osiroteny zaznam MUSI byt v zozname: #{rows.inspect}")
+  NxTest.assert_equal(['front:F1/drawer_bottom', 'drawer_bottom', 'F1', 'front:F1/panel',
+                       'DOSKA_18'],
+                      rows.first.values_at('part_key', 'role', 'front_id', 'owner_part_key',
+                                           'material_id'))
+  NxTest.assert(c::CB.orphan_drawer_part_override?(stored, 'front:F1/drawer_bottom'))
+
+  # ANTI-REGRESIA (in-SU FAIL #304): plan BEZ `part_thicknesses` stavia s UNI 16
+  # fallbackom, takze prave ten dielec v nom „zije" — preto sa na osirotenost
+  # NESMIE pytat planu. Tento riadok fixuje dovod, nie implementaciu.
+  NxTest.assert(c::CB.plan_parts_by_key(c::CB.config_to_params(stored))
+                     .key?('front:F1/drawer_bottom'),
+                'plan bez hrubok dielec EVIDUJE — a prave to bola pricina FAILu')
+
+  # Ziva zasuvka (bez konfliktu) do zoznamu NEPATRI — override sa meni na karte.
+  ok_cfg = c.orphan_cfg('part_overrides' => {
+                          'front:F1/drawer_bottom' => { 'material_id' => 'DOSKA_16' }
+                        })
+  ok_plan = c::CN.build_plan(ok_cfg, 'CAB-1', part_thicknesses: NxC2bD_TH.call)
+  ok_stored = JSON.parse(JSON.generate(c::CB.cabinet_config(c::CB.merge_final(ok_cfg, ok_plan))))
+  NxTest.assert_equal([], Array(ok_stored['drawer_conflicts']))
+  NxTest.assert_equal([], c::CB.orphan_drawer_part_overrides(ok_stored))
+  NxTest.refute(c::CB.orphan_drawer_part_override?(ok_stored, 'front:F1/drawer_bottom'))
+
+  # Override na INOM (nezasuvkovom) dielci sa zoznamu netyka ani pri konflikte.
+  other = JSON.parse(JSON.generate(stored))
+  other['part_overrides'] = { 'cabinet/side:left' => { 'material_id' => 'DOSKA_18' } }
+  NxTest.assert_equal([], c::CB.orphan_drawer_part_overrides(other))
+  # A ani override na cele INEHO cela, ktore v konflikte nie je.
+  foreign = JSON.parse(JSON.generate(stored))
+  foreign['part_overrides'] = { 'front:F9/drawer_bottom' => { 'material_id' => 'DOSKA_18' } }
+  NxTest.assert_equal([], c::CB.orphan_drawer_part_overrides(foreign))
+
+  # `drawer_part_role` pozna LEN roly zasuviek (aj `box_side:left`).
+  NxTest.assert_equal('box_side', c::CB.drawer_part_role('front:F1/box_side:left'))
+  NxTest.assert_equal(nil, c::CB.drawer_part_role('front:F1/panel'))
+  NxTest.assert_equal(nil, c::CB.drawer_part_role('zone:Z1/shelf:1'))
+
+  # Retaz do UI: panel z toho robi riadok, JS ho kresli, server ho resetuje.
+  pay = c.src(File.join('ui', 'panel', 'payloads.rb'))
+  NxTest.assert(pay.include?('CabinetBuilder.orphan_drawer_part_overrides(cfg)'),
+                'payload cita AUTORITU, nie prepocitany plan')
+  act = c.src(File.join('ui', 'panel', 'actions_parts.rb'))
+  NxTest.assert(act.include?('CabinetBuilder.orphan_drawer_part_override?(cfg, rk)'),
+                'serverovy reset overuje TO ISTE')
+  NxTest.assert(act.include?('ov.delete(rk)'), 'reset = ODSTRANENIE override')
+  pnl = c.src(File.join('ui', 'panel.rb'))
+  NxTest.assert(pnl.include?("cb(dlg, 'reset_part_override')"), 'akcia je registrovana')
+  js = c.src_ui(File.join('js', 'hardware.js'))
+  NxTest.assert(js.include?('sketchup.reset_part_override'), 'riadok vola tu akciu')
+
+  # Po odstraneni override je zasuvka ZELENA.
+  after = c::CN.build_plan(c.orphan_cfg('part_overrides' => {}), 'CAB-1')
+  NxTest.assert_equal([], Array(after[:drawer_conflicts]))
+  NxTest.assert_equal(2, after[:parts].count { |pd| pd[:material] == :drawer })
+end
+
+# ============================================================================
+# KOV-C2b-M — MATERIALOVY KANAL ZASUVIEK (UI, preflight, hromadne cesty)
+# ============================================================================
+
 NxTest.test('Codex #304 P1: `TARGETS` pozna 4. kanal a JS mapovanie s nim sedi') do
   c = NxC2bB
   md = c::E::MaterialsDialog
@@ -672,28 +964,6 @@ NxTest.test('Codex #304 P1: preflight predvolby zasuviek menuje SYSTEM aj skrink
   NxTest.assert(txt.include?('Atira') && txt.include?('16'), txt)
 end
 
-# ============================================================================
-# CODEX #304 KOLO 3 — propagacia `drawer_material_id`
-# ============================================================================
-
-NxTest.test('Codex #304 kolo 3 P1: vkladaci stav nesie `drawer_material_id`') do
-  c = NxC2bB
-  js = c.src_ui(File.join('js', 'insert_state.js'))
-  # JS kanal (zrkadlo serveroveho `normalize`) musi poznat VSETKY styri kanaly.
-  NxTest.assert(js.include?("'drawer_material_id'"),
-                'MATERIAL_KEYS bez 4. kanala = vlozena skrinka spadne na projektovu predvolbu')
-  # Server: `normalize` kluc pozna, takze `build` z insert payloadu ho ulozi.
-  cfg = c::CB.normalize('width' => 900.0, 'height' => 720.0, 'depth' => 500.0,
-                        'drawer_material_id' => 'ZO_SABLONY_18')
-  NxTest.assert_equal('ZO_SABLONY_18', cfg[:drawer_material_id])
-  NxTest.assert_equal('ZO_SABLONY_18', c::CB.cabinet_config(cfg)[:drawer_material_id])
-  # A round-trip cez ULOZENY config (sablona -> vklad -> prestavba).
-  back = c::CB.normalize(c::CB.config_to_params(JSON.parse(JSON.generate(c::CB.cabinet_config(cfg)))))
-  NxTest.assert_equal('ZO_SABLONY_18', back[:drawer_material_id])
-  # Prazdna hodnota = dedi z projektu (ziadny tichy default).
-  NxTest.assert_equal(nil, c::CB.normalize('drawer_material_id' => '')[:drawer_material_id])
-end
-
 NxTest.test('Codex #304 kolo 3 P1: „Nahradiť UNI…" pozna 4. kanal') do
   c = NxC2bB
   ru = c::E::Materials
@@ -744,10 +1014,6 @@ NxTest.test('Codex #304 kolo 3 P2: „Nahradiť UNI…" pouziva RECEPTOVY predik
   NxTest.assert(ru.ru_blocked_line('CAB-1', :drawer, []).include?('zásuviek'),
                 ru.ru_blocked_line('CAB-1', :drawer, []))
 end
-
-# ============================================================================
-# CODEX #304 KOLO 4 — system KAZDEHO dotknuteho cela + preflight vkladu
-# ============================================================================
 
 NxTest.test('Codex #304 kolo 4 P1: predvolba sa meria systemom KAZDEHO cela zakazky') do
   c = NxC2bB

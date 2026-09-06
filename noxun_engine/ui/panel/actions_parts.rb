@@ -83,6 +83,14 @@ module Noxun
           return nil unless mat && defined?(Materials)
           sheet = Materials.sheet(mat)
           return nil unless sheet # legacy material mimo katalogu — stary rezim
+          # KOV-C2b (Codex #304 P1): dielec ZASUVKY hrubku NEDEDI — je to VSTUP
+          # receptu. Guard preto bezi PRED UNI vetvou aj pred `thickness_ok_for?`
+          # (ta pusta cely rozsah dosky 6–50, takze 16,03 by presla) a meria
+          # PRESNE tak ako recept: bez tolerancie. Inak by sa override ulozil,
+          # recept by ho vzapati odmietol a dielec by zanikol aj s cestou spat.
+          if (msg = drawer_part_material_conflict(params, rk, sheet))
+            return msg
+          end
           # V0.6 M-B1: UNI dielec — hrubku dedi po korpuse, ziadny konflikt.
           return nil if Materials.uni?(sheet)
           pd = CabinetBuilder.plan_parts_by_key(params)[rk]
@@ -92,6 +100,93 @@ module Noxun
           return nil if CabinetBuilder.thickness_ok_for?(pd[:role], want, have)
           "Materiál #{mat_name(sheet)} má #{fmt_mm(have)} mm, dielec #{pd[:name] || rk} potrebuje #{fmt_mm(want)} mm " \
             '— dielec hrúbku dedí po korpuse. Zmeň materiál celej skrinky (prevezme hrúbku) alebo hrúbku korpusu (Základné).'
+        end
+
+        # KOV-C2b: hrubkovy guard dielca ZASUVKY proti AKTIVNEMU receptu jeho
+        # cela. Rola sa cita z part_key (dielec uz nemusi byt v plane — prave
+        # po zlom override tam nie je), recept z ULOZENEJ klasifikacie cela.
+        # -> hlaska | nil (nie je to dielec zasuvky / legacy celo / neznamy ref)
+        def drawer_part_material_conflict(params, rk, sheet)
+          return nil unless defined?(Recipes)
+
+          role = drawer_part_role(rk)
+          return nil unless role
+
+          item = drawer_front_item(params, PartKeys.front_id(rk))
+          return nil unless item
+
+          pair = Recipes.thicknesses_for(item, role)
+          return nil unless pair
+
+          recipe, allowed = pair
+          have = sheet['thickness'].to_f
+          return nil if allowed.any? { |v| (v - have).abs < 1e-9 }
+
+          "Materiál #{mat_name(sheet)} má #{fmt_mm(have)} mm — #{Recipes.label(recipe)} " \
+            "pripúšťa pre #{Recipes.role_label(role)} #{allowed.map { |v| fmt_mm(v) }.join(' alebo ')} mm. " \
+            'Vyber inú dosku (hrúbka dielca zásuvky je vstup receptu, nededí sa po korpuse).'
+        end
+
+        # `front:<id>/<rola zasuvky>` -> rola, inak nil. Autorita je
+        # `CabinetBuilder` (zdiela ju payload aj tento guard).
+        def drawer_part_role(rk)
+          CabinetBuilder.drawer_part_role(rk)
+        end
+
+        # Polozka cela z ULOZENEHO configu (kanonicka, so serverovymi polami).
+        def drawer_front_item(params, front_id)
+          return nil if front_id.nil?
+
+          Array(Fronts.normalize_config(params['fronts'])['items'])
+            .find { |it| it.is_a?(Hash) && it['id'].to_s == front_id.to_s }
+        end
+
+        # KOV-C2b (Codex #304 P1): ZRUSENIE osiroteneho materialoveho override
+        # dielca zasuvky. Vlastna akcia, lebo `handle_set_part_material` vyzaduje
+        # dielec VO VYBERE — a prave ten po fail-closed konflikte NEEXISTUJE,
+        # takze zly zaznam z ulozeneho modelu by nemal cestu von.
+        #
+        # FAIL-CLOSED: server si znovu overi, ze zaznam je naozaj osiroteny
+        # (dielec zasuvky, celo v ULOZENYCH `drawer_conflicts`, part_key NIE JE
+        # v aktualnom plane). Tato cesta teda NIKDY nezmaze zivy override.
+        def handle_reset_part_override(payload)
+          model = Sketchup.active_model
+          data = parse(payload)
+          return if foreign_document?(data, model, 'Ručný materiál sa nezmenil')
+
+          cab = find_cabinet(model)
+          return set_status('Najprv označ NOXUN korpus.', true) if cab.nil?
+          return if stale_cabinet_echo?(cab, data, 'reset materialu dielca')
+
+          rk = data['part_key'].to_s
+          params = existing_params(cab)
+          cfg = Store.config(cab) || {}
+          unless orphan_part_override?(cfg, params, rk)
+            push_selected(model)
+            return set_status('Ten ručný materiál sa dá zmeniť priamo na dielci — označ ho v modeli.', true)
+          end
+
+          ov = params['part_overrides'].is_a?(Hash) ? params['part_overrides'] : {}
+          ov.delete(rk)
+          params['part_overrides'] = ov
+          suspend_selection_sync do
+            CabinetBuilder.rebuild(model, cab, params, op_name: 'NOXUN: zrusenie rucneho materialu')
+            reselect(model, cab)
+          end
+          status_with_warnings(cab, 'Ručný materiál dielca zrušený — zásuvka sa prepočítala.')
+          push_selected(model)
+        end
+
+        # Je `rk` OSIROTENY materialovy override dielca zasuvky?
+        # Autorita je ULOZENY config (`drawer_conflicts`) — NIE prepocitany plan
+        # (ten bez `part_thicknesses` stavia s UNI 16 fallbackom, takze dielec,
+        # ktoreho 18 mm override konflikt sposobil, by v nom VZDY „zil";
+        # Codex #304, in-SU FAIL).
+        def orphan_part_override?(cfg, _params, rk)
+          CabinetBuilder.orphan_drawer_part_override?(cfg, rk)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.orphan_part_override?')
+          false
         end
 
         # D-41 C2: serverova autorita modalu — dovytvori 1,0 mm pasku k dekoru

@@ -184,6 +184,13 @@ module Noxun
         out
       end
 
+      # KOV-C2b (Codex #304 P1): JEDINA veta, ktorou sa pouzivatel dostane
+      # k naprave neplatneho rucneho zasahu. Riadok stavia panel z osiroteneho
+      # zoznamu (`Panel.hardware_overrides_payload`, `orphan_kind: 'invalid'`)
+      # a jeho tlacidlo vola serverovy `reset` — po nom prestavba konflikt
+      # uz nevyda. Text sa nesmie rozist s tym, co riadok naozaj pise.
+      ORPHAN_HINT = 'Inspector → Kovanie, riadok „neplatný ručný zásah" → Zrušiť.'
+
       def drawer_conflict(front_id, code, message)
         { 'front_id' => front_id.to_s, 'code' => code.to_s, 'message' => message.to_s,
           'part_key' => PartKeys.front(front_id, 'panel') }
@@ -263,15 +270,10 @@ module Noxun
 
       # Recept pre NOVU kombinaciu system|otvaranie: SURODENEC rovnakej verzie
       # ako uz pripnute zaznamy (prepnutie klasifikacie nikdy ticho nepovysi
-      # verziu), inak `latest_for`.
+      # verziu), inak `latest_for`. Implementacia zije v `Recipes` — cita ju aj
+      # panelovy guard materialu dielca (jedna pravda o „ktory recept plati").
       def pick_recipe_ref(refs_map, key)
-        if refs_map.is_a?(Hash)
-          refs_map.each_value do |id|
-            sib = Recipes.sibling(id, key[:system], key[:opening])
-            return sib if sib
-          end
-        end
-        Recipes.latest_for(key[:system], key[:opening])
+        Recipes.pick_ref(refs_map, key[:system], key[:opening])
       end
 
       # KOV-C2b: part_key(e) JEDNEJ roly dielca zasuvky (Codex #304 kolo 2 P1).
@@ -313,15 +315,15 @@ module Noxun
         return nil if rec.nil?
 
         if rec['disabled'] == true || rec[:disabled] == true
-          return 'Zásuvka má vypnutú položku výsuvu — výsuv z receptu sa vypnúť nedá; ' \
-                 'zruš ručný zásah v Kovaní.'
+          return 'Zásuvka má vypnutú položku výsuvu — výsuv z receptu sa vypnúť nedá. ' \
+                 "#{ORPHAN_HINT}"
         end
         q = rec['quantity'].nil? ? rec[:quantity] : rec['quantity']
         return nil if q.nil?
         return nil if q.is_a?(Numeric) && q.to_i == 1
 
-        "Zásuvka má ručne prepísaný počet výsuvov (#{q}) — recept vydáva vždy jeden; " \
-        'zruš ručný zásah v Kovaní.'
+        "Zásuvka má ručne prepísaný počet výsuvov (#{q}) — recept vydáva vždy jeden. " \
+        "#{ORPHAN_HINT}"
       end
 
       def drawer_override?(ov, owner, recipe_id)
