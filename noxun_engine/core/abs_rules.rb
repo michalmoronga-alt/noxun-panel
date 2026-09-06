@@ -108,7 +108,11 @@ module Noxun
       # kreslila pasku na opacnu stranu, nez hovori pravidlo aj `EDGE_LABELS`.
       EDGE_SIDES_STANDING = { 'L1' => 'top', 'L2' => 'bottom', 'W1' => 'left', 'W2' => 'right' }.freeze
       # Roly, ktore tuto mapu pouzivaju (`drawer_bottom` LEZI a ostava lying).
-      STANDING_ROLES = %w[drawer_back box_side drawer_inner_front].freeze
+      # KOV-D5: JEDINY literalny zoznam zije v `PartFaces::STANDING_ROLES` — su to
+      # presne tie roly, ktorym sa v modeli otaca dvojica L1/L2 (L1 = horna
+      # plocha). Dva samostatne zoznamy by sa casom rozisli a 2D karta by
+      # kreslila pasku na inu hranu, nez sa zafarbi v modeli.
+      STANDING_ROLES = PartFaces::STANDING_ROLES
 
       # Pravidlove defaulty ABS podla roly (hodnota = HRUBKA ABS v mm; dekor sa dopocita z materialu
       # dielca). Prazdna mapa = ziadne ABS. Standard 7.5 + zadanie V0.3 + D-30:

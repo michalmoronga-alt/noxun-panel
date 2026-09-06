@@ -25,6 +25,17 @@
 #                      celo  axes L=Z,W=X,T=Y -> L1 na X=0 = Lava,    W1 na Z=0 = Dolna
 #                      chrbat axes L=X,W=Z,T=Y -> L1 na Z=0 = Dolna,  W1 na X=0 = Lava
 #
+# VYNIMKA — STOJACE DIELCE ZASUVKY (KOV-D5, Astra #20 F15): u rol
+# `drawer_back`/`box_side`/`drawer_inner_front` je L1 podla ABS pravidla aj podla
+# `AbsRules::EDGE_LABELS` HORNA dlha hrana (tam ide olep), kym default vyssie by
+# ju polozil na MINIMUM osi sirky = spodok. Pre tieto roly (`STANDING_ROLES`)
+# preto plati OTOCENA dvojica L1/L2 (`STANDING_EDGE_FACES`) — os sirky je u nich
+# VYSKA dielca, takze L1 = jej maximum = horna plocha, L2 = dolna; W1/W2 ostavaju
+# min/max osi dlzky. Recept ani ABS pravidla sa tym NEMENIA (L1 = 1,0 mm ostava)
+# a mapa je JEDINA pre farbenie plosok (CabinetBuilder.paint_edge_faces) aj pre
+# zvyraznenie Kontroly/hoveru (EdgeCheck, HoverEdge) — dve mapy by znamenali, ze
+# sa zvyrazni ina hrana, nez sa zafarbi.
+#
 # BEZPECNOSTNY VENTIL: ked deskriptor osi nenesie, alebo ked osi NESEDIA s rozmermi
 # (box[os] != prod[rozmer] nad toleranciu), mapovanie sa NEHADA — vrati sa nil a
 # hrany sa jednoducho nezafarbia. Radsej ziadna farba nez farba na zlej hrane.
@@ -43,8 +54,28 @@ module Noxun
       AXES_FRONT   = { length: 2, width: 0, thickness: 1 }.freeze
       # Zvisla stena v rovine XZ: chrbat, sokel, vystuha na hranu — sirka je VYSKA (Z).
       AXES_WALL    = { length: 0, width: 2, thickness: 1 }.freeze
+      # KOV-D5: zvisla stena v rovine YZ — bok boxu zasuvky. Dlzka bezi po HLBKE
+      # (Y = NL), sirka je VYSKA boxu (Z), hrubka X. Je to AXES_WALL otocena o 90
+      # stupnov okolo Z; vlastna konstanta je nutna, lebo osi sa NIKDY nehadaju.
+      AXES_WALL_DEPTH = { length: 1, width: 2, thickness: 0 }.freeze
 
       AXIS_KEYS = %i[length width thickness].freeze
+
+      # ============ KOD HRANY -> [OS DESKRIPTORA, STRANA KVADRA] ==============
+      # JEDINE miesto, kde sa rozhoduje, na ktorej stene kvadra hrana lezi.
+      # Cita ho farbenie plosok (CabinetBuilder.paint_edge_faces) aj zvyraznenie
+      # Kontroly a hoveru (EdgeCheck, HoverEdge) — cez `edge_code_for_center`
+      # a `rect_axis_side`, nikdy vlastnou kopiou mapy.
+      EDGE_FACES = { 'L1' => [:width, :min], 'L2' => [:width, :max],
+                     'W1' => [:length, :min], 'W2' => [:length, :max] }.freeze
+      # STOJACE dielce zasuvky: L1 je HORNA hrana (viz hlavicka) — otocena len
+      # dvojica L1/L2, priecne hrany ostavaju.
+      STANDING_EDGE_FACES = { 'L1' => [:width, :max], 'L2' => [:width, :min],
+                              'W1' => [:length, :min], 'W2' => [:length, :max] }.freeze
+      # Roly s otocenou dvojicou. JEDINY literalny zoznam v celom pluginu —
+      # `AbsRules::STANDING_ROLES` (2D karta dielca) je jeho ALIAS, aby sa
+      # zvyraznena a zafarbena hrana nemohli casom rozist.
+      STANDING_ROLES = %w[drawer_back box_side drawer_inner_front].freeze
 
       module_function
 
@@ -78,14 +109,23 @@ module Noxun
         ax
       end
 
+      # Mapa „kod hrany -> [os, strana]" pre rolu dielca. Rola smie chybat
+      # (nil/''): vtedy plati default — stojace roly su vymenovane a chybajuca
+      # rola nikdy nema byt jednou z nich.
+      def edge_faces(role)
+        STANDING_ROLES.include?(role.to_s) ? STANDING_EDGE_FACES : EDGE_FACES
+      end
+
       # Kod hrany pre STRED plochy (mm suradnice v lokalnych osiach dielca) alebo nil
       # (velka dekorova plocha / plocha mimo obalu). `box` je [sx, sy, sz] v mm.
-      def edge_code_for_center(center_mm, box, ax)
+      # `role` rozhoduje o orientacii dvojice L1/L2 (stojace dielce zasuvky).
+      def edge_code_for_center(center_mm, box, ax, role = nil)
         return nil unless center_mm.is_a?(Array) && center_mm.length == 3 && ax
         axis, side = axis_side(center_mm, box)
         return nil if axis.nil? || axis == ax[:thickness]
-        return side == :min ? 'L1' : 'L2' if axis == ax[:width]
-        return side == :min ? 'W1' : 'W2' if axis == ax[:length]
+        edge_faces(role).each do |code, (key, want)|
+          return code if axis == ax[key] && side == want
+        end
         nil
       end
 
@@ -111,7 +151,12 @@ module Noxun
         'front_door' => [AXES_FRONT], 'drawer_front' => [AXES_FRONT],
         'flap' => [AXES_FRONT], 'false_front' => [AXES_FRONT],
         'back' => [AXES_WALL], 'plinth' => [AXES_WALL],
-        'rail_front' => [AXES_LYING, AXES_WALL], 'rail_back' => [AXES_LYING, AXES_WALL]
+        'rail_front' => [AXES_LYING, AXES_WALL], 'rail_back' => [AXES_LYING, AXES_WALL],
+        # KOV-D5: dielce zasuviek (recept ich stava v `Construction.drawer_part_descriptor`).
+        # Kazda rola ma PRAVE JEDNEHO kandidata — dno lezi, chrbat a vnutorne celo
+        # stoja v rovine XZ, bok boxu v rovine YZ (dlzka = NL po hlbke).
+        'drawer_bottom' => [AXES_LYING], 'drawer_back' => [AXES_WALL],
+        'drawer_inner_front' => [AXES_WALL], 'box_side' => [AXES_WALL_DEPTH]
       }.freeze
 
       # Osi dielca z jeho ROLY + rozmerov kvadra (mm) a vyrobnych udajov snapshotu.
@@ -138,8 +183,8 @@ module Noxun
       # z-fightingu. Posuva sa v LOKALNYCH osiach — zrkadlena ci otocena
       # instancia si smer „von" zachova aj po transformacii (winding quadu sa na
       # to pouzit NEDA).
-      def face_rect_mm(code, lo, hi, ax, out = 0.0)
-        axis, side = rect_axis_side(code, ax)
+      def face_rect_mm(code, lo, hi, ax, out = 0.0, role = nil)
+        axis, side = rect_axis_side(code, ax, role)
         return nil if axis.nil?
         return nil unless lo.is_a?(Array) && hi.is_a?(Array) && lo.length == 3 && hi.length == 3
         a, b = [0, 1, 2] - [axis]
@@ -153,16 +198,13 @@ module Noxun
         end
       end
 
-      # Kod hrany -> [index osi, :min|:max]. Zrkadlo edge_code_for_center (opacny smer).
-      def rect_axis_side(code, ax)
+      # Kod hrany -> [index osi, :min|:max]. Zrkadlo edge_code_for_center (opacny
+      # smer) — TA ISTA mapa, takze zvyraznena ploska sedi so zafarbenou.
+      def rect_axis_side(code, ax, role = nil)
         return [nil, nil] unless ax.is_a?(Hash)
-        case code.to_s
-        when 'L1' then [ax[:width], :min]
-        when 'L2' then [ax[:width], :max]
-        when 'W1' then [ax[:length], :min]
-        when 'W2' then [ax[:length], :max]
-        else [nil, nil]
-        end
+        key, side = edge_faces(role)[code.to_s]
+        return [nil, nil] if key.nil?
+        [ax[key], side]
       end
 
       # Na ktorej stene kvadra plocha lezi: [index osi, :min | :max] alebo nil.

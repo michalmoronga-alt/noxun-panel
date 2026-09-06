@@ -16468,6 +16468,211 @@ module NoxunSuRunner
        (kovd2b_axis(inst, 'nl')['state']).to_s == 'locked')
   end
 
+  # === KOV-D5: ABS FARBENIE DIELCOV ZASUVIEK =================================
+  #
+  # Pravidlo (package KOV-D, rez D5): dielce zasuvky nesu osi (`axes:`) a
+  # STOJACE roly (`drawer_back`, `box_side`, `drawer_inner_front`) maju
+  # L1 = HORNU dlhu hranu — presne tam, kde je podla ABS pravidla paska.
+  #
+  # Headless sada dokaze tvar planu a obe mapy hran. NEDOKAZE to, na com
+  # zalezi: KTORA ploska dielca je v modeli naozaj zafarbena a ci Kontrola
+  # olepov zvyrazni TU ISTU. Preto sa tu meria POLOHOU (horna stena kvadra =
+  # maximum osi Z), nie cez PartFaces — inak by test bol tautologiou.
+  #
+  # Bezi nad IZOLOVANYM katalogom (Materials.test_dir_override, vzor D-88):
+  # 16 mm doska zasuviek + KONTRASTNA paska v jej dekorovej skupine.
+  # Ziadna vetva „preskocene": nesulad predpokladu je FAIL (lekcia D2a).
+
+  KOVD5_ABS = 'D5E_HNEDA_23X10'
+
+  # D-88 katalog + 16 mm doska zasuviek (Atira aj Quadro ju prijmu) s vlastnou
+  # kontrastnou paskou. D-88 sadu nechavame nedotknutu.
+  def kovd5_catalog_json
+    cat = d88_catalog_json
+    cat['sheets'] = cat['sheets'] + [
+      { 'material_id' => 'D5DRAWER16', 'manufacturer' => 'Egger', 'decor' => 'D5DRAWER',
+        'type' => 'DTDL', 'thickness' => 16.0, 'grain' => 'none',
+        'sheet_size' => [2800.0, 2070.0], 'color' => [246, 246, 244],
+        'production_class' => 'sheet', 'group_id' => 'GRP-D5DRAWER', 'structure' => 'SM' }
+    ]
+    cat['edges'] = cat['edges'] + [
+      { 'abs_id' => KOVD5_ABS, 'decor' => 'D5DRAWER', 'thickness' => 1.0, 'width' => 23.0,
+        'color' => [120, 80, 40], 'group_id' => 'GRP-D5DRAWER', 'structure' => 'SM' }
+    ]
+    cat
+  end
+
+  def kovd5_params
+    kovc2b_params('material_id' => 'D88BIELA18', 'front_material_id' => 'D88BIELA18',
+                  'drawer_material_id' => 'D5DRAWER16')
+  end
+
+  def kovd5_part(inst, key)
+    kovc2b_parts(inst)[key]
+  end
+
+  # Prepnutie konstrukcie zasuvky PRESNE tak, ako ho posiela panel (klient
+  # serverove polia neposiela — `reattach_server_drawer_fields` ich vrati).
+  def kovd5_switch(model, inst, changes)
+    par = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    par['fronts']['items'][0] = par['fronts']['items'][0].merge(changes)
+    par['fronts'] = e::Fronts.reattach_server_drawer_fields(
+      par['fronts'], (e::Store.config(inst) || {})['fronts']
+    )
+    e::CabinetBuilder.rebuild(model, inst, par)
+  end
+
+  # Zvyraznenie Kontroly olepov pre JEDEN dielec — TA ISTA cesta, ktoru kresli
+  # overlay. -> [unresolved?, plosky stavu `taped` vo svetovych suradniciach]
+  def kovd5_taped(model, part)
+    occ = Array(e::EdgeCheck.scan(model)['occurrences']).find { |o| o['part'] == part.entityID }
+    return [nil, []] if occ.nil?
+
+    [occ['unresolved'], Array(occ['quads'][e::EdgeCheck::TAPED])]
+  end
+
+  # Svetove Z HORNEJ steny dielca (mm). Kvader je bez rotacie, takze staci
+  # posun instancii + vyska obalu definicie.
+  def kovd5_top_z(inst, part)
+    tr = inst.transformation * part.transformation
+    mm(tr.origin.z) + mm(part.definition.bounds.max.z)
+  end
+
+  # Lezi ploska zvyraznenia na HORNEJ stene dielca? (overlay ju posuva o
+  # `OUT_MM` VON z telesa — proti z-fightingu)
+  def kovd5_quad_on_top?(quad, top_z)
+    quad.length == 4 &&
+      quad.all? { |p| (mm(p.z) - (top_z + e::EdgeCheck::OUT_MM)).abs <= TOL }
+  end
+
+  def run_kovd5(model)
+    cleanup(model)
+    tmp = File.join(Dir.tmpdir, "noxun_kovd5_#{Process.pid}")
+    FileUtils.mkdir_p(tmp)
+    File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(kovd5_catalog_json))
+    e::Materials.test_dir_override = tmp
+    e::Materials.reload!
+    begin
+      ok('KOV-D5: override katalogu aktivny (kontrastna paska k 16 mm doske zasuviek)',
+         !e::Materials.edge(KOVD5_ABS).nil? &&
+         e::Materials.edge_color_of(KOVD5_ABS) == [120, 80, 40])
+      inst = e::CabinetBuilder.build(model, kovd5_params)
+      return ok('KOV-D5: vlozenie korpusu so zasuvkou', false) unless inst
+
+      kovd5_scenar(model, inst, d88_abs_name(KOVD5_ABS))
+    ensure
+      e::Materials.test_dir_override = nil
+      e::Materials.reload!
+      cleanup(model)
+      begin
+        FileUtils.rm_rf(tmp)
+      rescue StandardError
+        nil
+      end
+    end
+    ok('KOV-D5: cleanup (override prec, model prazdny)',
+       e::Materials.test_dir_override.nil? && cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: KOV-D5 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    e::Materials.test_dir_override = nil
+    e::Materials.reload!
+    cleanup(model)
+  end
+
+  def kovd5_scenar(model, inst, hneda)
+    # --- 1) ATIRA: chrbat ma pasku HORE, dno ziadnu -----------------------
+    back = kovd5_part(inst, 'front:F1/drawer_back')
+    ok('KOV-D5 Atira: chrbat zasuvky je v modeli', !back.nil?)
+    return if back.nil?
+
+    bcfg = e::Store.config(back) || {}
+    ok("KOV-D5 Atira: chrbat ma pravidlovu pasku na L1 (#{(bcfg['edges'] || {})['L1']})",
+       (bcfg['edges'] || {})['L1'] == KOVD5_ABS)
+    ok('KOV-D5 Atira: chrbat — HORNA ploska (Z max) nesie material PASKY',
+       d88_face_mat(back, 2, :max) == hneda)
+    ok('KOV-D5 Atira: chrbat — DOLNA ploska (Z min) ostava bez materialu',
+       d88_face_mat(back, 2, :min).nil?)
+    ok('KOV-D5 Atira: chrbat — velke dekorove plochy (Y min/max) ostavaju bez materialu',
+       d88_face_mat(back, 1, :min).nil? && d88_face_mat(back, 1, :max).nil?)
+    ok('KOV-D5 Atira: chrbat — bocne hrany (X) bez pravidla ostavaju bez materialu',
+       d88_face_mat(back, 0, :min).nil? && d88_face_mat(back, 0, :max).nil?)
+    bottom = kovd5_part(inst, 'front:F1/drawer_bottom')
+    ok('KOV-D5 Atira: dno (pravidlo bez ABS) nema ZIADNU zafarbenu plosku',
+       !bottom.nil? && bottom.definition.entities.grep(Sketchup::Face).none? { |f| f.material })
+
+    # --- 2) KONTROLA OLEPOV ukazuje TU ISTU hranu -------------------------
+    unres, quads = kovd5_taped(model, back)
+    top_z = kovd5_top_z(inst, back)
+    ok('KOV-D5 Kontrola: chrbat ma overitelne osi (nie `unresolved`)', unres == false)
+    ok("KOV-D5 Kontrola: zvyraznenie olepu lezi na HORNEJ hrane chrbta (#{top_z.round(1)} mm)",
+       quads.length == 1 && kovd5_quad_on_top?(quads.first, top_z))
+
+    # --- 3) QUADRO: bok boxu aj vnutorne celo maju pasku HORE -------------
+    kovd5_switch(model, inst, 'drawer' => { 'construction' => 'wood' })
+    side = kovd5_part(inst, 'front:F1/box_side:left')
+    ifr  = kovd5_part(inst, 'front:F1/drawer_inner_front')
+    ok('KOV-D5 Quadro: bok boxu aj vnutorne celo su v modeli', !side.nil? && !ifr.nil?)
+    return if side.nil? || ifr.nil?
+
+    ok('KOV-D5 Quadro: bok boxu — HORNA ploska (Z max) nesie material PASKY',
+       d88_face_mat(side, 2, :max) == hneda)
+    ok('KOV-D5 Quadro: bok boxu — DOLNA ploska (Z min) ostava bez materialu',
+       d88_face_mat(side, 2, :min).nil?)
+    ok('KOV-D5 Quadro: bok boxu — velke dekorove plochy (X min/max) bez materialu',
+       d88_face_mat(side, 0, :min).nil? && d88_face_mat(side, 0, :max).nil?)
+    ok('KOV-D5 Quadro: bok boxu — predna/zadna hrana (Y) bez pravidla ostava cista',
+       d88_face_mat(side, 1, :min).nil? && d88_face_mat(side, 1, :max).nil?)
+    ok('KOV-D5 Quadro: vnutorne celo ma pasku tiez HORE (Z max)',
+       d88_face_mat(ifr, 2, :max) == hneda && d88_face_mat(ifr, 2, :min).nil?)
+    sunres, squads = kovd5_taped(model, side)
+    stop_z = kovd5_top_z(inst, side)
+    ok("KOV-D5 Kontrola: zvyraznenie boku boxu je na HORNEJ hrane (#{stop_z.round(1)} mm)",
+       sunres == false && squads.length == 1 && kovd5_quad_on_top?(squads.first, stop_z))
+
+    # --- 4) SPAT / REDO mapovanie nemenia ---------------------------------
+    Sketchup.undo
+    back2 = kovd5_part(inst, 'front:F1/drawer_back')
+    ok('KOV-D5 Spat: po navrate na Atiru je paska zase na HORNEJ hrane chrbta',
+       !back2.nil? && d88_face_mat(back2, 2, :max) == hneda &&
+       d88_face_mat(back2, 2, :min).nil?)
+    if Sketchup.respond_to?(:redo)
+      Sketchup.redo
+      side2 = kovd5_part(inst, 'front:F1/box_side:left')
+      ok('KOV-D5 Redo: Quadro bok boxu ma pasku zase HORE',
+         !side2.nil? && d88_face_mat(side2, 2, :max) == hneda &&
+         d88_face_mat(side2, 2, :min).nil?)
+      Sketchup.undo
+    else
+      info('KOV-D5: Sketchup.redo nedostupne — Redo vetva netestovana')
+    end
+
+    # --- 5) STARY MODEL (zakazka postavena pred D5) -----------------------
+    # Zakazku bez osi poznat tak, ze dielce zasuvky nemaju ZIADNU zafarbenu
+    # plosku (plan vtedy `axes` neniesol). Simulujeme to odobratim materialu;
+    # prestavba ma farbu na hornej hrane vratit.
+    old = kovd5_part(inst, 'front:F1/drawer_back')
+    return ok('KOV-D5 stary model: chrbat je po Spat v modeli', false) if old.nil?
+
+    model.start_operation('NOXUN TEST: stary model bez osi', true)
+    old.definition.entities.grep(Sketchup::Face).each do |f|
+      f.material = nil
+      f.back_material = nil
+    end
+    model.commit_operation
+    ok('KOV-D5 stary model: dielec je pred prestavbou bez zafarbenej plosky',
+       old.definition.entities.grep(Sketchup::Face).none? { |f| f.material })
+    ounres, oquads = kovd5_taped(model, old)
+    ok('KOV-D5 stary model: Kontrola hranu zvyrazni aj tak (osi z ROLY, nie z planu)',
+       ounres == false && oquads.length == 1 &&
+       kovd5_quad_on_top?(oquads.first, kovd5_top_z(inst, old)))
+    e::CabinetBuilder.rebuild(model, inst,
+                              e::CabinetBuilder.config_to_params(e::Store.config(inst) || {}))
+    fresh = kovd5_part(inst, 'front:F1/drawer_back')
+    ok('KOV-D5 stary model: PRESTAVBA vratila pasku na HORNU hranu',
+       !fresh.nil? && d88_face_mat(fresh, 2, :max) == hneda &&
+       d88_face_mat(fresh, 2, :min).nil?)
+  end
+
   def run_kovc2b(model)
     cleanup(model)
     markers = []
@@ -17548,6 +17753,7 @@ module NoxunSuRunner
     run_kovd3a(model)        # KOV-D3a: upgrade receptu jedneho cela nad FIXTURNYM registrom (`with_test_dir`) — ciel s nesediacou hrubkou preflight odmietne BEZ kroku Spat (v mape ostava v1 aj zamok), uspesny upgrade meni ref, PREADRESUJE zamok NL a prestava dielce v JEDNEJ operacii (Spat aj Redo vratia vsetko naraz), kopia nesie novy ref
     run_kovd3b(model)        # KOV-D3b: CESTA Z KARTY nad dvojprvkovym fixturnym registrom — bez v2 karta ponuku nedostane vobec; s v2 nesie `upgrade.available` (plny aj lahky push), citaci callback dopadu vrati cisla (chrbat v1->v2, preneseny zamok NL, kod kitu) + ODTLACOK a NEZAPISE nic; ZMENA SKRINKY po nahlade zapis ODMIETNE bez kroku Spat (Codex #315 P1), potvrdeny zapis s tokenom a cerstvym odtlackom vymeni ref, preadresuje zamok a prestava dielce v JEDNEJ operacii (Spat = 1 krok, Redo obnovi ref+zamok+geometriu sucasne), odmietnuty preflight odpovie `ok:false` a nenechá ZIADNY krok Spat
     run_kovd4(model)         # KOV-D4: PAMAT pri prechode na dvierka — prechod zasuvka -> dvierka -> zasuvka ide TOU ISTOU cestou ako panel (klient serverove polia neposiela): pripnuty recept aj zamok NL prezije, dormantny zamok NEMA chipy osi, po navrate sa zamok znovu VALIDUJE stavbou (dlzka, geometria aj nakupny kit); zmena otvarania pripne INY recept a stary zamok ostava dormantny (dlzka je z automatu, riadok nesvieti ako aktivny), navrat na classic ho zase aktivuje
+    run_kovd5(model)         # KOV-D5: ABS farbenie dielcov zasuviek — chrbat Atiry ma pasku na HORNEJ ploske (dolna aj velke plochy cisté), dno ziadnu; Quadro bok boxu aj vnutorne celo tiez HORE; Kontrola olepov zvyrazni TU ISTU ploskou (aj pri starom modeli, kde osi pochadzaju z ROLY); Spat aj Redo mapovanie nemenia a prestavba starej zakazky farbu doplni
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

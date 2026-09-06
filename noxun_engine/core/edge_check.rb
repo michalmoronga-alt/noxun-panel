@@ -248,7 +248,9 @@ module Noxun
         return if ax.nil?
         STATES.each do |state|
           codes[state].each do |code|
-            rect = PartFaces.face_rect_mm(code, lo, hi, ax, OUT_MM)
+            # ROLA sa posiela aj sem: zvyraznena ploska musi byt TA ISTA, ktoru
+            # farbi `paint_edge_faces` (KOV-D5, stojace dielce zasuvky).
+            rect = PartFaces.face_rect_mm(code, lo, hi, ax, OUT_MM, role)
             next if rect.nil?
             occ['quads'][state] << rect.map { |p| Units.point(p[0], p[1], p[2]).transform(tr) }
           end

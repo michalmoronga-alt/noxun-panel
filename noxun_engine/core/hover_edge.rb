@@ -169,7 +169,7 @@ module Noxun
         prod = { 'length' => cfg['length'], 'width' => cfg['width'], 'thickness' => cfg['thickness'] }
         ax = PartFaces.axes_for_snapshot(role, box, prod)
         return nil if ax.nil?
-        rect = PartFaces.face_rect_mm(code, lo, hi, ax, OUT_MM)
+        rect = PartFaces.face_rect_mm(code, lo, hi, ax, OUT_MM, role)
         return nil if rect.nil?
         rect.map { |p| Units.point(p[0], p[1], p[2]).transform(tr) }
       rescue StandardError => e

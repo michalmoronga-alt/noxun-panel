@@ -368,12 +368,13 @@ module Noxun
       # ako to popisuje seed 4 (`drawer_back`/`box_side`/`drawer_inner_front`
       # maju L1 = horna dlha hrana).
       #
-      # OSI (`axes:`) sa VEDOME NEUVADZAJU. `axes` sluzia VYHRADNE na farbenie
-      # ABS plosiek (D-88) a PartFaces ma vlastnu zasadu „radsej ziadna farba nez
-      # farba na zlej hrane": pri stojacom dielci by L1 vysla na SPODNU hranu,
-      # kym paska ide na HORNU. Farbenie hran zasuviek preto pride az s vlastnou
-      # osovou mapou (KOV-C2c / D); geometria, vyrobne rozmery ani ABS kody od
-      # osi nezavisia.
+      # OSI (`axes:`) nesie KAZDY dielec zasuvky (KOV-D5) — bez nich sa hrany
+      # nezafarbia a Kontrola olepov ich nezvyrazni. Su to EXPLICITNE konstanty
+      # podla umiestnenia boxu nizsie (dno lezi, chrbat a vnutorne celo stoja
+      # v rovine XZ, bok boxu v rovine YZ), NIKDY odhad z rozmerov. Otazku
+      # „pri stojacom dielci by L1 vysla na SPODNU hranu, kym paska ide na
+      # HORNU" riesi `PartFaces::STANDING_EDGE_FACES` (otocena dvojica L1/L2 pre
+      # `STANDING_ROLES`) — recept, ABS pravidla ani vyrobne rozmery sa nemenia.
       #
       # UMIESTNENIE: box je vycentrovany v svetlej sirke (`ctx[:x0]`..`x1`),
       # zaciatok hlbky je predna rovina vnutra (y = 0) a spodok riadku `ctx[:z0]`.
@@ -444,12 +445,14 @@ module Noxun
           suffix = "DRWSIDE-#{side == 'right' ? 'R' : 'L'}"
           key = PartKeys.front(front_id, 'box_side', side)
           name = "Bok boxu #{side == 'right' ? 'pravy' : 'lavy'} #{front_id}"
+          axes = PartFaces::AXES_WALL_DEPTH
         when Recipes::ROLE_BOTTOM
           box = [wd, ht, th]
           origin = [cx - wd / 2.0, 0.0, z_lift]
           suffix = 'DRWBOT'
           key = PartKeys.front(front_id, 'drawer_bottom')
           name = "Dno zasuvky #{front_id}"
+          axes = PartFaces::AXES_LYING
         when Recipes::ROLE_INNER_FRONT
           # Predok aj chrbat stoja NA dne (recept ich vysku tak aj pocita:
           # box_height - hrubka dna - odsadenie dna).
@@ -458,15 +461,17 @@ module Noxun
           suffix = 'DRWIFR'
           key = PartKeys.front(front_id, 'drawer_inner_front')
           name = "Vnutorne celo zasuvky #{front_id}"
+          axes = PartFaces::AXES_WALL
         else # ROLE_BACK
           box = [wd, th, ht]
           origin = [cx - wd / 2.0, [anchor[:depth] - th, 0.0].max, z_lift + anchor[:bottom_th]]
           suffix = 'DRWBACK'
           key = PartKeys.front(front_id, 'drawer_back')
           name = "Chrbat zasuvky #{front_id}"
+          axes = PartFaces::AXES_WALL
         end
         { suffix: "#{suffix}-#{front_id}-#{index + 1}", part_key: key, role: role, name: name,
-          material: :drawer, box: box, origin: origin, prod: prod }
+          material: :drawer, box: box, origin: origin, prod: prod, axes: axes }
       end
 
       # --- KOV-C2b: JEDNA polozka vysuvu ---------------------------------------
