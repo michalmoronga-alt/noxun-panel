@@ -514,6 +514,156 @@ NxTest.test('KOV-D1a (Codex #308 P2): klasifikovany owner vyber uprace LEGACY kl
   NxTest.assert_equal([:ok, [legacy_key]], [st3, map3.keys])
 end
 
+NxTest.test('KOV-D1a (Codex #308 kolo 2 P1): PRITOMNY kluc s pokazenou hodnotou = RED, nie nizsia uroven') do
+  c = NxD1a
+  h = c::HWS
+  it = c.atira_item
+  # Nizsie urovne maju PLATNU hodnotu — a predsa sa na ne NESMIE padnut.
+  proj = { c::CLASSK => c.height_selector([[70, 'atira-biela-h70-sisy']]) }
+  cab  = { c::CLASSK => c.height_selector([[70, 'atira-biela-h70-sisy']]) }
+
+  [{ 'popis' => 'prazdna hodnota', 'raw' => '' },
+   { 'popis' => 'zly tvar selektora', 'raw' => { 'param' => 'height_variant', 'bands' => 'nie pole' } },
+   { 'popis' => 'prazdne set_id v pasme', 'raw' => { 'param' => 'height_variant',
+                                                     'bands' => [{ 'min' => 70.0, 'max' => 70.0,
+                                                                   'set_id' => '' }] } }].each do |cs|
+    raw = { c::OWNK => cs['raw'] }
+    ov = h.normalize_mapping(raw, nil, allow_owner: true, keep_invalid: true)
+    NxTest.assert(h.invalid_mapping_value?(ov[c::OWNK]), "#{cs['popis']}: kluc OSTAVA ako marker")
+
+    sid, reason, = h.resolve_set_id('slide', it, { 'CAB-1' => cab.merge(ov) }, proj)
+    NxTest.assert_equal([nil, 'mapping_invalid'], [sid, reason],
+                        "#{cs['popis']}: nikdy set z nizsej urovne")
+  end
+
+  # Expanzia: RED bez kodu (receptova polozka), nie kit z projektu.
+  ov = h.normalize_mapping({ c::OWNK => '' }, nil, allow_owner: true, keep_invalid: true)
+  state = c.state_of([c.seed_set('atira-biela-h70-sisy')], proj)
+  exp = h.expand([it], state, cabinet_overrides: { 'CAB-1' => ov })
+  NxTest.assert_equal([], exp['rows'], 'ziadny kod z predvolby projektu')
+  u = exp['unmapped'].first
+  NxTest.assert_equal(['drawer_kit_missing', 'mapping_invalid', true],
+                      [u['reason'], u['base_reason'], u['blocks_export']])
+  NxTest.assert(h.unmapped_reason_sk(u).include?('poškodený'), h.unmapped_reason_sk(u))
+
+  # NEEXISTUJUCI set_id ostava vlastnym dovodom (`set_missing`) — kluc je platny.
+  ov2 = h.normalize_mapping({ c::OWNK => c.height_selector([[70, 'nie-je']]) },
+                            nil, allow_owner: true, keep_invalid: true)
+  exp2 = h.expand([it], state, cabinet_overrides: { 'CAB-1' => ov2 })
+  NxTest.assert_equal('set_missing', exp2['unmapped'].first['base_reason'])
+end
+
+NxTest.test('KOV-D1a (Codex #308 kolo 2 P2): owner kluc na riadku `none` sa zahodi') do
+  c = NxD1a
+  fronts = { 'items' => [{ 'id' => 'F1', 'type' => 'none' },
+                         { 'id' => 'F2', 'type' => 'drawer_front', 'mode' => 'fixed',
+                           'height' => 175.0 }] }
+  map = c::CB.normalize('width' => 900.0, 'height' => 720.0, 'depth' => 500.0, 'fronts' => fronts,
+                        'hardware_sets' => { c::OWNK => 'atira-biela-h70-sisy',
+                                             "#{c::CLASSK}@front:F2/panel" => 'atira-biela-h70-sisy' })[:hardware_sets]
+  NxTest.refute(map.key?(c::OWNK), 'riadok `none` ziadne celo nema — vyber by sa ticho reaktivoval')
+  NxTest.assert(map.key?("#{c::CLASSK}@front:F2/panel"), 'skutocne celo si vyber ponecha')
+end
+
+NxTest.test('KOV-D1a (Codex #308 kolo 2 P2): neaktivny set sa neda PRESUNUT do ineho pasma') do
+  c = NxD1a
+  h = c::HWS
+  dead70 = c.seed_set('atira-biela-h70-sisy').merge('active' => false)
+  live144 = c.seed_set('atira-biela-h144-sisy')
+  stored = c.height_selector([[70, 'atira-biela-h70-sisy']])
+  state = c.state_of([dead70, live144], c::CLASSK => stored)
+  m = c.model_with(state)
+
+  # Rovnaky zavazok (to iste pasmo) = ZACHOVANIE ulozenej volby -> prejde.
+  NxTest.assert_equal(true, h.set_project_mapping!(m, c::CLASSK, stored, [dead70]))
+  # POSUN neaktivneho setu do INEHO pasma uz NIE JE zachovanie, ale NOVY vyber.
+  posun = { 'param' => 'height_variant',
+            'bands' => [{ 'min' => 70.0, 'max' => 144.0, 'set_id' => 'atira-biela-h70-sisy' }] }
+  NxTest.assert_equal(false, h.set_project_mapping!(m, c::CLASSK, posun, [dead70]),
+                      'rozsirene pasmo by neaktivny set objednalo do INYCH zakaziek')
+  # Rovnako prechod z pevnej volby na selektor s tym istym setom.
+  fix_state = c.state_of([dead70], 'class:slide|classic|wood' => 'atira-biela-h70-sisy')
+  m2 = c.model_with(fix_state)
+  NxTest.assert_equal(false, h.set_project_mapping!(m2, 'class:slide|classic|wood',
+                                                    c.height_selector([[70, 'atira-biela-h70-sisy']]),
+                                                    [dead70]))
+end
+
+NxTest.test('KOV-D1a (Codex #308 kolo 2 P2): triedny zapis overi sety proti KLASIFIKACII kluca') do
+  c = NxD1a
+  h = c::HWS
+  m = c.model_with(c.state_of([c.seed_set('vysuv-quadro-v6-sisy')],
+                              'class:slide|classic|wood' => 'vysuv-quadro-v6-sisy'))
+  # Tip-On sety pod klasickym klucom.
+  tipon = c.height_selector([[70, 'atira-biela-h70-p2o']])
+  NxTest.assert_equal(false, h.set_project_mapping!(m, c::CLASSK, tipon,
+                                                    [c.seed_set('atira-biela-h70-p2o')]),
+                      'iny sposob otvarania nez pomenuva kluc')
+  # PEVNY Atira set (ma vyskovy variant) pod triednym klucom.
+  NxTest.assert_equal(false, h.set_project_mapping!(m, c::CLASSK, 'atira-biela-h70-sisy',
+                                                    [c.seed_set('atira-biela-h70-sisy')]),
+                      'set s vyskovym variantom sa pevne vybrat neda')
+  # Ina konstrukcia (drevo pod kovovym klucom).
+  NxTest.assert_equal(false, h.set_project_mapping!(m, c::CLASSK, 'vysuv-quadro-v6-sisy',
+                                                    [c.seed_set('vysuv-quadro-v6-sisy')]))
+  # A SPRAVNA kombinacia prejde.
+  ok = c.height_selector([[70, 'atira-biela-h70-sisy']])
+  NxTest.assert_equal(true, h.set_project_mapping!(m, c::CLASSK, ok,
+                                                   [c.seed_set('atira-biela-h70-sisy')]))
+end
+
+NxTest.test('KOV-D1a (vlastny prechod): ZMIESANA skrinka sa jednym klucom zapisat NEDA') do
+  c = NxD1a
+  h = c::HWS
+  legacy = { 'owner_id' => 'CAB-1', 'owner_part_key' => 'front:F2/panel', 'generic_type' => 'slide',
+             'quantity' => 1, 'rule_id' => 'r', 'params' => { 'nominal_length' => 470.0 },
+             'source' => 'rule' }
+  cfg = c.cfg_with({}, [c.atira_item, legacy])
+  sel = c.height_selector([[70, 'atira-biela-h70-sisy']])
+  st, msg, = h.apply_cabinet_override(cfg, 'slide', nil, sel,
+                                      known_sets: [c.seed_set('atira-biela-h70-sisy')])
+  NxTest.assert_equal(:invalid, st, 'genericky kluc by klasifikovanu polozku NECITAL (tichy no-op)')
+  NxTest.assert(msg.include?('na konkrétnom čele'), msg)
+  # Na KONKRETNOM celi to ide dalej bez problemu.
+  NxTest.assert_equal(:ok, h.apply_cabinet_override(cfg, 'slide', c::OWNER, sel,
+                                                    known_sets: [c.seed_set('atira-biela-h70-sisy')])[0])
+end
+
+NxTest.test('KOV-D1a (Codex #308 kolo 2 P2): karta ukaze LEN kluc AKTIVNEJ triedy dielca') do
+  c = NxD1a
+  panel = c::E::Panel
+  tipon_key = "class:slide|tipon|metal@#{c::OWNER}"
+  overrides = { c::OWNK => 'A', tipon_key => 'B', "slide@#{c::OWNER}" => 'C' }
+
+  # Celo je KLASICKE: dormantny Tip-On vyber ani legacy kluc sa NEUKAZU.
+  out = panel.owner_set_overrides(overrides, 'slide', [c.atira_item])
+  NxTest.assert_equal({ 'set_id' => 'A' }, out[c::OWNER], 'len kluc aktivnej triedy')
+
+  # Po prepnuti na Tip-On sa ukaze TEN druhy — a klasicky sa stane dormantnym.
+  tip = c.atira_item('params' => { 'opening_mode' => 'tipon' })
+  out2 = panel.owner_set_overrides(overrides, 'slide', [tip])
+  NxTest.assert_equal({ 'set_id' => 'B' }, out2[c::OWNER])
+
+  # NEKLASIFIKOVANA polozka cita legacy kluc — a ten sa jej ukaze.
+  legacy = { 'owner_id' => 'CAB-1', 'owner_part_key' => c::OWNER, 'generic_type' => 'slide',
+             'quantity' => 1, 'rule_id' => 'r', 'params' => { 'nominal_length' => 470.0 },
+             'source' => 'rule' }
+  NxTest.assert_equal({ 'set_id' => 'C' }, panel.owner_set_overrides(overrides, 'slide', [legacy])[c::OWNER])
+
+  # Poskodena hodnota sa PRIZNA — nie prazdny select.
+  bad = c::HWS.normalize_mapping({ c::OWNK => '' }, nil, allow_owner: true, keep_invalid: true)
+  NxTest.assert_equal({ 'invalid' => true },
+                      panel.owner_set_overrides(bad, 'slide', [c.atira_item])[c::OWNER])
+end
+
+NxTest.test('KOV-D1a (vlastny prechod): pritomne `value` sa nepresvieti na `set_id`') do
+  panel = Noxun::Engine::Panel
+  NxTest.assert_equal(42, panel.hw_set_value('value' => 42, 'set_id' => 'atira-biela-h70-sisy'),
+                      'nepouzitelny tvar odmietne SERVER s hlaskou, nie ticho iny vyber')
+  NxTest.assert_equal('x', panel.hw_set_value('value' => 'x', 'set_id' => 'y'))
+  NxTest.assert_equal('y', panel.hw_set_value('value' => nil, 'set_id' => 'y'), 'null = nie je volba')
+end
+
 # ============================================================================
 # R3 — CONFIG_SCHEMA 6
 # ============================================================================

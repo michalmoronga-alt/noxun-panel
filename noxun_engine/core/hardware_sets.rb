@@ -154,10 +154,21 @@ module Noxun
       # KOV-C2b: pre polozku Z RECEPTU (`source: 'recipe'`) sa KAZDY dovod
       # povysuje na RED `drawer_kit_missing` — dielce su uz postavene na
       # konkretnu NL, takze chybajuci kit nie je „nenacenene", ale nevyrobitelne.
+      # KOV-D1a (Codex #308 kolo 2 P1): `mapping_invalid` = kluc mapovania JE
+      # pritomny, ale jeho hodnota sa neda pouzit (prazdna, poskodeny selektor).
+      # Vlastny dovod, nie `class_unmapped`: chybajuce mapovanie navadza na
+      # „Doplniť nové predvoľby", pokazene na opravu TEJTO skrinky.
       UNMAPPED_REASONS = %w[no_set set_missing set_type_mismatch nl_missing
                             param_band_missing selector_unresolved
                             length_unsupported library_incompatible
-                            class_unmapped set_incompatible drawer_kit_missing].freeze
+                            class_unmapped set_incompatible mapping_invalid
+                            drawer_kit_missing].freeze
+
+      # KOV-D1a: kluc MARKERA neplatneho mapovania. Marker je JEDINY tvar, ktory
+      # v mape znamena „kluc tu je, ale hodnota sa neda pouzit"; vyraba ho VYHRADNE
+      # citacia normalizacia cabinet override mapy (`keep_invalid`), zapisova cesta
+      # ho nikdy nezapise ako volbu pouzivatela (`parse_mapping_value` ho odmietne).
+      INVALID_KEY = 'invalid'
 
       # KOV-C2b: RED dovod receptovej polozky (viz `unmapped_entry`). Retazec
       # sa nesmie rozist s `Recipes::KIT_MISSING` — strazi to guard test.
@@ -1428,7 +1439,11 @@ module Noxun
             next false unless refs.all? { |sid| defs[sid] && defs[sid]['generic_type'] == gt }
             # F10: NOVY vyber neaktivneho setu sa odmieta; UZ ULOZENA hodnota
             # (aj neaktivna) ostava nedotknuta — meni sa vzdy len TENTO kluc.
-            next false if new_inactive_ref?(refs, defs, mapping[key])
+            next false if new_inactive_ref?(norm, defs, mapping[key])
+            # Codex #308 kolo 2 P2: pri TRIEDNOM kluci musia sety sediet
+            # klasifikacii, ktoru kluc pomenuva (inak by to odhalila az RED
+            # expanzia nad hotovou zakazkou).
+            next false if class_key_value_problem(key, norm, defs)
 
             mapping[key] = norm
           end
@@ -1451,20 +1466,93 @@ module Noxun
         BuildPlan::GENERIC_TYPES.include?(key) ? key : nil
       end
 
-      # F10: PRVY set novej hodnoty, ktory je NEAKTIVNY a doteraz ulozeny NEBOL
-      # (uz ulozeny neaktivny set sa smie zachovat aj prepisat na seba) — inak
-      # nil. JEDINA autorita otazky „da sa tento set novo vybrat"; pouzivaju ju
-      # VSETKY tri zapisove cesty (globál, projekt, override skrinky).
-      def inactive_ref(refs, defs, current_value)
-        kept = value_set_ids(current_value)
-        Array(refs).find do |sid|
+      # F10: PRVY set NOVEJ hodnoty, ktory je NEAKTIVNY a jeho EFEKTIVNE
+      # MAPOVANIE sa oproti ulozenej hodnote ZMENILO — inak nil. JEDINA autorita
+      # otazky „da sa tento set novo vybrat"; pouzivaju ju VSETKY tri zapisove
+      # cesty (globál, projekt, override skrinky).
+      #
+      # Codex #308 kolo 2 P2: neporovnava sa PRITOMNOST ID, ale ZAVAZOK — teda
+      # dvojica „na akom mieste hodnoty ten set stoji". Inak by sa neaktivny set
+      # dal posunut do INEHO pasma (alebo z pevnej volby na selektor) a ticho by
+      # sa tym objednal do inych zakaziek, nez pre ktore bol povodne vybraty.
+      def inactive_ref(value, defs, current_value)
+        kept = mapping_commitments(current_value)
+        mapping_commitments(value).each do |commitment|
+          sid = commitment.last
           d = defs[sid]
-          d.is_a?(Hash) && d['active'] == false && !kept.include?(sid)
+          next unless d.is_a?(Hash) && d['active'] == false
+
+          return sid unless kept.include?(commitment)
+        end
+        nil
+      end
+
+      # KOV-D1a (Codex #308 kolo 2 P2): hodnota TRIEDNEHO kluca proti KLASIFIKACII,
+      # ktoru ten kluc pomenuva. Bez tejto brany by sa `class:slide|classic|metal`
+      # dal namapovat na Tip-On sety alebo na PEVNY Atira set a expanzia by to
+      # odmietla az RED-om nad hotovou zakazkou.
+      #
+      # Je to VLASTNA funkcia, nie `classified_value_problem`: ta porovnava set
+      # s KONKRETNOU polozkou (jej `system` a aktualnu vysku), kym triedny kluc
+      # nesie LEN otvaranie a konstrukciu. Zdielaju sa spodne pravidla (vyskovy
+      # variant vs. pasmo), nie vstup.
+      # -> SK dovod | nil
+      def class_key_value_problem(class_key, value, defs)
+        canon, = parse_class_key(class_key, allow_owner: false)
+        return nil if canon.nil? # nie je triedny kluc — tato brana sa ho netyka
+
+        segs = canon[BuildPlan::HW_SET_CLASS_PREFIX.length..].to_s.split('|')
+        om = segs[1].to_s
+        dc = segs[2]
+        selector = height_selector?(value)
+        mapping_commitments(value).each do |commitment|
+          sid = commitment.last
+          set = defs[sid]
+          next if set.nil? # existenciu a typ overuje volajuci
+
+          if set['opening_mode'].to_s.strip != om
+            return "set „#{set['name']}“ má iný spôsob otvárania, než pomenúva kľúč"
+          end
+          if dc && set['drawer_construction'].to_s.strip != dc
+            return "set „#{set['name']}“ má inú konštrukciu zásuvky, než pomenúva kľúč"
+          end
+
+          set_hv = int_value(set[HEIGHT_VARIANT_KEY])
+          if selector
+            if set_hv.nil?
+              return "set „#{set['name']}“ nemá výškový variant — do výberu podľa výšky nepatrí"
+            end
+            unless set_hv >= commitment[1] && set_hv <= commitment[2]
+              return "set „#{set['name']}“ nepatrí do pásma, ktoré ho vydáva"
+            end
+          elsif set_hv
+            # Set s vyskovym variantom sa PEVNE vybrat neda — po prerasteni
+            # zasuvky by objednal kit inej vysky (rovnake pravidlo ako v
+            # `resolve_set_id`).
+            return "set „#{set['name']}“ má výškový variant — vyber ho podľa výšky, nie napevno"
+          end
+        end
+        nil
+      end
+
+      # Hodnota mapovania -> zoznam ZAVAZKOV `[param, min, max, set_id]`
+      # (pevna volba = `['fixed', set_id]`). Dva zavazky su rovnake PRAVE VTEDY,
+      # ked set objednavaju za rovnakych podmienok.
+      def mapping_commitments(value)
+        return [] if invalid_mapping_value?(value)
+        return [['fixed', value.to_s.strip]] if value.is_a?(String) || value.is_a?(Symbol)
+        return [] unless value.is_a?(Hash)
+
+        param = value['param'].to_s
+        Array(value['bands']).filter_map do |b|
+          next unless b.is_a?(Hash)
+
+          [param, b['min'].to_f, b['max'].to_f, b['set_id'].to_s]
         end
       end
 
-      def new_inactive_ref?(refs, defs, current_value)
-        !inactive_ref(refs, defs, current_value).nil?
+      def new_inactive_ref?(value, defs, current_value)
+        !inactive_ref(value, defs, current_value).nil?
       end
 
       # --- nakupny CSV (D1b, audit N11) ----------------------------------------
@@ -1572,6 +1660,10 @@ module Noxun
             'Pravidlá → Doplniť nové predvoľby'
         when 'set_incompatible'
           "set „#{sid}“ nesedí so zásuvkou (#{incompatible_detail_sk(u['detail'])})"
+        when 'mapping_invalid'
+          # KOV-D1a: vyber NA TEJTO SKRINKE je poskodeny. NIKDY sa nepouzije
+          # predvolba projektu — pouzivatel tu nieco vedome vybral.
+          'výber setu na tejto skrinke je poškodený — vyber ho nanovo'
         else
           'typ nemá priradený set'
         end
@@ -1889,7 +1981,8 @@ module Noxun
           d = defs[sid]
           d && d['generic_type'] == gt
         end
-        return false if new_inactive_ref?(refs, defs, state['mapping'][key]) # F10
+        return false if new_inactive_ref?(norm_value, defs, state['mapping'][key]) # F10
+        return false if class_key_value_problem(key, norm_value, defs) # Codex #308 kolo 2 P2
 
         state['mapping'][key] = norm_value
         refs.each { |sid| state['sets'][sid] = defs[sid] }
@@ -2084,7 +2177,9 @@ module Noxun
         end
         base = cfg.is_a?(Hash) && cfg['hardware_sets'].is_a?(Hash) ? cfg['hardware_sets'] : {}
         map = normalize_mapping(base, nil, allow_owner: true)
-        ck = override_class_key(items, gt, owner)
+        ck, ck_err = override_class_key(items, gt, owner)
+        return [:invalid, ck_err, nil] if ck_err
+
         key = ck || (owner ? "#{gt}@#{owner}" : gt)
         # KOV-D1a (Codex #308 kolo 1 P2): pri KLASIFIKOVANOM owner vybere je
         # LEGACY kluc `typ@owner` uz mrtvy (resolver ho pre taku polozku necita).
@@ -2106,7 +2201,7 @@ module Noxun
           # F10 plati pre KAZDY zapis override, nielen pre klasifikovany
           # (Codex #308 kolo 1 P1): neaktivny set sa NOVO vybrat neda ani na
           # legacy polozke. Uz ulozena hodnota ostava (vynimka pre `map[key]`).
-          dead = inactive_ref(refs, defs, map[key])
+          dead = inactive_ref(norm, defs, map[key])
           if dead
             return [:invalid, "set „#{defs[dead]['name']}“ je neaktívny — nedá sa vybrať", nil]
           end
@@ -2128,11 +2223,20 @@ module Noxun
       # genericky kluc (zmiesana skrinka: klasifikovane polozky si vyber urobia
       # cez svoje triedne mapovanie, legacy cez genericke — presne ako doteraz).
       # -> owner triedny / triedny kluc | nil (genericky)
+      # -> [kluc | nil, SK dovod | nil]
       def override_class_key(items, generic_type, owner)
         cks = Array(items).map { |it| class_key_for(it, generic_type) }.uniq
-        return nil if cks.length != 1 || cks.first.nil?
+        return [nil, nil] if cks.empty? || cks == [nil] # cisto legacy -> genericky kluc
 
-        owner ? "#{cks.first}@#{owner}" : cks.first
+        # ZMIESANY vyber (klasifikovane + legacy polozky, alebo dve rozne triedy)
+        # sa JEDNYM klucom zapisat NEDA: genericky kluc by klasifikovane polozky
+        # NECITALI (tichy no-op) a triedny by minul legacy. Vlastny prechod diffu
+        # po Codex #308 kolo 2 — je to ten isty vzor „zapis plati len na cast".
+        if cks.length > 1
+          return [nil, 'skrinka má viac druhov kovania tohto typu — vyber set na konkrétnom čele']
+        end
+
+        [owner ? "#{cks.first}@#{owner}" : cks.first, nil]
       end
 
       # KOV-D1a (Codex #307 kolo 2 P2): hodnota pre KLASIFIKOVANU polozku sa
@@ -2521,7 +2625,10 @@ module Noxun
         out = {}
         cabinet_overrides.each do |cid, map|
           next unless map.is_a?(Hash)
-          out[cid.to_s] = normalize_mapping(map, nil, allow_owner: true)
+          # `keep_invalid`: pritomny kluc s nepouzitelnou hodnotou ostava ako
+          # marker — expanzia z neho spravi `mapping_invalid`, nie tichy pad
+          # o uroven nizsie (Codex #308 kolo 2 P1).
+          out[cid.to_s] = normalize_mapping(map, nil, allow_owner: true, keep_invalid: true)
         end
         out
       end
@@ -2538,6 +2645,11 @@ module Noxun
         # setu" — je to konkretny chybajuci riadok predvolieb a hlaska musi
         # navigovat na „Pravidlá -> Doplniť nové predvoľby".
         return [nil, (ck ? 'class_unmapped' : 'no_set'), (ck ? { 'class_key' => ck } : {})] if value.nil?
+        # KOV-D1a (Codex #308 kolo 2 P1): kluc JE pritomny, ale hodnota sa neda
+        # pouzit. Vlastny dovod — a NIKDY set z nizsej urovne.
+        if invalid_mapping_value?(value)
+          return [nil, 'mapping_invalid', { 'detail' => value[INVALID_KEY].to_s }]
+        end
         # Polozka s vyskovym variantom sa NESMIE vybrat pevnym `set_id` — po
         # prerasteni zasuvky H70 -> H176 by override skrinky ticho objednal
         # H70 kit k dielcom H176 (Astra #19 B1). Vyber MUSI byt selektor podla
@@ -2618,8 +2730,21 @@ module Noxun
         present_mapping_value?(v) ? v : nil
       end
 
+      # KOV-D1a (Codex #308 kolo 2 P1): kluc JE pritomny, len jeho hodnota sa
+      # neda pouzit. Precedencia sa na nom MUSI zastavit — inak by sa poskodena
+      # hodnota tvarila ako NEPRITOMNY kluc a zasuvka by ticho dostala set
+      # z nizsej urovne (presne ta pasca, ktoru sme opravovali pri `recipe_refs`).
       def present_mapping_value?(v)
-        (v.is_a?(String) && !v.strip.empty?) || (v.is_a?(Hash) && v['bands'].is_a?(Array))
+        (v.is_a?(String) && !v.strip.empty?) || (v.is_a?(Hash) && v['bands'].is_a?(Array)) ||
+          invalid_mapping_value?(v)
+      end
+
+      def invalid_mapping_value?(v)
+        v.is_a?(Hash) && v.key?(INVALID_KEY)
+      end
+
+      def invalid_mapping_value(reason)
+        { INVALID_KEY => reason.to_s }
       end
 
       # === KOV-C2a: KOMPATIBILITA VYBRANEHO SETU =============================
@@ -3716,7 +3841,12 @@ module Noxun
       #             TICHO (delete_set! ocisti mapovanie; typ ostane nemapovany)
       #   allow_owner — composite kluce "gt@owner_part_key"; true LEN pre
       #             cabinet override mapu (config['hardware_sets'])
-      def parse_mapping(mapping, set_ids: nil, allow_owner: false)
+      #   keep_invalid — CITACIA cesta cabinet override mapy: polozka s PLATNYM
+      #             klucom a NEPOUZITELNOU hodnotou sa NEZAHADZUJE, ale ostava
+      #             ako MARKER neplatneho mapovania (Codex #308 kolo 2 P1).
+      #             Zahodenie by z pritomneho kluca spravilo nepritomny a
+      #             precedencia by ticho padla o uroven nizsie.
+      def parse_mapping(mapping, set_ids: nil, allow_owner: false, keep_invalid: false)
         return [{}, []] if mapping.nil? # chybajuce mapovanie = legitimne prazdne
         return [{}, ['mapovanie musí byť objekt']] unless mapping.is_a?(Hash)
         ids = set_ids.nil? ? nil : Array(set_ids).map(&:to_s)
@@ -3735,9 +3865,17 @@ module Noxun
               errors << "mapovanie „#{key}“: #{cerr}"
               next
             end
+            # UZ OZNACENA neplatna hodnota prechadza BEZ ZMENY — normalizacia
+            # musi byt idempotentna, inak by kazda prestavba prepisala dovod
+            # a config by sa menil bez zasahu pouzivatela.
+            if invalid_mapping_value?(value)
+              keep_invalid ? out[canon] = deep_copy(value) : errors << "mapovanie „#{key}“: neplatná hodnota"
+              next
+            end
             status, norm, refs = parse_mapping_value(value)
             if status != :ok
               errors << "mapovanie „#{key}“: #{norm}"
+              out[canon] = invalid_mapping_value(norm) if keep_invalid
               next
             end
             next if ids && refs.any? { |sid| !ids.include?(sid) }
@@ -3754,9 +3892,15 @@ module Noxun
             errors << "mapovanie „#{key}“: výber na úrovni dielca je len na skrinke"
             next
           end
+          plain = owner ? "#{gt}@#{owner}" : gt
+          if invalid_mapping_value?(value) # idempotencia (viz vyssie)
+            keep_invalid ? out[plain] = deep_copy(value) : errors << "mapovanie „#{key}“: neplatná hodnota"
+            next
+          end
           status, norm, refs = parse_mapping_value(value)
           if status != :ok
             errors << "mapovanie „#{key}“: #{norm}"
+            out[plain] = invalid_mapping_value(norm) if keep_invalid
             next
           end
           next if ids && refs.any? { |sid| !ids.include?(sid) }
@@ -3784,6 +3928,8 @@ module Noxun
       # Vsetky set_id, na ktore hodnota mapovania ukazuje (priamo alebo cez
       # pasma selectora) — pouziva ich zmrazovanie snapshotu (audit BLOCKER 1).
       def value_set_ids(value)
+        return [] if invalid_mapping_value?(value) # marker na nic neukazuje
+
         status, _norm, refs = parse_mapping_value(value)
         status == :ok ? refs : []
       end
@@ -3801,9 +3947,10 @@ module Noxun
 
       # CITACIA normalizacia mapovania (spatna kompatibilita signatury:
       # sets = pole definicii setov). Chyby tvaru sa loguju a polozka vypadne.
-      def normalize_mapping(mapping, sets = nil, allow_owner: false)
+      def normalize_mapping(mapping, sets = nil, allow_owner: false, keep_invalid: false)
         ids = sets.nil? ? nil : sets.map { |s| s['set_id'] }
-        out, errors = parse_mapping(mapping, set_ids: ids, allow_owner: allow_owner)
+        out, errors = parse_mapping(mapping, set_ids: ids, allow_owner: allow_owner,
+                                             keep_invalid: keep_invalid)
         errors.each { |e| log_skip(e) }
         out
       end

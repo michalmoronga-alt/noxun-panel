@@ -1319,6 +1319,9 @@ karta čela nikdy nespadne kvôli riadku zásuvky.
 `HardwareSets.mapping_key_type` a `owner_scoped_key?` — nie cez `BuildPlan.parse_hardware_set_key`, ktorý pre `class:` kľúče vracia `nil`. Bez toho by karta čela pri
 owner **triednom** override (`class:slide|…@front:F1/panel`) ukázala prázdny select, hoci uložený výber existuje — a prvý klik vedľa by ho ticho prepísal. Payload sa inak
 **nemení**; ponuku a ovládanie prináša D1b.
+**Emituje sa LEN kľúč, ktorý resolver pre ten dielec naozaj číta** (Codex #308 kolo 2 P2): owner triedny kľúč zhodný s **aktívnou** triedou položky (`active_class_by_owner`
+z `config.hardware`), a legacy `typ@owner` iba tam, kde položka klasifikáciu nemá. Bez toho by po zmene otvárania či konštrukcie karta ukázala **dormantný** výber starej
+triedy ako vybraný a mazanie by cielilo na iný kľúč. Poškodená hodnota sa priznáva príznakom `invalid` — karta nesmie ukázať prázdny select ani hodnotu z nižšej úrovne.
 
 ### resolvers.rb
 

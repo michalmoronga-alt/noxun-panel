@@ -247,8 +247,11 @@ module Noxun
         # `set_id` (retazec). Prazdne oboje = zrusenie overridu (nil).
         # ZIADNE skladanie klucov ani hodnot v paneli — tvar rozhoduje server.
         def hw_set_value(data)
-          v = data['value']
-          return v if v.is_a?(Hash)
+          # PRITOMNE `value` sa NIKDY nepresvieti na `set_id` (vlastny prechod
+          # diffu po Codex #308 kolo 2 — ten isty vzor „pritomne neplatne sa
+          # tvari ako nepritomne"): ked klient posle vyber, rozhoduje ON.
+          # Nepouzitelny tvar potom odmietne server s hlaskou, nie ticho.
+          return data['value'] if data.key?('value') && !data['value'].nil?
 
           present_str(data['set_id'])
         end

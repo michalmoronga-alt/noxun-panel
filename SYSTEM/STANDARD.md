@@ -527,6 +527,10 @@ Hodnota mapovania pre položku s `height_variant` **musí byť výškový selekt
 je položka klasifikovaná**. **Už uložená hodnota sa zobrazuje a zachováva** a expanzia je na príznak naďalej slepá, takže deaktivácia setu **nemení nákup existujúcej
 zákazky**. Neplatná aktuálna hodnota ostáva s chybou — nikdy sa nenahradí prvou kompatibilnou.
 
+**PRÍTOMNOSŤ KĽÚČA ROZHODUJE AJ V MAPOVANÍ SETOV (KOV-D1a).** V override mape skrinky je kľúč s **nepoužiteľnou** hodnotou (prázdna, poškodený selektor) stav **„neplatné
+mapovanie"**, nie „mapovanie chýba": čítacia normalizácia ho zachová ako marker, precedencia sa na ňom **zastaví** a expanzia vydá dôvod `mapping_invalid` (pri receptovej
+položke RED). Pád na nižšiu úroveň je dovolený **výhradne pri NEPRÍTOMNOM kľúči** — inak by poškodený výber ticho objednal iný kit, než aký si používateľ zvolil.
+
 **PRIPNUTÁ VERZIA RECEPTU: PRÍTOMNOSŤ KĽÚČA JE PIN (KOV-D1a).** V mape `drawer.recipe_refs` rozhoduje o stave „chýba" **výhradne prítomnosť kľúča**, nikdy použiteľnosť
 hodnoty. Prázdna, číselná, objektová aj `null` hodnota je **poškodený pin** → RED `drawer_recipe_unknown` bez dielcov. Opačný výklad (zahodiť nečitateľnú hodnotu) znamená
 „pin chýba", teda súrodenca alebo najnovší recept — a to je **tichá zmena fyziky** už postavenej zákazky.

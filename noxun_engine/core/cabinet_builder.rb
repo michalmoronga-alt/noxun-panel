@@ -2106,10 +2106,19 @@ module Noxun
         # ukazujuce na celo, ktore v skrinke uz neexistuje.
         def norm_hardware_sets(raw_map, fronts_cfg = nil)
           return {} unless raw_map.is_a?(Hash)
-          map = HardwareSets.normalize_mapping(raw_map, nil, allow_owner: true)
+          # KOV-D1a (Codex #308 kolo 2 P1): pritomny kluc s NEPOUZITELNOU
+          # hodnotou ostava v configu ako marker neplatneho mapovania. Zahodit
+          # ho by znamenalo spravit z pritomneho kluca nepritomny — a zasuvka by
+          # ticho dostala set z projektu namiesto RED hlasky.
+          map = HardwareSets.normalize_mapping(raw_map, nil, allow_owner: true, keep_invalid: true)
           return map if fronts_cfg.nil?
 
+          # Riadok `type: 'none'` v configu ZOSTAVA (Fronts ho drzi zamerne),
+          # ale ZIADNE celo nema — owner kluc na nom je mrtvy vyber a po navrate
+          # na zasuvku by sa ticho reaktivoval (Codex #308 kolo 2 P2; presne
+          # vzor `prune_none_front_overrides`).
           ids = Array(fronts_cfg.is_a?(Hash) ? fronts_cfg['items'] : nil)
+                .reject { |it| it.is_a?(Hash) && it['type'].to_s == 'none' }
                 .map { |it| it.is_a?(Hash) ? it['id'].to_s : '' }
           HardwareSets.prune_missing_owners(map, ids)
         end
