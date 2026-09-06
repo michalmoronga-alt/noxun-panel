@@ -480,7 +480,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   v `code_by_nl` NEPRÍTOMNÝ → RED `drawer_kit_missing`, nikdy prázdny reťazec ani cudzí kód. **`MAPPING_ADDITIONS` nezmenené** (predvoľba ostáva biela), katalóg kovania
   nedotknutý, jadro/UI/recepty bez zmeny. Rozhodnutia Michala 6.9.: **357887 zaseedovať** (overené v Démose), **NL 260/300 nezapisovať** (mimo radov). Testy:
   `tests/pure/test_kovd1c_antracit.rb` (11 testov, tabuľková fixtúra = druhý zápis dát; mutácie: cudzí kód · prázdny reťazec · antracit v `MAPPING_ADDITIONS` · názov zlúčený s bielou).
-  **D2a · ZÁMKY OSÍ — jadro (audit-povinné, overrides schéma):** (1) pole `height_variant` v `hardware_overrides` (Atira; Quadro výškový zámok NEponúka) — **`CONFIG_SCHEMA` 6 → 7** s downgrade testom (D1a už minula 6; plugin D1a by inak pole ticho zahodil whitelistom `norm_hardware_overrides` — Codex #307 P1); (2) **poradie resolvera**
+  **D2a · ZÁMKY OSÍ — jadro — ✅ HOTOVÉ (v0.9.37, 6.9.2026):** (1) pole `height_variant` v `hardware_overrides` (Atira; Quadro výškový zámok NEponúka) — **`CONFIG_SCHEMA` 6 → 7** s downgrade testom (D1a už minula 6; plugin D1a by inak pole ticho zahodil whitelistom `norm_hardware_overrides` — Codex #307 P1); (2) **poradie resolvera**
   (Astra #20 B2): zamknutá výška alebo automatická výška → rad NL TEJ výšky → zamknutá NL alebo automatická NL → dielce → nákupný selektor; výška musí existovať v pripnutom recepte
   a zmestiť sa, inak RED bez dielcov aj výsuvu; príklad: zamknutá NL 520 po automatickom prechode H70 → H144 (rad H144 520 nemá) = konflikt, nikdy návrat na H70 ani zmena NL;
   (3) **receptová zapisovacia cesta NL** (Astra #20 F5): D-93 `series_value?` hľadá len projektové `fit_series` — doplniť úzku serverovú vetvu vlastník → pripnutý recept → výsledná
@@ -488,7 +488,9 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   receptové zámky NEidú cez `apply_overrides` (prepína zdroj na `manual`); `locked` = súhrn, payload nesie stav každej osi (auto | locked | conflict) — text karty podľa osi;
   (5) **náhrada** (Astra #20 F6): mení LEN opravovanú os, druhý zámok ostáva a znovu sa overí; ak platná náhrada pri druhom zámku neexistuje, potvrdenie sa neponúka; návrh sa
   počíta z receptu + geometrie, nikdy z dostupných kódov; **reset per os** (dnešný orphan reset zahadzuje celý záznam — po pridaní výšky by zmazal aj platný druhý zámok).
-  Testy: poradie výška → NL (fixtúry H70/H144 × 520), zámok drží / konflikt / náhrada len jednej osi, reset per os, receptová NL cesta, per-os stav v payloade; mutácie min. 3.
+  Testy: `tests/pure/test_kovd2a_zamky.rb` (poradie výška → NL nad fixtúrami H70/H144 × 520, zámok drží / konflikt / návrh len jednej osi, reset per os, receptová NL cesta,
+  per-os stav v payloade, schéma 7; 3 overené mutácie) + in-SU sekcia **`run_kovd2a`** (zámok výšky proti automatu H144 → H70 v jednej operácii, Späť aj Redo, NL mimo radu =
+  RED bez dielcov a bez kitu, odomknutie jednej osi, kópia zámky nesie).
   **D2b · ZÁMKY — UI:** chipy osí (výška, NL) s ikonou zámku v karte čela aj v kontexte Kovanie (JEDEN stav zo servera), klik = zamknúť aktuálnu hodnotu / odomknúť; konflikt =
   RED riadok + návrh náhrady + potvrdenie (D-15 modal; náhrada ostáva zamknutá); odomknutie každej osi aj bez emitovaného výsuvu (konfliktná karta); bez diff-modal frameworku.
   **In-SU povinné (Undo/Redo zámkov).**
