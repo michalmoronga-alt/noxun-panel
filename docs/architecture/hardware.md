@@ -726,10 +726,28 @@ nevedia vôbec. Opačné poradie krokov by pri zmene výšky ticho posunulo NL. 
 prepol zdroj na `manual` a nákup by prestal povyšovať chýbajúci kit na blocker; Astra #20 F7). Porovnania sú **inkluzívne a bez EPS** nad nezaokrúhlenou hodnotou z `context_for`
 (105,00 platí, 104,995 padá). **Atomicita:** akýkoľvek konflikt ⇒ `parts = []` a `hardware_params = {}`.
 
+**Pamäť PRI PRECHODE NA DVIERKA A SPÄŤ (pravidlo KOV-D4).** Zásuvkové polia sa prechodom na iný typ čela **nezahadzujú** — pravidlo má tri časti a všetky sú fail-closed:
+
+1. **Pamäť patrí ROVNAKÉMU ID čela.** Serverové polia (`drawer.system`, `drawer.recipe_refs`) sa po klientskom payloade pripájajú späť **podľa `front_id`**
+   (`Fronts.reattach_server_drawer_fields`) — čelo s **novým** ID pamäť nedostane a recept mu pripne až stavba. `system` sa navyše nepripája pri **zmenenej konštrukcii**
+   (kov ↔ drevo), inak by čelo natrvalo uviazlo v `drawer_unclassified`.
+2. **Zámok ostáva viazaný na SVOJ recept.** `lock_value` / `height_lock_value` prijmú záznam **výhradne** s `rule_id` pripnutého receptu (`recipe:<id>`; NL navyše legacy
+   `vysuvy-nl-podla-hlbky`). Pri návrate na zásuvku s **tým istým** receptom sa zámok znovu **validuje stavbou** — teda tou istou cestou ako pri prvom zápise, nikdy sa
+   „obnoví" bez overenia.
+3. **Dormantný zámok iného receptu sa NIKDY nezobrazí ako aktívny.** Zmena otvárania (`classic` ↔ `tipon`) pripne **iný** recept a starý záznam ostane dormantný: resolver
+   ho nepoužije a payload mu **nedá chipy osí** (`Panel.attach_override_axes` porovnáva `rule_id` proti `idents` pripnutého receptu). Ukázať naň stav aktuálneho receptu
+   a zapisovať na cudzí `rule_id` je presne tá tichá zámena, ktorej celý package bráni. Záznam **ostáva v configu** a keď je osirotený, riadok ručných zásahov ho ukáže
+   s tlačidlom „zrušiť".
+
 **Dielce.** Atira presne 2: `drawer_bottom` `(LB − 2·EB − 51,5) × (NL + 10)` a `drawer_back` `(LB − 2·EB − 63) × rear_height`. Quadro 5: `box_side` ×2 `NL × box_height`,
 `drawer_bottom` `SKW × NL`, `drawer_inner_front` a `drawer_back` `SKW × (box_height − t_dna − 12)`, kde `SKW = LB − 46`. ABS per rola z receptu (dno bez, ostatné horná dlhá
 hrana 1,0). `hardware_params` (`recipe_id`, `system`, `height_variant` | `box_height`, `nominal_length`, `load`, `opening`) je podklad pre **jednu** položku výsuvu, ktorú
 skladá C2. `explain` sú slovenské vety pre Inspector.
+
+**`OVERRIDE_CONFLICT_CODES` (KOV-D4)** = podmnožina troch kódov, ktorých **nápravou je riadok ručného zásahu** v Kovaní: `nl_lock_invalid` · `height_lock_invalid` ·
+`drawer_override_invalid`. Presne tie, ktorých veta už riadok menuje (`LOCK_HINT`, `Construction::ORPHAN_HINT`) — a jediné, pri ktorých smie deep-link Kontroly mieriť na záznam
+`hardware_overrides`. Je to **whitelist**: pri hrúbke, prekážke, KD, poškodenom pine či `drawer_stale` by reset zásahu konflikt nevyriešil (a riadok ani nemusí byť osirotený),
+takže blacklist by tichú chybu zdedil každému budúcemu kódu.
 
 **`CONFLICT_CODES`** = register 11 kódov brány `DRAWER_BLOCKERS` (KOV-C 10 + `height_lock_invalid` z KOV-D2a). C1 ich len **produkuje**; napojenie na `export_blockers`, `hardware_issues` a Kontrolu je
 úloha C2 — v C1 preto `drawer_kit_missing` ani `drawer_override_invalid` nikto nevyrába, sú tu len ako jediné miesto pravdy o množine kódov.

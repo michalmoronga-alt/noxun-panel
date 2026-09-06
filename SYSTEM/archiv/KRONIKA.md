@@ -17,6 +17,45 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-D4 — CERUZKA TRAFÍ RIADOK, „BEZ KÓDOV" HOVORÍ PO ĽUDSKY, pamäť MÁ NAPÍSANÉ PRAVIDLO (v0.9.41, 6.9.2026).**
+  Tri drobnosti, ktoré ostali ako dlh z KOV-C a boli v pakete D ako posledný UI rez. Žiadna z nich nemení výrobné číslo ani objednávku — všetky tri sú o tom, aby človek
+  **našiel to, na čo klikol**, a aby mu plugin nikdy neukázal stav, ktorý nezvolil.
+  **(1) Ceruzka v Kontrole vedie na KONKRÉTNY riadok Kovania.** Doteraz otvorila kartu čela a hľadanie riadku ostalo na používateľovi — najmä pri vete „choď do Kovania na riadok
+  neplatný ručný zásah", ktorá miesto **menuje**, ale neukáže. Nález preto od tejto dávky nesie **adresu** toho riadku: aditívny kľúč `data` = tá istá trojica identity
+  (`owner_part_key` + `generic_type` + `rule_id`), akou je zásah adresovaný všade inde, plus príznak `orphan`. Skladá ju **VALIDÁCIA** (`Validation.hw_target`) — jediné miesto,
+  ktoré o náleze naozaj vie; `do_select` ju už len prepošle (`hw_focus_target` overí tvar) a klient si **nič neodvodzuje**. Do `stable_key` adresa **nevstupuje**, takže dedup,
+  klik-select ani počty semafora sa nehli. Kanál je nový, ale **čítací**: `Panel.push_focus_hardware` → `NX.focusHardware` → `nxFocusHardware`, žiadny stav na serveri, žiadny
+  zápis, zatvorený Inspector nedostane nič. Vetva kovania ide **PRED** kartou čela (pri kovaní je cieľom riadok, nie karta) a v modeli sa vyberá **vlastník (korpus)** z rovnakého
+  dôvodu ako pri A2b — sekcia Kovanie žije len nad označenou skrinkou.
+  **Kde server RADŠEJ MLČÍ.** Konflikt zásuvky adresu dostane **len vtedy, keď má vlastník práve JEDEN zásah výsuvu**. Keď vedľa aktuálneho leží dormantný zámok staršieho
+  receptu, server nevie, ktorý z nich používateľa páli — a prisvietiť ten druhý je horšie než neprisvietiť nič (`drawer_conflict_target` číta raw zoznam zásahov, schéma sa
+  nemenila; `rule_id` v uloženom `drawer_conflicts` totiž nie je). Rovnako mlčí klient: keď riadok medzitým zanikol alebo jeho trieda nesedí s `orphan` (osirotený vs. živý),
+  payload je zastaraný a **neprisvieti sa nič** (kontext sa ani neprepne).
+  **Prisvietenie je jedno, nie tri.** `hwFlash` (existujúca trieda `hwfocus`, 1600 ms) po novom sníma predchádzajúci highlight **hneď** pri ďalšom skoku — dva svietiace riadky
+  nepovedia, ktorý je „ten môj". Cieľom je celá `.hwitem`, keď existuje (nesie aj chipy osí a nákupný riadok). To isté prisvietenie dostal aj starší deep-link na kartu čela
+  (`nxFocusFront`); CSS pribudol jediný selektor `.frow.hwfocus` — **žiadna nová farba**, tá istá výberová rodina.
+  **(2) „Bez kódov" v Nákupe ukazuje ľudský názov.** V stĺpci „kde" stál surový `part_key` („front:Fmsi0wnix-1-3a3kxe/panel"), z ktorého sa nedalo prečítať, o ktoré čelo ide —
+  hoci **o dve tabuľky vyššie** už KOV-H2 popis skladá. Použil sa preto **ten istý** zdroj (`PartKeys.human_label` nad `cabinet_fronts`), vytiahnutý do spoločného
+  `owner_label_for`, takže sa obe tabuľky jedného okna nemôžu rozísť. Pole je **aditívne a čítacie**: identita záznamu (`cabinet_id` + `owner_part_key`), dedup zásuviek vo vete
+  „N× zásuvka", `blocks_export`, počet aj poradie riadkov ostali nedotknuté; surový kľúč sa nestratil — je v `title` bunky. Nákupný CSV má pevné stĺpce, takže je s popisom aj
+  bez neho **znak po znaku ten istý** (drží to test).
+  **(3) Pamäť pri prechode na dvierka dostala NAPÍSANÉ pravidlo — a jednu opravu.** Trojica je teraz v STANDARD §6 aj v `hardware.md`: pamäť patrí **rovnakému ID čela**
+  (nové ID ju nedostane), zámok ostáva viazaný na **svoj recept** a pri návrate sa **znovu validuje stavbou**, a dormantný zámok iného receptu sa **nikdy nezobrazí ako aktívny**.
+  Prvé dve už platili (`Fronts.reattach_server_drawer_fields`, `Recipes.lock_value` podľa `rule_id`) a dávka ich len **zafixovala testami**. Tretia mala dieru: pri konflikte
+  zásuvky dostával chipy osí **KAŽDÝ** receptový záznam vlastníka, teda aj dormantný — chip by ukazoval stav **aktuálneho** receptu, kým klik by zapisoval na **cudzí** `rule_id`.
+  Oprava je **čítacia**: `Panel.attach_override_axes` berie celý `drawer_axes_index` a porovnáva `rule_id` proti `idents` **pripnutého** receptu. Záznam v configu ostáva
+  (osirotený riadok ho ďalej ukáže s tlačidlom „zrušiť"), len bez chipov. **Jadro sa nedotklo** — resolver, normalizácia, schéma ani recepty.
+  **Codex kolo 1 (2× P2, žiadny P1).** Prvý nález: deep-link na zásah sa pripájal **každému** konfliktu zásuvky, ktorý mal jediný zásah výsuvu — teda aj `drawer_thickness_unsupported`,
+  `drawer_recipe_unknown` či `drawer_stale`, kde by jeho reset **nič nevyriešil** (a pri `drawer_stale` riadok ani nemusí byť osirotený). Ceruzka by hlásila úspech a zvýraznila
+  falošnú nápravu. Odteraz rozhoduje **whitelist** `Recipes::OVERRIDE_CONFLICT_CODES` = `nl_lock_invalid` · `height_lock_invalid` · `drawer_override_invalid` — presne tie tri,
+  ktorých veta riadok už dnes menuje (`LOCK_HINT` / `ORPHAN_HINT`). **Zámerne whitelist, nie blacklist:** pri blackliste by tichú chybu zdedil každý budúci kód konfliktu; guard
+  test navyše overuje, že celý whitelist je podmnožinou registra brány. Druhý nález: nálezy **„kód zo setu nie je v katalógu"** (`hardware_code`) adresu nemali, hoci každý
+  ne-ad-hoc zdroj nesie plnú identitu a jeho **živý** riadok v Kovaní existuje — ceruzka otvárala kartu čela namiesto riadku. Setový zdroj ju dostal (`orphan: false`), **ad-hoc**
+  zámerne nie: ručné položky žijú vo vlastnom zozname `hardware_manual` **bez identitných atribútov** (KOV-H2), takže riadok, na ktorý by sa mierilo, neexistuje.
+  **Testy:** `tests/pure/test_kovd4_ui.rb` (adresa nálezu, whitelist **per kód** nad celým registrom brány, ad-hoc vs. setový zdroj, fail-closed pri viacerých zásahoch,
+  `owner_label` mimo identity, pamäť a dormantný zámok nad reálnym configom), `tests/js/test_kovd4_ui.js` (47 assertov, mini-DOM: deep-link, jediné prisvietenie, stĺpec „kde"),
+  **10 overených mutácií** + in-SU sekcia **`run_kovd4`** (drawer → door → drawer cez tú istú cestu ako panel, zmena otvárania). Headless 3322, JS 94 sád.
+
 - **KOV-D3b — UPGRADE RECEPTU: UI, DOPAD NA TOTO ČELO, POTVRDENIE (v0.9.40, 6.9.2026).**
   D3a dodala jadro prechodu na novšiu verziu receptu, ale **bez tlačidla** a bez registrácie callbacku. Táto dávka ho zapája: karta čela dostáva ponuku, klik ukáže
   **konkrétny dopad práve na túto zásuvku** a až potom sa spýta. **Pre používateľa sa dnes nemení nič** — v repe sú len recepty v1, takže ponuka sa v plugine **nikdy neukáže**

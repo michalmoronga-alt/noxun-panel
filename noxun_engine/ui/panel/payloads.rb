@@ -107,7 +107,9 @@ module Noxun
           axes = index['by_owner']
           unless axes.empty?
             params['hardware'] = attach_drawer_axes(params['hardware'], axes)
-            params['hardware_overrides'] = attach_override_axes(params['hardware_overrides'], axes)
+            # KOV-D4: osiroteny zasah dostane chipy LEN ked patri PRIPNUTEMU
+            # receptu — preto sa posiela cely `index` (s `idents`), nie len mapa.
+            params['hardware_overrides'] = attach_override_axes(params['hardware_overrides'], index)
             params['front_drawer'] = attach_front_drawer_axes(params['front_drawer'], index,
                                                               params['cabinet_id'])
           end
@@ -840,14 +842,42 @@ module Noxun
 
         # Osiroteny riadok zasahu (polozka pri konflikte NEVZNIKLA) dostane ten
         # isty stav osi — inak by sa konfliktna zasuvka nedala odomknut.
-        def attach_override_axes(rows, axes)
+        #
+        # KOV-D4 (pravidlo pamate pri prechode na dvierka): stav osi patri
+        # PRIPNUTEMU receptu, takze ho dostane LEN zaznam s JEHO `rule_id`.
+        # DORMANTNY zamok ineho receptu (zostal po zmene otvarania alebo po
+        # prechode zasuvka -> dvierka -> zasuvka s inym pinom) chipy NEDOSTANE:
+        # `Recipes.lock_value` ho aj tak nepouzije, ale chipy by ukazovali stav
+        # AKTUALNEHO receptu, kym zapis by isiel na CUDZI `rule_id` — teda presne
+        # ta ticha zamena, ktorej cely package brani. Riadok osiroteneho zasahu
+        # taky zaznam nadalej ukaze (aj s tlacidlom „zrušiť"), len bez chipov.
+        def attach_override_axes(rows, index)
+          axes = index.is_a?(Hash) ? (index['by_owner'] || {}) : {}
+          active = active_lock_rules(index)
           Array(rows).map do |ov|
             next ov unless ov.is_a?(Hash) && ov['generic_type'].to_s == Recipes::LOCK_GENERIC_TYPE
             next ov unless ov['rule_id'].to_s.start_with?(Recipes::LOCK_RECIPE_PREFIX)
 
-            a = axes[ov['owner_part_key'].to_s]
+            owner = ov['owner_part_key'].to_s
+            next ov unless active[owner] == ov['rule_id'].to_s
+
+            a = axes[owner]
             a ? ov.merge('axes' => a) : ov
           end
+        end
+
+        # { owner_part_key => `rule_id` PRIPNUTEHO receptu } z `idents` — je to
+        # ta ista identita, akou sa zamok zapisuje (`drawer_lock_ident`), takze
+        # sa „co sa kresli" a „kam sa pise" nemozu rozist.
+        def active_lock_rules(index)
+          out = {}
+          idents = index.is_a?(Hash) ? index['idents'] : nil
+          (idents.is_a?(Hash) ? idents : {}).each_value do |ident|
+            next unless ident.is_a?(Hash)
+
+            out[ident['owner_part_key'].to_s] = ident['rule_id'].to_s
+          end
+          out
         end
 
         def hardware_overrides_payload(cfg, overrides)

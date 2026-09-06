@@ -503,6 +503,29 @@
     return out;
   }
   function hwStopCount(list){ return hwStopOwners(list).length; }
+  // ---- KOV-D4: STLPEC „KDE" v tabuľke „Bez kódov" -------------------------
+  // Doteraz tu stál SUROVÝ `part_key` („front:Fmsi0wnix-1-3a3kxe/panel"), z
+  // ktorého sa nedalo zistiť, o ktoré čelo ide. Ľudský popis skladá SERVER
+  // (`PartKeys.human_label` — ten istý zdroj ako pri nákupných riadkoch), JS
+  // z kľúča NIČ neodvodzuje. Surový kľúč ostáva v `title` (a v dátach), takže
+  // sa nestratí — len sa neukazuje ako hlavný text.
+  // Prázdny `owner_part_key` = kovanie patrí CELEJ skrinke.
+  // Čisté funkcie (Node testy).
+  function hwMissWhere(u){
+    var d = u || {};
+    var cab = String(d.cabinet_id == null ? '' : d.cabinet_id);
+    var who = d.owner_label ? String(d.owner_label)
+                            : (d.owner_part_key ? String(d.owner_part_key) : '');
+    return who ? (cab + ' · ' + who) : cab;
+  }
+  // Tooltip nesie AJ surový kľúč — je to identita riadku (a adresa pre klik).
+  function hwMissWhereTitle(u){
+    var d = u || {};
+    var cab = String(d.cabinet_id == null ? '' : d.cabinet_id);
+    var raw = d.owner_part_key ? String(d.owner_part_key) : '';
+    if (!raw) return cab;
+    return (d.owner_label ? (cab + ' · ' + String(d.owner_label) + ' · ') : (cab + ' · ')) + raw;
+  }
   // Veta nad tabuľkou — bez nej by červené riadky vyzerali ako ostatné
   // „nenacenené" a nebolo by vidieť, že sa nevytvorí ANI VEPO.
   function hwStopNoteHtml(list){
@@ -588,7 +611,7 @@
           // Rozhoduje SERVEROVÝ príznak `blocks_export`, nie enum dôvodu v JS.
           h += '<tr class="hwmiss' + (hwRowStops(u) ? ' hwstop' : '') + '">'
              + '<td>' + esc(u.generic_type) + '</td>'
-             + '<td>' + esc(u.cabinet_id + (u.owner_part_key ? ' · ' + u.owner_part_key : '')) + '</td>'
+             + '<td title="' + esc(hwMissWhereTitle(u)) + '">' + esc(hwMissWhere(u)) + '</td>'
              + '<td>' + num(u.quantity) + '</td><td>' + esc(reason) + '</td></tr>';
         });
         h += '</tbody></table>';
@@ -1874,6 +1897,8 @@
       // KOV-C2c (tests/js/test_kovc2c_karta.js): zastavujuce nemapovane polozky.
       hwRowStops: hwRowStops, hwStopCount: hwStopCount, hwStopNoteHtml: hwStopNoteHtml,
       hwStopOwners: hwStopOwners,
+      // KOV-D4 (tests/js/test_kovd4_ui.js): stlpec „kde" v tabulke „Bez kódov"
+      hwMissWhere: hwMissWhere, hwMissWhereTitle: hwMissWhereTitle,
       setBuyOpen: function(m){ buyOpen = m || {}; },
       // Š10 prepinace (sady D-104 / D-105 / K2 / ABS rail 3-stav)
       edgeCheckBarHtml: edgeCheckBarHtml, edgeCheckText: edgeCheckText,

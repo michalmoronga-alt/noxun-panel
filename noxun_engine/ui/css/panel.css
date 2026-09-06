@@ -1631,7 +1631,9 @@
   /* Kratke zvyraznenie ciela po skoku z riadku cela (alebo zo znacky v nahlade)
      do sekcie Kovanie — bez neho pouzivatel po prepnuti kontextu hlada, ktora
      polozka je „jeho". UI-C4: cielom je BOX vlastnika. */
-  .hwitem.hwfocus, .hwrow.hwfocus { background: var(--nx-select-bg); border-radius: 6px; }
+  /* KOV-D4: ten isty vzor prisvietenia dostava aj RIADOK CELA (deep-link
+     ceruzky z Kontroly otvori kartu cela) — jedna trieda, jedna farba. */
+  .hwitem.hwfocus, .hwrow.hwfocus, .frow.hwfocus { background: var(--nx-select-bg); border-radius: 6px; }
   .hwbox.hwfocus { border-color: var(--nx-select); box-shadow: 0 0 0 2px var(--nx-select-bg); }
   .hwbox.hwfocus > .hwboxh { background: var(--nx-select-bg); color: var(--nx-select-strong); }
   /* D-19: odhad platni v tabe Materialy — nowrap, fallback stisene LEN tieto bunky */

@@ -737,6 +737,14 @@
     // otvori KARTU toho cela tu. Server posiela LEN ID cela — prepnutie
     // kontextu, otvorenie karty aj doscrollovanie robi klient (form.js).
     focusFront: function(frontId){ if (typeof nxFocusFront === 'function') nxFocusFront(frontId); },
+    // KOV-D4 DEEP-LINK: klik s ceruzkou na nalez, ktory ma v sekcii Kovanie
+    // KONKRETNY riadok (ziva polozka alebo osiroteny rucny zasah). Server
+    // posiela LEN ADRESU riadku (owner_part_key + generic_type + rule_id +
+    // orphan) — prepnutie kontextu, doscrollovanie aj prisvietenie robi klient
+    // (hardware.js). Neexistujuci riadok = nerobi sa nic.
+    focusHardware: function(target){
+      if (typeof nxFocusHardware === 'function') nxFocusHardware(target);
+    },
     // D-27: viditelnost NOXUN tagov v modeli. Chodi po KAZDOM pushi vyberu
     // (Späť/Znova, prepnutie dokumentu, zmena vyberu) aj po kazdom prepnuti —
     // panel si ziadnu vlastnu kopiu stavu nedrzi.

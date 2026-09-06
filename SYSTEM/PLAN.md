@@ -538,9 +538,20 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   16 overených mutácií + in-SU sekcia **`run_kovd3b`**.
   **Pôvodné zadanie:** info „dostupný recept v2" pri čele + ponuka s konkrétnym dopadom na TOTO čelo (výška, NL, rozmery dielcov, zachovanie zámkov; nie textový diff konštánt —
   verzia môže meniť prahy/rad/hrúbky/ABS bez zmeny `constants`, Astra #20 F13) + autorská poznámka vydania z receptu (`release_note`) + potvrdenie; **In-SU povinné: 1 Späť A Redo (Ctrl+Y) — po redo ref v2, preadresované zámky aj geometria konzistentné** (Codex #307 P2); to isté pre zámky v D2b.
-  **D4 · UI DROBNOSTI (dlh z C, Astra #20 F18/N17):** highlight riadku Kontroly po ceruzke (a smerovanie na konkrétny osirotený záznam v Kovaní); `owner_label` (ľudský názov čela)
-  namiesto surového `part_key` v „Bez kódov" Štúdia (identita `cabinet_id + owner_part_key`, dedup a `blocks_export` zachované); pamäť pri prechode na dvierka: doplniť pravidlo
-  „pamäť patrí rovnakému ID čela, zámky ostávajú viazané na svoj recept a pri návrate sa znovu validujú; zmena otvárania nezobrazí dormant zámok starého receptu ako aktívny".
+  **D4 · UI DROBNOSTI — ✅ HOTOVÉ (v0.9.41, 6.9.2026):** (1) **adresa riadku Kovania v náleze** — `Validation.hw_target` pridáva do nálezu **aditívny** kľúč `data`
+  (`owner_part_key` + `generic_type` + `rule_id` + `orphan`), `stable_key` sa NEMENÍ; nesú ho `hardware` (vypnutý zásah, `orphan: true`), `hardware_unmapped` a `drawer_kit`
+  (živý riadok) a `drawer` (konflikt zásuvky) **len pri JEDINOM zásahu výsuvu vlastníka** — pri dormantnom zámku vedľa aktuálneho server **nehádá** a nález ostáva bez adresy.
+  `do_select` ju iba prepošle novým čítacím kanálom `push_focus_hardware` → `NX.focusHardware` (vetva PRED kartou čela; výber v modeli je **vlastník**, ako pri čele);
+  klient prepne kontext na Kovanie, doscrolluje a **krátko prisvieti** (`hwFlash` — od D4 svieti **najviac JEDEN** uzol, ďalší skok predchádzajúci sníma hneď; prisvieti aj
+  `nxFocusFront`, trieda `hwfocus` + nová `.frow.hwfocus`). Neexistujúci alebo nesediaci riadok (`orphan` vs. trieda) = **nerobí sa nič**. (2) **`owner_label` v „Bez kódov"**
+  zo `ProductionCore.decorate_unmapped` — ten istý `owner_label_for` ako nákupné riadky KOV-H2; identita (`cabinet_id + owner_part_key`), dedup zásuviek, `blocks_export`, počty
+  aj poradie nezmenené, surový kľúč ostáva v `title`, CSV/VEPO **znak po znaku** rovnaké. (3) **pravidlo pamäte** (STANDARD §6, `hardware.md`): pamäť patrí rovnakému ID čela ·
+  zámok je viazaný na svoj recept a pri návrate sa **znovu validuje stavbou** · dormantný zámok iného receptu sa **nikdy nezobrazí ako aktívny** — jediná chýbajúca časť
+  (`Panel.attach_override_axes` dával chipy KAŽDÉMU receptovému záznamu) je opravená **čítacím** filtrom podľa `idents` pripnutého receptu; jadro (resolver, schéma, zámky)
+  sa nemenilo. **Codex kolo 1 (2× P2):** deep-link na zásah dostanú **len konflikty, ktoré ten zásah spôsobil** — nový whitelist `Recipes::OVERRIDE_CONFLICT_CODES`
+  (`nl_lock_invalid` · `height_lock_invalid` · `drawer_override_invalid`); pri hrúbke, prekážke, KD, poškodenom pine či `drawer_stale` by reset zásahu konflikt nevyriešil ·
+  nález **„kód zo setu nie je v katalógu"** (`hardware_code`) mieri na svoj **živý riadok** kovania, ad-hoc zdroj ostáva na dnešnej ceste (ručné položky riadok s identitou nemajú).
+  Testy: `tests/pure/test_kovd4_ui.rb`, `tests/js/test_kovd4_ui.js` (47 assertov), **10 overených mutácií** + in-SU sekcia **`run_kovd4`** (drawer → door → drawer, zmena otvárania).
   **D5 · ABS FARBENIE DIELCOV ZÁSUVIEK (geometria, samostatný PR, In-SU povinné):** `axes:` pre drawer roly + explicitné pravidlo orientácie hrán pre stojace roly (`drawer_back`,
   `box_side`, `drawer_inner_front`: L1 = HORNÁ, `PartFaces` dnes mapuje L1 na minimum osi šírky — Astra #20 F15), spoločné pre farbenie aj zvýraznenie Kontroly; čítanie uložených
   dielcov cez `ROLE_AXES`; recept sa NEmení (L1 ostáva). In-SU overenie hornej hrany.

@@ -42,6 +42,17 @@ cesty (prepnúť na iný dielec / zmazať); `part_key` je zámerne `nil`, takže
 `placements:`). Tretia zmena je v `check_hardware_expansion`: riadok s **`catalog_missing`** (ad-hoc kód, ktorý z katalógu zmizol) ide **existujúcou** ORANGE cestou `hardware_code`,
 len s vetou, ktorá menuje ručnú položku a hovorí „ostáva bez ceny" — nie „bez názvu a ceny", lebo názov má zo snapshotu.
 
+**KOV-D4 — `data` = ADRESA RIADKU V KOVANÍ.** Nález, ktorý má v sekcii Kovanie konkrétny riadok, nesie aditívny kľúč `data` z `hw_target(owner_part_key, generic_type, rule_id,
+orphan:)` — tá istá trojica identity, akou je zásah adresovaný všade inde (`HardwareRules.override_identity`), plus príznak `orphan` (osirotený záznam vs. živá položka). Do
+`stable_key` **nevstupuje** (vzor `extra:` v `record_item`), takže dedup ani klik-select sa nehnú, a neúplná identita = **žiadne** `data` (nález sa správa ako pred D4).
+Nesú ju: `hardware` (vypnutý zásah, `orphan: true`), `hardware_unmapped`, `drawer_kit` a **`hardware_code` pri SETOVOM zdroji** (živý riadok, `orphan: false`) a `drawer`
+(konflikt zásuvky). **Dve výnimky, obe fail-closed:** ad-hoc zdroj `hardware_code` adresu **nedostane** (ručné položky žijú vo vlastnom zozname `hardware_manual` bez identitných
+atribútov — KOV-H2), a konflikt zásuvky ju dostane **len pri kóde z `Recipes::OVERRIDE_CONFLICT_CODES`** (`nl_lock_invalid` · `height_lock_invalid` · `drawer_override_invalid` —
+presne tie, ktorých veta už dnes menuje riadok zásahu cez `LOCK_HINT`/`ORPHAN_HINT`) **a súčasne len keď má vlastník práve JEDEN zásah výsuvu**. Whitelist zámerne: pri hrúbke,
+prekážke, KD, poškodenom pine či `drawer_stale` by reset zásahu konflikt **nevyriešil** (a riadok ani nemusí byť osirotený), takže by ceruzka sľubovala falošnú nápravu; blacklist
+by tú chybu zdedil každému budúcemu kódu. `drawer_conflict_target` číta raw `collected[:hardware_overrides]` (schéma sa nemení, `rule_id` v uloženom `drawer_conflicts` nie je) a pri
+viacerých záznamoch (dormantný zámok vedľa aktuálneho) **nehádá**. Klientska strana je v `ui-lifecycle.md` (sekcia KONTROLA, kontext Kovanie).
+
 ### production_core.rb — zdieľané čisté jadro výstupov zákazky (ŠT-1a PR A)
 
 kusovník, súpisy platní/ABS a VEPO export sa sťahovali z okna Výroba do nového okna **Štúdio**; aby obe okná čítali **tie isté čísla**, čistí pomocníci prešli do jedného modulu
@@ -183,6 +194,11 @@ firewall, neblokujúce duplicity a **potvrdené** riadky bez ceny. Kontrakt str�
 statusu), `tests/pure/test_hardware_sets.rb` (príznak `per_owner`) a `tests/js/test_p0hf_potvrdenie.js` (dvojkrokový klik).
 `do_select` navyše pozná príznak **`focus_inspector`** (ceruzka riadku Kusovníka, Š3): po výbere zdvihne Inspector cez `Panel.bring_to_front` — **nikdy ho neotvára**, výber sa tým
 nemení a do modelu sa nezapisuje nič.
+
+**KOV-D4 — dva deep-link ciele, jedno rozhodnutie.** Nález, ktorý nesie adresu riadku Kovania (`item['data']`, skladá ju `Validation.hw_target`), ide vetvou **`push_focus_hardware`
+PRED** vetvou karty čela: pri kovaní je cieľom riadok, nie karta. `hw_focus_target` adresu iba **overí a prepošle** (nič sa neodvodzuje z `part_key` ani z kategórie — druhá pravda
+o tom, kam nález vedie, by sa rozišla). `select_target_item` dostal štvrtý voliteľný argument: pri adrese Kovania vyberá **vlastníka (korpus)** z rovnakého dôvodu ako pri čele —
+sekcia Kovanie žije len nad označenou skrinkou. Nález bez adresy sa správa presne ako pred D4.
 
 **`project_names` (ŠT-1a, audit #1):** názov projektu je od tejto dávky **serverový údaj** — mapa v `vepo_settings.json` (nastavenie POČÍTAČA, žiadny zápis do modelu, žiadny krok
 Späť).
@@ -347,6 +363,11 @@ ISTOM prechode z už načítaného `ccfg` (žiadny druhý sken modelu) a **prvá
 `identities`), popisok sa kvôli nej nemá prečo hádať. Čitateľ je jediný — `ProductionCore.decorate_source_owners`, ktoré doplní **`owner_label`** do každého záznamu
 `rows[].sources` expanzie (`nil` = kovanie celej skrinky). Je to **aditívne pole zdroja**: nákupný CSV, `Budget.hardware_section` ani cenová ponuka ho nečítajú, takže výstup
 zákazky sa nemení ani o znak (drží to golden odtlačok `test_kovh_golden.rb`). `compute()` kľúč ignoruje.
+
+**KOV-D4 pridal DRUHÉHO čitateľa: `decorate_unmapped`** — ten istý `owner_label_for` (spoločný helper nad `front_index`) doplní `owner_label` aj do každého **nemapovaného**
+záznamu expanzie (`unmapped[]`), aby tabuľka „Bez kódov" v Štúdiu neukazovala surový `part_key`. Chodí spolu s `reason_sk` v jednom prechode. Pole je rovnako **aditívne
+a čítacie**: identita záznamu (`cabinet_id` + `owner_part_key`), `blocks_export`, poradie ani počet sa nemenia a `HardwareSets.purchase_csv` má pevné stĺpce — CSV je s ním
+aj bez neho znak po znaku to isté.
 
 **`newer_configs` (KOV-H1, R-12 exportná brána; rozšírené GHOST-D1):** aditívny zoznam objektov, ktorých uložený `config_schema` je **vyšší** než kontrakt tejto verzie. Vzniklo
 z auditu #15 BLOCKER 3: R-12 chránil len **prestavbu**, takže staršia verzia pluginu zákazku zo schémy 3 normálne **vyexportovala** — len bez toho, čomu nerozumie, a objednávka

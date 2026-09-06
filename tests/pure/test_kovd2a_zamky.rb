@@ -134,6 +134,13 @@ module NxD2a
     [cfg, panel.drawer_axes_map(cfg, cb.config_to_params(cfg))]
   end
 
+  # KOV-D4: `attach_override_axes` uz berie CELY index (`by_owner` + `idents`) —
+  # osiroteny zaznam dostane chipy len ked patri PRIPNUTEMU receptu.
+  def index_for(par, overrides = [])
+    cfg = cfg_for(par, overrides)
+    [cfg, panel.drawer_axes_index(cfg, cb.config_to_params(cfg))]
+  end
+
   def slide_item(cfg)
     Array(cfg['hardware']).find { |h| h['source'].to_s == 'recipe' }
   end
@@ -439,9 +446,9 @@ end
 NxTest.test('KOV-D2a (R4): konfliktna zasuvka nevydá polozku — stav osi nesie OSIROTENY riadok') do
   c = NxD2a
   overrides = c.ov('height_variant' => 176)
-  cfg, axes = c.axes_for(c.params, overrides)
+  cfg, index = c.index_for(c.params, overrides)
   NxTest.assert_equal(nil, c.slide_item(cfg), 'fail-closed: polozka vysuvu nevznikla')
-  rows = c.panel.attach_override_axes(cfg['hardware_overrides'], axes)
+  rows = c.panel.attach_override_axes(cfg['hardware_overrides'], index)
   NxTest.assert_equal('conflict', rows.first['axes']['height']['state'],
                       'bez toho by sa konfliktna zasuvka nedala odomknut')
 end

@@ -1654,6 +1654,10 @@
     if (row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
     var btn = row.querySelector('.ftname');
     if (btn && btn.focus) btn.focus();
+    // KOV-D4: kratke prisvietenie riadku — ten isty vzor ako skok do Kovania
+    // (`hwFlash`, trieda `hwfocus`). Bez neho pouzivatel po skoku hlada, KTORY
+    // z riadkov ciel je „jeho": karta sa otvori, ale zoznam moze byt dlhy.
+    if (typeof hwFlash === 'function') hwFlash(row);
     return true;
   }
 

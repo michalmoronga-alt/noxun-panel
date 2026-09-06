@@ -16351,6 +16351,123 @@ module NoxunSuRunner
     r03_clear_markers(model, markers)
   end
 
+  # === KOV-D4: PAMAT PRI PRECHODE NA DVIERKA ================================
+  #
+  # Pravidlo (package KOV-D, rez D4): pamat patri ROVNAKEMU ID cela; zamok
+  # ostava viazany na SVOJ recept a pri navrate sa znovu VALIDUJE STAVBOU;
+  # zmena otvarania (classic <-> tipon) pripne INY recept a stary zamok ostava
+  # DORMANTNY — nikdy sa nezobrazi ako aktivny.
+  #
+  # Headless sada dokaze TVAR payloadu (`attach_override_axes` chipy dormantnemu
+  # zaznamu nedava) a normalizaciu (`reattach_server_drawer_fields`). NEDOKAZE,
+  # ze cez REALNU cestu panela (klient serverove polia neposiela) zamok naozaj
+  # prezije prechod na dvierka a ze sa po navrate premietne do GEOMETRIE
+  # a do NAKUPU — to vidno len v modeli.
+  #
+  # Kazdy prechod ide TOU ISTOU cestou ako panel: `config_to_params` ->
+  # zmena typu/otvarania -> `reattach_server_drawer_fields` (klient serverove
+  # polia zahadzuje) -> `rebuild`. Ziadna vetva „preskocene": nesulad
+  # predpokladu je FAIL (lekcia D2a).
+  KOVD4_NL   = 420.0
+  KOVD4_TIP  = 'recipe:atira_p2o_v1'
+
+  # Prechod cela na iny typ / otvaranie PRESNE tak, ako ho posiela panel.
+  def kovd4_switch(model, inst, changes)
+    par = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    par['fronts']['items'][0] = par['fronts']['items'][0].merge(changes)
+    par['fronts'] = e::Fronts.reattach_server_drawer_fields(
+      par['fronts'], (e::Store.config(inst) || {})['fronts']
+    )
+    e::CabinetBuilder.rebuild(model, inst, par)
+  end
+
+  # Riadky `hardware_overrides` tak, ako ich vidi PANEL (s `orphan`, `axes`).
+  def kovd4_rows(inst)
+    Array(e::Panel.cabinet_payload(inst)['hardware_overrides'])
+  end
+
+  def kovd4_row(inst, rule_id)
+    kovd4_rows(inst).find { |r| r['rule_id'].to_s == rule_id }
+  end
+
+  def kovd4_refs(inst)
+    fi = kovc2b_front(inst)
+    (fi && fi['drawer'] && fi['drawer']['recipe_refs']) || {}
+  end
+
+  def run_kovd4(model)
+    cleanup(model)
+    inst = e::CabinetBuilder.build(model, kovc2b_params)
+    return ok('KOV-D4: vlozenie korpusu so zasuvkou', false) unless inst
+
+    cid = e::Store.get(inst, 'cabinet_id')
+    begin
+      kovd4_scenar(model, inst, cid)
+    ensure
+      cleanup(model)
+      ok('KOV-D4: cleanup (0 korpusov)', cabinets(model).empty?)
+    end
+  rescue StandardError => ex
+    log_line("FAIL: run_kovd4 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
+  def kovd4_scenar(model, inst, cid)
+    # --- 0) vychodisko: zasuvka classic (SiSy v1) so ZAMKNUTOU NL ----------
+    ok("KOV-D4: vychodisko = pripnuty atira_sisy_v1 (#{kovd4_refs(inst).inspect})",
+       kovd4_refs(inst)['atira|sisy'] == 'atira_sisy_v1')
+    kovd2a_set(model, inst, cid, 'nominal_length', KOVD4_NL)
+    ok("KOV-D4: NL #{KOVD4_NL.to_i} je zamknuta na identite #{KOVD2A_RID}",
+       (kovd2a_nl(inst).to_f - KOVD4_NL).abs <= TOL &&
+       kovd2a_overrides(inst).any? do |o|
+         o['rule_id'].to_s == KOVD2A_RID && (o['nominal_length'].to_f - KOVD4_NL).abs <= TOL
+       end)
+
+    # --- 1) PRECHOD NA DVIERKA: pamat drzi, zamok je dormantny -------------
+    kovd4_switch(model, inst, 'type' => 'door')
+    ok('KOV-D4 dvierka: pripnuty recept prezil (pamat patri TOMU ISTEMU ID cela)',
+       kovd4_refs(inst)['atira|sisy'] == 'atira_sisy_v1')
+    ok('KOV-D4 dvierka: zamok ostal v configu (nezahodil sa)',
+       kovd2a_overrides(inst).any? { |o| o['rule_id'].to_s == KOVD2A_RID })
+    ok('KOV-D4 dvierka: ziadna polozka vysuvu ani dielce zasuvky',
+       kovd2a_slide(inst).nil? && kovc2b_parts(inst).empty?)
+    ok('KOV-D4 dvierka: dormantny zamok NEMA chipy osi (nikdy nesvieti ako aktivny)',
+       (kovd4_row(inst, KOVD2A_RID) || {})['axes'].nil?)
+
+    # --- 2) NAVRAT NA ZASUVKU: zamok sa znovu VALIDUJE stavbou -------------
+    kovd4_switch(model, inst, 'type' => 'drawer_front')
+    ok("KOV-D4 navrat: zamknuta NL #{KOVD4_NL.to_i} zase PLATI " \
+       "(#{kovd2a_nl(inst).inspect})",
+       (kovd2a_nl(inst).to_f - KOVD4_NL).abs <= TOL)
+    ok('KOV-D4 navrat: a je to TEN ISTY recept (ziadna ticha zmena geometrie)',
+       kovd2a_slide(inst)['params']['recipe_id'].to_s == 'atira_sisy_v1')
+    ok('KOV-D4 navrat: riadok vysuvu ma chipy osi so stavom `locked`',
+       (kovd2b_axis(inst, 'nl')['state']).to_s == 'locked')
+    ok("KOV-D4 navrat: nakup objednava kit zamknutej dlzky (#{kovd1a_codes(model).inspect})",
+       kovd1a_codes(model).length == 1)
+
+    # --- 3) ZMENA OTVARANIA: iny recept, stary zamok ostava dormantny ------
+    kovd4_switch(model, inst, 'opening_mode' => 'tipon')
+    ok('KOV-D4 tipon: pripnuty je INY recept (Tip-On), stary zaznam mapy ostava',
+       kovd4_refs(inst)['atira|p2o'].to_s.start_with?('atira_p2o') &&
+       kovd4_refs(inst)['atira|sisy'] == 'atira_sisy_v1')
+    ok('KOV-D4 tipon: zamok SiSy receptu sa NEPOUZIL (dlzka je z automatu)',
+       kovd2a_slide(inst) && (kovd2a_nl(inst).to_f - KOVD4_NL).abs > TOL)
+    ok('KOV-D4 tipon: a v paneli NESVIETI ako aktivny (ziadne chipy na jeho riadku)',
+       (kovd4_row(inst, KOVD2A_RID) || {})['axes'].nil?)
+    ok('KOV-D4 tipon: chipy dostal LEN zaznam pripnuteho receptu (ak nejaky je)',
+       kovd4_rows(inst).none? do |r|
+         r['axes'] && r['rule_id'].to_s != KOVD4_TIP && r['rule_id'].to_s.start_with?('recipe:')
+       end)
+
+    # --- 4) NAVRAT NA CLASSIC: zamok sa aktivuje spat ----------------------
+    kovd4_switch(model, inst, 'opening_mode' => 'classic')
+    ok("KOV-D4 navrat otvarania: zamknuta NL #{KOVD4_NL.to_i} zase plati",
+       (kovd2a_nl(inst).to_f - KOVD4_NL).abs <= TOL)
+    ok('KOV-D4 navrat otvarania: a chipy su zase na zazname SiSy receptu',
+       (kovd2b_axis(inst, 'nl')['state']).to_s == 'locked')
+  end
+
   def run_kovc2b(model)
     cleanup(model)
     markers = []
@@ -17430,6 +17547,7 @@ module NoxunSuRunner
     run_kovd2b(model)        # KOV-D2b: chipy osi — kazdy zapis ide z PAYLOADU KARTY (identita `lock`, hodnoty `axes`): klik na `auto` pripne aktualnu vysku bez zmeny geometrie, volba z ponuky prestava dielce aj kit (Spat = 1 krok), odomknutie JEDNEJ osi necha druhu zit, konfliktna karta nesie identitu aj bez polozky a nahrada zo servera je zamknuta pri zachovanom druhom zamku (Spat aj Redo)
     run_kovd3a(model)        # KOV-D3a: upgrade receptu jedneho cela nad FIXTURNYM registrom (`with_test_dir`) — ciel s nesediacou hrubkou preflight odmietne BEZ kroku Spat (v mape ostava v1 aj zamok), uspesny upgrade meni ref, PREADRESUJE zamok NL a prestava dielce v JEDNEJ operacii (Spat aj Redo vratia vsetko naraz), kopia nesie novy ref
     run_kovd3b(model)        # KOV-D3b: CESTA Z KARTY nad dvojprvkovym fixturnym registrom — bez v2 karta ponuku nedostane vobec; s v2 nesie `upgrade.available` (plny aj lahky push), citaci callback dopadu vrati cisla (chrbat v1->v2, preneseny zamok NL, kod kitu) + ODTLACOK a NEZAPISE nic; ZMENA SKRINKY po nahlade zapis ODMIETNE bez kroku Spat (Codex #315 P1), potvrdeny zapis s tokenom a cerstvym odtlackom vymeni ref, preadresuje zamok a prestava dielce v JEDNEJ operacii (Spat = 1 krok, Redo obnovi ref+zamok+geometriu sucasne), odmietnuty preflight odpovie `ok:false` a nenechá ZIADNY krok Spat
+    run_kovd4(model)         # KOV-D4: PAMAT pri prechode na dvierka — prechod zasuvka -> dvierka -> zasuvka ide TOU ISTOU cestou ako panel (klient serverove polia neposiela): pripnuty recept aj zamok NL prezije, dormantny zamok NEMA chipy osi, po navrate sa zamok znovu VALIDUJE stavbou (dlzka, geometria aj nakupny kit); zmena otvarania pripne INY recept a stary zamok ostava dormantny (dlzka je z automatu, riadok nesvieti ako aktivny), navrat na classic ho zase aktivuje
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
