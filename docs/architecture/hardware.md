@@ -675,7 +675,8 @@ jedného otvárania žije `sisy` na v2 a `p2o` ešte na v1), rozhoduje **stabiln
 a to **výhradne z validovaných záznamov** (poškodený `:unknown` pin výber nikdy neovplyvní — D1a). Novo klasifikované čelo tak nikdy „neskočí" na novšiu fyziku len preto,
 že ju medzitým dostala iná kombinácia; povýšenie ostáva výhradne explicitnou akciou. Bez súrodenca platí `latest_for`.
 
-**`release_note` (KOV-D3a).** Jediné **voliteľné** pole schémy: autorská poznámka vydania (text pre potvrdenie upgradu v D3b). Recepty v1 ho vynechávajú, preto neprítomnosť
+**`release_note` (KOV-D3a).** Jediné **voliteľné** pole schémy: autorská poznámka vydania — od **KOV-D3b** ju nesie ponuka v karte čela aj hlavička potvrdzovacieho okna
+(`front_drawer[fid].upgrade.release_note`, `Panel.drawer_upgrade_offer`). Recepty v1 ho vynechávajú, preto neprítomnosť
 **nie je** chyba (`recipe[:release_note]` je `nil`); prítomné pole sa už validuje prísne ako každé iné — nie `String`, prázdne po orezaní alebo dlhšie než `RELEASE_NOTE_MAX`
 (400 znakov) je odmietnutie **celého** receptu.
 

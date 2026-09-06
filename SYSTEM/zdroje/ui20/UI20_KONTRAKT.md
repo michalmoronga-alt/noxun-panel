@@ -596,3 +596,11 @@ zmysle, že **mockup už nie je poslednou pravdou tam, kde tu stojí niečo iné
     naopak **ovládajú** zámok, preto zostali. Ak by otváranie a nosnosť mali niekedy pribudnúť, patria
     do riadku zhrnutia, nie vedľa neho. *(Zápis patrí ku KOVANIU, nie k fáze ŠTÚDIO — §7 je jediný
     zoznam vedomých odchýlok od mockupov, preto žije tu.)*
+11. **KOV-D3b — ponuka „Prejsť na novú verziu receptu" v mockupe NIE JE.** `mockup_kovanie_v1.html`
+    (scéna 1) pre ňu nemá blok, tak sa drží existujúcich vzorov karty: jeden `inforow` (tlmená veta
+    „Dostupný recept v2 — &lt;poznámka vydania&gt;") + **ghost** tlačidlo pod ňou, žiadna nová farba
+    ani token. Stojí **naspodku** karty, až pod jantárovým odporúčaním synchronizácie — to je
+    upozornenie na terajší stav, ponuka je príležitosť. V produkcii sa **nikdy neukáže** (žiadny
+    recept v2 neexistuje), takže vertikálny priestor karty sa touto dávkou reálne nemení.
+    Potvrdenie je **kostra D-15** s tabuľkou dopadu (`type: 'custom'`, zobrazovací blok bez `read`) —
+    nie vlastný formulár a nie textový diff konštánt.

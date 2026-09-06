@@ -17,6 +17,38 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-D3b — UPGRADE RECEPTU: UI, DOPAD NA TOTO ČELO, POTVRDENIE (v0.9.40, 6.9.2026).**
+  D3a dodala jadro prechodu na novšiu verziu receptu, ale **bez tlačidla** a bez registrácie callbacku. Táto dávka ho zapája: karta čela dostáva ponuku, klik ukáže
+  **konkrétny dopad práve na túto zásuvku** a až potom sa spýta. **Pre používateľa sa dnes nemení nič** — v repe sú len recepty v1, takže ponuka sa v plugine **nikdy neukáže**
+  a karta zásuvky vyzerá presne ako po D2b. Je to latentný rámec: hotový a otestovaný, čakajúci na prvú reálnu v2.
+  **Ponuka je LACNÁ otázka, dopad DRAHÁ (rozhodnutie o nákladoch).** `front_drawer[fid].upgrade` vzniká v payloade len vtedy, keď pre pripnutý recept existuje **vydaná vyššia**
+  verzia — `active_ref == :known` · `Recipes.latest_for` · `Recipes.upgrade?`, teda **tie isté** pravidlá, ktoré zápisovú cestu nakoniec pustia, takže sa ponuka nemôže objaviť
+  tam, kde by ju server vzápätí odmietol. Je to čítanie registra a `parse_id`, nič viac. **Dopad na čelo sa pri pushi karty nepočíta vôbec**: stojí celý `build_plan` + expanziu
+  setov, a keby bežal pri každom prekreslení karty, platili by sme ho v každej zákazke za funkciu, ktorú nikto nevyvolal. Chodí preto **lenivo**, samostatným čítacím callbackom
+  `drawer_upgrade_impact` — a ten nespúšťa žiadnu operáciu, nezapisuje do modelu nič a nenechá **žiadny** krok Späť. Kľúč `upgrade` v produkcii **chýba** (nie `false`), takže
+  payload bez v2 je s D3a zhodný **na kľúč presne** (charakterizačný test).
+  **Dopad, nie diff konštánt (Astra #20 F13).** Verzia receptu smie zmeniť prahy, rad NL, hrúbky aj ABS **bez zmeny `constants`**, takže porovnávať texty receptov by bolo
+  zavádzajúce. Ukazuje sa výsledok: výška · NL · rozmery **každého dielca** · objednávacie kódy · prenesené zámky, vždy v dvojici „teraz → po prechode". Čísla skladá **server**
+  a berie ich z **toho istého nasucho postaveného stavu, ktorý by sa aj zapísal**: `drawer_upgrade_prepare` vracia **aditívne** aj `side` (cieľová položka výsuvu, dielce z plánu,
+  kódy z expanzie) a `lock` (už preadresovaný záznam zámku), zápisová cesta číta naďalej len `params` a `recipe`. **Terajšiu** stranu stavia **ten istý** helper `drawer_dry_plan`
+  nad nezmenenými parametrami skrinky — dve rôzne cesty by ukázali rozdiel, ktorý v skutočnosti spôsobil len iný spôsob výpočtu. Preto ani preflight, ani kit nemajú druhú
+  implementáciu: `drawer_upgrade_preflight` vracia `[chyba, side]` a `drawer_upgrade_kit_problem` `[chyba, kódy]` — tá istá expanzia, ktorá rozhoduje o prijatí, dáva aj kódy
+  do tabuľky. Ponuka sa dáva **len vyriešenej** zásuvke (`state: 'ok'`): tabuľka porovnáva terajší stav s cieľovým a konfliktná zásuvka žiadny terajší nemá — jej cesta von je
+  dôvod konfliktu, nie upgrade.
+  **Okno sa otvára až z odpovede servera.** Klik neotvorí modal: pošle čítaciu otázku a čaká. Preflight môže prechod odmietnuť (nesediaca hrúbka, zámok mimo nového radu,
+  chýbajúci kit) a vtedy **nie je čo potvrdzovať** — používateľ dostane vetu servera a okno sa neotvorí vôbec (`ok: false` + `reason`). Pri `ok: true` je to **kostra D-15**
+  s tabuľkou ako zobrazovacím `custom` blokom (bez `read`, takže sa z nej nedá odoslať nič); zápis nesie **výhradne** `from`/`to` z payloadu. **Okno zatvára až potvrdenie
+  servera** — odmietnutie ho odomkne a hlášku ukáže v ňom (kontrakt D-15, lekcia D2b P2-1). Korelácia je **tokenom** a kanály sú **dva vlastné** (`NX.hwUpgradeImpact`,
+  `NX.hwUpgradeResult`), nie zdieľané s D2b: okno náhrady osi a okno prechodu sú dva rôzne modaly s vlastným stavom a jeden kanál by zavrel to nesprávne. Stav sa na klientovi
+  zakladá **až keď je kam poslať** — bez kanála by ho nemala čo vyčistiť odpoveď a tlačidlo (resp. zamknuté okno) by ostalo natrvalo mŕtve.
+  **UI bez novej farby a bez nového bloku.** Mockup `mockup_kovanie_v1.html` pre ponuku blok nemá, tak sa drží existujúcich vzorov karty: tlmená veta `inforow` + **ghost**
+  tlačidlo, žiadny nový token (`UI20_KONTRAKT.md` §7 bod 11). Stojí **naspodku** karty, až pod jantárovým odporúčaním synchronizácie — to je upozornenie na terajší stav, ponuka
+  je príležitosť. Markup aj klik žijú v `hardware.js` pri ostatných zápisových cestách kovania, karta je len renderer (`r.kind === 'upgrade'` → `hwUpHtml`) — rovnaká deľba ako
+  pri chipoch osí v D2b. Tlačidlo nesie `data-ax`/`data-axc`, takže fokus prežije prekreslenie karty **ľahkým** pushom; ten istý ľahký push nesie aj ponuku
+  (`front_drawer_refresh`), inak by z otvorenej karty po zmene mapovania zmizla.
+  **Testy:** headless **3292 PASS** (3273 pred dávkou, +19 v `tests/pure/test_kovd3b_upgrade_ui.rb`), **93 JS sád** (+`tests/js/test_kovd3b_ui.js`, 82 assertov v mini-DOM cez
+  celý tok klik → dopad → potvrdenie → odpoveď), **6 overených mutácií** (3 JS, 3 Ruby) a in-SU sekcia **`run_kovd3b`** (napísaná, spúšťa orchestrátor).
+
 - **KOV-D3a — UPGRADE RECEPTU: JEDNO ČELO, JADRO (v0.9.39, 6.9.2026).**
   Recepty zásuviek sú **nemenné**: oprava alebo nová hodnota od výrobcu neprepíše starý súbor, ale vydá `_v2`. Dovtedy však chýbal mechanizmus, ktorým sa už postavená
   zásuvka na novú verziu **prepne** — a prepnúť ju musí človek, nikdy automat. Táto dávka ho dodáva ako **jadro** (`handle_upgrade_drawer_recipe`); UI, ponuka „dostupná v2"
