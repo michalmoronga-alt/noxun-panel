@@ -494,6 +494,14 @@
       if (Array.isArray(d.manual_view) && typeof refreshHardwareManual === 'function'){
         refreshHardwareManual(d.manual_view);
       }
+      // KOV-D1b (Codex #310 kolo 1 P2-5): rozklik „Technický detail" na karte
+      // zásuvky nesie názov setu a kódy, ktoré tento push práve mení — obnovuje
+      // sa preto TÝM ISTÝM ľahkým pushom. Kľúč chýba pri starom payloade (vtedy
+      // sa nerobí nič) a `{}` je legitímna hodnota „skrinka zásuvky nemá".
+      if (d.front_drawer && typeof d.front_drawer === 'object' &&
+          typeof refreshFrontDrawer === 'function'){
+        refreshFrontDrawer(d.front_drawer);
+      }
     },
     // KOV-H2: výsledok hľadania v katalógu pre modal ručnej položky. Odpoveď
     // nesie generáciu dotazu — staršie kolo sa zahadzuje v `hardware.js`.

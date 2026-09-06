@@ -290,6 +290,23 @@ a `hardware_catalog.rb` a v [ui-lifecycle.md](ui-lifecycle.md) (sekcia `hw` Št�
   snapshot aj šablóna expandujú deep-equal so setom bez príznaku. Od KOV-B3 ho číta **jediné miesto: `set_options`**, teda PONUKA nového výberu (predvoľby projektu v Štúdiu
   a override skrinky v paneli). Neaktívny set sa už nenúka — ale **referencovaný set v ponuke OSTÁVA** (`referenced_ids`), inak by select ukazoval prázdno tam, kde projekt
   hodnotu má, a prvý klik vedľa by ju ticho prepísal. Globálnu tabuľku filtruje tá istá myšlienka v UI (`hwsGlobalOptions`).
+- **KOV-D1b — ponuka pre TRIEDNY kľúč (`class_set_options`).** `set_options` vracia sety JEDNÉHO TYPU; triedny kľúč je užší (menuje aj otváranie a konštrukciu) a pri sete
+  s `height_variant` sa hodnotou NIKDY nesmie stať pevný set. `class_set_options(class_key, globals, snapshot_sets, referenced_ids)` preto stavia ponuku sám: berie
+  `set_options` (rovnaká precedencia snapshot > global), **odfiltruje neaktívne aj tie referencované** (na rozdiel od `set_options` — F10: ponuka NOVÉHO výberu ich niesť nesmie,
+  uloženú hodnotu ukazuje volajúci osobitne cez `mapping_value_text`), nechá len sety sediace triede a rozdelí ich: set **bez** `height_variant` = PEVNÁ voľba, sety **s ním**
+  = jedna voľba za RODINU, teda pásmový selektor `height_variant` s jedným pásmom na výšku (`min == max`, `height_selector_for`). **Rodina je `(manufacturer, series, názov bez
+  tokenu `H<číslo>`)`** (`family_stem`) — klasifikácia farbu ani vyhotovenie nenesie (Atira biela a antracit majú všetky klasifikačné polia zhodné), takže jediný údaj, ktorý ich
+  odlíši, je názov. Je to **POHĽAD, nie pravda**: uložená hodnota je vždy zoznam reálnych `set_id` a každé pásmo znovu validuje zápisová cesta (`class_key_value_problem`
+  v globále/projekte, `classified_value_problem` v override skrinky), takže zle zgrupovaná ponuka nevie vyrobiť zlý nákup — najhoršie zle POPÍSANÚ voľbu. Sprievodné čisté
+  funkcie: `mapping_option_id` (stabilný token hodnoty pre `<select>`; rovnaká hodnota = rovnaký token), `mapping_value_text` (ľudský text uloženej hodnoty — chýbajúcu
+  definíciu PRIZNÁ, nikdy nenahradí), `class_key_label` (popisok kľúča z `HardwareRules.label_for` + `CLASS_OPTIONS`), `CLASS_MAPPING_KEYS` (= kľúče `MAPPING_ADDITIONS`,
+  jediný zoznam tried, na ktoré sa dá mapovať). `height_variant` v `PARAM_OPTIONS` nie je (nie je to os výberu člena), preto má vlastný 2. pád v `selector_by`.
+- **Trieda nepomenúva SYSTÉM — bránou je `set_system`** (Codex #310 kolo 1 P2-4). Triedny kľúč nesie len otváranie a konštrukciu, ale **receptová položka vždy nesie
+  `params['system']`**, a `set_incompatible_info` podľa neho porovnáva výrobcu a radu (`SYSTEM_IDENTITY`). Set cudzej rady s rovnakým otváraním aj konštrukciou (napr. Blum
+  Legrabox, `metal`/`classic`) by teda prešiel výberom aj zápisom a padol by až pri expanzii — zásuvka RED, export stojí. `set_system(set)` je **reverzné čítanie tej istej
+  jedinej autority** `SYSTEM_IDENTITY` (`[výrobca, rada] → system`, `same_name?` bez diakritiky) a stojí na OBOCH miestach: `class_set_options` taký set **neponúkne**
+  a `class_key_value_problem` ho **odmietne pred zápisom** (globál aj projekt). Legacy set bez klasifikácie systém nemá (`nil`) — pre triedny kľúč sa aj tak neponúka, lebo
+  neprejde už kontrolou otvárania.
 - **`save_set!` MERGUJE klasifikáciu z uloženého setu.** Do KOV-B3 posielal editor len štyri kľúče (`set_id`, `name`, `generic_type`, `members`), takže bez merge by KAŽDÁ úprava
   člena ticho zhodila zaradenie — presne tá trieda tichej straty, ktorú dávka riešila (a je to jedna z mutácií sady). Kľúč, ktorý vo vstupe VÔBEC NIE JE, sa preberie z uloženého
   setu; kľúč prítomný s `nil`/`''` (a `active: true`) je VEDOMÉ vymazanie. Až merged tvar ide do validácie, takže all-or-nothing platí nad tým, čo sa naozaj uloží. Validácia preto

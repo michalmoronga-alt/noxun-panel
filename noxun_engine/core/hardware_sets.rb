@@ -474,6 +474,12 @@ module Noxun
         'class:slide|tipon|wood'   => 'vysuv-quadro-v6-p2o'
       }.freeze
 
+      # KOV-D1b: TRIEDNE KLUCE, na ktore sa da mapovat v Pravidlach Studia.
+      # Je to TEN ISTY zoznam ako `MAPPING_ADDITIONS` (predvolby, ktore sa
+      # dopĺňajú do knižnice) — druhý zoznam v UI by sa s ním rozišiel pri
+      # prvom pribudnutom systéme.
+      CLASS_MAPPING_KEYS = MAPPING_ADDITIONS.keys.freeze
+
       module_function
 
       # --- slovnik parametrov (H1b) --------------------------------------------
@@ -1516,6 +1522,14 @@ module Noxun
           if dc && set['drawer_construction'].to_s.strip != dc
             return "set „#{set['name']}“ má inú konštrukciu zásuvky, než pomenúva kľúč"
           end
+          # KOV-D1b (Codex #310 kolo 1 P2-4): trieda system NEPOMENUVA, ale
+          # receptova polozka ho vzdy nesie — set cudzieho vyrobcu/rady by
+          # prešiel zápisom a padol až pri expanzii (`set_incompatible_info`
+          # `detail: 'system'`), teda RED nad hotovou zákazkou. Brána je preto
+          # aj TU, nielen vo filtri ponuky.
+          if set_system(set).nil?
+            return "set „#{set['name']}“ nepatrí k žiadnemu vydanému systému zásuviek"
+          end
 
           set_hv = int_value(set[HEIGHT_VARIANT_KEY])
           if selector
@@ -2137,6 +2151,191 @@ module Noxun
         end
         by_id.reject { |sid, s| s['active'] == false && !refs.include?(sid.to_s) }
              .values.sort_by { |s| [s['name'].to_s, s['set_id'].to_s] }
+      end
+
+      # === KOV-D1b: PONUKA PRE TRIEDNY KLUC (Pravidla Studia + karta) =========
+      #
+      # `set_options` vracia sety JEDNEHO TYPU. Triedny kluc
+      # (`class:slide|<otvaranie>|<konstrukcia>`) je UZSI: pomenuva aj otvaranie
+      # a konstrukciu — a pri sete s vyskovym variantom sa hodnotou NIKDY nesmie
+      # stat PEVNY set (po prerasteni zasuvky H70 -> H176 by objednal kit inej
+      # vysky; rovnake pravidlo strazi `class_key_value_problem`). Ponuka sa
+      # preto sklada TU a nie v JS:
+      #   * set BEZ `height_variant` (Quadro V6) -> PEVNA volba,
+      #   * sety S `height_variant` -> JEDNA volba za RODINU = pasmovy selektor
+      #     `height_variant` (jedno pasmo na kazdu vysku, `min == max`).
+      #
+      # RODINA je (vyrobca, rada, nazov BEZ vyskoveho tokenu `H<cislo>`).
+      # Klasifikacia setu farbu ani vyhotovenie NENESIE (Atira biela a Atira
+      # antracit maju vsetky klasifikacne polia zhodne), takze jediny udaj,
+      # ktory ich odlisi, je NAZOV. Grupovanie je preto POHLAD, nie pravda:
+      # ulozena hodnota je vzdy zoznam REALNYCH `set_id` a kazde pasmo znovu
+      # validuje zapisova cesta (`class_key_value_problem` v globale/projekte,
+      # `classified_value_problem` v override skrinky). Zle zgrupovana ponuka
+      # teda NEVIE vyrobit zly nakup — najhorsie zle POPISANU volbu.
+      #
+      # NEAKTIVNY set (F10) sa NEPONUKA vobec — ani ked ho projekt referencuje;
+      # ULOZENU hodnotu ukazuje volajuci osobitne (`mapping_value_text`), takze
+      # sa zobrazi, ale nedá sa vybrat znova.
+      # -> [{ 'id', 'label', 'set_id' | 'selector' }] (deterministicke poradie)
+      def class_set_options(class_key, globals, snapshot_sets, referenced_ids)
+        canon, = parse_class_key(class_key, allow_owner: true)
+        return [] if canon.nil?
+
+        segs = class_key_without_owner(canon)[BuildPlan::HW_SET_CLASS_PREFIX.length..]
+               .to_s.split('|')
+        gt, om, dc = segs
+        sets = set_options(gt, globals, snapshot_sets, referenced_ids).select do |s|
+          s['active'] != false && s['opening_mode'].to_s.strip == om.to_s &&
+            (dc.nil? || s['drawer_construction'].to_s.strip == dc) &&
+            !set_system(s).nil?
+        end
+        fixed, variant = sets.partition { |s| int_value(s[HEIGHT_VARIANT_KEY]).nil? }
+        out = fixed.map do |s|
+          { 'id' => mapping_option_id(s['set_id']), 'label' => s['name'].to_s,
+            'set_id' => s['set_id'] }
+        end
+        family_groups(variant).each_value do |list|
+          sel = height_selector_for(list)
+          next if sel.nil?
+
+          out << { 'id' => mapping_option_id(sel), 'label' => selector_text(sel, index_sets(list)),
+                   'selector' => sel }
+        end
+        out.sort_by { |o| [o['label'].to_s, o['id'].to_s] }
+      end
+
+      # KOV-D1b (Codex #310 kolo 1 P2-4): SYSTEM, ktoremu set patri, podla jeho
+      # vyrobcu a rady — reverzna citacia `SYSTEM_IDENTITY` (jedina autorita
+      # vztahu system <-> vyrobca/rada, tá istá, podľa ktorej rozhoduje
+      # `set_incompatible_info` pri expanzii).
+      #
+      # Set, ktoreho vyrobca a rada nepatria ZIADNEMU vydanemu systemu, sa pre
+      # triedny kluc ponuknut ani ulozit NESMIE: receptova polozka vzdy nesie
+      # `params['system']` a expanzia by taku definiciu odmietla (`detail:
+      # 'system'`) — zasuvka by skoncila RED nad hotovou zakazkou a export by
+      # stal. Klasifikacia setu system nenesie, preto sa cita z dvojice mien.
+      # -> system | nil (ziadny vydany system tomu setu nezodpoveda)
+      def set_system(set)
+        return nil unless set.is_a?(Hash)
+
+        SYSTEM_IDENTITY.each do |sys, (man, ser)|
+          return sys if same_name?(set['manufacturer'], man) && same_name?(set['series'], ser)
+        end
+        nil
+      end
+
+      # SK popisok TRIEDNEHO kluca do riadku Pravidiel a karty:
+      # „Výsuv · Tip-On · Kovové bočnice". Slova pochadzaju z UZAVRETYCH
+      # slovnikov (`HardwareRules.label_for`, `CLASS_OPTIONS`) — ziadny druhy
+      # zoznam v UI. Neplatny kluc = nil (volajuci riadok nekresli).
+      def class_key_label(class_key)
+        canon, = parse_class_key(class_key, allow_owner: true)
+        return nil if canon.nil?
+
+        segs = class_key_without_owner(canon)[BuildPlan::HW_SET_CLASS_PREFIX.length..]
+               .to_s.split('|')
+        parts = [HardwareRules.label_for(segs[0]), class_label('opening_mode', segs[1])]
+        parts << class_label('drawer_construction', segs[2]) if segs[2]
+        parts.join(' · ')
+      end
+
+      # Sety S vyskovym variantom -> { rodina => [sety] }.
+      def family_groups(sets)
+        out = {}
+        Array(sets).each do |s|
+          key = [s['manufacturer'].to_s, s['series'].to_s, family_stem(s['name'])]
+          (out[key] ||= []) << s
+        end
+        out
+      end
+
+      # Nazov setu bez vyskoveho tokenu — „Atira biela H70 — klasické" ->
+      # „Atira biela — klasické". Token je uzavrety tvar `H<cislo>`, takze
+      # nazov bez neho ostava CELY (rodina = ten set sam).
+      HEIGHT_TOKEN_RE = /\s*\bH\d+\b\s*/i.freeze
+
+      def family_stem(name)
+        name.to_s.gsub(HEIGHT_TOKEN_RE, ' ').gsub(/\s+/, ' ').strip
+      end
+
+      # Pasmovy selektor `height_variant` z rodiny setov: jedno pasmo na vysku
+      # (min == max), poradie podla vysky. Dva sety s ROVNAKOU vyskou v jednej
+      # rodine su ten isty vyrobok — berie sa nizsie `set_id` (deterministicky),
+      # nikdy sa pasma neprekryju.
+      def height_selector_for(sets)
+        bands = Array(sets).filter_map do |s|
+          hv = int_value(s[HEIGHT_VARIANT_KEY])
+          next if hv.nil?
+
+          [hv, s['set_id'].to_s]
+        end.sort.uniq { |hv, _sid| hv }
+        return nil if bands.empty?
+
+        { 'param' => HEIGHT_VARIANT_KEY,
+          'bands' => bands.map { |hv, sid| { 'min' => hv.to_f, 'max' => hv.to_f, 'set_id' => sid } } }
+      end
+
+      def index_sets(sets)
+        out = {}
+        Array(sets).each { |s| out[s['set_id'].to_s] = s if s.is_a?(Hash) }
+        out
+      end
+
+      # STABILNY token hodnoty mapovania pre `<select>`. Rovnaka hodnota =
+      # rovnaky token, takze ULOZENA hodnota sa da spárovať s ponukou bez toho,
+      # aby JS musel porovnavat objekty. nil pri neplatnom tvare.
+      def mapping_option_id(value)
+        return nil if invalid_mapping_value?(value)
+        return "set:#{value.to_s.strip}" if value.is_a?(String) || value.is_a?(Symbol)
+        return nil unless value.is_a?(Hash)
+
+        parts = Array(value['bands']).filter_map do |b|
+          next unless b.is_a?(Hash)
+
+          format('%g-%g:%s', b['min'].to_f, b['max'].to_f, b['set_id'])
+        end
+        "sel:#{value['param']}|#{parts.join(',')}"
+      end
+
+      # LUDSKY text hodnoty mapovania (riadok Pravidiel aj karta). `defs` =
+      # mapa set_id => definicia (snapshot pred globalom — poradie urcuje
+      # volajuci). Nikdy sa nic nedopocitava: co sa neda dolozit definiciou,
+      # sa PRIZNA („chýba"), nikdy nenahradi.
+      def mapping_value_text(value, defs)
+        return 'bez setu' if value.nil? || (value.is_a?(String) && value.to_s.strip.empty?)
+        return 'neplatný výber' if invalid_mapping_value?(value)
+        return selector_text(value, defs) if value.is_a?(Hash)
+
+        sid = value.to_s
+        d = defs[sid]
+        d ? d['name'].to_s : "#{sid} (chýba)"
+      end
+
+      # „Atira biela — klasické · podľa výšky (H70 · H144 · H176)". Rodinu
+      # menuje LEN vtedy, ked ju vsetky pasma zdielaju a kazde ma definiciu —
+      # inak ostane holy popis parametra (radsej menej nez vymysleny nazov).
+      def selector_text(value, defs)
+        bands = Array(value['bands'])
+        sets = bands.map { |b| b.is_a?(Hash) ? defs[b['set_id'].to_s] : nil }
+        stems = sets.compact.map { |s| family_stem(s['name']) }.uniq
+        head = (sets.length == bands.length && !sets.include?(nil) &&
+                stems.length == 1 && !stems.first.empty?) ? "#{stems.first} · " : ''
+        "#{head}#{selector_by(value['param'])} (#{selector_bands_text(bands, value['param'])})"
+      end
+
+      # `height_variant` v `PARAM_OPTIONS` NIE JE (nie je to os vyberu clena,
+      # ale klasifikacne pole) — vlastny 2. pad tu, aby text neskoncil ako
+      # „podľa: parameter „height_variant““.
+      def selector_by(param)
+        param.to_s == HEIGHT_VARIANT_KEY ? 'podľa výšky zásuvky' : param_by(param)
+      end
+
+      def selector_bands_text(bands, param)
+        return bands.map { |b| fmt_variant(b['min']) }.join(' · ') if param.to_s == HEIGHT_VARIANT_KEY
+
+        n = bands.length
+        "#{n} #{n == 1 ? 'pásmo' : 'pásma'}"
       end
 
       # --- cabinet override (H1a, audit FIX 7) --------------------------------

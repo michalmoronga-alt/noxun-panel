@@ -1575,7 +1575,74 @@
         t.appendChild(hwsSelectorSummaryRow(key, value, opts));
       }
     });
+    // KOV-D1b: riadky mapovania PODĽA TRIEDY (zásuvky) idú do TEJ ISTEJ tabuľky
+    // — žiadny nový blok, žiadny nový nadpis (vertikálny priestor je vzácny).
+    hwsMapClassRows(hwsScopeOf(action)).forEach(function(row){
+      var cr = hwsMapClassRow(row, action);
+      if (cr) t.appendChild(cr);
+    });
     return t;
+  }
+
+  // --- KOV-D1b: mapovanie podľa TRIEDY (zásuvky) -----------------------------
+  //
+  // Výsuv sa nemapuje podľa generického typu, ale podľa triedy
+  // (`class:slide|<otváranie>|<konštrukcia>`). Riadky skladá SERVER
+  // (`class_rows.project` / `.global`): popisok, hotová ponuka LEN kompatibilných
+  // možností a text uloženej hodnoty. JS nefiltruje, neprekladá a kľúč neskladá
+  // — len kreslí a pošle ID vybranej voľby späť.
+  var HWS_STORED_OPT = '__stored__'; // uložená voľba mimo ponuky — len ZOBRAZENIE
+
+  function hwsScopeOf(action){ return action === 'hws-map-global' ? 'global' : 'project'; }
+  function hwsMapClassRows(scope){
+    var d = (HWS_DATA && HWS_DATA.class_rows) || {};
+    return d[scope] || [];
+  }
+  // Voľba podľa ID — jediné miesto, kde sa z ponuky vyberá hodnota na odoslanie.
+  function hwsMapClassPick(row, id){
+    var list = (row && row.options) || [];
+    for (var i = 0; i < list.length; i++){ if (list[i] && list[i].id === id) return list[i]; }
+    return null;
+  }
+  // Hodnota pre server: pevný set = `set_id` (reťazec), rodina = selektor
+  // (objekt). Prázdne ID = zrušenie mapovania.
+  function hwsMapClassValue(row, id){
+    if (!id) return '';
+    var o = hwsMapClassPick(row, id);
+    if (!o) return null; // neznáme ID sa NEODOSIELA (radšej nič než hádanie)
+    return o.selector ? o.selector : (o.set_id || '');
+  }
+  function hwsMapClassRow(row, action){
+    if (!row || !row.key || !row.label) return null;
+    var r = hwsMk('div', 'hwsmap-row');
+    r.appendChild(hwsMk('label', null, row.label));
+    var sel = hwsMk('select');
+    sel.setAttribute('data-action-change', 'hws-map-class');
+    sel.setAttribute('data-hws-act', action);
+    sel.setAttribute('data-hws-mapkey', row.key);
+    var none = hwsMk('option', null, row.none_label || '— bez setu');
+    none.value = '';
+    none.selected = !row.current && !row.stored;
+    sel.appendChild(none);
+    // F10: uložená voľba, ktorá už v ponuke NIE JE (neaktívny set, set z novšej
+    // verzie) sa ZOBRAZÍ, ale nedá sa vybrať znova — inak by select ukazoval
+    // prázdno tam, kde projekt hodnotu má, a prvý klik vedľa by ju prepísal.
+    if (row.stored){
+      var st = hwsMk('option', null, (row.value_text || '') + ' (uložený výber)');
+      st.value = HWS_STORED_OPT;
+      st.selected = true;
+      st.disabled = true;
+      sel.appendChild(st);
+    }
+    (row.options || []).forEach(function(o){
+      if (!o || !o.id) return;
+      var op = hwsMk('option', null, o.label);
+      op.value = o.id;
+      if (o.id === row.current) op.selected = true;
+      sel.appendChild(op);
+    });
+    r.appendChild(sel);
+    return r;
   }
 
   function hwsIsSelector(v){ return !!(v && typeof v === 'object' && v.bands); }
@@ -1841,6 +1908,20 @@
       if (!t || !t.getAttribute) return;
       if (hwsModalChange(t)) return;
       var act = t.getAttribute('data-action-change');
+      // KOV-D1b: riadok mapovania podľa triedy — hodnota sa berie z PONUKY
+      // SERVERA podľa ID, nikdy sa neskladá v paneli. „(uložený výber)" je
+      // `disabled`, takže sem nikdy nepríde.
+      if (act === 'hws-map-class'){
+        var cAct = t.getAttribute('data-hws-act') || 'hws-map-proj';
+        var mapKey = t.getAttribute('data-hws-mapkey') || '';
+        var crow = null;
+        hwsMapClassRows(hwsScopeOf(cAct)).forEach(function(r){ if (r && r.key === mapKey) crow = r; });
+        if (!crow) return;
+        var cVal = hwsMapClassValue(crow, t.value);
+        if (cVal === null) return;
+        hwsSendMap(cAct, mapKey, cVal, '');
+        return;
+      }
       if (act === 'hws-map-proj' || act === 'hws-map-global'){
         var gt = t.getAttribute('data-hws-gt');
         var key = t.getAttribute('data-hws-key') || hwsSelKey(act, gt);
@@ -1973,7 +2054,10 @@
 
   function hwsCurrentRev(){ return (HWS_DATA && HWS_DATA.revision) || ''; }
 
-  function hwsSendMap(action, gt, value, key, pinnedRev){
+  // KOV-D1b: `mapKey` je KĽÚČ mapovania — generický typ (`slide`) alebo
+  // TRIEDNY kľúč zásuvky (`class:slide|classic|metal`). Posiela sa v poli
+  // `mapping_key`; `generic_type` ostáva kvôli staršiemu serveru rovnaké.
+  function hwsSendMap(action, mapKey, value, key, pinnedRev){
     // R-07: globálna predvoľba je zápis do knižnice — pri nekompatibilnej sa
     // neodosiela (select ju ani nevykreslí, toto je poistka pre zmenu selectu
     // zo zastaraného DOM-u).
@@ -1981,10 +2065,12 @@
     if (action === 'hws-map-global'){
       // R-08: globálna predvoľba nesie REVÍZIU knižnice (rovnako ako uloženie
       // a mazanie setu) — dve otvorené okná si ju inak ticho prepíšu.
-      hwsSend('hws_map_global', { generic_type: gt, value: value, ui_key: key || '',
+      hwsSend('hws_map_global', { generic_type: mapKey, mapping_key: mapKey, value: value,
+                                  ui_key: key || '',
                                   revision: hwsMapRev(pinnedRev, hwsCurrentRev()) });
     } else {
-      hwsSend('hws_map_project', { generic_type: gt, value: value, ui_key: key || '',
+      hwsSend('hws_map_project', { generic_type: mapKey, mapping_key: mapKey, value: value,
+                                   ui_key: key || '',
                                    model_guid: (HWS_DATA && HWS_DATA.model_guid) || '' });
     }
   }
@@ -2018,6 +2104,10 @@
       hwsChips: hwsChips, hwsServerErrors: hwsServerErrors,
       hwsPreviewLines: hwsPreviewLines, hwsPreviewStale: hwsPreviewStale,
       hwsGlobalOptions: hwsGlobalOptions,
+      // KOV-D1b: riadky mapovania podľa TRIEDY (server posiela hotové riadky)
+      hwsScopeOf: hwsScopeOf, hwsMapClassRows: hwsMapClassRows,
+      hwsMapClassPick: hwsMapClassPick, hwsMapClassValue: hwsMapClassValue,
+      HWS_STORED_OPT: HWS_STORED_OPT,
       HWS_NEW_OPT: HWS_NEW_OPT, HWS_KEY_NEW: HWS_KEY_NEW,
       HWS_KINDS: HWS_KINDS, HWS_PERS: HWS_PERS,
       // H1b: pásma člena setu + výber setu podľa parametra

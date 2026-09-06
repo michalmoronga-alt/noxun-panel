@@ -291,17 +291,74 @@
     }
     return out;
   }
+  // ---- KOV-D1b: ponuka pre KLASIFIKOVANU zasuvku --------------------------
+  // Pri klasifikovanej polozke (celo nesie otvaranie + konstrukciu) plati
+  // TRIEDNY kluc a ponuku sklada SERVER (`entry.compat`): len kompatibilne
+  // moznosti, Atira ako RODINA „podľa výšky", Quadro ako pevny set. JS
+  // nefiltruje, neprekladá a kluc neskladá — posle spat hodnotu, ktoru dostal.
+  var HW_SET_STORED = '__stored__'; // ulozena volba mimo ponuky (len ZOBRAZENIE)
+
+  function hwCompatScope(entry, owner){
+    var c = entry && entry.compat;
+    if (!c) return null;
+    if (owner) return (c.owners && c.owners[owner]) || null;
+    return c.cab || null;
+  }
+  function hwCompatPick(sc, id){
+    var list = (sc && sc.options) || [];
+    for (var i = 0; i < list.length; i++){ if (list[i] && list[i].id === id) return list[i]; }
+    return null;
+  }
+  function hwCompatOptionList(sc){
+    var out = [{ value: '', text: sc.none_label || 'podľa projektu',
+                 selected: !sc.current && !sc.stored, disabled: false }];
+    // F10: ulozena volba, ktora uz v ponuke NIE JE (neaktivny set), sa ZOBRAZI,
+    // ale vybrat sa neda — inak by select ukazoval prazdno tam, kde hodnota je.
+    if (sc.stored){
+      out.push({ value: HW_SET_STORED, text: (sc.value_text || '') + ' (uložený výber)',
+                 selected: true, disabled: true });
+    }
+    (sc.options || []).forEach(function(o){
+      if (!o || !o.id) return;
+      out.push({ value: o.id, text: o.label, selected: o.id === sc.current, disabled: false });
+    });
+    return out;
+  }
   // Ponuka pre riadok DIELCA (owner-level override, D-81).
   function hwOwnerOptionList(entry, owner){
+    var sc = hwCompatScope(entry, owner);
+    if (sc) return hwCompatOptionList(sc);
     var ov = hwOwnerOverride(entry, owner);
     return hwSetOptionList(entry, (ov && ov.set_id) || '', '(podľa skrinky/projektu)',
                            (ov && ov.selector) ? (ov.label || 'podľa parametra') : null);
   }
+  // KOV-D1b (Codex #310 kolo 1 P2-3): server ZÁMERNE pošle `compat.cab = null`,
+  // keď má skrinka klasifikované zásuvky VIACERÝCH tried (alebo klasifikovanú
+  // vedľa legacy) — jeden kľúč by platil len na časť položiek a
+  // `apply_cabinet_override` taký zápis odmieta. Riadok skrinky sa vtedy
+  // NEKRESLÍ vôbec; inak by sa vykreslil plochý zoznam setov, z ktorého by
+  // KAŽDÁ voľba skončila hláškou. Rozlišuje sa **neprítomný** `compat`
+  // (legacy/neklasifikovaná skrinka → pôvodná cesta) od prítomného s `cab: null`.
+  function hwCabRowOff(entry){
+    return !!(entry && entry.compat) && !entry.compat.cab;
+  }
   // Ponuka pre riadok SKRINKY (override projektovej predvolby).
+  // -> null = riadok sa nemá kresliť vôbec (zmiešaná skrinka)
   function hwCabOptionList(entry){
+    if (hwCabRowOff(entry)) return null;
+    var sc = hwCompatScope(entry, null);
+    if (sc) return hwCompatOptionList(sc);
     return hwSetOptionList(entry, (entry && entry.override_set_id) || '',
                            (entry && entry.project_label) || 'podľa projektu',
                            (entry && entry.override_selector) ? (entry.override_label || 'podľa parametra') : null);
+  }
+  // Tooltip selectu: pri klasifikovanej zasuvke povie, PRE KOHO vyber plati
+  // a akej triedy sa tyka („Set pre toto čelo — Výsuv · Tip-On · Kovové
+  // bočnice"); inak ostava povodny text „čo platí bez vlastného výberu".
+  function hwCompatTitle(sc, fallback){
+    if (!sc) return fallback;
+    var head = sc.scope_label || '';
+    return sc.class_label ? (head + ' — ' + sc.class_label) : head;
   }
   function hwOptionsHtml(list){
     var h = '';
@@ -316,6 +373,13 @@
          + '" data-cab="' + esc(cabId || '') + '" title="' + esc(title) + '" onchange="onHwSet(this)">'
          + hwOptionsHtml(list) + '</select>';
   }
+  // Odstranenie skrinkoveho riadku setu — cely `.hwsetrow` aj s popiskom
+  // (samotny select by nechal visiet holy nadpis bez ovladaca).
+  function hwDropSetRow(sel){
+    var row = (sel && sel.closest) ? sel.closest('.hwsetrow') : null;
+    var node = row || sel;
+    if (node && node.parentNode) node.parentNode.removeChild(node);
+  }
   // D-75: zivy refresh ponuky bez prekreslenia riadkov (rozpisany pocet
   // ostava). Vybranu hodnotu urcuje SERVER — payload nesie aktualne overridy.
   function refreshHardwareSets(options){
@@ -329,8 +393,13 @@
         var sel = sels[i];
         var entry = hwSetEntry(sel.getAttribute('data-gt'));
         var owner = sel.getAttribute('data-owner') || '';
-        sel.innerHTML = hwOptionsHtml(owner ? hwOwnerOptionList(entry, owner) : hwCabOptionList(entry));
-        sel.title = owner ? hwOwnerTitle(entry) : hwCabTitle(entry);
+        var list = owner ? hwOwnerOptionList(entry, owner) : hwCabOptionList(entry);
+        // KOV-D1b: skrinkový riadok sa medzitým mohol stať nepoužiteľným
+        // (pribudla zásuvka inej triedy) — ľahký push preto odstráni CELÝ
+        // riadok, nedopĺňa doň plochý zoznam, z ktorého by každá voľba zlyhala.
+        if (!list){ hwDropSetRow(sel); continue; }
+        sel.innerHTML = hwOptionsHtml(list);
+        sel.title = owner ? hwOwnerTitle(entry, owner) : hwCabTitle(entry);
       }
     });
   }
@@ -366,11 +435,17 @@
   // a spatne lomitka treba escapovat, inak by selektor spadol.
   function cssEsc(v){ return String(v).replace(/(["\\])/g, '\\$1'); }
 
-  function hwOwnerTitle(entry){
+  function hwOwnerTitle(entry, owner){
+    var sc = hwCompatScope(entry, owner);
+    if (sc) return hwCompatTitle(sc, '') + ' · bez vlastného výberu platí: '
+                  + (sc.none_label || 'predvoľba projektu');
     return 'Set kovania pre tento dielec · bez vlastného výberu platí: '
          + ((entry && entry.owner_default_label) || 'predvoľba projektu');
   }
   function hwCabTitle(entry){
+    var sc = hwCompatScope(entry, null);
+    if (sc) return hwCompatTitle(sc, '') + ' · bez vlastného výberu platí: '
+                  + (sc.none_label || 'predvoľba projektu');
     return 'Set kovania pre celú skrinku · bez vlastného výberu platí: '
          + ((entry && entry.project_label) || 'predvoľba projektu');
   }
@@ -400,7 +475,7 @@
     var entry = it.owner_part_key ? hwSetEntry(it.generic_type) : null;
     var setSel = entry
       ? hwSetSelectHtml(hwOwnerOptionList(entry, it.owner_part_key), it.generic_type,
-                        it.owner_part_key, cabId, hwOwnerTitle(entry))
+                        it.owner_part_key, cabId, hwOwnerTitle(entry, it.owner_part_key))
       : '';
     return '<div class="hwitem">'
       + '<div class="hwrow" data-owner="'+esc(it.owner_part_key||'')+'" data-type="'+esc(it.generic_type)+'" data-rule="'+esc(it.rule_id)+'" data-cab="'+esc(cabId||'')+'">'
@@ -630,13 +705,20 @@
     // skrinka naozaj ma) — inak by sa prvy novy set typu neobjavil hned, ale
     // az po novom vybere (zivy push obnovuje EXISTUJUCE selecty).
     if (!setBox) return;
-    var sets = (setOptions || []).filter(function(o){ return !!o; }).map(function(o){
+    // KOV-D1b: typ, ktorého skrinkový výber je nepoužiteľný (zmiešané triedy
+    // zásuviek), sa v skupine Sety NEKRESLÍ — set sa vtedy vyberá pri
+    // konkrétnom čele a ovládač na skrinke by len ponúkal chybu.
+    var all = (setOptions || []).filter(function(o){ return !!o; });
+    var perFront = all.length > 0 && all.every(hwCabRowOff);
+    var sets = all.filter(function(o){ return !hwCabRowOff(o); }).map(function(o){
       return '<div class="hwrow hwsetrow"><span class="hwname">'+esc(o.label)
            + ' <span class="hwown">set</span></span>'
            + hwSetSelectHtml(hwCabOptionList(o), o.generic_type, '', cabId, hwCabTitle(o))
            + '</div>';
     }).join('');
-    setBox.innerHTML = sets || '<div class="muted">Táto skrinka nemá kovanie, pre ktoré by sa dal vybrať set.</div>';
+    setBox.innerHTML = sets || (perFront
+      ? '<div class="muted">Zásuvky tejto skrinky sú rôznych druhov — set sa vyberá pri konkrétnom čele.</div>'
+      : '<div class="muted">Táto skrinka nemá kovanie, pre ktoré by sa dal vybrať set.</div>');
   }
 
   // ---- UI-C4: klik na hlavicku boxu = OZNAC VLASTNIKA V MODELI -------------
@@ -750,15 +832,35 @@
     }
     return null;
   }
+  // Telo payloadu vyberu setu — CISTA funkcia (Node testy). `sc` = rozsah
+  // KOV-D1b (`entry.compat`) alebo null pre povodny plochy zoznam setov.
+  // -> payload | null (nic sa neodosiela)
+  function hwSetPayload(sc, value, gt, owner, cabId){
+    // Volba „podľa parametra" aj „(uložený výber)" su len ZOBRAZENIE stavu
+    // (`disabled`) — nikdy sa neodosielaju.
+    if (value === HW_SET_PARAM || value === HW_SET_STORED) return null;
+    var body = { generic_type: gt, owner_part_key: owner || null, set_id: value,
+                 cabinet_id: cabId || '' }; // GH #127 P2 + R-02
+    if (!sc) return body;
+    if (!value) return { generic_type: gt, owner_part_key: owner || null, set_id: '',
+                         cabinet_id: cabId || '' }; // „vrátiť na projekt"
+    var o = hwCompatPick(sc, value);
+    if (!o) return null; // neznáme ID sa NEODOSIELA (radšej nič než hádanie)
+    body.set_id = o.set_id || '';
+    // Rodina (Atira) = výber podľa výškového variantu; server ho validuje
+    // pásmo po pásme (`classified_value_problem`) PRED zápisom.
+    if (o.selector) body.value = o.selector;
+    return body;
+  }
+
   function onHwSet(sel){
-    // Volba „podľa parametra" je len zobrazenie stavu (disabled) — nikdy sa
-    // neodosiela; server by ju aj tak odmietol ako neznamy set.
-    if (sel.value === HW_SET_PARAM) return;
+    var gt = sel.getAttribute('data-gt');
+    var owner = sel.getAttribute('data-owner') || '';
+    var body = hwSetPayload(hwCompatScope(hwSetEntry(gt), owner), sel.value, gt, owner,
+                            sel.getAttribute('data-cab') || '');
+    if (!body) return;
     if (window.sketchup && sketchup.set_hardware_set)
-      sketchup.set_hardware_set(nxDocPayload({ generic_type: sel.getAttribute('data-gt'),
-                                               owner_part_key: sel.getAttribute('data-owner') || null,
-                                               set_id: sel.value,
-                                               cabinet_id: sel.getAttribute('data-cab') || '' })); // GH #127 P2 + R-02
+      sketchup.set_hardware_set(nxDocPayload(body));
   }
 
   // D-93: select dlzky + zamok v TOM ISTOM riadku (vertikalny priestor).
@@ -1410,6 +1512,12 @@
     module.exports = { hwSetOptionList: hwSetOptionList, hwOwnerOptionList: hwOwnerOptionList,
       hwCabOptionList: hwCabOptionList, hwFindEntry: hwFindEntry, hwOwnerDesc: hwOwnerDesc,
       HW_SET_PARAM: HW_SET_PARAM,
+      // KOV-D1b: ponuka setu pre KLASIFIKOVANU zasuvku (server posiela hotovy
+      // rozsah `entry.compat`) — tests/js/test_kovd1b_ui.js
+      HW_SET_STORED: HW_SET_STORED, hwCompatScope: hwCompatScope, hwCabRowOff: hwCabRowOff,
+      hwCompatPick: hwCompatPick, hwCompatOptionList: hwCompatOptionList,
+      hwCompatTitle: hwCompatTitle, hwSetPayload: hwSetPayload,
+      hwOwnerTitle: hwOwnerTitle, hwCabTitle: hwCabTitle,
       // D-92 rozpis nakupu (tests/js/test_d92_hw_nakup.js)
       hwMemberText: hwMemberText, hwBuyLine: hwBuyLine, HW_NO_CATALOG: HW_NO_CATALOG,
       // D-93 rucny NL vysuvu (tests/js/test_d93_nl_override.js) — hwNlHtml a
