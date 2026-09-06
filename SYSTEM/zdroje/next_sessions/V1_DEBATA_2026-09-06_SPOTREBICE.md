@@ -61,8 +61,21 @@ Michal: „pred implementáciou si pripraviť pár konkrétnych tech listov s ro
 3. **Výstup = research packet** `SYSTEM/zdroje/next_sessions/SPOTREBICE_TECHLISTY_2026-09.md`: tabuľka modelov × rozmerov, čo listy ponúkajú, **čo z toho engine potrebuje**, kde je to
    komplikované a čo zatiaľ neriešiť + **prvý seed balík** (overené modely). Až nad ním: detailná debata S1 → package → `codex-audit`.
 
-## 5 · Dopad na živé dokumenty (zapracuje záverečný docs PR debaty)
+## 5 · Doplnenia Michala po výskume listov (6.9. večer)
+
+- **Vetrací kanál sa vo V1 nerieši** (žiadne pole, žiadna kontrola plochy vetrania). **Odsadenia sa nefixujú** — odsadenie korpusu je nastaviteľný parameter (K1),
+  šablóna nesie len hodnotu, ktorú si Michal zvolí; engine z listu nič nevynucuje.
+- **Umývačky:** predpísané rozmery čela Michal bežne **obchádza** (čelo presahuje hore, presah doplní slepým korpusom alebo malým šuflíkom nad umývačkou).
+  Dôsledok pre V1: kontrola umývačky = **len šírka slotu (450/600)**; výška čela vs. sokel sa nekontroluje (je to jeho konštrukčné rozhodnutie).
+- **Galéria pri spotrebiči (rozhodnuté ÁNO, do S1):** k záznamu spotrebiča sa dajú **uložiť súbory** — technické listy (PDF/JPG), obrázky z listov a **jeden náhľadový obrázok**
+  reálneho produktu. Posúdenie Fable: uskutočniteľné bez pascí — kópie súborov v `%APPDATA%NOXUNEngineppliances<id>`, záznam nesie zoznam súborov s druhom
+  (`list` / `obrázok` / `náhľad` — presne jeden náhľad), obrázky sa ukážu ako miniatúry (rovnaký lenivý kanál ako náhľady šablón PNG), PDF len ikona + otvorenie
+  v systémovom prehliadači (`UI.openURL`). **Bez** generovania náhľadu z PDF, bez extrakcie rozmerov. Obmedzenie priznať: súbory sú per PC (D-48 po V1).
+  Pri mazaní spotrebiča sa maže aj jeho priečinok; osirelé priečinky uprace ďalší štart (vzor zametania `template_previews`).
+- Detailná debata polí S1 pokračuje **po Michalovom overení** aspoň jedného listu per kategória ([SPOTREBICE_TECHLISTY_2026-09.md](SPOTREBICE_TECHLISTY_2026-09.md) §3).
+
+## 6 · Dopad na živé dokumenty (zapracuje záverečný docs PR debaty)
 
 - [../../V1_VIZIA.md](../../V1_VIZIA.md) bod 5 prepísať: „katalóg (ručne) + spotrebič v zákazke a skrinke s odkazmi a listami + kontrola niky pre chladničku/umývačku + šablóna
-  spotrebičová s upozornením + cena v rozpočte"; automatika políc a kontrola rúry/mikro = V1+.
+  spotrebičová s upozornením + galéria súborov + cena v rozpočte"; automatika políc a kontrola rúry/mikro = V1+.
 - [../../PLAN.md](../../PLAN.md) blok 4 položka „Spotrebiče S1": odkaz sem + predúloha (research) ako prvý krok.
