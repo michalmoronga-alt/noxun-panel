@@ -15884,6 +15884,166 @@ module NoxunSuRunner
     end
   end
 
+  # === KOV-D3a: UPGRADE RECEPTU — jedno celo, jedna operacia ================
+  #
+  # Headless sada dokaze akciu, preflight aj preadresovanie zamkov; NEDOKAZE,
+  # ze zapis ref-u, zamkov a PRESTAVBY je JEDEN krok Spat a ze sa dielce
+  # v modeli naozaj vymenia za geometriu novej verzie.
+  #
+  # V repe su LEN recepty v1, preto scenar bezi nad FIXTURNYM registrom
+  # (`tests/fixtures/recipes_d3a`) cez jediny len-testovaci seam
+  # `Recipes.with_test_dir`. Skrinka sa stavia EST PRED prepnutim, aby ju
+  # `pick_ref` pripol na v1 (v registri fixtury je aj v3/v4/v5, takze
+  # `latest_for` by dal iny recept, nez o com scenar je).
+  # Ziadna vetva „preskocene": nesulad predpokladu je FAIL (lekcia D2a).
+  KOVD3A_FIX = File.expand_path(File.join(__dir__, '..', 'fixtures', 'recipes_d3a'))
+  KOVD3A_V1  = 'atira_sisy_v1'
+  KOVD3A_V2  = 'atira_sisy_v2'   # dobry ciel: chrbat H144 120 mm
+  KOVD3A_BAD = 'atira_sisy_v3'   # hrubky len 18 mm -> preflight odmietne
+  KOVD3A_NL  = 470.0
+
+  def kovd3a_params
+    kovc2b_params({ 'height' => 900.0 }, 'height' => KOVD2A_FRONT_H)
+  end
+
+  def kovd3a_refs(inst)
+    front = kovc2b_front(inst)
+    d = front && front['drawer'].is_a?(Hash) ? front['drawer'] : {}
+    d['recipe_refs'] || {}
+  end
+
+  def kovd3a_ref(inst)
+    kovd3a_refs(inst)['atira|sisy'].to_s
+  end
+
+  # Vyska chrbta varianta PODLA FIXTURNEHO RECEPTU (nie zakodovane cislo).
+  def kovd3a_rear(recipe_id, variant)
+    v = (e::Recipes.load(recipe_id, dir: KOVD3A_FIX)[:height_variants] || {})[variant.to_s]
+    v && v[:rear_height].to_f
+  end
+
+  # REALNA akcia panela (nie priamy zapis do configu) — inak by sa nedalo
+  # overit, ze ref, zamky a geometria su JEDEN krok Spat.
+  def kovd3a_upgrade(model, inst, cid, from, to)
+    model.selection.clear
+    model.selection.add(inst)
+    e::Panel.handle_upgrade_drawer_recipe(
+      pg(model, 'cabinet_id' => cid, 'front_id' => 'F1', 'from' => from, 'to' => to)
+    )
+  end
+
+  def run_kovd3a(model)
+    cleanup(model)
+    markers = []
+    inst = e::CabinetBuilder.build(model, kovd3a_params)
+    return ok('KOV-D3a: vlozenie korpusu so zasuvkou', false) unless inst
+
+    cid = e::Store.get(inst, 'cabinet_id')
+    begin
+      kovd3a_scenar(model, inst, cid, markers)
+    ensure
+      r03_clear_markers(model, markers)
+      cleanup(model)
+      ok('KOV-D3a: cleanup (0 korpusov)', cabinets(model).empty?)
+    end
+  rescue StandardError => ex
+    log_line("FAIL: run_kovd3a vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
+  def kovd3a_scenar(model, inst, cid, markers)
+    # --- 0) vychodisko: v1, automat H144, zamknuta NL 470 ------------------
+    ok("KOV-D3a: vychodisko = pripnuty #{KOVD3A_V1} (#{kovd3a_ref(inst).inspect})",
+       kovd3a_ref(inst) == KOVD3A_V1)
+    ok("KOV-D3a: vychodisko = vyska H#{KOVD2A_AUTO_H} (dostal H#{kovd2a_variant(inst).inspect})",
+       kovd2a_variant(inst) == KOVD2A_AUTO_H)
+    kovd2a_set(model, inst, cid, 'nominal_length', KOVD3A_NL)
+    ok("KOV-D3a: NL #{KOVD3A_NL.to_i} je zamknuta na identite #{KOVD2A_RID}",
+       kovd2a_overrides(inst).any? do |o|
+         o['rule_id'].to_s == KOVD2A_RID && (o['nominal_length'].to_f - KOVD3A_NL).abs <= TOL
+       end)
+
+    e::Recipes.with_test_dir(KOVD3A_FIX) { kovd3a_fixture_scenar(model, inst, cid, markers) }
+  end
+
+  def kovd3a_fixture_scenar(model, inst, cid, markers)
+    v1_rear = kovd3a_rear(KOVD3A_V1, KOVD2A_AUTO_H)
+    v2_rear = kovd3a_rear(KOVD3A_V2, KOVD2A_AUTO_H)
+    ok("KOV-D3a: fixturna v2 ma INY chrbat H#{KOVD2A_AUTO_H} (v1 #{v1_rear}, v2 #{v2_rear})",
+       v1_rear && v2_rear && (v1_rear - v2_rear).abs > TOL)
+
+    # --- 1) PREFLIGHT ODMIETNE ciel, ktory nesadne — a NEVZNIKNE krok Spat -
+    m = r03_marker(model, markers)
+    kovd3a_upgrade(model, inst, cid, KOVD3A_V1, KOVD3A_BAD)
+    ok("KOV-D3a odmietnutie: v mape ostava #{KOVD3A_V1} (#{kovd3a_ref(inst).inspect})",
+       kovd3a_ref(inst) == KOVD3A_V1)
+    ok('KOV-D3a odmietnutie: zamok NL ostava na povodnej identite s hodnotou',
+       kovd2a_overrides(inst).any? do |o|
+         o['rule_id'].to_s == KOVD2A_RID && (o['nominal_length'].to_f - KOVD3A_NL).abs <= TOL
+       end)
+    ok("KOV-D3a odmietnutie: geometria ostava z v1 (#{kovd2a_back_dims(inst).inspect})",
+       kovd2a_back_dims(inst).any? { |v| (v - v1_rear).abs <= TOL })
+    # Marker bol POSLEDNY krok — akcia teda do undo stacku nezapisala nic.
+    Sketchup.undo
+    ok('KOV-D3a odmietnutie: ZIADNY krok Spat nevznikol (neulozilo sa nic)', !m.valid?)
+
+    # --- 2) UPGRADE = JEDNA operacia (ref + zamky + prestavba) -------------
+    m2 = r03_marker(model, markers)
+    kovd3a_upgrade(model, inst, cid, KOVD3A_V1, KOVD3A_V2)
+    ok("KOV-D3a: v mape je #{KOVD3A_V2} (#{kovd3a_ref(inst).inspect})",
+       kovd3a_ref(inst) == KOVD3A_V2)
+    ok("KOV-D3a: zamok je PREADRESOVANY na recipe:#{KOVD3A_V2} a DRZI NL #{KOVD3A_NL.to_i}",
+       kovd2a_overrides(inst).length == 1 &&
+       kovd2a_overrides(inst).first['rule_id'].to_s == "recipe:#{KOVD3A_V2}" &&
+       (kovd2a_overrides(inst).first['nominal_length'].to_f - KOVD3A_NL).abs <= TOL)
+    ok("KOV-D3a: polozka vysuvu nesie novy recept a zamknutu NL (#{kovd2a_nl(inst).inspect})",
+       kovd2a_slide(inst)['params']['recipe_id'].to_s == KOVD3A_V2 &&
+       (kovd2a_nl(inst).to_f - KOVD3A_NL).abs <= TOL &&
+       kovd2a_variant(inst) == KOVD2A_AUTO_H)
+    # MODEL, nie plan: chrbat ma vysku Z NOVEJ verzie a NIE zo starej.
+    ok("KOV-D3a: dielec chrbta v MODELI je z v2 (#{kovd2a_back_dims(inst).inspect})",
+       kovd2a_back_dims(inst).any? { |v| (v - v2_rear).abs <= TOL } &&
+       kovd2a_back_dims(inst).none? { |v| (v - v1_rear).abs <= TOL })
+    ok("KOV-D3a: nakup po upgrade stale objednava kit (#{kovd1a_codes(model).inspect})",
+       kovd1a_codes(model).length == 1)
+
+    # --- 3) Spat = PRESNE jeden krok pre ref, zamok aj geometriu -----------
+    Sketchup.undo
+    ok("KOV-D3a Spat: ref, zamok aj dielce sa vratili NARAZ (#{kovd3a_ref(inst).inspect})",
+       kovd3a_ref(inst) == KOVD3A_V1 &&
+       kovd2a_overrides(inst).any? { |o| o['rule_id'].to_s == KOVD2A_RID } &&
+       kovd2a_back_dims(inst).any? { |v| (v - v1_rear).abs <= TOL })
+    ok('KOV-D3a Spat: bol to PRESNE jeden krok', m2.valid?)
+
+    # --- 4) Redo obnovi ref, zamok aj geometriu SUCASNE --------------------
+    if Sketchup.respond_to?(:redo)
+      Sketchup.redo
+      ok('KOV-D3a Redo: ref, preadresovany zamok aj dielce su spat SUCASNE',
+         kovd3a_ref(inst) == KOVD3A_V2 &&
+         kovd2a_overrides(inst).any? { |o| o['rule_id'].to_s == "recipe:#{KOVD3A_V2}" } &&
+         kovd2a_back_dims(inst).any? { |v| (v - v2_rear).abs <= TOL })
+    else
+      info('KOV-D3a: Sketchup.redo nedostupne — Redo vetva netestovana')
+      kovd3a_upgrade(model, inst, cid, KOVD3A_V1, KOVD3A_V2)
+    end
+    r03_clear_markers(model, markers)
+
+    # --- 5) kopia skrinky nesie NOVY ref -----------------------------------
+    model.selection.clear
+    model.selection.add(inst)
+    e::Panel.handle_insert_copy(pg(model, 'cabinet_id' => cid))
+    copy = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' && i != inst }
+    ok("KOV-D3a kopia: kopia nesie pripnuty #{KOVD3A_V2}",
+       copy && kovd3a_ref(copy) == KOVD3A_V2)
+    ok('KOV-D3a kopia: kopia nesie aj preadresovany zamok',
+       copy && kovd2a_overrides(copy).any? { |o| o['rule_id'].to_s == "recipe:#{KOVD3A_V2}" })
+    return unless copy && copy.valid?
+
+    model.start_operation('KOV-D3a erase copy', true)
+    copy.erase!
+    model.commit_operation
+  end
+
   def run_kovc2b(model)
     cleanup(model)
     markers = []
@@ -16961,6 +17121,7 @@ module NoxunSuRunner
     run_kovd1a(model)        # KOV-D1a: owner triedny override setu na CELE — akcia panela zapise `class:slide|…@front:F1/panel`, zmrazi definiciu a prestava v JEDNEJ operacii (Spat aj Redo vratia mapovanie, snapshot aj nakupny kod naraz), kopia kluc nesie, prerastenie bez pasma neobjedna zly kit
     run_kovd2a(model)        # KOV-D2a: zamky osi zasuvky — akcia panela zamkne VYSKU proti automatu (H144 -> H70) a prestava v JEDNEJ operacii (Spat aj Redo vratia zamok, dielce v modeli aj nakupny kit naraz), NL mimo radu = RED bez dielcov a bez kitu, odomknutie JEDNEJ osi necha druhy zamok zit, kopia zamky nesie
     run_kovd2b(model)        # KOV-D2b: chipy osi — kazdy zapis ide z PAYLOADU KARTY (identita `lock`, hodnoty `axes`): klik na `auto` pripne aktualnu vysku bez zmeny geometrie, volba z ponuky prestava dielce aj kit (Spat = 1 krok), odomknutie JEDNEJ osi necha druhu zit, konfliktna karta nesie identitu aj bez polozky a nahrada zo servera je zamknuta pri zachovanom druhom zamku (Spat aj Redo)
+    run_kovd3a(model)        # KOV-D3a: upgrade receptu jedneho cela nad FIXTURNYM registrom (`with_test_dir`) — ciel s nesediacou hrubkou preflight odmietne BEZ kroku Spat (v mape ostava v1 aj zamok), uspesny upgrade meni ref, PREADRESUJE zamok NL a prestava dielce v JEDNEJ operacii (Spat aj Redo vratia vsetko naraz), kopia nesie novy ref
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
