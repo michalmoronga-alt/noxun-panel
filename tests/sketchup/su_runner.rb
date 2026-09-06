@@ -16044,6 +16044,244 @@ module NoxunSuRunner
     model.commit_operation
   end
 
+  # === KOV-D3b: UPGRADE RECEPTU — UI (ponuka, dopad, potvrdenie) ============
+  #
+  # Headless sada dokaze payload, dopad aj cely tok modalu v mini-DOM;
+  # NEDOKAZE, ze cesta Z KARTY (ponuka v payloade -> citaci callback dopadu ->
+  # potvrdeny zapis s tokenom) naozaj vymeni geometriu v modeli a ze je to
+  # JEDEN krok Spat, ktory Redo obnovi konzistentne (Codex #307 P2).
+  #
+  # V repe su LEN recepty v1, preto scenar bezi nad DVOJPRVKOVYM fixturnym
+  # registrom (bajtove kopie z `tests/fixtures/recipes_d3a`) cez jediny
+  # len-testovaci seam `Recipes.with_test_dir`. Dvojprvkovy ZAMERNE: ponuka
+  # vydava `latest_for`, takze register musi obsahovat presne ten ciel, o com
+  # scenar je (v registri D3a je `latest_for` az v5). Skrinka sa stavia EST
+  # PRED prepnutim, aby ju `pick_ref` pripol na v1.
+  # Ziadna vetva „preskocene": nesulad predpokladu je FAIL.
+  KOVD3B_V1  = 'atira_sisy_v1'
+  KOVD3B_V2  = 'atira_sisy_v2'   # dobry ciel: chrbat H144 120 mm, dno o 4 mm uzsie
+  KOVD3B_BAD = 'atira_sisy_v3'   # hrubky len 18 mm -> preflight odmietne
+  KOVD3B_NL  = 470.0
+
+  def kovd3b_reg(ids)
+    src = File.expand_path(File.join(__dir__, '..', 'fixtures', 'recipes_d3a'))
+    reg = e::Recipes.released(dir: src)
+    dir = File.join(Dir.tmpdir, "noxun_kovd3b_#{Process.pid}_#{ids.join('_')}")
+    FileUtils.mkdir_p(dir)
+    out = {}
+    ids.each do |id|
+      File.binwrite(File.join(dir, "#{id}.json"), File.binread(File.join(src, "#{id}.json")))
+      out[id] = reg[id]
+    end
+    File.binwrite(File.join(dir, 'RELEASED.json'), "#{JSON.pretty_generate(out)}\n")
+    dir
+  end
+
+  # PONUKA tak, ako ju dostane karta cela v PLNOM pushi panela.
+  def kovd3b_offer(inst, fid = 'F1')
+    ((e::Panel.cabinet_payload(inst)['front_drawer'] || {})[fid] || {})['upgrade']
+  end
+
+  # A tak, ako ju nesie LAHKY push (`push_hardware_sets` po zmene mapovania
+  # alebo katalogu v Studiu) — `refreshFrontDrawer` vymiena zaznam CELY.
+  def kovd3b_offer_light(inst, fid = 'F1')
+    ((e::Panel.front_drawer_refresh(e::Store.config(inst) || {},
+                                    e::Store.get(inst, 'cabinet_id')) || {})[fid] || {})['upgrade']
+  end
+
+  # Odpoved sa cita z KANALA (`NX.hwUpgradeImpact`), nie z navratovej hodnoty —
+  # inak by scenar nedokazal, ze cakajuci modal odpoved naozaj dostane.
+  def kovd3b_channel(rec, name, token)
+    line = Array(rec).find { |s| s.to_s.start_with?("NX.#{name}(") }
+    return nil unless line
+
+    m = line.match(/\ANX\.#{name}\((.*), (".*")\)\z/m)
+    return nil unless m && JSON.parse(m[2]) == token
+
+    JSON.parse("[#{m[1]}]")
+  rescue StandardError
+    nil
+  end
+
+  # CITACI callback presne tak, ako ho posiela `hardware.js` z ponuky karty.
+  # -> hash dopadu | nil
+  def kovd3b_impact(model, inst, up, token = 'u1')
+    rec = kovd3b_call(model, inst, :handle_drawer_upgrade_impact, up, token)
+    Array(kovd3b_channel(rec, 'hwUpgradeImpact', token)).first
+  end
+
+  # ZAPIS z potvrdeneho okna (nesie `up_token`, presne ako `onSubmit`).
+  # -> [ok, hlaska] | nil (ziadna odpoved = modal by ostal zamknuty)
+  def kovd3b_write(model, inst, up, token = 'u2')
+    rec = kovd3b_call(model, inst, :handle_upgrade_drawer_recipe, up, token)
+    kovd3b_channel(rec, 'hwUpgradeResult', token)
+  end
+
+  def kovd3b_call(model, inst, handler, up, token)
+    model.selection.clear
+    model.selection.add(inst)
+    rec = []
+    install_js_recorder(rec)
+    begin
+      e::Panel.send(handler,
+                    pg(model, 'cabinet_id' => up['cabinet_id'], 'front_id' => up['front_id'],
+                              'from' => up['from'], 'to' => up['to'], 'up_token' => token))
+    ensure
+      remove_js_recorder
+    end
+    rec
+  end
+
+  def run_kovd3b(model)
+    cleanup(model)
+    markers = []
+    inst = e::CabinetBuilder.build(model, kovd3a_params)
+    return ok('KOV-D3b: vlozenie korpusu so zasuvkou', false) unless inst
+
+    cid = e::Store.get(inst, 'cabinet_id')
+    begin
+      kovd3b_scenar(model, inst, cid, markers)
+    ensure
+      r03_clear_markers(model, markers)
+      cleanup(model)
+      ok('KOV-D3b: cleanup (0 korpusov)', cabinets(model).empty?)
+    end
+  rescue StandardError => ex
+    log_line("FAIL: run_kovd3b vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
+  def kovd3b_scenar(model, inst, cid, markers)
+    # --- 0) vychodisko: v1, automat H144, zamknuta NL 470 ------------------
+    ok("KOV-D3b: vychodisko = pripnuty #{KOVD3B_V1} (#{kovd3a_ref(inst).inspect})",
+       kovd3a_ref(inst) == KOVD3B_V1)
+    ok("KOV-D3b: vychodisko = vyska H#{KOVD2A_AUTO_H} (dostal H#{kovd2a_variant(inst).inspect})",
+       kovd2a_variant(inst) == KOVD2A_AUTO_H)
+    kovd2a_set(model, inst, cid, 'nominal_length', KOVD3B_NL)
+    ok("KOV-D3b: NL #{KOVD3B_NL.to_i} je zamknuta na identite #{KOVD2A_RID}",
+       kovd2a_overrides(inst).any? do |o|
+         o['rule_id'].to_s == KOVD2A_RID && (o['nominal_length'].to_f - KOVD3B_NL).abs <= TOL
+       end)
+
+    # --- 1) V PRODUKCII SA PONUKA NEUKAZE (ziadna v2 v repe) ---------------
+    ok('KOV-D3b: bez vydanej vyssej verzie karta ponuku NEDOSTANE (payload ako po D2b)',
+       kovd3b_offer(inst).nil? && kovd3b_offer_light(inst).nil?)
+
+    # --- 2) PONUKA JE, ale dopad ju ODMIETNE — a nevznikne krok Spat -------
+    e::Recipes.with_test_dir(kovd3b_reg([KOVD3B_V1, KOVD3B_BAD])) do
+      kovd3b_reject_scenar(model, inst, markers)
+    end
+
+    # --- 3) CELA CESTA: ponuka -> dopad -> potvrdeny zapis -----------------
+    e::Recipes.with_test_dir(kovd3b_reg([KOVD3B_V1, KOVD3B_V2])) do
+      kovd3b_ok_scenar(model, inst, markers)
+    end
+  end
+
+  def kovd3b_reject_scenar(model, inst, markers)
+    up = kovd3b_offer(inst)
+    ok("KOV-D3b odmietnutie: ponuka existuje a mieri na #{KOVD3B_BAD} (#{up.inspect})",
+       up.is_a?(Hash) && up['available'] == true && up['to'] == KOVD3B_BAD)
+    return if up.nil?
+
+    m = r03_marker(model, markers)
+    imp = kovd3b_impact(model, inst, up, 'r1')
+    ok("KOV-D3b odmietnutie: dopad odpoveda `ok: false` s dovodom (#{imp.inspect})",
+       imp.is_a?(Hash) && imp['ok'] == false && !imp['reason'].to_s.strip.empty?)
+    ok('KOV-D3b odmietnutie: v mape ostava v1 a zamok NL je nedotknuty',
+       kovd3a_ref(inst) == KOVD3B_V1 &&
+       kovd2a_overrides(inst).any? do |o|
+         o['rule_id'].to_s == KOVD2A_RID && (o['nominal_length'].to_f - KOVD3B_NL).abs <= TOL
+       end)
+    # Marker bol POSLEDNY krok — citaci callback do undo stacku nezapisal nic.
+    Sketchup.undo
+    ok('KOV-D3b odmietnutie: ZIADNY krok Spat nevznikol (citaci callback nezapisuje)', !m.valid?)
+    r03_clear_markers(model, markers)
+  end
+
+  def kovd3b_ok_scenar(model, inst, markers)
+    v1_rear = kovd3a_rear(KOVD3B_V1, KOVD2A_AUTO_H)
+    v2_rear = kovd3a_rear(KOVD3B_V2, KOVD2A_AUTO_H)
+    ok("KOV-D3b: fixturna v2 ma INY chrbat H#{KOVD2A_AUTO_H} (v1 #{v1_rear}, v2 #{v2_rear})",
+       v1_rear && v2_rear && (v1_rear - v2_rear).abs > TOL)
+
+    up = kovd3b_offer(inst)
+    ok("KOV-D3b: karta nesie ponuku na #{KOVD3B_V2} s poznamkou vydania (#{up.inspect})",
+       up.is_a?(Hash) && up['available'] == true && up['to'] == KOVD3B_V2 &&
+       up['from'] == KOVD3B_V1 && up['to_label'] == 'v2' &&
+       !up['release_note'].to_s.strip.empty?)
+    return if up.nil?
+
+    ok('KOV-D3b: identitu zapisu (skrinka + celo) dava SERVER',
+       up['cabinet_id'].to_s == e::Store.get(inst, 'cabinet_id').to_s && up['front_id'] == 'F1')
+    ok('KOV-D3b: lahky push nesie TU ISTU ponuku (inak by z otvorenej karty zmizla)',
+       kovd3b_offer_light(inst) == up)
+
+    # --- DOPAD: cisla, ktore uvidi potvrdzovacie okno ---------------------
+    imp = kovd3b_impact(model, inst, up, 'i1')
+    ok("KOV-D3b dopad: odpoved je `ok: true` a nesie oba refy (#{imp.class})",
+       imp.is_a?(Hash) && imp['ok'] == true && imp['from'] == KOVD3B_V1 && imp['to'] == KOVD3B_V2)
+    return if imp.nil? || imp['ok'] != true
+
+    back = Array(imp['parts']).find { |p| p['role'] == 'drawer_back' }
+    ok("KOV-D3b dopad: chrbat sa meni #{v1_rear} -> #{v2_rear} mm (#{back.inspect})",
+       back.is_a?(Hash) && (back['from'][1].to_f - v1_rear).abs <= TOL &&
+       (back['to'][1].to_f - v2_rear).abs <= TOL)
+    ok("KOV-D3b dopad: zamknuta NL #{KOVD3B_NL.to_i} sa PRENESIE bez zmeny hodnoty (#{imp['locks'].inspect})",
+       Array(imp['locks']).any? do |l|
+         l['axis'] == 'nl' && l['kept'] == true && (l['value'].to_f - KOVD3B_NL).abs <= TOL
+       end)
+    ok("KOV-D3b dopad: kit sa uvadza kodmi z tej istej expanzie ako nakup (#{imp['kit'].inspect})",
+       imp['kit'].is_a?(Hash) && Array(imp['kit']['to']).length == 1 &&
+       Array(imp['kit']['to']) == kovd1a_codes(model))
+    ok('KOV-D3b dopad: NIC sa nezapisalo — v mape stale v1',
+       kovd3a_ref(inst) == KOVD3B_V1)
+
+    # --- POTVRDENY ZAPIS = JEDNA operacia + odpoved cakajucemu oknu -------
+    m = r03_marker(model, markers)
+    res = kovd3b_write(model, inst, up, 'w1')
+    ok("KOV-D3b zapis: cakajuce okno dostalo odpoved `ok: true` (#{res.inspect})",
+       res.is_a?(Array) && res.first == true)
+    ok("KOV-D3b zapis: v mape je #{KOVD3B_V2} (#{kovd3a_ref(inst).inspect})",
+       kovd3a_ref(inst) == KOVD3B_V2)
+    ok("KOV-D3b zapis: zamok je PREADRESOVANY na recipe:#{KOVD3B_V2} a DRZI NL #{KOVD3B_NL.to_i}",
+       kovd2a_overrides(inst).length == 1 &&
+       kovd2a_overrides(inst).first['rule_id'].to_s == "recipe:#{KOVD3B_V2}" &&
+       (kovd2a_overrides(inst).first['nominal_length'].to_f - KOVD3B_NL).abs <= TOL)
+    # MODEL, nie plan: chrbat ma vysku Z NOVEJ verzie a NIE zo starej.
+    ok("KOV-D3b zapis: dielec chrbta v MODELI je z v2 (#{kovd2a_back_dims(inst).inspect})",
+       kovd2a_back_dims(inst).any? { |v| (v - v2_rear).abs <= TOL } &&
+       kovd2a_back_dims(inst).none? { |v| (v - v1_rear).abs <= TOL })
+    ok("KOV-D3b zapis: nakup objednava kit, ktory dopad slubil (#{kovd1a_codes(model).inspect})",
+       kovd1a_codes(model) == Array(imp['kit']['to']))
+    ok('KOV-D3b zapis: po prechode uz karta ziadnu dalsiu ponuku nedava (v2 je najnovsia)',
+       kovd3b_offer(inst).nil?)
+
+    # --- Spat = PRESNE jeden krok, Redo obnovi vsetko SUCASNE -------------
+    Sketchup.undo
+    ok("KOV-D3b Spat: ref, zamok aj dielce sa vratili NARAZ (#{kovd3a_ref(inst).inspect})",
+       kovd3a_ref(inst) == KOVD3B_V1 &&
+       kovd2a_overrides(inst).any? { |o| o['rule_id'].to_s == KOVD2A_RID } &&
+       kovd2a_back_dims(inst).any? { |v| (v - v1_rear).abs <= TOL })
+    ok('KOV-D3b Spat: bol to PRESNE jeden krok', m.valid?)
+
+    if Sketchup.respond_to?(:redo)
+      Sketchup.redo
+      ok('KOV-D3b Redo: ref v2, preadresovany zamok aj geometria su spat SUCASNE',
+         kovd3a_ref(inst) == KOVD3B_V2 &&
+         kovd2a_overrides(inst).any? do |o|
+           o['rule_id'].to_s == "recipe:#{KOVD3B_V2}" &&
+             (o['nominal_length'].to_f - KOVD3B_NL).abs <= TOL
+         end &&
+         kovd2a_back_dims(inst).any? { |v| (v - v2_rear).abs <= TOL })
+      ok('KOV-D3b Redo: a karta po nom hovori to iste co model (ziadna ponuka)',
+         kovd3b_offer(inst).nil? && kovd2a_slide(inst)['params']['recipe_id'].to_s == KOVD3B_V2)
+    else
+      info('KOV-D3b: Sketchup.redo nedostupne — Redo vetva netestovana')
+    end
+    r03_clear_markers(model, markers)
+  end
+
   def run_kovc2b(model)
     cleanup(model)
     markers = []
@@ -17122,6 +17360,7 @@ module NoxunSuRunner
     run_kovd2a(model)        # KOV-D2a: zamky osi zasuvky — akcia panela zamkne VYSKU proti automatu (H144 -> H70) a prestava v JEDNEJ operacii (Spat aj Redo vratia zamok, dielce v modeli aj nakupny kit naraz), NL mimo radu = RED bez dielcov a bez kitu, odomknutie JEDNEJ osi necha druhy zamok zit, kopia zamky nesie
     run_kovd2b(model)        # KOV-D2b: chipy osi — kazdy zapis ide z PAYLOADU KARTY (identita `lock`, hodnoty `axes`): klik na `auto` pripne aktualnu vysku bez zmeny geometrie, volba z ponuky prestava dielce aj kit (Spat = 1 krok), odomknutie JEDNEJ osi necha druhu zit, konfliktna karta nesie identitu aj bez polozky a nahrada zo servera je zamknuta pri zachovanom druhom zamku (Spat aj Redo)
     run_kovd3a(model)        # KOV-D3a: upgrade receptu jedneho cela nad FIXTURNYM registrom (`with_test_dir`) — ciel s nesediacou hrubkou preflight odmietne BEZ kroku Spat (v mape ostava v1 aj zamok), uspesny upgrade meni ref, PREADRESUJE zamok NL a prestava dielce v JEDNEJ operacii (Spat aj Redo vratia vsetko naraz), kopia nesie novy ref
+    run_kovd3b(model)        # KOV-D3b: CESTA Z KARTY nad dvojprvkovym fixturnym registrom — bez v2 karta ponuku nedostane vobec; s v2 nesie `upgrade.available` (plny aj lahky push), citaci callback dopadu vrati cisla (chrbat v1->v2, preneseny zamok NL, kod kitu) a NEZAPISE nic, potvrdeny zapis s tokenom vymeni ref, preadresuje zamok a prestava dielce v JEDNEJ operacii (Spat = 1 krok, Redo obnovi ref+zamok+geometriu sucasne), odmietnuty preflight odpovie `ok:false` a nenechá ZIADNY krok Spat
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
