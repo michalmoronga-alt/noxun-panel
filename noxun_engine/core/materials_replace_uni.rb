@@ -107,15 +107,16 @@ module Noxun
         # fallbacky SÚ recyklované UNI id!) == uni_id -> predvoľba sa prepíše.
         # Kompatibilita cieľa s predvoľbou = D-46 pravidlá pre NOVÉ skrinky.
         project = scan['project'].is_a?(Hash) ? scan['project'] : {}
-        # KOV-C2b (Codex #304 kolo 4 P1): projektova predvolba zasuviek sa tyka
-        # KAZDEJ dediacej skrinky, takze cielova hrubka musi vyhoviet SYSTEMU
-        # KAZDEHO klasifikovaneho cela v zakazke — nie „niektoremu vydanemu
+        # KOV-C2b (Codex #304 kolo 4 P1 + #305 kolo 1 P2): projektova predvolba
+        # zasuviek sa tyka KAZDEJ dediacej skrinky, takze cielova hrubka musi
+        # vyhoviet AKTIVNEMU RECEPTU KAZDEHO klasifikovaneho cela v zakazke —
+        # nie „niektoremu vydanemu systemu" a ani nie „najnovsiemu receptu
         # systemu". 18 mm je platna hrubka pre Quadro, ale v ATIROVEJ zakazke
         # by z kazdej zasuvky spravila RED `drawer_thickness_unsupported`.
-        scan_systems = ru_scan_drawer_systems(scan)
+        scan_fronts = ru_scan_drawer_fronts(scan)
         project.each do |key, eff|
           next unless eff.to_s == uni_id
-          reason = ru_project_target_issue(key, target_th, scan_systems)
+          reason = ru_project_target_issue(key, target_th, scan_fronts)
           if reason
             out['blocked'] << ['projektová predvoľba', reason, [RU_PROJECT_LABELS[key].to_s]]
           else
@@ -173,11 +174,14 @@ module Noxun
             # alebo LEN tie, ktorych dielec ma vlastny UNI material v override
             # (vtedy `roles_now` rolu `drawer` vobec nenesie a genericky rozsah
             # doskoveho materialu by 25 mm ticho prepustil).
-            bad_sys = ru_drawer_systems_affected(params, roles_now, hit_ov_keys)
-                      .reject { |sys| Recipes.thickness_ok_for_system?(sys, target_th) }
-            unless bad_sys.empty?
+            bad_fronts = ru_drawer_fronts_affected(params, roles_now, hit_ov_keys)
+                         .reject { |it| Recipes.thickness_ok_for_front?(it, target_th) }
+            unless bad_fronts.empty?
               blocked_reason = :drawer
-              blocked_names = bad_sys.map { |sys| Recipes.system_label(sys) }
+              blocked_names = bad_fronts.filter_map do |it|
+                pair = Recipes.thicknesses_for_front(it)
+                pair && Recipes.label(pair[0])
+              end.uniq
             end
           end
           if !blocked_reason && roles_now.include?('back') && params['back_mode'].to_s != 'none'
@@ -320,24 +324,27 @@ module Noxun
           'drawer' => 'default_drawer_material_id' }[role]
       end
 
-      # Systemy zasuviek jednej skrinky ako mapa `front_id => system`
+      # Klasifikovane zasuvkove cela jednej skrinky ako mapa `front_id => celo`
       # (KOV-C2b). Legacy cela a `construction other` sa netykaju — resolver
       # sa na nich nevola, takze im material zasuviek nic nemeni.
-      def ru_drawer_system_map(params)
+      #
+      # Codex #305 kolo 1 P2: nesie sa CELE CELO, nie len jeho system — hrubku
+      # posudzuje AKTIVNY recept toho cela (jeho otvaranie + pripnuta verzia),
+      # nie „najnovsi recept systemu".
+      def ru_drawer_front_map(params)
         fronts = params.is_a?(Hash) ? params['fronts'] : nil
         items = fronts.is_a?(Hash) ? fronts['items'] : nil
         Array(items).each_with_object({}) do |it, acc|
           next unless it.is_a?(Hash)
 
-          kind, key = Recipes.recipe_key_for(it)
-          acc[it['id'].to_s] = key[:system] if kind == :ok
+          acc[it['id'].to_s] = it if Recipes.recipe_key_for(it).first == :ok
         end
       end
 
-      # Systemy zasuviek v CELEJ zakazke (vstup pre projektovu predvolbu).
-      def ru_scan_drawer_systems(scan)
+      # Klasifikovane zasuvkove cela v CELEJ zakazke (projektova predvolba).
+      def ru_scan_drawer_fronts(scan)
         Array(scan.is_a?(Hash) ? scan['cabs'] : nil)
-          .flat_map { |entry| ru_drawer_system_map(entry[1]).values }.uniq.sort
+          .flat_map { |entry| ru_drawer_front_map(entry[1]).values }
       end
 
       # `front:<id>/<drawer rola>` -> id cela, inak nil.
@@ -348,21 +355,21 @@ module Noxun
         m[1]
       end
 
-      # Systemy, ktorych sa nahrada v TEJTO skrinke naozaj dotkne.
-      def ru_drawer_systems_affected(params, roles_now, hit_ov_keys)
-        map = ru_drawer_system_map(params)
+      # Cela, ktorych sa nahrada v TEJTO skrinke naozaj dotkne.
+      def ru_drawer_fronts_affected(params, roles_now, hit_ov_keys)
+        map = ru_drawer_front_map(params)
         return [] if map.empty?
-        return map.values.uniq.sort if Array(roles_now).include?('drawer')
+        return map.values if Array(roles_now).include?('drawer')
 
-        Array(hit_ov_keys).filter_map { |k| map[ru_drawer_key_front(k).to_s] }.uniq.sort
+        Array(hit_ov_keys).filter_map { |k| map[ru_drawer_key_front(k).to_s] }.uniq
       end
 
       # D-46 pravidlá vhodnosti cieľa ako projektovej predvolby (nové skrinky).
-      # `systems` (KOV-C2b) = systemy zasuviek pouzite v zakazke; cielova hrubka
-      # musi vyhoviet KAZDEMU z nich. Prazdny zoznam = zakazka zasuvky nema,
-      # vtedy staci, ze hrubku pozna aspon jeden vydany system (inak by sa
-      # predvolba nedala nastavit dopredu).
-      def ru_project_target_issue(key, target_th, systems = nil)
+      # `fronts` (KOV-C2b) = klasifikovane zasuvkove cela zakazky; cielova
+      # hrubka musi vyhoviet AKTIVNEMU RECEPTU KAZDEHO z nich. Prazdny zoznam =
+      # zakazka zasuvky nema, vtedy staci, ze hrubku pozna aspon jeden vydany
+      # system (inak by sa predvolba nedala nastavit dopredu).
+      def ru_project_target_issue(key, target_th, fronts = nil)
         case key
         when 'default_material_id'
           CabinetBuilder.thickness_in_range?(target_th) ? nil : :range
@@ -371,11 +378,11 @@ module Noxun
         when 'default_drawer_material_id'
           # KOV-C2b: hrubka dielcov zasuvky je VSTUP receptu, takze o nej
           # rozhoduje RECEPT — nie rozsah doskoveho materialu.
-          used = Array(systems)
+          used = Array(fronts)
           ok = if used.empty?
                  Recipes.thickness_ok_for_any_system?(target_th)
                else
-                 used.all? { |sys| Recipes.thickness_ok_for_system?(sys, target_th) }
+                 used.all? { |it| Recipes.thickness_ok_for_front?(it, target_th) }
                end
           ok ? nil : :drawer
         else

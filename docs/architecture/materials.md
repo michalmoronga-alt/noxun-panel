@@ -30,8 +30,14 @@ ako Čelá/Chrbát (vertikálny priestor je vzácny — žiadny nový blok). JS 
 **PREFLIGHT PER SYSTÉM (nie D-46 mechanicky).** D-46 vetva porovnáva hrúbku ČELA (18) a o receptoch nevie, takže sa sem nedá použiť. Namiesto nej:
 `drawer_thickness_any_system?` je **tvrdá** brána novej predvoľby — doska, ktorú neprijme ani jeden vydaný systém (napr. 25 mm), sa neuloží vôbec a hláška menuje povolené
 hrúbky (16 a 18). Keď dosku niektorý systém prijme, ale zákazka používa systém, ktorý ju **neprijme**, `drawer_change_plan` vráti zoznam systémov aj skriniek a predvoľba sa
-uloží **až po potvrdení** (`offer_drawer_change` — ten istý pending kontrakt a tá istá lišta ako D-46, líši sa len veta: menuje systém, jeho povolené hrúbky a počet skriniek).
-Zdrojom čísel je `Recipes.supported_thicknesses` ([hardware.md](hardware.md)), nikdy konštanta v UI.
+uloží **až po potvrdení** (`offer_drawer_change` — ten istý pending kontrakt a tá istá lišta ako D-46, líši sa len veta: menuje **recept**, jeho povolené hrúbky a počet
+skriniek). Tvrdé odmietnutie navyše **vráti select** na uloženú predvoľbu (`reset_project_select`) — inak by v UI zostal materiál, ktorý sa neuložil.
+
+**Meria sa AKTÍVNY recept každého dotknutého čela, nie „najnovší recept systému"** (Codex #305 kolo 1). `Recipes.thicknesses_for_front(front_item)` prejde cez
+`recipe_key_for` → `pick_ref` (pripnutý `recipe_refs` alebo súrodenec/latest) → `load` a vráti **prienik `thickness_supported` cez všetky roly toho receptu**; čelo pripnuté
+na staršiu verziu alebo na iné otváranie sa tak meria vlastnými číslami a hláška menuje jeho recept („Atira Tip-On v1 (16 mm)"). `Recipes.supported_thicknesses(system)`
+zostáva len ako **priblíženie pre prípad, keď ešte žiadna zásuvka neexistuje** (nová predvoľba v prázdnej zákazke) a pre texty hlášok — číta najnovší recept prvého
+otvárania systému, takže na existujúce čelá sa použiť nesmie. Čelo s neznámym pripnutým receptom preflight **neblokuje** — jeho stav rieši stavba vlastným RED nálezom.
 
 **Kľúč `drawer_material_id` musí cestovať VŠETKÝMI cestami materiálu.** Sú **päť** a každá je vlastný kanál: **normalize/config** (`CabinetBuilder.normalize` +
 `cabinet_config` + `config_to_params`), **šablóna** (`template_config_from` + `merge_template` preserve-or-override), **delete guard**
@@ -42,9 +48,9 @@ Nový materiálový kanál = pridať do všetkých piatich.
 
 **Predikát podľa toho, ČO sa naozaj mení.** „Prijme aspoň jeden vydaný systém" stačí len tam, kde ešte niet čo pokaziť — pri **novej** predvoľbe v Štúdiu a v zákazke,
 ktorá zásuvky nemá. Všade inde sa hrúbka meria **systémom každého dotknutého čela**:
-- **„Nahradiť UNI…" — projektová predvoľba:** `ru_scan_drawer_systems(scan)` zozbiera systémy z **celej** zákazky a cieľ musí vyhovieť **každému** z nich. 18 mm je platná
-  hrúbka pre Quadro, ale v atirovej zákazke by z každej zásuvky spravila RED — preto sa taká predvoľba neprepíše.
-- **„Nahradiť UNI…" — skrinka:** `ru_drawer_systems_affected(params, roles_now, hit_ov_keys)`. Keď sa mení **kanál** (rola `drawer` v `roles_now`), sú dotknuté všetky
+- **„Nahradiť UNI…" — projektová predvoľba:** `ru_scan_drawer_fronts(scan)` zozbiera **čelá** z celej zákazky a cieľ musí vyhovieť receptu **každého** z nich. 18 mm je
+  platná hrúbka pre Quadro, ale v atirovej zákazke by z každej zásuvky spravila RED — preto sa taká predvoľba neprepíše.
+- **„Nahradiť UNI…" — skrinka:** `ru_drawer_fronts_affected(params, roles_now, hit_ov_keys)`. Keď sa mení **kanál** (rola `drawer` v `roles_now`), sú dotknuté všetky
   klasifikované čelá skrinky; keď UNI sedí **len v `part_override` dielca zásuvky**, `roles_now` rolu `drawer` vôbec nenesie — dotknuté sú vtedy len čelá tých dielcov
   (`ru_drawer_key_front`). Bez tejto vetvy by 25 mm doska prešla generickým rozsahom doskového materiálu. Blokácia menuje **systém**, ktorý hrúbku neprijal.
 - **Vkladanie:** `MaterialsDialog.drawer_material_issue(params, model)` beží v `Panel.handle_insert` **pred** `prepare_insert`/ghostom — efektívny materiál zásuviek proti

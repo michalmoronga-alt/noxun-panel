@@ -33,7 +33,11 @@
   **zloženou** konfiguráciou čiel a nekompatibilný materiál odmietne hláškou „Nič sa nevložilo".
   **Vedomá odchýlka:** predikát „prijme aspoň jeden vydaný systém" zostal na dvoch miestach — pri **novej** predvoľbe v Štúdiu a v zákazke bez zásuviek. Prísny prienik
   naprieč systémami by nechal len 16 a blokoval by 18 mm dosku aj v čisto drevenej zákazke, kde je legitímna. Kde už existuje klasifikované čelo, je predikát prísny.
-  **Testy:** 3096 headless (+9 tejto dávky), 89 JS sád (`test_insert_state.js` štyri kanály, `test_proj_confirm.js` mapa `md_drawer`, `test_picker3_kontext.js` kontext
+  **Kolo 1 nad #305 (2× P2).** (1) Preflight bral len **najnovší recept systému** a jeho prienik hrúbok považoval za platný pre celý systém — čelo pripnuté na staršiu
+  verziu alebo na iné otváranie sa tak meralo cudzími číslami. Odteraz rozhoduje **aktívny recept každého dotknutého čela** (`Recipes.thicknesses_for_front`, cez
+  `pick_ref` + `recipe_refs`) a hláška menuje ten recept; per-systémový prienik ostal len pre predvoľbu v zákazke **bez** zásuviek a pre texty. (2) Po tvrdom odmietnutí
+  (napr. 25 mm) zostával selektor na odmietnutej hodnote — pribudol `reset_project_select`, takže sa vráti na uloženú predvoľbu.
+  **Testy:** 3100 headless (+13 tejto dávky), 89 JS sád (`test_insert_state.js` štyri kanály, `test_proj_confirm.js` mapa `md_drawer`, `test_picker3_kontext.js` kontext
   komba). In-SU sekcia sa nepridávala — `run_kovc2b` z #304 beží nad tým istým enginom a UI kanála je serverovo pokrytá headless testami.
 
 - **KOV-C2b — AKTIVÁCIA RECEPTOV ZÁSUVIEK: DIELCE, POLOŽKA VÝSUVU, BRÁNY, SCHÉMA 5 (v0.9.31, 5.9.2026):** tretí rez package KOV-C v2 a **prvý, ktorý mení výstupy** —

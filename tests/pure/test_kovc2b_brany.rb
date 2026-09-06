@@ -949,7 +949,7 @@ NxTest.test('Codex #304 P1: preflight predvolby zasuviek menuje SYSTEM aj skrink
   NxTest.assert(md.drawer_thickness_any_system?(18.0), 'Quadro 18 prijme')
   msg = md.drawer_reject_msg(25.0)
   NxTest.assert(msg.include?('16') && msg.include?('18'), msg)
-  # Systemy skrinky sa citaju z ULOZENYCH ciel (legacy celo sa netyka).
+  # Klasifikovane cela sa citaju z ULOZENYCH ciel (legacy celo sa netyka).
   params = { 'fronts' => { 'items' => [
     { 'id' => 'F1', 'type' => 'drawer_front', 'opening_mode' => 'classic',
       'drawer' => { 'construction' => 'metal' } },
@@ -957,11 +957,15 @@ NxTest.test('Codex #304 P1: preflight predvolby zasuviek menuje SYSTEM aj skrink
       'drawer' => { 'construction' => 'wood' } },
     { 'id' => 'F3', 'type' => 'door' }
   ] } }
-  NxTest.assert_equal(%w[atira quadro_v6], md.drawer_systems_of(params).sort)
-  NxTest.assert_equal([], md.drawer_systems_of('fronts' => { 'items' => [{ 'type' => 'door' }] }))
-  # Veta ponuky menuje system AJ povolene hrubky.
-  txt = md.drawer_systems_txt(['atira'])
-  NxTest.assert(txt.include?('Atira') && txt.include?('16'), txt)
+  NxTest.assert_equal(%w[F1 F2], md.drawer_fronts_of(params).map { |it| it['id'] })
+  NxTest.assert_equal([], md.drawer_fronts_of('fronts' => { 'items' => [{ 'type' => 'door' }] }))
+  # Veta ponuky menuje RECEPT cela AJ jeho povolene hrubky.
+  atira = params['fronts']['items'][0]
+  NxTest.assert_equal(nil, md.drawer_front_reject(atira, 16.0), 'Atira 16 mm prijme')
+  txt = md.drawer_front_reject(atira, 18.0)
+  NxTest.assert(txt.include?('Atira') && txt.include?('SiSy') && txt.include?('16'), txt.to_s)
+  NxTest.assert_equal(nil, md.drawer_front_reject({ 'id' => 'F3', 'type' => 'door' }, 25.0),
+                      'legacy celo preflight NEBLOKUJE')
 end
 
 NxTest.test('Codex #304 kolo 3 P1: „Nahradiť UNI…" pozna 4. kanal') do
@@ -1020,17 +1024,17 @@ NxTest.test('Codex #304 kolo 4 P1: predvolba sa meria systemom KAZDEHO cela zaka
   ru = c::E::Materials
   # 18 mm pozna Quadro, ale NIE Atira. V ATIROVEJ zakazke sa preto predvolba
   # zasuviek na 18 mm nesmie prepisat — spravila by RED z kazdej zasuvky.
-  atira = ['atira']
-  quadro = ['quadro_v6']
+  atira = [c.drawer_front('metal')]
+  quadro = [c.drawer_front('wood', 'F2')]
   NxTest.assert_equal(:drawer, ru.ru_project_target_issue('default_drawer_material_id', 18.0, atira),
-                      'Atira 18 mm neprijme')
+                      'recept atiroveho cela 18 mm neprijme')
   NxTest.assert_equal(nil, ru.ru_project_target_issue('default_drawer_material_id', 18.0, quadro))
   NxTest.assert_equal(nil, ru.ru_project_target_issue('default_drawer_material_id', 16.0,
                                                       atira + quadro),
-                      '16 mm prijmu OBA systemy')
+                      '16 mm prijmu OBA recepty')
   NxTest.assert_equal(:drawer,
                       ru.ru_project_target_issue('default_drawer_material_id', 18.0, atira + quadro),
-                      'zmiesana zakazka: staci JEDEN system, ktory hrubku neprijme')
+                      'zmiesana zakazka: staci JEDNO celo, ktoreho recept hrubku neprijme')
   # A cez CELU klasifikaciu: scan s Atirou -> 18 mm predvolba blokovana.
   uni = { 'material_id' => 'UNI_ZASUVKA_16', 'thickness' => 16.0, 'decor' => 'UNI' }
   t18 = { 'material_id' => 'BIELA_18', 'thickness' => 18.0, 'decor' => 'Biela' }
@@ -1122,4 +1126,109 @@ NxTest.test('Codex #304 kolo 4 P1: vklad odmietne nekompatibilny material zasuvi
   NxTest.assert(msg.to_s.include?('Nič sa nevložilo'), msg.to_s)
   NxTest.assert_equal(nil, md.drawer_material_issue(wood.merge('drawer_material_id' => id18), nil),
                       'Quadro 18 mm prijme')
+end
+
+# ============================================================================
+# CODEX #305 KOLO 1 — preflight podla AKTIVNEHO receptu CELA
+# ============================================================================
+
+NxTest.test('Codex #305 P2: preflight cita recept CELA, nie „najnovsi recept systemu"') do
+  c = NxC2bB
+  # Fixtura: system ma DVE vydane verzie s ROZNYMI hrubkami. Celo je pripnute
+  # na v1 (16 mm), `latest_for` by dalo v2 (18 mm) — presne ten rozdiel, ktory
+  # per-systemovy preflight prehliadol.
+  dir = File.join(Dir.tmpdir, "nx_recipes_#{Process.pid}_#{rand(9999)}")
+  FileUtils.mkdir_p(dir)
+  begin
+    src = JSON.parse(File.read(File.join(c::REC::DIR, 'atira_sisy_v1.json'), encoding: 'UTF-8'))
+    v2 = JSON.parse(JSON.generate(src))
+    v2['recipe_id'] = 'atira_sisy_v2'
+    v2['version'] = 2 if v2.key?('version')
+    v2['thickness_supported'] = { 'drawer_bottom' => [18], 'drawer_back' => [18] }
+    File.write(File.join(dir, 'atira_sisy_v1.json'), JSON.pretty_generate(src))
+    File.write(File.join(dir, 'atira_sisy_v2.json'), JSON.pretty_generate(v2))
+    reg = { 'atira_sisy_v1' => c::REC.file_digest(File.join(dir, 'atira_sisy_v1.json')),
+            'atira_sisy_v2' => c::REC.file_digest(File.join(dir, 'atira_sisy_v2.json')) }
+    File.write(File.join(dir, 'RELEASED.json'), JSON.pretty_generate(reg))
+
+    # Kontrola fixtury: `latest_for` je v2, systemovy prienik teda 18 mm.
+    NxTest.assert_equal('atira_sisy_v2', c::REC.latest_for('atira', 'sisy', dir: dir))
+    NxTest.assert_equal([18.0], c::REC.supported_thicknesses('atira', dir: dir),
+                        'per-SYSTEM priblizenie cita NAJNOVSI recept')
+
+    pinned = { 'id' => 'F1', 'type' => 'drawer_front', 'opening_mode' => 'classic',
+               'drawer' => { 'construction' => 'metal',
+                             'recipe_refs' => { 'atira|sisy' => 'atira_sisy_v1' } } }
+    recipe, allowed = c::REC.thicknesses_for_front(pinned, dir: dir)
+    NxTest.assert_equal('atira_sisy_v1', recipe[:recipe_id], 'plati PRIPNUTY recept')
+    NxTest.assert_equal([16.0], allowed, 'a jeho hrubky, nie hrubky najnovsej verzie')
+    NxTest.assert(c::REC.thickness_ok_for_front?(pinned, 16.0, dir: dir))
+    NxTest.refute(c::REC.thickness_ok_for_front?(pinned, 18.0, dir: dir),
+                  '18 mm by per-systemovy preflight PUSTIL — per-celo ho zastavi')
+
+    # Celo BEZ pripnutia dostane surodenca/najnovsi -> v2 (18 mm).
+    fresh = { 'id' => 'F2', 'type' => 'drawer_front', 'opening_mode' => 'classic',
+              'drawer' => { 'construction' => 'metal' } }
+    NxTest.assert_equal([18.0], c::REC.thicknesses_for_front(fresh, dir: dir)[1])
+  ensure
+    FileUtils.rm_rf(dir)
+  end
+end
+
+NxTest.test('Codex #305 P2: recept cela rozhoduje aj podla OTVARANIA') do
+  c = NxC2bB
+  # `supported_thicknesses(system)` cita PRVE otvaranie zo `OPENINGS` (sisy).
+  # Tip-On celo ma vlastny recept — preflight ho musi menovat, inak by hlaska
+  # ukazovala cudzie cislo aj cudzi nazov.
+  sisy = c.drawer_front('metal')
+  tipon = { 'id' => 'F2', 'type' => 'drawer_front', 'mode' => 'fixed', 'height' => 175.0,
+            'opening_mode' => 'tipon', 'drawer' => { 'construction' => 'metal' } }
+  NxTest.assert_equal('atira_sisy_v1', c::REC.thicknesses_for_front(sisy)[0][:recipe_id])
+  NxTest.assert_equal('atira_p2o_v1', c::REC.thicknesses_for_front(tipon)[0][:recipe_id],
+                      'Tip-On celo ma VLASTNY recept')
+  md = c::E::MaterialsDialog
+  NxTest.assert(md.drawer_front_reject(tipon, 18.0).to_s.include?('Tip-On'),
+                md.drawer_front_reject(tipon, 18.0).to_s)
+  # Legacy / neznamy ref preflight NEBLOKUJE — jeho stav rieši stavba.
+  unknown = { 'id' => 'F3', 'type' => 'drawer_front', 'opening_mode' => 'classic',
+              'drawer' => { 'construction' => 'metal',
+                            'recipe_refs' => { 'atira|sisy' => 'atira_sisy_v9' } } }
+  NxTest.assert_equal(nil, c::REC.thicknesses_for_front(unknown))
+  NxTest.assert(c::REC.thickness_ok_for_front?(unknown, 25.0), 'neznamy recept = nechaj stavbe')
+end
+
+NxTest.test('Codex #305 P2: „Nahradiť UNI…" meria recept KAZDEHO dotknuteho cela') do
+  c = NxC2bB
+  ru = c::E::Materials
+  # Tip-On celo (recept `atira_p2o_v1`) — blokacia MUSI menovat jeho recept.
+  tipon = { 'id' => 'F1', 'type' => 'drawer_front', 'mode' => 'fixed', 'height' => 175.0,
+            'opening_mode' => 'tipon', 'drawer' => { 'construction' => 'metal' } }
+  params = c.stored_params('fronts' => { 'items' => [tipon] },
+                           'drawer_material_id' => 'UNI_ZASUVKA_16')
+  uni = { 'material_id' => 'UNI_ZASUVKA_16', 'thickness' => 16.0, 'decor' => 'UNI' }
+  t18 = { 'material_id' => 'BIELA_18', 'thickness' => 18.0, 'decor' => 'Biela' }
+  scan = { 'cabs' => [['CAB-1', params, { 'drawer' => 'UNI_ZASUVKA_16' }, '{}', :ref]],
+           'boards' => [], 'model_guid' => 'G',
+           'project' => { 'default_drawer_material_id' => 'UNI_ZASUVKA_16' } }
+  out = ru.replace_uni_classify(scan, uni, t18)
+  NxTest.assert_equal({}, out['project_writes'], 'predvolba sa NEPREPISALA')
+  NxTest.assert_equal(:drawer, out['blocked'].last && out['blocked'].last[1])
+  NxTest.assert(Array(out['blocked'].last[2]).any? { |n| n.include?('Tip-On') },
+                out['blocked'].inspect)
+  # Cela sa zbieraju CELE, nie len ich systemy.
+  NxTest.assert_equal(['F1'], ru.ru_scan_drawer_fronts(scan).map { |it| it['id'] })
+  NxTest.assert_equal(['F1'], ru.ru_drawer_fronts_affected(params, ['drawer'], [])
+                                .map { |it| it['id'] })
+end
+
+NxTest.test('Codex #305 P2: tvrde odmietnutie VRATI select na ulozenu predvolbu') do
+  c = NxC2bB
+  src = c.src_ui('materials_dialog.rb')
+  body = src[/def handle_set_project_material.*?unless new_ok.*?\n          end/m].to_s
+  NxTest.assert(body.include?('reset_project_select(key, Materials.project_defaults(model)[key].to_s)'),
+                'bez resetu by select ostal na ODMIETNUTEJ hodnote')
+  NxTest.assert(body.include?('set_status(project_thickness_msg(key, value, have), true)'),
+                'a hlaska ostava')
+  # `reset_project_select` posiela JS kanal, ktory select vrati na `current`.
+  NxTest.assert(src.include?("js(\"MD.resetProject("), 'existujuci kanal, ziadny novy')
 end

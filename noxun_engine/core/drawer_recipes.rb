@@ -500,11 +500,47 @@ module Noxun
         lb[:by_nl][key_num(nl)] || lb[:default]
       end
 
-      # KOV-C2b: hrubky, ktore system PRIJME pre VSETKY svoje vyrabane dielce
-      # (PRIENIK cez roly — jeden materialovy kanal krmi vsetky roly naraz, takze
-      # hrubka dobra len pre dno by pri Quadre aj tak padla na boku). Cita sa
-      # z NAJNOVSIEHO vydaneho receptu systemu; neznamy system = [].
-      # CISTA funkcia — pouziva ju preflight projektovej predvolby zasuviek.
+      # KOV-C2b: hrubky, ktore AKTIVNY recept TOHTO cela prijme pre VSETKY svoje
+      # vyrabane dielce (PRIENIK cez roly — jeden materialovy kanal krmi vsetky
+      # roly naraz, takze hrubka dobra len pre dno by pri Quadre padla na boku).
+      #
+      # TOTO je jediny SPRAVNY vstup preflightu, ked zasuvky uz existuju
+      # (Codex #305 kolo 1 P2): `supported_thicknesses(system)` nizsie cita
+      # NAJNOVSI recept PRVEHO otvarania systemu, takze celo pripnute na starsiu
+      # verziu alebo na ine otvaranie by sa merala cudzimi cislami.
+      # -> [recipe, [mm, ...]] | nil (legacy celo, ciastocna klasifikacia,
+      #    neznamy pripnuty recept — vtedy sa preflight necha na stavbu)
+      def thicknesses_for_front(front_item, dir: DIR)
+        kind, key = recipe_key_for(front_item)
+        return nil unless kind == :ok
+
+        drawer = front_item['drawer'].is_a?(Hash) ? front_item['drawer'] : {}
+        id = pick_ref(drawer['recipe_refs'], key[:system], key[:opening], dir: dir)
+        return nil unless id
+
+        recipe = load(id, dir: dir)
+        lists = recipe[:thickness_supported].values.map { |l| Array(l).map(&:to_f) }
+        return nil if lists.empty?
+
+        [recipe, lists.reduce { |acc, l| acc.select { |v| l.any? { |x| same?(x, v) } } }.uniq.sort]
+      rescue RecipeError
+        nil
+      end
+
+      # Prijme AKTIVNY recept tohto cela danu hrubku? Celo, ktoreho recept
+      # nepoznáme (legacy, neznamy ref), preflight NEBLOKUJE — jeho stav rieši
+      # stavba vlastnym RED nalezom.
+      def thickness_ok_for_front?(front_item, mm, dir: DIR)
+        pair = thicknesses_for_front(front_item, dir: dir)
+        return true if pair.nil?
+
+        pair[1].any? { |v| same?(v, mm) }
+      end
+
+      # PRIBLIZENIE pre pripad, ked este ZIADNA zasuvka neexistuje: hrubky
+      # NAJNOVSIEHO receptu systemu. Pouziva sa VYHRADNE tam, kde niet co
+      # pokazit (nova projektova predvolba v zakazke bez zasuviek) a v textoch
+      # hlasok. Kde uz klasifikovane celo je, plati `thicknesses_for_front`.
       def supported_thicknesses(system, dir: DIR)
         id = OPENINGS.filter_map { |o| latest_for(system, o, dir: dir) }.first
         return [] if id.nil?

@@ -1009,7 +1009,11 @@ module Noxun
               CabinetBuilder.thickness_ok_for?(role, Fronts::FRONT_THICKNESS.to_f, have)
             end
           unless new_ok
-            return set_status(project_thickness_msg(key, value, have), true)
+            # Codex #305 kolo 1 P2: bez tohto by select (a s nim NXCombo) ostal
+            # na ODMIETNUTEJ hodnote — pouzivatel by videl material, ktory sa
+            # neulozil. Rovnaka cesta ako pri odmietnuti D-46 ponuky.
+            set_status(project_thickness_msg(key, value, have), true)
+            return reset_project_select(key, Materials.project_defaults(model)[key].to_s)
           end
           selected = Panel.find_cabinet(model)
           affected = Panel.all_cabinets(model).select do |cabinet|
@@ -1057,7 +1061,7 @@ module Noxun
             # Atira prijme 16, Quadro V6 16 aj 18. Nevyhovujúci výber sa NEULOŽÍ
             # bez potvrdenia (hláška menuje systém aj povolené hrúbky).
             plan = drawer_change_plan(model, affected, have)
-            unless plan['systems'].empty?
+            unless plan['recipes'].empty?
               fresh = { 'model_guid' => model_guid(model), 'key' => key, 'value' => value,
                         'old_default' => old_default,
                         'adopting_ids' => [], 'recompute_ids' => plan['ids'] }
@@ -1135,33 +1139,43 @@ module Noxun
 
         # --- KOV-C2b: predvolba ZASUVIEK a recepty ----------------------------
         #
-        # Systemy, ktore su v zakazke REALNE pouzite (klasifikovane zasuvkove
-        # cela dediacich skriniek), a ktore danu hrubku NEPRIJMU.
-        # -> { 'systems' => ['atira'], 'ids' => ['CAB-001'] } (obe zoradene)
+        # Cela dediacich skriniek, ktorych AKTIVNY recept danu hrubku NEPRIJME.
+        # Codex #305 kolo 1 P2: meria sa receptom KONKRETNEHO cela (jeho
+        # otvaranie + pripnuta verzia), nie „najnovsim receptom systemu" —
+        # celo pripnute na starsiu verziu ma vlastne hrubky.
+        # -> { 'recipes' => ['Atira SiSy v1 (16 mm)'], 'ids' => ['CAB-001'] }
         def drawer_change_plan(model, affected, have)
-          systems = {}
+          labels = {}
           ids = []
           affected.each do |cabinet|
             params = Panel.existing_params(cabinet)
-            bad = drawer_systems_of(params).reject { |sys| Recipes.thickness_ok_for_system?(sys, have) }
+            bad = drawer_fronts_of(params).filter_map { |it| drawer_front_reject(it, have) }
             next if bad.empty?
 
-            bad.each { |sys| systems[sys] = true }
+            bad.each { |txt| labels[txt] = true }
             id = Store.get(cabinet, 'cabinet_id').to_s
             ids << id unless id.empty? || ids.include?(id)
           end
-          { 'systems' => systems.keys.sort, 'ids' => ids.sort }
+          { 'recipes' => labels.keys.sort, 'ids' => ids.sort }
         end
 
-        # Systemy zasuviek jednej skrinky (z ULOZENYCH ciel). Legacy cela
+        # Klasifikovane zasuvkove cela (z ULOZENYCH ciel). Legacy cela
         # a `construction other` sa netykaju — resolver sa na nich nevola.
-        def drawer_systems_of(params)
+        def drawer_fronts_of(params)
           fronts = params.is_a?(Hash) ? params['fronts'] : nil
           items = fronts.is_a?(Hash) ? fronts['items'] : nil
-          Array(items).filter_map do |it|
-            kind, key = Recipes.recipe_key_for(it)
-            kind == :ok ? key[:system] : nil
-          end.uniq
+          Array(items).select { |it| Recipes.recipe_key_for(it).first == :ok }
+        end
+
+        # „Atira SiSy v1 (16 mm)" ked celo hrubku NEPRIJME, inak nil.
+        def drawer_front_reject(front_item, have)
+          pair = Recipes.thicknesses_for_front(front_item)
+          return nil if pair.nil?
+
+          recipe, allowed = pair
+          return nil if allowed.any? { |v| (v - have).abs < 1e-9 }
+
+          "#{Recipes.label(recipe)} (#{allowed.map { |v| Materials.fmt_mm(v) }.join(' alebo ')} mm)"
         end
 
         # Prijme hrubku ASPON JEDEN vydany system? (brana novej predvolby)
@@ -1179,26 +1193,20 @@ module Noxun
         def drawer_material_issue(params, model)
           return nil unless defined?(Recipes)
 
-          systems = drawer_systems_of('fronts' => Fronts.normalize_config(params['fronts']))
-          return nil if systems.empty?
+          items = drawer_fronts_of('fronts' => Fronts.normalize_config(params['fronts']))
+          return nil if items.empty?
 
           mat = CabinetBuilder.effective_materials(model, params)['drawer']
           sheet = mat && Materials.sheet(mat)
           return nil unless sheet.is_a?(Hash)
 
           th = sheet['thickness'].to_f
-          bad = systems.reject { |sys| Recipes.thickness_ok_for_system?(sys, th) }
+          bad = items.filter_map { |it| drawer_front_reject(it, th) }.uniq.sort
           return nil if bad.empty?
 
-          "Materiál zásuviek #{mat} (#{Materials.fmt_mm(th)} mm) sa nedá použiť: "             "#{drawer_systems_txt(bad)}. Zmeň materiál zásuviek alebo klasifikáciu čela. "             'Nič sa nevložilo.'
-        end
-
-        # „Atira (16 mm)" / „Atira (16 mm), Quadro V6 (16 alebo 18 mm)"
-        def drawer_systems_txt(systems)
-          Array(systems).map do |sys|
-            th = Recipes.supported_thicknesses(sys).map { |v| Materials.fmt_mm(v) }
-            "#{Recipes.system_label(sys)} (#{th.join(' alebo ')} mm)"
-          end.join(', ')
+          "Materiál zásuviek #{mat} (#{Materials.fmt_mm(th)} mm) sa nedá použiť: " \
+            "#{bad.join(', ')}. Zmeň materiál zásuviek alebo klasifikáciu čela. " \
+            'Nič sa nevložilo.'
         end
 
         def drawer_reject_msg(have)
@@ -1210,7 +1218,7 @@ module Noxun
         # Ponuka na potvrdenie (rovnaky kanal ako D-46 — jedna lista, jeden
         # pending kontrakt; lisi sa LEN veta).
         def offer_drawer_change(fresh, have, plan, stale: false)
-          msg = "#{drawer_systems_txt(plan['systems'])} hrúbku #{Materials.fmt_mm(have)} mm neprijíma — " \
+          msg = "#{plan['recipes'].join(', ')} hrúbku #{Materials.fmt_mm(have)} mm neprijíma — " \
                 "zásuvky v #{cabs_phrase(plan['ids'].size, :future).sub(/ prevezm\S+\z/, '')} " \
                 'sa prestanú vyrábať (Kontrola ich ukáže červené). Potvrď nižšie.'
           msg = "Stav sa medzitým zmenil — #{msg}" if stale
