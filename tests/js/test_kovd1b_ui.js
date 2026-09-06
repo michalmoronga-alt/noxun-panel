@@ -269,12 +269,9 @@ eq(HWS.hwsMapClassRows('global').length, 1, 'globálne riadky sú vlastný zozna
 // ďalej a `refreshFrontDrawer` prekreslí LEN otvorenú kartu.
 const fs = require('node:fs');
 // Zdroje sa citaju s normalizovanymi koncami riadkov: na Windows checkoute
-// (core.autocrlf=true) su subory CRLF a regexy nizsie kotvia na `
-` —
+// (core.autocrlf=true) su subory CRLF a regexy nizsie kotvia na LF -
 // bez normalizacie sada padne lokalne, hoci v CI (LF) prejde.
-const readSrc = (name) => fs.readFileSync(path.join(JS, name), 'utf8').replace(/
-/g, '
-');
+const readSrc = (name) => fs.readFileSync(path.join(JS, name), 'utf8').replace(/\r\n/g, '\n');
 const bridgeSrc = readSrc('bridge.js');
 const formSrc = readSrc('form.js');
 const hwSrc = readSrc('hardware.js');
