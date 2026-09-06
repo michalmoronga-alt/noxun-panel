@@ -222,7 +222,21 @@ module Noxun
         id = refs_map[key] || refs_map[key.to_sym]
         return [:missing, nil] unless id.is_a?(String) && !id.strip.empty?
 
+        id = id.strip
+        # KOV-D1a (Astra #20 B4): PRITOMNY zaznam sa uz nezahadzuje pri
+        # normalizacii — platnost rozhoduje TU, na jedinom mieste. Zaznam,
+        # ktoreho hodnota nema tvar recipe_id alebo hovori o INOM systeme/
+        # otvarani nez jeho kluc, je poskodeny (alebo podvrhnuty) pin:
+        # `[:unknown]` = RED `drawer_recipe_unknown`, NIKDY tichy surodenec.
+        return [:unknown, id] unless ref_matches_key?(id, system, opening)
+
         released(dir: dir).key?(id) ? [:known, id] : [:unknown, id]
+      end
+
+      # Hovori hodnota o TEJ ISTEJ kombinacii system|otvaranie ako jej kluc?
+      def ref_matches_key?(recipe_id, system, opening)
+        p = parse_id(recipe_id)
+        !p.nil? && p[:system] == system.to_s && p[:opening] == opening.to_s
       end
 
       # Aktivny recept pre kombinaciu system|otvaranie z mapy `recipe_refs`.
@@ -235,8 +249,13 @@ module Noxun
         return ref if state == :known
 
         # NOVA kombinacia: surodenec ROVNAKEJ verzie, inak najnovsi vydany.
+        # KOV-D1a (Codex #307 kolo 2 P1): surodenec sa berie LEN z VALIDOVANYCH
+        # zaznamov mapy — poskodeny (RED) zaznam vyber NIKDY neovplyvni.
         if refs_map.is_a?(Hash)
-          refs_map.each_value do |id|
+          refs_map.each do |k, id|
+            ksys, kopen = k.to_s.split('|', 2)
+            next unless ref_matches_key?(id, ksys, kopen)
+
             sib = sibling(id, system, opening, dir: dir)
             return sib if sib
           end

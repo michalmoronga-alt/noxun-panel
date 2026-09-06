@@ -452,7 +452,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   nákup nemení fyzický návrh).
   **Už hotové v KOV-C (NIE scope D):** triedny kľúč čítaný v resolve, per-height sety + seed + `MAPPING_ADDITIONS`, `drawer_kit_missing`, karta zásuvky s `explain_stored`,
   Kontrola ceruzka → čelo, osirotené zásahy so serverovým resetom, pamäť drawer polí pri prechode na dvierka (`none` čistí), sync tyč ORANGE.
-  **D1a · MAPOVANIE — jadro (audit-povinné, schéma):** (1) **owner-scoped triedny kľúč** `class:slide|<opening>|<construction>@front:<id>/panel` — povolený VÝHRADNE v
+  **D1a · MAPOVANIE — jadro (audit-povinné, schéma) — ✅ HOTOVÉ (v0.9.34, 6.9.2026):** (1) **owner-scoped triedny kľúč** `class:slide|<opening>|<construction>@front:<id>/panel` — povolený VÝHRADNE v
   `config.hardware_sets` skrinky (globál/projekt ho nemajú); triedna časť sa normalizuje, owner ostáva doslovne a validuje sa proti čelám skrinky; precedencia pre receptové položky
   **owner triedny → cabinet triedny → projektový snapshot**; na nižšiu úroveň sa ide LEN pri neprítomnom kľúči — neplatná hodnota, chýbajúce pásmo alebo nekompatibilný set = RED
   `drawer_kit_missing` (Astra #20 F8); pri Atire aj pod owner kľúčom selektor podľa `height_variant`, Quadro smie pevný set; existujúca akcia zapisujúca `slide@owner` (`handle_set_hardware_set` — dnes prijíma len reťazec `set_id` a zmrazí jednu definíciu) sa pre čelá so systémom prepne na triedny owner kľúč a **prijme aj validovaný selektor** (hodnota = selektor podľa

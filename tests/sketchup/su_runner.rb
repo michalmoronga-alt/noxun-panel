@@ -15304,6 +15304,138 @@ module NoxunSuRunner
     dir
   end
 
+  # === KOV-D1a: OWNER TRIEDNY OVERRIDE (mapovanie + zmrazenie + prestavba) ===
+  #
+  # Headless sada dokaze tvar kluca, precedenciu aj validaciu; NEDOKAZE, ze
+  # mapovanie, zmrazenie definicie a prestavba su JEDNA operacia (Codex #307
+  # kolo 2 P1) — to overuje az tento scenar: Spat aj Redo musia vratit
+  # mapovanie, snapshot AJ nakupny kod SUCASNE.
+  KOVD1A_ALT_SET = 'nx-test-atira-h70-alt'
+  KOVD1A_ALT_CODE = 'NX-TEST-470'
+
+  # Fixturna ALTERNATIVNA rodina (seed dnes ziadnu nema — Codex #307 P1):
+  # ten isty klasifikacny odtlacok ako `atira-biela-h70-sisy`, INY kod.
+  def kovd1a_alt_set
+    { 'set_id' => KOVD1A_ALT_SET, 'name' => 'TEST Atira H70 alternatíva',
+      'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'classic',
+      'drawer_construction' => 'metal', 'manufacturer' => 'Hettich',
+      'series' => 'InnoTech Atira', 'height_variant' => 70,
+      'members' => [{ 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
+                      'code_by_nl' => { '350' => 'NX-TEST-350', '470' => KOVD1A_ALT_CODE } }] }
+  end
+
+  def kovd1a_owner_key
+    "class:slide|classic|metal@#{e::PartKeys.front('F1', 'panel')}"
+  end
+
+  # Nakupne kody vysuvov CELEJ zakazky (co by sa naozaj objednalo).
+  def kovd1a_codes(model)
+    collected = e::Bom.collect(model)
+    exp = e::ProductionCore.hardware_expansion(model, collected)
+    Array(exp && exp['rows']).select do |r|
+      Array(r['sources']).any? { |s| s.is_a?(Hash) && s['generic_type'].to_s == 'slide' }
+    end.map { |r| r['code'].to_s }.sort
+  end
+
+  def kovd1a_map(inst)
+    (e::Store.config(inst) || {})['hardware_sets'] || {}
+  end
+
+  def run_kovd1a(model)
+    cleanup(model)
+    markers = []
+    inst = e::CabinetBuilder.build(model, kovc2b_params)
+    return ok('KOV-D1a: vlozenie korpusu so zasuvkou', false) unless inst
+
+    cid = e::Store.get(inst, 'cabinet_id')
+    base = kovd1a_codes(model)
+    ok("KOV-D1a: vychodiskovy nakup = seed kit H70/NL470 (#{base.inspect})",
+       base == ['357696'])
+
+    # Fixturnu definiciu zmrazime do PROJEKTOVEHO snapshotu (nie do zivej
+    # kniznice v %APPDATA% — testovaci model si ju nesie sam).
+    model.start_operation('KOV-D1a fixture set', true)
+    e::HardwareSets.add_project_sets!(model, [kovd1a_alt_set])
+    model.commit_operation
+
+    # --- 1) zapis owner triedneho kluca cez REALNU akciu panela ------------
+    model.selection.clear
+    model.selection.add(inst)
+    m = r03_marker(model, markers)
+    sel = { 'param' => 'height_variant',
+            'bands' => [{ 'min' => 70.0, 'max' => 70.0, 'set_id' => KOVD1A_ALT_SET }] }
+    e::Panel.handle_set_hardware_set(pg(model, 'generic_type' => 'slide',
+                                               'owner_part_key' => e::PartKeys.front('F1', 'panel'),
+                                               'value' => sel, 'cabinet_id' => cid))
+    map = kovd1a_map(inst)
+    ok("KOV-D1a: akcia zapisala OWNER TRIEDNY kluc (#{map.keys.inspect})",
+       map.keys == [kovd1a_owner_key])
+    ok('KOV-D1a: hodnotou je vyskovy selektor (nie pevny set)',
+       map[kovd1a_owner_key].is_a?(Hash) &&
+       map[kovd1a_owner_key]['param'] == 'height_variant')
+    _, st = e::HardwareSets.project_state_status(model)
+    ok('KOV-D1a: definicia setu je zmrazena v snapshote projektu',
+       st.is_a?(Hash) && st['sets'].is_a?(Hash) && st['sets'].key?(KOVD1A_ALT_SET))
+    after = kovd1a_codes(model)
+    ok("KOV-D1a: nakup objednava INY kod (#{after.inspect})", after == [KOVD1A_ALT_CODE])
+    ok("KOV-D1a: ulozeny config ma schemu #{e::CabinetBuilder::CONFIG_SCHEMA}",
+       (e::Store.config(inst) || {})['config_schema'].to_i == e::CabinetBuilder::CONFIG_SCHEMA)
+
+    # --- 2) Spat = JEDEN krok pre mapovanie, snapshot aj prestavbu ---------
+    Sketchup.undo
+    ok('KOV-D1a Spat: mapovanie aj nakupny kod sa vratili NARAZ',
+       kovd1a_map(inst).empty? && kovd1a_codes(model) == ['357696'])
+    ok('KOV-D1a Spat: bol to PRESNE jeden krok', m.valid?)
+
+    # --- 3) Redo obnovi VSETKO konzistentne --------------------------------
+    if Sketchup.respond_to?(:redo)
+      Sketchup.redo
+      _, st2 = e::HardwareSets.project_state_status(model)
+      ok('KOV-D1a Redo: kluc, snapshot aj kod su spat SUCASNE',
+         kovd1a_map(inst).keys == [kovd1a_owner_key] &&
+         st2.is_a?(Hash) && st2['sets'].key?(KOVD1A_ALT_SET) &&
+         kovd1a_codes(model) == [KOVD1A_ALT_CODE])
+    else
+      info('KOV-D1a: Sketchup.redo nedostupne — Redo vetva netestovana')
+      e::Panel.handle_set_hardware_set(pg(model, 'generic_type' => 'slide',
+                                                 'owner_part_key' => e::PartKeys.front('F1', 'panel'),
+                                                 'value' => sel, 'cabinet_id' => cid))
+    end
+    r03_clear_markers(model, markers)
+
+    # --- 4) kopia skrinky nesie owner kluc AJ kod --------------------------
+    model.selection.clear
+    model.selection.add(inst)
+    e::Panel.handle_insert_copy(pg(model, 'cabinet_id' => cid))
+    copy = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' && i != inst }
+    ok('KOV-D1a kopia: owner triedny override prezil „Vložiť kópiu"',
+       copy && kovd1a_map(copy).keys == [kovd1a_owner_key])
+    ok("KOV-D1a kopia: obe skrinky objednavaju alternativny kod (#{kovd1a_codes(model).inspect})",
+       kovd1a_codes(model) == [KOVD1A_ALT_CODE])
+
+    # --- 5) prestavba na H144 = RED, NIKDY kit H70 -------------------------
+    p2 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    p2['height'] = 900.0
+    p2['fronts']['items'][0]['height'] = 250.0
+    e::CabinetBuilder.rebuild(model, inst, p2)
+    sl = kovc2b_slides(inst)
+    grown = sl.first && sl.first['params']['height_variant'].to_i
+    if grown && grown != 70
+      codes = kovd1a_codes(model)
+      ok("KOV-D1a prerastenie: variant H#{grown} bez pasma = ziadny kit H70 v nakupe (#{codes.inspect})",
+         !codes.include?(KOVD1A_ALT_CODE) && !codes.include?('357696'))
+    else
+      info("KOV-D1a prerastenie: vyska cela dala variant H#{grown.inspect} — vetva preskocena")
+    end
+
+    cleanup(model)
+    ok('KOV-D1a: cleanup (0 korpusov)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: run_kovd1a vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    r03_clear_markers(model, markers || [])
+    cleanup(model)
+  end
+
   def run_kovc2b(model)
     cleanup(model)
     markers = []
@@ -16378,6 +16510,7 @@ module NoxunSuRunner
     run_tools1(model)        # NASTROJE-1 (T1a): Mower + Snaper v baliku enginu (kopia cez sev, rotacie/Z ako 1 krok Spat, odmietnutia bez operacie, bariera observera, Snaper a viditelnost)
     run_tools1b(model)       # NASTROJE-1 (T1b): boot migracia starych instalacii — docasny Plugins strom (styri ciele, marker per cesta, druhy beh = no-op) + dokaz, ze boot hook upratal ZIVU instalaciu
     run_kovc2b(model)        # KOV-C2b: zasuvky z receptu — dielce v modeli 1:1 s planom, JEDNA polozka vysuvu, prestavba (ina hlbka/vyska = ina NL/variant, ziadna duplicita, part_overrides prezijú), 1 krok Spat, kopia a sablona nesu pripnuty recept, plytka skrinka = ziadne dielce + RED + export zastaveny s PRAZDNYM priecinkom
+    run_kovd1a(model)        # KOV-D1a: owner triedny override setu na CELE — akcia panela zapise `class:slide|…@front:F1/panel`, zmrazi definiciu a prestava v JEDNEJ operacii (Spat aj Redo vratia mapovanie, snapshot aj nakupny kod naraz), kopia kluc nesie, prerastenie bez pasma neobjedna zly kit
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

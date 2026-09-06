@@ -1042,6 +1042,12 @@ module Noxun
           ck = HardwareSets.class_key_for(it, gt)
           if ck
             keys[ck] = true
+            # KOV-D1a (Codex #307 kolo 2 P1): resolver cita PRED triednym klucom
+            # este OWNER triedny (`class:…@front:F1/panel`). Bez neho by dve
+            # skrinky s rovnakym ID a ROZNYM owner overridom presli branou ako
+            # „neskodne" a objednali kit tej druhej.
+            opk = it['owner_part_key'].to_s
+            keys["#{ck}@#{opk}"] = true unless opk.empty?
             next
           end
           keys[gt] = true

@@ -259,16 +259,21 @@ end
 # R6 — SCHEMA 5 A SERVEROVE POLIA
 # ============================================================================
 
-NxTest.test('KOV-C2b (R6): CONFIG_SCHEMA je 5 a forward guard odmietne novsi config') do
+NxTest.test('KOV-C2b (R6): aktivacia zasuviek je na schéme 5 a forward guard odmietne novsi config') do
   c = NxC2bB
-  NxTest.assert_equal(5, c::CB::CONFIG_SCHEMA)
-  NxTest.refute(c::CB.newer_config?('config_schema' => 5), 'aktualna schema prejde')
-  NxTest.assert(c::CB.newer_config?('config_schema' => 6), 'novsia sa odmietne')
-  NxTest.refute(c::CB.newer_config?('config_schema' => 4), 'starsia je kompatibilna')
-  # Downgrade: starsi plugin (schema 4) taku zakazku PRESTAVAT nesmie — a to je
-  # jediny sposob, ako by z nej mohol ticho odobrat dielce zasuviek.
+  # KOV-D1a: `CONFIG_SCHEMA` sa medzitym posunula na 6 (owner triedny kluc).
+  # C2b strazi VLASTNU konstantu — aktivacia receptov ostava na 5, inak by sa
+  # kazda skrinka schemy 5 zrazu tvarila ako nemigrovana (`drawer_stale`).
+  NxTest.assert_equal(5, c::CB::DRAWER_ACTIVATION_SCHEMA)
+  cur = c::CB::CONFIG_SCHEMA
+  NxTest.assert(cur >= 5, 'aktualna schema nikdy neklesne pod aktivaciu zasuviek')
+  NxTest.refute(c::CB.newer_config?('config_schema' => cur), 'aktualna schema prejde')
+  NxTest.assert(c::CB.newer_config?('config_schema' => cur + 1), 'novsia sa odmietne')
+  NxTest.refute(c::CB.newer_config?('config_schema' => cur - 1), 'starsia je kompatibilna')
+  # Downgrade: starsi plugin taku zakazku PRESTAVAT nesmie — a to je jediny
+  # sposob, ako by z nej mohol ticho odobrat dielce zasuviek.
   inst = NxTest::FakeEntity.new
-  inst.set_attribute(c::E::Store::DICT, 'config', JSON.generate('config_schema' => 6))
+  inst.set_attribute(c::E::Store::DICT, 'config', JSON.generate('config_schema' => cur + 1))
   NxTest.assert_raise(/novšej verzie/) { c::CB.guard_newer_config!(inst) }
 end
 
@@ -497,7 +502,13 @@ NxTest.test('Codex #304 P1: NEZMENENA konstrukcia si ulozeny `system` PONECHA') 
   NxTest.assert_equal('atira', out['items'].first['drawer']['system'])
 end
 
-NxTest.test('Codex #304 P2: `recipe_refs` zaznam s NESEDIACIM klucom sa ZAHODI') do
+# KOV-D1a (Astra #20 B4) PREPISAL kontrakt tohto testu. V C sa NESEDIACI zaznam
+# ZAHADZOVAL a stavba isla na surodenca/latest — to je ale TICHA ZMENA FYZIKY
+# uz postavenej zakazky (poskodeny pin sa po vydani v2 sam „upgraduje").
+# Od D1a zaznam PREZIJE a stavba ho prizna ako RED bez dielcov. Cudzi recept sa
+# nepouzije ani teraz — to je jadro povodneho nalezu Codex #304 P2 a strazi ho
+# druha polovica testu.
+NxTest.test('KOV-D1a (B4): `recipe_refs` zaznam s NESEDIACIM klucom = RED, nie tichy surodenec') do
   c = NxC2bB
   cfg = c::FR.normalize_config('items' => [{ 'id' => 'F1', 'type' => 'drawer_front',
                                              'drawer' => { 'construction' => 'metal',
@@ -505,10 +516,13 @@ NxTest.test('Codex #304 P2: `recipe_refs` zaznam s NESEDIACIM klucom sa ZAHODI')
                                                              'atira|sisy' => 'quadro_v6_p2o_v1',
                                                              'atira|p2o' => 'atira_p2o_v1'
                                                            } } }])
-  NxTest.assert_equal({ 'atira|p2o' => 'atira_p2o_v1' },
+  NxTest.assert_equal({ 'atira|sisy' => 'quadro_v6_p2o_v1', 'atira|p2o' => 'atira_p2o_v1' },
                       cfg['items'].first['drawer']['recipe_refs'],
-                      'kluc a recept musia hovorit o TOM ISTOM systeme aj otvarani')
-  # A stavba potom pouzije SPRAVNY recept (stav `missing` -> surodenec/latest).
+                      'PRITOMNY zaznam sa nezahadzuje — o platnosti rozhoduje `active_ref`')
+  NxTest.assert_equal([:unknown, 'quadro_v6_p2o_v1'],
+                      c::REC.active_ref(cfg['items'].first['drawer']['recipe_refs'], 'atira', 'sisy'),
+                      'nesediaci pin je NEPLATNY, nie chybajuci')
+  # A stavba je RED bez dielcov aj bez vysuvu — NIKDY cudzi recept, NIKDY tichy latest.
   full = c::CB.normalize('width' => 900.0, 'height' => 720.0, 'depth' => 500.0,
                          'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'drawer_front',
                                                      'mode' => 'fixed', 'height' => 175.0,
@@ -516,10 +530,11 @@ NxTest.test('Codex #304 P2: `recipe_refs` zaznam s NESEDIACIM klucom sa ZAHODI')
                                                      'drawer' => { 'construction' => 'metal',
                                                                    'recipe_refs' => { 'atira|sisy' => 'quadro_v6_p2o_v1' } } }] })
   pl = c::CN.build_plan(full, 'CAB-1')
-  NxTest.assert_equal([], Array(pl[:drawer_conflicts]), pl[:drawer_conflicts].inspect)
-  NxTest.assert_equal('recipe:atira_sisy_v1',
-                      pl[:hardware].find { |h| h['generic_type'] == 'slide' }['rule_id'],
-                      'NIKDY cudzi recept')
+  NxTest.assert_equal(['drawer_recipe_unknown'], Array(pl[:drawer_conflicts]).map { |x| x['code'] })
+  NxTest.assert_equal(nil, pl[:hardware].find { |h| h['generic_type'] == 'slide' },
+                      'ziadny vysuv (fail-closed)')
+  NxTest.assert_equal([], pl[:parts].select { |p| c::CB::DRAWER_ROLES.include?(p[:role].to_s) },
+                      'ani jeden dielec zasuvky')
 end
 
 NxTest.test('Codex #304 P1: sablona nesie `drawer_material_id` preserve-or-override') do

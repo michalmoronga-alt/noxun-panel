@@ -17,6 +17,29 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-D1a — MAPOVANIE, JADRO: VLASTNÝ KIT PRE JEDNO ČELO, TRIEDNE ZÁPISY, SCHÉMA 6 (v0.9.34, 6.9.2026).**
+  Prvý rez package KOV-D v2 (checkpoint #20, PR #307) — **serverové jadro bez UI**; ovládanie v paneli prináša D1b.
+  **Čo z toho má používateľ.** (1) Výber setu **pre konkrétne čelo** sa konečne uplatní: doteraz akcia zapísala generický
+  kľúč `slide@<dielec>`, ktorý resolver zásuvky vôbec nečíta — klik teda ticho neurobil nič a zásuvka ďalej brala set
+  z projektu. Teraz sa zapisuje **owner triedny kľúč** `class:slide|<otváranie>|<konštrukcia>@front:<id>/panel` a platí
+  poradie **čelo → skrinka → projekt**. (2) **Neaktívny set sa už nedá NOVO vybrať** (na žiadnej z troch ciest), ale
+  **uložená voľba ostáva** a deaktivácia **nemení nákup hotovej zákazky**. (3) **Jediná zmena, ktorú vidno hneď:**
+  zásuvka s **poškodenou pripnutou verziou receptu** (záznam hovorí o inom systéme/otváraní, alebo má zlý tvar) je
+  **červená** — predtým sa taký záznam zahodil a stavba ticho prešla na súrodenca alebo najnovší recept, teda ticho
+  menila fyziku hotovej zákazky (Astra #20 B4).
+  **Fail-closed pravidlá, ktoré k tomu patria.** Owner kľúč žije VÝHRADNE v configu skrinky (globál aj projektový
+  snapshot ho odmietnu); na nižšiu úroveň sa ide **len pri neprítomnom kľúči** — prítomná nepoužiteľná hodnota je RED
+  `drawer_kit_missing`, nikdy tichý pád nižšie. Zápis validuje **každé pásmo** selektora proti klasifikácii cieľového
+  čela ešte PRED uložením (forged payload sa do configu nedostane), Atira potrebuje výškový selektor, Quadro smie pevný
+  set. `set_global_mapping!`/`set_project_mapping!` prijímajú aj **triedny kľúč** — mení sa vždy JEDEN kľúč a definície
+  všetkých setov selektora sa zmrazia v tom istom zápise. Šablóna owner kľúč cieľa **neprepíše** a brána duplicitných ID
+  ho pozná (Codex #307 kolo 2).
+  **Kompatibilita.** `CONFIG_SCHEMA` **5 → 6**: starší plugin owner kľúč zahodí, ale typová kontrola z neho stále prečíta
+  známy `slide`, takže by prestavbu nezastavil — preto marker. `DRAWER_ACTIVATION_SCHEMA` ostáva **5** (inak by sa každá
+  skrinka schémy 5 tvárila ako nemigrovaná). Testy: **3144 headless** (nová sada `test_kovd1a_mapovanie.rb`, 19 testov +
+  4 overené mutácie), 90 JS sád, in-SU sekcia `run_kovd1a` (Undo aj Redo vracajú mapovanie, snapshot aj nákupný kód naraz).
+  Dva testy z KOV-C boli **vedome prepísané** (schéma 5 → relatívne číslo; zahodenie neplatného `recipe_refs` → RED).
+
 - **KOV-C2c — UI ZÁSUVIEK: KARTA V INSPECTOROVI, ZASTAVUJÚCI RIADOK V NÁKUPE (PR #306, v0.9.33, 6.9.2026): SLICE C KOMPLET.**
   Posledný rez KOV-C — čisto zobrazovacia vrstva nad tým, čo #304 a #305 už postavili. Žiadna zmena builderov, plánu, schémy,
   receptov ani setov; všetko, čo pribudlo, je **čítanie** existujúceho configu.

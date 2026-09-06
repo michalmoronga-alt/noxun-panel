@@ -174,7 +174,13 @@ seed `AbsRules` `SEED_VERSION` 4. Roly žijú na troch miestach naraz (`BuildPla
   ticho **odobral dielce zásuviek aj položku výsuvu** — teda časť objednávky. **`drawer.recipe_refs` a `drawer.system` sú SERVEROVÉ polia:** klientsky payload panela ich
   nesmie zapísať (handler ich zahodí a uloženú mapu pripojí späť podľa ID čela), `Fronts.normalize_config` ich zachováva **bezstratovo** a jediný zápisový kanál je
   `Fronts.write_drawer_fields!` v tej istej operácii ako geometria. Zápis je vždy len **doplnenie chýbajúceho** — už pripnutá verzia sa nikdy neprepisuje (zmena verzie
-  je výhradne explicitná akcia KOV-D).
+  je výhradne explicitná akcia KOV-D). **KOV-D1a (v0.9.34):** prítomný, ale NEPLATNÝ záznam `recipe_refs` (nesúlad kľúča a receptu, zlý tvar hodnoty) sa už **nezahadzuje** —
+  zostáva v configu a `Recipes.active_ref` ho vráti ako `[:unknown, id]` → RED `drawer_recipe_unknown`. Zahodenie by zo záznamu spravilo „chýbajúci" a poškodený pin by ticho
+  zmenil fyziku hotovej zákazky.
+- **`6 = KOV-D1a` (v0.9.34): owner triedny kľúč v `hardware_sets` skrinky.** Config smie niesť kľúč `class:<generic_type>|<opening_mode>[|<drawer_construction>]@front:<id>/panel`
+  — vlastný kit pre JEDNO čelo. Starší plugin taký kľúč pri normalizácii zahodí, no typová kontrola z neho stále prečíta podporovaný `slide`, takže by prestavbu **nezastavil**
+  a zásuvka by ticho dostala set z projektu namiesto vybraného. `DRAWER_ACTIVATION_SCHEMA` (aktivácia receptov) ostáva **5** — je to vlastná konštanta práve preto, aby bump
+  neprehlásil každú skrinku schémy 5 za nemigrovanú.
 
 **Zóna** (`kind: zone`; nevýrobná — ghost):
 
@@ -499,12 +505,27 @@ na **overenie pri expanzii**, lebo pásmo H176 a H70 majú rovnaké otváranie, 
 strata celej klasifikácie (vlastná vrstva detektora).
 
 **MAPOVACÍ KĽÚČ `class:`.** Okrem `generic_type` a `generic_type@owner_part_key` pozná mapovanie aj **triedny kľúč**
-`class:<generic_type>|<opening_mode>[|<drawer_construction>]` (tretí segment len pri `slide`, žiadny `@owner` sufix). Do v0.9.19 preň platil iba bezstratový round-trip;
-**od KOV-C2a (v0.9.30) ho resolver ČÍTA** — a to pre položku, ktorá nesie `params.opening_mode` **aj** `params.drawer_construction`. Vtedy platí kratšia precedencia
-**cabinet override → projekt**, owner-level `slide@…` sa **ignoruje** a chýbajúce triedne mapovanie je vlastný ORANGE dôvod (`class_unmapped`, veta navádza na „Pravidlá →
-Doplniť nové predvoľby"): **na generický `slide` sa NIKDY nepadá**, lebo H70 kit k zásuvke H176 by bol zlý nákup, a mlčky. Expanzia navyše overí, že set klasifikáciou sedí
+`class:<generic_type>|<opening_mode>[|<drawer_construction>]` (tretí segment len pri `slide`). Do v0.9.19 preň platil iba bezstratový round-trip;
+**od KOV-C2a (v0.9.30) ho resolver ČÍTA** — a to pre položku, ktorá nesie `params.opening_mode` **aj** `params.drawer_construction`. Chýbajúce triedne mapovanie je vlastný
+ORANGE dôvod (`class_unmapped`, veta navádza na „Pravidlá → Doplniť nové predvoľby"): **na generický `slide` sa NIKDY nepadá**, lebo H70 kit k zásuvke H176 by bol zlý nákup,
+a mlčky; owner-level `slide@…` sa pre takú položku ignoruje. Expanzia navyše overí, že set klasifikáciou sedí
 (otváranie · konštrukcia · `manufacturer` + `series` ↔ `params.system` · `height_variant`) — nesúlad = nemapovaná položka s dôvodom `set_incompatible`, **nikdy iný set**.
 Hodnota mapovania pre položku s `height_variant` **musí byť výškový selektor** na každej úrovni; pevný `set_id` je nekompatibilný.
+
+**OWNER TRIEDNY KĽÚČ (KOV-D1a, záväzné od v0.9.34).** K triednemu kľúču smie pribudnúť sufix **`@front:<id>/panel`** — vlastný kit pre JEDNO čelo. Platia štyri pravidlá:
+
+- **Žije VÝHRADNE v `config.hardware_sets` skrinky.** Globálna knižnica ani projektový snapshot ho pri zápise neprijmú a pri čítaní ho zahodia; triedna časť sa normalizuje,
+  owner ostáva doslovne a musí ukazovať na panel čela. Kľúč na neexistujúce čelo sa pri normalizácii configu zahodí (nikdy nezhodí prestavbu).
+- **Precedencia je trojúrovňová: owner triedny → triedny → projektový snapshot**, a na nižšiu úroveň sa ide **LEN pri NEPRÍTOMNOM kľúči.** Prítomná hodnota, ktorá sa nedá
+  rozložiť (chýbajúce pásmo, nekompatibilný alebo chýbajúci set), je nemapovaná položka s dôvodom (pri receptovej RED `drawer_kit_missing`) — **nikdy tichý pád nižšie**.
+- **Zápis validuje SERVER PRED uložením:** každé pásmo selektora proti klasifikácii cieľového čela (otváranie · konštrukcia · systém · výška setu vs. pásmo), selektor musí
+  mať pásmo pre aktuálnu výšku a **neaktívna definícia sa odmietne**. Panel kľúč neskladá; zapisovacia cesta je jedna (`HardwareSets.apply_cabinet_override`).
+- **Triedny kľúč (bez ownera) prijímajú aj `set_global_mapping!`/`set_project_mapping!`** — mení sa vždy JEDEN kľúč, ostatné mapovania ostávajú a definície všetkých setov
+  selektora sa zmrazia do snapshotu v tom istom zápise.
+
+**NEAKTÍVNY SET (KOV-D1a).** `active: false` znamená „už sa NEDÁ NOVO vybrať" — na všetkých zapisovacích cestách (globál, projekt, override skrinky). **Už uložená hodnota sa
+zobrazuje a zachováva** a expanzia je na príznak naďalej slepá, takže deaktivácia setu **nemení nákup existujúcej zákazky**. Neplatná aktuálna hodnota ostáva s chybou —
+nikdy sa nenahradí prvou kompatibilnou.
 
 **MARKER `std` KNIŽNICE A SNAPSHOTU:** `1` = legacy · `2` = pásma/selector · **`3` = klasifikácia alebo triedny kľúč** · **`4` = set s `height_variant`**. Od KOV-C2a je
 čerstvá knižnica aj snapshot NOVÉHO projektu na `4` (seed nesie sety zásuviek); existujúce projekty svoj marker nemenia, kým do nich používateľ predvoľby vedome nedoplní. Marker je LAZY podľa

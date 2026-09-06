@@ -801,7 +801,10 @@ NxTest.test('KOV-C2a (R7): `override_keys_in_use` vracia aj triedne kluce') do
   # A NAOPAK: klasifikovana polozka registruje LEN triedny kluc. Generic `slide`
   # ani `slide@owner` pre nu resolver necita, takze rozdiel v nich jej kod
   # NEZMENI — zapisat ich by znamenalo zastavit export kvoli nicomu.
+  # KOV-D1a: k triednemu klucu pribudol OWNER triedny — resolver ho cita PRED
+  # nim, takze rozdiel v nom uz kod MENI a brana ho poznat MUSI.
   only_class = c::PC.override_keys_in_use(hardware: [c.drawer_item])['CAB-1']
-  NxTest.assert_equal(['class:slide|classic|metal'], only_class.keys,
-                      'receptova polozka registruje VYHRADNE triedny kluc')
+  NxTest.assert_equal(['class:slide|classic|metal',
+                       'class:slide|classic|metal@front:F1/panel'], only_class.keys.sort,
+                      'receptova polozka registruje triedny a owner triedny kluc — nikdy legacy')
 end

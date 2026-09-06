@@ -608,9 +608,12 @@ module Noxun
           refs = HardwareSets.referenced_set_ids(proj_map, 'cab' => overrides)
           types = Array(hardware).filter_map { |h| h.is_a?(Hash) ? h['generic_type'].to_s : nil }
                                  .reject(&:empty?).uniq
+          # KOV-D1a: typ z kluca cita JEDINA autorita (`mapping_key_type`) —
+          # pozna aj triedny a owner triedny kluc, ktory `parse_hardware_set_key`
+          # odmieta (a riadok kovania by pre override chybal).
           overrides.each_key do |k|
-            parsed = BuildPlan.parse_hardware_set_key(k)
-            types |= [parsed[0]] if parsed
+            t = HardwareSets.mapping_key_type(k)
+            types |= [t] if t
           end
           types.map do |gt|
             opts = HardwareSets.set_options(gt, globals, snap_sets, refs)
@@ -663,13 +666,17 @@ module Noxun
         end
 
         # { owner_part_key => { 'set_id' | 'selector' } } pre jeden typ kovania.
+        # KOV-D1a: vyber na urovni vlastnika ma DVA tvary — legacy composite
+        # `typ@owner` a OWNER TRIEDNY `class:slide|classic|metal@front:F1/panel`.
+        # Karta cela musi ukazat AKTUALNU volbu aj pri druhom (inak by select
+        # vyzeral prazdny a prvy klik vedla by ulozeny vyber ticho prepisal).
         def owner_set_overrides(overrides, gt)
           out = {}
           overrides.each do |key, val|
-            parsed = BuildPlan.parse_hardware_set_key(key)
-            next unless parsed && parsed[0] == gt && parsed[1]
+            owner = HardwareSets.owner_scoped_key?(key) ? owner_of_set_key(key) : nil
+            next unless owner && HardwareSets.mapping_key_type(key) == gt
 
-            out[parsed[1]] =
+            out[owner] =
               if val.is_a?(Hash)
                 { 'selector' => true, 'label' => HardwareSets.param_by(val['param']) }
               else
@@ -677,6 +684,16 @@ module Noxun
               end
           end
           out
+        end
+
+        # `owner_part_key` z kluca mapovania (oba tvary) alebo nil.
+        def owner_of_set_key(key)
+          if HardwareSets.class_mapping_key?(key)
+            canon, = HardwareSets.parse_class_key(key, allow_owner: true)
+            return canon && HardwareSets.class_key_split(canon)[1]
+          end
+          parsed = BuildPlan.parse_hardware_set_key(key)
+          parsed && parsed[1]
         end
 
         # existujuce params korpusu (na zachovanie casti pri ciastocnej zmene)

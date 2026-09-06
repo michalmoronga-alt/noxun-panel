@@ -534,24 +534,30 @@ module Noxun
         out.empty? ? nil : out
       end
 
-      # Mapa `"<system>|<otvaranie>" => recipe_id`. Neplatny kluc alebo hodnota
-      # mimo tvaru = zaznam prec (nikdy sa NEHADA); prazdna mapa = kluc prec.
+      # Mapa `"<system>|<otvaranie>" => recipe_id`. Prazdna mapa = kluc prec.
+      #
+      # KOV-D1a (Astra #20 B4 — OPRAVA z C): rozlisuje sa NEPRITOMNY zaznam od
+      # PRITOMNEHO NEPLATNEHO.
+      #   * kluc MIMO uzavreteho slovnika (`zly|kluc`) = zaznam, ktory ziadnu
+      #     realnu kombinaciu system|otvaranie nepripina -> vypadne (nie je co
+      #     stratit; drzat ho vecne v configu by bola len spina),
+      #   * PRITOMNA hodnota pod PLATNYM klucom sa ZACHOVA VZDY — aj ked ma zly
+      #     tvar alebo hovori o inom systeme/otvarani nez kluc. Zahodenie by
+      #     `active_ref` posunulo do stavu `:missing`, teda surodenec/`latest_for`
+      #     — a poskodeny pin by TICHO ZMENIL FYZIKU zakazky. Platnost hodnoty
+      #     rozhoduje `Recipes.active_ref`: nesediaci alebo neznamy ref je
+      #     `[:unknown, id]` -> RED `drawer_recipe_unknown` bez dielcov.
+      #   * hodnota, ktora nie je retazec (cislo, objekt), nie je ref v ziadnom
+      #     tvare -> vypadne.
       def norm_recipe_refs(raw)
         return nil unless raw.is_a?(Hash)
         out = {}
         raw.each do |k, v|
           key = k.to_s.strip
           next unless RECIPE_REF_KEY_RE.match?(key)
+          next unless v.is_a?(String) || v.is_a?(Symbol)
           id = v.to_s.strip
-          next unless RECIPE_ID_RE.match?(id)
-          # Codex #304 kolo 1 P2: KLUC a HODNOTA musia hovorit o TOM ISTOM.
-          # `{"atira|sisy" => "quadro_v6_p2o_v1"}` je poskodeny (alebo podvrhnuty)
-          # zaznam — bez tejto kontroly by `active_ref` vratila stav `:known`
-          # a zasuvka by sa postavila podla CUDZIEHO receptu. Zahodenim zaznamu
-          # sa stav zmeni na `:missing`, teda surodenec/`latest_for` — nikdy
-          # cudzi system ani cudzie otvaranie.
-          m = RECIPE_ID_RE.match(id)
-          next unless key == "#{m[1]}|#{m[2]}"
+          next if id.empty?
 
           out[key] = id
         end

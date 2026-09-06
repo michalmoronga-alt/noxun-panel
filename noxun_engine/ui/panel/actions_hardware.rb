@@ -195,40 +195,62 @@ module Noxun
             return set_status('Sety projektu sú poškodené — obnov ich v Katalógu kovania (Predvoľby projektu).', true)
           end
 
-          sid = present_str(data['set_id'])
           owner = present_str(data['owner_part_key'])
-          set_def = nil
-          if sid
+          # KOV-D1a (Codex #307 P1): hodnotou uz smie byt aj VYBER PODLA
+          # PARAMETRA (Atira: pasma podla `height_variant`) — zasuvka s vyskovym
+          # variantom sa pevnym set_id vybrat NEDA. Tvar overuje jediny parser,
+          # obsah (klasifikacia kazdeho pasma, neaktivne sety) sa overuje PRED
+          # zapisom v `apply_cabinet_override`.
+          value = hw_set_value(data)
+          set_defs = []
+          unless value.nil?
+            vstatus, vmsg, refs = HardwareSets.parse_mapping_value(value)
+            return set_status("Výber setu sa nedá uložiť — #{vmsg}.", true) unless vstatus == :ok
+
             # H1a (audit BLOCKER 4): definiciu vybera resolver — pre set_id,
             # ktore projekt uz pouziva, vyhrava SNAPSHOT (podla neho sa
             # nakupuje), global je len fallback pre nereferencovane.
-            cand = HardwareSets.resolve_set_def(model, sid)
-            set_def = cand if cand && cand['generic_type'] == gt
-            if set_def.nil?
-              # R-07 (review P3-6): pri nekompatibilnej kniznici resolver
-              # zamerne nic nevyda — „otvor Katalóg kovania a skús znova"
-              # by pouzivatela poslalo tam, kde sa to opravit NEDA.
-              return set_status(HardwareSets.library_read_only? ?
-                                  "#{HardwareSets.library_state_reason} — set sa nedá vybrať." :
-                                  'Set sa nenašiel — otvor Katalóg kovania a skús znova.', true)
+            # Do snapshotu sa zmrazi KAZDY referencovany set (Astra #20 F9).
+            refs.each do |rid|
+              cand = HardwareSets.resolve_set_def(model, rid)
+              cand = nil unless cand && cand['generic_type'] == gt
+              if cand.nil?
+                # R-07 (review P3-6): pri nekompatibilnej kniznici resolver
+                # zamerne nic nevyda — „otvor Katalóg kovania a skús znova"
+                # by pouzivatela poslalo tam, kde sa to opravit NEDA.
+                return set_status(HardwareSets.library_read_only? ?
+                                    "#{HardwareSets.library_state_reason} — set sa nedá vybrať." :
+                                    'Set sa nenašiel — otvor Katalóg kovania a skús znova.', true)
+              end
+              set_defs << cand
             end
           end
 
           cfg = Store.config(cab) || {}
-          st, map, = HardwareSets.apply_cabinet_override(cfg, gt, owner, sid,
-                                                         known_sets: (set_def ? [set_def] : nil))
+          st, map, = HardwareSets.apply_cabinet_override(cfg, gt, owner, value,
+                                                         known_sets: (value.nil? ? nil : set_defs))
           return set_status("Výber setu sa nedá uložiť — #{map}.", true) unless st == :ok
 
           params = existing_params(cab)
           params['hardware_sets'] = map
           suspend_selection_sync do
             CabinetBuilder.rebuild_many(model, [[cab, params]], op_name: 'NOXUN: set kovania') do
-              HardwareSets.add_project_set!(model, set_def) if set_def
+              HardwareSets.add_project_sets!(model, set_defs) unless set_defs.empty?
             end
             reselect(model, cab)
           end
-          status_with_warnings(cab, hw_set_status_msg(gt, owner, sid, set_def))
+          status_with_warnings(cab, hw_set_status_msg(gt, owner, value, set_defs))
           push_selected(model)
+        end
+
+        # Hodnota vyberu z payloadu: `value` (selector Hash) ma prednost pred
+        # `set_id` (retazec). Prazdne oboje = zrusenie overridu (nil).
+        # ZIADNE skladanie klucov ani hodnot v paneli — tvar rozhoduje server.
+        def hw_set_value(data)
+          v = data['value']
+          return v if v.is_a?(Hash)
+
+          present_str(data['set_id'])
         end
 
         # --- KOV-H2: hladanie v katalogu pre modal rucnej polozky ------------
@@ -294,11 +316,16 @@ module Noxun
         end
 
         # Hlaska po zmene setu — rozlisi skrinku a konkretny dielec (D-81).
-        def hw_set_status_msg(gt, owner, sid, set_def)
+        # KOV-D1a: hodnotou moze byt aj vyber podla parametra (viac setov).
+        def hw_set_status_msg(gt, owner, value, set_defs)
           who = "#{HardwareRules.label_for(gt)}#{owner ? " pre dielec #{owner}" : ''}"
-          return "#{who}: set „#{set_def['name']}“." if sid
+          return "#{who}: platí #{owner ? 'výber skrinky/projektu' : 'predvoľba projektu'}." if value.nil?
+          if value.is_a?(Hash)
+            n = Array(value['bands']).length
+            return "#{who}: #{HardwareSets.param_by(value['param'])} (#{n} #{n == 1 ? 'pásmo' : 'pásma'})."
+          end
 
-          owner ? "#{who}: platí výber skrinky/projektu." : "#{who}: platí predvoľba projektu."
+          "#{who}: set „#{Array(set_defs).first&.fetch('name', value) || value}“."
         end
       end
     end
