@@ -127,12 +127,10 @@ module Noxun
             'Vyber inú dosku (hrúbka dielca zásuvky je vstup receptu, nededí sa po korpuse).'
         end
 
-        # `front:<id>/<rola zasuvky>` -> rola, inak nil (`box_side:left` tiez).
+        # `front:<id>/<rola zasuvky>` -> rola, inak nil. Autorita je
+        # `CabinetBuilder` (zdiela ju payload aj tento guard).
         def drawer_part_role(rk)
-          m = rk.to_s.match(%r{\Afront:[^/]+/([a-z_]+)(?::[a-z]+)?\z})
-          return nil unless m && CabinetBuilder::DRAWER_ROLES.include?(m[1])
-
-          m[1]
+          CabinetBuilder.drawer_part_role(rk)
         end
 
         # Polozka cela z ULOZENEHO configu (kanonicka, so serverovymi polami).
@@ -179,15 +177,13 @@ module Noxun
           push_selected(model)
         end
 
-        # Je `rk` OSIROTENY materialovy override dielca zasuvky? (cista kontrola)
-        def orphan_part_override?(cfg, params, rk)
-          return false unless drawer_part_role(rk)
-
-          ov = params['part_overrides']
-          return false unless ov.is_a?(Hash) && ov[rk].is_a?(Hash)
-          return false unless drawer_conflict_owners(cfg).include?(PartKeys.front(PartKeys.front_id(rk).to_s, 'panel'))
-
-          !CabinetBuilder.plan_parts_by_key(params).key?(rk)
+        # Je `rk` OSIROTENY materialovy override dielca zasuvky?
+        # Autorita je ULOZENY config (`drawer_conflicts`) — NIE prepocitany plan
+        # (ten bez `part_thicknesses` stavia s UNI 16 fallbackom, takze dielec,
+        # ktoreho 18 mm override konflikt sposobil, by v nom VZDY „zil";
+        # Codex #304, in-SU FAIL).
+        def orphan_part_override?(cfg, _params, rk)
+          CabinetBuilder.orphan_drawer_part_override?(cfg, rk)
         rescue StandardError => e
           Engine.log_error(e, 'Panel.orphan_part_override?')
           false

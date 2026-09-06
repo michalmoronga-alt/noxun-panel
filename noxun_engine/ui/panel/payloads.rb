@@ -355,7 +355,7 @@ module Noxun
             row = ov.merge('owner_label' => PartKeys.human_label(ov['owner_part_key'], fronts: fronts))
             kind = HardwareRules.override_orphan_kind(ov, items, owners)
             kind ? row.merge('orphan' => true, 'orphan_kind' => kind) : row
-          end + orphan_part_material_rows(cfg, owners, fronts)
+          end + orphan_part_material_rows(cfg, fronts)
         rescue StandardError => e
           Engine.log_error(e, 'Panel.hardware_overrides_payload')
           overrides
@@ -368,40 +368,22 @@ module Noxun
         # zaznam nemal cestu von a exporty by ostali blokovane aj po reopen.
         # Riadok zije v TOM ISTOM zozname ako osirotene rucne zasahy kovania:
         # sekcia Kovanie je miesto, kam pouzivatela posiela hlaska konfliktu.
-        def orphan_part_material_rows(cfg, owners, fronts)
-          ov = cfg['part_overrides']
-          return [] unless ov.is_a?(Hash) && !ov.empty? && !owners.empty?
-
-          plan = CabinetBuilder.plan_parts_by_key(CabinetBuilder.config_to_params(cfg))
-          ov.filter_map do |rk, rec|
-            next nil unless rec.is_a?(Hash) && present_str(rec['material_id'])
-
-            role = drawer_part_role(rk)
-            next nil unless role
-
-            owner = PartKeys.front(PartKeys.front_id(rk).to_s, 'panel')
-            next nil unless owners.include?(owner)
-            next nil if plan.key?(rk) # dielec ZIJE — override sa meni na jeho karte
-
-            { 'orphan' => true, 'orphan_kind' => 'part_material', 'part_key' => rk,
-              'owner_part_key' => owner, 'generic_type' => '', 'rule_id' => '',
-              'material_id' => rec['material_id'],
-              'orphan_label' => "Ručný materiál · #{Recipes.role_label(role)}",
-              'owner_label' => PartKeys.human_label(owner, fronts: fronts) }
+        def orphan_part_material_rows(cfg, fronts)
+          CabinetBuilder.orphan_drawer_part_overrides(cfg).map do |r|
+            { 'orphan' => true, 'orphan_kind' => 'part_material', 'part_key' => r['part_key'],
+              'owner_part_key' => r['owner_part_key'], 'generic_type' => '', 'rule_id' => '',
+              'material_id' => r['material_id'],
+              'orphan_label' => "Ručný materiál · #{Recipes.role_label(r['role'])}",
+              'owner_label' => PartKeys.human_label(r['owner_part_key'], fronts: fronts) }
           end
         rescue StandardError => e
           Engine.log_error(e, 'Panel.orphan_part_material_rows')
           []
         end
 
-        # `owner_part_key` ciel, ktore skoncili fail-closed konfliktom zasuvky.
+        # `owner_part_key` ciel v konflikte — autorita je `CabinetBuilder`.
         def drawer_conflict_owners(cfg)
-          Array(cfg['drawer_conflicts']).filter_map do |c|
-            next nil unless c.is_a?(Hash)
-
-            key = c['part_key'].to_s
-            key.empty? ? nil : key
-          end
+          CabinetBuilder.drawer_conflict_owners(cfg)
         end
 
         # Resolved cela poslednej stavby — zdroj cisla „F2" (D-92).

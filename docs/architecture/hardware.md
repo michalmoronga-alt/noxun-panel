@@ -30,8 +30,13 @@ už nevydá. Hlášky konfliktov na túto cestu odkazujú doslovne (`Constructio
 **Tretí druh: `part_material`.** Do toho istého zoznamu patrí aj **materiálový override dielca zásuvky**, ktorého čelo je v `drawer_conflicts`
 (`Panel.orphan_part_material_rows`). Dôvod je ten istý a ešte tvrdší: karta dielca sa dá otvoriť len pre dielec **vo výbere**, ale po fail-closed konflikte ten dielec
 **neexistuje** — zlý záznam z uloženého modelu by teda nemal cestu von a exporty by ostali zablokované aj po reopen. Riadok volá vlastnú serverovú akciu
-`reset_part_override`, ktorá si osirotenosť **znovu overí** (drawer rola · čelo v konflikte · part_key nie je v aktuálnom pláne), takže živý override nezmaže nikdy.
-Živý dielec sa do zoznamu nedostane — ten sa mení na svojej karte.
+`reset_part_override`, ktorá si osirotenosť **znovu overí** — a to nad **uloženým** configom (`CabinetBuilder.orphan_drawer_part_overrides`: drawer rola · čelo
+v `drawer_conflicts`), takže živý override nezmaže nikdy: keď čelo v konflikte nie je, jeho dielce stoja a override sa mení na karte dielca.
+
+**Prečo NIE „part_key nie je v pláne" (Codex #304, in-SU FAIL).** Prvá verzia sa pýtala `plan_parts_by_key`, lenže ten stavia plán **bez** `part_thicknesses`, teda
+s UNI 16 fallbackom — a práve ten dielec, ktorého 18 mm override konflikt spôsobil, v takom pláne **vždy existuje**. Riadok sa preto odfiltroval a reset sa odmietol
+(headless to neodhalilo, lebo test bol len source-guard). Autorita je uložený `drawer_conflicts`: zapisuje sa v tej istej operácii ako geometria, emisia je per čelo
+**atomická**, takže „čelo je v konflikte" znamená „žiadny jeho dielec neexistuje" — presnejšie, než sa dá dopočítať.
 
 **D-93 ručný NL výsuvu:** polia zásahu (`quantity` · `disabled` · `nominal_length`) sú NEZÁVISLÉ (zápis PO POLIACH, `disabled` ostatné polia nezahadzuje), **zámok = existencia poľa
 `nominal_length`**; `fit_series` emituje položku aj pri hĺbke pod minimom radu, ak zámok existuje (`rule_nominal_length` = hodnota automatu, nil = nevie) + ORANGE build warning

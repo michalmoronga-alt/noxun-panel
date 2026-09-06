@@ -819,24 +819,70 @@ end
 
 NxTest.test('Codex #304 P1: osiroteny materialovy override ma cestu von') do
   c = NxC2bB
-  src = c.src(File.join('ui', 'panel', 'payloads.rb'))
-  NxTest.assert(src.include?("'orphan_kind' => 'part_material'"),
-                'osiroteny zoznam nesie aj materialove overridy dielcov zasuviek')
-  NxTest.assert(src.include?('next nil if plan.key?(rk)'),
-                'ZIVY dielec sa do zoznamu nedostane — ten sa meni na svojej karte')
-  NxTest.assert(src.include?('next nil unless owners.include?(owner)'),
-                'a len celo, ktore je naozaj v konflikte')
+  # ZIVY TVAR DAT: normalize -> build_plan S HRUBKAMI (18 mm override na dne)
+  # -> merge_final -> cabinet_config -> JSON (model). Presne to, co po zlej
+  # prestavbe lezi na entite a co cita panel.
+  cfg = c.orphan_cfg('part_overrides' => {
+                       'front:F1/drawer_bottom' => { 'material_id' => 'DOSKA_18' }
+                     })
+  th = NxC2bD_TH.call('front:F1/drawer_bottom' => 18.0)
+  plan = c::CN.build_plan(cfg, 'CAB-1', part_thicknesses: th)
+  stored = JSON.parse(JSON.generate(c::CB.cabinet_config(c::CB.merge_final(cfg, plan))))
+  NxTest.assert_equal('drawer_thickness_unsupported', stored['drawer_conflicts'].first['code'])
+  NxTest.assert_equal('front:F1/panel', stored['drawer_conflicts'].first['part_key'])
+
+  rows = c::CB.orphan_drawer_part_overrides(stored)
+  NxTest.assert_equal(1, rows.length, "osiroteny zaznam MUSI byt v zozname: #{rows.inspect}")
+  NxTest.assert_equal(['front:F1/drawer_bottom', 'drawer_bottom', 'F1', 'front:F1/panel',
+                       'DOSKA_18'],
+                      rows.first.values_at('part_key', 'role', 'front_id', 'owner_part_key',
+                                           'material_id'))
+  NxTest.assert(c::CB.orphan_drawer_part_override?(stored, 'front:F1/drawer_bottom'))
+
+  # ANTI-REGRESIA (in-SU FAIL #304): plan BEZ `part_thicknesses` stavia s UNI 16
+  # fallbackom, takze prave ten dielec v nom „zije" — preto sa na osirotenost
+  # NESMIE pytat planu. Tento riadok fixuje dovod, nie implementaciu.
+  NxTest.assert(c::CB.plan_parts_by_key(c::CB.config_to_params(stored))
+                     .key?('front:F1/drawer_bottom'),
+                'plan bez hrubok dielec EVIDUJE — a prave to bola pricina FAILu')
+
+  # Ziva zasuvka (bez konfliktu) do zoznamu NEPATRI — override sa meni na karte.
+  ok_cfg = c.orphan_cfg('part_overrides' => {
+                          'front:F1/drawer_bottom' => { 'material_id' => 'DOSKA_16' }
+                        })
+  ok_plan = c::CN.build_plan(ok_cfg, 'CAB-1', part_thicknesses: NxC2bD_TH.call)
+  ok_stored = JSON.parse(JSON.generate(c::CB.cabinet_config(c::CB.merge_final(ok_cfg, ok_plan))))
+  NxTest.assert_equal([], Array(ok_stored['drawer_conflicts']))
+  NxTest.assert_equal([], c::CB.orphan_drawer_part_overrides(ok_stored))
+  NxTest.refute(c::CB.orphan_drawer_part_override?(ok_stored, 'front:F1/drawer_bottom'))
+
+  # Override na INOM (nezasuvkovom) dielci sa zoznamu netyka ani pri konflikte.
+  other = JSON.parse(JSON.generate(stored))
+  other['part_overrides'] = { 'cabinet/side:left' => { 'material_id' => 'DOSKA_18' } }
+  NxTest.assert_equal([], c::CB.orphan_drawer_part_overrides(other))
+  # A ani override na cele INEHO cela, ktore v konflikte nie je.
+  foreign = JSON.parse(JSON.generate(stored))
+  foreign['part_overrides'] = { 'front:F9/drawer_bottom' => { 'material_id' => 'DOSKA_18' } }
+  NxTest.assert_equal([], c::CB.orphan_drawer_part_overrides(foreign))
+
+  # `drawer_part_role` pozna LEN roly zasuviek (aj `box_side:left`).
+  NxTest.assert_equal('box_side', c::CB.drawer_part_role('front:F1/box_side:left'))
+  NxTest.assert_equal(nil, c::CB.drawer_part_role('front:F1/panel'))
+  NxTest.assert_equal(nil, c::CB.drawer_part_role('zone:Z1/shelf:1'))
+
+  # Retaz do UI: panel z toho robi riadok, JS ho kresli, server ho resetuje.
+  pay = c.src(File.join('ui', 'panel', 'payloads.rb'))
+  NxTest.assert(pay.include?('CabinetBuilder.orphan_drawer_part_overrides(cfg)'),
+                'payload cita AUTORITU, nie prepocitany plan')
   act = c.src(File.join('ui', 'panel', 'actions_parts.rb'))
-  NxTest.assert(act.include?('def handle_reset_part_override(payload)'),
-                'vlastna serverova akcia (dielec sa NEDA oznacit — neexistuje)')
-  NxTest.assert(act.include?('def orphan_part_override?(cfg, params, rk)'),
-                'server si osirotenost znovu overi (fail-closed)')
-  NxTest.assert(act.include?("ov.delete(rk)"), 'reset = ODSTRANENIE override')
+  NxTest.assert(act.include?('CabinetBuilder.orphan_drawer_part_override?(cfg, rk)'),
+                'serverovy reset overuje TO ISTE')
+  NxTest.assert(act.include?('ov.delete(rk)'), 'reset = ODSTRANENIE override')
   pnl = c.src(File.join('ui', 'panel.rb'))
   NxTest.assert(pnl.include?("cb(dlg, 'reset_part_override')"), 'akcia je registrovana')
   js = c.src_ui(File.join('js', 'hardware.js'))
   NxTest.assert(js.include?('sketchup.reset_part_override'), 'riadok vola tu akciu')
-  NxTest.assert(js.include?("data-part=\"'+esc(ov.part_key||'')+'\""), 'a nesie part_key')
+
   # Po odstraneni override je zasuvka ZELENA.
   after = c::CN.build_plan(c.orphan_cfg('part_overrides' => {}), 'CAB-1')
   NxTest.assert_equal([], Array(after[:drawer_conflicts]))

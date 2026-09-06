@@ -1334,6 +1334,69 @@ module Noxun
         end
 
         # Mapa part_key -> deskriptor dielca z planu (rola, hrubka, nazov).
+        # --- KOV-C2b: OSIROTENY materialovy override dielca zasuvky ----------
+        #
+        # Zaznam `part_overrides` na dielci zasuvky, ktorej CELO je v ULOZENYCH
+        # `drawer_conflicts`. Take celo je fail-closed a emisia je ATOMICKA
+        # (vsetky dielce alebo ziadny) — takze ziadny jeho dielec v modeli
+        # NEEXISTUJE a jeho override sa neda zmenit na karte dielca (tá vyzaduje
+        # dielec VO VYBERE). Panel z toho robi riadok „neplatny rucny material"
+        # so serverovym resetom.
+        #
+        # POZOR (Codex #304, in-SU FAIL): „zije dielec?" sa NESMIE pytat
+        # `plan_parts_by_key` — ten stavia plan BEZ `part_thicknesses`, teda
+        # s UNI 16 fallbackom, takze prave ten dielec, ktoreho 18 mm override
+        # konflikt sposobil, by v takom plane VZDY existoval a zaznam by sa
+        # odfiltroval. Ulozeny `drawer_conflicts` je jedina spravna autorita:
+        # zapisuje sa v TEJ ISTEJ operacii ako geometria a hovori presne to,
+        # co sa naozaj (ne)postavilo.
+        #
+        # cfg = ULOZENY config korpusu (string kluce).
+        # -> [{ 'part_key', 'role', 'front_id', 'owner_part_key', 'material_id' }]
+        def orphan_drawer_part_overrides(cfg)
+          ov = cfg.is_a?(Hash) ? cfg['part_overrides'] : nil
+          return [] unless ov.is_a?(Hash) && !ov.empty?
+
+          owners = drawer_conflict_owners(cfg)
+          return [] if owners.empty?
+
+          ov.filter_map do |rk, rec|
+            next nil unless rec.is_a?(Hash) && present(rec['material_id'])
+
+            role = drawer_part_role(rk)
+            next nil unless role
+
+            fid = PartKeys.front_id(rk).to_s
+            owner = PartKeys.front(fid, 'panel')
+            next nil unless owners.include?(owner)
+
+            { 'part_key' => rk.to_s, 'role' => role, 'front_id' => fid,
+              'owner_part_key' => owner, 'material_id' => rec['material_id'].to_s }
+          end
+        end
+
+        def orphan_drawer_part_override?(cfg, part_key)
+          orphan_drawer_part_overrides(cfg).any? { |r| r['part_key'] == part_key.to_s }
+        end
+
+        # `owner_part_key` ciel, ktore skoncili fail-closed konfliktom zasuvky.
+        def drawer_conflict_owners(cfg)
+          Array(cfg.is_a?(Hash) ? cfg['drawer_conflicts'] : nil).filter_map do |c|
+            next nil unless c.is_a?(Hash)
+
+            key = c['part_key'].to_s
+            key.empty? ? nil : key
+          end
+        end
+
+        # `front:<id>/<rola zasuvky>` -> rola, inak nil (`box_side:left` tiez).
+        def drawer_part_role(part_key)
+          m = part_key.to_s.match(%r{\Afront:[^/]+/([a-z_]+)(?::[a-z]+)?\z})
+          return nil unless m && DRAWER_ROLES.include?(m[1])
+
+          m[1]
+        end
+
         def plan_parts_by_key(params)
           cfg = normalize(params)
           Construction.build_plan(cfg)[:parts].each_with_object({}) do |pd, map|
