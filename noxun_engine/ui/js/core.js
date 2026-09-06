@@ -279,12 +279,21 @@
       rows.push({ kind: 'seg', key: 'drawer_variant', label: 'Zásuvka',
                   options: FRONT_DRAWER_VARIANT_OPTIONS,
                   active: drw.variant == null ? null : drw.variant });
-      if (drw.construction == null && drw.variant == null){
+      // KOV-C2c (Codex #306 P2): „bez klasifikacie" znamena PRESNE to, co pod tym
+      // rozumie server (`Recipes.recipe_key_for` == `:legacy`) — teda ze CHYBAJU
+      // VSETKY klasifikacne polia, nie len dve z troch. Celo s otvaranim a bez
+      // konstrukcie je pre server UZ klasifikovane (a vyda k nemu konflikt), takze
+      // povodna podmienka ukazala vetu „bez klasifikácie" NAD cervenym dovodom —
+      // dve tvrdenia naraz. Druha poistka: ked server o zasuvke cokolvek povedal,
+      // veta sa nekresli (autoritou je ON, nie odvodenie z datasetu).
+      var drawerRows = frontDrawerRows(drawer);
+      if (!drawerRows.length && drw.construction == null && drw.variant == null &&
+          it.opening_mode == null){
         rows.push({ kind: 'info', tone: 'muted',
                     text: 'Zásuvka bez klasifikácie — dielce zásuvky sa nevyrobia. ' +
                           'Vyber konštrukciu a otváranie.' });
       }
-      frontDrawerRows(drawer).forEach(function(r){ rows.push(r); });
+      drawerRows.forEach(function(r){ rows.push(r); });
     }
     if (type === 'door' || type === 'drawer_front'){
       rows.push({ kind: 'hint', text: 'Set kovania podľa otvárania príde s KOV-D.' });

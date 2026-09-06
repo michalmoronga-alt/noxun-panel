@@ -96,6 +96,30 @@ const info = rowOf(mBare, 'info').map(r => r.text).join(' ');
 ok(info.indexOf('bez klasifikácie') >= 0, 'nezklasifikovana zasuvka to prizna');
 ok(info.indexOf('KOV-C') < 0, 'text uz neodkazuje na dávku, ktorá je hotová');
 
+// Codex #306 P2: CIASTOCNA klasifikacia. Pre server je celo, ktore ma UZ LEN
+// otvaranie, klasifikovane (`recipe_key_for` != :legacy) — vyda k nemu konflikt.
+// Veta „bez klasifikácie" nad cervenym dovodom = dve tvrdenia naraz.
+function infoTextsOf(m){ return rowOf(m, 'info').map(r => r.text).join(' '); }
+const CONF = { state: 'conflict', message: 'Zásuvka nie je klasifikovaná.' };
+
+const mPartial = C.frontCardModel({ type: 'drawer_front', opening_mode: 'classic' }, entry(), CONF);
+ok(infoTextsOf(mPartial).indexOf('bez klasifikácie') < 0,
+   'pri ciastocnej klasifikacii veta „bez klasifikácie" ZMIZNE (server uz hovori)');
+eq(rowOf(mPartial, 'info').length, 1, 'ostane PRAVE JEDEN informacny riadok — ten cerveny');
+eq(rowOf(mPartial, 'info')[0].tone, 'err', 'a je to dovod zo servera');
+
+// To iste bez zaznamu servera: samotne otvaranie uz nie je „bez klasifikácie"
+// (server by ho tak nenazval), takze veta sa nekresli ani vtedy.
+ok(infoTextsOf(C.frontCardModel({ type: 'drawer_front', opening_mode: 'classic' }, entry()))
+     .indexOf('bez klasifikácie') < 0,
+   'zvolene otvaranie samo o sebe uz klasifikaciu ZACALO');
+ok(infoTextsOf(C.frontCardModel({ type: 'drawer_front', drawer: { construction: 'metal' } }, entry()))
+     .indexOf('bez klasifikácie') < 0,
+   'zvolena konstrukcia tiez');
+// A vyriesena zasuvka uz vetu nema tym skor.
+ok(infoTextsOf(C.frontCardModel(drawerItem(), entry(), OKROW)).indexOf('bez klasifikácie') < 0,
+   'vyriesena zasuvka vetu „bez klasifikácie" NEMA');
+
 // ============ 3) render karty (DOM) ========================================
 
 const { mkEl, DOC } = require(path.join(__dirname, 'minidom.js'));
@@ -199,8 +223,28 @@ ok(!S.hwRowStops(SOFT), 'bezna nemapovana polozka exporty nezastavuje');
 ok(!S.hwRowStops(null), 'chybajuca polozka nic nezastavuje');
 ok(!S.hwRowStops({ reason: 'drawer_kit_missing' }),
    'sam dovod NESTACI — klient enum dovodov nepozna (zavaznost urcuje server)');
-eq(S.hwStopCount([STOP, SOFT, STOP]), 2, 'pocita sa len to, co server oznacil');
+// Codex #306 P2: veta hovori o ZASUVKACH, nie o riadkoch. Set s viacerymi
+// clenmi bez kodu vyda VIAC zaznamov na TU ISTU zasuvku (`expand_members`) —
+// „2× zásuvka" pri jednej zasuvke by bola lož.
+const STOP_M2 = Object.assign({}, STOP, { member_index: 1,
+                                          reason_sk: 'set „atira" nemá pásmo pre člena 2' });
+const STOP_OTHER = Object.assign({}, STOP, { cabinet_id: 'CAB-3',
+                                             owner_part_key: 'front:F5/panel' });
+eq(S.hwStopCount([STOP, STOP_M2]), 1,
+   'dva chybajuce kody JEDNEJ zasuvky su JEDNA zasuvka');
+eq(S.hwStopCount([STOP, STOP_M2, STOP_OTHER]), 2,
+   'ina skrinka/vlastnik = ina zasuvka');
+eq(S.hwStopOwners([STOP, STOP_M2, STOP_OTHER]),
+   ['CAB-2|front:F2/panel', 'CAB-3|front:F5/panel'],
+   'identita zasuvky = skrinka + vlastnik (poradie zo servera)');
+eq(S.hwStopCount([STOP, SOFT, STOP]), 1, 'pocita sa len to, co server oznacil — a raz');
 eq(S.hwStopNoteHtml([SOFT]), '', 'bez zastavujucej polozky ziadna veta');
+ok(S.hwStopNoteHtml([STOP, STOP_M2]).indexOf('1× zásuvka') >= 0,
+   'veta menuje POCET ZASUVIEK, nie pocet riadkov');
+// Tabulka pod vetou ostava po RIADKOCH — kazdy z nich je naozaj chybajuci kod.
+const HS2 = { state_status: 'ok', rows: [], unmapped: [STOP, STOP_M2], summary: {} };
+eq((S.buySection(HS2, []).match(/hwmiss hwstop/g) || []).length, 2,
+   'dva chybajuce kody = dva cervene riadky (aj ked je to jedna zasuvka)');
 
 const note = S.hwStopNoteHtml([STOP, SOFT]);
 ok(note.indexOf('hwbanner-stop') >= 0, 'veta ma vlastnu (cervenu) triedu');

@@ -486,9 +486,23 @@
   // klient nepozná enum dôvodov a závažnosť neurčuje na druhom mieste.
   // Čisté funkcie (Node testy).
   function hwRowStops(u){ return !!(u && u.blocks_export === true); }
-  function hwStopCount(list){
-    return (list || []).filter(hwRowStops).length;
+  // Codex #306 P2: JEDNA zásuvka môže vydať VIAC nemapovaných záznamov — set
+  // s viacerými členmi bez kódu ich emituje per člen (`expand_members`). Veta
+  // hovorí o ZÁSUVKÁCH, takže sa počítajú ich IDENTITY (skrinka + vlastník),
+  // nie riadky; inak by jedna zásuvka hlásila „2× zásuvka". Tabuľka pod vetou
+  // ostáva po riadkoch — každý z nich je naozaj chýbajúci kód.
+  function hwStopOwners(list){
+    var seen = {}, out = [];
+    (list || []).forEach(function(u){
+      if (!hwRowStops(u)) return;
+      var k = String((u && u.cabinet_id) || '') + '|' + String((u && u.owner_part_key) || '');
+      if (Object.prototype.hasOwnProperty.call(seen, k)) return;
+      seen[k] = true;
+      out.push(k);
+    });
+    return out;
   }
+  function hwStopCount(list){ return hwStopOwners(list).length; }
   // Veta nad tabuľkou — bez nej by červené riadky vyzerali ako ostatné
   // „nenacenené" a nebolo by vidieť, že sa nevytvorí ANI VEPO.
   function hwStopNoteHtml(list){
@@ -1859,6 +1873,7 @@
       hwRowManual: hwRowManual, hwSourceText: hwSourceText, hwSourcesHtml: hwSourcesHtml,
       // KOV-C2c (tests/js/test_kovc2c_karta.js): zastavujuce nemapovane polozky.
       hwRowStops: hwRowStops, hwStopCount: hwStopCount, hwStopNoteHtml: hwStopNoteHtml,
+      hwStopOwners: hwStopOwners,
       setBuyOpen: function(m){ buyOpen = m || {}; },
       // Š10 prepinace (sady D-104 / D-105 / K2 / ABS rail 3-stav)
       edgeCheckBarHtml: edgeCheckBarHtml, edgeCheckText: edgeCheckText,
