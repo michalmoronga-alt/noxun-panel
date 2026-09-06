@@ -989,6 +989,11 @@ je ručný zásah). Bez toho by pri piatich policiach s jednou vypnutou súhrn t
 spolu** (`HW_PINS_MIN` — rozklik nad jediným riadkom je klik navyše bez zisku); ručne upravená polica rozsvieti v súhrne jantárový štítok **„upravené"** (odchýlka od pravidla, nie
 chyba — semaforové `--nx-state-*` sa sem nemiešajú). Čisté jadro (`hwShelfPinSummary`, `hwSplitShelfPins`, texty) testuje `tests/js/test_smoke1_ui.js`.
 
+**KOV-D4 — PRISVIETENIE CIEĽA SKOKU.** `hwFlash` (trieda `hwfocus`, 1600 ms, `HW_FLASH_MS`) svieti od D4 **najviac na JEDNOM uzle**: ďalší skok predchádzajúce prisvietenie sníma
+**hneď**, nie až po jeho vlastnom časovači (dva svietiace riadky by nepovedali, ktorý je „ten môj"). Cieľom skoku z Kontroly je **celá `.hwitem`**, keď existuje (nesie aj chipy osí
+a nákupný riadok), inak samotný `.hwrow`. Riadok sa hľadá **výhradne podľa serverovej adresy** (`hwRowSelector`) a `hwRowKindOk` navyše overí, že trieda riadku sedí s `orphan` —
+osirotený záznam a živá položka nikdy nežijú súčasne, takže nezhoda znamená **zastaraný payload** a neprisvieti sa radšej nič.
+
 Trieda je `.hwbox` (nie `.hwown` z mockupu): `.hwown` už označuje popis vlastníka VNÚTRI riadku a dva významy jednej triedy by sa poprali. Klik na hlavičku má **flush handshake**
 ako „Dielcov" (`onInfoParts`), ale z iného dôvodu: nie kvôli prepísaniu formulára (táto cesta push nevyvolá), ale kvôli **výberu** — rozpísaný edit čaká 400 ms a keby timer dobehol
 až PO výbere, `handle_apply_all` by skrinku prestaval a `finish_cab` by reselectol celý korpus, takže by sa práve kliknutý vlastník ticho stratil; neplatné pole akciu **zastaví**.
@@ -1414,6 +1419,12 @@ je odvtedy tenký obal nad ním, takže in-SketchUp `run_kovd2a` ani ostatní č
 v riadku). Panel si identitu skladať **nesmie**: `recipe:<id>` pozná len server, a z `front_id` odvodený kľúč by po zmene pripnutého receptu ukazoval na inú položku. Záznam bez
 osí (`stale`, čelo s nenačítateľným receptom) ostáva presne taký, aký bol v C2c.
 
+**KOV-D4 — osi dostane LEN záznam PRIPNUTÉHO receptu.** `attach_override_axes` berie od D4 celý `index` (nie len `by_owner`) a `active_lock_rules` z jeho `idents` prečíta
+`owner_part_key → rule_id` **pripnutého** receptu. **Dormantný zámok iného receptu** — zostal po zmene otvárania (`classic` ↔ `tipon` = iný recept) alebo po prechode zásuvka →
+dvierka → zásuvka — chipy **nedostane**: `Recipes.lock_value` ho aj tak nepoužije, ale chipy by ukazovali stav **aktuálneho** receptu, kým zápis by šiel na **cudzí** `rule_id`.
+Záznam v zozname **ostáva** (riadok osiroteného zásahu ho ukáže aj s „zrušiť"), len bez chipov. Je to **čítacia** zmena payloadu — jadro (resolver, normalizácia, schéma) sa
+nedotklo.
+
 **`front_drawer` (KOV-C2c).** Druhý — **vlastný** — kanál toho istého pushu: mapa `front_id → záznam riadku zásuvky` pre čelá, ktoré `Recipes.classified?` pozná ako zásuvku.
 Do `front_slots` sa **nezlučuje** zámerne: ten odpovedá výhradne na otázku „kde sa pýta smer". Záznam skladá `front_drawer_payload` **čítacím** spôsobom z uloženého configu —
 položka výsuvu `source: 'recipe'` (legacy `slide` sa za recept **nevydáva**) dá `state: 'ok'` + hotový `text` a `detail`; `drawer_conflicts` toho čela dá `state: 'conflict'`
@@ -1475,6 +1486,10 @@ malé echo kanály funkčných prepínačov raily (`push_edge_check`, `push_grai
 katalógové a stavové zmeny vlastné úzke kanály namiesto `push_init`. Od v0.8.13 nesie **`push_selected` aj `push_tags(tags_state(model))`** (D-27): tou istou cestou beží
 Späť/Znova, prepnutie dokumentu aj zmena výberu, takže bez toho by okno tagov, ikona raily a checkbox ghost zón ostali na opačnom stave než model. Pole `zones_visible`
 v `push_init` tým zaniklo — zóny sú riadok v `tags`.
+
+**Deep-link kanály Kontroly (KOV-A2b, KOV-D4)** sú dva a oba sú **len na čítanie**: `push_focus_front(front_id)` otvorí kartu čela a `push_focus_hardware(target)` prisvieti riadok
+v sekcii Kovanie. Posiela sa **jediný údaj / jedna adresa** (`owner_part_key` + `generic_type` + `rule_id` + `orphan`), server si o nich **nič nepamätá** a nič nezapisuje;
+zatvorený Inspector (`dialog_alive?`) ani neúplná adresa nedostanú nič.
 
 **GUARD IDENTITY DOKUMENTU — `foreign_document?(data, model, what)`** (R-02, v0.8.19). Jediný guard, ktorým prechádza **každý zápisový handler panela**. Panel je JEDEN pre všetky
 otvorené dokumenty a callback HtmlDialogu je asynchrónny, pritom ID objektov sú jedinečné LEN v rámci modelu (`CAB-001` aj `BRD-001` sú v každej zákazke) — echo `cabinet_id` /
@@ -2172,8 +2187,19 @@ druhý krok nevymýšľa): čistá `ProductionCore.select_target_item` adresuje 
 obsluhuje korpusové nálezy (`scoped_owner_instance` pri známom `owner_pid`, inak všeobecná podľa `owner_id`) — **žiadny druhý resolver**. Bez ceruzky (obyčajný klik na riadok)
 ostáva dnešné správanie: označí sa **dielec**. Status vety sú preto dve (`front_focus_status` hovorí o skrinke a otvorenej karte). Opačný smer (panel → Štúdio) existoval už predtým.
 
+**Deep-link Kontrola → riadok v Kovaní (KOV-D4):** nález, ktorý má v sekcii Kovanie **konkrétny riadok**, nesie od D4 jeho **adresu** v aditívnom kľúči `data`
+(`owner_part_key` + `generic_type` + `rule_id` + `orphan`). Adresu skladá **VALIDÁCIA** — `Validation.hw_target` — a `stable_key` sa ňou **nemení** (dedup aj klik-select ostávajú).
+Nesú ju: vypnuté kovanie (`hardware`, `orphan: true` — vypnutý zásah živú položku nemá), nenacenená položka (`hardware_unmapped`) a chýbajúci kit (`drawer_kit`, oba `orphan: false`),
+a **konflikt zásuvky** (`drawer`) vtedy, keď má vlastník **práve JEDEN** zásah výsuvu — jeho veta posiela používateľa na riadok „neplatný ručný zásah" a ceruzka tam trafí.
+Pri viacerých zásahoch (dormantný zámok vedľa aktuálneho) server **nehádá** a nález ostáva bez adresy: prisvietiť ten druhý je horšie než neprisvietiť nič.
+
+`ProductionCore.do_select` adresu iba **prepošle** (`hw_focus_target` overí tvar) — vetva kovania ide **PRED** kartou čela (pri kovaní je cieľom riadok, nie karta) a beží cez nový
+kanál `Panel.push_focus_hardware` → `NX.focusHardware` → `nxFocusHardware` (hardware.js): prepne kontext na **Kovanie**, nájde riadok podľa adresy, rozbalí cestu, doscrolluje a
+**krátko prisvieti** (`hwFlash`). Výber v modeli je ten istý ako pri čele — **vlastník (korpus)**, lebo sekcia Kovanie tiež žije len nad označenou skrinkou. Neexistujúci riadok
+= nerobí sa NIC (kontext sa ani neprepne). **Aj deep-link na kartu čela** (`nxFocusFront`) od D4 riadok prisvieti — tou istou triedou `hwfocus`.
+
 **Vedomé odchýlky:** režim „diel po diele" (D-95) je mimo dávky (blok KONTROLA+VÝROBA). Testy: `tests/pure/test_st1b_kontrola.rb`, `tests/js/test_st1b_kontrola.js` (+ presunuté
-sady `test_d104`/`test_d105`/`test_k2`/`test_abs_rail_3stav`), in-SketchUp sekcia `run_st1b`.
+sady `test_d104`/`test_d105`/`test_k2`/`test_abs_rail_3stav`), in-SketchUp sekcia `run_st1b`; D4: `tests/pure/test_kovd4_ui.rb`, `tests/js/test_kovd4_ui.js`.
 
 ### Sekcia NÁKUP KOVANIA v Štúdiu (ŠT-1c PR A, Š7)
 
@@ -2207,6 +2233,12 @@ a nad tabuľkou stojí veta, koľkých zásuviek sa to týka a kam ísť po náp
 **Veta počíta ZÁSUVKY, tabuľka RIADKY** (Codex #306 P2). Jedna zásuvka môže vydať viac nemapovaných záznamov — set s viacerými členmi bez kódu ich emituje **per člen** (`expand_members`),
 takže naivný `filter(...).length` by pri jednej zásuvke hlásil „2× zásuvka". `hwStopOwners` preto dedupuje podľa **identity zásuvky** (`cabinet_id` + `owner_part_key`) a `hwStopCount` vracia
 jej dĺžku; riadky tabuľky sa nededupujú — každý z nich je naozaj chýbajúci kód a každý treba doplniť.
+
+**KOV-D4 — `owner_label` v „Bez kódov".** Stĺpec „kde" ukazoval **surový `part_key`** („front:Fmsi0wnix-1-3a3kxe/panel"), z ktorého sa nedalo zistiť, o ktoré čelo ide. Popis skladá
+**server** — `ProductionCore.decorate_unmapped` použije **ten istý** `owner_label_for` (`PartKeys.human_label` nad `cabinet_fronts`) ako nákupné riadky KOV-H2, takže sa obe tabuľky
+jedného okna nemôžu rozísť. JS z kľúča **nič neodvodzuje** (`hwMissWhere` / `hwMissWhereTitle`): bez `owner_label` (starý payload) sa správa presne ako predtým, surový kľúč ostáva
+v `title` bunky. Pole je **ADITÍVNE a čítacie**: identita (`cabinet_id` + `owner_part_key`), dedup zásuviek, `blocks_export`, počet aj poradie riadkov sú nedotknuté a nákupný CSV
+má pevné stĺpce — je so `owner_label` aj bez neho **znak po znaku ten istý**.
 
 Riadok generiky sa v0.7.58 premenoval z `tr.hwrow` na `tr.hwgen`: `.hwrow` je v zdieľanom panel.css **flex riadok** kovania Inspectora/Katalógu a `<tr>` s `display: flex` strácal
 zarovnanie stĺpcov s hlavičkou (guard `tests/pure/test_tr_flex_kolizia.rb` stráži, že žiadny `<tr>` nenesie triedu, ktorej panel.css dáva flex/grid). Export ide **vlastným kanálom

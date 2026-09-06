@@ -562,6 +562,14 @@ zámky **preadresované** `rule_id recipe:<v1>` → `recipe:<v2>` (kolidujúci a
 verziou z validovaných záznamov** — stabilné pravidlo, nezávislé od poradia kľúčov. **`release_note`** je jediné voliteľné pole schémy receptu (text ≤ 400 znakov,
 prítomné sa validuje prísne) — autorská poznámka vydania pre potvrdenie upgradu.
 
+**Pamäť zásuvky PRI PRECHODE NA DVIERKA (KOV-D4, v0.9.41).** Prepnutie typu čela ani zmena otvárania **nezahadzujú** uložené zásuvkové polia — a zároveň z nich nikdy
+nespravia stav, ktorý používateľ nezvolil. Platí trojica: **(a) pamäť patrí ROVNAKÉMU ID čela** — serverové polia (`drawer.system`, `drawer.recipe_refs`) sa po klientskom
+payloade pripájajú späť podľa `front_id`, takže čelo s novým ID pamäť nedostane (recept mu pripne až stavba) a pri zmenenej konštrukcii sa `system` odvodí nanovo;
+**(b) zámok ostáva viazaný na SVOJ recept** — platí výhradne záznam s `rule_id` pripnutého receptu (plus legacy NL identita) a pri návrate na zásuvku s tým istým receptom sa
+**znovu validuje stavbou**, nikdy sa neobnoví bez overenia; **(c) dormantný zámok iného receptu sa NIKDY nezobrazí ako aktívny** — zmena otvárania pripne iný recept, starý
+záznam ostáva v configu, ale resolver ho nepoužije a payload mu nedá ani stav osí (chip `locked` zo záznamu cudzieho `rule_id` neexistuje). Osirotený záznam smie riadok
+ručných zásahov ukázať spolu s cestou von („zrušiť"); tichá aktivácia cudzej hodnoty je zakázaná.
+
 **MARKER `std` KNIŽNICE A SNAPSHOTU:** `1` = legacy · `2` = pásma/selector · **`3` = klasifikácia alebo triedny kľúč** · **`4` = set s `height_variant`**. Od KOV-C2a je
 čerstvá knižnica aj snapshot NOVÉHO projektu na `4` (seed nesie sety zásuviek); existujúce projekty svoj marker nemenia, kým do nich používateľ predvoľby vedome nedoplní. Marker je LAZY podľa
 obsahu, takže čisto legacy dáta ostávajú čitateľné pre staršie verzie; obsah s vyšším `std`, než ktorý verzia pozná, je pre ňu read-only (knižnica) alebo `:invalid`
