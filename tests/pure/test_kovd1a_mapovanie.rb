@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # Testy KOV-D1a: MAPOVANIE — JADRO. Owner triedny kluc, trojurovnova
-# precedencia, zapisove operacie s triednym klucom, CONFIG_SCHEMA 6, neaktivny
+# precedencia, zapisove operacie s triednym klucom, bump CONFIG_SCHEMA, neaktivny
 # set a oprava neplatneho `recipe_refs` zaznamu.
 #
 # Co davka slubuje (a co tieto testy strazia):
@@ -10,7 +10,8 @@
 #      NEPRITOMNOM kluci); neexistujuce celo = zaznam prec s logom
 #   R2 `set_global_mapping!` / `set_project_mapping!` prijmu triedny kluc (owner
 #      NIE), meni sa JEDEN kluc, sety VSETKYCH pasiem sa zmrazia
-#   R3 `CONFIG_SCHEMA` 5 -> 6, `DRAWER_ACTIVATION_SCHEMA` ostava 5, forward guard
+#   R3 owner kluc si vyziadal `CONFIG_SCHEMA` 6 (presne cislo strazi najnovsia
+#      davka, dnes D2a), `DRAWER_ACTIVATION_SCHEMA` ostava 5, forward guard
 #   R4 neaktivny set — NOVY vyber odmietnuty, ULOZENA volba zachovana
 #   R5 pritomny NEPLATNY `recipe_refs` zaznam = `[:unknown]` -> RED
 #      `drawer_recipe_unknown` (nie zahodenie + surodenec/latest)
@@ -732,18 +733,22 @@ end
 # R3 — CONFIG_SCHEMA 6
 # ============================================================================
 
-NxTest.test('KOV-D1a (R3): CONFIG_SCHEMA je 6, aktivacia zasuviek ostava 5') do
+NxTest.test('KOV-D1a (R3): owner kluc zaviedol schemu 6, aktivacia zasuviek ostava 5') do
   c = NxD1a
-  NxTest.assert_equal(6, c::CB::CONFIG_SCHEMA)
+  # PRESNE cislo `CONFIG_SCHEMA` strazi VZDY najnovsia davka, ktora ho zdvihla
+  # (dnes KOV-D2a). Tu sa strazi to, co zaviedla D1a: owner kluc potrebuje
+  # ASPON schemu 6 a `DRAWER_ACTIVATION_SCHEMA` sa s tym bumpom nehyba.
+  NxTest.assert(c::CB::CONFIG_SCHEMA >= 6, 'owner kluc zaviedol schemu 6')
   NxTest.assert_equal(5, c::CB::DRAWER_ACTIVATION_SCHEMA)
   NxTest.assert_equal(Noxun::Engine::PartKeys::SCHEMA, Noxun::Engine::PartKeys::SCHEMA)
-  # Downgrade: plugin so schemou 6 odmietne PRESTAVBU configu 7; schema 6 prejde,
-  # 5 (starsia) je kompatibilna. Owner kluc sa NIKDY ticho neoreze.
-  NxTest.refute(c::CB.newer_config?('config_schema' => 6))
+  # Downgrade: plugin odmietne PRESTAVBU configu NOVSEJ schemy; vlastna
+  # a starsie su kompatibilne. Owner kluc sa NIKDY ticho neoreze.
+  NxTest.refute(c::CB.newer_config?('config_schema' => c::CB::CONFIG_SCHEMA))
   NxTest.refute(c::CB.newer_config?('config_schema' => 5))
-  NxTest.assert(c::CB.newer_config?('config_schema' => 7))
+  NxTest.assert(c::CB.newer_config?('config_schema' => c::CB::CONFIG_SCHEMA + 1))
   inst = NxTest::FakeEntity.new
-  inst.set_attribute(c::E::Store::DICT, 'config', JSON.generate('config_schema' => 7))
+  inst.set_attribute(c::E::Store::DICT, 'config',
+                     JSON.generate('config_schema' => c::CB::CONFIG_SCHEMA + 1))
   NxTest.assert_raise(/novšej verzie/) { c::CB.guard_newer_config!(inst) }
   # `drawer_stale` sa pre schemu 5 AJ 6 sprava rovnako (nic).
   cfg5 = { 'config_schema' => 5, 'front_items' => [{ 'id' => 'F1', 'type' => 'drawer_front',
@@ -755,10 +760,10 @@ NxTest.test('KOV-D1a (R3): CONFIG_SCHEMA je 6, aktivacia zasuviek ostava 5') do
                 'schema pred aktivaciou ostava RED')
 end
 
-NxTest.test('KOV-D1a (R3): prestavba zapise schemu 6 aj bez owner kluca') do
+NxTest.test('KOV-D1a (R3): prestavba zapise AKTUALNU schemu aj bez owner kluca') do
   c = NxD1a
   cfg = c::CB.normalize('width' => 900.0, 'height' => 720.0, 'depth' => 500.0)
-  NxTest.assert_equal(6, c::CB.cabinet_config(cfg)[:config_schema],
+  NxTest.assert_equal(c::CB::CONFIG_SCHEMA, c::CB.cabinet_config(cfg)[:config_schema],
                       'marker sa zapisuje pri KAZDOM zapise configu')
 end
 

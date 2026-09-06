@@ -96,6 +96,10 @@ a reprodukcie recyklácie cez skutočný `PanelAppObserver#onOpenModel` (vzor sc
 
 prístup k `NOXUN` dictionary.
 
+**Verzia kontraktu configu `config_schema` je dnes `7`** (KOV-D2a — výškový zámok zásuvky, pole `height_variant` v `hardware_overrides`); `DRAWER_ACTIVATION_SCHEMA`
+ostáva `5`. Zápis markera, dopredný guard aj celá **história čísel** žijú v odseku `cabinet_builder.rb` ([construction.md](construction.md)) — tu je len ukazovateľ,
+aby sa aktuálne číslo dalo nájsť od dát.
+
 ### part_keys.rb
 
 stabilná identita dielcov + `valid?` (aj `board/` prefix).

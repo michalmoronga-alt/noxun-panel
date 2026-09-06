@@ -96,6 +96,16 @@ module Noxun
           # D-92: aj VYPNUTE kategorie (disabled overridy) pomenuva server —
           # inak by jedine ony ostali v sekcii Kovanie so surovym part_key.
           params['hardware_overrides'] = hardware_overrides_payload(cfg, params['hardware_overrides'])
+          # KOV-D2a: STAV KAZDEJ OSI zamku (vyska, NL) — server pocita, JS len
+          # kresli (chipy su D2b). Aditivne: existujuce `locked` aj `nl` bloky
+          # ostavaju nedotknute. Mapa sa stavia RAZ a vesia sa na OBE strany —
+          # na emitovanu polozku vysuvu aj na osiroteny riadok zasahu, lebo pri
+          # konflikte ziadna polozka nevznikne a odomknut sa musi dat aj tak.
+          axes = drawer_axes_map(cfg, params)
+          unless axes.empty?
+            params['hardware'] = attach_drawer_axes(params['hardware'], axes)
+            params['hardware_overrides'] = attach_override_axes(params['hardware_overrides'], axes)
+          end
           # V0.6 D1b: vyber setu per typ NA SKRINKE (override projektovej
           # predvolby) — ponuka + efektivny stav; server je autorita.
           params['hardware_set_options'] = hardware_set_options(cfg, params['hardware'])
@@ -524,6 +534,180 @@ module Noxun
         #                mimo radu na zasuvke z receptu). Riadok ponuka RESET
         #                (odstranenie celeho zaznamu) — po nom prestavba
         #                konflikt uz nevyda.
+        # --- KOV-D2a: STAV OSI ZAMKU (server pocita, JS kresli) ---------------
+        #
+        # Receptova polozka OSTAVA `source: 'recipe'` a zamky sa citaju vyhradne
+        # v `Recipes.resolve` — NIKDY cez `HardwareRules.apply_overrides` (ten
+        # by pri NL prepol zdroj na `manual` a nakup by prestal povysovat
+        # chybajuci kit na blocker; Astra #20 F7). Preto tento payload existuje:
+        # je to JEDINY server-side stav, z ktoreho D2b nakresli chipy.
+        #
+        #   axes.height / axes.nl = { state: auto|locked|conflict, value,
+        #                             options[], message?, proposal?, blocked_by? }
+        #
+        # `options` = hodnoty, ktore sa DAJU zamknut (vysky receptu, ktore sa
+        # zmestia do svetlej vysky; NL z radu VYSLEDNEJ vysky, ktore sa zmestia
+        # do hlbky). `proposal` = navrh nahrady pri konflikte — z RECEPTU
+        # a GEOMETRIE, nikdy z dostupnych kodov, a meni LEN opravovanu os:
+        # druhy zamok ostava a znovu sa overi (nil = pri nom platna nahrada
+        # neexistuje, takze D2b potvrdenie neponukne).
+        # QUADRO: kluc `axes.height` CHYBA (nie `state: auto`) — system vyskove
+        # varianty nema a ponuknut sa nema co.
+        def drawer_axes_map(cfg, params)
+          ctxs = CabinetBuilder.drawer_axis_contexts(params)
+          return {} if ctxs.empty?
+
+          overrides = Array(cfg['hardware_overrides'])
+          Array(cfg['front_items']).each_with_object({}) do |item, acc|
+            next unless item.is_a?(Hash)
+
+            fid = item['id'].to_s
+            ctx = ctxs[fid]
+            next if ctx.nil?
+
+            recipe = drawer_axis_recipe(item)
+            next if recipe.nil?
+
+            acc[ctx[:owner_part_key].to_s] =
+              drawer_axes(recipe, ctx, overrides, drawer_conflict_for(cfg, fid))
+          end
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.drawer_axes_map')
+          {}
+        end
+
+        # PRIPNUTY recept cela (rovnaka retaz ako stavba), alebo nil.
+        # Nenacitatelny recept (chybajuci subor, zmeneny odtlacok) sa ZALOGUJE:
+        # tichy `nil` by vonkajsi logger nikdy nevidel a riadok osiroteneho
+        # zasahu by prisiel o stav osi bez stopy v diagnostike (Codex #312
+        # kolo 3 P2). Neznamy PIN (`:unknown`) logovanie nepotrebuje — to nie
+        # je chyba citania, ale stav, ktory uz hlasi RED `drawer_recipe_unknown`.
+        def drawer_axis_recipe(item)
+          kind, key = Recipes.recipe_key_for(item)
+          return nil unless kind == :ok
+
+          drawer = item['drawer'].is_a?(Hash) ? item['drawer'] : {}
+          state, ref = Recipes.active_ref(drawer['recipe_refs'], key[:system], key[:opening])
+          return nil if state == :unknown
+
+          ref = Recipes.pick_ref(drawer['recipe_refs'], key[:system], key[:opening]) if state == :missing
+          ref && Recipes.load(ref)
+        rescue StandardError => e
+          Engine.log_error(e, "Panel.drawer_axes_map #{item.is_a?(Hash) ? item['id'] : nil} recipe")
+          nil
+        end
+
+        # Stav oboch osi JEDNEJ zasuvky. Poradie je to iste ako v resolveri:
+        # vyska rozhoduje PRED radom NL (rad NL JE per vyska), takze pri
+        # konflikte vysky sa NL uz nema z coho pocitat — jej ponuka je vtedy
+        # prazdna a riadok priznava `blocked_by: 'height'`, nikdy nehada.
+        def drawer_axes(recipe, ctx, overrides, conflict)
+          clear_h = ctx[:clear_height].to_f
+          clear_d = ctx[:clear_depth].to_f
+          nl_lock = Recipes.lock_value(recipe, ctx, overrides)
+          axes = {}
+          height = nil
+          height_conflict = false
+
+          if Recipes.atira?(recipe)
+            opts = Recipes.height_options(recipe, clear_h)
+            h_lock = Recipes.height_lock_value(recipe, ctx, overrides)
+            if h_lock
+              valid = opts.include?(h_lock)
+              height = valid ? h_lock : nil
+              height_conflict = !valid
+              axes['height'] = { 'state' => valid ? 'locked' : 'conflict',
+                                 'value' => h_lock, 'options' => opts }
+              unless valid
+                # INVARIANT: os so `state: conflict` MA vzdy hlasku. Ulozeny
+                # dovod plati LEN ked sedi kod — zasuvka moze mat SKORSIE
+                # zlyhanie resolvera (prekazka, hrubka, KD), a vtedy
+                # `drawer_conflicts` o zamku nevie vobec. Veta sa preto odvodi
+                # z receptu a kontextu tou istou funkciou, akou ju sklada
+                # resolver (Codex #312 kolo 3 P2).
+                axes['height']['message'] = axis_message(conflict, 'height_lock_invalid') ||
+                                            Recipes.height_lock_problem(recipe, h_lock, clear_h)
+                axes['height']['proposal'] = height_proposal(recipe, opts, nl_lock, clear_d)
+              end
+            else
+              v = Recipes.pick_height_variant(recipe, clear_h)
+              height = v && v[:height]
+              axes['height'] = { 'state' => 'auto', 'value' => height, 'options' => opts }
+            end
+          end
+
+          axes['nl'] = drawer_nl_axis(recipe, height, height_conflict, clear_d, nl_lock, conflict)
+          axes
+        end
+
+        def drawer_nl_axis(recipe, height, height_conflict, clear_d, nl_lock, conflict)
+          # Neurcena vyska (konflikt vyskoveho zamku alebo ziadny variant sa
+          # nezmesti) = rad NL neexistuje. Zamok sa PRIZNA, ale ponuka je
+          # prazdna — vymysleny rad by ponukol dlzku, ktoru recept odmietne.
+          if Recipes.atira?(recipe) && height.nil?
+            out = { 'state' => nl_lock ? 'locked' : 'auto', 'value' => nl_lock, 'options' => [] }
+            out['blocked_by'] = 'height' if height_conflict
+            return out
+          end
+
+          opts = Recipes.nl_options(recipe, height, clear_d)
+          return { 'state' => 'auto', 'value' => opts.max, 'options' => opts } if nl_lock.nil?
+
+          valid = opts.any? { |v| (v - nl_lock).abs < 1e-9 }
+          out = { 'state' => valid ? 'locked' : 'conflict', 'value' => nl_lock, 'options' => opts }
+          unless valid
+            # Ten isty invariant ako pri vyske: hlaska sa odvodi nezavisle
+            # (`Recipes.nl_lock_problem` je JEDINA veta o tomto dovode — cita
+            # ju aj resolver), ulozeny dovod vyhrava len pri zhode kodu.
+            out['message'] = axis_message(conflict, 'nl_lock_invalid') ||
+                             Recipes.nl_lock_problem(recipe, nl_lock, height, clear_d)
+            out['proposal'] = opts.max
+          end
+          out
+        end
+
+        # Navrh nahrady VYSKY: najvyssi variant, ktory sa zmesti A v ktorom
+        # DRUHY zamok (NL) dalej plati. Ked taky neexistuje, `nil` — D2b vtedy
+        # potvrdenie neponukne (nikdy sa neruší druhý zámok potichu).
+        def height_proposal(recipe, options, nl_lock, clear_d)
+          options.sort.reverse.find do |h|
+            opts = Recipes.nl_options(recipe, h, clear_d)
+            next false if opts.empty?
+
+            nl_lock.nil? || opts.any? { |v| (v - nl_lock).abs < 1e-9 }
+          end
+        end
+
+        # Hlaska osi = ULOZENY dovod konfliktu (`drawer_conflicts`), nikdy druhy
+        # text — inak by sa karta rozisla s Kontrolou.
+        def axis_message(conflict, code)
+          return nil unless conflict.is_a?(Hash) && conflict['code'].to_s == code
+
+          m = conflict['message'].to_s
+          m.empty? ? nil : m
+        end
+
+        def attach_drawer_axes(items, axes)
+          Array(items).map do |h|
+            next h unless h.is_a?(Hash) && h['source'].to_s == BuildPlan::HW_SOURCE_RECIPE
+
+            a = axes[h['owner_part_key'].to_s]
+            a ? h.merge('axes' => a) : h
+          end
+        end
+
+        # Osiroteny riadok zasahu (polozka pri konflikte NEVZNIKLA) dostane ten
+        # isty stav osi — inak by sa konfliktna zasuvka nedala odomknut.
+        def attach_override_axes(rows, axes)
+          Array(rows).map do |ov|
+            next ov unless ov.is_a?(Hash) && ov['generic_type'].to_s == Recipes::LOCK_GENERIC_TYPE
+            next ov unless ov['rule_id'].to_s.start_with?(Recipes::LOCK_RECIPE_PREFIX)
+
+            a = axes[ov['owner_part_key'].to_s]
+            a ? ov.merge('axes' => a) : ov
+          end
+        end
+
         def hardware_overrides_payload(cfg, overrides)
           fronts = payload_fronts(cfg)
           items = cfg['hardware'].is_a?(Array) ? cfg['hardware'] : []

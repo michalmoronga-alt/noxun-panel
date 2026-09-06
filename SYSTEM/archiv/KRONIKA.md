@@ -17,6 +17,27 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-D2a — ZÁMKY OSÍ ZÁSUVKY: JADRO (v0.9.37, 6.9.2026).**
+  Zásuvka z receptu má odteraz **dve osi ručného zámku**: **dĺžku výsuvu** (`nominal_length`, existovala od D-93) a novú **výšku** (`height_variant`, len Atira — Quadro
+  výškové varianty nemá). Obe žijú v tom istom zázname `hardware_overrides` a zámok je jednoducho **existencia platného poľa**. Kľúčové je **poradie**, lebo rad dĺžok
+  je per výška: *zamknutá alebo automatická výška → rad NL tej výšky → zamknutá alebo automatická NL → dielce → nákupný kit* (Astra #20 B2). Zamknutá výška musí byť
+  v pripnutom recepte **a zmestiť sa**, inak je zásuvka **červená** (`height_lock_invalid`) bez dielcov aj výsuvu; zamknutá dĺžka sa meria proti radu **výslednej**
+  výšky — zamknutých 520 po automatickom prechode H70 → H144 (rad H144 520 nemá) ostáva konfliktom a **nikdy** nevyvolá návrat na H70 ani zmenu dĺžky.
+  **Zapisovacia cesta bola dovtedy slepá** (Astra #20 F5): D-93 validácia hľadala hodnotu výhradne v projektovom pravidle `fit_series`, ktorým receptová položka nie je,
+  takže zámok dĺžky zásuvky sa **uložiť nedal**. Pribudla preto úzka serverová vetva *vlastník → pripnutý recept → výsledná výška → rad tej výšky*, ktorá číta
+  **čerstvý serverový stav** (uložený config), nikdy payload — chip na obrazovke môže byť o generáciu starší než model. Je to však **serverová akcia**: Inspector
+  receptovej položke dodnes nekreslí ani editor dĺžky (`hwItemHtml` ho viaže na blok `nl`, ktorý receptová položka nemá) a `axes` ešte nečíta, takže **z panela sa zámok
+  zapnúť nedá až do D2b** — táto dávka pripravuje jadro, nie ovládanie.
+  Položka výsuvu **ostáva `source: 'recipe'`** a `locked` je odteraz **súhrn** „aspoň jedna os je zamknutá"; receptový zámok **nikdy** neprechádza
+  `HardwareRules.apply_overrides` — ten by pri dĺžke prepol zdroj na `manual` a nákup by prestal povyšovať chýbajúci kit na blocker (Astra #20 F7). Stav **každej osi**
+  (`auto` | `locked` | `conflict`, hodnota, ponuka, pri konflikte uložená hláška a návrh náhrady) skladá server do nového payloadu `axes` a vešia ho na položku **aj**
+  na riadok ručného zásahu — pri konflikte totiž položka fail-closed nevznikne a odomknúť sa musí dať aj tak. Návrh náhrady sa počíta **z receptu a geometrie**, nikdy
+  z dostupných kódov, mení **len opravovanú os** a keď pri druhom zámku platná náhrada neexistuje, je `nil` (D2b potvrdenie neponúkne) — Astra #20 F6. **Odomknutie osi**
+  maže len jedno pole, takže druhý zámok prežije; reset celého záznamu ostáva pre `disabled`/`quantity`.
+  **`CONFIG_SCHEMA` 6 → 7** (Codex #307 P1): plugin D1a/D1b by pole `height_variant` ticho zahodil whitelistom a zásuvka by sa vrátila na automatickú výšku — teda na iné
+  dielce a iný kit; `DRAWER_ACTIVATION_SCHEMA` ostáva 5. Register brány má 12 kódov (11 z resolvera + migračný `drawer_stale`).
+  **UI (chipy osí, opravný modal, klikanie) je D2b** — táto dávka je čisté jadro. Zákazky bez zámkov sa nemenia (charakterizácia v testoch).
+  Testy: `tests/pure/test_kovd2a_zamky.rb` + in-SU sekcia `run_kovd2a`; 3221 headless, 91 JS sád.
 - **KOV-D1c — DÁTA: PRODUKČNÝ SEED ALTERNATÍVNEJ RODINY „ATIRA ANTRACIT" (v0.9.36, 6.9.2026).**
   Čisto **dátová** dávka package KOV-D v2, plánovaná v D1b ako samostatný krok PO ňom. D1b dalo výberu setu rodinový
   pohľad a overilo ho len **fixtúrou v testoch** — produkčný seed poznal jedinú rodinu Atiry (bielu). Táto dávka do

@@ -633,7 +633,7 @@ mapovanie a zákaz typu by ju vzal tiež; nebezpečná je len položka s dĺžko
 **Od KOV-C2b (v0.9.31) je modul ZAPOJENÝ:** `Construction.build_plan` ho volá pre každé klasifikované zásuvkové čelo (`drawer_pass`, viď
 [construction.md](construction.md)) a z neho vznikajú dielce v pláne aj **jedna** položka výsuvu.
 
-**Register brány `DRAWER_BLOCKERS` (11 kódov)** = `CONFLICT_CODES` (10, ktoré produkuje resolver) **+ 1 MIGRAČNÝ**. Delí sa na `BUILD_BLOCKERS` (9 fail-closed konfliktov
+**Register brány `DRAWER_BLOCKERS` (12 kódov od KOV-D2a)** = `CONFLICT_CODES` (11, ktoré produkuje resolver) **+ 1 MIGRAČNÝ**. Delí sa na `BUILD_BLOCKERS` (10 fail-closed konfliktov
 STAVBY: zásuvka nevydala ani dielec ani položku) a `ALL_EXPORT_BLOCKERS` = `drawer_kit_missing` (vzniká až v NÁKUPE) **+ `drawer_stale`** — jediný kód, ktorý neprodukuje
 resolver ani nákup, ale **čítanie modelu** (`Bom.collect`): skrinka uložená pred aktiváciou receptov (`config_schema < CabinetBuilder::DRAWER_ACTIVATION_SCHEMA`) má
 klasifikovanú zásuvku, takže v .skp **nie sú** receptové dielce a výsuv je legacy — kusovník aj VEPO by boli neúplné a ticho. Nápravou je **prestavba** skrinky.
@@ -681,11 +681,26 @@ Tiché prepnutie systému by k dielcom jedného systému objednalo kovanie druh�
 
 **`resolve(recipe, ctx, part_thicknesses, overrides)`** → `{height_variant, box_height, nl, load, parts, hardware_params, conflicts, explain}`. Poradie krokov: KD mimo
 `kd_supported` → `drawer_kd_unsupported` · hrúbka role mimo `thickness_supported` (`part_thicknesses` je **VSTUP**, nie odvodená hodnota) → `drawer_thickness_unsupported` ·
-neprázdne `ctx[:obstructions]` → `drawer_obstruction` · **jedna výška** (Atira: najvyšší variant s `min_clear_height ≤ clear_height`; Quadro: `box_height = clear_height − 40`
-a čelo/chrbát `box_height − t_dna − 12 ≥ 30`) · **jedna NL** (najdlhšia z radu TEJ výšky s `min_depth ≤ clear_depth`) · **NL zámok** z `hardware_overrides`
-(`generic_type slide`, `rule_id` `vysuvy-nl-podla-hlbky` alebo `recipe:<id>`, pole `nominal_length`): v rade a zmestí sa → drží, inak `nl_lock_invalid` — **nikdy tichá
-zmena**; záznam s `disabled: true` zámok **nenesie** (ten istý kontrakt ako `HardwareRules.override_nominal_length`) · nosnosť bunky · dielce · kontrola každého rozmeru
-proti `MIN_DIM`. Porovnania sú **inkluzívne a bez EPS** nad nezaokrúhlenou hodnotou z `context_for`
+neprázdne `ctx[:obstructions]` → `drawer_obstruction` · **jedna výška** · **rad NL TEJ výšky** · **jedna NL** · nosnosť bunky · dielce · kontrola každého rozmeru
+proti `MIN_DIM`.
+
+**ZÁMKY OSÍ a ich poradie (KOV-D2a, Astra #20 B2).** Zásuvka má **dve** osi ručného zámku a obe žijú v tom istom zázname `hardware_overrides`
+(`generic_type slide`, `owner_part_key front:<id>/panel`): `nominal_length` (D-93; `rule_id` `vysuvy-nl-podla-hlbky` **alebo** `recipe:<id>`) a `height_variant`
+(KOV-D2a; **výhradne** `rule_id recipe:<id>` a **výhradne Atira** — Quadro výškové varianty nemá, `box_height` plynie z geometrie). Zámok = **existencia platného poľa**;
+záznam s `disabled: true` zámok **nenesie** (ten istý kontrakt ako `HardwareRules.override_nominal_length`). Poradie je záväzné, lebo **rad NL JE per výška**:
+
+1. **zamknutá alebo automatická výška** — zamknutá musí existovať v pripnutom recepte **a zmestiť sa** (`min_clear_height ≤ clear_height`), inak RED
+   `height_lock_invalid` **bez dielcov aj výsuvu**; automat berie najvyšší variant, ktorý sa zmestí (Quadro: `box_height = clear_height − 40`, čelo/chrbát
+   `box_height − t_dna − 12 ≥ 30`);
+2. **rad NL tej výšky** (`series_for`);
+3. **zamknutá alebo automatická NL** — zamknutá sa overuje proti radu **VÝSLEDNEJ** výšky: zamknutá 520 po automatickom prechode H70 → H144 (rad H144 520 nemá) je
+   `nl_lock_invalid`, **nikdy návrat na H70 ani zmena NL**; automat berie najdlhšiu z radu s `min_depth ≤ clear_depth`.
+
+Dôvod, prečo zámok neplatí, skladá **jediná** funkcia per os — `height_lock_problem` a `nl_lock_problem`. Číta ich `resolve` (RED nález) **aj** payload osí (hláška chipu),
+takže sa nemôžu rozísť; payload ich potrebuje preto, že zásuvka môže mať **skoršie** zlyhanie resolvera (prekážka, hrúbka, KD) a uložené `drawer_conflicts` o zámku vtedy
+nevedia vôbec. Opačné poradie krokov by pri zmene výšky ticho posunulo NL. Vety `explain` znejú „Výška: H144 (ručný zámok)" / „NL: 470 (ručný zámok)". Emitovaná položka výsuvu **ostáva
+`source: 'recipe'`** a nesie `locked: true` ako **súhrn** „aspoň jedna os je zamknutá" — receptový zámok **nikdy** neprechádza `HardwareRules.apply_overrides` (ten by pri NL
+prepol zdroj na `manual` a nákup by prestal povyšovať chýbajúci kit na blocker; Astra #20 F7). Porovnania sú **inkluzívne a bez EPS** nad nezaokrúhlenou hodnotou z `context_for`
 (105,00 platí, 104,995 padá). **Atomicita:** akýkoľvek konflikt ⇒ `parts = []` a `hardware_params = {}`.
 
 **Dielce.** Atira presne 2: `drawer_bottom` `(LB − 2·EB − 51,5) × (NL + 10)` a `drawer_back` `(LB − 2·EB − 63) × rear_height`. Quadro 5: `box_side` ×2 `NL × box_height`,
@@ -693,5 +708,5 @@ proti `MIN_DIM`. Porovnania sú **inkluzívne a bez EPS** nad nezaokrúhlenou ho
 hrana 1,0). `hardware_params` (`recipe_id`, `system`, `height_variant` | `box_height`, `nominal_length`, `load`, `opening`) je podklad pre **jednu** položku výsuvu, ktorú
 skladá C2. `explain` sú slovenské vety pre Inspector.
 
-**`CONFLICT_CODES`** = register 10 kódov brány `DRAWER_BLOCKERS` z package KOV-C. C1 ich len **produkuje**; napojenie na `export_blockers`, `hardware_issues` a Kontrolu je
+**`CONFLICT_CODES`** = register 11 kódov brány `DRAWER_BLOCKERS` (KOV-C 10 + `height_lock_invalid` z KOV-D2a). C1 ich len **produkuje**; napojenie na `export_blockers`, `hardware_issues` a Kontrolu je
 úloha C2 — v C1 preto `drawer_kit_missing` ani `drawer_override_invalid` nikto nevyrába, sú tu len ako jediné miesto pravdy o množine kódov.

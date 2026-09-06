@@ -15483,6 +15483,220 @@ module NoxunSuRunner
     end
   end
 
+  # === KOV-D2a: ZAMKY OSI ZASUVKY (vyska, NL) — jedna operacia, Undo/Redo ===
+  #
+  # Headless sada dokaze poradie resolvera, tvar configu aj payload osi;
+  # NEDOKAZE, ze zapis zamku a PRESTAVBA su JEDNA operacia a ze sa dielce
+  # v modeli naozaj vymenia za iny vyskovy variant. Preto tento scenar:
+  # zamkne vysku cez REALNU akciu panela a meria MODEL (dielce), NAKUP (kit)
+  # aj krok Spat/Redo.
+  KOVD2A_RID = 'recipe:atira_sisy_v1'
+
+  # DETERMINISTICKA geometria: svetla vyska riadku cela je `vyska cela - 16`
+  # (celo prekryva korpus, riadok sa oreze interierom). Celo 220 mm teda da
+  # svetlu vysku 204 mm — bezpecne v pasme varianta H144 (H144 potrebuje 189,
+  # H176 az 221, takze je 15 mm nad spodnou a 17 mm pod hornou hranicou).
+  # Prve znenie scenara malo celo 250 (svetla 234) a automat vybral H176 —
+  # scenar sa vtedy CELY preskocil a nedokazal NIC. Preto: ziadna vetva
+  # „preskoceny", nesulad predpokladu je FAIL.
+  KOVD2A_FRONT_H = 220.0
+  KOVD2A_AUTO_H  = 144
+
+  def kovd2a_params
+    kovc2b_params({ 'height' => 900.0 }, 'height' => KOVD2A_FRONT_H)
+  end
+
+  # Stav osi zo SERVERA (ten isty payload, z ktoreho bude kreslit D2b) —
+  # scenar si z neho berie ponuku platnych vysok, takze necaka na tvrdo
+  # zakodovane cislo.
+  def kovd2a_axes(inst)
+    cfg = e::Store.config(inst) || {}
+    map = e::Panel.drawer_axes_map(cfg, e::CabinetBuilder.config_to_params(cfg))
+    map[e::PartKeys.front('F1', 'panel')] || {}
+  end
+
+  def kovd2a_height_options(inst)
+    Array((kovd2a_axes(inst)['height'] || {})['options']).map(&:to_i)
+  end
+
+  # Vyska chrbta varianta PODLA RECEPTU (nie zakodovane cislo) — podla nej sa
+  # v modeli pozna, ktory variant sa naozaj postavil.
+  def kovd2a_rear_height(variant)
+    v = (e::Recipes.load('atira_sisy_v1')[:height_variants] || {})[variant.to_s]
+    v && v[:rear_height].to_f
+  end
+
+  def kovd2a_slide(inst)
+    kovc2b_slides(inst).first
+  end
+
+  def kovd2a_variant(inst)
+    s = kovd2a_slide(inst)
+    s && s['params'] ? s['params']['height_variant'].to_i : nil
+  end
+
+  def kovd2a_nl(inst)
+    s = kovd2a_slide(inst)
+    s && s['params'] ? s['params']['nominal_length'].to_f : nil
+  end
+
+  # Rozmery boxu chrbta zasuvky v MODELI (mm) — variant sa pozna podla nich.
+  def kovd2a_back_dims(inst)
+    back = kovc2b_parts(inst)['front:F1/drawer_back']
+    return [] unless back
+
+    b = back.definition.bounds
+    [mm(b.width), mm(b.height), mm(b.depth)]
+  end
+
+  def kovd2a_overrides(inst)
+    Array((e::Store.config(inst) || {})['hardware_overrides'])
+  end
+
+  def kovd2a_conflicts(inst)
+    Array((e::Store.config(inst) || {})['drawer_conflicts']).map { |c| c['code'].to_s }
+  end
+
+  # REALNA akcia panela (nie priama prestavba) — inak by sa nedalo overit,
+  # ze zapis zamku a geometria su JEDEN krok Spat.
+  def kovd2a_set(model, inst, cid, field, value)
+    model.selection.clear
+    model.selection.add(inst)
+    e::Panel.handle_set_hardware_override(
+      pg(model, 'generic_type' => 'slide', 'rule_id' => KOVD2A_RID,
+                'owner_part_key' => e::PartKeys.front('F1', 'panel'),
+                'field' => field, 'value' => value, 'cabinet_id' => cid)
+    )
+  end
+
+  def run_kovd2a(model)
+    cleanup(model)
+    markers = []
+    inst = e::CabinetBuilder.build(model, kovd2a_params)
+    return ok('KOV-D2a: vlozenie korpusu so zasuvkou', false) unless inst
+
+    cid = e::Store.get(inst, 'cabinet_id')
+    auto = kovd2a_variant(inst)
+    # PREDPOKLAD scenara je ASERCIA, nie podmienka behu: keby sa geometria
+    # rozisla s receptom, scenar to musi POVEDAT (FAIL), nie sa preskocit.
+    ok("KOV-D2a: vychodisko = AUTOMATICKA vyska H#{KOVD2A_AUTO_H} (dostal H#{auto.inspect})",
+       auto == KOVD2A_AUTO_H)
+    opts = kovd2a_height_options(inst)
+    ok("KOV-D2a: server ponuka na zamknutie aj INU platnu vysku (#{opts.inspect})",
+       (opts - [auto]).any?)
+    # Zamyka sa NAJNIZSIA ina platna vyska z PONUKY SERVERA (tu H70) — scenar
+    # tak nestoji na zakodovanom cisle a ostane platny aj po zmene receptu.
+    target = (opts - [auto]).min
+    return ok('KOV-D2a: bez inej platnej vysky sa zamok nema na com ukazat', false) if target.nil?
+
+    begin
+      kovd2a_scenar(model, inst, cid, markers, auto, target)
+    ensure
+      r03_clear_markers(model, markers)
+      cleanup(model)
+      ok('KOV-D2a: cleanup (0 korpusov)', cabinets(model).empty?)
+    end
+  rescue StandardError => ex
+    log_line("FAIL: run_kovd2a vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
+  def kovd2a_scenar(model, inst, cid, markers, auto, target)
+    rear = kovd2a_rear_height(target)
+    auto_rear = kovd2a_rear_height(auto)
+
+    # --- 1) zamknut VYSKU proti automatu -----------------------------------
+    m = r03_marker(model, markers)
+    kovd2a_set(model, inst, cid, 'height_variant', target)
+    ok("KOV-D2a: zamknuta vyska drzi H#{target} (automat dal H#{auto}, teraz " \
+       "H#{kovd2a_variant(inst).inspect})",
+       kovd2a_variant(inst) == target)
+    ok('KOV-D2a: zamok je v configu ako pole `height_variant`',
+       kovd2a_overrides(inst).any? { |o| o['height_variant'].to_i == target &&
+                                         o['rule_id'].to_s == KOVD2A_RID })
+    ok("KOV-D2a: ulozeny config ma schemu #{e::CabinetBuilder::CONFIG_SCHEMA}",
+       (e::Store.config(inst) || {})['config_schema'].to_i == e::CabinetBuilder::CONFIG_SCHEMA)
+    # MODEL, nie plan: chrbat ZAMKNUTEHO varianta ma vysku z RECEPTU (H70 =
+    # 65,5 mm), chrbat automatu inu (H144 = 144 mm). Meria sa mnozina rozmerov
+    # boxu (orientaciu drzi builder, tu nas zaujima ROZMER varianta) a overuje
+    # sa OBOJE — inak by tvrdenie prešlo aj vtedy, keby v modeli stal automat.
+    ok("KOV-D2a: dielec chrbta v MODELI je z H#{target} (#{kovd2a_back_dims(inst).inspect})",
+       kovd2a_back_dims(inst).any? { |v| (v - rear).abs <= TOL } &&
+       kovd2a_back_dims(inst).none? { |v| (v - auto_rear).abs <= TOL })
+    ok('KOV-D2a: polozka vysuvu OSTAVA `source: recipe` a nesie suhrn `locked`',
+       kovd2a_slide(inst)['source'] == 'recipe' && kovd2a_slide(inst)['locked'] == true)
+    ok("KOV-D2a: nakup objednava kit zamknutej vysky (#{kovd1a_codes(model).inspect})",
+       kovd1a_codes(model).length == 1)
+
+    # --- 2) Spat = JEDEN krok pre zamok aj geometriu -----------------------
+    Sketchup.undo
+    ok("KOV-D2a Spat: zamok aj dielce sa vratili NARAZ (H#{kovd2a_variant(inst).inspect})",
+       kovd2a_variant(inst) == auto && kovd2a_overrides(inst).empty? &&
+       kovd2a_back_dims(inst).any? { |v| (v - auto_rear).abs <= TOL })
+    ok('KOV-D2a Spat: bol to PRESNE jeden krok', m.valid?)
+
+    # --- 3) Redo obnovi zamok aj geometriu konzistentne --------------------
+    if Sketchup.respond_to?(:redo)
+      Sketchup.redo
+      ok('KOV-D2a Redo: zamok, dielce aj polozka su spat SUCASNE',
+         kovd2a_variant(inst) == target &&
+         kovd2a_back_dims(inst).any? { |v| (v - rear).abs <= TOL } &&
+         kovd2a_overrides(inst).any? { |o| o['height_variant'].to_i == target })
+    else
+      info('KOV-D2a: Sketchup.redo nedostupne — Redo vetva netestovana')
+      kovd2a_set(model, inst, cid, 'height_variant', target)
+    end
+    r03_clear_markers(model, markers)
+
+    # --- 4) NL MIMO radu zamknutej vysky = RED bez dielcov -----------------
+    #
+    # NL 620 zapisova cesta NEPUSTI (v rade H70 ani H144 nie je a do hlbky 497
+    # sa nezmesti ani v H176), preto sa zaznam sklada PRIAMO — presne tak, ako
+    # by v modeli vyzeral zamok, ktoremu sa pod rukami zmenila vyska. Zaznam sa
+    # stavia od nuly (nie kopiou stavu), aby krok nezavisel od predchadzajucich.
+    forced = [{ 'owner_part_key' => e::PartKeys.front('F1', 'panel'),
+                'generic_type' => 'slide', 'rule_id' => KOVD2A_RID,
+                'height_variant' => target, 'nominal_length' => 620.0 }]
+    p_forced = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    p_forced['hardware_overrides'] = forced
+    e::CabinetBuilder.rebuild(model, inst, p_forced)
+    ok("KOV-D2a: NL mimo radu = RED `nl_lock_invalid` (#{kovd2a_conflicts(inst).inspect})",
+       kovd2a_conflicts(inst) == ['nl_lock_invalid'])
+    ok('KOV-D2a: RED = ziadne dielce zasuvky a ziadna polozka vysuvu',
+       kovc2b_parts(inst).empty? && kovd2a_slide(inst).nil?)
+    ok("KOV-D2a: RED zastavi nakup vysuvu (#{kovd1a_codes(model).inspect})",
+       kovd1a_codes(model).empty?)
+
+    # --- 5) odomknutie JEDNEJ osi necha druhy zamok zit --------------------
+    kovd2a_set(model, inst, cid, 'nominal_length', nil)
+    ok("KOV-D2a: odomknuta NL = automat, vyskovy zamok DRZI (H#{kovd2a_variant(inst).inspect}, " \
+       "NL #{kovd2a_nl(inst).inspect})",
+       kovd2a_variant(inst) == target && kovd2a_nl(inst).to_f > 0.0 &&
+       kovd2a_overrides(inst).any? do |o|
+         o['height_variant'].to_i == target && !o.key?('nominal_length')
+       end)
+
+    # --- 6) kopia skrinky nesie zamky --------------------------------------
+    model.selection.clear
+    model.selection.add(inst)
+    e::Panel.handle_insert_copy(pg(model, 'cabinet_id' => cid))
+    copy = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' && i != inst }
+    ok('KOV-D2a kopia: vyskovy zamok prezil „Vložiť kópiu"',
+       copy && kovd2a_overrides(copy).any? { |o| o['height_variant'].to_i == target })
+    ok("KOV-D2a kopia: aj kopia stoji na H#{target} (nie na automate)",
+       copy && kovd2a_variant(copy) == target)
+    if copy && copy.valid?
+      model.start_operation('KOV-D2a erase copy', true)
+      copy.erase!
+      model.commit_operation
+    end
+
+    # --- 7) odomknutie VYSKY = navrat na automat ---------------------------
+    kovd2a_set(model, inst, cid, 'height_variant', nil)
+    ok("KOV-D2a: odomknuta vyska = automat H#{auto} (#{kovd2a_variant(inst).inspect})",
+       kovd2a_variant(inst) == auto && kovd2a_overrides(inst).empty?)
+  end
+
   def run_kovc2b(model)
     cleanup(model)
     markers = []
@@ -16558,6 +16772,7 @@ module NoxunSuRunner
     run_tools1b(model)       # NASTROJE-1 (T1b): boot migracia starych instalacii — docasny Plugins strom (styri ciele, marker per cesta, druhy beh = no-op) + dokaz, ze boot hook upratal ZIVU instalaciu
     run_kovc2b(model)        # KOV-C2b: zasuvky z receptu — dielce v modeli 1:1 s planom, JEDNA polozka vysuvu, prestavba (ina hlbka/vyska = ina NL/variant, ziadna duplicita, part_overrides prezijú), 1 krok Spat, kopia a sablona nesu pripnuty recept, plytka skrinka = ziadne dielce + RED + export zastaveny s PRAZDNYM priecinkom
     run_kovd1a(model)        # KOV-D1a: owner triedny override setu na CELE — akcia panela zapise `class:slide|…@front:F1/panel`, zmrazi definiciu a prestava v JEDNEJ operacii (Spat aj Redo vratia mapovanie, snapshot aj nakupny kod naraz), kopia kluc nesie, prerastenie bez pasma neobjedna zly kit
+    run_kovd2a(model)        # KOV-D2a: zamky osi zasuvky — akcia panela zamkne VYSKU proti automatu (H144 -> H70) a prestava v JEDNEJ operacii (Spat aj Redo vratia zamok, dielce v modeli aj nakupny kit naraz), NL mimo radu = RED bez dielcov a bez kitu, odomknutie JEDNEJ osi necha druhy zamok zit, kopia zamky nesie
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

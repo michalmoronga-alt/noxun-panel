@@ -124,7 +124,10 @@ starší plugin recepty nepozná, takže by pri prestavbe **ticho odobral dielce
 · **`6` = KOV-D1a** (OWNER TRIEDNY kľúč v `hardware_sets` skrinky — `class:slide|classic|metal@front:F1/panel`, teda vlastný kit pre JEDNO čelo): starší plugin taký kľúč pri
 normalizácii **zahodí** (jeho `parse_class_key` sufix `@` odmieta), no `unknown_generic_types` z neho stále prečíta podporovaný `slide`, takže by prestavbu **nezastavil**
 a zásuvka by ticho dostala set z projektu namiesto vybraného (Astra #20 B1). Brány sú tie isté ako pri 5 (prestavba, šablóny, kópia, export).
-**`DRAWER_ACTIVATION_SCHEMA` ostáva 5** — je to VLASTNÁ konštanta práve preto, aby bump na 6 nespravil z každej skrinky schémy 5 „nemigrovanú" (`drawer_stale`).
+· **`7` = KOV-D2a** (VÝŠKOVÝ ZÁMOK zásuvky — záznam `hardware_overrides` s `rule_id recipe:<id>` smie niesť pole `height_variant`, druhá os zámku popri `nominal_length`):
+starší plugin (schéma 6) ho pri normalizácii **zahodí** whitelistom `norm_hardware_overrides`, takže zásuvka by sa ticho vrátila na **automatickú výšku** — teda na iné
+dielce a iný kit (Codex #307 P1). Brány sú tie isté ako pri 5 a 6.
+**`DRAWER_ACTIVATION_SCHEMA` ostáva 5** — je to VLASTNÁ konštanta práve preto, aby bump na 6 ani 7 nespravil z každej skrinky schémy 5 „nemigrovanú" (`drawer_stale`).
 
 **AD-HOC KOVANIE `hardware_manual[]` (KOV-H1, v0.9.18).** Ďalšie pole configu, nie nový zápisový kanál (audit #15 BLOCKER 1): panel ho posiela v `collectAll()` presne ako čelá,
 takže ide cestou `apply_all` → `normalize` → **rebuild** — jeden krok Späť, guardy dokumentu aj skrinky, R-12, `push_selected(dedup: false)`. Cena je prestavba geometrie pri
