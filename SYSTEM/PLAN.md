@@ -552,9 +552,15 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   (`nl_lock_invalid` · `height_lock_invalid` · `drawer_override_invalid`); pri hrúbke, prekážke, KD, poškodenom pine či `drawer_stale` by reset zásahu konflikt nevyriešil ·
   nález **„kód zo setu nie je v katalógu"** (`hardware_code`) mieri na svoj **živý riadok** kovania, ad-hoc zdroj ostáva na dnešnej ceste (ručné položky riadok s identitou nemajú).
   Testy: `tests/pure/test_kovd4_ui.rb`, `tests/js/test_kovd4_ui.js` (47 assertov), **10 overených mutácií** + in-SU sekcia **`run_kovd4`** (drawer → door → drawer, zmena otvárania).
-  **D5 · ABS FARBENIE DIELCOV ZÁSUVIEK (geometria, samostatný PR, In-SU povinné):** `axes:` pre drawer roly + explicitné pravidlo orientácie hrán pre stojace roly (`drawer_back`,
-  `box_side`, `drawer_inner_front`: L1 = HORNÁ, `PartFaces` dnes mapuje L1 na minimum osi šírky — Astra #20 F15), spoločné pre farbenie aj zvýraznenie Kontroly; čítanie uložených
-  dielcov cez `ROLE_AXES`; recept sa NEmení (L1 ostáva). In-SU overenie hornej hrany.
+  **D5 · ABS FARBENIE DIELCOV ZÁSUVIEK — ✅ HOTOVÉ (v0.9.42, 7.9.2026):** (1) **`axes:` pre všetky roly zásuvky** — `Construction.drawer_part_descriptor` ich dáva pomenovanou
+  konštantou podľa umiestnenia boxu (dno `AXES_LYING`, chrbát a vnútorné čelo `AXES_WALL`, bok boxu **nová `AXES_WALL_DEPTH`** = rovina YZ, dĺžka NL po hĺbke); `ROLE_AXES` pozná
+  všetky štyri roly (jeden kandidát na rolu), takže **stará zákazka bez `axes`** si ich dopočíta z kvádra. (2) **Orientácia hrán stojacich rolí (Astra #20 F15):** preklad kódu
+  hrany na stenu kvádra žije v dvoch pomenovaných mapách `PartFaces::EDGE_FACES` (default) a **`STANDING_EDGE_FACES`** (L1 = MAXIMUM osi šírky = HORNÁ plocha, L2 dolná; W1/W2 sa
+  nemenia); dostávajú ju výhradne roly v `PartFaces::STANDING_ROLES` a `AbsRules::STANDING_ROLES` je odteraz jeho **alias** (jediný literálny zoznam). Mapu číta farbenie plôšok
+  (`CabinetBuilder.paint_edge_faces`) aj zvýraznenie Kontroly (`EdgeCheck`) a hover (`HoverEdge`) — všetky posielajú ROLU, vlastnú kópiu mapy nemá ani jeden (zdrojový guard).
+  (3) **Recept, ABS pravidlá, schéma ani výstupy sa nemenia** — seed 4 (L1 = 1,0 mm) platí ďalej, `axes` žijú len v pláne (na entitu sa nezapisujú), takže kusovník aj VEPO CSV sú
+  bajtovo identické a korpusové dielce mapujú hrany presne ako pred D5 (charakterizácia). Testy: `tests/pure/test_kovd5_abs_zasuvky.rb` (18), **5 overených mutácií** + in-SU
+  sekcia **`run_kovd5`** (Atira chrbát páska HORE a dno bez, Quadro bok boxu aj vnútorné čelo HORE, Kontrola tá istá plôška, Späť/Redo, stará zákazka po prestavbe).
   **explain (Astra #20 N16):** existujúci `Recipes.explain_stored` + `HardwareSets.explain` (členovia, kódy) sa v D len sprístupnia (D1b/D2b), žiadny druhý explain ani snapshot.
   **Scope OUT / presunuté:** Tip-On dvierka `class:hinge|tipon` → **KOV-F** (Astra #20 F14: závesové položky nenesú `opening_mode`, potrebuje dvojsegmentový hinge resolver) ·
   hromadný projektový upgrade (po D3b) · viacosový diff-modal · pomer D-109 · lifty (E) · linear pricing a sync tyč dĺžková (po V1) · šablóny 🔧 (I) · editor receptov · snapshot receptov.

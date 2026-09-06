@@ -17,6 +17,32 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-D5 — ZÁSUVKA UŽ UKAZUJE OLEP NA SPRÁVNEJ HRANE (v0.9.42, 7.9.2026).**
+  Posledný rez paketu KOV-D, jediný **geometrický**: dielce zásuvky boli v modeli **jednofarebné** — hoci pravidlo aj kusovník o ich olepe vedeli, na plôške sa páska
+  nekreslila vôbec a Kontrola olepov ich nezvýrazňovala. Dôvod bol vedomý (KOV-C2b): deskriptory zásuvky **zámerne nenosili osi** (`axes:`), lebo pri stojacom dielci by
+  vtedajšie mapovanie položilo L1 na **spodnú** hranu, kým páska ide na **hornú** — a `PartFaces` má zásadu „radšej žiadna farba než farba na zlej hrane". Astra to zapísala
+  ako F15 a package D z toho spravila samostatný PR.
+  **Čo bol vlastne ten rozpor.** `PartFaces` mapoval L1 vždy na MINIMUM osi šírky. Pre korpus to sedí (bok: L1 = predná hrana, chrbát: L1 = dolná), ale pre stojace dielce
+  zásuvky je osou šírky **výška** dielca, takže L1 vyšla dole — kým `AbsRules::EDGE_LABELS` aj seed 4 hovoria `drawer_back` L1 = **Horná** (a 2D karta to už kreslila cez
+  `EDGE_SIDES_STANDING`). Autoritou je ABS pravidlo a kusovník: recept sa **nemenil**, prispôsobilo sa mapovanie plôch.
+  **Riešenie = jedna mapa navyše, žiadna nová schéma.** Preklad kódu hrany na stenu kvádra má odteraz dve pomenované podoby: `EDGE_FACES` (default) a `STANDING_EDGE_FACES`,
+  kde je L1 = MAXIMUM osi šírky (horná plocha) a L2 dolná; priečne W1/W2 sa nemenia. Druhú dostávajú **výhradne** roly v `PartFaces::STANDING_ROLES` (`drawer_back`,
+  `box_side`, `drawer_inner_front`) — `drawer_bottom` leží a ostáva na defaulte. `AbsRules::STANDING_ROLES` je odteraz **alias** tej istej konštanty: zoznam existuje raz,
+  inak by sa 2D karta a model časom rozišli. Mapu číta **farbenie plôšok** (`CabinetBuilder.paint_edge_faces`), **zvýraznenie Kontroly** (`EdgeCheck`) aj **hover hrany**
+  (`HoverEdge`) — každé z nich posiela ROLU dielca a vlastnú kópiu mapy nemá (stráži zdrojový guard v testoch).
+  **Osi dielcov zásuvky.** `Construction.drawer_part_descriptor` ich dáva pomenovanou konštantou podľa toho, ako box naozaj stojí: dno `AXES_LYING`, chrbát a vnútorné čelo
+  `AXES_WALL` (rovina XZ), bok boxu **nová `AXES_WALL_DEPTH`** (rovina YZ — dĺžka je NL po hĺbke Y, šírka je výška boxu). Nič sa nehádalo z rozmerov. `ROLE_AXES` pozná všetky
+  štyri roly s **jediným** kandidátom, takže **stará zákazka** (postavená ešte bez osí) si ich pri čítaní dopočíta z kvádra — Kontrola olepov preto svieti aj tam, kde farba
+  ešte nie je, a prvá prestavba skrinky farbu doplní.
+  **Čo sa NEZMENILO (a je to testom uzamknuté):** recept ani ABS pravidlá (seed 4 = L1 1,0 mm, `SEED_VERSION` sa nebumpuje), schéma ani identita dielca — `axes` žijú **len
+  v pláne**, na entitu sa nikdy nezapisujú, takže kusovník, VEPO CSV aj ceny sú bajtovo rovnaké; korpusové dielce (bok, polica, dno, čelo, chrbát) mapujú hrany presne ako
+  predtým (charakterizácia „mapa s rolou = mapa bez roly"). Vedľajší dôsledok, ktorý pribudol zadarmo: odkedy sa osi zásuvkových dielcov dajú prečítať, vidí ich aj **kresba
+  smeru dekoru** (K2) — dovtedy ich ticho preskakovala.
+  **Testy:** `tests/pure/test_kovd5_abs_zasuvky.rb` (18 testov, celkovo **3340 headless**), **5 overených mutácií** (otočená mapa späť na default · dielec bez `axes` ·
+  `EdgeCheck` bez roly · `box_side` mimo `ROLE_AXES` · vlastný literál v `AbsRules`) + in-SU sekcia **`run_kovd5`**, ktorá meria **polohou plôšky** (nie cez `PartFaces`, inak
+  by bola tautológiou): Atira chrbát má materiál pásky na hornej stene a dno žiadny, Quadro bok boxu aj vnútorné čelo tiež hore, Kontrola zvýrazní tú istú plôšku, Späť aj
+  Redo mapovanie nemenia a zákazka bez farby ju po prestavbe dostane.
+
 - **KOV-D4 — CERUZKA TRAFÍ RIADOK, „BEZ KÓDOV" HOVORÍ PO ĽUDSKY, pamäť MÁ NAPÍSANÉ PRAVIDLO (v0.9.41, 6.9.2026).**
   Tri drobnosti, ktoré ostali ako dlh z KOV-C a boli v pakete D ako posledný UI rez. Žiadna z nich nemení výrobné číslo ani objednávku — všetky tri sú o tom, aby človek
   **našiel to, na čo klikol**, a aby mu plugin nikdy neukázal stav, ktorý nezvolil.

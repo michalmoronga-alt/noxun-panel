@@ -849,6 +849,8 @@ Vykonateľná podoba pravidiel ABS (defaulty rolí, resolver obchodnej hrúbky, 
 
 > **Priradenie strán L1/L2/W1/W2 na plochy kvádra dielca sa NIKDY neodvodzuje z hodnôt rozmerov** (dva rovnaké rozmery sú nerozhodnuteľné) — je to explicitný údaj deskriptora
 > `axes: { length:, width:, thickness: }`, ktorý zapisuje ten, kto box stavia. Keď osi chýbajú alebo nesedia s rozmermi, mapovanie sa **neháda** (radšej žiadna farba než farba na zlej hrane).
+> **Stojace dielce zásuviek (KOV-D5):** roly `drawer_back`, `box_side` a `drawer_inner_front` majú L1 = **hornú** hranu (tam ide páska), preto sa im dvojica L1/L2 mapuje
+> **otočene** — L1 na MAXIMUM osi šírky. Je to jedna zdieľaná mapa pre farbenie plôšok v modeli aj pre zvýraznenie Kontroly olepov; pravidlo (L1 = 1,0 mm) ani recept sa nemenia.
 > **Vedomá legacy výnimka (D-104):** deskriptor s osami žije len v pláne, na entite uložený nie je — kontrola olepov nad **už postavenou** zákazkou preto osi odvodí
 > z **ROLY** dielca a overí ich proti skutočnému kvádru; platí **výhradne jednoznačná zhoda** (nula alebo dve zhody = `nil` a dielec sa nezvýrazní), takže to nie je
 > zakázané hádanie z hodnôt rozmerov. Vykonateľná podoba kontraktu: [`noxun_engine/core/part_faces.rb`](../noxun_engine/core/part_faces.rb).
