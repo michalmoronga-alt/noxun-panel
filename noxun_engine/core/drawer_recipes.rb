@@ -153,12 +153,50 @@ module Noxun
       # Najmensi vyrobitelny rozmer — zdiela sa s planom (jediny prah v systeme).
       MIN_DIM = 0.01
 
+      # KOV-D3a: LEN-TESTOVACI SEAM PRE PRIECINOK RECEPTOV.
+      #
+      # Vsetky citacie funkcie maju `dir:` parameter (C1 vzor pre fixturny
+      # register v testoch), ale PANELOVE AKCIE a STAVBA ho neposielaju —
+      # citaju default. Aby sa dal upgrade receptu overit nad FIXTURNYM
+      # registrom (v repe su len recepty v1, produkcna v2 neexistuje), ma
+      # default JEDINE prepinacie miesto: tuto modulovu premennu.
+      #
+      # ZAMERNE UZKE: nastavuju ju VYHRADNE testy a in-SU runner
+      # (`with_test_dir`), NIKDY UI, config, payload ani datovy pack. Ziadna
+      # zapisova cesta pluginu sa jej nedotyka — v produkcii je vzdy `nil`,
+      # takze plati `DIR`.
+      @test_dir = nil
+
       module_function
+
+      # Priecinok, z ktoreho sa recepty citaju TERAZ (default vsetkych `dir:`).
+      def active_dir
+        @test_dir || DIR
+      end
+
+      def test_dir
+        @test_dir
+      end
+
+      # nil = spat na produkcny `DIR`. Cesta sa expanduje, aby sa relativny
+      # vstup testu nelamal o pracovny priecinok.
+      def test_dir=(path)
+        @test_dir = path.nil? ? nil : File.expand_path(path.to_s)
+      end
+
+      # Docasne prepnutie s GARANTOVANYM navratom (testy, in-SU sekcia).
+      def with_test_dir(path)
+        prev = @test_dir
+        self.test_dir = path
+        yield
+      ensure
+        @test_dir = prev
+      end
 
       # --- register a nacitanie ------------------------------------------------
 
       # Register vydanych receptov: { recipe_id => sha256 hex }.
-      def released(dir: DIR)
+      def released(dir: active_dir)
         path = File.join(dir, RELEASED_FILE)
         raise RecipeError, "Register receptov #{RELEASED_FILE} chyba (#{dir})." unless File.file?(path)
 
@@ -174,7 +212,7 @@ module Noxun
 
       # Nacita VYDANY recept. Odmietne neregistrovany id, chybajuci subor,
       # nesediaci odtlacok aj neplatnu schemu (vzdy vynimka, nikdy default).
-      def load(recipe_id, dir: DIR)
+      def load(recipe_id, dir: active_dir)
         id = recipe_id.to_s
         reg = released(dir: dir)
         raise RecipeError, "Recept #{id} nie je v registri vydanych receptov." unless reg.key?(id)
@@ -196,14 +234,14 @@ module Noxun
       # ZAMERNE sa NEFILTRUJE cez `parse_id` (Codex #302 kolo 1 P2): subor s menom,
       # ktore parser nepozna (`antaro_sisy_v1.json`), je prave ten pripad, ktory ma
       # test odhalit — odfiltrovanie by ho ticho prepasovalo.
-      def inventory(dir: DIR)
+      def inventory(dir: active_dir)
         Dir.glob(File.join(dir, '*.json')).map { |p| File.basename(p, '.json') }
            .reject { |b| b == File.basename(RELEASED_FILE, '.json') }
            .sort
       end
 
       # Najnovsia vydana verzia pre kombinaciu system|otvaranie, alebo nil.
-      def latest_for(system, opening, dir: DIR)
+      def latest_for(system, opening, dir: active_dir)
         best = nil
         released(dir: dir).each_key do |id|
           p = parse_id(id)
@@ -215,7 +253,7 @@ module Noxun
 
       # Surodenec ROVNAKEJ verzie pre inu kombinaciu system|otvaranie (alebo nil).
       # Prepnutie klasifikacie tak nikdy ticho nepovysi pripnuty recept.
-      def sibling(recipe_id, system, opening, dir: DIR)
+      def sibling(recipe_id, system, opening, dir: active_dir)
         p = parse_id(recipe_id)
         return nil unless p
 
@@ -223,11 +261,24 @@ module Noxun
         released(dir: dir).key?(want) ? want : nil
       end
 
+      # KOV-D3a: je `to_id` NOVSIA verzia TEJ ISTEJ kombinacie system|otvaranie
+      # ako `from_id`? JEDINE miesto pravdy o smere upgradu — cita ho akcia
+      # panela. Rovnaka alebo nizsia verzia je `false` (ZIADNY downgrade:
+      # stara zakazka sa nikdy nesmie „vratit" na inu fyziku), rovnako ako
+      # cudzi system alebo ine otvaranie.
+      def upgrade?(from_id, to_id)
+        a = parse_id(from_id)
+        b = parse_id(to_id)
+        return false if a.nil? || b.nil?
+
+        a[:system] == b[:system] && a[:opening] == b[:opening] && b[:version] > a[:version]
+      end
+
       # Stav AKTIVNEHO zaznamu mapy `drawer.recipe_refs` (system|opening -> id):
       #   [:missing, nil]   — zaznam chyba (C2 doplni `latest_for`/`sibling`)
       #   [:known, id]      — zaznam existuje a je vydany -> pouzi presne ten
       #   [:unknown, id]    — zaznam existuje, ale plugin ho nepozna -> RED
-      def active_ref(refs_map, system, opening, dir: DIR)
+      def active_ref(refs_map, system, opening, dir: active_dir)
         return [:missing, nil] unless refs_map.is_a?(Hash)
 
         key = "#{system}|#{opening}"
@@ -260,7 +311,7 @@ module Noxun
       # JEDINA implementacia troch stavov (`active_ref`) — cita ju stavba
       # (`Construction.drawer_pass`) aj panelove guardy. `nil` = neznamy ref
       # (RED `drawer_recipe_unknown` vyda stavba) alebo systém bez receptu.
-      def pick_ref(refs_map, system, opening, dir: DIR)
+      def pick_ref(refs_map, system, opening, dir: active_dir)
         state, ref = active_ref(refs_map, system, opening, dir: dir)
         return nil if state == :unknown
         return ref if state == :known
@@ -268,15 +319,27 @@ module Noxun
         # NOVA kombinacia: surodenec ROVNAKEJ verzie, inak najnovsi vydany.
         # KOV-D1a (Codex #307 kolo 2 P1): surodenec sa berie LEN z VALIDOVANYCH
         # zaznamov mapy — poskodeny (RED) zaznam vyber NIKDY neovplyvni.
+        #
+        # KOV-D3a (Astra #20 F12, Codex #307 kolo 2 P1): ked mapa nesie VIAC
+        # verzii (po upgrade jedneho otvarania zije `sisy` na v2 a `p2o` este
+        # na v1), rozhoduje STABILNE PRAVIDLO, nie poradie klucov v Hashi:
+        # berie sa NAJNIZSIA dostupna surodenecka verzia. Novo klasifikovane
+        # celo tak nikdy „skoci" na novsiu fyziku len preto, ze ju medzitym
+        # dostala INA kombinacia — povysenie ostava vyhradne explicitnou akciou.
+        best = nil
         if refs_map.is_a?(Hash)
           refs_map.each do |k, id|
             ksys, kopen = k.to_s.split('|', 2)
             next unless ref_matches_key?(id, ksys, kopen)
 
-            sib = sibling(id, system, opening, dir: dir)
-            return sib if sib
+            sib = parse_id(sibling(id, system, opening, dir: dir))
+            next if sib.nil?
+
+            best = sib if best.nil? || sib[:version] < best[:version]
           end
         end
+        return best[:id] if best
+
         latest_for(system, opening, dir: dir)
       end
 
@@ -285,7 +348,7 @@ module Noxun
       # semantika MUSI byt zhodna s `resolve` (presna zhoda, ziadna tolerancia),
       # inak by sa override ulozil a recept ho vzapati odmietol.
       # -> [recipe, [mm, ...]] | nil (legacy celo, neznamy ref, ina rola)
-      def thicknesses_for(front_item, role, dir: DIR)
+      def thicknesses_for(front_item, role, dir: active_dir)
         kind, key = recipe_key_for(front_item)
         return nil unless kind == :ok
 
@@ -553,7 +616,7 @@ module Noxun
       # verziu alebo na ine otvaranie by sa merala cudzimi cislami.
       # -> [recipe, [mm, ...]] | nil (legacy celo, ciastocna klasifikacia,
       #    neznamy pripnuty recept — vtedy sa preflight necha na stavbu)
-      def thicknesses_for_front(front_item, dir: DIR)
+      def thicknesses_for_front(front_item, dir: active_dir)
         kind, key = recipe_key_for(front_item)
         return nil unless kind == :ok
 
@@ -573,7 +636,7 @@ module Noxun
       # Prijme AKTIVNY recept tohto cela danu hrubku? Celo, ktoreho recept
       # nepoznáme (legacy, neznamy ref), preflight NEBLOKUJE — jeho stav rieši
       # stavba vlastnym RED nalezom.
-      def thickness_ok_for_front?(front_item, mm, dir: DIR)
+      def thickness_ok_for_front?(front_item, mm, dir: active_dir)
         pair = thicknesses_for_front(front_item, dir: dir)
         return true if pair.nil?
 
@@ -584,7 +647,7 @@ module Noxun
       # NAJNOVSIEHO receptu systemu. Pouziva sa VYHRADNE tam, kde niet co
       # pokazit (nova projektova predvolba v zakazke bez zasuviek) a v textoch
       # hlasok. Kde uz klasifikovane celo je, plati `thicknesses_for_front`.
-      def supported_thicknesses(system, dir: DIR)
+      def supported_thicknesses(system, dir: active_dir)
         id = OPENINGS.filter_map { |o| latest_for(system, o, dir: dir) }.first
         return [] if id.nil?
 
@@ -594,7 +657,7 @@ module Noxun
         lists.reduce { |acc, l| acc.select { |v| l.any? { |x| same?(x, v) } } }.uniq.sort
       end
 
-      def thickness_ok_for_system?(system, mm, dir: DIR)
+      def thickness_ok_for_system?(system, mm, dir: active_dir)
         th = supported_thicknesses(system, dir: dir)
         !th.empty? && th.any? { |v| same?(v, mm) }
       end
@@ -604,12 +667,12 @@ module Noxun
       # selektor predvolby v Studiu (`MaterialsDialog`) aj hromadne „Nahradit
       # UNI…" (`ru_project_target_issue`). Dva rozne predikaty by znamenali, ze
       # ta ista doska prejde jednou cestou a druhou nie.
-      def thickness_ok_for_any_system?(mm, dir: DIR)
+      def thickness_ok_for_any_system?(mm, dir: active_dir)
         SYSTEMS.any? { |sys| thickness_ok_for_system?(sys, mm, dir: dir) }
       end
 
       # Vsetky hrubky, ktore pozna aspon jeden vydany system (do hlasok).
-      def all_supported_thicknesses(dir: DIR)
+      def all_supported_thicknesses(dir: active_dir)
         SYSTEMS.flat_map { |sys| supported_thicknesses(sys, dir: dir) }.uniq.sort
       end
 
@@ -632,7 +695,7 @@ module Noxun
       # z ulozeneho stavu DOKAZAT (svetle rozmery skrinky sa neukladaju, preto
       # sa netvrdia). Nenacitatelny alebo neznamy recept = PRAZDNY zoznam —
       # karta vtedy detail vobec nekresli (radsej nic nez vymyslene cislo).
-      def explain_stored(params, dir: DIR)
+      def explain_stored(params, dir: active_dir)
         p = params.is_a?(Hash) ? params : {}
         id = p['recipe_id'].to_s
         return [] if id.empty?
@@ -963,6 +1026,7 @@ module Noxun
         r[:load_by_cell] = load_by_cell!(raw['load_by_cell'], id)
         r[:source] = raw['source'].is_a?(Hash) ? raw['source'] : (raise RecipeError, "Recept #{id}: chyba mapa 'source'.")
         r[:formula_doc] = raw['formula_doc'].is_a?(Hash) ? raw['formula_doc'] : {}
+        r[:release_note] = release_note!(raw, id)
 
         series = validate_series!(raw, r, id)
         r[:min_depth_by_nl] = min_depth_map!(raw['min_depth_by_nl'], id, series)
@@ -1092,6 +1156,29 @@ module Noxun
         raise RecipeError, "Recept #{id}: 'min_depth_by_nl' nema bunky pre NL #{missing.join(', ')}." unless missing.empty?
 
         out
+      end
+
+      # KOV-D3a: AUTORSKA POZNAMKA VYDANIA — jedine VOLITELNE pole schemy.
+      # Vysvetluje, co sa v novej verzii zmenilo a preco (text pre potvrdenie
+      # upgradu v D3b). Recepty v1 ho vynechavaju, preto sa NEPRITOMNOST
+      # nesmie stat chybou; PRITOMNE pole sa uz validuje prisne ako kazde ine
+      # (nie String, prazdne po orezani alebo dlhsie nez `RELEASE_NOTE_MAX` =
+      # odmietnutie CELEHO receptu — tichy default je zakazany zasadou 3).
+      RELEASE_NOTE_MAX = 400
+
+      def release_note!(raw, id)
+        return nil unless raw.key?('release_note')
+
+        v = raw['release_note']
+        raise RecipeError, "Recept #{id}: 'release_note' musi byt text (#{v.class})." unless v.is_a?(String)
+
+        s = v.strip
+        raise RecipeError, "Recept #{id}: 'release_note' je prazdne — vynechaj pole alebo napis dovod." if s.empty?
+        if s.length > RELEASE_NOTE_MAX
+          raise RecipeError, "Recept #{id}: 'release_note' ma #{s.length} znakov (max #{RELEASE_NOTE_MAX})."
+        end
+
+        s
       end
 
       def num_list!(raw, id, field)

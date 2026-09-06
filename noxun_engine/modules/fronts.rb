@@ -675,6 +675,32 @@ module Noxun
         changed
       end
 
+      # KOV-D3a: PREPIS JEDNEHO zaznamu mapy `recipe_refs` (upgrade receptu).
+      #
+      # `write_drawer_fields!` vyssie zamerne LEN DOPLNA chybajuce — je to
+      # migracna cesta stavby a tichy prepis pripnutej verzie by zmenil
+      # GEOMETRIU hotovej zakazky. Zmena verzie je vyhradne EXPLICITNA akcia
+      # pouzivatela, a tato funkcia je jej JEDINY zapisovy kanal.
+      #
+      # Meni sa PRESNE JEDEN kluc `system|otvaranie` PRESNE JEDNEHO cela;
+      # ostatne zaznamy mapy (druhy system, druhe otvaranie) sa nedotknu.
+      # `expect` = ocakavana STARA hodnota: nesulad = zapis sa NEVYKONA
+      # (stav sa medzitym zmenil). Vracia true, ak sa config naozaj zmenil.
+      def set_recipe_ref!(fronts_cfg, front_id, ref_key, recipe_id, expect:)
+        return false unless fronts_cfg.is_a?(Hash) && fronts_cfg['items'].is_a?(Array)
+        return false unless RECIPE_REF_KEY_RE.match?(ref_key.to_s) && RECIPE_ID_RE.match?(recipe_id.to_s)
+
+        it = fronts_cfg['items'].find { |i| i.is_a?(Hash) && i['id'].to_s == front_id.to_s }
+        return false unless it.is_a?(Hash) && it['drawer'].is_a?(Hash)
+
+        refs = it['drawer']['recipe_refs']
+        return false unless refs.is_a?(Hash) && refs[ref_key.to_s].to_s == expect.to_s
+        return false if expect.to_s == recipe_id.to_s
+
+        refs[ref_key.to_s] = recipe_id.to_s
+        true
+      end
+
       # Uzavrety zoznam hodnot: mimo zoznamu (aj prazdne/iny typ) -> nil = kluc
       # sa do configu nedostane. ZIADNY default sa nedoplna.
       def norm_enum(raw, allowed)
