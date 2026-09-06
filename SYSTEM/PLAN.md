@@ -548,8 +548,10 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   aj poradie nezmenené, surový kľúč ostáva v `title`, CSV/VEPO **znak po znaku** rovnaké. (3) **pravidlo pamäte** (STANDARD §6, `hardware.md`): pamäť patrí rovnakému ID čela ·
   zámok je viazaný na svoj recept a pri návrate sa **znovu validuje stavbou** · dormantný zámok iného receptu sa **nikdy nezobrazí ako aktívny** — jediná chýbajúca časť
   (`Panel.attach_override_axes` dával chipy KAŽDÉMU receptovému záznamu) je opravená **čítacím** filtrom podľa `idents` pripnutého receptu; jadro (resolver, schéma, zámky)
-  sa nemenilo. Testy: `tests/pure/test_kovd4_ui.rb`, `tests/js/test_kovd4_ui.js` (47 assertov), 8 overených mutácií + in-SU sekcia **`run_kovd4`** (drawer → door → drawer,
-  zmena otvárania).
+  sa nemenilo. **Codex kolo 1 (2× P2):** deep-link na zásah dostanú **len konflikty, ktoré ten zásah spôsobil** — nový whitelist `Recipes::OVERRIDE_CONFLICT_CODES`
+  (`nl_lock_invalid` · `height_lock_invalid` · `drawer_override_invalid`); pri hrúbke, prekážke, KD, poškodenom pine či `drawer_stale` by reset zásahu konflikt nevyriešil ·
+  nález **„kód zo setu nie je v katalógu"** (`hardware_code`) mieri na svoj **živý riadok** kovania, ad-hoc zdroj ostáva na dnešnej ceste (ručné položky riadok s identitou nemajú).
+  Testy: `tests/pure/test_kovd4_ui.rb`, `tests/js/test_kovd4_ui.js` (47 assertov), **10 overených mutácií** + in-SU sekcia **`run_kovd4`** (drawer → door → drawer, zmena otvárania).
   **D5 · ABS FARBENIE DIELCOV ZÁSUVIEK (geometria, samostatný PR, In-SU povinné):** `axes:` pre drawer roly + explicitné pravidlo orientácie hrán pre stojace roly (`drawer_back`,
   `box_side`, `drawer_inner_front`: L1 = HORNÁ, `PartFaces` dnes mapuje L1 na minimum osi šírky — Astra #20 F15), spoločné pre farbenie aj zvýraznenie Kontroly; čítanie uložených
   dielcov cez `ROLE_AXES`; recept sa NEmení (L1 ostáva). In-SU overenie hornej hrany.

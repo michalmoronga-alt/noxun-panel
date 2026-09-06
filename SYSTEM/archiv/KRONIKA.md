@@ -45,9 +45,16 @@
   zásuvky dostával chipy osí **KAŽDÝ** receptový záznam vlastníka, teda aj dormantný — chip by ukazoval stav **aktuálneho** receptu, kým klik by zapisoval na **cudzí** `rule_id`.
   Oprava je **čítacia**: `Panel.attach_override_axes` berie celý `drawer_axes_index` a porovnáva `rule_id` proti `idents` **pripnutého** receptu. Záznam v configu ostáva
   (osirotený riadok ho ďalej ukáže s tlačidlom „zrušiť"), len bez chipov. **Jadro sa nedotklo** — resolver, normalizácia, schéma ani recepty.
-  **Testy:** `tests/pure/test_kovd4_ui.rb` (adresa nálezu, fail-closed pri viacerých zásahoch, `owner_label` mimo identity, pamäť a dormantný zámok nad reálnym configom),
-  `tests/js/test_kovd4_ui.js` (47 assertov, mini-DOM: deep-link, jediné prisvietenie, stĺpec „kde"), **8 overených mutácií** + in-SU sekcia **`run_kovd4`** (drawer → door →
-  drawer cez tú istú cestu ako panel, zmena otvárania). Headless 3320, JS 94 sád.
+  **Codex kolo 1 (2× P2, žiadny P1).** Prvý nález: deep-link na zásah sa pripájal **každému** konfliktu zásuvky, ktorý mal jediný zásah výsuvu — teda aj `drawer_thickness_unsupported`,
+  `drawer_recipe_unknown` či `drawer_stale`, kde by jeho reset **nič nevyriešil** (a pri `drawer_stale` riadok ani nemusí byť osirotený). Ceruzka by hlásila úspech a zvýraznila
+  falošnú nápravu. Odteraz rozhoduje **whitelist** `Recipes::OVERRIDE_CONFLICT_CODES` = `nl_lock_invalid` · `height_lock_invalid` · `drawer_override_invalid` — presne tie tri,
+  ktorých veta riadok už dnes menuje (`LOCK_HINT` / `ORPHAN_HINT`). **Zámerne whitelist, nie blacklist:** pri blackliste by tichú chybu zdedil každý budúci kód konfliktu; guard
+  test navyše overuje, že celý whitelist je podmnožinou registra brány. Druhý nález: nálezy **„kód zo setu nie je v katalógu"** (`hardware_code`) adresu nemali, hoci každý
+  ne-ad-hoc zdroj nesie plnú identitu a jeho **živý** riadok v Kovaní existuje — ceruzka otvárala kartu čela namiesto riadku. Setový zdroj ju dostal (`orphan: false`), **ad-hoc**
+  zámerne nie: ručné položky žijú vo vlastnom zozname `hardware_manual` **bez identitných atribútov** (KOV-H2), takže riadok, na ktorý by sa mierilo, neexistuje.
+  **Testy:** `tests/pure/test_kovd4_ui.rb` (adresa nálezu, whitelist **per kód** nad celým registrom brány, ad-hoc vs. setový zdroj, fail-closed pri viacerých zásahoch,
+  `owner_label` mimo identity, pamäť a dormantný zámok nad reálnym configom), `tests/js/test_kovd4_ui.js` (47 assertov, mini-DOM: deep-link, jediné prisvietenie, stĺpec „kde"),
+  **10 overených mutácií** + in-SU sekcia **`run_kovd4`** (drawer → door → drawer cez tú istú cestu ako panel, zmena otvárania). Headless 3322, JS 94 sád.
 
 - **KOV-D3b — UPGRADE RECEPTU: UI, DOPAD NA TOTO ČELO, POTVRDENIE (v0.9.40, 6.9.2026).**
   D3a dodala jadro prechodu na novšiu verziu receptu, ale **bez tlačidla** a bez registrácie callbacku. Táto dávka ho zapája: karta čela dostáva ponuku, klik ukáže

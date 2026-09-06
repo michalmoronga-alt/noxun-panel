@@ -26,6 +26,12 @@
 #      -> „KOV-D4 (R3): DORMANTNY zamok ineho receptu chipy NEDOSTANE"
 #   M4 `owner_label` vstupi do identity nemapovaneho zaznamu
 #      -> „KOV-D4 (R2): `owner_label` je ADITIVNY — identita sa nemeni"
+# Codex #316 kolo 1 (P2):
+#   M5 `drawer_conflict_target` pouzije BLACKLIST (vsetko okrem par kodov)
+#      -> „KOV-D4 (P2-1): adresu zasahu dostanu LEN konflikty, ktore ten zasah
+#         naozaj sposobil"
+#   M6 `CAT_HW_CODE` prilepi cielovy riadok aj AD-HOC zdroju
+#      -> „KOV-D4 (P2-2): rucna polozka riadok kovania NEMA — ostava na dnesnej ceste"
 require_relative '../helper' unless defined?(NxTest)
 
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core') if NxTest.headless?
@@ -76,6 +82,16 @@ module NxD4
 
   def find(items, category)
     items.find { |it| it['category'] == category }
+  end
+
+  # Riadok expanzie s kodom MIMO katalogu (`exp['rows']`) + jeho zdroj.
+  # `origin: 'adhoc'` = rucna polozka KOV-H2 (vlastny zoznam, ziadny riadok
+  # kovania); bez neho je to SETOVY zdroj so zivym riadkom.
+  def code_row(src_extra = {})
+    src = { 'cabinet_id' => 'CAB-1', 'owner_part_key' => OWNER, 'generic_type' => 'slide',
+            'rule_id' => RID, 'set_id' => 'atira-h70', 'quantity' => 1 }.merge(src_extra)
+    { 'rows' => [{ 'code' => 'ABC-1', 'missing' => true, 'name_sk' => 'Kus',
+                   'sources' => [src] }] }
   end
 
   # Nemapovany zaznam expanzie (tvar `HardwareSets.unmapped_entry`).
@@ -169,6 +185,57 @@ NxTest.test('KOV-D4 (R1): pri VIACERYCH zasahoch vlastnika sa adresa NEHADA') do
                 'prisvietit ten druhy je horsie nez neprisvietit nic')
   none = c.find(c.items_for(hardware_issues: [c.issue]), 'drawer')
   NxTest.refute(none.key?('data'), 'a bez zasahu tiez ziadna adresa')
+end
+
+# M5 (Codex #316 kolo 1 P2-1)
+NxTest.test('KOV-D4 (P2-1): adresu zasahu dostanu LEN konflikty, ktore ten zasah naozaj sposobil') do
+  c = NxD4
+  r = c.e::Recipes
+  # NAPRAVOU je riadok zasahu — veta konfliktu ho uz dnes menuje (LOCK_HINT /
+  # ORPHAN_HINT), takze ceruzka tam smie mierit.
+  %w[nl_lock_invalid height_lock_invalid drawer_override_invalid].each do |code|
+    it = c.find(c.items_for(hardware_issues: [c.issue(code)],
+                            hardware_overrides: [c.lock]), 'drawer')
+    NxTest.assert_equal(NxD4::RID, (it['data'] || {})['rule_id'],
+                        "#{code}: reset zasahu konflikt VYRIESI, ceruzka nan smie mierit")
+  end
+  NxTest.assert_equal(%w[nl_lock_invalid height_lock_invalid drawer_override_invalid],
+                      r::OVERRIDE_CONFLICT_CODES,
+                      'zoznam je WHITELIST pri registri kodov — novy kod ho nezdedi')
+  NxTest.assert((r::OVERRIDE_CONFLICT_CODES - r::DRAWER_BLOCKERS).empty?,
+                'kazdy kod whitelistu MUSI byt v registri brany (inak je to preklep)')
+
+  # Konflikt, ktory so zasahom NESUVISI: zaznam vlastnika existuje, ale jeho
+  # zrusenie by NIC nevyriesilo — prisvietit ho by bola falosna naprava.
+  (r::DRAWER_BLOCKERS - r::OVERRIDE_CONFLICT_CODES).each do |code|
+    next if code == r::KIT_MISSING # ma vlastnu kategoriu (`drawer_kit`), sem nechodi
+
+    it = c.find(c.items_for(hardware_issues: [c.issue(code)],
+                            hardware_overrides: [c.lock]), 'drawer')
+    NxTest.refute(it.nil?, "#{code}: RED nalez musi vzniknut aj bez adresy")
+    NxTest.refute(it.key?('data'),
+                  "#{code}: reset rucneho zasahu tento konflikt NEVYRIESI — ziadna adresa")
+  end
+end
+
+# M6 (Codex #316 kolo 1 P2-2)
+NxTest.test('KOV-D4 (P2-2): kod mimo katalogu mieri na ZIVY riadok, rucna polozka nie') do
+  c = NxD4
+  set_it = c.find(c.items_for({}, c.code_row), 'hardware_code')
+  NxTest.refute(set_it.nil?, 'ORANGE nalez „kod nie je v katalogu" existuje')
+  NxTest.assert_equal({ 'owner_part_key' => NxD4::OWNER, 'generic_type' => 'slide',
+                        'rule_id' => NxD4::RID, 'orphan' => false },
+                      set_it['data'],
+                      'setova polozka v Kovani ZIJE (chyba jej len zaznam v katalogu)')
+
+  adhoc = c.find(c.items_for({}, c.code_row('origin' => 'adhoc')), 'hardware_code')
+  NxTest.refute(adhoc.nil?, 'aj rucna polozka ma svoj ORANGE nalez')
+  NxTest.refute(adhoc.key?('data'),
+                'KOV-D4 (P2-2): rucna polozka riadok kovania NEMA — ostava na dnesnej ceste')
+  NxTest.assert(adhoc['message_sk'].include?('Ručná položka'), 'a veta ju menuje ako rucnu')
+
+  bare = c.find(c.items_for({}, c.code_row('rule_id' => '')), 'hardware_code')
+  NxTest.refute(bare.key?('data'), 'zdroj bez `rule_id` adresu nedostane (neuplna identita)')
 end
 
 # M2

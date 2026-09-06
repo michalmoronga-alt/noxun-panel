@@ -2189,9 +2189,12 @@ ostáva dnešné správanie: označí sa **dielec**. Status vety sú preto dve (
 
 **Deep-link Kontrola → riadok v Kovaní (KOV-D4):** nález, ktorý má v sekcii Kovanie **konkrétny riadok**, nesie od D4 jeho **adresu** v aditívnom kľúči `data`
 (`owner_part_key` + `generic_type` + `rule_id` + `orphan`). Adresu skladá **VALIDÁCIA** — `Validation.hw_target` — a `stable_key` sa ňou **nemení** (dedup aj klik-select ostávajú).
-Nesú ju: vypnuté kovanie (`hardware`, `orphan: true` — vypnutý zásah živú položku nemá), nenacenená položka (`hardware_unmapped`) a chýbajúci kit (`drawer_kit`, oba `orphan: false`),
-a **konflikt zásuvky** (`drawer`) vtedy, keď má vlastník **práve JEDEN** zásah výsuvu — jeho veta posiela používateľa na riadok „neplatný ručný zásah" a ceruzka tam trafí.
-Pri viacerých zásahoch (dormantný zámok vedľa aktuálneho) server **nehádá** a nález ostáva bez adresy: prisvietiť ten druhý je horšie než neprisvietiť nič.
+Nesú ju: vypnuté kovanie (`hardware`, `orphan: true` — vypnutý zásah živú položku nemá), nenacenená položka (`hardware_unmapped`), chýbajúci kit (`drawer_kit`) a **kód mimo katalógu
+zo SETOVÉHO zdroja** (`hardware_code`; všetky tri `orphan: false`), plus **konflikt zásuvky** (`drawer`). **Ad-hoc zdroj `hardware_code` adresu nedostane** — ručné položky žijú
+vo vlastnom zozname bez identitných atribútov (KOV-H2), takže riadok, na ktorý by sa mierilo, neexistuje. **Konflikt zásuvky** ju dostane len pri kóde z
+`Recipes::OVERRIDE_CONFLICT_CODES` (`nl_lock_invalid` · `height_lock_invalid` · `drawer_override_invalid`) **a** keď má vlastník **práve JEDEN** zásah výsuvu: len pri týchto troch
+je nápravou naozaj riadok zásahu (ich veta ho už dnes menuje), pri ostatných kódoch by jeho reset konflikt **nevyriešil**. Pri viacerých zásahoch (dormantný zámok vedľa
+aktuálneho) server **nehádá** a nález ostáva bez adresy: prisvietiť ten druhý je horšie než neprisvietiť nič.
 
 `ProductionCore.do_select` adresu iba **prepošle** (`hw_focus_target` overí tvar) — vetva kovania ide **PRED** kartou čela (pri kovaní je cieľom riadok, nie karta) a beží cez nový
 kanál `Panel.push_focus_hardware` → `NX.focusHardware` → `nxFocusHardware` (hardware.js): prepne kontext na **Kovanie**, nájde riadok podľa adresy, rozbalí cestu, doscrolluje a

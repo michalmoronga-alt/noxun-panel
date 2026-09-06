@@ -616,7 +616,7 @@ module Noxun
         label = pkey.empty? ? 'zásuvka' : pkey if label.empty?
         msg = iss['message'].to_s.strip
         msg = 'Zásuvka sa nedá vyriešiť.' if msg.empty?
-        data = drawer_conflict_target(oid, pkey, overrides)
+        data = drawer_conflict_target(iss['code'], oid, pkey, overrides)
         # Migracny kod ma vlastny koniec vety: dielce nechybaju preto, ze sa
         # nedali vyrobit, ale preto, ze skrinka este nepresla prestavbou.
         tail = iss['code'].to_s == Recipes::STALE ? 'Export je zastavený, kým ju neprestavíš.'
@@ -638,14 +638,23 @@ module Noxun
       # Cita sa preto z RAW zoznamu zasahov (ten isty zdroj, z ktoreho panel
       # osirotene riadky stavia).
       #
-      # FAIL-CLOSED: adresa sa vrati LEN pri JEDINOM zasahu vysuvu tohto
-      # vlastnika. Ked ich lezi viac (dormantny zamok stareho receptu vedla
-      # zamku aktualneho), server nevie povedat, ktory z nich pouzivatela pali —
-      # a prisvietit ten druhy je horsie nez neprisvietit nic (nalez vtedy
-      # ostava „bez identity zaznamu" a sprava sa ako dnes).
+      # DVE FAIL-CLOSED BRANY:
+      #   (1) KOD konfliktu musi byt v `Recipes::OVERRIDE_CONFLICT_CODES`
+      #       (Codex #316 kolo 1 P2). Zasuvka moze byt cervena z desiatich
+      #       dovodov, ale reset rucneho zasahu je napravou len pri troch —
+      #       pri hrubke, prekazke, KD, poskodenom pine ci nemigrovanej skrinke
+      #       by ceruzka prisvietila zaznam, ktoreho zrusenie NIC nevyriesi
+      #       (a pri `drawer_stale` riadok ani nemusi byt osiroteny). Whitelist
+      #       zamerne: novy kod nema tichu chybu zdedit.
+      #   (2) Adresa sa vrati LEN pri JEDINOM zasahu vysuvu tohto vlastnika.
+      #       Ked ich lezi viac (dormantny zamok stareho receptu vedla zamku
+      #       aktualneho), server nevie povedat, ktory z nich pouzivatela pali —
+      #       a prisvietit ten druhy je horsie nez neprisvietit nic.
+      # Nalez bez adresy sa sprava presne ako pred D4 (karta cela).
       # CISTA funkcia (ziadne IO) — headless testovatelna.
-      def drawer_conflict_target(owner_id, part_key, overrides)
+      def drawer_conflict_target(code, owner_id, part_key, overrides)
         return nil if part_key.to_s.empty? || !defined?(Recipes)
+        return nil unless Recipes::OVERRIDE_CONFLICT_CODES.include?(code.to_s)
 
         gt = Recipes::LOCK_GENERIC_TYPE
         hits = Array(overrides).select do |ov|
@@ -951,13 +960,21 @@ module Noxun
                   else
                     "Kód #{code} zo setu „#{src['set_id']}“ nie je v katalógu kovania — bez názvu a ceny."
                   end
-            items << {
+            code_item = {
               'severity' => ORANGE, 'category' => CAT_HW_CODE,
               'owner_id' => oid, 'part_key' => (opk.empty? ? nil : opk), 'hw_key' => nil,
               'message_sk' => msg,
               'stable_key' => [CAT_HW_CODE, oid, opk, gt, src['rule_id'].to_s,
                                src['set_id'].to_s, code].join('|')
             }
+            # KOV-D4 (Codex #316 kolo 1 P2): SETOVY zdroj ma v Kovani ZIVY riadok
+            # (polozka vznikla, chyba jej len zaznam v katalogu), a nesie plnu
+            # identitu — ceruzka teda mieri nan, nie na kartu cela.
+            # AD-HOC riadok taky riadok NEMA: rucne polozky ziju vo vlastnom
+            # zozname (`hardware_manual`, KOV-H2) BEZ identitnych atributov,
+            # takze `data` nedostane a nalez ostava na dnesnej ceste.
+            src_target = adhoc ? nil : hw_target(opk, gt, src['rule_id'], orphan: false)
+            items << (src_target ? code_item.merge('data' => src_target) : code_item)
           end
         end
       end

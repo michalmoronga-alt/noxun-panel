@@ -45,9 +45,13 @@ len s vetou, ktorá menuje ručnú položku a hovorí „ostáva bez ceny" — n
 **KOV-D4 — `data` = ADRESA RIADKU V KOVANÍ.** Nález, ktorý má v sekcii Kovanie konkrétny riadok, nesie aditívny kľúč `data` z `hw_target(owner_part_key, generic_type, rule_id,
 orphan:)` — tá istá trojica identity, akou je zásah adresovaný všade inde (`HardwareRules.override_identity`), plus príznak `orphan` (osirotený záznam vs. živá položka). Do
 `stable_key` **nevstupuje** (vzor `extra:` v `record_item`), takže dedup ani klik-select sa nehnú, a neúplná identita = **žiadne** `data` (nález sa správa ako pred D4).
-Nesú ju: `hardware` (vypnutý zásah, `orphan: true`), `hardware_unmapped` a `drawer_kit` (živý riadok, `orphan: false`) a `drawer` (konflikt zásuvky) — ten **len keď má vlastník
-práve JEDEN zásah výsuvu**: `drawer_conflict_target` číta raw `collected[:hardware_overrides]` (schéma sa nemení, `rule_id` v uloženom `drawer_conflicts` nie je) a pri viacerých
-záznamoch (dormantný zámok vedľa aktuálneho) **fail-closed nehádá**. Klientska strana je v `ui-lifecycle.md` (sekcia KONTROLA, kontext Kovanie).
+Nesú ju: `hardware` (vypnutý zásah, `orphan: true`), `hardware_unmapped`, `drawer_kit` a **`hardware_code` pri SETOVOM zdroji** (živý riadok, `orphan: false`) a `drawer`
+(konflikt zásuvky). **Dve výnimky, obe fail-closed:** ad-hoc zdroj `hardware_code` adresu **nedostane** (ručné položky žijú vo vlastnom zozname `hardware_manual` bez identitných
+atribútov — KOV-H2), a konflikt zásuvky ju dostane **len pri kóde z `Recipes::OVERRIDE_CONFLICT_CODES`** (`nl_lock_invalid` · `height_lock_invalid` · `drawer_override_invalid` —
+presne tie, ktorých veta už dnes menuje riadok zásahu cez `LOCK_HINT`/`ORPHAN_HINT`) **a súčasne len keď má vlastník práve JEDEN zásah výsuvu**. Whitelist zámerne: pri hrúbke,
+prekážke, KD, poškodenom pine či `drawer_stale` by reset zásahu konflikt **nevyriešil** (a riadok ani nemusí byť osirotený), takže by ceruzka sľubovala falošnú nápravu; blacklist
+by tú chybu zdedil každému budúcemu kódu. `drawer_conflict_target` číta raw `collected[:hardware_overrides]` (schéma sa nemení, `rule_id` v uloženom `drawer_conflicts` nie je) a pri
+viacerých záznamoch (dormantný zámok vedľa aktuálneho) **nehádá**. Klientska strana je v `ui-lifecycle.md` (sekcia KONTROLA, kontext Kovanie).
 
 ### production_core.rb — zdieľané čisté jadro výstupov zákazky (ŠT-1a PR A)
 

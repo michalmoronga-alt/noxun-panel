@@ -744,5 +744,10 @@ prepol zdroj na `manual` a nákup by prestal povyšovať chýbajúci kit na bloc
 hrana 1,0). `hardware_params` (`recipe_id`, `system`, `height_variant` | `box_height`, `nominal_length`, `load`, `opening`) je podklad pre **jednu** položku výsuvu, ktorú
 skladá C2. `explain` sú slovenské vety pre Inspector.
 
+**`OVERRIDE_CONFLICT_CODES` (KOV-D4)** = podmnožina troch kódov, ktorých **nápravou je riadok ručného zásahu** v Kovaní: `nl_lock_invalid` · `height_lock_invalid` ·
+`drawer_override_invalid`. Presne tie, ktorých veta už riadok menuje (`LOCK_HINT`, `Construction::ORPHAN_HINT`) — a jediné, pri ktorých smie deep-link Kontroly mieriť na záznam
+`hardware_overrides`. Je to **whitelist**: pri hrúbke, prekážke, KD, poškodenom pine či `drawer_stale` by reset zásahu konflikt nevyriešil (a riadok ani nemusí byť osirotený),
+takže blacklist by tichú chybu zdedil každému budúcemu kódu.
+
 **`CONFLICT_CODES`** = register 11 kódov brány `DRAWER_BLOCKERS` (KOV-C 10 + `height_lock_invalid` z KOV-D2a). C1 ich len **produkuje**; napojenie na `export_blockers`, `hardware_issues` a Kontrolu je
 úloha C2 — v C1 preto `drawer_kit_missing` ani `drawer_override_invalid` nikto nevyrába, sú tu len ako jediné miesto pravdy o množine kódov.

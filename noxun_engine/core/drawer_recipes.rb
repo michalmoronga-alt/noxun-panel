@@ -80,6 +80,21 @@ module Noxun
         height_lock_invalid drawer_override_invalid drawer_kit_missing
       ].freeze
 
+      # KOV-D4 (Codex #316 kolo 1 P2): kody, ktorych NAPRAVOU je RIADOK RUCNEHO
+      # ZASAHU v Kovani — a teda jedine, pri ktorych smie ceruzka Kontroly
+      # smerovat na zaznam `hardware_overrides`. Su to presne tie tri, ktorych
+      # veta uz dnes menuje ten riadok (`Recipes::LOCK_HINT` pri oboch zamkoch,
+      # `Construction::ORPHAN_HINT` pri vypnutej/prepisanej polozke vysuvu).
+      #
+      # WHITELIST, NIE BLACKLIST: novy kod konfliktu (hrubka, prekazka, KD,
+      # poskodeny pin, nemigrovana skrinka…) sa NEMA napravovat resetom zasahu —
+      # ceruzka by prisvietila zaznam, ktoreho zrusenie konflikt nevyriesi
+      # (a pri `drawer_stale` riadok ani nemusi byt osiroteny). Pri blackliste
+      # by kazdy buduci kod tichu chybu zdedil.
+      OVERRIDE_CONFLICT_CODES = %w[
+        nl_lock_invalid height_lock_invalid drawer_override_invalid
+      ].freeze
+
       # Jediny kod, ktory vznika az v NAKUPE (receptova polozka bez setu alebo
       # bez kodu pre svoju NL). Dielce v modeli OSTAVAJU (fyzika je spravna),
       # ale rez na NL bez kitu tej NL je nepouzitelny — preto blokuje AJ VEPO.
