@@ -15697,6 +15697,190 @@ module NoxunSuRunner
        kovd2a_variant(inst) == auto && kovd2a_overrides(inst).empty?)
   end
 
+  # === KOV-D2b: ZAMKY OSI — UI CESTA (chip -> serverova akcia) ==============
+  #
+  # D2a dokazal JADRO (poradie resolvera, jedna operacia, Undo/Redo). D2b
+  # pridava UI: chipy citaju stav z payloadu (`front_drawer[fid].axes`) a pisu
+  # cez identitu, ktoru im dal SERVER (`front_drawer[fid].lock`). Headless sada
+  # dokaze tvar payloadu; NEDOKAZE, ze payload karty naozaj STACI na zapis
+  # a ze zapis z neho je jeden krok Spat aj v modeli.
+  #
+  # Preto tento scenar NIKDY nepodstrkuje rucne poskladanu identitu: kazdy
+  # zapis ide z toho, co panelu prisiel v payloade — presne ako klik v CEF.
+  # Ziadna vetva „preskocene": nesulad predpokladu je FAIL (lekcia D2a).
+  KOVD2B_FRONT_H = 220.0    # svetla vyska 204 -> automat H144
+  KOVD2B_SMALL_H = 175.0    # svetla vyska 159 -> H144 sa uz NEZMESTI
+
+  def kovd2b_params(front_h = KOVD2B_FRONT_H)
+    kovc2b_params({ 'height' => 900.0 }, 'height' => front_h)
+  end
+
+  # ZAZNAM KARTY tak, ako ho posiela PLNY push panela.
+  def kovd2b_card(inst, fid = 'F1')
+    (e::Panel.cabinet_payload(inst)['front_drawer'] || {})[fid] || {}
+  end
+
+  # ZAZNAM KARTY z LAHKEHO pushu (`push_hardware_sets` — zmena mapovania alebo
+  # katalogu v Studiu). Musi niest to iste, inak by `refreshFrontDrawer`
+  # z otvorenej karty zamky zmazal.
+  def kovd2b_card_light(inst, fid = 'F1')
+    (e::Panel.front_drawer_refresh(e::Store.config(inst) || {},
+                                   e::Store.get(inst, 'cabinet_id')) || {})[fid] || {}
+  end
+
+  KOVD2B_FIELDS = { 'height' => 'height_variant', 'nl' => 'nominal_length' }.freeze
+
+  # KLIK NA CHIP tak, ako ho posiela `hardware.js`: identita z `lock`, pole
+  # z osi, hodnota z parametra (chip posiela `axes.value`, ponuka hodnotu
+  # z `options`, tlacidlo nahrady `proposal`, odomknutie `nil`).
+  def kovd2b_click(model, inst, card, kind, value)
+    lock = card['lock'] || {}
+    model.selection.clear
+    model.selection.add(inst)
+    e::Panel.handle_set_hardware_override(
+      pg(model, 'owner_part_key' => lock['owner_part_key'],
+                'generic_type' => lock['generic_type'], 'rule_id' => lock['rule_id'],
+                'field' => KOVD2B_FIELDS[kind], 'value' => value,
+                'cabinet_id' => lock['cabinet_id'])
+    )
+  end
+
+  def kovd2b_axis(inst, kind, fid = 'F1')
+    (kovd2b_card(inst, fid)['axes'] || {})[kind] || {}
+  end
+
+  def run_kovd2b(model)
+    cleanup(model)
+    markers = []
+    inst = e::CabinetBuilder.build(model, kovd2b_params)
+    return ok('KOV-D2b: vlozenie korpusu so zasuvkou', false) unless inst
+
+    begin
+      kovd2b_scenar(model, inst, markers)
+    ensure
+      r03_clear_markers(model, markers)
+      cleanup(model)
+      ok('KOV-D2b: cleanup (0 korpusov)', cabinets(model).empty?)
+    end
+  rescue StandardError => ex
+    log_line("FAIL: run_kovd2b vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
+  def kovd2b_scenar(model, inst, markers)
+    # --- 1) karta nesie STAV OSI aj IDENTITU ZAPISU ------------------------
+    card = kovd2b_card(inst)
+    ok("KOV-D2b: karta cela je vyriesena zasuvka (#{card['state'].inspect})",
+       card['state'].to_s == 'ok')
+    lock = card['lock'] || {}
+    ok("KOV-D2b: karta nesie identitu zapisu (#{lock.inspect})",
+       lock['owner_part_key'].to_s == e::PartKeys.front('F1', 'panel') &&
+       lock['generic_type'].to_s == 'slide' &&
+       lock['rule_id'].to_s.start_with?('recipe:') &&
+       lock['cabinet_id'].to_s == e::Store.get(inst, 'cabinet_id').to_s)
+    ax = card['axes'] || {}
+    auto_h = (ax['height'] || {})['value']
+    ok("KOV-D2b: obe osi su `auto` a vyska je automat H#{auto_h.inspect}",
+       (ax['height'] || {})['state'] == 'auto' && (ax['nl'] || {})['state'] == 'auto' &&
+       auto_h.to_i == KOVD2A_AUTO_H)
+    ok('KOV-D2b: lahky push nesie ten isty stav osi',
+       kovd2b_card_light(inst)['axes'] == ax && kovd2b_card_light(inst)['lock'] == lock)
+
+    # --- 2) klik na `auto` chip zamkne PRAVE ZOBRAZENU hodnotu -------------
+    m = r03_marker(model, markers)
+    kovd2b_click(model, inst, card, 'height', auto_h)
+    ok("KOV-D2b: klik na chip zamkol aktualnu vysku H#{auto_h.inspect} " \
+       "(stav #{kovd2b_axis(inst, 'height')['state'].inspect})",
+       kovd2b_axis(inst, 'height')['state'] == 'locked' &&
+       kovd2a_variant(inst) == auto_h.to_i)
+    ok('KOV-D2b: zamok „aktuálnej" hodnoty NEMENI geometriu (len ju pripne)',
+       kovd2a_back_dims(inst).any? { |v| (v - kovd2a_rear_height(auto_h.to_i)).abs <= TOL })
+    Sketchup.undo
+    ok('KOV-D2b Spat: zamok zmizol a bol to PRESNE jeden krok',
+       kovd2a_overrides(inst).empty? && m.valid?)
+    r03_clear_markers(model, markers)
+
+    # --- 3) volba INEJ hodnoty z ponuky = dielce AJ nakup ------------------
+    card = kovd2b_card(inst)
+    opts = Array((card['axes']['height'] || {})['options']).map(&:to_i)
+    target = (opts - [auto_h.to_i]).min
+    ok("KOV-D2b: ponuka chipu ma aj INU platnu vysku (#{opts.inspect})", !target.nil?)
+    return if target.nil?
+
+    m = r03_marker(model, markers)
+    kovd2b_click(model, inst, card, 'height', target)
+    ok("KOV-D2b: volba z ponuky prestavala zasuvku na H#{target} " \
+       "(#{kovd2a_back_dims(inst).inspect})",
+       kovd2a_variant(inst) == target &&
+       kovd2a_back_dims(inst).any? { |v| (v - kovd2a_rear_height(target)).abs <= TOL })
+    ok("KOV-D2b: nakup objednava kit zamknutej vysky (#{kovd1a_codes(model).inspect})",
+       kovd1a_codes(model).length == 1)
+    Sketchup.undo
+    ok('KOV-D2b Spat: dielce aj kit sa vratili NARAZ, jeden krok',
+       kovd2a_variant(inst) == auto_h.to_i && m.valid?)
+    r03_clear_markers(model, markers)
+
+    # --- 4) OBE osi zamknute, odomknutie JEDNEJ druhu nechá zit ------------
+    card = kovd2b_card(inst)
+    auto_nl = (card['axes']['nl'] || {})['value']
+    kovd2b_click(model, inst, card, 'height', auto_h)
+    kovd2b_click(model, inst, kovd2b_card(inst), 'nl', auto_nl)
+    ok("KOV-D2b: obe osi su zamknute (H#{auto_h.inspect} · NL #{auto_nl.inspect})",
+       kovd2b_axis(inst, 'height')['state'] == 'locked' &&
+       kovd2b_axis(inst, 'nl')['state'] == 'locked')
+    kovd2b_click(model, inst, kovd2b_card(inst), 'nl', nil)
+    ok('KOV-D2b: odomknutie JEDNEJ osi (`value: null`) necha druhy zamok zit',
+       kovd2b_axis(inst, 'height')['state'] == 'locked' &&
+       kovd2b_axis(inst, 'nl')['state'] == 'auto' &&
+       kovd2a_overrides(inst).any? { |o| o['height_variant'].to_i == auto_h.to_i &&
+                                         !o.key?('nominal_length') })
+    # Druhy zamok sa vracia — nahrada nizsie ma dokazat, ze PREZIJE.
+    kovd2b_click(model, inst, kovd2b_card(inst), 'nl', auto_nl)
+
+    # --- 5) KONFLIKT: nizsie celo -> zamknuta vyska sa uz nezmesti ---------
+    par = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    par['fronts']['items'][0]['height'] = KOVD2B_SMALL_H
+    e::CabinetBuilder.rebuild(model, inst, par)
+    card = kovd2b_card(inst)
+    h = (card['axes'] || {})['height'] || {}
+    ok("KOV-D2b konflikt: karta je RED a os vysky je `conflict` " \
+       "(#{card['state'].inspect} / #{h['state'].inspect})",
+       card['state'].to_s == 'conflict' && h['state'] == 'conflict')
+    ok('KOV-D2b konflikt: os nesie HLASKU zo stavby (panel ziadnu neskladá)',
+       !h['message'].to_s.strip.empty?)
+    ok("KOV-D2b konflikt: karta NESIE identitu aj bez emitovanej polozky " \
+       "(#{(card['lock'] || {})['rule_id'].inspect})",
+       kovd2a_slide(inst).nil? && (card['lock'] || {})['rule_id'].to_s.start_with?('recipe:'))
+    prop = h['proposal']
+    ok("KOV-D2b konflikt: server ponuka nahradu (H#{prop.inspect})", !prop.nil?)
+    return if prop.nil?
+
+    # --- 6) NAHRADA (po D-15 potvrdeni) = zamknuta nahrada, druhy zamok zije
+    m = r03_marker(model, markers)
+    kovd2b_click(model, inst, card, 'height', prop)
+    ok("KOV-D2b nahrada: H#{prop} je ZAMKNUTA (nie automat) a zasuvka sa postavila",
+       kovd2b_axis(inst, 'height')['state'] == 'locked' &&
+       kovd2a_variant(inst) == prop.to_i && !kovd2a_slide(inst).nil?)
+    ok("KOV-D2b nahrada: DRUHY zamok (NL #{auto_nl.inspect}) ostal nedotknuty",
+       kovd2a_overrides(inst).any? do |o|
+         o['height_variant'].to_i == prop.to_i &&
+           (o['nominal_length'].to_f - auto_nl.to_f).abs <= TOL
+       end)
+    ok("KOV-D2b nahrada: nakup objednava kit nahrady (#{kovd1a_codes(model).inspect})",
+       kovd1a_codes(model).length == 1)
+    Sketchup.undo
+    ok('KOV-D2b nahrada Spat: konflikt sa vratil a bol to PRESNE jeden krok',
+       kovd2b_axis(inst, 'height')['state'] == 'conflict' && m.valid?)
+    if Sketchup.respond_to?(:redo)
+      Sketchup.redo
+      ok('KOV-D2b nahrada Redo: nahrada, druhy zamok aj dielce su spat SUCASNE',
+         kovd2b_axis(inst, 'height')['state'] == 'locked' &&
+         kovd2a_variant(inst) == prop.to_i && !kovd2a_slide(inst).nil?)
+    else
+      info('KOV-D2b: Sketchup.redo nedostupne — Redo vetva netestovana')
+    end
+  end
+
   def run_kovc2b(model)
     cleanup(model)
     markers = []
@@ -16773,6 +16957,7 @@ module NoxunSuRunner
     run_kovc2b(model)        # KOV-C2b: zasuvky z receptu — dielce v modeli 1:1 s planom, JEDNA polozka vysuvu, prestavba (ina hlbka/vyska = ina NL/variant, ziadna duplicita, part_overrides prezijú), 1 krok Spat, kopia a sablona nesu pripnuty recept, plytka skrinka = ziadne dielce + RED + export zastaveny s PRAZDNYM priecinkom
     run_kovd1a(model)        # KOV-D1a: owner triedny override setu na CELE — akcia panela zapise `class:slide|…@front:F1/panel`, zmrazi definiciu a prestava v JEDNEJ operacii (Spat aj Redo vratia mapovanie, snapshot aj nakupny kod naraz), kopia kluc nesie, prerastenie bez pasma neobjedna zly kit
     run_kovd2a(model)        # KOV-D2a: zamky osi zasuvky — akcia panela zamkne VYSKU proti automatu (H144 -> H70) a prestava v JEDNEJ operacii (Spat aj Redo vratia zamok, dielce v modeli aj nakupny kit naraz), NL mimo radu = RED bez dielcov a bez kitu, odomknutie JEDNEJ osi necha druhy zamok zit, kopia zamky nesie
+    run_kovd2b(model)        # KOV-D2b: chipy osi — kazdy zapis ide z PAYLOADU KARTY (identita `lock`, hodnoty `axes`): klik na `auto` pripne aktualnu vysku bez zmeny geometrie, volba z ponuky prestava dielce aj kit (Spat = 1 krok), odomknutie JEDNEJ osi necha druhu zit, konfliktna karta nesie identitu aj bez polozky a nahrada zo servera je zamknuta pri zachovanom druhom zamku (Spat aj Redo)
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

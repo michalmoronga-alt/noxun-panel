@@ -825,7 +825,14 @@ preto potrebujú dvojsegmentový hinge resolver). Výber setu patrí k **položk
 
 **RIADOK VYRIEŠENEJ ZÁSUVKY (KOV-C2c).** Pod klasifikáciou stojí **jediný read-only riadok** — „Atira · H70 · NL 470 · 30 kg · SiSy · recept v1" (Quadro namiesto H-variantu
 menuje **výšku boxu**). Vertikálny priestor panela je vzácny, preto to **nie je blok**: vety receptu („potrebná svetlá výška od…", „rad 350–520 mm, potrebná svetlá hĺbka…")
-žijú v **rozbaliteľnom** `<details>` „Technický detail". Chipy zámkov osí (mockup scéna 1) sem **nepatria** — sú KOV-D2b; ručný zámok dĺžky priznáva len veta pod riadkom.
+žijú v **rozbaliteľnom** `<details>` „Technický detail".
+
+**CHIPY ZÁMKOV OSÍ (KOV-D2b).** Pod riadkom stojí rad chipov — `H144 výška` a `NL 470` — a je to **ten istý markup** (`hwAxHtml` v `hardware.js`), aký kreslí sekcia Kovanie:
+karta si vlastnú verziu nekreslí, inak by sa obe miesta časom rozišli. Kreslí ich `frontCardHtml` z riadku `kind: 'axes'`, ktorý pridáva **čistá** `frontDrawerAxesRow` (`core.js`)
+— a **len keď server poslal OBOJE**: stav osí (`axes`) aj identitu zápisu (`lock`). Chipy bez identity by boli klikateľné do prázdna a `recipe:<id>` panel skladať nesmie.
+Chipy dostáva aj **konfliktná** karta (stav `conflict`) — práve z nej sa musí dať odomknúť, keď položka výsuvu fail-closed nevznikla. Kontrakt chipov, kliku a náhrady je
+v odseku „Kontext Kovanie" nižšie. **Chipy „otváranie" a „nosnosť" z mockupu sa VEDOME nepridali** (vertikálny priestor — riadok zhrnutia ich už nesie; `UI20_KONTRAKT.md` §7).
+Ručný zámok dĺžky priznáva navyše veta `locked_note` pod riadkom.
 
 **KOV-D1b doplnil do TOHO ISTÉHO rozkliku „čo je v balení"** — za vety receptu pribudne „Balenie: &lt;názov setu&gt;", riadok každého člena („· K-sada 357696 — Súprava Atira 470
 biela (1 ks)") a pri probléme priznaný dôvod („Bez kódu: …"). Žiadny nový blok a **žiadny druhý explain**: zdrojom je **jediný existujúci rozpis** `HardwareSets.explain`, ten
@@ -1027,8 +1034,31 @@ katalógu.
 výber. Payload nesie **tú istú čítaciu projekciu** ako plný push (`front_drawer_payload` — uložené `params` + `HardwareSets.explain`), takže **žiadny prepočet receptu,
 žiadny zápis, žiadny krok Späť**. Na klientovi ho preberá `refreshFrontDrawer` (`form.js`): vymení záznam a prekreslí **len OTVORENÚ kartu** (`openFrontCardId`) — riadky
 čiel sa neprestavujú, rovnaká úspornosť ako `refreshHardwarePurchase`. Chýbajúci kľúč (starý payload) sa nedotkne ničoho; `{}` je legitímna hodnota „skrinka zásuvky nemá".
+**KOV-D2b: záznam nesie aj `axes` a `lock`** (`Panel.front_drawer_refresh`, `sync.rb`). `refreshFrontDrawer` vymieňa záznam **celý**, takže payload bez osí by z otvorenej karty
+chipy odstránil — a s nimi cestu, ako konfliktnú zásuvku odomknúť. Plán sa preto stavia **len keď skrinka klasifikovanú zásuvku naozaj má** (zákazka bez zásuviek má payload
+zhodný s D1b).
 
-Testy: `tests/js/test_kovh2_adhoc_ui.js`, `tests/pure/test_kovh2_payload.rb`, in-SketchUp sekcia `run_kovh2`.
+**CHIPY ZÁMKOV OSÍ (KOV-D2b) — jeden markup, dve miesta.** `hwAxHtml(axes, ident)` kreslí `.hwax` (obal s identitou zápisu) + `.axchips` (chip za každú os, ktorú server poslal)
++ pri konflikte `.axconf`. Volá ho **riadok položky výsuvu** (`hwItemHtml`, medzi `.hwrow` a nákupným riadkom — `refreshHardwarePurchase` prilepuje nákup na koniec `.hwitem`,
+takže toto poradie prežije aj ľahký push), **riadok osiroteného zásahu** (`hwOffHtml`, ktorý sa preto obalí do `.hwitem`) a **karta čela**. Vlastný obal namiesto `.hwrow` je
+zámer: karta čela žiadny `.hwrow` nemá.
+
+- **Stav je serverový enum** (`auto` | `locked` | `conflict`); čokoľvek iné sa kreslí ako `auto` (nikdy sa nedomýšľa stav, ktorý server nepovedal). `locked` = jantárová rodina
+  (`--nx-warn-*`, zatvorený zámok zo sprite), `conflict` = červená (`--nx-err-*`), `auto` = neutrálny chip s otvoreným zámkom. Žiadna nová farba, žiadne emoji.
+- **Hodnota do zápisu ide VŽDY zo servera**, nikdy z textu chipu: `data-val` nesie `axes[os].value` (resp. hodnotu z `options` alebo `proposal`). Text je popisok pre človeka
+  („NL 470,5" s desatinnou čiarkou), hodnota je číslo pre server — čítať ju z textu by znamenalo zamknúť inú dĺžku, než používateľ videl.
+- **Klik na `auto` chip zamkne práve zobrazenú hodnotu**, klik na `locked` alebo `conflict` chip pošle `value: null` = odomknutie **LEN tejto osi** (`reset: true` by zahodil
+  celý záznam a s ním platný druhý zámok). Iná hodnota sa vyberá z `<select class="axsel">` s **výhradne** serverovými `options`; pri prázdnej ponuke (`blocked_by: 'height'`)
+  sa select nekreslí vôbec a chip sprevádza tlmená veta „najprv vyrieš výšku".
+- **Konflikt** dostane červený riadok s **vetou zo servera** (`axes[os].message` — panel žiadnu vlastnú neskladá) a dve cesty von: **„Nahradiť za …"** len keď server dal
+  `proposal`, a **„Odomknúť"** vždy. Náhrada je jedno rozhodnutie, takže ide cez **kostru D-15** (`NXModal.open` bez polí, `okLabel: 'Nahradiť'`); bez kostry sa neodošle nič —
+  zmena zamknutej hodnoty bez potvrdenia je presne to, čomu sa dávka vyhýba. Po potvrdení sa zapíše `proposal` a náhrada **ostáva zamknutá**; druhý zámok server nemení.
+- **Zápis ide EXISTUJÚCOU akciou** `set_hardware_override` (`field` `height_variant` / `nominal_length`) cez `hwSend` → `nxDocPayload`, teda s guardom dokumentu aj skrinky.
+  Žiadny nový callback, žiadny druhý tvar payloadu. Po zápise príde plný push a chipy sa prekreslia z nového `axes` — panel si stav osi **nikdy nepamätá**.
+
+Testy: `tests/js/test_kovd2b_ui.js` (chipy, klik, náhrada nad mini-DOM), `tests/pure/test_kovd2b_payload.rb`, in-SketchUp sekcia `run_kovd2b`.
+
+Testy ad-hoc položiek (KOV-H2): `tests/js/test_kovh2_adhoc_ui.js`, `tests/pure/test_kovh2_payload.rb`, in-SketchUp sekcia `run_kovh2`.
 
 **Klik na hlavičku → `nx_select_hw_owner` → `Panel.handle_select_hw_owner`** (`ui/panel/selection.rb`): prázdne `part_keys` = celá skrinka (`reselect`), inak `parts_by_keys` =
 výrobné dielce s daným `part_key` v **rovnakom rozsahu ako kusovník** (`manufactured_parts` — vnorené AJ odpojené). Je to **čisté čítanie + zmena výberu** pod
@@ -1332,6 +1362,13 @@ nikdy z dostupných kódov. Návrh mení **len opravovanú os**: druhý zámok o
 a riadok to prizná (`blocked_by: 'height'`): rad NL je per výška, takže sa nemá z čoho počítať. Svetlú výšku ani hĺbku config **neukladá**, preto sa `ctx` prepočítava
 z plánu (`CabinetBuilder.drawer_axis_contexts` → `Construction.drawer_contexts`) — tými **istými** číslami, z ktorých počíta `Recipes.resolve`; druhý výpočet inde by sa
 časom rozišiel a ponuka by sľubovala hodnotu, ktorú resolver odmietne. Existujúce `nl` bloky D-93 a súhrnné `locked` ostávajú **nedotknuté** (payload je aditívny).
+
+**KOV-D2b — TRETIE miesto je karta čela.** Mapa vzniká v `drawer_axes_index`, ktorý jedným prechodom čiel dáva **dvoje**: `by_owner` (stav osí, kontrakt D2a — `drawer_axes_map`
+je odvtedy tenký obal nad ním, takže in-SketchUp `run_kovd2a` ani ostatní čitatelia sa nemenia) a `idents` (identita zápisu per čelo: `owner_part_key` · `generic_type` `slide` ·
+`rule_id` `recipe:<id>`). Dva prechody by znamenali **druhé `Recipes.load`** na každý push panela — to číta súbor a overuje odtlačok. `attach_front_drawer_axes` z indexu obohatí
+`front_drawer[fid]` o `axes` (**tú istú inštanciu**, žiadny druhý výpočet) a `lock` = identitu doplnenú o `cabinet_id` (guard F6 — klik z karty musí byť rovnako chránený ako klik
+v riadku). Panel si identitu skladať **nesmie**: `recipe:<id>` pozná len server, a z `front_id` odvodený kľúč by po zmene pripnutého receptu ukazoval na inú položku. Záznam bez
+osí (`stale`, čelo s nenačítateľným receptom) ostáva presne taký, aký bol v C2c.
 
 **`front_drawer` (KOV-C2c).** Druhý — **vlastný** — kanál toho istého pushu: mapa `front_id → záznam riadku zásuvky` pre čelá, ktoré `Recipes.classified?` pozná ako zásuvku.
 Do `front_slots` sa **nezlučuje** zámerne: ten odpovedá výhradne na otázku „kde sa pýta smer". Záznam skladá `front_drawer_payload` **čítacím** spôsobom z uloženého configu —

@@ -556,6 +556,32 @@
   /* nekompletny nakup (chyba set/kod/pasmo) = jantarove UPOZORNENIE;
      semaforove --nx-state-* su rezervovane a nesmu sa sem miesat */
   .hwbuy.hwbuy-warn { color: var(--nx-warnchip-fg); }
+  /* KOV-D2b: CHIPY OSI ZAMKU (vyska, NL). TEN ISTY markup kresli riadok vysuvu
+     v sekcii Kovanie aj riadok zasuvky v karte cela — obal `.hwax` nesie
+     identitu zapisu, takze nepotrebuje `.hwrow`. Zamknuta os = jantarova
+     rodina (rucny zasah), konflikt = cervena. Ziadna nova farba. */
+  .hwax { margin: 2px 0 0 2px; }
+  .axchips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .axchip { display: inline-flex; align-items: center; gap: 4px; font: inherit; font-size: 11px;
+            padding: 2px 7px; border: 1px solid var(--nx-border); border-radius: 6px;
+            background: var(--nx-surface-sunken); color: var(--nx-ink-strong); cursor: pointer; }
+  .axchip .ic { width: 12px; height: 12px; color: var(--nx-ink-faint); }
+  .axchip .axsuf { color: var(--nx-ink-muted); }
+  .axchip.locked { background: var(--nx-warn-bg-soft); border-color: var(--nx-warnchip-border);
+                   color: var(--nx-warnrow-fg); }
+  .axchip.locked .ic { color: var(--nx-warn-fg); }
+  .axchip.err { background: var(--nx-err-bg); border-color: var(--nx-err-border);
+                color: var(--nx-err-fg); }
+  .axchip.err .ic { color: var(--nx-err-fg); }
+  .axsel { flex: 0 1 auto; min-width: 52px; max-width: 96px; padding: 2px 3px; font-size: 11px;
+           border: 1px solid var(--nx-border-strong); border-radius: 6px;
+           background: var(--nx-surface); color: var(--nx-ink); }
+  .axconf { margin-top: 4px; padding: 5px 7px; border: 1px solid var(--nx-err-border);
+            border-radius: 6px; background: var(--nx-err-bg); color: var(--nx-err-fg);
+            font-size: 11px; line-height: 1.45; }
+  .axconf .ic { width: 13px; height: 13px; vertical-align: -2px; margin-right: 4px; }
+  .axconf .cbtns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+  .axnote { margin-top: 3px; font-size: 11px; color: var(--nx-ink-muted); }
   /* UI-C4: BOX VLASTNIKA (kontrakt UI 2.0 — Skrinka + kazde celo). Kompaktne:
      hlavicka + obsah, ziadne vlastne zbalovanie (exkluzivita skupin S4 staci).
      Trieda je `.hwbox` (nie `.hwown` z mockupu) — `.hwown` uz oznacuje popis

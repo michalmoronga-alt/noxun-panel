@@ -85,6 +85,81 @@
   }
   function hwKey(owner, type, rule){ return (owner||'') + '||' + type + '||' + rule; }
 
+  // ---- KOV-D2b: CHIPY OSI ZAMKU (vyska, NL) --------------------------------
+  // JEDEN stav zo servera (`axes` z `Panel.drawer_axes_map`) kresli DVE miesta:
+  // riadok vysuvu v kontexte Kovanie a riadok zasuvky v karte cela. Panel tu
+  // NEPOCITA nic: ktore osi existuju, co plati, co sa da zamknut, ci je konflikt
+  // a aky je navrh nahrady — vsetko su hotove udaje servera.
+  //
+  // Hodnota do ZAPISU ide VZDY z `axes[os].value` (resp. `options` / `proposal`)
+  // ulozenej v `data-val`, NIKDY z textu chipu: text je popisok pre cloveka
+  // („H144", „NL 470"), hodnota je cislo pre server.
+  //
+  // Ciste funkcie (Node testy: tests/js/test_kovd2b_ui.js).
+  var HW_AX = [{ key: 'height', field: 'height_variant', label: 'výšku',
+                 noun: 'Výška', suffix: 'výška' },
+               { key: 'nl', field: 'nominal_length', label: 'dĺžku výsuvu',
+                 noun: 'Dĺžka výsuvu', suffix: '' }];
+  // Ponuka sa kresli az od DVOCH hodnot — jedna volba nie je vyber.
+  var HW_AX_OPTS_MIN = 2;
+  var HW_AX_NOVAL = 'Server pre túto os nemá hodnotu, ktorú by sa dalo zamknúť.';
+  var HW_AX_NOMODAL = 'Potvrdzovacie okno sa nedá otvoriť — náhrada sa neodoslala.';
+  var HW_AX_FIX_NOTE = 'Náhrada ostáva ZAMKNUTÁ (automat ju nezmení). Zámok druhej osi sa ' +
+                       'nemení a znova sa overí.';
+  var HW_AX_BLOCKED = 'Dĺžka výsuvu sa ponúkne, až keď vyriešiš výšku.';
+
+  function hwAxDef(kind){
+    for (var i = 0; i < HW_AX.length; i++){ if (HW_AX[i].key === kind) return HW_AX[i]; }
+    return null;
+  }
+  // Stav osi je SERVEROVY enum; cokolvek ine je 'auto' (nikdy sa nedomyslá
+  // stav, ktory server nepovedal).
+  function hwAxState(ax){
+    var s = ax ? String(ax.state || '') : '';
+    return (s === 'locked' || s === 'conflict') ? s : 'auto';
+  }
+  // Popisok hodnoty: vyska „H144", dlzka „NL 470". Chybajuca hodnota sa PRIZNA
+  // pomlckou — nula ani prazdny retazec by klamali.
+  function hwAxValText(kind, v){
+    if (v == null || !isFinite(Number(v))) return '—';
+    return (kind === 'height') ? ('H' + Math.round(Number(v))) : ('NL ' + hwNlFmt(v));
+  }
+  function hwAxText(kind, ax){ return hwAxValText(kind, ax ? ax.value : null); }
+  // Ponuka na zamknutie = VYHRADNE `options` zo servera. -> [{value,text,selected}]
+  function hwAxOptionList(kind, ax){
+    var out = [];
+    var cur = (ax && ax.value != null) ? Number(ax.value) : null;
+    var list = (ax && ax.options) ? ax.options : [];
+    for (var i = 0; i < list.length; i++){
+      var num = Number(list[i]);
+      if (!isFinite(num)) continue;
+      out.push({ value: String(num), text: hwAxValText(kind, num),
+                 selected: cur != null && Math.abs(num - cur) < 0.001 });
+    }
+    return out;
+  }
+  function hwAxChipTitle(kind, ax){
+    var d = hwAxDef(kind); if (!d) return '';
+    var st = hwAxState(ax);
+    if (st === 'locked') return 'Odomknúť — platí automat';
+    if (st === 'conflict') return 'Zamknutá hodnota už neplatí — odomkni ju alebo nahraď';
+    return 'Zamknúť ' + d.label + ' ' + hwAxText(kind, ax) + ' (automat by mohol zmeniť)';
+  }
+  function hwAxSelTitle(kind){
+    var d = hwAxDef(kind);
+    return d ? ('Zamknúť inú ' + d.label + ' z ponuky receptu') : '';
+  }
+  // Veta potvrdenia nahrady. Stavia sa z HODNOT servera (stara a navrhovana),
+  // nie z dovodu konfliktu — ten je uz na obrazovke v cervenom riadku.
+  function hwAxFixSub(kind, ax){
+    var d = hwAxDef(kind); if (!d) return '';
+    return d.noun + ' ' + hwAxText(kind, ax) + ' už neplatí. Nahradiť ju za ' +
+           hwAxValText(kind, ax && ax.proposal) + '?';
+  }
+  function hwAxFixLabel(kind, ax){
+    return 'Nahradiť za ' + hwAxValText(kind, ax && ax.proposal);
+  }
+
   // ---- UI-C4: BOXY PODLA VLASTNIKA ----------------------------------------
   // Kontrakt UI 2.0 (sekcia Kovanie): polozky nie su jeden dlhy zoznam, ale
   // horizontalne boxy — „Skrinka", potom box KAZDEHO cela. Je to ZOBRAZENIE
@@ -493,6 +568,11 @@
           : '<span class="hwsrc" title="Počet z pravidla"></span>')
       + '<button class="ghostbtn hwbtn" title="Vypnúť položku" aria-label="Vypnúť položku" onclick="onHwDisable(this)">'+NXIcons.svg('x')+'</button>'
       + '</div>'
+      // KOV-D2b: rad chipov osi zamku PATRI POD riadok a PRED nakup — `refresh
+      // HardwarePurchase` prilepuje nakupny riadok na KONIEC `.hwitem`, takze
+      // toto poradie prezije aj lahky push.
+      + hwAxHtml(it.axes, { owner_part_key: it.owner_part_key, generic_type: it.generic_type,
+                            rule_id: it.rule_id, cabinet_id: cabId })
       + hwBuyHtml(it.purchase)
       + '</div>';
   }
@@ -522,7 +602,7 @@
     } else {
       btn = '<button class="ghostbtn hwbtn" title="Obnoviť (platí pravidlo)" onclick="onHwEnable(this)">'+NXIcons.svg('rotate-ccw')+' obnoviť</button>';
     }
-    return '<div class="hwrow hwoff" data-owner="'+esc(ov.owner_part_key||'')+'" data-type="'+esc(ov.generic_type||'')+'" data-rule="'+esc(ov.rule_id||'')+'" data-part="'+esc(ov.part_key||'')+'" data-cab="'+esc(cabId||'')+'">'
+    var row = '<div class="hwrow hwoff" data-owner="'+esc(ov.owner_part_key||'')+'" data-type="'+esc(ov.generic_type||'')+'" data-rule="'+esc(ov.rule_id||'')+'" data-part="'+esc(ov.part_key||'')+'" data-cab="'+esc(cabId||'')+'">'
       // SMOKE PACK 1: nazov je jednoriadkovy s ellipsis, takze plny text MUSI
       // niest `title` — inak by sa orezany popis nedal precitat vobec.
       + '<span class="hwname" title="'+esc(name+(full?' · '+full:'')+' · '+ext)+'">'
@@ -530,6 +610,12 @@
       + ' <span class="hwext">'+esc(ext)+'</span></span>'
       + btn
       + '</div>';
+    // KOV-D2b: OSIROTENY zasah zasuvky nesie stav osi tiez (polozka vysuvu pri
+    // konflikte NEVZNIKLA) — bez chipov by sa konfliktna zasuvka nedala
+    // odomknut inak, nez zrusenim CELEHO zaznamu (a s nim druheho zamku).
+    var ax = hwAxHtml(ov.axes, { owner_part_key: ov.owner_part_key, generic_type: ov.generic_type,
+                                 rule_id: ov.rule_id, cabinet_id: cabId });
+    return ax ? ('<div class="hwitem">' + row + ax + '</div>') : row;
   }
   // UI-C4: box vlastnika. Hlavicka je TLACIDLO (klavesnica aj citacka) a nesie
   // `data-keys` = part_key vlastnikov, ktore ma klik oznacit v modeli. Box sa
@@ -932,6 +1018,144 @@
     if (isNaN(v)){ NX.setStatus('Vyber dĺžku výsuvu.', true); return; }
     hwSend(hwPayload(btn, { field: 'nominal_length', value: v }));
   }
+  // ---- KOV-D2b: markup a zapis chipov osi ---------------------------------
+  // `ident` = identita ZAPISU (`owner_part_key`, `generic_type`, `rule_id`,
+  // `cabinet_id`) — v kontexte Kovanie ju ma riadok, karte cela ju posiela
+  // server (`front_drawer[fid].lock`). Chipy si ju nesu vo VLASTNOM obale
+  // `.hwax`, takze ten isty markup funguje na oboch miestach a nepotrebuje
+  // `.hwrow` (karta cela ziadny nema).
+  function hwAxHtml(axes, ident){
+    var ax = (axes && typeof axes === 'object') ? axes : null;
+    var id = (ident && typeof ident === 'object') ? ident : null;
+    if (!ax || !id) return '';
+    var chips = '', notes = '';
+    HW_AX.forEach(function(d){
+      var a = ax[d.key];
+      // QUADRO nema kluc `height` VOBEC — os, ktora neexistuje, sa nekresli.
+      if (!a || typeof a !== 'object') return;
+      chips += hwAxChipHtml(d.key, a);
+      notes += hwAxNoteHtml(d.key, a);
+    });
+    if (!chips) return '';
+    return '<div class="hwax" data-owner="'+esc(id.owner_part_key||'')+'"'
+         + ' data-type="'+esc(id.generic_type||'')+'" data-rule="'+esc(id.rule_id||'')+'"'
+         + ' data-cab="'+esc(id.cabinet_id||'')+'">'
+         + '<div class="axchips">'+chips+'</div>'+notes+'</div>';
+  }
+  function hwAxChipHtml(kind, ax){
+    var st = hwAxState(ax);
+    var cls = 'axchip' + (st === 'locked' ? ' locked' : '') + (st === 'conflict' ? ' err' : '');
+    var d = hwAxDef(kind);
+    var val = (ax && ax.value != null) ? String(ax.value) : '';
+    var h = '<button type="button" class="'+cls+'" data-ax="'+esc(kind)+'"'
+          + ' data-state="'+esc(st)+'" data-val="'+esc(val)+'"'
+          + ' aria-pressed="'+(st === 'auto' ? 'false' : 'true')+'"'
+          + ' title="'+esc(hwAxChipTitle(kind, ax))+'" onclick="onHwAxChip(this)">'
+          + NXIcons.svg(st === 'auto' ? 'lock-open' : 'lock')
+          + '<b>'+esc(hwAxText(kind, ax))+'</b>'
+          + ((d && d.suffix) ? '<span class="axsuf">'+esc(d.suffix)+'</span>' : '')
+          + '</button>';
+    var opts = hwAxOptionList(kind, ax);
+    if (opts.length < HW_AX_OPTS_MIN) return h;   // `blocked_by` = prazdne options = ziadna ponuka
+    var oh = '';
+    opts.forEach(function(o){
+      oh += '<option value="'+esc(o.value)+'"'+(o.selected?' selected':'')+'>'+esc(o.text)+'</option>';
+    });
+    return h + '<select class="axsel" data-ax="'+esc(kind)+'" aria-label="'+esc(hwAxSelTitle(kind))+'"'
+             + ' title="'+esc(hwAxSelTitle(kind))+'" onchange="onHwAxPick(this)">'+oh+'</select>';
+  }
+  // CERVENY riadok konfliktu (veta je SERVEROVA — panel ziadnu vlastnu
+  // neskladá) + cesty von: nahrada LEN ked server navrh naozaj dal
+  // (`proposal`), odomknutie VZDY. Pri `blocked_by` je to len tlmena veta:
+  // NL sa nema z coho ponukat, kym neplati vyska.
+  function hwAxNoteHtml(kind, ax){
+    if (hwAxState(ax) === 'conflict'){
+      var msg = String((ax && ax.message) || '');
+      var btns = '';
+      if (ax && ax.proposal != null){
+        btns += '<button type="button" class="ghostbtn hwbtn" data-ax="'+esc(kind)+'"'
+              + ' data-val="'+esc(String(ax.proposal))+'"'
+              + ' data-sub="'+esc(hwAxFixSub(kind, ax))+'"'
+              + ' title="'+esc(hwAxFixSub(kind, ax))+'" onclick="onHwAxFix(this)">'
+              + esc(hwAxFixLabel(kind, ax))+'</button>';
+      }
+      btns += '<button type="button" class="ghostbtn hwbtn" data-ax="'+esc(kind)+'"'
+            + ' title="Odomknúť — platí automat" onclick="onHwAxUnlock(this)">'
+            + NXIcons.svg('lock-open')+' Odomknúť</button>';
+      return '<div class="axconf">'+NXIcons.svg('alert')
+           + (msg ? '<span>'+esc(msg)+'</span>' : '')
+           + '<div class="cbtns">'+btns+'</div></div>';
+    }
+    if (kind === 'nl' && ax && ax.blocked_by === 'height'){
+      return '<div class="axnote">'+esc(HW_AX_BLOCKED)+'</div>';
+    }
+    return '';
+  }
+  // Identita zapisu z obalu `.hwax` — TA ISTA na oboch miestach.
+  function hwAxIdent(node){
+    var box = (node && node.closest) ? node.closest('.hwax') : null;
+    if (!box) return null;
+    return { owner_part_key: box.getAttribute('data-owner') || null,
+             generic_type: box.getAttribute('data-type') || '',
+             rule_id: box.getAttribute('data-rule') || '',
+             cabinet_id: box.getAttribute('data-cab') || '' };
+  }
+  function hwAxSend(node, kind, value){
+    var d = hwAxDef(kind); if (!d) return false;
+    var id = hwAxIdent(node); if (!id) return false;
+    id.field = d.field;
+    id.value = value;
+    hwSend(id);
+    return true;
+  }
+  // Klik na chip: `auto` ZAMKNE hodnotu zo SERVERA (`data-val`), `locked`
+  // aj `conflict` odomknu LEN TUTO os (`value: null` — druhy zamok zije).
+  function onHwAxChip(btn){
+    var kind = btn.getAttribute('data-ax');
+    if (btn.getAttribute('data-state') !== 'auto'){ hwAxSend(btn, kind, null); return; }
+    var raw = btn.getAttribute('data-val');
+    var v = (raw == null || raw === '') ? NaN : parseFloat(raw);
+    if (isNaN(v)){ NX.setStatus(HW_AX_NOVAL, true); return; }
+    hwAxSend(btn, kind, v);
+  }
+  // Volba z ponuky = zamknutie PRAVE TEJ hodnoty. Ponuka nesie len `options`
+  // zo servera, takze sa neda odoslat nic, co server nedal.
+  function onHwAxPick(sel){
+    var v = parseFloat(sel.value);
+    if (isNaN(v)){ NX.setStatus('Neplatná hodnota osi.', true); return; }
+    hwAxSend(sel, sel.getAttribute('data-ax'), v);
+  }
+  function onHwAxUnlock(btn){ hwAxSend(btn, btn.getAttribute('data-ax'), null); }
+  // Nahrada je JEDNO rozhodnutie => kostra D-15 (potvrdenie bez poli).
+  // Identita aj hodnota sa citaju PRED otvorenim okna — modal prekresluje
+  // `#nxModalRoot`, nie panel, ale spoliehat sa na to by bola zbytocna vazba.
+  // BEZ kostry sa nahrada NEODOSLE: zmena zamknutej hodnoty bez potvrdenia je
+  // presne to, comu sa davka vyhyba.
+  function onHwAxFix(btn){
+    var kind = btn.getAttribute('data-ax');
+    var d = hwAxDef(kind);
+    var id = hwAxIdent(btn);
+    var v = parseFloat(btn.getAttribute('data-val'));
+    if (!d || !id || isNaN(v)) return;
+    if (typeof NXModal === 'undefined' || !NXModal || typeof NXModal.open !== 'function'){
+      NX.setStatus(HW_AX_NOMODAL, true);
+      return;
+    }
+    NXModal.open({
+      title: 'Nahradiť zamknutú hodnotu',
+      sub: btn.getAttribute('data-sub') || '',
+      note: HW_AX_FIX_NOTE,
+      okLabel: 'Nahradiť',
+      fields: [],
+      onSubmit: function(){
+        NXModal.close();
+        id.field = d.field;
+        id.value = v;
+        hwSend(id);
+      }
+    });
+  }
+
   // ŠT-3b-1: `openRulesDialog` ZANIKOL spolu s oknom „Pravidlá kovania" —
   // tlacidlo panela ide priamo deep-linkom `openStudio('rules')`.
   // ŠT-3a-2: `openHardwareCatalogDialog` ZANIKOL spolu s oknom „Katalóg
@@ -1525,6 +1749,15 @@
       hwNlFmt: hwNlFmt, hwNlOptionList: hwNlOptionList, hwNlAutoText: hwNlAutoText,
       hwNlSelectTitle: hwNlSelectTitle, hwNlLockTitle: hwNlLockTitle,
       hwNlHtml: hwNlHtml, hwPayload: hwPayload,
+      // KOV-D2b chipy osi zamku (tests/js/test_kovd2b_ui.js) — ciste texty
+      // a ponuky + CELY tok kliku cez mini-DOM (chip -> payload servera).
+      HW_AX: HW_AX, HW_AX_OPTS_MIN: HW_AX_OPTS_MIN, HW_AX_NOVAL: HW_AX_NOVAL,
+      HW_AX_NOMODAL: HW_AX_NOMODAL, HW_AX_BLOCKED: HW_AX_BLOCKED,
+      hwAxState: hwAxState, hwAxValText: hwAxValText, hwAxText: hwAxText,
+      hwAxOptionList: hwAxOptionList, hwAxChipTitle: hwAxChipTitle,
+      hwAxFixSub: hwAxFixSub, hwAxFixLabel: hwAxFixLabel, hwAxHtml: hwAxHtml,
+      hwAxIdent: hwAxIdent, onHwAxChip: onHwAxChip, onHwAxPick: onHwAxPick,
+      onHwAxUnlock: onHwAxUnlock, onHwAxFix: onHwAxFix,
       // UI-C4 boxy vlastnikov (tests/js/test_uic4_kovanie.js) — ciste skladanie
       // skupin z owner dat, ziadny DOM.
       hwGroupKeyOf: hwGroupKeyOf, hwLabelHead: hwLabelHead, hwLabelTail: hwLabelTail,

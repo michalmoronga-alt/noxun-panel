@@ -185,15 +185,25 @@
   // preto je vyriesena zasuvka JEDINY read-only riadok (system · vyska · NL ·
   // nosnost · otvaranie · recept) a vety receptu ziju v ROZBALITELNOM detaile.
   // Konflikt hodnoty NAHRADZA (cervena veta stavby), sync odporucanie je
-  // jantarovy riadok NAVIAC. Ziadne chipy zamkov — tie patria do KOV-D.
+  // jantarovy riadok NAVIAC.
   // Text NIKDY nesklada panel: vsetko su hotove retazce zo servera.
+  //
+  // KOV-D2b: k riadku pribudol rad CHIPOV OSI zamku (`axes` + identita zapisu
+  // `lock`, oboje zo servera). Kresli ho TEN ISTY markup ako v kontexte
+  // Kovanie (`hwAxHtml`), takze karta a sekcia nemozu ukazovat iny stav.
+  // Chipy „otváranie" a „nosnosť" z mockupu sa VEDOME nepridavaju — riadok
+  // zhrnutia ich uz nesie a vertikalny priestor panela je vzacny.
+  // Chipy dostava aj KONFLIKTNA zasuvka: prave z nej sa musi dat odomknut.
   function frontDrawerRows(drawer){
     var d = (drawer && typeof drawer === 'object') ? drawer : null;
     if (!d) return [];
+    var ax = frontDrawerAxesRow(d);
     var st = String(d.state || '');
     if (st === 'conflict'){
       var msg = String(d.message || '');
-      return msg ? [{ kind: 'info', tone: 'err', icon: 'alert', text: msg }] : [];
+      var conf = msg ? [{ kind: 'info', tone: 'err', icon: 'alert', text: msg }] : [];
+      if (ax) conf.push(ax);
+      return conf;
     }
     if (st === 'stale'){
       return [{ kind: 'info', tone: 'err', icon: 'alert',
@@ -204,8 +214,18 @@
     var out = [{ kind: 'resolved', label: 'Zásuvka', text: String(d.text || ''),
                  detail: Array.isArray(d.detail) ? d.detail.map(String) : [],
                  note: d.locked_note ? String(d.locked_note) : null }];
+    if (ax) out.push(ax);
     if (d.sync) out.push({ kind: 'info', tone: 'warn', icon: 'alert', text: String(d.sync) });
     return out;
+  }
+  // Riadok chipov vznikne LEN ked server poslal OBOJE — stav osi aj identitu
+  // zapisu. Chipy bez identity by boli klikatelne do prazdna (a identitu si
+  // panel z `front_id` skladat NESMIE: `recipe:<id>` pozna len server).
+  function frontDrawerAxesRow(d){
+    var ax = (d && d.axes && typeof d.axes === 'object') ? d.axes : null;
+    var lock = (d && d.lock && typeof d.lock === 'object') ? d.lock : null;
+    if (!ax || !lock) return null;
+    return { kind: 'axes', axes: ax, ident: lock };
   }
 
   // VIEW-MODEL karty. `item` = polozka cela (typ + dormant polia), `entry` =
@@ -1173,7 +1193,7 @@
       FRONT_DRAWER_VARIANT_OPTIONS: FRONT_DRAWER_VARIANT_OPTIONS,
       frontCardModel: frontCardModel, frontWingLabel: frontWingLabel,
       // KOV-C2c (tests/js/test_kovc2c_karta.js): riadky zasuvky v karte cela.
-      frontDrawerRows: frontDrawerRows,
+      frontDrawerRows: frontDrawerRows, frontDrawerAxesRow: frontDrawerAxesRow,
       frontCardKeepOpen: frontCardKeepOpen,
       frontCardFocusKey: frontCardFocusKey, frontCardFocusSelector: frontCardFocusSelector,
       frontExtraOnTypeChange: frontExtraOnTypeChange, frontExtraOnWings: frontExtraOnWings,

@@ -1341,6 +1341,13 @@
         h += '<div class="hint">' + esc(r.text) + '</div>';
         return;
       }
+      // KOV-D2b: chipy osi zamku kresli TEN ISTY markup ako kontext Kovanie
+      // (`hwAxHtml` v hardware.js) — jeden zdroj stavu aj jeden zapis. Karta
+      // si nekresli vlastnu verziu, aby sa obe miesta nemohli rozist.
+      if (r.kind === 'axes'){
+        if (typeof hwAxHtml === 'function') h += hwAxHtml(r.axes, r.ident);
+        return;
+      }
       // KOV-C2c: JEDEN read-only riadok vyriesenej zasuvky + rozbalitelny
       // technicky detail (vety receptu). Ziadne tlacidla, ziadny zapis —
       // hodnoty su vysledok stavby a menia sa klasifikaciou nad nou.

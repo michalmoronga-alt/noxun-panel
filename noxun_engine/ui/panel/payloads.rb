@@ -101,10 +101,15 @@ module Noxun
           # ostavaju nedotknute. Mapa sa stavia RAZ a vesia sa na OBE strany —
           # na emitovanu polozku vysuvu aj na osiroteny riadok zasahu, lebo pri
           # konflikte ziadna polozka nevznikne a odomknut sa musi dat aj tak.
-          axes = drawer_axes_map(cfg, params)
+          # KOV-D2b: TRETIE miesto je karta cela (`front_drawer`) — kresli sa
+          # z TEJ ISTEJ mapy, aby panel nemal dva stavy jednej osi.
+          index = drawer_axes_index(cfg, params)
+          axes = index['by_owner']
           unless axes.empty?
             params['hardware'] = attach_drawer_axes(params['hardware'], axes)
             params['hardware_overrides'] = attach_override_axes(params['hardware_overrides'], axes)
+            params['front_drawer'] = attach_front_drawer_axes(params['front_drawer'], index,
+                                                              params['cabinet_id'])
           end
           # V0.6 D1b: vyber setu per typ NA SKRINKE (override projektovej
           # predvolby) — ponuka + efektivny stav; server je autorita.
@@ -554,11 +559,26 @@ module Noxun
         # QUADRO: kluc `axes.height` CHYBA (nie `state: auto`) — system vyskove
         # varianty nema a ponuknut sa nema co.
         def drawer_axes_map(cfg, params)
+          drawer_axes_index(cfg, params)['by_owner']
+        end
+
+        # KOV-D2b: JEDEN prechod ciel dava OBOJE — stav osi per vlastnik
+        # (`by_owner`, kontrakt D2a) a IDENTITU ZAPISU per celo (`idents`).
+        # Recept sa nacitava RAZ (`Recipes.load` cita subor a overuje odtlacok),
+        # takze druhy prechod kvoli identite by bol druhy diskovy pristup na
+        # kazdy push panela.
+        #
+        # Identita je `owner_part_key` + `generic_type` + `rule_id` — presne to,
+        # co ocakava `handle_set_hardware_override`. Karta cela ju NEODVODZUJE
+        # (skladat `recipe:<id>` v JS by znamenalo druhu pravdu o tom, ku ktorej
+        # polozke zamok patri); v kontexte Kovanie ju riadok uz ma v datasete.
+        def drawer_axes_index(cfg, params)
+          empty = { 'by_owner' => {}, 'idents' => {} }
           ctxs = CabinetBuilder.drawer_axis_contexts(params)
-          return {} if ctxs.empty?
+          return empty if ctxs.empty?
 
           overrides = Array(cfg['hardware_overrides'])
-          Array(cfg['front_items']).each_with_object({}) do |item, acc|
+          Array(cfg['front_items']).each_with_object(empty) do |item, acc|
             next unless item.is_a?(Hash)
 
             fid = item['id'].to_s
@@ -568,12 +588,19 @@ module Noxun
             recipe = drawer_axis_recipe(item)
             next if recipe.nil?
 
-            acc[ctx[:owner_part_key].to_s] =
-              drawer_axes(recipe, ctx, overrides, drawer_conflict_for(cfg, fid))
+            owner = ctx[:owner_part_key].to_s
+            acc['by_owner'][owner] = drawer_axes(recipe, ctx, overrides, drawer_conflict_for(cfg, fid))
+            acc['idents'][fid] = drawer_lock_ident(owner, recipe)
           end
         rescue StandardError => e
           Engine.log_error(e, 'Panel.drawer_axes_map')
-          {}
+          { 'by_owner' => {}, 'idents' => {} }
+        end
+
+        def drawer_lock_ident(owner, recipe)
+          { 'owner_part_key' => owner,
+            'generic_type' => Recipes::LOCK_GENERIC_TYPE,
+            'rule_id' => "#{Recipes::LOCK_RECIPE_PREFIX}#{recipe[:recipe_id]}" }
         end
 
         # PRIPNUTY recept cela (rovnaka retaz ako stavba), alebo nil.
@@ -694,6 +721,31 @@ module Noxun
             a = axes[h['owner_part_key'].to_s]
             a ? h.merge('axes' => a) : h
           end
+        end
+
+        # KOV-D2b: KARTA CELA kresli ten isty rad chipov ako kontext Kovanie.
+        # Zaznam `front_drawer[fid]` preto dostava `axes` (TA ISTA mapa, ziadny
+        # druhy vypocet) a `lock` = identitu zapisu doplnenu o `cabinet_id`
+        # (guard F6 — klik z karty musi byt rovnako chraneny ako klik v riadku).
+        # Zaznam BEZ osi (napr. `stale` celo alebo celo, ktoreho recept sa
+        # nenacital) ostava presne taky, aky bol v C2c.
+        def attach_front_drawer_axes(map, index, cab_id)
+          return map unless map.is_a?(Hash)
+
+          by_owner = index['by_owner'] || {}
+          (index['idents'] || {}).each do |fid, ident|
+            row = map[fid]
+            next unless row.is_a?(Hash)
+
+            ax = by_owner[ident['owner_part_key']]
+            next if ax.nil?
+
+            map[fid] = row.merge('axes' => ax, 'lock' => ident.merge('cabinet_id' => cab_id.to_s))
+          end
+          map
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.attach_front_drawer_axes')
+          map
         end
 
         # Osiroteny riadok zasahu (polozka pri konflikte NEVZNIKLA) dostane ten

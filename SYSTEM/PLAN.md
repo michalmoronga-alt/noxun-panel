@@ -491,9 +491,16 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   Testy: `tests/pure/test_kovd2a_zamky.rb` (poradie výška → NL nad fixtúrami H70/H144 × 520, zámok drží / konflikt / návrh len jednej osi, reset per os, receptová NL cesta,
   per-os stav v payloade, schéma 7; 3 overené mutácie) + in-SU sekcia **`run_kovd2a`** (zámok výšky proti automatu H144 → H70 v jednej operácii, Späť aj Redo, NL mimo radu =
   RED bez dielcov a bez kitu, odomknutie jednej osi, kópia zámky nesie).
-  **D2b · ZÁMKY — UI:** chipy osí (výška, NL) s ikonou zámku v karte čela aj v kontexte Kovanie (JEDEN stav zo servera), klik = zamknúť aktuálnu hodnotu / odomknúť; konflikt =
-  RED riadok + návrh náhrady + potvrdenie (D-15 modal; náhrada ostáva zamknutá); odomknutie každej osi aj bez emitovaného výsuvu (konfliktná karta); bez diff-modal frameworku.
-  **In-SU povinné (Undo/Redo zámkov).**
+  **D2b · ZÁMKY — UI — ✅ HOTOVÉ (v0.9.38, 6.9.2026):** rad chipov osí (`hwAxHtml`) kreslí **JEDEN markup** na oboch miestach — riadok výsuvu aj riadok osiroteného zásahu
+  v kontexte Kovanie a riadok zásuvky v karte čela; stav je VÝHRADNE serverový (`axes` z D2a) a **hodnota do zápisu ide z `axes.*.value` / `options` / `proposal`, nikdy
+  z textu chipu** (`data-val`). Klik na `auto` zamkne zobrazenú hodnotu, klik na `locked`/`conflict` pošle `value: null` = odomknutie **LEN tejto osi** (nikdy `reset`);
+  iná hodnota len z ponuky `options` (pri `blocked_by: 'height'` ponuka nie je a chip to prizná vetou). Konflikt = RED chip + RED riadok s **vetou zo servera** + „Nahradiť
+  za …" LEN pri `proposal` → **D-15 potvrdenie** → zápis návrhu (náhrada ostáva zamknutá, druhý zámok sa nemení); „Odomknúť" je dostupné vždy, aj bez emitovanej položky.
+  Zápis ide **existujúcou** akciou `set_hardware_override`; jadro (resolver, normalizácia, schéma, `drawer_axes_map`) sa **nemenilo**. Server-side pribudlo LEN aditívne:
+  `front_drawer[fid]` nesie `axes` + `lock` (identita zápisu vrátane `cabinet_id`) — `drawer_axes_index` dáva stav aj identitu **jedným** prechodom (druhý by znamenal
+  druhé `Recipes.load` na každý push) a **ľahký push** (`front_drawer_refresh`) nesie to isté, inak by zmena mapovania zmazala chipy z otvorenej karty.
+  **Vedomá odchýlka od mockupu:** chipy „otváranie" a „nosnosť" sa nepridali (riadok zhrnutia ich už nesie) — zapísané v `zdroje/ui20/UI20_KONTRAKT.md` §7 bod 10.
+  Testy: `tests/pure/test_kovd2b_payload.rb`, `tests/js/test_kovd2b_ui.js` (mini-DOM, 3 overené mutácie) + in-SU sekcia **`run_kovd2b`**.
   **D3a · UPGRADE RECEPTU — jedno čelo, jadro (audit-povinné):** akcia mení **jeden záznam mapy `system|opening` jedného čela** (Astra #20 F12/F13; ostatné refs a dormant zámky
   nedotknuté); server overí očakávaný starý ref + cieľ rovnakého systému/otvárania; **preflight cieľa PRED zápisom**: hrúbky, oba zámky (preadresovanie `rule_id recipe:<v1> →
   recipe:<v2>`; kolidujúci override na cieľovom rule_id s inou hodnotou = odmietnutie), expanzia setu — **konflikt cieľového receptu alebo chýbajúci kit = upgrade sa NEULOŽÍ, ostáva

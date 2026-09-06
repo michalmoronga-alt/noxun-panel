@@ -588,3 +588,11 @@ zmysle, že **mockup už nie je poslednou pravdou tam, kde tu stojí niečo iné
    `noxun_engine_templates`, `noxun_engine_supplier_settings`) — je to zapamätaná veľkosť okna,
    ktoré už neexistuje, a SketchUp ju nikdy nepoužije. Mazať cudzí register kvôli kozmetike je
    väčšie riziko než nechať ich tam.
+10. **KOV-D2b — z radu chipov mockupu KOVANIA (scéna 1) sa kreslia len OSI ZÁMKU** (`výška`, `NL`).
+    Mockup `mockup_kovanie_v1.html` má v `.axchips` ešte chip otvárania („Tip-On"/„Classic") a nosnosti
+    („30 kg"); obe hodnoty **už nesie riadok zhrnutia zásuvky** („Atira · H70 · NL 470 · 30 kg · SiSy ·
+    recept v1", KOV-C2c) a ani jedna nie je klikateľná — boli by to dva popisky toho istého v jednom
+    okne, za cenu riadku navyše (trvalé pravidlo „vertikálny priestor panela je vzácny"). Chipy osí
+    naopak **ovládajú** zámok, preto zostali. Ak by otváranie a nosnosť mali niekedy pribudnúť, patria
+    do riadku zhrnutia, nie vedľa neho. *(Zápis patrí ku KOVANIU, nie k fáze ŠTÚDIO — §7 je jediný
+    zoznam vedomých odchýlok od mockupov, preto žije tu.)*

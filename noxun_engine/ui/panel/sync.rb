@@ -488,7 +488,10 @@ module Noxun
                 # Je to TA ISTA citacia projekcia ako v plnom pushi (`params`
                 # polozky vysuvu + `HardwareSets.explain`) — ziadny prepocet
                 # receptu, ziadny zapis, ziadny krok Spat.
-                'front_drawer' => front_drawer_payload(cfg) }
+                # KOV-D2b: k riadku patria aj CHIPY OSI. Keby ich lahky push
+                # vynechal, `refreshFrontDrawer` by zamky z OTVORENEJ karty
+                # zmazal — server je autorita a klient si stary stav nedrzi.
+                'front_drawer' => front_drawer_refresh(cfg, cid) }
             end
           js("NX.setHardwareSets(#{data.to_json})")
         rescue StandardError => e
@@ -506,6 +509,23 @@ module Noxun
         rescue StandardError => e
           Engine.log_error(e, 'Panel.manual_view_for_refresh')
           []
+        end
+
+        # KOV-D2b: riadok zasuvky pre ZIVY refresh — vratane stavu osi zamku.
+        # `refreshFrontDrawer` vymiena zaznam CELY, takze payload musi niest to
+        # iste, co plny push; inak by po zmene mapovania alebo katalogu zmizli
+        # z otvorenej karty chipy (a s nimi cesta odomknut konfliktnu zasuvku).
+        # Plan sa stavia LEN ked skrinka klasifikovanu zasuvku naozaj ma —
+        # zakazka bez zasuviek ma payload zhodny s D1b.
+        def front_drawer_refresh(cfg, cab_id)
+          map = front_drawer_payload(cfg)
+          return map unless map.is_a?(Hash) && !map.empty?
+
+          attach_front_drawer_axes(map, drawer_axes_index(cfg, CabinetBuilder.config_to_params(cfg)),
+                                   cab_id)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.front_drawer_refresh')
+          map.is_a?(Hash) ? map : {}
         end
 
         # D-92: minimalny tvar pre zivy refresh — identita riadku + to, co sa
