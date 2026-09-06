@@ -488,8 +488,14 @@ NxTest.test('KOV-D1b (P2-5): ľahký push nesie aj detail zásuvky') do
   c = NxD1b
   push = c.src('noxun_engine', 'ui', 'panel',
                'sync.rb')[/def push_hardware_sets.*?\n        end\n/m].to_s
-  NxTest.assert(push.include?("'front_drawer' => front_drawer_payload(cfg)"),
+  # KOV-D2b: volanie sa presunulo do `front_drawer_refresh` (ten k zaznamu
+  # priloži aj stav osi) — obsah pushu ostava ten isty riadok zasuvky.
+  NxTest.assert(push.include?("'front_drawer' => front_drawer_refresh(cfg, cid)"),
                 'zmena mapovania/katalogu obnovi aj „co je v baleni"')
+  refresh = c.src('noxun_engine', 'ui', 'panel',
+                  'sync.rb')[/def front_drawer_refresh.*?\n        end\n/m].to_s
+  NxTest.assert(refresh.include?('front_drawer_payload(cfg)'),
+                'a zdrojom riadku ostava JEDINA citacia projekcia D1b')
   NxTest.assert(push.include?("'options' => hardware_set_options(cfg, items)"),
                 'a povodny obsah lahkeho pushu ostava')
   # Cesta je CITACIA — ziadna operacia, ziadny zapis (rovnako ako doteraz).

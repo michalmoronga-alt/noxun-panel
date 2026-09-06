@@ -1299,7 +1299,11 @@
     var ae = document.activeElement;
     if (!ae || typeof ae.closest !== 'function' || ae.closest('.fcard') !== card) return null;
     var d = ae.dataset || {};
-    return frontCardFocusKey({ t: d.t, k: d.k, v: d.v, w: d.w });
+    // KOV-D2b (Codex #313 kolo 1 P2-4): chipy osi maju vlastnu identitu
+    // (`data-ax` = os, `data-axc` = druh ovladaca) — bez nej by fokus po
+    // KAZDOM prekresleni karty spadol na dokument prave pri klavesovej praci
+    // so zamkom, teda tam, kde je najdrahsi.
+    return frontCardFocusKey({ t: d.t, k: d.k, v: d.v, w: d.w, ax: d.ax, axc: d.axc });
   }
   // Najde v CERSTVO vykreslenej karte tlacidlo s rovnakou identitou a vrati mu
   // fokus. `preventScroll` je zamer: karta sa nema pod rukou posunut; staršie
@@ -1339,6 +1343,13 @@
       }
       if (r.kind === 'hint'){
         h += '<div class="hint">' + esc(r.text) + '</div>';
+        return;
+      }
+      // KOV-D2b: chipy osi zamku kresli TEN ISTY markup ako kontext Kovanie
+      // (`hwAxHtml` v hardware.js) — jeden zdroj stavu aj jeden zapis. Karta
+      // si nekresli vlastnu verziu, aby sa obe miesta nemohli rozist.
+      if (r.kind === 'axes'){
+        if (typeof hwAxHtml === 'function') h += hwAxHtml(r.axes, r.ident);
         return;
       }
       // KOV-C2c: JEDEN read-only riadok vyriesenej zasuvky + rozbalitelny

@@ -17,6 +17,51 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-D2b — ZÁMKY OSÍ ZÁSUVKY: UI (v0.9.38, 6.9.2026).**
+  D2a dala jadro, ale v paneli nebolo čo kliknúť. Táto dávka pridáva **rad chipov osí** — „H144 výška" a „NL 470" — a je to **jeden markup na dvoch miestach**
+  (`hwAxHtml` v `hardware.js`): riadok položky výsuvu **aj riadok osiroteného zásahu** v kontexte Kovanie a riadok zásuvky v **karte čela**. Dva renderery by sa časom
+  rozišli a panel by o jednej osi hovoril dve veci; karta preto na ten istý markup len deleguje (view-model riadok `kind: 'axes'` z čistej `frontDrawerAxesRow` v `core.js`).
+  **Stav je výhradne serverový.** Chip kreslí `axes[os].state` (`auto` | `locked` | `conflict`; čokoľvek iné sa kreslí ako `auto` — stav, ktorý server nepovedal, sa
+  nedomýšľa) a **hodnota do zápisu ide z `axes[os].value`, `options` alebo `proposal`, NIKDY z textu chipu**: text je popisok pre človeka („NL 470,5" s desatinnou čiarkou),
+  hodnota je číslo pre server, takže parsovanie textu by zamklo inú dĺžku, než používateľ videl. Hodnota preto žije v `data-val` a mutácia „čítaj z textu" test zhodí.
+  **Klik na `auto` chip zamkne práve zobrazenú hodnotu, klik na `locked`/`conflict` pošle `value: null`** = odomknutie **len tejto osi**. `reset: true` (zahodenie celého
+  záznamu) sa tu nepoužíva vôbec — zmazal by aj platný druhý zámok. Inú hodnotu vyberá `<select>` s **výhradne** serverovými `options`; pri `blocked_by: 'height'` je ponuka
+  prázdna, select sa nekreslí a chip to prizná vetou („najprv vyrieš výšku") — rad dĺžok je per výška, takže sa nemá z čoho počítať.
+  **Konflikt** dostáva červený chip, červený riadok s **uloženou vetou zo servera** (panel žiadnu vlastnú neskladá — inak by sa karta rozišla s Kontrolou) a dve cesty von:
+  **„Nahradiť za …"** len keď server dal `proposal`, a **„Odomknúť"** vždy — aj na karte, kde položka výsuvu fail-closed nevznikla. Náhrada je jedno rozhodnutie, takže ide
+  cez **kostru D-15** (`NXModal` bez polí); **bez kostry sa neodošle nič**, lebo zmena zamknutej hodnoty bez potvrdenia je presne to, čomu sa dávka vyhýba. Po potvrdení sa
+  zapíše návrh servera a náhrada **ostáva zamknutá**; druhý zámok sa nemení (server ho znova overí).
+  **Zápis ide EXISTUJÚCOU akciou** `set_hardware_override` (`field` `height_variant` / `nominal_length`) cez `hwSend` → `nxDocPayload`, teda s guardom dokumentu aj skrinky.
+  Žiadny nový callback, žiadny druhý tvar payloadu, jedna zmena = jeden krok Späť. **Jadro sa nemenilo**: resolver, `norm_hardware_overrides`, schéma 7 ani logika
+  `drawer_axes_map` sú nedotknuté.
+  **Server-side pribudlo len aditívne.** `front_drawer[fid]` nesie `axes` (**tú istú inštanciu**, žiadny druhý výpočet) a `lock` = identitu zápisu (`owner_part_key` ·
+  `generic_type` `slide` · `rule_id` `recipe:<id>` · `cabinet_id`). Panel si ju skladať nesmie: `recipe:<id>` pozná len server a kľúč odvodený z `front_id` by po zmene
+  pripnutého receptu ukazoval na inú položku. Stav aj identitu dáva **jeden** prechod čiel (`drawer_axes_index`; `drawer_axes_map` je odvtedy tenký obal nad ním, takže
+  in-SU `run_kovd2a` sa nemení) — druhý prechod by znamenal **druhé `Recipes.load`** na každý push panela, a to číta súbor a overuje odtlačok. **Ľahký push nesie to isté**
+  (`front_drawer_refresh`): `refreshFrontDrawer` vymieňa záznam celý, takže payload bez osí by po zmene mapovania v Štúdiu zmazal chipy z otvorenej karty — a s nimi cestu,
+  ako konfliktnú zásuvku odomknúť. Plán sa preň stavia len vtedy, keď skrinka klasifikovanú zásuvku naozaj má.
+  **Vedomá odchýlka od mockupu (`UI20_KONTRAKT.md` §7 bod 10):** chipy „otváranie" a „nosnosť" zo scény 1 sa **nepridali** — obe hodnoty už nesie riadok zhrnutia zásuvky
+  (C2c), ani jedna nie je klikateľná, a boli by to dva popisky toho istého za cenu riadku navyše (trvalé pravidlo o vertikálnom priestore). Chipy osí naopak **ovládajú**.
+  **Codex kolo 1 (4× P2, žiadny P1).** Všetky štyri sú o tom, čo sa stane, keď sa panel a model rozídu:
+  **(1) Modal náhrady sa zatváral hneď v `onSubmit`.** Ak server zápis odmietol (zastaraný `proposal` — používateľ medzitým zmenil výber), dôvod pristál ako status pod
+  prázdnou kartou: rozhodnutie zmizlo a náhradu nemal kto zopakovať. Kontrakt D-15 pritom hovorí, že **zápis okno nezatvára**. Okno sa teraz len **zamkne**
+  (`setBusy(true)`) a čaká na `NX.hwAxResult`; úspech ho zavrie, odmietnutie **odomkne a hlášku ukáže v ňom**. Korelácia je **tokenom** (`ax_token`, rastúci `a<N>`), nie
+  druhom operácie — inak by odpoveď na staršie odoslanie zavrela okno, ktoré už čaká na niečo iné (lekcia KOV-H2, Codex #285 P2-A). Server ho **nevyrába ani
+  neinterpretuje**, len vracia; tvar je uzavretý (String/Integer, orezaný) a odpoveď ide **v každej vetve** handlera — vetva, ktorá skončí len statusom, by okno nechala
+  zamknuté navždy. **Bez tokenu sa neposiela nič**: klik na chip žiadne okno nečaká.
+  **(2) Konfliktná karta hovorila jednu vetu dvakrát.** Pri `height_lock_invalid` / `nl_lock_invalid` dáva server ten istý uložený reťazec do `front_drawer.message` **aj**
+  do `axes[os].message`, takže karta ho vypísala ako červený riadok a hneď pod ním v bloku chipu. Vonkajšia veta sa teraz **potlačí pri doslovnej zhode** — konflikt, o ktorom
+  os nevie (prekážka, hrúbka, KD), ostáva jediným miestom, kde sa dôvod dá prečítať.
+  **(3) Konflikt mal DVE cesty k tej istej zmene.** Os v `conflict` stále kreslila `options` v selecte, takže výber z ponuky obišiel potvrdenie, ktoré vedľa neho vyžaduje
+  tlačidlo „Nahradiť za …". Select sa pri konflikte **nekreslí** (fail-closed, jednoduchšie než presmerovať výber do modalu).
+  **(4) Fokus padal na dokument.** Karta si po prekreslení pamätá ovládač podľa logickej identity (`data-t` alebo `data-k`/`data-v`/`data-w`); chipy mali len `data-ax`.
+  Pribudlo **`data-axc`** (druh ovládača: `chip` · `sel` · `fix` · `unlock`) a kľúč `a:<os>|<druh>` — hodnota v kľúči zámerne **nie je** (po zamknutí sa mení). Bez toho by
+  fokus po **každom** zamknutí spadol na dokument, teda presne pri klávesovej práci so zámkom.
+  Testy: `tests/pure/test_kovd2b_payload.rb` (jeden objekt pre kartu aj Kovanie, identita, konflikt, ľahký push, charakterizácia zákazky bez zásuviek, token a odpoveď
+  v každej vetve) + `tests/js/test_kovd2b_ui.js` (mini-DOM: markup, klik → payload, celý tok potvrdenia vrátane odmietnutia a cudzieho tokenu)
+  + `tests/js/test_kova2a_karta.js` (fokus na chipe prežije prekreslenie **celej** karty) + in-SU sekcia **`run_kovd2b`**, ktorá **každý zápis stavia z payloadu karty**
+  (identita z `lock`, hodnoty z `axes`) — presne ako klik v CEF. **8 overených mutácií.** 3248 headless, 92 JS sád.
+
 - **KOV-D2a — ZÁMKY OSÍ ZÁSUVKY: JADRO (v0.9.37, 6.9.2026).**
   Zásuvka z receptu má odteraz **dve osi ručného zámku**: **dĺžku výsuvu** (`nominal_length`, existovala od D-93) a novú **výšku** (`height_variant`, len Atira — Quadro
   výškové varianty nemá). Obe žijú v tom istom zázname `hardware_overrides` a zámok je jednoducho **existencia platného poľa**. Kľúčové je **poradie**, lebo rad dĺžok

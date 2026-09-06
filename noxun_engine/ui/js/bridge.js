@@ -513,6 +513,13 @@
     hwManualResult: function(ok, msg, op){
       if (typeof onHwManualResult === 'function') onHwManualResult(ok, msg, op);
     },
+    // KOV-D2b: výsledok ZÁPISU zámku osi. Chodí LEN keď zápis poslal modal
+    // náhrady (server odpovedá len na `ax_token`) — klik na chip ho nemá kto
+    // čakať. Tá istá zásada ako pri `hwManualResult`: okno zatvára VÝHRADNE
+    // volajúci, a to až po potvrdení servera.
+    hwAxResult: function(ok, msg, token){
+      if (typeof onHwAxResult === 'function') onHwAxResult(ok, msg, token);
+    },
     loadSelected: function(c){
       // R-02 (review #264 kolo 3): IDENTITA DOKUMENTU JE PRVA VEC V PUSHI.
       // Dovod je poradie: nizsie sa rozhoduje `keepGaps` (ci sa ZACHOVAJU
