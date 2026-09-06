@@ -268,9 +268,16 @@ eq(HWS.hwsMapClassRows('global').length, 1, 'globálne riadky sú vlastný zozna
 // overuje na zdrojoch: server ho do payloadu priloží, bridge ho posunie
 // ďalej a `refreshFrontDrawer` prekreslí LEN otvorenú kartu.
 const fs = require('node:fs');
-const bridgeSrc = fs.readFileSync(path.join(JS, 'bridge.js'), 'utf8');
-const formSrc = fs.readFileSync(path.join(JS, 'form.js'), 'utf8');
-const hwSrc = fs.readFileSync(path.join(JS, 'hardware.js'), 'utf8');
+// Zdroje sa citaju s normalizovanymi koncami riadkov: na Windows checkoute
+// (core.autocrlf=true) su subory CRLF a regexy nizsie kotvia na `
+` —
+// bez normalizacie sada padne lokalne, hoci v CI (LF) prejde.
+const readSrc = (name) => fs.readFileSync(path.join(JS, name), 'utf8').replace(/
+/g, '
+');
+const bridgeSrc = readSrc('bridge.js');
+const formSrc = readSrc('form.js');
+const hwSrc = readSrc('hardware.js');
 
 const setHw = bridgeSrc.match(/setHardwareSets: function\(data\)\{[\s\S]*?\n    \},/)[0];
 ok(/refreshFrontDrawer\(d\.front_drawer\)/.test(setHw),
