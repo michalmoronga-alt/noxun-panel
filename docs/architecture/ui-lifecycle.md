@@ -836,6 +836,38 @@ reťazec z `drawer_conflicts` a karta by ho vypísala dvakrát. Zhoda sa porovn�
 sa dôvod dá prečítať. Kontrakt chipov, kliku a náhrady je v odseku „Kontext Kovanie" nižšie. **Chipy „otváranie" a „nosnosť" z mockupu sa VEDOME nepridali** (vertikálny priestor — riadok zhrnutia ich už nesie; `UI20_KONTRAKT.md` §7).
 Ručný zámok dĺžky priznáva navyše veta `locked_note` pod riadkom.
 
+**PONUKA NOVEJ VERZIE RECEPTU (KOV-D3b).** Úplne naspodku karty — **až pod** jantárovým odporúčaním synchronizácie, lebo to je upozornenie na terajší stav, kým toto je
+príležitosť — stojí `.dwup`: jedna tlmená veta `inforow` („Dostupný recept v2 — &lt;release_note&gt;") a pod ňou **ghost** tlačidlo „Prejsť na v2…". Blok vzniká **výhradne**
+z kľúča `upgrade` v zázname (`frontDrawerUpgradeRow` v `core.js`); bez neho — čo je v produkcii **vždy**, lebo žiadna v2 neexistuje — karta nekreslí **nič** a vyzerá presne
+ako po D2b. Panel sa nikdy nepýta „je `to` novšie ako `from`?“: to je otázka registra receptov a odpovedá na ňu Ruby (`Recipes.upgrade?`). Markup aj klik žijú
+v `hardware.js` (`hwUpHtml`) pri ostatných zápisových cestách kovania — karta je renderer, nie druhé miesto, kde by sa skladal payload servera; tlačidlo nesie `data-ax`/`data-axc`,
+takže fokus prežije prekreslenie karty ľahkým pushom (vzor D2b P2-4).
+
+Klik **neotvára okno**: pošle **čítaciu** otázku `drawer_upgrade_impact` s korelačným tokenom a čaká na odpoveď kanálom `NX.hwUpgradeImpact`. Dôvod je vecný — preflight môže
+prechod odmietnuť (nesediaca hrúbka, zámok mimo nového radu, chýbajúci kit) a vtedy **nie je čo potvrdzovať**: používateľ dostane vetu servera do statusu a okno sa neotvorí
+vôbec. Pri `ok: true` sa otvorí **kostra D-15** („Prejsť na novú verziu receptu", `okLabel: 'Prejsť'`) s **tabuľkou dopadu na TOTO čelo** — výška · NL · rozmery každého
+dielca · objednávací kód, vždy v dvojici „teraz → po prechode", plus veta o zámkoch („prenesú sa bez zmeny hodnoty: NL 470"). Nezmenené riadky sú **stlmené**, aby oko našlo
+to, čo sa naozaj mení. Je to zobrazovací blok (`type: 'custom'` bez `read`), takže sa z neho nedá odoslať nič: zápis nesie **výhradne** `from`/`to`, ktoré prišli v payloade.
+Tabuľka **nie je textový diff konštánt** (Astra #20 F13) — verzia smie zmeniť prahy, rad NL, hrúbky aj ABS bez zmeny `constants`, takže sa ukazuje výsledok, nie recept.
+Potvrdenie ide na `upgrade_drawer_recipe` s vlastným tokenom a **okno sa nezatvára**, kým server zápis nepotvrdí (`NX.hwUpgradeResult`) — odmietnutie ho odomkne a hlášku
+ukáže **v ňom**. Sú to zámerne **dva kanály**, nie jeden zdieľaný s D2b: okno náhrady osi a okno prechodu sú dva rôzne modaly s vlastným stavom a jeden kanál by zavrel to
+nesprávne. Kým odoslanie beží, okno je **zamknuté aj proti zatvoreniu** (`busyLock`, nižšie).
+
+**ZÁPIS SMIE PRESADIŤ LEN TO, ČO POUŽÍVATEĽ VIDEL (`fingerprint`, Codex #315 kolo 1 P1).** Payload zápisu nesie iba refy a identitu, takže medzi „ukáž dopad" a „Prejsť" sa
+skrinka môže zmeniť (rozmery, materiály, mapovanie kovania, Späť/Redo) — `drawer_upgrade_prepare` by potom bežal nad **novým** stavom a zapísal **iný** dopad než ten
+potvrdený. `from` to nechytí: ten stráži len to, že sa nezmenil **pripnutý recept**. Server preto k dopadu pribalí **odtlačok** (`Digest::SHA256` nad identitou a **celým**
+dopadom — čo sa v dopade neprejaví, na potvrdení nezáleží; čo sa prejaví, odtlačok zmení), klient ho pri „Prejsť" **len vráti** (nič neskladá a nič si nedopočítava)
+a server ho **pred zápisom prepočíta tou istou funkciou**. Nezhoda **aj chýbajúci** odtlačok = odmietnutie „stav skrinky sa medzitým zmenil — otvor náhľad znova"
+(fail-closed: zápis smie prísť výhradne z potvrdeného náhľadu). Pri odmietnutí sa panel **prekreslí** (`push_selected`), takže ponuka aj karta ukazujú čerstvý stav a druhý
+pokus ide už nad novým náhľadom; modal ostáva otvorený s hláškou.
+
+**Keď zmenu odhalí až preflight, hláška je TÁ ISTÁ** (in-SU beh nad `615a92f`). Zmenený stav môže padnúť **skôr**, než sa k porovnaniu odtlačku vôbec príde: `prepare` nad
+novým stavom zlyhá (napr. zamknutá NL sa do menšej hĺbky nezmestí) a odtlačok, ktorý sa počíta **z dopadu**, vtedy neexistuje. Surový text preflightu by ale hovoril o stave,
+ktorý používateľ **nikdy nevidel**, a znel by ako chyba jeho zásuvky namiesto „medzitým sa niečo zmenilo". Preto: keď payload **nesie** odtlačok (`from_preview`), každé
+zlyhanie `prepare` sa prevedie na **tú istú** stale vetu a pôvodný dôvod sa **pripojí** za pomlčkou (`upgrade_stale_reason`). Bez odtlačku — teda mimo cesty z potvrdenia
+(testy, in-SU sekcia D3a) — sa dôvod **neprepisuje**. **Odmietnutie nezapíše nič a neotvorí operáciu:** jediné `start_operation` tejto cesty je v `CabinetBuilder.rebuild`
+za oboma bránami (stráži to headless test s počítadlom prestavieb).
+
 **KOV-D1b doplnil do TOHO ISTÉHO rozkliku „čo je v balení"** — za vety receptu pribudne „Balenie: &lt;názov setu&gt;", riadok každého člena („· K-sada 357696 — Súprava Atira 470
 biela (1 ks)") a pri probléme priznaný dôvod („Bez kódu: …"). Žiadny nový blok a **žiadny druhý explain**: zdrojom je **jediný existujúci rozpis** `HardwareSets.explain`, ten
 istý, z ktorého žije nákupný riadok D-92 aj súpis — panel a súpis sa rozísť nesmú. **NOSNOSŤ v balení nie je a byť nesmie**: vydáva ju výhradne recept (riadok „Nosnosť bunky"
@@ -1393,7 +1425,13 @@ kontext (stav setov + mapa kód → položka katalógu) sa stavia **raz pre cel�
 chýba, detail ostáva presne taký, aký bol v C2c. **Kontext je ZHODNÝ s nákupným riadkom** (Codex #310 kolo 1 P2-1): pri projekte bez snapshotu a **nepoužiteľnej knižnici**
 (`status == :missing && library_read_only?`) sa override skrinky **neuplatní** a do `item_purchase` ide `blocked: true` — tá istá podmienka aj to isté správanie ako
 v `decorate_hardware_purchase`. Bez toho by rozklik uplatnil override na definíciu, ktorá by musela prísť práve z tej knižnice, a panel by o jednej položke hovoril niečo
-iné než súpis (lekcia R-06a).
+iné než súpis (lekcia R-06a). **KOV-D3b** pripája k záznamu ešte **`upgrade`** (`attach_front_drawer_upgrade`, mimo bloku osí — os zásuvka mať nemusí, ale ponuka je otázka
+o mape `recipe_refs`, nie o zámkoch). Kľúč vzniká **len** vtedy, keď pre pripnutý recept naozaj existuje **vydaná vyššia** verzia (`active_ref == :known` · `latest_for` ·
+`Recipes.upgrade?` — tie isté pravidlá, ktoré zápisovú cestu nakoniec pustia), a **len pri `state: 'ok'`**: tabuľka dopadu porovnáva terajší stav s cieľovým a konfliktná
+zásuvka žiadny terajší nemá — jej cesta von je dôvod konfliktu. V produkcii žiadna v2 neexistuje, takže sa kľúč **nikdy nepridá** a payload je zhodný s D3a (charakterizačný
+test). Otázka je **lacná** (register + `parse_id`); dopad na čelo sa tu **nepočíta** — ten stojí celý `build_plan` + expanziu setov a chodí až na klik, samostatným čítacím
+callbackom. Blok nesie aj `cabinet_id` a `front_id`: identitu zápisu skladá **server** (rovnaká zásada ako `lock` v D2b), panel ju z ničoho neodvodzuje. Ten istý blok pripája
+aj **ľahký push** (`front_drawer_refresh`) — inak by z otvorenej karty po zmene mapovania ponuka zmizla.
 
 **`hardware_set_options` a owner výbery (KOV-D1a).** Typ kovania z kľúča override mapy aj rozpoznanie „výberu na úrovni vlastníka" idú cez **jediné autority**
 `HardwareSets.mapping_key_type` a `owner_scoped_key?` — nie cez `BuildPlan.parse_hardware_set_key`, ktorý pre `class:` kľúče vracia `nil`. Bez toho by karta čela pri
@@ -1603,8 +1641,23 @@ zamknuté navždy. **Bez tokenu sa neposiela nič**: klik na chip žiadne okno n
 **UPGRADE RECEPTU — jedno čelo (KOV-D3a, v0.9.39).** `handle_upgrade_drawer_recipe` mení **presne jeden** záznam mapy `recipe_refs` **presne jedného** čela
 (payload `{cabinet_id, front_id, from, to}`; mapu klient nikdy neposiela — `SERVER_DRAWER_KEYS` platí ďalej, klient posiela len **očakávaný starý ref**). Server overí:
 čelo je klasifikovaná zásuvka · záznam mapy je `:known` a rovná sa `from` (`:missing` ani `:unknown` sa upgradom **neopravujú** — chýbajúci doplní stavba, poškodený je RED
-`drawer_recipe_unknown`) · cieľ je **vydaný** · `Recipes.upgrade?(from, to)` = rovnaký systém aj otváranie a **vyššia** verzia (žiadny downgrade). **UI zatiaľ nie je**
-(D3b) — callback sa v paneli **neregistruje**, akcia je zatiaľ latentný rámec volaný z testov a in-SU sekcie `run_kovd3a`.
+`drawer_recipe_unknown`) · cieľ je **vydaný** · `Recipes.upgrade?(from, to)` = rovnaký systém aj otváranie a **vyššia** verzia (žiadny downgrade).
+
+**UI A ČÍTACÍ DOPAD (KOV-D3b, v0.9.40).** Panel registruje **dva** callbacky: zápisový `upgrade_drawer_recipe` a **čítací** `drawer_upgrade_impact`. Zápisový odpovedá
+čakajúcemu oknu **v každej vetve** (`push_upgrade_result` → `NX.hwUpgradeResult`, token `up_token` sa číta **pred** prvým návratom — inak by okno ostalo zamknuté navždy;
+sanitizer tokenu je zdieľaný s D2b, `axis_token`), a to **až za** `push_selected`: okno sa smie zavrieť, keď je panel prekreslený. Čítací nespúšťa **žiadnu** operáciu,
+nezapisuje do modelu **nič** a nenechá **žiadny** krok Späť — len postaví cieľ nasucho a vráti čísla (`push_upgrade_impact` → `NX.hwUpgradeImpact`; `ok: false` + `reason`
+pri odmietnutí, vtedy sa potvrdenie neponúkne vôbec).
+
+Dopad skladá **server** a berie ho z **TOHO ISTÉHO** nasucho postaveného stavu, ktorý by sa aj zapísal: `drawer_upgrade_prepare` vracia **aditívne** aj `side` (cieľová položka
+výsuvu, dielce čela z plánu, objednávacie kódy z expanzie), `lock` (už **preadresovaný** záznam zámku) a identitu (`fid`, `owner`, `from`, `to`); zápisová cesta číta naďalej
+len `params` a `recipe`. Dielce sú kľúčované **`part_key`, nie rolou** (Codex #315 kolo 1 P2): Quadro vydáva `box_side` **dvakrát** (vľavo a vpravo) s tou istou rolou, takže
+mapa kľúčovaná rolou by jeden dielec prepísala a tabuľka by mala 4 riadky namiesto 5; `part_key` je zároveň stabilná identita naprieč verziami, takže sa obe strany porovnania
+párujú správne. Výšku emituje `drawer_upgrade_height`: Atira nesie **výškový variant** (`height_variant`, „H144"), Quadro ho **nemá vôbec** a nesie výšku boxu v mm
+(`box_height`) — presne ako riadok zhrnutia karty. Ktoré pole platí, hovorí server cez `kind` (`variant` / `box`) a JS podľa neho volí popisok aj jednotku; bez toho by
+Quadro ukázalo „Výška — → —" a zmenu výšky boxu **zamlčalo**. **Terajšiu** stranu stavia **ten istý** helper `drawer_dry_plan` nad **nezmenenými** parametrami skrinky — dve rôzne cesty by ukázali rozdiel, ktorý
+v skutočnosti spôsobil len iný spôsob výpočtu. Preto ani preflight, ani kit nemajú druhú implementáciu: `drawer_upgrade_preflight` vracia `[chyba, side]` a
+`drawer_upgrade_kit_problem` `[chyba, kódy]` — tá istá expanzia, ktorá rozhoduje o prijatí, dáva aj kódy do tabuľky.
 
 **PREČO PREFLIGHT, A NIE ROLLBACK (Astra #20 B3).** Konflikt receptu **nie je výnimka**: `build_plan` ho vráti ako dáta (`plan[:drawer_conflicts]`), `merge_final` ho uloží
 do configu a `rebuild` operáciu normálne **commitne** — zápis by teda „uspel" a zásuvka by ostala bez dielcov na novej verzii. Preto `drawer_upgrade_prepare` postaví cieľový

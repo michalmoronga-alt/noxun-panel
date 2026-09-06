@@ -6,7 +6,7 @@ require 'extensions.rb'
 
 module Noxun
   module Engine
-    VERSION = '0.9.39'
+    VERSION = '0.9.40'
 
     class << self
       # Drzime kvoli UI::Notification (potrebuje registrovany extension objekt).

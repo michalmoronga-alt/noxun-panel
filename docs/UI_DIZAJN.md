@@ -1350,6 +1350,15 @@ prvky **nevyhadzuje**) a klik napíše **dôvod** do `.mrnote` — pravidlo D-78
   modelu je asynchrónny, takže druhý Enter by neprepadol — počkal by si vo
   fronte a odišiel s čerstvou generáciou, ktorú server **prijme**. Výsledok by
   bola tá istá položka dvakrát a dva kroky Späť.
+- **`busyLock: true` (KOV-D3b) — kým odoslanie beží, okno sa NEDÁ zavrieť.**
+  Zámok odoslania sám nestačí: Esc, scrim, krížik aj „Zrušiť" ostávali aktívne
+  a zatvorenie vyčistilo len stav **volajúceho** — asynchrónna mutácia na
+  serveri bežala ďalej, jej výsledok sa zahodil a „zrušená" akcia model aj tak
+  zmenila (a nechala krok Späť). Príznak je **opt-in a aditívny**: bez neho sa
+  správanie kostry nemení. Dať ho smie **len** modal, ktorého volajúci
+  odpovedá v **každej** vetve **vrátane výnimky** — inak by sa okno pri zlyhaní
+  servera už nedalo zavrieť vôbec. Používajú ho obe potvrdenia zásuvky
+  (náhrada zamknutej osi D2b, prechod na novú verziu receptu D3b).
 - **rozpísané hodnoty prežijú zatvorenie.** Esc ani klik vedľa nesmú byť tichá
   strata — hodnoty sa pamätajú a nasledujúce otvorenie ich predvyplní; zmaže
   ich až úspešný zápis. **Pamäť drží komponent** (od ŠT-2c), nie volajúci:

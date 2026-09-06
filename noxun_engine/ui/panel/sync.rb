@@ -521,8 +521,14 @@ module Noxun
           map = front_drawer_payload(cfg)
           return map unless map.is_a?(Hash) && !map.empty?
 
-          attach_front_drawer_axes(map, drawer_axes_index(cfg, CabinetBuilder.config_to_params(cfg)),
-                                   cab_id)
+          # KOV-D3b: aj PONUKA novej verzie — `refreshFrontDrawer` vymiena
+          # zaznam CELY, takze bez nej by z otvorenej karty po zmene mapovania
+          # alebo katalogu zmizol riadok „Dostupný recept v2".
+          attach_front_drawer_upgrade(
+            attach_front_drawer_axes(map, drawer_axes_index(cfg, CabinetBuilder.config_to_params(cfg)),
+                                     cab_id),
+            cfg, cab_id
+          )
         rescue StandardError => e
           Engine.log_error(e, 'Panel.front_drawer_refresh')
           map.is_a?(Hash) ? map : {}

@@ -1352,6 +1352,13 @@
         if (typeof hwAxHtml === 'function') h += hwAxHtml(r.axes, r.ident);
         return;
       }
+      // KOV-D3b: ponuka novej verzie receptu. Markup aj klik ziju v
+      // `hardware.js` pri ostatnych zapisovych cestach kovania — karta je
+      // renderer, nie druhe miesto, kde by sa skladal payload servera.
+      if (r.kind === 'upgrade'){
+        if (typeof hwUpHtml === 'function') h += hwUpHtml(r.upgrade);
+        return;
+      }
       // KOV-C2c: JEDEN read-only riadok vyriesenej zasuvky + rozbalitelny
       // technicky detail (vety receptu). Ziadne tlacidla, ziadny zapis —
       // hodnoty su vysledok stavby a menia sa klasifikaciou nad nou.

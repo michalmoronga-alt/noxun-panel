@@ -522,7 +522,21 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   1 Späť; **`pick_ref` pri mape s viacerými verziami** = stabilné pravidlo: najnižšia dostupná súrodenecká verzia LEN z VALIDOVANÝCH záznamov mapy — neplatný (RED) záznam nikdy neovplyvní výber súrodenca (Astra #20 F12, Codex #307 kolo 2 P1); **cieľ upgradu musí mať parsovanú verziu VYŠŠIU než starý ref** (rovnaká alebo nižšia = odmietnutie, žiadny downgrade — Codex #307 kolo 2
   P2); `release_note` = voliteľné pole schémy receptu validované v `Recipes.validate!` a prenášané do načítaného receptu (v1 ho smie vynechať). Hromadný projektový upgrade = samostatný PR PO D3b. **Dáta (Codex #307 P1):** v repe sú len recepty v1 a žiadny dôvod na v2 — D3a/D3b sú **latentný rámec** overený fixtúrnym registrom (dočasné `atira_sisy_v2` v testoch, ako C1); produkčná v2 vznikne
   až s reálnou dátovou zmenou (nová hodnota od výrobcu/Michala) a vtedy dostane `release_note`; DoD D3 = testy + in-SU nad fixtúrou, nie viditeľná ponuka v plugine.
-  **D3b · UPGRADE — UI:** info „dostupný recept v2" pri čele + ponuka s konkrétnym dopadom na TOTO čelo (výška, NL, rozmery dielcov, zachovanie zámkov; nie textový diff konštánt —
+  **D3b · UPGRADE — UI — ✅ HOTOVÉ (v0.9.40, 6.9.2026):** karta čela dostáva **aditívny** kľúč `front_drawer[fid].upgrade` — a to LEN keď pre pripnutý recept naozaj existuje
+  **vydaná vyššia** verzia (`active_ref == :known` · `latest_for` · `Recipes.upgrade?`) a záznam je `state: 'ok'`; v produkcii teda **nikdy** (žiadna v2 neexistuje), takže payload
+  je zhodný s D3a a karta nekreslí žiadny nový vertikálny blok. Ponuka = jeden `inforow` „Dostupný recept v2 — `release_note`" + ghost tlačidlo; klik pošle **čítací** callback
+  `drawer_upgrade_impact` (žiadna operácia, žiadny zápis, žiadny krok Späť), ktorý cez `drawer_upgrade_prepare` vráti **dopad na TOTO čelo** — výška · NL · rozmery každého dielca ·
+  objednávacie kódy · prenesené zámky, vždy „teraz → po prechode". Čísla skladá SERVER a berie ich z **toho istého nasucho postaveného stavu**, ktorý by sa aj zapísal (prepare
+  vracia aditívne `side`/`lock`; terajšiu stranu stavia **ten istý** `drawer_dry_plan`) — žiadny druhý výpočet a žiadny textový diff konštánt. `ok:false` = potvrdenie sa
+  **neponúkne**, len veta prečo. Potvrdenie je kostra D-15 (tabuľka ako zobrazovací `custom` blok), zápis ide na `upgrade_drawer_recipe` s vlastným tokenom a **okno zatvára až
+  potvrdenie servera** (`NX.hwUpgradeResult` / `NX.hwUpgradeImpact` — dva vlastné kanály, nie zdieľané s D2b). Oba callbacky sú v paneli **zaregistrované** (D3a ich nechala
+  latentné). **Po Codex kole 1:** zápis presadí **len to, čo používateľ videl** — dopad nesie `fingerprint` (odtlačok identity + celého dopadu), klient ho len vráti a server ho
+  pred zápisom prepočíta; nezhoda aj chýbajúci odtlačok = odmietnutie a prekreslenie panela (`from` stráži len pripnutý recept, nie rozmery, materiály či mapovanie).
+  Potvrdzovacie okno je počas zápisu zamknuté aj **proti zatvoreniu** (`busyLock` v kostre D-15, opt-in; zapnuté aj pre náhradu osi z D2b, ktorá dostala chýbajúci `rescue`).
+  Dielce sú kľúčované `part_key` (Quadro má **dva** boky boxu) a výška emituje `kind` (`variant` pre Atiru, `box` v mm pre Quadro). Register receptov sa číta **raz za prechod**
+  (`Recipes.with_register_cache` + memo cieľa per `system|opening`). Testy: `tests/pure/test_kovd3b_upgrade_ui.rb` (31), `tests/js/test_kovd3b_ui.js` (93 assertov, mini-DOM),
+  16 overených mutácií + in-SU sekcia **`run_kovd3b`**.
+  **Pôvodné zadanie:** info „dostupný recept v2" pri čele + ponuka s konkrétnym dopadom na TOTO čelo (výška, NL, rozmery dielcov, zachovanie zámkov; nie textový diff konštánt —
   verzia môže meniť prahy/rad/hrúbky/ABS bez zmeny `constants`, Astra #20 F13) + autorská poznámka vydania z receptu (`release_note`) + potvrdenie; **In-SU povinné: 1 Späť A Redo (Ctrl+Y) — po redo ref v2, preadresované zámky aj geometria konzistentné** (Codex #307 P2); to isté pre zámky v D2b.
   **D4 · UI DROBNOSTI (dlh z C, Astra #20 F18/N17):** highlight riadku Kontroly po ceruzke (a smerovanie na konkrétny osirotený záznam v Kovaní); `owner_label` (ľudský názov čela)
   namiesto surového `part_key` v „Bez kódov" Štúdia (identita `cabinet_id + owner_part_key`, dedup a `blocks_export` zachované); pamäť pri prechode na dvierka: doplniť pravidlo

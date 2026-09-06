@@ -675,9 +675,16 @@ jedného otvárania žije `sisy` na v2 a `p2o` ešte na v1), rozhoduje **stabiln
 a to **výhradne z validovaných záznamov** (poškodený `:unknown` pin výber nikdy neovplyvní — D1a). Novo klasifikované čelo tak nikdy „neskočí" na novšiu fyziku len preto,
 že ju medzitým dostala iná kombinácia; povýšenie ostáva výhradne explicitnou akciou. Bez súrodenca platí `latest_for`.
 
-**`release_note` (KOV-D3a).** Jediné **voliteľné** pole schémy: autorská poznámka vydania (text pre potvrdenie upgradu v D3b). Recepty v1 ho vynechávajú, preto neprítomnosť
+**`release_note` (KOV-D3a).** Jediné **voliteľné** pole schémy: autorská poznámka vydania — od **KOV-D3b** ju nesie ponuka v karte čela aj hlavička potvrdzovacieho okna
+(`front_drawer[fid].upgrade.release_note`, `Panel.drawer_upgrade_offer`). Recepty v1 ho vynechávajú, preto neprítomnosť
 **nie je** chyba (`recipe[:release_note]` je `nil`); prítomné pole sa už validuje prísne ako každé iné — nie `String`, prázdne po orezaní alebo dlhšie než `RELEASE_NOTE_MAX`
 (400 znakov) je odmietnutie **celého** receptu.
+
+**Register sa číta RAZ za prechod (`with_register_cache`, KOV-D3b, Codex #315 kolo 1 P2).** `active_ref`, `latest_for` aj `load` čítajú `RELEASED.json` **každý zvlášť** —
+pri desiatich zásuvkach je to 20+ synchrónnych čítaní disku na **jeden** push panela (vrátane echa po každom edite). Blok `Recipes.with_register_cache` drží už prečítaný
+register po dobu **jedného** prechodu; mimo neho je cache `nil`, takže zmena registra **medzi** pushmi sa vždy prejaví, a poškodený register sa **nezakešuje** (validácia beží
+pred zápisom do cache, takže padá pri každom volaní). Nemennosť obsahu receptu tým netrpí — `load` odtlačok súboru overuje aj proti registru z cache. Používa ho
+`Panel.attach_front_drawer_upgrade`, ktorý navyše zdieľa metadáta cieľa medzi zásuvkami s rovnakou kombináciou `system|opening`.
 
 **Testovací seam pre priečinok receptov (KOV-D3a).** Všetky čítacie funkcie majú `dir:` (C1 vzor), ale panelové akcie ani stavba ho neposielajú — čítajú default. Ten má
 **jediné** prepínacie miesto: modulovú premennú `@test_dir` (`active_dir` · `test_dir=` · `with_test_dir`). Nastavujú ju **výhradne testy a in-SU runner**, nikdy UI, config

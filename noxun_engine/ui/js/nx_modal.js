@@ -1629,7 +1629,19 @@
     // ci „Zrušiť" — a dalsia akcia by sa potom spravala, akoby okno este zilo.
     // Vola sa AZ po skutocnom zatvoreni (OPEN je uz null), takze volajuci smie
     // z neho bez rizika rekurzie citat stav aj otvarat nove okno.
+    // KOV-D3b (Codex #315 kolo 1 P2): `busyLock: true` v specifikacii = kym
+    // odoslanie BEZI, okno sa NEDA zavriet (Esc, scrim, krizik ani „Zrušiť").
+    // Bez toho zatvorenie len vycisti stav VOLAJUCEHO — asynchronna mutacia
+    // bezi dalej, server ju vykona a jej vysledok sa zahodi: pouzivatel „zrušil"
+    // akciu, ktora aj tak prestavala skrinku (a nechala krok Spat).
+    // ADITIVNE: bez priznaku sa nemeni nic. Priznak smie dat LEN modal, ktoreho
+    // volajuci odpoveda v KAZDEJ vetve vratane vynimky — inak by sa okno pri
+    // zlyhani serveru uz nedalo zavriet vobec.
+    function busyLocked(){
+      return !!(OPEN && OPEN.busy && OPEN.base && OPEN.base.busyLock === true);
+    }
     function close(){
+      if (busyLocked()) return;
       if (typeof document === 'undefined'){ OPEN = null; return; }
       remember();                       // Esc nesmie byt ticha strata hodnot
       var r = document.getElementById(ROOT_ID);
@@ -1816,6 +1828,10 @@
                 customBox: customBox, redrawCustom: redrawCustom,
                 open: open, close: close, submit: submit,
                 isOpen: isOpen, isBusy: isBusy, setBusy: setBusy,
+                // KOV-D3b: „bezi odoslanie a okno je preto ZAMKNUTE aj proti
+                // zatvoreniu" (`busyLock`) — testy to musia vediet odlisit od
+                // obycajneho `isBusy`.
+                busyLocked: busyLocked,
                 values: values, spec: spec, setRows: setRows,
                 showErrors: showErrors, clearErrors: clearErrors,
                 memory: memory, clearMemory: clearMemory,

@@ -164,6 +164,12 @@ module Noxun
           # CISTE CITANIE — ziadna operacia, ziadny zapis, ziadny krok Spat;
           # odpoved chodi kanalom `NX.hwManualSearchResult` s generaciou dotazu.
           cb(dlg, 'hw_manual_search')      { |p| handle_hw_manual_search(p) }
+          # KOV-D3b: prechod JEDNEHO cela na novsiu verziu receptu (jadro D3a).
+          # Zapisova cesta (jedna operacia = ref + preadresovane zamky +
+          # prestavba) + CITACI callback dopadu, ktory potvrdzovacie okno kresli
+          # — ten nespusta ziadnu operaciu a do modelu nezapisuje nic.
+          cb(dlg, 'upgrade_drawer_recipe') { |p| handle_upgrade_drawer_recipe(p) }
+          cb(dlg, 'drawer_upgrade_impact') { |p| handle_drawer_upgrade_impact(p) }
           # ŠT-3b-1: `open_rules` ZANIKOL spolu s oknom — tlacidlo panela ide
           # deep-linkom `openStudio('rules')` (vzor „Materiály projektu" zo ŠT-2b).
           # ŠT-3a-2: `open_hardware_catalog` ZANIKOL spolu s oknom — tlacidlo

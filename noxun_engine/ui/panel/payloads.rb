@@ -111,6 +111,11 @@ module Noxun
             params['front_drawer'] = attach_front_drawer_axes(params['front_drawer'], index,
                                                               params['cabinet_id'])
           end
+          # KOV-D3b: ponuka novej verzie receptu. Ide MIMO bloku osi — os
+          # zasuvka mat nemusi (QUADRO, konflikt), ale ponuka je otazka o mape
+          # `recipe_refs`, nie o zamkoch.
+          params['front_drawer'] = attach_front_drawer_upgrade(params['front_drawer'], cfg,
+                                                               params['cabinet_id'])
           # V0.6 D1b: vyber setu per typ NA SKRINKE (override projektovej
           # predvolby) — ponuka + efektivny stav; server je autorita.
           params['hardware_set_options'] = hardware_set_options(cfg, params['hardware'])
@@ -729,6 +734,91 @@ module Noxun
         # (guard F6 — klik z karty musi byt rovnako chraneny ako klik v riadku).
         # Zaznam BEZ osi (napr. `stale` celo alebo celo, ktoreho recept sa
         # nenacital) ostava presne taky, aky bol v C2c.
+        # KOV-D3b: PONUKA NOVEJ VERZIE RECEPTU. Zaznam dostane kluc `upgrade`
+        # LEN vtedy, ked pre jeho pripnuty recept naozaj existuje VYDANA vyssia
+        # verzia. V produkcii ziadna v2 neexistuje, takze sa kluc NIKDY
+        # nepridava a payload je zhodny s D3a (charakterizacny test).
+        #
+        # Otazka je LACNA (register + `parse_id`) — dopad na celo sa NEPOCITA:
+        # ten stoji cely `build_plan` + expanziu setov a chodi az na klik,
+        # samostatnym citacim callbackom `drawer_upgrade_impact`.
+        #
+        # Ponuka sa dava LEN vyriesenej zasuvke (`state == 'ok'`): tabulka
+        # dopadu porovnava TERAJSI stav s cielovym a konfliktna zasuvka ziadny
+        # terajsi stav nema — jej cesta von je dovod konfliktu, nie upgrade.
+        #
+        # `cabinet_id` a `front_id` su V BLOKU zamerne: identitu zapisu sklada
+        # SERVER (rovnaka zasada ako `lock` v D2b), panel ju z niceho neodvodzuje.
+        # NAKLAD (Codex #315 kolo 1 P2): register receptov sa cita RAZ na cely
+        # prechod (`Recipes.with_register_cache`) a metadata CIELA sa zdielaju
+        # medzi zasuvkami s rovnakou kombinaciou `system|opening` (`seen`).
+        # Bez toho by kazda zasuvka spustila `active_ref` + `latest_for` (a s v2
+        # aj `load` s odtlackom) samostatne — desat zasuviek = 20+ synchronnych
+        # citani disku pri KAZDOM pushi, vratane echa po kazdom edite.
+        # Ziadna trvala cache: mimo tohto bloku sa nekesuje nic.
+        def attach_front_drawer_upgrade(map, cfg, cab_id)
+          return map unless map.is_a?(Hash) && !map.empty?
+          return map unless defined?(Recipes)
+
+          seen = {}
+          Recipes.with_register_cache do
+            Array(cfg['front_items']).each do |it|
+              next unless it.is_a?(Hash)
+
+              row = map[it['id'].to_s]
+              next unless row.is_a?(Hash) && row['state'].to_s == 'ok'
+
+              up = drawer_upgrade_offer(it, cab_id, seen)
+              row['upgrade'] = up if up
+            end
+          end
+          map
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.attach_front_drawer_upgrade')
+          map
+        end
+
+        # Existuje pre TENTO pripnuty recept vydana vyssia verzia?
+        # -> hash ponuky | nil. Pravidla su TIE ISTE, ktore zapisovu cestu
+        # nakoniec pustia (`active_ref` == `:known` · vydany ciel ·
+        # `Recipes.upgrade?`) — ponuka sa preto nemoze objavit tam, kde by ju
+        # server vzapati odmietol.
+        #
+        # `seen` = memo CIELA per `system|opening` (najnovsi vydany + jeho
+        # popisok a poznamka vydania). Zavisi VYHRADNE od kombinacie, nie od
+        # cela, takze sa smie zdielat; `from` sa cita per celo (kazde ma vlastnu
+        # mapu `recipe_refs` a smie byt na inej verzii).
+        def drawer_upgrade_offer(item, cab_id, seen = {})
+          kind, key = Recipes.recipe_key_for(item)
+          return nil unless kind == :ok
+
+          drawer = item['drawer'].is_a?(Hash) ? item['drawer'] : {}
+          state, from = Recipes.active_ref(drawer['recipe_refs'], key[:system], key[:opening])
+          return nil unless state == :known
+
+          tgt = drawer_upgrade_target(key, seen)
+          return nil unless tgt && Recipes.upgrade?(from, tgt['to'])
+
+          tgt.merge('available' => true, 'from' => from.to_s,
+                    'cabinet_id' => cab_id.to_s, 'front_id' => item['id'].to_s)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.drawer_upgrade_offer')
+          nil
+        end
+
+        # Najnovsi VYDANY recept kombinacie + jeho popisok a poznamka vydania.
+        # `nil` = kombinacia ziadny vydany recept nema. Memo `seen` drzi aj
+        # zaporny vysledok, aby sa nehladal opakovane.
+        def drawer_upgrade_target(key, seen)
+          k = "#{key[:system]}|#{key[:opening]}"
+          return seen[k] if seen.key?(k)
+
+          to = Recipes.latest_for(key[:system], key[:opening])
+          ver = to && Recipes.parse_id(to)
+          seen[k] = ver && { 'to' => to.to_s, 'to_label' => "v#{ver[:version]}",
+                             'release_note' => Recipes.load(to)[:release_note].to_s }
+        end
+
         def attach_front_drawer_axes(map, index, cab_id)
           return map unless map.is_a?(Hash)
 

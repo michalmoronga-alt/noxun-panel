@@ -1172,6 +1172,11 @@
       sub: btn.getAttribute('data-sub') || '',
       note: HW_AX_FIX_NOTE,
       okLabel: 'Nahradiť',
+      // KOV-D3b (Codex #315 kolo 1 P2): TA ISTA pasca ako pri prechode na novu
+      // verziu — zatvorenie okna POCAS zapisu vycisti len nas stav, ale mutacia
+      // na serveri bezi dalej a zasuvku aj tak prestavi. Zapnute az teraz, lebo
+      // az teraz odpoveda `handle_set_hardware_override` aj z vetvy vynimky.
+      busyLock: true,
       fields: [],
       onSubmit: function(){
         if (!HW_AX_MODAL || HW_AX_MODAL.sent) return;   // dvojklik nezapise dvakrat
@@ -1207,6 +1212,221 @@
     HW_AX_MODAL.sent = false;
     NXModal.setBusy(false);
     NXModal.showErrors([{ msg: msg || 'Náhrada sa neuložila.' }]);
+  }
+
+  // ---- KOV-D3b: PRECHOD NA NOVSIU VERZIU RECEPTU --------------------------
+  // Recepty su NEMENNE: oprava hodnoty od vyrobcu nikdy neprepise stary subor,
+  // ale vyda `_v2`. Uz postavena zasuvka na nu preto neprejde sama — je to
+  // VEDOME rozhodnutie, lebo mení geometriu dielcov aj objednavacie kody.
+  //
+  // Panel o verziach NEROZHODUJE: `from`/`to` dostal v payloade (`upgrade`
+  // blok) a posiela SPAT PRESNE ICH. Ci je `to` naozaj novsie, ci je vydane
+  // a ci na cielovej verzii zasuvka vobec sadne, overuje server — dvakrat:
+  // pri dopade (nasucho) aj pri zapise.
+  //
+  // Preco DVA kanaly: „ukaz dopad" je CITANIE (nic sa nezapisuje, moze
+  // skoncit odmietnutim bez okna), „prejdi" je ZAPIS s potvrdenim. Jeden
+  // kanal by musel niest oboje a modal by nevedel, na co prave caka.
+  var HW_UP_ASK = null;   // { token, offer } = ziadost o dopad LETI
+  var HW_UP = null;       // { token, sent, offer, impact } = nase okno BEZI
+  var HW_UP_SEQ = 0;
+  function hwUpToken(){ HW_UP_SEQ += 1; return 'u' + HW_UP_SEQ; }
+  var HW_UP_NOMODAL = 'Potvrdzovacie okno sa nenačítalo — obnov panel (Inspector zavri a otvor).';
+
+  // Ponuka v karte cela: tlmena veta + ghost tlacidlo. Ziadny novy blok, ked
+  // v2 neexistuje — `frontDrawerRows` riadok vtedy vobec nevyrobi.
+  //
+  // `data-ax`/`data-axc` na tlacidle = LOGICKA IDENTITA ovladaca pre obnovu
+  // fokusu po prekresleni karty (`frontCardFocusKey`, vzor D2b P2-4). Karta sa
+  // prekresluje aj LAHKYM pushom (zmena mapovania alebo katalogu v Studiu),
+  // takze bez nej by fokus pri klavesovej praci spadol na dokument. Ponuka je
+  // v karte prave jedna, takze dvojica je jednoznacna.
+  function hwUpHtml(up){
+    var u = (up && typeof up === 'object') ? up : null;
+    if (!u || u.available !== true) return '';
+    var note = String(u.release_note || '');
+    var lbl = String(u.to_label || '');
+    return '<div class="dwup" data-cab="' + esc(u.cabinet_id || '') + '"'
+         + ' data-fid="' + esc(u.front_id || '') + '"'
+         + ' data-from="' + esc(u.from || '') + '" data-to="' + esc(u.to || '') + '">'
+         + '<div class="inforow">' + NXIcons.svg('info')
+         + esc('Dostupný recept ' + lbl + (note ? ' — ' + note : ''))
+         + '</div>'
+         + '<button type="button" class="ghostbtn" data-ax="upgrade" data-axc="upg"'
+         + ' title="' + esc('Ukáže, čo sa zmení na tejto zásuvke, a spýta sa na potvrdenie') + '"'
+         + ' onclick="onDrawerUpgrade(this)">' + esc('Prejsť na ' + lbl + '…') + '</button>'
+         + '</div>';
+  }
+  // Identita ponuky z obalu `.dwup` — panel si ju NESKLADA, len ju cita spat
+  // z toho, co vykreslil zo serveroveho payloadu.
+  function hwUpOffer(node){
+    var box = (node && node.closest) ? node.closest('.dwup') : null;
+    if (!box) return null;
+    var o = { cabinet_id: box.getAttribute('data-cab') || '',
+              front_id: box.getAttribute('data-fid') || '',
+              from: box.getAttribute('data-from') || '',
+              to: box.getAttribute('data-to') || '' };
+    return (o.front_id && o.from && o.to) ? o : null;
+  }
+
+  // Klik na ponuku = CITACIA otazka „co sa zmeni". Okno sa NEOTVARA hned:
+  // preflight moze prechod odmietnut (napr. hrubka dielca), a vtedy nie je
+  // co potvrdzovat — pouzivatel dostane vetu preco.
+  function onDrawerUpgrade(btn){
+    var o = hwUpOffer(btn);
+    if (!o) return;
+    if (HW_UP_ASK || HW_UP) return;   // dvojklik neposiela druhu otazku
+    // Stav sa zaklada AZ ked mame kam poslat: bez kanala by uz nikdy neprisla
+    // odpoved, ktora ho vycisti, a tlacidlo by ostalo natrvalo mrtve.
+    if (!(window.sketchup && sketchup.drawer_upgrade_impact)) return;
+    var tok = hwUpToken();
+    HW_UP_ASK = { token: tok, offer: o };
+    NX.setStatus('Počítam, čo prechod na novú verziu zmení…');
+    sketchup.drawer_upgrade_impact(nxDocPayload({
+      cabinet_id: o.cabinet_id, front_id: o.front_id,
+      from: o.from, to: o.to, up_token: tok }));
+  }
+
+  // Odpoved citacieho callbacku. Cudzi token (starsia otazka) sa zahadzuje.
+  function onHwUpgradeImpact(res, token){
+    if (!HW_UP_ASK || String(token || '') !== String(HW_UP_ASK.token || '')) return;
+    var offer = HW_UP_ASK.offer;
+    HW_UP_ASK = null;
+    var r = (res && typeof res === 'object') ? res : {};
+    if (r.ok !== true){
+      NX.setStatus('Na novú verziu sa prejsť nedá: ' + String(r.reason || 'neznámy dôvod'), true);
+      return;
+    }
+    if (typeof NXModal === 'undefined' || !NXModal || typeof NXModal.open !== 'function'){
+      NX.setStatus(HW_UP_NOMODAL, true);
+      return;
+    }
+    NX.setStatus('');
+    hwUpOpenModal(offer, r);
+  }
+
+  function hwUpOpenModal(offer, imp){
+    NXModal.open({
+      title: 'Prejsť na novú verziu receptu',
+      sub: String(imp.to_title || offer.to || ''),
+      note: String(imp.release_note || ''),
+      okLabel: 'Prejsť',
+      size: 'md',
+      // Kym zapis bezi, okno sa NEDA zavriet: zatvorenie by vycistilo len nas
+      // stav, ale mutacia by na serveri prebehla dalej — „zrušená" akcia by aj
+      // tak prestavala zasuvku (Codex #315 kolo 1 P2). Smieme to zapnut, lebo
+      // server odpoveda v KAZDEJ vetve vratane vynimky.
+      busyLock: true,
+      // Tabulka dopadu je ZOBRAZOVACI blok (`custom` bez `read`) — do
+      // `values()` sa nedostane a odoslat sa z nej neda nic. Odosielaju sa
+      // VYHRADNE `from`/`to` z payloadu.
+      fields: [{ key: 'impact', type: 'custom',
+                 render: function(host){ hwUpImpactRender(host, imp); } }],
+      onSubmit: function(){
+        if (!HW_UP || HW_UP.sent) return;      // dvojklik nezapise dvakrat
+        // Zamknut okno smieme AZ ked mame kam poslat — inak by ho neodomkla
+        // ziadna odpoved (odomyka VYHRADNE volajuci, kontrakt D-15).
+        if (!(window.sketchup && sketchup.upgrade_drawer_recipe)) return;
+        var tok = hwUpToken();
+        HW_UP.token = tok;
+        HW_UP.sent = true;
+        NXModal.clearErrors();
+        NXModal.setBusy(true);
+        // `fingerprint` = ODTLACOK NAHLADU zo servera. Klient ho LEN VRACIA
+        // (nic z neho neskladá a nic si nedopocitava); server ho pred zapisom
+        // prepocita a pri nezhode zapis odmietne — bez neho by sa dal zapisat
+        // iny dopad, nez ktory pouzivatel potvrdil (Codex #315 kolo 1 P1).
+        sketchup.upgrade_drawer_recipe(nxDocPayload({
+          cabinet_id: offer.cabinet_id, front_id: offer.front_id,
+          from: offer.from, to: offer.to,
+          fingerprint: String((HW_UP.impact && HW_UP.impact.fingerprint) || ''),
+          up_token: tok }));
+      },
+      onClose: function(){ HW_UP = null; }
+    });
+    // AZ ZA `open`: kostra najprv zatvara predchadzajuci modal, takze jeho
+    // `onClose` by novy stav hned vynuloval (vzor D2b).
+    HW_UP = { token: null, sent: false, offer: offer, impact: imp };
+  }
+
+  // Odpoved servera na ZAPIS z modalu. Uspech okno zatvara (panel je vtedy uz
+  // prekresleny plnym pushom), zlyhanie ho ODOMKNE a hlasku ukaze V NOM.
+  function onHwUpgradeResult(ok, msg, token){
+    if (!HW_UP || String(token || '') !== String(HW_UP.token || '')) return;
+    if (typeof NXModal === 'undefined' || !NXModal) return;
+    if (ok){
+      HW_UP = null;
+      NXModal.setBusy(false, { clear: true });
+      NXModal.close();
+      return;
+    }
+    HW_UP.sent = false;
+    NXModal.setBusy(false);
+    NXModal.showErrors([{ msg: msg || 'Prechod na novú verziu sa neuložil.' }]);
+  }
+
+  // TABULKA DOPADU. Vsetky cisla su zo servera — panel ich len parauje do
+  // dvojic „teraz -> po prechode" a nikdy nic nedopocitava (verzia moze zmenit
+  // prahy, rad NL, hrubky aj ABS bez zmeny konstant, Astra #20 F13).
+  function hwUpImpactRender(host, imp){
+    if (!host) return;
+    var rows = '';
+    rows += hwUpRow(hwUpHeightLabel(imp.height),
+                    hwUpVal(imp.height), hwUpVal(imp.height, true));
+    rows += hwUpRow('Dĺžka výsuvu (NL)', hwUpVal(imp.nl), hwUpVal(imp.nl, true));
+    (Array.isArray(imp.parts) ? imp.parts : []).forEach(function(p){
+      rows += hwUpRow(hwUpCap(p && p.label), hwUpDims(p && p.from), hwUpDims(p && p.to));
+    });
+    rows += hwUpRow('Objednávací kód', hwUpCodes(imp.kit && imp.kit.from),
+                    hwUpCodes(imp.kit && imp.kit.to));
+    var locks = (Array.isArray(imp.locks) ? imp.locks : []).map(function(l){
+      return hwUpLockLabel(l);
+    }).filter(function(t){ return !!t; });
+    var note = locks.length
+      ? 'Ručné zámky sa prenesú bez zmeny hodnoty: ' + locks.join(' · ') + '.'
+      : 'Na tejto zásuvke nie je žiadny ručný zámok.';
+    host.innerHTML = '<table class="dwuptab"><thead><tr><th></th><th>teraz</th>'
+                   + '<th>po prechode</th></tr></thead><tbody>' + rows + '</tbody></table>'
+                   + '<div class="hint">' + esc(note) + '</div>';
+  }
+  function hwUpRow(label, a, b){
+    var same = (a === b);
+    return '<tr' + (same ? ' class="same"' : '') + '><th>' + esc(label) + '</th>'
+         + '<td>' + esc(a) + '</td><td>' + esc(b) + '</td></tr>';
+  }
+  // Hodnota jednej osi. Ktore pole os nesie a v akej jednotke, hovori SERVER
+  // (`kind`): Atira ma vyskovy VARIANT („H144"), QUADRO vysku boxu v mm
+  // (Codex #315 kolo 1 P2) — panel si to neodvodzuje zo systemu.
+  function hwUpVal(pair, wantTo){
+    var v = pair ? (wantTo ? pair.to : pair.from) : null;
+    if (v == null || v === '') return '—';
+    var k = pair && pair.kind;
+    if (k === 'variant') return 'H' + String(v);
+    if (k === 'box') return String(v).replace('.', ',') + ' mm';
+    return String(v).replace('.', ',');
+  }
+  function hwUpHeightLabel(pair){
+    return (pair && pair.kind === 'box') ? 'Výška boxu' : 'Výška';
+  }
+  // „791,5 × 480 × 16 mm" — rozmery su Cisla zo servera, formatuje sa len
+  // desatinna ciarka (slovensky zapis, rovnako ako zvysok panela).
+  function hwUpDims(dims){
+    if (!Array.isArray(dims) || !dims.length) return '—';
+    return dims.map(function(v){ return String(v).replace('.', ','); }).join(' × ') + ' mm';
+  }
+  function hwUpCodes(list){
+    if (!Array.isArray(list) || !list.length) return '—';
+    return list.join(', ');
+  }
+  function hwUpLockLabel(l){
+    if (!l || l.value == null) return '';
+    if (l.axis === 'height') return 'výška H' + String(l.value);
+    if (l.axis === 'nl') return 'NL ' + String(l.value);
+    return String(l.axis) + ' ' + String(l.value);
+  }
+  function hwUpCap(s){
+    var t = String(s == null ? '' : s);
+    return t ? t.charAt(0).toUpperCase() + t.slice(1) : 'Dielec';
   }
 
   // ŠT-3b-1: `openRulesDialog` ZANIKOL spolu s oknom „Pravidlá kovania" —
@@ -1812,6 +2032,17 @@
       hwAxIdent: hwAxIdent, onHwAxChip: onHwAxChip, onHwAxPick: onHwAxPick,
       onHwAxUnlock: onHwAxUnlock, onHwAxFix: onHwAxFix, onHwAxResult: onHwAxResult,
       hwAxModalState: function(){ return HW_AX_MODAL; },
+      // KOV-D3b prechod na novsiu verziu receptu (tests/js/test_kovd3b_ui.js) —
+      // markup ponuky + CELY tok cez mini-DOM (klik -> dopad -> potvrdenie ->
+      // odpoved servera).
+      HW_UP_NOMODAL: HW_UP_NOMODAL,
+      hwUpHtml: hwUpHtml, hwUpOffer: hwUpOffer, hwUpDims: hwUpDims,
+      hwUpCodes: hwUpCodes, hwUpLockLabel: hwUpLockLabel, hwUpImpactRender: hwUpImpactRender,
+      hwUpVal: hwUpVal, hwUpHeightLabel: hwUpHeightLabel,
+      onDrawerUpgrade: onDrawerUpgrade, onHwUpgradeImpact: onHwUpgradeImpact,
+      onHwUpgradeResult: onHwUpgradeResult,
+      hwUpAskState: function(){ return HW_UP_ASK; },
+      hwUpModalState: function(){ return HW_UP; },
       // UI-C4 boxy vlastnikov (tests/js/test_uic4_kovanie.js) — ciste skladanie
       // skupin z owner dat, ziadny DOM.
       hwGroupKeyOf: hwGroupKeyOf, hwLabelHead: hwLabelHead, hwLabelTail: hwLabelTail,

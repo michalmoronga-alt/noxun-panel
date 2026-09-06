@@ -280,6 +280,12 @@ eq(Object.assign({}, fixSent, { ax_token: undefined }),
 ok(global.NXModal.isOpen(),
    'KOV-D2b (P2-1): okno ostava OTVORENE, kym server zapis nepotvrdi (kontrakt D-15)');
 ok(global.NXModal.isBusy(), 'a je ZAMKNUTE — druhy submit uz nezapise');
+// KOV-D3b (Codex #315 kolo 1 P2): TA ISTA pasca ako pri prechode na novu verziu
+// — zatvorenie POCAS zapisu by vycistilo len stav klienta, ale mutacia by na
+// serveri bezala dalej a zamok by aj tak prestavila.
+ok(global.NXModal.busyLocked(), 'okno nahrady je ZAMKNUTE aj proti zatvoreniu');
+global.NXModal.close();
+ok(global.NXModal.isOpen(), 'a „Zrušiť"/krížik/Esc/scrim ho POCAS zapisu nezavru');
 
 // Cudzi token (odpoved na STARSIE odoslanie) sa zahodi.
 global.NXModal.showErrors([]);
