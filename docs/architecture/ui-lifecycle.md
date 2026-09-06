@@ -1532,7 +1532,11 @@ Obe cesty overujú identitu **dokumentu** (`foreign_document?`, R-02) **pred** i
 `height_variant`) a **musí sa zhodovať** s `CabinetBuilder::OVERRIDE_CONTENT_KEYS` (stráži guard test) — inak by panel uložil pole, ktoré normalizácia zahodí.
 Validácia hodnoty sa **rozdvojuje podľa `rule_id`**: projektové pravidlo ide ako dosiaľ cez `series_value?` (rad `fit_series` zo snapshotu), receptová položka
 (`rule_id recipe:<id>`) ide **úzkou serverovou vetvou** `recipe_lock_context` — *vlastník (čelo) → jeho **pripnutý** recept (`Recipes.active_ref` nad uloženými
-`recipe_refs`) → **výsledná výška** (uložený výškový zámok má prednosť, inak `params.height_variant` emitovanej položky `source: 'recipe'`) → rad tej výšky*.
+`recipe_refs`) → **výsledná výška** → rad tej výšky*. Výslednú výšku hľadá `recipe_result_height` v troch krokoch: **(1)** platný uložený **výškový zámok** (rad NL sa
+berie z výšky, ktorá naozaj platí; zámok v **konflikte** výsledná výška **nie je** — vtedy sa zápis dĺžky odmietne, poradie osí platí aj tu), **(2)** `params.height_variant`
+**emitovanej** položky `source: 'recipe'`, **(3)** **automatická** výška z čerstvého `ctx` (`drawer_axis_contexts` → `pick_height_variant`). Tretí krok je nutný, lebo
+fail-closed zásuvka (napr. NL zámok mimo radu po zmenšenej hĺbke) položku **nevydá** — bez neho server odmietal **vlastný** návrh náhrady NL vetou „najprv zamkni výšku"
+(Codex #312 kolo 1 P2). Svetlé rozmery sa čítajú **tou istou** cestou ako pre payload `axes`, takže ponuka a zápis stoja na jednom výpočte.
 D-93 `series_value?` hľadá výhradne projektové `fit_series`, takže zámok NL zásuvky sa dovtedy z panela uložiť **nedal**. Každý článok reťaze sa číta z **čerstvého
 serverového stavu** (uložený config skrinky), nikdy z payloadu: chip na obrazovke môže byť o generáciu starší než model. `rule_id`, ktorý nesedí s pripnutým receptom,
 sa **odmieta** („položka sa medzitým zmenila"), Quadro výškový zámok odmieta hláškou (systém výškové varianty nemá) a výška mimo `height_variants` receptu tiež.

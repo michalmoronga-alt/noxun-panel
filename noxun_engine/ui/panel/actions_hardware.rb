@@ -142,7 +142,7 @@ module Noxun
         # starsi nez model a zamok by potom drzal cislo z iného radu.
         # Projektove `fit_series` pravidla ostavaju pre NE-receptove polozky.
         #
-        # -> [recipe, vysledna_vyska|nil, chyba|nil]
+        # -> [recipe, vysledna_vyska|nil, chyba|nil, dovod_chybajucej_vysky|nil]
         def recipe_lock_context(cab, owner, rid)
           cfg = (cab && Store.config(cab)) || {}
           fid = PartKeys.front_id(owner.to_s)
@@ -162,39 +162,80 @@ module Noxun
             unless rid.to_s == "#{RECIPE_RULE_PREFIX}#{ref}"
 
           recipe = Recipes.load(ref)
-          [recipe, recipe_result_height(cfg, owner, recipe), nil]
+          height, why = recipe_result_height(cfg, owner, recipe)
+          [recipe, height, nil, why]
         rescue StandardError => e
           Engine.log_error(e, 'Panel.recipe_lock_context')
-          [nil, nil, 'Zámok sa nepodarilo overiť proti receptu.']
+          [nil, nil, 'Zámok sa nepodarilo overiť proti receptu.', nil]
         end
 
-        # VYSLEDNA vyska zasuvky z CERSTVEHO serveroveho stavu: ulozeny vyskovy
-        # zamok ma prednost (rad NL sa berie z vysky, ktora naozaj plati), inak
-        # vyska EMITOVANEJ receptovej polozky. Quadro vysku nema -> nil.
+        # VYSLEDNA vyska zasuvky z CERSTVEHO serveroveho stavu. Quadro vysku
+        # nema -> [nil, nil] (os neexistuje, rad NL je jediny).
+        # -> [vyska|nil, dovod_ked_nil|nil]
         def recipe_result_height(cfg, owner, recipe)
-          return nil unless Recipes.atira?(recipe)
+          return [nil, nil] unless Recipes.atira?(recipe)
 
-          locked = Recipes.height_lock_value(recipe, { owner_part_key: owner.to_s },
+          # Svetle rozmery sa citaju RAZ, TOU ISTOU cestou ako payload osi
+          # (`drawer_axis_contexts`) — ponuka aj zapis tak stoja na JEDNOM
+          # vypocte a nemozu si protirecit.
+          ctx = drawer_axis_ctx(cfg, owner)
+
+          # (1) ZAMKNUTA vyska je najsilnejsia pravda: rad NL sa berie z vysky,
+          #     ktora naozaj plati. Zamok v KONFLIKTE ale vyslednou vyskou NIE
+          #     JE — rad sa z neho odvodit neda, takze nahrada NL ostava
+          #     odmietnuta a opravit treba najprv VYSKU (poradie osi plati aj
+          #     na zapisovej ceste).
+          locked = Recipes.height_lock_value(recipe, ctx || { owner_part_key: owner.to_s },
                                              Array(cfg['hardware_overrides']))
-          return locked if locked
+          if locked
+            return [locked, nil] if ctx.nil? ||
+                                    Recipes.height_lock_problem(recipe, locked,
+                                                                ctx[:clear_height].to_f).nil?
 
+            return [nil, 'Zámok výšky zásuvky neplatí — oprav najprv výšku, ' \
+                         'bez nej sa rad dĺžok určiť nedá.']
+          end
+
+          # (2) EMITOVANA polozka je odpoved SAMOTNEHO resolvera.
           item = Array(cfg['hardware']).find do |h|
             h.is_a?(Hash) && h['owner_part_key'].to_s == owner.to_s &&
               h['source'].to_s == BuildPlan::HW_SOURCE_RECIPE
           end
-          p = item.is_a?(Hash) && item['params'].is_a?(Hash) ? item['params'] : {}
-          Recipes.height_value(p['height_variant'])
+          params = item.is_a?(Hash) && item['params'].is_a?(Hash) ? item['params'] : {}
+          emitted = Recipes.height_value(params['height_variant'])
+          return [emitted, nil] if emitted
+
+          # (3) FAIL-CLOSED zasuvka polozku NEVYDALA (napr. NL zamok mimo radu
+          #     po zmensenej hlbke) — AUTOMATICKA vyska je pritom stale
+          #     urcitelna. Bez tejto vetvy server odmietal vlastny navrh
+          #     nahrady NL vetou „najprv zamkni vysku" (Codex #312 kolo 1 P2).
+          return [nil, 'Rozmery zásuvky sa nepodarilo prečítať — dĺžka sa uložiť nedá.'] if ctx.nil?
+
+          v = Recipes.pick_height_variant(recipe, ctx[:clear_height].to_f)
+          return [v[:height], nil] if v
+
+          [nil, 'Do zásuvky sa nezmestí ani najnižší variant — dĺžka sa uložiť nedá.']
+        end
+
+        # Svetle rozmery TOHTO cela — TA ISTA cesta, akou ich pocita payload osi
+        # (`drawer_axes_map`). Druhy vypocet inde by sa casom rozisiel a ponuka
+        # by slubovala hodnotu, ktoru zapis odmietne.
+        def drawer_axis_ctx(cfg, owner)
+          fid = PartKeys.front_id(owner.to_s)
+          return nil if fid.nil?
+
+          CabinetBuilder.drawer_axis_contexts(CabinetBuilder.config_to_params(cfg))[fid]
         end
 
         # NL zamok receptovej polozky: hodnota MUSI byt presne v rade VYSLEDNEJ
         # vysky. Ci sa zmesti do hlbky, rozhoduje az resolver (RED
         # `nl_lock_invalid`) — presne ako pri projektovom rade.
         def recipe_nl_value(cab, owner, rid, nl)
-          recipe, height, err = recipe_lock_context(cab, owner, rid)
+          recipe, height, err, why = recipe_lock_context(cab, owner, rid)
           return [nil, nil, err] if err
 
           if Recipes.atira?(recipe) && height.nil?
-            return [nil, nil, 'Najprv zamkni výšku zásuvky — bez nej sa nedá určiť rad dĺžok.']
+            return [nil, nil, why || 'Výšku zásuvky sa nepodarilo určiť — dĺžka sa uložiť nedá.']
           end
 
           series = Recipes.series_for(recipe, height)
@@ -212,6 +253,8 @@ module Noxun
           hv = Recipes.height_value(raw.is_a?(String) ? Float(raw, exception: false) : raw)
           return [nil, nil, 'Neplatná výška zásuvky.'] if hv.nil?
 
+          # Vyskovy zamok sa ZAPISUJE aj vtedy, ked vysledna vyska urcitelna
+          # NIE JE — je to prave cesta, ktorou sa neplatny zamok opravuje.
           recipe, _height, err = recipe_lock_context(cab, owner, rid)
           return [nil, nil, err] if err
           unless Recipes.atira?(recipe)

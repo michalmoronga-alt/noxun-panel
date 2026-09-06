@@ -23,6 +23,8 @@
 #      -> „KOV-D2a (R4): polozka so zamkami OSTAVA `source: recipe`"
 #   M3 reset osi zahodi CELY zaznam (dnesny orphan reset)
 #      -> „KOV-D2a (R5): odomknutie jednej osi necha druhy zamok zit"
+#   M4 zapisova cesta nedopocita AUTOMATICKU vysku, ked polozka chyba
+#      -> „KOV-D2a (R3): navrh nahrady NL sa da ulozit AJ BEZ zamku vysky"
 require_relative '../helper' unless defined?(NxTest)
 
 # Panelove akcie nie su v require zozname helpera (vzor KOV-D1a).
@@ -99,21 +101,21 @@ module NxD2a
       'fronts' => { 'items' => [item] } }
   end
 
-  # Ulozeny config skrinky TAK, ako ho po stavbe vidi panel (front_items,
-  # emitovane polozky kovania a ulozene dovody konfliktov).
+  # ULOZENY config skrinky presne tak, ako ho po stavbe vidi panel: ide cez
+  # tie iste dve funkcie ako realny zapis (`merge_final` -> `cabinet_config`)
+  # a JSON round-trip z neho spravi string-keyed hash ako `Store.config`.
+  # Musi byt PLNY (rozmery, cela, hrubky) — zapisova cesta zamku z neho
+  # prepocitava svetle rozmery, takze orezany fixture by merala inu skrinku.
   def cfg_for(par, overrides = [])
     norm = cb.normalize(par.merge('hardware_overrides' => overrides))
     plan = e::Construction.build_plan(norm, 'CAB-1',
                                       part_thicknesses: cb.drawer_thicknesses(norm, {}))
-    { 'front_items' => plan[:front_items],
-      'hardware' => plan[:hardware],
-      'drawer_conflicts' => plan[:drawer_conflicts],
-      'hardware_overrides' => cb.norm_hardware_overrides(overrides) }
+    JSON.parse(JSON.generate(cb.cabinet_config(cb.merge_final(norm, plan))))
   end
 
   def axes_for(par, overrides = [])
     cfg = cfg_for(par, overrides)
-    [cfg, panel.drawer_axes_map(cfg, par.merge('hardware_overrides' => overrides))]
+    [cfg, panel.drawer_axes_map(cfg, cb.config_to_params(cfg))]
   end
 
   def slide_item(cfg)
@@ -318,14 +320,19 @@ end
 
 NxTest.test('KOV-D2a (R3): rad sa berie z CERSTVEHO stavu — zamknuta vyska prebija params polozky') do
   c = NxD2a
-  # Ulozeny zamok H144 (polozka v configu este nesie H70 z predoslej stavby).
-  cfg = c.cfg_for(c.params)
-  cfg['hardware_overrides'] = c.cb.norm_hardware_overrides(c.ov('height_variant' => 144))
+  # Skrinka, ktorej automat da H144 (rad 350/420/470 — 520 v nom NIE JE).
+  par = c.params(front_height: 220.0, cabinet_height: 900.0)
+  cfg = c.cfg_for(par)
+  NxTest.assert_equal(144, c.slide_item(cfg)['params']['height_variant'].to_i, 'predpoklad: H144')
   _f, _v, err = c.write_value(cfg, 'nominal_length', 520.0)
-  NxTest.assert(err.to_s.include?('rade H144'), "rad musi plynut zo ZAMKNUTEJ vysky: #{err}")
-  field, value, ok_err = c.write_value(cfg, 'nominal_length', 470.0)
-  NxTest.assert_equal(nil, ok_err, ok_err.to_s)
-  NxTest.assert_equal(['nominal_length', 470.0], [field, value])
+  NxTest.assert(err.to_s.include?('rade H144'), "bez zamku plati rad automatu: #{err}")
+
+  # ULOZENY zamok H70 (platny — H70 sa do svetlej vysky zmesti) MUSI prebit
+  # `params` polozky, ktora este nesie H144 z predoslej stavby: rad H70 ma 520.
+  cfg['hardware_overrides'] = c.cb.norm_hardware_overrides(c.ov('height_variant' => 70))
+  field, value, ok_err = c.write_value(cfg, 'nominal_length', 520.0)
+  NxTest.assert_equal(nil, ok_err, "rad musi plynut zo ZAMKNUTEJ vysky: #{ok_err}")
+  NxTest.assert_equal(['nominal_length', 520.0], [field, value])
 end
 
 NxTest.test('KOV-D2a (R3): vyskovy zamok prijme LEN vysku pripnuteho receptu') do
@@ -544,4 +551,58 @@ NxTest.test('KOV-D2a: in-SU sekcia `run_kovd2a` stoji na TEJ ISTEJ geometrii a N
   NxTest.refute(section.include?('scenar preskoceny'),
                 'nesulad predpokladu musi byt FAIL, nikdy tiche preskocenie')
   NxTest.assert(src.include?('run_kovd2a(model)        #'), 'sekcia musi byt zaradena do behu')
+end
+
+# ============================================================================
+# R3 — CODEX #312 KOLO 1 P2: nahrada NL bez zamku vysky
+# ============================================================================
+
+NxTest.test('KOV-D2a (R3): navrh nahrady NL sa da ulozit AJ BEZ zamku vysky') do
+  c = NxD2a
+  # Hlbka 400 -> svetla 397: z radu H70 sa zmesti UZ LEN 350 (420 potrebuje 435).
+  # Zamknuta 470 tak prestane platit a zasuvka je fail-closed — polozka vysuvu
+  # NEVZNIKNE. Vyska je pritom stale urcitelna (automat H70), takze serverom
+  # navrhnuta nahrada 350 MUSI prejst; inak by pouzivatel musel zbytocne
+  # zamknut vysku, len aby smel opravit dlzku.
+  par = c.params(depth: 400.0)
+  cfg, axes = c.axes_for(par, c.ov('nominal_length' => 470.0))
+  NxTest.assert_equal(nil, c.slide_item(cfg), 'predpoklad: polozka vysuvu nevznikla')
+  NxTest.assert_equal(['nl_lock_invalid'],
+                      Array(cfg['drawer_conflicts']).map { |x| x['code'].to_s })
+  a = axes[c::OWNER]
+  NxTest.assert_equal('auto', a['height']['state'], 'vyska je AUTOMATICKA, nie zamknuta')
+  NxTest.assert_equal(70, a['height']['value'])
+  NxTest.assert_equal('conflict', a['nl']['state'])
+  NxTest.assert_equal([350.0], a['nl']['options'])
+  NxTest.assert_close(350.0, a['nl']['proposal'], 0.001)
+
+  field, value, err = c.write_value(cfg, 'nominal_length', a['nl']['proposal'])
+  NxTest.assert_equal(nil, err, "zapis vlastneho navrhu servera musi prejst: #{err}")
+  NxTest.assert_equal(['nominal_length', 350.0], [field, value])
+
+  # Vysledok zapisu: NL 350 zamknuta, vyska OSTAVA automaticka (zaznam nema
+  # pole `height_variant`) a zasuvka sa postavi.
+  after = c.panel.merge_override(cfg['hardware_overrides'], c::OWNER, 'slide', c::RID,
+                                 field, value)
+  cfg2, axes2 = c.axes_for(par, after)
+  NxTest.assert_close(350.0, c.slide_item(cfg2)['params']['nominal_length'], 0.001)
+  NxTest.assert_equal([], Array(cfg2['drawer_conflicts']))
+  NxTest.assert_equal('locked', axes2[c::OWNER]['nl']['state'])
+  NxTest.assert_equal('auto', axes2[c::OWNER]['height']['state'])
+  NxTest.refute(after.first.key?('height_variant'), 'vyska ostala automaticka')
+end
+
+NxTest.test('KOV-D2a (R3): pri KONFLIKTE vysky ostava nahrada NL odmietnuta') do
+  c = NxD2a
+  # Zamknuta vyska H176 pri svetlej 159 = `height_lock_invalid`. Rad NL sa
+  # z neplatnej vysky odvodit neda, takze zapis dlzky sa odmietne — poradie
+  # osi (vyska pred NL) plati aj na zapisovej ceste.
+  cfg, axes = c.axes_for(c.params, c.ov('height_variant' => 176))
+  NxTest.assert_equal('conflict', axes[c::OWNER]['height']['state'])
+  _f, _v, err = c.write_value(cfg, 'nominal_length', 350.0)
+  NxTest.assert(err.to_s.include?('oprav najprv výšku'), err.to_s)
+  # Cesta VON je zapis PLATNEJ vysky — ten sa odmietnut nesmie.
+  field, value, herr = c.write_value(cfg, 'height_variant', 70)
+  NxTest.assert_equal(nil, herr, herr.to_s)
+  NxTest.assert_equal(['height_variant', 70], [field, value])
 end
