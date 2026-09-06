@@ -33,6 +33,14 @@
 #      -> „KOV-D2a (P2): vyskovy zamok, ktory sa uz nezmesti, sa ODMIETNE"
 #   M8 `drawer_contexts` prehltne necakanu vynimku bez logu
 #      -> „KOV-D2a (P2): necakana vynimka v kontexte osi sa ZALOGUJE"
+#   M9 rescue nacitania receptu v payloade neloguje
+#      -> „KOV-D2a (P2): nenacitatelny recept sa pri stavbe osi ZALOGUJE"
+#   M10 hlaska osi sa berie LEN z ulozeneho `drawer_conflicts`
+#      -> „KOV-D2a (P2): os v konflikte MA hlasku aj pri SKORSOM zlyhani"
+#   M11 normalizacia neoveri `generic_type` vyskoveho zamku
+#      -> „KOV-D2a (P2): vyskovy zamok zije LEN na polozke `slide`"
+#   M12 zapisova akcia neoveri `generic_type` (ta ista os, druhy koniec)
+#      -> „KOV-D2a (P2): vyskovy zamok zije LEN na polozke `slide`"
 require_relative '../helper' unless defined?(NxTest)
 
 # Panelove akcie nie su v require zozname helpera (vzor KOV-D1a).
@@ -378,7 +386,7 @@ NxTest.test('KOV-D2a (R3): projektove `fit_series` pravidla ostavaju pre NE-rece
                   encoding: 'UTF-8')
   NxTest.assert(src.include?('unless series_value?(model, rid, gt, nl)'),
                 'legacy vetva D-93 musi ostat')
-  NxTest.assert(src.include?('return recipe_nl_value(cab, owner, rid, nl) if recipe_rule?(rid)'),
+  NxTest.assert(src.include?('return recipe_nl_value(cab, owner, gt, rid, nl) if recipe_rule?(rid)'),
                 'receptova vetva stoji PRED nou')
 end
 
@@ -725,4 +733,93 @@ NxTest.test('KOV-D2a (P2): necakana vynimka v kontexte osi sa ZALOGUJE, nie preh
     c.e.singleton_class.send(:alias_method, :log_error, :nx_d2a_log)
     c.e.singleton_class.send(:remove_method, :nx_d2a_log)
   end
+end
+
+# ============================================================================
+# CODEX #312 KOLO 3 — diagnostika receptu, hlaska sekundarnej osi, `slide`
+# ============================================================================
+
+NxTest.test('KOV-D2a (P2): nenacitatelny recept sa pri stavbe osi ZALOGUJE') do
+  c = NxD2a
+  cfg = c.cfg_for(c.params)
+  item = Array(cfg['front_items']).first
+  NxTest.assert(item.is_a?(Hash), 'predpoklad: zasuvkove celo v configu')
+
+  logged = []
+  rec = c.r
+  rec.singleton_class.send(:alias_method, :nx_d2a_load, :load)
+  c.e.singleton_class.send(:alias_method, :nx_d2a_log2, :log_error)
+  begin
+    rec.define_singleton_method(:load) { |*_a, **_k| raise rec::RecipeError, 'odtlacok nesedi' }
+    c.e.define_singleton_method(:log_error) { |ex, where = nil| logged << [ex.class, where.to_s] }
+
+    NxTest.assert_equal(nil, c.panel.drawer_axis_recipe(item), 'nenacitatelny recept = ziadne osi')
+    NxTest.assert_equal(1, logged.length, 'chyba MUSI byt v diagnostike, nie tichy nil')
+    NxTest.assert(logged.first[1].include?('F1'), logged.first[1])
+  ensure
+    rec.singleton_class.send(:alias_method, :load, :nx_d2a_load)
+    rec.singleton_class.send(:remove_method, :nx_d2a_load)
+    c.e.singleton_class.send(:alias_method, :log_error, :nx_d2a_log2)
+    c.e.singleton_class.send(:remove_method, :nx_d2a_log2)
+  end
+end
+
+NxTest.test('KOV-D2a (P2): os v konflikte MA hlasku aj pri SKORSOM zlyhani resolvera') do
+  c = NxD2a
+  # Zasuvka ma NEPODPOROVANU hrubku boku (KD 22 = PRVY krok resolvera)
+  # A ZAROVEN neplatny vyskovy zamok. Ulozene `drawer_conflicts` nesu LEN
+  # to skorsie zlyhanie, takze hlaska osi sa MUSI odvodit z receptu
+  # a kontextu — inak by riadok ukazal „konflikt + navrh" bez slova preco.
+  par = c.params.merge('thickness' => 22.0)
+  cfg, axes = c.axes_for(par, c.ov('height_variant' => 176, 'nominal_length' => 620.0))
+  codes = Array(cfg['drawer_conflicts']).map { |x| x['code'].to_s }
+  NxTest.refute(codes.include?('height_lock_invalid'),
+                "predpoklad: ulozeny je SKORSI dovod (#{codes.inspect})")
+
+  a = axes[c::OWNER]
+  NxTest.assert_equal('conflict', a['height']['state'])
+  NxTest.refute(a['height']['message'].to_s.strip.empty?,
+                'os so `state: conflict` MUSI mat hlasku')
+  NxTest.assert(a['height']['message'].include?('H176'), a['height']['message'])
+end
+
+NxTest.test('KOV-D2a: KAZDA os so `state: conflict` nesie hlasku (invariant)') do
+  c = NxD2a
+  cases = [[c.params, c.ov('height_variant' => 176)],
+           [c.params, c.ov('nominal_length' => 620.0)],
+           [c.params(depth: 400.0), c.ov('nominal_length' => 470.0)],
+           [c.params(front_height: 220.0, cabinet_height: 900.0),
+            c.ov('height_variant' => 70, 'nominal_length' => 620.0)]]
+  cases.each_with_index do |(par, ovs), i|
+    _cfg, axes = c.axes_for(par, ovs)
+    Array(axes[c::OWNER]).each do |_axis, st|
+      next unless st.is_a?(Hash) && st['state'] == 'conflict'
+
+      NxTest.refute(st['message'].to_s.strip.empty?, "pripad #{i}: os bez hlasky #{st.inspect}")
+    end
+  end
+end
+
+NxTest.test('KOV-D2a (P2): vyskovy zamok zije LEN na polozke `slide`') do
+  c = NxD2a
+  # CITACIA cesta: zaznam ineho typu kovania s receptovym `rule_id` pole
+  # zahodi — inak by v configu schemy 7 ostal MRTVY zamok, ktory nikto necita.
+  %w[hinge custom].each do |gt|
+    next unless Noxun::Engine::BuildPlan::GENERIC_TYPES.include?(gt)
+
+    raw = c.ov('height_variant' => 70, 'quantity' => 1)
+    raw.first['generic_type'] = gt
+    out = c.cb.norm_hardware_overrides(raw)
+    NxTest.refute(out.first.key?('height_variant'), "#{gt}: vyskovy zamok nepatri k inemu typu")
+    NxTest.assert_equal(1, out.first['quantity'], "#{gt}: ostatne polia ostavaju")
+  end
+
+  # ZAPISOVA cesta: akcia taky zapis ODMIETNE (HTML disabled nie je ochrana).
+  cfg = c.cfg_for(c.params)
+  _f, _v, err = c.panel.override_value('height_variant', 70, nil, c.cab_with(cfg),
+                                       c::OWNER, 'hinge', c::RID)
+  NxTest.assert(err.to_s.include?('výsuvu'), err.to_s)
+  _f2, _v2, err2 = c.panel.override_value('nominal_length', 470.0, nil, c.cab_with(cfg),
+                                          c::OWNER, 'hinge', c::RID)
+  NxTest.assert(err2.to_s.include?('výsuvu'), err2.to_s)
 end

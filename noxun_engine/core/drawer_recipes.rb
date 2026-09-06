@@ -463,19 +463,9 @@ module Noxun
         series = series_for(recipe, out[:height_variant])
         lock = lock_value(recipe, ctx, overrides)
         if lock
-          in_series = series.any? { |v| same?(v, lock) }
-          fits = in_series && min_depth(recipe, lock) <= clear_d
-          unless fits
-            reason = if in_series
-                       "potrebuje hĺbku #{fmt(min_depth(recipe, lock))} mm (svetlá #{fmt(clear_d)} mm)"
-                     else
-                       "nie je v rade #{series_label(out[:height_variant])}"
-                     end
-            return fail_with(out, 'nl_lock_invalid',
-                             "#{label(recipe)}: ručne zamknutá dĺžka #{fmt(lock)} mm #{reason} — " \
-                             'zámok sa nikdy nemení automaticky. ' \
-                             "#{LOCK_HINT}")
-          end
+          problem = nl_lock_problem(recipe, lock, out[:height_variant], clear_d)
+          return fail_with(out, 'nl_lock_invalid', problem) if problem
+
           nl = lock
           out[:explain] << "NL: #{fmt(nl)} (ručný zámok)"
         else
@@ -789,6 +779,24 @@ module Noxun
         "#{label(recipe)}: ručne zamknutá výška H#{key_num(height)} potrebuje svetlú výšku " \
           "#{fmt(v[:min_clear_height])} mm (svetlá #{fmt(clear_h)} mm) — " \
           "zámok sa nikdy nemení automaticky. #{LOCK_HINT}"
+      end
+
+      # Preco zamknuta NL neplati (alebo nil, ked plati). JEDINA veta o tomto
+      # dovode: cita ju `resolve` (RED nalez) AJ payload osi (hlaska chipu),
+      # takze sa nemozu rozist. Rad sa berie z VYSLEDNEJ vysky.
+      def nl_lock_problem(recipe, nl, height_variant, clear_d)
+        series = series_for(recipe, height_variant)
+        in_series = series.any? { |v| same?(v, nl) }
+        return nil if in_series && min_depth(recipe, nl) <= clear_d.to_f
+
+        reason = if in_series
+                   "potrebuje hĺbku #{fmt(min_depth(recipe, nl))} mm (svetlá #{fmt(clear_d)} mm)"
+                 else
+                   "nie je v rade #{series_label(height_variant)}"
+                 end
+        "#{label(recipe)}: ručne zamknutá dĺžka #{fmt(nl)} mm #{reason} — " \
+          'zámok sa nikdy nemení automaticky. ' \
+          "#{LOCK_HINT}"
       end
 
       # Vysky, ktore sa do svetlej vysky ZMESTIA (vzostupne). Prazdne pole =

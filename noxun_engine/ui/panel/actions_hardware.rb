@@ -114,12 +114,12 @@ module Noxun
           when 'nominal_length'
             nl = HardwareRules.override_nl(raw.is_a?(String) ? Float(raw, exception: false) : raw)
             return [nil, nil, 'Neplatná dĺžka výsuvu.'] if nl.nil?
-            return recipe_nl_value(cab, owner, rid, nl) if recipe_rule?(rid)
+            return recipe_nl_value(cab, owner, gt, rid, nl) if recipe_rule?(rid)
             return [nil, nil, 'Táto dĺžka nie je v rade pravidla — otvor Pravidlá kovania.'] \
               unless series_value?(model, rid, gt, nl)
             [field, nl, nil]
           when 'height_variant'
-            recipe_height_value(cab, owner, rid, raw)
+            recipe_height_value(cab, owner, gt, rid, raw)
           else
             [nil, nil, 'Neznáme pole ručného zásahu.']
           end
@@ -128,6 +128,15 @@ module Noxun
         def recipe_rule?(rid)
           rid.to_s.start_with?(RECIPE_RULE_PREFIX)
         end
+
+        # Obe osi zamku patria VYHRADNE k polozke vysuvu (`generic_type slide`)
+        # — presne to cita resolver. Zaznam ineho typu by ostal v configu ako
+        # mrtvy zamok, ktory nikto necita (Codex #312 kolo 3 P2).
+        def lock_item?(gt)
+          gt.to_s == Recipes::LOCK_GENERIC_TYPE
+        end
+
+        LOCK_WRONG_TYPE = 'Zámok osi patrí len k položke výsuvu zásuvky.'
 
         # --- KOV-D2a (Astra #20 F5): RECEPTOVA zapisovacia cesta zamkov -------
         #
@@ -229,7 +238,9 @@ module Noxun
         # NL zamok receptovej polozky: hodnota MUSI byt presne v rade VYSLEDNEJ
         # vysky. Ci sa zmesti do hlbky, rozhoduje az resolver (RED
         # `nl_lock_invalid`) — presne ako pri projektovom rade.
-        def recipe_nl_value(cab, owner, rid, nl)
+        def recipe_nl_value(cab, owner, gt, rid, nl)
+          return [nil, nil, LOCK_WRONG_TYPE] unless lock_item?(gt)
+
           info, err = recipe_lock_context(cab, owner, rid)
           return [nil, nil, err] if err
 
@@ -249,7 +260,8 @@ module Noxun
         end
 
         # Vyskovy zamok: LEN Atira, hodnota MUSI byt vyskou pripnuteho receptu.
-        def recipe_height_value(cab, owner, rid, raw)
+        def recipe_height_value(cab, owner, gt, rid, raw)
+          return [nil, nil, LOCK_WRONG_TYPE] unless lock_item?(gt)
           return [nil, nil, 'Výškový zámok sa dá uložiť len na receptovej položke výsuvu.'] unless recipe_rule?(rid)
 
           hv = Recipes.height_value(raw.is_a?(String) ? Float(raw, exception: false) : raw)

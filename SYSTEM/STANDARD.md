@@ -456,8 +456,10 @@ Nákup si k nej hľadá set **triednym kľúčom** a na generický `slide` **nik
 `quantity` prepíše počet, `disabled` položku vyradí, `nominal_length` prepíše dĺžku; šablóny korpusov zásahy zachovávajú.
 
 **ZÁMKY OSÍ ZÁSUVKY (KOV-D2a, v0.9.37).** Zásuvka z receptu má **dve** osi ručného zámku a obe žijú v tom istom zázname `hardware_overrides`:
-**`nominal_length`** (dĺžka výsuvu, D-93) a **`height_variant`** (výškový variant; celé číslo, **výhradne** pri `rule_id recipe:<id>` a **výhradne pre Atiru** — Quadro
-výškové varianty nemá, `box_height` plynie z geometrie). Zámok = **existencia platného poľa**; `disabled: true` zámok nenesie. Poradie resolvera je záväzné, lebo
+**`nominal_length`** (dĺžka výsuvu, D-93) a **`height_variant`** (výškový variant; celé číslo, **výhradne** na položke výsuvu (`generic_type: "slide"`), **výhradne** pri
+`rule_id recipe:<id>` a **výhradne pre Atiru** — Quadro výškové varianty nemá, `box_height` plynie z geometrie). Zámok = **existencia platného poľa**; `disabled: true`
+zámok nenesie. Obe brány (`generic_type` aj `rule_id`) platia **na oboch koncoch**: normalizácia pole zahodí s logom a zápisová akcia ho odmietne s hláškou — inak by
+v configu ostal **mŕtvy zámok**, ktorý čítač (`Recipes.height_lock_value` hľadá výhradne `slide`) nikdy neprečíta. Poradie resolvera je záväzné, lebo
 **rad NL JE per výška**: *zamknutá alebo automatická výška → rad NL tej výšky → zamknutá alebo automatická NL → dielce → nákupný selektor*. Zamknutá výška musí
 existovať v pripnutom recepte **a zmestiť sa**, inak RED `height_lock_invalid` bez dielcov aj výsuvu; zamknutá NL sa overuje proti radu **výslednej** výšky
 (zamknutá 520 po automatickom prechode H70 → H144 = `nl_lock_invalid`, **nikdy návrat na nižšiu výšku ani zmena NL**). Zápis ide **serverovou receptovou cestou**

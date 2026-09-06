@@ -2215,7 +2215,7 @@ module Noxun
             # NL: JEDINA autorita tvaru je HardwareRules.override_nl (strict Float).
             nl = HardwareRules.override_nl(ov['nominal_length'] || ov[:nominal_length])
             rec['nominal_length'] = nl if nl
-            hv = norm_height_lock(rid, ov['height_variant'] || ov[:height_variant])
+            hv = norm_height_lock(gt, rid, ov['height_variant'] || ov[:height_variant])
             rec['height_variant'] = hv if hv
             next unless OVERRIDE_CONTENT_KEYS.any? { |k| rec.key?(k) }
             out[[owner, gt, rid]] = rec
@@ -2223,15 +2223,24 @@ module Noxun
           out.values
         end
 
-
-        # Vyskovy zamok prezije normalizaciu LEN na receptovej identite ATIRY.
-        # Pritomna, ale neprijatelna hodnota sa zahadzuje S LOGOM — tichy drop
-        # by z ruceneho zamku spravil automat bez jedineho stopy.
-        def norm_height_lock(rule_id, raw)
+        # Vyskovy zamok prezije normalizaciu LEN na POLOZKE VYSUVU (`slide`)
+        # s receptovou identitou ATIRY. Pritomna, ale neprijatelna hodnota sa
+        # zahadzuje S LOGOM — tichy drop by z ruceneho zamku spravil automat
+        # bez jedineho stopy.
+        #
+        # Kontrola `generic_type` je NUTNA (Codex #312 kolo 3 P2): citac zamku
+        # (`Recipes.height_lock_value`) hlada VYHRADNE `slide`, takze zaznam
+        # `hinge`/`custom` s receptovym `rule_id` by v configu schemy 7 ostal
+        # ako MRTVY zamok — nic by ho necitalo a nic by ho nevysvetlilo.
+        def norm_height_lock(generic_type, rule_id, raw)
           return nil if raw.nil?
           return nil unless defined?(Recipes)
 
           rid = rule_id.to_s
+          unless generic_type.to_s == Recipes::LOCK_GENERIC_TYPE
+            log_dropped_height_lock(rid, "vyskovy zamok patri len k polozke #{Recipes::LOCK_GENERIC_TYPE}")
+            return nil
+          end
           unless rid.start_with?(Recipes::LOCK_RECIPE_PREFIX)
             log_dropped_height_lock(rid, 'vyskovy zamok existuje len na receptovej polozke')
             return nil

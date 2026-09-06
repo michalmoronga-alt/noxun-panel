@@ -1324,7 +1324,9 @@ prázdne sloty **a priznané neznámo**, takže karta o ňom nepovie ani „pýt
 `owner_part_key → { height?: {...}, nl: {...} }` a vešia ju **na obe strany**: na emitovanú položku výsuvu (`attach_drawer_axes`, len `source: 'recipe'`) **aj** na riadok
 ručného zásahu (`attach_override_axes`) — pri konflikte totiž položka fail-closed **nevznikne** a odomknúť sa musí dať aj tak. Každá os nesie
 `state` (`auto` | `locked` | `conflict`), `value`, `options` (hodnoty, ktoré sa **dajú** zamknúť: výšky receptu, ktoré sa zmestia do svetlej výšky; NL z radu **výslednej**
-výšky, ktoré sa zmestia do hĺbky), pri konflikte `message` (**uložený** dôvod z `drawer_conflicts`, nikdy druhý text) a `proposal` — návrh náhrady **z receptu a geometrie**,
+výšky, ktoré sa zmestia do hĺbky), pri konflikte `message` a `proposal`. **Invariant: os so `state: 'conflict'` má vždy `message`** — uložený dôvod z `drawer_conflicts`
+sa použije len keď **sedí kód**, inak sa veta odvodí z receptu a kontextu tou istou funkciou, akou ju skladá resolver (`Recipes.height_lock_problem` / `nl_lock_problem`).
+Bez toho by zásuvka so **skorším** zlyhaním (prekážka, hrúbka, KD) **a** neplatným zámkom ukázala konflikt aj návrh bez jediného slova prečo — návrh náhrady **z receptu a geometrie**,
 nikdy z dostupných kódov. Návrh mení **len opravovanú os**: druhý zámok ostáva a znova sa overí, a keď pri ňom platná náhrada neexistuje, `proposal` je `nil`
 (D2b potvrdenie neponúkne). **Quadro nemá kľúč `height` vôbec** (nie `state: 'auto'`) — os, ktorá neexistuje, sa neponúka. Pri konflikte **výšky** je ponuka NL prázdna
 a riadok to prizná (`blocked_by: 'height'`): rad NL je per výška, takže sa nemá z čoho počítať. Svetlú výšku ani hĺbku config **neukladá**, preto sa `ctx` prepočítava

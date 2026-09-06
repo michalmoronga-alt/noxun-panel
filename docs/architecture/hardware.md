@@ -696,7 +696,9 @@ záznam s `disabled: true` zámok **nenesie** (ten istý kontrakt ako `HardwareR
 3. **zamknutá alebo automatická NL** — zamknutá sa overuje proti radu **VÝSLEDNEJ** výšky: zamknutá 520 po automatickom prechode H70 → H144 (rad H144 520 nemá) je
    `nl_lock_invalid`, **nikdy návrat na H70 ani zmena NL**; automat berie najdlhšiu z radu s `min_depth ≤ clear_depth`.
 
-Opačné poradie by pri zmene výšky ticho posunulo NL. Vety `explain` znejú „Výška: H144 (ručný zámok)" / „NL: 470 (ručný zámok)". Emitovaná položka výsuvu **ostáva
+Dôvod, prečo zámok neplatí, skladá **jediná** funkcia per os — `height_lock_problem` a `nl_lock_problem`. Číta ich `resolve` (RED nález) **aj** payload osí (hláška chipu),
+takže sa nemôžu rozísť; payload ich potrebuje preto, že zásuvka môže mať **skoršie** zlyhanie resolvera (prekážka, hrúbka, KD) a uložené `drawer_conflicts` o zámku vtedy
+nevedia vôbec. Opačné poradie krokov by pri zmene výšky ticho posunulo NL. Vety `explain` znejú „Výška: H144 (ručný zámok)" / „NL: 470 (ručný zámok)". Emitovaná položka výsuvu **ostáva
 `source: 'recipe'`** a nesie `locked: true` ako **súhrn** „aspoň jedna os je zamknutá" — receptový zámok **nikdy** neprechádza `HardwareRules.apply_overrides` (ten by pri NL
 prepol zdroj na `manual` a nákup by prestal povyšovať chýbajúci kit na blocker; Astra #20 F7). Porovnania sú **inkluzívne a bez EPS** nad nezaokrúhlenou hodnotou z `context_for`
 (105,00 platí, 104,995 padá). **Atomicita:** akýkoľvek konflikt ⇒ `parts = []` a `hardware_params = {}`.

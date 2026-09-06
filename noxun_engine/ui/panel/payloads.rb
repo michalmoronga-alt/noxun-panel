@@ -577,6 +577,11 @@ module Noxun
         end
 
         # PRIPNUTY recept cela (rovnaka retaz ako stavba), alebo nil.
+        # Nenacitatelny recept (chybajuci subor, zmeneny odtlacok) sa ZALOGUJE:
+        # tichy `nil` by vonkajsi logger nikdy nevidel a riadok osiroteneho
+        # zasahu by prisiel o stav osi bez stopy v diagnostike (Codex #312
+        # kolo 3 P2). Neznamy PIN (`:unknown`) logovanie nepotrebuje — to nie
+        # je chyba citania, ale stav, ktory uz hlasi RED `drawer_recipe_unknown`.
         def drawer_axis_recipe(item)
           kind, key = Recipes.recipe_key_for(item)
           return nil unless kind == :ok
@@ -587,7 +592,8 @@ module Noxun
 
           ref = Recipes.pick_ref(drawer['recipe_refs'], key[:system], key[:opening]) if state == :missing
           ref && Recipes.load(ref)
-        rescue StandardError
+        rescue StandardError => e
+          Engine.log_error(e, "Panel.drawer_axes_map #{item.is_a?(Hash) ? item['id'] : nil} recipe")
           nil
         end
 
@@ -613,7 +619,14 @@ module Noxun
               axes['height'] = { 'state' => valid ? 'locked' : 'conflict',
                                  'value' => h_lock, 'options' => opts }
               unless valid
-                axes['height']['message'] = axis_message(conflict, 'height_lock_invalid')
+                # INVARIANT: os so `state: conflict` MA vzdy hlasku. Ulozeny
+                # dovod plati LEN ked sedi kod — zasuvka moze mat SKORSIE
+                # zlyhanie resolvera (prekazka, hrubka, KD), a vtedy
+                # `drawer_conflicts` o zamku nevie vobec. Veta sa preto odvodi
+                # z receptu a kontextu tou istou funkciou, akou ju sklada
+                # resolver (Codex #312 kolo 3 P2).
+                axes['height']['message'] = axis_message(conflict, 'height_lock_invalid') ||
+                                            Recipes.height_lock_problem(recipe, h_lock, clear_h)
                 axes['height']['proposal'] = height_proposal(recipe, opts, nl_lock, clear_d)
               end
             else
@@ -643,7 +656,11 @@ module Noxun
           valid = opts.any? { |v| (v - nl_lock).abs < 1e-9 }
           out = { 'state' => valid ? 'locked' : 'conflict', 'value' => nl_lock, 'options' => opts }
           unless valid
-            out['message'] = axis_message(conflict, 'nl_lock_invalid')
+            # Ten isty invariant ako pri vyske: hlaska sa odvodi nezavisle
+            # (`Recipes.nl_lock_problem` je JEDINA veta o tomto dovode — cita
+            # ju aj resolver), ulozeny dovod vyhrava len pri zhode kodu.
+            out['message'] = axis_message(conflict, 'nl_lock_invalid') ||
+                             Recipes.nl_lock_problem(recipe, nl_lock, height, clear_d)
             out['proposal'] = opts.max
           end
           out
