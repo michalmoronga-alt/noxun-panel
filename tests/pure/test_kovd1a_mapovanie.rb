@@ -528,7 +528,7 @@ NxTest.test('KOV-D1a (Codex #308 kolo 2 P1): PRITOMNY kluc s pokazenou hodnotou 
                                                      'bands' => [{ 'min' => 70.0, 'max' => 70.0,
                                                                    'set_id' => '' }] } }].each do |cs|
     raw = { c::OWNK => cs['raw'] }
-    ov = h.normalize_mapping(raw, nil, allow_owner: true, keep_invalid: true)
+    ov = h.normalize_mapping(raw, nil, allow_owner: true)
     NxTest.assert(h.invalid_mapping_value?(ov[c::OWNK]), "#{cs['popis']}: kluc OSTAVA ako marker")
 
     sid, reason, = h.resolve_set_id('slide', it, { 'CAB-1' => cab.merge(ov) }, proj)
@@ -537,7 +537,7 @@ NxTest.test('KOV-D1a (Codex #308 kolo 2 P1): PRITOMNY kluc s pokazenou hodnotou 
   end
 
   # Expanzia: RED bez kodu (receptova polozka), nie kit z projektu.
-  ov = h.normalize_mapping({ c::OWNK => '' }, nil, allow_owner: true, keep_invalid: true)
+  ov = h.normalize_mapping({ c::OWNK => '' }, nil, allow_owner: true)
   state = c.state_of([c.seed_set('atira-biela-h70-sisy')], proj)
   exp = h.expand([it], state, cabinet_overrides: { 'CAB-1' => ov })
   NxTest.assert_equal([], exp['rows'], 'ziadny kod z predvolby projektu')
@@ -548,9 +548,73 @@ NxTest.test('KOV-D1a (Codex #308 kolo 2 P1): PRITOMNY kluc s pokazenou hodnotou 
 
   # NEEXISTUJUCI set_id ostava vlastnym dovodom (`set_missing`) — kluc je platny.
   ov2 = h.normalize_mapping({ c::OWNK => c.height_selector([[70, 'nie-je']]) },
-                            nil, allow_owner: true, keep_invalid: true)
+                            nil, allow_owner: true)
   exp2 = h.expand([it], state, cabinet_overrides: { 'CAB-1' => ov2 })
   NxTest.assert_equal('set_missing', exp2['unmapped'].first['base_reason'])
+end
+
+NxTest.test('KOV-D1a (Codex #308 kolo 3 P1): marker PREZIJE KAZDU citaciu cestu cabinet mapy') do
+  c = NxD1a
+  h = c::HWS
+  it = c.atira_item
+  proj = { c::CLASSK => c.height_selector([[70, 'atira-biela-h70-sisy']]) }
+  broken = h.normalize_mapping({ c::OWNK => '' }, nil, allow_owner: true)
+  NxTest.assert(h.invalid_mapping_value?(broken[c::OWNK]), 'vychodisko: marker v mape')
+
+  # (1) UPRAVA INEHO KOVANIA na tej istej skrinke. Prave tu marker doteraz
+  # ticho zmizol — a nasledna prestavba by zasuvke dala set z projektu.
+  cfg = c.cfg_with(broken, [it, { 'owner_id' => 'CAB-1', 'owner_part_key' => nil,
+                                  'generic_type' => 'hinge', 'quantity' => 2,
+                                  'rule_id' => 'r', 'params' => {}, 'source' => 'rule' }])
+  st, map, = h.apply_cabinet_override(cfg, 'hinge', nil, 'zaves-p2o',
+                                      known_sets: [c.seed_set('zaves-p2o')])
+  NxTest.assert_equal(:ok, st, map.inspect)
+  NxTest.assert(h.invalid_mapping_value?(map[c::OWNK]),
+                'zapis INEHO kluca nesmie poskodeny vyber odstranit')
+  NxTest.assert_equal('zaves-p2o', map['hinge'])
+
+  # (2) PRESTAVBA (config -> params -> normalize) marker nesie dalej.
+  fronts = { 'items' => [{ 'id' => 'F1', 'type' => 'drawer_front', 'mode' => 'fixed',
+                           'height' => 175.0 }] }
+  norm = c::CB.normalize('width' => 900.0, 'height' => 720.0, 'depth' => 500.0,
+                         'fronts' => fronts, 'hardware_sets' => map)
+  NxTest.assert(h.invalid_mapping_value?(norm[:hardware_sets][c::OWNK]), 'prestavba ho nestrati')
+
+  # (3) SABLONA: cielovy owner vyber (aj poskodeny) sa NEPREPISUJE.
+  merged = c::E::TemplatesDialog.merge_hardware_sets({ 'hardware_sets' => map },
+                                                     { 'hardware_sets' => { 'hinge' => 'zaves-klasik' } })
+  NxTest.assert(h.invalid_mapping_value?(merged[c::OWNK]), 'merge sablony ho nesmie zahodit')
+
+  # (4) PAYLOAD karty (`cabinet_set_overrides`) aj `explain` panela.
+  pay = c::E::Panel.cabinet_set_overrides('hardware_sets' => map)
+  NxTest.assert(h.invalid_mapping_value?(pay[c::OWNK]), 'payload ho nesmie zahodit')
+  state = c.state_of([c.seed_set('atira-biela-h70-sisy'), c.seed_set('zaves-p2o')], proj)
+  ex = h.explain(it, state, overrides: map)
+  NxTest.assert_equal(nil, ex['set_id'], 'panel NESMIE ukazat set z predvolby projektu')
+  NxTest.assert(ex['problems'].first.to_s.include?('poškodený'), ex['problems'].inspect)
+
+  # (5) A po tom vsetkom expanzia STALE dava RED, nie kod z projektu.
+  exp = h.expand([it], state, cabinet_overrides: { 'CAB-1' => norm[:hardware_sets] })
+  NxTest.assert_equal([], exp['rows'])
+  NxTest.assert_equal(['drawer_kit_missing', 'mapping_invalid'],
+                      [exp['unmapped'].first['reason'], exp['unmapped'].first['base_reason']])
+end
+
+NxTest.test('KOV-D1a (Codex #308 kolo 3 P1): marker patri VYHRADNE cabinet mape') do
+  c = NxD1a
+  h = c::HWS
+  # `allow_owner: false` = kniznica / snapshot / sablona: ziadna nizsia uroven,
+  # takze marker tam nepatri a brany strat by ho naopak vyhodnotili ako platnu
+  # polozku (`read_template_mapping` by stratu neohlasil).
+  out, errs = h.parse_mapping({ 'hinge' => '' }, allow_owner: false)
+  NxTest.assert_equal({}, out, 'bez ownera sa polozka zahadzuje ako doteraz')
+  NxTest.refute(errs.empty?, 'a zapisova cesta ju odmietne chybou')
+  # Sablona so zlou hodnotou sa nadalej prizna ako STRATOVA.
+  status, lost = h.read_template_mapping('hinge' => '')
+  NxTest.assert_equal([:lossy, ['hinge']], [status, lost])
+  # Marker ako VSTUP do nekabinetnej mapy tiez neprejde.
+  NxTest.assert_equal({}, h.parse_mapping({ 'hinge' => { 'invalid' => 'x' } },
+                                          allow_owner: false)[0])
 end
 
 NxTest.test('KOV-D1a (Codex #308 kolo 2 P2): owner kluc na riadku `none` sa zahodi') do
@@ -651,7 +715,7 @@ NxTest.test('KOV-D1a (Codex #308 kolo 2 P2): karta ukaze LEN kluc AKTIVNEJ tried
   NxTest.assert_equal({ 'set_id' => 'C' }, panel.owner_set_overrides(overrides, 'slide', [legacy])[c::OWNER])
 
   # Poskodena hodnota sa PRIZNA — nie prazdny select.
-  bad = c::HWS.normalize_mapping({ c::OWNK => '' }, nil, allow_owner: true, keep_invalid: true)
+  bad = c::HWS.normalize_mapping({ c::OWNK => '' }, nil, allow_owner: true)
   NxTest.assert_equal({ 'invalid' => true },
                       panel.owner_set_overrides(bad, 'slide', [c.atira_item])[c::OWNER])
 end

@@ -36,8 +36,8 @@
   ho pozná (Codex #307 kolo 2).
   **Kompatibilita.** `CONFIG_SCHEMA` **5 → 6**: starší plugin owner kľúč zahodí, ale typová kontrola z neho stále prečíta
   známy `slide`, takže by prestavbu nezastavil — preto marker. `DRAWER_ACTIVATION_SCHEMA` ostáva **5** (inak by sa každá
-  skrinka schémy 5 tvárila ako nemigrovaná). Testy: **3157 headless** (nová sada `test_kovd1a_mapovanie.rb`, 32 testov +
-  6 overených mutácií), 90 JS sád, in-SU sekcia `run_kovd1a` (Undo aj Redo vracajú mapovanie, snapshot aj nákupný kód naraz).
+  skrinka schémy 5 tvárila ako nemigrovaná). Testy: **3159 headless** (nová sada `test_kovd1a_mapovanie.rb`, 34 testov +
+  8 overených mutácií), 90 JS sád, in-SU sekcia `run_kovd1a` (Undo aj Redo vracajú mapovanie, snapshot aj nákupný kód naraz).
   Dva testy z KOV-C boli **vedome prepísané** (schéma 5 → relatívne číslo; zahodenie neplatného `recipe_refs` → RED).
 
 - **KOV-C2c — UI ZÁSUVIEK: KARTA V INSPECTOROVI, ZASTAVUJÚCI RIADOK V NÁKUPE (PR #306, v0.9.33, 6.9.2026): SLICE C KOMPLET.**

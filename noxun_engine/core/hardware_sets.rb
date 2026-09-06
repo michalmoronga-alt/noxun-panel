@@ -2628,7 +2628,7 @@ module Noxun
           # `keep_invalid`: pritomny kluc s nepouzitelnou hodnotou ostava ako
           # marker — expanzia z neho spravi `mapping_invalid`, nie tichy pad
           # o uroven nizsie (Codex #308 kolo 2 P1).
-          out[cid.to_s] = normalize_mapping(map, nil, allow_owner: true, keep_invalid: true)
+          out[cid.to_s] = normalize_mapping(map, nil, allow_owner: true)
         end
         out
       end
@@ -3841,12 +3841,26 @@ module Noxun
       #             TICHO (delete_set! ocisti mapovanie; typ ostane nemapovany)
       #   allow_owner — composite kluce "gt@owner_part_key"; true LEN pre
       #             cabinet override mapu (config['hardware_sets'])
-      #   keep_invalid — CITACIA cesta cabinet override mapy: polozka s PLATNYM
-      #             klucom a NEPOUZITELNOU hodnotou sa NEZAHADZUJE, ale ostava
-      #             ako MARKER neplatneho mapovania (Codex #308 kolo 2 P1).
-      #             Zahodenie by z pritomneho kluca spravilo nepritomny a
-      #             precedencia by ticho padla o uroven nizsie.
-      def parse_mapping(mapping, set_ids: nil, allow_owner: false, keep_invalid: false)
+      #
+      # MARKER NEPLATNEHO MAPOVANIA (Codex #308 kolo 2 P1, principialne v kole 3):
+      # polozka s PLATNYM klucom a NEPOUZITELNOU hodnotou sa v CABINET OVERRIDE
+      # MAPE NEZAHADZUJE — ostava ako marker, aby sa precedencia na nom zastavila
+      # (zahodenie by z pritomneho kluca spravilo nepritomny a zasuvka by ticho
+      # dostala set o uroven nizsie).
+      #
+      # Ci ide o cabinet mapu, sa NEODOVZDAVA samostatnym prepinacom, ale plynie
+      # z `allow_owner` — a to je JEDINY dovod, preco tu ziadny `keep_invalid`
+      # parameter nie je (Codex #308 kolo 3 P1): pri samostatnom flagu staci
+      # zabudnut ho na jednom z pätnastich volani a marker sa TICHO strati pri
+      # najblizsej prestavbe skrinky. Vazba je presna a overena nad vsetkymi
+      # volaniami: `allow_owner: true` ma PRAVE cabinet override mapa
+      # (`config.hardware_sets`), teda jedina mapa, ktora ma pod sebou nizsiu
+      # uroven. Kniznica, projektovy snapshot aj sablona (`allow_owner: false`)
+      # nizsiu uroven nemaju a ich brany stratu chytaju vlastnymi kontrolami
+      # (`map_errors`, `norm_map.length != mapping.length`, `read_template_mapping`),
+      # ktore by marker naopak ROZBIL.
+      def parse_mapping(mapping, set_ids: nil, allow_owner: false)
+        keep_invalid = allow_owner
         return [{}, []] if mapping.nil? # chybajuce mapovanie = legitimne prazdne
         return [{}, ['mapovanie musí byť objekt']] unless mapping.is_a?(Hash)
         ids = set_ids.nil? ? nil : Array(set_ids).map(&:to_s)
@@ -3947,10 +3961,9 @@ module Noxun
 
       # CITACIA normalizacia mapovania (spatna kompatibilita signatury:
       # sets = pole definicii setov). Chyby tvaru sa loguju a polozka vypadne.
-      def normalize_mapping(mapping, sets = nil, allow_owner: false, keep_invalid: false)
+      def normalize_mapping(mapping, sets = nil, allow_owner: false)
         ids = sets.nil? ? nil : sets.map { |s| s['set_id'] }
-        out, errors = parse_mapping(mapping, set_ids: ids, allow_owner: allow_owner,
-                                             keep_invalid: keep_invalid)
+        out, errors = parse_mapping(mapping, set_ids: ids, allow_owner: allow_owner)
         errors.each { |e| log_skip(e) }
         out
       end

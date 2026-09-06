@@ -2110,7 +2110,7 @@ module Noxun
           # hodnotou ostava v configu ako marker neplatneho mapovania. Zahodit
           # ho by znamenalo spravit z pritomneho kluca nepritomny — a zasuvka by
           # ticho dostala set z projektu namiesto RED hlasky.
-          map = HardwareSets.normalize_mapping(raw_map, nil, allow_owner: true, keep_invalid: true)
+          map = HardwareSets.normalize_mapping(raw_map, nil, allow_owner: true)
           return map if fronts_cfg.nil?
 
           # Riadok `type: 'none'` v configu ZOSTAVA (Fronts ho drzi zamerne),

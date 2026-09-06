@@ -357,11 +357,17 @@ chceme), `BuildPlan.parse_hardware_set_key` vracia `nil` (preto sa kľúč mapov
   `height_variant`** — set bez neho by prešiel (probe by výšku zhodila, kontrola pásma by sa preskočila) a expanzia by ho vzápätí odmietla ako `drawer_kit_missing`.
 - **Owner výber upratuje LEGACY kľúč** (Codex #308 kolo 1 P2). Pri zápise aj zrušení klasifikovaného owner výberu sa z mapy odstráni aj `typ@owner` — pre klasifikovanú
   položku je mŕtvy (resolver ho nečíta), no po upgrade skrinky by v configu ostal a karta čela by ho ďalej ukazovala ako aktuálnu voľbu. Legacy položka si svoj kľúč ponecháva.
-- **PRÍTOMNÝ kľúč s nepoužiteľnou hodnotou = `mapping_invalid`, nikdy nižšia úroveň** (Codex #308 kolo 2 P1). Čítacia normalizácia cabinet override mapy beží s
-  `keep_invalid: true` a takú položku **nezahadzuje**, ale nechá ako **marker** `{ 'invalid' => dôvod }` (jediný tvar s týmto významom; zapisovacia cesta ho nikdy nezapíše
-  ako voľbu, `parse_mapping_value` ho odmieta). `present_mapping_value?` ho považuje za prítomný, takže **precedencia sa na ňom zastaví**, `value_set_ids` z neho nevydá nič
-  a `resolve_set_id` vráti nový dôvod `mapping_invalid` (pri receptovej položke povýšený na RED). Normalizácia je idempotentná — marker druhým prechodom neprepíše. Je to
-  presne to isté pravidlo ako pri `recipe_refs`: **o „chýba" rozhoduje prítomnosť kľúča, nie použiteľnosť hodnoty**.
+- **PRÍTOMNÝ kľúč s nepoužiteľnou hodnotou = `mapping_invalid`, nikdy nižšia úroveň** (Codex #308 kolo 2 P1). Čítacia normalizácia cabinet override mapy takú položku
+  **nezahadzuje**, ale nechá ako **marker** `{ 'invalid' => dôvod }` (jediný tvar s týmto významom; zapisovacia cesta ho nikdy nezapíše ako voľbu, `parse_mapping_value` ho
+  odmieta, a **neodstráni** ho — odstránením je len explicitné vymazanie kľúča používateľom). `present_mapping_value?` ho považuje za prítomný, takže **precedencia sa na ňom
+  zastaví**, `value_set_ids` z neho nevydá nič a `resolve_set_id` vráti nový dôvod `mapping_invalid` (pri receptovej položke povýšený na RED). Normalizácia je idempotentná.
+  Je to presne to isté pravidlo ako pri `recipe_refs`: **o „chýba" rozhoduje prítomnosť kľúča, nie použiteľnosť hodnoty**.
+- **Marker sa NEZAPÍNA prepínačom — plynie z `allow_owner`** (Codex #308 kolo 3 P1). Samostatný `keep_invalid` flag stačilo zabudnúť na jednom z pätnástich volaní
+  `normalize_mapping`/`parse_mapping` (`apply_cabinet_override`, `Panel.cabinet_set_overrides`, `HardwareSets.explain`, `TemplatesDialog.merge_hardware_sets` ho aj naozaj
+  zabudli) a marker sa **ticho stratil pri prvej úprave iného kovania** — teda presne tá tichá zmena, ktorej má brániť. Preto parameter neexistuje a platí väzba:
+  **`allow_owner: true` má PRÁVE cabinet override mapa**, jediná mapa s nižšou úrovňou pod sebou. Knižnica, projektový snapshot a šablóna (`allow_owner: false`) nižšiu
+  úroveň nemajú a ich detektory strát (`map_errors`, `norm_map.length != mapping.length`, `read_template_mapping`) by marker naopak **rozbil** — preto tam nepatrí. Väzbu
+  strážia dva testy aj dve mutácie (marker nikde / marker všade).
 - **Neaktívny set sa porovnáva ZÁVÄZKOM, nie ID** (Codex #308 kolo 2 P2). `mapping_commitments` rozloží hodnotu na `[param, min, max, set_id]` (pevná voľba na
   `['fixed', set_id]`) a uložená neaktívna referencia sa zachová, len **kým sa jej efektívne mapovanie nezmení**. Posun či rozšírenie pásma alebo prechod z pevnej voľby na
   selektor je **nový výber** — inak by sa neaktívny set ticho objednal do zákaziek, pre ktoré nebol vybraný.
@@ -374,7 +380,7 @@ chceme), `BuildPlan.parse_hardware_set_key` vracia `nil` (preto sa kľúč mapov
   vypadol a kit by sa ticho zmenil), ale `HardwareSets.owner_scoped_key?` — jediná autorita otázky „patrí tento záznam cieľu". `ProductionCore.override_keys_in_use` registruje
   pri klasifikovanej položke triedny AJ owner triedny kľúč, takže dve skrinky so spoločným ID a rôznym owner overridom bránu duplicít nepodliezajú.
 - **`CONFIG_SCHEMA` 5 → 6** ([construction.md](construction.md)) — starší plugin owner kľúč zahodí, no `unknown_generic_types` z neho stále prečíta podporovaný `slide`, takže
-  by prestavbu nezastavil (Astra #20 B1). `DRAWER_ACTIVATION_SCHEMA` ostáva 5. Testy: `tests/pure/test_kovd1a_mapovanie.rb` (32 testov + 6 overených mutácií) a in-SU sekcia
+  by prestavbu nezastavil (Astra #20 B1). `DRAWER_ACTIVATION_SCHEMA` ostáva 5. Testy: `tests/pure/test_kovd1a_mapovanie.rb` (34 testov + 8 overených mutácií) a in-SU sekcia
   `run_kovd1a` (Undo aj Redo vracajú mapovanie, snapshot a nákupný kód naraz).
 
 **KOV-C2b (v0.9.31) — RECEPTOVÁ POLOŽKA A RED `drawer_kit_missing`.** Zásuvkovú položku už **emituje** `Construction` (`source: 'recipe'`, `rule_id: recipe:<recipe_id>`,
