@@ -552,6 +552,16 @@ používateľom**. Do knižnice, projektového snapshotu ani šablóny marker **
 hodnoty. Prázdna, číselná, objektová aj `null` hodnota je **poškodený pin** → RED `drawer_recipe_unknown` bez dielcov. Opačný výklad (zahodiť nečitateľnú hodnotu) znamená
 „pin chýba", teda súrodenca alebo najnovší recept — a to je **tichá zmena fyziky** už postavenej zákazky.
 
+**ZMENA PRIPNUTEJ VERZIE = EXPLICITNÁ AKCIA S PREFLIGHTOM (KOV-D3a, v0.9.39).** Pripnutú verziu nesmie zmeniť žiadna automatická cesta: stavba záznam len **dopĺňa,
+keď chýba**, a jediný prepisovací kanál (`Fronts.set_recipe_ref!`) beží výhradne z akcie používateľa nad **jedným** kľúčom **jedného** čela, s overením očakávanej starej
+hodnoty. Cieľ musí byť **vydaný**, rovnakého systému aj otvárania a **vyššej** verzie — rovnaká alebo nižšia je odmietnutie (**žiadny downgrade**). Keďže konflikt receptu
+je **dáta, nie výnimka** (prestavba ho commitne aj s prázdnou zásuvkou), cieľový stav sa najprv postaví **nasucho tými istými funkciami ako stavba a nákup**: hrúbky, oba
+zámky **preadresované** `rule_id recipe:<v1>` → `recipe:<v2>` (kolidujúci alebo dormantný záznam na cieľovom `rule_id` s inou hodnotou = odmietnutie, nikdy tiché zlúčenie),
+`resolve` a expanzia setu. **Konflikt alebo chýbajúci kit = neuloží sa nič** (stará verzia, zámky aj geometria ostávajú, nevzniká krok Späť); úspech je **jedna operácia**
+= jeden krok Späť, Redo obnoví ref, zámky aj geometriu súčasne. Keď mapa nesie viac verzií naraz, `pick_ref` dopĺňa chýbajúci záznam **najnižšou dostupnou súrodeneckou
+verziou z validovaných záznamov** — stabilné pravidlo, nezávislé od poradia kľúčov. **`release_note`** je jediné voliteľné pole schémy receptu (text ≤ 400 znakov,
+prítomné sa validuje prísne) — autorská poznámka vydania pre potvrdenie upgradu.
+
 **MARKER `std` KNIŽNICE A SNAPSHOTU:** `1` = legacy · `2` = pásma/selector · **`3` = klasifikácia alebo triedny kľúč** · **`4` = set s `height_variant`**. Od KOV-C2a je
 čerstvá knižnica aj snapshot NOVÉHO projektu na `4` (seed nesie sety zásuviek); existujúce projekty svoj marker nemenia, kým do nich používateľ predvoľby vedome nedoplní. Marker je LAZY podľa
 obsahu, takže čisto legacy dáta ostávajú čitateľné pre staršie verzie; obsah s vyšším `std`, než ktorý verzia pozná, je pre ňu read-only (knižnica) alebo `:invalid`

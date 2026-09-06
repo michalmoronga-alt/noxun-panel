@@ -667,7 +667,23 @@ nepozná) == množina kľúčov registra**, a **golden fixtúra**
 
 **Čisté funkcie.** `load` · `released` · `inventory` · `latest_for(system, opening)` (najvyššia vydaná verzia) · `sibling(recipe_id, system, opening)` (**rovnaká** verzia pre
 inú kombináciu, inak `nil` — prepnutie klasifikácie tam a späť nikdy ticho nepovýši pripnutý recept) · `active_ref(refs_map, system, opening)` → `[:known, id]` ·
-`[:unknown, id]` (RED `drawer_recipe_unknown`) · `[:missing, nil]`.
+`[:unknown, id]` (RED `drawer_recipe_unknown`) · `[:missing, nil]` · `upgrade?(from_id, to_id)` (KOV-D3a — jediná pravda o smere upgradu: **rovnaký** systém aj otváranie
+a **vyššia** verzia; rovnaká alebo nižšia je `false`, teda žiadny downgrade).
+
+**`pick_ref` pri mape s VIAC verziami (KOV-D3a, Astra #20 F12).** Chýbajúci záznam sa dopĺňa **súrodencom rovnakej verzie**, a keď mapa nesie viac verzií naraz (po upgrade
+jedného otvárania žije `sisy` na v2 a `p2o` ešte na v1), rozhoduje **stabilné pravidlo, nie poradie kľúčov v Hashi**: berie sa **najnižšia dostupná** súrodenecká verzia,
+a to **výhradne z validovaných záznamov** (poškodený `:unknown` pin výber nikdy neovplyvní — D1a). Novo klasifikované čelo tak nikdy „neskočí" na novšiu fyziku len preto,
+že ju medzitým dostala iná kombinácia; povýšenie ostáva výhradne explicitnou akciou. Bez súrodenca platí `latest_for`.
+
+**`release_note` (KOV-D3a).** Jediné **voliteľné** pole schémy: autorská poznámka vydania (text pre potvrdenie upgradu v D3b). Recepty v1 ho vynechávajú, preto neprítomnosť
+**nie je** chyba (`recipe[:release_note]` je `nil`); prítomné pole sa už validuje prísne ako každé iné — nie `String`, prázdne po orezaní alebo dlhšie než `RELEASE_NOTE_MAX`
+(400 znakov) je odmietnutie **celého** receptu.
+
+**Testovací seam pre priečinok receptov (KOV-D3a).** Všetky čítacie funkcie majú `dir:` (C1 vzor), ale panelové akcie ani stavba ho neposielajú — čítajú default. Ten má
+**jediné** prepínacie miesto: modulovú premennú `@test_dir` (`active_dir` · `test_dir=` · `with_test_dir`). Nastavujú ju **výhradne testy a in-SU runner**, nikdy UI, config
+ani payload; v produkcii je vždy `nil`, takže platí `DIR`. Vďaka nej sa dá celý rámec upgradu overiť nad **fixtúrnym registrom** `tests/fixtures/recipes_d3a`
+(`atira_sisy_v1` = bajtová kópia produkčného + dočasné `v2`…`v5` a `quadro_v6_sisy_v2`), zatiaľ čo **produkčný register žiadnu v2 nemá** — stráži to guard test
+(D3a/D3b sú **latentný rámec**, produkčná v2 vznikne až s reálnou dátovou zmenou).
 
 **`recipe_key_for(front_item)` = rozhodovacia tabuľka, nikdy dve cesty naraz.** `[:legacy, nil]` pre iný typ než zásuvka, zásuvku **bez jediného** klasifikačného poľa
 (`construction`, `opening_mode`, `system` **aj `variant`** chýbajú) a pre `construction other` — legacy cesta ostáva CONTENT-identická a resolver sa nevolá.

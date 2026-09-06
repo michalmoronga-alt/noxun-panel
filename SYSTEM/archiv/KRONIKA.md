@@ -17,6 +17,33 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-D3a — UPGRADE RECEPTU: JEDNO ČELO, JADRO (v0.9.39, 6.9.2026).**
+  Recepty zásuviek sú **nemenné**: oprava alebo nová hodnota od výrobcu neprepíše starý súbor, ale vydá `_v2`. Dovtedy však chýbal mechanizmus, ktorým sa už postavená
+  zásuvka na novú verziu **prepne** — a prepnúť ju musí človek, nikdy automat. Táto dávka ho dodáva ako **jadro** (`handle_upgrade_drawer_recipe`); UI, ponuka „dostupná v2"
+  a potvrdenie s dopadom sú D3b.
+  **Latentný rámec (Codex #307 P1).** V repe sú len recepty v1 a **žiadny dôvod na v2** — produkčná verzia vznikne až s reálnou dátovou zmenou. Celý rámec sa preto overuje
+  nad **fixtúrnym registrom** `tests/fixtures/recipes_d3a` (`atira_sisy_v1` = bajtová kópia produkčného + dočasné v2…v5 a `quadro_v6_sisy_v2`), do ktorého sa prepína **jediný
+  len-testovací seam** `Recipes.with_test_dir` (modulová premenná s defaultom `DIR`; nastavujú ju výhradne testy a in-SU runner, nikdy UI, config ani payload). Guard test
+  stráži, že **produkčný register žiadnu v2 nemá** a že sa `RELEASED.json` ani súbory v1 touto dávkou nezmenili. Callback sa v paneli **neregistruje** — akcia je zatiaľ
+  volaná len z testov, aby v plugine nevznikol verejný kanál bez UI.
+  **Prečo preflight, a nie rollback (Astra #20 B3).** Konflikt receptu **nie je výnimka**: `build_plan` ho vráti ako dáta (`plan[:drawer_conflicts]`), `merge_final` ho uloží
+  do configu a `rebuild` operáciu normálne **commitne**. Pokus „skús a keď to nevyjde, vráť" by teda *uspel* a nechal zásuvku bez dielcov na novej verzii. Preto sa cieľový
+  stav najprv postaví **nasucho** — a to **tými istými funkciami ako stavba** (`CabinetBuilder.normalize` → `drawer_thicknesses` → `Construction.build_plan` →
+  `Recipes.resolve`) a **tou istou expanziou ako nákup** (`HardwareSets.expand` nad snapshotom projektu, inak globálnou knižnicou len na čítanie). Druhý výpočet by sa časom
+  rozišiel a ponuka by sľubovala niečo, čo zápis odmietne. Odmietne sa nesediaca hrúbka, neplatný zámok, `no_fit` aj **chýbajúci kit** k výslednej výške/NL — a vtedy
+  **nezapíše sa nič**: v modeli ostáva stará verzia, pôvodné zámky, geometria a **nevzniká ani krok Späť**.
+  **Zámky sa preadresúvajú, nezlievajú.** `rule_id recipe:<v1>` → `recipe:<v2>` so **zachovanými hodnotami** (mení sa len to, ku ktorej položke zámok patrí — vzor
+  `drawer_override_migration`). Ak na cieľovom `rule_id` toho istého vlastníka už záznam leží a jeho obsah nie je **totožný** — vrátane prípadu „zdroj neexistuje, dormantný
+  cieľ áno" — upgrade sa **odmietne**: zlúčenie by ticho aktivovalo dávno zabudnutú hodnotu, čo je presne tá tichá zmena, ktorej celý package bráni. Dormantné zámky **iných**
+  receptov (iné otváranie) sa nedotýkajú. Úspešný zápis je **jedna operácia** = jeden krok Späť; Redo vráti ref, zámky aj geometriu súčasne.
+  **Dve pravidlá navyše.** (1) `pick_ref` dostal **stabilné pravidlo** pre mapu s viacerými verziami (Astra #20 F12, Codex #307 kolo 2 P1): chýbajúci záznam sa dopĺňa
+  **najnižšou dostupnou** súrodeneckou verziou a **len z validovaných** záznamov — dovtedy rozhodovalo poradie kľúčov v Hashi, takže novo klasifikované čelo mohlo „skočiť"
+  na novšiu fyziku len preto, že ju medzitým dostala iná kombinácia. (2) `release_note` je **jediné voliteľné** pole schémy receptu (text ≤ 400 znakov): neprítomnosť nie je
+  chyba, prítomné pole sa validuje prísne ako každé iné. **Downgrade neexistuje** — `Recipes.upgrade?` je jediná pravda o smere a rovnaká či nižšia verzia je odmietnutie.
+  **Testy:** `tests/pure/test_kovd3a_upgrade.rb` (25 testov; 4 ručne overené mutácie — downgrade prejde · preflight vynechaný · neplatný záznam ovplyvní súrodenca · zámky
+  stratené po upgrade) + in-SU sekcia **`run_kovd3a`** nad fixtúrnym registrom: odmietnutý cieľ nenechá **žiadny** krok Späť, úspešný upgrade vymení geometriu aj
+  preadresuje zámok NL, Späť je **jeden** krok, Redo vráti všetko naraz a kópia skrinky nesie novú verziu.
+
 - **KOV-D2b — ZÁMKY OSÍ ZÁSUVKY: UI (v0.9.38, 6.9.2026).**
   D2a dala jadro, ale v paneli nebolo čo kliknúť. Táto dávka pridáva **rad chipov osí** — „H144 výška" a „NL 470" — a je to **jeden markup na dvoch miestach**
   (`hwAxHtml` v `hardware.js`): riadok položky výsuvu **aj riadok osiroteného zásahu** v kontexte Kovanie a riadok zásuvky v **karte čela**. Dva renderery by sa časom

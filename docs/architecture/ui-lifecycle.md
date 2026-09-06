@@ -1600,6 +1600,25 @@ odoslania. Server ho **nevyrába ani neinterpretuje**, len ho vracia v `NX.hwAxR
 (`axis_fail` pri odmietnutí, `push_axis_result(tok, true, '')` **až za** `push_selected`, keď je panel prekreslený) — vetva, ktorá skončí len statusom, by nechala okno
 zamknuté navždy. **Bez tokenu sa neposiela nič**: klik na chip žiadne okno nečaká.
 
+**UPGRADE RECEPTU — jedno čelo (KOV-D3a, v0.9.39).** `handle_upgrade_drawer_recipe` mení **presne jeden** záznam mapy `recipe_refs` **presne jedného** čela
+(payload `{cabinet_id, front_id, from, to}`; mapu klient nikdy neposiela — `SERVER_DRAWER_KEYS` platí ďalej, klient posiela len **očakávaný starý ref**). Server overí:
+čelo je klasifikovaná zásuvka · záznam mapy je `:known` a rovná sa `from` (`:missing` ani `:unknown` sa upgradom **neopravujú** — chýbajúci doplní stavba, poškodený je RED
+`drawer_recipe_unknown`) · cieľ je **vydaný** · `Recipes.upgrade?(from, to)` = rovnaký systém aj otváranie a **vyššia** verzia (žiadny downgrade). **UI zatiaľ nie je**
+(D3b) — callback sa v paneli **neregistruje**, akcia je zatiaľ latentný rámec volaný z testov a in-SU sekcie `run_kovd3a`.
+
+**PREČO PREFLIGHT, A NIE ROLLBACK (Astra #20 B3).** Konflikt receptu **nie je výnimka**: `build_plan` ho vráti ako dáta (`plan[:drawer_conflicts]`), `merge_final` ho uloží
+do configu a `rebuild` operáciu normálne **commitne** — zápis by teda „uspel" a zásuvka by ostala bez dielcov na novej verzii. Preto `drawer_upgrade_prepare` postaví cieľový
+stav **nasucho** a až potom sa čokoľvek zapíše. Preflight beží **tými istými funkciami ako stavba** (`CabinetBuilder.normalize` → `drawer_thicknesses` → `Construction.build_plan`
+→ `Recipes.resolve`) a **tou istou expanziou ako nákup** (`HardwareSets.expand` nad snapshotom projektu, inak globálnou knižnicou len na čítanie — vzor
+`ProductionCore.hardware_expansion`); žiadny druhý výpočet, takže ponuka a zápis sa nemôžu rozísť. Odmietne: nesediacu hrúbku, neplatný zámok po preadresovaní, `no_fit`,
+prekážku aj **chýbajúci kit** k výslednej výške/NL. Odmietnutie = **nezapíše sa nič**: v modeli ostáva stará verzia, pôvodné zámky aj geometria a **nevzniká krok Späť**.
+
+**PREADRESOVANIE ZÁMKOV.** `readdress_recipe_locks` prepíše `rule_id recipe:<v1>` → `recipe:<v2>` **so zachovanými hodnotami** (mení sa len to, ku ktorej položke zámok patrí
+— vzor `drawer_override_migration`). **Kolízna brána:** ak na cieľovom `rule_id` toho istého vlastníka už záznam leží a jeho obsah **nie je totožný** s preadresovaným
+(vrátane prípadu „zdroj neexistuje, dormantný cieľ áno"), upgrade sa **odmietne** — zlúčenie by ticho aktivovalo cudziu hodnotu. Dormantné zámky **iných** receptov
+(iné otváranie) sa nedotýkajú. Úspešný zápis je **jedna operácia** (`CabinetBuilder.rebuild`): nový ref v mape + preadresované zámky + prestavba = **jeden krok Späť**,
+Redo obnoví všetko súčasne.
+
 ### actions_materials.rb
 
 Doména panela: materiály **označenej skrinky** (`handle_set_cabinet_material` — override projektovej predvoľby pre telo/čelo/chrbát; materiál tela riadi hrúbku korpusu, D-45)
