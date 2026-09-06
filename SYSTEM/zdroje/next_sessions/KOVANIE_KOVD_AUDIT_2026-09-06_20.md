@@ -69,3 +69,16 @@
 | F19 | PRIJATÉ: rez na malé série D1a/D1b · D2a/D2b · D3a/D3b · D4 · D5, jadro a UI oddelene; in-SU pre zámky a upgrade. | celý package |
 
 Ďalšie kolo predauditu sa nevyžaduje — brána = kód + testy + in-SU per rez (rozhodnutie Michala pre KOV-C platí ďalej).
+
+## 3. GH Codex kolo 1 nad docs PR #307 (hlava `4add41f`) — 4 P1 + 1 P2, reconcile + otvorené dátové otázky
+
+| # | Nález | Rozhodnutie |
+|---|---|---|
+| P1 | D2a pridáva `height_variant` do overrides, ale D1a už minula schému 6 → plugin D1a by pole ticho zahodil. | PRIJATÉ: D2a = `CONFIG_SCHEMA` 6 → 7 + downgrade test. |
+| P1 | `handle_set_hardware_set` prijíma len `set_id`; owner override Atiry vyžaduje selektor. | PRIJATÉ: akcia prijme validovaný selektor, zmrazí každý referencovaný set; test akcie (D1a). |
+| P1 | V repe nie je žiadna v2 → D3 flow nedosiahnuteľný. | PRIJATÉ: D3a/D3b = latentný rámec overený fixtúrnym registrom; produkčná v2 až s reálnou dátovou zmenou. |
+| P1 | Seed nemá kompletnú alternatívnu rodinu (antracit) → smoke „antracit" nevykonateľný. | PRIJATÉ: D1b testuje prepnutie fixtúrou; produkčný antracit seed až po kompletných kódoch. |
+| P2 | D3 DoD bez Redo. | PRIJATÉ: in-SU Undo + Redo pre upgrade aj zámky. |
+
+**Otvorené dátové otázky na Michala:** (1) kompletná alternatívna rodina Atira antracit (výška × NL, SiSy aj Tip-On) — z #12 sú známe len 357887 (350/70), 348777 (470/70), 357969
+(420/70/176), 357970 (470/70/176), 341626; chýbajú 420/70, 520/70, H144 a Tip-On varianty; (2) existuje dôvod na recept v2 (zmena hodnôt výrobcu)? Ak nie, D3 ostáva latentný.

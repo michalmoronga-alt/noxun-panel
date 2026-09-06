@@ -455,8 +455,8 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   **D1a · MAPOVANIE — jadro (audit-povinné, schéma):** (1) **owner-scoped triedny kľúč** `class:slide|<opening>|<construction>@front:<id>/panel` — povolený VÝHRADNE v
   `config.hardware_sets` skrinky (globál/projekt ho nemajú); triedna časť sa normalizuje, owner ostáva doslovne a validuje sa proti čelám skrinky; precedencia pre receptové položky
   **owner triedny → cabinet triedny → projektový snapshot**; na nižšiu úroveň sa ide LEN pri neprítomnom kľúči — neplatná hodnota, chýbajúce pásmo alebo nekompatibilný set = RED
-  `drawer_kit_missing` (Astra #20 F8); pri Atire aj pod owner kľúčom selektor podľa `height_variant`, Quadro smie pevný set; existujúca akcia zapisujúca `slide@owner` sa pre čelá so
-  systémom prepne na triedny owner kľúč; (2) **zapisovacie operácie** `set_global_mapping!`/`set_project_mapping!` prijmú validovaný triedny kľúč (mení sa JEDEN kľúč, ostatné
+  `drawer_kit_missing` (Astra #20 F8); pri Atire aj pod owner kľúčom selektor podľa `height_variant`, Quadro smie pevný set; existujúca akcia zapisujúca `slide@owner` (`handle_set_hardware_set` — dnes prijíma len reťazec `set_id` a zmrazí jednu definíciu) sa pre čelá so systémom prepne na triedny owner kľúč a **prijme aj validovaný selektor** (hodnota = selektor podľa
+  `height_variant` pre Atiru, pevný set pre Quadro), zmrazí do snapshotu KAŽDÝ referencovaný set; test na úrovni akcie (Codex #307 P1); (2) **zapisovacie operácie** `set_global_mapping!`/`set_project_mapping!` prijmú validovaný triedny kľúč (mení sa JEDEN kľúč, ostatné
   zachované, definície všetkých setov selektora sa zmrazia do snapshotu — Astra #20 F9); globál ostáva predvoľbou nového projektu, existujúci snapshot sa mení len explicitne;
   (3) **`CONFIG_SCHEMA` 5 → 6** (nový tvar kľúča v `hardware_sets` configu; starší plugin by ho ticho orezal a použil automat — Astra #20 B1); `DRAWER_ACTIVATION_SCHEMA` ostáva 5;
   forward guard + downgrade test; (4) **neaktívny set** (Astra #20 F10): nedá sa NOVO vybrať, existujúca uložená voľba sa zobrazuje a zachováva, deaktivácia nemení nákup zákazky;
@@ -464,9 +464,9 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   a receptu, neregistrované ID) = RED `drawer_recipe_unknown` bez dielcov — NIE zahodenie + súrodenec/latest (`norm_recipe_refs` záznam zachová ako neplatný, `pick_ref` ho vidí);
   neprítomný záznam ostáva „chýbajúci → súrodenec/latest". Testy: precedencia 3 úrovní, owner kľúč mimo `hardware_sets` odmietnutý, downgrade, neaktívny set, neplatný ref = RED.
   **D1b · MAPOVANIE — UI:** Pravidlá Štúdia: pre kľúče `class:slide|…` výber setu/selektora globál → projekt (existujúci vzor mapovaní; len kompatibilné sety podľa klasifikácie +
-  `height_variant`); karta skrinky/čela: prepnutie setu per skrinka alebo per čelo cez D1a kľúče, ponuka LEN kompatibilných selektorov/setov; **„50 kg" = len dátovo overené
-  alternatívne sety, nosnosť receptu je garantovaný údaj a nákupná voľba ju NEzvyšuje** (Astra #20 F11 — žiadna os `load`, žiadne odvodzovanie z názvu). JS testy + headless payload.
-  **D2a · ZÁMKY OSÍ — jadro (audit-povinné, overrides schéma):** (1) pole `height_variant` v `hardware_overrides` (Atira; Quadro výškový zámok NEponúka); (2) **poradie resolvera**
+  `height_variant`); karta skrinky/čela: prepnutie setu per skrinka alebo per čelo cez D1a kľúče, ponuka LEN kompatibilných selektorov/setov; **„50 kg" = len dátovo overené alternatívne sety, nosnosť receptu je garantovaný údaj a nákupná voľba ju NEzvyšuje** (Astra #20 F11 — žiadna os `load`, žiadne odvodzovanie z názvu). **Dáta (Codex #307 P1):** seed dnes nemá kompletnú
+  alternatívnu rodinu (antracit kódy z #12 pokrývajú len časť buniek) — D1b overuje prepnutie setu fixtúrnou rodinou v testoch; produkčná alternatíva (antracit Atira per výška × NL) sa doplní ako dátový seed až po kompletných kódoch od Michala (otázka v checkpointe #20 §3). JS testy + headless payload.
+  **D2a · ZÁMKY OSÍ — jadro (audit-povinné, overrides schéma):** (1) pole `height_variant` v `hardware_overrides` (Atira; Quadro výškový zámok NEponúka) — **`CONFIG_SCHEMA` 6 → 7** s downgrade testom (D1a už minula 6; plugin D1a by inak pole ticho zahodil whitelistom `norm_hardware_overrides` — Codex #307 P1); (2) **poradie resolvera**
   (Astra #20 B2): zamknutá výška alebo automatická výška → rad NL TEJ výšky → zamknutá NL alebo automatická NL → dielce → nákupný selektor; výška musí existovať v pripnutom recepte
   a zmestiť sa, inak RED bez dielcov aj výsuvu; príklad: zamknutá NL 520 po automatickom prechode H70 → H144 (rad H144 520 nemá) = konflikt, nikdy návrat na H70 ani zmena NL;
   (3) **receptová zapisovacia cesta NL** (Astra #20 F5): D-93 `series_value?` hľadá len projektové `fit_series` — doplniť úzku serverovú vetvu vlastník → pripnutý recept → výsledná
@@ -482,9 +482,10 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   nedotknuté); server overí očakávaný starý ref + cieľ rovnakého systému/otvárania; **preflight cieľa PRED zápisom**: hrúbky, oba zámky (preadresovanie `rule_id recipe:<v1> →
   recipe:<v2>`; kolidujúci override na cieľovom rule_id s inou hodnotou = odmietnutie), expanzia setu — **konflikt cieľového receptu alebo chýbajúci kit = upgrade sa NEULOŽÍ, ostáva
   v1 aj pôvodné zámky** (Astra #20 B3: `rebuild_many` konflikt receptu ako dáta commitne — preto preflight, nie rollback); úspešný výsledok = jedna operácia (ref + zámky + prestavba),
-  1 Späť; **`pick_ref` pri mape s viacerými verziami** = stabilné pravidlo: najnižšia dostupná súrodenecká verzia (Astra #20 F12). Hromadný projektový upgrade = samostatný PR PO D3b.
+  1 Späť; **`pick_ref` pri mape s viacerými verziami** = stabilné pravidlo: najnižšia dostupná súrodenecká verzia (Astra #20 F12). Hromadný projektový upgrade = samostatný PR PO D3b. **Dáta (Codex #307 P1):** v repe sú len recepty v1 a žiadny dôvod na v2 — D3a/D3b sú **latentný rámec** overený fixtúrnym registrom (dočasné `atira_sisy_v2` v testoch, ako C1); produkčná v2 vznikne
+  až s reálnou dátovou zmenou (nová hodnota od výrobcu/Michala) a vtedy dostane `release_note`; DoD D3 = testy + in-SU nad fixtúrou, nie viditeľná ponuka v plugine.
   **D3b · UPGRADE — UI:** info „dostupný recept v2" pri čele + ponuka s konkrétnym dopadom na TOTO čelo (výška, NL, rozmery dielcov, zachovanie zámkov; nie textový diff konštánt —
-  verzia môže meniť prahy/rad/hrúbky/ABS bez zmeny `constants`, Astra #20 F13) + autorská poznámka vydania z receptu (`release_note`) + potvrdenie; **In-SU povinné (1 Späť).**
+  verzia môže meniť prahy/rad/hrúbky/ABS bez zmeny `constants`, Astra #20 F13) + autorská poznámka vydania z receptu (`release_note`) + potvrdenie; **In-SU povinné: 1 Späť A Redo (Ctrl+Y) — po redo ref v2, preadresované zámky aj geometria konzistentné** (Codex #307 P2); to isté pre zámky v D2b.
   **D4 · UI DROBNOSTI (dlh z C, Astra #20 F18/N17):** highlight riadku Kontroly po ceruzke (a smerovanie na konkrétny osirotený záznam v Kovaní); `owner_label` (ľudský názov čela)
   namiesto surového `part_key` v „Bez kódov" Štúdia (identita `cabinet_id + owner_part_key`, dedup a `blocks_export` zachované); pamäť pri prechode na dvierka: doplniť pravidlo
   „pamäť patrí rovnakému ID čela, zámky ostávajú viazané na svoj recept a pri návrate sa znovu validujú; zmena otvárania nezobrazí dormant zámok starého receptu ako aktívny".
@@ -496,9 +497,9 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   hromadný projektový upgrade (po D3b) · viacosový diff-modal · pomer D-109 · lifty (E) · linear pricing a sync tyč dĺžková (po V1) · šablóny 🔧 (I) · editor receptov · snapshot receptov.
   **Audit:** predaudit HOTOVÝ (Astra, checkpoint #20; 4 BLOCKER + 13 FIX + 2 NOTE zapracované) — ďalšia brána = kód + testy + in-SU per rez; GH Codex kolo per PR podľa pravidla
   delta-verifikácie a 3 kôl (pri P1 v 3. kole rezať, nie iterovať).
-  **Smoke pre Michala (po D2b/D3b):** vlož skrinku so zásuvkou → Nákup kód podľa NL a výšky · prepni set skrinky na antracit → iný kód, dielce rovnaké, nosnosť nezmenená ·
+  **Smoke pre Michala (po D2b/D3b):** vlož skrinku so zásuvkou → Nákup kód podľa NL a výšky · prepni set skrinky na alternatívnu rodinu (po doplnení dát; dovtedy fixtúra v testoch) → iný kód, dielce rovnaké, nosnosť nezmenená ·
   zamkni NL 420, zmeň hĺbku na 600 → NL 420 · zmenši hĺbku na 400 → RED + návrh 350, potvrď → 350 zamknuté, výškový zámok nedotknutý · zamkni výšku H70, zvýš čelo na 200 → H70 drží
-  · „Prejsť na recept v2" ukáže dopad, potvrdenie = 1 Späť; pri konflikte cieľa sa neuloží nič · Kontrola: ceruzka zvýrazní riadok.
+  · „Prejsť na recept v2" (až po vydaní reálnej v2; dovtedy in-SU nad fixtúrou) ukáže dopad, potvrdenie = 1 Späť, Redo obnoví v2 konzistentne; pri konflikte cieľa sa neuloží nič · Kontrola: ceruzka zvýrazní riadok.
   **Checklist uzáveru (per PR):** bump patch + `?v=` → testy (+ in-SU pri D2/D3/D5) → `hardware.md` (mapovanie owner kľúč, zámky per os, upgrade), `ui-lifecycle.md` (chipy,
   modal, highlight), `model-a-identita.md` (CONFIG_SCHEMA 6, `recipe_refs` neplatný záznam), `outputs.md` → STANDARD §6/§8.3 → D-109/D-111 stav v DOGFOODING → STAV/KRONIKA/PLAN.
 
