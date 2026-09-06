@@ -582,6 +582,21 @@
   .axconf .ic { width: 13px; height: 13px; vertical-align: -2px; margin-right: 4px; }
   .axconf .cbtns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
   .axnote { margin-top: 3px; font-size: 11px; color: var(--nx-ink-muted); }
+  /* KOV-D3b: PONUKA NOVEJ VERZIE RECEPTU v karte cela. Ziadne nove farby ani
+     tokeny — tlmena veta (`.inforow` karty) a pod nou ghost tlacidlo. Je to
+     prilezitost, nie upozornenie, takze ziadne jantarove ani cervene pozadie. */
+  .nx-inspector .fcard .dwup { margin-top: 6px; }
+  .nx-inspector .fcard .dwup .ghostbtn { margin-top: 4px; padding: 3px 8px; font-size: 11px; }
+  /* Tabulka dopadu v potvrdzovacom okne (kostra D-15, `custom` pole).
+     Cisla su vpravo a zarovnane na cifru — porovnavaju sa stlpce, nie riadky. */
+  .dwuptab { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  .dwuptab th, .dwuptab td { padding: 3px 6px; text-align: right; white-space: nowrap;
+            border-bottom: 1px solid var(--nx-border-soft); }
+  .dwuptab thead th { color: var(--nx-ink-faint); font-weight: 600; font-size: 10.5px; }
+  .dwuptab tbody th { text-align: left; color: var(--nx-ink-label); font-weight: 400; }
+  .dwuptab td { color: var(--nx-ink-strong); font-variant-numeric: tabular-nums; }
+  /* Nezmenene riadky sa TLMIA — oko ma najst to, co sa naozaj meni. */
+  .dwuptab tr.same td { color: var(--nx-ink-faint); }
   /* UI-C4: BOX VLASTNIKA (kontrakt UI 2.0 — Skrinka + kazde celo). Kompaktne:
      hlavicka + obsah, ziadne vlastne zbalovanie (exkluzivita skupin S4 staci).
      Trieda je `.hwbox` (nie `.hwown` z mockupu) — `.hwown` uz oznacuje popis

@@ -443,22 +443,48 @@ module Noxun
         UPGRADE_OP_NAME = 'NOXUN: nová verzia receptu zásuvky'
         UPGRADE_STALE = 'Stav zásuvky sa medzitým zmenil — panel sa obnoví, skús znova.'
 
+        # KOV-D3b: odpoved CAKAJUCEMU modalu prechodu (kostra D-15). Vlastny
+        # kanal, NIE `NX.hwAxResult`: ten obsluhuje stav modalu NAHRADY osi
+        # (`HW_AX_MODAL`) a dva rozne modaly nesmu citat jeden stav — token by
+        # sedel, ale zavrelo by sa cudzie okno. Bez tokenu (ziadne okno neceka)
+        # sa neposiela nic — vzor `push_axis_result`.
+        def push_upgrade_result(token, ok, msg)
+          return nil if token.nil?
+
+          js("NX.hwUpgradeResult(#{ok ? 'true' : 'false'}, #{msg.to_s.to_json}, #{token.to_json})")
+          nil
+        end
+
+        # Odmietnutie: hlaska do statusu (ak ju uz nenastavil volajuci) A do
+        # cakajuceho modalu — inak by okno ostalo zamknute navzdy.
+        def upgrade_fail(token, msg, status: true)
+          set_status(msg, true) if status
+          push_upgrade_result(token, false, msg)
+          nil
+        end
+
         def handle_upgrade_drawer_recipe(payload)
           model = Sketchup.active_model
           data = parse(payload)
-          return if foreign_document?(data, model, 'Verzia receptu sa nezmenila') # R-02
+          # KOV-D3b: token cakajuceho modalu sa cita PRED prvym navratom
+          # (sanitizer je zdielany s D2b — token je len echo, uzavrety tvar).
+          tok = axis_token(data['up_token'])
+          if foreign_document?(data, model, 'Verzia receptu sa nezmenila') # R-02
+            return upgrade_fail(tok, 'Verzia receptu sa nezmenila — panel patrí inému dokumentu.',
+                                status: false)
+          end
 
           cab = find_cabinet(model)
-          return set_status('Najprv označ NOXUN korpus.', true) if cab.nil?
+          return upgrade_fail(tok, 'Najprv označ NOXUN korpus.') if cab.nil?
 
           rendered = data['cabinet_id'].to_s
           if !rendered.empty? && rendered != Store.get(cab, 'cabinet_id').to_s
             push_selected(model)
-            return set_status('Výber sa medzitým zmenil — panel sa obnovil, skús znova.', true)
+            return upgrade_fail(tok, 'Výber sa medzitým zmenil — panel sa obnovil, skús znova.')
           end
 
           prep, err = drawer_upgrade_prepare(model, cab, data)
-          return set_status(err, true) if err
+          return upgrade_fail(tok, err) if err
 
           # JEDNA operacia: novy ref v mape + preadresovane zamky + prestavba.
           # Spat vrati vsetko naraz, Redo to isto obnovi (vzor D2a).
@@ -469,10 +495,183 @@ module Noxun
           status_with_warnings(cab, "Zásuvka prešla na #{Recipes.label(prep[:recipe])} — " \
                                     "#{Store.get(cab, 'cabinet_id')}.")
           push_selected(model)
+          # AZ TU: zapis prebehol a panel je prekresleny — modal sa smie zavriet.
+          push_upgrade_result(tok, true, '')
+        rescue StandardError => e
+          # Zdielany `cb` wrapper vynimku zachyti a napise status — lenze modal
+          # odomyka VYHRADNE volajuci (kontrakt D-15), takze bez odpovede by
+          # ostal zamknuty navzdy. Preto sa odpoveda aj z tejto vetvy.
+          Engine.log_error(e, 'Panel.handle_upgrade_drawer_recipe')
+          upgrade_fail(tok, 'Prechod na novú verziu sa nepodaril — nezmenilo sa nič.')
+        end
+
+        # === KOV-D3b: DOPAD PRECHODU NA TOTO CELO (CITACI CALLBACK) ==========
+        #
+        # Astra #20 F13: pouzivatel nesmie potvrdzovat „prejsť na v2" naslepo
+        # ani podla textoveho diffu konstant — verzia moze zmenit prahy, rad NL,
+        # hrubky aj ABS BEZ zmeny `constants`. Ukazuje sa preto CO SA STANE
+        # S TYMTO CELOM: vyska, NL, rozmery dielcov, zamky, kit.
+        #
+        # CISLA SKLADA SERVER, JS len kresli. A skladá ich z TOHO ISTEHO
+        # NASUCHO POSTAVENEHO STAVU, ktory by sa aj zapisal (`drawer_upgrade_prepare`
+        # -> `plan`), takze sa ponuka a zapis nemozu rozist. Ziadna operacia,
+        # ziadny zapis do modelu, ziadny krok Spat.
+        #
+        # KEDY sa pocita: LENIVO, az na klik na ponuku. Payload karty nesie iba
+        # LACNU otazku „existuje vydana vyssia verzia?" (`upgrade` blok, ktory
+        # v produkcii vobec nevznikne), takze preflight — cely `build_plan`
+        # + expanzia setov — sa pri pushi karty NIKDY nespusti.
+        def handle_drawer_upgrade_impact(payload)
+          model = Sketchup.active_model
+          data = parse(payload)
+          tok = axis_token(data['up_token'])
+          if foreign_document?(data, model, 'Dopad novej verzie sa nezistil') # R-02
+            return push_upgrade_impact(tok, false, 'Panel patrí inému dokumentu.')
+          end
+
+          cab = find_cabinet(model)
+          return push_upgrade_impact(tok, false, 'Najprv označ NOXUN korpus.') if cab.nil?
+
+          rendered = data['cabinet_id'].to_s
+          if !rendered.empty? && rendered != Store.get(cab, 'cabinet_id').to_s
+            push_selected(model)
+            return push_upgrade_impact(tok, false, 'Výber sa medzitým zmenil — panel sa obnovil.')
+          end
+
+          prep, err = drawer_upgrade_prepare(model, cab, data)
+          return push_upgrade_impact(tok, false, err) if err
+
+          push_upgrade_impact(tok, true, nil, drawer_upgrade_impact(model, cab, prep))
+        rescue StandardError => e
+          # Bez odpovede by klient cakal navzdy a tlacidlo ponuky by ostalo
+          # mrtve (stav otazky cisti az odpoved). Fail-closed: `ok: false`.
+          Engine.log_error(e, 'Panel.handle_drawer_upgrade_impact')
+          push_upgrade_impact(tok, false, 'Dopad novej verzie sa nepodarilo zistiť.')
+        end
+
+        # Odpoved citacieho callbacku. `ok: false` = potvrdenie sa NEPONUKNE,
+        # pouzivatel dostane len vetu preco.
+        def push_upgrade_impact(token, ok, reason, impact = nil)
+          return nil if token.nil?
+
+          # `ok` sa nastavuje AZ NAKONIEC: obsah dopadu je serverovy, ale kluc
+          # rozhodnutia nesmie prepisat ani omylom.
+          res = ok == true && impact.is_a?(Hash) ? impact.dup : {}
+          res['reason'] = reason.to_s unless ok == true
+          res['ok'] = ok == true
+          js("NX.hwUpgradeImpact(#{res.to_json}, #{token.to_json})")
+          nil
+        end
+
+        # KOV-D3b: os zamku -> pole zaznamu overridu. ZRKADLO pomenovania osi
+        # v payloade (`drawer_axes` — kluce `height` / `nl`) a v paneli
+        # (`HW_AX`); guard test strazi, ze hodnoty su podmnozinou
+        # `OVERRIDE_FIELDS` a kluce sedia s osami payloadu.
+        UPGRADE_LOCK_AXES = { 'height' => 'height_variant', 'nl' => 'nominal_length' }.freeze
+
+        # DOPAD = rozdiel medzi TERAJSIM a CIELOVYM stavom TOHTO cela.
+        # Obe strany idu TOU ISTOU cestou (`Construction.build_plan` ->
+        # `Recipes.resolve` + `HardwareSets.expand`): cielovu postavil PREFLIGHT
+        # (ten isty stav, ktory by sa aj zapisal), terajsiu postavi ten isty
+        # helper nad NEZMENENYMI parametrami skrinky. Ziadna vlastna formula,
+        # ziadne citanie geometrie z modelu, ziadny textovy diff konstant.
+        def drawer_upgrade_impact(model, cab, prep)
+          now = drawer_upgrade_side(model, cab, existing_params(cab), prep[:fid], prep[:owner])
+          to = prep[:side]
+          out = { 'height' => upgrade_pair(now[:params]['height_variant'],
+                                           to[:params]['height_variant']),
+                  'nl' => upgrade_pair(now[:params]['nominal_length'],
+                                       to[:params]['nominal_length']),
+                  'parts' => drawer_upgrade_parts(now[:parts], to[:parts]),
+                  'locks' => drawer_upgrade_locks(prep[:lock]),
+                  'kit' => upgrade_pair(now[:codes], to[:codes]),
+                  'from' => prep[:from], 'to' => prep[:to],
+                  # `to_title` = PLNY nazov receptu do hlavicky okna („Atira
+                  # SiSy v2"). Ponuka v karte nesie krátke `to_label` („v2") —
+                  # su to dva rozne texty, preto dva rozne kluce.
+                  'to_title' => Recipes.label(prep[:recipe]) }
+          note = prep[:recipe][:release_note]
+          out['release_note'] = note.to_s unless note.to_s.strip.empty?
+          out
+        end
+
+        def upgrade_pair(from, to)
+          { 'from' => from, 'to' => to }
+        end
+
+        # Dielce TOHTO cela: rola -> vyrobne rozmery [dlzka, sirka, hrubka].
+        # Zoznam sa riadi CIELOM (co sa naozaj postavi) a k nemu sa doparuje
+        # terajsi dielec; rola, ktora pribudne alebo zanikne, ma druhu stranu
+        # `nil` — priznat sa musi aj to.
+        def drawer_upgrade_parts(now, target)
+          (target.keys + now.keys).uniq.map do |k|
+            a = now[k]
+            b = target[k]
+            { 'role' => k, 'label' => Recipes.role_label(k),
+              'from' => a, 'to' => b }
+          end
+        end
+
+        # Zamky, ktore prechod PRENESIE. Hodnoty sa nemenia (kolizna brana D3a
+        # uz odmietla vsetko ostatne), preto `kept: true` bez vynimky.
+        # `lock` je PREADRESOVANY zaznam z prepare — nie druhe citanie configu.
+        def drawer_upgrade_locks(lock)
+          rec = lock.is_a?(Hash) ? lock : {}
+          UPGRADE_LOCK_AXES.each_with_object([]) do |(axis, field), out|
+            v = rec[field]
+            out << { 'axis' => axis, 'value' => v, 'kept' => true } unless v.nil?
+          end
+        end
+
+        # JEDNA STRANA porovnania: nasucho postaveny plan -> polozka vysuvu,
+        # dielce cela a objednavacie kody. Ked sa strana postavit neda (napr.
+        # terajsi stav je v konflikte), vracia PRAZDNE hodnoty — dopad sa tym
+        # nerozbije, len sa ta strana neuvedie.
+        def drawer_upgrade_side(model, cab, params, fid, owner)
+          norm, plan = drawer_dry_plan(model, cab, params)
+          item = drawer_plan_item(plan, owner)
+          _err, codes = item ? drawer_upgrade_kit_problem(model, cab, norm, item) : [nil, []]
+          { params: item.is_a?(Hash) && item['params'].is_a?(Hash) ? item['params'] : {},
+            parts: drawer_plan_parts(plan, fid), codes: codes || [] }
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.drawer_upgrade_side')
+          { params: {}, parts: {}, codes: [] }
+        end
+
+        # Polozka vysuvu Z RECEPTU pre daneho vlastnika (ta ista identita, aku
+        # cita nakup aj karta cela).
+        def drawer_plan_item(plan, owner)
+          Array(plan[:hardware]).find do |h|
+            h.is_a?(Hash) && h['source'].to_s == BuildPlan::HW_SOURCE_RECIPE &&
+              h['owner_part_key'].to_s == owner.to_s
+          end
+        end
+
+        # VYRABANE dielce TOHTO cela z planu: rola -> [dlzka, sirka, hrubka].
+        # Kluc je ROLA (nie `part_key`): rola je to, co pouzivatel v tabulke
+        # cita, a jej rozmery su presne to, co sa meni. Cielove celo sa pozna
+        # cez `PartKeys.front_id` — jediny parser tvaru kluca.
+        def drawer_plan_parts(plan, fid)
+          Array(plan[:parts]).each_with_object({}) do |pd, out|
+            next unless pd.is_a?(Hash) && pd[:material] == :drawer
+            next unless PartKeys.front_id(pd[:part_key]).to_s == fid.to_s
+
+            pr = pd[:prod] || {}
+            out[pd[:role].to_s] = [pr[:length].to_f.round(2), pr[:width].to_f.round(2),
+                                   pr[:thickness].to_f.round(2)]
+          end
         end
 
         # Overenie + cielovy config BEZ zapisu do modelu.
-        # -> [{ params:, recipe: }, nil] | [nil, hlaska]
+        # -> [{ params:, recipe:, fid:, owner:, from:, to:, lock:, side: }, nil]
+        #    | [nil, hlaska]
+        #
+        # KOV-D3b (aditivne, CITACIA cast): navrat nesie aj to, co uz preflight
+        # NASUCHO postavil — cielovu polozku vysuvu, dielce cela, objednavacie
+        # kody (`side`) a PREADRESOVANY zamok (`lock`). Vdaka tomu vie citaci
+        # callback dopadu ukazat CISLA Z TOHO ISTEHO STAVU, ktory by sa aj
+        # zapisal; druhy vypocet by sa mohol s zapisom rozist. Zapisova cesta
+        # (`handle_upgrade_drawer_recipe`) cita nadalej LEN `params` a `recipe`.
         def drawer_upgrade_prepare(model, cab, data)
           cfg = Store.config(cab) || {}
           fid = present_str(data['front_id'])
@@ -498,10 +697,16 @@ module Noxun
           end
 
           next_params = params.merge('fronts' => fronts, 'hardware_overrides' => overrides)
-          err = drawer_upgrade_preflight(model, cab, next_params, fid, owner)
+          err, side = drawer_upgrade_preflight(model, cab, next_params, fid, owner)
           return [nil, err] if err
 
-          [{ params: next_params, recipe: Recipes.load(to) }, nil]
+          [{ params: next_params, recipe: Recipes.load(to), fid: fid, owner: owner,
+             from: from, to: to, side: side,
+             # PREADRESOVANY zaznam zamku (uz s cielovym `rule_id`) — dopad ho
+             # len vypise, necita config druhykrat.
+             lock: Array(overrides).select { |ov| ov_match?(ov, owner, Recipes::LOCK_GENERIC_TYPE,
+                                                            "#{RECIPE_RULE_PREFIX}#{to}") }.last },
+           nil]
         rescue StandardError => e
           Engine.log_error(e, 'Panel.drawer_upgrade_prepare')
           [nil, 'Novú verziu receptu sa nepodarilo overiť — nezmenilo sa nič.']
@@ -572,49 +777,70 @@ module Noxun
           end
         end
 
-        # CIELOVY STAV NASUCHO: tie iste funkcie ako stavba (`build_plan`
-        # s hrubkami dielcov -> `Recipes.resolve`) a ten isty nakup
-        # (`HardwareSets.expand`). Ziadny druhy vypocet, ziadny zapis do
-        # modelu, ziadna operacia. -> hlaska | nil
-        def drawer_upgrade_preflight(model, cab, params, fid, owner)
+        # NASUCHO POSTAVENY STAV: tie iste funkcie ako stavba (`normalize` ->
+        # `drawer_thicknesses` -> `build_plan` -> `Recipes.resolve`). Ziadny
+        # zapis do modelu, ziadna operacia. -> [norm, plan]
+        #
+        # KOV-D3b: TEN ISTY helper stavia OBE strany dopadu (cielovu aj
+        # terajsiu) — dve rozne cesty by ukazali rozdiel, ktory v skutocnosti
+        # sposobil len iny sposob vypoctu.
+        def drawer_dry_plan(model, cab, params)
           cid = Store.get(cab, 'cabinet_id').to_s
           norm = CabinetBuilder.normalize(params)
           eff = CabinetBuilder.effective_materials(model, norm)
           # Pravidla kovania sa citaju LEN NA CITANIE (`panel_hardware_rules`):
           # stavba pouziva `ensure_project_rules!`, ktory pri prvom builde
           # snapshot ZAPISE — preflight nesmie do modelu zapisat nic.
-          plan = Construction.build_plan(norm, cid,
+          [norm, Construction.build_plan(norm, cid,
                                          hardware_rules: panel_hardware_rules(model),
-                                         part_thicknesses: CabinetBuilder.drawer_thicknesses(norm, eff))
+                                         part_thicknesses: CabinetBuilder.drawer_thicknesses(norm, eff))]
+        end
+
+        # CIELOVY STAV NASUCHO + ten isty nakup (`HardwareSets.expand`).
+        # Ziadny druhy vypocet, ziadny zapis do modelu, ziadna operacia.
+        # -> [nil, { params:, parts:, codes: }] | [hlaska, nil]
+        def drawer_upgrade_preflight(model, cab, params, fid, owner)
+          norm, plan = drawer_dry_plan(model, cab, params)
           bad = Array(plan[:drawer_conflicts]).find do |c|
             c.is_a?(Hash) && c['front_id'].to_s == fid.to_s
           end
-          return "Nová verzia receptu na túto zásuvku nesadne: #{bad['message']}" if bad
+          return ["Nová verzia receptu na túto zásuvku nesadne: #{bad['message']}", nil] if bad
 
-          item = Array(plan[:hardware]).find do |h|
-            h.is_a?(Hash) && h['source'].to_s == BuildPlan::HW_SOURCE_RECIPE &&
-              h['owner_part_key'].to_s == owner.to_s
-          end
-          return 'Nová verzia receptu nevydala výsuv zásuvky — nezmenilo sa nič.' if item.nil?
+          item = drawer_plan_item(plan, owner)
+          return ['Nová verzia receptu nevydala výsuv zásuvky — nezmenilo sa nič.', nil] if item.nil?
 
-          drawer_upgrade_kit_problem(model, cid, norm, item)
+          err, codes = drawer_upgrade_kit_problem(model, cab, norm, item)
+          return [err, nil] if err
+
+          [nil, { params: item['params'].is_a?(Hash) ? item['params'] : {},
+                  parts: drawer_plan_parts(plan, fid), codes: codes }]
         end
 
         # Najde NAKUP kit vysuvu pre vyslednu vysku a NL? Ide TOU ISTOU cestou
         # ako nakupny zoznam (`ProductionCore.hardware_expansion`), takze sa
-        # nemozu rozist. -> hlaska | nil
-        def drawer_upgrade_kit_problem(model, cid, norm, item)
+        # nemozu rozist. KOV-D3b: vracia AJ objednavacie kody — dopad ich len
+        # vypise, nespusta kvoli nim druhu expanziu.
+        # -> [nil, [kody]] | [hlaska, nil]
+        def drawer_upgrade_kit_problem(model, cab, norm, item)
+          cid = Store.get(cab, 'cabinet_id').to_s
           state, err = drawer_upgrade_sets_state(model)
-          return err if err
+          return [err, nil] if err
 
           sets = norm[:hardware_sets].is_a?(Hash) ? norm[:hardware_sets] : {}
           exp = HardwareSets.expand([item.merge('owner_id' => cid)], state,
                                     cabinet_overrides: (sets.empty? ? {} : { cid => sets }),
                                     catalog: HardwareCatalog.items)
           u = Array(exp['unmapped']).first
-          return nil if u.nil?
+          return [nil, drawer_kit_codes(exp)] if u.nil?
 
-          "Na novú verziu receptu nákup nenašiel kit výsuvu: #{HardwareSets.unmapped_reason_sk(u)}."
+          ["Na novú verziu receptu nákup nenašiel kit výsuvu: #{HardwareSets.unmapped_reason_sk(u)}.", nil]
+        end
+
+        # Objednavacie kody expanzie (bez cien a nazvov — v tabulke dopadu ide
+        # o jedinu otazku „meni sa to, co objednam?").
+        def drawer_kit_codes(exp)
+          Array(exp['rows']).map { |r| r.is_a?(Hash) ? r['code'].to_s : '' }
+                            .reject(&:empty?).uniq.sort
         end
 
         # Snapshot setov projektu, inak globalna kniznica LEN NA CITANIE

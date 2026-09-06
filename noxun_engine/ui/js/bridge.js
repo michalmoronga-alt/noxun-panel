@@ -520,6 +520,17 @@
     hwAxResult: function(ok, msg, token){
       if (typeof onHwAxResult === 'function') onHwAxResult(ok, msg, token);
     },
+    // KOV-D3b: DOPAD prechodu na novšiu verziu receptu — odpoveď na ČÍTACÍ
+    // callback (nič sa nezapísalo). `ok: false` = prechod sa nedá a okno sa
+    // vôbec neotvorí; `ok: true` nesie čísla, z ktorých sa kreslí tabuľka.
+    hwUpgradeImpact: function(res, token){
+      if (typeof onHwUpgradeImpact === 'function') onHwUpgradeImpact(res, token);
+    },
+    // KOV-D3b: výsledok ZÁPISU prechodu. Vlastný kanál (nie `hwAxResult`) —
+    // okno náhrady osi a okno prechodu sú dva rôzne modaly s vlastným stavom.
+    hwUpgradeResult: function(ok, msg, token){
+      if (typeof onHwUpgradeResult === 'function') onHwUpgradeResult(ok, msg, token);
+    },
     loadSelected: function(c){
       // R-02 (review #264 kolo 3): IDENTITA DOKUMENTU JE PRVA VEC V PUSHI.
       // Dovod je poradie: nizsie sa rozhoduje `keepGaps` (ci sa ZACHOVAJU

@@ -223,7 +223,26 @@
                  note: d.locked_note ? String(d.locked_note) : null }];
     if (ax) out.push(ax);
     if (d.sync) out.push({ kind: 'info', tone: 'warn', icon: 'alert', text: String(d.sync) });
+    var up = frontDrawerUpgradeRow(d);
+    if (up) out.push(up);
     return out;
+  }
+  // KOV-D3b: PONUKA NOVEJ VERZIE RECEPTU. Kresli sa VYHRADNE z toho, co poslal
+  // server — panel sa nikdy nepyta „je `to` novsie ako `from`?", to je otazka
+  // registra receptov a odpoveda na nu Ruby (`Recipes.upgrade?`). Bez kluca
+  // `upgrade` (v produkcii vzdy, lebo ziadna v2 neexistuje) sa nekresli NIC
+  // a karta vyzera presne ako po D2b.
+  //
+  // Blok stoji AZ POD jantarovym odporucanim synchronizacie: to je upozornenie
+  // na TERAJSI stav, ponuka je prilezitost — a vertikalny priestor patri
+  // najskor tomu, co treba riesit.
+  function frontDrawerUpgradeRow(d){
+    var u = (d && d.upgrade && typeof d.upgrade === 'object') ? d.upgrade : null;
+    if (!u || u.available !== true) return null;
+    // Identitu zapisu (`cabinet_id`, `front_id`) aj oba refy dava SERVER —
+    // bez nich by sa klik nemal comu prihlasit a panel by ich skladal sam.
+    if (!u.to || !u.from || !u.front_id) return null;
+    return { kind: 'upgrade', upgrade: u };
   }
   // Riadok chipov vznikne LEN ked server poslal OBOJE — stav osi aj identitu
   // zapisu. Chipy bez identity by boli klikatelne do prazdna (a identitu si
@@ -1225,6 +1244,8 @@
       // KOV-C2c (tests/js/test_kovc2c_karta.js): riadky zasuvky v karte cela.
       frontDrawerRows: frontDrawerRows, frontDrawerAxesRow: frontDrawerAxesRow,
       frontDrawerAxesSay: frontDrawerAxesSay,
+      // KOV-D3b (tests/js/test_kovd3b_ui.js): ponuka novej verzie receptu.
+      frontDrawerUpgradeRow: frontDrawerUpgradeRow,
       frontCardKeepOpen: frontCardKeepOpen,
       frontCardFocusKey: frontCardFocusKey, frontCardFocusSelector: frontCardFocusSelector,
       frontExtraOnTypeChange: frontExtraOnTypeChange, frontExtraOnWings: frontExtraOnWings,
