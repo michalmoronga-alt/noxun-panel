@@ -82,3 +82,20 @@
 
 **Otvorené dátové otázky na Michala:** (1) kompletná alternatívna rodina Atira antracit (výška × NL, SiSy aj Tip-On) — z #12 sú známe len 357887 (350/70), 348777 (470/70), 357969
 (420/70/176), 357970 (470/70/176), 341626; chýbajú 420/70, 520/70, H144 a Tip-On varianty; (2) existuje dôvod na recept v2 (zmena hodnôt výrobcu)? Ak nie, D3 ostáva latentný.
+
+## 4. GH Codex kolo 2 nad docs PR #307 (hlava `e3c2ffb`) — 4 P1 + 5 P2, reconcile; UZÁVER package
+
+| # | Nález | Rozhodnutie |
+|---|---|---|
+| P1 | `pick_ref` by pri hľadaní súrodenca mohol použiť neplatný (RED) záznam mapy. | PRIJATÉ: súrodenec len z validovaných záznamov. |
+| P1 | D1a mení akciu (mapovanie + zmrazenie + prestavba v jednej operácii) bez in-SU. | PRIJATÉ: in-SU Undo/Redo scenár aj pre D1a. |
+| P1 | `merge_hardware_sets` šablón nezachová owner triedny override (parser pre `class:` vracia nil). | PRIJATÉ: D1a bod (6). |
+| P1 | `override_keys_in_use` neregistruje owner triedny kľúč → duplicitné ID s rôznym override = zlý kit. | PRIJATÉ: D1a bod (6). |
+| P2 | Checklist uvádza schému 6 pre všetky rezy. | PRIJATÉ: 6 v D1a, 7 v D2a. |
+| P2 | Akcia zápisu neoveruje kompatibilitu pásiem/neaktívne sety pred zápisom. | PRIJATÉ: D1a bod (7). |
+| P2 | Upgrade neoveruje, že cieľ je novší. | PRIJATÉ: parsovaná verzia cieľa > starý ref. |
+| P2 | `release_note` nie je v kontrakte `validate!`. | PRIJATÉ: voliteľné pole schémy, v1 ho smie vynechať. |
+| P2 | D5 mení construction vrstvu, checklist nemenuje `construction.md`. | PRIJATÉ. |
+
+**Uzáver (orchestrátor, 6.9.):** po 2 kolách nad textom package platí rovnaké rozhodnutie ako pri KOV-C v2 (Michal 5.9.): package ZMRAZIŤ, docs PR mergnúť bez ďalšieho kola,
+brána = kód + testy + in-SU per rez; každý implementačný PR dostane vlastné GH kolá. Review textu produkuje implementačný spec (kolo 2 > kolo 1) — ďalšie upresnenia patria do briefov rezov.
