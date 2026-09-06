@@ -511,3 +511,37 @@ NxTest.test('KOV-D2a (R6): zakazka BEZ zasuviek si payload osi vobec nepyta') do
   NxTest.assert_equal({}, c.cb.drawer_axis_contexts(par))
   NxTest.assert_equal({}, c.panel.drawer_axes_map({}, par))
 end
+
+# ============================================================================
+# PREDPOKLAD IN-SU SCENARA (`run_kovd2a`)
+# ============================================================================
+
+NxTest.test('KOV-D2a: geometria in-SU scenara DETERMINISTICKY dava automat H144 a ponuku H70') do
+  c = NxD2a
+  # Prve znenie in-SU scenara stavilo na celo 250 mm — svetla vyska vysla 234
+  # a automat vybral H176, takze sa CELY scenar preskocil a nedokazal nic.
+  # Tento test drzi jeho predpoklad V CI: skrinka 900 / celo 220 musi dat
+  # svetlu vysku BEZPECNE v pasme H144 (189 az 221) a server musi ponuknut aj
+  # inu platnu vysku, na ktoru sa da zamok ukazat.
+  par = c.params(front_height: 220.0, cabinet_height: 900.0)
+  ctx = c.cb.drawer_axis_contexts(par)['F1']
+  NxTest.assert_close(204.0, ctx[:clear_height], 0.001, 'svetla vyska riadku cela')
+  NxTest.assert(ctx[:clear_height] > 189.0 + 10.0 && ctx[:clear_height] < 221.0 - 10.0,
+                'rezerva aspon 10 mm na obe strany pasma H144')
+
+  cfg, axes = c.axes_for(par)
+  NxTest.assert_equal(144, c.slide_item(cfg)['params']['height_variant'].to_i, 'automat = H144')
+  NxTest.assert_equal([70, 144], axes[c::OWNER]['height']['options'],
+                      'server ponuka aj H70 — na nu scenar zamyka')
+end
+
+NxTest.test('KOV-D2a: in-SU sekcia `run_kovd2a` stoji na TEJ ISTEJ geometrii a NEpreskakuje sa') do
+  src = File.read(File.join(NxTest::ROOT, 'tests', 'sketchup', 'su_runner.rb'), encoding: 'UTF-8')
+  NxTest.assert(src.include?('KOVD2A_FRONT_H = 220.0'), 'in-SU celo musi ostat 220 mm')
+  NxTest.assert(src.include?('KOVD2A_AUTO_H  = 144'), 'in-SU ocakava automat H144')
+  section = src[/def run_kovd2a\(model\)[\s\S]*?\n  end\n/].to_s
+  NxTest.refute(section.empty?, 'sekcia `run_kovd2a` musi existovat')
+  NxTest.refute(section.include?('scenar preskoceny'),
+                'nesulad predpokladu musi byt FAIL, nikdy tiche preskocenie')
+  NxTest.assert(src.include?('run_kovd2a(model)        #'), 'sekcia musi byt zaradena do behu')
+end

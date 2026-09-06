@@ -15492,10 +15492,38 @@ module NoxunSuRunner
   # aj krok Spat/Redo.
   KOVD2A_RID = 'recipe:atira_sisy_v1'
 
-  # Celo 250 mm v 900 mm skrinke = svetla vyska na H144 (automat). Zamok
-  # H70 tak musi ist PROTI automatu — presne to je zmysel osi.
+  # DETERMINISTICKA geometria: svetla vyska riadku cela je `vyska cela - 16`
+  # (celo prekryva korpus, riadok sa oreze interierom). Celo 220 mm teda da
+  # svetlu vysku 204 mm — bezpecne v pasme varianta H144 (H144 potrebuje 189,
+  # H176 az 221, takze je 15 mm nad spodnou a 17 mm pod hornou hranicou).
+  # Prve znenie scenara malo celo 250 (svetla 234) a automat vybral H176 —
+  # scenar sa vtedy CELY preskocil a nedokazal NIC. Preto: ziadna vetva
+  # „preskoceny", nesulad predpokladu je FAIL.
+  KOVD2A_FRONT_H = 220.0
+  KOVD2A_AUTO_H  = 144
+
   def kovd2a_params
-    kovc2b_params({ 'height' => 900.0 }, 'height' => 250.0)
+    kovc2b_params({ 'height' => 900.0 }, 'height' => KOVD2A_FRONT_H)
+  end
+
+  # Stav osi zo SERVERA (ten isty payload, z ktoreho bude kreslit D2b) —
+  # scenar si z neho berie ponuku platnych vysok, takze necaka na tvrdo
+  # zakodovane cislo.
+  def kovd2a_axes(inst)
+    cfg = e::Store.config(inst) || {}
+    map = e::Panel.drawer_axes_map(cfg, e::CabinetBuilder.config_to_params(cfg))
+    map[e::PartKeys.front('F1', 'panel')] || {}
+  end
+
+  def kovd2a_height_options(inst)
+    Array((kovd2a_axes(inst)['height'] || {})['options']).map(&:to_i)
+  end
+
+  # Vyska chrbta varianta PODLA RECEPTU (nie zakodovane cislo) — podla nej sa
+  # v modeli pozna, ktory variant sa naozaj postavil.
+  def kovd2a_rear_height(variant)
+    v = (e::Recipes.load('atira_sisy_v1')[:height_variants] || {})[variant.to_s]
+    v && v[:rear_height].to_f
   end
 
   def kovd2a_slide(inst)
@@ -15549,14 +15577,20 @@ module NoxunSuRunner
 
     cid = e::Store.get(inst, 'cabinet_id')
     auto = kovd2a_variant(inst)
-    unless auto == 144
-      info("KOV-D2a: automat dal variant H#{auto.inspect} (ocakavane H144) — scenar preskoceny")
-      return cleanup(model)
-    end
-    ok('KOV-D2a: vychodisko = AUTOMATICKA vyska H144', auto == 144)
+    # PREDPOKLAD scenara je ASERCIA, nie podmienka behu: keby sa geometria
+    # rozisla s receptom, scenar to musi POVEDAT (FAIL), nie sa preskocit.
+    ok("KOV-D2a: vychodisko = AUTOMATICKA vyska H#{KOVD2A_AUTO_H} (dostal H#{auto.inspect})",
+       auto == KOVD2A_AUTO_H)
+    opts = kovd2a_height_options(inst)
+    ok("KOV-D2a: server ponuka na zamknutie aj INU platnu vysku (#{opts.inspect})",
+       (opts - [auto]).any?)
+    # Zamyka sa NAJNIZSIA ina platna vyska z PONUKY SERVERA (tu H70) — scenar
+    # tak nestoji na zakodovanom cisle a ostane platny aj po zmene receptu.
+    target = (opts - [auto]).min
+    return ok('KOV-D2a: bez inej platnej vysky sa zamok nema na com ukazat', false) if target.nil?
 
     begin
-      kovd2a_scenar(model, inst, cid, markers)
+      kovd2a_scenar(model, inst, cid, markers, auto, target)
     ensure
       r03_clear_markers(model, markers)
       cleanup(model)
@@ -15567,22 +15601,28 @@ module NoxunSuRunner
     cleanup(model)
   end
 
-  def kovd2a_scenar(model, inst, cid, markers)
-    # --- 1) zamknut VYSKU H70 proti automatu (H144) -------------------------
+  def kovd2a_scenar(model, inst, cid, markers, auto, target)
+    rear = kovd2a_rear_height(target)
+    auto_rear = kovd2a_rear_height(auto)
+
+    # --- 1) zamknut VYSKU proti automatu -----------------------------------
     m = r03_marker(model, markers)
-    kovd2a_set(model, inst, cid, 'height_variant', 70)
-    ok("KOV-D2a: zamknuta vyska drzi H70 (bolo H144, teraz #{kovd2a_variant(inst).inspect})",
-       kovd2a_variant(inst) == 70)
+    kovd2a_set(model, inst, cid, 'height_variant', target)
+    ok("KOV-D2a: zamknuta vyska drzi H#{target} (automat dal H#{auto}, teraz " \
+       "H#{kovd2a_variant(inst).inspect})",
+       kovd2a_variant(inst) == target)
     ok('KOV-D2a: zamok je v configu ako pole `height_variant`',
-       kovd2a_overrides(inst).any? { |o| o['height_variant'].to_i == 70 &&
+       kovd2a_overrides(inst).any? { |o| o['height_variant'].to_i == target &&
                                          o['rule_id'].to_s == KOVD2A_RID })
     ok("KOV-D2a: ulozeny config ma schemu #{e::CabinetBuilder::CONFIG_SCHEMA}",
        (e::Store.config(inst) || {})['config_schema'].to_i == e::CabinetBuilder::CONFIG_SCHEMA)
-    # MODEL, nie plan: chrbat varianta H70 je 65,5 mm vysoky (H144 by mal 144).
-    # Meria sa mnozina rozmerov boxu (orientaciu drzi builder, tu nas zaujima
-    # ROZMER varianta) — H144 by 65,5 nemal ani na jednej osi.
-    ok("KOV-D2a: dielec chrbta v MODELI je z H70 (#{kovd2a_back_dims(inst).inspect})",
-       kovd2a_back_dims(inst).any? { |v| (v - 65.5).abs <= TOL })
+    # MODEL, nie plan: chrbat ZAMKNUTEHO varianta ma vysku z RECEPTU (H70 =
+    # 65,5 mm), chrbat automatu inu (H144 = 144 mm). Meria sa mnozina rozmerov
+    # boxu (orientaciu drzi builder, tu nas zaujima ROZMER varianta) a overuje
+    # sa OBOJE — inak by tvrdenie prešlo aj vtedy, keby v modeli stal automat.
+    ok("KOV-D2a: dielec chrbta v MODELI je z H#{target} (#{kovd2a_back_dims(inst).inspect})",
+       kovd2a_back_dims(inst).any? { |v| (v - rear).abs <= TOL } &&
+       kovd2a_back_dims(inst).none? { |v| (v - auto_rear).abs <= TOL })
     ok('KOV-D2a: polozka vysuvu OSTAVA `source: recipe` a nesie suhrn `locked`',
        kovd2a_slide(inst)['source'] == 'recipe' && kovd2a_slide(inst)['locked'] == true)
     ok("KOV-D2a: nakup objednava kit zamknutej vysky (#{kovd1a_codes(model).inspect})",
@@ -15591,29 +15631,32 @@ module NoxunSuRunner
     # --- 2) Spat = JEDEN krok pre zamok aj geometriu -----------------------
     Sketchup.undo
     ok("KOV-D2a Spat: zamok aj dielce sa vratili NARAZ (H#{kovd2a_variant(inst).inspect})",
-       kovd2a_variant(inst) == 144 && kovd2a_overrides(inst).empty?)
+       kovd2a_variant(inst) == auto && kovd2a_overrides(inst).empty? &&
+       kovd2a_back_dims(inst).any? { |v| (v - auto_rear).abs <= TOL })
     ok('KOV-D2a Spat: bol to PRESNE jeden krok', m.valid?)
 
     # --- 3) Redo obnovi zamok aj geometriu konzistentne --------------------
     if Sketchup.respond_to?(:redo)
       Sketchup.redo
       ok('KOV-D2a Redo: zamok, dielce aj polozka su spat SUCASNE',
-         kovd2a_variant(inst) == 70 &&
-         kovd2a_back_dims(inst).any? { |v| (v - 65.5).abs <= TOL } &&
-         kovd2a_overrides(inst).any? { |o| o['height_variant'].to_i == 70 })
+         kovd2a_variant(inst) == target &&
+         kovd2a_back_dims(inst).any? { |v| (v - rear).abs <= TOL } &&
+         kovd2a_overrides(inst).any? { |o| o['height_variant'].to_i == target })
     else
       info('KOV-D2a: Sketchup.redo nedostupne — Redo vetva netestovana')
-      kovd2a_set(model, inst, cid, 'height_variant', 70)
+      kovd2a_set(model, inst, cid, 'height_variant', target)
     end
     r03_clear_markers(model, markers)
 
     # --- 4) NL MIMO radu zamknutej vysky = RED bez dielcov -----------------
     #
-    # Zapisova cesta take cislo NEPUSTI (rad H70 620 nema), preto sa zapisuje
-    # PRIAMO do configu — presne tak, ako by v modeli vyzeral zamok, ktoremu
-    # sa pod rukami zmenila vyska.
-    forced = kovd2a_overrides(inst).map(&:dup)
-    forced.each { |o| o['nominal_length'] = 620.0 if o['rule_id'].to_s == KOVD2A_RID }
+    # NL 620 zapisova cesta NEPUSTI (v rade H70 ani H144 nie je a do hlbky 497
+    # sa nezmesti ani v H176), preto sa zaznam sklada PRIAMO — presne tak, ako
+    # by v modeli vyzeral zamok, ktoremu sa pod rukami zmenila vyska. Zaznam sa
+    # stavia od nuly (nie kopiou stavu), aby krok nezavisel od predchadzajucich.
+    forced = [{ 'owner_part_key' => e::PartKeys.front('F1', 'panel'),
+                'generic_type' => 'slide', 'rule_id' => KOVD2A_RID,
+                'height_variant' => target, 'nominal_length' => 620.0 }]
     p_forced = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
     p_forced['hardware_overrides'] = forced
     e::CabinetBuilder.rebuild(model, inst, p_forced)
@@ -15628,8 +15671,10 @@ module NoxunSuRunner
     kovd2a_set(model, inst, cid, 'nominal_length', nil)
     ok("KOV-D2a: odomknuta NL = automat, vyskovy zamok DRZI (H#{kovd2a_variant(inst).inspect}, " \
        "NL #{kovd2a_nl(inst).inspect})",
-       kovd2a_variant(inst) == 70 && kovd2a_nl(inst).to_f > 0.0 &&
-       kovd2a_overrides(inst).any? { |o| o['height_variant'].to_i == 70 && !o.key?('nominal_length') })
+       kovd2a_variant(inst) == target && kovd2a_nl(inst).to_f > 0.0 &&
+       kovd2a_overrides(inst).any? do |o|
+         o['height_variant'].to_i == target && !o.key?('nominal_length')
+       end)
 
     # --- 6) kopia skrinky nesie zamky --------------------------------------
     model.selection.clear
@@ -15637,9 +15682,9 @@ module NoxunSuRunner
     e::Panel.handle_insert_copy(pg(model, 'cabinet_id' => cid))
     copy = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' && i != inst }
     ok('KOV-D2a kopia: vyskovy zamok prezil „Vložiť kópiu"',
-       copy && kovd2a_overrides(copy).any? { |o| o['height_variant'].to_i == 70 })
-    ok('KOV-D2a kopia: aj kopia stoji na H70 (nie na automate)',
-       copy && kovd2a_variant(copy) == 70)
+       copy && kovd2a_overrides(copy).any? { |o| o['height_variant'].to_i == target })
+    ok("KOV-D2a kopia: aj kopia stoji na H#{target} (nie na automate)",
+       copy && kovd2a_variant(copy) == target)
     if copy && copy.valid?
       model.start_operation('KOV-D2a erase copy', true)
       copy.erase!
@@ -15648,8 +15693,8 @@ module NoxunSuRunner
 
     # --- 7) odomknutie VYSKY = navrat na automat ---------------------------
     kovd2a_set(model, inst, cid, 'height_variant', nil)
-    ok("KOV-D2a: odomknuta vyska = automat H144 (#{kovd2a_variant(inst).inspect})",
-       kovd2a_variant(inst) == 144 && kovd2a_overrides(inst).empty?)
+    ok("KOV-D2a: odomknuta vyska = automat H#{auto} (#{kovd2a_variant(inst).inspect})",
+       kovd2a_variant(inst) == auto && kovd2a_overrides(inst).empty?)
   end
 
   def run_kovc2b(model)
