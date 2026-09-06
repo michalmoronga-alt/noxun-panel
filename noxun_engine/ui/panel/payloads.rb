@@ -292,13 +292,18 @@ module Noxun
           return {} unless defined?(Recipes)
 
           out = {}
+          # KOV-D1b: „co je v balení" sa cita RAZ pre cely payload (stav setov +
+          # mapa kod => polozka katalogu) — nie per celo. Cesta je CITACIA
+          # (rovnaka ako D-92 riadok nakupu), takze karta a supis hovoria to iste.
+          buy = nil
           Array(cfg['front_items']).each do |it|
             next unless it.is_a?(Hash) && Recipes.classified?(it)
 
             fid = it['id'].to_s
             next if fid.empty?
 
-            out[fid] = drawer_card_row(cfg, fid)
+            buy = drawer_buy_ctx(cfg) if buy.nil?
+            out[fid] = drawer_card_row(cfg, fid, buy)
           end
           out
         rescue StandardError => e
@@ -306,7 +311,18 @@ module Noxun
           {}
         end
 
-        def drawer_card_row(cfg, fid)
+        # Kontext rozpisu nakupu pre karty zasuviek — postaveny RAZ.
+        def drawer_buy_ctx(cfg)
+          status, state = hardware_read_state
+          { 'status' => status, 'state' => state,
+            'overrides' => cabinet_set_overrides(cfg),
+            'lookup' => HardwareSets.catalog_lookup(HardwareCatalog.items) }
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.drawer_buy_ctx')
+          nil
+        end
+
+        def drawer_card_row(cfg, fid, buy = nil)
           conflict = drawer_conflict_for(cfg, fid)
           return { 'state' => 'conflict', 'message' => conflict['message'].to_s } if conflict
 
@@ -318,11 +334,45 @@ module Noxun
           end
           params = hw['params'].is_a?(Hash) ? hw['params'] : {}
           row = { 'state' => 'ok', 'text' => drawer_row_text(params),
-                  'detail' => Recipes.explain_stored(params) }
+                  'detail' => Recipes.explain_stored(params) + drawer_buy_lines(hw, buy) }
           row['locked_note'] = 'Dĺžka výsuvu je ručne zamknutá (Inspector → Kovanie).' if hw['locked'] == true
           sync = drawer_sync_note(cfg, fid)
           row['sync'] = sync if sync
           row
+        end
+
+        # KOV-D1b: „ČO JE V BALENÍ" — vety pod technickym detailom karty.
+        # Zdroj je JEDINY existujuci rozpis (`HardwareSets.explain`), ten isty,
+        # ktory kresli nakupny riadok D-92 a z ktoreho vznika supis — karta
+        # NEPOCITA nic vlastne (Astra #20 N16: ziadny druhy explain, ziadny
+        # novy snapshot). Bez kontextu (nedostupny stav setov) sa NEPRIDA NIC:
+        # radsej ziadna veta nez veta, ktora sa moze rozist s Nakupom.
+        #
+        # NOSNOST tu NIE JE a byt nesmie — tu vydava VYHRADNE recept
+        # (`explain_stored`, riadok „Nosnosť bunky"). Nakupna volba setu ju
+        # NEZVYSUJE (Astra #20 F11).
+        def drawer_buy_lines(hw, buy)
+          return [] unless buy.is_a?(Hash) && hw.is_a?(Hash)
+
+          exp = item_purchase(hw, buy['status'], buy['state'], buy['overrides'], buy['lookup'])
+          out = []
+          out << "Balenie: #{exp['set_name'] || exp['set_id']}" if exp['set_name'] || exp['set_id']
+          Array(exp['members']).each { |m| out << drawer_member_line(m) }
+          Array(exp['problems']).each { |p| out << "Bez kódu: #{p}" }
+          out
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.drawer_buy_lines')
+          []
+        end
+
+        # „· K-sada 357696 — Súprava Atira … (1 ks)". Nazov chybajuci
+        # v katalogu sa PRIZNA, nikdy sa nenahradi vymyslenym textom.
+        def drawer_member_line(m)
+          label = m['label'].to_s.strip
+          name = m['missing'] ? 'mimo katalógu' : m['name'].to_s
+          parts = ["· #{label.empty? ? 'položka' : label}", m['code'].to_s]
+          parts << "— #{name}" unless name.empty?
+          "#{parts.join(' ')} (#{m['qty']} ks)"
         end
 
         # Zhrnutie do JEDNEHO riadku: „Atira · H70 · NL 470 · 30 kg · SiSy ·
@@ -638,10 +688,90 @@ module Noxun
               # — panel ich vykresli priamo v riadku kovania toho dielca.
               'owner_overrides' => owner_set_overrides(overrides, gt, hardware),
               'owner_default_label' => owner_default_label(ov_val, proj_val, opts, proj_name),
+              # KOV-D1b: ponuka pre KLASIFIKOVANE polozky (zasuvky) — triedny
+              # kluc, len kompatibilne moznosti. `nil` = typ klasifikovanu
+              # polozku nema a karta kresli povodny plochy zoznam setov.
+              'compat' => class_compat_payload(gt, hardware, overrides, proj_map,
+                                               globals, snap_sets, refs),
               'status' => status.to_s,
               'options' => opts.map { |s| { 'set_id' => s['set_id'], 'name' => s['name'] } }
             }
           end
+        end
+
+        # === KOV-D1b: PREPNUTIE SETU NA KLASIFIKOVANEJ ZASUVKE ================
+        #
+        # Pri KLASIFIKOVANEJ polozke (celo nesie otvaranie + konstrukciu) cita
+        # resolver TRIEDNY kluc — genericky `slide` uz nie (KOV-C2a). Plochy
+        # zoznam setov typu je preto pre kartu zla ponuka hned dvakrat: obsahuje
+        # sety inej triedy A pri Atire ponuka PEVNY set tam, kde sa smie ulozit
+        # len vyber podla vyskoveho variantu (Astra #19 B1).
+        #
+        # Ponuku preto sklada SERVER (`HardwareSets.class_set_options`) a karta
+        # ju len kresli: pre CELU SKRINKU (ked su vsetky klasifikovane polozky
+        # typu z JEDNEJ triedy) aj pre KAZDE CELO zvlast. Hodnota, ktoru panel
+        # posle spat, ide existujucou akciou `set_hardware_set` — kluc z nej
+        # sklada `HardwareSets.apply_cabinet_override` (D1a), nie panel.
+        # -> { 'cab' => scope, 'owners' => { owner => scope } } | nil
+        def class_compat_payload(gt, hardware, overrides, proj_map, globals, snap_sets, refs)
+          active = active_class_by_owner(hardware, gt)
+          classes = active.values.compact.uniq
+          return nil if classes.empty?
+
+          defs = compat_defs(globals, snap_sets)
+          out = { 'cab' => nil, 'owners' => {} }
+          # Skrinkovy riadok len pri JEDNEJ triede — pri zmiesanych triedach by
+          # jeden kluc platil len na cast poloziek (`override_class_key` taky
+          # zapis odmietne, takze ho karta ani nesmie ponukat).
+          if classes.length == 1
+            out['cab'] = compat_scope(classes.first, nil, overrides, proj_map,
+                                      globals, snap_sets, refs, defs)
+          end
+          active.each do |owner, ck|
+            next if ck.nil?
+
+            out['owners'][owner] = compat_scope(ck, owner, overrides, proj_map,
+                                                globals, snap_sets, refs, defs)
+          end
+          out
+        end
+
+        # Definicie na CITANIE ulozenej hodnoty: snapshot vyhrava nad globalom
+        # (podla neho sa nakupuje — audit BLOCKER 4).
+        def compat_defs(globals, snap_sets)
+          out = {}
+          Array(globals).each { |s| out[s['set_id'].to_s] = s if s.is_a?(Hash) }
+          (snap_sets.is_a?(Hash) ? snap_sets : {}).each { |sid, s| out[sid.to_s] = s if s.is_a?(Hash) }
+          out
+        end
+
+        # Jeden rozsah vyberu (skrinka alebo konkretne celo).
+        #   none_label — co plati BEZ vlastneho vyberu („vrátiť na projekt")
+        #   current    — ID volby z ponuky, ktora je ulozena
+        #   stored     — ulozena hodnota, ktora v ponuke NIE JE (neaktivny set,
+        #                set z novsej verzie): zobrazi sa, vybrat sa nedá (F10)
+        def compat_scope(class_key, owner, overrides, proj_map, globals, snap_sets, refs, defs)
+          key = owner ? "#{class_key}@#{owner}" : class_key
+          value = overrides[key]
+          inherited = owner ? (overrides[class_key] || proj_map[class_key]) : proj_map[class_key]
+          opts = HardwareSets.class_set_options(class_key, globals, snap_sets, refs)
+          cur = HardwareSets.mapping_option_id(value)
+          known = !cur.nil? && opts.any? { |o| o['id'] == cur }
+          { 'class_key' => class_key,
+            'class_label' => HardwareSets.class_key_label(class_key),
+            'scope_label' => (owner ? 'Set pre toto čelo' : 'Set pre túto skrinku'),
+            'none_label' => compat_none_label(owner, overrides[class_key], inherited, defs),
+            'options' => opts, 'current' => (known ? cur : nil),
+            'stored' => (!value.nil? && !known),
+            'value_text' => HardwareSets.mapping_value_text(value, defs) }
+        end
+
+        # „podľa projektu — Atira biela — klasické · podľa výšky zásuvky (…)".
+        # Na urovni CELA sa prizna, ci hodnota prichadza zo skrinky alebo
+        # z projektu — poradie ako v `HardwareSets.resolve_set_id`.
+        def compat_none_label(owner, cab_value, inherited, defs)
+          src = (owner && !cab_value.nil?) ? 'skrinky' : 'projektu'
+          "podľa #{src} — #{HardwareSets.mapping_value_text(inherited, defs)}"
         end
 
         # Prva volba selectu setu na SKRINKE = co plati z projektu.

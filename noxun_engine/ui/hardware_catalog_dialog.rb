@@ -501,6 +501,9 @@ module Noxun
             # vyhrava definicia zo SNAPSHOTU (podla nej sa nakupuje), takze
             # select ukazuje nazov PROJEKTU, nie neskor premenovany global.
             'type_options' => project_type_options(lib, state),
+            # KOV-D1b: riadky mapovania PODLA TRIEDY (zasuvky). Hotove riadky
+            # aj s ponukou a textom ulozenej hodnoty — JS nic neodvodzuje.
+            'class_rows' => class_mapping_payload(lib, status, state),
             # Parametre pasiem/selectora — jediny slovnik je v core.
             'params' => HardwareSets::PARAM_OPTIONS,
             # KOV-B3: UZAVRETE slovniky klasifikacie + ich SK popisky. Jediny
@@ -555,6 +558,60 @@ module Noxun
           out
         end
 
+        # === KOV-D1b: RIADKY MAPOVANIA PODLA TRIEDY ==========================
+        #
+        # Zasuvka sa nemapuje podla generickeho typu `slide`, ale podla TRIEDY
+        # (`class:slide|<otvaranie>|<konstrukcia>`) — resolver pre klasifikovanu
+        # polozku genericky kluc UZ NECITA (KOV-C2a). Riadky preto skladá SERVER
+        # a JS ich kresli do TEJ ISTEJ tabulky mapovani; ziadny novy blok.
+        #
+        # Riadok nesie hotovu ponuku (`HardwareSets.class_set_options` — len
+        # kompatibilne, neaktivne NIKDY) aj hotovy TEXT ulozenej hodnoty. Ked
+        # ulozena hodnota v ponuke NIE JE (neaktivny set, set z novsej verzie,
+        # rucne upravena hodnota), riadok ju PRIZNA (`stored: true`) a JS ju
+        # ukaze ako vybranu, ale NEPONUKNE (F10: uz ulozena volba sa zachova,
+        # novy vyber sa nedá spraviť).
+        # -> [{ key, label, options, current, stored, value_text, none_label }]
+        def class_mapping_rows(mapping, globals, snap_sets, defs)
+          map = mapping.is_a?(Hash) ? mapping : {}
+          refs = HardwareSets.referenced_set_ids(map)
+          HardwareSets::CLASS_MAPPING_KEYS.map do |key|
+            value = map[key]
+            opts = HardwareSets.class_set_options(key, globals, snap_sets, refs)
+            cur = HardwareSets.mapping_option_id(value)
+            known = !cur.nil? && opts.any? { |o| o['id'] == cur }
+            { 'key' => key, 'label' => HardwareSets.class_key_label(key),
+              'options' => opts, 'current' => (known ? cur : nil),
+              'stored' => (!value.nil? && !known),
+              'value_text' => HardwareSets.mapping_value_text(value, defs),
+              # Nenamapovana KLASIFIKOVANA zasuvka nie je ORANGE ako ostatne
+              # kovanie — je to RED `drawer_kit_missing` (fail-closed): dielce
+              # sa vyrobia, kit sa neobjedna. Riadok to musí povedať rovno.
+              'none_label' => '— bez setu (RED — zásuvka bez kitu)' }
+          end
+        end
+
+        # Definicie, proti ktorym sa cita ULOZENA hodnota: snapshot projektu
+        # vyhrava nad globalom (podla neho sa nakupuje — audit BLOCKER 4).
+        def mapping_defs(lib, snap_sets)
+          out = {}
+          Array(lib['sets']).each { |s| out[s['set_id'].to_s] = s if s.is_a?(Hash) }
+          (snap_sets.is_a?(Hash) ? snap_sets : {}).each { |sid, s| out[sid.to_s] = s if s.is_a?(Hash) }
+          out
+        end
+
+        # Riadky pre OBE tabulky naraz — projekt (snapshot; bez neho platia
+        # globalne predvolby, presne ako pri generickych typoch) a globalne
+        # predvolby novych projektov.
+        def class_mapping_payload(lib, status, state)
+          snap_sets = (status == :ok && state) ? state['sets'] : {}
+          proj_map = (status == :ok && state) ? state['mapping'] : lib['mapping']
+          { 'project' => class_mapping_rows(proj_map, lib['sets'], snap_sets,
+                                            mapping_defs(lib, snap_sets)),
+            'global' => class_mapping_rows(lib['mapping'], lib['sets'], {},
+                                           mapping_defs(lib, {})) }
+        end
+
         # D-75: po KAZDEJ uspesnej zmene setov/predvolieb — ZIVY push ponuky
         # do panela (NX.setHardwareSets) + obnova Studia. NIKDY push_selected:
         # ten resetuje rozpracovany formular panela a dedup-uje kopie
@@ -605,6 +662,14 @@ module Noxun
         # Hodnota mapovania z okna: 'value' = set_id String ALEBO selector Hash
         # (H1b vyber podla parametra); stary kluc 'set_id' ostava kompatibilny.
         # Prazdne = odmapovanie (nil). Tvar validuje VYHRADNE core parser.
+        # KOV-D1b: KLUC mapovania z payloadu. Stary tvar posiela `generic_type`
+        # (typ kovania), novy `mapping_key` (aj TRIEDNY kluc zasuvky). Tvar
+        # overuje az server (`write_mapping_key`) — panel ziadny kluc neskladá.
+        def mapping_key(data)
+          raw = data['mapping_key'].to_s.strip
+          raw.empty? ? data['generic_type'].to_s.strip : raw
+        end
+
         def mapping_value(data)
           raw = data.key?('value') ? data['value'] : data['set_id']
           return nil if raw.nil?
@@ -774,7 +839,14 @@ module Noxun
             resync_sets
             return set_status('Model sa medzitým prepol — predvoľby sa obnovili, vyber znova.', true)
           end
-          gt = data['generic_type'].to_s
+          key = mapping_key(data)
+          # KOV-D1b: kluc uz nemusi byt genericky typ — pri zasuvkach je TRIEDNY
+          # (`class:slide|classic|metal`). Typ, proti ktoremu sa overuju sety,
+          # cita JEDINA autorita (`mapping_key_type`); zapis validuje aj triedu
+          # (`class_key_value_problem` v `set_project_mapping!`).
+          gt = HardwareSets.mapping_key_type(key).to_s
+          return set_status('Neznámy typ kovania.', true) if gt.empty?
+
           value = mapping_value(data)
           set_defs = nil
           if value
@@ -799,7 +871,7 @@ module Noxun
           op = { open: false }
           model.start_operation('NOXUN: Predvoľba setu kovania', true)
           op[:open] = true
-          ok = HardwareSets.set_project_mapping!(model, gt, value, set_defs)
+          ok = HardwareSets.set_project_mapping!(model, key, value, set_defs)
           if ok
             model.commit_operation
             op[:open] = false
@@ -807,7 +879,7 @@ module Noxun
             # Editor pasiem sa zatvara AZ po uspesnom zapise (echo kluca) —
             # pri chybe ostane rozpisany na doopravenie (vzor HWSETS.saved).
             js("HWSETS.mapSaved(#{data['ui_key'].to_s.to_json})")
-            set_status(mapping_status_txt(gt, value, set_defs))
+            set_status(mapping_status_txt(key, value, set_defs))
           else
             abort_open_operation(model, op)
             resync_sets
@@ -821,15 +893,22 @@ module Noxun
           raise e
         end
 
-        # „Výsuv → Atira biela H70." / „Výsuv → podľa výšky čela (2 pásma)."
-        def mapping_status_txt(gt, value, set_defs)
-          label = HardwareRules.label_for(gt)
+        # „Výsuv → Atira biela H70." / „Výsuv · Tip-On · Kovové bočnice →
+        # Atira biela — klasické · podľa výšky zásuvky (H70 · H144 · H176)."
+        # KOV-D1b: kluc uz moze byt TRIEDNY — popisok aj text hodnoty skladaju
+        # tie iste autority, ktore pouziva riadok Pravidiel.
+        def mapping_status_txt(key, value, set_defs)
+          label = mapping_key_label(key)
           return "#{label} — bez setu." if value.nil?
-          if value.is_a?(Hash)
-            n = Array(value['bands']).length
-            return "#{label} → #{HardwareSets.param_by(value['param'])} (#{n} #{n == 1 ? 'pásmo' : 'pásma'})."
-          end
-          "#{label} → #{(set_defs || []).first&.fetch('name', value) || value}."
+
+          "#{label} → #{HardwareSets.mapping_value_text(value, HardwareSets.index_sets(set_defs))}."
+        end
+
+        # Popisok kluca mapovania — triedny kluc menuje aj otvaranie
+        # a konstrukciu, genericky ostava pri nazve typu.
+        def mapping_key_label(key)
+          HardwareSets.class_key_label(key) ||
+            HardwareRules.label_for(HardwareSets.mapping_key_type(key))
         end
 
         # R-08 (audit 1d #5): aj globalna predvolba nesie REVIZIU kniznice —
@@ -848,7 +927,9 @@ module Noxun
           return set_status(library_blocked_txt, true) if HardwareSets.library_write_blocked?
 
           data = JSON.parse(payload.to_s)
-          status = HardwareSets.set_global_mapping!(data['generic_type'].to_s, mapping_value(data),
+          # KOV-D1b: aj tu uz kluc moze byt TRIEDNY (`mapping_key`) — tvar aj
+          # kompatibilitu setov s triedou overuje `set_global_mapping!`.
+          status = HardwareSets.set_global_mapping!(mapping_key(data), mapping_value(data),
                                                     revision: data['revision'].to_s)
           after_sets_change
           if status == :conflict

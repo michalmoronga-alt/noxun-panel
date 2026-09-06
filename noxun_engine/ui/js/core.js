@@ -295,8 +295,15 @@
       }
       drawerRows.forEach(function(r){ rows.push(r); });
     }
-    if (type === 'door' || type === 'drawer_front'){
-      rows.push({ kind: 'hint', text: 'Set kovania podľa otvárania príde s KOV-D.' });
+    // KOV-D1b: set VÝSUVU sa už vyberá — v kontexte Kovanie, pri riadku tohto
+    // čela („Set pre toto čelo"). Karta čela naň len ukazuje: výber patrí
+    // k položke kovania, nie ku klasifikácii čela. Závesy set podľa otvárania
+    // zatiaľ nemajú (dvojsegmentový hinge resolver = KOV-F).
+    if (type === 'drawer_front'){
+      rows.push({ kind: 'hint', text: 'Set výsuvu vyberieš v kontexte Kovanie — pri riadku tohto čela.' });
+    }
+    if (type === 'door'){
+      rows.push({ kind: 'hint', text: 'Set závesov podľa otvárania príde s KOV-F.' });
     }
     if (type === 'lift' || type === 'fall'){
       rows.push({ kind: 'info', tone: 'muted',
