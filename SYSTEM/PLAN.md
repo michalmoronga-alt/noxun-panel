@@ -445,7 +445,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   (drawer_recipes) → STANDARD §5/§6/§7 doplnky (roly, drawer materiál, recepty) → STAV/KRONIKA/PLAN.
 
 - **KOV-D · TASK PACKAGE „OVLÁDANIE ZÁSUVIEK — MAPOVANIE, ZÁMKY OSÍ, UPGRADE RECEPTU, DROBNOSTI" (slice D; štart po KOV-C ✅; **v2 z 6.9.2026** po Astra predaudite proti
-  hotovému KOV-C — záznam [zdroje/next_sessions/KOVANIE_KOVD_AUDIT_2026-09-06_20.md](zdroje/next_sessions/KOVANIE_KOVD_AUDIT_2026-09-06_20.md); **rez na MALÉ série D1a/D1b · D2a/D2b ·
+  hotovému KOV-C — záznam [zdroje/next_sessions/KOVANIE_KOVD_AUDIT_2026-09-06_20.md](zdroje/next_sessions/KOVANIE_KOVD_AUDIT_2026-09-06_20.md); **rez na MALÉ série D1a/D1b (+ dátová D1c) · D2a/D2b ·
   D3a/D3b · D4 · D5**, každá vlastný PR — jadro a UI vždy oddelene; poučenie z C2b):**
   **Cieľ:** používateľ ovláda zásuvku bez tichých zmien: vyberie set pre skrinku alebo čelo, zamkne výšku alebo NL, prejde na novšiu verziu receptu — vždy s viditeľným dopadom
   a jedným krokom Späť; resolver nikdy nemení potichu; nevyriešený stav = RED s cestou von. Mockup scény 1–2. Zásady KOV-C v2 platia (fail-closed, málo stavov, kódy v setoch,
@@ -475,6 +475,11 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   čiastočné, NL 620 nikde) — **čiastočná rodina sa smie zaseedovať: bunka bez kódu = RED `drawer_kit_missing` s hláškou (explicitne, nikdy tichá zámena); completeness test platí len
   pre predvolenú bielu rodinu**. **Rodinu určuje (výrobca, rada, názov bez tokenu `H<číslo>`)** — klasifikácia farbu nenesie; antracit seed preto musí dať rodine vlastný názov
   (napr. „Atira antracit H70 — klasické“), inak by sa zlúčila s bielou. Testy: `tests/pure/test_kovd1b_ui.rb`, `tests/js/test_kovd1b_ui.js`.
+  **D1c · DÁTA — PRODUKČNÝ ANTRACIT SEED — ✅ HOTOVÉ (v0.9.36, 6.9.2026):** `SEED_VERSION` 3 → 4 a **6 nových setov** `atira-antracit-h{70,144,176}-{sisy,p2o}` („Atira antracit
+  H70 — klasické“ / „— Tip-On“) s kódmi z draftu #13 §1 (Démos 6.9.). Kódy **len pre bunky radov receptov v1** — chýbajúca bunka (SiSy H176 350/520/620, všetky NL 620) má kľúč
+  v `code_by_nl` NEPRÍTOMNÝ → RED `drawer_kit_missing`, nikdy prázdny reťazec ani cudzí kód. **`MAPPING_ADDITIONS` nezmenené** (predvoľba ostáva biela), katalóg kovania
+  nedotknutý, jadro/UI/recepty bez zmeny. Rozhodnutia Michala 6.9.: **357887 zaseedovať** (overené v Démose), **NL 260/300 nezapisovať** (mimo radov). Testy:
+  `tests/pure/test_kovd1c_antracit.rb` (11 testov, tabuľková fixtúra = druhý zápis dát; mutácie: cudzí kód · prázdny reťazec · antracit v `MAPPING_ADDITIONS` · názov zlúčený s bielou).
   **D2a · ZÁMKY OSÍ — jadro (audit-povinné, overrides schéma):** (1) pole `height_variant` v `hardware_overrides` (Atira; Quadro výškový zámok NEponúka) — **`CONFIG_SCHEMA` 6 → 7** s downgrade testom (D1a už minula 6; plugin D1a by inak pole ticho zahodil whitelistom `norm_hardware_overrides` — Codex #307 P1); (2) **poradie resolvera**
   (Astra #20 B2): zamknutá výška alebo automatická výška → rad NL TEJ výšky → zamknutá NL alebo automatická NL → dielce → nákupný selektor; výška musí existovať v pripnutom recepte
   a zmestiť sa, inak RED bez dielcov aj výsuvu; príklad: zamknutá NL 520 po automatickom prechode H70 → H144 (rad H144 520 nemá) = konflikt, nikdy návrat na H70 ani zmena NL;

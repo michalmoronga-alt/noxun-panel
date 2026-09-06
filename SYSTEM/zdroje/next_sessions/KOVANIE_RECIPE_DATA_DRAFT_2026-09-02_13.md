@@ -74,15 +74,21 @@ zhodne [350, 420, 470, 520, 620]. **Každá bunka radov v1 má kit kód** (dopln
 
 | výška | NL 260 | NL 300 | NL 350 | NL 420 | NL 470 | NL 520 | NL 620 |
 |---|---|---|---|---|---|---|---|
-| H70 SiSy | — | — | 357887 (#12 „čelný antracit 350/70" — overiť) | 357888 | 348777 (#12 „sada 470/70 antracit") | 357890 | — |
+| H70 SiSy | — | — | 357887 (#12 „čelný antracit 350/70" — **overené 6.9. Michalom, demos-trade.sk**) | 357888 | 348777 (#12 „sada 470/70 antracit") | 357890 | — |
 | H144 SiSy relingy | 357924 | 357925 | 357926 | 357927 | 357928 | 357929 | — |
 | H176 SiSy relingy | — | — | — | 357969 (#12) | 357970 (#12) | — | — |
 | H70 Tip-On (PTOs) | 357912 | 357913 | 357914 | 357915 | 357916 | 357917 | — |
 | H144 Tip-On relingy | 357953 | 357954 | 357955 | 357956 | 357957 | 357958 | — |
 | H176 Tip-On relingy | 357994 | 357995 | 357996 | 357997 | 357998 | 357999 | — |
 
-Dôsledok pre seed (D1b/dátová dávka): antracit rodina NIE JE kompletná nad radmi receptov v1 — SiSy H70/350 (overiť „čelný"), H176/350, H176/520 a všetky NL 620 chýbajú;
+Dôsledok pre seed (D1b/dátová dávka): antracit rodina NIE JE kompletná nad radmi receptov v1 — SiSy H176/350, H176/520 a všetky NL 620 chýbajú;
 selektor „Atira antracit" preto pre tieto bunky dá RED `drawer_kit_missing` (nikdy tichá zámena). NL 260/300 sú mimo radov v1 (nekupujú sa). Recept v2: Michal 6.9. — **žiadny dôvod, v2 neexistuje**.
+
+**ZASEEDOVANÉ v KOV-D1c (v0.9.36, `SEED_VERSION` 4)** — 6 setov `atira-antracit-h{70,144,176}-{sisy,p2o}`. Rozhodnutia Michala 6.9.:
+- **357887** (SiSy H70/350) je naozaj antracitový kit — overené v Démose, zaseedovaný (pochybnosť „čelný" uzavretá).
+- **NL 260/300 sa NEZAPISUJÚ** (357924/357925, 357912/357913, 357953/357954, 357994/357995): sú mimo radov receptov v1, teda sa nekupujú. Rovnako sa nezapisuje **357929**
+  (SiSy H144/520) — rad SiSy H144 končí na 470.
+- Predvoľba (`MAPPING_ADDITIONS`) ostáva **biela**; antracit sa vyberá vedome v Pravidlách Štúdia alebo na karte čela.
 
 ## 2. Hettich Quadro V6 EB23 (WOOD_DRAWER_UNDERMOUNT) — Noxun profil: EB23, slide-on, 16 mm (18 valid), 30 kg
 

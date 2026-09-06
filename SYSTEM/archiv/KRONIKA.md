@@ -17,6 +17,35 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-D1c — DÁTA: PRODUKČNÝ SEED ALTERNATÍVNEJ RODINY „ATIRA ANTRACIT" (v0.9.36, 6.9.2026).**
+  Čisto **dátová** dávka package KOV-D v2, plánovaná v D1b ako samostatný krok PO ňom. D1b dalo výberu setu rodinový
+  pohľad a overilo ho len **fixtúrou v testoch** — produkčný seed poznal jedinú rodinu Atiry (bielu). Táto dávka do
+  neho pridala **6 setov `atira-antracit-h{70,144,176}-{sisy,p2o}`** („Atira antracit H70 — klasické“ / „— Tip-On“)
+  s kódmi z draftu #13 §1 (tabuľka Démos 6.9.2026, dodal Michal). Jadro, UI, recepty ani katalóg kovania sa nedotkli.
+  **Čo z toho má používateľ.** V **Pravidlách Štúdia** aj na **karte skrinky/čela** pribudla pri zásuvkách druhá voľba
+  „Atira antracit podľa výšky" (klasické aj Tip-On), takže sa dá objednať antracitová K-sada bez toho, aby sa čokoľvek
+  prepisovalo ručne. **Predvoľba nového projektu ostáva biela** a existujúce zákazky sa nemenia — antracit si používateľ
+  vyberie vedome. Kde antracit kit **neexistuje** (SiSy H176 na 350 a 520, všetky NL 620), je zásuvka **červená**
+  („nákup nenašiel kit výsuvu k postaveným dielcom") a export stojí; **nikdy sa ticho neobjedná biely kód**.
+  **Rozhodnutia a ich dôvody.** (1) **Čiastočná rodina je legitímny dátový stav** — politika bola uzavretá už v D1b
+  (Codex #307 P1 / #309 P2): bunka bez kódu má kľúč v `code_by_nl` **neprítomný**, nikdy prázdny reťazec a nikdy kód inej
+  farby či dĺžky. Alternatíva „seedovať až po doplnení celej rodiny" by antracit blokovala donekonečna, alternatíva
+  „doplniť najbližší kód" je presne tá tichá zámena, ktorej sa celý blok KOVANIE vyhýba. (2) **Completeness test ostáva
+  bielo-only** — „KAŽDÁ bunka radov v1 má kit kód" platí pre predvolenú rodinu, ktorú dostane nový projekt; antracit
+  stráži vlastná sada. (3) **Rodinu odlišuje výhradne názov** (`family_stem` zahodí token `H<číslo>`), lebo klasifikácia
+  farbu nenesie — antracit preto dostal vlastný kmeň názvu, inak by sa v ponuke zlúčil s bielou do jednej rodiny.
+  (4) **`MAPPING_ADDITIONS` sa nezmenilo** — pridanie antracitu do predvolieb by prepísalo, čo dostane nový projekt, a to
+  dávka nemá mandát urobiť. (5) Kódy **len pre bunky radov receptov v1**: NL 260/300 z tabuľky a SiSy H144/520 (357929)
+  sa nezapisujú, lebo v radoch nie sú a nekupujú sa (rozhodnutie Michala 6.9., zapísané do draftu #13). (6) **357887**
+  (SiSy H70/350) Michal 6.9. overil priamo v Démose ako antracitový kit — pochybnosť „čelný" z podania #12 je uzavretá.
+  **Testovanie.** Nová sada `tests/pure/test_kovd1c_antracit.rb` (11 testov) drží **tabuľkovú fixtúru** = druhý, nezávislý
+  zápis tých istých kódov; kontroluje aj **surový literál `SEED_SETS`**, lebo normalizácia prázdnu hodnotu ticho zahodí
+  (odhalila to mutácia M2, ktorá cez normalizovaný tvar prešla). Overené mutácie: cudzí (biely) kód v antracit bunke ·
+  prázdny reťazec namiesto chýbajúcej bunky · antracit set v `MAPPING_ADDITIONS` · názov zlúčený s bielou rodinou.
+  Headless 3189 zelených; in-SU sa nespúšťal (žiadna serverová akcia s prestavbou, žiadna zmena geometrie ani undo).
+  Známy lokálny šum: `tests/js/test_kovd1b_ui.js` padá na Windows kvôli CRLF v `hardware.js` (regex sady čaká LF) —
+  stav z `main`, nesúvisí s touto dávkou, v CI (LF) prechádza.
+
 - **KOV-D1b — MAPOVANIE, UI: SET ZÁSUVKY SA DÁ VYBRAŤ V ŠTÚDIU AJ NA KARTE (v0.9.35, 6.9.2026).**
   Druhý rez package KOV-D v2 — **výhradne UI a payload**; jadro (resolver, zámky, upgrade, schéma, seed) sa nedotklo.
   D1a zaviedlo triedne a owner triedne kľúče, ale ovládanie k nim neexistovalo: v Pravidlách Štúdia sa zásuvka dala
