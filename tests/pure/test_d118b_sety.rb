@@ -403,3 +403,38 @@ NxTest.test('D-118b (R9): „Doplniť nové predvoľby" OSVIEZI nedotknutu defin
   NxTest.assert_equal('Moja antracit', st['sets']['atira-antracit-h70-sisy']['name'],
                       'a vlastny nazov ostal')
 end
+
+NxTest.test('D-118b (R9): osvieženie berie definiciu z KNIZNICE, nie zo zabudovaneho seedu') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  c = NxD118b
+  # Pouzivatel si v GLOBALI ten isty set upravil (vlastny kod). „Doplniť nové
+  # predvoľby" kopiruje GLOBAL do projektu — nesmie teda dosadit zabudovany
+  # seed a prepisat mu jeho kody (Codex #321 kolo 2 P2).
+  lib_set = Marshal.load(Marshal.dump(c::HWS::SEED_SETS.find { |s| s['set_id'] == 'atira-biela-h70-p2o' }))
+  lib_set['members'][1]['code_by_nl']['420'] = '999420'
+  lib_sets = c::HWS::SEED_SETS.map { |s| s['set_id'] == 'atira-biela-h70-p2o' ? lib_set : s }
+  FileUtils.mkdir_p(c::HWS.dir)
+  c::STORE.write(c::HWS.path, 'std' => c::HWS::STD_SKIP_CODE, 'seed_version' => c::HWS::SEED_VERSION,
+                              'sets' => c::HWS.normalize_sets(lib_sets),
+                              'mapping' => c::HWS::SEED_MAPPING.merge(c::HWS::MAPPING_ADDITIONS))
+  FileUtils.rm_f("#{c::HWS.path}.bak")
+  c::STORE.invalidate(c::HWS.path)
+  c::HWS.reset_library_state!
+  begin
+    stary = c::HWS.normalize_sets([c::HWS::LEGACY_SEED_SHAPES['atira-biela-h70-p2o'].first]).first
+    m = c::Model.new
+    c::HWS.write_project_state(m, 'mapping' => { c::TIPON_METAL => 'atira-biela-h70-p2o' },
+                                  'sets' => { 'atira-biela-h70-p2o' => stary })
+    res, _a, _b, refreshed = c::HWS.merge_project_sets_seed!(m)
+    NxTest.assert_equal(:updated, res)
+    NxTest.assert_equal(['atira-biela-h70-p2o'], Array(refreshed))
+    _, st = c::HWS.project_state_status(m)
+    NxTest.assert_equal('999420',
+                        st['sets']['atira-biela-h70-p2o']['members'][1]['code_by_nl']['420'],
+                        'do projektu ide KNIZNICNA definicia, nie zabudovany seed')
+  ensure
+    [c::HWS.path, "#{c::HWS.path}.bak"].each { |f| FileUtils.rm_f(f) }
+    c::STORE.invalidate(c::HWS.path)
+    c::HWS.reset_library_state!
+  end
+end

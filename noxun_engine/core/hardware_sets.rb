@@ -2881,7 +2881,7 @@ module Noxun
         # ma napravit. VEDOMA akcia preto osviezi aj definicie, ktore su este
         # PRESNE predoslym seed tvarom; pouzivatelom upravena definicia ostava.
         # Automaticky sa snapshot nemeni NIKDY — to je stale kontrakt.
-        refreshed = refresh_untouched_project_sets(state)
+        refreshed = refresh_untouched_project_sets(state, by_id)
         return [:none, [], [], []] if added_map.empty? && refreshed.empty?
         return [:none, [], [], []] unless write_project_state(model, state)
         [:updated, added_sets.uniq, added_map, refreshed]
@@ -2889,15 +2889,20 @@ module Noxun
 
       # Osviezi v SNAPSHOTE definicie, ktore su bajtovo predoslym seed tvarom.
       # -> zoznam set_id, ktore sa naozaj zmenili (vzor `replace_untouched_seed_sets`).
-      def refresh_untouched_project_sets(state)
+      #
+      # ZDROJ JE NACITANA GLOBALNA KNIZNICA (`by_id`), NIE konstanta `SEED_SETS`
+      # (Codex #321 kolo 2 P2): akcia sa vola „Doplniť nové predvoľby", teda
+      # kopiruje GLOBAL do projektu. Keby brala zabudovany seed, vzkriesila by
+      # set, ktory si pouzivatel v globale ZMAZAL, alebo by prepisala jeho
+      # vlastne globalne kody — a status by pritom tvrdil, ze vlastne upravy
+      # ostali. Set, ktory v kniznici nie je, sa preto preskoci.
+      def refresh_untouched_project_sets(state, by_id)
         sets = state['sets']
-        return [] unless sets.is_a?(Hash)
+        return [] unless sets.is_a?(Hash) && by_id.is_a?(Hash)
 
-        seed_by_id = {}
-        normalize_sets(SEED_SETS).each { |s| seed_by_id[s['set_id']] = s }
         changed = []
         sets.each do |sid, cur|
-          fresh = seed_by_id[sid]
+          fresh = by_id[sid]
           next unless fresh && LEGACY_SEED_SHAPES.key?(sid)
           next if cur == fresh
           next unless legacy_seed_shape?(cur)

@@ -488,7 +488,8 @@ charakterizačný test). Päť častí:
   normalizovaný tvar je PRESNE niektorý predošlý seed tvar (`LEGACY_SEED_SHAPES`, teraz osem záznamov) — akákoľvek úprava používateľa (aj len premenovanie) znamená ruky preč
   a info log. **Projektové snapshoty sa nemenia SAMY**: hotová zákazka si nesie kódy, s ktorými bola objednaná. Do rozpracovanej ju dostane **vedomé „Doplniť nové predvoľby"** —
   a to od tejto dávky nielen dopĺňa chýbajúce kľúče, ale aj **osvieži definície, ktoré sú v snapshote ešte presne predošlým seed tvarom** (`refresh_untouched_project_sets`,
-  tá istá podmienka „nedotknutý tvar" ako v knižnici; používateľom upravená definícia ostáva). Bez toho by akcia, ktorá má opravu priniesť, vrátila „nič sa nedopĺňalo"
+  tá istá podmienka „nedotknutý tvar" ako v knižnici; používateľom upravená definícia ostáva). **Zdrojom je NAČÍTANÁ globálna knižnica, nie konštanta `SEED_SETS`** — akcia
+  kopíruje global do projektu, takže set zmazaný v globále sa nesmie vzkriesiť a vlastné globálne kódy sa nesmú prepísať zabudovaným seedom (Codex #321 kolo 2). Bez toho by akcia, ktorá má opravu priniesť, vrátila „nič sa nedopĺňalo"
   a zákazka by ďalej objednávala bez modulu (Codex #321 P1). Status akcie **pomenuje aj počet aktualizovaných setov** — tichá zmena objednávacieho kódu je zakázaná.
 - **Kompatibilita vybraného setu (`set_incompatible_info`)** beží v `expand` AJ v `explain` (panel a súpis sa nesmú rozísť) hneď za `set_type_mismatch` a porovnáva
   `opening_mode`, `drawer_construction`, **`manufacturer` + `series` ↔ `params.system`** (uzavretý `SYSTEM_IDENTITY`: `atira` → Hettich/InnoTech Atira, `quadro_v6` →
