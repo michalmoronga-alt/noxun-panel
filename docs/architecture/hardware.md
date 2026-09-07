@@ -235,6 +235,24 @@ Tri veci, ktoré k tomu patria:
   zámku** — taxonómia má vlastný sidecar (`materials.lock`) a vnoriť ho do katalógového by vyrobilo PORADIE zámkov, teda presne to riziko, kvôli ktorému majú katalógy jeden
   spoločný sidecar. Stráži to zdrojový guard v `tests/pure/test_hardware_catalog.rb`.
 
+**SEED v3 — dáta z Démosu (D-118, v0.9.43).** Manifest `SEED_ROWS` má odteraz **deväť polí**
+(`[kód, názov, kategória, MJ, cena|nil, poznámka|nil, výrobca|nil, rada|nil, demos_url|nil]`) a **114 riadkov**: pôvodných 60 z D1 + **54 kódov, ktoré používajú seed sety
+zásuviek** (vrátane PTOs modulov `352908`/`352909` a opravenej antracitovej K-sady `357889`). Každý riadok je overený proti PRODUKTOVEJ STRÁNKE demos-trade.sk (7.9.2026):
+kód sa našiel ako „Kód sortimentu", názov je H1 stránky a cena je hodnota **s DPH** — čítal ich TEN ISTÝ `DemosProductParser`, akým beží „Overiť cenu", preto je
+`SEED_PRICE_CHECKED_AT` legitímny server stamp a dostáva ho **len riadok, ktorý má cenu AJ `demos_url`** (F5 „dátum patrí konkrétnej väzbe"). **Kategória ostáva NAŠA**
+(93240 „Bystrica" = `SPOJOVACI_MATERIAL`, hoci Démos ju vedie pod závesmi — debata 2.8.); z webu je názov, cena, MJ, výrobca, rada a URL. `SEED_INACTIVE` = štyri kódy, ktoré
+Démos už nepozná: riadok **ostáva** (staré zákazky ho majú v nákupe), len je `active: false` s dôvodom v poznámke.
+
+**Migrácia v2 → v3** (`apply_seed_patch_v3`, `SEED_SET_VERSION` 3) drží dva kontrakty z patchu v1 → v2:
+
+- **Plný seed sa do existujúceho katalógu NELEJE** — dopĺňa sa LEN vymenovaný `SEED_PATCH_V3_ADD` (tých 54). Kto si seed položku zmazal, nedostane späť nič iné.
+- **Prepísať existujúci riadok sa smie len vtedy, keď je preukázateľne NÁŠ:** všetky `SEED_MATCH_FIELDS` sedia s `SEED_ROWS_V2` (zmrazená kópia v2 manifestu) **a** riadok nemá
+  vlastnú Démos väzbu **a** nemá vlastnú klasifikáciu (`manufacturer`/`series` — tie v `SEED_MATCH_FIELDS` nie sú, takže bez tejto podmienky by patch prepísal výrobcu, ktorého
+  tam dal používateľ; Astra #21 BLOCKER 1). Zápis je `cur.merge(rec)`, takže `use_count` aj ručne VYPNUTÁ aktívnosť prežijú a položka sa nikdy nezapne späť.
+
+Dôsledok, ktorý patrí do poznámok k vydaniu: katalóg bez klasifikácie sa doplnením výrobcov stampuje na `SCHEMA_CLASSIFIED`, teda **starší plugin ho odteraz číta ako read-only**
+(„aktualizuj plugin") — nikdy ticho neoreže.
+
 ### hardware_taxonomy.rb
 
 **Jediný zoznam prípustných výrobcov a rád kovania (KOV-B1, v0.9.19; audit #17 BLOCKER 4).** Set aj položka katalógu nesú `manufacturer`/`series` ako reťazec — keby si ho každý
@@ -255,9 +273,10 @@ u knižnice setov (R-07/R-08/R-11) a katalógu (GH #99).
   kovania) sa tu vedome nezavádza: dve otvorené okná by si ju prebili.
 - **Zápis:** `with_catalog_lock` → `JsonFileStore.reload!` → **znovu posúdená brána nad čerstvým dokumentom** → prípadná revízia (`load_with_revision` dáva obsah aj odtlačok
   z JEDNÉHO stavu súboru) → atomický zápis. Do súboru zapisuje **jediné miesto** (`write`); zlyhaný `flock` je IOError a končí ako `:write_failed`, nikdy ako tichý úspech.
-- **Seed (`SEED_VERSION` 1):** Hettich · Blum · Grass · Strong · Ostatné a ich rady (Sensys, InnoTech Atira, Quadro, AvanTech YOU, AXILO; CLIP top, AVENTOS, TANDEMBOX, LEGRABOX,
-  MERIVOBOX, TIP-ON; Nova Pro, Tiomos; StrongMax). Merge dopĺňa LEN chýbajúce mená, nikdy neprepisuje a nad read-only ani degradovaným súborom sa nerobí; `ensure_seeded` má
-  DVOJITÝ check (rýchly + pod zámkom), takže oneskorený seeder neprepíše reálnu zmenu.
+- **Seed (`SEED_VERSION` 2, D-118):** Hettich · Blum · Grass · Strong · **Tulip** · Ostatné a ich rady (Sensys, InnoTech Atira, Quadro, AvanTech YOU, AXILO; CLIP top, AVENTOS,
+  TANDEMBOX, LEGRABOX, MERIVOBOX, TIP-ON; Nova Pro, Tiomos; StrongMax, **StrongBox**). Tulip a StrongBox pribudli s katalógovým seedom v3 — bez nich by šesť úchytiek/vešiakov
+  a päť StrongBoxov nemalo výrobcu a strom katalógu by ich zhodil pod „— bez výrobcu". Merge dopĺňa LEN chýbajúce mená, nikdy neprepisuje a nad read-only ani degradovaným
+  súborom sa nerobí; `ensure_seeded` má DVOJITÝ check (rýchly + pod zámkom), takže oneskorený seeder neprepíše reálnu zmenu.
 - **`resolve_classification(manufacturer, series)`** → `[kanonický výrobca|nil, kanonická rada|nil, errors]` je spoločný kontrakt pre set aj položku katalógu
   (`check_classification` je nad ňou len wrapper na chyby). Zhoda je case-insensitive a bez diakritiky, ale **uložiť sa smie VÝHRADNE kanonický zápis zo zoznamu** —
   zapisovacie cesty (`HardwareSets.save_set!`, `HardwareCatalog.create_item`/`patch_item`) preto berú mená odtiaľto; inak by vedľa „Hettich" vyrástol „hettich" a padol by

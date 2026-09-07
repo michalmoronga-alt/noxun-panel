@@ -43,7 +43,7 @@ module Noxun
     module HardwareTaxonomy
       STD            = 'noxun-hardware-taxonomy'
       SCHEMA_CURRENT = 1
-      SEED_VERSION   = 1
+      SEED_VERSION   = 2
       FILE           = 'hardware_taxonomy.json'
 
       # Whitelisty klucov (KONTRAKT — vzor HardwareSets::SET_KEYS): kluc mimo
@@ -59,14 +59,17 @@ module Noxun
       # SEED (v1). Zdroj: SYSTEM/zdroje/SEED_KATALOG_2026-07.md + debata 2.8.2026.
       # Doplna sa LEN to, co v subore CHYBA — pouzivatelske mena sa nikdy
       # neprepisuju a nic sa nemaze.
-      SEED_MANUFACTURERS = ['Hettich', 'Blum', 'Grass', 'Strong', 'Ostatné'].freeze
+      # v2 (D-118, 7.9.2026): Tulip (uchytky a vesiaky, 6 seed poloziek) a rada
+      # StrongBox (5 poloziek) — bez nich by ich katalogovy riadok nemal
+      # vyrobcu a strom katalogu by ich zhodil pod „— bez vyrobcu".
+      SEED_MANUFACTURERS = ['Hettich', 'Blum', 'Grass', 'Strong', 'Tulip', 'Ostatné'].freeze
       SEED_SERIES = [
         ['Sensys', 'Hettich'], ['InnoTech Atira', 'Hettich'], ['Quadro', 'Hettich'],
         ['AvanTech YOU', 'Hettich'], ['AXILO', 'Hettich'],
         ['CLIP top', 'Blum'], ['AVENTOS', 'Blum'], ['TANDEMBOX', 'Blum'],
         ['LEGRABOX', 'Blum'], ['MERIVOBOX', 'Blum'], ['TIP-ON', 'Blum'],
         ['Nova Pro', 'Grass'], ['Tiomos', 'Grass'],
-        ['StrongMax', 'Strong']
+        ['StrongMax', 'Strong'], ['StrongBox', 'Strong']
       ].freeze
 
       module_function
