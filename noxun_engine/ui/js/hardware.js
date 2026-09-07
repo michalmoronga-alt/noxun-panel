@@ -291,6 +291,9 @@
 
   function hwMemberText(m){
     if (!m) return '';
+    // D-118b: člen, ktorý má pre túto dĺžku VEDOME prázdnu bunku (`none`) —
+    // súpis to prizná, inak by pri NL 620 vyzeralo, že modul niekto zabudol.
+    if (m.skipped === true) return (m.label || 'člen') + ' · bez kódu (netreba)';
     var q = (m.qty && m.qty > 1) ? (m.qty + '× ') : '';
     return q + (m.code || '') + ' · ' + (m.name || HW_NO_CATALOG);
   }

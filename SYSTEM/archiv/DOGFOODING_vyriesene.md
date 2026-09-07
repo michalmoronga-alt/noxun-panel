@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-118** — Katalóg kovania pozná kódy setov (114 položiek s cenou, URL a výrobcom), zásuvka antracit H70/470 objedná správnu K-sadu a Tip-On zásuvka aj PTOs modul — vyriešené 7.9.2026, PR #320 + #321, v0.9.43 + v0.9.44
 - **D-20** — Quick actions: Mower + Snaper sú jeden toolbar v balíku enginu, kópia má plnú NOXUN identitu a staré inštalácie sa odstránia samy — vyriešené 4.9.2026, PR #293 + #294, v0.9.25
 - **D-110** — Pridávanie kovaní: strom Kategória → Výrobca → Rada namiesto plochého zoznamu + modal položky s poradím polí ako dodávateľský list — vyriešené 4.9.2026, PR #290, v0.9.23
 - **D-112** — Odlišná ABS je vidieť vo VEPO objednávke: deviaty stĺpec `poznamka` + kontrolný oddiel v LOGu — vyriešené 4.9.2026, PR #287, v0.9.22
@@ -102,6 +103,34 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-118 · Kódy setov bez väzby na katalóg — plošný seed katalógu z Démosu (Michal 7.9.2026, smoke KOV-D krok 2; vyriešené 7.9.2026, PR #320 (D-118a) + #321 (D-118b), v0.9.43 + v0.9.44)
+
+**Pôvodný postreh (plné znenie).** „**D-118 · Kódy setov bez väzby na katalóg — plošný seed katalógu z Démosu** (Michal 7.9., smoke KOV-D krok 2) — receptové sety (biela aj
+antracit Atira, Quadro) nesú objednávacie kódy, ale katalóg kovania ich nepozná (položka „bez ceny", názov len z kódu) — Michal ich dnes dopĺňa ručne po jednom. Želanie:
+**jedna dátová dávka**, ktorá pre KAŽDÝ kód zo seed setov doplní do katalógu názov, cenu a URL Démosu (kód → URL/názov/cenu môže vyhľadať Antigravity, výsledok = seed riadky
+s odkazom na zdroj a dátumom), s pravidlom „existujúcu používateľskú položku neprepisovať"."
+
+**Ako sa to vyriešilo.** Zber sa **zastrojil**: vyhľadávacie API Démosu nájde podľa kódu presnú zhodu „Kód sortimentu", produktová stránka sa stiahne a rozparsuje
+**pluginovým `DemosProductParser`** — tým istým, akým beží „Overiť cenu". 114 kódov za štyri minúty, cena **s DPH** priamo z bloku „Základná cena za …". Antigravity to
+zvládlo tiež (5/5 presne), ale ~50× pomalšie — ostáva na krížovú kontrolu vzorky.
+
+**D-118a (PR #320, v0.9.43) — katalóg.** `SEED_ROWS` má deväť polí (+ výrobca, rada, `demos_url`) a 114 riadkov: pôvodných 60 + 54 kódov, ktoré používajú seed sety.
+`SEED_PRICE_CHECKED_AT` dostane len riadok s cenou AJ väzbou; štyri kódy, ktoré Démos už nepozná, ostávajú ako **neaktívne** s dôvodom. Migrácia v2 → v3 dopĺňa LEN vymenovaný
+`SEED_PATCH_V3_ADD` (plný seed sa do existujúceho katalógu neleje) a prepíše len riadok, ktorý je preukázateľne náš — teda sedí na `SEED_MATCH_FIELDS` s `SEED_ROWS_V2`,
+nemá vlastnú Démos väzbu **a nemá vlastnú klasifikáciu** (Astra #21 BLOCKER 1). Klasifikácia navyše prechádza **živou taxonómiou** (Codex #320 P2): používateľ v nej môže mať
+tú istú radu pod iným výrobcom, takže seed ju tam nesmie zapísať natvrdo. Taxonómia dostala `Tulip` a radu `StrongBox`.
+
+**D-118b (PR #321, v0.9.44) — sety.** Zber odhalil tri vecné chyby, ktoré by inak odišli do výroby:
+`348777` (antracit H70/470) **nie je K-sada** (stránka: „Priložené čelné kovanie: Nutné dokúpiť") → nahradené správnym **`357889`**;
+Tip-On (PTOs) K-sady **neobsahujú modul push-to-open** → šesť setov dostalo druhý člen **`352908`** (30 kg) / **`352909`** (50 kg kit H176/520), 28,33 € s DPH na zásuvku;
+kity typu `PTO` (620 mm Atira, Quadro V6) modul nepotrebujú — majú ho vo výsuve, preto ich bunka nesie **vyhradenú hodnotu `none`** („vedome bez kódu").
+K tomu tri poistky z auditu: **marker `std` 5** a **`CONFIG_SCHEMA` 8** (starší plugin by zo sentinelu objednal neexistujúci kód), **fail-closed `members_skipped`**
+(set, ktorý pre receptovú zásuvku nevydá ani jeden riadok, je RED so zastaveným exportom) a **`replace_untouched_seed_sets`** (oprava sa dostane aj do knižnice, ktorú už
+človek má na disku — ale len ak si ju sám neupravil). Legacy pravidlo výsuvov sa nemaže, len sa v Pravidlách prizná ako **„Výsuv — staré zákazky bez systému zásuvky"**.
+
+**Čo z toho platí ďalej.** Projektové snapshoty sa nemenia nikdy — hotová zákazka si nesie kódy, s ktorými bola objednaná; do rozpracovanej sa oprava dostane až vedomým
+„Doplniť nové predvoľby". Skript aj dáta zberu sú v `_dev/demos_harvest/` — ďalší katalóg (KOV-E výklopy, KOV-F závesy) stačí nakŕmiť zoznamom kódov.
 
 ### D-20 · Quick actions — bezpečný move plugin (Michal 19.7.2026; vyriešené 4.9.2026, package NÁSTROJE-1, PR #293 + #294, v0.9.24 + v0.9.25)
 

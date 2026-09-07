@@ -965,7 +965,7 @@ module Noxun
           op = { open: false }
           model.start_operation('NOXUN: Doplnenie predvolieb setov', true)
           op[:open] = true
-          res, added_sets, added_map = HardwareSets.merge_project_sets_seed!(model)
+          res, added_sets, added_map, refreshed = HardwareSets.merge_project_sets_seed!(model)
           if res == :blocked
             # R-07: doplnanie kopiruje globalne definicie do .skp — z
             # nekompatibilnej kniznice sa nerobi (a hlaska to povie).
@@ -990,8 +990,16 @@ module Noxun
 
           after_sets_change(model)
           labels = added_map.map { |gt| HardwareRules.label_for(gt) }
-          set_status("Doplnené predvoľby: #{labels.join(', ')} (#{added_sets.length} " \
-                     "#{added_sets.length == 1 ? 'nový set' : 'nových setov'}). Existujúce zostali.")
+          parts = []
+          unless labels.empty?
+            parts << "Doplnené predvoľby: #{labels.join(', ')} (#{added_sets.length} " \
+                     "#{added_sets.length == 1 ? 'nový set' : 'nových setov'})"
+          end
+          # D-118b: opravené definície sa MUSIA pomenovať — akcia inak potichu
+          # zmení objednávací kód setu, ktorý si používateľ už raz vybral.
+          n = Array(refreshed).length
+          parts << "aktualizované na novú verziu: #{n} #{n == 1 ? 'set' : 'setov'}" if n.positive?
+          set_status("#{parts.join(' · ')}. Vlastné úpravy zostali.")
         rescue StandardError => e
           # ŠT-3a-3: rusi sa LEN operacia, ktora je este otvorena. Doteraz
           # tu bolo bezpodmienecne `abort_operation` — vynimka v `set_status`

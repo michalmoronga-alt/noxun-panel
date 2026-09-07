@@ -831,6 +831,10 @@ module Noxun
           when 'mapping_invalid'
             'výber setu na tejto skrinke je poškodený — vyber ho nanovo (predvoľba ' \
             'projektu sa zámerne nepoužije)'
+          when 'members_skipped'
+            # D-118b: set sedel, ale všetky jeho členy majú pre túto dĺžku
+            # vedome prázdnu bunku — zásuvka by sa objednala „bez kovania".
+            "set „#{sid}“ nemá pre túto dĺžku ani jednu položku — doplň rad setu"
           else
             "nákup nenašiel kit (#{u['base_reason']})"
           end
