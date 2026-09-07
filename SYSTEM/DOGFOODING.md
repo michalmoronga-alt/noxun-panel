@@ -37,6 +37,12 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   horná (dnes) · dolná · ľavá / pravá bočná (vysoké dvere, skrine). Registry `front_profiles.rb` s voľbou hrany počíta (D-90: „dolná hrana sa používa často, existujú aj
   bočné"), config čela ju zatiaľ nenesie. Dopad: skrátenie panelu v inej osi, dĺžka rezu profilu, vizuál, smer dekoru. *Stav: OTVORENÉ — zaradiť ku KOV-F (úchytka podľa
   klasifikácie) alebo do UI/UX balíka Čiel; rozhodne Michal.*
+- **D-125 · Hmotnosť v Inspectore (Základné) je prázdny placeholder** (Michal 6.9., KLINIKA) — riadok „Hmotnosť" v informačnom stĺpci sektora Základné ukazuje vždy „—":
+  je to **statický placeholder z UI 2.0** (`panel.html` `#infWeight`, tooltip „Hmotnosť príde s kovaním (fáza 3)"), JS ho nikdy neplní a payload žiadnu hmotnosť nenesie.
+  Nie je to bug, ale nedokončené miesto. Hustota per typ materiálu už existuje (`Materials.density_for`, M-C), takže **hmotnosť skrinky = Σ dielcov (dĺžka × šírka × hrúbka
+  × hustota typu)** je odvodené čítanie nad BOM riadkami. Pravidlá: dielec s neznámou hustotou (typ „iný", UNI) sa **nevymýšľa** — výsledok ukázať ako „≈ X kg" s tooltipom
+  „bez N dielcov (materiál bez hustoty)"; pri všetkých neznámych ostáva „—". *Stav: OTVORENÉ — zaradiť ku **KOV-E** (tam vzniká helper hmotnosti čela z tých istých vstupov;
+  hmotnosť skrinky = ten istý helper nad všetkými dielcami) alebo ako malá samostatná dávka po KOVANÍ; do payloadu Inspectora pribudne `weight_kg` + `weight_missing` (aditívne).*
 
 ## KONTROLA + VÝROBA
 
