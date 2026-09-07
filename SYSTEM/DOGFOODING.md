@@ -51,6 +51,9 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   skratky) + ľudské názvy odvodených dielcov (`Zas dno s1`, `Zas chrb s1`…; číslo zásuvky/čela namiesto id — `PartKeys.human_label` D-92 vzor) aj v kusovníku a LOGu.
   *Stav: OTVORENÉ — **fix dávka pre implementačné okno (KOVANIE)** hneď, nečaká na koniec bloku; audit NIE (výstupný formát, kontrakt VEPO v1.1 sa nemení — 20 znakov je
   jeho súčasť z POJMY).*
+- **D-122 · Kontrola hlási každý UNI dielec zvlášť** (Michal 6.9., zákazka KLINIKA) — Štúdio → Kontrola ukazuje pri UNI farbách **každý dielec ako upozornenie**; pri tvorbe
+  je prirodzené, že dielce ostávajú UNI, kým sa nezvolia materiály. Želanie: **jedno upozornenie „použité nenahradené UNI farby"** a pod ním zoskupené dotknuté dielce (rozklik).
+  *Stav: OTVORENÉ — V1, malá UI dávka v sekcii Kontrola (zoskupenie nálezov podľa príčiny; semafor ostáva ORANGE, neblokuje).*
 - **D-94 · Traceability v celkovom súpise kovania — rozklik položky na miesta použitia** (Michal 9.8., test kovania na reálnej zákazke) — nákupný zoznam v okne Výroba povie „357695 × 12", ale nie
   **kde** tých 12 kusov je. Pri kontrole objednávky (a pri hľadaní, prečo je počet iný, než človek čakal) treba vedieť rozobrať riadok na **skrinky a čelá**, z ktorých vznikol. Dáta už existujú:
   `expand` skladá pri každom riadku pole `sources` (`cabinet_id`, `owner_part_key`, `generic_type`, `rule_id`, `set_id`, počet) — chýba len zobrazenie a klik-select. Návrh: rozklik riadku (vzor
@@ -67,6 +70,10 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 
 ## STABILITA
 
+- **D-123 · Ghost bez zámku Z položí dolnú skrinku so soklom na dno skrinky, nie na nohy** (Michal 6.9., KLINIKA) — pri voľnej Z (bez zámku) ghost umiestni skrinku tak, že
+  na cieľovú plochu sadne **dno korpusu** (Z = `floor_height`) a nohy/sokel idú pod podlahu; **so zamknutou Z umiestňuje správne**. Podozrenie: `ghost_tool.rb` počíta „spodok
+  tela" pre `under_sides` ako `floor_height` (r. ~506–513) — pre voľnú Z má byť spodok **celej skrinky** (nohy, Z = 0). *Stav: OTVORENÉ — **BUG**, fix dávka s in-SU testom
+  (blok GHOST je uzavretý, preto tu); overiť aj hornú skrinku a `between_sides`.*
 - **D-99 · Premenovanie dielca akoby prepísalo názvy všetkých kópií** (Michal 9.8., práca na zákazke KLINIKA) — po premenovaní jedného dielca to na chvíľu vyzeralo, akoby rovnaký názov dostali
   **všetky jeho kópie**; po prepnutí okna (zmena aktívneho modelu a späť) bolo všetko v poriadku, takže **dáta boli celý čas správne** — išlo o zobrazenie. *Stav: OTVORENÉ pozorovanie — zatiaľ
   **nereprodukované**. Sleduje sa; ak sa zopakuje, treba si všimnúť, či boli kópie vytvorené Ctrl+C/V (spoločná definícia, dedup tik) a čo presne ukazoval panel oproti modelu.*
@@ -80,6 +87,10 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 
 ## V1 DOTIAHNUTIE
 
+- **D-124 · Predvoľby projektu v Materiáloch — rozbalené, väčšie náhľady** (Michal 6.9., KLINIKA) — Štúdio → Katalógy → Materiály → Predvoľby projektu sú v defaulte
+  **zbalené**, pritom sa používajú často. Predstava: **väčšie náhľadové štvorce s detailmi pod sebou, zoradené v jednom riadku, default rozbalený stav**. Podotázka: **predvolený
+  materiál per rola dielca** (police, dno, chrbát…) — uskutočniteľné (poradie override dielca > predvoľba roly > materiál skrinky), ale stredná dávka (builder, BOM, VEPO, šablóny)
+  a dnes to kryje override dielca + šablóna → **mimo V1** (Michal). *Stav: OTVORENÉ — V1 len UI rework predvolieb (malá dávka); per-rola materiál v zásobníku Po V1.*
 - **Vedome odložené z dávky E — ceny (V1 rozsah)** (6.8., nič z toho neblokuje prácu so zákazkou) — **manuálne 1-klik overenie ceny** pre položky BEZ väzby na Demos a **viac URL na položke**
   (zvyšok V1-03; dnes ich „Prepočítať ceny" preskočí) · prepínač **„na faktúru"** (×1,2 — vzor ADAMČÍK), kandidát na štvrtý cenový režim.
   *(Piaty kus tej istej odkladovej sady — EN DANIELI textový export — je v skupine KONTROLA + VÝROBA; DOCX/PDF generátor a rodina dokumentov sú od 26.8. v skupine Po V1 — zásobník.)*
