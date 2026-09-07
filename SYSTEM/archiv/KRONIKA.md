@@ -17,6 +17,27 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-118a — KATALÓG KOVANIA UŽ POZNÁ KÓDY, KTORÉ SI PLUGIN SÁM OBJEDNÁVA (v0.9.43, 7.9.2026).**
+  Postreh vznikol pri Michalovom smoke KOV-D: receptové sety zásuviek (Atira biela aj antracit, Quadro V6) nesú objednávacie kódy, ale katalóg kovania ich nepoznal — v Nákupe
+  boli **„bez ceny"** a namiesto názvu holý kód. Michal ich dopĺňal ručne po jednom a sám pomenoval riziko: pri 111 kódoch sa človek pomýli.
+  **Zber je odteraz strojový a overiteľný:** pre každý kód sa cez vyhľadávacie API Démosu nájde URL s PRESNOU zhodou „Kód sortimentu", stránka sa stiahne a rozparsuje
+  **pluginovým `DemosProductParser`** — tým istým, akým beží „Overiť cenu". Preto je cena skutočne tá, ktorú by dal prepočet, a `SEED_PRICE_CHECKED_AT` je legitímny server stamp,
+  nie vymyslený dátum. 114 kódov, 4 minúty, 107 nájdených naprvý raz.
+  **Manifest** má deväť polí (`+ výrobca, rada, demos_url`) a 114 riadkov: pôvodných 60 + **54 kódov, ktoré používajú seed sety** (vrátane PTOs modulov `352908`/`352909`
+  a opravenej antracitovej K-sady `357889`). Kategória ostáva NAŠA (Bystrica ostáva v spojovacom materiáli, hoci Démos ju vedie pod závesmi); štyri kódy, ktoré Démos už nepozná,
+  **ostávajú** ako neaktívne s dôvodom v poznámke. Taxonómia dostala `Tulip` a radu `StrongBox`.
+  **Migrácia v2 → v3** drží dva kontrakty z patchu v1 → v2: plný seed sa do existujúceho katalógu **NELEJE** (dopĺňa sa len vymenovaný `SEED_PATCH_V3_ADD`) a prepísať sa smie len
+  riadok, ktorý je preukázateľne náš — teda sedí na `SEED_MATCH_FIELDS` s `SEED_ROWS_V2` **a** nemá vlastnú Démos väzbu **a** nemá vlastnú klasifikáciu. Tá tretia podmienka je
+  **Astra #21 BLOCKER 1**: `manufacturer`/`series` v `SEED_MATCH_FIELDS` nie sú, takže bez nej by patch prepísal výrobcu, ktorého tam dal používateľ. Zápis je `cur.merge(rec)`,
+  takže `use_count` aj ručne vypnutá aktívnosť prežijú a položka sa nikdy nezapne späť.
+  **Codex #320 P2** k tomu pridal druhú vrstvu: klasifikácia sa neberie z našej konštanty, ale prechádza **živou taxonómiou** (`seed_items_resolved` → `resolve_classification`) —
+  používateľ v nej už môže mať tú istú radu pod INÝM výrobcom a seed by inak vyrobil riadok, ktorý kontrakt taxonómie porušuje a ktorý sa potom nedá ani uložiť. Čo sa nedá
+  vyriešiť, sa vynechá (položka bez výrobcu je legálna), a otázka na taxonómiu ide **pred** katalógovým zámkom — zdrojový guard to stráži rovnako ako pri `create_item`.
+  **Prečo to bolo treba:** zber odhalil tri vecné veci, ktoré by inak odišli do výroby — `348777` (antracit H70/470) **nie je K-sada** (čelné kovanie treba dokúpiť, správny kód je
+  `357889`), Tip-On sety **nemajú v K-sade PTOs mechanizmus** (28,33 € na zásuvku) a 12 cien sa oproti starému seedu zmenilo. Prvé dve patria do **D-118b** (zadanie
+  `_dev/BRIEF_d118b.md`); tretia je opravená týmto PR. Testy: 3351 headless (11 nových, mutácie M1/M5/M6 overené), 94 JS sád.
+  Dôsledok do poznámok k vydaniu: katalóg bez klasifikácie sa doplnením výrobcov stampuje na `SCHEMA_CLASSIFIED`, takže **staršia verzia pluginu ho otvorí len na čítanie**.
+
 - **KOV-D5 — ZÁSUVKA UŽ UKAZUJE OLEP NA SPRÁVNEJ HRANE (v0.9.42, 7.9.2026).**
   Posledný rez paketu KOV-D, jediný **geometrický**: dielce zásuvky boli v modeli **jednofarebné** — hoci pravidlo aj kusovník o ich olepe vedeli, na plôške sa páska
   nekreslila vôbec a Kontrola olepov ich nezvýrazňovala. Dôvod bol vedomý (KOV-C2b): deskriptory zásuvky **zámerne nenosili osi** (`axes:`), lebo pri stojacom dielci by

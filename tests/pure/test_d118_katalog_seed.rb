@@ -54,6 +54,32 @@ module NxD118
     HWC.reset_state!
   end
 
+  # Vlastna taxonomia v sandboxe (napr. rada uz patri INEMU vyrobcovi).
+  # Vracia povodny obsah suboru, aby ho volajuci vedel vratit.
+  def install_taxonomy!(manufacturers, series, seed_version: TAX::SEED_VERSION)
+    before = (File.binread(TAX.path) if File.exist?(TAX.path))
+    FileUtils.mkdir_p(TAX.dir)
+    STORE.write(TAX.path, 'std' => TAX::STD, 'schema' => TAX::SCHEMA_CURRENT,
+                          'seed_version' => seed_version,
+                          'manufacturers' => manufacturers.map { |n| { 'name' => n } },
+                          'series' => series.map { |(n, m)| { 'name' => n, 'manufacturer' => m } })
+    FileUtils.rm_f("#{TAX.path}.bak")
+    STORE.invalidate(TAX.path)
+    TAX.reset_state!
+    before
+  end
+
+  def restore_taxonomy!(before)
+    if before
+      File.binwrite(TAX.path, before)
+    else
+      FileUtils.rm_f(TAX.path)
+    end
+    FileUtils.rm_f("#{TAX.path}.bak")
+    STORE.invalidate(TAX.path)
+    TAX.reset_state!
+  end
+
   def v2_item(code)
     rec, = HWC.normalize_item(HWC::SEED_ITEMS_V2.find { |i| i['item_code'] == code })
     rec
@@ -188,6 +214,64 @@ NxTest.test('D-118 (R6): use_count a vypnuta aktivnost migraciu prezijú') do
                       'a riadok sa napriek tomu osviezil')
   NxTest.assert_equal(false, NxD118::HWC.find('104454')['active'],
                       'rucne vypnuta polozka sa NIKDY nezapne spat')
+end
+
+NxTest.test('D-118 (R4): klasifikacia seedu prejde ZIVOU taxonomiou, cudzia rada sa VYNECHA') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  # Pouzivatel si uz zalozil radu „StrongBox" POD INYM vyrobcom — taxonomia jeho
+  # meno zamerne zachova, takze seed ju tam NESMIE zapisat pod Strongom (Codex
+  # #320 P2). Vyrobca sa vyriesi, rada vypadne — polozka bez rady je legalna.
+  before = NxD118.install_taxonomy!(%w[Hettich Blum Grass Strong Tulip Ostatné],
+                                    [['StrongBox', 'Hettich'], ['InnoTech Atira', 'Hettich']])
+  begin
+    NxD118.wipe!
+    NxTest.assert_equal(:ok, NxD118::HWC.assess!, 'chybajuci subor -> seed')
+    box = NxD118::HWC.find('179252')
+    NxTest.assert_equal('Strong', box['manufacturer'], 'vyrobca sa vyriesil')
+    NxTest.refute(box.key?('series'), 'rada patriaca inemu vyrobcovi sa NEZAPISE')
+    atira = NxD118::HWC.find('357695')
+    NxTest.assert_equal('InnoTech Atira', atira['series'], 'sediaca rada ostava')
+  ensure
+    NxD118.restore_taxonomy!(before)
+    NxD118.wipe!
+  end
+end
+
+NxTest.test('D-118 (R4): nad read-only taxonomiou sa klasifikacia NEZAPISUJE (fail-closed)') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  before = (File.binread(NxD118::TAX.path) if File.exist?(NxD118::TAX.path))
+  begin
+    FileUtils.mkdir_p(NxD118::TAX.dir)
+    NxD118::STORE.write(NxD118::TAX.path, 'std' => NxD118::TAX::STD,
+                                          'schema' => NxD118::TAX::SCHEMA_CURRENT + 5,
+                                          'seed_version' => NxD118::TAX::SEED_VERSION,
+                                          'manufacturers' => [], 'series' => [])
+    NxD118::STORE.invalidate(NxD118::TAX.path)
+    NxD118::TAX.reset_state!
+    NxD118.wipe!
+    NxTest.assert_equal(:ok, NxD118::HWC.assess!)
+    rec = NxD118::HWC.find('357695')
+    NxTest.refute(rec.key?('manufacturer'), 'bez citatelnej taxonomie ziadny vyrobca')
+    NxTest.refute(rec.key?('series'), 'ani rada')
+  ensure
+    NxD118.restore_taxonomy!(before)
+    NxD118.wipe!
+  end
+end
+
+NxTest.test('D-118 (R4): seed aj migracia sa pytaju taxonomie PRED katalogovym zamkom') do
+  # Taxonomia ma vlastny sidecar; vnorit ho do katalogoveho zamku by vyrobilo
+  # PORADIE zamkov (rovnaky zdrojovy guard ako pri create_item/patch_item).
+  src = File.binread(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'hardware_catalog.rb'))
+            .force_encoding(Encoding::UTF_8).gsub("\r\n", "\n")
+  %w[seed! apply_seed_patches!].each do |m|
+    body = src[/^      def #{Regexp.escape(m)}.*?\n      end\n/m].to_s
+    NxTest.assert(!body.empty?, "telo `#{m}` sa naslo")
+    gate = body.index('seed_items_resolved')
+    lock = body.index('with_lock do')
+    NxTest.assert(gate && lock, "#{m}: rozlisenie taxonomie aj zamok su v tele")
+    NxTest.assert(gate < lock, "#{m}: taxonomia sa pyta PRED katalogovym zamkom")
+  end
 end
 
 NxTest.test('D-118 (R5): read-only katalog sa migraciou nedotkne') do

@@ -1660,9 +1660,44 @@ module Noxun
         item
       end.freeze
 
+      # Klasifikacia seed riadku sa NEZAPISUJE „nasucho": prejde ZIVOU taxonomiou
+      # (Codex #320 P2). Pouzivatel v nej uz moze mat to iste meno inak zapisane
+      # alebo — a to je horsie — RADU POD INYM VYROBCOM (taxonomia cudzie mena
+      # zamerne zachovava, seed dopĺňa len chybajuce). Bez tohto kroku by seed
+      # vyrobil riadok, ktory kontrakt taxonomie porusuje: strom by rozdelil
+      # ekvivalentnych vyrobcov a najblizsia uprava riadku by skoncila
+      # „rada patri vyrobcovi X". Co sa nedá vyriešiť, sa VYNECHA — polozka bez
+      # vyrobcu je legalna (rovnaka fail-closed uvaha ako `taxonomy_refusal`).
+      #
+      # Bezi ZAMERNE MIMO katalogoveho zamku (taxonomia ma vlastny sidecar;
+      # vnorenie by vyrobilo PORADIE zamkov — ta ista uvaha ako pri create/patch).
+      def seed_items_resolved(items = SEED_ITEMS)
+        HardwareTaxonomy.ensure_seeded
+        items.map do |a|
+          next a if a['manufacturer'].nil? && a['series'].nil?
+
+          out = a.dup
+          if HardwareTaxonomy.read_only?
+            out.delete('manufacturer')
+            out.delete('series')
+            next out
+          end
+          man, ser, = HardwareTaxonomy.resolve_classification(a['manufacturer'], a['series'])
+          man.nil? ? out.delete('manufacturer') : out['manufacturer'] = man
+          ser.nil? ? out.delete('series') : out['series'] = ser
+          out
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'HardwareCatalog.seed_items_resolved') if defined?(Engine)
+        items.map do |a|
+          a['manufacturer'].nil? && a['series'].nil? ? a : a.reject { |k, _| %w[manufacturer series].include?(k) }
+        end
+      end
+
       def seed!
+        resolved = seed_items_resolved
         with_lock do
-          recs = SEED_ITEMS.map { |a| normalize_item(a)[0] }.compact
+          recs = resolved.map { |a| normalize_item(a)[0] }.compact
           # Cerstvy seed je natívne v aktualnej sade — patch sa ho uz nedotkne.
           write_unlocked('items' => recs, 'seed_version' => SEED_SET_VERSION)
         end
@@ -1683,6 +1718,10 @@ module Noxun
       SEED_MATCH_FIELDS = %w[name_sk category unit price_eur_vat notes supplier].freeze
 
       def apply_seed_patches!
+        # Taxonomia sa pyta PRED katalogovym zamkom (vzor create_item/patch_item,
+        # zdrojovy guard v testoch). Bezi len ked upgrade naozaj caka — `assess!`
+        # sem chodi az po lacnej kontrole `seed_version`.
+        resolved = seed_items_resolved
         with_lock do
           JsonFileStore.invalidate(path)
           doc = begin
@@ -1725,7 +1764,7 @@ module Noxun
               end
             end
           end
-          changed.concat(apply_seed_patch_v3(items)) if from < 3
+          changed.concat(apply_seed_patch_v3(items, resolved)) if from < 3
           ok = write_unlocked('items' => items, 'seed_version' => SEED_SET_VERSION)
           if ok && defined?(Engine)
             Engine.log("kovanie katalog: seed patch v#{from} -> v#{SEED_SET_VERSION}#{changed.any? ? " (#{changed.join(', ')})" : ''}")
@@ -1767,7 +1806,7 @@ module Noxun
         357998 357999 367919 352908 352909 357889
       ].freeze
 
-      def apply_seed_patch_v3(items)
+      def apply_seed_patch_v3(items, resolved = seed_items_resolved)
         v2_by_code = {}
         SEED_ITEMS_V2.each do |a|
           rec, = normalize_item(a)
@@ -1779,7 +1818,7 @@ module Noxun
         added = []
         updated = []
         kept = []
-        SEED_ITEMS.each do |seed|
+        resolved.each do |seed|
           rec, = normalize_item(seed)
           next unless rec
           key = rec['item_code'].downcase
