@@ -47,7 +47,7 @@ module NxD1c
   ANTRACIT = {
     'atira-antracit-h70-sisy' => { 'opening' => 'classic', 'hv' => 70,
                                    'codes' => { '350' => '357887', '420' => '357888',
-                                                '470' => '348777', '520' => '357890' } },
+                                                '470' => '357889', '520' => '357890' } },
     'atira-antracit-h144-sisy' => { 'opening' => 'classic', 'hv' => 144,
                                     'codes' => { '350' => '357926', '420' => '357927',
                                                  '470' => '357928' } },
@@ -155,7 +155,16 @@ NxTest.test('KOV-D1c (R1): 6 antracit setov, klasifikacia zhodna s bielou') do
                         "#{sid}: bez systemu by sa set ani neponukol, ani neulozil")
     NxTest.assert_equal(nil, set['active'], "#{sid}: set je AKTIVNY (sparse priznak sa neuklada)")
     members = set['members']
-    NxTest.assert_equal(1, members.length, "#{sid}: jeden clen (K-sada)")
+    # D-118b: Tip-On rada ma DRUHY clen — PTOs modul P2O (v K-sade nie je).
+    # Klasicka (SiSy) ma nadalej jediny clen.
+    expected_members = row['opening'] == 'tipon' ? 2 : 1
+    NxTest.assert_equal(expected_members, members.length,
+                        "#{sid}: K-sada#{row['opening'] == 'tipon' ? ' + PTOs modul' : ''}")
+    if row['opening'] == 'tipon'
+      NxTest.assert_equal('PTOs mechanizmus', members[1]['label'], "#{sid}: druhy clen je modul")
+      NxTest.assert_equal(row['codes'].keys.sort, members[1]['code_by_nl'].keys.sort,
+                          "#{sid}: modul ma bunku pre KAZDU dlzku radu")
+    end
     NxTest.assert_equal(['unit', 1, 'K-sada'],
                         [members.first['per'], members.first['qty'], members.first['label']], sid)
   end
@@ -233,8 +242,9 @@ NxTest.test('KOV-D1c (R3): antracit selektor objedna ANTRACIT kod') do
   NxTest.assert_equal(['atira-antracit-h176-sisy'], exp['rows'].first['sources'].map { |s| s['set_id'] })
 
   # Tip-On vetva ide na vlastnu rodinu.
+  # D-118b: Tip-On zasuvka objedna kit AJ PTOs modul (v K-sade nie je).
   tip = c::HWS.expand([c.drawer_item(144, 520, 'tipon')], c.antracit_state('tipon'))
-  NxTest.assert_equal(['357958'], tip['rows'].map { |r| r['code'] })
+  NxTest.assert_equal(%w[352908 357958], tip['rows'].map { |r| r['code'] }.sort)
 end
 
 NxTest.test('KOV-D1c (R3): chybajuca bunka je RED, nikdy tichá zámena') do
@@ -271,7 +281,10 @@ NxTest.test('KOV-D1c (R3): biela rodina je nad radmi v1 NADALEJ uplna') do
         exp = c::HWS.expand([c.drawer_item(hv.to_i, nl, opening)], state)
         NxTest.assert_equal([], exp['unmapped'],
                             "biela H#{hv} NL #{nl.to_i}: #{exp['unmapped'].inspect}")
-        NxTest.assert_equal(1, exp['rows'].length, "biela H#{hv} NL #{nl.to_i}")
+        # D-118b: Tip-On (okrem NL 620, kde je kit typu PTO s modulom v sebe)
+        # vydava DVA riadky — kit + PTOs modul.
+        want = (opening == 'tipon' && nl.to_i != 620) ? 2 : 1
+        NxTest.assert_equal(want, exp['rows'].length, "biela H#{hv} NL #{nl.to_i}")
       end
     end
   end
@@ -319,7 +332,7 @@ NxTest.test('KOV-D1c (R4): predvolba noveho projektu ostava BIELA') do
   NxTest.assert_equal('atira-biela-h70-sisy',
                       lib['mapping'][c::CLASSIC_METAL]['bands'].first['set_id'],
                       'novy projekt zacina na bielej')
-  NxTest.assert_equal(4, c::HWS::SEED_VERSION, 'antracit seed = bump SEED_VERSION na 4')
+  NxTest.assert_equal(5, c::HWS::SEED_VERSION, 'D-118b seed = bump SEED_VERSION na 5')
 end
 
 # ============================================================================

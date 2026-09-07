@@ -61,6 +61,23 @@
       '. Vypnutím vyššie sa profil prestane počítať.';
   }
 
+  // D-118b: pravidlo `vysuvy-nl-podla-hlbky` beží od KOV-C2b UŽ LEN na
+  // zásuvkových čelách BEZ systému zásuvky (staré zákazky) — čelo so systémom
+  // Atira/Quadro dostane kód z receptu a toto pravidlo sa naň nevzťahuje.
+  // Nemažeme ho (starým zákazkám by ticho vypadli výsuvy z nákupu), ale
+  // v zozname sa musí priznať, čím je. `rdLabel` sa NEMENÍ — je to spoločný
+  // slovník typov kovania so serverom (guard test) a tu ide o titulok RIADKU.
+  var RD_LEGACY_SLIDE_ID = 'vysuvy-nl-podla-hlbky';
+  var RD_LEGACY_SLIDE_HINT = 'Použije sa len na zásuvkové čelo bez systému zásuvky '
+    + '(staré zákazky); čelo so systémom Atira alebo Quadro dostane kód z receptu.';
+  function rdIsLegacySlide(r){
+    return !!r && String(r.rule_id || '') === RD_LEGACY_SLIDE_ID;
+  }
+  function rdRuleTitle(r){
+    var base = rdLabel(r && r.output);
+    return rdIsLegacySlide(r) ? (base + ' — staré zákazky bez systému zásuvky') : base;
+  }
+
   function rdRoleDesc(r){
     // GH #126 P2: popis podla SKUTOCNYCH filtrov pravidla — cabinet pravidlo
     // moze cielit podla podopretia (nohy) ALEBO typu korpusu (Bystrica).
@@ -293,7 +310,7 @@
     RD_RULES.forEach(function(r, i){
       html += '<div class="rrule" data-i="'+i+'">';
       html += '<div class="rhead"><label><input type="checkbox" class="ren" '+(r.enabled!==false?'checked':'')+'> '
-            + '<b>'+rdEsc(rdLabel(r.output))+'</b></label> <span class="rid">'+rdEsc(rdRoleDesc(r))+'</span></div>';
+            + '<b>'+rdEsc(rdRuleTitle(r))+'</b></label> <span class="rid">'+rdEsc(rdRoleDesc(r))+'</span></div>';
       if (r.kind === 'fixed'){
         html += '<div class="rrow"><label>Počet</label><input class="rqty rnum" type="number" min="1" max="999" step="1" value="'+rdEsc(r.quantity!=null?r.quantity:1)+'"><span class="unit">ks</span></div>';
       } else if (r.kind === 'bands'){
@@ -313,7 +330,8 @@
         html += '<div class="rrow"><label>Rad dĺžok</label><input class="rseries" type="text" value="'+rdEsc((r.series||[]).join(', '))+'"><span class="unit">mm</span></div>';
         html += '<div class="rrow"><label>Rezerva</label><input class="rclr rnum" type="number" min="0" step="1" value="'+rdEsc(r.clearance!=null?r.clearance:10)+'"><span class="unit">mm</span></div>';
         html += '<div class="rrow"><label>Počet</label><input class="rqty rnum" type="number" min="1" max="999" step="1" value="'+rdEsc(r.quantity!=null?r.quantity:1)+'"><span class="unit">sád</span></div>';
-        html += '<div class="hint">Vyberie sa najväčšia dĺžka z radu, ktorá sa zmestí do svetlej hĺbky mínus rezerva.</div>';
+        html += '<div class="hint">Vyberie sa najväčšia dĺžka z radu, ktorá sa zmestí do svetlej hĺbky mínus rezerva.'
+              + (rdIsLegacySlide(r) ? ' ' + rdEsc(RD_LEGACY_SLIDE_HINT) : '') + '</div>';
       } else if (r.kind === 'part_flag_length'){
         // D-90: pravidlo bez nastavení — reaguje na príznak profilu na čele.
         // TEST-1: text sa líši podľa roly (dvierka vs. zásuvkové čelo).
@@ -572,7 +590,9 @@
   // „push zo servera nezmaze rozpisany formular" sa inak nedal overit nicim
   // nez klikanim (rovnaky dovod ako pri `matRenderBody`).
   if (typeof module !== 'undefined' && module.exports){
-    module.exports = { rdHandleHint: rdHandleHint, rulesToolsHtml: rulesToolsHtml, rdValidate: rdValidate,
+    module.exports = { rdHandleHint: rdHandleHint, rdRuleTitle: rdRuleTitle,
+                       rdIsLegacySlide: rdIsLegacySlide, RD_LEGACY_SLIDE_HINT: RD_LEGACY_SLIDE_HINT,
+                       rulesToolsHtml: rulesToolsHtml, rdValidate: rdValidate,
                        rdLabel: rdLabel, rdRoleDesc: rdRoleDesc,
                        rulesRenderBody: rulesRenderBody, rdApplyState: rdApplyState,
                        rdCollectRules: rdCollectRules, RD: RD,

@@ -13274,8 +13274,10 @@ module NoxunSuRunner
       # dava receptove sety zasuviek s `height_variant`, a marker je LAZY podla
       # OBSAHU, takze najvyssi vyhrava a subor dostane std 4. Klasifikovany set
       # SAM O SEBE (nas `kovb1_class`) by dal 3 — to overuje headless sada.
-      ok("KOV-B1: subor kniznice nesie std 4 (#{doc['std']})",
-         doc['std'] == e::HardwareSets::STD_HEIGHT_VARIANT)
+      # D-118b: seed nesie Tip-On sety s vyhradenou bunkou `none`, takze najvyssi
+      # marker je uz 5.
+      ok("KOV-B1: subor kniznice nesie std 5 (#{doc['std']})",
+         doc['std'] == e::HardwareSets::STD_SKIP_CODE)
       e::JsonFileStore.invalidate(e::HardwareSets.path)
       e::HardwareSets.reset_library_state!
       ok('KOV-B1: a TA ISTA verzia si ho hned precita ako `:ok`',
@@ -13308,8 +13310,8 @@ module NoxunSuRunner
       # (`global_default_state`) — a v nich su od tejto davky aj triedne
       # mapovania a sety zasuviek s `height_variant`. Snapshot preto nesie std 4,
       # nie 3; nas klasifikovany set je v nom tak ci tak (overuje sa vyssie).
-      ok("KOV-B1: snapshot v NOXUN dict nesie std 4 (#{snap['std']})",
-         snap['std'] == e::HardwareSets::STD_HEIGHT_VARIANT)
+      ok("KOV-B1: snapshot v NOXUN dict nesie std 5 (#{snap['std']})",
+         snap['std'] == e::HardwareSets::STD_SKIP_CODE)
       exp_class = kovb1_expand(model)
       Sketchup.undo
       # POZOR: skrinka si pri stavbe zmrazila GLOBALNE predvolby, takze snapshot
@@ -13332,7 +13334,7 @@ module NoxunSuRunner
       snap2_set = snap2['sets'].is_a?(Hash) ? snap2['sets'][KOVB1_SID] : nil
       ok("KOV-B1: legacy definicia ostava NEZARADENA (std snapshotu #{snap2['std']})",
          snap2_set.is_a?(Hash) && snap2_set['use_type'].nil? && snap2_set['series'].nil? &&
-         snap2['std'] == e::HardwareSets::STD_HEIGHT_VARIANT)
+         snap2['std'] == e::HardwareSets::STD_SKIP_CODE)
       exp_plain = kovb1_expand(model)
       ok('KOV-B1: NAKUP je s klasifikaciou aj bez nej TOTOZNY (kody, pocty, ceny)',
          JSON.generate(exp_class) == JSON.generate(exp_plain))
@@ -16673,6 +16675,102 @@ module NoxunSuRunner
        d88_face_mat(fresh, 2, :min).nil?)
   end
 
+
+  # --- D-118b: PTOs modul a vedome prazdna bunka v ZIVOM nakupe ---------------
+  #
+  # Headless sada overuje expanziu nad rucne poskladanym stavom; TU ide o cely
+  # retazec: kniznica -> predvolby projektu -> vlozena skrinka -> nakup. Prave
+  # tu by sa ukazalo, keby migracia kniznice na disku neprebehla alebo keby
+  # projektovy snapshot niesol este stary set bez modulu.
+  def d118b_expand(model)
+    e::ProductionCore.hardware_expansion(model, e::Bom.collect(model))
+  end
+
+  def d118b_row(exp, code)
+    Array(exp && exp['rows']).find { |r| r['code'].to_s == code }
+  end
+
+  # Sokel 150 mm = noha z pasma AXILO. Pri predvolenych 100 mm by pasmovy set
+  # noh vydal ORANGE `param_band_missing` a zahmlil by tvrdenie „ziadna
+  # nemapovana polozka" (test ma merat ZASUVKU, nie znamy stav noh).
+  def d118b_params(depth)
+    kovc2b_params({ 'depth' => depth.to_f, 'floor_height' => 150.0 },
+                  { 'opening_mode' => 'tipon', 'drawer' => { 'construction' => 'metal' } })
+  end
+
+  def run_d118b(model)
+    cleanup(model)
+    # Stav katalogu je MODULOVA PAMAT na sedenie — predosle sekcie ho mohli
+    # posudit nad svojim sandboxom, takze bez resetu by `assess!` nad REALNYM
+    # suborom uz nebezal a migracia seedu (v2 -> v3) by sa nespustila.
+    e::JsonFileStore.invalidate(e::HardwareCatalog.path)
+    e::HardwareCatalog.reset_state!
+    e::HardwareCatalog.assess!
+    cat_doc = JSON.parse(File.binread(e::HardwareCatalog.path)) rescue {}
+    ok("D-118b: katalog na disku je zmigrovany na seed v#{e::HardwareCatalog::SEED_SET_VERSION} "        "(#{cat_doc['seed_version']}, poloziek #{Array(cat_doc['items']).length})",
+       cat_doc['seed_version'].to_i == e::HardwareCatalog::SEED_SET_VERSION)
+    ok('D-118b: katalog pozna PTOs modul 352908 s nazvom aj cenou',
+       (e::HardwareCatalog.find('352908') || {})['name_sk'].to_s.include?('PTOs') &&
+       (e::HardwareCatalog.find('352908') || {})['price_eur_vat'].to_f > 0)
+    # Predvolby projektu zo ZIVEJ (uz zmigrovanej) kniznice — inak by test meral
+    # snapshot z predosleho behu, nie dnesny seed.
+    state = e::HardwareSets.global_default_state
+    return ok('D-118b: globalna kniznica sa da precitat', false) if state.nil?
+
+    model.start_operation('NOXUN TEST: predvolby setov', true)
+    wrote = e::HardwareSets.write_project_state(model, state)
+    model.commit_operation
+    ok('D-118b: projekt ma cerstve predvolby zo zivej kniznice', wrote == true)
+
+    snap = JSON.parse(model.get_attribute(e::Store::DICT, e::HardwareSets::MODEL_KEY).to_s) rescue nil
+    ok("D-118b: snapshot nesie marker std #{e::HardwareSets::STD_SKIP_CODE} (starsi plugin ho odmietne)",
+       snap.is_a?(Hash) && snap['std'].to_i == e::HardwareSets::STD_SKIP_CODE)
+
+    # --- 1) Tip-On zasuvka: kit AJ PTOs modul --------------------------------
+    inst = e::CabinetBuilder.build(model, d118b_params(500))
+    return ok('D-118b: vlozenie korpusu s Tip-On zasuvkou', false) unless inst
+
+    sl = kovc2b_slides(inst)
+    ok("D-118b: recept vydal PRAVE JEDNU polozku vysuvu (#{sl.length})",
+       sl.length == 1 && sl.first['rule_id'] == 'recipe:atira_p2o_v1')
+    exp = d118b_expand(model)
+    kit = d118b_row(exp, '357724')
+    mod = d118b_row(exp, '352908')
+    ok("D-118b: nakup ma kit 357724 (NL 470) — #{kit ? kit['quantity'] : 'chyba'}",
+       kit && kit['quantity'].to_i == 1)
+    ok("D-118b: nakup ma AJ PTOs modul 352908 v pocte 1 (#{mod ? mod['quantity'] : 'chyba'})",
+       mod && mod['quantity'].to_i == 1)
+    ok("D-118b: modul ma nazov aj cenu z katalogu (#{mod && mod['name_sk']} / #{mod && mod['price_eur_vat']})",
+       mod && !mod['name_sk'].to_s.strip.empty? && mod['price_eur_vat'].to_f > 0 &&
+       mod['missing'] != true)
+    ok("D-118b: ziadna nemapovana polozka (#{Array(exp['unmapped']).map { |u| u['reason'] }.inspect})",
+       Array(exp['unmapped']).empty?)
+
+    # --- 2) NL 620: kit typu PTO — modul VEDOME nepribudne -------------------
+    par = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    par['fronts'] = e::Fronts.reattach_server_drawer_fields(par['fronts'],
+                                                           (e::Store.config(inst) || {})['fronts'])
+    par['depth'] = 700.0
+    e::CabinetBuilder.rebuild(model, inst, par)
+    exp2 = d118b_expand(model)
+    sl2 = kovc2b_slides(inst)
+    nl2 = sl2.first && sl2.first['params']['nominal_length'].to_f
+    ok("D-118b: hlbka 700 dala NL 620 (#{nl2})", nl2 && (nl2 - 620.0).abs <= TOL)
+    ok('D-118b: pri NL 620 je v nakupe kit 357716', !d118b_row(exp2, '357716').nil?)
+    ok('D-118b: a PTOs modul UZ NIE (vedome prazdna bunka)', d118b_row(exp2, '352908').nil?)
+    ok("D-118b: a NEVZNIKLA ziadna oranzova ani cervena (#{Array(exp2['unmapped']).map { |u| u['reason'] }.inspect})",
+       Array(exp2['unmapped']).empty?)
+
+    # --- 3) config nesie novu schemu ----------------------------------------
+    ok("D-118b: ulozeny config ma schemu #{e::CabinetBuilder::CONFIG_SCHEMA}",
+       (e::Store.config(inst) || {})['config_schema'].to_i == e::CabinetBuilder::CONFIG_SCHEMA)
+    cleanup(model)
+    ok('D-118b: cleanup (model prazdny)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: D-118b vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
   def run_kovc2b(model)
     cleanup(model)
     markers = []
@@ -17754,6 +17852,7 @@ module NoxunSuRunner
     run_kovd3b(model)        # KOV-D3b: CESTA Z KARTY nad dvojprvkovym fixturnym registrom — bez v2 karta ponuku nedostane vobec; s v2 nesie `upgrade.available` (plny aj lahky push), citaci callback dopadu vrati cisla (chrbat v1->v2, preneseny zamok NL, kod kitu) + ODTLACOK a NEZAPISE nic; ZMENA SKRINKY po nahlade zapis ODMIETNE bez kroku Spat (Codex #315 P1), potvrdeny zapis s tokenom a cerstvym odtlackom vymeni ref, preadresuje zamok a prestava dielce v JEDNEJ operacii (Spat = 1 krok, Redo obnovi ref+zamok+geometriu sucasne), odmietnuty preflight odpovie `ok:false` a nenechá ZIADNY krok Spat
     run_kovd4(model)         # KOV-D4: PAMAT pri prechode na dvierka — prechod zasuvka -> dvierka -> zasuvka ide TOU ISTOU cestou ako panel (klient serverove polia neposiela): pripnuty recept aj zamok NL prezije, dormantny zamok NEMA chipy osi, po navrate sa zamok znovu VALIDUJE stavbou (dlzka, geometria aj nakupny kit); zmena otvarania pripne INY recept a stary zamok ostava dormantny (dlzka je z automatu, riadok nesvieti ako aktivny), navrat na classic ho zase aktivuje
     run_kovd5(model)         # KOV-D5: ABS farbenie dielcov zasuviek — chrbat Atiry ma pasku na HORNEJ ploske (dolna aj velke plochy cisté), dno ziadnu; Quadro bok boxu aj vnutorne celo tiez HORE; Kontrola olepov zvyrazni TU ISTU ploskou (aj pri starom modeli, kde osi pochadzaju z ROLY); Spat aj Redo mapovanie nemenia a prestavba starej zakazky farbu doplni
+    run_d118b(model)         # D-118b: PTOs modul a vedome prazdna bunka v ZIVOM retazci kniznica -> predvolby projektu -> vlozena Tip-On zasuvka -> nakup: pri NL 470 pribudne modul 352908 (1 ks, nazov z katalogu), pri NL 620 (kit typu PTO) modul VEDOME nepribudne a NEVZNIKNE ziadna oranzova; snapshot nesie std 5 a config schemu 8
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

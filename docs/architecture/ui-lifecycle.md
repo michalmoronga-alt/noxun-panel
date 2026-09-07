@@ -2108,6 +2108,12 @@ vykonať); generáciu zdvíha naďalej VÝHRADNE `push_state`. Po zápise do mod
 Kovanie Inspectora) a `refresh_if_open(bump: true)` (prestavba VŠETKÝCH korpusov mení kusovník, nákupný zoznam aj rozpočet), a to v TOMTO poradí (vzor
 `refresh_studio_after_model_write`). Testy: `tests/pure/test_st3b_rules.rb`, `tests/js/test_st3b_rules.js`, in-SketchUp sekcia **`run_st3b`**.
 
+**D-118b — riadok pravidla sa prizná, čím je.** Pravidlo `vysuvy-nl-podla-hlbky` beží od KOV-C2b už LEN na zásuvkových čelách BEZ systému zásuvky (čelo so systémom
+Atira/Quadro dostane kód z receptu), ale v zozname vyzeralo ako plnohodnotné pravidlo výsuvov. Riadok preto dostal vlastný titulok **„Výsuv — staré zákazky bez systému
+zásuvky"** (`rdRuleTitle`, iba pre tento `rule_id`) a jednovetový hint pod radom dĺžok. **`rdLabel` sa NEMENÍ** — je to spoločný slovník typov kovania so serverovou
+`HardwareRules.label_for` (guard test na zhodu) a tu ide o titulok RIADKU, nie o premenovanie typu `slide`. Pravidlo sa **nemaže**: starým zákazkám by ticho vypadli výsuvy
+z nákupu.
+
 ### StudioModelWatch — indikátor neaktuálnosti okna (22.8., „Obnoviť" zožltne)
 
 Štúdio čísla **neprepočítava samo** — kým sa nestlačí „Obnoviť", visia v ňom čísla z posledného prepočtu. Model sa medzitým mohol zmeniť (prestavba skrinky z Inspectora, posun,

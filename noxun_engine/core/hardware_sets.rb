@@ -128,7 +128,26 @@ module Noxun
       # LEN kniznica/snapshot, v ktorej NIEKTORY set pole naozaj nesie; obsah
       # s triednym klucom bez tohto pola ostava na 3.
       STD_HEIGHT_VARIANT = 4
-      STD_SUPPORTED   = [STD, STD_PARAM_FORMS, STD_CLASSIFIED, STD_HEIGHT_VARIANT].freeze
+
+      # D-118b: bunka radu s hodnotou `SKIP_CODE` („vedome bez kodu"). Starsi
+      # plugin ju NEPOZNA — `member_code` mu vrati kod „none", takze by do
+      # NAKUPU napisal riadok s neexistujucim kodom (sonda nad v0.9.42 to
+      # potvrdila; kniznicna aj sablonova brana taky obsah prijmu). Marker je
+      # LAZY podla OBSAHU: std 5 dostane LEN kniznica/snapshot, v ktorych sa
+      # sentinel naozaj vyskytuje — ostatny obsah ostava na 1–4 a starsie
+      # verzie ho citaju dalej.
+      STD_SKIP_CODE = 5
+      STD_SUPPORTED   = [STD, STD_PARAM_FORMS, STD_CLASSIFIED, STD_HEIGHT_VARIANT,
+                         STD_SKIP_CODE].freeze
+
+      # D-118b: VYHRADENA hodnota bunky `code_by_nl` = „tato dlzka vedome NEMA
+      # kod, clen sa preskoci". Chybajuci kluc znamena nadalej NEMAPOVANE
+      # (ORANGE) — je to ta ista rodina ako „pritomna neplatna hodnota nie je
+      # to iste ako nepritomna" z KOV-D. Doslo to preto, ze rad Atira PTOs
+      # potrebuje modul P2O na kazdej dlzke OKREM 620 mm, kde je kit typu `PTO`
+      # a modul ma v sebe: vynechany kluc by hlasil chybajuci kod tam, kde
+      # ziadny nema byt. Kody su ciselne, takze kolizia nehrozi.
+      SKIP_CODE = 'none'
 
       # v2 (H1a): +set „Nohy podla vysky sokla" (param_bands) a migracia
       # globalneho defaultu leg z 'nohy-klzak-17' na neho.
@@ -137,7 +156,12 @@ module Noxun
       # v4 (KOV-D1c): +6 setov Atira ANTRACIT (3 vysky x 2 otvarania). LEN sety —
       # `MAPPING_ADDITIONS` sa NEMENI, predvolba ostava biela; antracit si
       # pouzivatel vybera vedome v Pravidlach Studia alebo na karte cela.
-      SEED_VERSION = 4
+      # v5 (D-118b): oprava kodu 348777 -> 357889 (antracit H70/470 NIE JE
+      # K-sada) + PTOs modul ako DRUHY clen siestich Tip-On setov + premenovanie
+      # legacy setu na „Výsuv (staré zákazky)". Prvy seed, ktory MENI obsah uz
+      # existujucich setov — preto k nemu patri `LEGACY_SEED_SHAPES` a krok
+      # „nahrad NEDOTKNUTY seed tvar" v `merge_seed`.
+      SEED_VERSION = 5
       FILE         = 'hardware_sets.json'
       MODEL_KEY    = 'hardware_sets' # kluc snapshotu v NOXUN dict na modeli
 
@@ -161,11 +185,15 @@ module Noxun
       # pritomny, ale jeho hodnota sa neda pouzit (prazdna, poskodeny selektor).
       # Vlastny dovod, nie `class_unmapped`: chybajuce mapovanie navadza na
       # „Doplniť nové predvoľby", pokazene na opravu TEJTO skrinky.
+      # D-118b: `members_skipped` = set sa NAŠIEL a sedel, ale pre TÚTO položku
+      # nevydal ANI JEDEN nákupný riadok — všetky jeho členy mali vyhradenú
+      # bunku `none`. Pri receptovej zásuvke je to fail-closed prípad: dielce sú
+      # postavené, nákup by bol prázdny a Kontrola by mlčala (Astra #21 BLOCKER 3).
       UNMAPPED_REASONS = %w[no_set set_missing set_type_mismatch nl_missing
                             param_band_missing selector_unresolved
                             length_unsupported library_incompatible
                             class_unmapped set_incompatible mapping_invalid
-                            drawer_kit_missing].freeze
+                            members_skipped drawer_kit_missing].freeze
 
       # KOV-D1a: kluc MARKERA neplatneho mapovania. Marker je JEDINY tvar, ktory
       # v mape znamena „kluc tu je, ale hodnota sa neda pouzit"; vyraba ho VYHRADNE
@@ -319,7 +347,7 @@ module Noxun
         { 'set_id' => 'nohy-axilo-150', 'name' => 'Noha AXILO 150 mm',
           'generic_type' => 'leg',
           'members' => [{ 'code' => '367823', 'per' => 'unit', 'qty' => 1 }] },
-        { 'set_id' => 'vysuv-atira-biela-h70', 'name' => 'Atira biela H70 (rad podľa NL)',
+        { 'set_id' => 'vysuv-atira-biela-h70', 'name' => 'Výsuv (staré zákazky)',
           'generic_type' => 'slide',
           'members' => [
             { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
@@ -368,7 +396,10 @@ module Noxun
           'members' => [
             { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
               'code_by_nl' => { '350' => '357722', '420' => '357723', '470' => '357724',
-                                '520' => '357725', '620' => '357716' } }
+                                '520' => '357725', '620' => '357716' } },
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'PTOs mechanizmus',
+              'code_by_nl' => { '350' => '352908', '420' => '352908', '470' => '352908',
+                                '520' => '352908', '620' => 'none' } }
           ] },
         { 'set_id' => 'atira-biela-h144-p2o', 'name' => 'Atira biela H144 — Tip-On',
           'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'tipon',
@@ -377,7 +408,10 @@ module Noxun
           'members' => [
             { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
               'code_by_nl' => { '350' => '357761', '420' => '357762', '470' => '357763',
-                                '520' => '357764', '620' => '357755' } }
+                                '520' => '357764', '620' => '357755' } },
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'PTOs mechanizmus',
+              'code_by_nl' => { '350' => '352908', '420' => '352908', '470' => '352908',
+                                '520' => '352908', '620' => 'none' } }
           ] },
         { 'set_id' => 'atira-biela-h176-p2o', 'name' => 'Atira biela H176 — Tip-On',
           'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'tipon',
@@ -386,7 +420,10 @@ module Noxun
           'members' => [
             { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
               'code_by_nl' => { '350' => '357801', '420' => '357802', '470' => '357803',
-                                '520' => '357812', '620' => '357795' } }
+                                '520' => '357812', '620' => '357795' } },
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'PTOs mechanizmus',
+              'code_by_nl' => { '350' => '352908', '420' => '352908', '470' => '352908',
+                                '520' => '352909', '620' => 'none' } }
           ] },
         # === KOV-D1c: ATIRA ANTRACIT (alternativna rodina, NIE predvolba) =====
         # Kody = draft #13 §1 tabulka „Antracit kity Atira" (Demos 6.9.2026).
@@ -412,7 +449,7 @@ module Noxun
               # 350 = 357887 (Michal overil 6.9. v Demose), 470 = 348777 (kod
               # mimo cislenej rady antracitu — je to tak v katalogu).
               'code_by_nl' => { '350' => '357887', '420' => '357888',
-                                '470' => '348777', '520' => '357890' } }
+                                '470' => '357889', '520' => '357890' } }
           ] },
         { 'set_id' => 'atira-antracit-h144-sisy', 'name' => 'Atira antracit H144 — klasické',
           'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'classic',
@@ -442,7 +479,10 @@ module Noxun
             { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
               # NL 620 antracit nema v ziadnej vyske -> RED.
               'code_by_nl' => { '350' => '357914', '420' => '357915',
-                                '470' => '357916', '520' => '357917' } }
+                                '470' => '357916', '520' => '357917' } },
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'PTOs mechanizmus',
+              'code_by_nl' => { '350' => '352908', '420' => '352908',
+                                '470' => '352908', '520' => '352908' } }
           ] },
         { 'set_id' => 'atira-antracit-h144-p2o', 'name' => 'Atira antracit H144 — Tip-On',
           'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'tipon',
@@ -451,7 +491,10 @@ module Noxun
           'members' => [
             { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
               'code_by_nl' => { '350' => '357955', '420' => '357956',
-                                '470' => '357957', '520' => '357958' } }
+                                '470' => '357957', '520' => '357958' } },
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'PTOs mechanizmus',
+              'code_by_nl' => { '350' => '352908', '420' => '352908',
+                                '470' => '352908', '520' => '352908' } }
           ] },
         { 'set_id' => 'atira-antracit-h176-p2o', 'name' => 'Atira antracit H176 — Tip-On',
           'generic_type' => 'slide', 'use_type' => 'drawer', 'opening_mode' => 'tipon',
@@ -460,7 +503,10 @@ module Noxun
           'members' => [
             { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada',
               'code_by_nl' => { '350' => '357996', '420' => '357997',
-                                '470' => '357998', '520' => '357999' } }
+                                '470' => '357998', '520' => '357999' } },
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'PTOs mechanizmus',
+              'code_by_nl' => { '350' => '352908', '420' => '352908',
+                                '470' => '352908', '520' => '352908' } }
           ] },
         # Quadro V6 vyskove varianty NEMA — `height_variant` preto CHYBA
         # (a mapovanie na neho smie ukazovat pevnym `set_id`).
@@ -501,11 +547,114 @@ module Noxun
       # Povodne (v1) seed tvary setov, ktorych migracia sa TYKA. Vzor
       # HardwareRules::LEGACY_SEED_SHAPES: dotkne sa LEN preukazatelne
       # NEZMENENEHO seed riadku; akykolvek pouzivatelsky zasah = ruky prec.
+      # D-118b: seed v5 je PRVY, ktory meni obsah UZ EXISTUJUCICH setov (zly kod
+      # 348777, chybajuci PTOs modul, premenovanie legacy setu), preto tu pribudlo
+      # OSEM predoslych (v4) tvarov. `replace_untouched_seed_sets` nahradi set LEN
+      # vtedy, ked sa jeho normalizovany tvar rovna niektoremu z nich — akakolvek
+      # uprava pouzivatela (aj premenovanie) znamena ruky prec.
       LEGACY_SEED_SHAPES = {
         'nohy-klzak-17' => [
           { 'set_id' => 'nohy-klzak-17', 'name' => 'Klzák s rektifikáciou 17 mm',
             'generic_type' => 'leg',
             'members' => [{ 'code' => '82744', 'per' => 'unit', 'qty' => 1 }] }
+        ],
+        'atira-antracit-h70-sisy' => [
+          { 'set_id' => 'atira-antracit-h70-sisy',
+            'name' => 'Atira antracit H70 — klasické',
+            'generic_type' => 'slide',
+            'use_type' => 'drawer',
+            'opening_mode' => 'classic',
+            'drawer_construction' => 'metal',
+            'manufacturer' => 'Hettich',
+            'series' => 'InnoTech Atira',
+            'height_variant' => 70,
+            'members' => [
+              { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada', 'code_by_nl' => { '350' => '357887', '420' => '357888', '470' => '348777', '520' => '357890' } } ] }
+        ],
+        'atira-biela-h70-p2o' => [
+          { 'set_id' => 'atira-biela-h70-p2o',
+            'name' => 'Atira biela H70 — Tip-On',
+            'generic_type' => 'slide',
+            'use_type' => 'drawer',
+            'opening_mode' => 'tipon',
+            'drawer_construction' => 'metal',
+            'manufacturer' => 'Hettich',
+            'series' => 'InnoTech Atira',
+            'height_variant' => 70,
+            'members' => [
+              { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada', 'code_by_nl' => { '350' => '357722', '420' => '357723', '470' => '357724', '520' => '357725', '620' => '357716' } } ] }
+        ],
+        'atira-biela-h144-p2o' => [
+          { 'set_id' => 'atira-biela-h144-p2o',
+            'name' => 'Atira biela H144 — Tip-On',
+            'generic_type' => 'slide',
+            'use_type' => 'drawer',
+            'opening_mode' => 'tipon',
+            'drawer_construction' => 'metal',
+            'manufacturer' => 'Hettich',
+            'series' => 'InnoTech Atira',
+            'height_variant' => 144,
+            'members' => [
+              { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada', 'code_by_nl' => { '350' => '357761', '420' => '357762', '470' => '357763', '520' => '357764', '620' => '357755' } } ] }
+        ],
+        'atira-biela-h176-p2o' => [
+          { 'set_id' => 'atira-biela-h176-p2o',
+            'name' => 'Atira biela H176 — Tip-On',
+            'generic_type' => 'slide',
+            'use_type' => 'drawer',
+            'opening_mode' => 'tipon',
+            'drawer_construction' => 'metal',
+            'manufacturer' => 'Hettich',
+            'series' => 'InnoTech Atira',
+            'height_variant' => 176,
+            'members' => [
+              { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada', 'code_by_nl' => { '350' => '357801', '420' => '357802', '470' => '357803', '520' => '357812', '620' => '357795' } } ] }
+        ],
+        'atira-antracit-h70-p2o' => [
+          { 'set_id' => 'atira-antracit-h70-p2o',
+            'name' => 'Atira antracit H70 — Tip-On',
+            'generic_type' => 'slide',
+            'use_type' => 'drawer',
+            'opening_mode' => 'tipon',
+            'drawer_construction' => 'metal',
+            'manufacturer' => 'Hettich',
+            'series' => 'InnoTech Atira',
+            'height_variant' => 70,
+            'members' => [
+              { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada', 'code_by_nl' => { '350' => '357914', '420' => '357915', '470' => '357916', '520' => '357917' } } ] }
+        ],
+        'atira-antracit-h144-p2o' => [
+          { 'set_id' => 'atira-antracit-h144-p2o',
+            'name' => 'Atira antracit H144 — Tip-On',
+            'generic_type' => 'slide',
+            'use_type' => 'drawer',
+            'opening_mode' => 'tipon',
+            'drawer_construction' => 'metal',
+            'manufacturer' => 'Hettich',
+            'series' => 'InnoTech Atira',
+            'height_variant' => 144,
+            'members' => [
+              { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada', 'code_by_nl' => { '350' => '357955', '420' => '357956', '470' => '357957', '520' => '357958' } } ] }
+        ],
+        'atira-antracit-h176-p2o' => [
+          { 'set_id' => 'atira-antracit-h176-p2o',
+            'name' => 'Atira antracit H176 — Tip-On',
+            'generic_type' => 'slide',
+            'use_type' => 'drawer',
+            'opening_mode' => 'tipon',
+            'drawer_construction' => 'metal',
+            'manufacturer' => 'Hettich',
+            'series' => 'InnoTech Atira',
+            'height_variant' => 176,
+            'members' => [
+              { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada', 'code_by_nl' => { '350' => '357996', '420' => '357997', '470' => '357998', '520' => '357999' } } ] }
+        ],
+        'vysuv-atira-biela-h70' => [
+          { 'set_id' => 'vysuv-atira-biela-h70',
+            'name' => 'Atira biela H70 (rad podľa NL)',
+            'generic_type' => 'slide',
+            'members' => [
+              { 'per' => 'unit', 'qty' => 1, 'label' => 'K-sada', 'code_by_nl' => { '420' => '357695', '470' => '357696' } } ] }
         ]
       }.freeze
 
@@ -1158,8 +1307,41 @@ module Noxun
         have = {}
         sets.each { |s| have[s['set_id']] = true }
         missing = SEED_SETS.reject { |s| have[s['set_id']] }
-        merged = sets + normalize_sets(missing)
+        merged = replace_untouched_seed_sets(sets) + normalize_sets(missing)
         [merged, add_mapping_seed(merged, migrate_mapping(merged, map)), true]
+      end
+
+      # D-118b: OPRAVA OBSAHU uz existujuceho seed setu. Doteraz vedel `merge_seed`
+      # iba DOPLNIT chybajuci set, takze zly kod (348777 nie je K-sada) ani chybajuci
+      # PTOs modul by sa ku kniznici, ktoru uz clovek na disku ma, NIKDY nedostali.
+      #
+      # Nahradza sa LEN set, ktoreho normalizovany tvar je PRESNE niektory predosly
+      # seed tvar (`legacy_seed_shape?` nad `LEGACY_SEED_SHAPES`). Akakolvek uprava
+      # pouzivatela — iny kod, pridany clen, aj len premenovanie — znamena RUKY PREC
+      # a info log; jeho volba ma prednost pred nasou opravou (rovnaka uvaha ako
+      # `migrate_mapping` a katalogovy `apply_seed_patch_v3`).
+      #
+      # PROJEKTOVE SNAPSHOTY sa tym NEMENIA: hotova zakazka si nesie kody, s ktorymi
+      # bola objednana. Do projektu sa oprava dostane az vedomym „Doplniť nové
+      # predvoľby" / novym vyberom setu.
+      def replace_untouched_seed_sets(sets)
+        seed_by_id = {}
+        normalize_sets(SEED_SETS).each { |s| seed_by_id[s['set_id']] = s }
+        Array(sets).map do |s|
+          sid = s.is_a?(Hash) ? s['set_id'].to_s : ''
+          fresh = seed_by_id[sid]
+          next s unless fresh && LEGACY_SEED_SHAPES.key?(sid)
+          next s if s == fresh # uz je aktualny
+
+          unless legacy_seed_shape?(s)
+            if defined?(Engine)
+              Engine.log("hardware sets: set '#{sid}' je upraveny pouzivatelom — obsah nechavam")
+            end
+            next s
+          end
+          Engine.log("hardware sets: set '#{sid}' aktualizovany na seed v#{SEED_VERSION}") if defined?(Engine)
+          deep_copy(fresh)
+        end
       end
 
       # KOV-C2a: doplni CHYBAJUCE kluce mapovania z `MAPPING_ADDITIONS`.
@@ -2010,6 +2192,11 @@ module Noxun
       # obsah ostava na svojom povodnom std (1/2) — spatna citatelnost sa
       # zbytocne neblokuje.
       def snapshot_std(mapping, sets)
+        # D-118b: NAJVYSSI marker vyhrava, preto sa sentinel testuje UPLNE PRVY.
+        # Bez neho by starsi plugin obsah prijal a z „none" spravil nakupny
+        # riadok s neexistujucim kodom.
+        return STD_SKIP_CODE if skip_code_present?(sets)
+
         # KOV-C2a: NAJVYSSI marker vyhrava, preto sa `height_variant` testuje
         # PRVY. Podmienka je uzka zamerne — std 4 dostane LEN obsah, v ktorom
         # NIEKTORY set pole naozaj nesie; kniznica a snapshot s triednym klucom
@@ -2031,6 +2218,37 @@ module Noxun
           end ||
           (mapping.is_a?(Hash) && mapping.each_value.any? { |v| v.is_a?(Hash) })
         new_forms ? STD_PARAM_FORMS : STD
+      end
+
+      # D-118b: nesie OBSAH vyhradenu hodnotu `SKIP_CODE`? Pyta sa na to marker
+      # kniznice, snapshotu aj brana sablon — jedno miesto, jedna odpoved.
+      def skip_code_present?(sets)
+        Array(sets).any? do |s|
+          next false unless s.is_a?(Hash)
+
+          Array(s['members']).any? do |m|
+            m.is_a?(Hash) && m['code_by_nl'].is_a?(Hash) &&
+              m['code_by_nl'].each_value.any? { |v| skip_code?(v) }
+          end
+        end
+      end
+
+      def skip_code?(value)
+        value.to_s.strip.downcase == SKIP_CODE
+      end
+
+      # Je clen pre TUTO polozku vedome bez kodu? (`member_code` vrati [nil, nil]
+      # aj pri legacy prazdnom `code` — supis chce rozlisit VEDOMU bunku.)
+      def skip_member?(member, it)
+        return false unless member.is_a?(Hash) && member['code_by_nl'].is_a?(Hash)
+
+        nl = numeric_param(it, 'nominal_length')
+        return false if nl.nil?
+
+        i = nl.round
+        return false unless (nl - i).abs < 1e-9
+
+        skip_code?(member['code_by_nl'][i.to_s])
       end
 
       # Zmeni projektove mapovanie JEDNEHO generickeho typu. set_def = plna
@@ -3101,9 +3319,11 @@ module Noxun
 
       def expand_members(it, set, qty, rows, unmapped, owner_seen, lookup)
         sid = set['set_id']
+        emitted = false
         Array(set['members']).each_with_index do |m, idx|
           code, miss = member_code(m, it)
           if miss
+            emitted = true # ORANGE/RED zaznam UZ vznikol — mlcanie nehrozi
             unmapped << unmapped_entry(it, sid, miss['reason'], miss.merge(
                                                                   'member_index' => idx,
                                                                   'member_label' => m['label']
@@ -3128,7 +3348,20 @@ module Noxun
           end
           src = add_row(rows, code, key ? m_qty : qty * m_qty, it, sid, lookup)
           owner_seen[key] = src if key
+          emitted = true
         end
+        return if emitted
+
+        # D-118b (Astra #21 BLOCKER 3): set nevydal NIC. Pri polozke Z RECEPTU
+        # to znamena zasuvku, ktora sa postavila, ale nema objednane kovanie —
+        # a bez tohto zaznamu by o tom nakup ani Kontrola nepovedali ani slovo
+        # (`unmapped_entry` dovod vzapati povysi na RED `drawer_kit_missing`
+        # s `blocks_export`). Polozky Z PRAVIDIEL sa spravaju ako doteraz:
+        # prazdny pevny kod je legitimny sposob, ako clena vypnut.
+        return unless it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE
+
+        unmapped << unmapped_entry(it, sid, 'members_skipped',
+                                   'detail' => 'set nevydal žiadnu položku')
       end
 
       # Kod clena: pevny 'code', rad 'code_by_nl' podla params.nominal_length
@@ -3145,6 +3378,12 @@ module Noxun
           return [nil, miss] unless (nl - i).abs < 1e-9
           code = member['code_by_nl'][i.to_s]
           return [nil, miss] if code.nil? || code.to_s.strip.empty?
+          # D-118b: VYPLNENA bunka `none` = vedome bez kodu -> clen sa preskoci
+          # ([nil, nil], existujuca vetva). Rozdiel oproti CHYBAJUCEMU klucu
+          # (ORANGE) je zamer: „tu ziadny kod nepatri" nie je to iste ako
+          # „na tuto dlzku sme kod nedoplnili".
+          return [nil, nil] if skip_code?(code)
+
           [code.to_s.strip, nil]
         elsif member['param_bands'].is_a?(Hash)
           param = member['param_bands']['param'].to_s
@@ -3529,7 +3768,20 @@ module Noxun
             )
             next
           end
-          next if code.nil? # clen bez kodu (legacy tvar) sa preskoci ako v expand
+          if code.nil?
+            # D-118b: VEDOME preskoceny clen (bunka `none`) sa v supise PRIZNA —
+            # inak by karta zásuvky pri NL 620 mlčala o tom, že modul tam
+            # zámerne nepatrí, a človek by hľadal chybu. Legacy clen bez kodu
+            # (prazdny pevny `code`) sa preskoci ticho ako doteraz.
+            next unless skip_member?(m, it)
+
+            out['members'] << {
+              'code' => nil, 'name' => nil, 'missing' => false, 'skipped' => true,
+              'qty' => 0, 'per' => m['per'].to_s, 'label' => m['label'],
+              'nominal_length' => numeric_param(it, 'nominal_length')
+            }
+            next
+          end
           item = lookup[code.downcase]
           per = m['per'].to_s
           out['members'] << {
@@ -3966,6 +4218,13 @@ module Noxun
         label = mm['label'].to_s.strip
         out['label'] = label unless label.empty?
         if has_code
+          # D-118b: `none` je vyhradene PRE BUNKU RADU. Ako pevny kod by
+          # znamenalo „clen, ktory nikdy nic nevyda" — teda tichy nezmysel;
+          # kto taky clen nechce, nech ho zmaze.
+          if skip_code?(mm['code'])
+            return [nil, ["#{pos}: „#{SKIP_CODE}“ sa smie použiť len v rade podľa dĺžky"]]
+          end
+
           out['code'] = mm['code'].to_s.strip
         elsif has_nl
           map, errs = validate_code_by_nl(mm['code_by_nl'], pos, strict: strict)
@@ -3994,7 +4253,9 @@ module Noxun
           elsif code.empty?
             errors << "#{pos}: dĺžka #{nl} nemá kód" if strict
           else
-            map[nl.to_s] = code
+            # D-118b: sentinel sa uklada KANONICKY malymi pismenami, aby sa
+            # „None"/„NONE" z rucneho zapisu spravali rovnako ako `none`.
+            map[nl.to_s] = skip_code?(code) ? SKIP_CODE : code
           end
         end
         errors << "#{pos}: rad je prázdny" if map.empty? && errors.empty?

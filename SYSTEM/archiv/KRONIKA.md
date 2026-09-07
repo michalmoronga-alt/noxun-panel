@@ -17,6 +17,27 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-118b — ZÁSUVKA OBJEDNÁ SPRÁVNU SADU A TIP-ON AJ MECHANIZMUS (v0.9.44, 7.9.2026).**
+  Druhá polovica D-118: to, čo strojový zber katalógu (D-118a) odhalil, sa premietlo do SETOV. Tri vecné veci — **`348777` nie je K-sada** (stránka Démosu pri ňom hovorí
+  „Priložené čelné kovanie: Nutné dokúpiť", preto je aj lacnejší; správny kód je **`357889`**, symetrický k bielej `357696`), **Tip-On K-sady neobsahujú modul P2O**
+  (zloženie kompletu 357722 = dva celovýsuvy PTOs + sada bočníc, modul `352908`/`352909` za 28,33 € s DPH v ňom nie je) a **kity typu `PTO`** (620 mm Atira, Quadro V6)
+  modul naopak **nepotrebujú** — majú push-to-open priamo vo výsuve (overené popisom výrobcu na produktovej stránke).
+  **Nový dátový kontrakt `SKIP_CODE`.** Práve tá posledná veta si vyžiadala vyhradenú hodnotu: rad Tip-On potrebuje modul na každej dĺžke OKREM 620, takže vynechaný kľúč by
+  hlásil chýbajúci kód tam, kde žiadny nepatrí. Vyplnená bunka `none` preto znamená „vedome bez kódu" (člen sa preskočí), **chýbajúci kľúč ostáva nemapovaný** — tá istá
+  rodina ako „prítomná neplatná hodnota ≠ neprítomná" z KOV-D.
+  **Tri poistky z Astra auditu (checkpoint #21), bez ktorých by kontrakt bol nebezpečný:** (1) **marker `std` 5** a **`CONFIG_SCHEMA` 8** — sonda nad v0.9.42 ukázala, že
+  starší plugin taký obsah PRIJME a do nákupu napíše riadok s kódom „none"; knižnicu a snapshot chráni marker, šablóny (`hardware_set_defs`) bump schémy. (2) **Fail-closed
+  `members_skipped`** — keby mala receptová zásuvka preskočené všetky členy, expanzia by vrátila prázdny nákup, cenu 0 a Kontrola by mlčala; teraz je to RED
+  `drawer_kit_missing` so zastaveným exportom. (3) **`replace_untouched_seed_sets`** — `merge_seed` doteraz vedel len DOPLNIŤ chýbajúci set, takže zlý kód by sa do knižnice
+  na disku nikdy nedostal; nahrádza sa len set, ktorého tvar je PRESNE predošlý seed (`LEGACY_SEED_SHAPES`, osem záznamov), akákoľvek úprava používateľa = ruky preč.
+  Audit našiel aj to, že pôvodné zadanie migrovalo sedem setov, hoci mení osem (premenovanie legacy setu na „Výsuv (staré zákazky)"), a že dovtedajšia completeness kontrola
+  nový povinný člen vôbec nechránila (číta `members.first`) — oboje je opravené.
+  **Michalove rozhodnutia k dávke:** modul je **1 ks na zásuvku** a pásmo sa volí **podľa nosnosti výsuvu** (hmotnosť čela plugin zatiaľ nepočíta — príde s KOV-E); cielené
+  tlačidlo „aktualizovať set zo knižnice" pre rozpracované zákazky **netreba**, stačí veta v poznámkach; legacy pravidlo výsuvov sa **nemaže**, len sa v Pravidlách prizná
+  ako „Výsuv — staré zákazky bez systému zásuvky" (bez neho by starým zákazkám ticho vypadli výsuvy z nákupu).
+  Testy: 3364 headless (11 nových v `test_d118b_sety.rb`, 4 mutácie overené), 95 JS sád (`test_d118b_ui.js`), in-SU sekcia `run_d118b` (živý reťazec knižnica → predvoľby
+  projektu → vložená Tip-On zásuvka → nákup).
+
 - **D-118a — KATALÓG KOVANIA UŽ POZNÁ KÓDY, KTORÉ SI PLUGIN SÁM OBJEDNÁVA (v0.9.43, 7.9.2026).**
   Postreh vznikol pri Michalovom smoke KOV-D: receptové sety zásuviek (Atira biela aj antracit, Quadro V6) nesú objednávacie kódy, ale katalóg kovania ich nepoznal — v Nákupe
   boli **„bez ceny"** a namiesto názvu holý kód. Michal ich dopĺňal ručne po jednom a sám pomenoval riziko: pri 111 kódoch sa človek pomýli.

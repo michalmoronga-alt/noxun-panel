@@ -570,8 +570,14 @@ payloade pripájajú späť podľa `front_id`, takže čelo s novým ID pamäť 
 záznam ostáva v configu, ale resolver ho nepoužije a payload mu nedá ani stav osí (chip `locked` zo záznamu cudzieho `rule_id` neexistuje). Osirotený záznam smie riadok
 ručných zásahov ukázať spolu s cestou von („zrušiť"); tichá aktivácia cudzej hodnoty je zakázaná.
 
-**MARKER `std` KNIŽNICE A SNAPSHOTU:** `1` = legacy · `2` = pásma/selector · **`3` = klasifikácia alebo triedny kľúč** · **`4` = set s `height_variant`**. Od KOV-C2a je
-čerstvá knižnica aj snapshot NOVÉHO projektu na `4` (seed nesie sety zásuviek); existujúce projekty svoj marker nemenia, kým do nich používateľ predvoľby vedome nedoplní. Marker je LAZY podľa
+**VYHRADENÁ BUNKA `none` V RADE `code_by_nl` (D-118b, v0.9.44).** Vyplnená hodnota `none` znamená **„táto dĺžka kód nemá a ani mať nemá"** → člen setu sa preskočí.
+**Chýbajúci kľúč ostáva NEMAPOVANÝ** (ORANGE, pri recepte RED) — prítomná hodnota nie je to isté ako neprítomná. Ako pevný `code` je `none` odmietnutý. Keď set pre
+receptovú položku nevydá **ani jeden** nákupný riadok (všetky členy preskočené), je to RED `drawer_kit_missing` (`base_reason: members_skipped`) so zastaveným exportom —
+zásuvka sa nikdy neobjedná „bez kovania" potichu.
+
+**MARKER `std` KNIŽNICE A SNAPSHOTU:** `1` = legacy · `2` = pásma/selector · **`3` = klasifikácia alebo triedny kľúč** · **`4` = set s `height_variant`** ·
+**`5` = set s vyhradenou bunkou `none`**. Od KOV-C2a je
+čerstvá knižnica aj snapshot NOVÉHO projektu na `4` (od D-118b na `5` — seed nesie Tip-On sety so sentinelom); existujúce projekty svoj marker nemenia, kým do nich používateľ predvoľby vedome nedoplní. Marker je LAZY podľa
 obsahu, takže čisto legacy dáta ostávajú čitateľné pre staršie verzie; obsah s vyšším `std`, než ktorý verzia pozná, je pre ňu read-only (knižnica) alebo `:invalid`
 (snapshot) — nikdy čiastočne prečítaný.
 

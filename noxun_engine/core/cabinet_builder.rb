@@ -110,7 +110,15 @@ module Noxun
       #       dielce a INY kit (Codex #307 P1). Brany su rovnake ako pri 5 a 6:
       #       dopredny guard prestavby/sablon/kopie (`newer_config?`) a exportna
       #       brana (`ProductionCore.export_blockers`).
-      CONFIG_SCHEMA = 7
+      #   8 = D-118b — set s VYHRADENOU bunkou `none` („vedome bez kodu")
+      #       cestuje v SABLONACH (`hardware_set_defs`) rovnako ako klasifikacia
+      #       pri 4. Starsi plugin sentinel NEPOZNA: `member_code` mu vrati kod
+      #       „none", takze by z takej sablony objednal NEEXISTUJUCI kod (sonda
+      #       nad v0.9.42). Kniznicu a projektovy snapshot chrani vlastny marker
+      #       (`HardwareSets::STD_SKIP_CODE`), sablonu chrani prave tento bump —
+      #       brany su tie iste ako pri 4–7 (dopredny `newer_config?` +
+      #       exportna `ProductionCore.export_blockers`).
+      CONFIG_SCHEMA = 8
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
       # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)

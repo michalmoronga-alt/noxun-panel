@@ -467,6 +467,27 @@ charakterizačný test). Päť častí:
   výsuvu k postaveným dielcom") a export stojí — to je ZÁMER: tichá zámena by objednala bielu K-sadu k antracitovej zákazke. **Completeness test** („KAŽDÁ bunka radov v1 má kit
   kód", `tests/pure/test_kovc2a_kanal_sety.rb`) preto platí LEN pre predvolenú bielu rodinu; antracit stráži vlastná sada `tests/pure/test_kovd1c_antracit.rb` (tabuľková fixtúra
   = druhý, nezávislý zápis kódov + kontrola SUROVÉHO literálu `SEED_SETS`, lebo normalizácia prázdnu hodnotu ticho zahodí). NL 260/300 z tabuľky sa neseedujú — sú mimo radov v1.
+- **Vyhradená bunka `SKIP_CODE` = „vedome bez kódu" (D-118b, v0.9.44).** Hodnota `'none'` v `code_by_nl` znamená **„táto dĺžka kód nemá a ani mať nemá"** → `member_code`
+  vráti `[nil, nil]` (existujúca vetva „člen sa preskočí"). **Chýbajúci kľúč ostáva NEMAPOVANÝ** (ORANGE / pri recepte RED) — je to tá istá rodina ako „prítomná neplatná
+  hodnota ≠ neprítomná" z KOV-D. Dôvod je dátový: rad Atira **PTOs** potrebuje modul P2O na každej dĺžke OKREM 620 mm, kde je kit typu `PTO` a modul má v sebe; vynechaný kľúč
+  by hlásil chýbajúci kód tam, kde žiadny nepatrí. Kódy sú číselné, takže kolízia nehrozí; ako **pevný `code`** je `'none'` odmietnutý (`validate_member`) a v rade sa ukladá
+  kanonicky malými písmenami. Súpis členov (`explain`) preskočený člen **prizná** (`skipped: true` → „bez kódu (netreba)"), aby karta pri NL 620 nemlčala; nákupné CSV z neho
+  nemá žiadny riadok.
+- **`std` 5 (`STD_SKIP_CODE`) — marker kompatibility sentinelu.** Testuje sa ÚPLNE PRVÝ (najvyšší marker vyhráva) a dostane ho len knižnica/snapshot, v ktorých sa `'none'`
+  naozaj vyskytuje. **Bez neho by starší plugin obsah prijal** a z bunky `none` vyrobil nákupný riadok s neexistujúcim kódom (overené sondou nad v0.9.42: knižničná aj šablónová
+  brána taký dokument prijmú a `member_code` vráti `["none", nil]`). Šablóny nesú definície setov v `hardware_set_defs`, tie marker `std` nemajú — preto k tejto dávke patrí
+  aj **`CabinetBuilder::CONFIG_SCHEMA` 7 → 8** (brány sú existujúce: dopredný `newer_config?` + exportná `ProductionCore.export_blockers`).
+- **Fail-closed, keď set nevydá NIČ (`members_skipped`).** Keby mala receptová položka výsuvu preskočené VŠETKY členy, expanzia by vrátila prázdne `rows`, prázdne `unmapped`
+  a cenu 0 — zásuvka postavená, nákup prázdny, Kontrola ticho (Astra #21 BLOCKER 3). `expand_members` preto sleduje, či vôbec niečo vydal, a pri položke so `source: 'recipe'`
+  zapíše `members_skipped`, ktorý sa štandardnou cestou povýši na RED `drawer_kit_missing` s `blocks_export`. Preskočenie JEDNÉHO člena je legitímne; položky z PRAVIDIEL sa
+  nemenia (prázdny pevný kód je legálny spôsob, ako člena vypnúť).
+- **Seed `SEED_VERSION` 4 → 5 (D-118b) — PRVÝ seed, ktorý MENÍ obsah existujúcich setov.** Tri veci: (1) `atira-antracit-h70-sisy` NL 470 **`348777` → `357889`** (348777 nie je
+  K-sada — čelné kovanie treba dokúpiť, overené na produktovej stránke), (2) šesť Tip-On setov dostalo **druhý člen „PTOs mechanizmus"** (`352908` pre 30 kg, `352909` pre 50 kg
+  kit H176/520, `none` pri NL 620) — K-sada ostáva PRVÝM členom, lebo completeness test KOV-C2a číta `members.first`, (3) legacy `vysuv-atira-biela-h70` sa premenoval na
+  **„Výsuv (staré zákazky)"**. Doteraz vedel `merge_seed` iba DOPLNIŤ chýbajúci set, preto pribudol krok **`replace_untouched_seed_sets`**: nahradí LEN set, ktorého
+  normalizovaný tvar je PRESNE niektorý predošlý seed tvar (`LEGACY_SEED_SHAPES`, teraz osem záznamov) — akákoľvek úprava používateľa (aj len premenovanie) znamená ruky preč
+  a info log. **Projektové snapshoty sa nemenia nikdy**: hotová zákazka si nesie kódy, s ktorými bola objednaná, a oprava sa do nej dostane až vedomým „Doplniť nové predvoľby"
+  alebo novým výberom setu.
 - **Kompatibilita vybraného setu (`set_incompatible_info`)** beží v `expand` AJ v `explain` (panel a súpis sa nesmú rozísť) hneď za `set_type_mismatch` a porovnáva
   `opening_mode`, `drawer_construction`, **`manufacturer` + `series` ↔ `params.system`** (uzavretý `SYSTEM_IDENTITY`: `atira` → Hettich/InnoTech Atira, `quadro_v6` →
   Hettich/Quadro; neznámy systém = fail-closed) a **`height_variant` setu ↔ `params.height_variant`** (presne, bez zaokrúhľovania). Bez toho by triedny kľúč sám nedokázal, že

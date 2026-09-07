@@ -300,24 +300,25 @@ NxTest.test('KOV-D2a (R1): panelove polia a whitelist normalizacie su TEN ISTY z
                       'panel by inak ulozil pole, ktore normalizacia zahodi')
 end
 
-NxTest.test('KOV-D2a (R1): CONFIG_SCHEMA je 7, aktivacia zasuviek ostava 5') do
+NxTest.test('KOV-D2a (R1): CONFIG_SCHEMA je 8, aktivacia zasuviek ostava 5') do
   c = NxD2a
-  NxTest.assert_equal(7, c.cb::CONFIG_SCHEMA)
+  # D-118b: bump na 8 — sety s vyhradenou bunkou `none` cestuju v sablonach.
+  NxTest.assert_equal(8, c.cb::CONFIG_SCHEMA)
   NxTest.assert_equal(5, c.cb::DRAWER_ACTIVATION_SCHEMA)
-  # Downgrade: plugin so schemou 7 odmietne PRESTAVBU configu 8; 7 a starsie
+  # Downgrade: plugin so schemou 8 odmietne PRESTAVBU configu 9; 8 a starsie
   # prejdu. Vyskovy zamok sa NIKDY ticho neoreze.
-  NxTest.refute(c.cb.newer_config?('config_schema' => 7))
+  NxTest.refute(c.cb.newer_config?('config_schema' => 8))
   NxTest.refute(c.cb.newer_config?('config_schema' => 6))
-  NxTest.assert(c.cb.newer_config?('config_schema' => 8))
+  NxTest.assert(c.cb.newer_config?('config_schema' => 9))
   inst = NxTest::FakeEntity.new
-  inst.set_attribute(c.e::Store::DICT, 'config', JSON.generate('config_schema' => 8))
+  inst.set_attribute(c.e::Store::DICT, 'config', JSON.generate('config_schema' => 9))
   NxTest.assert_raise(/novšej verzie/) { c.cb.guard_newer_config!(inst) }
 end
 
-NxTest.test('KOV-D2a (R1): prestavba zapise schemu 7 aj bez zamku') do
+NxTest.test('KOV-D2a (R1): prestavba zapise schemu 8 aj bez zamku') do
   c = NxD2a
   cfg = c.cb.normalize(c.params)
-  NxTest.assert_equal(7, c.cb.cabinet_config(cfg)[:config_schema])
+  NxTest.assert_equal(8, c.cb.cabinet_config(cfg)[:config_schema])
 end
 
 # ============================================================================

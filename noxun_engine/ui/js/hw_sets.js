@@ -112,13 +112,25 @@
     }
     return key ? ('podľa: ' + key) : 'podľa parametra';
   }
+  // D-118b: vyhradená hodnota bunky radu — TEN ISTÝ reťazec ako serverová
+  // `HardwareSets::SKIP_CODE` (zhodu stráži guard test); znamená „táto dĺžka
+  // vedome nemá kód", nie chýbajúci údaj.
+  var HWS_SKIP_CODE = 'none';
+  function hwsIsSkipCode(v){
+    return String(v == null ? '' : v).trim().toLowerCase() === HWS_SKIP_CODE;
+  }
   // Citatelny suhrn clena: "104717 ×1", "TipOn ×1 na dvierka",
   // "rad NL: 420→357695, 470→357696", "podľa výšky sokla: 17–21 → 82744 · …".
   function hwsMemberSummary(m, params){
     if (!m) return '';
     if (m.code_by_nl){
+      // D-118b: vyhradená hodnota `none` = „táto dĺžka vedome nemá kód".
+      // V súhrne sa píše po ľudsky — surové „none" by vyzeralo ako preklep.
       var pairs = Object.keys(m.code_by_nl).sort(function(a, b){ return Number(a) - Number(b); })
-        .map(function(nl){ return nl + '→' + m.code_by_nl[nl]; });
+        .map(function(nl){
+          var v = m.code_by_nl[nl];
+          return nl + '→' + (hwsIsSkipCode(v) ? 'bez kódu' : v);
+        });
       return 'rad NL: ' + (pairs.join(', ') || '—');
     }
     if (m.param_bands){

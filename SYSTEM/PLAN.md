@@ -572,10 +572,9 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   **Checklist uzáveru (per PR):** bump patch + `?v=` → testy (+ in-SU pri D2/D3/D5) → `hardware.md` (mapovanie owner kľúč, zámky per os, upgrade), `ui-lifecycle.md` (chipy,
   modal, highlight), `model-a-identita.md` (CONFIG_SCHEMA 6 v D1a, 7 v D2a; `recipe_refs` neplatný záznam), `outputs.md`, **`construction.md` pri D5** (osi deskriptora, orientácia hrán `PartFaces`) → STANDARD §6/§8.3 → D-109/D-111 stav v DOGFOODING → STAV/KRONIKA/PLAN.
 
-- **D-118 · Katalógový seed pre kódy setov** (Michal 7.9.) — **D-118a HOTOVÁ (v0.9.43, PR #320):** 114 katalógových položiek s názvom, cenou s DPH, URL, dátumom overenia,
-  výrobcom a radou; migrácia v2→v3 dopĺňa len vymenované kódy a používateľské riadky neprepisuje. **D-118b ČAKÁ** (zadanie `_dev/BRIEF_d118b.md`, audit Astra #21 zapracovaný):
-  oprava `348777`→`357889` v antracitovom sete, **PTOs mechanizmus** `352908`/`352909` ako druhý člen šiestich Tip-On setov (kontrakt `code_by_nl: none` + marker
-  kompatibility + fail-closed pri sete bez kódov), premenovanie legacy pravidla „Výsuv — staré zákazky bez systému zásuvky".
+- **D-118 · Katalógový seed pre kódy setov — ✅ HOTOVÁ CELÁ** (Michal 7.9.; **D-118a** PR #320 v0.9.43 + **D-118b** PR #321 v0.9.44). Katalóg má 114 položiek s overeným
+  názvom, cenou s DPH, URL, dátumom, výrobcom a radou; sety objednávajú správnu antracitovú K-sadu (`357889`) a Tip-On zásuvka aj **PTOs modul** (`352908`/`352909`).
+  Plné znenie + čo z toho platí ďalej: [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).
 - **KOV-E · „VÝKLOPY HK/HL" (po C, D):** `GENERIC_TYPES + lift` (plan_schema bump, `guard_unknown_hardware!` už chráni starší plugin) · roly `flap` z KOV-A dostanú
   pravidlo kind `weight_bands` (hmotnosť čela = rozmery × hrúbka × `Materials.density_for(typ)`; hustota nil → konzervatívny odhad + ORANGE) s tabuľkou HK top / HL top
   (data pack `lifts.json` z OFICIÁLNYCH Blum hodnôt — PDF follow-up pred zápisom; UNCONFIRMED sa nezapíše) · sety klasifikácia `lift × opening` (Tip-On = piest per owner)

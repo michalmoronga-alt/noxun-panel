@@ -95,7 +95,8 @@ module NxD118
     HWS::SEED_SETS.each do |s|
       Array(s['members']).each do |m|
         out << m['code'] if m['code']
-        (m['code_by_nl'] || {}).each_value { |c| out << c }
+        # D-118b: vyhradena bunka `none` NIE JE kod — do katalogu nepatri.
+        (m['code_by_nl'] || {}).each_value { |c| out << c unless HWS.skip_code?(c) }
         ((m['param_bands'] || {})['bands'] || []).each { |b| out << b['code'] if b['code'] }
       end
     end

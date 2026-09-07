@@ -508,8 +508,8 @@ NxTest.test('KOV-C2a (R4): SEEDNUTY SUBOR nesie triedne mapovania (nielen `seed_
     end
     NxTest.assert_equal('vysuv-atira-biela-h70', doc['mapping']['slide'],
                         'legacy mapovanie `slide` ostava')
-    NxTest.assert_equal(c::HWS::STD_HEIGHT_VARIANT, doc['std'],
-                        'seed nesie drawer sety s `height_variant` -> std 4')
+    NxTest.assert_equal(c::HWS::STD_SKIP_CODE, doc['std'],
+                        'seed nesie Tip-On sety s bunkou `none` -> std 5 (D-118b)')
     NxTest.assert_equal(:ok, c::HWS.library_state, 'a TA ISTA verzia si ho precita')
 
     # Predvolby NOVEHO projektu (`global_default_state`) z toho zmrazia aj
@@ -518,9 +518,9 @@ NxTest.test('KOV-C2a (R4): SEEDNUTY SUBOR nesie triedne mapovania (nielen `seed_
     gd = c::HWS.global_default_state
     NxTest.assert(gd['mapping'].key?('class:slide|classic|metal'))
     NxTest.assert(gd['sets'].key?('atira-biela-h70-sisy'))
-    NxTest.assert_equal(c::HWS::STD_HEIGHT_VARIANT,
+    NxTest.assert_equal(c::HWS::STD_SKIP_CODE,
                         c::HWS.snapshot_std(gd['mapping'], gd['sets'].values),
-                        'snapshot noveho projektu preto tiez nesie std 4')
+                        'snapshot noveho projektu preto tiez nesie std 5 (D-118b sentinel)')
   end
 end
 
