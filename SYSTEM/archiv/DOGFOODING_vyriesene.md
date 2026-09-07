@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-51** — Štandard veľkostí okien a tlačidiel — uzavreté 6.9.2026 rozhodnutím (Michal: veľkosť okien je OK; Inspector 470 × 810 z UI-B1, satelity zanikli v Štúdiu), bez PR
 - **D-118** — Katalóg kovania pozná kódy setov (114 položiek s cenou, URL a výrobcom), zásuvka antracit H70/470 objedná správnu K-sadu a Tip-On zásuvka aj PTOs modul — vyriešené 7.9.2026, PR #320 + #321, v0.9.43 + v0.9.44
 - **D-20** — Quick actions: Mower + Snaper sú jeden toolbar v balíku enginu, kópia má plnú NOXUN identitu a staré inštalácie sa odstránia samy — vyriešené 4.9.2026, PR #293 + #294, v0.9.25
 - **D-110** — Pridávanie kovaní: strom Kategória → Výrobca → Rada namiesto plochého zoznamu + modal položky s poradím polí ako dodávateľský list — vyriešené 4.9.2026, PR #290, v0.9.23
@@ -103,6 +104,17 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-51 · Štandard veľkostí okien a tlačidiel (Michal 31.7.2026; uzavreté 6.9.2026 — rozhodnutie v debate V1, bez PR)
+
+**Pôvodné znenie (presunuté z DOGFOODING.md):**
+
+**D-51 · Štandard veľkostí okien a tlačidiel** (Michal 31.7. večer) — zjednotiť šírky, rozmery a rozmiestnenie naprieč oknami (panel, Materiály, Výroba, Pravidlá, Šablóny) — dohodnúť konkrétne
+  hodnoty do UI_DIZAJN.md **pred prvým testovaním Lucie („skúška ohňom")**. *Stav: ČIASTOČNE — UI-B1 (PR #168) zaviedol mechaniku aj tabuľku rozmerov okien v UI_DIZAJN.md a vyplnil riadok Inspectora
+  (obsah 470 × 810). Riadky satelitných okien sa doplnia, keď ich prevezme Štúdio.*
+
+**Uzáver:** Michal 6.9.2026: „uzavrieť ako vyriešené — veľkosť okien je OK." UI-B1 (PR #168) dal mechaniku a tabuľku rozmerov do UI_DIZAJN.md (Inspector 470 × 810); satelitné okná
+zanikli vo fáze ŠTÚDIO, takže ďalšie riadky tabuľky nie sú potrebné. Luciin prvý test 6.9. veľkosti okien nekritizoval.
 
 ### D-118 · Kódy setov bez väzby na katalóg — plošný seed katalógu z Démosu (Michal 7.9.2026, smoke KOV-D krok 2; vyriešené 7.9.2026, PR #320 (D-118a) + #321 (D-118b), v0.9.43 + v0.9.44)
 

@@ -12,12 +12,9 @@
 *(Blok **1 · UI 2.0** je od v0.8.0 hotový a jeho plný text žije v
 [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md). Postrehy nižšie sa v ňom
 nevyriešili, takže od 26.8.2026 visia na bloku **1b · STABILIZAČNÁ REVÍZIA**, odrážka **F**
-v [PLAN.md](PLAN.md) — dnes už len **D-51**; **D-27** je vyriešené dávkou F/D-27 (v0.8.13)
-a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9.16).)*
+v [PLAN.md](PLAN.md) — **D-51 uzavreté 6.9.2026** (archív); **D-27** je vyriešené dávkou F/D-27 (v0.8.13)
+a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9.16). Skupina je prázdna.)*
 
-- **D-51 · Štandard veľkostí okien a tlačidiel** (Michal 31.7. večer) — zjednotiť šírky, rozmery a rozmiestnenie naprieč oknami (panel, Materiály, Výroba, Pravidlá, Šablóny) — dohodnúť konkrétne
-  hodnoty do UI_DIZAJN.md **pred prvým testovaním Lucie („skúška ohňom")**. *Stav: ČIASTOČNE — UI-B1 (PR #168) zaviedol mechaniku aj tabuľku rozmerov okien v UI_DIZAJN.md a vyplnil riadok Inspectora
-  (obsah 470 × 810). Riadky satelitných okien sa doplnia, keď ich prevezme Štúdio.*
 
 ## KOVANIE — vlastný blok (za GHOST VKLADANÍM; poradie rozhodol Michal 26.8.)
 
@@ -59,14 +56,6 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   `expand` skladá pri každom riadku pole `sources` (`cabinet_id`, `owner_part_key`, `generic_type`, `rule_id`, `set_id`, počet) — chýba len zobrazenie a klik-select. Návrh: rozklik riadku (vzor
   `<details>` v tabe Rozpočet) so zoznamom „CAB-003 · F2 · zásuvkové čelo — 2 ks" a klikom na výber v modeli (vzor KONTROLA tabu); ľudské názvy dielcov dodá `PartKeys.human_label` z D-92. *Stav:
   OTVORENÉ — návrh na dávku okolo okna Výroba; nízke riziko (čisté čítanie), stredný rozsah UI.*
-- **D-95 · Režim krížovej kontroly „diel po diele"** (Michal 9.8.) — pred odoslaním zákazky do výroby chýba **riadený prechod celou zákazkou**: dielec po dielci prejsť rozmery, ABS a kovanie a
-  **odškrtávať** skontrolované (so stavom, ktorý prežije zatvorenie okna). Dnes sa kontroluje preklikávaním po jednom v paneli, bez akejkoľvek stopy, čo už bolo overené. Michalov cieľ je konkrétny:
-  **KLINIKA ako prvý referenčný projekt vyrobený čisto z pluginu** s jasným, obhájiteľným výstupom. Návrh: nový režim v okne Výroba (vedľa KONTROLY) — zoznam dielcov s checkboxom, klik = výber v modeli,
-  filtre „neskontrolované / s upozornením", stav uložený v `NOXUN` dict na modeli (patrí k zákazke, nie k počítaču); semafor ostáva samostatný (automatické nálezy) — toto je **ľudská** kontrola. *Stav:
-  OTVORENÉ — väčší celok, návrh + Codex audit; kandidát hneď po dávke kovania. **Základ už stojí: D-104 + D-105** (v0.5.58/v0.5.59) dávajú vizuálnu časť pre olep — tri stavy hrany priamo v modeli, s
-  prepínačmi, živými počtami a filtrom podľa označeného. D-95 k tomu doplní **odškrtávanie so stavom uloženým v zákazke**, riadený prechod dielec po dielci a rozšírenie na **rozmery a kovanie**; z
-  pôvodného zadania ostávajú otvorené aj **šípky smeru dekoru** a **X-ray cez telesá**.*
-- **EN DANIELI textový export** výrobného zadania (Michal: „po E") — **vedome odložené z dávky E** (6.8., nič z toho neblokuje prácu so zákazkou); supplier-agnostický výstup. *Stav: čaká na prax — vytiahne sa, keď si to reálna zákazka vypýta.*
 
 ## STABILITA
 
@@ -92,15 +81,9 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   materiál per rola dielca** (police, dno, chrbát…) — uskutočniteľné (poradie override dielca > predvoľba roly > materiál skrinky), ale stredná dávka (builder, BOM, VEPO, šablóny)
   a dnes to kryje override dielca + šablóna → **mimo V1** (Michal). *Stav: OTVORENÉ — V1 len UI rework predvolieb (malá dávka); per-rola materiál v zásobníku Po V1.*
 - **Vedome odložené z dávky E — ceny (V1 rozsah)** (6.8., nič z toho neblokuje prácu so zákazkou) — **manuálne 1-klik overenie ceny** pre položky BEZ väzby na Demos a **viac URL na položke**
-  (zvyšok V1-03; dnes ich „Prepočítať ceny" preskočí) · prepínač **„na faktúru"** (×1,2 — vzor ADAMČÍK), kandidát na štvrtý cenový režim.
+  (zvyšok V1-03; dnes ich „Prepočítať ceny" preskočí) · ~~prepínač „na faktúru" (×1,2)~~ — **vyradené 6.9.2026** (Michal: existuje prepínač s DPH / bez DPH); zvyšok rozhodnutý v `zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md`.
   *(Piaty kus tej istej odkladovej sady — EN DANIELI textový export — je v skupine KONTROLA + VÝROBA; DOCX/PDF generátor a rodina dokumentov sú od 26.8. v skupine Po V1 — zásobník.)*
   *Stav: čaká na prax — vytiahne sa, keď si to reálna zákazka vypýta.*
-- **D-106 · Predbežná cena korpusu v informačnom stĺpci Základných** (Michal 20.8., smoke test Inspector reworku) — pri návrhu skrinky chýba **orientačný náklad**: koľko tá skrinka zhruba stojí ešte
-  predtým, než sa robí rozpočet celej zákazky. Údaj by stál v **informačnom stĺpci sektora Základné** (vedľa „Materiál m²", teda **žiadny nový riadok navyše**) ako text **„≈ X €"** so značkou odhadu a s
-  **tooltipom rozpadu** (materiál: plocha × cena tabule · ABS: bm × cena · kovanie: ks × cena). Dáta existujú — je to tá istá cesta, ktorou počíta tab Rozpočet (`budget`, `sheet_estimate`,
-  `hardware_catalog` ceny); ide o **odvodené čítanie**, nič sa nezapisuje. Pravidlá, ktoré platia: chýbajúca cena **nikdy nula**, ale priznaný odhad (D-61); je to **výstup, nie vstup** (text, nie pole).
-  *Stav: OTVORENÉ — zapísať na neskôr (Michal 20.8.: „zapísať na neskôr"). Zaradenie: [PLAN.md](PLAN.md) blok 4 (bloky okolo rozpočtu) — dovtedy sa nerobí.*
-- **D-10 · Presúvanie/úprava čiel priamo v náhľade** (ako drag priečok). *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
 
 ## RENDER M-R
 
@@ -111,9 +94,23 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   *Stav: na návrhovú dávku — od 26.8. SAMOSTATNE (bez väzby na D-48, ktorý je mimo V1); distribučný kanál jednoducho, napr. zdieľaný priečinok.*
 ## Po V1 — zásobník
 
+- **D-95 · Režim krížovej kontroly „diel po diele"** (Michal 9.8.) — pred odoslaním zákazky do výroby chýba **riadený prechod celou zákazkou**: dielec po dielci prejsť rozmery, ABS a kovanie a
+  **odškrtávať** skontrolované (so stavom, ktorý prežije zatvorenie okna). Dnes sa kontroluje preklikávaním po jednom v paneli, bez akejkoľvek stopy, čo už bolo overené. Michalov cieľ je konkrétny:
+  **KLINIKA ako prvý referenčný projekt vyrobený čisto z pluginu** s jasným, obhájiteľným výstupom. Návrh: nový režim v okne Výroba (vedľa KONTROLY) — zoznam dielcov s checkboxom, klik = výber v modeli,
+filtre „neskontrolované / s upozornením", stav uložený v `NOXUN` dict na modeli (patrí k zákazke, nie k počítaču); semafor ostáva samostatný (automatické nálezy) — toto je **ľudská** kontrola. *Stav: **MIMO V1 (Michal 6.9.2026)** — odškrtávanie diel po diele ide **preč natrvalo**; ostáva vizuálna kontrola (ABS · smer kresby · smer otvárania · tagy D-27),
+  neskôr presety a X-ray pohľady (koncept `zdroje/next_sessions/01_D95_PLOSNA_VYROBNA_KONTROLA.md`).*
+- **EN DANIELI textový export** výrobného zadania (Michal: „po E") — **vedome odložené z dávky E** (6.8., nič z toho neblokuje prácu so zákazkou); supplier-agnostický výstup. *Stav: **MIMO V1 (Michal 6.9.2026)** — zásobník.*
+- **D-106 · Predbežná cena korpusu v informačnom stĺpci Základných** (Michal 20.8., smoke test Inspector reworku) — pri návrhu skrinky chýba **orientačný náklad**: koľko tá skrinka zhruba stojí ešte
+  predtým, než sa robí rozpočet celej zákazky. Údaj by stál v **informačnom stĺpci sektora Základné** (vedľa „Materiál m²", teda **žiadny nový riadok navyše**) ako text **„≈ X €"** so značkou odhadu a s
+  **tooltipom rozpadu** (materiál: plocha × cena tabule · ABS: bm × cena · kovanie: ks × cena). Dáta existujú — je to tá istá cesta, ktorou počíta tab Rozpočet (`budget`, `sheet_estimate`,
+  `hardware_catalog` ceny); ide o **odvodené čítanie**, nič sa nezapisuje. Pravidlá, ktoré platia: chýbajúca cena **nikdy nula**, ale priznaný odhad (D-61); je to **výstup, nie vstup** (text, nie pole).
+  *Stav: **MIMO V1 (Michal 6.9.2026)** — zásobník.*
+- **D-10 · Presúvanie/úprava čiel priamo v náhľade** (ako drag priečok). *Stav: **MIMO V1 (Michal 6.9.2026)** — zásobník.*
 - **D-48 · Zdieľaná knižnica pre 2 PC (Michal + Lucia)** (Michal 31.7. večer; **od 26.8. MIMO V1**) — obe pracoviská majú zobrazovať ROVNAKÉ šablóny aj materiály (spolupráca, posúvanie projektov).
   Jednotný zdroj = **firemný Google Disk** (sú tam všetky firemné veci). Dotýka sa: katalóg materiálov, šablóny korpusov, pravidlá kovania (dnes všetko v lokálnom %APPDATA%).
-  *Stav: po V1 — dovtedy export/import ručne; predpoklad je perzistenčný kontrakt (CAS/rollback/konflikt 2 PC), viď audit podklad.*
+*Stav: po V1 — **rozhodnuté 6.9.2026: PRVÁ funkcia po uzávere V1** v tvare Odoslať / Aktualizovať naraz pre všetky katalógy (aj nastavenia rozpočtu a dodávateľa, prílohy
+spotrebičov, náhľady šablón), verzie per katalóg, konflikt ručne (výber verzie), štart len oznámi, koreň `H:\Môj disk\NoxunENGINE data`; odhad 3 PR — checkpoint
+`zdroje/next_sessions/V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.md`. Dovtedy export/import ručne.*
 - **DOCX/PDF generátor cenovej ponuky + rodina dokumentov** *(od 26.8. MIMO V1 — vyčlenené z odkladov dávky E)* — plný generátor ponuky do DOCX/PDF so šablónou a vizualizáciami (dnes XLSX) ·
   rodina dokumentov okolo ponuky (ponuka 3D vizualizácií, preberací protokol). *Predpoklad: neutrálny model ponuky (XLSX/DOCX/PDF ako renderery tých istých dát — audit kolo 0, P2).*
 - **D-107 · Izolácia objektu pred fotením náhľadu šablóny** (Michal 20.8., smoke test) — náhľad šablóny je dnes **kontextová fotografia** aktuálneho pohľadu dorámovaná na skrinku (UI-D2), takže do nej

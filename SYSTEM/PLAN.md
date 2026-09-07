@@ -55,7 +55,7 @@ jednej inštancie naprieč pushom je zásah do kontraktu výstupov, kandidát pr
 **F · UI dlhy po zaniknutom bloku UI 2.0** — otvorené postrehy, ktoré blok UI 2.0 nevyriešil a ktoré po jeho archivácii (26.8.) ostali bez bloku. Zaradenie je **mechanické, nie prioritizačné**
   (poradie určí Michal). **D-27** (rýchle zobraziť/skryť tagy z panela) je **✅ VYRIEŠENÉ dávkou F/D-27, v0.8.13 (28.8.2026)** — okno tagov v raile Inspectora, jeden klik = jeden krok Späť,
   jeden stav pre okno aj checkbox ghost zón; bokom opravené kreslenie kontrol nad skrytými dielcami. Plný záznam: [archiv/KRONIKA.md](archiv/KRONIKA.md) a
-  [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md). **Otvorené v F ostáva: D-51** štandard veľkostí okien a tlačidiel. Plné znenia sú v [DOGFOODING.md](DOGFOODING.md), skupina **„UI dlhy — k bloku 1b"**;
+  [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md). **Otvorené v F ostáva: D-51** štandard veľkostí okien a tlačidiel. Plné znenia sú v [DOGFOODING.md](DOGFOODING.md), skupina **„UI dlhy — k bloku 1b"**; **✅ D-51 UZAVRETÉ 6.9.2026** (Michal: veľkosť okien je OK — Inspector 470 × 810, satelity zanikli v Štúdiu; archív DOGFOODING_vyriesene).
   *(výklop ako samostatný typ čela je od triáže 1e — 30.8. — PRESUNUTÝ do okruhu konceptu 07 / package bloku 4.)* Otvorené **D-106** / **D-107** sem pôvodne patrili tiež, dnes žijú vo svojich skupinách podľa zaradenia:
   D-106 v skupine V1 DOTIAHNUTIE (blok 4), D-107 v skupine Po V1 — zásobník.
 
@@ -631,21 +631,25 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   **Checklist uzáveru:** bump patch + `?v=` → testy → outputs.md + **hardware.md** (obohatenie expansion) +
   ui-lifecycle.md odseky na mieste → STAV/KRONIKA/PLAN → D-94 do DOGFOODING_vyriesene (plný text + riadok
   navrch indexu).
-- **D-95 · Režim krížovej kontroly „diel po diele"** — riadený prechod zákazkou s odškrtávaním, stav uložený v zákazke; rozšírenie na rozmery a kovanie, šípky smeru dekoru, X-ray. *(Vizuálny základ pre olep už stojí: D-104 + D-105.)*
 - ✅ **D-112 · Zmenená ABS viditeľná vo VEPO exporte** — VEPO CSV má **deviaty stĺpec `poznamka`** (`ABS H1181 Dub Halifax tabakový`), plnený automaticky, keď sa dekor pásky líši od
   dekoru dosky; LOG dostal kontrolný oddiel „Poznámky pre VEPO" pred odoslaním objednávky. Variantu rozhodol Michalov import 3.9. — VEPO 9-stĺpcový súbor prijalo. Kontrakt je v1.1.
   **PR #287, v0.9.22.**
 - ✅ **D-113 · Krátky popis korpusu v názvoch dielcov** — názov riadku vo VEPO CSV a LOGu nesie skratku dielca a skrinky (`Bok LP s1 s2`); riadok sa **nerozpadá per skrinka**
   (nálepky VEPO tlačia ~20 znakov, agregácia kusovníka ostáva). Kusovník Štúdia má ďalej plné názvy. **PR #287, v0.9.22.**
-- **EN DANIELI textový export** výrobného zadania — supplier-agnostický výstup, vedome odložený z dávky E.
-- **Nárezový plán fáza 2** — guillotine, kerf, orezky, orientácia dekoru; vlastná heuristika v čistom Ruby (OpenCutList je GPL — algoritmus áno, kód nie), kontrakt D-19 pripravený.
-- **Stráž kolízií** — upozorniť, keď sa dielce prekrývajú alebo vyskočia mimo box (bbox check do validačnej vrstvy semaforu).
+- **D-121 · Názvy odvodených dielcov zásuviek sú pre VEPO pridlhé** — `Dno zasuvky <id čela>` prejde do exportu celé, VEPO odmieta polia nad 20 znakov; tvrdý limit 20 znakov
+  nad celým exportom + ľudské názvy (`Zas dno s1`). **FIX HNEĎ (výrobný výstup, Michal 6.9.2026)** — plné znenie v [DOGFOODING.md](DOGFOODING.md).
+- **D-122 · Kontrola zoskupí UNI dielce** — jedno upozornenie „nenahradené UNI farby" s rozklikom namiesto riadku per dielec (Michal 6.9.2026).
+- **Nárezový plán fáza 2 — PRIMITÍVNY, V1 rozsah (rozhodnuté 6.9.2026):** dnes je počet platní len odhad z m² (D-19, koeficient 10–25 %); po primitívnom pláne vieme presne,
+  koľko platní objednať, a vidieť, keď 1 dielec vychádza na celú platňu. Guillotine heuristika v čistom Ruby (OpenCutList je GPL — algoritmus áno, kód nie), smer dekoru, kerf,
+  výstup = počet platní + využitie + zvyšok + jednoduchý obrázok v sekcii Nárezový plán, rozpočet dostane presný počet vedľa odhadu. Rezy NP-1 (algoritmus, audit ÁNO) → NP-2
+  (sekcia + rozpočet). Rozsah a scope OUT: [zdroje/next_sessions/V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md) §1.
 
 ### 3 · STABILITA
 
 **Cieľ:** synchronizácia panela s modelom a okrajové situácie observerov. *(D-101 — panel po Späť/Znova — je vyriešená, PR #162.)*
 
 - **D-99 · Glitch názvov kópií pri premenovaní dielca** — nereprodukované pozorovanie, dáta boli správne; sleduje sa.
+- **D-123 · Ghost bez zámku Z položí dolnú skrinku so soklom na dno skrinky, nie na nohy** — so zámkom Z správne; **BUG**, fix s in-SU testom (Michal 6.9.2026, plné znenie v [DOGFOODING.md](DOGFOODING.md)).
 - **D-117 · Nestabilný in-SU test „GHOST suspend: aktívny nástroj po upratovaní"** — raz zlyhal (MeasureTool namiesto SelectionTool), opakovaný beh prešiel; asercia má overovať návrat PÔVODNÉHO nástroja (ghost používa `push_tool`), nie SelectionTool.
 - **Redo po zlúčených transparentných operáciách** — manuálne overiť Ctrl+Y (Ruby API nemá na Windows spoľahlivú redo akciu); otvorené od 17.7.
 - **Prepínanie typu HORNÁ/DOLNÁ na označenom korpuse občas zlyhá** — odložené, rieši sa s knižnicou/editorom typov.
@@ -654,18 +658,21 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
 
 **Cieľ:** kompletná reálna zákazka od návrhu po objednávky bez opustenia pluginu a bez ručného dopočítavania — definícia a princípy v [V1_VIZIA.md](V1_VIZIA.md).
 
-- **D-106 · Predbežná cena korpusu v informačnom stĺpci Základných** — orientačný náklad skrinky („≈ X €" s tooltipom rozpadu materiál/ABS/kovanie); odvodené čítanie, žiadny nový riadok. *Michal
-  20.8.: zapísať na neskôr — malo sa riešiť „s okruhom rozpočtu vo fáze ŠTÚDIO"; fáza ŠTÚDIO je uzavretá (v0.8.0) a D-106 v nej NEBOLO spravené, takže sa presúva sem — inak by otvorená požiadavka ostala
-  visieť v zatvorenom bloku (review #228).*
 
 - *(Kovanie — D-109/D-110/D-111 aj fáza 3 — sa 26.8. vyčlenilo do vlastného bloku **KOVANIE** vyššie.)*
-- **Spotrebiče S1** (V1-02) — katalóg, položky projektu s väzbou na skrinku, kontrola niche semaforom, sekcia v rozpočte.
-- **Ceny** (vedome odložené z dávky E, V1 rozsah): manuálne 1-klik overenie ceny pre položky BEZ väzby na Demos a viac URL na položke (zvyšok V1-03) · prepínač „na faktúru" (×1,2, kandidát na štvrtý cenový režim). **Mimo V1** (V1_VIZIA): DOCX/PDF generátor ponuky s vizualizáciami a rodina dokumentov — v zásobníku.
-- **Konštrukcia:** per-dielec odsadenia vpredu/vzadu pre strop/dno/boky (V1-01, chladničkový komín) · typy čiel **len ako cenová položka s dodávateľom** (V1-07 vo V1 rozsahu;
-  konfigurátor typov je mimo V1 — zásobník) · balík V0.4.8 z [archiv/06_PANEL_NASTAVENIA_navrh.md](archiv/06_PANEL_NASTAVENIA_navrh.md) — rohové spoje dna a stropu per strana,
-  chrbát s poldrážkou, „bez dielca" varianty s validáciou, per-dielec hrúbky a odsadenia.
+- **Spotrebiče S1** (V1-02) — **rozhodnuté 6.9.2026:** ručný katalóg (názov/model, odkazy obchod[], technické listy[] + **galéria príloh** so súbormi, rozmery per kategória),
+  spotrebič patrí **zákazke a skrinke**, cena len v rozpočte, kontrola niky vo V1 len chladnička + šírka umývačky, šablóna s tagom „spotrebičová" upozorní bez spotrebiča;
+  detail: [zdroje/next_sessions/V1_DEBATA_2026-09-06_SPOTREBICE.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_SPOTREBICE.md) + technické listy [zdroje/next_sessions/SPOTREBICE_TECHLISTY_2026-09.md](zdroje/next_sessions/SPOTREBICE_TECHLISTY_2026-09.md)
+  (predúloha hotová 6.9.; **čaká na Michalovo overenie listov** → detailná debata polí → package + `codex-audit`, nový modul). Za S1: **spotrebičová skrinka** (šablóny nad K1 + S1; nízka priorita).
+- **D-124 · Predvoľby projektu v Materiáloch rozbalené s väčšími náhľadmi** (Michal 6.9.2026) — malý UI rework; „materiál per rola dielca" = zásobník.
+- **Ceny** (vedome odložené z dávky E, V1 rozsah; **rozhodnuté 6.9.2026**): manuálne 1-klik overenie ceny („cena sedí" / „zmeniť") pre položky BEZ väzby na Demos a viac URL na položke (zvyšok V1-03) — [zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md); prepínač „na faktúru" **vyradený** (existuje s
+  DPH / bez DPH). **Mimo V1** (V1_VIZIA): DOCX/PDF generátor ponuky s vizualizáciami a rodina dokumentov — v zásobníku.
 - *(Vkladanie na klik — V1-04 — sa 26.8. vyčlenilo do vlastného bloku **GHOST VKLADANIE**; ten je od 31.8.2026 **hotový** (v0.9.0), plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).)*
-- **D-10 · Presúvanie a úprava čiel priamo v náhľade** — ako drag priečok.
+- **Konštrukcia — rozhodnuté 6.9.2026** ([zdroje/next_sessions/V1_DEBATA_2026-09-05_KONSTRUKCIA.md](zdroje/next_sessions/V1_DEBATA_2026-09-05_KONSTRUKCIA.md)): **K1 odsadenia** — dva prípady, jedna
+  hodnota per skrinka (komín vzadu: dno a strop kratšie, chrbát na ich zadnej hrane · strop zapustený vpredu), nastaviteľné, nefixované · **K2 chrbát z výstuh** — nový typ chrbta:
+  dve lišty medzi bokmi, výška parameter, ABS len hrana viditeľná z vnútra · **K3 rohová skrinka** (dolná, slepá s CR lištou: dolná skrinka + 5 dielcov rohovej zostavy + dverová
+  zóna, cr1, cr2, prepínač L/P; **nízka priorita, posledná vo V1**; outside-in + audit). Balík V0.4.8 (rohové spoje per strana, poldrážka, „bez dielca") a V1-07 čelo ako cenová
+  položka sú **mimo V1** (zásobník). K1/K2 = audit-povinné (CONFIG_SCHEMA).
 - **V1.0 zostavy — V1 rozsah PO ROZHODNUTÍ 4.9.2026:** prisunutie a kopírovanie korpusov po vlastnej osi (snaper + mower logika → draft NÁSTROJE-1) · dosky (pracovná doska, pilaster,
   soklová lišta, krycí panel) vkladané a kreslené prichytením na rohy skriniek (drafty GHOST-D1/D2) · test na kompletnej reálnej zákazke. **PO V1** (rozhodnutie 4.9., koncept 02):
   segmentová automatika — soklová lišta v celku pre segment, obklady a krycie prvky segmentu vrátane pilastra (priznaný vs. skrytý) ako generované diely, pracovné a horné krycie dosky
@@ -924,60 +931,19 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
 
 **Cieľ:** materiál vyzerá v modeli ako v skutočnosti — Luciin nástroj na vizualizácie.
 
-- **V1 rozsah — quick-win = TASK PACKAGE „M-R FOTO" (1e, zapísané 29.8.2026, rev. po slepom review #254; štart na „štartuj"):**
-  **Cieľ:** dielce v modeli nesú REÁLNU fotku dekoru namiesto plnej farby — vizualizácie bez exportu (V1_VIZIA bod 7).
-  **Scope IN:** čistý TROJSTAVOVÝ selektor `Materials.texture_state_for(material_id)` (headless — vzor `color_of`).
-  POZOR (nález GLM review po #254, overený v kóde): `:none` sa NESMIE odvodzovať z neprítomnosti `image_url` —
-  duplák URL DEDÍ zo zdroja (`duplak_record_from` ju nereject-uje) a `finalize_create` ju rozkopíruje na všetky
-  sheet záznamy vrátane zásten. Selektor rozhoduje HIERARCHICKY: (1) UNI (`uni: true`) → `[:none]` bez ohľadu na URL · (2) záznam BEZ
-  `image_url` (legacy, alebo bežný materiál, ktorému URL z katalógu UBUDLA) → `[:none]` — toto je cesta, ktorou
-  párové pravidlo odstránenia textúry reálne funguje · (3) duplák a zástena fotku LEGITÍMNE MAJÚ (URL dedia) (duplák = ten istý dekor, fotka je vizuálne správna;
-  zástena = fotka predného dekoru, rub je priznané obmedzenie fázy 2) · `[:missing]` = URL áno, lokálny súbor
-  chýba/nevalidný → existujúca textúra v modeli sa DRŽÍ · `[:path, cesta]` = aplikuj/over kľúč (apply/verify
-  je NOVÁ práca dávky — `image_cache` má dnes len fetch/validáciu/uloženie) (`core/demos/image_cache.rb`; `image_url` žije na SHEET zázname — SCHEMA_IMAGE, `family.rb` ho rozkopíruje
-  zo skupinovej URL; ŽIADNY „group" objekt neexistuje). Kľúč-attribute zároveň rozlišuje textúru položenú
-  pluginom od RUČNE namaľovanej používateľom — ručných sa plugin NIKDY nedotýka.
-  `ensure_su_material`: pri dostupnej cache textúra + fixná mierka rapportu (šírka ≈ 600 mm, doladí vizuálny test);
-  **identita textúry sa pamätá vlastným kľúčom** (napr. attribute na SU materiáli: basename+veľkosť súboru —
-  `Texture#filename` po reopene NIE JE stabilný) a prepis sa robí LEN pri zmene kľúča; **farba sa pri materiáli
-  s textúrou NENASTAVUJE** (color na textúre = tónovanie fotky!) a color write aj bez textúry len pri reálnej
-  zmene (dnešný bezpodmienečný `mt.color=` sa guarduje — rebuild nesmie špiniť model).
-  **KĽÚČOVÉ pravidlo pre stroj BEZ cache (Lucia): textúra sa NIKDY neprepisuje na farbu len preto, že cache
-  chýba** (`:missing`) — existujúca textúra v uloženom modeli sa DRŽÍ. Bez tohto by prestavba na druhom PC ticho
-  vyzliekla model z fotiek. PÁROVÁ cesta odstránenia: keď záznam `image_url` STRATÍ (`:none` po zmene katalógu)
-  alebo budúci vypínač textúry vypne, pluginová textúra (podľa kľúča) sa ZLOŽÍ na farbu — ručné textúry nie.
-  **STANDARD §7.1:** mŕtve pole `texture` na zázname variantu (deklarované, nikde neimplementované — zrkadlo
-  R-13) sa touto dávkou zo STANDARDU VYŠKRTNE; zdroj textúry je runtime cache z `image_url`, žiadne nové pole.
-  **Scope OUT:** PBR/appearance vrstva · knižnica vzhľadov · orientácia textúry podľa smeru dekoru dielca
-  (fáza 2 D-28) · pixla (V1-06) · sťahovanie fotiek (lazy re-fetch pre druhé PC = kandidát k D-48/zásobník;
-  dovtedy Lucia fotky NEuvidí pri dekoroch zakladaných u Michala — PRIZNANÉ obmedzenie, nie chyba) · UNI a legacy
-  záznamy = fallback farba; rub zásteny s vlastnou textúrou = fáza 2 (model môže byť zmiešaný fotka/farba —
-  priznať v smoke).
-  **Audit: ÁNO (úzky rozsah)** — škrt poľa zo STANDARDU (kontraktová zmena, hoci mŕtva) + dotyk cesty volanej
-  builderami; codex-audit pred implementáciou spustiť presne s týmto rozsahom.
-  **Testy a DoD:** headless — `texture_state_for` (`:path` s fotkou vrátane DUPLÁKU so zdedenou URL a zásteny
-  · `:missing` pri poškodenom/chýbajúcom súbore · `:none` pre UNI aj pri zdedenej URL · `:none` pre bežný záznam
-  po STRATE URL — hierarchia typ→URL, nikdy len URL) + kľúč identity textúry; **in-SU sekcia POVINNÁ** (cesta sa volá z builderov): rebuild s textúrou nevyrába
-  extra Undo, nemení BOM, neprepisuje textúru pri nezmenenom kľúči, model bez cache textúry DRŽÍ; mutácie min. 3
-  (texture vždy/nikdy · prepis pri chýbajúcej cache · color na textúre). VEPO/kusovník/rozpočet BAJTOVO nezmenené.
-  **Riziká:** veľkosť .skp (textúry sa vkladajú — smoke porovná na zákazke KLINIKA) · výkon pri mnohých
-  materiáloch (merať) · mierka rapportu (vizuálne doladiť; prípadný vypínač v Nastaveniach rozhodne smoke).
-  **Smoke pre Michala/Luciu:** zákazka s Demos materiálmi → dielce majú fotku; skrinka bez Demos materiálu ako
-  doteraz; ulož model, otvor na druhom PC bez cache a prestav skrinku — **fotky NESMÚ zmiznúť**; VEPO/rozpočet
-  čísla identické; veľkosť súboru pred/po.
-  **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `docs/architecture/materials.md` — odsek
-  o SU vizuálnych materiáloch sa ZAKLADÁ (dnes neexistuje; R-32 vzor: overiť proti kódu) → STANDARD §7.1 škrt →
-  STAV/KRONIKA/PLAN (package → ✅; blok 5 POKRAČUJE — bod 7 V1_VIZIA sa NEodškrtáva, kým je v bloku updater
-  a zásobník).
-- **D-28 · Textúry materiálov = M-R knižnica vzhľadov** (D-28 je do M-R zlúčená, samostatne sa nerieši): `texture_path` + render vlastnosti PBR + „Uložiť vzhľad do knižnice" + mierka rapportu; fáza 2 = orientácia textúry podľa smeru dekoru dielca. Zdroj JPG knižnica na firemnom Disku; väzba na D-48.
+- **V1 rozsah — M-R VZHĽAD (rozhodnuté 6.9.2026, NAHRÁDZA package „M-R FOTO" — Demos fotka ako textúra vypadáva):** ručné textúry z Michalovej knižnice (`E:\NOXUN\.MATERIÁLY`)
+  na všetky materiály katalógu (dosky, ABS hrany, dosky/boards), mierka + priehľadnosť + PBR v editore SketchUpu, **„Uložiť vzhľad" = `.skm`** (`Material#save_as` / `Materials#load`,
+  overené v SU 26.0), náhľad `write_thumbnail`, **orientácia textúry podľa smeru dekoru** per dielec (dekorové plochy + `position_material`), „drž textúru bez súboru" (druhé PC).
+  Rezy **MR-1 jadro** (audit ÁNO: kontrakt `appearance` v katalógu, STANDARD §7.1 pole `texture` → `appearance`) → **MR-2 UI** ‖ **MR-3 orientácia** (audit ÁNO: buildery, in-SU).
+  Návrh poradia: **prvá dávka po KOVANÍ**. Plný checkpoint: [zdroje/next_sessions/V1_DEBATA_2026-09-06_MR_VZHLAD.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_MR_VZHLAD.md). Pôvodný package M-R FOTO (29.8.) je v git histórii.
+- **D-28 · Textúry materiálov = M-R knižnica vzhľadov** (D-28 je do M-R zlúčená; **6.9.2026: splní ju blok M-R VZHĽAD vyššie okrem zdieľania knižnice — to je D-48 po V1**): `texture_path` + render vlastnosti PBR + „Uložiť vzhľad do knižnice" + mierka rapportu; fáza 2 = orientácia textúry podľa smeru dekoru dielca. Zdroj JPG knižnica na firemnom Disku; väzba na D-48.
   *(**D-87** — overlay čiar v smere dekoru — je **HOTOVÝ** v bloku KRESBA (K2, PR #188, v0.7.26); tu ostáva len **orientácia textúry** podľa smeru dekoru ako fáza 2 D-28. Overlay je kontrola, textúra je render — dve rôzne veci.)*
-- **Nástroj „pixla"** (V1-06) — ikonka na dlaždici materiálu, klik prefarbuje dielce cez `part_override` cestu (1 klik = 1 undo).
 
 ### 6 · INFRA (priebežne, podľa potreby)
 
 **Cieľ:** aby plugin a knižnice fungovali na dvoch pracoviskách (Michal + Lucia).
 
-- *(**D-48 · Zdieľaná knižnica pre 2 PC** je od 26.8. MIMO V1 — presunutá do zásobníka Po V1; katalógy sa dovtedy zdieľajú ručne export/importom.)*
+- *(**D-48 · Zdieľaná knižnica pre 2 PC** je MIMO V1 — **rozhodnuté 6.9.2026: prvá funkcia po uzávere V1** v tvare Odoslať / Aktualizovať s verziami per katalóg, konflikt ručne, koreň `H:\Môj disk\NoxunENGINE data`, odhad 3 PR: [zdroje/next_sessions/V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.md); dovtedy katalógy ručne.)*
 - **D-52 · TASK PACKAGE „AKTUALIZOVAŤ JEDNÝM KLIKOM" (1e, zapísané 30.8.2026, rev. po slepom review #255; rev. po Codex audite 2.9.; ✅ **D-52 KOMPLET 3.9.2026** — D-52a PR #277 (v0.9.9) · D-52b1 PR #278 (v0.9.13) · D-52b2 PR #279 (v0.9.14); plný text v archiv/DOGFOODING_vyriesene.md):**
   **Cieľ:** Lucia aj Michal zaktualizujú plugin bez kopírovania súborov — tlačidlo v sekcii O plugine Štúdia.
   BEZ väzby na D-48 sync.
@@ -1085,6 +1051,11 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
 - **Vyradené z V1 rozsahu 26.8.2026** (dôvody a rozsah: [V1_VIZIA.md](V1_VIZIA.md) „Mimo V1"): **D-48 G-Disk sync knižníc** (plné znenie v [DOGFOODING.md](DOGFOODING.md), skupina Po V1 — zásobník) · plné zostavy/segmenty s `attachment` (koncept 02) · plná appearance vrstva + pixla (koncept 06) ·
   DOCX/PDF ponuka s vizualizáciami a rodina dokumentov (koncept 08) · G-Disk sync D-48 (updater D-52 ostáva vo V1) · sektorová kontrola (koncept 01) ·
   konfigurátor typov čiel (V1-07 nad rámec cenovej položky) · kovanie fáza 3 geometria (plný model výklopov, výplne fáza B).
+- **Potvrdené / vyradené z V1 6.9.2026 (debata V1 po KOVANÍ, checkpointy `zdroje/next_sessions/V1_DEBATA_2026-09-0*.md`):** **D-95** krížová kontrola diel po diele — odškrtávanie
+  **preč natrvalo**, ostáva vizuálna kontrola, neskôr presety/X-ray (koncept 01) · **stráž kolízií** · **EN DANIELI** textový export · **D-106** predbežná cena skrinky ·
+  **D-10** čelá ťahaním v náhľade · **pixla** (V1-06) · rohové spoje per strana · poldrážka · „bez dielca" · V1-07 čelo ako cenová položka + konfigurátor typov čiel ·
+  horná rohová skrinka · digestorový korpus · LeMans rohový výsuv · materiál per rola dielca (D-124b) · kontrola rúra/mikro + police podľa niky + vetranie (S1 V1+) ·
+  zdieľanie `.skm` (D-48). **D-48** = prvá funkcia po V1 (blok 6).
 - **D-107 · Izolácia objektu pred fotením náhľadu šablóny** — automatické dočasné skrytie zvyšku modelu pred `view.write_image`. *Michal 20.8.: nízka priorita / vysoká náročnosť (skrývanie geometrie = zápis do modelu, undo kroky, observery). Medzitým stačí ručné „Odfotiť" v okne Šablóny — skrinku si naaranžuje a izoluje používateľ sám.*
 - Rohová a vysoká/potravinová skrinka ako **nové TYPY builderov** (odvodia sa od dolnej/hornej).
 - Zóny priamo vo viewporte (variant B vízie) — nadstavba 2D náhľadu.
