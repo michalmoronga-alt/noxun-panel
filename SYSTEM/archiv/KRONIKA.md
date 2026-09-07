@@ -35,11 +35,17 @@
   **Michalove rozhodnutia k dávke:** modul je **1 ks na zásuvku** a pásmo sa volí **podľa nosnosti výsuvu** (hmotnosť čela plugin zatiaľ nepočíta — príde s KOV-E); cielené
   tlačidlo „aktualizovať set zo knižnice" pre rozpracované zákazky **netreba**, stačí veta v poznámkach; legacy pravidlo výsuvov sa **nemaže**, len sa v Pravidlách prizná
   ako „Výsuv — staré zákazky bez systému zásuvky" (bez neho by starým zákazkám ticho vypadli výsuvy z nákupu).
+  **VEDOMÁ ODCHÝLKA OD PRAVIDLA 3 KÔL (zapísané zámerne).** Review išlo do troch kôl opráv, hoci pravidlo hovorí „PR bol zle narezaný — zavrieť a rozdeliť". Rezať sa tu
+  nedalo: dáta (PTOs modul) bez kontraktu `none` neexistujú — pri NL 620 by inak hlásili chýbajúci kód tam, kde žiadny nepatrí. Všetky tri kolá boli navyše tá istá trieda
+  nálezu („nový kontrakt má ešte jednu cestu, ktorá o ňom musí vedieť": projektový snapshot · veta semaforu · kódové pásmo), každý fix je lokálny, má test a mutáciu.
+  Poučenie do ďalších dávok: **nový sentinel = vymenovať VŠETKY cesty PRED implementáciou** (zoznam v package bol, ale nesiahal na `param_bands` ani na projektový snapshot).
   **Codex kolo 1 (3 nálezy, všetky zapracované):** P1 — „Doplniť nové predvoľby" preskakuje kľúče, ktoré projekt už má, takže **dokumentovaná cesta opravy bola no-op**
   a rozpracovaná zákazka by ďalej objednávala bez modulu; akcia preto od tejto dávky **osvieži aj nedotknuté definície snapshotu** a v statuse povie, koľko ich bolo.
   P2 — `unmapped_reason_sk` nemala pre `members_skipped` vetu a vracala zavádzajúce „typ nemá priradený set"; P2 — `explain` pri sete bez jedinej položky mlčal, kým Kontrola
   hlásila nevyrobiteľnú zásuvku (panel a súpis sa nesmú rozísť).
-  Testy: 3367 headless (14 nových v `test_d118b_sety.rb`, 5 mutácií overených), 95 JS sád (`test_d118b_ui.js`), in-SU sekcia `run_d118b` (živý reťazec knižnica → predvoľby
+  **Kolo 2 (1× P2):** osvieženie snapshotu bralo zabudovaný `SEED_SETS` namiesto NAČÍTANEJ knižnice — nad knižnicou, v ktorej si používateľ set zmazal alebo upravil, by
+  vzkriesilo zmazané alebo prepísalo jeho kódy, kým status tvrdí opak. **Kolo 3 (1× P2):** vyhradená hodnota bola odmietaná len pri pevnom `code`, nie v kódovom `param_bands`.
+  Testy: 3369 headless (14 nových v `test_d118b_sety.rb`, 5 mutácií overených), 95 JS sád (`test_d118b_ui.js`), in-SU sekcia `run_d118b` (živý reťazec knižnica → predvoľby
   projektu → vložená Tip-On zásuvka → nákup; beh 1965 PASS).
 
 - **D-118a — KATALÓG KOVANIA UŽ POZNÁ KÓDY, KTORÉ SI PLUGIN SÁM OBJEDNÁVA (v0.9.43, 7.9.2026).**
