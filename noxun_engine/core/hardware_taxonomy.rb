@@ -43,7 +43,7 @@ module Noxun
     module HardwareTaxonomy
       STD            = 'noxun-hardware-taxonomy'
       SCHEMA_CURRENT = 1
-      SEED_VERSION   = 1
+      SEED_VERSION   = 2
       FILE           = 'hardware_taxonomy.json'
 
       # Whitelisty klucov (KONTRAKT — vzor HardwareSets::SET_KEYS): kluc mimo
@@ -59,14 +59,17 @@ module Noxun
       # SEED (v1). Zdroj: SYSTEM/zdroje/SEED_KATALOG_2026-07.md + debata 2.8.2026.
       # Doplna sa LEN to, co v subore CHYBA — pouzivatelske mena sa nikdy
       # neprepisuju a nic sa nemaze.
-      SEED_MANUFACTURERS = ['Hettich', 'Blum', 'Grass', 'Strong', 'Ostatné'].freeze
+      # v2 (D-118, 7.9.2026): Tulip (uchytky a vesiaky, 6 seed poloziek) a rada
+      # StrongBox (5 poloziek) — bez nich by ich katalogovy riadok nemal
+      # vyrobcu a strom katalogu by ich zhodil pod „— bez vyrobcu".
+      SEED_MANUFACTURERS = ['Hettich', 'Blum', 'Grass', 'Strong', 'Tulip', 'Ostatné'].freeze
       SEED_SERIES = [
         ['Sensys', 'Hettich'], ['InnoTech Atira', 'Hettich'], ['Quadro', 'Hettich'],
         ['AvanTech YOU', 'Hettich'], ['AXILO', 'Hettich'],
         ['CLIP top', 'Blum'], ['AVENTOS', 'Blum'], ['TANDEMBOX', 'Blum'],
         ['LEGRABOX', 'Blum'], ['MERIVOBOX', 'Blum'], ['TIP-ON', 'Blum'],
         ['Nova Pro', 'Grass'], ['Tiomos', 'Grass'],
-        ['StrongMax', 'Strong']
+        ['StrongMax', 'Strong'], ['StrongBox', 'Strong']
       ].freeze
 
       module_function
@@ -470,7 +473,14 @@ module Noxun
         SEED_SERIES.each do |(name, man)|
           next if have_s.include?(key_of(name))
 
-          sers << { 'name' => name, 'manufacturer' => man }
+          # Vlastnik rady sa berie z UZ ULOZENEHO zaznamu vyrobcu (Codex #320
+          # kolo 2 P2): ked ma pouzivatel „STRONG", merge vyrobcu nedopĺňa,
+          # ale rada zapisana s nasim „Strong" by v UI zmizla — selecty rad
+          # (`hw_catalog.js`, `hw_sets.js`) filtruju podla PRESNEHO retazca.
+          owner = mans.find { |m| same_name?(m['name'], man) }
+          next unless owner
+
+          sers << { 'name' => name, 'manufacturer' => owner['name'] }
           have_s << key_of(name)
         end
         [mans.sort_by { |m| key_of(m['name']) }, sers.sort_by { |s| key_of(s['name']) }]

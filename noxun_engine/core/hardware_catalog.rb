@@ -44,7 +44,11 @@ module Noxun
       # nezmenenych povodnych seed riadkov; pouzivatelske upravy sa NIKDY
       # neprepisuju. v2 (D1): +105408/105425 (krytky Sensys, debata 2.8.),
       # 93240 NOHY -> SPOJOVACI_MATERIAL (Bystrica nie je noha).
-      SEED_SET_VERSION = 2
+      # v3 (D-118, 7.9.2026): vsetkych 60 riadkov overenych proti Demosu
+      # (nazov, cena s DPH, MJ, vyrobca, rada, URL + datum overenia) + 54 kodov,
+      # ktore pouzivaju seed sety (vratane PTOs modulov 352908/352909 a opravy
+      # 357889); 4 kody, ktore Demos uz nepozna, ostavaju ako NEAKTIVNE.
+      SEED_SET_VERSION = 3
       FILE = 'hardware_catalog.json'
 
       CATEGORIES = %w[ZAVESY VYSUVY VYKLOPY NOHY UCHYTKY SPOJOVACI_MATERIAL
@@ -1027,83 +1031,628 @@ module Noxun
         end
       end
 
-      # --- seed ---------------------------------------------------------------
-      # Deterministicky manifest (audit BLOCKER 2) — 1 riadok = 1 item_code,
-      # presny nazov/kategoria/MJ/cena S DPH z DEMOS CSV (autorita nazvov a
-      # cien) + Gmail/Disk sond (SYSTEM/zdroje/SEED_KATALOG_2026-07.md).
-      # nil cena = nezadana (sondy maju len ceny zostav). Krytky Sensys
-      # 105408/105425 doplnil Michal pri debate 2.8. (predtym kod chybal vo
-      # vsetkych zdrojoch); nazvy su opisne — spresni ich Demos vazba (D2).
-      # Sety NIE SU polozky — mapovanie flag->zoznam kodov robi HardwareSets (D1).
-      # Zmrazene rozhodnutia manifestu (1.8.2026): TipOn = 250831/250834
-      # (CSV riadok 25031 je preklep — Gmail 2x nezavisle plny kod); LED
-      # profily = 'ks' s poznamkou "4 m profil" (ziadne prepocty na meter);
-      # Aventos HL sa seeduje po PREDAJNYCH komponentoch, nie ako zostava.
-      # [kod, nazov, kategoria, MJ, cena|nil, poznamka|nil]
+      # --- seed ------------------------------------------------------------
+      # Deterministicky manifest (audit BLOCKER 2) — 1 riadok = 1 item_code.
+      # v3 (D-118, 7.9.2026): kazdy riadok je OVERENY proti produktovej stranke
+      # demos-trade.sk — kod sa nasiel ako „Kod sortimentu", nazov je H1 stranky,
+      # cena je hodnota S DPH z bloku „Zakladna cena za …" a URL je finalna adresa
+      # po presmerovaniach. Zber robil TEN ISTY parser, akym bezi „Overit cenu"
+      # (`DemosProductParser`), preto je `price_checked_at` legitimny server stamp
+      # (SEED_PRICE_CHECKED_AT) — kontrakt „datum patri konkretnej vazbe" plati.
+      # KATEGORIA OSTAVA NASA (93240 „Bystrica" = SPOJOVACI_MATERIAL, hoci Demos
+      # ju vedie pod zavesmi — debata 2.8.); z webu je nazov, cena, MJ, vyrobca,
+      # rada a URL. Vyrobca/rada sa zapisuju LEN ked su v `HardwareTaxonomy`.
+      # Sety NIE SU polozky — mapovanie flag->zoznam kodov robi HardwareSets.
+      # [kod, nazov, kategoria, MJ, cena|nil, poznamka|nil, vyrobca|nil, rada|nil, demos_url|nil]
       SEED_ROWS = [
-        ['104717', 'HETTICH 9071205 Sensys 8645i 110° TH52, naložený, SiSy', 'ZAVESY', 'ks', 4.18, 'záves „KLASIK"'],
-        ['104718', 'HETTICH 9071206 Sensys 8645i 110° TH52, polonaložený, SiSy', 'ZAVESY', 'ks', 5.42, nil],
-        ['104719', 'HETTICH 9071207 Sensys 8645i 110° TH52, vložený, SiSy', 'ZAVESY', 'ks', 5.75, nil],
-        ['245723', 'HETTICH 9071313 Sensys 8675 110° TH52 P2O (k tip-onu)', 'ZAVESY', 'ks', 4.00, 'bez tlmenia, k tip-onu'],
-        ['421309', 'HETTICH 9073673 Sensys 8675 vložený 110° P2O', 'ZAVESY', 'ks', 4.41, 'vložený P2O k tip-onu'],
-        ['264246', 'HETTICH 9099540 Sensys 8657i TH52 165°, naložený, SiSy', 'ZAVESY', 'ks', nil, nil],
-        ['106412', 'HETTICH 9071656 podložka 8099 s excentrom D=1,5', 'ZAVESY', 'ks', 0.97, '1:1 ku každému závesu'],
-        ['105408', 'HETTICH krytka misky Sensys', 'ZAVESY', 'ks', nil, '1:1 ku každému závesu (SET ZÁVES — debata 2.8.)'],
-        ['105425', 'HETTICH krytka ramienka Sensys', 'ZAVESY', 'ks', nil, '1:1 ku každému závesu (SET ZÁVES — debata 2.8.)'],
-        ['104454', 'Záves chladničkový HETTICH + platničky (komplet)', 'ZAVESY', 'ks', 10.12, nil],
-        ['104802', 'HETTICH 9088021 Sensys uhlový W90 TH52', 'ZAVESY', 'ks', nil, 'rohové skrinky'],
-        ['250831', 'BLUM 956A1004 TipOn pre záves 76 mm s magnetom, biely', 'ZAVESY', 'ks', nil, 'kód overiť (CSV šablóna má preklep 25031)'],
-        ['250834', 'BLUM 956A1004 TipOn pre záves 76 mm s magnetom, čierny', 'ZAVESY', 'ks', nil, nil],
-        ['35000', 'Strong tip-on s magnetom (protikus v balení)', 'ZAVESY', 'ks', nil, 'lacná alternatíva'],
-        ['357695', 'K-InnoTech Atira čelný biely 420/70, 30 kg, SiSy', 'VYSUVY', 'set', nil, 'K-sada'],
-        ['357696', 'K-InnoTech Atira čelný biely 470/70, 30 kg, SiSy', 'VYSUVY', 'set', nil, 'K-sada'],
-        ['357775', 'K-InnoTech Atira čelný biely 470/70/176 vr. relingu, 30 kg', 'VYSUVY', 'set', nil, 'K-sada'],
-        ['357970', 'K-InnoTech Atira čelný antracit 470/70/176 vr. relingu', 'VYSUVY', 'set', nil, 'K-sada'],
-        ['357819', 'K-InnoTech Atira vnútorný biely 470/70', 'VYSUVY', 'set', nil, 'K-sada; + čelo 294940 + príchyt 295276'],
-        ['358009', 'K-InnoTech Atira vnútorný antracit 420/70', 'VYSUVY', 'set', nil, 'K-sada; + čelo 294941 + príchyt 295277'],
-        ['294940', 'Čelo vnútornej zásuvky 2000/70 biela (Atira)', 'VYSUVY', 'ks', nil, 'profil 2000 mm, reže sa'],
-        ['294941', 'Čelo vnútornej zásuvky 2000/70 antracit (Atira)', 'VYSUVY', 'ks', nil, 'profil 2000 mm, reže sa'],
-        ['295276', 'Príchyt čela 70 biely, pár (Atira)', 'VYSUVY', 'par', nil, nil],
-        ['295277', 'Príchyt čela 70 antracit, pár (Atira)', 'VYSUVY', 'par', nil, nil],
-        ['502978', 'K-StrongMax 16 121/350 mm 40 kg, biela', 'VYSUVY', 'set', 30.76, 'K-sada'],
-        ['502993', 'K-StrongMax 16 249/450 mm 40 kg, biela', 'VYSUVY', 'set', 42.03, 'K-sada'],
-        ['179252', 'StrongBox H86/270 mm biely', 'VYSUVY', 'set', 16.91, nil],
-        ['179253', 'StrongBox H86/300 mm biely', 'VYSUVY', 'set', 17.50, nil],
-        ['179256', 'StrongBox H86/450 mm biely', 'VYSUVY', 'set', 17.95, nil],
-        ['179259', 'StrongBox H140/270 mm biely', 'VYSUVY', 'set', 18.16, nil],
-        ['402578', 'K-StrongBox H140/350 s hranatým relingom, biela', 'VYSUVY', 'set', nil, 'K-sada'],
-        ['317642', 'K-HETTICH Quadro V6 skrytý celovýsuv 450 mm/30 kg (18 mm)', 'VYSUVY', 'set', nil, 'K-sada'],
-        ['499013', 'K-BLUM Legrabox M 450 mm/40 kg Blumotion/TOB, karbón čierna CS-M', 'VYSUVY', 'set', nil, 'K-sada, prémium'],
-        ['499307', 'K-BLUM Legrabox K 450 mm/40 kg Tip-on, karbón čierna CS-M, vnútorná', 'VYSUVY', 'set', nil, 'K-sada; + čelný plech 491360 + reling 491359'],
-        ['507336', 'BLUM 22F2800 Aventos HF Top silný, skrutky', 'VYKLOPY', 'set', nil, 'krytky NIE sú v balení'],
-        ['347827', 'BLUM 22K2700T Aventos HK Top silný, Tip-on', 'VYKLOPY', 'par', nil, 'krytky 347834 zvlášť'],
-        ['23792', 'BLUM Aventos HL stredný', 'VYKLOPY', 'ks', nil, 'komponent zostavy HL'],
-        ['197611', 'BLUM Aventos HL ramená 450–580', 'VYKLOPY', 'ks', nil, 'komponent zostavy HL'],
-        ['13781', 'BLUM čelný príchyt 20S4200 (Aventos HL/HK)', 'VYKLOPY', 'ks', nil, 'komponent zostavy'],
-        ['461804', 'BLUM Aventos HL krytky 20L8020', 'VYKLOPY', 'ks', nil, 'krytky vždy zvlášť'],
-        ['13799', 'BLUM Aventos HL stabilizačná tyč 20Q1061UA', 'VYKLOPY', 'ks', nil, 'komponent zostavy HL'],
-        ['282474', 'IF K12 244 plynokvapalinová vzpera 120 N automatická', 'VYKLOPY', 'ks', nil, 'lacná alternatíva výklopu'],
-        ['82744', 'STRONG klzák s rektifikáciou, výška 17 mm, čierny', 'NOHY', 'ks', 0.48, 'najpoužívanejšia „noha"'],
-        ['367823', 'Häfele 637.76.355 noha AXILO v. 150 mm + podložka', 'NOHY', 'ks', 1.38, '4 ks na spodnú skrinku'],
-        ['93240', 'Rektifikačný uholník „Bystrica" (zavesenie skrinky na stenu)', 'SPOJOVACI_MATERIAL', 'ks', nil, '2 ks na hornú skrinku; NIE noha (debata 2.8.)'],
-        ['146993', 'Strong Big rektifikačná noha 100 mm', 'NOHY', 'ks', nil, nil],
-        ['360281', 'Skrutka SPAX 3,5×16 záp. hl. (bal 1000 ks)', 'SPOJOVACI_MATERIAL', 'ks', nil, 'predaj v bal 1000'],
-        ['228922', 'Skrutka PZ ZH 3,5×30 biely Zn (bal 1000)', 'SPOJOVACI_MATERIAL', 'ks', nil, 'predaj v bal 1000'],
-        ['228924', 'Skrutka PZ ZH 3,5×35 biely Zn (bal 1000)', 'SPOJOVACI_MATERIAL', 'ks', nil, 'predaj v bal 1000'],
-        ['11090', 'Konfirmát 5/50 Zn biely (bal 2400 ks)', 'SPOJOVACI_MATERIAL', 'ks', 0.07, 'cena za ks'],
-        ['11135', 'Skrutka PZ ZH 5×100/60 žltý Zn PZ2 čiastočný závit', 'SPOJOVACI_MATERIAL', 'ks', 0.06, nil],
-        ['306125', 'Podperka policová s návlekom 7/5 Zn biela', 'SPOJOVACI_MATERIAL', 'ks', nil, '4 ks na policu'],
-        ['402395', 'TULIP úchytka Bastone 320 čierna matná', 'UCHYTKY', 'ks', 4.05, nil],
-        ['398095', 'TULIP úchytka zápustná Shellby čierna matná', 'UCHYTKY', 'ks', 12.66, nil],
-        ['303211', 'TULIP úchytka Cana 128 biela', 'UCHYTKY', 'ks', 1.97, nil],
-        ['401555', 'TULIP úchytka Knop Conic čierna matná', 'UCHYTKY', 'ks', 2.54, nil],
-        ['355730', 'TULIP vešiak Kara L čierna matná', 'VESIAKY', 'ks', 13.10, nil],
-        ['355731', 'TULIP vešiak Kara M čierna matná', 'VESIAKY', 'ks', 9.27, nil],
-        ['252278', 'TM-profil LED Corner alu anodovaný 4000 mm', 'OSVETLENIE', 'ks', 30.79, '4 m profil — cena za kus'],
-        ['359426', 'TM-profil LED úchytkový Lucera narážací 4000 + tesnenie', 'OSVETLENIE', 'ks', nil, '4 m profil']
+        ['104717', 'HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy',
+         'ZAVESY', 'ks', 4.18, 'záves „KLASIK"',
+         'Hettich', 'Sensys',
+         'https://www.demos-trade.sk/hettich-9071205-sensys-zaves-nalozeny-110-th-skrutka-sisy/'],
+        ['104718', 'HETTICH 9071206 Sensys záves polonaložený 110° TH skrutka SiSy',
+         'ZAVESY', 'ks', 4.54, nil,
+         'Hettich', 'Sensys',
+         'https://www.demos-trade.sk/hettich-9071206-sensys-zaves-polonalozeny-110-th-skrutka-sisy/'],
+        ['104719', 'HETTICH 9071207 Sensys záves vložený 110° TH skrutka SiSy',
+         'ZAVESY', 'ks', 4.81, nil,
+         'Hettich', 'Sensys',
+         'https://www.demos-trade.sk/hettich-9071207-sensys-zaves-vlozeny-110-th-skrutka-sisy/'],
+        ['245723', 'HETTICH 9071313 Sensys záves naložený 110° TH skrutka PTO',
+         'ZAVESY', 'ks', 3.52, 'bez tlmenia, k tip-onu',
+         'Hettich', 'Sensys',
+         'https://www.demos-trade.sk/hettich-9071313-sensys-zaves-nalozeny-110-th-skrutka-pto/'],
+        ['421309', 'HETTICH 9073673 Sensys záves vložený 110° TB skrutka PTO',
+         'ZAVESY', 'ks', 4.41, 'vložený P2O k tip-onu',
+         'Hettich', 'Sensys',
+         'https://www.demos-trade.sk/hettich-9073673-sensys-zaves-vlozeny-110-tb-skrutka-pto/'],
+        ['264246', 'HETTICH 9099540 Sensys záves dvere nulový presah naložený 165° TH skrutka SiSy',
+         'ZAVESY', 'ks', 8.22, nil,
+         'Hettich', 'Sensys',
+         'https://www.demos-trade.sk/hettich-9099540-sensys-zaves-dvere-nulovy-presah-nalozeny-165-th-skrutka-sisy/'],
+        ['106412', 'HETTICH 9071656 Sensys montážna podložka krížová D1,5 excenter hmoždinka',
+         'ZAVESY', 'ks', 0.97, '1:1 ku každému závesu',
+         'Hettich', 'Sensys',
+         'https://www.demos-trade.sk/hettich-9071656-sensys-montazna-podlozka-krizova-d1-5-excenter-hmozdinka/'],
+        ['105408', 'HETTICH 9088251 Sensys krytka pre misku TH',
+         'ZAVESY', 'ks', 0.25, '1:1 ku každému závesu (SET ZÁVES — debata 2.8.)',
+         'Hettich', 'Sensys',
+         'https://www.demos-trade.sk/hettich-9088251-sensys-krytka-pre-misku-th/'],
+        ['105425', 'HETTICH 9088250 Sensys krytka ramienka logo Hettich',
+         'ZAVESY', 'ks', 0.19, '1:1 ku každému závesu (SET ZÁVES — debata 2.8.)',
+         'Hettich', 'Sensys',
+         'https://www.demos-trade.sk/hettich-9088250-sensys-krytka-ramienka-logo-hettich/'],
+        ['104454', 'HETTICH 72134 ET 582 záves pre vstavanú chladničku naložený 95° vrut pružina',
+         'ZAVESY', 'ks', 10.12, nil,
+         'Hettich', nil,
+         'https://www.demos-trade.sk/hettich-72134-et-582-zaves-pre-vstavanu-chladnicku-nalozeny-95-vrut-pruzina/'],
+        ['104802', 'HETTICH 9088021 Sensys záves slepý uhol vložený 90°/95° TH skrutka SiSy',
+         'ZAVESY', 'ks', 8.73, 'rohové skrinky',
+         'Hettich', 'Sensys',
+         'https://www.demos-trade.sk/hettich-9088021-sensys-zaves-slepy-uhol-vlozeny-90-95-th-skrutka-sisy/'],
+        ['250831', 'BLUM 956A1004 Tip-on pre závesy,76mm,magnet,komplet,biela',
+         'ZAVESY', 'ks', 6.93, 'kód overiť (CSV šablóna má preklep 25031)',
+         'Blum', 'TIP-ON',
+         'https://www.demos-trade.sk/blum-956a1004-tip-on-pre-zavesy-76mm-magnet-komplet-biela/'],
+        ['250834', 'BLUM 956A1004 TipOn pre záves 76 mm s magnetom, čierny',
+         'ZAVESY', 'ks', nil, 'kód Démos už nepozná (7.9.2026) — náhrada 497007 (Tip-on 76 mm, čierna CS)',
+         nil, nil,
+         nil],
+        ['35000', 'Strong tip-on s magnetom (protikus v balení)',
+         'ZAVESY', 'ks', nil, 'kód Démos už nepozná (7.9.2026)',
+         nil, nil,
+         nil],
+        ['357695', 'K-HETTICH Atira zásuvka 70, 420mm/30kg, biela, SiSy',
+         'VYSUVY', 'set', 42.59, 'K-sada',
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-70-420mm-30kg-biela-sisy/'],
+        ['357696', 'K-HETTICH Atira zásuvka 70, 470mm/30kg, biela, SiSy',
+         'VYSUVY', 'set', 42.89, 'K-sada',
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-70-470mm-30kg-biela-sisy/'],
+        ['357775', 'K-HETTICH Atira zásuvka 176, 470mm/30kg, relingy, biela, SiSy',
+         'VYSUVY', 'set', 61.88, 'K-sada',
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-176-470mm-30kg-relingy-biela-sisy/'],
+        ['357970', 'K-HETTICH Atira zásuvka 176, 470mm/30kg, relingy, antracit, SiSy',
+         'VYSUVY', 'set', 62.72, 'K-sada',
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-176-470mm-30kg-relingy-antracit-sisy/'],
+        ['357819', 'K-HETTICH Atira vnútorná zásuvka 70, 470mm/30kg, biela, SiSy',
+         'VYSUVY', 'set', 49.03, 'K-sada; + čelo 294940 + príchyt 295276',
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-vnutorna-zasuvka-70-470mm-30kg-biela-sisy/'],
+        ['358009', 'K-HETTICH Atira vnútorná zásuvka 70, 420mm/30kg, antracit, SiSy',
+         'VYSUVY', 'set', 48.73, 'K-sada; + čelo 294941 + príchyt 295277',
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-vnutorna-zasuvka-70-420mm-30kg-antracit-sisy/'],
+        ['294940', 'HETTICH 9194765 Atira čelo vnútornej zásuvky 70, 2m, biela',
+         'VYSUVY', 'ks', 47.36, 'profil 2000 mm, reže sa',
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/hettich-9194765-atira-celo-vnutornej-zasuvky-70-2m-biela/'],
+        ['294941', 'HETTICH 9194766 Atira čelo vnútornej zásuvky 70, 2m, antracit',
+         'VYSUVY', 'ks', 47.36, 'profil 2000 mm, reže sa',
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/hettich-9194766-atira-celo-vnutornej-zasuvky-70-2m-antracit/'],
+        ['295276', 'HETTICH 9196348 Atira príchyty čela vnútornej zásuvky 70, biela',
+         'VYSUVY', 'set', 6.14, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/hettich-9196348-atira-prichyty-cela-vnutornej-zasuvky-70-biela/'],
+        ['295277', 'HETTICH 9196349 Atira príchyty čela vnútornej zásuvky 70, antracit',
+         'VYSUVY', 'set', 6.14, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/hettich-9196349-atira-prichyty-cela-vnutornej-zasuvky-70-antracit/'],
+        ['502978', 'K-StrongMax 16 zásuvka H121/350mm, biela',
+         'VYSUVY', 'set', 30.76, 'K-sada',
+         'Strong', 'StrongMax',
+         'https://www.demos-trade.sk/k-strongmax-16-zasuvka-h121-350mm-biela/'],
+        ['502993', 'K-StrongMax 16 zásuvka H249/450mm, biela',
+         'VYSUVY', 'set', 42.03, 'K-sada',
+         'Strong', 'StrongMax',
+         'https://www.demos-trade.sk/k-strongmax-16-zasuvka-h249-450mm-biela/'],
+        ['179252', 'StrongBox zásuvka H86/270mm, biela',
+         'VYSUVY', 'set', 16.91, nil,
+         'Strong', 'StrongBox',
+         'https://www.demos-trade.sk/strongbox-zasuvka-h86-270mm-biela/'],
+        ['179253', 'StrongBox zásuvka H86/300mm, biela',
+         'VYSUVY', 'set', 17.50, nil,
+         'Strong', 'StrongBox',
+         'https://www.demos-trade.sk/strongbox-zasuvka-h86-300mm-biela/'],
+        ['179256', 'StrongBox zásuvka H86/450mm, biela',
+         'VYSUVY', 'set', 17.95, nil,
+         'Strong', 'StrongBox',
+         'https://www.demos-trade.sk/strongbox-zasuvka-h86-450mm-biela/'],
+        ['179259', 'StrongBox zásuvka H140/270mm, biela',
+         'VYSUVY', 'set', 18.16, nil,
+         'Strong', 'StrongBox',
+         'https://www.demos-trade.sk/strongbox-zasuvka-h140-270mm-biela/'],
+        ['402578', 'K-StrongBox zásuvka H140/350mm, reling hranatý horný, biela',
+         'VYSUVY', 'set', 22.75, 'K-sada',
+         'Strong', 'StrongBox',
+         'https://www.demos-trade.sk/k-strongbox-zasuvka-h140-350mm-reling-hranaty-horny-biela/'],
+        ['317642', 'K-HETTICH Quadro V6 skrytý celovýsuv, 450mm/30kg, sada pre 18mm, spojky, SiSy',
+         'VYSUVY', 'set', 31.32, 'K-sada',
+         'Hettich', 'Quadro',
+         'https://www.demos-trade.sk/k-hettich-quadro-v6-skryty-celovysuv-450mm-30kg-sada-pre-18mm-spojky-sisy/'],
+        ['499013', 'K-BLUM Legrabox, zásuvka M 450mm/40kg, Blumotion/TOB, čierna, skrutka',
+         'VYSUVY', 'set', 71.02, 'K-sada, prémium',
+         'Blum', 'LEGRABOX',
+         'https://www.demos-trade.sk/k-blum-legrabox-zasuvka-m-450mm-40kg-blumotion-tob-cierna-skrutka/'],
+        ['499307', 'K-BLUM Legrabox, zásuvka K 450mm/40kg, Tip-on, čierna, vnútorná',
+         'VYSUVY', 'set', 118.49, 'K-sada; + čelný plech 491360 + reling 491359',
+         'Blum', 'LEGRABOX',
+         'https://www.demos-trade.sk/k-blum-legrabox-zasuvka-k-450mm-40kg-tip-on-cierna-vnutorna/'],
+        ['507336', 'BLUM 22F2800 Aventos HF Top výklop silný, skrutky',
+         'VYKLOPY', 'set', 83.27, 'krytky NIE sú v balení',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22f2800-aventos-hf-top-vyklop-silny-skrutky/'],
+        ['347827', 'BLUM 22K2700T Aventos HK Top výklop silný, Tip-on',
+         'VYKLOPY', 'set', 81.56, 'krytky 347834 zvlášť',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22k2700t-aventos-hk-top-vyklop-silny-tip-on/'],
+        ['23792', 'BLUM 20L2500.05 Aventos HL stredný',
+         'VYKLOPY', 'set', 78.69, 'komponent zostavy HL',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-20l2500-05-aventos-hl-stredny/'],
+        ['197611', 'BLUM Aventos HL ramená 450–580',
+         'VYKLOPY', 'ks', nil, 'kód Démos už nepozná (7.9.2026) — rad Aventos HL sa dopredáva',
+         nil, nil,
+         nil],
+        ['13781', 'BLUM 20S4200 Aventos HK/HS/HL Top čelný príchyt',
+         'VYKLOPY', 'par', 4.40, 'komponent zostavy',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-20s4200-aventos-hk-hs-hl-top-celny-prichyt/'],
+        ['461804', 'BLUM Aventos HL krytky 20L8020',
+         'VYKLOPY', 'ks', nil, 'kód Démos už nepozná (7.9.2026) — rad Aventos HL sa dopredáva',
+         nil, nil,
+         nil],
+        ['13799', 'BLUM 20Q1061UA stabilizačná tyč pre Aventos HL',
+         'VYKLOPY', 'ks', 14.34, 'komponent zostavy HL',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-20q1061ua-stabilizacna-tyc-pre-aventos-hl/'],
+        ['282474', 'IF plynová vzpěra K12, pro horný výklop, automatická, 244mm/120N',
+         'VYKLOPY', 'ks', 18.66, 'lacná alternatíva výklopu',
+         nil, nil,
+         'https://www.demos-trade.sk/if-plynova-vzpera-k12-pro-horny-vyklop-automaticka-244mm-120n/'],
+        ['82744', 'STRONG Klzák s rektifikáciou, výška 17 mm čierna',
+         'NOHY', 'ks', 0.48, 'najpoužívanejšia „noha"',
+         'Strong', nil,
+         'https://www.demos-trade.sk/strong-klzak-s-rektifikaciou-vyska-17-mm-cierna/'],
+        ['367823', '637.76.355 Rektifikačná noha  v. 150 mm',
+         'NOHY', 'ks', 1.52, '4 ks na spodnú skrinku',
+         nil, nil,
+         'https://www.demos-trade.sk/637-76-355-rektifikacna-noha-v-150-mm/'],
+        ['93240', 'STRONG Bystrica závesné kovanie biela',
+         'SPOJOVACI_MATERIAL', 'ks', 0.37, '2 ks na hornú skrinku; NIE noha (debata 2.8.)',
+         'Strong', nil,
+         'https://www.demos-trade.sk/strong-bystrica-zavesne-kovanie-biela/'],
+        ['146993', 'StrongLegs rektifikačná noha AP002 100Rmm',
+         'NOHY', 'ks', 1.13, nil,
+         'Strong', nil,
+         'https://www.demos-trade.sk/stronglegs-rektifikacna-noha-ap002-100rmm/'],
+        ['360281', 'SPAX Skrutka 3,5x16mm zápustná hlava PZ W 4C MH',
+         'SPOJOVACI_MATERIAL', 'ks', 0.02, 'predaj v bal 1000',
+         nil, nil,
+         'https://www.demos-trade.sk/spax-skrutka-3-5x16mm-zapustna-hlava-pz-w-4c-mh/'],
+        ['228922', 'StrongFix Skrutka PZ 3,5x30mm zápustná hlava zinok biely',
+         'SPOJOVACI_MATERIAL', 'ks', 0.02, 'predaj v bal 1000',
+         'Strong', nil,
+         'https://www.demos-trade.sk/strongfix-skrutka-pz-3-5x30mm-zapustna-hlava-zinok-biely/'],
+        ['228924', 'StrongFix Skrutka PZ 3,5x35mm zápustná hlava zinok biely',
+         'SPOJOVACI_MATERIAL', 'ks', 0.03, 'predaj v bal 1000',
+         'Strong', nil,
+         'https://www.demos-trade.sk/strongfix-skrutka-pz-3-5x35mm-zapustna-hlava-zinok-biely/'],
+        ['11090', 'StrongFix Konfirmát 5 / 50 mm zinok biely',
+         'SPOJOVACI_MATERIAL', 'ks', 0.07, 'cena za ks',
+         'Strong', nil,
+         'https://www.demos-trade.sk/strongfix-konfirmat-5-50-mm-zinok-biely/'],
+        ['11135', 'StrongFix Skrutka PZ 5x100/60mm zápustná hlava zinok žltý čiastočný závit',
+         'SPOJOVACI_MATERIAL', 'ks', 0.07, nil,
+         'Strong', nil,
+         'https://www.demos-trade.sk/strongfix-skrutka-pz-5x100-60mm-zapustna-hlava-zinok-zlty-ciastocny-zavit/'],
+        ['306125', 'STRONG Podpera Policová s návlekom 7/5mm zinok biely',
+         'SPOJOVACI_MATERIAL', 'ks', 0.04, '4 ks na policu',
+         'Strong', nil,
+         'https://www.demos-trade.sk/strong-podpera-policova-s-navlekom-7-5mm-zinok-biely/'],
+        ['402395', 'TULIP Úchytka Bastone 320 čierna matná',
+         'UCHYTKY', 'ks', 4.21, nil,
+         'Tulip', nil,
+         'https://www.demos-trade.sk/tulip-uchytka-bastone-320-cierna-matna/'],
+        ['398095', 'TULIP Úchytka Shellby 96 zápustná čierná matná',
+         'UCHYTKY', 'ks', 13.16, nil,
+         'Tulip', nil,
+         'https://www.demos-trade.sk/tulip-uchytka-shellby-96-zapustna-cierna-matna/'],
+        ['303211', 'TULIP Úchytka Cana 128 biela',
+         'UCHYTKY', 'ks', 2.04, nil,
+         'Tulip', nil,
+         'https://www.demos-trade.sk/tulip-uchytka-cana-128-biela/'],
+        ['401555', 'TULIP Knopka Conic čierna matná',
+         'UCHYTKY', 'ks', 2.64, nil,
+         'Tulip', nil,
+         'https://www.demos-trade.sk/tulip-knopka-conic-cierna-matna/'],
+        ['355730', 'TULIP Vešiak Kara L čierna matná',
+         'VESIAKY', 'ks', 13.62, nil,
+         'Tulip', nil,
+         'https://www.demos-trade.sk/tulip-vesiak-kara-l-cierna-matna/'],
+        ['355731', 'TULIP Vešiak Kara M čierna matná',
+         'VESIAKY', 'ks', 9.64, nil,
+         'Tulip', nil,
+         'https://www.demos-trade.sk/tulip-vesiak-kara-m-cierna-matna/'],
+        ['252278', 'StrongLumio profil LED Corner 10, 4050mm strieborná elox',
+         'OSVETLENIE', 'ks', 32.08, '4 m profil — cena za kus',
+         'Strong', nil,
+         'https://www.demos-trade.sk/stronglumio-profil-led-corner-10-4050mm-strieborna-elox/'],
+        ['359426', 'StrongLumio profil Lucera narážací, 4000mm strieborná elox + tesnenie',
+         'OSVETLENIE', 'ks', 98.24, '4 m profil',
+         'Strong', nil,
+         'https://www.demos-trade.sk/stronglumio-profil-lucera-narazaci-4000mm-strieborna-elox-tesnenie/'],
+        ['317640', 'K-HETTICH Quadro V6 skrytý celovýsuv, 350mm/30kg, sada pre 18mm, spojky, SiSy',
+         'VYSUVY', 'set', 31.54, nil,
+         'Hettich', 'Quadro',
+         'https://www.demos-trade.sk/k-hettich-quadro-v6-skryty-celovysuv-350mm-30kg-sada-pre-18mm-spojky-sisy/'],
+        ['317641', 'K-HETTICH Quadro V6 skrytý celovýsuv, 400mm/30kg, sada pre 18mm, spojky, SiSy',
+         'VYSUVY', 'set', 32.78, nil,
+         'Hettich', 'Quadro',
+         'https://www.demos-trade.sk/k-hettich-quadro-v6-skryty-celovysuv-400mm-30kg-sada-pre-18mm-spojky-sisy/'],
+        ['317643', 'K-HETTICH Quadro V6 skrytý celovýsuv, 500mm/30kg, sada pre 18mm, spojky, SiSy',
+         'VYSUVY', 'set', 31.92, nil,
+         'Hettich', 'Quadro',
+         'https://www.demos-trade.sk/k-hettich-quadro-v6-skryty-celovysuv-500mm-30kg-sada-pre-18mm-spojky-sisy/'],
+        ['317644', 'K-HETTICH Quadro V6 skrytý celovýsuv, 450mm/30kg, sada pre 18mm, spojky, PTO',
+         'VYSUVY', 'set', 35.57, nil,
+         'Hettich', 'Quadro',
+         'https://www.demos-trade.sk/k-hettich-quadro-v6-skryty-celovysuv-450mm-30kg-sada-pre-18mm-spojky-pto/'],
+        ['343031', 'K-HETTICH Quadro V6 skrytý celovýsuv, 350mm/30kg, sada pre 18mm, spojky, PTO',
+         'VYSUVY', 'set', 35.98, nil,
+         'Hettich', 'Quadro',
+         'https://www.demos-trade.sk/k-hettich-quadro-v6-skryty-celovysuv-350mm-30kg-sada-pre-18mm-spojky-pto/'],
+        ['343033', 'K-HETTICH Quadro V6 skrytý celovýsuv, 400mm/30kg, sada pre 18mm, spojky, PTO',
+         'VYSUVY', 'set', 36.62, nil,
+         'Hettich', 'Quadro',
+         'https://www.demos-trade.sk/k-hettich-quadro-v6-skryty-celovysuv-400mm-30kg-sada-pre-18mm-spojky-pto/'],
+        ['348777', 'HETTICH Atira zásuvka 70, 470mm/30kg, antracit, SiSy',
+         'VYSUVY', 'set', 39.55, 'NIE je K-sada — čelné kovanie treba dokúpiť; kompletná sada je 357889',
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/hettich-atira-zasuvka-70-470mm-30kg-antracit-sisy/'],
+        ['357694', 'K-HETTICH Atira zásuvka 70, 350mm/30kg, biela, SiSy',
+         'VYSUVY', 'set', 41.58, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-70-350mm-30kg-biela-sisy/'],
+        ['357697', 'K-HETTICH Atira zásuvka 70, 520mm/30kg, biela, SiSy',
+         'VYSUVY', 'set', 43.75, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-70-520mm-30kg-biela-sisy/'],
+        ['357716', 'K-HETTICH Atira zásuvka 70, 620mm/50kg, biela, PTO',
+         'VYSUVY', 'set', 73.72, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-70-620mm-50kg-biela-pto/'],
+        ['357722', 'K-HETTICH Atira zásuvka 70, 350mm/30kg, biela, PTOs',
+         'VYSUVY', 'set', 44.99, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-70-350mm-30kg-biela-ptos/'],
+        ['357723', 'K-HETTICH Atira zásuvka 70, 420mm/30kg, biela, PTOs',
+         'VYSUVY', 'set', 46.00, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-70-420mm-30kg-biela-ptos/'],
+        ['357724', 'K-HETTICH Atira zásuvka 70, 470mm/30kg, biela, PTOs',
+         'VYSUVY', 'set', 45.55, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-70-470mm-30kg-biela-ptos/'],
+        ['357725', 'K-HETTICH Atira zásuvka 70, 520mm/30kg, biela, PTOs',
+         'VYSUVY', 'set', 47.00, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-70-520mm-30kg-biela-ptos/'],
+        ['357734', 'K-HETTICH Atira zásuvka 144, 350mm/30kg, relingy, biela, SiSy',
+         'VYSUVY', 'set', 57.50, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-144-350mm-30kg-relingy-biela-sisy/'],
+        ['357735', 'K-HETTICH Atira zásuvka 144, 420mm/30kg, relingy, biela, SiSy',
+         'VYSUVY', 'set', 58.84, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-144-420mm-30kg-relingy-biela-sisy/'],
+        ['357736', 'K-HETTICH Atira zásuvka 144, 470mm/30kg, relingy, biela, SiSy',
+         'VYSUVY', 'set', 59.38, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-144-470mm-30kg-relingy-biela-sisy/'],
+        ['357755', 'K-HETTICH Atira zásuvka 144, 620mm/50kg, relingy, biela, PTO',
+         'VYSUVY', 'set', 90.93, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-144-620mm-50kg-relingy-biela-pto/'],
+        ['357761', 'K-HETTICH Atira zásuvka 144, 350mm/30kg, relingy, biela, PTOs',
+         'VYSUVY', 'set', 60.91, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-144-350mm-30kg-relingy-biela-ptos/'],
+        ['357762', 'K-HETTICH Atira zásuvka 144, 420mm/30kg, relingy, biela, PTOs',
+         'VYSUVY', 'set', 62.25, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-144-420mm-30kg-relingy-biela-ptos/'],
+        ['357763', 'K-HETTICH Atira zásuvka 144, 470mm/30kg, relingy, biela, PTOs',
+         'VYSUVY', 'set', 62.05, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-144-470mm-30kg-relingy-biela-ptos/'],
+        ['357764', 'K-HETTICH Atira zásuvka 144, 520mm/30kg, relingy, biela, PTOs',
+         'VYSUVY', 'set', 63.74, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-144-520mm-30kg-relingy-biela-ptos/'],
+        ['357773', 'K-HETTICH Atira zásuvka 176, 350mm/30kg, relingy, biela, SiSy',
+         'VYSUVY', 'set', 60.83, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-176-350mm-30kg-relingy-biela-sisy/'],
+        ['357774', 'K-HETTICH Atira zásuvka 176, 420mm/30kg, relingy, biela, SiSy',
+         'VYSUVY', 'set', 62.18, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-176-420mm-30kg-relingy-biela-sisy/'],
+        ['357777', 'K-HETTICH Atira zásuvka 176, 520mm/30kg, relingy, biela, SiSy',
+         'VYSUVY', 'set', 63.83, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-176-520mm-30kg-relingy-biela-sisy/'],
+        ['357783', 'K-HETTICH Atira zásuvka 176, 620mm/50kg, relingy, biela, SiSy',
+         'VYSUVY', 'set', 76.07, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-176-620mm-50kg-relingy-biela-sisy/'],
+        ['357795', 'K-HETTICH Atira zásuvka 176, 620mm/50kg, relingy, biela, PTO',
+         'VYSUVY', 'set', 94.30, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-176-620mm-50kg-relingy-biela-pto/'],
+        ['357801', 'K-HETTICH Atira zásuvka 176, 350mm/30kg, relingy, biela, PTOs',
+         'VYSUVY', 'set', 64.24, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-176-350mm-30kg-relingy-biela-ptos/'],
+        ['357802', 'K-HETTICH Atira zásuvka 176, 420mm/30kg, relingy, biela, PTOs',
+         'VYSUVY', 'set', 65.59, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-176-420mm-30kg-relingy-biela-ptos/'],
+        ['357803', 'K-HETTICH Atira zásuvka 176, 470mm/30kg, relingy, biela, PTOs',
+         'VYSUVY', 'set', 64.55, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-176-470mm-30kg-relingy-biela-ptos/'],
+        ['357812', 'K-HETTICH Atira zásuvka 176, 520mm/50kg, relingy, biela, PTOs',
+         'VYSUVY', 'set', 74.31, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-176-520mm-50kg-relingy-biela-ptos/'],
+        ['357887', 'K-HETTICH Atira zásuvka 70, 350mm/30kg, antracit, SiSy',
+         'VYSUVY', 'set', 41.58, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-70-350mm-30kg-antracit-sisy/'],
+        ['357888', 'K-HETTICH Atira zásuvka 70, 420mm/30kg, antracit, SiSy',
+         'VYSUVY', 'set', 42.59, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-70-420mm-30kg-antracit-sisy/'],
+        ['357890', 'K-HETTICH Atira zásuvka 70, 520mm/30kg, antracit, SiSy',
+         'VYSUVY', 'set', 43.75, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-70-520mm-30kg-antracit-sisy/'],
+        ['357914', 'K-HETTICH Atira zásuvka 70, 350mm/30kg, antracit, PTOs',
+         'VYSUVY', 'set', 44.99, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-70-350mm-30kg-antracit-ptos/'],
+        ['357915', 'K-HETTICH Atira zásuvka 70, 420mm/30kg, antracit, PTOs',
+         'VYSUVY', 'set', 46.00, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-70-420mm-30kg-antracit-ptos/'],
+        ['357916', 'K-HETTICH Atira zásuvka 70, 470mm/30kg, antracit, PTOs',
+         'VYSUVY', 'set', 45.55, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-70-470mm-30kg-antracit-ptos/'],
+        ['357917', 'K-HETTICH Atira zásuvka 70, 520mm/30kg, antracit, PTOs',
+         'VYSUVY', 'set', 47.00, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-70-520mm-30kg-antracit-ptos/'],
+        ['357926', 'K-HETTICH Atira zásuvka 144, 350mm/30kg, relingy, antracit, SiSy',
+         'VYSUVY', 'set', 57.50, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-144-350mm-30kg-relingy-antracit-sisy/'],
+        ['357927', 'K-HETTICH Atira zásuvka 144, 420mm/30kg, relingy, antracit, SiSy',
+         'VYSUVY', 'set', 58.84, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-144-420mm-30kg-relingy-antracit-sisy/'],
+        ['357928', 'K-HETTICH Atira zásuvka 144, 470mm/30kg, relingy, antracit, SiSy',
+         'VYSUVY', 'set', 59.38, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-144-470mm-30kg-relingy-antracit-sisy/'],
+        ['357955', 'K-HETTICH Atira zásuvka 144, 350mm/30kg, relingy, antracit, PTOs',
+         'VYSUVY', 'set', 60.91, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-144-350mm-30kg-relingy-antracit-ptos/'],
+        ['357956', 'K-HETTICH Atira zásuvka 144, 420mm/30kg, relingy, antracit, PTOs',
+         'VYSUVY', 'set', 62.25, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-144-420mm-30kg-relingy-antracit-ptos/'],
+        ['357957', 'K-HETTICH Atira zásuvka 144, 470mm/30kg, relingy, antracit, PTOs',
+         'VYSUVY', 'set', 62.05, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-144-470mm-30kg-relingy-antracit-ptos/'],
+        ['357958', 'K-HETTICH Atira zásuvka 144, 520mm/30kg, relingy, antracit, PTOs',
+         'VYSUVY', 'set', 63.74, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-144-520mm-30kg-relingy-antracit-ptos/'],
+        ['357969', 'K-HETTICH Atira zásuvka 176, 420mm/30kg, relingy, antracit, SiSy',
+         'VYSUVY', 'set', 62.18, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-176-420mm-30kg-relingy-antracit-sisy/'],
+        ['357996', 'K-HETTICH Atira zásuvka 176, 350mm/30kg, relingy, antracit, PTOs',
+         'VYSUVY', 'set', 64.24, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-176-350mm-30kg-relingy-antracit-ptos/'],
+        ['357997', 'K-HETTICH Atira zásuvka 176, 420mm/30kg, relingy, antracit, PTOs',
+         'VYSUVY', 'set', 65.59, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-176-420mm-30kg-relingy-antracit-ptos/'],
+        ['357998', 'K-HETTICH Atira zásuvka 176, 470mm/30kg, relingy, antracit, PTOs',
+         'VYSUVY', 'set', 65.39, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-176-470mm-30kg-relingy-antracit-ptos/'],
+        ['357999', 'K-HETTICH Atira zásuvka 176, 520mm/30kg, relingy, antracit, PTOs',
+         'VYSUVY', 'set', 67.08, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-176-520mm-30kg-relingy-antracit-ptos/'],
+        ['367919', 'K-HETTICH Quadro V6 skrytý celovýsuv, 550mm/30kg, sada pre 18mm, spojky, SiSy',
+         'VYSUVY', 'set', 34.54, nil,
+         'Hettich', 'Quadro',
+         'https://www.demos-trade.sk/k-hettich-quadro-v6-skryty-celovysuv-550mm-30kg-sada-pre-18mm-spojky-sisy/'],
+        ['352908', 'HETTICH 9240163 Atira mechanizmus PTOs, 10-30kg',
+         'VYSUVY', 'set', 28.33, 'PTOs modul k Tip-On zásuvkám 30 kg (v K-sade NIE JE)',
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/hettich-9240163-atira-mechanizmus-ptos-10-30kg/'],
+        ['352909', 'HETTICH 9240164 Atira mechanizmus PTOs, 20-50kg',
+         'VYSUVY', 'set', 28.33, 'PTOs modul k Tip-On zásuvkám 50 kg (v K-sade NIE JE)',
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/hettich-9240164-atira-mechanizmus-ptos-20-50kg/'],
+        ['357889', 'K-HETTICH Atira zásuvka 70, 470mm/30kg, antracit, SiSy',
+         'VYSUVY', 'set', 42.89, nil,
+         'Hettich', 'InnoTech Atira',
+         'https://www.demos-trade.sk/k-hettich-atira-zasuvka-70-470mm-30kg-antracit-sisy/']
       ].freeze
 
-      SEED_ITEMS = SEED_ROWS.map do |code, name, category, unit, price, note|
+      # Datum overenia cien seedu (zber 7.9.2026). Stampuje sa LEN riadku, ktory
+      # ma cenu AJ demos_url — rovnaka podmienka ako v proposal flow (F5).
+      SEED_PRICE_CHECKED_AT = '2026-09-07T00:00:00Z'
+
+      # Kody, ktore Demos 7.9.2026 uz nepozna. Riadok OSTAVA (stare zakazky ho
+      # maju v nakupe), len sa zalozí ako neaktivny + poznamka s dovodom.
+      SEED_INACTIVE = %w[250834 35000 197611 461804].freeze
+
+      SEED_ITEMS = SEED_ROWS.map do |code, name, category, unit, price, note, man, series, url|
+        item = { 'item_code' => code, 'name_sk' => name, 'category' => category,
+                 'unit' => unit, 'supplier' => 'Demos' }
+        item['price_eur_vat'] = price unless price.nil?
+        item['notes'] = note unless note.nil?
+        item['manufacturer'] = man unless man.nil?
+        item['series'] = series unless series.nil?
+        item['demos_url'] = url unless url.nil?
+        # Datum overenia patri VAZBE: bez URL alebo bez ceny sa nezapisuje.
+        item['price_checked_at'] = SEED_PRICE_CHECKED_AT if url && !price.nil?
+        item['active'] = false if SEED_INACTIVE.include?(code)
+        item
+      end.freeze
+
+      # v2 tvar seed riadkov (60) — sluzi VYHRADNE migracii v2 -> v3: prepisat
+      # sa smie len riadok, ktory je este BAJTOVO nas seed (`SEED_MATCH_FIELDS`)
+      # a nema vlastnu Demos vazbu. Vzor: LEGACY_SEED_93240 z patchu v1 -> v2.
+      # [kod, nazov, kategoria, MJ, cena|nil, poznamka|nil]
+      SEED_ROWS_V2 = [
+        ['104717', 'HETTICH 9071205 Sensys 8645i 110° TH52, naložený, SiSy',
+         'ZAVESY', 'ks', 4.18, 'záves „KLASIK"'],
+        ['104718', 'HETTICH 9071206 Sensys 8645i 110° TH52, polonaložený, SiSy',
+         'ZAVESY', 'ks', 5.42, nil],
+        ['104719', 'HETTICH 9071207 Sensys 8645i 110° TH52, vložený, SiSy',
+         'ZAVESY', 'ks', 5.75, nil],
+        ['245723', 'HETTICH 9071313 Sensys 8675 110° TH52 P2O (k tip-onu)',
+         'ZAVESY', 'ks', 4.00, 'bez tlmenia, k tip-onu'],
+        ['421309', 'HETTICH 9073673 Sensys 8675 vložený 110° P2O',
+         'ZAVESY', 'ks', 4.41, 'vložený P2O k tip-onu'],
+        ['264246', 'HETTICH 9099540 Sensys 8657i TH52 165°, naložený, SiSy',
+         'ZAVESY', 'ks', nil, nil],
+        ['106412', 'HETTICH 9071656 podložka 8099 s excentrom D=1,5',
+         'ZAVESY', 'ks', 0.97, '1:1 ku každému závesu'],
+        ['105408', 'HETTICH krytka misky Sensys',
+         'ZAVESY', 'ks', nil, '1:1 ku každému závesu (SET ZÁVES — debata 2.8.)'],
+        ['105425', 'HETTICH krytka ramienka Sensys',
+         'ZAVESY', 'ks', nil, '1:1 ku každému závesu (SET ZÁVES — debata 2.8.)'],
+        ['104454', 'Záves chladničkový HETTICH + platničky (komplet)',
+         'ZAVESY', 'ks', 10.12, nil],
+        ['104802', 'HETTICH 9088021 Sensys uhlový W90 TH52',
+         'ZAVESY', 'ks', nil, 'rohové skrinky'],
+        ['250831', 'BLUM 956A1004 TipOn pre záves 76 mm s magnetom, biely',
+         'ZAVESY', 'ks', nil, 'kód overiť (CSV šablóna má preklep 25031)'],
+        ['250834', 'BLUM 956A1004 TipOn pre záves 76 mm s magnetom, čierny',
+         'ZAVESY', 'ks', nil, nil],
+        ['35000', 'Strong tip-on s magnetom (protikus v balení)',
+         'ZAVESY', 'ks', nil, 'lacná alternatíva'],
+        ['357695', 'K-InnoTech Atira čelný biely 420/70, 30 kg, SiSy',
+         'VYSUVY', 'set', nil, 'K-sada'],
+        ['357696', 'K-InnoTech Atira čelný biely 470/70, 30 kg, SiSy',
+         'VYSUVY', 'set', nil, 'K-sada'],
+        ['357775', 'K-InnoTech Atira čelný biely 470/70/176 vr. relingu, 30 kg',
+         'VYSUVY', 'set', nil, 'K-sada'],
+        ['357970', 'K-InnoTech Atira čelný antracit 470/70/176 vr. relingu',
+         'VYSUVY', 'set', nil, 'K-sada'],
+        ['357819', 'K-InnoTech Atira vnútorný biely 470/70',
+         'VYSUVY', 'set', nil, 'K-sada; + čelo 294940 + príchyt 295276'],
+        ['358009', 'K-InnoTech Atira vnútorný antracit 420/70',
+         'VYSUVY', 'set', nil, 'K-sada; + čelo 294941 + príchyt 295277'],
+        ['294940', 'Čelo vnútornej zásuvky 2000/70 biela (Atira)',
+         'VYSUVY', 'ks', nil, 'profil 2000 mm, reže sa'],
+        ['294941', 'Čelo vnútornej zásuvky 2000/70 antracit (Atira)',
+         'VYSUVY', 'ks', nil, 'profil 2000 mm, reže sa'],
+        ['295276', 'Príchyt čela 70 biely, pár (Atira)',
+         'VYSUVY', 'par', nil, nil],
+        ['295277', 'Príchyt čela 70 antracit, pár (Atira)',
+         'VYSUVY', 'par', nil, nil],
+        ['502978', 'K-StrongMax 16 121/350 mm 40 kg, biela',
+         'VYSUVY', 'set', 30.76, 'K-sada'],
+        ['502993', 'K-StrongMax 16 249/450 mm 40 kg, biela',
+         'VYSUVY', 'set', 42.03, 'K-sada'],
+        ['179252', 'StrongBox H86/270 mm biely',
+         'VYSUVY', 'set', 16.91, nil],
+        ['179253', 'StrongBox H86/300 mm biely',
+         'VYSUVY', 'set', 17.50, nil],
+        ['179256', 'StrongBox H86/450 mm biely',
+         'VYSUVY', 'set', 17.95, nil],
+        ['179259', 'StrongBox H140/270 mm biely',
+         'VYSUVY', 'set', 18.16, nil],
+        ['402578', 'K-StrongBox H140/350 s hranatým relingom, biela',
+         'VYSUVY', 'set', nil, 'K-sada'],
+        ['317642', 'K-HETTICH Quadro V6 skrytý celovýsuv 450 mm/30 kg (18 mm)',
+         'VYSUVY', 'set', nil, 'K-sada'],
+        ['499013', 'K-BLUM Legrabox M 450 mm/40 kg Blumotion/TOB, karbón čierna CS-M',
+         'VYSUVY', 'set', nil, 'K-sada, prémium'],
+        ['499307', 'K-BLUM Legrabox K 450 mm/40 kg Tip-on, karbón čierna CS-M, vnútorná',
+         'VYSUVY', 'set', nil, 'K-sada; + čelný plech 491360 + reling 491359'],
+        ['507336', 'BLUM 22F2800 Aventos HF Top silný, skrutky',
+         'VYKLOPY', 'set', nil, 'krytky NIE sú v balení'],
+        ['347827', 'BLUM 22K2700T Aventos HK Top silný, Tip-on',
+         'VYKLOPY', 'par', nil, 'krytky 347834 zvlášť'],
+        ['23792', 'BLUM Aventos HL stredný',
+         'VYKLOPY', 'ks', nil, 'komponent zostavy HL'],
+        ['197611', 'BLUM Aventos HL ramená 450–580',
+         'VYKLOPY', 'ks', nil, 'komponent zostavy HL'],
+        ['13781', 'BLUM čelný príchyt 20S4200 (Aventos HL/HK)',
+         'VYKLOPY', 'ks', nil, 'komponent zostavy'],
+        ['461804', 'BLUM Aventos HL krytky 20L8020',
+         'VYKLOPY', 'ks', nil, 'krytky vždy zvlášť'],
+        ['13799', 'BLUM Aventos HL stabilizačná tyč 20Q1061UA',
+         'VYKLOPY', 'ks', nil, 'komponent zostavy HL'],
+        ['282474', 'IF K12 244 plynokvapalinová vzpera 120 N automatická',
+         'VYKLOPY', 'ks', nil, 'lacná alternatíva výklopu'],
+        ['82744', 'STRONG klzák s rektifikáciou, výška 17 mm, čierny',
+         'NOHY', 'ks', 0.48, 'najpoužívanejšia „noha"'],
+        ['367823', 'Häfele 637.76.355 noha AXILO v. 150 mm + podložka',
+         'NOHY', 'ks', 1.38, '4 ks na spodnú skrinku'],
+        ['93240', 'Rektifikačný uholník „Bystrica" (zavesenie skrinky na stenu)',
+         'SPOJOVACI_MATERIAL', 'ks', nil, '2 ks na hornú skrinku; NIE noha (debata 2.8.)'],
+        ['146993', 'Strong Big rektifikačná noha 100 mm',
+         'NOHY', 'ks', nil, nil],
+        ['360281', 'Skrutka SPAX 3,5×16 záp. hl. (bal 1000 ks)',
+         'SPOJOVACI_MATERIAL', 'ks', nil, 'predaj v bal 1000'],
+        ['228922', 'Skrutka PZ ZH 3,5×30 biely Zn (bal 1000)',
+         'SPOJOVACI_MATERIAL', 'ks', nil, 'predaj v bal 1000'],
+        ['228924', 'Skrutka PZ ZH 3,5×35 biely Zn (bal 1000)',
+         'SPOJOVACI_MATERIAL', 'ks', nil, 'predaj v bal 1000'],
+        ['11090', 'Konfirmát 5/50 Zn biely (bal 2400 ks)',
+         'SPOJOVACI_MATERIAL', 'ks', 0.07, 'cena za ks'],
+        ['11135', 'Skrutka PZ ZH 5×100/60 žltý Zn PZ2 čiastočný závit',
+         'SPOJOVACI_MATERIAL', 'ks', 0.06, nil],
+        ['306125', 'Podperka policová s návlekom 7/5 Zn biela',
+         'SPOJOVACI_MATERIAL', 'ks', nil, '4 ks na policu'],
+        ['402395', 'TULIP úchytka Bastone 320 čierna matná',
+         'UCHYTKY', 'ks', 4.05, nil],
+        ['398095', 'TULIP úchytka zápustná Shellby čierna matná',
+         'UCHYTKY', 'ks', 12.66, nil],
+        ['303211', 'TULIP úchytka Cana 128 biela',
+         'UCHYTKY', 'ks', 1.97, nil],
+        ['401555', 'TULIP úchytka Knop Conic čierna matná',
+         'UCHYTKY', 'ks', 2.54, nil],
+        ['355730', 'TULIP vešiak Kara L čierna matná',
+         'VESIAKY', 'ks', 13.10, nil],
+        ['355731', 'TULIP vešiak Kara M čierna matná',
+         'VESIAKY', 'ks', 9.27, nil],
+        ['252278', 'TM-profil LED Corner alu anodovaný 4000 mm',
+         'OSVETLENIE', 'ks', 30.79, '4 m profil — cena za kus'],
+        ['359426', 'TM-profil LED úchytkový Lucera narážací 4000 + tesnenie',
+         'OSVETLENIE', 'ks', nil, '4 m profil']
+      ].freeze
+
+      SEED_ITEMS_V2 = SEED_ROWS_V2.map do |code, name, category, unit, price, note|
         item = { 'item_code' => code, 'name_sk' => name, 'category' => category,
                  'unit' => unit, 'supplier' => 'Demos' }
         item['price_eur_vat'] = price unless price.nil?
@@ -1111,9 +1660,44 @@ module Noxun
         item
       end.freeze
 
+      # Klasifikacia seed riadku sa NEZAPISUJE „nasucho": prejde ZIVOU taxonomiou
+      # (Codex #320 P2). Pouzivatel v nej uz moze mat to iste meno inak zapisane
+      # alebo — a to je horsie — RADU POD INYM VYROBCOM (taxonomia cudzie mena
+      # zamerne zachovava, seed dopĺňa len chybajuce). Bez tohto kroku by seed
+      # vyrobil riadok, ktory kontrakt taxonomie porusuje: strom by rozdelil
+      # ekvivalentnych vyrobcov a najblizsia uprava riadku by skoncila
+      # „rada patri vyrobcovi X". Co sa nedá vyriešiť, sa VYNECHA — polozka bez
+      # vyrobcu je legalna (rovnaka fail-closed uvaha ako `taxonomy_refusal`).
+      #
+      # Bezi ZAMERNE MIMO katalogoveho zamku (taxonomia ma vlastny sidecar;
+      # vnorenie by vyrobilo PORADIE zamkov — ta ista uvaha ako pri create/patch).
+      def seed_items_resolved(items = SEED_ITEMS)
+        HardwareTaxonomy.ensure_seeded
+        items.map do |a|
+          next a if a['manufacturer'].nil? && a['series'].nil?
+
+          out = a.dup
+          if HardwareTaxonomy.read_only?
+            out.delete('manufacturer')
+            out.delete('series')
+            next out
+          end
+          man, ser, = HardwareTaxonomy.resolve_classification(a['manufacturer'], a['series'])
+          man.nil? ? out.delete('manufacturer') : out['manufacturer'] = man
+          ser.nil? ? out.delete('series') : out['series'] = ser
+          out
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'HardwareCatalog.seed_items_resolved') if defined?(Engine)
+        items.map do |a|
+          a['manufacturer'].nil? && a['series'].nil? ? a : a.reject { |k, _| %w[manufacturer series].include?(k) }
+        end
+      end
+
       def seed!
+        resolved = seed_items_resolved
         with_lock do
-          recs = SEED_ITEMS.map { |a| normalize_item(a)[0] }.compact
+          recs = resolved.map { |a| normalize_item(a)[0] }.compact
           # Cerstvy seed je natívne v aktualnej sade — patch sa ho uz nedotkne.
           write_unlocked('items' => recs, 'seed_version' => SEED_SET_VERSION)
         end
@@ -1134,6 +1718,10 @@ module Noxun
       SEED_MATCH_FIELDS = %w[name_sk category unit price_eur_vat notes supplier].freeze
 
       def apply_seed_patches!
+        # Taxonomia sa pyta PRED katalogovym zamkom (vzor create_item/patch_item,
+        # zdrojovy guard v testoch). Bezi len ked upgrade naozaj caka — `assess!`
+        # sem chodi az po lacnej kontrole `seed_version`.
+        resolved = seed_items_resolved
         with_lock do
           JsonFileStore.invalidate(path)
           doc = begin
@@ -1148,8 +1736,12 @@ module Noxun
           items = doc['items'].dup
           changed = []
           if from < 2
+            # Aj legacy v1 -> v2 dopĺňanie berie riadky z UZ ROZLISENEJ sady
+            # (Codex #320 kolo 2 P2): z `SEED_ITEMS` by krytky 105408/105425
+            # dostali klasifikaciu mimo zivej taxonomie a nasledny v3 prechod
+            # by ich uz povazoval za pouzivatelsku upravu a nechal tak.
             seed_by_code = {}
-            SEED_ITEMS.each { |s| seed_by_code[s['item_code']] = s }
+            resolved.each { |s| seed_by_code[s['item_code']] = s }
             SEED_PATCH_V2_ADD.each do |code|
               next if items.any? { |i| i['item_code'].to_s.strip.downcase == code.downcase }
               rec, = normalize_item(seed_by_code[code])
@@ -1176,12 +1768,91 @@ module Noxun
               end
             end
           end
+          changed.concat(apply_seed_patch_v3(items, resolved)) if from < 3
           ok = write_unlocked('items' => items, 'seed_version' => SEED_SET_VERSION)
           if ok && defined?(Engine)
             Engine.log("kovanie katalog: seed patch v#{from} -> v#{SEED_SET_VERSION}#{changed.any? ? " (#{changed.join(', ')})" : ''}")
           end
           ok
         end
+      end
+
+      # v2 -> v3 (D-118): 54 NOVYCH kodov, ktore pouzivaju seed sety zasuviek
+      # (vratane PTOs modulov a opravy 357889), + OSVIEZENIE povodnych 60 riadkov
+      # o overeny nazov, cenu s DPH, MJ, vyrobcu, radu a Demos URL.
+      #
+      # PLNY SEED SA DO EXISTUJUCEHO KATALOGU NELEJE (kontrakt z v1 -> v2):
+      # doplna sa LEN vymenovany `SEED_PATCH_V3_ADD`. Kto si seed polozku zmazal,
+      # dostane spat iba to, co je na tomto zozname — nic ine sa nevzkriesi.
+      #
+      # Prepisat existujuci riadok sa smie LEN ked je este preukazatelne NAS
+      # (rovnaka uvaha ako pri 93240 v patchi v1 -> v2):
+      #   * vsetky `SEED_MATCH_FIELDS` sedia s v2 seed tvarom, A ZAROVEN
+      #   * riadok nema vlastnu Demos vazbu (`demos_url`), A ZAROVEN
+      #   * riadok nema vlastnu klasifikaciu (`manufacturer` / `series`) —
+      #     tie v `SEED_MATCH_FIELDS` NIE SU, takze bez tejto podmienky by sme
+      #     prepisali vyrobcu, ktoreho tam dal pouzivatel (Astra #21 BLOCKER 1).
+      # `merge` nad existujucim zaznamom drzi `use_count` aj rucne vypnutu
+      # aktivnost: v3 riadok nesie `active` LEN pre `SEED_INACTIVE` (a to `false`),
+      # takze polozku NIKDY nezapne spat.
+      #
+      # POZOR: doplnenim vyrobcov sa katalog bez klasifikacie stampuje na
+      # `SCHEMA_CLASSIFIED` — starsi plugin ho odteraz cita ako read-only
+      # („aktualizuj plugin"), nikdy ticho neoreze. To je zamer, nie vedlajsi
+      # ucinok: v3 riadky bez vyrobcu by boli polovicna praca.
+      SEED_PATCH_V3_ADD = %w[
+        317640 317641 317643 317644 343031 343033 348777 357694
+        357697 357716 357722 357723 357724 357725 357734 357735
+        357736 357755 357761 357762 357763 357764 357773 357774
+        357777 357783 357795 357801 357802 357803 357812 357887
+        357888 357890 357914 357915 357916 357917 357926 357927
+        357928 357955 357956 357957 357958 357969 357996 357997
+        357998 357999 367919 352908 352909 357889
+      ].freeze
+
+      def apply_seed_patch_v3(items, resolved = seed_items_resolved)
+        v2_by_code = {}
+        SEED_ITEMS_V2.each do |a|
+          rec, = normalize_item(a)
+          v2_by_code[rec['item_code'].downcase] = rec if rec
+        end
+        add_keys = SEED_PATCH_V3_ADD.map(&:downcase)
+        idx_by_code = {}
+        items.each_with_index { |i, n| idx_by_code[i['item_code'].to_s.strip.downcase] ||= n }
+        added = []
+        updated = []
+        kept = []
+        resolved.each do |seed|
+          rec, = normalize_item(seed)
+          next unless rec
+          key = rec['item_code'].downcase
+          idx = idx_by_code[key]
+          if idx.nil?
+            next unless add_keys.include?(key)
+
+            idx_by_code[key] = items.length
+            items << rec
+            added << rec['item_code']
+            next
+          end
+          cur = items[idx]
+          v2 = v2_by_code[key]
+          untouched = v2 &&
+                      SEED_MATCH_FIELDS.all? { |k| cur[k] == v2[k] } &&
+                      cur['demos_url'].to_s.empty? &&
+                      cur['manufacturer'].to_s.empty? &&
+                      cur['series'].to_s.empty?
+          unless untouched
+            kept << rec['item_code']
+            next
+          end
+          items[idx] = cur.merge(rec)
+          updated << rec['item_code']
+        end
+        if defined?(Engine) && kept.any?
+          Engine.log("kovanie katalog: v3 seed nechal bez zmeny #{kept.length} pouzivatelskych poloziek (#{kept.first(12).join(', ')}#{kept.length > 12 ? ', …' : ''})")
+        end
+        ["v3 +#{added.length}", "v3 ~#{updated.length}", "v3 =#{kept.length}"]
       end
 
       def finish_check(callback, result)

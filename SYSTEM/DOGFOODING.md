@@ -37,7 +37,10 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 - **D-118 · Kódy setov bez väzby na katalóg — plošný seed katalógu z Démosu** (Michal 7.9., smoke KOV-D krok 2) — receptové sety (biela aj antracit Atira, Quadro) nesú
   objednávacie kódy, ale katalóg kovania ich nepozná (položka „bez ceny", názov len z kódu) — Michal ich dnes dopĺňa ručne po jednom. Želanie: **jedna dátová dávka**, ktorá pre
   KAŽDÝ kód zo seed setov doplní do katalógu názov, cenu a URL Démosu (kód → URL/názov/cenu môže vyhľadať Antigravity, výsledok = seed riadky s odkazom na zdroj a dátumom),
-  s pravidlom „existujúcu používateľskú položku neprepisovať". *Stav: OTVORENÉ — kandidát na dátovú dávku po smoke KOV-D (pred KOV-E/F); rozhodne Michal v novom okne.*
+  s pravidlom „existujúcu používateľskú položku neprepisovať". *Stav: **KATALÓGOVÁ ČASŤ HOTOVÁ (D-118a, v0.9.43, PR #320)** — 114 položiek má názov, cenu s DPH, URL,
+  dátum overenia, výrobcu aj radu; dáta zbierané strojovo z produktových stránok Démosu tým istým parserom ako „Overiť cenu"; používateľské položky nedotknuté; 4 zrušené
+  kódy neaktívne. **OTVORENÉ ostáva D-118b** — oprava setov, ktorú zber odhalil: `348777` (antracit H70/470) nie je K-sada → `357889`, a Tip-On sety potrebujú PTOs
+  mechanizmus `352908`/`352909` (v K-sade nie je). Zadanie: `_dev/BRIEF_d118b.md`.*
 
 ## KONTROLA + VÝROBA
 

@@ -8,10 +8,15 @@ require_relative '../helper' unless defined?(NxTest)
 HWC = Noxun::Engine::HardwareCatalog
 
 # Prazdny katalog (BEZ seedu) — testy si polozky tvoria samy.
+# `seed_version` je tu POVINNE (vzor test_kovb2_katalog): bez neho by
+# `apply_seed_patches!` povazoval subor za starsiu sadu a doplnil do neho
+# `SEED_PATCH_V3_ADD` — „prazdny" katalog by mal 54 poloziek a testy identity
+# kodov aj markera schemy by merali nieco ine, nez deklaruju.
 def hwc_empty!
   FileUtils.mkdir_p(HWC.dir)
   Noxun::Engine::JsonFileStore.write(HWC.path,
-                                     'std' => HWC::STD, 'schema' => HWC::SCHEMA_CURRENT, 'items' => [])
+                                     'std' => HWC::STD, 'schema' => HWC::SCHEMA_CURRENT,
+                                     'seed_version' => HWC::SEED_SET_VERSION, 'items' => [])
   File.delete("#{HWC.path}.bak") if File.exist?("#{HWC.path}.bak")
   Noxun::Engine::JsonFileStore.invalidate(HWC.path)
   HWC.reset_state!
@@ -295,7 +300,8 @@ NxTest.test('hw katalog: seed — deterministicky manifest, unikatne kody, enum,
   NxTest.assert_equal(:ok, HWC.assess!, 'chybajuci subor -> seed -> ok')
   list = HWC.items
   NxTest.assert_equal(HWC::SEED_ROWS.length, list.length, 'kazdy riadok manifestu sa seedol')
-  NxTest.assert_equal(60, list.length, 'zmrazeny rozsah manifestu (58 + krytky 105408/105425 — D1)')
+  NxTest.assert_equal(114, list.length,
+                      'zmrazeny rozsah manifestu (60 z D1 + 54 kodov seed setov — D-118)')
   codes = list.map { |i| i['item_code'].downcase }
   NxTest.assert_equal(codes.uniq.length, codes.length, 'unikatne kody')
   list.each do |i|
@@ -304,11 +310,23 @@ NxTest.test('hw katalog: seed — deterministicky manifest, unikatne kody, enum,
     NxTest.assert(i['price_eur_vat'].nil? || i['price_eur_vat'].is_a?(Float),
                   "cena Float alebo chyba: #{i['item_code']}")
     NxTest.assert_equal('Demos', i['supplier'])
-    NxTest.refute(i.key?('price_checked_at'), 'seed cena nie je "overena" (ziadny stamp)')
+    # D-118: seed v3 uz NIE JE prepis z CSV — kazdy riadok s cenou ma aj vazbu
+    # na konkretnu stranku, z ktorej sa cena precitala, takze datum overenia
+    # patri k nemu (F5 „datum patri konkretnej vazbe"). Riadok BEZ vazby alebo
+    # BEZ ceny stamp mat NESMIE.
+    if i['demos_url'] && i['price_eur_vat']
+      NxTest.assert_equal(HWC::SEED_PRICE_CHECKED_AT, i['price_checked_at'],
+                          "seed stamp k vazbe: #{i['item_code']}")
+    else
+      NxTest.refute(i.key?('price_checked_at'), "bez vazby/ceny ziadny stamp: #{i['item_code']}")
+    end
   end
-  NxTest.assert_close(4.18, HWC.find('104717')['price_eur_vat'], 0.001, 'Sensys KLASIK s cenou z CSV')
-  NxTest.assert_equal(nil, HWC.find('360281')['price_eur_vat'], 'SPAX bez ceny (nil != 0)')
+  NxTest.assert_close(4.18, HWC.find('104717')['price_eur_vat'], 0.001, 'Sensys KLASIK s cenou z Demosu')
+  NxTest.assert_equal(nil, HWC.find('250834')['price_eur_vat'], 'zruseny kod bez ceny (nil != 0)')
+  NxTest.assert_equal(false, HWC.find('250834')['active'], 'kody, ktore Demos nepozna, su neaktivne')
   NxTest.assert_equal('set', HWC.find('357695')['unit'], 'Atira K-sada = set')
+  NxTest.assert_equal('Hettich', HWC.find('357695')['manufacturer'], 'vyrobca zo stranky')
+  NxTest.assert_equal('InnoTech Atira', HWC.find('357695')['series'], 'rada zo stranky')
   NxTest.refute(codes.include?('25031'), 'preklepovy TipOn kod z CSV sa NEseeduje (zmrazene 250831)')
   # opakovany assess uz NEseeduje (subor existuje) — zmena preziva
   rec = HWC.find('104717')
