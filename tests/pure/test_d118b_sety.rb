@@ -330,3 +330,76 @@ NxTest.test('D-118b (R3): supis clenov PRIZNA vedome preskoceny modul') do
   NxTest.assert_equal('PTOs mechanizmus', skipped.first['label'])
   NxTest.assert_equal(nil, skipped.first['code'], 'a NEMA kod')
 end
+
+# ============================================================================
+# R9 — NALEZY CODEX #321 (kolo 1)
+# ============================================================================
+
+module NxD118b
+  # Minimalny model (vzor `test_h1a_sety.rb`) — snapshot v NOXUN dict.
+  class Model
+    def initialize
+      @attrs = {}
+    end
+
+    def get_attribute(dict, key)
+      (@attrs[dict] || {})[key]
+    end
+
+    def set_attribute(dict, key, val)
+      (@attrs[dict] ||= {})[key] = val
+    end
+  end
+end
+
+NxTest.test('D-118b (R9): veta pre `members_skipped` nehovori „typ nema priradeny set"') do
+  c = NxD118b
+  u = { 'reason' => 'drawer_kit_missing', 'base_reason' => 'members_skipped',
+        'set_id' => 'atira-biela-h70-p2o', 'generic_type' => 'slide' }
+  txt = c::HWS.unmapped_reason_sk(u)
+  NxTest.assert(txt.include?('ani jednu položku'), "zavadzajuca veta: #{txt}")
+  NxTest.refute(txt.include?('nemá priradený set'), "fallback sa NESMIE pouzit: #{txt}")
+end
+
+NxTest.test('D-118b (R9): supis (explain) prizna, ked set nevyda ANI JEDNU polozku') do
+  c = NxD118b
+  sets = c.seed_norm.map do |s|
+    next s unless s['set_id'] == 'atira-biela-h70-p2o'
+
+    copy = Marshal.load(Marshal.dump(s))
+    copy['members'].each { |m| m['code_by_nl'].each_key { |k| m['code_by_nl'][k] = c::HWS::SKIP_CODE } }
+    copy
+  end
+  family = sets.select { |s| s['set_id'].start_with?('atira-biela-') && s['set_id'].end_with?('p2o') }
+  st = c.state_of(sets, c::HWS::SEED_MAPPING.merge(c::HWS::MAPPING_ADDITIONS)
+                          .merge(c::TIPON_METAL => c::HWS.height_selector_for(family)))
+  ex = c::HWS.explain(c.drawer_item(70, 420), st)
+  NxTest.assert_equal(1, ex['problems'].length, "panel a supis sa nesmu rozist: #{ex.inspect}")
+  NxTest.assert(ex['problems'].first.include?('ani jednu položku'), ex['problems'].inspect)
+end
+
+NxTest.test('D-118b (R9): „Doplniť nové predvoľby" OSVIEZI nedotknutu definiciu v projekte') do
+  c = NxD118b
+  # Projekt uz MA triedny kluc aj zmrazenu STARU definiciu (v4 tvar bez modulu)
+  # + jeden set, ktory si pouzivatel upravil. Bez osviezenia by akcia vratila
+  # `:none` a zakazka by dalej objednavala bez PTOs modulu (Codex #321 P1).
+  stary = c::HWS.normalize_sets([c::HWS::LEGACY_SEED_SHAPES['atira-biela-h70-p2o'].first]).first
+  moj = Marshal.load(Marshal.dump(c::HWS::LEGACY_SEED_SHAPES['atira-antracit-h70-sisy'].first))
+  moj['name'] = 'Moja antracit'
+  moj_norm = c::HWS.normalize_sets([moj]).first
+  m = c::Model.new
+  c::HWS.write_project_state(m, 'mapping' => { c::TIPON_METAL => 'atira-biela-h70-p2o' },
+                                'sets' => { 'atira-biela-h70-p2o' => stary,
+                                            'atira-antracit-h70-sisy' => moj_norm })
+  res, _added_sets, _added_map, refreshed = c::HWS.merge_project_sets_seed!(m)
+  NxTest.assert_equal(:updated, res, 'akcia sa NESMIE skoncit ako „niet co doplnat"')
+  NxTest.assert(Array(refreshed).include?('atira-biela-h70-p2o'), Array(refreshed).inspect)
+  NxTest.refute(Array(refreshed).include?('atira-antracit-h70-sisy'),
+                'pouzivatelom upravena definicia sa NEPREPISE')
+
+  _, st = c::HWS.project_state_status(m)
+  NxTest.assert_equal(2, st['sets']['atira-biela-h70-p2o']['members'].length,
+                      'projekt uz ma PTOs modul')
+  NxTest.assert_equal('Moja antracit', st['sets']['atira-antracit-h70-sisy']['name'],
+                      'a vlastny nazov ostal')
+end

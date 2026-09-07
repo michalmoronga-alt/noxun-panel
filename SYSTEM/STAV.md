@@ -45,7 +45,8 @@ Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` →
 - **D-118b — ZÁSUVKA OBJEDNÁ SPRÁVNU SADU A TIP-ON AJ MECHANIZMUS** (v0.9.44, 7.9.2026): antracitová zásuvka H70 s NL 470 objedná **`357889`** namiesto `348777` (ten
   **nie je K-sada** — čelné kovanie treba dokúpiť), a **každá Tip-On zásuvka** dostane k sade aj **PTOs modul** `352908` (30 kg) / `352909` (50 kg), 28,33 € s DPH — doteraz
   chýbal, lebo v K-sade nie je. Kity typu `PTO` (620 mm, Quadro V6) ho **vedome nedostanú**. Oprava sa dostane aj do knižnice na disku, ak si ju človek sám neupravil;
-  **rozpracované zákazky sa nemenia** (nesú si kódy, s ktorými boli objednané) — do nich ju prenesie „Doplniť nové predvoľby". [KRONIKA](archiv/KRONIKA.md).
+  **rozpracované zákazky sa nemenia samy** — do nich ju prenesie **„Doplniť nové predvoľby"** (od tejto dávky aj osvieži nedotknuté definície a povie, koľko ich bolo).
+  [KRONIKA](archiv/KRONIKA.md).
 - **D-118a — KATALÓG KOVANIA UŽ POZNÁ KÓDY, KTORÉ SI PLUGIN SÁM OBJEDNÁVA** (v0.9.43, 7.9.2026): katalóg má **114 položiek** a pri každej **presný názov z Démosu, cenu s DPH,
   odkaz na stránku, dátum overenia, výrobcu a radu** — doteraz boli kódy receptových setov v Nákupe „bez ceny". Dáta sú overené proti produktovej stránke tým istým parserom,
   akým beží „Overiť cenu". **Používateľské položky sa neprepisujú** (na tomto PC 11 vlastných + 13 doplnených riadkov), štyri zrušené kódy ostávajú ako **neaktívne** s dôvodom.

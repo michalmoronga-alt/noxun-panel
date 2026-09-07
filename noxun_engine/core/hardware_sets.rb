@@ -1937,6 +1937,11 @@ module Noxun
           # KOV-D1a: vyber NA TEJTO SKRINKE je poskodeny. NIKDY sa nepouzije
           # predvolba projektu — pouzivatel tu nieco vedome vybral.
           'výber setu na tejto skrinke je poškodený — vyber ho nanovo'
+        when 'members_skipped'
+          # D-118b: set sa NASIEL a sedel, len pre tuto dlzku nema ani jednu
+          # polozku (vsetky bunky su `none`). Bez vlastnej vety by riadok
+          # Nakupu aj CSV tvrdili „typ nemá priradený set", co je zavadzajuce.
+          "set „#{sid}“ nemá pre túto dĺžku ani jednu položku — doplň rad setu"
         else
           'typ nemá priradený set'
         end
@@ -2869,9 +2874,38 @@ module Noxun
             added_sets << sid
           end
         end
-        return [:none, [], []] if added_map.empty?
-        return [:none, [], []] unless write_project_state(model, state)
-        [:updated, added_sets.uniq, added_map]
+        # D-118b (Codex #321 P1): doplnanie doteraz vedelo LEN pridat chybajuci
+        # kluc. Projekt, ktory triedny kluc UZ MA, si tak nechal zmrazenu STARU
+        # definiciu setu — a po oprave seedu (zly kod, chybajuci PTOs modul) by
+        # dalej objednaval zle, hoci pouzivatel spustil prave tu akciu, ktora to
+        # ma napravit. VEDOMA akcia preto osviezi aj definicie, ktore su este
+        # PRESNE predoslym seed tvarom; pouzivatelom upravena definicia ostava.
+        # Automaticky sa snapshot nemeni NIKDY — to je stale kontrakt.
+        refreshed = refresh_untouched_project_sets(state)
+        return [:none, [], [], []] if added_map.empty? && refreshed.empty?
+        return [:none, [], [], []] unless write_project_state(model, state)
+        [:updated, added_sets.uniq, added_map, refreshed]
+      end
+
+      # Osviezi v SNAPSHOTE definicie, ktore su bajtovo predoslym seed tvarom.
+      # -> zoznam set_id, ktore sa naozaj zmenili (vzor `replace_untouched_seed_sets`).
+      def refresh_untouched_project_sets(state)
+        sets = state['sets']
+        return [] unless sets.is_a?(Hash)
+
+        seed_by_id = {}
+        normalize_sets(SEED_SETS).each { |s| seed_by_id[s['set_id']] = s }
+        changed = []
+        sets.each do |sid, cur|
+          fresh = seed_by_id[sid]
+          next unless fresh && LEGACY_SEED_SHAPES.key?(sid)
+          next if cur == fresh
+          next unless legacy_seed_shape?(cur)
+
+          sets[sid] = deep_copy(fresh)
+          changed << sid
+        end
+        changed
       end
 
       # --- sety v SABLONE korpusu (H2, D-76) -----------------------------------
@@ -3759,9 +3793,11 @@ module Noxun
       def explain_members(it, set, sid, lookup, out)
         # Pocet polozky je v configu vzdy >= 1; obrana pre poskodeny zaznam.
         qty = [it['quantity'].to_i, 1].max
+        emitted = false
         Array(set['members']).each_with_index do |m, idx|
           code, miss = member_code(m, it)
           if miss
+            emitted = true
             out['problems'] << unmapped_reason_sk(
               unmapped_entry(it, sid, miss['reason'],
                              miss.merge('member_index' => idx, 'member_label' => m['label']))
@@ -3797,7 +3833,19 @@ module Noxun
             # v paneli) — pri pevnom kode nil.
             'nominal_length' => (m['code_by_nl'].is_a?(Hash) ? numeric_param(it, 'nominal_length') : nil)
           }
+          emitted = true
         end
+        return if emitted
+
+        # D-118b (Codex #321 P2): panel a supis sa NESMU rozist. Ked set pre
+        # receptovu polozku nevyda ani jeden riadok, `expand` z toho robi RED
+        # `drawer_kit_missing` — karta by inak tvrdila „vsetky členy netreba",
+        # kym Kontrola hlasi nevyrobitelnu zasuvku.
+        return unless it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE
+
+        out['problems'] << unmapped_reason_sk(
+          unmapped_entry(it, sid, 'members_skipped', 'detail' => 'set nevydal žiadnu položku')
+        )
       end
 
       # --- KOV-B3: ZIVY NAHLAD EXPANZIE ROZPRACOVANEHO SETU --------------------
