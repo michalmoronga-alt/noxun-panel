@@ -62,6 +62,12 @@ NxTest.test('encoding: ziadne mojibake/C1 bajty v UI a docs suboroch + html char
     # (Znak sa pise `0.chr` - doslovny NUL v tomto subore by chytil guard
     #  sam seba, presne ako pri mojibake signaturach a cyrilike.)
     bad << "#{rel}: NUL bajt (subor by bol pre git BINARNY)" if bytes.include?(0.chr.b)
+    # Codex #322 P2 (6.9.2026): OSTATNE C0 riadiace znaky (okrem TAB/LF/CR) — realny nalez: cesta
+    # `%APPDATA%\NOXUN\...` prehnana interpolujucim Ruby heredocom sa zmenila na doslovny BEL
+    # (`\a`) a straty separatorov; v docs aj zdrojakoch nema riadiaci znak co robit.
+    if (m0 = bytes.match(/[\x01-\x08\x0B\x0C\x0E-\x1F]/n))
+      bad << "#{rel}: C0 riadiaci znak (0x#{m0[0].ord.to_s(16)})"
+    end
     text = bytes.dup.force_encoding('UTF-8')
     if text.valid_encoding? && (hit = text[cyr])
       bad << "#{rel}: cyrilicky homoglyf #{format('U+%04X', hit.ord)} (v SK/EN zdrojaku nema co robit)"

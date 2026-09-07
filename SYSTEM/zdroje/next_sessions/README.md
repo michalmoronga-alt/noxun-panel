@@ -112,3 +112,17 @@ Až po uzavretí tejto diskusie vzniká implementačné zadanie.
 Téma pôvodne vedená v parking lote ako **Základné vkladanie skriniek / V1-04** bola 23. 8. 2026 prebratá a zúžená na samostatný **Ghost Placement**. Jej schválený produktový kontrakt a predbežný repo audit sú v [09_GHOST_VKLADANIE.md](09_GHOST_VKLADANIE.md); externé SketchUp API/UX pasce a doplnené smoke scenáre sú v [09A_GHOST_EXTERNY_SKETCHUP_AUDIT.md](09A_GHOST_EXTERNY_SKETCHUP_AUDIT.md).
 
 Poradie stále nie je záväzný implementačný plán: najprv treba dokončiť UI 2.0, checkpoint/docs clean a následný hardening audit. Ak po ňom Ghost nemá nový konflikt, je preferovaný ako **prvá malá funkčná dávka**, pretože rieši opakovanú bolesť pri každom vložení skrinky bez otvárania segmentového scope.
+## D · Debata V1 „po KOVANÍ" (5.–6.9.2026) — checkpointy rozhodnutí
+
+Rozhodnutia Michala k zvyšku V1 (čo je vo V1, čo mimo, v akom tvare). Sú to **rozhodnuté podklady pre task packages**, nie packages; každý má status riadok. Zapracované do
+[../../V1_VIZIA.md](../../V1_VIZIA.md), [../../PLAN.md](../../PLAN.md) a [../../DOGFOODING.md](../../DOGFOODING.md) záverečným docs PR debaty.
+
+- [V1_DEBATA_2026-09-05_KONSTRUKCIA.md](V1_DEBATA_2026-09-05_KONSTRUKCIA.md) — K1 odsadenia (komín, strop vpredu) · K2 chrbát z výstuh · K3 rohová skrinka (spec z DC) · spotrebičová · mimo V1.
+- [V1_DEBATA_2026-09-06_SPOTREBICE.md](V1_DEBATA_2026-09-06_SPOTREBICE.md) — S1 vo V1 (katalóg ručne, väzba na zákazku a skrinku, galéria príloh, šablóna „spotrebičová") + predúloha technické listy.
+- [SPOTREBICE_TECHLISTY_2026-09.md](SPOTREBICE_TECHLISTY_2026-09.md) — zoznam objednávaných modelov (Disk VYBAVENIE + NAY) a čo výrobcovia uvádzajú v listoch (5 agy behov; surové packety v `…_agy_packety.md`).
+- [V1_DEBATA_2026-09-06_VYSTUPY.md](V1_DEBATA_2026-09-06_VYSTUPY.md) — overenie ceny na klik, viac URL, „na faktúru" vyradené.
+- [V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.md](V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.md) — Lucia testuje; D-48 zdieľané knižnice = prvá funkcia po V1 (Odoslať/Aktualizovať, verzie, konflikt per katalóg), odhad 3 PR.
+- [V1_DEBATA_2026-09-06_MR_VZHLAD.md](V1_DEBATA_2026-09-06_MR_VZHLAD.md) — nahrádza M-R FOTO: ručné textúry, `.skm`, orientácia, PBR cez editor SketchUpu; API overené v SU 26.0.
+- [V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md](V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md) — D-95 preč, stráž kolízií a EN DANIELI mimo V1, nárezový plán primitívny do V1, D-122/123/124.
+- [V1_DEBATA_2026-09-06_DROBNE_DLHY.md](V1_DEBATA_2026-09-06_DROBNE_DLHY.md) — D-106, D-10 mimo V1; D-51 uzavreté; stav hmotnosti a hustoty.
+- Návrhy mechanizmov vyčlenené do vlastného PR (pravidlo 3 kôl): `SYNC_KNIZNICE_NAVRH_2026-09-06.md` (zdieľanie knižníc) a `NAREZ_PLAN_NAVRH_2026-09-06.md` (nárezový plán).
