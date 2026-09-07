@@ -97,7 +97,7 @@ Rozmerové polia podľa kategórie, každé **voliteľné** (neznáme = prázdne
 | Kategória | Rozmery pre engine (mm) | Kontrola vo V1 |
 |---|---|---|
 | Rúra · mikro | nika Š min–max · V min–max · H min · čelo Š × V · presah hore / dole · zadný výrez police (komín) · [pevná polica medzi rúrou a mikro = konštrukčné pravidlo šablóny] | **NIE** (rozhodnutie 6.9.); polia sa len evidujú |
-| Chladnička | nika Š · V min–max · H min · počet dverí + pomer delenia (zadný kanál a vetranie **len ako poznámka v liste, bez poľa** — rozhodnutie 6.9.) | **ÁNO**: vnútro skrinky ≥ nika (Š, V, H); kanál/vetranie sa nekontroluje |
+| Chladnička | nika Š · V min–max · H min · počet dverí + pomer delenia (zadný kanál a vetranie **len ako poznámka v liste, bez poľa** — rozhodnutie 6.9.) | **ÁNO**: pre každý rozmer niky **`min ≤ vnútro skrinky ≤ max`** (šírka, výška, hĺbka — listy dávajú aj maximá, napr. 570 / 1950; príliš veľký otvor je rovnako chyba); kde list max nedáva, len jednostranne `≥ min`; kanál/vetranie sa nekontroluje |
 | Umývačka | šírka (450/600) · výška min–max · čelo Š min–max · V min–max · hmotnosť čela max · sokel min (evidencia) | **ÁNO**: len šírka slotu (450/600); výška čela vs. sokel sa **nekontroluje** (Michal predpísané rozmery obchádza — rozhodnutie 6.9.) |
 | Varná doska | vonkajší Š × H · výrez Š × H (+tolerancia) · montážna hĺbka · PD min hrúbka | cena + výrez (poznámka pre PD); kontrola = V1+ |
 | Digestor | šírka skrinky min · výška nad doskou min–max · Ø odvodu | len cena (mimo V1 konštrukčne) |

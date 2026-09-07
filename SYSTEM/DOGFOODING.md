@@ -34,8 +34,10 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   (`gap_sides`, Čelá); v praxi treba ľavú a pravú stranu nastaviť **zvlášť** (napr. čelo presahuje cez bok len na viditeľnej strane, pri susede ostáva škára). Hore/dole už
   zvlášť sú (`gap_top` / `gap_bottom`). *Stav: OTVORENÉ — zaradiť do UI/UX balíka kontextu Čelá (D-114) alebo skôr, ak blokuje prácu; mení config čela (CONFIG_SCHEMA bump).*
 - **D-120 · Úchytkový profil (UKW) aj na dolnej a bočných hranách** (Lucia 6.9., prvý test) — profil sa dnes osadzuje **len na hornú hranu** čela; treba voľbu hrany:
-  horná (dnes) · dolná · ľavá / pravá bočná (vysoké dvere, skrine). Registry `front_profiles.rb` s voľbou hrany počíta (D-90: „dolná hrana sa používa často, existujú aj
-  bočné"), config čela ju zatiaľ nenesie. Dopad: skrátenie panelu v inej osi, dĺžka rezu profilu, vizuál, smer dekoru. *Stav: OTVORENÉ — zaradiť ku KOV-F (úchytka podľa
+  horná (dnes) · dolná · ľavá / pravá bočná (vysoké dvere, skrine). Registry `front_profiles.rb` hranu dnes **nepozná** — záznam nesie len `reduction`, popisky, obrys, hĺbku
+  a výšku, `geometry`/`options` hranu nevracajú a modul výslovne predpokladá hornú hranu (komentár D-90 sľubuje len, že config to unesie bez migrácie). **Rozsah D-120 =**
+  config čela (hrana) **+ registry/API** (hrana ako parameter profilu) **+ všetci konzumenti**: matematika panelu vo `Fronts` (skrátenie v inej osi), pravidlo kovania (dĺžka
+  rezu), vizuál v modeli (renderer v `CabinetBuilder`), náhľad a UI panela; smer dekoru čela sa neotáča. *Stav: OTVORENÉ — zaradiť ku KOV-F (úchytka podľa
   klasifikácie) alebo do UI/UX balíka Čiel; rozhodne Michal.*
 - **D-125 · Hmotnosť v Inspectore (Základné) je prázdny placeholder** (Michal 6.9., KLINIKA) — riadok „Hmotnosť" v informačnom stĺpci sektora Základné ukazuje vždy „—":
   je to **statický placeholder z UI 2.0** (`panel.html` `#infWeight`, tooltip „Hmotnosť príde s kovaním (fáza 3)"), JS ho nikdy neplní a payload žiadnu hmotnosť nenesie.

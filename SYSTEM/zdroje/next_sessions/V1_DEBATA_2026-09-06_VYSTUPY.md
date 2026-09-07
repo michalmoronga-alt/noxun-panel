@@ -1,7 +1,7 @@
 # V1 debata · bod 6 VÝSTUPY — zvyšok cien (6.9.2026)
 
 > Stav: KONCEPT — neimplementovať priamo · zdroj: debata Michal + Fable 6.9.2026 (okno „V1 plánovanie po KOVANÍ") · auditované proti kódu: zatiaľ nie ·
-> rozsah je malý — task package vznikne priamo z tohto checkpointu (audit podľa obsahu: cenový kontrakt katalógu → `codex-audit` áno, ak sa mení schéma záznamu).
+> rozsah je malý — task package vznikne priamo z tohto checkpointu; **`codex-audit` ÁNO** (Codex #322 kolo 2 P1: `urls[]` je zmena dátového kontraktu katalógov, nie „prípadná").
 >
 > Pred implementáciou platí postup z [README.md](README.md).
 
@@ -20,7 +20,10 @@ Tým je zvyšok V1-03 definovaný; bod 6 V1_VIZIA sa odškrtne po implementácii
 - **Kde:** Štúdio → Materiály (položky bez Demos väzby), Kovanie → katalóg (položky bez Démos väzby), neskôr Spotrebiče (cena žije v rozpočte — tam sa overenie nerobí).
   Vstup = ten istý stavový riadok ceny, ktorý dnes ukazuje `price_checked_at` a vek ceny; „Prepočítať ceny" naďalej preskočí položky bez väzby, ale tie majú vlastné tlačidlá.
 - **Dáta:** existujúci `price_checked_at` (žiadne nové pole pre overenie); **zoznam odkazov** = nové pole `urls[]` (existujúca `demos_url` ostáva ako väzba na Demos —
-  nezlučovať, väzba ≠ odkaz). Jedna cena, jeden dátum.
+  nezlučovať, väzba ≠ odkaz). Jedna cena, jeden dátum. **Kontrakt (P1):** `urls[]` je **schémová zmena** oboch katalógov — materiály (`SCHEMA_*` bump + `normalize` whitelist
+  doplní `urls`: pole reťazcov, len `https`, dedup, strop napr. 10) aj katalóg kovania (`SCHEMA_CURRENT` bump + `assess!`); **dopredná brána** podľa R-11/R-12: starší plugin
+  katalóg s vyššou schémou číta **read-only / odmietne zápis**, nikdy `urls` ticho neoreže; migrácia = žiadna (pole chýba = prázdny zoznam). Projektové snapshoty materiálov/kovania
+  `urls` nenesú (odkaz nie je výrobný údaj) — potvrdí audit. Pred prvou takou zákazkou obe PC na rovnakej verzii (D-52).
 - **Rozpočet / ponuka:** vek ceny ostáva kontextový („N cien starších ako 30 dní"), nič nové.
 - **Scope OUT:** DOCX/PDF ponuka (zásobník) · „na faktúru" (vyradené) · automatické sledovanie cien z odkazov (nikdy — Demos fetch ostáva jediná automatika).
 

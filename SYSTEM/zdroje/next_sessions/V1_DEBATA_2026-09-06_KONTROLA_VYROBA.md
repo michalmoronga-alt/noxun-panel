@@ -14,20 +14,21 @@
 | **D-95 krížová kontrola** | odškrtávanie diel po diele **ide preč natrvalo**; ostáva **vizuálna kontrola** (ABS · smer kresby · smer otvárania · tagy D-27); neskôr posilniť X-ray pohľady a podobne („SketchUp pravdepodobne bude mať nejaké riešenie") | mimo V1 |
 | Stráž kolízií | — | mimo V1 |
 | EN DANIELI textový export | — | mimo V1 |
-| **Nárezový plán fáza 2 (primitívny)** | **DO V1** — dôvod: dnes je počet platní len odhad z m² (`SheetEstimate`, koeficient prerezu 10–25 %, D-19), realita je iná; po aspoň primitívnom nárezovom pláne vieme **presne**, koľko platní treba, a keď „1 diel vychádza na celú platňu a musím objednať 2", dá sa na to pozrieť a niečo vymyslieť | **ÁNO** (rozsah §1) |
+| **Nárezový plán fáza 2 (primitívny)** | **DO V1** — dôvod: dnes je počet platní len odhad z m² (`SheetEstimate`, koeficient prerezu 10–25 %, D-19), realita je iná; po aspoň primitívnom pláne vieme, koľko platní **najviac** treba (**horná hranica podľa zvoleného rozloženia**, nie presné množstvo — Codex #322), a keď „1 diel vychádza na celú platňu a musím objednať 2", dá sa na to pozrieť a niečo vymyslieť | **ÁNO** (rozsah §1) |
 | **D-121** názvy zásuvkových dielcov > 20 znakov vo VEPO | fix hneď (implementačné okno) | **ÁNO** — fix |
 
 ## 1 · Nárezový plán — minimálny rozsah V1 (návrh Fable, potvrdiť v package)
 
 - **Vstup:** tie isté BOM riadky ako `SheetEstimate.estimate` (rozmery, počty, materiál, duplák → zdrojový materiál) + formát platne z katalógu (`sheet_size`, fallback 2800 × 2070
-  s príznakom) + **smer dekoru dielca** (K1 `grain_direction` / vlastnosť materiálu; „bez smeru" = dielec sa smie otočiť) + kerf (default 4 mm) + orez okraja platne (default 10 mm).
+  s príznakom) + **smer dekoru dielca** (K1 `grain_direction` / vlastnosť materiálu; **„bez smeru" = dielec sa smie otočiť o 90°** — pravidlo pre NP-1: skúsi obe orientácie
+  v pevnom poradí (najprv dlhšia strana rovnobežne s dĺžkou platne) a vezme prvú, ktorá sa zmestí do aktuálnej police; žiadne hľadanie najlepšej) + kerf (default 4 mm) + orez okraja platne (default 10 mm).
 - **Algoritmus:** čisté Ruby, headless testovateľné (vlastná heuristika — OpenCutList je GPL: algoritmus áno, kód nie): **guillotine / police (shelf) heuristika** s triedením
   dielcov podľa výšky, rešpektovanie smeru dekoru, dielec > platňa = RED. Deterministický výsledok (rovnaký vstup = rovnaký plán), bez optimalizačných slučiek na výkon (KLINIKA
   254 dielcov musí prejsť pod sekundu).
 - **Výstup:** per nákupný materiál: **počet platní = HORNÁ HRANICA podľa zvoleného rozloženia** (deterministická heuristika, nie optimum — Codex #322 P1: iné platné rozloženie môže vyjsť lepšie, preto sa nesmie vydávať za presné množstvo), využitie %, zoznam dielcov per platňa, **najväčší zvyšok** (orezok) per platňa; **jednoduchý obrázok** rozloženia (SVG v
   Štúdiu, sekcia **Nárezový plán** — dnes neaktívna položka navigácie, kontrakt D-19 pripravený). Rozpočet: „Materiály po tabuliach" ukáže vedľa odhadu **počet z plánu ako hornú hranicu** („plán: N platní")
   (odhad ostáva default pre cenu; napojenie D-61 cien za celé tabule na plán = **voľba používateľa**, nie automatika; objednáva človek).
-- **Scope OUT:** optimalizácia na minimum odpadu (viac heuristík, rotácie bez dekoru — preto je výsledok horná hranica), tlač / export plánu pre pílu, ručné presúvanie dielcov v pláne, zvyšky ako sklad, ABS
+- **Scope OUT:** optimalizácia na minimum odpadu (viac heuristík, hľadanie najlepšieho rozloženia či poradia dielcov — preto je výsledok horná hranica; otočenie dielca bez smeru o 90° podľa pevného pravidla vyššie je vo vstupe, nie tu), tlač / export plánu pre pílu, ručné presúvanie dielcov v pláne, zvyšky ako sklad, ABS
   v pláne. *(Rezanie robí VEPO — plán je pre **objednávku správneho počtu platní a rozhodovanie**, nie výrobný dokument.)*
 - **Rezy:** NP-1 algoritmus + kontrakt výsledku (audit ÁNO, nový modul) → NP-2 sekcia Štúdia + napojenie rozpočtu (in-SU smoke KLINIKA: počty vs. reálne objednané platne).
 
@@ -43,5 +44,5 @@
 
 - [../../PLAN.md](../../PLAN.md) blok 2: D-95 → zásobník (s odkazom na koncept 01, „odškrtávanie preč, vizuálna kontrola + X-ray neskôr"); stráž kolízií + EN DANIELI → zásobník;
   nárezový plán → **V1 rozsah** s odkazom sem; D-121 fix; D-122/D-124 pridať jednou vetou; D-123 do bloku 3.
-- [../../V1_VIZIA.md](../../V1_VIZIA.md) bod 6: doplniť „nárezový plán — presný počet platní" do V1 rozsahu; „Mimo V1" doplniť D-95 kontrolu diel po diele (natrvalo), stráž kolízií, EN DANIELI.
+- [../../V1_VIZIA.md](../../V1_VIZIA.md) bod 6: doplniť „nárezový plán — horná hranica počtu platní podľa rozloženia" do V1 rozsahu; „Mimo V1" doplniť D-95 kontrolu diel po diele (natrvalo), stráž kolízií, EN DANIELI.
 - [../../DOGFOODING.md](../../DOGFOODING.md): D-95 presunúť do skupiny Po V1 — zásobník s prepísaným stavom.

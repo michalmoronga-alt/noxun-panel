@@ -21,7 +21,7 @@ plný text vrátane výsledku je v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADM
 
 **Cieľ:** doplatiť dlhy, ktoré fáza ŠTÚDIO vedome odložila, a spraviť refactory, na ktoré počas presunov nebol priestor.
 *(Stabilizačná revízia sa od začiatku produkcie naostro (20.8.) ešte NEKONALA — patrí pred ďalšie nové funkcie.)* Poradie určí Michal.
-Staré dlhy B–F nie sú blokujúce pre bežnú prácu (**B a D vybavené dávkou 1b-4, v0.8.8, 27.8.**; **sweep E je HOTOVÝ, 27.8.**; z písmen ostáva už len **F**;
+Staré dlhy B–F nie sú blokujúce pre bežnú prácu (**B a D vybavené dávkou 1b-4, v0.8.8, 27.8.**; **sweep E je HOTOVÝ, 27.8.**; **F uzavreté 6.9.2026** (D-51 rozhodnutím, viď odsek F) — z písmen neostáva nič;
 mimo písmen vybavené aj **1b-6a** — názov zákazky prežije prvé uloženie, v0.8.9, 27.8. — · **1b-7** — koniec tichého návratu starej ceny dekoru, v0.8.10, 27.8. — a **1b-6b** —
 rozlíšené hlavičky materiálov, v0.8.11, 27.8. — a **1b-6c** — zámok nad `vepo_settings.json`, v0.8.12, 28.8.; mimo písmen tak neostáva nič otvorené);
 **P0 odrážky A, G a H sú BRÁNY a VŠETKY TRI SÚ HOTOVÉ** — **A** (možná STRATA rozpísanej editácie) dávkou 1b-1, v0.8.6, 27.8. ·
@@ -578,7 +578,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   s hmotnosťou čela v KOV-E), neznáma hustota sa nevymýšľa (Michal 6.9.2026; plné znenie v [DOGFOODING.md](DOGFOODING.md)). Zaradiť ku KOV-E alebo hneď po KOVANÍ.
 - **D-119 · Presah dverí do strán per strana** (Lucia 6.9.2026, prvý test) — dnes jedna hodnota `gap_sides` pre obe strany; ľavá a pravá zvlášť (config čela, CONFIG_SCHEMA
   bump). Zaradenie: UI/UX balík Čiel (D-114) na konci bloku, skôr len ak blokuje prácu. Plné znenie v [DOGFOODING.md](DOGFOODING.md).
-- **D-120 · Úchytkový profil (UKW) aj na dolnej a bočných hranách** (Lucia 6.9.2026) — voľba hrany profilu (dnes len horná; registry `front_profiles` s tým počíta). Zaradenie:
+- **D-120 · Úchytkový profil (UKW) aj na dolnej a bočných hranách** (Lucia 6.9.2026) — voľba hrany profilu (dnes len horná; registry `front_profiles` hranu nepozná → rozsah = config + registry/API + všetci konzumenti: Fronts, kovanie, renderer, UI). Zaradenie:
   ku KOV-F (úchytka podľa klasifikácie) alebo do balíka Čiel — rozhodne Michal. Plné znenie v [DOGFOODING.md](DOGFOODING.md).
 - **KOV-E · „VÝKLOPY HK/HL" (po C, D):** `GENERIC_TYPES + lift` (plan_schema bump, `guard_unknown_hardware!` už chráni starší plugin) · roly `flap` z KOV-A dostanú
   pravidlo kind `weight_bands` (hmotnosť čela = rozmery × hrúbka × `Materials.density_for(typ)`; hustota nil → konzervatívny odhad + ORANGE) s tabuľkou HK top / HL top
@@ -671,7 +671,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   (predúloha hotová 6.9.; **čaká na Michalovo overenie listov** → detailná debata polí → package + `codex-audit`, nový modul). Za S1: **spotrebičová skrinka** (šablóny nad K1 + S1; nízka priorita).
 - **D-124 · Predvoľby projektu v Materiáloch rozbalené s väčšími náhľadmi** (Michal 6.9.2026) — malý UI rework; „materiál per rola dielca" = zásobník.
 - **Ceny** (vedome odložené z dávky E, V1 rozsah; **rozhodnuté 6.9.2026**): manuálne 1-klik overenie ceny („cena sedí" / „zmeniť") pre položky BEZ väzby na Demos a viac URL na položke (zvyšok V1-03) — [zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md); prepínač „na faktúru" **vyradený** (existuje s
-  DPH / bez DPH). **Mimo V1** (V1_VIZIA): DOCX/PDF generátor ponuky s vizualizáciami a rodina dokumentov — v zásobníku.
+  DPH / bez DPH); **audit ÁNO** — `urls[]` = schémová zmena katalógov (bump + dopredná brána R-11/R-12). **Mimo V1** (V1_VIZIA): DOCX/PDF generátor ponuky s vizualizáciami a rodina dokumentov — v zásobníku.
 - *(Vkladanie na klik — V1-04 — sa 26.8. vyčlenilo do vlastného bloku **GHOST VKLADANIE**; ten je od 31.8.2026 **hotový** (v0.9.0), plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).)*
 - **Konštrukcia — rozhodnuté 6.9.2026** ([zdroje/next_sessions/V1_DEBATA_2026-09-05_KONSTRUKCIA.md](zdroje/next_sessions/V1_DEBATA_2026-09-05_KONSTRUKCIA.md)): **K1 odsadenia** — dva prípady, jedna
   hodnota per skrinka (komín vzadu: dno a strop kratšie, chrbát na ich zadnej hrane · strop zapustený vpredu), nastaviteľné, nefixované · **K2 chrbát z výstuh** — nový typ chrbta:
@@ -941,7 +941,9 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   overené v SU 26.0), náhľad `write_thumbnail`, **orientácia textúry podľa smeru dekoru** per dielec (dekorové plochy + `position_material`), „drž textúru bez súboru" (druhé PC).
   Rezy **MR-1 jadro** (audit ÁNO: kontrakt `appearance` v katalógu, STANDARD §7.1 pole `texture` → `appearance`) → **MR-2 UI** ‖ **MR-3 orientácia** (audit ÁNO: buildery, in-SU).
   Návrh poradia: **prvá dávka po KOVANÍ**. Plný checkpoint: [zdroje/next_sessions/V1_DEBATA_2026-09-06_MR_VZHLAD.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_MR_VZHLAD.md). Pôvodný package M-R FOTO (29.8.) je v git histórii.
-- **D-28 · Textúry materiálov = M-R knižnica vzhľadov** (D-28 je do M-R zlúčená; **6.9.2026: splní ju blok M-R VZHĽAD vyššie okrem zdieľania knižnice — to je D-48 po V1**): `texture_path` + render vlastnosti PBR + „Uložiť vzhľad do knižnice" + mierka rapportu; fáza 2 = orientácia textúry podľa smeru dekoru dielca. Zdroj JPG knižnica na firemnom Disku; väzba na D-48.
+- **D-28 · Textúry materiálov = M-R knižnica vzhľadov** (zlúčené do bloku M-R VZHĽAD vyššie, 6.9.2026): kontrakt je **jediný — `appearance` → `.skm`** (textúra, mierka,
+  priehľadnosť aj PBR v jednom SketchUp kontajneri; `texture_path` ani samostatné PBR polia sa **nezavádzajú**); „Uložiť vzhľad" = MR-2, orientácia podľa smeru dekoru = MR-3;
+  zdieľanie `.skm` medzi PC = D-48 po V1. Zdroj JPG = Michalova knižnica textúr.
   *(**D-87** — overlay čiar v smere dekoru — je **HOTOVÝ** v bloku KRESBA (K2, PR #188, v0.7.26); tu ostáva len **orientácia textúry** podľa smeru dekoru ako fáza 2 D-28. Overlay je kontrola, textúra je render — dve rôzne veci.)*
 
 ### 6 · INFRA (priebežne, podľa potreby)

@@ -27,9 +27,10 @@ Nie zámok, ale **optimistické verzovanie** (vzor revízneho odtlačku Štúdia
 či má lokálne zmeny.
 
 - **Odoslať — kolízne bezpečne (Codex #322 P1: Google Disk nedáva zámok ani CAS, samotné „prečítaj tesne pred zápisom" okno TOCTOU nezavrie):** publikácia
-  **nikdy neprepisuje zdieľaný súbor**. Každé odoslanie zapíše **nemenný artefakt** `<katalóg>.r<rev>.<pc>.json` (unikátne meno = verzia + meno PC, nikdy sa neprepisuje) a
+  **nikdy neprepisuje zdieľaný súbor**. Každé odoslanie zapíše **nemenný artefakt** `<katalóg>.r<rev>.<pc>.<uuid>.json` (Codex #322 kolo 2 P1: meno PC nestačí — dve inštancie SketchUpu na jednom PC
+  alebo opakovanie po páde pred posunom základnej verzie by dali rovnaký názov; **uuid per publikácia** zaručí, že sa nikdy nič neprepíše) a
   až potom **manifest** (ukazovateľ na víťazný artefakt, zapísaný cez dočasný súbor + premenovanie, posledný). Konflikt sa **nedetekuje len z manifestu**: klient číta **všetky
-  artefakty** — dva artefakty tej istej verzie z rôznych PC = konflikt viditeľný na oboch stranách, nič sa nestratí (oba ostávajú), používateľ vyberie víťaza a ten sa
+  artefakty** — **dva a viac artefaktov tej istej verzie `r<rev>` — bez ohľadu na meno PC** (aj z jedného PC) = konflikt viditeľný na oboch stranách, nič sa nestratí (všetky ostávajú), používateľ vyberie víťaza a ten sa
   zapíše ako `r<rev+1>`. Navyše **advisory zámok** `publish.lock` (PC + čas, TTL ~10 min) ako prvá bariéra — Disk ho môže doručiť neskoro, preto je len pomocný, nie
   garancia. Zdieľaná verzia == základná → zápis; zdieľaná novšia → konflikt (nižšie). Zdieľaná novšia → **konflikt**: okno povie katalóg,
   kto/kedy zmenil, koľko lokálnych zmien; výber **prepísať zdieľaný mojou** / **zahodiť moje a prevziať** / zrušiť. Nič potichu.
@@ -52,7 +53,7 @@ Nie zámok, ale **optimistické verzovanie** (vzor revízneho odtlačku Štúdia
 
 | Dávka | Obsah | Audit | Odhad |
 |---|---|---|---|
-| SYNC-1 jadro | čistý modul: nemenné artefakty per publikácia + manifest ako ukazovateľ + čítanie všetkých artefaktov (kolízia bez CAS), advisory zámok, základná verzia + lokálne zmeny per katalóg, Odoslať/Aktualizovať s konfliktmi, prevzatie cez store API každého zo 6–7 katalógov, headless testy s mutáciami | ÁNO (nový modul, zápis katalógov) | 1 PR, 1 deň + review |
+| SYNC-1 jadro | čistý modul: nemenné artefakty per publikácia (verzia + PC + uuid) + manifest ako ukazovateľ + čítanie všetkých artefaktov (kolízia bez CAS, detekcia nezávislá od mena PC), advisory zámok, základná verzia + lokálne zmeny per katalóg, Odoslať/Aktualizovať s konfliktmi, prevzatie cez store API každého zo 6–7 katalógov, headless testy s mutáciami | ÁNO (nový modul, zápis katalógov) | 1 PR, 1 deň + review |
 | SYNC-2 UI | O plugine: riadky per katalóg, tlačidlá, konfliktný modal (D-15), oznámenie pri štarte (asynchrónne s deadline, vzor updater check) | NIE (nad kontraktom SYNC-1), in-SU smoke na oboch PC | 1 PR, 1 deň |
 | SYNC-3 súbory | prílohy spotrebičov + náhľady šablón do zdieľaného koreňa (relatívne cesty, migrácia existujúcich náhľadov, zametanie sirôt) | ÁNO (migrácia) | 1 PR, 0,5–1 deň |
 
