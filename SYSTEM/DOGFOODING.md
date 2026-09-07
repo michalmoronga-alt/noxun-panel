@@ -33,6 +33,13 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   čela" rozhodnúť), klik = nový riadok daného typu (dvierka ďalej cez výrobcu smeru „neurčené", pravidlo (a) karty). Rad zaberie **ten istý jeden riadok** ako dnešné dve tlačidlá.
   Michal zároveň: „celkovo UI čiel bude treba po tomto zásahu upratať — necháme na koniec, opäť spravíme UI/UX balík". *Stav: ZAPÍSANÉ — UI/UX balík kontextu Čelá **na koniec
   bloku KOVANIE** (po KOV-D/E/F, keď bude známy celý obsah karty: zámky osí, závesy, resolved systém); dovtedy sa nerobí.*
+- **D-119 · Presah dverí do strán per strana** (Lucia 6.9., prvý test pluginu na jej notebooku) — presah/okraj čela do strán je dnes **jedna hodnota pre obe strany**
+  (`gap_sides`, Čelá); v praxi treba ľavú a pravú stranu nastaviť **zvlášť** (napr. čelo presahuje cez bok len na viditeľnej strane, pri susede ostáva škára). Hore/dole už
+  zvlášť sú (`gap_top` / `gap_bottom`). *Stav: OTVORENÉ — zaradiť do UI/UX balíka kontextu Čelá (D-114) alebo skôr, ak blokuje prácu; mení config čela (CONFIG_SCHEMA bump).*
+- **D-120 · Úchytkový profil (UKW) aj na dolnej a bočných hranách** (Lucia 6.9., prvý test) — profil sa dnes osadzuje **len na hornú hranu** čela; treba voľbu hrany:
+  horná (dnes) · dolná · ľavá / pravá bočná (vysoké dvere, skrine). Registry `front_profiles.rb` s voľbou hrany počíta (D-90: „dolná hrana sa používa často, existujú aj
+  bočné"), config čela ju zatiaľ nenesie. Dopad: skrátenie panelu v inej osi, dĺžka rezu profilu, vizuál, smer dekoru. *Stav: OTVORENÉ — zaradiť ku KOV-F (úchytka podľa
+  klasifikácie) alebo do UI/UX balíka Čiel; rozhodne Michal.*
 
 ## KONTROLA + VÝROBA
 
