@@ -647,7 +647,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
 - **Nárezový plán fáza 2 — PRIMITÍVNY, V1 rozsah (rozhodnuté 6.9.2026):** dnes je počet platní len odhad z m² (D-19, koeficient 10–25 %); po primitívnom pláne máme **hornú hranicu počtu platní podľa zvoleného rozloženia** (deterministická heuristika, nie optimum — iné rozloženie môže
   vyjsť lepšie) a vidíme, keď 1 dielec vychádza na celú platňu. Guillotine heuristika v čistom Ruby (OpenCutList je GPL — algoritmus áno, kód nie), smer dekoru, kerf,
   výstup = počet platní + využitie + zvyšok + jednoduchý obrázok v sekcii Nárezový plán, rozpočet ukáže vedľa odhadu „plán: N platní (horná hranica)" — informácia pre objednávku, **nie povinné množstvo** (objednáva človek). Rezy NP-1 (algoritmus, audit ÁNO) → NP-2
-  (sekcia + rozpočet). Rozsah a scope OUT: [zdroje/next_sessions/V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md) §1.
+  (sekcia + rozpočet). Návrh rozsahu (vstup vrátane rozvinutia duplákov, algoritmus, výstup, scope OUT): `zdroje/next_sessions/NAREZ_PLAN_NAVRH_2026-09-06.md` (PR #323); rozhodnutie: [zdroje/next_sessions/V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md).
 
 ### 3 · STABILITA
 
@@ -950,7 +950,8 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
 
 **Cieľ:** aby plugin a knižnice fungovali na dvoch pracoviskách (Michal + Lucia).
 
-- *(**D-48 · Zdieľaná knižnica pre 2 PC** je MIMO V1 — **rozhodnuté 6.9.2026: prvá funkcia po uzávere V1** v tvare Odoslať / Aktualizovať s verziami per katalóg, konflikt ručne, koreň `H:\Môj disk\NoxunENGINE data`, odhad 3 PR: [zdroje/next_sessions/V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.md); dovtedy katalógy ručne.)*
+- *(**D-48 · Zdieľaná knižnica pre 2 PC** je MIMO V1 — **rozhodnuté 6.9.2026: prvá funkcia po uzávere V1** v tvare Odoslať / Aktualizovať s verziami per katalóg, konflikt ručne, koreň `H:\Môj disk\NoxunENGINE data`, odhad 3 PR: rozhodnutia
+  [zdroje/next_sessions/V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_LUCIA_KNIZNICE.md), mechanizmus `zdroje/next_sessions/SYNC_KNIZNICE_NAVRH_2026-09-06.md` (PR #323); dovtedy katalógy ručne.)*
 - **D-52 · TASK PACKAGE „AKTUALIZOVAŤ JEDNÝM KLIKOM" (1e, zapísané 30.8.2026, rev. po slepom review #255; rev. po Codex audite 2.9.; ✅ **D-52 KOMPLET 3.9.2026** — D-52a PR #277 (v0.9.9) · D-52b1 PR #278 (v0.9.13) · D-52b2 PR #279 (v0.9.14); plný text v archiv/DOGFOODING_vyriesene.md):**
   **Cieľ:** Lucia aj Michal zaktualizujú plugin bez kopírovania súborov — tlačidlo v sekcii O plugine Štúdia.
   BEZ väzby na D-48 sync.
@@ -1058,13 +1059,12 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
 - **Vyradené z V1 rozsahu 26.8.2026** (dôvody a rozsah: [V1_VIZIA.md](V1_VIZIA.md) „Mimo V1"): **D-48 G-Disk sync knižníc** (plné znenie v [DOGFOODING.md](DOGFOODING.md), skupina Po V1 — zásobník) · plné zostavy/segmenty s `attachment` (koncept 02) · plná appearance vrstva + pixla (koncept 06) ·
   DOCX/PDF ponuka s vizualizáciami a rodina dokumentov (koncept 08) · G-Disk sync D-48 (updater D-52 ostáva vo V1) · sektorová kontrola (koncept 01) ·
   konfigurátor typov čiel (V1-07 nad rámec cenovej položky) · kovanie fáza 3 geometria (plný model výklopov, výplne fáza B).
-- **Potvrdené / vyradené z V1 6.9.2026 (debata V1 po KOVANÍ, checkpointy `zdroje/next_sessions/V1_DEBATA_2026-09-0*.md`):** **D-95** krížová kontrola diel po diele — odškrtávanie
-  **preč natrvalo**, ostáva vizuálna kontrola, neskôr presety/X-ray (koncept 01) · **stráž kolízií** · **EN DANIELI** textový export · **D-106** predbežná cena skrinky ·
+- **Potvrdené / vyradené z V1 6.9.2026 (debata V1 po KOVANÍ, checkpointy `zdroje/next_sessions/V1_DEBATA_2026-09-0*.md`):** **D-95** krížová kontrola diel po diele — **uzavreté bez implementácie** (archív; odškrtávanie preč natrvalo), ostáva vizuálna kontrola, neskôr presety/X-ray (koncept 01) · **stráž kolízií** · **EN DANIELI** textový export · **D-106** predbežná cena skrinky ·
   **D-10** čelá ťahaním v náhľade · **pixla** (V1-06) · rohové spoje per strana · poldrážka · „bez dielca" · V1-07 čelo ako cenová položka + konfigurátor typov čiel ·
   horná rohová skrinka · digestorový korpus · LeMans rohový výsuv · materiál per rola dielca (D-124b) · kontrola rúra/mikro + police podľa niky + vetranie (S1 V1+) ·
   zdieľanie `.skm` (D-48). **D-48** = prvá funkcia po V1 (blok 6).
 - **D-107 · Izolácia objektu pred fotením náhľadu šablóny** — automatické dočasné skrytie zvyšku modelu pred `view.write_image`. *Michal 20.8.: nízka priorita / vysoká náročnosť (skrývanie geometrie = zápis do modelu, undo kroky, observery). Medzitým stačí ručné „Odfotiť" v okne Šablóny — skrinku si naaranžuje a izoluje používateľ sám.*
-- Rohová a vysoká/potravinová skrinka ako **nové TYPY builderov** (odvodia sa od dolnej/hornej).
+- **Horná** rohová skrinka (dolná slepá rohová **K3 je vo V1**, blok 4) a vysoká/potravinová skrinka ako **nové TYPY builderov** (odvodia sa od dolnej/hornej).
 - Zóny priamo vo viewporte (variant B vízie) — nadstavba 2D náhľadu.
 - **Interact pre čelá** — dráhy otvárania, klik = otvorenie, merač kolízií pri otvorení (dáta máme: origin čiel na hrane pántu; typ pántu určuje dráhu).
 - Náhľad povýšiť na „otvárací náhľad" panela so zobrazovaním zvolených elementov.

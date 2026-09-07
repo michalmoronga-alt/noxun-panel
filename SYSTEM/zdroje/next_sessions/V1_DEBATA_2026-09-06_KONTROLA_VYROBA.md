@@ -17,20 +17,12 @@
 | **Nárezový plán fáza 2 (primitívny)** | **DO V1** — dôvod: dnes je počet platní len odhad z m² (`SheetEstimate`, koeficient prerezu 10–25 %, D-19), realita je iná; po aspoň primitívnom pláne vieme, koľko platní **najviac** treba (**horná hranica podľa zvoleného rozloženia**, nie presné množstvo — Codex #322), a keď „1 diel vychádza na celú platňu a musím objednať 2", dá sa na to pozrieť a niečo vymyslieť | **ÁNO** (rozsah §1) |
 | **D-121** názvy zásuvkových dielcov > 20 znakov vo VEPO | fix hneď (implementačné okno) | **ÁNO** — fix |
 
-## 1 · Nárezový plán — minimálny rozsah V1 (návrh Fable, potvrdiť v package)
+## 1 · Nárezový plán — návrh rozsahu → samostatný dokument (rozdelenie PR #322 podľa pravidla 3 kôl)
 
-- **Vstup:** tie isté BOM riadky ako `SheetEstimate.estimate` (rozmery, počty, materiál, duplák → zdrojový materiál) + formát platne z katalógu (`sheet_size`, fallback 2800 × 2070
-  s príznakom) + **smer dekoru dielca** (K1 `grain_direction` / vlastnosť materiálu; **„bez smeru" = dielec sa smie otočiť o 90°** — pravidlo pre NP-1: skúsi obe orientácie
-  v pevnom poradí (najprv dlhšia strana rovnobežne s dĺžkou platne) a vezme prvú, ktorá sa zmestí do aktuálnej police; žiadne hľadanie najlepšej) + kerf (default 4 mm) + orez okraja platne (default 10 mm).
-- **Algoritmus:** čisté Ruby, headless testovateľné (vlastná heuristika — OpenCutList je GPL: algoritmus áno, kód nie): **guillotine / police (shelf) heuristika** s triedením
-  dielcov podľa výšky, rešpektovanie smeru dekoru, dielec > platňa = RED. Deterministický výsledok (rovnaký vstup = rovnaký plán), bez optimalizačných slučiek na výkon (KLINIKA
-  254 dielcov musí prejsť pod sekundu).
-- **Výstup:** per nákupný materiál: **počet platní = HORNÁ HRANICA podľa zvoleného rozloženia** (deterministická heuristika, nie optimum — Codex #322 P1: iné platné rozloženie môže vyjsť lepšie, preto sa nesmie vydávať za presné množstvo), využitie %, zoznam dielcov per platňa, **najväčší zvyšok** (orezok) per platňa; **jednoduchý obrázok** rozloženia (SVG v
-  Štúdiu, sekcia **Nárezový plán** — dnes neaktívna položka navigácie, kontrakt D-19 pripravený). Rozpočet: „Materiály po tabuliach" ukáže vedľa odhadu **počet z plánu ako hornú hranicu** („plán: N platní")
-  (odhad ostáva default pre cenu; napojenie D-61 cien za celé tabule na plán = **voľba používateľa**, nie automatika; objednáva človek).
-- **Scope OUT:** optimalizácia na minimum odpadu (viac heuristík, hľadanie najlepšieho rozloženia či poradia dielcov — preto je výsledok horná hranica; otočenie dielca bez smeru o 90° podľa pevného pravidla vyššie je vo vstupe, nie tu), tlač / export plánu pre pílu, ručné presúvanie dielcov v pláne, zvyšky ako sklad, ABS
-  v pláne. *(Rezanie robí VEPO — plán je pre **objednávku správneho počtu platní a rozhodovanie**, nie výrobný dokument.)*
-- **Rezy:** NP-1 algoritmus + kontrakt výsledku (audit ÁNO, nový modul) → NP-2 sekcia Štúdia + napojenie rozpočtu (in-SU smoke KLINIKA: počty vs. reálne objednané platne).
+Vstup, algoritmus, výstup, napojenie na rozpočet, scope OUT a rezy NP-1/NP-2 žijú v **[NAREZ_PLAN_NAVRH_2026-09-06.md](NAREZ_PLAN_NAVRH_2026-09-06.md)** (vlastný PR a review). Zapracované nálezy Codex #322
+kôl 1–3: počet platní = **horná hranica podľa zvoleného rozloženia** (nie presné množstvo, objednáva človek) · jedna politika otáčania dielcov bez smeru dekoru ·
+**duplák sa pred rozkladom rozvinie na `množstvo × multiplier` fyzických obdĺžnikov** zdrojového materiálu (ako `SheetEstimate` násobí plochu). Tu ostáva len rozhodnutie
+(§0: primitívny nárezový plán je vo V1) a jeho dôvod.
 
 ## 2 · Nové postrehy Michala z KLINIKY (6.9.) — zapísané v [../../DOGFOODING.md](../../DOGFOODING.md)
 

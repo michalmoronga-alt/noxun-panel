@@ -96,18 +96,14 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 
 ## RENDER M-R
 
-- **D-28 · Textúry materiálov (render)** (Michal 19.7. večer) — *Stav: **ZLÚČENÉ do dávky M-R** (roadmapa „Materiály — dokončenie", 2.8.): texture_path + render vlastnosti + „Uložiť vzhľad do knižnice" + mierka rapportu; fáza 2 orientácia podľa smeru dekoru. Zaradenie: blok 5 M-R v PLAN.md (fotku rieši package M-R FOTO; knižnica vzhľadov/PBR/orientácia = odrážka D-28 bloku 5) (Luciina priorita).*
-
+- **D-28 · Textúry materiálov (render)** (Michal 19.7. večer) — *Stav: **ZLÚČENÉ do bloku M-R VZHĽAD** (6.9.2026, [PLAN.md](PLAN.md) blok 5): **jediný kontrakt `appearance` → `.skm`**
+  (textúra, mierka, priehľadnosť aj PBR v jednom SketchUp kontajneri — `Material#save_as` / `Materials#load`); „Uložiť vzhľad" = MR-2, orientácia podľa smeru dekoru = MR-3;
+  `texture_path` ani samostatné PBR polia sa **nezavádzajú**, package „M-R FOTO" (Demos fotka) je nahradený; zdieľanie `.skm` medzi PC = D-48 po V1 (Luciina priorita).*
 ## INFRA
 
   *Stav: na návrhovú dávku — od 26.8. SAMOSTATNE (bez väzby na D-48, ktorý je mimo V1); distribučný kanál jednoducho, napr. zdieľaný priečinok.*
 ## Po V1 — zásobník
 
-- **D-95 · Režim krížovej kontroly „diel po diele"** (Michal 9.8.) — pred odoslaním zákazky do výroby chýba **riadený prechod celou zákazkou**: dielec po dielci prejsť rozmery, ABS a kovanie a
-  **odškrtávať** skontrolované (so stavom, ktorý prežije zatvorenie okna). Dnes sa kontroluje preklikávaním po jednom v paneli, bez akejkoľvek stopy, čo už bolo overené. Michalov cieľ je konkrétny:
-  **KLINIKA ako prvý referenčný projekt vyrobený čisto z pluginu** s jasným, obhájiteľným výstupom. Návrh: nový režim v okne Výroba (vedľa KONTROLY) — zoznam dielcov s checkboxom, klik = výber v modeli,
-filtre „neskontrolované / s upozornením", stav uložený v `NOXUN` dict na modeli (patrí k zákazke, nie k počítaču); semafor ostáva samostatný (automatické nálezy) — toto je **ľudská** kontrola. *Stav: **MIMO V1 (Michal 6.9.2026)** — odškrtávanie diel po diele ide **preč natrvalo**; ostáva vizuálna kontrola (ABS · smer kresby · smer otvárania · tagy D-27),
-  neskôr presety a X-ray pohľady (koncept `zdroje/next_sessions/01_D95_PLOSNA_VYROBNA_KONTROLA.md`).*
 - **EN DANIELI textový export** výrobného zadania (Michal: „po E") — **vedome odložené z dávky E** (6.8., nič z toho neblokuje prácu so zákazkou); supplier-agnostický výstup. *Stav: **MIMO V1 (Michal 6.9.2026)** — zásobník.*
 - **D-106 · Predbežná cena korpusu v informačnom stĺpci Základných** (Michal 20.8., smoke test Inspector reworku) — pri návrhu skrinky chýba **orientačný náklad**: koľko tá skrinka zhruba stojí ešte
   predtým, než sa robí rozpočet celej zákazky. Údaj by stál v **informačnom stĺpci sektora Základné** (vedľa „Materiál m²", teda **žiadny nový riadok navyše**) ako text **„≈ X €"** so značkou odhadu a s

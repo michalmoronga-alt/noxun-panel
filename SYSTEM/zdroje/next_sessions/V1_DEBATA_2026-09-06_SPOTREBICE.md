@@ -71,7 +71,8 @@ Michal: „pred implementáciou si pripraviť pár konkrétnych tech listov s ro
   reálneho produktu. Posúdenie Fable: uskutočniteľné bez pascí — kópie súborov v `%APPDATA%\NOXUN\Engine\appliances\<id>\`, záznam nesie zoznam súborov s druhom
   (`list` / `obrázok` / `náhľad` — presne jeden náhľad), obrázky sa ukážu ako miniatúry (rovnaký lenivý kanál ako náhľady šablón PNG), PDF len ikona + otvorenie
   v systémovom prehliadači (`UI.openURL`). **Bez** generovania náhľadu z PDF, bez extrakcie rozmerov. Obmedzenie priznať: súbory sú per PC (D-48 po V1).
-  Pri mazaní spotrebiča sa maže aj jeho priečinok; osirelé priečinky uprace ďalší štart (vzor zametania `template_previews`).
+Pri mazaní spotrebiča sa **súbory NEMAŽÚ** (Codex #322 P2: uložený projekt na ne môže odkazovať cez snapshot a bajty by sa nedali obnoviť): záznam dostane tombstone,
+priečinok ostáva; ručné „Vyčistiť nepoužívané prílohy" = po V1 (bez indexu projektov referencie nevieme overiť) — žiadne automatické zametanie.
 - Detailná debata polí S1 pokračuje **po Michalovom overení** aspoň jedného listu per kategória ([SPOTREBICE_TECHLISTY_2026-09.md](SPOTREBICE_TECHLISTY_2026-09.md) §3).
 
 ## 6 · Dopad na živé dokumenty (zapracuje záverečný docs PR debaty)
