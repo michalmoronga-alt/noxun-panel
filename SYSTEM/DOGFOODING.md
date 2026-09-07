@@ -50,10 +50,11 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   vo VEPO exporte typu `Dno zasuvky Fmslwqdm2-9-464wsa` / `Dno zasuvky Fmslwqew7-a-u7mna2`: názov nesie **interné id čela** (`construction.rb`: `"Dno zasuvky #{front_id}"`,
   KOV-C2b) a `VepoExport.row_name` ho nemá v mape skratiek `SHORT_NAMES`, takže prejde celý. Dôsledky: (1) používateľovi id nič nehovorí, (2) **VEPO import odmieta polia nad
   20 znakov** — pred odoslaním sa musia riadky ručne prepisovať (D-113 to riešila len pre korpusové dielce). „Aj niektoré iné dielce po poslednej zmene" — preveriť všetky
-  názvy, ktoré KOV-C/D pridali (dno, chrbát, boky zásuvky, sync tyč…). Riešenie: **tvrdý limit 20 znakov na názov riadku vo VEPO** (guard test nad celým exportom, nie len
-  skratky) + ľudské názvy odvodených dielcov (`Zas dno s1`, `Zas chrb s1`…; číslo zásuvky/čela namiesto id — `PartKeys.human_label` D-92 vzor) aj v kusovníku a LOGu.
-  *Stav: OTVORENÉ — **fix dávka pre implementačné okno (KOVANIE)** hneď, nečaká na koniec bloku; audit NIE (výstupný formát, kontrakt VEPO v1.1 sa nemení — 20 znakov je
-  jeho súčasť z POJMY).*
+  názvy, ktoré KOV-C/D pridali (dno, chrbát, boky zásuvky, sync tyč…). Riešenie: **generované názvy dielcov ≤ 20 znakov** (guard nad GENEROVANÝMI názvami; voľné názvy dosiek ostávajú pass-through s `NAME_MAX` 60 podľa kontraktu
+  v1.1 — `test_d112_d113_vepo.rb` ich chráni) + ľudské názvy odvodených dielcov (`Zas dno s1`, `Zas chrb s1`…; číslo zásuvky/čela namiesto id — `PartKeys.human_label` D-92 vzor) aj v kusovníku a LOGu.
+  *Stav: OTVORENÉ — **fix dávka pre implementačné okno (KOVANIE)** hneď, nečaká na koniec bloku; audit NIE, kým sa mení len generovanie názvov (kontrakt v1.1 nedotknutý). **Otázka na Michala (Codex #322 P2):** VEPO import podľa teba 6.9. „vyhadzuje chybu
+  pri poli nad 20 znakov" — kontrakt v1.1 (POJMY) doteraz hovoril, že 20 znakov je len TLAČ nálepky a CSV pole nesie do 60. Ak import naozaj odmieta, je to **revízia kontraktu**
+  (NAME_MAX, voľné názvy) = samostatná kontraktová dávka s auditom, nie súčasť tohto fixu.*
 - **D-122 · Kontrola hlási každý UNI dielec zvlášť** (Michal 6.9., zákazka KLINIKA) — Štúdio → Kontrola ukazuje pri UNI farbách **každý dielec ako upozornenie**; pri tvorbe
   je prirodzené, že dielce ostávajú UNI, kým sa nezvolia materiály. Želanie: **jedno upozornenie „použité nenahradené UNI farby"** a pod ním zoskupené dotknuté dielce (rozklik).
   *Stav: OTVORENÉ — V1, malá UI dávka v sekcii Kontrola (zoskupenie nálezov podľa príčiny; semafor ostáva ORANGE, neblokuje).*

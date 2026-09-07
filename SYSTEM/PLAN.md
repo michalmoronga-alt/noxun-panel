@@ -55,9 +55,8 @@ jednej inštancie naprieč pushom je zásah do kontraktu výstupov, kandidát pr
 **F · UI dlhy po zaniknutom bloku UI 2.0** — otvorené postrehy, ktoré blok UI 2.0 nevyriešil a ktoré po jeho archivácii (26.8.) ostali bez bloku. Zaradenie je **mechanické, nie prioritizačné**
   (poradie určí Michal). **D-27** (rýchle zobraziť/skryť tagy z panela) je **✅ VYRIEŠENÉ dávkou F/D-27, v0.8.13 (28.8.2026)** — okno tagov v raile Inspectora, jeden klik = jeden krok Späť,
   jeden stav pre okno aj checkbox ghost zón; bokom opravené kreslenie kontrol nad skrytými dielcami. Plný záznam: [archiv/KRONIKA.md](archiv/KRONIKA.md) a
-  [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md). **Otvorené v F ostáva: D-51** štandard veľkostí okien a tlačidiel. Plné znenia sú v [DOGFOODING.md](DOGFOODING.md), skupina **„UI dlhy — k bloku 1b"**; **✅ D-51 UZAVRETÉ 6.9.2026** (Michal: veľkosť okien je OK — Inspector 470 × 810, satelity zanikli v Štúdiu; archív DOGFOODING_vyriesene).
-  *(výklop ako samostatný typ čela je od triáže 1e — 30.8. — PRESUNUTÝ do okruhu konceptu 07 / package bloku 4.)* Otvorené **D-106** / **D-107** sem pôvodne patrili tiež, dnes žijú vo svojich skupinách podľa zaradenia:
-  D-106 v skupine V1 DOTIAHNUTIE (blok 4), D-107 v skupine Po V1 — zásobník.
+  [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md). **D-51** (štandard veľkostí okien a tlačidiel) je **✅ UZAVRETÉ 6.9.2026** rozhodnutím (Michal: veľkosť okien je OK — Inspector 470 × 810, satelity zanikli v Štúdiu); plný text v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md). **Odrážka F je tým prázdna.**
+  *(výklop ako samostatný typ čela je od triáže 1e — 30.8. — PRESUNUTÝ do okruhu konceptu 07 / package bloku 4.)* **D-106** a **D-107** sem pôvodne patrili tiež; od 6.9.2026 sú obe v skupine Po V1 — zásobník.
 
 **G · „Obnoviť" = čisté čítanie — ✅ VYRIEŠENÉ dávkou 1b-3, v0.8.7 (27.8.2026).**
 Nález (P0 z externého auditu kolo 0, [zdroje/AUDIT_2026-08_externy_kolo0.md](zdroje/AUDIT_2026-08_externy_kolo0.md)) **platil** a je dokázaný mutačne.
@@ -577,6 +576,10 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   Plné znenie + čo z toho platí ďalej: [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).
 - **D-125 · Hmotnosť v Inspectore je prázdny placeholder** — riadok „Hmotnosť" v Základných nikto neplní; hmotnosť skrinky = Σ dielcov × hustota typu (helper spoločný
   s hmotnosťou čela v KOV-E), neznáma hustota sa nevymýšľa (Michal 6.9.2026; plné znenie v [DOGFOODING.md](DOGFOODING.md)). Zaradiť ku KOV-E alebo hneď po KOVANÍ.
+- **D-119 · Presah dverí do strán per strana** (Lucia 6.9.2026, prvý test) — dnes jedna hodnota `gap_sides` pre obe strany; ľavá a pravá zvlášť (config čela, CONFIG_SCHEMA
+  bump). Zaradenie: UI/UX balík Čiel (D-114) na konci bloku, skôr len ak blokuje prácu. Plné znenie v [DOGFOODING.md](DOGFOODING.md).
+- **D-120 · Úchytkový profil (UKW) aj na dolnej a bočných hranách** (Lucia 6.9.2026) — voľba hrany profilu (dnes len horná; registry `front_profiles` s tým počíta). Zaradenie:
+  ku KOV-F (úchytka podľa klasifikácie) alebo do balíka Čiel — rozhodne Michal. Plné znenie v [DOGFOODING.md](DOGFOODING.md).
 - **KOV-E · „VÝKLOPY HK/HL" (po C, D):** `GENERIC_TYPES + lift` (plan_schema bump, `guard_unknown_hardware!` už chráni starší plugin) · roly `flap` z KOV-A dostanú
   pravidlo kind `weight_bands` (hmotnosť čela = rozmery × hrúbka × `Materials.density_for(typ)`; hustota nil → konzervatívny odhad + ORANGE) s tabuľkou HK top / HL top
   (data pack `lifts.json` z OFICIÁLNYCH Blum hodnôt — PDF follow-up pred zápisom; UNCONFIRMED sa nezapíše) · sety klasifikácia `lift × opening` (Tip-On = piest per owner)
@@ -638,12 +641,12 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   **PR #287, v0.9.22.**
 - ✅ **D-113 · Krátky popis korpusu v názvoch dielcov** — názov riadku vo VEPO CSV a LOGu nesie skratku dielca a skrinky (`Bok LP s1 s2`); riadok sa **nerozpadá per skrinka**
   (nálepky VEPO tlačia ~20 znakov, agregácia kusovníka ostáva). Kusovník Štúdia má ďalej plné názvy. **PR #287, v0.9.22.**
-- **D-121 · Názvy odvodených dielcov zásuviek sú pre VEPO pridlhé** — `Dno zasuvky <id čela>` prejde do exportu celé, VEPO odmieta polia nad 20 znakov; tvrdý limit 20 znakov
-  nad celým exportom + ľudské názvy (`Zas dno s1`). **FIX HNEĎ (výrobný výstup, Michal 6.9.2026)** — plné znenie v [DOGFOODING.md](DOGFOODING.md).
+- **D-121 · Názvy odvodených dielcov zásuviek sú pre VEPO pridlhé** — `Dno zasuvky <id čela>` prejde do exportu celé, VEPO odmieta polia nad 20 znakov; generované názvy ≤ 20 znakov (voľné názvy podľa kontraktu v1.1 nedotknuté; či import naozaj odmieta > 20 = otázka na Michala) + ľudské názvy (`Zas dno s1`). **FIX HNEĎ (výrobný výstup, Michal 6.9.2026)** —
+  plné znenie v [DOGFOODING.md](DOGFOODING.md).
 - **D-122 · Kontrola zoskupí UNI dielce** — jedno upozornenie „nenahradené UNI farby" s rozklikom namiesto riadku per dielec (Michal 6.9.2026).
-- **Nárezový plán fáza 2 — PRIMITÍVNY, V1 rozsah (rozhodnuté 6.9.2026):** dnes je počet platní len odhad z m² (D-19, koeficient 10–25 %); po primitívnom pláne vieme presne,
-  koľko platní objednať, a vidieť, keď 1 dielec vychádza na celú platňu. Guillotine heuristika v čistom Ruby (OpenCutList je GPL — algoritmus áno, kód nie), smer dekoru, kerf,
-  výstup = počet platní + využitie + zvyšok + jednoduchý obrázok v sekcii Nárezový plán, rozpočet dostane presný počet vedľa odhadu. Rezy NP-1 (algoritmus, audit ÁNO) → NP-2
+- **Nárezový plán fáza 2 — PRIMITÍVNY, V1 rozsah (rozhodnuté 6.9.2026):** dnes je počet platní len odhad z m² (D-19, koeficient 10–25 %); po primitívnom pláne máme **hornú hranicu počtu platní podľa zvoleného rozloženia** (deterministická heuristika, nie optimum — iné rozloženie môže
+  vyjsť lepšie) a vidíme, keď 1 dielec vychádza na celú platňu. Guillotine heuristika v čistom Ruby (OpenCutList je GPL — algoritmus áno, kód nie), smer dekoru, kerf,
+  výstup = počet platní + využitie + zvyšok + jednoduchý obrázok v sekcii Nárezový plán, rozpočet ukáže vedľa odhadu „plán: N platní (horná hranica)" — informácia pre objednávku, **nie povinné množstvo** (objednáva človek). Rezy NP-1 (algoritmus, audit ÁNO) → NP-2
   (sekcia + rozpočet). Rozsah a scope OUT: [zdroje/next_sessions/V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md) §1.
 
 ### 3 · STABILITA
@@ -663,7 +666,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
 
 - *(Kovanie — D-109/D-110/D-111 aj fáza 3 — sa 26.8. vyčlenilo do vlastného bloku **KOVANIE** vyššie.)*
 - **Spotrebiče S1** (V1-02) — **rozhodnuté 6.9.2026:** ručný katalóg (názov/model, odkazy obchod[], technické listy[] + **galéria príloh** so súbormi, rozmery per kategória),
-  spotrebič patrí **zákazke a skrinke**, cena len v rozpočte, kontrola niky vo V1 len chladnička + šírka umývačky, šablóna s tagom „spotrebičová" upozorní bez spotrebiča;
+  spotrebič patrí **zákazke a vlastníkovi podľa kategórie** (skrinka · slot umývačky · pracovná doska · len zákazka), cena len v rozpočte, kontrola niky vo V1 len chladnička + šírka umývačky, šablóna s tagom „spotrebičová" upozorní bez spotrebiča;
   detail: [zdroje/next_sessions/V1_DEBATA_2026-09-06_SPOTREBICE.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_SPOTREBICE.md) + technické listy [zdroje/next_sessions/SPOTREBICE_TECHLISTY_2026-09.md](zdroje/next_sessions/SPOTREBICE_TECHLISTY_2026-09.md)
   (predúloha hotová 6.9.; **čaká na Michalovo overenie listov** → detailná debata polí → package + `codex-audit`, nový modul). Za S1: **spotrebičová skrinka** (šablóny nad K1 + S1; nízka priorita).
 - **D-124 · Predvoľby projektu v Materiáloch rozbalené s väčšími náhľadmi** (Michal 6.9.2026) — malý UI rework; „materiál per rola dielca" = zásobník.

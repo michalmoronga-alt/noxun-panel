@@ -19,11 +19,11 @@ v PLANe prázdny**; V1 je hotové, keď je odškrtnuté všetko. Stav dopĺňaj�
 4. [ ] **Kovanie:** blok KOVANIE (architektúra V1 FINAL 2.9.2026): sety s klasifikáciou a katalóg (A, B, H hotové), recepty a odvodené dielce zásuviek (C), resolver + zámky (D),
    výklopy podľa hmotnosti (E), závesy max(výška, hmotnosť) + úchytka + Tip-On (F), nohy 4/6 + príchyty (G), šablóny s kovaním (I), UI/UX balík Čiel (D-114 + D-119 presah
    per strana + D-120 UKW na dolnej a bočných hranách). *(Plný model výklopov, výplne fáza B, D-109 pomer setu = mimo V1.)*
-5. [ ] **Spotrebiče S1 (rozhodnuté 6.9.2026):** ručný katalóg s odkazmi, technickými listami a **galériou príloh** · spotrebič patrí zákazke a skrinke · cena len v rozpočte ·
+5. [ ] **Spotrebiče S1 (rozhodnuté 6.9.2026):** ručný katalóg s odkazmi, technickými listami a **galériou príloh** · spotrebič patrí zákazke a vlastníkovi podľa kategórie (skrinka · slot umývačky · pracovná doska · len zákazka) · cena len v rozpočte ·
    kontrola niky vo V1 len chladnička a šírka umývačky · šablóna s tagom „spotrebičová" upozorní bez spotrebiča · za S1 spotrebičová skrinka ako šablóny nad K1.
    Predúloha (zoznam modelov + technické listy) hotová 6.9., čaká na Michalovo overenie listov. *(Kontrola rúry/mikro, police podľa niky, vetranie, digestor = mimo V1.)*
 6. [ ] **Výstupy:** VEPO CSV, kusovník, nákup kovania, rozpočet s cenami, XLSX cenová ponuka *(hotové — dávky E + fáza ŠTÚDIO)* · **zvyšok V1-03 (rozhodnuté 6.9.2026):**
-   manuálne 1-klik overenie ceny + viac URL na položke („na faktúru" vyradené) · **D-94** nákup s pôvodom · **nárezový plán primitívny** (presný počet platní namiesto odhadu z m²) ·
+   manuálne 1-klik overenie ceny + viac URL na položke („na faktúru" vyradené) · **D-94** nákup s pôvodom · **nárezový plán primitívny** (horná hranica počtu platní podľa zvoleného rozloženia namiesto odhadu z m²; objednáva človek) ·
    **D-121** názvy dielcov do 20 znakov (fix). *(D-95 odškrtávanie diel po diele = preč natrvalo, stráž kolízií a EN DANIELI = mimo V1.)*
 7. [ ] **Dvaja používatelia:** Michal aj **Lucia** (testuje od 6.9.2026) — updater D-52 (**hotové**) · **M-R VZHĽAD** (rozhodnuté 6.9.2026, nahrádza „Demos fotku": ručné textúry
    z knižnice, mierka + PBR v editore SketchUpu, „Uložiť vzhľad" do `.skm`, orientácia podľa smeru dekoru, aj ABS hrany a dosky) · zrozumiteľné UI *(Inspector + Štúdio hotové,

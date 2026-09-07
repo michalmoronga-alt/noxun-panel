@@ -23,7 +23,7 @@ Nekomplikovať: žiadny abstraktný framework, žiadne guardy navyše, jednoduch
 | Zdroj dát | **výhradne ručne** z technického listu; žiadny web scraping (obchody a URL sa menia) |
 | Záznam katalógu | názov/model (napr. „Mikrovlnná rúra Bosch Serie 8 BFL7221B1 čierna") · **viac odkazov na obchod** (rýchly preklik, URL sa menia) · **viac URL technických listov** (býva ich 5–10) · ideálne aj **priamo nahraný list** (súbor) · rozmery podľa kategórie (§2) |
 | Cena | **NIE v katalógu** (mení sa) — cena je **len položka rozpočtu** danej zákazky; spotrebič bez ceny = dodáva zákazník |
-| Väzba | spotrebič patrí **zákazke a konkrétnej skrinke**; toto je jadro V1 |
+| Väzba | spotrebič patrí **zákazke a vlastníkovi podľa kategórie** (koncept 04 §Binding, Codex #322 P2): **skrinka** (rúra, mikro, chladnička) · **slot medzi skrinkami** (umývačka — nemá korpus) · **pracovná doska** (varná doska, drez) · **len zákazka** (digestor, batéria, dávkovač); jadro V1 = „viem, kde patrí a kde sú listy" |
 | Kontrola rozmerov | vo V1 **len chladnička a umývačka** (jednoduché); **rúra a mikrovlnka zatiaľ nie** (previazané rozmery, presahy, rúra + mikro nad sebou) — až po predúlohe |
 | Šablóna „spotrebičová" | uložená šablóna nesie **tag/kategóriu „spotrebičová"**; skrinka z nej **bez priradeného spotrebiča = upozornenie v Kontrole** (ORANGE, neblokuje). Tag pri ukladaní šablóny = nový prvok mini-modalu „Uložiť ako šablónu" — **vymyslieť ako** |
 | UI | Štúdio: sekcia **Spotrebiče** (katalóg + zoznam v zákazke) · Inspector: riadok „Spotrebič" **len pri spotrebičových skrinkách** · Rozpočet/CP: skupina „Spotrebiče a vybavenie" |
@@ -68,7 +68,7 @@ Michal: „pred implementáciou si pripraviť pár konkrétnych tech listov s ro
 - **Umývačky:** predpísané rozmery čela Michal bežne **obchádza** (čelo presahuje hore, presah doplní slepým korpusom alebo malým šuflíkom nad umývačkou).
   Dôsledok pre V1: kontrola umývačky = **len šírka slotu (450/600)**; výška čela vs. sokel sa nekontroluje (je to jeho konštrukčné rozhodnutie).
 - **Galéria pri spotrebiči (rozhodnuté ÁNO, do S1):** k záznamu spotrebiča sa dajú **uložiť súbory** — technické listy (PDF/JPG), obrázky z listov a **jeden náhľadový obrázok**
-  reálneho produktu. Posúdenie Fable: uskutočniteľné bez pascí — kópie súborov v `%APPDATA%NOXUNEngineppliances<id>`, záznam nesie zoznam súborov s druhom
+  reálneho produktu. Posúdenie Fable: uskutočniteľné bez pascí — kópie súborov v `%APPDATA%\NOXUN\Engine\appliances\<id>\`, záznam nesie zoznam súborov s druhom
   (`list` / `obrázok` / `náhľad` — presne jeden náhľad), obrázky sa ukážu ako miniatúry (rovnaký lenivý kanál ako náhľady šablón PNG), PDF len ikona + otvorenie
   v systémovom prehliadači (`UI.openURL`). **Bez** generovania náhľadu z PDF, bez extrakcie rozmerov. Obmedzenie priznať: súbory sú per PC (D-48 po V1).
   Pri mazaní spotrebiča sa maže aj jeho priečinok; osirelé priečinky uprace ďalší štart (vzor zametania `template_previews`).
@@ -76,6 +76,6 @@ Michal: „pred implementáciou si pripraviť pár konkrétnych tech listov s ro
 
 ## 6 · Dopad na živé dokumenty (zapracuje záverečný docs PR debaty)
 
-- [../../V1_VIZIA.md](../../V1_VIZIA.md) bod 5 prepísať: „katalóg (ručne) + spotrebič v zákazke a skrinke s odkazmi a listami + kontrola niky pre chladničku/umývačku + šablóna
+- [../../V1_VIZIA.md](../../V1_VIZIA.md) bod 5 prepísať: „katalóg (ručne) + spotrebič v zákazke s vlastníkom podľa kategórie (skrinka / slot / PD / len zákazka), s odkazmi a listami + kontrola niky pre chladničku/umývačku + šablóna
   spotrebičová s upozornením + galéria súborov + cena v rozpočte"; automatika políc a kontrola rúry/mikro = V1+.
 - [../../PLAN.md](../../PLAN.md) blok 4 položka „Spotrebiče S1": odkaz sem + predúloha (research) ako prvý krok.

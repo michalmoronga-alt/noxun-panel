@@ -24,10 +24,10 @@
 - **Algoritmus:** čisté Ruby, headless testovateľné (vlastná heuristika — OpenCutList je GPL: algoritmus áno, kód nie): **guillotine / police (shelf) heuristika** s triedením
   dielcov podľa výšky, rešpektovanie smeru dekoru, dielec > platňa = RED. Deterministický výsledok (rovnaký vstup = rovnaký plán), bez optimalizačných slučiek na výkon (KLINIKA
   254 dielcov musí prejsť pod sekundu).
-- **Výstup:** per nákupný materiál: **počet platní**, využitie %, zoznam dielcov per platňa, **najväčší zvyšok** (orezok) per platňa; **jednoduchý obrázok** rozloženia (SVG v
-  Štúdiu, sekcia **Nárezový plán** — dnes neaktívna položka navigácie, kontrakt D-19 pripravený). Rozpočet: „Materiály po tabuliach" dostane vedľa odhadu **presný počet z plánu**
-  (odhad ostáva ako kontrola rozsahu; D-61 ceny za celé tabule sa napoja na plán).
-- **Scope OUT:** optimalizácia na minimum odpadu (viac heuristík, rotácie bez dekoru), tlač / export plánu pre pílu, ručné presúvanie dielcov v pláne, zvyšky ako sklad, ABS
+- **Výstup:** per nákupný materiál: **počet platní = HORNÁ HRANICA podľa zvoleného rozloženia** (deterministická heuristika, nie optimum — Codex #322 P1: iné platné rozloženie môže vyjsť lepšie, preto sa nesmie vydávať za presné množstvo), využitie %, zoznam dielcov per platňa, **najväčší zvyšok** (orezok) per platňa; **jednoduchý obrázok** rozloženia (SVG v
+  Štúdiu, sekcia **Nárezový plán** — dnes neaktívna položka navigácie, kontrakt D-19 pripravený). Rozpočet: „Materiály po tabuliach" ukáže vedľa odhadu **počet z plánu ako hornú hranicu** („plán: N platní")
+  (odhad ostáva default pre cenu; napojenie D-61 cien za celé tabule na plán = **voľba používateľa**, nie automatika; objednáva človek).
+- **Scope OUT:** optimalizácia na minimum odpadu (viac heuristík, rotácie bez dekoru — preto je výsledok horná hranica), tlač / export plánu pre pílu, ručné presúvanie dielcov v pláne, zvyšky ako sklad, ABS
   v pláne. *(Rezanie robí VEPO — plán je pre **objednávku správneho počtu platní a rozhodovanie**, nie výrobný dokument.)*
 - **Rezy:** NP-1 algoritmus + kontrakt výsledku (audit ÁNO, nový modul) → NP-2 sekcia Štúdia + napojenie rozpočtu (in-SU smoke KLINIKA: počty vs. reálne objednané platne).
 

@@ -39,8 +39,9 @@
 | Digestor | Elica FOLD BL MAT/A/52 | Hurbanová | |
 | Drez / batéria / dávkovač | Blanco, Alveus, Franke, Schock (drezyonline) | Bella, Trochtová, Hurbanová | len cenová položka + výrez PD |
 
-**Záver pre seed:** prioritné modely na technické listy = **Whirlpool rad (OMSR58RU1SB · MBNA900B · WIO 3O540 PELG · WL B1160 BF · BCNA306E5ZSN)** ako reálne kúpená sada,
-**Bosch BFL7221B1 + HBG774KB1** (Michalov vzor + prémiová alternatíva), **Whirlpool ART 97101 2** (druhá vstavaná chladnička), **Bosch SPV6EMX05E** (jediná 45 cm umývačka).
+**Seed balík — jedna záväzná sada (10 modelov; Codex #322 P2):** ★ objednané (6): Whirlpool OMSR58RU1SB · Whirlpool MBNA900B · **Beko** BCNA306E5ZSN · Whirlpool WIO 3O540 PELG ·
+Whirlpool WL B1160 BF · Whirlpool WCT3 63F LTK — a **doplnkové neobjednané (4):** Bosch BFL7221B1 (Michalov vzorový zápis) · Bosch HBG774KB1 (prémiová rúra) · Whirlpool ART 97101 2
+(druhá vstavaná chladnička) · Bosch SPV6EMX05E (jediná 45 cm umývačka). Voľne stojace chladničky/mrazničky a downdraft dosky do seedu nejdú.
 
 ## 3 · Technické listy — čo výrobcovia uvádzajú (Antigravity, 5 behov 6.9.2026; surové packety v [SPOTREBICE_TECHLISTY_2026-09_agy_packety.md](SPOTREBICE_TECHLISTY_2026-09_agy_packety.md))
 
@@ -68,7 +69,7 @@ Michalov ručný zápis pre BFL7221B1 (nika 362–365 × 560–568, presah hore 
 
 Obe: telo **540 × 1935 × 545**, nika **560 (–570) × 1940 (–1950) × min 550–560**, 2 nábytkové dvere (delenie podľa styku dverí spotrebiča, pomer ~70/30; presné mm výrobca
 **nedáva** — GAP), **posuvné lišty** (dvere na pántoch skrinky), odvetranie **sokel min 200 cm² + horný otvor min 200 cm² + zadný kanál min 50 mm**, dno na >75–80 kg, zásuvka nie za chrbtom.
-**Dopad na K1 (odsadenia):** zadný kanál 50 mm = presne prípad „komín" — chladničková šablóna ponesie odsadenie ≥ 50 a vetrací otvor v sokli/strope ako poznámku.
+**Dopad na K1 (odsadenia):** zadný kanál 50 mm je presne prípad „komín" — hodnotu odsadenia si Michal v chladničkovej šablóne nastaví sám (**nefixuje sa, vetranie sa vo V1 nerieši** — rozhodnutie 6.9.); list je len informácia.
 
 ### 3.3 Umývačka (Whirlpool WIO 3O540 PELG 60 · Bosch SPV6EMX05E 45)
 
@@ -96,8 +97,8 @@ Rozmerové polia podľa kategórie, každé **voliteľné** (neznáme = prázdne
 | Kategória | Rozmery pre engine (mm) | Kontrola vo V1 |
 |---|---|---|
 | Rúra · mikro | nika Š min–max · V min–max · H min · čelo Š × V · presah hore / dole · zadný výrez police (komín) · [pevná polica medzi rúrou a mikro = konštrukčné pravidlo šablóny] | **NIE** (rozhodnutie 6.9.); polia sa len evidujú |
-| Chladnička | nika Š · V min–max · H min · zadný kanál (→ odsadenie K1) · vetranie sokel/hore cm² (poznámka) · počet dverí + pomer delenia | **ÁNO**: vnútro skrinky ≥ nika, odsadenie ≥ kanál |
-| Umývačka | šírka (450/600) · výška min–max · čelo Š min–max · V min–max · hmotnosť čela max · sokel min | **ÁNO**: šírka slotu, výška čela vs. sokel |
+| Chladnička | nika Š · V min–max · H min · počet dverí + pomer delenia (zadný kanál a vetranie **len ako poznámka v liste, bez poľa** — rozhodnutie 6.9.) | **ÁNO**: vnútro skrinky ≥ nika (Š, V, H); kanál/vetranie sa nekontroluje |
+| Umývačka | šírka (450/600) · výška min–max · čelo Š min–max · V min–max · hmotnosť čela max · sokel min (evidencia) | **ÁNO**: len šírka slotu (450/600); výška čela vs. sokel sa **nekontroluje** (Michal predpísané rozmery obchádza — rozhodnutie 6.9.) |
 | Varná doska | vonkajší Š × H · výrez Š × H (+tolerancia) · montážna hĺbka · PD min hrúbka | cena + výrez (poznámka pre PD); kontrola = V1+ |
 | Digestor | šírka skrinky min · výška nad doskou min–max · Ø odvodu | len cena (mimo V1 konštrukčne) |
 
@@ -105,7 +106,7 @@ Rozmerové polia podľa kategórie, každé **voliteľné** (neznáme = prázdne
 (výrobcovia nekonzistentní: Whirlpool kótuje výrez, Bosch/Beko plochu) · výrezy digestora (len vo výkresoch) · umývačka bez korpusu = **slot medzi skrinkami**, nie skrinka
 (potvrdzuje koncept 04 §A — vo V1 stačí „umývačka patrí k zákazke + čelo je bežný dielec", slot ako typ korpusu neskôr).
 
-**Záver 3 — seed balík:** 9 modelov z §2 (★) so zapísanými poľami z §3 **po Michalovom overení** = prvý obsah knižnice spotrebičov; listy uložiť ako súbory (§3 debaty).
+**Záver 3 — seed balík:** 10 modelov zo seed balíka v §2 (6 objednaných ★ + 4 doplnkové) so zapísanými poľami z §3 **po Michalovom overení** = prvý obsah knižnice spotrebičov; listy uložiť ako súbory (§3 debaty).
 
 **Záver 4 — formát Michalovho zápisu (§2 debaty) je správny základ:** telo / čelo / nika min–max / presahy / odkazy / cena len v rozpočte. Výrobcovia to členia rovnako
 (Bosch: Gerätemaße · Nischenmaße · Überstände · Lüftungsmaße).

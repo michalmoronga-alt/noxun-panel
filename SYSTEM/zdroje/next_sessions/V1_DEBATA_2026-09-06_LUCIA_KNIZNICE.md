@@ -26,7 +26,12 @@ Nie zámok, ale **optimistické verzovanie** (vzor revízneho odtlačku Štúdia
 **manifest** (katalóg · verzia · dátum · meno PC) + podpriečinky so súbormi (prílohy, náhľady šablón). Lokálny katalóg si pamätá **základnú verziu** (z ktorej zdieľanej vznikol) a
 či má lokálne zmeny.
 
-- **Odoslať:** zdieľaná verzia == základná → zápis novej verzie (+1), manifest sa zapisuje **až po katalógu** (pečiatka „hotovo"). Zdieľaná novšia → **konflikt**: okno povie katalóg,
+- **Odoslať — kolízne bezpečne (Codex #322 P1: Google Disk nedáva zámok ani CAS, samotné „prečítaj tesne pred zápisom" okno TOCTOU nezavrie):** publikácia
+  **nikdy neprepisuje zdieľaný súbor**. Každé odoslanie zapíše **nemenný artefakt** `<katalóg>.r<rev>.<pc>.json` (unikátne meno = verzia + meno PC, nikdy sa neprepisuje) a
+  až potom **manifest** (ukazovateľ na víťazný artefakt, zapísaný cez dočasný súbor + premenovanie, posledný). Konflikt sa **nedetekuje len z manifestu**: klient číta **všetky
+  artefakty** — dva artefakty tej istej verzie z rôznych PC = konflikt viditeľný na oboch stranách, nič sa nestratí (oba ostávajú), používateľ vyberie víťaza a ten sa
+  zapíše ako `r<rev+1>`. Navyše **advisory zámok** `publish.lock` (PC + čas, TTL ~10 min) ako prvá bariéra — Disk ho môže doručiť neskoro, preto je len pomocný, nie
+  garancia. Zdieľaná verzia == základná → zápis; zdieľaná novšia → konflikt (nižšie). Zdieľaná novšia → **konflikt**: okno povie katalóg,
   kto/kedy zmenil, koľko lokálnych zmien; výber **prepísať zdieľaný mojou** / **zahodiť moje a prevziať** / zrušiť. Nič potichu.
 - **Aktualizovať:** zdieľaná novšia a bez lokálnych zmien → prevzatie (so `.bak`); s lokálnymi zmenami → ten istý konfliktný výber. Prevzatie ide **cez zápisovú cestu store**
   (assess, brány std/schema), nie kopírovaním súboru — katalóg z novšieho pluginu sa odmietne s odkazom „najprv aktualizuj plugin" (D-52; distribučný priečinok pluginu môže byť
@@ -37,7 +42,7 @@ Nie zámok, ale **optimistické verzovanie** (vzor revízneho odtlačku Štúdia
 
 ## 2 · Riziká (zapísané, opatrenia v package)
 
-1. Oneskorenie Disku → obaja vidia starú verziu, obaja zapíšu, Disk vyrobí druhú kópiu súboru → manifest čítať tesne pred zápisom, cudzie kópie v priečinku ohlásiť; pri práci z domu vzácne.
+1. Oneskorenie Disku → obaja vidia tú istú základnú verziu a obaja odošlú → **rieši §1: nemenné artefakty per publikácia + manifest posledný + čítanie všetkých artefaktov** (nikdy tichá strata, konflikt vidia obaja); advisory zámok len pomáha. Reziduálne: manifest z dvoch PC = dve kópie manifestu od Disku → klient berie artefakty ako pravdu, manifest len ako ukazovateľ.
 2. Rozdielne verzie pluginu → brány R-11/R-12 odmietnu novší katalóg → hláška na updater.
 3. Rozpísaný súbor počas synchronizácie → dočasný súbor + premenovanie (existujúci vzor).
 4. Zákazka s materiálom, ktorý druhé PC nemá → snapshot na skrinke je autorita, „chýba v katalógu" ako dnes pri kovaní.
@@ -47,7 +52,7 @@ Nie zámok, ale **optimistické verzovanie** (vzor revízneho odtlačku Štúdia
 
 | Dávka | Obsah | Audit | Odhad |
 |---|---|---|---|
-| SYNC-1 jadro | čistý modul: manifest, základná verzia + lokálne zmeny per katalóg, Odoslať/Aktualizovať s konfliktmi, prevzatie cez store API každého zo 6–7 katalógov, headless testy s mutáciami | ÁNO (nový modul, zápis katalógov) | 1 PR, 1 deň + review |
+| SYNC-1 jadro | čistý modul: nemenné artefakty per publikácia + manifest ako ukazovateľ + čítanie všetkých artefaktov (kolízia bez CAS), advisory zámok, základná verzia + lokálne zmeny per katalóg, Odoslať/Aktualizovať s konfliktmi, prevzatie cez store API každého zo 6–7 katalógov, headless testy s mutáciami | ÁNO (nový modul, zápis katalógov) | 1 PR, 1 deň + review |
 | SYNC-2 UI | O plugine: riadky per katalóg, tlačidlá, konfliktný modal (D-15), oznámenie pri štarte (asynchrónne s deadline, vzor updater check) | NIE (nad kontraktom SYNC-1), in-SU smoke na oboch PC | 1 PR, 1 deň |
 | SYNC-3 súbory | prílohy spotrebičov + náhľady šablón do zdieľaného koreňa (relatívne cesty, migrácia existujúcich náhľadov, zametanie sirôt) | ÁNO (migrácia) | 1 PR, 0,5–1 deň |
 
