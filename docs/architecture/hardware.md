@@ -470,8 +470,9 @@ charakterizačný test). Päť častí:
 - **Vyhradená bunka `SKIP_CODE` = „vedome bez kódu" (D-118b, v0.9.44).** Hodnota `'none'` v `code_by_nl` znamená **„táto dĺžka kód nemá a ani mať nemá"** → `member_code`
   vráti `[nil, nil]` (existujúca vetva „člen sa preskočí"). **Chýbajúci kľúč ostáva NEMAPOVANÝ** (ORANGE / pri recepte RED) — je to tá istá rodina ako „prítomná neplatná
   hodnota ≠ neprítomná" z KOV-D. Dôvod je dátový: rad Atira **PTOs** potrebuje modul P2O na každej dĺžke OKREM 620 mm, kde je kit typu `PTO` a modul má v sebe; vynechaný kľúč
-  by hlásil chýbajúci kód tam, kde žiadny nepatrí. Kódy sú číselné, takže kolízia nehrozí; ako **pevný `code`** je `'none'` odmietnutý (`validate_member`) a v rade sa ukladá
-  kanonicky malými písmenami. Súpis členov (`explain`) preskočený člen **prizná** (`skipped: true` → „bez kódu (netreba)"), aby karta pri NL 620 nemlčala; nákupné CSV z neho
+  by hlásil chýbajúci kód tam, kde žiadny nepatrí. Kódy sú číselné, takže kolízia nehrozí; ako **pevný `code`** aj ako hodnota **kódového pásma** (`param_bands`) je `'none'` odmietnutý
+  (`validate_member` / `validate_param_bands`) — inak by `member_code` vrátil doslovný „none" do nákupu a `skip_code_present?` by ho neuvidel, takže obsah by dostal nižší
+  marker kompatibility (Codex #321 kolo 3). V selektore mapovania (`set_id`) sa nekontroluje — tam je to legitímne meno setu. V rade sa ukladá kanonicky malými písmenami. Súpis členov (`explain`) preskočený člen **prizná** (`skipped: true` → „bez kódu (netreba)"), aby karta pri NL 620 nemlčala; nákupné CSV z neho
   nemá žiadny riadok.
 - **`std` 5 (`STD_SKIP_CODE`) — marker kompatibility sentinelu.** Testuje sa ÚPLNE PRVÝ (najvyšší marker vyhráva) a dostane ho len knižnica/snapshot, v ktorých sa `'none'`
   naozaj vyskytuje. **Bez neho by starší plugin obsah prijal** a z bunky `none` vyrobil nákupný riadok s neexistujúcim kódom (overené sondou nad v0.9.42: knižničná aj šablónová

@@ -4347,6 +4347,16 @@ module Noxun
             errors << "#{pos}: pásmo #{i + 1} (#{min.round(1)}–#{max.round(1)}) nemá hodnotu"
             next nil
           end
+          # D-118b (Codex #321 kolo 2): vyhradena hodnota `none` patri VYHRADNE
+          # do radu `code_by_nl`. V KODOVOM pasme by `member_code` vratil
+          # doslovny „none" (neexistujuci kod v nakupe aj v CSV) a `skip_code_present?`
+          # by ju neuvidel, takze obsah by dostal NIZSI marker kompatibility.
+          # Pri selectore mapovania (`value_key == 'set_id'`) sa nekontroluje —
+          # tam je to legitimne meno setu.
+          if value_key == 'code' && skip_code?(val)
+            errors << "#{pos}: pásmo #{i + 1} — „#{SKIP_CODE}“ sa smie použiť len v rade podľa dĺžky"
+            next nil
+          end
           { 'min' => min, 'max' => max, value_key => val }
         end
         return [nil, errors] unless errors.empty?

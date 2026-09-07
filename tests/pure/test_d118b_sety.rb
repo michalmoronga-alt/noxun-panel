@@ -438,3 +438,22 @@ NxTest.test('D-118b (R9): osvieženie berie definiciu z KNIZNICE, nie zo zabudov
     c::HWS.reset_library_state!
   end
 end
+
+NxTest.test('D-118b (R8): `none` sa odmietne aj v KODOVOM pasme, v selectore setov nie') do
+  c = NxD118b
+  bad, errs = c::HWS.validate_member(
+    { 'per' => 'unit', 'qty' => 1,
+      'param_bands' => { 'param' => 'height',
+                         'bands' => [{ 'min' => 10.0, 'max' => 20.0, 'code' => 'none' }] } }, 0
+  )
+  NxTest.assert_equal(nil, bad, 'kodove pasmo so sentinelom sa NEULOZI')
+  NxTest.assert(errs.first.to_s.include?('none'), errs.inspect)
+
+  # Selector mapovania nesie `set_id` — tam je „none" legitimne meno setu.
+  sel, errs2 = c::HWS.validate_param_bands(
+    { 'param' => 'front_height',
+      'bands' => [{ 'min' => 0.0, 'max' => 100.0, 'set_id' => 'none' }] }, 'set_id', 'výber'
+  )
+  NxTest.assert_equal([], errs2, errs2.inspect)
+  NxTest.assert_equal('none', sel['bands'].first['set_id'])
+end
