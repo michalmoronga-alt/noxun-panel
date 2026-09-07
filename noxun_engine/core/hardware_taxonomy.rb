@@ -473,7 +473,14 @@ module Noxun
         SEED_SERIES.each do |(name, man)|
           next if have_s.include?(key_of(name))
 
-          sers << { 'name' => name, 'manufacturer' => man }
+          # Vlastnik rady sa berie z UZ ULOZENEHO zaznamu vyrobcu (Codex #320
+          # kolo 2 P2): ked ma pouzivatel „STRONG", merge vyrobcu nedopĺňa,
+          # ale rada zapisana s nasim „Strong" by v UI zmizla — selecty rad
+          # (`hw_catalog.js`, `hw_sets.js`) filtruju podla PRESNEHO retazca.
+          owner = mans.find { |m| same_name?(m['name'], man) }
+          next unless owner
+
+          sers << { 'name' => name, 'manufacturer' => owner['name'] }
           have_s << key_of(name)
         end
         [mans.sort_by { |m| key_of(m['name']) }, sers.sort_by { |s| key_of(s['name']) }]

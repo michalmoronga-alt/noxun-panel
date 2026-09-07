@@ -259,6 +259,53 @@ NxTest.test('D-118 (R4): nad read-only taxonomiou sa klasifikacia NEZAPISUJE (fa
   end
 end
 
+NxTest.test('D-118 (R4): aj legacy v1 -> v2 doplnenie ide cez ZIVU taxonomiu') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  # Rada „Sensys" uz patri inemu vyrobcovi. Krytky 105408/105425, ktore dopĺňa
+  # LEGACY vetva v1 -> v2, ju preto zapisat NESMU — inak by ich nasledny v3
+  # prechod povazoval za pouzivatelsku upravu a nechal navzdy nekonzistentne.
+  before = NxD118.install_taxonomy!(%w[Hettich Blum Grass Strong Tulip Ostatné],
+                                    [['Sensys', 'Blum']], seed_version: NxD118::TAX::SEED_VERSION)
+  begin
+    FileUtils.mkdir_p(NxD118::HWC.dir)
+    NxD118::STORE.write(NxD118::HWC.path, 'std' => NxD118::HWC::STD,
+                                          'schema' => NxD118::HWC::SCHEMA_CURRENT,
+                                          'seed_version' => 1,
+                                          'items' => [NxD118.v2_item('104717')])
+    FileUtils.rm_f("#{NxD118::HWC.path}.bak")
+    NxD118::STORE.invalidate(NxD118::HWC.path)
+    NxD118::HWC.reset_state!
+    NxTest.assert_equal(:ok, NxD118::HWC.assess!)
+
+    krytka = NxD118::HWC.find('105408')
+    NxTest.assert(krytka, 'legacy vetva krytku doplnila')
+    NxTest.assert_equal('Hettich', krytka['manufacturer'], 'vyrobca sa vyriesil')
+    NxTest.refute(krytka.key?('series'), 'cudzia rada sa NEZAPISE ani v legacy vetve')
+  ensure
+    NxD118.restore_taxonomy!(before)
+    NxD118.wipe!
+  end
+end
+
+NxTest.test('D-118 (R4): seedovana rada sa naviaze na ULOZENY zapis vyrobcu') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  # Pouzivatel ma „STRONG"; merge vyrobcu NEdopĺňa (slug sedi), takze rada
+  # zapisana s nasim „Strong" by v selecte rad zmizla — JS filtruje podla
+  # PRESNEHO retazca (Codex #320 kolo 2 P2).
+  before = NxD118.install_taxonomy!(%w[Hettich Blum Grass STRONG Ostatné], [], seed_version: 1)
+  begin
+    NxTest.assert(NxD118::TAX.ensure_seeded, 'seed prebehol')
+    box = NxD118::TAX.series_of('STRONG').find { |s| s['name'] == 'StrongBox' }
+    NxTest.assert(box, 'StrongBox sa naviazal na ulozeny zapis vyrobcu')
+    NxTest.assert_equal('STRONG', box['manufacturer'], 'vlastnik = ULOZENY tvar mena')
+    mans = NxD118::TAX.manufacturers.map { |m| m['name'] }
+    NxTest.assert(mans.include?('STRONG') && !mans.include?('Strong'),
+                  "vyrobca sa nezdvojil: #{mans.inspect}")
+  ensure
+    NxD118.restore_taxonomy!(before)
+  end
+end
+
 NxTest.test('D-118 (R4): seed aj migracia sa pytaju taxonomie PRED katalogovym zamkom') do
   # Taxonomia ma vlastny sidecar; vnorit ho do katalogoveho zamku by vyrobilo
   # PORADIE zamkov (rovnaky zdrojovy guard ako pri create_item/patch_item).

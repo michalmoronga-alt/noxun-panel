@@ -1736,8 +1736,12 @@ module Noxun
           items = doc['items'].dup
           changed = []
           if from < 2
+            # Aj legacy v1 -> v2 dopĺňanie berie riadky z UZ ROZLISENEJ sady
+            # (Codex #320 kolo 2 P2): z `SEED_ITEMS` by krytky 105408/105425
+            # dostali klasifikaciu mimo zivej taxonomie a nasledny v3 prechod
+            # by ich uz povazoval za pouzivatelsku upravu a nechal tak.
             seed_by_code = {}
-            SEED_ITEMS.each { |s| seed_by_code[s['item_code']] = s }
+            resolved.each { |s| seed_by_code[s['item_code']] = s }
             SEED_PATCH_V2_ADD.each do |code|
               next if items.any? { |i| i['item_code'].to_s.strip.downcase == code.downcase }
               rec, = normalize_item(seed_by_code[code])
