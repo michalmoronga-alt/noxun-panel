@@ -43,6 +43,14 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 
 ## KONTROLA + VÝROBA
 
+- **D-121 · Názvy odvodených dielcov zásuviek sú pre VEPO pridlhé a nič nehovoria** (Michal 6.9., objednávka po KOV-C; **VYSOKÁ PRIORITA — výrobný výstup**) — riadky
+  vo VEPO exporte typu `Dno zasuvky Fmslwqdm2-9-464wsa` / `Dno zasuvky Fmslwqew7-a-u7mna2`: názov nesie **interné id čela** (`construction.rb`: `"Dno zasuvky #{front_id}"`,
+  KOV-C2b) a `VepoExport.row_name` ho nemá v mape skratiek `SHORT_NAMES`, takže prejde celý. Dôsledky: (1) používateľovi id nič nehovorí, (2) **VEPO import odmieta polia nad
+  20 znakov** — pred odoslaním sa musia riadky ručne prepisovať (D-113 to riešila len pre korpusové dielce). „Aj niektoré iné dielce po poslednej zmene" — preveriť všetky
+  názvy, ktoré KOV-C/D pridali (dno, chrbát, boky zásuvky, sync tyč…). Riešenie: **tvrdý limit 20 znakov na názov riadku vo VEPO** (guard test nad celým exportom, nie len
+  skratky) + ľudské názvy odvodených dielcov (`Zas dno s1`, `Zas chrb s1`…; číslo zásuvky/čela namiesto id — `PartKeys.human_label` D-92 vzor) aj v kusovníku a LOGu.
+  *Stav: OTVORENÉ — **fix dávka pre implementačné okno (KOVANIE)** hneď, nečaká na koniec bloku; audit NIE (výstupný formát, kontrakt VEPO v1.1 sa nemení — 20 znakov je
+  jeho súčasť z POJMY).*
 - **D-94 · Traceability v celkovom súpise kovania — rozklik položky na miesta použitia** (Michal 9.8., test kovania na reálnej zákazke) — nákupný zoznam v okne Výroba povie „357695 × 12", ale nie
   **kde** tých 12 kusov je. Pri kontrole objednávky (a pri hľadaní, prečo je počet iný, než človek čakal) treba vedieť rozobrať riadok na **skrinky a čelá**, z ktorých vznikol. Dáta už existujú:
   `expand` skladá pri každom riadku pole `sources` (`cabinet_id`, `owner_part_key`, `generic_type`, `rule_id`, `set_id`, počet) — chýba len zobrazenie a klik-select. Návrh: rozklik riadku (vzor
