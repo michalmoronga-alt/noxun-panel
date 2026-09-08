@@ -197,7 +197,7 @@ module Noxun
         end
         Array(collected[:records]).each { |r| check_record(r, smap, emap, items) }
         # D-121b: nad TYMI ISTYMI riadkami, ake pojdu do CSV (`Bom.aggregate_rows`).
-        check_name_lengths(collected[:records], items)
+        check_name_lengths(collected[:records], emap, items)
         Array(collected[:hardware_overrides]).each { |ov| check_hardware(ov, items) }
         # KOV-D4: konflikt zasuvky posiela pouzivatela na RIADOK OSIROTENEHO
         # ZASAHU v Kovani — identitu toho riadku pozna len server (raw zoznam
@@ -334,10 +334,31 @@ module Noxun
       #
       # Riadok, ktoremu sa nezmestila SKRINKA (nie nazov), sa TU nehlasi — nie je
       # to strata dielca, len horsia orientacia; ostava v oddiele LOGu.
-      def check_name_lengths(records, items)
+      def check_name_lengths(records, edges_catalog, items)
         Bom.aggregate_rows(name_check_records(records)).each do |row|
+          next unless exportable_row?(row, edges_catalog)
+
           info = VepoExport.row_name_info(row)
           items << name_long_item(row, info) if info['cut']
+        end
+      end
+
+      # Codex #325 kolo 1 (P2): riadok, ktory export VYRADI (bez materialu,
+      # nekladny rozmer, chybny pocet — `VepoExport.validate_row`; chybna hrubka
+      # — `commercial_thickness`; hrana s ABS mimo katalogu — `finished_dimensions`),
+      # do CSV nejde, takze nalez „pojde ako …" by klamal a nafukoval oranzove
+      # cislo. Kriteria su TIE ISTE ako v exporte (jeho vlastne funkcie, ziadna
+      # kopia). Bez mapy pasok (legacy volanie, headless bez katalogu) sa ABS
+      # neoveruje — Kontrola nesmie mlcat len preto, ze katalog nedostala.
+      def exportable_row?(row, edges_catalog)
+        return false if VepoExport.validate_row(row)
+        return false if VepoExport.commercial_thickness(row['thickness']).nil?
+        return true unless edges_catalog.is_a?(Hash)
+
+        e = row['edges'].is_a?(Hash) ? row['edges'] : {}
+        VepoExport::EDGE_CODES.all? do |code|
+          id = e[code]
+          id.nil? || id.to_s.empty? || edges_catalog.key?(id)
         end
       end
 
@@ -350,7 +371,9 @@ module Noxun
           next unless r.is_a?(Hash)
 
           out = r.merge(
-            'name' => r['name'].to_s, 'quantity' => r['quantity'].to_i,
+            # `quantity` ako `Bom.record` (vzdy >= 1) — fixtura bez pola nesmie
+            # skoncit ako „chybny pocet" a vypadnut z kontroly nazvov.
+            'name' => r['name'].to_s, 'quantity' => [r['quantity'].to_i, 1].max,
             'owner_id' => r['owner_id'].to_s, 'part_key' => r['part_key'].to_s,
             'material_id' => r['material_id'].to_s,
             'grain_direction' => r['grain_direction'].to_s,
@@ -378,20 +401,24 @@ module Noxun
                else
                  "Skráť názov dosky (#{free.join(', ')})."
                end
+        # Codex #325 kolo 1 (P2): ked hlaska posiela cloveka premenovat DOSKU,
+        # klik (oko/ceruzka) musi otvorit DOSKU — prvy vlastnik riadku moze byt
+        # skrinka (agregacia drzi poradie zaznamov a riadok byva zliatok oboch).
+        # Doska = `BRD-` (ta ista zasada ako `Bom.free_board_record?`).
+        target = owners.first
+        target = owners.find { |o| o.start_with?('BRD-') } || target unless free.empty?
         { 'severity' => ORANGE, 'category' => CAT_NAME_LONG,
-          'owner_id' => owners.first.to_s, 'part_key' => nil, 'hw_key' => nil,
+          'owner_id' => target.to_s, 'part_key' => nil, 'hw_key' => nil,
           'message_sk' => "Riadok VEPO „#{full}“ má #{full.length} znakov, VEPO prijme " \
                           "najviac #{VepoExport::NAME_MAX} — v objednávke pôjde ako " \
                           "„#{info['name']}“. #{hint}",
-          'stable_key' => "#{CAT_NAME_LONG}|#{full}|#{row['material_id']}|" \
-                          "#{dim_key(row['length'])}x#{dim_key(row['width'])}x" \
-                          "#{dim_key(row['thickness'])}" }
-      end
-
-      # Rozmer do `stable_key` — desatina mm ako cele cislo (vzor `Bom.row_key`:
-      # ziadne Float kluce, kluc musi byt medzi behmi `run` bajtovo rovnaky).
-      def dim_key(value)
-        (value.to_f * 10).round
+          # Codex #325 kolo 1 (P2): identita nalezu = CELY vyrobny kluc riadku
+          # (`Bom.row_key`: rozmery, material, hrany, smer dekoru, vazba duplaku).
+          # Len nazov + rozmery by dva riadky s inou hranou alebo dekorom zliali
+          # v `dedup` do jedneho a druhy by sa ukazal az po oprave prveho. Kluc
+          # su cele cisla a retazce (ziadne Floaty), takze `inspect` je medzi
+          # behmi `run` bajtovo rovnaky.
+          'stable_key' => "#{CAT_NAME_LONG}|#{Array(row['key']).inspect}" }
       end
 
       # RED (2A-2, F6): hrana referencuje abs_id, ktore v aktualnom katalogu nie

@@ -25,6 +25,10 @@
 #   M4 KONTROLA hodnoti zaznamy, nie riadky      -> dve kratke dosky prejdu ticho
 #   M5 LOG oddiel chyba pri nule                 -> „Skratene nazvy (0):"
 #   M6 `filename` priradeny PRED `dedup_filenames!` -> kolizia slugov
+#   M7 `cut_name` bez strip/zalozneho rezu     -> prazdny nazov riadku
+#   M8 Kontrola hodnoti aj riadky, ktore export VYRADI   (Codex #325 P2)
+#   M9 `stable_key` bez celeho kluca riadku      -> dedup zlial dva riadky (Codex #325 P2)
+#   M10 klik pri hinte o doske mieri na skrinku  (Codex #325 P2)
 require_relative '../helper' unless defined?(NxTest)
 
 module NxD121b
@@ -372,8 +376,11 @@ NxTest.test('D-121b: `stable_key` je medzi dvoma behmi `run` ROVNAKY (klik-selec
   a = d.long_items(recs).map { |i| i['stable_key'] }
   b = d.long_items(recs).map { |i| i['stable_key'] }
   NxTest.assert_equal(a, b)
-  NxTest.assert_equal(['name_long|Doska pod umyvadlo/Polica nad pracku|BIELA_18|6000x5000x180'], a,
-                      'kluc = kategoria + plny nazov + material + rozmery v desatinach mm')
+  # Codex #325 kolo 1 (P2): kluc = kategoria + CELY vyrobny kluc riadku
+  # (`Bom.row_key` — rozmery, material, hrany, smer dekoru, vazba duplaku).
+  key = NxD121b::B.aggregate_rows(recs).first['key']
+  NxTest.assert_equal(["name_long|#{key.inspect}"], a, 'kluc = kategoria + row_key riadku')
+  NxTest.refute(a.first.include?('Doska pod umyvadlo'), 'nazov v kluci netreba — riadok ho urcuje')
 end
 
 NxTest.test('D-121b: Kontrola znesie zaznamy BEZ `edges`, `quantity` a `material_source`') do
@@ -388,6 +395,58 @@ NxTest.test('D-121b: Kontrola znesie zaznamy BEZ `edges`, `quantity` a `material
 end
 
 # --- 6) guardy -------------------------------------------------------------
+
+# --- 5b) Codex #325 kolo 1 (3x P2) -----------------------------------------
+
+NxTest.test('Codex #325 P2: riadok, ktory export VYRADI, nalez o nazve NEDOSTANE') do
+  d = NxD121b
+  long = 'Polica nad velkou prackou'
+  NxTest.assert_equal(1, d.long_items([d.board(long)]).length, 'kontrolna vzorka: platny riadok nalez ma')
+  NxTest.assert_equal([], d.long_items([d.board(long, 'BRD-1', 'material_id' => '')]), 'bez materialu')
+  NxTest.assert_equal([], d.long_items([d.board(long, 'BRD-1', 'width' => 0.0)]), 'nekladny rozmer')
+  NxTest.assert_equal([], d.long_items([d.board(long, 'BRD-1', 'thickness' => 0.0)]), 'chybna hrubka')
+  # hrana s ABS mimo katalogu = export riadok vyradi (`finished_dimensions`);
+  # s mapou pasok Kontrola nalez o nazve nevyda, chybajucu ABS hlasi jej kategoria
+  bad = d.board(long, 'BRD-1', 'edges' => { 'L1' => 'ABS_NEZNAMA', 'L2' => nil, 'W1' => nil, 'W2' => nil })
+  items = d::V.run({ records: [bad], hardware_overrides: [], warnings: [] },
+                   sheets: d::SHEETS, edges: { 'ABS1' => { 'abs_id' => 'ABS1' } })['items']
+  NxTest.assert_equal([], items.select { |i| i['category'] == d::V::CAT_NAME_LONG },
+                      'ABS mimo katalogu = riadok von z CSV = ziadny nalez o nazve')
+  NxTest.assert(items.any? { |i| i['category'] == d::V::CAT_ABS }, 'kontrolna vzorka: chybajuca ABS ma vlastny nalez')
+  # bez mapy pasok (legacy volanie) sa ABS neoveruje — nalez o nazve ostava
+  NxTest.assert_equal(1, d.long_items([bad]).length, 'bez katalogu pasok Kontrola nemlci')
+end
+
+NxTest.test('Codex #325 P2: dva riadky s rovnakym nazvom a rozmermi, inym dekorom = DVA nalezy') do
+  d = NxD121b
+  long = 'Polica nad velkou prackou'
+  a = d.board(long, 'BRD-1', 'grain_direction' => 'length')
+  b = d.board(long, 'BRD-2', 'grain_direction' => 'width')
+  NxTest.assert_equal(2, d::B.aggregate_rows([a, b]).length, 'kontrolna vzorka: smer dekoru = iny riadok CSV')
+  items = d.long_items([a, b])
+  NxTest.assert_equal(2, items.length, 'kazdy riadok CSV ma vlastny nalez (dedup ich nezlial)')
+  NxTest.assert_equal(2, items.map { |i| i['stable_key'] }.uniq.length)
+  NxTest.assert_equal(%w[BRD-1 BRD-2], items.map { |i| i['owner_id'] }.sort)
+  # ina hrana = tiez iny riadok = vlastny nalez
+  c = d.board(long, 'BRD-3', 'edges' => { 'L1' => 'ABS1', 'L2' => 'ABS1', 'W1' => nil, 'W2' => nil })
+  NxTest.assert_equal(2, d.long_items([a, c]).length, 'ina hrana = iny riadok = vlastny nalez')
+end
+
+NxTest.test('Codex #325 P2: hint „Skráť názov dosky" mieri klikom na DOSKU, nie na skrinku') do
+  d = NxD121b
+  recs = [d.rec, d.board('Polica nad velkou prackou', 'BRD-7')] # skrinka je v riadku PRVA
+  row = d::B.aggregate_rows(recs).first
+  NxTest.assert_equal('CAB-1', row['kde'].first['owner_id'], 'kontrolna vzorka: prvy vlastnik riadku je skrinka')
+  items = d.long_items(recs)
+  NxTest.assert_equal(1, items.length)
+  NxTest.assert(items.first['message_sk'].include?('Skráť názov dosky'), items.first['message_sk'])
+  NxTest.assert_equal('BRD-7', items.first['owner_id'], 'klik/ceruzka otvori dosku, ktoru ma clovek premenovat')
+  # bez dosky v riadku ostava prvy vlastnik (skrinka)
+  gen = d.long_items([d.rec('name' => 'Dno'), d.rec('name' => 'Vrch'), d.rec('name' => 'Polica 1'),
+                      d.rec('name' => 'Polica 2'), d.rec('name' => 'Polica 3')])
+  NxTest.assert_equal(1, gen.length)
+  NxTest.assert_equal('CAB-1', gen.first['owner_id'])
+end
 
 NxTest.test('D-121b guard: kazdy kratky tvar + vlastnik `s12` sa zmesti do 20 znakov') do
   v = NxD121b.vepo
@@ -419,7 +478,7 @@ NxTest.test('D-121b guard: limit zije LEN vo `vepo_export.rb` (validation.rb ho 
   NxTest.refute(src.match?(/NAME_MAX\s*=/), 'validation.rb NESMIE definovat vlastny NAME_MAX')
   # v KODE kontroly nazvov nesmie byt ziadny cislovy literal limitu
   # (komentare sa vypustaju — text o limite v nich zit smie)
-  body = src[/def check_name_lengths.*?def dim_key.*?\n      end\n/m].to_s
+  body = src[/def check_name_lengths.*?def name_long_item.*?\n      end\n/m].to_s
   NxTest.refute(body.empty?, 'sekcia kontroly nazvov sa nenasla — premenovana?')
   code = body.lines.reject { |l| l.strip.start_with?('#') }.join
   NxTest.refute(code.match?(/(?<![\w.])20(?![\w.])/),
