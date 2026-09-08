@@ -37,6 +37,11 @@
 #      do projektu NEZMRAZÍ (a stavba to prizná ORANGE-om) · skrinka uložená
 #      PRED tabuľkou = RED `hinge_stale` + zastavené 3 exporty (VEPO beží) ·
 #      RED nadvýšky zhasne LEN skutočný zámok počtu, nie hocijaký ručný zásah
+#  12) FIX KOLO (Codex #329 kolo 3): PROJEKTOVÝ snapshot z novšieho pluginu =
+#      TRVALÝ RED blocker (prestavba ho nezhasne, snapshot ostáva bajtovo
+#      rovnaký) · `blocked` prežije opakované čítanie pod zámkom · `hinge_stale`
+#      platí aj po prestavbe, kým sú pravidlá projektu spred F1 · KONEČNÁ
+#      tabuľka bez číselného pásma sa neuloží a každé čelo je „mimo tabuľky“
 #
 # MUTACIE, ktore tato sada chyta (kazda by prazdnou sadou presla):
 #   M1  pásmo 849 sa zmení na 850 (výlučne)      -> hranice tabuľky
@@ -66,6 +71,12 @@
 #   M23 skrinka schémy 8 so závesmi prejde
 #       nákupom so starými počtami                -> `hinge_stale`
 #   M24 RED zhasne pri HOCIJAKOM `source:manual`  -> zámok počtu vs. zámok NL
+#   M25 projektový snapshot z novšej verzie sa
+#       len prečíta a exporty prejdú                -> trvalý RED blocker
+#   M26 `persist_seed_merge!` vráti `blocked` false -> zámok a druhé čítanie
+#   M27 prestavba (schéma 9) zhasne `hinge_stale`
+#       nad starými pravidlami projektu             -> dve nezávislé príčiny
+#   M28 `finite` bez číselného pásma = ticho        -> zápisová brána + RED
 require_relative '../helper' unless defined?(NxTest)
 
 require 'json'
@@ -128,6 +139,14 @@ module NxKovF
 
   def warn_codes(res)
     res[:warnings].map { |w| w['code'] }
+  end
+
+  # KONECNA tabulka, v ktorej ostalo LEN pasmo „vsetko nad“ (pouzivatel zmazal
+  # vsetky ciselne pasma; catch-all sa zmazat neda) — Codex #329 kolo 3 P2.
+  def no_band_rule
+    r = JSON.parse(JSON.generate(hinge_rule))
+    r['bands'] = [{ 'max' => nil, 'quantity' => 1 }]
+    HR.normalize_rules([r])
   end
 
   # Pravidlo BEZ door guardov = presne to, co vidi STARY citac.
@@ -995,6 +1014,192 @@ NxTest.test('KOV-F1 (11): RED nadvýšky zhasne LEN zámok POČTU, nie zámok NL
 end
 
 # ============================================================================
+# 12 — FIX KOLO (Codex #329 kolo 3)
+# ============================================================================
+
+NxTest.test('KOV-F1 (12): PROJEKTOVÝ snapshot z novšieho pluginu = TRVALÝ RED blocker') do
+  c = NxKovF
+  newer = JSON.generate('std' => c::HR::STD + 1, 'seed_version' => c::HR::SEED_VERSION,
+                        'rules' => [c.hinge_rule])
+  model = c.fake_model(newer)
+  NxTest.assert(c::HR.project_std_unsupported?(model), 'snapshot je z novšej verzie formátu')
+  iss = c::BOM.rules_snapshot_issue(model)
+  NxTest.assert(iss, 'zber nález vyrobí')
+  NxTest.assert_equal(c::BP::RULES_SNAPSHOT_INCOMPATIBLE, iss['code'])
+  NxTest.assert_equal('red', iss['severity'])
+  NxTest.assert_equal('', iss['owner_id'].to_s, 'je to stav CELÉHO projektu — bez vlastníka')
+  NxTest.assert(iss['message'].include?('Aktualizuj plugin'), iss['message'])
+  NxTest.assert(c::BP::HW_ISSUE_BLOCKERS.include?(iss['code']),
+                'kód je v jedinom registri brán')
+  # KONTROLA: RED riadok bez zavádzajúcej adresy.
+  items = []
+  c::V.check_hardware_issues([iss], items)
+  NxTest.assert_equal(1, items.length)
+  NxTest.assert_equal(c::V::RED, items.first['severity'])
+  NxTest.refute(items.first['message_sk'].include?('(—)'),
+                'prázdna adresa by predstierala skrinku, ktorú nikto nenájde')
+  NxTest.assert(items.first['message_sk'].start_with?('Pravidlá kovania:'),
+                items.first['message_sk'])
+  # BRANY: nákup + rozpočet + ponuka stoja, VEPO beží.
+  collected = { hardware_issues: [iss], hardware: [] }
+  all = c::PC.hardware_blockers(collected, nil)
+  NxTest.assert_equal(1, all.length, all.inspect)
+  NxTest.assert(all.first.include?('novší plugin'), all.first)
+  NxTest.refute(all.first.include?('()'), 'veta brány nemá prázdnu zátvorku')
+  NxTest.assert_equal([], c::PC.hardware_blockers(collected, nil, scope: :kit),
+                      'VEPO ide ďalej — geometria je správna')
+  # ZDRAVY projekt nález NEROBI.
+  ok = c.fake_model(JSON.generate('std' => c::HR::STD, 'rules' => [c.hinge_rule]))
+  NxTest.assert_equal(nil, c::BOM.rules_snapshot_issue(ok))
+  NxTest.assert_equal(nil, c::BOM.rules_snapshot_issue(c.fake_model))
+end
+
+NxTest.test('KOV-F1 (12): prestavba blocker NEZHASNE a snapshot ostáva bajtovo rovnaký') do
+  c = NxKovF
+  newer = JSON.generate('std' => c::HR::STD + 1, 'seed_version' => c::HR::SEED_VERSION,
+                        'rules' => [c.hinge_rule])
+  model = c.fake_model(newer)
+  # `ensure_project_rules!` je presne to, čo pri KAŽDEJ stavbe beží ako prvé.
+  rules = c::HR.ensure_project_rules!(model)
+  NxTest.assert_equal(1, rules.length, 'stavba pravidlá dostane — zákazka sa musí dať dokončiť')
+  NxTest.assert_equal(newer, model.raw, 'snapshot sa NEPREPÍSAL')
+  NxTest.refute(c::HR.set_project_rules(model, c.rules), 'zápis do neho je zakázaný')
+  NxTest.assert_equal(newer, model.raw, 'ani vedomým zápisom')
+  NxTest.assert(c::BOM.rules_snapshot_issue(model), 'a RED po prestavbe ostáva')
+  # Protajšok: projekt BEZ snapshotu je ORANGE stavby, nie tento RED.
+  NxTest.refute(c::HR.library_incompatible_without_snapshot?(model),
+                'so snapshotom ORANGE knižnice nevzniká — to je práve tá diera')
+end
+
+NxTest.test('KOV-F1 (12): `blocked` prežije opakované čítanie pod zámkom') do
+  NxTest.skip!('globálna knižnica (APPDATA sandbox) — headless only') unless NxTest.headless?
+  c = NxKovF
+  c.with_rules_library do
+    newer = { 'std' => c::HR::STD + 1, 'seed_version' => c::HR::SEED_VERSION,
+              'rules' => c.rules }
+    # a) SAMOTNÁ cesta pod zámkom: knižnica z novšieho pluginu -> [pravidlá, true].
+    c.install_rules(newer)
+    before = File.binread(c::HR.path)
+    got, blocked = c::HR.persist_seed_merge!([])
+    NxTest.assert(blocked, '`persist_seed_merge!` vracia dvojicu s príznakom')
+    NxTest.assert(got.length.positive?, 'a obsah sa POUŽIŤ smie')
+    NxTest.assert_equal(before, File.binread(c::HR.path), 'nič sa nezapísalo')
+    # b) CELÁ cesta: prvé čítanie vidí STARÝ seed (merge treba), pod zámkom už
+    #    knižnicu nahradil novší plugin. Bez propagácie by `load_state` hlásil
+    #    `blocked` false a `ensure_project_rules!` by orezané pravidlá ZMRAZIL.
+    c.install_rules('std' => 1, 'seed_version' => 1,
+                    'rules' => c::HR::LEGACY_SEED_SHAPES['zavesy-podla-vysky'])
+    _r, changed, blk0 = c::HR.read_rules
+    NxTest.assert(changed, 'prvé čítanie chce seed-merge')
+    NxTest.refute(blk0, 'a knižnica je zatiaľ čitateľná')
+    c.with_newer_library_under_lock(newer) do
+      rules, blocked2 = c::HR.load_state
+      NxTest.assert(blocked2, '`load_state` nesie príznak z DRUHÉHO čítania')
+      NxTest.assert(rules.length.positive?)
+      model = c.fake_model
+      c::HR.ensure_project_rules!(model)
+      NxTest.assert_equal(nil, model.raw, 'a snapshot sa NEZMRAZIL')
+    end
+    NxTest.assert_equal(c::HR::STD + 1, JSON.parse(File.binread(c::HR.path))['std'],
+                        'knižnica ostala tá, ktorú zapísal novší plugin')
+  end
+end
+
+NxTest.test('KOV-F1 (12): `hinge_stale` má DVE nezávislé príčiny — schéma a pravidlá') do
+  c = NxKovF
+  cur = c::CB::HINGE_ACTIVATION_SCHEMA
+  # (1) stará schéma + staré pravidlá = RED
+  NxTest.assert(c::BOM.hinge_stale_issue('CAB-1', 1, c.stale_cfg(cur - 1), true))
+  # (2) PRESTAVBA sama nestačí — snapshot projektu sa nikdy nemerguje sám
+  iss = c::BOM.hinge_stale_issue('CAB-2', 1, c.stale_cfg(cur), true)
+  NxTest.assert(iss, 'schéma 9 nad starými pravidlami je STÁLE stale')
+  NxTest.assert(iss['message'].include?('Doplniť nové predvoľby'), iss['message'])
+  NxTest.assert(iss['message'].include?('prestav'), 'hláška pýta OBOJE')
+  # (3) po „Doplniť nové predvoľby“ (snapshot F1) RED zhasne
+  NxTest.assert_equal(nil, c::BOM.hinge_stale_issue('CAB-3', 1, c.stale_cfg(cur), false))
+  # (4) stará schéma sama (pravidlá už F1) nález stále robí — náprava je prestavba
+  NxTest.assert(c::BOM.hinge_stale_issue('CAB-4', 1, c.stale_cfg(cur - 1), false))
+  # legacy volanie bez 4. argumentu = dnešné správanie (rozhoduje schéma)
+  NxTest.assert(c::BOM.hinge_stale_issue('CAB-5', 1, c.stale_cfg(cur - 1)))
+  NxTest.assert_equal(nil, c::BOM.hinge_stale_issue('CAB-6', 1, c.stale_cfg(cur)))
+  # skrinka BEZ závesov nález nerobí ani nad starými pravidlami
+  legs = [{ 'owner_part_key' => 'cabinet', 'generic_type' => 'leg', 'quantity' => 4,
+            'rule_id' => 'nohy-zakladne' }]
+  NxTest.assert_equal(nil, c::BOM.hinge_stale_issue('CAB-7', 1, c.stale_cfg(cur - 1, legs), true))
+end
+
+NxTest.test('KOV-F1 (12): `pre_hinge_table_rules?` rozhoduje podľa `std`, nie podľa obsahu') do
+  c = NxKovF
+  NxTest.assert_equal(2, c::HR::HINGE_TABLE_STD, 'tabuľka závesov prišla so `std` 2')
+  old = JSON.generate('std' => 1, 'seed_version' => 3,
+                      'rules' => c::HR::LEGACY_SEED_SHAPES['zavesy-podla-vysky'])
+  NxTest.assert(c::HR.pre_hinge_table_rules?(c.fake_model(old)), 'snapshot spred F1')
+  f1 = JSON.generate('std' => c::HR::HINGE_TABLE_STD, 'rules' => [c.hinge_rule])
+  NxTest.refute(c::HR.pre_hinge_table_rules?(c.fake_model(f1)), 'snapshot F1 je v poriadku')
+  # VEDOMÝ používateľský rule BEZ guardov uložený PO F1 stale NIE JE.
+  bare = JSON.generate('std' => c::HR::HINGE_TABLE_STD, 'rules' => c.legacy_reader_rule)
+  NxTest.refute(c::HR.pre_hinge_table_rules?(c.fake_model(bare)),
+                'rozhoduje verzia formátu, nie to, či si pravidlo guardy nesie')
+  newer = JSON.generate('std' => c::HR::STD + 1, 'rules' => [c.hinge_rule])
+  NxTest.refute(c::HR.pre_hinge_table_rules?(c.fake_model(newer)),
+                'novší snapshot má vlastný (tvrdší) blocker')
+end
+
+NxTest.test('KOV-F1 (12): bez snapshotu rozhoduje GLOBÁLNA knižnica rovnako') do
+  NxTest.skip!('globálna knižnica (APPDATA sandbox) — headless only') unless NxTest.headless?
+  c = NxKovF
+  c.with_rules_library do
+    c.install_rules('std' => 1, 'seed_version' => 3,
+                    'rules' => c::HR::LEGACY_SEED_SHAPES['zavesy-podla-vysky'])
+    NxTest.assert(c::HR.pre_hinge_table_rules?(c.fake_model),
+                  'projekt bez vlastných pravidiel dedí knižnicu')
+    NxTest.assert(c::HR.pre_hinge_table_rules?(c.fake_model('{ nie je JSON')),
+                  'a poškodený snapshot sa rieši tou istou cestou')
+    c.install_rules('std' => c::HR::STD, 'seed_version' => c::HR::SEED_VERSION,
+                    'rules' => c.rules)
+    NxTest.refute(c::HR.pre_hinge_table_rules?(c.fake_model))
+  end
+end
+
+NxTest.test('KOV-F1 (12): KONEČNÁ tabuľka bez číselného pásma sa NEULOŽÍ') do
+  c = NxKovF
+  probs = c::HR.rules_problems(c.no_band_rule)
+  NxTest.assert_equal(1, probs.length, probs.inspect)
+  NxTest.assert(probs.first['message'].include?('číselné pásmo'), probs.first['message'])
+  NxTest.assert(probs.first['message'].include?(c::HINGE_RULE), 'hláška adresuje pravidlo')
+  # Bez `finite` je catch-all obyčajné pásmo — dnešný legitímny tvar.
+  bare = c::HR.normalize_rules(c.no_band_rule.map { |r| r.reject { |k, _| k == 'finite' } })
+  NxTest.assert_equal([], c::HR.rules_problems(bare), 'tabuľka bez `finite` prejde')
+  # VYPNUTÉ pravidlo sa nekontroluje (negeneruje nič).
+  off = c::HR.normalize_rules(c.no_band_rule.map { |r| r.merge('enabled' => false) })
+  NxTest.assert_equal([], c::HR.rules_problems(off))
+  # Jedno číselné pásmo už stačí.
+  NxTest.assert_equal([], c::HR.rules_problems(c.rules), 'seed tabuľka je v poriadku')
+end
+
+NxTest.test('KOV-F1 (12): pri KONEČNEJ tabuľke bez pásma je KAŽDÉ čelo mimo tabuľky') do
+  c = NxKovF
+  parts = [c.door(400.0, 400.0, 'front:F1/wing:left'),
+           c.door(2900.0, 400.0, 'front:F1/wing:right')]
+  res = c.evaluate(parts, {}, c.no_band_rule)
+  NxTest.assert_equal([1, 1], c.hinges(res).map { |it| it['quantity'] },
+                      'položka VZNIKNE (catch-all počet) — inak niet kde zamknúť počet')
+  codes = res[:conflicts].map { |x| x['code'] }
+  NxTest.assert_equal([c::HR::DOOR_OUT_OF_TABLE, c::HR::DOOR_OUT_OF_TABLE], codes,
+                      'a RED dostane KAŽDÉ čelo, nie iba to vysoké')
+  NxTest.assert(res[:conflicts].first['message'].include?('ani jedno číselné pásmo'),
+                res[:conflicts].first['message'])
+  NxTest.assert_equal(%w[front:F1/wing:left front:F1/wing:right],
+                      res[:conflicts].map { |x| x['owner_part_key'] })
+  # RUČNÝ ZÁMOK POČTU konflikt zhasína rovnako ako pri nadvýške.
+  lock = [{ 'owner_part_key' => 'front:F1/wing:left', 'generic_type' => 'hinge',
+            'rule_id' => c::HINGE_RULE, 'quantity' => 3 }]
+  res2 = c.evaluate(parts, { hardware_overrides: lock }, c.no_band_rule)
+  NxTest.assert_equal(['front:F1/wing:right'], res2[:conflicts].map { |x| x['owner_part_key'] },
+                      'zamknuté čelo je vybavené, druhé ostáva RED')
+end
+
+# ============================================================================
 # POMOCNY MODEL (zapis snapshotu bez SketchUpu)
 # ============================================================================
 
@@ -1069,6 +1274,19 @@ module NxKovF
     end
     FileUtils.rm_f("#{HR.path}.bak")
     E::JsonFileStore.invalidate(HR.path)
+  end
+
+  # Simulacia „kniznicu medzi PRVYM citanim a zamkom nahradil NOVSI plugin“:
+  # zamok je jediny bod, v ktorom sa subor cita druhykrat.
+  def with_newer_library_under_lock(doc)
+    orig = HR.singleton_class.instance_method(:with_catalog_lock)
+    HR.define_singleton_method(:with_catalog_lock) do |&blk|
+      NxKovF.install_rules(doc)
+      blk.call
+    end
+    yield
+  ensure
+    HR.singleton_class.send(:define_method, :with_catalog_lock, orig)
   end
 
   def install_rules(doc)
