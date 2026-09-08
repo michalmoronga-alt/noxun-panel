@@ -17,6 +17,17 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-121 — DOPLNENIE PO REVIEW A IN-SU BEHU (8.9.2026 dopoludnia; docs PR #326).**
+  Odseky D-121a a D-121b nižšie vznikli v PR #324/#325 **pred** Codex kolami a pred in-SU behom — ostávajú tak, ako boli zapísané (tento súbor sa neprepisuje);
+  toto je ich datované doplnenie. **Review PR #325 (3 kolá = plná brána kontraktovej dávky):** kolo 1 = 3× P2 — nález `name_long` vznikal aj pre riadok, ktorý export
+  VYRADÍ (bez materiálu, nekladný rozmer, ABS mimo katalógu) → `exportable_row?` s tými istými funkciami ako export; `stable_key` z názvu a rozmerov by dva riadky
+  s inou hranou zlial v `dedup` → kľúč je celý `Bom.row_key`; klik pri hinte „Skráť názov dosky" mieril na prvého vlastníka riadku (mohla to byť skrinka) → mieri na
+  prvého `BRD-` vlastníka. Kolo 2 = 1× P1 — architektúra (`outputs.md`, odsek `validation.rb`) opisovala stav pred opravami → prepísaná podľa finálneho správania.
+  Kolo 3 bez nálezov. **Sonda orchestrátora nad hlavou PR** chytila okrajový prípad: voľný názov dosky so začiatočnou medzerou (jediný oddeľovač na indexe 0) dal po
+  oreze **prázdny názov** — chybný riadok objednávky → krajné medzery idú preč pred rezom, rozseknutý token sa zahadzuje len pri kladnom indexe a prázdny výsledok
+  nahrádza tvrdý rez (M7). **Počty po review:** sada D-121b 28 scenárov (M7–M10 z review), headless **3405** zelených, 95 JS sád. **In-SU beh** obe dávky v noci
+  nemali (SketchUp obsadený živou zákazkou); po jej zavretí dobehol 8.9. dopoludnia nad mainom v0.9.46 — **1965 PASS, 0 FAIL** (plugin preinštalovaný z mainu).
+
 - **D-121b — NÁZOV RIADKU VEPO JE VŽDY ≤ 20 ZNAKOV (kontrakt v1.2; v0.9.46, 8.9.2026).**
   **Fakt, ktorý zmenil kontrakt:** Michal 7.9.2026 overil v praxi, že **import objednávky VEPO pole `nazov` nad 20 znakov ODMIETA**. Kontrakt v1.1 pritom tvrdil, že 20 znakov
   je len tlač nálepky a CSV pole nesie 60 (`NAME_MAX = 60`) — takže sa dlhé riadky pred odoslaním prepisovali **ručne**. Nie je to teda kozmetika, ale revízia kontraktu na **v1.2**.
@@ -34,15 +45,9 @@
   a semafor mlčí) → Kontrola hodnotí **agregované riadky** cez tú istú `row_name_info`, teda `Bom.aggregate_rows` + `VepoExport` — jedna funkcia pre CSV, LOG aj semafor;
   (3) LOG neadresuje kolízie skrátených názvov a `filename` sa priraďoval pred `dedup_filenames!` → záznamy sa zbierajú per bucket (vzor `notes`) a riadok nesie rozmery, kusy
   a vlastníkov; (4) test povoľoval 60 znakov → sprísnený.
-  **Testy:** nová sada `tests/pure/test_d121b_vepo_kontrakt.rb` (28 scenárov; 6 mutácií z návrhu overených behom — každá sadu zhodí — a štyri ďalšie z review, M7–M10), sprísnené asercie limitu
-  v `test_d112_d113_vepo.rb`, `test_vepo_export.rb` a `test_d121_vepo_nazvy.rb`; headless **3405** zelených, 95 JS sád. In-SU beh dávka nepotrebovala (čistý export/validácia) a v noci ani nebol možný (SketchUp obsadený
-  živou zákazkou) — **dobehol 8.9. dopoludnia nad mainom v0.9.46: 1965 PASS.**
-  **Review PR #325 (3 kolá = plná brána kontraktovej dávky):** kolo 1 = 3× P2 — nález `name_long` vznikal aj pre riadok, ktorý export VYRADÍ (bez materiálu, nekladný rozmer,
-  ABS mimo katalógu) → `exportable_row?` s tými istými funkciami ako export; `stable_key` z názvu a rozmerov by dva riadky s inou hranou zlial v `dedup` → kľúč je celý
-  `Bom.row_key`; klik pri hinte „Skráť názov dosky" mieril na prvého vlastníka riadku (mohla to byť skrinka) → mieri na prvého `BRD-` vlastníka. Kolo 2 = 1× P1 —
-  architektúra (`outputs.md`, odsek `validation.rb`) ešte opisovala stav pred opravami → prepísaná podľa finálneho správania. Kolo 3 bez nálezov. Navyše **sonda
-  orchestrátora nad hlavou PR** chytila okrajový prípad: voľný názov dosky so začiatočnou medzerou (jediný oddeľovač na indexe 0) dal po oreze **prázdny názov** — chybný
-  riadok objednávky → krajné medzery idú preč pred rezom, rozseknutý token sa zahadzuje len pri kladnom indexe a prázdny výsledok nahrádza tvrdý rez (M7).
+  **Testy:** nová sada `tests/pure/test_d121b_vepo_kontrakt.rb` (24 scenárov; všetkých 6 deklarovaných mutácií overených behom — každá sadu zhodí), sprísnené asercie limitu
+  v `test_d112_d113_vepo.rb`, `test_vepo_export.rb` a `test_d121_vepo_nazvy.rb`; headless **3401** zelených, 95 JS sád. **In-SU beh nebežal** — SketchUp bol obsadený živou
+  zákazkou a dávka je čistý export/validácia (žiadny builder, observer ani geometria).
 
 - **D-121a — DIELCE ZÁSUVKY MAJÚ ĽUDSKÉ NÁZVY (v0.9.45, 8.9.2026).**
   Michal 6.9. po KOV-C nahlásil, že vo VEPO exporte stoja riadky `Dno zasuvky Fmslwqdm2-9-464wsa`. Názov niesol **interné id čela** — `drawer_part_descriptor` ho od KOV-C2b
@@ -58,7 +63,7 @@
   **Kontrakt ostáva v1.1** — `NAME_MAX` 60 sa nemenil, preto dávka nebola audit-povinná. **Čo príde v D-121b:** Michal 7.9. potvrdil, že **VEPO import pole nad 20 znakov
   ODMIETA** (kontrakt doteraz hovoril, že 20 znakov je len tlač nálepky), takže nasleduje kontraktová dávka **v1.2 s auditom**: `NAME_MAX` 20, orez skriniek, voľné názvy
   dosiek a zlúčenie čísel v riadku (`Zas dno 1/2`). Testy: nová sada `tests/pure/test_d121_vepo_nazvy.rb` (8 scenárov vrátane guardu „krátky tvar + skrinka ≤ 20 znakov",
-  ktorý pre v1.2 pripravuje pôdu); headless 3377 zelených. In-SU beh v tejto dávke nebežal — SketchUp bol obsadený živou zákazkou a zmena je výhradne reťazec názvu; dobehol 8.9. dopoludnia nad mainom v0.9.46 (1965 PASS).
+  ktorý pre v1.2 pripravuje pôdu); headless 3377 zelených. In-SU beh v tejto dávke nebežal — SketchUp bol obsadený živou zákazkou a zmena je výhradne reťazec názvu.
 
 - **D-118b — ZÁSUVKA OBJEDNÁ SPRÁVNU SADU A TIP-ON AJ MECHANIZMUS (v0.9.44, 7.9.2026).**
   Druhá polovica D-118: to, čo strojový zber katalógu (D-118a) odhalil, sa premietlo do SETOV. Tri vecné veci — **`348777` nie je K-sada** (stránka Démosu pri ňom hovorí
