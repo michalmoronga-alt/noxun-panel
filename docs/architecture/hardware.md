@@ -13,6 +13,12 @@ Pravidlá kovania (projektový snapshot na modeli), globálny katalóg položiek
 pravidlá kovania (V0.4): Ruby vzory `fixed`/`bands`/`fit_series` parametrizované JSON pravidlami; **projektový snapshot na modeli** (kľúč `hardware_rules` — rebuild
 reprodukovateľný z .skp; globál `%APPDATA%` len default nových projektov + seed-merge); `hardware_overrides` v configu korpusu s identitou (owner_part_key, generic_type, rule_id).
 
+**KOV-W (v0.9.47) — vstup `weight` (`INPUT_WEIGHT`, kg).** Vedľa `height`/`width` (prod rozmery dielca) vie `input_value` čítať aj **hmotnosť dielca** z anotácie plánu
+(`pd[:weight_kg]`, viď [construction.md](construction.md)) — pripravené pre závesy (KOV-F) a výklopy (KOV-E), kde o kovaní rozhoduje hmotnosť čela. Konštanta je **jediná
+autorita názvu**; nie je to kontextový kľúč (`CONTEXT_KEYS`), lebo hodnota patrí DIELCU, nie korpusu. Hmotnosť čela je počítaná z **katalógovej hrúbky** (25 mm čelo teda
+vyjde ťažšie než placeholderových 18 mm — pásmo sa nesmie určiť z podhodnotenej váhy). Keď plán bežal **bez materiálov** (starí volajúci), kľúč na deskriptore nie je a platí
+existujúca cesta „neznámy vstup": položka **nevznikne** + `info` warning `hardware_rule_skipped`. Žiadne seed pravidlo ho zatiaľ nepoužíva.
+
 **KOV-C2b (v0.9.31) — R2 EXKLUZIVITA.** `evaluate(..., suppress_slide_owners:)` dostáva množinu `owner_part_key` čiel, ktoré už majú položku výsuvu **z receptu**, a pravidlá
 s `output: 'slide'` sa na nich **nevyhodnocujú** — inak by zásuvka mala dva výsuvy (jeden s kitom, jeden legacy bez dielcov). Potlačenie sa priznáva **jedným** `info`
 warningom `legacy_slide_suppressed` na stavbu; Kontrola ho zámerne neukazuje (`Validation::BUILD_INFO_ONLY`) — používateľ nemá čo opravovať. Potlačenie platí aj vtedy,

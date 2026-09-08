@@ -724,7 +724,8 @@ module Noxun
           # z nespravnej hrubky dna.
           eff = effective_materials(model, cfg)
           plan = Construction.build_plan(cfg, cid, hardware_rules: rules,
-                                                   part_thicknesses: drawer_thicknesses(cfg, eff)) # validuje interne
+                                                   part_thicknesses: drawer_thicknesses(cfg, eff),
+                                                   materials: part_materials(cfg, eff)) # validuje interne
           # KOV-C2b: doplnenie CHYBAJUCEHO systemu a pripnutia receptu je zapis
           # do configu — bezi v TEJ ISTEJ operacii ako geometria (volajuci nas
           # obalil `start_operation`), takze Undo vrati oboje naraz.
@@ -1024,12 +1025,52 @@ module Noxun
           out
         end
 
+        # --- KOV-W: materialy dielcov PRED planom ----------------------------
+        #
+        # Rovnaky vzor ako `drawer_thicknesses`: plan potrebuje material ako
+        # VSTUP (hmotnost sa anotuje na dielce PRED pravidlami kovania), a
+        # katalog vie citat len builder. Vracia zaznam per MATERIALOVY KANAL
+        # (`effective_materials`) + per-part overridy z `part_overrides`.
+        # ZIADNY zapis do modelu, ziadna zmena geometrie.
+        def part_materials(cfg, eff)
+          channels = Construction::CHANNELS.each_with_object({}) do |ch, out|
+            out[ch] = sheet_weight_info(eff[ch])
+          end
+          overrides = cfg[:part_overrides].is_a?(Hash) ? cfg[:part_overrides] : {}
+          parts = {}
+          overrides.each do |key, ov|
+            mid = ov.is_a?(Hash) ? ov['material_id'] : nil
+            parts[key.to_s] = sheet_weight_info(mid) if present(mid)
+          end
+          { 'channels' => channels, 'parts' => parts }
+        end
+
+        # Katalogovy zaznam materialu tak, ako ho potrebuje anotacia hmotnosti:
+        #   'thickness' — katalogova hrubka (nil = katalog ju nema); z nej rata
+        #                 plan hmotnost CELA, ktore v deskriptore nesie len
+        #                 placeholder 18 mm (materializuje sa az po plane),
+        #   'density'   — hustota TYPU (nil = UNI, typ bez hustoty, material mimo
+        #                 katalogu) — plan z nej spravi TAZSI odhad, nikdy nulu,
+        #   'uni'       — UNI material hrubku dielca NEPREPISUJE (M-B1), takze
+        #                 hmotnost ostava na hrubke deskriptora.
+        def sheet_weight_info(material_id)
+          sheet = (material_id && defined?(Materials)) ? Materials.sheet(material_id) : nil
+          { 'thickness' => sheet_thickness_of(sheet),
+            'density' => (defined?(Materials) ? Materials.density_for(sheet) : nil),
+            'uni' => (defined?(Materials) ? Materials.uni?(sheet) : false) }
+        end
+
         # Katalogova hrubka materialu, alebo nil (bez katalogu / neznamy zaznam).
         # nil = volajuci (Construction) pouzije UNI 16 fallback.
         def sheet_thickness(material_id)
           return nil unless material_id && defined?(Materials)
 
-          sheet = Materials.sheet(material_id)
+          sheet_thickness_of(Materials.sheet(material_id))
+        end
+
+        # Hrubka uz nacitaneho katalogoveho zaznamu (nekladna sa ignoruje —
+        # M-B F6: 0.0 je truthy). Jedine miesto, kde sa hrubka z dosky cita.
+        def sheet_thickness_of(sheet)
           return nil unless sheet.is_a?(Hash)
 
           th = sheet['thickness'].to_f
@@ -1283,16 +1324,18 @@ module Noxun
 
         # Base material dielca podla roly: cela -> front, chrbat -> back, ostatne -> body (korpus).
         # pd[:material] (:front/:korpus) z Construction je sekundarny signal (cela maju :front).
+        # KOV-W: KTORY kanal dielec dedi, urcuje `Construction.material_channel`
+        # — jedine miesto pravdy (anotacia hmotnosti sa pyta toho isteho; druhy
+        # opisany `case` by sa rozisiel a hmotnost by sa ratala z inej dosky,
+        # nez akou je dielec postaveny). KOV-C2b: 4. kanal — dielce zasuviek
+        # dedia PREDVOLBU ZASUVIEK (skrinka -> projekt -> UNI 16), nie telo
+        # ani celo.
         def base_material_for(role, mat_sym, eff_body, eff_front, eff_back, eff_drawer = nil)
-          case role.to_s
-          when 'front_door', 'drawer_front', 'flap', 'false_front' then eff_front
-          when 'back' then eff_back
-          # KOV-C2b: 4. kanal — dielce zasuviek dedia PREDVOLBU ZASUVIEK
-          # (skrinka -> projekt -> UNI 16), nie telo ani celo.
-          when *DRAWER_ROLES then eff_drawer || eff_body
-          else
-            return eff_drawer || eff_body if mat_sym == :drawer
-            mat_sym == :front ? eff_front : eff_body
+          case Construction.material_channel(role, mat_sym)
+          when Construction::CHANNEL_FRONT then eff_front
+          when Construction::CHANNEL_BACK then eff_back
+          when Construction::CHANNEL_DRAWER then eff_drawer || eff_body
+          else eff_body
           end
         end
 

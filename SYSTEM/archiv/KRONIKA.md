@@ -17,6 +17,34 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-W — FIX KOLO PO SOL AUDITE A CODEX REVIEW (8.9.2026 večer; PR #328, tá istá verzia v0.9.47).**
+  Odsek KOV-W nižšie vznikol pri odovzdaní dávky, **pred** auditom a review — ostáva tak, ako bol zapísaný (tento súbor sa neprepisuje); tu je, čo sa v tom istom PR zmenilo.
+  **Hrúbka (Sol BLOCKER = Codex #328 P2):** vstup plánu už nie sú len hustoty (`densities:`), ale celý katalógový záznam **`materials:`** — per kanál aj per-part override
+  `thickness` + `density` + `uni` (plní `CabinetBuilder.part_materials` → `sheet_weight_info`). Dôvod: deskriptor čela nesie placeholder 18 mm a skutočnú hrúbku (18,6 / 19 /
+  25 mm) mu dáva až materializácia PO pláne — čelo 2000 × 600 z MDF 25 vychádzalo 16,2 kg namiesto 22,5 a Inspector (súčet zo snapshotov) sa s plánom rozchádzal.
+  Pri **UNI** ostáva hrúbka DIELCA, lebo builder ju vtedy neprepisuje (M-B1) — hmotnosť tak kopíruje skutočnú materializáciu v každej vetve.
+  **Warning (Sol FIX):** `weight_density_unknown` vzniká **len za dielce, ktoré UNI nie sú**, a filtruje to PLÁN — výnimka vo `Validation.check_build` (filtrovala podľa
+  jediného `owner_id|part_key`, takže korpusový warning by ňou prešiel, a zvonček Inspectora číta uložené warningy mimo Kontroly) **zanikla**. Jedno miesto rozhodovania =
+  Kontrola aj zvonček ukazujú to isté.
+  **Ďalej:** JS sada testuje celý tok payload → riadok (`setCabInfo` sa číta priamo z `bridge.js` a beží v mini-DOM, vrátane resetu `setCabInfo(null)`), pribudli regresné
+  guardy (žiadny `weight_*` v `add_part`/`merge_final`, `Bom.row_key` nezmenený, `prod`/`box`/`origin` bajt na bajt rovnaké) a in-SU sekcia `run_kovw` dostala scenáre
+  hrubého čela 25 mm a UNI čela. Testy po fix kole: **headless 3442**, **96 JS sád**, **in-SketchUp 1987 PASS / 0 FAIL** (beh nad vetvou, SketchUp bol voľný).
+
+- **KOV-W — HMOTNOSŤ DIELCOV A ČIEL + D-125 (8.9.2026; PR #328, v0.9.47).** Závesy (KOV-F) a výklopy (KOV-E) potrebujú hmotnosť čela a Inspector mal od UI 2.0 prázdny
+  riadok „Hmotnosť" — hustota per typ materiálu pritom v katalógu žila od M-C a nikto z nej nič nepočítal. Dávka postavila **jeden vzorec** (`Materials.weight_kg`,
+  mm × kg/m³ / 1e9) a napojila naň tri miesta: **plán** (`build_plan(densities:)` → aditívne `weight_kg`/`weight_estimated` na každom deskriptore vrátane dielcov
+  zásuviek, plnené `CabinetBuilder.part_densities`), **súčet nad výrobnými snapshotmi** (`Bom.weight_totals`) a **riadok Hmotnosť** v Inspectore (`Panel.cabinet_stats`
+  + čistá funkcia `nxCabWeight`). Pravidlá kovania dostali vstup `weight` (zatiaľ ho nepoužíva žiadne seed pravidlo — spotrebuje ho F/E).
+  **Prečo „ťažší odhad" a nie „—" (rozhodnutie Michala 8.9.2026, mení pôvodné znenie D-125 zo 6.9.):** dielec, ktorého materiál hustotu nemá (UNI · typ mimo registra ·
+  materiál mimo katalógu), do súčtu **vstúpi** s `Materials.fallback_density` = najvyššia hustota doskového typu v registri **okrem kompaktu**. Pri závesoch a výklopoch
+  je podhodnotená hmotnosť nebezpečná, nadhodnotená len drahšia; kompakt (1350) je extrém, ktorý by odhad zdvojnásobil. Číslo sa nikde nepíše ako literál (zdrojový guard).
+  Stav sa priznáva: „≈" a tooltip v Inspectore + **jeden** ORANGE `weight_density_unknown` na skrinku, ktorý Kontrola nad UNI dielcami potlačí rovnako ako abs_* warningy
+  (UNI už hlási `uni_material` — dva riadky o tom istom sú hluk).
+  **Vedomé hranice:** hmotnosť sa neukladá do modelu ani do snapshotu (`plan_schema` bez bumpu, žiadna migrácia), `Bom.compute` ju nevracia (kusovník, VEPO ani ceny sa
+  nemenia o číslo) a `build_plan` **bez** `densities:` sa správa presne ako predtým — charakterizačný test to stráži. Bokom vzniklo `Construction.material_channel`
+  (jediné miesto pravdy o materiálovom kanáli dielca; `CabinetBuilder.base_material_for` z neho odvtedy číta), aby sa hmotnosť nemohla rátať z inej dosky, než akou je
+  dielec postavený. Testy: headless 3429 (+24), JS 96 sád (+1), in-SU sekcia `run_kovw` **napísaná, ale nespustená** (SketchUp mal otvorenú živú zákazku).
+
 - **D-121 — DOPLNENIE PO REVIEW A IN-SU BEHU (8.9.2026 dopoludnia; docs PR #326).**
   Odseky D-121a a D-121b nižšie vznikli v PR #324/#325 **pred** Codex kolami a pred in-SU behom — ostávajú tak, ako boli zapísané (tento súbor sa neprepisuje);
   toto je ich datované doplnenie. **Review PR #325 (3 kolá = plná brána kontraktovej dávky):** kolo 1 = 3× P2 — nález `name_long` vznikal aj pre riadok, ktorý export

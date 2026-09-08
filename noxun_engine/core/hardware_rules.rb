@@ -40,9 +40,10 @@
 # typu podopretia (Construction.support_type). Volitelne "params_from_context":
 # {"height": "floor_height"} — deklarativne doplnenie params z kontextu korpusu.
 #
-# Vstup (input) pri role dielca: 'height'/'width' = prod rozmery dielca (vyska cela);
-# ostatne kluce sa beru z kontextu korpusu (width/height/depth/floor_height/
-# available_depth/available_height/available_width).
+# Vstup (input) pri role dielca: 'height'/'width' = prod rozmery dielca (vyska cela),
+# KOV-W 'weight' = hmotnost dielca v kg (`weight_kg` z planu — cela pre zavesy a
+# vyklopy); ostatne kluce sa beru z kontextu korpusu (width/height/depth/
+# floor_height/available_depth/available_height/available_width).
 #
 # ============================== OVERRIDE ==============================
 # cfg[:hardware_overrides] (pole v configu korpusu, prezije rebuild ako part_overrides):
@@ -88,6 +89,12 @@ module Noxun
       # Kontextove kluce povolene ako input/params_from_context (dokumentacia tvaru ctx).
       CONTEXT_KEYS = %w[width height depth floor_height available_depth
                         available_height available_width].freeze
+
+      # KOV-W: vstup „hmotnost dielca" (kg). JEDINA autorita nazvu — pravidla
+      # zavesov (F) a vyklopov (E) ho pisu do `input`, `input_value` ho cita z
+      # anotacie planu (`weight_kg`). Nie je to kontextovy kluc: hodnota patri
+      # DIELCU, nie korpusu.
+      INPUT_WEIGHT = 'weight'
 
       SEED_RULES = [
         { 'rule_id' => 'nohy-zakladne', 'enabled' => true,
@@ -598,6 +605,9 @@ module Noxun
       end
 
       # Hodnota vstupu: prod rozmery dielca (height/width cela) pred kontextom korpusu.
+      # KOV-W: 'weight' = hmotnost dielca (kg) z anotacie planu. Ked plan bezal
+      # BEZ hustot (stari volajuci), kluc na deskriptore nie je — vtedy plati
+      # existujuca cesta „neznamy vstup": polozka NEVZNIKNE + info warning.
       def input_value(rule, ctx, pd, owner, warnings)
         input = rule['input'].to_s
         v =
@@ -605,6 +615,8 @@ module Noxun
             pd[:prod] && pd[:prod][:length]
           elsif pd && input == 'width'
             pd[:prod] && pd[:prod][:width]
+          elsif pd && input == INPUT_WEIGHT
+            pd[:weight_kg]
           else
             ctx[input]
           end

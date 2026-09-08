@@ -306,6 +306,12 @@
     var pn = el('infParts'), an = el('infArea');
     if (pn) pn.title = 'Odhad počtu výrobných dielcov zo šablóny — presné číslo dá skrinka po vložení';
     if (an) an.title = 'Odhad plochy dosky zo šablóny — presné číslo dá skrinka po vložení';
+    // KOV-W: hmotnosť vo VKLADANÍ odhad NEMÁ (materiály sa riešia až pri
+    // vložení) — riadok sa vynuluje, aby nedržal číslo predtým označenej
+    // skrinky.
+    setOut('inf_weight', '—');
+    var wn = el('infWeight');
+    if (wn) wn.title = 'Hmotnosť dá skrinka po vložení (počíta sa z materiálov dielcov)';
   }
 
   // --- defaulty / viditelnost ---

@@ -1138,6 +1138,9 @@ module Noxun
         # V0.6 M-B1 (audit F4): ulozene ABS warnings dielca, ktory je AKTUALNE
         # na UNI, sa potlacaju — hlasi sa len CAT_UNI (jedna sprava, nie tri).
         return if code.start_with?('abs_') && uni_parts["#{oid}|#{pkey}"]
+        # KOV-W: hmotnostny warning `weight_density_unknown` sa TU nefiltruje —
+        # plan ho vydava LEN za dielce, ktore UNI NIE SU (`annotate_weights!`),
+        # takze co je ULOZENE, to sa aj hlasi (a zvoncek Inspectora ukaze to iste).
         msg  = (w['message'] || w['code']).to_s
         text = msg.empty? ? 'Upozornenie stavby.' : msg
         text = "#{oid}: #{text}" unless oid.empty?

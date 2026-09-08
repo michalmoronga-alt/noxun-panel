@@ -72,6 +72,28 @@ dĺžka = NL po hĺbke Y). Bez osí sa hrany nezafarbia a Kontrola olepov ich ne
 **Zápisy, ktoré má vykonať builder,** cestujú v pláne ako `drawer_writes` (chýbajúci `drawer.system` a chýbajúci záznam mapy) a `drawer_override_writes` (D-93 migrácia
 legacy `rule_id` na `recipe:<recipe_id>`). Aplikuje ich `CabinetBuilder.apply_drawer_writes` v **tej istej operácii** ako geometriu, takže Undo vráti oboje naraz.
 
+**KOV-W — HMOTNOSŤ DIELCOV V PLÁNE (v0.9.47).** `build_plan` má **voliteľný** vstup `materials:` = `{ 'channels' => { body/front/back/drawer => { 'thickness' => mm | nil,
+'density' => kg/m³ | nil, 'uni' => bool } }, 'parts' => { part_key => ten istý záznam } }`; plní ho `CabinetBuilder.part_materials`. **Bez neho sa nemení nič** — starí
+volajúci (migrácia identity, panelové resolvery, headless testy bez katalógu) dostanú plán bez kľúčov aj bez warningu. `annotate_weights!` beží **po** `drawer_pass` a
+**pred** `HardwareRules.evaluate` (pravidlá čítajú hmotnosť čela ako vstup `weight`) a každému deskriptoru — dielcom korpusu aj dielcom zásuviek — dopíše **aditívne**
+`weight_kg` (Float, `Materials.weight_kg`) a `weight_estimated`. Per-part záznam **vždy** prebíja kanál, **aj keď hustotu nemá** („materiál overridu hustotu nemá" nie je
+to isté ako „override nie je").
+
+**HRÚBKA kopíruje skutočnú materializáciu** (Codex #328 P2): deskriptor čela nesie placeholder `Fronts::FRONT_THICKNESS` (18 mm) a katalógovú hrúbku (18,6 / 19 / 25 mm) mu
+dáva až `CabinetBuilder.materialized_part` **po** pláne — hmotnosť sa preto počíta z `thickness` kanála/overridu (`weight_thickness`), nie z `prod[:thickness]`. Výnimka je
+**UNI**: pri ňom builder hrúbku dielca neprepisuje (M-B1), takže záznam s `'uni' => true` vracia hmotnosť na hrúbku deskriptora. Keď katalóg hrúbku nemá (materiál mimo
+katalógu, nekladná hodnota), platí tiež hrúbka deskriptora. `pd[:prod]`, `box` ani `origin` sa **nemenia** — anotácia je čisto aditívna.
+
+Kľúče žijú len v **pamäti plánu**: builder zapisuje na entitu menovitý zoznam polí a `merge_final` kopíruje menovitý zoznam kľúčov plánu, takže do modelu ani do výrobného
+snapshotu sa hmotnosť **neukladá** a `plan_schema` sa **nebumpuje**. Keď aspoň jeden dielec bežal na `Materials.fallback_density`, pribudne **PRESNE JEDEN** ORANGE warning
+`weight_density_unknown` **na skrinku** (nie na dielec) s `data['parts']` a `data['density']`. **V zozname sú LEN dielce, ktoré UNI nie sú** — za UNI hlási Kontrola vlastný
+`uni_material` a druhá veta o tom istom probléme je hluk; keď sú všetky odhady UNI, warning **vôbec nevznikne**. Filtruje teda PLÁN, nie `Validation` — uložený warning tak
+nesie presne to, čo má ukázať aj zvonček Inspectora (Sol audit 4).
+
+**`material_channel(role, mat_sym)` → `'body' | 'front' | 'back' | 'drawer'`** je **JEDINÉ miesto pravdy** o tom, z ktorého materiálového kanála dielec žije: pýta sa ho
+anotácia hmotnosti **aj** `CabinetBuilder.base_material_for`. Druhý opísaný `case` by sa časom rozišiel a hmotnosť by sa rátala z inej dosky, než akou je dielec postavený.
+`cover_panel` v `FRONT_MATERIAL_ROLES` **vedome nie je** — o jeho kanáli rozhoduje materiálový signál deskriptora, presne ako pred KOV-W.
+
 ### cabinet_builder.rb
 
 **ŠEV VKLADANIA (R-03, v0.8.20): `prepare_insert` → `commit_insert`; `build` je len ich kompozícia** a správanie všetkých doterajších volajúcich je nezmenené.
@@ -187,6 +209,14 @@ a `materialized_part` (prepis hrúbky boxu, polohy pred korpusom aj výrobného 
 kroku, takže `abort_safely` zruší **aj ten** — v okamihu, keď `process_dirty` výnimku chytí, transformácia už zväčšená nie je a `reject_scale` sa **nespustí**. Model
 je teda korektne obnovený a undo stack čistý, ale **hlášku používateľ nedostane**. Je to prevzatá vlastnosť observera (dávka R-12 ju nezaviedla); zmena by siahala do
 observer/undo lifecycle, a preto patrí do vlastnej audit-povinnej dávky.
+
+**KOV-W (v0.9.47) — materiály PRED plánom:** `part_materials(cfg, eff)` je rovnaký vzor ako `drawer_thicknesses` (katalóg vie čítať len builder, plán potrebuje materiál ako
+VSTUP) — vráti záznam per **materiálový kanál** (`effective_materials`) plus per-part overridy z `part_overrides`, obe cez `sheet_weight_info`: `thickness`
+(`sheet_thickness_of` — tá istá katalógová hrúbka, akou materializuje čelá `materialized_part`), `density` (`Materials.density_for`) a `uni` (`Materials.uni?` — pri UNI
+ostáva hrúbka na dielci). `nil` hustota = nie je známa (UNI · typ mimo registra · materiál mimo katalógu) a plán z nej spraví ťažší odhad, nikdy nulu. Žiadny zápis do
+modelu, žiadna zmena geometrie.
+**`base_material_for` už nemá vlastný `case`** — kanál si pýta od `Construction.material_channel` (jediné miesto pravdy; zdrojový guard v `test_kovw_hmotnost.rb`), výber
+efektívnej dosky sa nemení ani o písmeno (charakterizačný test nad každou rolou × každým signálom).
 
 **K1/D-108 smer dekoru dielca:** `effective_grain(sheet, override)` je JEDINÁ autorita efektívneho smeru (`override → materiál`) a `resolve_part` ho **materializuje RAZ** do
 snapshotu dielca.

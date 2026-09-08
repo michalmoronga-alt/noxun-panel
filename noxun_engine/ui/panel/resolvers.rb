@@ -183,19 +183,39 @@ module Noxun
         # CISTE CITANIE snapshotov na dielcoch (autorita vyrobneho zaznamu,
         # standard 8.3) — ziadny prepocet planu a ziadny zapis. Hodnoty su
         # TRANZIENTNE: do configu ani snapshotu sa NIKDY neukladaju.
+        #
+        # KOV-W (D-125): tou istou cestou ide riadok HMOTNOST — snapshot uz nesie
+        # material_id aj hotove rozmery, takze sucet je `Bom.weight_totals` nad
+        # TYMI ISTYMI zaznamami (jeden vzorec pre plan aj Inspector). Dielec s
+        # neznamou hustotou sa nevynecha, len sa prizna cez `weight_estimated_*`.
         def cabinet_stats(cab)
           count = 0
           area = 0.0
+          records = []
           manufactured_parts(cab).each do |part|
             cfg = Store.config(part) || {}
             qty = [cfg['quantity'].to_i, 1].max
             count += qty
             area += cfg['length'].to_f * cfg['width'].to_f * qty
+            records << cfg
           end
-          { 'parts_count' => count, 'parts_area_m2' => (area / 1_000_000.0).round(3) }
+          weight = Bom.weight_totals(records, weight_sheets_map)
+          { 'parts_count' => count, 'parts_area_m2' => (area / 1_000_000.0).round(3),
+            'weight_kg' => weight['kg'],
+            'weight_estimated_parts' => weight['estimated_parts'],
+            'weight_estimated_density' => weight['estimated_density'] }
         rescue StandardError => e
           Engine.log_error(e, 'Panel.cabinet_stats')
-          { 'parts_count' => 0, 'parts_area_m2' => 0.0 }
+          { 'parts_count' => 0, 'parts_area_m2' => 0.0, 'weight_kg' => 0.0,
+            'weight_estimated_parts' => 0, 'weight_estimated_density' => nil }
+        end
+
+        # KOV-W: katalog dosiek ako mapa pre `Bom.weight_totals`. Jedina autorita
+        # tvaru je `ProductionCore.sheets_map` (tu istu mapu dostava Kontrola) —
+        # panel si ju NEOPISUJE. Bez katalogu = prazdna mapa: kazdy dielec potom
+        # bezi na tazsom odhade, co Inspector prizna „≈".
+        def weight_sheets_map
+          defined?(ProductionCore) ? ProductionCore.sheets_map : {}
         end
 
         def truthy?(val)

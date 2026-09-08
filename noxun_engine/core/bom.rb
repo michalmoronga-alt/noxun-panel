@@ -634,6 +634,31 @@ module Noxun
         out.values.each { |s| s['m2'] = s['m2'].round(3) }.sort_by { |s| s['material_id'] }
       end
 
+      # KOV-W: HMOTNOST vyrobnych zaznamov (kg). `sheets` = mapa
+      # { material_id => katalogovy zaznam } — presne ta, ktoru stava
+      # `ProductionCore.sheets_map` pre `Validation.run`.
+      #
+      # Zaznam bez `material_id` alebo mimo katalogu (aj UNI) sa zo suctu
+      # NIKDY nevynecha — rata sa TAZSIM fallbackom (`Materials.density_or_fallback`,
+      # rozhodnutie Michal 8.9.2026) a stav sa prizna vratenymi poctami.
+      # -> { 'kg' => Float (2 des.), 'estimated_parts' => Integer (KUSY, nie
+      #      riadky), 'estimated_density' => Float | nil (nil = ziadny odhad) }
+      def weight_totals(records, sheets = {})
+        smap = sheets.is_a?(Hash) ? sheets : {}
+        kg = 0.0
+        estimated = 0
+        Array(records).each do |r|
+          next unless r.is_a?(Hash)
+
+          qty = [r['quantity'].to_i, 1].max
+          density, est = Materials.density_or_fallback(smap[r['material_id'].to_s])
+          estimated += qty if est
+          kg += Materials.weight_kg(r['length'], r['width'], r['thickness'], density) * qty
+        end
+        { 'kg' => kg.round(2), 'estimated_parts' => estimated,
+          'estimated_density' => (estimated.positive? ? Materials.fallback_density : nil) }
+      end
+
       # bm per ABS material — L hrany = dlzka dielca, W hrany = sirka; x pocet.
       def edging_totals(records)
         out = {}
