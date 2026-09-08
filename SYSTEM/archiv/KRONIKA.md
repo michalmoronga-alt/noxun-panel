@@ -17,6 +17,43 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-F1 — ZÁVESY PODĽA NOXUN TABUĽKY A SET PODĽA OTVÁRANIA (8.9.2026; PR #329, v0.9.48).**
+  Prvý z dvoch PR bloku KOV-F (jadro; editor nových polí je F2). **Počet závesov** už neurčuje starý odhad, ale **jedna Noxun tabuľka pre všetkých výrobcov**
+  (do 849 → 2 · 850–1700 → 3 · 1701–2200 → 4 · 2201–2400 → 5 · 2401–2600 → 6 · 2601–2800 → 7; výška ≤ max, inkluzívne) a **krídlo širšie než 600 mm dostane +1**.
+  Set rozhoduje LEN o produkte, nie o počte.
+  **Prečo ostal druh pravidla `bands` a prečo v ňom ostalo catch-all pásmo (Sol audit kolo 2 BLOCKER 1 + Codex #327 kolo 3):** nový `kind` by starší plugin
+  **preskočil** a dvierka by dostali NULA závesov — a to aj pri novom vložení skrinky, lebo čítače pravidiel `std` ignorujú. Guardy sú preto **voliteľné kľúče**
+  (`finite`, `width_plus`, `width_warn_over`, `weight_bands`), ktoré `normalize_rules` zachová a starý `compute` nevidí. Ten istý dôvod drží pásmo `nil → 7`:
+  starý čítač tak ráta podľa tabuľky (bez +1 a bez varovaní), **nikdy nulu**. Hranica je vedomá — knižnice sú per PC a updater (D-52) drží obe PC aktuálne,
+  takže „starší plugin s novšou knižnicou" je downgrade na tom istom PC (riziko do D-48).
+  **`finite` = „mimo tabuľky", a položka SA VYDÁ (Sol kolo 2 BLOCKER 2):** dvierka nad 2800 mm dostanú riadok s počtom 7 — bez neho by nemal kde vzniknúť ručný
+  zámok, ktorý je nápravou — a k nemu RED `door_height_out_of_table` cez **nový uložený nosič `hardware_conflicts`** v configu (vzor `drawer_conflicts`, tá istá
+  operácia ako geometria, prežije save/reopen aj Undo). Zámok počtu RED **zhasne**.
+  **Door guardy bežia AŽ NAD VÝSLEDNÝMI položkami** (po `apply_overrides`) — inak by sa hmotnostné pásmo porovnávalo s počtom z pravidla, nie s tým, čo si
+  používateľ zamkol, a konflikt by sa zámkom nedal zhasnúť. Varovania počet **nemenia**: `door_wide` · `door_wider_than_high` („nemá to byť výklop?") ·
+  `hinge_weight_more` · `hinge_weight_max`; neznáma hmotnosť je **INFO** v `BUILD_INFO_ONLY` (plán bez materiálov je legitímny stav — ORANGE na každých dvierkach
+  zákazky by prekryl skutočné nálezy).
+  **Set podľa otvárania:** položka závesu odteraz nesie `params {use_type: 'door', opening_mode}` (otváranie dopisuje plánu `Construction.annotate_front_modes!`,
+  vzor KOV-W `weight_kg`), seed sety `zaves-klasik`/`zaves-p2o` sú **klasifikované** a mapovanie dostalo dvojsegmentové triedne kľúče `class:hinge|classic|tipon`.
+  **Tip-On dvierka** tak dostanú P2O set + **jeden piest na krídlo**. **Precedencia je päťstupňová** a končí na legacy `hinge` — bez toho by každá existujúca
+  zákazka po prestavbe stratila závesy; **generický override skrinky stojí NAD triednym kľúčom projektu** (Codex #327 kolo 2), aby vlastný set skrinky nikdy ticho
+  nespadol na projektový default.
+  **Voľba „bez setu" sa ukladá SENTINELOM `none`, nie zmazaním kľúča (Sol kolo 2 FIX 4 + Codex #327 kolo 3):** pri reťazovej precedencii by prázdny kľúč znamenal
+  „padni nižšie", teda presný opak voľby. Je to samostatný kontrakt (nie členská bunka `code_by_nl`), ktorý prežije round-trip, zmrazenie snapshotu, resolver aj editor.
+  **Migrácia `hinge_class_v1` je jednorazová** (značka v snapshote): `class:hinge|classic` sa odvodí z účinného legacy mapovania (vlastný záves prežije),
+  `class:hinge|tipon` dostane seed P2O len vtedy, keď používateľ vlastný Tip-On set nemá; existujúci kľúč sa **nikdy** neprepíše. Nezaradený legacy set nie je chyba
+  — nákup beží ďalej a stav sa prizná ORANGE poznámkou `hinge_set_unclassified`; **definitívny nesúlad** (Tip-On čelo na klasickom sete) je RED `hinge_set_mismatch`.
+  **Jediný register brán `BuildPlan.hw_blockers`** (Codex #327 kolo 3) spojil zásuvkové a závesové kódy; `drawer_blockers` sa zovšeobecnil na `hardware_blockers`
+  a `export_blockers(drawer:)` na `(hardware:)`. Poradie kódov je kontrakt (určuje poradie viet), preto je register **funkcia, nie konštanta** — `build_plan.rb`
+  sa načítava pred `drawer_recipes.rb`. **Zásuvkové brány ostali bajtovo rovnaké** (charakterizačný test), závesové kódy **neblokujú VEPO** (geometria je správna).
+  **Seed sa nahrádza len v presnom starom tvare** (`LEGACY_SEED_SHAPES` aj pre pravidlá) a **nedopĺňa sa vôbec**, keď rolu už obsluhuje iné zapnuté pravidlo
+  s výstupom `hinge` — taký prekryv `evaluate` prizná ORANGE `hardware_rule_overlap` a uplatní prvé pravidlo. `HardwareRules::STD` 1 → 2 a čítače od tejto verzie
+  **honorujú `std`**: dokument z novšieho pluginu sa číta, ale nezapisuje (inak by tolerantná normalizácia ticho zahodila pole, ktorému nerozumieme).
+  **Rozpracovaným zákazkám sa nemení nič samo** — novú tabuľku aj klasifikované sety prinesie vedomé **„Doplniť nové predvoľby"**.
+  **Testy:** 3475 headless (+33 v `tests/pure/test_kovf_zavesy.rb`, 16 pomenovaných mutácií) · 96 JS sád (nové kontroly v `test_hw_sets.js` a `test_st3b_rules.js`) ·
+  nová in-SketchUp sekcia `run_kovf` (počty z reálnej šírky krídla, Tip-On set + piest, RED nad tabuľkou a jeho zhasnutie zámkom v jednom kroku Späť, vlastný set
+  skrinky prežije prestavbu). **Zlaté vzorky KOV-A** sa zmenili v samostatnom commite — výhradne o klasifikáciu položiek závesov a o nové čelné varovania.
+
 - **KOV-W — FIX KOLO PO SOL AUDITE A CODEX REVIEW (8.9.2026 večer; PR #328, tá istá verzia v0.9.47).**
   Odsek KOV-W nižšie vznikol pri odovzdaní dávky, **pred** auditom a review — ostáva tak, ako bol zapísaný (tento súbor sa neprepisuje); tu je, čo sa v tom istom PR zmenilo.
   **Hrúbka (Sol BLOCKER = Codex #328 P2):** vstup plánu už nie sú len hustoty (`densities:`), ale celý katalógový záznam **`materials:`** — per kanál aj per-part override

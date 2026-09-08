@@ -598,8 +598,8 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   hustoty rátaných ako <hustota> — ťažší odhad"; `—` LEN bez výrobných dielcov; žiadne `weight_missing`, žiadne vylúčenie z medzisúčtu · **D-125:** payload Inspectora
   `weight_kg` + `weight_estimated_parts` + `weight_estimated_density` (aditívne) · **Audit ÁNO (Sol — mení kontrakt deskriptora `BuildPlan` a payload Inspectora, hoci aditívne; Codex #327 kolo 2)** · in-SU sekcia `run_kovw`
   (builder → plán) · Smoke: dvierka 1000 × 600 × 18 DTD 680 → 7,34 kg; čelo 2000 × 600 MDF 25 mm → 22,5 kg (nie 16,2 z 18 mm); skrinka s UNI dielcom → „≈" + ORANGE.
-- **KOV-F · „ZÁVESY — NOXUN TABUĽKA + SET PODĽA OTVÁRANIA" (po W; v3 po Sol audite kolo 2 [2 BLOCKER + 4 FIX + 1 NOTE] — DVA PR: F1 jadro, F2 editor):**
-  **F1 jadro.** **Druh pravidla ostáva `bands`** — ŽIADNY nový kind (Sol kolo 2 BLOCKER 1: starší plugin vrátane NOVÉHO vloženia skrinky s aktualizovanou knižnicou by
+- **KOV-F · „ZÁVESY — NOXUN TABUĽKA + SET PODĽA OTVÁRANIA" (po W; v3 po Sol audite kolo 2 [2 BLOCKER + 4 FIX + 1 NOTE] — DVA PR: F1 jadro ✅, F2 editor):**
+  **F1 jadro — ✅ HOTOVÉ (PR #329, v0.9.48).** **Druh pravidla ostáva `bands`** — ŽIADNY nový kind (Sol kolo 2 BLOCKER 1: starší plugin vrátane NOVÉHO vloženia skrinky s aktualizovanou knižnicou by
   neznámy kind preskočil = nula závesov; čítače pravidiel `std` ignorujú, takže sa to nedá dohnať markerom). Seed `zavesy-podla-vysky` dostane novú tabuľku
   **`bands` [`{max: 849, quantity: 2}`, `{1700, 3}`, `{2200, 4}`, `{2400, 5}`, `{2600, 6}`, `{2800, 7}`, `{max: nil, quantity: 7}`] — výška ≤ max (Float, inkluzívne; 849 < h < 850 → 3); catch-all `nil → 7` ostáva kvôli STARÝM čítačom (dvere nad 2800 dostanú 7, nikdy nič — Codex #327 kolo 3)** a VOLITEĽNÉ polia,
   ktoré starší čítač zachová a ignoruje (`normalize_rules` neznáme kľúče drží): `width_plus: {over: 600, add: 1}` (šírka > 600 → +1, bez podmienky výšky) ·
@@ -630,7 +630,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   vlastný set prežije migráciu · sentinel `none` prežije prestavbu, reopen aj normalizáciu mapovania · **downgrade: starší čítač (`std` ignorovaný) dostane pri novom projekte závesy podľa tabuľky bez +1** ·
   in-SU `run_kovf`. Smoke: 1250 → 3; 850 → 3; 800 × 700 (1 krídlo) → 3; Tip-On → P2O + 1 piest; 850 široké → ORANGE; MDF 25 mm 2000 × 600 → ORANGE nad 22 kg; 2900 vysoké →
   7 + RED, zámok ho zhasne.
-  **F2 editor (samostatný PR, Audit NIE):** editor `bands` v Pravidlách dostane voliteľné polia (`width_plus`, `width_warn_over`, `weight_bands`, prepínač `finite`) +
+  **F2 editor (samostatný PR, Audit NIE) — ČAKÁ:** editor `bands` v Pravidlách dostane voliteľné polia (`width_plus`, `width_warn_over`, `weight_bands`, prepínač `finite`) +
   spoločná Ruby/JS validácia (prázdne, nečíselné, neusporiadané pásma; „všetko nad" povinné len bez `finite`) — kým F2 nie je, polia sú viditeľné len na čítanie.
 - **KOV-E · „VÝKLOPY HK top / HL top" (po F; v2 po Codex #327):** config čela `lift.system` (`hk_top` predvolene | `hl_top`) + výber v karte čela (CONFIG_SCHEMA 8 → 9,
   whitelisty šablón aditívne) · **sklop (`fall`) = závesy ako dvierka:** DRUHÉ seed pravidlo `zavesy-sklop` (rovnaké `bands` + door guardy ako F) s `applies_to: {role: flap, flap_dir: down}` — `applies_to.role` je skalár, pravidlo dvierok ostáva na `front_door` (Codex #327 kolo 3); `apply_rule` sa naučí filter `flap_dir`; položky nesú `params.use_type = 'door'`

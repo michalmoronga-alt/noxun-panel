@@ -94,6 +94,19 @@ nesie presne to, čo má ukázať aj zvonček Inspectora (Sol audit 4).
 anotácia hmotnosti **aj** `CabinetBuilder.base_material_for`. Druhý opísaný `case` by sa časom rozišiel a hmotnosť by sa rátala z inej dosky, než akou je dielec postavený.
 `cover_panel` v `FRONT_MATERIAL_ROLES` **vedome nie je** — o jeho kanáli rozhoduje materiálový signál deskriptora, presne ako pred KOV-W.
 
+**KOV-F1 — SPÔSOB OTVÁRANIA ČELA V PLÁNE (v0.9.48).** `annotate_front_modes!(parts, fr[:items])` dopíše každému deskriptoru čela **aditívne**
+`opening_mode` z jeho riadku čiel. Je to ten istý vzor ako hmotnosť: kľúč žije LEN v pamäti plánu (builder zapisuje na entitu menovitý zoznam polí, takže
+`plan_schema` sa **nebumpuje**) a chýbajúci kľúč riadku znamená legacy čelo — anotácia sa vtedy nerobí a čitateľ (`HardwareRules.hinge_params`) platí
+`classic`. Bez nej by expanzia nemala odkiaľ vedieť, či dvierka chcú Tip-On set: v modeli je otváranie na RIADKU čiel, položka kovania ho nesie až odtiaľto.
+
+**KOV-F1 — ULOŽENÝ NOSIČ `hardware_conflicts`.** Plán má aditívny kľúč `hardware_conflicts` `[{owner_part_key, code, message}]` (validuje
+`BuildPlan.validate_hardware_conflicts!` proti registru `HW_CONFLICT_CODES`, vrátane referenčnej integrity vlastníka). Je to **ten istý vzor** ako
+`drawer_conflicts` — `merge_final` ho uloží do configu v TEJ ISTEJ operácii ako geometriu — ale iný stav: pri závese nad tabuľkou **položka aj dielec
+EXISTUJÚ** (riadok v Kovaní musí byť, inak nemá kde vzniknúť ručný zámok), zastavený je len nákup. Dôvod musí prežiť save/reopen aj Undo, lebo po
+znovuotvorení .skp sa nedá odvodiť: `Bom.hardware_conflict_issues` ho zlúči do `hardware_issues`, `Validation` z neho robí RED
+([outputs.md](outputs.md)). `drawer_conflicts` ostáva **nedotknuté**.
+
+
 ### cabinet_builder.rb
 
 **ŠEV VKLADANIA (R-03, v0.8.20): `prepare_insert` → `commit_insert`; `build` je len ich kompozícia** a správanie všetkých doterajších volajúcich je nezmenené.

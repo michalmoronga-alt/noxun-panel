@@ -19,6 +19,43 @@ autorita názvu**; nie je to kontextový kľúč (`CONTEXT_KEYS`), lebo hodnota 
 vyjde ťažšie než placeholderových 18 mm — pásmo sa nesmie určiť z podhodnotenej váhy). Keď plán bežal **bez materiálov** (starí volajúci), kľúč na deskriptore nie je a platí
 existujúca cesta „neznámy vstup": položka **nevznikne** + `info` warning `hardware_rule_skipped`. Žiadne seed pravidlo ho zatiaľ nepoužíva.
 
+**KOV-F1 (v0.9.48) — NOXUN TABUĽKA ZÁVESOV + voliteľné door guardy pravidla `bands`.** Seed `zavesy-podla-vysky` dostal tabuľku
+**849 → 2 · 1700 → 3 · 2200 → 4 · 2400 → 5 · 2600 → 6 · 2800 → 7** (výška ≤ max, inkluzívne; 849 < h < 850 → 3) a k nej **VOLITEĽNÉ** kľúče
+(`DOOR_GUARD_KEYS`): `width_plus {over, add}` (šírka **krídla** > 600 mm → +1, bez podmienky výšky) · `width_warn_over` (ORANGE `door_wide`) ·
+`weight_bands` (Hettich pásma, vo V1 **len varujú**) · `finite`. **ŽIADNY nový `kind`** (Sol audit kolo 2 BLOCKER 1): starší plugin by neznámy kind
+preskočil a dvierka by dostali NULA závesov — a to aj pri NOVOM vložení skrinky, lebo čítače pravidiel `std` ignorujú. Preto ostáva aj **catch-all
+pásmo `nil → 7`**: starý čítač ráta podľa tabuľky (bez +1 a bez varovaní), nikdy nulu; `normalize_rules` mu nové kľúče **zachová** (vetva „neznáme
+kľúče") a jeho `compute` ich nevidí. Hranica downgrade je vedomá (knižnice sú per PC, updater D-52 drží obe PC aktuálne — „starší plugin s novšou
+knižnicou" je downgrade na tom istom PC, riziko do D-48).
+
+**`finite` = catch-all znamená „MIMO tabuľky".** Pre NOVÝ čítač zásah catch-all pásma **vydá položku** s jeho počtom (riadok v Kovaní MUSÍ existovať,
+inak nemá kde vzniknúť ručný zámok — Sol kolo 2 BLOCKER 2) a navyše vydá **KONFLIKT `door_height_out_of_table`** (`DOOR_OUT_OF_TABLE`), ktorý ide
+uloženým nosičom `hardware_conflicts` do configu ([construction.md](construction.md)) a odtiaľ do RED Kontroly aj do exportnej brány
+([outputs.md](outputs.md)). Validátor zápisu („pásmo všetko nad je povinné") sa **nemení** — catch-all je stále prítomný.
+
+**Door guardy bežia AŽ NAD VÝSLEDNÝMI položkami (`door_guards`, čistá funkcia).** `evaluate` ich volá po `apply_overrides` a vracia z nich
+`{items:, warnings:, conflicts:}`. Dôvod je vecný: hmotnostné pásmo sa musí porovnávať s počtom **PO ručnom zámku** (inak by varovalo aj vtedy, keď si
+používateľ počet už zdvihol) a konflikt „mimo tabuľky" musí ručný zámok **ZHASNÚŤ** (položka po override nesie `source: 'manual'`). Varovania **počet
+NEMENIA**: `door_wide` · `door_wider_than_high` („nemá to byť výklop?") · `hinge_weight_more` (pásmo chce viac než výsledný počet) ·
+`hinge_weight_max` (nad posledným pásmom); neznáma hmotnosť = **INFO** `hinge_weight_unknown` v `Validation::BUILD_INFO_ONLY` (plán bez materiálov je
+legitímny stav, ORANGE na každých dvierkach by bol hluk).
+
+**`STD` 1 → 2 a FORWARD BRÁNA čítačov.** Dokument (knižnica aj projektový snapshot) s vyšším `std` sa **číta** (zákazka sa musí dať dokončiť), ale
+**nikdy sa doň nezapisuje** ani nemerguje seed: `doc_std_unsupported?` je jediná autorita otázky, `read_rules` pri nej seed-merge vynechá,
+`newer_write_blocked?` je druhá zápisová brána knižnice (pod zámkom, vedľa degradovaného súboru) a `project_std_unsupported?` chráni snapshot. Bez nej
+by tolerantná `normalize_rules` ticho zahodila pole, ktorému nerozumieme, a prvý zápis by stratu zvečnil (vzor `HardwareSets` `STD_SUPPORTED`).
+
+**Seed sa nahrádza LEN v presnom starom tvare + PREKRYV.** `LEGACY_SEED_SHAPES` (nový register pravidiel, vzor `HardwareSets`) drží v1..v3 tvar tabuľky
+(900/1400/1900 → 2/3/4/5); do globálnej knižnice aj do projektového snapshotu („Doplniť nové predvoľby") sa nový tvar dostane iba tam, kde je pravidlo
+preukázateľne nedotknuté. **`seed_additions`** navyše seed **nedoplní**, keď rolu už obsluhuje INÉ zapnuté pravidlo s `output: hinge` (`OVERLAP_OUTPUT`)
+— dvoje závesov na tých istých dvierkach je dvojitý nákup. Taký prekryv `evaluate` **prizná** ORANGE `hardware_rule_overlap` a uplatní **prvé** pravidlo
+v poradí. Úzko na `hinge` zámerne: dve úchytkové pravidlá na jednej role sú legitímny stav. `SEED_VERSION` 3 → 4.
+
+**Klasifikácia položky závesu.** `part_params` pre `output: hinge` vydá `params {use_type: 'door', opening_mode}`; otváranie pochádza z anotácie plánu
+(`Construction.annotate_front_modes!`, vzor KOV-W `weight_kg`), dielec bez nej je legacy čelo a platí `classic`. Korpusová úroveň (`pd` nil) params
+nedostane — záves bez dielca nemá otváranie, podľa ktorého by sa vyberal set.
+
+
 **KOV-C2b (v0.9.31) — R2 EXKLUZIVITA.** `evaluate(..., suppress_slide_owners:)` dostáva množinu `owner_part_key` čiel, ktoré už majú položku výsuvu **z receptu**, a pravidlá
 s `output: 'slide'` sa na nich **nevyhodnocujú** — inak by zásuvka mala dva výsuvy (jeden s kitom, jeden legacy bez dielcov). Potlačenie sa priznáva **jedným** `info`
 warningom `legacy_slide_suppressed` na stavbu; Kontrola ho zámerne neukazuje (`Validation::BUILD_INFO_ONLY`) — používateľ nemá čo opravovať. Potlačenie platí aj vtedy,
@@ -507,6 +544,39 @@ charakterizačný test). Päť častí:
 
 Testy: `tests/pure/test_kovc2a_kanal_sety.rb` (23 testov + 4 overené mutácie vrátane completeness nad radmi receptov: pre KAŽDÚ bunku `nl_series_by_height`/`nl_series` každého
 vydaného receptu existuje v seede set vybraný triednym kľúčom a v ňom kit kód).
+
+**KOV-F1 (v0.9.48) — TRIEDA `hinge`, SENTINEL `none`, MIGRÁCIA MAPOVANIA.** Set závesu sa vyberá podľa **spôsobu otvárania čela** (Tip-On dvierka chcú
+P2O set bez tlmenia + piest), takže pribudlo päť vecí:
+
+- **Seed sety `zaves-klasik` / `zaves-p2o` sú KLASIFIKOVANÉ** (`use_type: 'door'`, `opening_mode: 'classic'|'tipon'`, Hettich Sensys) a
+  `MAPPING_ADDITIONS` má **`class:hinge|classic` → `zaves-klasik`** a **`class:hinge|tipon` → `zaves-p2o`**. `SEED_VERSION` 5 → 6; do existujúcej
+  knižnice aj snapshotu ich prenesie iba nedotknutý seed tvar (`LEGACY_SEED_SHAPES` + „Doplniť nové predvoľby").
+- **Triedny kľúč `hinge` je DVOJSEGMENTOVÝ** (`class:hinge|<opening_mode>`, bez konštrukcie zásuvky). `class_set_match?` je jediné miesto, kde sa
+  rozhoduje, či set patrí do ponuky triedy: pre `slide` platí doterajšie „musí mať systém a konštrukciu", pre `hinge` **„musí byť set na dvierka"** —
+  požiadavka „vydaný systém zásuviek" by závesové sety z ponuky vyhodila úplne (Sol kolo 2 FIX 3). Tú istú vetvu má aj zápisová validácia
+  `class_key_value_problem`. **Per-krídlo triedny override je MIMO F1**: `owner_scoped_class_head?` ho v parseri odmieta a UI ho neponúka (owner triedny
+  kľúč ostáva výhradou zásuviek).
+- **PRECEDENCIA závesu je PÄŤSTUPŇOVÁ**: override vlastníka (`hinge@front:F1/wing:left`) → **triedny override skrinky** → **generický override skrinky
+  `hinge`** → triedny kľúč projektu → **legacy `hinge`**. Dva rozdiely oproti zásuvke sú vecné: vlastný set NA SKRINKE nikdy ticho nespadne na projektový
+  default (Codex #327 kolo 2), a na konci reťaze stojí legacy `hinge` — bez neho by KAŽDÁ existujúca zákazka po prestavbe stratila závesy (položky sú
+  odteraz klasifikované, ale snapshot triedny kľúč ešte nemá). Prázdny výsledok preto pri závese znamená dnešné `no_set`, nie `class_unmapped`.
+- **Sentinel `MAPPING_NONE = 'none'` = „vedome bez setu".** Je to **samostatný kontrakt**, nie členská bunka `code_by_nl` (`SKIP_CODE` — zhoda reťazca je
+  náhoda). Zmazať kľúč nestačí: pri reťazovej precedencii by chýbajúci kľúč znamenal „padni nižšie", teda presný opak voľby. Sentinel prežije
+  `parse_mapping` (round-trip), zmrazenie snapshotu (na žiadny set neukazuje), `normalize_mapping`, resolver (`set_none` — vlastný dôvod, NIKDY set
+  z nižšej úrovne) aj editor (`none_value` v riadku triedneho mapovania, `hwsMapClassValue` v `js/hw_sets.js`).
+- **Migrácia `hinge_class_v1` je JEDNORAZOVÁ** (`migrate_hinge_classes!` v `ensure_project_state!`, značka v poli `migrations` snapshotu):
+  `class:hinge|classic` = **účinné legacy mapovanie projektu** (kto má vlastný záves, ten si ho podrží; neklasifikovaný set kľúč NEVYROBÍ a položky idú
+  legacy cestou + ORANGE poznámka `hinge_set_unclassified` v novom aditívnom kľúči `expansion['notes']`), `class:hinge|tipon` = `zaves-p2o`, ale **len keď
+  používateľ vlastný Tip-On set nemá**. Existujúci kľúč sa **NIKDY neprepíše**.
+
+**Nesúlad klasifikácie závesu je RED, nie ORANGE.** `hinge_incompatible_info` rozlišuje dva stavy: **nezaradený (legacy) set nie je nesúlad** — je to stav
+pred KOV-F1 a nákup beží ďalej (kódy set má), len sa prizná ORANGE poznámkou; **definitívny nesúlad** (klasifikovaný set, ktorý čelu odporuje — Tip-On čelo
+na klasickom sete, alebo set, ktorý nie je na dvierka) je `HINGE_SET_MISMATCH` = **RED**, položka ostáva NEMAPOVANÁ a export stojí — tlmený záves bez piestu
+by znamenal dvierka, ktoré sa nedajú otvoriť tak, ako sú navrhnuté. Dôvod vzniká pri **EXPANZII** (teda aj po zmene mapovania bez prestavby), preto ho
+exportná brána číta z `expansion['unmapped']` rovnako ako `drawer_kit_missing` (Codex #327 kolo 3).
+
+Testy: `tests/pure/test_kovf_zavesy.rb` (33 testov, 16 pomenovaných mutácií) + in-SketchUp sekcia `run_kovf`.
+
 
 **BEZSTRATOVÁ BRÁNA DEFINÍCIÍ SETOV V ŠABLÓNE — `assess_set_defs` (audit #17 BLOCKER 1).** `hardware_set_defs` išli doteraz LEN cez tolerantný `normalize_sets`, teda cez cestu,
 ktorá neznámy obsah ticho oreže; od KOV-B1 by starší plugin zmrazil do .skp set BEZ klasifikácie. Šablóna je dátový súbor MIMO modelu (môže byť ručne upravená alebo z novšej

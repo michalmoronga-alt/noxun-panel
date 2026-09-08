@@ -171,6 +171,26 @@ v **configu**: `Construction.build_plan` ho vydá v `plan[:drawer_conflicts]` (t
 robí RED kategóriu **`drawer`**. Prežije tak save/reopen aj Undo. Neznámy kód (config z novšej verzie) sa **preskočí** — o takú zákazku sa stará brána `newer_configs`.
 RED kategória **`drawer_kit`** vzniká paralelne z expanzie (`drawer_kit_item`) a veta menuje čelo, systém, výšku, NL aj dôvod.
 
+**KOV-F1 (v0.9.48) — JEDINÝ REGISTER BRÁN KOVANIA a dva nové RED dôvody.** Helper `drawer_blockers` sa zovšeobecnil na **`hardware_blockers`** a číta
+**`BuildPlan.hw_blockers`** = zásuvkové kódy (`Recipes::DRAWER_BLOCKERS`, v PÔVODNOM poradí) **+** závesové (`HW_HINGE_BLOCKERS`:
+`door_height_out_of_table` · `hinge_set_mismatch`). Poradie kódov je **kontrakt** (určuje poradie viet brány), preto je register **funkcia, nie
+konštanta**: `build_plan.rb` sa načítava PRED `drawer_recipes.rb`, takže zásuvkový register v čase definície konštanty ešte neexistuje. Zásuvkové výstupy
+sú vďaka tomu **bajtovo rovnaké** (stráži charakterizačný test). `export_blockers(drawer:)` sa premenoval na `export_blockers(hardware:)`; `drawer_stop`
+si názov ponechal (volá ho osem miest), ale od tejto dávky vydáva aj závesové dôvody.
+
+**VEPO závesové kódy NEBLOKUJE.** `door_height_out_of_table` aj `hinge_set_mismatch` zastavujú **nákupné CSV, rozpočet XLSX a cenovú ponuku**, ale nie
+rezacie dáta: geometria je správna a zastaviť rezanie by len zablokovalo výrobu (rovnaká úvaha ako pri `BUILD_BLOCKERS`). `door_height_out_of_table` sa
+číta z **uložených** nálezov (`hardware_issues`), `hinge_set_mismatch` z **EXPANZIE** (`expansion['unmapped']`) — vzniká pri nákupe, teda aj po zmene
+mapovania BEZ prestavby skrinky (Codex #327 kolo 3).
+
+**Dve nové RED kategórie Kontroly.** `CAT_HARDWARE_CONFLICT` (`hardware_conflict`) — položka kovania z pravidiel VZNIKLA, ale je nesprávna; vetu skladá
+STAVBA (pozná výšku aj posledné pásmo), Kontrola k nej doplní adresu a to, čo sa tým zastavuje. Náprava je **ručný zámok počtu** (`hardware_overrides`),
+po ktorom konflikt pri prestavbe nevznikne. `CAT_HW_MISMATCH` (`hardware_mismatch`) — vybraný set odporuje čelu (Tip-On čelo na klasickom sete); náprava je
+DÁTOVÁ (vyber set / Doplniť nové predvoľby), nikdy fallback na iný set. K tomu ORANGE `set_none` (vedomá voľba „bez setu" — nie chyba nastavenia) a ORANGE
+`hinge_set_unclassified` z nového aditívneho kľúča `expansion['notes']` (`check_hardware_notes`): nákup beží ďalej, ale set bez zaradenia sa nedá vybrať
+podľa otvárania čela. `BUILD_INFO_ONLY` má navyše `hinge_weight_unknown` — INFO o stave dát, nie nález.
+
+
 *(2) POTVRDITEĽNÁ — `export_confirmations(budget:)`.* Dnes jediný dôvod: **riadky bez ceny**. STANDARD §11.3 hovorí, že neznáma cena sa NIKDY nenahradí nulou, ale má sa **priznať**
 („medzisúčet je len zo známych cien a súhrn nahlas povie, že nie je úplný") — **rozpracovaný rozpočet je legitímny stav zákazky** a plošný tvrdý blok by používateľovi bral výstup,
 na ktorý má právo (nález Codex review PR #250 proti auditu). Default je teda zastavené, ale **cesta von existuje**: `export_confirm_status` ponúkne druhý klik, ten pošle

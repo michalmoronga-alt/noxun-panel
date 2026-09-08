@@ -412,13 +412,33 @@ Príklad (počet závesov podľa výšky krídla):
   "kind": "bands",
   "input": "height",
   "bands": [
-    { "max": 900,  "quantity": 2 },
-    { "max": 1400, "quantity": 3 },
-    { "max": 1900, "quantity": 4 },
-    { "max": null, "quantity": 5 }
+    { "max": 849,  "quantity": 2 },
+    { "max": 1700, "quantity": 3 },
+    { "max": 2200, "quantity": 4 },
+    { "max": 2400, "quantity": 5 },
+    { "max": 2600, "quantity": 6 },
+    { "max": 2800, "quantity": 7 },
+    { "max": null, "quantity": 7 }
+  ],
+  "finite": true,
+  "width_plus": { "over": 600, "add": 1 },
+  "width_warn_over": 800,
+  "weight_bands": [
+    { "max": 7.7,  "quantity": 2 },
+    { "max": 13.7, "quantity": 3 },
+    { "max": 17.1, "quantity": 4 },
+    { "max": 22.0, "quantity": 5 }
   ]
 }
 ```
+
+**NOXUN tabuľka závesov (KOV-F1, v0.9.48) platí pre VŠETKÝCH výrobcov** — set rozhoduje len o produkte, nie o počte. Výška ≤ `max` (inkluzívne;
+849 < h < 850 → 3). Kľúče `finite`, `width_plus`, `width_warn_over` a `weight_bands` sú **VOLITEĽNÉ door guardy** pravidla `bands`: starší plugin ich
+`normalize_rules` **zachová** a `compute` **ignoruje** (ráta podľa tabuľky bez +1 a bez varovaní, NIKDY nulu) — preto ostáva aj catch-all pásmo.
+`width_plus` sa počíta zo **šírky KRÍDLA**, bez podmienky výšky. **Hmotnosť vo V1 len VARUJE** (rozhodnutie Michal 8.9.2026) — počet riadi tabuľka výšok.
+`finite: true` znamená, že zásah catch-all pásma je **„mimo tabuľky"**: položka SA VYDÁ s jeho počtom (riadok v Kovaní musí existovať, inak nemá kde
+vzniknúť ručný zámok) a k nej vznikne RED `door_height_out_of_table`, ktorý blokuje nákup, rozpočet aj cenovú ponuku (VEPO nie). Náprava = ručný zámok
+počtu. **Kontrakt validátora sa nemení** — pásmo „všetko nad" je stále povinné.
 
 Pravidlá sú **JSON dáta editovateľné cez sekciu Pravidlá v Štúdiu** (nie ručne v súbore). Michal si počty závesov / výnimky mení bez programovania.
 
