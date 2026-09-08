@@ -560,10 +560,20 @@ P2O set bez tlmenia + piest), takže pribudlo päť vecí:
   `hinge`** → triedny kľúč projektu → **legacy `hinge`**. Dva rozdiely oproti zásuvke sú vecné: vlastný set NA SKRINKE nikdy ticho nespadne na projektový
   default (Codex #327 kolo 2), a na konci reťaze stojí legacy `hinge` — bez neho by KAŽDÁ existujúca zákazka po prestavbe stratila závesy (položky sú
   odteraz klasifikované, ale snapshot triedny kľúč ešte nemá). Prázdny výsledok preto pri závese znamená dnešné `no_set`, nie `class_unmapped`.
-- **Sentinel `MAPPING_NONE = 'none'` = „vedome bez setu".** Je to **samostatný kontrakt**, nie členská bunka `code_by_nl` (`SKIP_CODE` — zhoda reťazca je
-  náhoda). Zmazať kľúč nestačí: pri reťazovej precedencii by chýbajúci kľúč znamenal „padni nižšie", teda presný opak voľby. Sentinel prežije
-  `parse_mapping` (round-trip), zmrazenie snapshotu (na žiadny set neukazuje), `normalize_mapping`, resolver (`set_none` — vlastný dôvod, NIKDY set
-  z nižšej úrovne) aj editor (`none_value` v riadku triedneho mapovania, `hwsMapClassValue` v `js/hw_sets.js`).
+- **Sentinel `MAPPING_NONE = { 'none' => true }` = „vedome bez setu".** Je to **samostatný kontrakt**, nie členská bunka `code_by_nl` (`SKIP_CODE` — zhoda
+  reťazca je náhoda). Zmazať kľúč nestačí: pri reťazovej precedencii by chýbajúci kľúč znamenal „padni nižšie", teda presný opak voľby. **Je to HASH, nie
+  reťazec (Codex #329 kolo 1):** `set_id` je ľubovoľný neprázdny reťazec, takže vlastný set s ID `none` (aj `NONE`) sú platné dáta — reťazcový sentinel by
+  takú voľbu preklasifikoval na „bez nákupu", teda dvierka bez závesov. Hodnota mapovania je buď **reťazec** (= `set_id`), alebo **objekt** (= selektor),
+  takže objektový sentinel sa s ID setu prekryť nemôže a **žiadna migrácia dát netreba**. Jediná autorita otázky je `mapping_none?` (presne jeden kľúč
+  `none` s hodnotou `true`). Sentinel prežije `parse_mapping` (round-trip), `normalize_mapping`, resolver (`set_none` — vlastný dôvod, NIKDY set z nižšej
+  úrovne) aj editor. **Zmrazenie ho musí kopírovať výslovne:** `global_default_state` (predvoľby nového projektu) aj `merge_project_sets_seed!`
+  („Doplniť nové predvoľby") preskakujú mapovanie s prázdnym zoznamom referencií — a sentinel na žiadny set neukazuje, takže bez vlastnej vetvy by z oboch
+  ciest **vypadol** a projekt by spadol na legacy `hinge` (Codex #329 kolo 1). Kopíruje sa kľúč, definície nie je čo. **Nový `std` marker k tomu nepatrí:**
+  starší plugin sentinel nepozná, ale obe cesty zlyhajú zatvorene a s hláškou — knižničná brána `incompatible_mapping_entry?` → „aktualizuj plugin",
+  snapshot `norm_map.length != mapping.length` → `:invalid`.
+- **UI rozlišuje „nenastavené" a „vedome bez setu" (Codex #329 kolo 1).** Riadok triedneho mapovania nesie `unset_label` (prázdna hodnota = kľúč sa zmaže,
+  pri závese sa **dedí legacy `hinge`**, takže nákup závesy MÁ), `none_label` + `none_value` (TOKEN voľby v selecte) a `none_send` (**HODNOTA**, ktorú JS
+  pošle späť — panel doménovú hodnotu nikdy neskladá sám). Jedna spoločná voľba by pri chýbajúcom kľúči tvrdila „vedome bez setu", hoci závesy sa objednajú.
 - **Migrácia `hinge_class_v1` je JEDNORAZOVÁ** (`migrate_hinge_classes!` v `ensure_project_state!`, značka v poli `migrations` snapshotu):
   `class:hinge|classic` = **účinné legacy mapovanie projektu** (kto má vlastný záves, ten si ho podrží; neklasifikovaný set kľúč NEVYROBÍ a položky idú
   legacy cestou + ORANGE poznámka `hinge_set_unclassified` v novom aditívnom kľúči `expansion['notes']`), `class:hinge|tipon` = `zaves-p2o`, ale **len keď
@@ -573,9 +583,17 @@ P2O set bez tlmenia + piest), takže pribudlo päť vecí:
 pred KOV-F1 a nákup beží ďalej (kódy set má), len sa prizná ORANGE poznámkou; **definitívny nesúlad** (klasifikovaný set, ktorý čelu odporuje — Tip-On čelo
 na klasickom sete, alebo set, ktorý nie je na dvierka) je `HINGE_SET_MISMATCH` = **RED**, položka ostáva NEMAPOVANÁ a export stojí — tlmený záves bez piestu
 by znamenal dvierka, ktoré sa nedajú otvoriť tak, ako sú navrhnuté. Dôvod vzniká pri **EXPANZII** (teda aj po zmene mapovania bez prestavby), preto ho
-exportná brána číta z `expansion['unmapped']` rovnako ako `drawer_kit_missing` (Codex #327 kolo 3).
+exportná brána číta z `expansion['unmapped']` rovnako ako `drawer_kit_missing` (Codex #327 kolo 3). **Set NESPRÁVNEHO TYPU je pri dvierkach ten istý
+prípad (Codex #329 kolo 1):** vetva `set['generic_type'] != gt` v `expand` beží **skôr** než kontrola klasifikácie, takže set na nohy pod závesovým kľúčom
+(mapovanie zo šablóny + vlastná definícia projektu) by skončil ako ORANGE `set_type_mismatch` a nákup bez závesov by odišiel von. Pre `door_item?` sa preto
+hlási `HINGE_SET_MISMATCH` s `detail: 'generic_type'`; položka bez klasifikácie (legacy zákazka) ostáva na pôvodnom ORANGE.
 
-Testy: `tests/pure/test_kovf_zavesy.rb` (33 testov, 16 pomenovaných mutácií) + in-SketchUp sekcia `run_kovf`.
+**Door guardy sa berú z PRVÉHO pravidla s daným `rule_id` (Codex #329 kolo 1).** `evaluate` pri duplicitnom `rule_id` použije prvé pravidlo (druhé prizná
+ORANGE `hardware_rule_duplicate` a preskočí), takže index `by_rule` v `door_guards` musí byť **first-entry-wins** — zápis „posledný vyhráva" by priniesol
+guardy z pravidla, ktoré položku vôbec nevydalo (falošná RED nadvýška alebo naopak potlačené varovania).
+
+Testy: `tests/pure/test_kovf_zavesy.rb` (39 testov, 21 pomenovaných mutácií) + JS `tests/js/test_kovf_ui.js` (dve prázdne voľby riadku, sentinel ako
+hodnota zo servera) + in-SketchUp sekcia `run_kovf`.
 
 
 **BEZSTRATOVÁ BRÁNA DEFINÍCIÍ SETOV V ŠABLÓNE — `assess_set_defs` (audit #17 BLOCKER 1).** `hardware_set_defs` išli doteraz LEN cez tolerantný `normalize_sets`, teda cez cestu,

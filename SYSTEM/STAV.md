@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.9.48 · 8.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.9.49 · 8.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -21,7 +21,7 @@ a rád (`core/hardware_taxonomy.rb`) a vytiahla katalóg aj editor setu na obraz
 **Pozor na kompatibilitu:** čo uloží v0.9.20, to **v0.9.18 už nepoužije** — model/šablóna (`CONFIG_SCHEMA` 4 + brána `assess_set_defs`), knižnica setov aj projektový snapshot
 (`std` 3) a katalóg kovania s výrobcom (`schema` 2). Pred prvou takou zákazkou aktualizovať **obe PC** (D-52 updater).
 
-**Testy k v0.9.48:** **3475 headless** · 96 JS sád · posledný plný in-SketchUp beh **1987 PASS / 0 FAIL** (nad vetvou KOV-W, 8.9. večer); nová sekcia `run_kovf` (závesy) čaká na najbližší plný beh.
+**Testy k v0.9.49:** **3481 headless** · 97 JS sád · posledný plný in-SketchUp beh **1987 PASS / 0 FAIL** (nad vetvou KOV-W, 8.9. večer); nová sekcia `run_kovf` (závesy) čaká na najbližší plný beh.
 
 ## Robí sa
 
@@ -32,7 +32,7 @@ a rád (`core/hardware_taxonomy.rb`) a vytiahla katalóg aj editor setu na obraz
 **KOV-C KOMPLET:** C1 jadro (#302), C2a príprava (v0.9.30), C2b aktivácia (#304, v0.9.31), C2b-M materiálový kanál (#305, v0.9.32) a **C2c UI zásuviek** (v0.9.33).
 **KOV-D (package v2, PR #307, #20): slice D je KOMPLET (v0.9.42, 7.9.2026)** — D1a (0.9.34) · D1b (0.9.35) · D1c (0.9.36) · D2a (0.9.37) · D2b (0.9.38) · D3a/D3b (0.9.39/40) ·
 D4 (0.9.41) · D5 (0.9.42); 8 PR za deň (#310–#317). **KOV-W (hmotnosť dielcov + D-125) HOTOVÁ (v0.9.47)** — podklad pre závesy a výklopy.
-**KOV-F1 (jadro závesov) HOTOVÁ (v0.9.48)**; z bloku KOVANIE ostáva **F2 (editor door guardov v Pravidlách) → E → G → I** (packages v [PLAN.md](PLAN.md)); minor bump až pri uzávere celého bloku.
+**KOV-F1 (jadro závesov) HOTOVÁ (v0.9.49)**; z bloku KOVANIE ostáva **F2 (editor door guardov v Pravidlách) → E → G → I** (packages v [PLAN.md](PLAN.md)); minor bump až pri uzávere celého bloku.
 **Od 3.9. opäť Fable (Max, ~mesiac; priorita = uzavrieť V1)** — orchestruje Fable, implementujú Opus subagenti, review Codex; vstupný bod je [zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md](zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md) + tento súbor. **Limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
@@ -43,7 +43,7 @@ Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` →
 
 ## Posledné uzávery
 
-- **KOV-F1 — DVIERKA DOSTANÚ ZÁVESY PODĽA NOXUN TABUĽKY A TIP-ON SVOJ SET** (v0.9.48, 8.9.2026): počet už nie je starý odhad, ale **tabuľka** (do 849 → 2 · 850–1700 → 3 · … · 2601–2800 → 7)
+- **KOV-F1 — DVIERKA DOSTANÚ ZÁVESY PODĽA NOXUN TABUĽKY A TIP-ON SVOJ SET** (v0.9.48–0.9.49, 8.9.2026): počet už nie je starý odhad, ale **tabuľka** (do 849 → 2 · 850–1700 → 3 · … · 2601–2800 → 7)
   a **krídlo širšie než 600 mm dostane o jeden záves navyše**. Kontrola varuje (počet nemení) pri krídle nad 800 mm, pri čele širšom než vyššom („nemá to byť výklop?")
   a pri ťažkých dvierkach; nad 2800 mm položka vznikne s počtom 7, ale svieti **červená „mimo tabuľky"** (zastaví nákup, rozpočet aj ponuku, rezanie nie) — zhasne ju
   **ručný zámok počtu**. **Tip-On dvierka** dostanú **P2O set + piest na krídlo**; vlastný set skrinky aj rozpracované zákazky ostávajú bez zmeny (tabuľku prinesie **„Doplniť nové predvoľby"**). Editor je **F2**. [KRONIKA](archiv/KRONIKA.md).

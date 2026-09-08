@@ -2513,9 +2513,12 @@ pribalil a jeden krok Späť by vrátil OBA), a bezpodmienečný `abort_operatio
 **KOV-D1b — MAPOVANIE PODĽA TRIEDY v Predvoľbách projektu.** Zásuvka sa nemapuje podľa generického typu `slide` (resolver ho pre klasifikovanú položku nečíta), ale podľa
 **triedneho kľúča**. `sets_payload` preto nesie `class_rows = { project: [...], global: [...] }` — **hotové riadky** pre všetky `HardwareSets::CLASS_MAPPING_KEYS`
 (= kľúče `MAPPING_ADDITIONS`, jediný zoznam): popisok, `options` (`class_set_options` — len kompatibilné, neaktívne nikdy), `current`, `stored` + `value_text` (uložená hodnota
-mimo ponuky = `disabled`, F10) a `none_label` **„— bez setu (RED — zásuvka bez kitu)"** (nenamapovaná klasifikovaná zásuvka je fail-closed RED `drawer_kit_missing`, nie ORANGE
-ako ostatné kovanie). JS ich kreslí do **tej istej tabuľky** `.hwsmap` za generické typy — žiadny nový blok ani nadpis (vertikálny priestor je vzácny) — a nefiltruje ani
-neprekladá nič. Zápis ide **existujúcimi** handlermi `handle_map_project`/`handle_map_global`: payload nesie nové pole **`mapping_key`** (starý tvar `generic_type` ostáva
+mimo ponuky = `disabled`, F10) a `none_label` **„— vedome bez setu (RED — zásuvka bez kitu)"** (nenamapovaná klasifikovaná zásuvka je fail-closed RED `drawer_kit_missing`, nie
+ORANGE ako ostatné kovanie). JS ich kreslí do **tej istej tabuľky** `.hwsmap` za generické typy — žiadny nový blok ani nadpis (vertikálny priestor je vzácny) — a nefiltruje ani
+neprekladá nič. **Riadok má DVE prázdne voľby (KOV-F1, Codex #329):** `unset_label` s hodnotou `''` = „nenastavené" (kľúč sa z mapovania **zmaže**; pri závese sa potom dedí
+legacy `hinge`, takže nákup závesy MÁ) a `none_label` s hodnotou `none_value` = „vedome bez setu" (uloží sa **sentinel**). Ktorá je vybraná, rozhoduje jediná čistá funkcia
+`hwsMapClassSelectedId`; hodnotu sentinelu posiela server v `none_send` — panel doménovú hodnotu nikdy neskladá sám. Riadok bez `none_value` (staršie payloady, napr. karta
+skrinky) kreslí len prvú voľbu so svojím pôvodným popisom. Zápis ide **existujúcimi** handlermi `handle_map_project`/`handle_map_global`: payload nesie nové pole **`mapping_key`** (starý tvar `generic_type` ostáva
 funkčný), typ pre kontrolu setov číta `HardwareSets.mapping_key_type` a triedu proti hodnote validuje `class_key_value_problem` v `set_*_mapping!`. Editor pásiem sa pre triedne
 riadky **neponúka** — hodnotou je vždy celá voľba z ponuky (pevný set alebo rodina), takže sa nedá zostaviť selektor, ktorý by triede nesedel.
 

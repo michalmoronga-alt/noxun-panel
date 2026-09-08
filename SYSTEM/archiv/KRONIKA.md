@@ -17,6 +17,25 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-F1 — FIX KOLO PO CODEX GH REVIEW #329 (8.9.2026 v noci; ten istý PR #329, v0.9.48 → v0.9.49).**
+  Odsek KOV-F1 nižšie vznikol pri odovzdaní dávky, **pred** review — ostáva tak, ako bol zapísaný (tento súbor sa neprepisuje); tu je, čo kolo 1 (1× P1 + 5× P2) zmenilo.
+  **P1 — `CONFIG_SCHEMA` 8 → 9.** Package tvrdil „vo F sa nebumpuje", a to bola chyba: nosič `hardware_conflicts` je v configu **trvalý** a závesy sú **klasifikované**,
+  takže starší plugin by pri prestavbe nosič zahodil whitelistom `cabinet_config`, Tip-On čelo by dostalo klasický záves z legacy `hinge`, `+1` by neprirátal — a schému 8
+  by zapísal **späť**, teda stratu zvečnil. Cez .skp na druhom PC to znamená nedoobjednané závesy a zlý set BEZ blokády. Brány sú existujúce (dopredný `newer_config?`
+  + exportná `ProductionCore.export_blockers`), **KOV-E preto posúva svoj bump na 9 → 10**.
+  **Sentinel „vedome bez setu" je HASH `{none: true}`, nie reťazec.** `set_id` je ľubovoľný neprázdny reťazec, takže vlastný set s ID `none` (aj `NONE`) sú platné dáta —
+  reťazcový sentinel by takú voľbu preklasifikoval na „bez nákupu". Hodnota mapovania je buď reťazec (= `set_id`), alebo objekt (= selektor), takže objektový sentinel
+  sa s ID setu **prekryť nemôže** a žiadna migrácia dát netreba (variant (a) z review, bez rezervovania ID). Nový `std` marker k tomu nepatrí: starší plugin obe cesty
+  odmietne **zatvorene a s hláškou** — knižnicu cez `incompatible_mapping_entry?` („aktualizuj plugin"), snapshot cez `norm_map.length != mapping.length`.
+  **Sentinel sa musí kopírovať výslovne** — `global_default_state` (predvoľby nového projektu) aj `merge_project_sets_seed!` („Doplniť nové predvoľby") preskakovali
+  mapovanie s prázdnym zoznamom referencií, a sentinel na žiadny set neukazuje: voľba by z oboch ciest ticho vypadla a projekt by spadol na legacy `hinge`.
+  **UI rozlišuje „nenastavené" a „vedome bez setu".** Projekt bez triedneho kľúča dedí legacy `hinge` (nákup závesy **má**), takže jedna spoločná prázdna voľba klamala.
+  Riadok má odteraz dve: `unset_label` (kľúč sa zmaže) a `none_label` (uloží sa sentinel); hodnotu posiela server v `none_send` — panel doménovú hodnotu nikdy neskladá sám.
+  **Door guardy sa berú z PRVÉHO pravidla s daným `rule_id`** (ako `evaluate`) — index „posledný vyhráva" by priniesol guardy z pravidla, ktoré položku nevydalo.
+  **Set nesprávneho typu je pri dvierkach RED.** Vetva `generic_type` v `expand` beží skôr než kontrola klasifikácie, takže set na nohy pod závesovým kľúčom by skončil
+  ako ORANGE `set_type_mismatch` a nákup bez závesov by odišiel von; pre `door_item?` sa preto hlási `hinge_set_mismatch`. Položka bez klasifikácie ostáva na ORANGE.
+  **Testy:** 3481 headless (+6 v `test_kovf_zavesy.rb`, mutácie M17–M21) · 97 JS sád (nová `tests/js/test_kovf_ui.js`) · in-SketchUp `run_kovf`.
+
 - **KOV-F1 — ZÁVESY PODĽA NOXUN TABUĽKY A SET PODĽA OTVÁRANIA (8.9.2026; PR #329, v0.9.48).**
   Prvý z dvoch PR bloku KOV-F (jadro; editor nových polí je F2). **Počet závesov** už neurčuje starý odhad, ale **jedna Noxun tabuľka pre všetkých výrobcov**
   (do 849 → 2 · 850–1700 → 3 · 1701–2200 → 4 · 2201–2400 → 5 · 2401–2600 → 6 · 2601–2800 → 7; výška ≤ max, inkluzívne) a **krídlo širšie než 600 mm dostane +1**.
