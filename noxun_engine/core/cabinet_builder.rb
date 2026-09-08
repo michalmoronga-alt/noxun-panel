@@ -1966,6 +1966,8 @@ module Noxun
             hardware: cfg[:hardware].is_a?(Array) ? cfg[:hardware] : [],
             # KOV-C2b: fail-closed dovody zasuviek (viz merge_final).
             drawer_conflicts: cfg[:drawer_conflicts].is_a?(Array) ? cfg[:drawer_conflicts] : [],
+            # KOV-F1: nosic konfliktov kovania z pravidiel (viz merge_final).
+            hardware_conflicts: cfg[:hardware_conflicts].is_a?(Array) ? cfg[:hardware_conflicts] : [],
             type: cfg[:type],
             # D-100: uklada sa LEN rucny nazov (nil = zivy default z display_name).
             # Zapecenim defaultu by nazov prestal sledovat sirku/typ skrinky.
@@ -2081,6 +2083,10 @@ module Noxun
             # sa dovod dal obnovit — musi teda prezit v configu (a s nim aj
             # save/reopen a Undo). `Bom.collect` ho zlucuje do `hardware_issues`.
             drawer_conflicts: Array(plan[:drawer_conflicts]),
+            # KOV-F1: TEN ISTY vzor pre konflikty kovania z pravidiel (dvierka
+            # nad tabulkou zavesov). Polozka aj dielec existuju, ale nakup je
+            # zastaveny a dovod musi prezit save/reopen aj Undo.
+            hardware_conflicts: Array(plan[:hardware_conflicts]),
             available_width: plan[:available][:width].round(2),
             available_height: plan[:available][:height].round(2),
             available_depth: plan[:available][:depth].round(2),

@@ -131,6 +131,13 @@ module Noxun
               drawer_conflict_issues(cid, inst.persistent_id, ccfg['drawer_conflicts'],
                                      ccfg['front_items'])
             )
+            # KOV-F1: TEN ISTY vzor pre konflikty kovania z pravidiel (dvierka
+            # nad tabulkou zavesov). Nosic je v configu, lebo polozka sama
+            # o sebe o probleme nevie — nesie len pocet z posledneho pasma.
+            hardware_issues.concat(
+              hardware_conflict_issues(cid, inst.persistent_id, ccfg['hardware_conflicts'],
+                                       ccfg['front_items'])
+            )
             # KOV-C2b (Codex #304 kolo 1 P1): skrinka ULOZENA PRED aktivaciou
             # receptov, ktora UZ MA klasifikovanu zasuvku. V .skp nie su
             # receptove dielce (a vysuv je legacy), takze kusovnik, VEPO aj
@@ -341,6 +348,30 @@ module Noxun
           { 'code' => code, 'severity' => 'red',
             'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
             'part_key' => pkey, 'front_id' => c['front_id'].to_s,
+            'message' => c['message'].to_s,
+            'label' => PartKeys.human_label(pkey, fronts: items).to_s }
+        end
+      end
+
+      # KOV-F1: ulozene `hardware_conflicts` -> tvrde nalezy kovania. Tvar
+      # zaznamu je kontrakt `BuildPlan.validate_hardware_conflicts!`
+      # ({owner_part_key, code, message}); tu sa k nemu doplni ADRESA
+      # (vlastnik, instancia) a LUDSKY popis cela. Neznamy kod (config
+      # z novsej verzie) sa PRESKOCI — o taku zakazku sa stara vlastna brana
+      # `newer_configs`. `front_id` sa odvodi z kluca vlastnika (nosic ho
+      # neuklada — vlastnikom je KRIDLO, nie riadok ciel).
+      def hardware_conflict_issues(owner_id, owner_pid, conflicts, front_items)
+        items = front_items.is_a?(Array) ? front_items : []
+        Array(conflicts).filter_map do |c|
+          next nil unless c.is_a?(Hash)
+
+          code = c['code'].to_s
+          next nil unless BuildPlan::HW_CONFLICT_CODES.include?(code)
+
+          pkey = c['owner_part_key'].to_s
+          { 'code' => code, 'severity' => 'red',
+            'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
+            'part_key' => pkey, 'front_id' => PartKeys.front_id(pkey).to_s,
             'message' => c['message'].to_s,
             'label' => PartKeys.human_label(pkey, fronts: items).to_s }
         end
