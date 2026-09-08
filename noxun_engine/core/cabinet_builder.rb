@@ -1325,7 +1325,7 @@ module Noxun
         # Base material dielca podla roly: cela -> front, chrbat -> back, ostatne -> body (korpus).
         # pd[:material] (:front/:korpus) z Construction je sekundarny signal (cela maju :front).
         # KOV-W: KTORY kanal dielec dedi, urcuje `Construction.material_channel`
-        # — jedine miesto pravdy (anotacia hmotnosti sa pyta tam istam; druhy
+        # — jedine miesto pravdy (anotacia hmotnosti sa pyta toho isteho; druhy
         # opisany `case` by sa rozisiel a hmotnost by sa ratala z inej dosky,
         # nez akou je dielec postaveny). KOV-C2b: 4. kanal — dielce zasuviek
         # dedia PREDVOLBU ZASUVIEK (skrinka -> projekt -> UNI 16), nie telo
