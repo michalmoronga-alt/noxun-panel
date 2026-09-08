@@ -53,9 +53,14 @@
 #   M15 značka migrácie sa pri zápise stratí      -> snapshot round-trip
 #   M16 varovanie šírky sa posunie o 1 mm         -> hranica 800 / 801
 #   M17 `CONFIG_SCHEMA` ostane na 8               -> schéma 9 a downgrade brána
+#   M18 sentinel je REŤAZEC „none"                -> vlastný set s ID `none`
+#   M19 zmrazenie globálu sentinel zahodí         -> nový projekt / doplnenie
+#   M20 door guardy z POSLEDNÉHO duplikátu        -> duplicitný `rule_id`
+#   M21 set iného typu pri dvierkach = ORANGE     -> RED `hinge_set_mismatch`
 require_relative '../helper' unless defined?(NxTest)
 
 require 'json'
+require 'fileutils'
 
 # UI vrstva (brana exportov) — headless nie je v require zozname helpera,
 # takze si ju sada pyta sama (vzor `test_kovc2b_brany.rb`).
@@ -226,6 +231,24 @@ NxTest.test('KOV-F1 (3): široké čelo = ORANGE `door_wide`, počet sa NEMENÍ'
                       '800 mm je ešte v poriadku')
   NxTest.assert(c.warn_codes(c.evaluate([c.door(700.0, 801.0)])).include?('door_wide'),
                 '801 mm už varuje')
+end
+
+NxTest.test('KOV-F1 (3): door guardy sa berú z PRVÉHO duplicitného pravidla') do
+  c = NxKovF
+  # Codex #329 kolo 1 P2: `evaluate` pri duplicitnom `rule_id` použije PRVÉ
+  # pravidlo (druhé prizná ORANGE `hardware_rule_duplicate` a preskočí).
+  # Index guardov to musí robiť ROVNAKO — inak by nadvýška aj varovania prišli
+  # z pravidla, ktoré položku vôbec nevydalo.
+  first = c.hinge_rule
+  second = JSON.parse(JSON.generate(first))
+  second.delete('finite')          # bez `finite` by nad tabuľkou nevznikol konflikt
+  second['width_warn_over'] = 3000 # a široké čelo by nevarovalo
+  res = c.evaluate([c.door(2900.0, 900.0)], {}, c::HR.normalize_rules([first, second]))
+  codes = c.warn_codes(res)
+  NxTest.assert(codes.include?('hardware_rule_duplicate'), codes.inspect)
+  NxTest.assert_equal([c::HR::DOOR_OUT_OF_TABLE], res[:conflicts].map { |x| x['code'] },
+                      'konflikt „mimo tabuľky" je z PRVÉHO pravidla (`finite`)')
+  NxTest.assert(codes.include?('door_wide'), "aj varovanie šírky (limit 800): #{codes.inspect}")
 end
 
 NxTest.test('KOV-F1 (3): širšie než vyššie = ORANGE „nemá to byť výklop?"') do
@@ -498,8 +521,11 @@ NxTest.test('KOV-F1 (7): sentinel `none` prežije mapovanie, snapshot aj resolve
                                                           c::HWS::MAPPING_NONE, {}))
   NxTest.assert(c::HWS.mapping_value_text(c::HWS::MAPPING_NONE, {}).include?('vedome'))
   # Normalizacia so ZOZNAMOM setov ho NESMIE zahodit (inak by snapshot spadol).
-  kept = c::HWS.normalize_mapping({ 'class:hinge|tipon' => 'none' }, c.seed_sets)
-  NxTest.assert_equal('none', kept['class:hinge|tipon'])
+  kept = c::HWS.normalize_mapping({ 'class:hinge|tipon' => c::HWS::MAPPING_NONE }, c.seed_sets)
+  NxTest.assert_equal(c::HWS::MAPPING_NONE, kept['class:hinge|tipon'])
+  # A prezije JSON round-trip (config, snapshot aj kniznica idu cez JSON).
+  NxTest.assert(c::HWS.mapping_none?(JSON.parse(JSON.generate(c::HWS::MAPPING_NONE))),
+                'sentinel musí prežiť JSON — inak by sa po reopene stal „selektorom"')
   # Resolver: vedome bez setu, NIKDY set z nizsej urovne.
   st = c.state('class:hinge|tipon' => c::HWS::MAPPING_NONE, 'hinge' => 'zaves-klasik')
   exp = c::HWS.expand([c.item('tipon')], st)
@@ -522,6 +548,65 @@ NxTest.test('KOV-F1 (7): sentinel a značka migrácie prežijú ULOŽENIE snapsh
                       'značka prežije zápis — inak by sa migrácia opakovala pri každom otvorení')
   # A `ensure_project_state!` uz do mapovania NESIAHNE (znacka je tam).
   NxTest.assert_equal(back['mapping'], c::HWS.ensure_project_state!(model)['mapping'])
+end
+
+NxTest.test('KOV-F1 (7): vlastný set s ID `none` ostáva REÁLNYM setom') do
+  c = NxKovF
+  # Codex #329 kolo 1 P2: `set_id` je ľubovoľný neprázdny reťazec, takže set
+  # s ID „none" sú PLATNÉ dáta. Reťazcový sentinel by ho (aj v inej veľkosti
+  # písmen) preklasifikoval na „vedome bez setu" — teda dvierka BEZ závesov
+  # v nákupe, bez jediného náznaku. Sentinel je preto OBJEKT.
+  NxTest.refute(c::HWS.mapping_none?('none'), 'reťazec je `set_id`, nie sentinel')
+  NxTest.refute(c::HWS.mapping_none?('NONE'))
+  NxTest.refute(c::HWS.mapping_none?({ 'param' => 'none', 'bands' => [] }), 'selektor tiež nie')
+  NxTest.assert(c::HWS.mapping_none?(c::HWS::MAPPING_NONE))
+  # Tokeny sa nemôžu prekryť — reálny set má prefix, sentinel je holý.
+  NxTest.assert_equal('set:none', c::HWS.mapping_option_id('none'))
+  NxTest.assert_equal(c::HWS::MAPPING_NONE_OPTION, c::HWS.mapping_option_id(c::HWS::MAPPING_NONE))
+  NxTest.refute(c::HWS.mapping_option_id('none') == c::HWS.mapping_option_id(c::HWS::MAPPING_NONE))
+  # A set s ID `none` prejde mapovaním, zmrazením aj nákupom ako každý iný.
+  mine = c.set_def('zaves-klasik').merge('set_id' => 'none', 'name' => 'Môj záves')
+  out, errs = c::HWS.parse_mapping({ 'class:hinge|classic' => 'none' })
+  NxTest.assert_equal([], errs, errs.inspect)
+  NxTest.assert_equal('none', out['class:hinge|classic'])
+  NxTest.assert_equal(['none'], c::HWS.value_set_ids('none'), 'snapshot ho MUSÍ zmraziť')
+  exp = c::HWS.expand([c.item('classic')],
+                      { 'mapping' => { 'class:hinge|classic' => 'none' },
+                        'sets' => { 'none' => mine } })
+  NxTest.assert_equal([], exp['unmapped'], exp['unmapped'].inspect)
+  NxTest.assert_equal(c.codes(c::HWS.expand([c.item('classic')],
+                                            c.state('class:hinge|classic' => 'zaves-klasik'))),
+                      c.codes(exp), 'nakúpi presne to, čo ten istý set pod iným ID')
+end
+
+NxTest.test('KOV-F1 (7): sentinel prežije zmrazenie globálu aj „Doplniť nové predvoľby"') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  c = NxKovF
+  # Codex #329 kolo 1 P2: obe kopírovacie cesty preskakovali mapovanie
+  # s PRÁZDNYM zoznamom referencií — a sentinel na žiadny set neukazuje.
+  # Nový projekt by tak dostal kľúč zmazaný a spadol na legacy `hinge`, hoci
+  # UI tvrdí, že globálna voľba platí.
+  c.with_library do
+    c.install('std' => c::HWS::STD_CLASSIFIED, 'seed_version' => c::HWS::SEED_VERSION,
+              'sets' => [c.set_def('zaves-klasik')],
+              'mapping' => { 'hinge' => 'zaves-klasik',
+                             'class:hinge|tipon' => c::HWS::MAPPING_NONE })
+    NxTest.assert_equal(:ok, c::HWS.library_state, c::HWS.library_state_reason)
+    gd = c::HWS.global_default_state
+    NxTest.assert_equal(c::HWS::MAPPING_NONE, gd['mapping']['class:hinge|tipon'],
+                        'nový projekt musí zdediť „vedome bez setu"')
+    # Doplnenie do EXISTUJUCEHO snapshotu (vedoma akcia pouzivatela).
+    m = c.fake_model(JSON.generate(c.snapshot_of([c.set_def('zaves-klasik')],
+                                                 'hinge' => 'zaves-klasik')))
+    status, _added_sets, added_map, = c::HWS.merge_project_sets_seed!(m)
+    NxTest.assert_equal(:updated, status)
+    NxTest.assert(added_map.include?('class:hinge|tipon'), added_map.inspect)
+    _ok, state = c::HWS.project_state_status(m)
+    NxTest.assert_equal(c::HWS::MAPPING_NONE, state['mapping']['class:hinge|tipon'],
+                        'a snapshot ho po uložení naozaj nesie')
+    sid, reason, = c::HWS.resolve_set_id('hinge', c.item('tipon'), {}, state['mapping'])
+    NxTest.assert_equal([nil, 'set_none'], [sid, reason], 'resolver ho rešpektuje')
+  end
 end
 
 NxTest.test('KOV-F1 (7): migrácia mapovania je JEDNORAZOVÁ a vlastný set prežije') do
@@ -615,6 +700,33 @@ NxTest.test('KOV-F1 (8): Tip-On čelo na klasickom sete = RED `hinge_set_mismatc
   NxTest.assert_equal(1, items.length)
   NxTest.assert_equal(c::V::RED, items.first['severity'])
   NxTest.assert(items.first['message_sk'].include?('Doplniť nové predvoľby'))
+end
+
+NxTest.test('KOV-F1 (8): závesový set INÉHO TYPU kovania je RED, nie ORANGE') do
+  c = NxKovF
+  # Codex #329 kolo 1 P2: mapovanie zo šablóny môže ukázať na `set_id`, ktorého
+  # definíciu si projekt drží VLASTNÚ — a tá môže byť setom na nohy. Táto vetva
+  # je SKORŠIA než kontrola klasifikácie, takže bez povýšenia by nákup ostal
+  # BEZ ZÁVESOV a ORANGE by zákazku pustil von.
+  legs = c.seed_sets.find { |s| s['generic_type'] == 'leg' }
+  st = { 'mapping' => { 'class:hinge|classic' => legs['set_id'] },
+         'sets' => { legs['set_id'] => legs } }
+  exp = c::HWS.expand([c.item('classic')], st)
+  NxTest.assert_equal([], exp['rows'], 'nákup by bol bez závesov — radšej NIČ')
+  u = exp['unmapped'].first
+  NxTest.assert_equal(c::HWS::HINGE_SET_MISMATCH, u['reason'])
+  NxTest.assert_equal('generic_type', u['detail'])
+  NxTest.assert(c::HWS.unmapped_reason_sk(u).include?('iného typu'), c::HWS.unmapped_reason_sk(u))
+  items = []
+  c::V.check_hardware_expansion(exp, items)
+  NxTest.assert_equal(c::V::RED, items.first['severity'], 'RED brána, nie ORANGE')
+  NxTest.assert(c::BP.hw_blockers.include?(c::HWS::HINGE_SET_MISMATCH), 'a kód je v registri brán')
+  # LEGACY položka (bez klasifikácie) ostáva na ORANGE `set_type_mismatch`.
+  legacy = c::HWS.expand([c.legacy_item],
+                         { 'mapping' => { 'hinge' => legs['set_id'] },
+                           'sets' => { legs['set_id'] => legs } })
+  NxTest.assert_equal('set_type_mismatch', legacy['unmapped'].first['reason'],
+                      'nezmenené správanie pre položku bez `use_type`')
 end
 
 NxTest.test('KOV-F1 (8): precedencia — vlastný set NA SKRINKE prežije prestavbu') do
@@ -782,5 +894,42 @@ module NxKovF
 
   def fake_model(raw = nil)
     FakeModel.new(raw)
+  end
+
+  # --- sandbox globalnej kniznice (vzor `test_kovc2a_kanal_sety.rb`) --------
+  # Codex #329 kolo 1 P2 si vyziadal test nad ZMRAZENIM globalnych predvolieb,
+  # a to je jedina cesta tejto sady, ktora saha na %APPDATA% (len headless).
+  def with_library
+    paths = [HWS.path, E::HardwareTaxonomy.path]
+    before = paths.map { |p| [p, (File.binread(p) if File.exist?(p))] }
+    # Sandbox je ZDIELANY celym behom — skorsie sady v nom mohli nechat
+    # taxonomiu v stave `:read_only`; pri prvom pristupe sa naseeduje cerstva.
+    FileUtils.rm_f(E::HardwareTaxonomy.path)
+    FileUtils.rm_f("#{E::HardwareTaxonomy.path}.bak")
+    E::JsonFileStore.invalidate(E::HardwareTaxonomy.path)
+    E::HardwareTaxonomy.reset_state!
+    yield
+  ensure
+    before.each do |(p, raw)|
+      raw ? File.binwrite(p, raw) : FileUtils.rm_f(p)
+      FileUtils.rm_f("#{p}.bak")
+      E::JsonFileStore.invalidate(p)
+    end
+    HWS.reset_library_state!
+    E::HardwareTaxonomy.reset_state!
+  end
+
+  def install(doc)
+    FileUtils.mkdir_p(File.dirname(HWS.path))
+    File.binwrite(HWS.path, JSON.pretty_generate(doc))
+    E::JsonFileStore.invalidate(HWS.path)
+    HWS.reset_library_state!
+    true
+  end
+
+  def snapshot_of(sets, mapping)
+    by_id = {}
+    HWS.normalize_sets(sets).each { |s| by_id[s['set_id']] = s }
+    { 'std' => HWS.snapshot_std(mapping, by_id.values), 'mapping' => mapping, 'sets' => by_id }
   end
 end
