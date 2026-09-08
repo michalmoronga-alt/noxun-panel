@@ -141,6 +141,14 @@ module Noxun
       # nemigrovana. Zostava 5.
       DRAWER_ACTIVATION_SCHEMA = 5
 
+      # KOV-F1 (Codex #329 kolo 2 P1): schema, OD KTOREJ su ULOZENE zavesy
+      # spocitane podla NOXUN tabulky (+1 nad 600 mm, klasifikacia otvarania,
+      # nosic `hardware_conflicts`). Skrinka ulozena pod nizsou schemou nesie
+      # STARE pocty a nikto by to nezbadal — zber ju priznava `hinge_stale`.
+      # VLASTNA konstanta z TOHO ISTEHO dovodu ako pri zasuvkach: pri buducom
+      # bumpe na 10 sa skrinky schemy 9 nesmu zrazu tvarit ako nemigrovane.
+      HINGE_ACTIVATION_SCHEMA = 9
+
       MIN = { width: 200.0, height: 200.0, depth: 150.0 }.freeze
       # D-45: povoleny rozsah hrubky korpusu (mm) — JEDINY zdroj pravdy pre clamp
       # v normalize, pre prevzatie hrubky z materialu aj pre projektovy guard.

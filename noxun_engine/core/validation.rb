@@ -726,7 +726,11 @@ module Noxun
           elsif defined?(Recipes) &&
                 (Recipes::BUILD_BLOCKERS.include?(code) || code == Recipes::STALE)
             items << drawer_conflict_item(iss, overrides)
-          elsif BuildPlan::HW_CONFLICT_CODES.include?(code)
+          elsif BuildPlan::HW_ISSUE_BLOCKERS.include?(code)
+            # KOV-F1 (Codex #329 kolo 2 P1): register nesie DVA zdroje — ulozeny
+            # nosic (`door_height_out_of_table`) aj migracny `hinge_stale`.
+            # RED riadok je pre oba TEN ISTY (co sa zastavuje je rovnake), vetu
+            # o naprave nesie sprava zo zberu.
             items << hardware_conflict_item(iss)
           end
         end

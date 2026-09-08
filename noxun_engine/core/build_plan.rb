@@ -211,7 +211,8 @@ module Noxun
       #   * zasuvkove kody (`Recipes::DRAWER_BLOCKERS`) — cast z ulozenych
       #     `drawer_conflicts`, `drawer_kit_missing` z EXPANZIE,
       #   * zavesove kody (`HW_HINGE_BLOCKERS`) — `door_height_out_of_table`
-      #     z ulozenych `hardware_conflicts`, `hinge_set_mismatch` z EXPANZIE.
+      #     z ulozenych `hardware_conflicts`, `hinge_set_mismatch` z EXPANZIE,
+      #     `hinge_stale` zo SCHEMY ulozenej skrinky (`Bom.hinge_stale_issue`).
       # VEPO branu NEDOSTAVA ani jeden zavesovy kod: geometria je spravna,
       # zastavit rezanie by len zablokovalo vyrobu (rovnaka uvaha ako pri
       # `BUILD_BLOCKERS`).
@@ -221,18 +222,33 @@ module Noxun
       # register v case definicie konstanty este neexistuje. Poradie kodov je
       # pritom KONTRAKT — urcuje poradie viet brany, takze musi byt stabilne:
       # najprv cely zasuvkovy register (bajtovo ako doteraz), potom zavesy.
-      HW_HINGE_BLOCKERS = %w[door_height_out_of_table hinge_set_mismatch].freeze
+      # KOV-F1 (Codex #329 kolo 2 P1): MIGRACNY kod závesov — skrinka je ulozena
+      # este PRED tabulkou (`config_schema` < `CabinetBuilder::HINGE_ACTIVATION_
+      # SCHEMA`), takze jej `config.hardware[]` nesie STARE pocty (bez +1 nad
+      # 600 mm, bez klasifikacie/Tip-On setu) a ziadny nosic `hardware_conflicts`
+      # z nej nevznikol. Vzor `Recipes::STALE`: naprava je PRESTAVBA.
+      HINGE_STALE = 'hinge_stale'
+
+      HW_HINGE_BLOCKERS = %w[door_height_out_of_table hinge_set_mismatch hinge_stale].freeze
 
       # Kody, ktore smie niest ULOZENY nosic `hardware_conflicts` (viz
       # `validate_hardware_conflicts!`). `hinge_set_mismatch` medzi nimi NIE JE —
       # vznika az pri EXPANZII (aj po zmene mapovania bez prestavby), takze ho
-      # brana cita z `expansion['unmapped']`, nie z configu.
+      # brana cita z `expansion['unmapped']`, nie z configu. `hinge_stale` tiez
+      # nie — vznika pri ZBERE zo schemy configu, nie zo zapisaneho nosica.
       HW_CONFLICT_CODES = %w[door_height_out_of_table].freeze
+
+      # Zavesove kody, ktore prichadzaju z NALEZOV zberu (`Bom.collect` ->
+      # `hardware_issues`): ulozeny nosic + migracny `hinge_stale`. Cita ich
+      # Kontrola (RED riadok) aj brana exportov; `hinge_set_mismatch` tu NIE JE
+      # (ten ma zdroj v expanzii).
+      HW_ISSUE_BLOCKERS = (HW_CONFLICT_CODES + [HINGE_STALE]).freeze
 
       # SK nazvy zavesovych dovodov pre BRANU (vzor `Recipes::BLOCKER_LABELS`).
       HW_BLOCKER_LABELS = {
         'door_height_out_of_table' => 'dvierka sú vyššie než tabuľka závesov',
-        'hinge_set_mismatch'       => 'vybraný set závesov nesedí so spôsobom otvárania'
+        'hinge_set_mismatch'       => 'vybraný set závesov nesedí so spôsobom otvárania',
+        'hinge_stale'              => 'skrinka má závesy spočítané ešte spred Noxun tabuľky'
       }.freeze
 
       def self.hw_blockers

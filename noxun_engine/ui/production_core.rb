@@ -1247,7 +1247,9 @@ module Noxun
       # a cita JEDINY register (`BuildPlan.hw_blockers`) — zasuvkove kody
       # v POVODNOM poradi a za nimi zavesove. Zasuvkove vystupy su preto
       # BAJTOVO ROVNAKE; zavesove kody VEPO nikdy neblokuju (geometria je
-      # spravna, blokovat rezanie by len zastavilo vyrobu).
+      # spravna, blokovat rezanie by len zastavilo vyrobu) — vratane migracneho
+      # `hinge_stale` (Codex #329 kolo 2 P1): stara skrinka ma dielce aj rozmery
+      # spravne, chybne su LEN pocty kovania.
       def hardware_blockers(collected, expansion, scope: :all)
         return [] unless defined?(Recipes)
 
@@ -1256,7 +1258,7 @@ module Noxun
         # REZACIE data — dnes migracny `drawer_stale` (dielce v .skp chybaju).
         from_issues = if scope == :all
                         Recipes::BUILD_BLOCKERS + Recipes::ALL_EXPORT_BLOCKERS +
-                          BuildPlan::HW_CONFLICT_CODES
+                          BuildPlan::HW_ISSUE_BLOCKERS
                       else
                         Recipes::ALL_EXPORT_BLOCKERS
                       end

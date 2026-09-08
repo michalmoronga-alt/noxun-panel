@@ -144,6 +144,12 @@ module Noxun
             # nakup by boli NEUPLNE — a ticho. Fail-closed RED + brana.
             st = drawer_stale_issue(cid, inst.persistent_id, ccfg)
             hardware_issues << st if st
+            # KOV-F1 (Codex #329 kolo 2 P1): TEN ISTY vzor pre ZAVESY. Skrinka
+            # ulozena pred tabulkou nesie stare pocty v `config.hardware[]`
+            # a ziadny nosic konfliktu z nej nevznikol — bez tejto brany by
+            # nakup, rozpocet aj ponuka presli s poddimenzovanymi zavesmi.
+            hs = hinge_stale_issue(cid, inst.persistent_id, ccfg)
+            hardware_issues << hs if hs
             cs = ccfg['hardware_sets']
             note_cabinet_sets(cid, (cs.is_a?(Hash) && !cs.empty? ? cs : nil),
                               cabinet_sets, cabinet_sets_seen, cabinet_set_conflicts)
@@ -410,6 +416,42 @@ module Noxun
           'message' => "Skrinka #{owner_id} má zásuvku klasifikovanú pred aktivovaním receptov — " \
                        'prestav ju (zmeň a vráť rozmer alebo klikni Prestavať), inak jej v kusovníku ' \
                        'chýbajú dielce zásuvky a v nákupe správny výsuv.',
+          'label' => PartKeys.human_label(pkey, fronts: items).to_s }
+      end
+
+      # === KOV-F1 (Codex #329 kolo 2 P1): NEPRESTAVANE ZAVESY =================
+      #
+      # Skrinka ULOZENA PRED tabulkou zavesov (`config_schema` <
+      # `CabinetBuilder::HINGE_ACTIVATION_SCHEMA`), ktora UZ MA polozky zavesov.
+      # Jej `config.hardware[]` nesie pocty podla STAREJ tabulky: bez +1 nad
+      # sirku 600 mm, bez klasifikacie otvarania (Tip-On by dostal klasicky set)
+      # a bez nosica `hardware_conflicts` (RED nadvyska nad 2800 mm z nej nikdy
+      # nevznikne). Nova vetva pritom cita LEN ULOZENE hodnoty — nic sa
+      # neprepocitava — takze bez tejto brany by nakupny CSV, rozpocet aj
+      # cenova ponuka presli s PODDIMENZOVANYMI zavesmi a nikto by to nezbadal.
+      # Fail-closed RED; naprava je PRESTAVBA (vtedy sa zapise schema 9 a pocty
+      # sa prepocitaju). VEPO branu NEDOSTAVA — geometria je spravna.
+      # Skrinka BEZ zavesov nalez nerobi (stara schema sama o sebe nie je chyba).
+      # -> nalez | nil
+      def hinge_stale_issue(owner_id, owner_pid, ccfg)
+        return nil unless defined?(CabinetBuilder) && defined?(HardwareRules)
+
+        cfg = ccfg.is_a?(Hash) ? ccfg : {}
+        return nil if CabinetBuilder.config_schema_of(cfg) >= CabinetBuilder::HINGE_ACTIVATION_SCHEMA
+
+        hit = Array(cfg['hardware']).find do |h|
+          h.is_a?(Hash) && h['generic_type'].to_s == HardwareRules::HINGE_OUTPUT
+        end
+        return nil if hit.nil?
+
+        items = cfg['front_items'].is_a?(Array) ? cfg['front_items'] : []
+        pkey = hit['owner_part_key'].to_s
+        { 'code' => BuildPlan::HINGE_STALE, 'severity' => 'red',
+          'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
+          'part_key' => pkey, 'front_id' => PartKeys.front_id(pkey).to_s,
+          'message' => "Skrinka #{owner_id} bola uložená staršou verziou — prestav ju " \
+                       '(zmeň a vráť rozmer alebo klikni Prestavať), závesy sa prepočítajú ' \
+                       'podľa novej tabuľky (+1 nad šírku 600 mm, set podľa otvárania).',
           'label' => PartKeys.human_label(pkey, fronts: items).to_s }
       end
 
