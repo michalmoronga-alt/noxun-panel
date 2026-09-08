@@ -588,8 +588,13 @@ module Noxun
               'options' => opts, 'current' => (known ? cur : nil),
               'stored' => (!value.nil? && !known),
               'value_text' => HardwareSets.mapping_value_text(value, defs),
-              'none_value' => HardwareSets::MAPPING_NONE,
-              'none_label' => class_none_label(key) }
+              # `none_value` = TOKEN volby v `<select>`, `none_send` = HODNOTA,
+              # ktoru JS posle spat (Codex #329 kolo 1 P2 — sentinel je Hash,
+              # panel ho nikdy neskláda sám).
+              'none_value' => HardwareSets::MAPPING_NONE_OPTION,
+              'none_send' => HardwareSets::MAPPING_NONE,
+              'none_label' => class_none_label(key),
+              'unset_label' => class_unset_label(key) }
           end
         end
 
@@ -604,6 +609,20 @@ module Noxun
             '— vedome bez setu (dvierka bez závesov)'
           else
             '— vedome bez setu (RED — zásuvka bez kitu)'
+          end
+        end
+
+        # KOV-F1 (Codex #329 kolo 1 P2): co znamena PRAZDNY riadok — teda ze
+        # kluc v mapovani NIE JE. To NIE JE to iste ako sentinel:
+        #   * zaves — retaz precedencie konci na legacy `hinge`, takze polozka
+        #     set DOSTANE (a zavesy sa objednaju),
+        #   * zasuvka — nizsie sa NEPADA (KOV-C2a), takze kit chyba.
+        # Jedna spolocna veta by pri jednom z nich klamala.
+        def class_unset_label(key)
+          if HardwareSets.mapping_key_type(key).to_s == 'hinge'
+            '— nenastavené (dedí sa z predvoľby „Závesy")'
+          else
+            '— nenastavené (RED — zásuvka bez kitu)'
           end
         end
 

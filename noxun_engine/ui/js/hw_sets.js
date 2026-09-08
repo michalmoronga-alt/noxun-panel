@@ -1620,13 +1620,28 @@
   // (objekt). Prázdne ID = zrušenie mapovania.
   function hwsMapClassValue(row, id){
     if (!id) return '';
-    // KOV-F1: „vedome bez setu" sa ukladá ako SENTINEL (server ho posiela
-    // v `none_value`), nie zmazaním kľúča — pri závesoch by zmazanie znamenalo
-    // „použi projektovú predvoľbu", teda presný opak toho, čo si používateľ vybral.
-    if (row && row.none_value && id === row.none_value) return row.none_value;
+    // KOV-F1: „vedome bez setu" sa ukladá ako SENTINEL, nie zmazaním kľúča —
+    // pri závesoch by zmazanie znamenalo „použi nižšiu úroveň", teda presný
+    // opak toho, čo si používateľ vybral. Codex #329: sentinel je HODNOTA zo
+    // servera (`none_send`), lebo `none_value` je len TOKEN voľby v selecte;
+    // panel doménovú hodnotu nikdy neskladá sám.
+    if (row && row.none_value && id === row.none_value){
+      return row.none_send || null; // starší payload bez hodnoty = nič sa nepošle
+    }
     var o = hwsMapClassPick(row, id);
     if (!o) return null; // neznáme ID sa NEODOSIELA (radšej nič než hádanie)
     return o.selector ? o.selector : (o.set_id || '');
+  }
+  // Ktorá voľba selectu je VYBRANÁ — jedno miesto, jedna odpoveď (Codex #329).
+  // '' = „nenastavené" (kľúč v mapovaní NIE JE) · `none_value` = uložený
+  // sentinel · `HWS_STORED_OPT` = uložená hodnota mimo ponuky · inak ID voľby.
+  // Rozdiel medzi prvými dvoma je vecný: pri závesoch „nenastavené" znamená,
+  // že sa dedí legacy `hinge` (nákup závesy MÁ), sentinel že žiadne nebudú.
+  function hwsMapClassSelectedId(row){
+    if (!row) return '';
+    if (row.none_value && row.current === row.none_value) return row.none_value;
+    if (row.stored) return HWS_STORED_OPT;
+    return row.current || '';
   }
   function hwsMapClassRow(row, action){
     if (!row || !row.key || !row.label) return null;
@@ -1636,17 +1651,30 @@
     sel.setAttribute('data-action-change', 'hws-map-class');
     sel.setAttribute('data-hws-act', action);
     sel.setAttribute('data-hws-mapkey', row.key);
-    var none = hwsMk('option', null, row.none_label || '— bez setu');
-    none.value = row.none_value || '';
-    none.selected = row.current ? (row.current === row.none_value) : !row.stored;
-    sel.appendChild(none);
+    var pick = hwsMapClassSelectedId(row);
+    // Codex #329: „nenastavené" a „vedome bez setu" sú DVE RÔZNE voľby —
+    // prvá kľúč z mapovania zmaže (a pri závesoch sa dedí legacy `hinge`),
+    // druhá uloží sentinel. Riadok BEZ `none_value` (starší payload) má len
+    // prvú a nesie svoj pôvodný popis.
+    var unset = hwsMk('option', null,
+                      (row.none_value ? row.unset_label : row.none_label) ||
+                      row.none_label || '— bez setu');
+    unset.value = '';
+    unset.selected = pick === '';
+    sel.appendChild(unset);
+    if (row.none_value){
+      var none = hwsMk('option', null, row.none_label || '— vedome bez setu');
+      none.value = row.none_value;
+      none.selected = pick === row.none_value;
+      sel.appendChild(none);
+    }
     // F10: uložená voľba, ktorá už v ponuke NIE JE (neaktívny set, set z novšej
     // verzie) sa ZOBRAZÍ, ale nedá sa vybrať znova — inak by select ukazoval
     // prázdno tam, kde projekt hodnotu má, a prvý klik vedľa by ju prepísal.
     if (row.stored){
       var st = hwsMk('option', null, (row.value_text || '') + ' (uložený výber)');
       st.value = HWS_STORED_OPT;
-      st.selected = true;
+      st.selected = pick === HWS_STORED_OPT;
       st.disabled = true;
       sel.appendChild(st);
     }
@@ -1654,7 +1682,7 @@
       if (!o || !o.id) return;
       var op = hwsMk('option', null, o.label);
       op.value = o.id;
-      if (o.id === row.current) op.selected = true;
+      if (o.id === pick) op.selected = true;
       sel.appendChild(op);
     });
     r.appendChild(sel);
@@ -2123,6 +2151,7 @@
       // KOV-D1b: riadky mapovania podľa TRIEDY (server posiela hotové riadky)
       hwsScopeOf: hwsScopeOf, hwsMapClassRows: hwsMapClassRows,
       hwsMapClassPick: hwsMapClassPick, hwsMapClassValue: hwsMapClassValue,
+      hwsMapClassSelectedId: hwsMapClassSelectedId,
       HWS_STORED_OPT: HWS_STORED_OPT,
       HWS_NEW_OPT: HWS_NEW_OPT, HWS_KEY_NEW: HWS_KEY_NEW,
       HWS_KINDS: HWS_KINDS, HWS_PERS: HWS_PERS,
