@@ -177,7 +177,15 @@ a zásuvka by ticho dostala set z projektu namiesto vybraného (Astra #20 B1). B
 · **`7` = KOV-D2a** (VÝŠKOVÝ ZÁMOK zásuvky — záznam `hardware_overrides` s `rule_id recipe:<id>` smie niesť pole `height_variant`, druhá os zámku popri `nominal_length`):
 starší plugin (schéma 6) ho pri normalizácii **zahodí** whitelistom `norm_hardware_overrides`, takže zásuvka by sa ticho vrátila na **automatickú výšku** — teda na iné
 dielce a iný kit (Codex #307 P1). Brány sú tie isté ako pri 5 a 6.
-**`DRAWER_ACTIVATION_SCHEMA` ostáva 5** — je to VLASTNÁ konštanta práve preto, aby bump na 6 ani 7 nespravil z každej skrinky schémy 5 „nemigrovanú" (`drawer_stale`).
+· **`8` = D-118b** (set s VYHRADENOU bunkou `none` = „vedome bez kódu" cestuje v šablónach cez `hardware_set_defs`): starší plugin sentinel nepozná a `member_code` mu vráti
+kód „none", takže by z takej šablóny objednal **neexistujúci kód** — knižnicu a snapshot chráni vlastný marker `HardwareSets::STD_SKIP_CODE`, šablónu práve tento bump.
+· **`9` = KOV-F1** (ZÁVESY): config dostal **trvalý nosič `hardware_conflicts`** (dôvody, pre ktoré je UŽ VYDANÁ položka kovania nesprávna — dnes `door_height_out_of_table`)
+a závesové položky sú **klasifikované** (`use_type: 'door'` + `opening_mode`), takže si set hľadajú TRIEDNYM kľúčom (`class:hinge|classic` / `class:hinge|tipon`) a počet
+môže niesť `+1` nad šírku 600 mm. Starší plugin (schéma 8) nepozná ani jedno: pri prestavbe by nosič zahodil whitelistom `cabinet_config` (RED nadvýška by zmizla), Tip-On
+čelo by ticho dostalo klasický záves z legacy `hinge`, `+1` by neprirátal — a schému 8 by zapísal späť, teda **stratu zvečnil**. Cez .skp na druhom PC to znamená
+nedoobjednané závesy a zlý set BEZ blokády (Codex #329 kolo 1 P1). Brány sú tie isté ako pri 5–8: dopredný `newer_config?` (prestavba, šablóny, kópia) + exportná
+`ProductionCore.export_blockers`.
+**`DRAWER_ACTIVATION_SCHEMA` ostáva 5** — je to VLASTNÁ konštanta práve preto, aby bump na 6 až 9 nespravil z každej skrinky schémy 5 „nemigrovanú" (`drawer_stale`).
 
 **AD-HOC KOVANIE `hardware_manual[]` (KOV-H1, v0.9.18).** Ďalšie pole configu, nie nový zápisový kanál (audit #15 BLOCKER 1): panel ho posiela v `collectAll()` presne ako čelá,
 takže ide cestou `apply_all` → `normalize` → **rebuild** — jeden krok Späť, guardy dokumentu aj skrinky, R-12, `push_selected(dedup: false)`. Cena je prestavba geometrie pri

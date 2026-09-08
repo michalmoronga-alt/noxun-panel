@@ -31,6 +31,8 @@
 #      nesúlad klasifikácie = RED `hinge_set_mismatch`
 #   9) BRÁNY: jediný register `BuildPlan.hw_blockers`; zásuvkové výstupy
 #      BAJTOVO ROVNAKÉ; VEPO závesové kódy neblokujú
+#  10) `CONFIG_SCHEMA` 9 (trvalý nosič + klasifikované závesy): downgrade sa
+#      odmieta s hláškou, staršie schémy sa čítajú a prestavbou dostanú 9
 #
 # MUTACIE, ktore tato sada chyta (kazda by prazdnou sadou presla):
 #   M1  pásmo 849 sa zmení na 850 (výlučne)      -> hranice tabuľky
@@ -50,6 +52,7 @@
 #   M14 zásuvkové brány zmenia poradie/text      -> charakterizácia registra
 #   M15 značka migrácie sa pri zápise stratí      -> snapshot round-trip
 #   M16 varovanie šírky sa posunie o 1 mm         -> hranica 800 / 801
+#   M17 `CONFIG_SCHEMA` ostane na 8               -> schéma 9 a downgrade brána
 require_relative '../helper' unless defined?(NxTest)
 
 require 'json'
@@ -707,6 +710,48 @@ NxTest.test('KOV-F1 (9): zásuvkové brány ostali BAJTOVO ROVNAKÉ') do
      'zásuvka je klasifikovaná ešte spred aktivovania receptov (CAB-2) — oprav to v sekcii Kontrola'],
     c::PC.hardware_blockers(collected, exp, scope: :kit)
   )
+end
+
+# ============================================================================
+# 10 — CONFIG_SCHEMA 9 (Codex #329 kolo 1 P1)
+# ============================================================================
+
+NxTest.test('KOV-F1 (10): trvalý nosič a klasifikované závesy si vyžiadali schému 9') do
+  c = NxKovF
+  # PRESNE cislo strazi VZDY najnovsia davka, ktora ho zdvihla (vzor KOV-D1a R3).
+  NxTest.assert_equal(9, c::CB::CONFIG_SCHEMA, 'KOV-F1 zaviedla schému 9')
+  NxTest.assert_equal(5, c::CB::DRAWER_ACTIVATION_SCHEMA, 'aktivácia zásuviek sa bumpom nehýbe')
+  cfg = c::CB.normalize('width' => 600.0, 'height' => 720.0, 'depth' => 500.0)
+  written = c::CB.cabinet_config(cfg)
+  NxTest.assert_equal(9, written[:config_schema], 'marker sa zapisuje pri KAŽDOM zápise configu')
+  NxTest.assert_equal([], written[:hardware_conflicts],
+                      'nosič `hardware_conflicts` je v configu VŽDY — aj prázdny')
+end
+
+NxTest.test('KOV-F1 (10): DOWNGRADE — config novšej schémy sa NEPRESTAVIA, staršie sa načítajú') do
+  c = NxKovF
+  cur = c::CB::CONFIG_SCHEMA
+  # Starsi plugin sa tu simuluje POSUNUTIM configu o jedno cislo vyssie —
+  # `newer_config?` porovnava PRESNE tak, ako by ho porovnal citac schemy 8
+  # nad configom 9 (vzor charakterizacie KOV-D1a R3; stary plugin sa spustit
+  # neda). Odmietnutie MA hlasku — ticha strata pola je presne to, comu bump
+  # branil (Codex #329 P1).
+  NxTest.assert(c::CB.newer_config?('config_schema' => cur + 1))
+  inst = NxTest::FakeEntity.new
+  inst.set_attribute(c::E::Store::DICT, 'config', JSON.generate('config_schema' => cur + 1))
+  err = NxTest.assert_raise(/novšej verzie/) { c::CB.guard_newer_config!(inst) }
+  NxTest.assert(err.message.include?('novší plugin'), err.message)
+  # Opacny smer: KAZDA staršia schema (aj legacy 0 bez markera) sa cita dalej.
+  (0..cur).each do |s|
+    NxTest.refute(c::CB.newer_config?('config_schema' => s), "schéma #{s} je čitateľná")
+  end
+  NxTest.refute(c::CB.newer_config?({}), 'legacy korpus bez markera nikdy neblokuje')
+  # A pri PRESTAVBE dostane stara skrinka aktualnu schemu — nosic aj
+  # klasifikacia sa tym padom zapisu pod spravnym cislom.
+  old = c::CB.normalize('config_schema' => 8, 'width' => 600.0,
+                        'height' => 720.0, 'depth' => 500.0)
+  NxTest.assert_equal(cur, c::CB.cabinet_config(old)[:config_schema],
+                      'prestavba prepíše marker na aktuálny')
 end
 
 # ============================================================================

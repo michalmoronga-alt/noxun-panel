@@ -118,7 +118,22 @@ module Noxun
       #       (`HardwareSets::STD_SKIP_CODE`), sablonu chrani prave tento bump —
       #       brany su tie iste ako pri 4–7 (dopredny `newer_config?` +
       #       exportna `ProductionCore.export_blockers`).
-      CONFIG_SCHEMA = 8
+      #   9 = KOV-F1 — ZAVESY. Config dostal TRVALE pole `hardware_conflicts`
+      #       (dovody, pre ktore je UZ VYDANA polozka kovania nespravna — dnes
+      #       `door_height_out_of_table`, vzor `drawer_conflicts` zo schemy 5)
+      #       a zavesove polozky su KLASIFIKOVANE (`use_type: 'door'` +
+      #       `opening_mode`): set si hladaju TRIEDNYM klucom
+      #       (`class:hinge|classic` / `class:hinge|tipon`) a pocet moze niest
+      #       +1 nad sirku 600 mm. Starsi plugin (schema 8) nepozna ANI JEDNO:
+      #       pri prestavbe by `hardware_conflicts` zahodil whitelistom
+      #       `cabinet_config` (RED nadvyska by zmizla), Tip-On celo by ticho
+      #       dostalo klasicky zaves z legacy `hinge`, +1 by neprical — a schemu
+      #       8 by zapisal SPAT, takze by sa strata zvecnila. Cez .skp na druhom
+      #       PC to znamena nedoobjednane zavesy a zly set BEZ blokady
+      #       (Codex #329 kolo 1 P1). Brany su rovnake ako pri 5–8: dopredny
+      #       guard prestavby/sablon/kopie (`newer_config?`) a exportna brana
+      #       (`ProductionCore.export_blockers`).
+      CONFIG_SCHEMA = 9
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
       # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)

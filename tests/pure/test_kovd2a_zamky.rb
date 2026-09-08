@@ -300,25 +300,28 @@ NxTest.test('KOV-D2a (R1): panelove polia a whitelist normalizacie su TEN ISTY z
                       'panel by inak ulozil pole, ktore normalizacia zahodi')
 end
 
-NxTest.test('KOV-D2a (R1): CONFIG_SCHEMA je 8, aktivacia zasuviek ostava 5') do
+NxTest.test('KOV-D2a (R1): vyskovy zamok potrebuje ASPON schemu 7, aktivacia zasuviek ostava 5') do
   c = NxD2a
-  # D-118b: bump na 8 — sety s vyhradenou bunkou `none` cestuju v sablonach.
-  NxTest.assert_equal(8, c.cb::CONFIG_SCHEMA)
+  # PRESNE cislo `CONFIG_SCHEMA` strazi VZDY najnovsia davka, ktora ho zdvihla
+  # (dnes KOV-F1 = 9); tu sa strazi to, co si vyziadala D2a — vyskovy zamok
+  # potrebuje aspon 7 a `DRAWER_ACTIVATION_SCHEMA` sa s bumpom nehybe.
+  NxTest.assert(c.cb::CONFIG_SCHEMA >= 7, 'vyskovy zamok zaviedol schemu 7')
   NxTest.assert_equal(5, c.cb::DRAWER_ACTIVATION_SCHEMA)
-  # Downgrade: plugin so schemou 8 odmietne PRESTAVBU configu 9; 8 a starsie
-  # prejdu. Vyskovy zamok sa NIKDY ticho neoreze.
-  NxTest.refute(c.cb.newer_config?('config_schema' => 8))
+  # Downgrade: plugin odmietne PRESTAVBU configu NOVSEJ schemy; vlastna
+  # a starsie prejdu. Vyskovy zamok sa NIKDY ticho neoreze.
+  cur = c.cb::CONFIG_SCHEMA
+  NxTest.refute(c.cb.newer_config?('config_schema' => cur))
   NxTest.refute(c.cb.newer_config?('config_schema' => 6))
-  NxTest.assert(c.cb.newer_config?('config_schema' => 9))
+  NxTest.assert(c.cb.newer_config?('config_schema' => cur + 1))
   inst = NxTest::FakeEntity.new
-  inst.set_attribute(c.e::Store::DICT, 'config', JSON.generate('config_schema' => 9))
+  inst.set_attribute(c.e::Store::DICT, 'config', JSON.generate('config_schema' => cur + 1))
   NxTest.assert_raise(/novšej verzie/) { c.cb.guard_newer_config!(inst) }
 end
 
-NxTest.test('KOV-D2a (R1): prestavba zapise schemu 8 aj bez zamku') do
+NxTest.test('KOV-D2a (R1): prestavba zapise AKTUALNU schemu aj bez zamku') do
   c = NxD2a
   cfg = c.cb.normalize(c.params)
-  NxTest.assert_equal(8, c.cb.cabinet_config(cfg)[:config_schema])
+  NxTest.assert_equal(c.cb::CONFIG_SCHEMA, c.cb.cabinet_config(cfg)[:config_schema])
 end
 
 # ============================================================================
