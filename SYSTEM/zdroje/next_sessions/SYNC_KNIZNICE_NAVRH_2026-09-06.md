@@ -40,7 +40,8 @@ z registry (nie udržiavaný ručne) a guard test stráži, že každý modul vo
 ```
 <root>/library/<store>/
     r0007.michal-pc.3f9a1c2e.json      ← nemenný artefakt publikácie (verzia . PC . uuid), nikdy sa neprepisuje;
-                                      vnútri: { std, parent: "r0006.lucia-ntb.…", assets: { "<id>": "sha1…" }, data }
+                                      vnútri: { std, parent: "r0006.lucia-ntb.…", supersedes: [...], assets: { "<id>": "sha1…" }, data }
+                                      (`supersedes` žije V KAŽDOM artefakte — manifest ho len zrkadlí; Codex #323 kolo 2 P1)
     r0007.lucia-ntb.9b02d7aa.json      ← druhý artefakt tej istej verzie = KOLÍZIA (obaja odoslali z r0006)
     r0008.michal-pc.51ee0c4b.json      ← víťaz konfliktu, manifest nesie supersedes: [oba r0007]
     manifest.json                       ← ukazovateľ: { rev: 8, artifact: "r0008.michal-pc.51ee0c4b.json", supersedes: [...], by, at }
@@ -58,7 +59,7 @@ z registry (nie udržiavaný ručne) a guard test stráži, že každý modul vo
   1. prečítať `manifest.json` + **zoznam artefaktov**; ak existuje `publish.lock` cudzieho PC mladší než TTL → počkať / oznámiť;
   2. `manifest.artifact == base_artifact` a bez cudzích artefaktov `r(base_rev+1)` → zapísať artefakt `r(base_rev+1).<pc>.<uuid>.json` (temp + rename; vnútri `std`
      store-u, `parent = base_artifact`, digesty príloh — súbory sa nahrajú **pred** artefaktom), potom `manifest.json` (temp + rename, **posledný** = pečiatka hotovo) s
-     `supersedes: []`; lokálne `base_artifact = nový`;
+     zrkadlom `supersedes` artefaktu (bežná publikácia `[]`); lokálne `base_artifact = nový`;
   3. inak **konflikt** (§4).
   Google Disk môže oba zápisy z dvoch PC doručiť krížom — preto artefakty nikdy nezdieľajú názov (**uuid per publikácia** — aj dve inštancie SketchUpu na jednom PC či
   opakovanie po páde pred posunom `base_rev` dostanú nové meno) a manifest je len ukazovateľ.
@@ -71,7 +72,8 @@ z registry (nie udržiavaný ručne) a guard test stráži, že každý modul vo
   aktuálneho `manifest.artifact` (cez `parent`) spolu so všetkými id v `supersedes` každého článku reťaze = **pokryté** artefakty. **Každý artefakt mimo pokrytia je nevyriešená
   odbočka = kolízia** — bez ohľadu na verziu a meno PC: dva artefakty tej istej `R` z rôznych publikácií, **aj oneskorený artefakt nižšej verzie** (PC B publikovalo `r0007`,
   Disk ho doručil až po tom, čo PC A z vlastného `r0007` urobilo `r0008` — `r0008` z B nevyšlo ani ho neprekonalo, preto sa B nesmie ticho stratiť). Kolízia je vyriešená až keď
-  novšia publikácia uvedie odbočku v `supersedes`. Prekonané (pokryté) artefakty uprace zametanie (necháva posledné N verzií + všetko v `supersedes` aktuálnej reťaze).
+  novšia publikácia uvedie odbočku v **`supersedes` v samom artefakte** (manifest sa prepíše ďalšou bežnou publikáciou — keby `supersedes` žilo len v ňom, vyriešená odbočka by sa
+po `r0009` znova hlásila; preto reťaz predkov číta `supersedes` z každého článku). Prekonané (pokryté) artefakty uprace zametanie (necháva posledné N verzií + všetko v `supersedes` aktuálnej reťaze).
 - **Štart pluginu:** per store porovná **identitu artefaktov** (`manifest.artifact` vs. `base_artifact`, nie len čísla verzií) **a spustí tú istú detekciu kolízie** (§3 vyššie —
   Codex #323 P1: po súbežnej publikácii môže mať klient `manifest.rev == base_rev` a pritom existujú dva artefakty tej verzie); **oznámi** („Materiály: zdieľaná rev. 43, moja 42 ↑"
   / „Materiály: KOLÍZIA — 2 publikácie rev. 43"); nič nesťahuje. Všetky čítania zo zdieľaného koreňa s **časovým limitom** (vzor updater check: vlákno + deadline; Disk v režime
@@ -87,7 +89,8 @@ zlučovanie po záznamoch (verzia = celý store; zlučovanie až keby konflikty 
 ## 5 · Riziká
 
 1. Disk doručí dva manifesty krížom → Disk vyrobí konfliktnú kópiu súboru `manifest (1).json`; klient berie **artefakty ako pravdu**, manifest len ako ukazovateľ; cudzie kópie
-   manifestu ohlási a ponúkne „obnoviť manifest z artefaktov" (víťaz = najvyššia verzia s jediným artefaktom, inak konflikt §4).
+   manifestu ohlási a ponúkne „obnoviť manifest z artefaktov" — kandidát je jednoznačný **len keď jeho reťaz predkov + `supersedes` pokrýva každý viditeľný artefakt**
+(Codex #323 kolo 2 P1: „najvyššia verzia s jediným artefaktom" nestačí — `r0008` z A by skryl oneskorený `r0007` z B); inak konflikt §4.
 2. Rozdielne verzie pluginu → brány R-11/R-12 odmietnu novší artefakt → hláška na updater (rovnaký koreň).
 3. Rozpísaný súbor počas synchronizácie → temp + rename (existujúci vzor `JsonFileStore`).
 4. Zákazka s materiálom, ktorý druhé PC nemá → snapshot na skrinke je autorita, „chýba v katalógu" ako dnes pri kovaní.
@@ -101,7 +104,9 @@ zlučovanie po záznamoch (verzia = celý store; zlučovanie až keby konflikty 
 | **SYNC-0 registry** | `StoreRegistry` (§1): explicitná registrácia každého store (shared / local, `current_std`, `assess_import`, prílohy), `JsonFileStore` odmietne neregistrovaný store, guard test nad volajúcimi modulmi; bez zmeny správania store-ov | **ÁNO** (kontrakt perzistencie) |
 | **SYNC-1 jadro** | čistý modul (bez `Sketchup.*`): manifest + artefakty (uuid, `parent`, `std`, digesty príloh), **lineage detekcia** (§3) aj pri štarte, `base_artifact` + lokálne zmeny per store, **dopredná brána v sync vrstve** pred store API každého registrovaného store, konflikt = vždy publikácia `R+1`, advisory lock, čítanie s deadline; headless testy s mutáciami (kolízia z jedného PC, opakovanie po páde, vyriešená kolízia sa nehlási, **oneskorený artefakt nižšej verzie = kolízia**, prevzatie kandidáta publikuje `R+1`, novší `std` odmietnutý PRED store API, kandidát obnoví svoje súbory podľa digestov) | **ÁNO** (nový modul, zápis do všetkých store-ov) |
 | **SYNC-2 UI** | O plugine: riadky per store, tlačidlá Odoslať / Aktualizovať, konfliktný modal (D-15), oznámenie pri štarte (asynchrónne s deadline) | NIE (nad kontraktom SYNC-1), in-SU smoke na oboch PC |
-| **SYNC-3 súbory** | prílohy spotrebičov, náhľady šablón, `.skm` ako **obsahovo adresované** súbory `files/<sha1>.<ext>` + mapa id → digest v artefakte, migrácia existujúcich (stabilné cesty → digesty), zametanie súborov, na ktoré neukazuje žiadny živý artefakt | ÁNO (migrácia) |
+| **SYNC-3 súbory** | prílohy spotrebičov, náhľady šablón, `.skm` ako **obsahovo adresované** súbory `files/<sha1>.<ext>` + mapa id → digest v artefakte, migrácia existujúcich (stabilné cesty → digesty), zametanie súborov **dvojfázovo** (Codex #323 kolo 2 P1: Disk doručuje súbory a artefakty v ľubovoľnom poradí a súbory idú
+  pred artefaktom, takže „digest bez viditeľného artefaktu" môže byť práve prichádzajúca publikácia): súbor bez odkazu sa najprv **označí** (tombstone so značkou času,
+  publikovaný v ďalšom artefakte) a zmaže sa až po **ochrannej lehote** (default 14 dní) a stále bez odkazu; rovnaká lehota platí pre prekonané artefakty | ÁNO (migrácia) |
 
 Smoke na oboch PC s reálnym Diskom: naschvál vyrobená kolízia (obaja odošlú z tej istej verzie) → obaja ju vidia → vyriešenie → **už sa nehlási** · odpojený Disk → hláška, nič
 nezamrzne · novší plugin na jednom PC → odmietnutie s odkazom na updater.
@@ -112,4 +117,5 @@ nezamrzne · novší plugin na jednom PC → odmietnutie s odkazom na updater.
 #322 kolo 3 P1: vyriešené kolízie sa hlásili donekonečna → `supersedes` · #322 kolo 3 P1: produkčné store-y chýbali → záväzný zoznam §1 · **#323 kolo 1:** štart porovnáva
 identitu artefaktov a robí detekciu (P1) · prevzatie kandidáta publikuje `R+1` so `supersedes` (P1) · dopredná brána v sync vrstve pred store API — store-y ju nemajú (P1) ·
 oneskorený artefakt nižšej verzie = kolízia → lineage cez `parent` namiesto čísla verzie (P1) · súbory obsahovo adresované s digestmi v artefakte (P1) · `StoreRegistry` ako
-SYNC-0, nie guard nad neexistujúcimi registráciami (P2).
+SYNC-0, nie guard nad neexistujúcimi registráciami (P2) · **#323 kolo 2 P1:** `supersedes` v každom artefakte, manifest len zrkadlí · rekonštrukcia manifestu cez pokrytie
+lineage, nie „najvyššia verzia" · zametanie súborov dvojfázovo s ochrannou lehotou (súbory idú pred artefaktom, Disk mimo poradia).
