@@ -16901,13 +16901,18 @@ module NoxunSuRunner
   end
 
   # Skrinka s JEDNYM riadkom ciel o PEVNEJ vyske — vsetky scenare stavaju na
-  # nej, meni sa len rozmer alebo otvaranie. Korpus je o 150 mm vyssi nez celo
-  # (sokel 100 + medzery), aby sa celo vzdy zmestilo.
-  def kovf_params(front_h, width = 600.0, front = {})
+  # nej, meni sa len rozmer alebo otvaranie. Korpus je o `sokel + 50` vyssi
+  # nez celo, aby sa celo vzdy zmestilo.
+  #
+  # PRECO JE SOKEL PARAMETER: vyska korpusu ma STROP 3000 mm (`CabinetBuilder`
+  # ho clampuje), takze celo 2900 mm sa do skrinky so soklom 100 uz NEZMESTI —
+  # scenar „nad tabulkou" preto stavia na sokli 0.
+  def kovf_params(front_h, width = 600.0, front = {}, floor = 100.0)
     item = { 'id' => 'F1', 'type' => 'door', 'mode' => 'fixed',
              'height' => front_h.to_f, 'wings' => '1' }.merge(front)
-    { 'type' => 'lower', 'width' => width.to_f, 'height' => front_h.to_f + 150.0,
-      'depth' => 500.0, 'thickness' => 18.0, 'floor_height' => 100.0,
+    { 'type' => 'lower', 'width' => width.to_f,
+      'height' => front_h.to_f + floor.to_f + 50.0,
+      'depth' => 500.0, 'thickness' => 18.0, 'floor_height' => floor.to_f,
       'fronts' => { 'items' => [item] } }
   end
 
@@ -16939,8 +16944,8 @@ module NoxunSuRunner
     e::Validation.run(e::Bom.collect(model), sheets: e::ProductionCore.sheets_map)['items']
   end
 
-  def kovf_build(model, front_h, width = 600.0, front = {})
-    e::CabinetBuilder.build(model, kovf_params(front_h, width, front))
+  def kovf_build(model, front_h, width = 600.0, front = {}, floor = 100.0)
+    e::CabinetBuilder.build(model, kovf_params(front_h, width, front, floor))
   end
 
   # Prestavba na CELY novy tvar (config sa nahradi) — rozmerove scenare chcu
@@ -17065,7 +17070,7 @@ module NoxunSuRunner
 
   # --- 3) NAD TABULKOU: polozka + RED, rucny zamok RED zhasne -----------------
   def kovf_out_of_table(model, markers)
-    inst = kovf_build(model, 2900.0)
+    inst = kovf_build(model, 2900.0, 600.0, {}, 0.0)
     return ok('KOV-F 2900: vlozenie vysokeho korpusu', false) unless inst
 
     cid = e::Store.get(inst, 'cabinet_id')

@@ -1307,8 +1307,13 @@ module Noxun
         end
       end
 
-      # Hotova hlaska brany zasuviek, alebo nil. Vola sa PRED vyberom priecinka
+      # Hotova hlaska brany kovania, alebo nil. Vola sa PRED vyberom priecinka
       # / suboru — picker sa pri blokade ani neotvori (vzor `newer_config_stop`).
+      #
+      # KOV-F1: nazov ostal `drawer_stop` (cita ho osem volajucich), ale od tejto
+      # davky vydava dovody CELEHO registra `BuildPlan.hw_blockers` — teda aj
+      # zavesove. Premenovanie by bolo cisto kozmeticka zmena osmich miest;
+      # co brana zastavuje, hovori register, nie meno metody.
       def drawer_stop(collected, expansion, scope: :all)
         if drawer_expansion_unproven?(collected, expansion)
           return export_blocked_status(
