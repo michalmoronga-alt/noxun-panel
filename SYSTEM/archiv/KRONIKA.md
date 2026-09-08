@@ -17,6 +17,17 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-121 — DOPLNENIE PO REVIEW A IN-SU BEHU (8.9.2026 dopoludnia; docs PR #326).**
+  Odseky D-121a a D-121b nižšie vznikli v PR #324/#325 **pred** Codex kolami a pred in-SU behom — ostávajú tak, ako boli zapísané (tento súbor sa neprepisuje);
+  toto je ich datované doplnenie. **Review PR #325 (3 kolá = plná brána kontraktovej dávky):** kolo 1 = 3× P2 — nález `name_long` vznikal aj pre riadok, ktorý export
+  VYRADÍ (bez materiálu, nekladný rozmer, ABS mimo katalógu) → `exportable_row?` s tými istými funkciami ako export; `stable_key` z názvu a rozmerov by dva riadky
+  s inou hranou zlial v `dedup` → kľúč je celý `Bom.row_key`; klik pri hinte „Skráť názov dosky" mieril na prvého vlastníka riadku (mohla to byť skrinka) → mieri na
+  prvého `BRD-` vlastníka. Kolo 2 = 1× P1 — architektúra (`outputs.md`, odsek `validation.rb`) opisovala stav pred opravami → prepísaná podľa finálneho správania.
+  Kolo 3 bez nálezov. **Sonda orchestrátora nad hlavou PR** chytila okrajový prípad: voľný názov dosky so začiatočnou medzerou (jediný oddeľovač na indexe 0) dal po
+  oreze **prázdny názov** — chybný riadok objednávky → krajné medzery idú preč pred rezom, rozseknutý token sa zahadzuje len pri kladnom indexe a prázdny výsledok
+  nahrádza tvrdý rez (M7). **Počty po review:** sada D-121b 28 scenárov (M7–M10 z review), headless **3405** zelených, 95 JS sád. **In-SU beh** obe dávky v noci
+  nemali (SketchUp obsadený živou zákazkou); po jej zavretí dobehol 8.9. dopoludnia nad mainom v0.9.46 — **1965 PASS, 0 FAIL** (plugin preinštalovaný z mainu).
+
 - **D-121b — NÁZOV RIADKU VEPO JE VŽDY ≤ 20 ZNAKOV (kontrakt v1.2; v0.9.46, 8.9.2026).**
   **Fakt, ktorý zmenil kontrakt:** Michal 7.9.2026 overil v praxi, že **import objednávky VEPO pole `nazov` nad 20 znakov ODMIETA**. Kontrakt v1.1 pritom tvrdil, že 20 znakov
   je len tlač nálepky a CSV pole nesie 60 (`NAME_MAX = 60`) — takže sa dlhé riadky pred odoslaním prepisovali **ručne**. Nie je to teda kozmetika, ale revízia kontraktu na **v1.2**.

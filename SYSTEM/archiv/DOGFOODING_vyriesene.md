@@ -143,6 +143,8 @@ pred dedupom → záznamy per bucket, riadok s rozmermi/ks/vlastníkmi; (4) test
 v `test_d112_d113_vepo.rb` a `test_vepo_export.rb`. In-SU beh v žiadnej z oboch dávok nebežal — SketchUp bol obsadený živou zákazkou a zmena je výhradne reťazec názvu
 (žiadny builder, observer ani geometria).
 
+**Doplnenie (8.9.2026 dopoludnia, docs PR #326):** po Codex review PR #325 (3 kolá: 3× P2 · 1× P1 architektúra · bez nálezov) má sada D-121b **28 scenárov** (M7–M10: prázdny názov po oreze pri voľnom názve so začiatočnou medzerou, vyradené riadky bez nálezu, identita nálezu = celý `Bom.row_key`, klik pri hinte o doske mieri na dosku); headless **3405**. In-SU beh dobehol po zavretí zákazky nad mainom v0.9.46 — **1965 PASS, 0 FAIL**. Priebeh v [KRONIKA.md](KRONIKA.md).
+
 ### D-95 · Režim krížovej kontroly „diel po diele" (Michal 9.8.2026; uzavreté bez implementácie 6.9.2026 — rozhodnutie v debate V1, bez PR)
 
 **Pôvodné znenie (presunuté z DOGFOODING.md):**
