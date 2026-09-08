@@ -187,7 +187,12 @@ zdrojom; kovanie cez `Panel.merge_override(..., :all, nil)`, teda tú istú mut�
 **ŠT-3b-2c1 — BRÁNA TVARU PRAVIDIEL PRI ULOŽENÍ:** čistá `HardwareRules.rules_problems(rules)` (bez IO) sa volá **výhradne** v `handle_save`, **až PO `normalize_rules`** (validuje
 sa presne to, čo sa zapíše). Vynucuje sa: `kind == 'bands'` so `enabled != false` ⇒ neprázdne pásma a medzi nimi **pásmo „všetko nad"** (`max: null`); `kind == 'fit_series'` ⇒
 neprázdny rad `series`; **KOV-F1 (Codex #329 kolo 3 P2):** `bands` so `finite: true` navyše potrebuje **aspoň jedno ČÍSELNÉ pásmo** — konečná tabuľka,
-v ktorej ostal len catch-all, nie je tabuľka (catch-all by dal svoj počet každému čelu a každé by zároveň bolo „mimo tabuľky"). Kritérium visí na
+v ktorej ostal len catch-all, nie je tabuľka (catch-all by dal svoj počet každému čelu a každé by zároveň bolo „mimo tabuľky"); **KOV-F2 (v0.9.51):** keď pravidlo
+nesie `weight_bands`, musí to byť **použiteľná tabuľka** — neprázdna (`weight_bands_problem`), každé pásmo s **kilogramami > 0** a **žiadne dve pásma s rovnakou
+hmotnosťou** (druhé by bolo mŕtve). Sú to práve tie tri tvary, ktoré `normalize_rules` **nechá tak**: poradie zoraďuje sama (neusporiadané pásma teda **nie sú
+chyba používateľa**) a pásmo s neplatným počtom **zahodí** — keď vypadnú všetky, chytí to vetva „prázdne". Neplatný `width_plus`/`width_warn_over` sa do brány
+nikdy nedostane (normalizácia ho zahodí — kontrakt F1 „radšej žiadny guard než hádanie"), takže do modelu sa nezmysel nedostane ani bez vety; editor taký tvar
+navyše **ani neposiela** (prázdne alebo nekladné pole = kontrola vypnutá, chýbajúci počet = 1 — viď [ui-lifecycle.md](ui-lifecycle.md)). Kritérium visí na
 **`kind`, nie na prítomnosti kľúča `bands`** — `kind` je jediná autorita toho, ktorá vetva vyhodnotenia sa spustí, a `normalize_rules`
 neznáme kľúče zachováva, takže záznam smie niesť oba kľúče naraz (novšia verzia formátu, cudzí či legacy snapshot, zvyšok po zmene `kind` vo formulári) a validovať mu treba len to,
 čo sa naozaj použije; vypnuté pravidlo sa nekontroluje a neznámy `kind` z novšej verzie uloženie neblokuje.

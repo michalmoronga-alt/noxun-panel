@@ -17,6 +17,29 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-F2 — KONTROLY DVIEROK SA DAJÚ NASTAVIŤ (editor door guardov v Pravidlách; PR #330, v0.9.51, 9.9.2026).**
+  F1 dala pravidlu závesov voliteľné kontroly (`width_plus`, `width_warn_over`, `weight_bands`, `finite`), ale sekcia Pravidlá ich vedela len **prečítať jednou vetou** —
+  používateľ videl tabuľku výšok a netušil, prečo mu pri širokom krídle vyšiel záves navyše, a už vôbec to nevedel zmeniť. F2 z nich robí **formulár**: zbaliteľný blok
+  **„Kontroly dvierok"** pod tabuľkou výšok (šírka pre +N · varovanie nad šírku · tabuľka hmotností s pridávaním a mazaním riadkov · prepínač „tabuľka je konečná").
+  **Vertikálny priestor:** blok je `<details>` a je **zavretý** — súhrn v lište („+1 nad 600 mm · varovanie nad 800 mm · 2 hmotnostné pásma · konečná tabuľka") povie,
+  čo skrýva, a otvorený stav sa pamätá **podľa `rule_id`**, takže pridanie pásma (prekreslenie formulára) blok nezavrie. Read-only veta F1 (`rdGuardHint`) **zanikla** —
+  ten istý údaj nesmie byť na obrazovke dvakrát.
+  **Kde bola skutočná otázka dávky:** čo sa smie uložiť. Serverová `normalize_rules` (kontrakt F1 „radšej žiadny guard než hádanie") **zahadzuje** neplatný
+  `width_plus`/`width_warn_over`, a zápisová brána beží **až za ňou** — server teda taký tvar nikdy neuvidí a vetu o ňom povedať nemôže. Namiesto rozdielnych kritérií
+  (klient odmietne, server ticho pustí — presne to, čomu má brániť fixtúra parity) sa **stav stal nevyrobiteľným**: prázdne alebo nekladné pole = **kontrola vypnutá**
+  (vzor „prázdne pole je AUTO"), chýbajúci počet kusov = **1** (rovnaký clamp, aký má editor výškových pásiem od začiatku), odškrtnutý prepínač = kľúč preč (nikdy
+  `false`). Do modelu sa tak nezmysel nedostane ani jednou cestou. **Vety pre `over`/`warn` ≤ 0 a `add` < 1 z pôvodného znenia F2 teda nevznikli** (vedomá odchýlka
+  zapísaná v [../PLAN.md](../PLAN.md)) — boli by mŕtvou vetvou servera.
+  **Validujú sa tri veci, a to práve tie, ktoré normalizácia NECHÁ TAK:** hmotnostná tabuľka, ktorá ostala prázdna · pásmo bez kilogramov · dve pásma s rovnakou
+  hmotnosťou (druhé by bolo mŕtve). Hmotnostné pásma sú tu **výnimkou z clampovania**: riadok, ktorý používateľ vedome pridal, sa nezahadzuje — prázdne kilogramy idú
+  ako `null` a uloženie sa **odmietne vetou** na oboch stranách (`HardwareRules.weight_bands_problem` + JS `rdWeightProblem`). **Poradie pásiem sa nevynucuje**, server
+  ich zoraďuje sám; riadok s neplatným počtom normalizácia zahodí a keď vypadnú všetky, chytí to vetva „prázdne". „Všetko nad" ostáva povinné aj s `finite`
+  (rozhodnutie F1 — catch-all drží starší čítač).
+  **Testy:** 3510 headless (+16, nová sada `test_kovf2_editor_zavesy.rb`) · 98 JS sád (+1, `test_kovf2_editor_zavesy.js` nad mini-DOM — 50 assertov cez skutočný DOM,
+  lebo „prázdne pole = guard preč" a „pridanie pásma nezhodí rozpísané hodnoty" sa stubom overiť nedá) · spoločná fixtúra parity má **26 prípadov** (+11).
+  In-SketchUp beh nebežal — UI dávka bez builderov a observerov (posledný plný beh je z vetvy KOV-F1, 2028 PASS / 0 FAIL). **Tým je blok KOV-F KOMPLET**, z KOVANIA
+  ostáva E → G → I.
+
 - **KOV-F1 — TRETIE (POSLEDNÉ) FIX KOLO PO CODEX GH REVIEW #329 (9.9.2026; ten istý PR #329, v0.9.49 → v0.9.50 — mení sa `ui/js/rules.js`).**
   Kolo 3 vrátilo 2× P1 + 2× P2 a **štvrté kolo sa už nekonalo** (pravidlo 3 kôl): opravy prešli internou verifikáciou + plným in-SketchUp behom.
   Všetky štyri nálezy sú opäť o **tichých stavoch, ktoré by prešli bránami** — a dva z nich boli priamym dôsledkom opráv z kola 2.
