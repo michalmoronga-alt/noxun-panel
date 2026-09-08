@@ -415,6 +415,26 @@
       'výšok. Prázdne pole = kontrola je vypnutá.</div></div></details>';
   }
 
+  // Codex #330 kolo 1 (P2): ZBALENIE bloku je okamih, keď formulár zmizne
+  // z očí a hovoriť zaň začne SÚHRN v lište. Hodnoty polí ale žijú LEN v DOM
+  // (do `RD_RULES` sa preberajú až pri „+ pásmo" / „✕" / Uložiť), takže bez
+  // tohto kroku by lišta ukazovala stav SPRED úpravy — a používateľ by veril,
+  // že sa jeho zmena stratila (alebo naopak, že tam ešte je).
+  //
+  // Preberá sa TÝM ISTÝM zberom ako pri ukladaní (`rdSyncFromForm`), aby
+  // súhrn a uložené dáta nemohli povedať dve rôzne veci. PREKRESLIŤ sa
+  // NESMIE: `rdRender` by zahodil `<details>`, nad ktorým práve beží udalosť
+  // (a s ním zameranie) — mení sa preto len text lišty.
+  function rdGuardRefresh(det){
+    var host = det.closest ? det.closest('.rrule') : null;
+    var sum = det.querySelector ? det.querySelector('.rgsum') : null;
+    if (!host || !sum) return;
+    var i = parseInt(host.dataset ? host.dataset.i : '', 10);
+    rdSyncFromForm();
+    var r = RD_RULES[i];
+    if (r) sum.textContent = rdGuardSummary(r);
+  }
+
   // Zapamätanie otvoreného bloku. Kľúčom je `rule_id` (nie index) — pravidlá
   // sa môžu preskupiť a index by po prekreslení ukazoval na cudzí blok.
   function rdGuardToggle(det){
@@ -423,6 +443,7 @@
       ? det.open
       : !!(det.hasAttribute && det.hasAttribute('open'));
     RD_GUARD_OPEN[String(det.dataset ? (det.dataset.rid || '') : '')] = open;
+    if (!open) rdGuardRefresh(det);
   }
   if (typeof window !== 'undefined') window.rdGuardToggle = rdGuardToggle;
 

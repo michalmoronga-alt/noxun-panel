@@ -26,6 +26,8 @@
 //   R9 kľúč v NESPRÁVNOM tvare (hash/reťazec/číslo z cudzieho snapshotu)
 //      sekciu NEZHODÍ — vykreslí sa ako prázdna tabuľka s hintom a uložením
 //      sa opraví (Codex #330 kolo 1).
+//  R10 ZBALENIE bloku prevezme formulár a obnoví súhrn — inak by lišta
+//      ukazovala stav spred úpravy (Codex #330 kolo 1).
 //
 // MUTÁCIE (každá overená ručne — po zanesení chyby do rules.js spadne test):
 //   M1 `rdHasGuardEditor` vracia true pre každé `bands` -> R1
@@ -35,6 +37,7 @@
 //   M5 `rdAddWeight` nevolá `rdSyncFromForm`             -> R7
 //   M6 stav otvorenia sa drží podľa indexu pravidla      -> R8
 //   M7 `rdGuardHtml` kreslí pásma bez `rdArr`            -> R9
+//   M8 `rdGuardToggle` len zapíše stav otvorenia         -> R10
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
@@ -295,6 +298,48 @@ function rule(){ return R.rdCollectRules()[0]; }
   show([{ rule_id: 'vysuvy', kind: 'fit_series', output: 'slide', enabled: true,
           series: { a: 1 }, clearance: 10, quantity: 1, applies_to: { role: 'drawer_front' } }]);
   eq(DOC.querySelector('.rseries').value, '', 'R9: a rovnako rad dĺžok — pole ostane prázdne');
+})();
+
+// ---- R10: ZBALENIE bloku obnoví súhrn v lište ------------------------------
+(function(){
+  // Codex #330 kolo 1 (P2). Po úprave poľa a zbalení bloku hovorí za formulár
+  // UŽ LEN súhrn — hodnoty pritom žijú v DOM a do `RD_RULES` sa preberajú až
+  // pri „+ pásmo" / „✕" / Uložiť. Bez synchronizácie by lišta ukazovala stav
+  // spred úpravy a používateľ by veril, že sa jeho zmena stratila.
+  show([hingeRule()]);
+  const det = guardBox();
+  det.setAttribute('open', '');
+  R.rdGuardToggle(det);            // používateľ blok OTVORIL
+  field('.rgover').value = '700';  // …a zmenil šírku 600 -> 700
+  det.removeAttribute('open');
+  R.rdGuardToggle(det);            // …a zase ho ZBALIL
+  const sum = md.textOf(DOC.querySelector('.rgsum'));
+  eq(sum.indexOf('+1 nad 700 mm'), 0, 'R10: lišta hovorí hodnotu PO úprave: ' + sum);
+  eq(rule().width_plus, { over: 700, add: 1 }, 'R10: a model drží to isté číslo');
+  eq(DOC.querySelectorAll('.rgwb').length, 2,
+     'R10: obnova súhrnu formulár NEPREKRESLÍ (blok, na ktorom beží udalosť, ostáva)');
+
+  // Vyčistené pole = kontrola je vypnutá; aj to musí lišta povedať HNEĎ.
+  show([{ rule_id: 'uchytky-pasma', kind: 'bands', output: 'handle', enabled: true,
+          bands: [{ max: null, quantity: 1 }], width_warn_over: 700,
+          applies_to: { role: 'front_door' } }]);
+  const d2 = guardBox();
+  d2.setAttribute('open', '');
+  R.rdGuardToggle(d2);
+  field('.rgwarn').value = '';
+  d2.removeAttribute('open');
+  R.rdGuardToggle(d2);
+  eq(md.textOf(DOC.querySelector('.rgsum')), 'zatiaľ nič',
+     'R10: vyčistené pole = „zatiaľ nič" hneď pri zbalení, nie až po prekreslení');
+
+  // OTVORENIE nič nepreberá — vo formulári sú tie isté hodnoty, ktoré tam boli.
+  show([hingeRule()]);
+  const d3 = guardBox();
+  field('.rgover').value = '900';
+  d3.setAttribute('open', '');
+  R.rdGuardToggle(d3);
+  eq(md.textOf(DOC.querySelector('.rgsum')).indexOf('+1 nad 600 mm'), 0,
+     'R10: pri otváraní sa lišta neprepisuje (súhrn číta zbalený blok)');
 })();
 
 // ---- escapovanie identity v atribúte ---------------------------------------
