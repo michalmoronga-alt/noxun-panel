@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **KOV-W — HMOTNOSŤ DIELCOV A ČIEL + D-125 (8.9.2026; PR #N, v0.9.47).** Závesy (KOV-F) a výklopy (KOV-E) potrebujú hmotnosť čela a Inspector mal od UI 2.0 prázdny
+- **KOV-W — HMOTNOSŤ DIELCOV A ČIEL + D-125 (8.9.2026; PR #328, v0.9.47).** Závesy (KOV-F) a výklopy (KOV-E) potrebujú hmotnosť čela a Inspector mal od UI 2.0 prázdny
   riadok „Hmotnosť" — hustota per typ materiálu pritom v katalógu žila od M-C a nikto z nej nič nepočítal. Dávka postavila **jeden vzorec** (`Materials.weight_kg`,
   mm × kg/m³ / 1e9) a napojila naň tri miesta: **plán** (`build_plan(densities:)` → aditívne `weight_kg`/`weight_estimated` na každom deskriptore vrátane dielcov
   zásuviek, plnené `CabinetBuilder.part_densities`), **súčet nad výrobnými snapshotmi** (`Bom.weight_totals`) a **riadok Hmotnosť** v Inspectore (`Panel.cabinet_stats`

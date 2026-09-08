@@ -4,7 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
-- **D-125** — Riadok „Hmotnosť" v Inspectore ukazuje skutočnú hmotnosť skrinky; neznáma hustota sa neignoruje ani nevymýšľa — ráta sa ťažšie a prizná sa („≈" + tooltip, ORANGE v Kontrole) — vyriešené 8.9.2026, PR #N (KOV-W), v0.9.47
+- **D-125** — Riadok „Hmotnosť" v Inspectore ukazuje skutočnú hmotnosť skrinky; neznáma hustota sa neignoruje ani nevymýšľa — ráta sa ťažšie a prizná sa („≈" + tooltip, ORANGE v Kontrole) — vyriešené 8.9.2026, PR #328 (KOV-W), v0.9.47
 - **D-121** — Názvy dielcov zásuvky sú ľudské (`Zas dno 2 s1`) a názov riadku VEPO je vždy ≤ 20 znakov (kontrakt v1.2: zlučovanie čísel, orez po slovách s upozornením v Kontrole a LOGu) — vyriešené 8.9.2026, PR #324 + #325, v0.9.45 + v0.9.46
 - **D-95** — Režim krížovej kontroly „diel po diele" — **uzavreté bez implementácie 6.9.2026** (Michal: odškrtávanie ide preč natrvalo, ostáva vizuálna kontrola; presety/X-ray = koncept 01 v zásobníku), bez PR
 - **D-51** — Štandard veľkostí okien a tlačidiel — uzavreté 6.9.2026 rozhodnutím (Michal: veľkosť okien je OK; Inspector 470 × 810 z UI-B1, satelity zanikli v Štúdiu), bez PR
@@ -108,7 +108,7 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené (plné texty)
 
-### D-125 · Hmotnosť v Inspectore (Základné) je prázdny placeholder (Michal 6.9.2026; vyriešené 8.9.2026 — dávka KOV-W, PR #N, v0.9.47)
+### D-125 · Hmotnosť v Inspectore (Základné) je prázdny placeholder (Michal 6.9.2026; vyriešené 8.9.2026 — dávka KOV-W, PR #328, v0.9.47)
 
 **Pôvodné znenie (presunuté z DOGFOODING.md):**
 
@@ -124,7 +124,7 @@ zadávaní KOV-W zmenil: dielec, ktorého materiál hustotu nemá (UNI · typ mi
 v registri **okrem kompaktu** (`Materials.fallback_density`; kompakt 1350 by odhad zdvojnásobil). Dôvod je stolársky: pri závesoch a výklopoch je podhodnotená hmotnosť
 nebezpečná, nadhodnotená len drahšia. „—" ostáva **výhradne** pre skrinku bez výrobných dielcov.
 
-**Riešenie (dávka KOV-W, PR #N, v0.9.47, 8.9.2026).** Jeden vzorec `Materials.weight_kg` (mm × kg/m³ / 1e9) obsluhuje tri miesta: **plán** (`build_plan(densities:)` →
+**Riešenie (dávka KOV-W, PR #328, v0.9.47, 8.9.2026).** Jeden vzorec `Materials.weight_kg` (mm × kg/m³ / 1e9) obsluhuje tri miesta: **plán** (`build_plan(densities:)` →
 aditívne `weight_kg` a `weight_estimated` na každom deskriptore vrátane dielcov zásuviek — podklad pre závesy KOV-F a výklopy KOV-E, ktoré ho čítajú ako nový vstup pravidla
 `weight`), **súčet nad výrobnými snapshotmi** (`Bom.weight_totals`) a **riadok Hmotnosť v Inspectore** (`Panel.cabinet_stats` → `weight_kg` + `weight_estimated_parts` +
 `weight_estimated_density`; text skladá čistá funkcia `nxCabWeight`). Používateľ vidí `12,4 kg`, pri odhade `≈ 12,4 kg` s tooltipom „Hmotnosť je odhad — N dielcov bez

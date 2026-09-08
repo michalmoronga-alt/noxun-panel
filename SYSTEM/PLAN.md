@@ -574,7 +574,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
 - **D-118 · Katalógový seed pre kódy setov — ✅ HOTOVÁ CELÁ** (Michal 7.9.; **D-118a** PR #320 v0.9.43 + **D-118b** PR #321 v0.9.44). Katalóg má 114 položiek s overeným
   názvom, cenou s DPH, URL, dátumom, výrobcom a radou; sety objednávajú správnu antracitovú K-sadu (`357889`) a Tip-On zásuvka aj **PTOs modul** (`352908`/`352909`).
   Plné znenie + čo z toho platí ďalej: [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).
-- **✅ HOTOVÉ (PR #N, v0.9.47)** — **KOV-W · „HMOTNOSŤ DIELCOV A ČIEL + D-125":** jeden vzorec `Materials.weight_kg` (mm × hustota typu / 1e9) obsluhuje plán (aditívne
+- **✅ HOTOVÉ (PR #328, v0.9.47)** — **KOV-W · „HMOTNOSŤ DIELCOV A ČIEL + D-125":** jeden vzorec `Materials.weight_kg` (mm × hustota typu / 1e9) obsluhuje plán (aditívne
   `weight_kg`/`weight_estimated` na deskriptoroch — podklad pre závesy F a výklopy E cez nový vstup pravidla `weight`), súčet nad snapshotmi (`Bom.weight_totals`) aj
   riadok **Hmotnosť** v Inspectore (`12,4 kg` · `≈ 12,4 kg` s tooltipom · `—` len bez dielcov). Rozhodnutie Michala 8.9.2026: neznáma hustota (UNI · typ mimo registra ·
   materiál mimo katalógu) sa **nevynecháva, ráta sa ŤAŽŠIE** (`fallback_density` = max registra okrem kompaktu, nikde ako literál) a priznáva sa jedným ORANGE
