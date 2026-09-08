@@ -163,7 +163,27 @@ module Noxun
       # s vlastnym dovodom (`set_none`), nikdy s cudzim setom.
       # Sentinel prezije `parse_mapping` (round-trip), zmrazenie snapshotu
       # (na ziadny set neukazuje, takze nema co chybat) aj editor.
-      MAPPING_NONE = 'none'
+      #
+      # PRECO HASH A NIE RETAZEC (Codex #329 kolo 1 P2): `set_id` je LUBOVOLNY
+      # neprazdny retazec, takze vlastny set s ID „none" (aj „NONE") je PLATNY
+      # obsah — a retazcovy sentinel by taku volbu preklasifikoval na „vedome
+      # bez setu", teda na skrinku BEZ zavesov v nakupe. Hodnota mapovania je
+      # bud RETAZEC (= set_id), alebo OBJEKT (= selektor), takze objektovy
+      # sentinel sa s ID setu prekryt NEMOZE a ziadna migracia dat netreba.
+      #
+      # PRECO BEZ NOVEHO `std` MARKERA: starsi plugin sentinel nepozna, ale
+      # obe cesty zlyhavaju ZATVORENE a s hlaskou — kniznicna brana
+      # (`incompatible_mapping_entry?` -> `unknown_mapping_sk`, „aktualizuj
+      # plugin") aj snapshot (`norm_map.length != mapping.length` ->
+      # `:invalid`). Marker by teda nic nepridal.
+      NONE_KEY     = 'none'
+      MAPPING_NONE = { NONE_KEY => true }.freeze
+
+      # TOKEN sentinelu pre `<select>` (payload `none_value`). Menny priestor
+      # tokenov je prefixovany (`set:` / `sel:`), takze holy „none" s realnym
+      # set_id NEKOLIDUJE. HODNOTU (`MAPPING_NONE`) posiela server v `none_send`
+      # — JS ju len vracia spat, nikdy neskláda.
+      MAPPING_NONE_OPTION = 'none'
 
       # v2 (H1a): +set „Nohy podla vysky sokla" (param_bands) a migracia
       # globalneho defaultu leg z 'nohy-klzak-17' na neho.
@@ -1142,6 +1162,12 @@ module Noxun
           return true if parsed.nil? || parsed[1]
         end
         return false if value.is_a?(String) || value.is_a?(Symbol)
+        # KOV-F1: sentinel „vedome bez setu" je ZNAMY tvar (nie pokazeny
+        # selektor). Starsi plugin ho tu naopak odmietne — a prave to je jeho
+        # ochrana: kniznica so sentinelom je preň read-only s hlaskou
+        # „aktualizuj plugin", nie ticho zahodena volba.
+        return false if mapping_none?(value)
+
         incompatible_bands?(value, 'set_id')
       end
 
@@ -2045,6 +2071,9 @@ module Noxun
       INCOMPATIBLE_DETAIL_SK = {
         'opening_mode' => 'iný spôsob otvárania',
         'use_type' => 'set nie je na dvierka', # KOV-F1
+        # KOV-F1 (Codex #329 kolo 1 P2): set patri k inemu TYPU kovania (nohy,
+        # vysuv). Pri dvierkach je to RED, nie ORANGE `set_type_mismatch`.
+        'generic_type' => 'set je iného typu kovania',
         'drawer_construction' => 'iná konštrukcia zásuvky',
         'system' => 'iný systém výsuvu',
         'height_variant' => 'iná výška zásuvky',
@@ -2227,6 +2256,16 @@ module Noxun
         mapping = {}
         sets = {}
         lib['mapping'].each do |gt, value|
+          # KOV-F1 (Codex #329 kolo 1 P2): sentinel „vedome bez setu" na ziadny
+          # set NEUKAZUJE, takze `refs` je prazdne — bez tejto vetvy by ho
+          # podmienka nizsie zahodila a novy projekt by spadol na retaz
+          # fallbackov (pri zavesoch az na legacy `hinge`, teda zavesy by sa
+          # objednali), hoci UI tvrdi, ze plati globalna volba. Kopiruje sa
+          # KLUC; definicie nie je co kopirovat.
+          if mapping_none?(value)
+            mapping[gt] = deep_copy(value)
+            next
+          end
           # H1a: hodnota moze byt selector — zmrazit treba VSETKY sety, na
           # ktore ukazuje (audit BLOCKER 1); ak niektory chyba, typ sa
           # nezmrazi vobec (ciastocny selector by mlcky menil vyber).
@@ -2420,10 +2459,13 @@ module Noxun
 
       # KOV-F1: je hodnota mapovania SENTINEL „vedome bez setu"? Jedina
       # autorita otazky — pyta sa jej parser, resolver, zmrazenie aj editor.
-      # Hash (selektor) ani prazdny retazec sentinel NIE SU.
+      # Codex #329 kolo 1 P2: sentinel je PRESNE `{ 'none' => true }`. RETAZEC
+      # (ani „none") sentinel NIE JE — je to `set_id` a set s takym ID smie
+      # existovat. Selektor (`param`/`bands`) sentinel tiez nie je.
+      # Kluc je RETAZEC: hodnota mapovania vzdy prejde JSON (config, snapshot,
+      # kniznica, CEF payload), takze symbolovy tvar sem nema ako prist.
       def mapping_none?(value)
-        (value.is_a?(String) || value.is_a?(Symbol)) &&
-          value.to_s.strip.downcase == MAPPING_NONE
+        value.is_a?(Hash) && value.size == 1 && value[NONE_KEY] == true
       end
 
       # Je clen pre TUTO polozku vedome bez kodu? (`member_code` vrati [nil, nil]
@@ -2789,7 +2831,8 @@ module Noxun
       # aby JS musel porovnavat objekty. nil pri neplatnom tvare.
       def mapping_option_id(value)
         return nil if invalid_mapping_value?(value)
-        return MAPPING_NONE if mapping_none?(value) # KOV-F1: vlastny token volby „bez setu"
+        # KOV-F1: vlastny token volby „bez setu" (realny set ma prefix `set:`).
+        return MAPPING_NONE_OPTION if mapping_none?(value)
         return "set:#{value.to_s.strip}" if value.is_a?(String) || value.is_a?(Symbol)
         return nil unless value.is_a?(Hash)
 
@@ -3039,6 +3082,7 @@ module Noxun
         {
           'opening_mode' => 'iný spôsob otvárania',
           'use_type' => 'set nie je na dvierka', # KOV-F1
+          'generic_type' => 'set je iného typu kovania', # KOV-F1 (Codex #329)
           'drawer_construction' => 'iná konštrukcia zásuvky',
           'system' => 'iný systém zásuviek',
           HEIGHT_VARIANT_KEY => 'iná výška zásuvky'
@@ -3073,6 +3117,15 @@ module Noxun
         added_map = []
         lib['mapping'].each do |gt, value|
           next if state['mapping'].key?(gt)
+          # KOV-F1 (Codex #329 kolo 1 P2): sentinel sa doplna ROVNAKO ako iny
+          # chybajuci kluc — `value_set_ids` je pri nom prazdne, takze bez tejto
+          # vetvy by ho „Doplniť nové predvoľby" ticho preskocilo a projekt by
+          # dalej padal na nizsiu uroven.
+          if mapping_none?(value)
+            state['mapping'][gt] = deep_copy(value)
+            added_map << gt
+            next
+          end
           refs = value_set_ids(value)
           next if refs.empty? || refs.any? { |sid| by_id[sid].nil? }
           state['mapping'][gt] = deep_copy(value)
@@ -3338,8 +3391,18 @@ module Noxun
           # Zapisove cesty typ strazia, ale mapovanie zo sablony moze ukazat na
           # set_id, ktoreho definiciu si projekt drzi vlastnu (a ta moze byt
           # ineho typu) — expanzia je posledna poistka.
+          # KOV-F1 (Codex #329 kolo 1 P2): pri DVIERKACH je to ta ista chyba ako
+          # nesulad klasifikacie nizsie — nakup by ostal BEZ ZAVESOV. ORANGE by
+          # zakazku pustil von, preto RED brana (`hinge_set_mismatch`). Tato
+          # vetva je SKORSIA nez `set_incompatible_info`, takze bez povysenia
+          # prave tu by sa k RED nikdy nedoslo.
           if set['generic_type'].to_s != gt
-            unmapped << unmapped_entry(it, sid, 'set_type_mismatch')
+            unmapped << if door_item?(it)
+                          unmapped_entry(it, sid, HINGE_SET_MISMATCH,
+                                         { 'detail' => 'generic_type' })
+                        else
+                          unmapped_entry(it, sid, 'set_type_mismatch')
+                        end
             next
           end
           # KOV-C2a: klasifikacia setu vs. klasifikacia polozky (otvaranie,
@@ -3562,9 +3625,12 @@ module Noxun
       # neda pouzit. Precedencia sa na nom MUSI zastavit — inak by sa poskodena
       # hodnota tvarila ako NEPRITOMNY kluc a zasuvka by ticho dostala set
       # z nizsej urovne (presne ta pasca, ktoru sme opravovali pri `recipe_refs`).
+      # KOV-F1 (Codex #329 kolo 1 P2): sentinel je PRITOMNA hodnota — precedencia
+      # sa na nom MUSI zastavit. Odkedy je Hash bez `bands`, treba ho vymenovat
+      # zvlast (predtym prechadzal ako neprazdny retazec).
       def present_mapping_value?(v)
         (v.is_a?(String) && !v.strip.empty?) || (v.is_a?(Hash) && v['bands'].is_a?(Array)) ||
-          invalid_mapping_value?(v)
+          mapping_none?(v) || invalid_mapping_value?(v)
       end
 
       def invalid_mapping_value?(v)
@@ -4852,8 +4918,8 @@ module Noxun
       def parse_mapping_value(value)
         # KOV-F1: sentinel „vedome bez setu" je PLATNA hodnota, ktora
         # neukazuje na ziadny set — preto sa kanonizuje PRED vsetkym ostatnym
-        # (inak by z neho bolo `set_id` „none" a snapshot by ho zahodil ako
-        # odkaz na chybajucu definiciu).
+        # (inak by ho `validate_param_bands` odmietol ako pokazeny selektor
+        # a kluc by z mapovania vypadol, teda presny opak volby pouzivatela).
         return [:ok, MAPPING_NONE, []] if mapping_none?(value)
 
         if value.is_a?(String) || value.is_a?(Symbol)
