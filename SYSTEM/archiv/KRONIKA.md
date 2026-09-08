@@ -17,6 +17,19 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-W — FIX KOLO PO SOL AUDITE A CODEX REVIEW (8.9.2026 večer; PR #328, tá istá verzia v0.9.47).**
+  Odsek KOV-W nižšie vznikol pri odovzdaní dávky, **pred** auditom a review — ostáva tak, ako bol zapísaný (tento súbor sa neprepisuje); tu je, čo sa v tom istom PR zmenilo.
+  **Hrúbka (Sol BLOCKER = Codex #328 P2):** vstup plánu už nie sú len hustoty (`densities:`), ale celý katalógový záznam **`materials:`** — per kanál aj per-part override
+  `thickness` + `density` + `uni` (plní `CabinetBuilder.part_materials` → `sheet_weight_info`). Dôvod: deskriptor čela nesie placeholder 18 mm a skutočnú hrúbku (18,6 / 19 /
+  25 mm) mu dáva až materializácia PO pláne — čelo 2000 × 600 z MDF 25 vychádzalo 16,2 kg namiesto 22,5 a Inspector (súčet zo snapshotov) sa s plánom rozchádzal.
+  Pri **UNI** ostáva hrúbka DIELCA, lebo builder ju vtedy neprepisuje (M-B1) — hmotnosť tak kopíruje skutočnú materializáciu v každej vetve.
+  **Warning (Sol FIX):** `weight_density_unknown` vzniká **len za dielce, ktoré UNI nie sú**, a filtruje to PLÁN — výnimka vo `Validation.check_build` (filtrovala podľa
+  jediného `owner_id|part_key`, takže korpusový warning by ňou prešiel, a zvonček Inspectora číta uložené warningy mimo Kontroly) **zanikla**. Jedno miesto rozhodovania =
+  Kontrola aj zvonček ukazujú to isté.
+  **Ďalej:** JS sada testuje celý tok payload → riadok (`setCabInfo` sa číta priamo z `bridge.js` a beží v mini-DOM, vrátane resetu `setCabInfo(null)`), pribudli regresné
+  guardy (žiadny `weight_*` v `add_part`/`merge_final`, `Bom.row_key` nezmenený, `prod`/`box`/`origin` bajt na bajt rovnaké) a in-SU sekcia `run_kovw` dostala scenáre
+  hrubého čela 25 mm a UNI čela. Testy po fix kole: **headless 3442**, **96 JS sád**.
+
 - **KOV-W — HMOTNOSŤ DIELCOV A ČIEL + D-125 (8.9.2026; PR #328, v0.9.47).** Závesy (KOV-F) a výklopy (KOV-E) potrebujú hmotnosť čela a Inspector mal od UI 2.0 prázdny
   riadok „Hmotnosť" — hustota per typ materiálu pritom v katalógu žila od M-C a nikto z nej nič nepočítal. Dávka postavila **jeden vzorec** (`Materials.weight_kg`,
   mm × kg/m³ / 1e9) a napojila naň tri miesta: **plán** (`build_plan(densities:)` → aditívne `weight_kg`/`weight_estimated` na každom deskriptore vrátane dielcov

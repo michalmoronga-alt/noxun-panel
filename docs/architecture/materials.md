@@ -252,7 +252,10 @@ Nezaokrúhľuje (zaokrúhlenie patrí zobrazeniu); nekladný/neplatný vstup = `
 dvojnásobne ťažký kus). Číslo sa **nikde nepíše ako literál** — číta sa z registra, takže zmena registra ho posunie sama (zdrojový guard v `test_kovw_hmotnost.rb`).
 
 **`density_or_fallback(rec)` → `[hustota, odhad?]`** — `nil` záznam aj UNI dávajú `[fallback_density, true]`. Dielec sa zo súčtu **nikdy nevynechá**; stav sa prizná
-(ORANGE `weight_density_unknown` v pláne, „≈" v Inspectore).
+(ORANGE `weight_density_unknown` v pláne, „≈" v Inspectore). Warning v pláne vzniká **len za dielce, ktoré UNI nie sú** — UNI má vlastný nález `uni_material`.
+
+**Hrúbka do hmotnosti** ide z **katalógového záznamu**, nie z deskriptora: `CabinetBuilder.part_materials` posiela plánu vedľa hustoty aj `thickness` a `uni`, lebo čelo má
+v pláne len placeholder 18 mm (skutočnú hrúbku mu dá materializácia až po pláne) a **UNI hrúbku dielca neprepisuje** (M-B1). Detail rozhodovania: [construction.md](construction.md).
 
 **D-72:** protiťahová zástena — `zastena_decor_parts` + `zastena_counterbalance?` gate (single len s „protitah" markerom), záznam s príznakom `single_sided` (first-fill rubu
 zakázaný; párová stránka sa s ním nezhoduje).

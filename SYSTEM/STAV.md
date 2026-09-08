@@ -22,7 +22,7 @@ a rád (`core/hardware_taxonomy.rb`) a vytiahla katalóg aj editor setu na obraz
 **Pozor na kompatibilitu:** čo uloží v0.9.20, to **v0.9.18 už nepoužije** — model/šablóna (`CONFIG_SCHEMA` 4 + brána `assess_set_defs`), knižnica setov aj projektový snapshot
 (`std` 3) a katalóg kovania s výrobcom (`schema` 2). Pred prvou takou zákazkou aktualizovať **obe PC** (D-52 updater).
 
-**Testy k v0.9.47:** **3429 headless** · 96 JS sád · posledný plný in-SketchUp beh **1965 PASS** (nad mainom v0.9.46, 8.9.; nestabilný test = D-117; sekcia `run_kovw` napísaná, beh čaká).
+**Testy k v0.9.47:** **3442 headless** · 96 JS sád · posledný plný in-SketchUp beh **1965 PASS** (nad mainom v0.9.46, 8.9.; nestabilný test = D-117; sekcia `run_kovw` napísaná, beh čaká).
 
 ## Robí sa
 

@@ -71,10 +71,11 @@ prekážke, KD, poškodenom pine či `drawer_stale` by reset zásahu konflikt **
 by tú chybu zdedil každému budúcemu kódu. `drawer_conflict_target` číta raw `collected[:hardware_overrides]` (schéma sa nemení, `rule_id` v uloženom `drawer_conflicts` nie je) a pri
 viacerých záznamoch (dormantný zámok vedľa aktuálneho) **nehádá**. Klientska strana je v `ui-lifecycle.md` (sekcia KONTROLA, kontext Kovanie).
 
-**KOV-W — hmotnostný warning sa nad UNI dielcami POTLAČÍ (v0.9.47).** `check_build` má vedľa `abs_`-vetvy druhú výnimku: build warning `weight_density_unknown`
-(`WEIGHT_UNKNOWN_CODE`) je **korpusový** (bez `part_key`) a dotknuté dielce nesie v `data['parts']`. `weight_parts_all_uni?` ho zahodí len vtedy, keď je **KAŽDÝ** z nich
-v `uni_parts` — UNI dielec už hlási `uni_material` („materiál neurčený") a druhá veta o tom istom by bola hluk. Stačí jeden dotknutý dielec, ktorý UNI nie je (typ bez
-hustoty), a ORANGE ostáva. Prázdny `data['parts']` sa **nepotláča** (radšej veta navyše než ticho).
+**KOV-W — hmotnostný warning `check_build` NEFILTRUJE (v0.9.47).** Build warning `weight_density_unknown` je **korpusový** (bez `part_key`) a dotknuté dielce nesie
+v `data['parts']`. Potláčanie UNI dielcov je **v pláne** (`Construction.annotate_weights!` ich do zoznamu vôbec nedá), nie tu: `check_build` filtruje podľa jediného
+`owner_id|part_key`, takže korpusový warning by ním prešiel — a hlavne **zvonček Inspectora číta uložené warningy priamo**, teda mimo Kontroly. Filter na jednom mieste
+(v pláne) drží obe cesty zhodné: čo je uložené, to sa hlási. UNI dielec hlási `uni_material` („materiál neurčený"), ORANGE o hmotnosti ostáva len za dielce bez hustoty,
+ktoré UNI nie sú.
 
 ### production_core.rb — zdieľané čisté jadro výstupov zákazky (ŠT-1a PR A)
 

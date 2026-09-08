@@ -124,19 +124,25 @@ zadávaní KOV-W zmenil: dielec, ktorého materiál hustotu nemá (UNI · typ mi
 v registri **okrem kompaktu** (`Materials.fallback_density`; kompakt 1350 by odhad zdvojnásobil). Dôvod je stolársky: pri závesoch a výklopoch je podhodnotená hmotnosť
 nebezpečná, nadhodnotená len drahšia. „—" ostáva **výhradne** pre skrinku bez výrobných dielcov.
 
-**Riešenie (dávka KOV-W, PR #328, v0.9.47, 8.9.2026).** Jeden vzorec `Materials.weight_kg` (mm × kg/m³ / 1e9) obsluhuje tri miesta: **plán** (`build_plan(densities:)` →
+**Riešenie (dávka KOV-W, PR #328, v0.9.47, 8.9.2026).** Jeden vzorec `Materials.weight_kg` (mm × kg/m³ / 1e9) obsluhuje tri miesta: **plán** (`build_plan(materials:)` →
 aditívne `weight_kg` a `weight_estimated` na každom deskriptore vrátane dielcov zásuviek — podklad pre závesy KOV-F a výklopy KOV-E, ktoré ho čítajú ako nový vstup pravidla
 `weight`), **súčet nad výrobnými snapshotmi** (`Bom.weight_totals`) a **riadok Hmotnosť v Inspectore** (`Panel.cabinet_stats` → `weight_kg` + `weight_estimated_parts` +
 `weight_estimated_density`; text skladá čistá funkcia `nxCabWeight`). Používateľ vidí `12,4 kg`, pri odhade `≈ 12,4 kg` s tooltipom „Hmotnosť je odhad — N dielcov bez
 hustoty; ráta sa 870 kg/m³ (ťažšia hodnota)", a `—` len keď skrinka nemá výrobné dielce. Odhad sa priznáva aj v Kontrole: **jeden** ORANGE `weight_density_unknown` na
-skrinku (nie na dielec) — nad UNI dielcami sa **potlačí** rovnako ako abs_* warningy, lebo UNI už hlási `uni_material`; viditeľný ostáva pri type bez hustoty, ktorý UNI nie je.
+skrinku (nie na dielec) — a vzniká **len za dielce, ktoré UNI nie sú** (UNI už hlási `uni_material`, dva riadky o tom istom sú hluk); keď sú všetky odhady UNI, warning
+vôbec nevznikne. Filtruje PLÁN, nie Kontrola — uložený warning tak nesie presne to, čo ukáže aj zvonček Inspectora.
 
 **Čo sa vedome nezmenilo:** hmotnosť sa **neukladá** do modelu ani do výrobného snapshotu (`plan_schema` bez bumpu, žiadna migrácia), `Bom.compute` ju nevracia (kusovník,
-VEPO ani ceny sa nemenia o číslo), a `build_plan` **bez** `densities:` sa správa presne ako predtým (migrácia identity a panelové resolvery sú nedotknuté). Vertikálny
+VEPO ani ceny sa nemenia o číslo), a `build_plan` **bez** `materials:` sa správa presne ako predtým (migrácia identity a panelové resolvery sú nedotknuté). Vertikálny
 priestor panela sa nezmenil — riadok existoval od UI 2.0. Bokom vzniklo `Construction.material_channel` = jediné miesto pravdy o materiálovom kanáli dielca (číta ho aj
 `CabinetBuilder.base_material_for`), aby sa hmotnosť nemohla rátať z inej dosky, než akou je dielec postavený.
 
-**Testy:** nová sada `tests/pure/test_kovw_hmotnost.rb` (24 scenárov + 10 vymenovaných mutácií, vrátane zdrojového guardu „hustota nikde ako literál") a
+**Hrúbka do hmotnosti (Codex #328 P2 + Sol audit, fix kolo 8.9.):** vstupom plánu nie sú len hustoty, ale celý katalógový záznam (`materials:` → `thickness`, `density`,
+`uni` per kanál aj per-part override). Čelo z 25 mm dosky sa preto ráta z **25 mm**, nie z placeholderu 18 mm, ktorý deskriptor nesie do materializácie; pri UNI materiáli
+ostáva hrúbka DIELCA, lebo builder ju vtedy neprepisuje. Bez toho by Inspector (súčet zo snapshotov) ukazoval iné číslo než plán a pásma závesov by rozhodovali
+z podhodnotenej váhy.
+
+**Testy:** nová sada `tests/pure/test_kovw_hmotnost.rb` (37 scenárov + 14 vymenovaných mutácií, vrátane zdrojového guardu „hustota nikde ako literál") a
 `tests/js/test_kovw_hmotnost.js`; in-SU sekcia `run_kovw` (živý reťazec katalóg → skrinka → snapshoty → Inspector → Kontrola).
 
 ### D-121 · Názvy odvodených dielcov zásuviek sú pre VEPO pridlhé a nič nehovoria (Michal 6.9.2026; vyriešené 8.9.2026 — PR #324 v0.9.45 + PR #325 v0.9.46)

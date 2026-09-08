@@ -578,7 +578,8 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   `weight_kg`/`weight_estimated` na deskriptoroch — podklad pre závesy F a výklopy E cez nový vstup pravidla `weight`), súčet nad snapshotmi (`Bom.weight_totals`) aj
   riadok **Hmotnosť** v Inspectore (`12,4 kg` · `≈ 12,4 kg` s tooltipom · `—` len bez dielcov). Rozhodnutie Michala 8.9.2026: neznáma hustota (UNI · typ mimo registra ·
   materiál mimo katalógu) sa **nevynecháva, ráta sa ŤAŽŠIE** (`fallback_density` = max registra okrem kompaktu, nikde ako literál) a priznáva sa jedným ORANGE
-  `weight_density_unknown` na skrinku (nad UNI dielcami ho Kontrola potlačí — UNI už hlási `uni_material`). Bez `densities:` sa plán správa presne ako predtým; do modelu
+  `weight_density_unknown` na skrinku (vzniká LEN za dielce, ktoré UNI nie sú — UNI už hlási `uni_material`; filtruje plán, nie Kontrola). Hmotnosť čela sa ráta
+  z KATALÓGOVEJ hrúbky kanála/overridu (25 mm čelo = 22,5 kg, nie 16,2 z placeholderu 18 mm; pri UNI ostáva hrúbka dielca). Bez `materials:` sa plán správa ako predtým; do modelu
   ani do snapshotu sa hmotnosť neukladá (`plan_schema` bez bumpu, kusovník/VEPO/ceny nedotknuté). **D-125 tým vyriešená** — plné znenie a revízia zadania
   v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).
 - **D-119 · Presah dverí do strán per strana** (Lucia 6.9.2026, prvý test) — dnes jedna hodnota `gap_sides` pre obe strany; ľavá a pravá zvlášť (config čela, CONFIG_SCHEMA
