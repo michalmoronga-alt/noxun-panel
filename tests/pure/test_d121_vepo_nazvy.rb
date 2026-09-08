@@ -158,11 +158,11 @@ NxTest.test('D-121a: `row_name` — dva boky boxu jednej zasuvky su `Zas bok LP 
   # legacy dvojica (obe strany s id) sa zluci tiez — pripona je u oboch prazdna
   NxTest.assert_equal('Zas bok LP s1',
                       v.row_name('names' => ['Bok boxu lavy F1', 'Bok boxu pravy F1'], 'kde' => cab))
-  # boky ROZNYCH zasuviek nie su par
-  NxTest.assert_equal('Zas bok L 1/Zas bok P 2 s1',
-                      v.row_name('names' => ['Bok boxu lavy 1', 'Bok boxu pravy 2'], 'kde' => cab))
-  # dve zasuvky v jednom riadku: v1.1 spravanie (zlucenie cisel az v D-121b)
-  NxTest.assert_equal('Zas dno 1/Zas dno 2 s1',
+  # boky ROZNYCH zasuviek nie su par — cast s nazvami to povie (v1.2 ju uz oreze)
+  info = v.row_name_info('names' => ['Bok boxu lavy 1', 'Bok boxu pravy 2'], 'kde' => cab)
+  NxTest.assert_equal('Zas bok L 1/Zas bok P 2', info['full'], 'rozne zasuvky sa NEPARUJU')
+  # dve zasuvky v jednom riadku: od D-121b sa cisla zluia do jedneho tokenu
+  NxTest.assert_equal('Zas dno 1 2 s1',
                       v.row_name('names' => ['Dno zasuvky 1', 'Dno zasuvky 2'], 'kde' => cab))
 end
 
@@ -173,11 +173,13 @@ NxTest.test('D-121a: volny nazov dosky sa NESKRACUJE ani nepari (GH #287 zasada)
   NxTest.assert_equal('Dno zasuvky 3 d1', v.row_name(free), 'volny text pouzivatela ide cely')
   mix = { 'names' => ['Bok boxu lavy 2', 'Bok boxu pravy 2'], 'free_names' => ['Bok boxu lavy 2'],
           'kde' => [{ 'owner_id' => 'CAB-001' }, { 'owner_id' => 'BRD-002' }] }
-  NxTest.assert_equal('Bok boxu lavy 2/Zas bok P 2 s1 d2', v.row_name(mix),
-                      'doska + dielec skrinky nie su par')
+  # Cast s nazvami sa NEPARUJE (a od D-121b sa ani nezluci cez cislo) — v1.2 ju
+  # uz limit 20 oreze, plny tvar ostava v `full` (LOG + Kontrola ho ukazu).
+  NxTest.assert_equal('Bok boxu lavy 2/Zas bok P 2', v.row_name_info(mix)['full'],
+                      'doska + dielec skrinky nie su par ani zlucene cislo')
 end
 
-NxTest.test('D-121a: guard pre v1.2 — kratky tvar + vlastnik sa zmesti do 20 znakov') do
+NxTest.test('D-121a/b: kratky tvar + vlastnik sa zmesti do 20 znakov (kontrakt v1.2)') do
   v = NxD121.vepo
   kde = [{ 'owner_id' => 'CAB-012' }]
   ['Dno zasuvky 12', 'Chrbat zasuvky 12', 'Vnutorne celo zasuvky 12',
@@ -188,7 +190,7 @@ NxTest.test('D-121a: guard pre v1.2 — kratky tvar + vlastnik sa zmesti do 20 z
   # najdlhsi tvar je `Zas predok 12 s12` = 17 znakov
   NxTest.assert_equal('Zas predok 12 s12',
                       v.row_name('names' => ['Vnutorne celo zasuvky 12'], 'kde' => kde))
-  NxTest.assert_equal(60, v.const_get(:NAME_MAX), 'kontrakt ostava v1.1 — NAME_MAX sa nemeni')
+  NxTest.assert_equal(20, v.const_get(:NAME_MAX), 'kontrakt v1.2 — NAME_MAX je 20 (D-121b)')
 end
 
 NxTest.test('D-121a: charakterizacia — nazov do `Bom.row_key` nepatri (agregacia nezmenena)') do
@@ -205,6 +207,6 @@ NxTest.test('D-121a: charakterizacia — nazov do `Bom.row_key` nepatri (agregac
   NxTest.assert_equal(1, rows.length, 'zhodne vyrobne parametre = JEDEN riadok')
   NxTest.assert_equal(['Dno zasuvky 1', 'Dno zasuvky 2'], rows.first['names'])
   NxTest.assert_equal(2, rows.first['quantity'])
-  NxTest.assert_equal('Zas dno 1/Zas dno 2 s1', NxD121.vepo.row_name(rows.first),
-                      'cela cesta BOM -> VEPO')
+  NxTest.assert_equal('Zas dno 1 2 s1', NxD121.vepo.row_name(rows.first),
+                      'cela cesta BOM -> VEPO (D-121b: cisla zlucene)')
 end

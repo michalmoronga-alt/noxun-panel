@@ -33,8 +33,21 @@
 # kusovnik Studia ostava s plnymi nazvami.
 #
 # D-121a (8.9.2026): skratky dostali aj VYRABANE DIELCE ZASUVKY (`Dno zasuvky 2`
-# -> `Zas dno 2`, dva boky boxu v riadku -> `Zas bok LP 2`); kontrakt ostava v1.1
-# (`NAME_MAX` 60 sa nemeni).
+# -> `Zas dno 2`, dva boky boxu v riadku -> `Zas bok LP 2`).
+#
+# KONTRAKT v1.2 (D-121b, 8.9.2026): NAZOV RIADKU MA VZDY NAJVIAC 20 ZNAKOV.
+# Michal 7.9.2026 overil v praxi, ze IMPORT objednavky VEPO pole `nazov` nad 20
+# znakov ODMIETA — kontrakt v1.1 pritom tvrdil, ze 20 je len tlac nalepky a pole
+# nesie 60 (`NAME_MAX = 60`), takze sa dlhe riadky pred odoslanim prepisovali
+# rucne. `NAME_MAX = 20` je odteraz JEDINA autorita limitu (orez, vlastnici,
+# KONTROLA aj LOG ju citaju odtialto). Tri dosledky:
+#   * `merge_numbered` — tokeny `<base> <n>` s rovnakym base sa v riadku zlucia
+#     (`Polica 1/Polica 2/Polica 3` -> `Polica 1 2 3`), vyhradne zo skratky
+#     GENEROVANEHO nazvu;
+#   * `cut_name` — orez po HRANICI TOKENU (nikdy cez cislo dielca) a BEZ
+#     vypustky (`…` mini znak a nalepka interpunkciu aj tak netlaci);
+#   * `row_name_info` — orez ani strata skrinky nie su TICHE: LOG ma oddiel
+#     „Skratene nazvy" a KONTROLA ORANGE kategoriu `name_long`.
 require 'csv'
 require 'fileutils'
 
@@ -45,7 +58,10 @@ module Noxun
       COMMERCIAL_36 = (36.0..38.1)
       EDGE_SINGLE = '—' # em-dash: hrana na JEDNEJ strane dvojice
       EDGE_BOTH   = '='
-      NAME_MAX    = 60
+      # KONTRAKT v1.2 (D-121b): tvrdy limit pola `nazov` — import VEPO dlhsi
+      # riadok ODMIETNE. Jedina autorita cisla v celom repe (validation.rb ho
+      # cita odtialto, nikde sa neopakuje).
+      NAME_MAX    = 20
       CRLF        = "\r\n"
       EDGE_CODES  = %w[L1 L2 W1 W2].freeze
       # Windows si tieto mena rezervuje ako zariadenia — nesmu byt nazvom priecinka.
@@ -83,6 +99,11 @@ module Noxun
       # D-121a: dva boky boxu JEDNEJ zasuvky (rovnaka pripona — ` 2` alebo pri
       # legacy nazve prazdna) sa zluia rovnako ako dvierka: `Zas bok LP 2`.
       BOX_SIDE_PAIR = /\AZas bok L( \d+)?\z/.freeze
+      # D-121b: token, ktory konci CISLOM dielca (`Polica 3`, `Zas dno 2`,
+      # `Zas bok LP 12`). Cislo MUSI byt na konci a oddelene medzerou — `Dv1 LP`
+      # ani `Dv2` sa preto nezlucuju (cislo je vnutri skratky, nie je to poradove
+      # cislo rovnakych dielcov).
+      NUMBERED_TOKEN = /\A(.*\S)[ ](\d+)\z/.freeze
       # Vlastnici riadku: CAB-001 -> s1, BRD-007 -> d7 (poradie s pred d).
       OWNER_KINDS = { 'CAB' => ['s', 0], 'BRD' => ['d', 1] }.freeze
       OWNER_ID    = /\A([A-Z]+)-(\d+)\z/.freeze
@@ -191,10 +212,17 @@ module Noxun
           tag = merge_18_36 && [18, 36].include?(commercial) ? '18_36' : commercial.to_s
           key = [label, tag]
           b = buckets[key] ||= { rows: [], material_ids: [], label: label, tag: tag,
-                                 pieces: 0, displays: [], notes: [] }
+                                 pieces: 0, displays: [], notes: [], shortened: [] }
           e = row['edges'] || {}
           qty = row['quantity'].to_i
-          name = row_name(raw)
+          info = row_name_info(raw)
+          name = info['name']
+          # D-121b: orez ani stratena skrinka nie su ticha zmena objednavky —
+          # zaznam sa zbiera PER BUCKET (ako `notes`), aby `filename` dostal az
+          # po `dedup_filenames!` (audit Astra, nalez 3).
+          if shortened?(info)
+            b[:shortened] << shortened_entry(info, dims, commercial, qty, raw['kde'])
+          end
           # D-112: poznamka sa cita z ORIENTOVANEHO riadku — poradie hran je to
           # iste, s akym idu kody `—`/`=` do CSV.
           note = abs_note(row, edge_decors, sheet_decors)
@@ -219,15 +247,25 @@ module Noxun
           { 'filename' => "#{pslug}_#{base}_#{b[:tag]}.csv", 'csv' => csv,
             'rows' => b[:rows].length, 'pieces' => b[:pieces],
             'material_ids' => b[:material_ids], 'material_label' => b[:label], 'tag' => b[:tag],
-            'display_labels' => b[:displays], 'notes' => b[:notes] }
+            'display_labels' => b[:displays], 'notes' => b[:notes],
+            # D-121b: docasny kluc — po `dedup_filenames!` sa presunie do
+            # vysledneho 'shortened' (uz s finalnym `filename`) a odtialto zmizne.
+            'shortened' => b[:shortened] }
         end.sort_by { |g| g['filename'] }
         dedup_filenames!(groups)
+        # D-121b: az TU dostava kazdy skrateny riadok `filename` — pred dedupom
+        # by mohol niest meno, ktore sa este zmeni (audit Astra, nalez 3).
+        shortened = groups.flat_map do |g|
+          entries = g.delete('shortened')
+          Array(entries).map { |s| s.merge('filename' => g['filename']) }
+        end
 
         total_rows = groups.sum { |g| g['rows'] }
         {
           'project_slug' => pslug, 'groups' => groups, 'errors' => errors,
+          'shortened' => shortened,
           'total_rows' => total_rows, 'total_pieces' => groups.sum { |g| g['pieces'] },
-          'log_text' => log_text(pslug, project, groups, errors, validation,
+          'log_text' => log_text(pslug, project, groups, errors, shortened, validation,
                                  version, generated_at)
         }
       end
@@ -304,23 +342,95 @@ module Noxun
         nil
       end
 
+      # D-121b: vyradeny riadok nesie OREZANY nazov (ten, ktory by sel do CSV),
+      # ale pri oreze aj PLNY tvar — inak by sa v LOGu nedal spojit s dielcom.
       def error_entry(row, reason)
-        owners = Array(row['kde']).map { |k| k['owner_id'] }.compact.uniq
-        { 'name' => row_name(row), 'reason' => reason,
-          'material_id' => row['material_id'].to_s, 'owners' => owners }
+        info = row_name_info(row)
+        out = { 'name' => info['name'], 'reason' => reason,
+                'material_id' => row['material_id'].to_s, 'owners' => owner_ids(row['kde']) }
+        out['full'] = info['full'] if info['cut']
+        out
+      end
+
+      # ID vlastnikov riadku tak, ako prisli (bez skratiek) — pre LOG.
+      def owner_ids(kde)
+        Array(kde).map { |k| (k.is_a?(Hash) ? k['owner_id'] : k).to_s.strip }
+                  .reject(&:empty?).uniq
+      end
+
+      # D-121b: riadok, o ktorom sa MUSI povedat. Dva dovody:
+      #   'cut'      — cast s nazvami sa nezmestila do 20 znakov,
+      #   'no_owner' — nazov sa zmestil, ale skrinka uz nie (informacia o mieste
+      #                dielca z riadku vypadla).
+      def shortened?(info)
+        info['cut'] || (info['owners_total'].to_i.positive? && info['owners_shown'].to_i.zero?)
+      end
+
+      # Rozmery, ks a vlastnici robia zaznam jednoznacnym aj vtedy, ked sa dva
+      # rozne dlhe nazvy orezu na ten isty retazec (audit Astra, nalez 3).
+      def shortened_entry(info, dims, commercial, qty, kde)
+        { 'full' => info['full'], 'name' => info['name'],
+          'reason' => info['cut'] ? 'cut' : 'no_owner',
+          'length' => dims[0].round, 'width' => dims[1].round,
+          'thickness' => commercial, 'quantity' => qty, 'owners' => owner_ids(kde) }
       end
 
       # D-113: nazov riadku pre VEPO CSV a LOG = "<kratke nazvy> <skrinky>",
       # napr. "Bok LP s1 s2 s3". Kusovnik Studia sa NEMENI — plne nazvy tam
       # ostavaju (toto je vylucne objednavkovy/nalepkovy tvar).
       def row_name(row)
+        row_name_info(row)['name']
+      end
+
+      # D-121b: `row_name` + DOVOD, preco vysledok vyzera tak, ako vyzera.
+      # Orez nazvu ani nezmestena skrinka nesmu byt TICHE — z tohto hasha zije
+      # oddiel LOGu „Skratene nazvy" aj ORANGE kategoria `name_long` v KONTROLE
+      # (`Validation` pocita nad TYMI ISTYMI agregovanymi riadkami, aby CSV, LOG
+      # a semafor hovorili jedno a to iste).
+      #   'name'          — finalny retazec, ktory ide do CSV/LOGu
+      #   'full'          — cela cast s nazvami PRED orezom (bez vlastnikov)
+      #   'cut'           — musela sa cast s nazvami orezat?
+      #   'owners_total'  — kolko skriniek/dosiek riadok ma
+      #   'owners_shown'  — kolko sa ich do 20 znakov zmestilo
+      def row_name_info(row)
         names = Array(row['names']).reject { |n| n.to_s.empty? }
         names = [row['name']] if names.empty? && row['name']
-        n = join_names(names.compact, row['free_names'])
-        n = 'dielec' if n.empty?
-        # Samotne nazvy nad limit = dnesny orez; skrinky sa uz nezmestia.
-        return "#{n[0, NAME_MAX - 1]}…" if n.length > NAME_MAX
-        append_owners(n, owner_tokens(row['kde']))
+        full = join_names(names.compact, row['free_names'])
+        full = 'dielec' if full.empty?
+        base = cut_name(full)
+        tokens = owner_tokens(row['kde'])
+        # Orezany nazov uz limit vycerpal — vlastnici sa nepridavaju (ako v v1.1).
+        return name_info(base, full, true, tokens.length, 0) if base != full
+
+        name, shown = append_owners_info(base, tokens)
+        name_info(name, full, false, tokens.length, shown)
+      end
+
+      def name_info(name, full, cut, total, shown)
+        { 'name' => name, 'full' => full, 'cut' => cut,
+          'owners_total' => total, 'owners_shown' => shown }
+      end
+
+      # D-121b: deterministicky orez na NAME_MAX po HRANICI TOKENU.
+      # Rozseknuty token by klamal — `Polica 2 3 4 5 6 7 10` orezane natvrdo dava
+      # `Polica 2 3 4 5 6 7 1` a stitok by uvadzal policu 1 namiesto 10 (audit
+      # Astra 8.9., nalez 1). Preto: ked rez padne presne na hranicu (dalsi znak
+      # je medzera alebo '/'), berie sa cely `head`; inak sa rozseknuty token
+      # ZAHODI (rez na poslednom oddelovaci v `head`). Jedno dlhe slovo (volny
+      # nazov dosky) oddelovac nema — tam plati tvrdy rez.
+      # VYPUSTKA `…` sa NEPOUZIVA: minie znak z 20 a nalepka VEPO interpunkciu
+      # aj tak netlaci.
+      def cut_name(name)
+        s = name.to_s
+        return s if s.length <= NAME_MAX
+
+        head = s[0, NAME_MAX]
+        nxt = s[NAME_MAX]
+        unless nxt == ' ' || nxt == '/'
+          at = head.rindex(%r{[ /]})
+          head = head[0, at] if at
+        end
+        head.rstrip.sub(%r{/+\z}, '').rstrip
       end
 
       # Skratka JEDNEHO nazvu dielca. Neznamy nazov (samostatna doska = volny
@@ -387,7 +497,46 @@ module Noxun
         box_side_pairs(toks).each do |sfx|
           toks = merge_pair(toks, "Zas bok L#{sfx}", "Zas bok P#{sfx}", "Zas bok LP#{sfx}")
         end
-        toks.map { |t, _f| t }.join('/')
+        # D-121b AZ NAKONIEC (po vsetkych paroch): `Zas bok L 1` + `Zas bok P 1`
+        # sa najprv zluia na `Zas bok LP 1`, az potom sa scitaju cisla.
+        merge_numbered(toks).map { |t, _f| t }.join('/')
+      end
+
+      # D-121b: tokeny s rovnakym zakladom a CISLOM NA KONCI sa zluia do jedneho
+      # (`Polica 1/Polica 2/Polica 3` -> `Polica 1 2 3`). Setri to znaky, ktore
+      # 20-znakovy limit potrebuje, a citatelnost neubera — v riadku aj tak stoji
+      # jeden druh dielca s viacerymi poradovymi cislami.
+      # VYHRADNE tokeny zo SKRATKY GENEROVANEHO nazvu (`free == false`): volny
+      # nazov dosky je text pouzivatela a `Polička 1` + `Polička 2` mozu byt dve
+      # rozne veci (zhodna zasada ako pri `merge_pair` — GH #287 P2).
+      # Zluceny token stoji na POZICII PRVEHO clena; cisla su unikatne a vzostupne.
+      def merge_numbered(toks)
+        groups = {}
+        toks.each_with_index do |(t, f), i|
+          next if f
+
+          m = NUMBERED_TOKEN.match(t)
+          next unless m
+
+          (groups[m[1]] ||= []) << [i, m[2].to_i]
+        end
+        replace = {}
+        drop = {}
+        groups.each do |base, members|
+          next if members.length < 2
+
+          replace[members.first[0]] = "#{base} #{members.map { |(_i, n)| n }.uniq.sort.join(' ')}"
+          members[1..].each { |(i, _n)| drop[i] = true }
+        end
+        return toks if replace.empty?
+
+        out = []
+        toks.each_with_index do |(t, f), i|
+          next if drop[i]
+
+          out << [replace[i] || t, f]
+        end
+        out
       end
 
       # Cisla dvierok, ktore maju v riadku OBE strany (Dv1 L aj Dv1 P) — obe
@@ -443,7 +592,14 @@ module Noxun
       # " +K" (nikdy odseknuta skratka v polovici). Ak sa nezmesti ani " +K",
       # nazov ostava bez neho — limit je tvrdy.
       def append_owners(base, tokens)
-        return base if tokens.empty?
+        append_owners_info(base, tokens)[0]
+      end
+
+      # D-121b: to iste, ale vrati aj POCET vypisanych skriniek — pri nule
+      # (`owners_total > 0`, `owners_shown == 0`) sa z riadku stratila informacia
+      # o mieste dielca a LOG to prizna v oddiele „Skratene nazvy".
+      def append_owners_info(base, tokens)
+        return [base, 0] if tokens.empty?
         out = base
         used = 0
         tokens.each_with_index do |t, i|
@@ -454,9 +610,9 @@ module Noxun
           used = i + 1
         end
         left = tokens.length - used
-        return out if left.zero?
+        return [out, used] if left.zero?
         tail = " +#{left}"
-        out.length + tail.length <= NAME_MAX ? "#{out}#{tail}" : out
+        [out.length + tail.length <= NAME_MAX ? "#{out}#{tail}" : out, used]
       end
 
       # D-112: poznamka pre VEPO — pasky, ktorych DEKOR sa lisi od dekoru dosky.
@@ -556,7 +712,7 @@ module Noxun
         disp.nil? || disp.empty? ? nil : disp
       end
 
-      def log_text(pslug, project, groups, errors, validation, version, generated_at)
+      def log_text(pslug, project, groups, errors, shortened, validation, version, generated_at)
         lines = []
         lines << 'Noxun Engine — VEPO export LOG'
         lines << "Projekt: #{project} (#{pslug})"
@@ -579,11 +735,43 @@ module Noxun
         lines << "Riadky vyradené z CSV (#{errors.length}):"
         errors.each do |e|
           owners = e['owners'].empty? ? '' : " @ #{e['owners'].join(', ')}"
-          lines << "  ! #{e['name']} (#{e['material_id']})#{owners}: #{e['reason']}"
+          # D-121b: pri oreze aj plny tvar — orezany nazov sam nemusi stacit
+          # na identifikaciu dielca.
+          full = e['full'] ? " (plný názov: #{e['full']})" : ''
+          lines << "  ! #{e['name']}#{full} (#{e['material_id']})#{owners}: #{e['reason']}"
         end
+        log_shortened(lines, shortened)
         log_notes(lines, groups)
         log_control(lines, validation)
         lines.join(CRLF) + CRLF
+      end
+
+      # D-121b: kontrolny zoznam skratenych nazvov. Kontrola v okne hlasi len
+      # OREZ (strata skrinky nie je strata dielca), tu su OBA dovody aj s
+      # rozmermi, poctom kusov a vlastnikmi — dva rozne nazvy sa mozu orezat na
+      # ten isty retazec a bez rozmerov by sa v LOGu nedali rozlisit (audit
+      # Astra, nalez 3).
+      def log_shortened(lines, shortened)
+        rows = Array(shortened)
+        lines << ('-' * 60)
+        lines << "Skrátené názvy (#{rows.length}):"
+        if rows.empty?
+          lines << '  (žiadne)'
+          return
+        end
+        rows.each { |s| lines << shortened_line(s) }
+      end
+
+      def shortened_line(s)
+        dims = "#{s['length']}×#{s['width']}×#{s['thickness']}, #{s['quantity']} ks"
+        owners = Array(s['owners'])
+        if s['reason'] == 'no_owner'
+          "  * #{s['name']} [#{s['filename']}] — bez skrinky v názve " \
+            "(#{owners.join(', ')}): #{dims}"
+        else
+          at = owners.empty? ? '' : " @ #{owners.join(', ')}"
+          "  * #{s['full']} -> #{s['name']} [#{s['filename']}] — #{dims}#{at}"
+        end
       end
 
       # D-112: kontrolny zoznam pred odoslanim objednavky — riadky, ktore maju
