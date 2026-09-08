@@ -203,6 +203,78 @@ module Noxun
       HW_SOURCES = %w[rule manual recipe].freeze
       HW_SOURCE_RECIPE = 'recipe'
 
+      # === KOV-F1: JEDINY REGISTER BRAN KOVANIA ===============================
+      #
+      # `ProductionCore.hardware_blockers` cita TENTO zoznam — ziadny kod z neho
+      # nesmie prejst do vydaneho nakupneho CSV, rozpoctu ani cenovej ponuky.
+      # Register ma TRI casti a KAZDA ma vlastny zdroj:
+      #   * zasuvkove kody (`Recipes::DRAWER_BLOCKERS`) — cast z ulozenych
+      #     `drawer_conflicts`, `drawer_kit_missing` z EXPANZIE,
+      #   * zavesove kody (`HW_HINGE_BLOCKERS`) — `door_height_out_of_table`
+      #     z ulozenych `hardware_conflicts`, `hinge_set_mismatch` z EXPANZIE,
+      #     `hinge_stale` zo SCHEMY ulozenej skrinky a zo STD projektovych
+      #     pravidiel (`Bom.hinge_stale_issue`),
+      #   * pravidlove kody (`HW_RULES_BLOCKERS`) — stav CELEHO projektu
+      #     (`Bom.rules_snapshot_issue`), bez vlastnika.
+      # VEPO branu NEDOSTAVA ani jeden zavesovy kod: geometria je spravna,
+      # zastavit rezanie by len zablokovalo vyrobu (rovnaka uvaha ako pri
+      # `BUILD_BLOCKERS`).
+      #
+      # PRECO FUNKCIA A NIE KONSTANTA: `build_plan.rb` sa nacitava PRED
+      # `drawer_recipes.rb` (kontrakt planu je pod vsetkym), takze zasuvkovy
+      # register v case definicie konstanty este neexistuje. Poradie kodov je
+      # pritom KONTRAKT — urcuje poradie viet brany, takze musi byt stabilne:
+      # najprv cely zasuvkovy register (bajtovo ako doteraz), potom zavesy.
+      # KOV-F1 (Codex #329 kolo 2 P1): MIGRACNY kod závesov — skrinka je ulozena
+      # este PRED tabulkou (`config_schema` < `CabinetBuilder::HINGE_ACTIVATION_
+      # SCHEMA`), takze jej `config.hardware[]` nesie STARE pocty (bez +1 nad
+      # 600 mm, bez klasifikacie/Tip-On setu) a ziadny nosic `hardware_conflicts`
+      # z nej nevznikol. Vzor `Recipes::STALE`: naprava je PRESTAVBA.
+      HINGE_STALE = 'hinge_stale'
+
+      # KOV-F1 (Codex #329 kolo 3 P1): PROJEKTOVY snapshot pravidiel kovania je
+      # z NOVSIEHO pluginu (`std` > `HardwareRules::STD`). Citat sa smie —
+      # zakazka sa musi dat otvorit — ale `normalize_rules` z neho drzi LEN
+      # polia, ktorym rozumieme, takze POCTY su degradovane. Snapshot pritom
+      # EXISTUJE, takze ORANGE `hardware_rules_library_incompatible` (ten
+      # strazi projekt BEZ snapshotu) nevznikne a stavba by presla ticho.
+      # Kod NEMA vlastnika (je to stav CELEHO projektu) a NEDA sa zhasnut
+      # prestavbou — zapisy do snapshotu su zakazane, takze jedina naprava je
+      # AKTUALIZACIA PLUGINU. Preto TRVALY blocker, nie warning.
+      RULES_SNAPSHOT_INCOMPATIBLE = 'hardware_rules_snapshot_incompatible'
+
+      HW_HINGE_BLOCKERS = %w[door_height_out_of_table hinge_set_mismatch hinge_stale].freeze
+
+      # Kody, ktore nehovoria o CELE ani o skrinke, ale o PRAVIDLACH PROJEKTU.
+      # V registri stoja POSLEDNE — poradie kodov je kontrakt (urcuje poradie
+      # viet brany), takze novy kod sa pridava na koniec, nikdy do stredu.
+      HW_RULES_BLOCKERS = [RULES_SNAPSHOT_INCOMPATIBLE].freeze
+
+      # Kody, ktore smie niest ULOZENY nosic `hardware_conflicts` (viz
+      # `validate_hardware_conflicts!`). `hinge_set_mismatch` medzi nimi NIE JE —
+      # vznika az pri EXPANZII (aj po zmene mapovania bez prestavby), takze ho
+      # brana cita z `expansion['unmapped']`, nie z configu. `hinge_stale` tiez
+      # nie — vznika pri ZBERE zo schemy configu, nie zo zapisaneho nosica.
+      HW_CONFLICT_CODES = %w[door_height_out_of_table].freeze
+
+      # Zavesove kody, ktore prichadzaju z NALEZOV zberu (`Bom.collect` ->
+      # `hardware_issues`): ulozeny nosic + migracny `hinge_stale`. Cita ich
+      # Kontrola (RED riadok) aj brana exportov; `hinge_set_mismatch` tu NIE JE
+      # (ten ma zdroj v expanzii).
+      HW_ISSUE_BLOCKERS = (HW_CONFLICT_CODES + [HINGE_STALE] + HW_RULES_BLOCKERS).freeze
+
+      # SK nazvy zavesovych dovodov pre BRANU (vzor `Recipes::BLOCKER_LABELS`).
+      HW_BLOCKER_LABELS = {
+        'door_height_out_of_table' => 'dvierka sú vyššie než tabuľka závesov',
+        'hinge_set_mismatch'       => 'vybraný set závesov nesedí so spôsobom otvárania',
+        'hinge_stale'              => 'skrinka má závesy spočítané ešte spred Noxun tabuľky',
+        RULES_SNAPSHOT_INCOMPATIBLE => 'pravidlá kovania tohto projektu uložil novší plugin'
+      }.freeze
+
+      def self.hw_blockers
+        (defined?(Recipes) ? Recipes::DRAWER_BLOCKERS : []) + HW_HINGE_BLOCKERS + HW_RULES_BLOCKERS
+      end
+
       module_function
 
       # Jednotny tvar warningu (string kluce — round-tripuje cez JSON v configu korpusu).
@@ -224,6 +296,7 @@ module Noxun
         plan[:parts].each { |pd| validate_part!(pd, seen) }
         plan[:hardware].each { |hw| validate_hardware!(hw, seen) }
         validate_drawer_conflicts!(plan[:drawer_conflicts]) if plan.key?(:drawer_conflicts)
+        validate_hardware_conflicts!(plan[:hardware_conflicts], seen) if plan.key?(:hardware_conflicts)
         plan
       end
 
@@ -378,6 +451,34 @@ module Noxun
             raise "BuildPlan: drawer_conflicts ma neznamy kod '#{code}'."
           end
           raise "BuildPlan: drawer_conflicts #{code} nema hlasku." if c['message'].to_s.strip.empty?
+        end
+        list
+      end
+
+      # KOV-F1: aditivny kluc planu `hardware_conflicts` — dovody, pre ktore je
+      # vydana polozka kovania NESPRAVNA (dnes: dvierka nad tabulkou zavesov).
+      # Na rozdiel od `drawer_conflicts` polozka aj dielec EXISTUJU (riadok
+      # v Kovani musi byt, inak nema kde vzniknut rucny zamok) — nakup je ale
+      # zastaveny, kym to niekto neposudi. STRING kluce (JSON round-trip cez
+      # config, ako warnings); `part_keys` overuje referencnu integritu
+      # vlastnika rovnako ako pri polozkach kovania.
+      def validate_hardware_conflicts!(list, part_keys = nil)
+        raise 'BuildPlan: hardware_conflicts musi byt pole.' unless list.is_a?(Array)
+
+        list.each do |c|
+          raise 'BuildPlan: hardware_conflicts polozka musi byt Hash.' unless c.is_a?(Hash)
+          owner = c['owner_part_key'].to_s
+          raise 'BuildPlan: hardware_conflicts polozka nema owner_part_key.' if owner.empty?
+          unless PartKeys.valid?(owner)
+            raise "BuildPlan: hardware_conflicts ma neplatny owner_part_key '#{owner}'."
+          end
+          if part_keys && !part_keys[owner]
+            raise "BuildPlan: hardware_conflicts ukazuje na neexistujuci dielec '#{owner}'."
+          end
+
+          code = c['code'].to_s
+          raise "BuildPlan: hardware_conflicts ma neznamy kod '#{code}'." unless HW_CONFLICT_CODES.include?(code)
+          raise "BuildPlan: hardware_conflicts #{code} nema hlasku." if c['message'].to_s.strip.empty?
         end
         list
       end

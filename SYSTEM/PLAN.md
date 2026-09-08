@@ -598,15 +598,16 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   hustoty rátaných ako <hustota> — ťažší odhad"; `—` LEN bez výrobných dielcov; žiadne `weight_missing`, žiadne vylúčenie z medzisúčtu · **D-125:** payload Inspectora
   `weight_kg` + `weight_estimated_parts` + `weight_estimated_density` (aditívne) · **Audit ÁNO (Sol — mení kontrakt deskriptora `BuildPlan` a payload Inspectora, hoci aditívne; Codex #327 kolo 2)** · in-SU sekcia `run_kovw`
   (builder → plán) · Smoke: dvierka 1000 × 600 × 18 DTD 680 → 7,34 kg; čelo 2000 × 600 MDF 25 mm → 22,5 kg (nie 16,2 z 18 mm); skrinka s UNI dielcom → „≈" + ORANGE.
-- **KOV-F · „ZÁVESY — NOXUN TABUĽKA + SET PODĽA OTVÁRANIA" (po W; v3 po Sol audite kolo 2 [2 BLOCKER + 4 FIX + 1 NOTE] — DVA PR: F1 jadro, F2 editor):**
-  **F1 jadro.** **Druh pravidla ostáva `bands`** — ŽIADNY nový kind (Sol kolo 2 BLOCKER 1: starší plugin vrátane NOVÉHO vloženia skrinky s aktualizovanou knižnicou by
+- **KOV-F · „ZÁVESY — NOXUN TABUĽKA + SET PODĽA OTVÁRANIA" (po W; v3 po Sol audite kolo 2 [2 BLOCKER + 4 FIX + 1 NOTE] — DVA PR: F1 jadro ✅, F2 editor):**
+  **F1 jadro — ✅ HOTOVÉ (PR #329, v0.9.48).** **Druh pravidla ostáva `bands`** — ŽIADNY nový kind (Sol kolo 2 BLOCKER 1: starší plugin vrátane NOVÉHO vloženia skrinky s aktualizovanou knižnicou by
   neznámy kind preskočil = nula závesov; čítače pravidiel `std` ignorujú, takže sa to nedá dohnať markerom). Seed `zavesy-podla-vysky` dostane novú tabuľku
   **`bands` [`{max: 849, quantity: 2}`, `{1700, 3}`, `{2200, 4}`, `{2400, 5}`, `{2600, 6}`, `{2800, 7}`, `{max: nil, quantity: 7}`] — výška ≤ max (Float, inkluzívne; 849 < h < 850 → 3); catch-all `nil → 7` ostáva kvôli STARÝM čítačom (dvere nad 2800 dostanú 7, nikdy nič — Codex #327 kolo 3)** a VOLITEĽNÉ polia,
   ktoré starší čítač zachová a ignoruje (`normalize_rules` neznáme kľúče drží): `width_plus: {over: 600, add: 1}` (šírka > 600 → +1, bez podmienky výšky) ·
   `width_warn_over: 800` (ORANGE `door_wide`) · `weight_bands` [`{7.7, 2}`, `{13.7, 3}`, `{17.1, 4}`, `{22.0, 5}`] (Hettich, z kódu oficiálnej kalkulačky) · `finite:
   true` (= pre NOVÝ čítač je catch-all „mimo tabuľky": zásah catch-all pásma = položka s jeho počtom + RED; validátor „potrebuje pásmo všetko nad" ostáva bez zmeny — Sol
   kolo 2 FIX 6 + Codex #327 kolo 3). Starší plugin teda ráta podľa novej tabuľky
-  (len bez +1 a varovaní), NIKDY nulu; `CONFIG_SCHEMA` sa vo F NEbumpuje · **`HardwareRules::STD` bump + nový čítač od tejto verzie honoruje `std`** (snapshot/knižnica
+  (len bez +1 a varovaní), NIKDY nulu; **`CONFIG_SCHEMA` 8 → 9** kvôli trvalému poľu `hardware_conflicts` a klasifikovaným závesom — starší plugin by nosič aj triedny
+  kľúč pri prestavbe ticho zahodil a schému 8 zapísal späť (Codex #329) · **`HardwareRules::STD` bump + nový čítač od tejto verzie honoruje `std`** (snapshot/knižnica
   z novšieho pluginu = len na čítanie s hláškou, vzor setov) — chráni budúce zmeny · varovania ORANGE (nemenia počet): `door_wide`, `door_wider_than_high`
   („nemá to byť výklop?"), `hinge_weight_more` (hmotnostné pásmo chce viac než **VÝSLEDNÝ počet po override/zámku**), `hinge_weight_max` (nad posledným pásmom);
   `weight_kg` nil → `hinge_weight_unknown` v `BUILD_INFO_ONLY` (Sol kolo 2 NOTE 7); **hmotnosť vo V1 len varuje** (Michal 8.9.) · **nad tabuľkou (`finite` a zásah catch-all pásma): položka SA VYDÁ s počtom catch-all pásma (riadok v Kovaní existuje — Sol kolo 2 BLOCKER 2) + RED `door_height_out_of_table`** s uloženým nosičom
@@ -630,10 +631,10 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   vlastný set prežije migráciu · sentinel `none` prežije prestavbu, reopen aj normalizáciu mapovania · **downgrade: starší čítač (`std` ignorovaný) dostane pri novom projekte závesy podľa tabuľky bez +1** ·
   in-SU `run_kovf`. Smoke: 1250 → 3; 850 → 3; 800 × 700 (1 krídlo) → 3; Tip-On → P2O + 1 piest; 850 široké → ORANGE; MDF 25 mm 2000 × 600 → ORANGE nad 22 kg; 2900 vysoké →
   7 + RED, zámok ho zhasne.
-  **F2 editor (samostatný PR, Audit NIE):** editor `bands` v Pravidlách dostane voliteľné polia (`width_plus`, `width_warn_over`, `weight_bands`, prepínač `finite`) +
+  **F2 editor (samostatný PR, Audit NIE) — ČAKÁ:** editor `bands` v Pravidlách dostane voliteľné polia (`width_plus`, `width_warn_over`, `weight_bands`, prepínač `finite`) +
   spoločná Ruby/JS validácia (prázdne, nečíselné, neusporiadané pásma; „všetko nad" povinné len bez `finite`) — kým F2 nie je, polia sú viditeľné len na čítanie.
-- **KOV-E · „VÝKLOPY HK top / HL top" (po F; v2 po Codex #327):** config čela `lift.system` (`hk_top` predvolene | `hl_top`) + výber v karte čela (CONFIG_SCHEMA 8 → 9,
-  whitelisty šablón aditívne) · **sklop (`fall`) = závesy ako dvierka:** DRUHÉ seed pravidlo `zavesy-sklop` (rovnaké `bands` + door guardy ako F) s `applies_to: {role: flap, flap_dir: down}` — `applies_to.role` je skalár, pravidlo dvierok ostáva na `front_door` (Codex #327 kolo 3); `apply_rule` sa naučí filter `flap_dir`; položky nesú `params.use_type = 'door'`
+- **KOV-E · „VÝKLOPY HK top / HL top" (po F; v2 po Codex #327):** config čela `lift.system` (`hk_top` predvolene | `hl_top`) + výber v karte čela (CONFIG_SCHEMA 9 → 10 —
+  9 minula KOV-F1, Codex #329; whitelisty šablón aditívne) · **sklop (`fall`) = závesy ako dvierka:** DRUHÉ seed pravidlo `zavesy-sklop` (rovnaké `bands` + door guardy ako F) s `applies_to: {role: flap, flap_dir: down}` — `applies_to.role` je skalár, pravidlo dvierok ostáva na `front_door` (Codex #327 kolo 3); `apply_rule` sa naučí filter `flap_dir`; položky nesú `params.use_type = 'door'`
   (sety `use_type fall` — vzpery — ostávajú mimo V1 a `USE_TYPE_GENERIC` sa nemení; test: sklop nikdy nevydá `lift` položku) · nový rule kind `lift_class`: **HK top:
   `LF = KH × (weight_kg + handle_allowance_kg)`**, KH = výška korpusu (riadku čela), `handle_allowance_kg` v JSON pravidla, predvolene **0,5** (Blum definuje LF s dvojnásobkom
   hmotnosti úchytky; úchytky mimo V1 → konzervatívna rezerva 2 × 0,25 kg, Codex #327) → 22K2300 (LF 420–1610) · 22K2500 (930–2800) · 22K2700 (1730–5200) · 22K2900 (3200–9000),

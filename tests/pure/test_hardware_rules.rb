@@ -47,7 +47,9 @@ NxTest.test('hardware_rules: seed sa normalizuje (bands zoradene, series bez nek
   # D-90: seed v3 pridal 2 pravidla uchytkoveho profilu (dvierka + zasuvkove cela)
   NxTest.assert_equal(7, r.length, 'seed ma 7 pravidiel (D1: +zavesenie hornej, +podperky; D-90: +2x profil)')
   bands = r.find { |x| x['rule_id'] == 'zavesy-podla-vysky' }['bands']
-  NxTest.assert_equal([900.0, 1400.0, 1900.0, nil], bands.map { |b| b['max'] }, 'bands sort, null posledne')
+  # KOV-F1: NOXUN tabulka (catch-all `nil` ostava kvoli starym citacom).
+  NxTest.assert_equal([849.0, 1700.0, 2200.0, 2400.0, 2600.0, 2800.0, nil],
+                      bands.map { |b| b['max'] }, 'bands sort, null posledne')
   messy = Noxun::Engine::HardwareRules.normalize_rules([
     { 'rule_id' => 'x', 'output' => 'slide', 'kind' => 'fit_series',
       'series' => [500, -10, 0, 500, 270], 'clearance' => '10',
@@ -80,9 +82,10 @@ NxTest.test('hardware_rules: sokel nema vplyv na nohy; horna/na zemi bez noh') d
                       'bez podopretia (horna / floor 0) -> ziadne nohy')
 end
 
-NxTest.test('hardware_rules: bands hranice zavesov (900/1400/1900 vratane)') do
-  { 300.0 => 2, 900.0 => 2, 900.01 => 3, 1400.0 => 3, 1400.01 => 4,
-    1900.0 => 4, 1901.0 => 5, 2500.0 => 5 }.each do |h, want|
+NxTest.test('hardware_rules: bands hranice zavesov (NOXUN tabulka, KOV-F1)') do
+  { 300.0 => 2, 849.0 => 2, 849.5 => 3, 850.0 => 3, 1700.0 => 3, 1700.01 => 4,
+    2200.0 => 4, 2201.0 => 5, 2400.0 => 5, 2401.0 => 6, 2600.0 => 6,
+    2601.0 => 7, 2800.0 => 7, 2900.0 => 7 }.each do |h, want|
     res = NxHW.evaluate([NxHW.door(h)])
     hinges = NxHW.items_of(res, 'hinge')
     NxTest.assert_equal(1, hinges.length, "vyska #{h}: 1 polozka")

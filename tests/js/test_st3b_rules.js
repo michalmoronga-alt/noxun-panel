@@ -714,3 +714,35 @@ console.log(`OK ${n} kontrol (ŠT-3b sekcia Pravidlá — 3b-1/2a/2b/2c1/2c2)`);
     ok(t.indexOf('úchytkovým profilom') > -1, 'obe naďalej hovoria, kedy pravidlo vôbec platí');
   });
 })();
+
+// --- KOV-F1: veta o VOLITEĽNÝCH kontrolách dvierok (read-only do F2) ---------
+// Pravidlo `bands` môže niesť door guardy (+1 nad šírku, varovania, hmotnostné
+// pásma, „mimo tabuľky"). Editor ich prinesie až F2, takže sekcia ich musí
+// aspoň PRIZNAŤ — inak by používateľ videl tabuľku výšok a netušil, prečo mu
+// pri širokom krídle vyšiel záves navyše. Starý tvar pravidla musí vyzerať
+// PRESNE ako doteraz (žiadna veta).
+(function(){
+  ok(R.rdGuardHint({ kind: 'bands', bands: [{ max: 900, quantity: 2 }] }) === null,
+     'pravidlo BEZ guardov nemá vetu — starý tvar vyzerá ako doteraz');
+  ok(R.rdGuardHint({ kind: 'fit_series', width_plus: { over: 600, add: 1 } }) === null,
+     'veta patrí LEN k `bands` (iný druh pravidla guardy nečíta)');
+  ok(R.rdGuardHint(null) === null, 'null vstup je bezpečný');
+  const t = R.rdGuardHint({
+    kind: 'bands',
+    bands: [{ max: 849, quantity: 2 }, { max: null, quantity: 7 }],
+    width_plus: { over: 600, add: 1 },
+    width_warn_over: 800,
+    weight_bands: [{ max: 7.7, quantity: 2 }, { max: 22, quantity: 5 }],
+    finite: true
+  });
+  ok(t.indexOf('na čítanie') > -1, 'veta priznáva, že polia sa zatiaľ needitujú');
+  ok(t.indexOf('nad 600 mm → +1 ks') > -1, 'prídavok za šírku aj s počtom kusov');
+  ok(t.indexOf('nad 800 mm → upozornenie') > -1, 'hranica varovania');
+  ok(t.indexOf('7.7 kg → 2') > -1 && t.indexOf('22 kg → 5') > -1, 'hmotnostné pásma');
+  ok(t.indexOf('len upozorňujú') > -1, 'a to, že počet NEMENIA (V1 rozhodnutie)');
+  ok(t.indexOf('mimo') > -1 || t.indexOf('chyba na kontrolu') > -1, '`finite` = chyba na kontrolu');
+  // Ciastocny tvar: kazdy guard sa prizna SAM, ziadny nechyba ani sa nevymysla.
+  const only = R.rdGuardHint({ kind: 'bands', width_warn_over: 800 });
+  ok(only.indexOf('nad 800 mm') > -1 && only.indexOf('+') < 0,
+     'samotné varovanie šírky nespomína prídavok, ktorý pravidlo nemá');
+})();

@@ -139,6 +139,15 @@ prepísané"). Plán má aditívny kľúč **`drawer_conflicts`** (fail-closed d
 zápisové kanály pre builder — `drawer_writes` a `drawer_override_writes`. Rozšírenie je pre STARŠÍ plugin neznáma rola aj neznámy `source`, takže plán, ktorý ich môže niesť,
 už nie je plánom schémy 3 — odtiaľ bump.
 
+**KOV-F1 (v0.9.48): aditívny kľúč plánu `hardware_conflicts`.** `[{owner_part_key, code, message}]` — dôvody, pre ktoré je VYDANÁ položka kovania
+nesprávna (dnes `door_height_out_of_table`: dvierka vyššie než tabuľka závesov). Validuje `BuildPlan.validate_hardware_conflicts!` proti uzavretému
+registru `HW_CONFLICT_CODES` + referenčná integrita vlastníka (rovnako ako pri položkách kovania); STRING kľúče kvôli JSON round-tripu cez config.
+Na rozdiel od `drawer_conflicts` položka aj dielec **existujú** — `SCHEMA` plánu sa preto **nebumpuje** (plán je tranzientný a starší plugin neznámy kľúč nevyrába
+ani nečíta). **`CONFIG_SCHEMA` sa ale bumpuje (8 → 9, Codex #329 kolo 1 P1):** nosič je v configu **trvalý**, takže starší plugin ho pri prestavbe zahodí whitelistom
+`cabinet_config`, zapíše späť schému 8 a stratu zveční — RED nadvýška zmizne bez stopy a spolu s ňou (klasifikované závesy) aj správny set. Detail histórie markera
+je v [construction.md](construction.md).
+
+
 **`hardware_set_key_type` pozná prefix `class:`** (triedny kľúč mapovania setov, [hardware.md](hardware.md)): vracia z neho prvý segment, takže `class:lift|classic` prestavbu
 neblokuje a `class:sliding|classic` z novšej verzie áno. `parse_hardware_set_key` pre triedny kľúč vracia `nil` — nie je to výber podľa typu ani podľa dielca.
 

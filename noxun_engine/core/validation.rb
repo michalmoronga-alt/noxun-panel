@@ -114,6 +114,14 @@ module Noxun
       # (audit Astra 8.9., nalez 2) — per zaznam by Kontrola mlcala, hoci CSV
       # by nazov orezalo.
       CAT_NAME_LONG   = 'name_long'
+      # RED — KOV-F1: polozka kovania z pravidiel VZNIKLA, ale je nespravna
+      # (dvierka vyssie nez tabulka zavesov). Rozdiel oproti `CAT_DRAWER`:
+      # dielec aj riadok v Kovani EXISTUJU, takze naprava je rucny zamok poctu —
+      # a preto sa nesmie blokovat VEPO (geometria je spravna).
+      CAT_HARDWARE_CONFLICT = 'hardware_conflict'
+      # RED — KOV-F1: vybrany set zavesov ODPORUJE celu (Tip-On celo na
+      # klasickom sete). Vzniká az pri EXPANZII, takze ho brana cita z nej.
+      CAT_HW_MISMATCH = 'hardware_mismatch'
 
       # Druh top-level kusu, ktory MA KOVANIE. Zdielana konstanta preto, ze
       # „skrinka vs. doska" nie je kozmetika textu: len pri skrinke zliatie
@@ -207,6 +215,7 @@ module Noxun
         check_newer_configs(collected[:newer_configs], items)
         check_hardware_manual(collected[:hardware_manual], items)
         check_hardware_expansion(hardware_expansion, items)
+        check_hardware_notes(hardware_expansion, items) # KOV-F1
         check_placements(placements, items)
         check_identities(identities, items)
         Array(collected[:warnings]).each { |w| check_build(w, items, uni_parts) }
@@ -717,8 +726,38 @@ module Noxun
           elsif defined?(Recipes) &&
                 (Recipes::BUILD_BLOCKERS.include?(code) || code == Recipes::STALE)
             items << drawer_conflict_item(iss, overrides)
+          elsif BuildPlan::HW_ISSUE_BLOCKERS.include?(code)
+            # KOV-F1 (Codex #329 kolo 2 P1): register nesie DVA zdroje — ulozeny
+            # nosic (`door_height_out_of_table`) aj migracny `hinge_stale`.
+            # RED riadok je pre oba TEN ISTY (co sa zastavuje je rovnake), vetu
+            # o naprave nesie sprava zo zberu.
+            items << hardware_conflict_item(iss)
           end
         end
+      end
+
+      # RED (KOV-F1): polozka kovania z pravidiel VZNIKLA, ale je nespravna —
+      # dnes dvierka vyssie nez tabulka zavesov. Vetu sklada STAVBA (pozna
+      # presne vysku aj posledne pasmo), Kontrola k nej doplni adresu a to,
+      # co sa tym zastavuje. Exportnu branu drzi TEN ISTY register
+      # (`BuildPlan.hw_blockers`).
+      def hardware_conflict_item(iss)
+        oid = iss['owner_id'].to_s
+        pkey = iss['part_key'].to_s
+        label = iss['label'].to_s.strip
+        label = pkey.empty? ? 'kovanie' : pkey if label.empty?
+        msg = iss['message'].to_s.strip
+        msg = 'Kovanie sa nedá určiť.' if msg.empty?
+        # Codex #329 kolo 3 P1: nalez o PRAVIDLACH CELEHO PROJEKTU vlastnika
+        # NEMA — pomlcka v zatvorke by predstierala skrinku, ktoru sa niekto
+        # pokusi hladat. Bez ID sa preto adresa vynecha.
+        addr = oid.empty? ? label : "#{label} (#{oid})"
+        { 'severity' => RED, 'category' => CAT_HARDWARE_CONFLICT,
+          'owner_id' => oid, 'part_key' => (pkey.empty? ? nil : pkey), 'hw_key' => nil,
+          'owner_pid' => iss['owner_pid'],
+          'message_sk' => "#{addr}: #{msg} " \
+                          'Nákup kovania, rozpočet ani cenová ponuka sa zatiaľ nedajú vydať.',
+          'stable_key' => "#{CAT_HARDWARE_CONFLICT}|#{oid}|#{pkey}|#{iss['code']}" }
       end
 
       # RED riadok „zasuvka bez riesenia". Vetu sklada STAVBA (recept ju pozna
@@ -967,6 +1006,45 @@ module Noxun
         target ? item.merge('data' => target) : item
       end
 
+      # RED (KOV-F1): vybrany set ODPORUJE celu — Tip-On celo na klasickom
+      # sete by znamenalo tlmeny zaves BEZ piestu, teda dvierka, ktore sa
+      # nedaju otvorit tak, ako su navrhnute. Naprava je DATOVA (vyber setu
+      # alebo doplnenie predvolieb), nikdy fallback na iny set.
+      def hinge_mismatch_item(u, where, sid, opk, gt, oid)
+        item = { 'severity' => RED, 'category' => CAT_HW_MISMATCH,
+                 'owner_id' => oid, 'part_key' => (opk.empty? ? nil : opk), 'hw_key' => nil,
+                 'message_sk' => "Závesy (#{where}): set „#{sid}“ nesedí s čelom " \
+                                 "(#{HardwareSets.incompatible_detail_sk(u['detail'])}) — " \
+                                 'vyber správny set, alebo otvor Pravidlá → Doplniť nové predvoľby. ' \
+                                 'Nákup kovania, rozpočet ani cenová ponuka sa zatiaľ nedajú vydať.',
+                 'stable_key' => [CAT_HW_MISMATCH, oid, opk, gt, u['rule_id'].to_s, sid].join('|') }
+        target = hw_target(opk, gt, u['rule_id'], orphan: false)
+        target ? item.merge('data' => target) : item
+      end
+
+      # ORANGE (KOV-F1): poznamky k NAMAPOVANYM polozkam (`exp['notes']`) —
+      # dnes jedina: zavesovy set bez klasifikacie. Nakup bezi dalej (kody
+      # su), ale set nevie povedat, ci patri na Tip-On alebo klasicke dvierka,
+      # takze automat podla otvarania na nom nefunguje.
+      def check_hardware_notes(exp, items)
+        Array(exp.is_a?(Hash) ? exp['notes'] : nil).each do |n|
+          next unless n.is_a?(Hash) && n['code'].to_s == 'hinge_set_unclassified'
+
+          oid = n['cabinet_id'].to_s
+          opk = n['owner_part_key'].to_s
+          sid = n['set_id'].to_s
+          items << {
+            'severity' => ORANGE, 'category' => CAT_HW_UNMAPPED,
+            'owner_id' => oid, 'part_key' => (opk.empty? ? nil : opk), 'hw_key' => nil,
+            'message_sk' => "Závesy: set „#{n['set_name'].to_s.empty? ? sid : n['set_name']}“ " \
+                            'nemá zaradenie (typ použitia a spôsob otvárania), takže sa nedá vybrať ' \
+                            'podľa otvárania čela — kupuje sa ako doteraz. Otvor Pravidlá → ' \
+                            'Doplniť nové predvoľby.',
+            'stable_key' => [CAT_HW_UNMAPPED, oid, opk, 'hinge_set_unclassified', sid].join('|')
+          }
+        end
+      end
+
       # ORANGE (D1): sety kovania. Stable key nesie plnu identitu zdroja
       # (audit F7 — kategoria|korpus|vlastnik|generic|rule|set|kod): jedna
       # chybajuca polozka na 3 skrinkach = 3 klik-selectovatelne riadky.
@@ -989,6 +1067,13 @@ module Noxun
           # konkretnu NL) a ma VLASTNU kategoriu aj branu — VRATANE VEPO.
           if u['reason'].to_s == 'drawer_kit_missing'
             items << drawer_kit_item(u, where, sid, opk, gt, oid)
+            next
+          end
+          # KOV-F1: nesulad klasifikacie zavesoveho setu je RED s VLASTNOU
+          # kategoriou — nakup by bol bez zavesov, ale rezanie (VEPO) je
+          # v poriadku, takze brana zastavuje len nakup/rozpocet/ponuku.
+          if u['reason'].to_s == HardwareSets::HINGE_SET_MISMATCH
+            items << hinge_mismatch_item(u, where, sid, opk, gt, oid)
             next
           end
           msg =
@@ -1039,6 +1124,11 @@ module Noxun
               # nieco vedome vybral a tichy navrat by zmenil objednany kit.
               "#{label} (#{where}): výber setu na tejto skrinke je poškodený — vyber ho nanovo " \
                 '(predvoľba projektu sa zámerne nepoužije).'
+            when 'set_none'
+              # KOV-F1: VEDOMA volba „bez setu" — nie chyba nastavenia. Veta to
+              # musi povedat rovno, inak by pouzivatel hladal, co pokazil.
+              "#{label} (#{where}): vedome bez setu — kovanie sa neobjednáva. " \
+                'Ak to tak nemá byť, vyber set v Pravidlách Štúdia.'
             when 'library_incompatible'
               # R-07 (brana 1d): globalna kniznica setov je z novsej verzie
               # alebo ma neznamy tvar — POUZIT sa nesmie (nakup z orezanych dat
@@ -1127,7 +1217,11 @@ module Noxun
       # preto nepouzilo) — pouzivatel nema co opravovat a ORANGE riadok na KAZDEJ
       # zdravej zasuvke by bol falosny poplach. Warning ostava v plane a v LOGu
       # (diagnostika R2 exkluzivity), do Kontroly nejde.
-      BUILD_INFO_ONLY = %w[legacy_slide_suppressed].freeze
+      # KOV-F1: `hinge_weight_unknown` je INFO o STAVE DAT (plan nepozna
+      # hustotu materialu cela), nie nalez — pocet zavesov je legitimne len
+      # podla vysky a pouzivatel nema co opravovat. ORANGE na kazdych dvierkach
+      # zakazky bez hustot by bol hluk, ktory prekryje skutocne nalezy.
+      BUILD_INFO_ONLY = %w[legacy_slide_suppressed hinge_weight_unknown].freeze
 
       def check_build(w, items, uni_parts = {})
         return unless w.is_a?(Hash)

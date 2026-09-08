@@ -118,13 +118,36 @@ module Noxun
       #       (`HardwareSets::STD_SKIP_CODE`), sablonu chrani prave tento bump —
       #       brany su tie iste ako pri 4–7 (dopredny `newer_config?` +
       #       exportna `ProductionCore.export_blockers`).
-      CONFIG_SCHEMA = 8
+      #   9 = KOV-F1 — ZAVESY. Config dostal TRVALE pole `hardware_conflicts`
+      #       (dovody, pre ktore je UZ VYDANA polozka kovania nespravna — dnes
+      #       `door_height_out_of_table`, vzor `drawer_conflicts` zo schemy 5)
+      #       a zavesove polozky su KLASIFIKOVANE (`use_type: 'door'` +
+      #       `opening_mode`): set si hladaju TRIEDNYM klucom
+      #       (`class:hinge|classic` / `class:hinge|tipon`) a pocet moze niest
+      #       +1 nad sirku 600 mm. Starsi plugin (schema 8) nepozna ANI JEDNO:
+      #       pri prestavbe by `hardware_conflicts` zahodil whitelistom
+      #       `cabinet_config` (RED nadvyska by zmizla), Tip-On celo by ticho
+      #       dostalo klasicky zaves z legacy `hinge`, +1 by neprical — a schemu
+      #       8 by zapisal SPAT, takze by sa strata zvecnila. Cez .skp na druhom
+      #       PC to znamena nedoobjednane zavesy a zly set BEZ blokady
+      #       (Codex #329 kolo 1 P1). Brany su rovnake ako pri 5–8: dopredny
+      #       guard prestavby/sablon/kopie (`newer_config?`) a exportna brana
+      #       (`ProductionCore.export_blockers`).
+      CONFIG_SCHEMA = 9
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
       # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)
       # ani na 7 (KOV-D2a) sa nesmie kazda skrinka schemy 5 zrazu tvarit ako
       # nemigrovana. Zostava 5.
       DRAWER_ACTIVATION_SCHEMA = 5
+
+      # KOV-F1 (Codex #329 kolo 2 P1): schema, OD KTOREJ su ULOZENE zavesy
+      # spocitane podla NOXUN tabulky (+1 nad 600 mm, klasifikacia otvarania,
+      # nosic `hardware_conflicts`). Skrinka ulozena pod nizsou schemou nesie
+      # STARE pocty a nikto by to nezbadal — zber ju priznava `hinge_stale`.
+      # VLASTNA konstanta z TOHO ISTEHO dovodu ako pri zasuvkach: pri buducom
+      # bumpe na 10 sa skrinky schemy 9 nesmu zrazu tvarit ako nemigrovane.
+      HINGE_ACTIVATION_SCHEMA = 9
 
       MIN = { width: 200.0, height: 200.0, depth: 150.0 }.freeze
       # D-45: povoleny rozsah hrubky korpusu (mm) — JEDINY zdroj pravdy pre clamp
@@ -726,6 +749,11 @@ module Noxun
           plan = Construction.build_plan(cfg, cid, hardware_rules: rules,
                                                    part_thicknesses: drawer_thicknesses(cfg, eff),
                                                    materials: part_materials(cfg, eff)) # validuje interne
+          # KOV-F1 (Codex #329 kolo 2 P1): protajsok ORANGE `library_incompatible`
+          # setov — pravidla z nekompatibilnej kniznice sa NEZMRAZILI, takze to
+          # musi byt VIDNO (inak by zakazka vyzerala zdravo a snapshot by nikdy
+          # nevznikol).
+          attach_rules_state_warning!(plan, model)
           # KOV-C2b: doplnenie CHYBAJUCEHO systemu a pripnutia receptu je zapis
           # do configu — bezi v TEJ ISTEJ operacii ako geometria (volajuci nas
           # obalil `start_operation`), takze Undo vrati oboje naraz.
@@ -772,6 +800,26 @@ module Noxun
         def attach_abs_warnings!(plan, issues)
           return plan if issues.nil? || issues.empty?
           plan[:warnings].concat(AbsRules.pick_warnings(issues))
+          BuildPlan.validate!(plan)
+          plan
+        end
+
+        # KOV-F1 (Codex #329 kolo 2 P1): ORANGE „pravidla kovania sa nedaju
+        # bezpecne prevziat". Vznika LEN v stave, ktory sa sam neopravi: projekt
+        # NEMA snapshot pravidiel a globalna kniznica je z NOVSIEHO pluginu
+        # (`ensure_project_rules!` ju preto odmietol zmrazit). Pri kazdej dalsej
+        # stavbe sa zopakuje — kym sa plugin neaktualizuje, je to trvaly stav.
+        # Warning je CABINET-level (bez part_key), Kontrola ho ukaze v kategorii
+        # „stavba" (vzor R-07 `library_incompatible` pri setoch).
+        def attach_rules_state_warning!(plan, model)
+          return plan unless defined?(HardwareRules)
+          return plan unless HardwareRules.library_incompatible_without_snapshot?(model)
+
+          plan[:warnings] << BuildPlan.warning(
+            'hardware_rules_library_incompatible',
+            'Knižnica pravidiel kovania je z novšej verzie pluginu — projekt si ju NEZMRAZIL ' \
+            '(počty kovania sú len podľa toho, čomu tento plugin rozumie). Aktualizuj plugin.'
+          )
           BuildPlan.validate!(plan)
           plan
         end
@@ -1966,6 +2014,8 @@ module Noxun
             hardware: cfg[:hardware].is_a?(Array) ? cfg[:hardware] : [],
             # KOV-C2b: fail-closed dovody zasuviek (viz merge_final).
             drawer_conflicts: cfg[:drawer_conflicts].is_a?(Array) ? cfg[:drawer_conflicts] : [],
+            # KOV-F1: nosic konfliktov kovania z pravidiel (viz merge_final).
+            hardware_conflicts: cfg[:hardware_conflicts].is_a?(Array) ? cfg[:hardware_conflicts] : [],
             type: cfg[:type],
             # D-100: uklada sa LEN rucny nazov (nil = zivy default z display_name).
             # Zapecenim defaultu by nazov prestal sledovat sirku/typ skrinky.
@@ -2081,6 +2131,10 @@ module Noxun
             # sa dovod dal obnovit — musi teda prezit v configu (a s nim aj
             # save/reopen a Undo). `Bom.collect` ho zlucuje do `hardware_issues`.
             drawer_conflicts: Array(plan[:drawer_conflicts]),
+            # KOV-F1: TEN ISTY vzor pre konflikty kovania z pravidiel (dvierka
+            # nad tabulkou zavesov). Polozka aj dielec existuju, ale nakup je
+            # zastaveny a dovod musi prezit save/reopen aj Undo.
+            hardware_conflicts: Array(plan[:hardware_conflicts]),
             available_width: plan[:available][:width].round(2),
             available_height: plan[:available][:height].round(2),
             available_depth: plan[:available][:depth].round(2),

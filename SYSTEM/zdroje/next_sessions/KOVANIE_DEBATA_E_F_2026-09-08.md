@@ -87,4 +87,10 @@ E áno (Astra — config čela, nový kind, sety, dátový balík).
   jeho význam len pre nové (RED); jediný register brán `BuildPlan::HW_BLOCKERS`; `hinge_set_mismatch` číta exportná brána z expanzie; sentinel mapovania `none` s round-tripom;
   sklop cez DRUHÉ seed pravidlo (`applies_to.role` je skalár); HL pásma spojité; HL top + Tip-On nepodporované bez SKU; D-125 a STAV texty zosúladené; downgrade starším
   pluginom = vedomé riziko do D-48 (knižnice sú per PC, updater drží obe PC aktuálne).
+- **Codex GH #329 kolo 1 (implementačný PR KOV-F1; 1× P1 + 5× P2):** rozhodnutie „`CONFIG_SCHEMA` sa vo F NEbumpuje" NEPLATÍ — nosič `hardware_conflicts` je v configu
+  TRVALÝ a závesy sú klasifikované, takže starší plugin by ich pri prestavbe zahodil a schému 8 zapísal späť (nedoobjednané závesy a zlý set bez blokády). **KOV-F1 preto
+  berie 9 a §E (výklopy) posúva svoj bump na 9 → 10.** Ďalej z toho kola: sentinel „vedome bez setu" je HASH `{none: true}`, nie reťazec (vlastný set s ID `none` je platné
+  dáta a reťazec by ho preklasifikoval na „bez nákupu"); sentinel musí prežiť zmrazenie globálnych predvolieb aj „Doplniť nové predvoľby"; UI rozlišuje „nenastavené"
+  (dedí sa legacy `hinge`) od „vedome bez setu"; door guardy sa pri duplicitnom `rule_id` berú z PRVÉHO pravidla (ako `evaluate`); závesový set nesprávneho typu je RED
+  `hinge_set_mismatch`, nie ORANGE `set_type_mismatch`.
 

@@ -149,6 +149,42 @@ module Noxun
       # ziadny nema byt. Kody su ciselne, takze kolizia nehrozi.
       SKIP_CODE = 'none'
 
+      # === KOV-F1: SENTINEL MAPOVANIA „VEDOME BEZ SETU" =======================
+      #
+      # VYHRADENA hodnota kluca mapovania: „tento typ/trieda kovania NEMA mat
+      # set". Je to SAMOSTATNY kontrakt, nie clenska bunka `code_by_nl`
+      # (`SKIP_CODE`) — zhoda retazca je nahoda a ziadna vrstva ich nesmie
+      # zamienat.
+      #
+      # PRECO NESTACI ZMAZAT KLUC: pri zavesoch je precedencia REŤAZ, ktora
+      # konci na legacy `hinge`. Chybajuci triedny kluc znamena „padni nizsie",
+      # takze volba „bez setu" by sa ticho zmenila na projektovy default. So
+      # sentinelom je vysledok jednoznacny: polozka skonci ako NEMAPOVANA
+      # s vlastnym dovodom (`set_none`), nikdy s cudzim setom.
+      # Sentinel prezije `parse_mapping` (round-trip), zmrazenie snapshotu
+      # (na ziadny set neukazuje, takze nema co chybat) aj editor.
+      #
+      # PRECO HASH A NIE RETAZEC (Codex #329 kolo 1 P2): `set_id` je LUBOVOLNY
+      # neprazdny retazec, takze vlastny set s ID „none" (aj „NONE") je PLATNY
+      # obsah — a retazcovy sentinel by taku volbu preklasifikoval na „vedome
+      # bez setu", teda na skrinku BEZ zavesov v nakupe. Hodnota mapovania je
+      # bud RETAZEC (= set_id), alebo OBJEKT (= selektor), takze objektovy
+      # sentinel sa s ID setu prekryt NEMOZE a ziadna migracia dat netreba.
+      #
+      # PRECO BEZ NOVEHO `std` MARKERA: starsi plugin sentinel nepozna, ale
+      # obe cesty zlyhavaju ZATVORENE a s hlaskou — kniznicna brana
+      # (`incompatible_mapping_entry?` -> `unknown_mapping_sk`, „aktualizuj
+      # plugin") aj snapshot (`norm_map.length != mapping.length` ->
+      # `:invalid`). Marker by teda nic nepridal.
+      NONE_KEY     = 'none'
+      MAPPING_NONE = { NONE_KEY => true }.freeze
+
+      # TOKEN sentinelu pre `<select>` (payload `none_value`). Menny priestor
+      # tokenov je prefixovany (`set:` / `sel:`), takze holy „none" s realnym
+      # set_id NEKOLIDUJE. HODNOTU (`MAPPING_NONE`) posiela server v `none_send`
+      # — JS ju len vracia spat, nikdy neskláda.
+      MAPPING_NONE_OPTION = 'none'
+
       # v2 (H1a): +set „Nohy podla vysky sokla" (param_bands) a migracia
       # globalneho defaultu leg z 'nohy-klzak-17' na neho.
       # v3 (KOV-C2a): +8 klasifikovanych drawer setov (Atira 3 vysky x 2 otvarania,
@@ -161,7 +197,10 @@ module Noxun
       # legacy setu na „Výsuv (staré zákazky)". Prvy seed, ktory MENI obsah uz
       # existujucich setov — preto k nemu patri `LEGACY_SEED_SHAPES` a krok
       # „nahrad NEDOTKNUTY seed tvar" v `merge_seed`.
-      SEED_VERSION = 5
+      # v6 (KOV-F1): zavesove sety dostali UPLNU klasifikaciu (`use_type door`,
+      # `opening_mode classic|tipon`, Hettich Sensys) + triedne mapovania
+      # `class:hinge|classic` / `class:hinge|tipon` v `MAPPING_ADDITIONS`.
+      SEED_VERSION = 6
       FILE         = 'hardware_sets.json'
       MODEL_KEY    = 'hardware_sets' # kluc snapshotu v NOXUN dict na modeli
 
@@ -189,11 +228,19 @@ module Noxun
       # nevydal ANI JEDEN nákupný riadok — všetky jeho členy mali vyhradenú
       # bunku `none`. Pri receptovej zásuvke je to fail-closed prípad: dielce sú
       # postavené, nákup by bol prázdny a Kontrola by mlčala (Astra #21 BLOCKER 3).
+      # KOV-F1: `set_none` = pouzivatel VEDOME zvolil „bez setu" (sentinel
+      # mapovania); `hinge_set_mismatch` = klasifikacia vybraneho setu
+      # ODPORUJE polozke (Tip-On celo na klasickom sete) — RED, lebo nakup by
+      # bol bez zavesov, a nikdy sa nesiahne po inom sete.
       UNMAPPED_REASONS = %w[no_set set_missing set_type_mismatch nl_missing
                             param_band_missing selector_unresolved
                             length_unsupported library_incompatible
                             class_unmapped set_incompatible mapping_invalid
-                            members_skipped drawer_kit_missing].freeze
+                            members_skipped drawer_kit_missing
+                            set_none hinge_set_mismatch].freeze
+
+      # KOV-F1: RED dovod NESULADU zavesoveho setu (`BuildPlan::HW_HINGE_BLOCKERS`).
+      HINGE_SET_MISMATCH = 'hinge_set_mismatch'
 
       # KOV-D1a: kluc MARKERA neplatneho mapovania. Marker je JEDINY tvar, ktory
       # v mape znamena „kluc tu je, ale hodnota sa neda pouzit"; vyraba ho VYHRADNE
@@ -308,8 +355,12 @@ module Noxun
       # kody = SYSTEM/zdroje/SEED_KATALOG_2026-07.md §2. Atira rad nesie LEN
       # dolozene kody (420/470) — ostatne NL = ORANGE, kody doplni Michal/D2.
       SEED_SETS = [
+        # KOV-F1: zavesove sety su KLASIFIKOVANE (`use_type: 'door'` +
+        # `opening_mode`) — set sa vybera podla SPOSOBU OTVARANIA cela, takze
+        # bez klasifikacie by triedny kluc nemal na co ukazat.
         { 'set_id' => 'zaves-klasik', 'name' => 'Záves KLASIK (Sensys 110° SiSy)',
-          'generic_type' => 'hinge',
+          'generic_type' => 'hinge', 'use_type' => 'door', 'opening_mode' => 'classic',
+          'manufacturer' => 'Hettich', 'series' => 'Sensys',
           'members' => [
             { 'code' => '104717', 'per' => 'unit', 'qty' => 1, 'label' => 'záves' },
             { 'code' => '106412', 'per' => 'unit', 'qty' => 1, 'label' => 'platnička' },
@@ -317,7 +368,8 @@ module Noxun
             { 'code' => '105425', 'per' => 'unit', 'qty' => 1, 'label' => 'krytka ramienka' }
           ] },
         { 'set_id' => 'zaves-p2o', 'name' => 'Záves P2O + TipOn (bez tlmenia)',
-          'generic_type' => 'hinge',
+          'generic_type' => 'hinge', 'use_type' => 'door', 'opening_mode' => 'tipon',
+          'manufacturer' => 'Hettich', 'series' => 'Sensys',
           'members' => [
             { 'code' => '245723', 'per' => 'unit', 'qty' => 1, 'label' => 'záves P2O' },
             { 'code' => '106412', 'per' => 'unit', 'qty' => 1, 'label' => 'platnička' },
@@ -553,6 +605,29 @@ module Noxun
       # vtedy, ked sa jeho normalizovany tvar rovna niektoremu z nich — akakolvek
       # uprava pouzivatela (aj premenovanie) znamena ruky prec.
       LEGACY_SEED_SHAPES = {
+        # KOV-F1: v1..v5 tvar zavesovych setov (BEZ klasifikacie). Nedotknuty
+        # set sa nahradi klasifikovanym; akakolvek uprava = ruky prec.
+        'zaves-klasik' => [
+          { 'set_id' => 'zaves-klasik', 'name' => 'Záves KLASIK (Sensys 110° SiSy)',
+            'generic_type' => 'hinge',
+            'members' => [
+              { 'code' => '104717', 'per' => 'unit', 'qty' => 1, 'label' => 'záves' },
+              { 'code' => '106412', 'per' => 'unit', 'qty' => 1, 'label' => 'platnička' },
+              { 'code' => '105408', 'per' => 'unit', 'qty' => 1, 'label' => 'krytka misky' },
+              { 'code' => '105425', 'per' => 'unit', 'qty' => 1, 'label' => 'krytka ramienka' }
+            ] }
+        ],
+        'zaves-p2o' => [
+          { 'set_id' => 'zaves-p2o', 'name' => 'Záves P2O + TipOn (bez tlmenia)',
+            'generic_type' => 'hinge',
+            'members' => [
+              { 'code' => '245723', 'per' => 'unit', 'qty' => 1, 'label' => 'záves P2O' },
+              { 'code' => '106412', 'per' => 'unit', 'qty' => 1, 'label' => 'platnička' },
+              { 'code' => '105408', 'per' => 'unit', 'qty' => 1, 'label' => 'krytka misky' },
+              { 'code' => '105425', 'per' => 'unit', 'qty' => 1, 'label' => 'krytka ramienka' },
+              { 'code' => '250831', 'per' => 'owner', 'qty' => 1, 'label' => 'TipOn na dvierka' }
+            ] }
+        ],
         'nohy-klzak-17' => [
           { 'set_id' => 'nohy-klzak-17', 'name' => 'Klzák s rektifikáciou 17 mm',
             'generic_type' => 'leg',
@@ -697,7 +772,13 @@ module Noxun
                       { 'min' => 176.0, 'max' => 176.0, 'set_id' => 'atira-biela-h176-p2o' }]
         },
         'class:slide|classic|wood' => 'vysuv-quadro-v6-sisy',
-        'class:slide|tipon|wood'   => 'vysuv-quadro-v6-p2o'
+        'class:slide|tipon|wood'   => 'vysuv-quadro-v6-p2o',
+        # KOV-F1: zavesy podla SPOSOBU OTVARANIA. Tip-On dvierka potrebuju P2O
+        # set (bez tlmenia) s piestom `per: 'owner'` — klasicky set by im dal
+        # tlmeny zaves a ziadny piest. Vyskove varianty tu neexistuju, takze
+        # PEVNY set_id staci.
+        'class:hinge|classic' => 'zaves-klasik',
+        'class:hinge|tipon'   => 'zaves-p2o'
       }.freeze
 
       # KOV-D1b: TRIEDNE KLUCE, na ktore sa da mapovat v Pravidlach Studia.
@@ -1081,6 +1162,12 @@ module Noxun
           return true if parsed.nil? || parsed[1]
         end
         return false if value.is_a?(String) || value.is_a?(Symbol)
+        # KOV-F1: sentinel „vedome bez setu" je ZNAMY tvar (nie pokazeny
+        # selektor). Starsi plugin ho tu naopak odmietne — a prave to je jeho
+        # ochrana: kniznica so sentinelom je preň read-only s hlaskou
+        # „aktualizuj plugin", nie ticho zahodena volba.
+        return false if mapping_none?(value)
+
         incompatible_bands?(value, 'set_id')
       end
 
@@ -1118,6 +1205,12 @@ module Noxun
           unless allow_owner
             return [nil, 'triedny kľúč nemá výber na úrovni dielca — ten je len na skrinke']
           end
+          # KOV-F1: per-kridlo triedny vyber je MIMO davky — parser ho odmieta
+          # a UI ho neponuka. Owner triedny kluc ostava vyhradou zasuviek
+          # (`class:slide|…@front:F1/panel`), kde ma svoj resolver aj editor.
+          unless owner_scoped_class_head?(head)
+            return [nil, 'výber na úrovni dielca má zatiaľ len výsuv zásuvky']
+          end
           o = owner.to_s.strip
           unless CLASS_OWNER_RE.match?(o)
             return [nil, 'výber na úrovni dielca musí ukazovať na panel čela']
@@ -1128,6 +1221,15 @@ module Noxun
           return ["#{canon}@#{o}", nil]
         end
         parse_class_head(head)
+      end
+
+      # KOV-F1: smie mat TATO trieda vyber na urovni dielca? Dnes LEN vysuv
+      # zasuvky (`slide`) — jedno miesto, aby sa parser a UI nerozisli.
+      def owner_scoped_class_head?(head)
+        canon, = parse_class_head(head)
+        return false if canon.nil?
+
+        canon[BuildPlan::HW_SET_CLASS_PREFIX.length..].to_s.split('|').first == 'slide'
       end
 
       # Triedna (bezownerova) cast kluca -> [kanonicky tvar, nil] | [nil, dovod].
@@ -1767,6 +1869,7 @@ module Noxun
         return nil if canon.nil? # nie je triedny kluc — tato brana sa ho netyka
 
         segs = canon[BuildPlan::HW_SET_CLASS_PREFIX.length..].to_s.split('|')
+        gt = segs[0].to_s
         om = segs[1].to_s
         dc = segs[2]
         selector = height_selector?(value)
@@ -1777,6 +1880,13 @@ module Noxun
 
           if set['opening_mode'].to_s.strip != om
             return "set „#{set['name']}“ má iný spôsob otvárania, než pomenúva kľúč"
+          end
+          # KOV-F1: zavesovy triedny kluc konci TU — system zasuviek ani vyskovy
+          # variant sa ho netykaju; overuje sa TYP POUZITIA (set na dvierka).
+          if gt == 'hinge'
+            next if set['use_type'].to_s.strip == 'door'
+
+            return "set „#{set['name']}“ nie je set na dvierka"
           end
           if dc && set['drawer_construction'].to_s.strip != dc
             return "set „#{set['name']}“ má inú konštrukciu zásuvky, než pomenúva kľúč"
@@ -1813,6 +1923,7 @@ module Noxun
       # ked set objednavaju za rovnakych podmienok.
       def mapping_commitments(value)
         return [] if invalid_mapping_value?(value)
+        return [] if mapping_none?(value) # KOV-F1: sentinel neobjednava nic
         return [['fixed', value.to_s.strip]] if value.is_a?(String) || value.is_a?(Symbol)
         return [] unless value.is_a?(Hash)
 
@@ -1942,6 +2053,14 @@ module Noxun
           # polozku (vsetky bunky su `none`). Bez vlastnej vety by riadok
           # Nakupu aj CSV tvrdili „typ nemá priradený set", co je zavadzajuce.
           "set „#{sid}“ nemá pre túto dĺžku ani jednu položku — doplň rad setu"
+        when 'set_none'
+          # KOV-F1: VEDOMA volba „bez setu" (sentinel mapovania). Nie je to
+          # chyba nastavenia, ale rozhodnutie — a nakup to musi priznat, inak
+          # by tie kusy niekto cakal v objednavke.
+          'vedome bez setu — kovanie sa neobjednáva'
+        when HINGE_SET_MISMATCH
+          "set „#{sid}“ nesedí s čelom (#{incompatible_detail_sk(u['detail'])}) — " \
+            'vyber správny set alebo Pravidlá → Doplniť nové predvoľby'
         else
           'typ nemá priradený set'
         end
@@ -1951,6 +2070,10 @@ module Noxun
       # Neznamy detail sa nevymysla, len sa priznam, ze sedieť nemá klasifikácia.
       INCOMPATIBLE_DETAIL_SK = {
         'opening_mode' => 'iný spôsob otvárania',
+        'use_type' => 'set nie je na dvierka', # KOV-F1
+        # KOV-F1 (Codex #329 kolo 1 P2): set patri k inemu TYPU kovania (nohy,
+        # vysuv). Pri dvierkach je to RED, nie ORANGE `set_type_mismatch`.
+        'generic_type' => 'set je iného typu kovania',
         'drawer_construction' => 'iná konštrukcia zásuvky',
         'system' => 'iný systém výsuvu',
         'height_variant' => 'iná výška zásuvky',
@@ -2023,7 +2146,12 @@ module Noxun
         sets.each { |s| by_id[s['set_id']] = s }
         norm_map = normalize_mapping(mapping, sets)
         return [:invalid, nil] if norm_map.length != mapping.length
-        [:ok, { 'mapping' => norm_map, 'sets' => by_id }]
+        # KOV-F1: `migrations` = zoznam UZ VYKONANYCH jednorazovych migracii
+        # snapshotu (znacky, nie data). Aditivny kluc: starsi plugin ho pri
+        # zapise zahodi a migracia by sa zopakovala — je vsak IDEMPOTENTNA
+        # (existujuci kluc nikdy neprepise), takze to nic nepokazi.
+        [:ok, { 'mapping' => norm_map, 'sets' => by_id,
+                'migrations' => normalize_migrations(doc['migrations']) }]
       rescue StandardError => e
         Engine.log_error(e, 'HardwareSets.project_state_status') if defined?(Engine)
         [:invalid, nil]
@@ -2128,6 +2256,16 @@ module Noxun
         mapping = {}
         sets = {}
         lib['mapping'].each do |gt, value|
+          # KOV-F1 (Codex #329 kolo 1 P2): sentinel „vedome bez setu" na ziadny
+          # set NEUKAZUJE, takze `refs` je prazdne — bez tejto vetvy by ho
+          # podmienka nizsie zahodila a novy projekt by spadol na retaz
+          # fallbackov (pri zavesoch az na legacy `hinge`, teda zavesy by sa
+          # objednali), hoci UI tvrdi, ze plati globalna volba. Kopiruje sa
+          # KLUC; definicie nie je co kopirovat.
+          if mapping_none?(value)
+            mapping[gt] = deep_copy(value)
+            next
+          end
           # H1a: hodnota moze byt selector — zmrazit treba VSETKY sety, na
           # ktore ukazuje (audit BLOCKER 1); ak niektory chyba, typ sa
           # nezmrazi vobec (ciastocny selector by mlcky menil vyber).
@@ -2144,12 +2282,87 @@ module Noxun
       # :invalid sa NEOPRAVUJE ticho — vrati nil, UI ponukne vedomu obnovu.
       def ensure_project_state!(model)
         status, state = project_state_status(model)
-        return state if status == :ok
+        return migrate_hinge_classes!(model, state) if status == :ok
         return nil if status == :invalid
         state = global_default_state
         return nil if state.nil? # R-07: nekompatibilna kniznica sa nezmrazi
         write_project_state(model, state) if model
         state
+      end
+
+      # === KOV-F1: JEDNORAZOVA MIGRACIA MAPOVANIA ZAVESOV =====================
+      #
+      # Polozky zavesov su odteraz KLASIFIKOVANE, takze si set hladaju triednym
+      # klucom (`class:hinge|classic` / `class:hinge|tipon`). Existujuca zakazka
+      # ziadny taky kluc nema — bez migracie by kazde Tip-On celo dostalo
+      # klasicky zaves z legacy `hinge` (retaz na neho konci) a nikto by to
+      # nezbadal.
+      #
+      # TRI TVRDE PRAVIDLA:
+      #   1. JEDNORAZOVO — znacka `hinge_class_v1` v snapshote. Ked si
+      #      pouzivatel kluc neskor zmaze, uz sa nevrati.
+      #   2. EXISTUJUCI KLUC SA NIKDY NEPREPISE (ani ked ukazuje inam, nez by
+      #      sme dali my) — vlastny vyber ma absolutnu prednost.
+      #   3. `classic` sa odvodzuje z UCINNEHO legacy mapovania projektu (nie
+      #      zo seedu): kto ma vlastny zaves, ten si ho podrzi. Neklasifikovany
+      #      set kluc NEVYROBI — polozky idu legacy cestou a expanzia to
+      #      prizna ORANGE poznamkou `hinge_set_unclassified`.
+      #   4. `tipon` dostane `zaves-p2o` LEN vtedy, ked pouzivatel VLASTNY
+      #      tipon set nema (inak by sme mu prebili jeho volbu) a ked je
+      #      definicia v snapshote (inak by snapshot odkazoval na set, ktory
+      #      v .skp nie je — zapis by ho odmietol).
+      HINGE_CLASS_MIGRATION = 'hinge_class_v1'
+      HINGE_CLASS_KEY   = 'class:hinge|classic'
+      HINGE_TIPON_KEY   = 'class:hinge|tipon'
+      HINGE_TIPON_SET   = 'zaves-p2o'
+
+      def migrate_hinge_classes!(model, state)
+        return state unless model && state.is_a?(Hash)
+        return state if normalize_migrations(state['migrations']).include?(HINGE_CLASS_MIGRATION)
+
+        mapping = state['mapping'].is_a?(Hash) ? state['mapping'] : {}
+        sets = state['sets'].is_a?(Hash) ? state['sets'] : {}
+        next_state = deep_copy(state)
+        next_state['migrations'] = normalize_migrations(state['migrations']) + [HINGE_CLASS_MIGRATION]
+        add_hinge_classic_key(next_state, mapping, sets)
+        add_hinge_tipon_key(next_state, mapping, sets)
+        write_project_state(model, next_state) ? next_state : state
+      end
+
+      # `class:hinge|classic` = UCINNE legacy mapovanie, ak jeho set(y) sedia
+      # triede (klasifikovany set na dvierka s klasickym otvaranim).
+      def add_hinge_classic_key(state, mapping, sets)
+        return if mapping.key?(HINGE_CLASS_KEY)
+
+        value = mapping['hinge']
+        return unless present_mapping_value?(value) && !invalid_mapping_value?(value)
+        return if mapping_none?(value)
+        return unless value_set_ids(value).all? { |sid| classified?(sets[sid]) }
+        return if class_key_value_problem(HINGE_CLASS_KEY, value, sets)
+
+        state['mapping'][HINGE_CLASS_KEY] = deep_copy(value)
+      end
+
+      # `class:hinge|tipon` = seed P2O set — ale LEN ked pouzivatel vlastny
+      # tipon set nema a definicia je v snapshote.
+      def add_hinge_tipon_key(state, mapping, sets)
+        return if mapping.key?(HINGE_TIPON_KEY)
+
+        own = sets.values.any? do |s|
+          s.is_a?(Hash) && s['set_id'].to_s != HINGE_TIPON_SET &&
+            s['use_type'].to_s.strip == 'door' && s['opening_mode'].to_s.strip == 'tipon'
+        end
+        return if own
+        return unless classified?(sets[HINGE_TIPON_SET])
+        return if class_key_value_problem(HINGE_TIPON_KEY, HINGE_TIPON_SET, sets)
+
+        state['mapping'][HINGE_TIPON_KEY] = HINGE_TIPON_SET
+      end
+
+      # Znacky migracii: pole neprazdnych retazcov bez duplicit (cokolvek ine
+      # je obsah, ktoremu nerozumieme — a ten sa NEZAHADZUJE, len ocisti).
+      def normalize_migrations(raw)
+        Array(raw).map { |m| m.to_s.strip }.reject(&:empty?).uniq
       end
 
       # Zapise snapshot (volajuci drzi operaciu — undo vrati model aj sety).
@@ -2177,6 +2390,8 @@ module Noxun
           return false
         end
         doc = { 'std' => snapshot_std(mapping, norm_sets), 'mapping' => mapping, 'sets' => by_id }
+        migrations = normalize_migrations(state.is_a?(Hash) ? state['migrations'] : nil)
+        doc['migrations'] = migrations unless migrations.empty?
         model.set_attribute(Store::DICT, MODEL_KEY, doc.to_json)
         true
       rescue StandardError => e
@@ -2240,6 +2455,17 @@ module Noxun
 
       def skip_code?(value)
         value.to_s.strip.downcase == SKIP_CODE
+      end
+
+      # KOV-F1: je hodnota mapovania SENTINEL „vedome bez setu"? Jedina
+      # autorita otazky — pyta sa jej parser, resolver, zmrazenie aj editor.
+      # Codex #329 kolo 1 P2: sentinel je PRESNE `{ 'none' => true }`. RETAZEC
+      # (ani „none") sentinel NIE JE — je to `set_id` a set s takym ID smie
+      # existovat. Selektor (`param`/`bands`) sentinel tiez nie je.
+      # Kluc je RETAZEC: hodnota mapovania vzdy prejde JSON (config, snapshot,
+      # kniznica, CEF payload), takze symbolovy tvar sem nema ako prist.
+      def mapping_none?(value)
+        value.is_a?(Hash) && value.size == 1 && value[NONE_KEY] == true
       end
 
       # Je clen pre TUTO polozku vedome bez kodu? (`member_code` vrati [nil, nil]
@@ -2486,9 +2712,7 @@ module Noxun
                .to_s.split('|')
         gt, om, dc = segs
         sets = set_options(gt, globals, snapshot_sets, referenced_ids).select do |s|
-          s['active'] != false && s['opening_mode'].to_s.strip == om.to_s &&
-            (dc.nil? || s['drawer_construction'].to_s.strip == dc) &&
-            !set_system(s).nil?
+          class_set_match?(s, gt, om, dc)
         end
         fixed, variant = sets.partition { |s| int_value(s[HEIGHT_VARIANT_KEY]).nil? }
         out = fixed.map do |s|
@@ -2503,6 +2727,26 @@ module Noxun
                    'selector' => sel }
         end
         out.sort_by { |o| [o['label'].to_s, o['id'].to_s] }
+      end
+
+      # === KOV-F1: PATRI SET DO PONUKY TRIEDNEHO KLUCA? ======================
+      #
+      # Dve triedy, dva filtre — a rozdiel je vecny, nie kozmeticky:
+      #   * VYSUV (`slide`) sa vybera aj podla SYSTEMU (Atira vs. Quadro):
+      #     receptova polozka vzdy nesie `params.system` a set cudzieho
+      #     vyrobcu by padol az RED expanziou nad hotovou zakazkou;
+      #   * ZAVES (`hinge`) ziadny system nema — triedu urcuje typ pouzitia
+      #     (dvierka) a sposob otvarania. Poziadavka „vydany system zasuviek"
+      #     by zavesove sety vyhodila z ponuky UPLNE.
+      def class_set_match?(set, gt, om, dc)
+        return false unless set.is_a?(Hash) && set['active'] != false
+        return false unless set['opening_mode'].to_s.strip == om.to_s
+
+        if gt.to_s == 'hinge'
+          set['use_type'].to_s.strip == 'door'
+        else
+          (dc.nil? || set['drawer_construction'].to_s.strip == dc) && !set_system(set).nil?
+        end
       end
 
       # KOV-D1b (Codex #310 kolo 1 P2-4): SYSTEM, ktoremu set patri, podla jeho
@@ -2587,6 +2831,8 @@ module Noxun
       # aby JS musel porovnavat objekty. nil pri neplatnom tvare.
       def mapping_option_id(value)
         return nil if invalid_mapping_value?(value)
+        # KOV-F1: vlastny token volby „bez setu" (realny set ma prefix `set:`).
+        return MAPPING_NONE_OPTION if mapping_none?(value)
         return "set:#{value.to_s.strip}" if value.is_a?(String) || value.is_a?(Symbol)
         return nil unless value.is_a?(Hash)
 
@@ -2604,6 +2850,9 @@ module Noxun
       # sa PRIZNA („chýba"), nikdy nenahradi.
       def mapping_value_text(value, defs)
         return 'bez setu' if value.nil? || (value.is_a?(String) && value.to_s.strip.empty?)
+        # KOV-F1: sentinel je VEDOMA volba — text to musi odlisit od „este
+        # nikto nic nevybral" (to je hodnota nil vyssie).
+        return 'vedome bez setu' if mapping_none?(value)
         return 'neplatný výber' if invalid_mapping_value?(value)
         return selector_text(value, defs) if value.is_a?(Hash)
 
@@ -2827,9 +3076,13 @@ module Noxun
         item.merge('params' => params)
       end
 
+      # POZOR: rovnomenna metoda je v tomto module definovana DVAKRAT (druha
+      # vyhrava) — TATO je ta ucinna. Kazdy novy detail treba doplnit SEM.
       def incompatible_detail_sk(detail)
         {
           'opening_mode' => 'iný spôsob otvárania',
+          'use_type' => 'set nie je na dvierka', # KOV-F1
+          'generic_type' => 'set je iného typu kovania', # KOV-F1 (Codex #329)
           'drawer_construction' => 'iná konštrukcia zásuvky',
           'system' => 'iný systém zásuviek',
           HEIGHT_VARIANT_KEY => 'iná výška zásuvky'
@@ -2864,6 +3117,15 @@ module Noxun
         added_map = []
         lib['mapping'].each do |gt, value|
           next if state['mapping'].key?(gt)
+          # KOV-F1 (Codex #329 kolo 1 P2): sentinel sa doplna ROVNAKO ako iny
+          # chybajuci kluc — `value_set_ids` je pri nom prazdne, takze bez tejto
+          # vetvy by ho „Doplniť nové predvoľby" ticho preskocilo a projekt by
+          # dalej padal na nizsiu uroven.
+          if mapping_none?(value)
+            state['mapping'][gt] = deep_copy(value)
+            added_map << gt
+            next
+          end
           refs = value_set_ids(value)
           next if refs.empty? || refs.any? { |sid| by_id[sid].nil? }
           state['mapping'][gt] = deep_copy(value)
@@ -3101,6 +3363,7 @@ module Noxun
         lookup  = catalog_lookup(catalog)
         rows = {}
         unmapped = []
+        notes = [] # KOV-F1: ORANGE poznamky k NAMAPOVANYM polozkam
         # kluc clena `per: 'owner'` => UZ VYDANY zdrojovy zaznam riadku (R-34:
         # dalsi zasah na ten isty kluc je realne zliatie a doznaci mu `per_owner`)
         owner_seen = {}
@@ -3128,8 +3391,18 @@ module Noxun
           # Zapisove cesty typ strazia, ale mapovanie zo sablony moze ukazat na
           # set_id, ktoreho definiciu si projekt drzi vlastnu (a ta moze byt
           # ineho typu) — expanzia je posledna poistka.
+          # KOV-F1 (Codex #329 kolo 1 P2): pri DVIERKACH je to ta ista chyba ako
+          # nesulad klasifikacie nizsie — nakup by ostal BEZ ZAVESOV. ORANGE by
+          # zakazku pustil von, preto RED brana (`hinge_set_mismatch`). Tato
+          # vetva je SKORSIA nez `set_incompatible_info`, takze bez povysenia
+          # prave tu by sa k RED nikdy nedoslo.
           if set['generic_type'].to_s != gt
-            unmapped << unmapped_entry(it, sid, 'set_type_mismatch')
+            unmapped << if door_item?(it)
+                          unmapped_entry(it, sid, HINGE_SET_MISMATCH,
+                                         { 'detail' => 'generic_type' })
+                        else
+                          unmapped_entry(it, sid, 'set_type_mismatch')
+                        end
             next
           end
           # KOV-C2a: klasifikacia setu vs. klasifikacia polozky (otvaranie,
@@ -3137,9 +3410,15 @@ module Noxun
           # tie tuto vetvu nikdy neprejdu.
           bad = set_incompatible_info(it, set)
           if bad
-            unmapped << unmapped_entry(it, sid, 'set_incompatible', bad)
+            # KOV-F1: dovod si nesie sama kontrola — zaves ma vlastny RED kod
+            # (`hinge_set_mismatch`), zasuvka ostava na ORANGE `set_incompatible`.
+            unmapped << unmapped_entry(it, sid, bad['reason'] || 'set_incompatible', bad)
             next
           end
+          # KOV-F1: zaves na LEGACY (nezaradenom) sete sa NAKUPI ako doteraz,
+          # ale projekt sa o tom dozvie — bez klasifikacie nevie set povedat,
+          # ci patri na Tip-On alebo klasicke dvierka.
+          note_unclassified_hinge(it, set, sid, notes)
           # R-06 (brana 1d): dlzkove kovanie (uchytkovy profil D-90 nesie rez
           # v params) sa cez KUSOVY set nacenit NESMIE — cena katalogu je za
           # meter a subtotal by ju vynasobil poctom KUSOV. Radsej NIC (ORANGE
@@ -3150,7 +3429,23 @@ module Noxun
           end
           expand_members(it, set, qty, rows, unmapped, owner_seen, lookup)
         end
-        finalize(rows, unmapped)
+        finalize(rows, unmapped, notes)
+      end
+
+      # KOV-F1: poznamka „zavesovy set nie je zaradeny". Deduplikuje sa podla
+      # SETU (jeden set = jedna veta, nie jedna veta na kazde kridlo v zakazke)
+      # a nesie ADRESU prvej dotknutej polozky, aby na nu vedela Kontrola
+      # ukazat. Nakup sa NEMENI — set kody ma.
+      def note_unclassified_hinge(it, set, sid, notes)
+        return unless door_item?(it) && !classified?(set)
+        return if notes.any? { |n| n['set_id'] == sid.to_s }
+
+        notes << { 'code' => 'hinge_set_unclassified', 'set_id' => sid.to_s,
+                   'set_name' => set['name'].to_s,
+                   'cabinet_id' => it['owner_id'].to_s,
+                   'owner_part_key' => it['owner_part_key'].to_s,
+                   'generic_type' => it['generic_type'].to_s,
+                   'rule_id' => it['rule_id'].to_s }
       end
 
       def normalize_cabinet_overrides(cabinet_overrides)
@@ -3177,7 +3472,16 @@ module Noxun
         # KOV-C2a: klasifikovana polozka BEZ triedneho mapovania nie je „typ bez
         # setu" — je to konkretny chybajuci riadok predvolieb a hlaska musi
         # navigovat na „Pravidlá -> Doplniť nové predvoľby".
-        return [nil, (ck ? 'class_unmapped' : 'no_set'), (ck ? { 'class_key' => ck } : {})] if value.nil?
+        # KOV-F1: pri ZAVESE je `class_unmapped` nepravda — retaz konci na
+        # legacy `hinge`, takze prazdny vysledok znamena „typ nema ziadny set"
+        # (dnesny stav a dnesna hlaska).
+        if value.nil?
+          return [nil, 'no_set', {}] if ck.nil? || door_item?(it)
+
+          return [nil, 'class_unmapped', { 'class_key' => ck }]
+        end
+        # Vedoma volba „bez setu": vlastny dovod, NIKDY set z nizsej urovne.
+        return [nil, 'set_none', (ck ? { 'class_key' => ck } : {})] if mapping_none?(value)
         # KOV-D1a (Codex #308 kolo 2 P1): kluc JE pritomny, ale hodnota sa neda
         # pouzit. Vlastny dovod — a NIKDY set z nizsej urovne.
         if invalid_mapping_value?(value)
@@ -3212,11 +3516,29 @@ module Noxun
       def class_key_for(it, generic_type)
         params = it.is_a?(Hash) && it['params'].is_a?(Hash) ? it['params'] : {}
         om = params['opening_mode'].to_s.strip
+        return nil if om.empty?
+
+        # KOV-F1: ZAVES je klasifikovany DVOJSEGMENTOVO — konstrukcia zasuvky
+        # sa ho netyka. Poznava ho `use_type: 'door'` na polozke; legacy
+        # polozka (bez params) triedny kluc NEMA a ide dnesnou cestou.
+        if params['use_type'].to_s.strip == 'door'
+          canon, = parse_class_key("#{BuildPlan::HW_SET_CLASS_PREFIX}#{generic_type}|#{om}")
+          return canon
+        end
+
         dc = params['drawer_construction'].to_s.strip
-        return nil if om.empty? || dc.empty?
+        return nil if dc.empty?
 
         canon, = parse_class_key("#{BuildPlan::HW_SET_CLASS_PREFIX}#{generic_type}|#{om}|#{dc}")
         canon
+      end
+
+      # KOV-F1: je to polozka ZAVESU (klasifikovana ako dvierka)? Rozhoduje
+      # o DVOCH veciach naraz: o retazi precedencie (zaves smie spadnut na
+      # legacy `hinge`, zasuvka nikdy) a o tvare kontroly kompatibility setu.
+      def door_item?(it)
+        params = it.is_a?(Hash) && it['params'].is_a?(Hash) ? it['params'] : {}
+        params['use_type'].to_s.strip == 'door'
       end
 
       # Je hodnota mapovania VYSKOVY selektor? (pasma podla `height_variant`)
@@ -3234,6 +3556,42 @@ module Noxun
         # ani `slide@owner` pre nu NEEXISTUJU: H70 set k zasuvke H176 by bol
         # zly kit, a mlcky.
         ck = class_key_for(it, generic_type)
+        # === KOV-F1: PRECEDENCIA ZAVESU (PATSTUPNOVA) ========================
+        #
+        #   override VLASTNIKA (`hinge@front:F1/wing:left`)
+        #   > TRIEDNY override skrinky (`class:hinge|tipon`)
+        #   > GENERICKY override skrinky (`hinge`)
+        #   > TRIEDNY kluc projektu
+        #   > LEGACY `hinge` projektu
+        #
+        # Dva rozdiely oproti zasuvke a oba su vecne:
+        #   * vlastny set NA SKRINKE (genericky `hinge`) NIKDY ticho nespadne
+        #     na projektovy default (Codex #327 kolo 2) — preto stoji NAD
+        #     triednym klucom projektu;
+        #   * na konci retaze je LEGACY `hinge`. Bez neho by KAZDA existujuca
+        #     zakazka po prestavbe stratila zavesy (polozky su odteraz
+        #     klasifikovane, ale projektovy snapshot triedny kluc este nema).
+        #     „Vedome bez setu" sa preto zapisuje SENTINELOM, nie zmazanim.
+        if ck && door_item?(it)
+          ov = cabinet_overrides[it['owner_id'].to_s]
+          if ov.is_a?(Hash)
+            opk = it['owner_part_key'].to_s
+            unless opk.empty?
+              v = ov["#{generic_type}@#{opk}"]
+              return v if present_mapping_value?(v)
+            end
+            v = ov[ck]
+            return v if present_mapping_value?(v)
+
+            v = ov[generic_type]
+            return v if present_mapping_value?(v)
+          end
+          v = mapping[ck]
+          return v if present_mapping_value?(v)
+
+          v = mapping[generic_type]
+          return present_mapping_value?(v) ? v : nil
+        end
         if ck
           ov = cabinet_overrides[it['owner_id'].to_s]
           if ov.is_a?(Hash)
@@ -3267,9 +3625,12 @@ module Noxun
       # neda pouzit. Precedencia sa na nom MUSI zastavit — inak by sa poskodena
       # hodnota tvarila ako NEPRITOMNY kluc a zasuvka by ticho dostala set
       # z nizsej urovne (presne ta pasca, ktoru sme opravovali pri `recipe_refs`).
+      # KOV-F1 (Codex #329 kolo 1 P2): sentinel je PRITOMNA hodnota — precedencia
+      # sa na nom MUSI zastavit. Odkedy je Hash bez `bands`, treba ho vymenovat
+      # zvlast (predtym prechadzal ako neprazdny retazec).
       def present_mapping_value?(v)
         (v.is_a?(String) && !v.strip.empty?) || (v.is_a?(Hash) && v['bands'].is_a?(Array)) ||
-          invalid_mapping_value?(v)
+          mapping_none?(v) || invalid_mapping_value?(v)
       end
 
       def invalid_mapping_value?(v)
@@ -3303,6 +3664,8 @@ module Noxun
         ck = class_key_for(it, it['generic_type'].to_s)
         return nil if ck.nil? || !set.is_a?(Hash)
 
+        return hinge_incompatible_info(it, set) if door_item?(it)
+
         params = it['params'].is_a?(Hash) ? it['params'] : {}
         %w[opening_mode drawer_construction].each do |k|
           return { 'detail' => k } if set[k].to_s.strip != params[k].to_s.strip
@@ -3324,6 +3687,28 @@ module Noxun
         return { 'detail' => HEIGHT_VARIANT_KEY } if hv && set_hv && (hv - set_hv).abs > 1e-9
 
         nil
+      end
+
+      # === KOV-F1: KOMPATIBILITA ZAVESOVEHO SETU =============================
+      #
+      # NEKLASIFIKOVANY (legacy) set NIE JE nesulad — je to stav pred KOV-F1
+      # a polozka nan smie ist dalej (legacy cesta). Priznava sa INAK: ORANGE
+      # poznamkou `hinge_set_unclassified` s napravou (Doplniť nové predvoľby).
+      #
+      # DEFINITIVNY nesulad je az to, ked set KLASIFIKACIU MA a ta odporuje
+      # polozke — Tip-On celo na klasickom sete by v nakupe znamenalo tlmeny
+      # zaves bez piestu. Vtedy sa NIKDY nesiahne po inom sete: polozka je
+      # NEMAPOVANA s RED dovodom (`hinge_set_mismatch`) a export stoji.
+      def hinge_incompatible_info(it, set)
+        return nil unless classified?(set)
+
+        params = it['params'].is_a?(Hash) ? it['params'] : {}
+        if set['use_type'].to_s.strip != 'door'
+          return { 'detail' => 'use_type', 'reason' => HINGE_SET_MISMATCH }
+        end
+        return nil if set['opening_mode'].to_s.strip == params['opening_mode'].to_s.strip
+
+        { 'detail' => 'opening_mode', 'reason' => HINGE_SET_MISMATCH }
       end
 
       # Zhoda mena vyrobcu/rady — case-insensitive a bez diakritiky (`Materials.slug`
@@ -3659,7 +4044,7 @@ module Noxun
 
       # Zoradenie + medzisucty. Cena nil = "nezadana" (subtotal nil, nikdy 0 —
       # audit N11); summary total scitava LEN zname ceny a nesie pocet neznamych.
-      def finalize(rows, unmapped)
+      def finalize(rows, unmapped, notes = [])
         cat_rank = {}
         if defined?(HardwareCatalog)
           HardwareCatalog::CATEGORIES.each_with_index { |c, i| cat_rank[c] = i }
@@ -3690,6 +4075,11 @@ module Noxun
         {
           'rows' => list,
           'unmapped' => unmapped,
+          # KOV-F1: ADITIVNY kluc — ORANGE poznamky k NAMAPOVANEJ polozke
+          # (dnes: zaves na nezaradenom sete). Do `unmapped` nepatria: polozka
+          # kody DOSTALA, len o sebe nevie povedat vsetko. Konzumenti, ktori
+          # kluc nepoznaju (JS sekcia Nakup, CSV), sa nemenia.
+          'notes' => notes,
           'summary' => { 'rows' => list.length,
                          'quantity' => list.sum { |r| r['quantity'] },
                          'total_eur_vat' => total.round(2),
@@ -4526,6 +4916,12 @@ module Noxun
       # Hodnota mapovania: set_id String ALEBO selector Hash.
       # -> [:ok, norm, referenced_set_ids] | [:invalid, message, nil]
       def parse_mapping_value(value)
+        # KOV-F1: sentinel „vedome bez setu" je PLATNA hodnota, ktora
+        # neukazuje na ziadny set — preto sa kanonizuje PRED vsetkym ostatnym
+        # (inak by ho `validate_param_bands` odmietol ako pokazeny selektor
+        # a kluc by z mapovania vypadol, teda presny opak volby pouzivatela).
+        return [:ok, MAPPING_NONE, []] if mapping_none?(value)
+
         if value.is_a?(String) || value.is_a?(Symbol)
           sid = value.to_s.strip
           return [:invalid, 'prázdne set_id', nil] if sid.empty?

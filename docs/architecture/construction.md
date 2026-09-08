@@ -94,6 +94,19 @@ nesie presne to, čo má ukázať aj zvonček Inspectora (Sol audit 4).
 anotácia hmotnosti **aj** `CabinetBuilder.base_material_for`. Druhý opísaný `case` by sa časom rozišiel a hmotnosť by sa rátala z inej dosky, než akou je dielec postavený.
 `cover_panel` v `FRONT_MATERIAL_ROLES` **vedome nie je** — o jeho kanáli rozhoduje materiálový signál deskriptora, presne ako pred KOV-W.
 
+**KOV-F1 — SPÔSOB OTVÁRANIA ČELA V PLÁNE (v0.9.48).** `annotate_front_modes!(parts, fr[:items])` dopíše každému deskriptoru čela **aditívne**
+`opening_mode` z jeho riadku čiel. Je to ten istý vzor ako hmotnosť: kľúč žije LEN v pamäti plánu (builder zapisuje na entitu menovitý zoznam polí, takže
+`plan_schema` sa **nebumpuje**) a chýbajúci kľúč riadku znamená legacy čelo — anotácia sa vtedy nerobí a čitateľ (`HardwareRules.hinge_params`) platí
+`classic`. Bez nej by expanzia nemala odkiaľ vedieť, či dvierka chcú Tip-On set: v modeli je otváranie na RIADKU čiel, položka kovania ho nesie až odtiaľto.
+
+**KOV-F1 — ULOŽENÝ NOSIČ `hardware_conflicts`.** Plán má aditívny kľúč `hardware_conflicts` `[{owner_part_key, code, message}]` (validuje
+`BuildPlan.validate_hardware_conflicts!` proti registru `HW_CONFLICT_CODES`, vrátane referenčnej integrity vlastníka). Je to **ten istý vzor** ako
+`drawer_conflicts` — `merge_final` ho uloží do configu v TEJ ISTEJ operácii ako geometriu — ale iný stav: pri závese nad tabuľkou **položka aj dielec
+EXISTUJÚ** (riadok v Kovaní musí byť, inak nemá kde vzniknúť ručný zámok), zastavený je len nákup. Dôvod musí prežiť save/reopen aj Undo, lebo po
+znovuotvorení .skp sa nedá odvodiť: `Bom.hardware_conflict_issues` ho zlúči do `hardware_issues`, `Validation` z neho robí RED
+([outputs.md](outputs.md)). `drawer_conflicts` ostáva **nedotknuté**.
+
+
 ### cabinet_builder.rb
 
 **ŠEV VKLADANIA (R-03, v0.8.20): `prepare_insert` → `commit_insert`; `build` je len ich kompozícia** a správanie všetkých doterajších volajúcich je nezmenené.
@@ -164,7 +177,25 @@ a zásuvka by ticho dostala set z projektu namiesto vybraného (Astra #20 B1). B
 · **`7` = KOV-D2a** (VÝŠKOVÝ ZÁMOK zásuvky — záznam `hardware_overrides` s `rule_id recipe:<id>` smie niesť pole `height_variant`, druhá os zámku popri `nominal_length`):
 starší plugin (schéma 6) ho pri normalizácii **zahodí** whitelistom `norm_hardware_overrides`, takže zásuvka by sa ticho vrátila na **automatickú výšku** — teda na iné
 dielce a iný kit (Codex #307 P1). Brány sú tie isté ako pri 5 a 6.
-**`DRAWER_ACTIVATION_SCHEMA` ostáva 5** — je to VLASTNÁ konštanta práve preto, aby bump na 6 ani 7 nespravil z každej skrinky schémy 5 „nemigrovanú" (`drawer_stale`).
+· **`8` = D-118b** (set s VYHRADENOU bunkou `none` = „vedome bez kódu" cestuje v šablónach cez `hardware_set_defs`): starší plugin sentinel nepozná a `member_code` mu vráti
+kód „none", takže by z takej šablóny objednal **neexistujúci kód** — knižnicu a snapshot chráni vlastný marker `HardwareSets::STD_SKIP_CODE`, šablónu práve tento bump.
+· **`9` = KOV-F1** (ZÁVESY): config dostal **trvalý nosič `hardware_conflicts`** (dôvody, pre ktoré je UŽ VYDANÁ položka kovania nesprávna — dnes `door_height_out_of_table`)
+a závesové položky sú **klasifikované** (`use_type: 'door'` + `opening_mode`), takže si set hľadajú TRIEDNYM kľúčom (`class:hinge|classic` / `class:hinge|tipon`) a počet
+môže niesť `+1` nad šírku 600 mm. Starší plugin (schéma 8) nepozná ani jedno: pri prestavbe by nosič zahodil whitelistom `cabinet_config` (RED nadvýška by zmizla), Tip-On
+čelo by ticho dostalo klasický záves z legacy `hinge`, `+1` by neprirátal — a schému 8 by zapísal späť, teda **stratu zvečnil**. Cez .skp na druhom PC to znamená
+nedoobjednané závesy a zlý set BEZ blokády (Codex #329 kolo 1 P1). Brány sú tie isté ako pri 5–8: dopredný `newer_config?` (prestavba, šablóny, kópia) + exportná
+`ProductionCore.export_blockers`.
+**`DRAWER_ACTIVATION_SCHEMA` ostáva 5** — je to VLASTNÁ konštanta práve preto, aby bump na 6 až 9 nespravil z každej skrinky schémy 5 „nemigrovanú" (`drawer_stale`).
+**`HINGE_ACTIVATION_SCHEMA` = 9** je jej dvojička pre závesy (Codex #329 kolo 2 P1): skrinka uložená pod nižšou schémou nesie staré počty závesov, takže ju
+zber priznáva RED `hinge_stale` a brána zastaví nákup, rozpočet aj ponuku (VEPO nie) — detail v [outputs.md](outputs.md). **Sama o sebe schéma 9 RED
+nezhasína** (Codex #329 kolo 3 P1): kým sú pravidlá projektu spred F1, prestavba vyráta staré počty znova, takže nález drží aj druhá príčina
+(`HardwareRules.pre_hinge_table_rules?`) a náprava je prestavba **plus** „Doplniť nové predvoľby". Pri budúcom bumpe `CONFIG_SCHEMA`
+na 10 ostáva 9, aby sa prestavané skrinky zrazu netvárili ako nemigrované.
+
+**ORANGE, KEĎ SA PRAVIDLÁ NEDAJÚ ZMRAZIŤ (Codex #329 kolo 2 P1).** `build_into` po `Construction.build_plan` volá **`attach_rules_state_warning!(plan, model)`**
+(vzor `attach_abs_warnings!`: doplní warning a plán sa RE-VALIDUJE). Warning `hardware_rules_library_incompatible` vznikne LEN v stave, ktorý sa sám neopraví —
+projekt NEMÁ snapshot pravidiel a globálna knižnica je z novšieho pluginu, takže ju `HardwareRules.ensure_project_rules!` odmietol zmraziť
+([hardware.md](hardware.md)). Je cabinet-level (bez `part_key`), opakuje sa pri každej stavbe a Kontrola ho ukáže v kategórii „stavba".
 
 **AD-HOC KOVANIE `hardware_manual[]` (KOV-H1, v0.9.18).** Ďalšie pole configu, nie nový zápisový kanál (audit #15 BLOCKER 1): panel ho posiela v `collectAll()` presne ako čelá,
 takže ide cestou `apply_all` → `normalize` → **rebuild** — jeden krok Späť, guardy dokumentu aj skrinky, R-12, `push_selected(dedup: false)`. Cena je prestavba geometrie pri

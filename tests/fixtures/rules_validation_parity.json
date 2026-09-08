@@ -72,6 +72,31 @@
                   "series": [400.0], "bands": [{ "max": 900.0, "quantity": 1 }] }]
     },
     {
+      "name": "KONEČNÁ tabuľka bez číselného pásma — catch-all by dal počet každému čelu",
+      "invalid": true,
+      "rules": [{ "rule_id": "zavesy", "output": "hinge", "kind": "bands", "enabled": true,
+                  "finite": true, "bands": [{ "max": null, "quantity": 1 }] }]
+    },
+    {
+      "name": "KONEČNÁ tabuľka s jedným číselným pásmom je v poriadku",
+      "invalid": false,
+      "rules": [{ "rule_id": "zavesy", "output": "hinge", "kind": "bands", "enabled": true,
+                  "finite": true, "bands": [{ "max": 849.0, "quantity": 2 },
+                                            { "max": null, "quantity": 7 }] }]
+    },
+    {
+      "name": "tabuľka BEZ `finite` (dnešný catch-all) sa nekontroluje — počet je legitímny",
+      "invalid": false,
+      "rules": [{ "rule_id": "zavesy", "output": "hinge", "kind": "bands", "enabled": true,
+                  "bands": [{ "max": null, "quantity": 2 }] }]
+    },
+    {
+      "name": "VYPNUTÁ konečná tabuľka bez číselného pásma sa nekontroluje",
+      "invalid": false,
+      "rules": [{ "rule_id": "zavesy", "output": "hinge", "kind": "bands", "enabled": false,
+                  "finite": true, "bands": [{ "max": null, "quantity": 1 }] }]
+    },
+    {
       "name": "viac pravidiel, jedno deravé — odmietne sa uloženie CELKU",
       "invalid": true,
       "rules": [

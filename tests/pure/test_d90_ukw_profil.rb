@@ -184,7 +184,7 @@ end
 
 NxTest.test('D-90 pravidla: seed v3 nesie obe pravidla profilu (dvierka + zasuvky)') do
   hr = NxD90.hr
-  NxTest.assert_equal(3, hr::SEED_VERSION, 'seed v3 = D-90')
+  NxTest.assert(hr::SEED_VERSION >= 3, 'seed v3 zaviedol profil; KOV-F1 bumplo na 4')
   ids = hr::SEED_RULES.map { |r| r['rule_id'] }
   NxTest.assert(ids.include?('uchytkovy-profil'), 'pravidlo pre dvierka')
   NxTest.assert(ids.include?('uchytkovy-profil-zasuvky'), 'pravidlo pre zasuvkove cela')

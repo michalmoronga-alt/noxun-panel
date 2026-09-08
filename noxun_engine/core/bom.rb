@@ -83,6 +83,10 @@ module Noxun
         identities = []
         cabinets = 0
         boards = 0
+        # KOV-F1 (Codex #329 kolo 3 P1): su UCINNE pravidla projektu este spred
+        # tabulky zavesov? Otazka je MODELOVA (snapshot, inak globalna
+        # kniznica), preto sa pyta RAZ na zber, nie pri kazdej skrinke.
+        rules_stale = defined?(HardwareRules) && HardwareRules.pre_hinge_table_rules?(model)
         model.entities.grep(Sketchup::ComponentInstance).each do |inst|
           case Store.kind(inst)
           when 'cabinet'
@@ -131,12 +135,25 @@ module Noxun
               drawer_conflict_issues(cid, inst.persistent_id, ccfg['drawer_conflicts'],
                                      ccfg['front_items'])
             )
+            # KOV-F1: TEN ISTY vzor pre konflikty kovania z pravidiel (dvierka
+            # nad tabulkou zavesov). Nosic je v configu, lebo polozka sama
+            # o sebe o probleme nevie — nesie len pocet z posledneho pasma.
+            hardware_issues.concat(
+              hardware_conflict_issues(cid, inst.persistent_id, ccfg['hardware_conflicts'],
+                                       ccfg['front_items'])
+            )
             # KOV-C2b (Codex #304 kolo 1 P1): skrinka ULOZENA PRED aktivaciou
             # receptov, ktora UZ MA klasifikovanu zasuvku. V .skp nie su
             # receptove dielce (a vysuv je legacy), takze kusovnik, VEPO aj
             # nakup by boli NEUPLNE — a ticho. Fail-closed RED + brana.
             st = drawer_stale_issue(cid, inst.persistent_id, ccfg)
             hardware_issues << st if st
+            # KOV-F1 (Codex #329 kolo 2 P1): TEN ISTY vzor pre ZAVESY. Skrinka
+            # ulozena pred tabulkou nesie stare pocty v `config.hardware[]`
+            # a ziadny nosic konfliktu z nej nevznikol — bez tejto brany by
+            # nakup, rozpocet aj ponuka presli s poddimenzovanymi zavesmi.
+            hs = hinge_stale_issue(cid, inst.persistent_id, ccfg, rules_stale)
+            hardware_issues << hs if hs
             cs = ccfg['hardware_sets']
             note_cabinet_sets(cid, (cs.is_a?(Hash) && !cs.empty? ? cs : nil),
                               cabinet_sets, cabinet_sets_seen, cabinet_set_conflicts)
@@ -207,6 +224,11 @@ module Noxun
                               pid: inst.persistent_id)
           end
         end
+        # KOV-F1 (Codex #329 kolo 3 P1): stav PRAVIDIEL CELEHO PROJEKTU. Nalez
+        # nepatri ziadnej skrinke, preto vznika AZ TU — raz na zber, nie pri
+        # kazdej instancii.
+        rsi = rules_snapshot_issue(model)
+        hardware_issues << rsi if rsi
         { records: records, hardware: hardware, hardware_overrides: hardware_overrides,
           manual_overrides: manual_overrides,
           cabinet_sets: cabinet_sets, cabinet_set_conflicts: cabinet_set_conflicts,
@@ -346,6 +368,30 @@ module Noxun
         end
       end
 
+      # KOV-F1: ulozene `hardware_conflicts` -> tvrde nalezy kovania. Tvar
+      # zaznamu je kontrakt `BuildPlan.validate_hardware_conflicts!`
+      # ({owner_part_key, code, message}); tu sa k nemu doplni ADRESA
+      # (vlastnik, instancia) a LUDSKY popis cela. Neznamy kod (config
+      # z novsej verzie) sa PRESKOCI — o taku zakazku sa stara vlastna brana
+      # `newer_configs`. `front_id` sa odvodi z kluca vlastnika (nosic ho
+      # neuklada — vlastnikom je KRIDLO, nie riadok ciel).
+      def hardware_conflict_issues(owner_id, owner_pid, conflicts, front_items)
+        items = front_items.is_a?(Array) ? front_items : []
+        Array(conflicts).filter_map do |c|
+          next nil unless c.is_a?(Hash)
+
+          code = c['code'].to_s
+          next nil unless BuildPlan::HW_CONFLICT_CODES.include?(code)
+
+          pkey = c['owner_part_key'].to_s
+          { 'code' => code, 'severity' => 'red',
+            'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
+            'part_key' => pkey, 'front_id' => PartKeys.front_id(pkey).to_s,
+            'message' => c['message'].to_s,
+            'label' => PartKeys.human_label(pkey, fronts: items).to_s }
+        end
+      end
+
       # KOV-C2b: NEMIGROVANA zasuvka. Skrinka ma config z casov PRED aktivaciou
       # receptov (`config_schema < CabinetBuilder::DRAWER_ACTIVATION_SCHEMA`),
       # ale v `front_items` uz je celo klasifikovane ako zasuvka s konstrukciou
@@ -380,6 +426,83 @@ module Noxun
                        'prestav ju (zmeň a vráť rozmer alebo klikni Prestavať), inak jej v kusovníku ' \
                        'chýbajú dielce zásuvky a v nákupe správny výsuv.',
           'label' => PartKeys.human_label(pkey, fronts: items).to_s }
+      end
+
+      # === KOV-F1 (Codex #329 kolo 2 P1): NEPRESTAVANE ZAVESY =================
+      #
+      # Skrinka, ktora MA polozky zavesov a ktorej pocty este nevznikli z Noxun
+      # tabulky. Jej `config.hardware[]` nesie stare pocty: bez +1 nad sirku
+      # 600 mm, bez klasifikacie otvarania (Tip-On by dostal klasicky set) a bez
+      # nosica `hardware_conflicts` (RED nadvyska nad 2800 mm z nej nikdy
+      # nevznikne). Zber pritom cita LEN ULOZENE hodnoty — nic sa neprepocitava
+      # — takze bez tejto brany by nakupny CSV, rozpocet aj cenova ponuka presli
+      # s PODDIMENZOVANYMI zavesmi a nikto by to nezbadal. Fail-closed RED;
+      # VEPO branu NEDOSTAVA (geometria je spravna). Skrinka BEZ zavesov nalez
+      # nerobi — stary stav sam o sebe chyba nie je.
+      #
+      # DVE NEZAVISLE PRICINY (Codex #329 kolo 3 P1) — staci JEDNA:
+      #   (a) SCHEMA skrinky < `CabinetBuilder::HINGE_ACTIVATION_SCHEMA` —
+      #       config je spred tabulky, naprava je PRESTAVBA;
+      #   (b) `rules_stale` = UCINNE pravidla projektu su spred tabulky
+      #       (`HardwareRules.pre_hinge_table_rules?`). Prestavba SAMA nestaci:
+      #       `ensure_project_rules!` zamerne ponechava STARY snapshot projektu
+      #       (reprodukovatelnost stavby z .skp), takze prestavana skrinka by
+      #       dostala schemu 9 a ZNOVA stare pocty — a RED by zhasol nad
+      #       poddimenzovanym nakupom. Naprava je vedoma akcia „Doplniť nové
+      #       predvoľby" v Pravidlach kovania (alebo Ulozit v nich), ktora
+      #       zapise snapshot s aktualnym `std` A prestava vsetky skrinky.
+      # RED zhasne az ked NEPLATI ani jedna.
+      # -> nalez | nil
+      def hinge_stale_issue(owner_id, owner_pid, ccfg, rules_stale = false)
+        return nil unless defined?(CabinetBuilder) && defined?(HardwareRules)
+
+        cfg = ccfg.is_a?(Hash) ? ccfg : {}
+        old_schema = CabinetBuilder.config_schema_of(cfg) < CabinetBuilder::HINGE_ACTIVATION_SCHEMA
+        return nil unless old_schema || rules_stale
+
+        hit = Array(cfg['hardware']).find do |h|
+          h.is_a?(Hash) && h['generic_type'].to_s == HardwareRules::HINGE_OUTPUT
+        end
+        return nil if hit.nil?
+
+        items = cfg['front_items'].is_a?(Array) ? cfg['front_items'] : []
+        pkey = hit['owner_part_key'].to_s
+        { 'code' => BuildPlan::HINGE_STALE, 'severity' => 'red',
+          'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
+          'part_key' => pkey, 'front_id' => PartKeys.front_id(pkey).to_s,
+          'message' => "Skrinka #{owner_id} má závesy spočítané ešte spred Noxun tabuľky — " \
+                       'prestav ju (zmeň a vráť rozmer alebo klikni Prestavať) a v Pravidlách ' \
+                       'kovania spusti „Doplniť nové predvoľby“ — nová tabuľka závesov ' \
+                       '(+1 nad šírku 600 mm, set podľa otvárania) platí až keď je hotové oboje.',
+          'label' => PartKeys.human_label(pkey, fronts: items).to_s }
+      end
+
+      # === KOV-F1 (Codex #329 kolo 3 P1): PRAVIDLA Z NOVSIEHO PLUGINU ========
+      #
+      # PROJEKTOVY snapshot pravidiel kovania so `std` vyssim, nez tento plugin
+      # pozna (rollback pluginu, zakazka od kolegu s novsou verziou). Citanie je
+      # zamerne tolerantne — zakazka sa musi dat otvorit a dostavat — ale
+      # `normalize_rules` z pravidiel drzi LEN polia, ktorym rozumieme, takze
+      # pocty kovania su DEGRADOVANE (dnes napr. tabulka zavesov bez door
+      # guardov). A kedze snapshot EXISTUJE, ORANGE stavby
+      # (`hardware_rules_library_incompatible`, ten strazi projekt BEZ
+      # snapshotu) sa nespusti: bez tejto brany by starsi plugin prestavil cele
+      # skrinky svojou schemou a vydal nakup, rozpocet aj ponuku ticho.
+      #
+      # Snapshot sa NEPREPISUJE ani NEZMRAZUJE (zapisove cesty ho odmietaju),
+      # takze nalez je TRVALY — prestavba ho nezhasne a jedina naprava je
+      # AKTUALIZACIA PLUGINU. VEPO branu NEDOSTAVA: geometria je spravna.
+      # -> nalez | nil (ziadny zapis; jedine citanie modeloveho atributu)
+      def rules_snapshot_issue(model)
+        return nil unless defined?(HardwareRules)
+        return nil unless HardwareRules.project_std_unsupported?(model)
+
+        { 'code' => BuildPlan::RULES_SNAPSHOT_INCOMPATIBLE, 'severity' => 'red',
+          'owner_id' => '', 'owner_pid' => nil, 'part_key' => '', 'front_id' => '',
+          'message' => 'Pravidlá kovania tohto projektu uložil NOVŠÍ plugin — tento im ' \
+                       'nerozumie, takže počty kovania môžu byť poddimenzované. ' \
+                       'Aktualizuj plugin.',
+          'label' => 'Pravidlá kovania' }
       end
 
       # R-34 (review #262 P1): `cabinet_sets` je mapa ID => override setov, teda

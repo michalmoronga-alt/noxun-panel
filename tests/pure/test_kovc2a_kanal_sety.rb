@@ -481,7 +481,8 @@ NxTest.test('KOV-C2a (R4): cerstva kniznica ma 8 novych setov a 4 triedne mapova
   c::HWS::MAPPING_ADDITIONS.each_key do |key|
     NxTest.assert(lib['mapping'].key?(key), "cerstva kniznica musi mat #{key}")
   end
-  NxTest.assert_equal(4, c::HWS::MAPPING_ADDITIONS.size)
+  # KOV-F1: +2 zavesove triedne mapovania (`class:hinge|classic` / `|tipon`).
+  NxTest.assert_equal(6, c::HWS::MAPPING_ADDITIONS.size)
   # Vsetky seed sety su platne aj podla PRISNEJ zapisovej validacie.
   _norm, errs = c::HWS.validate_sets(c::HWS::SEED_SETS)
   NxTest.assert_equal([], errs, errs.inspect)

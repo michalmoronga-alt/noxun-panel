@@ -8,7 +8,8 @@ const path = require('node:path');
 const { hwsSlug, hwsSetsForType, hwsMemberSummary, hwsBuildSetPayload,
         hwsMembersOf, hwsNum, hwsParamLabel, hwsBandsSummary, hwsBuildBands,
         hwsSelectorFrom, hwsBuildSelector, hwsProjDraftKeys,
-        hwsPinRev, hwsMapRev } =
+        hwsPinRev, hwsMapRev, hwsMapClassValue, hwsMapClassSelectedId,
+        HWS_STORED_OPT } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'hw_sets.js'));
 
 // Slovnik parametrov posiela server (HardwareSets::PARAM_OPTIONS).
@@ -190,5 +191,42 @@ eq(Object.keys(hwsBuildSelector(hwsPinRev({ param: 'height', rows: [{ min: '', m
    ['bands', 'param'],
    'server dostava CISTY selector — `rev` v nom nie je');
 eq(hwsPinRev(null, 'rev-A'), null, 'null draft je bezpecny');
+
+
+// --- KOV-F1: SENTINEL "vedome bez setu" v triednom mapovani -------------------
+// Volba "bez setu" sa uklada ako VYHRADENA hodnota, nie zmazanim kluca. Pri
+// zavesoch je rozdiel vecny: prazdny kluc znamena "padni nizsie" (legacy
+// `hinge`), teda presny OPAK toho, co si pouzivatel vybral.
+// Codex #329: `none_value` je TOKEN volby v selecte, `none_send` je HODNOTA,
+// ktoru JS posle spat — sentinel je Hash a panel ho nikdy neskláda sam.
+const HROW = { key: 'class:hinge|tipon', none_value: 'none', none_send: { none: true },
+               options: [{ id: 'set:zaves-p2o', set_id: 'zaves-p2o' },
+                         { id: 'sel:x', selector: { param: 'height', bands: [] } }] };
+eq(hwsMapClassValue(HROW, 'none'), { none: true }, 'sentinel ide na server ako HODNOTA zo servera');
+eq(hwsMapClassValue(HROW, 'set:zaves-p2o'), 'zaves-p2o', 'pevny set = set_id');
+eq(hwsMapClassValue(HROW, 'sel:x'), { param: 'height', bands: [] }, 'rodina = selektor');
+eq(hwsMapClassValue(HROW, ''), '', 'prazdne ID ostava zrusenim mapovania');
+eq(hwsMapClassValue(HROW, 'neznamy'), null, 'nezname ID sa NEODOSIELA');
+// Token bez hodnoty (starsi/orezany payload) NEPOSLE nic — radsej ziadny zapis
+// nez retazec "none", ktory by na serveri bol `set_id`.
+eq(hwsMapClassValue({ key: 'class:hinge|tipon', none_value: 'none', options: [] }, 'none'), null,
+   'token bez `none_send` sa NEODOSIELA');
+// Riadok BEZ `none_value` (starsi payload) sa sprava presne ako doteraz.
+eq(hwsMapClassValue({ key: 'class:slide|classic|metal', options: [] }, 'none'), null,
+   'bez `none_value` je sentinel len nezname ID — ziadny tichy zapis');
+
+// --- Codex #329: "nenastavene" vs. "vedome bez setu" --------------------------
+// Projekt BEZ triedneho kluca (`current` null, `stored` false) NIE JE "vedome
+// bez setu": resolver pri chybajucom kluci pada na legacy `hinge`, takze zavesy
+// v nakupe SU. Select preto ma DVE volby a vybrana je prava z nich.
+eq(hwsMapClassSelectedId({ none_value: 'none', current: null, stored: false }), '',
+   'chybajuci kluc = "nenastavene", NIE sentinel');
+eq(hwsMapClassSelectedId({ none_value: 'none', current: 'none', stored: false }), 'none',
+   'ulozeny sentinel = volba "vedome bez setu"');
+eq(hwsMapClassSelectedId({ none_value: 'none', current: 'set:zaves-p2o', stored: false }),
+   'set:zaves-p2o', 'ulozeny set = jeho volba');
+eq(hwsMapClassSelectedId({ none_value: 'none', current: null, stored: true }), HWS_STORED_OPT,
+   'hodnota mimo ponuky = "ulozeny vyber" (F10)');
+eq(hwsMapClassSelectedId(null), '', 'chybajuci riadok je bezpecny');
 
 console.log(`OK — test_hw_sets.js: ${n} testov preslo`);

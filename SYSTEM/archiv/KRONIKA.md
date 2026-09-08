@@ -17,6 +17,106 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-F1 — TRETIE (POSLEDNÉ) FIX KOLO PO CODEX GH REVIEW #329 (9.9.2026; ten istý PR #329, v0.9.49 → v0.9.50 — mení sa `ui/js/rules.js`).**
+  Kolo 3 vrátilo 2× P1 + 2× P2 a **štvrté kolo sa už nekonalo** (pravidlo 3 kôl): opravy prešli internou verifikáciou + plným in-SketchUp behom.
+  Všetky štyri nálezy sú opäť o **tichých stavoch, ktoré by prešli bránami** — a dva z nich boli priamym dôsledkom opráv z kola 2.
+  **P1 — PROJEKTOVÝ snapshot pravidiel z novšieho pluginu = TRVALÝ RED blocker.** Kolo 2 ochránilo knižnicu, ale projekt, ktorý snapshot UŽ MÁ (rollback pluginu,
+  zákazka od kolegu s novšou verziou), ostal neviditeľný: `ensure_project_rules!` snapshot prečítal a `library_incompatible_without_snapshot?` bol `false` LEN preto,
+  že snapshot existuje — takže starší čítač prestaval skrinky svojou schémou a vydal nákup, rozpočet aj ponuku s degradovanými počtami. `Bom.rules_snapshot_issue`
+  odteraz vydáva RED `hardware_rules_snapshot_incompatible` (nový register `BuildPlan::HW_RULES_BLOCKERS`, súčasť `HW_ISSUE_BLOCKERS`): stojí nákupné CSV, rozpočet
+  a cenovú ponuku, VEPO beží. Snapshot sa **neprepisuje ani nezmrazuje**, takže nález je trvalý — prestavba ho nezhasne a jediná náprava je aktualizácia pluginu.
+  Kód **nemá vlastníka** (je to stav celého projektu), preto Kontrola aj veta brány pri prázdnom `owner_id` adresu vynechávajú (predtým „(—)").
+  **P1 — `hinge_stale` nezhasne samotnou prestavbou.** Prestavba označí skrinku schémou 9, ale `ensure_project_rules!` zámerne ponecháva starý seed snapshot projektu
+  (nové predvoľby sa dopĺňajú vedomou akciou) — takže rozrobená zákazka dostala po prestavbe ZNOVA staré počty (900/1400/1900, Tip-On cez klasický set) a RED zhasol
+  nad poddimenzovaným nákupom. Nález má odteraz **dve nezávislé príčiny** (stačí jedna): schéma skrinky < 9 **alebo** účinné pravidlá projektu spred F1
+  (`HardwareRules.pre_hinge_table_rules?` — projektový snapshot, inak globálna knižnica, `std` < `HINGE_TABLE_STD` = 2; zisťuje sa RAZ na zber). Rozhoduje **verzia
+  formátu, nie obsah pravidla**: vedomý používateľský rule bez guardov uložený PO F1 stale nie je. Hláška pýta OBOJE — prestav skrinku a v Pravidlách spusti
+  „Doplniť nové predvoľby" (tá zapíše snapshot s aktuálnym `std` A prestavia skrinky; to isté robí Uložiť v Pravidlách).
+  **P2 — `blocked` sa strácal pri opakovanom čítaní pod zámkom.** `persist_seed_merge!` číta knižnicu pod zámkom znova (read-modify-write), ale tretiu hodnotu
+  `read_rules` zahadzoval a `load_state` hlásil `blocked` natvrdo `false`. Keby knižnicu medzi prvým čítaním a zámkom nahradil novší plugin, `ensure_project_rules!`
+  by orezané pravidlá zmrazil do .skp — presne to, čomu mala brána `std` zabrániť. Funkcia teraz vracia tú istú dvojicu `[pravidlá, blocked]` ako `load_state`.
+  **P2 — konečná tabuľka bez číselného pásma je fail-closed.** Keď používateľ v editore zmazal všetky číselné pásma, ostal nezmazateľný catch-all a skrytý
+  `finite: true`: validácia to prijala, `compute` dala catch-all počet každému čelu a konflikt sa potlačil (`top` nil) — jeden záves bez RED. Odteraz platí OBOJE:
+  zápisová brána taký tvar odmieta („konečná tabuľka potrebuje aspoň jedno číselné pásmo", server aj klientska `rdValidate` — parita cez spoločnú fixtúru) a v
+  evaluácii je **mimo tabuľky KAŽDÉ čelo** (položka s catch-all počtom + RED); ručný zámok počtu ho zhasína rovnako ako pri nadvýške.
+  **Testy:** 3494 headless (+8 blokov v `test_kovf_zavesy.rb`, sekcia 12; mutácie M25–M28 overené dočasným vypnutím každej opravy — vždy padol práve nový test)
+  · 97 JS sád (+4 prípady vo fixtúre parity) · in-SketchUp **2028 PASS / 0 FAIL** vrátane rozšírenej sekcie `kovf_stale` („prestavba sama nestačí; doplnenie predvolieb zhasne").
+
+- **KOV-F1 — DRUHÉ FIX KOLO PO CODEX GH REVIEW #329 (8.9.2026 v noci; ten istý PR #329, v0.9.49 bez bumpu — css/js sa nemenili).**
+  Kolo 2 vrátilo 2× P1 + 1× P2; všetky tri sú o **tichých stavoch, ktoré by prešli bránami**.
+  **P1 — knižnica pravidiel z NOVŠIEHO pluginu sa už do projektu NEZMRAZÍ.** Doterajšia vetva vracala z `read_rules` len normalizované pravidlá a stav „len na čítanie"
+  stratila, takže `ensure_project_rules!` ich pri projekte BEZ snapshotu (rollback pluginu, nový projekt) zmrazil do .skp s NAŠÍM `std` — a keďže `normalize_bands` drží
+  len `max`/`quantity`, budúce polia by ticho zmizli **a brána by sa už nikdy nespustila**. `read_rules` teraz vracia `[pravidlá, changed, blocked]`, `load_state` ten
+  príznak podáva ďalej a `ensure_project_rules!` snapshot **nevytvorí** (vzor R-07 `HardwareSets.ensure_project_state!`). Stavba beží ďalej nad prečítaným obsahom
+  (tabuľka `bands` je forward-čitateľná zámerne a nikdy nevydá nulu), ale `CabinetBuilder.attach_rules_state_warning!` k nej pridá ORANGE
+  `hardware_rules_library_incompatible` („aktualizuj plugin") — protajšok `library_incompatible` pri setoch.
+  **P1 — skrinky uložené staršou schémou dostali RED `hinge_stale`.** Skrinka z 0.9.47 (`config_schema` 8) má v `config.hardware[]` staré počty (bez `+1` nad 600 mm,
+  bez klasifikácie/Tip-On setu) a nosič `hardware_conflicts` z nej nikdy nevznikol; nová vetva pritom číta LEN uložené hodnoty, takže nákupné CSV, rozpočet aj ponuka
+  by prešli s **poddimenzovanými závesmi a ticho** (`newer_config?` reaguje až na schému > 9). `Bom.collect` ju preto priznáva RED nálezom (`hinge_stale_issue`, vzor
+  `drawer_stale`) v jedinom registri brán; VEPO ide ďalej (geometria je správna). Náprava je **prestavba** — vtedy sa zapíše schéma 9 a RED zhasne. `HINGE_ACTIVATION_SCHEMA`
+  je vlastná konštanta (9), aby budúci bump `CONFIG_SCHEMA` nespravil z prestavaných skriniek „nemigrované".
+  **P2 — RED nadvýšky zhasne LEN skutočný zámok počtu.** Podmienka `source == 'manual'` zhasínala konflikt aj pri importovanom/legacy override, ktorý niesol iba
+  `nominal_length` — o počte teda nikto nerozhodol a catch-all počet prešiel bránami. Nový `quantity_locked?` sa pýta priamo ručných zásahov (platné pole `quantity`,
+  ten istý výklad a poradie „posledný vyhráva" ako `apply_overrides`).
+  **Testy:** 3486 headless (+5 v `test_kovf_zavesy.rb`, mutácie M22–M24 overené vypnutím každej opravy) · 97 JS sád · in-SketchUp **2021 PASS / 0 FAIL** vrátane novej
+  reopen sekcie `kovf_stale` (schéma 8 → RED → prestavba → zhasne).
+
+- **KOV-F1 — FIX KOLO PO CODEX GH REVIEW #329 (8.9.2026 v noci; ten istý PR #329, v0.9.48 → v0.9.49).**
+  Odsek KOV-F1 nižšie vznikol pri odovzdaní dávky, **pred** review — ostáva tak, ako bol zapísaný (tento súbor sa neprepisuje); tu je, čo kolo 1 (1× P1 + 5× P2) zmenilo.
+  **P1 — `CONFIG_SCHEMA` 8 → 9.** Package tvrdil „vo F sa nebumpuje", a to bola chyba: nosič `hardware_conflicts` je v configu **trvalý** a závesy sú **klasifikované**,
+  takže starší plugin by pri prestavbe nosič zahodil whitelistom `cabinet_config`, Tip-On čelo by dostalo klasický záves z legacy `hinge`, `+1` by neprirátal — a schému 8
+  by zapísal **späť**, teda stratu zvečnil. Cez .skp na druhom PC to znamená nedoobjednané závesy a zlý set BEZ blokády. Brány sú existujúce (dopredný `newer_config?`
+  + exportná `ProductionCore.export_blockers`), **KOV-E preto posúva svoj bump na 9 → 10**.
+  **Sentinel „vedome bez setu" je HASH `{none: true}`, nie reťazec.** `set_id` je ľubovoľný neprázdny reťazec, takže vlastný set s ID `none` (aj `NONE`) sú platné dáta —
+  reťazcový sentinel by takú voľbu preklasifikoval na „bez nákupu". Hodnota mapovania je buď reťazec (= `set_id`), alebo objekt (= selektor), takže objektový sentinel
+  sa s ID setu **prekryť nemôže** a žiadna migrácia dát netreba (variant (a) z review, bez rezervovania ID). Nový `std` marker k tomu nepatrí: starší plugin obe cesty
+  odmietne **zatvorene a s hláškou** — knižnicu cez `incompatible_mapping_entry?` („aktualizuj plugin"), snapshot cez `norm_map.length != mapping.length`.
+  **Sentinel sa musí kopírovať výslovne** — `global_default_state` (predvoľby nového projektu) aj `merge_project_sets_seed!` („Doplniť nové predvoľby") preskakovali
+  mapovanie s prázdnym zoznamom referencií, a sentinel na žiadny set neukazuje: voľba by z oboch ciest ticho vypadla a projekt by spadol na legacy `hinge`.
+  **UI rozlišuje „nenastavené" a „vedome bez setu".** Projekt bez triedneho kľúča dedí legacy `hinge` (nákup závesy **má**), takže jedna spoločná prázdna voľba klamala.
+  Riadok má odteraz dve: `unset_label` (kľúč sa zmaže) a `none_label` (uloží sa sentinel); hodnotu posiela server v `none_send` — panel doménovú hodnotu nikdy neskladá sám.
+  **Door guardy sa berú z PRVÉHO pravidla s daným `rule_id`** (ako `evaluate`) — index „posledný vyhráva" by priniesol guardy z pravidla, ktoré položku nevydalo.
+  **Set nesprávneho typu je pri dvierkach RED.** Vetva `generic_type` v `expand` beží skôr než kontrola klasifikácie, takže set na nohy pod závesovým kľúčom by skončil
+  ako ORANGE `set_type_mismatch` a nákup bez závesov by odišiel von; pre `door_item?` sa preto hlási `hinge_set_mismatch`. Položka bez klasifikácie ostáva na ORANGE.
+  **Testy:** 3481 headless (+6 v `test_kovf_zavesy.rb`, mutácie M17–M21) · 97 JS sád (nová `tests/js/test_kovf_ui.js`) · in-SketchUp `run_kovf`.
+
+- **KOV-F1 — ZÁVESY PODĽA NOXUN TABUĽKY A SET PODĽA OTVÁRANIA (8.9.2026; PR #329, v0.9.48).**
+  Prvý z dvoch PR bloku KOV-F (jadro; editor nových polí je F2). **Počet závesov** už neurčuje starý odhad, ale **jedna Noxun tabuľka pre všetkých výrobcov**
+  (do 849 → 2 · 850–1700 → 3 · 1701–2200 → 4 · 2201–2400 → 5 · 2401–2600 → 6 · 2601–2800 → 7; výška ≤ max, inkluzívne) a **krídlo širšie než 600 mm dostane +1**.
+  Set rozhoduje LEN o produkte, nie o počte.
+  **Prečo ostal druh pravidla `bands` a prečo v ňom ostalo catch-all pásmo (Sol audit kolo 2 BLOCKER 1 + Codex #327 kolo 3):** nový `kind` by starší plugin
+  **preskočil** a dvierka by dostali NULA závesov — a to aj pri novom vložení skrinky, lebo čítače pravidiel `std` ignorujú. Guardy sú preto **voliteľné kľúče**
+  (`finite`, `width_plus`, `width_warn_over`, `weight_bands`), ktoré `normalize_rules` zachová a starý `compute` nevidí. Ten istý dôvod drží pásmo `nil → 7`:
+  starý čítač tak ráta podľa tabuľky (bez +1 a bez varovaní), **nikdy nulu**. Hranica je vedomá — knižnice sú per PC a updater (D-52) drží obe PC aktuálne,
+  takže „starší plugin s novšou knižnicou" je downgrade na tom istom PC (riziko do D-48).
+  **`finite` = „mimo tabuľky", a položka SA VYDÁ (Sol kolo 2 BLOCKER 2):** dvierka nad 2800 mm dostanú riadok s počtom 7 — bez neho by nemal kde vzniknúť ručný
+  zámok, ktorý je nápravou — a k nemu RED `door_height_out_of_table` cez **nový uložený nosič `hardware_conflicts`** v configu (vzor `drawer_conflicts`, tá istá
+  operácia ako geometria, prežije save/reopen aj Undo). Zámok počtu RED **zhasne**.
+  **Door guardy bežia AŽ NAD VÝSLEDNÝMI položkami** (po `apply_overrides`) — inak by sa hmotnostné pásmo porovnávalo s počtom z pravidla, nie s tým, čo si
+  používateľ zamkol, a konflikt by sa zámkom nedal zhasnúť. Varovania počet **nemenia**: `door_wide` · `door_wider_than_high` („nemá to byť výklop?") ·
+  `hinge_weight_more` · `hinge_weight_max`; neznáma hmotnosť je **INFO** v `BUILD_INFO_ONLY` (plán bez materiálov je legitímny stav — ORANGE na každých dvierkach
+  zákazky by prekryl skutočné nálezy).
+  **Set podľa otvárania:** položka závesu odteraz nesie `params {use_type: 'door', opening_mode}` (otváranie dopisuje plánu `Construction.annotate_front_modes!`,
+  vzor KOV-W `weight_kg`), seed sety `zaves-klasik`/`zaves-p2o` sú **klasifikované** a mapovanie dostalo dvojsegmentové triedne kľúče `class:hinge|classic|tipon`.
+  **Tip-On dvierka** tak dostanú P2O set + **jeden piest na krídlo**. **Precedencia je päťstupňová** a končí na legacy `hinge` — bez toho by každá existujúca
+  zákazka po prestavbe stratila závesy; **generický override skrinky stojí NAD triednym kľúčom projektu** (Codex #327 kolo 2), aby vlastný set skrinky nikdy ticho
+  nespadol na projektový default.
+  **Voľba „bez setu" sa ukladá SENTINELOM `none`, nie zmazaním kľúča (Sol kolo 2 FIX 4 + Codex #327 kolo 3):** pri reťazovej precedencii by prázdny kľúč znamenal
+  „padni nižšie", teda presný opak voľby. Je to samostatný kontrakt (nie členská bunka `code_by_nl`), ktorý prežije round-trip, zmrazenie snapshotu, resolver aj editor.
+  **Migrácia `hinge_class_v1` je jednorazová** (značka v snapshote): `class:hinge|classic` sa odvodí z účinného legacy mapovania (vlastný záves prežije),
+  `class:hinge|tipon` dostane seed P2O len vtedy, keď používateľ vlastný Tip-On set nemá; existujúci kľúč sa **nikdy** neprepíše. Nezaradený legacy set nie je chyba
+  — nákup beží ďalej a stav sa prizná ORANGE poznámkou `hinge_set_unclassified`; **definitívny nesúlad** (Tip-On čelo na klasickom sete) je RED `hinge_set_mismatch`.
+  **Jediný register brán `BuildPlan.hw_blockers`** (Codex #327 kolo 3) spojil zásuvkové a závesové kódy; `drawer_blockers` sa zovšeobecnil na `hardware_blockers`
+  a `export_blockers(drawer:)` na `(hardware:)`. Poradie kódov je kontrakt (určuje poradie viet), preto je register **funkcia, nie konštanta** — `build_plan.rb`
+  sa načítava pred `drawer_recipes.rb`. **Zásuvkové brány ostali bajtovo rovnaké** (charakterizačný test), závesové kódy **neblokujú VEPO** (geometria je správna).
+  **Seed sa nahrádza len v presnom starom tvare** (`LEGACY_SEED_SHAPES` aj pre pravidlá) a **nedopĺňa sa vôbec**, keď rolu už obsluhuje iné zapnuté pravidlo
+  s výstupom `hinge` — taký prekryv `evaluate` prizná ORANGE `hardware_rule_overlap` a uplatní prvé pravidlo. `HardwareRules::STD` 1 → 2 a čítače od tejto verzie
+  **honorujú `std`**: dokument z novšieho pluginu sa číta, ale nezapisuje (inak by tolerantná normalizácia ticho zahodila pole, ktorému nerozumieme).
+  **Rozpracovaným zákazkám sa nemení nič samo** — novú tabuľku aj klasifikované sety prinesie vedomé **„Doplniť nové predvoľby"**.
+  **Testy:** 3475 headless (+33 v `tests/pure/test_kovf_zavesy.rb`, 16 pomenovaných mutácií) · 96 JS sád (nové kontroly v `test_hw_sets.js` a `test_st3b_rules.js`) ·
+  nová in-SketchUp sekcia `run_kovf` (počty z reálnej šírky krídla, Tip-On set + piest, RED nad tabuľkou a jeho zhasnutie zámkom v jednom kroku Späť, vlastný set
+  skrinky prežije prestavbu). **Zlaté vzorky KOV-A** sa zmenili v samostatnom commite — výhradne o klasifikáciu položiek závesov a o nové čelné varovania.
+
 - **KOV-W — FIX KOLO PO SOL AUDITE A CODEX REVIEW (8.9.2026 večer; PR #328, tá istá verzia v0.9.47).**
   Odsek KOV-W nižšie vznikol pri odovzdaní dávky, **pred** auditom a review — ostáva tak, ako bol zapísaný (tento súbor sa neprepisuje); tu je, čo sa v tom istom PR zmenilo.
   **Hrúbka (Sol BLOCKER = Codex #328 P2):** vstup plánu už nie sú len hustoty (`densities:`), ale celý katalógový záznam **`materials:`** — per kanál aj per-part override

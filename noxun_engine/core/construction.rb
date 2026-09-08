@@ -155,6 +155,12 @@ module Noxun
         # dielce zasuviek (rovnake Hash objekty, do ktorych sa zapisuje).
         annotate_weights!(parts + drawer[:parts], materials, warnings)
 
+        # KOV-F1: sposob otvarania cela na deskriptor. Zavesove pravidlo z neho
+        # sklada `params.opening_mode` polozky (set podla otvarania: Tip-On
+        # dvierka = P2O set + piest). Rovnaky vzor ako hmotnost — kluc zije LEN
+        # v pamati planu, do modelu sa neuklada.
+        annotate_front_modes!(parts, fr[:items])
+
         # Kovanie z pravidiel — az PO vyradeni degenerovanych dielcov (na dielec,
         # ktory v modeli nestoji, nesmie vzniknut polozka). Kontext string-keyed.
         hw_ctx = {
@@ -197,9 +203,43 @@ module Noxun
           # ktore ma builder vykonat v TEJ ISTEJ operacii ako geometriu.
           drawer_conflicts: drawer[:conflicts],
           drawer_writes: drawer[:writes],
-          drawer_override_writes: drawer[:override_writes]
+          drawer_override_writes: drawer[:override_writes],
+          # KOV-F1: ULOZENY NOSIC konfliktov kovania z PRAVIDIEL (dnes dvierka
+          # nad tabulkou zavesov). Vzor `drawer_conflicts`: polozka aj dielec
+          # existuju, ale nakup by bol nespravny — a po znovuotvoreni .skp sa
+          # dovod nema z coho odvodit, preto musi prezit v configu.
+          hardware_conflicts: hw[:conflicts].is_a?(Array) ? hw[:conflicts] : []
         }
         BuildPlan.validate!(plan)
+      end
+
+      # --- KOV-F1: anotacia sposobu otvarania ciel ----------------------------
+      #
+      # Kazdemu deskriptoru CELA dopise ADITIVNE `opening_mode` z jeho riadku
+      # ciel (`front_items`). Chybajuci kluc riadku = legacy celo; anotacia sa
+      # vtedy NEROBI a citatel (HardwareRules) plati `classic`.
+      # Kluc zije LEN v pamati planu — builder zapisuje na entitu menovity
+      # zoznam poli, takze `plan_schema` sa NEBUMPUJE.
+      def annotate_front_modes!(parts, items)
+        modes = {}
+        Array(items).each do |it|
+          next unless it.is_a?(Hash)
+
+          om = it['opening_mode'].to_s.strip
+          next if om.empty?
+
+          modes[it['id'].to_s] = om
+        end
+        return parts if modes.empty?
+
+        parts.each do |pd|
+          next unless pd.is_a?(Hash)
+
+          fid = PartKeys.front_id(pd[:part_key].to_s)
+          om = fid && modes[fid]
+          pd[:opening_mode] = om if om
+        end
+        parts
       end
 
       # --- KOV-W: anotacia hmotnosti dielcov ----------------------------------

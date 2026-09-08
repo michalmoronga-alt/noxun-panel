@@ -240,6 +240,8 @@
       "production_class": "counted",
       "manufactured": true,
       "params": {
+        "use_type": "door",
+        "opening_mode": "classic"
       },
       "source": "rule",
       "rule_quantity": 2
@@ -253,6 +255,8 @@
       "production_class": "counted",
       "manufactured": true,
       "params": {
+        "use_type": "door",
+        "opening_mode": "classic"
       },
       "source": "rule",
       "rule_quantity": 2
@@ -289,7 +293,24 @@
     }
   ],
   "warnings": [
-
+    {
+      "code": "hinge_weight_unknown",
+      "severity": "info",
+      "message": "Dvierka „Dvierka 1 lave“: hmotnosť dvierok nie je známa — počet závesov je len podľa výšky.",
+      "part_key": "front:F1/wing:left",
+      "data": {
+        "rule_id": "zavesy-podla-vysky"
+      }
+    },
+    {
+      "code": "hinge_weight_unknown",
+      "severity": "info",
+      "message": "Dvierka „Dvierka 1 prave“: hmotnosť dvierok nie je známa — počet závesov je len podľa výšky.",
+      "part_key": "front:F1/wing:right",
+      "data": {
+        "rule_id": "zavesy-podla-vysky"
+      }
+    }
   ],
   "front_items": [
     {
