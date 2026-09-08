@@ -17,6 +17,27 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-121b — NÁZOV RIADKU VEPO JE VŽDY ≤ 20 ZNAKOV (kontrakt v1.2; v0.9.46, 8.9.2026).**
+  **Fakt, ktorý zmenil kontrakt:** Michal 7.9.2026 overil v praxi, že **import objednávky VEPO pole `nazov` nad 20 znakov ODMIETA**. Kontrakt v1.1 pritom tvrdil, že 20 znakov
+  je len tlač nálepky a CSV pole nesie 60 (`NAME_MAX = 60`) — takže sa dlhé riadky pred odoslaním prepisovali **ručne**. Nie je to teda kozmetika, ale revízia kontraktu na **v1.2**.
+  **Čo sa zmenilo:** `NAME_MAX = 20` je jediná autorita limitu v celom repe (orez, vlastníci, Kontrola aj LOG ju čítajú odtiaľ; `validation.rb` číslo neopakuje — stráži guard test).
+  Aby sa riadok do 20 znakov reálne vošiel, **rovnaké dielce s číslom sa zlúčia do jedného tokenu** (`Polica 1/Polica 2/Polica 3` → `Polica 1 2 3` = 29 → 12 znakov,
+  `Zas dno 1 2`, `Zas celo 1 2 3`, `Zas bok LP 1 2`) — výhradne tokeny zo skratky **generovaného** názvu; voľné názvy dosiek sa nezlučujú ani nepárujú (zásada GH #287 P2).
+  Keď sa názov aj tak nezmestí, reže sa **po hranici tokenu**: rez presne na medzeru/`/` berie celý začiatok, inak sa rozseknuté slovo zahodí; jedno dlhé slovo (voľný názov
+  dosky) ide tvrdým rezom. **Orez sa prizná:** LOG dostal medzi „Riadky vyradené z CSV" a „Poznámky pre VEPO" oddiel **„Skrátené názvy (N):"** (plný → skrátený tvar, súbor,
+  rozmery, kusy, vlastníci) a **Kontrola** ORANGE nález `name_long` s presným tvarom, ktorý pôjde do objednávky. Vyradený riadok ukáže v LOGu aj plný názov.
+  **Čo sa vedome nerobí:** žiadna výpustka `…` (minula by znak z 20 a nálepka interpunkciu netlačí — stroj VEPO mení aj medzeru na `_`); riadok, ktorému sa zmestil názov, ale
+  **nie skrinka** (`Zas celo 1 2 3 4 5 6` = presne 20), Kontrola **nehlási** — nie je to strata dielca, len horšia orientácia v dielni, takže ostáva iba v LOGu.
+  Kusovník Štúdia, poznámka pre VEPO, kódy hrán, hrúbky, grouping ani názvy súborov sa nemenia; **zlatá vzorka CSV ostala nedotknutá** (jej názvy sú pod 20 znakov).
+  **Audit (Astra `gpt-6-astra`, 8.9., 4 nálezy, žiadny BLOCKER — všetky zapracované PRED implementáciou):** (1) tvrdý orez by rozsekol číslo dielca (`Polica 2 3 4 5 6 7 10` →
+  `…7 1` = na štítku polica **1** namiesto 10) → orez po hranici tokenu + regresný test; (2) Kontrola per doska nezodpovedá CSV (dve krátke dosky v jednom riadku sa orežú
+  a semafor mlčí) → Kontrola hodnotí **agregované riadky** cez tú istú `row_name_info`, teda `Bom.aggregate_rows` + `VepoExport` — jedna funkcia pre CSV, LOG aj semafor;
+  (3) LOG neadresuje kolízie skrátených názvov a `filename` sa priraďoval pred `dedup_filenames!` → záznamy sa zbierajú per bucket (vzor `notes`) a riadok nesie rozmery, kusy
+  a vlastníkov; (4) test povoľoval 60 znakov → sprísnený.
+  **Testy:** nová sada `tests/pure/test_d121b_vepo_kontrakt.rb` (24 scenárov; všetkých 6 deklarovaných mutácií overených behom — každá sadu zhodí), sprísnené asercie limitu
+  v `test_d112_d113_vepo.rb`, `test_vepo_export.rb` a `test_d121_vepo_nazvy.rb`; headless **3401** zelených, 95 JS sád. **In-SU beh nebežal** — SketchUp bol obsadený živou
+  zákazkou a dávka je čistý export/validácia (žiadny builder, observer ani geometria).
+
 - **D-121a — DIELCE ZÁSUVKY MAJÚ ĽUDSKÉ NÁZVY (v0.9.45, 8.9.2026).**
   Michal 6.9. po KOV-C nahlásil, že vo VEPO exporte stoja riadky `Dno zasuvky Fmslwqdm2-9-464wsa`. Názov niesol **interné id čela** — `drawer_part_descriptor` ho od KOV-C2b
   skladal ako `"Dno zasuvky #{front_id}"` — a `VepoExport.short_name` taký tvar nepoznal, takže prešiel celý. Id človeku nič nehovorí a na nálepku VEPO sa nezmestí.

@@ -42,6 +42,18 @@ cesty (prepnúť na iný dielec / zmazať); `part_key` je zámerne `nil`, takže
 `placements:`). Tretia zmena je v `check_hardware_expansion`: riadok s **`catalog_missing`** (ad-hoc kód, ktorý z katalógu zmizol) ide **existujúcou** ORANGE cestou `hardware_code`,
 len s vetou, ktorá menuje ručnú položku a hovorí „ostáva bez ceny" — nie „bez názvu a ceny", lebo názov má zo snapshotu.
 
+**D-121b — ORANGE `name_long` nad AGREGOVANÝMI RIADKAMI, nie nad záznamami.** Kontrakt VEPO v1.2 dal názvu riadku tvrdý limit 20 znakov (import dlhšie pole odmieta), takže
+Kontrola musí povedať, kde sa názov orezal. `check_name_lengths` postaví **tie isté riadky, aké pôjdu do CSV** — `Bom.aggregate_rows` (presne ten krok, ktorým `Bom.compute`
+vyrába riadky pre `VepoExport.build`) — a nad každým zavolá `VepoExport.row_name_info`; nález vznikne pri `cut`. **Prečo nie per záznam** (audit Astra 8.9., nález 2): dve dosky
+s 18-znakovým názvom skončia pri zhodných výrobných parametroch v JEDNOM riadku, ich spoločný názov má 37 znakov a orezal by sa **ticho**. Hláška menuje plný tvar, počet znakov
+a presne to, čo pôjde do objednávky; hint sa líši podľa `row['free_names']` (voľná doska → „Skráť názov dosky", inak → „plný tvar je v LOGu exportu"). `part_key` je `nil`
+(riadok nie je jeden dielec), takže klik-select označí vlastníka — rovnaká cesta ako pri `build` nálezoch bez kľúča; `stable_key` = `name_long|<plný názov>|<materiál>|<rozmery
+v desatinách mm>`, teda medzi behmi `run` nemenný. Riadky sa počítajú **vnútri `run` z `collected`** (žiadny nový parameter), takže klik-resolve aj `control_payload` v
+`production_core.rb` dostanú tie isté položky (lekcia GH #127 P2). **Závislosť na `Bom` a `VepoExport` je zámerná** — oba moduly sa načítavajú pred `validation` (main.rb aj
+`tests/helper.rb`), guard `defined?` sa nepoužíva; vstup sa robí tolerantným na strane Kontroly (`name_check_records` doplní chýbajúce `edges`/`quantity`/`material_source`),
+`Bom` sa kvôli semaforu nemení. Limit sa číta z `VepoExport::NAME_MAX` a číslo sa vo `validation.rb` neopakuje (guard test). Riadok, ktorému sa nezmestila **skrinka** (nie
+názov), sa **nehlási** — nie je to strata dielca, len horšia orientácia; ostáva v oddiele LOGu „Skrátené názvy".
+
 **KOV-D4 — `data` = ADRESA RIADKU V KOVANÍ.** Nález, ktorý má v sekcii Kovanie konkrétny riadok, nesie aditívny kľúč `data` z `hw_target(owner_part_key, generic_type, rule_id,
 orphan:)` — tá istá trojica identity, akou je zásah adresovaný všade inde (`HardwareRules.override_identity`), plus príznak `orphan` (osirotený záznam vs. živá položka). Do
 `stable_key` **nevstupuje** (vzor `extra:` v `record_item`), takže dedup ani klik-select sa nehnú, a neúplná identita = **žiadne** `data` (nález sa správa ako pred D4).
@@ -504,18 +516,36 @@ Skupiny sa porovnávajú **kanonicky, nie surovo**: `ProductionCore` vkladá do 
 s **tou istou** normalizáciou (trim, viacnásobné medzery na jednu, upcase) — rovnaký vzor, akým `decor_key` zrkadlí `decor_norm_key`. Bez nej by `grp-x` a `GRP-X` boli dve skupiny
 a export by nahlásil poznámku o inej ABS, ktorá tam nie je. **Pozor na rozdiel oproti `decor_key`:** `group_key` medzery len zlučuje, neodstraňuje (presne ako `identity_norm`).
 
-**Názov riadku (D-113, v0.9.22).** `row_name` skladá `"<krátke názvy> <skrinky>"` (napr. `Bok LP s1 s2`) a používa ho CSV **aj LOG** (chyby, poznámky). Tri čisté kroky:
-`short_name` (tabuľka skratiek na PRESNÉ reťazce builderov — `construction.rb`, `zone_tree.rb`, `fronts.rb`; **neznámy názov ide bez zmeny**), `join_names` (združenie dvojíc
-`Bok L`+`Bok P`→`Bok LP`, `Vyst P`+`Vyst Z`→`Vyst PZ`, `Dv<N> L`+`Dv<N> P`→`Dv<N> LP`, zvyšok cez `/`) a `owner_tokens` (`CAB-001`→`s1`, `BRD-007`→`d7`, unikátne a zoradené;
-neznámy tvar ID sa nezahadzuje, ide celý a až za nimi). `append_owners` drží `NAME_MAX = 60`: skrinky pridáva, kým sa zmestia, nezmestené zhrnie ` +K` — **nikdy odseknutá
-skratka v polovici**; keď je nad limit už samotná časť s názvami, platí pôvodný orez s `…`. Platí **len pre VEPO** — kusovník Štúdia nesie plné názvy.
+**Názov riadku (D-113, v0.9.22; kontrakt v1.2 od D-121b, v0.9.46).** `row_name` skladá `"<krátke názvy> <skrinky>"` (napr. `Bok LP s1 s2`) a používa ho CSV **aj LOG** (chyby,
+poznámky). Čisté kroky: `short_name` (tabuľka skratiek na PRESNÉ reťazce builderov — `construction.rb`, `zone_tree.rb`, `fronts.rb`; **neznámy názov ide bez zmeny**),
+`join_names` (združenie dvojíc `Bok L`+`Bok P`→`Bok LP`, `Vyst P`+`Vyst Z`→`Vyst PZ`, `Dv<N> L`+`Dv<N> P`→`Dv<N> LP`, zvyšok cez `/`) a `owner_tokens` (`CAB-001`→`s1`,
+`BRD-007`→`d7`, unikátne a zoradené; neznámy tvar ID sa nezahadzuje, ide celý a až za nimi). Platí **len pre VEPO** — kusovník Štúdia nesie plné názvy.
+
+**`NAME_MAX = 20` je JEDINÁ autorita limitu (v1.2).** Nie je to estetika: **import objednávky VEPO pole `nazov` nad 20 znakov odmieta** (Michal 7.9.2026, overené v praxi) —
+v1.1 pritom tvrdila, že 20 je len tlač nálepky a pole nesie 60, takže sa dlhé riadky pred odoslaním prepisovali ručne. Číslo sa nikde neopakuje; `validation.rb` ho číta
+z `VepoExport::NAME_MAX` (guard test to stráži).
+
+- **`merge_numbered` — zlúčenie číslovaných tokenov**, posledný krok `join_names` (až za všetkými pármi, aby sa `Zas bok L 1`+`Zas bok P 1` najprv združili na `Zas bok LP 1`).
+  Tokeny `<základ> <číslo>` s rovnakým základom dajú `<základ> n1 n2 …` (čísla unikátne, vzostupne, zlúčený token na pozícii prvého člena): `Polica 1/Polica 2/Polica 3` →
+  `Polica 1 2 3`. Číslo musí byť **na konci** (`NUMBERED_TOKEN`), takže `Dv1 LP/Dv2 LP` ostáva s `/`. Zlučujú sa **výhradne tokeny zo skratky generovaného názvu** (`free == false`)
+  — tá istá zásada ako pri `merge_pair` (GH #287 P2): `Polička 1` a `Polička 2` od používateľa môžu byť dve rôzne veci.
+- **`cut_name` — deterministický orez po hranici tokenu, bez výpustky.** Padne-li rez presne na medzeru alebo `/`, berie sa celý 20-znakový začiatok; inak sa **rozseknuté slovo
+  zahodí** (rez na poslednom oddeľovači v ňom). Jedno dlhé slovo oddeľovač nemá — tvrdý rez. Výpustka `…` sa **nepoužíva** (minie znak a nálepka interpunkciu netlačí).
+  Dôvod je výrobný (audit Astra 8.9., nález 1): tvrdý rez by z `Polica 2 3 4 5 6 7 10` urobil `…7 1` a štítok by uvádzal policu **1** namiesto 10.
+- **`row_name_info` — orez sa PRIZNÁ.** Vracia `{name, full, cut, owners_total, owners_shown}`; `row_name` je len jeho `name`. `append_owners_info` (a cezeň `append_owners`)
+  pridáva skrinky, kým sa zmestia, nezmestené zhrnie ` +K` — **nikdy odseknutá skratka v polovici**; pri oreze názvu sa skrinky už nepridávajú. Z tohto hasha žije aj ORANGE
+  kategória `name_long` v Kontrole (odsek `validation.rb`) — **jedna funkcia, takže CSV, LOG aj semafor hovoria to isté**.
+- **`shortened` + oddiel LOGu „Skrátené názvy (N):"** medzi vyradenými riadkami a poznámkami. `build` zbiera záznamy **per bucket** (rovnako ako `notes`) a `filename` im
+  priraďuje **až po `dedup_filenames!`** — pred dedupom by niesli meno, ktoré sa ešte zmení (audit nález 3). Dôvod je `cut` (názov sa orezal) alebo `no_owner` (názov sa zmestil,
+  skrinka už nie). Riadok LOGu nesie rozmery, kusy a vlastníkov, takže dva rôzne názvy orezané na ten istý reťazec sú **rozlíšiteľné**. Vyradený riadok (`error_entry`) ide s
+  orezaným názvom, ale pri oreze ukáže aj `(plný názov: …)`.
 
 **Dielce zásuvky (D-121a, v0.9.45).** Skratky pokrývajú aj vyrábané dielce zásuvky: `Dno zasuvky N`→`Zas dno N` · `Chrbat zasuvky N`→`Zas chrb N` ·
 `Vnutorne celo zasuvky N`→`Zas predok N` · `Bok boxu lavy/pravy N`→`Zas bok L/P N`; dva boky boxu **tej istej** zásuvky sa v riadku združia na `Zas bok LP N`
 **tým istým mechanizmom ako dvierka** (`box_side_pairs` + `merge_pair`, teda výhradne tokeny zo skratky generovaného názvu — voľný názov dosky sa nepáruje).
 `N` je **číslo čela** z `construction.rb` (poradie v `front_items`, rovnaké ako `Zasuvkove celo N`). **Legacy** názov — zákazka postavená pred D-121a nesie
 namiesto čísla interné id čela (`Dno zasuvky Fmslwqdm2-9-464wsa`) — dostane tvar **bez čísla** (`Zas dno s1`): id človeku nič nepovie, tak sa do skratky
-neprenáša (`num_suffix` berie len čisto číselný token). Kontrakt ostáva **v1.1** — `NAME_MAX = 60` sa nemení; skrátenie limitu na 20 rieši D-121b.
+neprenáša (`num_suffix` berie len čisto číselný token).
 
 **Voľné názvy dosiek sa neskracujú ani nepárujú (GH #287 P2).** Názov samostatnej dosky je **voľný text používateľa**, nie názov z buildera — tabuľka skratiek naň nesmie siahnuť
 (doska `Bok lavy` nie je bok skrinky) a nesmie sa spárovať s dielcom skrinky do klamlivého `Bok LP`. Pôvod nesie riadok v aditívnom kľúči **`free_names`** z `Bom.aggregate_rows`
@@ -523,11 +553,13 @@ neprenáša (`num_suffix` berie len čisto číselný token). Kontrakt ostáva *
 generovaného názvu. Keď ten istý reťazec prispela doska **aj** skrinka, platí konzervatívna cesta: pass-through bez skratky a bez páru.
 
 **Čo poznámka ani názov NEROBIA.** Sú to len **zobrazenie riadku**: `Bom.row_key` (a teda zlučovanie a počet riadkov), grouping podľa materiálu a hrúbkovej skupiny, názvy
-súborov, kódy hrán, obchodné hrúbky ani sekcia KONTROLA sa nemenia. Poradie oddielov LOGu: skupiny → vyradené riadky → **Poznámky pre VEPO** → KONTROLA.
+súborov, kódy hrán, obchodné hrúbky ani sekcia KONTROLA sa nemenia. Poradie oddielov LOGu: skupiny → vyradené riadky → **Skrátené názvy** → **Poznámky pre VEPO** → KONTROLA.
 
-**Testy:** `tests/pure/test_vepo_export.rb` (bajtové vzorky vrátane zlatej — jediný „schválený" obraz formátu, mení sa VÝHRADNE samostatným commitom s dôvodom),
-`tests/pure/test_d112_d113_vepo.rb` (správanie poznámky, skratiek a orezu + mapy dekorov nad sandbox katalógom), `tests/pure/test_d121_vepo_nazvy.rb`
-(čísla čiel v pláne, skratky dielcov zásuvky, legacy id, párovanie bokov boxu), in-SU `run_k1` (rotácia dekoru v reálnom CSV).
+**Testy:** `tests/pure/test_vepo_export.rb` (bajtové vzorky vrátane zlatej — jediný „schválený" obraz formátu, mení sa VÝHRADNE samostatným commitom s dôvodom; zlatá vzorka
+sa pri v1.2 **nemenila**, jej názvy sú pod 20 znakov), `tests/pure/test_d112_d113_vepo.rb` (správanie poznámky, skratiek a orezu + mapy dekorov nad sandbox katalógom),
+`tests/pure/test_d121_vepo_nazvy.rb` (čísla čiel v pláne, skratky dielcov zásuvky, legacy id, párovanie bokov boxu),
+`tests/pure/test_d121b_vepo_kontrakt.rb` (kontrakt v1.2: zlučovanie čísel, `cut_name`, `row_name_info`, `shortened` + LOG, kategória `name_long` a zdrojový guard limitu),
+in-SU `run_k1` (rotácia dekoru v reálnom CSV).
 
 ### cp_export.rb
 
