@@ -783,7 +783,10 @@ NxTest.test('KOV-F1 (9): jediný register brán — závesové kódy sú v ňom,
   c::REC::DRAWER_BLOCKERS.each { |code| NxTest.assert(reg.include?(code), "chýba #{code}") }
   NxTest.assert_equal(c::REC::DRAWER_BLOCKERS, reg[0, c::REC::DRAWER_BLOCKERS.length],
                       'zásuvkové kódy si držia PORADIE — vety brány sa nesmú prehádzať')
-  NxTest.assert_equal(c::BP::HW_HINGE_BLOCKERS, reg[c::REC::DRAWER_BLOCKERS.length..])
+  # Codex #329 kolo 3 P1: za zavesovymi kodmi stoji este PRAVIDLOVY register
+  # (stav celeho projektu) — poradie je kontrakt, novy kod ide na KONIEC.
+  NxTest.assert_equal(c::BP::HW_HINGE_BLOCKERS + c::BP::HW_RULES_BLOCKERS,
+                      reg[c::REC::DRAWER_BLOCKERS.length..])
   reg.each do |code|
     label = c::REC::BLOCKER_LABELS[code] || c::BP::HW_BLOCKER_LABELS[code]
     NxTest.assert(label, "kód #{code} nemá vetu brány")

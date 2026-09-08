@@ -1288,6 +1288,10 @@ module Noxun
           next nil if ids.nil?
 
           label = Recipes::BLOCKER_LABELS[code] || BuildPlan::HW_BLOCKER_LABELS[code] || code
+          # Codex #329 kolo 3 P1: MODELOVY dovod (pravidla projektu) ziadne ID
+          # nenesie — prazdna zatvorka by vyzerala ako chyba vypisu.
+          next "#{label} — oprav to v sekcii Kontrola" if ids.empty?
+
           "#{label} (#{ids_text(ids)}) — oprav to v sekcii Kontrola"
         end
       end

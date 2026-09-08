@@ -207,12 +207,15 @@ module Noxun
       #
       # `ProductionCore.hardware_blockers` cita TENTO zoznam — ziadny kod z neho
       # nesmie prejst do vydaneho nakupneho CSV, rozpoctu ani cenovej ponuky.
-      # Register ma dve casti a KAZDA ma vlastny zdroj:
+      # Register ma TRI casti a KAZDA ma vlastny zdroj:
       #   * zasuvkove kody (`Recipes::DRAWER_BLOCKERS`) — cast z ulozenych
       #     `drawer_conflicts`, `drawer_kit_missing` z EXPANZIE,
       #   * zavesove kody (`HW_HINGE_BLOCKERS`) — `door_height_out_of_table`
       #     z ulozenych `hardware_conflicts`, `hinge_set_mismatch` z EXPANZIE,
-      #     `hinge_stale` zo SCHEMY ulozenej skrinky (`Bom.hinge_stale_issue`).
+      #     `hinge_stale` zo SCHEMY ulozenej skrinky a zo STD projektovych
+      #     pravidiel (`Bom.hinge_stale_issue`),
+      #   * pravidlove kody (`HW_RULES_BLOCKERS`) — stav CELEHO projektu
+      #     (`Bom.rules_snapshot_issue`), bez vlastnika.
       # VEPO branu NEDOSTAVA ani jeden zavesovy kod: geometria je spravna,
       # zastavit rezanie by len zablokovalo vyrobu (rovnaka uvaha ako pri
       # `BUILD_BLOCKERS`).
@@ -229,7 +232,23 @@ module Noxun
       # z nej nevznikol. Vzor `Recipes::STALE`: naprava je PRESTAVBA.
       HINGE_STALE = 'hinge_stale'
 
+      # KOV-F1 (Codex #329 kolo 3 P1): PROJEKTOVY snapshot pravidiel kovania je
+      # z NOVSIEHO pluginu (`std` > `HardwareRules::STD`). Citat sa smie —
+      # zakazka sa musi dat otvorit — ale `normalize_rules` z neho drzi LEN
+      # polia, ktorym rozumieme, takze POCTY su degradovane. Snapshot pritom
+      # EXISTUJE, takze ORANGE `hardware_rules_library_incompatible` (ten
+      # strazi projekt BEZ snapshotu) nevznikne a stavba by presla ticho.
+      # Kod NEMA vlastnika (je to stav CELEHO projektu) a NEDA sa zhasnut
+      # prestavbou — zapisy do snapshotu su zakazane, takze jedina naprava je
+      # AKTUALIZACIA PLUGINU. Preto TRVALY blocker, nie warning.
+      RULES_SNAPSHOT_INCOMPATIBLE = 'hardware_rules_snapshot_incompatible'
+
       HW_HINGE_BLOCKERS = %w[door_height_out_of_table hinge_set_mismatch hinge_stale].freeze
+
+      # Kody, ktore nehovoria o CELE ani o skrinke, ale o PRAVIDLACH PROJEKTU.
+      # V registri stoja POSLEDNE — poradie kodov je kontrakt (urcuje poradie
+      # viet brany), takze novy kod sa pridava na koniec, nikdy do stredu.
+      HW_RULES_BLOCKERS = [RULES_SNAPSHOT_INCOMPATIBLE].freeze
 
       # Kody, ktore smie niest ULOZENY nosic `hardware_conflicts` (viz
       # `validate_hardware_conflicts!`). `hinge_set_mismatch` medzi nimi NIE JE —
@@ -242,17 +261,18 @@ module Noxun
       # `hardware_issues`): ulozeny nosic + migracny `hinge_stale`. Cita ich
       # Kontrola (RED riadok) aj brana exportov; `hinge_set_mismatch` tu NIE JE
       # (ten ma zdroj v expanzii).
-      HW_ISSUE_BLOCKERS = (HW_CONFLICT_CODES + [HINGE_STALE]).freeze
+      HW_ISSUE_BLOCKERS = (HW_CONFLICT_CODES + [HINGE_STALE] + HW_RULES_BLOCKERS).freeze
 
       # SK nazvy zavesovych dovodov pre BRANU (vzor `Recipes::BLOCKER_LABELS`).
       HW_BLOCKER_LABELS = {
         'door_height_out_of_table' => 'dvierka sú vyššie než tabuľka závesov',
         'hinge_set_mismatch'       => 'vybraný set závesov nesedí so spôsobom otvárania',
-        'hinge_stale'              => 'skrinka má závesy spočítané ešte spred Noxun tabuľky'
+        'hinge_stale'              => 'skrinka má závesy spočítané ešte spred Noxun tabuľky',
+        RULES_SNAPSHOT_INCOMPATIBLE => 'pravidlá kovania tohto projektu uložil novší plugin'
       }.freeze
 
       def self.hw_blockers
-        (defined?(Recipes) ? Recipes::DRAWER_BLOCKERS : []) + HW_HINGE_BLOCKERS
+        (defined?(Recipes) ? Recipes::DRAWER_BLOCKERS : []) + HW_HINGE_BLOCKERS + HW_RULES_BLOCKERS
       end
 
       module_function

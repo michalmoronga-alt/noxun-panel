@@ -220,6 +220,11 @@ module Noxun
                               pid: inst.persistent_id)
           end
         end
+        # KOV-F1 (Codex #329 kolo 3 P1): stav PRAVIDIEL CELEHO PROJEKTU. Nalez
+        # nepatri ziadnej skrinke, preto vznika AZ TU — raz na zber, nie pri
+        # kazdej instancii.
+        rsi = rules_snapshot_issue(model)
+        hardware_issues << rsi if rsi
         { records: records, hardware: hardware, hardware_overrides: hardware_overrides,
           manual_overrides: manual_overrides,
           cabinet_sets: cabinet_sets, cabinet_set_conflicts: cabinet_set_conflicts,
@@ -453,6 +458,34 @@ module Noxun
                        '(zmeň a vráť rozmer alebo klikni Prestavať), závesy sa prepočítajú ' \
                        'podľa novej tabuľky (+1 nad šírku 600 mm, set podľa otvárania).',
           'label' => PartKeys.human_label(pkey, fronts: items).to_s }
+      end
+
+      # === KOV-F1 (Codex #329 kolo 3 P1): PRAVIDLA Z NOVSIEHO PLUGINU ========
+      #
+      # PROJEKTOVY snapshot pravidiel kovania so `std` vyssim, nez tento plugin
+      # pozna (rollback pluginu, zakazka od kolegu s novsou verziou). Citanie je
+      # zamerne tolerantne — zakazka sa musi dat otvorit a dostavat — ale
+      # `normalize_rules` z pravidiel drzi LEN polia, ktorym rozumieme, takze
+      # pocty kovania su DEGRADOVANE (dnes napr. tabulka zavesov bez door
+      # guardov). A kedze snapshot EXISTUJE, ORANGE stavby
+      # (`hardware_rules_library_incompatible`, ten strazi projekt BEZ
+      # snapshotu) sa nespusti: bez tejto brany by starsi plugin prestavil cele
+      # skrinky svojou schemou a vydal nakup, rozpocet aj ponuku ticho.
+      #
+      # Snapshot sa NEPREPISUJE ani NEZMRAZUJE (zapisove cesty ho odmietaju),
+      # takze nalez je TRVALY — prestavba ho nezhasne a jedina naprava je
+      # AKTUALIZACIA PLUGINU. VEPO branu NEDOSTAVA: geometria je spravna.
+      # -> nalez | nil (ziadny zapis; jedine citanie modeloveho atributu)
+      def rules_snapshot_issue(model)
+        return nil unless defined?(HardwareRules)
+        return nil unless HardwareRules.project_std_unsupported?(model)
+
+        { 'code' => BuildPlan::RULES_SNAPSHOT_INCOMPATIBLE, 'severity' => 'red',
+          'owner_id' => '', 'owner_pid' => nil, 'part_key' => '', 'front_id' => '',
+          'message' => 'Pravidlá kovania tohto projektu uložil NOVŠÍ plugin — tento im ' \
+                       'nerozumie, takže počty kovania môžu byť poddimenzované. ' \
+                       'Aktualizuj plugin.',
+          'label' => 'Pravidlá kovania' }
       end
 
       # R-34 (review #262 P1): `cabinet_sets` je mapa ID => override setov, teda

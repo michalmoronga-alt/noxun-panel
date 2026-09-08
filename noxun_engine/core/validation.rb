@@ -748,10 +748,14 @@ module Noxun
         label = pkey.empty? ? 'kovanie' : pkey if label.empty?
         msg = iss['message'].to_s.strip
         msg = 'Kovanie sa nedá určiť.' if msg.empty?
+        # Codex #329 kolo 3 P1: nalez o PRAVIDLACH CELEHO PROJEKTU vlastnika
+        # NEMA — pomlcka v zatvorke by predstierala skrinku, ktoru sa niekto
+        # pokusi hladat. Bez ID sa preto adresa vynecha.
+        addr = oid.empty? ? label : "#{label} (#{oid})"
         { 'severity' => RED, 'category' => CAT_HARDWARE_CONFLICT,
           'owner_id' => oid, 'part_key' => (pkey.empty? ? nil : pkey), 'hw_key' => nil,
           'owner_pid' => iss['owner_pid'],
-          'message_sk' => "#{label} (#{oid.empty? ? '—' : oid}): #{msg} " \
+          'message_sk' => "#{addr}: #{msg} " \
                           'Nákup kovania, rozpočet ani cenová ponuka sa zatiaľ nedajú vydať.',
           'stable_key' => "#{CAT_HARDWARE_CONFLICT}|#{oid}|#{pkey}|#{iss['code']}" }
       end
