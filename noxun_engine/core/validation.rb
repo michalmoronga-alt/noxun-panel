@@ -1129,10 +1129,6 @@ module Noxun
       # (diagnostika R2 exkluzivity), do Kontroly nejde.
       BUILD_INFO_ONLY = %w[legacy_slide_suppressed].freeze
 
-      # KOV-W: warning „hmotnost je odhad" je KORPUSOVY (jeden na skrinku) a
-      # dotknute dielce nesie v `data['parts']`.
-      WEIGHT_UNKNOWN_CODE = 'weight_density_unknown'
-
       def check_build(w, items, uni_parts = {})
         return unless w.is_a?(Hash)
         oid  = w['owner_id'].to_s
@@ -1142,11 +1138,9 @@ module Noxun
         # V0.6 M-B1 (audit F4): ulozene ABS warnings dielca, ktory je AKTUALNE
         # na UNI, sa potlacaju — hlasi sa len CAT_UNI (jedna sprava, nie tri).
         return if code.start_with?('abs_') && uni_parts["#{oid}|#{pkey}"]
-        # KOV-W: to iste pre hmotnost. UNI dielec UZ hlasi CAT_UNI („materiál
-        # neurčený") — druha veta o odhade hmotnosti by bola ten isty problem
-        # dvakrat. Warning teda ostava viditelny LEN vtedy, ked je medzi
-        # dotknutymi dielcami aspon jeden, ktory UNI NIE JE (typ bez hustoty).
-        return if code == WEIGHT_UNKNOWN_CODE && weight_parts_all_uni?(w, oid, uni_parts)
+        # KOV-W: hmotnostny warning `weight_density_unknown` sa TU nefiltruje —
+        # plan ho vydava LEN za dielce, ktore UNI NIE SU (`annotate_weights!`),
+        # takze co je ULOZENE, to sa aj hlasi (a zvoncek Inspectora ukaze to iste).
         msg  = (w['message'] || w['code']).to_s
         text = msg.empty? ? 'Upozornenie stavby.' : msg
         text = "#{oid}: #{text}" unless oid.empty?
@@ -1163,17 +1157,6 @@ module Noxun
       end
 
       # --- pomocne -----------------------------------------------------------
-
-      # KOV-W: su VSETKY dielce, ktorych sa odhad hmotnosti tyka, na UNI (resp.
-      # nelepitelnom) materiali? Prazdny zoznam = nevieme, koho sa tyka —
-      # warning sa vtedy NEPOTLACI (radsej jedna veta navyse nez ticho).
-      def weight_parts_all_uni?(w, oid, uni_parts)
-        data = w['data']
-        keys = Array(data.is_a?(Hash) ? data['parts'] : nil)
-        return false if keys.empty?
-
-        keys.all? { |k| uni_parts["#{oid}|#{k}"] }
-      end
 
       # extra = volitelne DOPLNKOVE polia riadku (D-83 'uni_id'). Do stable_key
       # NEvstupuju — kluc je identita problemu a nesmie sa hnut, inak by sa

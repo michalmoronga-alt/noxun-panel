@@ -725,7 +725,7 @@ module Noxun
           eff = effective_materials(model, cfg)
           plan = Construction.build_plan(cfg, cid, hardware_rules: rules,
                                                    part_thicknesses: drawer_thicknesses(cfg, eff),
-                                                   densities: part_densities(cfg, eff)) # validuje interne
+                                                   materials: part_materials(cfg, eff)) # validuje interne
           # KOV-C2b: doplnenie CHYBAJUCEHO systemu a pripnutia receptu je zapis
           # do configu — bezi v TEJ ISTEJ operacii ako geometria (volajuci nas
           # obalil `start_operation`), takze Undo vrati oboje naraz.
@@ -1025,34 +1025,39 @@ module Noxun
           out
         end
 
-        # --- KOV-W: hustoty materialov PRED planom ---------------------------
+        # --- KOV-W: materialy dielcov PRED planom ----------------------------
         #
-        # Rovnaky vzor ako `drawer_thicknesses`: plan potrebuje hustotu ako
+        # Rovnaky vzor ako `drawer_thicknesses`: plan potrebuje material ako
         # VSTUP (hmotnost sa anotuje na dielce PRED pravidlami kovania), a
-        # katalog vie citat len builder. Vracia hustoty per MATERIALOVY KANAL
+        # katalog vie citat len builder. Vracia zaznam per MATERIALOVY KANAL
         # (`effective_materials`) + per-part overridy z `part_overrides`.
-        # nil hodnota = hustota nie je znama (UNI, typ mimo registra, material
-        # mimo katalogu) — plan z nej spravi TAZSI odhad, nikdy nulu.
         # ZIADNY zapis do modelu, ziadna zmena geometrie.
-        def part_densities(cfg, eff)
+        def part_materials(cfg, eff)
           channels = Construction::CHANNELS.each_with_object({}) do |ch, out|
-            out[ch] = sheet_density(eff[ch])
+            out[ch] = sheet_weight_info(eff[ch])
           end
           overrides = cfg[:part_overrides].is_a?(Hash) ? cfg[:part_overrides] : {}
           parts = {}
           overrides.each do |key, ov|
             mid = ov.is_a?(Hash) ? ov['material_id'] : nil
-            parts[key.to_s] = sheet_density(mid) if present(mid)
+            parts[key.to_s] = sheet_weight_info(mid) if present(mid)
           end
           { 'channels' => channels, 'parts' => parts }
         end
 
-        # Hustota materialu z katalogu (kg/m3), alebo nil — neznamy zaznam aj
-        # UNI. Jediny zdroj je `Materials.density_for` (register TYPOV).
-        def sheet_density(material_id)
-          return nil unless material_id && defined?(Materials)
-
-          Materials.density_for(Materials.sheet(material_id))
+        # Katalogovy zaznam materialu tak, ako ho potrebuje anotacia hmotnosti:
+        #   'thickness' — katalogova hrubka (nil = katalog ju nema); z nej rata
+        #                 plan hmotnost CELA, ktore v deskriptore nesie len
+        #                 placeholder 18 mm (materializuje sa az po plane),
+        #   'density'   — hustota TYPU (nil = UNI, typ bez hustoty, material mimo
+        #                 katalogu) — plan z nej spravi TAZSI odhad, nikdy nulu,
+        #   'uni'       — UNI material hrubku dielca NEPREPISUJE (M-B1), takze
+        #                 hmotnost ostava na hrubke deskriptora.
+        def sheet_weight_info(material_id)
+          sheet = (material_id && defined?(Materials)) ? Materials.sheet(material_id) : nil
+          { 'thickness' => sheet_thickness_of(sheet),
+            'density' => (defined?(Materials) ? Materials.density_for(sheet) : nil),
+            'uni' => (defined?(Materials) ? Materials.uni?(sheet) : false) }
         end
 
         # Katalogova hrubka materialu, alebo nil (bez katalogu / neznamy zaznam).
@@ -1060,7 +1065,12 @@ module Noxun
         def sheet_thickness(material_id)
           return nil unless material_id && defined?(Materials)
 
-          sheet = Materials.sheet(material_id)
+          sheet_thickness_of(Materials.sheet(material_id))
+        end
+
+        # Hrubka uz nacitaneho katalogoveho zaznamu (nekladna sa ignoruje —
+        # M-B F6: 0.0 je truthy). Jedine miesto, kde sa hrubka z dosky cita.
+        def sheet_thickness_of(sheet)
           return nil unless sheet.is_a?(Hash)
 
           th = sheet['thickness'].to_f

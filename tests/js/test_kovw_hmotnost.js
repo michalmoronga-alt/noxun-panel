@@ -11,7 +11,11 @@
 //   5) riadok ma v HTML vlastne `id` na oboch urovniach (hodnota + tooltip),
 //      inak by ho most nemal kam zapisat,
 //   6) vo VKLADANI sa riadok vynuluje — nesmie drzat cislo predtym oznacenej
-//      skrinky.
+//      skrinky,
+//   7) CELY TOK payload -> riadok: `setCabInfo` sa cita PRIAMO z `bridge.js`
+//      (Sol audit 5 — formatovac sam by neodhalil, ze most riadok neplni) a
+//      spusta sa nad mini-DOM; `setCabInfo(null)` = reset na '—', inak by riadok
+//      ukazoval hmotnost PREDTYM oznacenej skrinky.
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
@@ -19,7 +23,7 @@ const fs = require('node:fs');
 
 const ROOT = path.join(__dirname, '..', '..');
 const UI = path.join(ROOT, 'noxun_engine', 'ui');
-const { nxCabWeight, NX_WEIGHT_TITLE } = require(path.join(UI, 'js', 'core.js'));
+const { nxCabWeight, NX_WEIGHT_TITLE, nxCabInfo } = require(path.join(UI, 'js', 'core.js'));
 
 const PANEL_HTML = fs.readFileSync(path.join(UI, 'panel.html'), 'utf8');
 const BRIDGE_SRC = fs.readFileSync(path.join(UI, 'js', 'bridge.js'), 'utf8');
@@ -88,5 +92,63 @@ ok(/nxCabWeight\(c\)/.test(BRIDGE_SRC) && /setOut\('inf_weight'/.test(BRIDGE_SRC
 ok(/el\('infWeight'\)/.test(BRIDGE_SRC), 'most nastavuje aj tooltip riadku');
 ok(/setOut\('inf_weight', '—'\)/.test(FORM_SRC),
    'vo VKLADANI sa riadok vynuluje — nesmie drzat cislo predtym oznacenej skrinky');
+
+// --- 5) TOK payload -> riadok (Sol audit 5) ---------------------------------
+// `setCabInfo` sa NEKOPIRUJE — cita sa PRIAMO z bridge.js a spusta v sandboxe s
+// podstrcenymi zavislostami (vzor test_nastroje1_flush.js). Zrkadlo funkcie by
+// mohlo od zdroja odbehnut a prave tento nalez (most riadok nepln) by unikol.
+const SET_CAB_INFO = (function(){
+  const m = BRIDGE_SRC.match(/function setCabInfo\(c\)\{[\s\S]*?\n  \}/);
+  assert.ok(m, 'setCabInfo sa v bridge.js nenasla');
+  return m[0];
+})();
+
+function mkNode(){ return { textContent: '', title: '', _attrs: {},
+                            setAttribute(k, v){ this._attrs[k] = String(v); } }; }
+
+function runSetCabInfo(payload){
+  // Mini-DOM: len uzly, ktore riadok informacneho stlpca potrebuje.
+  const nodes = { inf_parts: mkNode(), inf_area: mkNode(), inf_weight: mkNode(),
+                  infParts: mkNode(), infArea: mkNode(), infWeight: mkNode() };
+  const deps = {
+    el: function(id){ return nodes[id] || null; },
+    // presna kopia `setOut` z core.js (prazdna hodnota = pomlcka)
+    setOut: function(id, v){
+      const e = nodes[id]; if (!e) return;
+      e.textContent = (v === null || v === undefined || v === '') ? '—' : String(v);
+    },
+    nxCabInfo: nxCabInfo,     // realna funkcia z core.js
+    nxCabWeight: nxCabWeight  // realna funkcia z core.js
+  };
+  const factory = new Function('deps', `
+    var el = deps.el, setOut = deps.setOut,
+        nxCabInfo = deps.nxCabInfo, nxCabWeight = deps.nxCabWeight;
+    ${SET_CAB_INFO}
+    return setCabInfo;
+  `);
+  factory(deps)(payload);
+  return nodes;
+}
+
+let dom = runSetCabInfo({ cabinet_id: 'CAB-001', parts_count: 7, parts_area_m2: 3.2,
+                          weight_kg: 12.44, weight_estimated_parts: 0,
+                          weight_estimated_density: null });
+eq(dom.inf_weight.textContent, '12,4 kg', 'payload oznacenej skrinky sa NAOZAJ dostane do riadku');
+eq(dom.infWeight.title, NX_WEIGHT_TITLE, 'riadok dostane aj vseobecny tooltip');
+eq(dom.inf_parts.textContent, '7', 'ostatne riadky stlpca ostavaju nedotknute');
+
+dom = runSetCabInfo({ cabinet_id: 'CAB-002', parts_count: 5, parts_area_m2: 2.0,
+                      weight_kg: 9.06, weight_estimated_parts: 3,
+                      weight_estimated_density: 870 });
+eq(dom.inf_weight.textContent, '≈ 9,1 kg', 'odhad ide do riadku aj so znackou ≈');
+ok(dom.infWeight.title.indexOf('3 dielce') !== -1,
+   `tooltip riadku vysvetli odhad: ${dom.infWeight.title}`);
+
+// RESET: preklik na dosku / prazdny vyber (`setCabInfo(null)`) — bez neho by
+// riadok drzal hmotnost predtym oznacenej skrinky.
+dom = runSetCabInfo(null);
+eq(dom.inf_weight.textContent, '—', 'bez skrinky je riadok prazdny');
+eq(dom.infWeight.title, NX_WEIGHT_TITLE, 'a tooltip sa vrati na vseobecny text');
+eq(dom.infParts._attrs['aria-disabled'], 'true', 'klikatelne riadky su neaktivne (vzor UI-B3)');
 
 console.log(`OK ${n} kontrol (KOV-W hmotnost)`);

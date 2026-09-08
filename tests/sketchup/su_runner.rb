@@ -16697,7 +16697,13 @@ module NoxunSuRunner
       'sheets' => [
         sheet.call('KWDTD18', 'DTDL', {}),                              # hustota z registra
         sheet.call('KWSKLO18', 'SKLO', {}),                             # typ MIMO registra = bez hustoty
-        sheet.call('KWUNI18', 'DTDL', 'uni' => true, 'uni_role' => 'body')
+        # Codex #328 P2: HRUBE celo (25 mm) — deskriptor cela nesie placeholder
+        # 18 mm, katalogovu hrubku mu dava az materializacia PO plane.
+        sheet.call('KWMDF25', 'MDF', 'thickness' => 25.0),
+        sheet.call('KWUNI18', 'DTDL', 'uni' => true, 'uni_role' => 'body'),
+        # UNI s katalogovou hrubkou 25: builder ju do cela NEPREPISUJE (M-B1),
+        # takze aj hmotnost musi ostat na hrubke DIELCA (18 mm).
+        sheet.call('KWUNI25', 'DTDL', 'thickness' => 25.0, 'uni' => true, 'uni_role' => 'front')
       ],
       'edges' => []
     }
@@ -16722,7 +16728,7 @@ module NoxunSuRunner
     eff = e::CabinetBuilder.effective_materials(model, cfg)
     plan = e::Construction.build_plan(cfg, e::Store.get(inst, 'cabinet_id').to_s,
                                       part_thicknesses: e::CabinetBuilder.drawer_thicknesses(cfg, eff),
-                                      densities: e::CabinetBuilder.part_densities(cfg, eff))
+                                      materials: e::CabinetBuilder.part_materials(cfg, eff))
     [plan, plan[:parts].inject(0.0) { |s, p| s + (p[:weight_kg].to_f * p.fetch(:quantity, 1)) }]
   end
 
@@ -16822,10 +16828,10 @@ module NoxunSuRunner
     uni = e::Panel.cabinet_stats(inst)
     ok('KOV-W UNI: Inspector stale prizna odhad (dielec sa zo suctu nevynecha)',
        uni['weight_estimated_parts'].to_i == 1 && uni['weight_kg'].to_f > 0.0)
-    ok('KOV-W UNI: build warning v configu OSTAVA (diagnostika sa nestraca)',
-       kovw_warnings(inst, 'weight_density_unknown').length == 1)
+    ok('KOV-W UNI: build warning UZ NEVZNIKNE (UNI hlasi „materiál neurčený")',
+       kovw_warnings(inst, 'weight_density_unknown').empty?)
     ctrl3 = kovw_ctrl(model)
-    ok('KOV-W UNI: KONTROLA hlasi LEN „materiál neurčený", hmotnostny nalez potlaci',
+    ok('KOV-W UNI: KONTROLA hlasi LEN „materiál neurčený", hmotnostny nalez nie je',
        ctrl3.none? { |i| i['message_sk'].to_s.include?('Hmotnosť') } &&
        ctrl3.any? { |i| i['category'] == e::Validation::CAT_UNI })
 
@@ -16839,6 +16845,38 @@ module NoxunSuRunner
     ok('KOV-W Spat: dalsi krok vrati DTD chrbat — hmotnost je zase presna',
        back2['weight_estimated_parts'].to_i.zero? &&
        (back2['weight_kg'].to_f - stats['weight_kg'].to_f).abs <= 0.05)
+
+    # --- 5) HRUBE CELO 25 mm (Codex #328 P2) -------------------------------
+    # Deskriptor cela nesie placeholder 18 mm; katalogovu hrubku mu dava az
+    # `materialized_part` PO plane. Keby plan ratal z placeholderu, cislo v
+    # Inspectore (zo snapshotov) by sa s planom rozislo o celu tretinu.
+    kovw_rebuild(model, inst, 'front_material_id' => 'KWMDF25')
+    thick_plan, thick_kg = kovw_plan_kg(model, inst)
+    thick_stats = e::Panel.cabinet_stats(inst)
+    door = thick_plan[:parts].find { |p| p[:role].to_s == 'front_door' }
+    want = e::Materials.weight_kg(door && door[:prod][:length], door && door[:prod][:width],
+                                  25.0, 750.0)
+    ok("KOV-W hrube celo: plan rata z KATALOGOVEJ hrubky 25 mm (#{door && door[:weight_kg].to_f.round(3)} kg)",
+       !door.nil? && (door[:weight_kg].to_f - want).abs <= 0.001 &&
+       door[:prod][:thickness].to_f == 18.0)
+    ok("KOV-W hrube celo: sucet zo SNAPSHOTOV sedi s planom (rozdiel #{(thick_stats['weight_kg'].to_f - thick_kg).abs.round(3)} kg)",
+       (thick_stats['weight_kg'].to_f - thick_kg).abs <= 0.05)
+
+    # --- 6) UNI celo 25 mm: hrubka OSTAVA na dielci ------------------------
+    # UNI material hrubku dielca neprepisuje (M-B1), takze aj hmotnost musi
+    # ostat na 18 mm — inak by sa Inspector (snapshot 18 mm) rozisiel s planom.
+    kovw_rebuild(model, inst, 'front_material_id' => 'KWUNI25')
+    uni_plan, uni_kg = kovw_plan_kg(model, inst)
+    uni_stats = e::Panel.cabinet_stats(inst)
+    uni_door = uni_plan[:parts].find { |p| p[:role].to_s == 'front_door' }
+    uni_want = e::Materials.weight_kg(uni_door && uni_door[:prod][:length],
+                                      uni_door && uni_door[:prod][:width],
+                                      18.0, e::Materials.fallback_density)
+    ok('KOV-W UNI celo: hmotnost ostava na hrubke DIELCA (18 mm), nie katalogu (25 mm)',
+       !uni_door.nil? && (uni_door[:weight_kg].to_f - uni_want).abs <= 0.001 &&
+       uni_door[:weight_estimated] == true)
+    ok("KOV-W UNI celo: sucet zo SNAPSHOTOV sedi s planom (rozdiel #{(uni_stats['weight_kg'].to_f - uni_kg).abs.round(3)} kg)",
+       (uni_stats['weight_kg'].to_f - uni_kg).abs <= 0.05)
   end
 
   # --- D-118b: PTOs modul a vedome prazdna bunka v ZIVOM nakupe ---------------
