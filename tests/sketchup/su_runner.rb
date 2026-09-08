@@ -16879,6 +16879,273 @@ module NoxunSuRunner
        (uni_stats['weight_kg'].to_f - uni_kg).abs <= 0.05)
   end
 
+  # --- KOV-F1: ZAVESY podla NOXUN tabulky + set podla otvarania ---------------
+  #
+  # PRECO in-SketchUp a nie len headless: pocet zavesov vznika z REALNEJ sirky
+  # KRIDLA (tu ju rata `Fronts.layout`, nie testovaci deskriptor), konflikt
+  # „mimo tabulky" musi PREZIT ulozenie do configu a Undo/Redo v JEDNOM kroku,
+  # a set podla otvarania sa vybera az v ZIVOM retazci kniznica -> snapshot
+  # projektu -> nakupny zoznam. Headless sada ani jedno z toho neuvidi.
+  KOVF_ALT_SET  = 'nx-test-zaves-alt'
+  KOVF_ALT_CODE = 'NX-TEST-ZAVES'
+  KOVF_RULE     = 'zavesy-podla-vysky'
+
+  # Fixturny VLASTNY set skrinky: klasifikacia klasickeho zavesu, INY kod.
+  # Bez neho by sa „vlastny set prezije prestavbu" nedalo odlisit od
+  # projektovej predvolby — obe by objednali ten isty kod.
+  def kovf_alt_set
+    { 'set_id' => KOVF_ALT_SET, 'name' => 'TEST záves alternatíva',
+      'generic_type' => 'hinge', 'use_type' => 'door', 'opening_mode' => 'classic',
+      'manufacturer' => 'Hettich', 'series' => 'Sensys',
+      'members' => [{ 'per' => 'unit', 'qty' => 1, 'label' => 'záves', 'code' => KOVF_ALT_CODE }] }
+  end
+
+  # Skrinka s JEDNYM riadkom ciel o PEVNEJ vyske — vsetky scenare stavaju na
+  # nej, meni sa len rozmer alebo otvaranie. Korpus je o 150 mm vyssi nez celo
+  # (sokel 100 + medzery), aby sa celo vzdy zmestilo.
+  def kovf_params(front_h, width = 600.0, front = {})
+    item = { 'id' => 'F1', 'type' => 'door', 'mode' => 'fixed',
+             'height' => front_h.to_f, 'wings' => '1' }.merge(front)
+    { 'type' => 'lower', 'width' => width.to_f, 'height' => front_h.to_f + 150.0,
+      'depth' => 500.0, 'thickness' => 18.0, 'floor_height' => 100.0,
+      'fronts' => { 'items' => [item] } }
+  end
+
+  def kovf_hinges(inst)
+    Array((e::Store.config(inst) || {})['hardware'])
+      .select { |h| h.is_a?(Hash) && h['generic_type'].to_s == 'hinge' }
+  end
+
+  def kovf_qty(inst)
+    kovf_hinges(inst).map { |h| h['quantity'] }
+  end
+
+  def kovf_conflicts(inst)
+    Array((e::Store.config(inst) || {})['hardware_conflicts'])
+  end
+
+  # Nakupne kody ZAVESOV celej zakazky => pocet kusov.
+  def kovf_codes(model)
+    collected = e::Bom.collect(model)
+    exp = e::ProductionCore.hardware_expansion(model, collected)
+    Array(exp && exp['rows']).each_with_object({}) do |r, out|
+      next unless Array(r['sources']).any? { |s| s.is_a?(Hash) && s['generic_type'].to_s == 'hinge' }
+
+      out[r['code'].to_s] = r['quantity']
+    end
+  end
+
+  def kovf_ctrl(model)
+    e::Validation.run(e::Bom.collect(model), sheets: e::ProductionCore.sheets_map)['items']
+  end
+
+  def kovf_build(model, front_h, width = 600.0, front = {})
+    e::CabinetBuilder.build(model, kovf_params(front_h, width, front))
+  end
+
+  # Prestavba na CELY novy tvar (config sa nahradi) — rozmerove scenare chcu
+  # ciste vychodisko bez overridov z predosleho kroku.
+  def kovf_reshape(model, inst, front_h, width = 600.0, front = {})
+    e::CabinetBuilder.rebuild(model, inst, kovf_params(front_h, width, front))
+  end
+
+  def run_kovf(model)
+    cleanup(model)
+    markers = []
+    sets = e::HardwareSets
+    sets.delete_set!(KOVF_ALT_SET, revision: sets.revision) # zvysok z predosleho behu
+    seed_status, = sets.save_set!(kovf_alt_set, revision: sets.revision, create: true)
+    unless seed_status == :ok
+      info("KOV-F: fixturny set sa nepodarilo zapisat (#{seed_status}) — scenar preskoceny")
+      return cleanup(model)
+    end
+
+    begin
+      kovf_predvolby(model)
+      kovf_counts(model)
+      kovf_tipon(model)
+      kovf_out_of_table(model, markers)
+      kovf_cabinet_set(model)
+    ensure
+      r03_clear_markers(model, markers)
+      sets.delete_set!(KOVF_ALT_SET, revision: sets.revision)
+      cleanup(model)
+    end
+    ok('KOV-F: cleanup (0 korpusov, fixturny set prec)',
+       cabinets(model).empty? && sets.load['sets'].none? { |s| s['set_id'] == KOVF_ALT_SET })
+  rescue StandardError => ex
+    log_line("FAIL: KOV-F vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
+  # --- 0) NOVE PREDVOLBY sa do EXISTUJUCEHO projektu dostanu len VEDOMOU akciou
+  #
+  # Snapshot pravidiel ani setov sa NIKDY nemerguje sam (D1b audit F4). Testovaci
+  # model nesie snapshoty z predoslych sekcii, takze bez „Doplniť nové
+  # predvoľby" by cely zvysok merial STARU tabulku a NEZARADENE zavesove sety —
+  # a to je presne stav, v ktorom sa ocitne kazda rozrobena zakazka po
+  # aktualizacii pluginu.
+  def kovf_predvolby(model)
+    hr = e::HardwareRules
+    model.start_operation('KOV-F: doplnit nove predvolby', true)
+    rstatus, radded, rrefreshed = hr.merge_project_seed!(model)
+    sstatus, sadded, smap, srefreshed = e::HardwareSets.merge_project_sets_seed!(model)
+    model.commit_operation
+    rules = hr.project_rules(model) || hr.load
+    rule = rules.find { |r| r['rule_id'].to_s == KOVF_RULE }
+    maxes = Array(rule && rule['bands']).map { |b| b['max'] }
+    ok("KOV-F predvolby: pravidla nesu NOXUN tabulku (#{maxes.inspect}; #{rstatus}, " \
+       "doplnene #{radded.inspect}, obnovene #{rrefreshed.inspect})",
+       maxes == [849.0, 1700.0, 2200.0, 2400.0, 2600.0, 2800.0, nil])
+    ok('KOV-F predvolby: pravidlo nesie door guardy (+1 nad 600, varovanie nad 800, „mimo tabuľky")',
+       rule.is_a?(Hash) && rule['finite'] == true &&
+       rule['width_plus'].is_a?(Hash) && rule['width_plus']['over'].to_f == 600.0 &&
+       rule['width_warn_over'].to_f == 800.0 && Array(rule['weight_bands']).length == 4)
+    info("KOV-F predvolby: sety #{sstatus} (doplnene #{Array(sadded).inspect}, " \
+         "mapovania #{Array(smap).inspect}, obnovene #{Array(srefreshed).inspect})")
+  end
+
+  # --- 1) POCTY z REALNYCH rozmerov kridla ------------------------------------
+  def kovf_counts(model)
+    inst = kovf_build(model, 1250.0)
+    return ok('KOV-F: vlozenie korpusu s dvierkami', false) unless inst
+
+    h = kovf_hinges(inst)
+    ok("KOV-F 1250 mm: 3 zavesy (#{kovf_qty(inst).inspect})",
+       h.length == 1 && h.first['quantity'] == 3)
+    ok('KOV-F 1250 mm: polozka nesie klasifikaciu (dvierka + klasicke otvaranie)',
+       h.first['params'].is_a?(Hash) && h.first['params']['use_type'] == 'door' &&
+       h.first['params']['opening_mode'] == 'classic')
+
+    kovf_reshape(model, inst, 850.0)
+    ok("KOV-F 850 mm: 3 zavesy — sprisnene prve pasmo (#{kovf_qty(inst).inspect})",
+       kovf_qty(inst) == [3])
+
+    # Korpus 804 mm = kridlo PRESNE 800 mm: +1 za sirku (2 -> 3), ale este
+    # ZIADNE varovanie (hranica `width_warn_over` je inkluzivna).
+    kovf_reshape(model, inst, 700.0, 804.0)
+    ok("KOV-F 800 × 700: 3 zavesy = 2 z tabulky + 1 za sirku kridla (#{kovf_qty(inst).inspect})",
+       kovf_qty(inst) == [3])
+    ok('KOV-F 800 × 700: pri PRESNE 800 mm este ziadne varovanie sirky',
+       kovf_ctrl(model).none? { |i| i['message_sk'].to_s.include?('nad odporúčaných') })
+
+    # Korpus 854 mm = kridlo 850 mm: pocet rovnaky, ale Kontrola varuje.
+    kovf_reshape(model, inst, 700.0, 854.0)
+    warn = kovf_ctrl(model).select { |i| i['message_sk'].to_s.include?('nad odporúčaných') }
+    ok("KOV-F 850 siroke: pocet sa NEMENI (#{kovf_qty(inst).inspect})", kovf_qty(inst) == [3])
+    ok("KOV-F 850 siroke: Kontrola hlasi ORANGE varovanie sirky (#{warn.length})",
+       warn.length == 1 && warn.first['severity'] == e::Validation::ORANGE)
+    cleanup(model)
+  end
+
+  # --- 2) TIP-ON celo dostane P2O set + piest na KRIDLO ------------------------
+  def kovf_tipon(model)
+    inst = kovf_build(model, 800.0, 900.0, 'opening_mode' => 'tipon', 'wings' => '2')
+    return ok('KOV-F Tip-On: vlozenie korpusu', false) unless inst
+
+    h = kovf_hinges(inst)
+    want = h.sum { |x| x['quantity'].to_i }
+    ok("KOV-F Tip-On: dve kridla = dve polozky s otvaranim tipon (#{kovf_qty(inst).inspect})",
+       h.length == 2 && h.all? { |x| x['params']['opening_mode'] == 'tipon' })
+    codes = kovf_codes(model)
+    ok("KOV-F Tip-On: nakup objednava P2O zaves, NIE klasicky (#{codes.inspect})",
+       codes['245723'].to_i == want && !codes.key?('104717'))
+    ok("KOV-F Tip-On: PRESNE JEDEN piest na KRIDLO (#{codes['250831'].inspect})",
+       codes['250831'].to_i == 2)
+    ok('KOV-F Tip-On: ziadny nesulad setu s celom',
+       kovf_ctrl(model).none? { |i| i['category'] == e::Validation::CAT_HW_MISMATCH })
+
+    # Klasicke celo tou istou cestou dostane KLASICKY set (bez piestu).
+    kovf_reshape(model, inst, 800.0, 900.0, 'opening_mode' => 'classic', 'wings' => '2')
+    classic = kovf_codes(model)
+    ok("KOV-F klasicke: nakup objednava klasicky zaves bez piestu (#{classic.inspect})",
+       classic.key?('104717') && !classic.key?('245723') && !classic.key?('250831'))
+    cleanup(model)
+  end
+
+  # --- 3) NAD TABULKOU: polozka + RED, rucny zamok RED zhasne -----------------
+  def kovf_out_of_table(model, markers)
+    inst = kovf_build(model, 2900.0)
+    return ok('KOV-F 2900: vlozenie vysokeho korpusu', false) unless inst
+
+    cid = e::Store.get(inst, 'cabinet_id')
+    conf = kovf_conflicts(inst)
+    ok("KOV-F 2900: polozka VZNIKNE s poctom posledneho pasma (#{kovf_qty(inst).inspect})",
+       kovf_qty(inst) == [7])
+    ok("KOV-F 2900: dovod je ULOZENY v configu (#{conf.map { |x| x['code'] }.inspect})",
+       conf.length == 1 && conf.first['code'] == 'door_height_out_of_table')
+    collected = e::Bom.collect(model)
+    red = Array(e::ProductionCore.control_payload(collected)['items'])
+          .select { |i| i['category'] == e::Validation::CAT_HARDWARE_CONFLICT }
+    ok("KOV-F 2900: Kontrola ukazuje RED mimo tabulky (#{red.length})",
+       red.length == 1 && red.first['severity'] == 'red')
+    exp = e::ProductionCore.hardware_expansion(model, collected)
+    ok('KOV-F 2900: brana zastavuje nakup, rozpocet aj cenovu ponuku',
+       !e::ProductionCore.drawer_stop(collected, exp).nil?)
+    ok('KOV-F 2900: VEPO branu NEDOSTAVA (geometria je spravna)',
+       e::ProductionCore.hardware_blockers(collected, exp, scope: :kit).empty?)
+
+    # NAPRAVA: rucny zamok poctu cez REALNU akciu panela = JEDEN krok Spat.
+    owner = kovf_hinges(inst).first['owner_part_key'].to_s
+    model.selection.clear
+    model.selection.add(inst)
+    m = r03_marker(model, markers)
+    e::Panel.handle_set_hardware_override(
+      pg(model, 'generic_type' => 'hinge', 'rule_id' => KOVF_RULE,
+                'owner_part_key' => owner, 'quantity' => 8, 'cabinet_id' => cid)
+    )
+    ok("KOV-F zamok: pocet je rucny (#{kovf_qty(inst).inspect}) a RED zhasol",
+       kovf_qty(inst) == [8] && kovf_conflicts(inst).empty?)
+    ok('KOV-F zamok: Kontrola uz „mimo tabulky" nehlasi',
+       kovf_ctrl(model).none? { |i| i['category'] == e::Validation::CAT_HARDWARE_CONFLICT })
+
+    Sketchup.undo
+    ok('KOV-F Spat: zamok aj RED sa vratili NARAZ',
+       kovf_qty(inst) == [7] &&
+       kovf_conflicts(inst).map { |x| x['code'] } == ['door_height_out_of_table'])
+    ok('KOV-F Spat: bol to PRESNE jeden krok', m.valid?)
+    if Sketchup.respond_to?(:redo)
+      Sketchup.redo
+      ok('KOV-F Redo: zamok je spat a RED je zase zhasnuty',
+         kovf_qty(inst) == [8] && kovf_conflicts(inst).empty?)
+    else
+      info('KOV-F: Sketchup.redo nedostupne — Redo vetva netestovana')
+    end
+    r03_clear_markers(model, markers)
+    cleanup(model)
+  end
+
+  # --- 4) VLASTNY SET SKRINKY prezije prestavbu -------------------------------
+  #
+  # Genericky override skrinky (`hardware_sets['hinge']`) stoji NAD triednym
+  # klucom projektu (Codex #327 kolo 2). Keby po prestavbe spadol na projektovu
+  # predvolbu, zakazka by ticho objednala INY zaves — a nikto by to nezbadal.
+  def kovf_cabinet_set(model)
+    inst = kovf_build(model, 800.0)
+    return ok('KOV-F vlastny set: vlozenie korpusu', false) unless inst
+
+    cid = e::Store.get(inst, 'cabinet_id')
+    ok("KOV-F vlastny set: vychodisko je projektova predvolba (#{kovf_codes(model).keys.sort.inspect})",
+       kovf_codes(model).key?('104717'))
+    model.selection.clear
+    model.selection.add(inst)
+    e::Panel.handle_set_hardware_set(pg(model, 'generic_type' => 'hinge',
+                                               'set_id' => KOVF_ALT_SET, 'cabinet_id' => cid))
+    ok("KOV-F vlastny set: nakup objednava VLASTNY kod (#{kovf_codes(model).keys.sort.inspect})",
+       kovf_codes(model).key?(KOVF_ALT_CODE))
+
+    # PRESTAVBA (ina hlbka) — override sa nesmie stratit ani „vylepsit".
+    e::CabinetBuilder.rebuild(model, inst,
+                              e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+                                               .merge('depth' => 560.0))
+    after = kovf_codes(model)
+    ok("KOV-F vlastny set: po prestavbe stale VLASTNY kod (#{after.keys.sort.inspect})",
+       after.key?(KOVF_ALT_CODE) && !after.key?('104717'))
+    ok('KOV-F vlastny set: ziadny nesulad klasifikacie (set je na dvierka, klasicky)',
+       kovf_ctrl(model).none? { |i| i['category'] == e::Validation::CAT_HW_MISMATCH })
+    cleanup(model)
+  end
+
   # --- D-118b: PTOs modul a vedome prazdna bunka v ZIVOM nakupe ---------------
   #
   # Headless sada overuje expanziu nad rucne poskladanym stavom; TU ide o cely
@@ -17138,7 +17405,7 @@ module NoxunSuRunner
                                            e::ProductionCore.hardware_expansion(model, collected))
       ok("KOV-C2b plytka: brana exportu zastavuje (#{stop.to_s[0, 60]})", !stop.nil?)
       ok('KOV-C2b plytka: VEPO branu STAVBY nedostava (geometria sa nevydala)',
-         e::ProductionCore.drawer_blockers(collected, nil, scope: :kit).empty?)
+         e::ProductionCore.hardware_blockers(collected, nil, scope: :kit).empty?)
 
       # Realny export. `UI.savepanel` je NASTRCENY tak, aby vratil cestu do
       # PRAZDNEHO docasneho priecinka — keby brana pretiekla, subor by tam
@@ -18056,6 +18323,7 @@ module NoxunSuRunner
     run_kovd4(model)         # KOV-D4: PAMAT pri prechode na dvierka — prechod zasuvka -> dvierka -> zasuvka ide TOU ISTOU cestou ako panel (klient serverove polia neposiela): pripnuty recept aj zamok NL prezije, dormantny zamok NEMA chipy osi, po navrate sa zamok znovu VALIDUJE stavbou (dlzka, geometria aj nakupny kit); zmena otvarania pripne INY recept a stary zamok ostava dormantny (dlzka je z automatu, riadok nesvieti ako aktivny), navrat na classic ho zase aktivuje
     run_kovd5(model)         # KOV-D5: ABS farbenie dielcov zasuviek — chrbat Atiry ma pasku na HORNEJ ploske (dolna aj velke plochy cisté), dno ziadnu; Quadro bok boxu aj vnutorne celo tiez HORE; Kontrola olepov zvyrazni TU ISTU ploskou (aj pri starom modeli, kde osi pochadzaju z ROLY); Spat aj Redo mapovanie nemenia a prestavba starej zakazky farbu doplni
     run_kovw(model)          # KOV-W: hmotnost dielcov v ZIVOM retazci katalog -> skrinka -> snapshoty -> Inspector -> Kontrola: pri znamej hustote sedi sucet zo snapshotov s planom (±0,05 kg) a nic sa neuklada do modelu; typ BEZ hustoty (nie UNI) da tazsi odhad, PRESNE JEDEN build warning na skrinku a ORANGE v Kontrole; UNI dielec odhad zachova, ale hmotnostny nalez sa v Kontrole POTLACI (hlasi sa len „materiál neurčený"); Spat vracia hmotnost spolu s materialom
+    run_kovf(model)          # KOV-F1: zavesy podla NOXUN tabulky — pocty z REALNEJ sirky kridla (1250 -> 3, 850 -> 3, kridlo 800 x 700 -> 2+1), varovanie sirky nad 800 mm v Kontrole, Tip-On celo dostane P2O set + PRESNE JEDEN piest na kridlo (klasicke celo klasicky set), dvierka nad tabulkou vydaju polozku 7 ks + RED „mimo tabuľky" so zastavenym nakupom/rozpoctom/ponukou (VEPO bezi dalej), rucny zamok poctu RED zhasne v JEDNOM kroku Spat (aj Redo), vlastny set skrinky prezije prestavbu
     run_d118b(model)         # D-118b: PTOs modul a vedome prazdna bunka v ZIVOM retazci kniznica -> predvolby projektu -> vlozena Tip-On zasuvka -> nakup: pri NL 470 pribudne modul 352908 (1 ks, nazov z katalogu), pri NL 620 (kit typu PTO) modul VEDOME nepribudne a NEVZNIKNE ziadna oranzova; snapshot nesie std 5 a config schemu 8
     run_async(model, nil)
   rescue StandardError => ex

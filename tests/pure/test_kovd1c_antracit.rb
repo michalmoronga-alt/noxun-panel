@@ -332,7 +332,7 @@ NxTest.test('KOV-D1c (R4): predvolba noveho projektu ostava BIELA') do
   NxTest.assert_equal('atira-biela-h70-sisy',
                       lib['mapping'][c::CLASSIC_METAL]['bands'].first['set_id'],
                       'novy projekt zacina na bielej')
-  NxTest.assert_equal(5, c::HWS::SEED_VERSION, 'D-118b seed = bump SEED_VERSION na 5')
+  NxTest.assert(c::HWS::SEED_VERSION >= 5, 'D-118b seed = 5; KOV-F1 bumplo na 6')
 end
 
 # ============================================================================

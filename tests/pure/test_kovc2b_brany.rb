@@ -125,14 +125,14 @@ NxTest.test('KOV-C2b (R4): KAZDY kod stavby zastavi CSV/rozpocet/ponuku, VEPO ni
   c = NxC2bB
   c::REC::BUILD_BLOCKERS.each do |code|
     collected = { hardware_issues: [c.issue(code)], hardware: [] }
-    all = c::PC.drawer_blockers(collected, nil)
+    all = c::PC.hardware_blockers(collected, nil)
     NxTest.assert_equal(1, all.length, "#{code}: brana `all` zastavuje")
     NxTest.assert(all.first.include?(c::REC::BLOCKER_LABELS[code]), all.inspect)
     NxTest.assert(all.first.include?('CAB-1'), 'brana menuje skrinku')
-    NxTest.assert_equal([], c::PC.drawer_blockers(collected, nil, scope: :kit),
+    NxTest.assert_equal([], c::PC.hardware_blockers(collected, nil, scope: :kit),
                         "#{code}: VEPO branu nepotrebuje (geometria sa nevydala)")
     # Hotovy status ide cez ten isty `export_blockers`.
-    NxTest.assert_equal(all, c::PC.export_blockers(drawer: all))
+    NxTest.assert_equal(all, c::PC.export_blockers(hardware: all))
   end
 end
 
@@ -141,11 +141,11 @@ NxTest.test('KOV-C2b (R4): `drawer_kit_missing` zastavi VSETKY exporty VRATANE V
   exp = c.expansion([{ 'cabinet_id' => 'CAB-2', 'reason' => 'drawer_kit_missing',
                        'base_reason' => 'class_unmapped' }])
   %i[all kit].each do |scope|
-    out = c::PC.drawer_blockers({ hardware_issues: [], hardware: [] }, exp, scope: scope)
+    out = c::PC.hardware_blockers({ hardware_issues: [], hardware: [] }, exp, scope: scope)
     NxTest.assert_equal(1, out.length, "#{scope}: kit blokuje")
     NxTest.assert(out.first.include?('CAB-2'))
   end
-  NxTest.assert_equal([], c::PC.drawer_blockers({ hardware_issues: [], hardware: [] },
+  NxTest.assert_equal([], c::PC.hardware_blockers({ hardware_issues: [], hardware: [] },
                                                 c.expansion([])),
                       'ziadny nemapovany riadok = ziadna blokada')
 end
@@ -633,7 +633,7 @@ NxTest.test('Codex #304 P1: `drawer_stale` je RED v Kontrole a blokuje VSETKY ex
   NxTest.assert(items.first['message_sk'].include?('neprestavíš'), items.first['message_sk'])
   collected = { hardware_issues: [iss], hardware: [] }
   %i[all kit].each do |scope|
-    out = c::PC.drawer_blockers(collected, c.expansion([]), scope: scope)
+    out = c::PC.hardware_blockers(collected, c.expansion([]), scope: scope)
     NxTest.assert_equal(1, out.length, "#{scope}: migracny kod zastavuje (aj VEPO)")
     NxTest.assert(out.first.include?('CAB-1'))
   end

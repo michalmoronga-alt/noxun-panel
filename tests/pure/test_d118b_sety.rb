@@ -268,7 +268,7 @@ NxTest.test('D-118b (R6): sentinel = std 5, obsah bez neho ostava na svojom std'
                       'bez sentinelu ostava marker na 4 — spatna citatelnost sa neblokuje zbytocne')
   NxTest.assert(c::HWS::STD_SUPPORTED.include?(c::HWS::STD_SKIP_CODE),
                 'novy marker je medzi podporovanymi')
-  NxTest.assert_equal(5, Noxun::Engine::HardwareSets::SEED_VERSION)
+  NxTest.assert(Noxun::Engine::HardwareSets::SEED_VERSION >= 5, 'D-118b seed = 5; KOV-F1 bumplo na 6')
 end
 
 # ============================================================================

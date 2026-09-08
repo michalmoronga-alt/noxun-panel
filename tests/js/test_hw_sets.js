@@ -8,7 +8,7 @@ const path = require('node:path');
 const { hwsSlug, hwsSetsForType, hwsMemberSummary, hwsBuildSetPayload,
         hwsMembersOf, hwsNum, hwsParamLabel, hwsBandsSummary, hwsBuildBands,
         hwsSelectorFrom, hwsBuildSelector, hwsProjDraftKeys,
-        hwsPinRev, hwsMapRev } =
+        hwsPinRev, hwsMapRev, hwsMapClassValue } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'hw_sets.js'));
 
 // Slovnik parametrov posiela server (HardwareSets::PARAM_OPTIONS).
@@ -190,5 +190,23 @@ eq(Object.keys(hwsBuildSelector(hwsPinRev({ param: 'height', rows: [{ min: '', m
    ['bands', 'param'],
    'server dostava CISTY selector — `rev` v nom nie je');
 eq(hwsPinRev(null, 'rev-A'), null, 'null draft je bezpecny');
+
+
+// --- KOV-F1: SENTINEL "vedome bez setu" v triednom mapovani -------------------
+// Volba "bez setu" sa uklada ako VYHRADENA hodnota (server ju posiela v
+// `none_value`), nie zmazanim kluca. Pri zavesoch je rozdiel vecny: prazdny
+// kluc znamena "padni na projektovu predvolbu", teda presny OPAK toho, co si
+// pouzivatel vybral. Prazdny retazec ostava zrusenim mapovania (zasuvky).
+const HROW = { key: 'class:hinge|tipon', none_value: 'none',
+               options: [{ id: 'set:zaves-p2o', set_id: 'zaves-p2o' },
+                         { id: 'sel:x', selector: { param: 'height', bands: [] } }] };
+eq(hwsMapClassValue(HROW, 'none'), 'none', 'sentinel ide na server ako vyhradena hodnota');
+eq(hwsMapClassValue(HROW, 'set:zaves-p2o'), 'zaves-p2o', 'pevny set = set_id');
+eq(hwsMapClassValue(HROW, 'sel:x'), { param: 'height', bands: [] }, 'rodina = selektor');
+eq(hwsMapClassValue(HROW, ''), '', 'prazdne ID ostava zrusenim mapovania');
+eq(hwsMapClassValue(HROW, 'neznamy'), null, 'nezname ID sa NEODOSIELA');
+// Riadok BEZ `none_value` (starsi payload) sa sprava presne ako doteraz.
+eq(hwsMapClassValue({ key: 'class:slide|classic|metal', options: [] }, 'none'), null,
+   'bez `none_value` je sentinel len nezname ID — ziadny tichy zapis');
 
 console.log(`OK — test_hw_sets.js: ${n} testov preslo`);
