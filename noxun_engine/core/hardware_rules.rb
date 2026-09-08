@@ -85,6 +85,14 @@ module Noxun
                        # seria vysuvov zladena s realnym radom Atira (GH #125 P2)
                        # v3 (D-90): +uchytkovy profil na dvierkach a zasuvkovych celach
                        # v4 (KOV-F1): NOXUN tabulka zavesov + door guardy
+      # KOV-F1 (Codex #329 kolo 3 P1): verzia formatu, OD KTOREJ seed pravidlo
+      # zavesov nesie door guardy (Noxun tabulka). Snapshot POD tymto cislom =
+      # pravidla este spred tabulky, takze skrinka so zavesmi nesie stare pocty
+      # aj PO prestavbe (snapshot sa nikdy nemerguje sam — naprava je vedoma
+      # akcia „Doplniť nové predvoľby" alebo ulozenie Pravidiel). PEVNE CISLO,
+      # nie `STD`: buduci bump formatu na tabulke zavesov nic nezmeni.
+      HINGE_TABLE_STD = 2
+
       FILE         = 'hardware_rules.json'
       MODEL_KEY    = 'hardware_rules' # kluc snapshotu v NOXUN dict na modeli
 
@@ -595,14 +603,53 @@ module Noxun
       # (`project_rules`) ho pusta dalej — stavba musi bezat — ale zapis sa
       # odmietne, aby sa nezvecnila strata poli, ktorym nerozumieme.
       def project_std_unsupported?(model)
-        return false unless model
+        doc_std_unsupported?(project_doc(model))
+      end
+
+      # SUROVY projektovy dokument pravidiel (Hash) alebo nil. JEDINE miesto,
+      # ktore modelovy atribut parsuje kvoli otazkam o VERZII formatu — dva
+      # samostatne citace by sa casom rozisli.
+      def project_doc(model)
+        return nil unless model
 
         raw = model.get_attribute(Store::DICT, MODEL_KEY)
-        return false if raw.nil? || raw.to_s.strip.empty?
+        return nil if raw.nil? || raw.to_s.strip.empty?
 
-        doc_std_unsupported?(JSON.parse(raw.to_s))
+        doc = JSON.parse(raw.to_s)
+        doc.is_a?(Hash) ? doc : nil
       rescue StandardError
-        false
+        nil
+      end
+
+      # `std` dokumentu s pravidlami, alebo nil (dokument ziadne pravidla
+      # nenesie / sa neda precitat). Chybajuci kluc = najstarsi format (1) —
+      # rovnaky vyklad ako `doc_std_unsupported?`.
+      def doc_std(doc)
+        return nil unless doc.is_a?(Hash) && doc['rules'].is_a?(Array)
+
+        doc.key?('std') ? doc['std'].to_i : 1
+      end
+
+      # KOV-F1 (Codex #329 kolo 3 P1): su UCINNE pravidla projektu este SPRED
+      # Noxun tabulky zavesov? Rozhoduje PROJEKTOVY snapshot; ked ho projekt
+      # nema, dedi globalnu kniznicu, takze rozhoduje ona. Neznamy/poskodeny
+      # stav = false (fallback su `SEED_RULES`, tie tabulku uz nesu).
+      #
+      # PRECO `std` A NIE OBSAH PRAVIDLA: vedomy pouzivatelsky rule bez guardov
+      # ULOZENY PO F1 je rozhodnutie, nie zaostalost — a kazdy zapis snapshotu
+      # (Ulozit v Pravidlach aj „Doplniť nové predvoľby") pecati aktualny `std`.
+      def pre_hinge_table_rules?(model)
+        std = doc_std(project_doc(model))
+        std = library_doc_std if std.nil?
+        return false if std.nil?
+
+        std < HINGE_TABLE_STD
+      end
+
+      def library_doc_std
+        doc_std(JsonFileStore.read(path, copy: false))
+      rescue StandardError
+        nil
       end
 
       # Zapise projektovy snapshot (editor pravidiel / ensure). Volajuci drzi operaciu.

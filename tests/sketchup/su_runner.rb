@@ -17159,7 +17159,51 @@ module NoxunSuRunner
        (e::Store.config(inst) || {})['config_schema'].to_i == e::CabinetBuilder::CONFIG_SCHEMA)
     ok('KOV-F stale: a Kontrola uz nic nehlasi',
        kovf_ctrl(model).none? { |i| i['category'] == e::Validation::CAT_HARDWARE_CONFLICT })
+    kovf_stale_rules(model, inst)
     cleanup(model)
+  end
+
+  # --- 4b) PRESTAVBA SAMA NESTACI (Codex #329 kolo 3 P1) ----------------------
+  #
+  # Snapshot pravidiel projektu sa NIKDY nemerguje sam, takze zakazka rozrobena
+  # pred F1 ma po aktualizacii pluginu STARE pravidla — a prestavba skrinky jej
+  # znovu vyrata stare pocty (tu 2 miesto 4). Presne to je stav, v ktorom RED
+  # `hinge_stale` NESMIE zhasnut. Zhasne az „Doplniť nové predvoľby" (zapise
+  # snapshot s aktualnym std A prestava skrinky) — tu sa vola telo tej akcie
+  # (`RulesDialog.handle_merge_seed`), lebo okno v teste nie je.
+  def kovf_stale_rules(model, inst)
+    hr = e::HardwareRules
+    legacy = hr::LEGACY_SEED_SHAPES['zavesy-podla-vysky'].first
+    rules = hr::SEED_RULES.reject { |r| r['rule_id'] == KOVF_RULE } + [legacy]
+    model.start_operation('SU-TEST KOV-F stare pravidla projektu', true)
+    model.set_attribute(e::Store::DICT, hr::MODEL_KEY,
+                        { 'std' => 1, 'seed_version' => 3, 'rules' => rules }.to_json)
+    model.commit_operation
+    ok('KOV-F stale-pravidla: projekt ma snapshot spred tabulky', hr.pre_hinge_table_rules?(model))
+
+    kovf_reshape(model, inst, 900.0, 700.0)
+    ok("KOV-F stale-pravidla: prestavba dala STARE pocty (#{kovf_qty(inst).inspect})",
+       kovf_qty(inst) == [2])
+    red = kovf_ctrl(model).select { |i| i['category'] == e::Validation::CAT_HARDWARE_CONFLICT }
+    ok("KOV-F stale-pravidla: prestavba SAMA RED nezhasla (#{red.length})",
+       red.length == 1 && red.first['message_sk'].to_s.include?('Doplniť nové predvoľby'))
+    ok('KOV-F stale-pravidla: brana stale zastavuje nakup, rozpocet aj ponuku',
+       !e::ProductionCore.drawer_stop(e::Bom.collect(model), nil).nil?)
+
+    # NAPRAVA: telo akcie „Doplniť nové predvoľby" — snapshot a prestavba
+    # v JEDNEJ operacii (inak by ulozene `config.hardware[]` pravidlo nepoznali).
+    plan, added, refreshed = hr.project_seed_plan(hr.project_rules(model))
+    jobs = cabinets(model).map { |cb| [cb, e::CabinetBuilder.config_to_params(e::Store.config(cb) || {})] }
+    e::CabinetBuilder.rebuild_many(model, jobs, op_name: 'SU-TEST KOV-F doplnenie predvolieb') do
+      raise 'snapshot pravidiel sa nezapisal' unless hr.set_project_rules(model, plan)
+    end
+    info("KOV-F stale-pravidla: doplnene #{added.inspect}, obnovene #{refreshed.inspect}")
+    cab = cabinets(model).first
+    ok('KOV-F stale-pravidla: snapshot uz nie je spred tabulky', !hr.pre_hinge_table_rules?(model))
+    ok("KOV-F stale-pravidla: pocty su podla novej tabulky (#{kovf_qty(cab).inspect})",
+       kovf_qty(cab) == [4])
+    ok('KOV-F stale-pravidla: RED zhasol az teraz',
+       kovf_ctrl(model).none? { |i| i['category'] == e::Validation::CAT_HARDWARE_CONFLICT })
   end
 
   # --- 5) VLASTNY SET SKRINKY prezije prestavbu -------------------------------
