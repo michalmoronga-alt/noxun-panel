@@ -44,10 +44,17 @@ len s vetou, ktorá menuje ručnú položku a hovorí „ostáva bez ceny" — n
 
 **D-121b — ORANGE `name_long` nad AGREGOVANÝMI RIADKAMI, nie nad záznamami.** Kontrakt VEPO v1.2 dal názvu riadku tvrdý limit 20 znakov (import dlhšie pole odmieta), takže
 Kontrola musí povedať, kde sa názov orezal. `check_name_lengths` postaví **tie isté riadky, aké pôjdu do CSV** — `Bom.aggregate_rows` (presne ten krok, ktorým `Bom.compute`
-vyrába riadky pre `VepoExport.build`) — a nad každým zavolá `VepoExport.row_name_info`; nález vznikne pri `cut` — ale **len pre riadok, ktorý export naozaj vydá** (`exportable_row?`, Codex #325 kolo 1): tie isté funkcie ako export — `VepoExport.validate_row` (materiál, rozmery, počet), `commercial_thickness` (hrúbka) a kľúče `EDGE_CODES` proti mape pások (ABS mimo katalógu = riadok ide do „vyradených", nie do CSV); bez mapy pások sa ABS neoveruje — Kontrola nesmie mlčať len preto, že katalóg nedostala. **Prečo nie per záznam** (audit Astra 8.9., nález 2): dve dosky
+vyrába riadky pre `VepoExport.build`) — a nad každým zavolá `VepoExport.row_name_info`; nález vznikne pri `cut` — ale **len pre riadok, ktorý export naozaj vydá**
+(`exportable_row?`, Codex #325 kolo 1): tie isté funkcie ako export — `VepoExport.validate_row` (materiál, rozmery, počet), `commercial_thickness` (hrúbka) a kľúče
+`EDGE_CODES` proti mape pások (ABS mimo katalógu = riadok ide do „vyradených", nie do CSV); bez mapy pások sa ABS neoveruje — Kontrola nesmie mlčať len preto, že
+katalóg nedostala. **Prečo nie per záznam** (audit Astra 8.9., nález 2): dve dosky
 s 18-znakovým názvom skončia pri zhodných výrobných parametroch v JEDNOM riadku, ich spoločný názov má 37 znakov a orezal by sa **ticho**. Hláška menuje plný tvar, počet znakov
 a presne to, čo pôjde do objednávky; hint sa líši podľa `row['free_names']` (voľná doska → „Skráť názov dosky", inak → „plný tvar je v LOGu exportu"). `part_key` je `nil`
-(riadok nie je jeden dielec), takže klik-select označí **vlastníka** — rovnaká cesta ako pri `build` nálezoch bez kľúča; ktorého: pri hinte o doske je to **prvý `BRD-` vlastník riadku** (tá istá zásada ako `Bom.free_board_record?` — riadok býva zliatok skrinky a dosky a prvý vlastník by mohol byť skrinka, ktorú nemá čo premenovať), inak prvý vlastník. `stable_key` = `name_long|<row['key'].inspect>`, teda **celý výrobný kľúč riadku** (`Bom.row_key`: rozmery, materiál, hrany, smer dekoru, väzba dupláku) — kľúč len z názvu a rozmerov by dva riadky s inou hranou zlial v `dedup` do jedného nálezu (Codex #325 kolo 1); medzi behmi `run` je nemenný (samé celé čísla a reťazce). Riadky sa počítajú **vnútri `run` z `collected`** (žiadny nový parameter), takže klik-resolve aj `control_payload` v
+(riadok nie je jeden dielec), takže klik-select označí **vlastníka** — rovnaká cesta ako pri `build` nálezoch bez kľúča; ktorého: pri hinte o doske je to **prvý `BRD-`
+vlastník riadku** (tá istá zásada ako `Bom.free_board_record?` — riadok býva zliatok skrinky a dosky a prvý vlastník by mohol byť skrinka, ktorú nemá čo premenovať),
+inak prvý vlastník. `stable_key` = `name_long|<row['key'].inspect>`, teda **celý výrobný kľúč riadku** (`Bom.row_key`: rozmery, materiál, hrany, smer dekoru, väzba
+dupláku) — kľúč len z názvu a rozmerov by dva riadky s inou hranou zlial v `dedup` do jedného nálezu (Codex #325 kolo 1); medzi behmi `run` je nemenný (samé celé čísla
+a reťazce). Riadky sa počítajú **vnútri `run` z `collected`** (žiadny nový parameter), takže klik-resolve aj `control_payload` v
 `production_core.rb` dostanú tie isté položky (lekcia GH #127 P2). **Závislosť na `Bom` a `VepoExport` je zámerná** — oba moduly sa načítavajú pred `validation` (main.rb aj
 `tests/helper.rb`), guard `defined?` sa nepoužíva; vstup sa robí tolerantným na strane Kontroly (`name_check_records` doplní chýbajúce `edges`/`quantity`/`material_source`; `quantity` ako `Bom.record`, vždy ≥ 1 — fixtúra bez poľa nesmie skončiť ako „chybný počet"),
 `Bom` sa kvôli semaforu nemení. Limit sa číta z `VepoExport::NAME_MAX` a číslo sa vo `validation.rb` neopakuje (guard test). Riadok, ktorému sa nezmestila **skrinka** (nie
@@ -529,7 +536,9 @@ z `VepoExport::NAME_MAX` (guard test to stráži).
   `Polica 1 2 3`. Číslo musí byť **na konci** (`NUMBERED_TOKEN`), takže `Dv1 LP/Dv2 LP` ostáva s `/`. Zlučujú sa **výhradne tokeny zo skratky generovaného názvu** (`free == false`)
   — tá istá zásada ako pri `merge_pair` (GH #287 P2): `Polička 1` a `Polička 2` od používateľa môžu byť dve rôzne veci.
 - **`cut_name` — deterministický orez po hranici tokenu, bez výpustky.** Padne-li rez presne na medzeru alebo `/`, berie sa celý 20-znakový začiatok; inak sa **rozseknuté slovo
-  zahodí** (rez na poslednom oddeľovači v ňom). Jedno dlhé slovo oddeľovač nemá — tvrdý rez. **Krajné medzery idú preč ešte pred rezom a prázdny výsledok nikdy nevznikne** (rozseknutý token sa zahadzuje len pri kladnom indexe; keď neostane nič, platí tvrdý rez) — voľný názov dosky so začiatočnou medzerou by inak dal prázdny riadok objednávky. Výpustka `…` sa **nepoužíva** (minie znak a nálepka interpunkciu netlačí).
+  zahodí** (rez na poslednom oddeľovači v ňom). Jedno dlhé slovo oddeľovač nemá — tvrdý rez. **Krajné medzery idú preč ešte pred rezom a prázdny výsledok nikdy
+  nevznikne** (rozseknutý token sa zahadzuje len pri kladnom indexe; keď neostane nič, platí tvrdý rez) — voľný názov dosky so začiatočnou medzerou by inak dal prázdny
+  riadok objednávky. Výpustka `…` sa **nepoužíva** (minie znak a nálepka interpunkciu netlačí).
   Dôvod je výrobný (audit Astra 8.9., nález 1): tvrdý rez by z `Polica 2 3 4 5 6 7 10` urobil `…7 1` a štítok by uvádzal policu **1** namiesto 10.
 - **`row_name_info` — orez sa PRIZNÁ.** Vracia `{name, full, cut, owners_total, owners_shown}`; `row_name` je len jeho `name`. `append_owners_info` (a cezeň `append_owners`)
   pridáva skrinky, kým sa zmestia, nezmestené zhrnie ` +K` — **nikdy odseknutá skratka v polovici**; pri oreze názvu sa skrinky už nepridávajú. Z tohto hasha žije aj ORANGE
