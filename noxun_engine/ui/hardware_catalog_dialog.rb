@@ -579,15 +579,31 @@ module Noxun
             value = map[key]
             opts = HardwareSets.class_set_options(key, globals, snap_sets, refs)
             cur = HardwareSets.mapping_option_id(value)
-            known = !cur.nil? && opts.any? { |o| o['id'] == cur }
+            # KOV-F1: SENTINEL „vedome bez setu" je platna ULOZENA volba, nie
+            # neznama hodnota — v ponuke ma svoju polozku (`none_value`), takze
+            # sa nesmie zobrazit ako „uložený výber", ktory sa nedá vybrať.
+            sentinel = HardwareSets.mapping_none?(value)
+            known = sentinel || (!cur.nil? && opts.any? { |o| o['id'] == cur })
             { 'key' => key, 'label' => HardwareSets.class_key_label(key),
               'options' => opts, 'current' => (known ? cur : nil),
               'stored' => (!value.nil? && !known),
               'value_text' => HardwareSets.mapping_value_text(value, defs),
-              # Nenamapovana KLASIFIKOVANA zasuvka nie je ORANGE ako ostatne
-              # kovanie — je to RED `drawer_kit_missing` (fail-closed): dielce
-              # sa vyrobia, kit sa neobjedna. Riadok to musí povedať rovno.
-              'none_label' => '— bez setu (RED — zásuvka bez kitu)' }
+              'none_value' => HardwareSets::MAPPING_NONE,
+              'none_label' => class_none_label(key) }
+          end
+        end
+
+        # KOV-F1: co znamena „bez setu" pri TEJTO triede. Dosledok je pri kazdej
+        # iny, takze jedna spolocna veta by klamala:
+        #   * zasuvka — RED `drawer_kit_missing` (dielce sa vyrobia, kit nie),
+        #   * zaves — polozka ostane bez kodov (dvierka bez zavesov v nakupe).
+        # Volba sa uklada ako SENTINEL, nie zmazanim kluca: pri zavesoch by
+        # zmazanie znamenalo „padni na legacy `hinge`", teda presny opak.
+        def class_none_label(key)
+          if HardwareSets.mapping_key_type(key).to_s == 'hinge'
+            '— vedome bez setu (dvierka bez závesov)'
+          else
+            '— vedome bez setu (RED — zásuvka bez kitu)'
           end
         end
 

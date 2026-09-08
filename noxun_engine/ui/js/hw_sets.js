@@ -1620,6 +1620,10 @@
   // (objekt). Prázdne ID = zrušenie mapovania.
   function hwsMapClassValue(row, id){
     if (!id) return '';
+    // KOV-F1: „vedome bez setu" sa ukladá ako SENTINEL (server ho posiela
+    // v `none_value`), nie zmazaním kľúča — pri závesoch by zmazanie znamenalo
+    // „použi projektovú predvoľbu", teda presný opak toho, čo si používateľ vybral.
+    if (row && row.none_value && id === row.none_value) return row.none_value;
     var o = hwsMapClassPick(row, id);
     if (!o) return null; // neznáme ID sa NEODOSIELA (radšej nič než hádanie)
     return o.selector ? o.selector : (o.set_id || '');
@@ -1633,8 +1637,8 @@
     sel.setAttribute('data-hws-act', action);
     sel.setAttribute('data-hws-mapkey', row.key);
     var none = hwsMk('option', null, row.none_label || '— bez setu');
-    none.value = '';
-    none.selected = !row.current && !row.stored;
+    none.value = row.none_value || '';
+    none.selected = row.current ? (row.current === row.none_value) : !row.stored;
     sel.appendChild(none);
     // F10: uložená voľba, ktorá už v ponuke NIE JE (neaktívny set, set z novšej
     // verzie) sa ZOBRAZÍ, ale nedá sa vybrať znova — inak by select ukazoval
