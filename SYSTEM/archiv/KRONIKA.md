@@ -17,6 +17,22 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-121a — DIELCE ZÁSUVKY MAJÚ ĽUDSKÉ NÁZVY (v0.9.45, 8.9.2026).**
+  Michal 6.9. po KOV-C nahlásil, že vo VEPO exporte stoja riadky `Dno zasuvky Fmslwqdm2-9-464wsa`. Názov niesol **interné id čela** — `drawer_part_descriptor` ho od KOV-C2b
+  skladal ako `"Dno zasuvky #{front_id}"` — a `VepoExport.short_name` taký tvar nepoznal, takže prešiel celý. Id človeku nič nehovorí a na nálepku VEPO sa nezmestí.
+  **Čo sa zmenilo:** dielce zásuvky nesú v modeli aj v kusovníku **číslo čela** (`Dno zasuvky 2`, `Chrbat zasuvky 2`, `Vnutorne celo zasuvky 2`, `Bok boxu lavy/pravy 2`) —
+  je to **to isté číslo**, aké má `Zasuvkove celo 2`, teda poradie v `front_items` (`idx = i + 1` v `drawer_pass`; riadok „Bez čela" číslo drží, nič sa nepreskakuje).
+  Vo VEPO CSV a LOGu pribudli skratky `Zas dno N` · `Zas chrb N` · `Zas predok N` · `Zas bok L/P N`, pričom **dva boky boxu jednej zásuvky** sa v riadku združia na
+  `Zas bok LP N` — tým istým mechanizmom ako dvierka (`box_side_pairs` + `merge_pair`), teda výhradne z generovaných názvov: voľný názov dosky sa ďalej neskracuje ani nepáruje.
+  **Identita dielca sa nedotkla:** `suffix` (`DRWBOT-F2-1`) aj `part_key` (`front:F2/drawer_bottom`) stoja ďalej na id čela, takže premenovanie nespôsobí prestavbu ani stratu
+  ručných zásahov — `prod` a `axes` sú v testoch porovnané s plánom pred zmenou.
+  **Legacy:** zákazka postavená pred touto dávkou má id v názve až do najbližšej prestavby skrinky; VEPO jej dá krátky tvar **bez čísla** (`Zas dno s1`) — id sa do skratky
+  vedome neprenáša (`num_suffix` berie len čisto číselný token).
+  **Kontrakt ostáva v1.1** — `NAME_MAX` 60 sa nemenil, preto dávka nebola audit-povinná. **Čo príde v D-121b:** Michal 7.9. potvrdil, že **VEPO import pole nad 20 znakov
+  ODMIETA** (kontrakt doteraz hovoril, že 20 znakov je len tlač nálepky), takže nasleduje kontraktová dávka **v1.2 s auditom**: `NAME_MAX` 20, orez skriniek, voľné názvy
+  dosiek a zlúčenie čísel v riadku (`Zas dno 1/2`). Testy: nová sada `tests/pure/test_d121_vepo_nazvy.rb` (8 scenárov vrátane guardu „krátky tvar + skrinka ≤ 20 znakov",
+  ktorý pre v1.2 pripravuje pôdu); headless 3377 zelených. In-SU beh v tejto dávke nebežal — SketchUp bol obsadený živou zákazkou a zmena je výhradne reťazec názvu.
+
 - **D-118b — ZÁSUVKA OBJEDNÁ SPRÁVNU SADU A TIP-ON AJ MECHANIZMUS (v0.9.44, 7.9.2026).**
   Druhá polovica D-118: to, čo strojový zber katalógu (D-118a) odhalil, sa premietlo do SETOV. Tri vecné veci — **`348777` nie je K-sada** (stránka Démosu pri ňom hovorí
   „Priložené čelné kovanie: Nutné dokúpiť", preto je aj lacnejší; správny kód je **`357889`**, symetrický k bielej `357696`), **Tip-On K-sady neobsahujú modul P2O**

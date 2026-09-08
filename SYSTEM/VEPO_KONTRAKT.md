@@ -5,6 +5,8 @@
 > ✅ **Implementované a VALIDOVANÉ:** export V0.5-C (PR #51) prešiel 20.7.2026 dvojkolovou krížovou validáciou proti starému OCL→vepo_exporter flow (26 = 26 dielcov, presné zhody; 1. kolo chytilo omyl s odpočtom ABS → fix PR #58). Plný záznam: [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).
 >
 > **v1.1 (3.9.2026, D-112 + D-113):** pribudol **deviaty stĺpec `poznamka`** a zmenil sa **tvar názvu riadku** (skratky + skrinky). Zvyšok formátu je bajtovo nezmenený.
+>
+> **D-121a (8.9.2026):** skratky dielcov zásuvky (`Zas dno N`, `Zas chrb N`, `Zas predok N`, `Zas bok L/P N`) — **kontrakt ostáva v1.1** (`NAME_MAX` 60 sa nemení).
 
 ## Výstupný CSV súbor (to, čo VEPO potrebuje)
 
@@ -42,7 +44,11 @@ Platí LEN pre VEPO CSV a LOG — **kusovník Štúdia ostáva s plnými názvam
 - **Skratky** (presná zhoda na názvy z builderov; neznámy názov ide BEZ ZMENY): `Bok lavy`→`Bok L` · `Bok pravy`→`Bok P` · `Vystuha predna`→`Vyst P` · `Vystuha zadna`→`Vyst Z` ·
   `Sokel predny`→`Sokel` · `Priecka zvisla`→`Priecka Z` · `Priecka vodorovna`→`Priecka V` · `Dvierka N lave/prave`→`Dv<N> L`/`Dv<N> P` · `Dvierka N kridlo i/n`→`Dv<N> k<i>` ·
   `Dvierka N`→`Dv<N>` · `Zasuvkove celo N`→`Zas celo N`. `Dno`, `Vrch`, `Chrbat`, `Polica N`, `Blenda N`, `Výklop N`, `Sklop N` a názvy samostatných dosiek (voľný text) sa nemenia.
-- **Združenie dvojíc** v jednom riadku: `Bok L`+`Bok P`→`Bok LP` · `Vyst P`+`Vyst Z`→`Vyst PZ` · `Dv<N> L`+`Dv<N> P`→`Dv<N> LP`. Ostatné rôzne názvy sa spájajú `/` (napr. `Dno/Vrch`) v poradí, v akom prišli.
+- **Vyrábané dielce zásuvky (D-121a, 8.9.2026):** `Dno zasuvky N`→`Zas dno N` · `Chrbat zasuvky N`→`Zas chrb N` · `Vnutorne celo zasuvky N`→`Zas predok N` ·
+  `Bok boxu lavy/pravy N`→`Zas bok L/P N`; dvojica bokov jednej zásuvky v riadku → `Zas bok LP N`. `N` je **číslo čela** — to isté, aké nesie `Zasuvkove celo N`.
+  **Legacy:** zákazka postavená pred D-121a má v názve namiesto čísla interné id čela (`Dno zasuvky Fmslwqdm2-9-464wsa`) — dostane tvar **bez čísla** (`Zas dno s1`);
+  id sa do skratky neprenáša, lebo človeku nič nepovie. Číslo sa v názve objaví po najbližšej prestavbe skrinky.
+- **Združenie dvojíc** v jednom riadku: `Bok L`+`Bok P`→`Bok LP` · `Vyst P`+`Vyst Z`→`Vyst PZ` · `Dv<N> L`+`Dv<N> P`→`Dv<N> LP` · `Zas bok L<N>`+`Zas bok P<N>`→`Zas bok LP<N>`. Ostatné rôzne názvy sa spájajú `/` (napr. `Dno/Vrch`) v poradí, v akom prišli.
 - **Voľné názvy samostatných dosiek sa NEMENIA ani nepárujú.** Názov dosky je voľný text používateľa, nie názov z buildera — doska pomenovaná `Bok lavy` ostáva `Bok lavy`
   (žiadna skratka) a s dielcom skrinky sa nikdy nespojí do `Bok LP`. Pôvod nesie riadok kusovníka v aditívnom kľúči `free_names` (`Bom.aggregate_rows`), lebo riadok môže byť
   zliatok dosky a dielca skrinky. Ak ten istý reťazec prispela doska **aj** skrinka, platí konzervatívna cesta: pass-through bez skratky a bez páru.

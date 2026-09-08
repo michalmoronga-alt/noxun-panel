@@ -510,6 +510,13 @@ a export by nahlásil poznámku o inej ABS, ktorá tam nie je. **Pozor na rozdie
 neznámy tvar ID sa nezahadzuje, ide celý a až za nimi). `append_owners` drží `NAME_MAX = 60`: skrinky pridáva, kým sa zmestia, nezmestené zhrnie ` +K` — **nikdy odseknutá
 skratka v polovici**; keď je nad limit už samotná časť s názvami, platí pôvodný orez s `…`. Platí **len pre VEPO** — kusovník Štúdia nesie plné názvy.
 
+**Dielce zásuvky (D-121a, v0.9.45).** Skratky pokrývajú aj vyrábané dielce zásuvky: `Dno zasuvky N`→`Zas dno N` · `Chrbat zasuvky N`→`Zas chrb N` ·
+`Vnutorne celo zasuvky N`→`Zas predok N` · `Bok boxu lavy/pravy N`→`Zas bok L/P N`; dva boky boxu **tej istej** zásuvky sa v riadku združia na `Zas bok LP N`
+**tým istým mechanizmom ako dvierka** (`box_side_pairs` + `merge_pair`, teda výhradne tokeny zo skratky generovaného názvu — voľný názov dosky sa nepáruje).
+`N` je **číslo čela** z `construction.rb` (poradie v `front_items`, rovnaké ako `Zasuvkove celo N`). **Legacy** názov — zákazka postavená pred D-121a nesie
+namiesto čísla interné id čela (`Dno zasuvky Fmslwqdm2-9-464wsa`) — dostane tvar **bez čísla** (`Zas dno s1`): id človeku nič nepovie, tak sa do skratky
+neprenáša (`num_suffix` berie len čisto číselný token). Kontrakt ostáva **v1.1** — `NAME_MAX = 60` sa nemení; skrátenie limitu na 20 rieši D-121b.
+
 **Voľné názvy dosiek sa neskracujú ani nepárujú (GH #287 P2).** Názov samostatnej dosky je **voľný text používateľa**, nie názov z buildera — tabuľka skratiek naň nesmie siahnuť
 (doska `Bok lavy` nie je bok skrinky) a nesmie sa spárovať s dielcom skrinky do klamlivého `Bok LP`. Pôvod nesie riadok v aditívnom kľúči **`free_names`** z `Bom.aggregate_rows`
 (riadok môže byť zliatok dosky a dielca skrinky, takže samotné `names` pôvod nepovedia); `join_names` drží pri každom tokene príznak „voľný" a páruje výhradne tokeny zo skratky
@@ -519,7 +526,8 @@ generovaného názvu. Keď ten istý reťazec prispela doska **aj** skrinka, pla
 súborov, kódy hrán, obchodné hrúbky ani sekcia KONTROLA sa nemenia. Poradie oddielov LOGu: skupiny → vyradené riadky → **Poznámky pre VEPO** → KONTROLA.
 
 **Testy:** `tests/pure/test_vepo_export.rb` (bajtové vzorky vrátane zlatej — jediný „schválený" obraz formátu, mení sa VÝHRADNE samostatným commitom s dôvodom),
-`tests/pure/test_d112_d113_vepo.rb` (správanie poznámky, skratiek a orezu + mapy dekorov nad sandbox katalógom), in-SU `run_k1` (rotácia dekoru v reálnom CSV).
+`tests/pure/test_d112_d113_vepo.rb` (správanie poznámky, skratiek a orezu + mapy dekorov nad sandbox katalógom), `tests/pure/test_d121_vepo_nazvy.rb`
+(čísla čiel v pláne, skratky dielcov zásuvky, legacy id, párovanie bokov boxu), in-SU `run_k1` (rotácia dekoru v reálnom CSV).
 
 ### cp_export.rb
 

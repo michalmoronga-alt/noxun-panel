@@ -54,9 +54,11 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   20 znakov** — pred odoslaním sa musia riadky ručne prepisovať (D-113 to riešila len pre korpusové dielce). „Aj niektoré iné dielce po poslednej zmene" — preveriť všetky
   názvy, ktoré KOV-C/D pridali (dno, chrbát, boky zásuvky, sync tyč…). Riešenie: **generované názvy dielcov ≤ 20 znakov** (guard nad GENEROVANÝMI názvami; voľné názvy dosiek ostávajú pass-through s `NAME_MAX` 60 podľa kontraktu
   v1.1 — `test_d112_d113_vepo.rb` ich chráni) + ľudské názvy odvodených dielcov (`Zas dno s1`, `Zas chrb s1`…; číslo zásuvky/čela namiesto id — `PartKeys.human_label` D-92 vzor) aj v kusovníku a LOGu.
-  *Stav: OTVORENÉ — **fix dávka pre implementačné okno (KOVANIE)** hneď, nečaká na koniec bloku; audit NIE, kým sa mení len generovanie názvov (kontrakt v1.1 nedotknutý). **Otázka na Michala (Codex #322 P2):** VEPO import podľa teba 6.9. „vyhadzuje chybu
-  pri poli nad 20 znakov" — kontrakt v1.1 (POJMY) doteraz hovoril, že 20 znakov je len TLAČ nálepky a CSV pole nesie do 60. Ak import naozaj odmieta, je to **revízia kontraktu**
-  (NAME_MAX, voľné názvy) = samostatná kontraktová dávka s auditom, nie súčasť tohto fixu.*
+  *Stav: **(a) ľudské názvy + skratky HOTOVÉ — PR #324, v0.9.45**: dielce zásuvky nesú číslo čela (`Dno zasuvky 2`) v modeli aj v kusovníku a VEPO ich skracuje
+  (`Zas dno 2 s1`, dvojica bokov `Zas bok LP 2 s1`); zákazka postavená pred fixom má v názve ešte id čela a dostane krátky tvar bez čísla (`Zas dno s1`) až do prestavby
+  skrinky. **(b) kontrakt v1.2 (`NAME_MAX` 20) = nasledujúca dávka s auditom** — Michal 7.9.2026 potvrdil, že **VEPO import pole nad 20 znakov ODMIETA** (kontrakt v1.1 doteraz
+  hovoril, že 20 znakov je len TLAČ nálepky a CSV pole nesie do 60), takže ide o revíziu kontraktu: `NAME_MAX`, orez skriniek, voľné názvy dosiek a zlúčenie čísel
+  (`Zas dno 1/2` namiesto `Zas dno 1/Zas dno 2`). **D-121 ostáva OTVORENÉ**, kým (b) nie je v maine.*
 - **D-122 · Kontrola hlási každý UNI dielec zvlášť** (Michal 6.9., zákazka KLINIKA) — Štúdio → Kontrola ukazuje pri UNI farbách **každý dielec ako upozornenie**; pri tvorbe
   je prirodzené, že dielce ostávajú UNI, kým sa nezvolia materiály. Želanie: **jedno upozornenie „použité nenahradené UNI farby"** a pod ním zoskupené dotknuté dielce (rozklik).
   *Stav: OTVORENÉ — V1, malá UI dávka v sekcii Kontrola (zoskupenie nálezov podľa príčiny; semafor ostáva ORANGE, neblokuje).*

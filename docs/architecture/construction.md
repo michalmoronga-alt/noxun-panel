@@ -39,6 +39,12 @@ prázdna, číselná, objektová aj `null` hodnota je **poškodený pin**, nie c
 **zachová**. Prázdny reťazec je platný uložený stav „pin tu je, ale je poškodený" a veta konfliktu ho pomenuje ako „bez čitateľnej hodnoty", nie prázdnymi úvodzovkami.
 Výstup je **atomický**: buď všetky dielce + jedna položka výsuvu, alebo nič a záznam v `plan[:drawer_conflicts]`. Dielce sa pripájajú **za** partition degenerovaných —
 ich minimá stráži recept sám (jediný neplatný rozmer = `drawer_no_fit` pre celú zásuvku, nikdy per-dielec `part_skipped_degenerate`).
+**D-121a (v0.9.45): názvy dielcov zásuvky nesú ČÍSLO ČELA, nie id.** `Dno zasuvky 2`, `Chrbat zasuvky 2`, `Vnutorne celo zasuvky 2`, `Bok boxu lavy/pravy 2` — číslo je
+**poradie v `front_items`** (`idx = i + 1` v `drawer_pass`, riadok typu `none` číslo drží a nič sa nepreskakuje), teda **to isté číslo**, aké dáva `Fronts.panels_for`
+(„Zasuvkove celo N") aj `PartKeys.front_no`. Predtým názov niesol interné id čela a išlo to až do VEPO (`Dno zasuvky Fmslwqdm2-9-464wsa`). **Identita dielca na názve
+NEZÁVISÍ** — `suffix` (`DRWBOT-<front_id>-<n>`, recyklácia SketchUp definície + `part_id`) aj `part_key` (overridy, kovanie) stoja ďalej na `front_id`, takže zmena názvu
+nespôsobí prestavbu ani stratu ručných zásahov. Zákazka postavená **pred** D-121a nesie id v názve až do najbližšej prestavby skrinky; VEPO jej dá krátky tvar bez čísla
+(viď [outputs.md](outputs.md), `vepo_export.rb`).
 **KOV-D3a (v0.9.39): konflikt receptu je DÁTA, nie výnimka** — `merge_final` ho uloží do configu a `rebuild` operáciu **commitne**. Preto sa zmena pripnutej verzie nikdy
 nerobí „skús a vráť späť", ale **preflightom pred zápisom** (viď `handle_upgrade_drawer_recipe` v [ui-lifecycle.md](ui-lifecycle.md)).
 
