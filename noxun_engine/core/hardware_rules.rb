@@ -72,10 +72,19 @@ require 'digest' # ŠT-3b-2c2: odtlacok pravidiel (vzor HardwareCatalog.record_r
 module Noxun
   module Engine
     module HardwareRules
-      STD          = 1 # verzia formatu suboru pravidiel (doc: std/seed_version/rules)
-      SEED_VERSION = 3 # v2 (D1): +zavesenie hornej skrinky, +podperky policove,
+      # KOV-F1: std 2 = pravidlo `bands` smie niest VOLITELNE door guardy
+      # (`finite`, `width_plus`, `width_warn_over`, `weight_bands`). Starsi
+      # plugin (std 1) ich `normalize_rules` ZACHOVA a `compute` IGNORUJE —
+      # rata podla tabulky bez +1 a bez varovani, NIKDY nulu (preto ostava aj
+      # catch-all pasmo). Marker chrani opacny smer: dokument z NOVSIEHO
+      # pluginu (std > STD) sa uz len CITA a zapisy sa odmietnu s hlaskou —
+      # inak by nase `normalize_rules` ticho zahodilo pole, ktoremu nerozumie,
+      # a prvy zapis by stratu zvecnil (vzor `HardwareSets` STD_SUPPORTED).
+      STD          = 2 # verzia formatu suboru pravidiel (doc: std/seed_version/rules)
+      SEED_VERSION = 4 # v2 (D1): +zavesenie hornej skrinky, +podperky policove,
                        # seria vysuvov zladena s realnym radom Atira (GH #125 P2)
                        # v3 (D-90): +uchytkovy profil na dvierkach a zasuvkovych celach
+                       # v4 (KOV-F1): NOXUN tabulka zavesov + door guardy
       FILE         = 'hardware_rules.json'
       MODEL_KEY    = 'hardware_rules' # kluc snapshotu v NOXUN dict na modeli
 
@@ -96,19 +105,66 @@ module Noxun
       # DIELCU, nie korpusu.
       INPUT_WEIGHT = 'weight'
 
+      # === KOV-F1: VOLITELNE DOOR GUARDY PRAVIDLA `bands` =====================
+      #
+      # ZIADNY novy kind (Sol audit kolo 2 BLOCKER 1): starsi plugin by neznamy
+      # kind PRESKOCIL a dvierka by dostali NULA zavesov — a to aj pri NOVOM
+      # vlozeni skrinky, lebo citace pravidiel `std` ignoruju. Tabulka preto
+      # ostava `bands` a guardy su VOLITELNE kluce, ktore `normalize_rules`
+      # zachova a stary `compute` nevidi.
+      #
+      #   finite           true = catch-all pasmo znamena „MIMO tabulky":
+      #                    polozka SA VYDA s jeho poctom (riadok v Kovani musi
+      #                    existovat, inak nema kde vzniknut rucny zamok) a
+      #                    pribudne KONFLIKT `door_height_out_of_table` (RED).
+      #                    Bez `finite` je catch-all obycajne pasmo (dnesok).
+      #   width_plus       { 'over' => mm, 'add' => ks } — sirsie kridlo nez
+      #                    `over` dostane +`add` zavesov (bez podmienky vysky).
+      #   width_warn_over  mm — sirsie kridlo = ORANGE `door_wide` (pocet NEMENI)
+      #   weight_bands     Hettich hmotnostne pasma (kg -> ks). Vo V1 LEN VARUJU
+      #                    (Michal 8.9.2026): ked pasmo chce viac nez VYSLEDNY
+      #                    pocet, pribudne ORANGE — pocet sa nemeni.
+      DOOR_GUARD_KEYS = %w[finite width_plus width_warn_over weight_bands].freeze
+
+      # KOV-F1: kod KONFLIKTU „dvierka su nad tabulkou". Retazec je autorita
+      # tohto modulu; register brany (`BuildPlan::HW_BLOCKERS`) aj hlaska
+      # Kontroly ho len citaju.
+      DOOR_OUT_OF_TABLE = 'door_height_out_of_table'
+
       SEED_RULES = [
         { 'rule_id' => 'nohy-zakladne', 'enabled' => true,
           'applies_to' => { 'role' => 'cabinet', 'support' => %w[legs plinth] },
           'output' => 'leg', 'kind' => 'fixed', 'quantity' => 4,
           'params_from_context' => { 'height' => 'floor_height' } },
+        # KOV-F1: NOXUN tabulka poctu zavesov (Michal 8.9.2026) — plati pre
+        # vsetkych vyrobcov, set rozhoduje LEN o produkte. Vysky su Hettich
+        # pasma so SPRISNENYM prvym (od 850 uz 3: dvere tej vysky sa na dvoch
+        # zavesoch zle nastavuju). Catch-all `nil -> 7` OSTAVA kvoli STARYM
+        # citacom (dvere nad 2800 dostanu 7, nikdy nic); pre novy citac ho
+        # `finite` meni na „mimo tabulky" (polozka + RED).
         { 'rule_id' => 'zavesy-podla-vysky', 'enabled' => true,
           'applies_to' => { 'role' => 'front_door' },
           'output' => 'hinge', 'kind' => 'bands', 'input' => 'height',
           'bands' => [
-            { 'max' => 900.0,  'quantity' => 2 },
-            { 'max' => 1400.0, 'quantity' => 3 },
-            { 'max' => 1900.0, 'quantity' => 4 },
-            { 'max' => nil,    'quantity' => 5 }
+            { 'max' => 849.0,  'quantity' => 2 },
+            { 'max' => 1700.0, 'quantity' => 3 },
+            { 'max' => 2200.0, 'quantity' => 4 },
+            { 'max' => 2400.0, 'quantity' => 5 },
+            { 'max' => 2600.0, 'quantity' => 6 },
+            { 'max' => 2800.0, 'quantity' => 7 },
+            { 'max' => nil,    'quantity' => 7 }
+          ],
+          'finite' => true,
+          'width_plus' => { 'over' => 600.0, 'add' => 1 },
+          'width_warn_over' => 800.0,
+          # Hettich (kod oficialnej kalkulacky hta.hettich.com, precitane
+          # 8.9.2026): <= 7,70 -> 2 · <= 13,70 -> 3 · <= 17,10 -> 4 ·
+          # <= 22,00 -> 5 · nad 22 kg „prekrocena maximalna hmotnost".
+          'weight_bands' => [
+            { 'max' => 7.7,  'quantity' => 2 },
+            { 'max' => 13.7, 'quantity' => 3 },
+            { 'max' => 17.1, 'quantity' => 4 },
+            { 'max' => 22.0, 'quantity' => 5 }
           ] },
         # Seria v2 = realny rad Hettich InnoTech Atira (GH #125 P2 — povodna
         # genericka seria mala 400/450 a NL 420 nikdy nevznikla, takze kluc
@@ -148,6 +204,18 @@ module Noxun
       # (vzor F8 katalogu: aktualizuje sa LEN preukazatelne nezmeneny riadok;
       # pouzivatelska uprava sa NIKDY neprepisuje). Porovnanie po normalize.
       LEGACY_SEED_SHAPES = {
+        # KOV-F1: v1..v3 tvar tabulky zavesov (900/1400/1900 -> 2/3/4/5).
+        'zavesy-podla-vysky' => [
+          { 'rule_id' => 'zavesy-podla-vysky', 'enabled' => true,
+            'applies_to' => { 'role' => 'front_door' },
+            'output' => 'hinge', 'kind' => 'bands', 'input' => 'height',
+            'bands' => [
+              { 'max' => 900.0,  'quantity' => 2 },
+              { 'max' => 1400.0, 'quantity' => 3 },
+              { 'max' => 1900.0, 'quantity' => 4 },
+              { 'max' => nil,    'quantity' => 5 }
+            ] }
+        ],
         'vysuvy-nl-podla-hlbky' => [
           { 'rule_id' => 'vysuvy-nl-podla-hlbky', 'enabled' => true,
             'applies_to' => { 'role' => 'drawer_front' },
@@ -203,11 +271,33 @@ module Noxun
       end
 
       # CISTE citanie + seed-merge BEZ zapisu -> [pravidla, changed].
+      #
+      # KOV-F1 (dopredna brana `std`): dokument z NOVSIEHO pluginu sa CITA
+      # (zakazka sa musi dat dokoncit), ale NIKDY sa doň nezapisuje ani sa
+      # nemerguje seed — `normalize_rules` je tolerantna a pole, ktoremu
+      # nerozumieme, by ticho zahodila; prvy zapis by stratu zvecnil.
       def read_rules
         doc = JsonFileStore.read(path, copy: false)
         rules = doc.is_a?(Hash) ? doc['rules'] : nil
         return [deep_copy(SEED_RULES), false] unless rules.is_a?(Array)
+        return [normalize_rules(rules), false] if doc_std_unsupported?(doc)
+
         merge_seed(normalize_rules(rules), doc['seed_version'].to_i)
+      end
+
+      # KOV-F1: je dokument (kniznica alebo projektovy snapshot) z NOVSEJ
+      # verzie formatu? JEDINA autorita otazky — pytaju sa jej obe citacie
+      # cesty aj obe zapisove. Chybajuci `std` = najstarsi format (1).
+      def doc_std_unsupported?(doc)
+        return false unless doc.is_a?(Hash)
+
+        doc.key?('std') && doc['std'].to_i > STD
+      end
+
+      # Hlaska pre zablokovany zapis (kniznica aj snapshot) — jedno znenie.
+      def std_block_reason(where)
+        "#{where} pravidiel kovania je z novšej verzie pluginu — číta sa len na " \
+          'čítanie, zápisy sú vypnuté (aktualizuj plugin)'
       end
 
       # R-08 (audit 1d #2/#10): seed-merge je READ-MODIFY-WRITE. Pod zamkom sa
@@ -246,8 +336,27 @@ module Noxun
         end
         have = {}
         refreshed.each { |r| have[r['rule_id']] = true }
-        missing = SEED_RULES.reject { |r| have[r['rule_id']] }
+        missing = seed_additions(refreshed, have)
         [refreshed + normalize_rules(missing), true]
+      end
+
+      # KOV-F1: ktore seed pravidla sa smu DOPLNIT. Chybajuce podla `rule_id`
+      # MINUS tie, ktorych vystup uz na tej istej role obsluhuje INE ZAPNUTE
+      # pravidlo (`OVERLAP_OUTPUT`): pouzivatel si zavesy premenoval alebo
+      # nahradil vlastnym pravidlom a doplnenie seedu by mu vyrobilo DVOJITY
+      # nakup. `evaluate` taky prekryv priznava ORANGE-om, doplnat ho nebudeme.
+      def seed_additions(existing, have)
+        taken = {}
+        Array(existing).each do |r|
+          next unless r.is_a?(Hash) && r['enabled'] != false
+          next unless r['output'].to_s == OVERLAP_OUTPUT
+
+          taken[(r['applies_to'] || {})['role'].to_s] = true
+        end
+        SEED_RULES.reject do |r|
+          have[r['rule_id']] ||
+            (r['output'].to_s == OVERLAP_OUTPUT && taken[(r['applies_to'] || {})['role'].to_s])
+        end
       end
 
       # Pravidlo je nezmeneny STARY seed? (porovnanie normalizovanych tvarov)
@@ -285,6 +394,7 @@ module Noxun
       def write(rules)
         with_catalog_lock do
           next false if degraded_write_blocked?
+          next false if newer_write_blocked?
 
           JsonFileStore.write(path, { 'std' => STD, 'seed_version' => SEED_VERSION,
                                       'rules' => normalize_rules(rules) })
@@ -315,6 +425,30 @@ module Noxun
                               "vypnuté (oprav alebo zmaž súbor #{path})"
         # Log LEN pri ZMENE stavu — seed-merge sa o zapis pokusa pri kazdom
         # nacitani, takze bezpodmienecny zapis by zaplavil Ruby konzolu.
+        if prev.to_s != @write_block_reason && defined?(Engine)
+          Engine.log("hardware rules: zapis odmietnuty — #{@write_block_reason}")
+        end
+        true
+      end
+
+      # KOV-F1: DRUHA zapisova brana — kniznica z NOVSIEHO pluginu. Vyhodnocuje
+      # sa POD ZAMKOM nad cerstvym stavom suboru (rovnako ako degradovany
+      # subor) a `@write_block_reason` LEN doplna: ked uz blokovala degradacia,
+      # sem sa vobec nedojde.
+      def newer_write_blocked?
+        # POSKODENY subor sem NEPATRI: `JsonFileStore.read` nad nim vyhodi
+        # ParserError a jeho vlastnu branu drzi `degraded_write_blocked?`
+        # (a bez zalohy sa dnes prvym zapisom SAMOOPRAVI — R-11). Neprecitatelny
+        # dokument teda NIE JE „z novsej verzie".
+        doc = begin
+          JsonFileStore.read(path, copy: false)
+        rescue StandardError
+          nil
+        end
+        return false unless doc_std_unsupported?(doc)
+
+        prev = @write_block_reason
+        @write_block_reason = std_block_reason('Globálna knižnica')
         if prev.to_s != @write_block_reason && defined?(Engine)
           Engine.log("hardware rules: zapis odmietnuty — #{@write_block_reason}")
         end
@@ -386,7 +520,7 @@ module Noxun
         end
         have = {}
         refreshed.each { |r| have[r['rule_id']] = true }
-        missing = SEED_RULES.reject { |r| have[r['rule_id']] }
+        missing = seed_additions(refreshed, have)
         [refreshed + normalize_rules(missing), missing.map { |r| r['rule_id'] }, refreshed_ids]
       end
 
@@ -398,9 +532,27 @@ module Noxun
         SEED_RULES.select { |r| r['kind'] == KIND_PROFILE }.map { |r| r['rule_id'] }
       end
 
+      # KOV-F1: je PROJEKTOVY snapshot z novsej verzie formatu? Citanie
+      # (`project_rules`) ho pusta dalej — stavba musi bezat — ale zapis sa
+      # odmietne, aby sa nezvecnila strata poli, ktorym nerozumieme.
+      def project_std_unsupported?(model)
+        return false unless model
+
+        raw = model.get_attribute(Store::DICT, MODEL_KEY)
+        return false if raw.nil? || raw.to_s.strip.empty?
+
+        doc_std_unsupported?(JSON.parse(raw.to_s))
+      rescue StandardError
+        false
+      end
+
       # Zapise projektovy snapshot (editor pravidiel / ensure). Volajuci drzi operaciu.
       def set_project_rules(model, rules)
         return false unless model
+        if project_std_unsupported?(model)
+          Engine.log("hardware rules: #{std_block_reason('Snapshot projektu')}") if defined?(Engine)
+          return false
+        end
         doc = { 'std' => STD, 'seed_version' => SEED_VERSION, 'rules' => normalize_rules(rules) }
         model.set_attribute(Store::DICT, MODEL_KEY, doc.to_json)
         true
@@ -426,10 +578,18 @@ module Noxun
       # JEDNYM info warningom na stavbu (nie na kazde celo).
       SLIDE_OUTPUT = 'slide'
 
+      # KOV-F1: typ kovania, pri ktorom je PREKRYV dvoch zapnutych pravidiel na
+      # tej istej role chyba, nie moznost. Dvoje zavesov na tych istych
+      # dvierkach = dvojity nakup a nikto by to nezbadal, preto sa uplatni PRVE
+      # v poradi a druhe sa PRIZNA (ORANGE). Uzko na `hinge` zamerne: dve
+      # uchytkove pravidla (`handle`) na jednej role su legitimny stav.
+      OVERLAP_OUTPUT = 'hinge'
+
       def evaluate(cfg, parts, ctx, rules:, suppress_slide_owners: {})
         items = []
         warnings = []
         seen_ids = {}
+        seen_overlap = {}
         suppress = suppress_slide_owners.is_a?(Hash) ? suppress_slide_owners : {}
         suppressed = [] # kluce ciel, na ktorych legacy pravidlo vysuvu nebezalo
         Array(rules).each do |rule|
@@ -452,6 +612,19 @@ module Noxun
                                                   'output' => rule['output'].to_s })
             next
           end
+          if rule['output'].to_s == OVERLAP_OUTPUT
+            role = (rule['applies_to'] || {})['role'].to_s
+            if seen_overlap[role]
+              warnings << BuildPlan.warning(
+                'hardware_rule_overlap',
+                "Pravidlo kovania '#{rid}' je druhé pravidlo závesov pre tú istú rolu — " \
+                "použije sa prvé („#{seen_overlap[role]}“). Vypni jedno z nich v Pravidlách kovania.",
+                data: { 'rule_id' => rid, 'used_rule_id' => seen_overlap[role], 'role' => role }
+              )
+              next
+            end
+            seen_overlap[role] = rid
+          end
           apply_rule(rule, cfg || {}, parts, ctx, items, warnings, suppress, suppressed)
         end
         warnings.concat(profile_rule_warnings(parts, rules))
@@ -463,7 +636,139 @@ module Noxun
             severity: 'info', data: { 'owners' => suppressed }
           )
         end
-        { items: apply_overrides(items, cfg[:hardware_overrides]), warnings: warnings }
+        final = apply_overrides(items, cfg[:hardware_overrides])
+        # KOV-F1: door guardy bezia AZ NAD VYSLEDNYMI polozkami — hmotnostna
+        # kontrola sa pyta na pocet PO rucnom zamku (Sol audit kolo 2) a
+        # konflikt „mimo tabulky" musi rucny zamok ZHASNUT (polozka po
+        # overridee nesie `source: 'manual'`).
+        guards = door_guards(final, parts, rules)
+        warnings.concat(guards[:warnings])
+        { items: final, warnings: warnings, conflicts: guards[:conflicts] }
+      end
+
+      # === KOV-F1: KONTROLY DVIEROK NAD VYSLEDNYMI POLOZKAMI ==================
+      #
+      # CISTA funkcia (ziadne IO). Vracia { warnings: [], conflicts: [] }:
+      #   * ORANGE varovania, ktore POCET NEMENIA (`door_wide`,
+      #     `door_wider_than_high`, `hinge_weight_more`, `hinge_weight_max`) —
+      #     a INFO `hinge_weight_unknown`, ked plan hmotnost nepozna,
+      #   * KONFLIKT `door_height_out_of_table` pre dvierka nad poslednym
+      #     pasmom pravidla s `finite`.
+      #
+      # PRECO AZ TU a nie v `compute`: `compute` bezi PRED `apply_overrides`,
+      # takze by hmotnostne pasmo porovnavalo s poctom z pravidla (nie s tym,
+      # co si pouzivatel zamkol) a konflikt by sa nedal zhasnut zamkom.
+      def door_guards(items, parts, rules)
+        by_rule = {}
+        Array(rules).each { |r| by_rule[r['rule_id'].to_s] = r if r.is_a?(Hash) }
+        by_owner = {}
+        Array(parts).each do |pd|
+          next unless pd.is_a?(Hash)
+
+          by_owner[PartKeys.for_descriptor(pd)] = pd
+        end
+        warnings = []
+        conflicts = []
+        Array(items).each do |it|
+          rule = by_rule[it['rule_id'].to_s]
+          next unless rule.is_a?(Hash) && rule['kind'].to_s == 'bands'
+          next unless DOOR_GUARD_KEYS.any? { |k| rule.key?(k) }
+
+          pd = by_owner[it['owner_part_key'].to_s]
+          next if pd.nil?
+
+          door_guard_warnings(rule, it, pd, warnings)
+          c = out_of_table_conflict(rule, it, pd)
+          conflicts << c if c
+        end
+        { warnings: warnings, conflicts: conflicts }
+      end
+
+      def door_guard_warnings(rule, it, pd, warnings)
+        owner = it['owner_part_key'].to_s
+        who = door_label(pd)
+        w = part_dim(pd, :width)
+        h = part_dim(pd, :length)
+        limit = rule['width_warn_over']
+        if limit.is_a?(Numeric) && w && w > limit.to_f
+          warnings << BuildPlan.warning(
+            'door_wide', "#{who}: šírka #{fmt_mm(w)} mm je nad odporúčaných #{fmt_mm(limit)} mm — " \
+                         'skontroluj závesy a uchytenie.',
+            part_key: owner, data: { 'width' => w, 'limit' => limit.to_f }
+          )
+        end
+        if w && h && w > h
+          warnings << BuildPlan.warning(
+            'door_wider_than_high',
+            "#{who}: šírka #{fmt_mm(w)} mm je väčšia než výška #{fmt_mm(h)} mm — nemá to byť výklop?",
+            part_key: owner, data: { 'width' => w, 'height' => h }
+          )
+        end
+        weight_guard_warnings(rule, it, pd, who, owner, warnings)
+      end
+
+      # Hmotnostne pasma Hettich. VO V1 LEN VARUJU (Michal 8.9.2026): pocet
+      # riadi tabulka vysok, hmotnost hovori „skontroluj". Prepnutie na
+      # automaticke +1 neskor nepotrebuje zmenu dat, len tejto vetvy.
+      def weight_guard_warnings(rule, it, pd, who, owner, warnings)
+        bands = rule['weight_bands']
+        return unless bands.is_a?(Array) && !bands.empty?
+
+        kg = pd[:weight_kg]
+        unless kg.is_a?(Numeric) && kg.to_f.finite?
+          warnings << BuildPlan.warning(
+            'hinge_weight_unknown', "#{who}: hmotnosť dvierok nie je známa — počet závesov je len podľa výšky.",
+            part_key: owner, severity: 'info', data: { 'rule_id' => rule['rule_id'].to_s }
+          )
+          return
+        end
+
+        kg = kg.to_f
+        band = bands.find { |b| b['max'].nil? || kg <= b['max'].to_f }
+        top = bands.reject { |b| b['max'].nil? }.map { |b| b['max'].to_f }.max
+        if band.nil?
+          warnings << BuildPlan.warning(
+            'hinge_weight_max',
+            "#{who}: hmotnosť #{fmt_mm(kg)} kg je nad maximom #{fmt_mm(top)} kg pre tento typ závesu — " \
+            'rozdeľ čelo alebo vyber iný záves.',
+            part_key: owner, data: { 'weight_kg' => kg, 'max_kg' => top }
+          )
+          return
+        end
+        want = clamp_qty(band['quantity']).to_i
+        return if want <= it['quantity'].to_i
+
+        warnings << BuildPlan.warning(
+          'hinge_weight_more',
+          "#{who}: pri hmotnosti #{fmt_mm(kg)} kg odporúča výrobca #{want} závesov, " \
+          "vyšlo #{it['quantity'].to_i} — skontroluj.",
+          part_key: owner, data: { 'weight_kg' => kg, 'want' => want, 'quantity' => it['quantity'].to_i }
+        )
+      end
+
+      # Dvierka NAD tabulkou: polozka uz existuje (s poctom catch-all pasma),
+      # takze v Kovani je riadok, na ktorom sa da pocet rucne zamknut — a prave
+      # ten zamok konflikt zhasina (`source: 'manual'`).
+      def out_of_table_conflict(rule, it, pd)
+        return nil unless rule['finite'] == true
+        return nil if it['source'].to_s == 'manual'
+
+        bands = Array(rule['bands'])
+        top = bands.reject { |b| b['max'].nil? }.map { |b| b['max'].to_f }.max
+        return nil if top.nil?
+
+        h = part_dim(pd, :length)
+        return nil if h.nil? || h <= top
+
+        { 'owner_part_key' => it['owner_part_key'].to_s, 'code' => DOOR_OUT_OF_TABLE,
+          'message' => "#{door_label(pd)}: výška #{fmt_mm(h)} mm je nad tabuľkou závesov " \
+                       "(posledné pásmo #{fmt_mm(top)} mm) — počet #{it['quantity'].to_i} je len " \
+                       'posledné pásmo. Zamkni počet ručne v Kovaní alebo rozdeľ čelo.' }
+      end
+
+      def door_label(pd)
+        name = pd.is_a?(Hash) ? pd[:name].to_s.strip : ''
+        name.empty? ? 'Dvierka' : "Dvierka „#{name}“"
       end
 
       # D-90 ORANGE `profile_rule_missing`: dielec MA uchytkovy profil, ale
@@ -565,7 +870,10 @@ module Noxun
                                           data: { 'rule_id' => rule['rule_id'].to_s, 'value' => v })
             return [nil, {}]
           end
-          [clamp_qty(band['quantity']), {}]
+          # KOV-F1: sirsie kridlo dostane +1 (guard z praxe, BEZ podmienky
+          # vysky — plati aj pre siroke nizke dvere). Bez kluca sa nic nemeni,
+          # takze stary tvar pravidla rata presne ako doteraz.
+          [clamp_qty(band['quantity'].to_i + width_plus_for(rule, pd)), {}]
         when 'fit_series'
           v = input_value(rule, ctx, pd, owner, warnings)
           return [nil, {}] if v.nil?
@@ -604,6 +912,27 @@ module Noxun
         end
       end
 
+      # KOV-F1: pripocitanie za SIRKU dielca (0 = pravidlo guard nema alebo
+      # dielec nie je dost siroky). Sirka = `pd[:prod][:width]`, teda pri
+      # dvierkach sirka KRIDLA (deskriptor `Fronts.box_desc`).
+      def width_plus_for(rule, pd)
+        wp = rule['width_plus']
+        return 0 unless wp.is_a?(Hash)
+
+        w = part_dim(pd, :width)
+        return 0 if w.nil? || w <= wp['over'].to_f
+
+        wp['add'].to_i
+      end
+
+      # Vyrobny rozmer dielca (Float) alebo nil. Jedno miesto — door guardy sa
+      # nesmu rozist s tym, co ratala `compute`.
+      def part_dim(pd, key)
+        prod = pd.is_a?(Hash) && pd[:prod].is_a?(Hash) ? pd[:prod] : nil
+        v = prod && prod[key]
+        v.is_a?(Numeric) && v.to_f.finite? ? v.to_f : nil
+      end
+
       # Hodnota vstupu: prod rozmery dielca (height/width cela) pred kontextom korpusu.
       # KOV-W: 'weight' = hmotnost dielca (kg) z anotacie planu. Ked plan bezal
       # BEZ hustot (stari volajuci), kluc na deskriptore nie je — vtedy plati
@@ -636,16 +965,39 @@ module Noxun
       # spadne do ORANGE namiesto hadania pasma.
       FRONT_ROLES = %w[front_door drawer_front flap cover_panel false_front].freeze
 
+      # KOV-F1: KLASIFIKACIA POLOZKY ZAVESU. Set sa vybera podla SPOSOBU
+      # OTVARANIA cela (Tip-On dvierka chcu P2O set s piestom), takze polozka
+      # musi otvaranie NIEST — expanzia si ho z modelu uz nema odkial vziat.
+      # Hodnota pochadza z anotacie planu (`Construction.annotate_front_modes!`,
+      # vzor KOV-W `weight_kg`); dielec bez nej je LEGACY celo a plati
+      # `classic` (rovnaky vyklad ako `Fronts`: chybajuci kluc = klasicke).
+      # `use_type` je DRUHA polovica klasifikacie — expanzia ju porovnava so
+      # setom (`door` set na dvierka), aby sa nikdy neobjednal zasuvkovy kit.
+      HINGE_OUTPUT   = 'hinge'
+      DOOR_USE_TYPE  = 'door'
+      DEFAULT_OPENING_MODE = 'classic'
+
       def part_params(rule, pd)
         # D-90: params dlzkoveho priznaku su odvodene z DIELCA — musia byt
         # autoritativne (params_from_context ich nikdy neprebije), preto sa
         # re-asertuju TU, v poslednom merge kroku. Jeden vypocet (flag_length_params).
         return flag_length_params(pd) if rule['kind'].to_s == KIND_PROFILE
+        return hinge_params(pd) if rule['output'].to_s == HINGE_OUTPUT
         return {} unless rule['output'].to_s == 'slide'
         return {} unless pd.is_a?(Hash) && FRONT_ROLES.include?(pd[:role].to_s)
         v = pd[:prod].is_a?(Hash) ? pd[:prod][:length] : nil
         return {} unless v.is_a?(Numeric) && v.to_f.finite? && v.to_f.positive?
         { 'front_height' => v.to_f.round(2) }
+      end
+
+      # Klasifikacia polozky zavesu. KORPUSOVA uroven (pd nil) ju nedostane —
+      # zaves bez dielca nema otvaranie, na ktore by sa dal vybrat set.
+      def hinge_params(pd)
+        return {} unless pd.is_a?(Hash)
+
+        om = pd[:opening_mode].to_s.strip
+        { 'use_type' => DOOR_USE_TYPE,
+          'opening_mode' => (om.empty? ? DEFAULT_OPENING_MODE : om) }
       end
 
       # D-90: params polozky dlzkoveho priznaku (uchytkovy profil).
@@ -797,11 +1149,17 @@ module Noxun
           r['kind'] = r['kind'].to_s.strip
           r['applies_to'] = r['applies_to'].is_a?(Hash) ? r['applies_to'] : {}
           r['quantity'] = clamp_qty(r['quantity']) || 1 if r.key?('quantity')
-          if r['bands'].is_a?(Array)
-            bands = r['bands'].select { |b| b.is_a?(Hash) && !clamp_qty(b['quantity']).nil? }
-                              .map { |b| { 'max' => (b['max'].nil? ? nil : b['max'].to_f),
-                                           'quantity' => clamp_qty(b['quantity']) } }
-            r['bands'] = bands.sort_by { |b| b['max'].nil? ? Float::INFINITY : b['max'] }
+          r['bands'] = normalize_bands(r['bands']) if r['bands'].is_a?(Array)
+          # KOV-F1: volitelne door guardy. Typovo sa OCISTIA (Float/Integer,
+          # pasma zoradene) a neplatny tvar sa ZAHODI — nikdy sa nehada.
+          # Starsi plugin ich `normalize_rules` NEPOZNA, ale ZACHOVA (vetva
+          # „nezname kluce" nizsie), takze prezuju aj jeho zapis.
+          r['finite'] = (r['finite'] == true) if r.key?('finite')
+          r['weight_bands'] = normalize_bands(r['weight_bands']) if r['weight_bands'].is_a?(Array)
+          normalize_width_plus!(r)
+          if r.key?('width_warn_over')
+            v = r['width_warn_over'].to_f
+            v.finite? && v.positive? ? r['width_warn_over'] = v : r.delete('width_warn_over')
           end
           if r['series'].is_a?(Array)
             r['series'] = r['series'].map(&:to_f).select(&:positive?).uniq.sort
@@ -809,6 +1167,33 @@ module Noxun
           r['clearance'] = r['clearance'].to_f if r.key?('clearance')
           r
         end
+      end
+
+      # Pasma (vyskove aj hmotnostne) v jednom tvare: neplatny pocet = pasmo
+      # von, `max` nil = „vsetko nad" a ide POSLEDNE.
+      def normalize_bands(raw)
+        bands = Array(raw).select { |b| b.is_a?(Hash) && !clamp_qty(b['quantity']).nil? }
+                          .map do |b|
+                            { 'max' => (b['max'].nil? ? nil : b['max'].to_f),
+                              'quantity' => clamp_qty(b['quantity']) }
+                          end
+        bands.sort_by { |b| b['max'].nil? ? Float::INFINITY : b['max'] }
+      end
+
+      # KOV-F1: `width_plus` je DVOJICA (od akej sirky, o kolko kusov) — polovicny
+      # ani nekladny tvar sa NEPOUZIJE (radsej ziadny guard nez hadanie).
+      def normalize_width_plus!(rule)
+        return rule unless rule.key?('width_plus')
+
+        wp = rule['width_plus']
+        over = wp.is_a?(Hash) ? wp['over'].to_f : 0.0
+        add  = wp.is_a?(Hash) ? clamp_qty(wp['add']) : nil
+        if add.nil? || !over.finite? || !over.positive?
+          rule.delete('width_plus')
+        else
+          rule['width_plus'] = { 'over' => over, 'add' => add }
+        end
+        rule
       end
 
       # --- odtlacok pravidiel (ŠT-3b-2c2) -------------------------------------

@@ -301,6 +301,28 @@
       ' · skriniek v modeli: ' + (RD_META.cabinets || 0);
   }
 
+  // KOV-F1: veta o voliteľných kontrolách pravidla `bands` (dvierka). Vracia
+  // null, keď pravidlo žiadnu nemá — starý tvar pravidla teda vyzerá presne
+  // ako doteraz. ČISTÁ funkcia (Node test).
+  function rdGuardHint(r){
+    if (!r || r.kind !== 'bands') return null;
+    var out = [];
+    var wp = r.width_plus;
+    if (wp && wp.over != null && wp.add != null){
+      out.push('šírka nad ' + wp.over + ' mm → +' + wp.add + ' ks');
+    }
+    if (r.width_warn_over != null) out.push('šírka nad ' + r.width_warn_over + ' mm → upozornenie');
+    var wb = r.weight_bands || [];
+    if (wb.length){
+      out.push('hmotnostné pásma (' + wb.map(function(b){
+        return (b.max == null ? 'viac' : b.max) + ' kg → ' + b.quantity;
+      }).join(' · ') + ') — len upozorňujú');
+    }
+    if (r.finite === true) out.push('nad poslednou hodnotou tabuľky = chyba na kontrolu');
+    if (!out.length) return null;
+    return 'Kontroly dvierok (zatiaľ len na čítanie): ' + out.join(' · ') + '.';
+  }
+
   function rdRender(){
     var line = rdEl('rdSrcLine');
     if (line) line.textContent = rdSrcLine();
@@ -326,6 +348,12 @@
         });
         html += '<div class="btnrow"><button class="ghostbtn" onclick="rdAddBand(this)">+ pásmo</button></div>';
         html += '</div>';
+        // KOV-F1: voliteľné kontroly dvierok (+1 nad šírku, varovania, hmotnostné
+        // pásma, „mimo tabuľky"). Zatiaľ LEN NA ČÍTANIE — editor prinesie F2;
+        // `rdCollectRules` pracuje na KÓPII pôvodného pravidla, takže polia
+        // uloženie prežijú aj bez formulára.
+        var guards = rdGuardHint(r);
+        if (guards) html += '<div class="hint">' + rdEsc(guards) + '</div>';
       } else if (r.kind === 'fit_series'){
         html += '<div class="rrow"><label>Rad dĺžok</label><input class="rseries" type="text" value="'+rdEsc((r.series||[]).join(', '))+'"><span class="unit">mm</span></div>';
         html += '<div class="rrow"><label>Rezerva</label><input class="rclr rnum" type="number" min="0" step="1" value="'+rdEsc(r.clearance!=null?r.clearance:10)+'"><span class="unit">mm</span></div>';
@@ -596,6 +624,8 @@
                        rdLabel: rdLabel, rdRoleDesc: rdRoleDesc,
                        rulesRenderBody: rulesRenderBody, rdApplyState: rdApplyState,
                        rdCollectRules: rdCollectRules, RD: RD,
+                       // KOV-F1: veta o voliteľných kontrolách dvierok (read-only do F2).
+                       rdGuardHint: rdGuardHint,
                        // ŠT-3b-2a: read-only bloky — `rdOvrHtml`/`rdAbsRulesHtml` su
                        // ciste funkcie (kontrola escapovania a stropu zoznamu),
                        // `rdRenderExtra` + `rdSelectOverride` potrebuju DOM a
