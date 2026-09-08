@@ -125,4 +125,5 @@ Rozhodnutia Michala k zvyšku V1 (čo je vo V1, čo mimo, v akom tvare). Sú to 
 - [V1_DEBATA_2026-09-06_MR_VZHLAD.md](V1_DEBATA_2026-09-06_MR_VZHLAD.md) — nahrádza M-R FOTO: ručné textúry, `.skm`, orientácia, PBR cez editor SketchUpu; API overené v SU 26.0.
 - [V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md](V1_DEBATA_2026-09-06_KONTROLA_VYROBA.md) — D-95 preč, stráž kolízií a EN DANIELI mimo V1, nárezový plán primitívny do V1, D-122/123/124.
 - [V1_DEBATA_2026-09-06_DROBNE_DLHY.md](V1_DEBATA_2026-09-06_DROBNE_DLHY.md) — D-106, D-10 mimo V1; D-51 uzavreté; stav hmotnosti a hustoty.
-- Návrhy mechanizmov vyčlenené do vlastného PR (pravidlo 3 kôl): `SYNC_KNIZNICE_NAVRH_2026-09-06.md` (zdieľanie knižníc) a `NAREZ_PLAN_NAVRH_2026-09-06.md` (nárezový plán).
+- [SYNC_KNIZNICE_NAVRH_2026-09-06.md](SYNC_KNIZNICE_NAVRH_2026-09-06.md) — mechanizmus Odoslať/Aktualizovať (nemenné artefakty + manifest, kolízie bez CAS, záväzný zoznam store-ov), rezy SYNC-1..3; nálezy Codex #322 kôl 1–3 zapracované.
+- [NAREZ_PLAN_NAVRH_2026-09-06.md](NAREZ_PLAN_NAVRH_2026-09-06.md) — návrh NP-1/NP-2 (vstup vrátane rozvinutia duplákov, politika otáčania, horná hranica, napojenie rozpočtu).
