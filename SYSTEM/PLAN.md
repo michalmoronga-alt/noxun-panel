@@ -641,9 +641,10 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   **PR #287, v0.9.22.**
 - ✅ **D-113 · Krátky popis korpusu v názvoch dielcov** — názov riadku vo VEPO CSV a LOGu nesie skratku dielca a skrinky (`Bok LP s1 s2`); riadok sa **nerozpadá per skrinka**
   (nálepky VEPO tlačia ~20 znakov, agregácia kusovníka ostáva). Kusovník Štúdia má ďalej plné názvy. **PR #287, v0.9.22.**
-- **D-121 · Názvy odvodených dielcov zásuviek sú pre VEPO pridlhé** — **(a) ✅ PR #324, v0.9.45:** dielce zásuvky nesú ČÍSLO čela (`Dno zasuvky 2`) v modeli aj v kusovníku,
-  VEPO ich skracuje (`Zas dno 2 s1`, dvojica bokov `Zas bok LP 2 s1`); staré zákazky dostanú tvar bez čísla, kým sa skrinka neprestaví. **(b) ĎALEJ:** kontrakt VEPO **v1.2**
-  (`NAME_MAX` 20 — Michal 7.9.2026 potvrdil, že import pole nad 20 znakov odmieta) + zlúčenie čísel v riadku = samostatná dávka **s auditom**. Plné znenie v [DOGFOODING.md](DOGFOODING.md).
+- ✅ **D-121 · Názvy odvodených dielcov zásuviek sú pre VEPO pridlhé** — **(a) PR #324, v0.9.45:** dielce zásuvky nesú ČÍSLO čela (`Dno zasuvky 2`) v modeli aj v kusovníku,
+  VEPO ich skracuje (`Zas dno 2 s1`, dvojica bokov `Zas bok LP 2 s1`); staré zákazky dostanú tvar bez čísla, kým sa skrinka neprestaví. **(b) PR #325, v0.9.46:** kontrakt VEPO
+  **v1.2** — názov riadku má VŽDY ≤ 20 znakov (import objednávky dlhšie pole odmieta): zlúčenie číslovaných tokenov (`Polica 1 2 3`), deterministický orez po celých slovách
+  bez výpustky a priznanie orezu (ORANGE nález Kontroly `name_long` + oddiel LOGu „Skrátené názvy"). Plný text v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).
 - **D-122 · Kontrola zoskupí UNI dielce** — jedno upozornenie „nenahradené UNI farby" s rozklikom namiesto riadku per dielec (Michal 6.9.2026).
 - **Nárezový plán fáza 2 — PRIMITÍVNY, V1 rozsah (rozhodnuté 6.9.2026):** dnes je počet platní len odhad z m² (D-19, koeficient 10–25 %); po primitívnom pláne máme **hornú hranicu počtu platní podľa zvoleného rozloženia** (deterministická heuristika, nie optimum — iné rozloženie môže
   vyjsť lepšie) a vidíme, keď 1 dielec vychádza na celú platňu. Guillotine heuristika v čistom Ruby (OpenCutList je GPL — algoritmus áno, kód nie), smer dekoru, kerf,

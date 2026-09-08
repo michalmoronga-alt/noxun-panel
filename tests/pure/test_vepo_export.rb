@@ -214,7 +214,9 @@ NxTest.test('vepo: nazov riadku — join mien, orezanie, fallback dielec; label 
   NxTest.assert_equal('A/B', v.row_name('names' => %w[A B]))
   NxTest.assert_equal('dielec', v.row_name('names' => []))
   long = v.row_name('names' => ['X' * 100])
-  NxTest.assert(long.length <= 60)
+  # D-121b (kontrakt v1.2): limit je 20 a orez nema vypustku.
+  NxTest.assert(long.length <= 20, "#{long.length}: #{long}")
+  NxTest.refute(long.include?('…'), long)
   NxTest.assert_equal('NEZNAMY_ID', v.material_label('NEZNAMY_ID', NxVepo::MATS))
 end
 

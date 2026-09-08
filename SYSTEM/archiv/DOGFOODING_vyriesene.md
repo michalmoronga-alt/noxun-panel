@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-121** — Názvy dielcov zásuvky sú ľudské (`Zas dno 2 s1`) a názov riadku VEPO je vždy ≤ 20 znakov (kontrakt v1.2: zlučovanie čísel, orez po slovách s upozornením v Kontrole a LOGu) — vyriešené 8.9.2026, PR #324 + #325, v0.9.45 + v0.9.46
 - **D-95** — Režim krížovej kontroly „diel po diele" — **uzavreté bez implementácie 6.9.2026** (Michal: odškrtávanie ide preč natrvalo, ostáva vizuálna kontrola; presety/X-ray = koncept 01 v zásobníku), bez PR
 - **D-51** — Štandard veľkostí okien a tlačidiel — uzavreté 6.9.2026 rozhodnutím (Michal: veľkosť okien je OK; Inspector 470 × 810 z UI-B1, satelity zanikli v Štúdiu), bez PR
 - **D-118** — Katalóg kovania pozná kódy setov (114 položiek s cenou, URL a výrobcom), zásuvka antracit H70/470 objedná správnu K-sadu a Tip-On zásuvka aj PTOs modul — vyriešené 7.9.2026, PR #320 + #321, v0.9.43 + v0.9.44
@@ -105,6 +106,42 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-121 · Názvy odvodených dielcov zásuviek sú pre VEPO pridlhé a nič nehovoria (Michal 6.9.2026; vyriešené 8.9.2026 — PR #324 v0.9.45 + PR #325 v0.9.46)
+
+**Pôvodné znenie (presunuté z DOGFOODING.md):**
+
+**D-121 · Názvy odvodených dielcov zásuviek sú pre VEPO pridlhé a nič nehovoria** (Michal 6.9., objednávka po KOV-C; **VYSOKÁ PRIORITA — výrobný výstup**) — riadky
+vo VEPO exporte typu `Dno zasuvky Fmslwqdm2-9-464wsa` / `Dno zasuvky Fmslwqew7-a-u7mna2`: názov nesie **interné id čela** (`construction.rb`: `"Dno zasuvky #{front_id}"`,
+KOV-C2b) a `VepoExport.row_name` ho nemá v mape skratiek `SHORT_NAMES`, takže prejde celý. Dôsledky: (1) používateľovi id nič nehovorí, (2) **VEPO import odmieta polia nad
+20 znakov** — pred odoslaním sa musia riadky ručne prepisovať (D-113 to riešila len pre korpusové dielce). „Aj niektoré iné dielce po poslednej zmene" — preveriť všetky
+názvy, ktoré KOV-C/D pridali (dno, chrbát, boky zásuvky, sync tyč…). Riešenie: **generované názvy dielcov ≤ 20 znakov** + ľudské názvy odvodených dielcov
+(`Zas dno s1`, `Zas chrb s1`…; číslo zásuvky/čela namiesto id — `PartKeys.human_label` D-92 vzor) aj v kusovníku a LOGu.
+
+**Riešenie (a) — ľudské názvy a skratky (PR #324, v0.9.45, 8.9.2026).** Dielce zásuvky nesú v modeli aj v kusovníku **číslo čela** (`Dno zasuvky 2`, `Chrbat zasuvky 2`,
+`Vnutorne celo zasuvky 2`, `Bok boxu lavy/pravy 2`) — to isté číslo, aké má `Zasuvkove celo 2` (poradie v `front_items`; riadok „Bez čela" číslo drží). Vo VEPO CSV a LOGu
+pribudli skratky `Zas dno N` · `Zas chrb N` · `Zas predok N` · `Zas bok L/P N`, pričom **dva boky boxu jednej zásuvky** sa v riadku združia na `Zas bok LP N` — tým istým
+mechanizmom ako dvierka, teda výhradne z generovaných názvov (voľný názov dosky sa ďalej neskracuje ani nepáruje). **Identita dielca sa nedotkla** (`suffix` aj `part_key`
+stoja ďalej na id čela, takže premenovanie nespôsobí prestavbu ani stratu ručných zásahov). Zákazka postavená pred fixom má id v názve až do najbližšej prestavby skrinky a
+dostane krátky tvar **bez čísla** (`Zas dno s1`). Kontrakt ostal v1.1.
+
+**Riešenie (b) — kontrakt VEPO v1.2, názov riadku vždy ≤ 20 znakov (PR #325, v0.9.46, 8.9.2026).** Michal 7.9.2026 overil v praxi, že **import objednávky VEPO pole `nazov`
+nad 20 znakov ODMIETA** — kontrakt v1.1 pritom tvrdil, že 20 je len tlač nálepky a pole nesie 60 (`NAME_MAX = 60`). Išlo teda o **revíziu kontraktu**, nie o kozmetiku:
+`NAME_MAX = 20` je jediná autorita limitu (orez, vlastníci, Kontrola aj LOG ju čítajú odtiaľ). Tri mechanizmy: **zlúčenie číslovaných tokenov** v riadku
+(`Polica 1/Polica 2/Polica 3` → `Polica 1 2 3`, `Zas dno 1 2`, `Zas celo 1 2 3`) výhradne pre skratky generovaných názvov; **deterministický orez po hranici tokenu bez
+výpustky** (`Polica 2 3 4 5 6 7 10` → `Polica 2 3 4 5 6 7`, nikdy `…7 1`, čo by na štítku uvádzalo policu 1 namiesto 10); a **priznanie orezu** — oddiel LOGu
+„Skrátené názvy (N):" s plným aj skráteným tvarom, rozmermi, kusmi a vlastníkmi + ORANGE nález Kontroly `name_long` s presným tvarom, ktorý pôjde do objednávky.
+**Kontrola hodnotí agregované riadky, nie jednotlivé dosky** (`Bom.aggregate_rows` + `VepoExport.row_name_info`) — dve dosky s krátkym názvom môžu skončiť v jednom riadku
+a spoločný názov sa oreže. Vedomé obmedzenie: riadok, ktorému sa zmestil názov, ale nie skrinka, Kontrola nehlási (nie je to strata dielca) — je len v LOGu.
+Kusovník Štúdia, poznámka pre VEPO, kódy hrán, hrúbky, grouping ani názvy súborov sa nemenia; **zlatá vzorka CSV ostala nedotknutá**.
+
+**Audit (Astra, 8.9.2026, 4 nálezy, žiadny BLOCKER — všetky zapracované pred implementáciou):** (1) orez cez číslo dielca → orez po hranici tokenu + regresný test;
+(2) Kontrola per doska nezodpovedá CSV → hodnotenie agregovaných riadkov cez tú istú `row_name_info`; (3) LOG neadresuje kolízie skrátených názvov a `filename` sa priraďoval
+pred dedupom → záznamy per bucket, riadok s rozmermi/ks/vlastníkmi; (4) test povoľoval 60 znakov → sprísnený.
+
+**Testy:** nová sada `tests/pure/test_d121_vepo_nazvy.rb` (a) a `tests/pure/test_d121b_vepo_kontrakt.rb` (b, 24 scenárov + 6 overených mutácií); asercie limitu sprísnené
+v `test_d112_d113_vepo.rb` a `test_vepo_export.rb`. In-SU beh v žiadnej z oboch dávok nebežal — SketchUp bol obsadený živou zákazkou a zmena je výhradne reťazec názvu
+(žiadny builder, observer ani geometria).
 
 ### D-95 · Režim krížovej kontroly „diel po diele" (Michal 9.8.2026; uzavreté bez implementácie 6.9.2026 — rozhodnutie v debate V1, bez PR)
 

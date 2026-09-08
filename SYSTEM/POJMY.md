@@ -115,6 +115,11 @@
   (medzera → `_`). Na orientáciu v dielni je teda použiteľných ±20 znakov názvu z CSV a nič viac. Preto sú vo VEPO exporte **krátke názvy a skrinka hneď za názvom** (`Bok LP s1 s2`,
   D-113) — dlhý presný názov by sa aj tak neprepísal. Orez ďalších skriniek do ` +K` Michalovi nevadí: prvé dve-tri stačia na zorientovanie.
 
+- **Import VEPO odmieta názov nad 20 znakov (Michal 7.9.2026, overené v praxi — KLINIKA):** 20 znakov **nie je len tlač nálepky**, ale **tvrdá podmienka importu** objednávkového
+  CSV do webformulára — dlhší reťazec v poli `nazov` formulár neprijme a riadok sa musel pred odoslaním prepisovať ručne. Preto je od 8.9.2026 kontrakt **v1.2**: názov riadku
+  má VŽDY najviac 20 znakov (aj voľné názvy dosiek), skracuje sa deterministicky po celých slovách a plugin to prizná — Kontrola oranžovým nálezom, LOG oddielom
+  „Skrátené názvy". Predtým kontrakt v1.1 tvrdil, že pole nesie 60 znakov, čo bol omyl.
+
 - **Poznámka pre VEPO (Michal 3.9.2026):** objednávkový formulár VEPO má **pri každom riadku pole „Poznámka pre VEPO"** — sem sa píše, čo tabuľka sama nepovie (typicky *páska v inom
   dekore, než je doska*). Poznámka **nejde na nálepku** a nemá 20-znakový limit (overené importom: 31 znakov prešlo celých). Import 9-stĺpcového CSV VEPO **prijal** a poznámku pri
   riadku zobrazil — preto ju od v0.9.22 posiela plugin sám (D-112), namiesto ručného dopisovania pri zadávaní objednávky.

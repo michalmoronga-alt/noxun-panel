@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.9.44 · 7.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.9.46 · 8.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -22,7 +22,7 @@ a rád (`core/hardware_taxonomy.rb`) a vytiahla katalóg aj editor setu na obraz
 **Pozor na kompatibilitu:** čo uloží v0.9.20, to **v0.9.18 už nepoužije** — model/šablóna (`CONFIG_SCHEMA` 4 + brána `assess_set_defs`), knižnica setov aj projektový snapshot
 (`std` 3) a katalóg kovania s výrobcom (`schema` 2). Pred prvou takou zákazkou aktualizovať **obe PC** (D-52 updater).
 
-**Testy k v0.9.44:** **3364 headless** · 94 JS sád · posledný plný in-SketchUp beh **1950 PASS** (nad vetvou KOV-D5, 7.9.; sekcie `run_kovd2a` … `run_kovd5` bežali; nestabilný test = D-117).
+**Testy k v0.9.46:** **3401 headless** · 95 JS sád · posledný plný in-SketchUp beh **1965 PASS** (D-118b, 7.9.; nestabilný test = D-117).
 
 ## Robí sa
 
@@ -37,20 +37,21 @@ D4 (0.9.41) · D5 (0.9.42); 8 PR za deň (#310–#317). Blok KOVANIE pokračuje 
 
 ## Ďalší krok
 
-**Poradie:** ~~D-52~~ → ~~KOV-A~~ → ~~KOV-H~~ → ~~KOV-B~~ → ~~KOV-C~~ → ~~KOV-D~~ (všetko v maine, D1a–D5) → ~~D-118~~ (katalógový seed + sety, a aj b) → **E/F/G/I** (poradie určí Michal; package pred štartom); súbežne 1d podľa kapacity.
+**Poradie:** ~~D-52~~ → ~~KOV-A~~ → ~~KOV-H~~ → ~~KOV-B~~ → ~~KOV-C~~ → ~~KOV-D~~ (všetko v maine, D1a–D5) → ~~D-118~~ (katalógový seed + sety, a aj b) → ~~D-121~~ (názvy dielcov zásuvky + VEPO kontrakt v1.2) → **E/F/G/I** (poradie určí Michal; package pred štartom); súbežne 1d podľa kapacity.
 Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` → subagent vo worktree → `codex-po-pr` → merge → uzáver. V1 checklist v [V1_VIZIA.md](V1_VIZIA.md).
 
 ## Posledné uzávery
 
-- **D-118b — ZÁSUVKA OBJEDNÁ SPRÁVNU SADU A TIP-ON AJ MECHANIZMUS** (v0.9.44, 7.9.2026): antracitová zásuvka H70 s NL 470 objedná **`357889`** namiesto `348777` (ten
-  **nie je K-sada** — čelné kovanie treba dokúpiť), a **každá Tip-On zásuvka** dostane k sade aj **PTOs modul** `352908` (30 kg) / `352909` (50 kg), 28,33 € s DPH — doteraz
-  chýbal, lebo v K-sade nie je. Kity typu `PTO` (620 mm, Quadro V6) ho **vedome nedostanú**. Oprava sa dostane aj do knižnice na disku, ak si ju človek sám neupravil;
-  **rozpracované zákazky sa nemenia samy** — do nich ju prenesie **„Doplniť nové predvoľby"** (od tejto dávky aj osvieži nedotknuté definície a povie, koľko ich bolo).
-  [KRONIKA](archiv/KRONIKA.md).
-- **D-118a — KATALÓG KOVANIA UŽ POZNÁ KÓDY, KTORÉ SI PLUGIN SÁM OBJEDNÁVA** (v0.9.43, 7.9.2026): katalóg má **114 položiek** a pri každej **presný názov z Démosu, cenu s DPH,
-  odkaz na stránku, dátum overenia, výrobcu a radu** — doteraz boli kódy receptových setov v Nákupe „bez ceny". Dáta sú overené proti produktovej stránke tým istým parserom,
-  akým beží „Overiť cenu". **Používateľské položky sa neprepisujú** (na tomto PC 11 vlastných + 13 doplnených riadkov), štyri zrušené kódy ostávajú ako **neaktívne** s dôvodom.
-  Doplnením výrobcov sa katalóg označí ako novší — **staršia verzia pluginu ho otvorí len na čítanie**. [KRONIKA](archiv/KRONIKA.md).
+- **D-121 — DIELCE ZÁSUVKY MAJÚ ĽUDSKÉ NÁZVY A VEPO RIADOK MÁ VŽDY ≤ 20 ZNAKOV** (v0.9.45 + v0.9.46, 8.9.2026): dielce zásuvky už nenesú interné id čela, ale **jeho číslo**
+  (`Dno zasuvky 2` → vo VEPO `Zas dno 2 s1`, dvojica bokov `Zas bok LP 2 s1`). A hlavne: **objednávku netreba ručne prepisovať** — import VEPO pole nad 20 znakov odmieta,
+  tak sa rovnaké dielce s číslom zlúčia (`Polica 1 2 3` namiesto `Polica 1/Polica 2/Polica 3`) a keď sa názov aj tak nezmestí, skráti sa **predvídateľne po celých slovách**
+  (nikdy cez číslo dielca, bez výpustky). Plugin to povie: **Kontrola** ukáže oranžové upozornenie s tvarom, ktorý pôjde do objednávky, a **LOG** má oddiel „Skrátené názvy".
+  Staré zákazky dostanú tvar bez čísla, kým sa skrinka neprestaví. [KRONIKA](archiv/KRONIKA.md).
+- **D-118a + D-118b — KATALÓG POZNÁ KÓDY, KTORÉ SI PLUGIN SÁM OBJEDNÁVA, A ZÁSUVKA OBJEDNÁ SPRÁVNU SADU** (v0.9.43 + v0.9.44, 7.9.2026): katalóg kovania má **114 položiek**
+  s presným názvom z Démosu, cenou s DPH, odkazom, dátumom overenia, výrobcom a radou (dovtedy boli kódy receptových setov v Nákupe „bez ceny"); používateľské položky sa
+  neprepisujú, štyri zrušené kódy ostávajú neaktívne s dôvodom. Na to nadviazali sety: antracitová zásuvka H70/470 objedná **`357889`** namiesto `348777` (ten nie je K-sada)
+  a **každá Tip-On zásuvka** dostane k sade aj **PTOs modul** `352908`/`352909` (28,33 € s DPH); kity typu `PTO` ho vedome nedostanú. Rozpracované zákazky sa nemenia samy —
+  prenesie to **„Doplniť nové predvoľby"**. Doplnením výrobcov sa katalóg označí ako novší, takže **staršia verzia pluginu ho otvorí len na čítanie**. [KRONIKA](archiv/KRONIKA.md).
 - **KOV-D5 — ZÁSUVKA UŽ UKAZUJE OLEP NA SPRÁVNEJ HRANE** (v0.9.42, 7.9.2026): dielce zásuvky boli doteraz v modeli **jednofarebné** — páska sa na nich nekreslila vôbec.
   Odteraz má **chrbát, bok boxu aj vnútorné čelo** pásku vidieť na **hornej** hrane (presne tam, kam ide), **dno ostáva bez pásky** a **Kontrola olepov** zvýrazní **tú istú**
   hranu. Rozmery, kusovník, VEPO ani ceny sa nemenia; stará zákazka dostane farbu pri najbližšej prestavbe skrinky. [KRONIKA](archiv/KRONIKA.md).

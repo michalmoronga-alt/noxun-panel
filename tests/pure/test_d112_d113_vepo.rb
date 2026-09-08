@@ -313,7 +313,8 @@ NxTest.test('D-113: orez na NAME_MAX — " +K" namiesto odseknutej skratky') do
   v = NxD112.vepo
   kde = (1..30).map { |i| { 'owner_id' => format('CAB-%03d', i) } }
   name = v.row_name('names' => ['Bok lavy', 'Bok pravy'], 'kde' => kde)
-  NxTest.assert(name.length <= 60, "#{name.length}: #{name}")
+  # D-121b: kontrakt v1.2 — limit je 20 (import VEPO dlhsie pole odmieta).
+  NxTest.assert(name.length <= 20, "#{name.length}: #{name}")
   NxTest.assert(name.start_with?('Bok LP s1 s2 s3'), name)
   NxTest.assert(name =~ / \+\d+\z/, "koniec zhrnie nezmestene skrinky: #{name}")
   # ziadna skratka nie je rozseknuta v polovici
@@ -324,11 +325,12 @@ NxTest.test('D-113: orez na NAME_MAX — " +K" namiesto odseknutej skratky') do
   NxTest.assert_equal(30 - shown.length, name[/\+(\d+)\z/, 1].to_i)
 end
 
-NxTest.test('D-113: samotny nazov nad limit = dnesny orez s vypustkou, skrinky sa nepridavaju') do
+NxTest.test('D-113/D-121b: samotny nazov nad limit sa oreze na 20 BEZ vypustky, skrinky sa nepridavaju') do
   v = NxD112.vepo
   name = v.row_name('names' => ['X' * 100], 'kde' => [{ 'owner_id' => 'CAB-001' }])
-  NxTest.assert_equal(60, name.length)
-  NxTest.assert(name.end_with?('…'), name)
+  # v1.2: jedno dlhe slovo (volny nazov dosky) oddelovac nema — tvrdy rez na 20.
+  NxTest.assert_equal(20, name.length)
+  NxTest.refute(name.include?('…'), "vypustka minie znak z 20 a nalepka ju netlaci: #{name}")
   NxTest.refute(name.include?('s1'), 'na skrinky uz miesto nie je')
 end
 

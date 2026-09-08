@@ -105,6 +105,15 @@ module Noxun
       # Dielce v modeli OSTAVAJU, ale rezu na NL bez kitu tej NL sa nedaru —
       # preto blokuje VSETKY exporty VRATANE VEPO.
       CAT_DRAWER_KIT  = 'drawer_kit'
+      # ORANGE — D-121b (kontrakt VEPO v1.2): riadok objednavky, ktoreho nazov sa
+      # nezmestil do `VepoExport::NAME_MAX` a musel sa orezat. Neblokuje (dielec
+      # sa objedna spravne, len sa bude v dielni horsie hladat), ale MUSI byt
+      # vidiet — do v1.2 sa taky riadok prepisoval rucne pred odoslanim.
+      # Hodnotia sa AGREGOVANE RIADKY, nie jednotlive zaznamy: dve dosky s
+      # kratkym nazvom mozu skoncit v JEDNOM riadku a spolocny nazov sa oreze
+      # (audit Astra 8.9., nalez 2) — per zaznam by Kontrola mlcala, hoci CSV
+      # by nazov orezalo.
+      CAT_NAME_LONG   = 'name_long'
 
       # Druh top-level kusu, ktory MA KOVANIE. Zdielana konstanta preto, ze
       # „skrinka vs. doska" nie je kozmetika textu: len pri skrinke zliatie
@@ -187,6 +196,8 @@ module Noxun
           uni_parts["#{r['owner_id']}|#{r['part_key']}"] = true if uni_sheet?(s) || abs_impossible?(s)
         end
         Array(collected[:records]).each { |r| check_record(r, smap, emap, items) }
+        # D-121b: nad TYMI ISTYMI riadkami, ake pojdu do CSV (`Bom.aggregate_rows`).
+        check_name_lengths(collected[:records], emap, items)
         Array(collected[:hardware_overrides]).each { |ov| check_hardware(ov, items) }
         # KOV-D4: konflikt zasuvky posiela pouzivatela na RIADOK OSIROTENEHO
         # ZASAHU v Kovani — identitu toho riadku pozna len server (raw zoznam
@@ -303,6 +314,111 @@ module Noxun
 
         check_abs_catalog(r, edges_catalog, items) if edges_catalog
         check_abs(r, role, items, sheet)
+      end
+
+      # --- D-121b: nazov riadku VEPO nad limit ------------------------------
+      #
+      # ORANGE nad AGREGOVANYMI RIADKAMI, nie nad zaznamami. `Bom.aggregate_rows`
+      # je PRESNE ten krok, ktorym `Bom.compute` vyraba riadky pre
+      # `VepoExport.build`, a `VepoExport.row_name_info` je ta ista funkcia, ktora
+      # sklada nazov do CSV — takze Kontrola, LOG aj CSV hovoria JEDNO A TO ISTE.
+      # Per zaznam by to nefungovalo: dve dosky s 18-znakovym nazvom skoncia v
+      # jednom riadku, ich spolocny nazov ma 37 znakov a orezal by sa TICHO
+      # (audit Astra 8.9., nalez 2).
+      #
+      # Riadky pocitame VNUTRI `run` z `collected` — ziadny novy parameter, takze
+      # klik-resolve aj push_state v `production_core.rb` dostanu tie iste
+      # polozky (lekcia GH #127 P2: rozpad vstupov medzi klikom a pushom).
+      # `Bom` aj `VepoExport` su nacitane PRED `validation` (main.rb aj
+      # tests/helper.rb) — zavislost je zamerna, guard `defined?` sa nepouziva.
+      #
+      # Riadok, ktoremu sa nezmestila SKRINKA (nie nazov), sa TU nehlasi — nie je
+      # to strata dielca, len horsia orientacia; ostava v oddiele LOGu.
+      def check_name_lengths(records, edges_catalog, items)
+        Bom.aggregate_rows(name_check_records(records)).each do |row|
+          next unless exportable_row?(row, edges_catalog)
+
+          info = VepoExport.row_name_info(row)
+          items << name_long_item(row, info) if info['cut']
+        end
+      end
+
+      # Codex #325 kolo 1 (P2): riadok, ktory export VYRADI (bez materialu,
+      # nekladny rozmer, chybny pocet — `VepoExport.validate_row`; chybna hrubka
+      # — `commercial_thickness`; hrana s ABS mimo katalogu — `finished_dimensions`),
+      # do CSV nejde, takze nalez „pojde ako …" by klamal a nafukoval oranzove
+      # cislo. Kriteria su TIE ISTE ako v exporte (jeho vlastne funkcie, ziadna
+      # kopia). Bez mapy pasok (legacy volanie, headless bez katalogu) sa ABS
+      # neoveruje — Kontrola nesmie mlcat len preto, ze katalog nedostala.
+      def exportable_row?(row, edges_catalog)
+        return false if VepoExport.validate_row(row)
+        return false if VepoExport.commercial_thickness(row['thickness']).nil?
+        return true unless edges_catalog.is_a?(Hash)
+
+        e = row['edges'].is_a?(Hash) ? row['edges'] : {}
+        VepoExport::EDGE_CODES.all? do |code|
+          id = e[code]
+          id.nil? || id.to_s.empty? || edges_catalog.key?(id)
+        end
+      end
+
+      # `Bom.aggregate_rows` cita zaznam v tvare, aky dava `Bom.record` (mm Float,
+      # `edges` mapa, `quantity` Integer, `material_source` Hash alebo nic).
+      # Fixtury Kontroly a legacy volajuci niektore polia vynechavaju, preto sa
+      # doplnaju TU, na strane volajuceho — `Bom` sa kvoli Kontrole nemeni.
+      def name_check_records(records)
+        Array(records).filter_map do |r|
+          next unless r.is_a?(Hash)
+
+          out = r.merge(
+            # `quantity` ako `Bom.record` (vzdy >= 1) — fixtura bez pola nesmie
+            # skoncit ako „chybny pocet" a vypadnut z kontroly nazvov.
+            'name' => r['name'].to_s, 'quantity' => [r['quantity'].to_i, 1].max,
+            'owner_id' => r['owner_id'].to_s, 'part_key' => r['part_key'].to_s,
+            'material_id' => r['material_id'].to_s,
+            'grain_direction' => r['grain_direction'].to_s,
+            'length' => r['length'].to_f, 'width' => r['width'].to_f,
+            'thickness' => r['thickness'].to_f,
+            'edges' => (r['edges'].is_a?(Hash) ? r['edges'] : {})
+          )
+          out.delete('material_source') unless out['material_source'].is_a?(Hash)
+          out
+        end
+      end
+
+      # Jedna polozka na RIADOK. `part_key` je `nil` (riadok nie je jeden dielec),
+      # takze klik-select oznaci vlastnika — rovnako ako dnesne `build` nalezy bez
+      # kluca. Limit sa cita VYHRADNE z `VepoExport::NAME_MAX` — cislo sa v tomto
+      # subore NEOPAKUJE (kontrakt ma jednu autoritu; strazi to guard test).
+      def name_long_item(row, info)
+        full = info['full'].to_s
+        free = Array(row['free_names']).map(&:to_s).reject(&:empty?)
+        owners = Array(row['kde']).map { |k| (k.is_a?(Hash) ? k['owner_id'] : k).to_s.strip }
+                                  .reject(&:empty?).uniq
+        hint = if free.empty?
+                 "Sú to dielce skrinky #{owners.join(', ')}, názov sa skrátil po celých " \
+                 'slovách — plný tvar je v LOGu exportu.'
+               else
+                 "Skráť názov dosky (#{free.join(', ')})."
+               end
+        # Codex #325 kolo 1 (P2): ked hlaska posiela cloveka premenovat DOSKU,
+        # klik (oko/ceruzka) musi otvorit DOSKU — prvy vlastnik riadku moze byt
+        # skrinka (agregacia drzi poradie zaznamov a riadok byva zliatok oboch).
+        # Doska = `BRD-` (ta ista zasada ako `Bom.free_board_record?`).
+        target = owners.first
+        target = owners.find { |o| o.start_with?('BRD-') } || target unless free.empty?
+        { 'severity' => ORANGE, 'category' => CAT_NAME_LONG,
+          'owner_id' => target.to_s, 'part_key' => nil, 'hw_key' => nil,
+          'message_sk' => "Riadok VEPO „#{full}“ má #{full.length} znakov, VEPO prijme " \
+                          "najviac #{VepoExport::NAME_MAX} — v objednávke pôjde ako " \
+                          "„#{info['name']}“. #{hint}",
+          # Codex #325 kolo 1 (P2): identita nalezu = CELY vyrobny kluc riadku
+          # (`Bom.row_key`: rozmery, material, hrany, smer dekoru, vazba duplaku).
+          # Len nazov + rozmery by dva riadky s inou hranou alebo dekorom zliali
+          # v `dedup` do jedneho a druhy by sa ukazal az po oprave prveho. Kluc
+          # su cele cisla a retazce (ziadne Floaty), takze `inspect` je medzi
+          # behmi `run` bajtovo rovnaky.
+          'stable_key' => "#{CAT_NAME_LONG}|#{Array(row['key']).inspect}" }
       end
 
       # RED (2A-2, F6): hrana referencuje abs_id, ktore v aktualnom katalogu nie
