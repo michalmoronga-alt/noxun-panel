@@ -359,7 +359,8 @@ NxTest.test('KOV-D5: deskriptor zasuvky pribral LEN kluc `axes` (kusovnik/VEPO n
   # Vyrobne cisla ostavaju presne tie z KOV-C2b (dno 791,5 x 480 x 16).
   NxTest.assert_equal({ length: 791.5, width: 480.0, thickness: 16.0 },
                       bottom[:prod].transform_values { |v| v.to_f.round(2) })
-  NxTest.assert_equal('Dno zasuvky F1', bottom[:name])
+  # D-121a: nazov nesie CISLO cela (plan ma jedine celo = 1), `suffix` dalej id.
+  NxTest.assert_equal('Dno zasuvky 1', bottom[:name])
   NxTest.assert_equal('DRWBOT-F1-1', bottom[:suffix])
   # `axes` je udaj PLANU — do snapshotu na entite (a teda do kusovnika ani VEPO)
   # sa nezapisuje; `CabinetBuilder` ziadny kluc `axes` nepise a VEPO ho nepozna.

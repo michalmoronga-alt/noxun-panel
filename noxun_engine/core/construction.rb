@@ -163,9 +163,15 @@ module Noxun
                 suppress: {}, writes: [], override_writes: [] }
         return out unless defined?(Recipes)
 
-        Array(ctx_plan[:front_items]).each do |item|
+        # D-121a: `idx` (poradie v `front_items`, F1 = SPODNE) je CISLO CELA pre
+        # ludske nazvy dielcov — to iste, ake dava `Fronts.panels_for`
+        # („Zasuvkove celo N") aj `PartKeys.front_no`. Riadok typu 'none' v
+        # zozname OSTAVA a cislo drzi (nic sa nepreskakuje), inak by sa cislovanie
+        # rozislo s tym, co pouzivatel vidi v karte Cela.
+        Array(ctx_plan[:front_items]).each_with_index do |item, i|
           next unless item.is_a?(Hash)
 
+          idx = i + 1
           kind, a, b = Recipes.recipe_key_for(item)
           next if kind == :legacy
 
@@ -179,7 +185,7 @@ module Noxun
             next
           end
 
-          resolve_drawer_front(cfg, ctx_plan, item, a, part_thicknesses, out)
+          resolve_drawer_front(cfg, ctx_plan, item, a, part_thicknesses, out, idx)
         end
         out
       end
@@ -197,7 +203,7 @@ module Noxun
       end
 
       # Jedno klasifikovane celo: aktivny recept -> kontext -> resolve -> emisia.
-      def resolve_drawer_front(cfg, ctx_plan, item, key, part_thicknesses, out)
+      def resolve_drawer_front(cfg, ctx_plan, item, key, part_thicknesses, out, idx)
         front_id = item['id'].to_s
         drawer_cfg = item['drawer'].is_a?(Hash) ? item['drawer'] : {}
         ref_key = "#{key[:system]}|#{key[:opening]}"
@@ -259,7 +265,7 @@ module Noxun
           return out[:conflicts] << drawer_conflict(front_id, c[:code], c[:message])
         end
 
-        out[:parts].concat(drawer_part_descriptors(front_id, res[:parts], ctx))
+        out[:parts].concat(drawer_part_descriptors(front_id, res[:parts], ctx, idx))
         out[:hardware] << drawer_hardware_item(front_id, item, recipe, res, ctx, overrides)
         if Recipes.sync_recommended?(recipe, ctx[:clear_width])
           out[:warnings] << BuildPlan.warning(
@@ -379,13 +385,13 @@ module Noxun
       # UMIESTNENIE: box je vycentrovany v svetlej sirke (`ctx[:x0]`..`x1`),
       # zaciatok hlbky je predna rovina vnutra (y = 0) a spodok riadku `ctx[:z0]`.
       # Je to VIZUAL zasuvky v korpuse — vyrobne cisla urcuje recept.
-      def drawer_part_descriptors(front_id, parts, ctx)
+      def drawer_part_descriptors(front_id, parts, ctx, idx)
         return [] if parts.empty?
 
         anchor = { cx: (ctx[:x0].to_f + ctx[:x1].to_f) / 2.0, z0: ctx[:z0].to_f,
                    outer: drawer_outer_width(parts), lift: drawer_bottom_lift(parts),
                    depth: drawer_box_depth(parts), bottom_th: drawer_bottom_thickness(parts) }
-        parts.each_with_index.map { |p, i| drawer_part_descriptor(front_id, p, i, anchor) }
+        parts.each_with_index.map { |p, i| drawer_part_descriptor(front_id, p, i, anchor, idx) }
       end
 
       # Vonkajsia sirka boxu — pri Quadre dno lezi MEDZI bokmi, takze celkova
@@ -425,7 +431,12 @@ module Noxun
         bottom ? bottom[:thickness].to_f : 0.0
       end
 
-      def drawer_part_descriptor(front_id, p, index, anchor)
+      # D-121a: `name` je udaj PRE CLOVEKA (kusovnik Studia, skratka `Zas dno N`
+      # vo VEPO) a nesie CISLO CELA (`idx` = poradie v `front_items`, rovnake ako
+      # v „Zasuvkove celo N"), nie interne id. Identita dielca na nazve NEZAVISI:
+      # `suffix` (recyklacia SketchUp definicie + part_id) aj `part_key`
+      # (overridy, kovanie) dalej stoja na `front_id`.
+      def drawer_part_descriptor(front_id, p, index, anchor, idx)
         role = p[:role].to_s
         wd = p[:width].to_f
         ht = p[:height].to_f
@@ -444,14 +455,14 @@ module Noxun
           origin = [(side == 'right' ? (x_out + outer - th) : x_out), 0.0, anchor[:z0]]
           suffix = "DRWSIDE-#{side == 'right' ? 'R' : 'L'}"
           key = PartKeys.front(front_id, 'box_side', side)
-          name = "Bok boxu #{side == 'right' ? 'pravy' : 'lavy'} #{front_id}"
+          name = "Bok boxu #{side == 'right' ? 'pravy' : 'lavy'} #{idx}"
           axes = PartFaces::AXES_WALL_DEPTH
         when Recipes::ROLE_BOTTOM
           box = [wd, ht, th]
           origin = [cx - wd / 2.0, 0.0, z_lift]
           suffix = 'DRWBOT'
           key = PartKeys.front(front_id, 'drawer_bottom')
-          name = "Dno zasuvky #{front_id}"
+          name = "Dno zasuvky #{idx}"
           axes = PartFaces::AXES_LYING
         when Recipes::ROLE_INNER_FRONT
           # Predok aj chrbat stoja NA dne (recept ich vysku tak aj pocita:
@@ -460,14 +471,14 @@ module Noxun
           origin = [cx - wd / 2.0, 0.0, z_lift + anchor[:bottom_th]]
           suffix = 'DRWIFR'
           key = PartKeys.front(front_id, 'drawer_inner_front')
-          name = "Vnutorne celo zasuvky #{front_id}"
+          name = "Vnutorne celo zasuvky #{idx}"
           axes = PartFaces::AXES_WALL
         else # ROLE_BACK
           box = [wd, th, ht]
           origin = [cx - wd / 2.0, [anchor[:depth] - th, 0.0].max, z_lift + anchor[:bottom_th]]
           suffix = 'DRWBACK'
           key = PartKeys.front(front_id, 'drawer_back')
-          name = "Chrbat zasuvky #{front_id}"
+          name = "Chrbat zasuvky #{idx}"
           axes = PartFaces::AXES_WALL
         end
         { suffix: "#{suffix}-#{front_id}-#{index + 1}", part_key: key, role: role, name: name,

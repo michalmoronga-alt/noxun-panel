@@ -31,6 +31,10 @@
 # nedalo povedat, kam patri. Nalepky VEPO tlacia ~20 znakov bez interpunkcie,
 # preto skratky a skrinky hned za nazvom. Plati LEN pre VEPO CSV a LOG —
 # kusovnik Studia ostava s plnymi nazvami.
+#
+# D-121a (8.9.2026): skratky dostali aj VYRABANE DIELCE ZASUVKY (`Dno zasuvky 2`
+# -> `Zas dno 2`, dva boky boxu v riadku -> `Zas bok LP 2`); kontrakt ostava v1.1
+# (`NAME_MAX` 60 sa nemeni).
 require 'csv'
 require 'fileutils'
 
@@ -62,12 +66,23 @@ module Noxun
       DOOR_WING = /\ADvierka (\d+) kridlo (\d+)\/\d+\z/.freeze
       DOOR_ONE  = /\ADvierka (\d+)\z/.freeze
       DRAWER    = /\AZasuvkove celo (\d+)\z/.freeze
+      # D-121a: vyrabane dielce zasuvky (construction.rb). Cislo cela = to iste,
+      # co v `Zasuvkove celo N`. Legacy nazov (zakazka postavena pred D-121a)
+      # nesie namiesto cisla ID cela (`Fmslwqdm2-9-464wsa`) — to sa do skratky
+      # NEPRENASA (cloveku nic nepovie), tvar je bez cisla: `Zas dno s1`.
+      DRAWER_PART = /\A(Dno|Chrbat|Vnutorne celo) zasuvky (\S+)\z/.freeze
+      BOX_SIDE    = /\ABok boxu (lavy|pravy) (\S+)\z/.freeze
+      DRAWER_PART_SHORT = { 'Dno' => 'Zas dno', 'Chrbat' => 'Zas chrb',
+                            'Vnutorne celo' => 'Zas predok' }.freeze
       # Dvojice, ktore sa v jednom riadku zluia do jedneho tokenu (zrkadlove
       # dielce sa v kusovniku agreguju do JEDNEHO riadku — „Bok L/Bok P" je
       # zbytocne dlhe pre 20-znakovu nalepku).
       NAME_PAIRS = [['Bok L', 'Bok P', 'Bok LP'],
                     ['Vyst P', 'Vyst Z', 'Vyst PZ']].freeze
       DOOR_PAIR = /\ADv(\d+) L\z/.freeze
+      # D-121a: dva boky boxu JEDNEJ zasuvky (rovnaka pripona — ` 2` alebo pri
+      # legacy nazve prazdna) sa zluia rovnako ako dvierka: `Zas bok LP 2`.
+      BOX_SIDE_PAIR = /\AZas bok L( \d+)?\z/.freeze
       # Vlastnici riadku: CAB-001 -> s1, BRD-007 -> d7 (poradie s pred d).
       OWNER_KINDS = { 'CAB' => ['s', 0], 'BRD' => ['d', 1] }.freeze
       OWNER_ID    = /\A([A-Z]+)-(\d+)\z/.freeze
@@ -325,7 +340,21 @@ module Noxun
         if (m = DRAWER.match(n))
           return "Zas celo #{m[1]}"
         end
+        # D-121a: vyrabane dielce zasuvky. Token za nazvom je bud CISLO CELA
+        # (dnesny nazov), alebo ID cela (zakazka postavena pred D-121a) — id sa
+        # do skratky neprenasa, ostane tvar bez cisla.
+        if (m = DRAWER_PART.match(n))
+          return "#{DRAWER_PART_SHORT[m[1]]}#{num_suffix(m[2])}"
+        end
+        if (m = BOX_SIDE.match(n))
+          return "Zas bok #{m[1] == 'lavy' ? 'L' : 'P'}#{num_suffix(m[2])}"
+        end
         n
+      end
+
+      # D-121a: ` <cislo>` pre cisto ciselny token, inak prazdno (legacy id cela).
+      def num_suffix(tok)
+        tok.to_s.match?(/\A\d+\z/) ? " #{tok.to_i}" : ''
       end
 
       # Skratky + zdruzenie dvojic (Bok L+Bok P => Bok LP), zvysok cez '/'.
@@ -355,6 +384,9 @@ module Noxun
         end
         NAME_PAIRS.each { |a, b, merged| toks = merge_pair(toks, a, b, merged) }
         door_pairs(toks).each { |num| toks = merge_pair(toks, "Dv#{num} L", "Dv#{num} P", "Dv#{num} LP") }
+        box_side_pairs(toks).each do |sfx|
+          toks = merge_pair(toks, "Zas bok L#{sfx}", "Zas bok P#{sfx}", "Zas bok LP#{sfx}")
+        end
         toks.map { |t, _f| t }.join('/')
       end
 
@@ -364,6 +396,15 @@ module Noxun
         plain = toks.reject { |_t, f| f }.map { |t, _f| t }
         nums = plain.map { |t| (m = DOOR_PAIR.match(t)) && m[1] }.compact
         nums.select { |num| plain.include?("Dv#{num} P") }
+      end
+
+      # D-121a: pripony bokov boxu, ktore maju v riadku OBE strany (` 2` alebo
+      # prazdna pri legacy nazve). Boky ROZNYCH zasuviek sa nikdy nezluia a
+      # volny nazov dosky sa do paru nedostane (rovnaka zasada ako pri dvierkach).
+      def box_side_pairs(toks)
+        plain = toks.reject { |_t, f| f }.map { |t, _f| t }
+        sfx = plain.map { |t| (m = BOX_SIDE_PAIR.match(t)) && m[1].to_s }.compact
+        sfx.select { |s| plain.include?("Zas bok P#{s}") }
       end
 
       # Zluci dvojicu tokenov do jedneho. Zdruzuju sa VYHRADNE tokeny zo skratky
