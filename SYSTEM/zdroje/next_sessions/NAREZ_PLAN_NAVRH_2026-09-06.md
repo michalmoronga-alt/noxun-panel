@@ -30,7 +30,7 @@ pre objednávku a rozhodovanie, nie výrobný dokument.
 
 Vlastná **shelf / guillotine heuristika** (OpenCutList je GPL — algoritmus áno, kód nie): dielce zoradiť podľa výšky (potom šírky) zostupne, plniť police zľava doprava, nová
 polica pod poslednou, nová platňa keď sa nezmestí; kerf medzi dielcami aj policami; dielec väčší než platňa (po oreze) = **RED** riadok (nedá sa vyrobiť z tohto formátu), plán
-pokračuje bez neho. **Deterministický** (rovnaký vstup = rovnaký plán, žiadne náhodné poradie), **bez optimalizačných slučiek** — KLINIKA (254 dielcov) pod sekundu.
+pokračuje bez neho, **ale výsledok toho materiálu je označený `incomplete`** (počet platní je neúplný — chýba materiál, ktorý zákazka potrebuje; §4). **Deterministický** (rovnaký vstup = rovnaký plán, žiadne náhodné poradie), **bez optimalizačných slučiek** — KLINIKA (254 dielcov) pod sekundu.
 
 ## 3 · Výstup (kontrakt výsledku)
 
@@ -42,6 +42,9 @@ presné množstvo), využitie % (plocha dielcov / plocha platní), zoznam dielco
 
 Sekcia „Materiály po tabuliach" ukáže **vedľa** odhadu rozsahu (`count_min–count_max`) hodnotu **„plán: N platní (horná hranica)"**. Odhad ostáva **default** pre cenu; napojenie
 cien za celé tabule (D-61) na plán = **voľba používateľa** (prepínač „ceny podľa plánu"), nie automatika. Objednáva človek.
+**Materiál s RED dielcom (`incomplete`) — Codex #323 kolo 2 P1:** „ceny podľa plánu" sú pre ten materiál **nedostupné** (ostáva odhad z m², aj keď je prepínač zapnutý)
+a Kontrola nesie **RED nález** „nárezový plán neúplný", ktorý **blokuje cenové exporty** (rozpočet XLSX, cenová ponuka — vzor blockera `hardware_issues`), kým sa dielec
+nevyrieši (iný formát platne, rozdelenie dielca, iný materiál). Neúplný počet sa nikdy nesmie dostať do ponuky ani do odvodených služieb (rezanie, montáž per platňa).
 
 ## 5 · Scope OUT
 
@@ -52,7 +55,7 @@ presúvanie dielcov v pláne · zvyšky ako sklad · ABS v pláne · dĺžkové 
 
 | Rez | Obsah | Audit |
 |---|---|---|
-| **NP-1 algoritmus** | modul `core/cut_plan.rb` (čistý), kontrakt výsledku §3, rozvinutie duplákov, politika otáčania, kerf/orez, RED; headless: determinizmus · duplák ×2/×3 dáva správny počet obdĺžnikov zdroja · dielec so smerom sa neotočí · dielec bez smeru sa otočí podľa pravidla · kerf mení počet platní na hrane · oversize = RED · `fallback` formát · **vlastnosť horná hranica** (Codex #323 P1: `count_max` z odhadu NIE JE hranica — je to zlomkový odhad plochy s koeficientom, pre malý dielec vyjde 0,1 platne): plán ≥ **dolná hranica** `ceil(Σ plocha dielcov / plocha platne po oreze)` a plán ≤ počet platní **ručne zostrojeného platného rozloženia** tej istej fixtúry (dokázateľne uskutočniteľná hranica); mutácie min. 4 | **ÁNO** (nový modul) |
+| **NP-1 algoritmus** | modul `core/cut_plan.rb` (čistý), kontrakt výsledku §3, rozvinutie duplákov, politika otáčania, kerf/orez, RED; headless: determinizmus · duplák ×2/×3 dáva správny počet obdĺžnikov zdroja · dielec so smerom sa neotočí · dielec bez smeru sa otočí podľa pravidla · kerf mení počet platní na hrane · oversize = RED · `fallback` formát · **vlastnosť horná hranica** (Codex #323 P1: `count_max` z odhadu NIE JE hranica — je to zlomkový odhad plochy s koeficientom, pre malý dielec vyjde 0,1 platne): plán ≥ **dolná hranica** `ceil(Σ plocha dielcov / plocha platne po oreze)` a plán ≤ **garantovaná hranica heuristiky** = počet zmestiteľných dielcov (jeden dielec na platňu — shelf heuristika nikdy nepotrebuje viac; Codex #323 kolo 2 P1: ručné rozloženie je hranica optima, nie tejto heuristiky) + **presné očakávané výstupy pre vybrané fixtúry** (rozklad polica po polici je deterministický → golden počet platní aj polohy); mutácie min. 4 | **ÁNO** (nový modul) |
 | **NP-2 sekcia + rozpočet** | Štúdio → Nárezový plán (SVG per platňa, zoznam, príznaky), riadok v rozpočte, prepínač „ceny podľa plánu"; **kerf, orez a prepínač = nové polia `BudgetStore`** (uzavretý whitelist, `BUDGET_STD`): **bump štandardu + dopredná brána** (starší plugin polia neoreže a nepočíta inú cenu) + atomická mutácia modelu (jeden Undo); in-SU smoke KLINIKA (počty vs. reálne objednané platne, čas, reopen zachová polia) | **ÁNO** (schéma rozpočtu — Codex #323 P1), potom `codex-po-pr` |
 
 ## 7 · Nálezy Codex #322 zapracované
@@ -60,4 +63,5 @@ presúvanie dielcov v pláne · zvyšky ako sklad · ABS v pláne · dĺžkové 
 #322 kolo 1 P1: heuristika ≠ presné množstvo → **horná hranica**, rozpočet informatívne, objednáva človek · #322 kolo 2 P2: jedna politika otáčania dielcov bez smeru (§1) ·
 #322 kolo 3 P1: duplák sa rozvinie na `množstvo × multiplier` obdĺžnikov zdroja pred rozkladom (§1) + vlastný test · **#323 kolo 1 P1:** normalizácia orientácie pri
 `grain_direction: "width"` pred rozkladom (§1) · `count_max` nie je hranica → test proti dolnej hranici z plochy a ručne zostrojenému rozloženiu (§6) · NP-2 = zmena schémy
-rozpočtu (`BudgetStore`, `BUDGET_STD`) → audit ÁNO (§6).
+rozpočtu (`BudgetStore`, `BUDGET_STD`) → audit ÁNO (§6) · **#323 kolo 2 P1:** test hornej hranice = počet zmestiteľných dielcov + golden fixtúry, nie ručné rozloženie (§6) ·
+RED dielec = `incomplete` → ceny podľa plánu nedostupné + RED blocker cenových exportov (§4).
