@@ -17,6 +17,25 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-F1 — DRUHÉ FIX KOLO PO CODEX GH REVIEW #329 (8.9.2026 v noci; ten istý PR #329, v0.9.49 bez bumpu — css/js sa nemenili).**
+  Kolo 2 vrátilo 2× P1 + 1× P2; všetky tri sú o **tichých stavoch, ktoré by prešli bránami**.
+  **P1 — knižnica pravidiel z NOVŠIEHO pluginu sa už do projektu NEZMRAZÍ.** Doterajšia vetva vracala z `read_rules` len normalizované pravidlá a stav „len na čítanie"
+  stratila, takže `ensure_project_rules!` ich pri projekte BEZ snapshotu (rollback pluginu, nový projekt) zmrazil do .skp s NAŠÍM `std` — a keďže `normalize_bands` drží
+  len `max`/`quantity`, budúce polia by ticho zmizli **a brána by sa už nikdy nespustila**. `read_rules` teraz vracia `[pravidlá, changed, blocked]`, `load_state` ten
+  príznak podáva ďalej a `ensure_project_rules!` snapshot **nevytvorí** (vzor R-07 `HardwareSets.ensure_project_state!`). Stavba beží ďalej nad prečítaným obsahom
+  (tabuľka `bands` je forward-čitateľná zámerne a nikdy nevydá nulu), ale `CabinetBuilder.attach_rules_state_warning!` k nej pridá ORANGE
+  `hardware_rules_library_incompatible` („aktualizuj plugin") — protajšok `library_incompatible` pri setoch.
+  **P1 — skrinky uložené staršou schémou dostali RED `hinge_stale`.** Skrinka z 0.9.47 (`config_schema` 8) má v `config.hardware[]` staré počty (bez `+1` nad 600 mm,
+  bez klasifikácie/Tip-On setu) a nosič `hardware_conflicts` z nej nikdy nevznikol; nová vetva pritom číta LEN uložené hodnoty, takže nákupné CSV, rozpočet aj ponuka
+  by prešli s **poddimenzovanými závesmi a ticho** (`newer_config?` reaguje až na schému > 9). `Bom.collect` ju preto priznáva RED nálezom (`hinge_stale_issue`, vzor
+  `drawer_stale`) v jedinom registri brán; VEPO ide ďalej (geometria je správna). Náprava je **prestavba** — vtedy sa zapíše schéma 9 a RED zhasne. `HINGE_ACTIVATION_SCHEMA`
+  je vlastná konštanta (9), aby budúci bump `CONFIG_SCHEMA` nespravil z prestavaných skriniek „nemigrované".
+  **P2 — RED nadvýšky zhasne LEN skutočný zámok počtu.** Podmienka `source == 'manual'` zhasínala konflikt aj pri importovanom/legacy override, ktorý niesol iba
+  `nominal_length` — o počte teda nikto nerozhodol a catch-all počet prešiel bránami. Nový `quantity_locked?` sa pýta priamo ručných zásahov (platné pole `quantity`,
+  ten istý výklad a poradie „posledný vyhráva" ako `apply_overrides`).
+  **Testy:** 3486 headless (+5 v `test_kovf_zavesy.rb`, mutácie M22–M24 overené vypnutím každej opravy) · 97 JS sád · in-SketchUp **2021 PASS / 0 FAIL** vrátane novej
+  reopen sekcie `kovf_stale` (schéma 8 → RED → prestavba → zhasne).
+
 - **KOV-F1 — FIX KOLO PO CODEX GH REVIEW #329 (8.9.2026 v noci; ten istý PR #329, v0.9.48 → v0.9.49).**
   Odsek KOV-F1 nižšie vznikol pri odovzdaní dávky, **pred** review — ostáva tak, ako bol zapísaný (tento súbor sa neprepisuje); tu je, čo kolo 1 (1× P1 + 5× P2) zmenilo.
   **P1 — `CONFIG_SCHEMA` 8 → 9.** Package tvrdil „vo F sa nebumpuje", a to bola chyba: nosič `hardware_conflicts` je v configu **trvalý** a závesy sú **klasifikované**,

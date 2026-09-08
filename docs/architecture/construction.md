@@ -186,6 +186,14 @@ môže niesť `+1` nad šírku 600 mm. Starší plugin (schéma 8) nepozná ani 
 nedoobjednané závesy a zlý set BEZ blokády (Codex #329 kolo 1 P1). Brány sú tie isté ako pri 5–8: dopredný `newer_config?` (prestavba, šablóny, kópia) + exportná
 `ProductionCore.export_blockers`.
 **`DRAWER_ACTIVATION_SCHEMA` ostáva 5** — je to VLASTNÁ konštanta práve preto, aby bump na 6 až 9 nespravil z každej skrinky schémy 5 „nemigrovanú" (`drawer_stale`).
+**`HINGE_ACTIVATION_SCHEMA` = 9** je jej dvojička pre závesy (Codex #329 kolo 2 P1): skrinka uložená pod nižšou schémou nesie staré počty závesov, takže ju
+zber priznáva RED `hinge_stale` a brána zastaví nákup, rozpočet aj ponuku (VEPO nie) — detail v [outputs.md](outputs.md). Pri budúcom bumpe `CONFIG_SCHEMA`
+na 10 ostáva 9, aby sa prestavané skrinky zrazu netvárili ako nemigrované.
+
+**ORANGE, KEĎ SA PRAVIDLÁ NEDAJÚ ZMRAZIŤ (Codex #329 kolo 2 P1).** `build_into` po `Construction.build_plan` volá **`attach_rules_state_warning!(plan, model)`**
+(vzor `attach_abs_warnings!`: doplní warning a plán sa RE-VALIDUJE). Warning `hardware_rules_library_incompatible` vznikne LEN v stave, ktorý sa sám neopraví —
+projekt NEMÁ snapshot pravidiel a globálna knižnica je z novšieho pluginu, takže ju `HardwareRules.ensure_project_rules!` odmietol zmraziť
+([hardware.md](hardware.md)). Je cabinet-level (bez `part_key`), opakuje sa pri každej stavbe a Kontrola ho ukáže v kategórii „stavba".
 
 **AD-HOC KOVANIE `hardware_manual[]` (KOV-H1, v0.9.18).** Ďalšie pole configu, nie nový zápisový kanál (audit #15 BLOCKER 1): panel ho posiela v `collectAll()` presne ako čelá,
 takže ide cestou `apply_all` → `normalize` → **rebuild** — jeden krok Späť, guardy dokumentu aj skrinky, R-12, `push_selected(dedup: false)`. Cena je prestavba geometrie pri

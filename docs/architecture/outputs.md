@@ -173,19 +173,29 @@ RED kategória **`drawer_kit`** vzniká paralelne z expanzie (`drawer_kit_item`)
 
 **KOV-F1 (v0.9.48) — JEDINÝ REGISTER BRÁN KOVANIA a dva nové RED dôvody.** Helper `drawer_blockers` sa zovšeobecnil na **`hardware_blockers`** a číta
 **`BuildPlan.hw_blockers`** = zásuvkové kódy (`Recipes::DRAWER_BLOCKERS`, v PÔVODNOM poradí) **+** závesové (`HW_HINGE_BLOCKERS`:
-`door_height_out_of_table` · `hinge_set_mismatch`). Poradie kódov je **kontrakt** (určuje poradie viet brány), preto je register **funkcia, nie
+`door_height_out_of_table` · `hinge_set_mismatch` · `hinge_stale`). Poradie kódov je **kontrakt** (určuje poradie viet brány), preto je register **funkcia, nie
 konštanta**: `build_plan.rb` sa načítava PRED `drawer_recipes.rb`, takže zásuvkový register v čase definície konštanty ešte neexistuje. Zásuvkové výstupy
 sú vďaka tomu **bajtovo rovnaké** (stráži charakterizačný test). `export_blockers(drawer:)` sa premenoval na `export_blockers(hardware:)`; `drawer_stop`
 si názov ponechal (volá ho osem miest), ale od tejto dávky vydáva aj závesové dôvody.
 
-**VEPO závesové kódy NEBLOKUJE.** `door_height_out_of_table` aj `hinge_set_mismatch` zastavujú **nákupné CSV, rozpočet XLSX a cenovú ponuku**, ale nie
-rezacie dáta: geometria je správna a zastaviť rezanie by len zablokovalo výrobu (rovnaká úvaha ako pri `BUILD_BLOCKERS`). `door_height_out_of_table` sa
-číta z **uložených** nálezov (`hardware_issues`), `hinge_set_mismatch` z **EXPANZIE** (`expansion['unmapped']`) — vzniká pri nákupe, teda aj po zmene
-mapovania BEZ prestavby skrinky (Codex #327 kolo 3).
+**VEPO závesové kódy NEBLOKUJE.** Všetky tri zastavujú **nákupné CSV, rozpočet XLSX a cenovú ponuku**, ale nie rezacie dáta: geometria je správna
+a zastaviť rezanie by len zablokovalo výrobu (rovnaká úvaha ako pri `BUILD_BLOCKERS`). Zdroje sú tri: `door_height_out_of_table` sa číta z **uložených**
+nálezov (`hardware_issues`), `hinge_set_mismatch` z **EXPANZIE** (`expansion['unmapped']`) — vzniká pri nákupe, teda aj po zmene mapovania BEZ prestavby
+skrinky (Codex #327 kolo 3) — a **`hinge_stale`** zo **SCHÉMY uloženej skrinky**. Kódy z nálezov drží `BuildPlan::HW_ISSUE_BLOCKERS`
+(= `HW_CONFLICT_CODES` + `hinge_stale`), ktorý číta brána aj Kontrola.
+
+**Tretí závesový dôvod je MIGRAČNÝ: `hinge_stale`** (Codex #329 kolo 2 P1, vzor `drawer_stale`). Skrinka uložená **pred** Noxun tabuľkou
+(`config_schema` < `CabinetBuilder::HINGE_ACTIVATION_SCHEMA` = 9), ktorá má položky `generic_type hinge`, nesie v `config.hardware[]` **staré počty** —
+bez `+1` nad šírku 600 mm, bez klasifikácie otvárania (Tip-On by dostal klasický set) a bez nosiča `hardware_conflicts` (RED nadvýška z nej nikdy
+nevznikne). Nová vetva pritom číta LEN uložené hodnoty, takže by nákup, rozpočet aj ponuka prešli s **poddimenzovanými závesmi a ticho**. `Bom.collect`
+to preto priznáva RED nálezom (`hinge_stale_issue`, klik-select mieri na krídlo); VEPO ide ďalej. Nápravou je **prestavba** (zapíše sa schéma 9 a počty sa
+prepočítajú) — RED vtedy zhasne. Skrinka bez závesov nález nerobí: stará schéma sama o sebe chyba nie je. `HINGE_ACTIVATION_SCHEMA` je **vlastná**
+konštanta z toho istého dôvodu ako `DRAWER_ACTIVATION_SCHEMA`: pri budúcom bumpe `CONFIG_SCHEMA` sa skrinky schémy 9 nesmú zrazu tváriť ako nemigrované.
 
 **Dve nové RED kategórie Kontroly.** `CAT_HARDWARE_CONFLICT` (`hardware_conflict`) — položka kovania z pravidiel VZNIKLA, ale je nesprávna; vetu skladá
 STAVBA (pozná výšku aj posledné pásmo), Kontrola k nej doplní adresu a to, čo sa tým zastavuje. Náprava je **ručný zámok počtu** (`hardware_overrides`),
-po ktorom konflikt pri prestavbe nevznikne. `CAT_HW_MISMATCH` (`hardware_mismatch`) — vybraný set odporuje čelu (Tip-On čelo na klasickom sete); náprava je
+po ktorom konflikt pri prestavbe nevznikne. **Tou istou kategóriou ide aj `hinge_stale`** (`check_hardware_issues` číta `HW_ISSUE_BLOCKERS`) — čo sa
+zastavuje je rovnaké, vetu o náprave („prestav ju") nesie správa zo zberu. `CAT_HW_MISMATCH` (`hardware_mismatch`) — vybraný set odporuje čelu (Tip-On čelo na klasickom sete); náprava je
 DÁTOVÁ (vyber set / Doplniť nové predvoľby), nikdy fallback na iný set. K tomu ORANGE `set_none` (vedomá voľba „bez setu" — nie chyba nastavenia) a ORANGE
 `hinge_set_unclassified` z nového aditívneho kľúča `expansion['notes']` (`check_hardware_notes`): nákup beží ďalej, ale set bez zaradenia sa nedá vybrať
 podľa otvárania čela. `BUILD_INFO_ONLY` má navyše `hinge_weight_unknown` — INFO o stave dát, nie nález.

@@ -35,7 +35,9 @@ uloženým nosičom `hardware_conflicts` do configu ([construction.md](construct
 
 **Door guardy bežia AŽ NAD VÝSLEDNÝMI položkami (`door_guards`, čistá funkcia).** `evaluate` ich volá po `apply_overrides` a vracia z nich
 `{items:, warnings:, conflicts:}`. Dôvod je vecný: hmotnostné pásmo sa musí porovnávať s počtom **PO ručnom zámku** (inak by varovalo aj vtedy, keď si
-používateľ počet už zdvihol) a konflikt „mimo tabuľky" musí ručný zámok **ZHASNÚŤ** (položka po override nesie `source: 'manual'`). Varovania **počet
+používateľ počet už zdvihol) a konflikt „mimo tabuľky" musí ručný zámok **ZHASNÚŤ**. Zámok sa hľadá v RUČNÝCH ZÁSAHOCH (`quantity_locked?` = záznam
+`hardware_overrides` s platným poľom `quantity`, ten istý výklad a poradie „posledný vyhráva" ako v `apply_overrides`), **nie** cez `source: 'manual'` na
+položke — ten nesie aj override, ktorý menil iba `nominal_length`, a taký o počte nepovedal nič (Codex #329 kolo 2 P2). Varovania **počet
 NEMENIA**: `door_wide` · `door_wider_than_high` („nemá to byť výklop?") · `hinge_weight_more` (pásmo chce viac než výsledný počet) ·
 `hinge_weight_max` (nad posledným pásmom); neznáma hmotnosť = **INFO** `hinge_weight_unknown` v `Validation::BUILD_INFO_ONLY` (plán bez materiálov je
 legitímny stav, ORANGE na každých dvierkach by bol hluk).
@@ -44,6 +46,14 @@ legitímny stav, ORANGE na každých dvierkach by bol hluk).
 **nikdy sa doň nezapisuje** ani nemerguje seed: `doc_std_unsupported?` je jediná autorita otázky, `read_rules` pri nej seed-merge vynechá,
 `newer_write_blocked?` je druhá zápisová brána knižnice (pod zámkom, vedľa degradovaného súboru) a `project_std_unsupported?` chráni snapshot. Bez nej
 by tolerantná `normalize_rules` ticho zahodila pole, ktorému nerozumieme, a prvý zápis by stratu zvečnil (vzor `HardwareSets` `STD_SUPPORTED`).
+**Nekompatibilná knižnica sa do projektu NEZMRAZÍ** (Codex #329 kolo 2 P1, vzor R-07 `HardwareSets.ensure_project_state!`): `read_rules` vracia
+`[pravidlá, changed, blocked]`, `load_state` ten príznak podáva ďalej a `ensure_project_rules!` pri ňom snapshot **nevytvorí** — inak by sa do .skp
+zapísal náš `std` nad obsahom, ktorý už prešiel našou `normalize_rules` (`normalize_bands` drží len `max`/`quantity`), budúce polia by ticho zmizli
+**a brána by sa už nikdy nespustila**. Stavba beží ďalej nad prečítaným obsahom (tabuľka `bands` je forward-čitateľná zámerne a nikdy nevydá nulu), ale
+`CabinetBuilder.attach_rules_state_warning!` k nej pridá ORANGE `hardware_rules_library_incompatible` („aktualizuj plugin") — protajšok `library_incompatible`
+pri setoch. Autorita stavu je `library_incompatible_without_snapshot?(model)`; projekt s vlastným snapshotom je zdravý bez ohľadu na knižnicu.
+**Hranica downgrade:** knižnice sú per PC a updater (D-52) drží obe PC aktuálne, takže „starší plugin s novšou knižnicou" je downgrade na tom istom PC —
+vedomé riziko do D-48. Preto kind ostáva `bands` (starý čítač ráta podľa tabuľky, catch-all 7) a nové čítače `std` honorujú.
 
 **Seed sa nahrádza LEN v presnom starom tvare + PREKRYV.** `LEGACY_SEED_SHAPES` (nový register pravidiel, vzor `HardwareSets`) drží v1..v3 tvar tabuľky
 (900/1400/1900 → 2/3/4/5); do globálnej knižnice aj do projektového snapshotu („Doplniť nové predvoľby") sa nový tvar dostane iba tam, kde je pravidlo
