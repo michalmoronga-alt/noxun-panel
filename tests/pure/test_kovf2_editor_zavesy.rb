@@ -205,6 +205,24 @@ NxTest.test('KOV-F2 (3): pásmo s neplatným POČTOM normalizácia zahodí, zvy�
                 'keď vypadnú všetky, uloženie sa odmietne')
 end
 
+NxTest.test('KOV-F2 (3): `weight_bands` v NESPRÁVNOM tvare normalizácia zmení na PRÁZDNE pole') do
+  c = NxKovF2
+  # Codex #330 kolo 1 (P2): hash/retazec/cislo v tomto kluci islo do panela tak,
+  # ako prislo — a `.forEach` nad nim zhodil CELU sekciu Pravidla, teda aj
+  # jedine miesto, kde sa taka hodnota da opravit. Normalizacia z kazdeho
+  # takeho tvaru robi prazdne pole (editor tak vzdy dostane tabulku).
+  [{ 'max' => 7.7 }, 'sedem', 7, true, nil].each do |bad|
+    stored = c.stored(c.hinge_rule('weight_bands' => bad))
+    NxTest.assert_equal([], stored['weight_bands'], "z tvaru #{bad.inspect} ostane prázdne pole")
+  end
+  # Data sa tym NESTRACAJU: pouzitelne pasmo je Hash v poli a to prezije.
+  NxTest.assert_equal([7.7, 22.0], c.stored(c.hinge_rule)['weight_bands'].map { |b| b['max'] },
+                      'platná tabuľka sa nedotkne')
+  # A prazdna tabulka sa dalej NEULOZI — brana ostava tam, kde bola.
+  NxTest.assert(c.message(c.hinge_rule('weight_bands' => { 'max' => 7.7 })).include?('prázdne'),
+                'uloženie takého pravidla sa odmietne vetou (nezmysel v modeli neostane)')
+end
+
 NxTest.test('KOV-F2 (3): brána ostáva ČISTÁ funkcia bez IO a bez druhého volajúceho') do
   src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'hardware_rules.rb'),
                   encoding: 'UTF-8')

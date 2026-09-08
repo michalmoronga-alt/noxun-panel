@@ -688,6 +688,9 @@
   .rrule .rgrd > summary::before { width: 5px; height: 5px; margin-right: 6px; }
   .rgsum { font-weight: 400; font-size: 10.8px; color: var(--nx-ink-muted); }
   .rgbody { padding: 0 6px 6px; }
+  /* Codex #330: hmotnostne pasma v NESPRAVNOM tvare (cudzi/pokazeny snapshot).
+     Jantar = „pozri sa na to", nie cervena chyba — ulozenim sa kluc odstrani. */
+  .rgbody .hint.rgbad { color: var(--nx-warnchip-fg); }
   .rgbody .btnrow { margin-top: 4px; }
   .rgplus { color: var(--nx-ink-label); font-size: 12px; }
   .rgchk { display: flex; align-items: center; gap: 5px; margin: 6px 0 2px;

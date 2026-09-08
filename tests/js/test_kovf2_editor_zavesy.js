@@ -23,6 +23,9 @@
 //   R7 pridanie/odobranie hmotnostného pásma prežije rozpísaný formulár a
 //      posledné zmazané pásmo kľúč odstráni.
 //   R8 otvorený blok prežije prekreslenie (inak by ho každé „+ pásmo" zavrelo).
+//   R9 kľúč v NESPRÁVNOM tvare (hash/reťazec/číslo z cudzieho snapshotu)
+//      sekciu NEZHODÍ — vykreslí sa ako prázdna tabuľka s hintom a uložením
+//      sa opraví (Codex #330 kolo 1).
 //
 // MUTÁCIE (každá overená ručne — po zanesení chyby do rules.js spadne test):
 //   M1 `rdHasGuardEditor` vracia true pre každé `bands` -> R1
@@ -31,6 +34,7 @@
 //   M4 prázdne kilogramy sa ticho zahodia                -> R6
 //   M5 `rdAddWeight` nevolá `rdSyncFromForm`             -> R7
 //   M6 stav otvorenia sa drží podľa indexu pravidla      -> R8
+//   M7 `rdGuardHtml` kreslí pásma bez `rdArr`            -> R9
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
@@ -253,6 +257,44 @@ function rule(){ return R.rdCollectRules()[0]; }
   const after = DOC.querySelectorAll('details.rgrd');
   ok(after[0].hasAttribute('open'), 'R8: otvorený ostal otvorený, aj keď sa pravidlá preskupili');
   ok(!after[1].hasAttribute('open'), 'R8: a zavretý zavretý');
+})();
+
+// ---- R9: kľúč v NESPRÁVNOM tvare sekciu NEZHODÍ ----------------------------
+(function(){
+  // Codex #330 kolo 1 (P2). Cudzí alebo pokazený snapshot môže niesť
+  // `weight_bands` ako hash, reťazec či číslo — serverová `normalize_rules`
+  // čistí LEN polia, takže taký tvar dojde až sem. Sekcia sa kreslí JEDNÝM
+  // `innerHTML`, takže bezpodmienečný `.forEach` by zhodil CELÚ sekciu
+  // Pravidlá — teda aj jediné miesto, kde sa tá hodnota dá opraviť.
+  [{}, { max: 7.7, quantity: 2 }, 'sedem', 7, true].forEach(function(bad){
+    show([hingeRule({ weight_bands: bad })]);
+    ok(guardBox() !== null, 'R9: sekcia sa vykreslí aj pri tvare ' + JSON.stringify(bad));
+    eq(DOC.querySelectorAll('.rgwb').length, 0, 'R9: a tabuľka je PRÁZDNA, nie pokazená');
+  });
+
+  show([hingeRule({ weight_bands: { max: 7.7, quantity: 2 } })]);
+  const hint = md.textOf(DOC.querySelector('.rgbad'));
+  ok(/nesprávnom tvare/.test(hint), 'R9: hint sa prizná, čo je s uloženými dátami: ' + hint);
+  ok(md.textOf(DOC.querySelector('.rgsum')).indexOf('neplatný tvar') > -1,
+     'R9: aj ZBALENÁ lišta to povie — blok je zavretý a inak by to nebolo vidieť');
+  ok(!('weight_bands' in rule()),
+     'R9: a ULOŽENIE pokazený kľúč z pravidla odstráni (formulár je autorita)');
+  eq(R.rdValidate([rule()]), null, 'R9: taký zápis je platný — guard je voliteľný');
+
+  eq(R.rdWeightBroken({ weight_bands: [] }), false, 'R9: prázdne POLE pokazený tvar NIE JE');
+  eq(R.rdWeightBroken({}), false, 'R9: ani chýbajúci kľúč');
+  eq(R.rdGuardSummary({ kind: 'bands', weight_bands: 'abc' }), 'hmotnostné pásma: neplatný tvar',
+     'R9: reťazec má `.length` — súhrn by inak hlásil pásma, ktoré neexistujú');
+
+  // Tá istá pasca je nad tabuľkou výšok a nad radom dĺžok — jedna brána (`rdArr`).
+  show([{ rule_id: 'zavesy-hash', kind: 'bands', output: 'hinge', enabled: true,
+          bands: { max: 900, quantity: 2 }, applies_to: { role: 'front_door' } }]);
+  ok(guardBox() !== null, 'R9: `bands` v nesprávnom tvare sekciu tiež nezhodí');
+  ok(/aspoň pásmo/.test(R.rdValidate(R.rdCollectRules())),
+     'R9: a uloženie takého pravidla sa odmietne vetou');
+  show([{ rule_id: 'vysuvy', kind: 'fit_series', output: 'slide', enabled: true,
+          series: { a: 1 }, clearance: 10, quantity: 1, applies_to: { role: 'drawer_front' } }]);
+  eq(DOC.querySelector('.rseries').value, '', 'R9: a rovnako rad dĺžok — pole ostane prázdne');
 })();
 
 // ---- escapovanie identity v atribúte ---------------------------------------

@@ -1305,7 +1305,14 @@ module Noxun
           # Starsi plugin ich `normalize_rules` NEPOZNA, ale ZACHOVA (vetva
           # „nezname kluce" nizsie), takze prezuju aj jeho zapis.
           r['finite'] = (r['finite'] == true) if r.key?('finite')
-          r['weight_bands'] = normalize_bands(r['weight_bands']) if r['weight_bands'].is_a?(Array)
+          # Codex #330 kolo 1 (P2): normalizuje sa kazdy tvar, nie len pole.
+          # Hash/retazec/cislo v tomto kluci (pokazeny alebo cudzi snapshot) sa
+          # uz NEZACHOVAVA — `normalize_bands` z neho spravi PRAZDNE pole, takze
+          # editor v paneli dostane vzdy tabulku a nie tvar, nad ktorym padne.
+          # Data sa tym nestracaju: pouzitelne pasmo nezanikne (pasma su Hash
+          # v poli) a prazdnu tabulku ULOZENIE dalej ODMIETA
+          # (`weight_bands_problem`), takze ticho v modeli neostane.
+          r['weight_bands'] = normalize_bands(r['weight_bands']) if r.key?('weight_bands')
           normalize_width_plus!(r)
           if r.key?('width_warn_over')
             v = r['width_warn_over'].to_f
