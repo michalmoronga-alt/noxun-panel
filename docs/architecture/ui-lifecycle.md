@@ -2122,6 +2122,31 @@ zásuvky"** (`rdRuleTitle`, iba pre tento `rule_id`) a jednovetový hint pod rad
 `HardwareRules.label_for` (guard test na zhodu) a tu ide o titulok RIADKU, nie o premenovanie typu `slide`. Pravidlo sa **nemaže**: starým zákazkám by ticho vypadli výsuvy
 z nákupu.
 
+**KOV-F2 (v0.9.51) — EDITOR door guardov pravidla `bands`.** Voliteľné kontroly dvierok z F1 (`width_plus {over, add}` · `width_warn_over` · `weight_bands [{max, quantity}]` ·
+`finite`) boli do F1 len **read-only veta** (`rdGuardHint`); od F2 sú **formulár** a veta zanikla — ten istý údaj nesmie byť na obrazovke dvakrát. Blok kreslí `rdGuardHtml`
+pri pravidle **`kind: 'bands'` s výstupom `hinge`** a pri **každom `bands`, ktoré už niektorý guard nesie** (inak by sa hodnota z cudzieho snapshotu nedala ani vidieť, ani
+opraviť); mená kľúčov drží `RD_GUARD_KEYS` ako **zrkadlo** serverových `HardwareRules::DOOR_GUARD_KEYS` (guard test na zhodu). **Vertikálny priestor:** je to `<details>`
+a je **zbalený** — súhrn v lište (`rdGuardSummary`, čistá funkcia) povie, čo skrýva („+1 nad 600 mm · varovanie nad 800 mm · 2 hmotnostné pásma · konečná tabuľka"), otvorený
+stav si pamätá `RD_GUARD_OPEN` **podľa `rule_id`** (nie indexu — pravidlá sa môžu preskupiť), takže pridanie hmotnostného pásma (= prekreslenie formulára) blok nezavrie.
+
+**Codex #330 (v0.9.52) — dve veci, ktoré blok robí sám.** (1) **Tvar zo snapshotu nesmie zhodiť sekciu:** `weight_bands` (a rovnako `bands` aj `series`) prechádza bránou
+`rdArr` (`Array.isArray(v) ? v : []`), takže hash, reťazec či číslo z cudzieho alebo pokazeného záznamu sa vykreslí ako **prázdna tabuľka s jantárovým hintom** („hmotnostné
+pásma sú v uložených dátach v nesprávnom tvare… uložením sa pokazený údaj odstráni", trieda `.rgbad`) a v zbalenej lište ako „hmotnostné pásma: neplatný tvar" (`rdWeightBroken`;
+reťazec má `.length`, takže bez toho by lišta hlásila pásma, ktoré neexistujú). Sekcia sa kreslí **jedným `innerHTML`**, takže bezpodmienečný `.forEach` nad takou hodnotou by
+zhodil CELÚ sekciu Pravidlá — teda aj jediné miesto, kde sa dá tá hodnota opraviť; takto ju **opraví uloženie** (zber píše len to, čo je vo formulári, a kľúč zmizne). Server
+robí ten istý krok zo svojej strany — `normalize_rules` mení ne-pole na `[]`, viď [hardware.md](hardware.md). (2) **Súhrn nesmie zaostať za formulárom:** pri **zbalení** bloku
+(`rdGuardToggle` → `rdGuardRefresh`) sa formulár preberie **tým istým zberom ako pri ukladaní** (`rdSyncFromForm`) a text lišty sa prepíše. Hodnoty polí totiž žijú len v DOM
+(do `RD_RULES` sa preberajú až pri „+ pásmo" / „✕" / Uložiť), takže bez tohto kroku by lišta po úprave ukazovala stav spred otvorenia. **Prekresliť sa nesmie** — `rdRender` by
+zahodil `<details>`, nad ktorým práve beží udalosť (a s ním zameranie), preto sa mení iba text `.rgsum`.
+
+**Zber (`rdCollectGuards`) NEPOSIELA tvar, ktorý by server ticho zahodil.** Kľúč, ktorý používateľ nevyplnil, sa **nezapíše** — a prázdne pole je zároveň jediný spôsob, ako
+kontrolu vypnúť (vzor „prázdne pole je AUTO"): nekladná alebo prázdna šírka = guard preč (rovnaký výsledok ako `normalize_width_plus!`), chýbajúci počet kusov = **1** (rovnaký
+clamp, aký má editor výškových pásiem), odškrtnutý prepínač = kľúč `finite` preč (nikdy `false`). **Výnimkou sú hmotnostné pásma:** riadok, ktorý používateľ vedome pridal, sa
+nezahadzuje — prázdne kilogramy idú ako `null` a uloženie sa **odmietne vetou** (klient hneď cez `rdValidate` → `rdWeightProblem`, server znova cez
+`HardwareRules.weight_bands_problem`, viď [hardware.md](hardware.md)); posledné zmazané pásmo kľúč odstráni. Pravidlo, na ktoré sa editor nekreslí, ostáva **nedotknuté** —
+`rdCollectRules` pracuje na kópii pôvodného pravidla, takže guard z cudzieho `fit_series` záznamu uloženie prežije. Testy: `tests/pure/test_kovf2_editor_zavesy.rb`,
+`tests/js/test_kovf2_editor_zavesy.js` (mini-DOM) + spoločná fixtúra parity.
+
 ### StudioModelWatch — indikátor neaktuálnosti okna (22.8., „Obnoviť" zožltne)
 
 Štúdio čísla **neprepočítava samo** — kým sa nestlačí „Obnoviť", visia v ňom čísla z posledného prepočtu. Model sa medzitým mohol zmeniť (prestavba skrinky z Inspectora, posun,

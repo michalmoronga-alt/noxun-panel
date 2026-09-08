@@ -598,7 +598,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   hustoty rátaných ako <hustota> — ťažší odhad"; `—` LEN bez výrobných dielcov; žiadne `weight_missing`, žiadne vylúčenie z medzisúčtu · **D-125:** payload Inspectora
   `weight_kg` + `weight_estimated_parts` + `weight_estimated_density` (aditívne) · **Audit ÁNO (Sol — mení kontrakt deskriptora `BuildPlan` a payload Inspectora, hoci aditívne; Codex #327 kolo 2)** · in-SU sekcia `run_kovw`
   (builder → plán) · Smoke: dvierka 1000 × 600 × 18 DTD 680 → 7,34 kg; čelo 2000 × 600 MDF 25 mm → 22,5 kg (nie 16,2 z 18 mm); skrinka s UNI dielcom → „≈" + ORANGE.
-- **KOV-F · „ZÁVESY — NOXUN TABUĽKA + SET PODĽA OTVÁRANIA" (po W; v3 po Sol audite kolo 2 [2 BLOCKER + 4 FIX + 1 NOTE] — DVA PR: F1 jadro ✅, F2 editor):**
+- **✅ KOV-F je KOMPLET (F1 PR #329, v0.9.48 · F2 PR #330, v0.9.51) — KOV-F · „ZÁVESY — NOXUN TABUĽKA + SET PODĽA OTVÁRANIA" (po W; v3 po Sol audite kolo 2 [2 BLOCKER + 4 FIX + 1 NOTE] — DVA PR: F1 jadro ✅, F2 editor ✅):**
   **F1 jadro — ✅ HOTOVÉ (PR #329, v0.9.48).** **Druh pravidla ostáva `bands`** — ŽIADNY nový kind (Sol kolo 2 BLOCKER 1: starší plugin vrátane NOVÉHO vloženia skrinky s aktualizovanou knižnicou by
   neznámy kind preskočil = nula závesov; čítače pravidiel `std` ignorujú, takže sa to nedá dohnať markerom). Seed `zavesy-podla-vysky` dostane novú tabuľku
   **`bands` [`{max: 849, quantity: 2}`, `{1700, 3}`, `{2200, 4}`, `{2400, 5}`, `{2600, 6}`, `{2800, 7}`, `{max: nil, quantity: 7}`] — výška ≤ max (Float, inkluzívne; 849 < h < 850 → 3); catch-all `nil → 7` ostáva kvôli STARÝM čítačom (dvere nad 2800 dostanú 7, nikdy nič — Codex #327 kolo 3)** a VOLITEĽNÉ polia,
@@ -631,8 +631,13 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   vlastný set prežije migráciu · sentinel `none` prežije prestavbu, reopen aj normalizáciu mapovania · **downgrade: starší čítač (`std` ignorovaný) dostane pri novom projekte závesy podľa tabuľky bez +1** ·
   in-SU `run_kovf`. Smoke: 1250 → 3; 850 → 3; 800 × 700 (1 krídlo) → 3; Tip-On → P2O + 1 piest; 850 široké → ORANGE; MDF 25 mm 2000 × 600 → ORANGE nad 22 kg; 2900 vysoké →
   7 + RED, zámok ho zhasne.
-  **F2 editor (samostatný PR, Audit NIE) — ČAKÁ:** editor `bands` v Pravidlách dostane voliteľné polia (`width_plus`, `width_warn_over`, `weight_bands`, prepínač `finite`) +
-  spoločná Ruby/JS validácia (prázdne, nečíselné, neusporiadané pásma; „všetko nad" povinné len bez `finite`) — kým F2 nie je, polia sú viditeľné len na čítanie.
+  **F2 editor — ✅ HOTOVÉ (PR #330, v0.9.51).** V Pravidlách je pri pravidle závesov (a pri každom `bands`, ktoré už guard nesie) **zbaliteľný blok „Kontroly dvierok"**
+  so súhrnom v lište: šírka nad X → +N · varovanie nad šírku · tabuľka hmotností (pridať/odobrať riadok) · prepínač „tabuľka je konečná". **Validácia je spoločná**
+  (Ruby `weight_bands_problem` + JS zrkadlo, parita cez `tests/fixtures/rules_validation_parity.json`): prázdna tabuľka hmotností · pásmo bez kilogramov · dve pásma
+  s rovnakou hmotnosťou. **ODCHÝLKA od pôvodného znenia (vedomá):** vety pre `over`/`warn` ≤ 0 a `add` < 1 nevznikli — také stavy sa v editore nedajú vyrobiť (prázdne
+  alebo nekladné pole = kontrola vypnutá, chýbajúci počet = 1, rovnaký clamp ako pri výškových pásmach) a serverová normalizácia taký guard aj tak zahodí (kontrakt F1),
+  takže veta by bola mŕtva vetva a rozbila by paritu klient/server. **Poradie pásiem sa nevynucuje** — server ich zoraďuje sám. „Všetko nad" ostáva povinné aj s `finite`
+  (rozhodnutie F1, Codex #329 kolo 3: catch-all drží starý čítač).
 - **KOV-E · „VÝKLOPY HK top / HL top" (po F; v2 po Codex #327):** config čela `lift.system` (`hk_top` predvolene | `hl_top`) + výber v karte čela (CONFIG_SCHEMA 9 → 10 —
   9 minula KOV-F1, Codex #329; whitelisty šablón aditívne) · **sklop (`fall`) = závesy ako dvierka:** DRUHÉ seed pravidlo `zavesy-sklop` (rovnaké `bands` + door guardy ako F) s `applies_to: {role: flap, flap_dir: down}` — `applies_to.role` je skalár, pravidlo dvierok ostáva na `front_door` (Codex #327 kolo 3); `apply_rule` sa naučí filter `flap_dir`; položky nesú `params.use_type = 'door'`
   (sety `use_type fall` — vzpery — ostávajú mimo V1 a `USE_TYPE_GENERIC` sa nemení; test: sklop nikdy nevydá `lift` položku) · nový rule kind `lift_class`: **HK top:
