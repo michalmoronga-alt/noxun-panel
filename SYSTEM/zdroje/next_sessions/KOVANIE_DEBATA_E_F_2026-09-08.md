@@ -65,3 +65,14 @@ Staré rady (HL 20L2x00.05 = 23790–23793, ramená 197609/197610) sa dopredáva
 
 Packages **KOV-W**, **KOV-F**, **KOV-E** (plné znenie v [PLAN.md](../../PLAN.md), blok KOVANIE). Audity: W nie (aditívne kľúče), F áno (Sol — nový kind, mapovacie kľúče, náhrada seed pravidla),
 E áno (Astra — config čela, nový kind, sety, dátový balík).
+
+## E. Audity návrhu (8.9.2026 popoludní) — čo zmenili v packages (v2)
+
+- **Sol audit KOV-F (Codex CLI, 2 BLOCKER + 7 FIX + 1 NOTE):** starší plugin neznámy kind preskočí (žiadne závesy) → dopredná brána `CONFIG_SCHEMA` 8 → 9 + `STD` bump;
+  aditívne triedne mapovanie by prepísalo vlastný výber setu → kľúče sa odvodzujú z účinného legacy mapovania a existujúci kľúč sa nikdy neprepíše; nad 2800 mm RED s nápravou
+  zámkom; seed sety potrebujú úplnú klasifikáciu (výrobca povinný); per-krídlo override mimo F; obnova setov + mapovania automaticky v `ensure_project_state!`; hmotnostná
+  kontrola nad výsledným počtom po zámku; prekryv pravidiel = ORANGE; editor druhu = F2; hranice pásiem Float + explicitné krídla v testoch.
+- **Codex GH #327 (docs PR, 8× P1 + 6× P2):** LF s rezervou na úchytku (`handle_allowance_kg` 0,5); prekryv ramien HL 480–540 → deterministicky 22L3800; nové pole klasifikácie
+  `lift_system` + verzia; sklop cez `door_hinges` (`use_type door`), `USE_TYPE_GENERIC` sa nemení; tyč HL do každého HL setu; `lift_class_missing` blokuje aj cenovú ponuku;
+  zber Démos dát presunutý do repa (`SYSTEM/zdroje/demos/`); KOV-W bez nového modulu (audit netreba) a jedna sémantika odhadu; D-120 a STAV zosúladené s rozhodnutím.
+
