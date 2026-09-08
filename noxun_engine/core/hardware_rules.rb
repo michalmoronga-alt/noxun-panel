@@ -261,28 +261,50 @@ module Noxun
       # rule_id) bez prepisu pouzivatelskych uprav — plati LEN pre globalnu kniznicu;
       # projektovy snapshot sa NIKDY nemeni sam (reprodukovatelnost stavby z .skp).
       def load
-        ensure_seeded
-        merged, changed = read_rules
-        return merged unless changed
-        persist_seed_merge!(merged)
-      rescue StandardError => e
-        Engine.log_error(e, 'HardwareRules.load') if defined?(Engine)
-        deep_copy(SEED_RULES)
+        load_state.first
       end
 
-      # CISTE citanie + seed-merge BEZ zapisu -> [pravidla, changed].
+      # KOV-F1 (Codex #329 kolo 2 P1): `load` + PRIZNAK nekompatibilnej
+      # kniznice -> [pravidla, blocked]. Sam `load` priznak zahadzuje, takze
+      # volajuci, ktory na zaklade pravidiel nieco ZVECNUJE (dnes jediny:
+      # `ensure_project_rules!`), by nedokazal rozlisit „precitane z kniznice,
+      # ktorej rozumieme" od „orezany odtlacok kniznice z novsieho pluginu".
+      def load_state
+        ensure_seeded
+        merged, changed, blocked = read_rules
+        return [merged, blocked] unless changed
+
+        [persist_seed_merge!(merged), false]
+      rescue StandardError => e
+        Engine.log_error(e, 'HardwareRules.load_state') if defined?(Engine)
+        [deep_copy(SEED_RULES), false]
+      end
+
+      # CISTE citanie + seed-merge BEZ zapisu -> [pravidla, changed, blocked].
       #
       # KOV-F1 (dopredna brana `std`): dokument z NOVSIEHO pluginu sa CITA
       # (zakazka sa musi dat dokoncit), ale NIKDY sa doň nezapisuje ani sa
       # nemerguje seed — `normalize_rules` je tolerantna a pole, ktoremu
       # nerozumieme, by ticho zahodila; prvy zapis by stratu zvecnil.
+      # TRETI PRVOK (`blocked`) je prave ten stav: obsah sa POUZIT smie, ale
+      # ZVECNIT nie (Codex #329 kolo 2 P1).
       def read_rules
         doc = JsonFileStore.read(path, copy: false)
         rules = doc.is_a?(Hash) ? doc['rules'] : nil
-        return [deep_copy(SEED_RULES), false] unless rules.is_a?(Array)
-        return [normalize_rules(rules), false] if doc_std_unsupported?(doc)
+        return [deep_copy(SEED_RULES), false, false] unless rules.is_a?(Array)
+        return [normalize_rules(rules), false, true] if doc_std_unsupported?(doc)
 
-        merge_seed(normalize_rules(rules), doc['seed_version'].to_i)
+        merged, changed = merge_seed(normalize_rules(rules), doc['seed_version'].to_i)
+        [merged, changed, false]
+      end
+
+      # KOV-F1 (Codex #329 kolo 2 P1): je GLOBALNA kniznica z novsieho pluginu?
+      # Rovnaka otazka ako v `read_rules`, len bez nacitania pravidiel — pytaju
+      # sa jej builder (ORANGE do stavby) a `ensure_project_rules!`.
+      def library_std_unsupported?
+        doc_std_unsupported?(JsonFileStore.read(path, copy: false))
+      rescue StandardError
+        false
       end
 
       # KOV-F1: je dokument (kniznica alebo projektovy snapshot) z NOVSEJ
@@ -478,12 +500,40 @@ module Noxun
       # Vrati pravidla projektu; ak snapshot chyba, zapise don globalnu kniznicu.
       # VOLAT LEN vnutri otvorenej operacie (build/rebuild) — zapis je sucastou
       # undo kroku, ktory snapshot prvykrat potreboval.
+      #
+      # KOV-F1 (Codex #329 kolo 2 P1): z NEKOMPATIBILNEJ kniznice (std vyssi nez
+      # nas) sa snapshot NEZMRAZI — vzor R-07 `HardwareSets.ensure_project_state!`.
+      # Zmrazenie by totiz zapisalo NAS `std` nad obsahom, ktory uz presiel
+      # nasou `normalize_rules` (a tá z pásiem drží len `max`/`quantity`), takze
+      # buduce polia by ticho zmizli A brana by sa uz nikdy nespustila — zakazka
+      # by na starsom pluginu vyzerala zdravo. Stavba bezi DALEJ nad precitanym
+      # obsahom (tabulka `bands` je forward-citatelna zamerne, nikdy nevrati
+      # nulu), ale prizna sa ORANGE `hardware_rules_library_incompatible`
+      # (`CabinetBuilder.attach_rules_state_warning!`) + zapis do logu.
       def ensure_project_rules!(model)
         existing = project_rules(model)
         return existing if existing
-        rules = load
+
+        rules, blocked = load_state
+        if blocked
+          if defined?(Engine)
+            Engine.log('hardware rules: snapshot projektu sa NEZMRAZIL — ' \
+                       "#{std_block_reason('Globálna knižnica')}")
+          end
+          return rules
+        end
         set_project_rules(model, rules) if model
         rules
+      end
+
+      # KOV-F1 (Codex #329 kolo 2 P1): stav „projekt este nema vlastne pravidla
+      # a globalna kniznica sa neda bezpecne zmrazit". JEDINA autorita otazky —
+      # pyta sa jej builder (ORANGE) aj testy; poradie podmienok je dolezite
+      # (model so snapshotom je zdravy bez ohladu na kniznicu).
+      def library_incompatible_without_snapshot?(model)
+        return false if project_rules(model)
+
+        library_std_unsupported?
       end
 
       # D1b (audit F4): VEDOMA akcia "Doplnit nove predvolene pravidla" —

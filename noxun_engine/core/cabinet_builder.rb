@@ -741,6 +741,11 @@ module Noxun
           plan = Construction.build_plan(cfg, cid, hardware_rules: rules,
                                                    part_thicknesses: drawer_thicknesses(cfg, eff),
                                                    materials: part_materials(cfg, eff)) # validuje interne
+          # KOV-F1 (Codex #329 kolo 2 P1): protajsok ORANGE `library_incompatible`
+          # setov — pravidla z nekompatibilnej kniznice sa NEZMRAZILI, takze to
+          # musi byt VIDNO (inak by zakazka vyzerala zdravo a snapshot by nikdy
+          # nevznikol).
+          attach_rules_state_warning!(plan, model)
           # KOV-C2b: doplnenie CHYBAJUCEHO systemu a pripnutia receptu je zapis
           # do configu — bezi v TEJ ISTEJ operacii ako geometria (volajuci nas
           # obalil `start_operation`), takze Undo vrati oboje naraz.
@@ -787,6 +792,26 @@ module Noxun
         def attach_abs_warnings!(plan, issues)
           return plan if issues.nil? || issues.empty?
           plan[:warnings].concat(AbsRules.pick_warnings(issues))
+          BuildPlan.validate!(plan)
+          plan
+        end
+
+        # KOV-F1 (Codex #329 kolo 2 P1): ORANGE „pravidla kovania sa nedaju
+        # bezpecne prevziat". Vznika LEN v stave, ktory sa sam neopravi: projekt
+        # NEMA snapshot pravidiel a globalna kniznica je z NOVSIEHO pluginu
+        # (`ensure_project_rules!` ju preto odmietol zmrazit). Pri kazdej dalsej
+        # stavbe sa zopakuje — kym sa plugin neaktualizuje, je to trvaly stav.
+        # Warning je CABINET-level (bez part_key), Kontrola ho ukaze v kategorii
+        # „stavba" (vzor R-07 `library_incompatible` pri setoch).
+        def attach_rules_state_warning!(plan, model)
+          return plan unless defined?(HardwareRules)
+          return plan unless HardwareRules.library_incompatible_without_snapshot?(model)
+
+          plan[:warnings] << BuildPlan.warning(
+            'hardware_rules_library_incompatible',
+            'Knižnica pravidiel kovania je z novšej verzie pluginu — projekt si ju NEZMRAZIL ' \
+            '(počty kovania sú len podľa toho, čomu tento plugin rozumie). Aktualizuj plugin.'
+          )
           BuildPlan.validate!(plan)
           plan
         end
