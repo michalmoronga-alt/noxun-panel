@@ -274,7 +274,9 @@ module Noxun
         merged, changed, blocked = read_rules
         return [merged, blocked] unless changed
 
-        [persist_seed_merge!(merged), false]
+        # Codex #329 kolo 3 P2: priznak sa berie z DRUHEHO citania (pod zamkom),
+        # nie z predzamkoveho — medzi nimi mohol kniznicu nahradit novsi plugin.
+        persist_seed_merge!(merged)
       rescue StandardError => e
         Engine.log_error(e, 'HardwareRules.load_state') if defined?(Engine)
         [deep_copy(SEED_RULES), false]
@@ -328,18 +330,25 @@ module Noxun
       # instancie by zanikla. Ked seed doplnila medzitym uz ona, `changed` je
       # false a nezapisuje sa. Zlyhany zamok/citanie vrati predzamkovy
       # kandidat (nikdy holy seed).
+      #
+      # Codex #329 kolo 3 P2: vracia TU ISTU DVOJICU ako `load_state`
+      # (`[pravidla, blocked]`). Kym sa tretia hodnota druheho citania zahadzovala
+      # a `blocked` sa natvrdo hlasilo ako `false`, stacilo, aby kniznicu medzi
+      # prvym citanim a zamkom nahradil NOVSI plugin — `ensure_project_rules!`
+      # by potom orezane pravidla ZMRAZIL do .skp a brana by sa uz nikdy
+      # nespustila (presne ta strata, ktorej ma `std` branit).
       def persist_seed_merge!(fallback)
         with_catalog_lock do
           JsonFileStore.reload!(path)
-          fresh, changed = read_rules
+          fresh, changed, blocked = read_rules
           if changed && write(fresh) && defined?(Engine)
             Engine.log('hardware rules: globalna kniznica doplnena o nove default pravidla')
           end
-          fresh
+          [fresh, blocked]
         end
       rescue StandardError => e
         Engine.log_error(e, 'HardwareRules.persist_seed_merge!') if defined?(Engine)
-        fallback
+        [fallback, false]
       end
 
       # Doplni seed pravidla, ktore v kniznici chybaju (podla rule_id), a
