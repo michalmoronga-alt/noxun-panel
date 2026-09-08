@@ -83,4 +83,8 @@ E áno (Astra — config čela, nový kind, sety, dátový balík).
 - **Codex GH #327 kolo 2 (7× P1 + 2× P2):** KOV-W audit ÁNO (kontrakt deskriptora + payload) a hmotnosť čela z ROZLÍŠENEJ hrúbky (deskriptor nesie placeholder 18 mm);
   F: generický override setu na skrinke má prednosť pred triednym kľúčom projektu, nesúlad klasifikácie = RED blokáda; E: HL top fail-closed do overenia limitov, editor
   `lift_class` = E2. Nadvýška, `finite` a STD čítač sú už vo v3 (Sol kolo 2).
+- **Codex GH #327 kolo 3 (posledné; 6× P1 + 4× P2) — zapracované bez ďalšieho kola (pravidlo 3 kôl):** catch-all pásmo `nil → 7` ostáva pre staré čítače, `finite` mení
+  jeho význam len pre nové (RED); jediný register brán `BuildPlan::HW_BLOCKERS`; `hinge_set_mismatch` číta exportná brána z expanzie; sentinel mapovania `none` s round-tripom;
+  sklop cez DRUHÉ seed pravidlo (`applies_to.role` je skalár); HL pásma spojité; HL top + Tip-On nepodporované bez SKU; D-125 a STAV texty zosúladené; downgrade starším
+  pluginom = vedomé riziko do D-48 (knižnice sú per PC, updater drží obe PC aktuálne).
 
