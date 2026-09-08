@@ -65,3 +65,16 @@ presúvanie dielcov v pláne · zvyšky ako sklad · ABS v pláne · dĺžkové 
 `grain_direction: "width"` pred rozkladom (§1) · `count_max` nie je hranica → test proti dolnej hranici z plochy a ručne zostrojenému rozloženiu (§6) · NP-2 = zmena schémy
 rozpočtu (`BudgetStore`, `BUDGET_STD`) → audit ÁNO (§6) · **#323 kolo 2 P1:** test hornej hranice = počet zmestiteľných dielcov + golden fixtúry, nie ručné rozloženie (§6) ·
 RED dielec = `incomplete` → ceny podľa plánu nedostupné + RED blocker cenových exportov (§4).
+
+## 8 · Otvorené body z Codex #323 kola 3 — rieši package audit NP-1/NP-2 (rozhodnutie Michal 7.9.2026: po kole 3 uzavrieť, nálezy riešiť pri implementácii)
+
+1. **Orez per hrana** (P2): použiteľný rozmer platne = `dĺžka − 2 × orez` a `šírka − 2 × orez` (orez na oboch protiľahlých hranách); hranica v testoch kerf/orez.
+2. **Identita fyzických dielcov** (P2): vstup nesie `part_key` / odkaz na BOM riadok; každý riadok sa rozvinie na `množstvo` (× multiplier pri dupláku) obdĺžnikov
+   s deterministickou identitou výskytu `<part_key>#<n>` (n od 1); výstup ich používa v zozname per platňa.
+3. **Dolná hranica len nad umiestniteľnými dielcami** (P2): vlastnosť `plán ≥ ceil(Σ plocha / plocha platne)` platí pre dielce, ktoré sa dali umiestniť; RED dielce
+   sa testujú samostatne (`incomplete`, počet platní bez nich).
+4. **Využitie pri nule platní** (P2): materiál len s RED dielcami → `sheets = 0`, `utilization` **chýba** (nie delenie nulou), `incomplete = true`.
+5. **Fallback formát → len informatívne** (P1): pri `fallback` (formát platne chýba v katalógu) je plán informačný, „ceny podľa plánu" **nedostupné**, cena ostáva na
+   odhade, kým katalóg nemá skutočný formát.
+6. **Validácia kerf a orezu** (P1): serverovo pred otvorením operácie `BudgetStore`: konečné čísla v mm, `kerf ≥ 0`, `orez ≥ 0`, použiteľné rozmery > 0
+   (orez < polovica menšieho rozmeru platne); poškodený payload odmietnutý s hláškou; testy hraníc aj nevalidných vstupov.

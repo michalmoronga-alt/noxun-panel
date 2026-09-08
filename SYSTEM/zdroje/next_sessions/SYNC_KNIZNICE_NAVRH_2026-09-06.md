@@ -22,7 +22,7 @@ Disku (bez zámku a bez atomického CAS) robí bezpečne, a **záväzný zoznam 
 | `hardware_taxonomy.json` | `hardware_taxonomy.rb` | `assess!`, flock (R-08 vzor) | áno |
 | **`hardware_rules.json`** (globálne defaulty pravidiel kovania) | `hardware_rules.rb` | `rules_rev`, normalizácia | **áno** (produkčné pravidlo) |
 | **`abs_rules.json`** (globálne ABS defaulty) | `abs_rules.rb` | normalizácia | **áno** (produkčné pravidlo) |
-| **`dim_series.json`** (rozmerové rady) | `dim_series.rb` | — | **áno** (produkčné pravidlo) |
+| `dim_series.json` (rozmerové rady) | `dim_series.rb` | — | **nie — per PC** (Codex #323 kolo 3 P2: podľa `docs/architecture/model-a-identita.md` sú to osobné UI skratky, výber ide existujúcou zápisovou cestou modelu; Michal a Lucia majú rôzne návyky) |
 | šablóny (`templates*.json` + náhľady PNG) | `templates.rb`, `template_previews.rb` | `CONFIG_SCHEMA`, `assess_set_defs`, zametanie PNG | áno (JSON + súbory) |
 | nastavenia dodávateľa / rozpočtu (`supplier_settings.json`, sadzby, marže) | `supplier_settings.rb`, `budget_store.rb` | revízny zámok | áno |
 | spotrebiče (`appliances.json` + priečinky príloh) | S1 (nový) | podľa package S1 | áno (JSON + súbory) |
@@ -119,3 +119,22 @@ identitu artefaktov a robí detekciu (P1) · prevzatie kandidáta publikuje `R+1
 oneskorený artefakt nižšej verzie = kolízia → lineage cez `parent` namiesto čísla verzie (P1) · súbory obsahovo adresované s digestmi v artefakte (P1) · `StoreRegistry` ako
 SYNC-0, nie guard nad neexistujúcimi registráciami (P2) · **#323 kolo 2 P1:** `supersedes` v každom artefakte, manifest len zrkadlí · rekonštrukcia manifestu cez pokrytie
 lineage, nie „najvyššia verzia" · zametanie súborov dvojfázovo s ochrannou lehotou (súbory idú pred artefaktom, Disk mimo poradia).
+
+## 8 · Otvorené body z Codex #323 kola 3 — rieši package audit SYNC-0/1/3 (rozhodnutie Michal 7.9.2026: po kole 3 uzavrieť, nálezy riešiť pri implementácii)
+
+Každý bod má zapísaný **smer riešenia**; package ho musí prevziať alebo vedome zamietnuť v audite.
+
+1. **Úplnosť publikácie pred spotrebou** (P1): Disk doručuje manifest, artefakt a súbory nezávisle a mimo poradia → pred obnovou manifestu aj pred importom musí byť
+   cieľ manifestu **aj každý digestom adresovaný súbor prítomný a overený** (digest sedí); inak lokálny stav ostáva nezmenený a skúsi sa znova po propagácii.
+2. **Bootstrap prvej synchronizácie** (P1): oba PC už majú naplnené store-y bez `base_artifact`. Explicitný tok: prvé PC **publikuje** každý store ako `r0001` (parent nil);
+   druhé PC pri prvom pripojení **porovná** lokálny obsah s publikovaným — zhoda → prevezme `base_artifact`; rozdiel → **konflikt §4 s kandidátom „môj lokálny stav"**
+   (publikuje ho ako odbočku), nikdy tiché prevzatie ani tichý prepis.
+3. **JSON + súbory ako jedna lokálna transakcia** (P1): kandidát sa celý **nastaví do staging** (JSON + všetky súbory, overené digesty) a prepne sa **generácia** naraz
+   (adresár generácie + ukazovateľ), pri zlyhaní sa vráti celá generácia; `.bak` JSON-u nestačí.
+4. **Dôkaz lineage pri zametaní** (P1): prerezanie na posledných N artefaktov nesmie zmazať riešiaci predok s jediným `supersedes` záznamom → pred prerezaním sa publikuje
+   **kontrolný artefakt** (checkpoint) s **úplnou množinou pokrytých id**; zametanie maže len to, čo checkpoint pokrýva.
+5. **Kontrola lokálnych zmien pod zámkom store** (P1): dve inštancie SketchUpu na jednom PC — import hook registry dostane **očakávaný hash lokálneho stavu** a porovná ho
+   znova **pod existujúcim medziprocesovým zámkom store** tesne pred prepísaním; nezhoda = odmietnutie a nový pokus.
+6. **Čítanie Disku bez únikov vlákien** (P2): vlákno zaseknuté vo Windows I/O sa nezabíja (vzor updatera) → **single-flight**: na jednu cestu jeden živý čítací worker,
+   opakované kontroly (štart, Odoslať, Aktualizovať) ho **znovu použijú** a zahodia až po reálnom dobehu.
+7. `dim_series` je per PC (§1 opravené; P2).
