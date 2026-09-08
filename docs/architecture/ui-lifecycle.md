@@ -2129,6 +2129,16 @@ opraviť); mená kľúčov drží `RD_GUARD_KEYS` ako **zrkadlo** serverových `
 a je **zbalený** — súhrn v lište (`rdGuardSummary`, čistá funkcia) povie, čo skrýva („+1 nad 600 mm · varovanie nad 800 mm · 2 hmotnostné pásma · konečná tabuľka"), otvorený
 stav si pamätá `RD_GUARD_OPEN` **podľa `rule_id`** (nie indexu — pravidlá sa môžu preskupiť), takže pridanie hmotnostného pásma (= prekreslenie formulára) blok nezavrie.
 
+**Codex #330 (v0.9.52) — dve veci, ktoré blok robí sám.** (1) **Tvar zo snapshotu nesmie zhodiť sekciu:** `weight_bands` (a rovnako `bands` aj `series`) prechádza bránou
+`rdArr` (`Array.isArray(v) ? v : []`), takže hash, reťazec či číslo z cudzieho alebo pokazeného záznamu sa vykreslí ako **prázdna tabuľka s jantárovým hintom** („hmotnostné
+pásma sú v uložených dátach v nesprávnom tvare… uložením sa pokazený údaj odstráni", trieda `.rgbad`) a v zbalenej lište ako „hmotnostné pásma: neplatný tvar" (`rdWeightBroken`;
+reťazec má `.length`, takže bez toho by lišta hlásila pásma, ktoré neexistujú). Sekcia sa kreslí **jedným `innerHTML`**, takže bezpodmienečný `.forEach` nad takou hodnotou by
+zhodil CELÚ sekciu Pravidlá — teda aj jediné miesto, kde sa dá tá hodnota opraviť; takto ju **opraví uloženie** (zber píše len to, čo je vo formulári, a kľúč zmizne). Server
+robí ten istý krok zo svojej strany — `normalize_rules` mení ne-pole na `[]`, viď [hardware.md](hardware.md). (2) **Súhrn nesmie zaostať za formulárom:** pri **zbalení** bloku
+(`rdGuardToggle` → `rdGuardRefresh`) sa formulár preberie **tým istým zberom ako pri ukladaní** (`rdSyncFromForm`) a text lišty sa prepíše. Hodnoty polí totiž žijú len v DOM
+(do `RD_RULES` sa preberajú až pri „+ pásmo" / „✕" / Uložiť), takže bez tohto kroku by lišta po úprave ukazovala stav spred otvorenia. **Prekresliť sa nesmie** — `rdRender` by
+zahodil `<details>`, nad ktorým práve beží udalosť (a s ním zameranie), preto sa mení iba text `.rgsum`.
+
 **Zber (`rdCollectGuards`) NEPOSIELA tvar, ktorý by server ticho zahodil.** Kľúč, ktorý používateľ nevyplnil, sa **nezapíše** — a prázdne pole je zároveň jediný spôsob, ako
 kontrolu vypnúť (vzor „prázdne pole je AUTO"): nekladná alebo prázdna šírka = guard preč (rovnaký výsledok ako `normalize_width_plus!`), chýbajúci počet kusov = **1** (rovnaký
 clamp, aký má editor výškových pásiem), odškrtnutý prepínač = kľúč `finite` preč (nikdy `false`). **Výnimkou sú hmotnostné pásma:** riadok, ktorý používateľ vedome pridal, sa

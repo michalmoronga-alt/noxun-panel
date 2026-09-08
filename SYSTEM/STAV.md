@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.9.51 · 9.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.9.52 · 9.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -21,7 +21,7 @@ a rád (`core/hardware_taxonomy.rb`) a vytiahla katalóg aj editor setu na obraz
 **Pozor na kompatibilitu:** čo uloží v0.9.20, to **v0.9.18 už nepoužije** — model/šablóna (`CONFIG_SCHEMA` 4 + brána `assess_set_defs`), knižnica setov aj projektový snapshot
 (`std` 3) a katalóg kovania s výrobcom (`schema` 2). Pred prvou takou zákazkou aktualizovať **obe PC** (D-52 updater).
 
-**Testy k v0.9.51:** **3510 headless** · 98 JS sád · posledný plný in-SketchUp beh **2028 PASS / 0 FAIL** (nad vetvou KOV-F1, 9.9.; F2 je UI dávka, in-SU nebežal) — vrátane sekcie `run_kovf` (závesy, `hinge_stale` aj „prestavba sama nestačí").
+**Testy k v0.9.52:** **3511 headless** · 98 JS sád · posledný plný in-SketchUp beh **2028 PASS / 0 FAIL** (nad vetvou KOV-F1, 9.9.; F2 je UI dávka, in-SU nebežal) — vrátane sekcie `run_kovf` (závesy, `hinge_stale` aj „prestavba sama nestačí").
 
 ## Robí sa
 
@@ -32,7 +32,7 @@ a rád (`core/hardware_taxonomy.rb`) a vytiahla katalóg aj editor setu na obraz
 **KOV-C KOMPLET:** C1 jadro (#302), C2a príprava (v0.9.30), C2b aktivácia (#304, v0.9.31), C2b-M materiálový kanál (#305, v0.9.32) a **C2c UI zásuviek** (v0.9.33).
 **KOV-D (package v2, PR #307, #20): slice D je KOMPLET (v0.9.42, 7.9.2026)** — D1a (0.9.34) · D1b (0.9.35) · D1c (0.9.36) · D2a (0.9.37) · D2b (0.9.38) · D3a/D3b (0.9.39/40) ·
 D4 (0.9.41) · D5 (0.9.42); 8 PR za deň (#310–#317). **KOV-W (hmotnosť dielcov + D-125) HOTOVÁ (v0.9.47)** — podklad pre závesy a výklopy.
-**KOV-F KOMPLET** — jadro závesov (v0.9.50) + **editor door guardov v Pravidlách (F2, v0.9.51)**; z bloku KOVANIE ostáva **E → G → I** (packages v [PLAN.md](PLAN.md)); minor bump až pri uzávere celého bloku.
+**KOV-F KOMPLET** — jadro závesov (v0.9.50) + **editor door guardov v Pravidlách (F2, v0.9.51; fix kolo Codex #330 — v0.9.52)**; z bloku KOVANIE ostáva **E → G → I** (packages v [PLAN.md](PLAN.md)); minor bump až pri uzávere celého bloku.
 **Od 3.9. opäť Fable (Max, ~mesiac; priorita = uzavrieť V1)** — orchestruje Fable, implementujú Opus subagenti, review Codex; vstupný bod je [zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md](zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md) + tento súbor. **Limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok

@@ -189,7 +189,10 @@ sa presne to, čo sa zapíše). Vynucuje sa: `kind == 'bands'` so `enabled != fa
 neprázdny rad `series`; **KOV-F1 (Codex #329 kolo 3 P2):** `bands` so `finite: true` navyše potrebuje **aspoň jedno ČÍSELNÉ pásmo** — konečná tabuľka,
 v ktorej ostal len catch-all, nie je tabuľka (catch-all by dal svoj počet každému čelu a každé by zároveň bolo „mimo tabuľky"); **KOV-F2 (v0.9.51):** keď pravidlo
 nesie `weight_bands`, musí to byť **použiteľná tabuľka** — neprázdna (`weight_bands_problem`), každé pásmo s **kilogramami > 0** a **žiadne dve pásma s rovnakou
-hmotnosťou** (druhé by bolo mŕtve). Sú to práve tie tri tvary, ktoré `normalize_rules` **nechá tak**: poradie zoraďuje sama (neusporiadané pásma teda **nie sú
+hmotnosťou** (druhé by bolo mŕtve). **Codex #330 (v0.9.52):** kľúč `weight_bands` sa pritom normalizuje **v každom tvare**, nie len keď je poľom — hash, reťazec či číslo
+z pokazeného alebo cudzieho snapshotu sa mení na **prázdne pole**, aby editor v paneli vždy dostal tabuľku a nie tvar, nad ktorým padne (viď [ui-lifecycle.md](ui-lifecycle.md));
+použiteľné pásmo tým nezaniká (pásma sú Hash v poli) a prázdnu tabuľku brána ďalej **odmieta**, takže nezmysel v modeli ticho neostane. Tri kritériá vyššie sú práve tie tvary,
+ktoré `normalize_rules` **nechá tak**: poradie zoraďuje sama (neusporiadané pásma teda **nie sú
 chyba používateľa**) a pásmo s neplatným počtom **zahodí** — keď vypadnú všetky, chytí to vetva „prázdne". Neplatný `width_plus`/`width_warn_over` sa do brány
 nikdy nedostane (normalizácia ho zahodí — kontrakt F1 „radšej žiadny guard než hádanie"), takže do modelu sa nezmysel nedostane ani bez vety; editor taký tvar
 navyše **ani neposiela** (prázdne alebo nekladné pole = kontrola vypnutá, chýbajúci počet = 1 — viď [ui-lifecycle.md](ui-lifecycle.md)). Kritérium visí na

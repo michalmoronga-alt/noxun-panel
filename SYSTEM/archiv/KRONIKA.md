@@ -17,6 +17,16 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-F2 fix kolo — POKAZENÉ DÁTA UŽ NEZHODIA SEKCIU A SÚHRN NEZAOSTÁVA (Codex #330 kolo 1, 2× P2; v0.9.52, 9.9.2026).**
+  Prvý nález: keď v uloženom pravidle boli hmotnostné pásma v **nesprávnom tvare** (nie zoznam — napr. jeden objekt alebo text z cudzieho či pokazeného snapshotu),
+  editor sa ich pokúsil prejsť riadok po riadku a **spadla celá sekcia Pravidlá** — teda aj jediné miesto, kde sa taká hodnota dá opraviť. Teraz sa taký stav vykreslí
+  ako **prázdna tabuľka s jantárovým vysvetlením** („uložené dáta majú nesprávny tvar… uložením sa pokazený údaj odstráni") a zbalená lišta to prizná tiež; **Uložiť**
+  pravidlo vyčistí. Tá istá brána tvaru (`rdArr`) chráni aj tabuľku výšok a rad dĺžok. Server robí ten istý krok zo svojej strany — `normalize_rules` premení ne-zoznam
+  na prázdny zoznam a zápisová brána prázdnu tabuľku ďalej **odmieta**, takže nezmysel v modeli ticho neostane.
+  Druhý nález: po úprave poľa a **zbalení** bloku ukazoval súhrn v lište hodnotu **spred úpravy** (hodnoty formulára do dovtedy žili len v okne). Zbalenie teraz
+  formulár preberie **tým istým zberom ako Uložiť** a text lišty prepíše — bez prekreslenia, aby blok, na ktorom práve beží klik, nezmizol pod rukami.
+  **Testy:** 3511 headless (+1) · 98 JS sád (sada `test_kovf2_editor_zavesy.js` +2 sekcie, 75 assertov). Obe opravy mutačne overené (po vypnutí opravy nový test padne).
+
 - **KOV-F2 — KONTROLY DVIEROK SA DAJÚ NASTAVIŤ (editor door guardov v Pravidlách; PR #330, v0.9.51, 9.9.2026).**
   F1 dala pravidlu závesov voliteľné kontroly (`width_plus`, `width_warn_over`, `weight_bands`, `finite`), ale sekcia Pravidlá ich vedela len **prečítať jednou vetou** —
   používateľ videl tabuľku výšok a netušil, prečo mu pri širokom krídle vyšiel záves navyše, a už vôbec to nevedel zmeniť. F2 z nich robí **formulár**: zbaliteľný blok
