@@ -166,6 +166,26 @@ NxTest.test('D-121b: `cut_name` — hranica tokenu, `/` bez konca, jedno dlhe sl
   NxTest.assert_equal('Polička pod', v.cut_name('Polička pod televízorom veľká'))
 end
 
+NxTest.test('D-121b: okrajovy vstup NIKDY nedá prazdny nazov (zaciatocna medzera, len oddelovace)') do
+  # Sonda orchestratora 8.9.: bez `strip` a zalozneho tvrdeho rezu dal
+  # " Polickapodtelevizorom" (jediny oddelovac na indexe 0) prazdny retazec —
+  # a prazdny nazov je chybny riadok objednavky.
+  v = NxD121b.vepo
+  # 21 znakov bez oddelovaca -> strip a tvrdy rez na 20 (nie prazdno)
+  NxTest.assert_equal('Polickapodtelevizoro', v.cut_name(' Polickapodtelevizorom'))
+  NxTest.assert_equal('Y' * 20, v.cut_name(' ' + 'Y' * 30))
+  NxTest.refute(v.cut_name('/' * 25).empty?, 'len oddelovace -> tvrdy rez, nie prazdno')
+  # krajne medzery nepatria do nazvu riadku (a kratky nazov nie je „orezany")
+  info = v.row_name_info('names' => [' Dno '], 'free_names' => [' Dno '],
+                         'kde' => [{ 'owner_id' => 'BRD-1' }])
+  NxTest.assert_equal('Dno d1', info['name'])
+  NxTest.refute(info['cut'], 'strip nie je orez')
+  long = v.row_name_info('names' => [' Polickapodtelevizorom'], 'free_names' => [' Polickapodtelevizorom'],
+                         'kde' => [{ 'owner_id' => 'BRD-1' }])
+  NxTest.assert_equal('Polickapodtelevizoro', long['name'])
+  NxTest.assert(long['cut'])
+end
+
 NxTest.test('D-121b: v ziadnom `row_name` nie je vypustka a nic nepresiahne 20') do
   d = NxD121b
   [['X' * 100], ['Doska pod umyvadlo velka'], ['Polica 2', 'Polica 3', 'Polica 40'],

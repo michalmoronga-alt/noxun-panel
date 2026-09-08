@@ -395,7 +395,10 @@ module Noxun
       def row_name_info(row)
         names = Array(row['names']).reject { |n| n.to_s.empty? }
         names = [row['name']] if names.empty? && row['name']
-        full = join_names(names.compact, row['free_names'])
+        # Krajne medzery nepatria do nazvu riadku (volny nazov dosky " Polička"
+        # by inak presiel do CSV aj s medzerou a `cut_name` by ho porovnaval
+        # s orezanym tvarom ako „zmeneny").
+        full = join_names(names.compact, row['free_names']).strip
         full = 'dielec' if full.empty?
         base = cut_name(full)
         tokens = owner_tokens(row['kde'])
@@ -420,17 +423,22 @@ module Noxun
       # nazov dosky) oddelovac nema — tam plati tvrdy rez.
       # VYPUSTKA `…` sa NEPOUZIVA: minie znak z 20 a nalepka VEPO interpunkciu
       # aj tak netlaci.
+      # Okrajove vstupy (volny nazov dosky so ZACIATOCNOU medzerou alebo len z
+      # oddelovacov) nesmu dat PRAZDNY nazov — to by bol chybny riadok
+      # objednavky: krajne medzery idu prec este pred rezom a ked po zahodeni
+      # rozseknuteho tokenu neostane nic, plati tvrdy rez.
       def cut_name(name)
-        s = name.to_s
+        s = name.to_s.strip
         return s if s.length <= NAME_MAX
 
         head = s[0, NAME_MAX]
         nxt = s[NAME_MAX]
         unless nxt == ' ' || nxt == '/'
           at = head.rindex(%r{[ /]})
-          head = head[0, at] if at
+          head = head[0, at] if at&.positive?
         end
-        head.rstrip.sub(%r{/+\z}, '').rstrip
+        out = head.rstrip.sub(%r{/+\z}, '').rstrip
+        out.empty? ? s[0, NAME_MAX].strip : out
       end
 
       # Skratka JEDNEHO nazvu dielca. Neznamy nazov (samostatna doska = volny
