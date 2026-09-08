@@ -16970,6 +16970,7 @@ module NoxunSuRunner
       kovf_counts(model)
       kovf_tipon(model)
       kovf_out_of_table(model, markers)
+      kovf_stale(model)
       kovf_cabinet_set(model)
     ensure
       r03_clear_markers(model, markers)
@@ -17120,7 +17121,48 @@ module NoxunSuRunner
     cleanup(model)
   end
 
-  # --- 4) VLASTNY SET SKRINKY prezije prestavbu -------------------------------
+  # --- 4) REOPEN: skrinka ULOZENA PRED tabulkou (`hinge_stale`) ---------------
+  #
+  # Codex #329 kolo 2 P1. Zakazka rozrobena v starsej verzii ma v .skp zavesy
+  # spocitane podla STAREJ tabulky (bez +1 nad 600 mm, bez klasifikacie) a nova
+  # vetva cita LEN ULOZENE hodnoty — bez brany by nakup presiel s poddimenzovanym
+  # poctom. Sonda „stareho pluginu" je ZAPIS MARKERA `config_schema` o jedno
+  # nizsie nez `HINGE_ACTIVATION_SCHEMA` priamo do ulozeneho configu (vzor
+  # `r12_make_future!` — presne to, co by v subore nechala starsia verzia).
+  # Meria sa: RED v Kontrole · zastavene 3 vystupy · VEPO bezi · PRESTAVBA RED
+  # zhasne.
+  def kovf_stale(model)
+    inst = kovf_build(model, 900.0, 700.0)
+    return ok('KOV-F stale: vlozenie korpusu', false) unless inst
+
+    cfg = e::Store.config(inst) || {}
+    old = e::CabinetBuilder::HINGE_ACTIVATION_SCHEMA - 1
+    e::CabinetBuilder.guarded do
+      model.start_operation('SU-TEST KOV-F stara schema', true)
+      e::Store.write_config(inst, cfg.merge('config_schema' => old))
+      model.commit_operation
+    end
+    collected = e::Bom.collect(model)
+    red = Array(e::ProductionCore.control_payload(collected)['items'])
+          .select { |i| i['category'] == e::Validation::CAT_HARDWARE_CONFLICT }
+    ok("KOV-F stale: skrinka zo schemy #{old} dostane RED „prestav ju\" (#{red.length})",
+       red.length == 1 && red.first['severity'] == 'red')
+    exp = e::ProductionCore.hardware_expansion(model, collected)
+    ok('KOV-F stale: brana zastavuje nakup, rozpocet aj cenovu ponuku',
+       !e::ProductionCore.drawer_stop(collected, exp).nil?)
+    ok('KOV-F stale: VEPO bezi dalej (geometria je spravna)',
+       e::ProductionCore.hardware_blockers(collected, exp, scope: :kit).empty?)
+
+    # NAPRAVA: prestavba prepise marker na aktualny a RED zhasne.
+    kovf_reshape(model, inst, 900.0, 700.0)
+    ok("KOV-F stale: po prestavbe je schema aktualna (#{(e::Store.config(inst) || {})['config_schema']})",
+       (e::Store.config(inst) || {})['config_schema'].to_i == e::CabinetBuilder::CONFIG_SCHEMA)
+    ok('KOV-F stale: a Kontrola uz nic nehlasi',
+       kovf_ctrl(model).none? { |i| i['category'] == e::Validation::CAT_HARDWARE_CONFLICT })
+    cleanup(model)
+  end
+
+  # --- 5) VLASTNY SET SKRINKY prezije prestavbu -------------------------------
   #
   # Genericky override skrinky (`hardware_sets['hinge']`) stoji NAD triednym
   # klucom projektu (Codex #327 kolo 2). Keby po prestavbe spadol na projektovu
@@ -18328,7 +18370,7 @@ module NoxunSuRunner
     run_kovd4(model)         # KOV-D4: PAMAT pri prechode na dvierka — prechod zasuvka -> dvierka -> zasuvka ide TOU ISTOU cestou ako panel (klient serverove polia neposiela): pripnuty recept aj zamok NL prezije, dormantny zamok NEMA chipy osi, po navrate sa zamok znovu VALIDUJE stavbou (dlzka, geometria aj nakupny kit); zmena otvarania pripne INY recept a stary zamok ostava dormantny (dlzka je z automatu, riadok nesvieti ako aktivny), navrat na classic ho zase aktivuje
     run_kovd5(model)         # KOV-D5: ABS farbenie dielcov zasuviek — chrbat Atiry ma pasku na HORNEJ ploske (dolna aj velke plochy cisté), dno ziadnu; Quadro bok boxu aj vnutorne celo tiez HORE; Kontrola olepov zvyrazni TU ISTU ploskou (aj pri starom modeli, kde osi pochadzaju z ROLY); Spat aj Redo mapovanie nemenia a prestavba starej zakazky farbu doplni
     run_kovw(model)          # KOV-W: hmotnost dielcov v ZIVOM retazci katalog -> skrinka -> snapshoty -> Inspector -> Kontrola: pri znamej hustote sedi sucet zo snapshotov s planom (±0,05 kg) a nic sa neuklada do modelu; typ BEZ hustoty (nie UNI) da tazsi odhad, PRESNE JEDEN build warning na skrinku a ORANGE v Kontrole; UNI dielec odhad zachova, ale hmotnostny nalez sa v Kontrole POTLACI (hlasi sa len „materiál neurčený"); Spat vracia hmotnost spolu s materialom
-    run_kovf(model)          # KOV-F1: zavesy podla NOXUN tabulky — pocty z REALNEJ sirky kridla (1250 -> 3, 850 -> 3, kridlo 800 x 700 -> 2+1), varovanie sirky nad 800 mm v Kontrole, Tip-On celo dostane P2O set + PRESNE JEDEN piest na kridlo (klasicke celo klasicky set), dvierka nad tabulkou vydaju polozku 7 ks + RED „mimo tabuľky" so zastavenym nakupom/rozpoctom/ponukou (VEPO bezi dalej), rucny zamok poctu RED zhasne v JEDNOM kroku Spat (aj Redo), vlastny set skrinky prezije prestavbu
+    run_kovf(model)          # KOV-F1: zavesy podla NOXUN tabulky — pocty z REALNEJ sirky kridla (1250 -> 3, 850 -> 3, kridlo 800 x 700 -> 2+1), varovanie sirky nad 800 mm v Kontrole, Tip-On celo dostane P2O set + PRESNE JEDEN piest na kridlo (klasicke celo klasicky set), dvierka nad tabulkou vydaju polozku 7 ks + RED „mimo tabuľky" so zastavenym nakupom/rozpoctom/ponukou (VEPO bezi dalej), rucny zamok poctu RED zhasne v JEDNOM kroku Spat (aj Redo), skrinka ULOZENA PRED tabulkou (schema 8) dostane RED „prestav ju" so zastavenymi 3 vystupmi a prestavba ho zhasne, vlastny set skrinky prezije prestavbu
     run_d118b(model)         # D-118b: PTOs modul a vedome prazdna bunka v ZIVOM retazci kniznica -> predvolby projektu -> vlozena Tip-On zasuvka -> nakup: pri NL 470 pribudne modul 352908 (1 ks, nazov z katalogu), pri NL 620 (kit typu PTO) modul VEDOME nepribudne a NEVZNIKNE ziadna oranzova; snapshot nesie std 5 a config schemu 8
     run_async(model, nil)
   rescue StandardError => ex
