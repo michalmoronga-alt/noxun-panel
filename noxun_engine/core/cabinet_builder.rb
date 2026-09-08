@@ -724,7 +724,8 @@ module Noxun
           # z nespravnej hrubky dna.
           eff = effective_materials(model, cfg)
           plan = Construction.build_plan(cfg, cid, hardware_rules: rules,
-                                                   part_thicknesses: drawer_thicknesses(cfg, eff)) # validuje interne
+                                                   part_thicknesses: drawer_thicknesses(cfg, eff),
+                                                   densities: part_densities(cfg, eff)) # validuje interne
           # KOV-C2b: doplnenie CHYBAJUCEHO systemu a pripnutia receptu je zapis
           # do configu — bezi v TEJ ISTEJ operacii ako geometria (volajuci nas
           # obalil `start_operation`), takze Undo vrati oboje naraz.
@@ -1024,6 +1025,36 @@ module Noxun
           out
         end
 
+        # --- KOV-W: hustoty materialov PRED planom ---------------------------
+        #
+        # Rovnaky vzor ako `drawer_thicknesses`: plan potrebuje hustotu ako
+        # VSTUP (hmotnost sa anotuje na dielce PRED pravidlami kovania), a
+        # katalog vie citat len builder. Vracia hustoty per MATERIALOVY KANAL
+        # (`effective_materials`) + per-part overridy z `part_overrides`.
+        # nil hodnota = hustota nie je znama (UNI, typ mimo registra, material
+        # mimo katalogu) — plan z nej spravi TAZSI odhad, nikdy nulu.
+        # ZIADNY zapis do modelu, ziadna zmena geometrie.
+        def part_densities(cfg, eff)
+          channels = Construction::CHANNELS.each_with_object({}) do |ch, out|
+            out[ch] = sheet_density(eff[ch])
+          end
+          overrides = cfg[:part_overrides].is_a?(Hash) ? cfg[:part_overrides] : {}
+          parts = {}
+          overrides.each do |key, ov|
+            mid = ov.is_a?(Hash) ? ov['material_id'] : nil
+            parts[key.to_s] = sheet_density(mid) if present(mid)
+          end
+          { 'channels' => channels, 'parts' => parts }
+        end
+
+        # Hustota materialu z katalogu (kg/m3), alebo nil — neznamy zaznam aj
+        # UNI. Jediny zdroj je `Materials.density_for` (register TYPOV).
+        def sheet_density(material_id)
+          return nil unless material_id && defined?(Materials)
+
+          Materials.density_for(Materials.sheet(material_id))
+        end
+
         # Katalogova hrubka materialu, alebo nil (bez katalogu / neznamy zaznam).
         # nil = volajuci (Construction) pouzije UNI 16 fallback.
         def sheet_thickness(material_id)
@@ -1283,16 +1314,18 @@ module Noxun
 
         # Base material dielca podla roly: cela -> front, chrbat -> back, ostatne -> body (korpus).
         # pd[:material] (:front/:korpus) z Construction je sekundarny signal (cela maju :front).
+        # KOV-W: KTORY kanal dielec dedi, urcuje `Construction.material_channel`
+        # — jedine miesto pravdy (anotacia hmotnosti sa pyta tam istam; druhy
+        # opisany `case` by sa rozisiel a hmotnost by sa ratala z inej dosky,
+        # nez akou je dielec postaveny). KOV-C2b: 4. kanal — dielce zasuviek
+        # dedia PREDVOLBU ZASUVIEK (skrinka -> projekt -> UNI 16), nie telo
+        # ani celo.
         def base_material_for(role, mat_sym, eff_body, eff_front, eff_back, eff_drawer = nil)
-          case role.to_s
-          when 'front_door', 'drawer_front', 'flap', 'false_front' then eff_front
-          when 'back' then eff_back
-          # KOV-C2b: 4. kanal — dielce zasuviek dedia PREDVOLBU ZASUVIEK
-          # (skrinka -> projekt -> UNI 16), nie telo ani celo.
-          when *DRAWER_ROLES then eff_drawer || eff_body
-          else
-            return eff_drawer || eff_body if mat_sym == :drawer
-            mat_sym == :front ? eff_front : eff_body
+          case Construction.material_channel(role, mat_sym)
+          when Construction::CHANNEL_FRONT then eff_front
+          when Construction::CHANNEL_BACK then eff_back
+          when Construction::CHANNEL_DRAWER then eff_drawer || eff_body
+          else eff_body
           end
         end
 

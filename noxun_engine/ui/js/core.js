@@ -741,6 +741,41 @@
       type: NX_TYPE_LABEL[p.type] || NX_TYPE_LABEL.lower
     };
   }
+  // --- KOV-W / D-125: riadok HMOTNOST informacneho stlpca --------------------
+  // Cista funkcia nad payloadom skrinky (`weight_kg`, `weight_estimated_parts`,
+  // `weight_estimated_density`) — panel NIC nedopocitava, sucet robi server
+  // (`Bom.weight_totals`). Skrinka bez vyrobnych dielcov = '—'.
+  // Ked cast dielcov nema znamu hustotu, cislo je ODHAD: znacka ≈ a tooltip,
+  // ktory nahlas povie, kolko dielcov a akou hustotou sa ratalo (rozhodnutie
+  // Michal 8.9.2026 — nikdy ticho, nikdy vynechany dielec).
+  var NX_WEIGHT_TITLE = 'Hmotnosť výrobných dielcov skrinky (Σ dĺžka × šírka × hrúbka × hustota typu)';
+  // kg s JEDNYM desatinnym miestom a slovenskou ciarkou (vzor mmLabel — cele
+  // cislo ostava bez desatinnej casti).
+  function kgLabel(v){
+    var n = parseFloat(v);
+    if (isNaN(n)) return '';
+    var r = Math.round(n*10)/10;
+    if (Math.abs(r - Math.round(r)) < 0.001) return String(Math.round(r));
+    return String(r).replace('.', ',');
+  }
+  // 1 dielec / 2-4 dielce / 5+ dielcov
+  function partsWord(n){
+    if (n === 1) return 'dielec';
+    return (n >= 2 && n <= 4) ? 'dielce' : 'dielcov';
+  }
+  function nxCabWeight(c){
+    var p = c || {};
+    var kg = parseFloat(p.weight_kg);
+    if (isNaN(kg) || kg <= 0) return { text: '—', title: NX_WEIGHT_TITLE, estimated: false };
+    var n = parseInt(p.weight_estimated_parts, 10);
+    if (isNaN(n) || n <= 0) return { text: kgLabel(kg) + ' kg', title: NX_WEIGHT_TITLE, estimated: false };
+    var d = parseFloat(p.weight_estimated_density);
+    return { text: '≈ ' + kgLabel(kg) + ' kg',
+             title: 'Hmotnosť je odhad — ' + n + ' ' + partsWord(n) + ' bez hustoty' +
+                    (isNaN(d) ? '' : ('; ráta sa ' + mmLabel(d) + ' kg/m³ (ťažšia hodnota)')) + '.',
+             estimated: true };
+  }
+
   // FIX 2: hrubkove predikaty pre filter doskovych materialov (tolerancia 0,05 mm).
   // Prazdny/neplatny cielovy rozmer -> nefiltruj (radsej vsetko nez nic).
   function thMatch(target){
@@ -1259,6 +1294,8 @@
       cabNameValue: cabNameValue, CAB_NAME_MAX: CAB_NAME_MAX,
       // UI-B3 (tests/js/test_uib3_korpus.js) — texty informacneho stlpca a typ badge
       nxCabInfo: nxCabInfo, NX_TYPE_LABEL: NX_TYPE_LABEL,
+      // KOV-W / D-125 (tests/js/test_kovw_hmotnost.js) — riadok Hmotnost
+      nxCabWeight: nxCabWeight, NX_WEIGHT_TITLE: NX_WEIGHT_TITLE,
       // D-85 (tests/js/test_ui03_combobox.js) — prevod katalogovej farby [r,g,b]
       // na hex pre stvorcek comboboxu (nxComboColorOf uz cita globalny MATERIALS)
       nxRgbHex: nxRgbHex };

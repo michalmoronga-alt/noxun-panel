@@ -694,6 +694,46 @@ module Noxun
         entry && entry['density'] ? entry['density'].to_f : nil
       end
 
+      # --- KOV-W: hmotnost dielca ------------------------------------------
+      #
+      # JEDINY vzorec hmotnosti v systeme (plan, kusovnik aj Inspector ho volaju
+      # sem): dlzka x sirka x hrubka [mm] x hustota [kg/m3] / 1e9 = kg.
+      # NEZAOKRUHLUJE — zaokruhlenie patri az tomu, kto cislo zobrazuje.
+      # Nekladny/neplatny vstup = 0.0 (degenerovany dielec vahu nema).
+      def weight_kg(length_mm, width_mm, thickness_mm, density)
+        vals = [length_mm, width_mm, thickness_mm, density].map(&:to_f)
+        return 0.0 unless vals.all? { |v| v.finite? && v.positive? }
+
+        vals.inject(:*) / 1_000_000_000.0
+      end
+
+      # KOV-W: typy VYNECHANE z fallback hustoty. Kompakt (HPL, ~1350) je
+      # extrem — z kazdeho dielca s neznamou hustotou by spravil takmer
+      # dvojnasobne tazky kus a odhad by prestal byt pouzitelny.
+      FALLBACK_DENSITY_SKIP_TYPES = %w[KOMPAKT].freeze
+
+      # KOV-W (rozhodnutie Michal 8.9.2026): hustota, ktorou sa rata dielec,
+      # ktoreho material ju NEMA (UNI, typ mimo registra, material mimo
+      # katalogu). Rata sa TAZSIE — najvyssia hustota doskoveho typu v registri
+      # okrem kompaktu (dnes HDF). Cislo sa NIKDE nepise ako literal: cita sa
+      # z TYPE_REGISTRY, takze kazda zmena registra ho posunie sama.
+      def fallback_density
+        TYPE_REGISTRY.each_with_object([]) do |(key, entry), out|
+          next if FALLBACK_DENSITY_SKIP_TYPES.include?(key)
+
+          out << entry['density'].to_f if entry['density']
+        end.max
+      end
+
+      # KOV-W: hustota zaznamu + priznak, ci je to ODHAD.
+      # -> [hustota (kg/m3), odhad?] — `nil` zaznam (material mimo katalogu)
+      # aj UNI davaju [fallback_density, true]. Dielec sa zo suctu NIKDY
+      # nevynecha; stav sa prizna (ORANGE warning + „≈" v Inspectore).
+      def density_or_fallback(rec)
+        d = density_for(rec)
+        d ? [d, false] : [fallback_density, true]
+      end
+
       # M-C: ktore ABS defaulty typ materialu POTLACA (autorita pre
       # AbsRules.resolve_edges aj semafor). :all = ziadne automaticke ABS:
       #   KOMPAKT — monoliticka hrana, nelepi sa nikdy;

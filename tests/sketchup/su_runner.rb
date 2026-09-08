@@ -16675,6 +16675,171 @@ module NoxunSuRunner
        d88_face_mat(fresh, 2, :min).nil?)
   end
 
+  # === KOV-W: HMOTNOST DIELCOV + riadok Hmotnost v Inspectore (D-125) ========
+  #
+  # Headless sada overuje vzorec a anotaciu planu nad RUCNE dodanymi hustotami.
+  # Tu ide o cely zivy retazec: KATALOG -> materialy skrinky -> stavba ->
+  # snapshoty na dielcoch -> payload Inspectora -> KONTROLA. Prave tu by sa
+  # ukazalo, keby builder hustoty do planu neposlal, keby sa Inspector pytal
+  # ineho katalogu, alebo keby sa sucet zo snapshotov rozisiel s planom.
+  #
+  # Katalog je IZOLOVANY (Materials.test_dir_override, vzor D-88/D-5): fresh
+  # seed su UNI materialy, na ktorych by sa PRESNA hmotnost nedala ani overit.
+  def kovw_catalog_json
+    sheet = lambda do |id, type, extra|
+      { 'material_id' => id, 'manufacturer' => 'Egger', 'decor' => "DEC-#{id}",
+        'type' => type, 'thickness' => 18.0, 'grain' => 'none',
+        'sheet_size' => [2800.0, 2070.0], 'color' => [200, 190, 170],
+        'production_class' => 'sheet', 'group_id' => "GRP-#{id}", 'structure' => 'SM' }.merge(extra)
+    end
+    {
+      'std' => 1, 'schema' => 2,
+      'sheets' => [
+        sheet.call('KWDTD18', 'DTDL', {}),                              # hustota z registra
+        sheet.call('KWSKLO18', 'SKLO', {}),                             # typ MIMO registra = bez hustoty
+        sheet.call('KWUNI18', 'DTDL', 'uni' => true, 'uni_role' => 'body')
+      ],
+      'edges' => []
+    }
+  end
+
+  def kovw_params(extra = {})
+    # Chrbat je tu 18 mm ZAMERNE: vsetky tri testovacie dosky maju 18 mm, takze
+    # sa da vymenit material chrbta bez toho, aby zasiahla hrubkova brana
+    # (`validate_material_thickness!`) — meria sa hmotnost, nie hrubky.
+    { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 500.0,
+      'thickness' => 18.0, 'back_thickness' => 18.0,
+      'material_id' => 'KWDTD18', 'front_material_id' => 'KWDTD18',
+      'back_material_id' => 'KWDTD18',
+      'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto',
+                                  'wings' => '1' }] } }.merge(extra)
+  end
+
+  # Hmotnost z PLANU (druha, nezavisla cesta k tomu istemu cislu — Inspector ju
+  # cita zo SNAPSHOTOV cez `Bom.weight_totals`).
+  def kovw_plan_kg(model, inst)
+    cfg = e::CabinetBuilder.normalize(e::CabinetBuilder.config_to_params(e::Store.config(inst) || {}))
+    eff = e::CabinetBuilder.effective_materials(model, cfg)
+    plan = e::Construction.build_plan(cfg, e::Store.get(inst, 'cabinet_id').to_s,
+                                      part_thicknesses: e::CabinetBuilder.drawer_thicknesses(cfg, eff),
+                                      densities: e::CabinetBuilder.part_densities(cfg, eff))
+    [plan, plan[:parts].inject(0.0) { |s, p| s + (p[:weight_kg].to_f * p.fetch(:quantity, 1)) }]
+  end
+
+  # Ulozene build warnings skrinky s danym kodom (to iste, co cita KONTROLA).
+  def kovw_warnings(inst, code)
+    Array((e::Store.config(inst) || {})['warnings']).select { |w| w.is_a?(Hash) && w['code'] == code }
+  end
+
+  # Polozky KONTROLY (zivy retazec Bom.collect -> Validation.run).
+  def kovw_ctrl(model)
+    e::Validation.run(e::Bom.collect(model), sheets: e::ProductionCore.sheets_map)['items']
+  end
+
+  def kovw_rebuild(model, inst, changes)
+    e::CabinetBuilder.rebuild(model, inst,
+                              e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+                                               .merge(changes))
+  end
+
+  def run_kovw(model)
+    cleanup(model)
+    tmp = File.join(Dir.tmpdir, "noxun_kovw_#{Process.pid}")
+    FileUtils.mkdir_p(tmp)
+    File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(kovw_catalog_json))
+    e::Materials.test_dir_override = tmp
+    e::Materials.reload!
+    begin
+      mats = e::Materials
+      ok('KOV-W: override katalogu aktivny (DTD s hustotou, SKLO bez hustoty, UNI)',
+         mats.density_for(mats.sheet('KWDTD18')) == 680.0 &&
+         mats.density_for(mats.sheet('KWSKLO18')).nil? &&
+         mats.density_for(mats.sheet('KWUNI18')).nil?)
+      inst = e::CabinetBuilder.build(model, kovw_params)
+      return ok('KOV-W: vlozenie korpusu', false) unless inst
+
+      kovw_scenar(model, inst)
+    ensure
+      e::Materials.test_dir_override = nil
+      e::Materials.reload!
+      cleanup(model)
+      begin
+        FileUtils.rm_rf(tmp)
+      rescue StandardError
+        nil
+      end
+    end
+    ok('KOV-W: cleanup (override prec, model prazdny)',
+       e::Materials.test_dir_override.nil? && cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: KOV-W vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    e::Materials.test_dir_override = nil
+    e::Materials.reload!
+    cleanup(model)
+  end
+
+  def kovw_scenar(model, inst)
+    before_ents = model.entities.length
+    # --- 1) ZNAMA hustota: plan aj Inspector davaju TO ISTE cislo -----------
+    plan, plan_kg = kovw_plan_kg(model, inst)
+    stats = e::Panel.cabinet_stats(inst)
+    ok("KOV-W: plan nesie hmotnost kazdeho dielca (#{plan[:parts].length} dielcov, #{plan_kg.round(2)} kg)",
+       plan_kg > 0.0 && plan[:parts].all? { |p| p[:weight_kg].to_f.positive? })
+    ok("KOV-W: Inspector ukazuje hmotnost skrinky (#{stats['weight_kg']} kg)",
+       stats['weight_kg'].to_f > 0.0)
+    ok("KOV-W: sucet zo SNAPSHOTOV sedi s planom (rozdiel #{(stats['weight_kg'].to_f - plan_kg).abs.round(3)} kg)",
+       (stats['weight_kg'].to_f - plan_kg).abs <= 0.05)
+    ok('KOV-W: pri znamej hustote NIE JE odhad (ziadne ≈) a nevznika warning',
+       stats['weight_estimated_parts'].to_i.zero? && stats['weight_estimated_density'].nil? &&
+       kovw_warnings(inst, 'weight_density_unknown').empty?)
+    ok('KOV-W: citanie hmotnosti NEMENI model (ziadna entita naviac ani menej)',
+       model.entities.length == before_ents)
+    ok('KOV-W: hmotnost sa NEUKLADA do configu skrinky ani na dielec',
+       !(e::Store.config(inst) || {}).key?('weight_kg') &&
+       e::Panel.manufactured_parts(inst).none? { |p| (e::Store.config(p) || {}).key?('weight_kg') })
+    ctrl = kovw_ctrl(model)
+    ok('KOV-W Kontrola: zdrava skrinka nema hmotnostny nalez',
+       ctrl.none? { |i| i['message_sk'].to_s.include?('Hmotnosť') })
+
+    # --- 2) TYP BEZ HUSTOTY (nie UNI): tazsi odhad + ORANGE -----------------
+    kovw_rebuild(model, inst, 'back_material_id' => 'KWSKLO18')
+    est = e::Panel.cabinet_stats(inst)
+    ws = kovw_warnings(inst, 'weight_density_unknown')
+    ok("KOV-W sklo: Inspector prizna ODHAD (#{est['weight_estimated_parts']} dielec, #{est['weight_estimated_density']} kg/m3)",
+       est['weight_estimated_parts'].to_i == 1 &&
+       est['weight_estimated_density'].to_f == e::Materials.fallback_density)
+    ok('KOV-W sklo: odhad je TAZSI nez presna hmotnost toho isteho chrbta',
+       est['weight_kg'].to_f > stats['weight_kg'].to_f)
+    ok('KOV-W sklo: PRESNE JEDEN build warning na skrinku (nie na dielec)',
+       ws.length == 1 && Array(ws.first['data'] && ws.first['data']['parts']).length == 1)
+    ctrl2 = kovw_ctrl(model)
+    weight_items = ctrl2.select { |i| i['message_sk'].to_s.include?('Hmotnosť') }
+    ok('KOV-W sklo: KONTROLA hlasi ORANGE odhad hmotnosti',
+       weight_items.length == 1 && weight_items.first['severity'] == e::Validation::ORANGE)
+
+    # --- 3) UNI: odhad ostava, ale hlaska sa NEZDVOJUJE ---------------------
+    kovw_rebuild(model, inst, 'back_material_id' => 'KWUNI18')
+    uni = e::Panel.cabinet_stats(inst)
+    ok('KOV-W UNI: Inspector stale prizna odhad (dielec sa zo suctu nevynecha)',
+       uni['weight_estimated_parts'].to_i == 1 && uni['weight_kg'].to_f > 0.0)
+    ok('KOV-W UNI: build warning v configu OSTAVA (diagnostika sa nestraca)',
+       kovw_warnings(inst, 'weight_density_unknown').length == 1)
+    ctrl3 = kovw_ctrl(model)
+    ok('KOV-W UNI: KONTROLA hlasi LEN „materiál neurčený", hmotnostny nalez potlaci',
+       ctrl3.none? { |i| i['message_sk'].to_s.include?('Hmotnosť') } &&
+       ctrl3.any? { |i| i['category'] == e::Validation::CAT_UNI })
+
+    # --- 4) SPAT vrati aj hmotnost (je to sucast TEJ ISTEJ operacie) --------
+    Sketchup.undo
+    back = e::Panel.cabinet_stats(inst)
+    ok('KOV-W Spat: po navrate na sklo je hmotnost zase odhad z predoslej stavby',
+       back['weight_estimated_parts'].to_i == 1)
+    Sketchup.undo
+    back2 = e::Panel.cabinet_stats(inst)
+    ok('KOV-W Spat: dalsi krok vrati DTD chrbat — hmotnost je zase presna',
+       back2['weight_estimated_parts'].to_i.zero? &&
+       (back2['weight_kg'].to_f - stats['weight_kg'].to_f).abs <= 0.05)
+  end
 
   # --- D-118b: PTOs modul a vedome prazdna bunka v ZIVOM nakupe ---------------
   #
@@ -17852,6 +18017,7 @@ module NoxunSuRunner
     run_kovd3b(model)        # KOV-D3b: CESTA Z KARTY nad dvojprvkovym fixturnym registrom — bez v2 karta ponuku nedostane vobec; s v2 nesie `upgrade.available` (plny aj lahky push), citaci callback dopadu vrati cisla (chrbat v1->v2, preneseny zamok NL, kod kitu) + ODTLACOK a NEZAPISE nic; ZMENA SKRINKY po nahlade zapis ODMIETNE bez kroku Spat (Codex #315 P1), potvrdeny zapis s tokenom a cerstvym odtlackom vymeni ref, preadresuje zamok a prestava dielce v JEDNEJ operacii (Spat = 1 krok, Redo obnovi ref+zamok+geometriu sucasne), odmietnuty preflight odpovie `ok:false` a nenechá ZIADNY krok Spat
     run_kovd4(model)         # KOV-D4: PAMAT pri prechode na dvierka — prechod zasuvka -> dvierka -> zasuvka ide TOU ISTOU cestou ako panel (klient serverove polia neposiela): pripnuty recept aj zamok NL prezije, dormantny zamok NEMA chipy osi, po navrate sa zamok znovu VALIDUJE stavbou (dlzka, geometria aj nakupny kit); zmena otvarania pripne INY recept a stary zamok ostava dormantny (dlzka je z automatu, riadok nesvieti ako aktivny), navrat na classic ho zase aktivuje
     run_kovd5(model)         # KOV-D5: ABS farbenie dielcov zasuviek — chrbat Atiry ma pasku na HORNEJ ploske (dolna aj velke plochy cisté), dno ziadnu; Quadro bok boxu aj vnutorne celo tiez HORE; Kontrola olepov zvyrazni TU ISTU ploskou (aj pri starom modeli, kde osi pochadzaju z ROLY); Spat aj Redo mapovanie nemenia a prestavba starej zakazky farbu doplni
+    run_kovw(model)          # KOV-W: hmotnost dielcov v ZIVOM retazci katalog -> skrinka -> snapshoty -> Inspector -> Kontrola: pri znamej hustote sedi sucet zo snapshotov s planom (±0,05 kg) a nic sa neuklada do modelu; typ BEZ hustoty (nie UNI) da tazsi odhad, PRESNE JEDEN build warning na skrinku a ORANGE v Kontrole; UNI dielec odhad zachova, ale hmotnostny nalez sa v Kontrole POTLACI (hlasi sa len „materiál neurčený"); Spat vracia hmotnost spolu s materialom
     run_d118b(model)         # D-118b: PTOs modul a vedome prazdna bunka v ZIVOM retazci kniznica -> predvolby projektu -> vlozena Tip-On zasuvka -> nakup: pri NL 470 pribudne modul 352908 (1 ks, nazov z katalogu), pri NL 620 (kit typu PTO) modul VEDOME nepribudne a NEVZNIKNE ziadna oranzova; snapshot nesie std 5 a config schemu 8
     run_async(model, nil)
   rescue StandardError => ex

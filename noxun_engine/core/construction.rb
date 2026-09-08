@@ -42,9 +42,49 @@ module Noxun
       # part_key ani suffix od nich nezavisia.
       DRAWER_DEFAULT_THICKNESS = 16.0
 
+      # --- KOV-W: materialovy kanal dielca -----------------------------------
+      #
+      # JEDINE miesto pravdy o tom, z KTOREHO materialoveho kanala dielec zije:
+      # `CabinetBuilder.base_material_for` (vyber efektivneho materialu) aj
+      # anotacia hmotnosti sa pytaju TU. Druhy opisany `case` by sa casom
+      # rozisiel a hmotnost by sa ratala z inej dosky, nez akou je dielec
+      # postaveny. Kanaly su kluce `effective_materials`.
+      CHANNEL_BODY   = 'body'
+      CHANNEL_FRONT  = 'front'
+      CHANNEL_BACK   = 'back'
+      CHANNEL_DRAWER = 'drawer'
+      CHANNELS = [CHANNEL_BODY, CHANNEL_FRONT, CHANNEL_BACK, CHANNEL_DRAWER].freeze
+
+      # Roly, ktore su celom Z DEFINICIE (dedia kanal `front` bez ohladu na
+      # materialovy signal deskriptora). `cover_panel` medzi nimi VEDOME nie je
+      # — o jeho kanale rozhoduje signal deskriptora, presne ako doteraz.
+      FRONT_MATERIAL_ROLES = %w[front_door drawer_front flap false_front].freeze
+
+      # role + materialovy signal deskriptora (`pd[:material]`) -> kanal.
+      def material_channel(role, mat_sym = nil)
+        r = role.to_s
+        return CHANNEL_FRONT if FRONT_MATERIAL_ROLES.include?(r)
+        return CHANNEL_BACK if r == 'back'
+        return CHANNEL_DRAWER if Recipes::PART_ROLES.include?(r)
+        return CHANNEL_DRAWER if mat_sym == :drawer
+
+        mat_sym == :front ? CHANNEL_FRONT : CHANNEL_BODY
+      end
+
       # Hlavny vstup: cfg (symbolove kluce, mm Float) + cabinet_id (pre ID zon) -> plan.
       # part_thicknesses: { part_key => mm } pre roly zasuviek (viz vyssie).
-      def build_plan(cfg, cabinet_id = 'CAB-000', hardware_rules: nil, part_thicknesses: nil)
+      # KOV-W: densities: = VOLITELNY vstup hustot materialov (kg/m3), z ktoreho
+      # sa dielcom dopocita `weight_kg`. Bez neho sa NIC nemeni (stari volajuci
+      # — migracia identity, panelove resolvery, headless testy bez katalogu —
+      # dostanu presne ten isty plan ako doteraz). Tvar:
+      #   { 'channels' => { 'body' => 680.0, 'front' => 750.0, 'back' => 870.0,
+      #                     'drawer' => 680.0 },        # nil = nezname
+      #     'parts'    => { part_key => hustota | nil } } # per-part override
+      # Per-part zaznam ma VZDY prednost pred kanalom (rovnaka precedencia ako
+      # `part_thicknesses`/`part_overrides`) — aj ked je jeho hodnota nil,
+      # lebo to znamena „material overridu hustotu nema", nie „override nie je".
+      def build_plan(cfg, cabinet_id = 'CAB-000', hardware_rules: nil, part_thicknesses: nil,
+                     densities: nil)
         w = cfg[:width]; h = cfg[:height]; t = cfg[:thickness]
 
         interior = interior_dims(cfg)
@@ -101,6 +141,12 @@ module Noxun
                              }, part_thicknesses)
         warnings.concat(drawer[:warnings])
 
+        # KOV-W: hmotnost dielcov. Bezi PRED pravidlami kovania — zavesy (F) a
+        # vyklopy (E) ju citaju ako VSTUP `weight` z deskriptora cela, takze v
+        # okamihu evaluacie uz musi byt na dielci. Anotuju sa dielce korpusu AJ
+        # dielce zasuviek (rovnake Hash objekty, do ktorych sa zapisuje).
+        annotate_weights!(parts + drawer[:parts], densities, warnings)
+
         # Kovanie z pravidiel — az PO vyradeni degenerovanych dielcov (na dielec,
         # ktory v modeli nestoji, nesmie vzniknut polozka). Kontext string-keyed.
         hw_ctx = {
@@ -146,6 +192,55 @@ module Noxun
           drawer_override_writes: drawer[:override_writes]
         }
         BuildPlan.validate!(plan)
+      end
+
+      # --- KOV-W: anotacia hmotnosti dielcov ----------------------------------
+      #
+      # Kazdemu deskriptoru dopise ADITIVNE `weight_kg` (Float, kg) a
+      # `weight_estimated` (true = hustota nebola znama a pouzil sa TAZSI
+      # fallback). Kluce su len v PAMATI planu: builder zapisuje na entitu
+      # menovity zoznam poli a `merge_final` kopiruje menovity zoznam klucov
+      # planu — do modelu ani do snapshotu sa hmotnost NEUKLADA (a `plan_schema`
+      # sa preto NEBUMPUJE).
+      #
+      # `densities` nil / bez tvaru = ziadna anotacia a ziadny warning
+      # (charakterizacia starych volajucich).
+      #
+      # Ked aspon jeden dielec bezal na fallback hustote, pribudne JEDEN ORANGE
+      # warning na skrinku (nie na dielec) so zoznamom dotknutych part_key —
+      # rozhodnutie Michal 8.9.2026: nikdy ticho, ale ani hluk per dielec.
+      def annotate_weights!(parts, densities, warnings)
+        return parts unless densities.is_a?(Hash)
+
+        channels = densities['channels'].is_a?(Hash) ? densities['channels'] : {}
+        overrides = densities['parts'].is_a?(Hash) ? densities['parts'] : {}
+        fallback = Materials.fallback_density
+        estimated = []
+        parts.each do |pd|
+          key = pd[:part_key].to_s
+          d = if overrides.key?(key)
+                overrides[key]
+              else
+                channels[material_channel(pd[:role], pd[:material])]
+              end
+          est = !(d.is_a?(Numeric) && d.to_f.finite? && d.to_f.positive?)
+          if est
+            d = fallback
+            estimated << key
+          end
+          prod = pd[:prod].is_a?(Hash) ? pd[:prod] : {}
+          pd[:weight_kg] = Materials.weight_kg(prod[:length], prod[:width], prod[:thickness], d)
+          pd[:weight_estimated] = est
+        end
+        return parts if estimated.empty?
+
+        n = estimated.length
+        warnings << BuildPlan.warning(
+          'weight_density_unknown',
+          "Hmotnosť #{n} #{n == 1 ? 'dielca' : 'dielcov'} je odhad (materiál bez hustoty), rátané ako ťažšie.",
+          data: { 'parts' => estimated, 'density' => fallback }
+        )
+        parts
       end
 
       # --- KOV-C2b: aktivacia receptov zasuviek --------------------------------

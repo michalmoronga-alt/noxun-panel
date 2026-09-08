@@ -791,6 +791,11 @@
     var info = nxCabInfo(c);
     setOut('inf_parts', info.parts);
     setOut('inf_area', info.area);
+    // KOV-W / D-125: riadok Hmotnost. Text aj tooltip sklada cista funkcia
+    // (nxCabWeight) — tu sa uz len zapisu; riadok NIE JE klikatelny.
+    var wg = nxCabWeight(c);
+    setOut('inf_weight', wg.text);
+    var wn = el('infWeight'); if (wn) wn.title = wg.title;
     var live = !!(c && c.cabinet_id);
     [['infParts', 'Klik = označí výrobné dielce tejto skrinky v modeli'],
      ['infArea', 'Klik = otvorí ŠTÚDIO → Kusovník, zužený na túto skrinku']].forEach(function(o){
