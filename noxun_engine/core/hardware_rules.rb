@@ -660,7 +660,17 @@ module Noxun
       # co si pouzivatel zamkol) a konflikt by sa nedal zhasnut zamkom.
       def door_guards(items, parts, rules)
         by_rule = {}
-        Array(rules).each { |r| by_rule[r['rule_id'].to_s] = r if r.is_a?(Hash) }
+        # Codex #329 kolo 1 P2: pri DUPLICITNOM `rule_id` pouziva `evaluate`
+        # PRVE pravidlo (druhe prizna ORANGE `hardware_rule_duplicate`
+        # a preskoci). Zapis „posledny vyhrava" by sem priniesol guardy
+        # z INEHO pravidla, nez ktore polozku vydalo — teda falosnu RED
+        # nadvysku alebo naopak potlacene varovania. FIRST-ENTRY-WINS.
+        Array(rules).each do |r|
+          next unless r.is_a?(Hash)
+
+          rid = r['rule_id'].to_s
+          by_rule[rid] = r unless by_rule.key?(rid)
+        end
         by_owner = {}
         Array(parts).each do |pd|
           next unless pd.is_a?(Hash)
