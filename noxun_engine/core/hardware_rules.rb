@@ -689,9 +689,9 @@ module Noxun
         final = apply_overrides(items, cfg[:hardware_overrides])
         # KOV-F1: door guardy bezia AZ NAD VYSLEDNYMI polozkami — hmotnostna
         # kontrola sa pyta na pocet PO rucnom zamku (Sol audit kolo 2) a
-        # konflikt „mimo tabulky" musi rucny zamok ZHASNUT (polozka po
-        # overridee nesie `source: 'manual'`).
-        guards = door_guards(final, parts, rules)
+        # konflikt „mimo tabulky" musi rucny zamok ZHASNUT. Zamok sa hlada
+        # v RUCNYCH ZASAHOCH, nie na polozke (Codex #329 kolo 2 P2).
+        guards = door_guards(final, parts, rules, cfg[:hardware_overrides])
         warnings.concat(guards[:warnings])
         { items: final, warnings: warnings, conflicts: guards[:conflicts] }
       end
@@ -708,7 +708,7 @@ module Noxun
       # PRECO AZ TU a nie v `compute`: `compute` bezi PRED `apply_overrides`,
       # takze by hmotnostne pasmo porovnavalo s poctom z pravidla (nie s tym,
       # co si pouzivatel zamkol) a konflikt by sa nedal zhasnut zamkom.
-      def door_guards(items, parts, rules)
+      def door_guards(items, parts, rules, overrides = nil)
         by_rule = {}
         # Codex #329 kolo 1 P2: pri DUPLICITNOM `rule_id` pouziva `evaluate`
         # PRVE pravidlo (druhe prizna ORANGE `hardware_rule_duplicate`
@@ -738,7 +738,7 @@ module Noxun
           next if pd.nil?
 
           door_guard_warnings(rule, it, pd, warnings)
-          c = out_of_table_conflict(rule, it, pd)
+          c = out_of_table_conflict(rule, it, pd, overrides)
           conflicts << c if c
         end
         { warnings: warnings, conflicts: conflicts }
@@ -808,10 +808,18 @@ module Noxun
 
       # Dvierka NAD tabulkou: polozka uz existuje (s poctom catch-all pasma),
       # takze v Kovani je riadok, na ktorom sa da pocet rucne zamknut — a prave
-      # ten zamok konflikt zhasina (`source: 'manual'`).
-      def out_of_table_conflict(rule, it, pd)
+      # ten zamok konflikt zhasina.
+      #
+      # Codex #329 kolo 2 P2: zhasina LEN SKUTOCNY ZAMOK POCTU, nie hocijaky
+      # rucny zasah. `source: 'manual'` nesie polozka aj po overridee, ktory
+      # menil IBA `nominal_length` (importovany/legacy zaznam) — a taky zaznam
+      # o pocte nepovedal NIC, takze catch-all pocet by presiel branami bez
+      # slova. Otazka preto ide do RUCNYCH ZASAHOV: existuje pre tuto polozku
+      # zaznam s PLATNYM polom `quantity`? (Zhoda a poradie „posledny vyhrava"
+      # su TIE ISTE ako v `apply_overrides` — inak by sa vyklad rozisiel.)
+      def out_of_table_conflict(rule, it, pd, overrides = nil)
         return nil unless rule['finite'] == true
-        return nil if it['source'].to_s == 'manual'
+        return nil if quantity_locked?(overrides, it)
 
         bands = Array(rule['bands'])
         top = bands.reject { |b| b['max'].nil? }.map { |b| b['max'].to_f }.max
@@ -824,6 +832,18 @@ module Noxun
           'message' => "#{door_label(pd)}: výška #{fmt_mm(h)} mm je nad tabuľkou závesov " \
                        "(posledné pásmo #{fmt_mm(top)} mm) — počet #{it['quantity'].to_i} je len " \
                        'posledné pásmo. Zamkni počet ručne v Kovaní alebo rozdeľ čelo.' }
+      end
+
+      # Codex #329 kolo 2 P2: ma polozka ZAMKNUTY POCET rucnym zasahom?
+      # JEDINA autorita otazky (nie `source == 'manual'` — to je siroky priznak
+      # „nieco tu clovek zmenil"). Vyklad hodnoty je `clamp_qty`, teda presne
+      # ten, ktory pocet aj prepisuje; `disabled` zaznam zamok nie je (polozka
+      # by vobec nevznikla).
+      def quantity_locked?(overrides, item)
+        ov = Array(overrides).select { |o| o.is_a?(Hash) && override_match?(o, item) }.last
+        return false if ov.nil? || ov['disabled'] == true
+
+        !clamp_qty(ov['quantity']).nil?
       end
 
       def door_label(pd)
