@@ -187,7 +187,9 @@ nedoobjednané závesy a zlý set BEZ blokády (Codex #329 kolo 1 P1). Brány s�
 `ProductionCore.export_blockers`.
 **`DRAWER_ACTIVATION_SCHEMA` ostáva 5** — je to VLASTNÁ konštanta práve preto, aby bump na 6 až 9 nespravil z každej skrinky schémy 5 „nemigrovanú" (`drawer_stale`).
 **`HINGE_ACTIVATION_SCHEMA` = 9** je jej dvojička pre závesy (Codex #329 kolo 2 P1): skrinka uložená pod nižšou schémou nesie staré počty závesov, takže ju
-zber priznáva RED `hinge_stale` a brána zastaví nákup, rozpočet aj ponuku (VEPO nie) — detail v [outputs.md](outputs.md). Pri budúcom bumpe `CONFIG_SCHEMA`
+zber priznáva RED `hinge_stale` a brána zastaví nákup, rozpočet aj ponuku (VEPO nie) — detail v [outputs.md](outputs.md). **Sama o sebe schéma 9 RED
+nezhasína** (Codex #329 kolo 3 P1): kým sú pravidlá projektu spred F1, prestavba vyráta staré počty znova, takže nález drží aj druhá príčina
+(`HardwareRules.pre_hinge_table_rules?`) a náprava je prestavba **plus** „Doplniť nové predvoľby". Pri budúcom bumpe `CONFIG_SCHEMA`
 na 10 ostáva 9, aby sa prestavané skrinky zrazu netvárili ako nemigrované.
 
 **ORANGE, KEĎ SA PRAVIDLÁ NEDAJÚ ZMRAZIŤ (Codex #329 kolo 2 P1).** `build_into` po `Construction.build_plan` volá **`attach_rules_state_warning!(plan, model)`**

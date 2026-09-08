@@ -33,6 +33,12 @@ inak nemá kde vzniknúť ručný zámok — Sol kolo 2 BLOCKER 2) a navyše vyd
 uloženým nosičom `hardware_conflicts` do configu ([construction.md](construction.md)) a odtiaľ do RED Kontroly aj do exportnej brány
 ([outputs.md](outputs.md)). Validátor zápisu („pásmo všetko nad je povinné") sa **nemení** — catch-all je stále prítomný.
 
+**KONEČNÁ tabuľka BEZ číselného pásma je fail-closed (Codex #329 kolo 3 P2).** Editor pásma mazať dovoľuje a catch-all zmazať nejde, takže sa dá dôjsť
+k tabuľke, v ktorej ostalo iba pásmo „všetko nad" + skrytý `finite`. Predtým `out_of_table_conflict` na takom tvare konflikt POTLAČIL (`top` nil), takže
+každé čelo ticho dostalo catch-all počet a nikde nebol RED. Odteraz platí OBOJE: zápisová brána taký tvar **odmietne** (viď nižšie) a v evaluácii je
+**mimo tabuľky KAŽDÉ čelo** — položka s catch-all počtom + RED s vlastnou vetou („tabuľka nemá ani jedno číselné pásmo"). Ručný zámok počtu ho zhasína
+rovnako ako pri nadvýške.
+
 **Door guardy bežia AŽ NAD VÝSLEDNÝMI položkami (`door_guards`, čistá funkcia).** `evaluate` ich volá po `apply_overrides` a vracia z nich
 `{items:, warnings:, conflicts:}`. Dôvod je vecný: hmotnostné pásmo sa musí porovnávať s počtom **PO ručnom zámku** (inak by varovalo aj vtedy, keď si
 používateľ počet už zdvihol) a konflikt „mimo tabuľky" musí ručný zámok **ZHASNÚŤ**. Zámok sa hľadá v RUČNÝCH ZÁSAHOCH (`quantity_locked?` = záznam
@@ -52,6 +58,24 @@ zapísal náš `std` nad obsahom, ktorý už prešiel našou `normalize_rules` (
 **a brána by sa už nikdy nespustila**. Stavba beží ďalej nad prečítaným obsahom (tabuľka `bands` je forward-čitateľná zámerne a nikdy nevydá nulu), ale
 `CabinetBuilder.attach_rules_state_warning!` k nej pridá ORANGE `hardware_rules_library_incompatible` („aktualizuj plugin") — protajšok `library_incompatible`
 pri setoch. Autorita stavu je `library_incompatible_without_snapshot?(model)`; projekt s vlastným snapshotom je zdravý bez ohľadu na knižnicu.
+**Príznak `blocked` prežije aj DRUHÉ čítanie (Codex #329 kolo 3 P2).** `persist_seed_merge!` číta knižnicu pod zámkom ZNOVA (read-modify-write) a vracia
+**tú istú dvojicu** `[pravidlá, blocked]` ako `load_state`. Kým sa tretia hodnota zahadzovala a `blocked` sa hlásilo natvrdo `false`, stačilo, aby knižnicu
+medzi prvým čítaním a zámkom nahradil novší plugin — a `ensure_project_rules!` by orezané pravidlá zmrazil do .skp.
+
+**PROJEKTOVÝ snapshot z novšieho pluginu = TRVALÝ RED (Codex #329 kolo 3 P1).** Knižnicu chráni ORANGE vyššie, ale projekt, ktorý snapshot UŽ MÁ (rollback
+pluginu, zákazka od kolegu s novšou verziou), bol dovtedy neviditeľný: `ensure_project_rules!` snapshot prečítal a `library_incompatible_without_snapshot?`
+bol `false` LEN preto, že snapshot existuje. Starší čítač tak prestaval skrinky svojou schémou a vydal nákup, rozpočet aj ponuku s degradovanými počtami.
+`Bom.rules_snapshot_issue(model)` (autorita stavu je `project_std_unsupported?`) preto vydáva RED **`hardware_rules_snapshot_incompatible`** — kód nemá
+vlastníka (je to stav CELÉHO projektu, preto ho Kontrola aj brána adresujú bez ID) a stojí v novom registri `BuildPlan::HW_RULES_BLOCKERS`. Nález je
+**trvalý**: snapshot sa neprepisuje ani nezmrazuje (zápisové cesty ho odmietajú), takže prestavba ho nezhasne — jediná náprava je aktualizácia pluginu.
+Detail brány v [outputs.md](outputs.md).
+
+**`HINGE_TABLE_STD` = 2 a `pre_hinge_table_rules?`.** Samostatná konštanta (nie `STD`): hovorí, OD KTOREJ verzie formátu nesie seed pravidlo závesov door
+guardy. `pre_hinge_table_rules?(model)` sa pýta PROJEKTOVÉHO snapshotu, a keď ho projekt nemá, globálnej knižnice (neznámy/poškodený stav = `false`,
+fallback sú `SEED_RULES`, ktoré tabuľku už nesú). Rozhoduje **verzia formátu, nie obsah pravidla**: vedomý používateľský rule bez guardov uložený PO F1 je
+rozhodnutie, nie zaostalosť — a každý zápis snapshotu (Uložiť v Pravidlách aj „Doplniť nové predvoľby") pečatí aktuálny `std`. Čitateľ je `hinge_stale`
+([outputs.md](outputs.md)).
+
 **Hranica downgrade:** knižnice sú per PC a updater (D-52) drží obe PC aktuálne, takže „starší plugin s novšou knižnicou" je downgrade na tom istom PC —
 vedomé riziko do D-48. Preto kind ostáva `bands` (starý čítač ráta podľa tabuľky, catch-all 7) a nové čítače `std` honorujú.
 
@@ -162,7 +186,9 @@ zdrojom; kovanie cez `Panel.merge_override(..., :all, nil)`, teda tú istú mut�
 
 **ŠT-3b-2c1 — BRÁNA TVARU PRAVIDIEL PRI ULOŽENÍ:** čistá `HardwareRules.rules_problems(rules)` (bez IO) sa volá **výhradne** v `handle_save`, **až PO `normalize_rules`** (validuje
 sa presne to, čo sa zapíše). Vynucuje sa: `kind == 'bands'` so `enabled != false` ⇒ neprázdne pásma a medzi nimi **pásmo „všetko nad"** (`max: null`); `kind == 'fit_series'` ⇒
-neprázdny rad `series`. Kritérium visí na **`kind`, nie na prítomnosti kľúča `bands`** — `kind` je jediná autorita toho, ktorá vetva vyhodnotenia sa spustí, a `normalize_rules`
+neprázdny rad `series`; **KOV-F1 (Codex #329 kolo 3 P2):** `bands` so `finite: true` navyše potrebuje **aspoň jedno ČÍSELNÉ pásmo** — konečná tabuľka,
+v ktorej ostal len catch-all, nie je tabuľka (catch-all by dal svoj počet každému čelu a každé by zároveň bolo „mimo tabuľky"). Kritérium visí na
+**`kind`, nie na prítomnosti kľúča `bands`** — `kind` je jediná autorita toho, ktorá vetva vyhodnotenia sa spustí, a `normalize_rules`
 neznáme kľúče zachováva, takže záznam smie niesť oba kľúče naraz (novšia verzia formátu, cudzí či legacy snapshot, zvyšok po zmene `kind` vo formulári) a validovať mu treba len to,
 čo sa naozaj použije; vypnuté pravidlo sa nekontroluje a neznámy `kind` z novšej verzie uloženie neblokuje.
 

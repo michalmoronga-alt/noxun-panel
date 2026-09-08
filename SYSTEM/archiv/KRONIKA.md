@@ -17,6 +17,31 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-F1 — TRETIE (POSLEDNÉ) FIX KOLO PO CODEX GH REVIEW #329 (9.9.2026; ten istý PR #329, v0.9.49 → v0.9.50 — mení sa `ui/js/rules.js`).**
+  Kolo 3 vrátilo 2× P1 + 2× P2 a **štvrté kolo sa už nekonalo** (pravidlo 3 kôl): opravy prešli internou verifikáciou + plným in-SketchUp behom.
+  Všetky štyri nálezy sú opäť o **tichých stavoch, ktoré by prešli bránami** — a dva z nich boli priamym dôsledkom opráv z kola 2.
+  **P1 — PROJEKTOVÝ snapshot pravidiel z novšieho pluginu = TRVALÝ RED blocker.** Kolo 2 ochránilo knižnicu, ale projekt, ktorý snapshot UŽ MÁ (rollback pluginu,
+  zákazka od kolegu s novšou verziou), ostal neviditeľný: `ensure_project_rules!` snapshot prečítal a `library_incompatible_without_snapshot?` bol `false` LEN preto,
+  že snapshot existuje — takže starší čítač prestaval skrinky svojou schémou a vydal nákup, rozpočet aj ponuku s degradovanými počtami. `Bom.rules_snapshot_issue`
+  odteraz vydáva RED `hardware_rules_snapshot_incompatible` (nový register `BuildPlan::HW_RULES_BLOCKERS`, súčasť `HW_ISSUE_BLOCKERS`): stojí nákupné CSV, rozpočet
+  a cenovú ponuku, VEPO beží. Snapshot sa **neprepisuje ani nezmrazuje**, takže nález je trvalý — prestavba ho nezhasne a jediná náprava je aktualizácia pluginu.
+  Kód **nemá vlastníka** (je to stav celého projektu), preto Kontrola aj veta brány pri prázdnom `owner_id` adresu vynechávajú (predtým „(—)").
+  **P1 — `hinge_stale` nezhasne samotnou prestavbou.** Prestavba označí skrinku schémou 9, ale `ensure_project_rules!` zámerne ponecháva starý seed snapshot projektu
+  (nové predvoľby sa dopĺňajú vedomou akciou) — takže rozrobená zákazka dostala po prestavbe ZNOVA staré počty (900/1400/1900, Tip-On cez klasický set) a RED zhasol
+  nad poddimenzovaným nákupom. Nález má odteraz **dve nezávislé príčiny** (stačí jedna): schéma skrinky < 9 **alebo** účinné pravidlá projektu spred F1
+  (`HardwareRules.pre_hinge_table_rules?` — projektový snapshot, inak globálna knižnica, `std` < `HINGE_TABLE_STD` = 2; zisťuje sa RAZ na zber). Rozhoduje **verzia
+  formátu, nie obsah pravidla**: vedomý používateľský rule bez guardov uložený PO F1 stale nie je. Hláška pýta OBOJE — prestav skrinku a v Pravidlách spusti
+  „Doplniť nové predvoľby" (tá zapíše snapshot s aktuálnym `std` A prestavia skrinky; to isté robí Uložiť v Pravidlách).
+  **P2 — `blocked` sa strácal pri opakovanom čítaní pod zámkom.** `persist_seed_merge!` číta knižnicu pod zámkom znova (read-modify-write), ale tretiu hodnotu
+  `read_rules` zahadzoval a `load_state` hlásil `blocked` natvrdo `false`. Keby knižnicu medzi prvým čítaním a zámkom nahradil novší plugin, `ensure_project_rules!`
+  by orezané pravidlá zmrazil do .skp — presne to, čomu mala brána `std` zabrániť. Funkcia teraz vracia tú istú dvojicu `[pravidlá, blocked]` ako `load_state`.
+  **P2 — konečná tabuľka bez číselného pásma je fail-closed.** Keď používateľ v editore zmazal všetky číselné pásma, ostal nezmazateľný catch-all a skrytý
+  `finite: true`: validácia to prijala, `compute` dala catch-all počet každému čelu a konflikt sa potlačil (`top` nil) — jeden záves bez RED. Odteraz platí OBOJE:
+  zápisová brána taký tvar odmieta („konečná tabuľka potrebuje aspoň jedno číselné pásmo", server aj klientska `rdValidate` — parita cez spoločnú fixtúru) a v
+  evaluácii je **mimo tabuľky KAŽDÉ čelo** (položka s catch-all počtom + RED); ručný zámok počtu ho zhasína rovnako ako pri nadvýške.
+  **Testy:** 3494 headless (+8 blokov v `test_kovf_zavesy.rb`, sekcia 12; mutácie M25–M28 overené dočasným vypnutím každej opravy — vždy padol práve nový test)
+  · 97 JS sád (+4 prípady vo fixtúre parity) · in-SketchUp **2028 PASS / 0 FAIL** vrátane rozšírenej sekcie `kovf_stale` („prestavba sama nestačí; doplnenie predvolieb zhasne").
+
 - **KOV-F1 — DRUHÉ FIX KOLO PO CODEX GH REVIEW #329 (8.9.2026 v noci; ten istý PR #329, v0.9.49 bez bumpu — css/js sa nemenili).**
   Kolo 2 vrátilo 2× P1 + 1× P2; všetky tri sú o **tichých stavoch, ktoré by prešli bránami**.
   **P1 — knižnica pravidiel z NOVŠIEHO pluginu sa už do projektu NEZMRAZÍ.** Doterajšia vetva vracala z `read_rules` len normalizované pravidlá a stav „len na čítanie"
