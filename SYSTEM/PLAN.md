@@ -575,20 +575,37 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   názvom, cenou s DPH, URL, dátumom, výrobcom a radou; sety objednávajú správnu antracitovú K-sadu (`357889`) a Tip-On zásuvka aj **PTOs modul** (`352908`/`352909`).
   Plné znenie + čo z toho platí ďalej: [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).
 - **D-125 · Hmotnosť v Inspectore je prázdny placeholder** — riadok „Hmotnosť" v Základných nikto neplní; hmotnosť skrinky = Σ dielcov × hustota typu (helper spoločný
-  s hmotnosťou čela v KOV-E), neznáma hustota sa nevymýšľa (Michal 6.9.2026; plné znenie v [DOGFOODING.md](DOGFOODING.md)). Zaradiť ku KOV-E alebo hneď po KOVANÍ.
+  s hmotnosťou čela v KOV-E), neznáma hustota sa nevymýšľa (Michal 6.9.2026; plné znenie v [DOGFOODING.md](DOGFOODING.md)). **Zaradené do KOV-W** (8.9.2026).
 - **D-119 · Presah dverí do strán per strana** (Lucia 6.9.2026, prvý test) — dnes jedna hodnota `gap_sides` pre obe strany; ľavá a pravá zvlášť (config čela, CONFIG_SCHEMA
   bump). Zaradenie: UI/UX balík Čiel (D-114) na konci bloku, skôr len ak blokuje prácu. Plné znenie v [DOGFOODING.md](DOGFOODING.md).
 - **D-120 · Úchytkový profil (UKW) aj na dolnej a bočných hranách** (Lucia 6.9.2026) — voľba hrany profilu (dnes len horná; registry `front_profiles` hranu nepozná → rozsah = config + registry/API + všetci konzumenti: Fronts, kovanie, renderer, UI). Zaradenie:
   ku KOV-F (úchytka podľa klasifikácie) alebo do balíka Čiel — rozhodne Michal. Plné znenie v [DOGFOODING.md](DOGFOODING.md).
-- **KOV-E · „VÝKLOPY HK/HL" (po C, D):** `GENERIC_TYPES + lift` (plan_schema bump, `guard_unknown_hardware!` už chráni starší plugin) · roly `flap` z KOV-A dostanú
-  pravidlo kind `weight_bands` (hmotnosť čela = rozmery × hrúbka × `Materials.density_for(typ)`; hustota nil → konzervatívny odhad + ORANGE) s tabuľkou HK top / HL top
-  (data pack `lifts.json` z OFICIÁLNYCH Blum hodnôt — PDF follow-up pred zápisom; UNCONFIRMED sa nezapíše) · sety klasifikácia `lift × opening` (Tip-On = piest per owner)
-  · fail-closed + RED rovnako ako zásuvky · žiadna geometria (cenové zaradenie). Audit ÁNO (GENERIC_TYPES). Smoke: výklop 600×400 → HK top set podľa hmotnosti; Tip-On → +piest;
-  ťažké čelo mimo tabuľky → RED + blocker.
-- **KOV-F · „ZÁVESY MAX(VÝŠKA, HMOTNOSŤ) + ÚCHYTKA + TIP-ON" (po D):** nový rule kind `max_bands` (dva vstupy: výška čela + hmotnosť; výsledok = max) — výškové prahy
-  zo seedu (900/1400/1900 → 2/3/4/5, Michal potvrdil 2.9.), hmotnostné z tabuľky výrobcu (Michal dodá / oficiálne) · override počtu = zámok (existuje) · pod minimom ORANGE,
-  export potvrditeľný · šírka len WARNING · úchytka: pravidlo `fixed 1` na krídlo/zásuvkové čelo LEN pri `opening_mode == classic` (vypínateľné; set úchytky podľa klasifikácie)
-  · Tip-On dvierka = P2O záves + presne 1 piest/krídlo (per:'owner'). Audit NIE (pravidlá = JSON + kind). Smoke: dvierka 1250 mm → 3 závesy; Tip-On → P2O + 1 piest; úchytka 1 ks.
+- **KOV-W · „HMOTNOSŤ DIELCOV A ČIEL" (pred F a E; MALÁ; debata 8.9.2026 → [zdroje/next_sessions/KOVANIE_DEBATA_E_F_2026-09-08.md](zdroje/next_sessions/KOVANIE_DEBATA_E_F_2026-09-08.md)):**
+  čistý helper `Weights` (kg = dĺžka × šírka × hrúbka [mm] × hustota typu [kg/m³] / 1e9; hustota z `Materials.density_for`) · **neznáma hustota (UNI, typ bez hustoty) = najvyššia
+  hustota doskového typu v registri okrem kompaktu + ORANGE `weight_density_unknown` — vždy rátať ťažšie, nikdy ticho (Michal 8.9.)** · builder posiela do plánu per-part hustotu
+  rovnako ako `part_thicknesses` (`part_densities`), kontext pravidiel (`HardwareRules`) dostane `front_weight_kg` + rozmery panelu čela (šírka × výška) — základ pre F aj E ·
+  **D-125:** payload Inspectora `weight_kg` + `weight_missing` (aditívne), riadok Hmotnosť „≈ 12,4 kg" s tooltipom „bez N dielcov (materiál bez hustoty)", všetky neznáme = „—" ·
+  Audit NIE (aditívne kľúče, žiadna schéma) · Smoke: dvierka 1000×600×18 DTD 680 → 7,34 kg; skrinka s UNI dielcom → „≈" + ORANGE.
+- **KOV-F · „ZÁVESY — NOXUN TABUĽKA + SET PODĽA OTVÁRANIA" (po W):** nový rule kind `door_hinges` (seed pravidlo `zavesy-podla-vysky` prechádza z `bands` 900/1400/1900 na tabuľku
+  Noxun): **výška dverí ≤ 849 → 2 · 850–1700 → 3 · 1701–2200 → 4 · 2201–2400 → 5 · 2401–2600 → 6 · 2601–2800 → 7** (Hettich výškové pásma, prvé sprísnené Michalovou praxou: od
+  850 už 3) · **šírka > 600 → +1 záves** (bez podmienky výšky) · varovania BEZ vplyvu na počet: šírka > 800 ORANGE `door_wide` · šírka > výška ORANGE `door_wider_than_high`
+  („nemá to byť výklop?") · hmotnosť podľa Hettich pásiem (≤ 7,7 / 13,7 / 17,1 / 22 kg → 2/3/4/5, z kódu oficiálnej kalkulačky hta.hettich.com) — keď chcú viac než tabuľka →
+  ORANGE `hinge_weight_more`, nad 22 kg ORANGE `hinge_weight_max`; **hmotnosť vo V1 len varuje, počet je predvídateľný z tabuľky (Michal 8.9.)** · jedna tabuľka pre všetkých
+  výrobcov (set rozhoduje o produkte) · **set podľa otvárania:** položka závesu nesie `params.opening_mode`, mapovanie `class:hinge|classic` → `zaves-klasik`, `class:hinge|tipon` →
+  `zaves-p2o` (piest 1 ks/krídlo už `per: owner`), legacy kľúč `hinge` ostáva fallback; kompatibilita setu ↔ položky sa overuje pri expanzii (vzor zásuviek) · **len naložený
+  záves (V1)** · seed pravidlo v knižnici sa nahradí LEN ak je nedotknuté (vzor `replace_untouched_seed_sets`, D-118b), projektový snapshot cez „Doplniť nové predvoľby" ·
+  override počtu = existujúci zámok · úchytky MIMO V1 (Michal 8.9.: neskôr aj s geometriou, 1 ks, set per projekt + override) · D-120 → balík Čiel · Audit ÁNO (Sol: nový kind +
+  mapovacie kľúče + náhrada seed pravidla) · Smoke: dvierka 1250 → 3; 850 → 3; 800 × 700 → 3 (2 + 1); Tip-On → P2O set + 1 piest; 850 široké → ORANGE; MDF 25 mm 2000 × 600 → ORANGE nad 22 kg.
+- **KOV-E · „VÝKLOPY HK top / HL top" (po F):** config čela `lift.system` (`hk_top` predvolene | `hl_top`) + výber v karte čela (CONFIG_SCHEMA bump, whitelisty šablón aditívne) ·
+  **sklop (`fall`) = závesy ako dvierka** (`door_hinges` nad rolou `flap` so smerom dole; vzpery mimo V1 — Michal 8.9.) · nový rule kind `lift_class`: **HK top: LF = výška
+  korpusu (riadku čela) × hmotnosť čela [kg] → 22K2300 (LF 420–1610) · 22K2500 (930–2800) · 22K2700 (1730–5200) · 22K2900 (3200–9000)**, pri prekryve najslabšia trieda, ktorá LF
+  pokrýva — Blum hodnoty z Démos produktových stránok (zber 8.9., `_dev/demos_harvest/aventos_hk_hl_top_2026-09-08.json`); **HL top:** mechanizmus podľa výšky korpusu 22L2200
+  (300–389) / 22L2500 (390–580) + ramená 22L3200/3500/3800/3900 podľa výšky; hmotnostný limit HL top = otvorený údaj (Blum e-services s Michalovým loginom alebo technický list)
+  — do overenia ORANGE „limit neoverený" · **plný automat bez zámkov (Michal 8.9.)** · sety `use_type lift`, klasifikácia `lift × opening × system` (`class:lift|classic|hk_top` →
+  selektor podľa LF, `…|tipon|…` → T mechanizmus + Tip-On jednotka `per: owner`); každý set kompletný: mechanizmus 1 sada + čelný príchyt 20S4200 (13781) 1 pár + krytky biela
+  (22K8000 347834 / 22.8000 507343) 1 sada (+ HL: ramená 1 sada) · **seed položiek kompletný ako D-118a (URL, názov, cena s DPH, MJ, výrobca, rada, dátum) — seed tabuľka na
+  Michalovu kontrolu PRED implementáciou (Michal 8.9.)** · fail-closed: LF/KH mimo tabuľky = RED `lift_class_missing` (blokuje HW CSV + rozpočet; geometria a VEPO nie) ·
+  Audit ÁNO (Astra: config čela, nový kind, sety, dátový balík) · Smoke: výklop 600 × 400 v skrinke 400 → LF ≈ 1180 → 22K2300; Tip-On → T + jednotka; ťažké čelo → 22K2700; KH 250 → RED.
 - **KOV-G · „NOHY 4/6, PRÍCHYTY, SOKEL PRI VKLADANÍ" (po D; LOW):** pravidlo nôh `bands` na šírku korpusu (<1000 → 4, ≥1000 → 6; AXILO aj klzáky) · **príchyt sokla = druhé
   bands pravidlo na šírku** (1 / 2) — O3, bez pomerového člena · set nôh podľa výšky sokla (existuje) viditeľný **pri vkladaní** (riadok v ghost pásiku/vkladacej karte) aj v
   Korpuse pri sokli (D-111) — override per skrinka. Audit NIE. Smoke: skrinka 1200 → 6 nôh + 2 príchyty; sokel 150 → iný set nôh viditeľný už pri vkladaní.
