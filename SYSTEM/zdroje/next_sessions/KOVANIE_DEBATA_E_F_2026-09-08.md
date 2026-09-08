@@ -75,4 +75,12 @@ E áno (Astra — config čela, nový kind, sety, dátový balík).
 - **Codex GH #327 (docs PR, 8× P1 + 6× P2):** LF s rezervou na úchytku (`handle_allowance_kg` 0,5); prekryv ramien HL 480–540 → deterministicky 22L3800; nové pole klasifikácie
   `lift_system` + verzia; sklop cez `door_hinges` (`use_type door`), `USE_TYPE_GENERIC` sa nemení; tyč HL do každého HL setu; `lift_class_missing` blokuje aj cenovú ponuku;
   zber Démos dát presunutý do repa (`SYSTEM/zdroje/demos/`); KOV-W bez nového modulu (audit netreba) a jedna sémantika odhadu; D-120 a STAV zosúladené s rozhodnutím.
+- **Sol audit KOV-F kolo 2 (v2 → v3):** dopredná brána cez `CONFIG_SCHEMA` nechráni NOVÉ vloženie skrinky starším pluginom s aktualizovanou knižnicou (čítače
+  pravidiel `std` ignorujú) → **žiadny nový kind**: `bands` + voliteľné polia (`width_plus`, `width_warn_over`, `weight_bands`, `finite`), starší plugin ráta podľa novej
+  tabuľky bez guardov; nad tabuľkou sa položka VYDÁ (posledné pásmo) + RED s uloženým nosičom `hardware_conflicts` — inak by zámok nemal kde vzniknúť; triedny kľúč `hinge`
+  potrebuje vlastnú vetvu ponuky a zápisovej validácie (dnešná je viazaná na systém zásuviek); migrácia kľúčov jednorazová so značkou a `none` = vedome bez setu;
+  `hinge_weight_unknown` do `BUILD_INFO_ONLY`; F2 validácia bez povinného „všetko nad" pri `finite`.
+- **Codex GH #327 kolo 2 (7× P1 + 2× P2):** KOV-W audit ÁNO (kontrakt deskriptora + payload) a hmotnosť čela z ROZLÍŠENEJ hrúbky (deskriptor nesie placeholder 18 mm);
+  F: generický override setu na skrinke má prednosť pred triednym kľúčom projektu, nesúlad klasifikácie = RED blokáda; E: HL top fail-closed do overenia limitov, editor
+  `lift_class` = E2. Nadvýška, `finite` a STD čítač sú už vo v3 (Sol kolo 2).
 
