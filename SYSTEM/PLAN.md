@@ -582,7 +582,11 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   **do balíka Čiel (D-114) — rozhodnuté 8.9.2026, NIE do KOV-F.** Plné znenie v [DOGFOODING.md](DOGFOODING.md).
 - **KOV-W · „HMOTNOSŤ DIELCOV A ČIEL" (pred F a E; MALÁ; v2 po Codex #327; debata 8.9.2026 → [zdroje/next_sessions/KOVANIE_DEBATA_E_F_2026-09-08.md](zdroje/next_sessions/KOVANIE_DEBATA_E_F_2026-09-08.md)):**
   **BEZ nového modulu** — vzorec do `Materials` (`weight_kg(l, w, t, density)` = l × w × t [mm] × hustota [kg/m³] / 1e9; `fallback_density` = najvyššia hustota doskového typu
-  v `TYPE_REGISTRY` okrem kompaktu, nikde ako literál; `density_or_fallback(rec)` → `[hustota, odhad?]`), súčty do `Bom` (`weight_totals(records, sheets)`), anotácia do plánu v `Construction` (`build_plan(..., materials:)` voliteľný vstup z buildera — per kanál `body/front/back/drawer` **hrúbka AJ hustota** z katalógového záznamu + per-part override, vzor `part_thicknesses`; **hmotnosť čela sa počíta z ROZLÍŠENEJ hrúbky kanála/override, nie z placeholder `FRONT_THICKNESS` 18 mm v deskriptore** — geometria sa nemení, builder materializuje hrúbku ako doteraz (Codex #327 kolo 2); každý deskriptor dostane aditívne `weight_kg` + `weight_estimated`; `HardwareRules.input_value` pozná vstup `'weight'`) · **JEDNA sémantika odhadu (Michal 8.9. nahrádza znenie
+  v `TYPE_REGISTRY` okrem kompaktu, nikde ako literál; `density_or_fallback(rec)` → `[hustota, odhad?]`), súčty do `Bom` (`weight_totals(records, sheets)`), anotácia do
+  plánu v `Construction` (`build_plan(..., materials:)` voliteľný vstup z buildera — per kanál `body/front/back/drawer` **hrúbka AJ hustota** z katalógového záznamu +
+  per-part override, vzor `part_thicknesses`; **hmotnosť čela sa počíta z ROZLÍŠENEJ hrúbky kanála/override, nie z placeholder `FRONT_THICKNESS` 18 mm v deskriptore** —
+  geometria sa nemení, builder materializuje hrúbku ako doteraz (Codex #327 kolo 2); každý deskriptor dostane aditívne `weight_kg` + `weight_estimated`;
+  `HardwareRules.input_value` pozná vstup `'weight'`) · **JEDNA sémantika odhadu (Michal 8.9. nahrádza znenie
   D-125 zo 6.9.):** neznáma hustota (UNI, typ bez hustoty) = **fallback hustota, dielec DO SÚČTU VSTUPUJE ako ťažší odhad** a stav sa prizná: v pláne jeden ORANGE build
   warning `weight_density_unknown` na skrinku (pri UNI dielcoch potlačený ako ABS warningy — UNI už hlási `uni_material`), v Inspectore `≈ 12,4 kg` s tooltipom „N dielcov bez
   hustoty rátaných ako <hustota> — ťažší odhad"; `—` LEN bez výrobných dielcov; žiadne `weight_missing`, žiadne vylúčenie z medzisúčtu · **D-125:** payload Inspectora
@@ -609,7 +613,10 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   ponuke setov aj v zápisovej validácii** — bez systému zásuviek, klasifikácia = use_type + opening_mode + výrobca/rada (Sol kolo 2 FIX 3); (3) kľúče `class:hinge|classic` /
   `class:hinge|tipon` odvodené z účinného legacy mapovania projektu (vlastný set ostáva účinný; neklasifikovaný → legacy + ORANGE `hinge_set_unclassified`; `tipon` →
   `zaves-p2o` len bez vlastného tipon setu) — **migrácia JEDNORAZOVÁ** (značka v snapshote `migrations: ['hinge_class_v1']`), voľba „bez setu" ukladá vedomú hodnotu `none`
-  (vzor D-118b), nie mazanie kľúča (Sol kolo 2 FIX 4); existujúci kľúč sa nikdy neprepíše; všetko idempotentne v `ensure_project_state!`; precedencia **override vlastníka > triedny override skrinky > generický override skrinky `hinge` (vlastný set skrinky NIKDY ticho nespadne na projektový default — Codex #327 kolo 2) > triedny kľúč projektu > legacy `hinge`**; expanzia overuje klasifikáciu — **definitívny nesúlad (Tip-On čelo na klasickom sete) = RED `hinge_set_mismatch` v `BUILD_BLOCKERS`** (expanzia set odmietne, nákup by bol bez závesov), s nápravou (vyber set / Doplniť nové predvoľby) · položka nesie `params.opening_mode` + `params.use_type =
+  (vzor D-118b), nie mazanie kľúča (Sol kolo 2 FIX 4); existujúci kľúč sa nikdy neprepíše; všetko idempotentne v `ensure_project_state!`; precedencia **override vlastníka
+  > triedny override skrinky > generický override skrinky `hinge` (vlastný set skrinky NIKDY ticho nespadne na projektový default — Codex #327 kolo 2) > triedny kľúč
+  projektu > legacy `hinge`**; expanzia overuje klasifikáciu — **definitívny nesúlad (Tip-On čelo na klasickom sete) = RED `hinge_set_mismatch` v `BUILD_BLOCKERS`**
+  (expanzia set odmietne, nákup by bol bez závesov), s nápravou (vyber set / Doplniť nové predvoľby) · položka nesie `params.opening_mode` + `params.use_type =
   'door'`; piest 1 ks/krídlo ostáva `per: owner` · per-krídlo triedny override MIMO F · len naložený · úchytky MIMO V1 · Audit: v3 = 3. (posledné) kolo Sol PRED implementáciou
   · Testy: hranice 849/849,5/850 · 600/600,5 · 800/801 · explicitné `wings` · 2/3/4 krídla = rovnaký počet piestov · nad 22 kg · zámok pod hmotnostným pásmom → varovanie ·
   vlastný set prežije migráciu · `none` prežije prestavbu · **downgrade: starší čítač (`std` ignorovaný) dostane pri novom projekte závesy podľa tabuľky bez +1** ·
@@ -623,7 +630,10 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   `LF = KH × (weight_kg + handle_allowance_kg)`**, KH = výška korpusu (riadku čela), `handle_allowance_kg` v JSON pravidla, predvolene **0,5** (Blum definuje LF s dvojnásobkom
   hmotnosti úchytky; úchytky mimo V1 → konzervatívna rezerva 2 × 0,25 kg, Codex #327) → 22K2300 (LF 420–1610) · 22K2500 (930–2800) · 22K2700 (1730–5200) · 22K2900 (3200–9000),
   pri prekryve **najslabšia trieda, ktorá LF pokrýva**; **HL top:** mechanizmus podľa KH 22L2200 (300–389) / 22L2500 (390–580); ramená 22L3200 (300–339) · 22L3500 (340–389) ·
-  22L3800 (390–540) · 22L3900 (480–580) — **prekryv 480–540 rozhoduje deterministicky nižší set 22L3800** (predpoklad, Michal overí v e-services); **hmotnostné limity HL top = otvorený údaj → HL top je do overenia FAIL-CLOSED: položka vznikne, ale RED `lift_limit_unverified` v `HW_BLOCKERS` (nikdy neobjednať poddimenzovaný mechanizmus — Codex #327 kolo 2); odomkne ju dátový follow-up po overení v Blum e-services** · **plný automat bez zámkov (Michal 8.9.)** · **sety:** nové klasifikačné pole `lift_system` (`hk_top|hl_top`)
+  22L3800 (390–540) · 22L3900 (480–580) — **prekryv 480–540 rozhoduje deterministicky nižší set 22L3800** (predpoklad, Michal overí v e-services); **hmotnostné limity HL
+  top = otvorený údaj → HL top je do overenia FAIL-CLOSED: položka vznikne, ale RED `lift_limit_unverified` v `HW_BLOCKERS` (nikdy neobjednať poddimenzovaný mechanizmus —
+  Codex #327 kolo 2); odomkne ju dátový follow-up po overení v Blum e-services** · **plný automat bez zámkov (Michal 8.9.)** · **sety:** nové klasifikačné pole
+  `lift_system` (`hk_top|hl_top`)
   pri `use_type lift` (whitelist + round-trip guard + lazy std bump, `parse_class_head` dovolí tretí segment aj pre `lift` = `lift_system`), kľúče `class:lift|classic|hk_top`,
   `class:lift|tipon|hk_top`, `class:lift|classic|hl_top`, `class:lift|tipon|hl_top` → selektor podľa LF (HK) / KH (HL); **každý set kompletný:** mechanizmus 1 sada + čelný
   príchyt 20S4200 (13781) 1 pár + krytky biela (22K8000 347834 / 22.8000 507343) 1 sada + Tip-On: T mechanizmus + Tip-On jednotka 76 mm (250831) + adaptér (250841) `per: owner`
