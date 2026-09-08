@@ -1414,6 +1414,10 @@ module Noxun
       #     by dal svoj pocet kazdemu celu a kazde celo by bolo „mimo tabulky"
       #     (RED). Odmietnut taky tvar RAZ pri ulozeni je lacnejsie nez RED na
       #     kazdych dvierkach zakazky (Codex #329 kolo 3 P2).
+      #   * KOV-F2: `weight_bands`, ked su v pravidle — prazdna tabulka, pasmo
+      #     bez kilogramov a dve pasma s rovnakou hmotnostou. Su to jedine tri
+      #     tvary guardu, ktore `normalize_rules` NECHA TAK (zvysok typovo
+      #     ocisti alebo zahodi), takze len ich vie brana este vidiet.
       #   * `kind == 'fit_series'` s prazdnym radom — automat nema z coho vybrat.
       #     VEDOMY DOSLEDOK: uzatvara sa tym D-93 vetva „rucny NL zamok pri
       #     prazdnom rade" (zamok mimo radu sa aj tak uz nedal zapisat).
@@ -1450,24 +1454,69 @@ module Noxun
       # do zatvorky za nazov.
       def rule_problem_message(rule)
         case rule['kind'].to_s
-        when 'bands'
-          bands = rule['bands'].is_a?(Array) ? rule['bands'] : []
-          if bands.empty? || bands.none? { |b| b.is_a?(Hash) && b['max'].nil? }
-            return "#{rule_address(rule)} potrebuje aspoň pásmo „všetko nad“."
-          end
-          # Codex #329 kolo 3 P2: KONECNA tabulka bez jedineho CISELNEHO pasma
-          # nie je tabulka — catch-all by dal svoj pocet kazdemu celu a kazde
-          # by zaroven bolo „mimo tabulky". Take pravidlo sa NEULOZI.
-          return nil unless rule['finite'] == true
-          return nil if bands.any? { |b| b.is_a?(Hash) && !b['max'].nil? }
-
-          "#{rule_address(rule)}: konečná tabuľka potrebuje aspoň jedno číselné pásmo."
+        when 'bands' then bands_problem(rule)
         when 'fit_series'
           series = rule['series'].is_a?(Array) ? rule['series'] : []
           return nil unless series.empty?
 
           "#{rule_address(rule)} potrebuje aspoň jednu dĺžku v rade."
         end
+      end
+
+      def bands_problem(rule)
+        bands = rule['bands'].is_a?(Array) ? rule['bands'] : []
+        if bands.empty? || bands.none? { |b| b.is_a?(Hash) && b['max'].nil? }
+          return "#{rule_address(rule)} potrebuje aspoň pásmo „všetko nad“."
+        end
+        # Codex #329 kolo 3 P2: KONECNA tabulka bez jedineho CISELNEHO pasma
+        # nie je tabulka — catch-all by dal svoj pocet kazdemu celu a kazde
+        # by zaroven bolo „mimo tabulky". Take pravidlo sa NEULOZI.
+        if rule['finite'] == true && bands.none? { |b| b.is_a?(Hash) && !b['max'].nil? }
+          return "#{rule_address(rule)}: konečná tabuľka potrebuje aspoň jedno číselné pásmo."
+        end
+
+        weight_bands_problem(rule)
+      end
+
+      # KOV-F2: hmotnostne pasma su VOLITELNY guard — kluc, ktory CHYBA, sa
+      # nevaliduje (pravidlo bez guardov ostava bez guardov). Ked ale kluc JE,
+      # musi to byt POUZITELNA tabulka; inak by sa varovania zavesov ticho
+      # posunuli (pasmo bez kilogramov chyti kazdu hmotnost, dve rovnake
+      # hodnoty urobia z jedneho riadku mrtvy riadok).
+      #
+      # KRITERIA su definovane nad tvarom PO `normalize_rules` (brana bezi az
+      # za nou) a su NEZAVISLE OD PORADIA — normalizacia pasma zoradi podla
+      # `max`, takze „neusporiadane" nie je chyba pouzivatela, ale vec, ktoru
+      # server opravi sam. Rozist sa teda moze len to, co normalizacia NECHA
+      # TAK: prazdna tabulka, pasmo bez kilogramov a dve pasma s rovnakou
+      # hmotnostou. Klientska `rdValidate` ma tie iste tri kriteria (parita
+      # cez `tests/fixtures/rules_validation_parity.json`).
+      #
+      # POCET v pasme sa TU nevaliduje ZAMERNE: `normalize_bands` riadok
+      # s neplatnym poctom ZAHODI, takze do brany sa taky riadok nikdy
+      # nedostane — kontrolovat ho by znamenalo mrtvu vetvu na serveri a
+      # rozchod s klientom (ten pocet clampuje na >= 1 ako pri vyskovych
+      # pasmach). Ked vypadnu VSETKY riadky, chyti to vetva „prazdne".
+      def weight_bands_problem(rule)
+        return nil unless rule.key?('weight_bands')
+
+        bands = rule['weight_bands']
+        unless bands.is_a?(Array) && !bands.empty?
+          return "#{rule_address(rule)}: hmotnostné pásma sú prázdne — vyplň kg aj počet, alebo tabuľku zmaž."
+        end
+
+        maxes = []
+        bands.each do |b|
+          max = b.is_a?(Hash) ? b['max'] : nil
+          unless max.is_a?(Numeric) && max.to_f.finite? && max.to_f.positive?
+            return "#{rule_address(rule)}: pásmo hmotnosti potrebuje kilogramy — číslo väčšie ako 0."
+          end
+
+          maxes << max.to_f
+        end
+        return nil if maxes.uniq.length == maxes.length
+
+        "#{rule_address(rule)}: dve hmotnostné pásma majú rovnakú hmotnosť — každé musí mať inú."
       end
 
       # „Pravidlo „Výsuvy" (vysuvy-nl-podla-hlbky)" — nazov PRE CLOVEKA

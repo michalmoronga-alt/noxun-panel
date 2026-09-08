@@ -8,7 +8,14 @@
     "zablokuje a server by pustil, sa neda ulozit inou cestou).",
     "TVAR je POST-collect (to, co posiela `rdCollectRules`) a zaroven POST-normalize",
     "(to, co validuje server) — kriteria sa porovnavaju nad ROVNAKYM vstupom.",
-    "`invalid: true` = ulozenie sa MUSI odmietnut."
+    "`invalid: true` = ulozenie sa MUSI odmietnut.",
+    "KOV-F2: door guardy pribudli ako pripady na konci. Su tu LEN tie tvary, ktore",
+    "`normalize_rules` NECHA TAK — prazdna tabulka hmotnosti, pasmo bez kilogramov",
+    "a dve pasma s rovnakou hmotnostou. Neplatny `width_plus`/`width_warn_over` sem",
+    "NEPATRI a je to zamerne: normalizacia ho ZAHODI (guard sa proste nezapise),",
+    "takze server nema co odmietat — a klient taky tvar ani neposle (prazdne alebo",
+    "nekladne pole = kontrola vypnuta, chybajuci pocet = 1, rovnaky clamp ako pri",
+    "vyskovych pasmach). Rozdiel „klient odmietne, server pusti\" tak nevznikne."
   ],
   "cases": [
     {
@@ -104,6 +111,84 @@
         { "rule_id": "zavesy", "output": "hinge", "kind": "bands", "enabled": true,
           "bands": [{ "max": 900.0, "quantity": 2 }] }
       ]
+    },
+    {
+      "name": "KOV-F2: pravidlo s door guardmi je v poriadku",
+      "invalid": false,
+      "rules": [{ "rule_id": "zavesy", "output": "hinge", "kind": "bands", "enabled": true,
+                  "bands": [{ "max": 849.0, "quantity": 2 }, { "max": null, "quantity": 7 }],
+                  "finite": true, "width_plus": { "over": 600.0, "add": 1 }, "width_warn_over": 800.0,
+                  "weight_bands": [{ "max": 7.7, "quantity": 2 }, { "max": 22.0, "quantity": 5 }] }]
+    },
+    {
+      "name": "KOV-F2: pravidlo BEZ hmotnostných pásiem sa nevaliduje (guard je voliteľný)",
+      "invalid": false,
+      "rules": [{ "rule_id": "zavesy", "output": "hinge", "kind": "bands", "enabled": true,
+                  "bands": [{ "max": 849.0, "quantity": 2 }, { "max": null, "quantity": 7 }],
+                  "width_plus": { "over": 600.0, "add": 1 } }]
+    },
+    {
+      "name": "KOV-F2: PRÁZDNA tabuľka hmotností — kľúč ostal, pásmo žiadne",
+      "invalid": true,
+      "rules": [{ "rule_id": "zavesy", "output": "hinge", "kind": "bands", "enabled": true,
+                  "bands": [{ "max": 849.0, "quantity": 2 }, { "max": null, "quantity": 7 }],
+                  "weight_bands": [] }]
+    },
+    {
+      "name": "KOV-F2: pásmo hmotnosti BEZ kilogramov (prázdne pole v editore)",
+      "invalid": true,
+      "rules": [{ "rule_id": "zavesy", "output": "hinge", "kind": "bands", "enabled": true,
+                  "bands": [{ "max": 849.0, "quantity": 2 }, { "max": null, "quantity": 7 }],
+                  "weight_bands": [{ "max": null, "quantity": 2 }] }]
+    },
+    {
+      "name": "KOV-F2: pásmo hmotnosti s nulou — hmotnosť musí byť väčšia ako 0",
+      "invalid": true,
+      "rules": [{ "rule_id": "zavesy", "output": "hinge", "kind": "bands", "enabled": true,
+                  "bands": [{ "max": 849.0, "quantity": 2 }, { "max": null, "quantity": 7 }],
+                  "weight_bands": [{ "max": 0, "quantity": 2 }] }]
+    },
+    {
+      "name": "KOV-F2: dve pásma hmotnosti s ROVNAKOU hmotnosťou — druhé by bolo mŕtve",
+      "invalid": true,
+      "rules": [{ "rule_id": "zavesy", "output": "hinge", "kind": "bands", "enabled": true,
+                  "bands": [{ "max": 849.0, "quantity": 2 }, { "max": null, "quantity": 7 }],
+                  "weight_bands": [{ "max": 7.7, "quantity": 2 }, { "max": 7.7, "quantity": 3 }] }]
+    },
+    {
+      "name": "KOV-F2: pásma hmotnosti v OPAČNOM poradí — server ich zoradí, chyba to nie je",
+      "invalid": false,
+      "rules": [{ "rule_id": "zavesy", "output": "hinge", "kind": "bands", "enabled": true,
+                  "bands": [{ "max": 849.0, "quantity": 2 }, { "max": null, "quantity": 7 }],
+                  "weight_bands": [{ "max": 22.0, "quantity": 5 }, { "max": 7.7, "quantity": 2 }] }]
+    },
+    {
+      "name": "KOV-F2: pásmo s neplatným počtom normalizácia zahodí — zvyšok tabuľky platí",
+      "invalid": false,
+      "rules": [{ "rule_id": "zavesy", "output": "hinge", "kind": "bands", "enabled": true,
+                  "bands": [{ "max": 849.0, "quantity": 2 }, { "max": null, "quantity": 7 }],
+                  "weight_bands": [{ "max": 7.7, "quantity": 2 }, { "max": 13.7, "quantity": 0 }] }]
+    },
+    {
+      "name": "KOV-F2: keď vypadnú VŠETKY pásma, tabuľka je prázdna a uloženie sa odmietne",
+      "invalid": true,
+      "rules": [{ "rule_id": "zavesy", "output": "hinge", "kind": "bands", "enabled": true,
+                  "bands": [{ "max": 849.0, "quantity": 2 }, { "max": null, "quantity": 7 }],
+                  "weight_bands": [{ "max": 7.7, "quantity": 0 }] }]
+    },
+    {
+      "name": "KOV-F2: kritérium visí na `kind`, nie na výstupe — aj iné `bands` pravidlo",
+      "invalid": true,
+      "rules": [{ "rule_id": "uchytky-pasma", "output": "handle", "kind": "bands", "enabled": true,
+                  "bands": [{ "max": null, "quantity": 1 }],
+                  "weight_bands": [{ "max": null, "quantity": 2 }] }]
+    },
+    {
+      "name": "KOV-F2: VYPNUTÉ pravidlo s pokazenou tabuľkou hmotností sa nekontroluje",
+      "invalid": false,
+      "rules": [{ "rule_id": "zavesy", "output": "hinge", "kind": "bands", "enabled": false,
+                  "bands": [{ "max": 849.0, "quantity": 2 }, { "max": null, "quantity": 7 }],
+                  "weight_bands": [{ "max": null, "quantity": 2 }] }]
     }
   ]
 }

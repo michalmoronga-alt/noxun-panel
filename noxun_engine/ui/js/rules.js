@@ -301,27 +301,103 @@
       ' · skriniek v modeli: ' + (RD_META.cabinets || 0);
   }
 
-  // KOV-F1: veta o voliteľných kontrolách pravidla `bands` (dvierka). Vracia
-  // null, keď pravidlo žiadnu nemá — starý tvar pravidla teda vyzerá presne
-  // ako doteraz. ČISTÁ funkcia (Node test).
-  function rdGuardHint(r){
-    if (!r || r.kind !== 'bands') return null;
-    var out = [];
-    var wp = r.width_plus;
-    if (wp && wp.over != null && wp.add != null){
-      out.push('šírka nad ' + wp.over + ' mm → +' + wp.add + ' ks');
-    }
-    if (r.width_warn_over != null) out.push('šírka nad ' + r.width_warn_over + ' mm → upozornenie');
-    var wb = r.weight_bands || [];
-    if (wb.length){
-      out.push('hmotnostné pásma (' + wb.map(function(b){
-        return (b.max == null ? 'viac' : b.max) + ' kg → ' + b.quantity;
-      }).join(' · ') + ') — len upozorňujú');
-    }
-    if (r.finite === true) out.push('nad poslednou hodnotou tabuľky = chyba na kontrolu');
-    if (!out.length) return null;
-    return 'Kontroly dvierok (zatiaľ len na čítanie): ' + out.join(' · ') + '.';
+  // ============== KOV-F2: EDITOR DOOR GUARDOV PRAVIDLA `bands` ===============
+  //
+  // F1 pridala pravidlu `bands` VOLITEĽNÉ kľúče (`width_plus`,
+  // `width_warn_over`, `weight_bands`, `finite`) a sekcia ich vedela len
+  // PREČÍTAŤ jednou vetou. F2 z nej robí formulár — veta zanikla, aby ten istý
+  // údaj nebol na obrazovke dvakrát; jej rolu prevzal SÚHRN v zbalenej lište
+  // (`rdGuardSummary`), takže blok povie, čo skrýva, aj keď je zavretý.
+  //
+  // VERTIKÁLNY PRIESTOR: celý editor je `<details>` a je ZBALENÝ — otvorený
+  // stav si pamätá `RD_GUARD_OPEN` (kľúč = `rule_id`), inak by ho každé
+  // pridanie hmotnostného pásma (prekreslenie formulára) zavrelo.
+  //
+  // Mená kľúčov sú ZRKADLOM serverovej `HardwareRules::DOOR_GUARD_KEYS`
+  // (guard test na zhodu) — klient si ich neopisuje vlastným slovníkom.
+  var RD_GUARD_KEYS = ['finite', 'width_plus', 'width_warn_over', 'weight_bands'];
+  var RD_GUARD_OPEN = {};
+
+  function rdGuardKey(r, i){ return String((r && r.rule_id) || ('#' + i)); }
+
+  // Editor sa kreslí pri pravidle závesov (`bands` + výstup `hinge`) a pri
+  // KAŽDOM pravidle `bands`, ktoré už niektorý guard nesie — inak by sa
+  // hodnota z cudzieho/novšieho snapshotu nedala ani vidieť, ani opraviť.
+  function rdHasGuardEditor(r){
+    if (!r || r.kind !== 'bands') return false;
+    if (r.output === 'hinge') return true;
+    return RD_GUARD_KEYS.some(function(k){
+      return Object.prototype.hasOwnProperty.call(r, k);
+    });
   }
+
+  // Slovenské tvary počtu — „1 pásmo · 2 pásma · 5 pásiem".
+  function rdWeightCount(n){
+    if (n === 1) return '1 hmotnostné pásmo';
+    return n < 5 ? (n + ' hmotnostné pásma') : (n + ' hmotnostných pásiem');
+  }
+
+  // SÚHRN do zbalenej lišty. ČISTÁ funkcia (Node test).
+  function rdGuardSummary(r){
+    var out = [];
+    var wp = r && r.width_plus;
+    if (wp && wp.over != null && wp.add != null) out.push('+' + wp.add + ' nad ' + wp.over + ' mm');
+    if (r && r.width_warn_over != null) out.push('varovanie nad ' + r.width_warn_over + ' mm');
+    var wb = (r && r.weight_bands) || [];
+    if (wb.length) out.push(rdWeightCount(wb.length));
+    if (r && r.finite === true) out.push('konečná tabuľka');
+    return out.length ? out.join(' · ') : 'zatiaľ nič';
+  }
+
+  // Hodnota do `value=""`: chýbajúci guard = PRÁZDNE pole (a prázdne pole je
+  // zároveň jediný spôsob, ako guard vypnúť — vzor „prázdne pole je AUTO").
+  function rdNumAttr(v){
+    return (typeof v === 'number' && isFinite(v)) ? String(v) : '';
+  }
+
+  // HTML editora. ČISTÁ funkcia (Node test) — stav otvorenia chodí z modulu.
+  function rdGuardHtml(r, i){
+    var wp = (r && r.width_plus && typeof r.width_plus === 'object') ? r.width_plus : {};
+    var open = RD_GUARD_OPEN[rdGuardKey(r, i)] === true;
+    var h = '<details class="rgrd" data-rid="' + rdEsc(rdGuardKey(r, i)) + '"' + (open ? ' open' : '') +
+      ' ontoggle="rdGuardToggle(this)">' +
+      '<summary>Kontroly dvierok <span class="rgsum">' + rdEsc(rdGuardSummary(r)) + '</span></summary>' +
+      '<div class="rgbody">' +
+      '<div class="rrow"><label>Šírka nad</label>' +
+      '<input class="rgover rnum" type="number" min="1" step="1" value="' + rdEsc(rdNumAttr(wp.over)) + '">' +
+      '<span class="unit">mm</span><span class="arrow">→</span><span class="rgplus">+</span>' +
+      '<input class="rgadd rnum" type="number" min="1" max="999" step="1" value="' + rdEsc(rdNumAttr(wp.add)) + '">' +
+      '<span class="unit">ks</span></div>' +
+      '<div class="rrow"><label>Varovanie nad</label>' +
+      '<input class="rgwarn rnum" type="number" min="1" step="1" value="' +
+      rdEsc(rdNumAttr(r && r.width_warn_over)) + '"><span class="unit">mm</span></div>' +
+      '<div class="rgwbox">';
+    ((r && r.weight_bands) || []).forEach(function(b, wi){
+      h += '<div class="rrow rgwb" data-wi="' + wi + '"><label>Hmotnosť do</label>' +
+        '<input class="wmax rnum" type="number" min="0.1" step="0.1" value="' + rdEsc(rdNumAttr(b && b.max)) +
+        '"><span class="unit">kg</span><span class="arrow">→</span>' +
+        '<input class="wqty rnum" type="number" min="1" max="999" step="1" value="' +
+        rdEsc(rdNumAttr(b && b.quantity)) + '"><span class="unit">ks</span>' +
+        '<button class="ghostbtn bdel" title="Odstrániť hmotnostné pásmo" onclick="rdDelWeight(this)">✕</button></div>';
+    });
+    return h + '</div><div class="btnrow"><button class="ghostbtn" onclick="rdAddWeight(this)">' +
+      '+ hmotnostné pásmo</button></div>' +
+      '<label class="rgchk"><input type="checkbox" class="rgfin"' + (r && r.finite === true ? ' checked' : '') +
+      '> tabuľka výšok je konečná — nad ňou hlási Kontrola chybu</label>' +
+      '<div class="hint">Platí pre dvierka. Hmotnostné pásma iba upozorňujú — počet závesov riadi tabuľka ' +
+      'výšok. Prázdne pole = kontrola je vypnutá.</div></div></details>';
+  }
+
+  // Zapamätanie otvoreného bloku. Kľúčom je `rule_id` (nie index) — pravidlá
+  // sa môžu preskupiť a index by po prekreslení ukazoval na cudzí blok.
+  function rdGuardToggle(det){
+    if (!det) return;
+    var open = (typeof det.open === 'boolean')
+      ? det.open
+      : !!(det.hasAttribute && det.hasAttribute('open'));
+    RD_GUARD_OPEN[String(det.dataset ? (det.dataset.rid || '') : '')] = open;
+  }
+  if (typeof window !== 'undefined') window.rdGuardToggle = rdGuardToggle;
 
   function rdRender(){
     var line = rdEl('rdSrcLine');
@@ -348,12 +424,11 @@
         });
         html += '<div class="btnrow"><button class="ghostbtn" onclick="rdAddBand(this)">+ pásmo</button></div>';
         html += '</div>';
-        // KOV-F1: voliteľné kontroly dvierok (+1 nad šírku, varovania, hmotnostné
-        // pásma, „mimo tabuľky"). Zatiaľ LEN NA ČÍTANIE — editor prinesie F2;
-        // `rdCollectRules` pracuje na KÓPII pôvodného pravidla, takže polia
-        // uloženie prežijú aj bez formulára.
-        var guards = rdGuardHint(r);
-        if (guards) html += '<div class="hint">' + rdEsc(guards) + '</div>';
+        // KOV-F2: voliteľné kontroly dvierok (+1 nad šírku, varovanie šírky,
+        // hmotnostné pásma, konečná tabuľka) sú od F2 EDITOR — zbalený blok
+        // so súhrnom. Pravidlo `bands`, ktoré sa ich netýka (iný výstup a
+        // žiadny guard), vyzerá presne ako doteraz.
+        if (rdHasGuardEditor(r)) html += rdGuardHtml(r, i);
       } else if (r.kind === 'fit_series'){
         html += '<div class="rrow"><label>Rad dĺžok</label><input class="rseries" type="text" value="'+rdEsc((r.series||[]).join(', '))+'"><span class="unit">mm</span></div>';
         html += '<div class="rrow"><label>Rezerva</label><input class="rclr rnum" type="number" min="0" step="1" value="'+rdEsc(r.clearance!=null?r.clearance:10)+'"><span class="unit">mm</span></div>';
@@ -400,6 +475,79 @@
     RD_RULES[i].bands.splice(bi, 1);
     rdRender();
   }
+  // KOV-F2: pridanie/odobranie HMOTNOSTNÉHO pásma. Rovnaký postup ako pri
+  // výškových pásmach — najprv `rdSyncFromForm` (inak by prekreslenie zahodilo
+  // rozpísané hodnoty ostatných pravidiel), potom zmena a render.
+  function rdAddWeight(btn){
+    var i = parseInt(rdRuleNode(btn).dataset.i, 10);
+    rdSyncFromForm();
+    var r = RD_RULES[i];
+    var wb = Array.isArray(r.weight_bands) ? r.weight_bands : [];
+    // Nové pásmo nadväzuje na NAJŤAŽŠIE existujúce (server pásma aj tak zoradí):
+    // +5 kg a o jeden záves viac — presne rytmus tabuľky výrobcu.
+    var last = null;
+    wb.forEach(function(b){
+      if (b && typeof b.max === 'number' && (last === null || b.max > last.max)) last = b;
+    });
+    wb.push({ max: last ? (last.max + 5) : 10,
+              quantity: last ? Math.min((parseInt(last.quantity, 10) || 1) + 1, 999) : 2 });
+    r.weight_bands = wb;
+    rdRender();
+  }
+  function rdDelWeight(btn){
+    var i = parseInt(rdRuleNode(btn).dataset.i, 10);
+    var wi = parseInt(btn.closest('.rgwb').dataset.wi, 10);
+    rdSyncFromForm();
+    var wb = RD_RULES[i].weight_bands || [];
+    wb.splice(wi, 1);
+    // Posledné zmazané pásmo = kontrola je VYPNUTÁ, teda kľúč v pravidle
+    // nemá čo hľadať (vzor „prázdne pole = guard preč“).
+    if (wb.length) RD_RULES[i].weight_bands = wb; else delete RD_RULES[i].weight_bands;
+    rdRender();
+  }
+  if (typeof window !== 'undefined'){
+    window.rdAddWeight = rdAddWeight;
+    window.rdDelWeight = rdDelWeight;
+  }
+
+  // Zber door guardov z formulára do KÓPIE pravidla. Kľúč, ktorý používateľ
+  // nevyplnil, sa NEZAPÍŠE — pravidlo bez guardov teda ostáva bez guardov aj
+  // po uložení (a to je zároveň jediný spôsob, ako guard vypnúť).
+  //
+  // Klient hodnoty NEHÁDŽE serveru „ako sú": prázdna alebo nekladná hranica =
+  // kontrola vypnutá (rovnaký výsledok, aký by dala serverová
+  // `normalize_width_plus!`), chýbajúci počet = 1 (rovnaký clamp ako pri
+  // výškových pásmach). Vďaka tomu neexistuje tvar, ktorý by klient poslal
+  // a server ticho zahodil.
+  //
+  // VÝNIMKA sú HMOTNOSTNÉ pásma: riadok, ktorý používateľ vedome pridal, sa
+  // nezahadzuje — prázdne kilogramy idú na server ako `null` a uloženie sa
+  // ODMIETNE vetou (server rovnako, viď `HardwareRules.weight_bands_problem`).
+  function rdCollectGuards(ruleEl, r){
+    var box = ruleEl.querySelector('.rgrd');
+    if (!box) return; // blok sa nekreslí -> kľúčov pravidla sa nedotýkame
+    var over = parseFloat((box.querySelector('.rgover') || {}).value);
+    var add = parseInt((box.querySelector('.rgadd') || {}).value, 10);
+    if (!isNaN(over) && over > 0) r.width_plus = { over: over, add: (isNaN(add) || add < 1) ? 1 : add };
+    else delete r.width_plus;
+    var warn = parseFloat((box.querySelector('.rgwarn') || {}).value);
+    if (!isNaN(warn) && warn > 0) r.width_warn_over = warn; else delete r.width_warn_over;
+    var rows = box.querySelectorAll('.rgwb');
+    if (rows.length){
+      var wb = [];
+      rows.forEach(function(row){
+        var m = parseFloat(row.querySelector('.wmax').value);
+        var q = parseInt(row.querySelector('.wqty').value, 10);
+        wb.push({ max: isNaN(m) ? null : m, quantity: (isNaN(q) || q < 1) ? 1 : q });
+      });
+      r.weight_bands = wb;
+    } else {
+      delete r.weight_bands;
+    }
+    var fin = box.querySelector('.rgfin');
+    if (fin && fin.checked) r.finite = true; else delete r.finite;
+  }
+
   function rdCollectBands(ruleEl){
     var out = [];
     ruleEl.querySelectorAll('.rband').forEach(function(row){
@@ -420,7 +568,10 @@
       r.enabled = ruleEl.querySelector('.ren').checked;
       var qty = ruleEl.querySelector('.rqty');
       if (qty){ var q = parseInt(qty.value, 10); r.quantity = (isNaN(q) || q < 1) ? 1 : q; }
-      if (r.kind === 'bands') r.bands = rdCollectBands(ruleEl);
+      if (r.kind === 'bands'){
+        r.bands = rdCollectBands(ruleEl);
+        rdCollectGuards(ruleEl, r); // KOV-F2: voliteľné kontroly dvierok
+      }
       if (r.kind === 'fit_series'){
         r.series = ruleEl.querySelector('.rseries').value.split(/[,;\s]+/)
           .map(function(s){ return parseFloat(s); })
@@ -431,6 +582,40 @@
       out.push(r);
     });
     return out;
+  }
+
+  // KOV-F2: ZRKADLO serverovej `HardwareRules.weight_bands_problem`. Tri
+  // kritériá, a to PRESNE tie, ktoré serverová normalizácia nechá tak:
+  // prázdna tabuľka · pásmo bez kilogramov · dve pásma s rovnakou hmotnosťou.
+  //
+  // Riadky, ktoré by normalizácia ZAHODILA (počet < 1), sa nepočítajú — inak
+  // by klient odmietol tvar, ktorý server ticho opraví (a fixtúra parity by
+  // padla). Poradie sa NEKONTROLUJE: pásma zoraďuje server podľa `max`.
+  function rdWeightNum(v){
+    if (v === null || v === undefined) return null;
+    if (typeof v === 'number') return isFinite(v) ? v : null;
+    var n = parseFloat(v);
+    return isNaN(n) ? 0 : n; // Ruby `'x'.to_f` je 0.0 — teda tiež neplatné
+  }
+  function rdWeightQtyOk(v){
+    if (v === null || v === undefined || String(v).trim() === '') return false;
+    var n = parseInt(v, 10);
+    return !isNaN(n) && n >= 1;
+  }
+  function rdWeightProblem(r){
+    if (!Object.prototype.hasOwnProperty.call(r, 'weight_bands')) return null;
+    var name = 'Pravidlo „' + rdLabel(r.output) + '“';
+    var raw = Array.isArray(r.weight_bands) ? r.weight_bands : [];
+    var rows = raw.filter(function(b){ return b && rdWeightQtyOk(b.quantity); });
+    if (!rows.length) return name + ': hmotnostné pásma sú prázdne — vyplň kg aj počet, alebo tabuľku zmaž.';
+    var maxes = [];
+    for (var i = 0; i < rows.length; i++){
+      var m = rdWeightNum(rows[i].max);
+      if (m === null || !(m > 0)) return name + ': pásmo hmotnosti potrebuje kilogramy — číslo väčšie ako 0.';
+      if (maxes.indexOf(m) >= 0) return name + ': dve hmotnostné pásma majú rovnakú hmotnosť — každé musí mať inú.';
+      maxes.push(m);
+    }
+    return null;
   }
 
   // Klientska kontrola pred odoslanim — CISTA funkcia (Node test). Vracia
@@ -452,6 +637,9 @@
         if (r.finite === true && !bands.some(function(b){ return b.max != null; })){
           return 'Pravidlo „' + rdLabel(r.output) + '“: konečná tabuľka potrebuje aspoň jedno číselné pásmo.';
         }
+        // KOV-F2: hmotnostné pásma (voliteľný guard).
+        var wmsg = rdWeightProblem(r);
+        if (wmsg) return wmsg;
       }
       if (r.kind === 'fit_series' && r.enabled !== false && !(r.series || []).length){
         return 'Pravidlo „' + rdLabel(r.output) + '“ potrebuje aspoň jednu dĺžku v rade.';
@@ -632,8 +820,16 @@
                        rdLabel: rdLabel, rdRoleDesc: rdRoleDesc,
                        rulesRenderBody: rulesRenderBody, rdApplyState: rdApplyState,
                        rdCollectRules: rdCollectRules, RD: RD,
-                       // KOV-F1: veta o voliteľných kontrolách dvierok (read-only do F2).
-                       rdGuardHint: rdGuardHint,
+                       // KOV-F2: editor door guardov. `rdGuardHtml`/`rdGuardSummary`/
+                       // `rdHasGuardEditor` sú ČISTÉ (kreslenie a súhrn),
+                       // `rdCollectGuards`, `rdAddWeight`, `rdDelWeight` a
+                       // `rdGuardToggle` potrebujú DOM a exportujú sa ZÁMERNE:
+                       // „prázdne pole = guard preč" a „pridanie pásma nezhodí
+                       // rozpísané hodnoty" sa inak overiť nedá.
+                       rdHasGuardEditor: rdHasGuardEditor, rdGuardSummary: rdGuardSummary,
+                       rdGuardHtml: rdGuardHtml, rdCollectGuards: rdCollectGuards,
+                       rdAddWeight: rdAddWeight, rdDelWeight: rdDelWeight,
+                       rdGuardToggle: rdGuardToggle, RD_GUARD_KEYS: RD_GUARD_KEYS,
                        // ŠT-3b-2a: read-only bloky — `rdOvrHtml`/`rdAbsRulesHtml` su
                        // ciste funkcie (kontrola escapovania a stropu zoznamu),
                        // `rdRenderExtra` + `rdSelectOverride` potrebuju DOM a
