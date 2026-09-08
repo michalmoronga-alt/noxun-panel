@@ -440,9 +440,17 @@
     for (var i = 0; i < (rules || []).length; i++){
       var r = rules[i];
       if (r.kind === 'bands' && r.enabled !== false){
-        var hasCatchAll = (r.bands || []).some(function(b){ return b.max == null; });
-        if (!(r.bands || []).length || !hasCatchAll){
+        var bands = r.bands || [];
+        var hasCatchAll = bands.some(function(b){ return b.max == null; });
+        if (!bands.length || !hasCatchAll){
           return 'Pravidlo „' + rdLabel(r.output) + '“ potrebuje aspoň pásmo „všetko nad“.';
+        }
+        // Codex #329 kolo 3 P2: KONEČNÁ tabuľka („nad poslednou hodnotou =
+        // chyba") bez jediného číselného pásma by dala catch-all počet každému
+        // čelu a každé by zároveň bolo mimo tabuľky. Server ju odmieta —
+        // klient musí povedať to isté (spoločný kontrakt je fixtúra parity).
+        if (r.finite === true && !bands.some(function(b){ return b.max != null; })){
+          return 'Pravidlo „' + rdLabel(r.output) + '“: konečná tabuľka potrebuje aspoň jedno číselné pásmo.';
         }
       }
       if (r.kind === 'fit_series' && r.enabled !== false && !(r.series || []).length){

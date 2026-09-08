@@ -879,7 +879,12 @@ module Noxun
 
         bands = Array(rule['bands'])
         top = bands.reject { |b| b['max'].nil? }.map { |b| b['max'].to_f }.max
-        return nil if top.nil?
+        # Codex #329 kolo 3 P2: KONECNA tabulka BEZ ciselneho pasma (pouzivatel
+        # ich v editore zmazal — catch-all sa zmazat neda). `top` je vtedy nil
+        # a povodna vetva konflikt POTLACILA, takze kazde celo ticho dostalo
+        # catch-all pocet (spravidla 1 zaves) a nikde ziadny RED. Fail-closed:
+        # mimo tabulky je vtedy KAZDE celo.
+        return no_table_conflict(it, pd) if top.nil?
 
         h = part_dim(pd, :length)
         return nil if h.nil? || h <= top
@@ -888,6 +893,15 @@ module Noxun
           'message' => "#{door_label(pd)}: výška #{fmt_mm(h)} mm je nad tabuľkou závesov " \
                        "(posledné pásmo #{fmt_mm(top)} mm) — počet #{it['quantity'].to_i} je len " \
                        'posledné pásmo. Zamkni počet ručne v Kovaní alebo rozdeľ čelo.' }
+      end
+
+      # Konecna tabulka, v ktorej ostalo LEN pasmo „vsetko nad". Ziadna vyska
+      # sa neda porovnat, takze sa neuvadza — hovori sa, co s tym.
+      def no_table_conflict(it, pd)
+        { 'owner_part_key' => it['owner_part_key'].to_s, 'code' => DOOR_OUT_OF_TABLE,
+          'message' => "#{door_label(pd)}: tabuľka závesov nemá ani jedno číselné pásmo — " \
+                       "počet #{it['quantity'].to_i} je len pásmo „všetko nad“. Doplň pásma " \
+                       'v Pravidlách kovania alebo zamkni počet ručne v Kovaní.' }
       end
 
       # Codex #329 kolo 2 P2: ma polozka ZAMKNUTY POCET rucnym zasahom?
@@ -1396,6 +1410,10 @@ module Noxun
       #     Nie je to tiche (kusovnik hlasi `hardware_rule_skipped` a KONTROLA
       #     to ukaze ako ORANGE), ale odmietnut deravy tvar RAZ pri ulozeni je
       #     lacnejsie nez ORANGE na kazdej skrinke zakazky.
+      #   * `kind == 'bands'` s `finite` a BEZ jedineho ciselneho pasma — catch-all
+      #     by dal svoj pocet kazdemu celu a kazde celo by bolo „mimo tabulky"
+      #     (RED). Odmietnut taky tvar RAZ pri ulozeni je lacnejsie nez RED na
+      #     kazdych dvierkach zakazky (Codex #329 kolo 3 P2).
       #   * `kind == 'fit_series'` s prazdnym radom — automat nema z coho vybrat.
       #     VEDOMY DOSLEDOK: uzatvara sa tym D-93 vetva „rucny NL zamok pri
       #     prazdnom rade" (zamok mimo radu sa aj tak uz nedal zapisat).
@@ -1434,9 +1452,16 @@ module Noxun
         case rule['kind'].to_s
         when 'bands'
           bands = rule['bands'].is_a?(Array) ? rule['bands'] : []
-          return nil if !bands.empty? && bands.any? { |b| b.is_a?(Hash) && b['max'].nil? }
+          if bands.empty? || bands.none? { |b| b.is_a?(Hash) && b['max'].nil? }
+            return "#{rule_address(rule)} potrebuje aspoň pásmo „všetko nad“."
+          end
+          # Codex #329 kolo 3 P2: KONECNA tabulka bez jedineho CISELNEHO pasma
+          # nie je tabulka — catch-all by dal svoj pocet kazdemu celu a kazde
+          # by zaroven bolo „mimo tabulky". Take pravidlo sa NEULOZI.
+          return nil unless rule['finite'] == true
+          return nil if bands.any? { |b| b.is_a?(Hash) && !b['max'].nil? }
 
-          "#{rule_address(rule)} potrebuje aspoň pásmo „všetko nad“."
+          "#{rule_address(rule)}: konečná tabuľka potrebuje aspoň jedno číselné pásmo."
         when 'fit_series'
           series = rule['series'].is_a?(Array) ? rule['series'] : []
           return nil unless series.empty?
