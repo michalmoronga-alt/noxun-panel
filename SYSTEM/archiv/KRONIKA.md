@@ -28,7 +28,7 @@
   Kontrola aj zvonček ukazujú to isté.
   **Ďalej:** JS sada testuje celý tok payload → riadok (`setCabInfo` sa číta priamo z `bridge.js` a beží v mini-DOM, vrátane resetu `setCabInfo(null)`), pribudli regresné
   guardy (žiadny `weight_*` v `add_part`/`merge_final`, `Bom.row_key` nezmenený, `prod`/`box`/`origin` bajt na bajt rovnaké) a in-SU sekcia `run_kovw` dostala scenáre
-  hrubého čela 25 mm a UNI čela. Testy po fix kole: **headless 3442**, **96 JS sád**.
+  hrubého čela 25 mm a UNI čela. Testy po fix kole: **headless 3442**, **96 JS sád**, **in-SketchUp 1987 PASS / 0 FAIL** (beh nad vetvou, SketchUp bol voľný).
 
 - **KOV-W — HMOTNOSŤ DIELCOV A ČIEL + D-125 (8.9.2026; PR #328, v0.9.47).** Závesy (KOV-F) a výklopy (KOV-E) potrebujú hmotnosť čela a Inspector mal od UI 2.0 prázdny
   riadok „Hmotnosť" — hustota per typ materiálu pritom v katalógu žila od M-C a nikto z nej nič nepočítal. Dávka postavila **jeden vzorec** (`Materials.weight_kg`,
