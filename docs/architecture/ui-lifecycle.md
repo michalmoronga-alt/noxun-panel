@@ -656,6 +656,12 @@ rozmerov sa stali `<b>` s **rovnakými ID** (`av_width`/`av_depth`/`av_height`) 
 `cabinet_payload` nesie `parts_count` + `parts_area_m2` z `Panel.cabinet_stats` — čisté čítanie snapshotov dielcov s **rovnakým filtrom ako `Bom.collect`** (`kind=part` +
 `manufactured` + `production_class=sheet`, takže proxy kovania sa do počtu nedostane); hodnoty sú **tranzientné** (do configu ani snapshotu sa neukladajú, žiadna zmena schémy).
 
+**KOV-W / D-125 — riadok „Hmotnosť" (v0.9.47).** Ten istý kanál: `cabinet_stats` posiela navyše `weight_kg` + `weight_estimated_parts` + `weight_estimated_density`
+(`Bom.weight_totals` nad TÝMI ISTÝMI snapshotmi — panel nič nepočíta, jeden vzorec pre plán aj Inspector). Text aj tooltip skladá **čistá funkcia `nxCabWeight(c)`**
+(`core.js`, Node test): `12,4 kg` · `≈ 12,4 kg` s tooltipom „Hmotnosť je odhad — N dielcov bez hustoty; ráta sa <hustota> kg/m³ (ťažšia hodnota)" · `—`, keď skrinka nemá
+výrobné dielce alebo údaj chýba (radšej pomlčka než vymyslené číslo). Riadok **nie je klikateľný** (nie je kam viesť) a vo VKLADANÍ sa **vynuluje** — odhad zo šablóny nemá
+(materiály sa riešia až pri vložení), takže by inak držal číslo predtým označenej skrinky. Vertikálny priestor panela sa nemení: riadok existoval od UI 2.0 ako placeholder.
+
 **Klikateľné sú len tie údaje, ktoré niekam vedú (N13):** „Dielcov" → `nx_select_parts` → `Panel.handle_select_parts` = **čisté čítanie + zmena výberu** pod
 `suspend_selection_sync` a refresh `dedup: false` (vzor `ProductionCore.do_select`; **žiadny `start_operation`, žiadny krok Späť**), s prísnym guardom `model_guid` + `cabinet_id`
 (asynchrónny callback). Klik má **rovnaký flush handshake ako „Vložiť kópiu"** (Codex audit UI-B3): zmena výberu si vypýta push celej skrinky, ktorý prepíše formulár — rozpísaný

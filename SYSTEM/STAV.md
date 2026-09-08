@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.9.46 · 8.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.9.47 · 8.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -22,7 +22,7 @@ a rád (`core/hardware_taxonomy.rb`) a vytiahla katalóg aj editor setu na obraz
 **Pozor na kompatibilitu:** čo uloží v0.9.20, to **v0.9.18 už nepoužije** — model/šablóna (`CONFIG_SCHEMA` 4 + brána `assess_set_defs`), knižnica setov aj projektový snapshot
 (`std` 3) a katalóg kovania s výrobcom (`schema` 2). Pred prvou takou zákazkou aktualizovať **obe PC** (D-52 updater).
 
-**Testy k v0.9.46:** **3405 headless** · 95 JS sád · posledný plný in-SketchUp beh **1965 PASS** (nad mainom v0.9.46, 8.9.; nestabilný test = D-117).
+**Testy k v0.9.47:** **3429 headless** · 96 JS sád · posledný plný in-SketchUp beh **1965 PASS** (nad mainom v0.9.46, 8.9.; nestabilný test = D-117; sekcia `run_kovw` napísaná, beh čaká).
 
 ## Robí sa
 
@@ -32,30 +32,30 @@ a rád (`core/hardware_taxonomy.rb`) a vytiahla katalóg aj editor setu na obraz
 **KOV-C má package v2 (5.9., PR #301, #19):** nemenné recepty, kódy v setoch, žiadny fallback NL; ZMRAZENÝ.
 **KOV-C KOMPLET:** C1 jadro (#302), C2a príprava (v0.9.30), C2b aktivácia (#304, v0.9.31), C2b-M materiálový kanál (#305, v0.9.32) a **C2c UI zásuviek** (v0.9.33).
 **KOV-D (package v2, PR #307, #20): slice D je KOMPLET (v0.9.42, 7.9.2026)** — D1a (0.9.34) · D1b (0.9.35) · D1c (0.9.36) · D2a (0.9.37) · D2b (0.9.38) · D3a/D3b (0.9.39/40) ·
-D4 (0.9.41) · D5 (0.9.42); 8 PR za deň (#310–#317). Blok KOVANIE pokračuje **KOV-W → F → E → G → I** (debata 8.9. uzavretá, packages v [PLAN.md](PLAN.md)); minor bump až pri uzávere celého bloku.
+D4 (0.9.41) · D5 (0.9.42); 8 PR za deň (#310–#317). **KOV-W (hmotnosť dielcov + D-125) HOTOVÁ (v0.9.47)** — podklad pre závesy a výklopy.
+Blok KOVANIE pokračuje **F → E → G → I** (debata 8.9. uzavretá, packages v [PLAN.md](PLAN.md)); minor bump až pri uzávere celého bloku.
 **Od 3.9. opäť Fable (Max, ~mesiac; priorita = uzavrieť V1)** — orchestruje Fable, implementujú Opus subagenti, review Codex; vstupný bod je [zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md](zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md) + tento súbor. **Limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
 
-**Poradie:** ~~D-52~~ → ~~KOV-A~~ → ~~KOV-H~~ → ~~KOV-B~~ → ~~KOV-C~~ → ~~KOV-D~~ (všetko v maine, D1a–D5) → ~~D-118~~ (katalógový seed + sety, a aj b) → ~~D-121~~ (názvy dielcov zásuvky + VEPO kontrakt v1.2) → **KOV-W → KOV-F → KOV-E → G → I** (poradie rozhodol Michal 8.9.2026; packages v [PLAN.md](PLAN.md), audity W Sol / F Sol / E Astra); súbežne 1d podľa kapacity.
+**Poradie:** ~~D-52~~ → ~~KOV-A~~ → ~~KOV-H~~ → ~~KOV-B~~ → ~~KOV-C~~ → ~~KOV-D~~ (všetko v maine, D1a–D5) → ~~D-118~~ (katalógový seed + sety, a aj b) → ~~D-121~~ (názvy dielcov zásuvky + VEPO kontrakt v1.2) → ~~KOV-W~~ (hmotnosť + D-125) → **KOV-F → KOV-E → G → I** (poradie rozhodol Michal 8.9.2026; packages v [PLAN.md](PLAN.md), audity F Sol / E Astra); súbežne 1d podľa kapacity.
 Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` → subagent vo worktree → `codex-po-pr` → merge → uzáver. V1 checklist v [V1_VIZIA.md](V1_VIZIA.md).
 
 ## Posledné uzávery
 
-- **D-121 — DIELCE ZÁSUVKY MAJÚ ĽUDSKÉ NÁZVY A VEPO RIADOK MÁ VŽDY ≤ 20 ZNAKOV** (v0.9.45 + v0.9.46, 8.9.2026): dielce zásuvky už nenesú interné id čela, ale **jeho číslo**
-  (`Dno zasuvky 2` → vo VEPO `Zas dno 2 s1`, dvojica bokov `Zas bok LP 2 s1`). A hlavne: **objednávku netreba ručne prepisovať** — import VEPO pole nad 20 znakov odmieta,
-  tak sa rovnaké dielce s číslom zlúčia (`Polica 1 2 3` namiesto `Polica 1/Polica 2/Polica 3`) a keď sa názov aj tak nezmestí, skráti sa **predvídateľne po celých slovách**
-  (nikdy cez číslo dielca, bez výpustky). Plugin to povie: **Kontrola** ukáže oranžové upozornenie s tvarom, ktorý pôjde do objednávky, a **LOG** má oddiel „Skrátené názvy".
-  Staré zákazky dostanú tvar bez čísla, kým sa skrinka neprestaví. [KRONIKA](archiv/KRONIKA.md).
+- **KOV-W — INSPECTOR UŽ UKÁŽE HMOTNOSŤ SKRINKY (D-125)** (v0.9.47, 8.9.2026): riadok „Hmotnosť" v Základných bol od UI 2.0 prázdny; odteraz ukazuje **skutočný súčet
+  výrobných dielcov** (`12,4 kg`). Keď má niektorý dielec materiál **bez známej hustoty** (UNI, „iný" typ), plugin ho **nevynechá** — počíta ho **ťažšie** a povie to:
+  `≈ 12,4 kg` s vysvetlením v tooltipe a jedným oranžovým upozornením v Kontrole (pri UNI dielcoch nie — tie už hlásia „materiál neurčený"). Rovnaká hmotnosť je teraz
+  aj v pláne pri každom dielci, takže **závesy (F) a výklopy (E) ju majú pripravenú**. Kusovník, VEPO ani ceny sa nemenia. [KRONIKA](archiv/KRONIKA.md).
+- **D-121 — DIELCE ZÁSUVKY MAJÚ ĽUDSKÉ NÁZVY A VEPO RIADOK MÁ VŽDY ≤ 20 ZNAKOV** (v0.9.45 + v0.9.46, 8.9.2026): namiesto interného id čela nesú **jeho číslo**
+  (`Zas dno 2 s1`, dvojica bokov `Zas bok LP 2 s1`); **objednávku netreba ručne prepisovať** — rovnaké dielce sa zlúčia (`Polica 1 2 3`) a dlhý názov sa skráti
+  predvídateľne po celých slovách. **Kontrola** ukáže tvar, ktorý pôjde do objednávky, **LOG** má oddiel „Skrátené názvy". [KRONIKA](archiv/KRONIKA.md).
 - **D-118a + D-118b — KATALÓG POZNÁ KÓDY, KTORÉ SI PLUGIN SÁM OBJEDNÁVA, A ZÁSUVKA OBJEDNÁ SPRÁVNU SADU** (v0.9.43 + v0.9.44, 7.9.2026): katalóg kovania má **114 položiek**
   s presným názvom z Démosu, cenou s DPH, odkazom, dátumom overenia, výrobcom a radou (dovtedy boli kódy receptových setov v Nákupe „bez ceny"); používateľské položky sa
   neprepisujú, štyri zrušené kódy ostávajú neaktívne s dôvodom. Na to nadviazali sety: antracitová zásuvka H70/470 objedná **`357889`** namiesto `348777` (ten nie je K-sada)
   a **každá Tip-On zásuvka** dostane k sade aj **PTOs modul** `352908`/`352909` (28,33 € s DPH); kity typu `PTO` ho vedome nedostanú. Rozpracované zákazky sa nemenia samy —
   prenesie to **„Doplniť nové predvoľby"**. Doplnením výrobcov sa katalóg označí ako novší, takže **staršia verzia pluginu ho otvorí len na čítanie**. [KRONIKA](archiv/KRONIKA.md).
-- **KOV-D5 — ZÁSUVKA UŽ UKAZUJE OLEP NA SPRÁVNEJ HRANE** (v0.9.42, 7.9.2026): dielce zásuvky boli doteraz v modeli **jednofarebné** — páska sa na nich nekreslila vôbec.
-  Odteraz má **chrbát, bok boxu aj vnútorné čelo** pásku vidieť na **hornej** hrane (presne tam, kam ide), **dno ostáva bez pásky** a **Kontrola olepov** zvýrazní **tú istú**
-  hranu. Rozmery, kusovník, VEPO ani ceny sa nemenia; stará zákazka dostane farbu pri najbližšej prestavbe skrinky. [KRONIKA](archiv/KRONIKA.md).
-- **Staršie uzávery** (**KOV-D4** ceruzka v Kontrole a „Bez kódov" po ľudsky v0.9.41 · **KOV-D1b + D1c** výber setu zásuvky vrátane antracitu v0.9.35/36 · **KOV-C2b + C2b-M** zásuvka naozaj vznikne a dá sa jej nastaviť materiál v0.9.31/32 ·
+- **Staršie uzávery** (**KOV-D5** zásuvka ukazuje olep na správnej hrane v0.9.42 · **KOV-D4** ceruzka v Kontrole a „Bez kódov" po ľudsky v0.9.41 · **KOV-D1b + D1c** výber setu zásuvky vrátane antracitu v0.9.35/36 · **KOV-C2b + C2b-M** zásuvka naozaj vznikne a dá sa jej nastaviť materiál v0.9.31/32 ·
   **KOV-D3a + D3b** prechod na novšiu verziu receptu — latentný rámec v0.9.39/40 · **KOV-D2b** klikacie zámky výšky a dĺžky zásuvky v0.9.38 · **KOV-D2a** zámky osí zásuvky, `CONFIG_SCHEMA` 7 v0.9.37 · **KOV-C1 + C2a** nemenné recepty, SHA register, 4. materiálový kanál a 8 setov s kódmi v0.9.29–v0.9.30 · **GHOST-D2** doska sa dá nakresliť na rozmer v0.9.28 ·
   **KOV-C2c** riadok zásuvky a Technický detail na karte čela v0.9.33 · **KOV-D1a** vlastný kit pre jedno čelo, poškodený pin receptu = červená v0.9.34 · **KOV-B3** editor setu v modale so živým náhľadom v0.9.26 · **NÁSTROJE-1** toolbar „Noxun Nástroje“ v0.9.24–v0.9.25 ·
   **GHOST-D1** doska sa kladie klikom, vlastný kontrakt configu v0.9.27 · **KOV-B2** katalóg kovania so stromom a modalom v0.9.23 · **KOV-H2** ad-hoc kovanie priamo v Inspectorovi v0.9.20 · **1d/R-14 · R-12 · R-11** zákazka z novšieho pluginu sa už ticho nezmrzačí v0.9.2–v0.9.4 ·

@@ -38,13 +38,6 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   a výšku, `geometry`/`options` hranu nevracajú a modul výslovne predpokladá hornú hranu (komentár D-90 sľubuje len, že config to unesie bez migrácie). **Rozsah D-120 =**
   config čela (hrana) **+ registry/API** (hrana ako parameter profilu) **+ všetci konzumenti**: matematika panelu vo `Fronts` (skrátenie v inej osi), pravidlo kovania (dĺžka
   rezu), vizuál v modeli (renderer v `CabinetBuilder`), náhľad a UI panela; smer dekoru čela sa neotáča. *Stav: OTVORENÉ — **zaradené do UI/UX balíka Čiel (D-114), rozhodnuté 8.9.2026; do KOV-F NEPATRÍ.***
-- **D-125 · Hmotnosť v Inspectore (Základné) je prázdny placeholder** (Michal 6.9., KLINIKA) — riadok „Hmotnosť" v informačnom stĺpci sektora Základné ukazuje vždy „—":
-  je to **statický placeholder z UI 2.0** (`panel.html` `#infWeight`, tooltip „Hmotnosť príde s kovaním (fáza 3)"), JS ho nikdy neplní a payload žiadnu hmotnosť nenesie.
-  Nie je to bug, ale nedokončené miesto. Hustota per typ materiálu už existuje (`Materials.density_for`, M-C), takže **hmotnosť skrinky = Σ dielcov (dĺžka × šírka × hrúbka
-  × hustota typu)** je odvodené čítanie nad BOM riadkami. Pravidlá (**revízia 8.9.2026, Michal**): dielec s neznámou hustotou (typ „iný", UNI) sa **ráta ako ťažší odhad**
-  (najvyššia hustota doskového typu okrem kompaktu) a stav sa prizná — „≈ X kg" s tooltipom „N dielcov bez hustoty rátaných ako <hustota>"; „—" len bez výrobných dielcov.
-  *Stav: OTVORENÉ — **zaradené do KOV-W** (package v [PLAN.md](PLAN.md), 8.9.2026): payload Inspectora `weight_kg` + `weight_estimated_parts` + `weight_estimated_density` (aditívne), žiadne `weight_missing`; ten istý helper hmotnosti používajú KOV-F/E.**KOV-E** — tam vzniká helper hmotnosti čela z tých istých vstupov;
-  hmotnosť skrinky = ten istý helper nad všetkými dielcami) alebo ako malá samostatná dávka po KOVANÍ; do payloadu Inspectora pribudne `weight_kg` + `weight_missing` (aditívne).*
 
 ## KONTROLA + VÝROBA
 

@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-125** — Riadok „Hmotnosť" v Inspectore ukazuje skutočnú hmotnosť skrinky; neznáma hustota sa neignoruje ani nevymýšľa — ráta sa ťažšie a prizná sa („≈" + tooltip, ORANGE v Kontrole) — vyriešené 8.9.2026, PR #N (KOV-W), v0.9.47
 - **D-121** — Názvy dielcov zásuvky sú ľudské (`Zas dno 2 s1`) a názov riadku VEPO je vždy ≤ 20 znakov (kontrakt v1.2: zlučovanie čísel, orez po slovách s upozornením v Kontrole a LOGu) — vyriešené 8.9.2026, PR #324 + #325, v0.9.45 + v0.9.46
 - **D-95** — Režim krížovej kontroly „diel po diele" — **uzavreté bez implementácie 6.9.2026** (Michal: odškrtávanie ide preč natrvalo, ostáva vizuálna kontrola; presety/X-ray = koncept 01 v zásobníku), bez PR
 - **D-51** — Štandard veľkostí okien a tlačidiel — uzavreté 6.9.2026 rozhodnutím (Michal: veľkosť okien je OK; Inspector 470 × 810 z UI-B1, satelity zanikli v Štúdiu), bez PR
@@ -106,6 +107,37 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-125 · Hmotnosť v Inspectore (Základné) je prázdny placeholder (Michal 6.9.2026; vyriešené 8.9.2026 — dávka KOV-W, PR #N, v0.9.47)
+
+**Pôvodné znenie (presunuté z DOGFOODING.md):**
+
+**D-125 · Hmotnosť v Inspectore (Základné) je prázdny placeholder** (Michal 6.9., KLINIKA) — riadok „Hmotnosť" v informačnom stĺpci sektora Základné ukazuje vždy „—":
+je to **statický placeholder z UI 2.0** (`panel.html` `#infWeight`, tooltip „Hmotnosť príde s kovaním (fáza 3)"), JS ho nikdy neplní a payload žiadnu hmotnosť nenesie.
+Nie je to bug, ale nedokončené miesto. Hustota per typ materiálu už existuje (`Materials.density_for`, M-C), takže **hmotnosť skrinky = Σ dielcov (dĺžka × šírka × hrúbka
+× hustota typu)** je odvodené čítanie nad BOM riadkami. Pravidlá: dielec s neznámou hustotou (typ „iný", UNI) sa **nevymýšľa** — výsledok ukázať ako „≈ X kg" s tooltipom
+„bez N dielcov (materiál bez hustoty)"; pri všetkých neznámych ostáva „—". *Stav: OTVORENÉ — zaradiť ku **KOV-E** (tam vzniká helper hmotnosti čela z tých istých vstupov;
+hmotnosť skrinky = ten istý helper nad všetkými dielcami) alebo ako malá samostatná dávka po KOVANÍ; do payloadu Inspectora pribudne `weight_kg` + `weight_missing` (aditívne).*
+
+**Revízia zadania (Michal 8.9.2026) — neznáma hustota sa NEVYNECHÁVA, ráta sa ŤAŽŠIE.** Pôvodné znenie hovorilo „bez N dielcov" a pri samých neznámych „—". Michal to pri
+zadávaní KOV-W zmenil: dielec, ktorého materiál hustotu nemá (UNI · typ mimo registra · materiál mimo katalógu), do súčtu **vstúpi** — s najvyššou hustotou doskového typu
+v registri **okrem kompaktu** (`Materials.fallback_density`; kompakt 1350 by odhad zdvojnásobil). Dôvod je stolársky: pri závesoch a výklopoch je podhodnotená hmotnosť
+nebezpečná, nadhodnotená len drahšia. „—" ostáva **výhradne** pre skrinku bez výrobných dielcov.
+
+**Riešenie (dávka KOV-W, PR #N, v0.9.47, 8.9.2026).** Jeden vzorec `Materials.weight_kg` (mm × kg/m³ / 1e9) obsluhuje tri miesta: **plán** (`build_plan(densities:)` →
+aditívne `weight_kg` a `weight_estimated` na každom deskriptore vrátane dielcov zásuviek — podklad pre závesy KOV-F a výklopy KOV-E, ktoré ho čítajú ako nový vstup pravidla
+`weight`), **súčet nad výrobnými snapshotmi** (`Bom.weight_totals`) a **riadok Hmotnosť v Inspectore** (`Panel.cabinet_stats` → `weight_kg` + `weight_estimated_parts` +
+`weight_estimated_density`; text skladá čistá funkcia `nxCabWeight`). Používateľ vidí `12,4 kg`, pri odhade `≈ 12,4 kg` s tooltipom „Hmotnosť je odhad — N dielcov bez
+hustoty; ráta sa 870 kg/m³ (ťažšia hodnota)", a `—` len keď skrinka nemá výrobné dielce. Odhad sa priznáva aj v Kontrole: **jeden** ORANGE `weight_density_unknown` na
+skrinku (nie na dielec) — nad UNI dielcami sa **potlačí** rovnako ako abs_* warningy, lebo UNI už hlási `uni_material`; viditeľný ostáva pri type bez hustoty, ktorý UNI nie je.
+
+**Čo sa vedome nezmenilo:** hmotnosť sa **neukladá** do modelu ani do výrobného snapshotu (`plan_schema` bez bumpu, žiadna migrácia), `Bom.compute` ju nevracia (kusovník,
+VEPO ani ceny sa nemenia o číslo), a `build_plan` **bez** `densities:` sa správa presne ako predtým (migrácia identity a panelové resolvery sú nedotknuté). Vertikálny
+priestor panela sa nezmenil — riadok existoval od UI 2.0. Bokom vzniklo `Construction.material_channel` = jediné miesto pravdy o materiálovom kanáli dielca (číta ho aj
+`CabinetBuilder.base_material_for`), aby sa hmotnosť nemohla rátať z inej dosky, než akou je dielec postavený.
+
+**Testy:** nová sada `tests/pure/test_kovw_hmotnost.rb` (24 scenárov + 10 vymenovaných mutácií, vrátane zdrojového guardu „hustota nikde ako literál") a
+`tests/js/test_kovw_hmotnost.js`; in-SU sekcia `run_kovw` (živý reťazec katalóg → skrinka → snapshoty → Inspector → Kontrola).
 
 ### D-121 · Názvy odvodených dielcov zásuviek sú pre VEPO pridlhé a nič nehovoria (Michal 6.9.2026; vyriešené 8.9.2026 — PR #324 v0.9.45 + PR #325 v0.9.46)
 

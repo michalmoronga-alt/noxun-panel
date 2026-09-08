@@ -71,6 +71,11 @@ prekážke, KD, poškodenom pine či `drawer_stale` by reset zásahu konflikt **
 by tú chybu zdedil každému budúcemu kódu. `drawer_conflict_target` číta raw `collected[:hardware_overrides]` (schéma sa nemení, `rule_id` v uloženom `drawer_conflicts` nie je) a pri
 viacerých záznamoch (dormantný zámok vedľa aktuálneho) **nehádá**. Klientska strana je v `ui-lifecycle.md` (sekcia KONTROLA, kontext Kovanie).
 
+**KOV-W — hmotnostný warning sa nad UNI dielcami POTLAČÍ (v0.9.47).** `check_build` má vedľa `abs_`-vetvy druhú výnimku: build warning `weight_density_unknown`
+(`WEIGHT_UNKNOWN_CODE`) je **korpusový** (bez `part_key`) a dotknuté dielce nesie v `data['parts']`. `weight_parts_all_uni?` ho zahodí len vtedy, keď je **KAŽDÝ** z nich
+v `uni_parts` — UNI dielec už hlási `uni_material` („materiál neurčený") a druhá veta o tom istom by bola hluk. Stačí jeden dotknutý dielec, ktorý UNI nie je (typ bez
+hustoty), a ORANGE ostáva. Prázdny `data['parts']` sa **nepotláča** (radšej veta navyše než ticho).
+
 ### production_core.rb — zdieľané čisté jadro výstupov zákazky (ŠT-1a PR A)
 
 kusovník, súpisy platní/ABS a VEPO export sa sťahovali z okna Výroba do nového okna **Štúdio**; aby obe okná čítali **tie isté čísla**, čistí pomocníci prešli do jedného modulu
@@ -335,6 +340,12 @@ Rozdiel medzi (1) a (3) je vecný a zámerný: **blokuje sa NEKOMPATIBILNÁ VERZ
 ### bom.rb
 
 Zber modelu a agregácia riadkov kusovníka (`Bom.collect`, `Bom.compute`, `Bom.row_key`); správanie je popísané v odsekoch, ktoré ho volajú.
+
+**KOV-W — `weight_totals(records, sheets)` (v0.9.47).** Hmotnosť výrobných záznamov v kg; `sheets` je tá istá mapa `{ material_id => záznam }`, akú stavia
+`ProductionCore.sheets_map` pre `Validation.run`. Vracia `{ 'kg' => Float (2 des.), 'estimated_parts' => Integer, 'estimated_density' => Float | nil }`. Súčet ide cez
+`quantity` a **jediný vzorec** `Materials.weight_kg`. Záznam bez `material_id`, mimo katalógu aj UNI sa zo súčtu **nikdy nevynechá** — beží na `Materials.density_or_fallback`
+(ťažší odhad) a prizná sa počtom KUSOV v `estimated_parts` + použitou hustotou v `estimated_density` (`nil` = žiadny odhad). Funkcia je **mimo `compute()`** — tvar výstupu
+kusovníka, VEPO ani ceny sa nemenia; čitateľom je zatiaľ len `Panel.cabinet_stats` (riadok Hmotnosť v Inspectore, D-125).
 
 **`aggregate_rows` — `free_names` (aditívny kľúč, GH #287 P2, v0.9.22).** Riadok sa zlučuje podľa **výrobných parametrov** (`row_key`), takže dielec skrinky a samostatná doska
 s rovnakými rozmermi, materiálom a hranami skončia v JEDNOM riadku — a `names` potom nepovedia, čo z toho je voľný text používateľa. Riadok preto nesie navyše `free_names`:

@@ -17,6 +17,21 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-W — HMOTNOSŤ DIELCOV A ČIEL + D-125 (8.9.2026; PR #N, v0.9.47).** Závesy (KOV-F) a výklopy (KOV-E) potrebujú hmotnosť čela a Inspector mal od UI 2.0 prázdny
+  riadok „Hmotnosť" — hustota per typ materiálu pritom v katalógu žila od M-C a nikto z nej nič nepočítal. Dávka postavila **jeden vzorec** (`Materials.weight_kg`,
+  mm × kg/m³ / 1e9) a napojila naň tri miesta: **plán** (`build_plan(densities:)` → aditívne `weight_kg`/`weight_estimated` na každom deskriptore vrátane dielcov
+  zásuviek, plnené `CabinetBuilder.part_densities`), **súčet nad výrobnými snapshotmi** (`Bom.weight_totals`) a **riadok Hmotnosť** v Inspectore (`Panel.cabinet_stats`
+  + čistá funkcia `nxCabWeight`). Pravidlá kovania dostali vstup `weight` (zatiaľ ho nepoužíva žiadne seed pravidlo — spotrebuje ho F/E).
+  **Prečo „ťažší odhad" a nie „—" (rozhodnutie Michala 8.9.2026, mení pôvodné znenie D-125 zo 6.9.):** dielec, ktorého materiál hustotu nemá (UNI · typ mimo registra ·
+  materiál mimo katalógu), do súčtu **vstúpi** s `Materials.fallback_density` = najvyššia hustota doskového typu v registri **okrem kompaktu**. Pri závesoch a výklopoch
+  je podhodnotená hmotnosť nebezpečná, nadhodnotená len drahšia; kompakt (1350) je extrém, ktorý by odhad zdvojnásobil. Číslo sa nikde nepíše ako literál (zdrojový guard).
+  Stav sa priznáva: „≈" a tooltip v Inspectore + **jeden** ORANGE `weight_density_unknown` na skrinku, ktorý Kontrola nad UNI dielcami potlačí rovnako ako abs_* warningy
+  (UNI už hlási `uni_material` — dva riadky o tom istom sú hluk).
+  **Vedomé hranice:** hmotnosť sa neukladá do modelu ani do snapshotu (`plan_schema` bez bumpu, žiadna migrácia), `Bom.compute` ju nevracia (kusovník, VEPO ani ceny sa
+  nemenia o číslo) a `build_plan` **bez** `densities:` sa správa presne ako predtým — charakterizačný test to stráži. Bokom vzniklo `Construction.material_channel`
+  (jediné miesto pravdy o materiálovom kanáli dielca; `CabinetBuilder.base_material_for` z neho odvtedy číta), aby sa hmotnosť nemohla rátať z inej dosky, než akou je
+  dielec postavený. Testy: headless 3429 (+24), JS 96 sád (+1), in-SU sekcia `run_kovw` **napísaná, ale nespustená** (SketchUp mal otvorenú živú zákazku).
+
 - **D-121 — DOPLNENIE PO REVIEW A IN-SU BEHU (8.9.2026 dopoludnia; docs PR #326).**
   Odseky D-121a a D-121b nižšie vznikli v PR #324/#325 **pred** Codex kolami a pred in-SU behom — ostávajú tak, ako boli zapísané (tento súbor sa neprepisuje);
   toto je ich datované doplnenie. **Review PR #325 (3 kolá = plná brána kontraktovej dávky):** kolo 1 = 3× P2 — nález `name_long` vznikal aj pre riadok, ktorý export

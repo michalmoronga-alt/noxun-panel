@@ -240,7 +240,19 @@ nechal jej **starý `catalog_rev`**, takže jej najbližší zápis by server od
 **M-C (SCHEMA 8):** `pd_edge_subtype` (postforming/abs — z Demos parametra „Typ pracovnej dosky" alebo edit formulára; len PD, enum, guard aj v normalize) +
 `abs_default_suppression` = jedna autorita „nelepiteľných" (KOMPAKT vždy · PD-postforming) pre resolve_edges, semafor (`abs_impossible?` headless dvojník + potlačenie uložených
 abs_* warnings), modal aj `ensure_edge_for_sheet` (`:abs_suppressed`); zmena materiálu dosky na nelepiteľný ČISTÍ hrany; **`density` per TYP v TYPE_REGISTRY** + `density_for`
-(UNI/„iný" = nil) — spotrebuje dávka D (pri návrhu D density SNAPSHOT do modelu).
+(UNI/„iný" = nil).
+
+#### KOV-W — hmotnosť: jeden vzorec a ťažší odhad (v0.9.47)
+
+**`weight_kg(l, w, t, density)`** = dĺžka × šírka × hrúbka [mm] × hustota [kg/m³] / 1e9 — **jediný vzorec hmotnosti v systéme** (plán, kusovník aj Inspector volajú sem).
+Nezaokrúhľuje (zaokrúhlenie patrí zobrazeniu); nekladný/neplatný vstup = `0.0`.
+
+**`fallback_density`** = hustota, ktorou sa ráta dielec, ktorého materiál ju nemá (UNI · typ mimo registra · materiál mimo katalógu). Rozhodnutie Michala 8.9.2026: ráta sa
+**ŤAŽŠIE** — je to **max `density` v `TYPE_REGISTRY` okrem typov v `FALLBACK_DENSITY_SKIP_TYPES`** (dnes `KOMPAKT`; jeho 1350 by z každého neznámeho dielca spravilo takmer
+dvojnásobne ťažký kus). Číslo sa **nikde nepíše ako literál** — číta sa z registra, takže zmena registra ho posunie sama (zdrojový guard v `test_kovw_hmotnost.rb`).
+
+**`density_or_fallback(rec)` → `[hustota, odhad?]`** — `nil` záznam aj UNI dávajú `[fallback_density, true]`. Dielec sa zo súčtu **nikdy nevynechá**; stav sa prizná
+(ORANGE `weight_density_unknown` v pláne, „≈" v Inspectore).
 
 **D-72:** protiťahová zástena — `zastena_decor_parts` + `zastena_counterbalance?` gate (single len s „protitah" markerom), záznam s príznakom `single_sided` (first-fill rubu
 zakázaný; párová stránka sa s ním nezhoduje).
