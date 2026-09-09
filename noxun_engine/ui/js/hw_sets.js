@@ -295,9 +295,6 @@
   // (E1a ich odkladala celé ako `raw`, lebo editor pre ne ešte nebol). Kontrakt
   // je nezmenený: `code XOR code_by_nl XOR param_bands XOR code_by_param`
   // a `quantity_from` NEZÁVISLE od nich.
-  function hwsCopy(v){
-    try { return JSON.parse(JSON.stringify(v)); } catch (e){ return v; }
-  }
   function hwsBuildMembers(members){
     return (members || []).map(function(m){
       var out = { per: m.per === 'owner' ? 'owner' : 'unit', qty: parseInt(m.qty, 10) || 1 };
