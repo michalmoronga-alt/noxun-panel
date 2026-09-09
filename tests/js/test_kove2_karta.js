@@ -265,4 +265,43 @@ eq(C.frontCardModel({ type: 'door' }, ENTRY, null, OK_REC).rows.filter(r => r.ki
 eq(C.frontCardModel({ type: 'fall' }, ENTRY, null, OK_REC).rows.filter(r => r.kind === 'resolved')
    .length, 0, 'K6: a sklop tiež nie');
 
+// ============ K7: PICKER SETU VÝKLOPU (kontext Kovanie) =====================
+//
+// Výber setu (vrátane tmavého) NIE JE v karte čela — je pri položke kovania,
+// rovnako ako pri zásuvke (D1b). Klient tu NIČ nefiltruje a nič neprekladá:
+// ponuku aj popisky skladá server (`Panel.class_compat_payload`) a panel pošle
+// späť ID voľby, ktoré dostal. Táto sekcia stráži presne to.
+const HW = require(path.join(JS, 'hardware.js'));
+const OWNER = 'front:F1/flap';
+// Payload presne v tvare, aký posiela server pre klasifikovaný výklop.
+const ENTRY_LIFT = {
+  generic_type: 'lift', label: 'Výklop / sklop',
+  compat: { cab: null, owners: { [OWNER]: {
+    class_key: 'class:lift|classic|hk_top',
+    class_label: 'Výklop / sklop · klasické · HK top',
+    scope_label: 'Set pre toto čelo',
+    none_label: 'podľa projektu — Výklop HK top — klasik (biela)',
+    options: [{ id: 'vyklop-hk-klasik', label: 'Výklop HK top — klasik (biela)',
+                set_id: 'vyklop-hk-klasik' },
+              { id: 'vyklop-hk-klasik-tmavy', label: 'Výklop HK top — klasik (tmavá)',
+                set_id: 'vyklop-hk-klasik-tmavy' }],
+    current: 'vyklop-hk-klasik-tmavy', stored: false,
+    value_text: 'Výklop HK top — klasik (tmavá)'
+  } } }
+};
+const picker = HW.hwOwnerOptionList(ENTRY_LIFT, OWNER);
+eq(picker.length, 3, 'K7: „predvolené" + dve triedne kompatibilné voľby');
+eq(picker[0].text, 'podľa projektu — Výklop HK top — klasik (biela)',
+   'K7: prvá voľba povie, čo platí BEZ vlastného výberu');
+eq(picker[0].selected, false, 'K7: a nie je vybraná, lebo vlastný výber existuje');
+ok(picker.some(o => o.text.indexOf('tmavá') >= 0), 'K7: tmavý set je v ponuke POZNAŤ');
+eq(picker.find(o => o.value === 'vyklop-hk-klasik-tmavy').selected, true,
+   'K7: uložený výber je vybraný — prvý klik vedľa ho ticho neprepíše');
+ok(HW.hwOwnerTitle(ENTRY_LIFT, OWNER).indexOf('HK top') >= 0,
+   'K7: tooltip povie, akej triedy sa výber týka');
+// Čelo BEZ klasifikácie (starý výklop) ponuku triedy nedostane — spadne na
+// pôvodný plochý zoznam, presne ako doteraz.
+eq(HW.hwOwnerOptionList({ generic_type: 'lift', options: [] }, OWNER)[0].text,
+   '(podľa skrinky/projektu)', 'K7: neklasifikovaná položka ide pôvodnou cestou');
+
 console.log('KOV-E2 karta vyklopu: ' + n + ' assertov OK');

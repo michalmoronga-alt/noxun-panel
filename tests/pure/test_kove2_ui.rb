@@ -443,6 +443,46 @@ NxTest.test('KOV-E2 (6): polovičná trieda sa NESCHOVÁ — server o nej povie'
   NxTest.assert(e3.first.to_s.include?('názov parametra'), e3.inspect)
 end
 
+NxTest.test('KOV-E2 (6): ZÁPIS zmeneného člena setu výklopu server PUSTÍ') do
+  # E1a mala dočasnú bránu „členov tohto setu zatiaľ meniť nemožno" — editor
+  # pre nové tvary vtedy neexistoval. Po E2 by bola JEDINOU prekážkou opravy
+  # setu výklopu (kód triedy zmenený v Démose, nová trieda), takže zanikla.
+  # Ochranou ostáva VALIDÁCIA OBSAHU, nie zákaz zápisu.
+  hws = NxKovE2::HWS
+  tax = NxKovE2::E::HardwareTaxonomy
+  # Sada beži v spoločnom %APPDATA% (helper ho presmeruje do tempu), takže
+  # súbory po INÝCH sadách musia ísť preč — inak sa zápis odmietne z dôvodu,
+  # ktorý s výklopmi nemá nič spoločné (napr. „taxonómia je z novšej verzie").
+  [hws.path, "#{hws.path}.bak", tax.path, "#{tax.path}.bak"].each do |f|
+    File.delete(f) if File.exist?(f)
+    Noxun::Engine::JsonFileStore.invalidate(f)
+  end
+  set = { 'set_id' => 'moj-vyklop', 'name' => 'Môj výklop', 'generic_type' => 'lift',
+          'use_type' => 'lift', 'opening_mode' => 'classic', 'lift_system' => 'hk_top',
+          'manufacturer' => 'Blum', 'series' => 'AVENTOS',
+          'members' => [{ 'per' => 'unit', 'qty' => 1,
+                          'code_by_param' => { 'param' => 'lift_class',
+                                               'codes' => { '22K2300' => '347810' } } }] }
+  status, info = hws.save_set!(set, revision: hws.revision)
+  NxTest.assert_equal(:ok, status, "set výklopu sa uloží (#{info.inspect})")
+  zmeneny = JSON.parse(JSON.generate(set))
+  zmeneny['members'][0]['code_by_param']['codes']['22K2500'] = '347811'
+  zmeneny['members'] << { 'per' => 'unit', 'qty' => 1, 'code' => '507365',
+                          'quantity_from' => 'rod_count' }
+  status, rec = hws.save_set!(zmeneny, revision: hws.revision)
+  NxTest.assert_equal(:ok, status, 'a ZMENA jeho členov tiež — editor už tie tvary vie')
+  NxTest.assert_equal(2, rec['members'].length, 'nový člen pribudol')
+  NxTest.assert_equal({ '22K2300' => '347810', '22K2500' => '347811' },
+                      rec['members'][0]['code_by_param']['codes'], 'nová trieda sa uložila')
+  # Ale NEZMYSEL server odmietne ďalej — brána je obsah, nie zákaz.
+  zly = JSON.parse(JSON.generate(zmeneny))
+  zly['members'][0]['code'] = '999'
+  status, = hws.save_set!(zly, revision: hws.revision)
+  NxTest.assert_equal(:invalid, status, 'dve stratégie kódu naraz sa neuložia')
+  [hws.path, "#{hws.path}.bak"].each { |f| File.delete(f) if File.exist?(f) }
+  Noxun::Engine::JsonFileStore.invalidate(hws.path)
+end
+
 NxTest.test('KOV-E2 (6): seedové sety výklopu prejdú editorovým kontraktom') do
   c = NxKovE2
   c.lift_sets.each do |set|

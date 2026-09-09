@@ -1973,15 +1973,12 @@ module Noxun
               msg = 'typ kovania existujúceho setu sa nemení — vytvor nový set'
               next [:invalid, msg, [set_err('generic_type', msg)]]
             end
-            # KOV-E1a: set NOVSIEHO TVARU (`code_by_param` / `quantity_from`)
-            # sa v editore este upravovat neda (editor pride v E2), takze
-            # server ZMENU CLENOV ODMIETNE. HTML `disabled` nie je ochrana —
-            # keby JS clena „zabudol", ulozil by sa set bez mechanizmu.
-            # Nazov, aktivnost a klasifikacia sa menit smu.
-            if new_shape_members?(sets[idx]) && norm['members'] != sets[idx]['members']
-              msg = 'členov tohto setu zatiaľ meniť nemožno — je novšieho tvaru (výklopy)'
-              next [:invalid, msg, [set_err('members', msg)]]
-            end
+            # KOV-E2: docasna brana z E1a („clenov setu noveho tvaru menit
+            # nemozno") ZANIKLA — editor `code_by_param` aj `quantity_from` uz
+            # vie, takze bola jedinou prekazkou opravy setu vyklopu. Ochranou
+            # ostava to, co nou bolo vzdy: `validate_set_detailed` (XOR strategii
+            # kodu, uplnost tabulky tried, nazov parametra) — teda VALIDACIA
+            # obsahu, nie zakaz zapisu.
             sets[idx] = norm
           else
             sets << norm
@@ -1992,18 +1989,6 @@ module Noxun
       rescue StandardError => e
         Engine.log_error(e, 'HardwareSets.save_set!') if defined?(Engine)
         [:write_failed, nil]
-      end
-
-      # KOV-E1a: ma set clena NOVSIEHO TVARU? Odpoved potrebuje zapisova brana
-      # (`save_set!`) aj payload editora (read-only badge v `hw_sets.js`) —
-      # jedna otazka, jedna odpoved.
-      def new_shape_members?(set)
-        return false unless set.is_a?(Hash)
-
-        Array(set['members']).any? do |m|
-          m.is_a?(Hash) && (m['code_by_param'].is_a?(Hash) ||
-                            !m['quantity_from'].to_s.strip.empty?)
-        end
       end
 
       def invalid_set(errors)
