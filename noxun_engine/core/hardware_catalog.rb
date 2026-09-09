@@ -53,7 +53,12 @@ module Noxun
       # zo `SYSTEM/zdroje/demos/SEED_AVENTOS_v2_2026-09-09.md`. Patch v3 -> v4
       # LEN DOPLNA chybajuce kody — existujuce riadky (vratane 347827, 13781
       # a 250831, ktore uz v katalogu su) sa NEDOTYKA.
-      SEED_SET_VERSION = 4
+      # v5 (KOV-G1a, 9.9.2026): +9 kodov nôh a prichytu sokla (272212 z Demosu,
+      # osem AXILO od QUATRO LM) + ENRICHMENT existujuceho riadku 367823
+      # o vyrobcu/radu (Häfele/AXILO) a oprava katalogovych poloziek, ktore
+      # nesu PRESNE dvojicu Hettich+AXILO — tu presunula pod Häfele migracia
+      # taxonomie a bez opravy by sa taky riadok uz nedal ulozit.
+      SEED_SET_VERSION = 5
       FILE = 'hardware_catalog.json'
 
       CATEGORIES = %w[ZAVESY VYSUVY VYKLOPY NOHY UCHYTKY SPOJOVACI_MATERIAL
@@ -1048,7 +1053,17 @@ module Noxun
       # ju vedie pod zavesmi — debata 2.8.); z webu je nazov, cena, MJ, vyrobca,
       # rada a URL. Vyrobca/rada sa zapisuju LEN ked su v `HardwareTaxonomy`.
       # Sety NIE SU polozky — mapovanie flag->zoznam kodov robi HardwareSets.
-      # [kod, nazov, kategoria, MJ, cena|nil, poznamka|nil, vyrobca|nil, rada|nil, demos_url|nil]
+      # v5 (KOV-G1a, 9.9.2026): +9 riadkov nôh a prichytu sokla. Osem z nich je
+      # od INEHO DODAVATELA — **Quatro LM** (quatrolm.sk), nie Demos. Preto:
+      #   * `demos_url` ostava **nil** (Demos klient by cudziu adresu odmietol —
+      #     `Demos.sanitize_url` ma allowlist hostov; polozka bez vazby sa pri
+      #     „Overiť cenu" preskoci s vetou „položka nemá adresu produktu"),
+      #   * a preto ani `price_checked_at` (datum patri KONKRETNEJ vazbe, F5),
+      #   * dodavatel zije v POLI `supplier` (existujuce, patchovatelne, chodi
+      #     do rozpoctu ako „dodávateľ") a jeho ADRESA v poznamke riadku
+      #     — ziadne nove pole katalogu.
+      # [kod, nazov, kategoria, MJ, cena|nil, poznamka|nil, vyrobca|nil, rada|nil,
+      #  demos_url|nil, dodavatel|nil (nil = 'Demos')]
       SEED_ROWS = [
         ['104717', 'HETTICH 9071205 Sensys záves naložený 110° TH skrutka SiSy',
          'ZAVESY', 'ks', 4.18, 'záves „KLASIK"',
@@ -1320,10 +1335,48 @@ module Noxun
          'NOHY', 'ks', 0.48, 'najpoužívanejšia „noha"',
          'Strong', nil,
          'https://www.demos-trade.sk/strong-klzak-s-rektifikaciou-vyska-17-mm-cierna/'],
+        # KOV-G1a: riadok OSTAVA (stare zakazky ho maju v nakupe aj v sete
+        # `nohy-axilo-150`), ale dostava spravnu klasifikaciu — AXILO je
+        # HÄFELE program, nie Hettich. Do UZ ZALOZENEHO katalogu ju patch v5
+        # doplni LEN vtedy, ked je vyrobca aj rada PRAZDNA (enrichment-if-empty).
         ['367823', '637.76.355 Rektifikačná noha  v. 150 mm',
          'NOHY', 'ks', 1.52, '4 ks na spodnú skrinku',
-         nil, nil,
+         'Häfele', 'AXILO',
          'https://www.demos-trade.sk/637-76-355-rektifikacna-noha-v-150-mm/'],
+        # --- KOV-G1a: NOHY 17-220 mm (rozhodnutia Michal 9.9.2026) -----------
+        # 17-20 mm: STRONG klzak s rektifikaciou, SEDY (cierny 82744 ostava
+        # v katalogu, len uz nie je v sete).
+        ['272212', 'STRONG Klzák s rektifikáciou, výška 17mm, šedá',
+         'NOHY', 'ks', 0.41, 'sokel 17–20 mm',
+         'Strong', nil,
+         'https://www.demos-trade.sk/strong-klzak-s-rektifikaciou-vyska-17mm-seda/'],
+        # 55-220 mm: HÄFELE AXILO od QUATRO LM (ceny s DPH, overene 9.9.2026 —
+        # eshop ich zobrazuje bez DPH, 0,65 -> 0,80). Bez `demos_url`, teda aj
+        # bez `price_checked_at`: cena sa obnovuje rucne.
+        ['9069', 'Häfele 637.76.351 noha AXILO H60',
+         'NOHY', 'ks', 0.80, 'sokel 55–90 mm · Quatro LM · https://quatrolm.sk/p/noha-axilo-h60-hafele-637-76-351',
+         'Häfele', 'AXILO', nil, 'Quatro LM'],
+        ['9078', 'Häfele 637.76.353 noha AXILO H100',
+         'NOHY', 'ks', 0.72, 'sokel 91–115 mm · Quatro LM · https://quatrolm.sk/p/noha-axilo-h100-hafele-637-76-353',
+         'Häfele', 'AXILO', nil, 'Quatro LM'],
+        ['9077', 'Häfele 637.76.354 noha AXILO H125',
+         'NOHY', 'ks', 0.77, 'sokel 116–140 mm · Quatro LM · https://quatrolm.sk/p/noha-axilo-h125-hafele-637-76-354',
+         'Häfele', 'AXILO', nil, 'Quatro LM'],
+        ['9076', 'Häfele 637.76.355 noha AXILO H150',
+         'NOHY', 'ks', 0.79, 'sokel 141–170 mm · Quatro LM · https://quatrolm.sk/p/noha-axilo-h150-hafele-637-76-355',
+         'Häfele', 'AXILO', nil, 'Quatro LM'],
+        ['9027', 'Häfele 637.76.356 noha AXILO H180',
+         'NOHY', 'ks', 0.96, 'sokel 171–190 mm · Quatro LM · https://quatrolm.sk/p/noha-axilo-h180-637-76-356',
+         'Häfele', 'AXILO', nil, 'Quatro LM'],
+        ['9075', 'Häfele 637.76.357 noha AXILO H200',
+         'NOHY', 'ks', 1.20, 'sokel 191–220 mm · Quatro LM · https://quatrolm.sk/p/noha-axilo-h200-hafele-637-76-357',
+         'Häfele', 'AXILO', nil, 'Quatro LM'],
+        ['9079', 'Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna',
+         'NOHY', 'ks', 0.50, 'na každú nohu AXILO (sokel 55–220 mm) · Quatro LM · https://quatrolm.sk/p/platnicka-axilo-79x92x25mm-cierna-hafele-637-76-333',
+         'Häfele', 'AXILO', nil, 'Quatro LM'],
+        ['950', 'Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)',
+         'NOHY', 'ks', 0.35, '1 ks na začaté 4 nohy · Quatro LM · https://quatrolm.sk/p/objimka-axilo-hafele-k-drevenemu-soklu-637-38-054',
+         'Häfele', 'AXILO', nil, 'Quatro LM'],
         ['93240', 'STRONG Bystrica závesné kovanie biela',
          'SPOJOVACI_MATERIAL', 'ks', 0.37, '2 ks na hornú skrinku; NIE noha (debata 2.8.)',
          'Strong', nil,
@@ -1629,9 +1682,12 @@ module Noxun
         507365 507366 507343 507344 507345
       ].freeze
 
-      SEED_ITEMS = SEED_ROWS.map do |code, name, category, unit, price, note, man, series, url|
+      # KOV-G1a: 10. prvok = DODAVATEL (nil = 'Demos', historicka predvolba
+      # vsetkych 137 riadkov). Nie je to nove pole katalogu — `supplier` v item
+      # zazname existuje od zaciatku, len ho manifest doteraz nemal ako povedat.
+      SEED_ITEMS = SEED_ROWS.map do |code, name, category, unit, price, note, man, series, url, sup|
         item = { 'item_code' => code, 'name_sk' => name, 'category' => category,
-                 'unit' => unit, 'supplier' => 'Demos' }
+                 'unit' => unit, 'supplier' => sup || 'Demos' }
         item['price_eur_vat'] = price unless price.nil?
         item['notes'] = note unless note.nil?
         item['manufacturer'] = man unless man.nil?
@@ -1891,6 +1947,7 @@ module Noxun
           end
           changed.concat(apply_seed_patch_v3(items, resolved)) if from < 3
           changed.concat(apply_seed_patch_v4(items, resolved)) if from < 4
+          changed.concat(apply_seed_patch_v5(items, resolved)) if from < 5
           ok = write_unlocked('items' => items, 'seed_version' => SEED_SET_VERSION)
           if ok && defined?(Engine)
             Engine.log("kovanie katalog: seed patch v#{from} -> v#{SEED_SET_VERSION}#{changed.any? ? " (#{changed.join(', ')})" : ''}")
@@ -2002,6 +2059,110 @@ module Noxun
           added << rec['item_code']
         end
         ["v4 +#{added.length}"]
+      end
+
+      # v4 -> v5 (KOV-G1a): NOHY 17-220 mm + prichyt sokla. Tri kroky a kazdy
+      # ma vlastnu, uzku podmienku „ruky prec od pouzivatelskej upravy":
+      #
+      #   1) ADD-IF-ABSENT devat kodov (`SEED_PATCH_V5_ADD`) — kto si niektory
+      #      z nich medzitym zalozil sam, ostava mu jeho vlastny zaznam
+      #      (rovnaky kontrakt ako v4).
+      #   2) ENRICHMENT riadku 367823 (noha AXILO 150 z Demosu): doplni sa
+      #      vyrobca a rada, ale LEN ked su OBE PRAZDNE. Ked si klasifikaciu
+      #      zapisal pouzivatel, patch sa jej nedotkne (vzor v3, Astra #21
+      #      BLOCKER 1) — a nedotkne sa ani nicoho ineho na riadku (nazov,
+      #      cena, poznamka, `use_count`, vypnuta aktivnost).
+      #   3) OPRAVA DVOJICE Hettich+AXILO: radu AXILO presunula spod Hettichu
+      #      pod Häfele migracia taxonomie (`HardwareTaxonomy.migrate_axilo_owner!`),
+      #      takze polozka s tou dvojicou by sa uz NEDALA ULOZIT („rada nepatri
+      #      výrobcovi") — modal by pri vyrobcovi Hettich radu AXILO ani
+      #      neponukol. Je to naprava nekonzistencie, ktoru sposobila NASA
+      #      zmena, nie prepisanie cudzieho rozhodnutia: meni sa VYHRADNE
+      #      vyrobca, VYHRADNE pri presnej zhode oboch mien a VYHRADNE vtedy,
+      #      ked ZIVA taxonomia naozaj hovori, ze AXILO patri Häfele
+      #      (Codex #337 N2 — pri cudzej vazbe rady sa krok NEVYKONA).
+      SEED_PATCH_V5_ADD = %w[272212 9069 9078 9077 9076 9027 9075 9079 950].freeze
+      SEED_PATCH_V5_CLASSIFY = '367823'
+
+      def apply_seed_patch_v5(items, resolved = seed_items_resolved)
+        by_code = {}
+        resolved.each do |seed|
+          rec, = normalize_item(seed)
+          by_code[rec['item_code'].downcase] = rec if rec
+        end
+        have = {}
+        items.each_with_index { |i, n| have[i['item_code'].to_s.strip.downcase] ||= n }
+
+        added = []
+        SEED_PATCH_V5_ADD.each do |code|
+          key = code.downcase
+          next if have.key?(key)
+
+          rec = by_code[key]
+          next unless rec
+
+          have[key] = items.length
+          items << rec
+          added << code
+        end
+
+        enriched = enrich_axilo_150(items, have, by_code)
+        fixed = fix_axilo_manufacturer(items)
+        ["v5 +#{added.length}", "v5 ~#{enriched + fixed}"]
+      end
+
+      # Krok 2 — enrichment-if-empty (viz komentar `apply_seed_patch_v5`).
+      def enrich_axilo_150(items, have, by_code)
+        idx = have[SEED_PATCH_V5_CLASSIFY.downcase]
+        return 0 if idx.nil?
+
+        seed = by_code[SEED_PATCH_V5_CLASSIFY.downcase]
+        # Ked taxonomia klasifikaciu nerozlisila (read-only / cudzi vlastnik
+        # rady), `seed_items_resolved` ju z riadku ODOBRALA — nemame co doplnit.
+        return 0 if seed.nil? || seed['manufacturer'].to_s.strip.empty?
+
+        cur = items[idx]
+        unless cur['manufacturer'].to_s.strip.empty? && cur['series'].to_s.strip.empty?
+          if defined?(Engine)
+            Engine.log("kovanie katalog: #{SEED_PATCH_V5_CLASSIFY} ma vlastnu klasifikaciu — nechavam")
+          end
+          return 0
+        end
+        patch = { 'manufacturer' => seed['manufacturer'] }
+        patch['series'] = seed['series'] unless seed['series'].to_s.strip.empty?
+        items[idx] = cur.merge(patch)
+        1
+      end
+
+      # Krok 3 — presun vlastnika rady AXILO (viz komentar `apply_seed_patch_v5`).
+      #
+      # Codex #337 N2: vlastnik sa pyta ZIVEJ TAXONOMIE, NIKDY sa neodvodzuje
+      # z resolvnuteho seedu. Ked si pouzivatel naviazal AXILO na vlastneho
+      # vyrobcu, migracia taxonomie mu to (spravne) necha — ale seed riadok
+      # 367823 sa vtedy resolvne na „Häfele BEZ rady", takze stara podmienka
+      # (neprazdny vyrobca ineho mena nez Hettich) by presla a prepisala by
+      # jeho polozky na dvojicu Häfele+AXILO, ktora v JEHO taxonomii
+      # NEEXISTUJE — a v modale by ju uz neulozil. Oprava preto bezi VYHRADNE
+      # vtedy, ked taxonomia naozaj hovori „AXILO patri Häfele", a zapisuje sa
+      # jej ULOZENY zapis mena (JS filtruje presnym retazcom).
+      def fix_axilo_manufacturer(items)
+        owner = HardwareTaxonomy.series_owner(HardwareTaxonomy::AXILO_SERIES)
+        return 0 if owner.nil?
+        return 0 unless HardwareTaxonomy.same_name?(owner, HardwareTaxonomy::AXILO_OWNER)
+
+        n = 0
+        items.each_with_index do |cur, i|
+          next unless HardwareTaxonomy.same_name?(cur['series'], HardwareTaxonomy::AXILO_SERIES)
+          next unless HardwareTaxonomy.same_name?(cur['manufacturer'],
+                                                  HardwareTaxonomy::AXILO_LEGACY_OWNER)
+
+          items[i] = cur.merge('manufacturer' => owner)
+          n += 1
+        end
+        if n.positive? && defined?(Engine)
+          Engine.log("kovanie katalog: #{n} poloziek AXILO presunutych pod '#{owner}'")
+        end
+        n
       end
 
       def finish_check(callback, result)

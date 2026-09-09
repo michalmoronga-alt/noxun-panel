@@ -25,7 +25,11 @@
 #                          `box_side`/`drawer_inner_front`, materialovy signal `:drawer`, polozka
 #                          vysuvu so `source: 'recipe'` a volitelnym `locked`, aditivny kluc
 #                          `drawer_conflicts`. Starsi plugin tieto roly ani source nepozna —
-#                          plan, ktory ich moze niest, uz nie je plan schemy 3).
+#                          plan, ktory ich moze niest, uz nie je plan schemy 3);
+#                          5 = KOV-G1a (slovnik GENERIC_TYPES sa rozsiril o `plinth_clip` —
+#                          prichyt soklovej listy; presne ten isty dovod ako pri `lift`
+#                          v schema 3: polozka s nim je pre STARSI plugin neznamy typ,
+#                          ktory jeho `guard_unknown_hardware!` odmietne).
 #   parts       [dielec] — deskriptory REALNE POSTAVITELNYCH dielcov. Degenerovane dielce
 #                          (nekladny rozmer boxu, napr. z extremne uzkych zon) sa do parts
 #                          NEdostanu — plan ich vyradi s warningom part_skipped_degenerate,
@@ -82,7 +86,7 @@
 module Noxun
   module Engine
     module BuildPlan
-      SCHEMA = 4
+      SCHEMA = 5
 
       # Najmensi vyrobitelny rozmer (mm). JEDINY prah degenerovanosti v systeme:
       # plan (partition v Construction.build_plan) aj builder (positive_box?) ho zdielaju —
@@ -114,7 +118,15 @@ module Noxun
       # ho potrebuje UZ TERAZ, inak sa vyklopovy set neda ulozit. PRAVIDLA ani
       # SEED MAPOVANIE k nemu zatial NIE SU — tie prinesie KOV-E; slovnik je
       # tu preto, aby uz nebolo treba dalsi bump kontraktu.
-      GENERIC_TYPES = %w[leg hinge slide handle shelf_pin connector wall_hanger lift].freeze
+      # plinth_clip = PRICHYT SOKLOVEJ LISTY (KOV-G1a, rozhodnutie Michal
+      # 9.9.2026): drzi samostatnu soklovu listu na nohach AXILO, 1 ks na zacate
+      # 4 nohy. Rozsirenie je presne ten isty pripad ako `lift` — starsi plugin
+      # typ nepozna, takze set aj mapovanie s nim odmietne (kniznica read-only,
+      # snapshot :invalid) a prestavbu s takou polozkou zastavi
+      # `guard_unknown_hardware!`. PRAVIDLO k nemu prinesie az KOV-G1b; TU je
+      # slovnik + seed set + mapovanie, aby uz nebol potrebny dalsi bump.
+      GENERIC_TYPES = %w[leg hinge slide handle shelf_pin connector wall_hanger
+                         lift plinth_clip].freeze
 
       # H1a (audit BLOCKER 2): JEDINY parser kluca mapovania setov kovania.
       # Tvar kluca: "generic_type" ALEBO "generic_type@owner_part_key"

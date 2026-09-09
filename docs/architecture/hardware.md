@@ -459,6 +459,28 @@ nesú **vlastný** `SEED_PRICE_CHECKED_AT_V4` — spoločný stamp by starším 
 boli, takže sa ich dávka **nedotkla** (vrátane toho, že `250831` ostáva v kategórii `ZAVESY` — je to tá istá Tip-On jednotka ako pri závesoch). Kto si niektorý z 23 kódov
 medzitým založil sám, ostáva mu jeho vlastný záznam.
 
+**SEED v5 — NOHY 17–220 mm a PRVÝ CUDZÍ DODÁVATEĽ (KOV-G1a, v0.9.58).** Manifest má **146 riadkov**: k v4 pribudlo **9 kódov nôh a príchytu sokla** (rozhodnutia Michal
+9.9.2026) — `272212` STRONG klzák 17 mm šedý z Démosu a **osem Häfele AXILO od QUATRO LM** (nohy H60/H100/H125/H150/H180/H200, platnička `9079`, príchyt sokla `950`).
+Riadok `367823` (noha AXILO 150 z Démosu) dostal v manifeste **výrobcu Häfele a radu AXILO**. **Manifest má preto DESIATY prvok — dodávateľa** (`nil` = `Demos`, historická
+predvoľba všetkých 137 riadkov); `supplier` je existujúce pole položky (patchovateľné, chodí do rozpočtu ako „dodávateľ"), nie nové pole katalógu.
+
+**Quatro LM riadky NEMAJÚ `demos_url`, a preto ani `price_checked_at`.** Nie je to opomenutie: `Demos.sanitize_url` má allowlist hostov, takže adresu z `quatrolm.sk` by
+„Overiť cenu" odmietla — a `check_price!` položku bez väzby končí vetou „položka nemá adresu produktu". Cena sa pri nich obnovuje **ručne** a **adresa dodávateľa žije
+v POZNÁMKE riadku** v tvare `… · Quatro LM · https://quatrolm.sk/p/…` (poznámka je viditeľná v katalógu aj v hľadaní — `score_item` ju tokenizuje). Ceny sú **s DPH**
+(Quatro LM zobrazuje bez DPH: 0,65 → 0,80), overené 9.9.2026.
+
+**Migrácia v4 → v5** (`apply_seed_patch_v5`, `SEED_SET_VERSION` 5) má tri kroky a každý vlastnú, úzku podmienku „ruky preč od používateľskej úpravy": **(1) add-if-absent**
+deviatich kódov (`SEED_PATCH_V5_ADD`) — kto si niektorý založil sám, ostáva mu jeho záznam, a kto si seed položku zmazal, nedostane späť nič iné; **(2) enrichment riadku
+`367823`** o výrobcu a radu, ale **LEN keď sú OBE prázdne** (vzor v3, Astra #21 BLOCKER 1) — nič iné na riadku sa nemení (názov, cena, `use_count`, ručne vypnutá aktívnosť);
+**(3) oprava dvojice `Hettich`+`AXILO`** na `Häfele`+`AXILO`. Tretí krok je náprava nekonzistencie, ktorú spôsobila NAŠA zmena: radu AXILO presunula spod Hettichu migrácia
+taxonómie, takže položka s tou dvojicou by v modáli už neprešla („rada nepatrí výrobcovi") a v selecte rád by sa pod Hettichom AXILO ani neponúkla. Mení sa **výhradne
+výrobca** a **výhradne pri presnej zhode oboch mien** (`HardwareTaxonomy.same_name?`); zo stromu katalógu položka **nezmizne ani bez opravy** (strom zoskupuje podľa reťazcov
+NA POLOŽKE, nie podľa taxonómie) — opraviteľnosť je jediný dôvod kroku. **Vlastníka rady dáva ŽIVÁ taxonómia, nikdy resolvnutý seed** (Codex #337 N2,
+`HardwareTaxonomy.series_owner` — číta uložený súbor BEZ seedovania a bez zápisu): keď má používateľ AXILO naviazané na vlastného výrobcu, migrácia taxonómie mu to zámerne
+nechá, ale seed riadok `367823` sa vtedy resolvne na „Häfele BEZ rady" — a odvodiť z toho vlastníka by znamenalo prepísať jeho položky na dvojicu, ktorá v jeho taxonómii
+NEEXISTUJE. Krok 3 preto beží **len keď taxonómia naozaj hovorí „AXILO patrí Häfele"**, a zapisuje jej ULOŽENÝ zápis mena (JS filtruje presným reťazcom); pri cudzej väzbe
+alebo pri ešte nezaloženej taxonómii sa nevykoná vôbec.
+
 ### hardware_taxonomy.rb
 
 **Jediný zoznam prípustných výrobcov a rád kovania (KOV-B1, v0.9.19; audit #17 BLOCKER 4).** Set aj položka katalógu nesú `manufacturer`/`series` ako reťazec — keby si ho každý
@@ -479,10 +501,22 @@ u knižnice setov (R-07/R-08/R-11) a katalógu (GH #99).
   kovania) sa tu vedome nezavádza: dve otvorené okná by si ju prebili.
 - **Zápis:** `with_catalog_lock` → `JsonFileStore.reload!` → **znovu posúdená brána nad čerstvým dokumentom** → prípadná revízia (`load_with_revision` dáva obsah aj odtlačok
   z JEDNÉHO stavu súboru) → atomický zápis. Do súboru zapisuje **jediné miesto** (`write`); zlyhaný `flock` je IOError a končí ako `:write_failed`, nikdy ako tichý úspech.
-- **Seed (`SEED_VERSION` 2, D-118):** Hettich · Blum · Grass · Strong · **Tulip** · Ostatné a ich rady (Sensys, InnoTech Atira, Quadro, AvanTech YOU, AXILO; CLIP top, AVENTOS,
+- **Seed (`SEED_VERSION` 3, KOV-G1a):** Hettich · Blum · Grass · Strong · **Häfele** · **Tulip** · Ostatné a ich rady (Sensys, InnoTech Atira, Quadro, AvanTech YOU; **AXILO
+  pod Häfele**; CLIP top, AVENTOS,
   TANDEMBOX, LEGRABOX, MERIVOBOX, TIP-ON; Nova Pro, Tiomos; StrongMax, **StrongBox**). Tulip a StrongBox pribudli s katalógovým seedom v3 — bez nich by šesť úchytiek/vešiakov
   a päť StrongBoxov nemalo výrobcu a strom katalógu by ich zhodil pod „— bez výrobcu". Merge dopĺňa LEN chýbajúce mená, nikdy neprepisuje a nad read-only ani degradovaným
   súborom sa nerobí; `ensure_seeded` má DVOJITÝ check (rýchly + pod zámkom), takže oneskorený seeder neprepíše reálnu zmenu.
+- **JEDNORAZOVÁ MIGRÁCIA VLASTNÍKA RADY — `migrate_axilo_owner!` (KOV-G1a).** Seed v1 viedol **AXILO pod Hettichom**, hoci je to **Häfele** program. „Doplniť chýbajúce mená"
+  na to nestačí: rada v súbore už je, takže by pod Hettichom ostala navždy — a set nôh aj deväť nových katalógových riadkov nesú dvojicu Häfele/AXILO, ktorá by v takej
+  taxonómii NEEXISTOVALA (`create_item` aj `save_set!` by ich odmietli vetou „rada nepatrí výrobcovi"). Presun preto beží **vnútri `merge_seed`, PRED dopĺňaním rád** (po ňom
+  by ho add-if-absent krok preskočil) a dotkne sa **LEN záznamu, ktorý je PRESNE starý seed tvar**: meno doslovne `AXILO` **a** vlastník ekvivalentný `Hettich` (vzor
+  `LEGACY_SEED_SHAPES` v `hardware_sets.rb`). Premenovaná („AXILO plus") alebo inak naviazaná rada = **ruky preč** + info log. Nový vlastník sa berie z **UŽ ULOŽENÉHO** zápisu
+  výrobcu (keď má používateľ „HÄFELE", rada zapísaná naším „Häfele" by v selectoch rád zmizla — JS filtruje presným reťazcom, Codex #320 kolo 2 P2); keď výrobca ešte
+  neexistuje, doplní sa v tom istom kroku. Jednorazovosť stráži `seed_version` (2 → **3**), takže návrat rady pod Hettich sa už nikdy neprepíše.
+- **`series_owner(rada)` — KOMU RADA V ŽIVEJ TAXONÓMII PATRÍ** (Codex #337 N2/N3). Migrácie (katalógová oprava dvojice Hettich+AXILO, klasifikácia seed setov) sa musia pýtať
+  taxonómie, nie odvodzovať vlastníka z toho, čo im vrátil `resolve_classification` nad NAŠÍM seedom: pri cudzej väzbe rady vráti resolve nášho výrobcu BEZ rady, a migrácia by
+  z toho usúdila „vlastník je Häfele". Predikát číta **LEN uložený dokument** — bez `ensure_seeded`, teda **bez zápisu** (pýta sa „odporuje mi taxonómia?", nie „založ mi ju")
+  — a nad read-only súborom aj nad neexistujúcim súborom vracia `nil`, čo volajúci vykladajú ako „nemáme sa čoho chytiť, nič nemeníme".
 - **`resolve_classification(manufacturer, series)`** → `[kanonický výrobca|nil, kanonická rada|nil, errors]` je spoločný kontrakt pre set aj položku katalógu
   (`check_classification` je nad ňou len wrapper na chyby). Zhoda je case-insensitive a bez diakritiky, ale **uložiť sa smie VÝHRADNE kanonický zápis zo zoznamu** —
   zapisovacie cesty (`HardwareSets.save_set!`, `HardwareCatalog.create_item`/`patch_item`) preto berú mená odtiaľto; inak by vedľa „Hettich" vyrástol „hettich" a padol by
@@ -565,8 +599,8 @@ je iná vrstva a zostáva oddelene. Neznáma hodnota (obsah novšej verzie) sa *
 **Marker `std` má ŠESŤ hodnôt a je LAZY podľa obsahu.** `1` = len legacy tvary · `2` = pásma člena alebo selector v mapovaní (GH #131) · **`3` = set s KTORÝMKOĽVEK kľúčom mimo
 `LEGACY_SET_KEYS`** (každé klasifikačné pole aj `active` samostatne) **alebo mapovanie s triednym kľúčom `class:`**. Čisto legacy obsah ostáva na svojom pôvodnom std, takže
 spätná čitateľnosť sa zbytočne neblokuje; obsah so `std: 3` je pre starší plugin `:read_only` (knižnica) a `:invalid` (snapshot) — NIKDY čiastočné čítanie. Ďalšie hodnoty
-pridali neskoršie dávky: `4` = `height_variant` (KOV-C2a) · `5` = vyhradená bunka `none` (D-118b) · **`6` = tvary výklopov** (`code_by_param`, `quantity_from`, `lift_system` —
-KOV-E1a). Tú istú funkciu (`snapshot_std`) používa zápis knižnice aj zápis snapshotu: marker musí hovoriť o obsahu rovnako v `%APPDATA%` aj v .skp.
+pridali neskoršie dávky: `4` = `height_variant` (KOV-C2a) · `5` = vyhradená bunka `none` — od KOV-G1a **v rade `code_by_nl` AJ v kódovom pásme `param_bands`**, jeden marker
+pre obe miesta (D-118b, KOV-G1a) · **`6` = tvary výklopov** (`code_by_param`, `quantity_from`, `lift_system` — KOV-E1a). Tú istú funkciu (`snapshot_std`) používa zápis knižnice aj zápis snapshotu: marker musí hovoriť o obsahu rovnako v `%APPDATA%` aj v .skp.
 
 **TRIEDNY kľúč mapovania `class:<generic_type>|<opening_mode>[|<tretí segment>]`** (KOV-B1 zaviedol tvar, KOV-C2a čítanie, KOV-D1a zápis, KOV-E1a výklopy). Tvar je uzavretý:
 tretí segment majú LEN `slide` (konštrukcia zásuvky, voliteľný) a `lift` (systém výklopu, **povinný**), segmenty sa trimujú a downcasujú. Pozná ho **jediný parser** (`parse_mapping` ho rozpozná PRED `parse_hardware_set_key`), prijímajú ho všetky mapy
@@ -683,9 +717,16 @@ charakterizačný test). Päť častí:
 - **Vyhradená bunka `SKIP_CODE` = „vedome bez kódu" (D-118b, v0.9.44).** Hodnota `'none'` v `code_by_nl` znamená **„táto dĺžka kód nemá a ani mať nemá"** → `member_code`
   vráti `[nil, nil]` (existujúca vetva „člen sa preskočí"). **Chýbajúci kľúč ostáva NEMAPOVANÝ** (ORANGE / pri recepte RED) — je to tá istá rodina ako „prítomná neplatná
   hodnota ≠ neprítomná" z KOV-D. Dôvod je dátový: rad Atira **PTOs** potrebuje modul P2O na každej dĺžke OKREM 620 mm, kde je kit typu `PTO` a modul má v sebe; vynechaný kľúč
-  by hlásil chýbajúci kód tam, kde žiadny nepatrí. Kódy sú číselné, takže kolízia nehrozí; ako **pevný `code`** aj ako hodnota **kódového pásma** (`param_bands`) je `'none'` odmietnutý
-  (`validate_member` / `validate_param_bands`) — inak by `member_code` vrátil doslovný „none" do nákupu a `skip_code_present?` by ho neuvidel, takže obsah by dostal nižší
-  marker kompatibility (Codex #321 kolo 3). V selektore mapovania (`set_id`) sa nekontroluje — tam je to legitímne meno setu. V rade sa ukladá kanonicky malými písmenami. Súpis členov (`explain`) preskočený člen **prizná** (`skipped: true` → „bez kódu (netreba)"), aby karta pri NL 620 nemlčala; nákupné CSV z neho
+  by hlásil chýbajúci kód tam, kde žiadny nepatrí. Kódy sú číselné, takže kolízia nehrozí; ako **pevný `code`** je `'none'` odmietnutý
+  (`validate_member`) — inak by `member_code` vrátil doslovný „none" do nákupu. V **kódovom pásme** (`param_bands`) ho D-118b odmietalo z jedného dôvodu (`skip_code_present?`
+  sa naň nepýtal, takže obsah by dostal nižší marker kompatibility, Codex #321 kolo 3); **KOV-G1a ho tam povolila** spolu s markerom — ale aspoň JEDNO pásmo (resp. jedna
+  bunka radu) musí mať skutočný kód, inak je to člen, ktorý nikdy nič neobjedná (Codex #337 N1). **Táto kontrola platí LEN pri PÍSANÍ setu** (`validate_set_detailed(authoring: true)`
+  → editor `save_set!` a jeho náhľad `preview_expansion`; JS zrkadlo `hwsAllSkip` beží tiež len pri odoslaní) — **Codex #337 kolo 2 N1**: verzie so sentinelom takého člena uložiť
+  DOVOLILI, takže tolerantné čítanie (`normalize_sets`) aj hromadný prepis už uloženého obsahu (`validate_sets` → `write` pri seed-merge, `write_project_state` pri zmrazení
+  snapshotu) ho ZACHOVAJÚ. Inak by ho čítanie zahodilo, detektor `members_lost?` by videl zmenu počtu a **celá** legacy knižnica by skončila ako read-only (snapshot ako
+  `:invalid`) skôr, než beh stihne čokoľvek povedať. Že taký člen nič nevydá, hlási RUNTIME (`members_all_skipped`); opravu si vyžiada až prvý pokus ten set uložiť.
+  V selektore mapovania (`set_id`) sa nekontroluje — tam je to legitímne meno setu. V rade sa ukladá kanonicky malými písmenami. Súpis členov (`explain`) preskočený člen
+  **prizná** (`skipped: true` → „bez kódu (netreba)"), aby karta pri NL 620 nemlčala; nákupné CSV z neho
   nemá žiadny riadok.
 - **`std` 5 (`STD_SKIP_CODE`) — marker kompatibility sentinelu.** Testuje sa ÚPLNE PRVÝ (najvyšší marker vyhráva) a dostane ho len knižnica/snapshot, v ktorých sa `'none'`
   naozaj vyskytuje. **Bez neho by starší plugin obsah prijal** a z bunky `none` vyrobil nákupný riadok s neexistujúcim kódom (overené sondou nad v0.9.42: knižničná aj šablónová
@@ -693,8 +734,8 @@ charakterizačný test). Päť častí:
   aj **`CabinetBuilder::CONFIG_SCHEMA` 7 → 8** (brány sú existujúce: dopredný `newer_config?` + exportná `ProductionCore.export_blockers`).
 - **Fail-closed, keď set nevydá NIČ (`members_skipped`).** Keby mala receptová položka výsuvu preskočené VŠETKY členy, expanzia by vrátila prázdne `rows`, prázdne `unmapped`
   a cenu 0 — zásuvka postavená, nákup prázdny, Kontrola ticho (Astra #21 BLOCKER 3). `expand_members` preto sleduje, či vôbec niečo vydal, a pri položke so `source: 'recipe'`
-  zapíše `members_skipped`, ktorý sa štandardnou cestou povýši na RED `drawer_kit_missing` s `blocks_export`. Preskočenie JEDNÉHO člena je legitímne; položky z PRAVIDIEL sa
-  nemenia (prázdny pevný kód je legálny spôsob, ako člena vypnúť).
+  zapíše `members_skipped`, ktorý sa štandardnou cestou povýši na RED `drawer_kit_missing` s `blocks_export`. Preskočenie JEDNÉHO člena je legitímne. **Od KOV-G1a (Codex #337
+  N1) nemlčí ani položka z PRAVIDIEL** — dostane ORANGE `members_all_skipped` (viď sekciu KOV-G1a nižšie); RED cesty receptu a výklopu sa nemenia.
 - **Seed `SEED_VERSION` 4 → 5 (D-118b) — PRVÝ seed, ktorý MENÍ obsah existujúcich setov.** Tri veci: (1) `atira-antracit-h70-sisy` NL 470 **`348777` → `357889`** (348777 nie je
   K-sada — čelné kovanie treba dokúpiť, overené na produktovej stránke), (2) šesť Tip-On setov dostalo **druhý člen „PTOs mechanizmus"** (`352908` pre 30 kg, `352909` pre 50 kg
   kit H176/520, `none` pri NL 620) — K-sada ostáva PRVÝM členom, lebo completeness test KOV-C2a číta `members.first`, (3) legacy `vysuv-atira-biela-h70` sa premenoval na
@@ -894,6 +935,74 @@ Testy: `tests/pure/test_kove1a_data.rb` (34 testov, 25 pomenovaných mutácií v
 + `tests/pure/test_kove2_ui.rb` (zápis zmeneného člena setu výklopu prejde, nezmysel neprejde)
 + JS `tests/js/test_hw_sets_code_by_param.js` (bezstratový round-trip cez editor, editovateľnosť, „iné (vypíšem)", súhrn vrátane 4 kombinácií kód × `quantity_from`).
 
+
+**KOV-G1a (v0.9.58) — NOHY 17–220 mm, SENTINEL V KÓDOVOM PÁSME, TYP `plinth_clip`.** Rozhodnutia Michala 9.9.2026 sú dátové, nie behové (pravidlo počtu nôh 4/6 a pravidlo
+príchytu prináša až G1b):
+
+- **Seed `nohy-podla-sokla` má NOVÝ TVAR (`SEED_VERSION` 7 → 8).** Člen **noha** má sedem pásiem (`17–20 → 272212` STRONG klzák · `55–90 → 9069` · `91–115 → 9078` ·
+  `116–140 → 9077` · `141–170 → 9076` · `171–190 → 9027` · `191–220 → 9075` Häfele AXILO) a pribudol druhý člen **platnička** (`17–20 → none` · `55–220 → 9079`), lebo
+  platnička sa skrutkuje do dna ku KAŽDEJ nohe AXILO. **Zóna 20–55 mm je VEDOME nepokrytá** (nič vhodné neexistuje) a hlási sa existujúcou cestou `param_band_missing` →
+  ORANGE `hardware_unmapped` s vetou o **výške sokla**. Pásma sú **celočíselné rozsahy s hranicami VRÁTANE**, takže neceločíselná výška medzi nimi (90,5) je tiež ORANGE —
+  vedomá vlastnosť, nie diera: výšky sokla sú v praxi z rozmerového radu a „najbližšie pásmo" by objednalo inú nohu (tá istá filozofia ako presný kľúč radu NL, nikdy sused).
+  Pri 90,5 pritom **platnička kód MÁ** (jej pásmo 55–220 je spojité) — ORANGE dostane len noha, a to je presne tá veta, ktorú má človek vidieť.
+- **`none` v KÓDOVOM PÁSME `param_bands` = „v tomto pásme člen vedome nevznikne"** — tá istá sémantika ako v rade `code_by_nl` (D-118b): `member_code` vráti `[nil, nil]`,
+  žiadny riadok a **ŽIADNY nález**. Rozdiel oproti CHÝBAJÚCEMU pásmu (ORANGE) je zámer. D-118b to tu ešte **zakazovalo**, a to z jediného dôvodu: `skip_code_present?` sa
+  na pásma nepýtalo, takže by obsah dostal nižší marker a starší plugin by z bunky vyrobil nákupný riadok s neexistujúcim kódom „none". Predikát ich odteraz prehľadáva
+  (`member_skip_code?`), takže **marker `std` 5 platí pre obe miesta** a nový marker netreba. Ako **pevný `code`** ostáva `none` zakázané (člen, ktorý nikdy nič nevydá, je
+  tichý nezmysel) a v selektore mapovania (`set_id`) sa nekontroluje vôbec (tam je to legitímne meno setu). Hodnota sa ukladá **kanonicky malými písmenami**; súpis (`explain`)
+  preskočeného člena **prizná** („bez kódu (netreba)") a editor v `hw_sets.js` ho v súhrne píše ako **„bez kódu"** (v selektore setov NIE — tam by to klamalo).
+- **Člen musí mať aspoň JEDEN skutočný kód — pri PÍSANÍ setu** (Codex #337 N1, spresnené kolom 2). Sentinel hovorí „TU žiadny kód nepatrí"; keď ho má člen vo VŠETKÝCH pásmach
+  (alebo v celom rade `code_by_nl`), je to člen, ktorý nikdy nič neobjedná — ten istý tichý nezmysel ako pevný `code: none`. `validate_param_bands` aj `validate_code_by_nl` taký
+  tvar **odmietajú LEN pod príznakom `authoring: true`**, ktorý nesie `validate_set_detailed` z jediných dvoch miest, kde set píše používateľ: **`save_set!`** a jeho náhľad
+  **`preview_expansion`** (aby náhľad nehovoril niečo iné než uloženie). **Editor to povie ešte skôr** (`hwsMemberProblems` → `hwsAllSkip`, „všetky kódy sú „none"" pri TOM
+  členovi) — a beží tiež len pri odoslaní, takže JS zrkadlo a server sedia.
+  **Prečo NIE aj pri čítaní (Codex #337 kolo 2 N1):** verzie, ktoré sentinel zaviedli, takého člena uložiť DOVOLILI — často vedľa úplne normálnych členov. Keby ho tolerantné
+  čítanie (`normalize_sets` → `validate_member`) zahodilo, detektor `members_lost?` by uvidel zmenu počtu a **celá** knižnica by sa stala `:read_only` (projektový snapshot
+  `:invalid`, šablóna `:lossy`) — používateľ by prišiel o všetky sety kvôli jednému členovi, a to ešte predtým, než by mu behová poistka `members_all_skipped` stihla čokoľvek
+  povedať. Z toho istého dôvodu kontrolu **NEMÁ ani hromadný prepis už uloženého obsahu** (`validate_sets` → `write` pri seed-merge a `write_project_state` pri zmrazení
+  snapshotu): tie len ukladajú, čo v knižnici už je, a odmietnutie by projekt nechalo navždy bez snapshotu. Opravu si teda vyžiada až prvý pokus ten set **uložiť z editora**.
+- **Keď set nevydá pre BEŽNÚ položku ANI JEDEN riadok, je to viditeľný ORANGE `members_all_skipped`** (Codex #337 N1). Doteraz mali fail-closed fallback len receptová zásuvka
+  (RED `drawer_kit_missing`) a výklop (RED `lift_set_incomplete`); položka z pravidiel — napríklad **noha** — skončila s prázdnym nákupom a **BEZ jediného dôvodu**, takže
+  nákup, Kontrola aj cenová ponuka o tom kovaní nepovedali ani slovo. Vlastný dôvod (nie `members_skipped`) preto, že ten cestuje v `base_reason` receptu (veta o DĹŽKE) a
+  výklopu (veta o POČTOCH) — spoločné znenie by pri jednom z nich klamalo. Veta menuje pásma a kódy („set … nevydal pre túto položku ani jeden riadok"), Kontrola je ORANGE
+  (nenacenené, export beží ďalej) a **súpis v karte hovorí to isté** (`explain` ide tou istou cestou — panel a súpis sa nesmú rozísť).
+- **Nový generický typ `plinth_clip` („Príchyt sokla")** v `BuildPlan::GENERIC_TYPES` + seed set **`prichyt-sokla-axilo`** (`use_type: other`, `opening_mode: other`,
+  Häfele/AXILO, jediný člen `950 ×1 per unit`) + mapovanie `plinth_clip → prichyt-sokla-axilo` v `SEED_MAPPING` (čerstvá knižnica) **aj v `MAPPING_ADDITIONS`** (add-if-absent
+  do už založenej knižnice a — cez „Doplniť nové predvoľby" — do projektu). Precedens je `lift` z KOV-B1: **`BuildPlan::SCHEMA` 4 → 5**, lebo položka s neznámym typom je pre
+  starší plugin dôvod zastaviť prestavbu (`guard_unknown_hardware!`), a set aj mapovanie s ním odmietnu existujúce brány — knižnica `:read_only`, snapshot `:invalid`,
+  šablóna `:lossy` (`normalize_sets` set neznámeho typu zahodí a detektor straty to vidí). **Bez pravidla položka nevzniká** — to je v poriadku a rovnaké ako sety výklopov
+  pred KOV-E1b.
+- **Generický kľúč sa doplní LEN na set TOHO TYPU** (Codex #337 N4, `mapping_seed_ref_ok?` → `generic_type_ref_ok?`). Pri NEtriednom kľúči stačila doteraz samotná PRÍTOMNOSŤ
+  `set_id` — a to prestalo stačiť vo chvíli, keď `MAPPING_ADDITIONS` dostali generický kľúč: používateľ už môže mať vlastný set s ID `prichyt-sokla-axilo`
+  a `generic_type: 'hinge'` (`merge_seed` mu ho správne nechá), predvoľba by mu aj tak sadla a každý príchyt by skončil `set_type_mismatch` namiesto objednaných kusov. Typ sa
+  z kľúča číta JEDINÝM parserom (`BuildPlan.parse_hardware_set_key`, teda aj tvar `leg@front:F1/panel`); neznámy tvar = kľúč sa nedoplní. Brána je spoločná pre knižnicu,
+  snapshot nového projektu aj „Doplniť nové predvoľby" (`mapping_seed_value_ok?`) a odmietnutie sa **loguje** (`add_mapping_seed`), aby po upgrade nechýbala predvoľba bez stopy.
+- **`CLASS_MAPPING_KEYS` už NIE JE celý `MAPPING_ADDITIONS`**, ale jeho podmnožina s prefixom `class:`. `plinth_clip` je generický kľúč (príchyt spôsob otvárania nemá) a do
+  tabuľky TRIEDNYCH mapovaní v Pravidlách nepatrí: `class_key_label` by mu vrátil `nil` (riadok bez popisku) a `class_set_options` by ho rozkladala ako triedny kľúč. Svoj
+  riadok má medzi generickými typmi (`generic_types` z `BuildPlan::GENERIC_TYPES`).
+- **Klasifikácia seed setu sa pred inštaláciou overí proti ŽIVEJ taxonómii** (Codex #337 N3, `seed_sets_resolved`). Seed sety nesú dvojicu výrobca/rada natvrdo
+  (Hettich/Sensys, Blum/AVENTOS, Häfele/AXILO), ale taxonómia cudziu väzbu rady **zámerne zachováva**: keď má používateľ radu naviazanú na vlastného výrobcu, naša dvojica
+  v jeho taxonómii NEEXISTUJE. Hromadný zápis seedu `taxonomy_refusal` nevolá (tá je pre VEDOMÝ zápis jedného setu), takže by sa taká klasifikácia do knižnice uložila a
+  **každá neskoršia úprava toho setu cez `save_set!` by skončila hláškou „rada … patrí výrobcovi …"** — set by sa nedal ani opraviť. Preto: keď `HardwareTaxonomy.series_owner`
+  povie, že rada patrí INÉMU výrobcovi, odchádza zo setu **CELÁ klasifikácia** (je all-or-nothing — set bez výrobcu je neplatný tvar, nie „polovične zaradený") a set sa
+  nainštaluje ako **nezaradený** + info log. **Kódy a typ sa nemenia**, takže nákup ide ďalej; nesadne mu len TRIEDNA predvoľba (`mapping_seed_ref_ok?`) — fail-closed, presne
+  ako pri každej inej nesediacej definícii. Keď sa taxonómia čítať nedá alebo radu ešte nepozná, klasifikácia **ostáva** (seed taxonómie ju vzápätí doplní a jej odobratie by
+  zbytočne odpojilo triedne predvoľby závesov a výklopov). Rovnaká, jediná sada ide do VŠETKÝCH seed ciest — `seed_library` (čerstvá inštalácia), doplnenie chýbajúceho setu,
+  `replace_untouched_seed_sets` aj `migrate_mapping` (inak by set, ktorému taxonómia zaradenie odobrala, už nikdy „nesedel s naším seedom" a migrácia by stála).
+- **PORADIE: taxonómia sa doseeduje PRED klasifikáciou seed setov** (Codex #337 kolo 2 N2). `seed_sets_resolved` volá na začiatku `HardwareTaxonomy.ensure_seeded`. Pri bežnom
+  upgrade z taxonómie **v2** je v uloženom zápise rada AXILO ešte pod **Hettichom** — pod Häfele ju presunie až migrácia `migrate_axilo_owner!` vo vnútri `ensure_seeded`,
+  a `series_owner` ju **zámerne nespúšťa** (je to čistý dotaz bez zápisu). Bez tohto poradia by sa náš set `prichyt-sokla-axilo` (Häfele/AXILO) javil ako odporujúci, prišiel by
+  o klasifikáciu — a knižnica by sa vzápätí zapísala so `seed_version` 8, takže **seed-merge setov by sa už nikdy nezopakoval** a set by ostal navždy nezaradený. Poradie je
+  vidieť v `ProductionCore.hardware_expansion`: `HardwareSets.load` beží **pred** `HardwareCatalog.items` (ktorý taxonómiu doseeduje tiež), takže prvý na rade je práve tento kód.
+  **R-07 sa nemení:** nad read-only/degradovanou taxonómiou `ensure_seeded` nič nezapíše, `series_owner` vráti `nil` a klasifikácia ostáva — presne ako doteraz. **Vlastný
+  výrobca rady sa neprebíja** (migrácia presúva LEN presný starý seed tvar), takže používateľ s „AXILO → Moja firma" dostane set ďalej ako nezaradený.
+- **Migrácia:** starý (v2..v7) tvar setu nôh je v `LEGACY_SEED_SHAPES`, takže `replace_untouched_seed_sets` nedotknutú knižnicu aktualizuje a používateľom upravený set
+  (stačí premenovanie) nechá tak. **Projektové snapshoty sa nemenia samy** — do rozpracovanej zákazky nový tvar aj predvoľbu príchytu prenesie vedomé **„Doplniť nové
+  predvoľby"** (`refresh_untouched_project_sets` + `add_mapping_seed`, existujúci mechanizmus). Dôsledok, ktorý patrí do poznámok k vydaniu: **skrinka so soklom 150 mm
+  objedná po prestavbe AXILO H150 + platničku (9076 + 9079) namiesto demosovskej nohy 367823** — golden charakterizácia `seed_kniznica` je preto vedome pregenerovaná.
+
+Testy: `tests/pure/test_kovg1a_nohy_data.rb` (36 sád + 14 overených mutácií, vrátane tabuľkovej fixtúry výšok sokla ako druhého nezávislého zápisu) +
+JS `tests/js/test_hw_sets.js` (sentinel v pásme).
 
 **BEZSTRATOVÁ BRÁNA DEFINÍCIÍ SETOV V ŠABLÓNE — `assess_set_defs` (audit #17 BLOCKER 1).** `hardware_set_defs` išli doteraz LEN cez tolerantný `normalize_sets`, teda cez cestu,
 ktorá neznámy obsah ticho oreže; od KOV-B1 by starší plugin zmrazil do .skp set BEZ klasifikácie. Šablóna je dátový súbor MIMO modelu (môže byť ručne upravená alebo z novšej

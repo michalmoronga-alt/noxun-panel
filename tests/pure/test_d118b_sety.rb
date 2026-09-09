@@ -19,7 +19,8 @@
 #      (starsi plugin ich odmietne), obsah bez neho ostava na povodnom std
 #   R7 MIGRACIA: nedotknuty seed tvar sa nahradi novym (vratane premenovania
 #      legacy setu), pouzivatelom upraveny set ostava
-#   R8 `none` je vyhradene PRE BUNKU RADU — ako pevny kod sa odmietne
+#   R8 `none` je vyhradene pre BUNKU (rad `code_by_nl`, od KOV-G1a aj KODOVE
+#      pasmo `param_bands`) — ako PEVNY kod sa odmieta dalej
 #
 # MUTACIE (kazda overena rucne — po zaneseni chyby spadne uvedeny test):
 #   M1 v sete sa vrati kod 348777 -> „D-118b (R1): antracit H70/470 = 357889"
@@ -231,12 +232,15 @@ end
 
 NxTest.test('D-118b (R5): set bez jedinej polozky = RED, nikdy ticho prazdny nakup') do
   c = NxD118b
-  # Patologicky (ale ulozitelny) stav: VSETKY bunky setu su `none`.
+  # Patologicky (ale ULOZITELNY) stav: pre TUTO dlzku (NL 420) je `none`
+  # v KAZDOM clene setu — ostatne dlzky kody maju, takze sety su platne
+  # (Codex #337 N1: clen, ktoreho su VSETKY bunky `none`, uz validacia
+  # odmieta, takze taky set by sa v kniznici ani nedal ulozit).
   sets = c.seed_norm.map do |s|
     next s unless s['set_id'] == 'atira-biela-h70-p2o'
 
     copy = Marshal.load(Marshal.dump(s))
-    copy['members'].each { |m| m['code_by_nl'].each_key { |k| m['code_by_nl'][k] = c::HWS::SKIP_CODE } }
+    copy['members'].each { |m| m['code_by_nl']['420'] = c::HWS::SKIP_CODE }
     copy
   end
   family = sets.select { |s| s['set_id'].start_with?('atira-biela-') && s['set_id'].end_with?('p2o') }
@@ -268,9 +272,14 @@ NxTest.test('D-118b (R6): sentinel = std 5, obsah bez neho ostava na svojom std'
   NxTest.assert_equal(c::HWS::STD_SKIP_CODE, c::HWS.snapshot_std(mapping, bez_lift),
                       'seed nesie Tip-On sety so sentinelom')
 
-  bez = bez_lift.reject { |s| c::TIPON_SETY.include?(s['set_id']) }
+  # KOV-G1a: sentinel zije UZ AJ v KODOVOM PASME (platnicka setu nôh pod
+  # 55 mm), takze „obsah bez sentinelu" musi vynechat aj ten set.
+  bez = bez_lift.reject { |s| c::TIPON_SETY.include?(s['set_id']) || s['set_id'] == 'nohy-podla-sokla' }
   NxTest.assert_equal(c::HWS::STD_HEIGHT_VARIANT, c::HWS.snapshot_std(mapping, bez),
                       'bez sentinelu ostava marker na 4 — spatna citatelnost sa neblokuje zbytocne')
+  nohy = bez_lift.select { |s| s['set_id'] == 'nohy-podla-sokla' }
+  NxTest.assert_equal(c::HWS::STD_SKIP_CODE, c::HWS.snapshot_std({}, nohy),
+                      'KOV-G1a: sentinel v KODOVOM pasme nesie ten isty marker ako v rade')
   NxTest.assert(c::HWS::STD_SUPPORTED.include?(c::HWS::STD_SKIP_CODE),
                 'novy marker je medzi podporovanymi')
   NxTest.assert(Noxun::Engine::HardwareSets::SEED_VERSION >= 5, 'D-118b seed = 5; KOV-F1 bumplo na 6')
@@ -368,11 +377,12 @@ end
 
 NxTest.test('D-118b (R9): supis (explain) prizna, ked set nevyda ANI JEDNU polozku') do
   c = NxD118b
+  # Ta ista fixtura ako v R5: `none` LEN pre NL 420 (Codex #337 N1).
   sets = c.seed_norm.map do |s|
     next s unless s['set_id'] == 'atira-biela-h70-p2o'
 
     copy = Marshal.load(Marshal.dump(s))
-    copy['members'].each { |m| m['code_by_nl'].each_key { |k| m['code_by_nl'][k] = c::HWS::SKIP_CODE } }
+    copy['members'].each { |m| m['code_by_nl']['420'] = c::HWS::SKIP_CODE }
     copy
   end
   family = sets.select { |s| s['set_id'].start_with?('atira-biela-') && s['set_id'].end_with?('p2o') }
@@ -444,15 +454,35 @@ NxTest.test('D-118b (R9): osvieženie berie definiciu z KNIZNICE, nie zo zabudov
   end
 end
 
-NxTest.test('D-118b (R8): `none` sa odmietne aj v KODOVOM pasme, v selectore setov nie') do
+NxTest.test('D-118b (R8) + KOV-G1a: `none` je PLATNE v kodovom pasme, v selectore setov je meno') do
   c = NxD118b
-  bad, errs = c::HWS.validate_member(
+  # D-118b tu sentinel ZAKAZOVALO — a to z JEDINEHO dovodu: marker `std` sa
+  # naň nepytal, takze starsi plugin by z bunky vyrobil riadok s kodom „none".
+  # KOV-G1a mu marker dal (`skip_code_present?` vidi aj pasma), takze zakaz
+  # zanikol a pasmo `none` znamena „v tomto pasme clen vedome nevznika".
+  # Codex #337 N1: aspon JEDNO pasmo musi mat skutocny kod — clen, ktoreho su
+  # VSETKY pasma `none`, by nikdy nic neobjednal (rovnaky tichy nezmysel ako
+  # pevny kod `none`), preto ho validacia odmieta.
+  ok, errs = c::HWS.validate_member(
     { 'per' => 'unit', 'qty' => 1,
       'param_bands' => { 'param' => 'height',
-                         'bands' => [{ 'min' => 10.0, 'max' => 20.0, 'code' => 'none' }] } }, 0
+                         'bands' => [{ 'min' => 10.0, 'max' => 20.0, 'code' => 'NONE' },
+                                     { 'min' => 55.0, 'max' => 220.0, 'code' => '9079' }] } }, 0
   )
-  NxTest.assert_equal(nil, bad, 'kodove pasmo so sentinelom sa NEULOZI')
-  NxTest.assert(errs.first.to_s.include?('none'), errs.inspect)
+  NxTest.assert_equal([], errs, errs.inspect)
+  NxTest.assert_equal(c::HWS::SKIP_CODE, ok['param_bands']['bands'].first['code'],
+                      'sentinel sa aj v pasme uklada kanonicky malymi pismenami')
+  # Codex #337 kolo 2 N1: odmieta sa LEN PISANIE setu (`authoring: true`,
+  # teda editor) — citanie ulozeneho obsahu taky clen ZACHOVA.
+  all_none = { 'per' => 'unit', 'qty' => 1,
+               'param_bands' => { 'param' => 'height',
+                                  'bands' => [{ 'min' => 10.0, 'max' => 20.0,
+                                                'code' => 'none' }] } }
+  _bad, errs_all = c::HWS.validate_member(all_none, 0, authoring: true)
+  NxTest.assert(errs_all.first.to_s.include?('všetky pásma'), errs_all.inspect)
+  kept, errs_read = c::HWS.validate_member(all_none, 0)
+  NxTest.assert_equal([], errs_read, errs_read.inspect)
+  NxTest.assert_equal(c::HWS::SKIP_CODE, kept['param_bands']['bands'].first['code'])
 
   # Selector mapovania nesie `set_id` — tam je „none" legitimne meno setu.
   sel, errs2 = c::HWS.validate_param_bands(

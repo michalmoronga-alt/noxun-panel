@@ -484,7 +484,12 @@ NxTest.test('KOV-C2a (R4): cerstva kniznica ma 8 novych setov a 4 triedne mapova
   # KOV-F1: +2 zavesove triedne mapovania (`class:hinge|classic` / `|tipon`).
   # KOV-E1a: +3 vyklopove (`class:lift|classic|hk_top` · `|tipon|hk_top` ·
   # `|classic|hl_top`; `class:lift|tipon|hl_top` NEEXISTUJE).
-  NxTest.assert_equal(9, c::HWS::MAPPING_ADDITIONS.size)
+  # KOV-G1a: +1 GENERICKY kluc (`plinth_clip`) — prichyt sokla sposob
+  # otvarania nema, takze triednym klucom nie je.
+  NxTest.assert_equal(10, c::HWS::MAPPING_ADDITIONS.size)
+  NxTest.assert_equal(9, c::HWS::CLASS_MAPPING_KEYS.length,
+                      'tabulka TRIEDNYCH mapovani genericky kluc nesmie dostat')
+  NxTest.assert(c::HWS::CLASS_MAPPING_KEYS.all? { |k| k.start_with?('class:') })
   # Vsetky seed sety su platne aj podla PRISNEJ zapisovej validacie.
   _norm, errs = c::HWS.validate_sets(c::HWS::SEED_SETS)
   NxTest.assert_equal([], errs, errs.inspect)

@@ -90,8 +90,10 @@ NxTest.test('KOV-B1 taxonomia: prve pouzitie SEEDNE zoznam a je idempotentne') d
   t.with_taxonomy do
     t.wipe!
     names = t::TAX.manufacturers.map { |m| m['name'] }
-    NxTest.assert_equal(%w[Blum Grass Hettich Ostatné Strong Tulip], names,
-                        'seed v2: vyrobcovia vratane Tulip (poradie je deterministicke)')
+    NxTest.assert_equal(['Blum', 'Grass', 'Häfele', 'Hettich', 'Ostatné', 'Strong', 'Tulip'], names,
+                        'seed v3: vyrobcovia vratane Häfele (poradie je deterministicke)')
+    NxTest.assert_equal(['AXILO'], t::TAX.series_of('Häfele').map { |s| s['name'] },
+                        'KOV-G1a: AXILO je Häfele program, nie Hettich')
     NxTest.assert_equal(%w[AVENTOS CLIP\ top LEGRABOX MERIVOBOX TANDEMBOX TIP-ON].sort,
                         t::TAX.series_of('Blum').map { |s| s['name'] }.sort)
     NxTest.assert_equal(t::TAX::SEED_VERSION, t.raw['seed_version'])

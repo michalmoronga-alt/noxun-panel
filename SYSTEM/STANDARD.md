@@ -509,7 +509,7 @@ brána existuje preto, že odmietnuť ho **raz pri uložení** je lacnejšie ne�
 stavba je reprodukovateľná zo samotného .skp (iné PC, zmeny globálu, kópie skriniek) a undo vracia pravidlá aj geometriu naraz.
 Globálna knižnica `%APPDATA%\NOXUN\Engine\hardware_rules.json` je len default pre nové projekty (so seed-merge novej verzie seedov podľa `rule_id`).
 
-**Položka kovania v pláne** (BuildPlan schema 4, string kľúče kvôli JSON round-trip): `owner_part_key` (nil = korpus; inak musí existovať v parts), `generic_type` (slovník),
+**Položka kovania v pláne** (BuildPlan schema 5 — KOV-G1a pridala generický typ `plinth_clip`; string kľúče kvôli JSON round-trip): `owner_part_key` (nil = korpus; inak musí existovať v parts), `generic_type` (slovník),
 `quantity` (1–999), `rule_id`, `variant_id` (nil vo fáze 1), `production_class: "counted"`, `manufactured: true`, `params` (napr. výška nohy, NL výsuvu),
 `source` (`rule`/`manual`/**`recipe`**), `rule_quantity`. Voliteľne `rule_nominal_length` (viď nižšie) a **`locked`** (viď nižšie).
 
@@ -663,8 +663,23 @@ ručných zásahov ukázať spolu s cestou von („zrušiť"); tichá aktivácia
 receptovú položku nevydá **ani jeden** nákupný riadok (všetky členy preskočené), je to RED `drawer_kit_missing` (`base_reason: members_skipped`) so zastaveným exportom —
 zásuvka sa nikdy neobjedná „bez kovania" potichu.
 
+**KOV-G1a (v0.9.58) rozšírila `none` aj na KÓDOVÉ PÁSMO člena (`param_bands`)** — tá istá veta a ten istý marker: „v tomto pásme člen vedome nevzniká" (platnička AXILO patrí
+k nohe od 55 mm, pri klzáku 17–20 mm žiadna nie je). Ako pevný `code` ostáva `none` odmietnuté a v selektore mapovania (`set_id`) sa nekontroluje.
+**Člen musí mať aspoň JEDEN skutočný kód** (Codex #337 N1): keď sú `none` VŠETKY jeho pásma (alebo celý rad `code_by_nl`), je to člen, ktorý nikdy nič neobjedná — teda ten
+istý tichý nezmysel ako pevný kód `none`, a **uloženie setu z editora** sa odmieta (rovnako na serveri aj v editore setu). Kontrola platí LEN pri PÍSANÍ setu (Codex #337 kolo 2):
+už uložený člen takého tvaru (verzie so sentinelom ho uložiť dovolili) sa pri čítaní ani pri hromadnom prepise **nezahadzuje** — inak by detektor straty spravil z celej
+knižnice `:read_only` a zo snapshotu `:invalid`. Že taký člen nič nevydá, hlási runtime (nižšie). A keď set pre BEŽNÚ položku z pravidiel nevydá **ani jeden** riadok,
+je to ORANGE `members_all_skipped` s vetou „set nevydal ani jeden nákupný riadok" — nikdy prázdny nákup bez jediného dôvodu (receptová zásuvka a výklop si držia svoju RED
+cestu).
+
+**NOHY 17–220 mm A PRÍCHYT SOKLA (KOV-G1a, rozhodnutia Michal 9.9.2026).** Set „Nohy podľa výšky sokla" pokrýva **každú výšku sokla od 17 do 220 mm okrem VEDOME nepokrytej
+zóny 20–55 mm**: 17–20 mm = STRONG klzák s rektifikáciou (`272212`), 55–220 mm = **Häfele AXILO** (noha podľa výšky + **platnička na každú nohu**), dodávateľ **Quatro LM**
+(NIE Démos — riadky preto nemajú `demos_url` ani dátum overenia a cena sa obnovuje ručne). Nepokrytá zóna aj neceločíselná výška medzi pásmami (90,5) sú **ORANGE „doplň
+pásmo"** s vetou o výške sokla — nikdy najbližšie pásmo. **Príchyt soklovej lišty** je vlastný generický typ **`plinth_clip`** („Príchyt sokla", Häfele 637.38.054) so seed
+setom `prichyt-sokla-axilo`; vzniká **len pri samostatnej soklovej lište** a v počte **1 ks na začaté 4 nohy** — to rozhoduje pravidlo z KOV-G1b, dovtedy položka nevzniká.
+
 **MARKER `std` KNIŽNICE A SNAPSHOTU:** `1` = legacy · `2` = pásma/selector · **`3` = klasifikácia alebo triedny kľúč** · **`4` = set s `height_variant`** ·
-**`5` = set s vyhradenou bunkou `none`** · **`6` = tvary výklopov (`code_by_param`, `quantity_from`, `lift_system`)**. Od KOV-C2a je
+**`5` = set s vyhradenou bunkou `none`** (v rade `code_by_nl` aj v kódovom pásme `param_bands`) · **`6` = tvary výklopov (`code_by_param`, `quantity_from`, `lift_system`)**. Od KOV-C2a je
 čerstvá knižnica aj snapshot NOVÉHO projektu na `4` (od D-118b na `5`, od KOV-E1a na `6` — seed nesie sety výklopov); existujúce projekty svoj marker nemenia, kým do nich používateľ predvoľby vedome nedoplní. Marker je LAZY podľa
 obsahu, takže čisto legacy dáta ostávajú čitateľné pre staršie verzie; obsah s vyšším `std`, než ktorý verzia pozná, je pre ňu read-only (knižnica) alebo `:invalid`
 (snapshot) — nikdy čiastočne prečítaný.

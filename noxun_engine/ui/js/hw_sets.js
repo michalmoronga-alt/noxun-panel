@@ -179,11 +179,18 @@
     if (qty) out += (m.quantity_from ? ' — ' : ' ') + qty;
     return out + (m.per === 'owner' ? ' na vlastníka' : '');
   }
-  // „17–21 → 82744 · 140–160 → 367823"; names = mapa hodnota->citatelny nazov
+  // „17–20 → 272212 · 55–90 → 9069"; names = mapa hodnota->citatelny nazov
   // (pri selectore su hodnoty set_id, pri clene setu kody).
+  //
+  // KOV-G1a: v KODOVOM pasme (`key === 'code'`) je vyhradena hodnota `none`
+  // to iste ako v rade NL — „v tomto pásme člen vedome nevzniká". Pise sa
+  // preto po ludsky („bez kódu"); surove „none" by vyzeralo ako preklep.
+  // V SELECTORE mapovania (`key === 'set_id'`) sa NEPREKLADA — tam je „none"
+  // legitimne meno setu a preklad by klamal.
   function hwsBandsSummary(bands, key, names){
     var list = (bands || []).map(function(b){
       var v = b[key];
+      if (key === 'code' && hwsIsSkipCode(v)) return hwsNum(b.min) + '–' + hwsNum(b.max) + ' → bez kódu';
       return hwsNum(b.min) + '–' + hwsNum(b.max) + ' → ' + ((names && names[v]) || v);
     });
     return list.join(' · ') || '—';
@@ -1507,6 +1514,15 @@
                    msg: 'Člen ' + (i + 1) + ': zadaj názov parametra triedy — '
                       + 'pri voľbe „iné (vypíšem)“ sa prázdne pole neuloží.' });
       }
+      // KOV-G1a (Codex #337 N1): VŠETKY vyplnené kódy člena sú „none".
+      // Sentinel znamená „TU žiadny kód nepatrí" — keď ho má člen všade,
+      // nikdy nič neobjedná (rovnaký tichý nezmysel ako pevný kód „none").
+      // Server to odmieta tiež; klient to povie SKÔR a menuje člena.
+      if (hwsAllSkip(m)){
+        out.push({ row: 'members:' + i, field: null,
+                   msg: 'Člen ' + (i + 1) + ': všetky kódy sú „none“ — člen by nikdy nič '
+                      + 'neobjednal. Zmaž ho, alebo doplň aspoň jeden kód.' });
+      }
       var dup = m.is_param ? hwsDupValue(m.codes, 'value')
               : (m.is_series ? hwsDupValue(m.series, 'nl') : '');
       if (!dup) return;
@@ -1515,6 +1531,17 @@
                     + 'nechaj jeden riadok (druhý by prvý ticho prepísal).' });
     });
     return out;
+  }
+  // KOV-G1a (Codex #337 N1): má člen VYPLNENÝ aspoň jeden kód a sú VŠETKY
+  // „none"? Týka sa LEN radu (NL) a pásiem — pevný kód `none` server odmieta
+  // sám a tabuľka tried sentinel vôbec nepozná. Nedopísaný riadok (prázdny
+  // kód) sa NEPOČÍTA: o tom hovorí server, nie táto veta.
+  function hwsAllSkip(m){
+    var rows = m.is_series ? m.series : (m.is_bands ? m.bands : null);
+    if (!rows) return false;
+    var filled = (rows || []).filter(function(r){ return !hwsBlank(r && r.code); });
+    if (!filled.length) return false;
+    return filled.every(function(r){ return hwsIsSkipCode(r.code); });
   }
   // Prvá hodnota, ktorá sa v riadkoch opakuje (po orezaní), inak ''.
   // Prázdna hodnota sa NEPOČÍTA — to je nedopísaný riadok a o tom hovorí server.
@@ -1739,6 +1766,14 @@
     } else {
       val = hwsMk('input');
       val.type = 'text'; val.value = cur; val.placeholder = o.placeholder || '';
+      // KOV-G1a: v KODOVOM pasme je `none` VYHRADENA hodnota — hodnota ostava
+      // v poli surova (inak by sa nedala prepisat), ale bublina povie, co
+      // znamena, a pri `none` to potvrdi rovnou vetou ako v suhrne.
+      if (o.valueField === 'code'){
+        val.title = hwsIsSkipCode(cur)
+          ? 'V tomto pásme člen vedome nevzniká (bez kódu).'
+          : 'Kód položky katalógu. „none“ = v tomto pásme člen vedome nevzniká.';
+      }
     }
     hwsBandAttrs(val, o, o.valueField);
     r.appendChild(val);

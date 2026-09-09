@@ -260,9 +260,12 @@ NxTest.test('hw sety: expand — kod mimo katalogu = viditelny riadok, cena nil 
 end
 
 NxTest.test('hw sety: expand — summary total len zo znamych cien, deterministicke poradie') do
+  # KOV-G1a: vyska sokla 40 mm je VEDOME nepokryta zona (20-55 mm), takze noha
+  # nevyda ziadny riadok — presne to, o com je toto tvrdenie (krytky su jedine
+  # dva riadky bez ceny). Do KOV-G1a tu stalo 100 mm, ktore uz pasmo MA.
   items = [NxSets.hinge_item, NxSets.slide_item(470.0),
            { 'owner_id' => 'CAB-2', 'owner_part_key' => nil, 'generic_type' => 'leg',
-             'quantity' => 4, 'rule_id' => 'nohy-zakladne', 'params' => { 'height' => 100.0 } }]
+             'quantity' => 4, 'rule_id' => 'nohy-zakladne', 'params' => { 'height' => 40.0 } }]
   res = HWS.expand(items, NxSets.state, catalog: NxSets.catalog)
   codes = res['rows'].map { |r| r['code'] }
   zavesy = %w[104717 105408 105425 106412]
@@ -358,7 +361,9 @@ NxTest.test('hw sety GH#127 P1: prva zmena v projekte BEZ snapshotu zmrazi VSETK
   # KOV-C2a: default uz nie je len `SEED_MAPPING` — cerstva kniznica nesie aj
   # triedne mapovania zasuviek (`MAPPING_ADDITIONS`), takze „cely default"
   # znamena OBE mnoziny.
-  NxTest.assert_equal(HWS::SEED_MAPPING.length + HWS::MAPPING_ADDITIONS.length,
+  # KOV-G1a: `plinth_clip` je v OBOCH mnozinach (SEED_MAPPING pre cerstvu
+  # kniznicu, MAPPING_ADDITIONS pre uz zalozenu), takze sa pocita RAZ.
+  NxTest.assert_equal((HWS::SEED_MAPPING.keys | HWS::MAPPING_ADDITIONS.keys).length,
                       st['mapping'].length, 'cely default zmrazeny')
   NxTest.assert(st['mapping'].key?('class:slide|classic|metal'),
                 'aj triedne mapovania (inak by nova zakazka zasuvky nemapovala)')

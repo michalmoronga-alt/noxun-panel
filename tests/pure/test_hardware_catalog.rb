@@ -300,9 +300,9 @@ NxTest.test('hw katalog: seed — deterministicky manifest, unikatne kody, enum,
   NxTest.assert_equal(:ok, HWC.assess!, 'chybajuci subor -> seed -> ok')
   list = HWC.items
   NxTest.assert_equal(HWC::SEED_ROWS.length, list.length, 'kazdy riadok manifestu sa seedol')
-  NxTest.assert_equal(137, list.length,
+  NxTest.assert_equal(146, list.length,
                       'zmrazeny rozsah manifestu (60 z D1 + 54 kodov seed setov D-118 ' \
-                      '+ 23 kodov AVENTOS KOV-E1a)')
+                      '+ 23 kodov AVENTOS KOV-E1a + 9 kodov nôh a prichytu KOV-G1a)')
   codes = list.map { |i| i['item_code'].downcase }
   NxTest.assert_equal(codes.uniq.length, codes.length, 'unikatne kody')
   list.each do |i|
@@ -310,7 +310,15 @@ NxTest.test('hw katalog: seed — deterministicky manifest, unikatne kody, enum,
     NxTest.assert(HWC::UNITS.include?(i['unit']), "enum MJ: #{i['item_code']}")
     NxTest.assert(i['price_eur_vat'].nil? || i['price_eur_vat'].is_a?(Float),
                   "cena Float alebo chyba: #{i['item_code']}")
-    NxTest.assert_equal('Demos', i['supplier'])
+    # KOV-G1a: osem riadkov AXILO je od QUATRO LM (quatrolm.sk), nie z Demosu —
+    # dodavatel zije v existujucom poli `supplier` a ADRESA v poznamke.
+    if i['supplier'] == 'Quatro LM'
+      NxTest.assert(i['notes'].to_s.include?('https://quatrolm.sk/'),
+                    "#{i['item_code']}: adresa dodavatela je v poznamke")
+      NxTest.refute(i.key?('demos_url'), "#{i['item_code']}: cudzia adresa NIE JE Demos vazba")
+    else
+      NxTest.assert_equal('Demos', i['supplier'])
+    end
     # D-118: seed v3 uz NIE JE prepis z CSV — kazdy riadok s cenou ma aj vazbu
     # na konkretnu stranku, z ktorej sa cena precitala, takze datum overenia
     # patri k nemu (F5 „datum patri konkretnej vazbe"). Riadok BEZ vazby alebo

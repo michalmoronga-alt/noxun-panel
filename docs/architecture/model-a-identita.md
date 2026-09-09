@@ -123,7 +123,7 @@ parser inde by sa časom rozišiel; jediný čitateľ je zatiaľ deep-link „kl
 
 ### build_plan.rb
 
-**ZÁVÄZNÝ kontrakt plánu** (SCHEMA 4, MIN_DIM, validátor, `warnings[]`, hardware string-keyed s GENERIC_TYPES/limitmi/referenčnou integritou ownera). Geometria, kusovník aj VEPO
+**ZÁVÄZNÝ kontrakt plánu** (SCHEMA 5 — posledný bump KOV-G1a: nový generický typ `plinth_clip`; MIN_DIM, validátor, `warnings[]`, hardware string-keyed s GENERIC_TYPES/limitmi/referenčnou integritou ownera). Geometria, kusovník aj VEPO
 čítajú TEN ISTÝ plán.
 
 **`GENERIC_TYPES` + `lift` a `SCHEMA` 2 → 3 (KOV-B1, v0.9.19).** Slovník typov kovania dostal `lift` (výklopy a sklopy) — presunuté z KOV-E podľa auditu #17 BLOCKER 2, lebo
@@ -131,6 +131,14 @@ kanonická mapa `use_type → generic_type` v `hardware_sets.rb` ho potrebuje U�
 prinesie KOV-E; slovník je tu preto, aby už nebol potrebný ďalší bump kontraktu. Rozšírenie je pre STARŠÍ plugin neznámy typ, ktorý jeho `guard_unknown_hardware!` odmietne, takže
 plán, ktorý ho môže niesť, už nie je plánom schémy 2 — odtiaľ bump. Slovenský názov („Výklop / sklop") žije v troch mapách naraz (`HardwareRules.label_for`,
 `Validation::HW_LABELS`, `ui/js/rules.js`) a paritu stráži guard, ktorý iteruje `GENERIC_TYPES` — nie opísaný zoznam.
+
+**`GENERIC_TYPES` + `plinth_clip` a `SCHEMA` 4 → 5 (KOV-G1a, v0.9.58).** Slovník typov kovania dostal **`plinth_clip`** — príchyt soklovej lišty (Häfele AXILO 637.38.054,
+rozhodnutie Michal 9.9.2026: drží samostatnú soklovú lištu na nohách, 1 ks na začaté 4 nohy). PRAVIDLO k nemu prinesie až **KOV-G1b**; tu je slovník, seed set
+`prichyt-sokla-axilo` a mapovanie (viď [hardware.md](hardware.md)). Dôvod bumpu je presne ten istý ako pri `lift` v schéme 3: položka s novým typom je pre STARŠÍ plugin
+neznámy typ, ktorý jeho `guard_unknown_hardware!` odmietne, takže plán, ktorý ho môže niesť, už nie je plánom schémy 4. Slovenský názov („Príchyt sokla") žije v tých istých
+troch mapách naraz (`HardwareRules.label_for`, `Validation::HW_LABELS`, `ui/js/rules.js`) a paritu stráži ten istý guard, ktorý iteruje `GENERIC_TYPES`.
+**`CONFIG_SCHEMA` sa NEBUMPUJE** — bez pravidla položka `plinth_clip` nevzniká, do configu skrinky sa teda nemá ako dostať; downgrade knižnice a snapshotu zastavia existujúce
+brány (`normalize_sets` set neznámeho typu zahodí a detektor straty to prizná).
 
 **`SCHEMA` 3 → 4 (KOV-C2b, v0.9.31): DIELCE ZÁSUVIEK.** `ROLES` dostali `drawer_bottom` · `drawer_back` · `box_side` · `drawer_inner_front` (zhodné s `Recipes::ROLE_*`
 aj `CabinetBuilder::DRAWER_ROLES` — väzbu drží guard test), materiálový signál dielca pozná **`:drawer`** (4. kanál) a `HW_SOURCES` má **`recipe`**. Položka výsuvu z receptu

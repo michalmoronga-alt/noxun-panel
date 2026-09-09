@@ -228,24 +228,33 @@ end
 NxTest.test('H1a pasma: expand — noha podla vysky sokla, mimo pasiem ORANGE (nikdy najblizsie)') do
   hws = NxH1a::HWS
   st = NxH1a.state
-  cat = [{ 'item_code' => '82744', 'name_sk' => 'Klzák 17', 'category' => 'NOHY', 'unit' => 'ks', 'price_eur_vat' => 0.48 },
-         { 'item_code' => '367823', 'name_sk' => 'AXILO 150', 'category' => 'NOHY', 'unit' => 'ks', 'price_eur_vat' => 3.2 }]
+  # KOV-G1a: seed set nôh ma NOVE pasma (17-20 STRONG klzak, 55-220 AXILO)
+  # a druheho clena „platnička" — medzera je odteraz 20-55 mm.
+  cat = [{ 'item_code' => '272212', 'name_sk' => 'Klzák 17 šedý', 'category' => 'NOHY', 'unit' => 'ks', 'price_eur_vat' => 0.41 },
+         { 'item_code' => '9076', 'name_sk' => 'AXILO H150', 'category' => 'NOHY', 'unit' => 'ks', 'price_eur_vat' => 0.79 },
+         { 'item_code' => '9079', 'name_sk' => 'Platnička AXILO', 'category' => 'NOHY', 'unit' => 'ks', 'price_eur_vat' => 0.5 }]
   low = hws.expand([NxH1a.leg_item(19.0)], st, catalog: cat)
   NxTest.assert_equal(4, low['rows'][0]['quantity'])
-  NxTest.assert_equal('82744', low['rows'][0]['code'], 'sokel 19 -> klzak 17')
+  NxTest.assert_equal('272212', low['rows'][0]['code'], 'sokel 19 -> klzak 17')
+  NxTest.assert_equal(1, low['rows'].length, 'klzak platnicku NEMA (pasmo `none`)')
+  NxTest.assert_equal([], low['unmapped'], 'a vedome prazdne pasmo NIE JE problem')
   high = hws.expand([NxH1a.leg_item(150.0)], st, catalog: cat)
-  NxTest.assert_equal('367823', high['rows'][0]['code'], 'sokel 150 -> AXILO (D-79)')
-  NxTest.assert_equal('82744', hws.expand([NxH1a.leg_item(17.0)], st, catalog: cat)['rows'][0]['code'],
+  NxTest.assert_equal(%w[9076 9079], high['rows'].map { |r| r['code'] }.sort,
+                      'sokel 150 -> AXILO H150 + platnicka na kazdu nohu')
+  NxTest.assert_equal('272212', hws.expand([NxH1a.leg_item(17.0)], st, catalog: cat)['rows'][0]['code'],
                       'dolna hranica patri do pasma')
-  NxTest.assert_equal('82744', hws.expand([NxH1a.leg_item(21.0)], st, catalog: cat)['rows'][0]['code'],
+  NxTest.assert_equal('272212', hws.expand([NxH1a.leg_item(20.0)], st, catalog: cat)['rows'][0]['code'],
                       'horna hranica patri do pasma')
-  gap = hws.expand([NxH1a.leg_item(100.0)], st, catalog: cat)
-  NxTest.assert_equal([], gap['rows'], 'sokel 100 v medzere = ZIADNY kod (nikdy najblizsie pasmo)')
+  gap = hws.expand([NxH1a.leg_item(40.0)], st, catalog: cat)
+  NxTest.assert_equal([], gap['rows'], 'sokel 40 v medzere = ZIADNY kod (nikdy najblizsie pasmo)')
+  # KOV-G1a: mimo pasiem su odteraz NEMAPOVANI OBAJA clenovia (noha aj
+  # platnicka) — kazdy s vlastnou identitou clena.
+  NxTest.assert_equal([0, 1], gap['unmapped'].map { |x| x['member_index'] },
+                      'identita CLENA setu (FIX 9)')
   u = gap['unmapped'][0]
   NxTest.assert_equal('param_band_missing', u['reason'])
   NxTest.assert_equal('height', u['param'])
-  NxTest.assert_equal(100.0, u['value'])
-  NxTest.assert_equal(0, u['member_index'], 'identita CLENA setu (FIX 9)')
+  NxTest.assert_equal(40.0, u['value'])
   none = hws.expand([NxH1a.leg_item(nil)], st, catalog: cat)
   NxTest.assert_equal('param_band_missing', none['unmapped'][0]['reason'], 'chybajuci parameter')
   NxTest.assert_equal(nil, none['unmapped'][0]['value'])
@@ -411,11 +420,25 @@ NxTest.test('H1a snapshot GH#131 P2: std marker podla OBSAHU — nove tvary star
   hws.write_project_state(m1, 'mapping' => { 'leg' => 'nohy-klzak-17' },
                               'sets' => { 'nohy-klzak-17' => klzak })
   NxTest.assert_equal(hws::STD, std_of.call(m1), 'len legacy tvary = std 1')
-  # clen s pasmami -> std 2
+  # clen s pasmami -> std 2. KOV-G1a: SEED set nôh uz nesie AJ sentinel `none`
+  # (platnicka pod 55 mm), takze CISTY `param_bands` tvar sa skusa nad vlastnou
+  # definiciou a seed set ma vlastne tvrdenie nizsie.
+  pasma = hws.normalize_sets([
+    { 'set_id' => 'nohy-pasma', 'name' => 'Nohy podľa pásiem', 'generic_type' => 'leg',
+      'members' => [{ 'per' => 'unit', 'qty' => 1,
+                      'param_bands' => { 'param' => 'height',
+                                         'bands' => [{ 'min' => 17.0, 'max' => 20.0,
+                                                       'code' => '272212' }] } }] }
+  ]).first
   m2 = NxH1a::Model.new
-  hws.write_project_state(m2, 'mapping' => { 'leg' => 'nohy-podla-sokla' },
-                              'sets' => { 'nohy-podla-sokla' => nohy })
+  hws.write_project_state(m2, 'mapping' => { 'leg' => 'nohy-pasma' },
+                              'sets' => { 'nohy-pasma' => pasma })
   NxTest.assert_equal(hws::STD_PARAM_FORMS, std_of.call(m2), 'param_bands = std 2')
+  m2b = NxH1a::Model.new
+  hws.write_project_state(m2b, 'mapping' => { 'leg' => 'nohy-podla-sokla' },
+                               'sets' => { 'nohy-podla-sokla' => nohy })
+  NxTest.assert_equal(hws::STD_SKIP_CODE, std_of.call(m2b),
+                      'KOV-G1a: sentinel v kodovom pasme = std 5')
   # MIESANY set (legacy clen + pasma) — presne pripad z GH #131 P2
   miesany = hws.normalize_sets([
     { 'set_id' => 'miesany', 'name' => 'Miešaný', 'generic_type' => 'leg',
@@ -669,14 +692,16 @@ NxTest.test('H1a semafor: nove dovody maju SK text, parameter aj identitu clena'
   st = NxH1a.state
   sel = NxH1a.selector('front_height', [{ 'min' => 0.0, 'max' => 120.0, 'set_id' => 'bocnica-h70' }])
   st['mapping']['slide'] = sel
-  exp = hws.expand([NxH1a.leg_item(100.0), NxH1a.slide_item(500.0)], st, catalog: [])
+  # KOV-G1a: sokel 40 mm je VEDOME nepokryta zona (20-55 mm) a set nôh ma
+  # DVOCH clenov, takze nemapovane su obaja.
+  exp = hws.expand([NxH1a.leg_item(40.0), NxH1a.slide_item(500.0)], st, catalog: [])
   res = Noxun::Engine::Validation.run({}, hardware_expansion: exp)
   items = res['items'].select { |i| i['category'] == 'hardware_unmapped' }
-  NxTest.assert_equal(2, items.length)
+  NxTest.assert_equal(3, items.length)
   band = items.find { |i| i['stable_key'].include?('param_band_missing') }
   NxTest.assert(!band.nil?, 'pasmo clena setu ma vlastny dovod')
   # H1b: cisla su vsade v tom istom tvare (150 / 17,5) — fmt_mm.
-  NxTest.assert(band['message_sk'].include?('výšku sokla 100 mm'), 'sprava nesie parameter aj hodnotu')
+  NxTest.assert(band['message_sk'].include?('výšku sokla 40 mm'), 'sprava nesie parameter aj hodnotu')
   NxTest.assert(band['stable_key'].end_with?('|0'), 'stable_key nesie index clena (F7)')
   selr = items.find { |i| i['stable_key'].include?('selector_unresolved') }
   NxTest.assert(!selr.nil?)
@@ -713,8 +738,9 @@ end
 NxTest.test('H1a end-to-end: plan skrinky so soklom 150 -> AXILO, sokel 17 -> klzak') do
   cb = Noxun::Engine::CabinetBuilder
   hws = NxH1a::HWS
-  cat = [{ 'item_code' => '82744', 'name_sk' => 'Klzák 17', 'category' => 'NOHY', 'unit' => 'ks' },
-         { 'item_code' => '367823', 'name_sk' => 'AXILO 150', 'category' => 'NOHY', 'unit' => 'ks' }]
+  cat = [{ 'item_code' => '272212', 'name_sk' => 'Klzák 17 šedý', 'category' => 'NOHY', 'unit' => 'ks' },
+         { 'item_code' => '9076', 'name_sk' => 'AXILO H150', 'category' => 'NOHY', 'unit' => 'ks' },
+         { 'item_code' => '9079', 'name_sk' => 'Platnička AXILO', 'category' => 'NOHY', 'unit' => 'ks' }]
   legs_for = lambda do |floor_height, plinth|
     cfg = cb.normalize('type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0,
                        'floor_height' => floor_height, 'plinth_mode' => plinth)
@@ -723,12 +749,14 @@ NxTest.test('H1a end-to-end: plan skrinky so soklom 150 -> AXILO, sokel 17 -> kl
     hws.expand(items, NxH1a.state, catalog: cat)
   end
   sokel = legs_for.call(150.0, 'front')
-  NxTest.assert_equal('367823', sokel['rows'][0]['code'], 'sokel 150 -> AXILO (D-79 opravene)')
-  NxTest.assert_equal(4, sokel['rows'][0]['quantity'])
+  NxTest.assert_equal(%w[9076 9079], sokel['rows'].map { |r| r['code'] }.sort,
+                      'sokel 150 -> AXILO H150 + platnicka (D-79 opravene, KOV-G1a)')
+  sokel['rows'].each { |r| NxTest.assert_equal(4, r['quantity'], r['code']) }
   nizke = legs_for.call(19.0, 'none')
-  NxTest.assert_equal('82744', nizke['rows'][0]['code'], 'nizke nohy -> klzak 17')
-  medzi = legs_for.call(100.0, 'none')
-  NxTest.assert_equal([], medzi['rows'], 'sokel 100 nema pasmo — ORANGE, nie tichy klzak')
+  NxTest.assert_equal(['272212'], nizke['rows'].map { |r| r['code'] },
+                      'nizke nohy -> klzak 17 (a ziadna platnicka)')
+  medzi = legs_for.call(40.0, 'none')
+  NxTest.assert_equal([], medzi['rows'], 'sokel 40 nema pasmo — ORANGE, nie tichy klzak')
   NxTest.assert_equal('param_band_missing', medzi['unmapped'][0]['reason'])
 end
 
@@ -736,7 +764,7 @@ end
 
 NxTest.test('H1a: nakupne CSV nemapovanych funguje aj s novymi dovodmi') do
   hws = NxH1a::HWS
-  exp = hws.expand([NxH1a.leg_item(100.0)], NxH1a.state, catalog: [])
+  exp = hws.expand([NxH1a.leg_item(40.0)], NxH1a.state, catalog: [])
   csv = hws.purchase_csv(exp, project: 'H1a', generated_at: '2026-08-03')
   NxTest.assert(csv.include?('NEMAPOVANÉ'), 'nemapovana sekcia')
   NxTest.assert(csv.include?('"leg"'), 'typ kovania v riadku')
