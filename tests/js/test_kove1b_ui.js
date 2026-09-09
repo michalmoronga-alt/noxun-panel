@@ -203,4 +203,50 @@ show([liftRule()]);
 DOC.querySelector('.rrule .ren').checked = false;
 eq(R.rdCollectRules()[0].enabled, false, 'L2: pravidlo sa dá vypnúť aj bez editora');
 
+// ============ L3 (Codex #333 kolo 1 P2): klientska VALIDÁCIA výklopu ========
+//
+// Sekcia ukladá VŠETKY pravidlá naraz, takže pokazené výklopové pravidlo
+// (starší/cudzí snapshot) musí zastaviť klient — inak ho pustí a server
+// zamietne, pričom read-only tabuľku tu niet ako opraviť. Kritériá sú tie
+// isté ako serverové `HardwareRules.lift_problem`; spoločný kontrakt je
+// `tests/fixtures/rules_validation_parity.json` (beží v test_st3b_rules).
+ok(R.rdValidate([liftRule({ classes: [] })]) !== null, 'L3: prázdne triedy HK klient odmietne');
+ok(R.rdValidate([liftRule({ mechanisms: [] })]) !== null, 'L3: prázdne mechanizmy HL');
+ok(R.rdValidate([liftRule({ arms: [] })]) !== null, 'L3: prázdne ramená HL');
+ok(R.rdValidate([liftRule({ classes: [{ code: '22K2300', min: 1610, max: 420 }] })]) !== null,
+   'L3: obrátený rozsah triedy');
+ok(R.rdValidate([liftRule({
+  arms: [{ code: '22L3200', kh_min: 300, kh_max: 340, kg_min: 1.5, kg_max: 9 },
+         { code: '22L3500', kh_min: 360, kh_max: 390, kg_min: 1.75, kg_max: 10 }]
+})]) !== null, 'L3: MEDZERA medzi pásmami ramien (výška 340–360 by nedostala nič)');
+ok(R.rdValidate([liftRule({ handle_allowance_kg: -0.5 })]) !== null,
+   'L3: záporná rezerva na úchytku by vybrala slabší mechanizmus');
+ok(R.rdValidate([liftRule({ arms: [{ code: '', kh_min: 300, kh_max: 340, kg_min: 1.5, kg_max: 9 }] })]) !== null,
+   'L3: riadok bez kódu server zahodí — klient ho tiež nesmie počítať');
+eq(R.rdValidate([liftRule({ enabled: false, classes: [], arms: [], mechanisms: [] })]), null,
+   'L3: pokazené pravidlo sa DÁ VYPNÚŤ (vypnuté sa nekontroluje)');
+const lmsg = R.rdValidate([liftRule({ classes: [] })]);
+ok(/Výklop/.test(lmsg), 'L3: hláška menuje pravidlo: ' + lmsg);
+
+// ============ L4 (Codex #333 kolo 1 P2): karta čela už NEKLAME ==============
+//
+// Text „mechanizmus sa pridáva ručne — automatika príde s KOV-E" bol pravdivý
+// do E1a. Od aktivácie pravidiel by viedol k ručnej položke NAVYŠE, teda
+// k dvojitej objednávke.
+function infoText(type){
+  return C.frontCardModel({ type: type }, { wings: 1, slots: [] }).rows
+    .filter(function(r){ return r.kind === 'info'; })
+    .map(function(r){ return r.text; }).join(' | ');
+}
+const liftTxt = infoText('lift');
+const fallTxt = infoText('fall');
+ok(liftTxt.indexOf('KOV-E') < 0 && liftTxt.indexOf('ručne') < 0,
+   'L4: výklop už netvrdí, že sa mechanizmus pridáva ručne: ' + liftTxt);
+ok(liftTxt.indexOf('automat') >= 0 && liftTxt.indexOf('hmotnosti') >= 0,
+   'L4: povie, podľa čoho automat vyberá: ' + liftTxt);
+ok(fallTxt.indexOf('závesy') >= 0 && fallTxt.indexOf('KOV-E') < 0,
+   'L4: sklop dostane závesy ako dvierka: ' + fallTxt);
+ok(liftTxt.split(' | ').length === 1 && fallTxt.split(' | ').length === 1,
+   'L4: jeden riadok (vertikálny priestor panela je vzácny)');
+
 console.log('KOV-E1b klientska cast: ' + n + ' assertov OK');

@@ -696,6 +696,61 @@
   // Klientska kontrola pred odoslanim — CISTA funkcia (Node test). Vracia
   // hlasku, alebo null ked je formular v poriadku. Server validuje znova;
   // toto je len to, co sa da povedat BEZ neho.
+  // === KOV-E1b (Codex #333 kolo 1 P2): PARITA VALIDÁCIE VÝKLOPOV ===========
+  //
+  // Zrkadlo serverovej `HardwareRules.lift_problem`. Kritériá sú definované
+  // nad tvarom PO normalizácii, preto sa riadky najprv PREFILTRUJÚ rovnako
+  // ako v `HardwareRules.lift_row?` (riadok bez kódu alebo s nečíselným
+  // rozsahom server ZAHODÍ, takže ho nesmieme počítať ani tu).
+  // Spoločný kontrakt = `tests/fixtures/rules_validation_parity.json`.
+  function rdLiftNum(v){ return (typeof v === 'number' && isFinite(v)) ? v : null; }
+  function rdLiftRows(raw, keys){
+    return rdArr(raw).filter(function(row){
+      if (!row || String(row.code == null ? '' : row.code).trim() === '') return false;
+      return keys.every(function(k){ return rdLiftNum(row[k]) !== null; });
+    });
+  }
+  function rdLiftProblem(r){
+    var name = 'Pravidlo „' + rdLabel(r.output) + '“';
+    var classes = rdLiftRows(r.classes, ['min', 'max']);
+    var mechs   = rdLiftRows(r.mechanisms, ['max']);
+    var arms    = rdLiftRows(r.arms, ['kh_min', 'kh_max', 'kg_min', 'kg_max']);
+    if (!classes.length) return name + ': tabuľka tried HK top je prázdna — doplň aspoň jednu triedu.';
+    if (!mechs.length) return name + ': tabuľka mechanizmov HL top je prázdna — doplň aspoň jeden.';
+    if (!arms.length) return name + ': tabuľka ramien HL top je prázdna — doplň aspoň jedny.';
+    for (var i = 0; i < classes.length; i++){
+      if (classes[i].min > classes[i].max){
+        return name + ': trieda ' + classes[i].code + ' má LF od väčšie než do.';
+      }
+    }
+    for (var j = 0; j < arms.length; j++){
+      if (arms[j].kh_min > arms[j].kh_max || arms[j].kg_min > arms[j].kg_max){
+        return name + ': ramená ' + arms[j].code + ' majú od väčšie než do.';
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(r, 'handle_allowance_kg')
+        && (rdLiftNum(r.handle_allowance_kg) || 0) < 0){
+      return name + ': rezerva na úchytku nesmie byť záporná.';
+    }
+    return rdLiftGapProblem(name, arms);
+  }
+  // DIERA medzi pásmami ramien: ďalšie pásmo sa musí začínať najneskôr tam,
+  // kde predošlé končí — výška v diere by nedostala žiadne ramená.
+  function rdLiftGapProblem(name, arms){
+    var sorted = arms.slice().sort(function(a, b){ return a.kh_min - b.kh_min; });
+    var reach = null;
+    for (var i = 0; i < sorted.length; i++){
+      if (reach !== null && sorted[i].kh_min > reach){
+        return name + ': medzi pásmami ramien je medzera pri výške ' + reach
+             + ' mm — výklop tej výšky by nedostal žiadne ramená.';
+      }
+      var top = sorted[i].kh_max;
+      if (reach === null || top > reach) reach = top;
+    }
+    return null;
+  }
+  if (typeof window !== 'undefined') window.rdLiftProblem = rdLiftProblem;
+
   function rdValidate(rules){
     for (var i = 0; i < (rules || []).length; i++){
       var r = rules[i];
@@ -718,6 +773,14 @@
       }
       if (r.kind === 'fit_series' && r.enabled !== false && !rdArr(r.series).length){
         return 'Pravidlo „' + rdLabel(r.output) + '“ potrebuje aspoň jednu dĺžku v rade.';
+      }
+      // KOV-E1b (Codex #333 kolo 1 P2): výklopové pravidlo sa tu zatiaľ
+      // needituje, ale ULOŽIŤ sa dá (sekcia ukladá VŠETKY pravidlá naraz) —
+      // a server pokazené tabuľky odmieta. Bez tejto vetvy by klient uloženie
+      // pustil, server ho zamietol a používateľ by nemal kde chybu opraviť.
+      if (r.kind === 'lift_class' && r.enabled !== false){
+        var lmsg = rdLiftProblem(r);
+        if (lmsg) return lmsg;
       }
     }
     return null;

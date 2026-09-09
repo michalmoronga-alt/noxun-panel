@@ -364,9 +364,17 @@
     if (type === 'door'){
       rows.push({ kind: 'hint', text: 'Set závesov podľa otvárania príde s KOV-F.' });
     }
-    if (type === 'lift' || type === 'fall'){
+    // KOV-E1b (Codex #333 kolo 1 P2): od aktivácie pravidiel dostane výklop
+    // mechanizmus a sklop závesy AUTOMATICKY. Pôvodný text („pridáva sa
+    // ručne") by po tejto dávke klamal a viedol k ručnej položke navyše —
+    // teda k dvojitej objednávke.
+    if (type === 'lift'){
       rows.push({ kind: 'info', tone: 'muted',
-                  text: 'Mechanizmus (AVENTOS a spol.) sa zatiaľ pridáva ručne — automatika príde s KOV-E.' });
+                  text: 'Mechanizmus vyberá automat podľa hmotnosti a rozmerov čela — detail v Kovaní.' });
+    }
+    if (type === 'fall'){
+      rows.push({ kind: 'info', tone: 'muted',
+                  text: 'Sklop dostane závesy ako dvierka podľa tabuľky.' });
     }
     return { type: type, known: known, tiles: tiles, rows: rows };
   }
