@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 # Testy prekladu detailu nekompatibilneho setu — `HardwareSets.incompatible_detail_sk`
-# nad JEDINOU tabulkou `INCOMPATIBLE_DETAIL_SK` (fix v0.9.56).
+# nad JEDINOU tabulkou `INCOMPATIBLE_DETAIL_SK` (fix v0.9.56) a mena odmietnuteho
+# pevneho setu vo vete `height_selector` (fix v0.9.57).
 #
 # Pozadie: metoda mala v module DVE definicie (KOV-C2a tabulka + inline hash
 # z KOV-D1a). Ruby ticho pouzije druhu, takze tabulka bola mrtvy kod a
@@ -23,12 +24,20 @@
 #   R5 uplnost: kazdy `'detail' => <string|KONSTANTA>` v hardware_sets.rb (cez
 #      AST — komentare a uvodzovky nehraju rolu) ma vetu a tabulka nema kluc,
 #      ktory core nevydava
+#   R6 (v0.9.57) veta pri `height_selector` MENUJE odmietnuty pevny set: resolver
+#      ho vracia v `info['set_id']` (prvy prvok ostava nil — set NIE JE ucinny,
+#      kontrakt `[nil, 'set_incompatible']` sa nemeni), `unmapped_entry` ho
+#      preberá LEN pri nil `sid` a LEN ako neprazdny String; Nakup, panel aj
+#      Kontrola ho ukazuju; zaznamy bez `set_id` v info sa nemenia (golden
+#      fixtury a testy C2a/D1a ostavaju platne)
 #
 # MUTACIE (kazda overena rucne — po zaneseni chyby spadne uvedeny test):
 #   M1 vratenie druhej (inline) definicie bez `height_selector` -> R1 (zdrojovy
 #      guard) + R4 + AST guard v test_guards.rb
 #   M2 fallback zmeneny na „nesedí klasifikácia setu" -> R3
 #   M3 novy `{ 'detail' => 'novy_kluc' }` v core bez vety -> R5
+#   M4 resolver prestane posielat `set_id` v info ALEBO `unmapped_entry` ho
+#      prestane preberat -> R6 + R4 (veta bez mena setu)
 require_relative '../helper' unless defined?(NxTest)
 
 module NxIncompatDetail
@@ -200,6 +209,16 @@ NxTest.test('incompatible_detail_sk (R4): pevny set_id pre Atiru = veta o vyske 
   # predlozka musia zniet rovnako („so zásuvkou", nie „s zásuvkou").
   NxTest.assert(nakup.include?('nesedí so zásuvkou'), "Nakup: #{nakup}")
   NxTest.assert(msg.include?('nesedí so zásuvkou'), "Kontrola: #{msg}")
+  # R6 (v0.9.57): veta MENUJE odmietnuty pevny set — dovtedy znela
+  # „set „“ nesedí so zásuvkou (…)", lebo resolver vracal set_id nil a
+  # `unmapped_entry` ho z info nepreberal. Vsetky TRI miesta, ziadne „„“".
+  panel = ex['problems'].map(&:to_s)
+  NxTest.assert_equal('atira-biela-h70-sisy', u['set_id'], 'zaznam nesie odmietnuty pevny set')
+  { 'Nakup' => [nakup], 'Kontrola' => [msg], 'panel' => panel }.each do |kde, texts|
+    NxTest.assert(texts.any? { |t| t.include?('set „atira-biela-h70-sisy“ nesedí so zásuvkou') },
+                  "#{kde} nemenuje set: #{texts.inspect}")
+    NxTest.refute(texts.any? { |t| t.include?('„“') }, "#{kde}: prazdne meno setu: #{texts.inspect}")
+  end
 end
 
 NxTest.test('incompatible_detail_sk (R4): vyklop ma v Nakupe vlastny podmet („nesedí s výklopom")') do
@@ -225,4 +244,42 @@ NxTest.test('incompatible_detail_sk (R5): uplnost — kazdy detail zo zdrojaku m
   extra = tbl.keys - keys
   NxTest.assert_equal([], extra, "veta pre kluc, ktory core nevydava: #{extra.inspect}")
   NxTest.assert_equal(c::EMITTED.sort, tbl.keys.sort, 'nezavisly zapis zoznamu detailov sedi s tabulkou')
+end
+
+NxTest.test('incompatible_detail_sk (R6): odmietnuty pevny set cestuje v info, kontrakt resolvera ostava [nil, set_incompatible]') do
+  c = NxIncompatDetail
+  item = c.drawer_item
+  fixed = { 'class:slide|classic|metal' => 'atira-biela-h70-sisy' }
+  # Obe urovne (projektove mapovanie aj override skrinky) — vsade rovnako.
+  { 'projekt' => [{}, fixed], 'override skrinky' => [{ 'CAB-1' => fixed }, {}] }.each do |kde, (ov, mapping)|
+    sid, reason, info = c::HWS.resolve_set_id('slide', item, ov, mapping)
+    NxTest.assert_equal([nil, 'set_incompatible'], [sid, reason], "#{kde}: set NIE JE ucinny — prvy prvok ostava nil")
+    NxTest.assert_equal({ 'detail' => 'height_selector', 'set_id' => 'atira-biela-h70-sisy' }, info, kde)
+    e = c::HWS.expand([item], c.state_of([c.seed_set('atira-biela-h70-sisy')], mapping),
+                      cabinet_overrides: ov)['unmapped'].first
+    NxTest.assert_equal(['drawer_kit_missing', 'atira-biela-h70-sisy'], [e['reason'], e['set_id']], kde)
+    NxTest.assert(c::HWS.unmapped_reason_sk(e).start_with?('set „atira-biela-h70-sisy“'), kde)
+  end
+  # `unmapped_entry` preberá `set_id` z info LEN pri nil `sid` a LEN ako
+  # neprazdny String — ucinny set ma vzdy prednost, smeti sa nepreberaju.
+  base = { 'detail' => 'height_selector' }
+  e = c::HWS.send(:unmapped_entry, item, nil, 'set_incompatible', base.merge('set_id' => 'atira-biela-h70-sisy'))
+  NxTest.assert_equal('atira-biela-h70-sisy', e['set_id'])
+  e2 = c::HWS.send(:unmapped_entry, item, 'ucinny', 'nl_missing', { 'set_id' => 'iny' })
+  NxTest.assert_equal('ucinny', e2['set_id'], 'ucinny set ma prednost pred info')
+  [nil, '', '  ', 42, { 'x' => 1 }, ['a']].each do |bad|
+    e3 = c::HWS.send(:unmapped_entry, item, nil, 'set_incompatible', base.merge('set_id' => bad))
+    NxTest.assert_equal(nil, e3['set_id'], "neplatna hodnota #{bad.inspect} sa nepreberá")
+  end
+  NxTest.assert_equal(nil, c::HWS.send(:unmapped_entry, item, nil, 'set_incompatible', base)['set_id'],
+                      'info bez set_id = zaznam bez mena (doterajsi tvar)')
+  # Ostatne dovody bez ucinneho setu ostavaju BEZ mena — nic ine sa nemeni.
+  u = c::HWS.expand([item], c.state_of([c.seed_set('atira-biela-h70-sisy')], {}))['unmapped'].first
+  NxTest.assert_equal(['class_unmapped', nil], [u['base_reason'], u['set_id']])
+  # Selektor podla INEHO parametra jeden set nema — meno nenesie, dovod ostava.
+  sel = { 'class:slide|classic|metal' => { 'param' => 'front_height',
+                                          'bands' => [{ 'min' => 0.0, 'max' => 999.0,
+                                                        'set_id' => 'atira-biela-h70-sisy' }] } }
+  NxTest.assert_equal([nil, 'set_incompatible', { 'detail' => 'height_selector' }],
+                      c::HWS.resolve_set_id('slide', item, {}, sel))
 end

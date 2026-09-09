@@ -3976,8 +3976,15 @@ module Noxun
         # prerasteni zasuvky H70 -> H176 by override skrinky ticho objednal
         # H70 kit k dielcom H176 (Astra #19 B1). Vyber MUSI byt selektor podla
         # vysky, a to na KAZDEJ urovni (override skrinky aj projekt).
+        # Odmietnuty PEVNY set cestuje v `info['set_id']` — prvy prvok ostava
+        # nil (set NIE JE ucinny, nic sa z neho neobjedna), ale veta Nakupu,
+        # panela aj Kontroly ho ma MENOVAT; bez toho znela „set „“ nesedí so
+        # zásuvkou" (priznany zvysok fixu #335). Selektor podla ineho
+        # parametra jeden set nema, preto meno nenesie.
         if ck && !numeric_param(it, HEIGHT_VARIANT_KEY).nil? && !height_selector?(value)
-          return [nil, 'set_incompatible', { 'detail' => 'height_selector' }]
+          info = { 'detail' => 'height_selector' }
+          info['set_id'] = value if value.is_a?(String) && !value.strip.empty?
+          return [nil, 'set_incompatible', info]
         end
         return [value, nil, {}] if value.is_a?(String)
         param = value['param'].to_s
@@ -4844,6 +4851,14 @@ module Noxun
         # predvolieb chyba) — obe cestuju do vety semaforu.
         %w[param value member_index member_label detail class_key].each do |k|
           out[k] = ex[k] if ex.key?(k)
+        end
+        # Resolver set NEVYBRAL (`sid` nil), ale vie, ktory PEVNY set odmietol
+        # (`height_selector`, KOV-C2a/D1a) — veta ho ma menovat, inak znie
+        # „set „“ nesedí so zásuvkou". Preberá sa LEN pri nil `sid` a LEN
+        # neprazdny String: ucinny set ma vzdy prednost, ostatne zaznamy
+        # (info bez `set_id`) sa nemenia.
+        if sid.nil? && ex['set_id'].is_a?(String) && !ex['set_id'].strip.empty?
+          out['set_id'] = ex['set_id']
         end
         # === KOV-C2b: POVYSENIE NA RED `drawer_kit_missing` ==================
         #
