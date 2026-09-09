@@ -804,7 +804,9 @@ NxTest.test('KOV-F1 (9): jediný register brán — závesové kódy sú v ňom,
                       'zásuvkové kódy si držia PORADIE — vety brány sa nesmú prehádzať')
   # Codex #329 kolo 3 P1: za zavesovymi kodmi stoji este PRAVIDLOVY register
   # (stav celeho projektu) — poradie je kontrakt, novy kod ide na KONIEC.
-  NxTest.assert_equal(c::BP::HW_HINGE_BLOCKERS + c::BP::HW_RULES_BLOCKERS,
+  # KOV-E1a: medzi zavesove a pravidlove kody pribudol VYKLOPOVY register.
+  NxTest.assert_equal(c::BP::HW_HINGE_BLOCKERS + c::BP::HW_LIFT_BLOCKERS +
+                      c::BP::HW_RULES_BLOCKERS,
                       reg[c::REC::DRAWER_BLOCKERS.length..])
   reg.each do |code|
     label = c::REC::BLOCKER_LABELS[code] || c::BP::HW_BLOCKER_LABELS[code]
@@ -861,12 +863,15 @@ end
 
 NxTest.test('KOV-F1 (10): trvalý nosič a klasifikované závesy si vyžiadali schému 9') do
   c = NxKovF
-  # PRESNE cislo strazi VZDY najnovsia davka, ktora ho zdvihla (vzor KOV-D1a R3).
-  NxTest.assert_equal(9, c::CB::CONFIG_SCHEMA, 'KOV-F1 zaviedla schému 9')
+  # PRESNE cislo strazi VZDY najnovsia davka, ktora ho zdvihla (vzor KOV-D1a R3)
+  # — KOV-E1a ho zdvihla na 10 (owner triedny kluc vyklopu `…@front:<id>/flap`).
+  NxTest.assert_equal(10, c::CB::CONFIG_SCHEMA, 'KOV-E1a zdvihla schému na 10')
+  NxTest.assert_equal(9, c::CB::HINGE_ACTIVATION_SCHEMA,
+                      'aktivácia závesov ostáva na 9 — bump ju nesmie posunúť')
   NxTest.assert_equal(5, c::CB::DRAWER_ACTIVATION_SCHEMA, 'aktivácia zásuviek sa bumpom nehýbe')
   cfg = c::CB.normalize('width' => 600.0, 'height' => 720.0, 'depth' => 500.0)
   written = c::CB.cabinet_config(cfg)
-  NxTest.assert_equal(9, written[:config_schema], 'marker sa zapisuje pri KAŽDOM zápise configu')
+  NxTest.assert_equal(10, written[:config_schema], 'marker sa zapisuje pri KAŽDOM zápise configu')
   NxTest.assert_equal([], written[:hardware_conflicts],
                       'nosič `hardware_conflicts` je v configu VŽDY — aj prázdny')
 end

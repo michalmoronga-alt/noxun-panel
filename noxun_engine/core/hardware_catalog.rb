@@ -48,7 +48,12 @@ module Noxun
       # (nazov, cena s DPH, MJ, vyrobca, rada, URL + datum overenia) + 54 kodov,
       # ktore pouzivaju seed sety (vratane PTOs modulov 352908/352909 a opravy
       # 357889); 4 kody, ktore Demos uz nepozna, ostavaju ako NEAKTIVNE.
-      SEED_SET_VERSION = 3
+      # v4 (KOV-E1a, 9.9.2026): +23 kodov AVENTOS HK top / HL top (mechanizmy,
+      # krytky, Tip-On jednotky, ramena, stabilizacna tyc, predlzovaci diel)
+      # zo `SYSTEM/zdroje/demos/SEED_AVENTOS_v2_2026-09-09.md`. Patch v3 -> v4
+      # LEN DOPLNA chybajuce kody — existujuce riadky (vratane 347827, 13781
+      # a 250831, ktore uz v katalogu su) sa NEDOTYKA.
+      SEED_SET_VERSION = 4
       FILE = 'hardware_catalog.json'
 
       CATEGORIES = %w[ZAVESY VYSUVY VYKLOPY NOHY UCHYTKY SPOJOVACI_MATERIAL
@@ -1213,6 +1218,104 @@ module Noxun
          'VYKLOPY', 'ks', 18.66, 'lacná alternatíva výklopu',
          nil, nil,
          'https://www.demos-trade.sk/if-plynova-vzpera-k12-pro-horny-vyklop-automaticka-244mm-120n/'],
+        # === KOV-E1a: AVENTOS HK top / HL top (seed v2, 9.9.2026) =============
+        # Zdroj: SYSTEM/zdroje/demos/SEED_AVENTOS_v2_2026-09-09.md (Demos LBX
+        # API, ceny s DPH overene 9.9.2026). LF = vyska korpusu x hmotnost cela
+        # VRATANE dvojnasobnej hmotnosti uchytky; KH = vyska korpusu bez sokla.
+        # 347827 (22K2700T), 13781 (celny prichyt) a 250831 (Tip-On biela) uz
+        # v seede SU a tato davka sa ich NEDOTYKA.
+        ['347810', 'BLUM 22K2300 Aventos HK Top výklop slabý',
+         'VYKLOPY', 'set', 71.45, 'LF 420–1610 · krytky zvlášť',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22k2300-aventos-hk-top-vyklop-slaby/'],
+        ['347811', 'BLUM 22K2500 Aventos HK Top výklop stredný',
+         'VYKLOPY', 'set', 71.45, 'LF 930–2800 · krytky zvlášť',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22k2500-aventos-hk-top-vyklop-stredny/'],
+        ['347812', 'BLUM 22K2700 Aventos HK Top výklop silný',
+         'VYKLOPY', 'set', 71.80, 'LF 1730–5200 · krytky zvlášť',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22k2700-aventos-hk-top-vyklop-silny/'],
+        ['347813', 'BLUM 22K2900 Aventos HK Top výklop najsilnejší',
+         'VYKLOPY', 'set', 84.00, 'LF 3200–9000 · krytky zvlášť',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22k2900-aventos-hk-top-vyklop-najsilnejsi/'],
+        ['347814', 'BLUM 22K2300T Aventos HK Top výklop slabý, Tip-on',
+         'VYKLOPY', 'set', 76.68, 'LF 420–1610 · Tip-On jednotka zvlášť',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22k2300t-aventos-hk-top-vyklop-slaby-tip-on/'],
+        ['347826', 'BLUM 22K2500T Aventos HK Top výklop stredný, Tip-on',
+         'VYKLOPY', 'set', 76.68, 'LF 930–2800 · Tip-On jednotka zvlášť',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22k2500t-aventos-hk-top-vyklop-stredny-tip-on/'],
+        ['347828', 'BLUM 22K2900T Aventos HK Top výklop najsilnejší, Tip-on',
+         'VYKLOPY', 'set', 93.77, 'LF 3200–9000 · Tip-On jednotka zvlášť',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22k2900t-aventos-hk-top-vyklop-najsilnejsi-tip-on/'],
+        ['347834', 'BLUM 22K8000 Aventos HK Top krytky bez S-D, biela',
+         'VYKLOPY', 'set', 11.26, 'predvolená farba setu',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22k8000-aventos-hk-top-krytky-bez-s-d-biela/'],
+        ['347833', 'BLUM 22K8000 Aventos HK Top krytky bez S-D, svetlo šedá',
+         'VYKLOPY', 'set', 10.28, 'set pre ňu nevzniká (Michal 9.9.)',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22k8000-aventos-hk-top-krytky-bez-s-d-svetlo-seda/'],
+        ['347835', 'BLUM 22K8000 Aventos HK Top krytky bez S-D, tmavo šedá',
+         'VYKLOPY', 'set', 11.26, 'tmavý set výklopu HK',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22k8000-aventos-hk-top-krytky-bez-s-d-tmavo-seda/'],
+        ['250833', 'BLUM 956A1004 Tip-on pre závesy, 76mm, magnet, komplet, šedá',
+         'VYKLOPY', 'ks', 6.93, 'šedá — set pre ňu nevzniká (Michal 9.9.)',
+         'Blum', 'TIP-ON',
+         'https://www.demos-trade.sk/blum-956a1004-tip-on-pre-zavesy-76mm-magnet-komplet-seda/'],
+        ['497007', 'BLUM 956A1004 Tip-on pre závesy, 76mm, magnet, sada, čierna CS',
+         'VYKLOPY', 'set', 6.93, 'MJ sada — čierna CS; tmavý set výklopu HK',
+         'Blum', 'TIP-ON',
+         'https://www.demos-trade.sk/blum-956a1004-tip-on-pre-zavesy-76mm-magnet-sada-cierna-cs/'],
+        ['507351', 'BLUM 22L2200 Aventos HL Top výklop slabý, skrutky',
+         'VYKLOPY', 'set', 80.91, 'KH 300–389 · ramená zvlášť',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22l2200-aventos-hl-top-vyklop-slaby-skrutky/'],
+        ['507352', 'BLUM 22L2500 Aventos HL Top výklop silný, skrutky',
+         'VYKLOPY', 'set', 86.81, 'KH 390–580 · ramená zvlášť',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22l2500-aventos-hl-top-vyklop-silny-skrutky/'],
+        ['507355', 'BLUM 22L3200 Aventos HL Top ramená - 300-339mm',
+         'VYKLOPY', 'set', 56.89, 'KH 300–339 · 1,5–9 kg vrát. úchytky',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22l3200-aventos-hl-top-ramena-300-339mm/'],
+        ['507356', 'BLUM 22L3500 Aventos HL Top ramená - 340-389mm',
+         'VYKLOPY', 'set', 58.07, 'KH 340–389 · 1,75–10 kg vrát. úchytky',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22l3500-aventos-hl-top-ramena-340-389mm/'],
+        ['507357', 'BLUM 22L3800 Aventos HL Top ramená - 390-540mm',
+         'VYKLOPY', 'set', 59.84, 'KH 390–540 · 2–12,25 kg vrát. úchytky',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22l3800-aventos-hl-top-ramena-390-540mm/'],
+        ['507358', 'BLUM 22L3900 Aventos HL Top ramená - 480-580mm',
+         'VYKLOPY', 'set', 66.34, 'KH 480–580 · 2,5–14 kg vrát. úchytky',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22l3900-aventos-hl-top-ramena-480-580mm/'],
+        ['507365', 'BLUM 22Q1076U Aventos HL Top stabilizačná tyč (1076 mm)',
+         'VYKLOPY', 'ks', 15.59, 'vždy v sete HL; od šírky korpusu 1100 mm 2 ks',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22q1076u-aventos-hl-top-stabilizacna-tyc/'],
+        ['507366', 'BLUM 22Q080Z Aventos HL Top predlžovací diel stabilizačnej tyče',
+         'VYKLOPY', 'ks', 14.19, 'k druhej tyči od šírky korpusu 1100 mm',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22q080z-aventos-hl-top-predlzovaci-diel-stabilizacnej-tyce/'],
+        ['507343', 'BLUM 22.8000 Aventos HF/HL/HS Top krytky bez S-D, biela',
+         'VYKLOPY', 'set', 12.73, 'predvolená farba setu',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22-8000-aventos-hf-hl-hs-top-krytky-bez-s-d-biela/'],
+        ['507344', 'BLUM 22.8000 Aventos HF/HL/HS Top krytky bez S-D, svetlo šedá',
+         'VYKLOPY', 'set', 11.66, 'set pre ňu nevzniká (Michal 9.9.)',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22-8000-aventos-hf-hl-hs-top-krytky-bez-s-d-svetlo-seda/'],
+        ['507345', 'BLUM 22.8000 Aventos HF/HL/HS Top krytky bez S-D, tmavo šedá',
+         'VYKLOPY', 'set', 12.73, 'tmavý set výklopu HL',
+         'Blum', 'AVENTOS',
+         'https://www.demos-trade.sk/blum-22-8000-aventos-hf-hl-hs-top-krytky-bez-s-d-tmavo-seda/'],
         ['82744', 'STRONG Klzák s rektifikáciou, výška 17 mm čierna',
          'NOHY', 'ks', 0.48, 'najpoužívanejšia „noha"',
          'Strong', nil,
@@ -1507,9 +1610,24 @@ module Noxun
       # ma cenu AJ demos_url — rovnaka podmienka ako v proposal flow (F5).
       SEED_PRICE_CHECKED_AT = '2026-09-07T00:00:00Z'
 
+      # KOV-E1a: AVENTOS riadky maju VLASTNY datum overenia (zber 9.9.2026).
+      # Spolocny stamp by starsim 60 riadkom prepisal 7.9. na 9.9. — datum
+      # overenia patri KONKRETNEJ vazbe, takze by to bola nepravda.
+      SEED_PRICE_CHECKED_AT_V4 = '2026-09-09T00:00:00Z'
+
       # Kody, ktore Demos 7.9.2026 uz nepozna. Riadok OSTAVA (stare zakazky ho
       # maju v nakupe), len sa zalozí ako neaktivny + poznamka s dovodom.
       SEED_INACTIVE = %w[250834 35000 197611 461804].freeze
+
+      # KOV-E1a: 23 NOVYCH kodov AVENTOS (seed v2, 9.9.2026). Zoznam je zaroven
+      # `SEED_PATCH_V4_ADD` (doplnenie do existujuceho katalogu) aj mnozina,
+      # ktorej riadky nesu `SEED_PRICE_CHECKED_AT_V4`.
+      SEED_AVENTOS_V4 = %w[
+        347810 347811 347812 347813 347814 347826 347828
+        347833 347834 347835 250833 497007
+        507351 507352 507355 507356 507357 507358
+        507365 507366 507343 507344 507345
+      ].freeze
 
       SEED_ITEMS = SEED_ROWS.map do |code, name, category, unit, price, note, man, series, url|
         item = { 'item_code' => code, 'name_sk' => name, 'category' => category,
@@ -1520,7 +1638,10 @@ module Noxun
         item['series'] = series unless series.nil?
         item['demos_url'] = url unless url.nil?
         # Datum overenia patri VAZBE: bez URL alebo bez ceny sa nezapisuje.
-        item['price_checked_at'] = SEED_PRICE_CHECKED_AT if url && !price.nil?
+        if url && !price.nil?
+          item['price_checked_at'] =
+            SEED_AVENTOS_V4.include?(code) ? SEED_PRICE_CHECKED_AT_V4 : SEED_PRICE_CHECKED_AT
+        end
         item['active'] = false if SEED_INACTIVE.include?(code)
         item
       end.freeze
@@ -1769,6 +1890,7 @@ module Noxun
             end
           end
           changed.concat(apply_seed_patch_v3(items, resolved)) if from < 3
+          changed.concat(apply_seed_patch_v4(items, resolved)) if from < 4
           ok = write_unlocked('items' => items, 'seed_version' => SEED_SET_VERSION)
           if ok && defined?(Engine)
             Engine.log("kovanie katalog: seed patch v#{from} -> v#{SEED_SET_VERSION}#{changed.any? ? " (#{changed.join(', ')})" : ''}")
@@ -1853,6 +1975,33 @@ module Noxun
           Engine.log("kovanie katalog: v3 seed nechal bez zmeny #{kept.length} pouzivatelskych poloziek (#{kept.first(12).join(', ')}#{kept.length > 12 ? ', …' : ''})")
         end
         ["v3 +#{added.length}", "v3 ~#{updated.length}", "v3 =#{kept.length}"]
+      end
+
+      # v3 -> v4 (KOV-E1a): 23 NOVYCH kodov AVENTOS HK top / HL top. Patch je
+      # LEN DOPLNAJUCI — na rozdiel od v3 NEOSVIEZUJE ziadny existujuci riadok:
+      # 347827, 13781 a 250831 v katalogu uz su a ich obsah (vratane rucnych
+      # uprav a kategorie 250831 = ZAVESY) sa NEMENI. Kto si niektory z 23 kodov
+      # medzitym zalozil sam, ostava mu jeho vlastny zaznam.
+      SEED_PATCH_V4_ADD = SEED_AVENTOS_V4
+
+      def apply_seed_patch_v4(items, resolved = seed_items_resolved)
+        add_keys = SEED_PATCH_V4_ADD.map(&:downcase)
+        have = {}
+        items.each { |i| have[i['item_code'].to_s.strip.downcase] = true }
+        added = []
+        resolved.each do |seed|
+          rec, = normalize_item(seed)
+          next unless rec
+
+          key = rec['item_code'].downcase
+          next unless add_keys.include?(key)
+          next if have[key]
+
+          have[key] = true
+          items << rec
+          added << rec['item_code']
+        end
+        ["v4 +#{added.length}"]
       end
 
       def finish_check(callback, result)

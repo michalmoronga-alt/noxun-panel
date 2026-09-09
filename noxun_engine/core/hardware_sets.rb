@@ -137,8 +137,18 @@ module Noxun
       # sentinel naozaj vyskytuje — ostatny obsah ostava na 1–4 a starsie
       # verzie ho citaju dalej.
       STD_SKIP_CODE = 5
+
+      # KOV-E1a: VYKLOPY. Set moze niest TRI veci, ktore starsi plugin NEPOZNA:
+      # clena `code_by_param` (kod podla textoveho parametra polozky — trieda
+      # mechanizmu), clena `quantity_from` (pocet z parametra polozky — pocet
+      # stabilizacnych tyci) a klasifikacne pole `lift_system` (HK top / HL top).
+      # Starsi citac ich odmieta ZATVORENE (`incompatible_member?` / whitelist
+      # `SET_KEYS`), takze kniznica aj snapshot su preň read-only s hlaskou
+      # „aktualizuj plugin" — NIKDY ticho poddimenzovany nakup („tyc 1 ks").
+      # Marker je LAZY podla OBSAHU: obsah bez tychto tvarov ostava na 1–5.
+      STD_LIFT_FORMS = 6
       STD_SUPPORTED   = [STD, STD_PARAM_FORMS, STD_CLASSIFIED, STD_HEIGHT_VARIANT,
-                         STD_SKIP_CODE].freeze
+                         STD_SKIP_CODE, STD_LIFT_FORMS].freeze
 
       # D-118b: VYHRADENA hodnota bunky `code_by_nl` = „tato dlzka vedome NEMA
       # kod, clen sa preskoci". Chybajuci kluc znamena nadalej NEMAPOVANE
@@ -200,7 +210,12 @@ module Noxun
       # v6 (KOV-F1): zavesove sety dostali UPLNU klasifikaciu (`use_type door`,
       # `opening_mode classic|tipon`, Hettich Sensys) + triedne mapovania
       # `class:hinge|classic` / `class:hinge|tipon` v `MAPPING_ADDITIONS`.
-      SEED_VERSION = 6
+      # v7 (KOV-E1a): +6 setov vyklopov AVENTOS (HK klasik / HK Tip-On / HL
+      # klasik, kazdy v bielej a tmavej) + triedne mapovania
+      # `class:lift|classic|hk_top` · `class:lift|tipon|hk_top` ·
+      # `class:lift|classic|hl_top` v `MAPPING_ADDITIONS`. Tmave sety triedny
+      # kluc NEMAJU — vyberaju sa per celo (E2).
+      SEED_VERSION = 7
       FILE         = 'hardware_sets.json'
       MODEL_KEY    = 'hardware_sets' # kluc snapshotu v NOXUN dict na modeli
 
@@ -232,15 +247,47 @@ module Noxun
       # mapovania); `hinge_set_mismatch` = klasifikacia vybraneho setu
       # ODPORUJE polozke (Tip-On celo na klasickom sete) — RED, lebo nakup by
       # bol bez zavesov, a nikdy sa nesiahne po inom sete.
+      # KOV-E1a: `quantity_unresolved` = clen berie POCET z parametra polozky
+      # (`quantity_from`), ale hodnota chyba alebo nie je cele nezaporne cislo.
+      # `lift_set_incomplete` = RED brana UPLNOSTI vyklopu (nizsie).
       UNMAPPED_REASONS = %w[no_set set_missing set_type_mismatch nl_missing
                             param_band_missing selector_unresolved
                             length_unsupported library_incompatible
                             class_unmapped set_incompatible mapping_invalid
                             members_skipped drawer_kit_missing
-                            set_none hinge_set_mismatch].freeze
+                            set_none hinge_set_mismatch
+                            quantity_unresolved lift_set_incomplete
+                            lift_system_missing].freeze
 
       # KOV-F1: RED dovod NESULADU zavesoveho setu (`BuildPlan::HW_HINGE_BLOCKERS`).
       HINGE_SET_MISMATCH = 'hinge_set_mismatch'
+
+      # === KOV-E1a: BRANA UPLNOSTI VYKLOPU ===================================
+      #
+      # Vyklop je ZOSTAVA: mechanizmus + prichyt + krytky (+ Tip-On jednotka,
+      # + ramena a stabilizacna tyc pri HL). Ked set niektoreho clena NEVYRIESI
+      # (chyba kod triedy, chyba hodnota pre `quantity_from`, chyba set alebo
+      # mapovanie), expanzia by ostatne cleny VYDALA — a v nakupe by skoncili
+      # „krytky bez mechanizmu" (Astra BLOCKER 1). Preto sa KAZDY nevyrieseny
+      # dovod polozky `lift` povysuje na RED s `blocks_export` (vzor receptovych
+      # poloziek `drawer_kit_missing`); povodny dovod cestuje v `base_reason`.
+      # Kod je v `BuildPlan::HW_LIFT_BLOCKERS` aj vo `from_expansion`
+      # (`ProductionCore.hardware_blockers`) — nakup, rozpocet a cenova ponuka
+      # stoja, VEPO bezi dalej (geometria je spravna).
+      LIFT_SET_INCOMPLETE = 'lift_set_incomplete'
+      # Dovod nevyrieseneho POCTU (`quantity_from`) — sam o sebe ORANGE, pri
+      # polozke `lift` sa povysuje vyssie uvedenou branou.
+      QUANTITY_UNRESOLVED = 'quantity_unresolved'
+      # KOV-E1a (Codex #332 kolo 3 P1): polozka sa KLASIFIKOVALA ako vyklop
+      # (`params.use_type == 'lift'`), ale triedny kluc z nej NEVZNIKNE —
+      # chyba `lift_system` (alebo `opening_mode`). Taka polozka NESMIE spadnut
+      # na genericke mapovanie `lift`: v prestavanej zakazke, ktora si legacy
+      # `lift` mapovanie opravnene ponechala, by ticho vydala LEGACY set (napr.
+      # HK krytky k HL mechanizmu) a Kontrola by mlcala. Je to teda NEPLATNA
+      # klasifikacia s vlastnym dovodom — a branou uplnosti nizsie aj RED.
+      # (Pozor, ine miesto nez grandfather z kola 2: ten sa tyka SETU bez
+      # systemu pri CITANI kniznice. Obe su fail-closed smerom k exportu.)
+      LIFT_SYSTEM_MISSING = 'lift_system_missing'
 
       # KOV-D1a: kluc MARKERA neplatneho mapovania. Marker je JEDINY tvar, ktory
       # v mape znamena „kluc tu je, ale hodnota sa neda pouzit"; vyraba ho VYHRADNE
@@ -263,8 +310,13 @@ module Noxun
       # set, ktory ma ktorykolvek kluc MIMO tohto zoznamu, uz nie je citatelny
       # starsim pluginom (`snapshot_std` -> 3).
       LEGACY_SET_KEYS  = %w[set_id name generic_type members].freeze
-      MEMBER_KEYS      = %w[per qty label code code_by_nl param_bands].freeze
+      MEMBER_KEYS      = %w[per qty label code code_by_nl param_bands
+                            code_by_param quantity_from].freeze
       PARAM_BANDS_KEYS = %w[param bands].freeze
+      # KOV-E1a: kluce selektora `code_by_param` (kod podla TEXTOVEJ hodnoty
+      # parametra polozky — trieda mechanizmu vyklopu). Zoznam je whitelist
+      # rovnako ako `PARAM_BANDS_KEYS`.
+      CODE_BY_PARAM_KEYS = %w[param codes].freeze
       BAND_KEYS        = %w[min max].freeze # + hodnota (code / set_id)
 
       # === KOV-B1: KLASIFIKACIA SETU ==========================================
@@ -286,6 +338,14 @@ module Noxun
       OPENING_MODES       = %w[classic tipon other].freeze
       DRAWER_CONSTRUCTIONS = %w[metal wood other].freeze
 
+      # KOV-E1a: SYSTEM VYKLOPU — LEN pri `use_type: 'lift'` (rovnaka logika ako
+      # `drawer_construction` pri zasuvke: pri inom type pouzitia je to chyba
+      # zapisu). Slovnik je UZAVRETY: `hk_top` = jednodielne veko nad korpusom,
+      # `hl_top` = zdvih celeho cela dopredu a hore (ramena + stabilizacna tyc).
+      # Sklop (`fall`) system NEMA — vzpery su mimo V1.
+      LIFT_SYSTEM_KEY = 'lift_system'
+      LIFT_SYSTEMS    = %w[hk_top hl_top].freeze
+
       # KANONICKA MAPA typu pouzitia na typ kovania (audit #17 BLOCKER 2).
       # JEDINA autorita vztahu: `generic_type` je pri klasifikovanom sete
       # ODVODENY, nie nezavisly udaj — inak by sa dali ulozit dva protirecive
@@ -306,7 +366,10 @@ module Noxun
                            ['other', 'Ostatné / neuplatňuje sa']],
         'drawer_construction' => [['metal', 'Kovové bočnice'],
                                   ['wood', 'Drevený box / skrytý výsuv'],
-                                  ['other', 'Ostatné / atyp']]
+                                  ['other', 'Ostatné / atyp']],
+        # KOV-E1a: system vyklopu (LEN pri type pouzitia „Výklop").
+        'lift_system' => [['hk_top', 'HK top (veko)'],
+                          ['hl_top', 'HL top (paralelný zdvih)']]
       }.freeze
 
       # Klasifikacne kluce su ALL-OR-NOTHING (audit #17 FIX 6): pri zapise su
@@ -326,8 +389,8 @@ module Noxun
       # system (Antaro, StrongBox) si svoje hodnoty prida v TEJ dávke, ktora ho
       # zavedie; neznama hodnota = obsah novsej verzie, nie nova kategoria.
       DRAWER_HEIGHT_VARIANTS = [70, 144, 176].freeze
-      CLASS_KEYS = %w[use_type opening_mode drawer_construction manufacturer series
-                      height_variant].freeze
+      CLASS_KEYS = %w[use_type opening_mode drawer_construction lift_system
+                      manufacturer series height_variant].freeze
 
       # POZOR: whitelist je KONTRAKT (viz odsek vyssie) — kazde nove pole setu
       # sa musi doplnit SEM, inak vlastny zapis vyrobi read-only stav.
@@ -337,8 +400,8 @@ module Noxun
       # kniznice aj snapshotu). Klasifikacne kluce su pritomne LEN pri
       # klasifikovanom sete, `series` a `active` len ked maju hodnotu.
       SET_KEY_ORDER = %w[set_id name generic_type use_type opening_mode
-                         drawer_construction manufacturer series height_variant
-                         active members].freeze
+                         drawer_construction lift_system manufacturer series
+                         height_variant active members].freeze
 
       # H1b: parametre, podla ktorych sa daju stavat pasma clena (param_bands)
       # a selector mapovania. JEDINA autorita ponuky pre UI — okno Katalog
@@ -582,7 +645,106 @@ module Noxun
           'members' => [{ 'code' => '93240', 'per' => 'unit', 'qty' => 1 }] },
         { 'set_id' => 'podperky-police', 'name' => 'Podperka policová 7/5',
           'generic_type' => 'shelf_pin',
-          'members' => [{ 'code' => '306125', 'per' => 'unit', 'qty' => 1 }] }
+          'members' => [{ 'code' => '306125', 'per' => 'unit', 'qty' => 1 }] },
+        # === KOV-E1a: VYKLOPY AVENTOS (seed v7, 9.9.2026) ====================
+        #
+        # Sest setov = tri triedy (HK klasik · HK Tip-On · HL klasik) x DVE
+        # FARBY. Farba NIE JE klasifikacne pole (Demos ju nesie len v nazve
+        # polozky), takze tmavy set nema triedny kluc — vybera sa PER CELO
+        # (`class:lift|<mode>|<system>@front:<id>/flap` v `config.hardware_sets`).
+        #
+        # PORADIE CLENOV JE ZAVAZNE: mechanizmus je PRVY. Supis clenov aj
+        # nakupny riadok tak zacinaju tym, co vyklop naozaj drzi; krytky
+        # a prichyt su prislusenstvo.
+        #
+        # Mechanizmus a ramena sa vyberaju `code_by_param` (trieda z pravidla
+        # `vyklopy-aventos`, ktore pride v E1b) — chybajuci kluc je VZDY chyba
+        # (vyklop nema „vedome bez kodu", sentinel `none` sa sem NEDEDI).
+        # Stabilizacna tyc a jej predlzovaci diel beru POCET z polozky
+        # (`quantity_from`), a to `per: 'owner'` — tyc je na CELO, nie na kus.
+        { 'set_id' => 'vyklop-hk-klasik', 'name' => 'Výklop HK top — klasik (biela)',
+          'generic_type' => 'lift', 'use_type' => 'lift', 'opening_mode' => 'classic',
+          'lift_system' => 'hk_top', 'manufacturer' => 'Blum', 'series' => 'AVENTOS',
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'mechanizmus HK top',
+              'code_by_param' => { 'param' => 'lift_class',
+                                   'codes' => { '22K2300' => '347810', '22K2500' => '347811',
+                                                '22K2700' => '347812', '22K2900' => '347813' } } },
+            { 'code' => '13781', 'per' => 'unit', 'qty' => 1, 'label' => 'čelný príchyt (pár)' },
+            { 'code' => '347834', 'per' => 'unit', 'qty' => 1, 'label' => 'krytky biele' }
+          ] },
+        { 'set_id' => 'vyklop-hk-klasik-tmavy', 'name' => 'Výklop HK top — klasik (tmavá)',
+          'generic_type' => 'lift', 'use_type' => 'lift', 'opening_mode' => 'classic',
+          'lift_system' => 'hk_top', 'manufacturer' => 'Blum', 'series' => 'AVENTOS',
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'mechanizmus HK top',
+              'code_by_param' => { 'param' => 'lift_class',
+                                   'codes' => { '22K2300' => '347810', '22K2500' => '347811',
+                                                '22K2700' => '347812', '22K2900' => '347813' } } },
+            { 'code' => '13781', 'per' => 'unit', 'qty' => 1, 'label' => 'čelný príchyt (pár)' },
+            { 'code' => '347835', 'per' => 'unit', 'qty' => 1, 'label' => 'krytky tmavo šedé' }
+          ] },
+        { 'set_id' => 'vyklop-hk-tipon', 'name' => 'Výklop HK top — Tip-On (biela)',
+          'generic_type' => 'lift', 'use_type' => 'lift', 'opening_mode' => 'tipon',
+          'lift_system' => 'hk_top', 'manufacturer' => 'Blum', 'series' => 'AVENTOS',
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'mechanizmus HK top Tip-On',
+              'code_by_param' => { 'param' => 'lift_class',
+                                   'codes' => { '22K2300' => '347814', '22K2500' => '347826',
+                                                '22K2700' => '347827', '22K2900' => '347828' } } },
+            { 'code' => '13781', 'per' => 'unit', 'qty' => 1, 'label' => 'čelný príchyt (pár)' },
+            { 'code' => '347834', 'per' => 'unit', 'qty' => 1, 'label' => 'krytky biele' },
+            { 'code' => '250831', 'per' => 'owner', 'qty' => 1, 'label' => 'Tip-On jednotka 76 mm' }
+          ] },
+        { 'set_id' => 'vyklop-hk-tipon-tmavy', 'name' => 'Výklop HK top — Tip-On (tmavá)',
+          'generic_type' => 'lift', 'use_type' => 'lift', 'opening_mode' => 'tipon',
+          'lift_system' => 'hk_top', 'manufacturer' => 'Blum', 'series' => 'AVENTOS',
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'mechanizmus HK top Tip-On',
+              'code_by_param' => { 'param' => 'lift_class',
+                                   'codes' => { '22K2300' => '347814', '22K2500' => '347826',
+                                                '22K2700' => '347827', '22K2900' => '347828' } } },
+            { 'code' => '13781', 'per' => 'unit', 'qty' => 1, 'label' => 'čelný príchyt (pár)' },
+            { 'code' => '347835', 'per' => 'unit', 'qty' => 1, 'label' => 'krytky tmavo šedé' },
+            { 'code' => '497007', 'per' => 'owner', 'qty' => 1,
+              'label' => 'Tip-On jednotka 76 mm čierna' }
+          ] },
+        { 'set_id' => 'vyklop-hl-klasik', 'name' => 'Výklop HL top — klasik (biela)',
+          'generic_type' => 'lift', 'use_type' => 'lift', 'opening_mode' => 'classic',
+          'lift_system' => 'hl_top', 'manufacturer' => 'Blum', 'series' => 'AVENTOS',
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'mechanizmus HL top',
+              'code_by_param' => { 'param' => 'lift_class',
+                                   'codes' => { '22L2200' => '507351', '22L2500' => '507352' } } },
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'ramená HL top',
+              'code_by_param' => { 'param' => 'arm_class',
+                                   'codes' => { '22L3200' => '507355', '22L3500' => '507356',
+                                                '22L3800' => '507357', '22L3900' => '507358' } } },
+            { 'code' => '507365', 'per' => 'owner', 'qty' => 1, 'label' => 'stabilizačná tyč',
+              'quantity_from' => 'rod_count' },
+            { 'code' => '507366', 'per' => 'owner', 'qty' => 1,
+              'label' => 'predlžovací diel tyče', 'quantity_from' => 'rod_extension' },
+            { 'code' => '13781', 'per' => 'unit', 'qty' => 1, 'label' => 'čelný príchyt (pár)' },
+            { 'code' => '507343', 'per' => 'unit', 'qty' => 1, 'label' => 'krytky biele' }
+          ] },
+        { 'set_id' => 'vyklop-hl-klasik-tmavy', 'name' => 'Výklop HL top — klasik (tmavá)',
+          'generic_type' => 'lift', 'use_type' => 'lift', 'opening_mode' => 'classic',
+          'lift_system' => 'hl_top', 'manufacturer' => 'Blum', 'series' => 'AVENTOS',
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'mechanizmus HL top',
+              'code_by_param' => { 'param' => 'lift_class',
+                                   'codes' => { '22L2200' => '507351', '22L2500' => '507352' } } },
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'ramená HL top',
+              'code_by_param' => { 'param' => 'arm_class',
+                                   'codes' => { '22L3200' => '507355', '22L3500' => '507356',
+                                                '22L3800' => '507357', '22L3900' => '507358' } } },
+            { 'code' => '507365', 'per' => 'owner', 'qty' => 1, 'label' => 'stabilizačná tyč',
+              'quantity_from' => 'rod_count' },
+            { 'code' => '507366', 'per' => 'owner', 'qty' => 1,
+              'label' => 'predlžovací diel tyče', 'quantity_from' => 'rod_extension' },
+            { 'code' => '13781', 'per' => 'unit', 'qty' => 1, 'label' => 'čelný príchyt (pár)' },
+            { 'code' => '507345', 'per' => 'unit', 'qty' => 1, 'label' => 'krytky tmavo šedé' }
+          ] }
       ].freeze
 
       # Default mapovanie novych projektov: handle/connector vedome BEZ setu
@@ -778,7 +940,15 @@ module Noxun
         # tlmeny zaves a ziadny piest. Vyskove varianty tu neexistuju, takze
         # PEVNY set_id staci.
         'class:hinge|classic' => 'zaves-klasik',
-        'class:hinge|tipon'   => 'zaves-p2o'
+        'class:hinge|tipon'   => 'zaves-p2o',
+        # KOV-E1a: VYKLOPY. Trieda nesie AJ system (`hk_top` / `hl_top`), takze
+        # HL set sa na HK celo nedostane. Predvolba je vzdy BIELA — tmavy set
+        # (tmavo sede krytky, cierny Tip-On) si pouzivatel vybera VEDOME na
+        # konkretnom cele (E2). `class:lift|tipon|hl_top` v zozname NIE JE:
+        # HL top Tip-On neexistuje a validacia taky kluc odmietne.
+        'class:lift|classic|hk_top' => 'vyklop-hk-klasik',
+        'class:lift|tipon|hk_top'   => 'vyklop-hk-tipon',
+        'class:lift|classic|hl_top' => 'vyklop-hl-klasik'
       }.freeze
 
       # KOV-D1b: TRIEDNE KLUCE, na ktore sa da mapovat v Pravidlach Studia.
@@ -1119,7 +1289,9 @@ module Noxun
         return true unless member.is_a?(Hash)
         m = stringify(member)
         return true unless (m.keys - MEMBER_KEYS).empty?
-        return true if %w[per qty label code].any? { |k| bad_type?(m[k], :scalar) }
+        # KOV-E1a: `quantity_from` je NAZOV parametra (skalar) — pole ci objekt
+        # by citanie ticho zahodilo a clen by sa vratil na pevny pocet.
+        return true if %w[per qty label code quantity_from].any? { |k| bad_type?(m[k], :scalar) }
         # `code_by_nl` a `param_bands` su MAPY. Coko0lvek ine (pole, string,
         # cislo) je tvar novsej verzie — nie „nula poloziek", ale NEZNAMY OBSAH:
         # normalizacia by ho zahodila BEZ STOPY a najblizsi zapis by stratu
@@ -1127,9 +1299,28 @@ module Noxun
         return true if %w[code_by_nl param_bands].any? { |k| bad_type?(m[k], :hash) }
         nl = m['code_by_nl']
         return true if nl.is_a?(Hash) && nl.each_value.any? { |v| !scalar_value?(v) }
+        # KOV-E1a: `code_by_param` je MAPA `{param, codes}` — cokolvek ine je
+        # tvar novsej verzie (rovnaka uvaha ako pri `param_bands`).
+        cbp = m['code_by_param']
+        return incompatible_code_by_param?(cbp) unless cbp.nil?
+
         pb = m['param_bands']
         return incompatible_bands?(pb, 'code') unless pb.nil?
         false
+      end
+
+      # KOV-E1a: whitelist + typy selektora `code_by_param`.
+      def incompatible_code_by_param?(raw)
+        return true unless raw.is_a?(Hash)
+
+        h = stringify(raw)
+        return true unless (h.keys - CODE_BY_PARAM_KEYS).empty?
+        return true if bad_type?(h['param'], :scalar)
+
+        codes = h['codes']
+        return true unless codes.is_a?(Hash)
+
+        codes.each_value.any? { |v| !scalar_value?(v) }
       end
 
       def incompatible_bands?(raw, value_key)
@@ -1190,10 +1381,17 @@ module Noxun
         key.to_s.strip.downcase.start_with?(BuildPlan::HW_SET_CLASS_PREFIX)
       end
 
-      # Owner v triednom kluci je VZDY panel cela — jediny dielec, ku ktoremu
-      # sa zasuvkovy kit viaze. Uzsie nez `PartKeys.valid?` zamerne (fail-closed):
+      # Owner v triednom kluci je VZDY dielec CELA — jediny dielec, ku ktoremu
+      # sa kovanie viaze. Uzsie nez `PartKeys.valid?` zamerne (fail-closed):
       # override na zone/doske/korpuse by resolver nikdy neprecital.
-      CLASS_OWNER_RE = %r{\Afront:[^/@\s]+/panel\z}.freeze
+      # KOV-E1a: pribudol `flap` (vyklop/sklop, `PartKeys.front(id, 'flap')`).
+      CLASS_OWNER_RE = %r{\Afront:[^/@\s]+/(panel|flap)\z}.freeze
+
+      # KOV-E1a: KTORY dielec cela patri KTOREJ triede. Dvojica je ZAVAZNA:
+      # zasuvkovy kit sa viaze na `panel`, vyklop na `flap` — krizom by owner
+      # kluc ukazoval na dielec, ktory ta trieda nikdy nema, a resolver by ho
+      # nikdy neprecital (tichy mrtvy vyber).
+      CLASS_OWNER_PART = { 'slide' => 'panel', 'lift' => 'flap' }.freeze
 
       # -> [kanonicky kluc, nil] | [nil, SK dovod]
       def parse_class_key(key, allow_owner: false)
@@ -1206,14 +1404,16 @@ module Noxun
             return [nil, 'triedny kľúč nemá výber na úrovni dielca — ten je len na skrinke']
           end
           # KOV-F1: per-kridlo triedny vyber je MIMO davky — parser ho odmieta
-          # a UI ho neponuka. Owner triedny kluc ostava vyhradou zasuviek
-          # (`class:slide|…@front:F1/panel`), kde ma svoj resolver aj editor.
-          unless owner_scoped_class_head?(head)
-            return [nil, 'výber na úrovni dielca má zatiaľ len výsuv zásuvky']
+          # a UI ho neponuka. Owner triedny kluc maju LEN triedy z
+          # `CLASS_OWNER_PART`: zasuvka (`class:slide|…@front:F1/panel`)
+          # a KOV-E1a vyklop (`class:lift|…@front:F1/flap`).
+          part = owner_scoped_class_part(head)
+          if part.nil?
+            return [nil, 'výber na úrovni dielca má zatiaľ len výsuv zásuvky a výklop']
           end
           o = owner.to_s.strip
-          unless CLASS_OWNER_RE.match?(o)
-            return [nil, 'výber na úrovni dielca musí ukazovať na panel čela']
+          unless CLASS_OWNER_RE.match?(o) && o.end_with?("/#{part}")
+            return [nil, "výber na úrovni dielca musí ukazovať na #{owner_part_sk(part)}"]
           end
           canon, err = parse_class_head(head)
           return [nil, err] if canon.nil?
@@ -1223,13 +1423,23 @@ module Noxun
         parse_class_head(head)
       end
 
-      # KOV-F1: smie mat TATO trieda vyber na urovni dielca? Dnes LEN vysuv
-      # zasuvky (`slide`) — jedno miesto, aby sa parser a UI nerozisli.
-      def owner_scoped_class_head?(head)
+      # KOV-F1/E1a: smie mat TATO trieda vyber na urovni dielca — a NA KTOROM
+      # dielci? Jedno miesto, aby sa parser a UI nerozisli.
+      # -> 'panel' | 'flap' | nil (trieda owner vyber nema)
+      def owner_scoped_class_part(head)
         canon, = parse_class_head(head)
-        return false if canon.nil?
+        return nil if canon.nil?
 
-        canon[BuildPlan::HW_SET_CLASS_PREFIX.length..].to_s.split('|').first == 'slide'
+        gt = canon[BuildPlan::HW_SET_CLASS_PREFIX.length..].to_s.split('|').first
+        CLASS_OWNER_PART[gt]
+      end
+
+      def owner_scoped_class_head?(head)
+        !owner_scoped_class_part(head).nil?
+      end
+
+      def owner_part_sk(part)
+        part.to_s == 'flap' ? 'výklop čela' : 'panel čela'
       end
 
       # Triedna (bezownerova) cast kluca -> [kanonicky tvar, nil] | [nil, dovod].
@@ -1239,13 +1449,28 @@ module Noxun
           return [nil, 'triedny kľúč musí mať typ kovania a spôsob otvárania']
         end
 
-        gt, om, dc = segs
+        gt, om, third = segs
         return [nil, "neznámy typ kovania „#{gt}“"] unless BuildPlan::GENERIC_TYPES.include?(gt)
         return [nil, "neznámy spôsob otvárania „#{om}“"] unless OPENING_MODES.include?(om)
 
-        if segs.length == 3
+        # KOV-E1a: TRETI SEGMENT ZNAMENA INE PODLA TYPU — pri vysuve je to
+        # konstrukcia zasuvky, pri VYKLOPE system (`hk_top` / `hl_top`). Preto
+        # sa validuje podla typu a nikdy spolocnym slovnikom.
+        if gt == 'lift'
+          return [nil, 'výklop potrebuje aj systém (HK top / HL top)'] if segs.length != 3
+          unless LIFT_SYSTEMS.include?(third)
+            return [nil, "neznámy systém výklopu „#{third}“"]
+          end
+          # HL top Tip-On NEEXISTUJE (Blum ani Demos ho nemaju) — kluc, ktory
+          # ho pomenuva, sa nesmie dat ani ulozit, ani precitat.
+          if third == 'hl_top' && om == 'tipon'
+            return [nil, 'HL top Tip-On neexistuje — HL top má len klasické otváranie']
+          end
+        elsif segs.length == 3
           return [nil, 'konštrukciu zásuvky má len výsuv'] unless gt == 'slide'
-          return [nil, "neznáma konštrukcia zásuvky „#{dc}“"] unless DRAWER_CONSTRUCTIONS.include?(dc)
+          unless DRAWER_CONSTRUCTIONS.include?(third)
+            return [nil, "neznáma konštrukcia zásuvky „#{third}“"]
+          end
         end
         ["#{BuildPlan::HW_SET_CLASS_PREFIX}#{segs.join('|')}", nil]
       end
@@ -1256,18 +1481,40 @@ module Noxun
       # nesmie ostat vecne v configu (vzor `prune_none_front_overrides`).
       # LEGACY composite kluce `typ@owner` sa NEDOTYKAJU (ich zivotny cyklus je
       # sirsi nez cela a menit ho v tejto davke by bola nesuvisiaca zmena).
-      # front_ids nil = kontrola sa NEROBI (cista tvarova normalizacia).
-      def prune_missing_owners(map, front_ids)
-        return map if front_ids.nil? || !map.is_a?(Hash)
+      #
+      # KOV-E1a (Codex #332 kolo 3 P2): nestaci ID cela — rozhoduje, ci celo
+      # DNES naozaj vyraba TEN dielec, na ktory kluc ukazuje. Celo s rovnakym
+      # ID prepnute z vyklopu na dvierka uz `front:F1/flap` nema; kluc by tam
+      # ostal mrtvy a po navrate na vyklop by ticho OZIL so starym setom.
+      # Preto sa odovzdava mapa `{ id cela => dielec, ktory vyraba }`
+      # ('panel' | 'flap' | nil pre dvierka, blendu a „bez čela"); autorita
+      # tvaru je `Fronts.class_owner_part` (odvodena z `Fronts.panels_for`).
+      # front_parts nil = kontrola sa NEROBI (cista tvarova normalizacia).
+      def prune_missing_owners(map, front_parts)
+        return map if front_parts.nil? || !map.is_a?(Hash)
 
-        ids = Array(front_ids).map(&:to_s)
+        parts = front_parts.is_a?(Hash) ? front_parts : {}
         map.reject do |key, _value|
           owner = class_mapping_key?(key) ? class_key_split(key)[1] : nil
           next false if owner.nil?
 
           fid = PartKeys.front_id(owner)
-          drop = fid.nil? || !ids.include?(fid)
-          log_skip("mapovanie „#{key}“: čelo v skrinke už nie je") if drop
+          want = CLASS_OWNER_RE.match(owner.to_s)
+          have = fid.nil? ? nil : parts[fid]
+          # Interna delta P3: `have.nil?` NEZNAMENA „celo neexistuje" — mapa
+          # nesie `nil` aj pre EXISTUJUCE celo, ktore ziadny triedny dielec
+          # nevyraba (dvierka, blenda, „bez čela"). Existenciu preto rozhoduje
+          # PRITOMNOST KLUCA, inak by log pri prepnuti vyklopu na dvierka
+          # tvrdil, ze celo v skrinke uz nie je.
+          known = !fid.nil? && parts.key?(fid)
+          drop = fid.nil? || want.nil? || have.to_s != want[1]
+          if drop
+            log_skip(if known
+                       "mapovanie „#{key}“: čelo už taký dielec nevyrába"
+                     else
+                       "mapovanie „#{key}“: čelo v skrinke už nie je"
+                     end)
+          end
           drop
         end
       end
@@ -1347,9 +1594,14 @@ module Noxun
       # su tu JEDINA autorita ich obsahu (SEED_MAPPING drzi len legacy kluce podla
       # generickeho typu) — inak by sa fresh install a upgrade rozisli a nova
       # instalacia by zasuvky nemapovala, kym stara ano.
+      # KOV-E1a (Codex #332 kolo 4 P1): aj CERSTVA instalacia ide cez TU ISTU
+      # branu (`add_mapping_seed` -> `mapping_seed_value_ok?`), nie cez holy
+      # `merge`. Nad nasim vlastnym seedom je vysledok rovnaky (guard test to
+      # strazi), ale druha, volnejsia cesta k predvolbam uz neexistuje — buduci
+      # kluc bez zodpovedajuceho setu by inak prisiel LEN fresh instalaciam.
       def seed_library
-        { 'sets' => deep_copy(SEED_SETS),
-          'mapping' => SEED_MAPPING.merge(deep_copy(MAPPING_ADDITIONS)) }
+        sets = deep_copy(SEED_SETS)
+        { 'sets' => sets, 'mapping' => add_mapping_seed(normalize_sets(sets), SEED_MAPPING) }
       end
 
       # CISTE citanie + seed-merge BEZ zapisu -> [kniznica, changed].
@@ -1453,19 +1705,74 @@ module Noxun
       #      ktora prepis robi, ale len nad nedotknutym seed stavom),
       #   2) kluc sa doplni LEN ked su VSETKY sety, na ktore hodnota ukazuje,
       #      v kniznici (ciastocny selektor by ticho menil, co sa vyberie —
-      #      ta ista uvaha ako v `global_default_state`).
+      #      ta ista uvaha ako v `global_default_state`) A ZODPOVEDAJU TRIEDE
+      #      (Codex #332 kolo 1 P1, viz `mapping_seed_ref_ok?`).
+      # Podmienka 2 je od kola 4 ZDIELANA (`mapping_seed_value_ok?`) so VSETKYMI
+      # ostatnymi cestami, ktore predvolbu instaluju — kniznica, snapshot
+      # noveho projektu (`global_default_state`) aj „Doplniť nové predvoľby"
+      # (`merge_project_sets_seed!`). Jedna brana, jedno pravidlo.
       def add_mapping_seed(sets, mapping)
         by_id = {}
-        sets.each { |s| by_id[s['set_id']] = true }
+        sets.each { |s| by_id[s['set_id']] = s }
         out = mapping.dup
         MAPPING_ADDITIONS.each do |key, value|
           next if out.key?(key)
-          refs = value_set_ids(value)
-          next if refs.empty? || refs.any? { |sid| !by_id[sid] }
+          next unless mapping_seed_value_ok?(key, value, by_id)
+
           out[key] = deep_copy(value)
           Engine.log("hardware sets: doplnene mapovanie '#{key}'") if defined?(Engine)
         end
         out
+      end
+
+      # KOV-E1a (Codex #332 kolo 4 P1): JEDNA BRANA pre KAZDU cestu, ktora
+      # instaluje PREDVOLENE mapovanie (globalna kniznica, snapshot noveho
+      # projektu, „Doplniť nové predvoľby"). `defs` je LOOKUP DO CIELOVEHO
+      # DOKUMENTU — teda definicie, ktore v nom po zapise naozaj BUDU, nie tie,
+      # z ktorych hodnotu kopirujeme. Rozdiel je vecny: snapshot si vlastnu
+      # definiciu s rovnakym `set_id` PONECHA, takze kontrola nad kniznicou by
+      # branu obisla a projekt by dostal predvolbu na CUDZI set.
+      # -> true = kluc sa smie doplnit
+      def mapping_seed_value_ok?(key, value, defs)
+        refs = value_set_ids(value)
+        return false if refs.empty? # ciastocny/prazdny selektor sa nedoplna
+
+        refs.all? { |sid| mapping_seed_ref_ok?(defs[sid], key) }
+      end
+
+      # KOV-E1a (Codex #332 kolo 1 P1): ZODPOVEDA definicia v kniznici triede,
+      # ktorej predvolbu chceme doplnit?
+      #
+      # Samotna PRITOMNOST `set_id` nestaci. Kniznica mohla mat set s tym istym
+      # ID uz predtym (napr. vlastny, NEZARADENY „vyklop-hk-klasik") — `merge_seed`
+      # ho spravne nechal tak, ale default by sme mu aj tak nasadili a expanzia by
+      # z neho vydala LUBOVOLNE kody BEZ brany uplnosti (`lift_incompatible_info`
+      # nezaradene sety pripusta). Preto sa referencia overuje TOU ISTOU autoritou,
+      # akou sa set ponuka v Pravidlach (`class_set_match?`): typ pouzitia, sposob
+      # otvarania a treti segment (system vyklopu / konstrukcia zasuvky).
+      # Naviac musia byt clenovia CITATELNI (`incompatible_member?`) — na set,
+      # ktoremu tato verzia nerozumie, sa default ukazovat nesmie.
+      # Nesediaca definicia = kluc sa NEDOPLNI a polozka skonci `class_unmapped`
+      # (brana + veta „Doplniť nové predvoľby"), nikdy tichy zly nakup.
+      #
+      # PRIZNAK `active` sa TU IGNORUJE (`ignore_active: true`) — invariant
+      # KOV-B3 hovori, ze neaktivnost meni VYHRADNE ponuky NOVEHO vyberu.
+      # Keby o instalacii predvolby rozhodovala, deaktivovanie setu v kniznici
+      # by bola SLEPA ULICKA: kluc by v nej ostal, novy projekt ani „Doplniť
+      # nové predvoľby" by ho uz nedostali a kazdy taky vyklop by skoncil RED
+      # `lift_set_incomplete` bez cesty von. Rozhoduje teda LEN klasifikacia
+      # (typ pouzitia + otvaranie + treti segment) a citatelnost clenov.
+      def mapping_seed_ref_ok?(set, key)
+        return false unless set.is_a?(Hash)
+        return true unless class_mapping_key?(key) # legacy kluc typu — len pritomnost
+
+        canon, = parse_class_head(key)
+        return false if canon.nil?
+
+        gt, om, third = canon[BuildPlan::HW_SET_CLASS_PREFIX.length..].to_s.split('|')
+        return false unless class_set_match?(set, gt, om, third, ignore_active: true)
+
+        Array(set['members']).none? { |m| incompatible_member?(m) }
       end
 
       # Prepis defaultu LEN pri nedotknutom seed stave (vzor F8/LEGACY_SEED_SHAPES):
@@ -1666,6 +1973,15 @@ module Noxun
               msg = 'typ kovania existujúceho setu sa nemení — vytvor nový set'
               next [:invalid, msg, [set_err('generic_type', msg)]]
             end
+            # KOV-E1a: set NOVSIEHO TVARU (`code_by_param` / `quantity_from`)
+            # sa v editore este upravovat neda (editor pride v E2), takze
+            # server ZMENU CLENOV ODMIETNE. HTML `disabled` nie je ochrana —
+            # keby JS clena „zabudol", ulozil by sa set bez mechanizmu.
+            # Nazov, aktivnost a klasifikacia sa menit smu.
+            if new_shape_members?(sets[idx]) && norm['members'] != sets[idx]['members']
+              msg = 'členov tohto setu zatiaľ meniť nemožno — je novšieho tvaru (výklopy)'
+              next [:invalid, msg, [set_err('members', msg)]]
+            end
             sets[idx] = norm
           else
             sets << norm
@@ -1676,6 +1992,18 @@ module Noxun
       rescue StandardError => e
         Engine.log_error(e, 'HardwareSets.save_set!') if defined?(Engine)
         [:write_failed, nil]
+      end
+
+      # KOV-E1a: ma set clena NOVSIEHO TVARU? Odpoved potrebuje zapisova brana
+      # (`save_set!`) aj payload editora (read-only badge v `hw_sets.js`) —
+      # jedna otazka, jedna odpoved.
+      def new_shape_members?(set)
+        return false unless set.is_a?(Hash)
+
+        Array(set['members']).any? do |m|
+          m.is_a?(Hash) && (m['code_by_param'].is_a?(Hash) ||
+                            !m['quantity_from'].to_s.strip.empty?)
+        end
       end
 
       def invalid_set(errors)
@@ -1871,7 +2199,10 @@ module Noxun
         segs = canon[BuildPlan::HW_SET_CLASS_PREFIX.length..].to_s.split('|')
         gt = segs[0].to_s
         om = segs[1].to_s
-        dc = segs[2]
+        # TRETI segment: konstrukcia zasuvky (`slide`) alebo system vyklopu
+        # (`lift`, KOV-E1a) — vyznam urcuje typ, nikdy spolocny slovnik.
+        third = segs[2]
+        dc = gt == 'lift' ? nil : third
         selector = height_selector?(value)
         mapping_commitments(value).each do |commitment|
           sid = commitment.last
@@ -1887,6 +2218,16 @@ module Noxun
             next if set['use_type'].to_s.strip == 'door'
 
             return "set „#{set['name']}“ nie je set na dvierka"
+          end
+          # KOV-E1a: VYKLOP — trieda pomenuva aj SYSTEM. System zasuviek ani
+          # vyskovy variant sa jej netykaju, takze vetva konci TU.
+          if gt == 'lift'
+            unless set['use_type'].to_s.strip == 'lift'
+              return "set „#{set['name']}“ nie je set na výklopy"
+            end
+            next if set[LIFT_SYSTEM_KEY].to_s.strip == third.to_s
+
+            return "set „#{set['name']}“ má iný systém výklopu, než pomenúva kľúč"
           end
           if dc && set['drawer_construction'].to_s.strip != dc
             return "set „#{set['name']}“ má inú konštrukciu zásuvky, než pomenúva kľúč"
@@ -2001,6 +2342,14 @@ module Noxun
 
           return unmapped_reason_sk(u.merge('reason' => base))
         end
+        # KOV-E1a: to iste pri vyklope — RED `lift_set_incomplete` je len INE
+        # ZAVAZNOSTNE ZARADENIE toho isteho zistenia.
+        if reason == LIFT_SET_INCOMPLETE
+          base = u['base_reason'].to_s
+          return 'výklop nemá celú zostavu kovania' if base.empty?
+
+          return unmapped_reason_sk(u.merge('reason' => base))
+        end
         case reason
         when 'nl_missing'
           # GH #132 P2: NL sa NEZAOKRUHLUJE — frakcna dlzka (419,6) je vedome
@@ -2038,12 +2387,35 @@ module Noxun
           'knižnica setov kovania sa nedá bezpečne prečítať a projekt vlastné ' \
             'predvoľby ešte nemá — nemapuje sa nič'
         when 'class_unmapped'
-          # KOV-C2a: zasuvka NIKDY nepada na generický `slide` — H70 kit
-          # k zásuvke H176 by bol zlý nákup, a mlčky.
-          'zásuvka nemá predvolený set pre svoje otváranie a konštrukciu — ' \
-            'Pravidlá → Doplniť nové predvoľby'
+          # KOV-E1a: TEN ISTY dovod ma DVA zdroje — chybajuce triedne mapovanie
+          # (resolver, nesie `class_key`) a chybajuci KOD TRIEDY v clene setu
+          # (`code_by_param`, nesie `param`). Rozlisuje ich pritomnost `param`;
+          # jedna spolocna veta by pri jednom z nich klamala.
+          if u.key?('param')
+            v = u['value'].to_s
+            who = member_txt(u)
+            v.empty? ? "trieda „#{u['param']}“ nie je známa — set „#{sid}“ nemá čo vybrať#{who}" \
+                     : "set „#{sid}“ nemá kód pre triedu #{v}#{who}"
+          elsif class_unmapped_lift?(u)
+            # KOV-E1a (Codex #332 kolo 1 P2): projekt, ktoremu chyba NOVY kluc
+            # `class:lift|…`, nie je „zasuvka bez predvolby" — veta by menovala
+            # cudzi typ kovania a poslala hladat konstrukciu zasuvky.
+            'výklop nemá predvolený set pre svoje otváranie a systém — ' \
+              'Pravidlá → Doplniť nové predvoľby'
+          else
+            # KOV-C2a: zasuvka NIKDY nepada na generický `slide` — H70 kit
+            # k zásuvke H176 by bol zlý nákup, a mlčky.
+            'zásuvka nemá predvolený set pre svoje otváranie a konštrukciu — ' \
+              'Pravidlá → Doplniť nové predvoľby'
+          end
+        when QUANTITY_UNRESOLVED
+          # KOV-E1a: pocet clena ide z parametra polozky (pocet stabilizacnych
+          # tyci) a ten chyba alebo nie je cele nezaporne cislo.
+          "set „#{sid}“ nevie určiť počet#{member_txt(u)} — chýba údaj „#{u['param']}“"
         when 'set_incompatible'
-          "set „#{sid}“ nesedí so zásuvkou (#{incompatible_detail_sk(u['detail'])})"
+          # KOV-E1a: rovnaka veta, iny podmet — vyklop nie je zasuvka.
+          what = u['generic_type'].to_s == 'lift' ? 'výklopom' : 'zásuvkou'
+          "set „#{sid}“ nesedí s #{what} (#{incompatible_detail_sk(u['detail'])})"
         when 'mapping_invalid'
           # KOV-D1a: vyber NA TEJTO SKRINKE je poskodeny. NIKDY sa nepouzije
           # predvolba projektu — pouzivatel tu nieco vedome vybral.
@@ -2052,7 +2424,14 @@ module Noxun
           # D-118b: set sa NASIEL a sedel, len pre tuto dlzku nema ani jednu
           # polozku (vsetky bunky su `none`). Bez vlastnej vety by riadok
           # Nakupu aj CSV tvrdili „typ nemá priradený set", co je zavadzajuce.
-          "set „#{sid}“ nemá pre túto dĺžku ani jednu položku — doplň rad setu"
+          # KOV-E1a (Codex #332 kolo 2 P2): pri VYKLOPE nejde o dlzku, ale
+          # o pocty — vsetci clenovia setu vysli na nulu.
+          if u['generic_type'].to_s == 'lift'
+            "set „#{sid}“ nevydal pre tento výklop ani jednu položku — " \
+              'skontroluj počty a kódy v sete'
+          else
+            "set „#{sid}“ nemá pre túto dĺžku ani jednu položku — doplň rad setu"
+          end
         when 'set_none'
           # KOV-F1: VEDOMA volba „bez setu" (sentinel mapovania). Nie je to
           # chyba nastavenia, ale rozhodnutie — a nakup to musi priznat, inak
@@ -2061,9 +2440,36 @@ module Noxun
         when HINGE_SET_MISMATCH
           "set „#{sid}“ nesedí s čelom (#{incompatible_detail_sk(u['detail'])}) — " \
             'vyber správny set alebo Pravidlá → Doplniť nové predvoľby'
+        when LIFT_SYSTEM_MISSING
+          # KOV-E1a (Codex #332 kolo 3 P1): polozka je vyklop, ale triedny kluc
+          # z nej nevznikol — set sa preto vybrat NEDA a ziadny sa ani nehada.
+          # Dovody su DVA (`class_key_for`: chyba `opening_mode` ALEBO
+          # `lift_system`) a veta menuje oba — hlaska „nemá určený systém" by
+          # pri chybajucom otvarani posielala opravovat spravne pole.
+          'výklop nemá určený spôsob otvárania alebo systém (HK top / HL top) — ' \
+            'bez nich sa set vybrať nedá'
         else
           'typ nemá priradený set'
         end
+      end
+
+      # KOV-E1a (Codex #332 kolo 1 P2): je zaznam `class_unmapped` RESOLVER-LEVEL
+      # (chyba TRIEDNE MAPOVANIE) a patri VYKLOPU?
+      #
+      # Dva zdroje toho isteho dovodu maju ROZNU napravu: resolver-level znamena
+      # „doplň predvoľbu" (zaznam nesie `class_key`, NEMA ani `param`, ani
+      # `set_id`), member-level znamena „doplň kód do setu" (`code_by_param` —
+      # nesie `param` aj `set_id`). Bez tohto rozlisenia by veta pri chybajucej
+      # predvolbe menovala prazdny set („set „“ nemá kód") alebo cudzi typ
+      # kovania. JEDNA autorita pre Nakup aj pre vetu Kontroly.
+      def class_unmapped_lift?(u)
+        return false unless u.is_a?(Hash)
+        return false if u.key?('param') || !u['set_id'].to_s.strip.empty?
+
+        ck = u['class_key'].to_s.strip.downcase
+        return true if ck.start_with?("#{BuildPlan::HW_SET_CLASS_PREFIX}lift|")
+
+        ck.empty? && u['generic_type'].to_s == 'lift'
       end
 
       # KOV-C2a: CO presne na sete nesedi — jedna veta pre semafor aj pre panel.
@@ -2077,7 +2483,17 @@ module Noxun
         'drawer_construction' => 'iná konštrukcia zásuvky',
         'system' => 'iný systém výsuvu',
         'height_variant' => 'iná výška zásuvky',
-        'height_selector' => 'výber setu nie je podľa výšky zásuvky'
+        'height_selector' => 'výber setu nie je podľa výšky zásuvky',
+        # KOV-E1a: `use_type` je pri vyklope INA veta nez pri dvierkach, preto
+        # ma VLASTNY kluc detailu (jeden kluc s dvoma vyznammi by klamal).
+        'use_type_lift' => 'set nie je na výklopy',
+        'lift_system' => 'iný systém výklopu (HK top vs. HL top)',
+        # KOV-E1a (Codex #332 kolo 3 P1): nie „iný systém", ale ŽIADNY.
+        # Triedny kľúč výklopu nevznikne z DVOCH dôvodov (`class_key_for`) —
+        # chýba spôsob otvárania ALEBO systém; veta menuje oba, inak by
+        # posielala opravovať pole, ktoré je v poriadku.
+        'lift_system_missing' =>
+          'výklop nemá určený spôsob otvárania alebo systém (HK top / HL top)'
       }.freeze
 
       def incompatible_detail_sk(detail)
@@ -2211,6 +2627,11 @@ module Noxun
           # H70 kit. Preto ma VLASTNU vrstvu.
           next true if !src[HEIGHT_VARIANT_KEY].to_s.strip.empty? &&
                        !norm.key?(HEIGHT_VARIANT_KEY)
+          # KOV-E1a: `lift_system` ma VLASTNU vrstvu z toho isteho dovodu —
+          # bez neho by HL set vyzeral ako HK a k HL celu by prisiel HK
+          # mechanizmus bez ramien.
+          next true if !src[LIFT_SYSTEM_KEY].to_s.strip.empty? &&
+                       !norm.key?(LIFT_SYSTEM_KEY)
 
           src['active'] == false && norm['active'] != false
         end
@@ -2271,6 +2692,13 @@ module Noxun
           # nezmrazi vobec (ciastocny selector by mlcky menil vyber).
           refs = value_set_ids(value)
           next if refs.empty? || refs.any? { |sid| by_id[sid].nil? }
+          # KOV-E1a (Codex #332 kolo 4 P1): TA ISTA brana ako pri kniznici a pri
+          # „Doplniť nové predvoľby" — do snapshotu sa zmrazi len predvolba,
+          # ktorej definicia (tu je zdroj aj ciel ta ista kniznica) triede
+          # naozaj zodpoveda. Rucne upraveny alebo cudzi subor tak novemu
+          # projektu nepodstrci triedny kluc na nezaradeny set.
+          next unless mapping_seed_value_ok?(gt, value, by_id)
+
           mapping[gt] = deep_copy(value)
           refs.each { |sid| sets[sid] = by_id[sid] }
         end
@@ -2412,6 +2840,11 @@ module Noxun
       # obsah ostava na svojom povodnom std (1/2) — spatna citatelnost sa
       # zbytocne neblokuje.
       def snapshot_std(mapping, sets)
+        # KOV-E1a: NAJVYSSI marker vyhrava, preto su tvary vyklopov UPLNE PRVE.
+        # Podmienka je uzka zamerne — std 6 dostane LEN obsah, ktory naozaj
+        # nesie `code_by_param`, `quantity_from` alebo `lift_system`.
+        return STD_LIFT_FORMS if lift_forms_present?(sets)
+
         # D-118b: NAJVYSSI marker vyhrava, preto sa sentinel testuje UPLNE PRVY.
         # Bez neho by starsi plugin obsah prijal a z „none" spravil nakupny
         # riadok s neexistujucim kodom.
@@ -2455,6 +2888,22 @@ module Noxun
 
       def skip_code?(value)
         value.to_s.strip.downcase == SKIP_CODE
+      end
+
+      # KOV-E1a: nesie OBSAH tvar, ktoremu starsi plugin NEROZUMIE (clen
+      # `code_by_param` / `quantity_from` alebo klasifikacne pole
+      # `lift_system`)? Jedno miesto pre marker kniznice, snapshotu aj branu
+      # sablon — rovnako ako `skip_code_present?`.
+      def lift_forms_present?(sets)
+        Array(sets).any? do |s|
+          next false unless s.is_a?(Hash)
+          next true unless s[LIFT_SYSTEM_KEY].to_s.strip.empty?
+
+          Array(s['members']).any? do |m|
+            m.is_a?(Hash) && (m['code_by_param'].is_a?(Hash) ||
+                              !m['quantity_from'].to_s.strip.empty?)
+          end
+        end
       end
 
       # KOV-F1: je hodnota mapovania SENTINEL „vedome bez setu"? Jedina
@@ -2738,12 +3187,23 @@ module Noxun
       #   * ZAVES (`hinge`) ziadny system nema — triedu urcuje typ pouzitia
       #     (dvierka) a sposob otvarania. Poziadavka „vydany system zasuviek"
       #     by zavesove sety vyhodila z ponuky UPLNE.
-      def class_set_match?(set, gt, om, dc)
-        return false unless set.is_a?(Hash) && set['active'] != false
+      #
+      # `ignore_active: true` = pytame sa LEN na KLASIFIKACIU, nie na ponuku.
+      # Pouziva to seed brana predvolieb (`mapping_seed_ref_ok?`): neaktivnost
+      # podla invariantu KOV-B3 meni VYHRADNE ponuky noveho vyberu, o tom, ci
+      # sa predvolene TRIEDNE mapovanie nainstaluje, rozhodovat NESMIE.
+      def class_set_match?(set, gt, om, dc, ignore_active: false)
+        return false unless set.is_a?(Hash)
+        return false unless ignore_active || set['active'] != false
         return false unless set['opening_mode'].to_s.strip == om.to_s
 
         if gt.to_s == 'hinge'
           set['use_type'].to_s.strip == 'door'
+        elsif gt.to_s == 'lift'
+          # KOV-E1a: vyklop — typ pouzitia A system. Vyrobcovy „vydany system"
+          # (poziadavka zasuviek) sa ho netyka.
+          set['use_type'].to_s.strip == 'lift' &&
+            set[LIFT_SYSTEM_KEY].to_s.strip == dc.to_s
         else
           (dc.nil? || set['drawer_construction'].to_s.strip == dc) && !set_system(set).nil?
         end
@@ -2780,7 +3240,11 @@ module Noxun
         segs = class_key_without_owner(canon)[BuildPlan::HW_SET_CLASS_PREFIX.length..]
                .to_s.split('|')
         parts = [HardwareRules.label_for(segs[0]), class_label('opening_mode', segs[1])]
-        parts << class_label('drawer_construction', segs[2]) if segs[2]
+        # KOV-E1a: treti segment je pri vyklope SYSTEM, inde konstrukcia zasuvky.
+        if segs[2]
+          parts << class_label(segs[0] == 'lift' ? LIFT_SYSTEM_KEY : 'drawer_construction',
+                               segs[2])
+        end
         parts.join(' · ')
       end
 
@@ -3085,7 +3549,17 @@ module Noxun
           'generic_type' => 'set je iného typu kovania', # KOV-F1 (Codex #329)
           'drawer_construction' => 'iná konštrukcia zásuvky',
           'system' => 'iný systém zásuviek',
-          HEIGHT_VARIANT_KEY => 'iná výška zásuvky'
+          HEIGHT_VARIANT_KEY => 'iná výška zásuvky',
+          # KOV-E1a: vyklop ma vlastny kluc pre `use_type` — veta „set nie je
+          # na dvierka" by pri nom klamala.
+          'use_type_lift' => 'set nie je na výklopy',
+          LIFT_SYSTEM_KEY => 'iný systém výklopu (HK top vs. HL top)',
+          # KOV-E1a (interná delta P3): detail patrí do TEJTO, účinnej mapy —
+          # v prvej (mŕtvej) definícii by ho nikto neprečítal a veta by znela
+          # „iná klasifikácia". Menuje OBA dôvody, pre ktoré triedny kľúč
+          # výklopu nevznikne (chýba otváranie ALEBO systém).
+          LIFT_SYSTEM_MISSING =>
+            'výklop nemá určený spôsob otvárania alebo systém (HK top / HL top)'
         }[detail.to_s] || 'iná klasifikácia'
       end
 
@@ -3128,6 +3602,24 @@ module Noxun
           end
           refs = value_set_ids(value)
           next if refs.empty? || refs.any? { |sid| by_id[sid].nil? }
+          # KOV-E1a (Codex #332 kolo 4 P1): predikat sa vyhodnocuje nad
+          # definiciou, ktora bude UCINNA V SNAPSHOTE. Snapshot si vlastnu
+          # definiciu s rovnakym `set_id` PONECHA (`next if state['sets']
+          # .key?(sid)` nizsie), takze kontrola nad kniznicou by branu obisla:
+          # projekt s vlastnym NEZARADENYM „vyklop-hk-klasik" by dostal triedny
+          # kluc a expanzia by z neho vydala LUBOVOLNE kody BEZ brany uplnosti.
+          # Nesediaca definicia = kluc sa NEDOPLNI a polozka skonci
+          # `class_unmapped` (ORANGE/RED podla existujucej cesty).
+          effective = {}
+          refs.each { |sid| effective[sid] = state['sets'][sid] || by_id[sid] }
+          unless mapping_seed_value_ok?(gt, value, effective)
+            if defined?(Engine)
+              Engine.log("hardware sets: predvolba '#{gt}' sa NEDOPLNILA — " \
+                         'definicia v projekte nezodpoveda triede')
+            end
+            next
+          end
+
           state['mapping'][gt] = deep_copy(value)
           added_map << gt
           refs.each do |sid|
@@ -3468,6 +3960,14 @@ module Noxun
       # -> [set_id|nil, reason|nil, info Hash]
       def resolve_set_id(generic_type, it, cabinet_overrides, mapping)
         ck = class_key_for(it, generic_type)
+        # KOV-E1a (Codex #332 kolo 3 P1): KLASIFIKOVANY vyklop bez triedneho
+        # kluca je NEPLATNA klasifikacia, nie legacy polozka. Zastavuje sa TU,
+        # PRED mapovanim — inak by `resolve_mapping_value` (aj
+        # `set_incompatible_info`) videli `nil` triedny kluc a pustili ju na
+        # genericky `lift`, teda na set, o ktorom nikto nedokaze, ze k systemu
+        # cela patri. Legacy vyklop (bez `params.use_type`) sa tym NEMENI.
+        return [nil, LIFT_SYSTEM_MISSING, {}] if ck.nil? && lift_item?(it)
+
         value = resolve_mapping_value(generic_type, it, cabinet_overrides, mapping)
         # KOV-C2a: klasifikovana polozka BEZ triedneho mapovania nie je „typ bez
         # setu" — je to konkretny chybajuci riadok predvolieb a hlaska musi
@@ -3526,6 +4026,18 @@ module Noxun
           return canon
         end
 
+        # KOV-E1a: VYKLOP je klasifikovany TROJSEGMENTOVO, ale treti segment je
+        # SYSTEM (`hk_top` / `hl_top`), nie konstrukcia zasuvky. Polozku pozna
+        # `use_type: 'lift'` v `params`; bez systemu triedny kluc NEVZNIKNE
+        # (fail-closed — nedopisuje sa „nejaky" system).
+        if params['use_type'].to_s.strip == 'lift'
+          ls = params[LIFT_SYSTEM_KEY].to_s.strip
+          return nil if ls.empty?
+
+          canon, = parse_class_key("#{BuildPlan::HW_SET_CLASS_PREFIX}#{generic_type}|#{om}|#{ls}")
+          return canon
+        end
+
         dc = params['drawer_construction'].to_s.strip
         return nil if dc.empty?
 
@@ -3539,6 +4051,12 @@ module Noxun
       def door_item?(it)
         params = it.is_a?(Hash) && it['params'].is_a?(Hash) ? it['params'] : {}
         params['use_type'].to_s.strip == 'door'
+      end
+
+      # KOV-E1a: je to polozka VYKLOPU? (klasifikovana `use_type: 'lift'`)
+      def lift_item?(it)
+        params = it.is_a?(Hash) && it['params'].is_a?(Hash) ? it['params'] : {}
+        params['use_type'].to_s.strip == 'lift'
       end
 
       # Je hodnota mapovania VYSKOVY selektor? (pasma podla `height_variant`)
@@ -3662,9 +4180,25 @@ module Noxun
       # -> nil (sedi / netyka sa) | info Hash s dovodom
       def set_incompatible_info(it, set)
         ck = class_key_for(it, it['generic_type'].to_s)
-        return nil if ck.nil? || !set.is_a?(Hash)
+        return nil unless set.is_a?(Hash)
+        # KOV-E1a (Codex #332 kolo 3 P1): klasifikovany vyklop BEZ triedneho
+        # kluca (chyba `opening_mode` alebo `lift_system`) sa NESMIE tvarit ako
+        # legacy polozka, ku ktorej „sedi hocico".
+        #
+        # POZOR (interna delta P3): DNES sa sem taka polozka NEDOSTANE ani
+        # z jedneho z troch volani — `expand` aj `explain` zastavia skor
+        # (`resolve_set_id` vrati `lift_system_missing` este PRED mapovanim)
+        # a `band_set_problem` bezi vyhradne nad EXISTUJUCIM triednym klucom.
+        # Vetva teda NIE JE „ta ista odpoved na zapisovej ceste", ale
+        # FAIL-CLOSED POISTKA pre buduce volanie: nechava sa preto, lebo
+        # tichy `nil` („set sedi") by tu bol horsi nez zbytocny riadok.
+        if ck.nil? && lift_item?(it)
+          return { 'detail' => LIFT_SYSTEM_MISSING, 'reason' => LIFT_SYSTEM_MISSING }
+        end
+        return nil if ck.nil?
 
         return hinge_incompatible_info(it, set) if door_item?(it)
+        return lift_incompatible_info(it, set) if lift_item?(it)
 
         params = it['params'].is_a?(Hash) ? it['params'] : {}
         %w[opening_mode drawer_construction].each do |k|
@@ -3711,6 +4245,29 @@ module Noxun
         { 'detail' => 'opening_mode', 'reason' => HINGE_SET_MISMATCH }
       end
 
+      # === KOV-E1a: KOMPATIBILITA SETU VYKLOPU ===============================
+      #
+      # Rovnaka filozofia ako pri zavese, len o segment sirsia: set musi byt na
+      # VYKLOPY, so ZHODNYM otvaranim a ZHODNYM systemom — HL set na HK cele by
+      # objednal ramena a stabilizacnu tyc k mechanizmu, ktory ich nema.
+      # Vlastny RED kod netreba: KAZDY nevyrieseny dovod polozky `lift` uz
+      # povysuje `unmapped_entry` na `lift_set_incomplete` (`blocks_export`),
+      # takze detail nesulad cestuje v `detail`/`base_reason`.
+      # NEKLASIFIKOVANY (legacy) set sa NEPOSUDZUJE — nema podla coho.
+      def lift_incompatible_info(it, set)
+        return nil unless classified?(set)
+
+        params = it['params'].is_a?(Hash) ? it['params'] : {}
+        return { 'detail' => 'use_type_lift' } if set['use_type'].to_s.strip != 'lift'
+
+        if set['opening_mode'].to_s.strip != params['opening_mode'].to_s.strip
+          return { 'detail' => 'opening_mode' }
+        end
+        return nil if set[LIFT_SYSTEM_KEY].to_s.strip == params[LIFT_SYSTEM_KEY].to_s.strip
+
+        { 'detail' => LIFT_SYSTEM_KEY }
+      end
+
       # Zhoda mena vyrobcu/rady — case-insensitive a bez diakritiky (`Materials.slug`
       # je jedina translit autorita v repe, rovnako ako v `HardwareTaxonomy.same_name?`).
       def same_name?(a, b)
@@ -3725,6 +4282,54 @@ module Noxun
         v = params[param]
         return nil unless v.is_a?(Numeric) && v.to_f.finite?
         v.to_f
+      end
+
+      # KOV-E1a: TEXTOVA hodnota parametra polozky (trieda mechanizmu). nil =
+      # parameter chyba alebo je prazdny; `true`/`false`, pole a objekt NIE SU
+      # trieda (tvar novsej verzie sa nikdy nepretypuje na kluc).
+      def text_param(it, param)
+        params = it.is_a?(Hash) && it['params'].is_a?(Hash) ? it['params'] : {}
+        v = params[param.to_s]
+        return nil unless v.is_a?(String) || v.is_a?(Numeric)
+
+        s = v.to_s.strip
+        s.empty? ? nil : s
+      end
+
+      # === KOV-E1a: POCET CLENA (`quantity_from`) =============================
+      #
+      # Clen bez `quantity_from` ma pocet `qty` (dnesny stav). S nim sa `qty`
+      # NASOBI celym cislom z parametra polozky:
+      #   * hodnota 0  -> clen sa VEDOME NEVYDA (rozhodnutie PRED `add_row`,
+      #     ziadny nakupny riadok s poctom 0 — HL pod sirkou 1100 mm proste
+      #     nema riadok predlzovacieho dielu),
+      #   * chybajuca / necela / zaporna hodnota -> NEVYRIESENY clen
+      #     (`quantity_unresolved`); pri vyklope to branou znamena RED.
+      # -> [pocet|nil, miss|nil]; pocet nil = clen sa nevydava
+      def member_multiplier(member, it)
+        param = member['quantity_from'].to_s.strip
+        return [1, nil] if param.empty?
+
+        raw = it.is_a?(Hash) && it['params'].is_a?(Hash) ? it['params'][param] : nil
+        n = quantity_value(raw)
+        miss = { 'reason' => QUANTITY_UNRESOLVED, 'param' => param, 'value' => raw }
+        return [nil, miss] if n.nil?
+        return [nil, nil] if n.zero?
+
+        [n, nil]
+      end
+
+      # Cele NEZAPORNE cislo z hodnoty parametra (Integer, Float bez desatinnej
+      # casti, cislo v stringu). Cokolvek ine = nil (nevyrieseny pocet).
+      def quantity_value(raw)
+        n = case raw
+            when Integer then raw
+            when Float   then (raw % 1).zero? ? raw.to_i : nil
+            when String  then (raw.strip.match?(/\A-?\d+\z/) ? raw.strip.to_i : nil)
+            end
+        return nil if n.nil? || n.negative?
+
+        n
       end
 
       # R-06 (brana 1d): polozka sa REZE NA DLZKU — nesie kladnu dlzku rezu
@@ -3745,9 +4350,27 @@ module Noxun
         sid = set['set_id']
         emitted = false
         Array(set['members']).each_with_index do |m, idx|
+          # KOV-E1a: pocet z parametra polozky. Rozhoduje sa PRVY a PRED
+          # `add_row`: nula = riadok VOBEC nevznikne (`finalize` riadky s poctom
+          # 0 nezahadzuje), nevyriesena hodnota = zaznam s dovodom.
+          # PORADIE JE KONTRAKT (Codex #332 kolo 1 P2): clen, ktory sa VEDOME
+          # NEVYDA, svoj kod rozlisit NEMUSI — inak by predlzovaci diel
+          # s poctom 0 hlasil chybajucu triedu (RED `lift_set_incomplete`)
+          # pri zakazke, kde ziadny taky diel nepatri.
+          mult, qmiss = member_multiplier(m, it)
+          if qmiss
+            emitted = true # ORANGE/RED zaznam UZ vznikol — mlcanie nehrozi
+            unmapped << unmapped_entry(it, sid, qmiss['reason'], qmiss.merge(
+                                                                  'member_index' => idx,
+                                                                  'member_label' => m['label']
+                                                                ))
+            next
+          end
+          next if mult.nil?
+
           code, miss = member_code(m, it)
           if miss
-            emitted = true # ORANGE/RED zaznam UZ vznikol — mlcanie nehrozi
+            emitted = true
             unmapped << unmapped_entry(it, sid, miss['reason'], miss.merge(
                                                                   'member_index' => idx,
                                                                   'member_label' => m['label']
@@ -3755,7 +4378,8 @@ module Noxun
             next
           end
           next if code.nil?
-          m_qty = m['qty'].to_i
+
+          m_qty = m['qty'].to_i * mult
           # audit B3: clen `per: 'owner'` ide 1x na (korpus, vlastnik, set, kod)
           # — druhe pravidlo s rovnakym vlastnikom TipOn nezdvoji.
           key = m['per'] == 'owner' ? [it['owner_id'].to_s, it['owner_part_key'].to_s,
@@ -3768,6 +4392,14 @@ module Noxun
             # so zdielanym `cabinet_id`, ale ROZNYM `owner_part_key`: tie sa
             # nezlievaju (kluc sa nezhoduje) a ich mnozstva su spravne.
             prev['per_owner'] = true
+            # KOV-E1a (Codex #332 kolo 4 P2): dedup ZNAMENA VYDANE. Clena uz
+            # vydalo PRVE pravidlo na tom istom vlastnikovi — set teda nie je
+            # „prazdny". Bez tohto riadku by set zlozeny LEN z `per: 'owner'`
+            # clenov (napr. HL tyc + predlzenie) skoncil pri DRUHOM pravidle
+            # na fallbacku `members_skipped` -> RED `lift_set_incomplete`
+            # a zastavil export nad KOMPLETNOU zostavou. Fallback ostava
+            # vyhradne pre sety, ktore naozaj nevydali nic.
+            emitted = true
             next
           end
           src = add_row(rows, code, key ? m_qty : qty * m_qty, it, sid, lookup)
@@ -3782,7 +4414,16 @@ module Noxun
         # (`unmapped_entry` dovod vzapati povysi na RED `drawer_kit_missing`
         # s `blocks_export`). Polozky Z PRAVIDIEL sa spravaju ako doteraz:
         # prazdny pevny kod je legitimny sposob, ako clena vypnut.
-        return unless it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE
+        #
+        # KOV-E1a (Codex #332 kolo 2 P2): VYKLOP ma tu istu vahu ako receptova
+        # zasuvka. Nula je platne vynechanie JEDNEHO clena (HL pod 1100 mm nema
+        # predlzenie tyce), ale ked set nevyda ANI JEDEN riadok, je to vyklop
+        # BEZ KOVANIA — a bez tohto zaznamu by expanzia vratila 0 riadkov aj
+        # 0 nemapovanych, takze nakup, rozpocet aj ponuka by presli mlcky.
+        # `unmapped_entry` dovod vzapati povysi na RED `lift_set_incomplete`
+        # (`base_reason` = `members_skipped`, `blocks_export`).
+        return unless it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE ||
+                      it['generic_type'].to_s == 'lift'
 
         unmapped << unmapped_entry(it, sid, 'members_skipped',
                                    'detail' => 'set nevydal žiadnu položku')
@@ -3819,6 +4460,19 @@ module Noxun
           end
           return [nil, miss] if band.nil? || band['code'].to_s.strip.empty?
           [band['code'].to_s.strip, nil]
+        elsif member['code_by_param'].is_a?(Hash)
+          # KOV-E1a: kod podla TEXTOVEJ triedy polozky (mechanizmus/ramena
+          # vyklopu). PRESNA zhoda kluca — chybajuca alebo neznama trieda je
+          # NEVYRIESENY clen (`class_unmapped`), NIKDY najblizsi kod.
+          param = member['code_by_param']['param'].to_s
+          v = text_param(it, param)
+          miss = { 'reason' => 'class_unmapped', 'param' => param, 'value' => v }
+          return [nil, miss] if v.nil?
+
+          code = member['code_by_param']['codes'][v]
+          return [nil, miss] if code.nil? || code.to_s.strip.empty?
+
+          [code.to_s.strip, nil]
         else
           c = member['code'].to_s.strip
           [c.empty? ? nil : c, nil]
@@ -4028,7 +4682,21 @@ module Noxun
         # `set_incompatible` a chybajuci kod pre NL, ale ziadny iny dovod nedava
         # receptovej polozke lepsi vysledok), povodny dovod cestuje v
         # `base_reason` a vetu semaforu sklada `Validation`.
-        if it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE && reason.to_s != DRAWER_KIT_MISSING
+        # === KOV-E1a: POVYSENIE NA RED `lift_set_incomplete` =================
+        #
+        # Vyklop je ZOSTAVA (mechanizmus + prichyt + krytky + …). Ked set
+        # niektory clen nevyriesi, ostatne riadky by v nakupe ostali — teda
+        # „krytky bez mechanizmu" (Astra BLOCKER 1). Povysuje sa preto KAZDY
+        # dovod polozky `lift`, vratane chybajuceho setu a mapovania; povodny
+        # dovod cestuje v `base_reason` a vetu semaforu sklada `Validation`.
+        # Receptova vetva nizsie sa s touto NEKRIZI: polozka `lift` z receptu
+        # neexistuje (recepty su zasuvkove).
+        if it['generic_type'].to_s == 'lift' && reason.to_s != LIFT_SET_INCOMPLETE
+          out['base_reason'] = reason.to_s
+          out['reason'] = LIFT_SET_INCOMPLETE
+          out['lift_system'] = params['lift_system'].to_s
+          out['blocks_export'] = true
+        elsif it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE && reason.to_s != DRAWER_KIT_MISSING
           out['base_reason'] = reason.to_s
           out['reason'] = DRAWER_KIT_MISSING
           out['system'] = params['system'].to_s
@@ -4190,6 +4858,22 @@ module Noxun
         qty = [it['quantity'].to_i, 1].max
         emitted = false
         Array(set['members']).each_with_index do |m, idx|
+          # KOV-E1a: TA ISTA autorita poctu ako v `expand_members` — panel
+          # a supis sa nesmu rozist, a to VRATANE PORADIA (Codex #332 kolo 1
+          # P2): nula = clen sa v supise NEUKAZE (rovnako ako v nakupe nevznikne
+          # riadok) a jeho kod sa preto ani nerozlisuje; nevyrieseny pocet =
+          # problem.
+          mult, qmiss = member_multiplier(m, it)
+          if qmiss
+            emitted = true
+            out['problems'] << unmapped_reason_sk(
+              unmapped_entry(it, sid, qmiss['reason'],
+                             qmiss.merge('member_index' => idx, 'member_label' => m['label']))
+            )
+            next
+          end
+          next if mult.nil?
+
           code, miss = member_code(m, it)
           if miss
             emitted = true
@@ -4221,7 +4905,7 @@ module Noxun
             # nikdy sa nedosadzuje nahradny text uz na serveri.
             'name' => (item ? item['name_sk'] : nil),
             'missing' => item.nil?,
-            'qty' => (per == 'owner' ? m['qty'].to_i : qty * m['qty'].to_i),
+            'qty' => (per == 'owner' ? m['qty'].to_i * mult : qty * m['qty'].to_i * mult),
             'per' => per,
             'label' => m['label'],
             # Rad podla dlzky: hodnota, ktora kod vybrala (tooltip v Studiu aj
@@ -4236,7 +4920,10 @@ module Noxun
         # receptovu polozku nevyda ani jeden riadok, `expand` z toho robi RED
         # `drawer_kit_missing` — karta by inak tvrdila „vsetky členy netreba",
         # kym Kontrola hlasi nevyrobitelnu zasuvku.
-        return unless it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE
+        # KOV-E1a (Codex #332 kolo 2 P2): to iste pri VYKLOPE — `expand` z toho
+        # robi RED `lift_set_incomplete`, takze nahlad to musi povedat tiez.
+        return unless it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE ||
+                      it['generic_type'].to_s == 'lift'
 
         out['problems'] << unmapped_reason_sk(
           unmapped_entry(it, sid, 'members_skipped', 'detail' => 'set nevydal žiadnu položku')
@@ -4305,6 +4992,10 @@ module Noxun
         # dlzka, inak najdlhsia — deterministicky, nikdy nahodne.
         params['nominal_length'] = preview_nl(norm, params['nominal_length']) unless
           sample.is_a?(Hash) && num(sample['nominal_length'] || sample[:nominal_length])
+        # KOV-E1a: nove tvary clenov potrebuju vzorovu hodnotu, inak by nahlad
+        # setu vyklopu ukazal len samé „!" riadky. Trieda = PRVY kluc selektora
+        # (deterministicky), pocet z parametra = 1.
+        preview_lift_params(norm, params)
         sid = norm['set_id']
         gt  = norm['generic_type']
         item = { 'generic_type' => gt, 'quantity' => 1, 'owner_id' => PREVIEW_OWNER,
@@ -4341,6 +5032,26 @@ module Noxun
         bits << "výška čela #{fmt_mm(params['front_height'])} mm" if uses_param?(norm, 'front_height')
         bits << "výška sokla #{fmt_mm(params['height'])} mm" if uses_param?(norm, 'height')
         "#{bits.join(' · ')}:"
+      end
+
+      # KOV-E1a: vzorove hodnoty pre nove tvary clenov. Klient ich NEPOSIELA
+      # (uzavrety `PREVIEW_PARAM_KEYS`) — dopĺňa ich server z DRAFTU samotného,
+      # takze nahlad ukaze presne tie kody, ktore set naozaj ma: trieda = PRVY
+      # kluc selektora, pocet z parametra = 1 (jedna tyc).
+      # Vzorova polozka ZAMERNE NEDOSTAVA klasifikaciu (`use_type` a spol.):
+      # nahlad si set mapuje generickym typom, takze triedny kluc by nemal na
+      # co ukazat a set by skoncil ako „bez predvolby".
+      def preview_lift_params(norm, params)
+        Array(norm['members']).each do |m|
+          cbp = m['code_by_param']
+          if cbp.is_a?(Hash)
+            key = cbp['param'].to_s
+            params[key] ||= cbp['codes'].keys.first.to_s unless key.empty?
+          end
+          qf = m['quantity_from'].to_s.strip
+          params[qf] ||= 1 unless qf.empty?
+        end
+        params
       end
 
       def uses_nl?(norm)
@@ -4473,8 +5184,17 @@ module Noxun
       # `generic_type` je pri klasifikovanom sete ODVODENY (`USE_TYPE_GENERIC`):
       # chybajuci sa DOPLNI, nesediaci je CHYBA. Pri `use_type: 'other'` mapa
       # neexistuje, takze typ musi prist explicitne.
+      # `legacy_lift:` (Codex #332 kolo 2 P1) — LEN CITACIA cesta. Set
+      # `use_type: 'lift'` BEZ `lift_system` je LEGACY TVAR z verzie, kde to
+      # pole este neexistovalo (v0.9.52 a starsie). Zapis ho nepusti, ale
+      # CITANIE ho musi uznat, inak by kniznica s takym setom skoncila ako
+      # „stratena klasifikacia" -> read-only / neplatny snapshot a pouzivatel
+      # by set nemal ako opravit. Klasifikacia sa preto zachova BEZ systemu
+      # (= „neurceny"): triednemu klucu `class:lift|…|hk_top/hl_top` taky set
+      # NIKDY nesadne (porovnanie s prazdnym retazcom zlyha), ostava vsak
+      # pouzitelny cez legacy genericke mapovanie `lift`.
       # -> [klasifikacia Hash, generic_type String, errors]
-      def classify(s, sid)
+      def classify(s, sid, legacy_lift: false)
         gt = s['generic_type'].to_s.strip
         return [{}, gt, []] unless classified?(s)
 
@@ -4498,6 +5218,24 @@ module Noxun
         elsif !dc.empty?
           errors << set_err('drawer_construction',
                             "set „#{sid}“: konštrukciu zásuvky má len set na zásuvky")
+        end
+        # KOV-E1a: SYSTEM VYKLOPU — presne ta ista logika ako konstrukcia
+        # zasuvky o riadok vyssie: pri `use_type: 'lift'` POVINNY, inde
+        # ZAKAZANY. Sklop (`fall`) system nema (vzpery su mimo V1).
+        ls = s[LIFT_SYSTEM_KEY].to_s.strip
+        if ut == 'lift'
+          if ls.empty?
+            # `legacy_lift` = citacia cesta: chybajuce pole je LEGACY, nie chyba.
+            unless legacy_lift
+              errors << set_err(LIFT_SYSTEM_KEY,
+                                "set „#{sid}“: pri výklope treba uviesť systém (HK top / HL top)")
+            end
+          elsif !LIFT_SYSTEMS.include?(ls)
+            errors << set_err(LIFT_SYSTEM_KEY, "set „#{sid}“ má neznámy systém výklopu „#{ls}“")
+          end
+        elsif !ls.empty?
+          errors << set_err(LIFT_SYSTEM_KEY,
+                            "set „#{sid}“: systém výklopu má len set na výklopy")
         end
         man = s['manufacturer']
         if !man.is_a?(String) || man.strip.empty?
@@ -4538,6 +5276,9 @@ module Noxun
         out['use_type'] = ut
         out['opening_mode'] = om
         out['drawer_construction'] = dc if ut == 'drawer'
+        # Legacy vyklop bez systemu: kluc sa NEUKLADA (klasifikacia ostava
+        # platna, system je „neurceny" — triedny kluc na taky set nesadne).
+        out[LIFT_SYSTEM_KEY] = ls if ut == 'lift' && !ls.empty?
         out['manufacturer'] = man.strip
         # VOLITELNA rada (vedoma odchylka od mockupu, ktory ju ukazuje ako
         # povinnu): podperky, klzaky ani „Bystrica" ziadnu radu nemaju a
@@ -4649,17 +5390,39 @@ module Noxun
         has_code  = !mm['code'].to_s.strip.empty?
         has_nl    = mm['code_by_nl'].is_a?(Hash) && !mm['code_by_nl'].empty?
         has_bands = mm['param_bands'].is_a?(Hash)
-        kinds = [has_code, has_nl, has_bands].count(true)
+        # KOV-E1a: STVRTY sposob urcenia kodu — podla TEXTOVEJ hodnoty
+        # parametra polozky (trieda mechanizmu vyklopu).
+        has_param = mm['code_by_param'].is_a?(Hash)
+        kinds = [has_code, has_nl, has_bands, has_param].count(true)
         if kinds != 1
-          return [nil, ["#{pos} musí mať práve jedno z: kód, rad podľa dĺžky, pásma parametra"]]
+          return [nil, ["#{pos} musí mať práve jedno z: kód, rad podľa dĺžky, " \
+                        'pásma parametra, kód podľa triedy']]
         end
-        if per == 'owner' && (has_nl || has_bands)
-          return [nil, ["#{pos}: rad/pásma sú per jednotka, nie per vlastníka"]]
+        if per == 'owner' && (has_nl || has_bands || has_param)
+          return [nil, ["#{pos}: rad/pásma/triedy sú per jednotka, nie per vlastníka"]]
         end
 
         out = { 'per' => per, 'qty' => qty }
         label = mm['label'].to_s.strip
         out['label'] = label unless label.empty?
+        # KOV-E1a: POCET Z PARAMETRA polozky. Je to NEZAVISLE od sposobu
+        # urcenia kodu (tyc ma pevny kod a premenlivy pocet), preto vlastny
+        # kluc a nie dalsi druh v XOR vyssie.
+        raw_qf = mm['quantity_from']
+        unless raw_qf.nil?
+          unless scalar_value?(raw_qf) && !raw_qf.to_s.strip.empty?
+            return [nil, ["#{pos}: počet podľa parametra potrebuje názov parametra"]]
+          end
+
+          out['quantity_from'] = raw_qf.to_s.strip
+        end
+        if has_param
+          cbp, errs = validate_code_by_param(mm['code_by_param'], pos)
+          return [nil, errs] unless errs.empty?
+
+          out['code_by_param'] = cbp
+          return [out, []]
+        end
         if has_code
           # D-118b: `none` je vyhradene PRE BUNKU RADU. Ako pevny kod by
           # znamenalo „clen, ktory nikdy nic nevyda" — teda tichy nezmysel;
@@ -4703,6 +5466,51 @@ module Noxun
         end
         errors << "#{pos}: rad je prázdny" if map.empty? && errors.empty?
         [map, errors]
+      end
+
+      # === KOV-E1a: KOD PODLA TRIEDY (`code_by_param`) ========================
+      #
+      # `{ "param": "lift_class", "codes": { "22K2300": "347810", … } }`
+      # Kluce su RETAZCE a zhoda je PRESNA (`to_s`, bez trimu hodnoty polozky
+      # nad ramec `strip`): chybajuci kluc = NEVYRIESENY clen, NIKDY „najblizsi"
+      # kod. Vyhradena hodnota `none` sa sem NEDEDI — vyklop nema „vedome bez
+      # kodu" (chybajuci mechanizmus je vzdy chyba, nie zamer).
+      # -> [norm|nil, errors]
+      def validate_code_by_param(raw, pos)
+        return [nil, ["#{pos}: kód podľa triedy musí byť objekt"]] unless raw.is_a?(Hash)
+
+        h = stringify(raw)
+        unless (h.keys - CODE_BY_PARAM_KEYS).empty?
+          return [nil, ["#{pos}: kód podľa triedy pozná len „param“ a „codes“"]]
+        end
+        param = h['param'].to_s.strip
+        return [nil, ["#{pos}: kód podľa triedy nemá názov parametra"]] if param.empty?
+
+        codes = h['codes']
+        unless codes.is_a?(Hash) && !codes.empty?
+          return [nil, ["#{pos}: kód podľa triedy nemá ani jednu triedu"]]
+        end
+
+        out = {}
+        errors = []
+        codes.each do |k, v|
+          key = k.to_s.strip
+          code = v.to_s.strip
+          if key.empty?
+            errors << "#{pos}: trieda bez názvu"
+          elsif code.empty?
+            errors << "#{pos}: trieda „#{key}“ nemá kód"
+          elsif skip_code?(code)
+            errors << "#{pos}: „#{SKIP_CODE}“ sa smie použiť len v rade podľa dĺžky"
+          elsif out.key?(key)
+            errors << "#{pos}: trieda „#{key}“ je uvedená viackrát"
+          else
+            out[key] = code
+          end
+        end
+        return [nil, errors] unless errors.empty?
+
+        [{ 'param' => param, 'codes' => out }, []]
       end
 
       # Pasma (H1a FIX 8) — value_key 'code' (clen setu) alebo 'set_id'
@@ -4808,7 +5616,12 @@ module Noxun
       def read_set_classification(s, sid)
         return {} unless classified?(s)
 
-        klass, gt, errors = classify(s, sid)
+        # Codex #332 kolo 2 P1: LEGACY VYKLOP (klasifikovany set `use_type:
+        # 'lift'` z v0.9.52, kde `lift_system` este neexistoval) sa cita ako
+        # PLATNY — bez systemu. Bez tejto vynimky by nova povinnost pola
+        # zhodila klasifikaciu celej kniznice (read-only / neplatny snapshot)
+        # a pouzivatel by set nemal kde doplnit.
+        klass, gt, errors = classify(s, sid, legacy_lift: true)
         # Aj ked su pravidla splnene, ODVODENY typ sa musi zhodovat s ULOZENYM
         # — inak by set po zapise zmenil typ kovania (a s nim aj nakup).
         return klass if errors.empty? && gt == s['generic_type'].to_s.strip

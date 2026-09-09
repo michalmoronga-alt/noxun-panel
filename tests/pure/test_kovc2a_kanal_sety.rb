@@ -482,7 +482,9 @@ NxTest.test('KOV-C2a (R4): cerstva kniznica ma 8 novych setov a 4 triedne mapova
     NxTest.assert(lib['mapping'].key?(key), "cerstva kniznica musi mat #{key}")
   end
   # KOV-F1: +2 zavesove triedne mapovania (`class:hinge|classic` / `|tipon`).
-  NxTest.assert_equal(6, c::HWS::MAPPING_ADDITIONS.size)
+  # KOV-E1a: +3 vyklopove (`class:lift|classic|hk_top` · `|tipon|hk_top` ·
+  # `|classic|hl_top`; `class:lift|tipon|hl_top` NEEXISTUJE).
+  NxTest.assert_equal(9, c::HWS::MAPPING_ADDITIONS.size)
   # Vsetky seed sety su platne aj podla PRISNEJ zapisovej validacie.
   _norm, errs = c::HWS.validate_sets(c::HWS::SEED_SETS)
   NxTest.assert_equal([], errs, errs.inspect)
@@ -509,8 +511,8 @@ NxTest.test('KOV-C2a (R4): SEEDNUTY SUBOR nesie triedne mapovania (nielen `seed_
     end
     NxTest.assert_equal('vysuv-atira-biela-h70', doc['mapping']['slide'],
                         'legacy mapovanie `slide` ostava')
-    NxTest.assert_equal(c::HWS::STD_SKIP_CODE, doc['std'],
-                        'seed nesie Tip-On sety s bunkou `none` -> std 5 (D-118b)')
+    NxTest.assert_equal(c::HWS::STD_LIFT_FORMS, doc['std'],
+                        'seed nesie sety vyklopov (`code_by_param`) -> std 6 (KOV-E1a)')
     NxTest.assert_equal(:ok, c::HWS.library_state, 'a TA ISTA verzia si ho precita')
 
     # Predvolby NOVEHO projektu (`global_default_state`) z toho zmrazia aj
@@ -519,9 +521,9 @@ NxTest.test('KOV-C2a (R4): SEEDNUTY SUBOR nesie triedne mapovania (nielen `seed_
     gd = c::HWS.global_default_state
     NxTest.assert(gd['mapping'].key?('class:slide|classic|metal'))
     NxTest.assert(gd['sets'].key?('atira-biela-h70-sisy'))
-    NxTest.assert_equal(c::HWS::STD_SKIP_CODE,
+    NxTest.assert_equal(c::HWS::STD_LIFT_FORMS,
                         c::HWS.snapshot_std(gd['mapping'], gd['sets'].values),
-                        'snapshot noveho projektu preto tiez nesie std 5 (D-118b sentinel)')
+                        'snapshot noveho projektu preto tiez nesie std 6 (KOV-E1a)')
   end
 end
 

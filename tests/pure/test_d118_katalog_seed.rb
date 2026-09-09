@@ -98,6 +98,9 @@ module NxD118
         # D-118b: vyhradena bunka `none` NIE JE kod — do katalogu nepatri.
         (m['code_by_nl'] || {}).each_value { |c| out << c unless HWS.skip_code?(c) }
         ((m['param_bands'] || {})['bands'] || []).each { |b| out << b['code'] if b['code'] }
+        # KOV-E1a: kody podla TRIEDY (mechanizmus a ramena vyklopu) — sentinel
+        # `none` sa sem NEDEDI, takze kazdy kluc MUSI mat katalogovu polozku.
+        ((m['code_by_param'] || {})['codes'] || {}).each_value { |c| out << c }
       end
     end
     out.uniq
@@ -118,7 +121,14 @@ end
 NxTest.test('D-118 (R2): datum overenia patri VAZBE (cena + URL), nie kazdemu riadku') do
   NxD118::HWC::SEED_ITEMS.each do |i|
     if i['demos_url'] && i['price_eur_vat']
-      NxTest.assert_equal(NxD118::HWC::SEED_PRICE_CHECKED_AT, i['price_checked_at'],
+      # KOV-E1a: AVENTOS riadky maju VLASTNY datum zberu (9.9.2026) — spolocny
+      # stamp by starsim 60 riadkom prepisal ich skutocny datum overenia.
+      want = if NxD118::HWC::SEED_AVENTOS_V4.include?(i['item_code'])
+               NxD118::HWC::SEED_PRICE_CHECKED_AT_V4
+             else
+               NxD118::HWC::SEED_PRICE_CHECKED_AT
+             end
+      NxTest.assert_equal(want, i['price_checked_at'],
                           "#{i['item_code']}: vazba s cenou ma datum")
     else
       NxTest.refute(i.key?('price_checked_at'),

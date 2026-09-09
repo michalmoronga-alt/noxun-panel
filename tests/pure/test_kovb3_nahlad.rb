@@ -379,12 +379,15 @@ end
 NxTest.test('KOV-B3: popisky klasifikacie ziju v core a pokryvaju CELY slovnik') do
   b = NxB3
   opts = b::HWS::CLASS_OPTIONS
-  NxTest.assert_equal(%w[use_type opening_mode drawer_construction], opts.keys,
+  NxTest.assert_equal(%w[use_type opening_mode drawer_construction lift_system], opts.keys,
                       'popisky ma kazdy uzavrety slovnik')
   NxTest.assert_equal(b::HWS::USE_TYPES, opts['use_type'].map(&:first), 'typ pouzitia 1:1')
   NxTest.assert_equal(b::HWS::OPENING_MODES, opts['opening_mode'].map(&:first), 'otvaranie 1:1')
   NxTest.assert_equal(b::HWS::DRAWER_CONSTRUCTIONS, opts['drawer_construction'].map(&:first),
                       'konstrukcia zasuvky 1:1')
+  # KOV-E1a: system vyklopu je STVRTY uzavrety slovnik.
+  NxTest.assert_equal(b::HWS::LIFT_SYSTEMS, opts['lift_system'].map(&:first),
+                      'system vyklopu 1:1')
   opts.each_value do |list|
     list.each { |(key, label)| NxTest.assert(!label.to_s.strip.empty?, "#{key} ma popisok") }
   end

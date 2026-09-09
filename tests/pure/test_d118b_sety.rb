@@ -260,10 +260,15 @@ NxTest.test('D-118b (R6): sentinel = std 5, obsah bez neho ostava na svojom std'
   c = NxD118b
   sets = c.seed_norm
   mapping = c::HWS::SEED_MAPPING.merge(c::HWS::MAPPING_ADDITIONS)
-  NxTest.assert_equal(c::HWS::STD_SKIP_CODE, c::HWS.snapshot_std(mapping, sets),
+  # KOV-E1a: seed uz nesie AJ sety vyklopov (`code_by_param`), a NAJVYSSI
+  # marker vyhrava — sentinel sa preto skusa nad seedom BEZ nich.
+  bez_lift = sets.reject { |s| s['generic_type'] == 'lift' }
+  NxTest.assert_equal(c::HWS::STD_LIFT_FORMS, c::HWS.snapshot_std(mapping, sets),
+                      'seed nesie sety vyklopov -> std 6')
+  NxTest.assert_equal(c::HWS::STD_SKIP_CODE, c::HWS.snapshot_std(mapping, bez_lift),
                       'seed nesie Tip-On sety so sentinelom')
 
-  bez = sets.reject { |s| c::TIPON_SETY.include?(s['set_id']) }
+  bez = bez_lift.reject { |s| c::TIPON_SETY.include?(s['set_id']) }
   NxTest.assert_equal(c::HWS::STD_HEIGHT_VARIANT, c::HWS.snapshot_std(mapping, bez),
                       'bez sentinelu ostava marker na 4 — spatna citatelnost sa neblokuje zbytocne')
   NxTest.assert(c::HWS::STD_SUPPORTED.include?(c::HWS::STD_SKIP_CODE),

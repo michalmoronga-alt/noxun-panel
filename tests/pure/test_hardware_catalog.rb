@@ -300,8 +300,9 @@ NxTest.test('hw katalog: seed — deterministicky manifest, unikatne kody, enum,
   NxTest.assert_equal(:ok, HWC.assess!, 'chybajuci subor -> seed -> ok')
   list = HWC.items
   NxTest.assert_equal(HWC::SEED_ROWS.length, list.length, 'kazdy riadok manifestu sa seedol')
-  NxTest.assert_equal(114, list.length,
-                      'zmrazeny rozsah manifestu (60 z D1 + 54 kodov seed setov — D-118)')
+  NxTest.assert_equal(137, list.length,
+                      'zmrazeny rozsah manifestu (60 z D1 + 54 kodov seed setov D-118 ' \
+                      '+ 23 kodov AVENTOS KOV-E1a)')
   codes = list.map { |i| i['item_code'].downcase }
   NxTest.assert_equal(codes.uniq.length, codes.length, 'unikatne kody')
   list.each do |i|
@@ -315,7 +316,14 @@ NxTest.test('hw katalog: seed — deterministicky manifest, unikatne kody, enum,
     # patri k nemu (F5 „datum patri konkretnej vazbe"). Riadok BEZ vazby alebo
     # BEZ ceny stamp mat NESMIE.
     if i['demos_url'] && i['price_eur_vat']
-      NxTest.assert_equal(HWC::SEED_PRICE_CHECKED_AT, i['price_checked_at'],
+      # KOV-E1a: riadky AVENTOS su zo zberu 9.9.2026 a nesu VLASTNY datum —
+      # spolocny stamp by o starsich 60 riadkoch klamal.
+      want = if HWC::SEED_AVENTOS_V4.include?(i['item_code'])
+               HWC::SEED_PRICE_CHECKED_AT_V4
+             else
+               HWC::SEED_PRICE_CHECKED_AT
+             end
+      NxTest.assert_equal(want, i['price_checked_at'],
                           "seed stamp k vazbe: #{i['item_code']}")
     else
       NxTest.refute(i.key?('price_checked_at'), "bez vazby/ceny ziadny stamp: #{i['item_code']}")

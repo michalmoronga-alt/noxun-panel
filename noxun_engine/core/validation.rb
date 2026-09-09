@@ -122,6 +122,11 @@ module Noxun
       # RED — KOV-F1: vybrany set zavesov ODPORUJE celu (Tip-On celo na
       # klasickom sete). Vzniká az pri EXPANZII, takze ho brana cita z nej.
       CAT_HW_MISMATCH = 'hardware_mismatch'
+      # RED — KOV-E1a: vyklop je ZOSTAVA a set k nemu nevydal vsetko (chyba kod
+      # triedy, pocet tyci, set alebo predvolba). Ostatne riadky by v nakupe
+      # ostali ako „krytky bez mechanizmu", preto sa zastavuje nakup, rozpocet
+      # a cenova ponuka; VEPO bezi dalej (geometria cela je spravna).
+      CAT_HW_INCOMPLETE = 'hardware_incomplete'
 
       # Druh top-level kusu, ktory MA KOVANIE. Zdielana konstanta preto, ze
       # „skrinka vs. doska" nie je kozmetika textu: len pri skrinke zliatie
@@ -1022,6 +1027,70 @@ module Noxun
         target ? item.merge('data' => target) : item
       end
 
+      # RED (KOV-E1a): VYKLOP bez celej zostavy. Veta menuje CELO, systém a to,
+      # ČO presne chýba — a navigje na existujúcu akciu (výber setu alebo
+      # Pravidlá → Doplniť nové predvoľby). Nikdy sa nesiahne po inom sete
+      # a nikdy sa nevydá „polovica" zostavy.
+      LIFT_SYSTEM_SK = { 'hk_top' => 'HK top', 'hl_top' => 'HL top' }.freeze
+
+      def lift_incomplete_item(u, where, sid, opk, gt, oid)
+        sys = LIFT_SYSTEM_SK[u['lift_system'].to_s] || ''
+        what = sys.empty? ? '' : " (#{sys})"
+        member = u['member_label'].to_s.strip
+        member = "člen #{u['member_index'].to_i + 1}" if member.empty? && u.key?('member_index')
+        detail = member.empty? ? '' : " — #{member}"
+        reason =
+          case u['base_reason'].to_s
+          when 'class_unmapped'
+            # KOV-E1a (Codex #332 kolo 1 P2): TEN ISTY dovod ma DVA zdroje a
+            # DVE napravy. Chybajuce TRIEDNE MAPOVANIE (resolver — zaznam nema
+            # `param` ani `set_id`) sa opravuje v Pravidlach; bez tohto
+            # rozlisenia by veta znela „set „“ nemá kód" a poslala cloveka
+            # dopĺňať kód do setu, ktorý ani neexistuje.
+            if HardwareSets.class_unmapped_lift?(u)
+              'výklop nemá predvolený set — otvor Pravidlá → Doplniť nové predvoľby'
+            else
+              "set „#{sid}“ nemá kód pre triedu, ktorú výklop potrebuje#{detail} — " \
+              'doplň kód do setu'
+            end
+          when 'quantity_unresolved'
+            "set „#{sid}“ nevie určiť počet#{detail} — chýba údaj z pravidla výklopu"
+          when 'set_incompatible'
+            "set „#{sid}“ nesedí s výklopom (#{HardwareSets.incompatible_detail_sk(u['detail'])}) — " \
+            'vyber správny set'
+          when 'set_missing'
+            "projekt odkazuje na set „#{sid}“, ktorý v ňom nie je — vyber set nanovo"
+          when 'members_skipped'
+            # KOV-E1a (Codex #332 kolo 2 P2): set sedel, ale VSETCI jeho
+            # clenovia vysli na nulu — vyklop by sa objednal „bez kovania".
+            "set „#{sid}“ nevydal pre tento výklop ani jednu položku — " \
+            'skontroluj počty a kódy v sete'
+          when HardwareSets::LIFT_SYSTEM_MISSING
+            # KOV-E1a (Codex #332 kolo 3 P1): polozka JE vyklop, ale triedny
+            # kluc z nej nevznikol. Set sa preto nevybera ani sa nehada — a veta
+            # nesmie znieť „nemá predvolený set" (poslala by opravovať
+            # Pravidlá, kde chyba nie je). Dovody su DVA (chyba `opening_mode`
+            # ALEBO `lift_system`), takze veta menuje oba.
+            'výklop nemá určený spôsob otvárania alebo systém (HK top / HL top) — ' \
+            'bez nich sa set vybrať nedá'
+          when 'set_none'
+            'výklop je vedome bez setu — ak to tak nemá byť, vyber set v Pravidlách Štúdia'
+          when 'mapping_invalid'
+            'výber setu na tejto skrinke je poškodený — vyber ho nanovo'
+          else
+            'výklop nemá predvolený set — otvor Pravidlá → Doplniť nové predvoľby'
+          end
+        item = { 'severity' => RED, 'category' => CAT_HW_INCOMPLETE,
+                 'owner_id' => oid, 'part_key' => (opk.empty? ? nil : opk), 'hw_key' => nil,
+                 'message_sk' => "Výklop (#{where})#{what}: #{reason}. " \
+                                 'Zostava by bola neúplná (krytky bez mechanizmu), preto sa ' \
+                                 'nákup kovania, rozpočet ani cenová ponuka zatiaľ nedajú vydať.',
+                 'stable_key' => [CAT_HW_INCOMPLETE, oid, opk, gt, u['rule_id'].to_s, sid,
+                                  u['base_reason'].to_s, u['member_index'].to_s].join('|') }
+        target = hw_target(opk, gt, u['rule_id'], orphan: false)
+        target ? item.merge('data' => target) : item
+      end
+
       # ORANGE (KOV-F1): poznamky k NAMAPOVANYM polozkam (`exp['notes']`) —
       # dnes jedina: zavesovy set bez klasifikacie. Nakup bezi dalej (kody
       # su), ale set nevie povedat, ci patri na Tip-On alebo klasicke dvierka,
@@ -1076,6 +1145,12 @@ module Noxun
             items << hinge_mismatch_item(u, where, sid, opk, gt, oid)
             next
           end
+          # KOV-E1a: neuplna zostava vyklopu je RED s VLASTNOU kategoriou —
+          # rovnaka vaha ako nesulad zavesoveho setu (VEPO ide dalej).
+          if u['reason'].to_s == HardwareSets::LIFT_SET_INCOMPLETE
+            items << lift_incomplete_item(u, where, sid, opk, gt, oid)
+            next
+          end
           msg =
             case u['reason'].to_s
             when 'nl_missing'
@@ -1092,6 +1167,12 @@ module Noxun
               # nespadá…"); „podľa + 4. pad" bola gramaticka chyba.
               "#{label} (#{where}): #{param_txt_nom(u)} nespadá do žiadneho pásma " \
                 'predvoľby — doplň pásmo výberu setu.'
+            when 'quantity_unresolved'
+              # KOV-E1a: clen berie POCET z parametra polozky, ale hodnota
+              # chyba alebo nie je cele nezaporne cislo. Pri vyklope je to RED
+              # (vyssie), tu ostava ORANGE pre vlastne sety pouzivatela.
+              "#{label} (#{where}): set „#{sid}“ nevie určiť počet" \
+                "#{member.empty? ? '' : " (#{member})"} — chýba údaj z pravidla."
             when 'set_missing'
               "#{label} (#{where}): projekt odkazuje na set „#{sid}“, ktorý v projekte nie je — vyber set nanovo."
             when 'set_type_mismatch'

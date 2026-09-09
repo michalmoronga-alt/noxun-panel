@@ -135,6 +135,7 @@ module NxB1
 
   # Klasifikovana KOPIA seed setu — typ pouzitia podla typu kovania.
   USE_BY_GT = { 'hinge' => %w[door classic], 'slide' => %w[drawer classic],
+                'lift' => %w[lift classic], # KOV-E1a: seed vyklopov
                 'leg' => %w[other other], 'wall_hanger' => %w[other other],
                 'shelf_pin' => %w[other other] }.freeze
 
@@ -142,6 +143,8 @@ module NxB1
     ut, om = USE_BY_GT[set['generic_type']]
     out = set.merge('use_type' => ut, 'opening_mode' => om, 'manufacturer' => 'Hettich')
     out['drawer_construction'] = 'metal' if ut == 'drawer'
+    # KOV-E1a: pri vyklope je system POVINNY (inak sa set neda klasifikovat).
+    out['lift_system'] = 'hk_top' if ut == 'lift'
     out
   end
 
@@ -253,6 +256,8 @@ NxTest.test('KOV-B1 (R2): `generic_type` je ODVODENY — chybajuci sa doplni, ne
   { 'door' => 'hinge', 'drawer' => 'slide', 'lift' => 'lift', 'fall' => 'lift' }.each do |ut, gt|
     s = b.set_def('use_type' => ut, 'opening_mode' => 'classic', 'manufacturer' => 'Hettich')
     s['drawer_construction'] = 'metal' if ut == 'drawer'
+    # KOV-E1a: vyklop ma POVINNY system (rovnako ako zasuvka konstrukciu).
+    s['lift_system'] = 'hk_top' if ut == 'lift'
     s.delete('generic_type')
     NxTest.assert_equal(gt, b::HWS.validate_set(s)[0]['generic_type'], "#{ut} -> #{gt}")
   end
@@ -594,8 +599,13 @@ NxTest.test('KOV-B1 (R7): kanonicky tvar triedneho kluca') do
   NxTest.assert_equal(['class:slide|tipon|metal', nil], h.parse_class_key('class:slide|tipon|metal'))
   NxTest.assert_equal('class:hinge|classic', h.parse_class_key(' CLASS: Hinge | Classic ')[0],
                       'trim + downcase segmentov')
-  NxTest.assert_equal('class:lift|classic', h.parse_class_key('class:lift|classic')[0],
-                      'typ `lift` uz existuje (KOV-B1)')
+  # KOV-E1a: vyklop je TROJSEGMENTOVY (treti segment = system), takze
+  # dvojsegmentovy `class:lift|classic` uz kanonicky tvar NIE JE.
+  NxTest.assert_equal('class:lift|classic|hk_top',
+                      h.parse_class_key('class:lift|classic|hk_top')[0],
+                      'typ `lift` so systemom (KOV-E1a)')
+  NxTest.assert_equal(nil, h.parse_class_key('class:lift|classic')[0],
+                      'vyklop bez systemu = neuplny kluc')
   # neplatne tvary
   { 'class:hinge|tipon|metal' => 'konštrukciu',
     'class:foo|classic' => 'typ kovania',
