@@ -308,6 +308,9 @@
       // Konstrukcia patri VYHRADNE zasuvke — inde sa posiela PRAZDNA
       // (vedome vymazanie), nikdy sa nevynecha (viz merge vyssie).
       drawer_construction: ut === 'drawer' ? hwsTrim(d.drawer_construction) : '',
+      // Codex #332 kolo 2 P1: system vyklopu patri VYHRADNE vyklopu — inde sa
+      // posiela PRAZDNY (vedome vymazanie), nikdy sa nevynecha (viz merge vyssie).
+      lift_system: ut === 'lift' ? hwsTrim(d.lift_system) : '',
       manufacturer: hwsTrim(d.manufacturer),
       series: hwsTrim(d.series),
       active: d.active !== false,
@@ -403,6 +406,8 @@
     var ut = hwsTrim(v.use_type);
     if (ut === 'drawer' && hwsTrim(v.drawer_construction)){
       parts.push(hwsClassLabel('drawer_construction', v.drawer_construction));
+    } else if (ut === 'lift' && hwsTrim(v.lift_system)){
+      parts.push(hwsClassLabel('lift_system', v.lift_system));
     } else if (ut){
       parts.push(hwsClassLabel('use_type', ut));
     }
@@ -429,6 +434,9 @@
       if (hwsTrim(s.opening_mode)) out.push({ text: hwsClassLabel('opening_mode', s.opening_mode), cls: '' });
       if (hwsTrim(s.drawer_construction)){
         out.push({ text: hwsClassLabel('drawer_construction', s.drawer_construction), cls: '' });
+      }
+      if (hwsTrim(s.lift_system)){
+        out.push({ text: hwsClassLabel('lift_system', s.lift_system), cls: '' });
       }
       if (hwsTrim(s.manufacturer)) out.push({ text: hwsTrim(s.manufacturer), cls: 'dim' });
       if (hwsTrim(s.series)) out.push({ text: hwsTrim(s.series), cls: 'dim' });
@@ -961,6 +969,7 @@
                 use_type: hwsTrim(d.use_type),
                 opening_mode: hwsTrim(d.opening_mode),
                 drawer_construction: hwsTrim(d.drawer_construction),
+                lift_system: hwsTrim(d.lift_system),
                 manufacturer: hwsTrim(d.manufacturer),
                 manufacturer_new: hwsTrim(d.manufacturer_new),
                 series: hwsTrim(d.series),
@@ -980,7 +989,8 @@
     var s = set || {};
     return hwsSetDraft({
       set_id: s.set_id, use_type: s.use_type, opening_mode: s.opening_mode,
-      drawer_construction: s.drawer_construction, manufacturer: s.manufacturer,
+      drawer_construction: s.drawer_construction, lift_system: s.lift_system,
+      manufacturer: s.manufacturer,
       series: s.series, generic_type: s.generic_type, name: s.name,
       active: s.active !== false
     });
@@ -988,7 +998,7 @@
 
   // Ploché polia z PAMÄTE rozpísaného konceptu do draftu (review #297 P2-1).
   // Členovia sem NEPATRIA — tie vlieva kostra priamo do vlastného uzla.
-  var HWS_DRAFT_KEYS = ['use_type', 'opening_mode', 'drawer_construction',
+  var HWS_DRAFT_KEYS = ['use_type', 'opening_mode', 'drawer_construction', 'lift_system',
                         'manufacturer', 'manufacturer_new', 'series', 'series_new',
                         'generic_type', 'name'];
 
@@ -1031,6 +1041,16 @@
       out.push({ key: 'drawer_construction', type: 'select', label: '3 · Konštrukcia',
                  options: hwsClassOptions('drawer_construction', '—'),
                  value: hwsTrim(v.drawer_construction) });
+    }
+    // Codex #332 kolo 2 P1: SYSTEM VYKLOPU — presne to iste miesto a spravanie
+    // ako konstrukcia pri zasuvke. Bez tohto pola sa legacy set `use_type:
+    // 'lift'` (z v0.9.52, kde pole neexistovalo) nedal ulozit: server ho
+    // odmietal vetou „pri výklope treba uviesť systém", ale modal nemal kde
+    // system zadat.
+    if (hwsTrim(v.use_type) === 'lift'){
+      out.push({ key: 'lift_system', type: 'select', label: '3 · Systém výklopu',
+                 options: hwsClassOptions('lift_system', '—'),
+                 value: hwsTrim(v.lift_system) });
     }
     out.push({ key: 'manufacturer', type: 'select', label: '4 · Výrobca',
                options: hwsManOptions(v.manufacturer), value: hwsTrim(v.manufacturer),
@@ -1239,6 +1259,7 @@
     if (hwsTrim(d.use_type) === ''){
       d.opening_mode = '';
       d.drawer_construction = '';
+      d.lift_system = '';
       d.manufacturer = '';
       d.manufacturer_new = '';
       d.series = '';
@@ -1246,6 +1267,7 @@
       return d;
     }
     if (hwsTrim(d.use_type) !== 'drawer') d.drawer_construction = '';
+    if (hwsTrim(d.use_type) !== 'lift') d.lift_system = '';
     return d;
   }
 
@@ -2091,7 +2113,7 @@
   // Klasifikacia meni SADU POLI, takze modal sa PREKRESLI; nazov a vzorova NL
   // menia len stav a nahlad.
   var HWS_CTX_FIELDS = { use_type: 1, opening_mode: 1, drawer_construction: 1,
-                         manufacturer: 1, series: 1 };
+                         lift_system: 1, manufacturer: 1, series: 1 };
 
   function hwsModalChange(t){
     if (!HWS_SET || !t || !t.getAttribute) return false;

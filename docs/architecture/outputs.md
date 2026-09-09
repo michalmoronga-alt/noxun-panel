@@ -163,7 +163,11 @@ Skladá to `drawer_blockers(collected, expansion, scope:)`: `scope: :all` číta
 `drawer_conflicts` a `drawer_stale`, nižšie) a k tomu kit z expanzie; `scope: :kit` (VEPO) číta z nálezov len `ALL_EXPORT_BLOCKERS` a kit. Poradie dôvodov určuje register (deterministicky, bez ohľadu na poradie zberu) a text stavia
 `Recipes::BLOCKER_LABELS` + `ids_text` (ten istý strop „tri ID + a ďalšie N"). Hotovú hlášku vydáva **`drawer_stop`**, ktorý beží — rovnako ako `newer_config_stop` —
 **pred pickerom**; VEPO si preto expanziu kovania počíta **hneď po zbere** a nižšie ju už len použije (žiadny druhý prepočet). Keď expanziu nemáme (chyba katalógu/setov)
-a zákazka **má** aspoň jednu receptovú položku, brána je **fail-closed** (`drawer_expansion_unproven?`) — nedokázateľný stav zastavujeme, rovnako ako neznámu expanziu duplicít.
+a zákazka **má** položku, ktorej úplnosť dokazuje AŽ expanzia, brána je **fail-closed** (`hardware_expansion_unproven?`) — nedokázateľný stav zastavujeme, rovnako ako neznámu expanziu duplicít.
+Takéto položky sú **dve**: **receptová** (`source: recipe` — dielce sú rezané na konkrétnu NL, takže bez expanzie sa nedá overiť kit) a **VÝKLOP**
+(`generic_type: lift` — výklop je ZOSTAVA a jej úplnosť dokáže len expanzia). Predikát sa preto zovšeobecnil z `drawer_expansion_unproven?` (Codex #332
+kolo 2 P1): pri `nil` expanzii nákupný CSV stál, ale rozpočet aj ponuka `nil` pustili do `Budget` (sekcia kovania sa ticho vynechá) a zákazník by dostal
+cenu BEZ výklopového kovania. Hláška menuje oboje: „…nedá sa overiť kit zásuviek ani zostava výklopov".
 
 **Uložený nosič `drawer_conflicts` (Astra #19 F6).** Po fail-closed stavbe v modeli nezostane ani dielec ani položka, z ktorej by sa dôvod dal obnoviť — musí teda prežiť
 v **configu**: `Construction.build_plan` ho vydá v `plan[:drawer_conflicts]` (tvar `{front_id, code, message, part_key}`, validuje `BuildPlan.validate_drawer_conflicts!`),

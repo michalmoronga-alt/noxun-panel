@@ -669,6 +669,11 @@ navyše jednotka, pri HL top ramená a stabilizačná tyč), a mechanizmus sa vy
   členov v zozname **ostávajú** (rovnako ako pri zásuvke), ale von sa nedostanú: kód je v `BuildPlan::HW_LIFT_BLOCKERS` aj vo `from_expansion`
   (`ProductionCore.hardware_blockers`), takže nákup kovania, rozpočet aj cenová ponuka STOJA a „krytky bez mechanizmu" NIKDY neopustia plugin. **VEPO beží ďalej** — geometria
   čela je správna (tá istá úvaha ako pri závesoch). Vetu skladá `Validation.lift_incomplete_item` (RED, kategória `hardware_incomplete`) a menuje čelo, systém aj člena.
+  **Set, ktorý nevydal ANI JEDEN riadok, je RED tiež** (Codex #332 kolo 2 P2): nula je platné vynechanie JEDNÉHO člena, ale keď na nulu vyjdú VŠETCI členovia
+  (alebo ich set preskočí), expanzia by vrátila 0 riadkov aj 0 nemapovaných a exporty by prešli s výklopom BEZ kovania. Fallback `members_skipped` (dovtedy
+  len pre receptové položky) preto platí aj pre `generic_type: lift` — v `expand_members` aj v `explain_members`, aby sa panel a súpis nerozišli — a
+  štandardnou cestou sa povýši na RED `lift_set_incomplete` s `blocks_export`. Veta (Nákup aj Kontrola) hovorí o POČTOCH, nie o dĺžke: „set X nevydal pre
+  tento výklop ani jednu položku".
   **Dôvod `class_unmapped` má DVA zdroje a DVE nápravy** (Codex #332 kolo 1 P2) — rozlišuje ich `HardwareSets.class_unmapped_lift?`, JEDNA autorita pre Nákup
   (`unmapped_reason_sk`) aj pre vetu Kontroly: **resolver-level** (chýba triedny kľúč `class:lift|…`; záznam nesie `class_key` a nemá `param` ani `set_id`) → „výklop nemá
   predvolený set — Pravidlá → Doplniť nové predvoľby", **member-level** (`code_by_param` bez kódu triedy; `param` aj `set_id` sú prítomné) → „set X nemá kód pre …".
@@ -676,6 +681,13 @@ navyše jednotka, pri HL top ramená a stabilizačná tyč), a mechanizmus sa vy
 - **Klasifikačné pole `lift_system` (`hk_top` | `hl_top`)** je **POVINNÉ pri `use_type: 'lift'` a ZAKÁZANÉ inde** — presne tá istá logika ako `drawer_construction` pri zásuvke
   (sklop `fall` systém nemá, vzpery sú mimo V1). Je v `CLASS_KEYS`, `SET_KEYS`, `SET_KEY_ORDER`, `CLASS_OPTIONS` aj vo whitelistoch šablón; jeho stratu chytá **vlastná vrstva**
   v `classification_lost?` (kontrola „žiadny klasifikačný kľúč" by ju prehliadla, a bez systému by HL set vyzeral ako HK).
+  **Povinnosť platí LEN pri ZÁPISE — čítanie legacy tvar UZNÁVA** (Codex #332 kolo 2 P1). Set `use_type: lift` bez `lift_system` mohol vzniknúť vo v0.9.52
+  (pole vtedy neexistovalo); keby nová povinnosť platila aj pri čítaní, `read_set_classification` by klasifikáciu zahodila, `classification_lost?` by celý
+  súbor označil za nekompatibilný (knižnica read-only, snapshot `:invalid`) a používateľ by sa z toho nedostal. `classify` má preto prepínač `legacy_lift:` —
+  zapína ho VÝHRADNE čítacia cesta: klasifikácia ostane platná a systém je „neurčený" (kľúč sa neuloží). Taký set triednemu kľúču `class:lift|…|hk_top` NIKDY
+  nesadne (porovnanie s prázdnym reťazcom zlyhá), ostáva použiteľný cez legacy generické mapovanie `lift` a v editore sa dá dopracovať: modal má pri
+  `use_type: lift` **select „3 · Systém výklopu"** (`hw_sets.js`, presný vzor `drawer_construction` pri zásuvke), ktorý sa posiela VŽDY (aj prázdny —
+  `save_set!` merguje) a `validate_set` ho pri zápise stále VYŽADUJE.
 - **Triedny kľúč `lift` je TROJSEGMENTOVÝ a tretí segment znamená INÉ než pri zásuvke:** `class:lift|<opening_mode>|<lift_system>`. `parse_class_head` preto validuje tretí
   segment PODĽA TYPU (`slide` → konštrukcia, `lift` → systém) a **`class:lift|tipon|hl_top` ODMIETA** vetou „HL top Tip-On neexistuje" (Blum ani Démos ho nemajú). Platné kľúče
   sú tri a všetky sú v `MAPPING_ADDITIONS` (add-if-absent, existujúca voľba sa nikdy neprepíše): `class:lift|classic|hk_top` → `vyklop-hk-klasik` · `class:lift|tipon|hk_top`

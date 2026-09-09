@@ -55,6 +55,9 @@
 #   M17 predvolbu dostane CUDZI set s tym istym ID    -> `mapping_seed_ref_ok?`
 #   M18 kod sa rozlisuje aj pri pocte 0               -> pocet PRVY (expand aj explain)
 #   M19 chybajuca predvolba hlasi „set „“ nema kod"   -> resolver vs. member veta
+#   M20 legacy vyklop bez `lift_system` = strata klasifikacie -> grandfather pri CITANI
+#   M21 set, ktoreho VSETCI clenovia vysli na nulu, prejde ticho -> RED `members_skipped`
+#   M22 nedostupna expanzia pusti vyklop do rozpoctu a ponuky -> fail-closed predikat
 require_relative '../helper' unless defined?(NxTest)
 
 require 'json'
@@ -342,6 +345,30 @@ NxTest.test('KOV-E1a (3): Kontrola vysvetli neuplnu zostavu RED vetou') do
   NxTest.assert(red.first['message_sk'].include?('mechanizmus'), 'aj clena, ktory chyba')
 end
 
+NxTest.test('KOV-E1a (3): NEDOSTUPNA expanzia s vyklopom zastavi VSETKY tri cenove vystupy') do
+  c = NxKovE1a
+  NxTest.skip!('brana exportov zije v UI vrstve') unless defined?(Noxun::Engine::ProductionCore)
+  pc = Noxun::Engine::ProductionCore
+  # Codex #332 kolo 2 P1: expanzia = JEDINY dokaz, ze zostava vyklopu je uplna.
+  # Ked nie je (`nil`), nakupny CSV stal uz predtym, ale rozpocet a ponuka
+  # pustili `nil` do `Budget` — sekcia kovania sa ticho vynechala a zakaznik
+  # dostal cenu BEZ vyklopoveho kovania.
+  s_lift = { hardware_issues: [], hardware: [c.item] }
+  NxTest.assert(pc.hardware_expansion_unproven?(s_lift, nil))
+  msg = pc.drawer_stop(s_lift, nil).to_s
+  NxTest.assert(msg.include?('výklopov'), msg)
+  # Receptova zasuvka sa sprava PRESNE ako doteraz.
+  s_rec = { hardware_issues: [],
+            hardware: [{ 'generic_type' => 'slide', 'source' => c::BP::HW_SOURCE_RECIPE }] }
+  NxTest.assert(pc.hardware_expansion_unproven?(s_rec, nil))
+  # GOLDEN: zakazka BEZ vyklopu a BEZ receptu sa nemeni (legacy sprava ostava).
+  s_old = { hardware_issues: [], hardware: [{ 'generic_type' => 'hinge', 'source' => 'rule' }] }
+  NxTest.refute(pc.hardware_expansion_unproven?(s_old, nil))
+  NxTest.assert_equal(nil, pc.drawer_stop(s_old, nil))
+  # A ked expanzia JE, predikat mlci — dokaz existuje.
+  NxTest.refute(pc.hardware_expansion_unproven?(s_lift, { 'rows' => [], 'unmapped' => [] }))
+end
+
 # ============================================================================
 # 4 — `quantity_from`
 # ============================================================================
@@ -394,15 +421,25 @@ NxTest.test('KOV-E1a (4): NULOVY pocet sa rozhodne PRED kodom — triedu uz netr
          'sets' => { 'test-nula' => set } }
   ziadne = c::HWS.expand([c.item('params' => { 'lift_class' => nil, 'rod_extension' => 0 })], st)
   NxTest.assert_equal([], ziadne['rows'], 'nulovy clen riadok nevyda')
-  NxTest.assert_equal([], ziadne['unmapped'],
+  # Codex #332 kolo 2 P2: tento set ma JEDINEHO clena, takze nulou nevydal NIC
+  # — a to je uz brana UPLNOSTI (`members_skipped`), nie chybajuca trieda.
+  # Kontrakt kola 1 tym ostava: o triede sa NEHOVORI (clen sa vedome nevydava),
+  # zaznam nesie clena ziadneho a hovori o POCTOCH.
+  NxTest.assert_equal(1, ziadne['unmapped'].length, ziadne['unmapped'].inspect)
+  nic = ziadne['unmapped'].first
+  NxTest.assert_equal(c::HWS::LIFT_SET_INCOMPLETE, nic['reason'])
+  NxTest.assert_equal('members_skipped', nic['base_reason'],
                       'a NEHLASI chybajucu triedu — clen sa vedome nevydava')
+  NxTest.refute(nic.key?('member_index'), 'zaznam patri CELEMU setu, nie clenu')
   # Ten isty set s poctom 1 chybajucu triedu hlasi (brana ostava fail-closed).
   jeden = c::HWS.expand([c.item('params' => { 'lift_class' => nil, 'rod_extension' => 1 })], st)
   NxTest.assert_equal([c::HWS::LIFT_SET_INCOMPLETE], c.reasons(jeden))
   # SUPIS (`explain`) drzi TO ISTE poradie — panel a nakup sa nesmu rozist.
   ex = c::HWS.explain(c.item('params' => { 'lift_class' => nil, 'rod_extension' => 0 }), st)
-  NxTest.assert_equal([], ex['problems'], ex['problems'].inspect)
   NxTest.assert_equal([], ex['members'], 'nulovy clen sa v supise neukaze')
+  # Supis hovori TO ISTE co nakup (panel a supis sa nesmu rozist): set nevydal nic.
+  NxTest.assert_equal(1, ex['problems'].length, ex['problems'].inspect)
+  NxTest.assert(ex['problems'].first.include?('ani jednu položku'), ex['problems'].inspect)
 end
 
 NxTest.test('KOV-E1a (4): `per: owner` clen sa DVOMA pravidlami na jednom cele NEZDVOJI') do
@@ -417,6 +454,51 @@ NxTest.test('KOV-E1a (4): `per: owner` clen sa DVOMA pravidlami na jednom cele N
                             c.hl_item('owner_part_key' => 'front:F2/flap')], st)
   NxTest.assert_equal(2, ine_celo['rows'].find { |r| r['code'] == '507365' }['quantity'],
                       'INE celo = vlastna tyc')
+end
+
+NxTest.test('KOV-E1a (4): set, ktoreho VSETCI clenovia vysli na NULU, je RED') do
+  c = NxKovE1a
+  # Codex #332 kolo 2 P2: nula je platne vynechanie JEDNEHO clena, ale ked
+  # set nevyda ANI JEDEN riadok, je to vyklop BEZ KOVANIA — a bez zaznamu by
+  # expanzia vratila 0 riadkov aj 0 nemapovanych a exporty by presli mlcky.
+  raw = { 'set_id' => 'nulovy', 'name' => 'Nulovy', 'generic_type' => 'lift',
+          'use_type' => 'lift', 'opening_mode' => 'classic', 'lift_system' => 'hk_top',
+          'manufacturer' => 'Blum',
+          'members' => [{ 'per' => 'unit', 'qty' => 1, 'label' => 'mechanizmus',
+                          'code' => '347810', 'quantity_from' => 'mech_count' },
+                        { 'per' => 'owner', 'qty' => 1, 'label' => 'stabilizačná tyč',
+                          'code' => '507365', 'quantity_from' => 'rod_count' }] }
+  norm, errs = c::HWS.validate_set(raw)
+  NxTest.assert_equal([], errs)
+  st = { 'mapping' => { 'class:lift|classic|hk_top' => 'nulovy' }, 'sets' => { 'nulovy' => norm } }
+
+  nula = c.item('params' => { 'mech_count' => 0, 'rod_count' => 0 })
+  exp = c::HWS.expand([nula], st)
+  NxTest.assert_equal([], c.codes(exp), 'ziadny riadok — set nevydal nic')
+  NxTest.assert_equal(1, exp['unmapped'].length, exp['unmapped'].inspect)
+  u = exp['unmapped'].first
+  NxTest.assert_equal(c::HWS::LIFT_SET_INCOMPLETE, u['reason'])
+  NxTest.assert_equal('members_skipped', u['base_reason'])
+  NxTest.assert_equal(true, u['blocks_export'], 'export STOJI')
+  NxTest.assert(c::HWS.unmapped_reason_sk(u).include?('ani jednu položku'),
+                c::HWS.unmapped_reason_sk(u))
+  # A brana exportov to naozaj zastavi.
+  if defined?(Noxun::Engine::ProductionCore)
+    pc = Noxun::Engine::ProductionCore
+    NxTest.assert_equal(1, pc.hardware_blockers({ hardware_issues: [], hardware: [nula] },
+                                                exp).length)
+  end
+  # Kontrola to vysvetli RED vetou o poctoch, nie o „chybajucej predvolbe“.
+  items = []
+  c::V.check_hardware_expansion(exp, items)
+  red = items.select { |i| i['severity'] == c::V::RED }
+  NxTest.assert_equal(1, red.length, items.inspect)
+  NxTest.assert(red.first['message_sk'].include?('ani jednu položku'), red.first['message_sk'])
+
+  # JEDNA nula (predlzenie tyce pod 1100 mm) je LEGITIMNA — set vydal mechanizmus.
+  ok = c::HWS.expand([c.item('params' => { 'mech_count' => 1, 'rod_count' => 0 })], st)
+  NxTest.assert_equal([['347810', 1]], c.codes(ok))
+  NxTest.assert_equal([], c.reasons(ok), 'ziadny RED — zostava je uplna')
 end
 
 # ============================================================================
@@ -452,6 +534,38 @@ NxTest.test('KOV-E1a (5): `lift_system` prezije citaciu normalizaciu (round-trip
   bez = JSON.parse(JSON.generate(s))
   NxTest.assert(c::HWS.classification_lost?([s], [bez.reject { |k, _| k == 'lift_system' }]),
                 'zahodeny system = priznana strata')
+end
+
+NxTest.test('KOV-E1a (5): LEGACY vyklop BEZ systemu sa CITA — kniznica NEJDE do read-only') do
+  c = NxKovE1a
+  # Codex #332 kolo 2 P1: set `use_type: 'lift'` bez `lift_system` mohol
+  # vzniknut vo v0.9.52 (pole vtedy neexistovalo). Keby nova POVINNOST pola
+  # platila aj pri CITANI, `read_set_classification` by klasifikaciu zahodila,
+  # `classification_lost?` by cely subor oznacil za nekompatibilny a set by uz
+  # nebolo ako opravit — kniznica read-only, snapshot neplatny.
+  legacy = { 'set_id' => 'moj-vyklop', 'name' => 'Môj výklop', 'generic_type' => 'lift',
+             'use_type' => 'lift', 'opening_mode' => 'classic', 'manufacturer' => 'Blum',
+             'members' => [{ 'per' => 'unit', 'qty' => 1, 'code' => '347810' }] }
+  norm = c::HWS.normalize_sets([legacy]).first
+  NxTest.assert(norm, 'set sa precita')
+  NxTest.assert_equal('lift', norm['use_type'], 'klasifikacia OSTAVA')
+  NxTest.assert_equal('classic', norm['opening_mode'])
+  NxTest.refute(norm.key?('lift_system'), 'system ostava NEURCENY (nedopisuje sa)')
+  NxTest.refute(c::HWS.classification_lost?([legacy], [norm]), 'ziadna priznana strata')
+  status, = c::HWS.assess_library_doc('sets' => [legacy], 'mapping' => {})
+  NxTest.assert_equal(:ok, status, 'kniznica s takym setom NIE JE read-only')
+
+  # Triedny kluc na neho NIKDY neukaze — system nie je znamy.
+  ids = c::HWS.class_set_options('class:lift|classic|hk_top', [norm], {}, [])
+              .map { |o| o['set_id'] }.compact
+  NxTest.assert_equal([], ids, 'set bez systemu sa triednemu klucu NEPONUKA')
+
+  # ZAPIS system NADALEJ vyzaduje — inak by legacy tvar vznikal aj po tejto verzii.
+  _n, errs = c::HWS.validate_set(legacy)
+  NxTest.assert(errs.first.to_s.include?('systém'), errs.inspect)
+  # Doplneny system prejde (to je cesta von z legacy stavu).
+  _n2, ok = c::HWS.validate_set(legacy.merge('lift_system' => 'hk_top'))
+  NxTest.assert_equal([], ok)
 end
 
 # ============================================================================

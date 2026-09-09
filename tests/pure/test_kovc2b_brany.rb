@@ -153,11 +153,11 @@ end
 NxTest.test('KOV-C2b (R4): nedokazatelna expanzia pri receptovej polozke = fail-closed') do
   c = NxC2bB
   with_recipe = { hardware_issues: [], hardware: [c.recipe_item] }
-  NxTest.assert(c::PC.drawer_expansion_unproven?(with_recipe, nil))
+  NxTest.assert(c::PC.hardware_expansion_unproven?(with_recipe, nil))
   NxTest.assert(c::PC.drawer_stop(with_recipe, nil).to_s.include?('kit zásuviek'))
   # Zakazka BEZ receptovych poloziek sa nemeni (legacy sprava ostava).
   legacy = { hardware_issues: [], hardware: [c.legacy_item] }
-  NxTest.refute(c::PC.drawer_expansion_unproven?(legacy, nil))
+  NxTest.refute(c::PC.hardware_expansion_unproven?(legacy, nil))
   NxTest.assert_equal(nil, c::PC.drawer_stop(legacy, nil))
 end
 

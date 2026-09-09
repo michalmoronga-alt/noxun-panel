@@ -2361,7 +2361,14 @@ module Noxun
           # D-118b: set sa NASIEL a sedel, len pre tuto dlzku nema ani jednu
           # polozku (vsetky bunky su `none`). Bez vlastnej vety by riadok
           # Nakupu aj CSV tvrdili „typ nemá priradený set", co je zavadzajuce.
-          "set „#{sid}“ nemá pre túto dĺžku ani jednu položku — doplň rad setu"
+          # KOV-E1a (Codex #332 kolo 2 P2): pri VYKLOPE nejde o dlzku, ale
+          # o pocty — vsetci clenovia setu vysli na nulu.
+          if u['generic_type'].to_s == 'lift'
+            "set „#{sid}“ nevydal pre tento výklop ani jednu položku — " \
+              'skontroluj počty a kódy v sete'
+          else
+            "set „#{sid}“ nemá pre túto dĺžku ani jednu položku — doplň rad setu"
+          end
         when 'set_none'
           # KOV-F1: VEDOMA volba „bez setu" (sentinel mapovania). Nie je to
           # chyba nastavenia, ale rozhodnutie — a nakup to musi priznat, inak
@@ -4262,7 +4269,16 @@ module Noxun
         # (`unmapped_entry` dovod vzapati povysi na RED `drawer_kit_missing`
         # s `blocks_export`). Polozky Z PRAVIDIEL sa spravaju ako doteraz:
         # prazdny pevny kod je legitimny sposob, ako clena vypnut.
-        return unless it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE
+        #
+        # KOV-E1a (Codex #332 kolo 2 P2): VYKLOP ma tu istu vahu ako receptova
+        # zasuvka. Nula je platne vynechanie JEDNEHO clena (HL pod 1100 mm nema
+        # predlzenie tyce), ale ked set nevyda ANI JEDEN riadok, je to vyklop
+        # BEZ KOVANIA — a bez tohto zaznamu by expanzia vratila 0 riadkov aj
+        # 0 nemapovanych, takze nakup, rozpocet aj ponuka by presli mlcky.
+        # `unmapped_entry` dovod vzapati povysi na RED `lift_set_incomplete`
+        # (`base_reason` = `members_skipped`, `blocks_export`).
+        return unless it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE ||
+                      it['generic_type'].to_s == 'lift'
 
         unmapped << unmapped_entry(it, sid, 'members_skipped',
                                    'detail' => 'set nevydal žiadnu položku')
@@ -4759,7 +4775,10 @@ module Noxun
         # receptovu polozku nevyda ani jeden riadok, `expand` z toho robi RED
         # `drawer_kit_missing` — karta by inak tvrdila „vsetky členy netreba",
         # kym Kontrola hlasi nevyrobitelnu zasuvku.
-        return unless it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE
+        # KOV-E1a (Codex #332 kolo 2 P2): to iste pri VYKLOPE — `expand` z toho
+        # robi RED `lift_set_incomplete`, takze nahlad to musi povedat tiez.
+        return unless it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE ||
+                      it['generic_type'].to_s == 'lift'
 
         out['problems'] << unmapped_reason_sk(
           unmapped_entry(it, sid, 'members_skipped', 'detail' => 'set nevydal žiadnu položku')
@@ -5020,8 +5039,17 @@ module Noxun
       # `generic_type` je pri klasifikovanom sete ODVODENY (`USE_TYPE_GENERIC`):
       # chybajuci sa DOPLNI, nesediaci je CHYBA. Pri `use_type: 'other'` mapa
       # neexistuje, takze typ musi prist explicitne.
+      # `legacy_lift:` (Codex #332 kolo 2 P1) — LEN CITACIA cesta. Set
+      # `use_type: 'lift'` BEZ `lift_system` je LEGACY TVAR z verzie, kde to
+      # pole este neexistovalo (v0.9.52 a starsie). Zapis ho nepusti, ale
+      # CITANIE ho musi uznat, inak by kniznica s takym setom skoncila ako
+      # „stratena klasifikacia" -> read-only / neplatny snapshot a pouzivatel
+      # by set nemal ako opravit. Klasifikacia sa preto zachova BEZ systemu
+      # (= „neurceny"): triednemu klucu `class:lift|…|hk_top/hl_top` taky set
+      # NIKDY nesadne (porovnanie s prazdnym retazcom zlyha), ostava vsak
+      # pouzitelny cez legacy genericke mapovanie `lift`.
       # -> [klasifikacia Hash, generic_type String, errors]
-      def classify(s, sid)
+      def classify(s, sid, legacy_lift: false)
         gt = s['generic_type'].to_s.strip
         return [{}, gt, []] unless classified?(s)
 
@@ -5052,8 +5080,11 @@ module Noxun
         ls = s[LIFT_SYSTEM_KEY].to_s.strip
         if ut == 'lift'
           if ls.empty?
-            errors << set_err(LIFT_SYSTEM_KEY,
-                              "set „#{sid}“: pri výklope treba uviesť systém (HK top / HL top)")
+            # `legacy_lift` = citacia cesta: chybajuce pole je LEGACY, nie chyba.
+            unless legacy_lift
+              errors << set_err(LIFT_SYSTEM_KEY,
+                                "set „#{sid}“: pri výklope treba uviesť systém (HK top / HL top)")
+            end
           elsif !LIFT_SYSTEMS.include?(ls)
             errors << set_err(LIFT_SYSTEM_KEY, "set „#{sid}“ má neznámy systém výklopu „#{ls}“")
           end
@@ -5100,7 +5131,9 @@ module Noxun
         out['use_type'] = ut
         out['opening_mode'] = om
         out['drawer_construction'] = dc if ut == 'drawer'
-        out[LIFT_SYSTEM_KEY] = ls if ut == 'lift'
+        # Legacy vyklop bez systemu: kluc sa NEUKLADA (klasifikacia ostava
+        # platna, system je „neurceny" — triedny kluc na taky set nesadne).
+        out[LIFT_SYSTEM_KEY] = ls if ut == 'lift' && !ls.empty?
         out['manufacturer'] = man.strip
         # VOLITELNA rada (vedoma odchylka od mockupu, ktory ju ukazuje ako
         # povinnu): podperky, klzaky ani „Bystrica" ziadnu radu nemaju a
@@ -5438,7 +5471,12 @@ module Noxun
       def read_set_classification(s, sid)
         return {} unless classified?(s)
 
-        klass, gt, errors = classify(s, sid)
+        # Codex #332 kolo 2 P1: LEGACY VYKLOP (klasifikovany set `use_type:
+        # 'lift'` z v0.9.52, kde `lift_system` este neexistoval) sa cita ako
+        # PLATNY — bez systemu. Bez tejto vynimky by nova povinnost pola
+        # zhodila klasifikaciu celej kniznice (read-only / neplatny snapshot)
+        # a pouzivatel by set nemal kde doplnit.
+        klass, gt, errors = classify(s, sid, legacy_lift: true)
         # Aj ked su pravidla splnene, ODVODENY typ sa musi zhodovat s ULOZENYM
         # — inak by set po zapise zmenil typ kovania (a s nim aj nakup).
         return klass if errors.empty? && gt == s['generic_type'].to_s.strip

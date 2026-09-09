@@ -1060,6 +1060,11 @@ module Noxun
             'vyber správny set'
           when 'set_missing'
             "projekt odkazuje na set „#{sid}“, ktorý v ňom nie je — vyber set nanovo"
+          when 'members_skipped'
+            # KOV-E1a (Codex #332 kolo 2 P2): set sedel, ale VSETCI jeho
+            # clenovia vysli na nulu — vyklop by sa objednal „bez kovania".
+            "set „#{sid}“ nevydal pre tento výklop ani jednu položku — " \
+            'skontroluj počty a kódy v sete'
           when 'set_none'
             'výklop je vedome bez setu — ak to tak nemá byť, vyber set v Pravidlách Štúdia'
           when 'mapping_invalid'

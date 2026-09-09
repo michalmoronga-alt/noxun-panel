@@ -81,7 +81,8 @@ const CLASS_OPTIONS = {
   opening_mode: [['classic', 'Klasické'], ['tipon', 'Tip-On'],
                  ['other', 'Ostatné / neuplatňuje sa']],
   drawer_construction: [['metal', 'Kovové bočnice'], ['wood', 'Drevený box / skrytý výsuv'],
-                        ['other', 'Ostatné / atyp']]
+                        ['other', 'Ostatné / atyp']],
+  lift_system: [['hk_top', 'HK top (veko)'], ['hl_top', 'HL top (paralelný zdvih)']]
 };
 const PARAMS = [
   { key: 'height', label: 'výška sokla', by: 'podľa výšky sokla' },
@@ -246,6 +247,20 @@ function lastToken(){
   setVal('nxm_use_type', 'door');
   eq(fieldKeys().indexOf('drawer_construction'), -1,
      'po prepnutí na dvierka konštrukcia zmizne');
+
+  // KOV-E1a (Codex #332 kolo 2 P1): systém výklopu má PRESNE to isté miesto
+  // a správanie ako konštrukcia zásuvky. Bez tohto poľa sa set `use_type:
+  // 'lift'` z v0.9.52 (kde pole neexistovalo) nedal uložiť — server ho odmietal
+  // vetou „pri výklope treba uviesť systém", ale modal nemal kde ho zadať.
+  setVal('nxm_use_type', 'lift');
+  eq(fieldKeys(), ['use_type', 'opening_mode', 'lift_system', 'manufacturer',
+                   'series', 'name', 'active'],
+     'systém výklopu je 3. pole — LEN pri výklope');
+  setVal('nxm_lift_system', 'hl_top');
+  eq(el('nxm_lift_system').value, 'hl_top', 'voľba systému v modale drží');
+  setVal('nxm_use_type', 'door');
+  eq(fieldKeys().indexOf('lift_system'), -1,
+     'po prepnutí na dvierka systém výklopu zmizne');
 
   setVal('nxm_use_type', 'other');
   ok(fieldKeys().indexOf('generic_type') > -1,
@@ -637,15 +652,22 @@ function lastToken(){
 // ====== 13) P2-3: „— nezaradený —" VYMAŽE CELÝ KLASIFIKAČNÝ BLOK =============
 (function(){
   eq(HWS.hwsApplyUseType({ use_type: '', opening_mode: 'classic', drawer_construction: 'metal',
+                           lift_system: 'hk_top',
                            manufacturer: 'Hettich', series: 'Sensys', manufacturer_new: 'X',
                            series_new: 'Y', generic_type: 'slide', name: 'N' }),
-     { use_type: '', opening_mode: '', drawer_construction: '', manufacturer: '',
-       series: '', manufacturer_new: '', series_new: '', generic_type: 'slide', name: 'N' },
+     { use_type: '', opening_mode: '', drawer_construction: '', lift_system: '',
+       manufacturer: '', series: '', manufacturer_new: '', series_new: '',
+       generic_type: 'slide', name: 'N' },
      'KOV-B3 (P2-3): nezaradený set nemá ANI JEDEN klasifikačný kľúč (typ kovania ostáva)');
   eq(HWS.hwsApplyUseType({ use_type: 'door', drawer_construction: 'metal' }).drawer_construction,
      '', 'konštrukcia patrí výhradne zásuvke');
   eq(HWS.hwsApplyUseType({ use_type: 'drawer', drawer_construction: 'metal' }).drawer_construction,
      'metal', 'pri zásuvke ostáva');
+  // KOV-E1a: systém výklopu má rovnaký režim ako konštrukcia zásuvky.
+  eq(HWS.hwsApplyUseType({ use_type: 'drawer', lift_system: 'hk_top' }).lift_system,
+     '', 'systém výklopu patrí výhradne výklopu');
+  eq(HWS.hwsApplyUseType({ use_type: 'lift', lift_system: 'hk_top' }).lift_system,
+     'hk_top', 'pri výklope ostáva');
 
   HWS.HWSETS.init(payload());
   openEdit('atira-h176');

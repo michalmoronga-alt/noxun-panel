@@ -11,6 +11,8 @@
 //   2) BEZSTRATOVÝ round-trip: knižnica -> editor -> payload servera
 //   3) súhrn člena vie nové tvary prečítať (nie prázdny riadok)
 //   4) legacy tvary (pevný kód, rad NL, pásma) sa správajú PRESNE ako doteraz
+//   5) `lift_system` prejde knižnica -> editor -> payload servera BEZ straty
+//      (Codex #332 kolo 2 P1 — bez toho sa legacy výklop nedal doplniť)
 //
 // MUTÁCIE, ktoré sada chytá:
 //   M1 `hwsMembersOf` rozoberie nový tvar na polia   -> round-trip
@@ -18,11 +20,12 @@
 //   M3 `quantity_from` sa cestou stratí              -> round-trip
 //   M4 súhrn nového člena je prázdny reťazec         -> súhrn
 //   M5 set s novým členom sa tvári upraviteľný       -> hwsSetIsNewShape
+//   M6 `lift_system` sa cestou modal -> server stratí -> round-trip poľa
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
 const { hwsMemberIsNew, hwsSetIsNewShape, hwsMembersOf, hwsBuildMembers,
-        hwsMemberSummary, hwsBuildSetPayload, HWS_LOCKED_HINT } =
+        hwsMemberSummary, hwsBuildSetPayload, hwsSetDraftOf, HWS_LOCKED_HINT } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'hw_sets.js'));
 
 let n = 0;
@@ -108,5 +111,29 @@ eq(hwsBuildMembers(hwsMembersOf(legacy)),
    [{ per: 'unit', qty: 1, label: 'záves', code: '104717' },
     { per: 'unit', qty: 1, code_by_nl: { 420: '357695', 470: '357696' } }],
    'legacy set round-trip bez zmeny');
+
+// --- 5) `lift_system` v editore (Codex #332 kolo 2 P1) ------------------------
+// Legacy set z v0.9.52 je `use_type: 'lift'` BEZ systému. Server ho číta ako
+// zaradený (grandfather), ale zápis systém VYŽADUJE — takže modal ho musí
+// vedieť poslať, inak sa taký set už nikdy neuloží.
+const LEGACY_LIFT = { set_id: 'moj-vyklop', name: 'Môj výklop', generic_type: 'lift',
+                      use_type: 'lift', opening_mode: 'classic', manufacturer: 'Blum',
+                      members: [{ per: 'unit', qty: 1, code: '347810' }] };
+eq(hwsSetDraftOf(HL_SET).lift_system, 'hl_top', 'uložený systém sa dostane do editora');
+eq(hwsSetDraftOf(LEGACY_LIFT).lift_system, '', 'legacy set sa otvorí s prázdnym systémom');
+
+const doplneny = hwsBuildSetPayload({ set_id: LEGACY_LIFT.set_id, name: LEGACY_LIFT.name,
+                                      use_type: 'lift', opening_mode: 'classic',
+                                      lift_system: 'hk_top', manufacturer: 'Blum' },
+                                    hwsMembersOf(LEGACY_LIFT));
+eq(doplneny.lift_system, 'hk_top', 'doplnený systém odchádza na server');
+// Kľúč sa posiela VŽDY (aj prázdny) — `save_set!` merguje, takže vynechaný
+// kľúč by v uloženom sete nechal systém po prepnutí typu použitia.
+const zasuvka = hwsBuildSetPayload({ set_id: 'z', name: 'Z', use_type: 'drawer',
+                                     opening_mode: 'classic', drawer_construction: 'metal',
+                                     lift_system: 'hk_top', manufacturer: 'Hettich' }, []);
+eq(zasuvka.lift_system, '', 'pri zásuvke odchádza PRÁZDNY systém (vedomé vymazanie)');
+ok(Object.prototype.hasOwnProperty.call(zasuvka, 'lift_system'),
+   'kľúč sa nikdy nevynechá — server merguje');
 
 console.log(`OK — test_hw_sets_code_by_param.js: ${n} testov preslo`);

@@ -1309,13 +1309,25 @@ module Noxun
       end
 
       # Cerstva expanzia kovania nedostupna (chyba katalogu/setov) A zakazka MA
-      # aspon jednu receptovu polozku = nedokazatelny stav. Fail-closed:
-      # zastavime, rovnako ako pri neznamej expanzii duplicit.
-      def drawer_expansion_unproven?(collected, expansion)
+      # polozku, ktorej UPLNOST sa da dokazat LEN expanziou = nedokazatelny
+      # stav. Fail-closed: zastavime, rovnako ako pri neznamej expanzii duplicit.
+      #
+      # DVA druhy takych poloziek (KOV-E1a, Codex #332 kolo 2 P1):
+      #   * RECEPTOVA (`source: 'recipe'`) — zasuvka ma postavene dielce rezane
+      #     na konkretnu NL a bez expanzie sa neda overit, ci k nim existuje kit,
+      #   * VYKLOP (`generic_type: 'lift'`) — je to ZOSTAVA (mechanizmus +
+      #     prichyt + krytky + …) a jej uplnost dokazuje az expanzia; bez nej by
+      #     rozpocet aj ponuka presli s vyklopom UPLNE BEZ kovania (sekcia
+      #     kovania sa pri `nil` len ticho vynecha).
+      # Nazov sa preto zovseobecnil z `drawer_expansion_unproven?`.
+      def hardware_expansion_unproven?(collected, expansion)
         return false unless expansion.nil?
 
         Array(collected.is_a?(Hash) ? collected[:hardware] : nil).any? do |it|
-          it.is_a?(Hash) && it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE
+          next false unless it.is_a?(Hash)
+
+          it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE ||
+            it['generic_type'].to_s == 'lift'
         end
       end
 
@@ -1327,10 +1339,10 @@ module Noxun
       # zavesove. Premenovanie by bolo cisto kozmeticka zmena osmich miest;
       # co brana zastavuje, hovori register, nie meno metody.
       def drawer_stop(collected, expansion, scope: :all)
-        if drawer_expansion_unproven?(collected, expansion)
+        if hardware_expansion_unproven?(collected, expansion)
           return export_blocked_status(
             ['nákupný zoznam kovania sa nedá zostaviť, takže sa nedá overiť kit zásuviek ' \
-             '(pozri Ruby konzolu)']
+             'ani zostava výklopov (pozri Ruby konzolu)']
           )
         end
         reasons = hardware_blockers(collected, expansion, scope: scope)
