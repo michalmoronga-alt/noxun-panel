@@ -1042,8 +1042,17 @@ module Noxun
         reason =
           case u['base_reason'].to_s
           when 'class_unmapped'
-            "set „#{sid}“ nemá kód pre triedu, ktorú výklop potrebuje#{detail} — " \
-            'doplň kód do setu'
+            # KOV-E1a (Codex #332 kolo 1 P2): TEN ISTY dovod ma DVA zdroje a
+            # DVE napravy. Chybajuce TRIEDNE MAPOVANIE (resolver — zaznam nema
+            # `param` ani `set_id`) sa opravuje v Pravidlach; bez tohto
+            # rozlisenia by veta znela „set „“ nemá kód" a poslala cloveka
+            # dopĺňať kód do setu, ktorý ani neexistuje.
+            if HardwareSets.class_unmapped_lift?(u)
+              'výklop nemá predvolený set — otvor Pravidlá → Doplniť nové predvoľby'
+            else
+              "set „#{sid}“ nemá kód pre triedu, ktorú výklop potrebuje#{detail} — " \
+              'doplň kód do setu'
+            end
           when 'quantity_unresolved'
             "set „#{sid}“ nevie určiť počet#{detail} — chýba údaj z pravidla výklopu"
           when 'set_incompatible'

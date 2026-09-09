@@ -662,11 +662,17 @@ navyše jednotka, pri HL top ramená a stabilizačná tyč), a mechanizmus sa vy
   ďalší druh v XOR. Hodnota musí byť **celé nezáporné číslo**: `0` = **člen sa VEDOME NEVYDÁ** (rozhodne sa PRED `add_row`, takže riadok s počtom 0 vôbec nevznikne — `finalize`
   ho nezahadzuje; HL top pod šírkou korpusu 1100 mm teda nemá riadok `507366` vôbec), chýbajúca, necelá alebo záporná hodnota = **nevyriešený člen** (`quantity_unresolved`).
   Kombinuje sa s `per: 'owner'` — tyč je na ČELO, nie na kus, takže dve pravidlá s výstupom `lift` na jednom čele ju nezdvoja (existujúci dedup `(korpus, vlastník, set, kód)`).
+  **PORADIE JE KONTRAKT (Codex #332 kolo 1 P2):** počet sa vyhodnocuje PRED `member_code` — v `expand_members` aj v `explain_members`. Člen, ktorý sa vedome nevydá, svoj kód
+  rozlíšiť NEMUSÍ; opačné poradie by pri predlžovacom diele s počtom 0 hlásilo chýbajúcu triedu (RED `lift_set_incomplete`) na zákazke, kam ten diel vôbec nepatrí.
 - **BRÁNA ÚPLNOSTI `lift_set_incomplete` (Astra BLOCKER 1).** Pri položke s `generic_type == 'lift'` sa **KAŽDÝ** dôvod nemapovania povýši na RED s `blocks_export`
   (`unmapped_entry`, presný vzor receptového `drawer_kit_missing`) — vrátane chýbajúceho setu a chýbajúceho mapovania; pôvodný dôvod cestuje v `base_reason`. Riadky ostatných
   členov v zozname **ostávajú** (rovnako ako pri zásuvke), ale von sa nedostanú: kód je v `BuildPlan::HW_LIFT_BLOCKERS` aj vo `from_expansion`
   (`ProductionCore.hardware_blockers`), takže nákup kovania, rozpočet aj cenová ponuka STOJA a „krytky bez mechanizmu" NIKDY neopustia plugin. **VEPO beží ďalej** — geometria
   čela je správna (tá istá úvaha ako pri závesoch). Vetu skladá `Validation.lift_incomplete_item` (RED, kategória `hardware_incomplete`) a menuje čelo, systém aj člena.
+  **Dôvod `class_unmapped` má DVA zdroje a DVE nápravy** (Codex #332 kolo 1 P2) — rozlišuje ich `HardwareSets.class_unmapped_lift?`, JEDNA autorita pre Nákup
+  (`unmapped_reason_sk`) aj pre vetu Kontroly: **resolver-level** (chýba triedny kľúč `class:lift|…`; záznam nesie `class_key` a nemá `param` ani `set_id`) → „výklop nemá
+  predvolený set — Pravidlá → Doplniť nové predvoľby", **member-level** (`code_by_param` bez kódu triedy; `param` aj `set_id` sú prítomné) → „set X nemá kód pre …".
+  Bez rozlíšenia znela veta „set „“ nemá kód" a Nákup ju označoval ako zásuvku.
 - **Klasifikačné pole `lift_system` (`hk_top` | `hl_top`)** je **POVINNÉ pri `use_type: 'lift'` a ZAKÁZANÉ inde** — presne tá istá logika ako `drawer_construction` pri zásuvke
   (sklop `fall` systém nemá, vzpery sú mimo V1). Je v `CLASS_KEYS`, `SET_KEYS`, `SET_KEY_ORDER`, `CLASS_OPTIONS` aj vo whitelistoch šablón; jeho stratu chytá **vlastná vrstva**
   v `classification_lost?` (kontrola „žiadny klasifikačný kľúč" by ju prehliadla, a bez systému by HL set vyzeral ako HK).
@@ -674,7 +680,10 @@ navyše jednotka, pri HL top ramená a stabilizačná tyč), a mechanizmus sa vy
   segment PODĽA TYPU (`slide` → konštrukcia, `lift` → systém) a **`class:lift|tipon|hl_top` ODMIETA** vetou „HL top Tip-On neexistuje" (Blum ani Démos ho nemajú). Platné kľúče
   sú tri a všetky sú v `MAPPING_ADDITIONS` (add-if-absent, existujúca voľba sa nikdy neprepíše): `class:lift|classic|hk_top` → `vyklop-hk-klasik` · `class:lift|tipon|hk_top`
   → `vyklop-hk-tipon` · `class:lift|classic|hl_top` → `vyklop-hl-klasik`. Ponuku filtruje `class_set_match?` vetvou pre `lift` (typ použitia + systém; požiadavka „vydaný systém
-  zásuviek" sa výklopu netýka) a zápis stráži `class_key_value_problem`.
+  zásuviek" sa výklopu netýka) a zápis stráži `class_key_value_problem`. **Doplnenie predvoľby overuje DEFINÍCIU, nielen existenciu `set_id`** (Codex #332 kolo 1 P1,
+  `mapping_seed_ref_ok?`): knižnica mohla mať pod tým istým ID vlastný, nezaradený set — `merge_seed` ho správne nechá tak, a default sa mu preto NENASADÍ. Referencia musí
+  sedieť tou istou autoritou, akou sa set ponúka v Pravidlách (`class_set_match?` = typ použitia + otváranie + tretí segment) a jej členovia musia byť čitateľní
+  (`incompatible_member?`). Nesediaca definícia = kľúč sa nedoplní a položka skončí `class_unmapped` (brána + veta „Doplniť nové predvoľby"), nikdy tichý zlý nákup.
 - **OWNER kľúč `@front:<id>/flap`** (tak sa vyberá TMAVÝ set pre JEDNO čelo — UI príde v E2). `CLASS_OWNER_RE` pozná `panel|flap` a **`CLASS_OWNER_PART` páruje triedu s dielcom**
   (`slide` → `panel`, `lift` → `flap`): krížom by kľúč ukazoval na dielec, ktorý tá trieda nikdy nemá, a resolver by ho nikdy neprečítal. Parse, zápisová validácia, resolver aj
   pruning zmazaného čela sa `/flap` naučili v JEDNEJ dávke (Astra FIX 6). K tomu patrí **`CabinetBuilder::CONFIG_SCHEMA` 9 → 10**: owner mapovanie je perzistentná hodnota
@@ -692,7 +701,7 @@ navyše jednotka, pri HL top ramená a stabilizačná tyč), a mechanizmus sa vy
   ktorý nesie nový tvar (`new_shape_members?`), ODMIETNE — názov, aktívnosť a klasifikácia sa meniť smú. Súhrn člena aj živý náhľad nové tvary čítajú („podľa lift_class",
   „počet podľa rod_count"); `preview_expansion` si vzorovú triedu a počet doplní z DRAFTU, takže náhľad neukazuje samé ORANGE riadky.
 
-Testy: `tests/pure/test_kove1a_data.rb` (23 testov, 16 pomenovaných mutácií vrátane golden charakterizácie „existujúca zákazka nakupuje presne ako pred dávkou")
+Testy: `tests/pure/test_kove1a_data.rb` (29 testov, 19 pomenovaných mutácií vrátane golden charakterizácie „existujúca zákazka nakupuje presne ako pred dávkou")
 + JS `tests/js/test_hw_sets_code_by_param.js` (bezstratový transport, súhrn, read-only stav).
 
 

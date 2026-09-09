@@ -52,6 +52,9 @@
 #   M14 seed prepise pouzivatelsku katalogovu polozku -> patch v3 -> v4
 #   M15 `CONFIG_SCHEMA` ostane na 9                   -> owner `/flap` v configu
 #   M16 seed vyklopov zmeni nakup starej zakazky      -> golden
+#   M17 predvolbu dostane CUDZI set s tym istym ID    -> `mapping_seed_ref_ok?`
+#   M18 kod sa rozlisuje aj pri pocte 0               -> pocet PRVY (expand aj explain)
+#   M19 chybajuca predvolba hlasi „set „“ nema kod"   -> resolver vs. member veta
 require_relative '../helper' unless defined?(NxTest)
 
 require 'json'
@@ -281,6 +284,34 @@ NxTest.test('KOV-E1a (3): CHYBAJUCA trieda aj chybajuci set su ta ista RED brana
   NxTest.assert_equal(true, bez_setu['unmapped'].first['blocks_export'])
 end
 
+NxTest.test('KOV-E1a (3): CHYBAJUCA PREDVOLBA a chybajuci KOD maju ROZNE vety') do
+  c = NxKovE1a
+  # (a) RESOLVER-LEVEL: projekt este nema kluc `class:lift|…`. Naprava je
+  # v Pravidlach — veta preto NESMIE menovat prazdny set ani zasuvku
+  # (Codex #332 kolo 1 P2).
+  bez_setu = c::HWS.expand([c.item], { 'mapping' => {}, 'sets' => {} })
+  u = bez_setu['unmapped'].first
+  nakup = c::HWS.unmapped_reason_sk(u)
+  NxTest.assert(nakup.include?('výklop'), nakup)
+  NxTest.refute(nakup.include?('zásuvka'), "z vyklopu sa nesmie stat zasuvka: #{nakup}")
+  NxTest.refute(nakup.include?('set „“'), "prazdny set sa nemenuje: #{nakup}")
+  items = []
+  c::V.check_hardware_expansion(bez_setu, items)
+  veta = items.first['message_sk']
+  NxTest.assert(veta.include?('Doplniť nové predvoľby'), veta)
+  NxTest.refute(veta.include?('set „“'), "veta Kontroly nesmie menovat prazdny set: #{veta}")
+  # (b) MEMBER-LEVEL: set JE vybrany, len nema kod triedy — veta ostava pri
+  # „set X nemá kód" a navadza na doplnenie kodu do setu.
+  st = c.state({ 'class:lift|classic|hk_top' => 'vyklop-hk-klasik' }, ['vyklop-hk-klasik'])
+  bez_kodu = c::HWS.expand([c.item('params' => { 'lift_class' => '22K9999' })], st)
+  NxTest.assert(c::HWS.unmapped_reason_sk(bez_kodu['unmapped'].first).include?('nemá kód pre triedu'),
+                'chybajuci kod triedy ma svoju vlastnu vetu')
+  items2 = []
+  c::V.check_hardware_expansion(bez_kodu, items2)
+  NxTest.assert(items2.first['message_sk'].include?('vyklop-hk-klasik'),
+                items2.first['message_sk'])
+end
+
 NxTest.test('KOV-E1a (3): kod je v REGISTRI bran — zastavi nakup, VEPO nie') do
   c = NxKovE1a
   NxTest.assert(c::BP.hw_blockers.include?(c::HWS::LIFT_SET_INCOMPLETE),
@@ -343,6 +374,35 @@ NxTest.test('KOV-E1a (4): chybajuci alebo necely pocet = NEVYRIESENY clen (RED)'
     NxTest.assert_equal(true, u['blocks_export'])
     NxTest.assert_equal('rod_count', u['param'])
   end
+end
+
+NxTest.test('KOV-E1a (4): NULOVY pocet sa rozhodne PRED kodom — triedu uz netreba') do
+  c = NxKovE1a
+  # Clen s poctom 0 sa VEDOME NEVYDA, takze jeho kod sa NEMUSI rozlisit
+  # (Codex #332 kolo 1 P2). Pred opravou bezal `member_code` skor a set hlasil
+  # RED „chybajuca trieda" pri dieli, ktory do zakazky vobec nepatri.
+  set = c::HWS.normalize_sets([{
+    'set_id' => 'test-nula', 'name' => 'Test nuloveho clena', 'generic_type' => 'lift',
+    'use_type' => 'lift', 'opening_mode' => 'classic', 'lift_system' => 'hk_top',
+    'manufacturer' => 'Blum', 'series' => 'AVENTOS',
+    'members' => [{ 'per' => 'unit', 'qty' => 1, 'label' => 'Predĺženie',
+                    'quantity_from' => 'rod_extension',
+                    'code_by_param' => { 'param' => 'lift_class',
+                                         'codes' => { '22K2300' => '347810' } } }]
+  }]).first
+  st = { 'mapping' => { 'class:lift|classic|hk_top' => 'test-nula' },
+         'sets' => { 'test-nula' => set } }
+  ziadne = c::HWS.expand([c.item('params' => { 'lift_class' => nil, 'rod_extension' => 0 })], st)
+  NxTest.assert_equal([], ziadne['rows'], 'nulovy clen riadok nevyda')
+  NxTest.assert_equal([], ziadne['unmapped'],
+                      'a NEHLASI chybajucu triedu — clen sa vedome nevydava')
+  # Ten isty set s poctom 1 chybajucu triedu hlasi (brana ostava fail-closed).
+  jeden = c::HWS.expand([c.item('params' => { 'lift_class' => nil, 'rod_extension' => 1 })], st)
+  NxTest.assert_equal([c::HWS::LIFT_SET_INCOMPLETE], c.reasons(jeden))
+  # SUPIS (`explain`) drzi TO ISTE poradie — panel a nakup sa nesmu rozist.
+  ex = c::HWS.explain(c.item('params' => { 'lift_class' => nil, 'rod_extension' => 0 }), st)
+  NxTest.assert_equal([], ex['problems'], ex['problems'].inspect)
+  NxTest.assert_equal([], ex['members'], 'nulovy clen sa v supise neukaze')
 end
 
 NxTest.test('KOV-E1a (4): `per: owner` clen sa DVOMA pravidlami na jednom cele NEZDVOJI') do
@@ -526,6 +586,31 @@ NxTest.test('KOV-E1a (8): tri vyklopove predvolby pribudnu a EXISTUJUCU volbu ne
   NxTest.assert_equal('moj-vyklop', merged['class:lift|classic|hk_top'], 'ruky prec')
   NxTest.assert_equal('vyklop-hl-klasik', merged['class:lift|classic|hl_top'],
                       'chybajuce kluce sa doplnili')
+end
+
+NxTest.test('KOV-E1a (8): CUDZI set s rovnakym `set_id` sa predvolbou NESTANE') do
+  c = NxKovE1a
+  # Kniznica uz ma vlastny, NEZARADENY set s ID, ktore si seed naroky.
+  # `merge_seed` jeho obsah spravne nechal tak — a default sa mu preto nesmie
+  # nasadit ani „lebo ID existuje" (Codex #332 kolo 1 P1). Inak by z neho
+  # expanzia vydala LUBOVOLNE kody BEZ brany uplnosti.
+  legacy = { 'set_id' => 'vyklop-hk-klasik', 'name' => 'Moj stary vyklop',
+             'generic_type' => 'lift',
+             'members' => [{ 'per' => 'unit', 'qty' => 1, 'label' => 'Cosi', 'code' => '999999' }] }
+  sets = c.seed_sets.reject { |s| s['set_id'] == 'vyklop-hk-klasik' } +
+         c::HWS.normalize_sets([legacy])
+  out = c::HWS.add_mapping_seed(sets, {})
+  NxTest.refute(out.key?('class:lift|classic|hk_top'),
+                'nezaradena definicia s tym istym ID HK default NEDOSTANE')
+  NxTest.assert_equal('vyklop-hk-tipon', out['class:lift|tipon|hk_top'],
+                      'NEDOTKNUTY seed set svoj kluc dostane (kontrakt sa nezuzil)')
+  # Polozka tak skonci na BRANE (chybajuca predvolba), nie na cudzich kodoch.
+  exp = c::HWS.expand([c.item], { 'mapping' => out, 'sets' => {} })
+  NxTest.assert_equal([], exp['rows'], 'ziadny kod cudzieho setu sa nevyda')
+  NxTest.assert_equal([c::HWS::LIFT_SET_INCOMPLETE], c.reasons(exp))
+  # Kontrola: nedotknuta seed kniznica funguje presne ako doteraz.
+  cista = c::HWS.add_mapping_seed(c.seed_sets, {})
+  NxTest.assert_equal('vyklop-hk-klasik', cista['class:lift|classic|hk_top'])
 end
 
 # ============================================================================

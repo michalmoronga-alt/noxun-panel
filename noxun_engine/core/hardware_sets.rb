@@ -1667,19 +1667,49 @@ module Noxun
       #      ktora prepis robi, ale len nad nedotknutym seed stavom),
       #   2) kluc sa doplni LEN ked su VSETKY sety, na ktore hodnota ukazuje,
       #      v kniznici (ciastocny selektor by ticho menil, co sa vyberie —
-      #      ta ista uvaha ako v `global_default_state`).
+      #      ta ista uvaha ako v `global_default_state`) A ZODPOVEDAJU TRIEDE
+      #      (Codex #332 kolo 1 P1, viz `mapping_seed_ref_ok?`).
       def add_mapping_seed(sets, mapping)
         by_id = {}
-        sets.each { |s| by_id[s['set_id']] = true }
+        sets.each { |s| by_id[s['set_id']] = s }
         out = mapping.dup
         MAPPING_ADDITIONS.each do |key, value|
           next if out.key?(key)
           refs = value_set_ids(value)
-          next if refs.empty? || refs.any? { |sid| !by_id[sid] }
+          next if refs.empty?
+          next unless refs.all? { |sid| mapping_seed_ref_ok?(by_id[sid], key) }
+
           out[key] = deep_copy(value)
           Engine.log("hardware sets: doplnene mapovanie '#{key}'") if defined?(Engine)
         end
         out
+      end
+
+      # KOV-E1a (Codex #332 kolo 1 P1): ZODPOVEDA definicia v kniznici triede,
+      # ktorej predvolbu chceme doplnit?
+      #
+      # Samotna PRITOMNOST `set_id` nestaci. Kniznica mohla mat set s tym istym
+      # ID uz predtym (napr. vlastny, NEZARADENY „vyklop-hk-klasik") — `merge_seed`
+      # ho spravne nechal tak, ale default by sme mu aj tak nasadili a expanzia by
+      # z neho vydala LUBOVOLNE kody BEZ brany uplnosti (`lift_incompatible_info`
+      # nezaradene sety pripusta). Preto sa referencia overuje TOU ISTOU autoritou,
+      # akou sa set ponuka v Pravidlach (`class_set_match?`): typ pouzitia, sposob
+      # otvarania a treti segment (system vyklopu / konstrukcia zasuvky).
+      # Naviac musia byt clenovia CITATELNI (`incompatible_member?`) — na set,
+      # ktoremu tato verzia nerozumie, sa default ukazovat nesmie.
+      # Nesediaca definicia = kluc sa NEDOPLNI a polozka skonci `class_unmapped`
+      # (brana + veta „Doplniť nové predvoľby"), nikdy tichy zly nakup.
+      def mapping_seed_ref_ok?(set, key)
+        return false unless set.is_a?(Hash)
+        return true unless class_mapping_key?(key) # legacy kluc typu — len pritomnost
+
+        canon, = parse_class_head(key)
+        return false if canon.nil?
+
+        gt, om, third = canon[BuildPlan::HW_SET_CLASS_PREFIX.length..].to_s.split('|')
+        return false unless class_set_match?(set, gt, om, third)
+
+        Array(set['members']).none? { |m| incompatible_member?(m) }
       end
 
       # Prepis defaultu LEN pri nedotknutom seed stave (vzor F8/LEGACY_SEED_SHAPES):
@@ -2303,6 +2333,12 @@ module Noxun
             who = member_txt(u)
             v.empty? ? "trieda „#{u['param']}“ nie je známa — set „#{sid}“ nemá čo vybrať#{who}" \
                      : "set „#{sid}“ nemá kód pre triedu #{v}#{who}"
+          elsif class_unmapped_lift?(u)
+            # KOV-E1a (Codex #332 kolo 1 P2): projekt, ktoremu chyba NOVY kluc
+            # `class:lift|…`, nie je „zasuvka bez predvolby" — veta by menovala
+            # cudzi typ kovania a poslala hladat konstrukciu zasuvky.
+            'výklop nemá predvolený set pre svoje otváranie a systém — ' \
+              'Pravidlá → Doplniť nové predvoľby'
           else
             # KOV-C2a: zasuvka NIKDY nepada na generický `slide` — H70 kit
             # k zásuvke H176 by bol zlý nákup, a mlčky.
@@ -2337,6 +2373,25 @@ module Noxun
         else
           'typ nemá priradený set'
         end
+      end
+
+      # KOV-E1a (Codex #332 kolo 1 P2): je zaznam `class_unmapped` RESOLVER-LEVEL
+      # (chyba TRIEDNE MAPOVANIE) a patri VYKLOPU?
+      #
+      # Dva zdroje toho isteho dovodu maju ROZNU napravu: resolver-level znamena
+      # „doplň predvoľbu" (zaznam nesie `class_key`, NEMA ani `param`, ani
+      # `set_id`), member-level znamena „doplň kód do setu" (`code_by_param` —
+      # nesie `param` aj `set_id`). Bez tohto rozlisenia by veta pri chybajucej
+      # predvolbe menovala prazdny set („set „“ nemá kód") alebo cudzi typ
+      # kovania. JEDNA autorita pre Nakup aj pre vetu Kontroly.
+      def class_unmapped_lift?(u)
+        return false unless u.is_a?(Hash)
+        return false if u.key?('param') || !u['set_id'].to_s.strip.empty?
+
+        ck = u['class_key'].to_s.strip.downcase
+        return true if ck.start_with?("#{BuildPlan::HW_SET_CLASS_PREFIX}lift|")
+
+        ck.empty? && u['generic_type'].to_s == 'lift'
       end
 
       # KOV-C2a: CO presne na sete nesedi — jedna veta pre semafor aj pre panel.
@@ -4151,23 +4206,16 @@ module Noxun
         sid = set['set_id']
         emitted = false
         Array(set['members']).each_with_index do |m, idx|
-          code, miss = member_code(m, it)
-          if miss
-            emitted = true # ORANGE/RED zaznam UZ vznikol — mlcanie nehrozi
-            unmapped << unmapped_entry(it, sid, miss['reason'], miss.merge(
-                                                                  'member_index' => idx,
-                                                                  'member_label' => m['label']
-                                                                ))
-            next
-          end
-          next if code.nil?
-
-          # KOV-E1a: pocet z parametra polozky. Rozhoduje sa PRED `add_row`:
-          # nula = riadok VOBEC nevznikne (`finalize` riadky s poctom 0
-          # nezahadzuje), nevyriesena hodnota = zaznam s dovodom.
+          # KOV-E1a: pocet z parametra polozky. Rozhoduje sa PRVY a PRED
+          # `add_row`: nula = riadok VOBEC nevznikne (`finalize` riadky s poctom
+          # 0 nezahadzuje), nevyriesena hodnota = zaznam s dovodom.
+          # PORADIE JE KONTRAKT (Codex #332 kolo 1 P2): clen, ktory sa VEDOME
+          # NEVYDA, svoj kod rozlisit NEMUSI — inak by predlzovaci diel
+          # s poctom 0 hlasil chybajucu triedu (RED `lift_set_incomplete`)
+          # pri zakazke, kde ziadny taky diel nepatri.
           mult, qmiss = member_multiplier(m, it)
           if qmiss
-            emitted = true
+            emitted = true # ORANGE/RED zaznam UZ vznikol — mlcanie nehrozi
             unmapped << unmapped_entry(it, sid, qmiss['reason'], qmiss.merge(
                                                                   'member_index' => idx,
                                                                   'member_label' => m['label']
@@ -4175,6 +4223,17 @@ module Noxun
             next
           end
           next if mult.nil?
+
+          code, miss = member_code(m, it)
+          if miss
+            emitted = true
+            unmapped << unmapped_entry(it, sid, miss['reason'], miss.merge(
+                                                                  'member_index' => idx,
+                                                                  'member_label' => m['label']
+                                                                ))
+            next
+          end
+          next if code.nil?
 
           m_qty = m['qty'].to_i * mult
           # audit B3: clen `per: 'owner'` ide 1x na (korpus, vlastnik, set, kod)
@@ -4638,6 +4697,22 @@ module Noxun
         qty = [it['quantity'].to_i, 1].max
         emitted = false
         Array(set['members']).each_with_index do |m, idx|
+          # KOV-E1a: TA ISTA autorita poctu ako v `expand_members` — panel
+          # a supis sa nesmu rozist, a to VRATANE PORADIA (Codex #332 kolo 1
+          # P2): nula = clen sa v supise NEUKAZE (rovnako ako v nakupe nevznikne
+          # riadok) a jeho kod sa preto ani nerozlisuje; nevyrieseny pocet =
+          # problem.
+          mult, qmiss = member_multiplier(m, it)
+          if qmiss
+            emitted = true
+            out['problems'] << unmapped_reason_sk(
+              unmapped_entry(it, sid, qmiss['reason'],
+                             qmiss.merge('member_index' => idx, 'member_label' => m['label']))
+            )
+            next
+          end
+          next if mult.nil?
+
           code, miss = member_code(m, it)
           if miss
             emitted = true
@@ -4661,20 +4736,6 @@ module Noxun
             }
             next
           end
-          # KOV-E1a: TA ISTA autorita poctu ako v `expand_members` — panel
-          # a supis sa nesmu rozist. Nula = clen sa v supise NEUKAZE (rovnako
-          # ako v nakupe nevznikne riadok), nevyrieseny pocet = problem.
-          mult, qmiss = member_multiplier(m, it)
-          if qmiss
-            emitted = true
-            out['problems'] << unmapped_reason_sk(
-              unmapped_entry(it, sid, qmiss['reason'],
-                             qmiss.merge('member_index' => idx, 'member_label' => m['label']))
-            )
-            next
-          end
-          next if mult.nil?
-
           item = lookup[code.downcase]
           per = m['per'].to_s
           out['members'] << {
