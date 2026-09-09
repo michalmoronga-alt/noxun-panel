@@ -212,6 +212,20 @@ staré počty, takže RED by zhasol nad poddimenzovaným nákupom. Hláška pret
 (tá zapíše snapshot s aktuálnym `std` A prestavia všetky skrinky; to isté robí Uložiť v Pravidlách). RED zhasne, až keď neplatí ani jedna príčina. `HINGE_ACTIVATION_SCHEMA` je **vlastná**
 konštanta z toho istého dôvodu ako `DRAWER_ACTIVATION_SCHEMA`: pri budúcom bumpe `CONFIG_SCHEMA` sa skrinky schémy 9 nesmú zrazu tváriť ako nemigrované.
 
+**KOV-E1b (v0.9.54) — VÝKLOPOVÉ DÔVODY A MIGRAČNÝ `flap_stale`.** `HW_LIFT_BLOCKERS` (od E1a `lift_set_incomplete`) sa rozšíril o **štyri dôvody z PRAVIDLA**
+(`lift_class_missing` — LF/KH/kg mimo tabuľky alebo neznáma hmotnosť · `lift_dimension_unsupported` — rozmery mimo programu Blum · `lift_multirow_unsupported` —
+výklop musí byť jediný riadok čiel · `lift_combo_unsupported` — HL top v prevedení Tip-On neexistuje) **a o `flap_stale`**. Prvé štyri prichádzajú z **uloženého
+nosiča** `hardware_conflicts` (preto sú aj v `HW_CONFLICT_CODES`), takže cesta je tá istá ako pri `door_height_out_of_table`: `Bom.hardware_conflict_issues` →
+`Validation` RED kategória `hardware_conflict` → brána. **Položka výklopu sa VYDÁ vždy** (aj bez triedy) — riadok v Kovaní musí existovať, inak používateľ nevidí,
+čo sa objednáva; zastavené sú nákup, rozpočet a ponuka, **VEPO beží** (geometria čela je správna, rovnaká úvaha ako pri závesoch).
+
+**`flap_stale` je MIGRAČNÝ, s JEDINOU príčinou (delta audit Sol FIX 4).** `Bom.flap_stale_issue` je **tretí vzor** po `drawer_stale_issue` a `hinge_stale_issue`,
+ale aktivuje ho **výhradne proveniencia stavby**: skrinka s čelom `flap` postavená pod `config_schema` < `CabinetBuilder::LIFT_ACTIVATION_SCHEMA` (= 11), ktorej
+v uloženom `config.hardware[]` **chýba** položka `lift` (smer `up`) alebo závesy s `use_type: 'door'` (smer `down`). Pravidlá výklopov vtedy neexistovali, takže
+také čelo nemá v nákupe **nič** — a zber číta len uložené hodnoty. Náprava je „Doplniť nové predvoľby" **+ prestavba**. Na rozdiel od `hinge_stale` sa NEPÝTA na
+`std` pravidiel projektu: používateľ smie mať vlastné (aj vypnuté) výklopové pravidlo, seed sa mu vtedy nedoplní (`seed_additions`) a RED by nezhasol nikdy.
+A na rozdiel od `hinge_stale_issue`, ktorý pri nenájdenom závese **mlčí**, je tu chýbajúca položka práve tým nálezom.
+
 **Dve nové RED kategórie Kontroly.** `CAT_HARDWARE_CONFLICT` (`hardware_conflict`) — položka kovania z pravidiel VZNIKLA, ale je nesprávna; vetu skladá
 STAVBA (pozná výšku aj posledné pásmo), Kontrola k nej doplní adresu a to, čo sa tým zastavuje. Náprava je **ručný zámok počtu** (`hardware_overrides`),
 po ktorom konflikt pri prestavbe nevznikne. **Tou istou kategóriou ide aj `hinge_stale`** (`check_hardware_issues` číta `HW_ISSUE_BLOCKERS`) — čo sa

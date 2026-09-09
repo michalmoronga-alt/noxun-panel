@@ -188,6 +188,10 @@ seed `AbsRules` `SEED_VERSION` 4. Roly žijú na troch miestach naraz (`BuildPla
   tmavá farba setu. Starší plugin (schéma 9) sufix `/flap` nepozná vôbec (jeho owner kľúč je len `/panel`, a to výhradne pri `slide`), takže by ho pri prestavbe **ticho
   zahodil** a čelo by dostalo biely set z projektovej predvoľby. `HINGE_ACTIVATION_SCHEMA` ostáva **9** a `DRAWER_ACTIVATION_SCHEMA` **5** — z toho istého dôvodu ako vyššie.
   (Čísla 8 a 9 patria D-118b a KOV-F1; ich dôvody sú v komentári `HISTORIA` pri konštante.)
+- **`11 = KOV-E1b` (v0.9.54): systém výklopu na čele.** Riadok čiel typu `lift` smie niesť `lift: {"system": "hk_top"|"hl_top"}` (§5) a config smie niesť výklopové
+  dôvody v `hardware_conflicts` (§8). Starší plugin (schéma 10) `lift` nepozná — jeho normalizácia čiel ho **zahodí** a prestavba by HL top ticho vrátila na HK,
+  teda iný mechanizmus, iné ramená a iná tyč v objednávke; nové dôvody by z nosiča vypadli a RED by zmizol. **`LIFT_ACTIVATION_SCHEMA` = 11** je aktivačná konštanta
+  výklopov (skrinka postavená pod ňou nemá k čelu `flap` žiadne kovanie → `flap_stale`, §8) a pri budúcich bumpoch sa nehýbe.
 
 **Zóna** (`kind: zone`; nevýrobná — ghost):
 
@@ -379,7 +383,11 @@ stredné krídla 3/4-krídlových dvierok; krajné sú ODVODENÉ a neukladajú s
 **TROJSTAV** platí pre smer: kľúč **CHÝBA = legacy** (nikdy sa nedopĺňa, nikdy nedá nález) · `unset` = vedome neurčené (RED nález `front_direction`, bez exportnej brány — O1/R-39) ·
 `left`/`right` = vyriešené. `unset` vzniká **výhradne** používateľskou akciou alebo z poškodenej hodnoty (neznámy neprázdny string → `unset` fail-visible; `nil`/`""`/iný typ →
 kľúč sa zahodí). Pri `opening_mode` a `drawer` žiadny „neurčený" stav neexistuje — neplatná hodnota kľúč **zahodí**.
-**DORMANT:** všetky štyri sa v configu držia bez ohľadu na aktuálny typ a počet krídel (prepnutie typu ani `1 ↔ 2 ↔ auto` hodnotu nezahodí, po návrate sa obnoví).
+**Piate pole (KOV-E1b, v0.9.54): `lift` = `{"system": "hk_top"|"hl_top"}`** — systém výklopu. Slovník je uzavretý a neznáma hodnota kľúč **zahodí** (žiadny „neurčený"
+stav neexistuje), ale pri type `lift` sa hodnota **VŽDY materializuje**: chýbajúci kľúč znamená stará schéma a číta sa ako `hk_top` (grandfather pri ČÍTANÍ), každý nový
+zápis ho uloží explicitne — inak by starší plugin (§2, schéma 11) nevedel odlíšiť „ešte nikto nevybral" od „vybral HK". Do resolved čiel (`front_items`) ide ako **skalár
+`lift_system`** vedľa `flap_dir`; obidva sú zároveň anotáciou deskriptora, z ktorej číta pravidlo (§6).
+**DORMANT:** všetkých päť sa v configu drží bez ohľadu na aktuálny typ a počet krídel (prepnutie typu ani `1 ↔ 2 ↔ auto` hodnotu nezahodí, po návrate sa obnoví).
 **Aplikovateľnosť smeru má JEDINÚ definíciu** — `Fronts.direction_slots(resolved_item)` nad efektívnym `wings_n` (nie surovým `wings`): 1 krídlo → `single` · 2 → nič (odvodené
 Ľ+P) · 3 → `p2` · 4 → `p2`+`p3` · ne-dvierka → nič. **Nikde v kóde (Ruby, JS, náhľad ani overlay) nesmie existovať default ani heuristika smeru.**
 
@@ -444,12 +452,38 @@ Príklad (počet závesov podľa výšky krídla):
 vzniknúť ručný zámok) a k nej vznikne RED `door_height_out_of_table`, ktorý blokuje nákup, rozpočet aj cenovú ponuku (VEPO nie). Náprava = ručný zámok
 počtu. **Kontrakt validátora sa nemení** — pásmo „všetko nad" je stále povinné.
 
+**BRÁNY VÝKLOPU (KOV-E1b, v0.9.54) — jeden register, jeden výklad.** Kódy žijú v `BuildPlan::HW_LIFT_BLOCKERS` a zastavujú **nákupné CSV, rozpočet a cenovú ponuku;
+VEPO nikdy** (geometria čela je správna). Štyri z nich vydáva PRAVIDLO do **uloženého nosiča** `hardware_conflicts` (rovnaký kontrakt ako `door_height_out_of_table`):
+`lift_class_missing` (LF/KH/kg mimo tabuľky alebo neznáma hmotnosť čela) · `lift_dimension_unsupported` (rozmery mimo programu — `eligibility`) ·
+`lift_multirow_unsupported` (výklop musí byť **jediný riadok čiel** skrinky; V1) · `lift_combo_unsupported` (HL top v prevedení Tip-On neexistuje).
+Piaty, `lift_set_incomplete`, vzniká až pri EXPANZII (nevyriešený člen setu). **Položka výklopu sa VYDÁ vždy** — aj bez triedy: riadok v Kovaní musí existovať, inak
+používateľ nevidí, čo sa objednáva. Príliš ľahké čelo je len **ORANGE** `lift_light_front` (pružina sa dá doladiť) a položka dostane najslabšiu triedu.
+**`flap_stale` je migračná brána podľa PROVENIENCIE stavby:** skrinka s čelom `flap` postavená pod `config_schema` < 11 nemá k nemu žiadne kovanie (výklop bez
+mechanizmu, sklop bez závesov) — náprava je „Doplniť nové predvoľby" **+ prestavba**. Pýtať sa namiesto toho na prítomnosť seed pravidiel je **zakázané**: používateľ
+smie mať vlastné (aj vypnuté) výklopové pravidlo a RED by nezhasol nikdy.
+
+**VÝKLOPY — vzor `lift_class` (KOV-E1b, v0.9.54).** Štvrtý `kind` nevydáva POČET, ale **KLASIFIKÁCIU**: jedna položka `lift` na čelo (`quantity: 1`) s
+`params {use_type: "lift", lift_system, opening_mode, lift_class, arm_class (len HL), rod_count, rod_extension}`. Kód z triedy robí až set (`code_by_param`, §6.3) —
+pravidlo žiadny kód nepozná. JSON nesie `handle_allowance_kg` (rezerva na úchytku; pripočíta sa k hmotnosti čela pri **oboch** systémoch), `classes` (HK top:
+`LF = KH × hmotnosť`, inkluzívne `min`/`max`), `mechanisms` a `arms` (HL top podľa KH a hmotnosti), `rod_double_from_kb_mm` (od akej šírky korpusu druhá stabilizačná
+tyč + predĺženie) a `eligibility` per systém (`kh_min`/`kh_max`/`kb_max`/`depth_min`). **V prekryve pásiem vyhráva vždy NAJSLABŠIA položka, ktorá zaťaženie pokryje**;
+voliteľné `max_exclusive` znamená, že horná hranica do pásma už nepatrí (tak sú Blum pásma ramien SPOJITÉ bez diery).
+**Vstupy pravidla sú výhradne deskriptor dielca a kontext KORPUSU:** `KH` = výška korpusu **bez sokla** (`kh`), `KB` = šírka korpusu (`kb`), vnútorná hĺbka
+(`available_depth`) a počet riadkov čiel (`front_rows`). Výrobná dĺžka čela (`input: "height"`) sa na výklop **nepoužíva** — Blum udáva rozmery korpusu.
+**`applies_to.flap_dir`** (`up`/`down`) rozlišuje výklop od sklopu na spoločnej role `flap`; pravidlo bez neho platí na obidva smery, deskriptor bez smeru
+filtru nevyhovie. **Sklop dostáva ZÁVESY ako dvierka** (seed `zavesy-sklop`: tá istá tabuľka `bands` + door guardy, položka s `use_type: "door"`).
+**Položky seed pravidla výklopov sú PLNÝ AUTOMAT:** ručný zásah (`disabled`/`quantity`) sa na nich ignoruje **a** normalizácia configu ho vyčistí — výklop je zostava,
+polovičná objednávka nie je voľba. Vlastné `lift` pravidlá používateľa a ich zásahy ostávajú účinné.
+
 Pravidlá sú **JSON dáta editovateľné cez sekciu Pravidlá v Štúdiu** (nie ručne v súbore). Michal si počty závesov / výnimky mení bez programovania.
+Editor `lift_class` príde s KOV-E2 — dovtedy je výklopové pravidlo v sekcii Pravidlá **len na čítanie** (súhrn tabuliek, vypnúť sa dá).
 
 **Tvar pravidla je KONTRAKT pri ULOŽENÍ (ŠT-3b-2c1).** Zapísať sa smú len pravidlá, ktoré vedia rozhodnúť pre **každý** rozmer:
 
 - pravidlo `kind: "bands"` so `enabled != false` musí mať **neprázdne pásma a medzi nimi pásmo „všetko nad" (`max: null`)** — bez neho rozmer nad posledným pásmom nespadne do žiadneho a položka pre takú skrinku nevznikne;
 - pravidlo `kind: "fit_series"` so `enabled != false` musí mať **neprázdny rad `series`** — automat nemá z čoho vybrať (dôsledok: ručný zámok NL nad prázdnym radom už nemá ako vzniknúť);
+- pravidlo `kind: "lift_class"` so `enabled != false` musí mať **neprázdne tabuľky** (triedy HK, mechanizmy aj ramená HL), pásma **neobrátené** a medzi pásmami ramien
+  **žiadnu dieru** — výška v diere by nedostala žiadne ramená a každý taký výklop by bol RED;
 - **vypnuté pravidlo sa nekontroluje** (negeneruje nič) a **neznámy `kind`** z novšej verzie uloženie **neblokuje** (forward-compat: neznáme kľúče sa zachovávajú).
 
 Bránu drží **jedna čistá funkcia `HardwareRules.rules_problems`**, volaná **výhradne v zapisovacej ceste** (`RulesDialog.handle_save`, až PO `normalize_rules` — validuje sa presne to, čo sa zapíše).

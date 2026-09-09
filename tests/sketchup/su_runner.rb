@@ -13275,9 +13275,10 @@ module NoxunSuRunner
       # OBSAHU, takze najvyssi vyhrava a subor dostane std 4. Klasifikovany set
       # SAM O SEBE (nas `kovb1_class`) by dal 3 — to overuje headless sada.
       # D-118b: seed nesie Tip-On sety s vyhradenou bunkou `none`, takze najvyssi
-      # marker je uz 5.
-      ok("KOV-B1: subor kniznice nesie std 5 (#{doc['std']})",
-         doc['std'] == e::HardwareSets::STD_SKIP_CODE)
+      # marker bol 5. KOV-E1a: seed vyklopov pridal cleny `code_by_param`
+      # a `quantity_from`, takze najvyssi marker OBSAHU je uz `STD_LIFT_FORMS`.
+      ok("KOV-B1: subor kniznice nesie std #{e::HardwareSets::STD_LIFT_FORMS} (#{doc['std']})",
+         doc['std'] == e::HardwareSets::STD_LIFT_FORMS)
       e::JsonFileStore.invalidate(e::HardwareSets.path)
       e::HardwareSets.reset_library_state!
       ok('KOV-B1: a TA ISTA verzia si ho hned precita ako `:ok`',
@@ -13308,10 +13309,11 @@ module NoxunSuRunner
       snap = JSON.parse(kovb1_snap_raw(model))
       # KOV-C2a: prvy zapis do projektu ZMRAZI VSETKY globalne predvolby
       # (`global_default_state`) — a v nich su od tejto davky aj triedne
-      # mapovania a sety zasuviek s `height_variant`. Snapshot preto nesie std 4,
-      # nie 3; nas klasifikovany set je v nom tak ci tak (overuje sa vyssie).
-      ok("KOV-B1: snapshot v NOXUN dict nesie std 5 (#{snap['std']})",
-         snap['std'] == e::HardwareSets::STD_SKIP_CODE)
+      # mapovania a sety zasuviek s `height_variant`. Snapshot preto nesie
+      # NAJVYSSI marker obsahu — od KOV-E1a `STD_LIFT_FORMS` (sety vyklopov);
+      # nas klasifikovany set je v nom tak ci tak (overuje sa vyssie).
+      ok("KOV-B1: snapshot v NOXUN dict nesie std #{e::HardwareSets::STD_LIFT_FORMS} (#{snap['std']})",
+         snap['std'] == e::HardwareSets::STD_LIFT_FORMS)
       exp_class = kovb1_expand(model)
       Sketchup.undo
       # POZOR: skrinka si pri stavbe zmrazila GLOBALNE predvolby, takze snapshot
@@ -13334,7 +13336,7 @@ module NoxunSuRunner
       snap2_set = snap2['sets'].is_a?(Hash) ? snap2['sets'][KOVB1_SID] : nil
       ok("KOV-B1: legacy definicia ostava NEZARADENA (std snapshotu #{snap2['std']})",
          snap2_set.is_a?(Hash) && snap2_set['use_type'].nil? && snap2_set['series'].nil? &&
-         snap2['std'] == e::HardwareSets::STD_SKIP_CODE)
+         snap2['std'] == e::HardwareSets::STD_LIFT_FORMS)
       exp_plain = kovb1_expand(model)
       ok('KOV-B1: NAKUP je s klasifikaciou aj bez nej TOTOZNY (kody, pocty, ceny)',
          JSON.generate(exp_class) == JSON.generate(exp_plain))
@@ -17237,6 +17239,241 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # ============================================================================
+  # KOV-E1b — VYKLOPY A SKLOPY V ZIVOM RETAZCI
+  # ============================================================================
+  #
+  # Headless sada overuje pravidlo nad RUCNE poskladanym kontextom; TU ide o cely
+  # retazec: predvolby projektu -> vlozena skrinka -> config v .skp -> nakup.
+  # Prave tu by sa ukazalo, keby KH neprisla z korpusu (ale z vyrobnej dlzky
+  # cela), keby `lift.system` neprezil prestavbu alebo keby sa RED nedal zhasnut.
+  KOVE_RULE = 'vyklopy-aventos'
+  KOVE_FALL = 'zavesy-sklop'
+
+  # Skrinka s JEDNYM riadkom ciel typu vyklop. Sokel 100 mm je zamerny —
+  # KH je vyska korpusu BEZ neho, takze pri vyske 400 vyjde KH 300.
+  def kove_params(height, front = {}, over = {})
+    item = { 'id' => 'F1', 'type' => 'lift', 'mode' => 'auto' }.merge(front)
+    { 'type' => 'lower', 'width' => 600.0, 'height' => height.to_f, 'depth' => 320.0,
+      'thickness' => 18.0, 'floor_height' => 100.0,
+      'fronts' => { 'items' => [item] } }.merge(over)
+  end
+
+  def kove_hw(inst, type)
+    Array((e::Store.config(inst) || {})['hardware'])
+      .select { |h| h.is_a?(Hash) && h['generic_type'].to_s == type }
+  end
+
+  # [trieda mechanizmu, trieda ramien, pocet tyci] ULOZENEJ polozky vyklopu.
+  def kove_class(inst)
+    it = kove_hw(inst, 'lift').first
+    return nil unless it
+
+    p = it['params'] || {}
+    [p['lift_class'], p['arm_class'], p['rod_count']]
+  end
+
+  def kove_conflicts(inst)
+    Array((e::Store.config(inst) || {})['hardware_conflicts']).map { |c| c['code'] }
+  end
+
+  # Nakupne kody VYKLOPU celej zakazky => pocet kusov.
+  def kove_codes(model)
+    collected = e::Bom.collect(model)
+    exp = e::ProductionCore.hardware_expansion(model, collected)
+    Array(exp && exp['rows']).each_with_object({}) do |r, out|
+      next unless Array(r['sources']).any? { |s| s.is_a?(Hash) && s['generic_type'].to_s == 'lift' }
+
+      out[r['code'].to_s] = r['quantity']
+    end
+  end
+
+  def kove_ctrl(model)
+    e::Validation.run(e::Bom.collect(model), sheets: e::ProductionCore.sheets_map)['items']
+  end
+
+  def kove_build(model, height, front = {}, over = {})
+    e::CabinetBuilder.build(model, kove_params(height, front, over))
+  end
+
+  def kove_reshape(model, inst, height, front = {}, over = {})
+    e::CabinetBuilder.rebuild(model, inst, kove_params(height, front, over))
+  end
+
+  def run_kove(model)
+    cleanup(model)
+    begin
+      kove_predvolby(model)
+      kove_hk(model)
+      kove_hl(model)
+      kove_sklop(model)
+      kove_stale(model)
+    ensure
+      cleanup(model)
+    end
+    ok('KOV-E: cleanup (0 korpusov)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: KOV-E vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
+  # --- 0) NOVE PREDVOLBY (pravidla aj sety) -----------------------------------
+  #
+  # Snapshot projektu sa NIKDY nemerguje sam — testovaci model nesie snapshoty
+  # z predoslych sekcii, takze bez „Doplniť nové predvoľby" by vyklop ziadne
+  # pravidlo nedostal (presne stav rozrobenej zakazky po aktualizacii pluginu).
+  def kove_predvolby(model)
+    hr = e::HardwareRules
+    model.start_operation('KOV-E: doplnit nove predvolby', true)
+    rstatus, radded, = hr.merge_project_seed!(model)
+    sstatus, sadded, smap, = e::HardwareSets.merge_project_sets_seed!(model)
+    model.commit_operation
+    rules = hr.project_rules(model) || hr.load
+    lift = rules.find { |r| r['rule_id'].to_s == KOVE_RULE }
+    fall = rules.find { |r| r['rule_id'].to_s == KOVE_FALL }
+    ok("KOV-E predvolby: projekt pozna pravidlo vyklopov (#{rstatus}, doplnene #{radded.inspect})",
+       lift.is_a?(Hash) && lift['kind'].to_s == 'lift_class' &&
+       Array(lift['classes']).length == 4 && Array(lift['arms']).length == 4)
+    ok('KOV-E predvolby: aj pravidlo zavesov SKLOPU (rola flap, smer down)',
+       fall.is_a?(Hash) && (fall['applies_to'] || {})['flap_dir'].to_s == 'down')
+    info("KOV-E predvolby: sety #{sstatus} (doplnene #{Array(sadded).inspect}, " \
+         "mapovania #{Array(smap).inspect})")
+  end
+
+  # --- 1) HK TOP: 600 x 400 x 320 -> 22K2300 + KOMPLETNY set ------------------
+  def kove_hk(model)
+    inst = kove_build(model, 400.0)
+    return ok('KOV-E HK: vlozenie korpusu s vyklopom', false) unless inst
+
+    it = kove_hw(inst, 'lift').first
+    ok("KOV-E HK: skrinka 600 x 400 (KH 300) da 22K2300 (#{kove_class(inst).inspect})",
+       it && it['params']['lift_class'] == '22K2300')
+    ok('KOV-E HK: polozka je KLASIFIKOVANA (vyklop, HK top, klasicke otvaranie)',
+       it && it['params']['use_type'] == 'lift' && it['params']['lift_system'] == 'hk_top' &&
+       it['params']['opening_mode'] == 'classic')
+    ok("KOV-E HK: jedna tyc a ziadne predlzenie (#{it && it['params']['rod_count']})",
+       it && it['params']['rod_count'].to_i == 1 && it['params']['rod_extension'].to_i.zero?)
+    ok("KOV-E HK: ziadny konflikt (#{kove_conflicts(inst).inspect})", kove_conflicts(inst).empty?)
+    codes = kove_codes(model)
+    ok("KOV-E HK: nakup objednava mechanizmus + prichyt + krytky (#{codes.inspect})",
+       codes['347810'].to_i == 1 && codes['13781'].to_i == 1 && codes['347834'].to_i == 1)
+    ok('KOV-E HK: Kontrola nehlasi ziadny tvrdy nalez kovania',
+       kove_ctrl(model).none? { |i| i['category'] == e::Validation::CAT_HARDWARE_CONFLICT })
+    cleanup(model)
+  end
+
+  # --- 2) HL TOP + Undo/Redo + reopen -----------------------------------------
+  #
+  # Prestavba na HL top pri vyske 600 (KH 500). Keby KH prisla z CELA (~496),
+  # vysli by 22L2500 + 22L3800 tiez — preto sa meria aj hranica 490 (KH 390):
+  # z cela by vysiel 22L2200 + 22L3500.
+  def kove_hl(model)
+    inst = kove_build(model, 400.0)
+    return ok('KOV-E HL: vlozenie korpusu', false) unless inst
+
+    kove_reshape(model, inst, 600.0, 'lift' => { 'system' => 'hl_top' })
+    ok("KOV-E HL: KH 500 -> 22L2500 + 22L3800 (#{kove_class(inst).inspect})",
+       kove_class(inst)[0, 2] == %w[22L2500 22L3800])
+    codes = kove_codes(model)
+    ok("KOV-E HL: nakup ma mechanizmus, ramena, JEDNU tyc a ZIADNE predlzenie (#{codes.inspect})",
+       codes['507352'].to_i == 1 && codes['507357'].to_i == 1 &&
+       codes['507365'].to_i == 1 && !codes.key?('507366'))
+    ok("KOV-E HL: ziadny konflikt (#{kove_conflicts(inst).inspect})", kove_conflicts(inst).empty?)
+
+    # KH ide z KORPUSU: vyska 490 = KH 390 (celo je nizsie) -> este 22L2500.
+    kove_reshape(model, inst, 490.0, 'lift' => { 'system' => 'hl_top' })
+    ok("KOV-E HL: KH 390 (celo ~386) da 22L2500 + 22L3800 — KH je z KORPUSU " \
+       "(#{kove_class(inst).inspect})", kove_class(inst)[0, 2] == %w[22L2500 22L3800])
+
+    # SIROKA skrinka: druha tyc + predlzovaci diel.
+    kove_reshape(model, inst, 600.0, { 'lift' => { 'system' => 'hl_top' } }, 'width' => 1200.0)
+    wide = kove_codes(model)
+    ok("KOV-E HL: KB 1200 -> dve tyce + predlzenie (#{wide.inspect})",
+       wide['507365'].to_i == 2 && wide['507366'].to_i == 1)
+
+    # UNDO: prestavba je JEDEN krok — vrati sa uzka skrinka s jednou tycou.
+    Sketchup.undo
+    ok("KOV-E Spat: vratila sa uzka skrinka (#{kove_class(inst).inspect})",
+       kove_class(inst)[2].to_i == 1)
+    if Sketchup.respond_to?(:redo)
+      Sketchup.redo
+      ok("KOV-E Redo: siroka skrinka je spat (#{kove_class(inst).inspect})",
+         kove_class(inst)[2].to_i == 2)
+    else
+      info('KOV-E: Sketchup.redo nedostupne — Redo vetva netestovana')
+    end
+
+    # REOPEN: prestavba z ULOZENEHO configu (to iste, co robi otvorenie .skp
+    # a zmena rozmeru) — system vyklopu sa NESMIE stratit.
+    e::CabinetBuilder.rebuild(model, inst,
+                              e::CabinetBuilder.config_to_params(e::Store.config(inst) || {}))
+    cfg = e::Store.config(inst) || {}
+    row = Array(cfg['front_items']).first || {}
+    ok("KOV-E reopen: ulozene celo nesie system (#{row['lift_system'].inspect})",
+       row['lift_system'].to_s == 'hl_top')
+    ok("KOV-E reopen: a polozka ostava HL (#{kove_class(inst).inspect})",
+       kove_class(inst)[0] == '22L2500')
+    ok("KOV-E reopen: schema configu je aktualna (#{cfg['config_schema']})",
+       cfg['config_schema'].to_i == e::CabinetBuilder::CONFIG_SCHEMA)
+    cleanup(model)
+  end
+
+  # --- 3) SKLOP dostane ZAVESY, nikdy vyklopovy mechanizmus -------------------
+  def kove_sklop(model)
+    inst = kove_build(model, 400.0, 'type' => 'fall')
+    return ok('KOV-E sklop: vlozenie korpusu', false) unless inst
+
+    lifts = kove_hw(inst, 'lift')
+    hinges = kove_hw(inst, 'hinge')
+    ok("KOV-E sklop: ziadny vyklopovy mechanizmus (#{lifts.length})", lifts.empty?)
+    ok("KOV-E sklop: dostal zavesy z pravidla `#{KOVE_FALL}` (#{hinges.length})",
+       hinges.length == 1 && hinges.first['rule_id'].to_s == KOVE_FALL &&
+       (hinges.first['params'] || {})['use_type'].to_s == 'door')
+    ok('KOV-E sklop: Kontrola nehlasi „nemá to byť výklop?"',
+       kove_ctrl(model).none? { |i| i['message_sk'].to_s.include?('nemá to byť výklop') })
+    cleanup(model)
+  end
+
+  # --- 4) STARA SKRINKA (schema 10) = RED `flap_stale` ------------------------
+  #
+  # Sonda „stareho pluginu" je ZAPIS MARKERA `config_schema` o jedno nizsie nez
+  # `LIFT_ACTIVATION_SCHEMA` PLUS odobranie polozky vyklopu — presne to, co by
+  # v subore nechala verzia spred E1b (pravidlo vtedy neexistovalo).
+  def kove_stale(model)
+    inst = kove_build(model, 400.0)
+    return ok('KOV-E stale: vlozenie korpusu', false) unless inst
+
+    cfg = e::Store.config(inst) || {}
+    old = e::CabinetBuilder::LIFT_ACTIVATION_SCHEMA - 1
+    e::CabinetBuilder.guarded do
+      model.start_operation('SU-TEST KOV-E stara schema', true)
+      e::Store.write_config(inst, cfg.merge('config_schema' => old,
+                                            'hardware' => Array(cfg['hardware'])
+                                              .reject { |h| h['generic_type'].to_s == 'lift' },
+                                            'hardware_conflicts' => []))
+      model.commit_operation
+    end
+    collected = e::Bom.collect(model)
+    red = Array(e::ProductionCore.control_payload(collected)['items'])
+          .select { |i| i['category'] == e::Validation::CAT_HARDWARE_CONFLICT }
+    ok("KOV-E stale: skrinka zo schemy #{old} bez vyklopu dostane RED (#{red.length})",
+       red.length == 1 && red.first['severity'] == 'red' &&
+       red.first['message_sk'].to_s.include?('Doplniť nové predvoľby'))
+    exp = e::ProductionCore.hardware_expansion(model, collected)
+    ok('KOV-E stale: brana zastavuje nakup, rozpocet aj cenovu ponuku',
+       !e::ProductionCore.drawer_stop(collected, exp).nil?)
+    ok('KOV-E stale: VEPO bezi dalej (geometria je spravna)',
+       e::ProductionCore.hardware_blockers(collected, exp, scope: :kit).empty?)
+
+    # NAPRAVA: prestavba prepise marker a doplni polozku -> RED zhasne.
+    kove_reshape(model, inst, 400.0)
+    ok("KOV-E stale: po prestavbe je schema aktualna (#{(e::Store.config(inst) || {})['config_schema']})",
+       (e::Store.config(inst) || {})['config_schema'].to_i == e::CabinetBuilder::CONFIG_SCHEMA)
+    ok('KOV-E stale: a Kontrola uz nic nehlasi',
+       kove_ctrl(model).none? { |i| i['category'] == e::Validation::CAT_HARDWARE_CONFLICT })
+    cleanup(model)
+  end
+
   # --- D-118b: PTOs modul a vedome prazdna bunka v ZIVOM nakupe ---------------
   #
   # Headless sada overuje expanziu nad rucne poskladanym stavom; TU ide o cely
@@ -17284,8 +17521,10 @@ module NoxunSuRunner
     ok('D-118b: projekt ma cerstve predvolby zo zivej kniznice', wrote == true)
 
     snap = JSON.parse(model.get_attribute(e::Store::DICT, e::HardwareSets::MODEL_KEY).to_s) rescue nil
-    ok("D-118b: snapshot nesie marker std #{e::HardwareSets::STD_SKIP_CODE} (starsi plugin ho odmietne)",
-       snap.is_a?(Hash) && snap['std'].to_i == e::HardwareSets::STD_SKIP_CODE)
+    # KOV-E1a: marker je LAZY podla OBSAHU a seed uz nesie sety vyklopov
+    # (`code_by_param`/`quantity_from`), takze najvyssi je `STD_LIFT_FORMS`.
+    ok("D-118b: snapshot nesie marker std #{e::HardwareSets::STD_LIFT_FORMS} (starsi plugin ho odmietne)",
+       snap.is_a?(Hash) && snap['std'].to_i == e::HardwareSets::STD_LIFT_FORMS)
 
     # --- 1) Tip-On zasuvka: kit AJ PTOs modul --------------------------------
     inst = e::CabinetBuilder.build(model, d118b_params(500))
@@ -18415,7 +18654,8 @@ module NoxunSuRunner
     run_kovd5(model)         # KOV-D5: ABS farbenie dielcov zasuviek — chrbat Atiry ma pasku na HORNEJ ploske (dolna aj velke plochy cisté), dno ziadnu; Quadro bok boxu aj vnutorne celo tiez HORE; Kontrola olepov zvyrazni TU ISTU ploskou (aj pri starom modeli, kde osi pochadzaju z ROLY); Spat aj Redo mapovanie nemenia a prestavba starej zakazky farbu doplni
     run_kovw(model)          # KOV-W: hmotnost dielcov v ZIVOM retazci katalog -> skrinka -> snapshoty -> Inspector -> Kontrola: pri znamej hustote sedi sucet zo snapshotov s planom (±0,05 kg) a nic sa neuklada do modelu; typ BEZ hustoty (nie UNI) da tazsi odhad, PRESNE JEDEN build warning na skrinku a ORANGE v Kontrole; UNI dielec odhad zachova, ale hmotnostny nalez sa v Kontrole POTLACI (hlasi sa len „materiál neurčený"); Spat vracia hmotnost spolu s materialom
     run_kovf(model)          # KOV-F1: zavesy podla NOXUN tabulky — pocty z REALNEJ sirky kridla (1250 -> 3, 850 -> 3, kridlo 800 x 700 -> 2+1), varovanie sirky nad 800 mm v Kontrole, Tip-On celo dostane P2O set + PRESNE JEDEN piest na kridlo (klasicke celo klasicky set), dvierka nad tabulkou vydaju polozku 7 ks + RED „mimo tabuľky" so zastavenym nakupom/rozpoctom/ponukou (VEPO bezi dalej), rucny zamok poctu RED zhasne v JEDNOM kroku Spat (aj Redo), skrinka ULOZENA PRED tabulkou (schema 8) dostane RED „prestav ju" so zastavenymi 3 vystupmi a prestavba ho zhasne, vlastny set skrinky prezije prestavbu
-    run_d118b(model)         # D-118b: PTOs modul a vedome prazdna bunka v ZIVOM retazci kniznica -> predvolby projektu -> vlozena Tip-On zasuvka -> nakup: pri NL 470 pribudne modul 352908 (1 ks, nazov z katalogu), pri NL 620 (kit typu PTO) modul VEDOME nepribudne a NEVZNIKNE ziadna oranzova; snapshot nesie std 5 a config schemu 8
+    run_kove(model)          # KOV-E1b: vyklopy a sklopy — skrinka 600 x 400 x 320 s vyklopom da 22K2300 + kompletny set (mechanizmus, prichyt, krytky), prestavba na HL top pri vyske 600 da 22L2500 + 22L3800 + JEDNU tyc (KH je z KORPUSU, nie z cela), siroka skrinka 1200 dve tyce + predlzenie, Spat/Redo vratia stav NARAZ, reopen (prestavba z ULOZENEHO configu) system vyklopu nestrati, sklop dostane ZAVESY (nikdy vyklopovy mechanizmus), skrinka zo schemy 10 bez vyklopu = RED „Doplniť nové predvoľby" so zastavenymi 3 vystupmi (VEPO bezi) a prestavba ho zhasne
+    run_d118b(model)         # D-118b: PTOs modul a vedome prazdna bunka v ZIVOM retazci kniznica -> predvolby projektu -> vlozena Tip-On zasuvka -> nakup: pri NL 470 pribudne modul 352908 (1 ks, nazov z katalogu), pri NL 620 (kit typu PTO) modul VEDOME nepribudne a NEVZNIKNE ziadna oranzova; snapshot nesie std 6 (od KOV-E1a) a config schemu 8
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

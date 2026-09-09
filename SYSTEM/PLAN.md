@@ -669,7 +669,16 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   s novým tvarom sú v editore **read-only** (badge „tvar novšej verzie — úprava v E2"), transport bezstratový · RED `lift_set_mismatch` pri EXPANZII (Tip-On čelo na klasickom
   sete, HL set na HK čele; vzor `hinge_set_mismatch`) · Testy: round-trip `code_by_param`/`quantity_from`/`lift_system`/owner `/flap` · starší čítač = nekompatibilný ·
   6 setov kompletné (každý kľúč `codes` má katalógový riadok) · `parse_class_head` `slide` vs `lift` tretí segment.
-  **E1b PRAVIDLO + BRÁNY (Audit ÁNO — delta Sol pred implementáciou: config čela, nový kind, brány):** config čela `lift.system` (`hk_top` predvolene | `hl_top`,
+  **DELTA AUDIT SOL (9.9.2026, session `01a08558-c5d7-77e1-824d-1325ec6b5fcb`) — 5 ZÁVÄZNÝCH rozhodnutí pred E1b, všetky zapracované:**
+  **(1)** vnútorná hĺbka pre eligibility HL ide z **`ctx['available_depth']`**, nie z `depth − chrbát` (drážka `GROOVE_OFFSET` by unikla, overlay chrbát by sa odčítal
+  dvakrát) · **(2)** RUNTIME prekryv v `evaluate` sa porovnáva podľa **(output, role, `flap_dir`|wildcard)** a `OVERLAP_OUTPUT` platí pre `hinge` **aj** `lift` (dovtedy len
+  rola a len `hinge`: skoršie `hinge/flap/up` pravidlo by potlačilo `zavesy-sklop` aj na skrinke len so sklopom a dve `lift` pravidlá by dali dva mechanizmy) ·
+  **(3)** guard **nedostupnej expanzie** platí aj pre položky `lift` — vyriešené UŽ V E1a (`hardware_expansion_unproven?`, Codex #332 kolo 2 P1), v E1b sa len overuje
+  end-to-end nad položkou z pravidla · **(4)** **`flap_stale` NIE podľa prítomnosti seed pravidiel, ale VÝHRADNE podľa proveniencie stavby** (`config_schema` < 11);
+  skrinka prestavaná pod schémou 11 nie je stale nikdy — pri vedome vypnutom vlastnom výklopovom pravidle by RED nezhasla nikdy (`pre_lift_rules?` sa nezavádza) ·
+  **(5)** **`HardwareRules::SEED_VERSION` 4 → 5** samostatne od `STD` — bez bumpu by `merge_seed` migráciu preskočil a existujúca knižnica by nové seed pravidlá nedala
+  ani novým projektom.
+  ✅ **E1b PRAVIDLO + BRÁNY — HOTOVO (PR #333, v0.9.54):** config čela `lift.system` (`hk_top` predvolene | `hl_top`,
   **CONFIG_SCHEMA 10 → 11** — 10 minula E1a; whitelisty šablón aditívne) + **`lift` bezstratovo na CELEJ ceste**: `FRONT_EXTRA_KEYS` (form.js) **A server** — `Fronts.normalize_items`
   (dnes kopíruje len smer/otváranie/zásuvku) + `DORMANT_KEYS`/`Fronts.layout` projekcia do resolved `front_items` (Codex #331 kolo 2 P1: inak prestavba HL ticho spadne na HK;
   Astra FIX 10) ·
@@ -706,6 +715,12 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   `normalize_items` + prestavbu + reopen · sklop v starej zákazke bez závesov → `flap_stale` · HL pod 1100 → žiadny riadok 507366 · tmavý set v `config.hardware_sets` prežije prestavbu, reopen, Undo · in-SU `run_kove`. Smoke: výklop 600 × 400 v skrinke 400 → LF ≈ 400 × 3,4 = 1380 → 22K2300 +
   príchyt + krytky biela; Tip-On → 22K2300T + jednotka 250831; tmavý set → 347835 + 497007; ťažké čelo → 22K2700; HL 500 vysoká, 6 kg → 22L2500 + 22L3800 + 1 tyč; HL 1200
   široká → 2 tyče + predĺženie; KH 250 → RED; sklop → závesy; stará zákazka s výklopom alebo sklopom → RED `flap_stale`, „Doplniť nové predvoľby" + prestavba ju zhasne.
+  **Uzáver E1b:** headless 3597 testov · 100 JS sád · in-SU beh 2055 PASS / 0 FAIL vrátane novej sekcie `run_kove` (27 PASS: HK 22K2300 + kompletný set · HL 22L2500 + 22L3800 + tyč · KB 1200 = 2 tyče
+  + predĺženie · Späť/Redo · reopen · sklop dostane závesy · schéma 10 = RED + zastavené 3 výstupy, prestavba ho zhasne). **Odchýlky:** `LIFT_RULES_STD` marker
+  sa NEZAVIEDOL (po delta audite FIX 4 ho nemá kto čítať — `flap_stale` ide podľa `config_schema`; `HardwareRules::STD` je 3) a `LEGACY_SEED_SHAPES` sa NEROZŠÍRILO
+  (obe pravidlá sú nové, starší tvar na „obnovenie" neexistuje). Pri behu vyšli najavo aj 4 stale in-SU očakávania z E1a (`HardwareSets` std 5 → `STD_LIFT_FORMS` 6) —
+  opravené v tej istej vetve.
+
   **E2 UI (samostatný PR, Audit NIE):** v karte výklopu výber systému (HK top | HL top) + **výber setu vrátane tmavého** (vzor D1b zásuvky, zápis do
   `config.hardware_sets`) + riadok „Technický detail" (trieda, LF alebo KH/kg, tyč) · editor `lift_class` v Pravidlách (`handle_allowance_kg`, `rod_double_from_kb_mm`,
   tabuľky tried/ramien, eligibility) so spoločnou Ruby/JS validáciou (parita cez `rules_validation_parity.json`) · editor setov sa naučí `code_by_param` a `quantity_from`

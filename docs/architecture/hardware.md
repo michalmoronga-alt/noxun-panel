@@ -89,6 +89,39 @@ v poradí. Úzko na `hinge` zámerne: dve úchytkové pravidlá na jednej role s
 (`Construction.annotate_front_modes!`, vzor KOV-W `weight_kg`), dielec bez nej je legacy čelo a platí `classic`. Korpusová úroveň (`pd` nil) params
 nedostane — záves bez dielca nemá otváranie, podľa ktorého by sa vyberal set.
 
+**KOV-E1b (v0.9.54) — VÝKLOPY: kind `lift_class`, filter `flap_dir`, dve nové seed pravidlá.** Štvrtý vzor (`KINDS + lift_class`) nevydáva POČET, ale
+**KLASIFIKÁCIU**: `params {use_type: 'lift', lift_system, opening_mode, lift_class, arm_class (HL), rod_count, rod_extension}`, `quantity` vždy 1. Kód z triedy robí až
+set (`code_by_param`, E1a) — pravidlo žiadny kód nepozná. Seed `vyklopy-aventos` (`applies_to {role: 'flap', flap_dir: 'up'}`) nesie:
+`handle_allowance_kg` **0,5 kg** (pripočíta sa pri OBOCH systémoch — Blum LF aj HL tabuľka rátajú s úchytkou, Astra BLOCKER 3) · **`classes`** HK top
+(LF = KH × hmotnosť; 22K2300 420–1610 · 22K2500 930–2800 · 22K2700 1730–5200 · 22K2900 3200–9000, inkluzívne, **v prekryve vyhráva najslabšia**) ·
+**`mechanisms`** HL top (max-pásma podľa KH: < 390 → 22L2200, ≤ 580 → 22L2500) · **`arms`** HL top (`kh_min`/`kh_max` + `kg_min`/`kg_max`; 300–340 · 340–390 ·
+390–540 · 480–580, v prekryve KH **najslabšie ramená, ktoré hmotnosť pokryjú**) · `rod_double_from_kb_mm` **1100** (KB ≥ → 2 tyče + predĺženie) ·
+**`eligibility`** per systém (HK `kh 205–600`, `kb ≤ 1800`; HL `kh 300–580`, `kb ≤ 1800`, `depth_min 264` = vnútorná hĺbka).
+**`max_exclusive`** je jediný spôsob, ako sú Blum pásma 300–339 / 340–389 SPOJITÉ bez diery pri 339,5: horná hranica do pásma nepatrí. Normalizácia
+(`normalize_lift_rule!`) tabuľky typovo očistí (riadok bez kódu alebo bez čísel **vypadne**) a **zoradí** — poradie je významové, lebo rozhoduje o „najslabšej".
+Zápisová brána (`lift_problem`) odmietne prázdnu tabuľku, obrátené pásmo a **dieru medzi pásmami ramien**.
+
+**`applies_to.flap_dir` a druhé seed pravidlo `zavesy-sklop`.** Rola `flap` je spoločná pre výklop aj sklop, preto `apply_rule` filtruje čelá podľa smeru: pravidlo
+BEZ filtra platí na oba (dnešné správanie), deskriptor bez smeru filtru **nevyhovie**. Sklop je z pohľadu kovania dvierka, takže dostane kópiu tabuľky závesov
+(`bands` + door guardy) s `applies_to {role: 'flap', flap_dir: 'down'}` a položkou `params.use_type = 'door'` — set si hľadá tým istým triednym kľúčom `class:hinge|…`
+ako dvierka (vzpery `use_type: 'fall'` sú mimo V1). Dva dôsledky pre door guardy: `door_wider_than_high` sa na rolu `flap` **neuplatní** (širšie než vyššie je pri sklope
+norma) a `door_label` hovorí „Sklop", nie „Dvierka".
+
+**Prekryv sa porovnáva podľa (výstup, rola, SMER) — `OVERLAP_OUTPUTS = hinge + lift`** (Codex #331 kolo 3 P1, delta audit Sol BLOCKER 2). Kľúč skladá `overlap_key`
+a rozhoduje `overlap_conflict?` (prázdny smer = wildcard, pretína sa s oboma) — a **tie isté dve funkcie** používa `seed_additions` aj runtime vetva v `evaluate`.
+Kým sa runtime prekryv pýtal len na rolu, skoršie pravidlo `hinge/flap/up` by potlačilo `zavesy-sklop` **aj na skrinke, kde je len sklop** (nula závesov, iba ORANGE),
+a `lift` sa nekontroloval vôbec (dve rôzne pomenované výklopové pravidlá = dva mechanizmy na jednom čele). Vlastné pravidlo len pre `down` seed výklopov nepotlačí.
+
+**Položky seed pravidla výklopov sú PLNÝ AUTOMAT** (Astra FIX 11, rozsah zúžený Codex #331 kolo 2 P1). Výklop je zostava, takže „vypnúť" ani „ručný počet" na ňom
+neexistuje: `apply_overrides` záznam s `rule_id == 'vyklopy-aventos'` **ignoruje** a prizná ORANGE `lift_override_ignored`, a `CabinetBuilder.norm_hardware_overrides`
+ho pri normalizácii configu **vyčistí so záznamom v logu**. **Vlastné** `lift` pravidlá používateľa a ich overridy ostávajú ÚČINNÉ — ochrana je viazaná na `rule_id`
+seedu, nie na typ kovania.
+
+**`STD` 2 → 3 a `SEED_VERSION` 4 → 5.** `std` chráni ZÁPIS: starší plugin kind `lift_class` nepozná (výklop by ostal bez položky — vedomé riziko do D-48) a filter smeru
+IGNORUJE, takže by `zavesy-sklop` uplatnil na každé čelo `flap` vrátane výklopu. **`SEED_VERSION` sa bumpuje SAMOSTATNE** (delta audit Sol FIX 5): `merge_seed` migráciu
+preskočí pri `from_version >= SEED_VERSION`, takže bez bumpu by existujúca knižnica nové seed pravidlá nedala ani novým projektom. `LEGACY_SEED_SHAPES` sa
+**nerozširuje** — obe pravidlá sú nové a starší tvar, ktorý by sa dal „obnoviť", neexistuje.
+
 
 **KOV-C2b (v0.9.31) — R2 EXKLUZIVITA.** `evaluate(..., suppress_slide_owners:)` dostáva množinu `owner_part_key` čiel, ktoré už majú položku výsuvu **z receptu**, a pravidlá
 s `output: 'slide'` sa na nich **nevyhodnocujú** — inak by zásuvka mala dva výsuvy (jeden s kitom, jeden legacy bez dielcov). Potlačenie sa priznáva **jedným** `info`

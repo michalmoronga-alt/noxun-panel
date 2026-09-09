@@ -94,17 +94,28 @@ nesie presne to, čo má ukázať aj zvonček Inspectora (Sol audit 4).
 anotácia hmotnosti **aj** `CabinetBuilder.base_material_for`. Druhý opísaný `case` by sa časom rozišiel a hmotnosť by sa rátala z inej dosky, než akou je dielec postavený.
 `cover_panel` v `FRONT_MATERIAL_ROLES` **vedome nie je** — o jeho kanáli rozhoduje materiálový signál deskriptora, presne ako pred KOV-W.
 
-**KOV-F1 — SPÔSOB OTVÁRANIA ČELA V PLÁNE (v0.9.48).** `annotate_front_modes!(parts, fr[:items])` dopíše každému deskriptoru čela **aditívne**
-`opening_mode` z jeho riadku čiel. Je to ten istý vzor ako hmotnosť: kľúč žije LEN v pamäti plánu (builder zapisuje na entitu menovitý zoznam polí, takže
-`plan_schema` sa **nebumpuje**) a chýbajúci kľúč riadku znamená legacy čelo — anotácia sa vtedy nerobí a čitateľ (`HardwareRules.hinge_params`) platí
-`classic`. Bez nej by expanzia nemala odkiaľ vedieť, či dvierka chcú Tip-On set: v modeli je otváranie na RIADKU čiel, položka kovania ho nesie až odtiaľto.
+**KOV-F1 / E1b — KLASIFIKÁCIA ČELA V PLÁNE (v0.9.48, rozšírené v0.9.54).** `annotate_front_modes!(parts, fr[:items])` dopíše každému deskriptoru čela **aditívne**
+`opening_mode` **a od E1b aj `flap_dir` a `lift_system`** z jeho riadku čiel. Je to ten istý vzor ako hmotnosť: kľúče žijú LEN v pamäti plánu (builder zapisuje na entitu
+menovitý zoznam polí, takže `plan_schema` sa **nebumpuje**) a chýbajúci kľúč riadku znamená legacy čelo — anotácia sa vtedy nerobí a čitateľ (`HardwareRules.hinge_params`)
+platí `classic`. Bez nej by expanzia nemala odkiaľ vedieť, či dvierka chcú Tip-On set: v modeli je otváranie na RIADKU čiel, položka kovania ho nesie až odtiaľto.
+**Prečo aj smer a systém (Astra FIX 5):** `flap_dir` dovtedy žil LEN na resolved čele, takže pravidlo by muselo čítať `front_items` — teda projekciu configu, nie plán.
+Odteraz platí, že **pravidlá kovania čítajú výhradne deskriptor + kontext korpusu**: `apply_rule` filtruje podľa `applies_to.flap_dir` (výklop `up` vs. sklop `down`)
+a `lift_class` si zo `lift_system` vyberá HK/HL vetvu. Deskriptor **bez** smeru filtru nevyhovie — hádať smer by znamenalo poslať výklopový mechanizmus na sklop.
+
+**KOV-E1b — KH, KB A POČET RIADKOV V KONTEXTE PRAVIDIEL (v0.9.54).** `hw_ctx` dostal tri kľúče (`HardwareRules::CONTEXT_KEYS`): **`kh`** = výška korpusu **BEZ SOKLA**
+(`height − floor_height`, nezaokrúhlený Float), **`kb`** = šírka korpusu a **`front_rows`** = počet riadkov čiel. Blum udáva výklopy v rozmeroch KORPUSU, takže
+`input: 'height'` (= zaokrúhlená výrobná dĺžka čela, 396 pri korpuse 400) by dal **inú triedu** — a `ctx['height']` zase výšku SO soklom. Vnútorná hĺbka pre spôsobilosť
+HL top ide z existujúceho **`available_depth`** (`interior[:back_front_y]`) — delta audit Sol BLOCKER 1: `depth − hrúbka chrbta` by prehliadlo `GROOVE_OFFSET`
+a pri overlay chrbte by hĺbku odčítalo dvakrát.
 
 **KOV-F1 — ULOŽENÝ NOSIČ `hardware_conflicts`.** Plán má aditívny kľúč `hardware_conflicts` `[{owner_part_key, code, message}]` (validuje
 `BuildPlan.validate_hardware_conflicts!` proti registru `HW_CONFLICT_CODES`, vrátane referenčnej integrity vlastníka). Je to **ten istý vzor** ako
 `drawer_conflicts` — `merge_final` ho uloží do configu v TEJ ISTEJ operácii ako geometriu — ale iný stav: pri závese nad tabuľkou **položka aj dielec
 EXISTUJÚ** (riadok v Kovaní musí byť, inak nemá kde vzniknúť ručný zámok), zastavený je len nákup. Dôvod musí prežiť save/reopen aj Undo, lebo po
 znovuotvorení .skp sa nedá odvodiť: `Bom.hardware_conflict_issues` ho zlúči do `hardware_issues`, `Validation` z neho robí RED
-([outputs.md](outputs.md)). `drawer_conflicts` ostáva **nedotknuté**.
+([outputs.md](outputs.md)). `drawer_conflicts` ostáva **nedotknuté**. **KOV-E1b** ten istý nosič nesie aj štyri výklopové dôvody
+(`lift_class_missing` · `lift_dimension_unsupported` · `lift_multirow_unsupported` · `lift_combo_unsupported`) — s tým istým výkladom: položka výklopu sa
+**VYDÁ vždy** (riadok v Kovaní musí existovať, inak používateľ nevidí, čo sa objednáva), zastavený je nákup, rozpočet a ponuka.
 
 
 ### cabinet_builder.rb
@@ -185,12 +196,22 @@ môže niesť `+1` nad šírku 600 mm. Starší plugin (schéma 8) nepozná ani 
 čelo by ticho dostalo klasický záves z legacy `hinge`, `+1` by neprirátal — a schému 8 by zapísal späť, teda **stratu zvečnil**. Cez .skp na druhom PC to znamená
 nedoobjednané závesy a zlý set BEZ blokády (Codex #329 kolo 1 P1). Brány sú tie isté ako pri 5–8: dopredný `newer_config?` (prestavba, šablóny, kópia) + exportná
 `ProductionCore.export_blockers`.
-**`DRAWER_ACTIVATION_SCHEMA` ostáva 5** — je to VLASTNÁ konštanta práve preto, aby bump na 6 až 9 nespravil z každej skrinky schémy 5 „nemigrovanú" (`drawer_stale`).
+· **`10` = KOV-E1a** (OWNER TRIEDNY kľúč VÝKLOPU v `hardware_sets` skrinky — `class:lift|<otváranie>|<systém>@front:<id>/flap`, teda tmavý set pre JEDNO čelo):
+starší plugin (schéma 9) taký kľúč pri normalizácii **ticho zahodí** — jeho `parse_class_key` pozná owner len pri `slide` a sufix `/flap` vôbec — takže by čelo dostalo
+BIELY set z projektovej predvoľby a prvým zápisom by sa strata zvečnila (Codex #331 kolo 2 P1).
+· **`11` = KOV-E1b** (SYSTÉM VÝKLOPU NA ČELE): riadok čiel typu `lift` nesie **`lift: { system: 'hk_top' | 'hl_top' }`** a config nesie **výklopové dôvody**
+v `hardware_conflicts`. Starší plugin (schéma 10) `lift` nepozná: jeho `Fronts.normalize_items` ho whitelistom **zahodí** a prestavba by HL top ticho vrátila na HK —
+teda iný mechanizmus, iné ramená a iná tyč v objednávke; nové dôvody by z nosiča vypadli (`HW_CONFLICT_CODES` ich nepozná) a RED by zmizol. Brány sú tie isté ako pri 5–10.
+**`DRAWER_ACTIVATION_SCHEMA` ostáva 5** — je to VLASTNÁ konštanta práve preto, aby bump na 6 až 11 nespravil z každej skrinky schémy 5 „nemigrovanú" (`drawer_stale`).
 **`HINGE_ACTIVATION_SCHEMA` = 9** je jej dvojička pre závesy (Codex #329 kolo 2 P1): skrinka uložená pod nižšou schémou nesie staré počty závesov, takže ju
 zber priznáva RED `hinge_stale` a brána zastaví nákup, rozpočet aj ponuku (VEPO nie) — detail v [outputs.md](outputs.md). **Sama o sebe schéma 9 RED
 nezhasína** (Codex #329 kolo 3 P1): kým sú pravidlá projektu spred F1, prestavba vyráta staré počty znova, takže nález drží aj druhá príčina
-(`HardwareRules.pre_hinge_table_rules?`) a náprava je prestavba **plus** „Doplniť nové predvoľby". Pri budúcom bumpe `CONFIG_SCHEMA`
-na 10 ostáva 9, aby sa prestavané skrinky zrazu netvárili ako nemigrované.
+(`HardwareRules.pre_hinge_table_rules?`) a náprava je prestavba **plus** „Doplniť nové predvoľby". Pri bumpe `CONFIG_SCHEMA` na 10 a 11 ostáva 9, aby sa prestavané
+skrinky zrazu netvárili ako nemigrované.
+**`LIFT_ACTIVATION_SCHEMA` = 11** je tretia z tejto rodiny (KOV-E1b): skrinka postavená pod nižšou schémou vznikla PRED pravidlami výklopov, takže jej čelo `flap`
+nemá ani mechanizmus (`up`), ani závesy (`down`) — zber ju priznáva RED `flap_stale` ([outputs.md](outputs.md)). **Na rozdiel od `hinge_stale` má JEDINÚ príčinu:
+provenienciu stavby** (delta audit Sol FIX 4). Otázka „nesie projekt seed pravidlá?" sa zámerne NEKLADIE: používateľ smie mať vlastné (aj vypnuté) výklopové pravidlo,
+seed sa mu vtedy nedoplní a RED by nezhasol nikdy. Skrinka prestavaná pod schémou 11 preto stale **nie je** — výsledok stavby s účinnými pravidlami je jeho rozhodnutie.
 
 **ORANGE, KEĎ SA PRAVIDLÁ NEDAJÚ ZMRAZIŤ (Codex #329 kolo 2 P1).** `build_into` po `Construction.build_plan` volá **`attach_rules_state_warning!(plan, model)`**
 (vzor `attach_abs_warnings!`: doplní warning a plán sa RE-VALIDUJE). Warning `hardware_rules_library_incompatible` vznikne LEN v stave, ktorý sa sám neopraví —
