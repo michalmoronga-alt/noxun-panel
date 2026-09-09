@@ -17,6 +17,23 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **FIX · VETA `height_selector` MENUJE ODMIETNUTÝ PEVNÝ SET (9.9.2026; PR #336, v0.9.57).**
+  Priznaný zvyšok fixu #335: pri pevnom `set_id` pre zásuvku s výškovým variantom (detail `height_selector`) znela veta v Nákupe, paneli aj Kontrole „set „“ nesedí
+  so zásuvkou (výber setu nie je podľa výšky zásuvky)" — `resolve_set_id` vracal `[nil, 'set_incompatible', { detail }]` a `unmapped_entry` preberal z `info` len
+  `param value member_index member_label detail class_key`, takže záznam nemal `set_id` a všetky tri vety (`unmapped_reason_sk`, `explain`, `Validation.drawer_kit_item`
+  / `check_hardware_expansion`) vypísali prázdne meno. **Fix (minimálny, dva riadky kódu):** resolver posiela odmietnutý set v **`info['set_id']`** (LEN keď je hodnota
+  mapovania neprázdny String — selektor podľa iného parametra jeden set nemá a zápisová cesta ho pre výškový set aj tak odmieta) a `unmapped_entry` ho preberie **LEN keď
+  resolver set nevybral (`sid` nil) a LEN ako neprázdny String**. Kontrakt resolvera `[nil, 'set_incompatible']` sa NEMENÍ (testy C2a R5 a D1a R1 platia ďalej,
+  `effective_flap_set` číta len `sid`), účinný set má vždy prednosť a záznamy bez `set_id` v `info` (`class_unmapped`, `mapping_invalid`, `selector_unresolved`, …)
+  sú rovnaké ako doteraz — golden fixtúry nezmenené. Platí pre obe úrovne (projektové mapovanie aj override skrinky). JS ani CSV sa nemenia (Nákup a Kontrola čítajú
+  hotovú vetu zo servera, `hwSourceText` číta `set_id` len z nákupných riadkov). **Stráži:** R4 rozšírené o meno setu na všetkých troch miestach (žiadne „„“") a nové
+  **R6** v `tests/pure/test_incompatible_detail_sk.rb` (obe úrovne, prednosť účinného setu, neplatné hodnoty `nil`/`''`/`42`/Hash/Array, info bez `set_id`, selektor podľa
+  iného parametra); mutácie M4a (resolver neposiela) a M4b (`unmapped_entry` nepreberá) overené ručne — obe zhodia R4 aj R6. Testy: **headless 3662 / 0** (+1),
+  **102 JS sád / 0**; in-SU beh netreba (bez buildera/observera).
+  **Review brána:** GH Codex kolo 1 nad `6963958` (automatické, 8 min) = 1 nález označený P1 — `SYSTEM/STAV.md` ostal pri bumpe na v0.9.55 a starých počtoch testov
+  (checklist uzáveru ho žiada prepísať, hoci sám STAV hovorí „drobné fix PR ho nemenia"; po #335 a #336 by bol dve verzie pozadu, takže nález platí) → opravené in-place
+  (verzia, testy, fixy #335/#336 v „Robí sa" a „Posledné uzávery"; 80 riadkov / 12 kB limit držaný) a kolo 2 vyžiadané nad fix hlavou (výsledok v PR #336).
+
 - **FIX · `incompatible_detail_sk` MÁ JEDNU DEFINÍCIU — `height_selector` KONEČNE S VETOU, AST GUARD DUPLICÍT (9.9.2026; PR #335, v0.9.56).**
   Metóda, ktorá prekladá dôvod nekompatibilného setu do vety Nákupu, panela a Kontroly, bola v `HardwareSets` definovaná **dvakrát** — tabuľka `INCOMPATIBLE_DETAIL_SK`
   z KOV-C2a a inline hash z KOV-D1a. Ruby ticho používa druhú, takže tabuľka aj prvá metóda boli mŕtvy kód a detail **`height_selector`** (pevný `set_id` pre zásuvku
