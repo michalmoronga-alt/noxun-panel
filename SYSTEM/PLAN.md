@@ -638,30 +638,51 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   alebo nekladné pole = kontrola vypnutá, chýbajúci počet = 1, rovnaký clamp ako pri výškových pásmach) a serverová normalizácia taký guard aj tak zahodí (kontrakt F1),
   takže veta by bola mŕtva vetva a rozbila by paritu klient/server. **Poradie pásiem sa nevynucuje** — server ich zoraďuje sám. „Všetko nad" ostáva povinné aj s `finite`
   (rozhodnutie F1, Codex #329 kolo 3: catch-all drží starý čítač).
-- **KOV-E · „VÝKLOPY HK top / HL top" (po F; v2 po Codex #327):** config čela `lift.system` (`hk_top` predvolene | `hl_top`) + výber v karte čela (CONFIG_SCHEMA 9 → 10 —
-  9 minula KOV-F1, Codex #329; whitelisty šablón aditívne) · **sklop (`fall`) = závesy ako dvierka:** DRUHÉ seed pravidlo `zavesy-sklop` (rovnaké `bands` + door guardy ako F) s `applies_to: {role: flap, flap_dir: down}` — `applies_to.role` je skalár, pravidlo dvierok ostáva na `front_door` (Codex #327 kolo 3); `apply_rule` sa naučí filter `flap_dir`; položky nesú `params.use_type = 'door'`
-  (sety `use_type fall` — vzpery — ostávajú mimo V1 a `USE_TYPE_GENERIC` sa nemení; test: sklop nikdy nevydá `lift` položku) · nový rule kind `lift_class`: **HK top:
-  `LF = KH × (weight_kg + handle_allowance_kg)`**, KH = výška korpusu (riadku čela), `handle_allowance_kg` v JSON pravidla, predvolene **0,5** (Blum definuje LF s dvojnásobkom
-  hmotnosti úchytky; úchytky mimo V1 → konzervatívna rezerva 2 × 0,25 kg, Codex #327) → 22K2300 (LF 420–1610) · 22K2500 (930–2800) · 22K2700 (1730–5200) · 22K2900 (3200–9000),
-  pri prekryve **najslabšia trieda, ktorá LF pokrýva**; **HL top:** mechanizmus podľa KH ako SPOJITÉ max-pásma (Float bez medzier — Codex #327 kolo 3): KH < 390 →
-  22L2200, KH ≤ 580 → 22L2500; ramená KH < 340 → 22L3200 · < 390 → 22L3500 · ≤ 540 → 22L3800 · ≤ 580 → 22L3900 (**prekryv 480–540 = 22L3800**, predpoklad, Michal overí v
-  e-services); KH < 300 alebo > 580 = mimo tabuľky; **HL top + Tip-On = NEPODPOROVANÉ (RED `lift_combo_unsupported`)**, kým seed nemá overený T mechanizmus pre HL (zber
-  ho nemá — Codex #327 kolo 3); **hmotnostné limity HL
-  top = otvorený údaj → HL top je do overenia FAIL-CLOSED: položka vznikne, ale RED `lift_limit_unverified` v `HW_BLOCKERS` (nikdy neobjednať poddimenzovaný mechanizmus —
-  Codex #327 kolo 2); odomkne ju dátový follow-up po overení v Blum e-services** · **plný automat bez zámkov (Michal 8.9.)** · **sety:** nové klasifikačné pole
-  `lift_system` (`hk_top|hl_top`)
-  pri `use_type lift` (whitelist + round-trip guard + lazy std bump, `parse_class_head` dovolí tretí segment aj pre `lift` = `lift_system`), kľúče `class:lift|classic|hk_top`,
-  `class:lift|tipon|hk_top`, `class:lift|classic|hl_top`, `class:lift|tipon|hl_top` → selektor podľa LF (HK) / KH (HL); **každý set kompletný:** mechanizmus 1 sada + čelný
-  príchyt 20S4200 (13781) 1 pár + krytky biela (22K8000 347834 / 22.8000 507343) 1 sada + Tip-On: T mechanizmus + Tip-On jednotka 76 mm (250831) + adaptér (250841) `per: owner`
-  + **HL: ramená 1 sada + stabilizačná tyč 22Q1076U (507365) 1 ks** (predĺženie 507366 = ORANGE hint pri širokom čele) · **seed položiek kompletný ako D-118a** (URL, názov,
-  cena s DPH, MJ, výrobca, rada, dátum) — zdroj v repe: [zdroje/demos/SEED_AVENTOS_2026-09-08.md](zdroje/demos/SEED_AVENTOS_2026-09-08.md) + JSON zber, **seed tabuľka na
-  Michalovu kontrolu PRED implementáciou** · fail-closed: LF/KH mimo tabuľky = RED `lift_class_missing` v jedinom registri `BuildPlan::HW_BLOCKERS` (HW CSV + rozpočet +
-  **cenová ponuka**; geometria a VEPO nie) · **downgrade:** starší plugin kind `lift_class` nepozná; knižnice sú per PC a updater (D-52) drží obe PC aktuálne, takže
-  „starší plugin s novšou knižnicou" = downgrade na tom istom PC — VEDOMÉ riziko do D-48 (zdieľané knižnice budú potrebovať bariéru kompatibility knižnice), čítače od F
-  `std` honorujú (Codex #327 kolo 3) · **E2 (samostatný PR, Audit NIE):** editor `lift_class` v Pravidlách (`handle_allowance_kg`, LF/KH rozsahy, voľba prekryvu) +
-  spoločná Ruby/JS validácia — do E2 len na čítanie · Audit ÁNO (Astra: config čela, nový kind, `lift_system`, dátový balík) · Smoke: výklop 600 × 400 v skrinke 400 → LF
-  ≈ 400 × 3,4 = 1380 → 22K2300; Tip-On →
-  T + jednotka + adaptér; ťažké čelo → 22K2700; KH 250 → RED; sklop → závesy.
+- **KOV-E · „VÝKLOPY HK top / HL top" (po F; v3 9.9.2026 — seed v2 overený, rozhodnutia Michala 8.–9.9.; DVA PR: E1 jadro, E2 UI):**
+  **Dáta (uzavreté 9.9.):** [zdroje/demos/SEED_AVENTOS_v2_2026-09-09.md](zdroje/demos/SEED_AVENTOS_v2_2026-09-09.md) — 24 položiek Démos (ceny s DPH 9.9., URL, MJ),
+  **hmotnostné limity HL top z Blum katalógu 2024/25** (verejný zdroj, e-services netreba): ramená 22L3200 KH 300–339 / 1,5–9 kg · 22L3500 340–389 / 1,75–10 kg ·
+  22L3800 390–540 / 2–12,25 kg · 22L3900 480–580 / 2,5–14 kg. Rozhodnutia Michala: **len skrutkové varianty** · **HL top Tip-On NEEXISTUJE** (len klasický) · Tip-On jednotka
+  76 mm **BEZ adaptéra** (zavŕtava sa) · **stabilizačná tyč VŽDY** v HL sete, **od šírky korpusu KB ≥ 1100 mm 2× tyč + predlžovací diel** (delenie tyče medzi úzke skrinky =
+  „Dĺžkové", mimo V1) · **farba setu = jedna voľba, zasahuje krytky aj Tip-On spolu:** biela (predvolená) | tmavá (= tmavo šedé krytky 347835 / 507345 + čierny Tip-On 497007;
+  čierne krytky Démos nemá, šedá sa nerieši) · príliš ľahké čelo = **ORANGE** · plný automat bez zámkov.
+  **E1 jadro (Audit ÁNO — Astra: config čela, nový kind, `lift_system`, dátový balík; hľadať hraničné prípady):** config čela `lift.system` (`hk_top` predvolene | `hl_top`)
+  (CONFIG_SCHEMA 9 → 10 — 9 minula KOV-F1, Codex #329; whitelisty šablón aditívne) · **sklop (`fall`) = závesy ako dvierka:** DRUHÉ seed pravidlo `zavesy-sklop` (rovnaké
+  `bands` + door guardy ako F) s `applies_to: {role: flap, flap_dir: down}` — `applies_to.role` je skalár, pravidlo dvierok ostáva na `front_door` (Codex #327 kolo 3);
+  `apply_rule` sa naučí filter `flap_dir`; položky nesú `params.use_type = 'door'` (sety `use_type fall` — vzpery — ostávajú mimo V1 a `USE_TYPE_GENERIC` sa nemení; test: sklop
+  nikdy nevydá `lift` položku) · nový rule kind **`lift_class`** (seed pravidlo `vyklopy-aventos`, `applies_to: {role: flap, flap_dir: up}`), JEDNA položka `lift` per výklop
+  s `params` {`lift_system`, `lift_class`, `arm_class` (HL), `rod_count`, `rod_extension`, `opening_mode`, `use_type: 'lift'`}: **HK top: `LF = KH × (weight_kg +
+  handle_allowance_kg)`**, KH = výška korpusu (pri jednom riadku čiel výška riadku), `handle_allowance_kg` v JSON pravidla, predvolene **0,5** (Blum definuje LF s dvojnásobkom
+  hmotnosti úchytky; úchytky mimo V1 → rezerva 2 × 0,25 kg, Codex #327) → triedy `22K2300` (LF 420–1610) · `22K2500` (930–2800) · `22K2700` (1730–5200) · `22K2900`
+  (3200–9000) ako `classes[]` v JSON pravidla (Float, inkluzívne hranice), pri prekryve **najslabšia trieda, ktorá LF pokrýva**; **HL top:** mechanizmus podľa KH ako SPOJITÉ
+  max-pásma (Float bez medzier — Codex #327 kolo 3): KH < 390 → `22L2200`, KH ≤ 580 → `22L2500`; **ramená podľa KH A hmotnosti čela** (`arms[]`: {kh_min, kh_max, kg_min,
+  kg_max, class}) — v prekryve KH 480–540 **najslabšie ramená, ktoré hmotnosť pokrývajú** (do 12,25 kg → 22L3800, nad → 22L3900; rovnaká logika ako LF triedy) ·
+  **tyč:** `rod_count` = 1, od `rod_double_from_kb_mm` (JSON pravidla, predvolene **1100**, šírka korpusu KB) = 2 + `rod_extension` 1 · **brány (jediný register
+  `BuildPlan::HW_BLOCKERS`, HW CSV + rozpočet + cenová ponuka; geometria a VEPO nie):** RED `lift_class_missing` = LF/KH/hmotnosť mimo tabuľky (HK LF > 9000 · HL KH < 300 alebo
+  > 580 · HL hmotnosť nad max ramien pre dané KH) alebo `weight_kg` nil (bez hmotnosti sa trieda NEDÁ určiť — fail-closed, položka `lift` sa vydá bez triedy a set ju
+  nepreloží) · RED **`lift_combo_unsupported`** = `hl_top` + Tip-On (mechanizmus neexistuje) · ORANGE `lift_light_front` = pod spodným limitom (HK LF < 420 · HL hmotnosť pod
+  kg_min ramien) — položka vzniká s najslabšou triedou · ORANGE `door_wider_than_high` sa na výklop NEuplatňuje (výklop je z definície širší) · **`HardwareRules::STD` bump**
+  (čítače od F `std` honorujú) · **sety:** nové klasifikačné pole **`lift_system`** (`hk_top|hl_top`) pri `use_type lift` (whitelist + round-trip guard + lazy std bump,
+  `parse_class_head` dovolí tretí segment aj pre `lift` = `lift_system`), kľúče **`class:lift|classic|hk_top` · `class:lift|tipon|hk_top` · `class:lift|classic|hl_top`**
+  (kľúč `class:lift|tipon|hl_top` sa NEZAKLADÁ — validácia ho odmietne) · **farba = DVA seed sety na kľúč** (vzor antracit D1b): `vyklop-hk-klasik` (biela, predvolený pre
+  triedny kľúč) / `vyklop-hk-klasik-tmavy` · `vyklop-hk-tipon` / `vyklop-hk-tipon-tmavy` · `vyklop-hl-klasik` / `vyklop-hl-klasik-tmavy` — voľba tmavej = **override
+  vlastníka** (existujúci mechanizmus `hardware_overrides` pre front kľúč), precedencia ako F (override vlastníka > triedny override skrinky > triedny kľúč projektu),
+  nesúlad klasifikácie (Tip-On čelo na klasickom sete, HL set na HK čele) = RED `lift_set_mismatch` pri EXPANZII (vzor `hinge_set_mismatch`) · **členovia setu:** mechanizmus
+  `code_by_class` {`22K2300` → 347810 …} (vzor `code_by_nl`; T varianty v tipon setoch 347814/26/27/28) 1 sada · čelný príchyt 13781 1 pár · krytky (HK 347834 | tmavé 347835;
+  HL 507343 | 507345) 1 sada · tipon: Tip-On jednotka 250831 | tmavá 497007 `per: owner` 1 ks (**bez adaptéra**) · HL: ramená `code_by_class` {`22L3200` → 507355, `22L3500` →
+  507356, `22L3800` → 507357, `22L3900` → 507358} 1 sada + tyč 507365 **`quantity_from: 'rod_count'`** + predĺženie 507366 **`quantity_from: 'rod_extension'`** — NOVÝ aditívny
+  kľúč člena; starší čítač ho ignoruje a berie počet 1 (tyč 1 ks, predĺženie 1 ks navyše = bezpečná chyba smerom nahor, nikdy 0; overiť v audite) · **seed položiek** (24 riadkov,
+  `SEED_ROWS` 9 polí vzor D-118a, kategória VYKLOPY, výrobca Blum, rada AVENTOS, dátum overenia 9.9.2026) cez migráciu katalógu (`seed_version` bump, používateľské položky sa
+  neprepisujú) · sety cez `LEGACY_SEED_SHAPES` / lazy std (vzor D-118b), projektový snapshot cez „Doplniť nové predvoľby"; **prekryv:** iné zapnuté pravidlo s výstupom `lift`
+  pre `flap` → seed sa nedopĺňa + ORANGE `hardware_rule_overlap` · **downgrade:** starší plugin kind `lift_class` nepozná → výklop bez položky (VEDOMÉ riziko do D-48; knižnice
+  per PC, updater D-52 drží obe PC aktuálne) · Testy (headless, hranice Float): LF 419,9/420 · 1610/1610,5 (→ 22K2500) · 1730 · 2800/2800,5 · 9000/9000,5 (RED) · KH 299/300 ·
+  389/390 (22L2200+22L3500 → 22L2500+22L3800) · 540/540,5 · 580/581 (RED) · hmotnosť 9,00/9,01 pri KH 320 (RED — žiadne iné ramená) · 12,25/12,26 pri KH 500 (22L3800 → 22L3900)
+  · 14,00/14,01 (RED) · KB 1099/1100 (`rod_count` 1 → 2 + extension) · `weight_kg` nil → RED · HL + Tip-On → RED · sklop nikdy `lift` · tmavý set override prežije prestavbu,
+  reopen, Undo · downgrade: starý čítač `quantity_from` ignoruje → 1 · in-SU `run_kove`. Smoke: výklop 600 × 400 v skrinke 400 → LF ≈ 400 × 3,4 = 1380 → 22K2300 + príchyt +
+  krytky biela; Tip-On → 22K2300T + jednotka 250831; tmavý set → 347835 + 497007; ťažké čelo → 22K2700; HL 500 vysoká, 6 kg → 22L2500 + 22L3800 + 1 tyč; HL 1200 široká →
+  2 tyče + predĺženie; KH 250 → RED; sklop → závesy.
+  **E2 UI (samostatný PR, Audit NIE):** v karte výklopu výber systému (HK top | HL top) + **výber setu vrátane tmavého** (vzor D1b zásuvky) + riadok „Technický detail"
+  (trieda, LF alebo KH/kg, tyč) · editor `lift_class` v Pravidlách (`handle_allowance_kg`, `rod_double_from_kb_mm`, tabuľky tried/ramien) so spoločnou Ruby/JS validáciou
+  (parita cez `rules_validation_parity.json`; do E2 len na čítanie) · D-114 balík Čiel ostáva na koniec bloku.
 - **KOV-G · „NOHY 4/6, PRÍCHYTY, SOKEL PRI VKLADANÍ" (po D; LOW):** pravidlo nôh `bands` na šírku korpusu (<1000 → 4, ≥1000 → 6; AXILO aj klzáky) · **príchyt sokla = druhé
   bands pravidlo na šírku** (1 / 2) — O3, bez pomerového člena · set nôh podľa výšky sokla (existuje) viditeľný **pri vkladaní** (riadok v ghost pásiku/vkladacej karte) aj v
   Korpuse pri sokli (D-111) — override per skrinka. Audit NIE. Smoke: skrinka 1200 → 6 nôh + 2 príchyty; sokel 150 → iný set nôh viditeľný už pri vkladaní.
