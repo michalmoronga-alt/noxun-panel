@@ -17,6 +17,33 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **FIX · `incompatible_detail_sk` MÁ JEDNU DEFINÍCIU — `height_selector` KONEČNE S VETOU, AST GUARD DUPLICÍT (9.9.2026; PR #335, v0.9.56).**
+  Metóda, ktorá prekladá dôvod nekompatibilného setu do vety Nákupu, panela a Kontroly, bola v `HardwareSets` definovaná **dvakrát** — tabuľka `INCOMPATIBLE_DETAIL_SK`
+  z KOV-C2a a inline hash z KOV-D1a. Ruby ticho používa druhú, takže tabuľka aj prvá metóda boli mŕtvy kód a detail **`height_selector`** (pevný `set_id` pre zásuvku
+  s výškovým variantom, KOV-C2a/D1a) sa nikdy nepreložil — používateľ videl generické „iná klasifikácia". KOV-F1 a KOV-E1a to vedome obchádzali dopisovaním každého
+  nového detailu na obe miesta (komentár „TÁTO je tá účinná"). **Fix:** jedna tabuľka + jedna metóda; znenia tie, ktoré sa zobrazovali doteraz (`system` = „iný systém
+  zásuviek", fallback „iná klasifikácia" — teraz konštanta `INCOMPATIBLE_DETAIL_FALLBACK_SK`), doplnený `height_selector` („výber setu nie je podľa výšky zásuvky");
+  `use_type` už v účinnej mape bol. **Stráži to:** nový **AST guard** v `tests/pure/test_guards.rb` (`NxTest::DupDefs`) — žiadna metóda nie je v tom istom module/triede
+  definovaná dvakrát; kľúč = plná cesta modulu + meno metódy (cez `RubyVM::AbstractSyntaxTree`, nie regex), takže duplicitu neschová ani znovuotvorený modul v inom súbore
+  ani `module ::M`; `class << self` = `def self.x` (`class << KONST` iný scope), `module_function` vytvára aj singleton kópiu, výlučné vetvy `if`/`case` nie sú duplicita
+  (nepodmienená + podmienená, dve v tej istej vetve alebo pod nezávislými `if` áno), `private def x` = holý `def`, `def` v tele metódy sa neskenuje; hranice drží self-test s 26 prípadmi; pred fixom
+  presne jeden nález v celom plugine, tento — a sada `tests/pure/test_incompatible_detail_sk.rb` (jedna autorita · každý `detail` zo zdrojáku má vetu a naopak — kľúče
+  sa čítajú z AST vrátane slučky nad `%w[…]` · zachované znenia · `height_selector` end-to-end v Nákupe, paneli a Kontrole · rovnaký podmet vety na oboch stranách;
+  mutácie M1–M3 overené ručne). Existujúce testy na tie texty neasertovali. Bokom opravená predložka v Nákupe („nesedí **so** zásuvkou", ako hovorí Kontrola).
+  Testy: **headless 3661 / 0**, **102 JS sád / 0**; in-SU beh netreba (bez buildera/observera).
+  **Review brána (4 nezávislé línie):** GitHub Codex kolo skončilo 2× **Failed** (po prepnutí z draftu aj po `@codex review`, bez nálezov aj bez dôvodu) → náhrada
+  podľa vzoru z 31.8.: **slepý Opus reviewer s vykonanými reprodukciami** (MERGE OK: 0×P1, 1×P2 = prázdne meno setu → follow-up, 5×P3 → opravené) + **Codex CLI Astra**
+  nad celým diffom (MERGE PO OPRAVE P1: 2×P1 = vetvy `if` v guarde a regex R5, 2×P2 = `module_function` a `::M`/`def A.a`, 1×P3 → všetko opravené: guard prenáša vetvy
+  aj do `class << self`, R5 číta AST) + **Opus delta-verifikácia** prvého fix kola (DELTA OK, 4×P3 → opravené) + tretí pokus **GitHub Codex nad 195f6d8 prešiel** (2×P2:
+  nezávislé `if` a slučkové kľúče R5 → opravené v druhom fix kole, reply s hashom v threadoch) + **Opus delta-verifikácia** druhého fix kola (DELTA OK, 1×P2 = vetva `FCALL`
+  prestala zostupovať do `private def` → opravené v treťom, poslednom fix kole spolu s 2×P3; vedomá výnimka z pravidla 3 kôl — kolá 2–3 sa točili výhradne okolo hraníc
+  testovacej poistky, nie produkčného kódu, ktorý sa od prvého fix kola `195f6d8` (predložka) nezmenil ani o riadok). Sandboxový beh Codex CLI hlásil 19 FAIL updatera — artefakt
+  sandboxu (EACCES na `IO.popen`/`tasklist`), lokálne aj CI 0 FAIL. **Priznaný zvyšok (mimo opravy):** pri `height_selector` nesie veta prázdne meno setu („set „“ nesedí
+  so zásuvkou (…)"), lebo `resolve_set_id` vracia `set_id = nil` a `unmapped_entry` ho z `info` nepreberá — samostatná drobnosť naprieč Nákupom, Kontrolou a panelom;
+  guard nesleduje `define_method`/`alias_method`.
+  **Poučenie:** „druhá definícia vyhráva" Ruby nehlási ani warningom; keď sa pri review objaví komentár „táto je tá účinná", je to nález, nie riešenie. Draft → ready
+  Codex kolo nespustí spoľahlivo — stav sa vždy overuje v „Codex Review Summary" (Failed ≠ beží); `codex exec` na pozadí potrebuje `< /dev/null`, inak visí na stdin.
+
 - **KOV-E — VÝKLOP DOSTANE KOVANIE SÁM: AVENTOS HK top / HL top (E1a dáta PR #332 · E1b pravidlo + brány PR #333 · E2 UI PR #334; v0.9.53–0.9.55, 9.9.2026).**
   Doteraz čelo typu **výklop** nedostalo v nákupe nič — plugin preň nemal pravidlo a katalóg nepoznal mechanizmy. Blok E to uzatvára v troch dávkach nad jedným package (v4,
   po Astra audite [4 BLOCKER + 7 FIX + 1 NOTE] a troch kolách Codex nad docs PR #331). **Dáta (E1a):** katalóg pozná 23 položiek AVENTOS (mechanizmy HK top 4 triedy × skrutky | Tip-On,

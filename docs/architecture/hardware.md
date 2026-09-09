@@ -711,6 +711,18 @@ charakterizačný test). Päť častí:
   set patrí k TOMUTO systému a TEJTO výške — Antaro/StrongBox raz budú zdieľať `class:slide|classic|metal` s Atirou a pásmo H176 vs. H70 má rovnaké NL 470. Nesúlad =
   **nemapovaná položka s dôvodom, NIKDY iný set**; nové ORANGE dôvody `class_unmapped` a `set_incompatible` majú vety v `unmapped_reason_sk` aj vo
   `Validation.check_hardware_expansion`. Povýšenie na RED `drawer_kit_missing` prinesie C2b.
+  **Dôvod (`detail`) prekladá JEDNA tabuľka `INCOMPATIBLE_DETAIL_SK`** cez `incompatible_detail_sk` — čítajú ju Nákup a panel (`unmapped_reason_sk` / `explain`),
+  Kontrola (`Validation`, vrátane RED položiek závesov a výklopov) aj validácia override skrinky (`band_set_problem`); neznámy detail = fallback „iná klasifikácia"
+  (`INCOMPATIBLE_DETAIL_FALLBACK_SK`), nikdy vymyslená veta. **Od v0.9.56 má metóda jedinú definíciu** — dovtedy boli v module dve (KOV-C2a tabuľka + inline hash
+  z KOV-D1a), Ruby ticho brala druhú, takže tabuľka bola mŕtvy kód, `height_selector` (pevný `set_id` pre zásuvku s výškovým variantom) ostával bez vety „výber setu nie je
+  podľa výšky zásuvky" a KOV-F1/E1a dopisovali každý detail na obe miesta. Duplicitné `def` stráži **AST guard** v `tests/pure/test_guards.rb` (`NxTest::DupDefs`): sken celého
+  pluginu s kľúčom **plná cesta modulu + meno metódy**, takže duplicitu neschová ani znovuotvorený modul v inom súbore (`module Noxun::Engine::X` = vnorené moduly), `class << self`
+  a `def self.x` sú jeden singleton scope (`class << KONST` iný), `module_function` (aj `module_function def x`) vytvára aj singleton kópiu, `private def x` sa skenuje ako holý
+  `def`, dve definície vo **vzájomne výlučných** vetvách `if`/`unless`/`case` nie sú duplicita (nepodmienená + podmienená, dve v tej istej vetve alebo pod nezávislými `if` áno)
+  a `def` v tele metódy sa neskenuje — hranice drží vlastný self-test. **Priznané limity:** `define_method`/`alias_method` scanner nesleduje; vetvy rozlišuje riadkom uzla
+  `if`/`case` (dva nezávislé `if` na jednom riadku s definíciami v rôznych vetvách by bral ako výlučné). Úplnosť tabuľky (každý `detail` zo zdrojáku má vetu a naopak — kľúče sa čítajú z AST vrátane slučky
+  nad `%w[…]`; symbolový kľúč `detail:` ani interpolovanú hodnotu scanner nevidí, v `hardware_sets.rb` sa nepoužívajú; `height_selector` end-to-end, rovnaký podmet vety
+  v Nákupe aj Kontrole) stráži `tests/pure/test_incompatible_detail_sk.rb`.
 
 Testy: `tests/pure/test_kovc2a_kanal_sety.rb` (23 testov + 4 overené mutácie vrátane completeness nad radmi receptov: pre KAŽDÚ bunku `nl_series_by_height`/`nl_series` každého
 vydaného receptu existuje v seede set vybraný triednym kľúčom a v ňom kit kód).
@@ -783,7 +795,8 @@ navyše jednotka, pri HL top ramená a stabilizačná tyč), a mechanizmus sa vy
   s `blocks_export`) a bez toho, aby sa vôbec pozrel do mapovania. Prepad na generický `lift` by v prestavanej zákazke, ktorá si legacy mapovanie oprávnene drží, ticho
   vydal LEGACY set — teda kovanie, o ktorom nikto nedokáže, že k systému čela patrí. **Veta menuje OBA dôvody** („výklop nemá určený spôsob otvárania alebo systém
   (HK top / HL top)" — interná delta P3): chýbať môže otváranie aj systém a hláška o samotnom systéme by posielala opravovať pole, ktoré je v poriadku. Je JEDNA
-  a rovnaká v Nákupe (`unmapped_reason_sk`), v Kontrole (`Validation`) aj v mape detailov (`incompatible_detail_sk` — pozor, tá **účinná**, druhá v poradí).
+  a rovnaká v Nákupe (`unmapped_reason_sk`), v Kontrole (`Validation`) aj v mape detailov (`incompatible_detail_sk` nad jedinou tabuľkou `INCOMPATIBLE_DETAIL_SK`
+  — od v0.9.56 má metóda jedinú definíciu, viď odsek KOV-C2a vyššie).
   Rovnaký dôvod má aj `set_incompatible_info`, ale **DNES je tá vetva nedosiahnuteľná** (expanzia aj súpis zastanú skôr v `resolve_set_id`, `band_set_problem` beží
   len nad existujúcim triednym kľúčom) — necháva sa ako fail-closed poistka pre budúce volanie, nie ako „tá istá odpoveď na zápisovej ceste".
   **Legacy výklop (bez `params.use_type`) sa tým NEMENÍ** — ide dnešnou generickou cestou. (Pozor na dve rôzne veci: grandfather
