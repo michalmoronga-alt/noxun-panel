@@ -116,10 +116,9 @@
   // `HardwareSets::SKIP_CODE` (zhodu stráži guard test); znamená „táto dĺžka
   // vedome nemá kód", nie chýbajúci údaj.
   var HWS_SKIP_CODE = 'none';
-  // KOV-E1a: veta pri sete, ktorého člen je novšieho tvaru (kód podľa triedy
-  // alebo počet z parametra). Editor preň príde v E2; do vtedy je set len na
-  // čítanie — a server zmenu jeho členov ODMIETNE, nie iba `disabled` pole.
-  var HWS_LOCKED_HINT = 'Set novšieho tvaru — úprava príde neskôr; zatiaľ len na čítanie.';
+  // KOV-E2: read-only režim setov s novým tvarom člena (badge a hláška z E1a)
+  // ZANIKOL — editor `code_by_param` aj `quantity_from` už vie, takže veta
+  // „úprava príde neskôr" by klamala a set výklopu by sa nedal opraviť.
   function hwsIsSkipCode(v){
     return String(v == null ? '' : v).trim().toLowerCase() === HWS_SKIP_CODE;
   }
@@ -208,19 +207,51 @@
   // „Ako sa určí kód?" (`kind`) + „Koľko?" (`per`). Prepnutie sposobu polia
   // druheho sposobu ZAHADZUJE — polovicny clen by sa na serveri odmietol
   // a v editore by vyzeral hotovo.
+  // KOV-E2: STVRTA stratégia kódu — `code_by_param` („podľa triedy položky").
+  // Server ju validuje ako XOR s ostatnými tromi (`validate_member`), takže
+  // v editore je to jedna voľba toho istého selectu, nie nový druh člena.
   var HWS_KINDS = [['code', 'pevný kód'], ['nl', 'podľa dĺžky výsuvu (NL)'],
-                   ['bands', 'podľa pásma parametra']];
+                   ['bands', 'podľa pásma parametra'],
+                   ['param', 'podľa triedy položky']];
   var HWS_PERS  = [['unit', 'na 1 kus kovania'], ['owner', 'na vlastníka (dvierka/zásuvku)']];
+  // Hodnota „iné" v selecte parametra — odomkne textové pole. NIKDY sa
+  // neposiela na server (posiela sa až vypísaný názov).
+  var HWS_PARAM_OTHER = '__other__';
+  // Parametre, ktoré dnes položky naozaj nesú (`HardwareRules.lift_compute`).
+  // Zoznam je POMÔCKA, nie brána: vlastný názov sa dá vypísať a autoritou
+  // ostáva server (chýbajúci kľúč = NEVYRIEŠENÝ člen, nikdy „najbližší" kód).
+  var HWS_CODE_PARAMS = [['lift_class', 'trieda mechanizmu (lift_class)'],
+                         ['arm_class', 'trieda ramien (arm_class)']];
+  var HWS_QTY_PARAMS  = [['rod_count', 'počet stabilizačných tyčí (rod_count)'],
+                         ['rod_extension', 'predlžovací diel tyče (rod_extension)']];
 
   function hwsMemberKind(m){
     if (!m) return 'code';
     if (m.is_series) return 'nl';
     if (m.is_bands) return 'bands';
+    if (m.is_param) return 'param';
     return 'code';
+  }
+  // Uložený názov parametra -> dvojica pre editor: známy = hodnota selectu,
+  // neznámy = „iné" + vypísaný text. Prázdny = kritérium sa nepoužíva.
+  function hwsParamSplit(value, list){
+    var v = String(value == null ? '' : value).trim();
+    if (!v) return { sel: '', custom: '' };
+    for (var i = 0; i < list.length; i++){
+      if (list[i][0] === v) return { sel: v, custom: '' };
+    }
+    return { sel: HWS_PARAM_OTHER, custom: v };
+  }
+  // Späť: čo sa naozaj pošle na server. „iné" bez textu = nič (kľúč sa
+  // nezapíše) — polovičný člen by na serveri spadol a v editore vyzeral hotovo.
+  function hwsParamJoin(sel, custom){
+    var s = String(sel == null ? '' : sel).trim();
+    if (s === HWS_PARAM_OTHER) return String(custom == null ? '' : custom).trim();
+    return s;
   }
   // Prazdny clen daneho sposobu (pre „+ Pridať člena" aj pre prepnutie).
   function hwsMemberBlank(kind, gt){
-    var base = { per: 'unit', qty: 1, label: '' };
+    var base = { per: 'unit', qty: 1, label: '', qfrom: '', qfrom_custom: '' };
     if (kind === 'nl'){
       base.is_series = true;
       base.series = [{ nl: '', code: '' }];
@@ -228,6 +259,12 @@
       base.is_bands = true;
       base.param = hwsDefaultParam(gt);
       base.bands = [{ min: '', max: '', code: '' }];
+    } else if (kind === 'param'){
+      // KOV-E2: prázdny člen „podľa triedy" — jeden riadok `hodnota -> kód`.
+      base.is_param = true;
+      base.param = HWS_CODE_PARAMS[0][0];
+      base.param_custom = '';
+      base.codes = [{ value: '', code: '' }];
     } else {
       base.is_series = false;
       base.code = '';
@@ -236,36 +273,36 @@
   }
   // Prepnutie sposobu urcenia kodu: spolocne polia („Koľko?", počet, popis)
   // OSTAVAJU, polia druheho sposobu sa ZAHADZUJU.
+  //
+  // KOV-E2: `quantity_from` je NEZAVISLE od stratégie kódu (server ho dovoľuje
+  // ku všetkým štyrom), preto prepnutie kódu počet z parametra NEZAHADZUJE —
+  // tyč s pevným kódom a premenlivým počtom je legitímny člen.
   function hwsMemberSwitch(m, kind, gt){
     var out = hwsMemberBlank(kind, gt);
     out.per = (m && m.per === 'owner') ? 'owner' : 'unit';
     out.qty = (m && m.qty) || 1;
     out.label = (m && m.label) || '';
+    out.qfrom = (m && m.qfrom) || '';
+    out.qfrom_custom = (m && m.qfrom_custom) || '';
     if (kind === 'code' && m && m.code) out.code = m.code;
     return out;
   }
   // Cleny editora -> tvar servera (rad: riadky {nl, code} -> mapa;
-  // pasma: riadky {min, max, code} -> { param, bands }).
-  // KOV-E1a: člen NOVŠIEHO TVARU (`code_by_param` / `quantity_from`). Editor
-  // ho zatiaľ upravovať nevie (príde v E2), ale NESMIE ho stratiť — preto ho
-  // `hwsMembersOf` odloží celý (`raw`) a `hwsBuildMembers` ho pošle späť
-  // NEZMENENÝ. Bez toho by sa z mechanizmu výklopu stal člen s prázdnym kódom.
-  function hwsMemberIsNew(m){
-    return !!(m && (m.code_by_param || m.quantity_from));
-  }
-  // Nesie set člena novšieho tvaru? (dlaždica ho ukáže len na čítanie)
-  function hwsSetIsNewShape(set){
-    return ((set && set.members) || []).some(hwsMemberIsNew);
-  }
-  function hwsCopy(v){
-    try { return JSON.parse(JSON.stringify(v)); } catch (e){ return v; }
-  }
+  // pasma: riadky {min, max, code} -> { param, bands }; trieda: riadky
+  // {value, code} -> { param, codes }).
+  //
+  // KOV-E2: `code_by_param` a `quantity_from` sa UZ ROZOBERAJU na polia editora
+  // (E1a ich odkladala celé ako `raw`, lebo editor pre ne ešte nebol). Kontrakt
+  // je nezmenený: `code XOR code_by_nl XOR param_bands XOR code_by_param`
+  // a `quantity_from` NEZÁVISLE od nich.
   function hwsBuildMembers(members){
     return (members || []).map(function(m){
-      // Bezstratový transport: člen novšieho tvaru ide späť tak, ako prišiel.
-      if (m && m.is_locked && m.raw) return hwsCopy(m.raw);
       var out = { per: m.per === 'owner' ? 'owner' : 'unit', qty: parseInt(m.qty, 10) || 1 };
       if (m.label) out.label = m.label;
+      // POCET Z PARAMETRA je nezávislý od stratégie kódu — píše sa PRED ňou,
+      // aby mal člen vždy rovnaké poradie kľúčov nech ide ktoroukoľvek vetvou.
+      var qf = hwsParamJoin(m.qfrom, m.qfrom_custom);
+      if (qf) out.quantity_from = qf;
       if (m.is_series){
         var map = {};
         (m.series || []).forEach(function(row){
@@ -276,6 +313,18 @@
         out.code_by_nl = map;
       } else if (m.is_bands){
         out.param_bands = { param: hwsTrim(m.param), bands: hwsBuildBands(m.bands, 'code') };
+      } else if (m.is_param){
+        // Prázdny riadok sa ZAHADZUJE (vzor radu NL); čiastočne vyplnený ide
+        // na server, aby používateľ dostal konkrétnu vetu — validácia je
+        // all-or-nothing na SERVERI (`validate_code_by_param`).
+        var codes = {};
+        (m.codes || []).forEach(function(row){
+          var val = hwsTrim(row.value);
+          var code = hwsTrim(row.code);
+          if (!val && !code) return;
+          codes[val] = code;
+        });
+        out.code_by_param = { param: hwsParamJoin(m.param, m.param_custom), codes: codes };
       } else {
         out.code = hwsTrim(m.code);
       }
@@ -285,25 +334,40 @@
   // Set z kniznice -> cleny editora (kopia; rad -> riadky zoradene podla NL).
   function hwsMembersOf(set){
     return ((set && set.members) || []).map(function(m){
-      // KOV-E1a: nový tvar sa NEROZOBERÁ na polia editora — odloží sa celý.
-      if (hwsMemberIsNew(m)){
-        return { is_locked: true, raw: hwsCopy(m), per: m.per || 'unit',
-                 qty: m.qty || 1, label: m.label || '' };
-      }
+      var qf = hwsParamSplit(m.quantity_from, HWS_QTY_PARAMS);
+      var base = { per: m.per || 'unit', qty: m.qty || 1, label: m.label || '',
+                   qfrom: qf.sel, qfrom_custom: qf.custom };
       if (m.code_by_nl){
-        return { is_series: true, per: m.per || 'unit', qty: m.qty || 1, label: m.label || '',
-                 series: Object.keys(m.code_by_nl).sort(function(a, b){ return Number(a) - Number(b); })
-                   .map(function(nl){ return { nl: nl, code: m.code_by_nl[nl] }; }) };
+        base.is_series = true;
+        base.series = Object.keys(m.code_by_nl).sort(function(a, b){ return Number(a) - Number(b); })
+          .map(function(nl){ return { nl: nl, code: m.code_by_nl[nl] }; });
+        return base;
       }
       if (m.param_bands){
-        return { is_bands: true, per: m.per || 'unit', qty: m.qty || 1, label: m.label || '',
-                 param: m.param_bands.param || '',
-                 bands: (m.param_bands.bands || []).map(function(b){
-                   return { min: hwsNum(b.min), max: hwsNum(b.max), code: b.code || '' };
-                 }) };
+        base.is_bands = true;
+        base.param = m.param_bands.param || '';
+        base.bands = (m.param_bands.bands || []).map(function(b){
+          return { min: hwsNum(b.min), max: hwsNum(b.max), code: b.code || '' };
+        });
+        return base;
       }
-      return { is_series: false, per: m.per || 'unit', qty: m.qty || 1,
-               label: m.label || '', code: m.code || '' };
+      if (m.code_by_param){
+        // KOV-E2: kľúče sú RETAZCE a poradie je poradím v sete — netriedi sa
+        // (trieda „22K2300" nie je číslo a abecedné poradie by tabuľku Blumu
+        // preusporiadalo bez dôvodu).
+        var cp = m.code_by_param;
+        var ps = hwsParamSplit(cp.param, HWS_CODE_PARAMS);
+        base.is_param = true;
+        base.param = ps.sel;
+        base.param_custom = ps.custom;
+        base.codes = Object.keys(cp.codes || {}).map(function(k){
+          return { value: k, code: (cp.codes || {})[k] };
+        });
+        return base;
+      }
+      base.is_series = false;
+      base.code = m.code || '';
+      return base;
     });
   }
 
@@ -809,11 +873,9 @@
     var eb = hwsMk('button', 'ghostbtn hwsbtn', 'Upraviť');
     eb.setAttribute('data-action', 'hws-edit');
     eb.setAttribute('data-set-id', s.set_id);
-    // KOV-E1a: set novšieho tvaru sa zatiaľ upravovať nedá — editor preň
-    // príde v E2. Server tú istú zmenu odmieta (`disabled` nie je ochrana).
-    var locked = hwsSetIsNewShape(s);
-    if (writeOff || locked) eb.disabled = true;
-    if (locked) eb.title = HWS_LOCKED_HINT;
+    // KOV-E2: read-only režim setov s `code_by_param`/`quantity_from` ZANIKOL —
+    // editor tie tvary už vie, takže „Upraviť" zamyká už len nedostupná knižnica.
+    if (writeOff) eb.disabled = true;
     head.appendChild(eb);
     var db = hwsMk('button', 'ghostbtn hwsbtn' + (HWS_DEL_ARM === s.set_id ? ' danger' : ''),
                    HWS_DEL_ARM === s.set_id ? 'Naozaj zmazať?' : 'Zmazať');
@@ -832,7 +894,6 @@
       ul.appendChild(hwsMk('div', 'hwsset-m', hwsMemberSummary(m, HWS_DATA.params)));
     });
     card.appendChild(ul);
-    if (locked) card.appendChild(hwsMk('div', 'hint', HWS_LOCKED_HINT));
     return card;
   }
 
@@ -905,7 +966,34 @@
     del.title = 'Odobrať člena';
     top.appendChild(del);
     row.appendChild(top);
+    // KOV-E2: „Počet z parametra" je DRUHÝ riadok hlavičky, nie štvrtá otázka
+    // v prvom rade — ten je už plný (dva selecty, počet, popis, ✕) a piaty
+    // ovládač by ho pretiekol (rovnaká lekcia ako rad čela, smoke 20.8.).
+    row.appendChild(hwsMemberQtyFrom(m, i));
     row.appendChild(hwsMemberBody(m, i));
+    return row;
+  }
+
+  // KOV-E2: POČET Z PARAMETRA (`quantity_from`) — nezávislý od stratégie kódu.
+  // Prázdna voľba = pevný počet (pole „Počet kusov" vyššie); vybraný parameter
+  // znamená, že počet berie položka (`rod_count` = koľko stabilizačných tyčí).
+  // Server je autorita: chýbajúca alebo necelá hodnota = NEVYRIEŠENÝ člen.
+  function hwsMemberQtyFrom(m, i){
+    var row = hwsMk('div', 'mset-mqf');
+    row.appendChild(hwsMk('span', 'hwsed-mlbl', 'Počet z parametra'));
+    var opts = [['', 'pevný počet']].concat(HWS_QTY_PARAMS)
+      .concat([[HWS_PARAM_OTHER, 'iné (vypíšem)']]);
+    row.appendChild(hwsSmallSelect('qfrom', m.qfrom || '', opts, i,
+                                   'Počet berie položka z tohto parametra.'));
+    if (m.qfrom === HWS_PARAM_OTHER){
+      var inp = hwsMk('input');
+      inp.type = 'text'; inp.className = 'hwsed-band';
+      inp.value = m.qfrom_custom || '';
+      inp.placeholder = 'názov parametra';
+      inp.setAttribute('data-hws-m', i);
+      inp.setAttribute('data-hws-field', 'qfrom_custom');
+      row.appendChild(inp);
+    }
     return row;
   }
 
@@ -968,6 +1056,55 @@
       box.appendChild(addb);
       box.appendChild(hwsMk('div', 'hint',
         'Hodnota mimo pásiem = ORANGE „doplň pásmo" — nikdy sa neberie najbližšie pásmo.'));
+      return box;
+    }
+    if (m.is_param){
+      // KOV-E2: kód podľa TRIEDY položky. Zhoda je PRESNÁ — chýbajúci kľúč
+      // znamená NEVYRIEŠENÝ člen (RED `lift_set_incomplete`), nikdy „najbližší"
+      // kód. Preto tu nie sú pásma, ale výpis hodnota -> kód.
+      var pr = hwsMk('div', 'hwsed-srow');
+      pr.appendChild(hwsMk('span', 'hwsed-mlbl', 'Podľa'));
+      var opts = HWS_CODE_PARAMS.concat([[HWS_PARAM_OTHER, 'iné (vypíšem)']]);
+      pr.appendChild(hwsSmallSelect('param', m.param || '', opts, i,
+                                    'Parameter položky, z ktorého sa číta trieda.'));
+      if (m.param === HWS_PARAM_OTHER){
+        var pi = hwsMk('input');
+        pi.type = 'text'; pi.className = 'hwsed-band';
+        pi.value = m.param_custom || '';
+        pi.placeholder = 'názov parametra';
+        pi.setAttribute('data-hws-m', i);
+        pi.setAttribute('data-hws-field', 'param_custom');
+        pr.appendChild(pi);
+      }
+      box.appendChild(pr);
+      (m.codes || []).forEach(function(crow, j){
+        var cr = hwsMk('div', 'hwsed-srow');
+        var val = hwsMk('input'); val.type = 'text'; val.value = crow.value || '';
+        val.placeholder = 'trieda'; val.className = 'hwsed-band';
+        val.setAttribute('data-hws-m', i); val.setAttribute('data-hws-c', j);
+        val.setAttribute('data-hws-field', 'value');
+        cr.appendChild(val);
+        cr.appendChild(hwsMk('span', null, '→'));
+        var cc = hwsMk('input'); cc.type = 'text'; cc.value = crow.code || '';
+        cc.placeholder = 'kód';
+        cc.setAttribute('data-hws-m', i); cc.setAttribute('data-hws-c', j);
+        cc.setAttribute('data-hws-field', 'code');
+        cr.appendChild(cc);
+        var cd = hwsMk('button', 'ghostbtn hwsbtn', '×');
+        cd.setAttribute('type', 'button');
+        cd.setAttribute('data-action', 'hws-c-del');
+        cd.setAttribute('data-hws-m', i); cd.setAttribute('data-hws-c', j);
+        cr.appendChild(cd);
+        box.appendChild(cr);
+      });
+      var addc = hwsMk('button', 'ghostbtn hwsbtn', '+ trieda');
+      addc.setAttribute('type', 'button');
+      addc.setAttribute('data-action', 'hws-c-add');
+      addc.setAttribute('data-hws-m', i);
+      box.appendChild(addc);
+      box.appendChild(hwsMk('div', 'hint',
+        'Trieda, ktorá tu nie je, znamená člen BEZ kódu — výklop potom blokuje nákup ' +
+        '(nikdy sa neberie najbližší kód).'));
       return box;
     }
     var row = hwsMk('div', 'hwsed-srow');
@@ -1311,7 +1448,7 @@
       hwsTaxCreate(d);
       return;
     }
-    var errs = hwsSetValidate(d);
+    var errs = hwsSetValidate(d).concat(hwsMemberProblems(HWS_SET.members));
     if (errs.length){ NXModal.showErrors(errs); NXModal.setBusy(false); return; }
     NXModal.clearErrors();
     // Identitu NOVEHO setu urcuje slug z nazvu (server odmietne koliziu).
@@ -1331,6 +1468,68 @@
     var out = [];
     if (hwsBlank(d.name)) out.push({ row: null, field: 'name', msg: 'Názov je povinný.' });
     return out;
+  }
+
+  // KOV-E2 (Codex #334 kolo 1 P2): DUPLICITNÁ TRIEDA v tabuľke „trieda → kód".
+  //
+  // Toto je výnimka z pravidla „autoritou validácie je server": tabuľka ide na
+  // server ako MAPA (`code_by_param.codes`), takže druhý riadok s tou istou
+  // triedou prepíše prvý UŽ PRI SKLADANÍ payloadu (`hwsBuildMembers`) — server
+  // duplicitu nikdy neuvidí, uloženie prejde a prvé priradenie po refreshi
+  // ticho zmizne. Povedať to vie LEN klient, kým sú riadky ešte poľom.
+  // (Rovnaká pasca je v rade NL — `code_by_nl` je tiež mapa.)
+  //
+  // KOV-E2 (Codex #334 kolo 2 P2): PRÁZDNY VLASTNÝ NÁZOV PARAMETRA — druhá
+  // výnimka z toho istého dôvodu. Voľba „iné (vypíšem)“ žije LEN v editore;
+  // na server ide už len výsledok `hwsParamJoin`, a ten pri prázdnom texte
+  // vráti prázdny reťazec:
+  //   · `quantity_from` sa vtedy do payloadu VÔBEC nezapíše, takže server
+  //     dostane platného člena s PEVNÝM počtom — uloží sa, nič nenahlási
+  //     a voľba „počet z parametra“ po refreshi ticho zmizne (presne ten
+  //     tichý rozdiel, ktorý editor nesmie vyrobiť);
+  //   · `code_by_param.param` odíde prázdny a server ho síce odmietne
+  //     („kód podľa triedy nemá názov parametra"), ale veta nepovie, ktorý
+  //     člen a ktorá voľba to spôsobila.
+  // Obe preto stráži klient, kým ešte vidí STAV EDITORA (select + textové
+  // pole), nie až jeho výsledok.
+  function hwsMemberProblems(members){
+    var out = [];
+    (members || []).forEach(function(m, i){
+      if (!m) return;
+      if (m.qfrom === HWS_PARAM_OTHER && hwsBlank(m.qfrom_custom)){
+        out.push({ row: 'members:' + i, field: null,
+                   msg: 'Člen ' + (i + 1) + ': zadaj názov parametra počtu — '
+                      + 'pri voľbe „iné (vypíšem)“ sa prázdne pole neuloží '
+                      + 'a člen by ostal na pevnom počte.' });
+      }
+      if (m.is_param && m.param === HWS_PARAM_OTHER && hwsBlank(m.param_custom)){
+        out.push({ row: 'members:' + i, field: null,
+                   msg: 'Člen ' + (i + 1) + ': zadaj názov parametra triedy — '
+                      + 'pri voľbe „iné (vypíšem)“ sa prázdne pole neuloží.' });
+      }
+      var dup = m.is_param ? hwsDupValue(m.codes, 'value')
+              : (m.is_series ? hwsDupValue(m.series, 'nl') : '');
+      if (!dup) return;
+      out.push({ row: 'members:' + i, field: null,
+                 msg: 'Člen ' + (i + 1) + ': hodnota „' + dup + '“ je v tabuľke dvakrát — '
+                    + 'nechaj jeden riadok (druhý by prvý ticho prepísal).' });
+    });
+    return out;
+  }
+  // Prvá hodnota, ktorá sa v riadkoch opakuje (po orezaní), inak ''.
+  // Prázdna hodnota sa NEPOČÍTA — to je nedopísaný riadok a o tom hovorí server.
+  function hwsDupValue(rows, key){
+    // Zoznam, nie objekt: kľúč `__proto__` sa do objektu nezapíše (mení
+    // prototyp) a duplicita nad ním by prekĺzla.
+    var seen = [];
+    var list = rows || [];
+    for (var i = 0; i < list.length; i++){
+      var v = hwsTrim(list[i] && list[i][key]);
+      if (v === '') continue;
+      if (seen.indexOf(v) >= 0) return v;
+      seen.push(v);
+    }
+    return '';
   }
 
   // Zalozenie vyrobcu/rady z modalu setu — ta ista cesta ako v modale polozky
@@ -1882,9 +2081,6 @@
         if (a === 'hws-edit'){
           var sid = t.getAttribute('data-set-id');
           var s = hwsSetById(sid);
-          // KOV-E1a: druhá poistka k `disabled` — set novšieho tvaru sa
-          // v editore neotvorí ani zo zastaraného DOM-u.
-          if (s && hwsSetIsNewShape(s)) return;
           if (s) hwsSetOpen(s, null, { trigger: t });
           return;
         }
@@ -1963,6 +2159,20 @@
           var m2 = hwsMember(parseInt(t.getAttribute('data-hws-m'), 10));
           if (m2 && m2.series){
             m2.series.splice(parseInt(t.getAttribute('data-hws-s'), 10), 1);
+            hwsMembersChanged();
+          }
+          return;
+        }
+        // KOV-E2: riadky `hodnota -> kód` člena „podľa triedy položky".
+        if (a === 'hws-c-add'){
+          var mc = hwsMember(parseInt(t.getAttribute('data-hws-m'), 10));
+          if (mc){ (mc.codes = mc.codes || []).push({ value: '', code: '' }); hwsMembersChanged(); }
+          return;
+        }
+        if (a === 'hws-c-del'){
+          var mc2 = hwsMember(parseInt(t.getAttribute('data-hws-m'), 10));
+          if (mc2 && mc2.codes){
+            mc2.codes.splice(parseInt(t.getAttribute('data-hws-c'), 10), 1);
             hwsMembersChanged();
           }
           return;
@@ -2127,7 +2337,22 @@
       hwsPreviewSchedule();
       return true;
     }
+    // KOV-E2: riadok `hodnota -> kód` člena „podľa triedy".
+    var ci = t.getAttribute('data-hws-c');
+    if (ci != null && m.codes){
+      var crow = m.codes[parseInt(ci, 10)];
+      if (crow) crow[field] = t.value;
+      hwsPreviewSchedule();
+      return true;
+    }
     m[field] = t.value;
+    // KOV-E2: prepnutie na „iné (vypíšem)" a späť MENÍ SADU POLÍ (odomyká
+    // textové pole názvu parametra) — riadok sa preto musí prekresliť, inak
+    // by používateľ vybral „iné" a nemal kam písať.
+    if (field === 'qfrom' || (field === 'param' && m.is_param)){
+      hwsMembersChanged();
+      return true;
+    }
     hwsPreviewSchedule();
     return true;
   }
@@ -2226,10 +2451,12 @@
     module.exports = { hwsSlug: hwsSlug, hwsSetsForType: hwsSetsForType,
       hwsMemberSummary: hwsMemberSummary, hwsBuildSetPayload: hwsBuildSetPayload,
       hwsMembersOf: hwsMembersOf, hwsBuildMembers: hwsBuildMembers,
-      // KOV-E1a: nové tvary člena (kód podľa triedy, počet z parametra) —
-      // bezstratový transport a read-only stav setu.
-      hwsMemberIsNew: hwsMemberIsNew, hwsSetIsNewShape: hwsSetIsNewShape,
-      HWS_LOCKED_HINT: HWS_LOCKED_HINT,
+      // KOV-E2: nové tvary člena (kód podľa triedy, počet z parametra) sú
+      // EDITOVATEĽNÉ — round-trip cez editor musí byť bezstratový a názov
+      // parametra sa rozpadá na select + voľný text.
+      hwsParamSplit: hwsParamSplit, hwsParamJoin: hwsParamJoin,
+      HWS_CODE_PARAMS: HWS_CODE_PARAMS, HWS_QTY_PARAMS: HWS_QTY_PARAMS,
+      HWS_PARAM_OTHER: HWS_PARAM_OTHER,
       // KOV-B3: modal setu — clenovia (dve otazky), klasifikacia, auto-nazov,
       // chipy dlazdice, adresovanie chyb servera a poradie odpovedi nahladu.
       hwsMemberKind: hwsMemberKind, hwsMemberBlank: hwsMemberBlank,
@@ -2242,6 +2469,10 @@
       hwsApplyUseType: hwsApplyUseType, hwsDefaultType: hwsDefaultType,
       hwsSampleShown: hwsSampleShown,
       hwsChips: hwsChips, hwsServerErrors: hwsServerErrors,
+      // Codex #334 kolo 1 P2: duplicitna hodnota v tabulke clena. JEDINE
+      // miesto, kde je klient AUTORITOU — server dostava uz mapu, v ktorej
+      // druhy riadok prvy prepisal, takze duplicitu nikdy neuvidi.
+      hwsMemberProblems: hwsMemberProblems, hwsDupValue: hwsDupValue,
       hwsPreviewLines: hwsPreviewLines, hwsPreviewStale: hwsPreviewStale,
       hwsGlobalOptions: hwsGlobalOptions,
       // KOV-D1b: riadky mapovania podľa TRIEDY (server posiela hotové riadky)

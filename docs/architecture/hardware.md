@@ -169,6 +169,35 @@ Spoločný kontrakt je `tests/fixtures/rules_validation_parity.json` — keď sa
 kontrolu skalárov:** `RD_LIFT_SCALARS` je kópia serverovej mapy `LIFT_SCALARS` a nečíselná hodnota (kľúč, ktorý normalizácia nechala ako `null`) padne rovnako ako na
 serveri. Predtým `rdLiftNum(...) || 0` bral pokazenú rezervu ako **nulu** a prah tyče netypoval vôbec — Save prešiel klientom a server ho zamietol.
 
+**KOV-E2 (v0.9.55) — EDITOR pravidla `lift_class` a tri nové kritériá brány.** Read-only veta z E1b **zanikla**: v sekcii Pravidlá má výklopové pravidlo **formulár**
+presne vo vzore door guardov z F2 — zbalený `<details>` (`rdLiftHtml`, `RD_LIFT_OPEN` kľúčované `rule_id`) so **súhrnom v lište** („HK 4 triedy · HL 2 + 4 ramená · tyč od
+1100 mm · rezerva 0,5 kg"), skaláre, tri tabuľky (triedy HK · mechanizmy HL · ramená HL, každá s „+ riadok" a „✕") a **spôsobilosť per systém** (`RD_LIFT_ELIG` je zrkadlo
+`ELIGIBILITY_KEYS`). `RD_LIFT_KEYS` je zrkadlo serverových kľúčov (`LIFT_SCALARS` + `classes`/`mechanisms`/`arms`/`eligibility`) — guard test zhodu stráži. **Zber
+(`rdCollectLift`) je bezstratový aj v tom, čo NIE JE pole formulára:** `max_exclusive` (Blum má spojité pásma 300–339 a 340–389) cestuje cez `data-mx` na riadku a tooltip
+hornej hranice o ňom hovorí; bez toho by sa dve pásma ramien začali **prekrývať** a automat by pri hraničnej výške vybral iné ramená. **Prázdne pole = kritérium sa
+nezapíše** (vzor F2), nekladná hodnota spôsobilosti ide preč rovnako ako v `normalize_lift_eligibility` — tvar „klient pošle, server ticho zahodí" nevzniká. Poškodený tvar
+(hash namiesto poľa) sekciu **nezhodí** (lekcia Codex #330) a uložením sa z pravidla odpratá.
+
+Brána (`lift_problem`) dostala **tri kritériá naviac**, všetky nad tvarom PO normalizácii a všetky zrkadlené v `rdLiftProblem`: **nekladný `rod_double_from_kb_mm`**
+(`lift_rod_count` žiada kladné číslo, takže by pravidlo ticho tvrdilo „druhá tyč nikdy" — a pri **nule** by súhrn v lište zároveň písal „tyč od 0 mm", teda „druhá tyč
+vždy"; „žiadne zdvojenie" sa hovorí **prázdnym poľom**, Codex #334 kolo 1 P2 — a tyč je nákupná položka) · **záporná hodnota v ktorejkoľvek tabuľke**
+(`lift_negative_row`; `lift_row?` prepustí každé konečné číslo, takže „LF od −500" by prešlo) · **spôsobilosť s obrátenou výškou** (`lift_eligibility_problem`; každé kladné
+číslo normalizácia nechá, takže `kh_min 600` a `kh_max 205` by prežilo a systém by nebol použiteľný **nikdy**, bez slova o dôvode). `kh_min == kh_max` je legitímne.
+Poradie sa nevynucuje (server zoraďuje) a **prekryv sa nekontroluje zámerne** — HK triedy Blumu sa prekrývajú a ramená 480–540 tiež; kontrolovaná je len **spojitosť**
+(`arms_gap_problem`). **Zápisová cesta má odteraz DVE brány (Codex #334 kolo 1 P2).** `rules_problems` sa pýta tvaru PO normalizácii, a preto **nevidí riadok, ktorý normalizácia zahodila**:
+kto v tabuľke rozpíše riadok a vyplní len kód (alebo len jednu hranicu), uložil by ho bez slova a po prestavbe by riadok zmizol. Odhodenie je pri **čítaní** správne
+(legacy snapshot sa musí dať prečítať a hádať sa nesmie), pri **uložení** je to tiché zahodenie práce — preto pred normalizáciou stojí `HardwareRules.lift_input_problems`
+nad **surovým** vstupom a kontroluje **výhradne** nedopísaný riadok (`lift_partial_row?`, tabuľky a ich ľudské názvy drží `LIFT_TABLES`, zrkadlo v `rules.js` je
+`RD_LIFT_TABLES`). **Úplne prázdny riadok je pohodlie editora** (pridám, rozmyslím si to) a mlčky sa zahadzuje na oboch stranách. Volajúci je **jediný** — `handle_save`
+v `rules_dialog.rb`; stavba ani seed validáciu nevolajú. Fixtúra parity sa preto pýta **oboch brán naraz** (klient má na obe jednu odpoveď `rdValidate`).
+
+**Hint pod editorom hovorí, čo uloženie SKUTOČNE robí (Codex #334 kolo 2 P2).** Tvrdil, že „po uložení sa skrinky neprestavia — prestav ich"; uloženie pravidiel v Štúdiu
+pritom prestavuje **všetky** skrinky (`RulesDialog.handle_save` → `CabinetBuilder.rebuild_many`, **jeden** krok Späť) a status hlási ich počet. Výzva na ďalšiu prestavbu
+posielala človeka robiť prácu, ktorá je už hotová, a protirečila tlačidlu lišty **„Uložiť a prestavať skrinky"**. Znenie je odteraz „Uloženie prestaví všetky skrinky, takže
+nové hodnoty platia hneď."; ostatné hinty sekcie (pásma F2, rad výsuvov) taký omyl nemali — hovoria o kritériách, nie o prestavbe.
+
+Nové prípady sú v `tests/fixtures/rules_validation_parity.json`. Testy: `tests/pure/test_kove2_ui.rb`, `tests/js/test_kove2_rules_editor.js`.
+
 
 **KOV-C2b (v0.9.31) — R2 EXKLUZIVITA.** `evaluate(..., suppress_slide_owners:)` dostáva množinu `owner_part_key` čiel, ktoré už majú položku výsuvu **z receptu**, a pravidlá
 s `output: 'slide'` sa na nich **nevyhodnocujú** — inak by zásuvka mala dva výsuvy (jeden s kitom, jeden legacy bez dielcov). Potlačenie sa priznáva **jedným** `info`
@@ -763,7 +792,11 @@ navyše jednotka, pri HL top ramená a stabilizačná tyč), a mechanizmus sa vy
   (`unmapped_entry`, presný vzor receptového `drawer_kit_missing`) — vrátane chýbajúceho setu a chýbajúceho mapovania; pôvodný dôvod cestuje v `base_reason`. Riadky ostatných
   členov v zozname **ostávajú** (rovnako ako pri zásuvke), ale von sa nedostanú: kód je v `BuildPlan::HW_LIFT_BLOCKERS` aj vo `from_expansion`
   (`ProductionCore.hardware_blockers`), takže nákup kovania, rozpočet aj cenová ponuka STOJA a „krytky bez mechanizmu" NIKDY neopustia plugin. **VEPO beží ďalej** — geometria
-  čela je správna (tá istá úvaha ako pri závesoch). Vetu skladá `Validation.lift_incomplete_item` (RED, kategória `hardware_incomplete`) a menuje čelo, systém aj člena.
+  čela je správna (tá istá úvaha ako pri závesoch). Vetu skladá `Validation.lift_incomplete_sentence` (RED, kategória `hardware_incomplete`) a menuje čelo, systém aj člena;
+  `lift_incomplete_item` z nej robí nález Kontroly a **kartu čela v Inspectore ňou hovorí `Panel.lift_incomplete_note`** — jedno znenie, dva odbery (Codex #334 kolo 2 P2).
+  Kontrola vetu predsadí **lokátorom** skrinky (je to zoznam cez celý projekt), karta nie (stojí v tej skrinke); dôvod a náprava sú slovo za slovom rovnaké.
+  Aby karta o závažnosti vôbec vedela, vracia `explain` popri preložených `problems` aj **surové záznamy `unmapped`** (aditívny kľúč, `explain_problem` ich zapisuje **naraz**,
+  takže sa nemôžu rozísť) — z preloženej vety sa RED od ORANGE odlíšiť nedá.
   **Set, ktorý nevydal ANI JEDEN riadok, je RED tiež** (Codex #332 kolo 2 P2): nula je platné vynechanie JEDNÉHO člena, ale keď na nulu vyjdú VŠETCI členovia
   (alebo ich set preskočí), expanzia by vrátila 0 riadkov aj 0 nemapovaných a exporty by prešli s výklopom BEZ kovania. Fallback `members_skipped` (dovtedy
   len pre receptové položky) preto platí aj pre `generic_type: lift` — v `expand_members` aj v `explain_members`, aby sa panel a súpis nerozišli — a
@@ -813,17 +846,32 @@ navyše jednotka, pri HL top ramená a stabilizačná tyč), a mechanizmus sa vy
   ktorý naozaj nesie `code_by_param`, `quantity_from` alebo `lift_system`. Starší čítač taký set **ODMIETNE** (`incompatible_member?` cez whitelist `MEMBER_KEYS`,
   `assess_set_defs` pri šablóne) → knižnica/snapshot/šablóna sú preň len na čítanie s hláškou „aktualizuj plugin". **Tiché „tyč 1 ks" NEEXISTUJE** — správanie je odmietnutie
   a testuje sa charakterizáciou so simulovaným starým `MEMBER_KEYS` (Astra FIX 8).
-- **Editor setov (E1a) nové tvary NEUPRAVUJE, ale ich NESTRATÍ** (Astra FIX 10). `hw_sets.js` člena novšieho tvaru nerozoberá na polia, ale odloží celý (`is_locked` + `raw`)
-  a pošle späť nezmenený; dlaždica takého setu má vypnuté „Upraviť" a vetu „Set novšieho tvaru — úprava príde neskôr". Ochranou je **server**: `save_set!` zmenu členov setu,
-  ktorý nesie nový tvar (`new_shape_members?`), ODMIETNE — názov, aktívnosť a klasifikácia sa meniť smú. Súhrn člena aj živý náhľad nové tvary čítajú („podľa lift_class",
+- **Editor setov nové tvary UPRAVUJE (KOV-E2; read-only režim z E1a ZANIKOL).** E1a člena novšieho tvaru nerozoberala na polia, len ho odkladala celý (`is_locked` + `raw`),
+  dlaždica mala vypnuté „Upraviť" a vetu „úprava príde neskôr" — po E2 by tá veta klamala a set výklopu by sa nedal opraviť. Odteraz je **stratégia kódu select so ŠTYRMI
+  voľbami** (`HWS_KINDS` + `param`); pri „podľa triedy položky" pribudne **výber parametra** (`lift_class` / `arm_class` / „iné (vypíšem)" — `hwsParamSplit`/`hwsParamJoin`,
+  sentinel `__other__` sa na server **nikdy** neposiela) a tabuľka **hodnota → kód** (`hws-c-add`/`hws-c-del`; poradie tried sa **netriedi** — „22K2300" nie je číslo
+  a abecedné poradie by tabuľku Blumu preusporiadalo). **„Počet z parametra"** (`quantity_from`) je **druhý riadok hlavičky člena**, nie štvrtá otázka v prvom rade (ten je
+  už plný a piaty ovládač by ho pretiekol), a je **nezávislý od stratégie kódu** — prepnutie kódu ho nezahadzuje (tyč má pevný kód a premenlivý počet). Úplne prázdny riadok
+  tabuľky sa zahadzuje (vzor radu NL), **čiastočne vyplnený ide na server**, aby používateľ dostal konkrétnu vetu: validácia je all-or-nothing na SERVERI
+  (`validate_member` / `validate_code_by_param`) a HTML `disabled` nie je ochrana. **Jediná výnimka z „autoritou je server" je DUPLICITNÁ hodnota v tabuľke člena**
+  (`hwsMemberProblems`, Codex #334 kolo 1 P2): `code_by_param.codes` aj `code_by_nl` idú na server ako **mapa**, takže druhý riadok s tou istou triedou (dĺžkou) prepíše
+  prvý už pri skladaní payloadu — server duplicitu **nikdy neuvidí**, uloženie prejde a prvé priradenie po refreshi ticho zmizne. Kontrola preto beží nad **poľom riadkov**
+  pred zložením mapy a chyba pristane pri tom členovi. **Druhá výnimka z toho istého dôvodu je PRÁZDNY vlastný názov parametra** (Codex #334 kolo 2 P2): voľba
+  „iné (vypíšem)" žije **len v editore** a `hwsParamJoin` z nej pri prázdnom texte spraví prázdny reťazec — pri `quantity_from` sa kľúč do payloadu **vôbec nezapíše**,
+  takže server dostane platného člena s **pevným počtom**, uloží ho bez slova a voľba po refreshi ticho zmizne; pri `code_by_param` odíde prázdny `param`, ktorý server
+  síce odmietne, ale nepovie, ktorý člen a ktorá voľba to spôsobila. Obe stráži klient, kým ešte vidí **stav editora** (select + textové pole), nie až jeho výsledok. Súhrn člena aj živý náhľad nové tvary čítajú („podľa lift_class",
   „počet podľa rod_count"); `preview_expansion` si vzorovú triedu a počet doplní z DRAFTU, takže náhľad neukazuje samé ORANGE riadky.
   **Súhrn skladá KÓD a POČET NEZÁVISLE (Codex #332 kolo 3 P2):** `hwsMemberCodeText` (jedna zo štyroch stratégií `code` | `code_by_nl` | `param_bands` | `code_by_param`)
   + `hwsMemberQtyText` (`quantity_from`, inak `×qty`). Skorý return podľa stratégie zamlčal dynamický počet, resp. pri rade NL a pásmach vypísal `m.code` (`undefined`)
-  a kódy schoval — a keďže tieto sety sú v editore len na čítanie, súhrn je JEDINÁ inšpekcia, ktorú používateľ má. Pri výpise kódov sa samozrejmé „×1" vynecháva (bol by
+  a kódy schoval — a súhrn je pritom to, čo používateľ číta v dlaždici setu bez otvárania editora. Pri výpise kódov sa samozrejmé „×1" vynecháva (bol by
   to len šum za posledným kódom radu) a `per: 'owner'` sa píše neutrálne **„na vlastníka"** — od výklopov je vlastníkom aj `front:F#/flap`, nie len dvierka.
+- **Dočasná ZÁPISOVÁ brána z E1a ZANIKLA (KOV-E2).** `save_set!` odmietal zmenu členov setu, ktorý nesie nový tvar (`new_shape_members?`), lebo editor pre ne neexistoval —
+  po E2 by bola jedinou prekážkou opravy setu výklopu (zmenený kód triedy v Démose, nová trieda). Ochranou ostáva to, čou bola vždy: **validácia obsahu**
+  (`validate_set_detailed` → XOR stratégií kódu, úplnosť tabuľky tried, názov parametra), nie zákaz zápisu.
 
 Testy: `tests/pure/test_kove1a_data.rb` (34 testov, 25 pomenovaných mutácií vrátane golden charakterizácie „existujúca zákazka nakupuje presne ako pred dávkou")
-+ JS `tests/js/test_hw_sets_code_by_param.js` (bezstratový transport, súhrn vrátane 4 kombinácií kód × `quantity_from`, read-only stav).
++ `tests/pure/test_kove2_ui.rb` (zápis zmeneného člena setu výklopu prejde, nezmysel neprejde)
++ JS `tests/js/test_hw_sets_code_by_param.js` (bezstratový round-trip cez editor, editovateľnosť, „iné (vypíšem)", súhrn vrátane 4 kombinácií kód × `quantity_from`).
 
 
 **BEZSTRATOVÁ BRÁNA DEFINÍCIÍ SETOV V ŠABLÓNE — `assess_set_defs` (audit #17 BLOCKER 1).** `hardware_set_defs` išli doteraz LEN cez tolerantný `normalize_sets`, teda cez cestu,

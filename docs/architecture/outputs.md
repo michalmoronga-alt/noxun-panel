@@ -241,6 +241,10 @@ na výklope HORE pustili nákup, rozpočet aj ponuku nad čelom, ktoré žiadny 
 sklop záves — [hardware.md](hardware.md)). Kódy mechanizmov (seed + sety projektového snapshotu) si `Bom.collect` vypýta RAZ na zber, presne ako `rules_stale`;
 `HardwareSets.project_state` číta iba modelový atribút, takže zber ostáva bez IO. Úplná zostava bránu zhasne preto, že je to **vedomý zásah** a naša náprava
 (prestavba) by k nej pridala ešte automatickú zostavu — `HardwareSets.add_adhoc_row` **sčítava rovnaké kódy**, teda dvojitá objednávka. Protiváha na strane stavby:
+**Kritérium má JEDEN vstupný bod (Codex #334 kolo 1 P2):** `Bom.flap_stale_items(cfg, flap_codes)` skladá všetky tri podmienky (proveniencia · chýbajúce kovanie podľa
+smeru · výnimka pre úplnú ručnú zostavu) a používa ho **aj nález Kontroly, aj karta čela v paneli** (`Bom.flap_stale_front?` → [ui-lifecycle.md](ui-lifecycle.md)).
+Predtým sa panel pýtal iba `pre_lift_build?`, takže čelo s ručne zloženým mechanizmom malo v karte červenú vetu, kým Kontrola mlčala — dve odpovede na tú istú otázku.
+Protiváha na strane stavby:
 čelo `flap` s úplnou ručnou zostavou automat **nedostane** a vznikne ORANGE **`flap_manual_hardware`** („kovanie je pridané RUČNE — automatický mechanizmus/závesy sa
 nevydali; odstráň ručnú položku, ak chceš automat"); ručný **doplnok** (krytka, tyč, rameno) automat nevypína a zliatie kódu v nákupe prizná ORANGE
 **`flap_manual_duplicate`** ([construction.md](construction.md)) — nikdy sčítanie oboch potichu.

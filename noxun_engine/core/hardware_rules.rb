@@ -2126,6 +2126,69 @@ module Noxun
         end
       end
 
+      # === Codex #334 kolo 1 P2: BRANA NAD SUROVYM VSTUPOM =================
+      #
+      # `rules_problems` sa pyta tvaru PO normalizacii — a to je spravne
+      # (validuje sa presne to, co sa zapise). Prave preto ale NEVIDI riadok,
+      # ktory normalizacia ZAHODILA: kto v tabulke vyklopu rozpise riadok
+      # a vyplni len kod (alebo len jednu hranicu), ulozil by ho bez slova
+      # a po prestavbe by riadok zmizol. Odhodenie je pri CITANI spravne
+      # (legacy snapshot sa musi dat precitat a hadat sa nesmie), pri ULOZENI
+      # je to tiche zahodenie pouzivatelovej prace.
+      #
+      # Preto stoji v zapisovej ceste EST JEDNA brana — nad SUROVYMI datami,
+      # pred normalizaciou. Kontroluje VYHRADNE to, co normalizacia zahodi
+      # (nedopisany riadok tabulky vyklopu); vsetko ostatne ostava na
+      # `rules_problems`. UPLNE PRAZDNY riadok je pohodlie editora (pridam
+      # riadok, rozmyslim si to) a preto sa MLCKY zahadzuje — rovnako na
+      # klientovi (`rdLiftPartialProblem`). Spolocny kontrakt oboch bran
+      # je `tests/fixtures/rules_validation_parity.json`.
+      #
+      # VYPNUTE pravidlo sa nekontroluje (zhodne s `rules_problems`).
+      # -> pole nalezov { rule_id, output, message }
+      def lift_input_problems(rules)
+        Array(rules).filter_map do |rule|
+          next nil unless rule.is_a?(Hash)
+          next nil if rule['enabled'] == false
+          next nil unless rule['kind'].to_s == LIFT_KIND
+
+          msg = lift_partial_row_message(rule)
+          next nil if msg.nil?
+
+          { 'rule_id' => rule['rule_id'].to_s, 'output' => rule['output'].to_s, 'message' => msg }
+        end
+      end
+
+      # Tabulky vyklopu + LUDSKY nazov do hlasky a kluce, ktore riadok potrebuje.
+      LIFT_TABLES = [['classes', 'tried HK top', %w[min max]],
+                     ['mechanisms', 'mechanizmov HL top', %w[max]],
+                     ['arms', 'ramien HL top', %w[kh_min kh_max kg_min kg_max]]].freeze
+
+      def lift_partial_row_message(rule)
+        LIFT_TABLES.each do |key, human, cells|
+          next unless rule[key].is_a?(Array)
+
+          bad = rule[key].find { |row| lift_partial_row?(row, cells) }
+          next if bad.nil?
+
+          who = bad.is_a?(Hash) && !bad['code'].to_s.strip.empty? ? " „#{bad['code'].to_s.strip}“" : ''
+          return "#{rule_address(rule)}: riadok#{who} v tabuľke #{human} je nedopísaný — " \
+                 'doplň kód aj všetky hodnoty, alebo riadok odober.'
+        end
+        nil
+      end
+
+      # Nedopisany riadok = nieco vyplnene JE, ale riadok neplati (`lift_row?`).
+      # Uplne prazdny riadok nedopisany NIE JE — to je pohodlie editora.
+      def lift_partial_row?(row, cells)
+        return false unless row.is_a?(Hash)
+        return false if lift_row?(row, cells)
+
+        return true unless row['code'].to_s.strip.empty?
+
+        cells.any? { |k| row[k].is_a?(Numeric) && row[k].to_f.finite? }
+      end
+
       # Hlaska ADRESUJE pravidlo menom, ktore pouzivatel vidi vo formulari —
       # inak by pri desiatich pravidlach nevedel, ktore opravit.
       #
@@ -2181,7 +2244,56 @@ module Noxun
           return "#{addr}: rezerva na úchytku nesmie byť záporná."
         end
 
+        # KOV-E2: NEKLADNY prah druhej tyce. `lift_rod_count` ziada KLADNE
+        # cislo, takze zaporny prah aj NULU zahodi a pravidlo by TICHO tvrdilo
+        # „druha tyc nikdy" — pricom suhrn editora by pisal „tyc od 0 mm",
+        # teda „druha tyc VZDY" (Codex #334 kolo 1 P2). Dve opacne tvrdenia
+        # nad jednou hodnotou; stabilizacna tyc je pritom pri HL top nakupna
+        # polozka, nie kozmetika. „Ziadne zdvojenie" sa vyjadruje PRAZDNYM
+        # polom (kluc sa nezapise), nie nulou.
+        if rule.key?('rod_double_from_kb_mm') && !rule['rod_double_from_kb_mm'].to_f.positive?
+          return "#{addr}: šírka pre druhú stabilizačnú tyč musí byť kladná — " \
+                 'prázdne pole znamená „druhá tyč sa nepridáva nikdy“.'
+        end
+
+        # KOV-E2: ZAPORNA hodnota v tabulke. `lift_row?` prepusti kazde konecne
+        # cislo, takze riadok „LF od −500" by pravidlo prijalo a trieda by
+        # pokryvala aj nezmyselne LF. Rozmery, sily ani hmotnosti zaporne nie su.
+        neg = lift_negative_row(classes, %w[min max]) ||
+              lift_negative_row(mechs, %w[max]) ||
+              lift_negative_row(arms, %w[kh_min kh_max kg_min kg_max])
+        return "#{addr}: riadok #{neg} má zápornú hodnotu — rozmery aj hmotnosti sú kladné." if neg
+
+        elig = lift_eligibility_problem(addr, rule['eligibility'])
+        return elig if elig
+
         arms_gap_problem(addr, arms)
+      end
+
+      # Prvy riadok tabulky so ZAPORNOU hodnotou (kod riadku) alebo nil.
+      def lift_negative_row(rows, keys)
+        bad = Array(rows).find do |r|
+          r.is_a?(Hash) && keys.any? { |k| r[k].is_a?(Numeric) && r[k].to_f.negative? }
+        end
+        bad && bad['code'].to_s
+      end
+
+      # KOV-E2: SPOSOBILOST s obratenym rozsahom. `normalize_lift_eligibility`
+      # necha kazde KLADNE cislo, takze `kh_min 600` a `kh_max 205` prezije —
+      # a taky system by nebol pouzitelny NIKDY (kazde celo RED
+      # `lift_dimension_unsupported`), bez jedineho slova o tom, preco.
+      def lift_eligibility_problem(addr, raw)
+        return nil unless raw.is_a?(Hash)
+
+        [LIFT_HK, LIFT_HL].each do |sys|
+          rec = raw[sys]
+          next unless rec.is_a?(Hash)
+          next unless rec['kh_min'].is_a?(Numeric) && rec['kh_max'].is_a?(Numeric)
+          next unless rec['kh_min'].to_f > rec['kh_max'].to_f
+
+          return "#{addr}: spôsobilosť #{lift_system_label(sys)} má výšku od väčšiu než do."
+        end
+        nil
       end
 
       # DIERA medzi pasmami ramien: dalsie pasmo sa musi zacinat NAJNESKOR tam,

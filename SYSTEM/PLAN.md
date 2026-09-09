@@ -638,7 +638,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   alebo nekladné pole = kontrola vypnutá, chýbajúci počet = 1, rovnaký clamp ako pri výškových pásmach) a serverová normalizácia taký guard aj tak zahodí (kontrakt F1),
   takže veta by bola mŕtva vetva a rozbila by paritu klient/server. **Poradie pásiem sa nevynucuje** — server ich zoraďuje sám. „Všetko nad" ostáva povinné aj s `finite`
   (rozhodnutie F1, Codex #329 kolo 3: catch-all drží starý čítač).
-- **KOV-E · „VÝKLOPY HK top / HL top" (po F; v4 9.9.2026 — po Astra audite [zdroje/next_sessions/KOVANIE_KOVE_AUDIT_2026-09-09_ASTRA.md](zdroje/next_sessions/KOVANIE_KOVE_AUDIT_2026-09-09_ASTRA.md) [4 BLOCKER + 7 FIX + 1 NOTE] a Codex GH #331 kolo 1 [2 P1 + 6 P2] + kolo 2 [4 P1 + 1 P2]; TRI PR: E1a dáta, E1b pravidlo + brány, E2 UI):**
+- **KOV-E · „VÝKLOPY HK top / HL top" ✅ KOMPLET (po F; v4 9.9.2026 — po Astra audite [zdroje/next_sessions/KOVANIE_KOVE_AUDIT_2026-09-09_ASTRA.md](zdroje/next_sessions/KOVANIE_KOVE_AUDIT_2026-09-09_ASTRA.md) [4 BLOCKER + 7 FIX + 1 NOTE] a Codex GH #331 kolo 1 [2 P1 + 6 P2] + kolo 2 [4 P1 + 1 P2]; TRI PR: E1a dáta, E1b pravidlo + brány, E2 UI):**
   **Dáta (uzavreté 9.9.):** [zdroje/demos/SEED_AVENTOS_v2_2026-09-09.md](zdroje/demos/SEED_AVENTOS_v2_2026-09-09.md) — **26 kódov Démos** (ceny s DPH 9.9., URL, MJ), z nich
   **23 nových** do `SEED_ROWS` (347827, 13781, 250831 už existujú — identita katalógu sa nemení); **hmotnostné limity HL top z Blum katalógu 2024/25** (verejný zdroj,
   e-services netreba): ramená 22L3200 KH 300–339 / 1,5–9 kg · 22L3500 340–389 / 1,75–10 kg · 22L3800 390–540 / 2–12,25 kg · 22L3900 480–580 / 2,5–14 kg — **hmotnosť
@@ -721,10 +721,24 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   (obe pravidlá sú nové, starší tvar na „obnovenie" neexistuje). Pri behu vyšli najavo aj 4 stale in-SU očakávania z E1a (`HardwareSets` std 5 → `STD_LIFT_FORMS` 6) —
   opravené v tej istej vetve.
 
-  **E2 UI (samostatný PR, Audit NIE):** v karte výklopu výber systému (HK top | HL top) + **výber setu vrátane tmavého** (vzor D1b zásuvky, zápis do
-  `config.hardware_sets`) + riadok „Technický detail" (trieda, LF alebo KH/kg, tyč) · editor `lift_class` v Pravidlách (`handle_allowance_kg`, `rod_double_from_kb_mm`,
-  tabuľky tried/ramien, eligibility) so spoločnou Ruby/JS validáciou (parita cez `rules_validation_parity.json`) · editor setov sa naučí `code_by_param` a `quantity_from`
-  (read-only z E1a odpadá) · D-114 balík Čiel ostáva na koniec bloku.
+  ✅ **E2 UI — HOTOVO (PR #334, v0.9.55):** v karte čela výklopu segment **Systém (HK top | HL top)** — sklop ho nemá — a **jeden read-only riadok** vyriešeného výklopu
+  („AVENTOS HK top · 22K2300 · automat") s rozklikom **Technický detail** (otváranie, KH/KB tým istým vzorcom ako kontext pravidiel, tyč + predĺženie, balenie a kódy);
+  RED dôvod je **doslovne tá istá veta**, akú vydá Kontrola (`hardware_conflicts` cez `BuildPlan::HW_CONFLICT_CODES`), ORANGE je riadok NAVIAC, `stale` ide podľa
+  **`Bom.flap_stale_front?`** (tá istá autorita ako RED `flap_stale` — vrátane výnimky pre úplnú ručnú zostavu) · **výber setu vrátane tmavého** beží BEZ zmeny klienta (položka `lift` má triedny kľúč, takže
+  `class_compat_payload` naplní `compat.owners['front:<id>/flap']` a existujúci picker D1b vykreslí len triedne kompatibilné sety; zápis pod owner triednym kľúčom
+  `class:lift|<mode>|<system>@front:<id>/flap`, jeden krok Späť) · **editor `lift_class` v Pravidlách** (vzor F2: zbalený blok so súhrnom v lište, skaláre, tri tabuľky,
+  spôsobilosť per systém; `max_exclusive` prechádza zberom bezstratovo cez `data-mx`) so **spoločnou Ruby/JS validáciou** — nové kritériá (nekladný prah tyče, záporná
+  hodnota v tabuľke, spôsobilosť s obrátenou výškou, **nedopísaný riadok tabuľky**) v `rules_validation_parity.json` · **editor setov sa naučil `code_by_param` a `quantity_from`** (stratégia kódu = select
+  so 4 voľbami, parameter `lift_class`/`arm_class`/vlastný, tabuľka hodnota → kód, „Počet z parametra" ako druhý riadok hlavičky člena); **read-only z E1a odpadol vrátane
+  serverovej brány `new_shape_members?`** — ochranou ostáva validácia obsahu. **Odchýlky:** štítok je posledný segment textu riadku, nie samostatný badge (nový
+  markup by pribudol bez zisku) — a hovorí o ZDROJI položky („automat" len pri chránenom seed pravidle, inak „ručne" alebo nič) · **LF/hmotnosť sa v technickom detaile NEDOPOČÍTAVAJÚ** — na položke uložené nie sú a druhý výpočet tej istej veličiny by sa s automatom
+  rozišiel; pri probléme ich nesie veta konfliktu · prekryv tabuliek sa nevaliduje zámerne (Blum HK triedy aj ramená 480–540 sa prekrývajú — kontroluje sa len spojitosť) ·
+  in-SU beh sa nekonal: dávka nepridala žiadnu novú zápisovú akciu panela (výber setu ide existujúcou `set_hardware_set`).
+  **Fix kolo Codex #334 (1 P1 + 5 P2):** uzáver bloku do STAV/KRONIKY · zdieľaný predikát `Bom.flap_stale_items`/`flap_stale_front?` (karta a Kontrola hlásia stale rovnako) ·
+  nekladný prah druhej tyče sa neuloží · duplicitná trieda v tabuľke člena setu padne na klientovi (server dostáva mapu) · nedopísaný riadok tabuľky výklopu odmietne
+  **druhá brána nad surovým vstupom** (`HardwareRules.lift_input_problems` v `handle_save`, pred normalizáciou) · štítok zdroja položky (`lift_source_tag`).
+  Uzáver: headless **3649 testov**, **102 JS sád**.
+  · **KOV-E je KOMPLET** (E1a #332 · E1b #333 · E2 #334) · D-114 balík Čiel ostáva na koniec bloku.
 - **KOV-G · „NOHY 4/6, PRÍCHYTY, SOKEL PRI VKLADANÍ" (po D; LOW):** pravidlo nôh `bands` na šírku korpusu (<1000 → 4, ≥1000 → 6; AXILO aj klzáky) · **príchyt sokla = druhé
   bands pravidlo na šírku** (1 / 2) — O3, bez pomerového člena · set nôh podľa výšky sokla (existuje) viditeľný **pri vkladaní** (riadok v ghost pásiku/vkladacej karte) aj v
   Korpuse pri sokli (D-111) — override per skrinka. Audit NIE. Smoke: skrinka 1200 → 6 nôh + 2 príchyty; sokel 150 → iný set nôh viditeľný už pri vkladaní.

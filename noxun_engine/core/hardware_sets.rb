@@ -1973,15 +1973,12 @@ module Noxun
               msg = 'typ kovania existujúceho setu sa nemení — vytvor nový set'
               next [:invalid, msg, [set_err('generic_type', msg)]]
             end
-            # KOV-E1a: set NOVSIEHO TVARU (`code_by_param` / `quantity_from`)
-            # sa v editore este upravovat neda (editor pride v E2), takze
-            # server ZMENU CLENOV ODMIETNE. HTML `disabled` nie je ochrana —
-            # keby JS clena „zabudol", ulozil by sa set bez mechanizmu.
-            # Nazov, aktivnost a klasifikacia sa menit smu.
-            if new_shape_members?(sets[idx]) && norm['members'] != sets[idx]['members']
-              msg = 'členov tohto setu zatiaľ meniť nemožno — je novšieho tvaru (výklopy)'
-              next [:invalid, msg, [set_err('members', msg)]]
-            end
+            # KOV-E2: docasna brana z E1a („clenov setu noveho tvaru menit
+            # nemozno") ZANIKLA — editor `code_by_param` aj `quantity_from` uz
+            # vie, takze bola jedinou prekazkou opravy setu vyklopu. Ochranou
+            # ostava to, co nou bolo vzdy: `validate_set_detailed` (XOR strategii
+            # kodu, uplnost tabulky tried, nazov parametra) — teda VALIDACIA
+            # obsahu, nie zakaz zapisu.
             sets[idx] = norm
           else
             sets << norm
@@ -1992,18 +1989,6 @@ module Noxun
       rescue StandardError => e
         Engine.log_error(e, 'HardwareSets.save_set!') if defined?(Engine)
         [:write_failed, nil]
-      end
-
-      # KOV-E1a: ma set clena NOVSIEHO TVARU? Odpoved potrebuje zapisova brana
-      # (`save_set!`) aj payload editora (read-only badge v `hw_sets.js`) —
-      # jedna otazka, jedna odpoved.
-      def new_shape_members?(set)
-        return false unless set.is_a?(Hash)
-
-        Array(set['members']).any? do |m|
-          m.is_a?(Hash) && (m['code_by_param'].is_a?(Hash) ||
-                            !m['quantity_from'].to_s.strip.empty?)
-        end
       end
 
       def invalid_set(errors)
@@ -4989,13 +4974,23 @@ module Noxun
       # kupi raz. Je to POHLAD NA POLOZKU, nie nakupny zoznam (ten je v Studiu).
       #
       # Cista funkcia: ziadne IO, ziadny SketchUp, vstup sa NEMENI.
-      # -> { 'set_id', 'set_name', 'members' => [...], 'problems' => [SK texty] }
+      # -> { 'set_id', 'set_name', 'members' => [...], 'problems' => [SK texty],
+      #      'unmapped' => [SUROVE zaznamy] }
+      #
+      # KOV-E2 (Codex #334 kolo 2 P2): `unmapped` nesie TIE ISTE zaznamy, z
+      # akych `expand` skladá nálezy Kontroly — `problems` je len ich SK preklad
+      # a z prelozenej vety sa uz neda zistit ZAVAZNOST (RED `lift_set_incomplete`
+      # vs. ORANGE). Karta cela preto potrebuje zaznam, nie vetu: bez neho
+      # ukazovala neuplnu zostavu vyklopu ako `state: 'ok'` a problem schovala
+      # do rozkliku, kym Kontrola vedla hlasila RED a zastavovala exporty.
+      # Kluc je ADITIVNY (existujuci volajuci ho ignoruje).
       # no_set_reason: ako v `expand` — volajuci ho posiela, ked je pricina
       # „bez mapovania" INA a konkretnejsia (R-07: `library_incompatible`).
       # Panel a supis musia dat TEN ISTY dovod (review P2-3).
       def explain(item, state, overrides: {}, catalog: nil, lookup: nil,
                   no_set_reason: 'no_set')
-        out = { 'set_id' => nil, 'set_name' => nil, 'members' => [], 'problems' => [] }
+        out = { 'set_id' => nil, 'set_name' => nil, 'members' => [], 'problems' => [],
+                'unmapped' => [] }
         return out unless item.is_a?(Hash)
         gt = item['generic_type'].to_s
         return out if gt.empty?
@@ -5009,32 +5004,32 @@ module Noxun
         sid, reason, info = resolve_set_id(gt, it, ovr, mapping)
         if sid.nil?
           reason = no_set_reason if reason == 'no_set'
-          out['problems'] << unmapped_reason_sk(unmapped_entry(it, nil, reason, info))
+          explain_problem(out, unmapped_entry(it, nil, reason, info))
           return out
         end
         out['set_id'] = sid
         set = sets[sid]
         if set.nil?
-          out['problems'] << unmapped_reason_sk(unmapped_entry(it, sid, 'set_missing'))
+          explain_problem(out, unmapped_entry(it, sid, 'set_missing'))
           return out
         end
         out['set_name'] = set['name']
         if set['generic_type'].to_s != gt
-          out['problems'] << unmapped_reason_sk(unmapped_entry(it, sid, 'set_type_mismatch'))
+          explain_problem(out, unmapped_entry(it, sid, 'set_type_mismatch'))
           return out
         end
         # KOV-C2a: TA ISTA kontrola ako v `expand` — panel a supis sa nesmu
         # rozist (inak by panel rozpisal kody kitu, ktory v nakupe nevznikne).
         bad = set_incompatible_info(it, set)
         if bad
-          out['problems'] << unmapped_reason_sk(unmapped_entry(it, sid, 'set_incompatible', bad))
+          explain_problem(out, unmapped_entry(it, sid, 'set_incompatible', bad))
           return out
         end
         # R-06 (brana 1d): TA ISTA brana ako v expand — panel a supis sa nesmu
         # rozist. Bez nej by panel rozpisal kody s cenou za meter pri polozke,
         # ktora v nakupe vobec nevznikne.
         if length_unsupported?(it)
-          out['problems'] << unmapped_reason_sk(unmapped_entry(it, sid, 'length_unsupported'))
+          explain_problem(out, unmapped_entry(it, sid, 'length_unsupported'))
           return out
         end
         explain_members(it, set, sid, (lookup || catalog_lookup(catalog)), out)
@@ -5054,10 +5049,10 @@ module Noxun
           mult, qmiss = member_multiplier(m, it)
           if qmiss
             emitted = true
-            out['problems'] << unmapped_reason_sk(
-              unmapped_entry(it, sid, qmiss['reason'],
-                             qmiss.merge('member_index' => idx, 'member_label' => m['label']))
-            )
+            explain_problem(out,
+                            unmapped_entry(it, sid, qmiss['reason'],
+                                           qmiss.merge('member_index' => idx,
+                                                       'member_label' => m['label'])))
             next
           end
           next if mult.nil?
@@ -5065,10 +5060,10 @@ module Noxun
           code, miss = member_code(m, it)
           if miss
             emitted = true
-            out['problems'] << unmapped_reason_sk(
-              unmapped_entry(it, sid, miss['reason'],
-                             miss.merge('member_index' => idx, 'member_label' => m['label']))
-            )
+            explain_problem(out,
+                            unmapped_entry(it, sid, miss['reason'],
+                                           miss.merge('member_index' => idx,
+                                                      'member_label' => m['label'])))
             next
           end
           if code.nil?
@@ -5113,9 +5108,19 @@ module Noxun
         return unless it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE ||
                       it['generic_type'].to_s == 'lift'
 
-        out['problems'] << unmapped_reason_sk(
-          unmapped_entry(it, sid, 'members_skipped', 'detail' => 'set nevydal žiadnu položku')
-        )
+        explain_problem(out,
+                        unmapped_entry(it, sid, 'members_skipped',
+                                       'detail' => 'set nevydal žiadnu položku'))
+      end
+
+      # KOV-E2 (Codex #334 kolo 2 P2): JEDINY zapis problemu do nahladu.
+      # `problems` je SK preklad pre oko, `unmapped` je SUROVY zaznam pre
+      # volajuceho, ktory potrebuje ZAVAZNOST (karta cela) — obe vznikaju TU
+      # a naraz, takze sa nemozu rozist.
+      def explain_problem(out, entry)
+        out['problems'] << unmapped_reason_sk(entry)
+        (out['unmapped'] ||= []) << entry
+        nil
       end
 
       # --- KOV-B3: ZIVY NAHLAD EXPANZIE ROZPRACOVANEHO SETU --------------------

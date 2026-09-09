@@ -26,7 +26,13 @@
     "(`handle_allowance_kg`, `rod_double_from_kb_mm`). Neciselnu hodnotu",
     "`normalize_lift_scalar!` NEZAHADZUJE — kluc ostava pritomny s `null`, aby",
     "o nom brana povedala. Klient ju preto musi odmietnut rovnako; predtym ju",
-    "bral cez `|| 0` ako nulovu rezervu a prah tyce netypoval vobec."
+    "bral cez `|| 0` ako nulovu rezervu a prah tyce netypoval vobec.",
+    "KOV-E2 (Codex #334 kolo 1 P2): ZAPISOVA CESTA MA DVE BRANY a fixtura sa",
+    "pyta OBOCH naraz (`lift_input_problems` nad SUROVYM vstupom + `rules_problems`",
+    "nad normalizovanym) — inak by sa NEDOPISANY riadok tabulky vyklopu nedal",
+    "otestovat vobec: normalizacia ho zahodi este pred druhou branou, takze",
+    "pouzivatelovi by po prestavbe ticho zmizol. UPLNE PRAZDNY riadok je naopak",
+    "pohodlie editora a MUSI prejst — na oboch stranach rovnako."
   ],
   "cases": [
     {
@@ -318,6 +324,95 @@
       "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": true,
                   "rod_double_from_kb_mm": "1100",
                   "classes": [{ "code": "22K2300", "min": 420.0, "max": 1610.0 }],
+                  "mechanisms": [{ "code": "22L2500", "max": 580.0 }],
+                  "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": 1.5, "kg_max": 9.0 }] }]
+    },
+    {
+      "name": "KOV-E2: ZÁPORNÝ prah druhej tyče — `lift_rod_count` ho zahodí, teda „druhá tyč nikdy“",
+      "invalid": true,
+      "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": true,
+                  "rod_double_from_kb_mm": -1100.0,
+                  "classes": [{ "code": "22K2300", "min": 420.0, "max": 1610.0 }],
+                  "mechanisms": [{ "code": "22L2500", "max": 580.0 }],
+                  "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": 1.5, "kg_max": 9.0 }] }]
+    },
+    {
+      "name": "KOV-E2: ZÁPORNÉ LF v triede HK — pásmo by pokrývalo nezmyselné hodnoty",
+      "invalid": true,
+      "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": true,
+                  "classes": [{ "code": "22K2300", "min": -420.0, "max": 1610.0 }],
+                  "mechanisms": [{ "code": "22L2500", "max": 580.0 }],
+                  "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": 1.5, "kg_max": 9.0 }] }]
+    },
+    {
+      "name": "KOV-E2: ZÁPORNÁ hmotnosť ramien",
+      "invalid": true,
+      "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": true,
+                  "classes": [{ "code": "22K2300", "min": 420.0, "max": 1610.0 }],
+                  "mechanisms": [{ "code": "22L2500", "max": 580.0 }],
+                  "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": -1.5, "kg_max": 9.0 }] }]
+    },
+    {
+      "name": "KOV-E2: spôsobilosť HL s OBRÁTENOU výškou — systém by nebol použiteľný nikdy",
+      "invalid": true,
+      "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": true,
+                  "classes": [{ "code": "22K2300", "min": 420.0, "max": 1610.0 }],
+                  "mechanisms": [{ "code": "22L2500", "max": 580.0 }],
+                  "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": 1.5, "kg_max": 9.0 }],
+                  "eligibility": { "hk_top": { "kh_min": 205.0, "kh_max": 600.0, "kb_max": 1800.0 },
+                                   "hl_top": { "kh_min": 580.0, "kh_max": 300.0 } } }]
+    },
+    {
+      "name": "KOV-E2: PLATNÁ spôsobilosť oboch systémov prejde",
+      "invalid": false,
+      "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": true,
+                  "handle_allowance_kg": 0.5, "rod_double_from_kb_mm": 1100.0,
+                  "classes": [{ "code": "22K2300", "min": 420.0, "max": 1610.0 }],
+                  "mechanisms": [{ "code": "22L2500", "max": 580.0 }],
+                  "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": 1.5, "kg_max": 9.0 }],
+                  "eligibility": { "hk_top": { "kh_min": 205.0, "kh_max": 600.0, "kb_max": 1800.0 },
+                                   "hl_top": { "kh_min": 300.0, "kh_max": 580.0, "kb_max": 1800.0, "depth_min": 264.0 } } }]
+    },
+    {
+      "name": "KOV-E2 (Codex #334 kolo 1 P2): NULOVÝ prah druhej tyče — súhrn by písal „od 0 mm“, automat by druhú tyč nedal nikdy",
+      "invalid": true,
+      "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": true,
+                  "rod_double_from_kb_mm": 0.0,
+                  "classes": [{ "code": "22K2300", "min": 420.0, "max": 1610.0 }],
+                  "mechanisms": [{ "code": "22L2500", "max": 580.0 }],
+                  "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": 1.5, "kg_max": 9.0 }] }]
+    },
+    {
+      "name": "KOV-E2 (Codex #334 kolo 1 P2): NEDOPÍSANÁ trieda VEDĽA platnej (kód bez hornej hranice) sa neuloží ticho",
+      "invalid": true,
+      "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": true,
+                  "classes": [{ "code": "22K2300", "min": 420.0, "max": 1610.0 },
+                              { "code": "22K2500", "min": 1610.0, "max": null }],
+                  "mechanisms": [{ "code": "22L2500", "max": 580.0 }],
+                  "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": 1.5, "kg_max": 9.0 }] }]
+    },
+    {
+      "name": "KOV-E2 (Codex #334 kolo 1 P2): NEDOPÍSANÝ mechanizmus (hranica bez kódu) VEDĽA platného",
+      "invalid": true,
+      "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": true,
+                  "classes": [{ "code": "22K2300", "min": 420.0, "max": 1610.0 }],
+                  "mechanisms": [{ "code": "22L2500", "max": 580.0 }, { "code": "", "max": 700.0 }],
+                  "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": 1.5, "kg_max": 9.0 }] }]
+    },
+    {
+      "name": "KOV-E2 (Codex #334 kolo 1 P2): ÚPLNE PRÁZDNY riadok je pohodlie editora — zahodí sa mlčky na oboch stranách",
+      "invalid": false,
+      "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": true,
+                  "classes": [{ "code": "22K2300", "min": 420.0, "max": 1610.0 },
+                              { "code": "", "min": null, "max": null }],
+                  "mechanisms": [{ "code": "22L2500", "max": 580.0 }],
+                  "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": 1.5, "kg_max": 9.0 }] }]
+    },
+    {
+      "name": "KOV-E2 (Codex #334 kolo 1 P2): VYPNUTÉ pravidlo s nedopísaným riadkom sa nekontroluje ani jednou bránou",
+      "invalid": false,
+      "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": false,
+                  "classes": [{ "code": "22K2300", "min": 420.0, "max": null }],
                   "mechanisms": [{ "code": "22L2500", "max": 580.0 }],
                   "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": 1.5, "kg_max": 9.0 }] }]
     },

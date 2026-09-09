@@ -508,7 +508,11 @@ module Noxun
                 # KOV-D2b: k riadku patria aj CHIPY OSI. Keby ich lahky push
                 # vynechal, `refreshFrontDrawer` by zamky z OTVORENEJ karty
                 # zmazal — server je autorita a klient si stary stav nedrzi.
-                'front_drawer' => front_drawer_refresh(cfg, cid) }
+                'front_drawer' => front_drawer_refresh(cfg, cid),
+                # KOV-E2: to iste pre riadok VYKLOPU — jeho „Technický detail"
+                # nesie NAZOV SETU (biely / tmavy) a kody clenov, teda presne
+                # to, co tento push meni (vyber tmaveho setu per celo).
+                'front_lift' => front_lift_payload(cfg) }
             end
           js("NX.setHardwareSets(#{data.to_json})")
         rescue StandardError => e

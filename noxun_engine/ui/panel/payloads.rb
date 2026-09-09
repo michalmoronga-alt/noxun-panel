@@ -74,6 +74,10 @@ module Noxun
           # otvaranie · recept, alebo RED dovod / ORANGE sync). Vlastny kluc —
           # `front_slots` odpoveda VYHRADNE na otazku „kde sa pyta smer".
           params['front_drawer'] = front_drawer_payload(cfg)
+          # KOV-E2: RIADOK VYKLOPU karty cela (system · trieda · tyc, alebo RED
+          # dovod / ORANGE upozornenie). Vlastny kluc — `front_drawer` odpoveda
+          # VYHRADNE na otazku o zasuvke.
+          params['front_lift'] = front_lift_payload(cfg)
           # svetle (available) rozmery — view-only kontrola pre pouzivatela
           params['available_width'] = cfg['available_width']
           params['available_height'] = cfg['available_height']
@@ -385,17 +389,35 @@ module Noxun
         # (`explain_stored`, riadok „Nosnosť bunky"). Nakupna volba setu ju
         # NEZVYSUJE (Astra #20 F11).
         def drawer_buy_lines(hw, buy)
-          return [] unless buy.is_a?(Hash) && hw.is_a?(Hash)
+          buy_lines(item_expansion(hw, buy))
+        end
 
-          exp = item_purchase(hw, buy['status'], buy['state'], buy['overrides'], buy['lookup'],
-                              blocked: buy['blocked'] == true)
+        # KOV-E2 (Codex #334 kolo 2 P2): EXPANZIA POLOZKY sa pocita RAZ.
+        # Karta vyklopu z nej potrebuje OBOJE — vety rozkliku aj to, ci
+        # expanzia ZLYHALA (stav karty) — a dva behy tej istej expanzie by
+        # boli nielen zbytocne, ale aj miesto, kde sa vety a stav mozu
+        # rozist. `nil` = expanziu sa nepodarilo ziskat (chybajuci kontext
+        # setov alebo chyba): vtedy sa NEPRIDA a NETVRDI nic.
+        def item_expansion(hw, buy)
+          return nil unless buy.is_a?(Hash) && hw.is_a?(Hash)
+
+          item_purchase(hw, buy['status'], buy['state'], buy['overrides'], buy['lookup'],
+                        blocked: buy['blocked'] == true)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.item_expansion')
+          nil
+        end
+
+        def buy_lines(exp)
+          return [] unless exp.is_a?(Hash)
+
           out = []
           out << "Balenie: #{exp['set_name'] || exp['set_id']}" if exp['set_name'] || exp['set_id']
           Array(exp['members']).each { |m| out << drawer_member_line(m) }
           Array(exp['problems']).each { |p| out << "Bez kódu: #{p}" }
           out
         rescue StandardError => e
-          Engine.log_error(e, 'Panel.drawer_buy_lines')
+          Engine.log_error(e, 'Panel.buy_lines')
           []
         end
 
@@ -462,6 +484,225 @@ module Noxun
         def drawer_stale_cfg?(cfg)
           defined?(CabinetBuilder) &&
             CabinetBuilder.config_schema_of(cfg) < CabinetBuilder::DRAWER_ACTIVATION_SCHEMA
+        end
+
+        # --- KOV-E2: RIADOK VYKLOPU v karte cela ------------------------------
+        #
+        # Mapa `front_id => zaznam` pre riadky ciel typu `lift`. Karta z nej
+        # kresli JEDEN read-only riadok + rozbalitelny „Technický detail" —
+        # ziadny novy vertikalny blok (vertikalny priestor panela je vzacny).
+        #
+        # SERVER je jedina autorita textu. Cerveny dovod je DOSLOVNE ten isty
+        # ulozeny retazec, ktory vyda Kontrola v Studiu (`hardware_conflicts`
+        # -> `Bom.collect` -> `HW_CONFLICT_CODES`), takze o jednej chybe
+        # neexistuju dve vety. Vsetko je CITACIE — ziadny zapis, ziadna zmena
+        # schemy; zdroje su ULOZENY config (polozka `lift`, `hardware_conflicts`,
+        # `warnings`) a stav setov.
+        #
+        # Stavy zaznamu (`state`) su ZRKADLOM zaznamu zasuvky (C2c):
+        #   'conflict' — RED dovod stavby; `message` = veta Kontroly
+        #   'stale'    — skrinka postavena PRED pravidlami vyklopov
+        #                (`Bom.flap_stale_front?`) — TA ISTA autorita, akou
+        #                vznika RED `flap_stale`, nie druha podmienka vedla nej.
+        #                Codex #334 kolo 1 P2: nestaci sa pytat proveniencie —
+        #                nalez Kontroly ma este VYNIMKU pre uplnu rucnu zostavu
+        #                (`HardwareSets.manual_flap_assemblies`), takze celo
+        #                s rucne zlozenym mechanizmom by v karte bolo cervene,
+        #                kym Kontrola mlci.
+        #   'ok'       — `text` = zhrnutie, `detail` = vety, `warn` = ORANGE
+        #   'incomplete' — polozka VZNIKLA, ale set ju nevie cely vydat
+        #                (Codex #334 kolo 2 P2): `message` = TA ISTA veta, aku
+        #                da Kontrola pri RED `lift_set_incomplete`; `text`
+        #                a `detail` OSTAVAJU (co uz vieme, sa nezahadzuje)
+        #   'pending'  — pravidlo vyklopov je vypnute / polozka nevznikla:
+        #                karta mlci (a hovori za nu veta „vyberá automat")
+        #
+        # ORANGE kody, ktore sa VIAZU NA VLASTNIKA (`part_key`). `hardware_rule_overlap`
+        # tu ZAMERNE NIE JE: je to varovanie o PRAVIDLACH (seed sa nedoplnil),
+        # nie o tomto cele - vlastnika nenesie a v karte by nemalo kde pristat.
+        LIFT_WARN_CODES = %w[lift_light_front lift_override_ignored].freeze
+
+        def front_lift_payload(cfg)
+          return {} unless defined?(HardwareRules)
+
+          out = {}
+          buy = nil
+          Array(cfg['front_items']).each do |it|
+            next unless it.is_a?(Hash) && it['type'].to_s == 'lift'
+
+            fid = it['id'].to_s
+            next if fid.empty?
+
+            buy = drawer_buy_ctx(cfg) if buy.nil?
+            out[fid] = lift_card_row(cfg, fid, buy)
+          end
+          out
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.front_lift_payload')
+          {}
+        end
+
+        def lift_card_row(cfg, fid, buy = nil)
+          owner = PartKeys.front(fid, 'flap')
+          conflict = lift_conflict_for(cfg, owner)
+          return { 'state' => 'conflict', 'message' => conflict['message'].to_s } if conflict
+
+          hw = lift_item_for(cfg, owner)
+          if hw.nil?
+            return { 'state' => 'stale', 'message' => lift_stale_message } if
+              defined?(Bom) && Bom.flap_stale_front?(cfg, fid)
+
+            return { 'state' => 'pending' }
+          end
+          params = hw['params'].is_a?(Hash) ? hw['params'] : {}
+          exp = item_expansion(hw, buy)
+          row = { 'state' => 'ok', 'text' => lift_row_text(params, hw),
+                  'detail' => lift_detail_lines(cfg, params) + buy_lines(exp) }
+          # Codex #334 kolo 2 P2: ZLYHANIE EXPANZIE JE STAV KARTY, nie riadok
+          # v rozkliku. Kym `state` ostavalo 'ok', karta neuplnu zostavu
+          # priznala len vetou „Bez kódu: …" schovanou v „Technickom detaile" —
+          # kym Kontrola vedla hlasila RED `lift_set_incomplete` a zastavovala
+          # nakup, rozpocet aj cenovu ponuku. Karta a Kontrola sa rozist nesmu.
+          bad = lift_incomplete_note(exp)
+          if bad
+            row['state'] = 'incomplete'
+            row['message'] = bad
+          end
+          warn = lift_warn_note(cfg, owner)
+          row['warn'] = warn if warn
+          row
+        end
+
+        # Veta o NEUPLNEJ ZOSTAVE vyklopu, alebo nil. Zdroj je SUROVY zaznam
+        # expanzie (`explain` -> `unmapped`) — z prelozeneho `problems` sa
+        # zavaznost uz precitat neda, a prave zavaznost tu rozhoduje: pri
+        # polozke `lift` sa KAZDY nevyrieseny clen povysuje na RED
+        # `lift_set_incomplete` (`HardwareSets.unmapped_entry`).
+        # ZNENIE vety sklada `Validation` — TA ISTA metoda, akou vznika nalez
+        # Kontroly, len bez lokatora skrinky (karta v tej skrinke stoji).
+        def lift_incomplete_note(exp)
+          return nil unless exp.is_a?(Hash) && defined?(Validation)
+
+          u = Array(exp['unmapped']).find do |x|
+            x.is_a?(Hash) && x['reason'].to_s == HardwareSets::LIFT_SET_INCOMPLETE
+          end
+          u ? Validation.lift_incomplete_sentence(u) : nil
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.lift_incomplete_note')
+          nil
+        end
+
+        # Veta stale stavu. Kratsia ako nalez Kontroly (ten menuje skrinku),
+        # ale hovori TO ISTE a navadza na TU ISTU napravu.
+        def lift_stale_message
+          'Výklop je postavený ešte pred pravidlami výklopov — v Pravidlách kovania spusti ' \
+            '„Doplniť nové predvoľby“ a skrinku prestav, inak jej v nákupe chýba celý mechanizmus.'
+        end
+
+        # Zhrnutie do JEDNEHO riadku: „AVENTOS HK top · 22K2300 · automat".
+        # Kazdy udaj pochadza z ULOZENYCH `params` polozky vyklopu — nic sa
+        # nedopocitava a chybajuci udaj sa VYNECHA (nikdy sa nehada).
+        def lift_row_text(params, item = nil)
+          p = params.is_a?(Hash) ? params : {}
+          parts = ["AVENTOS #{HardwareRules.lift_system_label(p['lift_system'].to_s)}"]
+          cls = p['lift_class'].to_s.strip
+          arm = p['arm_class'].to_s.strip
+          parts << cls unless cls.empty?
+          parts << "ramená #{arm}" unless arm.empty?
+          tag = lift_source_tag(item)
+          parts << tag if tag
+          parts.join(' · ')
+        end
+
+        # Codex #334 kolo 1 P2: STITOK ZDROJA polozky.
+        #
+        # `automat` nie je „vybral to plugin" — je to priznanie, ze polozku
+        # riadi CELE pravidlo a rucny zasah sa na nej NEUPLATNI. To plati
+        # VYHRADNE pre chranene seed pravidlo (`HardwareRules.protected_lift_item?`,
+        # `LIFT_RULE_ID`); na polozke z VLASTNEHO vyklopoveho pravidla override
+        # ucinny JE a `apply_overrides` ju oznaci `source: 'manual'`. Karta by
+        # o rucne prepisanom pocte tvrdila „automat" — presny opak pravdy.
+        # Vlastne pravidlo BEZ overridu stitok NEDOSTANE: mlcanie je presnejsie
+        # nez ktorekolvek z dvoch slov.
+        def lift_source_tag(item)
+          return nil unless item.is_a?(Hash)
+          return 'automat' if HardwareRules.protected_lift_item?(item)
+
+          item['source'].to_s == 'manual' ? 'ručne' : nil
+        end
+
+        # Vety rozkliku. Su to VYHRADNE ULOZENE fakty polozky a rozmery korpusu
+        # z configu — ziadny prepocet planu. Cislo LF (HK) ani hmotnost (HL) sa
+        # na polozke NEUKLADAJU (kontrakt E1a/E1b), takze sa tu nedopocitavaju:
+        # druhy vypocet tej istej veliciny by sa s automatom casom rozisiel.
+        # Ked automat trafi problem, cisla su vo VETE KONFLIKTU — a tu vetu
+        # karta ukaze doslovne.
+        def lift_detail_lines(cfg, params)
+          p = params.is_a?(Hash) ? params : {}
+          out = []
+          out << "Otváranie: #{HardwareSets.class_label('opening_mode', p['opening_mode'])}" unless
+            p['opening_mode'].to_s.strip.empty?
+          kh = lift_kh_mm(cfg)
+          kb = num_or_nil(cfg['width'])
+          dims = []
+          dims << "výška korpusu bez sokla #{HardwareRules.fmt_mm(kh)} mm" if kh
+          dims << "šírka korpusu #{HardwareRules.fmt_mm(kb)} mm" if kb
+          out << "Rozmery pre výber: #{dims.join(' · ')}" unless dims.empty?
+          out << lift_rod_line(p)
+          out.compact
+        end
+
+        # KH = vyska korpusu BEZ SOKLA. TEN ISTY vzorec, akym ho pocita kontext
+        # pravidiel (`Construction`: `height - floor_height`) — karta nesmie
+        # ukazat iny rozmer, nez podla ktoreho automat vyberal.
+        def lift_kh_mm(cfg)
+          h = num_or_nil(cfg['height'])
+          return nil if h.nil?
+
+          (h - num_or_nil(cfg['floor_height']).to_f).round(2)
+        end
+
+        def num_or_nil(v)
+          v.is_a?(Numeric) && v.to_f.finite? ? v.to_f : nil
+        end
+
+        # Stabilizacna tyc: pocet a predlzovaci diel su ULOZENE v `params`
+        # (`rod_count` / `rod_extension`), takze riadok hovori presne to, co je
+        # v nakupe. Polozka bez tychto klucov (HK top) riadok NEDOSTANE.
+        def lift_rod_line(p)
+          n = p['rod_count']
+          return nil unless n.is_a?(Numeric) && n.to_i.positive?
+
+          ext = p['rod_extension'].is_a?(Numeric) && p['rod_extension'].to_i.positive?
+          "Stabilizačná tyč: #{n.to_i}×#{ext ? ' + predlžovací diel' : ''}"
+        end
+
+        # ULOZENY dovod stavby pre TOHTO vlastnika. Register kodov je JEDINY
+        # (`BuildPlan::HW_CONFLICT_CODES`) — panel si zoznam neopisuje.
+        def lift_conflict_for(cfg, owner)
+          Array(cfg['hardware_conflicts']).find do |c|
+            c.is_a?(Hash) && c['owner_part_key'].to_s == owner &&
+              BuildPlan::HW_CONFLICT_CODES.include?(c['code'].to_s) &&
+              !c['message'].to_s.strip.empty?
+          end
+        end
+
+        # ORANGE veta pre TOHTO vlastnika (lahke celo, ignorovany rucny zasah).
+        def lift_warn_note(cfg, owner)
+          w = Array(cfg['warnings']).find do |x|
+            x.is_a?(Hash) && LIFT_WARN_CODES.include?(x['code'].to_s) &&
+              x['part_key'].to_s == owner && !x['message'].to_s.strip.empty?
+          end
+          w && w['message'].to_s
+        end
+
+        # Polozka VYKLOPU pre dane celo (`use_type: 'lift'` — jedina autorita
+        # otazky „je to vyklop" je `HardwareSets.lift_item?`, nie `generic_type`:
+        # rucna polozka typu `lift` triedu ani tyce nenesie).
+        def lift_item_for(cfg, owner)
+          Array(cfg['hardware']).find do |h|
+            h.is_a?(Hash) && h['owner_part_key'].to_s == owner && HardwareSets.lift_item?(h)
+          end
         end
 
         # V0.6 D-92: polozky kovania pre panel. Aditivne k ulozenemu configu:

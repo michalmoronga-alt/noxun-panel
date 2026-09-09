@@ -101,7 +101,11 @@ eq(infoTexts(C.frontCardModel({ type: 'door' }, entry(null, []))), [],
 // --- ostatne typy ---------------------------------------------------------
 eq(rowKeys(C.frontCardModel({ type: 'drawer_front' }, entry(1, []))),
    ['opening_mode', 'drawer_construction', 'drawer_variant'], 'zasuvka: otvaranie + klasifikacia');
-eq(rowKeys(C.frontCardModel({ type: 'lift' }, entry(1, []))), ['opening_mode'], 'vyklop: len otvaranie');
+// KOV-E2: vyklop dostal riadok SYSTEMU (HK top | HL top) — je to prva otazka,
+// ktora o nom rozhoduje. SKLOP ho NEMA a mat nesmie: dostava zavesy ako
+// dvierka, mechanizmus ziadny.
+eq(rowKeys(C.frontCardModel({ type: 'lift' }, entry(1, []))), ['lift_system', 'opening_mode'],
+   'vyklop: system + otvaranie');
 eq(rowKeys(C.frontCardModel({ type: 'fall' }, entry(1, []))), ['opening_mode'], 'sklop: len otvaranie');
 eq(rowKeys(C.frontCardModel({ type: 'blind' }, entry(1, []))), [], 'blenda nema smer ani otvaranie');
 eq(rowKeys(C.frontCardModel({ type: 'none' }, entry(1, []))), [], '„Bez čela" nema co nastavovat');
@@ -295,6 +299,7 @@ global.FRONT_PROFILES = [];
 global.frontItems = null;
 global.frontSlots = null;
 global.frontDrawer = null;   // KOV-C2c: riadok zasuvky karty (druhy serverovy kanal)
+global.frontLift = null;     // KOV-E2: zaznam vyklopu (front_lift) — form.js ho cita
 global.selectedCabId = null;
 global.applyTimer = null;
 // Cudzie zavislosti riadku (rady rozmerov, vyrazy, materialy, informacny stlpec).

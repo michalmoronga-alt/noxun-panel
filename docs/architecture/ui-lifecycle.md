@@ -892,6 +892,30 @@ null" preto ukázala vetu „bez klasifikácie" **nad** červeným dôvodom, ted
 
 Testy: `tests/pure/test_kovc2c_karta.rb`, `tests/js/test_kovc2c_karta.js`.
 
+**KOV-E2 — KARTA ČELA VÝKLOPU.** Riadok typu `lift` má v karte **segment „Systém" (HK top | HL top)** a pod ním **jeden read-only riadok vyriešeného výklopu** s rozklikom
+„Technický detail" — presne toľko a nič viac (vertikálny priestor je vzácny). **Sklop (`fall`) riadok systému NEMÁ** a mať nesmie: dostáva závesy ako dvierka, mechanizmus
+žiadny. Zápis systému ide **existujúcou cestou dormant polí** (`FRONT_EXTRA_KEYS` → `collectFronts` → `Fronts.normalize_items`, E1b) a `frontExtraOnSegrow` prepisuje **kópiu**
+vnoreného objektu `lift`, nie hodnotu v datasete riadku. Jediná výnimka zo železného pravidla A1 („kľúč, ktorý config nemá, sa nevyrobí") je **prepnutie typu NA výklop**:
+`frontExtraOnTypeChange` vtedy materializuje `hk_top` — nie je to hádanie, `Fronts.normalize_config` tú istú hodnotu pri uložení zapíše tak či tak, takže bez nej by segment
+stál bez zvýrazneného chipu nad riadkom, ktorý HK top **už má**. Uložená hodnota sa **neprepisuje** (dormant HL top prežije prechod na dvierka a späť).
+
+Zdroj riadku je **výhradne server**: `cabinet_payload` posiela **`front_lift`** (vlastný kľúč vedľa `front_drawer`, nižšie odsek `payloads.rb`) a `frontLiftRows` z neho len
+kreslí. Stavy: `ok` → riadok („AVENTOS HK top · 22K2300 · automat") + vety detailu **(+ jantárový riadok NAVIAC pri ORANGE — nikdy namiesto neho)** · `conflict` / `stale` →
+**červený inforow s vetou SERVERA, slovo za slovom** (tá istá, akú vydá Kontrola v Štúdiu z `hardware_conflicts`) **namiesto** riadku výklopu · **`incomplete`** (Codex #334
+kolo 2 P2) → **červený inforow NAD zhrnutím**, ktoré aj s rozklikom **ostáva**: položka vznikla, ale set ju nevie celú vydať, takže dôvod je stav riadku, nie poznámka
+pod ním (poradie je RED → zhrnutie → ORANGE) · `pending` a chýbajúci kľúč →
+karta mlčí. Muted veta **„Mechanizmus vyberá automat…"** sa kreslí **len keď server o výklope ešte nič nepovedal** — nad vyriešeným riadkom by bola druhá veta o tom istom.
+Ikonu (`alert` zo sprite) nesie **len** červený a jantárový riadok. Kombinácia **HL top + Tip-On** sa dá nastaviť ďalej (HTML `disabled` nie je ochrana) — karta o nej len
+**hneď** povie červenou vetou; bránu drží server.
+
+**Výber setu výklopu (vrátane tmavého) NIE JE v karte** — je pri položke v kontexte **Kovanie**, rovnako ako pri zásuvke (D1b), a beží **bez jedinej zmeny klienta**: položka
+`lift` nesie triedny kľúč (`HardwareSets.class_key_for`), takže `class_compat_payload` jej naplní `compat.owners['front:<id>/flap']` a existujúci picker (`hwOwnerOptionList`)
+vykreslí **len triedne kompatibilné** sety — biely aj tmavý, ktorý je poznať už z názvu („… (tmavá)"). Zápis ide existujúcou akciou `set_hardware_set` a `apply_cabinet_override`
+z nej skladá **owner triedny kľúč** `class:lift|<mode>|<system>@front:<id>/flap` (E1a); generický `lift` by sa na klasifikovanú položku **nikdy neuplatnil**. Jeden krok Späť,
+prestavba nie je nutná (expanzia číta mapovanie) a karta aj Nákup sa prekreslia ľahkým pushom.
+
+Testy: `tests/pure/test_kove2_ui.rb`, `tests/js/test_kove2_karta.js`.
+
 **KDE sa smer pýta, rozhoduje VÝHRADNE SERVER** — `cabinet_payload` posiela `front_slots` (`front_id → { wings_n, slots }` z `Fronts.direction_slots`) a panel z `wings`
 ani `wings_n` **nič neodvodzuje**: keby si to odvodil, dvojkrídlo by sa začalo pýtať na stranu pántov a 3/4-krídlové dvierka aj na krajné krídla (tie sú odvodené — A1 kontrakt).
 **`wings_n` chodí SPOLU so slotmi (Codex #281 P2-A)**, lebo prázdny zoznam slotov sám o sebe dvojkrídlo **neznamená** — dá ho aj veľmi starý `front_items` (pred D-07), kde server
@@ -1451,6 +1475,32 @@ zásuvka žiadny terajší nemá — jej cesta von je dôvod konfliktu. V produk
 test). Otázka je **lacná** (register + `parse_id`); dopad na čelo sa tu **nepočíta** — ten stojí celý `build_plan` + expanziu setov a chodí až na klik, samostatným čítacím
 callbackom. Blok nesie aj `cabinet_id` a `front_id`: identitu zápisu skladá **server** (rovnaká zásada ako `lock` v D2b), panel ju z ničoho neodvodzuje. Ten istý blok pripája
 aj **ľahký push** (`front_drawer_refresh`) — inak by z otvorenej karty po zmene mapovania ponuka zmizla.
+
+**`front_lift` (KOV-E2).** Tretí — opäť **vlastný** — kanál toho istého pushu: mapa `front_id → záznam riadku výklopu` pre riadky čiel typu `lift` (sklop tu nemá čo hľadať).
+Skladá ho `front_lift_payload` **čítacím** spôsobom z uloženého configu a je to **zrkadlo `front_drawer_payload`** aj v stavoch: uložený dôvod z `hardware_conflicts` tohto
+vlastníka (`front:<id>/flap`), ktorého kód je v **jedinom registri** `BuildPlan::HW_CONFLICT_CODES`, dá `state: 'conflict'` s **vetou stavby** (cudzí kód — napr. zásuvkový —
+sa ignoruje, nosič je zdieľaný); položka `HardwareSets.lift_item?` dá `state: 'ok'`; jej absencia dá `stale` **podľa `Bom.flap_stale_front?`** — tej istej autority, akou vzniká
+RED `flap_stale`, nie druhej podmienky vedľa nej. Kritérium je **celé** (Codex #334 kolo 1 P2): obe proveniencie (`config_schema` aj `rules_seed_version`), chýbajúce
+kovanie podľa **smeru** čela **a výnimka pre úplnú ručnú zostavu** (`HardwareSets.manual_flap_assemblies`) — čelo s ručne zloženým mechanizmom je preto v karte pokojné
+presne tak, ako je pokojná Kontrola. Inak `pending`. ORANGE (`warn`) je **riadok navyše** a berie sa
+len z `warnings` s `part_key` tohto čela a kódom z `LIFT_WARN_CODES` (`lift_light_front`, `lift_override_ignored`); `hardware_rule_overlap` tu **zámerne nie je** — je to
+varovanie o pravidlách, vlastníka nenesie a v karte by nemalo kde pristáť.
+
+Text riadku (`lift_row_text`) aj vety detailu (`lift_detail_lines`) sú **výhradne z uložených dát**: systém, trieda mechanizmu, trieda ramien, otváranie, počet tyčí
+a predlžovací diel. **Štítok na konci riadku hovorí o ZDROJI položky** (`lift_source_tag`, Codex #334 kolo 1 P2): `automat` neznamená „vybral to plugin", ale „ručný zásah
+sa na tejto položke **neuplatní**" — a to platí len pre **chránené seed pravidlo** (`HardwareRules.protected_lift_item?`). Položka z vlastného výklopového pravidla
+override **prijíma** (`source: 'manual'`) a dostane štítok **`ručne`**; vlastné pravidlo bez zásahu nedostane štítok žiadny — mlčanie je presnejšie než ktorékoľvek
+z dvoch slov. **Číslo, ktoré na položke nie je (LF pri HK, hmotnosť pri HL), sa NEDOPOČÍTAVA** — druhý výpočet tej istej veličiny by sa s automatom časom rozišiel
+a obnoviť ho by znamenalo postaviť celý plán s katalógom materiálov na každý push. Keď automat na problém narazí, čísla sú **vo vete konfliktu** a tú karta ukáže doslovne.
+**KH a KB** idú z configu **tým istým vzorcom, aký používa kontext pravidiel** (`Construction`: `height − floor_height`, `width`) — karta nesmie ukázať iný rozmer, než podľa
+ktorého automat vyberal. Vety „čo je v balení" pridáva **tá istá** cesta (`HardwareSets.explain`) ako pri zásuvke, s **tým istým** kontextom `drawer_buy_ctx`; expanzia sa počíta **raz**
+(`item_expansion` → `buy_lines`), lebo karta výklopu z nej potrebuje **oboje** — vety rozkliku aj to, či expanzia **zlyhala**. **Zlyhanie expanzie je STAV karty, nie riadok
+v rozkliku** (Codex #334 kolo 2 P2): keď `explain` vydá záznam s `reason == lift_set_incomplete` (chýbajúce mapovanie, chýbajúci kód triedy, nevyriešený počet), karta dá
+`state: 'incomplete'` a `message`. Dovtedy vracala `ok` a problém priznala len vetou „Bez kódu: …" schovanou v „Technickom detaile", kým Kontrola vedľa hlásila RED
+a zastavovala nákup, rozpočet aj cenovú ponuku. **Znenie vety skladá `Validation.lift_incomplete_sentence` — tá istá metóda, akou vzniká nález Kontroly**, len bez lokátora
+skrinky (karta v tej skrinke stojí); dve znenia o jednej chybe existovať nesmú. Rozhoduje **surový záznam** `explain['unmapped']`, nie preložené `problems`: z preloženej
+vety sa závažnosť už prečítať nedá.
+Ten istý záznam nesie aj **ľahký push** (`sync.rb`, `NX.setHardwareSets`) — rozklik detailu ukazuje názov setu a kódy, teda presne to, čo výber tmavého setu mení.
 
 **`hardware_set_options` a owner výbery (KOV-D1a).** Typ kovania z kľúča override mapy aj rozpoznanie „výberu na úrovni vlastníka" idú cez **jediné autority**
 `HardwareSets.mapping_key_type` a `owner_scoped_key?` — nie cez `BuildPlan.parse_hardware_set_key`, ktorý pre `class:` kľúče vracia `nil`. Bez toho by karta čela pri

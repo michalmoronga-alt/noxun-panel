@@ -597,6 +597,16 @@ module Noxun
               return set_status(rev_conflict_status, true)
             end
           end
+          # KOV-E2 (Codex #334 kolo 1 P2): PRVA brana stoji nad SUROVYM vstupom —
+          # nedopisany riadok tabulky vyklopu ocista ZAHODI, takze o nom uz
+          # DRUHA brana (nizsie) nema ako povedat a pouzivatelovi by riadok po
+          # prestavbe ticho zmizol. Kontroluje VYHRADNE to, co ocista zahadzuje;
+          # vsetko ostatne ostava na druhej brane.
+          raw_problems = HardwareRules.lift_input_problems(data['rules'])
+          unless raw_problems.empty?
+            return set_status("Pravidlá sa neuložili — #{problems_text(raw_problems)}", true)
+          end
+
           rules = HardwareRules.normalize_rules(data['rules'])
           return set_status('Žiadne platné pravidlá — nič sa neuložilo.', true) if rules.empty?
 

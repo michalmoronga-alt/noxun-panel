@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.9.52 · 9.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.9.55 · 9.9.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -21,7 +21,7 @@ a rád (`core/hardware_taxonomy.rb`) a vytiahla katalóg aj editor setu na obraz
 **Pozor na kompatibilitu:** čo uloží v0.9.20, to **v0.9.18 už nepoužije** — model/šablóna (`CONFIG_SCHEMA` 4 + brána `assess_set_defs`), knižnica setov aj projektový snapshot
 (`std` 3) a katalóg kovania s výrobcom (`schema` 2). Pred prvou takou zákazkou aktualizovať **obe PC** (D-52 updater).
 
-**Testy k v0.9.52:** **3511 headless** · 98 JS sád · posledný plný in-SketchUp beh **2028 PASS / 0 FAIL** (nad vetvou KOV-F1, 9.9.; F2 je UI dávka, in-SU nebežal) — vrátane sekcie `run_kovf` (závesy, `hinge_stale` aj „prestavba sama nestačí").
+**Testy k v0.9.55:** **3649 headless** · 102 JS sád · posledný plný in-SketchUp beh **2071 PASS / 0 FAIL** (nad vetvou KOV-E1b, 9.9.2026; E2 je UI dávka, in-SU nebežal) — vrátane sekcie `run_kove` (výklopy HK/HL, sklop, `flap_stale`, ručné kovanie).
 
 ## Robí sa
 
@@ -32,21 +32,21 @@ a rád (`core/hardware_taxonomy.rb`) a vytiahla katalóg aj editor setu na obraz
 **KOV-C KOMPLET:** C1 jadro (#302), C2a príprava (v0.9.30), C2b aktivácia (#304, v0.9.31), C2b-M materiálový kanál (#305, v0.9.32) a **C2c UI zásuviek** (v0.9.33).
 **KOV-D (package v2, PR #307, #20): slice D je KOMPLET (v0.9.42, 7.9.2026)** — D1a (0.9.34) · D1b (0.9.35) · D1c (0.9.36) · D2a (0.9.37) · D2b (0.9.38) · D3a/D3b (0.9.39/40) ·
 D4 (0.9.41) · D5 (0.9.42); 8 PR za deň (#310–#317). **KOV-W (hmotnosť dielcov + D-125) HOTOVÁ (v0.9.47)** — podklad pre závesy a výklopy.
-**KOV-F KOMPLET** — jadro závesov (v0.9.50) + **editor door guardov v Pravidlách (F2, v0.9.51; fix kolo Codex #330 — v0.9.52)**; z bloku KOVANIE ostáva **E → G → I** (packages v [PLAN.md](PLAN.md)); minor bump až pri uzávere celého bloku.
+**KOV-F KOMPLET** (jadro závesov v0.9.50 + editor F2 v0.9.51/52). **KOV-E KOMPLET** — výklopy AVENTOS HK top / HL top: E1a dáta (#332, v0.9.53), E1b pravidlo + brány (#333, v0.9.54),
+E2 UI (#334, v0.9.55); z bloku KOVANIE ostáva **G → I** (packages v [PLAN.md](PLAN.md)); minor bump až pri uzávere celého bloku.
 **Od 3.9. opäť Fable (Max, ~mesiac; priorita = uzavrieť V1)** — orchestruje Fable, implementujú Opus subagenti, review Codex; vstupný bod je [zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md](zdroje/next_sessions/KOVANIE_HANDOFF_2026-09-02.md) + tento súbor. **Limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
 
-**Poradie:** ~~D-52~~ → ~~KOV-A~~ → ~~KOV-H~~ → ~~KOV-B~~ → ~~KOV-C~~ → ~~KOV-D~~ (všetko v maine, D1a–D5) → ~~D-118~~ (katalógový seed + sety, a aj b) → ~~D-121~~ (názvy dielcov zásuvky + VEPO kontrakt v1.2) → ~~KOV-W~~ (hmotnosť + D-125) → ~~KOV-F~~ (závesy: jadro F1 + editor F2)
-→ **KOV-E → G → I** (poradie rozhodol Michal 8.9.2026; packages v [PLAN.md](PLAN.md), audit E Astra); súbežne 1d podľa kapacity.
+**Poradie:** ~~D-52~~ → ~~KOV-A~~ → ~~KOV-H~~ → ~~KOV-B~~ → ~~KOV-C~~ → ~~KOV-D~~ (všetko v maine, D1a–D5) → ~~D-118~~ (katalógový seed + sety, a aj b) → ~~D-121~~ (názvy dielcov zásuvky + VEPO kontrakt v1.2) → ~~KOV-W~~ (hmotnosť + D-125) → ~~KOV-F~~ (závesy: jadro F1 + editor F2) → ~~KOV-E~~ (výklopy: E1a + E1b + E2)
+→ **KOV-G → KOV-I** (poradie rozhodol Michal 8.9.2026; packages v [PLAN.md](PLAN.md)) → uzáver bloku KOVANIE (minor bump) → D-114 balík Čiel; súbežne 1d podľa kapacity.
 Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` → subagent vo worktree → `codex-po-pr` → merge → uzáver. V1 checklist v [V1_VIZIA.md](V1_VIZIA.md).
 
 ## Posledné uzávery
 
-- **KOV-F — ZÁVESY PODĽA NOXUN TABUĽKY, TIP-ON SVOJ SET A KONTROLY SA DAJÚ PRESTAVIŤ** (v0.9.48–0.9.51, 8.–9.9.2026): počet už nie je starý odhad, ale **tabuľka** (do 849 → 2 · 850–1700 → 3 · … · 2601–2800 → 7)
-  a **krídlo širšie než 600 mm dostane o jeden záves navyše**. Kontrola varuje (počet nemení) pri krídle nad 800 mm, pri čele širšom než vyššom a pri ťažkých dvierkach; nad 2800 mm položka vznikne s počtom 7, ale svieti **červená „mimo tabuľky"**
-  (zastaví nákup, rozpočet aj ponuku, rezanie nie) — zhasne ju **ručný zámok počtu**. **Tip-On dvierka** dostanú **P2O set + piest na krídlo** (tabuľku do starej zákazky prinesie **„Doplniť nové predvoľby"**).
-  **F2:** všetky tieto kontroly sa dajú v Pravidlách **prestaviť** — zbaliteľný blok „Kontroly dvierok"; nezmysel uloženie odmietne vetou. [KRONIKA](archiv/KRONIKA.md).
+- **KOV-E — VÝKLOP DOSTANE KOVANIE SÁM** (v0.9.53–0.9.55, 9.9.2026): HK top podľa **LF = výška korpusu × (hmotnosť čela + 0,5 kg)** → 22K2300…2900, HL top podľa výšky a hmotnosti
+  (mechanizmus + ramená + **tyč vždy**, od 1100 mm dve + predĺženie), **sklop = závesy ako dvierka**, **tmavý set** voľbou per čelo. Červené stopky: mimo tabuľky, mimo rozmerov Blum,
+  viac riadkov čiel, HL + Tip-On, **stará zákazka**. Karta čela má systém HK | HL a technický detail, Pravidlá editor výklopov, katalóg +23 položiek AVENTOS a 6 setov. [KRONIKA](archiv/KRONIKA.md).
 - **KOV-W — INSPECTOR UŽ UKÁŽE HMOTNOSŤ SKRINKY (D-125)** (v0.9.47, 8.9.2026): riadok „Hmotnosť" v Základných bol od UI 2.0 prázdny; odteraz ukazuje **skutočný súčet
   výrobných dielcov** (`12,4 kg`). Keď má niektorý dielec materiál **bez známej hustoty** (UNI, „iný" typ), plugin ho **nevynechá** — počíta ho **ťažšie** a povie to:
   `≈ 12,4 kg` s vysvetlením v tooltipe a jedným oranžovým upozornením v Kontrole (pri UNI dielcoch nie — tie už hlásia „materiál neurčený"). Rovnaká hmotnosť je teraz
@@ -54,7 +54,7 @@ Každá dávka: package v PLAN (autorita) + FINAL + mockup → `codex-audit` →
 - **D-121 — DIELCE ZÁSUVKY MAJÚ ĽUDSKÉ NÁZVY A VEPO RIADOK MÁ VŽDY ≤ 20 ZNAKOV** (v0.9.45 + v0.9.46, 8.9.2026): namiesto interného id čela nesú **jeho číslo**
   (`Zas dno 2 s1`, dvojica bokov `Zas bok LP 2 s1`); **objednávku netreba ručne prepisovať** — rovnaké dielce sa zlúčia (`Polica 1 2 3`) a dlhý názov sa skráti
   predvídateľne po celých slovách. **Kontrola** ukáže tvar, ktorý pôjde do objednávky, **LOG** má oddiel „Skrátené názvy". [KRONIKA](archiv/KRONIKA.md).
-- **Staršie uzávery** (**D-118a + D-118b** katalóg pozná kódy, ktoré si plugin sám objednáva (114 položiek
+- **Staršie uzávery** (**KOV-F** závesy podľa Noxun tabuľky, Tip-On svoj set, kontroly dvierok prestaviteľné v Pravidlách v0.9.48–0.9.52 · **D-118a + D-118b** katalóg pozná kódy, ktoré si plugin sám objednáva (114 položiek
   z Démosu), a zásuvka objedná správnu sadu vrátane PTOs modulu v0.9.43/44 · **KOV-D5** zásuvka ukazuje olep na správnej hrane v0.9.42 · **KOV-D4** ceruzka v Kontrole a „Bez kódov" po ľudsky v0.9.41 · **KOV-D1b + D1c** výber setu zásuvky vrátane antracitu v0.9.35/36 · **KOV-C2b + C2b-M** zásuvka naozaj vznikne a dá sa jej nastaviť materiál v0.9.31/32 ·
   **KOV-D3a + D3b** prechod na novšiu verziu receptu — latentný rámec v0.9.39/40 · **KOV-D2b** klikacie zámky výšky a dĺžky zásuvky v0.9.38 · **KOV-D2a** zámky osí zásuvky, `CONFIG_SCHEMA` 7 v0.9.37 · **KOV-C1 + C2a** nemenné recepty, SHA register, 4. materiálový kanál a 8 setov s kódmi v0.9.29–v0.9.30 · **GHOST-D2** doska sa dá nakresliť na rozmer v0.9.28 ·
   **KOV-C2c** riadok zásuvky a Technický detail na karte čela v0.9.33 · **KOV-D1a** vlastný kit pre jedno čelo, poškodený pin receptu = červená v0.9.34 · **KOV-B3** editor setu v modale so živým náhľadom v0.9.26 · **NÁSTROJE-1** toolbar „Noxun Nástroje“ v0.9.24–v0.9.25 ·

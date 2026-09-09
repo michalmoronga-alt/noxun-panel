@@ -141,6 +141,7 @@ global.FRONT_PROFILES = [];
 global.frontItems = null;
 global.frontSlots = null;
 global.frontDrawer = null;
+global.frontLift = null;     // KOV-E2: zaznam vyklopu (front_lift) — form.js ho cita
 global.selectedCabId = null;
 global.applyTimer = null;
 global.newStableId = p => p + (++global.__nxid || (global.__nxid = 1));

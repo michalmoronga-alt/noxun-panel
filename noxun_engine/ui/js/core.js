@@ -24,6 +24,11 @@
   // autorita: panel z klasifikacie ani z kovania NIC neodvodzuje a text si
   // NESKLADA. null = nic oznacene (alebo payload bez zasuviek).
   var frontDrawer = null;
+  // KOV-E2: `front_lift` z Ruby — mapa front_id -> zaznam riadku vyklopu
+  // ({ state, text, detail[], warn, message }). SERVER je jedina autorita:
+  // panel vetu ani kody NESKLADA (tie iste vety hovori Kontrola v Studiu).
+  // null = nic oznacene (alebo payload bez vyklopov).
+  var frontLift = null;
   // UI-B2: posledny payload kovania (config.hardware oznacenej skrinky). Drzi sa
   // LEN preto, aby z neho vedel kreslit nahlad (projekcia Kovanie a ghost
   // vrstva) — je to TEN ISTY payload, ktory dostava sekcia kovania, ziadne nove
@@ -157,6 +162,19 @@
     { value: 'classic', label: 'Klasické' },
     { value: 'tipon', label: 'Tip-On' }
   ];
+  // KOV-E2: SYSTEM VYKLOPU. Dve volby, teda segment (vzor „jedna volba z N"
+  // z UI_DIZAJN §1) — nie select. Hodnoty su ZRKADLOM serverovej
+  // `HardwareSets::LIFT_SYSTEMS` / `HardwareRules::LIFT_HK|LIFT_HL`.
+  // Predvolba `hk_top` NIE JE hadanie: `Fronts.normalize_config` ju kazdemu
+  // riadku typu `lift` MATERIALIZUJE, takze karta ukazuje to, co server ulozi.
+  var FRONT_LIFT_HK = 'hk_top';
+  var FRONT_LIFT_HL = 'hl_top';
+  var FRONT_LIFT_OPTIONS = [
+    { value: FRONT_LIFT_HK, label: 'HK top',
+      title: 'AVENTOS HK top — veko, jeden mechanizmus na stranu' },
+    { value: FRONT_LIFT_HL, label: 'HL top',
+      title: 'AVENTOS HL top — zdvih nahor s ramenami (Tip-On sa nevyrába)' }
+  ];
   var FRONT_DRAWER_CONSTR_OPTIONS = [
     { value: 'metal', label: 'Kovové bočnice' },
     { value: 'wood', label: 'Drevený box' },
@@ -267,6 +285,58 @@
     return false;
   }
 
+  // KOV-E2: RIADKY VYKLOPU v karte cela. Vzor `frontDrawerRows` (C2c) do
+  // posledneho detailu — a z toho istoho dovodu: vertikalny priestor panela
+  // je vzacny, takze vyriesny vyklop je JEDINY read-only riadok (system,
+  // trieda, kody) a vety vypoctu ziju v ROZBALITELNOM „Technickom detaile".
+  //
+  // TEXTY SKLADA VYHRADNE SERVER (`Panel.front_lift_payload`): tie iste vety,
+  // ktore vyda Kontrola v Studiu (`hardware_conflicts` -> `Bom.collect`).
+  // Panel by inak mal DRUHU verziu vety o tej istej chybe.
+  //
+  // Stavy zaznamu (`state`) su ZRKADLOM zaznamu zasuvky:
+  //   'conflict' — RED dovod stavby (mimo tabulky, rozmery, viac riadkov,
+  //                HL + Tip-On) -> cerveny inforow
+  //   'stale'    — skrinka postavena PRED pravidlami vyklopov -> cerveny
+  //   'ok'       — `text` + `detail[]`; `warn` = ORANGE riadok NAVIAC
+  //                (lahke celo, ignorovany override, prekryv pravidiel)
+  //   'incomplete' — Codex #334 kolo 2 P2: polozka VZNIKLA, ale set ju nevie
+  //                cely vydat (chyba mapovanie, kod triedy alebo pocet).
+  //                Kreslia sa OBE veci: cerveny riadok s dovodom (`message` =
+  //                ta ista veta ako v Kontrole) a POD nim zhrnutie s rozklikom,
+  //                lebo to, co uz o vyklope vieme, sa zahadzovat nema.
+  //   'pending'  — server sa este nevyjadril -> karta mlci
+  function frontLiftRows(lift){
+    var d = (lift && typeof lift === 'object') ? lift : null;
+    if (!d) return [];
+    var st = String(d.state || '');
+    if (st === 'conflict' || st === 'stale'){
+      var msg = String(d.message || '');
+      return msg ? [{ kind: 'info', tone: 'err', icon: 'alert', text: msg }] : [];
+    }
+    if (st !== 'ok' && st !== 'incomplete') return [];
+    var out = [];
+    // RED stoji NAD zhrnutim: je to stav riadku, nie poznamka pod nim.
+    if (st === 'incomplete' && d.message){
+      out.push({ kind: 'info', tone: 'err', icon: 'alert', text: String(d.message) });
+    }
+    out.push({ kind: 'resolved', label: 'Výklop', text: String(d.text || ''),
+               detail: Array.isArray(d.detail) ? d.detail.map(String) : [],
+               note: null });
+    // ORANGE je riadok NAVIAC (nie nahrada) — polozka existuje a objedna sa,
+    // len s upozornenim. Rovnaky vyklad ako `sync` pri zasuvke.
+    if (d.warn) out.push({ kind: 'info', tone: 'warn', icon: 'alert', text: String(d.warn) });
+    return out;
+  }
+  // Ulozeny system vyklopu (`item.lift.system`) alebo null. Panel si ho
+  // NEDOPLNA — chybajuca hodnota znamena „server sa k riadku este nevyjadril".
+  function frontLiftSystem(item){
+    var l = (item && item.lift && typeof item.lift === 'object') ? item.lift : null;
+    if (!l) return null;
+    var v = l.system == null ? '' : String(l.system);
+    return v === '' ? null : v;
+  }
+
   // VIEW-MODEL karty. `item` = polozka cela (typ + dormant polia), `entry` =
   // ZAZNAM SERVERA `front_slots[front_id]` v tvare `{ wings_n, slots }`.
   //   entry == null            -> server sa k celu este nevyjadril (novy riadok
@@ -282,7 +352,10 @@
   // / null = server o zasuvke nic nepovedal (nove celo pred prvym echom, celo
   // bez klasifikacie) — karta vtedy riadok zasuvky NEKRESLI a nic si
   // neodvodzuje. Vstup sa NEMENI.
-  function frontCardModel(item, entry, drawer){
+  // KOV-E2: `lift` = ZAZNAM SERVERA `front_lift[front_id]`. `undefined`/null =
+  // server o vyklope nic nepovedal (nove celo pred prvym echom, navrh
+  // vkladania) — karta vtedy riadok vyklopu NEKRESLI. Vstup sa NEMENI.
+  function frontCardModel(item, entry, drawer, lift){
     var it = item || {};
     var type = it.type || 'door';
     var known = FRONT_CARD_TYPES.indexOf(type) >= 0;
@@ -322,6 +395,13 @@
         rows.push({ kind: 'info', tone: 'muted',
                     text: 'Dvojkrídlo: ľavé krídlo má pánty vľavo, pravé vpravo — smer sa neurčuje.' });
       }
+    }
+    // KOV-E2: SYSTEM VYKLOPU stoji hned pod dlazdicami typu — je to prva
+    // otazka, ktora o vyklope rozhoduje (HK a HL maju ine tabulky aj iny
+    // nakup). SKLOP ho NEMA: dostane zavesy ako dvierka, mechanizmus ziadny.
+    if (type === 'lift'){
+      rows.push({ kind: 'seg', key: 'lift_system', label: 'Systém',
+                  options: FRONT_LIFT_OPTIONS, active: frontLiftSystem(it) });
     }
     if (FRONT_OPENING_TYPES.indexOf(type) >= 0){
       rows.push({ kind: 'seg', key: 'opening_mode', label: 'Otváranie',
@@ -369,8 +449,15 @@
     // ručne") by po tejto dávke klamal a viedol k ručnej položke navyše —
     // teda k dvojitej objednávke.
     if (type === 'lift'){
-      rows.push({ kind: 'info', tone: 'muted',
-                  text: 'Mechanizmus vyberá automat podľa hmotnosti a rozmerov čela — detail v Kovaní.' });
+      // KOV-E2: ked server o vyklope UZ NIECO POVEDAL, hovori zaň vyriesny
+      // riadok (a pri chybe cerveny dovod) — veta „vyberá automat" by bola
+      // druhym riadkom o tom istom a vertikalny priestor panela je vzacny.
+      var liftRows = frontLiftRows(lift);
+      if (!liftRows.length){
+        rows.push({ kind: 'info', tone: 'muted',
+                    text: 'Mechanizmus vyberá automat podľa hmotnosti a rozmerov čela — detail v Kovaní.' });
+      }
+      liftRows.forEach(function(r){ rows.push(r); });
     }
     if (type === 'fall'){
       rows.push({ kind: 'info', tone: 'muted',
@@ -384,6 +471,13 @@
   function frontExtraOnTypeChange(extra, newType){
     var out = frontExtraCopy(extra);
     if (newType === 'door' && out.direction == null) out.direction = FRONT_DIR_UNSET;
+    // KOV-E2: prepnutie NA VYKLOP materializuje systém rovnako, ako ho pri
+    // uložení materializuje `Fronts.normalize_config` (`hk_top`). NIE JE to
+    // hádanie ani porušenie železného pravidla A1: server tú hodnotu zapíše
+    // tak či tak, takže segment by inak stál bez zvýrazneného chipu nad
+    // riadkom, ktorý HK top UŽ MÁ. Uložená hodnota sa NEPREPISUJE (návrat
+    // z iného typu obnoví HL top).
+    if (newType === 'lift' && frontLiftSystem(out) == null) out.lift = { system: FRONT_LIFT_HK };
     return out;
   }
   // (d) Zmena poctu kridiel. 3 kridla = jedno stredne (p2), 4 = dve (p2, p3).
@@ -423,6 +517,15 @@
       }
       drw[key === 'drawer_construction' ? 'construction' : 'variant'] = value;
       out.drawer = drw;
+    } else if (key === 'lift_system'){
+      // KOV-E2: `lift` je VNORENY objekt (rovnako ako `drawer`) — prepisuje sa
+      // KOPIA, aby dataset riadku ostal nedotknuty.
+      var lf = {};
+      if (out.lift && typeof out.lift === 'object'){
+        Object.keys(out.lift).forEach(function(k){ lf[k] = out.lift[k]; });
+      }
+      lf.system = value;
+      out.lift = lf;
     }
     return out;
   }
@@ -1289,6 +1392,9 @@
       frontDrawerAxesSay: frontDrawerAxesSay,
       // KOV-D3b (tests/js/test_kovd3b_ui.js): ponuka novej verzie receptu.
       frontDrawerUpgradeRow: frontDrawerUpgradeRow,
+      // KOV-E2 (tests/js/test_kove2_karta.js): riadky VYKLOPU v karte cela.
+      frontLiftRows: frontLiftRows, frontLiftSystem: frontLiftSystem,
+      FRONT_LIFT_OPTIONS: FRONT_LIFT_OPTIONS,
       frontCardKeepOpen: frontCardKeepOpen,
       frontCardFocusKey: frontCardFocusKey, frontCardFocusSelector: frontCardFocusSelector,
       frontExtraOnTypeChange: frontExtraOnTypeChange, frontExtraOnWings: frontExtraOnWings,

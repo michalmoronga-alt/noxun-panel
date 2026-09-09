@@ -81,20 +81,172 @@
   function rdIsLegacySlide(r){
     return !!r && String(r.rule_id || '') === RD_LEGACY_SLIDE_ID;
   }
-  // KOV-E1b: jednoriadkový súhrn výklopového pravidla (read-only do E2).
-  // Číta LEN to, čo naozaj existuje — pravidlo z poškodeného snapshotu alebo
-  // z novšej verzie nesmie zhodiť render celej sekcie.
+  // KOV-E2: SÚHRN výklopového pravidla do ZBALENEJ lišty editora — „HK 4 triedy ·
+  // HL 2 mechanizmy + 4 ramená · tyč od 1100 mm · rezerva 0,5 kg". Zbalený blok
+  // musí povedať, čo skrýva (UI_DIZAJN §1). Číta LEN to, čo naozaj existuje —
+  // pravidlo z poškodeného snapshotu alebo z novšej verzie nesmie zhodiť render
+  // celej sekcie (Codex #330 lekcia). ČISTÁ funkcia (Node test).
+  // Slovenske tvary poctu — „1 trieda · 2 triedy · 5 tried · 0 tried".
+  // NULA ide do genitivu (`many`), nie do „2-4" tvaru.
+  function rdCount(n, one, few, many){
+    return n + ' ' + (n === 1 ? one : (n >= 2 && n <= 4 ? few : many));
+  }
   function rdLiftSummary(r){
     var cls = rdArr(r && r.classes).length;
+    var mech = rdArr(r && r.mechanisms).length;
     var arms = rdArr(r && r.arms).length;
     var kg = (r && typeof r.handle_allowance_kg === 'number') ? r.handle_allowance_kg : null;
     var rod = (r && typeof r.rod_double_from_kb_mm === 'number') ? r.rod_double_from_kb_mm : null;
-    var parts = ['HK top: ' + cls + ' tried podľa LF', 'HL top: ' + arms + ' párov ramien'];
-    if (kg !== null) parts.push('rezerva na úchytku ' + kg + ' kg');
-    if (rod !== null) parts.push('druhá stabilizačná tyč od šírky ' + rod + ' mm');
-    return parts.join(' · ') + '. Tabuľky sa tu zatiaľ needitujú.';
+    var parts = ['HK ' + rdCount(cls, 'trieda', 'triedy', 'tried'),
+                 'HL ' + mech + ' + ' + rdCount(arms, 'rameno', 'ramená', 'ramien')];
+    if (rod !== null) parts.push('tyč od ' + rod + ' mm');
+    if (kg !== null) parts.push('rezerva ' + kg + ' kg');
+    return parts.join(' · ');
   }
   if (typeof window !== 'undefined') window.rdLiftSummary = rdLiftSummary;
+
+  // ============ KOV-E2: EDITOR PRAVIDLA VÝKLOPOV (`lift_class`) =============
+  //
+  // E1b vedela pravidlo len PREČÍTAŤ (jedna veta). E2 z neho robí formulár —
+  // rovnakým vzorom ako F2 „Kontroly dvierok": celý editor je ZBALENÝ
+  // `<details>`, jeho stav si pamätá `RD_LIFT_OPEN` (kľúč = `rule_id`, nie
+  // index — pravidlá sa môžu preskupiť) a v lište stojí SÚHRN.
+  //
+  // Mená kľúčov sú ZRKADLOM servera (`HardwareRules::LIFT_SCALARS`,
+  // `normalize_lift_*`, `ELIGIBILITY_KEYS`) — klient si ich neopisuje vlastným
+  // slovníkom a guard test zhodu stráži.
+  var RD_LIFT_KEYS = ['handle_allowance_kg', 'rod_double_from_kb_mm',
+                      'classes', 'mechanisms', 'arms', 'eligibility'];
+  var RD_LIFT_ELIG = [['kh_min', 'výška od', 'mm'], ['kh_max', 'výška do', 'mm'],
+                      ['kb_max', 'šírka do', 'mm'], ['depth_min', 'hĺbka od', 'mm']];
+  var RD_LIFT_OPEN = {};
+
+  function rdLiftKey(r, i){ return String((r && r.rule_id) || ('#' + i)); }
+
+  // Číselné pole tabuľky. `cls` nesie údaj, ktorý sa z riadku číta späť.
+  function rdLiftNumInput(cls, v, title){
+    return '<input class="' + cls + ' rnum" type="number" step="0.1" value="' +
+      rdEsc(rdNumAttr(v)) + '"' + (title ? ' title="' + rdEsc(title) + '"' : '') + '>';
+  }
+  function rdLiftCodeInput(v){
+    return '<input class="lfcode" type="text" value="' + rdEsc(v == null ? '' : v) +
+      '" placeholder="kód">';
+  }
+  // BEZSTRATOVÝ prenos `max_exclusive` (Blum: 300–339 a 340–389 sú SPOJITÉ, teda
+  // horná hranica do pásma NEPATRÍ). Nie je to pole formulára — je to vlastnosť
+  // pásma, ktorú by zber inak zahodil a dve pásma by sa začali prekrývať.
+  // Nesie ju `data-mx` na riadku a hovorí o nej tooltip hornej hranice.
+  function rdLiftMxAttr(row){
+    return (row && row.max_exclusive === true) ? ' data-mx="1"' : '';
+  }
+  function rdLiftMxTitle(row){
+    return (row && row.max_exclusive === true)
+      ? 'Horná hranica do pásma NEPATRÍ (spojité pásmo — hodnota už patrí ďalšiemu).'
+      : 'Horná hranica do pásma patrí.';
+  }
+  function rdLiftDel(action, title){
+    return '<button class="ghostbtn bdel" title="' + rdEsc(title) + '" onclick="' + action +
+      '(this)">✕</button>';
+  }
+
+  // HTML editora. ČISTÁ funkcia (Node test) — stav otvorenia chodí z modulu.
+  function rdLiftHtml(r, i){
+    var open = RD_LIFT_OPEN[rdLiftKey(r, i)] === true;
+    var h = '<details class="rlift" data-rid="' + rdEsc(rdLiftKey(r, i)) + '"' + (open ? ' open' : '') +
+      ' ontoggle="rdLiftToggle(this)">' +
+      '<summary>Výklopy AVENTOS <span class="rgsum">' + rdEsc(rdLiftSummary(r)) + '</span></summary>' +
+      '<div class="rgbody">' +
+      '<div class="rrow"><label>Rezerva na úchytku</label>' +
+      rdLiftNumInput('lallow', r && r.handle_allowance_kg,
+                     'Pripočíta sa k hmotnosti čela pri OBOCH systémoch (Blum ráta s úchytkou).') +
+      '<span class="unit">kg</span></div>' +
+      '<div class="rrow"><label>Druhá tyč od šírky</label>' +
+      rdLiftNumInput('lrod', r && r.rod_double_from_kb_mm,
+                     'Od tejto šírky korpusu ide 2× stabilizačná tyč + predlžovací diel. Prázdne = vždy jedna.') +
+      '<span class="unit">mm</span></div>';
+    // --- HK top: triedy podla LF -------------------------------------------
+    h += '<div class="lfgrp"><div class="lfgrph">HK top — triedy podľa LF</div>';
+    rdArr(r && r.classes).forEach(function(c, ci){
+      h += '<div class="rrow lfrow lcls" data-ci="' + ci + '">' + rdLiftCodeInput(c && c.code) +
+        '<label>LF</label>' + rdLiftNumInput('lmin', c && c.min, 'LF od (vrátane)') +
+        '<span class="arrow">–</span>' + rdLiftNumInput('lmax', c && c.max, 'LF do (vrátane)') +
+        rdLiftDel('rdDelLiftClass', 'Odstrániť triedu') + '</div>';
+    });
+    h += '<div class="btnrow"><button class="ghostbtn" onclick="rdAddLiftClass(this)">' +
+      '+ trieda</button></div></div>';
+    // --- HL top: mechanizmy podla KH ---------------------------------------
+    h += '<div class="lfgrp"><div class="lfgrph">HL top — mechanizmy podľa výšky korpusu</div>';
+    rdArr(r && r.mechanisms).forEach(function(m, mi){
+      h += '<div class="rrow lfrow lmech" data-mi="' + mi + '"' + rdLiftMxAttr(m) + '>' +
+        rdLiftCodeInput(m && m.code) + '<label>výška do</label>' +
+        rdLiftNumInput('lmmax', m && m.max, rdLiftMxTitle(m)) + '<span class="unit">mm</span>' +
+        rdLiftDel('rdDelLiftMech', 'Odstrániť mechanizmus') + '</div>';
+    });
+    h += '<div class="btnrow"><button class="ghostbtn" onclick="rdAddLiftMech(this)">' +
+      '+ mechanizmus</button></div></div>';
+    // --- HL top: ramena ----------------------------------------------------
+    h += '<div class="lfgrp"><div class="lfgrph">HL top — ramená podľa výšky a hmotnosti</div>';
+    rdArr(r && r.arms).forEach(function(a, ai){
+      h += '<div class="rrow lfrow larm" data-ai="' + ai + '"' + rdLiftMxAttr(a) + '>' +
+        rdLiftCodeInput(a && a.code) + '<label>výška</label>' +
+        rdLiftNumInput('lkhmin', a && a.kh_min, 'Výška korpusu od (vrátane)') +
+        '<span class="arrow">–</span>' +
+        rdLiftNumInput('lkhmax', a && a.kh_max, rdLiftMxTitle(a)) + '<span class="unit">mm</span>' +
+        '<label>hmotnosť</label>' + rdLiftNumInput('lkgmin', a && a.kg_min, 'Hmotnosť od (vrátane)') +
+        '<span class="arrow">–</span>' +
+        rdLiftNumInput('lkgmax', a && a.kg_max, 'Hmotnosť do (vrátane)') + '<span class="unit">kg</span>' +
+        rdLiftDel('rdDelLiftArm', 'Odstrániť ramená') + '</div>';
+    });
+    h += '<div class="btnrow"><button class="ghostbtn" onclick="rdAddLiftArm(this)">' +
+      '+ ramená</button></div></div>';
+    // --- sposobilost per system --------------------------------------------
+    var el = (r && r.eligibility && typeof r.eligibility === 'object') ? r.eligibility : {};
+    h += '<div class="lfgrp"><div class="lfgrph">Kedy sa systém dá použiť</div>';
+    RD_LIFT_SYSTEMS.forEach(function(sys){
+      var rec = (el[sys[0]] && typeof el[sys[0]] === 'object') ? el[sys[0]] : {};
+      h += '<div class="rrow lfrow lelig" data-sys="' + rdEsc(sys[0]) + '"><label>' +
+        rdEsc(sys[1]) + '</label>';
+      RD_LIFT_ELIG.forEach(function(f){
+        h += '<span class="lfsub">' + rdEsc(f[1]) + '</span>' +
+          rdLiftNumInput('le_' + f[0], rec[f[0]], null) + '<span class="unit">' + f[2] + '</span>';
+      });
+      h += '</div>';
+    });
+    h += '</div>';
+    // Codex #334 kolo 2 (P2): hint TVRDIL, že po uložení treba skrinky prestaviť
+    // ručne — ale uloženie pravidiel v Štúdiu prestavuje VŠETKY skrinky samo
+    // (`RulesDialog.handle_save` -> `CabinetBuilder.rebuild_many`, jeden krok
+    // Späť) a status hlási ich počet. Výzva na ďalšiu prestavbu posielala
+    // človeka robiť prácu, ktorá je už hotová, a spochybňovala, či sa zmena
+    // vôbec prejavila. To isté hovorí aj tlačidlo lišty („Uložiť a prestavať
+    // skrinky") — dve vety o tom istom kroku si protirečiť nesmú.
+    return h + '<div class="hint">Prázdne pole = kritérium sa nepoužije. Pásma sa nemusia písať ' +
+      'v poradí — server ich zoradí sám. Uloženie prestaví všetky skrinky, ' +
+      'takže nové hodnoty platia hneď.</div></div></details>';
+  }
+
+  // Zbalenie bloku = formulár zmizne z očí a hovoriť zaň začne SÚHRN v lište.
+  // Hodnoty žijú LEN v DOM, preto sa najprv preberú TÝM ISTÝM zberom ako pri
+  // ukladaní (vzor `rdGuardRefresh` z F2). PREKRESLIŤ sa NESMIE — `rdRender` by
+  // zahodil `<details>`, nad ktorým práve beží udalosť.
+  function rdLiftRefresh(det){
+    var host = det.closest ? det.closest('.rrule') : null;
+    var sum = det.querySelector ? det.querySelector('.rgsum') : null;
+    if (!host || !sum) return;
+    var i = parseInt(host.dataset ? host.dataset.i : '', 10);
+    rdSyncFromForm();
+    var r = RD_RULES[i];
+    if (r) sum.textContent = rdLiftSummary(r);
+  }
+  function rdLiftToggle(det){
+    if (!det) return;
+    var open = (typeof det.open === 'boolean')
+      ? det.open
+      : !!(det.hasAttribute && det.hasAttribute('open'));
+    RD_LIFT_OPEN[String(det.dataset ? (det.dataset.rid || '') : '')] = open;
+    if (!open) rdLiftRefresh(det);
+  }
+  if (typeof window !== 'undefined') window.rdLiftToggle = rdLiftToggle;
 
   function rdRuleTitle(r){
     var base = rdLabel(r && r.output);
@@ -506,10 +658,9 @@
         html += '<div class="hint">Vyberie sa najväčšia dĺžka z radu, ktorá sa zmestí do svetlej hĺbky mínus rezerva.'
               + (rdIsLegacySlide(r) ? ' ' + rdEsc(RD_LEGACY_SLIDE_HINT) : '') + '</div>';
       } else if (r.kind === 'lift_class'){
-        // KOV-E1b: výklopy sú zatiaľ LEN NA ČÍTANIE — editor (triedy, ramená,
-        // eligibility) prinesie E2. Súhrn ale musí byť: pravidlo, ktoré sa
-        // nedá ani prečítať, vyzerá ako chyba, ktorú niekto zabudol zmazať.
-        html += '<div class="hint">' + rdEsc(rdLiftSummary(r)) + '</div>';
+        // KOV-E2: výklopy majú EDITOR (skaláre, tri tabuľky, spôsobilosť) —
+        // zbalený blok so súhrnom v lište, presne ako door guardy z F2.
+        html += rdLiftHtml(r, i);
       } else if (r.kind === 'part_flag_length'){
         // D-90: pravidlo bez nastavení — reaguje na príznak profilu na čele.
         // TEST-1: text sa líši podľa roly (dvierka vs. zásuvkové čelo).
@@ -623,6 +774,111 @@
     if (fin && fin.checked) r.finite = true; else delete r.finite;
   }
 
+  // ============ KOV-E2: PRIDANIE/ODOBRANIE riadku výklopového pravidla =======
+  //
+  // Rovnaký postup ako pri pásmach závesov: najprv `rdSyncFromForm` (inak by
+  // prekreslenie zahodilo rozpísané hodnoty ostatných pravidiel), potom zmena
+  // a render. Nový riadok je PRÁZDNY — server aj klient ho zahodia, kým ho
+  // používateľ nevyplní (`rdLiftRows` / `HardwareRules.lift_row?`), takže
+  // „+ trieda" nikdy nevyrobí pásmo, ktoré by niečo pokrývalo omylom.
+  function rdLiftList(btn, key){
+    var i = parseInt(rdRuleNode(btn).dataset.i, 10);
+    rdSyncFromForm();
+    var r = RD_RULES[i];
+    if (!Array.isArray(r[key])) r[key] = [];
+    return r[key];
+  }
+  function rdLiftDrop(btn, key, sel, attr){
+    var i = parseInt(rdRuleNode(btn).dataset.i, 10);
+    var row = btn.closest(sel);
+    var at = row ? parseInt(row.dataset[attr], 10) : -1;
+    rdSyncFromForm();
+    var list = RD_RULES[i][key];
+    if (Array.isArray(list) && at >= 0) list.splice(at, 1);
+    rdRender();
+  }
+  function rdAddLiftClass(btn){ rdLiftList(btn, 'classes').push({ code: '', min: null, max: null }); rdRender(); }
+  function rdDelLiftClass(btn){ rdLiftDrop(btn, 'classes', '.lcls', 'ci'); }
+  function rdAddLiftMech(btn){ rdLiftList(btn, 'mechanisms').push({ code: '', max: null }); rdRender(); }
+  function rdDelLiftMech(btn){ rdLiftDrop(btn, 'mechanisms', '.lmech', 'mi'); }
+  function rdAddLiftArm(btn){
+    rdLiftList(btn, 'arms').push({ code: '', kh_min: null, kh_max: null,
+                                   kg_min: null, kg_max: null });
+    rdRender();
+  }
+  function rdDelLiftArm(btn){ rdLiftDrop(btn, 'arms', '.larm', 'ai'); }
+  if (typeof window !== 'undefined'){
+    window.rdAddLiftClass = rdAddLiftClass; window.rdDelLiftClass = rdDelLiftClass;
+    window.rdAddLiftMech = rdAddLiftMech;   window.rdDelLiftMech = rdDelLiftMech;
+    window.rdAddLiftArm = rdAddLiftArm;     window.rdDelLiftArm = rdDelLiftArm;
+  }
+
+  // Hodnota číselného poľa editora výklopu: prázdne pole = `null` (server ho
+  // v tabuľke ZAHODÍ ako neúplný riadok, v skalári ho odstráni ako vypnuté
+  // kritérium). NIKDY sa nehádže nula — „rezerva 0 kg" a „rezerva nie je" sú
+  // dve rôzne veci a obe sú legitímne.
+  function rdLiftVal(box, cls){
+    var el = box.querySelector('.' + cls);
+    if (!el) return null;
+    var v = parseFloat(el.value);
+    return isNaN(v) ? null : v;
+  }
+  function rdLiftText(box, cls){
+    var el = box.querySelector('.' + cls);
+    return el ? String(el.value == null ? '' : el.value).trim() : '';
+  }
+  // Zber editora výklopu do KÓPIE pravidla. Kľúč, ktorý používateľ vyprázdnil,
+  // sa NEZAPÍŠE (vzor „prázdne pole = kritérium vypnuté" z F2); tabuľky idú
+  // celé, aj s nedopísanými riadkami — obe strany ich zahadzujú ROVNAKO
+  // (`rdLiftRows` / `lift_row?`), takže tvar „klient pošle, server ticho zahodí"
+  // tu nevzniká.
+  function rdCollectLift(ruleEl, r){
+    var box = ruleEl.querySelector('.rlift');
+    if (!box) return; // blok sa nekreslí -> kľúčov pravidla sa nedotýkame
+    var allow = rdLiftVal(box, 'lallow');
+    if (allow === null) delete r.handle_allowance_kg; else r.handle_allowance_kg = allow;
+    var rod = rdLiftVal(box, 'lrod');
+    if (rod === null) delete r.rod_double_from_kb_mm; else r.rod_double_from_kb_mm = rod;
+    var classes = [];
+    box.querySelectorAll('.lcls').forEach(function(row){
+      classes.push({ code: rdLiftText(row, 'lfcode'), min: rdLiftVal(row, 'lmin'),
+                     max: rdLiftVal(row, 'lmax') });
+    });
+    r.classes = classes;
+    var mechs = [];
+    box.querySelectorAll('.lmech').forEach(function(row){
+      var m = { code: rdLiftText(row, 'lfcode'), max: rdLiftVal(row, 'lmmax') };
+      // BEZSTRATOVO: `max_exclusive` nie je pole formulára, ale vlastnosť pásma.
+      if (row.dataset && row.dataset.mx === '1') m.max_exclusive = true;
+      mechs.push(m);
+    });
+    r.mechanisms = mechs;
+    var arms = [];
+    box.querySelectorAll('.larm').forEach(function(row){
+      var a = { code: rdLiftText(row, 'lfcode'), kh_min: rdLiftVal(row, 'lkhmin'),
+                kh_max: rdLiftVal(row, 'lkhmax'), kg_min: rdLiftVal(row, 'lkgmin'),
+                kg_max: rdLiftVal(row, 'lkgmax') };
+      if (row.dataset && row.dataset.mx === '1') a.max_exclusive = true;
+      arms.push(a);
+    });
+    r.arms = arms;
+    var elig = {};
+    box.querySelectorAll('.lelig').forEach(function(row){
+      var sys = row.dataset ? row.dataset.sys : '';
+      if (!sys) return;
+      var rec = {}, any = false;
+      RD_LIFT_ELIG.forEach(function(f){
+        var v = rdLiftVal(row, 'le_' + f[0]);
+        // Server drží LEN kladné hodnoty (`normalize_lift_eligibility`) —
+        // klient posiela to isté, aby sa tvary nerozišli.
+        if (v === null || !(v > 0)) return;
+        rec[f[0]] = v; any = true;
+      });
+      if (any) elig[sys] = rec;
+    });
+    r.eligibility = elig;
+  }
+
   function rdCollectBands(ruleEl){
     var out = [];
     ruleEl.querySelectorAll('.rband').forEach(function(row){
@@ -654,6 +910,7 @@
         var c = parseFloat(ruleEl.querySelector('.rclr').value);
         r.clearance = isNaN(c) ? 10 : Math.max(0, c);
       }
+      if (r.kind === 'lift_class') rdCollectLift(ruleEl, r); // KOV-E2
       out.push(r);
     });
     return out;
@@ -709,14 +966,57 @@
   // pokazených skalároch naraz obe strany menujú TEN ISTÝ.
   var RD_LIFT_SCALARS = [['handle_allowance_kg', 'rezerva na úchytku'],
                          ['rod_double_from_kb_mm', 'šírka pre druhú stabilizačnú tyč']];
+  // Riadok, ktorý PLATÍ: neprázdny kód + všetky menované bunky ako konečné
+  // čísla (zrkadlo serverovej `lift_row?`). Jediná definícia pre obe použitia
+  // — filter tabuliek aj kontrolu nedopísaného riadku.
+  function rdLiftRowFull(row, keys){
+    if (!row || typeof row !== 'object') return false;
+    if (String(row.code == null ? '' : row.code).trim() === '') return false;
+    return keys.every(function(k){ return rdLiftNum(row[k]) !== null; });
+  }
   function rdLiftRows(raw, keys){
-    return rdArr(raw).filter(function(row){
-      if (!row || String(row.code == null ? '' : row.code).trim() === '') return false;
-      return keys.every(function(k){ return rdLiftNum(row[k]) !== null; });
-    });
+    return rdArr(raw).filter(function(row){ return rdLiftRowFull(row, keys); });
+  }
+  // Tabuľky výklopu + ĽUDSKÝ názov do hlášky a bunky, ktoré riadok potrebuje.
+  // Zrkadlo serverovej `HardwareRules::LIFT_TABLES` vrátane PORADIA (pri dvoch
+  // pokazených tabuľkách naraz obe strany menujú TÚ ISTÚ).
+  var RD_LIFT_TABLES = [['classes', 'tried HK top', ['min', 'max']],
+                        ['mechanisms', 'mechanizmov HL top', ['max']],
+                        ['arms', 'ramien HL top', ['kh_min', 'kh_max', 'kg_min', 'kg_max']]];
+  // KOV-E2 (Codex #334 kolo 1 P2): NEDOPÍSANÝ riadok. Kto pridá riadok a vyplní
+  // len kód (alebo len jednu hranicu), poslal by ho na server, ktorý ho pri
+  // normalizácii ZAHODÍ — a po prestavbe by riadok bez slova zmizol. ÚPLNE
+  // prázdny riadok je naopak pohodlie editora (pridám, rozmyslím si to)
+  // a zahadzuje sa mlčky. Server hovorí to isté (`lift_input_problems`).
+  function rdLiftPartialProblem(name, r){
+    for (var t = 0; t < RD_LIFT_TABLES.length; t++){
+      var key = RD_LIFT_TABLES[t][0], human = RD_LIFT_TABLES[t][1], cells = RD_LIFT_TABLES[t][2];
+      var rows = rdArr(r[key]);
+      for (var i = 0; i < rows.length; i++){
+        var row = rows[i];
+        if (!row || typeof row !== 'object') continue;
+        if (rdLiftRowFull(row, cells)) continue;
+        var code = String(row.code == null ? '' : row.code).trim();
+        var filled = code !== '' || rdLiftAnyCell(row, cells);
+        if (!filled) continue;
+        return name + ': riadok' + (code ? ' „' + code + '“' : '') + ' v tabuľke ' + human
+             + ' je nedopísaný — doplň kód aj všetky hodnoty, alebo riadok odober.';
+      }
+    }
+    return null;
+  }
+  function rdLiftAnyCell(row, keys){
+    for (var i = 0; i < keys.length; i++){
+      if (rdLiftNum(row[keys[i]]) !== null) return true;
+    }
+    return false;
   }
   function rdLiftProblem(r){
     var name = 'Pravidlo „' + rdLabel(r.output) + '“';
+    // Nedopísaný riadok sa pýta ako PRVÝ — inak by ho prekryla veta o prázdnej
+    // tabuľke (riadok sa do nej nepočíta) a používateľ by hľadal inú chybu.
+    var partial = rdLiftPartialProblem(name, r);
+    if (partial) return partial;
     var classes = rdLiftRows(r.classes, ['min', 'max']);
     var mechs   = rdLiftRows(r.mechanisms, ['max']);
     var arms    = rdLiftRows(r.arms, ['kh_min', 'kh_max', 'kg_min', 'kg_max']);
@@ -749,7 +1049,46 @@
         && r.handle_allowance_kg < 0){
       return name + ': rezerva na úchytku nesmie byť záporná.';
     }
+    // KOV-E2 (Codex #334 kolo 1 P2): NEKLADNÝ prah druhej tyče — `lift_rod_count`
+    // žiada kladné číslo, takže zápornú hodnotu AJ nulu zahodí („druhá tyč
+    // nikdy"), kým súhrn v lište by písal „tyč od 0 mm" („druhá tyč vždy").
+    // „Žiadne zdvojenie" sa hovorí PRÁZDNYM poľom, nie nulou.
+    if (Object.prototype.hasOwnProperty.call(r, 'rod_double_from_kb_mm')
+        && !(r.rod_double_from_kb_mm > 0)){
+      return name + ': šírka pre druhú stabilizačnú tyč musí byť kladná — '
+           + 'prázdne pole znamená „druhá tyč sa nepridáva nikdy“.';
+    }
+    // KOV-E2: ZÁPORNÁ hodnota v tabuľke (rozmery, sily aj hmotnosti sú kladné).
+    var neg = rdLiftNegative(classes, ['min', 'max'])
+           || rdLiftNegative(mechs, ['max'])
+           || rdLiftNegative(arms, ['kh_min', 'kh_max', 'kg_min', 'kg_max']);
+    if (neg) return name + ': riadok ' + neg + ' má zápornú hodnotu — rozmery aj hmotnosti sú kladné.';
+    var elig = rdLiftEligProblem(name, r.eligibility);
+    if (elig) return elig;
     return rdLiftGapProblem(name, arms);
+  }
+  function rdLiftNegative(rows, keys){
+    for (var i = 0; i < rows.length; i++){
+      for (var k = 0; k < keys.length; k++){
+        if (rows[i][keys[k]] < 0) return String(rows[i].code);
+      }
+    }
+    return null;
+  }
+  // KOV-E2: spôsobilosť s OBRÁTENÝM rozsahom výšky — taký systém by nebol
+  // použiteľný nikdy (každé čelo RED) a nikto by nevedel prečo. Zrkadlo
+  // serverovej `lift_eligibility_problem` vrátane PORADIA systémov.
+  var RD_LIFT_SYSTEMS = [['hk_top', 'HK top'], ['hl_top', 'HL top']];
+  function rdLiftEligProblem(name, raw){
+    if (!raw || typeof raw !== 'object') return null;
+    for (var i = 0; i < RD_LIFT_SYSTEMS.length; i++){
+      var rec = raw[RD_LIFT_SYSTEMS[i][0]];
+      if (!rec || typeof rec !== 'object') continue;
+      var lo = rdLiftNum(rec.kh_min), hi = rdLiftNum(rec.kh_max);
+      if (lo === null || hi === null || lo <= hi) continue;
+      return name + ': spôsobilosť ' + RD_LIFT_SYSTEMS[i][1] + ' má výšku od väčšiu než do.';
+    }
+    return null;
   }
   // DIERA medzi pásmami ramien: ďalšie pásmo sa musí začínať najneskôr tam,
   // kde predošlé končí — výška v diere by nedostala žiadne ramená.
@@ -992,6 +1331,23 @@
                        rdGuardHtml: rdGuardHtml, rdCollectGuards: rdCollectGuards,
                        rdAddWeight: rdAddWeight, rdDelWeight: rdDelWeight,
                        rdGuardToggle: rdGuardToggle, RD_GUARD_KEYS: RD_GUARD_KEYS,
+                       // KOV-E2: editor pravidla výklopov. `rdLiftHtml`/`rdLiftSummary`
+                       // sú čisté funkcie; `rdCollectLift` + tlačidlá riadkov
+                       // potrebujú DOM a exportujú sa ZÁMERNE — „prázdne pole =
+                       // kritérium preč", „`max_exclusive` prežije zber" a
+                       // „pridanie riadku nezhodí rozpísané hodnoty" sa inak
+                       // overiť nedá.
+                       rdLiftSummary: rdLiftSummary, rdLiftHtml: rdLiftHtml,
+                       rdCollectLift: rdCollectLift, rdLiftToggle: rdLiftToggle,
+                       rdAddLiftClass: rdAddLiftClass, rdDelLiftClass: rdDelLiftClass,
+                       rdAddLiftMech: rdAddLiftMech, rdDelLiftMech: rdDelLiftMech,
+                       rdAddLiftArm: rdAddLiftArm, rdDelLiftArm: rdDelLiftArm,
+                       RD_LIFT_KEYS: RD_LIFT_KEYS, RD_LIFT_ELIG: RD_LIFT_ELIG,
+                       rdLiftProblem: rdLiftProblem,
+                       // Codex #334 kolo 1 P2: tabuľky výklopu ako DÁTA —
+                       // sada porovnáva zoznam so serverovým `LIFT_TABLES`
+                       // (inak by sa zrkadlo rozišlo bez toho, aby to padlo).
+                       RD_LIFT_TABLES: RD_LIFT_TABLES,
                        // ŠT-3b-2a: read-only bloky — `rdOvrHtml`/`rdAbsRulesHtml` su
                        // ciste funkcie (kontrola escapovania a stropu zoznamu),
                        // `rdRenderExtra` + `rdSelectOverride` potrebuju DOM a

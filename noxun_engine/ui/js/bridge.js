@@ -502,6 +502,12 @@
           typeof refreshFrontDrawer === 'function'){
         refreshFrontDrawer(d.front_drawer);
       }
+      // KOV-E2: to isté pre riadok VÝKLOPU — rozklik „Technický detail" nesie
+      // názov setu a kódy, ktoré tento push mení (výber tmavého setu).
+      if (d.front_lift && typeof d.front_lift === 'object' &&
+          typeof refreshFrontLift === 'function'){
+        refreshFrontLift(d.front_lift);
+      }
     },
     // KOV-H2: výsledok hľadania v katalógu pre modal ručnej položky. Odpoveď
     // nesie generáciu dotazu — staršie kolo sa zahadzuje v `hardware.js`.
@@ -577,6 +583,8 @@
       // KOV-C2c: riadok zasuvky karty cela — TEN ISTY push, vlastny kluc.
       // Stary payload bez kluca = mapa je prazdna a karta riadok nekresli.
       frontDrawer = c.front_drawer || {};
+      // KOV-E2: riadok vyklopu karty cela — TEN ISTY push, vlastny kluc.
+      frontLift = c.front_lift || {};
       // D-07 Codex B2: echo apply toho isteho korpusu s dalsimi cakajucimi editmi
       // nesmie prepisat gap polia (selectedCabId sa meni az nizsie v setSelected).
       // D-22: pod tym istym guardom je aj zamok presahov (edge_limit_off) —
@@ -657,6 +665,7 @@
       if (typeof absModalCloseSilent === 'function') absModalCloseSilent();
       setSelected(null);
       activeZoneId = null; frontItems = null; frontSlots = null; frontDrawer = null; hwItems = null;
+      frontLift = null; // KOV-E2: bez oznaceneho korpusu niet vyklopu, o ktorom by server hovoril
       // KOV-H2 (Codex #285 P1): odchod z korpusu (doska alebo prazdny vyber) je
       // ZMENA IDENTITY — otvoreny modal by odoslal zoznam skrinky, ktora uz nie
       // je oznacena.
@@ -689,6 +698,7 @@
       // vnutri setUiMode) nesmie bezat nad zvyskami stareho vyberu.
       setSelected(null);
       activeZoneId = null; frontItems = null; frontSlots = null; frontDrawer = null; hwItems = null;
+      frontLift = null; // KOV-E2: bez oznaceneho korpusu niet vyklopu, o ktorom by server hovoril
       // KOV-H2 (Codex #285 P1): odchod z korpusu (doska alebo prazdny vyber) je
       // ZMENA IDENTITY — otvoreny modal by odoslal zoznam skrinky, ktora uz nie
       // je oznacena.
