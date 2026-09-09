@@ -704,6 +704,11 @@
   // rozsahom server ZAHODÍ, takže ho nesmieme počítať ani tu).
   // Spoločný kontrakt = `tests/fixtures/rules_validation_parity.json`.
   function rdLiftNum(v){ return (typeof v === 'number' && isFinite(v)) ? v : null; }
+  // Zrkadlo serverovej mapy `HardwareRules::LIFT_SCALARS` — kľúč + ĽUDSKÝ
+  // názov do hlášky. Poradie je to isté ako na serveri, takže pri dvoch
+  // pokazených skalároch naraz obe strany menujú TEN ISTÝ.
+  var RD_LIFT_SCALARS = [['handle_allowance_kg', 'rezerva na úchytku'],
+                         ['rod_double_from_kb_mm', 'šírka pre druhú stabilizačnú tyč']];
   function rdLiftRows(raw, keys){
     return rdArr(raw).filter(function(row){
       if (!row || String(row.code == null ? '' : row.code).trim() === '') return false;
@@ -728,8 +733,20 @@
         return name + ': ramená ' + arms[j].code + ' majú od väčšie než do.';
       }
     }
+    // Codex #333 kolo 3 P2: NEČÍSELNÝ skalár (poškodený alebo cudzí snapshot)
+    // musí padnúť aj TU. Server ho normalizáciou nechá ako `null` a `lift_problem`
+    // ho odmietne — klient ho predtým bral cez `|| 0` ako nulu (rezerva ticho
+    // zmizla) a prah tyče netypoval vôbec, takže Save prešiel a server ho
+    // zamietol nad pravidlom, ktoré sa v tejto obrazovke needituje.
+    for (var s = 0; s < RD_LIFT_SCALARS.length; s++){
+      var key = RD_LIFT_SCALARS[s][0];
+      if (Object.prototype.hasOwnProperty.call(r, key) && rdLiftNum(r[key]) === null){
+        return name + ': ' + RD_LIFT_SCALARS[s][1] + ' musí byť číslo.';
+      }
+    }
+    // Za predošlou slučkou je hodnota (ak kľúč je) ISTOTNE konečné číslo.
     if (Object.prototype.hasOwnProperty.call(r, 'handle_allowance_kg')
-        && (rdLiftNum(r.handle_allowance_kg) || 0) < 0){
+        && r.handle_allowance_kg < 0){
       return name + ': rezerva na úchytku nesmie byť záporná.';
     }
     return rdLiftGapProblem(name, arms);

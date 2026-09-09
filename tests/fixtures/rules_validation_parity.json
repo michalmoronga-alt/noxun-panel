@@ -21,7 +21,12 @@
     "pravidla naraz — takze pokazena tabulka z cudzieho/starsieho snapshotu musi",
     "padnut na klientovi rovnako ako na serveri. Riadok BEZ kodu alebo s necislenym",
     "rozsahom je tu ZAMERNE: `normalize_rules` ho ZAHODI, takze obe strany ho musia",
-    "prestat pocitat rovnako (inak by tabulka bola „plna\" len na jednej strane)."
+    "prestat pocitat rovnako (inak by tabulka bola „plna\" len na jednej strane).",
+    "KOV-E1b (Codex #333 kolo 3 P2): a to iste plati pre SKALARY pravidla",
+    "(`handle_allowance_kg`, `rod_double_from_kb_mm`). Neciselnu hodnotu",
+    "`normalize_lift_scalar!` NEZAHADZUJE — kluc ostava pritomny s `null`, aby",
+    "o nom brana povedala. Klient ju preto musi odmietnut rovnako; predtym ju",
+    "bral cez `|| 0` ako nulovu rezervu a prah tyce netypoval vobec."
   ],
   "cases": [
     {
@@ -285,6 +290,33 @@
       "invalid": true,
       "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": true,
                   "handle_allowance_kg": -0.5,
+                  "classes": [{ "code": "22K2300", "min": 420.0, "max": 1610.0 }],
+                  "mechanisms": [{ "code": "22L2500", "max": 580.0 }],
+                  "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": 1.5, "kg_max": 9.0 }] }]
+    },
+    {
+      "name": "KOV-E1b: NEČÍSELNÁ rezerva na úchytku (normalizácia ju necháva ako `null`)",
+      "invalid": true,
+      "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": true,
+                  "handle_allowance_kg": null,
+                  "classes": [{ "code": "22K2300", "min": 420.0, "max": 1610.0 }],
+                  "mechanisms": [{ "code": "22L2500", "max": 580.0 }],
+                  "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": 1.5, "kg_max": 9.0 }] }]
+    },
+    {
+      "name": "KOV-E1b: rezerva ako OBJEKT (cudzí/pokazený snapshot) — nie nula",
+      "invalid": true,
+      "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": true,
+                  "handle_allowance_kg": {},
+                  "classes": [{ "code": "22K2300", "min": 420.0, "max": 1610.0 }],
+                  "mechanisms": [{ "code": "22L2500", "max": 580.0 }],
+                  "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": 1.5, "kg_max": 9.0 }] }]
+    },
+    {
+      "name": "KOV-E1b: NEČÍSELNÝ prah druhej stabilizačnej tyče (text namiesto čísla)",
+      "invalid": true,
+      "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": true,
+                  "rod_double_from_kb_mm": "1100",
                   "classes": [{ "code": "22K2300", "min": 420.0, "max": 1610.0 }],
                   "mechanisms": [{ "code": "22L2500", "max": 580.0 }],
                   "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": 1.5, "kg_max": 9.0 }] }]
