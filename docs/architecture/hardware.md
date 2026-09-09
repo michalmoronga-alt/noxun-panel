@@ -144,6 +144,16 @@ setu (podklad ORANGE `flap_manual_duplicate`). Ramená, tyče, krytky, Tip-On an
 `{ owner_part_key => { druh => true } }` — číta LEN pamäť a modelový atribút (**žiadne IO**), takže ho zvládne aj zber: `Bom.collect` si kódy vypýta RAZ na zber (vzor
 `rules_stale`) a odovzdá ich do `flap_stale_issue` ([outputs.md](outputs.md)). Katalóg (a s ním „živý zdroj, ktorý sa mohol zmeniť") už v tejto ceste nefiguruje.
 
+**ALE ZLIATIE KÓDOV SA PÝTA ÚČINNÉHO SETU — `HardwareSets.flap_emitted_codes` (Codex #333 kolo 3 P2).** `flap_set_codes` odpovedá za **všetky** výklopové a závesové sety
+(seed aj snapshot), takže ako podklad ORANGE `flap_manual_duplicate` klamal: HK čelo s ručne pridanou **HL stabilizačnou tyčou** (507365) dostávalo varovanie „nákup to
+spočíta", hoci jeho HK set taký kód nikdy nevydá. `flap_emitted_codes(hardware_items, state, overrides:)` preto ide **tou istou cestou ako `expand`** a vráti
+`{ owner_part_key => { 'lift'|'hinge' => { kód => true } } }`: účinný set podľa precedencie (`resolve_set_id` — owner override > triedny override skrinky > triedny kľúč
+projektu) a jeho brány (`generic_type` setu, `set_incompatible_info`, `length_unsupported?`), potom **rozlíšenie členov podľa parametrov položky** — `code_by_param`
+(`lift_class` / `arm_class`) dá presne jeden kód a `quantity_from` s nulou (predĺženie tyče pod prahom 1100 mm) znamená, že sa člen **nevydá**. Katalóg netreba (kódy sú
+v sete, parametre v položke) a **IO tiež nie**, takže to zvládne stavba. `overrides` je mapa **jednej** skrinky (`config.hardware_sets`) — položky plánu ešte `owner_id`
+nenesú (dopisuje ho až `Bom.collect`), preto sa použije pre každé `owner_id`. Bez snapshotu setov (nekompatibilná knižnica) je mapa prázdna a varovanie nevznikne —
+správne, taký nákup je celý ORANGE `library_incompatible` a nemá s čím zliať. `flap_set_codes` ostáva tam, kde je otázka iná („je tento kód vôbec mechanizmus?").
+
 **Nečíselný skalár výklopu NEZHODÍ dokument (Codex #333 kolo 2 P2).** `normalize_lift_rule!` prehnal `handle_allowance_kg` a `rod_double_from_kb_mm` cez `to_f` —
 na Hash/Array/`true` (pokazený alebo cudzí snapshot) to **vyhodí výnimku**, `project_rules` ju odchytil, vrátil `nil` a `ensure_project_rules!` potom projektové pravidlá
 **ticho nahradil globálnou knižnicou**. Od kola 2 ich čistí `normalize_lift_scalar!` s tou istou typovou kontrolou ako bunky tabuliek (`lift_row?`): nečíselná hodnota sa
@@ -155,7 +165,9 @@ o probleme povie (`LIFT_SCALARS` → „rezerva na úchytku musí byť číslo")
 (prázdne `classes`/`mechanisms`/`arms`, obrátený rozsah, diera medzi pásmami ramien, **záporná `handle_allowance_kg`** — tá by hmotnosť znížila a vybrala slabší
 mechanizmus) a rovnakým predfiltrom riadkov ako `lift_row?`. Výklop sa v UI zatiaľ needituje, ale sekcia ukladá **všetky** pravidlá naraz, takže bez tejto vetvy by
 klient uloženie pustil, server ho zamietol a read-only tabuľku by nebolo kde opraviť. Vypnutie pokazeného pravidla ostáva možné (`enabled: false` sa nevaliduje).
-Spoločný kontrakt je `tests/fixtures/rules_validation_parity.json` — keď sa kritériá rozídu, padne práve jedna zo sád.
+Spoločný kontrakt je `tests/fixtures/rules_validation_parity.json` — keď sa kritériá rozídu, padne práve jedna zo sád. **Od kola 3 (P2) zrkadlí klient aj typovú
+kontrolu skalárov:** `RD_LIFT_SCALARS` je kópia serverovej mapy `LIFT_SCALARS` a nečíselná hodnota (kľúč, ktorý normalizácia nechala ako `null`) padne rovnako ako na
+serveri. Predtým `rdLiftNum(...) || 0` bral pokazenú rezervu ako **nulu** a prah tyče netypoval vôbec — Save prešiel klientom a server ho zamietol.
 
 
 **KOV-C2b (v0.9.31) — R2 EXKLUZIVITA.** `evaluate(..., suppress_slide_owners:)` dostáva množinu `owner_part_key` čiel, ktoré už majú položku výsuvu **z receptu**, a pravidlá

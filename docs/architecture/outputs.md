@@ -225,6 +225,10 @@ s `use_type: 'door'` (smer `down`). Pravidlá výklopov vtedy neexistovali, tak�
 **Provenienciu tvoria DVE hodnoty a stačí, že jedna je stará** (`Bom.pre_lift_build?`):
 · `config_schema` < `CabinetBuilder::LIFT_ACTIVATION_SCHEMA` (= 11) — skrinka postavená pred E1b;
 · `rules_seed_version` < `HardwareRules::LIFT_SEED_VERSION` (= 5) — stavala sa s pravidlami spred výklopov (chýbajúci kľúč = 0).
+**Oba markery sa čítajú TYPOVO (Codex #333 kolo 3 P2):** `to_i` na Hash/Array/`true` vyhodí `NoMethodError` a `Bom.collect` žiadny rescue nemá, takže jediný ručne
+pokazený (alebo cudzím producentom zapísaný) atribút by zhodil Kontrolu **aj všetky výstupy**. Nepoužiteľná hodnota preto znamená to isté ako chýbajúca: `0`, teda
+najstaršia provenienia → RED a fail-closed stopka. Seed verziu číta `Bom.provenance_marker` (**len `Numeric`**), schému `CabinetBuilder.config_schema_of`
+(`Numeric` **aj číselný string** — R-12 kontrakt: tam je dopredný guard fail-OPEN, takže marker „12" nesmie zhasnúť blokádu novšieho configu).
 Druhá podmienka je nutná preto, že `ensure_project_rules!` **zámerne** vracia starý projektový snapshot (reprodukovateľnosť stavby z .skp): prestavba starej zákazky
 by nevydala nič, ale zapísala by schému 11 — a RED by zhasol práve prestavbou, ktorú sama odporúča. Náprava je „Doplniť nové predvoľby" **+ prestavba** (v tomto poradí).
 Na rozdiel od `hinge_stale` sa nález NEPÝTA na obsah pravidiel: používateľ smie mať vlastné (aj vypnuté) výklopové pravidlo, seed sa mu vtedy nedoplní

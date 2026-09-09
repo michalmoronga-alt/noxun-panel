@@ -232,7 +232,14 @@ neklasifikuje zámerne: nemá katalógový kód, v nákupe je vlastným riadkom 
 s bránami) a ručný riadok ostáva vedľa neho. Ak má pritom rovnaký **kód** ako niektorý člen setu toho druhu, `HardwareSets.add_adhoc_row` ich v nákupe zlepí do jedného
 riadku a množstvá **sčíta** (typicky práve krytky). `build_into` to po pláne priznáva cez **`attach_manual_duplicate_warnings!(plan, cfg, model)`** (vzor
 `attach_rules_state_warning!`: doplní warning a plán sa RE-VALIDUJE): jeden ORANGE na (čelo, kód), len pre rolu `flap` a len keď automat na tom čele naozaj položku
-vydal (`emitted_flap_kinds`). Neopravuje sa to za používateľa — je to vec, o ktorej má vedieť.
+vydal. Neopravuje sa to za používateľa — je to vec, o ktorej má vedieť.
+
+**POROVNÁVA SA S ÚČINNÝM SETOM TOHO ČELA (Codex #333 kolo 3 P2).** Pôvodne sa ručný kód hľadal medzi členmi **všetkých** výklopových a závesových setov
+(`flap_set_codes`), takže HK čelo s ručnou **HL stabilizačnou tyčou** (507365) dostávalo falošné varovanie — jeho HK set taký kód nevydá a nákup nemá čo zliať.
+`emitted_flap_codes(plan, cfg, model)` preto vezme položky kovania na čelách `flap` (`flap_hardware_items`) a nechá si od
+**`HardwareSets.flap_emitted_codes`** ([hardware.md](hardware.md)) povedať, ktoré kódy automat na tom čele NAOZAJ vydá: účinný set podľa precedencie (owner override >
+triedny override skrinky > triedny kľúč projektu) a členovia rozlíšení podľa parametrov položky (`code_by_param lift_class`/`arm_class`, `quantity_from` 0 = člen sa
+nevydá). Override skrinky prichádza z `cfg[:hardware_sets]`, stav setov zo snapshotu projektu — **žiadne IO navyše**.
 
 **ORANGE, KEĎ SA PRAVIDLÁ NEDAJÚ ZMRAZIŤ (Codex #329 kolo 2 P1).** `build_into` po `Construction.build_plan` volá **`attach_rules_state_warning!(plan, model)`**
 (vzor `attach_abs_warnings!`: doplní warning a plán sa RE-VALIDUJE). Warning `hardware_rules_library_incompatible` vznikne LEN v stave, ktorý sa sám neopraví —
