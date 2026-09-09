@@ -57,47 +57,135 @@ NxTest.test('guard: Numeric#mm sa nepouziva mimo units.rb') do
   NxTest.assert(offenders.empty?, "Numeric#mm mimo units.rb (mm<->Length prevadza VYHRADNE Units): #{offenders.join(', ')}")
 end
 
-NxTest.test('guard: ziadna metoda nie je v tom istom module/triede definovana dvakrat (AST)') do
-  # Ruby druhu definiciu ticho prijme a ta VYHRA — prva (aj konstanty, ktore
-  # cita) sa stane mrtvym kodom bez jedineho varovania. Presne to sa stalo
-  # `HardwareSets.incompatible_detail_sk` (fix v0.9.56): `height_selector` sa
-  # nikdy nepreložil a KOV-F1/E1a dopisovali kazdy detail na DVE miesta.
-  # Kontrola ide cez AST, nie regex — rovnake mena v ROZNYCH triedach
-  # (`initialize`, `to_h`) nie su duplicita; vnoreny module/class = vlastny scope.
-  NxTest.skip!('RubyVM::AbstractSyntaxTree nie je k dispozicii') unless defined?(RubyVM::AbstractSyntaxTree)
+# --- duplicitne definicie metod (AST) ----------------------------------------
+#
+# Ruby druhu definiciu ticho prijme a ta VYHRA — prva (aj konstanty, ktore
+# cita) sa stane mrtvym kodom bez jedineho varovania. Presne to sa stalo
+# `HardwareSets.incompatible_detail_sk` (fix v0.9.56): `height_selector` sa
+# nikdy nepreložil a KOV-F1/E1a dopisovali kazdy detail na DVE miesta.
+#
+# Scanner ide cez AST (nie regex) a klucuje PLNOU cestou konstanty + menom
+# metody, takze:
+#   - rovnake mena v ROZNYCH triedach (`initialize`, `to_h`) nie su duplicita,
+#   - znovuotvoreny modul (v tom istom aj v INOM subore) duplicitu neschova —
+#     `module Noxun::Engine::X` a vnorene `module Noxun; module Engine; module X`
+#     su ten isty scope,
+#   - `class << self` a `def self.x` zdielaju singleton scope (`X.x`),
+#   - `def` v tele metody sa neskenuje (lokalna zvlastnost, nie redefinicia),
+#   - `def` v roznych vetvach `if`/`unless`/`case` nie je duplicita (vedoma
+#     podmienena definicia, napr. podla verzie Ruby).
+# Self-test nizsie drzi presne tieto hranice.
+module NxTest
+  module DupDefs
+    module_function
 
-  offenders = []
-  scan = nil
-  scan = lambda do |node, file|
-    return unless node.is_a?(RubyVM::AbstractSyntaxTree::Node)
+    BRANCHING = %i[IF UNLESS CASE CASE2 CASE3 WHEN IN].freeze
 
-    unless %i[MODULE CLASS SCLASS].include?(node.type)
-      node.children.each { |ch| scan.call(ch, file) }
-      return
+    # -> seen: { 'Noxun::Engine::X#y' => ['subor:riadok', …] }; duplicita = >1 zaznam
+    def scan(ast, file, seen = Hash.new { |h, k| h[k] = [] })
+      walk(ast, [], file, seen, nil)
+      seen
     end
-    seen = Hash.new { |h, k| h[k] = [] }
-    collect = nil
-    collect = lambda do |n|
-      return unless n.is_a?(RubyVM::AbstractSyntaxTree::Node)
 
-      case n.type
-      when :DEFN then seen[n.children[0].to_s] << n.first_lineno
-      when :DEFS then seen["self.#{n.children[1]}"] << n.first_lineno
-      when :MODULE, :CLASS, :SCLASS then scan.call(n, file)
-      else n.children.each { |ch| collect.call(ch) }
+    def duplicates(seen)
+      seen.select { |_, where| where.length > 1 }.map { |key, where| "#{key} (#{where.join(', ')})" }
+    end
+
+    def cpath_name(node)
+      return '?' unless node.is_a?(RubyVM::AbstractSyntaxTree::Node)
+
+      # `module M` je (COLON2 nil :M), `module A::B` je (COLON2 (CONST :A) :B),
+      # `module ::M` je (COLON3 :M) — bez rodica sa meno neuvadza s `::`, aby
+      # vnorene moduly a `Noxun::Engine::X` dali ten isty kluc.
+      case node.type
+      when :CONST  then node.children[0].to_s
+      when :COLON2
+        parent = node.children[0]
+        parent ? "#{cpath_name(parent)}::#{node.children[1]}" : node.children[1].to_s
+      when :COLON3 then node.children[0].to_s
+      else '?'
       end
     end
-    collect.call(node.children.last)
-    seen.each do |name, lines|
-      offenders << "#{file}: #{name} (riadky #{lines.join(', ')})" if lines.length > 1
+
+    def walk(node, scope, file, seen, branch)
+      return unless node.is_a?(RubyVM::AbstractSyntaxTree::Node)
+
+      case node.type
+      when :MODULE, :CLASS
+        walk(node.children.last, scope + [cpath_name(node.children[0])], file, seen, nil)
+      when :SCLASS
+        walk(node.children.last, scope + ['self'], file, seen, nil)
+      when :DEFN
+        record(seen, scope, node.children[0].to_s, branch, file, node.first_lineno)
+      when :DEFS
+        record(seen, scope + ['self'], node.children[1].to_s, branch, file, node.first_lineno)
+      when *BRANCHING
+        node.children.each_with_index do |ch, i|
+          walk(ch, scope, file, seen, "#{branch}#{node.first_lineno}/#{i};")
+        end
+      else
+        node.children.each { |ch| walk(ch, scope, file, seen, branch) }
+      end
+    end
+
+    def record(seen, scope, name, branch, file, line)
+      singleton = scope.last == 'self'
+      path = (singleton ? scope[0..-2] : scope).join('::')
+      key = "#{path}#{singleton ? '.' : '#'}#{name}"
+      key += " [vetva #{branch}]" if branch
+      seen[key] << "#{file}:#{line}"
     end
   end
+end
 
+NxTest.test('guard: self-test scannera duplicitnych definicii (hranice AST)') do
+  NxTest.skip!('RubyVM::AbstractSyntaxTree nie je k dispozicii') unless defined?(RubyVM::AbstractSyntaxTree)
+
+  dups = lambda do |*sources|
+    seen = Hash.new { |h, k| h[k] = [] }
+    sources.each_with_index { |src, i| NxTest::DupDefs.scan(RubyVM::AbstractSyntaxTree.parse(src), "f#{i}", seen) }
+    NxTest::DupDefs.duplicates(seen)
+  end
+  # A) `class << self` + rovnomenna instancna metoda = dva rozne scope
+  NxTest.assert_equal([], dups.call("module M\n  class << self\n    def a; end\n  end\n  def a; end\nend\n"))
+  # B) znovuotvoreny modul v tom istom subore = duplicita
+  NxTest.assert_equal(['M#b (f0:2, f0:5)'],
+                      dups.call("module M\n  def b; end\nend\nmodule M\n  def b; end\nend\n"))
+  # B2) …aj v INOM subore, aj cez `Noxun::Engine::X` vs. vnorene moduly
+  NxTest.assert_equal(['Noxun::Engine::X#g (f0:2, f1:4)'],
+                      dups.call("module Noxun::Engine::X\n  def g; end\nend\n",
+                                "module Noxun\n  module Engine\n    module X\n      def g; end\n    end\n  end\nend\n"))
+  # C) rovnake meno v roznych triedach nie je duplicita
+  NxTest.assert_equal([], dups.call("class A\n  def c; end\nend\nclass B\n  def c; end\nend\n"))
+  # D) vedoma podmienena definicia (vetvy `if`) nie je duplicita
+  NxTest.assert_equal([], dups.call("module M\n  if RUBY_VERSION > '3'\n    def d; end\n  else\n    def d; end\n  end\nend\n"))
+  # E) `def self.e` dvakrat = duplicita; H) `class << self` + `def self.h` = ten isty singleton scope
+  NxTest.assert_equal(['M.e (f0:2, f0:3)'], dups.call("module M\n  def self.e; end\n  def self.e; end\nend\n"))
+  NxTest.assert_equal(['M.h (f0:3, f0:5)'],
+                      dups.call("module M\n  class << self\n    def h; end\n  end\n  def self.h; end\nend\n"))
+  # F) `def` v tele metody sa neskenuje
+  NxTest.assert_equal([], dups.call("module M\n  def f\n    def g; end\n  end\n  def g; end\nend\n"))
+end
+
+NxTest.test('guard: ziadna metoda nie je v tom istom module/triede definovana dvakrat (AST, cely plugin)') do
+  NxTest.skip!('RubyVM::AbstractSyntaxTree nie je k dispozicii') unless defined?(RubyVM::AbstractSyntaxTree)
+
+  seen = Hash.new { |h, k| h[k] = [] }
+  broken = []
   files = Dir[File.join(NxTest::ROOT, 'noxun_engine', '**', '*.rb')] +
           [File.join(NxTest::ROOT, 'noxun_engine.rb')]
   files.sort.each do |path|
-    scan.call(RubyVM::AbstractSyntaxTree.parse_file(path), path.sub("#{NxTest::ROOT}/", ''))
+    rel = path.sub("#{NxTest::ROOT}/", '')
+    begin
+      NxTest::DupDefs.scan(RubyVM::AbstractSyntaxTree.parse_file(path), rel, seen)
+    rescue ScriptError => e
+      # SyntaxError je ScriptError, nie StandardError — bez rescue by zhodil
+      # cely runner namiesto jedneho FAIL.
+      broken << "#{rel}: #{e.class}: #{e.message[0, 120]}"
+    end
   end
+  NxTest.assert(broken.empty?, "subor sa neda parsovat: #{broken.join(' | ')}")
+  offenders = NxTest::DupDefs.duplicates(seen)
   NxTest.assert(offenders.empty?,
                 "duplicitna definicia metody v jednom scope (druha ticho vyhrava): #{offenders.join(', ')}")
 end

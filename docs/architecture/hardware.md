@@ -715,8 +715,10 @@ charakterizačný test). Päť častí:
   Kontrola (`Validation`, vrátane RED položiek závesov a výklopov) aj validácia override skrinky (`band_set_problem`); neznámy detail = fallback „iná klasifikácia"
   (`INCOMPATIBLE_DETAIL_FALLBACK_SK`), nikdy vymyslená veta. **Od v0.9.56 má metóda jedinú definíciu** — dovtedy boli v module dve (KOV-C2a tabuľka + inline hash
   z KOV-D1a), Ruby ticho brala druhú, takže tabuľka bola mŕtvy kód, `height_selector` (pevný `set_id` pre zásuvku s výškovým variantom) ostával bez vety „výber setu nie je
-  podľa výšky zásuvky" a KOV-F1/E1a dopisovali každý detail na obe miesta. Duplicitné `def` v jednom module stráži **AST guard** v `tests/pure/test_guards.rb` (sken celého
-  pluginu), úplnosť tabuľky (každý `detail` zo zdrojáku má vetu a naopak, `height_selector` end-to-end) `tests/pure/test_incompatible_detail_sk.rb`.
+  podľa výšky zásuvky" a KOV-F1/E1a dopisovali každý detail na obe miesta. Duplicitné `def` stráži **AST guard** v `tests/pure/test_guards.rb` (`NxTest::DupDefs`): sken celého
+  pluginu s kľúčom **plná cesta modulu + meno metódy**, takže duplicitu neschová ani znovuotvorený modul v inom súbore (`module Noxun::Engine::X` = vnorené moduly), `class << self`
+  a `def self.x` sú jeden singleton scope, `def` v rôznych vetvách `if` nie je duplicita a `def` v tele metódy sa neskenuje — hranice drží vlastný self-test. Úplnosť tabuľky
+  (každý `detail` zo zdrojáku má vetu a naopak, `height_selector` end-to-end) stráži `tests/pure/test_incompatible_detail_sk.rb`.
 
 Testy: `tests/pure/test_kovc2a_kanal_sety.rb` (23 testov + 4 overené mutácie vrátane completeness nad radmi receptov: pre KAŽDÚ bunku `nl_series_by_height`/`nl_series` každého
 vydaného receptu existuje v seede set vybraný triednym kľúčom a v ňom kit kód).

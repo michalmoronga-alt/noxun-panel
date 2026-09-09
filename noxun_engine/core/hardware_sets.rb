@@ -2399,8 +2399,10 @@ module Noxun
           "set „#{sid}“ nevie určiť počet#{member_txt(u)} — chýba údaj „#{u['param']}“"
         when 'set_incompatible'
           # KOV-E1a: rovnaka veta, iny podmet — vyklop nie je zasuvka.
-          what = u['generic_type'].to_s == 'lift' ? 'výklopom' : 'zásuvkou'
-          "set „#{sid}“ nesedí s #{what} (#{incompatible_detail_sk(u['detail'])})"
+          # Vokalizovana predlozka patri k podmetu („so zásuvkou", nie „s
+          # zásuvkou") — Kontrola hovori to iste (`Validation`).
+          what = u['generic_type'].to_s == 'lift' ? 's výklopom' : 'so zásuvkou'
+          "set „#{sid}“ nesedí #{what} (#{incompatible_detail_sk(u['detail'])})"
         when 'mapping_invalid'
           # KOV-D1a: vyber NA TEJTO SKRINKE je poskodeny. NIKDY sa nepouzije
           # predvolba projektu — pouzivatel tu nieco vedome vybral.

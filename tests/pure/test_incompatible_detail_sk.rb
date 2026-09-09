@@ -67,9 +67,12 @@ module NxIncompatDetail
   # Kluce detailu zapisane v zdrojaku ako literal alebo konstanta modulu
   # (`'detail' => 'x'` / `'detail' => KONSTANTA`). Premenna v slucke
   # (`'detail' => k`) sem nepatri — tie kluce kryje R2 behaviorálne.
+  # Riadkove komentare sa vynechaju (priklad v komentari nie je emitovany
+  # detail); literal s medzerou (`'set nevydal žiadnu položku'`, dovod
+  # `members_skipped`) regex zamerne minie — cez preklad neprechadza.
   def source_detail_keys
-    src = File.read(SRC, encoding: 'UTF-8')
-    src.scan(/'detail'\s*=>\s*(?:'([a-z_]+)'|([A-Z][A-Z_]+))/).map do |lit, const|
+    src = File.readlines(SRC, encoding: 'UTF-8').reject { |l| l =~ /\A\s*#/ }.join
+    src.scan(/'detail'\s*=>\s*(?:'([a-z0-9_]+)'|([A-Z][A-Z0-9_]+))/).map do |lit, const|
       lit || HWS.const_get(const)
     end.uniq
   end
