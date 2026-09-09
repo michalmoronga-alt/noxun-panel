@@ -1,5 +1,7 @@
 # KOV-E — Astra audit package v3 (9.9.2026) + reconcile → package v4
 
+> Stav: KONCEPT / audit checkpoint — nie implementačný spec. Autorita dávok = package KOV-E v4 (E1a/E1b/E2) v PLAN.md; táto tabuľka je dôkazový záznam nálezov a reconcile rozhodnutí.
+
 Codex CLI 0.153.4, model `gpt-6-astra`, session `01a084fa-1856-7950-ac1a-ea6eace62152`. Prompt: package v3 (PLAN.md) + seed v2 + kontrakty
 `hardware_rules` / `hardware_sets` / `build_plan` / `cabinet_builder`. Výsledok: **4 BLOCKER · 7 FIX-IN-E1 · 1 NOTE**. Každý nález overený v kóde orchestrátorom (Fable) pred reconcile.
 
