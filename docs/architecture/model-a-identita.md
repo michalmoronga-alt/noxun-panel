@@ -123,7 +123,7 @@ parser inde by sa časom rozišiel; jediný čitateľ je zatiaľ deep-link „kl
 
 ### build_plan.rb
 
-**ZÁVÄZNÝ kontrakt plánu** (SCHEMA 4, MIN_DIM, validátor, `warnings[]`, hardware string-keyed s GENERIC_TYPES/limitmi/referenčnou integritou ownera). Geometria, kusovník aj VEPO
+**ZÁVÄZNÝ kontrakt plánu** (SCHEMA 5 — posledný bump KOV-G1a: nový generický typ `plinth_clip`; MIN_DIM, validátor, `warnings[]`, hardware string-keyed s GENERIC_TYPES/limitmi/referenčnou integritou ownera). Geometria, kusovník aj VEPO
 čítajú TEN ISTÝ plán.
 
 **`GENERIC_TYPES` + `lift` a `SCHEMA` 2 → 3 (KOV-B1, v0.9.19).** Slovník typov kovania dostal `lift` (výklopy a sklopy) — presunuté z KOV-E podľa auditu #17 BLOCKER 2, lebo

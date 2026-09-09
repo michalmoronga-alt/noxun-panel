@@ -509,7 +509,7 @@ brána existuje preto, že odmietnuť ho **raz pri uložení** je lacnejšie ne�
 stavba je reprodukovateľná zo samotného .skp (iné PC, zmeny globálu, kópie skriniek) a undo vracia pravidlá aj geometriu naraz.
 Globálna knižnica `%APPDATA%\NOXUN\Engine\hardware_rules.json` je len default pre nové projekty (so seed-merge novej verzie seedov podľa `rule_id`).
 
-**Položka kovania v pláne** (BuildPlan schema 4, string kľúče kvôli JSON round-trip): `owner_part_key` (nil = korpus; inak musí existovať v parts), `generic_type` (slovník),
+**Položka kovania v pláne** (BuildPlan schema 5 — KOV-G1a pridala generický typ `plinth_clip`; string kľúče kvôli JSON round-trip): `owner_part_key` (nil = korpus; inak musí existovať v parts), `generic_type` (slovník),
 `quantity` (1–999), `rule_id`, `variant_id` (nil vo fáze 1), `production_class: "counted"`, `manufactured: true`, `params` (napr. výška nohy, NL výsuvu),
 `source` (`rule`/`manual`/**`recipe`**), `rule_quantity`. Voliteľne `rule_nominal_length` (viď nižšie) a **`locked`** (viď nižšie).
 
