@@ -578,12 +578,12 @@ NxTest.test('KOV-B1/H2: platne definicie prechadzaju a zmrazuju sa ako doteraz')
   NxTest.assert_equal('Sensys', frozen['series'])
   snap = JSON.parse(m.get_attribute(Noxun::Engine::Store::DICT, hws::MODEL_KEY))
   # KOV-C2a: prvy zapis do prazdneho projektu zmrazi VSETKY globalne predvolby.
-  # D-118b: v seede su Tip-On sety s vyhradenou bunkou `none`, takze snapshot
-  # dostane std 5 (najvyssi marker vyhrava). Podstata testu je nezmenena: obsah,
-  # ktoremu starsia verzia nerozumie, je pre nu `:invalid`, NIKDY ciastocne
-  # precitany.
-  NxTest.assert_equal(hws::STD_SKIP_CODE, snap['std'],
-                      'snapshot so sentinelom dostane std 5 (starsi plugin ho odmietne)')
+  # D-118b: v seede su Tip-On sety s vyhradenou bunkou `none`; KOV-E1a pridala
+  # sety vyklopov (`code_by_param`), takze snapshot dostane std 6 (najvyssi
+  # marker vyhrava). Podstata testu je nezmenena: obsah, ktoremu starsia verzia
+  # nerozumie, je pre nu `:invalid`, NIKDY ciastocne precitany.
+  NxTest.assert_equal(hws::STD_LIFT_FORMS, snap['std'],
+                      'snapshot s novymi tvarmi dostane std 6 (starsi plugin ho odmietne)')
 ensure
   NxH2.wipe_library!
 end
