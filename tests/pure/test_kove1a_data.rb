@@ -457,9 +457,24 @@ NxTest.test('KOV-E1a (3): klasifikovany vyklop BEZ systemu NEPADA na legacy mapo
   NxTest.assert_equal(1, red.length, items.inspect)
   NxTest.assert(red.first['message_sk'].include?('systém'), red.first['message_sk'])
   # To iste plati, ked chyba `opening_mode` — triedny kluc tiez nevznikne.
+  # Interna delta P3: dovody su DVA, takze veta musi menovat OBA — hlaska
+  # „nemá určený systém" by pri chybajucom otvarani posielala opravovat pole,
+  # ktore je v poriadku.
   bez_om = c.item('params' => { 'opening_mode' => '' })
-  NxTest.assert_equal(c::HWS::LIFT_SYSTEM_MISSING,
-                      c::HWS.expand([bez_om], st)['unmapped'].first['base_reason'])
+  om_exp = c::HWS.expand([bez_om], st)
+  NxTest.assert_equal(c::HWS::LIFT_SYSTEM_MISSING, om_exp['unmapped'].first['base_reason'])
+  om_items = []
+  c::V.check_hardware_expansion(om_exp, om_items)
+  om_red = om_items.select { |i| i['severity'] == c::V::RED }
+  NxTest.assert_equal(1, om_red.length, om_items.inspect)
+  NxTest.assert(om_red.first['message_sk'].include?('spôsob otvárania'),
+                om_red.first['message_sk'])
+  # Ta ista veta ide aj do NAKUPU (jedna autorita, dve miesta).
+  nakup = c::HWS.unmapped_reason_sk(om_exp['unmapped'].first)
+  NxTest.assert(nakup.include?('spôsob otvárania') && nakup.include?('systém'), nakup)
+  # A detail sa cita z UCINNEJ mapy — nie „iná klasifikácia".
+  NxTest.assert_equal('výklop nemá určený spôsob otvárania alebo systém (HK top / HL top)',
+                      c::HWS.incompatible_detail_sk(c::HWS::LIFT_SYSTEM_MISSING))
   # GOLDEN: LEGACY vyklop (bez `params.use_type`) sa NEMENI — ide dnesnou
   # cestou cez genericke mapovanie a set DOSTANE.
   legacy = { 'owner_id' => 'CAB-1', 'owner_part_key' => 'front:F1/flap',
@@ -932,6 +947,55 @@ NxTest.test('KOV-E1a (8): „Doplniť nové predvoľby" NEDA predvolbu CUDZIEMU 
     gd = c::HWS.global_default_state
     NxTest.assert(gd['mapping'].key?('class:lift|classic|hk_top'),
                   'nad zdravou kniznicou sa nic nezuzilo')
+  end
+end
+
+NxTest.test('KOV-E1a (8): DEAKTIVOVANY seed set predvolbu STALE dostane (KOV-B3)') do
+  c = NxKovE1a
+  # Interna delta P2: neaktivnost meni VYHRADNE ponuky NOVEHO vyberu. Keby
+  # rozhodovala aj o INSTALACII triedneho mapovania, deaktivovanie setu by bola
+  # SLEPA ULICKA — kluc by v kniznici ostal, novy projekt ani „Doplniť nové
+  # predvoľby" by ho nedostali a kazdy taky vyklop by skoncil RED
+  # `lift_set_incomplete` bez cesty von.
+  vypnuty = c.seed_sets.map do |s|
+    s['set_id'] == 'vyklop-hk-klasik' ? s.merge('active' => false) : s
+  end
+  out = c::HWS.add_mapping_seed(vypnuty, {})
+  NxTest.assert_equal('vyklop-hk-klasik', out['class:lift|classic|hk_top'],
+                      'neaktivny set predvolbu dostane — inak slepa ulicka')
+  # A kolizia s NEZARADENOU definiciou ostava ODMIETNUTA (M26 sa nezmakcila).
+  legacy = { 'set_id' => 'vyklop-hk-klasik', 'name' => 'Moj stary vyklop',
+             'generic_type' => 'lift', 'active' => false,
+             'members' => [{ 'per' => 'unit', 'qty' => 1, 'label' => 'Cosi', 'code' => '999999' }] }
+  sets = c.seed_sets.reject { |s| s['set_id'] == 'vyklop-hk-klasik' } +
+         c::HWS.normalize_sets([legacy])
+  NxTest.refute(c::HWS.add_mapping_seed(sets, {}).key?('class:lift|classic|hk_top'),
+                'nezaradena definicia kluc NEDOSTANE ani ked je neaktivna')
+end
+
+NxTest.test('KOV-E1a (8): deaktivovanie v kniznici NEZAVRIE novy projekt ani „Doplniť"') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  c = NxKovE1a
+  c.with_library do
+    set = c::HWS.load['sets'].find { |s| s['set_id'] == 'vyklop-hk-klasik' }
+    status, = c::HWS.save_set!(set.merge('active' => false), revision: c::HWS.revision)
+    NxTest.assert_equal(:ok, status, 'set sa da deaktivovat')
+    # 1) SNAPSHOT NOVEHO PROJEKTU predvolbu aj definiciu dostane.
+    gd = c::HWS.global_default_state
+    NxTest.assert_equal('vyklop-hk-klasik', gd['mapping']['class:lift|classic|hk_top'],
+                        'novy projekt predvolbu dostane')
+    NxTest.assert(gd['sets'].key?('vyklop-hk-klasik'), gd['sets'].keys.inspect)
+    # 2) „Doplniť nové predvoľby" ju doplni do EXISTUJUCEHO projektu.
+    m = c.model_with(c.snapshot_of([], {}))
+    st, added_sets, added_map = c::HWS.merge_project_sets_seed!(m)
+    NxTest.assert_equal(:updated, st)
+    NxTest.assert(added_map.include?('class:lift|classic|hk_top'), added_map.inspect)
+    NxTest.assert(added_sets.include?('vyklop-hk-klasik'), added_sets.inspect)
+    # 3) A vyklop sa naozaj objedna — ziadny RED `lift_set_incomplete`.
+    _ok, state = c::HWS.project_state_status(m)
+    exp = c::HWS.expand([c.item], state)
+    NxTest.assert_equal([], exp['unmapped'], exp['unmapped'].inspect)
+    NxTest.refute(c.codes(exp).empty?, 'kody deaktivovaneho setu sa vydali')
   end
 end
 

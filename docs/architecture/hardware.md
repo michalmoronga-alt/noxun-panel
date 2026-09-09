@@ -474,6 +474,9 @@ chceme), `BuildPlan.parse_hardware_set_key` vracia `nil` (preto sa kľúč mapov
   z `CabinetBuilder.norm_hardware_sets` mapu `{id čela => dielec}` (`Fronts.class_owner_part`: `drawer_front` → `panel`, `lift`/`fall` → `flap`, dvierka, blenda a `none`
   → nič) a kľúč, ktorý jej nesedí, vypadne s logom (vzor `prune_none_front_overrides`). Samotné ID nestačí (Codex #332 kolo 3 P2): čelo s tým istým ID prepnuté z výklopu
   na dvierka už `/flap` nemá — kľúč by tam ostal mŕtvy a po návrate na výklop by ticho OŽIL so starým setom. Legacy composite `typ@owner` sa pruning nedotýka.
+  **Log rozlišuje DVA dôvody** (interná delta P3): mapa nesie `nil` aj pre EXISTUJÚCE čelo, ktoré žiadny triedny dielec nevyrába (dvierka, blenda, „bez čela"),
+  takže o existencii rozhoduje PRÍTOMNOSŤ KĽÚČA — „čelo v skrinke už nie je" vs. „čelo už taký dielec nevyrába". Bez toho by prepnutie výklopu na dvierka logovalo,
+  že čelo zmizlo.
 - **Precedencia pre receptovú položku je TROJÚROVŇOVÁ:** owner triedny → triedny (skrinka) → projektový snapshot. Na nižšiu úroveň sa ide **LEN pri NEPRÍTOMNOM kľúči**;
   prítomná hodnota, ktorá sa nedá rozložiť (chýbajúce pásmo, nekompatibilný set), končí ako `unmapped` s dôvodom → RED `drawer_kit_missing`. Na generický `slide`/`slide@owner`
   sa naďalej NIKDY nepadá.
@@ -669,8 +672,12 @@ navyše jednotka, pri HL top ramená a stabilizačná tyč), a mechanizmus sa vy
 - **KLASIFIKOVANÝ VÝKLOP BEZ SYSTÉMU JE NEPLATNÁ KLASIFIKÁCIA, nie legacy položka (Codex #332 kolo 3 P1).** Keď položka nesie `params.use_type == 'lift'`, ale triedny kľúč
   z nej nevznikne (chýba `lift_system` alebo `opening_mode`), `resolve_set_id` sa zastaví HNEĎ — vlastným dôvodom **`lift_system_missing`** (bránou vyššie teda RED
   s `blocks_export`) a bez toho, aby sa vôbec pozrel do mapovania. Prepad na generický `lift` by v prestavanej zákazke, ktorá si legacy mapovanie oprávnene drží, ticho
-  vydal LEGACY set — teda kovanie, o ktorom nikto nedokáže, že k systému čela patrí. Tú istú odpoveď má aj zápisová cesta (`set_incompatible_info` → `band_set_problem`),
-  aby sa výber setu a expanzia nerozišli. **Legacy výklop (bez `params.use_type`) sa tým NEMENÍ** — ide dnešnou generickou cestou. (Pozor na dve rôzne veci: grandfather
+  vydal LEGACY set — teda kovanie, o ktorom nikto nedokáže, že k systému čela patrí. **Veta menuje OBA dôvody** („výklop nemá určený spôsob otvárania alebo systém
+  (HK top / HL top)" — interná delta P3): chýbať môže otváranie aj systém a hláška o samotnom systéme by posielala opravovať pole, ktoré je v poriadku. Je JEDNA
+  a rovnaká v Nákupe (`unmapped_reason_sk`), v Kontrole (`Validation`) aj v mape detailov (`incompatible_detail_sk` — pozor, tá **účinná**, druhá v poradí).
+  Rovnaký dôvod má aj `set_incompatible_info`, ale **DNES je tá vetva nedosiahnuteľná** (expanzia aj súpis zastanú skôr v `resolve_set_id`, `band_set_problem` beží
+  len nad existujúcim triednym kľúčom) — necháva sa ako fail-closed poistka pre budúce volanie, nie ako „tá istá odpoveď na zápisovej ceste".
+  **Legacy výklop (bez `params.use_type`) sa tým NEMENÍ** — ide dnešnou generickou cestou. (Pozor na dve rôzne veci: grandfather
   z kola 2 sa týka SETU bez `lift_system` pri ČÍTANÍ knižnice; toto je POLOŽKA. Obe sú fail-closed smerom k exportu.)
 - **BRÁNA ÚPLNOSTI `lift_set_incomplete` (Astra BLOCKER 1).** Pri položke s `generic_type == 'lift'` sa **KAŽDÝ** dôvod nemapovania povýši na RED s `blocks_export`
   (`unmapped_entry`, presný vzor receptového `drawer_kit_missing`) — vrátane chýbajúceho setu a chýbajúceho mapovania; pôvodný dôvod cestuje v `base_reason`. Riadky ostatných
@@ -710,6 +717,10 @@ navyše jednotka, pri HL top ramená a stabilizačná tyč), a mechanizmus sa vy
   knižnice (`add_mapping_seed`), snapshot nového projektu (`global_default_state`) aj „Doplniť nové predvoľby" (`merge_project_sets_seed!`) — a vyhodnocuje sa nad definíciou,
   ktorá bude ÚČINNÁ V CIEĽOVOM dokumente: snapshot si vlastnú definíciu s rovnakým `set_id` ponechá, takže kontrola nad knižnicou by bránu obišla. Vedomé zápisy (Pravidlá,
   šablóna, lazy migrácia závesov) ostávajú na zápisovej autorite `class_key_value_problem` nad TÝM ISTÝM cieľovým dokumentom.
+  **Príznak `active` do tejto brány NEVSTUPUJE** (`class_set_match?(…, ignore_active: true)` — interná delta P2): invariant KOV-B3 hovorí, že neaktívnosť mení
+  VÝHRADNE ponuky NOVÉHO výberu. Keby rozhodovala aj o inštalácii predvoľby, deaktivovanie setu v knižnici by bola **slepá ulička** — kľúč by v nej ostal, nový
+  projekt ani „Doplniť nové predvoľby" by ho nedostali a každý taký výklop by skončil RED `lift_set_incomplete` bez cesty von. Rozhoduje teda len klasifikácia
+  (typ použitia + otváranie + tretí segment) a čitateľnosť členov; kolízia s NEZARADENOU definíciou ostáva odmietnutá aj pri neaktívnom sete.
 - **OWNER kľúč `@front:<id>/flap`** (tak sa vyberá TMAVÝ set pre JEDNO čelo — UI príde v E2). `CLASS_OWNER_RE` pozná `panel|flap` a **`CLASS_OWNER_PART` páruje triedu s dielcom**
   (`slide` → `panel`, `lift` → `flap`): krížom by kľúč ukazoval na dielec, ktorý tá trieda nikdy nemá, a resolver by ho nikdy neprečítal. Parse, zápisová validácia, resolver aj
   pruning zmazaného čela sa `/flap` naučili v JEDNEJ dávke (Astra FIX 6). K tomu patrí **`CabinetBuilder::CONFIG_SCHEMA` 9 → 10**: owner mapovanie je perzistentná hodnota

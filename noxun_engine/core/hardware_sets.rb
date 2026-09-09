@@ -1501,12 +1501,18 @@ module Noxun
           fid = PartKeys.front_id(owner)
           want = CLASS_OWNER_RE.match(owner.to_s)
           have = fid.nil? ? nil : parts[fid]
+          # Interna delta P3: `have.nil?` NEZNAMENA „celo neexistuje" — mapa
+          # nesie `nil` aj pre EXISTUJUCE celo, ktore ziadny triedny dielec
+          # nevyraba (dvierka, blenda, „bez čela"). Existenciu preto rozhoduje
+          # PRITOMNOST KLUCA, inak by log pri prepnuti vyklopu na dvierka
+          # tvrdil, ze celo v skrinke uz nie je.
+          known = !fid.nil? && parts.key?(fid)
           drop = fid.nil? || want.nil? || have.to_s != want[1]
           if drop
-            log_skip(if have.nil?
-                       "mapovanie „#{key}“: čelo v skrinke už nie je"
-                     else
+            log_skip(if known
                        "mapovanie „#{key}“: čelo už taký dielec nevyrába"
+                     else
+                       "mapovanie „#{key}“: čelo v skrinke už nie je"
                      end)
           end
           drop
@@ -1748,6 +1754,14 @@ module Noxun
       # ktoremu tato verzia nerozumie, sa default ukazovat nesmie.
       # Nesediaca definicia = kluc sa NEDOPLNI a polozka skonci `class_unmapped`
       # (brana + veta „Doplniť nové predvoľby"), nikdy tichy zly nakup.
+      #
+      # PRIZNAK `active` sa TU IGNORUJE (`ignore_active: true`) — invariant
+      # KOV-B3 hovori, ze neaktivnost meni VYHRADNE ponuky NOVEHO vyberu.
+      # Keby o instalacii predvolby rozhodovala, deaktivovanie setu v kniznici
+      # by bola SLEPA ULICKA: kluc by v nej ostal, novy projekt ani „Doplniť
+      # nové predvoľby" by ho uz nedostali a kazdy taky vyklop by skoncil RED
+      # `lift_set_incomplete` bez cesty von. Rozhoduje teda LEN klasifikacia
+      # (typ pouzitia + otvaranie + treti segment) a citatelnost clenov.
       def mapping_seed_ref_ok?(set, key)
         return false unless set.is_a?(Hash)
         return true unless class_mapping_key?(key) # legacy kluc typu — len pritomnost
@@ -1756,7 +1770,7 @@ module Noxun
         return false if canon.nil?
 
         gt, om, third = canon[BuildPlan::HW_SET_CLASS_PREFIX.length..].to_s.split('|')
-        return false unless class_set_match?(set, gt, om, third)
+        return false unless class_set_match?(set, gt, om, third, ignore_active: true)
 
         Array(set['members']).none? { |m| incompatible_member?(m) }
       end
@@ -2427,9 +2441,13 @@ module Noxun
           "set „#{sid}“ nesedí s čelom (#{incompatible_detail_sk(u['detail'])}) — " \
             'vyber správny set alebo Pravidlá → Doplniť nové predvoľby'
         when LIFT_SYSTEM_MISSING
-          # KOV-E1a (Codex #332 kolo 3 P1): polozka je vyklop, ale nepovedala
-          # KTORY systém — set sa preto vybrat NEDA a ziadny sa ani nehada.
-          'výklop nemá určený systém (HK top / HL top) — bez neho sa set vybrať nedá'
+          # KOV-E1a (Codex #332 kolo 3 P1): polozka je vyklop, ale triedny kluc
+          # z nej nevznikol — set sa preto vybrat NEDA a ziadny sa ani nehada.
+          # Dovody su DVA (`class_key_for`: chyba `opening_mode` ALEBO
+          # `lift_system`) a veta menuje oba — hlaska „nemá určený systém" by
+          # pri chybajucom otvarani posielala opravovat spravne pole.
+          'výklop nemá určený spôsob otvárania alebo systém (HK top / HL top) — ' \
+            'bez nich sa set vybrať nedá'
         else
           'typ nemá priradený set'
         end
@@ -2470,9 +2488,12 @@ module Noxun
         # ma VLASTNY kluc detailu (jeden kluc s dvoma vyznammi by klamal).
         'use_type_lift' => 'set nie je na výklopy',
         'lift_system' => 'iný systém výklopu (HK top vs. HL top)',
-        # KOV-E1a (Codex #332 kolo 3 P1): nie „iný systém", ale ŽIADNY —
-        # položka výklopu systém vôbec nenesie.
-        'lift_system_missing' => 'výklop nemá určený systém (HK top / HL top)'
+        # KOV-E1a (Codex #332 kolo 3 P1): nie „iný systém", ale ŽIADNY.
+        # Triedny kľúč výklopu nevznikne z DVOCH dôvodov (`class_key_for`) —
+        # chýba spôsob otvárania ALEBO systém; veta menuje oba, inak by
+        # posielala opravovať pole, ktoré je v poriadku.
+        'lift_system_missing' =>
+          'výklop nemá určený spôsob otvárania alebo systém (HK top / HL top)'
       }.freeze
 
       def incompatible_detail_sk(detail)
@@ -3166,8 +3187,14 @@ module Noxun
       #   * ZAVES (`hinge`) ziadny system nema — triedu urcuje typ pouzitia
       #     (dvierka) a sposob otvarania. Poziadavka „vydany system zasuviek"
       #     by zavesove sety vyhodila z ponuky UPLNE.
-      def class_set_match?(set, gt, om, dc)
-        return false unless set.is_a?(Hash) && set['active'] != false
+      #
+      # `ignore_active: true` = pytame sa LEN na KLASIFIKACIU, nie na ponuku.
+      # Pouziva to seed brana predvolieb (`mapping_seed_ref_ok?`): neaktivnost
+      # podla invariantu KOV-B3 meni VYHRADNE ponuky noveho vyberu, o tom, ci
+      # sa predvolene TRIEDNE mapovanie nainstaluje, rozhodovat NESMIE.
+      def class_set_match?(set, gt, om, dc, ignore_active: false)
+        return false unless set.is_a?(Hash)
+        return false unless ignore_active || set['active'] != false
         return false unless set['opening_mode'].to_s.strip == om.to_s
 
         if gt.to_s == 'hinge'
@@ -3526,7 +3553,13 @@ module Noxun
           # KOV-E1a: vyklop ma vlastny kluc pre `use_type` — veta „set nie je
           # na dvierka" by pri nom klamala.
           'use_type_lift' => 'set nie je na výklopy',
-          LIFT_SYSTEM_KEY => 'iný systém výklopu (HK top vs. HL top)'
+          LIFT_SYSTEM_KEY => 'iný systém výklopu (HK top vs. HL top)',
+          # KOV-E1a (interná delta P3): detail patrí do TEJTO, účinnej mapy —
+          # v prvej (mŕtvej) definícii by ho nikto neprečítal a veta by znela
+          # „iná klasifikácia". Menuje OBA dôvody, pre ktoré triedny kľúč
+          # výklopu nevznikne (chýba otváranie ALEBO systém).
+          LIFT_SYSTEM_MISSING =>
+            'výklop nemá určený spôsob otvárania alebo systém (HK top / HL top)'
         }[detail.to_s] || 'iná klasifikácia'
       end
 
@@ -4149,9 +4182,16 @@ module Noxun
         ck = class_key_for(it, it['generic_type'].to_s)
         return nil unless set.is_a?(Hash)
         # KOV-E1a (Codex #332 kolo 3 P1): klasifikovany vyklop BEZ triedneho
-        # kluca (chyba `lift_system`) sa NESMIE tvarit ako legacy polozka, ku
-        # ktorej „sedi hocico". Zapisova cesta (`band_set_problem`) na nom
-        # zastane rovnako ako expanzia — jedna odpoved na dvoch miestach.
+        # kluca (chyba `opening_mode` alebo `lift_system`) sa NESMIE tvarit ako
+        # legacy polozka, ku ktorej „sedi hocico".
+        #
+        # POZOR (interna delta P3): DNES sa sem taka polozka NEDOSTANE ani
+        # z jedneho z troch volani — `expand` aj `explain` zastavia skor
+        # (`resolve_set_id` vrati `lift_system_missing` este PRED mapovanim)
+        # a `band_set_problem` bezi vyhradne nad EXISTUJUCIM triednym klucom.
+        # Vetva teda NIE JE „ta ista odpoved na zapisovej ceste", ale
+        # FAIL-CLOSED POISTKA pre buduce volanie: nechava sa preto, lebo
+        # tichy `nil` („set sedi") by tu bol horsi nez zbytocny riadok.
         if ck.nil? && lift_item?(it)
           return { 'detail' => LIFT_SYSTEM_MISSING, 'reason' => LIFT_SYSTEM_MISSING }
         end

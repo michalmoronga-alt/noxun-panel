@@ -1066,11 +1066,13 @@ module Noxun
             "set „#{sid}“ nevydal pre tento výklop ani jednu položku — " \
             'skontroluj počty a kódy v sete'
           when HardwareSets::LIFT_SYSTEM_MISSING
-            # KOV-E1a (Codex #332 kolo 3 P1): polozka JE vyklop, ale nepovedala
-            # KTORY systém. Bez neho sa set nevybera ani sa nehada — a veta
+            # KOV-E1a (Codex #332 kolo 3 P1): polozka JE vyklop, ale triedny
+            # kluc z nej nevznikol. Set sa preto nevybera ani sa nehada — a veta
             # nesmie znieť „nemá predvolený set" (poslala by opravovať
-            # Pravidlá, kde chyba nie je).
-            'výklop nemá určený systém (HK top / HL top) — bez neho sa set vybrať nedá'
+            # Pravidlá, kde chyba nie je). Dovody su DVA (chyba `opening_mode`
+            # ALEBO `lift_system`), takze veta menuje oba.
+            'výklop nemá určený spôsob otvárania alebo systém (HK top / HL top) — ' \
+            'bez nich sa set vybrať nedá'
           when 'set_none'
             'výklop je vedome bez setu — ak to tak nemá byť, vyber set v Pravidlách Štúdia'
           when 'mapping_invalid'
