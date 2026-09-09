@@ -2226,7 +2226,7 @@ module Noxun
 
         # KOV-E1b (Codex #333 kolo 1 P1): `seed_version` = seed pravidiel, s
         # ktorym stavba naozaj bezala (`HardwareRules.effective_seed_version`).
-        # Nepovinny tretí argument ZAMERNE: `merge_final` volaju aj testy
+        # Nepovinny TRETI argument ZAMERNE: `merge_final` volaju aj testy
         # a cesty bez modelu — bez neho ostava pole nil a `cabinet_config`
         # zapise 0 („o pravidlach nic nevieme"), teda fail-closed.
         def merge_final(cfg, plan, seed_version = nil)
