@@ -1688,8 +1688,51 @@ module Noxun
       # strazi), ale druha, volnejsia cesta k predvolbam uz neexistuje — buduci
       # kluc bez zodpovedajuceho setu by inak prisiel LEN fresh instalaciam.
       def seed_library
-        sets = deep_copy(SEED_SETS)
+        sets = deep_copy(seed_sets_resolved)
         { 'sets' => sets, 'mapping' => add_mapping_seed(normalize_sets(sets), SEED_MAPPING) }
+      end
+
+      # === KOV-G1a (Codex #337 N3): KLASIFIKACIA SEED SETU PROTI TAXONOMII ====
+      #
+      # Seed sety nesu dvojicu vyrobca/rada natvrdo (Hettich/Sensys, Blum/…,
+      # Häfele/AXILO). Taxonomia pritom cudziu vazbu rady ZAMERNE zachovava:
+      # ked ma pouzivatel radu naviazanu na vlastneho vyrobcu, nasa dvojica
+      # v jeho taxonomii NEEXISTUJE. Hromadny zapis seedu `taxonomy_refusal`
+      # nevola (a volat ju nemoze — ta je pre VEDOMY zapis jedneho setu), takze
+      # by sa taka klasifikacia do kniznice ULOZILA a KAZDA neskorsia uprava
+      # toho setu cez `save_set!` by skoncila hlaskou „rada AXILO patrí
+      # výrobcovi …" — set by sa nedal ani opravit.
+      #
+      # Preto: pred instalaciou sa dvojica overi proti ZIVEJ taxonomii
+      # (`series_owner` — bez seedovania a bez zapisu). Ked rada patri INEMU
+      # vyrobcovi, zo setu odchadza CELA klasifikacia (klasifikacia je
+      # all-or-nothing — set BEZ vyrobcu by bol neplatny tvar, nie „polovicne
+      # zaradeny") a set sa nainstaluje ako NEZARADENY + info log. Expanzia
+      # a nakup su od klasifikacie nezavisle, takze kody ostavaju; nesadne mu
+      # len TRIEDNA predvolba (`mapping_seed_ref_ok?`) — fail-closed, presne
+      # ako pri kazdej inej nesediacej definicii.
+      #
+      # Ked sa taxonomia citat neda alebo rada v nej este nie je, klasifikacia
+      # OSTAVA: seed taxonomie dvojicu vzapati doplni a jej odobratie by
+      # zbytocne odpojilo triedne predvolby zavesov a vysuvov.
+      def seed_sets_resolved(sets = SEED_SETS)
+        sets.map do |s|
+          man = s['manufacturer'].to_s.strip
+          ser = s['series'].to_s.strip
+          next s if man.empty? || ser.empty?
+
+          owner = HardwareTaxonomy.series_owner(ser)
+          next s if owner.nil? || HardwareTaxonomy.same_name?(owner, man)
+
+          if defined?(Engine)
+            Engine.log("hardware sets: set '#{s['set_id']}' sa instaluje BEZ zaradenia — " \
+                       "rada '#{ser}' patri v taxonomii vyrobcovi '#{owner}'")
+          end
+          s.reject { |k, _| CLASS_KEYS.include?(k) }
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'HardwareSets.seed_sets_resolved') if defined?(Engine)
+        sets
       end
 
       # CISTE citanie + seed-merge BEZ zapisu -> [kniznica, changed].
@@ -1748,9 +1791,12 @@ module Noxun
         return [sets, map, false] if from_version >= SEED_VERSION
         have = {}
         sets.each { |s| have[s['set_id']] = true }
-        missing = SEED_SETS.reject { |s| have[s['set_id']] }
-        merged = replace_untouched_seed_sets(sets) + normalize_sets(missing)
-        [merged, add_mapping_seed(merged, migrate_mapping(merged, map)), true]
+        # KOV-G1a (Codex #337 N3): TA ISTA resolvnuta sada pre OBE cesty —
+        # doplnenie chybajuceho setu aj nahradu nedotknuteho seed tvaru.
+        resolved = seed_sets_resolved
+        missing = resolved.reject { |s| have[s['set_id']] }
+        merged = replace_untouched_seed_sets(sets, resolved) + normalize_sets(missing)
+        [merged, add_mapping_seed(merged, migrate_mapping(merged, map, resolved)), true]
       end
 
       # D-118b: OPRAVA OBSAHU uz existujuceho seed setu. Doteraz vedel `merge_seed`
@@ -1766,9 +1812,9 @@ module Noxun
       # PROJEKTOVE SNAPSHOTY sa tym NEMENIA: hotova zakazka si nesie kody, s ktorymi
       # bola objednana. Do projektu sa oprava dostane az vedomym „Doplniť nové
       # predvoľby" / novym vyberom setu.
-      def replace_untouched_seed_sets(sets)
+      def replace_untouched_seed_sets(sets, seed = seed_sets_resolved)
         seed_by_id = {}
-        normalize_sets(SEED_SETS).each { |s| seed_by_id[s['set_id']] = s }
+        normalize_sets(seed).each { |s| seed_by_id[s['set_id']] = s }
         Array(sets).map do |s|
           sid = s.is_a?(Hash) ? s['set_id'].to_s : ''
           fresh = seed_by_id[sid]
@@ -1896,11 +1942,14 @@ module Noxun
       #   3) CIELOVY set je presne nas seed (GH #131 P2 — ked si ID medzitym
       #      obsadil vlastny set pouzivatela, migracia sa NEVYKONA; inak by sa
       #      nohy premapovali na cudziu, hoci aj inotypovu definiciu).
-      def migrate_mapping(sets, mapping)
+      def migrate_mapping(sets, mapping, seed = seed_sets_resolved)
         by_id = {}
         sets.each { |s| by_id[s['set_id']] = s }
         seed_by_id = {}
-        normalize_sets(SEED_SETS).each { |s| seed_by_id[s['set_id']] = s }
+        # KOV-G1a (Codex #337 N3): porovnava sa s TOU ISTOU sadou, aku
+        # instaluje `merge_seed` — inak by set, ktoremu taxonomia odobrala
+        # zaradenie, uz nikdy nesedel s „nasim seedom" a migracia by stala.
+        normalize_sets(seed).each { |s| seed_by_id[s['set_id']] = s }
         out = mapping.dup
         MAPPING_MIGRATIONS.each do |gt, (from_id, to_id)|
           next unless out[gt] == from_id

@@ -453,6 +453,75 @@ NxTest.test('KOV-G1a (R5): STARSI citac set prichytu ODMIETNE — nikdy tichy or
   NxTest.assert_equal(:ok, h.assess_set_defs([clip])[0])
 end
 
+NxTest.test('KOV-G1a (Codex #337 N3): seed set s cudzou vazbou rady sa instaluje BEZ zaradenia') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  c = NxG1a
+  c.with_taxonomy do
+    # Podporovany upgrade: pouzivatel ma radu AXILO naviazanu na vlastneho
+    # vyrobcu a migracia taxonomie mu to (spravne) necha. Seed set prichytu
+    # nesie Häfele/AXILO natvrdo — kniznica by tak dostala dvojicu, ktora
+    # v jeho taxonomii NEEXISTUJE, a KAZDA neskorsia uprava toho setu cez
+    # `save_set!` by skoncila hlaskou „rada AXILO patrí výrobcovi …".
+    c.install_tax(['Hettich', 'Häfele', 'Moja firma'],
+                  [['AXILO', 'Moja firma'], ['Sensys', 'Hettich']])
+    # (a) CERSTVA kniznica
+    lib = c::HWS.seed_library
+    clip = lib['sets'].find { |s| s['set_id'] == c::CLIP_SET }
+    NxTest.assert_equal(nil, clip['manufacturer'], 'nezaradeny set — nie polovicna klasifikacia')
+    NxTest.assert_equal(nil, clip['series'])
+    NxTest.assert_equal(c::CLIP_TYPE, clip['generic_type'], 'typ kovania sa NEMENI')
+    NxTest.assert_equal('950', clip['members'][0]['code'], 'a kody uz vobec nie')
+    zaves = lib['sets'].find { |s| s['set_id'] == 'zaves-klasik' }
+    NxTest.assert_equal('Hettich', zaves['manufacturer'], 'nedotknuta rada ostava zaradena')
+    NxTest.assert_equal(c::CLIP_SET, lib['mapping'][c::CLIP_TYPE],
+                        'genericke mapovanie prichytu sa doplni aj tak (nakup je nezavisly)')
+    # (b) UPGRADE uz zalozenej kniznice ide tou istou sadou
+    stara = c::HWS.normalize_sets([c::HWS::LEGACY_SEED_SHAPES['nohy-klzak-17'].first])
+    merged, = c::HWS.merge_seed(stara, {}, 7)
+    doplneny = merged.find { |s| s['set_id'] == c::CLIP_SET }
+    NxTest.assert_equal(nil, doplneny['manufacturer'], 'to iste pri seed-mergi')
+    # (c) a nad takym setom uz `save_set!` PREJDE (o to cele ide)
+    FileUtils.mkdir_p(c::HWS.dir)
+    sets = c::HWS.normalize_sets(lib['sets'])
+    begin
+      c::STORE.write(c::HWS.path, 'std' => c::HWS::STD_SKIP_CODE,
+                                  'seed_version' => c::HWS::SEED_VERSION,
+                                  'sets' => sets, 'mapping' => lib['mapping'])
+      FileUtils.rm_f("#{c::HWS.path}.bak")
+      c::STORE.invalidate(c::HWS.path)
+      c::HWS.reset_library_state!
+      status, = c::HWS.save_set!(sets.find { |s| s['set_id'] == c::CLIP_SET }
+                                     .merge('name' => 'Príchyt sokla (moje)'))
+      NxTest.assert_equal(:ok, status, 'set, ktory sme nainstalovali, sa MUSI dat aj ulozit')
+    ensure
+      [c::HWS.path, "#{c::HWS.path}.bak"].each { |f| FileUtils.rm_f(f) }
+      c::STORE.invalidate(c::HWS.path)
+      c::HWS.reset_library_state!
+    end
+  end
+end
+
+NxTest.test('KOV-G1a (Codex #337 N3): bez taxonomie (a pri zhode) klasifikacia OSTAVA') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  c = NxG1a
+  c.with_taxonomy do
+    # Subor taxonomie este neexistuje — seed ho vzapati zalozi so spravnou
+    # dvojicou, takze odoberat klasifikaciu by len zbytocne odpojilo triedne
+    # predvolby zavesov a vyklopov.
+    FileUtils.rm_f(c::TAX.path)
+    FileUtils.rm_f("#{c::TAX.path}.bak")
+    c::STORE.invalidate(c::TAX.path)
+    c::TAX.reset_state!
+    clip = c::HWS.seed_sets_resolved.find { |s| s['set_id'] == c::CLIP_SET }
+    NxTest.assert_equal('Häfele', clip['manufacturer'])
+    NxTest.assert_equal('AXILO', clip['series'])
+    # A ked taxonomia dvojicu POTVRDI, ostava tiez (aj pri inom zapise mena).
+    c.install_tax(['HÄFELE'], [['axilo', 'HÄFELE']])
+    clip2 = c::HWS.seed_sets_resolved.find { |s| s['set_id'] == c::CLIP_SET }
+    NxTest.assert_equal('Häfele', clip2['manufacturer'], 'zhoda je bez ohladu na zapis mena')
+  end
+end
+
 # ============================================================================
 # R6 + R8 — KATALOG
 # ============================================================================

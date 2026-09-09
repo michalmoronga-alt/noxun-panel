@@ -958,6 +958,15 @@ príchytu prináša až G1b):
 - **`CLASS_MAPPING_KEYS` už NIE JE celý `MAPPING_ADDITIONS`**, ale jeho podmnožina s prefixom `class:`. `plinth_clip` je generický kľúč (príchyt spôsob otvárania nemá) a do
   tabuľky TRIEDNYCH mapovaní v Pravidlách nepatrí: `class_key_label` by mu vrátil `nil` (riadok bez popisku) a `class_set_options` by ho rozkladala ako triedny kľúč. Svoj
   riadok má medzi generickými typmi (`generic_types` z `BuildPlan::GENERIC_TYPES`).
+- **Klasifikácia seed setu sa pred inštaláciou overí proti ŽIVEJ taxonómii** (Codex #337 N3, `seed_sets_resolved`). Seed sety nesú dvojicu výrobca/rada natvrdo
+  (Hettich/Sensys, Blum/AVENTOS, Häfele/AXILO), ale taxonómia cudziu väzbu rady **zámerne zachováva**: keď má používateľ radu naviazanú na vlastného výrobcu, naša dvojica
+  v jeho taxonómii NEEXISTUJE. Hromadný zápis seedu `taxonomy_refusal` nevolá (tá je pre VEDOMÝ zápis jedného setu), takže by sa taká klasifikácia do knižnice uložila a
+  **každá neskoršia úprava toho setu cez `save_set!` by skončila hláškou „rada … patrí výrobcovi …"** — set by sa nedal ani opraviť. Preto: keď `HardwareTaxonomy.series_owner`
+  povie, že rada patrí INÉMU výrobcovi, odchádza zo setu **CELÁ klasifikácia** (je all-or-nothing — set bez výrobcu je neplatný tvar, nie „polovične zaradený") a set sa
+  nainštaluje ako **nezaradený** + info log. **Kódy a typ sa nemenia**, takže nákup ide ďalej; nesadne mu len TRIEDNA predvoľba (`mapping_seed_ref_ok?`) — fail-closed, presne
+  ako pri každej inej nesediacej definícii. Keď sa taxonómia čítať nedá alebo radu ešte nepozná, klasifikácia **ostáva** (seed taxonómie ju vzápätí doplní a jej odobratie by
+  zbytočne odpojilo triedne predvoľby závesov a výklopov). Rovnaká, jediná sada ide do VŠETKÝCH seed ciest — `seed_library` (čerstvá inštalácia), doplnenie chýbajúceho setu,
+  `replace_untouched_seed_sets` aj `migrate_mapping` (inak by set, ktorému taxonómia zaradenie odobrala, už nikdy „nesedel s naším seedom" a migrácia by stála).
 - **Migrácia:** starý (v2..v7) tvar setu nôh je v `LEGACY_SEED_SHAPES`, takže `replace_untouched_seed_sets` nedotknutú knižnicu aktualizuje a používateľom upravený set
   (stačí premenovanie) nechá tak. **Projektové snapshoty sa nemenia samy** — do rozpracovanej zákazky nový tvar aj predvoľbu príchytu prenesie vedomé **„Doplniť nové
   predvoľby"** (`refresh_untouched_project_sets` + `add_mapping_seed`, existujúci mechanizmus). Dôsledok, ktorý patrí do poznámok k vydaniu: **skrinka so soklom 150 mm
