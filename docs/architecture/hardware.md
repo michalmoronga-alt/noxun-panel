@@ -681,7 +681,9 @@ navyše jednotka, pri HL top ramená a stabilizačná tyč), a mechanizmus sa vy
   (alebo ich set preskočí), expanzia by vrátila 0 riadkov aj 0 nemapovaných a exporty by prešli s výklopom BEZ kovania. Fallback `members_skipped` (dovtedy
   len pre receptové položky) preto platí aj pre `generic_type: lift` — v `expand_members` aj v `explain_members`, aby sa panel a súpis nerozišli — a
   štandardnou cestou sa povýši na RED `lift_set_incomplete` s `blocks_export`. Veta (Nákup aj Kontrola) hovorí o POČTOCH, nie o dĺžke: „set X nevydal pre
-  tento výklop ani jednu položku".
+  tento výklop ani jednu položku". **Dedup `per: 'owner'` sa počíta ako VYDANÉ** (Codex #332 kolo 4 P2): keď set zložený len z členov na vlastníka
+  vydá zostavu prvým pravidlom, druhé pravidlo na tom istom čele nájde všetkých členov v `owner_seen` a nepridá nič — to NIE JE prázdny set a fallback
+  sa naň nevzťahuje (inak by RED zastavil export nad KOMPLETNOU zostavou).
   **Dôvod `class_unmapped` má DVA zdroje a DVE nápravy** (Codex #332 kolo 1 P2) — rozlišuje ich `HardwareSets.class_unmapped_lift?`, JEDNA autorita pre Nákup
   (`unmapped_reason_sk`) aj pre vetu Kontroly: **resolver-level** (chýba triedny kľúč `class:lift|…`; záznam nesie `class_key` a nemá `param` ani `set_id`) → „výklop nemá
   predvolený set — Pravidlá → Doplniť nové predvoľby", **member-level** (`code_by_param` bez kódu triedy; `param` aj `set_id` sú prítomné) → „set X nemá kód pre …".
@@ -704,6 +706,10 @@ navyše jednotka, pri HL top ramená a stabilizačná tyč), a mechanizmus sa vy
   `mapping_seed_ref_ok?`): knižnica mohla mať pod tým istým ID vlastný, nezaradený set — `merge_seed` ho správne nechá tak, a default sa mu preto NENASADÍ. Referencia musí
   sedieť tou istou autoritou, akou sa set ponúka v Pravidlách (`class_set_match?` = typ použitia + otváranie + tretí segment) a jej členovia musia byť čitateľní
   (`incompatible_member?`). Nesediaca definícia = kľúč sa nedoplní a položka skončí `class_unmapped` (brána + veta „Doplniť nové predvoľby"), nikdy tichý zlý nákup.
+  **Predikát je JEDEN a beží na KAŽDEJ ceste, ktorá predvoľbu inštaluje** (`mapping_seed_value_ok?` — Codex #332 kolo 4 P1): čerstvá knižnica (`seed_library`), seed-merge
+  knižnice (`add_mapping_seed`), snapshot nového projektu (`global_default_state`) aj „Doplniť nové predvoľby" (`merge_project_sets_seed!`) — a vyhodnocuje sa nad definíciou,
+  ktorá bude ÚČINNÁ V CIEĽOVOM dokumente: snapshot si vlastnú definíciu s rovnakým `set_id` ponechá, takže kontrola nad knižnicou by bránu obišla. Vedomé zápisy (Pravidlá,
+  šablóna, lazy migrácia závesov) ostávajú na zápisovej autorite `class_key_value_problem` nad TÝM ISTÝM cieľovým dokumentom.
 - **OWNER kľúč `@front:<id>/flap`** (tak sa vyberá TMAVÝ set pre JEDNO čelo — UI príde v E2). `CLASS_OWNER_RE` pozná `panel|flap` a **`CLASS_OWNER_PART` páruje triedu s dielcom**
   (`slide` → `panel`, `lift` → `flap`): krížom by kľúč ukazoval na dielec, ktorý tá trieda nikdy nemá, a resolver by ho nikdy neprečítal. Parse, zápisová validácia, resolver aj
   pruning zmazaného čela sa `/flap` naučili v JEDNEJ dávke (Astra FIX 6). K tomu patrí **`CabinetBuilder::CONFIG_SCHEMA` 9 → 10**: owner mapovanie je perzistentná hodnota

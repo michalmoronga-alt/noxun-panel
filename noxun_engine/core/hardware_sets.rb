@@ -1588,9 +1588,14 @@ module Noxun
       # su tu JEDINA autorita ich obsahu (SEED_MAPPING drzi len legacy kluce podla
       # generickeho typu) — inak by sa fresh install a upgrade rozisli a nova
       # instalacia by zasuvky nemapovala, kym stara ano.
+      # KOV-E1a (Codex #332 kolo 4 P1): aj CERSTVA instalacia ide cez TU ISTU
+      # branu (`add_mapping_seed` -> `mapping_seed_value_ok?`), nie cez holy
+      # `merge`. Nad nasim vlastnym seedom je vysledok rovnaky (guard test to
+      # strazi), ale druha, volnejsia cesta k predvolbam uz neexistuje — buduci
+      # kluc bez zodpovedajuceho setu by inak prisiel LEN fresh instalaciam.
       def seed_library
-        { 'sets' => deep_copy(SEED_SETS),
-          'mapping' => SEED_MAPPING.merge(deep_copy(MAPPING_ADDITIONS)) }
+        sets = deep_copy(SEED_SETS)
+        { 'sets' => sets, 'mapping' => add_mapping_seed(normalize_sets(sets), SEED_MAPPING) }
       end
 
       # CISTE citanie + seed-merge BEZ zapisu -> [kniznica, changed].
@@ -1696,20 +1701,37 @@ module Noxun
       #      v kniznici (ciastocny selektor by ticho menil, co sa vyberie —
       #      ta ista uvaha ako v `global_default_state`) A ZODPOVEDAJU TRIEDE
       #      (Codex #332 kolo 1 P1, viz `mapping_seed_ref_ok?`).
+      # Podmienka 2 je od kola 4 ZDIELANA (`mapping_seed_value_ok?`) so VSETKYMI
+      # ostatnymi cestami, ktore predvolbu instaluju — kniznica, snapshot
+      # noveho projektu (`global_default_state`) aj „Doplniť nové predvoľby"
+      # (`merge_project_sets_seed!`). Jedna brana, jedno pravidlo.
       def add_mapping_seed(sets, mapping)
         by_id = {}
         sets.each { |s| by_id[s['set_id']] = s }
         out = mapping.dup
         MAPPING_ADDITIONS.each do |key, value|
           next if out.key?(key)
-          refs = value_set_ids(value)
-          next if refs.empty?
-          next unless refs.all? { |sid| mapping_seed_ref_ok?(by_id[sid], key) }
+          next unless mapping_seed_value_ok?(key, value, by_id)
 
           out[key] = deep_copy(value)
           Engine.log("hardware sets: doplnene mapovanie '#{key}'") if defined?(Engine)
         end
         out
+      end
+
+      # KOV-E1a (Codex #332 kolo 4 P1): JEDNA BRANA pre KAZDU cestu, ktora
+      # instaluje PREDVOLENE mapovanie (globalna kniznica, snapshot noveho
+      # projektu, „Doplniť nové predvoľby"). `defs` je LOOKUP DO CIELOVEHO
+      # DOKUMENTU — teda definicie, ktore v nom po zapise naozaj BUDU, nie tie,
+      # z ktorych hodnotu kopirujeme. Rozdiel je vecny: snapshot si vlastnu
+      # definiciu s rovnakym `set_id` PONECHA, takze kontrola nad kniznicou by
+      # branu obisla a projekt by dostal predvolbu na CUDZI set.
+      # -> true = kluc sa smie doplnit
+      def mapping_seed_value_ok?(key, value, defs)
+        refs = value_set_ids(value)
+        return false if refs.empty? # ciastocny/prazdny selektor sa nedoplna
+
+        refs.all? { |sid| mapping_seed_ref_ok?(defs[sid], key) }
       end
 
       # KOV-E1a (Codex #332 kolo 1 P1): ZODPOVEDA definicia v kniznici triede,
@@ -2649,6 +2671,13 @@ module Noxun
           # nezmrazi vobec (ciastocny selector by mlcky menil vyber).
           refs = value_set_ids(value)
           next if refs.empty? || refs.any? { |sid| by_id[sid].nil? }
+          # KOV-E1a (Codex #332 kolo 4 P1): TA ISTA brana ako pri kniznici a pri
+          # „Doplniť nové predvoľby" — do snapshotu sa zmrazi len predvolba,
+          # ktorej definicia (tu je zdroj aj ciel ta ista kniznica) triede
+          # naozaj zodpoveda. Rucne upraveny alebo cudzi subor tak novemu
+          # projektu nepodstrci triedny kluc na nezaradeny set.
+          next unless mapping_seed_value_ok?(gt, value, by_id)
+
           mapping[gt] = deep_copy(value)
           refs.each { |sid| sets[sid] = by_id[sid] }
         end
@@ -3540,6 +3569,24 @@ module Noxun
           end
           refs = value_set_ids(value)
           next if refs.empty? || refs.any? { |sid| by_id[sid].nil? }
+          # KOV-E1a (Codex #332 kolo 4 P1): predikat sa vyhodnocuje nad
+          # definiciou, ktora bude UCINNA V SNAPSHOTE. Snapshot si vlastnu
+          # definiciu s rovnakym `set_id` PONECHA (`next if state['sets']
+          # .key?(sid)` nizsie), takze kontrola nad kniznicou by branu obisla:
+          # projekt s vlastnym NEZARADENYM „vyklop-hk-klasik" by dostal triedny
+          # kluc a expanzia by z neho vydala LUBOVOLNE kody BEZ brany uplnosti.
+          # Nesediaca definicia = kluc sa NEDOPLNI a polozka skonci
+          # `class_unmapped` (ORANGE/RED podla existujucej cesty).
+          effective = {}
+          refs.each { |sid| effective[sid] = state['sets'][sid] || by_id[sid] }
+          unless mapping_seed_value_ok?(gt, value, effective)
+            if defined?(Engine)
+              Engine.log("hardware sets: predvolba '#{gt}' sa NEDOPLNILA — " \
+                         'definicia v projekte nezodpoveda triede')
+            end
+            next
+          end
+
           state['mapping'][gt] = deep_copy(value)
           added_map << gt
           refs.each do |sid|
@@ -4305,6 +4352,14 @@ module Noxun
             # so zdielanym `cabinet_id`, ale ROZNYM `owner_part_key`: tie sa
             # nezlievaju (kluc sa nezhoduje) a ich mnozstva su spravne.
             prev['per_owner'] = true
+            # KOV-E1a (Codex #332 kolo 4 P2): dedup ZNAMENA VYDANE. Clena uz
+            # vydalo PRVE pravidlo na tom istom vlastnikovi — set teda nie je
+            # „prazdny". Bez tohto riadku by set zlozeny LEN z `per: 'owner'`
+            # clenov (napr. HL tyc + predlzenie) skoncil pri DRUHOM pravidle
+            # na fallbacku `members_skipped` -> RED `lift_set_incomplete`
+            # a zastavil export nad KOMPLETNOU zostavou. Fallback ostava
+            # vyhradne pre sety, ktore naozaj nevydali nic.
+            emitted = true
             next
           end
           src = add_row(rows, code, key ? m_qty : qty * m_qty, it, sid, lookup)

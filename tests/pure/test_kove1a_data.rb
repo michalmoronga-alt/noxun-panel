@@ -61,6 +61,9 @@
 #   M23 nedostupna expanzia s vyklopom zastavi aj VEPO         -> scope `:kit`
 #   M24 klasifikovany vyklop BEZ systemu spadne na legacy `lift` -> vlastny dovod
 #   M25 owner `/flap` prezije zmenu TYPU cela                  -> pruning podla dielca
+#   M26 predvolbu dostane CUDZI set s tym istym ID V SNAPSHOTE -> `mapping_seed_value_ok?`
+#       na KAZDEJ ceste (kniznica · novy projekt · „Doplniť nové predvoľby")
+#   M27 set LEN z `per: owner` clenov je pri DRUHOM pravidle „prazdny" -> dedup = vydane
 require_relative '../helper' unless defined?(NxTest)
 
 require 'json'
@@ -73,6 +76,8 @@ module NxKovE1a
   BP  = E::BuildPlan
   CB  = E::CabinetBuilder
   V   = E::Validation
+  TAX = E::HardwareTaxonomy
+  STORE = E::JsonFileStore
 
   # 23 kodov, ktore davka pridava (zdroj: SEED_AVENTOS_v2_2026-09-09.md).
   NOVE_KODY = HWC::SEED_AVENTOS_V4
@@ -125,6 +130,45 @@ module NxKovE1a
 
   def reasons(exp)
     exp['unmapped'].map { |u| u['reason'] }
+  end
+
+  # --- sandbox globalnej kniznice + fiktivny model (vzor KOV-C2a) ----------
+
+  # Beh dostane CERSTVU globalnu kniznicu (seed) a po teste sa povodny stav
+  # sandboxu vrati. Taxonomia sa nuluje z toho isteho dovodu ako v KOV-C2a:
+  # skorsie sady ju v zdielanom sandboxe nechavaju v stave `:read_only`
+  # a zapis klasifikovaneho setu je nad nou fail-closed.
+  def with_library
+    paths = [HWS.path, TAX.path]
+    before = paths.map { |p| [p, (File.binread(p) if File.exist?(p))] }
+    paths.each do |p|
+      FileUtils.rm_f(p)
+      FileUtils.rm_f("#{p}.bak")
+      STORE.invalidate(p)
+    end
+    HWS.reset_library_state!
+    TAX.reset_state!
+    yield
+  ensure
+    before.each do |(p, raw)|
+      if raw then File.binwrite(p, raw) else FileUtils.rm_f(p) end
+      FileUtils.rm_f("#{p}.bak")
+      STORE.invalidate(p)
+    end
+    HWS.reset_library_state!
+    TAX.reset_state!
+  end
+
+  def model_with(state)
+    m = NxTest::FakeEntity.new
+    m.set_attribute(E::Store::DICT, HWS::MODEL_KEY, state.to_json)
+    m
+  end
+
+  def snapshot_of(sets, mapping)
+    by_id = {}
+    HWS.normalize_sets(sets).each { |s| by_id[s['set_id']] = s }
+    { 'std' => HWS.snapshot_std(mapping, by_id.values), 'mapping' => mapping, 'sets' => by_id }
   end
 
   # Vsetky kody, ktore pouzivaju SEED sety vyklopov.
@@ -513,6 +557,32 @@ NxTest.test('KOV-E1a (4): `per: owner` clen sa DVOMA pravidlami na jednom cele N
                       'INE celo = vlastna tyc')
 end
 
+NxTest.test('KOV-E1a (4): set LEN z `per: owner` clenov je po dedupe VYDANY, nie „prazdny"') do
+  c = NxKovE1a
+  # Codex #332 kolo 4 P2: dva pravidla na TOM ISTOM cele — druha expanzia najde
+  # vsetkych clenov v `owner_seen` a nic nepridá. To NIE JE prazdny set: zostavu
+  # uz vydalo prve pravidlo. Bez tohto by fallback `members_skipped` povysil na
+  # RED `lift_set_incomplete` a zastavil export nad KOMPLETNOU zostavou.
+  raw = { 'set_id' => 'len-owner', 'name' => 'Len na celo', 'generic_type' => 'lift',
+          'use_type' => 'lift', 'opening_mode' => 'classic', 'lift_system' => 'hk_top',
+          'manufacturer' => 'Blum',
+          'members' => [{ 'per' => 'owner', 'qty' => 1, 'label' => 'stabilizačná tyč',
+                          'code' => '507365' },
+                        { 'per' => 'owner', 'qty' => 1, 'label' => 'predĺženie',
+                          'code' => '507366' }] }
+  norm, errs = c::HWS.validate_set(raw)
+  NxTest.assert_equal([], errs, errs.inspect)
+  st = { 'mapping' => { 'class:lift|classic|hk_top' => 'len-owner' },
+         'sets' => { 'len-owner' => norm } }
+
+  dve = c::HWS.expand([c.item, c.item('rule_id' => 'moje-vyklopy')], st)
+  NxTest.assert_equal([['507365', 1], ['507366', 1]], c.codes(dve),
+                      'zostava je na CELO — druhe pravidlo ju nezdvoji')
+  NxTest.assert_equal([], c.reasons(dve), 'ziadny RED — zostava UZ bola vydana')
+  # A jedno pravidlo sa sprava rovnako (kontrola, ze sa nezmenil zaklad).
+  NxTest.assert_equal([], c.reasons(c::HWS.expand([c.item], st)))
+end
+
 NxTest.test('KOV-E1a (4): set, ktoreho VSETCI clenovia vysli na NULU, je RED') do
   c = NxKovE1a
   # Codex #332 kolo 2 P2: nula je platne vynechanie JEDNEHO clena, ale ked
@@ -818,6 +888,51 @@ NxTest.test('KOV-E1a (8): CUDZI set s rovnakym `set_id` sa predvolbou NESTANE') 
   # Kontrola: nedotknuta seed kniznica funguje presne ako doteraz.
   cista = c::HWS.add_mapping_seed(c.seed_sets, {})
   NxTest.assert_equal('vyklop-hk-klasik', cista['class:lift|classic|hk_top'])
+  # A CERSTVA INSTALACIA ide TOU ISTOU branou — vsetky predvolby v nej ostavaju
+  # (druha, volnejsia cesta k predvolbam uz neexistuje; Codex #332 kolo 4 P1).
+  fresh = c::HWS.seed_library['mapping']
+  c::HWS::MAPPING_ADDITIONS.each_key do |k|
+    NxTest.assert(fresh.key?(k), "fresh install: predvolba #{k} chyba")
+  end
+end
+
+NxTest.test('KOV-E1a (8): „Doplniť nové predvoľby" NEDA predvolbu CUDZIEMU setu v SNAPSHOTE') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  c = NxKovE1a
+  # Codex #332 kolo 4 P1: kopirovanie predvolieb z kniznice do projektu sa
+  # rozhoduje podla definicie, ktora bude UCINNA V SNAPSHOTE. Projekt si
+  # vlastnu definiciu s rovnakym `set_id` ponecha, takze kontrola nad
+  # KNIZNICOU by branu obisla a vyklop by sa objednal z cudzich kodov.
+  c.with_library do
+    lib = c::HWS.load
+    NxTest.assert_equal('vyklop-hk-klasik', lib['mapping']['class:lift|classic|hk_top'],
+                        'cerstva kniznica predvolbu ma')
+    legacy = { 'set_id' => 'vyklop-hk-klasik', 'name' => 'Moj stary vyklop',
+               'generic_type' => 'lift',
+               'members' => [{ 'per' => 'unit', 'qty' => 1, 'label' => 'Cosi',
+                               'code' => '999999' }] }
+    m = c.model_with(c.snapshot_of([legacy], { 'lift' => 'vyklop-hk-klasik' }))
+    status, added_sets, added_map = c::HWS.merge_project_sets_seed!(m)
+    NxTest.assert_equal(:updated, status)
+    NxTest.refute(added_map.include?('class:lift|classic|hk_top'),
+                  'kolizia `set_id` v snapshote = predvolba sa NEDOPLNI')
+    NxTest.assert(added_map.include?('class:lift|tipon|hk_top'),
+                  'bez kolizie predvolba pribudne (kontrakt sa nezuzil)')
+    NxTest.assert(added_sets.include?('vyklop-hk-tipon'), added_sets.inspect)
+    _ok, state = c::HWS.project_state_status(m)
+    NxTest.assert_equal(['999999'],
+                        state['sets']['vyklop-hk-klasik']['members'].map { |mm| mm['code'] },
+                        'vlastna definicia projektu ostala NEDOTKNUTA')
+    # Polozka tak skonci na BRANE, nie na cudzich kodoch.
+    exp = c::HWS.expand([c.item], state)
+    NxTest.assert_equal([], exp['rows'], 'ziadny kod cudzieho setu sa nevyda')
+    NxTest.assert_equal([c::HWS::LIFT_SET_INCOMPLETE], c.reasons(exp))
+    NxTest.assert_equal('class_unmapped', exp['unmapped'].first['base_reason'])
+    # Ta ista brana plati aj pri MRAZENI predvolieb do NOVEHO projektu.
+    gd = c::HWS.global_default_state
+    NxTest.assert(gd['mapping'].key?('class:lift|classic|hk_top'),
+                  'nad zdravou kniznicou sa nic nezuzilo')
+  end
 end
 
 # ============================================================================
