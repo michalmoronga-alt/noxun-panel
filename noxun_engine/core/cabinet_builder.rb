@@ -652,10 +652,27 @@ module Noxun
 
         # Marker configu ako Integer. Chybajuci marker = 0 (legacy korpus
         # spred R-12) a ten NIKDY neblokuje.
+        # Codex #333 kolo 3 P2: marker je CISLO (aj zapisane ako string) alebo
+        # NIC. `to_i` na Hash/Array/true vyhodi `NoMethodError`, a tento helper
+        # cita KAZDA migracna vetva zberu (`drawer_stale`, `hinge_stale`,
+        # `flap_stale`) — jediny rucne pokazeny atribut by tak zhodil Kontrolu
+        # aj vsetky vystupy namiesto toho, aby skrinku priznal ako nemigrovanu.
+        # Nepouzitelna hodnota znamena to iste ako chybajuca: 0 = najstarsi
+        # config (migracne nalezy RED, dopredny guard `newer_config?` nie —
+        # smetie nie je marker NOVSEJ verzie).
+        # CISELNY STRING sa cita ako cislo (R-12 kontrakt): dopredny guard je
+        # tu fail-OPEN smerom k prestavbe, takze marker „12" z ineho producenta
+        # nesmie zhasnut blokadu novsieho configu.
         def config_schema_of(cfg)
           return 0 unless cfg.is_a?(Hash)
 
-          cfg['config_schema'].to_i
+          raw = cfg['config_schema']
+          v = case raw
+              when Numeric then raw.to_f.finite? ? raw.to_i : 0
+              when String then raw.strip.match?(/\A-?\d+\z/) ? raw.strip.to_i : 0
+              else 0
+              end
+          v.negative? ? 0 : v
         end
 
         # Je ulozeny config z NOVSEJ verzie? Porovnanie je PRISNE vacsie —

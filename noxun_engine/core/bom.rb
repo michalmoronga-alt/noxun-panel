@@ -548,7 +548,28 @@ module Noxun
       def pre_lift_build?(cfg)
         return true if CabinetBuilder.config_schema_of(cfg) < CabinetBuilder::LIFT_ACTIVATION_SCHEMA
 
-        cfg['rules_seed_version'].to_i < HardwareRules::LIFT_SEED_VERSION
+        provenance_marker(cfg['rules_seed_version']) < HardwareRules::LIFT_SEED_VERSION
+      end
+
+      # Codex #333 kolo 3 P2: MARKER PROVENIENCIE ma byt cislo — a ked nie je,
+      # plati NAJSTARSIA hodnota (0), nie vynimka. `to_i` na Hash/Array/true
+      # VYHODI `NoMethodError` a `Bom.collect` ziadny rescue nema, takze jediny
+      # rucne pokazeny (alebo cudzim producentom zapisany) atribut by zhodil
+      # Kontrolu AJ vsetky vystupy — namiesto toho, aby skrinku priznal ako
+      # nemigrovanu a fail-closed zastavil nakup, rozpocet a ponuku.
+      # Zaporne cislo je tiez „najstarsie" (marker nikdy nie je zaporny).
+      #
+      # PRIJIMA sa LEN `Numeric` — na rozdiel od `config_schema_of`, ktory cita
+      # aj ciselny string (R-12 kontrakt). Dovod je smer zlyhania: tam by 0
+      # ZHASLA doprednu blokadu (fail-open), tu 0 znamena RED `flap_stale`
+      # a napravu „Doplniť nové predvoľby + prestavba" — teda fail-CLOSED,
+      # a prestavba marker aj tak prepise spravnym Integerom.
+      # -> celociselny marker >= 0
+      def provenance_marker(raw)
+        return 0 unless raw.is_a?(Numeric) && raw.to_f.finite?
+
+        v = raw.to_i
+        v.negative? ? 0 : v
       end
 
       # Riadok ciel je `flap` a v ULOZENOM kovani k nemu chyba to, co mu podla

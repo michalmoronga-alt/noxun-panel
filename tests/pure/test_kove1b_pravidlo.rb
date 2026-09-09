@@ -930,6 +930,32 @@ NxTest.test('KOV-E1b (11): mechanizmy sa čítajú aj z POUŽÍVATEĽSKÝCH seto
   NxTest.assert(c::HWS.flap_set_codes('nezmysel')['lift']['mechanism'][c::MECH_HK])
 end
 
+NxTest.test('KOV-E1b (11): POKAZENÝ marker provenience nezhodí zber — platí najstarší') do
+  c = NxKovE1b
+  # Codex #333 kolo 3 P2: `to_i` na Hash/Array/true vyhodí výnimku a `Bom.collect`
+  # žiadny rescue nemá — jeden ručne pokazený atribút by zhodil Kontrolu AJ
+  # všetky výstupy. Nepoužiteľná hodnota preto znamená to isté ako chýbajúca: 0.
+  [{}, [], true, 'nezmysel', nil, -3].each do |junk|
+    cfg = c.stale_cfg(c::CB::LIFT_ACTIVATION_SCHEMA, c::HR::FLAP_UP, [], seed: junk)
+    iss = c::BOM.flap_stale_issue('CAB-9', 4, cfg)
+    NxTest.assert(iss, "seed #{junk.inspect} = najstarší -> RED `flap_stale`")
+    NxTest.assert_equal(c::BP::FLAP_STALE, iss['code'])
+  end
+  # To isté pre schému configu (číta ju KAŽDÁ migračná vetva zberu).
+  bad = c.stale_cfg(c::CB::LIFT_ACTIVATION_SCHEMA)
+  bad['config_schema'] = {}
+  NxTest.assert_equal(0, c::CB.config_schema_of(bad), 'smetie = najstaršia schéma')
+  NxTest.assert(c::BOM.flap_stale_issue('CAB-9', 4, bad), 'a skrinka je nemigrovaná')
+  NxTest.refute(c::CB.newer_config?(bad), 'smetie NIE JE marker novšej verzie')
+  # Zdravá skrinka sa tým nemení.
+  NxTest.assert_equal(nil, c::BOM.flap_stale_issue(
+                             'CAB-9', 4,
+                             c.stale_cfg(c::CB::LIFT_ACTIVATION_SCHEMA, c::HR::FLAP_UP,
+                                         [{ 'owner_part_key' => 'front:F1/flap',
+                                            'generic_type' => 'lift' }])
+                           ))
+end
+
 NxTest.test('KOV-E1b (11): ručný doplnok vedľa automatu = ORANGE `flap_manual_duplicate`') do
   c = NxKovE1b
   owner = 'front:F1/flap'
