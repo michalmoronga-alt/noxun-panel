@@ -81,6 +81,21 @@
   function rdIsLegacySlide(r){
     return !!r && String(r.rule_id || '') === RD_LEGACY_SLIDE_ID;
   }
+  // KOV-E1b: jednoriadkový súhrn výklopového pravidla (read-only do E2).
+  // Číta LEN to, čo naozaj existuje — pravidlo z poškodeného snapshotu alebo
+  // z novšej verzie nesmie zhodiť render celej sekcie.
+  function rdLiftSummary(r){
+    var cls = rdArr(r && r.classes).length;
+    var arms = rdArr(r && r.arms).length;
+    var kg = (r && typeof r.handle_allowance_kg === 'number') ? r.handle_allowance_kg : null;
+    var rod = (r && typeof r.rod_double_from_kb_mm === 'number') ? r.rod_double_from_kb_mm : null;
+    var parts = ['HK top: ' + cls + ' tried podľa LF', 'HL top: ' + arms + ' párov ramien'];
+    if (kg !== null) parts.push('rezerva na úchytku ' + kg + ' kg');
+    if (rod !== null) parts.push('druhá stabilizačná tyč od šírky ' + rod + ' mm');
+    return parts.join(' · ') + '. Tabuľky sa tu zatiaľ needitujú.';
+  }
+  if (typeof window !== 'undefined') window.rdLiftSummary = rdLiftSummary;
+
   function rdRuleTitle(r){
     var base = rdLabel(r && r.output);
     return rdIsLegacySlide(r) ? (base + ' — staré zákazky bez systému zásuvky') : base;
@@ -100,6 +115,13 @@
     }
     if (role === 'front_door') return 'na každé krídlo dvierok';
     if (role === 'drawer_front') return 'na každé zásuvkové čelo';
+    // KOV-E1b: rola `flap` je SPOLOČNÁ pre výklop aj sklop — rozlišuje ich až
+    // filter smeru, takže bez neho by dve pravidlá vyzerali rovnako.
+    if (role === 'flap'){
+      if (ap.flap_dir === 'up') return 'na každý výklop';
+      if (ap.flap_dir === 'down') return 'na každý sklop';
+      return 'na každý výklop aj sklop';
+    }
     if (role === 'shelf') return 'na každú policu';
     return role;
   }
@@ -483,6 +505,11 @@
         html += '<div class="rrow"><label>Počet</label><input class="rqty rnum" type="number" min="1" max="999" step="1" value="'+rdEsc(r.quantity!=null?r.quantity:1)+'"><span class="unit">sád</span></div>';
         html += '<div class="hint">Vyberie sa najväčšia dĺžka z radu, ktorá sa zmestí do svetlej hĺbky mínus rezerva.'
               + (rdIsLegacySlide(r) ? ' ' + rdEsc(RD_LEGACY_SLIDE_HINT) : '') + '</div>';
+      } else if (r.kind === 'lift_class'){
+        // KOV-E1b: výklopy sú zatiaľ LEN NA ČÍTANIE — editor (triedy, ramená,
+        // eligibility) prinesie E2. Súhrn ale musí byť: pravidlo, ktoré sa
+        // nedá ani prečítať, vyzerá ako chyba, ktorú niekto zabudol zmazať.
+        html += '<div class="hint">' + rdEsc(rdLiftSummary(r)) + '</div>';
       } else if (r.kind === 'part_flag_length'){
         // D-90: pravidlo bez nastavení — reaguje na príznak profilu na čele.
         // TEST-1: text sa líši podľa roly (dvierka vs. zásuvkové čelo).
@@ -866,6 +893,9 @@
                        rdIsLegacySlide: rdIsLegacySlide, RD_LEGACY_SLIDE_HINT: RD_LEGACY_SLIDE_HINT,
                        rulesToolsHtml: rulesToolsHtml, rdValidate: rdValidate,
                        rdLabel: rdLabel, rdRoleDesc: rdRoleDesc,
+                       // KOV-E1b: súhrn výklopového pravidla (read-only do E2) —
+                       // ČISTÁ funkcia, testuje sa aj bez DOM.
+                       rdLiftSummary: rdLiftSummary,
                        rulesRenderBody: rulesRenderBody, rdApplyState: rdApplyState,
                        rdCollectRules: rdCollectRules, RD: RD,
                        // KOV-F2: editor door guardov. `rdGuardHtml`/`rdGuardSummary`/

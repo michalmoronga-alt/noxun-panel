@@ -943,7 +943,12 @@
   // `||` fallback na neurčený stav, na klasické otváranie ani na stranu pántov.
   // (Guard v tests/pure/test_kova1_cela.rb stráži aj tento súbor, preto tu
   // taký literál nesmie stáť ani v komentári.)
-  var FRONT_EXTRA_KEYS = ['direction', 'wing_directions', 'opening_mode', 'drawer'];
+  // KOV-E1b: `lift` (= `{ system: 'hk_top' | 'hl_top' }`) je tu z toho istého
+  // dôvodu ako `drawer` — je to VNORENÝ objekt, ktorý panel iba prenáša.
+  // Bez neho by Inspector pri každom uložení prepísal HL top späť na HK
+  // (Astra FIX 10, Codex #331 kolo 2 P1): riadok ide na server VCELKU, takže
+  // kľúč, ktorý serializér nepozná, zanikne.
+  var FRONT_EXTRA_KEYS = ['direction', 'wing_directions', 'opening_mode', 'drawer', 'lift'];
   function frontExtraStore(row, item){
     var out = {}, n = 0;
     for (var i = 0; i < FRONT_EXTRA_KEYS.length; i++){

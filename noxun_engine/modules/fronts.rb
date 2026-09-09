@@ -81,11 +81,21 @@ module Noxun
       # PREZIJE normalizaciu a stavba ho prizna ako RED `drawer_recipe_unknown`.
       RECIPE_REF_KEY_RE = /\A(#{DRAWER_SYSTEMS.join('|')})\|(sisy|p2o)\z/.freeze
       RECIPE_ID_RE      = /\A(#{DRAWER_SYSTEMS.join('|')})_(sisy|p2o)_v\d+\z/.freeze
+      # KOV-E1b: SYSTEM VYKLOPU (`lift.system`) — HK top (veko) / HL top
+      # (dvojdielne rameno). Slovnik je ZHODNY s `HardwareSets::LIFT_SYSTEMS`
+      # (guard test ich porovnava); tu zije preto, ze `fronts` sa nacitava PRED
+      # setmi. Chybajuca/neznama hodnota pri CITANI = `hk_top` (grandfather
+      # starej schemy), ale KAZDY novy zapis riadku typu `lift` hodnotu ULOZI —
+      # inak by sa nedalo odlisit „este nikto nevybral" od „vybral HK".
+      LIFT_SYSTEMS       = %w[hk_top hl_top].freeze
+      LIFT_SYSTEM_DEFAULT = 'hk_top'
       # Polia, ktore su DORMANT (audit #14 BLOCKER 3): v configu sa drzia VZDY
       # bez ohladu na aktualny typ a pocet kridiel, takze po navrate na
       # dvierka/1 kridlo sa ulozena hodnota obnovi. Aplikovatelnost urcuje
       # VYHRADNE `direction_slots` z efektivneho `wings_n`.
-      DORMANT_KEYS = %w[direction wing_directions opening_mode drawer].freeze
+      # KOV-E1b: `lift` je dormant z TOHO ISTEHO dovodu — prepnutie vyklopu na
+      # dvierka a spat nesmie zahodit vybrany system.
+      DORMANT_KEYS = %w[direction wing_directions opening_mode drawer lift].freeze
 
       module_function
 
@@ -149,6 +159,10 @@ module Noxun
           # `flap_dir` je ODVODENY z typu (nie je to default smeru dvierok —
           # trojstav O1 sa tyka STRANY PANTOV, toto je smer vyklapania).
           res['flap_dir'] = (it['type'] == 'fall' ? 'down' : 'up') if FLAP_TYPES.include?(it['type'])
+          # KOV-E1b: PROJEKCIA systemu vyklopu do resolved cela — pravidlo
+          # (`lift_class`) aj karta ho citaju odtialto, nie z vnoreneho `lift`.
+          # Len pri type `lift`: sklop system nema (dostane zavesy).
+          res['lift_system'] = lift_system_of(it) if it['type'] == 'lift'
           resolved << res
           bounds[res['id']] = { z0: z.to_f, z1: (z + h).to_f, height: h.to_f }
           z += h + gap
@@ -492,6 +506,13 @@ module Noxun
           out['opening_mode'] = om if om
           drw = norm_drawer(it['drawer'] || it[:drawer])
           out['drawer'] = drw if drw
+          # KOV-E1b: system vyklopu. Ako ostatne dormant polia sa ZACHOVA bez
+          # ohladu na typ riadku, ale pri type `lift` sa VZDY MATERIALIZUJE
+          # (chybajuca hodnota = stara schema; novy zapis nesie vybrany system
+          # explicitne, aby ho starsi plugin nemohol ticho vratit na HK).
+          lft = norm_lift(it['lift'] || it[:lift])
+          out['lift'] = lft if lft
+          out['lift'] = { 'system' => LIFT_SYSTEM_DEFAULT } if type == 'lift' && !out.key?('lift')
           out
         end
       end
@@ -546,6 +567,32 @@ module Noxun
         refs = norm_recipe_refs(raw['recipe_refs'] || raw[:recipe_refs])
         out['recipe_refs'] = refs if refs
         out.empty? ? nil : out
+      end
+
+      # KOV-E1b: `lift` = { 'system' => 'hk_top' | 'hl_top' }. Pod-pole je LEN
+      # jedno, takze hash bez neho (ani z novsej verzie) do configu nejde —
+      # prazdny objekt by predstieral vybranu hodnotu. NEZNAMA hodnota sa
+      # ZAHADZUJE (nie „unset"): systemy su uzavrety slovnik a citac ma pre
+      # chybajucu hodnotu jednoznacny vyklad (`hk_top`).
+      def norm_lift(raw)
+        return nil unless raw.is_a?(Hash)
+
+        s = norm_enum(raw['system'] || raw[:system], LIFT_SYSTEMS)
+        s ? { 'system' => s } : nil
+      end
+
+      # JEDINA autorita otazky „aky system ma tento riadok ciel". Cita SUROVU
+      # aj RESOLVED polozku (`front_items` nesie `lift_system` skalar) a pre
+      # stary config vracia `hk_top` — grandfather pri CITANI, nikdy zapis.
+      def lift_system_of(item)
+        return LIFT_SYSTEM_DEFAULT unless item.is_a?(Hash)
+
+        flat = (item['lift_system'] || item[:lift_system]).to_s.strip
+        return flat if LIFT_SYSTEMS.include?(flat)
+
+        lift = item['lift'] || item[:lift]
+        s = lift.is_a?(Hash) ? (lift['system'] || lift[:system]).to_s.strip : ''
+        LIFT_SYSTEMS.include?(s) ? s : LIFT_SYSTEM_DEFAULT
       end
 
       # Mapa `"<system>|<otvaranie>" => recipe_id`. Prazdna mapa = kluc prec.

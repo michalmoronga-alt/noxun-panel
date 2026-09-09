@@ -144,7 +144,18 @@ module Noxun
       #       5–9: dopredny guard prestavby/sablon/kopie (`newer_config?`)
       #       a exportna brana (`ProductionCore.export_blockers`).
       #       E1b bumpne znova (10 -> 11) pre config cela `lift.system`.
-      CONFIG_SCHEMA = 10
+      #  11 = KOV-E1b — SYSTEM VYKLOPU NA CELE. Riadok ciel typu `lift` nesie
+      #       `lift: { system: 'hk_top' | 'hl_top' }` a config skrinky nesie
+      #       vyklopove dovody v `hardware_conflicts` (`lift_class_missing`,
+      #       `lift_dimension_unsupported`, `lift_multirow_unsupported`,
+      #       `lift_combo_unsupported`). Starsi plugin (schema 10) `lift`
+      #       nepozna: jeho `Fronts.normalize_items` ho whitelistom ZAHODI
+      #       a prestavba by HL top ticho vratila na HK — teda INY mechanizmus,
+      #       ine ramena a ina tyc v objednavke; nove dovody by z nosica
+      #       vypadli (`HW_CONFLICT_CODES` ich nepozna) a RED by zmizol. Brany
+      #       su rovnake ako pri 5–10: dopredny guard prestavby/sablon/kopie
+      #       (`newer_config?`) a exportna brana (`ProductionCore.export_blockers`).
+      CONFIG_SCHEMA = 11
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
       # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)
@@ -159,6 +170,17 @@ module Noxun
       # VLASTNA konstanta z TOHO ISTEHO dovodu ako pri zasuvkach: pri buducom
       # bumpe na 10 sa skrinky schemy 9 nesmu zrazu tvarit ako nemigrovane.
       HINGE_ACTIVATION_SCHEMA = 9
+
+      # KOV-E1b (delta audit Sol FIX 4): schema, OD KTOREJ stavba pozna PRAVIDLA
+      # VYKLOPOV A SKLOPOV (`lift_class` + `zavesy-sklop`). Skrinka ulozena POD
+      # nou vznikla PRED E1b, takze jej `config.hardware[]` o celach `flap` NIC
+      # nevie — zber ju priznava `flap_stale`. Rozhoduje VYHRADNE proveniencia
+      # stavby, NIE pritomnost seed pravidiel: pouzivatel smie mat vlastne
+      # (aj vypnute) vyklopove pravidlo a skrinka prestavana pod schemou 11 je
+      # vysledok jeho rozhodnutia, nie zaostalost. VLASTNA konstanta z toho
+      # isteho dovodu ako pri zasuvkach a zavesoch (buduci bump schemy nesmie
+      # spravit zo skriniek schemy 11 nemigrovane).
+      LIFT_ACTIVATION_SCHEMA = 11
 
       MIN = { width: 200.0, height: 200.0, depth: 150.0 }.freeze
       # D-45: povoleny rozsah hrubky korpusu (mm) — JEDINY zdroj pravdy pre clamp
@@ -2333,9 +2355,16 @@ module Noxun
             next if rid.empty?
 
             rec = { 'owner_part_key' => owner, 'generic_type' => gt, 'rule_id' => rid }
-            rec['disabled'] = true if truthy_flag(ov['disabled'] || ov[:disabled])
+            # KOV-E1b (Astra FIX 11, rozsah podla Codex #331 kolo 2 P1): polozky
+            # SEED pravidla vyklopov su „plny automat" — vypnutie ani rucny
+            # pocet na nich neexistuje (vyklop je ZOSTAVA, polovicna objednavka
+            # nie je volba). Zaznam sa preto vycisti UZ TU, so zaznamom v logu;
+            # VLASTNE `lift` pravidla pouzivatela a ich overridy ostavaju UCINNE.
+            protected_lift = rid == HardwareRules::LIFT_RULE_ID
+            log_dropped_lift_override(rid, owner) if protected_lift && lift_override_content?(ov)
+            rec['disabled'] = true if !protected_lift && truthy_flag(ov['disabled'] || ov[:disabled])
             q = (ov['quantity'] || ov[:quantity])
-            qi = q.to_s.strip.empty? ? nil : q.to_i
+            qi = q.to_s.strip.empty? || protected_lift ? nil : q.to_i
             rec['quantity'] = [qi, BuildPlan::MAX_HW_QUANTITY].min if qi && qi >= 1
             # NL: JEDINA autorita tvaru je HardwareRules.override_nl (strict Float).
             nl = HardwareRules.override_nl(ov['nominal_length'] || ov[:nominal_length])
@@ -2382,6 +2411,20 @@ module Noxun
 
         def log_dropped_height_lock(rule_id, why)
           Engine.log("norm_hardware_overrides: height_variant zahodeny (#{rule_id}) — #{why}") if defined?(Engine)
+        end
+
+        # KOV-E1b: nesie zaznam nieco, co by na chranenej vyklopovej polozke
+        # zaniklo? (Len kvoli logu — tichy drop by rucny zasah zmazal bez stopy.)
+        def lift_override_content?(ov)
+          truthy_flag(ov['disabled'] || ov[:disabled]) ||
+            !(ov['quantity'] || ov[:quantity]).to_s.strip.empty?
+        end
+
+        def log_dropped_lift_override(rule_id, owner)
+          return unless defined?(Engine)
+
+          Engine.log("norm_hardware_overrides: rucny zasah na vyklope zahodeny (#{rule_id}, " \
+                     "#{owner || 'korpus'}) — polozky pravidla #{rule_id} su plny automat")
         end
 
         # --- KOV-H1: ad-hoc kovanie -----------------------------------------

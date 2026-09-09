@@ -154,6 +154,12 @@ module Noxun
             # nakup, rozpocet aj ponuka presli s poddimenzovanymi zavesmi.
             hs = hinge_stale_issue(cid, inst.persistent_id, ccfg, rules_stale)
             hardware_issues << hs if hs
+            # KOV-E1b: TRETI vzor — skrinka postavena PRED pravidlami vyklopov.
+            # Jej vyklop nema mechanizmus a jej sklop nema zavesy, takze nakup
+            # by bol NEUPLNY a ticho. Aktivuje ju VYHRADNE proveniencia stavby
+            # (schema configu), nie pritomnost pravidiel (delta audit Sol FIX 4).
+            fs = flap_stale_issue(cid, inst.persistent_id, ccfg)
+            hardware_issues << fs if fs
             cs = ccfg['hardware_sets']
             note_cabinet_sets(cid, (cs.is_a?(Hash) && !cs.empty? ? cs : nil),
                               cabinet_sets, cabinet_sets_seen, cabinet_set_conflicts)
@@ -475,6 +481,71 @@ module Noxun
                        'kovania spusti „Doplniť nové predvoľby“ — nová tabuľka závesov ' \
                        '(+1 nad šírku 600 mm, set podľa otvárania) platí až keď je hotové oboje.',
           'label' => PartKeys.human_label(pkey, fronts: items).to_s }
+      end
+
+      # === KOV-E1b: NEPRESTAVANY VYKLOP ALEBO SKLOP (`flap_stale`) ===========
+      #
+      # Skrinka postavena PRED E1b (`config_schema` < `LIFT_ACTIVATION_SCHEMA`),
+      # ktora MA celo `flap`. Pravidla vyklopov a sklopov vtedy neexistovali,
+      # takze v jej `config.hardware[]` nie je ani vyklopovy mechanizmus (`up`),
+      # ani zavesy sklopu (`down`) — a zber cita LEN ULOZENE hodnoty, takze bez
+      # tejto brany by nakup, rozpocet aj ponuka presli s celom UPLNE BEZ
+      # kovania. Fail-closed RED; VEPO branu NEDOSTAVA (geometria je spravna).
+      #
+      # ROZHODUJE VYHRADNE PROVENIENCIA STAVBY (delta audit Sol FIX 4).
+      # Predikat sa ZAMERNE NEPYTA na pritomnost seed pravidiel: pouzivatel smie
+      # mat vlastne (aj vypnute) vyklopove pravidlo, a kedze `seed_additions`
+      # taky seed nedoplni a ochrana overridov ho drzi, „Doplniť nové predvoľby
+      # + prestavba" by RED nikdy nezhasla. Skrinka PRESTAVANA pod schemou 11
+      # preto NIE JE stale nikdy — vysledok stavby s UCINNYMI pravidlami je
+      # rozhodnutie pouzivatela, nie zaostalost.
+      #
+      # `hinge_stale_issue` mlci, ked zaves nenajde; TU je to naopak — CHYBAJUCA
+      # polozka JE nalez. -> nalez | nil
+      def flap_stale_issue(owner_id, owner_pid, ccfg)
+        return nil unless defined?(CabinetBuilder) && defined?(HardwareRules)
+
+        cfg = ccfg.is_a?(Hash) ? ccfg : {}
+        return nil if CabinetBuilder.config_schema_of(cfg) >= CabinetBuilder::LIFT_ACTIVATION_SCHEMA
+
+        items = cfg['front_items'].is_a?(Array) ? cfg['front_items'] : []
+        hw = Array(cfg['hardware'])
+        hit = items.find { |it| it.is_a?(Hash) && flap_without_hardware?(it, hw) }
+        return nil if hit.nil?
+
+        up = hit['flap_dir'].to_s != HardwareRules::FLAP_DOWN
+        pkey = PartKeys.front(hit['id'].to_s, 'flap')
+        { 'code' => BuildPlan::FLAP_STALE, 'severity' => 'red',
+          'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
+          'part_key' => pkey, 'front_id' => hit['id'].to_s,
+          'message' => "Skrinka #{owner_id} má #{up ? 'výklop' : 'sklop'} postavený ešte pred " \
+                       "pravidlami #{up ? 'výklopov' : 'sklopov'} — v Pravidlách kovania spusti " \
+                       '„Doplniť nové predvoľby“ a skrinku prestav, inak jej v nákupe chýba ' \
+                       "#{up ? 'celý mechanizmus výklopu' : 'závesy sklopu'}.",
+          'label' => PartKeys.human_label(pkey, fronts: items).to_s }
+      end
+
+      # Riadok ciel je `flap` a v ULOZENOM kovani k nemu chyba to, co mu podla
+      # smeru patri: vyklopu (`up`) polozka `lift`, sklopu (`down`) zaves
+      # s `use_type: 'door'`. Iny typ riadku nalez nerobi.
+      def flap_without_hardware?(item, hardware)
+        dir = item['flap_dir'].to_s
+        return false unless [HardwareRules::FLAP_UP, HardwareRules::FLAP_DOWN].include?(dir)
+
+        fid = item['id'].to_s
+        want_lift = dir == HardwareRules::FLAP_UP
+        hardware.none? do |h|
+          next false unless h.is_a?(Hash)
+          next false unless PartKeys.front_id(h['owner_part_key'].to_s).to_s == fid
+
+          if want_lift
+            h['generic_type'].to_s == HardwareRules::LIFT_OUTPUT
+          else
+            params = h['params'].is_a?(Hash) ? h['params'] : {}
+            h['generic_type'].to_s == HardwareRules::HINGE_OUTPUT &&
+              params['use_type'].to_s == HardwareRules::DOOR_USE_TYPE
+          end
+        end
       end
 
       # === KOV-F1 (Codex #329 kolo 3 P1): PRAVIDLA Z NOVSIEHO PLUGINU ========

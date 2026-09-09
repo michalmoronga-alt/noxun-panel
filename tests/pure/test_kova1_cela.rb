@@ -658,7 +658,9 @@ module NxTest
 
   test('KOV-A1 GUARD: form.js pass-through BEZ defaultu + VSETKYCH SEST typov v ponuke') do
     s = NxKovA1.src('ui/js/form.js')
-    assert(s.include?("var FRONT_EXTRA_KEYS = ['direction', 'wing_directions', 'opening_mode', 'drawer']"),
+    # KOV-E1b: zoznam sa rozsiril o `lift` (system vyklopu) — pribuda sa
+    # VZDY na koniec, aby sa dal guard citat ako historia kontraktu.
+    assert(s.include?("var FRONT_EXTRA_KEYS = ['direction', 'wing_directions', 'opening_mode', "                       "'drawer', 'lift']"),
            'form.js musi drzat zoznam prenasanych poli na JEDNOM mieste')
     assert(s.include?('frontExtraStore(row, item)'), 'addFrontRow uklada polia do datasetu')
     assert(s.include?('frontExtraApply(item, r)'), 'collectFronts ich vracia spat')
