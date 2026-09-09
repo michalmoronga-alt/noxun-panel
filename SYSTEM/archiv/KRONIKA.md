@@ -17,6 +17,20 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **FIX · `incompatible_detail_sk` MÁ JEDNU DEFINÍCIU — `height_selector` KONEČNE S VETOU, AST GUARD DUPLICÍT (9.9.2026; PR #335, v0.9.56).**
+  Metóda, ktorá prekladá dôvod nekompatibilného setu do vety Nákupu, panela a Kontroly, bola v `HardwareSets` definovaná **dvakrát** — tabuľka `INCOMPATIBLE_DETAIL_SK`
+  z KOV-C2a a inline hash z KOV-D1a. Ruby ticho používa druhú, takže tabuľka aj prvá metóda boli mŕtvy kód a detail **`height_selector`** (pevný `set_id` pre zásuvku
+  s výškovým variantom, KOV-C2a/D1a) sa nikdy nepreložil — používateľ videl generické „iná klasifikácia". KOV-F1 a KOV-E1a to vedome obchádzali dopisovaním každého
+  nového detailu na obe miesta (komentár „TÁTO je tá účinná"). **Fix:** jedna tabuľka + jedna metóda; znenia tie, ktoré sa zobrazovali doteraz (`system` = „iný systém
+  zásuviek", fallback „iná klasifikácia" — teraz konštanta `INCOMPATIBLE_DETAIL_FALLBACK_SK`), doplnený `height_selector` („výber setu nie je podľa výšky zásuvky");
+  `use_type` už v účinnej mape bol. **Stráži to:** nový **AST guard** v `tests/pure/test_guards.rb` — žiadna metóda nie je v tom istom module/triede definovaná dvakrát
+  (sken celého pluginu cez `RubyVM::AbstractSyntaxTree`, nie regex — rovnaké mená v rôznych triedach nie sú duplicita; pred fixom presne jeden nález, tento) — a sada
+  `tests/pure/test_incompatible_detail_sk.rb` (jedna autorita · každý `detail` vydávaný zdrojákom má vetu a naopak · zachované znenia · `height_selector` end-to-end
+  v Nákupe, paneli a Kontrole; mutácie M1–M3 overené ručne). Existujúce testy na tie texty neasertovali. Testy: **headless 3659 / 0**, **102 JS sád / 0**; in-SU beh
+  netreba (bez buildera/observera). **Priznaný zvyšok (mimo opravy):** pri `height_selector` nesie veta prázdne meno setu („set „“ nesedí so zásuvkou (…)"), lebo
+  `resolve_set_id` vracia `set_id = nil` a `unmapped_entry` ho z `info` nepreberá — samostatná drobnosť naprieč Nákupom, Kontrolou a panelom.
+  **Poučenie:** „druhá definícia vyhráva" Ruby nehlási ani warningom; keď sa pri review objaví komentár „táto je tá účinná", je to nález, nie riešenie.
+
 - **KOV-E — VÝKLOP DOSTANE KOVANIE SÁM: AVENTOS HK top / HL top (E1a dáta PR #332 · E1b pravidlo + brány PR #333 · E2 UI PR #334; v0.9.53–0.9.55, 9.9.2026).**
   Doteraz čelo typu **výklop** nedostalo v nákupe nič — plugin preň nemal pravidlo a katalóg nepoznal mechanizmy. Blok E to uzatvára v troch dávkach nad jedným package (v4,
   po Astra audite [4 BLOCKER + 7 FIX + 1 NOTE] a troch kolách Codex nad docs PR #331). **Dáta (E1a):** katalóg pozná 23 položiek AVENTOS (mechanizmy HK top 4 triedy × skrutky | Tip-On,
