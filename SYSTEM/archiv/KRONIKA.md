@@ -17,6 +17,36 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-E — VÝKLOP DOSTANE KOVANIE SÁM: AVENTOS HK top / HL top (E1a dáta PR #332 · E1b pravidlo + brány PR #333 · E2 UI PR #334; v0.9.53–0.9.55, 9.9.2026).**
+  Doteraz čelo typu **výklop** nedostalo v nákupe nič — plugin preň nemal pravidlo a katalóg nepoznal mechanizmy. Blok E to uzatvára v troch dávkach nad jedným package (v4,
+  po Astra audite [4 BLOCKER + 7 FIX + 1 NOTE] a troch kolách Codex nad docs PR #331). **Dáta (E1a):** katalóg pozná 23 položiek AVENTOS (mechanizmy HK top 4 triedy × skrutky | Tip-On,
+  krytky HK/HL biela + svetlo/tmavo šedá, Tip-On jednotky 76 mm, HL top 2 mechanizmy + 4 ramená + stabilizačná tyč + predĺženie) — ceny s DPH z Démosu, hmotnostné limity HL top
+  z verejného Blum katalógu 2024/25 (e-services netreba). Knižnica má **6 setov výklopov** (HK klasik / HK Tip-On / HL klasik, každý **biely a tmavý** — tmavá = tmavo šedé krytky
+  + čierny Tip-On, čierne krytky Démos nemá); člen setu vie **vybrať kód podľa parametra** (`code_by_param` — trieda mechanizmu, ramená) a **počet z parametra** (`quantity_from` —
+  tyč 1×/2×, predĺženie 0/1); výklop má **owner kľúč `front:<id>/flap`** pre voľbu tmavého setu; **brána úplnosti** `lift_set_incomplete` = nikdy „krytky bez mechanizmu“.
+  **Pravidlo (E1b):** kind `lift_class` — HK top podľa **LF = výška korpusu bez sokla × (hmotnosť čela + 0,5 kg rezerva na úchytku)** → 22K2300 / 2500 / 2700 / 2900 (v prekryve
+  najslabšia trieda, ktorá pokryje); HL top mechanizmus podľa výšky (22L2200 / 2500) + ramená podľa výšky **a hmotnosti vrátane rezervy** (22L3200 / 3500 / 3800 / 3900, pásma bez
+  Float medzier) + tyč vždy, od šírky korpusu 1100 mm dve + predĺženie; **sklop dostane závesy ako dvierka** (druhé seed pravidlo `zavesy-sklop`); karta čela nesie **systém HK | HL**
+  bezstratovo (CONFIG_SCHEMA 11, JS aj server). **Brány:** RED mimo tabuľky / bez hmotnosti · mimo rozmerov Blum (HK korpus 205–600, šírka ≤ 1800, HL hĺbka ≥ 264 — z `available_depth`)
+  · výklop vo viacriadkovej skrinke (V1: jediný riadok čiel) · HL top + Tip-On (nevyrába sa) · **`flap_stale`** pre staré zákazky — **proveniencia stavby** (schéma < 11 alebo pravidlá
+  seed < 5; prestavba so starým snapshotom červenú NEzhasne, zhasne až „Doplniť nové predvoľby“ + prestavba). ORANGE: ľahké čelo (najslabšia trieda), prekryv pravidiel (podľa roly
+  AJ smeru výklopu, seed aj runtime), **ručné kovanie na výklope**: úplná ručná zostava (= mechanizmus podľa setov) automat potlačí, doplnok (krytka, tyč) automat nechá a varuje pri
+  zhode kódu s účinným setom. Položky seed pravidla sú **plný automat** (ručný `disabled`/`quantity` sa ignoruje + ORANGE), vlastné lift pravidlá a ich zásahy ostávajú účinné.
+  Riadok v Kovaní existuje vždy, aj pri červenej; export nákupu/rozpočtu/ponuky stojí, VEPO a geometria bežia. **UI (E2):** karta výklopu = segment HK | HL + jeden riadok
+  vyriešeného mechanizmu s rozklikom „Technický detail“ + inforow s tou istou vetou ako Kontrola; výber setu vrátane tmavého v Kovaní cez existujúci picker (bez zmeny klienta);
+  editor pravidla výklopov v Pravidlách (vzor F2, spoločná Ruby/JS validácia cez paritnú fixtúru); editor setov pozná nové tvary členov (read-only režim z E1a zanikol).
+  **Kolo 1 review #334 dorovnalo päť tichých rozdielov:** karta hlási „postavené pred pravidlami“ presne vtedy čo Kontrola (úplná ručná zostava ju zháša na oboch stranách) ·
+  štítok **„automat“** ostáva chránenému seed pravidlu, položka z vlastného pravidla s ručným zásahom je **„ručne“** · **nulový** prah druhej tyče sa neuloží (súhrn by písal
+  „od 0 mm“, automat by tyč nedal nikdy) · **nedopísaný riadok** tabuľky výklopu sa neuloží ticho (normalizácia ho zahodí, preto stojí v ceste uloženia druhá brána nad surovým
+  vstupom) · **duplicitnú triedu** v tabuľke člena setu zachytí klient (server dostáva mapu, v ktorej druhý riadok prvý už prepísal).
+  **Review a odchýlky:** #331 3 kolá (8+5+2), #332 4 kolá (3+3+4+2) + slepá delta (1 P2 + 4 P3), #333 3 kolá (6+3+3) + slepá delta (1 P2 + 2 P3), #334 1 kolo (1 P1 + 5 P2) —
+  **vedomá odchýlka od pravidla 3 kôl** (RETRO 12.8.): nešlo o zle narezané PR, ale o hardening dátovej vrstvy a brán, na ktorých stojí celý blok; každé kolo nieslo reálny nález
+  (najcennejšie: prestavba starej zákazky by zhasla červenú bez kovania; ručné kovanie by sa objednalo dvakrát; deaktivovaný set by zablokoval nové projekty). Po kolách len s P2
+  sa použila interná delta verifikácia slepým subagentom (pravidlo 29.8.). Rozhodnutia Michala 8.–9.9.: len skrutky, HL bez Tip-On, Tip-On bez adaptéra, tyč vždy / od 1100 dve,
+  farba setu biela | tmavá (= tmavo šedá), ľahké čelo ORANGE, výklop = jediný riadok čiel, eligibility Blum. Podklady: `zdroje/demos/SEED_AVENTOS_v2_2026-09-09.md`,
+  `zdroje/next_sessions/KOVANIE_KOVE_AUDIT_2026-09-09_ASTRA.md`. **Testy:** 3649 headless · 102 JS sád · in-SketchUp 2071 PASS / 0 FAIL (sekcia `run_kove`).
+  **Mimo V1 (zapísané):** delenie stabilizačnej tyče medzi úzke skrinky („Dĺžkové“), výklop vo viacriadkovej skrinke, svetlo šedá farba setu, LF/kg v technickom detaile karty.
+
 - **KOV-F2 fix kolo — POKAZENÉ DÁTA UŽ NEZHODIA SEKCIU A SÚHRN NEZAOSTÁVA (Codex #330 kolo 1, 2× P2; v0.9.52, 9.9.2026).**
   Prvý nález: keď v uloženom pravidle boli hmotnostné pásma v **nesprávnom tvare** (nie zoznam — napr. jeden objekt alebo text z cudzieho či pokazeného snapshotu),
   editor sa ich pokúsil prejsť riadok po riadku a **spadla celá sekcia Pravidlá** — teda aj jediné miesto, kde sa taká hodnota dá opraviť. Teraz sa taký stav vykreslí
