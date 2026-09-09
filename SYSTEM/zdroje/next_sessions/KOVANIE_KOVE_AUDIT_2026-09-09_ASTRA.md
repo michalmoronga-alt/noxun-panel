@@ -24,4 +24,4 @@ Codex CLI 0.153.4, model `gpt-6-astra`, session `01a084fa-1856-7950-ac1a-ea6eace
 owner `/flap`, std/bariéry, read-only editor) · **E1b PRAVIDLO + BRÁNY** (kind `lift_class`, config `lift.system`, KH, eligibility, sklop, stale, overrides, `FRONT_EXTRA_KEYS`) ·
 **E2 UI**. Audit pred E1b znova (delta Sol) — E1b mení kontrakt configu a brán.
 
-**Otvorené pre Michala:** (a) V1 = výklop len ako jediný riadok čiel skrinky — OK? (b) eligibility hodnoty Blum (HK KH 205–600, šírka ≤ 1800, HL hĺbka ≥ 264) — potvrdiť z katalógu.
+**Michal potvrdil 9.9.2026 (obe):** (a) V1 = výklop len ako jediný riadok čiel skrinky — OK? (b) eligibility hodnoty Blum (HK KH 205–600, šírka ≤ 1800, HL hĺbka ≥ 264) — potvrdiť z katalógu.
