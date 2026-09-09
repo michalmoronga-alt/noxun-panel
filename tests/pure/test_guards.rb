@@ -56,3 +56,48 @@ NxTest.test('guard: Numeric#mm sa nepouziva mimo units.rb') do
   end
   NxTest.assert(offenders.empty?, "Numeric#mm mimo units.rb (mm<->Length prevadza VYHRADNE Units): #{offenders.join(', ')}")
 end
+
+NxTest.test('guard: ziadna metoda nie je v tom istom module/triede definovana dvakrat (AST)') do
+  # Ruby druhu definiciu ticho prijme a ta VYHRA — prva (aj konstanty, ktore
+  # cita) sa stane mrtvym kodom bez jedineho varovania. Presne to sa stalo
+  # `HardwareSets.incompatible_detail_sk` (fix v0.9.56): `height_selector` sa
+  # nikdy nepreložil a KOV-F1/E1a dopisovali kazdy detail na DVE miesta.
+  # Kontrola ide cez AST, nie regex — rovnake mena v ROZNYCH triedach
+  # (`initialize`, `to_h`) nie su duplicita; vnoreny module/class = vlastny scope.
+  NxTest.skip!('RubyVM::AbstractSyntaxTree nie je k dispozicii') unless defined?(RubyVM::AbstractSyntaxTree)
+
+  offenders = []
+  scan = nil
+  scan = lambda do |node, file|
+    return unless node.is_a?(RubyVM::AbstractSyntaxTree::Node)
+
+    unless %i[MODULE CLASS SCLASS].include?(node.type)
+      node.children.each { |ch| scan.call(ch, file) }
+      return
+    end
+    seen = Hash.new { |h, k| h[k] = [] }
+    collect = nil
+    collect = lambda do |n|
+      return unless n.is_a?(RubyVM::AbstractSyntaxTree::Node)
+
+      case n.type
+      when :DEFN then seen[n.children[0].to_s] << n.first_lineno
+      when :DEFS then seen["self.#{n.children[1]}"] << n.first_lineno
+      when :MODULE, :CLASS, :SCLASS then scan.call(n, file)
+      else n.children.each { |ch| collect.call(ch) }
+      end
+    end
+    collect.call(node.children.last)
+    seen.each do |name, lines|
+      offenders << "#{file}: #{name} (riadky #{lines.join(', ')})" if lines.length > 1
+    end
+  end
+
+  files = Dir[File.join(NxTest::ROOT, 'noxun_engine', '**', '*.rb')] +
+          [File.join(NxTest::ROOT, 'noxun_engine.rb')]
+  files.sort.each do |path|
+    scan.call(RubyVM::AbstractSyntaxTree.parse_file(path), path.sub("#{NxTest::ROOT}/", ''))
+  end
+  NxTest.assert(offenders.empty?,
+                "duplicitna definicia metody v jednom scope (druha ticho vyhrava): #{offenders.join(', ')}")
+end

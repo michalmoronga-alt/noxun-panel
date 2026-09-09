@@ -2457,8 +2457,24 @@ module Noxun
         ck.empty? && u['generic_type'].to_s == 'lift'
       end
 
-      # KOV-C2a: CO presne na sete nesedi — jedna veta pre semafor aj pre panel.
-      # Neznamy detail sa nevymysla, len sa priznam, ze sedieť nemá klasifikácia.
+      # KOV-C2a: CO presne na sete nesedi — JEDNA veta pre kazdeho citatela:
+      # Nakup a panel (`unmapped_reason_sk`, `explain`), Kontrola
+      # (`Validation.check_hardware_expansion` a jej RED polozky) aj validacia
+      # zapisu override (`band_set_problem`). Tabulka je JEDINA autorita
+      # prekladu detailu.
+      #
+      # Historia (fix v0.9.56): metoda mala v tomto module DVE definicie —
+      # Ruby ticho pouzije druhu, takze tato tabulka bola mrtvy kod a
+      # `height_selector` (pevny `set_id` pre zasuvku s vyskovym variantom) sa
+      # nikdy nepreložil: pouzivatel videl genericke „iná klasifikácia".
+      # Duplicitne `def` v jednom module odvtedy strazi AST guard
+      # v `tests/pure/test_guards.rb`, uplnost tabulky
+      # `tests/pure/test_incompatible_detail_sk.rb`.
+      #
+      # Kluce = presne to, co `set_incompatible_info` (aj vetvy pre zaves
+      # a vyklop), `resolve_set_id` a brana typu v `expand` vydaju v `detail`
+      # (vyrobca + rada vystupuju spolocne ako `system`). Neznamy detail sa
+      # nevymysla, len sa prizna, ze nesedi klasifikacia.
       INCOMPATIBLE_DETAIL_SK = {
         'opening_mode' => 'iný spôsob otvárania',
         'use_type' => 'set nie je na dvierka', # KOV-F1
@@ -2466,23 +2482,28 @@ module Noxun
         # vysuv). Pri dvierkach je to RED, nie ORANGE `set_type_mismatch`.
         'generic_type' => 'set je iného typu kovania',
         'drawer_construction' => 'iná konštrukcia zásuvky',
-        'system' => 'iný systém výsuvu',
-        'height_variant' => 'iná výška zásuvky',
+        'system' => 'iný systém zásuviek',
+        HEIGHT_VARIANT_KEY => 'iná výška zásuvky',
+        # KOV-C2a/D1a: zasuvka s vyskovym variantom sa smie vybrat LEN vyskovym
+        # selektorom — pevny `set_id` odmieta `resolve_set_id` (H70 kit by po
+        # prerasteni na H176 ostal). Detail vznika v resolveri, nie pri sete.
         'height_selector' => 'výber setu nie je podľa výšky zásuvky',
         # KOV-E1a: `use_type` je pri vyklope INA veta nez pri dvierkach, preto
         # ma VLASTNY kluc detailu (jeden kluc s dvoma vyznammi by klamal).
         'use_type_lift' => 'set nie je na výklopy',
-        'lift_system' => 'iný systém výklopu (HK top vs. HL top)',
+        LIFT_SYSTEM_KEY => 'iný systém výklopu (HK top vs. HL top)',
         # KOV-E1a (Codex #332 kolo 3 P1): nie „iný systém", ale ŽIADNY.
         # Triedny kľúč výklopu nevznikne z DVOCH dôvodov (`class_key_for`) —
         # chýba spôsob otvárania ALEBO systém; veta menuje oba, inak by
         # posielala opravovať pole, ktoré je v poriadku.
-        'lift_system_missing' =>
+        LIFT_SYSTEM_MISSING =>
           'výklop nemá určený spôsob otvárania alebo systém (HK top / HL top)'
       }.freeze
+      # Neznamy detail (obsah novsej verzie) — priznanie, nie vymyslena veta.
+      INCOMPATIBLE_DETAIL_FALLBACK_SK = 'iná klasifikácia'
 
       def incompatible_detail_sk(detail)
-        INCOMPATIBLE_DETAIL_SK[detail.to_s] || 'nesedí klasifikácia setu'
+        INCOMPATIBLE_DETAIL_SK[detail.to_s] || INCOMPATIBLE_DETAIL_FALLBACK_SK
       end
 
       # „ (člen 2)" / „ (noha)" — identita clena setu (H1a nesie index aj label).
@@ -3523,29 +3544,6 @@ module Noxun
           params[HEIGHT_VARIANT_KEY] = height_variant.to_f
         end
         item.merge('params' => params)
-      end
-
-      # POZOR: rovnomenna metoda je v tomto module definovana DVAKRAT (druha
-      # vyhrava) — TATO je ta ucinna. Kazdy novy detail treba doplnit SEM.
-      def incompatible_detail_sk(detail)
-        {
-          'opening_mode' => 'iný spôsob otvárania',
-          'use_type' => 'set nie je na dvierka', # KOV-F1
-          'generic_type' => 'set je iného typu kovania', # KOV-F1 (Codex #329)
-          'drawer_construction' => 'iná konštrukcia zásuvky',
-          'system' => 'iný systém zásuviek',
-          HEIGHT_VARIANT_KEY => 'iná výška zásuvky',
-          # KOV-E1a: vyklop ma vlastny kluc pre `use_type` — veta „set nie je
-          # na dvierka" by pri nom klamala.
-          'use_type_lift' => 'set nie je na výklopy',
-          LIFT_SYSTEM_KEY => 'iný systém výklopu (HK top vs. HL top)',
-          # KOV-E1a (interná delta P3): detail patrí do TEJTO, účinnej mapy —
-          # v prvej (mŕtvej) definícii by ho nikto neprečítal a veta by znela
-          # „iná klasifikácia". Menuje OBA dôvody, pre ktoré triedny kľúč
-          # výklopu nevznikne (chýba otváranie ALEBO systém).
-          LIFT_SYSTEM_MISSING =>
-            'výklop nemá určený spôsob otvárania alebo systém (HK top / HL top)'
-        }[detail.to_s] || 'iná klasifikácia'
       end
 
       def fmt_variant(value)
