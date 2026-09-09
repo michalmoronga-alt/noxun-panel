@@ -1320,14 +1320,22 @@ module Noxun
       #     rozpocet aj ponuka presli s vyklopom UPLNE BEZ kovania (sekcia
       #     kovania sa pri `nil` len ticho vynecha).
       # Nazov sa preto zovseobecnil z `drawer_expansion_unproven?`.
-      def hardware_expansion_unproven?(collected, expansion)
+      #
+      # SCOPE (Codex #332 kolo 3 P2): vyklopova polovica plati LEN pre `:all`
+      # (nakup kovania, rozpocet, ponuka). VEPO (`:kit`) sa neuplnosti vyklopu
+      # NETYKA — geometria cela je spravna a `hardware_blockers` uz v `:kit`
+      # `lift_set_incomplete` vedome vynechava; blokovat rezacie data kvoli
+      # chybajucemu kovaniu by bola nova, nezamyslana brana. Receptova polovica
+      # plati v OBOCH scope: tam su REZACIE data (dielce na konkretnu NL) tie,
+      # ktore sa bez expanzie nedaju obhajit.
+      def hardware_expansion_unproven?(collected, expansion, scope: :all)
         return false unless expansion.nil?
 
         Array(collected.is_a?(Hash) ? collected[:hardware] : nil).any? do |it|
           next false unless it.is_a?(Hash)
+          next true if it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE
 
-          it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE ||
-            it['generic_type'].to_s == 'lift'
+          scope == :all && it['generic_type'].to_s == 'lift'
         end
       end
 
@@ -1339,10 +1347,13 @@ module Noxun
       # zavesove. Premenovanie by bolo cisto kozmeticka zmena osmich miest;
       # co brana zastavuje, hovori register, nie meno metody.
       def drawer_stop(collected, expansion, scope: :all)
-        if hardware_expansion_unproven?(collected, expansion)
+        if hardware_expansion_unproven?(collected, expansion, scope: scope)
+          # Veta menuje LEN to, co sa v tomto scope naozaj nedokazalo — vo VEPO
+          # sa zostava vyklopu neoveruje, takze ju ani nesmie spominat.
+          co = scope == :all ? 'kit zásuviek ani zostava výklopov' : 'kit zásuviek'
           return export_blocked_status(
-            ['nákupný zoznam kovania sa nedá zostaviť, takže sa nedá overiť kit zásuviek ' \
-             'ani zostava výklopov (pozri Ruby konzolu)']
+            ["nákupný zoznam kovania sa nedá zostaviť, takže sa nedá overiť #{co} " \
+             '(pozri Ruby konzolu)']
           )
         end
         reasons = hardware_blockers(collected, expansion, scope: scope)

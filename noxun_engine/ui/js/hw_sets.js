@@ -123,22 +123,17 @@
   function hwsIsSkipCode(v){
     return String(v == null ? '' : v).trim().toLowerCase() === HWS_SKIP_CODE;
   }
-  // Citatelny suhrn clena: "104717 ×1", "TipOn ×1 na dvierka",
-  // "rad NL: 420→357695, 470→357696", "podľa výšky sokla: 17–21 → 82744 · …".
-  function hwsMemberSummary(m, params){
-    if (!m) return '';
-    // KOV-E1a: nové tvary člena. Súhrn ich MUSÍ vedieť prečítať — prázdny
-    // riadok by v knižnici vyzeral ako set bez mechanizmu.
+  // KÓDOVÁ časť súhrnu — ktorý kód člen vydá. Štyri stratégie sa vylučujú
+  // (server validuje `code XOR code_by_nl XOR param_bands XOR code_by_param`).
+  // -> { text, enum } ; `enum` = je to VÝPIS (rad/pásma/trieda), nie jeden kód
+  function hwsMemberCodeText(m, params){
+    // KOV-E1a: kód podľa triedy položky (výklop). Súhrn ho MUSÍ vedieť
+    // prečítať — prázdny riadok by v knižnici vyzeral ako set bez mechanizmu.
     if (m.code_by_param){
       var cp = m.code_by_param;
-      var keys = Object.keys(cp.codes || {});
-      var pairs = keys.map(function(k){ return k + '→' + cp.codes[k]; });
-      return 'podľa ' + (cp.param || 'triedy') + ': ' + (pairs.join(', ') || '—');
-    }
-    if (m.quantity_from){
-      var lb = m.label ? m.label + ' ' : '';
-      return lb + m.code + ' — počet podľa ' + m.quantity_from +
-             (m.per === 'owner' ? ' (na vlastníka)' : '');
+      var cpairs = Object.keys(cp.codes || {}).map(function(k){ return k + '→' + cp.codes[k]; });
+      return { text: 'podľa ' + (cp.param || 'triedy') + ': ' + (cpairs.join(', ') || '—'),
+               enum: true };
     }
     if (m.code_by_nl){
       // D-118b: vyhradená hodnota `none` = „táto dĺžka vedome nemá kód".
@@ -148,13 +143,42 @@
           var v = m.code_by_nl[nl];
           return nl + '→' + (hwsIsSkipCode(v) ? 'bez kódu' : v);
         });
-      return 'rad NL: ' + (pairs.join(', ') || '—');
+      return { text: 'rad NL: ' + (pairs.join(', ') || '—'), enum: true };
     }
     if (m.param_bands){
-      return hwsParamLabel(m.param_bands.param, params) + ': ' + hwsBandsSummary(m.param_bands.bands, 'code');
+      return { text: hwsParamLabel(m.param_bands.param, params) + ': ' +
+                     hwsBandsSummary(m.param_bands.bands, 'code'),
+               enum: true };
     }
-    var label = m.label ? m.label + ' ' : '';
-    return label + m.code + ' ×' + (m.qty || 1) + (m.per === 'owner' ? ' na vlastníka (dvierka)' : '');
+    return { text: (m.label ? m.label + ' ' : '') + m.code, enum: false };
+  }
+  // POČETNÁ časť súhrnu. `quantity_from` = počet berie z parametra položky
+  // (`qty` je pri ňom NÁSOBOK, píše sa len keď nie je 1); inak pevné „×qty".
+  // Pri výpise kódov sa samozrejmé „×1" vynecháva (bolo by to len šum za
+  // posledným kódom radu).
+  function hwsMemberQtyText(m, isEnum){
+    if (m.quantity_from){
+      var mult = Number(m.qty || 1);
+      return 'počet podľa ' + m.quantity_from + (mult > 1 ? ' ×' + mult : '');
+    }
+    var qty = Number(m.qty || 1);
+    if (isEnum && !(qty > 1)) return '';
+    return '×' + (m.qty || 1);
+  }
+  // Citatelny suhrn clena: "104717 ×1", "TipOn ×1 na vlastníka",
+  // "rad NL: 420→357695, 470→357696", "podľa výšky sokla: 17–21 → 82744 · …".
+  //
+  // KOV-E1a (Codex #332 kolo 3 P2): KÓD a POČET sa skladajú NEZÁVISLE. Server
+  // dovoľuje `quantity_from` ku VŠETKÝM štyrom kódovým stratégiám a tieto sety
+  // sú v editore len na čítanie — súhrn je teda jediná cesta, ako si ich
+  // používateľ prezrie, a musí ukázať OBE veci naraz.
+  function hwsMemberSummary(m, params){
+    if (!m) return '';
+    var code = hwsMemberCodeText(m, params);
+    var qty = hwsMemberQtyText(m, code.enum);
+    var out = code.text;
+    if (qty) out += (m.quantity_from ? ' — ' : ' ') + qty;
+    return out + (m.per === 'owner' ? ' na vlastníka' : '');
   }
   // „17–21 → 82744 · 140–160 → 367823"; names = mapa hodnota->citatelny nazov
   // (pri selectore su hodnoty set_id, pri clene setu kody).

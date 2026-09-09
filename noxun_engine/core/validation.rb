@@ -1065,6 +1065,12 @@ module Noxun
             # clenovia vysli na nulu — vyklop by sa objednal „bez kovania".
             "set „#{sid}“ nevydal pre tento výklop ani jednu položku — " \
             'skontroluj počty a kódy v sete'
+          when HardwareSets::LIFT_SYSTEM_MISSING
+            # KOV-E1a (Codex #332 kolo 3 P1): polozka JE vyklop, ale nepovedala
+            # KTORY systém. Bez neho sa set nevybera ani sa nehada — a veta
+            # nesmie znieť „nemá predvolený set" (poslala by opravovať
+            # Pravidlá, kde chyba nie je).
+            'výklop nemá určený systém (HK top / HL top) — bez neho sa set vybrať nedá'
           when 'set_none'
             'výklop je vedome bez setu — ak to tak nemá byť, vyber set v Pravidlách Štúdia'
           when 'mapping_invalid'

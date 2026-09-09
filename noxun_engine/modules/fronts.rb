@@ -248,6 +248,20 @@ module Noxun
       # medzery) — skracuje sa PANEL: panel_h = h - reduction, panel ostava na z
       # (cela sa kladu odspodu, hornych `reduction` mm riadku zaberie profil).
       # Kazde kridlo ma vlastny profil dlzky = sirka kridla.
+      # KOV-E1a (Codex #332 kolo 3 P2): KTORY dielec — v termine owner triednych
+      # klucov kovania — celo tohto typu naozaj vyraba. Zasuvkove celo `panel`,
+      # vyklop/sklop `flap`; dvierka (`wing:*`), blenda a „bez čela" owner
+      # triedny kluc nemaju, preto nil. Zhrnutie `panels_for` NIZSIE (jedina
+      # autorita tvaru klucov) — neznamy typ sa tam sklapa na dvierka, teda
+      # rovnako nil. Pouziva `CabinetBuilder.norm_hardware_sets`, aby po zmene
+      # typu cela neostal v configu mrtvy vyber setu.
+      def class_owner_part(type)
+        t = type.to_s
+        return 'panel' if t == 'drawer_front'
+
+        FLAP_TYPES.include?(t) ? 'flap' : nil
+      end
+
       def panels_for(item, idx, gs, opening_w, z, h, gap = GAP_DEFAULT)
         return [] if item['type'] == 'none'
         front_id = item['id'].to_s

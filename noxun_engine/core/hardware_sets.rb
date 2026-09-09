@@ -256,7 +256,8 @@ module Noxun
                             class_unmapped set_incompatible mapping_invalid
                             members_skipped drawer_kit_missing
                             set_none hinge_set_mismatch
-                            quantity_unresolved lift_set_incomplete].freeze
+                            quantity_unresolved lift_set_incomplete
+                            lift_system_missing].freeze
 
       # KOV-F1: RED dovod NESULADU zavesoveho setu (`BuildPlan::HW_HINGE_BLOCKERS`).
       HINGE_SET_MISMATCH = 'hinge_set_mismatch'
@@ -277,6 +278,16 @@ module Noxun
       # Dovod nevyrieseneho POCTU (`quantity_from`) — sam o sebe ORANGE, pri
       # polozke `lift` sa povysuje vyssie uvedenou branou.
       QUANTITY_UNRESOLVED = 'quantity_unresolved'
+      # KOV-E1a (Codex #332 kolo 3 P1): polozka sa KLASIFIKOVALA ako vyklop
+      # (`params.use_type == 'lift'`), ale triedny kluc z nej NEVZNIKNE —
+      # chyba `lift_system` (alebo `opening_mode`). Taka polozka NESMIE spadnut
+      # na genericke mapovanie `lift`: v prestavanej zakazke, ktora si legacy
+      # `lift` mapovanie opravnene ponechala, by ticho vydala LEGACY set (napr.
+      # HK krytky k HL mechanizmu) a Kontrola by mlcala. Je to teda NEPLATNA
+      # klasifikacia s vlastnym dovodom — a branou uplnosti nizsie aj RED.
+      # (Pozor, ine miesto nez grandfather z kola 2: ten sa tyka SETU bez
+      # systemu pri CITANI kniznice. Obe su fail-closed smerom k exportu.)
+      LIFT_SYSTEM_MISSING = 'lift_system_missing'
 
       # KOV-D1a: kluc MARKERA neplatneho mapovania. Marker je JEDINY tvar, ktory
       # v mape znamena „kluc tu je, ale hodnota sa neda pouzit"; vyraba ho VYHRADNE
@@ -1470,18 +1481,34 @@ module Noxun
       # nesmie ostat vecne v configu (vzor `prune_none_front_overrides`).
       # LEGACY composite kluce `typ@owner` sa NEDOTYKAJU (ich zivotny cyklus je
       # sirsi nez cela a menit ho v tejto davke by bola nesuvisiaca zmena).
-      # front_ids nil = kontrola sa NEROBI (cista tvarova normalizacia).
-      def prune_missing_owners(map, front_ids)
-        return map if front_ids.nil? || !map.is_a?(Hash)
+      #
+      # KOV-E1a (Codex #332 kolo 3 P2): nestaci ID cela — rozhoduje, ci celo
+      # DNES naozaj vyraba TEN dielec, na ktory kluc ukazuje. Celo s rovnakym
+      # ID prepnute z vyklopu na dvierka uz `front:F1/flap` nema; kluc by tam
+      # ostal mrtvy a po navrate na vyklop by ticho OZIL so starym setom.
+      # Preto sa odovzdava mapa `{ id cela => dielec, ktory vyraba }`
+      # ('panel' | 'flap' | nil pre dvierka, blendu a „bez čela"); autorita
+      # tvaru je `Fronts.class_owner_part` (odvodena z `Fronts.panels_for`).
+      # front_parts nil = kontrola sa NEROBI (cista tvarova normalizacia).
+      def prune_missing_owners(map, front_parts)
+        return map if front_parts.nil? || !map.is_a?(Hash)
 
-        ids = Array(front_ids).map(&:to_s)
+        parts = front_parts.is_a?(Hash) ? front_parts : {}
         map.reject do |key, _value|
           owner = class_mapping_key?(key) ? class_key_split(key)[1] : nil
           next false if owner.nil?
 
           fid = PartKeys.front_id(owner)
-          drop = fid.nil? || !ids.include?(fid)
-          log_skip("mapovanie „#{key}“: čelo v skrinke už nie je") if drop
+          want = CLASS_OWNER_RE.match(owner.to_s)
+          have = fid.nil? ? nil : parts[fid]
+          drop = fid.nil? || want.nil? || have.to_s != want[1]
+          if drop
+            log_skip(if have.nil?
+                       "mapovanie „#{key}“: čelo v skrinke už nie je"
+                     else
+                       "mapovanie „#{key}“: čelo už taký dielec nevyrába"
+                     end)
+          end
           drop
         end
       end
@@ -2377,6 +2404,10 @@ module Noxun
         when HINGE_SET_MISMATCH
           "set „#{sid}“ nesedí s čelom (#{incompatible_detail_sk(u['detail'])}) — " \
             'vyber správny set alebo Pravidlá → Doplniť nové predvoľby'
+        when LIFT_SYSTEM_MISSING
+          # KOV-E1a (Codex #332 kolo 3 P1): polozka je vyklop, ale nepovedala
+          # KTORY systém — set sa preto vybrat NEDA a ziadny sa ani nehada.
+          'výklop nemá určený systém (HK top / HL top) — bez neho sa set vybrať nedá'
         else
           'typ nemá priradený set'
         end
@@ -2416,7 +2447,10 @@ module Noxun
         # KOV-E1a: `use_type` je pri vyklope INA veta nez pri dvierkach, preto
         # ma VLASTNY kluc detailu (jeden kluc s dvoma vyznammi by klamal).
         'use_type_lift' => 'set nie je na výklopy',
-        'lift_system' => 'iný systém výklopu (HK top vs. HL top)'
+        'lift_system' => 'iný systém výklopu (HK top vs. HL top)',
+        # KOV-E1a (Codex #332 kolo 3 P1): nie „iný systém", ale ŽIADNY —
+        # položka výklopu systém vôbec nenesie.
+        'lift_system_missing' => 'výklop nemá určený systém (HK top / HL top)'
       }.freeze
 
       def incompatible_detail_sk(detail)
@@ -3846,6 +3880,14 @@ module Noxun
       # -> [set_id|nil, reason|nil, info Hash]
       def resolve_set_id(generic_type, it, cabinet_overrides, mapping)
         ck = class_key_for(it, generic_type)
+        # KOV-E1a (Codex #332 kolo 3 P1): KLASIFIKOVANY vyklop bez triedneho
+        # kluca je NEPLATNA klasifikacia, nie legacy polozka. Zastavuje sa TU,
+        # PRED mapovanim — inak by `resolve_mapping_value` (aj
+        # `set_incompatible_info`) videli `nil` triedny kluc a pustili ju na
+        # genericky `lift`, teda na set, o ktorom nikto nedokaze, ze k systemu
+        # cela patri. Legacy vyklop (bez `params.use_type`) sa tym NEMENI.
+        return [nil, LIFT_SYSTEM_MISSING, {}] if ck.nil? && lift_item?(it)
+
         value = resolve_mapping_value(generic_type, it, cabinet_overrides, mapping)
         # KOV-C2a: klasifikovana polozka BEZ triedneho mapovania nie je „typ bez
         # setu" — je to konkretny chybajuci riadok predvolieb a hlaska musi
@@ -4058,7 +4100,15 @@ module Noxun
       # -> nil (sedi / netyka sa) | info Hash s dovodom
       def set_incompatible_info(it, set)
         ck = class_key_for(it, it['generic_type'].to_s)
-        return nil if ck.nil? || !set.is_a?(Hash)
+        return nil unless set.is_a?(Hash)
+        # KOV-E1a (Codex #332 kolo 3 P1): klasifikovany vyklop BEZ triedneho
+        # kluca (chyba `lift_system`) sa NESMIE tvarit ako legacy polozka, ku
+        # ktorej „sedi hocico". Zapisova cesta (`band_set_problem`) na nom
+        # zastane rovnako ako expanzia — jedna odpoved na dvoch miestach.
+        if ck.nil? && lift_item?(it)
+          return { 'detail' => LIFT_SYSTEM_MISSING, 'reason' => LIFT_SYSTEM_MISSING }
+        end
+        return nil if ck.nil?
 
         return hinge_incompatible_info(it, set) if door_item?(it)
         return lift_incompatible_info(it, set) if lift_item?(it)

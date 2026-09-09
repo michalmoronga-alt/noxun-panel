@@ -21,6 +21,8 @@
 //   M4 súhrn nového člena je prázdny reťazec         -> súhrn
 //   M5 set s novým členom sa tvári upraviteľný       -> hwsSetIsNewShape
 //   M6 `lift_system` sa cestou modal -> server stratí -> round-trip poľa
+//   M7 `quantity_from` s výpisom kódov zamlčí počet alebo vypíše `undefined`
+//      namiesto kódov                                -> súhrn 3b (4 kombinácie)
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
@@ -93,10 +95,32 @@ eq(payload.members, HL_SET.members, 'payload setu nesie členov bezstratovo');
 eq(hwsMemberSummary(HL_SET.members[0]),
    'podľa lift_class: 22L2200→507351, 22L2500→507352', 'kód podľa triedy sa dá prečítať');
 eq(hwsMemberSummary(HL_SET.members[1]),
-   'stabilizačná tyč 507365 — počet podľa rod_count (na vlastníka)',
+   'stabilizačná tyč 507365 — počet podľa rod_count na vlastníka',
    'počet z parametra sa dá prečítať');
 eq(hwsMemberSummary({ code_by_param: { param: 'arm_class', codes: {} } }),
    'podľa arm_class: —', 'prázdny selektor sa prizná, nie zamlčí');
+
+// --- 3b) KÓD × POČET sa skladajú NEZÁVISLE (Codex #332 kolo 3 P2) ------------
+// Server dovoľuje `quantity_from` ku VŠETKÝM štyrom kódovým stratégiám a tieto
+// sety sú v editore len na čítanie — súhrn je jediná inšpekcia, takže nesmie
+// ani zamlčať dynamický počet, ani vypísať `undefined` namiesto kódov.
+eq(hwsMemberSummary({ per: 'unit', qty: 1, quantity_from: 'rod_count',
+                      code_by_param: { param: 'lift_class', codes: { '22K2300': '347810' } } }),
+   'podľa lift_class: 22K2300→347810 — počet podľa rod_count',
+   'trieda + počet z parametra: obe veci naraz');
+eq(hwsMemberSummary({ per: 'owner', qty: 1, quantity_from: 'rod_count',
+                      code_by_nl: { 420: '357695', 470: '357696' } }),
+   'rad NL: 420→357695, 470→357696 — počet podľa rod_count na vlastníka',
+   'rad NL + počet z parametra: kódy sa NEstratia');
+eq(hwsMemberSummary({ per: 'unit', qty: 2, quantity_from: 'rod_count',
+                      param_bands: { param: 'height',
+                                     bands: [{ min: 17, max: 21, code: '82744' }] } }, []),
+   'podľa: height: 17–21 → 82744 — počet podľa rod_count ×2',
+   'pásma + počet z parametra (aj s násobkom)');
+eq(hwsMemberSummary({ per: 'unit', qty: 1, quantity_from: 'rod_extension',
+                      label: 'predĺženie', code: '507366' }),
+   'predĺženie 507366 — počet podľa rod_extension',
+   'pevný kód + počet z parametra ako doteraz');
 
 // --- 4) LEGACY tvary sa nemenia -----------------------------------------------
 eq(hwsMemberSummary({ code: '104717', qty: 1, per: 'unit', label: 'záves' }),

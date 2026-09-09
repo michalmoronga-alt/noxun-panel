@@ -58,6 +58,9 @@
 #   M20 legacy vyklop bez `lift_system` = strata klasifikacie -> grandfather pri CITANI
 #   M21 set, ktoreho VSETCI clenovia vysli na nulu, prejde ticho -> RED `members_skipped`
 #   M22 nedostupna expanzia pusti vyklop do rozpoctu a ponuky -> fail-closed predikat
+#   M23 nedostupna expanzia s vyklopom zastavi aj VEPO         -> scope `:kit`
+#   M24 klasifikovany vyklop BEZ systemu spadne na legacy `lift` -> vlastny dovod
+#   M25 owner `/flap` prezije zmenu TYPU cela                  -> pruning podla dielca
 require_relative '../helper' unless defined?(NxTest)
 
 require 'json'
@@ -367,6 +370,60 @@ NxTest.test('KOV-E1a (3): NEDOSTUPNA expanzia s vyklopom zastavi VSETKY tri ceno
   NxTest.assert_equal(nil, pc.drawer_stop(s_old, nil))
   # A ked expanzia JE, predikat mlci — dokaz existuje.
   NxTest.refute(pc.hardware_expansion_unproven?(s_lift, { 'rows' => [], 'unmapped' => [] }))
+  # Codex #332 kolo 3 P2: VEPO (`scope: :kit`) sa vyklopu NETYKA — geometria
+  # cela je platna a `hardware_blockers` v `:kit` `lift_set_incomplete` vedome
+  # vynechava. Zastavovat rezacie data kvoli kovaniu by bola NOVA brana.
+  NxTest.refute(pc.hardware_expansion_unproven?(s_lift, nil, scope: :kit))
+  NxTest.assert_equal(nil, pc.drawer_stop(s_lift, nil, scope: :kit),
+                      'VEPO s vyklopom bezi aj bez expanzie kovania')
+  # Receptova zasuvka VEPO nadalej ZASTAVUJE — tam su v hre rezacie data.
+  NxTest.assert(pc.hardware_expansion_unproven?(s_rec, nil, scope: :kit))
+  kit = pc.drawer_stop(s_rec, nil, scope: :kit).to_s
+  NxTest.assert(kit.include?('kit zásuviek'), kit)
+  NxTest.refute(kit.include?('výklop'), "veta VEPO nesmie menovat vyklopy: #{kit}")
+end
+
+NxTest.test('KOV-E1a (3): klasifikovany vyklop BEZ systemu NEPADA na legacy mapovanie') do
+  c = NxKovE1a
+  # Codex #332 kolo 3 P1: prestavana zakazka si genericke mapovanie `lift`
+  # opravnene drzi. Polozka, ktora sa UZ klasifikovala (`use_type: 'lift'`),
+  # ale system nenesie, by cezen ticho vydala LEGACY set — teda kovanie,
+  # o ktorom nikto nedokaze, ze k systemu cela patri.
+  # LEGACY set = nezaradeny (bez `use_type`), s PEVNYMI kodmi — teda taky,
+  # ktory by sa cez genericke mapovanie naozaj CELY vydal.
+  stary = c::HWS.normalize_sets([{ 'set_id' => 'stary-vyklop', 'name' => 'Starý výklop',
+                                   'generic_type' => 'lift',
+                                   'members' => [{ 'per' => 'unit', 'qty' => 1,
+                                                   'code' => '347810' }] }])
+  st = { 'mapping' => { 'lift' => 'stary-vyklop' }, 'sets' => { 'stary-vyklop' => stary.first } }
+  bez = c.item
+  bez['params'] = bez['params'].reject { |k, _| k == 'lift_system' }
+  exp = c::HWS.expand([bez], st)
+  NxTest.assert_equal([], c.codes(exp), 'ZIADNY riadok legacy setu')
+  u = exp['unmapped'].first
+  NxTest.assert_equal(c::HWS::LIFT_SET_INCOMPLETE, u['reason'])
+  NxTest.assert_equal(c::HWS::LIFT_SYSTEM_MISSING, u['base_reason'])
+  NxTest.assert(u['blocks_export'], 'export stoji')
+  NxTest.assert_equal(nil, u['set_id'], 'ziadny set sa nevybral')
+  # Kontrola to vysvetli SYSTEMOM, nie chybajucou predvolbou (ta by poslala
+  # opravovat Pravidla, kde chyba nie je).
+  items = []
+  c::V.check_hardware_expansion(exp, items)
+  red = items.select { |i| i['severity'] == c::V::RED }
+  NxTest.assert_equal(1, red.length, items.inspect)
+  NxTest.assert(red.first['message_sk'].include?('systém'), red.first['message_sk'])
+  # To iste plati, ked chyba `opening_mode` — triedny kluc tiez nevznikne.
+  bez_om = c.item('params' => { 'opening_mode' => '' })
+  NxTest.assert_equal(c::HWS::LIFT_SYSTEM_MISSING,
+                      c::HWS.expand([bez_om], st)['unmapped'].first['base_reason'])
+  # GOLDEN: LEGACY vyklop (bez `params.use_type`) sa NEMENI — ide dnesnou
+  # cestou cez genericke mapovanie a set DOSTANE.
+  legacy = { 'owner_id' => 'CAB-1', 'owner_part_key' => 'front:F1/flap',
+             'generic_type' => 'lift', 'quantity' => 1, 'rule_id' => 'r',
+             'source' => 'rule', 'params' => {} }
+  lexp = c::HWS.expand([legacy], st)
+  NxTest.assert_equal([['347810', 1]], c.codes(lexp), 'legacy polozka set stale dostane')
+  NxTest.assert_equal([], lexp['unmapped'], 'a nic sa jej nevycita')
 end
 
 # ============================================================================
@@ -661,9 +718,45 @@ NxTest.test('KOV-E1a (7): owner `front:<id>/flap` — parse, validacia, resolver
   exp = h.expand([c.item], st, cabinet_overrides: { 'CAB-1' => map })
   NxTest.assert(c.codes(exp).any? { |code, _| code == '347835' },
                 'celo dostane TMAVE krytky z owner volby')
-  # Pruning: ked celo zmizne, mrtvy vyber sa zahodi.
-  NxTest.assert_equal({}, h.prune_missing_owners(map, ['F2']), 'zmazane celo = vyber prec')
-  NxTest.assert_equal(map, h.prune_missing_owners(map, ['F1']), 'existujuce celo ostava')
+  # Pruning: ked celo zmizne, mrtvy vyber sa zahodi. Codex #332 kolo 3 P2:
+  # rozhoduje DIELEC, ktory celo dnes vyraba — nie len jeho ID.
+  NxTest.assert_equal({}, h.prune_missing_owners(map, { 'F2' => 'flap' }),
+                      'zmazane celo = vyber prec')
+  NxTest.assert_equal(map, h.prune_missing_owners(map, { 'F1' => 'flap' }),
+                      'existujuce celo ostava')
+  NxTest.assert_equal({}, h.prune_missing_owners(map, { 'F1' => 'panel' }),
+                      'celo s tym istym ID uz `flap` nevyraba = vyber prec')
+  NxTest.assert_equal(map, h.prune_missing_owners(map, nil), 'nil = kontrola sa nerobi')
+end
+
+NxTest.test('KOV-E1a (7): zmena TYPU cela zahodi owner vyber a ten uz NEOZIJE') do
+  c = NxKovE1a
+  # Codex #332 kolo 3 P2: celo si drzi ID, ale po prepnuti z vyklopu na dvierka
+  # `front:F1/flap` UZ NEEXISTUJE. Ked kluc prezije, po navrate na vyklop sa
+  # ticho aktivuje STARY set — vyber, ktory pouzivatel medzitym nikde nevidel.
+  key = 'class:lift|classic|hk_top@front:F1/flap'
+  panel = 'class:slide|classic|metal@front:F1/panel'
+  cfg = lambda do |type, sets|
+    c::CB.normalize('width' => 600.0, 'height' => 720.0, 'depth' => 500.0,
+                    'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => type }] },
+                    'hardware_sets' => sets)[:hardware_sets]
+  end
+  NxTest.assert_equal({ key => 'vyklop-hk-klasik-tmavy' },
+                      cfg.call('lift', key => 'vyklop-hk-klasik-tmavy'))
+  po = cfg.call('door', key => 'vyklop-hk-klasik-tmavy')
+  NxTest.assert_equal({}, po, 'po zmene typu je mrtvy vyber prec')
+  NxTest.assert_equal({}, cfg.call('lift', po), 'navrat na vyklop ho NEOZIVI')
+  # Sklop (`fall`) TEN ISTY dielec vyraba — vyber prezije (nie je mrtvy).
+  NxTest.assert_equal({ key => 'vyklop-hk-klasik-tmavy' },
+                      cfg.call('fall', key => 'vyklop-hk-klasik-tmavy'))
+  # GOLDEN: zasuvkovy `/panel` override zije, kym je celo zasuvkove...
+  NxTest.assert_equal({ panel => 'atira-biela-h70' },
+                      cfg.call('drawer_front', panel => 'atira-biela-h70'))
+  # ...a zmizne, ked sa z cela stane vyklop (dielec `panel` uz nevznika).
+  NxTest.assert_equal({}, cfg.call('lift', panel => 'atira-biela-h70'))
+  # Blenda ani „bez čela" ziadny z tychto dielcov nevyrabaju.
+  NxTest.assert_equal({}, cfg.call('blind', key => 'vyklop-hk-klasik-tmavy'))
+  NxTest.assert_equal({}, cfg.call('none', panel => 'atira-biela-h70'))
 end
 
 NxTest.test('KOV-E1a (7): owner vyber vyklopu prezije normalizaciu configu skrinky') do

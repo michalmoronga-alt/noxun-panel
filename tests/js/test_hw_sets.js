@@ -42,8 +42,10 @@ eq(hwsSetsForType(null, 'hinge'), [], 'null vstup bezpecny');
 // --- hwsMemberSummary ---------------------------------------------------------
 eq(hwsMemberSummary({ code: '104717', qty: 1, per: 'unit', label: 'záves' }),
    'záves 104717 ×1', 'clen s labelom');
+// KOV-E1a (Codex #332 kolo 3 P2): „na vlastníka" už BEZ „(dvierka)" — od
+// výklopov je vlastníkom aj čelo výklopu (`front:F#/flap`), nie len dvierka.
 eq(hwsMemberSummary({ code: '250831', qty: 1, per: 'owner' }),
-   '250831 ×1 na vlastníka (dvierka)', 'per owner popis');
+   '250831 ×1 na vlastníka', 'per owner popis');
 eq(hwsMemberSummary({ code_by_nl: { '470': '357696', '420': '357695' }, qty: 1, per: 'unit' }),
    'rad NL: 420→357695, 470→357696', 'rad zoradeny ciselne podla NL');
 

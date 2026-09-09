@@ -470,8 +470,10 @@ chceme), `BuildPlan.parse_hardware_set_key` vracia `nil` (preto sa kľúč mapov
 
 - **Kde smie žiť.** VÝHRADNE v `config.hardware_sets` skrinky (`parse_mapping(allow_owner: true)`). Globálna knižnica aj projektový snapshot ho pri zápise ODMIETNU a pri
   čítaní zahodia s logom. Triedna časť sa normalizuje, **owner ostáva doslovne** (part_key je identita dielca, nie enum) a musí mať tvar panela čela — override na zóne či
-  doske by resolver nikdy neprečítal. Pri normalizácii configu skrinky sa navyše kontroluje **existencia čela**: kľúč na zmazané čelo vypadne s logom (`prune_missing_owners`,
-  vzor `prune_none_front_overrides`); legacy composite `typ@owner` sa nedotýka.
+  doske by resolver nikdy neprečítal. Pri normalizácii configu skrinky sa navyše kontroluje, či čelo ten dielec **dnes naozaj vyrába**: `prune_missing_owners` dostáva
+  z `CabinetBuilder.norm_hardware_sets` mapu `{id čela => dielec}` (`Fronts.class_owner_part`: `drawer_front` → `panel`, `lift`/`fall` → `flap`, dvierka, blenda a `none`
+  → nič) a kľúč, ktorý jej nesedí, vypadne s logom (vzor `prune_none_front_overrides`). Samotné ID nestačí (Codex #332 kolo 3 P2): čelo s tým istým ID prepnuté z výklopu
+  na dvierka už `/flap` nemá — kľúč by tam ostal mŕtvy a po návrate na výklop by ticho OŽIL so starým setom. Legacy composite `typ@owner` sa pruning nedotýka.
 - **Precedencia pre receptovú položku je TROJÚROVŇOVÁ:** owner triedny → triedny (skrinka) → projektový snapshot. Na nižšiu úroveň sa ide **LEN pri NEPRÍTOMNOM kľúči**;
   prítomná hodnota, ktorá sa nedá rozložiť (chýbajúce pásmo, nekompatibilný set), končí ako `unmapped` s dôvodom → RED `drawer_kit_missing`. Na generický `slide`/`slide@owner`
   sa naďalej NIKDY nepadá.
@@ -664,6 +666,12 @@ navyše jednotka, pri HL top ramená a stabilizačná tyč), a mechanizmus sa vy
   Kombinuje sa s `per: 'owner'` — tyč je na ČELO, nie na kus, takže dve pravidlá s výstupom `lift` na jednom čele ju nezdvoja (existujúci dedup `(korpus, vlastník, set, kód)`).
   **PORADIE JE KONTRAKT (Codex #332 kolo 1 P2):** počet sa vyhodnocuje PRED `member_code` — v `expand_members` aj v `explain_members`. Člen, ktorý sa vedome nevydá, svoj kód
   rozlíšiť NEMUSÍ; opačné poradie by pri predlžovacom diele s počtom 0 hlásilo chýbajúcu triedu (RED `lift_set_incomplete`) na zákazke, kam ten diel vôbec nepatrí.
+- **KLASIFIKOVANÝ VÝKLOP BEZ SYSTÉMU JE NEPLATNÁ KLASIFIKÁCIA, nie legacy položka (Codex #332 kolo 3 P1).** Keď položka nesie `params.use_type == 'lift'`, ale triedny kľúč
+  z nej nevznikne (chýba `lift_system` alebo `opening_mode`), `resolve_set_id` sa zastaví HNEĎ — vlastným dôvodom **`lift_system_missing`** (bránou vyššie teda RED
+  s `blocks_export`) a bez toho, aby sa vôbec pozrel do mapovania. Prepad na generický `lift` by v prestavanej zákazke, ktorá si legacy mapovanie oprávnene drží, ticho
+  vydal LEGACY set — teda kovanie, o ktorom nikto nedokáže, že k systému čela patrí. Tú istú odpoveď má aj zápisová cesta (`set_incompatible_info` → `band_set_problem`),
+  aby sa výber setu a expanzia nerozišli. **Legacy výklop (bez `params.use_type`) sa tým NEMENÍ** — ide dnešnou generickou cestou. (Pozor na dve rôzne veci: grandfather
+  z kola 2 sa týka SETU bez `lift_system` pri ČÍTANÍ knižnice; toto je POLOŽKA. Obe sú fail-closed smerom k exportu.)
 - **BRÁNA ÚPLNOSTI `lift_set_incomplete` (Astra BLOCKER 1).** Pri položke s `generic_type == 'lift'` sa **KAŽDÝ** dôvod nemapovania povýši na RED s `blocks_export`
   (`unmapped_entry`, presný vzor receptového `drawer_kit_missing`) — vrátane chýbajúceho setu a chýbajúceho mapovania; pôvodný dôvod cestuje v `base_reason`. Riadky ostatných
   členov v zozname **ostávajú** (rovnako ako pri zásuvke), ale von sa nedostanú: kód je v `BuildPlan::HW_LIFT_BLOCKERS` aj vo `from_expansion`
@@ -712,9 +720,13 @@ navyše jednotka, pri HL top ramená a stabilizačná tyč), a mechanizmus sa vy
   a pošle späť nezmenený; dlaždica takého setu má vypnuté „Upraviť" a vetu „Set novšieho tvaru — úprava príde neskôr". Ochranou je **server**: `save_set!` zmenu členov setu,
   ktorý nesie nový tvar (`new_shape_members?`), ODMIETNE — názov, aktívnosť a klasifikácia sa meniť smú. Súhrn člena aj živý náhľad nové tvary čítajú („podľa lift_class",
   „počet podľa rod_count"); `preview_expansion` si vzorovú triedu a počet doplní z DRAFTU, takže náhľad neukazuje samé ORANGE riadky.
+  **Súhrn skladá KÓD a POČET NEZÁVISLE (Codex #332 kolo 3 P2):** `hwsMemberCodeText` (jedna zo štyroch stratégií `code` | `code_by_nl` | `param_bands` | `code_by_param`)
+  + `hwsMemberQtyText` (`quantity_from`, inak `×qty`). Skorý return podľa stratégie zamlčal dynamický počet, resp. pri rade NL a pásmach vypísal `m.code` (`undefined`)
+  a kódy schoval — a keďže tieto sety sú v editore len na čítanie, súhrn je JEDINÁ inšpekcia, ktorú používateľ má. Pri výpise kódov sa samozrejmé „×1" vynecháva (bol by
+  to len šum za posledným kódom radu) a `per: 'owner'` sa píše neutrálne **„na vlastníka"** — od výklopov je vlastníkom aj `front:F#/flap`, nie len dvierka.
 
-Testy: `tests/pure/test_kove1a_data.rb` (29 testov, 19 pomenovaných mutácií vrátane golden charakterizácie „existujúca zákazka nakupuje presne ako pred dávkou")
-+ JS `tests/js/test_hw_sets_code_by_param.js` (bezstratový transport, súhrn, read-only stav).
+Testy: `tests/pure/test_kove1a_data.rb` (34 testov, 25 pomenovaných mutácií vrátane golden charakterizácie „existujúca zákazka nakupuje presne ako pred dávkou")
++ JS `tests/js/test_hw_sets_code_by_param.js` (bezstratový transport, súhrn vrátane 4 kombinácií kód × `quantity_from`, read-only stav).
 
 
 **BEZSTRATOVÁ BRÁNA DEFINÍCIÍ SETOV V ŠABLÓNE — `assess_set_defs` (audit #17 BLOCKER 1).** `hardware_set_defs` išli doteraz LEN cez tolerantný `normalize_sets`, teda cez cestu,

@@ -608,7 +608,9 @@ police v zónach: rovnomerné rozloženie v svetlej výške (`n` políc ⇒ `n+1
 
 **KOV-A1 — TYPY:** `items[].type` ∈ `door` · `drawer_front` · `lift` (výklop) · `fall` (sklop) · `blind` (blenda) · `none`; neznámy typ sa (ako doteraz) sklopí na `door`.
 `lift`/`fall` → rola **`flap`**, kľúč `front:F#/flap`, suffix `FLAP-#`, názvy „Výklop #" / „Sklop #"; `blind` → rola **`false_front`**, kľúč `front:F#/blind`, suffix `BLIND-#`.
-Oba typy majú **identickú panelovú matematiku ako zásuvkové čelo** (1 panel cez celý otvor, `wings_n` 1, `AXES_FRONT`). **Vedomý limit A1:** úchytkový `profile` je pre
+Oba typy majú **identickú panelovú matematiku ako zásuvkové čelo** (1 panel cez celý otvor, `wings_n` 1, `AXES_FRONT`). **`Fronts.class_owner_part(type)`** (KOV-E1a,
+Codex #332 kolo 3 P2) zhŕňa tú istú tabuľku pre owner triedne kľúče kovania — `drawer_front` → `panel`, `lift`/`fall` → `flap`, ostatné (dvierka, blenda, `none`,
+neznámy typ) → nič; číta ju `CabinetBuilder.norm_hardware_sets`, aby po zmene typu čela neostal v configu mŕtvy výber setu. **Vedomý limit A1:** úchytkový `profile` je pre
 `lift`/`fall`/`blind` (aj `none`) normalizovaný na `none` — profilové pravidlo D-90 pozná len dvierka a zásuvku, inak by vznikol falošný `profile_rule_missing`
 (profil na pohyblivom čele = KOV-E/F). UI ich sprístupní až KOV-A2; v A1 vznikajú len cez config/API a select typu ich nesie ako **neaktívne** voľby.
 

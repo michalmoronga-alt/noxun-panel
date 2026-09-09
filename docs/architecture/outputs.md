@@ -167,7 +167,10 @@ a zákazka **má** položku, ktorej úplnosť dokazuje AŽ expanzia, brána je *
 Takéto položky sú **dve**: **receptová** (`source: recipe` — dielce sú rezané na konkrétnu NL, takže bez expanzie sa nedá overiť kit) a **VÝKLOP**
 (`generic_type: lift` — výklop je ZOSTAVA a jej úplnosť dokáže len expanzia). Predikát sa preto zovšeobecnil z `drawer_expansion_unproven?` (Codex #332
 kolo 2 P1): pri `nil` expanzii nákupný CSV stál, ale rozpočet aj ponuka `nil` pustili do `Budget` (sekcia kovania sa ticho vynechá) a zákazník by dostal
-cenu BEZ výklopového kovania. Hláška menuje oboje: „…nedá sa overiť kit zásuviek ani zostava výklopov".
+cenu BEZ výklopového kovania. **Predikát pozná `scope:` (Codex #332 kolo 3 P2):** výklopová polovica platí LEN pre `:all` (nákup, rozpočet, ponuka),
+receptová v OBOCH scope. VEPO (`:kit`) sa neúplnosti výklopu **netýka** — geometria čela je platná a `hardware_blockers` v `:kit` `lift_set_incomplete`
+vedome vynecháva; zastaviť rezacie dáta kvôli chýbajúcemu kovaniu by bola nová, nezamýšľaná brána. Podľa toho sa skladá aj hláška: `:all` menuje oboje
+(„…nedá sa overiť kit zásuviek ani zostava výklopov"), `:kit` len „…kit zásuviek".
 
 **Uložený nosič `drawer_conflicts` (Astra #19 F6).** Po fail-closed stavbe v modeli nezostane ani dielec ani položka, z ktorej by sa dôvod dal obnoviť — musí teda prežiť
 v **configu**: `Construction.build_plan` ho vydá v `plan[:drawer_conflicts]` (tvar `{front_id, code, message, part_key}`, validuje `BuildPlan.validate_drawer_conflicts!`),
