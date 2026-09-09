@@ -36,8 +36,11 @@
 #  11) `flap_stale` — LEN podla PROVENIENCIE STAVBY, a to DVOJITEJ (Codex #333
 #      kolo 1 P1): `config_schema` < 11 ALEBO `rules_seed_version` < 5, takze
 #      prestavba so STARYM snapshotom pravidiel RED nezhasne; up AJ down;
-#      celo s RUCNYM kovanim nalez nerobi a automat sa naň nevydava
-#      (delta audit Sol FIX 4 + Codex #333)
+#      celo s UPLNOU RUCNOU ZOSTAVOU (mechanizmus vyklopu / zaves sklopu)
+#      nalez nerobi a automat sa naň nevydava; prislusenstvo (krytka, tyc,
+#      ramena, Tip-On) ani zly DRUH zostavu netvoria — automat bezi dalej
+#      a zliatie kodov prizna ORANGE `flap_manual_duplicate`
+#      (delta audit Sol FIX 4 + Codex #333 kola 1 a 2)
 #  12) BRANY — kody v registri, nakup/rozpocet/ponuka stoja, VEPO bezi;
 #      nedostupna expanzia s vyklopom je fail-closed (guard z E1a — TU sa LEN
 #      overuje, ze plati aj na polozku z pravidla)
@@ -68,13 +71,16 @@
 #   M19 `SEED_VERSION` ostane 4                         -> migracia z v4
 #   M20 pocet tyci sa rata zo SIRKY CELA                -> KB korpusu
 #   M21 `flap_stale` pozera LEN na schemu configu       -> prestavba so seed 4
-#   M22 brana ignoruje rucne kovanie na cele            -> `hardware_manual`
-#   M23 automat sa vyda AJ k rucnej polozke             -> potlacenie + ORANGE
-#   M24 potlacenie sa spusti aj pri VOLNEJ polozke      -> klasifikacia katalogu
+#   M22 brana ignoruje UPLNU rucnu zostavu na cele      -> `hardware_manual`
+#   M23 automat sa vyda AJ k rucnemu mechanizmu         -> potlacenie + ORANGE
+#   M24 potlacenie spusti KAZDA rucna polozka           -> krytka/volna/nezname
+#   M25 stale branu zhasne HOCIJAKY rucny zaznam        -> prislusenstvo = RED
+#   M26 druh rucnej polozky sa neporovnava so SMEROM    -> zaves na vyklope
+#   M27 zliatie kodu s automatom je ticho               -> `flap_manual_duplicate`
+#   M28 neciselny skalar zhodi normalizaciu dokumentu   -> Hash/true v pravidle
 require_relative '../helper' unless defined?(NxTest)
 
 require 'json'
-require 'fileutils'
 
 # UI vrstva (brana exportov) — headless nie je v require zozname helpera.
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core') if NxTest.headless?
@@ -221,31 +227,17 @@ module NxKovE1b
       'hardware' => hardware, 'hardware_manual' => manual }
   end
 
-  # --- katalog v sandboxe (klasifikacia rucnych poloziek) -------------------
-  HWC   = E::HardwareCatalog
-  STORE = E::JsonFileStore
-
-  def catalog_item(code)
-    raw = (HWC::SEED_ITEMS + HWC::SEED_ITEMS_V2).find { |i| i['item_code'].to_s == code }
-    rec, = HWC.normalize_item(raw)
-    rec
-  end
-
-  def install_catalog!
-    FileUtils.mkdir_p(HWC.dir)
-    STORE.write(HWC.path, 'std' => HWC::STD, 'schema' => HWC::SCHEMA_CURRENT,
-                          'seed_version' => 2,
-                          'items' => [catalog_item('347810'), catalog_item('104717')])
-    FileUtils.rm_f("#{HWC.path}.bak")
-    STORE.invalidate(HWC.path)
-    HWC.reset_state!
-  end
-
-  def wipe_catalog!
-    [HWC.path, "#{HWC.path}.bak"].each { |f| FileUtils.rm_f(f) }
-    STORE.invalidate(HWC.path)
-    HWC.reset_state!
-  end
+  # --- kody zo SEED SETOV (klasifikacia rucnych poloziek, Codex #333 kolo 2) -
+  # Mechanizmus = PRVY clen `per: 'unit'`; ostatne kody su prislusenstvo.
+  MECH_HK      = '347810' # AVENTOS HK top 22K2300 (set `vyklop-hk-klasik`)
+  MECH_HK_TIP  = '347814' # HK top Tip-On 22K2300
+  MECH_HL      = '507352' # AVENTOS HL top 22L2500
+  MECH_HINGE   = '104717' # Sensys zaves (set `zaves-klasik`)
+  MECH_HINGE_T = '245723' # zaves P2O (set `zaves-p2o`)
+  ACC_COVER    = '347834' # krytky biele — clen setu, NIE mechanizmus
+  ACC_ARMS     = '507357' # ramena HL 22L3800
+  ACC_ROD      = '507365' # stabilizacna tyc
+  ACC_TIPON    = '250831' # Tip-On jednotka
 
   # Model s (alebo bez) projektovym snapshotom pravidiel — LEN citanie.
   FAKE_MODEL = Struct.new(:doc) do
@@ -259,7 +251,7 @@ module NxKovE1b
   end
 
   # Rucna (ad-hoc) polozka kovania pripnuta na celo F1.
-  def manual_rec(source: 'catalog', code: '22K2300', owner: 'front:F1/flap')
+  def manual_rec(source: 'catalog', code: MECH_HK, owner: 'front:F1/flap')
     { 'id' => 'M1', 'owner_part_key' => owner, 'source' => source, 'code' => code,
       'name' => 'AVENTOS HK top', 'unit' => 'ks', 'qty' => 1 }
   end
@@ -806,10 +798,10 @@ NxTest.test('KOV-E1b (11): `effective_seed_version` je proveniencia stavby') do
                       'projekt bez snapshotu dedí knižnicu')
 end
 
-# --- Codex #333 kolo 1 P1: RUCNE kovanie na vyklope ------------------------
-NxTest.test('KOV-E1b (11): ručné kovanie na výklope `flap_stale` NEROBÍ') do
+# --- Codex #333 kolo 2 P1: UPLNA rucna zostava na vyklope ------------------
+NxTest.test('KOV-E1b (11): `flap_stale` zhasne LEN úplná ručná zostava') do
   c = NxKovE1b
-  # Skrinka schemy 10, ktorej vyklop ma kovanie pridane RUCNE (kanal
+  # Skrinka schemy 10, ktorej vyklop ma MECHANIZMUS pridany RUCNE (kanal
   # `hardware_manual`). Bez tejto vetvy by ju brana hnala do prestavby, ta by
   # k rucnej polozke pridala automaticku zostavu a nakup by ten isty kod
   # zratal DVAKRAT (`add_adhoc_row` scitava rovnake kody).
@@ -819,9 +811,29 @@ NxTest.test('KOV-E1b (11): ručné kovanie na výklope `flap_stale` NEROBÍ') do
   other = c.stale_cfg(10, c::HR::FLAP_UP, [],
                       manual: [c.manual_rec(owner: 'front:F9/flap')])
   NxTest.assert(c::BOM.flap_stale_issue('CAB-5', 7, other), 'cudzie čelo nález nezhasí')
-  # Rovnako pre SKLOP.
-  down = c.stale_cfg(10, c::HR::FLAP_DOWN, [], manual: [c.manual_rec(code: '71B3550')])
-  NxTest.assert_equal(nil, c::BOM.flap_stale_issue('CAB-5', 7, down), 'sklop rovnako')
+  # PRISLUSENSTVO (krytka, ramena, tyc, Tip-On) zostavu NETVORI — bez
+  # mechanizmu je celo stale UPLNE BEZ kovania a RED musí ostať (M25).
+  [c::ACC_COVER, c::ACC_ARMS, c::ACC_ROD, c::ACC_TIPON].each do |code|
+    acc = c.stale_cfg(10, c::HR::FLAP_UP, [], manual: [c.manual_rec(code: code)])
+    NxTest.assert(c::BOM.flap_stale_issue('CAB-5', 7, acc), "#{code} nie je zostava")
+  end
+  # Neznamy kod, VOLNA polozka a zaznam bez kodu tiez nie.
+  [c.manual_rec(code: 'NEEXISTUJE'), c.manual_rec(source: 'free'),
+   c.manual_rec(code: '')].each do |rec|
+    cfg2 = c.stale_cfg(10, c::HR::FLAP_UP, [], manual: [rec])
+    NxTest.assert(c::BOM.flap_stale_issue('CAB-5', 7, cfg2), rec.inspect)
+  end
+  # DRUH musí sedieť so SMEROM: ručný ZÁVES na výklope HORE mechanizmus
+  # nenahradí (M26) a naopak výklopový mechanizmus na sklope tiež nie.
+  up_hinge = c.stale_cfg(10, c::HR::FLAP_UP, [], manual: [c.manual_rec(code: c::MECH_HINGE)])
+  NxTest.assert(c::BOM.flap_stale_issue('CAB-5', 7, up_hinge), 'záves výklop hore nezhasí')
+  down_lift = c.stale_cfg(10, c::HR::FLAP_DOWN, [], manual: [c.manual_rec])
+  NxTest.assert(c::BOM.flap_stale_issue('CAB-5', 7, down_lift), 'mechanizmus sklop nezhasí')
+  # SKLOP zhasne ručný ZÁVES (oba seed sety).
+  [c::MECH_HINGE, c::MECH_HINGE_T].each do |code|
+    down = c.stale_cfg(10, c::HR::FLAP_DOWN, [], manual: [c.manual_rec(code: code)])
+    NxTest.assert_equal(nil, c::BOM.flap_stale_issue('CAB-5', 7, down), "sklop + #{code}")
+  end
 end
 
 NxTest.test('KOV-E1b (11): pri ručnom kovaní sa AUTOMAT vynechá (nikdy sčítanie oboch)') do
@@ -855,29 +867,99 @@ NxTest.test('KOV-E1b (11): pri ručnom kovaní sa AUTOMAT vynechá (nikdy sčít
   NxTest.assert_equal(1, c.lifts(c.evaluate([c.flap])).length, 'bez ručnej položky = automat')
 end
 
-NxTest.test('KOV-E1b (11): druh ručnej položky určuje KATALÓG (kategória)') do
-  NxTest.skip! 'katalógové testy bežia len headless (APPDATA sandbox)' unless NxTest.headless?
+NxTest.test('KOV-E1b (11): úplnú ručnú zostavu tvorí MECHANIZMUS, nie príslušenstvo') do
   c = NxKovE1b
-  c.install_catalog!
   cfg = { hardware_manual: [
-    # 347810 = BLUM 22K2300, kategória VYKLOPY -> `lift`
-    { 'owner_part_key' => 'front:F1/flap', 'source' => 'catalog', 'code' => '347810', 'qty' => 1 },
-    # 104717 = Sensys záves, kategória ZAVESY -> `hinge`
-    { 'owner_part_key' => 'front:F2/flap', 'source' => 'catalog', 'code' => '104717', 'qty' => 1 },
-    # úchytka ani neznámy kód automat neovplyvnia
-    { 'owner_part_key' => 'front:F3/flap', 'source' => 'catalog', 'code' => 'NEEXISTUJE', 'qty' => 1 },
+    { 'owner_part_key' => 'front:F1/flap', 'source' => 'catalog', 'code' => c::MECH_HK, 'qty' => 1 },
+    { 'owner_part_key' => 'front:F2/flap', 'source' => 'catalog', 'code' => c::MECH_HINGE, 'qty' => 1 },
+    # krytka je v TOM ISTOM sete (a v katalógu v kategórii VYKLOPY) — zostavu
+    # netvorí, automat na tom čele beží ďalej aj s bránami (M24)
+    { 'owner_part_key' => 'front:F3/flap', 'source' => 'catalog', 'code' => c::ACC_COVER, 'qty' => 1 },
+    { 'owner_part_key' => 'front:F4/flap', 'source' => 'catalog', 'code' => 'NEEXISTUJE', 'qty' => 1 },
     # voľná položka nemá katalógový kód — v nákupe je vlastným riadkom, takže
     # sa s automatom nikdy nezlieva a automat sa kvôli nej nevypína
-    { 'owner_part_key' => 'front:F4/flap', 'source' => 'free', 'code' => '347810', 'qty' => 1 }
+    { 'owner_part_key' => 'front:F5/flap', 'source' => 'free', 'code' => c::MECH_HK, 'qty' => 1 },
+    # Tip-On, ramená a tyč sú tiež len príslušenstvo
+    { 'owner_part_key' => 'front:F6/flap', 'source' => 'catalog', 'code' => c::ACC_TIPON, 'qty' => 1 }
   ] }
   map = c::CB.manual_flap_owners(cfg)
   NxTest.assert_equal({ 'lift' => true }, map['front:F1/flap'])
   NxTest.assert_equal({ 'hinge' => true }, map['front:F2/flap'])
-  NxTest.assert_equal(nil, map['front:F3/flap'], 'neznámy kód sa nezaradí')
-  NxTest.assert_equal(nil, map['front:F4/flap'], 'voľná položka automat nevypína (M24)')
+  %w[front:F3/flap front:F4/flap front:F5/flap front:F6/flap].each do |owner|
+    NxTest.assert_equal(nil, map[owner], "#{owner} zostavu netvorí")
+  end
   NxTest.assert_equal({}, c::CB.manual_flap_owners(hardware_manual: []), 'bez položiek prázdna mapa')
-ensure
-  NxKovE1b.wipe_catalog!
+  # Tip-On mechanizmus (iný set, iný kód) zostavu TVORÍ.
+  tip = { hardware_manual: [{ 'owner_part_key' => 'front:F1/flap', 'source' => 'catalog',
+                              'code' => c::MECH_HK_TIP, 'qty' => 1 }] }
+  NxTest.assert_equal({ 'lift' => true }, c::CB.manual_flap_owners(tip)['front:F1/flap'])
+  # A HL mechanizmus tiež.
+  hl = { hardware_manual: [{ 'owner_part_key' => 'front:F1/flap', 'source' => 'catalog',
+                             'code' => c::MECH_HL, 'qty' => 1 }] }
+  NxTest.assert_equal({ 'lift' => true }, c::CB.manual_flap_owners(hl)['front:F1/flap'])
+end
+
+NxTest.test('KOV-E1b (11): mechanizmy sa čítajú aj z POUŽÍVATEĽSKÝCH setov snapshotu') do
+  c = NxKovE1b
+  # Seed sám o sebe kód `X-MECH` nepozná.
+  seed = c::HWS.flap_set_codes
+  NxTest.assert(seed['lift']['mechanism'][c::MECH_HK], 'seed pozná HK mechanizmus')
+  NxTest.assert(seed['lift']['members'][c::ACC_COVER], 'krytka je členom setu')
+  NxTest.refute(seed['lift']['mechanism'][c::ACC_COVER], 'krytka NIE JE mechanizmus')
+  NxTest.refute(seed['lift']['mechanism']['X-MECH'])
+  # Projektový snapshot s VLASTNÝM výklopovým setom: prvý `per: 'unit'` člen
+  # je mechanizmus, druhý (ramená) už nie.
+  state = { 'mapping' => {},
+            'sets' => { 'moj-vyklop' => {
+              'set_id' => 'moj-vyklop', 'generic_type' => 'lift', 'use_type' => 'lift',
+              'members' => [{ 'code' => 'X-MECH', 'per' => 'unit', 'qty' => 1 },
+                            { 'code' => 'X-ARM', 'per' => 'unit', 'qty' => 1 }]
+            } } }
+  codes = c::HWS.flap_set_codes(state)
+  NxTest.assert(codes['lift']['mechanism']['X-MECH'], 'vlastný mechanizmus sa pozná')
+  NxTest.refute(codes['lift']['mechanism']['X-ARM'], 'druhý člen mechanizmus nie je')
+  NxTest.assert(codes['lift']['members']['X-ARM'], 'ale členom setu áno')
+  NxTest.assert(codes['lift']['mechanism'][c::MECH_HK], 'seed ostáva ako základ')
+  # A predikát ten kód uzná.
+  rec = [{ 'owner_part_key' => 'front:F1/flap', 'source' => 'catalog',
+           'code' => 'X-MECH', 'qty' => 1 }]
+  NxTest.assert_equal({ 'front:F1/flap' => { 'lift' => true } },
+                      c::HWS.manual_flap_assemblies(rec, codes))
+  NxTest.assert_equal({}, c::HWS.manual_flap_assemblies(rec), 'bez snapshotu seed kód nepozná')
+  # Pokazený snapshot normalizáciu ani zber nezhodí (fail-soft).
+  NxTest.assert(c::HWS.flap_set_codes('nezmysel')['lift']['mechanism'][c::MECH_HK])
+end
+
+NxTest.test('KOV-E1b (11): ručný doplnok vedľa automatu = ORANGE `flap_manual_duplicate`') do
+  c = NxKovE1b
+  owner = 'front:F1/flap'
+  parts = [{ role: 'flap', part_key: owner, suffix: 'FLAP-1', name: 'Výklop 1' }]
+  hw = [{ 'owner_part_key' => owner, 'generic_type' => 'lift', 'quantity' => 1 }]
+  plan = { parts: parts, hardware: hw }
+  emitted = c::CB.emitted_flap_kinds(plan)
+  NxTest.assert_equal({ owner => { 'lift' => true } }, emitted)
+  codes = c::HWS.flap_set_codes
+  # Krytka JE členom setu -> nákup ich zlepí do jedného riadku (M27).
+  ws = c::CB.manual_duplicate_warnings([c.manual_rec(code: c::ACC_COVER)], emitted, codes)
+  NxTest.assert_equal(1, ws.length, ws.inspect)
+  NxTest.assert_equal('flap_manual_duplicate', ws.first['code'])
+  NxTest.assert_equal(owner, ws.first['part_key'])
+  NxTest.assert(ws.first['message'].include?(c::ACC_COVER), ws.first['message'])
+  # Kód mimo setu ORANGE nerobí; rovnako voľná položka.
+  NxTest.assert_equal([], c::CB.manual_duplicate_warnings([c.manual_rec(code: 'INE')],
+                                                          emitted, codes))
+  NxTest.assert_equal([], c::CB.manual_duplicate_warnings([c.manual_rec(code: c::ACC_COVER,
+                                                                       source: 'free')],
+                                                          emitted, codes))
+  # Bez vydanej automatickej položky (napr. čelo s úplnou ručnou zostavou) tiež nie.
+  NxTest.assert_equal([], c::CB.manual_duplicate_warnings([c.manual_rec(code: c::ACC_COVER)],
+                                                          {}, codes))
+  # DVIERKA sa tým nedotknú — `emitted_flap_kinds` berie LEN rolu `flap`.
+  door_plan = { parts: [{ role: 'front_door', part_key: 'front:F2/wing:single',
+                          suffix: 'DOOR-1', name: 'Dvierka' }],
+                hardware: [{ 'owner_part_key' => 'front:F2/wing:single',
+                             'generic_type' => 'hinge', 'quantity' => 2 }] }
+  NxTest.assert_equal({}, c::CB.emitted_flap_kinds(door_plan))
 end
 
 NxTest.test('KOV-E1b (11): `flap_stale` je RED v Kontrole a stopka pre 3 exporty') do
@@ -1038,6 +1120,46 @@ NxTest.test('KOV-E1b (14): pravidlo `lift_class` prejde normalizáciou aj zápis
   # Prazdna tabulka tried tiez nie.
   empty = JSON.parse(JSON.generate(c.lift_rule)).merge('classes' => [])
   NxTest.assert(c::HR.rules_problems(c::HR.normalize_rules([empty])).any?)
+end
+
+# --- Codex #333 kolo 2 P2: neciselny skalar nezhodi CELY snapshot ----------
+NxTest.test('KOV-E1b (14): nečíselná rezerva/prah pravidlo NAHLÁSI, snapshot NEZAHODÍ') do
+  c = NxKovE1b
+  mine = { 'rule_id' => 'moje-pravidlo', 'enabled' => true, 'output' => 'leg',
+           'kind' => 'fixed', 'quantity' => 6, 'applies_to' => { 'role' => 'cabinet' } }
+  broken = JSON.parse(JSON.generate(c.lift_rule))
+                .merge('handle_allowance_kg' => {}, 'rod_double_from_kb_mm' => true)
+  rules = nil
+  begin
+    rules = c::HR.normalize_rules([broken, mine])
+  rescue StandardError => e
+    NxTest.assert(false, "normalizácia spadla: #{e.class} #{e.message} (M28)")
+  end
+  NxTest.assert_equal(2, rules.length, 'ostatné pravidlá projektu ostávajú')
+  NxTest.assert_equal(6, rules.last['quantity'], 'používateľské pravidlo nedotknuté')
+  bad = rules.first
+  NxTest.assert_equal(nil, bad['handle_allowance_kg'], 'neplatný skalár = nil, kľúč ostáva')
+  NxTest.assert_equal(nil, bad['rod_double_from_kb_mm'])
+  # Pravidlo sa NEULOZI, kym to clovek neopravi — a hlaska povie CO.
+  msg = c::HR.rules_problems(rules).first
+  NxTest.assert(msg && msg['message'].include?('rezerva na úchytku'), msg.inspect)
+  NxTest.assert(msg['message'].include?('musí byť číslo'), msg['message'])
+  # Vypnute pravidlo branu neblokuje (cesta von).
+  off = rules.map { |r| r['rule_id'] == c::LIFT_RULE ? r.merge('enabled' => false) : r }
+  NxTest.assert_equal([], c::HR.rules_problems(off), 'vypnuté pravidlo sa nekontroluje')
+  # Vypocet je typovo bezpecny: ziadna rezerva, JEDNA tyc (nikdy hadanie).
+  res = c.evaluate([c.flap(weight_kg: 3.0)], { 'kh' => c::KH_LF, 'kb' => 1200.0 }, {}, rules)
+  item = c.lifts(res).first
+  NxTest.assert(item, res[:conflicts].inspect)
+  NxTest.assert_equal(1, item['params']['rod_count'], 'bez prahu sa tyč nezdvojí')
+  # PROJEKTOVY snapshot s takym pravidlom sa DA precitat (P2: `to_f` na Hash
+  # padol -> `project_rules` vratil nil -> `ensure_project_rules!` by projektove
+  # pravidla ticho nahradil globalnou kniznicou).
+  model = c.model_with('std' => c::HR::STD, 'seed_version' => c::HR::SEED_VERSION,
+                       'rules' => [broken, mine])
+  loaded = c::HR.project_rules(model)
+  NxTest.assert(loaded.is_a?(Array), 'snapshot sa načítal')
+  NxTest.assert_equal([c::LIFT_RULE, 'moje-pravidlo'], loaded.map { |r| r['rule_id'] })
 end
 
 NxTest.test('KOV-E1b (14): GOLDEN — zákazka BEZ výklopov sa nezmenila') do

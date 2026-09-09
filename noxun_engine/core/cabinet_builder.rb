@@ -213,11 +213,6 @@ module Noxun
       # POCTU/dlzky setovej polozky (`config.hardware[].source`), uplne iny pojem
       # (audit #15 FIX 7). Ad-hoc kanal nesie `origin: 'adhoc'` az na riadku.
       MANUAL_SOURCES = %w[catalog free].freeze
-      # KOV-E1b (Codex #333 kolo 1 P1): kategoria katalogu -> druh kovania,
-      # ktory na cele `flap` NAHRADZA automat (`manual_flap_owners`). Jedine
-      # miesto tohto prekladu; iny druh (uchytka, spojovaci material) automat
-      # neovplyvnuje.
-      MANUAL_FLAP_CATEGORIES = { 'VYKLOPY' => 'lift', 'ZAVESY' => 'hinge' }.freeze
       MANUAL_QTY_MAX = 999
       MANUAL_NOTE_MAX = 200
 
@@ -793,12 +788,16 @@ module Noxun
           plan = Construction.build_plan(cfg, cid, hardware_rules: rules,
                                                    part_thicknesses: drawer_thicknesses(cfg, eff),
                                                    materials: part_materials(cfg, eff),
-                                                   manual_flap_owners: manual_flap_owners(cfg)) # validuje interne
+                                                   manual_flap_owners: manual_flap_owners(cfg, model)) # validuje interne
           # KOV-F1 (Codex #329 kolo 2 P1): protajsok ORANGE `library_incompatible`
           # setov — pravidla z nekompatibilnej kniznice sa NEZMRAZILI, takze to
           # musi byt VIDNO (inak by zakazka vyzerala zdravo a snapshot by nikdy
           # nevznikol).
           attach_rules_state_warning!(plan, model)
+          # KOV-E1b (Codex #333 kolo 2 P1): rucny doplnok (krytka, tyc…) automat
+          # UZ NEVYPINA — ked ma ale rovnaky kod ako clen setu, nakup ich zleje
+          # do jedneho riadku. ORANGE to prizna.
+          attach_manual_duplicate_warnings!(plan, cfg, model)
           # KOV-C2b: doplnenie CHYBAJUCEHO systemu a pripnutia receptu je zapis
           # do configu — bezi v TEJ ISTEJ operacii ako geometria (volajuci nas
           # obalil `start_operation`), takze Undo vrati oboje naraz.
@@ -839,55 +838,119 @@ module Noxun
           merge_final(cfg, plan, seed_v)
         end
 
-        # === KOV-E1b (Codex #333 kolo 1 P1): CELA S RUCNYM KOVANIM ===========
+        # === KOV-E1b: CELA S UPLNOU RUCNOU ZOSTAVOU ==========================
         #
         # -> { owner_part_key => { 'lift'|'hinge' => true } } pre `evaluate`.
         # Automat na taketo celo polozku NEVYDA (inak by nakup zratal to iste
         # dvakrat — ad-hoc katalogovy riadok sa zlieva so setovym podla kodu).
         #
-        # DRUH kovania sa urcuje z KATALOGU (`category`): VYKLOPY -> `lift`,
-        # ZAVESY -> `hinge`. Preto to nerobi `HardwareRules.evaluate` (cista
-        # funkcia bez IO), ale builder, ktory katalog aj tak cita.
-        #
-        # VOLNA polozka (`source: 'free'`) sa NEKLASIFIKUJE: nema katalogovy
-        # kod, v nakupe je VLASTNYM riadkom (`add_free_row`) a s automatom sa
-        # teda nikdy nezleje — potlacit kvoli nej automat by znamenalo tichu
-        # stratu mechanizmu. Iny druh kovania (uchytka, spojovaci material)
-        # automat neovplyvnuje.
-        def manual_flap_owners(cfg)
+        # Codex #333 kolo 2 P1: rozhoduje MECHANIZMUS, nie kategoria katalogu.
+        # Kategoria `VYKLOPY` drzi aj krytky, ramena, tyce a Tip-On — jedna
+        # rucne pridana krytka tak predtym vypla automat AJ jeho tvrde kontroly
+        # a nakup mohol prejst UPLNE BEZ mechanizmu. Predikat je od kola 2
+        # ZDIELANY s `Bom.flap_stale_issue`
+        # (`HardwareSets.manual_flap_assemblies`) a kody mechanizmov cita zo
+        # SETOV (seed + projektovy snapshot), takze katalog uz netreba vobec.
+        def manual_flap_owners(cfg, model = nil)
+          return {} unless defined?(HardwareSets)
+
           list = cfg.is_a?(Hash) ? cfg[:hardware_manual] : nil
-          return {} unless list.is_a?(Array) && !list.empty?
+          HardwareSets.manual_flap_assemblies(list, HardwareSets.flap_set_codes(sets_state(model)))
+        rescue StandardError => e
+          Engine.log_error(e, 'CabinetBuilder.manual_flap_owners') if defined?(Engine)
+          {}
+        end
 
+        # Projektovy snapshot setov (bez IO, len modelovy atribut) — zdroj
+        # POUZIVATELSKYCH setov pre klasifikaciu. Bez modelu ostava seed.
+        def sets_state(model)
+          return nil unless model && defined?(HardwareSets)
+
+          HardwareSets.project_state(model)
+        rescue StandardError => e
+          Engine.log_error(e, 'CabinetBuilder.sets_state') if defined?(Engine)
+          nil
+        end
+
+        # === KOV-E1b (Codex #333 kolo 2 P1): RUCNY DOPLNOK VEDLA AUTOMATU ====
+        #
+        # Rucna polozka BEZ mechanizmu automat NEVYPINA (viz vyssie) — vyda sa
+        # cela zostava a rucny riadok ostava vedla nej. Ked ma pritom rovnaky
+        # KOD ako niektory clen setu toho druhu, `add_adhoc_row` ich v nakupe
+        # ZLEJE do jedneho riadku a mnozstvo sa SCITA (typicky prave krytky).
+        # To nie je chyba, ktoru by sme mali opravit za pouzivatela — je to vec,
+        # o ktorej musi vediet. ORANGE na (celo, kod).
+        def attach_manual_duplicate_warnings!(plan, cfg, model)
+          return plan unless defined?(HardwareSets)
+
+          list = cfg.is_a?(Hash) ? cfg[:hardware_manual] : nil
+          return plan unless list.is_a?(Array) && !list.empty?
+
+          emitted = emitted_flap_kinds(plan)
+          return plan if emitted.empty?
+
+          codes = HardwareSets.flap_set_codes(sets_state(model))
+          added = manual_duplicate_warnings(list, emitted, codes)
+          return plan if added.empty?
+
+          plan[:warnings].concat(added)
+          BuildPlan.validate!(plan)
+          plan
+        rescue StandardError => e
+          Engine.log_error(e, 'CabinetBuilder.attach_manual_duplicate_warnings!') if defined?(Engine)
+          plan
+        end
+
+        # { owner_part_key => { 'lift'|'hinge' => true } } — druhy kovania,
+        # ktore AUTOMAT na cele `flap` naozaj vydal. Iba rola `flap`: rucna
+        # polozka na DVIERKACH je stara zalezitost H1 a tu sa nerozsiruje.
+        def emitted_flap_kinds(plan)
+          flaps = {}
+          Array(plan[:parts]).each do |pd|
+            next unless pd.is_a?(Hash) && pd[:role].to_s == 'flap'
+
+            flaps[PartKeys.for_descriptor(pd)] = true
+          end
           out = {}
-          list.each do |rec|
-            next unless rec.is_a?(Hash)
+          Array(plan[:hardware]).each do |it|
+            next unless it.is_a?(Hash)
 
-            owner = rec['owner_part_key'].to_s
-            next if owner.empty?
-
-            gt = manual_generic_type(rec)
-            next if gt.nil?
+            owner = it['owner_part_key'].to_s
+            gt = it['generic_type'].to_s
+            next unless flaps[owner] && HardwareSets::FLAP_USE_TYPES.key?(gt)
 
             (out[owner] ||= {})[gt] = true
           end
           out
         end
 
-        # Druh kovania katalogovej ad-hoc polozky, alebo nil (nedokazeme ho
-        # urcit). Katalog je ZIVY zdroj — kod, ktory z neho zmizol, sa neda
-        # zaradit a automat pobezi (fail-closed opacnym smerom by znamenal
-        # skrinku bez mechanizmu).
-        def manual_generic_type(rec)
-          return nil unless rec['source'].to_s == 'catalog'
-          return nil unless defined?(HardwareCatalog)
+        def manual_duplicate_warnings(list, emitted, codes)
+          seen = {}
+          list.filter_map do |rec|
+            next nil unless rec.is_a?(Hash) && rec['source'].to_s == 'catalog'
 
-          item = HardwareCatalog.find(rec['code'])
-          return nil unless item.is_a?(Hash)
+            owner = rec['owner_part_key'].to_s
+            code = rec['code'].to_s.strip
+            next nil if code.empty?
 
-          MANUAL_FLAP_CATEGORIES[item['category'].to_s.strip.upcase]
-        rescue StandardError => e
-          Engine.log_error(e, 'CabinetBuilder.manual_generic_type') if defined?(Engine)
-          nil
+            kinds = emitted[owner]
+            next nil unless kinds.is_a?(Hash)
+
+            kind = kinds.keys.find { |k| codes.dig(k, 'members', code) }
+            next nil if kind.nil?
+
+            key = "#{owner}|#{code}"
+            next nil if seen[key]
+
+            seen[key] = true
+            BuildPlan.warning(
+              'flap_manual_duplicate',
+              "Ručne pridané kovanie #{code} je zároveň v automatickej zostave čela — v nákupe " \
+              'sa počty SPOČÍTAJÚ do jedného riadku. Uber ručnú položku, ak to tak nemá byť.',
+              part_key: owner,
+              data: { 'owner_part_key' => owner, 'code' => code, 'generic_type' => kind }
+            )
+          end
         end
 
         # 2A-3 (audit B2): kanonicke warnings z vyberu ABS do planu + re-validacia.

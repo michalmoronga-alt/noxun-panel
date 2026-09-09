@@ -87,6 +87,10 @@ module Noxun
         # tabulky zavesov? Otazka je MODELOVA (snapshot, inak globalna
         # kniznica), preto sa pyta RAZ na zber, nie pri kazdej skrinke.
         rules_stale = defined?(HardwareRules) && HardwareRules.pre_hinge_table_rules?(model)
+        # KOV-E1b (Codex #333 kolo 2 P1): kody MECHANIZMOV vyklopu a zavesov zo
+        # setov projektu. Otazka je rovnako MODELOVA ako `rules_stale`, preto sa
+        # pyta RAZ na zber; `project_state` cita len atribut modelu (ziadne IO).
+        flap_codes = defined?(HardwareSets) ? HardwareSets.flap_set_codes(HardwareSets.project_state(model)) : nil
         model.entities.grep(Sketchup::ComponentInstance).each do |inst|
           case Store.kind(inst)
           when 'cabinet'
@@ -158,7 +162,7 @@ module Noxun
             # Jej vyklop nema mechanizmus a jej sklop nema zavesy, takze nakup
             # by bol NEUPLNY a ticho. Aktivuje ju VYHRADNE proveniencia stavby
             # (schema configu), nie pritomnost pravidiel (delta audit Sol FIX 4).
-            fs = flap_stale_issue(cid, inst.persistent_id, ccfg)
+            fs = flap_stale_issue(cid, inst.persistent_id, ccfg, flap_codes)
             hardware_issues << fs if fs
             cs = ccfg['hardware_sets']
             note_cabinet_sets(cid, (cs.is_a?(Hash) && !cs.empty? ? cs : nil),
@@ -514,7 +518,7 @@ module Noxun
       #
       # `hinge_stale_issue` mlci, ked zaves nenajde; TU je to naopak — CHYBAJUCA
       # polozka JE nalez. -> nalez | nil
-      def flap_stale_issue(owner_id, owner_pid, ccfg)
+      def flap_stale_issue(owner_id, owner_pid, ccfg, flap_codes = nil)
         return nil unless defined?(CabinetBuilder) && defined?(HardwareRules)
 
         cfg = ccfg.is_a?(Hash) ? ccfg : {}
@@ -522,7 +526,7 @@ module Noxun
 
         items = cfg['front_items'].is_a?(Array) ? cfg['front_items'] : []
         hw = Array(cfg['hardware'])
-        manual = Array(cfg['hardware_manual'])
+        manual = manual_flap_assemblies(cfg['hardware_manual'], flap_codes)
         hit = items.find { |it| it.is_a?(Hash) && flap_without_hardware?(it, hw, manual) }
         return nil if hit.nil?
 
@@ -551,21 +555,26 @@ module Noxun
       # smeru patri: vyklopu (`up`) polozka `lift`, sklopu (`down`) zaves
       # s `use_type: 'door'`. Iny typ riadku nalez nerobi.
       #
-      # Codex #333 kolo 1 P1: RUCNE (ad-hoc) kovanie pripnute na to celo je
-      # kovanie ako kazde ine — zber ho zbiera (`hardware_manual`) a do nakupu
-      # ide. Nalez by tu nutil k prestavbe, ktora by k rucnej polozke pridala
-      # este automaticku zostavu a nakup by ten isty kod zratal DVAKRAT
-      # (`HardwareSets.add_adhoc_row` scitava rovnake kody). Celo s rucnym
-      # zaznamom sa preto povazuje za obsluzene; automat ho z toho isteho
-      # dovodu obchadza (`HardwareRules.manual_flap_hit?`).
-      def flap_without_hardware?(item, hardware, manual = [])
+      # Codex #333 kolo 2 P1: branu zhasne LEN UPLNA RUCNA ZOSTAVA toho druhu,
+      # ktory celu podla SMERU patri — vyklopu mechanizmus, sklopu zaves.
+      # V kole 1 stacil AKYKOLVEK owner-bound rucny zaznam, takze uchytka,
+      # volna poznamka ci zaves na vyklope HORE pustili nakup, rozpocet aj
+      # ponuku nad celom, ktore ziadny mechanizmus nema. Uplna zostava je
+      # naopak vedomy zasah a prestavba (nasa naprava) by k nej pridala este
+      # automat — nakup by ten isty kod zratal DVAKRAT
+      # (`HardwareSets.add_adhoc_row` scitava rovnake kody). Predikat je
+      # ZDIELANY s builderom (`HardwareSets.manual_flap_assemblies`).
+      # `manual` = uz vyhodnotena mapa { owner_part_key => { druh => true } }.
+      def flap_without_hardware?(item, hardware, manual = {})
         dir = item['flap_dir'].to_s
         return false unless [HardwareRules::FLAP_UP, HardwareRules::FLAP_DOWN].include?(dir)
 
-        fid = item['id'].to_s
-        return false if manual_hardware_for?(manual, fid)
-
         want_lift = dir == HardwareRules::FLAP_UP
+        fid = item['id'].to_s
+        return false if manual_assembly_for?(manual, fid,
+                                             want_lift ? HardwareRules::LIFT_OUTPUT
+                                                       : HardwareRules::HINGE_OUTPUT)
+
         hardware.none? do |h|
           next false unless h.is_a?(Hash)
           next false unless PartKeys.front_id(h['owner_part_key'].to_s).to_s == fid
@@ -580,17 +589,29 @@ module Noxun
         end
       end
 
-      # Visi na tom cele RUCNY (ad-hoc) zaznam kovania? Druh sa TU nerozlisuje
-      # — config ho nenesie (kategoriu vie az ZIVY katalog) a zber je citacia
-      # cesta bez IO. Pre branu to staci: rucny zaznam na cele je vedomy zasah
-      # a migracna RED, ktorej napravou je prestavba, by pri nom hrozila
-      # zdvojenim objednavky.
-      def manual_hardware_for?(manual, front_id)
-        return false if front_id.to_s.empty?
+      # Cela s UPLNOU rucnou zostavou. Kody mechanizmov pochadzaju zo SETOV
+      # (seed + projektovy snapshot) — `flap_codes` pocita `collect` RAZ na
+      # zber (vzor `rules_stale`); bez nich sa vezme seed, takze aj priame
+      # volanie (testy, diagnostika) da rozumnu odpoved. ZIADNE IO.
+      def manual_flap_assemblies(manual, flap_codes = nil)
+        return {} unless defined?(HardwareSets)
 
-        Array(manual).any? do |rec|
-          rec.is_a?(Hash) &&
-            PartKeys.front_id(rec['owner_part_key'].to_s).to_s == front_id.to_s
+        HardwareSets.manual_flap_assemblies(manual, flap_codes)
+      rescue StandardError => e
+        Engine.log_error(e, 'Bom.manual_flap_assemblies') if defined?(Engine)
+        {}
+      end
+
+      # Ma celo `front_id` rucnu zostavu druhu `kind`? Mapa je klucovana
+      # `owner_part_key`, zber pozna len ID cela — porovnava sa preto cez
+      # `PartKeys.front_id` (rovnako ako pri ULOZENOM kovani).
+      def manual_assembly_for?(manual, front_id, kind)
+        return false if front_id.to_s.empty?
+        return false unless manual.is_a?(Hash)
+
+        manual.any? do |owner, kinds|
+          kinds.is_a?(Hash) && kinds[kind] == true &&
+            PartKeys.front_id(owner.to_s).to_s == front_id.to_s
         end
       end
 

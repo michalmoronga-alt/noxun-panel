@@ -17310,6 +17310,7 @@ module NoxunSuRunner
       kove_stale(model)
       kove_stale_rules(model)
       kove_manual(model)
+      kove_manual_partial(model)
     ensure
       cleanup(model)
     end
@@ -17529,9 +17530,9 @@ module NoxunSuRunner
     cleanup(model)
   end
 
-  # --- 6) RUCNE KOVANIE NA VYKLOPE (Codex #333 kolo 1 P1) ---------------------
+  # --- 6) RUCNE KOVANIE NA VYKLOPE (Codex #333 kola 1 a 2) --------------------
   #
-  # Skrinka spred E1b, ktorej vyklop uz ma mechanizmus pridany RUCNE
+  # Skrinka spred E1b, ktorej vyklop uz ma MECHANIZMUS pridany RUCNE
   # (kanal `hardware_manual`). Brana ju nesmie hnat do prestavby a prestavba
   # jej nesmie pridat DRUHU (automaticku) zostavu — ad-hoc katalogovy riadok
   # sa v nakupe zlieva so setovym podla kodu, takze by sa objednal dvakrat.
@@ -17580,6 +17581,56 @@ module NoxunSuRunner
     e::CabinetBuilder.rebuild(model, inst, par)
     ok("KOV-E manual: po odstraneni rucnej polozky je automat spat (#{kove_class(inst).inspect})",
        kove_hw(inst, 'lift').length == 1)
+    cleanup(model)
+  end
+
+  # --- 7) RUCNY DOPLNOK BEZ MECHANIZMU (Codex #333 kolo 2 P1) -----------------
+  #
+  # TA ISTA stara skrinka, ale rucne je pridana LEN KRYTKA (347834). Kategoria
+  # katalogu je rovnaka (`VYKLOPY`), takze kolo 1 by ju povazovalo za uplnu
+  # zostavu: automat aj s tvrdymi kontrolami by sa vypol a nakup by presiel
+  # BEZ mechanizmu. Od kola 2 rozhoduje mechanizmus — RED `flap_stale` drzi,
+  # prestavba vyda celu zostavu a zliatie kodu prizna ORANGE.
+  def kove_manual_partial(model)
+    inst = kove_build(model, 400.0)
+    return ok('KOV-E manual-doplnok: vlozenie korpusu', false) unless inst
+
+    cfg = e::Store.config(inst) || {}
+    fid = (Array(cfg['front_items']).first || {})['id'].to_s
+    owner = e::PartKeys.front(fid, 'flap')
+    rec = { 'id' => 'M2', 'owner_part_key' => owner, 'source' => 'catalog',
+            'code' => '347834', 'name' => 'BLUM krytky biele', 'unit' => 'par', 'qty' => 1 }
+    e::CabinetBuilder.guarded do
+      model.start_operation('SU-TEST KOV-E rucny doplnok', true)
+      e::Store.write_config(inst, cfg.merge(
+        'config_schema' => e::CabinetBuilder::LIFT_ACTIVATION_SCHEMA - 1,
+        'hardware' => Array(cfg['hardware']).reject { |h| h['generic_type'].to_s == 'lift' },
+        'hardware_conflicts' => [], 'hardware_manual' => [rec]
+      ))
+      model.commit_operation
+    end
+    red = kove_ctrl(model).select { |i| i['category'] == e::Validation::CAT_HARDWARE_CONFLICT }
+    ok("KOV-E manual-doplnok: RED `flap_stale` OSTAVA (#{red.length})",
+       red.length == 1 && red.first['severity'] == 'red')
+
+    e::CabinetBuilder.rebuild(model, inst,
+                              e::CabinetBuilder.config_to_params(e::Store.config(inst) || {}))
+    cfg2 = e::Store.config(inst) || {}
+    codes = Array(cfg2['warnings']).map { |w| w['code'].to_s }
+    ok("KOV-E manual-doplnok: prestavba VYDALA automat (#{kove_class(inst).inspect})",
+       kove_hw(inst, 'lift').length == 1)
+    ok("KOV-E manual-doplnok: automat sa NEPOTLACIL (#{codes.inspect})",
+       !codes.include?('flap_manual_hardware'))
+    ok('KOV-E manual-doplnok: zliatie kodu prizna ORANGE `flap_manual_duplicate`',
+       codes.include?('flap_manual_duplicate'))
+    # Krytka je v sete 1x na kus + 1x rucne => nakupny riadok ma DVA kusy
+    # (`add_adhoc_row` scitava rovnake kody) — presne o tom je to ORANGE.
+    exp = e::ProductionCore.hardware_expansion(model, e::Bom.collect(model))
+    row = Array(exp && exp['rows']).find { |r| r['code'].to_s == '347834' }
+    ok("KOV-E manual-doplnok: nakup ma krytky 2x (#{row && row['quantity']})",
+       row && row['quantity'].to_i == 2)
+    ok('KOV-E manual-doplnok: a Kontrola uz RED nehlasi',
+       kove_ctrl(model).none? { |i| i['category'] == e::Validation::CAT_HARDWARE_CONFLICT })
     cleanup(model)
   end
 
