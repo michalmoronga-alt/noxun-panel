@@ -245,6 +245,20 @@ module Noxun
 
       HW_HINGE_BLOCKERS = %w[door_height_out_of_table hinge_set_mismatch hinge_stale].freeze
 
+      # === KOV-E1a: VYKLOPOVE KODY ===========================================
+      #
+      # `lift_set_incomplete` = polozka vyklopu, ktorej set NEVYRIESIL aspon
+      # jeden clen (chybajuci kod triedy, chybajuca hodnota pre `quantity_from`,
+      # chybajuci set alebo mapovanie). Vyklop je ZOSTAVA — ostatne riadky by
+      # v nakupe znamenali „krytky bez mechanizmu", preto RED. Zdroj je
+      # EXPANZIA (vznika aj po zmene mapovania bez prestavby), takze ho brana
+      # cita z `expansion['unmapped']`, nie z configu. VEPO NEBLOKUJE:
+      # geometria cela je spravna (rovnaka uvaha ako pri zavesoch).
+      # Kody stoja v registri ZA zavesovymi a PRED pravidlovymi — poradie
+      # urcuje poradie viet brany, takze novy kod sa pridava na koniec svojej
+      # skupiny, nikdy do stredu cudzej.
+      HW_LIFT_BLOCKERS = %w[lift_set_incomplete].freeze
+
       # Kody, ktore nehovoria o CELE ani o skrinke, ale o PRAVIDLACH PROJEKTU.
       # V registri stoja POSLEDNE — poradie kodov je kontrakt (urcuje poradie
       # viet brany), takze novy kod sa pridava na koniec, nikdy do stredu.
@@ -268,11 +282,13 @@ module Noxun
         'door_height_out_of_table' => 'dvierka sú vyššie než tabuľka závesov',
         'hinge_set_mismatch'       => 'vybraný set závesov nesedí so spôsobom otvárania',
         'hinge_stale'              => 'skrinka má závesy spočítané ešte spred Noxun tabuľky',
+        'lift_set_incomplete'      => 'výklop nemá celú zostavu kovania', # KOV-E1a
         RULES_SNAPSHOT_INCOMPATIBLE => 'pravidlá kovania tohto projektu uložil novší plugin'
       }.freeze
 
       def self.hw_blockers
-        (defined?(Recipes) ? Recipes::DRAWER_BLOCKERS : []) + HW_HINGE_BLOCKERS + HW_RULES_BLOCKERS
+        (defined?(Recipes) ? Recipes::DRAWER_BLOCKERS : []) + HW_HINGE_BLOCKERS +
+          HW_LIFT_BLOCKERS + HW_RULES_BLOCKERS
       end
 
       module_function

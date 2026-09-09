@@ -1264,8 +1264,14 @@ module Noxun
                       end
         # Z EXPANZIE (nie z ulozenych nalezov): dovod vznika az pri nakupe, teda
         # aj po zmene mapovania BEZ prestavby skrinky.
-        from_expansion = scope == :all ? [Recipes::KIT_MISSING, HardwareSets::HINGE_SET_MISMATCH]
-                                       : [Recipes::KIT_MISSING]
+        # KOV-E1a: `lift_set_incomplete` ma ten isty zdroj (expanzia) a tu istu
+        # vahu ako `hinge_set_mismatch` — nakup/rozpocet/ponuka stoja, VEPO nie.
+        from_expansion = if scope == :all
+                           [Recipes::KIT_MISSING, HardwareSets::HINGE_SET_MISMATCH,
+                            HardwareSets::LIFT_SET_INCOMPLETE]
+                         else
+                           [Recipes::KIT_MISSING]
+                         end
         Array(collected.is_a?(Hash) ? collected[:hardware_issues] : nil).each do |iss|
           next unless iss.is_a?(Hash)
 

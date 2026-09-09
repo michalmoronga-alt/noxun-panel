@@ -133,7 +133,18 @@ module Noxun
       #       (Codex #329 kolo 1 P1). Brany su rovnake ako pri 5–8: dopredny
       #       guard prestavby/sablon/kopie (`newer_config?`) a exportna brana
       #       (`ProductionCore.export_blockers`).
-      CONFIG_SCHEMA = 9
+      #  10 = KOV-E1a — VYKLOPY. Config skrinky smie niest OWNER TRIEDNY kluc
+      #       vyklopu `class:lift|<otvaranie>|<systém>@front:<id>/flap`
+      #       v `hardware_sets` (tak sa vybera TMAVY set pre jedno celo).
+      #       Starsi plugin (schema 9) taky kluc pri normalizacii TICHO ZAHODI —
+      #       jeho `parse_class_key` pozna owner len pri `slide` a suffix
+      #       `/flap` vobec (`CLASS_OWNER_RE` = `/panel`) — takze by celo
+      #       dostalo BIELY set z projektovej predvolby a prvym zapisom by sa
+      #       strata zvecnila (Codex #331 kolo 2 P1). Brany su rovnake ako pri
+      #       5–9: dopredny guard prestavby/sablon/kopie (`newer_config?`)
+      #       a exportna brana (`ProductionCore.export_blockers`).
+      #       E1b bumpne znova (10 -> 11) pre config cela `lift.system`.
+      CONFIG_SCHEMA = 10
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
       # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)
