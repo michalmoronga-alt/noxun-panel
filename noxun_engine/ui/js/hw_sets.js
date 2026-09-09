@@ -116,6 +116,10 @@
   // `HardwareSets::SKIP_CODE` (zhodu stráži guard test); znamená „táto dĺžka
   // vedome nemá kód", nie chýbajúci údaj.
   var HWS_SKIP_CODE = 'none';
+  // KOV-E1a: veta pri sete, ktorého člen je novšieho tvaru (kód podľa triedy
+  // alebo počet z parametra). Editor preň príde v E2; do vtedy je set len na
+  // čítanie — a server zmenu jeho členov ODMIETNE, nie iba `disabled` pole.
+  var HWS_LOCKED_HINT = 'Set novšieho tvaru — úprava príde neskôr; zatiaľ len na čítanie.';
   function hwsIsSkipCode(v){
     return String(v == null ? '' : v).trim().toLowerCase() === HWS_SKIP_CODE;
   }
@@ -123,6 +127,19 @@
   // "rad NL: 420→357695, 470→357696", "podľa výšky sokla: 17–21 → 82744 · …".
   function hwsMemberSummary(m, params){
     if (!m) return '';
+    // KOV-E1a: nové tvary člena. Súhrn ich MUSÍ vedieť prečítať — prázdny
+    // riadok by v knižnici vyzeral ako set bez mechanizmu.
+    if (m.code_by_param){
+      var cp = m.code_by_param;
+      var keys = Object.keys(cp.codes || {});
+      var pairs = keys.map(function(k){ return k + '→' + cp.codes[k]; });
+      return 'podľa ' + (cp.param || 'triedy') + ': ' + (pairs.join(', ') || '—');
+    }
+    if (m.quantity_from){
+      var lb = m.label ? m.label + ' ' : '';
+      return lb + m.code + ' — počet podľa ' + m.quantity_from +
+             (m.per === 'owner' ? ' (na vlastníka)' : '');
+    }
     if (m.code_by_nl){
       // D-118b: vyhradená hodnota `none` = „táto dĺžka vedome nemá kód".
       // V súhrne sa píše po ľudsky — surové „none" by vyzeralo ako preklep.
@@ -205,8 +222,24 @@
   }
   // Cleny editora -> tvar servera (rad: riadky {nl, code} -> mapa;
   // pasma: riadky {min, max, code} -> { param, bands }).
+  // KOV-E1a: člen NOVŠIEHO TVARU (`code_by_param` / `quantity_from`). Editor
+  // ho zatiaľ upravovať nevie (príde v E2), ale NESMIE ho stratiť — preto ho
+  // `hwsMembersOf` odloží celý (`raw`) a `hwsBuildMembers` ho pošle späť
+  // NEZMENENÝ. Bez toho by sa z mechanizmu výklopu stal člen s prázdnym kódom.
+  function hwsMemberIsNew(m){
+    return !!(m && (m.code_by_param || m.quantity_from));
+  }
+  // Nesie set člena novšieho tvaru? (dlaždica ho ukáže len na čítanie)
+  function hwsSetIsNewShape(set){
+    return ((set && set.members) || []).some(hwsMemberIsNew);
+  }
+  function hwsCopy(v){
+    try { return JSON.parse(JSON.stringify(v)); } catch (e){ return v; }
+  }
   function hwsBuildMembers(members){
     return (members || []).map(function(m){
+      // Bezstratový transport: člen novšieho tvaru ide späť tak, ako prišiel.
+      if (m && m.is_locked && m.raw) return hwsCopy(m.raw);
       var out = { per: m.per === 'owner' ? 'owner' : 'unit', qty: parseInt(m.qty, 10) || 1 };
       if (m.label) out.label = m.label;
       if (m.is_series){
@@ -228,6 +261,11 @@
   // Set z kniznice -> cleny editora (kopia; rad -> riadky zoradene podla NL).
   function hwsMembersOf(set){
     return ((set && set.members) || []).map(function(m){
+      // KOV-E1a: nový tvar sa NEROZOBERÁ na polia editora — odloží sa celý.
+      if (hwsMemberIsNew(m)){
+        return { is_locked: true, raw: hwsCopy(m), per: m.per || 'unit',
+                 qty: m.qty || 1, label: m.label || '' };
+      }
       if (m.code_by_nl){
         return { is_series: true, per: m.per || 'unit', qty: m.qty || 1, label: m.label || '',
                  series: Object.keys(m.code_by_nl).sort(function(a, b){ return Number(a) - Number(b); })
@@ -739,7 +777,11 @@
     var eb = hwsMk('button', 'ghostbtn hwsbtn', 'Upraviť');
     eb.setAttribute('data-action', 'hws-edit');
     eb.setAttribute('data-set-id', s.set_id);
-    if (writeOff) eb.disabled = true;
+    // KOV-E1a: set novšieho tvaru sa zatiaľ upravovať nedá — editor preň
+    // príde v E2. Server tú istú zmenu odmieta (`disabled` nie je ochrana).
+    var locked = hwsSetIsNewShape(s);
+    if (writeOff || locked) eb.disabled = true;
+    if (locked) eb.title = HWS_LOCKED_HINT;
     head.appendChild(eb);
     var db = hwsMk('button', 'ghostbtn hwsbtn' + (HWS_DEL_ARM === s.set_id ? ' danger' : ''),
                    HWS_DEL_ARM === s.set_id ? 'Naozaj zmazať?' : 'Zmazať');
@@ -758,6 +800,7 @@
       ul.appendChild(hwsMk('div', 'hwsset-m', hwsMemberSummary(m, HWS_DATA.params)));
     });
     card.appendChild(ul);
+    if (locked) card.appendChild(hwsMk('div', 'hint', HWS_LOCKED_HINT));
     return card;
   }
 
@@ -1793,6 +1836,9 @@
         if (a === 'hws-edit'){
           var sid = t.getAttribute('data-set-id');
           var s = hwsSetById(sid);
+          // KOV-E1a: druhá poistka k `disabled` — set novšieho tvaru sa
+          // v editore neotvorí ani zo zastaraného DOM-u.
+          if (s && hwsSetIsNewShape(s)) return;
           if (s) hwsSetOpen(s, null, { trigger: t });
           return;
         }
@@ -2134,6 +2180,10 @@
     module.exports = { hwsSlug: hwsSlug, hwsSetsForType: hwsSetsForType,
       hwsMemberSummary: hwsMemberSummary, hwsBuildSetPayload: hwsBuildSetPayload,
       hwsMembersOf: hwsMembersOf, hwsBuildMembers: hwsBuildMembers,
+      // KOV-E1a: nové tvary člena (kód podľa triedy, počet z parametra) —
+      // bezstratový transport a read-only stav setu.
+      hwsMemberIsNew: hwsMemberIsNew, hwsSetIsNewShape: hwsSetIsNewShape,
+      HWS_LOCKED_HINT: HWS_LOCKED_HINT,
       // KOV-B3: modal setu — clenovia (dve otazky), klasifikacia, auto-nazov,
       // chipy dlazdice, adresovanie chyb servera a poradie odpovedi nahladu.
       hwsMemberKind: hwsMemberKind, hwsMemberBlank: hwsMemberBlank,
