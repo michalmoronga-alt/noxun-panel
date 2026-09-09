@@ -181,7 +181,10 @@ NxTest.test('KOV-C2b (R1): builder pocita hrubky Z KANALA :drawer PRED planom') 
   # Poradie v `build_into` je zavazne: efektivne materialy PRED planom.
   src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'cabinet_builder.rb'),
                   encoding: 'UTF-8')
-  body = src[/def build_into.*?merge_final\(cfg, plan\)/m].to_s
+  # KOV-E1b (Codex #333 kolo 1 P1): `merge_final` berie aj seed verziu
+  # pravidiel (`merge_final(cfg, plan, seed_v)`) — hranica tela sa preto
+  # hlada bez uzatvaracej zatvorky.
+  body = src[/def build_into.*?merge_final\(cfg, plan/m].to_s
   NxTest.assert(body.index('eff = effective_materials(model, cfg)') <
                 body.index('plan = Construction.build_plan'),
                 'hrubky kanala sa MUSIA vyriesit pred planom (Codex #301 kolo 3 P1)')

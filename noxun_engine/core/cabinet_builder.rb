@@ -144,7 +144,18 @@ module Noxun
       #       5–9: dopredny guard prestavby/sablon/kopie (`newer_config?`)
       #       a exportna brana (`ProductionCore.export_blockers`).
       #       E1b bumpne znova (10 -> 11) pre config cela `lift.system`.
-      CONFIG_SCHEMA = 10
+      #  11 = KOV-E1b — SYSTEM VYKLOPU NA CELE. Riadok ciel typu `lift` nesie
+      #       `lift: { system: 'hk_top' | 'hl_top' }` a config skrinky nesie
+      #       vyklopove dovody v `hardware_conflicts` (`lift_class_missing`,
+      #       `lift_dimension_unsupported`, `lift_multirow_unsupported`,
+      #       `lift_combo_unsupported`). Starsi plugin (schema 10) `lift`
+      #       nepozna: jeho `Fronts.normalize_items` ho whitelistom ZAHODI
+      #       a prestavba by HL top ticho vratila na HK — teda INY mechanizmus,
+      #       ine ramena a ina tyc v objednavke; nove dovody by z nosica
+      #       vypadli (`HW_CONFLICT_CODES` ich nepozna) a RED by zmizol. Brany
+      #       su rovnake ako pri 5–10: dopredny guard prestavby/sablon/kopie
+      #       (`newer_config?`) a exportna brana (`ProductionCore.export_blockers`).
+      CONFIG_SCHEMA = 11
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
       # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)
@@ -159,6 +170,17 @@ module Noxun
       # VLASTNA konstanta z TOHO ISTEHO dovodu ako pri zasuvkach: pri buducom
       # bumpe na 10 sa skrinky schemy 9 nesmu zrazu tvarit ako nemigrovane.
       HINGE_ACTIVATION_SCHEMA = 9
+
+      # KOV-E1b (delta audit Sol FIX 4): schema, OD KTOREJ stavba pozna PRAVIDLA
+      # VYKLOPOV A SKLOPOV (`lift_class` + `zavesy-sklop`). Skrinka ulozena POD
+      # nou vznikla PRED E1b, takze jej `config.hardware[]` o celach `flap` NIC
+      # nevie — zber ju priznava `flap_stale`. Rozhoduje VYHRADNE proveniencia
+      # stavby, NIE pritomnost seed pravidiel: pouzivatel smie mat vlastne
+      # (aj vypnute) vyklopove pravidlo a skrinka prestavana pod schemou 11 je
+      # vysledok jeho rozhodnutia, nie zaostalost. VLASTNA konstanta z toho
+      # isteho dovodu ako pri zasuvkach a zavesoch (buduci bump schemy nesmie
+      # spravit zo skriniek schemy 11 nemigrovane).
+      LIFT_ACTIVATION_SCHEMA = 11
 
       MIN = { width: 200.0, height: 200.0, depth: 150.0 }.freeze
       # D-45: povoleny rozsah hrubky korpusu (mm) — JEDINY zdroj pravdy pre clamp
@@ -630,10 +652,27 @@ module Noxun
 
         # Marker configu ako Integer. Chybajuci marker = 0 (legacy korpus
         # spred R-12) a ten NIKDY neblokuje.
+        # Codex #333 kolo 3 P2: marker je CISLO (aj zapisane ako string) alebo
+        # NIC. `to_i` na Hash/Array/true vyhodi `NoMethodError`, a tento helper
+        # cita KAZDA migracna vetva zberu (`drawer_stale`, `hinge_stale`,
+        # `flap_stale`) — jediny rucne pokazeny atribut by tak zhodil Kontrolu
+        # aj vsetky vystupy namiesto toho, aby skrinku priznal ako nemigrovanu.
+        # Nepouzitelna hodnota znamena to iste ako chybajuca: 0 = najstarsi
+        # config (migracne nalezy RED, dopredny guard `newer_config?` nie —
+        # smetie nie je marker NOVSEJ verzie).
+        # CISELNY STRING sa cita ako cislo (R-12 kontrakt): dopredny guard je
+        # tu fail-OPEN smerom k prestavbe, takze marker „12" z ineho producenta
+        # nesmie zhasnut blokadu novsieho configu.
         def config_schema_of(cfg)
           return 0 unless cfg.is_a?(Hash)
 
-          cfg['config_schema'].to_i
+          raw = cfg['config_schema']
+          v = case raw
+              when Numeric then raw.to_f.finite? ? raw.to_i : 0
+              when String then raw.strip.match?(/\A-?\d+\z/) ? raw.strip.to_i : 0
+              else 0
+              end
+          v.negative? ? 0 : v
         end
 
         # Je ulozeny config z NOVSEJ verzie? Porovnanie je PRISNE vacsie —
@@ -742,6 +781,12 @@ module Noxun
           # Prvy build ho zapise z globalnej kniznice; sme VNUTRI operacie volajuceho,
           # takze undo vrati model aj snapshot naraz.
           rules = defined?(HardwareRules) ? HardwareRules.ensure_project_rules!(model) : nil
+          # KOV-E1b (Codex #333 kolo 1 P1): PROVENIENCIA PRAVIDIEL tejto stavby.
+          # `ensure_project_rules!` existujuci snapshot ZAMERNE ponechava, takze
+          # prestavba starej zakazky moze bezat s pravidlami SPRED vyklopov —
+          # a sama schema configu by o tom nepovedala nic. Cita sa AZ TERAZ
+          # (ensure mohol snapshot prave zmrazit) a uklada sa do configu.
+          seed_v = defined?(HardwareRules) ? HardwareRules.effective_seed_version(model) : nil
           # D1b: rovnaka mechanika pre SETY kovania — prva stavba zmrazi
           # mapping + definicie z globalu (audit B2/F9; :invalid sa NEOPRAVUJE
           # ticho — ensure vtedy vrati nil a nic nezapise).
@@ -759,12 +804,17 @@ module Noxun
           eff = effective_materials(model, cfg)
           plan = Construction.build_plan(cfg, cid, hardware_rules: rules,
                                                    part_thicknesses: drawer_thicknesses(cfg, eff),
-                                                   materials: part_materials(cfg, eff)) # validuje interne
+                                                   materials: part_materials(cfg, eff),
+                                                   manual_flap_owners: manual_flap_owners(cfg, model)) # validuje interne
           # KOV-F1 (Codex #329 kolo 2 P1): protajsok ORANGE `library_incompatible`
           # setov — pravidla z nekompatibilnej kniznice sa NEZMRAZILI, takze to
           # musi byt VIDNO (inak by zakazka vyzerala zdravo a snapshot by nikdy
           # nevznikol).
           attach_rules_state_warning!(plan, model)
+          # KOV-E1b (Codex #333 kolo 2 P1): rucny doplnok (krytka, tyc…) automat
+          # UZ NEVYPINA — ked ma ale rovnaky kod ako clen setu, nakup ich zleje
+          # do jedneho riadku. ORANGE to prizna.
+          attach_manual_duplicate_warnings!(plan, cfg, model)
           # KOV-C2b: doplnenie CHYBAJUCEHO systemu a pripnutia receptu je zapis
           # do configu — bezi v TEJ ISTEJ operacii ako geometria (volajuci nas
           # obalil `start_operation`), takze Undo vrati oboje naraz.
@@ -802,7 +852,137 @@ module Noxun
 
           # V0.2c: ghost zony uz NEstoja v definicii korpusu, ale ako top-level skupina
           # (Zones.sync_ghost, volane z build/rebuild) — klik na zonu = 1 klik bez dvojkliku.
-          merge_final(cfg, plan)
+          merge_final(cfg, plan, seed_v)
+        end
+
+        # === KOV-E1b: CELA S UPLNOU RUCNOU ZOSTAVOU ==========================
+        #
+        # -> { owner_part_key => { 'lift'|'hinge' => true } } pre `evaluate`.
+        # Automat na taketo celo polozku NEVYDA (inak by nakup zratal to iste
+        # dvakrat — ad-hoc katalogovy riadok sa zlieva so setovym podla kodu).
+        #
+        # Codex #333 kolo 2 P1: rozhoduje MECHANIZMUS, nie kategoria katalogu.
+        # Kategoria `VYKLOPY` drzi aj krytky, ramena, tyce a Tip-On — jedna
+        # rucne pridana krytka tak predtym vypla automat AJ jeho tvrde kontroly
+        # a nakup mohol prejst UPLNE BEZ mechanizmu. Predikat je od kola 2
+        # ZDIELANY s `Bom.flap_stale_issue`
+        # (`HardwareSets.manual_flap_assemblies`) a kody mechanizmov cita zo
+        # SETOV (seed + projektovy snapshot), takze katalog uz netreba vobec.
+        def manual_flap_owners(cfg, model = nil)
+          return {} unless defined?(HardwareSets)
+
+          list = cfg.is_a?(Hash) ? cfg[:hardware_manual] : nil
+          HardwareSets.manual_flap_assemblies(list, HardwareSets.flap_set_codes(sets_state(model)))
+        rescue StandardError => e
+          Engine.log_error(e, 'CabinetBuilder.manual_flap_owners') if defined?(Engine)
+          {}
+        end
+
+        # Projektovy snapshot setov (bez IO, len modelovy atribut) — zdroj
+        # POUZIVATELSKYCH setov pre klasifikaciu. Bez modelu ostava seed.
+        def sets_state(model)
+          return nil unless model && defined?(HardwareSets)
+
+          HardwareSets.project_state(model)
+        rescue StandardError => e
+          Engine.log_error(e, 'CabinetBuilder.sets_state') if defined?(Engine)
+          nil
+        end
+
+        # === KOV-E1b (Codex #333 kolo 2 P1): RUCNY DOPLNOK VEDLA AUTOMATU ====
+        #
+        # Rucna polozka BEZ mechanizmu automat NEVYPINA (viz vyssie) — vyda sa
+        # cela zostava a rucny riadok ostava vedla nej. Ked ma pritom rovnaky
+        # KOD ako niektory clen setu toho druhu, `add_adhoc_row` ich v nakupe
+        # ZLEJE do jedneho riadku a mnozstvo sa SCITA (typicky prave krytky).
+        # To nie je chyba, ktoru by sme mali opravit za pouzivatela — je to vec,
+        # o ktorej musi vediet. ORANGE na (celo, kod).
+        #
+        # Codex #333 kolo 3 P2: porovnava sa proti kodom UCINNEHO setu TOHO
+        # CELA, nie proti clenom vsetkych vyklopovych setov — HK celo s rucnou
+        # HL tycou inak dostavalo varovanie o zliati, ktore nikdy nenastane.
+        def attach_manual_duplicate_warnings!(plan, cfg, model)
+          return plan unless defined?(HardwareSets)
+
+          list = cfg.is_a?(Hash) ? cfg[:hardware_manual] : nil
+          return plan unless list.is_a?(Array) && !list.empty?
+
+          emitted = emitted_flap_codes(plan, cfg, model)
+          return plan if emitted.empty?
+
+          added = manual_duplicate_warnings(list, emitted)
+          return plan if added.empty?
+
+          plan[:warnings].concat(added)
+          BuildPlan.validate!(plan)
+          plan
+        rescue StandardError => e
+          Engine.log_error(e, 'CabinetBuilder.attach_manual_duplicate_warnings!') if defined?(Engine)
+          plan
+        end
+
+        # { owner_part_key => { 'lift'|'hinge' => { kod => true } } } — kody,
+        # ktore AUTOMAT na cele `flap` naozaj vyda (ucinny set + rozlisenie
+        # clenov podla parametrov polozky). Iba rola `flap`: rucna polozka na
+        # DVIERKACH je stara zalezitost H1 a tu sa nerozsiruje.
+        #
+        # Ked projekt snapshot setov NEMA (nekompatibilna globalna kniznica —
+        # `ensure_project_state!` vtedy nic nezmrazi), ostane mapa prazdna
+        # a varovanie nevznikne. Je to spravne: taky nakup je cely ORANGE
+        # `library_incompatible` a ziadny setovy riadok, s ktorym by sa rucna
+        # polozka zliala, v nom nie je.
+        def emitted_flap_codes(plan, cfg, model)
+          items = flap_hardware_items(plan)
+          return {} if items.empty?
+
+          sets_over = cfg.is_a?(Hash) && cfg[:hardware_sets].is_a?(Hash) ? cfg[:hardware_sets] : {}
+          HardwareSets.flap_emitted_codes(items, sets_state(model), overrides: sets_over)
+        end
+
+        # Polozky kovania planu, ktore visia na CELE `flap` a su vyklopoveho
+        # alebo zavesoveho druhu.
+        def flap_hardware_items(plan)
+          flaps = {}
+          Array(plan[:parts]).each do |pd|
+            next unless pd.is_a?(Hash) && pd[:role].to_s == 'flap'
+
+            flaps[PartKeys.for_descriptor(pd)] = true
+          end
+          return [] if flaps.empty?
+
+          Array(plan[:hardware]).select do |it|
+            it.is_a?(Hash) && flaps[it['owner_part_key'].to_s] &&
+              HardwareSets::FLAP_USE_TYPES.key?(it['generic_type'].to_s)
+          end
+        end
+
+        def manual_duplicate_warnings(list, emitted)
+          seen = {}
+          list.filter_map do |rec|
+            next nil unless rec.is_a?(Hash) && rec['source'].to_s == 'catalog'
+
+            owner = rec['owner_part_key'].to_s
+            code = rec['code'].to_s.strip
+            next nil if code.empty?
+
+            kinds = emitted[owner]
+            next nil unless kinds.is_a?(Hash)
+
+            kind = kinds.keys.find { |k| kinds[k].is_a?(Hash) && kinds[k][code] }
+            next nil if kind.nil?
+
+            key = "#{owner}|#{code}"
+            next nil if seen[key]
+
+            seen[key] = true
+            BuildPlan.warning(
+              'flap_manual_duplicate',
+              "Ručne pridané kovanie #{code} je zároveň v automatickej zostave čela — v nákupe " \
+              'sa počty SPOČÍTAJÚ do jedného riadku. Uber ručnú položku, ak to tak nemá byť.',
+              part_key: owner,
+              data: { 'owner_part_key' => owner, 'code' => code, 'generic_type' => kind }
+            )
+          end
         end
 
         # 2A-3 (audit B2): kanonicke warnings z vyberu ABS do planu + re-validacia.
@@ -2019,6 +2199,13 @@ module Noxun
             # takze co je v modeli, to naozaj zodpoveda tomuto whitelistu.
             # Zamerne sa NEPREBERA z params: klientsky payload nie je autorita.
             config_schema: CONFIG_SCHEMA,
+            # KOV-E1b (Codex #333 kolo 1 P1): DRUHA proveniencia stavby — seed
+            # pravidiel, s ktorym sa stavalo. Sama schema nestaci: prestavba
+            # so STARYM projektovym snapshotom (ten sa nikdy nemerguje sam)
+            # zapise aktualnu schemu, ale celu `flap` nevyda nic — a brana
+            # `flap_stale` by zhasla nad zakazkou bez mechanizmu. Chybajuca
+            # hodnota = 0 („nevieme"), teda brana ostava.
+            rules_seed_version: cfg[:rules_seed_version].is_a?(Integer) ? cfg[:rules_seed_version] : 0,
             part_key_schema: PartKeys::SCHEMA,
             plan_schema: cfg[:plan_schema] || BuildPlan::SCHEMA,
             warnings: cfg[:warnings].is_a?(Array) ? cfg[:warnings] : [],
@@ -2132,9 +2319,15 @@ module Noxun
           type == 'upper' ? 'base-upper-18' : 'base-lower-18'
         end
 
-        def merge_final(cfg, plan)
+        # KOV-E1b (Codex #333 kolo 1 P1): `seed_version` = seed pravidiel, s
+        # ktorym stavba naozaj bezala (`HardwareRules.effective_seed_version`).
+        # Nepovinny TRETI argument ZAMERNE: `merge_final` volaju aj testy
+        # a cesty bez modelu — bez neho ostava pole nil a `cabinet_config`
+        # zapise 0 („o pravidlach nic nevieme"), teda fail-closed.
+        def merge_final(cfg, plan, seed_version = nil)
           cfg.merge(
             plan_schema: plan[:schema],     # verzia tvaru planu (nezavisla od part_key_schema)
+            rules_seed_version: seed_version,
             warnings: plan[:warnings],      # nefatalne upozornenia — panel/vystupy ich zobrazia
             hardware: plan[:hardware],      # kovanie (V0.4+); tvar uz zavazny
             # KOV-C2b (Astra #19 F6): ULOZENY NOSIC fail-closed dovodov zasuviek.
@@ -2333,9 +2526,16 @@ module Noxun
             next if rid.empty?
 
             rec = { 'owner_part_key' => owner, 'generic_type' => gt, 'rule_id' => rid }
-            rec['disabled'] = true if truthy_flag(ov['disabled'] || ov[:disabled])
+            # KOV-E1b (Astra FIX 11, rozsah podla Codex #331 kolo 2 P1): polozky
+            # SEED pravidla vyklopov su „plny automat" — vypnutie ani rucny
+            # pocet na nich neexistuje (vyklop je ZOSTAVA, polovicna objednavka
+            # nie je volba). Zaznam sa preto vycisti UZ TU, so zaznamom v logu;
+            # VLASTNE `lift` pravidla pouzivatela a ich overridy ostavaju UCINNE.
+            protected_lift = rid == HardwareRules::LIFT_RULE_ID
+            log_dropped_lift_override(rid, owner) if protected_lift && lift_override_content?(ov)
+            rec['disabled'] = true if !protected_lift && truthy_flag(ov['disabled'] || ov[:disabled])
             q = (ov['quantity'] || ov[:quantity])
-            qi = q.to_s.strip.empty? ? nil : q.to_i
+            qi = q.to_s.strip.empty? || protected_lift ? nil : q.to_i
             rec['quantity'] = [qi, BuildPlan::MAX_HW_QUANTITY].min if qi && qi >= 1
             # NL: JEDINA autorita tvaru je HardwareRules.override_nl (strict Float).
             nl = HardwareRules.override_nl(ov['nominal_length'] || ov[:nominal_length])
@@ -2382,6 +2582,20 @@ module Noxun
 
         def log_dropped_height_lock(rule_id, why)
           Engine.log("norm_hardware_overrides: height_variant zahodeny (#{rule_id}) — #{why}") if defined?(Engine)
+        end
+
+        # KOV-E1b: nesie zaznam nieco, co by na chranenej vyklopovej polozke
+        # zaniklo? (Len kvoli logu — tichy drop by rucny zasah zmazal bez stopy.)
+        def lift_override_content?(ov)
+          truthy_flag(ov['disabled'] || ov[:disabled]) ||
+            !(ov['quantity'] || ov[:quantity]).to_s.strip.empty?
+        end
+
+        def log_dropped_lift_override(rule_id, owner)
+          return unless defined?(Engine)
+
+          Engine.log("norm_hardware_overrides: rucny zasah na vyklope zahodeny (#{rule_id}, " \
+                     "#{owner || 'korpus'}) — polozky pravidla #{rule_id} su plny automat")
         end
 
         # --- KOV-H1: ad-hoc kovanie -----------------------------------------

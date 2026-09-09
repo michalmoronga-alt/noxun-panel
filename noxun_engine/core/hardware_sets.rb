@@ -4511,6 +4511,194 @@ module Noxun
         src
       end
 
+      # --- KOV-E1b: UPLNA RUCNA ZOSTAVA NA CELE (Codex #333 kolo 2 P1) -------
+      #
+      # JEDEN zdielany predikat pre DVE miesta, ktore sa predtym pytali kazde
+      # inak (a obe zle): `CabinetBuilder.manual_flap_owners` (automat sa na
+      # take celo nevyda) a `Bom.flap_stale_issue` (migracna RED mlci). Kym to
+      # boli dva predikaty, jedna rucne pridana KRYTKA vypla automat aj jeho
+      # tvrde kontroly a nakup siel bez mechanizmu — a naopak, akykolvek rucny
+      # zaznam (uchytka, volna poznamka, zaves na vyklope HORE) zhasol stale
+      # branu.
+      #
+      # RUCNA ZOSTAVA JE UPLNA LEN S MECHANIZMOM. Mechanizmus je PRVY clen
+      # `per: 'unit'` setu prislusneho druhu (poradie clenov je zavazne — pozri
+      # SEED_SETS): pri vyklope je to `code_by_param lift_class`, pri sklope
+      # samotny zaves. Krytky, ramena, tyce, Tip-On ani uchytky zostavu
+      # NETVORIA — na takom cele automat bezi dalej (aj s branami) a rucny
+      # doplnok ostava vlastnym riadkom.
+      #
+      # ZDROJ KODOV: seed (vzdy, ako fallback) + sety PROJEKTOVEHO SNAPSHOTU,
+      # teda aj pouzivatelske. Cita sa LEN pamat/model — ziadne IO, aby to
+      # zvladol aj zber (`Bom.collect`).
+      FLAP_USE_TYPES = { 'lift' => 'lift', 'hinge' => 'door' }.freeze
+
+      # -> { 'lift' => { 'mechanism' => {kod=>true}, 'members' => {kod=>true} },
+      #      'hinge' => { ... } }
+      # `members` = VSETKY kody setu (podklad ORANGE `flap_manual_duplicate`:
+      # ad-hoc katalogovy riadok sa v nakupe zlieva so setovym podla kodu).
+      def flap_set_codes(state = nil)
+        out = {}
+        FLAP_USE_TYPES.each_key { |kind| out[kind] = { 'mechanism' => {}, 'members' => {} } }
+        begin
+          snap = state.is_a?(Hash) && state['sets'].is_a?(Hash) ? state['sets'].values : []
+          (SEED_SETS + snap).each { |set| collect_flap_set_codes(set, out) }
+        rescue StandardError => e
+          # Citacia cesta: pokazeny snapshot NESMIE zhodit stavbu ani zber —
+          # ostanu seed kody, ktore sa stihli nacitat.
+          Engine.log_error(e, 'HardwareSets.flap_set_codes') if defined?(Engine)
+        end
+        out
+      end
+
+      def collect_flap_set_codes(set, out)
+        return unless set.is_a?(Hash)
+
+        kind = FLAP_USE_TYPES.key(set['use_type'].to_s)
+        return if kind.nil?
+
+        members = set['members'].is_a?(Array) ? set['members'] : []
+        mech = members.find { |m| m.is_a?(Hash) && m['per'].to_s == 'unit' }
+        member_codes(mech).each { |code| out[kind]['mechanism'][code] = true }
+        members.each { |m| member_codes(m).each { |code| out[kind]['members'][code] = true } }
+      end
+
+      # Vsetky kody, ktore z clena setu mozu vyjst — pevny kod aj oba selektory
+      # (`code_by_param` trieda, `code_by_nl` dlzka).
+      def member_codes(member)
+        return [] unless member.is_a?(Hash)
+
+        codes = [member['code'].to_s.strip]
+        cbp = member['code_by_param']
+        codes.concat(cbp['codes'].values.map { |v| v.to_s.strip }) if
+          cbp.is_a?(Hash) && cbp['codes'].is_a?(Hash)
+        nl = member['code_by_nl']
+        codes.concat(nl.values.map { |v| v.to_s.strip }) if nl.is_a?(Hash)
+        codes.reject(&:empty?).uniq
+      end
+
+      # Cela s UPLNOU rucnou zostavou -> { owner_part_key => { 'lift' => true } }.
+      # `manual` = zaznamy `config.hardware_manual` (jednej skrinky alebo zberu).
+      #
+      # VOLNA polozka (`source: 'free'`) sa NEKLASIFIKUJE: nema katalogovy kod,
+      # v nakupe je VLASTNYM riadkom (`add_free_row`) a s automatom sa teda
+      # nikdy nezleje.
+      def manual_flap_assemblies(manual, codes = nil)
+        list = manual.is_a?(Array) ? manual : []
+        return {} if list.empty?
+
+        map = codes.is_a?(Hash) ? codes : flap_set_codes
+        out = {}
+        list.each do |rec|
+          next unless rec.is_a?(Hash)
+          next unless rec['source'].to_s == 'catalog'
+
+          owner = rec['owner_part_key'].to_s
+          next if owner.empty?
+
+          code = rec['code'].to_s.strip
+          next if code.empty?
+
+          kind = FLAP_USE_TYPES.keys.find { |k| map.dig(k, 'mechanism', code) }
+          next if kind.nil?
+
+          (out[owner] ||= {})[kind] = true
+        end
+        out
+      end
+
+      # --- KOV-E1b: KODY, KTORE AUTOMAT NA CELE NAOZAJ VYDA ------------------
+      #
+      # Codex #333 kolo 3 P2: podklad ORANGE `flap_manual_duplicate` sa nesmie
+      # pytat `flap_set_codes` — ten drzi cleny VSETKYCH vyklopovych/zavesovych
+      # setov (seed AJ snapshot), takze HK celo s rucne pridanou HL tycou
+      # (507365) dostavalo varovanie „nakup to spocita", hoci jeho HK set taky
+      # kod nikdy nevyda a zliatie nema z coho vzniknut.
+      #
+      # Ide sa preto TOU ISTOU cestou ako `expand`:
+      #   * UCINNY set podla precedencie (owner override > triedny override
+      #     skrinky > triedny kluc projektu) a jeho kontroly (typ setu,
+      #     kompatibilita klasifikacie, dlzkove kovanie);
+      #   * cleny sa ROZLISIA podla parametrov polozky — `code_by_param`
+      #     (`lift_class` / `arm_class`) da presne jeden kod a `quantity_from`
+      #     s nulou (HL pod prahom druhej tyce) znamena, ze sa clen NEVYDA.
+      # Katalog netreba: kody su v sete, parametre v polozke. ZIADNE IO.
+      #
+      # `overrides` = override mapa JEDNEJ skrinky (`config.hardware_sets`).
+      # Polozky planu este `owner_id` nemaju (dopisuje ho az `Bom.collect`),
+      # takze mapa ma DEFAULT — pri stavbe je skrinka aj tak prave jedna.
+      #
+      # -> { owner_part_key => { 'lift'|'hinge' => { kod => true } } }
+      def flap_emitted_codes(hardware_items, state, overrides: {})
+        mapping = state.is_a?(Hash) && state['mapping'].is_a?(Hash) ? state['mapping'] : {}
+        sets    = state.is_a?(Hash) && state['sets'].is_a?(Hash) ? state['sets'] : {}
+        cab = single_cabinet_overrides(overrides)
+        out = {}
+        Array(hardware_items).each do |it|
+          next unless it.is_a?(Hash)
+
+          gt = it['generic_type'].to_s
+          next unless FLAP_USE_TYPES.key?(gt)
+          next if it['quantity'].to_i < 1
+
+          owner = it['owner_part_key'].to_s
+          next if owner.empty?
+
+          set = effective_flap_set(it, gt, cab, mapping, sets)
+          next if set.nil?
+
+          bucket = ((out[owner] ||= {})[gt] ||= {})
+          emitted_member_codes(set, it).each { |code| bucket[code] = true }
+        end
+        out
+      rescue StandardError => e
+        # Citacia cesta: pokazeny snapshot nesmie zhodit stavbu. Bez kodov
+        # varovanie proste nevznikne (ORANGE, nie brana).
+        Engine.log_error(e, 'HardwareSets.flap_emitted_codes') if defined?(Engine)
+        {}
+      end
+
+      # Override mapa pouzita pre KAZDE `owner_id` (stavba pozna prave jednu
+      # skrinku a jej polozky `owner_id` este nenesu).
+      def single_cabinet_overrides(overrides)
+        return Hash.new({}) unless overrides.is_a?(Hash) && !overrides.empty?
+
+        Hash.new(normalize_mapping(overrides, nil, allow_owner: true))
+      end
+
+      # UCINNY set polozky — zrkadlo tych istych bran, ktore ma `expand`
+      # (chybajuce mapovanie, chybajuca definicia, iny typ setu, nesulad
+      # klasifikacie, dlzkove kovanie). Ktorakolvek z nich znamena, ze nakup
+      # z tejto polozky nevyda ANI JEDEN riadok — a teda ani nema co zliat.
+      def effective_flap_set(it, generic_type, cabinet_overrides, mapping, sets)
+        sid, = resolve_set_id(generic_type, it, cabinet_overrides, mapping)
+        return nil if sid.nil?
+
+        set = sets[sid]
+        return nil unless set.is_a?(Hash) && set['generic_type'].to_s == generic_type
+        return nil if set_incompatible_info(it, set)
+        return nil if length_unsupported?(it)
+
+        set
+      end
+
+      # Cleny, ktore by `expand_members` na TEJTO polozke naozaj vydala —
+      # bez riadkov, bez katalogu a bez dedup logiky `per: 'owner'` (dedup
+      # mnozstvo znizuje, kod nemeni).
+      def emitted_member_codes(set, it)
+        Array(set['members']).filter_map do |m|
+          next nil unless m.is_a?(Hash)
+
+          mult, qmiss = member_multiplier(m, it)
+          next nil if qmiss || mult.nil?
+
+          code, miss = member_code(m, it)
+          next nil if miss || code.nil?
+
+          code
+        end
+      end
+
       # --- KOV-H1: ad-hoc kanal (polozky mimo setov) -------------------------
       #
       # Vstup su UZ OCISTENE zaznamy z configu (`CabinetBuilder.norm_hardware_manual`)

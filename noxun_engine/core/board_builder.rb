@@ -133,10 +133,25 @@ module Noxun
 
         # Marker configu ako Integer. Chybajuci marker = 0 (doska spred
         # GHOST-D1) a ten NIKDY neblokuje.
+        #
+        # Interna delta E1b: hodnota je RAW atribut z modelu, takze to moze byt
+        # HOCICO (rucne prepisany atribut, pokazena sablona). `to_i` na
+        # Hash/Array/true vyhodi vynimku a `Bom.collect` (vetva `when 'board'`)
+        # sa na `newer_config?` pyta BEZ rescue — jedna taka doska by zhodila
+        # Kontrolu AJ vsetky vystupy. Typovy guard je preto ten isty ako pri
+        # korpuse (`CabinetBuilder.config_schema_of`): pouzitelne je LEN cislo
+        # alebo ciselny retazec, cokolvek ine znamena to iste ako chybajuci
+        # marker = 0 (R-12: `newer_config?` je fail-open).
         def config_schema_of(cfg)
           return 0 unless cfg.is_a?(Hash)
 
-          (cfg['config_schema'] || cfg[:config_schema]).to_i
+          raw = cfg['config_schema'] || cfg[:config_schema]
+          v = case raw
+              when Numeric then raw.to_f.finite? ? raw.to_i : 0
+              when String then raw.strip.match?(/\A-?\d+\z/) ? raw.strip.to_i : 0
+              else 0
+              end
+          v.negative? ? 0 : v
         end
 
         # Je ulozeny config z NOVSEJ verzie? Porovnanie je PRISNE vacsie —

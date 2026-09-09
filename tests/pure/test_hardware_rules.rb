@@ -45,7 +45,9 @@ end
 NxTest.test('hardware_rules: seed sa normalizuje (bands zoradene, series bez nekladnych)') do
   r = NxHW.rules
   # D-90: seed v3 pridal 2 pravidla uchytkoveho profilu (dvierka + zasuvkove cela)
-  NxTest.assert_equal(7, r.length, 'seed ma 7 pravidiel (D1: +zavesenie hornej, +podperky; D-90: +2x profil)')
+  # KOV-E1b: seed v5 pridal vyklopy (`vyklopy-aventos`) a zavesy sklopu (`zavesy-sklop`)
+  NxTest.assert_equal(9, r.length,
+                      'seed ma 9 pravidiel (D1: +zavesenie hornej, +podperky; D-90: +2x profil; '                       'KOV-E1b: +vyklopy, +sklop)')
   bands = r.find { |x| x['rule_id'] == 'zavesy-podla-vysky' }['bands']
   # KOV-F1: NOXUN tabulka (catch-all `nil` ostava kvoli starym citacom).
   NxTest.assert_equal([849.0, 1700.0, 2200.0, 2400.0, 2600.0, 2800.0, nil],

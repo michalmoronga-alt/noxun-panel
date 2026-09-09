@@ -257,7 +257,21 @@ module Noxun
       # Kody stoja v registri ZA zavesovymi a PRED pravidlovymi — poradie
       # urcuje poradie viet brany, takze novy kod sa pridava na koniec svojej
       # skupiny, nikdy do stredu cudzej.
-      HW_LIFT_BLOCKERS = %w[lift_set_incomplete].freeze
+      # KOV-E1b: MIGRACNY kod vyklopov a sklopov — skrinka je ulozena PRED
+      # pravidlami vyklopov (`config_schema` < `CabinetBuilder::LIFT_ACTIVATION_
+      # SCHEMA`), takze jej `config.hardware[]` o cele `flap` NIC nevie: vyklop
+      # nema mechanizmus a sklop nema zavesy. Vzor `HINGE_STALE` — naprava je
+      # „Doplniť nové predvoľby" + PRESTAVBA.
+      FLAP_STALE = 'flap_stale'
+
+      # KOV-E1b: dovody, pre ktore je UZ VYDANA polozka vyklopu nespravna.
+      # Vsetky prichadzaju z ULOZENEHO nosica `hardware_conflicts` (polozka aj
+      # dielec existuju — riadok v Kovani musi byt), preto su aj v
+      # `HW_CONFLICT_CODES`. Poradie v registri je KONTRAKT (urcuje poradie viet
+      # brany): novy kod ide na koniec svojej skupiny.
+      HW_LIFT_BLOCKERS = %w[lift_set_incomplete lift_class_missing
+                            lift_dimension_unsupported lift_multirow_unsupported
+                            lift_combo_unsupported flap_stale].freeze
 
       # Kody, ktore nehovoria o CELE ani o skrinke, ale o PRAVIDLACH PROJEKTU.
       # V registri stoja POSLEDNE — poradie kodov je kontrakt (urcuje poradie
@@ -269,13 +283,19 @@ module Noxun
       # vznika az pri EXPANZII (aj po zmene mapovania bez prestavby), takze ho
       # brana cita z `expansion['unmapped']`, nie z configu. `hinge_stale` tiez
       # nie — vznika pri ZBERE zo schemy configu, nie zo zapisaneho nosica.
-      HW_CONFLICT_CODES = %w[door_height_out_of_table].freeze
+      # KOV-E1b: vyklopove dovody sem PATRIA (na rozdiel od `lift_set_incomplete`,
+      # ktory vznika az pri EXPANZII) — pravidlo ich pozna uz pri stavbe a po
+      # znovuotvoreni .skp sa nemaju z coho odvodit.
+      HW_CONFLICT_CODES = %w[door_height_out_of_table lift_class_missing
+                             lift_dimension_unsupported lift_multirow_unsupported
+                             lift_combo_unsupported].freeze
 
       # Zavesove kody, ktore prichadzaju z NALEZOV zberu (`Bom.collect` ->
       # `hardware_issues`): ulozeny nosic + migracny `hinge_stale`. Cita ich
       # Kontrola (RED riadok) aj brana exportov; `hinge_set_mismatch` tu NIE JE
       # (ten ma zdroj v expanzii).
-      HW_ISSUE_BLOCKERS = (HW_CONFLICT_CODES + [HINGE_STALE] + HW_RULES_BLOCKERS).freeze
+      HW_ISSUE_BLOCKERS = (HW_CONFLICT_CODES + [HINGE_STALE, FLAP_STALE] +
+                           HW_RULES_BLOCKERS).freeze
 
       # SK nazvy zavesovych dovodov pre BRANU (vzor `Recipes::BLOCKER_LABELS`).
       HW_BLOCKER_LABELS = {
@@ -283,6 +303,12 @@ module Noxun
         'hinge_set_mismatch'       => 'vybraný set závesov nesedí so spôsobom otvárania',
         'hinge_stale'              => 'skrinka má závesy spočítané ešte spred Noxun tabuľky',
         'lift_set_incomplete'      => 'výklop nemá celú zostavu kovania', # KOV-E1a
+        # KOV-E1b
+        'lift_class_missing'          => 'výklopu sa nedá určiť trieda mechanizmu',
+        'lift_dimension_unsupported'  => 'výklop sa do skrinky takých rozmerov nedá použiť',
+        'lift_multirow_unsupported'   => 'výklop musí byť jediný riadok čiel skrinky',
+        'lift_combo_unsupported'      => 'HL top sa v prevedení Tip-On nevyrába',
+        'flap_stale'                  => 'skrinka s výklopom alebo sklopom je spred pravidiel výklopov',
         RULES_SNAPSHOT_INCOMPATIBLE => 'pravidlá kovania tohto projektu uložil novší plugin'
       }.freeze
 

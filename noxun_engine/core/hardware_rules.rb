@@ -80,11 +80,23 @@ module Noxun
       # pluginu (std > STD) sa uz len CITA a zapisy sa odmietnu s hlaskou —
       # inak by nase `normalize_rules` ticho zahodilo pole, ktoremu nerozumie,
       # a prvy zapis by stratu zvecnil (vzor `HardwareSets` STD_SUPPORTED).
-      STD          = 2 # verzia formatu suboru pravidiel (doc: std/seed_version/rules)
-      SEED_VERSION = 4 # v2 (D1): +zavesenie hornej skrinky, +podperky policove,
+      # KOV-E1b: std 3 = pravidlo smie mat kind `lift_class` (vyklopy AVENTOS)
+      # a `applies_to` smie niest filter `flap_dir`. Starsi plugin (std 2) kind
+      # NEPOZNA — `evaluate` ho preskoci s info warningom, takze vyklop ostane
+      # BEZ polozky (vedome riziko do D-48: kniznice su per PC, updater D-52).
+      # Filter smeru starsi plugin IGNORUJE, takze by `zavesy-sklop` uplatnil
+      # na KAZDE celo `flap` (aj na vyklop) — a prave preto sa dokument so
+      # std 3 do starsieho pluginu uz NEZAPISUJE (dopredna brana nizsie).
+      STD          = 3 # verzia formatu suboru pravidiel (doc: std/seed_version/rules)
+      SEED_VERSION = 5 # v2 (D1): +zavesenie hornej skrinky, +podperky policove,
                        # seria vysuvov zladena s realnym radom Atira (GH #125 P2)
                        # v3 (D-90): +uchytkovy profil na dvierkach a zasuvkovych celach
                        # v4 (KOV-F1): NOXUN tabulka zavesov + door guardy
+                       # v5 (KOV-E1b, delta audit Sol FIX 5): +vyklopy AVENTOS
+                       # (`vyklopy-aventos`) a +zavesy sklopu (`zavesy-sklop`).
+                       # BEZ tohto bumpu by `merge_seed` migraciu preskocil
+                       # (`from_version >= SEED_VERSION`) a existujuca kniznica
+                       # by nove seed pravidla nedala ani NOVYM projektom.
       # KOV-F1 (Codex #329 kolo 3 P1): verzia formatu, OD KTOREJ seed pravidlo
       # zavesov nesie door guardy (Noxun tabulka). Snapshot POD tymto cislom =
       # pravidla este spred tabulky, takze skrinka so zavesmi nesie stare pocty
@@ -93,10 +105,56 @@ module Noxun
       # nie `STD`: buduci bump formatu na tabulke zavesov nic nezmeni.
       HINGE_TABLE_STD = 2
 
+      # KOV-E1b (Codex #333 kolo 1 P1): verzia SEEDU, OD KTOREJ pravidla vedia
+      # vydat kovanie vyklopu a sklopu. Snapshot POD tymto cislom je „pred
+      # E1b" — a kedze `ensure_project_rules!` existujuci snapshot ZAMERNE
+      # ponechava (reprodukovatelnost stavby z .skp), prestavba pod nim vyda
+      # celu `flap` NULA poloziek, hoci do configu zapise aktualnu schemu.
+      # Preto stavba svoju seed verziu ULOZI (`config.rules_seed_version`)
+      # a `Bom.flap_stale_issue` sa pyta OBOCH provenienci. PEVNE CISLO ako
+      # `HINGE_TABLE_STD`: buduci bump seedu na tomto nic nemeni.
+      LIFT_SEED_VERSION = 5
+
       FILE         = 'hardware_rules.json'
       MODEL_KEY    = 'hardware_rules' # kluc snapshotu v NOXUN dict na modeli
 
-      KINDS = %w[fixed bands fit_series part_flag_length].freeze
+      KINDS = %w[fixed bands fit_series part_flag_length lift_class].freeze
+
+      # === KOV-E1b: VYKLOPY (kind `lift_class`) ===============================
+      #
+      # `lift_class` je STVRTY vzor: z rozmerov KORPUSU a hmotnosti CELA urci
+      # TRIEDU mechanizmu (a pri HL top aj triedu ramien a pocet stabilizacnych
+      # tyci). Trieda ide do `params`, kod z nej robi az set (`code_by_param`,
+      # E1a) — pravidlo ziadny kod nepozna.
+      #
+      # Prečo VLASTNY kind a nie `bands`: vystupom nie je POCET, ale KLASIFIKACIA
+      # (dva parametre naraz) a vstupom su DVE veliciny (KH a hmotnost) plus
+      # eligibility. Cena je znama a vedoma: starsi plugin kind preskoci
+      # a vyklop ostane bez polozky (`std` 3 chrani zapis, nie citanie).
+      LIFT_KIND    = 'lift_class'
+      LIFT_OUTPUT  = 'lift'
+      # SEED pravidla, ktore E1b prinasa. `LIFT_RULE_ID` je zaroven JEDINA
+      # autorita otazky „ktore polozky su plny automat" (ochrana pred rucnym
+      # zasahom — Astra FIX 11, zuzene Codex #331 kolo 2 P1 LEN na seed).
+      LIFT_RULE_ID  = 'vyklopy-aventos'
+      FALL_RULE_ID  = 'zavesy-sklop'
+      # Rola CELA vyklopu aj sklopu (`Fronts.panels_for`) a hodnoty smeru
+      # vyklapania (`Fronts` ich odvodzuje z typu riadku).
+      FLAP_ROLE     = 'flap'
+      FLAP_UP       = 'up'
+      FLAP_DOWN     = 'down'
+      LIFT_HK       = 'hk_top'
+      LIFT_HL       = 'hl_top'
+      # Klasifikacia polozky vyklopu — `use_type` je DRUHA polovica triedneho
+      # kluca setu (`class:lift|<otvaranie>|<system>`), presne ako `door` pri
+      # zavesoch. Slovnik hodnot drzi `HardwareSets::LIFT_SYSTEMS`.
+      LIFT_USE_TYPE = 'lift'
+      # Kody KONFLIKTOV vyklopu (ULOZENY nosic `hardware_conflicts`, register
+      # `BuildPlan::HW_CONFLICT_CODES`). Retazce su autoritou tohto modulu.
+      LIFT_CLASS_MISSING        = 'lift_class_missing'
+      LIFT_DIMENSION_UNSUPPORTED = 'lift_dimension_unsupported'
+      LIFT_MULTIROW_UNSUPPORTED  = 'lift_multirow_unsupported'
+      LIFT_COMBO_UNSUPPORTED     = 'lift_combo_unsupported'
 
       # D-90: kluc dlzky rezu v params polozky. JEDINA autorita nazvu — cita ho
       # `flag_length_params` (zapis), `params_label` (text) aj brana dlzkoveho
@@ -104,8 +162,11 @@ module Noxun
       LENGTH_PARAM = 'cut_length_mm'
 
       # Kontextove kluce povolene ako input/params_from_context (dokumentacia tvaru ctx).
+      # KOV-E1b: `kh` (vyska korpusu BEZ sokla) a `kb` (sirka korpusu) su Blum
+      # rozmery vyklopu; `front_rows` je pocet riadkov ciel skrinky (V1 pusta
+      # vyklop len ako jediny riadok).
       CONTEXT_KEYS = %w[width height depth floor_height available_depth
-                        available_height available_width].freeze
+                        available_height available_width kh kb front_rows].freeze
 
       # KOV-W: vstup „hmotnost dielca" (kg). JEDINA autorita nazvu — pravidla
       # zavesov (F) a vyklopov (E) ho pisu do `input`, `input_value` ho cita z
@@ -200,7 +261,81 @@ module Noxun
           'output' => 'handle', 'kind' => 'part_flag_length', 'quantity' => 1 },
         { 'rule_id' => 'uchytkovy-profil-zasuvky', 'enabled' => true,
           'applies_to' => { 'role' => 'drawer_front' },
-          'output' => 'handle', 'kind' => 'part_flag_length', 'quantity' => 1 }
+          'output' => 'handle', 'kind' => 'part_flag_length', 'quantity' => 1 },
+        # === KOV-E1b: VYKLOPY AVENTOS (HK top / HL top) ======================
+        #
+        # Data: SYSTEM/zdroje/demos/SEED_AVENTOS_v2_2026-09-09.md (Demos + Blum
+        # katalog 2024/25 str. 40). Hodnoty su Float a INKLUZIVNE, ak nie je
+        # povedane inak; `max_exclusive` znaci HORNU hranicu, ktora do pasma
+        # UZ NEPATRI (Blum pasma ramien 300–339 / 340–389 su spojite, medzi
+        # nimi nesmie vzniknut diera pre KH 339,5).
+        #
+        # `handle_allowance_kg` sa pripocita k hmotnosti cela pri OBOCH
+        # systemoch (Astra BLOCKER 3): LF aj HL tabulka rataju s uchytkou.
+        { 'rule_id' => LIFT_RULE_ID, 'enabled' => true,
+          'applies_to' => { 'role' => FLAP_ROLE, 'flap_dir' => FLAP_UP },
+          'output' => LIFT_OUTPUT, 'kind' => LIFT_KIND,
+          'handle_allowance_kg' => 0.5,
+          # HK top: LF = KH x hmotnost; v prekryve tried vyhrava NAJSLABSIA,
+          # ktora LF pokryva (poradie v poli = poradie sily).
+          'classes' => [
+            { 'code' => '22K2300', 'min' => 420.0,  'max' => 1610.0 },
+            { 'code' => '22K2500', 'min' => 930.0,  'max' => 2800.0 },
+            { 'code' => '22K2700', 'min' => 1730.0, 'max' => 5200.0 },
+            { 'code' => '22K2900', 'min' => 3200.0, 'max' => 9000.0 }
+          ],
+          # HL top: mechanizmus podla KH (spojite max-pasma).
+          'mechanisms' => [
+            { 'code' => '22L2200', 'max' => 390.0, 'max_exclusive' => true },
+            { 'code' => '22L2500', 'max' => 580.0 }
+          ],
+          # HL top: ramena podla KH A hmotnosti; v prekryve KH (480–540)
+          # vyhrava NAJSLABSI par, ktory hmotnost pokryva.
+          'arms' => [
+            { 'code' => '22L3200', 'kh_min' => 300.0, 'kh_max' => 340.0, 'max_exclusive' => true,
+              'kg_min' => 1.5,  'kg_max' => 9.0 },
+            { 'code' => '22L3500', 'kh_min' => 340.0, 'kh_max' => 390.0, 'max_exclusive' => true,
+              'kg_min' => 1.75, 'kg_max' => 10.0 },
+            { 'code' => '22L3800', 'kh_min' => 390.0, 'kh_max' => 540.0,
+              'kg_min' => 2.0,  'kg_max' => 12.25 },
+            { 'code' => '22L3900', 'kh_min' => 480.0, 'kh_max' => 580.0,
+              'kg_min' => 2.5,  'kg_max' => 14.0 }
+          ],
+          # Sirka korpusu, od ktorej ide DRUHA stabilizacna tyc + predlzovaci
+          # diel (Michalov prah, prisnejsi nez Blum LW 1190).
+          'rod_double_from_kb_mm' => 1100.0,
+          # Rozmerova sposobilost per system (Blum; Michal potvrdil 9.9.2026).
+          # `depth_min` je VNUTORNA hlbka (`ctx['available_depth']`).
+          'eligibility' => {
+            LIFT_HK => { 'kh_min' => 205.0, 'kh_max' => 600.0, 'kb_max' => 1800.0 },
+            LIFT_HL => { 'kh_min' => 300.0, 'kh_max' => 580.0, 'kb_max' => 1800.0,
+                         'depth_min' => 264.0 }
+          } },
+        # KOV-E1b: SKLOP (`flap_dir down`) dostane ZAVESY ako dvierka — tabulka
+        # aj door guardy su tie iste ako pri `zavesy-podla-vysky`, lisi sa LEN
+        # rola a smer. Vzpery (`use_type: 'fall'`) su mimo V1, preto polozka
+        # nesie `use_type: 'door'` a set si hlada triednym klucom `class:hinge|…`.
+        { 'rule_id' => FALL_RULE_ID, 'enabled' => true,
+          'applies_to' => { 'role' => FLAP_ROLE, 'flap_dir' => FLAP_DOWN },
+          'output' => 'hinge', 'kind' => 'bands', 'input' => 'height',
+          'bands' => [
+            { 'max' => 849.0,  'quantity' => 2 },
+            { 'max' => 1700.0, 'quantity' => 3 },
+            { 'max' => 2200.0, 'quantity' => 4 },
+            { 'max' => 2400.0, 'quantity' => 5 },
+            { 'max' => 2600.0, 'quantity' => 6 },
+            { 'max' => 2800.0, 'quantity' => 7 },
+            { 'max' => nil,    'quantity' => 7 }
+          ],
+          'finite' => true,
+          'width_plus' => { 'over' => 600.0, 'add' => 1 },
+          'width_warn_over' => 800.0,
+          'weight_bands' => [
+            { 'max' => 7.7,  'quantity' => 2 },
+            { 'max' => 13.7, 'quantity' => 3 },
+            { 'max' => 17.1, 'quantity' => 4 },
+            { 'max' => 22.0, 'quantity' => 5 }
+          ] }
       ].freeze
 
       # D-90: kind pravidla, ktore reaguje na PRIZNAK PROFILU dielca. Zdielaju ho
@@ -380,22 +515,43 @@ module Noxun
       end
 
       # KOV-F1: ktore seed pravidla sa smu DOPLNIT. Chybajuce podla `rule_id`
-      # MINUS tie, ktorych vystup uz na tej istej role obsluhuje INE ZAPNUTE
-      # pravidlo (`OVERLAP_OUTPUT`): pouzivatel si zavesy premenoval alebo
-      # nahradil vlastnym pravidlom a doplnenie seedu by mu vyrobilo DVOJITY
-      # nakup. `evaluate` taky prekryv priznava ORANGE-om, doplnat ho nebudeme.
+      # MINUS tie, ktorych vystup uz na tej istej role A SMERE obsluhuje INE
+      # ZAPNUTE pravidlo (`OVERLAP_OUTPUTS`): pouzivatel si zavesy premenoval
+      # alebo nahradil vlastnym pravidlom a doplnenie seedu by mu vyrobilo
+      # DVOJITY nakup. `evaluate` taky prekryv priznava ORANGE-om, doplnat ho
+      # nebudeme.
+      #
+      # KOV-E1b (Codex #331 kolo 3 P1 + delta audit Sol BLOCKER 2): kluc je
+      # TROJICA (vystup, rola, smer vyklapania) a POROVNAVA sa TU aj v `evaluate`
+      # tou istou funkciou — vlastne pravidlo len pre `down` (vzpery) nesmie
+      # potlacit seed vyklopov pre `up`.
       def seed_additions(existing, have)
-        taken = {}
-        Array(existing).each do |r|
-          next unless r.is_a?(Hash) && r['enabled'] != false
-          next unless r['output'].to_s == OVERLAP_OUTPUT
+        taken = Array(existing).filter_map do |r|
+          next nil unless r.is_a?(Hash) && r['enabled'] != false
+          next nil unless OVERLAP_OUTPUTS.include?(r['output'].to_s)
 
-          taken[(r['applies_to'] || {})['role'].to_s] = true
+          overlap_key(r)
         end
         SEED_RULES.reject do |r|
           have[r['rule_id']] ||
-            (r['output'].to_s == OVERLAP_OUTPUT && taken[(r['applies_to'] || {})['role'].to_s])
+            (OVERLAP_OUTPUTS.include?(r['output'].to_s) &&
+             taken.any? { |k| overlap_conflict?(k, overlap_key(r)) })
         end
+      end
+
+      # KOV-E1b: IDENTITA prekryvu pravidla — [vystup, rola, smer vyklapania].
+      # Prazdny smer = WILDCARD (pravidlo bez filtra plati na oba smery).
+      def overlap_key(rule)
+        at = rule.is_a?(Hash) && rule['applies_to'].is_a?(Hash) ? rule['applies_to'] : {}
+        [rule.is_a?(Hash) ? rule['output'].to_s : '', at['role'].to_s, at['flap_dir'].to_s]
+      end
+
+      # Prekryvaju sa dva kluce? Rovnaky vystup a rola, a smery, ktore sa
+      # PRETINAJU (wildcard sa pretina s oboma smermi).
+      def overlap_conflict?(a, b)
+        return false unless a[0] == b[0] && a[1] == b[1]
+
+        a[2].empty? || b[2].empty? || a[2] == b[2]
       end
 
       # Pravidlo je nezmeneny STARY seed? (porovnanie normalizovanych tvarov)
@@ -652,6 +808,40 @@ module Noxun
         nil
       end
 
+      # === KOV-E1b (Codex #333 kolo 1 P1): SEED VERZIA UCINNYCH PRAVIDIEL ====
+      #
+      # „S akym seedom sa TERAZ stavia?" — jedina autorita otazky. Odpoved je
+      # PROVENIENCIA, ktoru si stavba ULOZI do configu skrinky, takze brana
+      # `flap_stale` uz nemusia zaujimat pravidla samotne (delta audit Sol
+      # FIX 4: vedome vypnute vlastne pravidlo NIE JE zaostalost).
+      #
+      # Poradie je to iste ako pri `pre_hinge_table_rules?`: rozhoduje
+      # PROJEKTOVY snapshot; ked ho projekt nema, dedi globalnu kniznicu —
+      # a tu prave `ensure_project_rules!` o chvilu zmrazi. Chybajuci kluc
+      # `seed_version` = najstarsi seed (0), teda urcite pred vyklopmi.
+      def effective_seed_version(model)
+        doc = project_doc(model)
+        return doc['seed_version'].to_i if doc.is_a?(Hash) && doc['rules'].is_a?(Array)
+
+        library_seed_version
+      end
+
+      # Seed verzia, s ktorou by sa stavalo z GLOBALNEJ kniznice. Citanie
+      # kniznicu MIGRUJE (`merge_seed` doplni chybajuce seed pravidla a bumpne
+      # verziu), takze ucinna hodnota je aspon nasa `SEED_VERSION` — jedina
+      # vynimka je kniznica z NOVSIEHO pluginu, ktoru `read_rules` zamerne
+      # NEMERGUJE (dopredna brana `std`), takze plati jej vlastna verzia.
+      # Neprecitatelna kniznica = fallback `SEED_RULES`, teda nas seed.
+      def library_seed_version
+        doc = JsonFileStore.read(path, copy: false)
+        return SEED_VERSION unless doc.is_a?(Hash) && doc['rules'].is_a?(Array)
+
+        v = doc['seed_version'].to_i
+        doc_std_unsupported?(doc) ? v : [v, SEED_VERSION].max
+      rescue StandardError
+        SEED_VERSION
+      end
+
       # Zapise projektovy snapshot (editor pravidiel / ensure). Volajuci drzi operaciu.
       def set_project_rules(model, rules)
         return false unless model
@@ -687,17 +877,28 @@ module Noxun
       # KOV-F1: typ kovania, pri ktorom je PREKRYV dvoch zapnutych pravidiel na
       # tej istej role chyba, nie moznost. Dvoje zavesov na tych istych
       # dvierkach = dvojity nakup a nikto by to nezbadal, preto sa uplatni PRVE
-      # v poradi a druhe sa PRIZNA (ORANGE). Uzko na `hinge` zamerne: dve
-      # uchytkove pravidla (`handle`) na jednej role su legitimny stav.
-      OVERLAP_OUTPUT = 'hinge'
+      # v poradi a druhe sa PRIZNA (ORANGE). Uzko zamerne: dve uchytkove
+      # pravidla (`handle`) na jednej role su legitimny stav.
+      #
+      # KOV-E1b (delta audit Sol BLOCKER 2): zoznam je od E1b DVOJPRVKOVY —
+      # `lift` sa v runtime prekryve nekontroloval vobec, takze dve rozne
+      # pomenovane vyklopove pravidla by na jedno celo poslali DVA mechanizmy.
+      # A prekryv sa porovnava podla (vystup, rola, SMER) — kluc pocita
+      # `overlap_key` a rozhoduje `overlap_conflict?`, tie iste, akymi sa riadi
+      # `seed_additions`. Bez smeru by skorsie pravidlo `hinge/flap/up`
+      # potlacilo `zavesy-sklop` aj na skrinke, kde je LEN sklop (nula zavesov).
+      OVERLAP_OUTPUTS = %w[hinge lift].freeze
 
-      def evaluate(cfg, parts, ctx, rules:, suppress_slide_owners: {})
+      def evaluate(cfg, parts, ctx, rules:, suppress_slide_owners: {}, manual_flap_owners: {})
         items = []
         warnings = []
+        conflicts = [] # KOV-E1b: tvrde dovody vyklopu (ULOZENY nosic)
         seen_ids = {}
-        seen_overlap = {}
+        seen_overlap = []
         suppress = suppress_slide_owners.is_a?(Hash) ? suppress_slide_owners : {}
         suppressed = [] # kluce ciel, na ktorych legacy pravidlo vysuvu nebezalo
+        manual_flap = manual_flap_owners.is_a?(Hash) ? manual_flap_owners : {}
+        manual_hits = [] # [owner, output, pd] — cela s RUCNYM kovanim toho druhu
         Array(rules).each do |rule|
           next unless rule.is_a?(Hash)
           rid = rule['rule_id'].to_s
@@ -718,22 +919,26 @@ module Noxun
                                                   'output' => rule['output'].to_s })
             next
           end
-          if rule['output'].to_s == OVERLAP_OUTPUT
-            role = (rule['applies_to'] || {})['role'].to_s
-            if seen_overlap[role]
+          if OVERLAP_OUTPUTS.include?(rule['output'].to_s)
+            key = overlap_key(rule)
+            hit = seen_overlap.find { |(k, _rid)| overlap_conflict?(k, key) }
+            if hit
               warnings << BuildPlan.warning(
                 'hardware_rule_overlap',
-                "Pravidlo kovania '#{rid}' je druhé pravidlo závesov pre tú istú rolu — " \
-                "použije sa prvé („#{seen_overlap[role]}“). Vypni jedno z nich v Pravidlách kovania.",
-                data: { 'rule_id' => rid, 'used_rule_id' => seen_overlap[role], 'role' => role }
+                "Pravidlo kovania '#{rid}' je druhé pravidlo #{overlap_noun(rule['output'])} pre tú " \
+                "istú rolu — použije sa prvé („#{hit[1]}“). Vypni jedno z nich v Pravidlách kovania.",
+                data: { 'rule_id' => rid, 'used_rule_id' => hit[1], 'role' => key[1],
+                        'flap_dir' => key[2] }
               )
               next
             end
-            seen_overlap[role] = rid
+            seen_overlap << [key, rid]
           end
-          apply_rule(rule, cfg || {}, parts, ctx, items, warnings, suppress, suppressed)
+          apply_rule(rule, cfg || {}, parts, ctx, items, warnings, suppress, suppressed, conflicts,
+                     manual_flap, manual_hits)
         end
         warnings.concat(profile_rule_warnings(parts, rules))
+        warnings.concat(manual_flap_warnings(manual_hits))
         unless suppressed.empty?
           warnings << BuildPlan.warning(
             'legacy_slide_suppressed',
@@ -742,14 +947,38 @@ module Noxun
             severity: 'info', data: { 'owners' => suppressed }
           )
         end
-        final = apply_overrides(items, cfg[:hardware_overrides])
+        final = apply_overrides(items, cfg[:hardware_overrides], warnings)
         # KOV-F1: door guardy bezia AZ NAD VYSLEDNYMI polozkami — hmotnostna
         # kontrola sa pyta na pocet PO rucnom zamku (Sol audit kolo 2) a
         # konflikt „mimo tabulky" musi rucny zamok ZHASNUT. Zamok sa hlada
         # v RUCNYCH ZASAHOCH, nie na polozke (Codex #329 kolo 2 P2).
         guards = door_guards(final, parts, rules, cfg[:hardware_overrides])
         warnings.concat(guards[:warnings])
-        { items: final, warnings: warnings, conflicts: guards[:conflicts] }
+        { items: final, warnings: warnings,
+          conflicts: guards[:conflicts] + live_lift_conflicts(conflicts, final) }
+      end
+
+      # KOV-E1b: dovod vyklopu prezije LEN dovtedy, kym existuje polozka, ku
+      # ktorej patri. Polozky SEED pravidla sa vypnut nedaju (plny automat), ale
+      # VLASTNE `lift_class` pravidlo pouzivatela sa `disabled` zasahom vyradit
+      # da — a osirely RED by sa uz nedal zhasnut nicim.
+      def live_lift_conflicts(conflicts, final)
+        return [] if conflicts.empty?
+
+        owners = {}
+        Array(final).each do |it|
+          next unless it.is_a?(Hash) && it['generic_type'].to_s == LIFT_OUTPUT
+
+          owners[it['owner_part_key'].to_s] = true
+        end
+        conflicts.select { |c| owners[c['owner_part_key'].to_s] }
+      end
+
+      # Podstatne meno pre vetu o prekryve — „druhé pravidlo závesov" vs.
+      # „druhé pravidlo výklopov". Vlastny slovnik (nie `label_for`): ten dava
+      # NAZOV pravidla („Závesy"), tu treba druhy pad mnozneho cisla.
+      def overlap_noun(output)
+        output.to_s == LIFT_OUTPUT ? 'výklopov' : 'závesov'
       end
 
       # === KOV-F1: KONTROLY DVIEROK NAD VYSLEDNYMI POLOZKAMI ==================
@@ -813,7 +1042,9 @@ module Noxun
             part_key: owner, data: { 'width' => w, 'limit' => limit.to_f }
           )
         end
-        if w && h && w > h
+        # KOV-E1b: „nemá to byť výklop?" sa na SKLOP (rola `flap`) NEUPLATNI —
+        # sirsie nez vyssie je pri sklope NORMA, nie podozrenie.
+        if w && h && w > h && pd[:role].to_s != FLAP_ROLE
           warnings << BuildPlan.warning(
             'door_wider_than_high',
             "#{who}: šírka #{fmt_mm(w)} mm je väčšia než výška #{fmt_mm(h)} mm — nemá to byť výklop?",
@@ -916,9 +1147,13 @@ module Noxun
         !clamp_qty(ov['quantity']).nil?
       end
 
+      # KOV-E1b: SKLOP dostava zavesy tym istym vzorom `bands`, takze tou istou
+      # cestou chodia aj jeho varovania — ale volat ho „Dvierka" by pri hladani
+      # v modeli poslalo cloveka na iny dielec.
       def door_label(pd)
         name = pd.is_a?(Hash) ? pd[:name].to_s.strip : ''
-        name.empty? ? 'Dvierka' : "Dvierka „#{name}“"
+        base = pd.is_a?(Hash) && pd[:role].to_s == FLAP_ROLE ? 'Sklop' : 'Dvierka'
+        name.empty? ? base : "#{base} „#{name}“"
       end
 
       # D-90 ORANGE `profile_rule_missing`: dielec MA uchytkovy profil, ale
@@ -955,7 +1190,8 @@ module Noxun
 
       # Aplikuje jedno pravidlo: korpusova uroven (owner nil) alebo per dielec roly.
       # cfg putuje az do compute — fit_series musi vediet o rucnom NL zamku (D-93).
-      def apply_rule(rule, cfg, parts, ctx, items, warnings, suppress = {}, suppressed = [])
+      def apply_rule(rule, cfg, parts, ctx, items, warnings, suppress = {}, suppressed = [],
+                     conflicts = [], manual_flap = {}, manual_hits = [])
         role = (rule['applies_to'] || {})['role'].to_s
         if role == 'cabinet'
           supports = Array((rule['applies_to'] || {})['support']).map(&:to_s)
@@ -964,11 +1200,20 @@ module Noxun
           # hornu skrinku od spodnej bez noh (Bystrica ide LEN na horne).
           kinds = Array((rule['applies_to'] || {})['cabinet_type']).map(&:to_s)
           return if kinds.any? && !kinds.include?(ctx['cabinet_type'].to_s)
-          emit(rule, nil, ctx, nil, items, warnings, cfg)
+          emit(rule, nil, ctx, nil, items, warnings, cfg, conflicts)
         else
           slide = rule['output'].to_s == SLIDE_OUTPUT
+          # KOV-E1b: filter SMERU vyklapania. Pravidlo s `applies_to.flap_dir`
+          # plati LEN na cela s tym smerom (vyklop `up` vs. sklop `down`);
+          # pravidlo BEZ filtra plati na vsetky cela svojej roly — presne ako
+          # doteraz. Deskriptor bez smeru (legacy plan, cudzi volajuci) filtru
+          # NEVYHOVIE: hadat smer by znamenalo poslat vyklopovy mechanizmus
+          # na sklop.
+          want_dir = (rule['applies_to'] || {})['flap_dir'].to_s
           parts.each do |pd|
             next unless pd[:role].to_s == role
+            next if !want_dir.empty? && pd[:flap_dir].to_s != want_dir
+
             owner = PartKeys.for_descriptor(pd)
             # KOV-C2b R2: celo s receptovym vysuvom legacy `slide` pravidlo
             # NEDOSTANE (ani ked recept skoncil konfliktom — fail-closed).
@@ -976,15 +1221,75 @@ module Noxun
               suppressed << owner unless suppressed.include?(owner)
               next
             end
-            emit(rule, owner, ctx, pd, items, warnings, cfg)
+            # KOV-E1b (Codex #333 kolo 1 P1): celo `flap` s RUCNE pridanym
+            # kovanim TOHO ISTEHO druhu automat NEDOSTANE — inak by ho nakup
+            # zratal DVAKRAT (`HardwareSets.add_adhoc_row` scitava rovnake
+            # kody). Nikdy ticho: dovod ide do ORANGE.
+            if manual_flap_hit?(rule, pd, owner, manual_flap)
+              manual_hits << [owner, rule['output'].to_s, pd]
+              next
+            end
+            emit(rule, owner, ctx, pd, items, warnings, cfg, conflicts)
           end
         end
       end
 
+      # === KOV-E1b (Codex #333 kolo 1 P1): RUCNE KOVANIE NA VYKLOPE/SKLOPE ===
+      #
+      # `manual_flap` = { owner_part_key => { 'lift' => true, 'hinge' => true } },
+      # pripravene v `CabinetBuilder` (klasifikacia potrebuje KATALOG, evaluacia
+      # ostava CISTA). Znamena: na tom cele UZ VISI rucna (ad-hoc) polozka toho
+      # druhu kovania.
+      #
+      # PRECO SA AUTOMAT VYNECHA A NESCITA: ad-hoc katalogova polozka sa
+      # v nakupe ZLIEVA so setovou podla kodu (`add_adhoc_row`), takze skrinka
+      # so schemou 10, ktora mala vyklop pridany rucne, by po vynutenej
+      # prestavbe objednala mechanizmus DVAKRAT. Fail-closed smerom k cloveku:
+      # plati RUCNY zaznam (ten je vedomy) a automat sa PRIZNA ORANGE-om.
+      #
+      # UZKO ZAMERNE: len rola `flap`. Rucny zaves na DVIERKACH sa spravanim
+      # F1 nedotkne (tam sa automat vydava dalej ako doteraz).
+      def manual_flap_hit?(rule, pd, owner, manual_flap)
+        return false unless manual_flap.is_a?(Hash) && !manual_flap.empty?
+        return false unless pd.is_a?(Hash) && pd[:role].to_s == FLAP_ROLE
+
+        by_owner = manual_flap[owner.to_s]
+        return false unless by_owner.is_a?(Hash)
+
+        by_owner[rule['output'].to_s] == true
+      end
+
+      # JEDEN ORANGE na CELO (nie na pravidlo): pri dvoch pravidlach rovnakeho
+      # vystupu by sa veta inak zopakovala. Nesie `part_key`, takze Kontroly
+      # ukazu, o ktore celo ide.
+      def manual_flap_warnings(hits)
+        seen = {}
+        Array(hits).filter_map do |(owner, output, pd)|
+          key = "#{owner}|#{output}"
+          next nil if seen[key]
+
+          seen[key] = true
+          what = output.to_s == LIFT_OUTPUT ? 'mechanizmus výklopu' : 'závesy sklopu'
+          BuildPlan.warning(
+            'flap_manual_hardware',
+            "#{flap_label(pd)}: kovanie je pridané RUČNE — automatický #{what} sa nevydal " \
+            '(inak by bol v nákupe dvakrát). Odstráň ručnú položku, ak chceš automat.',
+            part_key: owner.to_s,
+            data: { 'owner_part_key' => owner.to_s, 'generic_type' => output.to_s }
+          )
+        end
+      end
+
+      # Vyklop hovori „Výklop", sklop „Sklop" — dve rozne veci s jednou rolou.
+      def flap_label(pd)
+        dir = pd.is_a?(Hash) ? pd[:flap_dir].to_s : ''
+        dir == FLAP_DOWN ? door_label(pd) : lift_label(pd)
+      end
+
       # Vypocita pocet + params a prida polozku (string kluce — JSON round-trip
       # cez config korpusu bez konverzii, ako warnings).
-      def emit(rule, owner, ctx, pd, items, warnings, cfg = {})
-        qty, params = compute(rule, ctx, pd, owner, warnings, cfg)
+      def emit(rule, owner, ctx, pd, items, warnings, cfg = {}, conflicts = [])
+        qty, params = compute(rule, ctx, pd, owner, warnings, cfg, conflicts)
         return if qty.nil?
         # Poradie merge: kontextove params (deklarativne z pravidla) a AZ POTOM
         # odvodene params dielca — tie su autoritativne (front_height je vyska
@@ -1005,8 +1310,10 @@ module Noxun
       end
 
       # Vzory vypoctu. Vrati [quantity, params] alebo [nil, _] = polozka nevznikne.
-      def compute(rule, ctx, pd, owner, warnings, cfg = {})
+      def compute(rule, ctx, pd, owner, warnings, cfg = {}, conflicts = [])
         case rule['kind'].to_s
+        when LIFT_KIND
+          lift_compute(rule, ctx, pd, owner, warnings, conflicts)
         when 'fixed'
           [clamp_qty(rule['quantity']), {}]
         when 'bands'
@@ -1060,6 +1367,241 @@ module Noxun
           return [nil, {}] if flag_params.empty?
           [clamp_qty(rule.fetch('quantity', 1)), flag_params]
         end
+      end
+
+      # === KOV-E1b: VYPOCET VYKLOPU (kind `lift_class`) =======================
+      #
+      # JEDNA polozka na celo, VZDY (aj ked je nieco zle): riadok v Kovani musi
+      # existovat, inak sa uzivatel o probleme dozvie len z Kontroly a nema kde
+      # vidiet, co sa objednava. Dovody idu do `conflicts` (ULOZENY nosic
+      # `hardware_conflicts` -> RED Kontroly + zastavene 3 exporty), varovania
+      # do `warnings` (ORANGE).
+      #
+      # Vstupy su VYHRADNE deskriptor (`weight_kg`, `flap_dir`, `lift_system`,
+      # `opening_mode`) a kontext korpusu (`kh`, `kb`, `available_depth`,
+      # `front_rows`) — resolved cela pravidlo necita.
+      def lift_compute(rule, ctx, pd, owner, warnings, conflicts)
+        # Korpusova uroven (pd nil) vyklop nema — nie je celo, ktore by sa
+        # vyklapalo, ani hmotnost, z ktorej by sa dala urcit trieda.
+        return [nil, {}] unless pd.is_a?(Hash)
+
+        system = lift_system_of(pd)
+        mode   = opening_mode_of(pd)
+        kh = ctx_num(ctx, 'kh')
+        kb = ctx_num(ctx, 'kb')
+        rods = lift_rod_count(rule, kb)
+        who = lift_label(pd)
+        params = { 'use_type' => LIFT_USE_TYPE, 'lift_system' => system,
+                   'opening_mode' => mode,
+                   'rod_count' => rods, 'rod_extension' => (rods > 1 ? 1 : 0) }
+        lift_multirow_conflict(ctx, owner, who, conflicts)
+        lift_combo_conflict(system, mode, owner, who, conflicts)
+        lift_dimension_conflict(rule, ctx, system, kh, kb, owner, who, conflicts)
+        [1, params.merge(lift_class_params(rule, system, kh, pd, owner, who, warnings, conflicts))]
+      end
+
+      # Pocet stabilizacnych tyci z KB. Chybajuci/neplatny prah = pravidlo
+      # zdvojenie NEPOZNA (jedna tyc) — nikdy sa nehada.
+      def lift_rod_count(rule, kb)
+        from = rule['rod_double_from_kb_mm']
+        return 1 unless from.is_a?(Numeric) && from.to_f.finite? && from.to_f.positive?
+        return 1 if kb.nil?
+
+        kb >= from.to_f ? 2 : 1
+      end
+
+      # System vyklopu Z DESKRIPTORA (anotacia planu). Chybajuca hodnota =
+      # legacy celo -> HK top, rovnaky vyklad ako `Fronts.lift_system_of`.
+      def lift_system_of(pd)
+        v = pd[:lift_system].to_s.strip
+        v == LIFT_HL ? LIFT_HL : LIFT_HK
+      end
+
+      # Sposob otvarania Z DESKRIPTORA (vzor `hinge_params`).
+      def opening_mode_of(pd)
+        om = pd[:opening_mode].to_s.strip
+        om.empty? ? DEFAULT_OPENING_MODE : om
+      end
+
+      def lift_label(pd)
+        name = pd.is_a?(Hash) ? pd[:name].to_s.strip : ''
+        name.empty? ? 'Výklop' : "Výklop „#{name}“"
+      end
+
+      def ctx_num(ctx, key)
+        v = ctx.is_a?(Hash) ? ctx[key] : nil
+        v.is_a?(Numeric) && v.to_f.finite? ? v.to_f : nil
+      end
+
+      def lift_conflict(conflicts, owner, code, message)
+        conflicts << { 'owner_part_key' => owner.to_s, 'code' => code, 'message' => message }
+      end
+
+      # V1: vyklop smie byt LEN jediny riadok ciel skrinky (Michal 9.9.2026) —
+      # dva riadky nad sebou by si mechanizmom prekazali a Blum na to ma iny
+      # program. Pocet riadkov je v kontexte (`front_rows`).
+      def lift_multirow_conflict(ctx, owner, who, conflicts)
+        rows = ctx_num(ctx, 'front_rows')
+        return if rows.nil? || rows <= 1
+
+        lift_conflict(conflicts, owner, LIFT_MULTIROW_UNSUPPORTED,
+                      "#{who}: skrinka má #{rows.to_i} riadky čiel — výklop vie systém spočítať len " \
+                      'ako JEDINÝ riadok skrinky. Rozdeľ ho na samostatnú skrinku.')
+      end
+
+      # HL top v Tip-On prevedeni NEEXISTUJE (Michal 9.9.2026, Demos ho nema).
+      def lift_combo_conflict(system, mode, owner, who, conflicts)
+        return unless system == LIFT_HL && mode == 'tipon'
+
+        lift_conflict(conflicts, owner, LIFT_COMBO_UNSUPPORTED,
+                      "#{who}: HL top sa v prevedení Tip-On nevyrába — vyber HK top alebo " \
+                      'prepni čelo na klasické otváranie.')
+      end
+
+      # Rozmerova sposobilost systemu (Blum): KH, sirka korpusu a pri HL aj
+      # VNUTORNA hlbka (`available_depth` — uz zohladnuje chrbat aj drazku;
+      # delta audit Sol BLOCKER 1: `depth - chrbat` by drazku prehliadol).
+      def lift_dimension_conflict(rule, ctx, system, kh, kb, owner, who, conflicts)
+        el = rule['eligibility']
+        el = el.is_a?(Hash) ? el[system] : nil
+        return unless el.is_a?(Hash)
+
+        depth = ctx_num(ctx, 'available_depth')
+        bad = []
+        bad << "výška korpusu bez sokla #{fmt_mm(kh)} mm je pod #{fmt_mm(el['kh_min'])} mm" if
+          kh && el['kh_min'].is_a?(Numeric) && kh < el['kh_min'].to_f
+        bad << "výška korpusu bez sokla #{fmt_mm(kh)} mm je nad #{fmt_mm(el['kh_max'])} mm" if
+          kh && el['kh_max'].is_a?(Numeric) && kh > el['kh_max'].to_f
+        bad << "šírka korpusu #{fmt_mm(kb)} mm je nad #{fmt_mm(el['kb_max'])} mm" if
+          kb && el['kb_max'].is_a?(Numeric) && kb > el['kb_max'].to_f
+        bad << "vnútorná hĺbka #{fmt_mm(depth)} mm je pod #{fmt_mm(el['depth_min'])} mm" if
+          depth && el['depth_min'].is_a?(Numeric) && depth < el['depth_min'].to_f
+        return if bad.empty?
+
+        lift_conflict(conflicts, owner, LIFT_DIMENSION_UNSUPPORTED,
+                      "#{who}: #{lift_system_label(system)} sa do tejto skrinky nedá použiť — " \
+                      "#{bad.join(', ')}. Zmeň rozmer skrinky alebo systém výklopu.")
+      end
+
+      def lift_system_label(system)
+        system == LIFT_HL ? 'HL top' : 'HK top'
+      end
+
+      # TRIEDA mechanizmu (a pri HL aj ramien). Vracia params — prazdny hash
+      # znamena „trieda sa nedala urcit" a JE k nemu RED `lift_class_missing`.
+      def lift_class_params(rule, system, kh, pd, owner, who, warnings, conflicts)
+        kg = pd[:weight_kg]
+        unless kg.is_a?(Numeric) && kg.to_f.finite? && kg.to_f.positive?
+          lift_conflict(conflicts, owner, LIFT_CLASS_MISSING,
+                        "#{who}: hmotnosť čela nie je známa, takže sa nedá určiť trieda výklopu — " \
+                        'doplň materiálom hustotu (Materiály) a prestav skrinku.')
+          return {}
+        end
+
+        w = kg.to_f + lift_allowance(rule)
+        system == LIFT_HL ? hl_class_params(rule, kh, w, owner, who, warnings, conflicts)
+                          : hk_class_params(rule, kh, w, owner, who, warnings, conflicts)
+      end
+
+      # Rezerva na uchytku (kg) — pripocitava sa pri OBOCH systemoch (Blum LF
+      # aj HL tabulka rataju s uchytkou; Astra BLOCKER 3).
+      def lift_allowance(rule)
+        v = rule['handle_allowance_kg']
+        v.is_a?(Numeric) && v.to_f.finite? && !v.to_f.negative? ? v.to_f : 0.0
+      end
+
+      # HK top: LF = KH x hmotnost; v prekryve vyhrava NAJSLABSIA trieda,
+      # ktora LF pokryva (poradie v poli).
+      def hk_class_params(rule, kh, w, owner, who, warnings, conflicts)
+        classes = Array(rule['classes']).select { |c| c.is_a?(Hash) && !c['code'].to_s.empty? }
+        if kh.nil? || classes.empty?
+          lift_conflict(conflicts, owner, LIFT_CLASS_MISSING,
+                        "#{who}: tabuľka tried výklopu HK top chýba alebo je neúplná — " \
+                        'doplň ju v Pravidlách kovania.')
+          return {}
+        end
+
+        lf = kh * w
+        hit = classes.find { |c| lf >= c['min'].to_f && lf <= c['max'].to_f }
+        return { 'lift_class' => hit['code'].to_s } if hit
+
+        floor = classes.map { |c| c['min'].to_f }.min
+        if lf < floor
+          warnings << lift_light_warning(who, owner, "LF #{fmt_mm(lf)}", "#{fmt_mm(floor)}",
+                                         classes.first['code'].to_s)
+          return { 'lift_class' => classes.first['code'].to_s }
+        end
+
+        top = classes.map { |c| c['max'].to_f }.max
+        lift_conflict(conflicts, owner, LIFT_CLASS_MISSING,
+                      "#{who}: LF #{fmt_mm(lf)} (výška korpusu #{fmt_mm(kh)} mm × #{fmt_mm(w)} kg " \
+                      "aj s úchytkou) je nad tabuľkou HK top (maximum #{fmt_mm(top)}) — " \
+                      'rozdeľ čelo, odľahči ho alebo vyber iný systém.')
+        {}
+      end
+
+      # HL top: mechanizmus podla KH, ramena podla KH A hmotnosti. Ked sa
+      # nedaju urcit ramena, polozka NEDOSTANE ani triedu mechanizmu — set by
+      # inak objednal mechanizmus bez ramien.
+      def hl_class_params(rule, kh, w, owner, who, warnings, conflicts)
+        arms = Array(rule['arms']).select { |a| a.is_a?(Hash) && !a['code'].to_s.empty? }
+        mech = kh.nil? ? nil : Array(rule['mechanisms']).find { |m| max_band_covers?(m, kh) }
+        cands = kh.nil? ? [] : arms.select { |a| arm_kh_covers?(a, kh) }
+        if mech.nil? || cands.empty?
+          lift_conflict(conflicts, owner, LIFT_CLASS_MISSING,
+                        "#{who}: výška korpusu bez sokla #{kh ? fmt_mm(kh) : '?'} mm nie je " \
+                        'v tabuľke HL top — ' \
+                        'zmeň výšku skrinky alebo vyber HK top.')
+          return {}
+        end
+
+        hit = cands.find { |a| w >= a['kg_min'].to_f && w <= a['kg_max'].to_f }
+        if hit
+          return { 'lift_class' => mech['code'].to_s, 'arm_class' => hit['code'].to_s }
+        end
+
+        floor = cands.map { |a| a['kg_min'].to_f }.min
+        if w < floor
+          warnings << lift_light_warning(who, owner, "hmotnosť #{fmt_mm(w)} kg",
+                                         "#{fmt_mm(floor)} kg", cands.first['code'].to_s)
+          return { 'lift_class' => mech['code'].to_s, 'arm_class' => cands.first['code'].to_s }
+        end
+
+        top = cands.map { |a| a['kg_max'].to_f }.max
+        lift_conflict(conflicts, owner, LIFT_CLASS_MISSING,
+                      "#{who}: hmotnosť #{fmt_mm(w)} kg (aj s úchytkou) je nad maximom " \
+                      "#{fmt_mm(top)} kg pre ramená HL top pri výške #{fmt_mm(kh)} mm — " \
+                      'odľahči čelo alebo zmeň výšku skrinky.')
+        {}
+      end
+
+      # ORANGE „prilis lahke celo": mechanizmus sa da doladit pruzinou, preto
+      # to NIE JE stopka (Michal 9.9.2026) — polozka dostane NAJSLABSIU triedu.
+      def lift_light_warning(who, owner, what, floor, code)
+        BuildPlan.warning(
+          'lift_light_front',
+          "#{who}: #{what} je pod spodnou hranicou tabuľky (#{floor}) — použije sa najslabšia " \
+          "trieda #{code}, skontroluj dotiahnutie pružiny.",
+          part_key: owner, data: { 'lift_class' => code }
+        )
+      end
+
+      # Pasmo „do max" (mechanizmy HL). `max_exclusive` = horna hranica do
+      # pasma UZ NEPATRI.
+      def max_band_covers?(band, v)
+        return false unless band.is_a?(Hash) && band['max'].is_a?(Numeric)
+
+        band['max_exclusive'] == true ? v < band['max'].to_f : v <= band['max'].to_f
+      end
+
+      # Pasmo ramien podla KH: `kh_min` je VZDY inkluzivne, `kh_max` podla
+      # `max_exclusive` (Blum 300–339 / 340–389 su spojite, 390–540 a 480–580
+      # su inkluzivne).
+      def arm_kh_covers?(arm, kh)
+        return false unless arm['kh_min'].is_a?(Numeric) && arm['kh_max'].is_a?(Numeric)
+        return false if kh < arm['kh_min'].to_f
+
+        arm['max_exclusive'] == true ? kh < arm['kh_max'].to_f : kh <= arm['kh_max'].to_f
       end
 
       # KOV-F1: pripocitanie za SIRKU dielca (0 = pravidlo guard nema alebo
@@ -1192,12 +1734,22 @@ module Noxun
       # Rucne zasahy z configu korpusu. Match = (owner, generic_type, rule_id);
       # disabled -> polozka von; quantity -> prepis poctu; nominal_length (D-93) ->
       # prepis params. Polia su NEZAVISLE, jeden zaznam ich moze niest viac.
-      def apply_overrides(items, overrides)
+      def apply_overrides(items, overrides, warnings = nil)
         list = Array(overrides).select { |ov| ov.is_a?(Hash) }
         return items if list.empty?
         items.filter_map do |it|
           ov = list.select { |o| override_match?(o, it) }.last
           next it unless ov
+          # KOV-E1b (Astra FIX 11, zuzene Codex #331 kolo 2 P1): polozky SEED
+          # pravidla vyklopov su PLNY AUTOMAT — vypnutie ani rucny pocet na nich
+          # neplati (vyklop je zostava, polovicna objednavka nie je volba).
+          # Normalizacia configu taky zaznam uz cisti; toto je druha obrana pre
+          # zakazky ulozene starsim pluginom. VLASTNE `lift` pravidla
+          # pouzivatela a ich overridy ostavaju UCINNE.
+          if protected_lift_item?(it)
+            warnings << lift_override_ignored_warning(it) if warnings.is_a?(Array)
+            next it
+          end
           next nil if ov['disabled'] == true
           out = it
           # D-93: rucna NL. rule_nominal_length = hodnota automatu (nil = automat
@@ -1218,6 +1770,23 @@ module Noxun
           out = out.merge('quantity' => q, 'source' => 'manual') if q
           out
         end
+      end
+
+      # KOV-E1b: je polozka z chraneneho SEED pravidla vyklopov? JEDINA autorita
+      # otazky — pyta sa jej evaluacia aj normalizacia configu (cez
+      # `LIFT_RULE_ID`).
+      def protected_lift_item?(item)
+        (item['rule_id'] || item[:rule_id]).to_s == LIFT_RULE_ID
+      end
+
+      def lift_override_ignored_warning(item)
+        BuildPlan.warning(
+          'lift_override_ignored',
+          'Ručný zásah na výklope sa neuplatní — výklop je zostava a plugin ju počíta celú ' \
+          '(zmeň systém výklopu na čele alebo vyber iný set).',
+          part_key: (item['owner_part_key'] || item[:owner_part_key]),
+          data: { 'rule_id' => LIFT_RULE_ID }
+        )
       end
 
       # D-93: JEDINA autorita hodnoty NL overridu (strict). Konecny kladny Float,
@@ -1322,8 +1891,113 @@ module Noxun
             r['series'] = r['series'].map(&:to_f).select(&:positive?).uniq.sort
           end
           r['clearance'] = r['clearance'].to_f if r.key?('clearance')
+          normalize_lift_rule!(r)
           r
         end
+      end
+
+      # KOV-E1b: typova ocista tabuliek vyklopu. Riadok bez kodu alebo bez
+      # pouzitelnych cisel sa ZAHODI (radsej ziadne pasmo nez hadanie) a pasma
+      # sa ZORADIA — poradie je vyznamove (v prekryve vyhrava PRVE, teda
+      # najslabsie), takze sa nesmie spoliehat na poradie v subore. Kluce sa
+      # cistia PODLA PRITOMNOSTI, nie podla `kind`: pravidlo smie niest zvysky
+      # po zmene typu a validovat/pouzit sa ma len to, co sa naozaj pocita.
+      def normalize_lift_rule!(rule)
+        LIFT_SCALARS.each_key { |key| normalize_lift_scalar!(rule, key) }
+        rule['classes'] = normalize_lift_classes(rule['classes']) if rule.key?('classes')
+        rule['mechanisms'] = normalize_lift_mechanisms(rule['mechanisms']) if rule.key?('mechanisms')
+        rule['arms'] = normalize_lift_arms(rule['arms']) if rule.key?('arms')
+        rule['eligibility'] = normalize_lift_eligibility(rule['eligibility']) if
+          rule.key?('eligibility')
+        rule
+      end
+
+      # Skalary vyklopoveho pravidla + ich LUDSKY nazov do hlasky.
+      LIFT_SCALARS = { 'handle_allowance_kg' => 'rezerva na úchytku',
+                       'rod_double_from_kb_mm' => 'šírka pre druhú stabilizačnú tyč' }.freeze
+
+      # Codex #333 kolo 2 P2: `to_f` na Hash/Array/true VYHODI vynimku, takze
+      # jediny pokazeny skalar zhodil normalizaciu CELEHO dokumentu —
+      # `project_rules` ju odchytil, vratil nil a `ensure_project_rules!` potom
+      # projektove pravidla TICHO nahradil globalnou kniznicou.
+      #
+      # Typova kontrola je rovnaka ako pri bunkach tabuliek (`lift_row?`):
+      # neciselna hodnota sa NEHADA a NEZAHADZUJE sa cely kluc — ostava
+      # PRITOMNY s hodnotou `nil`. To je vzor `weight_bands` (KOV-F2):
+      # normalizacia necha tvar, ktory brana odmietne, takze `lift_problem`
+      # o probleme POVIE a ulozenie takeho pravidla neprejde (vypnute pravidlo
+      # sa nekontroluje — cesta von existuje). Citatelia (`lift_allowance`,
+      # `lift_rod_count`) su uz typovo bezpecni: nil = ziadna rezerva / jedna
+      # tyc, nikdy hadanie.
+      def normalize_lift_scalar!(rule, key)
+        return rule unless rule.key?(key)
+
+        v = rule[key]
+        rule[key] = v.is_a?(Numeric) && v.to_f.finite? ? v.to_f : nil
+        rule
+      end
+
+      def normalize_lift_classes(raw)
+        rows = Array(raw).filter_map do |c|
+          next nil unless lift_row?(c, %w[min max])
+
+          { 'code' => c['code'].to_s.strip, 'min' => c['min'].to_f, 'max' => c['max'].to_f }
+        end
+        rows.sort_by { |c| [c['min'], c['max']] }
+      end
+
+      def normalize_lift_mechanisms(raw)
+        rows = Array(raw).filter_map do |m|
+          next nil unless lift_row?(m, %w[max])
+
+          out = { 'code' => m['code'].to_s.strip, 'max' => m['max'].to_f }
+          out['max_exclusive'] = true if m['max_exclusive'] == true
+          out
+        end
+        rows.sort_by { |m| m['max'] }
+      end
+
+      def normalize_lift_arms(raw)
+        rows = Array(raw).filter_map do |a|
+          next nil unless lift_row?(a, %w[kh_min kh_max kg_min kg_max])
+
+          out = { 'code' => a['code'].to_s.strip, 'kh_min' => a['kh_min'].to_f,
+                  'kh_max' => a['kh_max'].to_f, 'kg_min' => a['kg_min'].to_f,
+                  'kg_max' => a['kg_max'].to_f }
+          out['max_exclusive'] = true if a['max_exclusive'] == true
+          out
+        end
+        rows.sort_by { |a| [a['kh_min'], a['kg_max']] }
+      end
+
+      # Riadok tabulky = neprazdny kod + vsetky menovane hodnoty ako KONECNE
+      # cisla. Cokolvek ine je nepouzitelny riadok.
+      def lift_row?(row, keys)
+        return false unless row.is_a?(Hash) && !row['code'].to_s.strip.empty?
+
+        keys.all? { |k| row[k].is_a?(Numeric) && row[k].to_f.finite? }
+      end
+
+      # Sposobilost per SYSTEM — cudzie kluce (a systemy, ktore nepozname)
+      # vypadnu; prazdny vysledok = pravidlo eligibility nema.
+      ELIGIBILITY_KEYS = %w[kh_min kh_max kb_max depth_min].freeze
+
+      def normalize_lift_eligibility(raw)
+        return {} unless raw.is_a?(Hash)
+
+        out = {}
+        [LIFT_HK, LIFT_HL].each do |sys|
+          rec = raw[sys]
+          next unless rec.is_a?(Hash)
+
+          vals = {}
+          ELIGIBILITY_KEYS.each do |k|
+            v = rec[k]
+            vals[k] = v.to_f if v.is_a?(Numeric) && v.to_f.finite? && v.to_f.positive?
+          end
+          out[sys] = vals unless vals.empty?
+        end
+        out
       end
 
       # Pasma (vyskove aj hmotnostne) v jednom tvare: neplatny pocet = pasmo
@@ -1462,12 +2136,70 @@ module Noxun
       def rule_problem_message(rule)
         case rule['kind'].to_s
         when 'bands' then bands_problem(rule)
+        when LIFT_KIND then lift_problem(rule)
         when 'fit_series'
           series = rule['series'].is_a?(Array) ? rule['series'] : []
           return nil unless series.empty?
 
           "#{rule_address(rule)} potrebuje aspoň jednu dĺžku v rade."
         end
+      end
+
+      # KOV-E1b: co sa na vyklopovom pravidle NESMIE ulozit. Kriteria su nad
+      # tvarom PO `normalize_rules` (neplatne riadky uz vypadli), takze sa
+      # kontroluje LEN to, co normalizacia necha tak: uplne prazdna tabulka,
+      # obratene pasmo a DIERA medzi pasmami ramien (KH v diere by nedostalo
+      # ziadne ramena a kazde take celo by bolo RED).
+      def lift_problem(rule)
+        addr = rule_address(rule)
+        classes = rule['classes'].is_a?(Array) ? rule['classes'] : []
+        arms    = rule['arms'].is_a?(Array) ? rule['arms'] : []
+        mechs   = rule['mechanisms'].is_a?(Array) ? rule['mechanisms'] : []
+        return "#{addr}: tabuľka tried HK top je prázdna — doplň aspoň jednu triedu." if classes.empty?
+        return "#{addr}: tabuľka mechanizmov HL top je prázdna — doplň aspoň jeden." if mechs.empty?
+        return "#{addr}: tabuľka ramien HL top je prázdna — doplň aspoň jedny." if arms.empty?
+
+        bad = classes.find { |c| c['min'].to_f > c['max'].to_f }
+        return "#{addr}: trieda #{bad['code']} má LF od väčšie než do." if bad
+
+        bad = arms.find { |a| a['kh_min'].to_f > a['kh_max'].to_f || a['kg_min'].to_f > a['kg_max'].to_f }
+        return "#{addr}: ramená #{bad['code']} majú od väčšie než do." if bad
+
+        # Codex #333 kolo 2 P2: NECISELNY skalar (Hash/Array/true z pokazeneho
+        # alebo cudzieho snapshotu). `normalize_lift_scalar!` ho zmenil na nil,
+        # aby normalizacia dokumentu neskoncila vynimkou — a TU sa o nom povie.
+        # Bez tejto vety by rezerva ticho spadla na 0 kg (slabsi mechanizmus)
+        # a prah druhej tyce by zmizol (jedna tyc nad 1100 mm).
+        bad_key = LIFT_SCALARS.keys.find { |k| rule.key?(k) && !rule[k].is_a?(Numeric) }
+        return "#{addr}: #{LIFT_SCALARS[bad_key]} musí byť číslo." if bad_key
+
+        # Codex #333 kolo 1 P2: ZAPORNA rezerva na uchytku by hmotnost cela
+        # ZNIZILA, takze automat by vybral SLABSI mechanizmus — presne opak
+        # toho, na co rezerva je. `normalize_lift_rule!` ju len pretypuje
+        # (`to_f`), takze bez tejto vety by taka hodnota ticho presla.
+        if rule.key?('handle_allowance_kg') && rule['handle_allowance_kg'].to_f.negative?
+          return "#{addr}: rezerva na úchytku nesmie byť záporná."
+        end
+
+        arms_gap_problem(addr, arms)
+      end
+
+      # DIERA medzi pasmami ramien: dalsie pasmo sa musi zacinat NAJNESKOR tam,
+      # kde predosle konci (pri `max_exclusive` presne tam, inak hned zaň —
+      # inkluzivne pasma sa smu prekryvat, medzera medzi nimi ale nie).
+      def arms_gap_problem(addr, arms)
+        sorted = arms.sort_by { |a| a['kh_min'].to_f }
+        reach = nil
+        sorted.each do |a|
+          if reach && a['kh_min'].to_f > reach
+            return "#{addr}: medzi pásmami ramien je medzera pri výške #{fmt_mm(reach)} mm — " \
+                   'výklop tej výšky by nedostal žiadne ramená.'
+          end
+
+          top = a['kh_max'].to_f
+          reach = top if reach.nil? || top > reach
+        end
+        nil
       end
 
       def bands_problem(rule)

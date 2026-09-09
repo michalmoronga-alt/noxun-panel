@@ -87,6 +87,10 @@ module Noxun
         # tabulky zavesov? Otazka je MODELOVA (snapshot, inak globalna
         # kniznica), preto sa pyta RAZ na zber, nie pri kazdej skrinke.
         rules_stale = defined?(HardwareRules) && HardwareRules.pre_hinge_table_rules?(model)
+        # KOV-E1b (Codex #333 kolo 2 P1): kody MECHANIZMOV vyklopu a zavesov zo
+        # setov projektu. Otazka je rovnako MODELOVA ako `rules_stale`, preto sa
+        # pyta RAZ na zber; `project_state` cita len atribut modelu (ziadne IO).
+        flap_codes = defined?(HardwareSets) ? HardwareSets.flap_set_codes(HardwareSets.project_state(model)) : nil
         model.entities.grep(Sketchup::ComponentInstance).each do |inst|
           case Store.kind(inst)
           when 'cabinet'
@@ -154,6 +158,12 @@ module Noxun
             # nakup, rozpocet aj ponuka presli s poddimenzovanymi zavesmi.
             hs = hinge_stale_issue(cid, inst.persistent_id, ccfg, rules_stale)
             hardware_issues << hs if hs
+            # KOV-E1b: TRETI vzor — skrinka postavena PRED pravidlami vyklopov.
+            # Jej vyklop nema mechanizmus a jej sklop nema zavesy, takze nakup
+            # by bol NEUPLNY a ticho. Aktivuje ju VYHRADNE proveniencia stavby
+            # (schema configu), nie pritomnost pravidiel (delta audit Sol FIX 4).
+            fs = flap_stale_issue(cid, inst.persistent_id, ccfg, flap_codes)
+            hardware_issues << fs if fs
             cs = ccfg['hardware_sets']
             note_cabinet_sets(cid, (cs.is_a?(Hash) && !cs.empty? ? cs : nil),
                               cabinet_sets, cabinet_sets_seen, cabinet_set_conflicts)
@@ -475,6 +485,155 @@ module Noxun
                        'kovania spusti „Doplniť nové predvoľby“ — nová tabuľka závesov ' \
                        '(+1 nad šírku 600 mm, set podľa otvárania) platí až keď je hotové oboje.',
           'label' => PartKeys.human_label(pkey, fronts: items).to_s }
+      end
+
+      # === KOV-E1b: NEPRESTAVANY VYKLOP ALEBO SKLOP (`flap_stale`) ===========
+      #
+      # Skrinka postavena PRED E1b (`config_schema` < `LIFT_ACTIVATION_SCHEMA`),
+      # ktora MA celo `flap`. Pravidla vyklopov a sklopov vtedy neexistovali,
+      # takze v jej `config.hardware[]` nie je ani vyklopovy mechanizmus (`up`),
+      # ani zavesy sklopu (`down`) — a zber cita LEN ULOZENE hodnoty, takze bez
+      # tejto brany by nakup, rozpocet aj ponuka presli s celom UPLNE BEZ
+      # kovania. Fail-closed RED; VEPO branu NEDOSTAVA (geometria je spravna).
+      #
+      # ROZHODUJE VYHRADNE PROVENIENCIA STAVBY (delta audit Sol FIX 4).
+      # Predikat sa ZAMERNE NEPYTA na pritomnost seed pravidiel: pouzivatel smie
+      # mat vlastne (aj vypnute) vyklopove pravidlo, a kedze `seed_additions`
+      # taky seed nedoplni a ochrana overridov ho drzi, „Doplniť nové predvoľby
+      # + prestavba" by RED nikdy nezhasla.
+      #
+      # PROVENIENCIE SU DVE (Codex #333 kolo 1 P1) — staci, ze JEDNA je stara:
+      #   (a) `config_schema` < `LIFT_ACTIVATION_SCHEMA` — skrinka postavena
+      #       pred E1b;
+      #   (b) `rules_seed_version` < `HardwareRules::LIFT_SEED_VERSION` —
+      #       stavala sa s pravidlami SPRED vyklopov. Bez (b) by stacilo
+      #       skrinku PRESTAVAT: `ensure_project_rules!` zamerne vrati STARY
+      #       projektovy snapshot (reprodukovatelnost z .skp), takze prestavba
+      #       nevyda ani mechanizmus ani zavesy sklopu — ale do configu zapise
+      #       schemu 11 a RED by zhasol nad zakazkou UPLNE BEZ kovania.
+      #       Prestavba je pritom jedna z nami odporucanych naprav.
+      # RED zhasne az po „Doplniť nové predvoľby" (snapshot na seed 5) A
+      # prestavbe. Skrinka postavena s UCINNYMI pravidlami stale nie je nikdy:
+      # vysledok takej stavby je rozhodnutie pouzivatela, nie zaostalost.
+      #
+      # `hinge_stale_issue` mlci, ked zaves nenajde; TU je to naopak — CHYBAJUCA
+      # polozka JE nalez. -> nalez | nil
+      def flap_stale_issue(owner_id, owner_pid, ccfg, flap_codes = nil)
+        return nil unless defined?(CabinetBuilder) && defined?(HardwareRules)
+
+        cfg = ccfg.is_a?(Hash) ? ccfg : {}
+        return nil unless pre_lift_build?(cfg)
+
+        items = cfg['front_items'].is_a?(Array) ? cfg['front_items'] : []
+        hw = Array(cfg['hardware'])
+        manual = manual_flap_assemblies(cfg['hardware_manual'], flap_codes)
+        hit = items.find { |it| it.is_a?(Hash) && flap_without_hardware?(it, hw, manual) }
+        return nil if hit.nil?
+
+        up = hit['flap_dir'].to_s != HardwareRules::FLAP_DOWN
+        pkey = PartKeys.front(hit['id'].to_s, 'flap')
+        { 'code' => BuildPlan::FLAP_STALE, 'severity' => 'red',
+          'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
+          'part_key' => pkey, 'front_id' => hit['id'].to_s,
+          'message' => "Skrinka #{owner_id} má #{up ? 'výklop' : 'sklop'} postavený ešte pred " \
+                       "pravidlami #{up ? 'výklopov' : 'sklopov'} — v Pravidlách kovania spusti " \
+                       '„Doplniť nové predvoľby“ a skrinku prestav, inak jej v nákupe chýba ' \
+                       "#{up ? 'celý mechanizmus výklopu' : 'závesy sklopu'}.",
+          'label' => PartKeys.human_label(pkey, fronts: items).to_s }
+      end
+
+      # Bola skrinka postavena PRED vyklopmi? Staci JEDNA stara proveniencia
+      # (schema configu ALEBO seed pravidiel — viz `flap_stale_issue`).
+      # Chybajuci `rules_seed_version` (config spred tejto opravy) = 0.
+      def pre_lift_build?(cfg)
+        return true if CabinetBuilder.config_schema_of(cfg) < CabinetBuilder::LIFT_ACTIVATION_SCHEMA
+
+        provenance_marker(cfg['rules_seed_version']) < HardwareRules::LIFT_SEED_VERSION
+      end
+
+      # Codex #333 kolo 3 P2: MARKER PROVENIENCIE ma byt cislo — a ked nie je,
+      # plati NAJSTARSIA hodnota (0), nie vynimka. `to_i` na Hash/Array/true
+      # VYHODI `NoMethodError` a `Bom.collect` ziadny rescue nema, takze jediny
+      # rucne pokazeny (alebo cudzim producentom zapisany) atribut by zhodil
+      # Kontrolu AJ vsetky vystupy — namiesto toho, aby skrinku priznal ako
+      # nemigrovanu a fail-closed zastavil nakup, rozpocet a ponuku.
+      # Zaporne cislo je tiez „najstarsie" (marker nikdy nie je zaporny).
+      #
+      # PRIJIMA sa LEN `Numeric` — na rozdiel od `config_schema_of`, ktory cita
+      # aj ciselny string (R-12 kontrakt). Dovod je smer zlyhania: tam by 0
+      # ZHASLA doprednu blokadu (fail-open), tu 0 znamena RED `flap_stale`
+      # a napravu „Doplniť nové predvoľby + prestavba" — teda fail-CLOSED,
+      # a prestavba marker aj tak prepise spravnym Integerom.
+      # -> celociselny marker >= 0
+      def provenance_marker(raw)
+        return 0 unless raw.is_a?(Numeric) && raw.to_f.finite?
+
+        v = raw.to_i
+        v.negative? ? 0 : v
+      end
+
+      # Riadok ciel je `flap` a v ULOZENOM kovani k nemu chyba to, co mu podla
+      # smeru patri: vyklopu (`up`) polozka `lift`, sklopu (`down`) zaves
+      # s `use_type: 'door'`. Iny typ riadku nalez nerobi.
+      #
+      # Codex #333 kolo 2 P1: branu zhasne LEN UPLNA RUCNA ZOSTAVA toho druhu,
+      # ktory celu podla SMERU patri — vyklopu mechanizmus, sklopu zaves.
+      # V kole 1 stacil AKYKOLVEK owner-bound rucny zaznam, takze uchytka,
+      # volna poznamka ci zaves na vyklope HORE pustili nakup, rozpocet aj
+      # ponuku nad celom, ktore ziadny mechanizmus nema. Uplna zostava je
+      # naopak vedomy zasah a prestavba (nasa naprava) by k nej pridala este
+      # automat — nakup by ten isty kod zratal DVAKRAT
+      # (`HardwareSets.add_adhoc_row` scitava rovnake kody). Predikat je
+      # ZDIELANY s builderom (`HardwareSets.manual_flap_assemblies`).
+      # `manual` = uz vyhodnotena mapa { owner_part_key => { druh => true } }.
+      def flap_without_hardware?(item, hardware, manual = {})
+        dir = item['flap_dir'].to_s
+        return false unless [HardwareRules::FLAP_UP, HardwareRules::FLAP_DOWN].include?(dir)
+
+        want_lift = dir == HardwareRules::FLAP_UP
+        fid = item['id'].to_s
+        return false if manual_assembly_for?(manual, fid,
+                                             want_lift ? HardwareRules::LIFT_OUTPUT
+                                                       : HardwareRules::HINGE_OUTPUT)
+
+        hardware.none? do |h|
+          next false unless h.is_a?(Hash)
+          next false unless PartKeys.front_id(h['owner_part_key'].to_s).to_s == fid
+
+          if want_lift
+            h['generic_type'].to_s == HardwareRules::LIFT_OUTPUT
+          else
+            params = h['params'].is_a?(Hash) ? h['params'] : {}
+            h['generic_type'].to_s == HardwareRules::HINGE_OUTPUT &&
+              params['use_type'].to_s == HardwareRules::DOOR_USE_TYPE
+          end
+        end
+      end
+
+      # Cela s UPLNOU rucnou zostavou. Kody mechanizmov pochadzaju zo SETOV
+      # (seed + projektovy snapshot) — `flap_codes` pocita `collect` RAZ na
+      # zber (vzor `rules_stale`); bez nich sa vezme seed, takze aj priame
+      # volanie (testy, diagnostika) da rozumnu odpoved. ZIADNE IO.
+      def manual_flap_assemblies(manual, flap_codes = nil)
+        return {} unless defined?(HardwareSets)
+
+        HardwareSets.manual_flap_assemblies(manual, flap_codes)
+      rescue StandardError => e
+        Engine.log_error(e, 'Bom.manual_flap_assemblies') if defined?(Engine)
+        {}
+      end
+
+      # Ma celo `front_id` rucnu zostavu druhu `kind`? Mapa je klucovana
+      # `owner_part_key`, zber pozna len ID cela — porovnava sa preto cez
+      # `PartKeys.front_id` (rovnako ako pri ULOZENOM kovani).
+      def manual_assembly_for?(manual, front_id, kind)
+        return false if front_id.to_s.empty?
+        return false unless manual.is_a?(Hash)
+
+        manual.any? do |owner, kinds|
+          kinds.is_a?(Hash) && kinds[kind] == true &&
+            PartKeys.front_id(owner.to_s).to_s == front_id.to_s
+        end
       end
 
       # === KOV-F1 (Codex #329 kolo 3 P1): PRAVIDLA Z NOVSIEHO PLUGINU ========

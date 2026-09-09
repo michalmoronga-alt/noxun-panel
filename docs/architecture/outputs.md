@@ -212,6 +212,39 @@ staré počty, takže RED by zhasol nad poddimenzovaným nákupom. Hláška pret
 (tá zapíše snapshot s aktuálnym `std` A prestavia všetky skrinky; to isté robí Uložiť v Pravidlách). RED zhasne, až keď neplatí ani jedna príčina. `HINGE_ACTIVATION_SCHEMA` je **vlastná**
 konštanta z toho istého dôvodu ako `DRAWER_ACTIVATION_SCHEMA`: pri budúcom bumpe `CONFIG_SCHEMA` sa skrinky schémy 9 nesmú zrazu tváriť ako nemigrované.
 
+**KOV-E1b (v0.9.54) — VÝKLOPOVÉ DÔVODY A MIGRAČNÝ `flap_stale`.** `HW_LIFT_BLOCKERS` (od E1a `lift_set_incomplete`) sa rozšíril o **štyri dôvody z PRAVIDLA**
+(`lift_class_missing` — LF/KH/kg mimo tabuľky alebo neznáma hmotnosť · `lift_dimension_unsupported` — rozmery mimo programu Blum · `lift_multirow_unsupported` —
+výklop musí byť jediný riadok čiel · `lift_combo_unsupported` — HL top v prevedení Tip-On neexistuje) **a o `flap_stale`**. Prvé štyri prichádzajú z **uloženého
+nosiča** `hardware_conflicts` (preto sú aj v `HW_CONFLICT_CODES`), takže cesta je tá istá ako pri `door_height_out_of_table`: `Bom.hardware_conflict_issues` →
+`Validation` RED kategória `hardware_conflict` → brána. **Položka výklopu sa VYDÁ vždy** (aj bez triedy) — riadok v Kovaní musí existovať, inak používateľ nevidí,
+čo sa objednáva; zastavené sú nákup, rozpočet a ponuka, **VEPO beží** (geometria čela je správna, rovnaká úvaha ako pri závesoch).
+
+**`flap_stale` je MIGRAČNÝ a rozhoduje o ňom PROVENIENCIA STAVBY (delta audit Sol FIX 4, rozšírené Codex #333 kolo 1 P1).** `Bom.flap_stale_issue` je **tretí vzor**
+po `drawer_stale_issue` a `hinge_stale_issue`: skrinka s čelom `flap`, ktorej v uloženom `config.hardware[]` **chýba** položka `lift` (smer `up`) alebo závesy
+s `use_type: 'door'` (smer `down`). Pravidlá výklopov vtedy neexistovali, takže také čelo nemá v nákupe **nič** — a zber číta len uložené hodnoty.
+**Provenienciu tvoria DVE hodnoty a stačí, že jedna je stará** (`Bom.pre_lift_build?`):
+· `config_schema` < `CabinetBuilder::LIFT_ACTIVATION_SCHEMA` (= 11) — skrinka postavená pred E1b;
+· `rules_seed_version` < `HardwareRules::LIFT_SEED_VERSION` (= 5) — stavala sa s pravidlami spred výklopov (chýbajúci kľúč = 0).
+**Oba markery sa čítajú TYPOVO (Codex #333 kolo 3 P2):** `to_i` na Hash/Array/`true` vyhodí `NoMethodError` a `Bom.collect` žiadny rescue nemá, takže jediný ručne
+pokazený (alebo cudzím producentom zapísaný) atribút by zhodil Kontrolu **aj všetky výstupy**. Nepoužiteľná hodnota preto znamená to isté ako chýbajúca: `0`, teda
+najstaršia provenienia → RED a fail-closed stopka. Seed verziu číta `Bom.provenance_marker` (**len `Numeric`**), schému `CabinetBuilder.config_schema_of`
+(`Numeric` **aj číselný string** — R-12 kontrakt: tam je dopredný guard fail-OPEN, takže marker „12" nesmie zhasnúť blokádu novšieho configu).
+Druhá podmienka je nutná preto, že `ensure_project_rules!` **zámerne** vracia starý projektový snapshot (reprodukovateľnosť stavby z .skp): prestavba starej zákazky
+by nevydala nič, ale zapísala by schému 11 — a RED by zhasol práve prestavbou, ktorú sama odporúča. Náprava je „Doplniť nové predvoľby" **+ prestavba** (v tomto poradí).
+Na rozdiel od `hinge_stale` sa nález NEPÝTA na obsah pravidiel: používateľ smie mať vlastné (aj vypnuté) výklopové pravidlo, seed sa mu vtedy nedoplní
+(`seed_additions`) a RED by nezhasol nikdy — rozhoduje **verzia snapshotu**, nie prítomnosť seed pravidiel. A na rozdiel od `hinge_stale_issue`, ktorý pri nenájdenom
+závese **mlčí**, je tu chýbajúca položka práve tým nálezom.
+
+**Bránu zhasne LEN ÚPLNÁ RUČNÁ ZOSTAVA (Codex #333 kolá 1 a 2).** V kole 1 stačil **akýkoľvek** owner-bound ad-hoc záznam, takže úchytka, voľná poznámka či záves
+na výklope HORE pustili nákup, rozpočet aj ponuku nad čelom, ktoré žiadny mechanizmus nemá. Od kola 2 sa zber pýta **tým istým predikátom ako stavba**:
+`flap_stale_issue(..., flap_codes)` → `Bom.manual_flap_assemblies` → `HardwareSets.manual_flap_assemblies` a druh musí sedieť so **smerom** (výklop mechanizmus,
+sklop záves — [hardware.md](hardware.md)). Kódy mechanizmov (seed + sety projektového snapshotu) si `Bom.collect` vypýta RAZ na zber, presne ako `rules_stale`;
+`HardwareSets.project_state` číta iba modelový atribút, takže zber ostáva bez IO. Úplná zostava bránu zhasne preto, že je to **vedomý zásah** a naša náprava
+(prestavba) by k nej pridala ešte automatickú zostavu — `HardwareSets.add_adhoc_row` **sčítava rovnaké kódy**, teda dvojitá objednávka. Protiváha na strane stavby:
+čelo `flap` s úplnou ručnou zostavou automat **nedostane** a vznikne ORANGE **`flap_manual_hardware`** („kovanie je pridané RUČNE — automatický mechanizmus/závesy sa
+nevydali; odstráň ručnú položku, ak chceš automat"); ručný **doplnok** (krytka, tyč, rameno) automat nevypína a zliatie kódu v nákupe prizná ORANGE
+**`flap_manual_duplicate`** ([construction.md](construction.md)) — nikdy sčítanie oboch potichu.
+
 **Dve nové RED kategórie Kontroly.** `CAT_HARDWARE_CONFLICT` (`hardware_conflict`) — položka kovania z pravidiel VZNIKLA, ale je nesprávna; vetu skladá
 STAVBA (pozná výšku aj posledné pásmo), Kontrola k nej doplní adresu a to, čo sa tým zastavuje. Náprava je **ručný zámok počtu** (`hardware_overrides`),
 po ktorom konflikt pri prestavbe nevznikne. **Tou istou kategóriou ide aj `hinge_stale`** (`check_hardware_issues` číta `HW_ISSUE_BLOCKERS`) — čo sa
@@ -457,7 +490,9 @@ aj cena boli neúplné bez slova.
 (`CabinetBuilder.newer_config?` proti `CabinetBuilder::CONFIG_SCHEMA`) aj pre **dosku** (`BoardBuilder.newer_config?` proti `BoardBuilder::BOARD_CONFIG_SCHEMA` — dva **nezávislé**
 kontrakty, čísla sa navzájom neporovnávajú). Doska sa priznáva **ešte pred filtrom `manufactured: true`**: tomu poľu už nemusíme rozumieť a tiché vynechanie budúceho výrobného
 poľa je presne to, čomu brána zabraňuje. **Legacy tvar (holý String) sa ďalej číta ako skrinka**, takže staršie volania a headless testy sa nemenia
-(`Validation.newer_config_entry` je jediný normalizátor).
+(`Validation.newer_config_entry` je jediný normalizátor). **Marker DOSKY sa číta typovo rovnako ako pri skrinke** (interná delta E1b): `BoardBuilder.config_schema_of`
+berie `Numeric` aj číselný string, čokoľvek iné (Hash/Array/`true`) znamená `0` — zber sa vo vetve `when 'board'` pýta `newer_config?` nad RAW configom entity a **bez
+rescue**, takže jedna ručne pokazená doska by inak zhodila Kontrolu aj všetky výstupy.
 
 **Blocker NESMIE zaniknúť spolu s ID (Codex #298 P1).** `note_newer_config` prázdne ID ignoruje, lenže entita s poškodenou identitou **ďalej prispieva známymi poľami do
 `records`** — bez adresy by teda blocker vypadol a VEPO aj ostatné výstupy by pokračovali s ticho orezaným novším configom. Adresu preto skladá **`Bom.newer_address(inst, id)`**,

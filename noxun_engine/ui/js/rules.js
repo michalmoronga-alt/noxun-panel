@@ -81,6 +81,21 @@
   function rdIsLegacySlide(r){
     return !!r && String(r.rule_id || '') === RD_LEGACY_SLIDE_ID;
   }
+  // KOV-E1b: jednoriadkový súhrn výklopového pravidla (read-only do E2).
+  // Číta LEN to, čo naozaj existuje — pravidlo z poškodeného snapshotu alebo
+  // z novšej verzie nesmie zhodiť render celej sekcie.
+  function rdLiftSummary(r){
+    var cls = rdArr(r && r.classes).length;
+    var arms = rdArr(r && r.arms).length;
+    var kg = (r && typeof r.handle_allowance_kg === 'number') ? r.handle_allowance_kg : null;
+    var rod = (r && typeof r.rod_double_from_kb_mm === 'number') ? r.rod_double_from_kb_mm : null;
+    var parts = ['HK top: ' + cls + ' tried podľa LF', 'HL top: ' + arms + ' párov ramien'];
+    if (kg !== null) parts.push('rezerva na úchytku ' + kg + ' kg');
+    if (rod !== null) parts.push('druhá stabilizačná tyč od šírky ' + rod + ' mm');
+    return parts.join(' · ') + '. Tabuľky sa tu zatiaľ needitujú.';
+  }
+  if (typeof window !== 'undefined') window.rdLiftSummary = rdLiftSummary;
+
   function rdRuleTitle(r){
     var base = rdLabel(r && r.output);
     return rdIsLegacySlide(r) ? (base + ' — staré zákazky bez systému zásuvky') : base;
@@ -100,6 +115,13 @@
     }
     if (role === 'front_door') return 'na každé krídlo dvierok';
     if (role === 'drawer_front') return 'na každé zásuvkové čelo';
+    // KOV-E1b: rola `flap` je SPOLOČNÁ pre výklop aj sklop — rozlišuje ich až
+    // filter smeru, takže bez neho by dve pravidlá vyzerali rovnako.
+    if (role === 'flap'){
+      if (ap.flap_dir === 'up') return 'na každý výklop';
+      if (ap.flap_dir === 'down') return 'na každý sklop';
+      return 'na každý výklop aj sklop';
+    }
     if (role === 'shelf') return 'na každú policu';
     return role;
   }
@@ -483,6 +505,11 @@
         html += '<div class="rrow"><label>Počet</label><input class="rqty rnum" type="number" min="1" max="999" step="1" value="'+rdEsc(r.quantity!=null?r.quantity:1)+'"><span class="unit">sád</span></div>';
         html += '<div class="hint">Vyberie sa najväčšia dĺžka z radu, ktorá sa zmestí do svetlej hĺbky mínus rezerva.'
               + (rdIsLegacySlide(r) ? ' ' + rdEsc(RD_LEGACY_SLIDE_HINT) : '') + '</div>';
+      } else if (r.kind === 'lift_class'){
+        // KOV-E1b: výklopy sú zatiaľ LEN NA ČÍTANIE — editor (triedy, ramená,
+        // eligibility) prinesie E2. Súhrn ale musí byť: pravidlo, ktoré sa
+        // nedá ani prečítať, vyzerá ako chyba, ktorú niekto zabudol zmazať.
+        html += '<div class="hint">' + rdEsc(rdLiftSummary(r)) + '</div>';
       } else if (r.kind === 'part_flag_length'){
         // D-90: pravidlo bez nastavení — reaguje na príznak profilu na čele.
         // TEST-1: text sa líši podľa roly (dvierka vs. zásuvkové čelo).
@@ -669,6 +696,78 @@
   // Klientska kontrola pred odoslanim — CISTA funkcia (Node test). Vracia
   // hlasku, alebo null ked je formular v poriadku. Server validuje znova;
   // toto je len to, co sa da povedat BEZ neho.
+  // === KOV-E1b (Codex #333 kolo 1 P2): PARITA VALIDÁCIE VÝKLOPOV ===========
+  //
+  // Zrkadlo serverovej `HardwareRules.lift_problem`. Kritériá sú definované
+  // nad tvarom PO normalizácii, preto sa riadky najprv PREFILTRUJÚ rovnako
+  // ako v `HardwareRules.lift_row?` (riadok bez kódu alebo s nečíselným
+  // rozsahom server ZAHODÍ, takže ho nesmieme počítať ani tu).
+  // Spoločný kontrakt = `tests/fixtures/rules_validation_parity.json`.
+  function rdLiftNum(v){ return (typeof v === 'number' && isFinite(v)) ? v : null; }
+  // Zrkadlo serverovej mapy `HardwareRules::LIFT_SCALARS` — kľúč + ĽUDSKÝ
+  // názov do hlášky. Poradie je to isté ako na serveri, takže pri dvoch
+  // pokazených skalároch naraz obe strany menujú TEN ISTÝ.
+  var RD_LIFT_SCALARS = [['handle_allowance_kg', 'rezerva na úchytku'],
+                         ['rod_double_from_kb_mm', 'šírka pre druhú stabilizačnú tyč']];
+  function rdLiftRows(raw, keys){
+    return rdArr(raw).filter(function(row){
+      if (!row || String(row.code == null ? '' : row.code).trim() === '') return false;
+      return keys.every(function(k){ return rdLiftNum(row[k]) !== null; });
+    });
+  }
+  function rdLiftProblem(r){
+    var name = 'Pravidlo „' + rdLabel(r.output) + '“';
+    var classes = rdLiftRows(r.classes, ['min', 'max']);
+    var mechs   = rdLiftRows(r.mechanisms, ['max']);
+    var arms    = rdLiftRows(r.arms, ['kh_min', 'kh_max', 'kg_min', 'kg_max']);
+    if (!classes.length) return name + ': tabuľka tried HK top je prázdna — doplň aspoň jednu triedu.';
+    if (!mechs.length) return name + ': tabuľka mechanizmov HL top je prázdna — doplň aspoň jeden.';
+    if (!arms.length) return name + ': tabuľka ramien HL top je prázdna — doplň aspoň jedny.';
+    for (var i = 0; i < classes.length; i++){
+      if (classes[i].min > classes[i].max){
+        return name + ': trieda ' + classes[i].code + ' má LF od väčšie než do.';
+      }
+    }
+    for (var j = 0; j < arms.length; j++){
+      if (arms[j].kh_min > arms[j].kh_max || arms[j].kg_min > arms[j].kg_max){
+        return name + ': ramená ' + arms[j].code + ' majú od väčšie než do.';
+      }
+    }
+    // Codex #333 kolo 3 P2: NEČÍSELNÝ skalár (poškodený alebo cudzí snapshot)
+    // musí padnúť aj TU. Server ho normalizáciou nechá ako `null` a `lift_problem`
+    // ho odmietne — klient ho predtým bral cez `|| 0` ako nulu (rezerva ticho
+    // zmizla) a prah tyče netypoval vôbec, takže Save prešiel a server ho
+    // zamietol nad pravidlom, ktoré sa v tejto obrazovke needituje.
+    for (var s = 0; s < RD_LIFT_SCALARS.length; s++){
+      var key = RD_LIFT_SCALARS[s][0];
+      if (Object.prototype.hasOwnProperty.call(r, key) && rdLiftNum(r[key]) === null){
+        return name + ': ' + RD_LIFT_SCALARS[s][1] + ' musí byť číslo.';
+      }
+    }
+    // Za predošlou slučkou je hodnota (ak kľúč je) ISTOTNE konečné číslo.
+    if (Object.prototype.hasOwnProperty.call(r, 'handle_allowance_kg')
+        && r.handle_allowance_kg < 0){
+      return name + ': rezerva na úchytku nesmie byť záporná.';
+    }
+    return rdLiftGapProblem(name, arms);
+  }
+  // DIERA medzi pásmami ramien: ďalšie pásmo sa musí začínať najneskôr tam,
+  // kde predošlé končí — výška v diere by nedostala žiadne ramená.
+  function rdLiftGapProblem(name, arms){
+    var sorted = arms.slice().sort(function(a, b){ return a.kh_min - b.kh_min; });
+    var reach = null;
+    for (var i = 0; i < sorted.length; i++){
+      if (reach !== null && sorted[i].kh_min > reach){
+        return name + ': medzi pásmami ramien je medzera pri výške ' + reach
+             + ' mm — výklop tej výšky by nedostal žiadne ramená.';
+      }
+      var top = sorted[i].kh_max;
+      if (reach === null || top > reach) reach = top;
+    }
+    return null;
+  }
+  if (typeof window !== 'undefined') window.rdLiftProblem = rdLiftProblem;
+
   function rdValidate(rules){
     for (var i = 0; i < (rules || []).length; i++){
       var r = rules[i];
@@ -691,6 +790,14 @@
       }
       if (r.kind === 'fit_series' && r.enabled !== false && !rdArr(r.series).length){
         return 'Pravidlo „' + rdLabel(r.output) + '“ potrebuje aspoň jednu dĺžku v rade.';
+      }
+      // KOV-E1b (Codex #333 kolo 1 P2): výklopové pravidlo sa tu zatiaľ
+      // needituje, ale ULOŽIŤ sa dá (sekcia ukladá VŠETKY pravidlá naraz) —
+      // a server pokazené tabuľky odmieta. Bez tejto vetvy by klient uloženie
+      // pustil, server ho zamietol a používateľ by nemal kde chybu opraviť.
+      if (r.kind === 'lift_class' && r.enabled !== false){
+        var lmsg = rdLiftProblem(r);
+        if (lmsg) return lmsg;
       }
     }
     return null;
@@ -866,6 +973,9 @@
                        rdIsLegacySlide: rdIsLegacySlide, RD_LEGACY_SLIDE_HINT: RD_LEGACY_SLIDE_HINT,
                        rulesToolsHtml: rulesToolsHtml, rdValidate: rdValidate,
                        rdLabel: rdLabel, rdRoleDesc: rdRoleDesc,
+                       // KOV-E1b: súhrn výklopového pravidla (read-only do E2) —
+                       // ČISTÁ funkcia, testuje sa aj bez DOM.
+                       rdLiftSummary: rdLiftSummary,
                        rulesRenderBody: rulesRenderBody, rdApplyState: rdApplyState,
                        rdCollectRules: rdCollectRules, RD: RD,
                        // KOV-F2: editor door guardov. `rdGuardHtml`/`rdGuardSummary`/

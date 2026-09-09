@@ -89,6 +89,86 @@ v poradí. Úzko na `hinge` zámerne: dve úchytkové pravidlá na jednej role s
 (`Construction.annotate_front_modes!`, vzor KOV-W `weight_kg`), dielec bez nej je legacy čelo a platí `classic`. Korpusová úroveň (`pd` nil) params
 nedostane — záves bez dielca nemá otváranie, podľa ktorého by sa vyberal set.
 
+**KOV-E1b (v0.9.54) — VÝKLOPY: kind `lift_class`, filter `flap_dir`, dve nové seed pravidlá.** Štvrtý vzor (`KINDS + lift_class`) nevydáva POČET, ale
+**KLASIFIKÁCIU**: `params {use_type: 'lift', lift_system, opening_mode, lift_class, arm_class (HL), rod_count, rod_extension}`, `quantity` vždy 1. Kód z triedy robí až
+set (`code_by_param`, E1a) — pravidlo žiadny kód nepozná. Seed `vyklopy-aventos` (`applies_to {role: 'flap', flap_dir: 'up'}`) nesie:
+`handle_allowance_kg` **0,5 kg** (pripočíta sa pri OBOCH systémoch — Blum LF aj HL tabuľka rátajú s úchytkou, Astra BLOCKER 3) · **`classes`** HK top
+(LF = KH × hmotnosť; 22K2300 420–1610 · 22K2500 930–2800 · 22K2700 1730–5200 · 22K2900 3200–9000, inkluzívne, **v prekryve vyhráva najslabšia**) ·
+**`mechanisms`** HL top (max-pásma podľa KH: < 390 → 22L2200, ≤ 580 → 22L2500) · **`arms`** HL top (`kh_min`/`kh_max` + `kg_min`/`kg_max`; 300–340 · 340–390 ·
+390–540 · 480–580, v prekryve KH **najslabšie ramená, ktoré hmotnosť pokryjú**) · `rod_double_from_kb_mm` **1100** (KB ≥ → 2 tyče + predĺženie) ·
+**`eligibility`** per systém (HK `kh 205–600`, `kb ≤ 1800`; HL `kh 300–580`, `kb ≤ 1800`, `depth_min 264` = vnútorná hĺbka).
+**`max_exclusive`** je jediný spôsob, ako sú Blum pásma 300–339 / 340–389 SPOJITÉ bez diery pri 339,5: horná hranica do pásma nepatrí. Normalizácia
+(`normalize_lift_rule!`) tabuľky typovo očistí (riadok bez kódu alebo bez čísel **vypadne**) a **zoradí** — poradie je významové, lebo rozhoduje o „najslabšej".
+Zápisová brána (`lift_problem`) odmietne prázdnu tabuľku, obrátené pásmo a **dieru medzi pásmami ramien**.
+
+**`applies_to.flap_dir` a druhé seed pravidlo `zavesy-sklop`.** Rola `flap` je spoločná pre výklop aj sklop, preto `apply_rule` filtruje čelá podľa smeru: pravidlo
+BEZ filtra platí na oba (dnešné správanie), deskriptor bez smeru filtru **nevyhovie**. Sklop je z pohľadu kovania dvierka, takže dostane kópiu tabuľky závesov
+(`bands` + door guardy) s `applies_to {role: 'flap', flap_dir: 'down'}` a položkou `params.use_type = 'door'` — set si hľadá tým istým triednym kľúčom `class:hinge|…`
+ako dvierka (vzpery `use_type: 'fall'` sú mimo V1). Dva dôsledky pre door guardy: `door_wider_than_high` sa na rolu `flap` **neuplatní** (širšie než vyššie je pri sklope
+norma) a `door_label` hovorí „Sklop", nie „Dvierka".
+
+**Prekryv sa porovnáva podľa (výstup, rola, SMER) — `OVERLAP_OUTPUTS = hinge + lift`** (Codex #331 kolo 3 P1, delta audit Sol BLOCKER 2). Kľúč skladá `overlap_key`
+a rozhoduje `overlap_conflict?` (prázdny smer = wildcard, pretína sa s oboma) — a **tie isté dve funkcie** používa `seed_additions` aj runtime vetva v `evaluate`.
+Kým sa runtime prekryv pýtal len na rolu, skoršie pravidlo `hinge/flap/up` by potlačilo `zavesy-sklop` **aj na skrinke, kde je len sklop** (nula závesov, iba ORANGE),
+a `lift` sa nekontroloval vôbec (dve rôzne pomenované výklopové pravidlá = dva mechanizmy na jednom čele). Vlastné pravidlo len pre `down` seed výklopov nepotlačí.
+
+**Položky seed pravidla výklopov sú PLNÝ AUTOMAT** (Astra FIX 11, rozsah zúžený Codex #331 kolo 2 P1). Výklop je zostava, takže „vypnúť" ani „ručný počet" na ňom
+neexistuje: `apply_overrides` záznam s `rule_id == 'vyklopy-aventos'` **ignoruje** a prizná ORANGE `lift_override_ignored`, a `CabinetBuilder.norm_hardware_overrides`
+ho pri normalizácii configu **vyčistí so záznamom v logu**. **Vlastné** `lift` pravidlá používateľa a ich overridy ostávajú ÚČINNÉ — ochrana je viazaná na `rule_id`
+seedu, nie na typ kovania.
+
+**`STD` 2 → 3 a `SEED_VERSION` 4 → 5.** `std` chráni ZÁPIS: starší plugin kind `lift_class` nepozná (výklop by ostal bez položky — vedomé riziko do D-48) a filter smeru
+IGNORUJE, takže by `zavesy-sklop` uplatnil na každé čelo `flap` vrátane výklopu. **`SEED_VERSION` sa bumpuje SAMOSTATNE** (delta audit Sol FIX 5): `merge_seed` migráciu
+preskočí pri `from_version >= SEED_VERSION`, takže bez bumpu by existujúca knižnica nové seed pravidlá nedala ani novým projektom. `LEGACY_SEED_SHAPES` sa
+**nerozširuje** — obe pravidlá sú nové a starší tvar, ktorý by sa dal „obnoviť", neexistuje.
+
+**`LIFT_SEED_VERSION` = 5 a `effective_seed_version(model)` (Codex #333 kolo 1 P1).** Jediná autorita otázky „s akým seedom sa TERAZ stavia": rozhoduje projektový
+snapshot (`project_doc` → `seed_version`, chýbajúci kľúč = 0), a keď ho projekt nemá, dedí knižnicu (`library_seed_version` — čítanie ju MIGRUJE, takže je to aspoň naša
+`SEED_VERSION`; výnimka je knižnica z novšieho pluginu, ktorú `read_rules` zámerne nemerguje). Hodnotu si **ukladá stavba** do configu skrinky
+(`rules_seed_version`, [construction.md](construction.md)) a číta ju migračná brána `flap_stale` ([outputs.md](outputs.md)) — sama schéma configu nestačí, lebo
+prestavba so starým snapshotom zapíše novú schému a nevydá nič. `LIFT_SEED_VERSION` je **pevné číslo** (ako `HINGE_TABLE_STD`): budúci bump seedu na hranici nič nemení.
+
+**ÚPLNÁ RUČNÁ ZOSTAVA NA ČELE `flap` VYPÍNA AUTOMAT (Codex #333 kolá 1 a 2).** `evaluate(..., manual_flap_owners:)` dostáva mapu `{ owner_part_key => { 'lift'|'hinge' => true } }`
+(pripravuje ju `CabinetBuilder` — [construction.md](construction.md)) a `apply_rule` na takom čele položku **nevydá**; `manual_flap_warnings` prizná
+JEDEN ORANGE `flap_manual_hardware` na (čelo, druh). Je to ten istý vzor ako `suppress_slide_owners`, ale iný dôvod: ad-hoc katalógový riadok sa v nákupe **zlieva so
+setovým podľa kódu** (`HardwareSets.add_adhoc_row` sčítava množstvá), takže stará skrinka s ručne pridaným výklopom by po prestavbe objednala mechanizmus dvakrát.
+Fail-closed smerom k človeku: platí RUČNÝ záznam (ten je vedomý), automat sa prizná ORANGE-om. **Úzko len na rolu `flap`** — ručný záves na DVIERKACH správanie F1
+nemení (automat beží ďalej ako doteraz).
+
+**`HardwareSets.flap_set_codes` / `manual_flap_assemblies` — JEDEN zdieľaný predikát (Codex #333 kolo 2 P1).** Kým to boli dva predikáty (builder podľa kategórie
+katalógu, `Bom` podľa akéhokoľvek owner-bound záznamu), jedna ručne pridaná **krytka** vypla automat aj jeho tvrdé kontroly a naopak **úchytka alebo voľná poznámka**
+zhasla migračnú RED `flap_stale`. Od kola 2 platí jedna definícia: **ručná zostava je úplná LEN s mechanizmom**. `flap_set_codes(state)` prejde `SEED_SETS`
+**+ sety projektového snapshotu** (`FLAP_USE_TYPES`: `lift` → `use_type lift`, `hinge` → `use_type door`) a vráti `{ druh => { 'mechanism' => {kód}, 'members' => {kód} } }`;
+mechanizmus je **prvý člen `per: 'unit'`** (poradie členov je záväzné — pri výklope je to `code_by_param lift_class`, pri sklope samotný záves), `members` sú všetky kódy
+setu (podklad ORANGE `flap_manual_duplicate`). Ramená, tyče, krytky, Tip-On ani úchytky zostavu netvoria. `manual_flap_assemblies(manual, codes)` z toho urobí mapu
+`{ owner_part_key => { druh => true } }` — číta LEN pamäť a modelový atribút (**žiadne IO**), takže ho zvládne aj zber: `Bom.collect` si kódy vypýta RAZ na zber (vzor
+`rules_stale`) a odovzdá ich do `flap_stale_issue` ([outputs.md](outputs.md)). Katalóg (a s ním „živý zdroj, ktorý sa mohol zmeniť") už v tejto ceste nefiguruje.
+
+**ALE ZLIATIE KÓDOV SA PÝTA ÚČINNÉHO SETU — `HardwareSets.flap_emitted_codes` (Codex #333 kolo 3 P2).** `flap_set_codes` odpovedá za **všetky** výklopové a závesové sety
+(seed aj snapshot), takže ako podklad ORANGE `flap_manual_duplicate` klamal: HK čelo s ručne pridanou **HL stabilizačnou tyčou** (507365) dostávalo varovanie „nákup to
+spočíta", hoci jeho HK set taký kód nikdy nevydá. `flap_emitted_codes(hardware_items, state, overrides:)` preto ide **tou istou cestou ako `expand`** a vráti
+`{ owner_part_key => { 'lift'|'hinge' => { kód => true } } }`: účinný set podľa precedencie (`resolve_set_id` — owner override > triedny override skrinky > triedny kľúč
+projektu) a jeho brány (`generic_type` setu, `set_incompatible_info`, `length_unsupported?`), potom **rozlíšenie členov podľa parametrov položky** — `code_by_param`
+(`lift_class` / `arm_class`) dá presne jeden kód a `quantity_from` s nulou (predĺženie tyče pod prahom 1100 mm) znamená, že sa člen **nevydá**. Katalóg netreba (kódy sú
+v sete, parametre v položke) a **IO tiež nie**, takže to zvládne stavba. `overrides` je mapa **jednej** skrinky (`config.hardware_sets`) — položky plánu ešte `owner_id`
+nenesú (dopisuje ho až `Bom.collect`), preto sa použije pre každé `owner_id`. Bez snapshotu setov (nekompatibilná knižnica) je mapa prázdna a varovanie nevznikne —
+správne, taký nákup je celý ORANGE `library_incompatible` a nemá s čím zliať. `flap_set_codes` ostáva tam, kde je otázka iná („je tento kód vôbec mechanizmus?").
+
+**Nečíselný skalár výklopu NEZHODÍ dokument (Codex #333 kolo 2 P2).** `normalize_lift_rule!` prehnal `handle_allowance_kg` a `rod_double_from_kb_mm` cez `to_f` —
+na Hash/Array/`true` (pokazený alebo cudzí snapshot) to **vyhodí výnimku**, `project_rules` ju odchytil, vrátil `nil` a `ensure_project_rules!` potom projektové pravidlá
+**ticho nahradil globálnou knižnicou**. Od kola 2 ich čistí `normalize_lift_scalar!` s tou istou typovou kontrolou ako bunky tabuliek (`lift_row?`): nečíselná hodnota sa
+nehádže preč ani nehádže — kľúč **ostáva s hodnotou `nil`**. Je to vzor `weight_bands` (KOV-F2): normalizácia nechá tvar, ktorý brána odmietne, takže `lift_problem`
+o probleme povie (`LIFT_SCALARS` → „rezerva na úchytku musí byť číslo") a uloženie takého pravidla neprejde; vypnuté pravidlo sa nekontroluje, takže cesta von existuje.
+Čitatelia (`lift_allowance`, `lift_rod_count`) sú typovo bezpeční už dnes: `nil` = žiadna rezerva / jedna tyč, nikdy hádanie.
+
+**Klientska parita validácie výklopu (Codex #333 kolo 1 P2).** `rdValidate` má vetvu `lift_class` (`rdLiftProblem`) s tými istými kritériami ako `lift_problem`
+(prázdne `classes`/`mechanisms`/`arms`, obrátený rozsah, diera medzi pásmami ramien, **záporná `handle_allowance_kg`** — tá by hmotnosť znížila a vybrala slabší
+mechanizmus) a rovnakým predfiltrom riadkov ako `lift_row?`. Výklop sa v UI zatiaľ needituje, ale sekcia ukladá **všetky** pravidlá naraz, takže bez tejto vetvy by
+klient uloženie pustil, server ho zamietol a read-only tabuľku by nebolo kde opraviť. Vypnutie pokazeného pravidla ostáva možné (`enabled: false` sa nevaliduje).
+Spoločný kontrakt je `tests/fixtures/rules_validation_parity.json` — keď sa kritériá rozídu, padne práve jedna zo sád. **Od kola 3 (P2) zrkadlí klient aj typovú
+kontrolu skalárov:** `RD_LIFT_SCALARS` je kópia serverovej mapy `LIFT_SCALARS` a nečíselná hodnota (kľúč, ktorý normalizácia nechala ako `null`) padne rovnako ako na
+serveri. Predtým `rdLiftNum(...) || 0` bral pokazenú rezervu ako **nulu** a prah tyče netypoval vôbec — Save prešiel klientom a server ho zamietol.
+
 
 **KOV-C2b (v0.9.31) — R2 EXKLUZIVITA.** `evaluate(..., suppress_slide_owners:)` dostáva množinu `owner_part_key` čiel, ktoré už majú položku výsuvu **z receptu**, a pravidlá
 s `output: 'slide'` sa na nich **nevyhodnocujú** — inak by zásuvka mala dva výsuvy (jeden s kitom, jeden legacy bez dielcov). Potlačenie sa priznáva **jedným** `info`

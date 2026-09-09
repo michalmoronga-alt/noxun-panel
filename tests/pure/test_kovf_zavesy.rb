@@ -864,14 +864,14 @@ end
 NxTest.test('KOV-F1 (10): trvalý nosič a klasifikované závesy si vyžiadali schému 9') do
   c = NxKovF
   # PRESNE cislo strazi VZDY najnovsia davka, ktora ho zdvihla (vzor KOV-D1a R3)
-  # — KOV-E1a ho zdvihla na 10 (owner triedny kluc vyklopu `…@front:<id>/flap`).
-  NxTest.assert_equal(10, c::CB::CONFIG_SCHEMA, 'KOV-E1a zdvihla schému na 10')
+  # — KOV-E1b ho zdvihla na 11 (config cela `lift.system`).
+  NxTest.assert_equal(11, c::CB::CONFIG_SCHEMA, 'KOV-E1b zdvihla schému na 11')
   NxTest.assert_equal(9, c::CB::HINGE_ACTIVATION_SCHEMA,
                       'aktivácia závesov ostáva na 9 — bump ju nesmie posunúť')
   NxTest.assert_equal(5, c::CB::DRAWER_ACTIVATION_SCHEMA, 'aktivácia zásuviek sa bumpom nehýbe')
   cfg = c::CB.normalize('width' => 600.0, 'height' => 720.0, 'depth' => 500.0)
   written = c::CB.cabinet_config(cfg)
-  NxTest.assert_equal(10, written[:config_schema], 'marker sa zapisuje pri KAŽDOM zápise configu')
+  NxTest.assert_equal(11, written[:config_schema], 'marker sa zapisuje pri KAŽDOM zápise configu')
   NxTest.assert_equal([], written[:hardware_conflicts],
                       'nosič `hardware_conflicts` je v configu VŽDY — aj prázdny')
 end

@@ -91,8 +91,14 @@ module Noxun
       # placeholderu vysla nizsia, nez co sa naozaj postavi (Codex #328 P2).
       # Pri UNI materiali builder hrubku dielca NEPREPISUJE, preto zaznam nesie aj
       # `uni` (viz `weight_thickness`).
+      # KOV-E1b (Codex #333 kolo 1 P1): `manual_flap_owners` = cela `flap`, na
+      # ktorych UZ visi RUCNA polozka kovania toho druhu (mapa
+      # { owner_part_key => { 'lift'|'hinge' => true } }). Klasifikacia
+      # potrebuje KATALOG, preto ju robi `CabinetBuilder` a sem chodi hotova —
+      # `build_plan` aj `HardwareRules.evaluate` ostavaju bez IO. Prazdna mapa
+      # = spravanie ako doteraz.
       def build_plan(cfg, cabinet_id = 'CAB-000', hardware_rules: nil, part_thicknesses: nil,
-                     materials: nil)
+                     materials: nil, manual_flap_owners: {})
         w = cfg[:width]; h = cfg[:height]; t = cfg[:thickness]
 
         interior = interior_dims(cfg)
@@ -169,13 +175,24 @@ module Noxun
           'available_width' => (w - 2 * t),
           'available_height' => interior[:avail_h],
           'available_depth' => interior[:back_front_y],
+          # KOV-E1b: KH/KB su Blum rozmery KORPUSU pre vyklop — KH je vyska BEZ
+          # SOKLA (nezaokruhleny Float; `input height` by dal VYROBNU dlzku cela,
+          # teda 396 pri korpuse 400) a KB je sirka korpusu. Vnutorna hlbka pre
+          # eligibility HL ide z `available_depth` (uz zohladnuje chrbat aj drazku).
+          'kh' => (h.to_f - cfg[:floor_height].to_f),
+          'kb' => w.to_f,
+          # KOV-E1b: pocet RIADKOV ciel skrinky. V1 pusta vyklop len ako JEDINY
+          # riadok (`lift_multirow_unsupported`) — pravidlo o inych riadkoch
+          # z deskriptorov nevie, preto je pocet v kontexte korpusu.
+          'front_rows' => Array(fr[:items]).length,
           'support' => support_type(cfg),
           # D1: predikat pravidiel podla typu korpusu (upper/lower) — support
           # 'none' nerozlisuje hornu od spodnej bez noh (GH #125 P2).
           'cabinet_type' => cfg[:type].to_s
         }
         hw = HardwareRules.evaluate(cfg, parts, hw_ctx, rules: hardware_rules || HardwareRules.load,
-                                                        suppress_slide_owners: drawer[:suppress])
+                                                        suppress_slide_owners: drawer[:suppress],
+                                                        manual_flap_owners: manual_flap_owners)
         warnings.concat(hw[:warnings])
 
         plan = {
@@ -213,22 +230,30 @@ module Noxun
         BuildPlan.validate!(plan)
       end
 
-      # --- KOV-F1: anotacia sposobu otvarania ciel ----------------------------
+      # --- KOV-F1/E1b: anotacia klasifikacie ciel -----------------------------
       #
       # Kazdemu deskriptoru CELA dopise ADITIVNE `opening_mode` z jeho riadku
       # ciel (`front_items`). Chybajuci kluc riadku = legacy celo; anotacia sa
       # vtedy NEROBI a citatel (HardwareRules) plati `classic`.
-      # Kluc zije LEN v pamati planu — builder zapisuje na entitu menovity
+      # KOV-E1b: TOU ISTOU cestou pribudli `flap_dir` (smer vyklapania — dovtedy
+      # zil LEN na resolved cele) a `lift_system` (HK top / HL top). Pravidla
+      # vyklopov a sklopov tak citaju VYHRADNE deskriptor + kontext korpusu,
+      # nikdy `front_items` — ten je projekcia configu, nie plan.
+      # Kluce ziju LEN v pamati planu — builder zapisuje na entitu menovity
       # zoznam poli, takze `plan_schema` sa NEBUMPUJE.
       def annotate_front_modes!(parts, items)
         modes = {}
         Array(items).each do |it|
           next unless it.is_a?(Hash)
 
+          rec = {}
           om = it['opening_mode'].to_s.strip
-          next if om.empty?
-
-          modes[it['id'].to_s] = om
+          rec[:opening_mode] = om unless om.empty?
+          fd = it['flap_dir'].to_s.strip
+          rec[:flap_dir] = fd unless fd.empty?
+          ls = it['lift_system'].to_s.strip
+          rec[:lift_system] = ls unless ls.empty?
+          modes[it['id'].to_s] = rec unless rec.empty?
         end
         return parts if modes.empty?
 
@@ -236,8 +261,10 @@ module Noxun
           next unless pd.is_a?(Hash)
 
           fid = PartKeys.front_id(pd[:part_key].to_s)
-          om = fid && modes[fid]
-          pd[:opening_mode] = om if om
+          rec = fid && modes[fid]
+          next unless rec
+
+          rec.each { |k, v| pd[k] = v }
         end
         parts
       end
