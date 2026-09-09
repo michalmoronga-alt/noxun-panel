@@ -3,6 +3,7 @@
 > Nahrádza `SEED_AVENTOS_2026-09-08.md`. Ceny **s DPH** (Démos `price_with_vat`, stav 9.9.2026), MJ z Démosu, LF/KH z produktových stránok Démos,
 > **hmotnostné limity HL top z Blum katalógu 2024/25** (publications.blum.com, str. 40 — verejný zdroj, e-services netreba).
 > Zber: `harvest_aventos.py` (8.9.) + `harvest_aventos2.py` (9.9., doplnky cez „súvisiaci sortiment" každého mechanizmu) → `aventos_doplnky_2026-09-09.json`.
+> **Počty:** 26 kódov v tomto dokumente, z nich 3 už v `SEED_ROWS` pluginu (347827, 13781, 250831) → migrácia pridá **23 nových**.
 > Rozhodnutia Michala 8.–9.9. sú zapracované (bez adaptéra · Tip-On jednotka podľa farby · tyč vždy · od KB 1100 2× tyč + predĺženie · len skrutky · HL bez Tip-On).
 
 ## A · HK top — mechanizmy (skrutky do DTD; kategória VYKLOPY)
@@ -79,11 +80,11 @@ Blum katalóg udáva spojku od vnútornej šírky LW ≥ 1190 mm (KB ≥ 1228 mm
 | 507344 | BLUM 22.8000 Aventos HF/HL/HS Top krytky bez S-D, svetlo šedá | sada | 11,66 | https://www.demos-trade.sk/blum-22-8000-aventos-hf-hl-hs-top-krytky-bez-s-d-svetlo-seda/ |
 | 507345 | BLUM 22.8000 Aventos HF/HL/HS Top krytky bez S-D, tmavo šedá | sada | 12,73 | https://www.demos-trade.sk/blum-22-8000-aventos-hf-hl-hs-top-krytky-bez-s-d-tmavo-seda/ |
 
-## Zloženie setov (návrh pre package E — farba = dva sety na kľúč, tmavý sa vyberá ako override čela)
+## Zloženie setov (package E v4 — farba = dva sety na kľúč, tmavý sa vyberá per čelo cez `config.hardware_sets`; mechanizmus/ramená cez `code_by_param`, tyč cez `quantity_from`)
 
 | set | kľúč | položky |
 |---|---|---|
-| `vyklop-hk-klasik` (biela, predvolený) | `class:lift\|classic\|hk_top` | mechanizmus 22K2x00 podľa LF (1 sada) + príchyt 13781 (1 pár) + krytky HK biela 347834 (1 sada) |
+| `vyklop-hk-klasik` (biela, predvolený) | `class:lift\|classic\|hk_top` (tmavý = `…@front:<id>/flap` v `config.hardware_sets`) | mechanizmus 22K2x00 podľa LF (1 sada) + príchyt 13781 (1 pár) + krytky HK biela 347834 (1 sada) |
 | `vyklop-hk-klasik-tmavy` | — (override) | to isté, krytky tmavo šedá 347835 |
 | `vyklop-hk-tipon` (biela, predvolený) | `class:lift\|tipon\|hk_top` | mechanizmus 22K2x00T podľa LF (1 sada) + Tip-On jednotka 250831 (1 ks, `per: owner`, bez adaptéra) + príchyt 13781 + krytky HK biela 347834 |
 | `vyklop-hk-tipon-tmavy` | — (override) | to isté, krytky tmavo šedá 347835 + Tip-On čierna 497007 (MJ sada) |
