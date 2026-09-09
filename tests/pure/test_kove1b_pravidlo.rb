@@ -78,6 +78,8 @@
 #   M26 druh rucnej polozky sa neporovnava so SMEROM    -> zaves na vyklope
 #   M27 zliatie kodu s automatom je ticho               -> `flap_manual_duplicate`
 #   M28 neciselny skalar zhodi normalizaciu dokumentu   -> Hash/true v pravidle
+#   M29 helper kodov sa rozide s realnou expanziou      -> parita mnozin kodov
+#   M30 pokazeny marker DOSKY zhodi zber a vystupy      -> typovy guard dosky
 require_relative '../helper' unless defined?(NxTest)
 
 require 'json'
@@ -196,6 +198,27 @@ module NxKovE1b
   def buy(items)
     exp = HWS.expand(items, state)
     exp['rows'].each_with_object({}) { |r, out| out[r['code'].to_s] = r['quantity'] }
+  end
+
+  # --- PARITA helpera kodov vs. REALNA expanzia -----------------------------
+  # `flap_emitted_codes` je TRETIE zrkadlo prechodu `expand` (zdielane
+  # primitiva `resolve_set_id` / `member_multiplier` / `member_code`, ale
+  # VLASTNA orchestracia). Ked sa rozide, ORANGE `flap_manual_duplicate` bud
+  # hlasi zliatie s kodom, ktory nakup nikdy nevyda, alebo naopak mlci —
+  # oboje ticho. Porovnavaju sa MNOZINY kodov (mnozstva helper zamerne neriesi).
+
+  # Kody, ktore helper na polozkach vyda (cez vsetkych vlastnikov a druhy).
+  def emitted_codes(items, over = {})
+    HWS.flap_emitted_codes(items, state, overrides: over)
+       .values.flat_map { |by_kind| by_kind.values.flat_map(&:keys) }.uniq.sort
+  end
+
+  # Kody, ktore na TYCH ISTYCH polozkach vyda nakup. Polozky planu `owner_id`
+  # este nenesu (dopisuje ho `Bom.collect`), preto sa doplni jedna skrinka —
+  # presne to modeluje aj `single_cabinet_overrides` v helperi.
+  def expanded(items, over = {})
+    HWS.expand(items.map { |i| i.merge('owner_id' => 'CAB-1') }, state,
+               cabinet_overrides: { 'CAB-1' => over })
   end
 
   # --- config skrinky s vyklopom -------------------------------------------
@@ -956,6 +979,31 @@ NxTest.test('KOV-E1b (11): POKAZENÝ marker provenience nezhodí zber — platí
                            ))
 end
 
+NxTest.test('KOV-E1b (11): pokazený marker DOSKY tiež nezhodí zber — platí najstaršia') do
+  c = NxKovE1b
+  bb = c::E::BoardBuilder
+  # Interná delta E1b: `Bom.collect` sa vo vetve `when 'board'` pýta
+  # `BoardBuilder.newer_config?` nad RAW configom entity a BEZ rescue — presne
+  # ako pri skrinke vyššie. `to_i` na Hash/Array/true vyhodí výnimku, takže
+  # jedna ručne pokazená doska by zhodila Kontrolu AJ všetky výstupy (M30).
+  [{}, [], true, 'nezmysel', nil, -3, Float::NAN].each do |junk|
+    cfg = { 'config_schema' => junk }
+    NxTest.assert_equal(0, bb.config_schema_of(cfg), "#{junk.inspect} = najstaršia schéma")
+    NxTest.refute(bb.newer_config?(cfg), "#{junk.inspect} NIE JE marker novšej verzie")
+  end
+  # R-12 kontrakt: číselný reťazec sa PRIJÍMA (marker vie prísť z JSON šablóny)
+  # a novšia schéma naďalej blokuje.
+  NxTest.assert_equal(12, bb.config_schema_of('config_schema' => '12'))
+  NxTest.assert_equal(12, bb.config_schema_of('config_schema' => ' 12 '))
+  NxTest.assert_equal(1, bb.config_schema_of('config_schema' => 1.9), 'Float sa oreže')
+  NxTest.assert(bb.newer_config?('config_schema' => (bb::BOARD_CONFIG_SCHEMA + 1).to_s),
+                'novšia schéma z reťazca stále blokuje')
+  # Symbolový kľúč (normalizovaný config dosky) ostáva čitateľný.
+  NxTest.assert_equal(bb::BOARD_CONFIG_SCHEMA,
+                      bb.config_schema_of(config_schema: bb::BOARD_CONFIG_SCHEMA))
+  NxTest.refute(bb.newer_config?(config_schema: bb::BOARD_CONFIG_SCHEMA), 'zdravá doska prejde')
+end
+
 NxTest.test('KOV-E1b (11): ručný doplnok vedľa automatu = ORANGE `flap_manual_duplicate`') do
   c = NxKovE1b
   owner = 'front:F1/flap'
@@ -1016,6 +1064,39 @@ NxTest.test('KOV-E1b (11): účinný set rozhoduje aj cez OVERRIDE skrinky') do
                                                           dark))
   NxTest.assert_equal(1, c::CB.manual_duplicate_warnings([c.manual_rec(code: '347835')],
                                                          dark).length)
+end
+
+NxTest.test('KOV-E1b (11): PARITA — `flap_emitted_codes` vydá presne to, čo nákup') do
+  c = NxKovE1b
+  # Interná delta E1b: helper je tretie zrkadlo `expand`. Bez tejto brány by sa
+  # jeho orchestrácia mohla ticho rozísť s nákupom (M29) — napr. vynechanie
+  # `member_multiplier` pred `member_code` by pridalo predĺženie tyče, ktoré
+  # sa v skutočnosti nevydá.
+  over_dark = { 'class:lift|classic|hk_top@front:F1/flap' => 'vyklop-hk-klasik-tmavy' }
+  hk = c.lifts(c.evaluate([c.flap]))
+  hl = lambda do |kb|
+    c.lifts(c.evaluate([c.flap(lift_system: c::HR::LIFT_HL, weight_kg: 6.0)],
+                       'kh' => 500.0, 'kb' => kb))
+  end
+  cases = [
+    ['HK 22K2300 biely set', hk, {}],
+    ['HK 22K2300 cez owner override (tmavý set)', hk, over_dark],
+    ['HL 22L2500 + 22L3800, KB 1200 (tyč 2× + predĺženie)', hl.call(1200.0), {}],
+    ['HL 22L2500 + 22L3800, KB 800 (predĺženie sa NEVYDÁ)', hl.call(800.0), {}],
+    ['SKLOP = závesy', c.hinges(c.evaluate([c.flap(flap_dir: c::HR::FLAP_DOWN)])), {}]
+  ]
+  cases.each do |label, items, over|
+    NxTest.assert_equal(1, items.length, "#{label}: jedna položka (#{items.inspect})")
+    exp = c.expanded(items, over)
+    NxTest.assert_equal([], exp['unmapped'], "#{label}: nákup položku namapuje")
+    NxTest.assert_equal(exp['rows'].map { |r| r['code'].to_s }.uniq.sort,
+                        c.emitted_codes(items, over),
+                        "#{label}: helper == riadky nákupu")
+  end
+  # A práve tie dva HL scenáre sa v predĺžení tyče LÍŠIA — parita teda nie je
+  # triviálne splnená tým, že by helper vracal „všetko" alebo „nič".
+  NxTest.assert(c.emitted_codes(hl.call(1200.0)).include?('507366'), 'KB 1200 predĺženie MÁ')
+  NxTest.refute(c.emitted_codes(hl.call(800.0)).include?('507366'), 'KB 800 predĺženie NEMÁ')
 end
 
 NxTest.test('KOV-E1b (11): `flap_stale` je RED v Kontrole a stopka pre 3 exporty') do

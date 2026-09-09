@@ -490,7 +490,9 @@ aj cena boli neúplné bez slova.
 (`CabinetBuilder.newer_config?` proti `CabinetBuilder::CONFIG_SCHEMA`) aj pre **dosku** (`BoardBuilder.newer_config?` proti `BoardBuilder::BOARD_CONFIG_SCHEMA` — dva **nezávislé**
 kontrakty, čísla sa navzájom neporovnávajú). Doska sa priznáva **ešte pred filtrom `manufactured: true`**: tomu poľu už nemusíme rozumieť a tiché vynechanie budúceho výrobného
 poľa je presne to, čomu brána zabraňuje. **Legacy tvar (holý String) sa ďalej číta ako skrinka**, takže staršie volania a headless testy sa nemenia
-(`Validation.newer_config_entry` je jediný normalizátor).
+(`Validation.newer_config_entry` je jediný normalizátor). **Marker DOSKY sa číta typovo rovnako ako pri skrinke** (interná delta E1b): `BoardBuilder.config_schema_of`
+berie `Numeric` aj číselný string, čokoľvek iné (Hash/Array/`true`) znamená `0` — zber sa vo vetve `when 'board'` pýta `newer_config?` nad RAW configom entity a **bez
+rescue**, takže jedna ručne pokazená doska by inak zhodila Kontrolu aj všetky výstupy.
 
 **Blocker NESMIE zaniknúť spolu s ID (Codex #298 P1).** `note_newer_config` prázdne ID ignoruje, lenže entita s poškodenou identitou **ďalej prispieva známymi poľami do
 `records`** — bez adresy by teda blocker vypadol a VEPO aj ostatné výstupy by pokračovali s ticho orezaným novším configom. Adresu preto skladá **`Bom.newer_address(inst, id)`**,
