@@ -717,9 +717,10 @@ charakterizačný test). Päť častí:
 - **Vyhradená bunka `SKIP_CODE` = „vedome bez kódu" (D-118b, v0.9.44).** Hodnota `'none'` v `code_by_nl` znamená **„táto dĺžka kód nemá a ani mať nemá"** → `member_code`
   vráti `[nil, nil]` (existujúca vetva „člen sa preskočí"). **Chýbajúci kľúč ostáva NEMAPOVANÝ** (ORANGE / pri recepte RED) — je to tá istá rodina ako „prítomná neplatná
   hodnota ≠ neprítomná" z KOV-D. Dôvod je dátový: rad Atira **PTOs** potrebuje modul P2O na každej dĺžke OKREM 620 mm, kde je kit typu `PTO` a modul má v sebe; vynechaný kľúč
-  by hlásil chýbajúci kód tam, kde žiadny nepatrí. Kódy sú číselné, takže kolízia nehrozí; ako **pevný `code`** aj ako hodnota **kódového pásma** (`param_bands`) je `'none'` odmietnutý
-  (`validate_member` / `validate_param_bands`) — inak by `member_code` vrátil doslovný „none" do nákupu a `skip_code_present?` by ho neuvidel, takže obsah by dostal nižší
-  marker kompatibility (Codex #321 kolo 3). V selektore mapovania (`set_id`) sa nekontroluje — tam je to legitímne meno setu. V rade sa ukladá kanonicky malými písmenami. Súpis členov (`explain`) preskočený člen **prizná** (`skipped: true` → „bez kódu (netreba)"), aby karta pri NL 620 nemlčala; nákupné CSV z neho
+  by hlásil chýbajúci kód tam, kde žiadny nepatrí. Kódy sú číselné, takže kolízia nehrozí; ako **pevný `code`** je `'none'` odmietnutý
+  (`validate_member`) — inak by `member_code` vrátil doslovný „none" do nákupu. V **kódovom pásme** (`param_bands`) ho D-118b odmietalo z jedného dôvodu (`skip_code_present?`
+  sa naň nepýtal, takže obsah by dostal nižší marker kompatibility, Codex #321 kolo 3); **KOV-G1a ho tam povolila** spolu s markerom — ale aspoň JEDNO pásmo (resp. jedna
+  bunka radu) musí mať skutočný kód, inak je to člen, ktorý nikdy nič neobjedná (Codex #337 N1). V selektore mapovania (`set_id`) sa nekontroluje — tam je to legitímne meno setu. V rade sa ukladá kanonicky malými písmenami. Súpis členov (`explain`) preskočený člen **prizná** (`skipped: true` → „bez kódu (netreba)"), aby karta pri NL 620 nemlčala; nákupné CSV z neho
   nemá žiadny riadok.
 - **`std` 5 (`STD_SKIP_CODE`) — marker kompatibility sentinelu.** Testuje sa ÚPLNE PRVÝ (najvyšší marker vyhráva) a dostane ho len knižnica/snapshot, v ktorých sa `'none'`
   naozaj vyskytuje. **Bez neho by starší plugin obsah prijal** a z bunky `none` vyrobil nákupný riadok s neexistujúcim kódom (overené sondou nad v0.9.42: knižničná aj šablónová
@@ -727,8 +728,8 @@ charakterizačný test). Päť častí:
   aj **`CabinetBuilder::CONFIG_SCHEMA` 7 → 8** (brány sú existujúce: dopredný `newer_config?` + exportná `ProductionCore.export_blockers`).
 - **Fail-closed, keď set nevydá NIČ (`members_skipped`).** Keby mala receptová položka výsuvu preskočené VŠETKY členy, expanzia by vrátila prázdne `rows`, prázdne `unmapped`
   a cenu 0 — zásuvka postavená, nákup prázdny, Kontrola ticho (Astra #21 BLOCKER 3). `expand_members` preto sleduje, či vôbec niečo vydal, a pri položke so `source: 'recipe'`
-  zapíše `members_skipped`, ktorý sa štandardnou cestou povýši na RED `drawer_kit_missing` s `blocks_export`. Preskočenie JEDNÉHO člena je legitímne; položky z PRAVIDIEL sa
-  nemenia (prázdny pevný kód je legálny spôsob, ako člena vypnúť).
+  zapíše `members_skipped`, ktorý sa štandardnou cestou povýši na RED `drawer_kit_missing` s `blocks_export`. Preskočenie JEDNÉHO člena je legitímne. **Od KOV-G1a (Codex #337
+  N1) nemlčí ani položka z PRAVIDIEL** — dostane ORANGE `members_all_skipped` (viď sekciu KOV-G1a nižšie); RED cesty receptu a výklopu sa nemenia.
 - **Seed `SEED_VERSION` 4 → 5 (D-118b) — PRVÝ seed, ktorý MENÍ obsah existujúcich setov.** Tri veci: (1) `atira-antracit-h70-sisy` NL 470 **`348777` → `357889`** (348777 nie je
   K-sada — čelné kovanie treba dokúpiť, overené na produktovej stránke), (2) šesť Tip-On setov dostalo **druhý člen „PTOs mechanizmus"** (`352908` pre 30 kg, `352909` pre 50 kg
   kit H176/520, `none` pri NL 620) — K-sada ostáva PRVÝM členom, lebo completeness test KOV-C2a číta `members.first`, (3) legacy `vysuv-atira-biela-h70` sa premenoval na
@@ -944,6 +945,15 @@ príchytu prináša až G1b):
   (`member_skip_code?`), takže **marker `std` 5 platí pre obe miesta** a nový marker netreba. Ako **pevný `code`** ostáva `none` zakázané (člen, ktorý nikdy nič nevydá, je
   tichý nezmysel) a v selektore mapovania (`set_id`) sa nekontroluje vôbec (tam je to legitímne meno setu). Hodnota sa ukladá **kanonicky malými písmenami**; súpis (`explain`)
   preskočeného člena **prizná** („bez kódu (netreba)") a editor v `hw_sets.js` ho v súhrne píše ako **„bez kódu"** (v selektore setov NIE — tam by to klamalo).
+- **Člen musí mať aspoň JEDEN skutočný kód** (Codex #337 N1). Sentinel hovorí „TU žiadny kód nepatrí"; keď ho má člen vo VŠETKÝCH pásmach (alebo v celom rade `code_by_nl`),
+  je to člen, ktorý nikdy nič neobjedná — ten istý tichý nezmysel ako pevný `code: none`. `validate_param_bands` aj `validate_code_by_nl` taký tvar **odmietajú** (zapisovacia
+  aj čítacia cesta; v čítacej člen vypadne s logom, čo nákup nemení — nevydával nič ani predtým) a **editor to povie skôr** (`hwsMemberProblems` → „všetky kódy sú „none"" pri
+  TOM členovi), takže sa nedá uložiť tvar, ktorý by v knižnici vyzeral hotovo.
+- **Keď set nevydá pre BEŽNÚ položku ANI JEDEN riadok, je to viditeľný ORANGE `members_all_skipped`** (Codex #337 N1). Doteraz mali fail-closed fallback len receptová zásuvka
+  (RED `drawer_kit_missing`) a výklop (RED `lift_set_incomplete`); položka z pravidiel — napríklad **noha** — skončila s prázdnym nákupom a **BEZ jediného dôvodu**, takže
+  nákup, Kontrola aj cenová ponuka o tom kovaní nepovedali ani slovo. Vlastný dôvod (nie `members_skipped`) preto, že ten cestuje v `base_reason` receptu (veta o DĹŽKE) a
+  výklopu (veta o POČTOCH) — spoločné znenie by pri jednom z nich klamalo. Veta menuje pásma a kódy („set … nevydal pre túto položku ani jeden riadok"), Kontrola je ORANGE
+  (nenacenené, export beží ďalej) a **súpis v karte hovorí to isté** (`explain` ide tou istou cestou — panel a súpis sa nesmú rozísť).
 - **Nový generický typ `plinth_clip` („Príchyt sokla")** v `BuildPlan::GENERIC_TYPES` + seed set **`prichyt-sokla-axilo`** (`use_type: other`, `opening_mode: other`,
   Häfele/AXILO, jediný člen `950 ×1 per unit`) + mapovanie `plinth_clip → prichyt-sokla-axilo` v `SEED_MAPPING` (čerstvá knižnica) **aj v `MAPPING_ADDITIONS`** (add-if-absent
   do už založenej knižnice a — cez „Doplniť nové predvoľby" — do projektu). Precedens je `lift` z KOV-B1: **`BuildPlan::SCHEMA` 4 → 5**, lebo položka s neznámym typom je pre
@@ -972,7 +982,7 @@ príchytu prináša až G1b):
   predvoľby"** (`refresh_untouched_project_sets` + `add_mapping_seed`, existujúci mechanizmus). Dôsledok, ktorý patrí do poznámok k vydaniu: **skrinka so soklom 150 mm
   objedná po prestavbe AXILO H150 + platničku (9076 + 9079) namiesto demosovskej nohy 367823** — golden charakterizácia `seed_kniznica` je preto vedome pregenerovaná.
 
-Testy: `tests/pure/test_kovg1a_nohy_data.rb` (29 sád + 9 overených mutácií, vrátane tabuľkovej fixtúry výšok sokla ako druhého nezávislého zápisu) +
+Testy: `tests/pure/test_kovg1a_nohy_data.rb` (31 sád + 11 overených mutácií, vrátane tabuľkovej fixtúry výšok sokla ako druhého nezávislého zápisu) +
 JS `tests/js/test_hw_sets.js` (sentinel v pásme).
 
 **BEZSTRATOVÁ BRÁNA DEFINÍCIÍ SETOV V ŠABLÓNE — `assess_set_defs` (audit #17 BLOCKER 1).** `hardware_set_defs` išli doteraz LEN cez tolerantný `normalize_sets`, teda cez cestu,

@@ -183,9 +183,14 @@ end
 
 NxTest.test('KOV-C2b: receptova polozka bez triedneho mapovania = RED, NIKDY `slide`') do
   c = NxC2bB
+  # Codex #337 N1: set MUSI mat aspon jedneho clena, ktory nieco vyda — set,
+  # ktory nevyda NIC, je od tejto davky viditelny ORANGE `members_all_skipped`
+  # (a prazdny zoznam clenov by tu meral nieco ine, nez test tvrdi).
   state = { 'mapping' => { 'slide' => 'vysuv-atira-biela-h70' },
-            'sets' => { 'vysuv-atira-biela-h70' => { 'set_id' => 'vysuv-atira-biela-h70',
-                                                     'generic_type' => 'slide', 'members' => [] } } }
+            'sets' => { 'vysuv-atira-biela-h70' => {
+              'set_id' => 'vysuv-atira-biela-h70', 'generic_type' => 'slide',
+              'members' => [{ 'code' => '317640', 'per' => 'unit', 'qty' => 1 }]
+            } } }
   exp = c::HWS.expand([c.recipe_item], state)
   NxTest.assert_equal([], exp['rows'], 'H70 kit „len tak" sa neobjedna')
   u = exp['unmapped'].first

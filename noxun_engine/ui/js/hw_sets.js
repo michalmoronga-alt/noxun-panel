@@ -1514,6 +1514,15 @@
                    msg: 'Člen ' + (i + 1) + ': zadaj názov parametra triedy — '
                       + 'pri voľbe „iné (vypíšem)“ sa prázdne pole neuloží.' });
       }
+      // KOV-G1a (Codex #337 N1): VŠETKY vyplnené kódy člena sú „none".
+      // Sentinel znamená „TU žiadny kód nepatrí" — keď ho má člen všade,
+      // nikdy nič neobjedná (rovnaký tichý nezmysel ako pevný kód „none").
+      // Server to odmieta tiež; klient to povie SKÔR a menuje člena.
+      if (hwsAllSkip(m)){
+        out.push({ row: 'members:' + i, field: null,
+                   msg: 'Člen ' + (i + 1) + ': všetky kódy sú „none“ — člen by nikdy nič '
+                      + 'neobjednal. Zmaž ho, alebo doplň aspoň jeden kód.' });
+      }
       var dup = m.is_param ? hwsDupValue(m.codes, 'value')
               : (m.is_series ? hwsDupValue(m.series, 'nl') : '');
       if (!dup) return;
@@ -1522,6 +1531,17 @@
                     + 'nechaj jeden riadok (druhý by prvý ticho prepísal).' });
     });
     return out;
+  }
+  // KOV-G1a (Codex #337 N1): má člen VYPLNENÝ aspoň jeden kód a sú VŠETKY
+  // „none"? Týka sa LEN radu (NL) a pásiem — pevný kód `none` server odmieta
+  // sám a tabuľka tried sentinel vôbec nepozná. Nedopísaný riadok (prázdny
+  // kód) sa NEPOČÍTA: o tom hovorí server, nie táto veta.
+  function hwsAllSkip(m){
+    var rows = m.is_series ? m.series : (m.is_bands ? m.bands : null);
+    if (!rows) return false;
+    var filled = (rows || []).filter(function(r){ return !hwsBlank(r && r.code); });
+    if (!filled.length) return false;
+    return filled.every(function(r){ return hwsIsSkipCode(r.code); });
   }
   // Prvá hodnota, ktorá sa v riadkoch opakuje (po orezaní), inak ''.
   // Prázdna hodnota sa NEPOČÍTA — to je nedopísaný riadok a o tom hovorí server.

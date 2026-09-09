@@ -232,12 +232,15 @@ end
 
 NxTest.test('D-118b (R5): set bez jedinej polozky = RED, nikdy ticho prazdny nakup') do
   c = NxD118b
-  # Patologicky (ale ulozitelny) stav: VSETKY bunky setu su `none`.
+  # Patologicky (ale ULOZITELNY) stav: pre TUTO dlzku (NL 420) je `none`
+  # v KAZDOM clene setu — ostatne dlzky kody maju, takze sety su platne
+  # (Codex #337 N1: clen, ktoreho su VSETKY bunky `none`, uz validacia
+  # odmieta, takze taky set by sa v kniznici ani nedal ulozit).
   sets = c.seed_norm.map do |s|
     next s unless s['set_id'] == 'atira-biela-h70-p2o'
 
     copy = Marshal.load(Marshal.dump(s))
-    copy['members'].each { |m| m['code_by_nl'].each_key { |k| m['code_by_nl'][k] = c::HWS::SKIP_CODE } }
+    copy['members'].each { |m| m['code_by_nl']['420'] = c::HWS::SKIP_CODE }
     copy
   end
   family = sets.select { |s| s['set_id'].start_with?('atira-biela-') && s['set_id'].end_with?('p2o') }
@@ -374,11 +377,12 @@ end
 
 NxTest.test('D-118b (R9): supis (explain) prizna, ked set nevyda ANI JEDNU polozku') do
   c = NxD118b
+  # Ta ista fixtura ako v R5: `none` LEN pre NL 420 (Codex #337 N1).
   sets = c.seed_norm.map do |s|
     next s unless s['set_id'] == 'atira-biela-h70-p2o'
 
     copy = Marshal.load(Marshal.dump(s))
-    copy['members'].each { |m| m['code_by_nl'].each_key { |k| m['code_by_nl'][k] = c::HWS::SKIP_CODE } }
+    copy['members'].each { |m| m['code_by_nl']['420'] = c::HWS::SKIP_CODE }
     copy
   end
   family = sets.select { |s| s['set_id'].start_with?('atira-biela-') && s['set_id'].end_with?('p2o') }
@@ -456,14 +460,24 @@ NxTest.test('D-118b (R8) + KOV-G1a: `none` je PLATNE v kodovom pasme, v selector
   # naň nepytal, takze starsi plugin by z bunky vyrobil riadok s kodom „none".
   # KOV-G1a mu marker dal (`skip_code_present?` vidi aj pasma), takze zakaz
   # zanikol a pasmo `none` znamena „v tomto pasme clen vedome nevznika".
+  # Codex #337 N1: aspon JEDNO pasmo musi mat skutocny kod — clen, ktoreho su
+  # VSETKY pasma `none`, by nikdy nic neobjednal (rovnaky tichy nezmysel ako
+  # pevny kod `none`), preto ho validacia odmieta.
   ok, errs = c::HWS.validate_member(
     { 'per' => 'unit', 'qty' => 1,
       'param_bands' => { 'param' => 'height',
-                         'bands' => [{ 'min' => 10.0, 'max' => 20.0, 'code' => 'NONE' }] } }, 0
+                         'bands' => [{ 'min' => 10.0, 'max' => 20.0, 'code' => 'NONE' },
+                                     { 'min' => 55.0, 'max' => 220.0, 'code' => '9079' }] } }, 0
   )
   NxTest.assert_equal([], errs, errs.inspect)
   NxTest.assert_equal(c::HWS::SKIP_CODE, ok['param_bands']['bands'].first['code'],
                       'sentinel sa aj v pasme uklada kanonicky malymi pismenami')
+  _bad, errs_all = c::HWS.validate_member(
+    { 'per' => 'unit', 'qty' => 1,
+      'param_bands' => { 'param' => 'height',
+                         'bands' => [{ 'min' => 10.0, 'max' => 20.0, 'code' => 'none' }] } }, 0
+  )
+  NxTest.assert(errs_all.first.to_s.include?('všetky pásma'), errs_all.inspect)
 
   # Selector mapovania nesie `set_id` — tam je „none" legitimne meno setu.
   sel, errs2 = c::HWS.validate_param_bands(

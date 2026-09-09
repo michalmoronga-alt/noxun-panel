@@ -1189,6 +1189,15 @@ module Noxun
               # (vyssie), tu ostava ORANGE pre vlastne sety pouzivatela.
               "#{label} (#{where}): set „#{sid}“ nevie určiť počet" \
                 "#{member.empty? ? '' : " (#{member})"} — chýba údaj z pravidla."
+            when HardwareSets::MEMBERS_ALL_SKIPPED
+              # KOV-G1a (Codex #337 N1): set sa NASIEL a sedel, ale VSETCI jeho
+              # clenovia sa pre tuto polozku preskocili — nevznikol ani jeden
+              # nakupny riadok. Bez vlastnej vety by Kontrola tvrdila „nemá
+              # priradený set" (zavadzajuce) alebo — pred touto davkou —
+              # nepovedala NIC a kovanie by z objednavky ticho zmizlo.
+              "#{label} (#{where}): set „#{sid}“ nevydal ani jeden nákupný riadok — všetky jeho " \
+                'členy sú pre túto položku vedome bez kódu. Skontroluj kódy a pásma setu — ' \
+                'kovanie je zatiaľ bez kódov (nenacenené).'
             when 'set_missing'
               "#{label} (#{where}): projekt odkazuje na set „#{sid}“, ktorý v projekte nie je — vyber set nanovo."
             when 'set_type_mismatch'

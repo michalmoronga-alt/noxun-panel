@@ -38,6 +38,25 @@
 #      -> „KOV-G1a (R3): sentinel v kodovom pasme = std 5"
 #   M5 `migrate_axilo_owner!` prestane overovat, ze radu vlastni Hettich
 #      -> „KOV-G1a (R7): pouzivatelska rada sa NEPRESUNIE"
+#
+# CODEX #337 KOLO 1 — co pribudlo (a mutacie, ktore to strazia):
+#   N1 clen so samymi `none` kodmi sa NEULOZI (pasma aj rad) a set, ktory pre
+#      BEZNU polozku nevyda NIC, je viditelny ORANGE `members_all_skipped`
+#      M6 `validate_param_bands` prestane kontrolovat „vsetky pasma none"
+#         -> „(Codex #337 N1): clen, ktoreho su VSETKY pasma `none`, sa NEULOZI"
+#      M7 `set_empty_reason` vrati vzdy `members_skipped`
+#         -> „(Codex #337 N1): set, ktory pre polozku nevyda NIC, je ORANGE"
+#      M8 fallback sa vrati k `return unless recipe_or_lift?(it)` (tiche nic)
+#         -> to iste („MUSI vzniknut zaznam")
+#   N2 vlastnika rady AXILO urcuje ZIVA taxonomia
+#      M9 `fix_axilo_manufacturer` sa vrati k odvodeniu vlastnika zo seedu
+#         -> „(Codex #337 N2): AXILO pod VLASTNYM vyrobcom — katalog sa NEDOTKNE"
+#   N3 seed set s cudzou vazbou rady sa instaluje BEZ klasifikacie
+#      M10 `seed_sets_resolved` prestane citat taxonomiu (owner = nil)
+#         -> „(Codex #337 N3): seed set s cudzou vazbou rady sa instaluje BEZ zaradenia"
+#   N4 genericky kluc mapovania overuje `generic_type` cieloveho setu
+#      M11 `mapping_seed_ref_ok?` sa vrati k „len pritomnost"
+#         -> „(Codex #337 N4): predvolba prichytu sa NEDOPLNI na set INEHO typu"
 require_relative '../helper' unless defined?(NxTest)
 
 module NxG1a
@@ -261,7 +280,8 @@ NxTest.test('KOV-G1a (R2): `none` v kodovom pasme sa uklada KANONICKY, pevny kod
   ok, errs = c::HWS.validate_member(
     { 'per' => 'unit', 'qty' => 1,
       'param_bands' => { 'param' => 'height',
-                         'bands' => [{ 'min' => 17.0, 'max' => 20.0, 'code' => ' NoNe ' }] } }, 0
+                         'bands' => [{ 'min' => 17.0, 'max' => 20.0, 'code' => ' NoNe ' },
+                                     { 'min' => 55.0, 'max' => 220.0, 'code' => '9079' }] } }, 0
   )
   NxTest.assert_equal([], errs, errs.inspect)
   NxTest.assert_equal(c::HWS::SKIP_CODE, ok['param_bands']['bands'].first['code'])
@@ -270,6 +290,70 @@ NxTest.test('KOV-G1a (R2): `none` v kodovom pasme sa uklada KANONICKY, pevny kod
   bad, errs2 = c::HWS.validate_member({ 'per' => 'unit', 'qty' => 1, 'code' => 'none' }, 0)
   NxTest.assert_equal(nil, bad)
   NxTest.assert(errs2.first.to_s.include?('none'), errs2.inspect)
+end
+
+NxTest.test('KOV-G1a (Codex #337 N1): clen, ktoreho su VSETKY pasma `none`, sa NEULOZI') do
+  c = NxG1a
+  # Sentinel znamena „TU ziadny kod nepatri". Ked ho ma clen vo VSETKYCH
+  # pasmach, je to clen, ktory nikdy nic neobjedna — ten isty tichy nezmysel
+  # ako pevny kod `none`. Kto ho nechce, nech ho zmaze.
+  bad, errs = c::HWS.validate_member(
+    { 'per' => 'unit', 'qty' => 1,
+      'param_bands' => { 'param' => 'height',
+                         'bands' => [{ 'min' => 17.0, 'max' => 20.0, 'code' => 'none' },
+                                     { 'min' => 55.0, 'max' => 220.0, 'code' => 'NONE' }] } }, 1
+  )
+  NxTest.assert_equal(nil, bad)
+  NxTest.assert(errs.first.to_s.include?('všetky pásma'), errs.inspect)
+  # TA ISTA uvaha v rade podla dlzky (D-118b) — aj tam musi ostat aspon
+  # jeden skutocny kod.
+  bad2, errs2 = c::HWS.validate_member(
+    { 'per' => 'unit', 'qty' => 1, 'code_by_nl' => { '350' => 'none', '420' => 'none' } }, 1
+  )
+  NxTest.assert_equal(nil, bad2)
+  NxTest.assert(errs2.first.to_s.include?('celý rad'), errs2.inspect)
+  # Zmiesany clen (aspon jeden kod) ostava PLATNY — to je tvar seed setu nôh.
+  ok, = c::HWS.validate_member(
+    { 'per' => 'unit', 'qty' => 1, 'code_by_nl' => { '350' => 'none', '420' => '357695' } }, 1
+  )
+  NxTest.assert_equal({ '350' => c::HWS::SKIP_CODE, '420' => '357695' }, ok['code_by_nl'])
+end
+
+NxTest.test('KOV-G1a (Codex #337 N1): set, ktory pre polozku nevyda NIC, je ORANGE — nikdy ticho') do
+  c = NxG1a
+  # Kazdy clen je sam o sebe platny (ma aj skutocne kody), len pre TUTO vysku
+  # sokla su OBA vedome bez kodu. Set sa nasiel, sedel — a nakup by ostal
+  # prazdny BEZ jedineho dovodu: kovanie by z objednavky ticho zmizlo.
+  bez = c.leg_set_with(0) { |m| m['param_bands']['bands'][0]['code'] = c::HWS::SKIP_CODE }
+  st = c.state(c.seed_norm.map { |s| s['set_id'] == c::LEG_SET ? bez : s })
+  exp = c::HWS.expand([c.leg_item(17.0)], st, catalog: [])
+  NxTest.assert_equal([], exp['rows'], 'ziadny nakupny riadok')
+  u = exp['unmapped'].first
+  NxTest.assert(u, 'MUSI vzniknut zaznam')
+  NxTest.assert_equal(c::HWS::MEMBERS_ALL_SKIPPED, u['reason'])
+  NxTest.refute(u['blocks_export'], 'ORANGE — polozka je nenacenena, nie nevyrobitelna')
+  NxTest.assert(c::HWS.unmapped_reason_sk(u).include?('ani jeden riadok'),
+                c::HWS.unmapped_reason_sk(u))
+  # Kontrola o tom hovori jednou ORANGE polozkou s navodom.
+  res = c::E::Validation.run({}, hardware_expansion: exp)
+  items = res['items'].select { |i| i['category'] == 'hardware_unmapped' }
+  NxTest.assert_equal(1, items.length, res['items'].inspect)
+  NxTest.assert_equal('orange', items.first['severity'])
+  NxTest.assert(items.first['message_sk'].include?('nevydal ani jeden nákupný riadok'),
+                items.first['message_sk'])
+  NxTest.refute(items.first['message_sk'].include?('nemá priradený set'),
+                'zavadzajuca veta — set priradeny JE')
+  # A supis (karta) sa s Kontrolou NEROZIDE.
+  ex = c::HWS.explain(c.leg_item(17.0), st)
+  NxTest.assert_equal(1, ex['problems'].length, ex.inspect)
+  NxTest.assert(ex['problems'].first.include?('ani jeden riadok'), ex['problems'].inspect)
+  NxTest.assert_equal(c::HWS::MEMBERS_ALL_SKIPPED, ex['unmapped'].first['reason'])
+  # Receptova zasuvka a vyklop si drzia SVOJU (RED) cestu — dovod sa nemeni.
+  NxTest.assert(c::HWS::UNMAPPED_REASONS.include?(c::HWS::MEMBERS_ALL_SKIPPED))
+  NxTest.assert_equal('members_skipped',
+                      c::HWS.send(:set_empty_reason, 'generic_type' => 'lift'))
+  NxTest.assert_equal('members_skipped',
+                      c::HWS.send(:set_empty_reason, 'source' => c::BP::HW_SOURCE_RECIPE))
 end
 
 # ============================================================================

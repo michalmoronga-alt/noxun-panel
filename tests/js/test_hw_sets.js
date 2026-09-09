@@ -9,7 +9,7 @@ const { hwsSlug, hwsSetsForType, hwsMemberSummary, hwsBuildSetPayload,
         hwsMembersOf, hwsBuildMembers, hwsNum, hwsParamLabel, hwsBandsSummary, hwsBuildBands,
         hwsSelectorFrom, hwsBuildSelector, hwsProjDraftKeys,
         hwsPinRev, hwsMapRev, hwsMapClassValue, hwsMapClassSelectedId,
-        HWS_STORED_OPT } =
+        hwsMemberProblems, HWS_STORED_OPT } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'hw_sets.js'));
 
 // Slovnik parametrov posiela server (HardwareSets::PARAM_OPTIONS).
@@ -142,6 +142,36 @@ eq(hwsBuildBands([{ min: '17', max: '20', code: 'none' }], 'code'),
 // Prazdny kod dalej PADA na serveri — sentinel nie je „prazdna bunka".
 eq(hwsBuildBands([{ min: '17', max: '20', code: '' }], 'code'),
    [{ min: '17', max: '20', code: '' }], 'prazdna hodnota ostava prazdna (chybu hlasi SERVER)');
+
+// --- KOV-G1a (Codex #337 N1): VSETKY kody clena su `none` ---------------------
+// Sentinel znamena „TU ziadny kod nepatri". Ked ho ma clen VSADE, nikdy nic
+// neobjedna — server takeho clena odmieta a editor to musi povedat SKOR
+// (a menovat clena, o ktoreho ide).
+const vsetkyNone = hwsMemberProblems([{ per: 'unit', qty: 1, is_bands: true, param: 'height',
+                                        bands: [{ min: '17', max: '20', code: 'none' },
+                                                { min: '55', max: '220', code: ' NONE ' }] }]);
+eq(vsetkyNone.length, 1, 'clen so samymi `none` pasmami sa ohlasi');
+eq(vsetkyNone[0].row, 'members:0', 'a pristane pri TOM clenovi');
+eq(vsetkyNone[0].msg.indexOf('všetky kódy sú „none“') >= 0, true,
+   'veta povie, co je zle: ' + vsetkyNone[0].msg);
+// Zmiesany clen (aspon jeden kod) je PLATNY — to je tvar seed setu nôh.
+eq(hwsMemberProblems([{ per: 'unit', qty: 1, is_bands: true, param: 'height',
+                        bands: [{ min: '17', max: '20', code: 'none' },
+                                { min: '55', max: '220', code: '9079' }] }]), [],
+   'platnicka AXILO: jedno pasmo `none`, druhe s kodom');
+// TA ISTA uvaha v rade podla dlzky (`code_by_nl`).
+eq(hwsMemberProblems([{ per: 'unit', qty: 1, is_series: true,
+                        series: [{ nl: '350', code: 'none' }, { nl: '420', code: 'none' }] }]).length,
+   1, 'cely rad `none` tiez');
+eq(hwsMemberProblems([{ per: 'unit', qty: 1, is_series: true,
+                        series: [{ nl: '350', code: 'none' }, { nl: '420', code: '357695' }] }]), [],
+   'rad s jednou vedome prazdnou dlzkou prejde');
+// Nedopisane riadky sa NEPOCITAJU — o tych hovori server.
+eq(hwsMemberProblems([{ per: 'unit', qty: 1, is_bands: true, param: 'height',
+                        bands: [{ min: '', max: '', code: '' }] }]), [],
+   'prazdny riadok nie je „same none"');
+eq(hwsMemberProblems([{ per: 'unit', qty: 1, code: 'none' }]), [],
+   'pevny kod `none` odmieta SERVER (v editore je to jedno pole, nie tabulka)');
 
 // --- hwsBuildBands ------------------------------------------------------------
 eq(hwsBuildBands([{ min: ' 17 ', max: '21', code: ' 82744 ' },

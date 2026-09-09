@@ -272,10 +272,20 @@ module Noxun
                             param_band_missing selector_unresolved
                             length_unsupported library_incompatible
                             class_unmapped set_incompatible mapping_invalid
-                            members_skipped drawer_kit_missing
+                            members_skipped members_all_skipped drawer_kit_missing
                             set_none hinge_set_mismatch
                             quantity_unresolved lift_set_incomplete
                             lift_system_missing].freeze
+
+      # KOV-G1a (Codex #337 N1): `members_all_skipped` = set sa NASIEL a sedel,
+      # ale pre BEZNU (pravidlovu, nereceptovu a nevyklopovu) polozku nevydal
+      # ANI JEDEN nakupny riadok — vsetky jeho cleny sa preskocili. Vlastny
+      # dovod, nie `members_skipped`: ten cestuje v `base_reason` receptovej
+      # zasuvky (RED `drawer_kit_missing`, veta o DLZKE) a vyklopu (RED
+      # `lift_set_incomplete`, veta o POCTOCH), takze spolocne znenie by pri
+      # jednom z nich klamalo. ORANGE — polozka je „nenacenena", nie
+      # nevyrobitelna; export nezastavuje.
+      MEMBERS_ALL_SKIPPED = 'members_all_skipped'
 
       # KOV-F1: RED dovod NESULADU zavesoveho setu (`BuildPlan::HW_HINGE_BLOCKERS`).
       HINGE_SET_MISMATCH = 'hinge_set_mismatch'
@@ -2583,6 +2593,13 @@ module Noxun
           else
             "set „#{sid}“ nemá pre túto dĺžku ani jednu položku — doplň rad setu"
           end
+        when MEMBERS_ALL_SKIPPED
+          # KOV-G1a (Codex #337 N1): BEZNA polozka — set sa nasiel a sedel, ale
+          # vsetci jeho clenovia sa preskocili, takze objednat sa nema co.
+          # Veta NEMENUJE dlzku (tu ma receptova zasuvka) ani pocty (vyklop) —
+          # priciny su tu pasma a kody.
+          "set „#{sid}“ nevydal pre túto položku ani jeden riadok — " \
+            'skontroluj kódy a pásma setu'
         when 'set_none'
           # KOV-F1: VEDOMA volba „bez setu" (sentinel mapovania). Nie je to
           # chyba nastavenia, ale rozhodnutie — a nakup to musi priznat, inak
@@ -4606,11 +4623,28 @@ module Noxun
         # 0 nemapovanych, takze nakup, rozpocet aj ponuka by presli mlcky.
         # `unmapped_entry` dovod vzapati povysi na RED `lift_set_incomplete`
         # (`base_reason` = `members_skipped`, `blocks_export`).
-        return unless it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE ||
-                      it['generic_type'].to_s == 'lift'
-
-        unmapped << unmapped_entry(it, sid, 'members_skipped',
+        #
+        # KOV-G1a (Codex #337 N1): BEZNA polozka z pravidiel uz TIEZ nemlci.
+        # Preskocenie JEDNEHO clena je legitimne (platnicka pod 55 mm), ale ked
+        # sa preskocili VSETCI, nevznikol ziadny nakupny riadok ANI ziadny
+        # dovod — nakup, Kontrola aj cenova ponuka by o tom kovani nepovedali
+        # ani slovo (a prave tak zmizne polozka, ktorej sa cely set „vypol"
+        # samymi `none` pasmami). Zavaznost ostava ORANGE (nenacenene), dovod
+        # je vlastny — `members_all_skipped`.
+        unmapped << unmapped_entry(it, sid, set_empty_reason(it),
                                    'detail' => 'set nevydal žiadnu položku')
+      end
+
+      # Dovod pre set, ktory nevydal ANI JEDEN riadok. Receptova zasuvka
+      # a vyklop maju vlastnu (RED) cestu s vlastnou vetou — tie si drzia
+      # historicky `members_skipped` v `base_reason`.
+      def set_empty_reason(it)
+        recipe_or_lift?(it) ? 'members_skipped' : MEMBERS_ALL_SKIPPED
+      end
+
+      def recipe_or_lift?(it)
+        it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE ||
+          it['generic_type'].to_s == 'lift'
       end
 
       # Kod clena: pevny 'code', rad 'code_by_nl' podla params.nominal_length
@@ -5319,11 +5353,11 @@ module Noxun
         # kym Kontrola hlasi nevyrobitelnu zasuvku.
         # KOV-E1a (Codex #332 kolo 2 P2): to iste pri VYKLOPE — `expand` z toho
         # robi RED `lift_set_incomplete`, takze nahlad to musi povedat tiez.
-        return unless it['source'].to_s == BuildPlan::HW_SOURCE_RECIPE ||
-                      it['generic_type'].to_s == 'lift'
-
+        # KOV-G1a (Codex #337 N1): a to iste pri BEZNEJ polozke — `expand` z nej
+        # robi ORANGE `members_all_skipped`, takze karta nesmie tvrdit „vsetky
+        # členy netreba", kym Kontrola hlasi nenacenene kovanie.
         explain_problem(out,
-                        unmapped_entry(it, sid, 'members_skipped',
+                        unmapped_entry(it, sid, set_empty_reason(it),
                                        'detail' => 'set nevydal žiadnu položku'))
       end
 
@@ -5872,6 +5906,13 @@ module Noxun
           end
         end
         errors << "#{pos}: rad je prázdny" if map.empty? && errors.empty?
+        # KOV-G1a (Codex #337 N1): TA ISTA uvaha ako pri pasmach — rad, ktoreho
+        # VSETKY bunky su `none`, je clen bez jedineho kodu (a teda bez jedineho
+        # nakupneho riadku pri KAZDEJ dlzke).
+        if errors.empty? && !map.empty? && map.each_value.all? { |v| skip_code?(v) }
+          errors << "#{pos}: celý rad je „#{SKIP_CODE}“ — člen by nikdy nič neobjednal; " \
+                    'zmaž ho, alebo doplň aspoň jeden kód'
+        end
         [map, errors]
       end
 
@@ -5966,6 +6007,15 @@ module Noxun
           { 'min' => min, 'max' => max, value_key => val }
         end
         return [nil, errors] unless errors.empty?
+        # KOV-G1a (Codex #337 N1): VSETKY pasma `none` = clen, ktory nikdy nic
+        # nevyda. Sentinel znamena „TU ziadny kod nepatri" — pri VSETKYCH
+        # pasmach je to ale ten isty tichy nezmysel ako pevny kod `none`
+        # (a nakup by o takom clenovi nepovedal ani slovo). Kto clena nechce,
+        # nech ho zmaze; aspon JEDNO pasmo musi mat skutocny kod.
+        if value_key == 'code' && bands.all? { |b| skip_code?(b['code']) }
+          return [nil, ["#{pos}: všetky pásma sú „#{SKIP_CODE}“ — člen by nikdy nič " \
+                        'neobjednal; zmaž ho, alebo doplň aspoň jeden kód']]
+        end
         bands = bands.sort_by { |b| [b['min'], b['max']] }
         bands.each_cons(2) do |a, b|
           # UZAVRETE hranice -> dotyk (a.max == b.min) je uz prekryv
