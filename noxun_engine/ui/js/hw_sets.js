@@ -179,11 +179,18 @@
     if (qty) out += (m.quantity_from ? ' — ' : ' ') + qty;
     return out + (m.per === 'owner' ? ' na vlastníka' : '');
   }
-  // „17–21 → 82744 · 140–160 → 367823"; names = mapa hodnota->citatelny nazov
+  // „17–20 → 272212 · 55–90 → 9069"; names = mapa hodnota->citatelny nazov
   // (pri selectore su hodnoty set_id, pri clene setu kody).
+  //
+  // KOV-G1a: v KODOVOM pasme (`key === 'code'`) je vyhradena hodnota `none`
+  // to iste ako v rade NL — „v tomto pásme člen vedome nevzniká". Pise sa
+  // preto po ludsky („bez kódu"); surove „none" by vyzeralo ako preklep.
+  // V SELECTORE mapovania (`key === 'set_id'`) sa NEPREKLADA — tam je „none"
+  // legitimne meno setu a preklad by klamal.
   function hwsBandsSummary(bands, key, names){
     var list = (bands || []).map(function(b){
       var v = b[key];
+      if (key === 'code' && hwsIsSkipCode(v)) return hwsNum(b.min) + '–' + hwsNum(b.max) + ' → bez kódu';
       return hwsNum(b.min) + '–' + hwsNum(b.max) + ' → ' + ((names && names[v]) || v);
     });
     return list.join(' · ') || '—';
@@ -1739,6 +1746,14 @@
     } else {
       val = hwsMk('input');
       val.type = 'text'; val.value = cur; val.placeholder = o.placeholder || '';
+      // KOV-G1a: v KODOVOM pasme je `none` VYHRADENA hodnota — hodnota ostava
+      // v poli surova (inak by sa nedala prepisat), ale bublina povie, co
+      // znamena, a pri `none` to potvrdi rovnou vetou ako v suhrne.
+      if (o.valueField === 'code'){
+        val.title = hwsIsSkipCode(cur)
+          ? 'V tomto pásme člen vedome nevzniká (bez kódu).'
+          : 'Kód položky katalógu. „none“ = v tomto pásme člen vedome nevzniká.';
+      }
     }
     hwsBandAttrs(val, o, o.valueField);
     r.appendChild(val);

@@ -121,6 +121,28 @@ eq(hwsMemberSummary({ per: 'unit', qty: 1, label: 'noha',
 eq(hwsMemberSummary({ param_bands: { param: 'height', bands: [] } }, PARAMS),
    'podľa výšky sokla: —', 'clen bez pasiem');
 
+// --- KOV-G1a: sentinel `none` v KODOVOM pasme ---------------------------------
+// Vyplnene pasmo s hodnotou `none` znamena „v tomto pasme clen VEDOME
+// nevznika" (platnicka AXILO pod 55 mm). V suhrne sa pise po ludsky — surove
+// „none" by vyzeralo ako preklep alebo ako kod, ktory sa objedna.
+eq(hwsMemberSummary({ per: 'unit', qty: 1, label: 'platnička',
+                      param_bands: { param: 'height',
+                                     bands: [{ min: 17.0, max: 20.0, code: 'none' },
+                                             { min: 55.0, max: 220.0, code: '9079' }] } }, PARAMS),
+   'podľa výšky sokla: 17–20 → bez kódu · 55–220 → 9079', 'sentinel v pasme je „bez kódu"');
+eq(hwsBandsSummary([{ min: 17.0, max: 20.0, code: ' NONE ' }], 'code'),
+   '17–20 → bez kódu', 'zhoda je bez ohladu na velkost pismen a medzery');
+// V SELECTORE mapovania je „none" legitimne MENO SETU — tam sa neprekladá,
+// inak by riadok tvrdil „bez kódu" o sete, ktory sa naozaj objedna.
+eq(hwsBandsSummary([{ min: 0.0, max: 100.0, set_id: 'none' }], 'set_id'),
+   '0–100 → none', 'selector setov sentinel NEMA');
+// Editor pasmo prijme a posle ho na server nezmenene (kanonizuje az server).
+eq(hwsBuildBands([{ min: '17', max: '20', code: 'none' }], 'code'),
+   [{ min: '17', max: '20', code: 'none' }], 'pasmo `none` sa da zadat a odide na server');
+// Prazdny kod dalej PADA na serveri — sentinel nie je „prazdna bunka".
+eq(hwsBuildBands([{ min: '17', max: '20', code: '' }], 'code'),
+   [{ min: '17', max: '20', code: '' }], 'prazdna hodnota ostava prazdna (chybu hlasi SERVER)');
+
 // --- hwsBuildBands ------------------------------------------------------------
 eq(hwsBuildBands([{ min: ' 17 ', max: '21', code: ' 82744 ' },
                   { min: '', max: '', code: '' },

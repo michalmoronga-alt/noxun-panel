@@ -36,8 +36,10 @@
 #   (ORANGE), NIKDY sa neberie susedny kod (audit F10).
 #   param_bands (H1a, audit FIX 8) = kod podla ciselneho parametra polozky:
 #     { "param": "height",
-#       "bands": [ { "min": 17.0, "max": 21.0, "code": "82744" }, ... ] }
-#   Priklad: „Nohy podla vysky sokla" — klzak 17-21 mm, AXILO pri 140-160 mm.
+#       "bands": [ { "min": 17.0, "max": 20.0, "code": "272212" }, ... ] }
+#   Priklad: „Nohy podla vysky sokla" — klzak 17-20 mm, AXILO 55-220 mm.
+#   KOV-G1a: hodnota pasma smie byt aj `SKIP_CODE` („v tomto pasme clen vedome
+#   nevznika" — ta ista semantika ako v rade `code_by_nl`, D-118b).
 #
 # ======================= PASMA (jedna konvencia) ======================
 # Pasma param_bands aj selector bands (nizsie) maju TU ISTU semantiku:
@@ -47,6 +49,8 @@
 #     PREKRYV = chyba zapisu; medzery su legalne
 #   * hodnota mimo vsetkych pasiem = NEMAPOVANE (ORANGE), NIKDY najblizsie
 #     pasmo (rovnaka filozofia ako "presny NL kluc, nikdy sused")
+#   * KOV-G1a: PRITOMNE pasmo s hodnotou `none` (len KODOVE pasma clena) je
+#     ZAMER — clen sa preskoci BEZ nalezu; CHYBAJUCE pasmo ostava ORANGE
 #
 # ================== MAPOVANIE: JEDEN PARSER FORIEM ====================
 # (H1a, audit BLOCKER 2) Kluc mapovania:
@@ -136,6 +140,10 @@ module Noxun
       # LAZY podla OBSAHU: std 5 dostane LEN kniznica/snapshot, v ktorych sa
       # sentinel naozaj vyskytuje — ostatny obsah ostava na 1–4 a starsie
       # verzie ho citaju dalej.
+      # KOV-G1a: sentinel zije UZ V DVOCH tvaroch clena (rad `code_by_nl` aj
+      # KODOVE pasmo `param_bands`) a marker plati pre OBA — `skip_code_present?`
+      # prehladava obe. NOVY marker k tomu netreba: dovod aj dosledok su
+      # totozne, takze druhe cislo by len rozdelilo jednu otazku na dve.
       STD_SKIP_CODE = 5
 
       # KOV-E1a: VYKLOPY. Set moze niest TRI veci, ktore starsi plugin NEPOZNA:
@@ -157,6 +165,11 @@ module Noxun
       # potrebuje modul P2O na kazdej dlzke OKREM 620 mm, kde je kit typu `PTO`
       # a modul ma v sebe: vynechany kluc by hlasil chybajuci kod tam, kde
       # ziadny nema byt. Kody su ciselne, takze kolizia nehrozi.
+      # KOV-G1a: TA ISTA hodnota plati aj v KODOVOM PASME clena (`param_bands`)
+      # — platnicka AXILO patri k nohe od 55 mm, pri klzaku 17-20 mm ziadna
+      # nie je. Ako PEVNY `code` ostava zakazana (clen, ktory nikdy nic nevyda,
+      # je tichy nezmysel — kto ho nechce, nech ho zmaze) a v selectore
+      # mapovania (`set_id`) sa nekontroluje vobec (tam je to meno setu).
       SKIP_CODE = 'none'
 
       # === KOV-F1: SENTINEL MAPOVANIA „VEDOME BEZ SETU" =======================
@@ -215,7 +228,12 @@ module Noxun
       # `class:lift|classic|hk_top` · `class:lift|tipon|hk_top` ·
       # `class:lift|classic|hl_top` v `MAPPING_ADDITIONS`. Tmave sety triedny
       # kluc NEMAJU — vyberaju sa per celo (E2).
-      SEED_VERSION = 7
+      # v8 (KOV-G1a): NOHY 17-220 mm. Set `nohy-podla-sokla` dostal NOVY TVAR
+      # (sedem pasiem nohy + druhy clen „platnička" s pasmom `none` pod 55 mm)
+      # a pribudol set `prichyt-sokla-axilo` (`plinth_clip`) s mapovanim.
+      # Druhy seed, ktory MENI obsah existujuceho setu — preto je stary tvar
+      # v `LEGACY_SEED_SHAPES` a plati „nedotknuty nahradim, upraveny nechavam".
+      SEED_VERSION = 8
       FILE         = 'hardware_sets.json'
       MODEL_KEY    = 'hardware_sets' # kluc snapshotu v NOXUN dict na modeli
 
@@ -444,15 +462,53 @@ module Noxun
         # 'leg' nesie params['height'] = floor_height (pravidlo nohy-zakladne).
         # Skrinka so soklom 150 uz nedostane klzak 17. Vyska mimo pasiem =
         # ORANGE „doplnit pasmo", NIKDY najblizsie pasmo.
+        #
+        # KOV-G1a (rozhodnutia Michal 9.9.2026): set pokryva KAZDU vysku sokla
+        # od 17 do 220 mm okrem VEDOME nepokrytej zony 20-55 mm (tam nic
+        # rozumne neexistuje -> ORANGE „doplň pásmo"). Dve pasma su dnes dva
+        # svety: 17-20 = STRONG klzak s rektifikaciou (272212, Demos),
+        # 55-220 = HAFELE AXILO (Quatro LM) — noha podla vysky + PLATNICKA
+        # na kazdu nohu. Pasma su CELOCISELNE rozsahy (min/max VRATANE);
+        # neceloselna vyska medzi pasmami (90,5) je VEDOME ORANGE — vysky
+        # sokla su v praxi z rozmeroveho radu a hadanie susedneho pasma by
+        # objednalo inu nohu.
         { 'set_id' => 'nohy-podla-sokla', 'name' => 'Nohy podľa výšky sokla',
           'generic_type' => 'leg',
           'members' => [
             { 'per' => 'unit', 'qty' => 1, 'label' => 'noha',
               'param_bands' => { 'param' => 'height',
                                  'bands' => [
-                                   { 'min' => 17.0, 'max' => 21.0, 'code' => '82744' },
-                                   { 'min' => 140.0, 'max' => 160.0, 'code' => '367823' }
+                                   { 'min' => 17.0, 'max' => 20.0, 'code' => '272212' },
+                                   { 'min' => 55.0, 'max' => 90.0, 'code' => '9069' },
+                                   { 'min' => 91.0, 'max' => 115.0, 'code' => '9078' },
+                                   { 'min' => 116.0, 'max' => 140.0, 'code' => '9077' },
+                                   { 'min' => 141.0, 'max' => 170.0, 'code' => '9076' },
+                                   { 'min' => 171.0, 'max' => 190.0, 'code' => '9027' },
+                                   { 'min' => 191.0, 'max' => 220.0, 'code' => '9075' }
+                                 ] } },
+            # Platnicka je SUCASTOU nohy AXILO (skrutkuje sa do dna), takze ide
+            # na KAZDU nohu. Klzak 17-20 mm ziadnu nema — pasmo je preto
+            # VYPLNENE sentinelom `none` („tu ziadny kod nepatri"), nie
+            # vynechane: chybajuce pasmo by hlasilo ORANGE tam, kde je vsetko
+            # v poriadku (ta ista uvaha ako PTOs modul pri NL 620, D-118b).
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'platnička',
+              'param_bands' => { 'param' => 'height',
+                                 'bands' => [
+                                   { 'min' => 17.0, 'max' => 20.0, 'code' => SKIP_CODE },
+                                   { 'min' => 55.0, 'max' => 220.0, 'code' => '9079' }
                                  ] } }
+          ] },
+        # KOV-G1a: PRICHYT SOKLOVEJ LISTY (Häfele 637.38.054). Vznika LEN pri
+        # samostatnej soklovej liste (skrinka na nohach) a je 1 ks na zacate
+        # 4 nohy — POCET riesi pravidlo v KOV-G1b, tu je len set a mapovanie.
+        # Bez pravidla ziadna polozka `plinth_clip` nevznikne, takze set je
+        # zatial „pripraveny" (rovnako ako sety vyklopov pred KOV-E1b).
+        { 'set_id' => 'prichyt-sokla-axilo', 'name' => 'Príchyt sokla AXILO',
+          'generic_type' => 'plinth_clip',
+          'use_type' => 'other', 'opening_mode' => 'other',
+          'manufacturer' => 'Häfele', 'series' => 'AXILO',
+          'members' => [
+            { 'code' => '950', 'per' => 'unit', 'qty' => 1, 'label' => 'príchyt sokla' }
           ] },
         # Jednokodove sety nôh OSTAVAJU — pouzivatelia ich mozu mat namapovane
         # (a migracia defaultu nizsie ich vedome respektuje).
@@ -754,7 +810,12 @@ module Noxun
         'leg'         => 'nohy-podla-sokla', # H1a: default riadi vyska sokla
         'slide'       => 'vysuv-atira-biela-h70',
         'wall_hanger' => 'zavesenie-bystrica',
-        'shelf_pin'   => 'podperky-police'
+        'shelf_pin'   => 'podperky-police',
+        # KOV-G1a: pravidlo pride az v G1b, takze polozka `plinth_clip` zatial
+        # nevznika — predvolba je tu preto, aby ju v tej davke uz nebolo treba
+        # dopĺňať do KAZDEJ existujucej kniznice zvlast (`MAPPING_ADDITIONS`
+        # nizsie robi to iste pre uz zalozene kniznice a projekty).
+        'plinth_clip' => 'prichyt-sokla-axilo'
       }.freeze
 
       # --- migracia globalneho defaultu nôh (H1a, audit BLOCKER 3) ------------
@@ -794,6 +855,21 @@ module Noxun
           { 'set_id' => 'nohy-klzak-17', 'name' => 'Klzák s rektifikáciou 17 mm',
             'generic_type' => 'leg',
             'members' => [{ 'code' => '82744', 'per' => 'unit', 'qty' => 1 }] }
+        ],
+        # KOV-G1a: v2..v7 tvar setu nôh (dve pasma, ziadna platnicka). Nedotknuty
+        # set sa nahradi novym (17-20 STRONG klzak + 55-220 AXILO + platnicka);
+        # akakolvek uprava pouzivatela = ruky prec a info log.
+        'nohy-podla-sokla' => [
+          { 'set_id' => 'nohy-podla-sokla', 'name' => 'Nohy podľa výšky sokla',
+            'generic_type' => 'leg',
+            'members' => [
+              { 'per' => 'unit', 'qty' => 1, 'label' => 'noha',
+                'param_bands' => { 'param' => 'height',
+                                   'bands' => [
+                                     { 'min' => 17.0, 'max' => 21.0, 'code' => '82744' },
+                                     { 'min' => 140.0, 'max' => 160.0, 'code' => '367823' }
+                                   ] } }
+            ] }
         ],
         'atira-antracit-h70-sisy' => [
           { 'set_id' => 'atira-antracit-h70-sisy',
@@ -948,14 +1024,26 @@ module Noxun
         # HL top Tip-On neexistuje a validacia taky kluc odmietne.
         'class:lift|classic|hk_top' => 'vyklop-hk-klasik',
         'class:lift|tipon|hk_top'   => 'vyklop-hk-tipon',
-        'class:lift|classic|hl_top' => 'vyklop-hl-klasik'
+        'class:lift|classic|hl_top' => 'vyklop-hl-klasik',
+        # KOV-G1a: PRICHYT SOKLA je GENERICKY kluc (nie triedny) — trieda by
+        # menovala sposob otvarania, ktory prichyt nema. Do uz zalozenej
+        # kniznice sa doplni add-if-absent rovnako ako triedne kluce vyssie;
+        # do projektu ho prenesie vedome „Doplniť nové predvoľby".
+        'plinth_clip' => 'prichyt-sokla-axilo'
       }.freeze
 
       # KOV-D1b: TRIEDNE KLUCE, na ktore sa da mapovat v Pravidlach Studia.
-      # Je to TEN ISTY zoznam ako `MAPPING_ADDITIONS` (predvolby, ktore sa
-      # dopĺňajú do knižnice) — druhý zoznam v UI by sa s ním rozišiel pri
-      # prvom pribudnutom systéme.
-      CLASS_MAPPING_KEYS = MAPPING_ADDITIONS.keys.freeze
+      # Je to podmnozina `MAPPING_ADDITIONS` (predvolby, ktore sa dopĺňajú do
+      # knižnice) — druhý zoznam v UI by sa s ním rozišiel pri prvom pribudnutom
+      # systéme.
+      # KOV-G1a: filter podla prefixu je NOVY a je nutny. `MAPPING_ADDITIONS`
+      # od tejto davky nesie aj GENERICKY kluc (`plinth_clip`) a ten do tabulky
+      # TRIEDNYCH mapovani nepatri: `class_key_label` by mu vratil nil (riadok
+      # bez popisku) a `class_set_options` by ho rozkladala ako triedny kluc.
+      # Genericke typy maju v Pravidlach vlastnu tabulku (`generic_types`
+      # z `BuildPlan::GENERIC_TYPES`), takze prichyt sokla riadok MA.
+      CLASS_MAPPING_KEYS =
+        MAPPING_ADDITIONS.keys.select { |k| k.start_with?(BuildPlan::HW_SET_CLASS_PREFIX) }.freeze
 
       module_function
 
@@ -2883,15 +2971,29 @@ module Noxun
 
       # D-118b: nesie OBSAH vyhradenu hodnotu `SKIP_CODE`? Pyta sa na to marker
       # kniznice, snapshotu aj brana sablon — jedno miesto, jedna odpoved.
+      # KOV-G1a: sentinel zije UZ V DVOCH tvaroch clena — v rade `code_by_nl`
+      # aj v KODOVOM pasme `param_bands`. Predikat musi vidiet OBA, inak by
+      # kniznica s pasmom `none` dostala nizsi marker a starsi plugin by z nej
+      # vyrobil nakupny riadok s neexistujucim kodom „none".
       def skip_code_present?(sets)
         Array(sets).any? do |s|
           next false unless s.is_a?(Hash)
 
-          Array(s['members']).any? do |m|
-            m.is_a?(Hash) && m['code_by_nl'].is_a?(Hash) &&
-              m['code_by_nl'].each_value.any? { |v| skip_code?(v) }
-          end
+          Array(s['members']).any? { |m| member_skip_code?(m) }
         end
+      end
+
+      def member_skip_code?(member)
+        return false unless member.is_a?(Hash)
+        if member['code_by_nl'].is_a?(Hash) &&
+           member['code_by_nl'].each_value.any? { |v| skip_code?(v) }
+          return true
+        end
+
+        bands = member['param_bands']
+        return false unless bands.is_a?(Hash)
+
+        Array(bands['bands']).any? { |b| b.is_a?(Hash) && skip_code?(b['code']) }
       end
 
       def skip_code?(value)
@@ -2927,16 +3029,30 @@ module Noxun
 
       # Je clen pre TUTO polozku vedome bez kodu? (`member_code` vrati [nil, nil]
       # aj pri legacy prazdnom `code` — supis chce rozlisit VEDOMU bunku.)
+      # KOV-G1a: rovnaka otazka nad KODOVYM PASMOM (`param_bands`) — platnicka
+      # AXILO ma pri klzaku 17-20 mm pasmo `none` a karta o tom musi povedat
+      # („bez kódu (netreba)"), nie mlcat.
       def skip_member?(member, it)
-        return false unless member.is_a?(Hash) && member['code_by_nl'].is_a?(Hash)
+        return false unless member.is_a?(Hash)
 
-        nl = numeric_param(it, 'nominal_length')
-        return false if nl.nil?
+        if member['code_by_nl'].is_a?(Hash)
+          nl = numeric_param(it, 'nominal_length')
+          return false if nl.nil?
 
-        i = nl.round
-        return false unless (nl - i).abs < 1e-9
+          i = nl.round
+          return false unless (nl - i).abs < 1e-9
 
-        skip_code?(member['code_by_nl'][i.to_s])
+          return skip_code?(member['code_by_nl'][i.to_s])
+        end
+        return false unless member['param_bands'].is_a?(Hash)
+
+        v = numeric_param(it, member['param_bands']['param'].to_s)
+        return false if v.nil?
+
+        band = Array(member['param_bands']['bands']).find do |b|
+          v >= b['min'].to_f && v <= b['max'].to_f
+        end
+        !band.nil? && skip_code?(band['code'])
       end
 
       # Zmeni projektove mapovanie JEDNEHO generickeho typu. set_def = plna
@@ -4451,6 +4567,13 @@ module Noxun
             v >= b['min'].to_f && v <= b['max'].to_f
           end
           return [nil, miss] if band.nil? || band['code'].to_s.strip.empty?
+          # KOV-G1a: TA ISTA semantika ako v rade `code_by_nl` (D-118b) —
+          # VYPLNENE pasmo s hodnotou `none` znamena „v tomto pasme clen
+          # vedome nevznika" -> [nil, nil], ziadny nalez. Rozdiel oproti
+          # CHYBAJUCEMU pasmu (ORANGE `param_band_missing`) je zamer: platnicka
+          # AXILO patri k nohe od 55 mm, pri klzaku 17-20 mm ziadna nie je.
+          return [nil, nil] if skip_code?(band['code'])
+
           [band['code'].to_s.strip, nil]
         elsif member['code_by_param'].is_a?(Hash)
           # KOV-E1a: kod podla TEXTOVEJ triedy polozky (mechanizmus/ramena
@@ -5753,16 +5876,17 @@ module Noxun
             errors << "#{pos}: pásmo #{i + 1} (#{min.round(1)}–#{max.round(1)}) nemá hodnotu"
             next nil
           end
-          # D-118b (Codex #321 kolo 2): vyhradena hodnota `none` patri VYHRADNE
-          # do radu `code_by_nl`. V KODOVOM pasme by `member_code` vratil
-          # doslovny „none" (neexistujuci kod v nakupe aj v CSV) a `skip_code_present?`
-          # by ju neuvidel, takze obsah by dostal NIZSI marker kompatibility.
-          # Pri selectore mapovania (`value_key == 'set_id'`) sa nekontroluje —
-          # tam je to legitimne meno setu.
-          if value_key == 'code' && skip_code?(val)
-            errors << "#{pos}: pásmo #{i + 1} — „#{SKIP_CODE}“ sa smie použiť len v rade podľa dĺžky"
-            next nil
-          end
+          # KOV-G1a: `none` je od tejto davky POVOLENE aj v KODOVOM pasme
+          # („v tomto pasme clen vedome nevznika" — platnicka AXILO pod 55 mm).
+          # D-118b ho tu zakazovalo z JEDINEHO dovodu: `skip_code_present?`
+          # pasma nepozeralo, takze obsah by dostal NIZSI marker kompatibility
+          # a starsi plugin by z bunky vyrobil nakupny riadok s kodom „none".
+          # Teraz ho vidi (`skip_code_present?` prehladava aj `param_bands`),
+          # takze marker `STD_SKIP_CODE` plati rovnako pre obe miesta a hodnota
+          # sa uklada KANONICKY malymi pismenami (ako v rade).
+          # Pri selectore mapovania (`value_key == 'set_id'`) sa NEKANONIZUJE —
+          # tam je „none" legitimne meno setu.
+          val = SKIP_CODE if value_key == 'code' && skip_code?(val)
           { 'min' => min, 'max' => max, value_key => val }
         end
         return [nil, errors] unless errors.empty?

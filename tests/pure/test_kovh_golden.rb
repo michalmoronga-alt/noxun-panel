@@ -54,6 +54,13 @@ module NxKovhGolden
       'category' => 'ZAVESY', 'unit' => 'ks' },
     { 'item_code' => '367823', 'name_sk' => 'Häfele 637.76.355 noha AXILO v. 150 mm + podložka',
       'category' => 'NOHY', 'unit' => 'ks', 'price_eur_vat' => 1.38 },
+    # KOV-G1a: seed set nôh objednava od tejto davky AXILO od Quatro LM
+    # (noha podla vysky + platnicka na kazdu nohu) — bez nich by scenar
+    # `seed_kniznica` stratil ceny a hovoril by o „riadkoch bez ceny".
+    { 'item_code' => '9076', 'name_sk' => 'Häfele 637.76.355 noha AXILO H150',
+      'category' => 'NOHY', 'unit' => 'ks', 'price_eur_vat' => 0.79 },
+    { 'item_code' => '9079', 'name_sk' => 'Häfele 637.76.333 platnička AXILO 79×92×2,5 mm čierna',
+      'category' => 'NOHY', 'unit' => 'ks', 'price_eur_vat' => 0.50 },
     { 'item_code' => '93240', 'name_sk' => 'Rektifikačný uholník „Bystrica“',
       'category' => 'SPOJOVACI_MATERIAL', 'unit' => 'ks' },
     { 'item_code' => '306125', 'name_sk' => 'Podperka policová s návlekom 7/5 Zn biela',

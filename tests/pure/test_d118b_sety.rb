@@ -19,7 +19,8 @@
 #      (starsi plugin ich odmietne), obsah bez neho ostava na povodnom std
 #   R7 MIGRACIA: nedotknuty seed tvar sa nahradi novym (vratane premenovania
 #      legacy setu), pouzivatelom upraveny set ostava
-#   R8 `none` je vyhradene PRE BUNKU RADU — ako pevny kod sa odmietne
+#   R8 `none` je vyhradene pre BUNKU (rad `code_by_nl`, od KOV-G1a aj KODOVE
+#      pasmo `param_bands`) — ako PEVNY kod sa odmieta dalej
 #
 # MUTACIE (kazda overena rucne — po zaneseni chyby spadne uvedeny test):
 #   M1 v sete sa vrati kod 348777 -> „D-118b (R1): antracit H70/470 = 357889"
@@ -268,9 +269,14 @@ NxTest.test('D-118b (R6): sentinel = std 5, obsah bez neho ostava na svojom std'
   NxTest.assert_equal(c::HWS::STD_SKIP_CODE, c::HWS.snapshot_std(mapping, bez_lift),
                       'seed nesie Tip-On sety so sentinelom')
 
-  bez = bez_lift.reject { |s| c::TIPON_SETY.include?(s['set_id']) }
+  # KOV-G1a: sentinel zije UZ AJ v KODOVOM PASME (platnicka setu nôh pod
+  # 55 mm), takze „obsah bez sentinelu" musi vynechat aj ten set.
+  bez = bez_lift.reject { |s| c::TIPON_SETY.include?(s['set_id']) || s['set_id'] == 'nohy-podla-sokla' }
   NxTest.assert_equal(c::HWS::STD_HEIGHT_VARIANT, c::HWS.snapshot_std(mapping, bez),
                       'bez sentinelu ostava marker na 4 — spatna citatelnost sa neblokuje zbytocne')
+  nohy = bez_lift.select { |s| s['set_id'] == 'nohy-podla-sokla' }
+  NxTest.assert_equal(c::HWS::STD_SKIP_CODE, c::HWS.snapshot_std({}, nohy),
+                      'KOV-G1a: sentinel v KODOVOM pasme nesie ten isty marker ako v rade')
   NxTest.assert(c::HWS::STD_SUPPORTED.include?(c::HWS::STD_SKIP_CODE),
                 'novy marker je medzi podporovanymi')
   NxTest.assert(Noxun::Engine::HardwareSets::SEED_VERSION >= 5, 'D-118b seed = 5; KOV-F1 bumplo na 6')
@@ -444,15 +450,20 @@ NxTest.test('D-118b (R9): osvieženie berie definiciu z KNIZNICE, nie zo zabudov
   end
 end
 
-NxTest.test('D-118b (R8): `none` sa odmietne aj v KODOVOM pasme, v selectore setov nie') do
+NxTest.test('D-118b (R8) + KOV-G1a: `none` je PLATNE v kodovom pasme, v selectore setov je meno') do
   c = NxD118b
-  bad, errs = c::HWS.validate_member(
+  # D-118b tu sentinel ZAKAZOVALO — a to z JEDINEHO dovodu: marker `std` sa
+  # naň nepytal, takze starsi plugin by z bunky vyrobil riadok s kodom „none".
+  # KOV-G1a mu marker dal (`skip_code_present?` vidi aj pasma), takze zakaz
+  # zanikol a pasmo `none` znamena „v tomto pasme clen vedome nevznika".
+  ok, errs = c::HWS.validate_member(
     { 'per' => 'unit', 'qty' => 1,
       'param_bands' => { 'param' => 'height',
-                         'bands' => [{ 'min' => 10.0, 'max' => 20.0, 'code' => 'none' }] } }, 0
+                         'bands' => [{ 'min' => 10.0, 'max' => 20.0, 'code' => 'NONE' }] } }, 0
   )
-  NxTest.assert_equal(nil, bad, 'kodove pasmo so sentinelom sa NEULOZI')
-  NxTest.assert(errs.first.to_s.include?('none'), errs.inspect)
+  NxTest.assert_equal([], errs, errs.inspect)
+  NxTest.assert_equal(c::HWS::SKIP_CODE, ok['param_bands']['bands'].first['code'],
+                      'sentinel sa aj v pasme uklada kanonicky malymi pismenami')
 
   # Selector mapovania nesie `set_id` — tam je „none" legitimne meno setu.
   sel, errs2 = c::HWS.validate_param_bands(

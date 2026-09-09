@@ -2392,7 +2392,10 @@ module Noxun
           'wall_hanger' => 'Zavesenie na stenu',
           # KOV-B1: typ existuje v slovniku BuildPlan (set sa da ulozit), ale
           # PRAVIDLO nan zatial ziadne nie je — to prinesie KOV-E.
-          'lift' => 'Výklop / sklop' }[generic_type.to_s] || generic_type.to_s
+          'lift' => 'Výklop / sklop',
+          # KOV-G1a: prichyt soklovej listy (Michal 9.9.2026 — NIE „objímka").
+          # Pravidlo (pocet podla siroky skrinky) prinesie KOV-G1b.
+          'plinth_clip' => 'Príchyt sokla' }[generic_type.to_s] || generic_type.to_s
       end
 
       def stringify(h)

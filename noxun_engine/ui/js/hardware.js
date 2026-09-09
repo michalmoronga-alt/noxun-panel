@@ -6,9 +6,14 @@
 
   // V0.6 C-2 (audit F11): autorita labelov je SERVER (HardwareRules.label_for,
   // payload nesie it.label) — tato mapa je uz LEN fallback pre stary payload.
+  // KOV-G1a: fallback mapa dobehla server — chybali v nej `wall_hanger`,
+  // `lift` aj novy `plinth_clip`, takze stary payload by ich ukazal ako holy
+  // kluc („plinth_clip" namiesto „Príchyt sokla").
   function hwLabel(t){
     return { leg:'Nohy', hinge:'Závesy', slide:'Výsuv', handle:'Úchytky',
-             shelf_pin:'Podperky', connector:'Spojky' }[t] || t;
+             shelf_pin:'Podperky', connector:'Spojky',
+             wall_hanger:'Zavesenie na stenu', lift:'Výklop / sklop',
+             plinth_clip:'Príchyt sokla' }[t] || t;
   }
   function hwUnit(t){ return t === 'slide' ? 'sada' : 'ks'; }
   // Ludsky popis vlastnika: front:F2/wing:left -> "F2 · ľavé krídlo".

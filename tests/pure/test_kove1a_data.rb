@@ -248,7 +248,7 @@ NxTest.test('KOV-E1a (1): migracia v3 -> v4 LEN doplna — pouzivatelsku polozku
   NxTest.assert_equal(1.23, by_code['347810']['price_eur_vat'], 'ani jej cena')
   NxTest.assert_equal(22, items.length - 1, 'zvysnych 22 kodov sa doplnilo')
   NxTest.assert(by_code.key?('507366'), 'predlzovaci diel tyce pribudol')
-  NxTest.assert_equal(4, c::HWC::SEED_SET_VERSION, 'verzia sady bumpnuta na 4')
+  NxTest.assert(c::HWC::SEED_SET_VERSION >= 4, 'verzia sady bumpnuta aspon na 4 (KOV-G1a je 5)')
 end
 
 # ============================================================================
@@ -870,8 +870,15 @@ NxTest.test('KOV-E1a (8): tri vyklopove predvolby pribudnu a EXISTUJUCU volbu ne
   NxTest.assert_equal('vyklop-hk-klasik', add['class:lift|classic|hk_top'])
   NxTest.assert_equal('vyklop-hk-tipon', add['class:lift|tipon|hk_top'])
   NxTest.assert_equal('vyklop-hl-klasik', add['class:lift|classic|hl_top'])
+  # KOV-G1a: `MAPPING_ADDITIONS` nesie od tejto davky aj GENERICKY kluc
+  # (`plinth_clip`) — kontrakt je „platny kluc mapovania", nie „triedny kluc".
   add.each_key do |k|
-    NxTest.assert(c::HWS.parse_class_key(k)[0], "predvolba #{k} musi byt platny triedny kluc")
+    if k.start_with?('class:')
+      NxTest.assert(c::HWS.parse_class_key(k)[0], "predvolba #{k} musi byt platny triedny kluc")
+    else
+      NxTest.assert(c::E::BuildPlan::GENERIC_TYPES.include?(k),
+                    "predvolba #{k} musi byt znamy genericky typ")
+    end
   end
   # Vlastna volba pouzivatela sa NEPREPISE (add-if-absent).
   merged = c::HWS.add_mapping_seed(c.seed_sets, 'class:lift|classic|hk_top' => 'moj-vyklop')
@@ -1079,9 +1086,12 @@ NxTest.test('KOV-E1a (11): nakup EXISTUJUCEJ zakazky je CONTENT-identicky') do
       'quantity' => 4, 'rule_id' => 'podperky', 'source' => 'rule', 'params' => {} }
   ]
   exp = c::HWS.expand(items, st)
+  # KOV-G1a: sokel 150 mm objedna AXILO H150 (9076) + platnicku (9079) namiesto
+  # demosovskej nohy 367823 — to je VEDOMA zmena seedu nôh, nie regresia
+  # vyklopov. Zavesy a podperky ostavaju presne ako pred davkou.
   NxTest.assert_equal([['104717', 2], ['105408', 2], ['105425', 2], ['106412', 2],
-                       ['306125', 4], ['367823', 4]], c.codes(exp),
-                      'zavesy, nohy a podperky nakupuju presne ako pred davkou')
+                       ['306125', 4], ['9076', 4], ['9079', 4]], c.codes(exp),
+                      'zavesy a podperky nakupuju presne ako pred davkou')
   NxTest.assert_equal([], exp['unmapped'])
   lift = c.lift_codes
   NxTest.refute(c.codes(exp).any? { |code, _| lift.include?(code) },

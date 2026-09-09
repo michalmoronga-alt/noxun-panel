@@ -43,7 +43,7 @@ module Noxun
     module HardwareTaxonomy
       STD            = 'noxun-hardware-taxonomy'
       SCHEMA_CURRENT = 1
-      SEED_VERSION   = 2
+      SEED_VERSION   = 3
       FILE           = 'hardware_taxonomy.json'
 
       # Whitelisty klucov (KONTRAKT — vzor HardwareSets::SET_KEYS): kluc mimo
@@ -62,15 +62,33 @@ module Noxun
       # v2 (D-118, 7.9.2026): Tulip (uchytky a vesiaky, 6 seed poloziek) a rada
       # StrongBox (5 poloziek) — bez nich by ich katalogovy riadok nemal
       # vyrobcu a strom katalogu by ich zhodil pod „— bez vyrobcu".
-      SEED_MANUFACTURERS = ['Hettich', 'Blum', 'Grass', 'Strong', 'Tulip', 'Ostatné'].freeze
+      # v3 (KOV-G1a, 9.9.2026): vyrobca **Häfele** a rada **AXILO** presunuta
+      # pod neho. AXILO je Häfele program, nie Hettich — seed v1 to mal ZLE
+      # a od tejto davky ma set nôh aj devat katalogovych riadkov spravneho
+      # vyrobcu. Presun existujucich suborov robi `migrate_axilo_owner!` nizsie.
+      SEED_MANUFACTURERS = ['Hettich', 'Blum', 'Grass', 'Strong', 'Häfele',
+                            'Tulip', 'Ostatné'].freeze
       SEED_SERIES = [
         ['Sensys', 'Hettich'], ['InnoTech Atira', 'Hettich'], ['Quadro', 'Hettich'],
-        ['AvanTech YOU', 'Hettich'], ['AXILO', 'Hettich'],
+        ['AvanTech YOU', 'Hettich'], ['AXILO', 'Häfele'],
         ['CLIP top', 'Blum'], ['AVENTOS', 'Blum'], ['TANDEMBOX', 'Blum'],
         ['LEGRABOX', 'Blum'], ['MERIVOBOX', 'Blum'], ['TIP-ON', 'Blum'],
         ['Nova Pro', 'Grass'], ['Tiomos', 'Grass'],
         ['StrongMax', 'Strong'], ['StrongBox', 'Strong']
       ].freeze
+
+      # KOV-G1a: JEDNORAZOVA MIGRACIA VLASTNIKA RADY (seed v2 -> v3).
+      # `merge_seed` vie iba DOPĹŇAŤ chybajuce mena, takze uz zapisana rada
+      # AXILO by pod Hettichom ostala navzdy — a set nôh aj devat novych
+      # katalogovych riadkov by mali „Häfele/AXILO", teda dvojicu, ktora
+      # v taxonomii NEEXISTUJE (`create_item`/`save_set!` by ich odmietli
+      # vetou „rada nepatri vyrobcovi"). Dotkne sa LEN zaznamu, ktory je
+      # PRESNE nas stary seed tvar: meno doslovne „AXILO" a vlastnik
+      # ekvivalentny „Hettich" (vzor `LEGACY_SEED_SHAPES` v HardwareSets).
+      # Premenovana ci inak naviazana rada = ruky prec + info log.
+      AXILO_SERIES        = 'AXILO'
+      AXILO_LEGACY_OWNER  = 'Hettich'
+      AXILO_OWNER         = 'Häfele'
 
       module_function
 
@@ -469,6 +487,11 @@ module Noxun
           mans << { 'name' => name }
           have_m << key_of(name)
         end
+        # KOV-G1a: presun MUSI byt PRED dopĺňaním rad — inak by `have_s` uz
+        # obsahovalo AXILO a add-if-absent krok by ho preskocil, takze by
+        # rada ostala pod Hettichom (a nova dvojica Häfele/AXILO by nikdy
+        # nevznikla).
+        migrate_axilo_owner!(mans, sers)
         have_s = sers.map { |s| key_of(s['name']) }
         SEED_SERIES.each do |(name, man)|
           next if have_s.include?(key_of(name))
@@ -484,6 +507,30 @@ module Noxun
           have_s << key_of(name)
         end
         [mans.sort_by { |m| key_of(m['name']) }, sers.sort_by { |s| key_of(s['name']) }]
+      end
+
+      # KOV-G1a: presunie radu AXILO spod Hettichu pod Häfele — ale LEN vtedy,
+      # ked je zaznam PRESNE nas stary seed tvar. Mutuje `mans`/`sers` na
+      # mieste (bezi vnutri `merge_seed`, teda nad kopiou z `norm_records`).
+      #
+      # Vlastnik sa berie z UZ ULOZENEHO zapisu vyrobcu (rovnaka uvaha ako pri
+      # radach vyssie, Codex #320 kolo 2 P2): ked ma pouzivatel „HÄFELE", rada
+      # zapisana nasim „Häfele" by v selectoch rad ZMIZLA — JS filtruje podla
+      # PRESNEHO retazca. Ked vyrobca este neexistuje, doplni sa TU (add-only,
+      # rovnako ako v kroku vyssie), aby rada nikdy nesedela na prazdne miesto.
+      def migrate_axilo_owner!(mans, sers)
+        rec = sers.find { |s| s['name'].to_s == AXILO_SERIES }
+        return false if rec.nil?
+        return false unless same_name?(rec['manufacturer'], AXILO_LEGACY_OWNER)
+
+        owner = mans.find { |m| same_name?(m['name'], AXILO_OWNER) }
+        if owner.nil?
+          owner = { 'name' => AXILO_OWNER }
+          mans << owner
+        end
+        rec['manufacturer'] = owner['name']
+        Engine.log("hardware taxonomy: rada '#{AXILO_SERIES}' presunuta pod '#{owner['name']}'") if defined?(Engine)
+        true
       end
 
       # --- API (LEN create — R-35 / audit #17 FIX 10) -------------------------

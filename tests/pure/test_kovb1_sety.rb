@@ -137,7 +137,8 @@ module NxB1
   USE_BY_GT = { 'hinge' => %w[door classic], 'slide' => %w[drawer classic],
                 'lift' => %w[lift classic], # KOV-E1a: seed vyklopov
                 'leg' => %w[other other], 'wall_hanger' => %w[other other],
-                'shelf_pin' => %w[other other] }.freeze
+                'shelf_pin' => %w[other other],
+                'plinth_clip' => %w[other other] }.freeze # KOV-G1a: prichyt sokla
 
   def classify_seed(set)
     ut, om = USE_BY_GT[set['generic_type']]

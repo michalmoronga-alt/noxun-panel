@@ -97,7 +97,11 @@ module NxD118
         out << m['code'] if m['code']
         # D-118b: vyhradena bunka `none` NIE JE kod — do katalogu nepatri.
         (m['code_by_nl'] || {}).each_value { |c| out << c unless HWS.skip_code?(c) }
-        ((m['param_bands'] || {})['bands'] || []).each { |b| out << b['code'] if b['code'] }
+        # KOV-G1a: sentinel `none` zije aj v KODOVOM pasme (platnicka AXILO pod
+        # 55 mm) — tiez to NIE JE kod a do katalogu nepatri.
+        ((m['param_bands'] || {})['bands'] || []).each do |b|
+          out << b['code'] if b['code'] && !HWS.skip_code?(b['code'])
+        end
         # KOV-E1a: kody podla TRIEDY (mechanizmus a ramena vyklopu) — sentinel
         # `none` sa sem NEDEDI, takze kazdy kluc MUSI mat katalogovu polozku.
         ((m['code_by_param'] || {})['codes'] || {}).each_value { |c| out << c }
