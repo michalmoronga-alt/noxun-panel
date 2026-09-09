@@ -20,8 +20,9 @@
 #   R4 `height_selector` end-to-end: pevny set_id pre Atiru = veta o vyske
 #      v Nakupe (`unmapped_reason_sk`), v paneli (`explain`) aj v Kontrole
 #      (`Validation.check_hardware_expansion`) — nikde „iná klasifikácia"
-#   R5 uplnost: kazdy literalny/konstantny `'detail' => …` v hardware_sets.rb
-#      ma vetu a tabulka nema kluc, ktory core nevydava
+#   R5 uplnost: kazdy `'detail' => <string|KONSTANTA>` v hardware_sets.rb (cez
+#      AST — komentare a uvodzovky nehraju rolu) ma vetu a tabulka nema kluc,
+#      ktory core nevydava
 #
 # MUTACIE (kazda overena rucne — po zaneseni chyby spadne uvedeny test):
 #   M1 vratenie druhej (inline) definicie bez `height_selector` -> R1 (zdrojovy
@@ -64,17 +65,49 @@ module NxIncompatDetail
       'source' => 'recipe' }
   end
 
-  # Kluce detailu zapisane v zdrojaku ako literal alebo konstanta modulu
-  # (`'detail' => 'x'` / `'detail' => KONSTANTA`). Premenna v slucke
-  # (`'detail' => k`) sem nepatri — tie kluce kryje R2 behaviorálne.
-  # Riadkove komentare sa vynechaju (priklad v komentari nie je emitovany
-  # detail); literal s medzerou (`'set nevydal žiadnu položku'`, dovod
-  # `members_skipped`) regex zamerne minie — cez preklad neprechadza.
+  # Kluce detailu v zdrojaku — cez AST (nie regex), takze komentare, druh
+  # uvodzoviek ani zalomenie nehraju rolu: kazdy hash s klucom `'detail'` a
+  # hodnotou STRING, KONSTANTA modulu alebo PREMENNA bloku nad polom literalov
+  # (`%w[opening_mode drawer_construction].each do |k| … 'detail' => k`) —
+  # premenna sa rozlozi na prvky toho pola (Codex #335 P2: novy kluc v tej
+  # slucke bez vety inak neodhali nikto). Volny text s medzerou (`'set nevydal
+  # žiadnu položku'`, dovod `members_skipped`) nie je kluc prekladu, preto sa
+  # beru len identifikatory `[a-z0-9_]+`.
+  # Pozn.: pri `frozen_string_literal` je kluc hashu uzol LIT (nie STR).
   def source_detail_keys
-    src = File.readlines(SRC, encoding: 'UTF-8').reject { |l| l =~ /\A\s*#/ }.join
-    src.scan(/'detail'\s*=>\s*(?:'([a-z0-9_]+)'|([A-Z][A-Z0-9_]+))/).map do |lit, const|
-      lit || HWS.const_get(const)
-    end.uniq
+    ast = RubyVM::AbstractSyntaxTree.parse_file(SRC)
+    keys = []
+    node = ->(n) { n.is_a?(RubyVM::AbstractSyntaxTree::Node) }
+    str = ->(n) { node.call(n) && %i[STR LIT].include?(n.type) && n.children[0].is_a?(String) ? n.children[0] : nil }
+    walk = nil
+    walk = lambda do |n, bindings|
+      return unless node.call(n)
+
+      # `<pole literalov>.each do |k| … end` — k = kazdy prvok pola
+      if n.type == :ITER && node.call(n.children[0]) && n.children[0].type == :CALL &&
+         n.children[0].children[1] == :each && node.call(n.children[0].children[0]) &&
+         n.children[0].children[0].type == :LIST && node.call(n.children[1]) && n.children[1].type == :SCOPE
+        items = n.children[0].children[0].children.map { |e| str.call(e) }.compact
+        param = Array(n.children[1].children[0]).first
+        bindings = bindings.merge(param.to_s => items) if param && !items.empty?
+      end
+      if n.type == :HASH && node.call(n.children[0])
+        n.children[0].children.each_slice(2) do |k, v|
+          next unless str.call(k) == 'detail' && node.call(v)
+
+          vals = case v.type
+                 when :STR, :LIT then [str.call(v)]
+                 when :CONST then [HWS.const_get(v.children[0])]
+                 when :DVAR, :LVAR then bindings.fetch(v.children[0].to_s, [])
+                 else []
+                 end
+          vals.each { |val| keys << val if val.is_a?(String) && val =~ /\A[a-z0-9_]+\z/ }
+        end
+      end
+      n.children.each { |c| walk.call(c, bindings) }
+    end
+    walk.call(ast, {})
+    keys.uniq
   end
 end
 
@@ -163,19 +196,33 @@ NxTest.test('incompatible_detail_sk (R4): pevny set_id pre Atiru = veta o vyske 
   msg = red.first['message_sk'].to_s
   NxTest.assert(msg.include?('podľa výšky zásuvky'), "Kontrola: #{msg}")
   NxTest.refute(msg.include?('iná klasifikácia'), "Kontrola nesmie byt genericka: #{msg}")
+  # Veta je na dvoch miestach (Nakup + Kontrola) — podmet aj vokalizovana
+  # predlozka musia zniet rovnako („so zásuvkou", nie „s zásuvkou").
+  NxTest.assert(nakup.include?('nesedí so zásuvkou'), "Nakup: #{nakup}")
+  NxTest.assert(msg.include?('nesedí so zásuvkou'), "Kontrola: #{msg}")
+end
+
+NxTest.test('incompatible_detail_sk (R4): vyklop ma v Nakupe vlastny podmet („nesedí s výklopom")') do
+  c = NxIncompatDetail
+  u = { 'reason' => 'set_incompatible', 'generic_type' => 'lift', 'set_id' => 'vyklop-hk-klasik',
+        'detail' => c::HWS::LIFT_SYSTEM_KEY }
+  txt = c::HWS.unmapped_reason_sk(u)
+  NxTest.assert(txt.include?('nesedí s výklopom') && txt.include?('HK top'), txt)
 end
 
 NxTest.test('incompatible_detail_sk (R5): uplnost — kazdy detail zo zdrojaku ma vetu a tabulka nema kluc navyse') do
+  NxTest.skip!('RubyVM::AbstractSyntaxTree nie je k dispozicii') unless defined?(RubyVM::AbstractSyntaxTree)
   c = NxIncompatDetail
   tbl = c::HWS::INCOMPATIBLE_DETAIL_SK
   keys = c.source_detail_keys
-  NxTest.assert(keys.length >= 5, "regex nasiel prilis malo klucov: #{keys.inspect}")
+  NxTest.assert(keys.length >= 5, "AST nasiel prilis malo klucov: #{keys.inspect}")
+  # Slucka `%w[opening_mode drawer_construction].each do |k|` sa rozklada na
+  # prvky — obidva kluce musia prist z AST, nie z rucneho zoznamu.
+  NxTest.assert(%w[opening_mode drawer_construction].all? { |k| keys.include?(k) },
+                "kluce zo slucky sa nerozlozili: #{keys.inspect}")
   missing = keys.reject { |k| tbl.key?(k) }
   NxTest.assert_equal([], missing, "detail bez vety (dopln INCOMPATIBLE_DETAIL_SK): #{missing.inspect}")
-  # `opening_mode` a `drawer_construction` vydava aj slucka nad premennou `k`
-  # (regex ju nevidi) — kryje ich R2 behaviorálne.
-  known = (keys + %w[opening_mode drawer_construction]).uniq
-  extra = tbl.keys - known
+  extra = tbl.keys - keys
   NxTest.assert_equal([], extra, "veta pre kluc, ktory core nevydava: #{extra.inspect}")
   NxTest.assert_equal(c::EMITTED.sort, tbl.keys.sort, 'nezavisly zapis zoznamu detailov sedi s tabulkou')
 end

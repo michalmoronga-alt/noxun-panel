@@ -69,11 +69,17 @@ end
 #   - rovnake mena v ROZNYCH triedach (`initialize`, `to_h`) nie su duplicita,
 #   - znovuotvoreny modul (v tom istom aj v INOM subore) duplicitu neschova —
 #     `module Noxun::Engine::X` a vnorene `module Noxun; module Engine; module X`
-#     su ten isty scope,
-#   - `class << self` a `def self.x` zdielaju singleton scope (`X.x`),
+#     su ten isty scope; `module ::M` je koren namespace, nie vnorenie,
+#   - `class << self` a `def self.x` zdielaju singleton scope (`X.x`); `class
+#     << KONST` / `def KONST.x` je INY scope (`X::self<KONST>.x`),
+#   - `module_function` (bez argumentov aj s menami) vytvara AJ singleton kopiu
+#     (`X.x`), takze neskorsi `def self.x` je duplicita,
 #   - `def` v tele metody sa neskenuje (lokalna zvlastnost, nie redefinicia),
-#   - `def` v roznych vetvach `if`/`unless`/`case` nie je duplicita (vedoma
-#     podmienena definicia, napr. podla verzie Ruby).
+#   - dve definicie vo VZAJOMNE VYLUCNYCH vetvach `if`/`unless`/`case` nie su
+#     duplicita (vedoma podmienena definicia, napr. podla verzie Ruby) — aj
+#     ked su vo vetvach zabalene do `class << self`; nepodmienena + podmienena,
+#     alebo dve v TEJ ISTEJ vetve, duplicita SU — druha prvu prekryje.
+# Priznany limit: `define_method`/`alias_method` scanner nesleduje.
 # Self-test nizsie drzi presne tieto hranice.
 module NxTest
   module DupDefs
@@ -81,18 +87,43 @@ module NxTest
 
     BRANCHING = %i[IF UNLESS CASE CASE2 CASE3 WHEN IN].freeze
 
-    # -> seen: { 'Noxun::Engine::X#y' => ['subor:riadok', …] }; duplicita = >1 zaznam
+    # -> seen: { 'Noxun::Engine::X#y' => [['subor:riadok', cesta_vetvenia], …] }
     def scan(ast, file, seen = Hash.new { |h, k| h[k] = [] })
-      walk(ast, [], file, seen, nil)
+      walk(ast, [], file, seen, [], { mf: false })
       seen
     end
 
+    # Dve definicie su vylucne LEN ked sa ich cesty vetvenia rozidu v tom
+    # istom uzle (rovnaky riadok `if`/`when`, ina vetva). Prazdna cesta
+    # (nepodmienena) proti hocijakej, alebo ta ista cesta, = duplicita.
+    def exclusive?(a, b)
+      a.zip(b).any? { |x, y| x && y && x != y && x.split('/')[0] == y.split('/')[0] }
+    end
+
     def duplicates(seen)
-      seen.select { |_, where| where.length > 1 }.map { |key, where| "#{key} (#{where.join(', ')})" }
+      seen.filter_map do |key, entries|
+        next if entries.length < 2
+
+        hits = entries.each_index.select do |i|
+          entries.each_index.any? { |j| i != j && !exclusive?(entries[i][1], entries[j][1]) }
+        end
+        next if hits.empty?
+        # Singleton kopie z `module_function` su ODVODENE od instancnych `def`:
+        # dva `def x` v takom module uz hlasi instancny kluc `M#x` — hlasit aj
+        # `M.x` by bol ten isty nalez dvakrat. Odvodena kopia sa hlasi len
+        # proti SKUTOCNEJ singleton definicii (`def self.x`, `class << self`).
+        next if hits.all? { |i| entries[i][2] }
+
+        "#{key} (#{hits.map { |i| entries[i][0] }.join(', ')})"
+      end
+    end
+
+    def node?(n)
+      n.is_a?(RubyVM::AbstractSyntaxTree::Node)
     end
 
     def cpath_name(node)
-      return '?' unless node.is_a?(RubyVM::AbstractSyntaxTree::Node)
+      return '?' unless node?(node)
 
       # `module M` je (COLON2 nil :M), `module A::B` je (COLON2 (CONST :A) :B),
       # `module ::M` je (COLON3 :M) — bez rodica sa meno neuvadza s `::`, aby
@@ -107,33 +138,81 @@ module NxTest
       end
     end
 
-    def walk(node, scope, file, seen, branch)
-      return unless node.is_a?(RubyVM::AbstractSyntaxTree::Node)
+    # `module ::M` / `module ::A::B` = koren namespace bez ohladu na vnorenie.
+    def absolute_cpath?(node)
+      return false unless node?(node)
+      return true if node.type == :COLON3
+
+      node.type == :COLON2 && absolute_cpath?(node.children[0])
+    end
+
+    # `class << self` / `def self.x` -> 'self'; `class << KONST` / `def KONST.x`
+    # -> 'self<KONST>' (iny objekt = iny scope, nie falosna duplicita).
+    def singleton_tag(receiver)
+      node?(receiver) && receiver.type == :SELF ? 'self' : "self<#{cpath_name(receiver)}>"
+    end
+
+    # Mena symbolov v argumentoch (`module_function :a, :b`).
+    def symbols(args)
+      out = []
+      collect = nil
+      collect = lambda do |n|
+        return unless node?(n)
+
+        if (n.type == :LIT && n.children[0].is_a?(Symbol)) || n.type == :SYM
+          out << n.children[0].to_s
+        else
+          n.children.each { |c| collect.call(c) }
+        end
+      end
+      collect.call(args)
+      out
+    end
+
+    def walk(node, scope, file, seen, branch, ctx)
+      return unless node?(node)
 
       case node.type
       when :MODULE, :CLASS
-        walk(node.children.last, scope + [cpath_name(node.children[0])], file, seen, nil)
+        cpath = node.children[0]
+        inner = (absolute_cpath?(cpath) ? [] : scope) + [cpath_name(cpath)]
+        walk(node.children.last, inner, file, seen, branch, { mf: false })
       when :SCLASS
-        walk(node.children.last, scope + ['self'], file, seen, nil)
+        walk(node.children.last, scope + [singleton_tag(node.children[0])], file, seen, branch, { mf: false })
       when :DEFN
-        record(seen, scope, node.children[0].to_s, branch, file, node.first_lineno)
+        name = node.children[0].to_s
+        record(seen, scope, name, branch, file, node.first_lineno)
+        record(seen, scope + ['self'], name, branch, file, node.first_lineno, true) if ctx[:mf]
       when :DEFS
-        record(seen, scope + ['self'], node.children[1].to_s, branch, file, node.first_lineno)
+        record(seen, scope + [singleton_tag(node.children[0])], node.children[1].to_s, branch, file, node.first_lineno)
+      when :VCALL, :FCALL
+        if node.children[0] == :module_function
+          args = node.type == :FCALL ? node.children[1] : nil
+          if args.nil?
+            ctx[:mf] = true
+          else
+            symbols(args).each { |n| record(seen, scope + ['self'], n, branch, file, node.first_lineno) }
+          end
+        end
       when *BRANCHING
         node.children.each_with_index do |ch, i|
-          walk(ch, scope, file, seen, "#{branch}#{node.first_lineno}/#{i};")
+          walk(ch, scope, file, seen, branch + ["#{node.first_lineno}/#{i}"], ctx)
         end
       else
-        node.children.each { |ch| walk(ch, scope, file, seen, branch) }
+        node.children.each { |ch| walk(ch, scope, file, seen, branch, ctx) }
       end
     end
 
-    def record(seen, scope, name, branch, file, line)
-      singleton = scope.last == 'self'
-      path = (singleton ? scope[0..-2] : scope).join('::')
-      key = "#{path}#{singleton ? '.' : '#'}#{name}"
-      key += " [vetva #{branch}]" if branch
-      seen[key] << "#{file}:#{line}"
+    def record(seen, scope, name, branch, file, line, derived = false)
+      last = scope.last.to_s
+      key = if last == 'self'
+              "#{scope[0..-2].join('::')}.#{name}"
+            elsif last.start_with?('self<')
+              "#{scope.join('::')}.#{name}"
+            else
+              "#{scope.join('::')}##{name}"
+            end
+      seen[key] << ["#{file}:#{line}", branch, derived]
     end
   end
 end
@@ -155,16 +234,42 @@ NxTest.test('guard: self-test scannera duplicitnych definicii (hranice AST)') do
   NxTest.assert_equal(['Noxun::Engine::X#g (f0:2, f1:4)'],
                       dups.call("module Noxun::Engine::X\n  def g; end\nend\n",
                                 "module Noxun\n  module Engine\n    module X\n      def g; end\n    end\n  end\nend\n"))
+  # B3) `module ::M` vnutri ineho modulu je KOREN, nie `O::M`
+  NxTest.assert_equal(['M#a (f0:2, f0:6)'],
+                      dups.call("module M\n  def a; end\nend\nmodule O\n  module ::M\n    def a; end\n  end\nend\n"))
   # C) rovnake meno v roznych triedach nie je duplicita
   NxTest.assert_equal([], dups.call("class A\n  def c; end\nend\nclass B\n  def c; end\nend\n"))
-  # D) vedoma podmienena definicia (vetvy `if`) nie je duplicita
+  # D) vedoma podmienena definicia (vylucne vetvy `if` / `case`) nie je duplicita…
   NxTest.assert_equal([], dups.call("module M\n  if RUBY_VERSION > '3'\n    def d; end\n  else\n    def d; end\n  end\nend\n"))
+  NxTest.assert_equal([], dups.call("module M\n  case RUBY_VERSION\n  when '3' then def d; end\n  else def d; end\n  end\nend\n"))
+  # D1) …ani ked su vetvy zabalene do `class << self`
+  NxTest.assert_equal([], dups.call("module M\n  if x\n    class << self\n      def a; end\n    end\n  else\n    class << self\n      def a; end\n    end\n  end\nend\n"))
+  # D2) …ale nepodmienena + podmienena JE (druha prekryje prvu) — v oboch poradiach, rovnako dve
+  #     v tej istej vetve a dve pod NEZAVISLYMI `if` (obe podmienky mozu platit naraz; Codex #335 P2)
+  NxTest.assert_equal(['M#d (f0:2, f0:4)'], dups.call("module M\n  def d; end\n  if x\n    def d; end\n  end\nend\n"))
+  NxTest.assert_equal(['M#d (f0:3, f0:5)'], dups.call("module M\n  if x\n    def d; end\n  end\n  def d; end\nend\n"))
+  NxTest.assert_equal(['M#d (f0:3, f0:4)'], dups.call("module M\n  if x\n    def d; end\n    def d; end\n  end\nend\n"))
+  NxTest.assert_equal(['M#d (f0:3, f0:6)'],
+                      dups.call("module M\n  if x\n    def d; end\n  end\n  if y\n    def d; end\n  end\nend\n"))
   # E) `def self.e` dvakrat = duplicita; H) `class << self` + `def self.h` = ten isty singleton scope
   NxTest.assert_equal(['M.e (f0:2, f0:3)'], dups.call("module M\n  def self.e; end\n  def self.e; end\nend\n"))
   NxTest.assert_equal(['M.h (f0:3, f0:5)'],
                       dups.call("module M\n  class << self\n    def h; end\n  end\n  def self.h; end\nend\n"))
   # F) `def` v tele metody sa neskenuje
   NxTest.assert_equal([], dups.call("module M\n  def f\n    def g; end\n  end\n  def g; end\nend\n"))
+  # MF) `module_function` vytvara aj singleton kopiu — neskorsi `def self.a` ju prekryje
+  NxTest.assert_equal(['M.a (f0:3, f0:4)'],
+                      dups.call("module M\n  module_function\n  def a; end\n  def self.a; end\nend\n"))
+  NxTest.assert_equal(['M.a (f0:2, f0:4)'],
+                      dups.call("module M\n  module_function :a\n  def a; end\n  def self.a; end\nend\n"))
+  NxTest.assert_equal([], dups.call("module M\n  module_function\n  def a; end\n  def b; end\nend\n"))
+  # MF3) dva `def a` v module_function module = JEDEN nalez (instancny), nie aj odvodeny singleton
+  NxTest.assert_equal(['M#a (f0:3, f0:4)'], dups.call("module M\n  module_function\n  def a; end\n  def a; end\nend\n"))
+  # X) `class << KONST` / `def A.a` je iny scope nez `class << self` / `def B.a` — ziadna falosna duplicita
+  NxTest.assert_equal([], dups.call("module M\n  class << K\n    def a; end\n  end\n  class << self\n    def a; end\n  end\nend\n"))
+  NxTest.assert_equal([], dups.call("module M\n  def A.a; end\n  def B.a; end\nend\n"))
+  NxTest.assert_equal(['M::self<K>.a (f0:3, f0:5)'],
+                      dups.call("module M\n  class << K\n    def a; end\n  end\n  def K.a; end\nend\n"))
 end
 
 NxTest.test('guard: ziadna metoda nie je v tom istom module/triede definovana dvakrat (AST, cely plugin)') do
