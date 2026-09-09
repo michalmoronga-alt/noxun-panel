@@ -116,7 +116,7 @@
   // `HardwareSets::SKIP_CODE` (zhodu stráži guard test); znamená „táto dĺžka
   // vedome nemá kód", nie chýbajúci údaj.
   var HWS_SKIP_CODE = 'none';
-  // KOV-E2: read-only režim setov s novým tvarom člena (E1a `HWS_LOCKED_HINT`)
+  // KOV-E2: read-only režim setov s novým tvarom člena (badge a hláška z E1a)
   // ZANIKOL — editor `code_by_param` aj `quantity_from` už vie, takže veta
   // „úprava príde neskôr" by klamala a set výklopu by sa nedal opraviť.
   function hwsIsSkipCode(v){

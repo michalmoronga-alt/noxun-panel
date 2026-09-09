@@ -322,6 +322,52 @@
                   "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": 1.5, "kg_max": 9.0 }] }]
     },
     {
+      "name": "KOV-E2: ZÁPORNÝ prah druhej tyče — `lift_rod_count` ho zahodí, teda „druhá tyč nikdy“",
+      "invalid": true,
+      "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": true,
+                  "rod_double_from_kb_mm": -1100.0,
+                  "classes": [{ "code": "22K2300", "min": 420.0, "max": 1610.0 }],
+                  "mechanisms": [{ "code": "22L2500", "max": 580.0 }],
+                  "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": 1.5, "kg_max": 9.0 }] }]
+    },
+    {
+      "name": "KOV-E2: ZÁPORNÉ LF v triede HK — pásmo by pokrývalo nezmyselné hodnoty",
+      "invalid": true,
+      "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": true,
+                  "classes": [{ "code": "22K2300", "min": -420.0, "max": 1610.0 }],
+                  "mechanisms": [{ "code": "22L2500", "max": 580.0 }],
+                  "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": 1.5, "kg_max": 9.0 }] }]
+    },
+    {
+      "name": "KOV-E2: ZÁPORNÁ hmotnosť ramien",
+      "invalid": true,
+      "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": true,
+                  "classes": [{ "code": "22K2300", "min": 420.0, "max": 1610.0 }],
+                  "mechanisms": [{ "code": "22L2500", "max": 580.0 }],
+                  "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": -1.5, "kg_max": 9.0 }] }]
+    },
+    {
+      "name": "KOV-E2: spôsobilosť HL s OBRÁTENOU výškou — systém by nebol použiteľný nikdy",
+      "invalid": true,
+      "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": true,
+                  "classes": [{ "code": "22K2300", "min": 420.0, "max": 1610.0 }],
+                  "mechanisms": [{ "code": "22L2500", "max": 580.0 }],
+                  "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": 1.5, "kg_max": 9.0 }],
+                  "eligibility": { "hk_top": { "kh_min": 205.0, "kh_max": 600.0, "kb_max": 1800.0 },
+                                   "hl_top": { "kh_min": 580.0, "kh_max": 300.0 } } }]
+    },
+    {
+      "name": "KOV-E2: PLATNÁ spôsobilosť oboch systémov prejde",
+      "invalid": false,
+      "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": true,
+                  "handle_allowance_kg": 0.5, "rod_double_from_kb_mm": 1100.0,
+                  "classes": [{ "code": "22K2300", "min": 420.0, "max": 1610.0 }],
+                  "mechanisms": [{ "code": "22L2500", "max": 580.0 }],
+                  "arms": [{ "code": "22L3200", "kh_min": 300.0, "kh_max": 340.0, "kg_min": 1.5, "kg_max": 9.0 }],
+                  "eligibility": { "hk_top": { "kh_min": 205.0, "kh_max": 600.0, "kb_max": 1800.0 },
+                                   "hl_top": { "kh_min": 300.0, "kh_max": 580.0, "kb_max": 1800.0, "depth_min": 264.0 } } }]
+    },
+    {
       "name": "KOV-E1b: VYPNUTÉ výklopové pravidlo s prázdnymi tabuľkami sa nekontroluje (dá sa vypnúť)",
       "invalid": false,
       "rules": [{ "rule_id": "vyklopy-aventos", "output": "lift", "kind": "lift_class", "enabled": false,
