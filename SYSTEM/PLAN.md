@@ -649,7 +649,7 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   **Definície (Astra FIX 5; Michal potvrdil 9.9.2026):** **KH = výška korpusu BEZ sokla** (`height − floor_height`, nezaokrúhlený Float — Blum KH je korpus, nie výrobná dĺžka
   čela 396 pri korpuse 400); **V1: výklop = JEDINÝ riadok čiel skrinky** — viac riadkov s výklopom = RED `lift_multirow_unsupported` (hint „rozdeľ na samostatnú skrinku");
   deskriptor dielca nesie `flap_dir` + `lift_system` explicitne (dnes žije `flap_dir` len na resolved čele).
-  **E1a DÁTA (Audit HOTOVÝ — Astra 9.9.; po implementácii len codex-po-pr):** katalóg **23 riadkov** (`SEED_ROWS` 9 polí vzor D-118a, kategória VYKLOPY, výrobca Blum,
+  ✅ **E1a DÁTA — HOTOVO (PR #332, v0.9.53):** katalóg **23 riadkov** (`SEED_ROWS` 9 polí vzor D-118a, kategória VYKLOPY, výrobca Blum,
   rada AVENTOS, dátum 9.9.2026) cez migráciu (`seed_version` bump, používateľské položky sa neprepisujú) · **člen setu — dva nové tvary** (Codex P1, Astra FIX 8/9):
   **`code_by_param: { "param": "lift_class", "codes": { "22K2300": "347810", … } }`** (serializovaný selektor, string kľúče, `code XOR code_by_nl XOR param_bands XOR
   code_by_param`; chýbajúci kľúč = NEVYRIEŠENÝ člen) a **`quantity_from: "rod_count"`** (celé číslo ≥ 0 z `params`; `rod_extension` explicitne 0/1; **0 = člen sa VEDOME NEVYDÁ — rozhodne sa PRED `add_row`, žiadny

@@ -340,6 +340,16 @@ Démos už nepozná: riadok **ostáva** (staré zákazky ho majú v nákupe), le
 Dôsledok, ktorý patrí do poznámok k vydaniu: katalóg bez klasifikácie sa doplnením výrobcov stampuje na `SCHEMA_CLASSIFIED`, teda **starší plugin ho odteraz číta ako read-only**
 („aktualizuj plugin") — nikdy ticho neoreže.
 
+**SEED v4 — VÝKLOPY AVENTOS (KOV-E1a, v0.9.53).** Manifest má **137 riadkov**: k v3 pribudlo **23 kódov Blum AVENTOS** zo `SYSTEM/zdroje/demos/SEED_AVENTOS_v2_2026-09-09.md`
+(HK top mechanizmy `22K2x00` a `22K2x00T`, krytky HK `22K8000` v troch farbách, Tip-On jednotky 76 mm šedá a čierna, HL top mechanizmy `22L2x00`, ramená `22L3x00`,
+stabilizačná tyč `22Q1076U`, predlžovací diel `22Q080Z` a krytky HL `22.8000`). Kategória je `VYKLOPY`, výrobca `Blum`, rada `AVENTOS` (Tip-On jednotky `TIP-ON`) a poznámka
+nesie rozsah, podľa ktorého sa trieda vyberá (`LF 420–1610`, `KH 300–339 · 1,5–9 kg vrát. úchytky`). **Ceny sú s DPH zo zberu 9.9.2026 cez Démos LBX API**, preto tieto riadky
+nesú **vlastný** `SEED_PRICE_CHECKED_AT_V4` — spoločný stamp by starším 60 riadkom prepísal ich skutočný dátum overenia (7.9.), a dátum patrí konkrétnej väzbe.
+
+**Migrácia v3 → v4** (`apply_seed_patch_v4`, `SEED_SET_VERSION` 4) je LEN DOPĹŇAJÚCA: neosviežuje ani jeden existujúci riadok. Kódy `347827`, `13781` a `250831` v katalógu už
+boli, takže sa ich dávka **nedotkla** (vrátane toho, že `250831` ostáva v kategórii `ZAVESY` — je to tá istá Tip-On jednotka ako pri závesoch). Kto si niektorý z 23 kódov
+medzitým založil sám, ostáva mu jeho vlastný záznam.
+
 ### hardware_taxonomy.rb
 
 **Jediný zoznam prípustných výrobcov a rád kovania (KOV-B1, v0.9.19; audit #17 BLOCKER 4).** Set aj položka katalógu nesú `manufacturer`/`series` ako reťazec — keby si ho každý
@@ -379,8 +389,8 @@ Sety kovania (mapovacie pravidlo generický typ → kódy katalógu) + projektov
 a `hardware_catalog.rb` a v [ui-lifecycle.md](ui-lifecycle.md) (sekcia `hw` Štúdia).
 
 **KLASIFIKÁCIA SETU (KOV-B1, v0.9.19).** Set už nie je len „mapovanie typu na kódy" — nesie AJ to, NA ČO sa používa: `use_type` (door|drawer|lift|fall|other) · `opening_mode`
-(classic|tipon|other, kde `other` = „neuplatňuje sa" pri nohách, podperkách a zavesení) · `drawer_construction` (metal|wood|other, **len pri zásuvke**) · `manufacturer` ·
-`series` · `active`. Slovníky sú UZAVRETÉ (neznáma hodnota = obsah novšej verzie, nie nová kategória) a s čelami držia JEDNU doménovú pravdu — `Fronts` sa načítava PO
+(classic|tipon|other, kde `other` = „neuplatňuje sa" pri nohách, podperkách a zavesení) · `drawer_construction` (metal|wood|other, **len pri zásuvke**) · `lift_system`
+(hk_top|hl_top, **len pri výklope** — KOV-E1a) · `manufacturer` · `series` · `active`. Slovníky sú UZAVRETÉ (neznáma hodnota = obsah novšej verzie, nie nová kategória) a s čelami držia JEDNU doménovú pravdu — `Fronts` sa načítava PO
 `hardware_sets`, takže väzbu drží guard test, nie referencia.
 
 Šesť pravidiel, na ktorých kontrakt stojí:
@@ -443,18 +453,20 @@ existujúca** dĺžka radu (inak najdlhšia) — rad 260–350 by inak hlásil f
 (`sets_payload['class_options']`) a vlastný nemá — druhý zoznam v JS by sa pri prvom pribudnutom type rozišiel s doménovou pravdou. `USE_TYPE_SK` (2./4. pád do vety servera)
 je iná vrstva a zostáva oddelene. Neznáma hodnota (obsah novšej verzie) sa **neprekladá** — vypíše sa tak, ako prišla.
 
-**Marker `std` má TRI hodnoty a je LAZY podľa obsahu.** `1` = len legacy tvary · `2` = pásma člena alebo selector v mapovaní (GH #131) · **`3` = set s KTORÝMKOĽVEK kľúčom mimo
+**Marker `std` má ŠESŤ hodnôt a je LAZY podľa obsahu.** `1` = len legacy tvary · `2` = pásma člena alebo selector v mapovaní (GH #131) · **`3` = set s KTORÝMKOĽVEK kľúčom mimo
 `LEGACY_SET_KEYS`** (každé klasifikačné pole aj `active` samostatne) **alebo mapovanie s triednym kľúčom `class:`**. Čisto legacy obsah ostáva na svojom pôvodnom std, takže
-spätná čitateľnosť sa zbytočne neblokuje; obsah so `std: 3` je pre starší plugin `:read_only` (knižnica) a `:invalid` (snapshot) — NIKDY čiastočné čítanie. Tú istú funkciu
-(`snapshot_std`) používa zápis knižnice aj zápis snapshotu: marker musí hovoriť o obsahu rovnako v `%APPDATA%` aj v .skp.
+spätná čitateľnosť sa zbytočne neblokuje; obsah so `std: 3` je pre starší plugin `:read_only` (knižnica) a `:invalid` (snapshot) — NIKDY čiastočné čítanie. Ďalšie hodnoty
+pridali neskoršie dávky: `4` = `height_variant` (KOV-C2a) · `5` = vyhradená bunka `none` (D-118b) · **`6` = tvary výklopov** (`code_by_param`, `quantity_from`, `lift_system` —
+KOV-E1a). Tú istú funkciu (`snapshot_std`) používa zápis knižnice aj zápis snapshotu: marker musí hovoriť o obsahu rovnako v `%APPDATA%` aj v .skp.
 
-**TRIEDNY kľúč mapovania `class:<generic_type>|<opening_mode>[|<drawer_construction>]`** (KOV-B1 zaviedol tvar, KOV-C2a čítanie, KOV-D1a zápis). Tvar je uzavretý: tretí
-segment má LEN `slide`, segmenty sa trimujú a downcasujú. Pozná ho **jediný parser** (`parse_mapping` ho rozpozná PRED `parse_hardware_set_key`), prijímajú ho všetky mapy
+**TRIEDNY kľúč mapovania `class:<generic_type>|<opening_mode>[|<tretí segment>]`** (KOV-B1 zaviedol tvar, KOV-C2a čítanie, KOV-D1a zápis, KOV-E1a výklopy). Tvar je uzavretý:
+tretí segment majú LEN `slide` (konštrukcia zásuvky, voliteľný) a `lift` (systém výklopu, **povinný**), segmenty sa trimujú a downcasujú. Pozná ho **jediný parser** (`parse_mapping` ho rozpozná PRED `parse_hardware_set_key`), prijímajú ho všetky mapy
 (globálna, snapshot aj cabinet override), počíta s ním whitelist brány, `snapshot_std`, `referenced_set_ids` aj `mapping_types_by_set`.
 `BuildPlan.hardware_set_key_type` z neho vracia prvý segment (starší plugin prefix nepozná, takže mu z toho istého kľúča vyjde neznámy typ a prestavbu zablokuje — presne to
 chceme), `BuildPlan.parse_hardware_set_key` vracia `nil` (preto sa kľúč mapovania nikde nečíta cez neho, ale cez `HardwareSets.mapping_key_type` / `owner_scoped_key?`).
 
-**KOV-D1a (v0.9.34) — OWNER TRIEDNY KĽÚČ, TRIEDNE ZÁPISY, NEAKTÍVNY SET.** K triednemu kľúču smie pribudnúť sufix **`@front:<id>/panel`** — vlastný kit pre JEDNO čelo:
+**KOV-D1a (v0.9.34) — OWNER TRIEDNY KĽÚČ, TRIEDNE ZÁPISY, NEAKTÍVNY SET.** K triednemu kľúču smie pribudnúť sufix **`@front:<id>/panel`** — vlastný kit pre JEDNO čelo
+(KOV-E1a pridala **`@front:<id>/flap`** pre výklop; pár trieda ↔ dielec drží `CLASS_OWNER_PART`):
 
 - **Kde smie žiť.** VÝHRADNE v `config.hardware_sets` skrinky (`parse_mapping(allow_owner: true)`). Globálna knižnica aj projektový snapshot ho pri zápise ODMIETNU a pri
   čítaní zahodia s logom. Triedna časť sa normalizuje, **owner ostáva doslovne** (part_key je identita dielca, nie enum) a musí mať tvar panela čela — override na zóne či
@@ -638,6 +650,50 @@ guardy z pravidla, ktoré položku vôbec nevydalo (falošná RED nadvýška ale
 
 Testy: `tests/pure/test_kovf_zavesy.rb` (39 testov, 21 pomenovaných mutácií) + JS `tests/js/test_kovf_ui.js` (dve prázdne voľby riadku, sentinel ako
 hodnota zo servera) + in-SketchUp sekcia `run_kovf`.
+
+**KOV-E1a (v0.9.53) — VÝKLOPY: DVA NOVÉ TVARY ČLENA, `lift_system`, OWNER `/flap`, BRÁNA ÚPLNOSTI.** Výklop je ZOSTAVA (mechanizmus + čelný príchyt + krytky, pri Tip-One
+navyše jednotka, pri HL top ramená a stabilizačná tyč), a mechanizmus sa vyberá podľa TRIEDY, ktorú spočíta pravidlo (`vyklopy-aventos` príde v E1b). Preto:
+
+- **Člen setu má odteraz ŠTYRI spôsoby, ako určiť kód** (XOR — práve jeden): pevný `code` · rad `code_by_nl` · pásma `param_bands` · **`code_by_param`**
+  = `{ "param": "lift_class", "codes": { "22K2300": "347810", … } }`. Kľúče sú REŤAZCE a zhoda je PRESNÁ (`text_param` → `strip`, nikdy zaokrúhlenie ani „najbližší" kód —
+  tá istá filozofia ako „presný NL kľúč, nikdy sused"). **Chýbajúci kľúč je VŽDY chyba**: sentinel `SKIP_CODE` sa sem NEDEDÍ, lebo výklop nemá „vedome bez kódu" — mechanizmus,
+  ktorý sa nenašiel, znamená neúplnú zostavu, nie zámer.
+- **`quantity_from` = POČET Z PARAMETRA položky** (`"rod_count"`). Je to NEZÁVISLÉ od spôsobu určenia kódu (tyč má pevný kód a premenlivý počet), preto vlastný kľúč a nie
+  ďalší druh v XOR. Hodnota musí byť **celé nezáporné číslo**: `0` = **člen sa VEDOME NEVYDÁ** (rozhodne sa PRED `add_row`, takže riadok s počtom 0 vôbec nevznikne — `finalize`
+  ho nezahadzuje; HL top pod šírkou korpusu 1100 mm teda nemá riadok `507366` vôbec), chýbajúca, necelá alebo záporná hodnota = **nevyriešený člen** (`quantity_unresolved`).
+  Kombinuje sa s `per: 'owner'` — tyč je na ČELO, nie na kus, takže dve pravidlá s výstupom `lift` na jednom čele ju nezdvoja (existujúci dedup `(korpus, vlastník, set, kód)`).
+- **BRÁNA ÚPLNOSTI `lift_set_incomplete` (Astra BLOCKER 1).** Pri položke s `generic_type == 'lift'` sa **KAŽDÝ** dôvod nemapovania povýši na RED s `blocks_export`
+  (`unmapped_entry`, presný vzor receptového `drawer_kit_missing`) — vrátane chýbajúceho setu a chýbajúceho mapovania; pôvodný dôvod cestuje v `base_reason`. Riadky ostatných
+  členov v zozname **ostávajú** (rovnako ako pri zásuvke), ale von sa nedostanú: kód je v `BuildPlan::HW_LIFT_BLOCKERS` aj vo `from_expansion`
+  (`ProductionCore.hardware_blockers`), takže nákup kovania, rozpočet aj cenová ponuka STOJA a „krytky bez mechanizmu" NIKDY neopustia plugin. **VEPO beží ďalej** — geometria
+  čela je správna (tá istá úvaha ako pri závesoch). Vetu skladá `Validation.lift_incomplete_item` (RED, kategória `hardware_incomplete`) a menuje čelo, systém aj člena.
+- **Klasifikačné pole `lift_system` (`hk_top` | `hl_top`)** je **POVINNÉ pri `use_type: 'lift'` a ZAKÁZANÉ inde** — presne tá istá logika ako `drawer_construction` pri zásuvke
+  (sklop `fall` systém nemá, vzpery sú mimo V1). Je v `CLASS_KEYS`, `SET_KEYS`, `SET_KEY_ORDER`, `CLASS_OPTIONS` aj vo whitelistoch šablón; jeho stratu chytá **vlastná vrstva**
+  v `classification_lost?` (kontrola „žiadny klasifikačný kľúč" by ju prehliadla, a bez systému by HL set vyzeral ako HK).
+- **Triedny kľúč `lift` je TROJSEGMENTOVÝ a tretí segment znamená INÉ než pri zásuvke:** `class:lift|<opening_mode>|<lift_system>`. `parse_class_head` preto validuje tretí
+  segment PODĽA TYPU (`slide` → konštrukcia, `lift` → systém) a **`class:lift|tipon|hl_top` ODMIETA** vetou „HL top Tip-On neexistuje" (Blum ani Démos ho nemajú). Platné kľúče
+  sú tri a všetky sú v `MAPPING_ADDITIONS` (add-if-absent, existujúca voľba sa nikdy neprepíše): `class:lift|classic|hk_top` → `vyklop-hk-klasik` · `class:lift|tipon|hk_top`
+  → `vyklop-hk-tipon` · `class:lift|classic|hl_top` → `vyklop-hl-klasik`. Ponuku filtruje `class_set_match?` vetvou pre `lift` (typ použitia + systém; požiadavka „vydaný systém
+  zásuviek" sa výklopu netýka) a zápis stráži `class_key_value_problem`.
+- **OWNER kľúč `@front:<id>/flap`** (tak sa vyberá TMAVÝ set pre JEDNO čelo — UI príde v E2). `CLASS_OWNER_RE` pozná `panel|flap` a **`CLASS_OWNER_PART` páruje triedu s dielcom**
+  (`slide` → `panel`, `lift` → `flap`): krížom by kľúč ukazoval na dielec, ktorý tá trieda nikdy nemá, a resolver by ho nikdy neprečítal. Parse, zápisová validácia, resolver aj
+  pruning zmazaného čela sa `/flap` naučili v JEDNEJ dávke (Astra FIX 6). K tomu patrí **`CabinetBuilder::CONFIG_SCHEMA` 9 → 10**: owner mapovanie je perzistentná hodnota
+  v `config.hardware_sets`, ktorú by starší plugin (jeho `parse_class_key` `/flap` nepozná) pri prestavbe ticho zahodil a čelo by dostalo biely set (Codex #331 kolo 2 P1).
+- **Šesť seed setov** `vyklop-hk-klasik{,-tmavy}` · `vyklop-hk-tipon{,-tmavy}` · `vyklop-hl-klasik{,-tmavy}` (`SEED_VERSION` 6 → 7). Poradie členov je ZÁVAZNÉ — **mechanizmus je
+  PRVÝ** (súpis aj nákup začínajú tým, čo výklop naozaj drží). Farba NIE JE klasifikačné pole (Démos ju nesie len v názve položky), takže tmavý set **triedny kľúč nemá** —
+  vyberá sa per čelo. Do existujúcej knižnice ich prenesie `merge_seed` (doplní CHÝBAJÚCE), do projektu vedomé „Doplniť nové predvoľby"; set s rovnakým `set_id` od používateľa
+  sa nikdy neprepíše.
+- **`std` 6 (`STD_LIFT_FORMS`) — FAIL-CLOSED downgrade.** Marker je LAZY podľa obsahu (`lift_forms_present?`, testuje sa ÚPLNE PRVÝ — najvyšší vyhráva) a dostane ho len obsah,
+  ktorý naozaj nesie `code_by_param`, `quantity_from` alebo `lift_system`. Starší čítač taký set **ODMIETNE** (`incompatible_member?` cez whitelist `MEMBER_KEYS`,
+  `assess_set_defs` pri šablóne) → knižnica/snapshot/šablóna sú preň len na čítanie s hláškou „aktualizuj plugin". **Tiché „tyč 1 ks" NEEXISTUJE** — správanie je odmietnutie
+  a testuje sa charakterizáciou so simulovaným starým `MEMBER_KEYS` (Astra FIX 8).
+- **Editor setov (E1a) nové tvary NEUPRAVUJE, ale ich NESTRATÍ** (Astra FIX 10). `hw_sets.js` člena novšieho tvaru nerozoberá na polia, ale odloží celý (`is_locked` + `raw`)
+  a pošle späť nezmenený; dlaždica takého setu má vypnuté „Upraviť" a vetu „Set novšieho tvaru — úprava príde neskôr". Ochranou je **server**: `save_set!` zmenu členov setu,
+  ktorý nesie nový tvar (`new_shape_members?`), ODMIETNE — názov, aktívnosť a klasifikácia sa meniť smú. Súhrn člena aj živý náhľad nové tvary čítajú („podľa lift_class",
+  „počet podľa rod_count"); `preview_expansion` si vzorovú triedu a počet doplní z DRAFTU, takže náhľad neukazuje samé ORANGE riadky.
+
+Testy: `tests/pure/test_kove1a_data.rb` (23 testov, 16 pomenovaných mutácií vrátane golden charakterizácie „existujúca zákazka nakupuje presne ako pred dávkou")
++ JS `tests/js/test_hw_sets_code_by_param.js` (bezstratový transport, súhrn, read-only stav).
 
 
 **BEZSTRATOVÁ BRÁNA DEFINÍCIÍ SETOV V ŠABLÓNE — `assess_set_defs` (audit #17 BLOCKER 1).** `hardware_set_defs` išli doteraz LEN cez tolerantný `normalize_sets`, teda cez cestu,

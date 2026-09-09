@@ -184,6 +184,10 @@ seed `AbsRules` `SEED_VERSION` 4. Roly žijú na troch miestach naraz (`BuildPla
   — vlastný kit pre JEDNO čelo. Starší plugin taký kľúč pri normalizácii zahodí, no typová kontrola z neho stále prečíta podporovaný `slide`, takže by prestavbu **nezastavil**
   a zásuvka by ticho dostala set z projektu namiesto vybraného. `DRAWER_ACTIVATION_SCHEMA` (aktivácia receptov) ostáva **5** — je to vlastná konštanta práve preto, aby bump
   neprehlásil každú skrinku schémy 5 za nemigrovanú.
+- **`10 = KOV-E1a` (v0.9.53): owner triedny kľúč VÝKLOPU.** Config smie niesť kľúč `class:lift|<opening_mode>|<lift_system>@front:<id>/flap` — tak sa pre JEDNO čelo vyberá
+  tmavá farba setu. Starší plugin (schéma 9) sufix `/flap` nepozná vôbec (jeho owner kľúč je len `/panel`, a to výhradne pri `slide`), takže by ho pri prestavbe **ticho
+  zahodil** a čelo by dostalo biely set z projektovej predvoľby. `HINGE_ACTIVATION_SCHEMA` ostáva **9** a `DRAWER_ACTIVATION_SCHEMA` **5** — z toho istého dôvodu ako vyššie.
+  (Čísla 8 a 9 patria D-118b a KOV-F1; ich dôvody sú v komentári `HISTORIA` pri konštante.)
 
 **Zóna** (`kind: zone`; nevýrobná — ghost):
 
@@ -517,8 +521,8 @@ ponuka XLSX sa NEVYTVORIA** (hláška menuje skrinky a žiada aktualizáciu plug
 číta správne. Potvrdiť sa to nedá: chýbajúce dáta sa nedajú „vziať na vedomie".
 
 **KLASIFIKÁCIA SETU (KOV-B1, záväzné od v0.9.19).** Set nesie okrem `generic_type` aj to, NA ČO sa používa: `use_type` (`door|drawer|lift|fall|other`) · `opening_mode`
-(`classic|tipon|other`, kde `other` = „neuplatňuje sa" — nohy, podperky, zavesenie) · `drawer_construction` (`metal|wood|other`, **len pri zásuvke**) · `manufacturer` ·
-`series` · `active`. Slovníky sú **uzavreté** a s klasifikáciou čela (`Fronts`) držia jednu doménovú pravdu.
+(`classic|tipon|other`, kde `other` = „neuplatňuje sa" — nohy, podperky, zavesenie) · `drawer_construction` (`metal|wood|other`, **len pri zásuvke**) · `lift_system`
+(`hk_top|hl_top`, **len pri výklope** — KOV-E1a) · `manufacturer` · `series` · `active`. Slovníky sú **uzavreté** a s klasifikáciou čela (`Fronts`) držia jednu doménovú pravdu.
 
 - **All-or-nothing:** klasifikácia buď **úplne chýba** (legacy „nezaradený" set — správa sa presne ako pred KOV-B1), alebo je **úplná a kontextovo platná**. Čiastočný tvar sa
   pri zápise odmieta. **Rada je VOLITEĽNÁ** — podperky ani klzáky žiadnu nemajú a vynútená rada by znečistila taxonómiu vymyslenými menami.
@@ -539,15 +543,34 @@ s inou taxonómiou.
 na **overenie pri expanzii**, lebo pásmo H176 a H70 majú rovnaké otváranie, konštrukciu aj NL 470, takže inak by nesúlad nemal čo odhaliť. Jeho strata sa prizná rovnako ako
 strata celej klasifikácie (vlastná vrstva detektora).
 
+**`lift_system` — KLASIFIKAČNÉ POLE VÝKLOPU (KOV-E1a, záväzné od v0.9.53).** Uzavretý slovník `hk_top` (veko nad korpusom) | `hl_top` (paralelný zdvih s ramenami
+a stabilizačnou tyčou), **povinné pri `use_type: 'lift'` a zakázané inde** — presne tá istá logika ako `drawer_construction` pri zásuvke. Sklop (`fall`) systém nemá.
+Na rozdiel od `height_variant` je to **os výberu**: je tretím segmentom triedneho kľúča, takže HL set sa na HK čelo nedostane. Jeho strata sa prizná vlastnou vrstvou
+detektora (bez systému by HL set vyzeral ako HK).
+
+**ČLEN SETU MÁ ŠTYRI SPÔSOBY URČENIA KÓDU A VOLITEĽNÝ POČET Z PARAMETRA (KOV-E1a, záväzné od v0.9.53).** K pevnému `code`, radu `code_by_nl` a pásmam `param_bands` pribudol
+**`code_by_param`** = `{ "param": "lift_class", "codes": { "22K2300": "347810", … } }` — kód podľa **textovej triedy**, ktorú položke dá pravidlo. Platí XOR (práve jeden
+zo štyroch), zhoda kľúča je **presná** (nikdy „najbližší" kód) a **chýbajúci kľúč je vždy chyba** — vyhradená hodnota `none` sa sem NEDEDÍ, lebo výklop nemá „vedome bez kódu".
+Nezávisle od nich smie člen niesť **`quantity_from`** = názov parametra, z ktorého plynie POČET (`"rod_count"`): hodnota musí byť **celé nezáporné číslo**, `0` znamená
+**člen sa vedome nevydá** (rozhoduje sa PRED vytvorením riadku — nákupný riadok s počtom 0 nikdy nevznikne), chýbajúca / necelá / záporná hodnota je **nevyriešený člen**.
+
+**BRÁNA ÚPLNOSTI VÝKLOPU `lift_set_incomplete` (KOV-E1a).** Výklop je ZOSTAVA (mechanizmus + príchyt + krytky + …), takže pri položke `generic_type: 'lift'` sa **každý**
+dôvod nemapovania — chýbajúci kód triedy, nevyriešený počet, chýbajúci set aj chýbajúce mapovanie — povyšuje na **RED so zastaveným exportom** (nákup kovania, rozpočet,
+cenová ponuka; **VEPO nie** — geometria čela je správna), presne ako receptové `drawer_kit_missing`. Pôvodný dôvod cestuje v `base_reason`. Bez tejto brány by expanzia vydala
+ostatné členy a objednávka by obsahovala „krytky bez mechanizmu".
+
 **MAPOVACÍ KĽÚČ `class:`.** Okrem `generic_type` a `generic_type@owner_part_key` pozná mapovanie aj **triedny kľúč**
-`class:<generic_type>|<opening_mode>[|<drawer_construction>]` (tretí segment len pri `slide`). Do v0.9.19 preň platil iba bezstratový round-trip;
+`class:<generic_type>|<opening_mode>[|<tretí segment>]`. Tretí segment majú len `slide` (konštrukcia zásuvky, voliteľný) a `lift` (**systém výklopu, povinný** — KOV-E1a;
+kombinácia `class:lift|tipon|hl_top` sa odmieta, HL top Tip-On neexistuje). Do v0.9.19 preň platil iba bezstratový round-trip;
 **od KOV-C2a (v0.9.30) ho resolver ČÍTA** — a to pre položku, ktorá nesie `params.opening_mode` **aj** `params.drawer_construction`. Chýbajúce triedne mapovanie je vlastný
 ORANGE dôvod (`class_unmapped`, veta navádza na „Pravidlá → Doplniť nové predvoľby"): **na generický `slide` sa NIKDY nepadá**, lebo H70 kit k zásuvke H176 by bol zlý nákup,
 a mlčky; owner-level `slide@…` sa pre takú položku ignoruje. Expanzia navyše overí, že set klasifikáciou sedí
 (otváranie · konštrukcia · `manufacturer` + `series` ↔ `params.system` · `height_variant`) — nesúlad = nemapovaná položka s dôvodom `set_incompatible`, **nikdy iný set**.
 Hodnota mapovania pre položku s `height_variant` **musí byť výškový selektor** na každej úrovni; pevný `set_id` je nekompatibilný.
 
-**OWNER TRIEDNY KĽÚČ (KOV-D1a, záväzné od v0.9.34).** K triednemu kľúču smie pribudnúť sufix **`@front:<id>/panel`** — vlastný kit pre JEDNO čelo. Platia štyri pravidlá:
+**OWNER TRIEDNY KĽÚČ (KOV-D1a, záväzné od v0.9.34).** K triednemu kľúču smie pribudnúť sufix **`@front:<id>/panel`** — vlastný kit pre JEDNO čelo; od KOV-E1a aj
+**`@front:<id>/flap`** pre výklop (tak sa vyberá tmavá farba setu). **Dielec je párovaný s triedou**: `slide` → `panel`, `lift` → `flap` — krížom by kľúč ukazoval na dielec,
+ktorý tá trieda nikdy nemá, a resolver by ho nikdy neprečítal. Platia štyri pravidlá:
 
 - **Žije VÝHRADNE v `config.hardware_sets` skrinky.** Globálna knižnica ani projektový snapshot ho pri zápise neprijmú a pri čítaní ho zahodia; triedna časť sa normalizuje,
   owner ostáva doslovne a musí ukazovať na panel čela. Kľúč na neexistujúce čelo sa pri normalizácii configu zahodí (nikdy nezhodí prestavbu).
@@ -596,8 +619,8 @@ receptovú položku nevydá **ani jeden** nákupný riadok (všetky členy presk
 zásuvka sa nikdy neobjedná „bez kovania" potichu.
 
 **MARKER `std` KNIŽNICE A SNAPSHOTU:** `1` = legacy · `2` = pásma/selector · **`3` = klasifikácia alebo triedny kľúč** · **`4` = set s `height_variant`** ·
-**`5` = set s vyhradenou bunkou `none`**. Od KOV-C2a je
-čerstvá knižnica aj snapshot NOVÉHO projektu na `4` (od D-118b na `5` — seed nesie Tip-On sety so sentinelom); existujúce projekty svoj marker nemenia, kým do nich používateľ predvoľby vedome nedoplní. Marker je LAZY podľa
+**`5` = set s vyhradenou bunkou `none`** · **`6` = tvary výklopov (`code_by_param`, `quantity_from`, `lift_system`)**. Od KOV-C2a je
+čerstvá knižnica aj snapshot NOVÉHO projektu na `4` (od D-118b na `5`, od KOV-E1a na `6` — seed nesie sety výklopov); existujúce projekty svoj marker nemenia, kým do nich používateľ predvoľby vedome nedoplní. Marker je LAZY podľa
 obsahu, takže čisto legacy dáta ostávajú čitateľné pre staršie verzie; obsah s vyšším `std`, než ktorý verzia pozná, je pre ňu read-only (knižnica) alebo `:invalid`
 (snapshot) — nikdy čiastočne prečítaný.
 
