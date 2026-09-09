@@ -178,12 +178,20 @@ hornej hranice o ňom hovorí; bez toho by sa dve pásma ramien začali **prekr�
 nezapíše** (vzor F2), nekladná hodnota spôsobilosti ide preč rovnako ako v `normalize_lift_eligibility` — tvar „klient pošle, server ticho zahodí" nevzniká. Poškodený tvar
 (hash namiesto poľa) sekciu **nezhodí** (lekcia Codex #330) a uložením sa z pravidla odpratá.
 
-Brána (`lift_problem`) dostala **tri kritériá naviac**, všetky nad tvarom PO normalizácii a všetky zrkadlené v `rdLiftProblem`: **záporný `rod_double_from_kb_mm`**
-(`lift_rod_count` žiada kladné číslo, takže by pravidlo ticho tvrdilo „druhá tyč nikdy" — a tyč je nákupná položka) · **záporná hodnota v ktorejkoľvek tabuľke**
+Brána (`lift_problem`) dostala **tri kritériá naviac**, všetky nad tvarom PO normalizácii a všetky zrkadlené v `rdLiftProblem`: **nekladný `rod_double_from_kb_mm`**
+(`lift_rod_count` žiada kladné číslo, takže by pravidlo ticho tvrdilo „druhá tyč nikdy" — a pri **nule** by súhrn v lište zároveň písal „tyč od 0 mm", teda „druhá tyč
+vždy"; „žiadne zdvojenie" sa hovorí **prázdnym poľom**, Codex #334 kolo 1 P2 — a tyč je nákupná položka) · **záporná hodnota v ktorejkoľvek tabuľke**
 (`lift_negative_row`; `lift_row?` prepustí každé konečné číslo, takže „LF od −500" by prešlo) · **spôsobilosť s obrátenou výškou** (`lift_eligibility_problem`; každé kladné
 číslo normalizácia nechá, takže `kh_min 600` a `kh_max 205` by prežilo a systém by nebol použiteľný **nikdy**, bez slova o dôvode). `kh_min == kh_max` je legitímne.
 Poradie sa nevynucuje (server zoraďuje) a **prekryv sa nekontroluje zámerne** — HK triedy Blumu sa prekrývajú a ramená 480–540 tiež; kontrolovaná je len **spojitosť**
-(`arms_gap_problem`). Nové prípady sú v `tests/fixtures/rules_validation_parity.json`. Testy: `tests/pure/test_kove2_ui.rb`, `tests/js/test_kove2_rules_editor.js`.
+(`arms_gap_problem`). **Zápisová cesta má odteraz DVE brány (Codex #334 kolo 1 P2).** `rules_problems` sa pýta tvaru PO normalizácii, a preto **nevidí riadok, ktorý normalizácia zahodila**:
+kto v tabuľke rozpíše riadok a vyplní len kód (alebo len jednu hranicu), uložil by ho bez slova a po prestavbe by riadok zmizol. Odhodenie je pri **čítaní** správne
+(legacy snapshot sa musí dať prečítať a hádať sa nesmie), pri **uložení** je to tiché zahodenie práce — preto pred normalizáciou stojí `HardwareRules.lift_input_problems`
+nad **surovým** vstupom a kontroluje **výhradne** nedopísaný riadok (`lift_partial_row?`, tabuľky a ich ľudské názvy drží `LIFT_TABLES`, zrkadlo v `rules.js` je
+`RD_LIFT_TABLES`). **Úplne prázdny riadok je pohodlie editora** (pridám, rozmyslím si to) a mlčky sa zahadzuje na oboch stranách. Volajúci je **jediný** — `handle_save`
+v `rules_dialog.rb`; stavba ani seed validáciu nevolajú. Fixtúra parity sa preto pýta **oboch brán naraz** (klient má na obe jednu odpoveď `rdValidate`).
+
+Nové prípady sú v `tests/fixtures/rules_validation_parity.json`. Testy: `tests/pure/test_kove2_ui.rb`, `tests/js/test_kove2_rules_editor.js`.
 
 
 **KOV-C2b (v0.9.31) — R2 EXKLUZIVITA.** `evaluate(..., suppress_slide_owners:)` dostáva množinu `owner_part_key` čiel, ktoré už majú položku výsuvu **z receptu**, a pravidlá
@@ -836,7 +844,10 @@ navyše jednotka, pri HL top ramená a stabilizačná tyč), a mechanizmus sa vy
   a abecedné poradie by tabuľku Blumu preusporiadalo). **„Počet z parametra"** (`quantity_from`) je **druhý riadok hlavičky člena**, nie štvrtá otázka v prvom rade (ten je
   už plný a piaty ovládač by ho pretiekol), a je **nezávislý od stratégie kódu** — prepnutie kódu ho nezahadzuje (tyč má pevný kód a premenlivý počet). Úplne prázdny riadok
   tabuľky sa zahadzuje (vzor radu NL), **čiastočne vyplnený ide na server**, aby používateľ dostal konkrétnu vetu: validácia je all-or-nothing na SERVERI
-  (`validate_member` / `validate_code_by_param`) a HTML `disabled` nie je ochrana. Súhrn člena aj živý náhľad nové tvary čítajú („podľa lift_class",
+  (`validate_member` / `validate_code_by_param`) a HTML `disabled` nie je ochrana. **Jediná výnimka z „autoritou je server" je DUPLICITNÁ hodnota v tabuľke člena**
+  (`hwsMemberProblems`, Codex #334 kolo 1 P2): `code_by_param.codes` aj `code_by_nl` idú na server ako **mapa**, takže druhý riadok s tou istou triedou (dĺžkou) prepíše
+  prvý už pri skladaní payloadu — server duplicitu **nikdy neuvidí**, uloženie prejde a prvé priradenie po refreshi ticho zmizne. Kontrola preto beží nad **poľom riadkov**
+  pred zložením mapy a chyba pristane pri tom členovi. Súhrn člena aj živý náhľad nové tvary čítajú („podľa lift_class",
   „počet podľa rod_count"); `preview_expansion` si vzorovú triedu a počet doplní z DRAFTU, takže náhľad neukazuje samé ORANGE riadky.
   **Súhrn skladá KÓD a POČET NEZÁVISLE (Codex #332 kolo 3 P2):** `hwsMemberCodeText` (jedna zo štyroch stratégií `code` | `code_by_nl` | `param_bands` | `code_by_param`)
   + `hwsMemberQtyText` (`quantity_from`, inak `×qty`). Skorý return podľa stratégie zamlčal dynamický počet, resp. pri rade NL a pásmach vypísal `m.code` (`undefined`)

@@ -1448,7 +1448,7 @@
       hwsTaxCreate(d);
       return;
     }
-    var errs = hwsSetValidate(d);
+    var errs = hwsSetValidate(d).concat(hwsMemberProblems(HWS_SET.members));
     if (errs.length){ NXModal.showErrors(errs); NXModal.setBusy(false); return; }
     NXModal.clearErrors();
     // Identitu NOVEHO setu urcuje slug z nazvu (server odmietne koliziu).
@@ -1468,6 +1468,43 @@
     var out = [];
     if (hwsBlank(d.name)) out.push({ row: null, field: 'name', msg: 'Názov je povinný.' });
     return out;
+  }
+
+  // KOV-E2 (Codex #334 kolo 1 P2): DUPLICITNÁ TRIEDA v tabuľke „trieda → kód".
+  //
+  // Toto je výnimka z pravidla „autoritou validácie je server": tabuľka ide na
+  // server ako MAPA (`code_by_param.codes`), takže druhý riadok s tou istou
+  // triedou prepíše prvý UŽ PRI SKLADANÍ payloadu (`hwsBuildMembers`) — server
+  // duplicitu nikdy neuvidí, uloženie prejde a prvé priradenie po refreshi
+  // ticho zmizne. Povedať to vie LEN klient, kým sú riadky ešte poľom.
+  // (Rovnaká pasca je v rade NL — `code_by_nl` je tiež mapa.)
+  function hwsMemberProblems(members){
+    var out = [];
+    (members || []).forEach(function(m, i){
+      if (!m) return;
+      var dup = m.is_param ? hwsDupValue(m.codes, 'value')
+              : (m.is_series ? hwsDupValue(m.series, 'nl') : '');
+      if (!dup) return;
+      out.push({ row: 'members:' + i, field: null,
+                 msg: 'Člen ' + (i + 1) + ': hodnota „' + dup + '“ je v tabuľke dvakrát — '
+                    + 'nechaj jeden riadok (druhý by prvý ticho prepísal).' });
+    });
+    return out;
+  }
+  // Prvá hodnota, ktorá sa v riadkoch opakuje (po orezaní), inak ''.
+  // Prázdna hodnota sa NEPOČÍTA — to je nedopísaný riadok a o tom hovorí server.
+  function hwsDupValue(rows, key){
+    // Zoznam, nie objekt: kľúč `__proto__` sa do objektu nezapíše (mení
+    // prototyp) a duplicita nad ním by prekĺzla.
+    var seen = [];
+    var list = rows || [];
+    for (var i = 0; i < list.length; i++){
+      var v = hwsTrim(list[i] && list[i][key]);
+      if (v === '') continue;
+      if (seen.indexOf(v) >= 0) return v;
+      seen.push(v);
+    }
+    return '';
   }
 
   // Zalozenie vyrobcu/rady z modalu setu — ta ista cesta ako v modale polozky
@@ -2407,6 +2444,10 @@
       hwsApplyUseType: hwsApplyUseType, hwsDefaultType: hwsDefaultType,
       hwsSampleShown: hwsSampleShown,
       hwsChips: hwsChips, hwsServerErrors: hwsServerErrors,
+      // Codex #334 kolo 1 P2: duplicitna hodnota v tabulke clena. JEDINE
+      // miesto, kde je klient AUTORITOU — server dostava uz mapu, v ktorej
+      // druhy riadok prvy prepisal, takze duplicitu nikdy neuvidi.
+      hwsMemberProblems: hwsMemberProblems, hwsDupValue: hwsDupValue,
       hwsPreviewLines: hwsPreviewLines, hwsPreviewStale: hwsPreviewStale,
       hwsGlobalOptions: hwsGlobalOptions,
       // KOV-D1b: riadky mapovania podľa TRIEDY (server posiela hotové riadky)

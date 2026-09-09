@@ -36,7 +36,7 @@ const path = require('node:path');
 const { hwsMembersOf, hwsBuildMembers, hwsMemberSummary, hwsBuildSetPayload,
         hwsSetDraftOf, hwsMemberKind, hwsMemberBlank, hwsMemberSwitch,
         hwsParamSplit, hwsParamJoin, HWS_KINDS, HWS_CODE_PARAMS, HWS_QTY_PARAMS,
-        HWS_PARAM_OTHER } =
+        HWS_PARAM_OTHER, hwsMemberProblems } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'hw_sets.js'));
 
 let n = 0;
@@ -238,5 +238,37 @@ const zasuvka = hwsBuildSetPayload({ set_id: 'z', name: 'Z', use_type: 'drawer',
 eq(zasuvka.lift_system, '', 'pri zásuvke odchádza PRÁZDNY systém (vedomé vymazanie)');
 ok(Object.prototype.hasOwnProperty.call(zasuvka, 'lift_system'),
    'kľúč sa nikdy nevynechá — server merguje');
+
+
+// ============ DUPLICITNÁ TRIEDA (Codex #334 kolo 1 P2) ======================
+// `code_by_param.codes` je na serveri MAPA: druhý riadok s tou istou triedou
+// prepíše prvý UŽ pri skladaní payloadu, takže server duplicitu nikdy neuvidí,
+// uloženie prejde a prvé priradenie po refreshi ticho zmizne. Povedať to vie
+// LEN klient, kým sú riadky ešte poľom.
+const dupClen = { per: 'unit', qty: 1, is_param: true, param: 'lift_class',
+                  codes: [{ value: '22K2300', code: '347810' },
+                          { value: ' 22K2300 ', code: '347899' }] };
+const dupErr = hwsMemberProblems([dupClen]);
+eq(dupErr.length, 1, 'duplicitná trieda sa ohlási');
+ok(dupErr[0].msg.indexOf('22K2300') >= 0 && dupErr[0].msg.indexOf('dvakrát') >= 0,
+   'veta menuje hodnotu: ' + dupErr[0].msg);
+eq(dupErr[0].row, 'members:0', 'a pristane pri TOM členovi');
+// Skladanie payloadu duplicitu naozaj STRATÍ — preto musí padnúť PRED ním.
+eq(Object.keys(hwsBuildMembers([dupClen])[0].code_by_param.codes).length, 1,
+   'mapa udrží len jednu hodnotu (to je tá pasca)');
+eq(hwsMemberProblems([{ per: 'unit', qty: 1, is_param: true, param: 'lift_class',
+                            codes: [{ value: '22K2300', code: '347810' },
+                                    { value: '22K2500', code: '347811' }] }]), [],
+   'rôzne triedy prejdú');
+// Prázdne hodnoty duplicitou nie sú (o nedopísanom riadku hovorí server).
+eq(hwsMemberProblems([{ per: 'unit', qty: 1, is_param: true, param: 'lift_class',
+                            codes: [{ value: '', code: '1' }, { value: '', code: '2' }] }]), [],
+   'dva prázdne riadky ohlási server, nie táto kontrola');
+// TÁ ISTÁ pasca je v rade NL (`code_by_nl` je tiež mapa).
+eq(hwsMemberProblems([{ per: 'unit', qty: 1, is_series: true,
+                            series: [{ nl: '450', code: 'A' }, { nl: '450', code: 'B' }] }]).length,
+   1, 'duplicitná NL v rade tiež');
+eq(hwsMemberProblems([]), [], 'prázdny zoznam členov nespadne');
+eq(hwsMemberProblems(null), [], 'ani chýbajúci');
 
 console.log(`OK — test_hw_sets_code_by_param.js: ${n} testov preslo`);

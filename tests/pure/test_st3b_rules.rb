@@ -1265,8 +1265,14 @@ NxTest.test('ŠT-3b-2c1 (PARITA): server a klient maju ROVNAKE kriteria') do
   cases = ST3B2C1_FIXTURE['cases']
   NxTest.assert(cases.length >= 10, 'fixtura ma dost pripadov (inak parita nic nestrazi)')
   cases.each do |c|
+    # KOV-E2 (Codex #334 kolo 1 P2): zapisova cesta ma DVE brany a fixtura sa
+    # pyta OBOCH — `lift_input_problems` nad SUROVYM vstupom (chyta to, co
+    # normalizacia zahodi: nedopisany riadok tabulky vyklopu) a `rules_problems`
+    # nad normalizovanym tvarom (vsetko ostatne). Klient ma na oboje JEDNU
+    # odpoved (`rdValidate`), takze porovnava sa ich SUCET.
+    raw = !hr.lift_input_problems(c['rules']).empty?
     rules = hr.normalize_rules(c['rules'])
-    got = !hr.rules_problems(rules).empty?
+    got = raw || !hr.rules_problems(rules).empty?
     NxTest.assert_equal(c['invalid'], got, "server: #{c['name']}")
   end
   # Ten isty subor cita aj JS sada — ked sa kriteria rozidu, padne prave jedna.

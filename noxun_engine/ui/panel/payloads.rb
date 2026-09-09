@@ -484,8 +484,13 @@ module Noxun
         # Stavy zaznamu (`state`) su ZRKADLOM zaznamu zasuvky (C2c):
         #   'conflict' — RED dovod stavby; `message` = veta Kontroly
         #   'stale'    — skrinka postavena PRED pravidlami vyklopov
-        #                (`Bom.pre_lift_build?`) — TA ISTA autorita, akou vznika
-        #                RED `flap_stale`, nie druha podmienka vedla nej
+        #                (`Bom.flap_stale_front?`) — TA ISTA autorita, akou
+        #                vznika RED `flap_stale`, nie druha podmienka vedla nej.
+        #                Codex #334 kolo 1 P2: nestaci sa pytat proveniencie —
+        #                nalez Kontroly ma este VYNIMKU pre uplnu rucnu zostavu
+        #                (`HardwareSets.manual_flap_assemblies`), takze celo
+        #                s rucne zlozenym mechanizmom by v karte bolo cervene,
+        #                kym Kontrola mlci.
         #   'ok'       — `text` = zhrnutie, `detail` = vety, `warn` = ORANGE
         #   'pending'  — pravidlo vyklopov je vypnute / polozka nevznikla:
         #                karta mlci (a hovori za nu veta „vyberá automat")
@@ -523,12 +528,12 @@ module Noxun
           hw = lift_item_for(cfg, owner)
           if hw.nil?
             return { 'state' => 'stale', 'message' => lift_stale_message } if
-              defined?(Bom) && Bom.pre_lift_build?(cfg)
+              defined?(Bom) && Bom.flap_stale_front?(cfg, fid)
 
             return { 'state' => 'pending' }
           end
           params = hw['params'].is_a?(Hash) ? hw['params'] : {}
-          row = { 'state' => 'ok', 'text' => lift_row_text(params),
+          row = { 'state' => 'ok', 'text' => lift_row_text(params, hw),
                   'detail' => lift_detail_lines(cfg, params) + drawer_buy_lines(hw, buy) }
           warn = lift_warn_note(cfg, owner)
           row['warn'] = warn if warn
@@ -545,17 +550,33 @@ module Noxun
         # Zhrnutie do JEDNEHO riadku: „AVENTOS HK top · 22K2300 · automat".
         # Kazdy udaj pochadza z ULOZENYCH `params` polozky vyklopu — nic sa
         # nedopocitava a chybajuci udaj sa VYNECHA (nikdy sa nehada).
-        # `automat` je priznanie, ze polozku riadi cele pravidlo a rucny zasah
-        # sa na nej neuplatni (`lift_override_ignored`).
-        def lift_row_text(params)
+        def lift_row_text(params, item = nil)
           p = params.is_a?(Hash) ? params : {}
           parts = ["AVENTOS #{HardwareRules.lift_system_label(p['lift_system'].to_s)}"]
           cls = p['lift_class'].to_s.strip
           arm = p['arm_class'].to_s.strip
           parts << cls unless cls.empty?
           parts << "ramená #{arm}" unless arm.empty?
-          parts << 'automat'
+          tag = lift_source_tag(item)
+          parts << tag if tag
           parts.join(' · ')
+        end
+
+        # Codex #334 kolo 1 P2: STITOK ZDROJA polozky.
+        #
+        # `automat` nie je „vybral to plugin" — je to priznanie, ze polozku
+        # riadi CELE pravidlo a rucny zasah sa na nej NEUPLATNI. To plati
+        # VYHRADNE pre chranene seed pravidlo (`HardwareRules.protected_lift_item?`,
+        # `LIFT_RULE_ID`); na polozke z VLASTNEHO vyklopoveho pravidla override
+        # ucinny JE a `apply_overrides` ju oznaci `source: 'manual'`. Karta by
+        # o rucne prepisanom pocte tvrdila „automat" — presny opak pravdy.
+        # Vlastne pravidlo BEZ overridu stitok NEDOSTANE: mlcanie je presnejsie
+        # nez ktorekolvek z dvoch slov.
+        def lift_source_tag(item)
+          return nil unless item.is_a?(Hash)
+          return 'automat' if HardwareRules.protected_lift_item?(item)
+
+          item['source'].to_s == 'manual' ? 'ručne' : nil
         end
 
         # Vety rozkliku. Su to VYHRADNE ULOZENE fakty polozky a rozmery korpusu

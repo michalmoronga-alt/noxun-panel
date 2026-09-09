@@ -522,12 +522,8 @@ module Noxun
         return nil unless defined?(CabinetBuilder) && defined?(HardwareRules)
 
         cfg = ccfg.is_a?(Hash) ? ccfg : {}
-        return nil unless pre_lift_build?(cfg)
-
         items = cfg['front_items'].is_a?(Array) ? cfg['front_items'] : []
-        hw = Array(cfg['hardware'])
-        manual = manual_flap_assemblies(cfg['hardware_manual'], flap_codes)
-        hit = items.find { |it| it.is_a?(Hash) && flap_without_hardware?(it, hw, manual) }
+        hit = flap_stale_items(cfg, flap_codes).first
         return nil if hit.nil?
 
         up = hit['flap_dir'].to_s != HardwareRules::FLAP_DOWN
@@ -540,6 +536,38 @@ module Noxun
                        '„Doplniť nové predvoľby“ a skrinku prestav, inak jej v nákupe chýba ' \
                        "#{up ? 'celý mechanizmus výklopu' : 'závesy sklopu'}.",
           'label' => PartKeys.human_label(pkey, fronts: items).to_s }
+      end
+
+      # === Codex #334 kolo 1 P2: JEDEN ZDROJ PRAVDY otazky „hlasi sa stale?" ==
+      #
+      # Kriterium RED `flap_stale` nie je jedna podmienka, ale TRI naraz:
+      # stara proveniencia (`pre_lift_build?`), chybajuce kovanie podla SMERU
+      # cela (`flap_without_hardware?`) a VYNIMKA pre uplnu rucnu zostavu
+      # (`manual_flap_assemblies`). Karta cela v paneli sa pytala len na PRVU,
+      # takze celo s rucne zlozenym mechanizmom malo v karte cervenu vetu,
+      # kym Kontrola v Studiu mlcala — dve odpovede na tu istu otazku.
+      # Odvtedy sa OBAJA pytaju TEJTO metody.
+      #
+      # `flap_codes` = kody mechanizmov zo setov; bez nich plati seed (viz
+      # `manual_flap_assemblies`). -> pole poloziek `front_items`
+      def flap_stale_items(cfg, flap_codes = nil)
+        c = cfg.is_a?(Hash) ? cfg : {}
+        return [] unless defined?(CabinetBuilder) && defined?(HardwareRules)
+        return [] unless pre_lift_build?(c)
+
+        hw = Array(c['hardware'])
+        manual = manual_flap_assemblies(c['hardware_manual'], flap_codes)
+        items = c['front_items'].is_a?(Array) ? c['front_items'] : []
+        items.select { |it| it.is_a?(Hash) && flap_without_hardware?(it, hw, manual) }
+      end
+
+      # Hlasi sa `flap_stale` na KONKRETNOM cele? Otazka karty v paneli —
+      # odpoved je z TEJ ISTEJ metody, akou vznika RED nalez Kontroly.
+      def flap_stale_front?(cfg, front_id, flap_codes = nil)
+        fid = front_id.to_s
+        return false if fid.empty?
+
+        flap_stale_items(cfg, flap_codes).any? { |it| it['id'].to_s == fid }
       end
 
       # Bola skrinka postavena PRED vyklopmi? Staci JEDNA stara proveniencia

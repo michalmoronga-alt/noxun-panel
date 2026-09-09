@@ -39,6 +39,12 @@
 #   M8 záporná hodnota / obrátená spôsobilosť prejde -> (5)
 #   M9 `code_by_param` z editora server odmietne -> (6)
 #  M10 editor setov ostane read-only            -> (7)
+# Codex #334 kolo 1 (P2), doplnené mutácie:
+#  M11 karta píše „automat" aj pri ručnom zásahu -> (3) štítok zdroja
+#  M12 `stale` sa nepýta na ručnú zostavu       -> (1) úplná ručná zostava
+#  M13 nulový prah druhej tyče prejde           -> (5) nekladný prah
+#  M14 nedopísaný riadok sa uloží ticho         -> (5) brána nad surovým vstupom
+#  M15 duplicitná trieda v tabuľke člena prejde -> (7) `hwsMemberProblems`
 require_relative '../helper' unless defined?(NxTest)
 
 require 'json'
@@ -181,6 +187,31 @@ NxTest.test('KOV-E2 (1): STALE skrinka — TÁ ISTÁ autorita ako RED `flap_stal
                       'stará proveniencia pravidiel stačí (M2)')
 end
 
+NxTest.test('KOV-E2 (1): ÚPLNA RUČNÁ ZOSTAVA stale ZHASÍNA — presne ako v Kontrole') do
+  # Codex #334 kolo 1 P2: RED `flap_stale` nie je jedna podmienka, ale tri —
+  # stará proveniencia, chýbajúce kovanie podľa smeru čela A VÝNIMKA pre úplnú
+  # ručnú zostavu. Karta sa pýtala len prvej, takže čelo s ručne zloženým
+  # mechanizmom malo v karte červenú vetu, kým Kontrola mlčala (M12).
+  c = NxKovE2
+  rucny = { 'source' => 'catalog', 'owner_part_key' => c::OWNER, 'code' => '347810',
+            'quantity' => 1 }
+  cfg = c.cfg('hardware' => [], 'config_schema' => 10, 'hardware_manual' => [rucny])
+  NxTest.assert_equal('pending', c.row(cfg)['state'], 'karta o chýbajúcom mechanizme MLČÍ')
+  NxTest.assert_equal(nil, NxKovE2::E::Bom.flap_stale_issue('CAB-1', 1, cfg),
+                      'a Kontrola tiež — obe odpovede sú z tej istej metódy')
+  # Ručný riadok, ktorý mechanizmom NIE JE (krytky), výnimku nedáva:
+  # obe strany ostávajú červené.
+  kryt = c.cfg('hardware' => [], 'config_schema' => 10,
+               'hardware_manual' => [rucny.merge('code' => '347834')])
+  NxTest.assert_equal('stale', c.row(kryt)['state'], 'krytky mechanizmus nenahradia')
+  NxTest.assert(!NxKovE2::E::Bom.flap_stale_issue('CAB-1', 1, kryt).nil?,
+                'a Kontrola hovorí to isté')
+  # Predikát je ZDIEĽANÝ — karta si druhú podmienku neopisuje vlastnou rukou.
+  NxTest.refute(NxKovE2::E::Bom.flap_stale_front?(cfg, 'F1'), 'ručná zostava = nie stale')
+  NxTest.assert(NxKovE2::E::Bom.flap_stale_front?(kryt, 'F1'))
+  NxTest.refute(NxKovE2::E::Bom.flap_stale_front?(kryt, ''), 'bez identity čela sa netvrdí nič')
+end
+
 NxTest.test('KOV-E2 (1): PENDING — čerstvá skrinka bez položky karta MLČÍ') do
   c = NxKovE2
   # Vypnuté výklopové pravidlo: skrinka je postavená pod aktuálnou verziou,
@@ -224,10 +255,36 @@ end
 
 NxTest.test('KOV-E2 (3): chýbajúci údaj sa VYNECHÁ, nikdy nehádže') do
   c = NxKovE2
-  t = NxKovE2::E::Panel.lift_row_text('lift_system' => 'hk_top')
+  t = NxKovE2::E::Panel.lift_row_text({ 'lift_system' => 'hk_top' }, c.lift_item)
   NxTest.assert(t.include?('AVENTOS HK top'), t)
   NxTest.refute(t.include?('nil'), 'žiadne „nil“ v texte')
   NxTest.assert_equal('AVENTOS HK top · automat', t, 'len to, čo je uložené')
+end
+
+NxTest.test('KOV-E2 (3): štítok „automat“ patrí LEN chránenému seed pravidlu') do
+  # Codex #334 kolo 1 P2: „automat" neznamená „vybral to plugin", ale „ručný
+  # zásah sa na tejto položke NEUPLATNÍ" — a to platí výhradne pre chránené
+  # seed pravidlo. Na položke z VLASTNÉHO výklopového pravidla je override
+  # účinný a `apply_overrides` ju označí `source: 'manual'`; karta by o ručne
+  # prepísanom počte tvrdila „automat" (M11).
+  c = NxKovE2
+  vlastne = c.lift_item('rule_id' => 'moje-vyklopy', 'source' => 'manual')
+  t = NxKovE2::E::Panel.lift_row_text(vlastne['params'], vlastne)
+  NxTest.assert(t.include?('ručne'), "ručne prepísaná položka to prizná: #{t}")
+  NxTest.refute(t.include?('automat'), 'a NEtvrdí opak')
+  # Vlastné pravidlo BEZ overridu štítok nedostane — mlčanie je presnejšie
+  # než ktorékoľvek z dvoch slov.
+  bez = c.lift_item('rule_id' => 'moje-vyklopy')
+  t2 = NxKovE2::E::Panel.lift_row_text(bez['params'], bez)
+  NxTest.refute(t2.include?('automat'), t2)
+  NxTest.refute(t2.include?('ručne'), t2)
+  # A seedová položka s ručným zásahom ostáva „automat" — override je na nej
+  # zámerne neúčinný (ORANGE `lift_override_ignored`).
+  seed = c.lift_item('source' => 'manual')
+  NxTest.assert(NxKovE2::E::Panel.lift_row_text(seed['params'], seed).include?('automat'),
+                'chránené pravidlo si štítok drží')
+  # Karta ho vypĺňa z POLOŽKY, nie z parametrov (bez položky žiadny štítok).
+  NxTest.refute(NxKovE2::E::Panel.lift_row_text('lift_system' => 'hk_top').include?('automat'))
 end
 
 NxTest.test('KOV-E2 (3): KH je TEN ISTÝ vzorec ako kontext pravidiel (bez sokla)') do
@@ -354,11 +411,84 @@ NxTest.test('KOV-E2 (5): seedový tvar výklopového pravidla prejde') do
   NxTest.assert_equal('', c.rule_message(c.lift_rule), 'nič sa nevymýšľa')
 end
 
-NxTest.test('KOV-E2 (5): ZÁPORNÝ prah druhej tyče sa NEULOŽÍ') do
+NxTest.test('KOV-E2 (5): NEKLADNÝ prah druhej tyče sa NEULOŽÍ (ani nula)') do
+  # Codex #334 kolo 1 P2: `lift_rod_count` žiada KLADNÉ číslo — nulu aj zápornú
+  # hodnotu zahodí („druhá tyč nikdy"), kým súhrn editora by písal „tyč od 0 mm"
+  # („druhá tyč vždy"). Dve opačné tvrdenia nad jednou hodnotou.
   c = NxKovE2
-  msg = c.rule_message(c.lift_rule('rod_double_from_kb_mm' => -1100.0))
-  NxTest.assert(msg.include?('druhú stabilizačnú tyč'), msg)
-  NxTest.assert(msg.include?('záporná'), 'a povie prečo')
+  [-1100.0, -5.0, 0.0].each do |bad|
+    msg = c.rule_message(c.lift_rule('rod_double_from_kb_mm' => bad))
+    NxTest.assert(msg.include?('druhú stabilizačnú tyč'), "#{bad}: #{msg}")
+    NxTest.assert(msg.include?('musí byť kladná'), 'a povie prečo')
+    NxTest.assert(msg.include?('nepridáva nikdy'), 'aj to, ako sa myslí „žiadne zdvojenie“')
+  end
+  NxTest.assert_equal('', c.rule_message(c.lift_rule('rod_double_from_kb_mm' => 1100.0)),
+                      'kladný prah je v poriadku')
+  # Kľúč, ktorý vo formulári ostal prázdny, sa nezapíše — a to je legitímne.
+  bez = c.lift_rule
+  bez.delete('rod_double_from_kb_mm')
+  NxTest.assert_equal('', c.rule_message(bez), 'prázdne pole = „druhá tyč nikdy“, bez hlášky')
+  # A `lift_rod_count` sa s nulou správa TAK, ako veta tvrdí (jedna tyč).
+  NxTest.assert_equal(1, NxKovE2::HR.lift_rod_count({ 'rod_double_from_kb_mm' => 0.0 }, 1800.0),
+                      'nula prah NIE JE — inak by veta klamala')
+end
+
+NxTest.test('KOV-E2 (5): NEDOPÍSANÝ riadok tabuľky sa NEULOŽÍ TICHO') do
+  # Codex #334 kolo 1 P2: normalizácia neúplný riadok ZAHODÍ (a pri čítaní
+  # legacy snapshotu je to správne), takže druhá brána o ňom nemá ako povedať —
+  # používateľovi by riadok po prestavbe zmizol. Brána nad SUROVÝM vstupom
+  # (`lift_input_problems`) je jediné miesto, kde ho ešte vidno.
+  c = NxKovE2
+  msgs = lambda { |rule| NxKovE2::HR.lift_input_problems([rule]).map { |p| p['message'] } }
+  # (a) kód bez hornej hranice VEDĽA platného riadku
+  neuplny = c.lift_rule('classes' => [{ 'code' => '22K2300', 'min' => 420.0, 'max' => 1610.0 },
+                                      { 'code' => '22K2500', 'min' => 1610.0 }])
+  m = msgs.call(neuplny).first.to_s
+  NxTest.assert(m.include?('nedopísaný'), m)
+  NxTest.assert(m.include?('22K2500'), 'veta menuje TEN riadok, ktorý treba dopísať')
+  NxTest.assert(m.include?('tried HK top'), 'aj tabuľku, v ktorej je')
+  NxTest.assert_equal([], NxKovE2::HR.rules_problems(NxKovE2::HR.normalize_rules([neuplny])),
+                      'druhá brána ho naozaj NEVIDÍ — preto je prvá potrebná')
+  # (b) hranica bez kódu — mechanizmy aj ramená
+  NxTest.assert(msgs.call(c.lift_rule('mechanisms' => [{ 'code' => '22L2500', 'max' => 580.0 },
+                                                       { 'code' => '', 'max' => 700.0 }])).any?)
+  NxTest.assert(msgs.call(c.lift_rule('arms' => [{ 'code' => '22L3200', 'kh_min' => 300.0,
+                                                   'kh_max' => 340.0, 'kg_min' => 1.5,
+                                                   'kg_max' => 9.0 },
+                                                 { 'code' => '22L3500', 'kh_min' => 340.0 }])).any?)
+  # (c) ÚPLNE prázdny riadok je pohodlie editora — mlčky sa zahodí
+  NxTest.assert_equal([], msgs.call(c.lift_rule('classes' => [
+                        { 'code' => '22K2300', 'min' => 420.0, 'max' => 1610.0 },
+                        { 'code' => '', 'min' => nil, 'max' => nil }
+                      ])), 'pridaný a nevyplnený riadok uloženie neblokuje')
+  # (d) seed a vypnuté pravidlo prejdú; iný `kind` sa brány netýka
+  NxTest.assert_equal([], msgs.call(c.lift_rule), 'seedový tvar')
+  NxTest.assert_equal([], msgs.call(c.lift_rule('enabled' => false,
+                                                'classes' => [{ 'code' => 'X', 'min' => 1.0 }])),
+                      'vypnuté pravidlo sa nekontroluje (zhodne s druhou bránou)')
+  NxTest.assert_equal([], NxKovE2::HR.lift_input_problems([{ 'rule_id' => 'zavesy',
+                                                             'kind' => 'bands', 'enabled' => true,
+                                                             'bands' => [{ 'max' => nil }] }]),
+                      'pásmové pravidlo brána výklopov nerieši')
+  NxTest.assert_equal([], NxKovE2::HR.lift_input_problems(nil), 'nil vstup nespadne')
+end
+
+NxTest.test('KOV-E2 (5): brána nad surovým vstupom je v ZÁPISOVEJ ceste, PRED normalizáciou') do
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'rules_dialog.rb'),
+                  encoding: 'UTF-8')
+  body = src[/def handle_save\(payload\).*?\n        end\n/m].to_s
+  NxTest.assert(body.include?('HardwareRules.lift_input_problems'), 'brána sa naozaj volá')
+  NxTest.assert(body.index('lift_input_problems') < body.index('normalize_rules'),
+                'a stojí PRED normalizáciou — po nej už neúplný riadok neexistuje')
+  # CITACIE cesty ostávajú nedotknuté (vzor `rules_problems`): brána je LEN
+  # v uložení — stavba ani seed ju nevolajú.
+  root = File.join(NxTest::ROOT, 'noxun_engine')
+  hits = Dir[File.join(root, '**', '*.rb')].sort.select do |f|
+    code = File.read(f, encoding: 'UTF-8').lines.reject { |l| l.strip.start_with?('#') }.join
+    code.include?('lift_input_problems')
+  end.map { |f| f.sub("#{NxTest::ROOT}/", '').tr('\\', '/') }
+  NxTest.assert_equal(['noxun_engine/core/hardware_rules.rb', 'noxun_engine/ui/rules_dialog.rb'],
+                      hits.sort, 'definícia + JEDINÝ volajúci (zápisová cesta)')
 end
 
 NxTest.test('KOV-E2 (5): ZÁPORNÁ hodnota v tabuľke sa NEULOŽÍ') do
@@ -518,6 +648,30 @@ NxTest.test('KOV-E2 (7): `rules.js` má editor, nie read-only vetu') do
                 'veta z E1b zanikla — po E2 by klamala')
   # Súhrn v lište ostáva (zbalený blok musí povedať, čo skrýva).
   NxTest.assert(js.include?('function rdLiftSummary('), 'súhrn do lišty')
+end
+
+NxTest.test('KOV-E2 (7): tabuľky výklopu sú na oboch stranách TIE ISTÉ') do
+  # Codex #334 kolo 1 P2: hlášku o nedopísanom riadku skladá klient aj server —
+  # keby sa zoznamy tabuliek rozišli, jedna strana by o tabuľke mlčala.
+  c = NxKovE2
+  js = c.js(c::RULES_JS)
+  keys = js[/var RD_LIFT_TABLES = \[(.*?)\];/m].to_s.scan(/\['([a-z]+)', '([^']+)', \[/)
+  NxTest.assert_equal(NxKovE2::HR::LIFT_TABLES.map { |k, human, _| [k, human] }, keys,
+                      'kľúče, ľudské názvy aj PORADIE sú zrkadlom servera')
+  NxTest.assert(js.include?('function rdLiftPartialProblem('), 'klient nedopísaný riadok pozná')
+  NxTest.assert(js.include?('nedopísaný'), 'a hovorí tú istú vetu ako server')
+end
+
+NxTest.test('KOV-E2 (7): duplicitnú hodnotu v tabuľke člena stráži KLIENT') do
+  # JEDINÉ miesto, kde je autoritou klient: `code_by_param.codes` je na serveri
+  # MAPA, takže druhý riadok s tou istou triedou prepíše prvý ešte pri skladaní
+  # payloadu a server duplicitu nikdy neuvidí (Codex #334 kolo 1 P2).
+  c = NxKovE2
+  js = c.js(c::HWSETS_JS)
+  NxTest.assert(js.include?('function hwsMemberProblems('), 'kontrola existuje')
+  NxTest.assert(js.include?('hwsSetValidate(d).concat(hwsMemberProblems('),
+                'a beží PRI ODOSLANÍ setu, nie len v teste')
+  NxTest.assert(js.include?('dvakrát'), 'veta povie, čo je zle')
 end
 
 NxTest.test('KOV-E2 (7): `hw_sets.js` UŽ NEMÁ read-only režim z E1a') do

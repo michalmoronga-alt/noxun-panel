@@ -1477,13 +1477,18 @@ aj **ľahký push** (`front_drawer_refresh`) — inak by z otvorenej karty po zm
 **`front_lift` (KOV-E2).** Tretí — opäť **vlastný** — kanál toho istého pushu: mapa `front_id → záznam riadku výklopu` pre riadky čiel typu `lift` (sklop tu nemá čo hľadať).
 Skladá ho `front_lift_payload` **čítacím** spôsobom z uloženého configu a je to **zrkadlo `front_drawer_payload`** aj v stavoch: uložený dôvod z `hardware_conflicts` tohto
 vlastníka (`front:<id>/flap`), ktorého kód je v **jedinom registri** `BuildPlan::HW_CONFLICT_CODES`, dá `state: 'conflict'` s **vetou stavby** (cudzí kód — napr. zásuvkový —
-sa ignoruje, nosič je zdieľaný); položka `HardwareSets.lift_item?` dá `state: 'ok'`; jej absencia dá `stale` **podľa `Bom.pre_lift_build?`** — tej istej autority, akou vzniká
-RED `flap_stale`, nie druhej podmienky vedľa nej (obe proveniencie: `config_schema` aj `rules_seed_version`); inak `pending`. ORANGE (`warn`) je **riadok navyše** a berie sa
+sa ignoruje, nosič je zdieľaný); položka `HardwareSets.lift_item?` dá `state: 'ok'`; jej absencia dá `stale` **podľa `Bom.flap_stale_front?`** — tej istej autority, akou vzniká
+RED `flap_stale`, nie druhej podmienky vedľa nej. Kritérium je **celé** (Codex #334 kolo 1 P2): obe proveniencie (`config_schema` aj `rules_seed_version`), chýbajúce
+kovanie podľa **smeru** čela **a výnimka pre úplnú ručnú zostavu** (`HardwareSets.manual_flap_assemblies`) — čelo s ručne zloženým mechanizmom je preto v karte pokojné
+presne tak, ako je pokojná Kontrola. Inak `pending`. ORANGE (`warn`) je **riadok navyše** a berie sa
 len z `warnings` s `part_key` tohto čela a kódom z `LIFT_WARN_CODES` (`lift_light_front`, `lift_override_ignored`); `hardware_rule_overlap` tu **zámerne nie je** — je to
 varovanie o pravidlách, vlastníka nenesie a v karte by nemalo kde pristáť.
 
 Text riadku (`lift_row_text`) aj vety detailu (`lift_detail_lines`) sú **výhradne z uložených dát**: systém, trieda mechanizmu, trieda ramien, otváranie, počet tyčí
-a predlžovací diel. **Číslo, ktoré na položke nie je (LF pri HK, hmotnosť pri HL), sa NEDOPOČÍTAVA** — druhý výpočet tej istej veličiny by sa s automatom časom rozišiel
+a predlžovací diel. **Štítok na konci riadku hovorí o ZDROJI položky** (`lift_source_tag`, Codex #334 kolo 1 P2): `automat` neznamená „vybral to plugin", ale „ručný zásah
+sa na tejto položke **neuplatní**" — a to platí len pre **chránené seed pravidlo** (`HardwareRules.protected_lift_item?`). Položka z vlastného výklopového pravidla
+override **prijíma** (`source: 'manual'`) a dostane štítok **`ručne`**; vlastné pravidlo bez zásahu nedostane štítok žiadny — mlčanie je presnejšie než ktorékoľvek
+z dvoch slov. **Číslo, ktoré na položke nie je (LF pri HK, hmotnosť pri HL), sa NEDOPOČÍTAVA** — druhý výpočet tej istej veličiny by sa s automatom časom rozišiel
 a obnoviť ho by znamenalo postaviť celý plán s katalógom materiálov na každý push. Keď automat na problém narazí, čísla sú **vo vete konfliktu** a tú karta ukáže doslovne.
 **KH a KB** idú z configu **tým istým vzorcom, aký používa kontext pravidiel** (`Construction`: `height − floor_height`, `width`) — karta nesmie ukázať iný rozmer, než podľa
 ktorého automat vyberal. Vety „čo je v balení" pridáva **ten istý** `drawer_buy_lines` (`HardwareSets.explain`) ako pri zásuvke, s **tým istým** kontextom `drawer_buy_ctx`.

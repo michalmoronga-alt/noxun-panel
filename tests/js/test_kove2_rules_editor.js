@@ -24,6 +24,8 @@
 //   M5 spôsobilosť sa zberom stratí               -> E2
 //   M6 nekladná hodnota spôsobilosti ide na server -> E2 (server ju zahadzuje)
 //   M7 súhrn prestane menovať tabuľky             -> E1
+//   M8 nulový prah druhej tyče prejde             -> E7 (Codex #334 kolo 1 P2)
+//   M9 nedopísaný riadok sa odošle na server      -> E8 (Codex #334 kolo 1 P2)
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
@@ -187,6 +189,42 @@ ok(R.rdValidate([opravene]) !== null, 'E6: a prázdne tabuľky klient odmietne u
 // ============ E7: klientska VALIDÁCIA (nové kritériá E2) =====================
 ok(R.rdLiftProblem(liftRule({ rod_double_from_kb_mm: -1100 })) !== null,
    'E7: záporný prah druhej tyče');
+// Codex #334 kolo 1 P2: NULA je rovnaký problém — `lift_rod_count` ju zahodí
+// („druhá tyč nikdy"), kým súhrn by písal „tyč od 0 mm" („druhá tyč vždy").
+const nula = R.rdLiftProblem(liftRule({ rod_double_from_kb_mm: 0 }));
+ok(nula !== null && nula.indexOf('musí byť kladná') >= 0, 'E7: nulový prah tyče: ' + nula);
+eq(R.rdLiftProblem(liftRule({ rod_double_from_kb_mm: 1100 })), null, 'E7: kladný prah prejde');
+const bezPrahu = liftRule();
+delete bezPrahu.rod_double_from_kb_mm;
+eq(R.rdLiftProblem(bezPrahu), null, 'E7: prázdne pole = „druhá tyč nikdy“, bez hlášky');
+
+// ============ E8: NEDOPÍSANÝ riadok tabuľky (Codex #334 kolo 1 P2) ==========
+// Riadok s kódom, ale bez hranice (alebo naopak) by prešiel klientom aj
+// normalizáciou servera — a po prestavbe by BEZ SLOVA zmizol. Úplne prázdny
+// riadok je naopak pohodlie editora a musí prejsť.
+const polovicna = R.rdLiftProblem(liftRule({
+  classes: [{ code: '22K2300', min: 420, max: 1610 }, { code: '22K2500', min: 1610, max: null }]
+}));
+ok(polovicna !== null && polovicna.indexOf('nedopísaný') >= 0,
+   'E8: trieda bez hornej hranice: ' + polovicna);
+ok(polovicna.indexOf('22K2500') >= 0, 'E8: veta menuje TEN riadok');
+ok(polovicna.indexOf('tried HK top') >= 0, 'E8: aj tabuľku, v ktorej je');
+ok(R.rdLiftProblem(liftRule({
+  mechanisms: [{ code: '22L2500', max: 580 }, { code: '', max: 700 }]
+})) !== null, 'E8: mechanizmus s hranicou bez kódu');
+ok(R.rdLiftProblem(liftRule({
+  arms: [{ code: 'A', kh_min: 300, kh_max: 340, kg_min: 1.5, kg_max: 9 },
+         { code: 'B', kh_min: 340, kh_max: 390, kg_min: 1.75 }]
+})) !== null, 'E8: ramená bez hornej hmotnosti');
+eq(R.rdLiftProblem(liftRule({
+  classes: [{ code: '22K2300', min: 420, max: 1610 }, { code: '', min: null, max: null }]
+})), null, 'E8: ÚPLNE prázdny riadok je pohodlie editora — prejde');
+// A uložiť sa nedopísaný riadok naozaj nedá (celá cesta, nie len predikát).
+show([liftRule({ classes: [{ code: '22K2300', min: 420, max: 1610 },
+                           { code: '22K2500', min: 1610, max: null }] })]);
+SENT.length = 0;
+R.rdSaveRules();
+eq(SENT.length, 0, 'E8: formulár s nedopísaným riadkom sa NEODOŠLE');
 ok(R.rdLiftProblem(liftRule({ classes: [{ code: 'A', min: -1, max: 100 }] })) !== null,
    'E7: záporné LF v triede');
 ok(R.rdLiftProblem(liftRule({

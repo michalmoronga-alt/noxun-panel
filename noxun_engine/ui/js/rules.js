@@ -959,14 +959,57 @@
   // pokazených skalároch naraz obe strany menujú TEN ISTÝ.
   var RD_LIFT_SCALARS = [['handle_allowance_kg', 'rezerva na úchytku'],
                          ['rod_double_from_kb_mm', 'šírka pre druhú stabilizačnú tyč']];
+  // Riadok, ktorý PLATÍ: neprázdny kód + všetky menované bunky ako konečné
+  // čísla (zrkadlo serverovej `lift_row?`). Jediná definícia pre obe použitia
+  // — filter tabuliek aj kontrolu nedopísaného riadku.
+  function rdLiftRowFull(row, keys){
+    if (!row || typeof row !== 'object') return false;
+    if (String(row.code == null ? '' : row.code).trim() === '') return false;
+    return keys.every(function(k){ return rdLiftNum(row[k]) !== null; });
+  }
   function rdLiftRows(raw, keys){
-    return rdArr(raw).filter(function(row){
-      if (!row || String(row.code == null ? '' : row.code).trim() === '') return false;
-      return keys.every(function(k){ return rdLiftNum(row[k]) !== null; });
-    });
+    return rdArr(raw).filter(function(row){ return rdLiftRowFull(row, keys); });
+  }
+  // Tabuľky výklopu + ĽUDSKÝ názov do hlášky a bunky, ktoré riadok potrebuje.
+  // Zrkadlo serverovej `HardwareRules::LIFT_TABLES` vrátane PORADIA (pri dvoch
+  // pokazených tabuľkách naraz obe strany menujú TÚ ISTÚ).
+  var RD_LIFT_TABLES = [['classes', 'tried HK top', ['min', 'max']],
+                        ['mechanisms', 'mechanizmov HL top', ['max']],
+                        ['arms', 'ramien HL top', ['kh_min', 'kh_max', 'kg_min', 'kg_max']]];
+  // KOV-E2 (Codex #334 kolo 1 P2): NEDOPÍSANÝ riadok. Kto pridá riadok a vyplní
+  // len kód (alebo len jednu hranicu), poslal by ho na server, ktorý ho pri
+  // normalizácii ZAHODÍ — a po prestavbe by riadok bez slova zmizol. ÚPLNE
+  // prázdny riadok je naopak pohodlie editora (pridám, rozmyslím si to)
+  // a zahadzuje sa mlčky. Server hovorí to isté (`lift_input_problems`).
+  function rdLiftPartialProblem(name, r){
+    for (var t = 0; t < RD_LIFT_TABLES.length; t++){
+      var key = RD_LIFT_TABLES[t][0], human = RD_LIFT_TABLES[t][1], cells = RD_LIFT_TABLES[t][2];
+      var rows = rdArr(r[key]);
+      for (var i = 0; i < rows.length; i++){
+        var row = rows[i];
+        if (!row || typeof row !== 'object') continue;
+        if (rdLiftRowFull(row, cells)) continue;
+        var code = String(row.code == null ? '' : row.code).trim();
+        var filled = code !== '' || rdLiftAnyCell(row, cells);
+        if (!filled) continue;
+        return name + ': riadok' + (code ? ' „' + code + '“' : '') + ' v tabuľke ' + human
+             + ' je nedopísaný — doplň kód aj všetky hodnoty, alebo riadok odober.';
+      }
+    }
+    return null;
+  }
+  function rdLiftAnyCell(row, keys){
+    for (var i = 0; i < keys.length; i++){
+      if (rdLiftNum(row[keys[i]]) !== null) return true;
+    }
+    return false;
   }
   function rdLiftProblem(r){
     var name = 'Pravidlo „' + rdLabel(r.output) + '“';
+    // Nedopísaný riadok sa pýta ako PRVÝ — inak by ho prekryla veta o prázdnej
+    // tabuľke (riadok sa do nej nepočíta) a používateľ by hľadal inú chybu.
+    var partial = rdLiftPartialProblem(name, r);
+    if (partial) return partial;
     var classes = rdLiftRows(r.classes, ['min', 'max']);
     var mechs   = rdLiftRows(r.mechanisms, ['max']);
     var arms    = rdLiftRows(r.arms, ['kh_min', 'kh_max', 'kg_min', 'kg_max']);
@@ -999,11 +1042,14 @@
         && r.handle_allowance_kg < 0){
       return name + ': rezerva na úchytku nesmie byť záporná.';
     }
-    // KOV-E2: ZÁPORNÝ prah druhej tyče — `lift_rod_count` ho zahodí, takže by
-    // pravidlo ticho tvrdilo „druhá tyč nikdy".
+    // KOV-E2 (Codex #334 kolo 1 P2): NEKLADNÝ prah druhej tyče — `lift_rod_count`
+    // žiada kladné číslo, takže zápornú hodnotu AJ nulu zahodí („druhá tyč
+    // nikdy"), kým súhrn v lište by písal „tyč od 0 mm" („druhá tyč vždy").
+    // „Žiadne zdvojenie" sa hovorí PRÁZDNYM poľom, nie nulou.
     if (Object.prototype.hasOwnProperty.call(r, 'rod_double_from_kb_mm')
-        && r.rod_double_from_kb_mm < 0){
-      return name + ': šírka pre druhú stabilizačnú tyč nesmie byť záporná.';
+        && !(r.rod_double_from_kb_mm > 0)){
+      return name + ': šírka pre druhú stabilizačnú tyč musí byť kladná — '
+           + 'prázdne pole znamená „druhá tyč sa nepridáva nikdy“.';
     }
     // KOV-E2: ZÁPORNÁ hodnota v tabuľke (rozmery, sily aj hmotnosti sú kladné).
     var neg = rdLiftNegative(classes, ['min', 'max'])
@@ -1291,6 +1337,10 @@
                        rdAddLiftArm: rdAddLiftArm, rdDelLiftArm: rdDelLiftArm,
                        RD_LIFT_KEYS: RD_LIFT_KEYS, RD_LIFT_ELIG: RD_LIFT_ELIG,
                        rdLiftProblem: rdLiftProblem,
+                       // Codex #334 kolo 1 P2: tabuľky výklopu ako DÁTA —
+                       // sada porovnáva zoznam so serverovým `LIFT_TABLES`
+                       // (inak by sa zrkadlo rozišlo bez toho, aby to padlo).
+                       RD_LIFT_TABLES: RD_LIFT_TABLES,
                        // ŠT-3b-2a: read-only bloky — `rdOvrHtml`/`rdAbsRulesHtml` su
                        // ciste funkcie (kontrola escapovania a stropu zoznamu),
                        // `rdRenderExtra` + `rdSelectOverride` potrebuju DOM a
