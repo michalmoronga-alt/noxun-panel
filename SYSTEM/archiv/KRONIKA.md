@@ -26,7 +26,7 @@
   `use_type` už v účinnej mape bol. **Stráži to:** nový **AST guard** v `tests/pure/test_guards.rb` (`NxTest::DupDefs`) — žiadna metóda nie je v tom istom module/triede
   definovaná dvakrát; kľúč = plná cesta modulu + meno metódy (cez `RubyVM::AbstractSyntaxTree`, nie regex), takže duplicitu neschová ani znovuotvorený modul v inom súbore
   ani `module ::M`; `class << self` = `def self.x` (`class << KONST` iný scope), `module_function` vytvára aj singleton kópiu, výlučné vetvy `if`/`case` nie sú duplicita
-  (nepodmienená + podmienená, dve v tej istej vetve alebo pod nezávislými `if` áno), `def` v tele metódy sa neskenuje; hranice drží self-test s 22 prípadmi; pred fixom
+  (nepodmienená + podmienená, dve v tej istej vetve alebo pod nezávislými `if` áno), `private def x` = holý `def`, `def` v tele metódy sa neskenuje; hranice drží self-test s 25 prípadmi; pred fixom
   presne jeden nález v celom plugine, tento — a sada `tests/pure/test_incompatible_detail_sk.rb` (jedna autorita · každý `detail` zo zdrojáku má vetu a naopak — kľúče
   sa čítajú z AST vrátane slučky nad `%w[…]` · zachované znenia · `height_selector` end-to-end v Nákupe, paneli a Kontrole · rovnaký podmet vety na oboch stranách;
   mutácie M1–M3 overené ručne). Existujúce testy na tie texty neasertovali. Bokom opravená predložka v Nákupe („nesedí **so** zásuvkou", ako hovorí Kontrola).
@@ -35,7 +35,9 @@
   podľa vzoru z 31.8.: **slepý Opus reviewer s vykonanými reprodukciami** (MERGE OK: 0×P1, 1×P2 = prázdne meno setu → follow-up, 5×P3 → opravené) + **Codex CLI Astra**
   nad celým diffom (MERGE PO OPRAVE P1: 2×P1 = vetvy `if` v guarde a regex R5, 2×P2 = `module_function` a `::M`/`def A.a`, 1×P3 → všetko opravené: guard prenáša vetvy
   aj do `class << self`, R5 číta AST) + **Opus delta-verifikácia** prvého fix kola (DELTA OK, 4×P3 → opravené) + tretí pokus **GitHub Codex nad 195f6d8 prešiel** (2×P2:
-  nezávislé `if` a slučkové kľúče R5 → opravené v druhom fix kole, reply s hashom v threadoch, interná delta). Sandboxový beh Codex CLI hlásil 19 FAIL updatera — artefakt
+  nezávislé `if` a slučkové kľúče R5 → opravené v druhom fix kole, reply s hashom v threadoch) + **Opus delta-verifikácia** druhého fix kola (DELTA OK, 1×P2 = vetva `FCALL`
+  prestala zostupovať do `private def` → opravené v treťom, poslednom fix kole spolu s 2×P3; vedomá výnimka z pravidla 3 kôl — kolá 2–3 sa točili výhradne okolo hraníc
+  testovacej poistky, nie produkčného kódu, ktorý sa od `2a07855` nezmenil ani o riadok). Sandboxový beh Codex CLI hlásil 19 FAIL updatera — artefakt
   sandboxu (EACCES na `IO.popen`/`tasklist`), lokálne aj CI 0 FAIL. **Priznaný zvyšok (mimo opravy):** pri `height_selector` nesie veta prázdne meno setu („set „“ nesedí
   so zásuvkou (…)"), lebo `resolve_set_id` vracia `set_id = nil` a `unmapped_entry` ho z `info` nepreberá — samostatná drobnosť naprieč Nákupom, Kontrolou a panelom;
   guard nesleduje `define_method`/`alias_method`.

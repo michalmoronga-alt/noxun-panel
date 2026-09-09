@@ -717,10 +717,12 @@ charakterizačný test). Päť častí:
   z KOV-D1a), Ruby ticho brala druhú, takže tabuľka bola mŕtvy kód, `height_selector` (pevný `set_id` pre zásuvku s výškovým variantom) ostával bez vety „výber setu nie je
   podľa výšky zásuvky" a KOV-F1/E1a dopisovali každý detail na obe miesta. Duplicitné `def` stráži **AST guard** v `tests/pure/test_guards.rb` (`NxTest::DupDefs`): sken celého
   pluginu s kľúčom **plná cesta modulu + meno metódy**, takže duplicitu neschová ani znovuotvorený modul v inom súbore (`module Noxun::Engine::X` = vnorené moduly), `class << self`
-  a `def self.x` sú jeden singleton scope (`class << KONST` iný), `module_function` vytvára aj singleton kópiu, dve definície vo **vzájomne výlučných** vetvách `if`/`unless`/`case`
-  nie sú duplicita (nepodmienená + podmienená, dve v tej istej vetve alebo pod nezávislými `if` áno) a `def` v tele metódy sa neskenuje — hranice drží vlastný self-test;
-  `define_method`/`alias_method` scanner nesleduje. Úplnosť tabuľky (každý `detail` zo zdrojáku má vetu a naopak — kľúče sa čítajú z AST vrátane slučky nad `%w[…]`,
-  `height_selector` end-to-end, rovnaký podmet vety v Nákupe aj Kontrole) stráži `tests/pure/test_incompatible_detail_sk.rb`.
+  a `def self.x` sú jeden singleton scope (`class << KONST` iný), `module_function` (aj `module_function def x`) vytvára aj singleton kópiu, `private def x` sa skenuje ako holý
+  `def`, dve definície vo **vzájomne výlučných** vetvách `if`/`unless`/`case` nie sú duplicita (nepodmienená + podmienená, dve v tej istej vetve alebo pod nezávislými `if` áno)
+  a `def` v tele metódy sa neskenuje — hranice drží vlastný self-test. **Priznané limity:** `define_method`/`alias_method` scanner nesleduje; vetvy rozlišuje riadkom uzla
+  `if`/`case` (dva nezávislé `if` na jednom riadku by bral ako výlučné). Úplnosť tabuľky (každý `detail` zo zdrojáku má vetu a naopak — kľúče sa čítajú z AST vrátane slučky
+  nad `%w[…]`; symbolový kľúč `detail:` ani interpolovanú hodnotu scanner nevidí, v `hardware_sets.rb` sa nepoužívajú; `height_selector` end-to-end, rovnaký podmet vety
+  v Nákupe aj Kontrole) stráži `tests/pure/test_incompatible_detail_sk.rb`.
 
 Testy: `tests/pure/test_kovc2a_kanal_sety.rb` (23 testov + 4 overené mutácie vrátane completeness nad radmi receptov: pre KAŽDÚ bunku `nl_series_by_height`/`nl_series` každého
 vydaného receptu existuje v seede set vybraný triednym kľúčom a v ňom kit kód).

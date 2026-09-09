@@ -72,14 +72,18 @@ end
 #     su ten isty scope; `module ::M` je koren namespace, nie vnorenie,
 #   - `class << self` a `def self.x` zdielaju singleton scope (`X.x`); `class
 #     << KONST` / `def KONST.x` je INY scope (`X::self<KONST>.x`),
-#   - `module_function` (bez argumentov aj s menami) vytvara AJ singleton kopiu
-#     (`X.x`), takze neskorsi `def self.x` je duplicita,
+#   - `module_function` (bez argumentov, s menami aj `module_function def x`)
+#     vytvara AJ singleton kopiu (`X.x`), takze neskorsi `def self.x` je
+#     duplicita; `private def x` / `public def x` sa skenuje ako holy `def`,
 #   - `def` v tele metody sa neskenuje (lokalna zvlastnost, nie redefinicia),
 #   - dve definicie vo VZAJOMNE VYLUCNYCH vetvach `if`/`unless`/`case` nie su
 #     duplicita (vedoma podmienena definicia, napr. podla verzie Ruby) — aj
 #     ked su vo vetvach zabalene do `class << self`; nepodmienena + podmienena,
-#     alebo dve v TEJ ISTEJ vetve, duplicita SU — druha prvu prekryje.
-# Priznany limit: `define_method`/`alias_method` scanner nesleduje.
+#     dve v TEJ ISTEJ vetve alebo pod NEZAVISLYMI `if` duplicita SU — druha
+#     prvu prekryje.
+# Priznane limity: `define_method`/`alias_method` scanner nesleduje; vetvy
+# rozlisuje riadkom uzla `if`/`case` (dva nezavisle `if` na JEDNOM riadku by
+# sa brali ako vylucne).
 # Self-test nizsie drzi presne tieto hranice.
 module NxTest
   module DupDefs
@@ -191,8 +195,16 @@ module NxTest
           if args.nil?
             ctx[:mf] = true
           else
-            symbols(args).each { |n| record(seen, scope + ['self'], n, branch, file, node.first_lineno) }
+            # `module_function :a, :b` — odvodena singleton kopia menovanych
+            # metod; `module_function def a … end` — argumentom je sam `def`,
+            # ktory sa zaznamena s kopiou (mf plati len pre neho).
+            symbols(args).each { |n| record(seen, scope + ['self'], n, branch, file, node.first_lineno, true) }
+            args.children.each { |ch| walk(ch, scope, file, seen, branch, { mf: true }) }
           end
+        else
+          # `private def a … end`, `public def …` — `def` je argument volania
+          # a musi sa zaznamenat rovnako ako holy `def`.
+          node.children.each { |ch| walk(ch, scope, file, seen, branch, ctx) }
         end
       when *BRANCHING
         node.children.each_with_index do |ch, i|
@@ -265,6 +277,12 @@ NxTest.test('guard: self-test scannera duplicitnych definicii (hranice AST)') do
   NxTest.assert_equal([], dups.call("module M\n  module_function\n  def a; end\n  def b; end\nend\n"))
   # MF3) dva `def a` v module_function module = JEDEN nalez (instancny), nie aj odvodeny singleton
   NxTest.assert_equal(['M#a (f0:3, f0:4)'], dups.call("module M\n  module_function\n  def a; end\n  def a; end\nend\n"))
+  # MF4) hole `module_function` + neskorsie `module_function :a` tej istej metody = ziadna duplicita
+  NxTest.assert_equal([], dups.call("module M\n  module_function\n  def a; end\n  module_function :a\nend\n"))
+  # MF5) `module_function def a` = def s odvodenou kopiou -> neskorsi `def self.a` je duplicita
+  NxTest.assert_equal(['M.a (f0:2, f0:3)'], dups.call("module M\n  module_function def a; end\n  def self.a; end\nend\n"))
+  # V) `def` ako argument volania (`private def a`) sa skenuje ako holy `def`
+  NxTest.assert_equal(['M#a (f0:2, f0:3)'], dups.call("module M\n  private def a; end\n  private def a; end\nend\n"))
   # X) `class << KONST` / `def A.a` je iny scope nez `class << self` / `def B.a` — ziadna falosna duplicita
   NxTest.assert_equal([], dups.call("module M\n  class << K\n    def a; end\n  end\n  class << self\n    def a; end\n  end\nend\n"))
   NxTest.assert_equal([], dups.call("module M\n  def A.a; end\n  def B.a; end\nend\n"))
