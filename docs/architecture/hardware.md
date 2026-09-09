@@ -989,12 +989,19 @@ príchytu prináša až G1b):
   ako pri každej inej nesediacej definícii. Keď sa taxonómia čítať nedá alebo radu ešte nepozná, klasifikácia **ostáva** (seed taxonómie ju vzápätí doplní a jej odobratie by
   zbytočne odpojilo triedne predvoľby závesov a výklopov). Rovnaká, jediná sada ide do VŠETKÝCH seed ciest — `seed_library` (čerstvá inštalácia), doplnenie chýbajúceho setu,
   `replace_untouched_seed_sets` aj `migrate_mapping` (inak by set, ktorému taxonómia zaradenie odobrala, už nikdy „nesedel s naším seedom" a migrácia by stála).
+- **PORADIE: taxonómia sa doseeduje PRED klasifikáciou seed setov** (Codex #337 kolo 2 N2). `seed_sets_resolved` volá na začiatku `HardwareTaxonomy.ensure_seeded`. Pri bežnom
+  upgrade z taxonómie **v2** je v uloženom zápise rada AXILO ešte pod **Hettichom** — pod Häfele ju presunie až migrácia `migrate_axilo_owner!` vo vnútri `ensure_seeded`,
+  a `series_owner` ju **zámerne nespúšťa** (je to čistý dotaz bez zápisu). Bez tohto poradia by sa náš set `prichyt-sokla-axilo` (Häfele/AXILO) javil ako odporujúci, prišiel by
+  o klasifikáciu — a knižnica by sa vzápätí zapísala so `seed_version` 8, takže **seed-merge setov by sa už nikdy nezopakoval** a set by ostal navždy nezaradený. Poradie je
+  vidieť v `ProductionCore.hardware_expansion`: `HardwareSets.load` beží **pred** `HardwareCatalog.items` (ktorý taxonómiu doseeduje tiež), takže prvý na rade je práve tento kód.
+  **R-07 sa nemení:** nad read-only/degradovanou taxonómiou `ensure_seeded` nič nezapíše, `series_owner` vráti `nil` a klasifikácia ostáva — presne ako doteraz. **Vlastný
+  výrobca rady sa neprebíja** (migrácia presúva LEN presný starý seed tvar), takže používateľ s „AXILO → Moja firma" dostane set ďalej ako nezaradený.
 - **Migrácia:** starý (v2..v7) tvar setu nôh je v `LEGACY_SEED_SHAPES`, takže `replace_untouched_seed_sets` nedotknutú knižnicu aktualizuje a používateľom upravený set
   (stačí premenovanie) nechá tak. **Projektové snapshoty sa nemenia samy** — do rozpracovanej zákazky nový tvar aj predvoľbu príchytu prenesie vedomé **„Doplniť nové
   predvoľby"** (`refresh_untouched_project_sets` + `add_mapping_seed`, existujúci mechanizmus). Dôsledok, ktorý patrí do poznámok k vydaniu: **skrinka so soklom 150 mm
   objedná po prestavbe AXILO H150 + platničku (9076 + 9079) namiesto demosovskej nohy 367823** — golden charakterizácia `seed_kniznica` je preto vedome pregenerovaná.
 
-Testy: `tests/pure/test_kovg1a_nohy_data.rb` (31 sád + 11 overených mutácií, vrátane tabuľkovej fixtúry výšok sokla ako druhého nezávislého zápisu) +
+Testy: `tests/pure/test_kovg1a_nohy_data.rb` (36 sád + 14 overených mutácií, vrátane tabuľkovej fixtúry výšok sokla ako druhého nezávislého zápisu) +
 JS `tests/js/test_hw_sets.js` (sentinel v pásme).
 
 **BEZSTRATOVÁ BRÁNA DEFINÍCIÍ SETOV V ŠABLÓNE — `assess_set_defs` (audit #17 BLOCKER 1).** `hardware_set_defs` išli doteraz LEN cez tolerantný `normalize_sets`, teda cez cestu,

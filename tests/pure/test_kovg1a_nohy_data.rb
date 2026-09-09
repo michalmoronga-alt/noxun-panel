@@ -57,6 +57,22 @@
 #   N4 genericky kluc mapovania overuje `generic_type` cieloveho setu
 #      M11 `mapping_seed_ref_ok?` sa vrati k „len pritomnost"
 #         -> „(Codex #337 N4): predvolba prichytu sa NEDOPLNI na set INEHO typu"
+#
+# CODEX #337 KOLO 2 — co sa zmenilo (a mutacie, ktore to strazia):
+#   N1 clena bez jedineho kodu odmieta LEN PISANIE setu (`authoring: true` —
+#      editor `save_set!` a jeho nahlad). Citanie aj hromadny prepis uz
+#      ulozeneho obsahu ho ZACHOVAJU, inak by legacy kniznica (a projektovy
+#      snapshot) skoncila ako read-only / `:invalid` skor, nez behova poistka
+#      `members_all_skipped` stihne cokolvek povedat.
+#      M13 kontrola „vsetky none" sa vrati k bezpodmienecnej platnosti
+#         -> „(kolo 2 N1): LEGACY clen bez kodov sa CITA…" + „…legacy set
+#            FUNGUJE…" + „…EDITOR ten isty tvar odmietne…" (a D-118b R8)
+#      M14 `save_set!` prestane posielat `authoring: true`
+#         -> „(kolo 2 N1): EDITOR ten isty tvar odmietne…"
+#   N2 taxonomia sa DOSEEDUJE (migracia AXILO) PRED tym, nez sa citaju vlastnici
+#      rad pre klasifikaciu seed setov
+#      M12 `seed_sets_resolved` prestane volat `HardwareTaxonomy.ensure_seeded`
+#         -> „(kolo 2 N2): taxonomia sa DOSEEDUJE PRED klasifikaciou seed setov"
 require_relative '../helper' unless defined?(NxTest)
 
 module NxG1a
@@ -136,11 +152,13 @@ module NxG1a
   end
 
   # Zapise dokument PRIAMO na disk (obide brany) a zhodi cache aj stav.
-  def install_tax(mans, sers)
+  # `seed_version` je parameter (Codex #337 kolo 2 N2): STARSIA taxonomia je
+  # presne ten stav, v ktorom este AXILO patri Hettichu.
+  def install_tax(mans, sers, seed_version: TAX::SEED_VERSION)
     FileUtils.mkdir_p(File.dirname(TAX.path))
     File.binwrite(TAX.path,
                   JSON.pretty_generate('std' => TAX::STD, 'schema' => TAX::SCHEMA_CURRENT,
-                                       'seed_version' => TAX::SEED_VERSION,
+                                       'seed_version' => seed_version,
                                        'manufacturers' => mans.map { |n| { 'name' => n } },
                                        'series' => sers.map { |(n, m)| { 'name' => n, 'manufacturer' => m } }))
     STORE.invalidate(TAX.path)
@@ -696,6 +714,47 @@ NxTest.test('KOV-G1a (Codex #337 N3): seed set s cudzou vazbou rady sa instaluje
       c::STORE.invalidate(c::HWS.path)
       c::HWS.reset_library_state!
     end
+  end
+end
+
+NxTest.test('KOV-G1a (Codex #337 kolo 2 N2): taxonomia sa DOSEEDUJE PRED klasifikaciou seed setov') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  c = NxG1a
+  c.with_library do
+    # BEZNY UPGRADE: taxonomia je este v2 (AXILO patri Hettichu) a kniznica
+    # setov v7. `HardwareSets.load` bezi PRVA (`ProductionCore.hardware_expansion`
+    # ju vola pred katalogom), takze keby si vlastnika rady precitala BEZ
+    # migracie, nas set Häfele/AXILO by sa javil ako odporujuci, prisiel by
+    # o klasifikaciu — a kniznica by sa hned zapisala so seed verziou 8, takze
+    # by sa seed-merge uz nikdy nezopakoval a set by ostal navzdy nezaradeny.
+    c.install_tax(['Hettich'], [['AXILO', 'Hettich'], ['Sensys', 'Hettich']], seed_version: 2)
+    c.install_lib(c::HWS.normalize_sets(c::HWS::LEGACY_SEED_SHAPES['nohy-klzak-17']), {}, 7)
+    lib = c::HWS.load
+    clip = lib['sets'].find { |x| x['set_id'] == c::CLIP_SET }
+    NxTest.assert(clip, 'seed-merge doplnil set prichytu')
+    NxTest.assert_equal('Häfele', clip['manufacturer'], 'a je ZARADENY (migracia bezala PRED nim)')
+    NxTest.assert_equal('AXILO', clip['series'])
+    NxTest.assert_equal(c::TAX::SEED_VERSION,
+                        JSON.parse(File.binread(c::TAX.path))['seed_version'].to_i,
+                        'taxonomia je doseedovana (v3)')
+    NxTest.assert_equal('Häfele', c::TAX.series_owner('AXILO'), 'rada uz patri Häfele')
+  end
+end
+
+NxTest.test('KOV-G1a (Codex #337 kolo 2 N2): VLASTNY vyrobca rady sa doseedovanim NEPREBIJE') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  c = NxG1a
+  c.with_library do
+    # Ta ista stara seed verzia, ale radu AXILO si pouzivatel naviazal na
+    # vlastneho vyrobcu. Migracia presuva LEN presny stary seed tvar, takze
+    # jeho vazba ostava — a set sa preto instaluje NEZARADENY (ako doteraz).
+    c.install_tax(['Hettich', 'Moja firma'], [['AXILO', 'Moja firma']], seed_version: 2)
+    c.install_lib(c::HWS.normalize_sets(c::HWS::LEGACY_SEED_SHAPES['nohy-klzak-17']), {}, 7)
+    lib = c::HWS.load
+    clip = lib['sets'].find { |x| x['set_id'] == c::CLIP_SET }
+    NxTest.assert(clip, 'set sa doplni tak ci tak (nakup je od klasifikacie nezavisly)')
+    NxTest.assert_equal(nil, clip['manufacturer'], 'ale BEZ zaradenia')
+    NxTest.assert_equal('Moja firma', c::TAX.series_owner('AXILO'), 'vlastna vazba ostava')
   end
 end
 

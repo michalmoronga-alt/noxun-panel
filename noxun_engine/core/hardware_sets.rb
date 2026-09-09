@@ -1725,7 +1725,21 @@ module Noxun
       # Ked sa taxonomia citat neda alebo rada v nej este nie je, klasifikacia
       # OSTAVA: seed taxonomie dvojicu vzapati doplni a jej odobratie by
       # zbytocne odpojilo triedne predvolby zavesov a vysuvov.
+      # Codex #337 kolo 2 N2: PORADIE JE SUCASTOU PRAVIDLA. Pri beznom upgrade
+      # z taxonomie v2 je v ulozenom zapise rada AXILO este pod Hettichom —
+      # pod Häfele ju presunie AZ migracia v `HardwareTaxonomy.ensure_seeded`.
+      # `series_owner` migraciu ZAMERNE nespusta (je to cisty dotaz), takze bez
+      # tohto riadku by sa nas seed set `prichyt-sokla-axilo` (Häfele/AXILO)
+      # javil ako ODPORUJUCI, prisiel by o klasifikaciu — a kniznica by sa hned
+      # zapisala so seed verziou 8, takze seed-merge setov by sa uz NIKDY
+      # nezopakoval a set by ostal navzdy nezaradeny. (`HardwareSets.load` bezi
+      # PRED `HardwareCatalog.items`, ktory taxonomiu doseeduje tiez —
+      # v `ProductionCore.hardware_expansion` je teda prvy na rade prave tento
+      # kod.) Zapis sa tu NEVYNUCUJE: nad read-only/degradovanou taxonomiou
+      # `ensure_seeded` nic nezapise, `series_owner` vrati nil a klasifikacia
+      # ostava — presne ako doteraz.
       def seed_sets_resolved(sets = SEED_SETS)
+        HardwareTaxonomy.ensure_seeded
         sets.map do |s|
           man = s['manufacturer'].to_s.strip
           ser = s['series'].to_s.strip
