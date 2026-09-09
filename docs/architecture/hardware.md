@@ -720,7 +720,7 @@ charakterizačný test). Päť častí:
   a `def self.x` sú jeden singleton scope (`class << KONST` iný), `module_function` (aj `module_function def x`) vytvára aj singleton kópiu, `private def x` sa skenuje ako holý
   `def`, dve definície vo **vzájomne výlučných** vetvách `if`/`unless`/`case` nie sú duplicita (nepodmienená + podmienená, dve v tej istej vetve alebo pod nezávislými `if` áno)
   a `def` v tele metódy sa neskenuje — hranice drží vlastný self-test. **Priznané limity:** `define_method`/`alias_method` scanner nesleduje; vetvy rozlišuje riadkom uzla
-  `if`/`case` (dva nezávislé `if` na jednom riadku by bral ako výlučné). Úplnosť tabuľky (každý `detail` zo zdrojáku má vetu a naopak — kľúče sa čítajú z AST vrátane slučky
+  `if`/`case` (dva nezávislé `if` na jednom riadku s definíciami v rôznych vetvách by bral ako výlučné). Úplnosť tabuľky (každý `detail` zo zdrojáku má vetu a naopak — kľúče sa čítajú z AST vrátane slučky
   nad `%w[…]`; symbolový kľúč `detail:` ani interpolovanú hodnotu scanner nevidí, v `hardware_sets.rb` sa nepoužívajú; `height_selector` end-to-end, rovnaký podmet vety
   v Nákupe aj Kontrole) stráži `tests/pure/test_incompatible_detail_sk.rb`.
 

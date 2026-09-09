@@ -82,8 +82,8 @@ end
 #     dve v TEJ ISTEJ vetve alebo pod NEZAVISLYMI `if` duplicita SU — druha
 #     prvu prekryje.
 # Priznane limity: `define_method`/`alias_method` scanner nesleduje; vetvy
-# rozlisuje riadkom uzla `if`/`case` (dva nezavisle `if` na JEDNOM riadku by
-# sa brali ako vylucne).
+# rozlisuje riadkom uzla `if`/`case` (dva nezavisle `if` na JEDNOM riadku
+# s definiciami v ROZNYCH vetvach — then vs. else — by sa brali ako vylucne).
 # Self-test nizsie drzi presne tieto hranice.
 module NxTest
   module DupDefs
@@ -198,7 +198,13 @@ module NxTest
             # `module_function :a, :b` — odvodena singleton kopia menovanych
             # metod; `module_function def a … end` — argumentom je sam `def`,
             # ktory sa zaznamena s kopiou (mf plati len pre neho).
-            symbols(args).each { |n| record(seen, scope + ['self'], n, branch, file, node.first_lineno, true) }
+            # Symboly sa beru len z PRIAMYCH argumentov — telo `def` v argumente
+            # moze volat `x(:sym)` a to nie je meno metody na kopirovanie.
+            args.children.each do |ch|
+              next if node?(ch) && %i[DEFN DEFS].include?(ch.type)
+
+              symbols(ch).each { |n| record(seen, scope + ['self'], n, branch, file, node.first_lineno, true) }
+            end
             args.children.each { |ch| walk(ch, scope, file, seen, branch, { mf: true }) }
           end
         else
@@ -281,6 +287,8 @@ NxTest.test('guard: self-test scannera duplicitnych definicii (hranice AST)') do
   NxTest.assert_equal([], dups.call("module M\n  module_function\n  def a; end\n  module_function :a\nend\n"))
   # MF5) `module_function def a` = def s odvodenou kopiou -> neskorsi `def self.a` je duplicita
   NxTest.assert_equal(['M.a (f0:2, f0:3)'], dups.call("module M\n  module_function def a; end\n  def self.a; end\nend\n"))
+  # MF6) symbol volany v TELE takeho `def` (`x(:b)`) nie je meno metody — ziadna falosna kopia `M.b`
+  NxTest.assert_equal([], dups.call("module M\n  module_function def a; x(:b); end\n  def self.b; end\nend\n"))
   # V) `def` ako argument volania (`private def a`) sa skenuje ako holy `def`
   NxTest.assert_equal(['M#a (f0:2, f0:3)'], dups.call("module M\n  private def a; end\n  private def a; end\nend\n"))
   # X) `class << KONST` / `def A.a` je iny scope nez `class << self` / `def B.a` — ziadna falosna duplicita
