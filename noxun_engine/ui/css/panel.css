@@ -2037,6 +2037,11 @@
   .mset-mtop input.mset-lbl { flex: 1 1 100px; min-width: 80px; padding: 4px 6px; font: inherit;
                               font-size: 12px; }
   .mset-mtop .mset-del { flex: 0 0 auto; padding: 2px 7px; font-size: 12px; }
+  /* KOV-E2: „Počet z parametra" je DRUHÝ riadok hlavičky člena — prvý rad je
+     už plný (dva selecty, počet, popis, ✕) a piaty ovládač by ho pretiekol. */
+  .mset-mqf { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+  .mset-mqf select { flex: 1 1 120px; min-width: 96px; padding: 4px 6px; font: inherit;
+                     font-size: 12px; }
   .mset-mbody { margin-top: 3px; }
   .mset-m .merr { flex: none; }
   .mset-empty { font-size: 11.5px; color: var(--nx-ink-faint); padding: 3px 2px; }

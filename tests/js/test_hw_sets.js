@@ -6,7 +6,7 @@
 const assert = require('node:assert');
 const path = require('node:path');
 const { hwsSlug, hwsSetsForType, hwsMemberSummary, hwsBuildSetPayload,
-        hwsMembersOf, hwsNum, hwsParamLabel, hwsBandsSummary, hwsBuildBands,
+        hwsMembersOf, hwsBuildMembers, hwsNum, hwsParamLabel, hwsBandsSummary, hwsBuildBands,
         hwsSelectorFrom, hwsBuildSelector, hwsProjDraftKeys,
         hwsPinRev, hwsMapRev, hwsMapClassValue, hwsMapClassSelectedId,
         HWS_STORED_OPT } =
@@ -86,8 +86,14 @@ eq(round.set_id, libSet.set_id, 'identita drzi');
 
 const plain = hwsMembersOf({ set_id: 'k', name: 'K', generic_type: 'hinge',
                              members: [{ code: '1', per: 'owner', qty: 3 }] });
-eq(plain[0], { is_series: false, per: 'owner', qty: 3, label: '', code: '1' },
+// KOV-E2: kazdy clen editora nesie aj POCET Z PARAMETRA (`quantity_from`) —
+// je NEZAVISLY od strategie kodu, takze pole ma aj plochy clen (prazdne =
+// pevny pocet). Na server sa prazdna hodnota NEZAPISUJE (viz round-trip nizsie).
+eq(plain[0], { per: 'owner', qty: 3, label: '', qfrom: '', qfrom_custom: '',
+               is_series: false, code: '1' },
    'plochy clen do stavu editora');
+eq(hwsBuildMembers(plain), [{ per: 'owner', qty: 3, code: '1' }],
+   'a spat na server bez prazdneho `quantity_from`');
 
 // ============ H1b: pasma clena setu + vyber setu podla parametra ============
 
