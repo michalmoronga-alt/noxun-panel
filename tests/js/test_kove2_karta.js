@@ -14,6 +14,8 @@
 //   K2 riadky zo servera (`front_lift[fid]`): `ok` = resolved + detail,
 //      `conflict`/`stale` = ČERVENÝ inforow s vetou SERVERA, ORANGE je riadok
 //      NAVIAC; `pending` = karta mlčí a hovorí za ňu veta o automate
+//      K2b: `incomplete` (set nevydá celú zostavu) = ČERVENÝ riadok NAD
+//      zhrnutím, ktoré aj s rozklikom OSTÁVA
 //   K3 VERTIKÁLNY PRIESTOR: vyriešený výklop nepridá druhú vetu o automate
 //   K4 zápis: klik na chip zapíše `lift.system` a `collectFronts` ho pošle;
 //      prepnutie typu hodnotu NEZAHODÍ (dormant)
@@ -29,6 +31,8 @@
 //   M6 klik na chip zapíše `lift_system` naplocho     -> K4
 //   M7 detail sa nevykreslí ako rozklik               -> K5
 //   M8 karta dvierok dostane riadok výklopu           -> K6
+//   M9 stav `incomplete` sa nekreslí, alebo je len jantárový (Codex #334
+//      kolo 2 P2 — neúplná zostava by vyzerala ako drobnosť)  -> K2b
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
@@ -109,6 +113,35 @@ eq(warnRows.length, 2, 'K2: ORANGE je riadok NAVIAC (M4)');
 eq(warnRows[0].kind, 'resolved', 'K2: vyriešený riadok ostáva prvý');
 eq(warnRows[1].tone, 'warn', 'K2: a jantárový stojí pod ním');
 eq(warnRows[1].text, 'Čelo je ľahké.', 'K2: aj tú vetu skladá server');
+
+// K2b (Codex #334 kolo 2 P2): NEÚPLNÁ ZOSTAVA je RED STAV karty, nie riadok
+// schovaný v rozkliku. Kým `state` ostávalo `ok`, karta o výklope bez kódu
+// mlčala (veta „Bez kódu: …" žila len v „Technickom detaile"), kým Kontrola
+// vedľa hlásila RED a zastavovala nákup, rozpočet aj cenovú ponuku.
+const NEUPLNY = 'Výklop (HK top): set „vyklop-hk-klasik“ nemá kód pre triedu, ' +
+  'ktorú výklop potrebuje — člen 1 — doplň kód do setu. Zostava by bola neúplná ' +
+  '(krytky bez mechanizmu), preto sa nákup kovania, rozpočet ani cenová ponuka ' +
+  'zatiaľ nedajú vydať.';
+const badRows = C.frontLiftRows(Object.assign({}, OK_REC,
+                                              { state: 'incomplete', message: NEUPLNY }));
+eq(badRows.length, 2, 'K2b: červený dôvod + zhrnutie, nie jedno namiesto druhého');
+eq(badRows[0].kind, 'info', 'K2b: dôvod je inforow');
+eq(badRows[0].tone, 'err', 'K2b: a je ČERVENÝ — nie jantárová poznámka');
+eq(badRows[0].text, NEUPLNY, 'K2b: veta je SERVERA, slovo za slovom (tá istá ako v Kontrole)');
+eq(badRows[1].kind, 'resolved', 'K2b: pod ním ostáva zhrnutie…');
+eq(badRows[1].detail, OK_REC.detail, '…aj s rozklikom — čo už vieme, sa nezahadzuje');
+const badWarn = C.frontLiftRows(Object.assign({}, OK_REC,
+                                              { state: 'incomplete', message: NEUPLNY,
+                                                warn: 'Čelo je ľahké.' }));
+eq(badWarn.map(r => r.tone || r.kind), ['err', 'resolved', 'warn'],
+   'K2b: poradie je RED → zhrnutie → ORANGE');
+eq(C.frontLiftRows({ state: 'incomplete', text: 'x', message: '' }).length, 1,
+   'K2b: bez vety sa prázdny červený pruh nekreslí');
+const kartaNeuplna = C.frontCardModel({ type: 'lift', lift: { system: 'hk_top' } }, ENTRY, null,
+                                      Object.assign({}, OK_REC,
+                                                    { state: 'incomplete', message: NEUPLNY }));
+eq(kinds(kartaNeuplna), ['seg', 'seg', 'info', 'resolved'],
+   'K2b: veta o automate MIZNE aj tu — hovorí zaň červený riadok');
 
 // ============ K3: vertikálny priestor =======================================
 const bezZaznamu = C.frontCardModel({ type: 'lift' }, ENTRY);

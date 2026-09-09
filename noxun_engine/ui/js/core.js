@@ -300,6 +300,11 @@
   //   'stale'    — skrinka postavena PRED pravidlami vyklopov -> cerveny
   //   'ok'       — `text` + `detail[]`; `warn` = ORANGE riadok NAVIAC
   //                (lahke celo, ignorovany override, prekryv pravidiel)
+  //   'incomplete' — Codex #334 kolo 2 P2: polozka VZNIKLA, ale set ju nevie
+  //                cely vydat (chyba mapovanie, kod triedy alebo pocet).
+  //                Kreslia sa OBE veci: cerveny riadok s dovodom (`message` =
+  //                ta ista veta ako v Kontrole) a POD nim zhrnutie s rozklikom,
+  //                lebo to, co uz o vyklope vieme, sa zahadzovat nema.
   //   'pending'  — server sa este nevyjadril -> karta mlci
   function frontLiftRows(lift){
     var d = (lift && typeof lift === 'object') ? lift : null;
@@ -309,10 +314,15 @@
       var msg = String(d.message || '');
       return msg ? [{ kind: 'info', tone: 'err', icon: 'alert', text: msg }] : [];
     }
-    if (st !== 'ok') return [];
-    var out = [{ kind: 'resolved', label: 'Výklop', text: String(d.text || ''),
-                 detail: Array.isArray(d.detail) ? d.detail.map(String) : [],
-                 note: null }];
+    if (st !== 'ok' && st !== 'incomplete') return [];
+    var out = [];
+    // RED stoji NAD zhrnutim: je to stav riadku, nie poznamka pod nim.
+    if (st === 'incomplete' && d.message){
+      out.push({ kind: 'info', tone: 'err', icon: 'alert', text: String(d.message) });
+    }
+    out.push({ kind: 'resolved', label: 'Výklop', text: String(d.text || ''),
+               detail: Array.isArray(d.detail) ? d.detail.map(String) : [],
+               note: null });
     // ORANGE je riadok NAVIAC (nie nahrada) — polozka existuje a objedna sa,
     // len s upozornenim. Rovnaky vyklad ako `sync` pri zasuvke.
     if (d.warn) out.push({ kind: 'info', tone: 'warn', icon: 'alert', text: String(d.warn) });

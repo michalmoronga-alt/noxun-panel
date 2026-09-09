@@ -1033,9 +1033,20 @@ module Noxun
       # a nikdy sa nevydá „polovica" zostavy.
       LIFT_SYSTEM_SK = { 'hk_top' => 'HK top', 'hl_top' => 'HL top' }.freeze
 
-      def lift_incomplete_item(u, where, sid, opk, gt, oid)
+      # KOV-E2 (Codex #334 kolo 2 P2): ZNENIE vety ma JEDINY zdroj a je nim
+      # tato metoda. Kontrola nie je jediny, kto vetu hovori — kartu cela
+      # v Inspectore vydava `Panel.lift_card_row`, a keby si ju pisala sama,
+      # o tej istej chybe by existovali DVE znenia (karta by ju navyse mohla
+      # ukazat ako drobnost v rozkliku, kym Kontrola vedla zastavuje exporty).
+      # `where` je LOKATOR skrinky: Kontrola ho potrebuje (je to zoznam cez
+      # cely projekt), karta nie (stoji v tej skrinke) — DOVOD aj naprava su
+      # v oboch pripadoch to iste slovo za slovom.
+      def lift_incomplete_sentence(u, where = nil)
+        sid = u['set_id'].to_s
         sys = LIFT_SYSTEM_SK[u['lift_system'].to_s] || ''
         what = sys.empty? ? '' : " (#{sys})"
+        loc = where.to_s.strip
+        loc = loc.empty? ? '' : " (#{loc})"
         member = u['member_label'].to_s.strip
         member = "člen #{u['member_index'].to_i + 1}" if member.empty? && u.key?('member_index')
         detail = member.empty? ? '' : " — #{member}"
@@ -1080,11 +1091,15 @@ module Noxun
           else
             'výklop nemá predvolený set — otvor Pravidlá → Doplniť nové predvoľby'
           end
+        "Výklop#{loc}#{what}: #{reason}. " \
+          'Zostava by bola neúplná (krytky bez mechanizmu), preto sa ' \
+          'nákup kovania, rozpočet ani cenová ponuka zatiaľ nedajú vydať.'
+      end
+
+      def lift_incomplete_item(u, where, sid, opk, gt, oid)
         item = { 'severity' => RED, 'category' => CAT_HW_INCOMPLETE,
                  'owner_id' => oid, 'part_key' => (opk.empty? ? nil : opk), 'hw_key' => nil,
-                 'message_sk' => "Výklop (#{where})#{what}: #{reason}. " \
-                                 'Zostava by bola neúplná (krytky bez mechanizmu), preto sa ' \
-                                 'nákup kovania, rozpočet ani cenová ponuka zatiaľ nedajú vydať.',
+                 'message_sk' => lift_incomplete_sentence(u, where),
                  'stable_key' => [CAT_HW_INCOMPLETE, oid, opk, gt, u['rule_id'].to_s, sid,
                                   u['base_reason'].to_s, u['member_index'].to_s].join('|') }
         target = hw_target(opk, gt, u['rule_id'], orphan: false)

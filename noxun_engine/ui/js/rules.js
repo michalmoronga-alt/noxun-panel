@@ -213,9 +213,16 @@
       h += '</div>';
     });
     h += '</div>';
+    // Codex #334 kolo 2 (P2): hint TVRDIL, že po uložení treba skrinky prestaviť
+    // ručne — ale uloženie pravidiel v Štúdiu prestavuje VŠETKY skrinky samo
+    // (`RulesDialog.handle_save` -> `CabinetBuilder.rebuild_many`, jeden krok
+    // Späť) a status hlási ich počet. Výzva na ďalšiu prestavbu posielala
+    // človeka robiť prácu, ktorá je už hotová, a spochybňovala, či sa zmena
+    // vôbec prejavila. To isté hovorí aj tlačidlo lišty („Uložiť a prestavať
+    // skrinky") — dve vety o tom istom kroku si protirečiť nesmú.
     return h + '<div class="hint">Prázdne pole = kritérium sa nepoužije. Pásma sa nemusia písať ' +
-      'v poradí — server ich zoradí sám. Po uložení skrinky NEPRESTAVÍ automaticky: ' +
-      'prestav ich (zmeň a vráť rozmer alebo klikni Prestavať).</div></div></details>';
+      'v poradí — server ich zoradí sám. Uloženie prestaví všetky skrinky, ' +
+      'takže nové hodnoty platia hneď.</div></div></details>';
   }
 
   // Zbalenie bloku = formulár zmizne z očí a hovoriť zaň začne SÚHRN v lište.

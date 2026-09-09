@@ -26,6 +26,7 @@
 //   M7 súhrn prestane menovať tabuľky             -> E1
 //   M8 nulový prah druhej tyče prejde             -> E7 (Codex #334 kolo 1 P2)
 //   M9 nedopísaný riadok sa odošle na server      -> E8 (Codex #334 kolo 1 P2)
+//   M10 hint tvrdí, že skrinky treba prestaviť ručne -> E1b (Codex #334 kolo 2 P2)
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
@@ -98,6 +99,18 @@ eq(box().querySelectorAll('.lelig').length, 2, 'E1: spôsobilosť má riadok na 
 // Zbalený blok je default — otvorený stav si pamätá modul (nie DOM).
 eq(box().querySelector('.rlift').attrs.open, undefined,
    'E1: editor je ZBALENÝ (vertikálny priestor panela je vzácny)');
+// E1b (Codex #334 kolo 2 P2): hint pod editorom nesmie vyzývať na PRESTAVBU.
+// Uloženie pravidiel v Štúdiu prestavuje všetky skrinky samo (`handle_save` ->
+// `CabinetBuilder.rebuild_many`, jeden krok Späť) a status hlási ich počet;
+// výzva „prestav ich" posielala človeka robiť prácu, ktorá je už hotová, a
+// protirečila tlačidlu lišty „Uložiť a prestavať skrinky".
+const liftHint = md.textOf(box().querySelector('.rlift .hint'));
+ok(liftHint.indexOf('Uloženie prestaví všetky skrinky') >= 0,
+   'E1b: hint povie, že uloženie prestaví skrinky: ' + liftHint);
+ok(liftHint.indexOf('NEPRESTAVÍ') < 0 && liftHint.indexOf('prestav ich') < 0,
+   'E1b: a nevyzýva na ďalšiu prestavbu (M10): ' + liftHint);
+ok(R.rulesToolsHtml({}).indexOf('Uložiť a prestavať skrinky') >= 0,
+   'E1b: tlačidlo lišty hovorí to isté — dve vety o jednom kroku si neprotirečia');
 
 // ============ E2: ROUND-TRIP formulár -> pravidlo =============================
 show([liftRule()]);

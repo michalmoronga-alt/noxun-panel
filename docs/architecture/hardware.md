@@ -191,6 +191,11 @@ nad **surovým** vstupom a kontroluje **výhradne** nedopísaný riadok (`lift_p
 `RD_LIFT_TABLES`). **Úplne prázdny riadok je pohodlie editora** (pridám, rozmyslím si to) a mlčky sa zahadzuje na oboch stranách. Volajúci je **jediný** — `handle_save`
 v `rules_dialog.rb`; stavba ani seed validáciu nevolajú. Fixtúra parity sa preto pýta **oboch brán naraz** (klient má na obe jednu odpoveď `rdValidate`).
 
+**Hint pod editorom hovorí, čo uloženie SKUTOČNE robí (Codex #334 kolo 2 P2).** Tvrdil, že „po uložení sa skrinky neprestavia — prestav ich"; uloženie pravidiel v Štúdiu
+pritom prestavuje **všetky** skrinky (`RulesDialog.handle_save` → `CabinetBuilder.rebuild_many`, **jeden** krok Späť) a status hlási ich počet. Výzva na ďalšiu prestavbu
+posielala človeka robiť prácu, ktorá je už hotová, a protirečila tlačidlu lišty **„Uložiť a prestavať skrinky"**. Znenie je odteraz „Uloženie prestaví všetky skrinky, takže
+nové hodnoty platia hneď."; ostatné hinty sekcie (pásma F2, rad výsuvov) taký omyl nemali — hovoria o kritériách, nie o prestavbe.
+
 Nové prípady sú v `tests/fixtures/rules_validation_parity.json`. Testy: `tests/pure/test_kove2_ui.rb`, `tests/js/test_kove2_rules_editor.js`.
 
 
@@ -787,7 +792,11 @@ navyše jednotka, pri HL top ramená a stabilizačná tyč), a mechanizmus sa vy
   (`unmapped_entry`, presný vzor receptového `drawer_kit_missing`) — vrátane chýbajúceho setu a chýbajúceho mapovania; pôvodný dôvod cestuje v `base_reason`. Riadky ostatných
   členov v zozname **ostávajú** (rovnako ako pri zásuvke), ale von sa nedostanú: kód je v `BuildPlan::HW_LIFT_BLOCKERS` aj vo `from_expansion`
   (`ProductionCore.hardware_blockers`), takže nákup kovania, rozpočet aj cenová ponuka STOJA a „krytky bez mechanizmu" NIKDY neopustia plugin. **VEPO beží ďalej** — geometria
-  čela je správna (tá istá úvaha ako pri závesoch). Vetu skladá `Validation.lift_incomplete_item` (RED, kategória `hardware_incomplete`) a menuje čelo, systém aj člena.
+  čela je správna (tá istá úvaha ako pri závesoch). Vetu skladá `Validation.lift_incomplete_sentence` (RED, kategória `hardware_incomplete`) a menuje čelo, systém aj člena;
+  `lift_incomplete_item` z nej robí nález Kontroly a **kartu čela v Inspectore ňou hovorí `Panel.lift_incomplete_note`** — jedno znenie, dva odbery (Codex #334 kolo 2 P2).
+  Kontrola vetu predsadí **lokátorom** skrinky (je to zoznam cez celý projekt), karta nie (stojí v tej skrinke); dôvod a náprava sú slovo za slovom rovnaké.
+  Aby karta o závažnosti vôbec vedela, vracia `explain` popri preložených `problems` aj **surové záznamy `unmapped`** (aditívny kľúč, `explain_problem` ich zapisuje **naraz**,
+  takže sa nemôžu rozísť) — z preloženej vety sa RED od ORANGE odlíšiť nedá.
   **Set, ktorý nevydal ANI JEDEN riadok, je RED tiež** (Codex #332 kolo 2 P2): nula je platné vynechanie JEDNÉHO člena, ale keď na nulu vyjdú VŠETCI členovia
   (alebo ich set preskočí), expanzia by vrátila 0 riadkov aj 0 nemapovaných a exporty by prešli s výklopom BEZ kovania. Fallback `members_skipped` (dovtedy
   len pre receptové položky) preto platí aj pre `generic_type: lift` — v `expand_members` aj v `explain_members`, aby sa panel a súpis nerozišli — a
@@ -847,7 +856,10 @@ navyše jednotka, pri HL top ramená a stabilizačná tyč), a mechanizmus sa vy
   (`validate_member` / `validate_code_by_param`) a HTML `disabled` nie je ochrana. **Jediná výnimka z „autoritou je server" je DUPLICITNÁ hodnota v tabuľke člena**
   (`hwsMemberProblems`, Codex #334 kolo 1 P2): `code_by_param.codes` aj `code_by_nl` idú na server ako **mapa**, takže druhý riadok s tou istou triedou (dĺžkou) prepíše
   prvý už pri skladaní payloadu — server duplicitu **nikdy neuvidí**, uloženie prejde a prvé priradenie po refreshi ticho zmizne. Kontrola preto beží nad **poľom riadkov**
-  pred zložením mapy a chyba pristane pri tom členovi. Súhrn člena aj živý náhľad nové tvary čítajú („podľa lift_class",
+  pred zložením mapy a chyba pristane pri tom členovi. **Druhá výnimka z toho istého dôvodu je PRÁZDNY vlastný názov parametra** (Codex #334 kolo 2 P2): voľba
+  „iné (vypíšem)" žije **len v editore** a `hwsParamJoin` z nej pri prázdnom texte spraví prázdny reťazec — pri `quantity_from` sa kľúč do payloadu **vôbec nezapíše**,
+  takže server dostane platného člena s **pevným počtom**, uloží ho bez slova a voľba po refreshi ticho zmizne; pri `code_by_param` odíde prázdny `param`, ktorý server
+  síce odmietne, ale nepovie, ktorý člen a ktorá voľba to spôsobila. Obe stráži klient, kým ešte vidí **stav editora** (select + textové pole), nie až jeho výsledok. Súhrn člena aj živý náhľad nové tvary čítajú („podľa lift_class",
   „počet podľa rod_count"); `preview_expansion` si vzorovú triedu a počet doplní z DRAFTU, takže náhľad neukazuje samé ORANGE riadky.
   **Súhrn skladá KÓD a POČET NEZÁVISLE (Codex #332 kolo 3 P2):** `hwsMemberCodeText` (jedna zo štyroch stratégií `code` | `code_by_nl` | `param_bands` | `code_by_param`)
   + `hwsMemberQtyText` (`quantity_from`, inak `×qty`). Skorý return podľa stratégie zamlčal dynamický počet, resp. pri rade NL a pásmach vypísal `m.code` (`undefined`)

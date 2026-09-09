@@ -901,7 +901,9 @@ stál bez zvýrazneného chipu nad riadkom, ktorý HK top **už má**. Uložená
 
 Zdroj riadku je **výhradne server**: `cabinet_payload` posiela **`front_lift`** (vlastný kľúč vedľa `front_drawer`, nižšie odsek `payloads.rb`) a `frontLiftRows` z neho len
 kreslí. Stavy: `ok` → riadok („AVENTOS HK top · 22K2300 · automat") + vety detailu **(+ jantárový riadok NAVIAC pri ORANGE — nikdy namiesto neho)** · `conflict` / `stale` →
-**červený inforow s vetou SERVERA, slovo za slovom** (tá istá, akú vydá Kontrola v Štúdiu z `hardware_conflicts`) **namiesto** riadku výklopu · `pending` a chýbajúci kľúč →
+**červený inforow s vetou SERVERA, slovo za slovom** (tá istá, akú vydá Kontrola v Štúdiu z `hardware_conflicts`) **namiesto** riadku výklopu · **`incomplete`** (Codex #334
+kolo 2 P2) → **červený inforow NAD zhrnutím**, ktoré aj s rozklikom **ostáva**: položka vznikla, ale set ju nevie celú vydať, takže dôvod je stav riadku, nie poznámka
+pod ním (poradie je RED → zhrnutie → ORANGE) · `pending` a chýbajúci kľúč →
 karta mlčí. Muted veta **„Mechanizmus vyberá automat…"** sa kreslí **len keď server o výklope ešte nič nepovedal** — nad vyriešeným riadkom by bola druhá veta o tom istom.
 Ikonu (`alert` zo sprite) nesie **len** červený a jantárový riadok. Kombinácia **HL top + Tip-On** sa dá nastaviť ďalej (HTML `disabled` nie je ochrana) — karta o nej len
 **hneď** povie červenou vetou; bránu drží server.
@@ -1491,7 +1493,13 @@ override **prijíma** (`source: 'manual'`) a dostane štítok **`ručne`**; vlas
 z dvoch slov. **Číslo, ktoré na položke nie je (LF pri HK, hmotnosť pri HL), sa NEDOPOČÍTAVA** — druhý výpočet tej istej veličiny by sa s automatom časom rozišiel
 a obnoviť ho by znamenalo postaviť celý plán s katalógom materiálov na každý push. Keď automat na problém narazí, čísla sú **vo vete konfliktu** a tú karta ukáže doslovne.
 **KH a KB** idú z configu **tým istým vzorcom, aký používa kontext pravidiel** (`Construction`: `height − floor_height`, `width`) — karta nesmie ukázať iný rozmer, než podľa
-ktorého automat vyberal. Vety „čo je v balení" pridáva **ten istý** `drawer_buy_lines` (`HardwareSets.explain`) ako pri zásuvke, s **tým istým** kontextom `drawer_buy_ctx`.
+ktorého automat vyberal. Vety „čo je v balení" pridáva **tá istá** cesta (`HardwareSets.explain`) ako pri zásuvke, s **tým istým** kontextom `drawer_buy_ctx`; expanzia sa počíta **raz**
+(`item_expansion` → `buy_lines`), lebo karta výklopu z nej potrebuje **oboje** — vety rozkliku aj to, či expanzia **zlyhala**. **Zlyhanie expanzie je STAV karty, nie riadok
+v rozkliku** (Codex #334 kolo 2 P2): keď `explain` vydá záznam s `reason == lift_set_incomplete` (chýbajúce mapovanie, chýbajúci kód triedy, nevyriešený počet), karta dá
+`state: 'incomplete'` a `message`. Dovtedy vracala `ok` a problém priznala len vetou „Bez kódu: …" schovanou v „Technickom detaile", kým Kontrola vedľa hlásila RED
+a zastavovala nákup, rozpočet aj cenovú ponuku. **Znenie vety skladá `Validation.lift_incomplete_sentence` — tá istá metóda, akou vzniká nález Kontroly**, len bez lokátora
+skrinky (karta v tej skrinke stojí); dve znenia o jednej chybe existovať nesmú. Rozhoduje **surový záznam** `explain['unmapped']`, nie preložené `problems`: z preloženej
+vety sa závažnosť už prečítať nedá.
 Ten istý záznam nesie aj **ľahký push** (`sync.rb`, `NX.setHardwareSets`) — rozklik detailu ukazuje názov setu a kódy, teda presne to, čo výber tmavého setu mení.
 
 **`hardware_set_options` a owner výbery (KOV-D1a).** Typ kovania z kľúča override mapy aj rozpoznanie „výberu na úrovni vlastníka" idú cez **jediné autority**

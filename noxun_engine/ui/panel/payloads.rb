@@ -389,17 +389,35 @@ module Noxun
         # (`explain_stored`, riadok „Nosnosť bunky"). Nakupna volba setu ju
         # NEZVYSUJE (Astra #20 F11).
         def drawer_buy_lines(hw, buy)
-          return [] unless buy.is_a?(Hash) && hw.is_a?(Hash)
+          buy_lines(item_expansion(hw, buy))
+        end
 
-          exp = item_purchase(hw, buy['status'], buy['state'], buy['overrides'], buy['lookup'],
-                              blocked: buy['blocked'] == true)
+        # KOV-E2 (Codex #334 kolo 2 P2): EXPANZIA POLOZKY sa pocita RAZ.
+        # Karta vyklopu z nej potrebuje OBOJE — vety rozkliku aj to, ci
+        # expanzia ZLYHALA (stav karty) — a dva behy tej istej expanzie by
+        # boli nielen zbytocne, ale aj miesto, kde sa vety a stav mozu
+        # rozist. `nil` = expanziu sa nepodarilo ziskat (chybajuci kontext
+        # setov alebo chyba): vtedy sa NEPRIDA a NETVRDI nic.
+        def item_expansion(hw, buy)
+          return nil unless buy.is_a?(Hash) && hw.is_a?(Hash)
+
+          item_purchase(hw, buy['status'], buy['state'], buy['overrides'], buy['lookup'],
+                        blocked: buy['blocked'] == true)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.item_expansion')
+          nil
+        end
+
+        def buy_lines(exp)
+          return [] unless exp.is_a?(Hash)
+
           out = []
           out << "Balenie: #{exp['set_name'] || exp['set_id']}" if exp['set_name'] || exp['set_id']
           Array(exp['members']).each { |m| out << drawer_member_line(m) }
           Array(exp['problems']).each { |p| out << "Bez kódu: #{p}" }
           out
         rescue StandardError => e
-          Engine.log_error(e, 'Panel.drawer_buy_lines')
+          Engine.log_error(e, 'Panel.buy_lines')
           []
         end
 
@@ -492,6 +510,10 @@ module Noxun
         #                s rucne zlozenym mechanizmom by v karte bolo cervene,
         #                kym Kontrola mlci.
         #   'ok'       — `text` = zhrnutie, `detail` = vety, `warn` = ORANGE
+        #   'incomplete' — polozka VZNIKLA, ale set ju nevie cely vydat
+        #                (Codex #334 kolo 2 P2): `message` = TA ISTA veta, aku
+        #                da Kontrola pri RED `lift_set_incomplete`; `text`
+        #                a `detail` OSTAVAJU (co uz vieme, sa nezahadzuje)
         #   'pending'  — pravidlo vyklopov je vypnute / polozka nevznikla:
         #                karta mlci (a hovori za nu veta „vyberá automat")
         #
@@ -533,11 +555,41 @@ module Noxun
             return { 'state' => 'pending' }
           end
           params = hw['params'].is_a?(Hash) ? hw['params'] : {}
+          exp = item_expansion(hw, buy)
           row = { 'state' => 'ok', 'text' => lift_row_text(params, hw),
-                  'detail' => lift_detail_lines(cfg, params) + drawer_buy_lines(hw, buy) }
+                  'detail' => lift_detail_lines(cfg, params) + buy_lines(exp) }
+          # Codex #334 kolo 2 P2: ZLYHANIE EXPANZIE JE STAV KARTY, nie riadok
+          # v rozkliku. Kym `state` ostavalo 'ok', karta neuplnu zostavu
+          # priznala len vetou „Bez kódu: …" schovanou v „Technickom detaile" —
+          # kym Kontrola vedla hlasila RED `lift_set_incomplete` a zastavovala
+          # nakup, rozpocet aj cenovu ponuku. Karta a Kontrola sa rozist nesmu.
+          bad = lift_incomplete_note(exp)
+          if bad
+            row['state'] = 'incomplete'
+            row['message'] = bad
+          end
           warn = lift_warn_note(cfg, owner)
           row['warn'] = warn if warn
           row
+        end
+
+        # Veta o NEUPLNEJ ZOSTAVE vyklopu, alebo nil. Zdroj je SUROVY zaznam
+        # expanzie (`explain` -> `unmapped`) — z prelozeneho `problems` sa
+        # zavaznost uz precitat neda, a prave zavaznost tu rozhoduje: pri
+        # polozke `lift` sa KAZDY nevyrieseny clen povysuje na RED
+        # `lift_set_incomplete` (`HardwareSets.unmapped_entry`).
+        # ZNENIE vety sklada `Validation` — TA ISTA metoda, akou vznika nalez
+        # Kontroly, len bez lokatora skrinky (karta v tej skrinke stoji).
+        def lift_incomplete_note(exp)
+          return nil unless exp.is_a?(Hash) && defined?(Validation)
+
+          u = Array(exp['unmapped']).find do |x|
+            x.is_a?(Hash) && x['reason'].to_s == HardwareSets::LIFT_SET_INCOMPLETE
+          end
+          u ? Validation.lift_incomplete_sentence(u) : nil
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.lift_incomplete_note')
+          nil
         end
 
         # Veta stale stavu. Kratsia ako nalez Kontroly (ten menuje skrinku),

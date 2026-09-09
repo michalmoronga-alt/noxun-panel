@@ -1478,10 +1478,35 @@
   // duplicitu nikdy neuvidí, uloženie prejde a prvé priradenie po refreshi
   // ticho zmizne. Povedať to vie LEN klient, kým sú riadky ešte poľom.
   // (Rovnaká pasca je v rade NL — `code_by_nl` je tiež mapa.)
+  //
+  // KOV-E2 (Codex #334 kolo 2 P2): PRÁZDNY VLASTNÝ NÁZOV PARAMETRA — druhá
+  // výnimka z toho istého dôvodu. Voľba „iné (vypíšem)“ žije LEN v editore;
+  // na server ide už len výsledok `hwsParamJoin`, a ten pri prázdnom texte
+  // vráti prázdny reťazec:
+  //   · `quantity_from` sa vtedy do payloadu VÔBEC nezapíše, takže server
+  //     dostane platného člena s PEVNÝM počtom — uloží sa, nič nenahlási
+  //     a voľba „počet z parametra“ po refreshi ticho zmizne (presne ten
+  //     tichý rozdiel, ktorý editor nesmie vyrobiť);
+  //   · `code_by_param.param` odíde prázdny a server ho síce odmietne
+  //     („kód podľa triedy nemá názov parametra"), ale veta nepovie, ktorý
+  //     člen a ktorá voľba to spôsobila.
+  // Obe preto stráži klient, kým ešte vidí STAV EDITORA (select + textové
+  // pole), nie až jeho výsledok.
   function hwsMemberProblems(members){
     var out = [];
     (members || []).forEach(function(m, i){
       if (!m) return;
+      if (m.qfrom === HWS_PARAM_OTHER && hwsBlank(m.qfrom_custom)){
+        out.push({ row: 'members:' + i, field: null,
+                   msg: 'Člen ' + (i + 1) + ': zadaj názov parametra počtu — '
+                      + 'pri voľbe „iné (vypíšem)“ sa prázdne pole neuloží '
+                      + 'a člen by ostal na pevnom počte.' });
+      }
+      if (m.is_param && m.param === HWS_PARAM_OTHER && hwsBlank(m.param_custom)){
+        out.push({ row: 'members:' + i, field: null,
+                   msg: 'Člen ' + (i + 1) + ': zadaj názov parametra triedy — '
+                      + 'pri voľbe „iné (vypíšem)“ sa prázdne pole neuloží.' });
+      }
       var dup = m.is_param ? hwsDupValue(m.codes, 'value')
               : (m.is_series ? hwsDupValue(m.series, 'nl') : '');
       if (!dup) return;

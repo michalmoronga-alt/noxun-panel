@@ -106,6 +106,34 @@ module NxKovE2
        vyklop-hl-klasik vyklop-hl-klasik-tmavy].map { |sid| seed_set(sid) }.compact
   end
 
+  # Kontext nakupu pre kartu (`drawer_buy_ctx` v produkcii). Sety su SEEDOVE —
+  # ta ista kniznica, z akej stavia nakup, takze karta a supis nemozu hovorit
+  # o inych kodoch.
+  def all_sets
+    out = {}
+    HWS::SEED_SETS.each { |s| out[s['set_id']] = s }
+    out
+  end
+
+  def buy_ctx(sets = all_sets, mapping = { CLASS_HK => 'vyklop-hk-klasik' })
+    { 'status' => :ok, 'state' => { 'mapping' => mapping, 'sets' => sets },
+      'overrides' => {}, 'lookup' => {}, 'blocked' => false }
+  end
+
+  # Set, ktoremu CHYBA kod pre triedu, ktoru vyklop potrebuje. Ostatne cleny
+  # (prichyt, krytky) vydat VIE — presne to je „krytky bez mechanizmu".
+  def sets_bez_kodu
+    sets = all_sets
+    set = sets['vyklop-hk-klasik']
+    sets.merge('vyklop-hk-klasik' => set.merge(
+      'members' => Array(set['members']).map do |m|
+        next m unless m['code_by_param']
+
+        m.merge('code_by_param' => { 'param' => 'lift_class', 'codes' => { 'INA' => '999' } })
+      end
+    ))
+  end
+
   def js(path)
     File.read(path, encoding: 'UTF-8')
   end
@@ -217,6 +245,53 @@ NxTest.test('KOV-E2 (1): PENDING — čerstvá skrinka bez položky karta MLČÍ
   # Vypnuté výklopové pravidlo: skrinka je postavená pod aktuálnou verziou,
   # takže „stale" to nie je — a tvrdiť „chýba mechanizmus" by bola lož.
   NxTest.assert_equal('pending', c.row(c.cfg('hardware' => []))['state'])
+end
+
+NxTest.test('KOV-E2 (1): NEÚPLNÁ ZOSTAVA je RED STAV karty, nie riadok v rozkliku') do
+  # Codex #334 kolo 2 P2: set vydal príchyt aj krytky, ale NIE mechanizmus —
+  # `item_purchase` to hlási ako problém a Kontrola z toho robí RED
+  # `lift_set_incomplete` so `blocks_export`. Karta pritom vracala `state: 'ok'`
+  # a problém schovala do rozkliku ako „Bez kódu: …" (M16).
+  c = NxKovE2
+  r = NxKovE2::E::Panel.lift_card_row(c.cfg, 'F1', c.buy_ctx(c.sets_bez_kodu))
+  NxTest.assert_equal('incomplete', r['state'], 'karta je ČERVENÁ, nie „ok"')
+  NxTest.assert(r['message'].to_s.include?('nemá kód pre triedu'),
+                "veta povie, čo chýba: #{r['message']}")
+  NxTest.assert(r['message'].to_s.include?('krytky bez mechanizmu'),
+                'a prečo to zastavuje exporty')
+  # Detail OSTÁVA — čo o výklope už vieme, sa nezahadzuje.
+  NxTest.assert(r['text'].to_s.include?('AVENTOS HK top'), 'zhrnutie ostáva')
+  NxTest.assert(r['detail'].any? { |d| d.to_s.start_with?('Bez kódu:') },
+                'aj vety rozkliku')
+end
+
+NxTest.test('KOV-E2 (1): veta karty je TÁ ISTÁ ako veta Kontroly (jeden zdroj textu)') do
+  c = NxKovE2
+  exp = NxKovE2::E::Panel.item_purchase(c.lift_item, :ok,
+                                        c.buy_ctx(c.sets_bez_kodu)['state'], {}, {})
+  u = exp['unmapped'].find { |x| x['reason'] == NxKovE2::HWS::LIFT_SET_INCOMPLETE }
+  NxTest.assert(!u.nil?, 'expanzia vydala surový záznam, nie len preloženú vetu')
+  karta = NxKovE2::E::Panel.lift_incomplete_note(exp)
+  kontrola = NxKovE2::E::Validation.lift_incomplete_item(
+    u, 'CAB-1 · front:F1/flap', u['set_id'].to_s, c::OWNER, 'lift', 'CAB-1'
+  )['message_sk']
+  # Kontrola je zoznam cez celý projekt, takže vetu predsadí LOKÁTOROM skrinky;
+  # karta v tej skrinke stojí. Dôvod a náprava sú slovo za slovom rovnaké.
+  NxTest.assert_equal(kontrola,
+                      karta.sub('Výklop', 'Výklop (CAB-1 · front:F1/flap)'),
+                      'karta a Kontrola nesmú mať dve znenia tej istej chyby')
+end
+
+NxTest.test('KOV-E2 (1): úplný set kartu NEZČERVENÁ a bez kontextu sa netvrdí nič') do
+  c = NxKovE2
+  r = NxKovE2::E::Panel.lift_card_row(c.cfg, 'F1', c.buy_ctx)
+  NxTest.assert_equal('ok', r['state'], 'set, ktorý vydá celú zostavu, je v poriadku')
+  NxTest.assert_equal(nil, r['message'], 'a karta nemá čo hlásiť')
+  NxTest.assert(r['detail'].none? { |d| d.to_s.start_with?('Bez kódu:') }, 'ani v rozkliku')
+  # Bez kontextu setov (nedostupný stav) sa NETVRDÍ nič — radšej ticho než
+  # červená veta, ktorá sa môže rozísť s Nákupom (vzor `drawer_buy_lines`).
+  NxTest.assert_equal('ok', NxKovE2::E::Panel.lift_card_row(c.cfg, 'F1', nil)['state'])
+  NxTest.assert_equal(nil, NxKovE2::E::Panel.lift_incomplete_note(nil), 'ani pri prázdnej expanzii')
 end
 
 # ============================================================================

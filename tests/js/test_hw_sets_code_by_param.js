@@ -30,6 +30,8 @@
 //      namiesto kódov                                    -> súhrn 6b
 //   M8 „iné (vypíšem)" sa pošle na server ako `__other__` -> hwsParamJoin
 //   M9 poradie tried sa preusporiada (abecedne)          -> round-trip poradia
+//   M10 „iné (vypíšem)" s PRÁZDNYM poľom sa ticho uloží ako pevný počet
+//       (`quantity_from` z payloadu zmizne)                -> hwsMemberProblems
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
@@ -270,5 +272,49 @@ eq(hwsMemberProblems([{ per: 'unit', qty: 1, is_series: true,
    1, 'duplicitná NL v rade tiež');
 eq(hwsMemberProblems([]), [], 'prázdny zoznam členov nespadne');
 eq(hwsMemberProblems(null), [], 'ani chýbajúci');
+
+// ============ PRÁZDNY VLASTNÝ NÁZOV PARAMETRA (Codex #334 kolo 2 P2) =========
+// Voľba „iné (vypíšem)" žije LEN v editore; `hwsParamJoin` z nej pri prázdnom
+// texte spraví prázdny reťazec. Pri `quantity_from` to znamená, že sa kľúč do
+// payloadu VÔBEC nezapíše — server dostane platného člena s PEVNÝM počtom,
+// uloží ho a voľba po refreshi ticho zmizne. To musí padnúť u klienta, kým
+// ešte vidí STAV EDITORA (select + textové pole), nie až jeho výsledok.
+const qfPrazdny = { per: 'unit', qty: 1, code: '347811',
+                    qfrom: HWS_PARAM_OTHER, qfrom_custom: '  ' };
+const qfErr = hwsMemberProblems([qfPrazdny]);
+eq(qfErr.length, 1, 'prázdny vlastný názov parametra počtu sa ohlási');
+ok(qfErr[0].msg.indexOf('zadaj názov parametra počtu') >= 0,
+   'veta povie, čo doplniť: ' + qfErr[0].msg);
+eq(qfErr[0].row, 'members:0', 'a pristane pri TOM členovi');
+// Toto je tá pasca: payload vyzerá úplne v poriadku.
+eq(hwsBuildMembers([qfPrazdny])[0].quantity_from, undefined,
+   'kľúč `quantity_from` z payloadu ticho zmizne (to je tá pasca)');
+eq(hwsMemberProblems([{ per: 'unit', qty: 1, code: '347811',
+                        qfrom: HWS_PARAM_OTHER, qfrom_custom: 'rod_count_x' }]), [],
+   'vyplnený vlastný názov prejde');
+eq(hwsMemberProblems([{ per: 'unit', qty: 1, code: '347811',
+                        qfrom: 'rod_count', qfrom_custom: '' }]), [],
+   'známy parameter zo selectu nepotrebuje text');
+eq(hwsMemberProblems([{ per: 'unit', qty: 1, code: '347811', qfrom: '', qfrom_custom: '' }]), [],
+   'pevný počet (prázdna voľba) je legitímny');
+// To isté pre parameter TRIEDY: server ho síce odmietne, ale nepovie, ktorý
+// člen a ktorá voľba to spôsobila.
+const cpPrazdny = { per: 'unit', qty: 1, is_param: true, param: HWS_PARAM_OTHER,
+                    param_custom: '', codes: [{ value: '22K2300', code: '347810' }] };
+const cpErr = hwsMemberProblems([cpPrazdny]);
+eq(cpErr.length, 1, 'prázdny vlastný názov parametra triedy sa ohlási tiež');
+ok(cpErr[0].msg.indexOf('zadaj názov parametra triedy') >= 0,
+   'a menuje, o ktorý parameter ide: ' + cpErr[0].msg);
+eq(hwsBuildMembers([cpPrazdny])[0].code_by_param.param, '',
+   'inak by na server odišiel prázdny `param`');
+eq(hwsMemberProblems([{ per: 'unit', qty: 1, is_param: true, param: HWS_PARAM_OTHER,
+                        param_custom: 'lift_class_x',
+                        codes: [{ value: '22K2300', code: '347810' }] }]), [],
+   'vyplnený vlastný názov triedy prejde');
+// Obe chyby na jednom členovi = obe vety (človek nemá hľadať druhú po oprave prvej).
+eq(hwsMemberProblems([{ per: 'unit', qty: 1, is_param: true, param: HWS_PARAM_OTHER,
+                        param_custom: '', qfrom: HWS_PARAM_OTHER, qfrom_custom: '',
+                        codes: [{ value: '22K2300', code: '347810' }] }]).length, 2,
+   'dve chyby na jednom členovi = dve vety');
 
 console.log(`OK — test_hw_sets_code_by_param.js: ${n} testov preslo`);
