@@ -51,11 +51,13 @@ queries = sorted(acc) + ['22K8000', '347834', 'krytky Aventos HK top', '22.8000'
                          'TIP-ON 956A1004', '250831', '497007', 'TIP-ON dvierka 76', 'Aventos HL top Tip-on', '22L2200T',
                          '22L2500T', '22L2', '22Q1076U', '22Q080Z', 'Aventos HK top krytky čierna', 'Aventos HK top krytky sivá']
 seen = {}
+failures = []
 for q in queries:
     try:
         hits = lbx(q)
     except Exception as e:  # noqa
         print('ERR', q, e)
+        failures.append(q)
         continue
     for h in hits:
         a = h.get('attributes', {})
@@ -78,10 +80,17 @@ for code, rec in seen.items():
             info = page(rec['url'])
         except Exception as e:  # noqa
             info = {'err': str(e)[:60]}
+            failures.append(rec['url'])
         time.sleep(0.3)
     out.append({'code': code, **rec, **info})
 
 for o in sorted(out, key=lambda x: x['title']):
     print('%s | %s | %s %s | %s | q=%s' % (o['code'], o['title'][:80], o.get('price_vat'), o.get('unit'), o['url'], o['q']))
-json.dump(out, open(OUT, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+if failures:
+    # Neuplny zber NESMIE prepisat dokumentovany dokaz — vystup ostava povodny.
+    print('ABORT: %d poziadaviek zlyhalo, %s sa NEPREPISUJE' % (len(failures), os.path.basename(OUT)))
+    sys.exit(2)
+tmp = OUT + '.tmp'
+json.dump(out, open(tmp, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+os.replace(tmp, OUT)
 print('TOTAL', len(out), 'of', len(seen), '->', OUT)

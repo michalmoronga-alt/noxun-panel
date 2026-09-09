@@ -692,7 +692,8 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   hľadá uložený záves a pri žiadnom mlčí): skrinka s čelom `flap` (**up AJ down**) postavená pred `HardwareRules::STD` E (config nesie std z poslednej stavby; chýba = staré) bez
   položky `lift` (up) / bez závesov `use_type door` na tom čele (down) = existujúca zákazka po upgrade (`ensure_project_rules!` seed nedopĺňa) → RED nákup/rozpočet/ponuka,
   náprava „Doplniť nové predvoľby + prestavba" · ORANGE `lift_light_front` (pod min: HK
-  LF < 420 · HL kg < kg_min ramien; položka s najslabšou triedou) · ORANGE `hardware_rule_overlap` (iné zapnuté pravidlo s výstupom `lift` pre `flap` → seed sa nedopĺňa)
+  LF < 420 · HL kg < kg_min ramien; položka s najslabšou triedou) · ORANGE `hardware_rule_overlap` (iné zapnuté pravidlo s výstupom `lift` pre `flap` **A rovnakým smerom** `flap_dir up` (alebo bez filtra smeru) → seed sa nedopĺňa;
+  `seed_additions` prekryv porovnáva `applies_to.role` AJ `flap_dir` — vlastné pravidlo len pre `down` (vzpery) seed NEPOTLAČÍ; Codex #331 kolo 3 P1; rovnako pre `zavesy-sklop` s `hinge`/`down`)
   · `door_wider_than_high` sa na výklop NEuplatňuje · **plný automat = položky zo seed pravidla `vyklopy-aventos` chránené ako receptové** (Astra FIX 11; rozsah zúžený podľa Codex #331 kolo 2 P1 — vlastné pravidlá
   s `output: lift` a ich overridy `(owner, lift, rule_id)` ostávajú ÚČINNÉ): `apply_overrides` pre `rule_id == 'vyklopy-aventos'` `disabled`/`quantity` ignoruje + ORANGE
   `lift_override_ignored`, neplatné overridy LEN toho pravidla normalizácia vyčistí so záznamom v logu · `HardwareRules::STD` bump (čítače od F `std`
