@@ -100,6 +100,35 @@ module NxG1a
     exp['rows'].map { |r| r['code'] }.sort
   end
 
+  # --- sandbox taxonomie (vzor `test_kovb1_taxonomia.rb`) -------------------
+  # Migracie od Codex #337 (N2/N3) sa pytaju ZIVEJ taxonomie, takze test musi
+  # vediet postavit konkretny stav suboru a po sebe upratat.
+
+  def with_taxonomy
+    path = TAX.path
+    before = (File.binread(path) if File.exist?(path))
+    bak = (File.binread("#{path}.bak") if File.exist?("#{path}.bak"))
+    yield
+  ensure
+    if before then File.binwrite(path, before) else FileUtils.rm_f(path) end
+    if bak then File.binwrite("#{path}.bak", bak) else FileUtils.rm_f("#{path}.bak") end
+    STORE.invalidate(path)
+    TAX.reset_state!
+  end
+
+  # Zapise dokument PRIAMO na disk (obide brany) a zhodi cache aj stav.
+  def install_tax(mans, sers)
+    FileUtils.mkdir_p(File.dirname(TAX.path))
+    File.binwrite(TAX.path,
+                  JSON.pretty_generate('std' => TAX::STD, 'schema' => TAX::SCHEMA_CURRENT,
+                                       'seed_version' => TAX::SEED_VERSION,
+                                       'manufacturers' => mans.map { |n| { 'name' => n } },
+                                       'series' => sers.map { |(n, m)| { 'name' => n, 'manufacturer' => m } }))
+    STORE.invalidate(TAX.path)
+    TAX.reset_state!
+    true
+  end
+
   # Kopia seed setu nôh s upravenym clenom (pre negativne varianty).
   def leg_set_with(member_index)
     copy = Marshal.load(Marshal.dump(set_of(LEG_SET)))
@@ -510,23 +539,59 @@ NxTest.test('KOV-G1a (R6): patch v5 — 367823 s VLASTNOU klasifikaciou ostava')
 end
 
 NxTest.test('KOV-G1a (R6): patch v5 opravi polozky s dvojicou Hettich+AXILO') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
   c = NxG1a
   # Radu AXILO presunula spod Hettichu pod Häfele migracia taxonomie, takze
   # polozka s tou dvojicou by uz v modale NEPRESLA („rada nepatri výrobcovi") —
   # a bez opravy by ju pouzivatel nevedel ulozit. Meni sa VYHRADNE vyrobca.
-  moja, = c::HWC.normalize_item('item_code' => 'X-AXILO', 'name_sk' => 'Moja noha AXILO',
-                                'category' => 'NOHY', 'unit' => 'ks',
-                                'manufacturer' => 'hettich', 'series' => 'axilo',
-                                'price_eur_vat' => 9.99)
-  ina, = c::HWC.normalize_item('item_code' => 'X-SENSYS', 'name_sk' => 'Záves',
-                               'category' => 'ZAVESY', 'unit' => 'ks',
-                               'manufacturer' => 'Hettich', 'series' => 'Sensys')
-  items = [moja, ina]
-  c::HWC.apply_seed_patch_v5(items, c::HWC::SEED_ITEMS)
-  NxTest.assert_equal('Häfele', items[0]['manufacturer'], 'AXILO uz patri Häfele')
-  NxTest.assert_equal('axilo', items[0]['series'], 'rada sa NEMENI (ani jej zapis)')
-  NxTest.assert_equal(9.99, items[0]['price_eur_vat'], 'a nic ine tiez nie')
-  NxTest.assert_equal('Hettich', items[1]['manufacturer'], 'ina rada Hettichu sa NEDOTKNE')
+  c.with_taxonomy do
+    c.install_tax(['Hettich', 'Häfele'], [['AXILO', 'Häfele'], ['Sensys', 'Hettich']])
+    moja, = c::HWC.normalize_item('item_code' => 'X-AXILO', 'name_sk' => 'Moja noha AXILO',
+                                  'category' => 'NOHY', 'unit' => 'ks',
+                                  'manufacturer' => 'hettich', 'series' => 'axilo',
+                                  'price_eur_vat' => 9.99)
+    ina, = c::HWC.normalize_item('item_code' => 'X-SENSYS', 'name_sk' => 'Záves',
+                                 'category' => 'ZAVESY', 'unit' => 'ks',
+                                 'manufacturer' => 'Hettich', 'series' => 'Sensys')
+    items = [moja, ina]
+    c::HWC.apply_seed_patch_v5(items, c::HWC::SEED_ITEMS)
+    NxTest.assert_equal('Häfele', items[0]['manufacturer'], 'AXILO uz patri Häfele')
+    NxTest.assert_equal('axilo', items[0]['series'], 'rada sa NEMENI (ani jej zapis)')
+    NxTest.assert_equal(9.99, items[0]['price_eur_vat'], 'a nic ine tiez nie')
+    NxTest.assert_equal('Hettich', items[1]['manufacturer'], 'ina rada Hettichu sa NEDOTKNE')
+  end
+end
+
+NxTest.test('KOV-G1a (Codex #337 N2): AXILO pod VLASTNYM vyrobcom — katalog sa NEDOTKNE') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  c = NxG1a
+  # Pouzivatel ma radu AXILO naviazanu na vlastneho vyrobcu; migracia taxonomie
+  # mu to (spravne) necha. Katalogovy patch sa preto pytat NASHO seedu NESMIE:
+  # `resolve_classification('Häfele','AXILO')` vrati „Häfele BEZ rady", a keby
+  # z toho odvodil vlastnika, prepisal by polozky na dvojicu Häfele+AXILO,
+  # ktora v JEHO taxonomii NEEXISTUJE (a v modale by ju uz neulozil).
+  c.with_taxonomy do
+    c.install_tax(['Hettich', 'Häfele', 'Moja firma'], [['AXILO', 'Moja firma']])
+    NxTest.assert_equal('Moja firma', c::TAX.series_owner('axilo'), 'ziva taxonomia rozhoduje')
+    moja, = c::HWC.normalize_item('item_code' => 'X-AXILO', 'name_sk' => 'Moja noha AXILO',
+                                  'category' => 'NOHY', 'unit' => 'ks',
+                                  'manufacturer' => 'Hettich', 'series' => 'AXILO',
+                                  'price_eur_vat' => 9.99)
+    items = [moja]
+    c::HWC.apply_seed_patch_v5(items, c::HWC::SEED_ITEMS)
+    NxTest.assert_equal('Hettich', items[0]['manufacturer'],
+                        'cudzia vazba rady = ruky prec od katalogovych poloziek')
+    NxTest.assert_equal('AXILO', items[0]['series'])
+  end
+  # A ked taxonomia este NEEXISTUJE (subor sa zaklada az prvym pouzitim),
+  # krok sa tiez nevykona — nemame sa coho chytit.
+  c.with_taxonomy do
+    FileUtils.rm_f(c::TAX.path)
+    FileUtils.rm_f("#{c::TAX.path}.bak")
+    c::STORE.invalidate(c::TAX.path)
+    c::TAX.reset_state!
+    NxTest.assert_equal(nil, c::TAX.series_owner('AXILO'), 'bez suboru sa NESEEDUJE a nic nevie')
+  end
 end
 
 # ============================================================================

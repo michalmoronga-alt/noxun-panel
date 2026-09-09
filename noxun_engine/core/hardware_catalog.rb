@@ -2078,7 +2078,9 @@ module Noxun
       #      výrobcovi") — modal by pri vyrobcovi Hettich radu AXILO ani
       #      neponukol. Je to naprava nekonzistencie, ktoru sposobila NASA
       #      zmena, nie prepisanie cudzieho rozhodnutia: meni sa VYHRADNE
-      #      vyrobca a VYHRADNE pri presnej zhode oboch mien.
+      #      vyrobca, VYHRADNE pri presnej zhode oboch mien a VYHRADNE vtedy,
+      #      ked ZIVA taxonomia naozaj hovori, ze AXILO patri Häfele
+      #      (Codex #337 N2 — pri cudzej vazbe rady sa krok NEVYKONA).
       SEED_PATCH_V5_ADD = %w[272212 9069 9078 9077 9076 9027 9075 9079 950].freeze
       SEED_PATCH_V5_CLASSIFY = '367823'
 
@@ -2105,7 +2107,7 @@ module Noxun
         end
 
         enriched = enrich_axilo_150(items, have, by_code)
-        fixed = fix_axilo_manufacturer(items, by_code)
+        fixed = fix_axilo_manufacturer(items)
         ["v5 +#{added.length}", "v5 ~#{enriched + fixed}"]
       end
 
@@ -2133,11 +2135,20 @@ module Noxun
       end
 
       # Krok 3 — presun vlastnika rady AXILO (viz komentar `apply_seed_patch_v5`).
-      def fix_axilo_manufacturer(items, by_code)
-        seed = by_code[SEED_PATCH_V5_CLASSIFY.downcase]
-        owner = seed && seed['manufacturer'].to_s.strip
-        return 0 if owner.nil? || owner.empty?
-        return 0 if HardwareTaxonomy.same_name?(owner, HardwareTaxonomy::AXILO_LEGACY_OWNER)
+      #
+      # Codex #337 N2: vlastnik sa pyta ZIVEJ TAXONOMIE, NIKDY sa neodvodzuje
+      # z resolvnuteho seedu. Ked si pouzivatel naviazal AXILO na vlastneho
+      # vyrobcu, migracia taxonomie mu to (spravne) necha — ale seed riadok
+      # 367823 sa vtedy resolvne na „Häfele BEZ rady", takze stara podmienka
+      # (neprazdny vyrobca ineho mena nez Hettich) by presla a prepisala by
+      # jeho polozky na dvojicu Häfele+AXILO, ktora v JEHO taxonomii
+      # NEEXISTUJE — a v modale by ju uz neulozil. Oprava preto bezi VYHRADNE
+      # vtedy, ked taxonomia naozaj hovori „AXILO patri Häfele", a zapisuje sa
+      # jej ULOZENY zapis mena (JS filtruje presnym retazcom).
+      def fix_axilo_manufacturer(items)
+        owner = HardwareTaxonomy.series_owner(HardwareTaxonomy::AXILO_SERIES)
+        return 0 if owner.nil?
+        return 0 unless HardwareTaxonomy.same_name?(owner, HardwareTaxonomy::AXILO_OWNER)
 
         n = 0
         items.each_with_index do |cur, i|

@@ -367,6 +367,34 @@ module Noxun
 
       # --- kontrola klasifikacie (pouziva ju set aj polozka katalogu) ---------
 
+      # KOV-G1a (Codex #337 N2/N3): KOMU RADA V ZIVEJ TAXONOMII PATRI?
+      #
+      # Migracie (katalogova oprava dvojice Hettich+AXILO, klasifikacia seed
+      # setov) sa musia pytat TAXONOMIE, nie odvodzovat vlastnika z toho, co
+      # im vratil `resolve_classification` nad NASIM seedom: ked rada patri
+      # cudziemu vyrobcovi, resolve vrati nasho vyrobcu BEZ rady — a migracia
+      # by z toho usudila „vlastnik je Häfele" a prepisala pouzivatelove
+      # zaznamy na dvojicu, ktora v jeho taxonomii NEEXISTUJE.
+      #
+      # Cita LEN ULOZENY dokument — bez `ensure_seeded`, teda BEZ ZAPISU
+      # (volajuci sa pyta „odporuje mi taxonomia?", nie „zaloz mi ju").
+      # -> meno vyrobcu v ULOZENOM zapise | nil (rada tam nie je / neda sa citat)
+      def series_owner(series)
+        name = series.to_s.strip
+        return nil if name.empty?
+        return nil if read_only?
+
+        doc = read_doc
+        return nil unless doc.is_a?(Hash)
+
+        rec = norm_records(doc['series'], SERIES_KEYS).find { |s| same_name?(s['name'], name) }
+        owner = rec && rec['manufacturer'].to_s.strip
+        owner.nil? || owner.empty? ? nil : owner
+      rescue StandardError => e
+        Engine.log_error(e, 'HardwareTaxonomy.series_owner') if defined?(Engine)
+        nil
+      end
+
       # Patri dvojica (vyrobca, rada) do taxonomie? -> [] | [{ 'field', 'msg' }].
       # Prazdna dvojica = nic sa nekontroluje (nezaradeny set/polozka).
       # POZOR: volajuci si musi NAJPRV overit `read_only?` — nad nekompatibilnou

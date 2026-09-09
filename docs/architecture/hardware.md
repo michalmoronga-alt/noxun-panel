@@ -475,7 +475,11 @@ deviatich kódov (`SEED_PATCH_V5_ADD`) — kto si niektorý založil sám, ostá
 **(3) oprava dvojice `Hettich`+`AXILO`** na `Häfele`+`AXILO`. Tretí krok je náprava nekonzistencie, ktorú spôsobila NAŠA zmena: radu AXILO presunula spod Hettichu migrácia
 taxonómie, takže položka s tou dvojicou by v modáli už neprešla („rada nepatrí výrobcovi") a v selecte rád by sa pod Hettichom AXILO ani neponúkla. Mení sa **výhradne
 výrobca** a **výhradne pri presnej zhode oboch mien** (`HardwareTaxonomy.same_name?`); zo stromu katalógu položka **nezmizne ani bez opravy** (strom zoskupuje podľa reťazcov
-NA POLOŽKE, nie podľa taxonómie) — opraviteľnosť je jediný dôvod kroku.
+NA POLOŽKE, nie podľa taxonómie) — opraviteľnosť je jediný dôvod kroku. **Vlastníka rady dáva ŽIVÁ taxonómia, nikdy resolvnutý seed** (Codex #337 N2,
+`HardwareTaxonomy.series_owner` — číta uložený súbor BEZ seedovania a bez zápisu): keď má používateľ AXILO naviazané na vlastného výrobcu, migrácia taxonómie mu to zámerne
+nechá, ale seed riadok `367823` sa vtedy resolvne na „Häfele BEZ rady" — a odvodiť z toho vlastníka by znamenalo prepísať jeho položky na dvojicu, ktorá v jeho taxonómii
+NEEXISTUJE. Krok 3 preto beží **len keď taxonómia naozaj hovorí „AXILO patrí Häfele"**, a zapisuje jej ULOŽENÝ zápis mena (JS filtruje presným reťazcom); pri cudzej väzbe
+alebo pri ešte nezaloženej taxonómii sa nevykoná vôbec.
 
 ### hardware_taxonomy.rb
 
@@ -509,6 +513,10 @@ u knižnice setov (R-07/R-08/R-11) a katalógu (GH #99).
   `LEGACY_SEED_SHAPES` v `hardware_sets.rb`). Premenovaná („AXILO plus") alebo inak naviazaná rada = **ruky preč** + info log. Nový vlastník sa berie z **UŽ ULOŽENÉHO** zápisu
   výrobcu (keď má používateľ „HÄFELE", rada zapísaná naším „Häfele" by v selectoch rád zmizla — JS filtruje presným reťazcom, Codex #320 kolo 2 P2); keď výrobca ešte
   neexistuje, doplní sa v tom istom kroku. Jednorazovosť stráži `seed_version` (2 → **3**), takže návrat rady pod Hettich sa už nikdy neprepíše.
+- **`series_owner(rada)` — KOMU RADA V ŽIVEJ TAXONÓMII PATRÍ** (Codex #337 N2/N3). Migrácie (katalógová oprava dvojice Hettich+AXILO, klasifikácia seed setov) sa musia pýtať
+  taxonómie, nie odvodzovať vlastníka z toho, čo im vrátil `resolve_classification` nad NAŠÍM seedom: pri cudzej väzbe rady vráti resolve nášho výrobcu BEZ rady, a migrácia by
+  z toho usúdila „vlastník je Häfele". Predikát číta **LEN uložený dokument** — bez `ensure_seeded`, teda **bez zápisu** (pýta sa „odporuje mi taxonómia?", nie „založ mi ju")
+  — a nad read-only súborom aj nad neexistujúcim súborom vracia `nil`, čo volajúci vykladajú ako „nemáme sa čoho chytiť, nič nemeníme".
 - **`resolve_classification(manufacturer, series)`** → `[kanonický výrobca|nil, kanonická rada|nil, errors]` je spoločný kontrakt pre set aj položku katalógu
   (`check_classification` je nad ňou len wrapper na chyby). Zhoda je case-insensitive a bez diakritiky, ale **uložiť sa smie VÝHRADNE kanonický zápis zo zoznamu** —
   zapisovacie cesty (`HardwareSets.save_set!`, `HardwareCatalog.create_item`/`patch_item`) preto berú mená odtiaľto; inak by vedľa „Hettich" vyrástol „hettich" a padol by
