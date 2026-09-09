@@ -1805,7 +1805,15 @@ module Noxun
         out = mapping.dup
         MAPPING_ADDITIONS.each do |key, value|
           next if out.key?(key)
-          next unless mapping_seed_value_ok?(key, value, by_id)
+          unless mapping_seed_value_ok?(key, value, by_id)
+            # KOV-G1a (Codex #337 N4): odmietnutie MA byt v logu — inak by po
+            # upgrade chybala predvolba bez jedineho stopy po dovode.
+            if defined?(Engine)
+              Engine.log("hardware sets: predvolba '#{key}' sa NEDOPLNILA — " \
+                         'definicia v kniznici klucu nezodpoveda')
+            end
+            next
+          end
 
           out[key] = deep_copy(value)
           Engine.log("hardware sets: doplnene mapovanie '#{key}'") if defined?(Engine)
@@ -1850,9 +1858,17 @@ module Noxun
       # nové predvoľby" by ho uz nedostali a kazdy taky vyklop by skoncil RED
       # `lift_set_incomplete` bez cesty von. Rozhoduje teda LEN klasifikacia
       # (typ pouzitia + otvaranie + treti segment) a citatelnost clenov.
+      #
+      # KOV-G1a (Codex #337 N4): GENERICKY kluc (`leg`, `plinth_clip`, …) ma
+      # vlastnu, rovnako tvrdu podmienku — DEFINICIA MUSI BYT TOHO TYPU.
+      # Samotna pritomnost `set_id` nestacila: pouzivatel uz mohol mat vlastny
+      # set s tym istym ID a INYM `generic_type` (`merge_seed` mu ho spravne
+      # nechal), predvolba by mu aj tak sadla a kazda polozka toho typu by
+      # skoncila `set_type_mismatch` namiesto objednaneho kovania. Je to TA
+      # ISTA kontrola, akou vyber typu strazi vyslovny zapis mapovania.
       def mapping_seed_ref_ok?(set, key)
         return false unless set.is_a?(Hash)
-        return true unless class_mapping_key?(key) # legacy kluc typu — len pritomnost
+        return generic_type_ref_ok?(set, key) unless class_mapping_key?(key)
 
         canon, = parse_class_head(key)
         return false if canon.nil?
@@ -1861,6 +1877,17 @@ module Noxun
         return false unless class_set_match?(set, gt, om, third, ignore_active: true)
 
         Array(set['members']).none? { |m| incompatible_member?(m) }
+      end
+
+      # KOV-G1a (Codex #337 N4): sedi definicia GENERICKEMU klucu mapovania?
+      # Kluc je bud holy typ (`leg`), alebo typ s vlastnikom (`leg@front:F1/panel`)
+      # — typ sa preto cita JEDINYM parserom klucov, nie porovnanim retazcov.
+      # Neznamy tvar kluca = NEDOPLNA sa (fail-closed, vzor triednej vetvy).
+      def generic_type_ref_ok?(set, key)
+        parsed = BuildPlan.parse_hardware_set_key(key)
+        return false if parsed.nil?
+
+        set['generic_type'].to_s == parsed[0].to_s
       end
 
       # Prepis defaultu LEN pri nedotknutom seed stave (vzor F8/LEGACY_SEED_SHAPES):

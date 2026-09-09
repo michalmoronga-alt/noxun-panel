@@ -376,6 +376,27 @@ NxTest.test('KOV-G1a (R5): mapovanie prichytu je ADD-IF-ABSENT, vlastna volba sa
   NxTest.assert(c::HWS::CLASS_MAPPING_KEYS.all? { |k| k.start_with?('class:') })
 end
 
+NxTest.test('KOV-G1a (Codex #337 N4): predvolba prichytu sa NEDOPLNI na set INEHO typu') do
+  c = NxG1a
+  # Upgrade: pouzivatel uz ma VLASTNY set s tym istym ID, ale je to ZAVES.
+  # `merge_seed` mu ho spravne necha — a predvolba `plinth_clip` sa preto
+  # doplnit NESMIE, inak by kazdy prichyt skoncil `set_type_mismatch`
+  # namiesto objednanych kusov.
+  moj = { 'set_id' => c::CLIP_SET, 'name' => 'Moje dvierka', 'generic_type' => 'hinge',
+          'members' => [{ 'code' => 'X1', 'per' => 'unit', 'qty' => 1 }] }
+  sets = c.seed_norm.map { |s| s['set_id'] == c::CLIP_SET ? c::HWS.normalize_sets([moj]).first : s }
+  out = c::HWS.add_mapping_seed(sets, {})
+  NxTest.refute(out.key?(c::CLIP_TYPE),
+                "genericky kluc na set ineho typu: #{out[c::CLIP_TYPE].inspect}")
+  # Kontrola je o TYPE, nie o mene: ten isty set spravneho typu kluc dostane.
+  NxTest.assert_equal(c::CLIP_SET, c::HWS.add_mapping_seed(c.seed_norm, {})[c::CLIP_TYPE])
+  # A rovnaka brana chrani aj snapshot noveho projektu / „Doplniť nové
+  # predvoľby" — obe cesty stoja na `mapping_seed_value_ok?`.
+  by_id = {}
+  sets.each { |s| by_id[s['set_id']] = s }
+  NxTest.refute(c::HWS.mapping_seed_value_ok?(c::CLIP_TYPE, c::CLIP_SET, by_id))
+end
+
 NxTest.test('KOV-G1a (R5): STARSI citac set prichytu ODMIETNE — nikdy tichy orez') do
   c = NxG1a
   h = c::HWS

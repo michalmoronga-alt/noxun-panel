@@ -942,6 +942,11 @@ príchytu prináša až G1b):
   starší plugin dôvod zastaviť prestavbu (`guard_unknown_hardware!`), a set aj mapovanie s ním odmietnu existujúce brány — knižnica `:read_only`, snapshot `:invalid`,
   šablóna `:lossy` (`normalize_sets` set neznámeho typu zahodí a detektor straty to vidí). **Bez pravidla položka nevzniká** — to je v poriadku a rovnaké ako sety výklopov
   pred KOV-E1b.
+- **Generický kľúč sa doplní LEN na set TOHO TYPU** (Codex #337 N4, `mapping_seed_ref_ok?` → `generic_type_ref_ok?`). Pri NEtriednom kľúči stačila doteraz samotná PRÍTOMNOSŤ
+  `set_id` — a to prestalo stačiť vo chvíli, keď `MAPPING_ADDITIONS` dostali generický kľúč: používateľ už môže mať vlastný set s ID `prichyt-sokla-axilo`
+  a `generic_type: 'hinge'` (`merge_seed` mu ho správne nechá), predvoľba by mu aj tak sadla a každý príchyt by skončil `set_type_mismatch` namiesto objednaných kusov. Typ sa
+  z kľúča číta JEDINÝM parserom (`BuildPlan.parse_hardware_set_key`, teda aj tvar `leg@front:F1/panel`); neznámy tvar = kľúč sa nedoplní. Brána je spoločná pre knižnicu,
+  snapshot nového projektu aj „Doplniť nové predvoľby" (`mapping_seed_value_ok?`) a odmietnutie sa **loguje** (`add_mapping_seed`), aby po upgrade nechýbala predvoľba bez stopy.
 - **`CLASS_MAPPING_KEYS` už NIE JE celý `MAPPING_ADDITIONS`**, ale jeho podmnožina s prefixom `class:`. `plinth_clip` je generický kľúč (príchyt spôsob otvárania nemá) a do
   tabuľky TRIEDNYCH mapovaní v Pravidlách nepatrí: `class_key_label` by mu vrátil `nil` (riadok bez popisku) a `class_set_options` by ho rozkladala ako triedny kľúč. Svoj
   riadok má medzi generickými typmi (`generic_types` z `BuildPlan::GENERIC_TYPES`).
@@ -950,7 +955,7 @@ príchytu prináša až G1b):
   predvoľby"** (`refresh_untouched_project_sets` + `add_mapping_seed`, existujúci mechanizmus). Dôsledok, ktorý patrí do poznámok k vydaniu: **skrinka so soklom 150 mm
   objedná po prestavbe AXILO H150 + platničku (9076 + 9079) namiesto demosovskej nohy 367823** — golden charakterizácia `seed_kniznica` je preto vedome pregenerovaná.
 
-Testy: `tests/pure/test_kovg1a_nohy_data.rb` (25 sád + 5 overených mutácií, vrátane tabuľkovej fixtúry výšok sokla ako druhého nezávislého zápisu) +
+Testy: `tests/pure/test_kovg1a_nohy_data.rb` (29 sád + 9 overených mutácií, vrátane tabuľkovej fixtúry výšok sokla ako druhého nezávislého zápisu) +
 JS `tests/js/test_hw_sets.js` (sentinel v pásme).
 
 **BEZSTRATOVÁ BRÁNA DEFINÍCIÍ SETOV V ŠABLÓNE — `assess_set_defs` (audit #17 BLOCKER 1).** `hardware_set_defs` išli doteraz LEN cez tolerantný `normalize_sets`, teda cez cestu,
