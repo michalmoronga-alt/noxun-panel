@@ -897,17 +897,20 @@ module Noxun
         # ZLEJE do jedneho riadku a mnozstvo sa SCITA (typicky prave krytky).
         # To nie je chyba, ktoru by sme mali opravit za pouzivatela — je to vec,
         # o ktorej musi vediet. ORANGE na (celo, kod).
+        #
+        # Codex #333 kolo 3 P2: porovnava sa proti kodom UCINNEHO setu TOHO
+        # CELA, nie proti clenom vsetkych vyklopovych setov — HK celo s rucnou
+        # HL tycou inak dostavalo varovanie o zliati, ktore nikdy nenastane.
         def attach_manual_duplicate_warnings!(plan, cfg, model)
           return plan unless defined?(HardwareSets)
 
           list = cfg.is_a?(Hash) ? cfg[:hardware_manual] : nil
           return plan unless list.is_a?(Array) && !list.empty?
 
-          emitted = emitted_flap_kinds(plan)
+          emitted = emitted_flap_codes(plan, cfg, model)
           return plan if emitted.empty?
 
-          codes = HardwareSets.flap_set_codes(sets_state(model))
-          added = manual_duplicate_warnings(list, emitted, codes)
+          added = manual_duplicate_warnings(list, emitted)
           return plan if added.empty?
 
           plan[:warnings].concat(added)
@@ -918,30 +921,42 @@ module Noxun
           plan
         end
 
-        # { owner_part_key => { 'lift'|'hinge' => true } } — druhy kovania,
-        # ktore AUTOMAT na cele `flap` naozaj vydal. Iba rola `flap`: rucna
-        # polozka na DVIERKACH je stara zalezitost H1 a tu sa nerozsiruje.
-        def emitted_flap_kinds(plan)
+        # { owner_part_key => { 'lift'|'hinge' => { kod => true } } } — kody,
+        # ktore AUTOMAT na cele `flap` naozaj vyda (ucinny set + rozlisenie
+        # clenov podla parametrov polozky). Iba rola `flap`: rucna polozka na
+        # DVIERKACH je stara zalezitost H1 a tu sa nerozsiruje.
+        #
+        # Ked projekt snapshot setov NEMA (nekompatibilna globalna kniznica —
+        # `ensure_project_state!` vtedy nic nezmrazi), ostane mapa prazdna
+        # a varovanie nevznikne. Je to spravne: taky nakup je cely ORANGE
+        # `library_incompatible` a ziadny setovy riadok, s ktorym by sa rucna
+        # polozka zliala, v nom nie je.
+        def emitted_flap_codes(plan, cfg, model)
+          items = flap_hardware_items(plan)
+          return {} if items.empty?
+
+          sets_over = cfg.is_a?(Hash) && cfg[:hardware_sets].is_a?(Hash) ? cfg[:hardware_sets] : {}
+          HardwareSets.flap_emitted_codes(items, sets_state(model), overrides: sets_over)
+        end
+
+        # Polozky kovania planu, ktore visia na CELE `flap` a su vyklopoveho
+        # alebo zavesoveho druhu.
+        def flap_hardware_items(plan)
           flaps = {}
           Array(plan[:parts]).each do |pd|
             next unless pd.is_a?(Hash) && pd[:role].to_s == 'flap'
 
             flaps[PartKeys.for_descriptor(pd)] = true
           end
-          out = {}
-          Array(plan[:hardware]).each do |it|
-            next unless it.is_a?(Hash)
+          return [] if flaps.empty?
 
-            owner = it['owner_part_key'].to_s
-            gt = it['generic_type'].to_s
-            next unless flaps[owner] && HardwareSets::FLAP_USE_TYPES.key?(gt)
-
-            (out[owner] ||= {})[gt] = true
+          Array(plan[:hardware]).select do |it|
+            it.is_a?(Hash) && flaps[it['owner_part_key'].to_s] &&
+              HardwareSets::FLAP_USE_TYPES.key?(it['generic_type'].to_s)
           end
-          out
         end
 
-        def manual_duplicate_warnings(list, emitted, codes)
+        def manual_duplicate_warnings(list, emitted)
           seen = {}
           list.filter_map do |rec|
             next nil unless rec.is_a?(Hash) && rec['source'].to_s == 'catalog'
@@ -953,7 +968,7 @@ module Noxun
             kinds = emitted[owner]
             next nil unless kinds.is_a?(Hash)
 
-            kind = kinds.keys.find { |k| codes.dig(k, 'members', code) }
+            kind = kinds.keys.find { |k| kinds[k].is_a?(Hash) && kinds[k][code] }
             next nil if kind.nil?
 
             key = "#{owner}|#{code}"

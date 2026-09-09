@@ -959,33 +959,63 @@ end
 NxTest.test('KOV-E1b (11): ručný doplnok vedľa automatu = ORANGE `flap_manual_duplicate`') do
   c = NxKovE1b
   owner = 'front:F1/flap'
-  parts = [{ role: 'flap', part_key: owner, suffix: 'FLAP-1', name: 'Výklop 1' }]
-  hw = [{ 'owner_part_key' => owner, 'generic_type' => 'lift', 'quantity' => 1 }]
-  plan = { parts: parts, hardware: hw }
-  emitted = c::CB.emitted_flap_kinds(plan)
-  NxTest.assert_equal({ owner => { 'lift' => true } }, emitted)
-  codes = c::HWS.flap_set_codes
+  # Codex #333 kolo 3 P2: podklad varovania je ÚČINNÝ set toho čela, nie
+  # členovia všetkých výklopových setov. HK čelo teda pozná len svoje kódy.
+  hk = c::HWS.flap_emitted_codes(c::CB.flap_hardware_items(c.plan), c.state)
+  NxTest.assert(hk[owner]['lift'][c::ACC_COVER], 'krytky HK sú v účinnom sete')
+  NxTest.refute(hk[owner]['lift'][c::ACC_ROD], 'HL tyč v HK sete NIE JE')
   # Krytka JE členom setu -> nákup ich zlepí do jedného riadku (M27).
-  ws = c::CB.manual_duplicate_warnings([c.manual_rec(code: c::ACC_COVER)], emitted, codes)
+  ws = c::CB.manual_duplicate_warnings([c.manual_rec(code: c::ACC_COVER)], hk)
   NxTest.assert_equal(1, ws.length, ws.inspect)
   NxTest.assert_equal('flap_manual_duplicate', ws.first['code'])
   NxTest.assert_equal(owner, ws.first['part_key'])
   NxTest.assert(ws.first['message'].include?(c::ACC_COVER), ws.first['message'])
+  # A TOTO je nález kola 3: ručná HL tyč na HK čele sa nemá s čím zliať.
+  NxTest.assert_equal([], c::CB.manual_duplicate_warnings([c.manual_rec(code: c::ACC_ROD)], hk),
+                      'HK čelo + ručná HL tyč = žiadne varovanie')
+  # Na HL čele je tá istá tyč členom účinného setu -> ORANGE.
+  hl = c::HWS.flap_emitted_codes(
+    c::CB.flap_hardware_items(c.plan('lift' => { 'system' => 'hl_top' })), c.state
+  )
+  NxTest.assert(hl[owner]['lift'][c::ACC_ROD], 'tyč je v HL sete')
+  NxTest.refute(hl[owner]['lift'][c::ACC_COVER], 'HK krytky v HL sete nie sú')
+  NxTest.assert_equal(1, c::CB.manual_duplicate_warnings([c.manual_rec(code: c::ACC_ROD)],
+                                                         hl).length,
+                      'HL čelo + ručná tyč = ORANGE')
+  # Člen s `quantity_from` NULA sa NEVYDÁ (predĺženie tyče pri jednej tyči),
+  # takže sa ani nezlieva.
+  NxTest.refute(hl[owner]['lift']['507366'], 'predĺženie tyče pri KB 600 nevzniká')
+  NxTest.assert_equal([], c::CB.manual_duplicate_warnings([c.manual_rec(code: '507366')], hl))
   # Kód mimo setu ORANGE nerobí; rovnako voľná položka.
-  NxTest.assert_equal([], c::CB.manual_duplicate_warnings([c.manual_rec(code: 'INE')],
-                                                          emitted, codes))
+  NxTest.assert_equal([], c::CB.manual_duplicate_warnings([c.manual_rec(code: 'INE')], hk))
   NxTest.assert_equal([], c::CB.manual_duplicate_warnings([c.manual_rec(code: c::ACC_COVER,
-                                                                       source: 'free')],
-                                                          emitted, codes))
+                                                                       source: 'free')], hk))
   # Bez vydanej automatickej položky (napr. čelo s úplnou ručnou zostavou) tiež nie.
-  NxTest.assert_equal([], c::CB.manual_duplicate_warnings([c.manual_rec(code: c::ACC_COVER)],
-                                                          {}, codes))
-  # DVIERKA sa tým nedotknú — `emitted_flap_kinds` berie LEN rolu `flap`.
+  NxTest.assert_equal([], c::CB.manual_duplicate_warnings([c.manual_rec(code: c::ACC_COVER)], {}))
+  # Bez snapshotu setov (nekompatibilná knižnica) sa nemá čo zliať.
+  NxTest.assert_equal({}, c::HWS.flap_emitted_codes(c::CB.flap_hardware_items(c.plan), nil))
+  # DVIERKA sa tým nedotknú — `flap_hardware_items` berie LEN rolu `flap`.
   door_plan = { parts: [{ role: 'front_door', part_key: 'front:F2/wing:single',
                           suffix: 'DOOR-1', name: 'Dvierka' }],
                 hardware: [{ 'owner_part_key' => 'front:F2/wing:single',
                              'generic_type' => 'hinge', 'quantity' => 2 }] }
-  NxTest.assert_equal({}, c::CB.emitted_flap_kinds(door_plan))
+  NxTest.assert_equal([], c::CB.flap_hardware_items(door_plan))
+end
+
+NxTest.test('KOV-E1b (11): účinný set rozhoduje aj cez OVERRIDE skrinky') do
+  c = NxKovE1b
+  owner = 'front:F1/flap'
+  items = c::CB.flap_hardware_items(c.plan)
+  # Owner override na TMAVÝ HK set: krytky sú iné (347835), biele sa už
+  # nevydajú — a ručná biela krytka teda varovanie NEROBÍ.
+  over = { "class:lift|classic|hk_top@#{owner}" => 'vyklop-hk-klasik-tmavy' }
+  dark = c::HWS.flap_emitted_codes(items, c.state, overrides: over)
+  NxTest.assert(dark[owner]['lift']['347835'], 'tmavé krytky sa vydajú')
+  NxTest.refute(dark[owner]['lift'][c::ACC_COVER], 'biele krytky už nie')
+  NxTest.assert_equal([], c::CB.manual_duplicate_warnings([c.manual_rec(code: c::ACC_COVER)],
+                                                          dark))
+  NxTest.assert_equal(1, c::CB.manual_duplicate_warnings([c.manual_rec(code: '347835')],
+                                                         dark).length)
 end
 
 NxTest.test('KOV-E1b (11): `flap_stale` je RED v Kontrole a stopka pre 3 exporty') do

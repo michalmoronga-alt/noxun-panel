@@ -4607,6 +4607,98 @@ module Noxun
         out
       end
 
+      # --- KOV-E1b: KODY, KTORE AUTOMAT NA CELE NAOZAJ VYDA ------------------
+      #
+      # Codex #333 kolo 3 P2: podklad ORANGE `flap_manual_duplicate` sa nesmie
+      # pytat `flap_set_codes` — ten drzi cleny VSETKYCH vyklopovych/zavesovych
+      # setov (seed AJ snapshot), takze HK celo s rucne pridanou HL tycou
+      # (507365) dostavalo varovanie „nakup to spocita", hoci jeho HK set taky
+      # kod nikdy nevyda a zliatie nema z coho vzniknut.
+      #
+      # Ide sa preto TOU ISTOU cestou ako `expand`:
+      #   * UCINNY set podla precedencie (owner override > triedny override
+      #     skrinky > triedny kluc projektu) a jeho kontroly (typ setu,
+      #     kompatibilita klasifikacie, dlzkove kovanie);
+      #   * cleny sa ROZLISIA podla parametrov polozky — `code_by_param`
+      #     (`lift_class` / `arm_class`) da presne jeden kod a `quantity_from`
+      #     s nulou (HL pod prahom druhej tyce) znamena, ze sa clen NEVYDA.
+      # Katalog netreba: kody su v sete, parametre v polozke. ZIADNE IO.
+      #
+      # `overrides` = override mapa JEDNEJ skrinky (`config.hardware_sets`).
+      # Polozky planu este `owner_id` nemaju (dopisuje ho az `Bom.collect`),
+      # takze mapa ma DEFAULT — pri stavbe je skrinka aj tak prave jedna.
+      #
+      # -> { owner_part_key => { 'lift'|'hinge' => { kod => true } } }
+      def flap_emitted_codes(hardware_items, state, overrides: {})
+        mapping = state.is_a?(Hash) && state['mapping'].is_a?(Hash) ? state['mapping'] : {}
+        sets    = state.is_a?(Hash) && state['sets'].is_a?(Hash) ? state['sets'] : {}
+        cab = single_cabinet_overrides(overrides)
+        out = {}
+        Array(hardware_items).each do |it|
+          next unless it.is_a?(Hash)
+
+          gt = it['generic_type'].to_s
+          next unless FLAP_USE_TYPES.key?(gt)
+          next if it['quantity'].to_i < 1
+
+          owner = it['owner_part_key'].to_s
+          next if owner.empty?
+
+          set = effective_flap_set(it, gt, cab, mapping, sets)
+          next if set.nil?
+
+          bucket = ((out[owner] ||= {})[gt] ||= {})
+          emitted_member_codes(set, it).each { |code| bucket[code] = true }
+        end
+        out
+      rescue StandardError => e
+        # Citacia cesta: pokazeny snapshot nesmie zhodit stavbu. Bez kodov
+        # varovanie proste nevznikne (ORANGE, nie brana).
+        Engine.log_error(e, 'HardwareSets.flap_emitted_codes') if defined?(Engine)
+        {}
+      end
+
+      # Override mapa pouzita pre KAZDE `owner_id` (stavba pozna prave jednu
+      # skrinku a jej polozky `owner_id` este nenesu).
+      def single_cabinet_overrides(overrides)
+        return Hash.new({}) unless overrides.is_a?(Hash) && !overrides.empty?
+
+        Hash.new(normalize_mapping(overrides, nil, allow_owner: true))
+      end
+
+      # UCINNY set polozky — zrkadlo tych istych bran, ktore ma `expand`
+      # (chybajuce mapovanie, chybajuca definicia, iny typ setu, nesulad
+      # klasifikacie, dlzkove kovanie). Ktorakolvek z nich znamena, ze nakup
+      # z tejto polozky nevyda ANI JEDEN riadok — a teda ani nema co zliat.
+      def effective_flap_set(it, generic_type, cabinet_overrides, mapping, sets)
+        sid, = resolve_set_id(generic_type, it, cabinet_overrides, mapping)
+        return nil if sid.nil?
+
+        set = sets[sid]
+        return nil unless set.is_a?(Hash) && set['generic_type'].to_s == generic_type
+        return nil if set_incompatible_info(it, set)
+        return nil if length_unsupported?(it)
+
+        set
+      end
+
+      # Cleny, ktore by `expand_members` na TEJTO polozke naozaj vydala —
+      # bez riadkov, bez katalogu a bez dedup logiky `per: 'owner'` (dedup
+      # mnozstvo znizuje, kod nemeni).
+      def emitted_member_codes(set, it)
+        Array(set['members']).filter_map do |m|
+          next nil unless m.is_a?(Hash)
+
+          mult, qmiss = member_multiplier(m, it)
+          next nil if qmiss || mult.nil?
+
+          code, miss = member_code(m, it)
+          next nil if miss || code.nil?
+
+          code
+        end
+      end
+
       # --- KOV-H1: ad-hoc kanal (polozky mimo setov) -------------------------
       #
       # Vstup su UZ OCISTENE zaznamy z configu (`CabinetBuilder.norm_hardware_manual`)
