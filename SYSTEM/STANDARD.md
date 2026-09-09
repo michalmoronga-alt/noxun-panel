@@ -466,8 +466,12 @@ používateľ nevidí, čo sa objednáva. Príliš ľahké čelo je len **ORANGE
 je stale, keď je stará **aspoň jedna** z hodnôt uložených stavbou — `config_schema` < 11 **alebo** `rules_seed_version` < 5 (§2.5; chýbajúci kľúč = 0). Sama schéma
 nestačí: `ensure_project_rules!` zámerne vracia starý projektový snapshot, takže **prestavba** starej zákazky zapíše novú schému a nevydá nič — a RED by zhasol práve
 nápravou, ktorú brána odporúča. Náprava je „Doplniť nové predvoľby" **+ prestavba**, v tomto poradí. Pýtať sa namiesto verzie na prítomnosť seed pravidiel je
-**zakázané**: používateľ smie mať vlastné (aj vypnuté) výklopové pravidlo a RED by nezhasol nikdy. **Čelo s ručnou (ad-hoc) položkou kovania nález nerobí** a automat sa
+**zakázané**: používateľ smie mať vlastné (aj vypnuté) výklopové pravidlo a RED by nezhasol nikdy. **Čelo s ÚPLNOU ručnou (ad-hoc) zostavou nález nerobí** a automat sa
 naň nevydáva (ORANGE `flap_manual_hardware`) — ad-hoc katalógový riadok sa v nákupe zlieva so setovým podľa kódu, takže vynútená prestavba by objednala dvakrát.
+**Úplná je len zostava s MECHANIZMOM** toho druhu, ktorý čelu podľa smeru patrí (výklop: mechanizmus zo setu `use_type lift`; sklop: záves zo setu `use_type door`);
+krytky, ramená, tyče, Tip-On ani úchytky ju netvoria — pri nich beží automat aj s bránami ďalej a zliatie kódu v nákupe prizná ORANGE `flap_manual_duplicate`.
+Predikát je JEDEN (`HardwareSets.manual_flap_assemblies`) a používa ho stavba aj zber; klasifikovať podľa kategórie katalógu je **zakázané** (kategória `VYKLOPY`
+drží aj príslušenstvo, takže jedna krytka by vypla mechanizmus aj tvrdé kontroly).
 
 **VÝKLOPY — vzor `lift_class` (KOV-E1b, v0.9.54).** Štvrtý `kind` nevydáva POČET, ale **KLASIFIKÁCIU**: jedna položka `lift` na čelo (`quantity: 1`) s
 `params {use_type: "lift", lift_system, opening_mode, lift_class, arm_class (len HL), rod_count, rod_extension}`. Kód z triedy robí až set (`code_by_param`, §6.3) —

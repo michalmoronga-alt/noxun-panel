@@ -220,11 +220,19 @@ závesy sklopu — ale do configu zapíše schému 11, a RED by zhasol nad záka
 až po „Doplniť nové predvoľby" (snapshot na seed 5) **A** prestavbe. Skrinka postavená pod schémou 11 **so seedom 5** stale nie je nikdy — výsledok stavby s účinnými
 pravidlami je rozhodnutie používateľa.
 
-**RUČNÉ KOVANIE NA VÝKLOPE VYPÍNA AUTOMAT (Codex #333 kolo 1 P1).** `build_into` odovzdáva do `Construction.build_plan` mapu **`manual_flap_owners(cfg)`**
-`{ owner_part_key => { 'lift'|'hinge' => true } }` — čelá `flap`, na ktorých už visí ad-hoc položka (`config.hardware_manual`) toho istého druhu kovania. Druh sa určuje
-z **kategórie katalógu** (`VYKLOPY` → `lift`, `ZAVESY` → `hinge`), preto to robí builder a nie `HardwareRules.evaluate` (tá ostáva bez IO). **Voľná položka**
-(`source: 'free'`) sa neklasifikuje zámerne: nemá katalógový kód, v nákupe je vlastným riadkom (`add_free_row`) a s automatom sa nikdy nezlieva — vypnúť kvôli nej
-automat by znamenalo tichú stratu mechanizmu. Kategóriu nemapuje ani neznámy kód (živý katalóg sa mohol zmeniť). Detail potlačenia je v [hardware.md](hardware.md).
+**ÚPLNÁ RUČNÁ ZOSTAVA NA VÝKLOPE VYPÍNA AUTOMAT (Codex #333 kolá 1 a 2).** `build_into` odovzdáva do `Construction.build_plan` mapu **`manual_flap_owners(cfg, model)`**
+`{ owner_part_key => { 'lift'|'hinge' => true } }` — čelá `flap`, na ktorých už visí ad-hoc položka (`config.hardware_manual`) toho istého druhu kovania.
+**Rozhoduje MECHANIZMUS, nie kategória katalógu (kolo 2 P1).** Kategória `VYKLOPY` drží aj krytky, ramená, tyče a Tip-On, takže jedna ručne pridaná krytka predtým
+vypla automat **aj jeho tvrdé kontroly** a nákup mohol prejsť úplne bez mechanizmu. Klasifikácia je od kola 2 **zdieľaná so zberom** — jeden predikát
+`HardwareSets.manual_flap_assemblies(manual, HardwareSets.flap_set_codes(state))`, kde mechanizmus = prvý člen `per: 'unit'` setu `use_type lift` (výklop) alebo
+`use_type door` (sklop), zo **seedu aj z projektového snapshotu** ([hardware.md](hardware.md)). Katalóg sa už nečíta vôbec. **Voľná položka** (`source: 'free'`) sa
+neklasifikuje zámerne: nemá katalógový kód, v nákupe je vlastným riadkom (`add_free_row`) a s automatom sa nikdy nezlieva. Detail potlačenia je v [hardware.md](hardware.md).
+
+**RUČNÝ DOPLNOK VEDĽA AUTOMATU = ORANGE `flap_manual_duplicate` (Codex #333 kolo 2 P1).** Keď ručná položka mechanizmus **nie je**, automat sa vydá normálne (aj
+s bránami) a ručný riadok ostáva vedľa neho. Ak má pritom rovnaký **kód** ako niektorý člen setu toho druhu, `HardwareSets.add_adhoc_row` ich v nákupe zlepí do jedného
+riadku a množstvá **sčíta** (typicky práve krytky). `build_into` to po pláne priznáva cez **`attach_manual_duplicate_warnings!(plan, cfg, model)`** (vzor
+`attach_rules_state_warning!`: doplní warning a plán sa RE-VALIDUJE): jeden ORANGE na (čelo, kód), len pre rolu `flap` a len keď automat na tom čele naozaj položku
+vydal (`emitted_flap_kinds`). Neopravuje sa to za používateľa — je to vec, o ktorej má vedieť.
 
 **ORANGE, KEĎ SA PRAVIDLÁ NEDAJÚ ZMRAZIŤ (Codex #329 kolo 2 P1).** `build_into` po `Construction.build_plan` volá **`attach_rules_state_warning!(plan, model)`**
 (vzor `attach_abs_warnings!`: doplní warning a plán sa RE-VALIDUJE). Warning `hardware_rules_library_incompatible` vznikne LEN v stave, ktorý sa sám neopraví —

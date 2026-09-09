@@ -231,12 +231,15 @@ Na rozdiel od `hinge_stale` sa nález NEPÝTA na obsah pravidiel: používateľ 
 (`seed_additions`) a RED by nezhasol nikdy — rozhoduje **verzia snapshotu**, nie prítomnosť seed pravidiel. A na rozdiel od `hinge_stale_issue`, ktorý pri nenájdenom
 závese **mlčí**, je tu chýbajúca položka práve tým nálezom.
 
-**Čelo s RUČNÝM kovaním nález nerobí (Codex #333 kolo 1 P1).** Keď na tom čele visí ad-hoc záznam (`config.hardware_manual`, `Bom.manual_hardware_for?`), brána mlčí:
-zber ho zbiera a do nákupu ide, takže RED by nútil k prestavbe, ktorá by k ručnej položke pridala ešte automatickú zostavu — a `HardwareSets.add_adhoc_row` **sčítava
-rovnaké kódy**, teda dvojitá objednávka. Druh kovania sa v zbere nerozlišuje zámerne (config ho nenesie, kategóriu vie až živý katalóg a zber je čítacia cesta bez IO);
-na úzke rozlíšenie je stavba. Protiváha na strane stavby: čelo `flap` s ručnou položkou toho istého druhu automat **nedostane** a vznikne ORANGE
-**`flap_manual_hardware`** („kovanie je pridané RUČNE — automatický mechanizmus/závesy sa nevydali; odstráň ručnú položku, ak chceš automat") — nikdy sčítanie oboch
-a nikdy ticho. Detail klasifikácie je v [construction.md](construction.md), potlačenie v [hardware.md](hardware.md).
+**Bránu zhasne LEN ÚPLNÁ RUČNÁ ZOSTAVA (Codex #333 kolá 1 a 2).** V kole 1 stačil **akýkoľvek** owner-bound ad-hoc záznam, takže úchytka, voľná poznámka či záves
+na výklope HORE pustili nákup, rozpočet aj ponuku nad čelom, ktoré žiadny mechanizmus nemá. Od kola 2 sa zber pýta **tým istým predikátom ako stavba**:
+`flap_stale_issue(..., flap_codes)` → `Bom.manual_flap_assemblies` → `HardwareSets.manual_flap_assemblies` a druh musí sedieť so **smerom** (výklop mechanizmus,
+sklop záves — [hardware.md](hardware.md)). Kódy mechanizmov (seed + sety projektového snapshotu) si `Bom.collect` vypýta RAZ na zber, presne ako `rules_stale`;
+`HardwareSets.project_state` číta iba modelový atribút, takže zber ostáva bez IO. Úplná zostava bránu zhasne preto, že je to **vedomý zásah** a naša náprava
+(prestavba) by k nej pridala ešte automatickú zostavu — `HardwareSets.add_adhoc_row` **sčítava rovnaké kódy**, teda dvojitá objednávka. Protiváha na strane stavby:
+čelo `flap` s úplnou ručnou zostavou automat **nedostane** a vznikne ORANGE **`flap_manual_hardware`** („kovanie je pridané RUČNE — automatický mechanizmus/závesy sa
+nevydali; odstráň ručnú položku, ak chceš automat"); ručný **doplnok** (krytka, tyč, rameno) automat nevypína a zliatie kódu v nákupe prizná ORANGE
+**`flap_manual_duplicate`** ([construction.md](construction.md)) — nikdy sčítanie oboch potichu.
 
 **Dve nové RED kategórie Kontroly.** `CAT_HARDWARE_CONFLICT` (`hardware_conflict`) — položka kovania z pravidiel VZNIKLA, ale je nesprávna; vetu skladá
 STAVBA (pozná výšku aj posledné pásmo), Kontrola k nej doplní adresu a to, čo sa tým zastavuje. Náprava je **ručný zámok počtu** (`hardware_overrides`),

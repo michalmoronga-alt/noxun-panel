@@ -128,12 +128,28 @@ snapshot (`project_doc` → `seed_version`, chýbajúci kľúč = 0), a keď ho 
 (`rules_seed_version`, [construction.md](construction.md)) a číta ju migračná brána `flap_stale` ([outputs.md](outputs.md)) — sama schéma configu nestačí, lebo
 prestavba so starým snapshotom zapíše novú schému a nevydá nič. `LIFT_SEED_VERSION` je **pevné číslo** (ako `HINGE_TABLE_STD`): budúci bump seedu na hranici nič nemení.
 
-**RUČNÉ KOVANIE NA ČELE `flap` VYPÍNA AUTOMAT (Codex #333 kolo 1 P1).** `evaluate(..., manual_flap_owners:)` dostáva mapu `{ owner_part_key => { 'lift'|'hinge' => true } }`
-(klasifikuje ju `CabinetBuilder` z kategórie katalógu — [construction.md](construction.md)) a `apply_rule` na takom čele položku **nevydá**; `manual_flap_warnings` prizná
+**ÚPLNÁ RUČNÁ ZOSTAVA NA ČELE `flap` VYPÍNA AUTOMAT (Codex #333 kolá 1 a 2).** `evaluate(..., manual_flap_owners:)` dostáva mapu `{ owner_part_key => { 'lift'|'hinge' => true } }`
+(pripravuje ju `CabinetBuilder` — [construction.md](construction.md)) a `apply_rule` na takom čele položku **nevydá**; `manual_flap_warnings` prizná
 JEDEN ORANGE `flap_manual_hardware` na (čelo, druh). Je to ten istý vzor ako `suppress_slide_owners`, ale iný dôvod: ad-hoc katalógový riadok sa v nákupe **zlieva so
 setovým podľa kódu** (`HardwareSets.add_adhoc_row` sčítava množstvá), takže stará skrinka s ručne pridaným výklopom by po prestavbe objednala mechanizmus dvakrát.
 Fail-closed smerom k človeku: platí RUČNÝ záznam (ten je vedomý), automat sa prizná ORANGE-om. **Úzko len na rolu `flap`** — ručný záves na DVIERKACH správanie F1
 nemení (automat beží ďalej ako doteraz).
+
+**`HardwareSets.flap_set_codes` / `manual_flap_assemblies` — JEDEN zdieľaný predikát (Codex #333 kolo 2 P1).** Kým to boli dva predikáty (builder podľa kategórie
+katalógu, `Bom` podľa akéhokoľvek owner-bound záznamu), jedna ručne pridaná **krytka** vypla automat aj jeho tvrdé kontroly a naopak **úchytka alebo voľná poznámka**
+zhasla migračnú RED `flap_stale`. Od kola 2 platí jedna definícia: **ručná zostava je úplná LEN s mechanizmom**. `flap_set_codes(state)` prejde `SEED_SETS`
+**+ sety projektového snapshotu** (`FLAP_USE_TYPES`: `lift` → `use_type lift`, `hinge` → `use_type door`) a vráti `{ druh => { 'mechanism' => {kód}, 'members' => {kód} } }`;
+mechanizmus je **prvý člen `per: 'unit'`** (poradie členov je záväzné — pri výklope je to `code_by_param lift_class`, pri sklope samotný záves), `members` sú všetky kódy
+setu (podklad ORANGE `flap_manual_duplicate`). Ramená, tyče, krytky, Tip-On ani úchytky zostavu netvoria. `manual_flap_assemblies(manual, codes)` z toho urobí mapu
+`{ owner_part_key => { druh => true } }` — číta LEN pamäť a modelový atribút (**žiadne IO**), takže ho zvládne aj zber: `Bom.collect` si kódy vypýta RAZ na zber (vzor
+`rules_stale`) a odovzdá ich do `flap_stale_issue` ([outputs.md](outputs.md)). Katalóg (a s ním „živý zdroj, ktorý sa mohol zmeniť") už v tejto ceste nefiguruje.
+
+**Nečíselný skalár výklopu NEZHODÍ dokument (Codex #333 kolo 2 P2).** `normalize_lift_rule!` prehnal `handle_allowance_kg` a `rod_double_from_kb_mm` cez `to_f` —
+na Hash/Array/`true` (pokazený alebo cudzí snapshot) to **vyhodí výnimku**, `project_rules` ju odchytil, vrátil `nil` a `ensure_project_rules!` potom projektové pravidlá
+**ticho nahradil globálnou knižnicou**. Od kola 2 ich čistí `normalize_lift_scalar!` s tou istou typovou kontrolou ako bunky tabuliek (`lift_row?`): nečíselná hodnota sa
+nehádže preč ani nehádže — kľúč **ostáva s hodnotou `nil`**. Je to vzor `weight_bands` (KOV-F2): normalizácia nechá tvar, ktorý brána odmietne, takže `lift_problem`
+o probleme povie (`LIFT_SCALARS` → „rezerva na úchytku musí byť číslo") a uloženie takého pravidla neprejde; vypnuté pravidlo sa nekontroluje, takže cesta von existuje.
+Čitatelia (`lift_allowance`, `lift_rod_count`) sú typovo bezpeční už dnes: `nil` = žiadna rezerva / jedna tyč, nikdy hádanie.
 
 **Klientska parita validácie výklopu (Codex #333 kolo 1 P2).** `rdValidate` má vetvu `lift_class` (`rdLiftProblem`) s tými istými kritériami ako `lift_problem`
 (prázdne `classes`/`mechanisms`/`arms`, obrátený rozsah, diera medzi pásmami ramien, **záporná `handle_allowance_kg`** — tá by hmotnosť znížila a vybrala slabší
