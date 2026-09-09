@@ -496,9 +496,21 @@ module Noxun
       # Predikat sa ZAMERNE NEPYTA na pritomnost seed pravidiel: pouzivatel smie
       # mat vlastne (aj vypnute) vyklopove pravidlo, a kedze `seed_additions`
       # taky seed nedoplni a ochrana overridov ho drzi, „Doplniť nové predvoľby
-      # + prestavba" by RED nikdy nezhasla. Skrinka PRESTAVANA pod schemou 11
-      # preto NIE JE stale nikdy — vysledok stavby s UCINNYMI pravidlami je
-      # rozhodnutie pouzivatela, nie zaostalost.
+      # + prestavba" by RED nikdy nezhasla.
+      #
+      # PROVENIENCIE SU DVE (Codex #333 kolo 1 P1) — staci, ze JEDNA je stara:
+      #   (a) `config_schema` < `LIFT_ACTIVATION_SCHEMA` — skrinka postavena
+      #       pred E1b;
+      #   (b) `rules_seed_version` < `HardwareRules::LIFT_SEED_VERSION` —
+      #       stavala sa s pravidlami SPRED vyklopov. Bez (b) by stacilo
+      #       skrinku PRESTAVAT: `ensure_project_rules!` zamerne vrati STARY
+      #       projektovy snapshot (reprodukovatelnost z .skp), takze prestavba
+      #       nevyda ani mechanizmus ani zavesy sklopu — ale do configu zapise
+      #       schemu 11 a RED by zhasol nad zakazkou UPLNE BEZ kovania.
+      #       Prestavba je pritom jedna z nami odporucanych naprav.
+      # RED zhasne az po „Doplniť nové predvoľby" (snapshot na seed 5) A
+      # prestavbe. Skrinka postavena s UCINNYMI pravidlami stale nie je nikdy:
+      # vysledok takej stavby je rozhodnutie pouzivatela, nie zaostalost.
       #
       # `hinge_stale_issue` mlci, ked zaves nenajde; TU je to naopak — CHYBAJUCA
       # polozka JE nalez. -> nalez | nil
@@ -506,11 +518,12 @@ module Noxun
         return nil unless defined?(CabinetBuilder) && defined?(HardwareRules)
 
         cfg = ccfg.is_a?(Hash) ? ccfg : {}
-        return nil if CabinetBuilder.config_schema_of(cfg) >= CabinetBuilder::LIFT_ACTIVATION_SCHEMA
+        return nil unless pre_lift_build?(cfg)
 
         items = cfg['front_items'].is_a?(Array) ? cfg['front_items'] : []
         hw = Array(cfg['hardware'])
-        hit = items.find { |it| it.is_a?(Hash) && flap_without_hardware?(it, hw) }
+        manual = Array(cfg['hardware_manual'])
+        hit = items.find { |it| it.is_a?(Hash) && flap_without_hardware?(it, hw, manual) }
         return nil if hit.nil?
 
         up = hit['flap_dir'].to_s != HardwareRules::FLAP_DOWN
@@ -525,14 +538,33 @@ module Noxun
           'label' => PartKeys.human_label(pkey, fronts: items).to_s }
       end
 
+      # Bola skrinka postavena PRED vyklopmi? Staci JEDNA stara proveniencia
+      # (schema configu ALEBO seed pravidiel — viz `flap_stale_issue`).
+      # Chybajuci `rules_seed_version` (config spred tejto opravy) = 0.
+      def pre_lift_build?(cfg)
+        return true if CabinetBuilder.config_schema_of(cfg) < CabinetBuilder::LIFT_ACTIVATION_SCHEMA
+
+        cfg['rules_seed_version'].to_i < HardwareRules::LIFT_SEED_VERSION
+      end
+
       # Riadok ciel je `flap` a v ULOZENOM kovani k nemu chyba to, co mu podla
       # smeru patri: vyklopu (`up`) polozka `lift`, sklopu (`down`) zaves
       # s `use_type: 'door'`. Iny typ riadku nalez nerobi.
-      def flap_without_hardware?(item, hardware)
+      #
+      # Codex #333 kolo 1 P1: RUCNE (ad-hoc) kovanie pripnute na to celo je
+      # kovanie ako kazde ine — zber ho zbiera (`hardware_manual`) a do nakupu
+      # ide. Nalez by tu nutil k prestavbe, ktora by k rucnej polozke pridala
+      # este automaticku zostavu a nakup by ten isty kod zratal DVAKRAT
+      # (`HardwareSets.add_adhoc_row` scitava rovnake kody). Celo s rucnym
+      # zaznamom sa preto povazuje za obsluzene; automat ho z toho isteho
+      # dovodu obchadza (`HardwareRules.manual_flap_hit?`).
+      def flap_without_hardware?(item, hardware, manual = [])
         dir = item['flap_dir'].to_s
         return false unless [HardwareRules::FLAP_UP, HardwareRules::FLAP_DOWN].include?(dir)
 
         fid = item['id'].to_s
+        return false if manual_hardware_for?(manual, fid)
+
         want_lift = dir == HardwareRules::FLAP_UP
         hardware.none? do |h|
           next false unless h.is_a?(Hash)
@@ -545,6 +577,20 @@ module Noxun
             h['generic_type'].to_s == HardwareRules::HINGE_OUTPUT &&
               params['use_type'].to_s == HardwareRules::DOOR_USE_TYPE
           end
+        end
+      end
+
+      # Visi na tom cele RUCNY (ad-hoc) zaznam kovania? Druh sa TU nerozlisuje
+      # — config ho nenesie (kategoriu vie az ZIVY katalog) a zber je citacia
+      # cesta bez IO. Pre branu to staci: rucny zaznam na cele je vedomy zasah
+      # a migracna RED, ktorej napravou je prestavba, by pri nom hrozila
+      # zdvojenim objednavky.
+      def manual_hardware_for?(manual, front_id)
+        return false if front_id.to_s.empty?
+
+        Array(manual).any? do |rec|
+          rec.is_a?(Hash) &&
+            PartKeys.front_id(rec['owner_part_key'].to_s).to_s == front_id.to_s
         end
       end
 

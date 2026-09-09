@@ -219,12 +219,24 @@ nosiča** `hardware_conflicts` (preto sú aj v `HW_CONFLICT_CODES`), takže cest
 `Validation` RED kategória `hardware_conflict` → brána. **Položka výklopu sa VYDÁ vždy** (aj bez triedy) — riadok v Kovaní musí existovať, inak používateľ nevidí,
 čo sa objednáva; zastavené sú nákup, rozpočet a ponuka, **VEPO beží** (geometria čela je správna, rovnaká úvaha ako pri závesoch).
 
-**`flap_stale` je MIGRAČNÝ, s JEDINOU príčinou (delta audit Sol FIX 4).** `Bom.flap_stale_issue` je **tretí vzor** po `drawer_stale_issue` a `hinge_stale_issue`,
-ale aktivuje ho **výhradne proveniencia stavby**: skrinka s čelom `flap` postavená pod `config_schema` < `CabinetBuilder::LIFT_ACTIVATION_SCHEMA` (= 11), ktorej
-v uloženom `config.hardware[]` **chýba** položka `lift` (smer `up`) alebo závesy s `use_type: 'door'` (smer `down`). Pravidlá výklopov vtedy neexistovali, takže
-také čelo nemá v nákupe **nič** — a zber číta len uložené hodnoty. Náprava je „Doplniť nové predvoľby" **+ prestavba**. Na rozdiel od `hinge_stale` sa NEPÝTA na
-`std` pravidiel projektu: používateľ smie mať vlastné (aj vypnuté) výklopové pravidlo, seed sa mu vtedy nedoplní (`seed_additions`) a RED by nezhasol nikdy.
-A na rozdiel od `hinge_stale_issue`, ktorý pri nenájdenom závese **mlčí**, je tu chýbajúca položka práve tým nálezom.
+**`flap_stale` je MIGRAČNÝ a rozhoduje o ňom PROVENIENCIA STAVBY (delta audit Sol FIX 4, rozšírené Codex #333 kolo 1 P1).** `Bom.flap_stale_issue` je **tretí vzor**
+po `drawer_stale_issue` a `hinge_stale_issue`: skrinka s čelom `flap`, ktorej v uloženom `config.hardware[]` **chýba** položka `lift` (smer `up`) alebo závesy
+s `use_type: 'door'` (smer `down`). Pravidlá výklopov vtedy neexistovali, takže také čelo nemá v nákupe **nič** — a zber číta len uložené hodnoty.
+**Provenienciu tvoria DVE hodnoty a stačí, že jedna je stará** (`Bom.pre_lift_build?`):
+· `config_schema` < `CabinetBuilder::LIFT_ACTIVATION_SCHEMA` (= 11) — skrinka postavená pred E1b;
+· `rules_seed_version` < `HardwareRules::LIFT_SEED_VERSION` (= 5) — stavala sa s pravidlami spred výklopov (chýbajúci kľúč = 0).
+Druhá podmienka je nutná preto, že `ensure_project_rules!` **zámerne** vracia starý projektový snapshot (reprodukovateľnosť stavby z .skp): prestavba starej zákazky
+by nevydala nič, ale zapísala by schému 11 — a RED by zhasol práve prestavbou, ktorú sama odporúča. Náprava je „Doplniť nové predvoľby" **+ prestavba** (v tomto poradí).
+Na rozdiel od `hinge_stale` sa nález NEPÝTA na obsah pravidiel: používateľ smie mať vlastné (aj vypnuté) výklopové pravidlo, seed sa mu vtedy nedoplní
+(`seed_additions`) a RED by nezhasol nikdy — rozhoduje **verzia snapshotu**, nie prítomnosť seed pravidiel. A na rozdiel od `hinge_stale_issue`, ktorý pri nenájdenom
+závese **mlčí**, je tu chýbajúca položka práve tým nálezom.
+
+**Čelo s RUČNÝM kovaním nález nerobí (Codex #333 kolo 1 P1).** Keď na tom čele visí ad-hoc záznam (`config.hardware_manual`, `Bom.manual_hardware_for?`), brána mlčí:
+zber ho zbiera a do nákupu ide, takže RED by nútil k prestavbe, ktorá by k ručnej položke pridala ešte automatickú zostavu — a `HardwareSets.add_adhoc_row` **sčítava
+rovnaké kódy**, teda dvojitá objednávka. Druh kovania sa v zbere nerozlišuje zámerne (config ho nenesie, kategóriu vie až živý katalóg a zber je čítacia cesta bez IO);
+na úzke rozlíšenie je stavba. Protiváha na strane stavby: čelo `flap` s ručnou položkou toho istého druhu automat **nedostane** a vznikne ORANGE
+**`flap_manual_hardware`** („kovanie je pridané RUČNE — automatický mechanizmus/závesy sa nevydali; odstráň ručnú položku, ak chceš automat") — nikdy sčítanie oboch
+a nikdy ticho. Detail klasifikácie je v [construction.md](construction.md), potlačenie v [hardware.md](hardware.md).
 
 **Dve nové RED kategórie Kontroly.** `CAT_HARDWARE_CONFLICT` (`hardware_conflict`) — položka kovania z pravidiel VZNIKLA, ale je nesprávna; vetu skladá
 STAVBA (pozná výšku aj posledné pásmo), Kontrola k nej doplní adresu a to, čo sa tým zastavuje. Náprava je **ručný zámok počtu** (`hardware_overrides`),

@@ -122,6 +122,25 @@ IGNORUJE, takže by `zavesy-sklop` uplatnil na každé čelo `flap` vrátane vý
 preskočí pri `from_version >= SEED_VERSION`, takže bez bumpu by existujúca knižnica nové seed pravidlá nedala ani novým projektom. `LEGACY_SEED_SHAPES` sa
 **nerozširuje** — obe pravidlá sú nové a starší tvar, ktorý by sa dal „obnoviť", neexistuje.
 
+**`LIFT_SEED_VERSION` = 5 a `effective_seed_version(model)` (Codex #333 kolo 1 P1).** Jediná autorita otázky „s akým seedom sa TERAZ stavia": rozhoduje projektový
+snapshot (`project_doc` → `seed_version`, chýbajúci kľúč = 0), a keď ho projekt nemá, dedí knižnicu (`library_seed_version` — čítanie ju MIGRUJE, takže je to aspoň naša
+`SEED_VERSION`; výnimka je knižnica z novšieho pluginu, ktorú `read_rules` zámerne nemerguje). Hodnotu si **ukladá stavba** do configu skrinky
+(`rules_seed_version`, [construction.md](construction.md)) a číta ju migračná brána `flap_stale` ([outputs.md](outputs.md)) — sama schéma configu nestačí, lebo
+prestavba so starým snapshotom zapíše novú schému a nevydá nič. `LIFT_SEED_VERSION` je **pevné číslo** (ako `HINGE_TABLE_STD`): budúci bump seedu na hranici nič nemení.
+
+**RUČNÉ KOVANIE NA ČELE `flap` VYPÍNA AUTOMAT (Codex #333 kolo 1 P1).** `evaluate(..., manual_flap_owners:)` dostáva mapu `{ owner_part_key => { 'lift'|'hinge' => true } }`
+(klasifikuje ju `CabinetBuilder` z kategórie katalógu — [construction.md](construction.md)) a `apply_rule` na takom čele položku **nevydá**; `manual_flap_warnings` prizná
+JEDEN ORANGE `flap_manual_hardware` na (čelo, druh). Je to ten istý vzor ako `suppress_slide_owners`, ale iný dôvod: ad-hoc katalógový riadok sa v nákupe **zlieva so
+setovým podľa kódu** (`HardwareSets.add_adhoc_row` sčítava množstvá), takže stará skrinka s ručne pridaným výklopom by po prestavbe objednala mechanizmus dvakrát.
+Fail-closed smerom k človeku: platí RUČNÝ záznam (ten je vedomý), automat sa prizná ORANGE-om. **Úzko len na rolu `flap`** — ručný záves na DVIERKACH správanie F1
+nemení (automat beží ďalej ako doteraz).
+
+**Klientska parita validácie výklopu (Codex #333 kolo 1 P2).** `rdValidate` má vetvu `lift_class` (`rdLiftProblem`) s tými istými kritériami ako `lift_problem`
+(prázdne `classes`/`mechanisms`/`arms`, obrátený rozsah, diera medzi pásmami ramien, **záporná `handle_allowance_kg`** — tá by hmotnosť znížila a vybrala slabší
+mechanizmus) a rovnakým predfiltrom riadkov ako `lift_row?`. Výklop sa v UI zatiaľ needituje, ale sekcia ukladá **všetky** pravidlá naraz, takže bez tejto vetvy by
+klient uloženie pustil, server ho zamietol a read-only tabuľku by nebolo kde opraviť. Vypnutie pokazeného pravidla ostáva možné (`enabled: false` sa nevaliduje).
+Spoločný kontrakt je `tests/fixtures/rules_validation_parity.json` — keď sa kritériá rozídu, padne práve jedna zo sád.
+
 
 **KOV-C2b (v0.9.31) — R2 EXKLUZIVITA.** `evaluate(..., suppress_slide_owners:)` dostáva množinu `owner_part_key` čiel, ktoré už majú položku výsuvu **z receptu**, a pravidlá
 s `output: 'slide'` sa na nich **nevyhodnocujú** — inak by zásuvka mala dva výsuvy (jeden s kitom, jeden legacy bez dielcov). Potlačenie sa priznáva **jedným** `info`

@@ -17308,6 +17308,8 @@ module NoxunSuRunner
       kove_hl(model)
       kove_sklop(model)
       kove_stale(model)
+      kove_stale_rules(model)
+      kove_manual(model)
     ensure
       cleanup(model)
     end
@@ -17471,6 +17473,113 @@ module NoxunSuRunner
        (e::Store.config(inst) || {})['config_schema'].to_i == e::CabinetBuilder::CONFIG_SCHEMA)
     ok('KOV-E stale: a Kontrola uz nic nehlasi',
        kove_ctrl(model).none? { |i| i['category'] == e::Validation::CAT_HARDWARE_CONFLICT })
+    cleanup(model)
+  end
+
+  # --- 5) PRESTAVBA SO STARYM SNAPSHOTOM PRAVIDIEL (Codex #333 kolo 1 P1) -----
+  #
+  # Najnebezpecnejsi scenar celej davky: zakazka ma snapshot pravidiel SPRED
+  # E1b. `ensure_project_rules!` ho zamerne ponecha (reprodukovatelnost stavby
+  # z .skp), takze prestavba vyda NULA vyklopoveho kovania — ale do configu
+  # zapise aktualnu schemu. Keby brana pozerala len na schemu, RED by zhasol
+  # nad zakazkou UPLNE BEZ mechanizmu, a to prave PRESTAVBOU, ktoru sama
+  # odporuca. Druha proveniencia (`rules_seed_version`) to drzi.
+  def kove_old_rules!(model)
+    hr = e::HardwareRules
+    rules = Array(hr.project_rules(model))
+            .reject { |r| [KOVE_RULE, KOVE_FALL].include?(r['rule_id'].to_s) }
+    model.start_operation('SU-TEST KOV-E stary snapshot pravidiel', true)
+    # ZAMERNE surovy zapis: `set_project_rules` peciatkuje AKTUALNY
+    # `seed_version`, takze stary stav sa cez neho nasimulovat neda.
+    model.set_attribute(e::Store::DICT, hr::MODEL_KEY,
+                        JSON.generate('std' => hr::STD, 'seed_version' => 4, 'rules' => rules))
+    model.commit_operation
+  end
+
+  def kove_stale_rules(model)
+    hr = e::HardwareRules
+    inst = kove_build(model, 400.0)
+    return ok('KOV-E stale-rules: vlozenie korpusu', false) unless inst
+
+    kove_old_rules!(model)
+    kove_reshape(model, inst, 400.0)
+    cfg = e::Store.config(inst) || {}
+    ok("KOV-E stale-rules: prestavba so starym snapshotom nevydala vyklop (#{kove_hw(inst, 'lift').length})",
+       kove_hw(inst, 'lift').empty?)
+    ok("KOV-E stale-rules: config nesie schemu #{cfg['config_schema']} A seed #{cfg['rules_seed_version']}",
+       cfg['config_schema'].to_i == e::CabinetBuilder::CONFIG_SCHEMA &&
+       cfg['rules_seed_version'].to_i == 4)
+    red = kove_ctrl(model).select { |i| i['category'] == e::Validation::CAT_HARDWARE_CONFLICT }
+    ok("KOV-E stale-rules: RED `flap_stale` NEZHASOL (#{red.length})",
+       red.length == 1 && red.first['severity'] == 'red' &&
+       red.first['message_sk'].to_s.include?('Doplniť nové predvoľby'))
+
+    # NAPRAVA: „Doplniť nové predvoľby" (snapshot na aktualny seed) + prestavba.
+    model.start_operation('KOV-E: doplnit nove predvolby (naprava)', true)
+    hr.merge_project_seed!(model)
+    model.commit_operation
+    kove_reshape(model, inst, 400.0)
+    cfg2 = e::Store.config(inst) || {}
+    ok("KOV-E stale-rules: po doplneni predvolieb je seed #{cfg2['rules_seed_version']} " \
+       "a vyklop je spat (#{kove_class(inst).inspect})",
+       cfg2['rules_seed_version'].to_i >= hr::LIFT_SEED_VERSION &&
+       kove_hw(inst, 'lift').length == 1)
+    ok('KOV-E stale-rules: a Kontrola uz nic nehlasi',
+       kove_ctrl(model).none? { |i| i['category'] == e::Validation::CAT_HARDWARE_CONFLICT })
+    cleanup(model)
+  end
+
+  # --- 6) RUCNE KOVANIE NA VYKLOPE (Codex #333 kolo 1 P1) ---------------------
+  #
+  # Skrinka spred E1b, ktorej vyklop uz ma mechanizmus pridany RUCNE
+  # (kanal `hardware_manual`). Brana ju nesmie hnat do prestavby a prestavba
+  # jej nesmie pridat DRUHU (automaticku) zostavu — ad-hoc katalogovy riadok
+  # sa v nakupe zlieva so setovym podla kodu, takze by sa objednal dvakrat.
+  def kove_manual(model)
+    inst = kove_build(model, 400.0)
+    return ok('KOV-E manual: vlozenie korpusu', false) unless inst
+
+    cfg = e::Store.config(inst) || {}
+    fid = (Array(cfg['front_items']).first || {})['id'].to_s
+    owner = e::PartKeys.front(fid, 'flap')
+    rec = { 'id' => 'M1', 'owner_part_key' => owner, 'source' => 'catalog',
+            'code' => '347810', 'name' => 'BLUM 22K2300', 'unit' => 'set', 'qty' => 1 }
+    e::CabinetBuilder.guarded do
+      model.start_operation('SU-TEST KOV-E rucne kovanie', true)
+      e::Store.write_config(inst, cfg.merge(
+        'config_schema' => e::CabinetBuilder::LIFT_ACTIVATION_SCHEMA - 1,
+        'hardware' => Array(cfg['hardware']).reject { |h| h['generic_type'].to_s == 'lift' },
+        'hardware_conflicts' => [], 'hardware_manual' => [rec]
+      ))
+      model.commit_operation
+    end
+    ok('KOV-E manual: stara skrinka s RUCNYM vyklopom RED nedostane',
+       kove_ctrl(model).none? { |i| i['category'] == e::Validation::CAT_HARDWARE_CONFLICT })
+
+    # PRESTAVBA Z ULOZENEHO CONFIGU (to iste, co robi zmena rozmeru v paneli —
+    # `kove_params` by rucny zoznam neniesol a prestavba by ho zmazala).
+    e::CabinetBuilder.rebuild(model, inst,
+                              e::CabinetBuilder.config_to_params(e::Store.config(inst) || {}))
+    cfg2 = e::Store.config(inst) || {}
+    warn = Array(cfg2['warnings']).find { |w| w['code'].to_s == 'flap_manual_hardware' }
+    ok("KOV-E manual: prestavba automat NEVYDALA (#{kove_hw(inst, 'lift').length})",
+       kove_hw(inst, 'lift').empty?)
+    ok("KOV-E manual: a priznala to ORANGE-om (#{warn && warn['message']})", !warn.nil?)
+    # Riadok nakupu 347810 musi mat pocet 1 — pri scitani rucnej a automatickej
+    # polozky by tu boli DVA kusy (presne to, comu sa branime). `kove_codes`
+    # sa TU nehodi: filtruje riadky podla zdroja `lift`, a ad-hoc zdroj
+    # `generic_type` zamerne nenesie.
+    exp = e::ProductionCore.hardware_expansion(model, e::Bom.collect(model))
+    row = Array(exp && exp['rows']).find { |r| r['code'].to_s == '347810' }
+    ok("KOV-E manual: nakup ma mechanizmus PRAVE RAZ (#{row && row['quantity']})",
+       row && row['quantity'].to_i == 1)
+
+    # ODSTRANENIE rucnej polozky -> automat sa vrati.
+    par = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    par['hardware_manual'] = []
+    e::CabinetBuilder.rebuild(model, inst, par)
+    ok("KOV-E manual: po odstraneni rucnej polozky je automat spat (#{kove_class(inst).inspect})",
+       kove_hw(inst, 'lift').length == 1)
     cleanup(model)
   end
 
@@ -18654,7 +18763,7 @@ module NoxunSuRunner
     run_kovd5(model)         # KOV-D5: ABS farbenie dielcov zasuviek — chrbat Atiry ma pasku na HORNEJ ploske (dolna aj velke plochy cisté), dno ziadnu; Quadro bok boxu aj vnutorne celo tiez HORE; Kontrola olepov zvyrazni TU ISTU ploskou (aj pri starom modeli, kde osi pochadzaju z ROLY); Spat aj Redo mapovanie nemenia a prestavba starej zakazky farbu doplni
     run_kovw(model)          # KOV-W: hmotnost dielcov v ZIVOM retazci katalog -> skrinka -> snapshoty -> Inspector -> Kontrola: pri znamej hustote sedi sucet zo snapshotov s planom (±0,05 kg) a nic sa neuklada do modelu; typ BEZ hustoty (nie UNI) da tazsi odhad, PRESNE JEDEN build warning na skrinku a ORANGE v Kontrole; UNI dielec odhad zachova, ale hmotnostny nalez sa v Kontrole POTLACI (hlasi sa len „materiál neurčený"); Spat vracia hmotnost spolu s materialom
     run_kovf(model)          # KOV-F1: zavesy podla NOXUN tabulky — pocty z REALNEJ sirky kridla (1250 -> 3, 850 -> 3, kridlo 800 x 700 -> 2+1), varovanie sirky nad 800 mm v Kontrole, Tip-On celo dostane P2O set + PRESNE JEDEN piest na kridlo (klasicke celo klasicky set), dvierka nad tabulkou vydaju polozku 7 ks + RED „mimo tabuľky" so zastavenym nakupom/rozpoctom/ponukou (VEPO bezi dalej), rucny zamok poctu RED zhasne v JEDNOM kroku Spat (aj Redo), skrinka ULOZENA PRED tabulkou (schema 8) dostane RED „prestav ju" so zastavenymi 3 vystupmi a prestavba ho zhasne, vlastny set skrinky prezije prestavbu
-    run_kove(model)          # KOV-E1b: vyklopy a sklopy — skrinka 600 x 400 x 320 s vyklopom da 22K2300 + kompletny set (mechanizmus, prichyt, krytky), prestavba na HL top pri vyske 600 da 22L2500 + 22L3800 + JEDNU tyc (KH je z KORPUSU, nie z cela), siroka skrinka 1200 dve tyce + predlzenie, Spat/Redo vratia stav NARAZ, reopen (prestavba z ULOZENEHO configu) system vyklopu nestrati, sklop dostane ZAVESY (nikdy vyklopovy mechanizmus), skrinka zo schemy 10 bez vyklopu = RED „Doplniť nové predvoľby" so zastavenymi 3 vystupmi (VEPO bezi) a prestavba ho zhasne
+    run_kove(model)          # KOV-E1b: vyklopy a sklopy — skrinka 600 x 400 x 320 s vyklopom da 22K2300 + kompletny set (mechanizmus, prichyt, krytky), prestavba na HL top pri vyske 600 da 22L2500 + 22L3800 + JEDNU tyc (KH je z KORPUSU, nie z cela), siroka skrinka 1200 dve tyce + predlzenie, Spat/Redo vratia stav NARAZ, reopen (prestavba z ULOZENEHO configu) system vyklopu nestrati, sklop dostane ZAVESY (nikdy vyklopovy mechanizmus), skrinka zo schemy 10 bez vyklopu = RED „Doplniť nové predvoľby" so zastavenymi 3 vystupmi (VEPO bezi) a prestavba ho zhasne; prestavba so STARYM snapshotom pravidiel (seed 4) RED NEZHASNE (zhasne az doplnenie predvolieb + prestavba) a vyklop s RUCNYM kovanim RED nedostane, prestavba mu automat NEVYDA (ORANGE) a v nakupe je mechanizmus prave raz
     run_d118b(model)         # D-118b: PTOs modul a vedome prazdna bunka v ZIVOM retazci kniznica -> predvolby projektu -> vlozena Tip-On zasuvka -> nakup: pri NL 470 pribudne modul 352908 (1 ks, nazov z katalogu), pri NL 620 (kit typu PTO) modul VEDOME nepribudne a NEVZNIKNE ziadna oranzova; snapshot nesie std 6 (od KOV-E1a) a config schemu 8
     run_async(model, nil)
   rescue StandardError => ex

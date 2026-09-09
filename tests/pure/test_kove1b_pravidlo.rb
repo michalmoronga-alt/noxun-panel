@@ -33,8 +33,11 @@
 #      `lift` pravidle ostavaju UCINNE
 #  10) CONFIG CELA — `lift.system` prezije `normalize_items`, layout projekciu,
 #      stavbu aj „reopen"; `CONFIG_SCHEMA` 11
-#  11) `flap_stale` — LEN podla proveniencie stavby (`config_schema` < 11),
-#      up AJ down, po prestavbe zhasne (delta audit Sol FIX 4)
+#  11) `flap_stale` — LEN podla PROVENIENCIE STAVBY, a to DVOJITEJ (Codex #333
+#      kolo 1 P1): `config_schema` < 11 ALEBO `rules_seed_version` < 5, takze
+#      prestavba so STARYM snapshotom pravidiel RED nezhasne; up AJ down;
+#      celo s RUCNYM kovanim nalez nerobi a automat sa naň nevydava
+#      (delta audit Sol FIX 4 + Codex #333)
 #  12) BRANY — kody v registri, nakup/rozpocet/ponuka stoja, VEPO bezi;
 #      nedostupna expanzia s vyklopom je fail-closed (guard z E1a — TU sa LEN
 #      overuje, ze plati aj na polozku z pravidla)
@@ -64,6 +67,10 @@
 #   M18 vyklopove kody zablokuju VEPO                   -> scope `:kit`
 #   M19 `SEED_VERSION` ostane 4                         -> migracia z v4
 #   M20 pocet tyci sa rata zo SIRKY CELA                -> KB korpusu
+#   M21 `flap_stale` pozera LEN na schemu configu       -> prestavba so seed 4
+#   M22 brana ignoruje rucne kovanie na cele            -> `hardware_manual`
+#   M23 automat sa vyda AJ k rucnej polozke             -> potlacenie + ORANGE
+#   M24 potlacenie sa spusti aj pri VOLNEJ polozke      -> klasifikacia katalogu
 require_relative '../helper' unless defined?(NxTest)
 
 require 'json'
@@ -121,8 +128,17 @@ module NxKovE1b
       'kh' => 400.0, 'kb' => 600.0, 'front_rows' => 1, 'support' => 'none' }.merge(over)
   end
 
-  def evaluate(parts, over_ctx = {}, cfg = {}, rules_over = nil)
-    HR.evaluate(cfg, Array(parts), ctx(over_ctx), rules: rules_over || rules)
+  def evaluate(parts, over_ctx = {}, cfg = {}, rules_over = nil, manual_flap = {})
+    HR.evaluate(cfg, Array(parts), ctx(over_ctx), rules: rules_over || rules,
+                                                  manual_flap_owners: manual_flap)
+  end
+
+  # Deskriptor DVIEROK (rola `front_door`) — kontrola, ze sa spravanie F1
+  # potlacenim vyklopov nezmenilo.
+  def door(over = {})
+    { role: 'front_door', part_key: 'front:F2/wing:single', suffix: 'DOOR-1', name: 'Dvierka',
+      prod: { length: 700.0, width: 396.0, thickness: 18.0 },
+      weight_kg: 5.0 }.merge(over)
   end
 
   def lifts(res)
@@ -194,11 +210,58 @@ module NxKovE1b
   end
 
   # ULOZENY config skrinky s celom `flap`, ktora este nepozna pravidla vyklopov.
-  def stale_cfg(schema, dir = HR::FLAP_UP, hardware = [])
-    { 'config_schema' => schema,
+  # Codex #333 kolo 1 P1: proveniencie su DVE — schema configu A seed pravidiel,
+  # s ktorym stavba bezala. Predvolena seed verzia je AKTUALNA, takze stare
+  # volania (`stale_cfg(10)`) skusaju presne to, co skusali.
+  def stale_cfg(schema, dir = HR::FLAP_UP, hardware = [],
+                seed: HR::LIFT_SEED_VERSION, manual: [])
+    { 'config_schema' => schema, 'rules_seed_version' => seed,
       'front_items' => [{ 'id' => 'F1', 'type' => (dir == HR::FLAP_UP ? 'lift' : 'fall'),
                           'flap_dir' => dir, 'height' => 396.0 }],
-      'hardware' => hardware }
+      'hardware' => hardware, 'hardware_manual' => manual }
+  end
+
+  # --- katalog v sandboxe (klasifikacia rucnych poloziek) -------------------
+  HWC   = E::HardwareCatalog
+  STORE = E::JsonFileStore
+
+  def catalog_item(code)
+    raw = (HWC::SEED_ITEMS + HWC::SEED_ITEMS_V2).find { |i| i['item_code'].to_s == code }
+    rec, = HWC.normalize_item(raw)
+    rec
+  end
+
+  def install_catalog!
+    FileUtils.mkdir_p(HWC.dir)
+    STORE.write(HWC.path, 'std' => HWC::STD, 'schema' => HWC::SCHEMA_CURRENT,
+                          'seed_version' => 2,
+                          'items' => [catalog_item('347810'), catalog_item('104717')])
+    FileUtils.rm_f("#{HWC.path}.bak")
+    STORE.invalidate(HWC.path)
+    HWC.reset_state!
+  end
+
+  def wipe_catalog!
+    [HWC.path, "#{HWC.path}.bak"].each { |f| FileUtils.rm_f(f) }
+    STORE.invalidate(HWC.path)
+    HWC.reset_state!
+  end
+
+  # Model s (alebo bez) projektovym snapshotom pravidiel — LEN citanie.
+  FAKE_MODEL = Struct.new(:doc) do
+    def get_attribute(_dict, _key, default = nil)
+      doc.nil? ? default : doc
+    end
+  end
+
+  def model_with(doc)
+    FAKE_MODEL.new(doc.nil? ? nil : JSON.generate(doc))
+  end
+
+  # Rucna (ad-hoc) polozka kovania pripnuta na celo F1.
+  def manual_rec(source: 'catalog', code: '22K2300', owner: 'front:F1/flap')
+    { 'id' => 'M1', 'owner_part_key' => owner, 'source' => source, 'code' => code,
+      'name' => 'AVENTOS HK top', 'unit' => 'ks', 'qty' => 1 }
   end
 end
 
@@ -665,8 +728,8 @@ end
 
 NxTest.test('KOV-E1b (11): rozhoduje PROVENIENCIA stavby, nie pravidlá projektu') do
   c = NxKovE1b
-  # Prestavana skrinka (schema 11) NIE JE stale NIKDY — ani ked vyklop kovanie
-  # nedostal (vypnute vlastne pravidlo je rozhodnutie pouzivatela).
+  # Prestavana skrinka (schema 11 A seed 5) NIE JE stale NIKDY — ani ked vyklop
+  # kovanie nedostal (vypnute vlastne pravidlo je rozhodnutie pouzivatela).
   NxTest.assert_equal(nil, c::BOM.flap_stale_issue('CAB-5', 7,
                                                    c.stale_cfg(c::CB::LIFT_ACTIVATION_SCHEMA)))
   NxTest.assert_equal(nil, c::BOM.flap_stale_issue('CAB-5', 7,
@@ -688,6 +751,133 @@ NxTest.test('KOV-E1b (11): rozhoduje PROVENIENCIA stavby, nie pravidlá projektu
                                                      'front_items' => [{ 'id' => 'F1',
                                                                          'type' => 'door' }],
                                                      'hardware' => [] }))
+end
+
+# --- Codex #333 kolo 1 P1: druha proveniencia = SEED PRAVIDIEL -------------
+NxTest.test('KOV-E1b (11): prestavba so STARYM snapshotom pravidiel RED NEZHASNE') do
+  c = NxKovE1b
+  NxTest.assert_equal(5, c::HR::LIFT_SEED_VERSION, 'hranica je VLASTNÁ konštanta')
+  # Východisko: stará skrinka (schéma 10), zákazka má snapshot pravidiel spred
+  # E1b (seed 4).
+  NxTest.assert(c::BOM.flap_stale_issue('CAB-5', 7, c.stale_cfg(10, c::HR::FLAP_UP, [], seed: 4)),
+                'schéma 10 + seed 4 = RED')
+  # PRESTAVBA so starým snapshotom: `ensure_project_rules!` vráti pôvodné
+  # pravidlá, takže výklop ZASE nedostane nič — ale config už nesie schému 11.
+  # Bez druhej proveniencie by tu RED zhasol nad zákazkou BEZ mechanizmu.
+  reb = c.stale_cfg(c::CB::CONFIG_SCHEMA, c::HR::FLAP_UP, [], seed: 4)
+  NxTest.assert(c::BOM.flap_stale_issue('CAB-5', 7, reb),
+                'schéma 11, ale seed 4 — RED ostáva (M21)')
+  # To isté pre SKLOP.
+  NxTest.assert(c::BOM.flap_stale_issue('CAB-5', 7,
+                                        c.stale_cfg(c::CB::CONFIG_SCHEMA, c::HR::FLAP_DOWN, [],
+                                                    seed: 4)),
+                'a rovnako pre sklop')
+  # Config spred tejto opravy kľúč vôbec nemá = 0, teda „nevieme" -> RED.
+  no_key = c.stale_cfg(c::CB::CONFIG_SCHEMA)
+  no_key.delete('rules_seed_version')
+  NxTest.assert(c::BOM.flap_stale_issue('CAB-5', 7, no_key), 'chýbajúci kľúč je najstarší seed')
+  # Až „Doplniť nové predvoľby" (snapshot na seed 5) + PRESTAVBA zhasnú RED.
+  NxTest.assert_equal(nil,
+                      c::BOM.flap_stale_issue('CAB-5', 7,
+                                              c.stale_cfg(c::CB::CONFIG_SCHEMA, c::HR::FLAP_UP, [],
+                                                          seed: 5)),
+                      'schéma 11 + seed 5 = hotovo')
+  # A stále platí FIX 4: rozhoduje VERZIA snapshotu, nie prítomnosť seed
+  # pravidiel — vedome vypnuté vlastné pravidlo v snapshote seed 5 falošnú
+  # červenú nerobí.
+  NxTest.assert_equal(nil,
+                      c::BOM.flap_stale_issue('CAB-5', 7,
+                                              c.stale_cfg(c::CB::CONFIG_SCHEMA, c::HR::FLAP_DOWN, [],
+                                                          seed: 9)),
+                      'novší seed tiež nie je zaostalosť')
+end
+
+NxTest.test('KOV-E1b (11): `effective_seed_version` je proveniencia stavby') do
+  c = NxKovE1b
+  NxTest.assert(c::HR.respond_to?(:effective_seed_version), 'funkcia existuje')
+  # Projektový snapshot rozhoduje (aj keď je starší než knižnica).
+  model = c.model_with('std' => c::HR::STD, 'seed_version' => 4, 'rules' => [])
+  NxTest.assert_equal(4, c::HR.effective_seed_version(model), 'zo snapshotu projektu')
+  # Chýbajúci kľúč `seed_version` v snapshote = najstarší seed.
+  model2 = c.model_with('std' => c::HR::STD, 'rules' => [])
+  NxTest.assert_equal(0, c::HR.effective_seed_version(model2), 'bez kľúča = 0')
+  # Bez snapshotu sa dedí knižnica — tú čítanie MIGRUJE, takže je to náš seed.
+  NxTest.assert_equal(c::HR::SEED_VERSION, c::HR.effective_seed_version(c.model_with(nil)),
+                      'projekt bez snapshotu dedí knižnicu')
+end
+
+# --- Codex #333 kolo 1 P1: RUCNE kovanie na vyklope ------------------------
+NxTest.test('KOV-E1b (11): ručné kovanie na výklope `flap_stale` NEROBÍ') do
+  c = NxKovE1b
+  # Skrinka schemy 10, ktorej vyklop ma kovanie pridane RUCNE (kanal
+  # `hardware_manual`). Bez tejto vetvy by ju brana hnala do prestavby, ta by
+  # k rucnej polozke pridala automaticku zostavu a nakup by ten isty kod
+  # zratal DVAKRAT (`add_adhoc_row` scitava rovnake kody).
+  cfg = c.stale_cfg(10, c::HR::FLAP_UP, [], manual: [c.manual_rec])
+  NxTest.assert_equal(nil, c::BOM.flap_stale_issue('CAB-5', 7, cfg), 'M22')
+  # Rucna polozka INEHO cela branu nezhasne.
+  other = c.stale_cfg(10, c::HR::FLAP_UP, [],
+                      manual: [c.manual_rec(owner: 'front:F9/flap')])
+  NxTest.assert(c::BOM.flap_stale_issue('CAB-5', 7, other), 'cudzie čelo nález nezhasí')
+  # Rovnako pre SKLOP.
+  down = c.stale_cfg(10, c::HR::FLAP_DOWN, [], manual: [c.manual_rec(code: '71B3550')])
+  NxTest.assert_equal(nil, c::BOM.flap_stale_issue('CAB-5', 7, down), 'sklop rovnako')
+end
+
+NxTest.test('KOV-E1b (11): pri ručnom kovaní sa AUTOMAT vynechá (nikdy sčítanie oboch)') do
+  c = NxKovE1b
+  owner = 'front:F1/flap'
+  # (a) VYKLOP s rucnym vyklopovym kovanim: polozka NEVZNIKNE + ORANGE.
+  res = c.evaluate([c.flap], {}, {}, nil, owner => { 'lift' => true })
+  NxTest.assert_equal([], c.lifts(res), 'automatický mechanizmus sa nevydal (M23)')
+  w = res[:warnings].find { |x| x['code'] == 'flap_manual_hardware' }
+  NxTest.assert(w, "ORANGE priznanie (#{c.warn_codes(res).inspect})")
+  NxTest.assert_equal(owner, w['part_key'])
+  NxTest.assert(w['message'].include?('RUČNE'), w['message'])
+  NxTest.assert(w['message'].include?('dvakrát'), w['message'])
+  # (b) RUCNY ZAVES na vyklope automat NEZASTAVI — je to iný druh kovania.
+  res2 = c.evaluate([c.flap], {}, {}, nil, owner => { 'hinge' => true })
+  NxTest.assert_equal(1, c.lifts(res2).length, 'iný druh ručnej položky automat nevypína')
+  NxTest.refute(c.warn_codes(res2).include?('flap_manual_hardware'))
+  # (c) SKLOP s rucnymi zavesmi: zavesy sklopu sa nevydaju + ORANGE „Sklop".
+  fall = c.flap(flap_dir: c::HR::FLAP_DOWN, name: 'Sklop 1')
+  res3 = c.evaluate([fall], {}, {}, nil, owner => { 'hinge' => true })
+  NxTest.assert_equal([], c.hinges(res3), 'závesy sklopu sa nevydali')
+  w3 = res3[:warnings].find { |x| x['code'] == 'flap_manual_hardware' }
+  NxTest.assert(w3 && w3['message'].include?('Sklop'), w3.inspect)
+  # (d) DVIERKA sa tým NEMENIA (F1 ostáva bajtovo rovnaké): ručný záves na
+  #     dvierkach automat NEVYPÍNA — potlačenie je úzko len pre rolu `flap`.
+  res4 = c.evaluate([c.door], {}, {}, nil,
+                    'front:F2/wing:single' => { 'hinge' => true })
+  NxTest.assert(c.hinges(res4).length.positive?, 'dvierka dostanú závesy ako doteraz')
+  NxTest.refute(c.warn_codes(res4).include?('flap_manual_hardware'))
+  # (e) Po ODSTRANENI rucnej polozky sa automat vrati.
+  NxTest.assert_equal(1, c.lifts(c.evaluate([c.flap])).length, 'bez ručnej položky = automat')
+end
+
+NxTest.test('KOV-E1b (11): druh ručnej položky určuje KATALÓG (kategória)') do
+  NxTest.skip! 'katalógové testy bežia len headless (APPDATA sandbox)' unless NxTest.headless?
+  c = NxKovE1b
+  c.install_catalog!
+  cfg = { hardware_manual: [
+    # 347810 = BLUM 22K2300, kategória VYKLOPY -> `lift`
+    { 'owner_part_key' => 'front:F1/flap', 'source' => 'catalog', 'code' => '347810', 'qty' => 1 },
+    # 104717 = Sensys záves, kategória ZAVESY -> `hinge`
+    { 'owner_part_key' => 'front:F2/flap', 'source' => 'catalog', 'code' => '104717', 'qty' => 1 },
+    # úchytka ani neznámy kód automat neovplyvnia
+    { 'owner_part_key' => 'front:F3/flap', 'source' => 'catalog', 'code' => 'NEEXISTUJE', 'qty' => 1 },
+    # voľná položka nemá katalógový kód — v nákupe je vlastným riadkom, takže
+    # sa s automatom nikdy nezlieva a automat sa kvôli nej nevypína
+    { 'owner_part_key' => 'front:F4/flap', 'source' => 'free', 'code' => '347810', 'qty' => 1 }
+  ] }
+  map = c::CB.manual_flap_owners(cfg)
+  NxTest.assert_equal({ 'lift' => true }, map['front:F1/flap'])
+  NxTest.assert_equal({ 'hinge' => true }, map['front:F2/flap'])
+  NxTest.assert_equal(nil, map['front:F3/flap'], 'neznámy kód sa nezaradí')
+  NxTest.assert_equal(nil, map['front:F4/flap'], 'voľná položka automat nevypína (M24)')
+  NxTest.assert_equal({}, c::CB.manual_flap_owners(hardware_manual: []), 'bez položiek prázdna mapa')
+ensure
+  NxKovE1b.wipe_catalog!
 end
 
 NxTest.test('KOV-E1b (11): `flap_stale` je RED v Kontrole a stopka pre 3 exporty') do

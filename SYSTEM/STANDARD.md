@@ -192,6 +192,10 @@ seed `AbsRules` `SEED_VERSION` 4. Roly žijú na troch miestach naraz (`BuildPla
   dôvody v `hardware_conflicts` (§8). Starší plugin (schéma 10) `lift` nepozná — jeho normalizácia čiel ho **zahodí** a prestavba by HL top ticho vrátila na HK,
   teda iný mechanizmus, iné ramená a iná tyč v objednávke; nové dôvody by z nosiča vypadli a RED by zmizol. **`LIFT_ACTIVATION_SCHEMA` = 11** je aktivačná konštanta
   výklopov (skrinka postavená pod ňou nemá k čelu `flap` žiadne kovanie → `flap_stale`, §8) a pri budúcich bumpoch sa nehýbe.
+- **`rules_seed_version` — DRUHÁ proveniencia stavby (KOV-E1b, v0.9.54).** Config nesie **aditívne** pole so **seed verziou pravidiel kovania, s ktorou stavba bežala**
+  (`HardwareRules.effective_seed_version`; chýbajúce pole = `0`). Zapisuje ho **výhradne stavba** (`cabinet_config`) — z klientskeho payloadu sa **nikdy nepreberá**,
+  presne ako `config_schema`. Dôvod: projektový snapshot pravidiel sa zámerne nemerguje sám, takže prestavba starej zákazky zapíše aktuálnu schému, ale kovanie
+  z nových pravidiel nevydá; bez tohto poľa by migračná brána `flap_stale` (§8) zhasla nad zákazkou úplne bez mechanizmu.
 
 **Zóna** (`kind: zone`; nevýrobná — ghost):
 
@@ -458,9 +462,12 @@ VEPO nikdy** (geometria čela je správna). Štyri z nich vydáva PRAVIDLO do **
 `lift_multirow_unsupported` (výklop musí byť **jediný riadok čiel** skrinky; V1) · `lift_combo_unsupported` (HL top v prevedení Tip-On neexistuje).
 Piaty, `lift_set_incomplete`, vzniká až pri EXPANZII (nevyriešený člen setu). **Položka výklopu sa VYDÁ vždy** — aj bez triedy: riadok v Kovaní musí existovať, inak
 používateľ nevidí, čo sa objednáva. Príliš ľahké čelo je len **ORANGE** `lift_light_front` (pružina sa dá doladiť) a položka dostane najslabšiu triedu.
-**`flap_stale` je migračná brána podľa PROVENIENCIE stavby:** skrinka s čelom `flap` postavená pod `config_schema` < 11 nemá k nemu žiadne kovanie (výklop bez
-mechanizmu, sklop bez závesov) — náprava je „Doplniť nové predvoľby" **+ prestavba**. Pýtať sa namiesto toho na prítomnosť seed pravidiel je **zakázané**: používateľ
-smie mať vlastné (aj vypnuté) výklopové pravidlo a RED by nezhasol nikdy.
+**`flap_stale` je migračná brána podľa PROVENIENCIE stavby, a tá je DVOJITÁ:** skrinka s čelom `flap` bez príslušného kovania (výklop bez mechanizmu, sklop bez závesov)
+je stale, keď je stará **aspoň jedna** z hodnôt uložených stavbou — `config_schema` < 11 **alebo** `rules_seed_version` < 5 (§2.5; chýbajúci kľúč = 0). Sama schéma
+nestačí: `ensure_project_rules!` zámerne vracia starý projektový snapshot, takže **prestavba** starej zákazky zapíše novú schému a nevydá nič — a RED by zhasol práve
+nápravou, ktorú brána odporúča. Náprava je „Doplniť nové predvoľby" **+ prestavba**, v tomto poradí. Pýtať sa namiesto verzie na prítomnosť seed pravidiel je
+**zakázané**: používateľ smie mať vlastné (aj vypnuté) výklopové pravidlo a RED by nezhasol nikdy. **Čelo s ručnou (ad-hoc) položkou kovania nález nerobí** a automat sa
+naň nevydáva (ORANGE `flap_manual_hardware`) — ad-hoc katalógový riadok sa v nákupe zlieva so setovým podľa kódu, takže vynútená prestavba by objednala dvakrát.
 
 **VÝKLOPY — vzor `lift_class` (KOV-E1b, v0.9.54).** Štvrtý `kind` nevydáva POČET, ale **KLASIFIKÁCIU**: jedna položka `lift` na čelo (`quantity: 1`) s
 `params {use_type: "lift", lift_system, opening_mode, lift_class, arm_class (len HL), rod_count, rod_extension}`. Kód z triedy robí až set (`code_by_param`, §6.3) —

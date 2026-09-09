@@ -105,6 +105,16 @@ module Noxun
       # nie `STD`: buduci bump formatu na tabulke zavesov nic nezmeni.
       HINGE_TABLE_STD = 2
 
+      # KOV-E1b (Codex #333 kolo 1 P1): verzia SEEDU, OD KTOREJ pravidla vedia
+      # vydat kovanie vyklopu a sklopu. Snapshot POD tymto cislom je „pred
+      # E1b" — a kedze `ensure_project_rules!` existujuci snapshot ZAMERNE
+      # ponechava (reprodukovatelnost stavby z .skp), prestavba pod nim vyda
+      # celu `flap` NULA poloziek, hoci do configu zapise aktualnu schemu.
+      # Preto stavba svoju seed verziu ULOZI (`config.rules_seed_version`)
+      # a `Bom.flap_stale_issue` sa pyta OBOCH provenienci. PEVNE CISLO ako
+      # `HINGE_TABLE_STD`: buduci bump seedu na tomto nic nemeni.
+      LIFT_SEED_VERSION = 5
+
       FILE         = 'hardware_rules.json'
       MODEL_KEY    = 'hardware_rules' # kluc snapshotu v NOXUN dict na modeli
 
@@ -798,6 +808,40 @@ module Noxun
         nil
       end
 
+      # === KOV-E1b (Codex #333 kolo 1 P1): SEED VERZIA UCINNYCH PRAVIDIEL ====
+      #
+      # „S akym seedom sa TERAZ stavia?" — jedina autorita otazky. Odpoved je
+      # PROVENIENCIA, ktoru si stavba ULOZI do configu skrinky, takze brana
+      # `flap_stale` uz nemusia zaujimat pravidla samotne (delta audit Sol
+      # FIX 4: vedome vypnute vlastne pravidlo NIE JE zaostalost).
+      #
+      # Poradie je to iste ako pri `pre_hinge_table_rules?`: rozhoduje
+      # PROJEKTOVY snapshot; ked ho projekt nema, dedi globalnu kniznicu —
+      # a tu prave `ensure_project_rules!` o chvilu zmrazi. Chybajuci kluc
+      # `seed_version` = najstarsi seed (0), teda urcite pred vyklopmi.
+      def effective_seed_version(model)
+        doc = project_doc(model)
+        return doc['seed_version'].to_i if doc.is_a?(Hash) && doc['rules'].is_a?(Array)
+
+        library_seed_version
+      end
+
+      # Seed verzia, s ktorou by sa stavalo z GLOBALNEJ kniznice. Citanie
+      # kniznicu MIGRUJE (`merge_seed` doplni chybajuce seed pravidla a bumpne
+      # verziu), takze ucinna hodnota je aspon nasa `SEED_VERSION` — jedina
+      # vynimka je kniznica z NOVSIEHO pluginu, ktoru `read_rules` zamerne
+      # NEMERGUJE (dopredna brana `std`), takze plati jej vlastna verzia.
+      # Neprecitatelna kniznica = fallback `SEED_RULES`, teda nas seed.
+      def library_seed_version
+        doc = JsonFileStore.read(path, copy: false)
+        return SEED_VERSION unless doc.is_a?(Hash) && doc['rules'].is_a?(Array)
+
+        v = doc['seed_version'].to_i
+        doc_std_unsupported?(doc) ? v : [v, SEED_VERSION].max
+      rescue StandardError
+        SEED_VERSION
+      end
+
       # Zapise projektovy snapshot (editor pravidiel / ensure). Volajuci drzi operaciu.
       def set_project_rules(model, rules)
         return false unless model
@@ -845,7 +889,7 @@ module Noxun
       # potlacilo `zavesy-sklop` aj na skrinke, kde je LEN sklop (nula zavesov).
       OVERLAP_OUTPUTS = %w[hinge lift].freeze
 
-      def evaluate(cfg, parts, ctx, rules:, suppress_slide_owners: {})
+      def evaluate(cfg, parts, ctx, rules:, suppress_slide_owners: {}, manual_flap_owners: {})
         items = []
         warnings = []
         conflicts = [] # KOV-E1b: tvrde dovody vyklopu (ULOZENY nosic)
@@ -853,6 +897,8 @@ module Noxun
         seen_overlap = []
         suppress = suppress_slide_owners.is_a?(Hash) ? suppress_slide_owners : {}
         suppressed = [] # kluce ciel, na ktorych legacy pravidlo vysuvu nebezalo
+        manual_flap = manual_flap_owners.is_a?(Hash) ? manual_flap_owners : {}
+        manual_hits = [] # [owner, output, pd] — cela s RUCNYM kovanim toho druhu
         Array(rules).each do |rule|
           next unless rule.is_a?(Hash)
           rid = rule['rule_id'].to_s
@@ -888,9 +934,11 @@ module Noxun
             end
             seen_overlap << [key, rid]
           end
-          apply_rule(rule, cfg || {}, parts, ctx, items, warnings, suppress, suppressed, conflicts)
+          apply_rule(rule, cfg || {}, parts, ctx, items, warnings, suppress, suppressed, conflicts,
+                     manual_flap, manual_hits)
         end
         warnings.concat(profile_rule_warnings(parts, rules))
+        warnings.concat(manual_flap_warnings(manual_hits))
         unless suppressed.empty?
           warnings << BuildPlan.warning(
             'legacy_slide_suppressed',
@@ -1143,7 +1191,7 @@ module Noxun
       # Aplikuje jedno pravidlo: korpusova uroven (owner nil) alebo per dielec roly.
       # cfg putuje az do compute — fit_series musi vediet o rucnom NL zamku (D-93).
       def apply_rule(rule, cfg, parts, ctx, items, warnings, suppress = {}, suppressed = [],
-                     conflicts = [])
+                     conflicts = [], manual_flap = {}, manual_hits = [])
         role = (rule['applies_to'] || {})['role'].to_s
         if role == 'cabinet'
           supports = Array((rule['applies_to'] || {})['support']).map(&:to_s)
@@ -1173,9 +1221,69 @@ module Noxun
               suppressed << owner unless suppressed.include?(owner)
               next
             end
+            # KOV-E1b (Codex #333 kolo 1 P1): celo `flap` s RUCNE pridanym
+            # kovanim TOHO ISTEHO druhu automat NEDOSTANE — inak by ho nakup
+            # zratal DVAKRAT (`HardwareSets.add_adhoc_row` scitava rovnake
+            # kody). Nikdy ticho: dovod ide do ORANGE.
+            if manual_flap_hit?(rule, pd, owner, manual_flap)
+              manual_hits << [owner, rule['output'].to_s, pd]
+              next
+            end
             emit(rule, owner, ctx, pd, items, warnings, cfg, conflicts)
           end
         end
+      end
+
+      # === KOV-E1b (Codex #333 kolo 1 P1): RUCNE KOVANIE NA VYKLOPE/SKLOPE ===
+      #
+      # `manual_flap` = { owner_part_key => { 'lift' => true, 'hinge' => true } },
+      # pripravene v `CabinetBuilder` (klasifikacia potrebuje KATALOG, evaluacia
+      # ostava CISTA). Znamena: na tom cele UZ VISI rucna (ad-hoc) polozka toho
+      # druhu kovania.
+      #
+      # PRECO SA AUTOMAT VYNECHA A NESCITA: ad-hoc katalogova polozka sa
+      # v nakupe ZLIEVA so setovou podla kodu (`add_adhoc_row`), takze skrinka
+      # so schemou 10, ktora mala vyklop pridany rucne, by po vynutenej
+      # prestavbe objednala mechanizmus DVAKRAT. Fail-closed smerom k cloveku:
+      # plati RUCNY zaznam (ten je vedomy) a automat sa PRIZNA ORANGE-om.
+      #
+      # UZKO ZAMERNE: len rola `flap`. Rucny zaves na DVIERKACH sa spravanim
+      # F1 nedotkne (tam sa automat vydava dalej ako doteraz).
+      def manual_flap_hit?(rule, pd, owner, manual_flap)
+        return false unless manual_flap.is_a?(Hash) && !manual_flap.empty?
+        return false unless pd.is_a?(Hash) && pd[:role].to_s == FLAP_ROLE
+
+        by_owner = manual_flap[owner.to_s]
+        return false unless by_owner.is_a?(Hash)
+
+        by_owner[rule['output'].to_s] == true
+      end
+
+      # JEDEN ORANGE na CELO (nie na pravidlo): pri dvoch pravidlach rovnakeho
+      # vystupu by sa veta inak zopakovala. Nesie `part_key`, takze Kontroly
+      # ukazu, o ktore celo ide.
+      def manual_flap_warnings(hits)
+        seen = {}
+        Array(hits).filter_map do |(owner, output, pd)|
+          key = "#{owner}|#{output}"
+          next nil if seen[key]
+
+          seen[key] = true
+          what = output.to_s == LIFT_OUTPUT ? 'mechanizmus výklopu' : 'závesy sklopu'
+          BuildPlan.warning(
+            'flap_manual_hardware',
+            "#{flap_label(pd)}: kovanie je pridané RUČNE — automatický #{what} sa nevydal " \
+            '(inak by bol v nákupe dvakrát). Odstráň ručnú položku, ak chceš automat.',
+            part_key: owner.to_s,
+            data: { 'owner_part_key' => owner.to_s, 'generic_type' => output.to_s }
+          )
+        end
+      end
+
+      # Vyklop hovori „Výklop", sklop „Sklop" — dve rozne veci s jednou rolou.
+      def flap_label(pd)
+        dir = pd.is_a?(Hash) ? pd[:flap_dir].to_s : ''
+        dir == FLAP_DOWN ? door_label(pd) : lift_label(pd)
       end
 
       # Vypocita pocet + params a prida polozku (string kluce — JSON round-trip
@@ -2034,6 +2142,14 @@ module Noxun
 
         bad = arms.find { |a| a['kh_min'].to_f > a['kh_max'].to_f || a['kg_min'].to_f > a['kg_max'].to_f }
         return "#{addr}: ramená #{bad['code']} majú od väčšie než do." if bad
+
+        # Codex #333 kolo 1 P2: ZAPORNA rezerva na uchytku by hmotnost cela
+        # ZNIZILA, takze automat by vybral SLABSI mechanizmus — presne opak
+        # toho, na co rezerva je. `normalize_lift_rule!` ju len pretypuje
+        # (`to_f`), takze bez tejto vety by taka hodnota ticho presla.
+        if rule.key?('handle_allowance_kg') && rule['handle_allowance_kg'].to_f.negative?
+          return "#{addr}: rezerva na úchytku nesmie byť záporná."
+        end
 
         arms_gap_problem(addr, arms)
       end

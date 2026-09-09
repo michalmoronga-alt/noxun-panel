@@ -209,9 +209,22 @@ nezhasína** (Codex #329 kolo 3 P1): kým sú pravidlá projektu spred F1, prest
 (`HardwareRules.pre_hinge_table_rules?`) a náprava je prestavba **plus** „Doplniť nové predvoľby". Pri bumpe `CONFIG_SCHEMA` na 10 a 11 ostáva 9, aby sa prestavané
 skrinky zrazu netvárili ako nemigrované.
 **`LIFT_ACTIVATION_SCHEMA` = 11** je tretia z tejto rodiny (KOV-E1b): skrinka postavená pod nižšou schémou vznikla PRED pravidlami výklopov, takže jej čelo `flap`
-nemá ani mechanizmus (`up`), ani závesy (`down`) — zber ju priznáva RED `flap_stale` ([outputs.md](outputs.md)). **Na rozdiel od `hinge_stale` má JEDINÚ príčinu:
-provenienciu stavby** (delta audit Sol FIX 4). Otázka „nesie projekt seed pravidlá?" sa zámerne NEKLADIE: používateľ smie mať vlastné (aj vypnuté) výklopové pravidlo,
-seed sa mu vtedy nedoplní a RED by nezhasol nikdy. Skrinka prestavaná pod schémou 11 preto stale **nie je** — výsledok stavby s účinnými pravidlami je jeho rozhodnutie.
+nemá ani mechanizmus (`up`), ani závesy (`down`) — zber ju priznáva RED `flap_stale` ([outputs.md](outputs.md)). Rozhoduje **PROVENIENCIA STAVBY** (delta audit Sol
+FIX 4), nie prítomnosť seed pravidiel: používateľ smie mať vlastné (aj vypnuté) výklopové pravidlo, seed sa mu vtedy nedoplní a RED by nezhasol nikdy.
+
+**PROVENIENCIA JE DVOJITÁ — schéma A SEED PRAVIDIEL (Codex #333 kolo 1 P1).** Config nesie aditívne pole **`rules_seed_version`**: seed pravidiel, s ktorým stavba
+naozaj bežala (`HardwareRules.effective_seed_version(model)`, čítané v `build_into` **až po** `ensure_project_rules!` — ten mohol snapshot práve zmraziť; hodnota ide
+cez `merge_final(cfg, plan, seed_v)` a zapisuje ju `cabinet_config`, chýbajúca = **0**). Klientsky payload autoritou **nie je** — `normalize` pole nečíta, presne ako pri
+`config_schema`. Bez neho by stačilo skrinku PRESTAVAŤ: `ensure_project_rules!` zámerne vráti STARÝ projektový snapshot, takže prestavba nevydá ani mechanizmus, ani
+závesy sklopu — ale do configu zapíše schému 11, a RED by zhasol nad zákazkou úplne bez kovania (pričom prestavba je jedna z nami odporúčaných náprav). RED preto zhasne
+až po „Doplniť nové predvoľby" (snapshot na seed 5) **A** prestavbe. Skrinka postavená pod schémou 11 **so seedom 5** stale nie je nikdy — výsledok stavby s účinnými
+pravidlami je rozhodnutie používateľa.
+
+**RUČNÉ KOVANIE NA VÝKLOPE VYPÍNA AUTOMAT (Codex #333 kolo 1 P1).** `build_into` odovzdáva do `Construction.build_plan` mapu **`manual_flap_owners(cfg)`**
+`{ owner_part_key => { 'lift'|'hinge' => true } }` — čelá `flap`, na ktorých už visí ad-hoc položka (`config.hardware_manual`) toho istého druhu kovania. Druh sa určuje
+z **kategórie katalógu** (`VYKLOPY` → `lift`, `ZAVESY` → `hinge`), preto to robí builder a nie `HardwareRules.evaluate` (tá ostáva bez IO). **Voľná položka**
+(`source: 'free'`) sa neklasifikuje zámerne: nemá katalógový kód, v nákupe je vlastným riadkom (`add_free_row`) a s automatom sa nikdy nezlieva — vypnúť kvôli nej
+automat by znamenalo tichú stratu mechanizmu. Kategóriu nemapuje ani neznámy kód (živý katalóg sa mohol zmeniť). Detail potlačenia je v [hardware.md](hardware.md).
 
 **ORANGE, KEĎ SA PRAVIDLÁ NEDAJÚ ZMRAZIŤ (Codex #329 kolo 2 P1).** `build_into` po `Construction.build_plan` volá **`attach_rules_state_warning!(plan, model)`**
 (vzor `attach_abs_warnings!`: doplní warning a plán sa RE-VALIDUJE). Warning `hardware_rules_library_incompatible` vznikne LEN v stave, ktorý sa sám neopraví —

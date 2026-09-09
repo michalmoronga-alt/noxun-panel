@@ -91,8 +91,14 @@ module Noxun
       # placeholderu vysla nizsia, nez co sa naozaj postavi (Codex #328 P2).
       # Pri UNI materiali builder hrubku dielca NEPREPISUJE, preto zaznam nesie aj
       # `uni` (viz `weight_thickness`).
+      # KOV-E1b (Codex #333 kolo 1 P1): `manual_flap_owners` = cela `flap`, na
+      # ktorych UZ visi RUCNA polozka kovania toho druhu (mapa
+      # { owner_part_key => { 'lift'|'hinge' => true } }). Klasifikacia
+      # potrebuje KATALOG, preto ju robi `CabinetBuilder` a sem chodi hotova —
+      # `build_plan` aj `HardwareRules.evaluate` ostavaju bez IO. Prazdna mapa
+      # = spravanie ako doteraz.
       def build_plan(cfg, cabinet_id = 'CAB-000', hardware_rules: nil, part_thicknesses: nil,
-                     materials: nil)
+                     materials: nil, manual_flap_owners: {})
         w = cfg[:width]; h = cfg[:height]; t = cfg[:thickness]
 
         interior = interior_dims(cfg)
@@ -185,7 +191,8 @@ module Noxun
           'cabinet_type' => cfg[:type].to_s
         }
         hw = HardwareRules.evaluate(cfg, parts, hw_ctx, rules: hardware_rules || HardwareRules.load,
-                                                        suppress_slide_owners: drawer[:suppress])
+                                                        suppress_slide_owners: drawer[:suppress],
+                                                        manual_flap_owners: manual_flap_owners)
         warnings.concat(hw[:warnings])
 
         plan = {

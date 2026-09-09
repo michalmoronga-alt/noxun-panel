@@ -213,6 +213,11 @@ module Noxun
       # POCTU/dlzky setovej polozky (`config.hardware[].source`), uplne iny pojem
       # (audit #15 FIX 7). Ad-hoc kanal nesie `origin: 'adhoc'` az na riadku.
       MANUAL_SOURCES = %w[catalog free].freeze
+      # KOV-E1b (Codex #333 kolo 1 P1): kategoria katalogu -> druh kovania,
+      # ktory na cele `flap` NAHRADZA automat (`manual_flap_owners`). Jedine
+      # miesto tohto prekladu; iny druh (uchytka, spojovaci material) automat
+      # neovplyvnuje.
+      MANUAL_FLAP_CATEGORIES = { 'VYKLOPY' => 'lift', 'ZAVESY' => 'hinge' }.freeze
       MANUAL_QTY_MAX = 999
       MANUAL_NOTE_MAX = 200
 
@@ -764,6 +769,12 @@ module Noxun
           # Prvy build ho zapise z globalnej kniznice; sme VNUTRI operacie volajuceho,
           # takze undo vrati model aj snapshot naraz.
           rules = defined?(HardwareRules) ? HardwareRules.ensure_project_rules!(model) : nil
+          # KOV-E1b (Codex #333 kolo 1 P1): PROVENIENCIA PRAVIDIEL tejto stavby.
+          # `ensure_project_rules!` existujuci snapshot ZAMERNE ponechava, takze
+          # prestavba starej zakazky moze bezat s pravidlami SPRED vyklopov —
+          # a sama schema configu by o tom nepovedala nic. Cita sa AZ TERAZ
+          # (ensure mohol snapshot prave zmrazit) a uklada sa do configu.
+          seed_v = defined?(HardwareRules) ? HardwareRules.effective_seed_version(model) : nil
           # D1b: rovnaka mechanika pre SETY kovania — prva stavba zmrazi
           # mapping + definicie z globalu (audit B2/F9; :invalid sa NEOPRAVUJE
           # ticho — ensure vtedy vrati nil a nic nezapise).
@@ -781,7 +792,8 @@ module Noxun
           eff = effective_materials(model, cfg)
           plan = Construction.build_plan(cfg, cid, hardware_rules: rules,
                                                    part_thicknesses: drawer_thicknesses(cfg, eff),
-                                                   materials: part_materials(cfg, eff)) # validuje interne
+                                                   materials: part_materials(cfg, eff),
+                                                   manual_flap_owners: manual_flap_owners(cfg)) # validuje interne
           # KOV-F1 (Codex #329 kolo 2 P1): protajsok ORANGE `library_incompatible`
           # setov — pravidla z nekompatibilnej kniznice sa NEZMRAZILI, takze to
           # musi byt VIDNO (inak by zakazka vyzerala zdravo a snapshot by nikdy
@@ -824,7 +836,58 @@ module Noxun
 
           # V0.2c: ghost zony uz NEstoja v definicii korpusu, ale ako top-level skupina
           # (Zones.sync_ghost, volane z build/rebuild) — klik na zonu = 1 klik bez dvojkliku.
-          merge_final(cfg, plan)
+          merge_final(cfg, plan, seed_v)
+        end
+
+        # === KOV-E1b (Codex #333 kolo 1 P1): CELA S RUCNYM KOVANIM ===========
+        #
+        # -> { owner_part_key => { 'lift'|'hinge' => true } } pre `evaluate`.
+        # Automat na taketo celo polozku NEVYDA (inak by nakup zratal to iste
+        # dvakrat — ad-hoc katalogovy riadok sa zlieva so setovym podla kodu).
+        #
+        # DRUH kovania sa urcuje z KATALOGU (`category`): VYKLOPY -> `lift`,
+        # ZAVESY -> `hinge`. Preto to nerobi `HardwareRules.evaluate` (cista
+        # funkcia bez IO), ale builder, ktory katalog aj tak cita.
+        #
+        # VOLNA polozka (`source: 'free'`) sa NEKLASIFIKUJE: nema katalogovy
+        # kod, v nakupe je VLASTNYM riadkom (`add_free_row`) a s automatom sa
+        # teda nikdy nezleje — potlacit kvoli nej automat by znamenalo tichu
+        # stratu mechanizmu. Iny druh kovania (uchytka, spojovaci material)
+        # automat neovplyvnuje.
+        def manual_flap_owners(cfg)
+          list = cfg.is_a?(Hash) ? cfg[:hardware_manual] : nil
+          return {} unless list.is_a?(Array) && !list.empty?
+
+          out = {}
+          list.each do |rec|
+            next unless rec.is_a?(Hash)
+
+            owner = rec['owner_part_key'].to_s
+            next if owner.empty?
+
+            gt = manual_generic_type(rec)
+            next if gt.nil?
+
+            (out[owner] ||= {})[gt] = true
+          end
+          out
+        end
+
+        # Druh kovania katalogovej ad-hoc polozky, alebo nil (nedokazeme ho
+        # urcit). Katalog je ZIVY zdroj — kod, ktory z neho zmizol, sa neda
+        # zaradit a automat pobezi (fail-closed opacnym smerom by znamenal
+        # skrinku bez mechanizmu).
+        def manual_generic_type(rec)
+          return nil unless rec['source'].to_s == 'catalog'
+          return nil unless defined?(HardwareCatalog)
+
+          item = HardwareCatalog.find(rec['code'])
+          return nil unless item.is_a?(Hash)
+
+          MANUAL_FLAP_CATEGORIES[item['category'].to_s.strip.upcase]
+        rescue StandardError => e
+          Engine.log_error(e, 'CabinetBuilder.manual_generic_type') if defined?(Engine)
+          nil
         end
 
         # 2A-3 (audit B2): kanonicke warnings z vyberu ABS do planu + re-validacia.
@@ -2041,6 +2104,13 @@ module Noxun
             # takze co je v modeli, to naozaj zodpoveda tomuto whitelistu.
             # Zamerne sa NEPREBERA z params: klientsky payload nie je autorita.
             config_schema: CONFIG_SCHEMA,
+            # KOV-E1b (Codex #333 kolo 1 P1): DRUHA proveniencia stavby — seed
+            # pravidiel, s ktorym sa stavalo. Sama schema nestaci: prestavba
+            # so STARYM projektovym snapshotom (ten sa nikdy nemerguje sam)
+            # zapise aktualnu schemu, ale celu `flap` nevyda nic — a brana
+            # `flap_stale` by zhasla nad zakazkou bez mechanizmu. Chybajuca
+            # hodnota = 0 („nevieme"), teda brana ostava.
+            rules_seed_version: cfg[:rules_seed_version].is_a?(Integer) ? cfg[:rules_seed_version] : 0,
             part_key_schema: PartKeys::SCHEMA,
             plan_schema: cfg[:plan_schema] || BuildPlan::SCHEMA,
             warnings: cfg[:warnings].is_a?(Array) ? cfg[:warnings] : [],
@@ -2154,9 +2224,15 @@ module Noxun
           type == 'upper' ? 'base-upper-18' : 'base-lower-18'
         end
 
-        def merge_final(cfg, plan)
+        # KOV-E1b (Codex #333 kolo 1 P1): `seed_version` = seed pravidiel, s
+        # ktorym stavba naozaj bezala (`HardwareRules.effective_seed_version`).
+        # Nepovinny tretí argument ZAMERNE: `merge_final` volaju aj testy
+        # a cesty bez modelu — bez neho ostava pole nil a `cabinet_config`
+        # zapise 0 („o pravidlach nic nevieme"), teda fail-closed.
+        def merge_final(cfg, plan, seed_version = nil)
           cfg.merge(
             plan_schema: plan[:schema],     # verzia tvaru planu (nezavisla od part_key_schema)
+            rules_seed_version: seed_version,
             warnings: plan[:warnings],      # nefatalne upozornenia — panel/vystupy ich zobrazia
             hardware: plan[:hardware],      # kovanie (V0.4+); tvar uz zavazny
             # KOV-C2b (Astra #19 F6): ULOZENY NOSIC fail-closed dovodov zasuviek.
