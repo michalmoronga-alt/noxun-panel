@@ -1903,15 +1903,37 @@ module Noxun
       # cistia PODLA PRITOMNOSTI, nie podla `kind`: pravidlo smie niest zvysky
       # po zmene typu a validovat/pouzit sa ma len to, co sa naozaj pocita.
       def normalize_lift_rule!(rule)
-        rule['handle_allowance_kg'] = rule['handle_allowance_kg'].to_f if
-          rule.key?('handle_allowance_kg')
-        rule['rod_double_from_kb_mm'] = rule['rod_double_from_kb_mm'].to_f if
-          rule.key?('rod_double_from_kb_mm')
+        LIFT_SCALARS.each_key { |key| normalize_lift_scalar!(rule, key) }
         rule['classes'] = normalize_lift_classes(rule['classes']) if rule.key?('classes')
         rule['mechanisms'] = normalize_lift_mechanisms(rule['mechanisms']) if rule.key?('mechanisms')
         rule['arms'] = normalize_lift_arms(rule['arms']) if rule.key?('arms')
         rule['eligibility'] = normalize_lift_eligibility(rule['eligibility']) if
           rule.key?('eligibility')
+        rule
+      end
+
+      # Skalary vyklopoveho pravidla + ich LUDSKY nazov do hlasky.
+      LIFT_SCALARS = { 'handle_allowance_kg' => 'rezerva na úchytku',
+                       'rod_double_from_kb_mm' => 'šírka pre druhú stabilizačnú tyč' }.freeze
+
+      # Codex #333 kolo 2 P2: `to_f` na Hash/Array/true VYHODI vynimku, takze
+      # jediny pokazeny skalar zhodil normalizaciu CELEHO dokumentu —
+      # `project_rules` ju odchytil, vratil nil a `ensure_project_rules!` potom
+      # projektove pravidla TICHO nahradil globalnou kniznicou.
+      #
+      # Typova kontrola je rovnaka ako pri bunkach tabuliek (`lift_row?`):
+      # neciselna hodnota sa NEHADA a NEZAHADZUJE sa cely kluc — ostava
+      # PRITOMNY s hodnotou `nil`. To je vzor `weight_bands` (KOV-F2):
+      # normalizacia necha tvar, ktory brana odmietne, takze `lift_problem`
+      # o probleme POVIE a ulozenie takeho pravidla neprejde (vypnute pravidlo
+      # sa nekontroluje — cesta von existuje). Citatelia (`lift_allowance`,
+      # `lift_rod_count`) su uz typovo bezpecni: nil = ziadna rezerva / jedna
+      # tyc, nikdy hadanie.
+      def normalize_lift_scalar!(rule, key)
+        return rule unless rule.key?(key)
+
+        v = rule[key]
+        rule[key] = v.is_a?(Numeric) && v.to_f.finite? ? v.to_f : nil
         rule
       end
 
@@ -2142,6 +2164,14 @@ module Noxun
 
         bad = arms.find { |a| a['kh_min'].to_f > a['kh_max'].to_f || a['kg_min'].to_f > a['kg_max'].to_f }
         return "#{addr}: ramená #{bad['code']} majú od väčšie než do." if bad
+
+        # Codex #333 kolo 2 P2: NECISELNY skalar (Hash/Array/true z pokazeneho
+        # alebo cudzieho snapshotu). `normalize_lift_scalar!` ho zmenil na nil,
+        # aby normalizacia dokumentu neskoncila vynimkou — a TU sa o nom povie.
+        # Bez tejto vety by rezerva ticho spadla na 0 kg (slabsi mechanizmus)
+        # a prah druhej tyce by zmizol (jedna tyc nad 1100 mm).
+        bad_key = LIFT_SCALARS.keys.find { |k| rule.key?(k) && !rule[k].is_a?(Numeric) }
+        return "#{addr}: #{LIFT_SCALARS[bad_key]} musí byť číslo." if bad_key
 
         # Codex #333 kolo 1 P2: ZAPORNA rezerva na uchytku by hmotnost cela
         # ZNIZILA, takze automat by vybral SLABSI mechanizmus — presne opak
