@@ -2135,7 +2135,9 @@ module Noxun
           sid = raw['set_id'].to_s.strip
           idx = sid.empty? ? nil : sets.index { |s| s['set_id'] == sid }
           merged = idx && !create ? merge_class_keys(raw, sets[idx]) : raw
-          norm, errors = validate_set_detailed(merged)
+          # Codex #337 kolo 2 N1: `authoring: true` — TOTO je jedina cesta, kde
+          # pouzivatel set PISE, takze len tu sa odmieta clen bez jedineho kodu.
+          norm, errors = validate_set_detailed(merged, authoring: true)
           next invalid_set(errors) if norm.nil?
 
           refusal = taxonomy_refusal(norm)
@@ -5423,7 +5425,9 @@ module Noxun
       end
 
       def preview_expansion(draft, catalog: nil, lookup: nil, sample: {})
-        norm, errors = validate_set_detailed(draft)
+        # Nahlad musi hovorit TO ISTE co ulozenie (`save_set!`), inak by set
+        # v nahlade presiel a pri ulozeni spadol.
+        norm, errors = validate_set_detailed(draft, authoring: true)
         return [nil, errors] if norm.nil?
 
         params = preview_sample(sample)
@@ -5554,8 +5558,14 @@ module Noxun
       # a citanie sablon, ktore cestuju medzi PC s INOU taxonomiou; clenstvo
       # vyrobcu/rady v taxonomii sa preto overuje AZ v `save_set!` (globalna
       # kniznica), nikdy tu.
+      #
+      # authoring: true LEN tam, kde set PISE pouzivatel (`save_set!` a jeho
+      # nahlad `preview_expansion`) — vtedy pribuda kontrola „clen bez jedineho
+      # kodu" (Codex #337 kolo 2 N1). Hromadne prepisy uz ulozeneho obsahu
+      # (`validate_sets` -> `write`, `write_project_state`) ju NEMAJU: legacy
+      # kniznica sa tak da dalej citat aj zapisat a projekt zmrazit.
       # -> [norm|nil, [{row, field, msg}]]
-      def validate_set_detailed(set)
+      def validate_set_detailed(set, authoring: false)
         return [nil, [set_err(nil, 'set musí byť objekt')]] unless set.is_a?(Hash)
         s = deep_copy(stringify(set))
         sid = s['set_id'].to_s.strip
@@ -5573,7 +5583,7 @@ module Noxun
         end
         errors = []
         members = raw_members.each_with_index.map do |m, i|
-          norm, errs = validate_member(m, i, strict: true)
+          norm, errs = validate_member(m, i, strict: true, authoring: authoring)
           errs.each { |e| errors << set_err('members', "set „#{sid}“: #{e}", row: i) }
           norm
         end
@@ -5807,7 +5817,23 @@ module Noxun
       # citacia cesta legacy suborov, kde sa nepouzitelny kluc radu ticho
       # zahodi (historicke spravanie; pasma tuto tolerancia NEMAJU — pokazene
       # pasmo by ticho menilo, ktory kod sa vyberie).
-      def validate_member(member, index = 0, strict: false)
+      #
+      # authoring: true = pouzivatel PRAVE TERAZ pise set (editor: `save_set!`
+      # a jeho nahlad). LEN vtedy sa odmieta clen, ktoreho su VSETKY kody
+      # `none` (Codex #337 kolo 2 N1). Je to pravidlo pre NOVY OBSAH, nie sud
+      # nad ulozenym: verzie so sentinelom `none` (D-118b) takeho clena ulozit
+      # DOVOLILI, takze
+      #   * CITANIE ho musi zniest — inak ho `normalize_sets` zahodi, detektor
+      #     `members_lost?` uvidi zmenu poctu a CELA legacy kniznica skonci ako
+      #     read-only (snapshot ako `:invalid`) skor, nez behova poistka
+      #     `members_all_skipped` stihne cokolvek povedat;
+      #   * HROMADNY ZAPIS uz existujuceho obsahu (`write` pri seed-merge,
+      #     `write_project_state` pri zmrazeni snapshotu) ho musi zniest tiez —
+      #     tie len prepisuju, co uz v kniznici je, a odmietnutie by projekt
+      #     nechalo navzdy bez snapshotu.
+      # Ze taky clen nic nevyda, povie BEH (`members_all_skipped`); opravu si
+      # vyziada az prvy pokus ulozit ten set z editora.
+      def validate_member(member, index = 0, strict: false, authoring: false)
         pos = "člen #{index + 1}"
         return [nil, ["#{pos} musí byť objekt"]] unless member.is_a?(Hash)
         mm = stringify(member)
@@ -5874,18 +5900,20 @@ module Noxun
 
           out['code'] = mm['code'].to_s.strip
         elsif has_nl
-          map, errs = validate_code_by_nl(mm['code_by_nl'], pos, strict: strict)
+          map, errs = validate_code_by_nl(mm['code_by_nl'], pos,
+                                          strict: strict, authoring: authoring)
           return [nil, errs] unless errs.empty?
           out['code_by_nl'] = map
         else
-          bands, errs = validate_param_bands(mm['param_bands'], 'code', pos)
+          bands, errs = validate_param_bands(mm['param_bands'], 'code', pos,
+                                             authoring: authoring)
           return [nil, errs] unless errs.empty?
           out['param_bands'] = bands
         end
         [out, []]
       end
 
-      def validate_code_by_nl(raw, pos, strict: false)
+      def validate_code_by_nl(raw, pos, strict: false, authoring: false)
         map = {}
         errors = []
         raw.each do |k, v|
@@ -5909,7 +5937,10 @@ module Noxun
         # KOV-G1a (Codex #337 N1): TA ISTA uvaha ako pri pasmach — rad, ktoreho
         # VSETKY bunky su `none`, je clen bez jedineho kodu (a teda bez jedineho
         # nakupneho riadku pri KAZDEJ dlzke).
-        if errors.empty? && !map.empty? && map.each_value.all? { |v| skip_code?(v) }
+        # Codex #337 kolo 2 N1: LEN PRI PISANI SETU (`authoring`) — duvody su
+        # v hlavicke `validate_member`. Citanie aj hromadny prepis existujuceho
+        # obsahu legacy clena ZACHOVAJU; ze nic nevyda, ukaze `members_all_skipped`.
+        if authoring && errors.empty? && !map.empty? && map.each_value.all? { |v| skip_code?(v) }
           errors << "#{pos}: celý rad je „#{SKIP_CODE}“ — člen by nikdy nič neobjednal; " \
                     'zmaž ho, alebo doplň aspoň jeden kód'
         end
@@ -5963,8 +5994,12 @@ module Noxun
 
       # Pasma (H1a FIX 8) — value_key 'code' (clen setu) alebo 'set_id'
       # (selector mapovania). Konvencia hranic a prekryvov je v hlavicke suboru.
+      # authoring: rovnaky vyznam ako vo `validate_member` — LEN pisanie setu
+      # v editore odmieta clena, ktoreho su VSETKY kodove pasma `none`
+      # (Codex #337 kolo 2 N1; citanie ho zachova, aby legacy obsah nezhodil
+      # celu kniznicu).
       # -> [norm|nil, errors]; norm = { 'param' => .., 'bands' => [...] } zoradene.
-      def validate_param_bands(raw, value_key, pos)
+      def validate_param_bands(raw, value_key, pos, authoring: false)
         return [nil, ["#{pos}: pásma musia byť objekt"]] unless raw.is_a?(Hash)
         h = stringify(raw)
         param = h['param'].to_s.strip
@@ -6012,7 +6047,9 @@ module Noxun
         # pasmach je to ale ten isty tichy nezmysel ako pevny kod `none`
         # (a nakup by o takom clenovi nepovedal ani slovo). Kto clena nechce,
         # nech ho zmaze; aspon JEDNO pasmo musi mat skutocny kod.
-        if value_key == 'code' && bands.all? { |b| skip_code?(b['code']) }
+        # Codex #337 kolo 2 N1: LEN PRI PISANI SETU (`authoring`) — rovnaka uvaha
+        # ako pri rade; dovody su v hlavicke `validate_member`.
+        if authoring && value_key == 'code' && bands.all? { |b| skip_code?(b['code']) }
           return [nil, ["#{pos}: všetky pásma sú „#{SKIP_CODE}“ — člen by nikdy nič " \
                         'neobjednal; zmaž ho, alebo doplň aspoň jeden kód']]
         end

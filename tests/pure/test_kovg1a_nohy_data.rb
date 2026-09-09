@@ -148,6 +148,47 @@ module NxG1a
     true
   end
 
+  # --- sandbox globalnej kniznice (vzor `test_kovb1_sety.rb`) ---------------
+
+  def with_library
+    paths = [HWS.path, TAX.path]
+    before = paths.map { |p| [p, (File.exist?(p) ? File.binread(p) : nil)] }
+    yield
+  ensure
+    before.each do |(p, raw)|
+      if raw then File.binwrite(p, raw) else FileUtils.rm_f(p) end
+      FileUtils.rm_f("#{p}.bak")
+      STORE.invalidate(p)
+    end
+    HWS.reset_library_state!
+    TAX.reset_state!
+  end
+
+  def install_lib(sets, mapping = {}, seed_version = HWS::SEED_VERSION)
+    FileUtils.mkdir_p(File.dirname(HWS.path))
+    File.binwrite(HWS.path,
+                  JSON.pretty_generate('std' => HWS::STD_SKIP_CODE, 'seed_version' => seed_version,
+                                       'sets' => sets, 'mapping' => mapping))
+    FileUtils.rm_f("#{HWS.path}.bak")
+    STORE.invalidate(HWS.path)
+    HWS.reset_library_state!
+    true
+  end
+
+  # Set, aky sa DAL ULOZIT vo verziach so sentinelom `none` (D-118b): prvy clen
+  # nema ANI JEDEN skutocny kod, druhy je uplne bezny. `kind` = :nl | :bands.
+  def legacy_all_none_set(kind)
+    prvy = if kind == :nl
+             { 'per' => 'unit', 'qty' => 1, 'code_by_nl' => { '350' => 'none', '420' => 'none' } }
+           else
+             { 'per' => 'unit', 'qty' => 1,
+               'param_bands' => { 'param' => 'height',
+                                  'bands' => [{ 'min' => 17.0, 'max' => 220.0, 'code' => 'none' }] } }
+           end
+    { 'set_id' => 'legacy-none', 'name' => 'Legacy none', 'generic_type' => 'leg',
+      'members' => [prvy, { 'per' => 'unit', 'qty' => 1, 'code' => '9069' }] }
+  end
+
   # Kopia seed setu nôh s upravenym clenom (pre negativne varianty).
   def leg_set_with(member_index)
     copy = Marshal.load(Marshal.dump(set_of(LEG_SET)))
@@ -297,26 +338,99 @@ NxTest.test('KOV-G1a (Codex #337 N1): clen, ktoreho su VSETKY pasma `none`, sa N
   # Sentinel znamena „TU ziadny kod nepatri". Ked ho ma clen vo VSETKYCH
   # pasmach, je to clen, ktory nikdy nic neobjedna — ten isty tichy nezmysel
   # ako pevny kod `none`. Kto ho nechce, nech ho zmaze.
+  # Codex #337 kolo 2 N1: odmieta sa PISANIE setu (`authoring: true` — editor),
+  # nie citanie uz ulozeneho obsahu.
   bad, errs = c::HWS.validate_member(
     { 'per' => 'unit', 'qty' => 1,
       'param_bands' => { 'param' => 'height',
                          'bands' => [{ 'min' => 17.0, 'max' => 20.0, 'code' => 'none' },
-                                     { 'min' => 55.0, 'max' => 220.0, 'code' => 'NONE' }] } }, 1
+                                     { 'min' => 55.0, 'max' => 220.0, 'code' => 'NONE' }] } },
+    1, authoring: true
   )
   NxTest.assert_equal(nil, bad)
   NxTest.assert(errs.first.to_s.include?('všetky pásma'), errs.inspect)
   # TA ISTA uvaha v rade podla dlzky (D-118b) — aj tam musi ostat aspon
   # jeden skutocny kod.
   bad2, errs2 = c::HWS.validate_member(
-    { 'per' => 'unit', 'qty' => 1, 'code_by_nl' => { '350' => 'none', '420' => 'none' } }, 1
+    { 'per' => 'unit', 'qty' => 1, 'code_by_nl' => { '350' => 'none', '420' => 'none' } },
+    1, authoring: true
   )
   NxTest.assert_equal(nil, bad2)
   NxTest.assert(errs2.first.to_s.include?('celý rad'), errs2.inspect)
   # Zmiesany clen (aspon jeden kod) ostava PLATNY — to je tvar seed setu nôh.
   ok, = c::HWS.validate_member(
-    { 'per' => 'unit', 'qty' => 1, 'code_by_nl' => { '350' => 'none', '420' => '357695' } }, 1
+    { 'per' => 'unit', 'qty' => 1, 'code_by_nl' => { '350' => 'none', '420' => '357695' } },
+    1, authoring: true
   )
   NxTest.assert_equal({ '350' => c::HWS::SKIP_CODE, '420' => '357695' }, ok['code_by_nl'])
+end
+
+NxTest.test('KOV-G1a (Codex #337 kolo 2 N1): LEGACY clen bez kodov sa CITA — nic sa nezahadzuje') do
+  c = NxG1a
+  # Verzie so sentinelom `none` (D-118b) taketo cleny ulozit DOVOLILI. Keby ich
+  # citacia cesta zahodila, `members_lost?` by uvidel zmenu poctu a CELA
+  # kniznica by skoncila ako read-only (snapshot ako `:invalid`) — pouzivatel
+  # by prisiel o VSETKY sety kvoli jednemu clenu.
+  %i[nl bands].each do |kind|
+    raw = c.legacy_all_none_set(kind)
+    norm = c::HWS.normalize_sets([raw])
+    NxTest.assert_equal(1, norm.length, "#{kind}: set sa NESMIE zahodit")
+    NxTest.assert_equal(2, norm.first['members'].length, "#{kind}: OBA cleny ostavaju")
+    NxTest.refute(c::HWS.members_lost?([raw], norm), "#{kind}: detektor straty NESMIE vystrelit")
+    # A ten isty obsah sa da aj ZAPISAT spat (seed-merge kniznice, zmrazenie
+    # snapshotu) — inak by projekt ostal navzdy bez snapshotu.
+    _sets, errs = c::HWS.validate_sets(norm)
+    NxTest.assert_equal([], errs, "#{kind}: #{errs.inspect}")
+    m = c::Model.new
+    NxTest.assert(c::HWS.write_project_state(m, 'mapping' => { 'leg' => 'legacy-none' },
+                                                'sets' => { 'legacy-none' => norm.first }),
+                  "#{kind}: snapshot sa MUSI dat zmrazit")
+    NxTest.assert_equal(:ok, c::HWS.project_state_status(m).first, kind.to_s)
+  end
+end
+
+NxTest.test('KOV-G1a (Codex #337 kolo 2 N1): legacy set FUNGUJE — clen sa preskoci, zvysok sa objedna') do
+  c = NxG1a
+  norm = c::HWS.normalize_sets([c.legacy_all_none_set(:nl)])
+  st = c.state(norm, 'leg' => 'legacy-none')
+  exp = c::HWS.expand([c.leg_item(60.0, 'params' => { 'height' => 60.0,
+                                                      'nominal_length' => 420.0 })],
+                      st, catalog: [])
+  NxTest.assert_equal(['9069'], c.codes(exp), 'druhy clen sa objedna normalne')
+  NxTest.assert_equal([], exp['unmapped'], exp['unmapped'].inspect)
+  ex = c::HWS.explain(c.leg_item(60.0, 'params' => { 'height' => 60.0,
+                                                     'nominal_length' => 420.0 }), st)
+  NxTest.assert_equal([], ex['problems'], ex['problems'].inspect)
+  NxTest.assert_equal(1, ex['members'].count { |m| m['skipped'] }, 'clen bez kodu je „preskoceny"')
+end
+
+NxTest.test('KOV-G1a (Codex #337 kolo 2 N1): EDITOR ten isty tvar odmietne — oprava sa vyziada pri ulozeni') do
+  NxTest.skip!('zapisuje do headless %APPDATA% sandboxu') unless NxTest.headless?
+  c = NxG1a
+  c.with_library do
+    %i[nl bands].each do |kind|
+      raw = c.legacy_all_none_set(kind)
+      c.install_lib(c::HWS.normalize_sets([raw]), { 'leg' => 'legacy-none' })
+      # Kniznica sa CITA normalne (o to islo) …
+      NxTest.refute(c::HWS.library_read_only?, "#{kind}: legacy obsah NESMIE zamknut kniznicu")
+      lib = c::HWS.load
+      set = lib['sets'].find { |x| x['set_id'] == 'legacy-none' }
+      NxTest.assert(set, "#{kind}: set sa nacital")
+      NxTest.assert_equal(2, set['members'].length, "#{kind}: s OBOMA clenmi")
+      # … ale prvy pokus ULOZIT ho z editora si vypyta opravu.
+      status, msg = c::HWS.save_set!(set)
+      NxTest.assert_equal(:invalid, status, "#{kind}: #{msg}")
+      NxTest.assert(msg.to_s.include?(kind == :nl ? 'celý rad' : 'všetky pásma'), msg.to_s)
+      # A po oprave (doplneny kod) uz zapis prejde.
+      fixed = Marshal.load(Marshal.dump(set))
+      if kind == :nl
+        fixed['members'][0]['code_by_nl']['420'] = '357695'
+      else
+        fixed['members'][0]['param_bands']['bands'][0]['code'] = '9069'
+      end
+      NxTest.assert_equal(:ok, c::HWS.save_set!(fixed).first, kind.to_s)
+    end
+  end
 end
 
 NxTest.test('KOV-G1a (Codex #337 N1): set, ktory pre polozku nevyda NIC, je ORANGE — nikdy ticho') do

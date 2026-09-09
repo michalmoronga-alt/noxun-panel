@@ -472,12 +472,17 @@ NxTest.test('D-118b (R8) + KOV-G1a: `none` je PLATNE v kodovom pasme, v selector
   NxTest.assert_equal([], errs, errs.inspect)
   NxTest.assert_equal(c::HWS::SKIP_CODE, ok['param_bands']['bands'].first['code'],
                       'sentinel sa aj v pasme uklada kanonicky malymi pismenami')
-  _bad, errs_all = c::HWS.validate_member(
-    { 'per' => 'unit', 'qty' => 1,
-      'param_bands' => { 'param' => 'height',
-                         'bands' => [{ 'min' => 10.0, 'max' => 20.0, 'code' => 'none' }] } }, 0
-  )
+  # Codex #337 kolo 2 N1: odmieta sa LEN PISANIE setu (`authoring: true`,
+  # teda editor) — citanie ulozeneho obsahu taky clen ZACHOVA.
+  all_none = { 'per' => 'unit', 'qty' => 1,
+               'param_bands' => { 'param' => 'height',
+                                  'bands' => [{ 'min' => 10.0, 'max' => 20.0,
+                                                'code' => 'none' }] } }
+  _bad, errs_all = c::HWS.validate_member(all_none, 0, authoring: true)
   NxTest.assert(errs_all.first.to_s.include?('všetky pásma'), errs_all.inspect)
+  kept, errs_read = c::HWS.validate_member(all_none, 0)
+  NxTest.assert_equal([], errs_read, errs_read.inspect)
+  NxTest.assert_equal(c::HWS::SKIP_CODE, kept['param_bands']['bands'].first['code'])
 
   # Selector mapovania nesie `set_id` — tam je „none" legitimne meno setu.
   sel, errs2 = c::HWS.validate_param_bands(

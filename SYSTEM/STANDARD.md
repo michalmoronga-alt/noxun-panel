@@ -666,7 +666,9 @@ zásuvka sa nikdy neobjedná „bez kovania" potichu.
 **KOV-G1a (v0.9.58) rozšírila `none` aj na KÓDOVÉ PÁSMO člena (`param_bands`)** — tá istá veta a ten istý marker: „v tomto pásme člen vedome nevzniká" (platnička AXILO patrí
 k nohe od 55 mm, pri klzáku 17–20 mm žiadna nie je). Ako pevný `code` ostáva `none` odmietnuté a v selektore mapovania (`set_id`) sa nekontroluje.
 **Člen musí mať aspoň JEDEN skutočný kód** (Codex #337 N1): keď sú `none` VŠETKY jeho pásma (alebo celý rad `code_by_nl`), je to člen, ktorý nikdy nič neobjedná — teda ten
-istý tichý nezmysel ako pevný kód `none`, a zápis sa odmieta (rovnako na serveri aj v editore setu). A keď set pre BEŽNÚ položku z pravidiel nevydá **ani jeden** riadok,
+istý tichý nezmysel ako pevný kód `none`, a **uloženie setu z editora** sa odmieta (rovnako na serveri aj v editore setu). Kontrola platí LEN pri PÍSANÍ setu (Codex #337 kolo 2):
+už uložený člen takého tvaru (verzie so sentinelom ho uložiť dovolili) sa pri čítaní ani pri hromadnom prepise **nezahadzuje** — inak by detektor straty spravil z celej
+knižnice `:read_only` a zo snapshotu `:invalid`. Že taký člen nič nevydá, hlási runtime (nižšie). A keď set pre BEŽNÚ položku z pravidiel nevydá **ani jeden** riadok,
 je to ORANGE `members_all_skipped` s vetou „set nevydal ani jeden nákupný riadok" — nikdy prázdny nákup bez jediného dôvodu (receptová zásuvka a výklop si držia svoju RED
 cestu).
 

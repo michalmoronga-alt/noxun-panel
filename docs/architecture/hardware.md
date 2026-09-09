@@ -720,7 +720,13 @@ charakterizačný test). Päť častí:
   by hlásil chýbajúci kód tam, kde žiadny nepatrí. Kódy sú číselné, takže kolízia nehrozí; ako **pevný `code`** je `'none'` odmietnutý
   (`validate_member`) — inak by `member_code` vrátil doslovný „none" do nákupu. V **kódovom pásme** (`param_bands`) ho D-118b odmietalo z jedného dôvodu (`skip_code_present?`
   sa naň nepýtal, takže obsah by dostal nižší marker kompatibility, Codex #321 kolo 3); **KOV-G1a ho tam povolila** spolu s markerom — ale aspoň JEDNO pásmo (resp. jedna
-  bunka radu) musí mať skutočný kód, inak je to člen, ktorý nikdy nič neobjedná (Codex #337 N1). V selektore mapovania (`set_id`) sa nekontroluje — tam je to legitímne meno setu. V rade sa ukladá kanonicky malými písmenami. Súpis členov (`explain`) preskočený člen **prizná** (`skipped: true` → „bez kódu (netreba)"), aby karta pri NL 620 nemlčala; nákupné CSV z neho
+  bunka radu) musí mať skutočný kód, inak je to člen, ktorý nikdy nič neobjedná (Codex #337 N1). **Táto kontrola platí LEN pri PÍSANÍ setu** (`validate_set_detailed(authoring: true)`
+  → editor `save_set!` a jeho náhľad `preview_expansion`; JS zrkadlo `hwsAllSkip` beží tiež len pri odoslaní) — **Codex #337 kolo 2 N1**: verzie so sentinelom takého člena uložiť
+  DOVOLILI, takže tolerantné čítanie (`normalize_sets`) aj hromadný prepis už uloženého obsahu (`validate_sets` → `write` pri seed-merge, `write_project_state` pri zmrazení
+  snapshotu) ho ZACHOVAJÚ. Inak by ho čítanie zahodilo, detektor `members_lost?` by videl zmenu počtu a **celá** legacy knižnica by skončila ako read-only (snapshot ako
+  `:invalid`) skôr, než beh stihne čokoľvek povedať. Že taký člen nič nevydá, hlási RUNTIME (`members_all_skipped`); opravu si vyžiada až prvý pokus ten set uložiť.
+  V selektore mapovania (`set_id`) sa nekontroluje — tam je to legitímne meno setu. V rade sa ukladá kanonicky malými písmenami. Súpis členov (`explain`) preskočený člen
+  **prizná** (`skipped: true` → „bez kódu (netreba)"), aby karta pri NL 620 nemlčala; nákupné CSV z neho
   nemá žiadny riadok.
 - **`std` 5 (`STD_SKIP_CODE`) — marker kompatibility sentinelu.** Testuje sa ÚPLNE PRVÝ (najvyšší marker vyhráva) a dostane ho len knižnica/snapshot, v ktorých sa `'none'`
   naozaj vyskytuje. **Bez neho by starší plugin obsah prijal** a z bunky `none` vyrobil nákupný riadok s neexistujúcim kódom (overené sondou nad v0.9.42: knižničná aj šablónová
@@ -945,10 +951,16 @@ príchytu prináša až G1b):
   (`member_skip_code?`), takže **marker `std` 5 platí pre obe miesta** a nový marker netreba. Ako **pevný `code`** ostáva `none` zakázané (člen, ktorý nikdy nič nevydá, je
   tichý nezmysel) a v selektore mapovania (`set_id`) sa nekontroluje vôbec (tam je to legitímne meno setu). Hodnota sa ukladá **kanonicky malými písmenami**; súpis (`explain`)
   preskočeného člena **prizná** („bez kódu (netreba)") a editor v `hw_sets.js` ho v súhrne píše ako **„bez kódu"** (v selektore setov NIE — tam by to klamalo).
-- **Člen musí mať aspoň JEDEN skutočný kód** (Codex #337 N1). Sentinel hovorí „TU žiadny kód nepatrí"; keď ho má člen vo VŠETKÝCH pásmach (alebo v celom rade `code_by_nl`),
-  je to člen, ktorý nikdy nič neobjedná — ten istý tichý nezmysel ako pevný `code: none`. `validate_param_bands` aj `validate_code_by_nl` taký tvar **odmietajú** (zapisovacia
-  aj čítacia cesta; v čítacej člen vypadne s logom, čo nákup nemení — nevydával nič ani predtým) a **editor to povie skôr** (`hwsMemberProblems` → „všetky kódy sú „none"" pri
-  TOM členovi), takže sa nedá uložiť tvar, ktorý by v knižnici vyzeral hotovo.
+- **Člen musí mať aspoň JEDEN skutočný kód — pri PÍSANÍ setu** (Codex #337 N1, spresnené kolom 2). Sentinel hovorí „TU žiadny kód nepatrí"; keď ho má člen vo VŠETKÝCH pásmach
+  (alebo v celom rade `code_by_nl`), je to člen, ktorý nikdy nič neobjedná — ten istý tichý nezmysel ako pevný `code: none`. `validate_param_bands` aj `validate_code_by_nl` taký
+  tvar **odmietajú LEN pod príznakom `authoring: true`**, ktorý nesie `validate_set_detailed` z jediných dvoch miest, kde set píše používateľ: **`save_set!`** a jeho náhľad
+  **`preview_expansion`** (aby náhľad nehovoril niečo iné než uloženie). **Editor to povie ešte skôr** (`hwsMemberProblems` → `hwsAllSkip`, „všetky kódy sú „none"" pri TOM
+  členovi) — a beží tiež len pri odoslaní, takže JS zrkadlo a server sedia.
+  **Prečo NIE aj pri čítaní (Codex #337 kolo 2 N1):** verzie, ktoré sentinel zaviedli, takého člena uložiť DOVOLILI — často vedľa úplne normálnych členov. Keby ho tolerantné
+  čítanie (`normalize_sets` → `validate_member`) zahodilo, detektor `members_lost?` by uvidel zmenu počtu a **celá** knižnica by sa stala `:read_only` (projektový snapshot
+  `:invalid`, šablóna `:lossy`) — používateľ by prišiel o všetky sety kvôli jednému členovi, a to ešte predtým, než by mu behová poistka `members_all_skipped` stihla čokoľvek
+  povedať. Z toho istého dôvodu kontrolu **NEMÁ ani hromadný prepis už uloženého obsahu** (`validate_sets` → `write` pri seed-merge a `write_project_state` pri zmrazení
+  snapshotu): tie len ukladajú, čo v knižnici už je, a odmietnutie by projekt nechalo navždy bez snapshotu. Opravu si teda vyžiada až prvý pokus ten set **uložiť z editora**.
 - **Keď set nevydá pre BEŽNÚ položku ANI JEDEN riadok, je to viditeľný ORANGE `members_all_skipped`** (Codex #337 N1). Doteraz mali fail-closed fallback len receptová zásuvka
   (RED `drawer_kit_missing`) a výklop (RED `lift_set_incomplete`); položka z pravidiel — napríklad **noha** — skončila s prázdnym nákupom a **BEZ jediného dôvodu**, takže
   nákup, Kontrola aj cenová ponuka o tom kovaní nepovedali ani slovo. Vlastný dôvod (nie `members_skipped`) preto, že ten cestuje v `base_reason` receptu (veta o DĹŽKE) a
