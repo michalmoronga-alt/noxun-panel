@@ -52,6 +52,7 @@ global.FRONT_PROFILES = [];
 global.frontItems = null;
 global.frontSlots = null;
 global.frontDrawer = null;
+global.frontLift = null;     // KOV-E2: zaznam vyklopu (front_lift) — form.js ho cita
 global.selectedCabId = null;
 global.applyTimer = null;
 global.newStableId = p => p + (++global.__nxid || (global.__nxid = 1));
@@ -158,14 +159,17 @@ function show(rules){
 show([liftRule()]);
 const box = DOC.getElementById('rulesBox');
 eq(box.querySelectorAll('.rrule').length, 1, 'L2: pravidlo výklopov sa vykreslilo');
-const hint = md.textOf(box.querySelector('.hint'));
-ok(hint.indexOf('novšej verzie') < 0,
+// KOV-E2: pôvodná read-only VETA zanikla — jej rolu prevzal SÚHRN v lište
+// editora (`.rgsum`). Kritérium ostáva to isté: pravidlo, ktoré sa nedá ani
+// prečítať, vyzerá ako chyba, ktorú niekto zabudol zmazať.
+const hint = md.textOf(box.querySelector('.rgsum'));
+ok(md.textOf(box).indexOf('novšej verzie') < 0,
    'L2: kind, ktorý TÁTO verzia pozná, sa netvári ako z budúcnosti: ' + hint);
-ok(hint.indexOf('2 tried') >= 0 && hint.indexOf('1 párov ramien') >= 0,
+ok(hint.indexOf('HK 2 triedy') >= 0 && hint.indexOf('1 rameno') >= 0,
    'L2: súhrn menuje tabuľky: ' + hint);
 ok(hint.indexOf('0.5 kg') >= 0 && hint.indexOf('1100 mm') >= 0,
    'L2: aj rezervu na úchytku a prah druhej tyče: ' + hint);
-eq(box.querySelectorAll('.rbands').length, 0, 'L2: ale žiadny formulár pásiem (editor je E2)');
+eq(box.querySelectorAll('.rbands').length, 0, 'L2: pásma závesov výklop nemá');
 eq(md.textOf(box.querySelector('.rid')), 'na každý výklop',
    'L2: podnadpis rozlíši výklop od sklopu (rovnaká rola, iný smer)');
 
@@ -182,11 +186,11 @@ eq(md.textOf(DOC.getElementById('rulesBox').querySelector('.rid')), 'na každý 
 // --- L2d: poškodené/prázdne tabuľky sekciu NEZHODIA -------------------------
 show([liftRule({ classes: 'nezmysel', arms: null, handle_allowance_kg: 'x',
                  rod_double_from_kb_mm: null })]);
-const bad = md.textOf(DOC.getElementById('rulesBox').querySelector('.hint'));
-ok(bad.indexOf('0 tried') >= 0 && bad.indexOf('0 párov ramien') >= 0,
+const bad = md.textOf(DOC.getElementById('rulesBox').querySelector('.rgsum'));
+ok(bad.indexOf('HK 0 tried') >= 0 && bad.indexOf('0 ramien') >= 0,
    'L2: poškodený tvar sa prizná ako prázdny, nespadne: ' + bad);
 ok(bad.indexOf('rezerva') < 0, 'L2: a nečíselná hodnota sa vôbec nevypíše');
-eq(R.rdLiftSummary(null).indexOf('0 tried') >= 0, true, 'L2: ani chýbajúce pravidlo nespadne');
+eq(R.rdLiftSummary(null).indexOf('HK 0 tried') >= 0, true, 'L2: ani chýbajúce pravidlo nespadne');
 
 // --- L2e: ULOŽENIE pravidlo NEOREŽE -----------------------------------------
 show([liftRule(), fallRule()]);

@@ -707,6 +707,9 @@
     // KOV-C2c: to iste plati pre riadok zasuvky — navrh vkladania nema za sebou
     // stavbu, takze server o systeme, vyske ani NL nic nevie.
     frontDrawer = null;
+    // KOV-E2: a rovnako pre vyklop — navrh nema za sebou stavbu, takze server
+    // nepozna triedu mechanizmu, hmotnost cela ani pocet tyci.
+    frontLift = null;
     closeFrontCard();                        // ani otvorena karta cela (Codex #281 P2-B)
     renderFronts(insertFrontsOf(src));       //         cela + medzery + edge_limit_off
     currentZoneTree = src.zone_tree ? sanitizeTree(src.zone_tree) : defaultTree();
@@ -1010,6 +1013,24 @@
   function frontDrawerOf(fid){
     if (!frontDrawer || !fid) return undefined;
     return Object.prototype.hasOwnProperty.call(frontDrawer, fid) ? frontDrawer[fid] : undefined;
+  }
+
+  // KOV-E2: ZAZNAM SERVERA o vyklope daneho cela (`front_lift[fid]`).
+  // `undefined` = server sa k nemu nevyjadril (nove celo pred prvym echom,
+  // navrh vkladania, stary payload) — karta riadok vyklopu nekresli.
+  function frontLiftOf(fid){
+    if (!frontLift || !fid) return undefined;
+    return Object.prototype.hasOwnProperty.call(frontLift, fid) ? frontLift[fid] : undefined;
+  }
+
+  // KOV-E2: LAHKY refresh zaznamu vyklopu — vzor `refreshFrontDrawer` (D1b).
+  // Rozklik „Technický detail" vyklopu nesie NAZOV SETU a KODY, ktore push
+  // `NX.setHardwareSets` prave meni (vyber tmaveho setu!), takze bez neho by
+  // karta ukazovala stary nakup. Riadky ciel sa NEPRESTAVUJU — prekresli sa
+  // len OTVORENA karta.
+  function refreshFrontLift(map){
+    frontLift = map || {};
+    if (openFrontCardId) refreshFrontCards();
   }
 
   // KOV-D1b (Codex #310 kolo 1 P2-5): ĽAHKÝ refresh záznamu zásuvky
@@ -1334,7 +1355,8 @@
     var item = frontExtraOf(row);
     item.type = row.dataset.frontType || 'door';
     var m = frontCardModel(item, frontSlotsOf(row.dataset.frontId),
-                           frontDrawerOf(row.dataset.frontId));
+                           frontDrawerOf(row.dataset.frontId),
+                           frontLiftOf(row.dataset.frontId));
     var h = '<div class="typegrid" role="group" aria-label="Typ čela">';
     m.tiles.forEach(function(t){
       h += '<button type="button" class="typetile' + (t.on ? ' on' : '') + '"' +

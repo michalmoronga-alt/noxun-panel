@@ -2181,7 +2181,51 @@ module Noxun
           return "#{addr}: rezerva na úchytku nesmie byť záporná."
         end
 
+        # KOV-E2: ZAPORNY prah druhej tyce. `lift_rod_count` ho zahodi (ziada
+        # kladne cislo), takze by pravidlo TICHO tvrdilo „druha tyc nikdy" —
+        # a stabilizacna tyc je pri HL top nakupna polozka, nie kozmetika.
+        if rule.key?('rod_double_from_kb_mm') && rule['rod_double_from_kb_mm'].to_f.negative?
+          return "#{addr}: šírka pre druhú stabilizačnú tyč nesmie byť záporná."
+        end
+
+        # KOV-E2: ZAPORNA hodnota v tabulke. `lift_row?` prepusti kazde konecne
+        # cislo, takze riadok „LF od −500" by pravidlo prijalo a trieda by
+        # pokryvala aj nezmyselne LF. Rozmery, sily ani hmotnosti zaporne nie su.
+        neg = lift_negative_row(classes, %w[min max]) ||
+              lift_negative_row(mechs, %w[max]) ||
+              lift_negative_row(arms, %w[kh_min kh_max kg_min kg_max])
+        return "#{addr}: riadok #{neg} má zápornú hodnotu — rozmery aj hmotnosti sú kladné." if neg
+
+        elig = lift_eligibility_problem(addr, rule['eligibility'])
+        return elig if elig
+
         arms_gap_problem(addr, arms)
+      end
+
+      # Prvy riadok tabulky so ZAPORNOU hodnotou (kod riadku) alebo nil.
+      def lift_negative_row(rows, keys)
+        bad = Array(rows).find do |r|
+          r.is_a?(Hash) && keys.any? { |k| r[k].is_a?(Numeric) && r[k].to_f.negative? }
+        end
+        bad && bad['code'].to_s
+      end
+
+      # KOV-E2: SPOSOBILOST s obratenym rozsahom. `normalize_lift_eligibility`
+      # necha kazde KLADNE cislo, takze `kh_min 600` a `kh_max 205` prezije —
+      # a taky system by nebol pouzitelny NIKDY (kazde celo RED
+      # `lift_dimension_unsupported`), bez jedineho slova o tom, preco.
+      def lift_eligibility_problem(addr, raw)
+        return nil unless raw.is_a?(Hash)
+
+        [LIFT_HK, LIFT_HL].each do |sys|
+          rec = raw[sys]
+          next unless rec.is_a?(Hash)
+          next unless rec['kh_min'].is_a?(Numeric) && rec['kh_max'].is_a?(Numeric)
+          next unless rec['kh_min'].to_f > rec['kh_max'].to_f
+
+          return "#{addr}: spôsobilosť #{lift_system_label(sys)} má výšku od väčšiu než do."
+        end
+        nil
       end
 
       # DIERA medzi pasmami ramien: dalsie pasmo sa musi zacinat NAJNESKOR tam,
