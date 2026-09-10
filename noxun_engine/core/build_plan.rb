@@ -276,6 +276,18 @@ module Noxun
       # „Doplniť nové predvoľby" + PRESTAVBA.
       FLAP_STALE = 'flap_stale'
 
+      # KOV-G1b: MIGRACNY kod NOH — skrinka bola postavena s pravidlami SPRED
+      # „4/6 podla sirky" (`rules_seed_version` < `HardwareRules::
+      # LEG_WIDTH_SEED_VERSION`), takze jej `config.hardware[]` nesie 4 nohy aj
+      # pri sirke 1200 a ziadny prichyt sokla.
+      #
+      # ZAMERNE ORANGE a ZAMERNE MIMO `HW_ISSUE_BLOCKERS`: nohy nie su blocker
+      # vyroby (rezanie ani montaz na nich nestoja) a chybajuce dva kusy si
+      # stolar vsimne — zastavit kvoli nim nakup, rozpocet aj ponuku by bolo
+      # neumerne. Naprava je ta ista ako pri `flap_stale`: „Doplniť nové
+      # predvoľby" + prestavba skrinky.
+      LEG_STALE = 'leg_stale'
+
       # KOV-E1b: dovody, pre ktore je UZ VYDANA polozka vyklopu nespravna.
       # Vsetky prichadzaju z ULOZENEHO nosica `hardware_conflicts` (polozka aj
       # dielec existuju — riadok v Kovani musi byt), preto su aj v

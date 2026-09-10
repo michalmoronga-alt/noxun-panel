@@ -164,6 +164,12 @@ module Noxun
             # (schema configu), nie pritomnost pravidiel (delta audit Sol FIX 4).
             fs = flap_stale_issue(cid, inst.persistent_id, ccfg, flap_codes)
             hardware_issues << fs if fs
+            # KOV-G1b: STVRTY vzor, prvy ORANGE — skrinka na nohach postavena
+            # pred pravidlom „4/6 podla sirky". Nakup by mal o dve nohy a o
+            # prichyty menej; vyrobu to ale nezastavuje (kod nie je v registri
+            # blokerov), preto len upozornenie s napravou.
+            ls = leg_stale_issue(cid, inst.persistent_id, ccfg)
+            hardware_issues << ls if ls
             cs = ccfg['hardware_sets']
             note_cabinet_sets(cid, (cs.is_a?(Hash) && !cs.empty? ? cs : nil),
                               cabinet_sets, cabinet_sets_seen, cabinet_set_conflicts)
@@ -485,6 +491,100 @@ module Noxun
                        'kovania spusti „Doplniť nové predvoľby“ — nová tabuľka závesov ' \
                        '(+1 nad šírku 600 mm, set podľa otvárania) platí až keď je hotové oboje.',
           'label' => PartKeys.human_label(pkey, fronts: items).to_s }
+      end
+
+      # === KOV-G1b: NEPRESTAVANE NOHY A CHYBAJUCI PRICHYT (`leg_stale`) ======
+      #
+      # Skrinka NA NOHACH postavena s pravidlami SPRED „4/6 podla sirky":
+      # v `config.hardware[]` ma 4 nohy aj pri sirke 1200 a ziadny prichyt
+      # soklovej listy. Zber cita LEN ULOZENE hodnoty (nic sa neprepocitava),
+      # takze bez tejto vety by nakup obsahoval o dve nohy a o prichyty menej
+      # a nikto by to nezbadal.
+      #
+      # ORANGE, NIE RED (rozhodnutie davky): nohy nie su blocker vyroby —
+      # rezanie ani VEPO na nich nestoja a chybajuce kusy sa daju dokupit.
+      # Kod preto ZAMERNE NIE JE v `BuildPlan::HW_ISSUE_BLOCKERS`, takze nakup,
+      # rozpocet ani ponuku nezastavi.
+      #
+      # PROVENIENCIA je JEDNA a je NUTNA (na rozdiel od `flap_stale`, kde staci
+      # jedna z dvoch): `rules_seed_version` < `LEG_WIDTH_SEED_VERSION`. ZIADNY
+      # novy kluc configu sa NEZAKLADA — marker uz zapisuje kazda stavba
+      # (KOV-E1b) a `CONFIG_SCHEMA` sa tu NEBUMPUJE (nic noveho sa neuklada).
+      # Po „Doplniť nové predvoľby" + prestavbe je marker >= 6 a veta zhasne.
+      #
+      # SYMPTOM musi byt aspon jeden (inak by veta strasila aj tam, kde sa
+      # NIC nezmeni — uzka skrinka so soklom 30 mm dostane 4 nohy a ziadny
+      # prichyt aj podla novych pravidiel):
+      #   (a) sirka >= `LEG_WIDE_FROM_MM` a ulozena polozka `leg` ma este
+      #       4 kusy z PRAVIDLA (`source: 'rule'` — rucny zamok nesie 'manual'
+      #       a je to vedome rozhodnutie pouzivatela),
+      #   (b) vyska sokla >= `PLINTH_CLIP_MIN_MM` a ulozene kovanie nema ANI
+      #       JEDEN `plinth_clip`.
+      # -> nalez | nil
+      def leg_stale_issue(owner_id, owner_pid, ccfg)
+        return nil unless defined?(HardwareRules)
+
+        cfg = ccfg.is_a?(Hash) ? cfg_hash(ccfg) : {}
+        return nil unless support_type_of(cfg) == 'legs'
+        return nil if provenance_marker(cfg['rules_seed_version']) >=
+                      HardwareRules::LEG_WIDTH_SEED_VERSION
+
+        wide = num_of(cfg['width']).to_f >= HardwareRules::LEG_WIDE_FROM_MM
+        fh = num_of(cfg['floor_height']).to_f
+        hw = Array(cfg['hardware'])
+        legs4 = wide && hw.any? { |h| rule_leg_four?(h) }
+        clip_missing = fh >= HardwareRules::PLINTH_CLIP_MIN_MM &&
+                       hw.none? { |h| h.is_a?(Hash) && h['generic_type'].to_s == 'plinth_clip' }
+        return nil unless legs4 || clip_missing
+
+        { 'code' => BuildPlan::LEG_STALE, 'severity' => 'orange',
+          'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
+          'part_key' => nil, 'front_id' => '',
+          'message' => leg_stale_message(owner_id, cfg['width'], fh),
+          'label' => 'Nohy' }
+      end
+
+      # Veta hovori KONKRETNE cislami tejto skrinky, aby bolo jasne, co sa zmeni.
+      def leg_stale_message(owner_id, width, floor_height)
+        w = num_of(width).to_f
+        legs = w >= HardwareRules::LEG_WIDE_FROM_MM ? 6 : 4
+        clips = floor_height >= HardwareRules::PLINTH_CLIP_MIN_MM ? (legs / 4.0).ceil : 0
+        want = "#{legs} nôh"
+        want += " + #{clips} #{clips == 1 ? 'príchyt' : 'príchyty'} sokla" if clips.positive?
+        "Skrinka #{owner_id} má nohy spočítané ešte pred pravidlom 4/6 (šírka " \
+          "#{fmt_mm(w)} → #{want}) — v Pravidlách spusti „Doplniť nové predvoľby“ " \
+          'a skrinku prestav.'
+      end
+
+      # Ulozena polozka noh, ktora este nesie STARY pevny pocet 4 z pravidla.
+      # `source: 'manual'` = rucny zamok pouzivatela — ten sa nekomentuje.
+      def rule_leg_four?(item)
+        return false unless item.is_a?(Hash)
+
+        item['generic_type'].to_s == 'leg' && item['source'].to_s == 'rule' &&
+          item['quantity'].to_i == 4
+      end
+
+      # Typ podopretia z ULOZENEHO configu (deskriptor `support`), nie z
+      # prepoctu — zber nikdy nic neprepocitava.
+      def support_type_of(cfg)
+        sup = cfg['support']
+        sup.is_a?(Hash) ? sup['type'].to_s : ''
+      end
+
+      def num_of(v)
+        v.is_a?(Numeric) && v.to_f.finite? ? v.to_f : 0.0
+      end
+
+      # Config zo Store ma string kluce; testy a volajuci so symbolmi by inak
+      # dostali prazdny vysledok. Plytka konverzia je dost — citaju sa len
+      # top-level kluce a `support`.
+      def cfg_hash(cfg)
+        return {} unless cfg.is_a?(Hash)
+
+        cfg.each_with_object({}) do |(k, v), out|
+          out[k.to_s] = v.is_a?(Hash) ? v.each_with_object({}) { |(k2, v2), o2| o2[k2.to_s] = v2 } : v
+        end
       end
 
       # === KOV-E1b: NEPRESTAVANY VYKLOP ALEBO SKLOP (`flap_stale`) ===========

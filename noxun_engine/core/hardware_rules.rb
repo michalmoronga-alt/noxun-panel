@@ -37,7 +37,9 @@
 #   "kind": "bands", "input": "height",
 #   "bands": [ {"max": 900, "quantity": 2}, ... {"max": null, "quantity": 5} ] }
 # applies_to.role == 'cabinet' moze mat "support": ["legs","plinth"] — filter podla
-# typu podopretia (Construction.support_type). Volitelne "params_from_context":
+# typu podopretia (Construction.support_type) — a (KOV-G1b) "floor_height_min": 55.0
+# = prah VYSKY SOKLA (mm): pravidlo plati LEN na korpus s aspon takym soklom.
+# Volitelne "params_from_context":
 # {"height": "floor_height"} — deklarativne doplnenie params z kontextu korpusu.
 #
 # Vstup (input) pri role dielca: 'height'/'width' = prod rozmery dielca (vyska cela),
@@ -88,12 +90,16 @@ module Noxun
       # na KAZDE celo `flap` (aj na vyklop) — a prave preto sa dokument so
       # std 3 do starsieho pluginu uz NEZAPISUJE (dopredna brana nizsie).
       STD          = 3 # verzia formatu suboru pravidiel (doc: std/seed_version/rules)
-      SEED_VERSION = 5 # v2 (D1): +zavesenie hornej skrinky, +podperky policove,
+      SEED_VERSION = 6 # v2 (D1): +zavesenie hornej skrinky, +podperky policove,
                        # seria vysuvov zladena s realnym radom Atira (GH #125 P2)
                        # v3 (D-90): +uchytkovy profil na dvierkach a zasuvkovych celach
                        # v4 (KOV-F1): NOXUN tabulka zavesov + door guardy
                        # v5 (KOV-E1b, delta audit Sol FIX 5): +vyklopy AVENTOS
                        # (`vyklopy-aventos`) a +zavesy sklopu (`zavesy-sklop`).
+                       # v6 (KOV-G1b): `nohy-zakladne` uz nie je `fixed 4`, ale
+                       # `bands` podla SIRKY korpusu (< 1000 -> 4, inak 6) a
+                       # pribudlo pravidlo `prichyt-sokla` (1 ks na zacate
+                       # 4 nohy, len pri samostatnej soklovej liste).
                        # BEZ tohto bumpu by `merge_seed` migraciu preskocil
                        # (`from_version >= SEED_VERSION`) a existujuca kniznica
                        # by nove seed pravidla nedala ani NOVYM projektom.
@@ -114,6 +120,41 @@ module Noxun
       # a `Bom.flap_stale_issue` sa pyta OBOCH provenienci. PEVNE CISLO ako
       # `HINGE_TABLE_STD`: buduci bump seedu na tomto nic nemeni.
       LIFT_SEED_VERSION = 5
+
+      # === KOV-G1b: NOHY PODLA SIRKY + PRICHYT SOKLA =========================
+      #
+      # Rozhodnutia Michala (8.-9.9.2026):
+      #   * pocet NOH sa riadi SIRKOU korpusu — < 1000 mm 4 nohy, od 1000 mm 6.
+      #     Plati pre VSETKY sety noh (klzak aj AXILO); set rozhoduje LEN
+      #     o produkte (kod podla vysky sokla).
+      #   * PRICHYT soklovej listy je 1 ks na ZACATE 4 nohy (4 nohy -> 1,
+      #     6 noh -> 2). Ziadny pomerovy clen — druhe `bands` pravidlo na tu
+      #     istu sirku (rozhodnutie O3, D-109 ostava po V1).
+      #   * Prichyt vznika LEN pri SAMOSTATNEJ soklovej liste, teda pri skrinke
+      #     NA NOHACH (`support legs`) a LEN od vysky sokla, kde lista na nohach
+      #     AXILO existuje (55 mm). Klzak 17-20 mm ziadnu listu nema.
+      LEG_RULE_ID        = 'nohy-zakladne'
+      LEG_OUTPUT         = 'leg'
+      PLINTH_CLIP_RULE_ID = 'prichyt-sokla'
+      PLINTH_CLIP_OUTPUT  = 'plinth_clip'
+      # Sirka, OD ktorej ide 6 noh (a 2 prichyty). V pasmach je vyjadrena ako
+      # `max 999.0` = „< 1000" — rovnaka konvencia ako 849.0 pri zavesoch
+      # (`bands` porovnava `v <= max`). Konstanta je autoritou HLASOK a brany
+      # `Bom.leg_stale_issue`, nie samotneho vypoctu (ten drzia pasma).
+      LEG_WIDE_FROM_MM = 1000.0
+      # Vyska sokla, OD ktorej existuje soklova lista na nohach AXILO.
+      PLINTH_CLIP_MIN_MM = 55.0
+      # KOV-G1b: VOLITELNY filter `applies_to`. Pravidlo s nim plati LEN na
+      # korpus, ktoreho `ctx['floor_height']` je >= hodnota (mm). Bez kluca sa
+      # nic nemeni. Rovnaky vzor ako `flap_dir` z E1b — ZIADNY novy `kind`,
+      # takze starsi plugin pravidlo dalej pocita (kluc ale IGNORUJE, viz
+      # docs/architecture/hardware.md).
+      FLOOR_HEIGHT_MIN = 'floor_height_min'
+      # KOV-G1b: verzia SEEDU, OD KTOREJ vedia pravidla ratat nohy podla sirky
+      # a vydat prichyt sokla. Snapshot POD tymto cislom je „pred G1b" — cita
+      # ho `Bom.leg_stale_issue` (ORANGE „prestav skrinku"). PEVNE CISLO ako
+      # `LIFT_SEED_VERSION`: buduci bump seedu na tomto nic nemeni.
+      LEG_WIDTH_SEED_VERSION = 6
 
       FILE         = 'hardware_rules.json'
       MODEL_KEY    = 'hardware_rules' # kluc snapshotu v NOXUN dict na modeli
@@ -201,10 +242,33 @@ module Noxun
       DOOR_OUT_OF_TABLE = 'door_height_out_of_table'
 
       SEED_RULES = [
-        { 'rule_id' => 'nohy-zakladne', 'enabled' => true,
+        # KOV-G1b: pocet noh podla SIRKY korpusu (Michal 8.9.2026) — < 1000 mm
+        # 4 nohy, od 1000 mm 6. `params_from_context` OSTAVA: set nohy si podla
+        # `params['height']` (vyska sokla) dalej vybera KOD, sirka riesi POCET.
+        # Filter `support` je nezmeneny — nohy su pod skrinkou aj vtedy, ked je
+        # sokel vpredu sucastou korpusu (`plinth`).
+        { 'rule_id' => LEG_RULE_ID, 'enabled' => true,
           'applies_to' => { 'role' => 'cabinet', 'support' => %w[legs plinth] },
-          'output' => 'leg', 'kind' => 'fixed', 'quantity' => 4,
+          'output' => LEG_OUTPUT, 'kind' => 'bands', 'input' => 'width',
+          'bands' => [
+            { 'max' => 999.0, 'quantity' => 4 },
+            { 'max' => nil,   'quantity' => 6 }
+          ],
           'params_from_context' => { 'height' => 'floor_height' } },
+        # KOV-G1b: PRICHYT soklovej listy — 1 ks na zacate 4 nohy, teda ta ista
+        # sirkova hranica ako pri nohach (ziadny pomerovy clen; D-109 po V1).
+        # Filter `support legs` = LEN samostatna soklova lista (sokel vpredu
+        # `plinth` je sucast korpusu a prichyt nema co drzat), filter
+        # `floor_height_min` = LEN vyska, v ktorej lista na nohach AXILO
+        # existuje (klzak 17-20 mm ziadnu nema).
+        { 'rule_id' => PLINTH_CLIP_RULE_ID, 'enabled' => true,
+          'applies_to' => { 'role' => 'cabinet', 'support' => %w[legs],
+                            FLOOR_HEIGHT_MIN => PLINTH_CLIP_MIN_MM },
+          'output' => PLINTH_CLIP_OUTPUT, 'kind' => 'bands', 'input' => 'width',
+          'bands' => [
+            { 'max' => 999.0, 'quantity' => 1 },
+            { 'max' => nil,   'quantity' => 2 }
+          ] },
         # KOV-F1: NOXUN tabulka poctu zavesov (Michal 8.9.2026) — plati pre
         # vsetkych vyrobcov, set rozhoduje LEN o produkte. Vysky su Hettich
         # pasma so SPRISNENYM prvym (od 850 uz 3: dvere tej vysky sa na dvoch
@@ -347,6 +411,16 @@ module Noxun
       # (vzor F8 katalogu: aktualizuje sa LEN preukazatelne nezmeneny riadok;
       # pouzivatelska uprava sa NIKDY neprepisuje). Porovnanie po normalize.
       LEGACY_SEED_SHAPES = {
+        # KOV-G1b: v1..v5 tvar pravidla noh — PEVNE 4 nohy bez ohladu na sirku.
+        # Nedotknute pravidlo dostane pri `merge_seed` (kniznica) alebo pri
+        # „Doplniť nové predvoľby" (snapshot projektu) novy tvar `bands`;
+        # pouzivatelom upravene (napr. 5 noh) sa NIKDY neprepisuje.
+        LEG_RULE_ID => [
+          { 'rule_id' => LEG_RULE_ID, 'enabled' => true,
+            'applies_to' => { 'role' => 'cabinet', 'support' => %w[legs plinth] },
+            'output' => LEG_OUTPUT, 'kind' => 'fixed', 'quantity' => 4,
+            'params_from_context' => { 'height' => 'floor_height' } }
+        ],
         # KOV-F1: v1..v3 tvar tabulky zavesov (900/1400/1900 -> 2/3/4/5).
         'zavesy-podla-vysky' => [
           { 'rule_id' => 'zavesy-podla-vysky', 'enabled' => true,
@@ -887,7 +961,13 @@ module Noxun
       # `overlap_key` a rozhoduje `overlap_conflict?`, tie iste, akymi sa riadi
       # `seed_additions`. Bez smeru by skorsie pravidlo `hinge/flap/up`
       # potlacilo `zavesy-sklop` aj na skrinke, kde je LEN sklop (nula zavesov).
-      OVERLAP_OUTPUTS = %w[hinge lift].freeze
+      # KOV-G1b: `plinth_clip` je TRETI — prichyt je NOVY seed vystup, takze bez
+      # neho by `seed_additions` doplnilo seed pravidlo aj pouzivatelovi, ktory
+      # si prichyt uz riesi VLASTNYM pravidlom, a nakup by ho zratal DVAKRAT.
+      # `leg` v zozname ZAMERNE NIE JE: pravidlo noh existuje od v1, doplnenie
+      # podla `rule_id` ho nikdy nezduplikuje a pridanim by dve legitimne
+      # pravidla noh (napr. ine pre horne skrinky) zacali hlasit ORANGE.
+      OVERLAP_OUTPUTS = %w[hinge lift plinth_clip].freeze
 
       def evaluate(cfg, parts, ctx, rules:, suppress_slide_owners: {}, manual_flap_owners: {})
         items = []
@@ -978,7 +1058,11 @@ module Noxun
       # „druhé pravidlo výklopov". Vlastny slovnik (nie `label_for`): ten dava
       # NAZOV pravidla („Závesy"), tu treba druhy pad mnozneho cisla.
       def overlap_noun(output)
-        output.to_s == LIFT_OUTPUT ? 'výklopov' : 'závesov'
+        case output.to_s
+        when LIFT_OUTPUT then 'výklopov'
+        when PLINTH_CLIP_OUTPUT then 'príchytov sokla' # KOV-G1b
+        else 'závesov'
+        end
       end
 
       # === KOV-F1: KONTROLY DVIEROK NAD VYSLEDNYMI POLOZKAMI ==================
@@ -1200,6 +1284,12 @@ module Noxun
           # hornu skrinku od spodnej bez noh (Bystrica ide LEN na horne).
           kinds = Array((rule['applies_to'] || {})['cabinet_type']).map(&:to_s)
           return if kinds.any? && !kinds.include?(ctx['cabinet_type'].to_s)
+          # KOV-G1b: PRAH VYSKY SOKLA. Pravidlo s `floor_height_min` plati LEN
+          # na korpus s aspon takym soklom (prichyt sokla existuje az od 55 mm,
+          # kde je soklova lista AXILO). Kontext BEZ pouzitelnej vysky filtru
+          # NEVYHOVIE — hadat by znamenalo objednat prichyt ku klzaku.
+          return unless floor_height_ok?(rule, ctx)
+
           emit(rule, nil, ctx, nil, items, warnings, cfg, conflicts)
         else
           slide = rule['output'].to_s == SLIDE_OUTPUT
@@ -1232,6 +1322,18 @@ module Noxun
             emit(rule, owner, ctx, pd, items, warnings, cfg, conflicts)
           end
         end
+      end
+
+      # KOV-G1b: splna korpus prah `applies_to.floor_height_min`? Bez kluca
+      # (alebo s hodnotou, ktoru normalizacia zahodila) plati pravidlo ako
+      # doteraz. JEDINA autorita otazky — pyta sa jej `apply_rule` aj testy.
+      def floor_height_ok?(rule, ctx)
+        at = rule.is_a?(Hash) && rule['applies_to'].is_a?(Hash) ? rule['applies_to'] : {}
+        min = at[FLOOR_HEIGHT_MIN]
+        return true unless min.is_a?(Numeric) && min.to_f.finite?
+
+        fh = ctx_num(ctx, 'floor_height')
+        !fh.nil? && fh >= min.to_f
       end
 
       # === KOV-E1b (Codex #333 kolo 1 P1): RUCNE KOVANIE NA VYKLOPE/SKLOPE ===
@@ -1867,6 +1969,7 @@ module Noxun
           r['output'] = r['output'].to_s.strip
           r['kind'] = r['kind'].to_s.strip
           r['applies_to'] = r['applies_to'].is_a?(Hash) ? r['applies_to'] : {}
+          normalize_floor_height_min!(r['applies_to'], r['rule_id'])
           r['quantity'] = clamp_qty(r['quantity']) || 1 if r.key?('quantity')
           r['bands'] = normalize_bands(r['bands']) if r['bands'].is_a?(Array)
           # KOV-F1: volitelne door guardy. Typovo sa OCISTIA (Float/Integer,
@@ -1894,6 +1997,31 @@ module Noxun
           normalize_lift_rule!(r)
           r
         end
+      end
+
+      # KOV-G1b: typova ocista prahu `applies_to.floor_height_min`. Pouzitelna
+      # hodnota = KONECNE KLADNE cislo -> Float (mm). Cokolvek ine (retazec,
+      # nula, zaporne cislo, Hash) sa ZAHODI aj s klucom — pravidlo potom plati
+      # BEZ prahu, presne ako pravidlo, ktore prah nikdy nemalo. Je to ten isty
+      # vzor ako `width_warn_over` (KOV-F1): filter, ktory sa neda precitat, sa
+      # nehada. VEDOMY DOSLEDOK: pokazeny prah znamena prichyt aj tam, kde
+      # soklova lista nie je — v Nakupe je taky riadok VIDNO (na rozdiel od
+      # ticho chybajuceho kovania). Editor prahu neexistuje, takze sa tam
+      # pokazena hodnota da dostat len rucnou upravou JSON suboru.
+      def normalize_floor_height_min!(applies_to, rule_id = nil)
+        return applies_to unless applies_to.is_a?(Hash) && applies_to.key?(FLOOR_HEIGHT_MIN)
+
+        v = applies_to[FLOOR_HEIGHT_MIN]
+        if v.is_a?(Numeric) && v.to_f.finite? && v.to_f.positive?
+          applies_to[FLOOR_HEIGHT_MIN] = v.to_f
+          return applies_to
+        end
+        applies_to.delete(FLOOR_HEIGHT_MIN)
+        if defined?(Engine)
+          Engine.log("hardware rules: pravidlo '#{rule_id}' ma nepouzitelny " \
+                     "#{FLOOR_HEIGHT_MIN} — prah sa ignoruje")
+        end
+        applies_to
       end
 
       # KOV-E1b: typova ocista tabuliek vyklopu. Riadok bez kodu alebo bez

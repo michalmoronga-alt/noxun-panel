@@ -254,6 +254,16 @@
     return rdIsLegacySlide(r) ? (base + ' — staré zákazky bez systému zásuvky') : base;
   }
 
+  // KOV-G1b: veta pod tabuľkou pásiem — LEN pre korpusové pravidlo na šírku.
+  // Pri `height` (závesy, sklop) sa nič nemení: tam je výška zaužívaná a
+  // panel je na vertikálny priestor lakomý. Čistá funkcia (Node test).
+  function rdWidthHint(r){
+    if (!r || r.kind !== 'bands' || r.input !== 'width') return null;
+    if (((r.applies_to || {}).role || '') !== 'cabinet') return null;
+    return 'Pásma podľa šírky korpusu.';
+  }
+  if (typeof window !== 'undefined') window.rdWidthHint = rdWidthHint;
+
   function rdRoleDesc(r){
     // GH #126 P2: popis podla SKUTOCNYCH filtrov pravidla — cabinet pravidlo
     // moze cielit podla podopretia (nohy) ALEBO typu korpusu (Bystrica).
@@ -263,6 +273,14 @@
       var hasU = kinds.indexOf('upper') >= 0, hasL = kinds.indexOf('lower') >= 0;
       if (hasU && !hasL) return 'na hornú skrinku';
       if (hasL && !hasU) return 'na spodnú skrinku';
+      // KOV-G1b: prah výšky sokla (príchyt sokla existuje až od 55 mm) —
+      // bez neho by dve pravidlá na skrinku na nohách vyzerali rovnako.
+      var fmin = ap.floor_height_min;
+      if (typeof fmin === 'number' && isFinite(fmin) && fmin > 0){
+        // Číslo sa vypisuje tak, ako ho posiela server (vzor `rdLiftSummary`
+        // — „tyč od 1100 mm“): 55.0 je v JS „55“, žiadny vlastný formátovač.
+        return 'na skrinku na nohách so soklom od ' + fmin + ' mm';
+      }
       if ((ap.support || []).length) return 'na skrinku s podstavcom';
       return 'na každú skrinku';
     }
@@ -647,6 +665,11 @@
         });
         html += '<div class="btnrow"><button class="ghostbtn" onclick="rdAddBand(this)">+ pásmo</button></div>';
         html += '</div>';
+        // KOV-G1b: tabuľka pásiem hovorí „do X mm → N ks“, ale NIE podľa čoho.
+        // Pri korpusových pravidlách na šírku (nohy, príchyt sokla) je to
+        // podstatné — bez vety by vyzerali ako pásma podľa výšky (závesy).
+        var wHint = rdWidthHint(r);
+        if (wHint) html += '<div class="hint">' + rdEsc(wHint) + '</div>';
         // KOV-F2: voliteľné kontroly dvierok (+1 nad šírku, varovanie šírky,
         // hmotnostné pásma, konečná tabuľka) sú od F2 EDITOR — zbalený blok
         // so súhrnom. Pravidlo `bands`, ktoré sa ich netýka (iný výstup a
@@ -1313,6 +1336,10 @@
                        rdIsLegacySlide: rdIsLegacySlide, RD_LEGACY_SLIDE_HINT: RD_LEGACY_SLIDE_HINT,
                        rulesToolsHtml: rulesToolsHtml, rdValidate: rdValidate,
                        rdLabel: rdLabel, rdRoleDesc: rdRoleDesc,
+                       // KOV-G1b: veta „Pásma podľa šírky korpusu." — ČISTÁ
+                       // funkcia, testuje sa bez DOM (a `rulesRenderBody`
+                       // overí, že sa naozaj vykreslí).
+                       rdWidthHint: rdWidthHint,
                        // KOV-E1b: súhrn výklopového pravidla (read-only do E2) —
                        // ČISTÁ funkcia, testuje sa aj bez DOM.
                        rdLiftSummary: rdLiftSummary,

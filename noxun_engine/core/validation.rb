@@ -732,6 +732,11 @@ module Noxun
           elsif defined?(Recipes) &&
                 (Recipes::BUILD_BLOCKERS.include?(code) || code == Recipes::STALE)
             items << drawer_conflict_item(iss, overrides)
+          elsif code == BuildPlan::LEG_STALE
+            # KOV-G1b: JEDINY nalez kovania, ktory je ORANGE — nohy vyrobu
+            # nezastavuju (kod ZAMERNE nie je v `HW_ISSUE_BLOCKERS`), ale
+            # nakup by bol o dve nohy a o prichyty chudobnejsi.
+            items << leg_stale_item(iss)
           elsif BuildPlan::HW_ISSUE_BLOCKERS.include?(code)
             # KOV-F1 (Codex #329 kolo 2 P1): register nesie DVA zdroje — ulozeny
             # nosic (`door_height_out_of_table`) aj migracny `hinge_stale`.
@@ -740,6 +745,21 @@ module Noxun
             items << hardware_conflict_item(iss)
           end
         end
+      end
+
+      # ORANGE (KOV-G1b): skrinka na nohach postavena pred pravidlom „4/6 podla
+      # sirky". Vetu sklada ZBER (pozna sirku aj vysku sokla), Kontrola k nej
+      # doplni len to, ze export bezi dalej — inak by pouzivatel cakal branu.
+      # Vlastnika ma (skrinku), dielec nie: nohy su korpusova polozka.
+      def leg_stale_item(iss)
+        oid = iss['owner_id'].to_s
+        msg = iss['message'].to_s.strip
+        msg = 'Nohy sú spočítané ešte pred pravidlom 4/6.' if msg.empty?
+        { 'severity' => ORANGE, 'category' => CAT_HARDWARE,
+          'owner_id' => oid, 'part_key' => nil, 'hw_key' => nil,
+          'owner_pid' => iss['owner_pid'],
+          'message_sk' => "#{msg} Nákup ani výroba sa tým nezastavujú.",
+          'stable_key' => "#{CAT_HARDWARE}|#{oid}||#{BuildPlan::LEG_STALE}" }
       end
 
       # RED (KOV-F1): polozka kovania z pravidiel VZNIKLA, ale je nespravna —
