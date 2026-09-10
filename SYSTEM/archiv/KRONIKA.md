@@ -17,6 +17,13 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **CENY-KOV-A — ODKAZY PRODUKTOV KOVANIA (10.9.2026, PR #345, v0.10.4).** Každá katalógová položka má v Kovaní aj Rozpočte malú SVG ikonu; platná URL otvorí prehliadač bez zmeny ceny/dátumu.
+  Chýbajúci odkaz je jantárový a vedie do editora presnej položky s fokusom na URL. Ručné `product_url`, lazy schema 3 a úzka seed migrácia ôsmich Quatro LM odkazov zachovávajú vlastné úpravy a ceny.
+  Pred zápisom sa kontroluje celý čerstvý nefiltrovaný katalóg vrátane záložného zdroja pri chýbajúcom primári. Read-only záloha dovolí preklik; oneskorená odpoveď po zmene sekcie/modelu/formulára neotvorí cudziu položku.
+  **3799 headless PASS, 109 JS sád PASS.** Browser QA skutočného Štúdia s fiktívnymi dátami: 1140/760 px, jednoriadkové ikony, URL fokus z Rozpočtu, uloženie, DEMOS bez zápisu, read-only a oneskorené odpovede.
+  Interný Codex review našiel P2 fallback čítania zo zálohy; opravené a delta overená bez nálezu. Povinný predimplementačný audit návrhu A/B: 0 blockerov, tri prijaté doplnenia ochrany dát a UI životnosti.
+  Geometria/Undo bez zásahu; externý browser a fokus v SketchUpe ostávajú na používateľský smoke po B. Dokumentácia aktualizovaná pred merge. B pokračuje z čerstvého main; Claude review je podľa Michalovej dohody odložené.
+
 - **D-124 — PREHĽADNÉ PREDVOĽBY MATERIÁLOV (10.9.2026, PR #344, v0.10.3).** Blok v Štúdiu je od prvého zobrazenia otvorený; štyri skupiny s dekorovými vzorkami **115 px**
   (schválený mockup mínus 20 %) a údajmi pod nimi. Úzke okno má dva stĺpce. Pôvodný NXCombo zachová celý názov variantu vrátane formátu/rubu; jedna potvrdzovacia lišta je pod mriežkou.
   Fotografia, RGB, meta a prístupný názov ovládača nasledujú select pri používateľskom výbere aj programovom návrate, katalógovom echu a zmene projektu. UNI nemá zavádzajúcu hrúbku.

@@ -61,6 +61,7 @@ v [PLAN.md](PLAN.md), odrážka „BALÍK ČIEL". Čo z bloku KOVANIE ostalo mim
 
 - **Vedome odložené z dávky E — ceny (V1 rozsah)** (6.8., nič z toho neblokuje prácu so zákazkou) — **manuálne 1-klik overenie ceny** pre položky BEZ väzby na Demos a **viac URL na položke**
   (zvyšok V1-03; dnes ich „Prepočítať ceny" preskočí) · ~~prepínač „na faktúru" (×1,2)~~ — **vyradené 6.9.2026** (Michal: existuje prepínač s DPH / bez DPH); zvyšok rozhodnutý v `zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md`.
+  **10.9., CENY-KOV-A, PR #345:** kovanie má jeden produktový odkaz a preklik v katalógu/Rozpočte. Ručné potvrdenie kovania nasleduje v B; materiály/ABS a viac URL sú naďalej otvorené.
   *(Piaty kus tej istej odkladovej sady — EN DANIELI textový export — je v skupine KONTROLA + VÝROBA; DOCX/PDF generátor a rodina dokumentov sú od 26.8. v skupine Po V1 — zásobník.)*
   *Stav: čaká na prax — vytiahne sa, keď si to reálna zákazka vypýta.*
 

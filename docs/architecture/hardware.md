@@ -462,6 +462,7 @@ platný odkaz sa pred otvorením znovu dohľadá a overí na serveri. Klient nep
 
 **Čerstvý dokument sa pred zápisom overuje celý.** Katalógový zámok + revízia upravovaného riadku samy nestačia: čítací `load` môže odfiltrovať nečitateľný záznam.
 Preto zápis musí odmietnuť neplatný obsah čerstvého nefiltrovaného dokumentu aj po predchádzajúcom cachovanom stave `:ok`; úprava položky A nesmie vymazať poškodenú B.
+Pri chýbajúcom primári overuje rovnakým pravidlom záložný zdroj. Čítanie produktu používa čerstvý primár alebo platnú zálohu bez migrácie, takže read-only katalóg stále vie otvoriť uložený odkaz.
 
 **Od ŠT-3a-2 ho ukazuje JEDINÉ UI:** sekcia `hw` okna Štúdio (Š16 — pohľady Položky · Sety). Okno „Katalóg kovania" ZANIKLO; serverová autorita ostala v
 `hardware_catalog_dialog.rb` (modul sa NEPREMENOVÁVA — vzor audit #21 zo ŠT-2a), a to vrátane **troch MODELOVÝCH zápisov** predvolieb setov projektu (`hws_map_project` ·

@@ -270,7 +270,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 - **Ceny — CENY-KOV (schválené Michalom 10.9.2026, realizácia teraz):** odkazy a ručné overenie **katalógového kovania**. Jeden hlavný odkaz na položku; viac URL a ručné overenie materiálov/ABS ostávajú zo
   zvyšku V1-03 v zásobníku. Voľné ad-hoc položky bez katalógového kódu sú mimo tejto dávky. **Audit ÁNO** — nové polia, lazy schema marker a úzka migrácia katalógu. Dve sekvenčné PR, druhé až z čerstvého main
   po prvom:
-  - **CENY-KOV-A · Odkazy:** každá položka (aj Demos) má malú SVG ikonu „Otvoriť produkt" v katalógu aj v Rozpočte. Uložený platný odkaz otvorí iba externý prehliadač; žiadny zápis ceny/dátumu. Chýbajúci odkaz
+  - **CENY-KOV-A · Odkazy — HOTOVÉ, PR #345, v0.10.4:** každá položka (aj Demos) má malú SVG ikonu „Otvoriť produkt" v katalógu aj v Rozpočte. Uložený platný odkaz otvorí iba externý prehliadač; žiadny zápis ceny/dátumu. Chýbajúci odkaz
     = oranžová ikona s vysvetlením, klik otvorí úpravu konkrétnej položky s fokusom na doplnení adresy. Nové voliteľné `product_url` (http/https) pre položky bez Demos väzby; `demos_url` zostáva výlučne
     overovanou väzbou konektora. Uloženie/odstránenie URL ide existujúcim formulárom, revision guardom a zámkom; čítacia cesta pred otvorením adresu znovu overí. Schema 3 len pri novom obsahu chráni pred
     stratou údajov v staršom plugine. Známe Quatro LM odkazy možno previesť z presne pôvodných seed poznámok bez zmeny ceny, dátumu alebo vlastných úprav.
