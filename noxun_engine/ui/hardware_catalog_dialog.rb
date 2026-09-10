@@ -59,6 +59,7 @@ module Noxun
       SECTION_ACTIONS = %w[
         hw_search hw_tree hw_create hw_patch hw_delete
         hw_product_prepare hw_product_open
+        hw_manual_prepare hw_manual_open hw_manual_confirm
         hw_check_price hw_apply_price
         hw_tax_create_manufacturer hw_tax_create_series
         hw_demos_search hw_demos_preview hw_demos_cancel hw_demos_create
@@ -102,6 +103,9 @@ module Noxun
           when 'hw_delete'         then handle_delete(payload)
           when 'hw_product_prepare' then handle_product_prepare(payload)
           when 'hw_product_open'    then handle_product_open(payload)
+          when 'hw_manual_prepare' then handle_manual_prepare(payload)
+          when 'hw_manual_open'    then handle_manual_open(payload)
+          when 'hw_manual_confirm' then handle_manual_confirm(payload)
           when 'hw_check_price'    then handle_check_price(payload)
           when 'hw_apply_price'    then handle_apply_price(payload)
           when 'hw_demos_search'   then handle_demos_search(payload)
@@ -900,6 +904,72 @@ module Noxun
           url = HardwareCatalog.product_link(HardwareCatalog.product_record(data['code']))
           return set_status('Odkaz sa medzitým zmenil alebo chýba — vyber položku znova.', true) unless url
           UI.openURL(url)
+        end
+
+        # CENY-KOV-B: bez fetchu a bez druhej cenovej cache. Prepare iba cita;
+        # otvorenie browsera pride az po klientskom prijati spravneho formulara.
+        def manual_snapshot(data)
+          result = data.select { |k, _| %w[code token model_guid section].include?(k) }
+          item = product_model_current?(data) ? HardwareCatalog.product_record(data['code']) : nil
+          reason = HardwareCatalog.product_edit_reason
+          result.merge('item' => item, 'row_rev' => item && HardwareCatalog.record_rev(item),
+                       'has_url' => !!HardwareCatalog.product_link(item),
+                       'read_only' => !reason.nil?, 'reason' => reason)
+        end
+
+        def handle_manual_prepare(payload)
+          data = JSON.parse(payload.to_s)
+          js("MDH.manualReady(#{JSON.generate(manual_snapshot(data))})")
+        rescue StandardError => e
+          Engine.log_error(e, 'HardwareCatalogDialog.manual_prepare')
+          result = (data || {}).select { |k, _| %w[code token model_guid section].include?(k) }
+          js("MDH.manualReady(#{JSON.generate(result.merge('item' => nil, 'reason' => 'Položku sa nepodarilo načítať.'))})")
+        end
+
+        # Pri otvoreni stranky kontrolujeme AJ reviziu zobrazeneho formulara.
+        # Zmeneny zdroj nesmie otvorit novy produkt vedla starej ceny.
+        def handle_manual_open(payload)
+          data = JSON.parse(payload.to_s)
+          snap = manual_snapshot(data)
+          item = snap['item']
+          unless item && !snap['read_only'] && snap['has_url'] &&
+                 item['demos_url'].to_s.strip.empty? && snap['row_rev'] == data['row_rev'].to_s
+            return manual_result(data, :conflict, 'Položka sa medzitým zmenila — skontroluj aktuálne údaje.', nil, phase: 'open')
+          end
+          if UI.openURL(HardwareCatalog.product_link(item)) == false
+            manual_result(data, :error, 'Stránku sa nepodarilo otvoriť. Skús overenie znova.', nil, phase: 'open')
+          end
+        rescue StandardError => e
+          Engine.log_error(e, 'HardwareCatalogDialog.manual_open')
+          manual_result(data || {}, :error, 'Stránku sa nepodarilo otvoriť. Skús overenie znova.', nil, phase: 'open')
+        end
+
+        def manual_result(data, status, msg, field = nil, phase: 'submit')
+          snap = begin
+            manual_snapshot(data)
+          rescue StandardError
+            data.select { |k, _| %w[code token model_guid section].include?(k) }
+                .merge('item' => nil, 'read_only' => true)
+          end
+          snap.merge!('ok' => status == :ok, 'status' => status.to_s, 'phase' => phase,
+                      'msg' => msg.to_s, 'errors' => status == :ok ? [] : item_errors(msg, field))
+          js("MDH.manualResult(#{JSON.generate(snap)})")
+        end
+
+        def handle_manual_confirm(payload)
+          data = JSON.parse(payload.to_s)
+          unless product_model_current?(data)
+            return manual_result(data, :stale_model, 'Model sa medzitým prepol — otvor overenie znova.')
+          end
+          status, info, field = HardwareCatalog.confirm_manual_price!(
+            data['code'].to_s, price: data['price'], row_rev: data['row_rev'].to_s)
+          push_items if status == :ok || status == :conflict
+          msg = status == :ok ? 'Cena bola ručne potvrdená k dnešnému dňu.' : info.to_s
+          msg = 'Cenu sa nepodarilo potvrdiť.' if msg.empty?
+          manual_result(data, status, msg, field)
+        rescue StandardError => e
+          Engine.log_error(e, 'HardwareCatalogDialog.manual_confirm')
+          manual_result(data || {}, :error, 'Cenu sa nepodarilo uložiť. Skús to znova.')
         end
 
         def handle_map_project(payload)

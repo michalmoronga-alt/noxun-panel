@@ -39,7 +39,8 @@ module Noxun
       SCHEMA_BASE = 1
       SCHEMA_CLASSIFIED = 2
       SCHEMA_PRODUCT_URL = 3
-      SCHEMA_CURRENT = SCHEMA_PRODUCT_URL
+      SCHEMA_MANUAL_CHECK = 4
+      SCHEMA_CURRENT = SCHEMA_MANUAL_CHECK
       # Verzia SEED sady (nezavisla od SCHEMA — tvar zaznamov sa nemeni).
       # Upgrade existujuceho katalogu robi apply_seed_patches! (audit D1 F8):
       # merge-safe backfill novych kodov + oprava LEN preukazatelne
@@ -260,7 +261,8 @@ module Noxun
         item.is_a?(Hash) && !item['item_code'].to_s.strip.empty? &&
           !item['name_sk'].to_s.strip.empty? &&
           %w[manufacturer series].all? { |k| item[k].nil? || item[k].is_a?(String) } &&
-          (!item.key?('product_url') || item['product_url'].is_a?(String))
+          (!item.key?('product_url') || item['product_url'].is_a?(String)) &&
+          (!item.key?('price_check_method') || item['price_check_method'] == 'manual')
       end
 
       # load filtruje necitatelne riadky. Pred zapisom treba overit aj cudzie B,
@@ -393,6 +395,11 @@ module Noxun
         # vyhradne proposal flow / seed s vedomym povodom.
         put_opt(out, 'demos_url', a['demos_url'] || a[:demos_url])
         put_opt(out, 'price_checked_at', a['price_checked_at'] || a[:price_checked_at])
+        if a.key?('price_check_method') || a.key?(:price_check_method)
+          method = a.key?('price_check_method') ? a['price_check_method'] : a[:price_check_method]
+          return [nil, 'neznámy spôsob overenia ceny', 'price_check_method'] unless method == 'manual'
+          out['price_check_method'] = method
+        end
         uc = (a['use_count'] || a[:use_count]).to_i
         out['use_count'] = uc if uc.positive?
         [out, nil]
@@ -406,6 +413,7 @@ module Noxun
       # katalog, ktory bez novych poli citat NEJDE — teda ten, kde ma aspon
       # jedna polozka vyrobcu alebo radu.
       def schema_for(items)
+        return SCHEMA_MANUAL_CHECK if Array(items).any? { |i| i.is_a?(Hash) && i.key?('price_check_method') }
         return SCHEMA_PRODUCT_URL if Array(items).any? { |i| i.is_a?(Hash) && !i['product_url'].to_s.strip.empty? }
         classified = Array(items).any? do |i|
           i.is_a?(Hash) &&
@@ -467,6 +475,7 @@ module Noxun
       # -> [:ok, rec] | [:exists|:invalid|:read_only|:write_failed, info, field]
       def create_item(attrs)
         return [:read_only, state_reason] if read_only?
+        attrs = attrs.reject { |k, _| k.to_s == 'price_check_method' }
         rec, err, field = normalize_item(attrs)
         return [:invalid, err, field] if rec.nil?
         # create NIKDY nepreberie cache polia z klienta (F7) — vznikaju len
@@ -541,12 +550,23 @@ module Noxun
           end
           # F5: datum overenia patri konkretnej vazbe (URL) + cene + MJ —
           # manualna zmena ktorehokolvek ho zneplatni.
-          if clean.key?('price_eur_vat') || clean.key?('unit') || clean.key?('demos_url')
+          if existing['price_check_method'] != 'manual' &&
+             (clean.key?('price_eur_vat') || clean.key?('unit') || clean.key?('demos_url'))
             merged.delete('price_checked_at')
           end
           merged.delete('demos_url') if clean.key?('demos_url') # prazdna = vymazat vazbu
           rec, err, field = normalize_item(merged)
           return [:invalid, err, field] if rec.nil?
+          if existing['price_check_method'] == 'manual'
+            old_values = { 'price_eur_vat' => Materials.normalize_price(existing['price_eur_vat']),
+                           'unit' => canonical_unit(existing['unit']),
+                           'product_url' => sanitize_product_url(existing['product_url']),
+                           'supplier' => existing['supplier'].to_s.strip }
+            changed = old_values.any? do |key, value|
+              clean.key?(key) && (key == 'supplier' ? rec[key].to_s : rec[key]) != value
+            end
+            clear_manual_check!(rec) if changed || clean.key?('demos_url')
+          end
           data['items'] = data['items'].map { |i| i.equal?(existing) ? rec : i }
           return [:write_failed, nil] unless write_unlocked(data)
           [:ok, rec]
@@ -940,6 +960,7 @@ module Noxun
           patch['price_eur_vat'] = proposal['price_vat'] unless proposal['unchanged']
           merged = existing.merge(patch)
           merged.delete('product_url') # explicitne potvrdena Demos vazba nahradi rucny zdroj
+          merged.delete('price_check_method')
           rec, err = normalize_item(merged)
           return [:invalid, err] if rec.nil?
           data['items'] = data['items'].map { |i| i.equal?(existing) ? rec : i }
@@ -947,6 +968,39 @@ module Noxun
           price_proposals.delete(key)
           [:ok, rec]
         end
+      end
+
+      # CENY-KOV-B: jedina cesta, ktora smie zalozit rucne potvrdenie. Cena je
+      # uzivatelsky vstup; datum a metoda patria serveru, nie klientskemu echu.
+      def confirm_manual_price!(code, price:, row_rev:)
+        return [:read_only, state_reason] if read_only?
+        amount = (price.is_a?(String) || price.is_a?(Numeric)) ? Materials.normalize_price(price) : nil
+        if amount.nil? || !amount.finite? || amount.negative?
+          return [:invalid, 'vlož nezápornú cenu s DPH; prázdna cena sa nedá potvrdiť', 'price']
+        end
+        with_lock do
+          JsonFileStore.invalidate(path)
+          data = load
+          existing = data['items'].find { |i| i['item_code'].to_s.strip.casecmp?(code.to_s.strip) }
+          return [:not_found, 'Položka už v katalógu nie je.'] unless existing
+          return [:conflict, 'Položka sa medzitým zmenila — skontroluj aktuálne údaje.'] if
+            row_rev.to_s.empty? || record_rev(existing) != row_rev.to_s
+          return [:invalid, 'Položka je viazaná na Demos — použi overenie z Demosu.'] unless existing['demos_url'].to_s.strip.empty?
+          return [:invalid, 'Najprv doplň platný odkaz na produkt.'] unless sanitize_product_url(existing['product_url'])
+          return [:invalid, 'Položka nemá platnú mernú jednotku.'] unless canonical_unit(existing['unit'])
+          rec, err, field = normalize_item(existing.merge('price_eur_vat' => amount,
+            'price_checked_at' => Time.now.utc.iso8601, 'price_check_method' => 'manual'))
+          return [:invalid, err, field] unless rec
+          data['items'] = data['items'].map { |i| i.equal?(existing) ? rec : i }
+          return [:write_failed, 'Cenu sa nepodarilo uložiť.'] unless write_unlocked(data)
+          [:ok, rec]
+        end
+      end
+
+      def clear_manual_check!(rec)
+        rec.delete('price_check_method')
+        rec.delete('price_checked_at')
+        rec
       end
 
       # --- V0.6 D2: "Pridat z Demosu" (novy zaznam z produktovej stranky) -----
@@ -2007,7 +2061,7 @@ module Noxun
               cur = items[idx]
               untouched = legacy &&
                           SEED_MATCH_FIELDS.all? { |k| cur[k] == legacy[k] } &&
-                          cur['demos_url'].to_s.empty?
+                          cur['demos_url'].to_s.empty? && cur['price_check_method'] != 'manual'
               if untouched
                 fixed, = normalize_item(seed_by_code['93240'])
                 if fixed
@@ -2029,7 +2083,9 @@ module Noxun
               if seed && cur['notes'] == seed['notes'] &&
                  cur['product_url'].to_s.strip.empty? && cur['demos_url'].to_s.strip.empty?
                 changed << "URL:#{cur['item_code']}"
-                cur.merge('product_url' => seed['product_url'])
+                enriched = cur.merge('product_url' => seed['product_url'])
+                clear_manual_check!(enriched) if cur['price_check_method'] == 'manual'
+                enriched
               else
                 cur
               end
@@ -2108,6 +2164,7 @@ module Noxun
                       cur['demos_url'].to_s.empty? &&
                       cur['manufacturer'].to_s.empty? &&
                       cur['series'].to_s.empty?
+          untouched &&= cur['price_check_method'] != 'manual'
           unless untouched
             kept << rec['item_code']
             next
