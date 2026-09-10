@@ -138,7 +138,7 @@
     ctrl: { t: 'Kontrola', hint: 'semafor filtruje zoznam · klik na nález ho označí v modeli · prepínače hrán a kresby' },
     buy: { t: 'Nákup kovania', hint: 'nákupný zoznam zo setov · nekompletné položky jantárovo · CSV pre objednávku' },
     budget: { t: 'Rozpočet',
-              hint: 'jediná sekcia, ktorá mení model — každá zmena = 1 krok Späť · sumy počíta server' },
+              hint: 'rozpočet zákazky · ceny kovania sú spoločné pre všetky zákazky' },
     offer: { t: 'Cenová ponuka',
              hint: 'zákaznícky pohľad na ten istý rozpočet · rečou zákazníka, bez interných kódov' },
     // ŠT-2a: hint nesie to, co v okne Materialy stal podtitul (`#mdline`) —
