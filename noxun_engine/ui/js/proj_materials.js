@@ -1,5 +1,5 @@
   // ===================== Materialy projektu =====================
-  // Horna cast: 3 selecty projektovych predvolieb (korpus / cela / chrbat) —
+  // Horna cast: 4 selecty projektovych predvolieb (korpus / cela / chrbat / zasuvky) —
   // hrubkovu kompatibilitu skriniek strazi Ruby pri ulozeni.
   // Davka 2 (D-05): sprava GLOBALNEHO katalogu (dosky + ABS). ID generuje SERVER
   // (JS ho nikdy nevymysla); create/edit su oddelene callbacky; hrubka
@@ -2523,6 +2523,37 @@
     MD_COMBO_HOOKED = true;
   }
 
+  // D-124: vzorka a meta sú odvodené z TOHO ISTÉHO selectu ako NXCombo.
+  // Žiadna pamäť výberu navyše: programové vrátenie pri potvrdení/odmietnutí
+  // musí vrátiť aj obrázok, hoci zámerne nevyvoláva `change`.
+  function mdRenderProjectPreview(selectId){
+    var sel = mdEl(selectId);
+    if (!sel) return;
+    var value = String(sel.value || '');
+    var rec = value && (MD_CATALOG.sheets || []).find(function(s){ return String(s.material_id) === value; });
+    var sheet = rec || (value && MD_SHEETS.find(function(s){ return String(s.id) === value; }));
+    var swatch = mdEl(selectId + '_swatch'), meta = mdEl(selectId + '_meta');
+    if (swatch){
+      swatch.style.backgroundColor = sheet && sheet.color ? rgbToHex(sheet.color) : '';
+      // Iba lokálna cache emitovaná serverom. Pri chybe obrázka ostáva RGB;
+      // nová hodnota vždy nahradí celý obrázok, aj jeho predošlý error stav.
+      swatch.innerHTML = rec && rec.image_file
+        ? '<img src="' + mdEsc(mdImageSrc(rec.image_file)) + '" alt="" onerror="this.style.display=\'none\'">' : '';
+    }
+    if (meta){
+      var thickness = sheet && Number(sheet.thickness);
+      meta.textContent = !sheet ? (value ? 'Materiál nie je dostupný' : 'Vyber materiál')
+        : sheet.uni === true ? 'Pracovný materiál UNI'
+        : [sheet.type || '', isFinite(thickness) && thickness > 0 ? String(thickness).replace('.', ',') + ' mm' : ''].filter(Boolean).join(' · ');
+    }
+    // `<label for>` pomenúva skrytý select. Skutočné tlačidlo NXCombo musí
+    // niesť aj rolu; jeho refresh aria-label nemení, text labelu áno.
+    var label = mdEl(selectId + '_label');
+    var option = sel.options && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex] : null;
+    var name = (label ? label.textContent + ': ' : '') + (option ? option.textContent : 'Vyber materiál');
+    if (sel.__nxc && sel.__nxc.btn) sel.__nxc.btn.setAttribute('aria-label', name);
+  }
+
   function mdSetProjectSelect(key, id){
     var sel = mdEl(mdProjectSelectId(key)); // programovy zapis onchange NEspusti
     if (sel && id) sel.value = id;
@@ -2532,6 +2563,7 @@
     // ale VLASTNÝ trigger, takže by ukazoval hodnotu, ktorá už neplatí —
     // preto ho treba zosynchronizovať výslovne.
     if (sel && typeof NXCombo !== 'undefined' && NXCombo && NXCombo.sync) NXCombo.sync(sel);
+    mdRenderProjectPreview(mdProjectSelectId(key));
   }
   function mdClearPending(){
     MD_PENDING = null;
@@ -2608,6 +2640,7 @@
     // natívny select, takže D-46 potvrdzovanie aj `model_guid` guard bežia
     // NEZMENENOU cestou.
     mdComboScan();
+    ['md_body', 'md_front', 'md_back', 'md_drawer'].forEach(mdRenderProjectPreview);
     mdRenderLists(); // rozpisany formular sa NECHAVA (mdEditing drzi stav)
     if (keep){
       var sel = '.mdcell[data-kind="' + keep.kind + '"][data-id="' + keep.id + '"][data-field="' + keep.field + '"]';
@@ -2819,6 +2852,7 @@
     // D-46: iny vyber v KTOROMKOLVEK projektovom selecte zahadzuje nepotvrdenu
     // ponuku — suhlas vzdy patri prave jednej zmene.
     mdClearPending();
+    mdRenderProjectPreview(mdProjectSelectId(key));
     // D-42 (audit BLOCKER 4): posli identitu modelu — server odmietne zapis do
     // ineho modelu, ak sa medzitym prepol dokument.
     if (window.sketchup && sketchup.set_project_material)
@@ -3018,6 +3052,8 @@
       mdSheetDim: mdSheetDim,
       // D-46 (tests/js/test_proj_confirm.js) — ciste funkcie listy bez DOM
       mdProjectSelectId: mdProjectSelectId, mdConfirmPayload: mdConfirmPayload,
+      // D-124: živé návraty selectu/náhľadu bez `change` a odoslanie potvrdenia.
+      onProjMaterial: onProjMaterial, mdConfirmProject: mdConfirmProject, mdCancelProject: mdCancelProject,
       // 2A-4b (tests/js/test_md_schema2.js) — skupiny, sekcie struktur, batch 3
       mdGroupKeyOf: mdGroupKeyOf, mdStructureSections: mdStructureSections,
       mdBuildEdgeVariants: mdBuildEdgeVariants, mdParseExtraThs: mdParseExtraThs,

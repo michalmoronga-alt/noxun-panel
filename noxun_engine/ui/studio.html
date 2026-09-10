@@ -519,6 +519,26 @@
   .totrow .tmuted { color: var(--nx-ink-muted); }
 
   #status { margin: 0; border-radius: 0; border-left: 0; border-right: 0; border-bottom: 0; }
+  /* D-124: štyri predvoľby v jednom bloku; zdieľaný picker nemení správanie. */
+  .mddefaults > .body { padding: 16px; }
+  .mddefaults-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; }
+  .mddefault { min-width: 0; }
+  .mddefault > label { display: block; margin-bottom: 10px; color: var(--nx-ink-label); font-size: 12px; font-weight: 600; }
+  .mddefault-swatch { width: 115px; max-width: 100%; aspect-ratio: 1; margin-bottom: 12px;
+                      background: var(--nx-surface-sunken); border: 1px solid var(--nx-border); border-radius: 8px; overflow: hidden; }
+  .mddefault-swatch img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .mddefault .cbtrigger { min-height: 54px; padding: 7px 9px; align-items: flex-start; }
+  .mddefault .cbtrigger .lbl { white-space: normal; overflow: visible; overflow-wrap: anywhere; line-height: 17px; }
+  .mddefault .cbtrigger .sw { display: none; }
+  .mddefault .cbtrigger .ic { margin-top: 2px; }
+  .mddefault > select { width: 100%; min-width: 0; }
+  .mddefault-meta { margin-top: 7px; color: var(--nx-ink-muted); font-size: 10.5px; line-height: 15px; }
+  .mddefaults .mdconfirm { margin-top: 12px; flex-wrap: wrap; }
+  .mddefaults .mdconfirm span { flex-basis: 220px; }
+  .mddefaults .hint { margin-top: 14px; margin-bottom: 0; }
+  @media (max-width: 1000px) {
+    .mddefaults-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  }
 </style>
 
 <div class="studio" id="studio">
@@ -708,24 +728,43 @@
     <span id="mdCutoverBannerText">…</span>
   </div>
 
-  <!-- D-42 PR B: predvoľby zbalené do <details> — sekcia je primárne KATALÓG,
-       projektové predvoľby sa nastavujú občas (vertikálny priestor). -->
-  <details>
+  <!-- D-124: otvorené pri prvom zobrazení; perzistentné telo drží ručné zbalenie. -->
+  <details class="mddefaults" open>
     <summary>Predvoľby projektu (korpus · čelá · chrbát · zásuvky)</summary>
     <div class="body">
-      <div class="hint">Predvolené materiály pre <b>všetky skrinky projektu</b>, ktoré nemajú vlastný materiál (dedenie projekt → skrinka → dielec). Zmena sa hneď premietne do všetkých dediacich skriniek (1 krok Späť).</div>
-      <div class="matrow"><label>Korpus</label><select id="md_body" data-nx-combo="decor" data-nx-combo-ctx="body" onchange="onProjMaterial('default_material_id', this.value)"></select></div>
-      <!-- D-46: potvrdzovacia lišta — ukazuje ju VÝHRADNE server (MD.confirmDefault). -->
+      <div class="mddefaults-grid">
+        <div class="mddefault">
+          <label id="md_body_label" for="md_body">Korpus</label>
+          <div class="mddefault-swatch" id="md_body_swatch" aria-hidden="true"></div>
+          <select id="md_body" data-nx-combo="decor" data-nx-combo-ctx="body" onchange="onProjMaterial('default_material_id', this.value)"></select>
+          <div class="mddefault-meta" id="md_body_meta"></div>
+        </div>
+        <div class="mddefault">
+          <label id="md_front_label" for="md_front">Čelá</label>
+          <div class="mddefault-swatch" id="md_front_swatch" aria-hidden="true"></div>
+          <select id="md_front" data-nx-combo="decor" data-nx-combo-ctx="front" onchange="onProjMaterial('default_front_material_id', this.value)"></select>
+          <div class="mddefault-meta" id="md_front_meta"></div>
+        </div>
+        <div class="mddefault">
+          <label id="md_back_label" for="md_back">Chrbát</label>
+          <div class="mddefault-swatch" id="md_back_swatch" aria-hidden="true"></div>
+          <select id="md_back" data-nx-combo="decor" data-nx-combo-ctx="back" onchange="onProjMaterial('default_back_material_id', this.value)"></select>
+          <div class="mddefault-meta" id="md_back_meta"></div>
+        </div>
+        <div class="mddefault">
+          <label id="md_drawer_label" for="md_drawer">Zásuvky</label>
+          <div class="mddefault-swatch" id="md_drawer_swatch" aria-hidden="true"></div>
+          <select id="md_drawer" data-nx-combo="decor" data-nx-combo-ctx="drawer" onchange="onProjMaterial('default_drawer_material_id', this.value)"></select>
+          <div class="mddefault-meta" id="md_drawer_meta"></div>
+        </div>
+      </div>
+      <!-- D-46 / KOV-C2b: JEDNA lišta pre korpus aj zásuvky, riadená serverom. -->
       <div class="mdconfirm" id="mdConfirmBar" style="display:none">
         <span id="mdConfirmText"></span>
         <button class="primary" onclick="mdConfirmProject()">Potvrdiť</button>
         <button class="ghostbtn" onclick="mdCancelProject()">Zrušiť</button>
       </div>
-      <div class="matrow"><label>Čelá</label><select id="md_front" data-nx-combo="decor" data-nx-combo-ctx="front" onchange="onProjMaterial('default_front_material_id', this.value)"></select></div>
-      <div class="matrow"><label>Chrbát</label><select id="md_back" data-nx-combo="decor" data-nx-combo-ctx="back" onchange="onProjMaterial('default_back_material_id', this.value)"></select></div>
-      <!-- KOV-C2b: 4. materiálový kanál — dielce zásuviek (dno · chrbát · boky boxu · vnútorné čelo).
-           JEDEN riadok v tom istom vzore ako Čelá/Chrbát (vertikálny priestor je vzácny). -->
-      <div class="matrow"><label>Zásuvky</label><select id="md_drawer" data-nx-combo="decor" data-nx-combo-ctx="drawer" onchange="onProjMaterial('default_drawer_material_id', this.value)"></select></div>
+      <div class="hint">Použijú sa na skrinkách, ktoré dedia materiál z projektu. Zmena sa premietne do všetkých dediacich skriniek (1 krok Späť).</div>
     </div>
   </details>
 
