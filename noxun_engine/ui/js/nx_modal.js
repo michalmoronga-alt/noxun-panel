@@ -46,6 +46,7 @@
     // NAJVIAC JEDEN modal (dve „pridavacky" na obrazovke naraz su vzdy chyba
     // navrhu, nie stav).
     var OPEN = null;
+    var OPEN_GENERATION = 0;
 
     // --- PAMAT ROZPISANYCH HODNOT (audit ŠT-2c #12) --------------------------
     // Do ŠT-2c ju drzal KAZDY volajuci sam (rozpocet cez `BUD_DRAFT_VALUES`).
@@ -158,6 +159,7 @@
       } else {
         input = '<input id="' + id + '" type="text" data-nxm="' + key + '"' + cls +
                 ' value="' + esc(d.value == null ? '' : d.value) + '"' +
+                (d.disabled === true ? ' disabled aria-disabled="true"' : '') +
                 (d.placeholder ? ' placeholder="' + esc(d.placeholder) + '"' : '') + '>';
       }
       return '<div class="mrow">' + lbl + input + fieldActionHtml(d) + hint + '</div>';
@@ -1577,11 +1579,18 @@
       // otvorilo — Enter za scrimom by ho otvoril ZNOVA. Fokus vtedy dostane
       // POTVRDZOVACIE tlacidlo v patke: klavesnicova cesta pokracuje tam, kde
       // pouzivatel prave je.
-      var first = firstField(r) ||
+      var owner = OPEN;
+      var key = owner && owner.spec && owner.spec.initialFocus;
+      var wanted = key && /^[a-zA-Z0-9_]+$/.test(key) && r.querySelector
+        ? r.querySelector('[data-nxm="' + key + '"]') : null;
+      var first = (wanted && !wanted.disabled ? wanted : null) || firstField(r) ||
                   (r.querySelector ? r.querySelector('.mfoot [data-nxm-act="submit"]') : null);
       if (!first) return;
       try { first.focus(); } catch (e) { /* fokus nie je kriticky */ }
-      setTimeout(function(){ try { first.focus(); } catch (e) {} }, 20);
+      setTimeout(function(){
+        if (OPEN !== owner || (r.contains && !r.contains(first))) return;
+        try { first.focus(); } catch (e) {}
+      }, 20);
     }
 
     function warnDupKeys(s){
@@ -1598,6 +1607,7 @@
       if (!s || typeof document === 'undefined') return;
       var r = root();
       if (!r) return;
+      OPEN_GENERATION++;
       // KOV-B2 (review #290 P2): volajuci smie spusac PODAT. Je to pre PREKRESLENIE
       // modalu (`open` nad uz otvorenym oknom): vtedy je `activeElement` pole
       // PRAVE ZANIKAJUCEHO formulara, takze fokus by sa po zatvoreni vracal na
@@ -1828,6 +1838,7 @@
                 customBox: customBox, redrawCustom: redrawCustom,
                 open: open, close: close, submit: submit,
                 isOpen: isOpen, isBusy: isBusy, setBusy: setBusy,
+                generation: function(){ return OPEN_GENERATION; },
                 // KOV-D3b: „bezi odoslanie a okno je preto ZAMKNUTE aj proti
                 // zatvoreniu" (`busyLock`) — testy to musia vediet odlisit od
                 // obycajneho `isBusy`.

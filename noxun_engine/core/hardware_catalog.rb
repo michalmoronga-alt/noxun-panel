@@ -22,6 +22,7 @@
 require 'digest'
 require 'time'
 require 'json'
+require 'uri'
 require 'fileutils'
 
 module Noxun
@@ -37,7 +38,8 @@ module Noxun
       # odmietne ako read-only („aktualizuj plugin"), nikdy ticho neoreze.
       SCHEMA_BASE = 1
       SCHEMA_CLASSIFIED = 2
-      SCHEMA_CURRENT = SCHEMA_CLASSIFIED
+      SCHEMA_PRODUCT_URL = 3
+      SCHEMA_CURRENT = SCHEMA_PRODUCT_URL
       # Verzia SEED sady (nezavisla od SCHEMA — tvar zaznamov sa nemeni).
       # Upgrade existujuceho katalogu robi apply_seed_patches! (audit D1 F8):
       # merge-safe backfill novych kodov + oprava LEN preukazatelne
@@ -58,7 +60,7 @@ module Noxun
       # o vyrobcu/radu (Häfele/AXILO) a oprava katalogovych poloziek, ktore
       # nesu PRESNE dvojicu Hettich+AXILO — tu presunula pod Häfele migracia
       # taxonomie a bez opravy by sa taky riadok uz nedal ulozit.
-      SEED_SET_VERSION = 5
+      SEED_SET_VERSION = 6
       FILE = 'hardware_catalog.json'
 
       CATEGORIES = %w[ZAVESY VYSUVY VYKLOPY NOHY UCHYTKY SPOJOVACI_MATERIAL
@@ -108,7 +110,7 @@ module Noxun
       # VYMAZANIE vazby (prazdna hodnota); neprazdnu URL zapisuje vyhradne
       # proposal flow. use_count/price_checked_at NIKDY z klienta.
       PATCHABLE = %w[name_sk price_eur_vat supplier notes category unit active
-                     demos_url manufacturer series].freeze
+                     demos_url manufacturer series product_url].freeze
 
       PRICE_TOLERANCE = 0.005
       WATCHDOG_S = 45
@@ -257,7 +259,59 @@ module Noxun
       def valid_stored_item?(item)
         item.is_a?(Hash) && !item['item_code'].to_s.strip.empty? &&
           !item['name_sk'].to_s.strip.empty? &&
-          %w[manufacturer series].all? { |k| item[k].nil? || item[k].is_a?(String) }
+          %w[manufacturer series].all? { |k| item[k].nil? || item[k].is_a?(String) } &&
+          (!item.key?('product_url') || item['product_url'].is_a?(String))
+      end
+
+      # load filtruje necitatelne riadky. Pred zapisom treba overit aj cudzie B,
+      # inak ho edit citatelneho A zahodi z katalogu.
+      def stored_document_issue(data)
+        return 'katalóg kovania je poškodený' unless data.is_a?(Hash) && data['items'].is_a?(Array)
+        return 'katalóg kovania patrí inému systému (std)' unless data['std'].to_s == STD
+        return 'katalóg kovania je v novšej verzii — aktualizuj plugin' if data['schema'].to_i > SCHEMA_CURRENT
+        return 'katalóg kovania obsahuje nečitateľné položky' unless data['items'].all? { |i| valid_stored_item?(i) }
+        codes = data['items'].map { |i| i['item_code'].to_s.strip.downcase }
+        return 'katalóg kovania obsahuje duplicitné kódy' unless codes.uniq.length == codes.length
+        nil
+      end
+
+      def sanitize_product_url(raw)
+        return nil unless raw.is_a?(String)
+        s = raw.strip
+        return nil if s.empty? || s.match?(/[\s"'<>\\]/)
+        uri = begin
+          URI.parse(s)
+        rescue URI::InvalidURIError
+          nil
+        end
+        return nil unless uri.is_a?(URI::HTTP) && !uri.host.to_s.strip.empty?
+        uri.to_s
+      end
+
+      # Ulozena Demos vazba ma prednost; druhy odkaz nesmie predstierat zdroj.
+      def product_link(rec)
+        return nil unless rec.is_a?(Hash)
+        source = rec['demos_url'].to_s.strip.empty? ? rec['product_url'] : rec['demos_url']
+        sanitize_product_url(source)
+      end
+
+      # Cisto citacia cesta: bez assess!/seed migracie, cerstvo z disku.
+      def product_record(code)
+        JsonFileStore.invalidate(path)
+        doc = JsonFileStore.read(path)
+        rows = doc.is_a?(Hash) && doc['items'].is_a?(Array) ? doc['items'] : []
+        rows.find { |i| valid_stored_item?(i) && i['item_code'].to_s.strip.casecmp?(code.to_s.strip) }
+      rescue StandardError
+        nil
+      end
+
+      def product_edit_reason
+        fresh = begin
+          JSON.parse(File.binread(path))
+        rescue StandardError
+          nil
+        end
+        stored_document_issue(fresh) || (@state == :read_only ? @state_reason : nil)
       end
 
       # --- citanie ------------------------------------------------------------
@@ -316,6 +370,15 @@ module Noxun
         out['price_eur_vat'] = price unless price.nil?
         put_opt(out, 'supplier', a['supplier'] || a[:supplier])
         put_opt(out, 'notes', a['notes'] || a[:notes])
+        raw_url = a.key?('product_url') ? a['product_url'] : a[:product_url]
+        if a.key?('product_url') || a.key?(:product_url)
+          return [nil, 'odkaz musí byť text', 'product_url'] unless raw_url.is_a?(String)
+          unless raw_url.strip.empty?
+            url = sanitize_product_url(raw_url)
+            return [nil, 'vlož platný odkaz http:// alebo https://', 'product_url'] unless url
+            out['product_url'] = url
+          end
+        end
         # KOV-B1: vyrobca a rada z TAXONOMIE (`HardwareTaxonomy`) — obe
         # VOLITELNE (podperky ani skrutky ziadneho vyrobcu mat nemusia).
         # Ulozeny je KANONICKY NAZOV, nie id — cestuje medzi PC bez joinu.
@@ -343,6 +406,7 @@ module Noxun
       # katalog, ktory bez novych poli citat NEJDE — teda ten, kde ma aspon
       # jedna polozka vyrobcu alebo radu.
       def schema_for(items)
+        return SCHEMA_PRODUCT_URL if Array(items).any? { |i| i.is_a?(Hash) && !i['product_url'].to_s.strip.empty? }
         classified = Array(items).any? do |i|
           i.is_a?(Hash) &&
             (!i['manufacturer'].to_s.strip.empty? || !i['series'].to_s.strip.empty?)
@@ -471,6 +535,10 @@ module Noxun
             return [:conflict, nil]
           end
           merged = existing.merge(clean)
+          if clean.key?('product_url') && !clean['product_url'].to_s.strip.empty? &&
+             !existing['demos_url'].to_s.strip.empty? && !clean.key?('demos_url')
+            return [:invalid, 'najprv zruš väzbu Demos v detaile položky', 'product_url']
+          end
           # F5: datum overenia patri konkretnej vazbe (URL) + cene + MJ —
           # manualna zmena ktorehokolvek ho zneplatni.
           if clean.key?('price_eur_vat') || clean.key?('unit') || clean.key?('demos_url')
@@ -518,9 +586,8 @@ module Noxun
           rescue StandardError
             nil
           end
-          if fresh.is_a?(Hash) &&
-             (fresh['std'].to_s != STD || fresh['schema'].to_i > SCHEMA_CURRENT)
-            set_read_only(fresh['std'].to_s != STD ? 'katalóg kovania patrí inému systému (std)' : 'katalóg kovania je v novšej verzii — aktualizuj plugin')
+          if (issue = stored_document_issue(fresh))
+            set_read_only(issue)
             return false
           end
         end
@@ -872,6 +939,7 @@ module Noxun
           }
           patch['price_eur_vat'] = proposal['price_vat'] unless proposal['unchanged']
           merged = existing.merge(patch)
+          merged.delete('product_url') # explicitne potvrdena Demos vazba nahradi rucny zdroj
           rec, err = normalize_item(merged)
           return [:invalid, err] if rec.nil?
           data['items'] = data['items'].map { |i| i.equal?(existing) ? rec : i }
@@ -1685,6 +1753,12 @@ module Noxun
       # KOV-G1a: 10. prvok = DODAVATEL (nil = 'Demos', historicka predvolba
       # vsetkych 137 riadkov). Nie je to nove pole katalogu — `supplier` v item
       # zazname existuje od zaciatku, len ho manifest doteraz nemal ako povedat.
+      SEED_PRODUCT_CODES = %w[9069 9078 9077 9076 9027 9075 9079 950].freeze
+      SEED_PRODUCT_LINKS = SEED_ROWS.each_with_object({}) do |row, links|
+        next unless SEED_PRODUCT_CODES.include?(row[0])
+        links[row[0]] = { 'notes' => row[5], 'product_url' => row[5].split(' · ').last }
+      end.freeze
+
       SEED_ITEMS = SEED_ROWS.map do |code, name, category, unit, price, note, man, series, url, sup|
         item = { 'item_code' => code, 'name_sk' => name, 'category' => category,
                  'unit' => unit, 'supplier' => sup || 'Demos' }
@@ -1693,6 +1767,7 @@ module Noxun
         item['manufacturer'] = man unless man.nil?
         item['series'] = series unless series.nil?
         item['demos_url'] = url unless url.nil?
+        item['product_url'] = SEED_PRODUCT_LINKS[code]['product_url'] if SEED_PRODUCT_LINKS.key?(code)
         # Datum overenia patri VAZBE: bez URL alebo bez ceny sa nezapisuje.
         if url && !price.nil?
           item['price_checked_at'] =
@@ -1948,6 +2023,18 @@ module Noxun
           changed.concat(apply_seed_patch_v3(items, resolved)) if from < 3
           changed.concat(apply_seed_patch_v4(items, resolved)) if from < 4
           changed.concat(apply_seed_patch_v5(items, resolved)) if from < 5
+          if from < 6
+            items.map! do |cur|
+              seed = SEED_PRODUCT_LINKS[cur['item_code']]
+              if seed && cur['notes'] == seed['notes'] &&
+                 cur['product_url'].to_s.strip.empty? && cur['demos_url'].to_s.strip.empty?
+                changed << "URL:#{cur['item_code']}"
+                cur.merge('product_url' => seed['product_url'])
+              else
+                cur
+              end
+            end
+          end
           ok = write_unlocked('items' => items, 'seed_version' => SEED_SET_VERSION)
           if ok && defined?(Engine)
             Engine.log("kovanie katalog: seed patch v#{from} -> v#{SEED_SET_VERSION}#{changed.any? ? " (#{changed.join(', ')})" : ''}")
