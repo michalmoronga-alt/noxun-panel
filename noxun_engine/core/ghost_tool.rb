@@ -244,6 +244,30 @@ module Noxun
           nil
         end
 
+        # KOV-G2 (Codex #339 kolo 1 N5): ZNEPLATNENIE MEMA suhrnu noh. Hodnota
+        # sa pocita raz za session, lenze stav, z ktoreho vznikla (sety projektu
+        # a ich definicie, pravidla kovania, katalog), sa da v SUBEZNE otvorenom
+        # Studiu zmenit PRAVE POCAS session — a zmena plati aj pre commit
+        # (`build_into`). Bez tohto by pasik tesne pred klikom slubil jeden set
+        # noh a skrinka by sa postavila a objednala s inym.
+        #
+        # Volaju to hooky, ktore o zmene UZ DNES hovoria panelu
+        # (`Panel.push_hardware_sets` = sety, mapovanie a katalog;
+        # `RulesDialog.after_model_write` = pravidla). Odtlacok stavu sa
+        # zamerne nepocita pri kazdom pushi: pasik sa prekresluje pri kazdej
+        # sipke a digest katalogu je drahsi nez cely dovod jeho existencie.
+        # Memo sa TU len ZAHODI — prepocita ho az push nizsie (lenivost ostava).
+        def invalidate_legs_summary!(s = @session)
+          return false unless s && s.active? && s.respond_to?(:cabinet?) && s.cabinet?
+
+          s.invalidate_legs_summary!
+          push_state(s)
+          true
+        rescue StandardError => e
+          Engine.log_error(e, 'GhostTool.invalidate_legs_summary!')
+          false
+        end
+
         def push_state(s = @session)
           return unless defined?(Panel) && Panel.respond_to?(:push_ghost)
 
@@ -1167,6 +1191,14 @@ module Noxun
         def legs_summary
           @legs_summary = GhostTool.legs_summary_for(self) if @legs_summary == :unset
           @legs_summary
+        end
+
+        # KOV-G2 (Codex #339 kolo 1 N5): zahodenie mema po zmene setov, pravidiel
+        # alebo katalogu v subezne otvorenom Studiu. Nic sa TU nepocita — hodnotu
+        # zlozi az najblizsi `push_state` (lenivost je cely zmysel mema).
+        def invalidate_legs_summary!
+          @legs_summary = :unset
+          true
         end
 
         def drawing?

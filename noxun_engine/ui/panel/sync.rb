@@ -526,6 +526,12 @@ module Noxun
                 'legs_summary' => HardwareSets.legs_summary_from_purchase(items) }
             end
           js("NX.setHardwareSets(#{data.to_json})")
+          # KOV-G2 (Codex #339 kolo 1 N5): ghost na kurzore drzi suhrn noh ako
+          # MEMO za session — sety, mapovanie a katalog, ktore prave doslo
+          # zmenit, mu ho robia neplatnym (a plati pre commit, teda pre skrinku,
+          # ktora klikom vznikne). Zahodi sa TU, kde uz o zmene vieme; pasik ho
+          # prepocita v tom istom kroku.
+          GhostTool.invalidate_legs_summary! if defined?(GhostTool)
         rescue StandardError => e
           Engine.log_error(e, 'Panel.push_hardware_sets')
         end

@@ -1712,7 +1712,12 @@ neodvodzuje** — skladá ho server (`HardwareSets.legs_summary`, [hardware.md](
 pravidlá, sety aj katalóg. Výpočet ide cez `Panel.legs_preview_summary` (nižšie) a **definície setov zo šablóny podáva session sama** (`s.hardware['defs']` — zmrazia sa až
 v commite, Codex #339 N1), takže pásik a vkladacia karta hovoria to isté.
 
-
+**Memo NIE JE navždy (Codex #339 kolo 1 N5).** Zmrazený je **plán**, nie projekt: sety, mapovanie, pravidlá aj katalóg sa dajú v súbežne otvorenom Štúdiu zmeniť **práve počas**
+session — a platia pre `build_into` pri kliku, takže pásik by tesne pred ním sľúbil jeden set nôh a skrinka by vznikla s iným. Memo preto zhadzuje `GhostTool.invalidate_legs_summary!`
+z **tých istých hookov, ktoré o zmene už dnes hovoria panelu**: `Panel.push_hardware_sets` (sety, mapovanie, katalóg — obe satelitné cesty končia v ňom) a
+`RulesDialog.after_model_write` (pravidlá; **až za** operáciou prestavby). Odtlačok stavu sa zámerne **nepočíta pri každom pushi** — pásik sa prekresľuje pri každej šípke a digest
+katalógu je drahší než celý dôvod existencie mema. Zneplatnenie iba zahodí sentinel a hneď pošle `push_state`; hodnotu zloží až on. Testy: `tests/js/test_kovg2_nohy_ui.js`,
+`tests/pure/test_kovg2_nohy_ui.rb` (sekcia 10).
 
 Zmeny vo vkladacej karte sa do **bežiacej** session NEPREMIETAJÚ (snapshot je zmrazený; status to prizná) a **druhé „Vložiť" starú session zruší** a založí novú s čerstvým
 snapshotom. **Poznámku preflightov** (D-45 prevzatá hrúbka, materiálové noty) vypisuje **až `ghost_after_commit`** — pri stlačení „Vložiť" sa ešte nič nestalo, takže hlásiť ju

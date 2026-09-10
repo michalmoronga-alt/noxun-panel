@@ -577,8 +577,45 @@ end
 # pravidla aj katalog sa daju zmenit v subezne otvorenom Studiu PRAVE POCAS nej
 # a platia pre commit. Bez zneplatnenia by pasik tesne pred klikom slubil ine nohy.
 
+NxTest.test('KOV-G2 (10): zmena mapovania POCAS session prepocita suhrn pasika') do
+  NxTest.skip!('panelova cesta bezi len headless') unless NxTest.headless?
+  gt = Noxun::Engine::GhostTool
+  st = NxKovG2.state
+  st['sets'] = st['sets'].merge(NxKovG2::TPL_SET_ID => NxKovG2::TPL_SET)
+  NxKovG2.with_read_state(st) do
+    cfg = NxKovG2.cfg(width: 1200.0, fh: 100.0)
+    plan = Noxun::Engine::CabinetBuilder::InsertPlan.new(Object.new, cfg, 0.0)
+    s = gt::PlacementSession.new(model: Object.new, plan: plan)
+    first = gt.state_payload(s)['legs_short'].to_s
+    NxTest.assert(!first.empty?, "PREMISA: pasik skrinky suhrn nesie (#{first})")
+    # „Studio" zmeni projektovu predvolbu setu noh POCAS session.
+    st['mapping'] = st['mapping'].merge('leg' => NxKovG2::TPL_SET_ID)
+    NxTest.assert_equal first, gt.state_payload(s)['legs_short'].to_s,
+                        'memo drzi — inak by kazda sipka siahla na pravidla, sety aj katalog'
+    NxTest.assert(gt.invalidate_legs_summary!(s), 'hook zneplatnenia session pozna')
+    after = gt.state_payload(s)['legs_short'].to_s
+    NxTest.assert(after != first,
+                  "po zneplatneni hovori pasik to, co skrinka po kliku dostane (#{after})")
+  end
+end
 
+NxTest.test('KOV-G2 (10): zneplatnenie sa pyta SUBJEKTU a nikdy nespadne') do
+  gt = Noxun::Engine::GhostTool
+  NxTest.assert_equal false, gt.invalidate_legs_summary!(nil), 'bez session nie je co rusit'
+  body = NxKovG2.method_src('core/ghost_tool.rb', 'invalidate_legs_summary!')
+  NxTest.assert(body.include?('s.active?') && body.include?('s.cabinet?'),
+                'doska ani ukoncena session suhrn noh nemaju')
+  NxTest.assert(body.include?('push_state(s)'), 'pasik sa prekresli v tom istom kroku')
+end
 
+NxTest.test('KOV-G2 (10): hooky zneplatnenia stoja tam, kde sa o zmene uz vie') do
+  sync = NxKovG2.method_src('ui/panel/sync.rb', 'push_hardware_sets')
+  NxTest.assert(sync.include?('GhostTool.invalidate_legs_summary!'),
+                'sety, mapovanie a katalog chodia lahkym pushom')
+  rules = NxKovG2.method_src('ui/rules_dialog.rb', 'after_model_write')
+  NxTest.assert(rules.include?('GhostTool.invalidate_legs_summary!'),
+                'pravidla kovania koncia TOUTO cestou (uz MIMO operacie prestavby)')
+end
 
 NxTest.test('KOV-G2 (10): lahky push nesie CERSTVY riadok Noh (N4)') do
   sync = NxKovG2.method_src('ui/panel/sync.rb', 'push_hardware_sets')

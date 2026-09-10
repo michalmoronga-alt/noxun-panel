@@ -997,6 +997,11 @@ module Noxun
         # samostatny vrchol undo stacku z nej nevznikne.
         def after_model_write(model)
           Panel.push_selected(model) if defined?(Panel)
+          # KOV-G2 (Codex #339 kolo 1 N5): zmenene pravidla platia aj pre skrinku,
+          # ktora prave visi na kurzore (commit stavia `build_into` s NIMI), takze
+          # suhrn noh v ghost pasiku uz neplati. Bezi AZ TU — mimo operacie
+          # prestavby, ktoru volajuci prave zavrel.
+          GhostTool.invalidate_legs_summary! if defined?(GhostTool)
           refresh_studio(bump: true)
         end
 

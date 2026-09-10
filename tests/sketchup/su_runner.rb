@@ -18033,6 +18033,31 @@ module NoxunSuRunner
        !gp2['legs_short'].to_s.include?('noha AXILO'))
     e::GhostTool.cancel_session('SU-TEST KOV-G2', deferred: false)
 
+    # --- 6) ZMENA SETOV POCAS SESSION (Codex #339 kolo 1 N5) ---------------
+    #
+    # Suhrn v pasiku je memo za session, ale predvolbu setu noh mozno zmenit
+    # v subezne otvorenom Studiu PRAVE POCAS nej — a zmena plati pre commit.
+    # Hook (`Panel.push_hardware_sets`, tu volany priamo) memo zahodi.
+    e::Panel.handle_insert(pg(model, kovg_params(1200.0, 100.0)))
+    s3 = ghost_session
+    before = s3 ? e::GhostTool.state_payload(s3)['legs_short'].to_s : ''
+    ok("KOV-G2 session: pasik zacina projektovou predvolbou (#{before})",
+       before.include?('AXILO'))
+    m4 = r03_marker(model, markers)
+    model.start_operation('SU KOV-G2 zmena predvolby noh', true)
+    wrote = e::HardwareSets.set_project_mapping!(model, 'leg', KOVG2_SET['set_id'],
+                                                 [KOVG2_SET.dup])
+    model.commit_operation
+    ok('KOV-G2 session: projektova predvolba noh sa prepisala', wrote)
+    ok('KOV-G2 session: memo drzi, kym o zmene nikto nepovie',
+       e::GhostTool.state_payload(s3)['legs_short'].to_s == before)
+    e::Panel.push_hardware_sets
+    after = e::GhostTool.state_payload(s3)['legs_short'].to_s
+    ok("KOV-G2 session: po zneplatneni hovori pasik NOVU predvolbu (#{after})",
+       after != before && after.include?('Klzák'))
+    e::GhostTool.cancel_session('SU-TEST KOV-G2', deferred: false)
+    Sketchup.undo # spat na povodnu predvolbu projektu
+    ok('KOV-G2 session: zmena predvolby je PRAVE JEDEN krok Spat', m4.valid?)
     r03_clear_markers(model, markers)
     cleanup(model)
   end
