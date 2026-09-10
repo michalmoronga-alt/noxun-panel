@@ -17,6 +17,13 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-123 — SKRINKA PRI VOĽNOM VKLADANÍ STOJÍ NA PLOCHE (10.9.2026, PR #342, v0.10.1).** Pri vypnutom zámku Z sa dolná skrinka s dnom pod bokmi zachytávala za drevené dno:
+  výška sokla sa odpočítala od kliknutej polohy, takže napríklad 100 mm sokel skončil pod podlahou. Kotvy aj obálka ghostu teraz zahŕňajú **celú skrinku od Z = 0**.
+  Horné uchopenie a režim zamknutej výšky ostávajú funkčne rovnaké. Pôvodnú chybu dokázal padajúci regresný test; doplnené sú in-SU scenáre vloženia na podlahu a vyvýšenú
+  plochu, geometria sokla, horné skrinky, oba varianty dna, rotácia a návrat celého vkladu jedným krokom Späť. Kompletná Ruby sada **3789 PASS / 0 FAIL / 0 SKIP**, **105 JS sád PASS**,
+  in-SketchUp **2174 PASS / 0 FAIL** nad opravou `3b07615` (kópia `ENGINEtests_run_160232.skp`, 40 nových kontrol D-123).
+  Aktualizovaný odsek `ghost_tool.rb` v architektúre, D-123 presunuté do archívu. Blok KOVANIE ostáva uzavretý, používateľský smoke a dogfooding sú naplánované na večer.
+
 - **UZÁVER BLOKU KOVANIE — PLUGIN VIE KOVANIE SÁM (2.–10.9.2026; slices 0 · A · H · B · C · D · W · F · E · G · I, 50 PR #277 → #340, v0.9.14 → v0.10.0).**
   Blok začal 2.9. updaterom **D-52** (bez „Aktualizovať jedným klikom" by séria schema bumpov rozhádzala dve PC) a skončil 10.9. šablónami. Vstupom bola architektúra
   V1 uzavretá po cross-audite Codex/GLM/Opus (`zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md`) + schválený mockup (`zdroje/ui20/mockup_kovanie_v1.html`).
