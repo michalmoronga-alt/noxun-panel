@@ -62,7 +62,7 @@
   // a polia zon — pripajaju ich rendery; bc_quantity je POCET, vyrazy nema).
   function bindExprFields(){
     ['width','height','depth','thickness','floor_height','plinth_recess','rails_top_offset','rail_depth',
-     'fr_gap','fr_gap_top','fr_gap_bottom','fr_gap_sides'] // D-07 medzery/presahy cel
+     'fr_gap','fr_gap_top','fr_gap_bottom','fr_gap_left','fr_gap_right'] // D-119 medzery/presahy cel
       .forEach(function(id){ attachExprField(el(id), { flushFn: flushCabinetEditsNow }); });
     // E-03: ib_thickness je pri UNI materiali editovatelne dim pole (pri realnom
     // je readOnly — expr handler sam zamknute pole nikdy nemeni).

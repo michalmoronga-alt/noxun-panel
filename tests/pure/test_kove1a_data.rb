@@ -1056,11 +1056,11 @@ NxTest.test('KOV-E1a (10): owner mapovanie vyklopu si vyziadalo schemu 10') do
   c = NxKovE1a
   # PRESNE cislo strazi VZDY najnovsia davka, ktora ho zdvihla — KOV-E1b ho
   # zdvihla na 11 (config cela `lift.system` + vyklopove dovody v nosici).
-  NxTest.assert_equal(11, c::CB::CONFIG_SCHEMA, 'KOV-E1b zdvihla schemu na 11')
+  NxTest.assert(c::CB::CONFIG_SCHEMA >= 11, 'KOV-E1b vyzaduje aspon schemu 11')
   written = c::CB.cabinet_config(c::CB.normalize('width' => 600.0, 'height' => 720.0,
                                                  'depth' => 500.0))
-  NxTest.assert_equal(11, written[:config_schema], 'marker sa zapisuje pri KAZDOM zapise')
-  NxTest.assert(c::CB.newer_config?('config_schema' => 12), 'novsia schema sa neprestavuje')
+  NxTest.assert_equal(c::CB::CONFIG_SCHEMA, written[:config_schema], 'marker sa zapisuje pri KAZDOM zapise')
+  NxTest.assert(c::CB.newer_config?('config_schema' => c::CB::CONFIG_SCHEMA + 1), 'novsia schema sa neprestavuje')
   NxTest.refute(c::CB.newer_config?('config_schema' => 11))
   NxTest.assert_equal(9, c::CB::HINGE_ACTIVATION_SCHEMA,
                       'aktivacia zavesov sa bumpom NEHYBE (skrinky schemy 9 nie su „stare")')

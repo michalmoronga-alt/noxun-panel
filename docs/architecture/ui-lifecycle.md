@@ -1031,6 +1031,10 @@ nerozídu. Používajú ho **všetci traja**: `frontProfileScopeItems` (rozsah),
 
 ### N26 medzery jantárovo (preview.js)
 
+ČELÁ-A (D-119): štyri okraje sú v dvoch riadkoch (`front-gap-grid`). Formulár odosiela `gap_left`/`gap_right`; legacy `gap_sides` preberá len pre chýbajúcu stranu.
+Obe polia prechádzajú existujúcou validáciou, odomykaním limitu, resetom aj echo guardom `keepGaps`. `pvGeom` nesie `gapLeft`/`gapRight`; kresba čiel, kóty, ghost vrstva,
+fit vo vkladaní aj pri výbere, odhad plochy a značky kovania používajú oba okraje. Koľajnice výsuvov ostávajú na vnútorných lícach bokov korpusu.
+
 pri **otvorenej** skupine „Medzery a presahy" (alebo kurzore v jej poli) sa medzery v projekcii Čelá podfarbia jantárovo. Stav sa **číta z DOM** (`details[data-key="fgaps"].open`),
 nedrží sa bokom — zbalenie skupiny zhasne zvýraznenie bez ďalšej synchronizácie; `toggle` NEBUBLÁ, preto listener v capture fáze. Pásy vznikajú z **toho istého** `nxFrontDims`,
 ktorým sa už kótuje (žiadny nový výpočet, žiadne nové dáta); farby `PV_GAP_*` sú zrkadlom tokenov `--nx-warn-bg-soft` / `--nx-warn` / `--nx-warnchip-fg`.

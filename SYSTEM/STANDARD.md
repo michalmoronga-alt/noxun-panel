@@ -363,7 +363,7 @@ Zóna nesie `allowed_modules` — čo do nej smie. Modul pri vklade dostane rozm
 ```json
 {
   "split_axis": "height",
-  "gap": 3.0, "gap_top": 2.0, "gap_bottom": 2.0, "gap_sides": 2.0,
+  "gap": 3.0, "gap_top": 2.0, "gap_bottom": 2.0, "gap_left": 2.0, "gap_right": 2.0,
   "items": [
     { "id": "F1", "type": "drawer_front", "mode": "fixed", "height": 140.0, "locked": true, "wings": 1 },
     { "id": "F2", "type": "door", "mode": "auto", "height": null, "locked": false, "wings": "auto" },
@@ -373,7 +373,9 @@ Zóna nesie `allowed_modules` — čo do nej smie. Modul pri vklade dostane rozm
 ```
 
 `auto` čelá si rovnomerne rozdelia zvyšnú výšku; `wings: "auto"` = 2 krídla nad 600 mm šírky otvoru.
-**Škáry sú konfigurovateľné** (`gap` medzi čelami, `gap_top`/`gap_bottom`/`gap_sides` po obvode).
+**Škáry sú konfigurovateľné** (`gap` medzi čelami, `gap_top`/`gap_bottom`/`gap_left`/`gap_right` po obvode), spoločne pre celú skrinku.
+ČELÁ-A (D-119, config schéma 12): otvor = šírka korpusu − ľavý − pravý okraj, prvé čelo začína na ľavom okraji. Každá chýbajúca nová strana sa načíta zo starého
+`gap_sides` (inak 2 mm); prítomná nula má prednosť. Nový zápis už `gap_sides` neukladá. Čítanie starý model nemení. Limity ±100/±2000 mm platia pre každú stranu osobitne.
 Prekrytie korpusu (`overlay`) ani odlišná škára medzi krídlami (`gap_between`) v konfigurácii čiel **nie sú** — prekrytie určuje typ pántu, preto patria k budúcej práci na kovaní (viď 6.2; zaradenie určí PLAN).
 
 `items[].type` nadobúda `door` · `drawer_front` · `lift` (výklop) · `fall` (sklop) · `blind` (blenda) · `none` (D-18 „Bez čela"); neznámy typ sa sklopí na `door`.

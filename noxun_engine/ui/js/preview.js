@@ -62,8 +62,8 @@
   function frontsExtent(){
     var items = frontItems; if (!items || !items.length) return null;
     var W = numv('width')||600, H = numv('height')||720;
-    var gs = 2; var gsv = numv('fr_gap_sides'); if (!isNaN(gsv)) gs = gsv;
-    var e = { minX: Math.min(0, gs), maxX: Math.max(W, W - gs), minZ: 0, maxZ: H };
+    var gl = nxNumOr(numv('fr_gap_left'), 2), gr = nxNumOr(numv('fr_gap_right'), 2);
+    var e = { minX: Math.min(0, gl), maxX: Math.max(W, W - gr), minZ: 0, maxZ: H };
     items.forEach(function(it){
       e.minZ = Math.min(e.minZ, it.z);
       e.maxZ = Math.max(e.maxZ, it.z + it.height);
@@ -107,15 +107,15 @@
   // `nxFrontsExtent` (Node testy).
   function insertFrontsExtent(){
     if (previewMode !== 'insert' || pvInsertBoard()) return null;
-    var gs = 2; var gsv = numv('fr_gap_sides'); if (!isNaN(gsv)) gs = gsv;
-    return nxFrontsExtent(pvInsertFronts(), numv('width') || 0, numv('height') || 0, gs);
+    return nxFrontsExtent(pvInsertFronts(), numv('width') || 0, numv('height') || 0,
+                          numv('fr_gap_left'), numv('fr_gap_right'));
   }
   // Ciste (Node testy): obalka korpus ∪ cela. Zaporny bocny okraj = cela sirsie
   // nez korpus; zaporne medzery hore/dole = cela nad/pod obrysom.
-  function nxFrontsExtent(items, W, H, gapSides){
+  function nxFrontsExtent(items, W, H, gapLeft, gapRight){
     if (!items || !items.length) return null;
-    var gs = nxNumOr(gapSides, 2), w = nxNumOr(W, 0), h = nxNumOr(H, 0);
-    var e = { minX: Math.min(0, gs), maxX: Math.max(w, w - gs), minZ: 0, maxZ: h };
+    var gl = nxNumOr(gapLeft, 2), gr = nxNumOr(gapRight, gl), w = nxNumOr(W, 0), h = nxNumOr(H, 0);
+    var e = { minX: Math.min(0, gl), maxX: Math.max(w, w - gr), minZ: 0, maxZ: h };
     items.forEach(function(it){
       if (!it) return;
       e.minZ = Math.min(e.minZ, nxNumOr(it.z, 0));
@@ -272,7 +272,7 @@
   // JEDEN zdroj hodnot pre vsetky vrstvy (zakladne aj ghost) — ziadna vrstva si
   // necita formular sama, inak by sa dve kresby rozisli.
   function pvGeom(){
-    var gs = 2; var gsv = numv('fr_gap_sides'); if (!isNaN(gsv)) gs = gsv;
+    var gl = nxNumOr(numv('fr_gap_left'), 2), gr = nxNumOr(numv('fr_gap_right'), 2);
     var gap = 3; var gv = numv('fr_gap'); if (!isNaN(gv)) gap = gv;
     return { W: numv('width')||600, H: numv('height')||720, t: numv('thickness')||18,
              D: numv('depth')||0,
@@ -282,7 +282,7 @@
              topMode: val('top_mode'), backMode: val('back_mode'),
              bottomBetween: val('bottom_mode') === 'between_sides',
              railDepth: numv('rail_depth') || 100,
-             gapSides: gs, gap: gap,
+             gapLeft: gl, gapRight: gr, gap: gap,
              // UI-C1b: vo VKLADANI server resolved cela nema (skrinka este
              // neexistuje a `frontItems` je tu null — pasca Codex FIX 11),
              // preto ich dopocita cisty draft resolver z hodnot karty.
@@ -299,6 +299,8 @@
     var n = parseFloat(v);
     return (isNaN(n) || !isFinite(n)) ? dflt : n;
   }
+  // D-119: spolocna projekcia oboch stran; gapSides len pre legacy volania.
+  function nxFrontSide(g, key){ return nxNumOr(g[key], nxNumOr(g.gapSides, 2)); }
   function nxFrontsResolve(cfg, H, fh){
     var out = [];
     var items = (cfg && cfg.items) ? cfg.items : [];
@@ -360,7 +362,7 @@
         if (c > 0) add(c, (z.split.axis === 'v' ? nxNumOr(z.h, 0) : nxNumOr(z.w, 0)) * D);
       }
     });
-    var gs = nxNumOr(g.gapSides, 2), ow = Math.max(0, W - 2 * gs);
+    var ow = Math.max(0, W - nxFrontSide(g, 'gapLeft') - nxFrontSide(g, 'gapRight'));
     (fronts || []).forEach(function(it){
       if (!it || it.type === 'none' || !(it.height > 0)) return;
       var wn = parseInt(it.wings_n, 10);
@@ -562,8 +564,8 @@
     }
     // D-07: okraje/medzera z poli (0 je platna hodnota — NIE || default);
     // zaporny bocny okraj = cela sirsie nez korpus (presah).
-    var gs = g.gapSides, gap = g.gap;
-    var ow = W - 2*gs;
+    var gs = nxFrontSide(g, 'gapLeft'), gap = g.gap;
+    var ow = W - gs - nxFrontSide(g, 'gapRight');
     items.forEach(function(it, i){
       var z = it.z, h = it.height, col = (it.type==='drawer_front')?PV_FRONT_DRAWER:PV_FRONT_DOOR;
       var fnum = 'F' + (i + 1);
@@ -700,7 +702,7 @@
   // projekcii Cela sa prisvietia — clovek vidi, KTORU skaru prave meni.
   // Je to LEN zvyraznenie: ziadne nove data, ziadny novy vypocet (pasy vznikaju
   // z toho isteho `nxFrontDims`, ktorym sa uz kotuju).
-  var NX_GAP_FIELDS = { fr_gap: 1, fr_gap_top: 1, fr_gap_bottom: 1, fr_gap_sides: 1 };
+  var NX_GAP_FIELDS = { fr_gap: 1, fr_gap_top: 1, fr_gap_bottom: 1, fr_gap_left: 1, fr_gap_right: 1 };
   var PV_GAP_FILL = '#fff3e0';   // --nx-warn-bg-soft
   var PV_GAP_LINE = '#ffb74d';   // --nx-warn
   var PV_GAP_TEXT = '#b26a00';   // --nx-warnchip-fg
@@ -741,11 +743,12 @@
   function drawFrontDims(S, rx, ry, g){
     var dims = nxFrontDims(g.fronts, g);
     if (!dims.length) return;
-    var xr = Math.max(g.W, g.W - g.gapSides) + 26;
+    var gl = nxFrontSide(g, 'gapLeft'), gr = nxFrontSide(g, 'gapRight');
+    var xr = Math.max(g.W, g.W - gr) + 26;
     // N26: pasy medzier sa kreslia PRED kotami, aby cisla ostali navrchu.
     var hot = pvGapsHot();
     if (hot){
-      var x0 = Math.min(g.gapSides, 0), x1 = Math.max(g.W, g.W - g.gapSides);
+      var x0 = Math.min(gl, 0), x1 = Math.max(g.W, g.W - gr);
       dims.forEach(function(d){
         if (d.kind !== 'gap') return;
         S.push('<rect x="' + rx(x0) + '" y="' + ry(d.z2) + '" width="' + (x1 - x0) + '" height="' + (d.z2 - d.z1) +
@@ -757,7 +760,7 @@
       else pvText(S, rx(-14), ry((d.z1 + d.z2)/2), String(Math.round(d.size)), 15, 'end',
                   hot ? PV_GAP_TEXT : null);
     });
-    pvDimH(S, rx, ry, g.gapSides, g.W - g.gapSides, -26, String(Math.round(g.W - 2*g.gapSides)), 18);
+    pvDimH(S, rx, ry, gl, g.W - gr, -26, String(Math.round(g.W - gl - gr)), 18);
   }
 
   // Ciste (Node testy): rozklad radu ciel na kotovatelne useky.
@@ -806,9 +809,9 @@
     var out = [];
     if (!items || !items.length) return out;
     var W = g.W, fh = g.fh || 0;
-    var gs = (g.gapSides == null) ? 2 : g.gapSides;
+    var gs = nxFrontSide(g, 'gapLeft');
     var gap = (g.gap == null) ? 3 : g.gap;
-    var ow = W - 2*gs;
+    var ow = W - gs - nxFrontSide(g, 'gapRight');
     // Svetly priestor KORPUSU (vnutorne lica bokov) — kovanie, ktore sa montuje
     // na bok (vysuv), sa kotvi sem; cela a ich kridla ostavaju na gs/ow.
     var t = (g.t > 0) ? g.t : 0, ix0 = t, ix1 = W - t;
@@ -1057,7 +1060,7 @@
   function drawFrontsGhost(S, rx, ry, g){
     var items = g.fronts;
     if (!items || !items.length) return;
-    var gs = g.gapSides, ow = g.W - 2*gs, L = [];
+    var gs = nxFrontSide(g, 'gapLeft'), ow = g.W - gs - nxFrontSide(g, 'gapRight'), L = [];
     items.forEach(function(it){
       if (!it || !(it.height > 0)) return;
       L.push('M'+rx(gs)+' '+ry(it.z)+'h'+ow+'V'+ry(it.z + it.height)+'h'+(-ow)+'Z');

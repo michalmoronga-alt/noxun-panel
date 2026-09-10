@@ -155,7 +155,12 @@ module Noxun
       #       vypadli (`HW_CONFLICT_CODES` ich nepozna) a RED by zmizol. Brany
       #       su rovnake ako pri 5–10: dopredny guard prestavby/sablon/kopie
       #       (`newer_config?`) a exportna brana (`ProductionCore.export_blockers`).
-      CONFIG_SCHEMA = 11
+      #  12 = D-119 — SAMOSTATNE PRESAHY VLAVO/VPRAVO. Fronts uklada
+      #       gap_left/gap_right namiesto spolocneho gap_sides. Starsi plugin
+      #       tieto hodnoty nepozna a pri prestavbe by obe nahradil defaultom,
+      #       teda zmenil obrys aj vyrobne rozmery ciel. Dopredny guard
+      #       prestavby/sablon/kopie a exportna brana chrania novy config.
+      CONFIG_SCHEMA = 12
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
       # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)

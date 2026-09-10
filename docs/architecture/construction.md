@@ -674,6 +674,10 @@ police v zónach: rovnomerné rozloženie v svetlej výške (`n` políc ⇒ `n+1
 
 ### fronts.rb
 
+ČELÁ-A (D-119, v0.10.6): `gap_left`/`gap_right` sú samostatné okraje celej skrinky. Normalizácia pre každú chýbajúcu stranu preberá legacy `gap_sides` (inak 2 mm),
+prítomná nula vyhráva; nový zápis starý kľúč vynecháva. Otvor je `width − gap_left − gap_right`, prvý panel začína na `gap_left`. Každá strana má vlastnú kontrolu
+konečného čísla a limitu ±100/±2000. Korpusové kotvy a krok kópie sa nemenia. `CONFIG_SCHEMA` 12 chráni asymetriu pred starším pluginom; BuildPlan ostáva 5.
+
 čelá fixed/auto s lockmi, „bez čela", krídla 1–4, **úchytkový profil na hornej hrane (D-90 — riadok drží výšku, skracuje sa PANEL; `profile_band` je podklad vizuálu aj náhľadu)**.
 
 **KOV-A1 — TYPY:** `items[].type` ∈ `door` · `drawer_front` · `lift` (výklop) · `fall` (sklop) · `blind` (blenda) · `none`; neznámy typ sa (ako doteraz) sklopí na `door`.

@@ -4,7 +4,8 @@
     "gap": 3.0,
     "gap_top": 2.0,
     "gap_bottom": 2.0,
-    "gap_sides": 2.0,
+    "gap_left": 2.0,
+    "gap_right": 2.0,
     "edge_limit_off": false,
     "items": [
 

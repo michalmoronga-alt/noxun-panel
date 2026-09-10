@@ -169,7 +169,7 @@ NxTest.test('fronts gaps: normalize_config drzi explicitne zaporne okraje') do
   NxTest.assert_close(7.5, cfg['gap'])
   NxTest.assert_close(-50.0, cfg['gap_top'])
   NxTest.assert_close(0.0, cfg['gap_bottom'])
-  NxTest.assert_close(-12.0, cfg['gap_sides'])
+  NxTest.assert_close(-12.0, cfg['gap_left'])
 end
 
 # ---------------------------------------------------------------------------
