@@ -1235,8 +1235,9 @@ v katalógu, preto sa nikdy nič neprepisuje.
 set nôh má pri sokli 40 mm (vedome nepokrytá zóna 20–55 z G1a) **dva** záznamy — nohu aj platničku s tou istou chýbajúcou hranicou — a dve takmer identické vety v jednom riadku
 panela sú šum. Kľúč zliatia je PRÍČINA (`reason` + `set_id` + `param` + `value` + `generic_type`), berie sa PRVÁ veta. **`tone: 'none'`** = žiadne položky (horná skrinka, sokel 0)
 → text `bez nôh` a panel riadok vôbec nekreslí. `short` je verzia pre ghost pásik: názvy sa režú pri prvej čiarke, príslušenstvo do nej nejde a celok má strop `LEGS_SHORT_MAX`
-(48 znakov) — karta neskracuje nič (má tooltip). Konzumenti: `Panel.legs_preview_summary` (vkladacia karta + ghost pásik) a `cabinet_payload['legs_summary']`
-([ui-lifecycle.md](ui-lifecycle.md)). Testy: `tests/pure/test_kovg2_nohy_ui.rb`, `tests/js/test_kovg2_nohy_ui.js`, in-SketchUp sekcia `run_kovg`.
+(48 znakov) — karta neskracuje nič (má tooltip). Konzumenti: `Panel.legs_preview_summary` (vkladacia karta + ghost pásik), `cabinet_payload['legs_summary']` a **ľahký push**
+`push_hardware_sets` (Codex #339 N4 — zmena setu či názvu položky v Štúdiu chodí práve ním, inak by veta držala starú expanziu do ďalšieho označenia skrinky), všetko
+v [ui-lifecycle.md](ui-lifecycle.md). Testy: `tests/pure/test_kovg2_nohy_ui.rb`, `tests/js/test_kovg2_nohy_ui.js`, in-SketchUp sekcia `run_kovg`.
 
 **PROSPEKTÍVNY stav setov — `state_with_template_sets(state, mapping, defs)` (Codex #339 kolo 1 N1).** Vklad zo **šablóny** nesie mapovanie setov aj ich zmrazené definície
 (`hardware_sets` / `hardware_set_defs`) a `ghost_freeze_hardware` ich pri kliku zapíše do projektu. Náhľad, ktorý pozná len dnešný snapshot, by preto sľuboval **projektovú

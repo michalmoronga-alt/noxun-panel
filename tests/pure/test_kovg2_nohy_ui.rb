@@ -580,6 +580,13 @@ end
 
 
 
+NxTest.test('KOV-G2 (10): lahky push nesie CERSTVY riadok Noh (N4)') do
+  sync = NxKovG2.method_src('ui/panel/sync.rb', 'push_hardware_sets')
+  NxTest.assert(sync.include?("'legs_summary' => HardwareSets.legs_summary_from_purchase(items)"),
+                'inak by veta riadku drzala staru expanziu az do dalsieho oznacenia skrinky')
+  NxTest.refute(sync.include?('HardwareSets.legs_summary('),
+                'ziadny druhy rozpis — polozky uz maju kluc `purchase`')
+end
 
 NxTest.test('KOV-G2 (10): DOSKOVA vetva vkladacej karty riadok Noh RESETUJE (N2)') do
   body = NxKovG2.js_func_src('ui/js/form.js', 'materializeInsertBoardCard')

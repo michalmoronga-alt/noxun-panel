@@ -512,7 +512,18 @@ module Noxun
                 # KOV-E2: to iste pre riadok VYKLOPU — jeho „Technický detail"
                 # nesie NAZOV SETU (biely / tmavy) a kody clenov, teda presne
                 # to, co tento push meni (vyber tmaveho setu per celo).
-                'front_lift' => front_lift_payload(cfg) }
+                'front_lift' => front_lift_payload(cfg),
+                # KOV-G2 (Codex #339 kolo 1 N4): riadok NOH v Zakladnych. Uprava
+                # setu noh alebo nazvu jeho polozky v subezne otvorenom Studiu
+                # chodi PRAVE tymto lahkym pushom — bez tohto kluca by sa
+                # obnovili len selecty a rozpisane riadky Kovania, kym veta
+                # riadku Noh by drzala STARU expanziu (alebo stary nazov
+                # polozky) az do dalsieho oznacenia skrinky. Je to TA ISTA
+                # projekcia ako v plnom pushi (`cabinet_payload`): sklada sa
+                # z UZ ROZPISANYCH poloziek (`items` maju od
+                # `hardware_items_payload` kluc `purchase`), takze riadok
+                # a rozklik polozky sa rozist nemozu.
+                'legs_summary' => HardwareSets.legs_summary_from_purchase(items) }
             end
           js("NX.setHardwareSets(#{data.to_json})")
         rescue StandardError => e

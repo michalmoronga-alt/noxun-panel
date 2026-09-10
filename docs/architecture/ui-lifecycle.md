@@ -1027,7 +1027,10 @@ ktorým sa už kótuje (žiadny nový výpočet, žiadne nové dáta); farby `PV
 tri skupiny v **záväznom poradí** — **Položky z pravidiel** (`data-key="hwitems"`) · **Sety** (`hwsets`) · **Pravidlá** (`hwrules`); kostra je STATICKÁ, JS píše len obsah **dvoch**
 kontajnerov `#hwRows` a `#hwSetRows` (preto `refreshHardwareSets` obnovuje selecty v OBOCH — inak by novo pridaný set typu v skupine Sety ostal neviditeľný až do ďalšieho označenia
 skrinky). **KOV-G2 (v0.9.60): kontajnery sú TRI** — pribudol `#legsRow` v Základných (riadok Nôh, nižšie), ktorý nesie **ten istý** select pre typ `leg`; bez neho by držal starú
-ponuku setov.
+ponuku setov. **Ľahký push nesie aj `legs_summary`** (Codex #339 kolo 1 N4): úprava setu nôh alebo názvu jeho katalógovej položky v súbežne otvorenom Štúdiu chodí práve
+`NX.setHardwareSets`, ktorý dovtedy obnovoval len `<select>`y a rozpísané riadky Kovania — **veta** riadku Nôh držala starú expanziu až do ďalšieho označenia skrinky. Kľúč skladá
+`HardwareSets.legs_summary_from_purchase` nad **už rozpísanými** položkami (tá istá projekcia ako v plnom pushi) a klient volá `renderLegsRow` **až za** `refreshHardwareSets`
+(berie si z neho ponuku setov). Chýbajúci kľúč (starší payload, žiadna označená skrinka) sa riadku **nedotkne** — vtedy patrí náhľadu vkladania.
 
 **Položky sú BOXY PODĽA VLASTNÍKA** (`.hwbox`): „Skrinka" · box KAŽDÉHO čela · spoločný box „Vnútro skrinky" pre ostatných vlastníkov (podperky políc). Je to **len ZOBRAZENIE tých
 istých dát** — identita položky (`owner_part_key`, `generic_type`, `rule_id`), zápisové cesty (`set_hardware_override`, `set_hardware_set`), D-92 nákupný riadok aj D-93 zámok NL sú

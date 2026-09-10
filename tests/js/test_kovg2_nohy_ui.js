@@ -406,4 +406,33 @@ ok(rowHidden(), 'a ostáva skrytý');
 global.__type = 'lower';
 HW.nxLegsInsertReset();
 
+// ===========================================================================
+// 7) Codex #339 kolo 1 N4: ĽAHKÝ PUSH OBNOVUJE AJ VETU RIADKU NÔH
+// ===========================================================================
+// Úprava setu nôh alebo názvu jeho katalógovej položky v súbežne otvorenom
+// Štúdiu chodí `NX.setHardwareSets` — ten dovtedy obnovoval len `<select>`y
+// a rozpísané riadky Kovania, takže veta „6× noha AXILO…" držala STARÚ
+// expanziu až do ďalšieho označenia skrinky. Kontrakt sa overuje na zdroji
+// (bridge je tenká vrstva) + funkčne na riadku samotnom.
+const fs = require('node:fs');
+// CRLF checkout na Windows — regexy nižšie kotvia na LF.
+const bridgeSrc = fs.readFileSync(path.join(JS, 'bridge.js'), 'utf8').replace(/\r\n/g, '\n');
+const setHwSrc = bridgeSrc.match(/setHardwareSets: function\(data\)\{[\s\S]*?\n    \},/)[0];
+ok(/renderLegsRow\(d\.legs_summary/.test(setHwSrc),
+   'ľahký push prekreslí aj riadok Nôh');
+ok(setHwSrc.indexOf('refreshHardwareSets') < setHwSrc.indexOf('renderLegsRow'),
+   'AŽ ZA obnovou ponuky setov — riadok si z nej berie svoj select');
+ok(/d\.legs_summary !== undefined/.test(setHwSrc),
+   'starší payload (a stav bez označenej skrinky) sa riadku nedotkne');
+
+// Funkčne: ten istý riadok, nový text zo servera — bez preklikania výberu.
+HW.refreshHardwareSets([LEG_ENTRY]);
+HW.renderLegsRow(SUMMARY_OK, 'CAB-001');
+eq(textOfEl('legsTxt'), SUMMARY_OK.text, 'PREMISA: riadok drží pôvodnú vetu');
+HW.renderLegsRow({ text: '6× noha PREMENOVANÁ', short: '6× noha PREMENOVANÁ', tone: 'ok',
+                   set_id: 'nohy-podla-sokla', set_name: 'Nohy podľa výšky sokla' }, 'CAB-001');
+eq(textOfEl('legsTxt'), '6× noha PREMENOVANÁ',
+   'zmena názvu položky v Štúdiu je v riadku HNEĎ, nie až po preklikaní výberu');
+HW.nxLegsInsertReset();
+
 console.log('OK ' + n + ' assertov (KOV-G2 riadok Noh + ghost segment)');

@@ -508,6 +508,17 @@
           typeof refreshFrontLift === 'function'){
         refreshFrontLift(d.front_lift);
       }
+      // KOV-G2 (Codex #339 kolo 1 N4): riadok NÔH. Úprava setu nôh alebo názvu
+      // jeho položky v súbežne otvorenom Štúdiu chodí PRÁVE týmto ľahkým pushom
+      // — bez tohto kroku by sa obnovili len `<select>`y a rozpísané riadky
+      // Kovania, kým veta „6× noha AXILO…" by držala starú expanziu až do
+      // ďalšieho označenia skrinky. Text skladá SERVER (`legs_summary`), klient
+      // si z položiek nič neodvodzuje. Kľúč chýba pri staršom payloade aj vtedy,
+      // keď nie je označená skrinka — vtedy sa riadku nedotýkame (patrí náhľadu
+      // vkladania). AŽ ZA `refreshHardwareSets` — berie si z neho ponuku setov.
+      if (d.legs_summary !== undefined && typeof renderLegsRow === 'function'){
+        renderLegsRow(d.legs_summary, d.cabinet_id || '');
+      }
     },
     // KOV-H2: výsledok hľadania v katalógu pre modal ručnej položky. Odpoveď
     // nesie generáciu dotazu — staršie kolo sa zahadzuje v `hardware.js`.
