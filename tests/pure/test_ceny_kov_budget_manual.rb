@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 require_relative '../helper' unless defined?(NxTest)
+require 'tmpdir'
 
 module CkbBudget
   B = Noxun::Engine::Budget
@@ -18,14 +19,47 @@ module CkbBudget
     B.freshness_item('hardware', rec['item_code'], rec['name_sk'], rec, days, NOW)
   end
 
-  def budget(items, used = ['M'])
+  def budget(items, used = ['M'], now: NOW)
     rows = items.select { |i| used.include?(i['item_code']) }.map do |i|
       { 'code' => i['item_code'], 'name_sk' => i['name_sk'], 'unit' => i['unit'],
         'quantity' => 3, 'price_eur_vat' => i['price_eur_vat'] }
     end
     B.compute({ rows: [], edging: [] }, {}, Noxun::Engine::SupplierSettings.seed_supplier,
-      hardware_expansion: { 'rows' => rows }, hardware_catalog: items, now: NOW)
+      hardware_expansion: { 'rows' => rows }, hardware_catalog: items, now: now)
   end
+end
+
+NxTest.test('CENY-KOV-B integracia: skutocne katalogove potvrdenie prepocita cenu aj upozornenie') do
+  NxTest.skip!('izolovana katalogova integracia') unless NxTest.headless?
+  c = CkbBudget
+  h = Noxun::Engine::HardwareCatalog
+  mat = Noxun::Engine::Materials
+  previous_dir = mat.test_dir_override
+  Dir.mktmpdir('ceny-kov-budget-') do |dir|
+    mat.test_dir_override = dir
+    h.reset_state!
+    rec = c.item.reject { |k, _| %w[price_check_method price_checked_at].include?(k) }
+    File.binwrite(h.path, JSON.generate('std' => h::STD, 'schema' => h.schema_for([rec]),
+      'seed_version' => h::SEED_SET_VERSION, 'items' => [rec]))
+    Noxun::Engine::JsonFileStore.invalidate(h.path)
+    before = c.budget(h.items)
+    NxTest.assert_equal(1, before['stale']['counts']['attention'])
+    status, confirmed = h.confirm_manual_price!('M', price: '14,00', row_rev: h.record_rev(h.find('M')))
+    NxTest.assert_equal(:ok, status)
+    checked_now = Time.iso8601(confirmed['price_checked_at']) + 1
+    after = c.budget(h.items, now: checked_now)
+    NxTest.assert_equal(0, after['stale']['counts']['attention'])
+    NxTest.assert_close(42.0, after['sections'].find { |s| s['key'] == 'hardware' }['subtotal'], 0.001)
+    NxTest.assert_equal([], c::P.manual_from_budget(after))
+    status, = h.patch_item('M', { 'product_url' => 'https://supplier.example/another' }, row_rev: h.record_rev(confirmed))
+    NxTest.assert_equal(:ok, status)
+    changed = c.budget(h.items, now: checked_now)
+    NxTest.assert_equal(1, changed['stale']['counts']['attention'], 'zmena zdroja vrati kontrolu bez zmeny ceny')
+    NxTest.assert_close(42.0, changed['sections'].find { |s| s['key'] == 'hardware' }['subtotal'], 0.001)
+  end
+ensure
+  mat.test_dir_override = previous_dir if mat
+  h.reset_state! if h
 end
 
 NxTest.test('CENY-KOV-B budget: manualny den 29/30 a nastavitelny prah su rovnake ako Demos') do
