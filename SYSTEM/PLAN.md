@@ -186,9 +186,9 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 
 **Autorita bloku:** [zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md](zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md)
 (po cross-audite Codex/GLM/Opus + reconcile + rozhodnutia O1–O3) · **UX referencia:** [zdroje/ui20/mockup_kovanie_v1.html](zdroje/ui20/mockup_kovanie_v1.html)
-(schválený 2.9.) · vendor dáta: checkpoint #10 · detail fill: checkpoint #11. Otvorené postrehy D-109/D-111 sú v packages nižšie (D-110 ✅ vyriešená KOV-B2)
-(D-109 mechanika = R-05 po V1, výsledok cez KOV-G). **Predpoklad prvého schema bumpu: D-52 updater** (blok 6 — štartovaný 2.9.).
-Poradie slices: **0 (D-52 ✅) → A1 ✅ → A2 ✅ → H1 ✅ → B1 ✅ → H2 ✅ → B2 ✅ → B3 ✅ → C (AKTUÁLNA, package v2) → D → E → F → G → I** (B po Codex audite #17 rezaná na B1 dáta+std / B2 katalóg UI / B3 editor setu)
+(schválený 2.9.) · vendor dáta: checkpoint #10 · detail fill: checkpoint #11. Otvorený postreh D-109 je v packages nižšie (D-110 ✅ vyriešená KOV-B2, **D-111 ✅ vyriešená KOV-G2**)
+(D-109 mechanika = R-05 po V1, výsledok už dáva KOV-G1b). **Predpoklad prvého schema bumpu: D-52 updater** (blok 6 — štartovaný 2.9.).
+Poradie slices: **0 (D-52 ✅) → A1 ✅ → A2 ✅ → H1 ✅ → B1 ✅ → H2 ✅ → B2 ✅ → B3 ✅ → C ✅ → D ✅ → W ✅ → F ✅ → E ✅ → G ✅ → I (POSLEDNÁ)** (B po Codex audite #17 rezaná na B1 dáta+std / B2 katalóg UI / B3 editor setu)
 (KOV-A rezaná po Codex audite #14 na A1 dátová vrstva / A2 UI+overlay; otázka 3/4 krídel rozhodnutá Michalom 3.9. — variant a); **KOV-C package v2 (5.9.2026)** nahradil v13 z PR #300 po simplification review (zásady: nemenné recepty, kódy v setoch, žiadny fallback NL, pevné EB) — KOV-D revidovaná podľa neho.
 **KOV-A je KOMPLET a v maine** (A1 PR #280 · A2a PR #281 · A2b PR #282 — plné texty packages v git histórii a v checkpointe #14; záznamy dávok v [archiv/KRONIKA.md](archiv/KRONIKA.md)).
 Každý package sa pred štartom krátko audituje proti aktuálnemu mainu (read-only), implementuje subagent v worktree, brány podľa CLAUDE.md.
@@ -739,9 +739,32 @@ všetkých typov, trojkrídlo + Kontrola vedie na neurčené čelo, medzery, vš
   **druhá brána nad surovým vstupom** (`HardwareRules.lift_input_problems` v `handle_save`, pred normalizáciou) · štítok zdroja položky (`lift_source_tag`).
   Uzáver: headless **3649 testov**, **102 JS sád**.
   · **KOV-E je KOMPLET** (E1a #332 · E1b #333 · E2 #334) · D-114 balík Čiel ostáva na koniec bloku.
-- **KOV-G · „NOHY 4/6, PRÍCHYTY, SOKEL PRI VKLADANÍ" (po D; LOW):** pravidlo nôh `bands` na šírku korpusu (<1000 → 4, ≥1000 → 6; AXILO aj klzáky) · **príchyt sokla = druhé
-  bands pravidlo na šírku** (1 / 2) — O3, bez pomerového člena · set nôh podľa výšky sokla (existuje) viditeľný **pri vkladaní** (riadok v ghost pásiku/vkladacej karte) aj v
-  Korpuse pri sokli (D-111) — override per skrinka. Audit NIE. Smoke: skrinka 1200 → 6 nôh + 2 príchyty; sokel 150 → iný set nôh viditeľný už pri vkladaní.
+- **KOV-G · „NOHY 4/6, PRÍCHYTY, SOKEL PRI VKLADANÍ" ✅ KOMPLET (10.9.2026; TRI PR: G1a dáta, G1b pravidlá, G2 UI — D-111 vyriešené):**
+  ✅ **G1a DÁTA — HOTOVO (PR #337, v0.9.58):** set „Nohy podľa výšky sokla" má **sedem pásiem** (17–20 STRONG klzák 272212; 55–90 / 91–115 / 116–140 / 141–170 / 171–190 /
+  191–220 Häfele **AXILO**) a druhého člena **platnička** (17–20 sentinel `none`, 55–220 kód 9079) · nový set **„Príchyt sokla AXILO"** + generický typ **`plinth_clip`**
+  (`BuildPlan::SCHEMA` 4 → 5, precedens `lift`) · **sentinel `none` v pásme** `param_bands` (tá istá sémantika ako rad `code_by_nl` z D-118b — vyplnené pásmo `none` = člen sa
+  vedome nevydá; zákaz z D-118b zanikol) · taxonómia dostala výrobcu **Häfele** a rada AXILO sa presunula spod Hettichu pod neho (jednorazová migrácia sa dotkne LEN presného
+  starého seed tvaru) · katalóg **+9 riadkov** (272212 Démos, 8× AXILO od **Quatro LM** — desiaty prvok manifestu je dodávateľ, `nil` = Démos). **Zóna 20–55 mm ostáva vedome
+  nepokrytá** → existujúca ORANGE cesta `param_band_missing` s vetou o výške sokla (rozhodnutie Michala 9.9.).
+  **Review: TRI kolá (1 P1 + 3 P2 · 1 P1 + 2 P2 · čisté) — vedomá odchýlka od pravidla 3 kôl:** PR nebol zle narezaný, obe kolá tvrdo trafili **dátovú vrstvu** (kovanie by
+  potichu zmizlo z nákupu; legacy set zamykal celú knižnicu; klasifikácia seed setov proti živej taxonómii) — teda presne to, čo sa v .skp zamrazí a spätne sa opravuje draho.
+  ✅ **G1b PRAVIDLÁ — HOTOVO (PR #338, v0.9.59):** seed `nohy-zakladne` už nie je `fixed 4`, ale **`bands` podľa ŠÍRKY korpusu** (< 1000 mm → 4, od 1000 mm → 6) — platí pre
+  **všetky** sety nôh, set rozhoduje len o produkte · nové pravidlo **`prichyt-sokla`** vydáva `plinth_clip` **tými istými pásmami** (1 / 2 = **1 ks na začaté 4 nohy**, O3 —
+  bez pomerového člena, D-109 mechanika ostáva R-05) a platí **LEN pri samostatnej soklovej lište**: filter `support legs` + nový voliteľný `applies_to.floor_height_min`
+  (55 mm — odkiaľ lišta na nohách AXILO existuje), klzák 17–20 mm príchyt nemá · `Bom.leg_stale_issue` = **ORANGE** (`LEG_STALE`, zámerne mimo `HW_ISSUE_BLOCKERS` — nohy
+  výrobu nezastavujú): stará zákazka na nohách so seedom < 6 dostane „prestav ju" · editor Pravidiel dostal hint „Pásma podľa šírky korpusu." a popis roly s prahom sokla.
+  **Review: 1 kolo (3 P2) + interná delta-verifikácia (5 P3).**
+  ✅ **G2 UI — HOTOVO (PR #339, v0.9.60; D-111):** **jeden** riadok **„Nohy"** v Základných (cez oba stĺpce mriežky, viditeľnosť s riadkom Sokel) — vetu skladá **SERVER**
+  (`HardwareSets.legs_summary` z výsledku `explain`, žiadny druhý výklad nákupu; dôvody sa zlievajú cez členov, takže sokel 40 mm dá JEDNU vetu Kontroly) · **dve cesty, jeden
+  vzhľad**: označená skrinka = `legs_summary` z **už rozpísaných** položiek + **select setu nôh** (ten istý ovládač ako v Kovanie → Sety, existujúca akcia `set_hardware_set`),
+  vkladanie = **čítací** callback `insert_legs_preview` (žiadna operácia, žiadny krok Späť, generácia dotazu, uzavretý payload) · **ghost pásik** dostal segment `gbLegs`
+  (skrátený text, len subjekt `cabinet`, počíta sa lenivo raz za session).
+  **Review: kolo 1 = 5 P2 + 1 P1 (uzáver bloku).** Fixy: náhľad pri vklade **zo šablóny** ukazoval projektovú predvoľbu → prospektívny stav setov
+  (`state_with_template_sets` nad spoločnou `template_sets_selection`, projekt vyhráva) · prepnutie vkladania na **Dosku** nechalo visieť riadok skrinky · odpoveď v lete
+  **odkryla riadok pri hornej** skrinke (generácia + typová poistka) · **ľahký push** neobnovil vetu riadku po zmene setu v Štúdiu · **memo pásika** neprežilo zmenu setov
+  či pravidiel počas session (hooky `push_hardware_sets` / `after_model_write`).
+  **Smoke (Michal):** skrinka 1200 → 6 nôh + 2 príchyty; sokel 150 → iný set nôh viditeľný už pri vkladaní; sokel 40 → oranžová veta o nepokrytej zóne; šablóna s vlastným
+  setom nôh → riadok aj pásik hovoria o ňom, nie o predvoľbe projektu. **Audit NIE (risk-based).** Z bloku KOVANIE ostáva **KOV-I**.
 - **KOV-I · „ŠABLÓNY — ULOŽIŤ AJ KOVANIE" (po D):** checkbox „Uložiť aj kovanie" v mini-modale Inspectora (dnes freeze vždy → voľba) · 🔧 badge odvodený z prítomnosti
   `hardware_sets` snapshotu (žiadne nové pole) · hover súhrn + read-only detail pred vložením · **R12:** buď prenášať relevantné drawer overridy (`hardware_overrides` pre
   front kľúče) do šablóny, alebo v detaile priznať „zámky sa neprenášajú" — rozhodnúť v package audite · hard conflict blokuje uloženie S kovaním, geometria sa uloží.

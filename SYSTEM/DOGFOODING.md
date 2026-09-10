@@ -22,9 +22,8 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 
 - **D-109 · Pomer člena setu „1 ks na N nôh"** (Michal 24.8., prvý test v0.8.0) — set kovania vie dnes počítať člena len **per unit** (na kus) alebo **per owner** (na skrinku). Chýba pomer typu „**1
   príchyt sokla na 4 nohy**": pri príchytoch soklovej lišty sa počet neviaže na skrinku ani na jednotlivú nohu, ale na ich **počet**. Dnes sa to musí dopočítať ručne — a práve to má set robiť za
-  človeka. *(Nefixované v TEST-1: mení dátový model setu.)*
-- **D-111 · Výber setu podľa výšky sokla je schovaný** (Michal 24.8., prvý test v0.8.0) — predvoľba, ktorý set kovania sa použije podľa výšky sokla, žije v **Predvoľbách projektu** v sekcii Kovanie. Je
-  to nastavenie, ktoré človek hľadá pri **vkladaní skrinky**, nie v katalógu — dnes ho nájde len ten, kto vie, že tam je. *(UX.)*
+  človeka. *(Nefixované v TEST-1: mení dátový model setu.)* *Stav: výsledok (1 príchyt na začaté 4 nohy) dáva od KOV-G1b pravidlo `prichyt-sokla` podľa šírky (O3);
+  nesúlad po ručnom zámku nôh hlási Kontrola ORANGE `plinth_clip_check`; pomerová mechanika = R-05 po V1.*
 - **D-114 · Rad piktogramov namiesto tlačidiel „+ pridaj dvere" / „+ pridaj čelo" + upratanie kontextu Čelá** (Michal 3.9., smoke v0.9.20 po KOV-A) — nové čelo sa má pridávať
   **priamo výberom typu**: namiesto dvoch textových tlačidiel jeden rad dlaždíc s tými istými sprite ikonami ako typegrid karty (dvierka · zásuvka · výklop · sklop · blenda; „bez
   čela" rozhodnúť), klik = nový riadok daného typu (dvierka ďalej cez výrobcu smeru „neurčené", pravidlo (a) karty). Rad zaberie **ten istý jeden riadok** ako dnešné dve tlačidlá.
