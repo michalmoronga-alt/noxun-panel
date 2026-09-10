@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-124** — Predvoľby materiálov sú otvorené, v štyroch skupinách so vzorkami 115 px; pôvodný výber/potvrdenia zachované, per-rola defaulty mimo V1 — vyriešené 10.9.2026, PR #344, v0.10.3
 - **D-122** — UNI upozornenia sú zbalené pod jednu skupinu s počtom dielcov; jednotlivé akcie aj serverové počty ostávajú — vyriešené 10.9.2026, PR #343, v0.10.2
 - **D-123** — Ghost pri voľnej výške položí celú skrinku vrátane nôh/sokla na cieľovú plochu; náhľad zahŕňa aj soklovú časť — vyriešené 10.9.2026, PR #342, v0.10.1
 - **D-111** — Riadok „Nohy" v Základných aj v ghost pásiku povie, aké nohy a príchyty sokla skrinka pri tejto šírke a výške sokla dostane (a set sa dá zmeniť tým istým ovládačom ako v Kovaní) — vyriešené 10.9.2026, blok KOV-G, PR #337 + #338 + #339, v0.9.58–v0.9.60
@@ -110,6 +111,14 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+- **D-124 · Predvoľby projektu v Materiáloch — rozbalené, väčšie náhľady** (Michal 6.9., KLINIKA) — Štúdio → Katalógy → Materiály → Predvoľby projektu sú v defaulte
+  **zbalené**, pritom sa používajú často. Predstava: **väčšie náhľadové štvorce s detailmi pod sebou, zoradené v jednom riadku, default rozbalený stav**. Podotázka: **predvolený
+  materiál per rola dielca** (police, dno, chrbát…) — uskutočniteľné (poradie override dielca > predvoľba roly > materiál skrinky), ale stredná dávka (builder, BOM, VEPO, šablóny)
+  a dnes to kryje override dielca + šablóna → **mimo V1** (Michal). *Pôvodný stav: OTVORENÉ — V1 len UI rework predvolieb (malá dávka); per-rola materiál v zásobníku Po V1.*
+  **Vyriešené 10.9.2026, PR #344, v0.10.3:** schválené štyri skupiny Korpus/Čelá/Chrbát/Zásuvky, default rozbalený blok, náhľady **115 × 115 px** (mockup mínus 20 %),
+  celý názov variantu a údaje pod vzorkou. V úzkom okne dva stĺpce. Pôvodný picker, potvrdenia a identita modelu; zrušenie/odmietnutie vráti aj obrázok a údaje. Ručné zbalenie
+  prežije obnovu a návrat do sekcie. UNI bez zavádzajúcej hrúbky, chýbajúci obrázok nahradí RGB. Dátový kontrakt ani per-rola defaulty sa nemenia; tie ostávajú Po V1.
 
 - **D-122 · Kontrola hlási každý UNI dielec zvlášť** (Michal 6.9., zákazka KLINIKA) — Štúdio → Kontrola ukazuje pri UNI farbách **každý dielec ako upozornenie**; pri tvorbe
   je prirodzené, že dielce ostávajú UNI, kým sa nezvolia materiály. Želanie: **jedno upozornenie „použité nenahradené UNI farby"** a pod ním zoskupené dotknuté dielce (rozklik).

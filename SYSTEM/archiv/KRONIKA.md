@@ -17,6 +17,15 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-124 — PREHĽADNÉ PREDVOĽBY MATERIÁLOV (10.9.2026, PR #344, v0.10.3).** Blok v Štúdiu je od prvého zobrazenia otvorený; štyri skupiny s dekorovými vzorkami **115 px**
+  (schválený mockup mínus 20 %) a údajmi pod nimi. Úzke okno má dva stĺpce. Pôvodný NXCombo zachová celý názov variantu vrátane formátu/rubu; jedna potvrdzovacia lišta je pod mriežkou.
+  Fotografia, RGB, meta a prístupný názov ovládača nasledujú select pri používateľskom výbere aj programovom návrate, katalógovom echu a zmene projektu. UNI nemá zavádzajúcu hrúbku.
+  **3789 headless PASS, 107 JS sád PASS** (nový DOM test: 45 kontrol so skutočnými MD callbackmi a NXCombo). Browser test skutočného Štúdia s testovacími payloadmi overil
+  rozmery, zalamovanie, dlhé názvy, klávesnicový výber, potvrdenie/zrušenie, návrat po odmietnutí, zmenu dokumentu, perzistentné zbalenie aj chýbajúci obrázok. Obrázky z lokálnej
+  cache boli v HTTP harness mapované na testovacie URL; produkčný prevod `image_file` ostal nezmenený a pokrýva ho JS test. Read-only subagent bez nálezu.
+  In-SketchUp sa neopakovalo: Ruby, geometriu ani Undo nemení. Aktualizovaná architektúra/UI dizajn, D-124 s plným textom a indexom archivované. Schválený rozsah D-122/D-124 dokončený;
+  per-rola defaulty ostávajú Po V1, používateľský smoke a dogfooding čakajú na večer.
+
 - **D-122 — UNI UPOZORNENIA V JEDNEJ SKUPINE (10.9.2026, PR #343, v0.10.2).** Kontrola už pri tvorbe zákazky nezapĺňa obrazovku každým UNI dielcom: jedna zbalená skupina
   ukazuje počet dielcov, po rozbalení ostávajú hlásenia s vlastníkom aj všetky pôvodné akcie. Zoskupenie mení iba zobrazenie; semafor, badge, validácia a exporty držia pôvodné
   serverové počty a identity. Rozbalenie prežije filter/refresh toho istého dokumentu, iný dokument alebo náhrada posledného UNI ho zruší.
