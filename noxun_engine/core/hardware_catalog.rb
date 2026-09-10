@@ -580,9 +580,9 @@ module Noxun
         # novsi plugin mohol subor medzitym nahradit novsou schemou a tento
         # zapis by ju ticho zhodil na 1 (zahodil by novsie polia). Marker sa
         # cita CERSTVO z disku pod zamkom pred KAZDYM zapisom.
-        if File.exist?(path)
+        if JsonFileStore.available?(path)
           fresh = begin
-            JSON.parse(File.binread(path))
+            JSON.parse(File.binread(File.exist?(path) ? path : "#{path}.bak"))
           rescue StandardError
             nil
           end

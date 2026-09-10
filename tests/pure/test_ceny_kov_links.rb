@@ -140,6 +140,61 @@ NxTest.test('CENY-KOV-A: seed v6 meni len URL 8 znamych kodov s presnou povodnou
   NxTest.assert_equal(raw, File.binread(h.path), 'druhy start nic neprepisuje')
 end
 
+NxTest.test('CENY-KOV-A: Demos potvrdenie nahradi rucny URL a vedome odviazanie odstrani datum') do
+  c = CkaLinks
+  h = c::H
+  manual = c.item('A', 'product_url' => 'https://manual.example/p')
+  c.write([manual])
+  h.price_proposals['A'] = { 'pid' => 'proposal', 'base_row_rev' => h.record_rev(manual),
+                             'final_url' => 'https://www.demos-trade.sk/product/',
+                             'price_vat' => 14.0, 'unchanged' => false }
+  status, bound = h.apply_price_proposal!('A', pid: 'proposal')
+  NxTest.assert_equal(:ok, status)
+  NxTest.refute(bound.key?('product_url'), 'nova vazba nema druhy skryty zdroj')
+  NxTest.assert_equal('https://www.demos-trade.sk/product/', h.product_link(bound))
+  NxTest.assert_equal(14.0, bound['price_eur_vat'])
+  NxTest.assert(bound.key?('price_checked_at'))
+  bytes = File.binread(h.path)
+  NxTest.assert_equal(:invalid, h.patch_item('A', { 'product_url' => 'https://other.example/p' },
+                                             row_rev: h.record_rev(bound))[0])
+  NxTest.assert_equal(bytes, File.binread(h.path), 'rucny URL nesmie potichu prekryt Demos vazbu')
+  status, unbound = h.patch_item('A', { 'demos_url' => '', 'product_url' => 'https://other.example/p' },
+                                 row_rev: h.record_rev(bound))
+  NxTest.assert_equal(:ok, status)
+  NxTest.refute(unbound.key?('demos_url'))
+  NxTest.refute(unbound.key?('price_checked_at'), 'datum patril zrusenej vazbe')
+  NxTest.assert_equal('https://other.example/p', h.product_link(unbound))
+  NxTest.assert_equal(14.0, unbound['price_eur_vat'], 'odviazanie nemeni cenu')
+end
+
+NxTest.test('CENY-KOV-A: schema 3 zastavi starsi reader a fresh guard kryje aj chybajuci primar') do
+  c = CkaLinks
+  h = c::H
+  current = h::SCHEMA_CURRENT
+  c.write([c.item('A', 'product_url' => 'https://shop.example/p')])
+  before = File.binread(h.path)
+  h.send(:remove_const, :SCHEMA_CURRENT)
+  h.const_set(:SCHEMA_CURRENT, h::SCHEMA_CLASSIFIED)
+  NxTest.assert_equal(:read_only, h.assess!, 'predchadzajuca schema nesmie zahodit product_url')
+  NxTest.assert_equal(:read_only, h.patch_item('A', { 'notes' => 'old reader' }, row_rev: 'x')[0])
+  NxTest.assert_equal(before, File.binread(h.path))
+  h.send(:remove_const, :SCHEMA_CURRENT)
+  h.const_set(:SCHEMA_CURRENT, current)
+  c.write([c.item])
+  h.assess!
+  bad = JSON.generate('std' => h::STD, 'schema' => 3, 'seed_version' => h::SEED_SET_VERSION,
+                      'items' => [c.item, c.item('B', 'product_url' => {})])
+  File.binwrite("#{h.path}.bak", bad)
+  FileUtils.rm_f(h.path)
+  NxTest.assert_equal(:write_failed, h.patch_item('A', { 'notes' => 'edit' }, row_rev: h.record_rev(c.item))[0])
+  NxTest.refute(File.exist?(h.path), 'zapis nesmie obnovit orezanu zalohu ako novy katalog')
+  NxTest.assert_equal(bad.b, File.binread("#{h.path}.bak"))
+ensure
+  h.send(:remove_const, :SCHEMA_CURRENT)
+  h.const_set(:SCHEMA_CURRENT, current)
+  h.reset_state!
+end
+
 NxTest.test('CENY-KOV-A: prepare/open citaju cerstvy URL, nepisu, readonly moze otvorit, cudzi model nie') do
   NxTest.skip!('headless UI stub') unless NxTest.headless?
   c = CkaLinks
@@ -179,7 +234,7 @@ NxTest.test('CENY-KOV-A: prepare/open citaju cerstvy URL, nepisu, readonly moze 
         c.call('hw_product_open', req)
         NxTest.assert_equal('https://backup.example/p', opened.last, 'citatelna readonly zaloha ma funkcny odkaz')
         NxTest.assert_equal(primary, File.exist?(h.path) ? File.binread(h.path) : nil)
-        NxTest.assert_equal(backup, File.binread("#{h.path}.bak"))
+        NxTest.assert_equal(backup.b, File.binread("#{h.path}.bak"))
         NxTest.assert(h.product_edit_reason, 'zaloha nepripusta edit')
       end
       c.write([c.item])

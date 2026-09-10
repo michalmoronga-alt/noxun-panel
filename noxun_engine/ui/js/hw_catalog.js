@@ -188,7 +188,9 @@
     toggle.setAttribute('aria-label', 'Detail položky');
     toggle.setAttribute('aria-expanded', MDH_OPEN === item.item_code ? 'true' : 'false');
     head.appendChild(toggle);
-    head.appendChild(mdhMk('b', null, item.item_code));
+    var codeLabel = mdhMk('b', null, item.item_code);
+    codeLabel.setAttribute('title', item.item_code);
+    head.appendChild(codeLabel);
     var link = mdhMk('button', 'ghostbtn tplbtn hw-product-link' + (item.product_link ? '' : ' is-missing'));
     link.type = 'button';
     link.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-external-link"/></svg>';
