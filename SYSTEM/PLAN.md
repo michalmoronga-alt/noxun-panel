@@ -267,23 +267,9 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 - ✅ **D-124 · Predvoľby projektu v Materiáloch** — default rozbalené, ručne zbaliteľné; štyri skupiny Korpus / Čelá / Chrbát / Zásuvky vedľa seba, náhľady **115 × 115 px**
   (schválený mockup mínus 20 %), celý názov variantu a údaje pod vzorkou; v úzkom okne dva stĺpce. Spoločný picker, potvrdenie/zrušenie a serverový kontrakt zachované.
   **PR #344, v0.10.3.** „Materiál per rola dielca" ostáva v zásobníku Po V1. Podklad: `zdroje/next_sessions/D124_OUTSIDE_IN_2026-09-10.md`.
-- **Ceny — CENY-KOV (schválené Michalom 10.9.2026, realizácia teraz):** odkazy a ručné overenie **katalógového kovania**. Jeden hlavný odkaz na položku; viac URL a ručné overenie materiálov/ABS ostávajú zo
-  zvyšku V1-03 v zásobníku. Voľné ad-hoc položky bez katalógového kódu sú mimo tejto dávky. **Audit ÁNO** — nové polia, lazy schema marker a úzka migrácia katalógu. Dve sekvenčné PR, druhé až z čerstvého main
-  po prvom:
-  - **CENY-KOV-A · Odkazy — HOTOVÉ, PR #345, v0.10.4:** každá položka (aj Demos) má malú SVG ikonu „Otvoriť produkt" v katalógu aj v Rozpočte. Uložený platný odkaz otvorí iba externý prehliadač; žiadny zápis ceny/dátumu. Chýbajúci odkaz
-    = oranžová ikona s vysvetlením, klik otvorí úpravu konkrétnej položky s fokusom na doplnení adresy. Nové voliteľné `product_url` (http/https) pre položky bez Demos väzby; `demos_url` zostáva výlučne
-    overovanou väzbou konektora. Uloženie/odstránenie URL ide existujúcim formulárom, revision guardom a zámkom; čítacia cesta pred otvorením adresu znovu overí. Schema 3 len pri novom obsahu chráni pred
-    stratou údajov v staršom plugine. Známe Quatro LM odkazy možno previesť z presne pôvodných seed poznámok bez zmeny ceny, dátumu alebo vlastných úprav.
-  - **CENY-KOV-B · Ručné overenie:** samostatná akcia „Overiť cenu" z katalógu aj Rozpočtu pre položky bez Demos väzby; jeden spoločný formulár (kód/názov/dodávateľ, cena **s DPH za uvedenú MJ**, odkaz,
-    posledné overenie). Pripraví formulár a otvorí web; spätný fokus sa nevynucuje. „Potvrdiť cenu k dnešku" uloží cenu + serverový dátum + ručný pôvod v jednom zápise, so stráženou revíziou a identitou
-    požiadavky. Zrušenie, samotný preklik ani obyčajná úprava nič nepotvrdia. Zmena ceny/MJ/zdroja/dodávateľa ručné overenie zneplatní. Chýbajúca cena ostáva priznaná; zmena globálnej ceny sa prejaví pri
-    prepočte aj v ostatných zákazkách.
-  - **Spoločné pravidlo:** rovnaký nastaviteľný prah ako DEMOS (default 30 dní; vek ≥ prah = upozornenie). Ručne overená mladšia cena je aktuálna, pôvod je viditeľný. Automatický refresh nikdy neparsuje
-    `product_url`. Pole `price_check_method: manual` a dátum chránia lazy schema 4; staré DEMOS potvrdenia ostávajú platné. Uloženie obnoví katalóg/panel/Rozpočet existujúcou cestou, bez modelového zápisu.
-    Testy pokryjú deň 29/30, zrušenie, konflikt, prepnutie zákazky/sekcie, chýbajúcu cenu a nezmenené DEMOS/ABS/materiály.
-  **Predimplementačný audit Astra (10.9.2026):** 0 BLOCKER, 1 FIX-IN-A, 2 FIX-IN-B; všetky prijaté. A overí celý čerstvý nefiltrovaný dokument pod zámkom, aby typovo poškodený riadok nezmizol pri úprave iného.
-  B použije existujúci `busyLock` počas odoslaného potvrdenia a zneplatní čakajúcu požiadavku pri odchode z pôvodnej sekcie (aj Rozpočet, aj deep-link), zmene modelu alebo otvorení iného formulára.
-  Pôvodná debata: [zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md). Prepínač „na faktúru" je vyradený (existuje s DPH / bez DPH). **Mimo V1:** DOCX/PDF generátor ponuky a rodina dokumentov.
+- **Ceny — zvyšok V1-03:** ručné overenie cien **materiálov/ABS** bez Demos väzby a viac URL na položke ostávajú v zásobníku; vytiahnuť podľa reálnej praxe.
+  **CENY-KOV-A/B je hotové** (10.9.2026, PR #345/#346, v0.10.4–v0.10.5): jeden produktový odkaz a ručné potvrdenie katalógového kovania; plný schválený rozsah v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).
+  Pôvodná debata: [zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md). Prepínač „na faktúru“ je vyradený (existuje s DPH / bez DPH); DOCX/PDF ponuka a rodina dokumentov sú mimo V1.
 - *(Vkladanie na klik — V1-04 — sa 26.8. vyčlenilo do vlastného bloku **GHOST VKLADANIE**; ten je od 31.8.2026 **hotový** (v0.9.0), plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).)*
 - **Konštrukcia — rozhodnuté 6.9.2026** ([zdroje/next_sessions/V1_DEBATA_2026-09-05_KONSTRUKCIA.md](zdroje/next_sessions/V1_DEBATA_2026-09-05_KONSTRUKCIA.md)): **K1 odsadenia** — dva prípady, jedna
   hodnota per skrinka (komín vzadu: dno a strop kratšie, chrbát na ich zadnej hrane · strop zapustený vpredu), nastaviteľné, nefixované · **K2 chrbát z výstuh** — nový typ chrbta:

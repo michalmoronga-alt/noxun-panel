@@ -117,6 +117,10 @@
   function budStaleLabel(stale){
     var s = stale || {};
     var c = s.counts || {};
+    if (Number(c.manual_hardware || 0) > 0){
+      var pending = Number(c.attention || c.manual_hardware);
+      return pending + ' ' + budPluralSk(pending, ['cena na kontrolu', 'ceny na kontrolu', 'cien na kontrolu']);
+    }
     var n = Number(c.stale || 0);
     if (!n) return null;
     return n + ' ' + budPluralSk(n, ['cena staršia', 'ceny staršie', 'cien starších']) +
@@ -467,12 +471,15 @@
   function budPriceBtnHtml(b, running){
     var stale = budStaleLabel(b && b.stale);
     var warn = !!stale && !running;
+    var manualOnly = Number(b && b.stale && b.stale.counts && b.stale.counts.manual_hardware || 0) > 0 && !budPrTargets(b).length;
+    var hint = manualOnly ? 'Otvorí zoznam položiek na ručné overenie ceny' :
+      'Stiahne aktuálne ceny všetkých položiek zákazky viazaných na Demos (medzi položkami je 3 s pauza — pravidlo Demosu)';
     return '<button type="button" class="ghostbtn' + (warn ? ' bstalebtn' : '') + '"' +
       ' data-bud="refresh" data-bkey="pr"' + (running ? ' disabled' : '') +
       ' title="' + (stale ? bEsc(stale) + ' — ' : '') +
-      'Stiahne aktuálne ceny všetkých položiek zákazky viazaných na Demos' +
-      ' (medzi položkami je 3 s pauza — pravidlo Demosu)">' +
-      '<svg class="ic" aria-hidden="true"><use href="#i-refresh-cw"/></svg> Prepočítať ceny</button>';
+      bEsc(hint) + '">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-' + (manualOnly ? 'clipboard-check' : 'refresh-cw') + '"/></svg> ' +
+      (manualOnly ? 'Skontrolovať ceny' : 'Prepočítať ceny') + '</button>';
   }
 
   function budChipHtml(c, b, d){
@@ -501,8 +508,8 @@
     if (!items.length) return '';
     var h = '<div class="blist">';
     items.forEach(function(it){
-      var age = it.state === 'stale' ? ('overené pred ' + it.age_days + ' dňami')
-              : (it.state === 'unverified' ? 'cena nikdy neoverená' : 'ručná položka');
+      var age = it.state === 'stale' ? ((it.manual_check ? 'ručne ' : '') + 'overené pred ' + it.age_days + ' dňami')
+              : (it.manual_check ? 'vyžaduje ručné overenie' : (it.state === 'unverified' ? 'cena nikdy neoverená' : 'ručná položka'));
       // Akcia/poznámka je SÚRODENEC veku, nie jeho súčasť — .bage je nowrap
       // (dátum sa nesmie zalomiť), dôvod „bez väzby" sa zalomiť SMIE.
       h += '<div><span>' + bEsc(it.label) + '</span><span class="bage">' + bEsc(age) + '</span>' +
@@ -517,7 +524,17 @@
   // povie, čo s ním: over cenu v katalógu ručne.
   function budStaleActionHtml(it){
     var i = it || {};
+    if (i.kind === 'hardware' && i.id){
+      var link = budHardwareLink({ kod: i.id, nazov: i.label, product_link: !!(i.demos_url || i.product_link) });
+      if (!i.demos_url) return link + budManualCheckHtml(i.id, i.label, i, false);
+      // Aj Demos riadok v zozname upozorneni ma bezny preklik produktu.
+      return link + budDemosRefreshHtml(i);
+    }
     if (!i.demos_url) return ' <span class="bprwhy">· bez Demos väzby — over v katalógu ručne</span>';
+    return budDemosRefreshHtml(i);
+  }
+
+  function budDemosRefreshHtml(i){
     return ' <button type="button" class="bact" data-bud="refresh_one" data-kind="' + bEsc(i.kind) +
       '" data-id="' + bEsc(i.id) + '" data-label="' + bEsc(i.label) +
       '" title="Obnoviť cenu tejto položky z Demosu" aria-label="Obnoviť túto cenu">' +
@@ -688,7 +705,9 @@
       '<td>' + bEsc(r.nazov) + budNoteHtml(r) + '</td>' +
       '<td class="bnum">' + bEsc(budFmtNum(r.mnozstvo, 0)) + '</td>' +
       '<td class="bnum">' + bEsc(r.mj) + '</td>' +
-      budPriceCell(r, d) +
+      (r.price_check ? '<td class="bnum">' +
+        (r.price_missing ? '<span class="bmisslbl">chýba cena</span>' : bEsc(budSub(r.cena_mj, d))) +
+        budManualCheckHtml(r.kod, r.nazov, r.price_check, true) + '</td>' : budPriceCell(r, d)) +
       '<td class="bnum">' + bEsc(budSub(r.spolu, d)) + '</td></tr>';
   }
 
@@ -702,6 +721,20 @@
       '" data-action="hw-product" data-code="' + bEsc(r.kod) + '" title="' + bEsc(label) +
       '" aria-label="' + bEsc(label + ' · ' + (r.nazov || r.kod)) + '">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-external-link"/></svg></button>';
+  }
+
+  function budManualCheckHtml(code, name, info, compact){
+    var i = info || {};
+    if (!code) return '';
+    var fresh = i.state === 'fresh';
+    var date = i.checked_at ? String(i.checked_at).slice(0, 10).split('-').reverse().join('.') : '';
+    var state = fresh ? 'Ručne overené ' + date : 'Cena vyžaduje ručné overenie';
+    return ' <button type="button" class="bact hw-manual-check' + (fresh ? '' : ' is-pending') +
+      '" data-action="hw-manual-check" data-code="' + bEsc(code) +
+      '" title="' + bEsc(state + ' · Overiť cenu') + '" aria-label="' + bEsc('Overiť cenu · ' + (name || code) + ' · ' + state) + '">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-clipboard-check"/></svg>' +
+      (compact ? '' : ' Overiť cenu') + '</button>' +
+      (compact && fresh ? '<span class="bmanual-checked">ručne ' + bEsc(date) + '</span>' : '');
   }
 
   // Automaticka sluzba: vypocet vlavo, vpravo EDITOVATELNA suma. Prepis
@@ -1382,6 +1415,13 @@
       }
     }
     if (!targets.length){
+      var budget = budBudget();
+      if (Number(budget && budget.stale && budget.stale.counts && budget.stale.counts.manual_hardware || 0) > 0){
+        BUD_STALE_OPEN = true;
+        budRerender();
+        NX.setStatus('Vyber položku a klikni na Overiť cenu. Ručné odkazy sa automaticky nesťahujú.', false);
+        return;
+      }
       NX.setStatus('Všetky ceny viazané na Demos sú čerstvé — netreba nič sťahovať.', false);
       return;
     }

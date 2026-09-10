@@ -569,6 +569,11 @@ explicitná, aby to bol zámer, nie náhoda). Cenová ponuka voľný riadok **ne
 ten istý globálny katalóg ako pri dodávateľovi; URL nevstupuje do výpočtu ani projektových override dát. Platný odkaz otvorí web, chýbajúci vedie do existujúcej úpravy
 katalógovej položky. Voľné položky bez kódu tento kanál nemajú; vlastné položky Rozpočtu a spotrebiče si nechávajú pôvodné odkazy uložené v zákazke.
 
+**Ručná čerstvosť kovania (CENY-KOV-B, v0.10.5).** `freshness_item` pre neviazané kovanie používa ručný serverový marker, uložený odkaz, reálnu cenu/MJ a platný ISO dátum, ktorý nie je v budúcnosti.
+Bez platného potvrdenia zostáva stav `manual`; platné potvrdenie je `fresh` alebo `stale` podľa rovnakého `stale_days` ako Demos (vek ≥ prah). Materiály/ABS a viazané Demos položky používajú pôvodnú vetvu.
+Riadok kovania nesie `price_check` aj pre čerstvé ručné ceny, aby UI vedelo ukázať pôvod/dátum a opätovné overenie. Rovnaká funkcia a časová referencia tvoria scan aj riadok; `stale.items` naďalej vynecháva čerstvé ceny.
+`counts.manual_hardware` počíta nevyriešené ručné kovanie; `counts.attention` ho spája so starými cenami bez dvojitého započítania. Kontrolujú sa iba použité katalógové položky, voľné riadky sú mimo scanu.
+
 ### budget_store.rb
 
 _(kostra založená dávkou 1d/R-14 — doplniť pri ďalších zásahoch)_
@@ -593,9 +598,9 @@ Testy: `tests/pure/test_r14_budget_std.rb` (19 scenárov, 7 mutácií overených
 
 ### price_refresh.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
-
-Beh prepočtu cien voči Demosu — zmienky v odseku `production_core.rb`.
+Sekvenčný beh prepočtu cien voči Demosu, iba pre položky použité v rozpočte. `targets_from_budget` vyžaduje `demos_url`; všeobecné `product_url` sa nikdy nefetchuje ani vtedy, keď má Demos host.
+Každá cena ide existujúcou serverovou proposal cestou, jednotlivé položky sa zapisujú samostatne a chyby sa priznajú v reporte. Zrušenie dokončí rozbehnutú položku a preskočí zvyšok.
+**CENY-KOV-B (v0.10.5):** `manual_from_budget` vracia iba nevyriešené neviazané položky, čerstvé ručné potvrdenie už do zoznamu nepatrí. Ručné potvrdenie vlastní HardwareCatalog; tento modul preň nevytvára druhý zápis.
 
 ### supplier_settings.rb
 

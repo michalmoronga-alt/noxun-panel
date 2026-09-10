@@ -97,13 +97,13 @@ module Noxun
         out
       end
 
-      # Polozky BEZ vazby (rucne) — UI ich vymenuje s odporucanim "over v
-      # katalogu rucne". Ziadny fetch, ziadny zapis.
+      # Nevyriesene polozky BEZ vazby (rucne). Rucne potvrdene a este cerstve
+      # kovanie uz kontrolu nepotrebuje. Ziadny fetch, ziadny zapis.
       def manual_from_budget(budget)
         b = budget.is_a?(Hash) ? budget : {}
         stale = b['stale'].is_a?(Hash) ? b['stale'] : {}
         Array(stale['items']).select do |it|
-          it.is_a?(Hash) && it['demos_url'].to_s.strip.empty?
+          it.is_a?(Hash) && it['demos_url'].to_s.strip.empty? && it['state'] != 'fresh'
         end
       end
 

@@ -239,6 +239,14 @@
     del.setAttribute('data-hw-code', item.item_code);
     if (MDH_RO) del.disabled = true;
     line1.appendChild(del);
+    if (!item.demos_url){
+      var manual = mdhMk('button', 'ghostbtn tplbtn', 'Overiť cenu ručne');
+      manual.setAttribute('data-action', 'hw-manual-check');
+      manual.setAttribute('data-code', item.item_code);
+      manual.setAttribute('title', 'Otvorí produkt a formulár na ručné potvrdenie ceny s DPH');
+      if (MDH_RO) manual.disabled = true;
+      line1.appendChild(manual);
+    }
     box.appendChild(line1);
     var line2 = mdhMk('div', 'tplrow');
     line2.appendChild(mdhMk('span', 'tplt', 'Poznámka'));
@@ -269,7 +277,8 @@
     }
     box.appendChild(line3);
     var checked = mdhCheckedLabel(item.price_checked_at);
-    if (checked) box.appendChild(mdhMk('div', 'mans', 'cena ' + checked));
+    if (checked) box.appendChild(mdhMk('div', 'mans',
+      (item.price_check_method === 'manual' ? 'cena ručne ' : 'cena ') + checked));
     var pr = MDH_PRICE[item.item_code];
     if (pr){
       var line4 = mdhMk('div', 'tplrow hwprice');
@@ -906,8 +915,10 @@
 
   function hwItemOpen(item, draft, opts){
     if (typeof NXModal === 'undefined' || !NXModal || typeof NXModal.open !== 'function') return;
+    if (HW_MANUAL && NXModal.busyLocked && NXModal.busyLocked()) return;
     var o = opts || {};
     HW_PRODUCT_PENDING = null;
+    HW_MANUAL_PENDING = null;
     var edit = !!item;
     // Review #290 P2: proposal z Demosu PREZIL zatvorenie okna, takze nove
     // otvorenie „Nová položka" z neho formular znovu predvyplni — vyhladany
@@ -1223,9 +1234,16 @@
     if (p && (p.section !== String(nextSection || '') || p.model_guid !== String(nextModelGuid || ''))){
       HW_PRODUCT_PENDING = null;
     }
+    var m = HW_MANUAL_PENDING;
+    if (m && (m.section !== String(nextSection || '') || m.model_guid !== String(nextModelGuid || ''))) HW_MANUAL_PENDING = null;
+    var f = HW_MANUAL;
+    if (f && (f.section !== String(nextSection || '') || f.model_guid !== String(nextModelGuid || ''))){
+      hwManualClose();
+    }
   }
   function hwProductRequest(code, trigger){
     HW_PRODUCT_PENDING = null;
+    HW_MANUAL_PENDING = null;
     if (!code || (typeof NXModal !== 'undefined' && NXModal.isOpen())) return;
     var ctx = hwProductContext();
     if (!ctx.model_guid || (ctx.section !== 'hw' && ctx.section !== 'budget')) return;
@@ -1259,10 +1277,141 @@
     hwItemOpen(item, null, { trigger: p.trigger, initialFocus: 'product_url' });
   }
 
+  // Rucne overenie ma vlastny formular a tokeny; nikdy nepouziva Demos fetch
+  // ani HW_ITEM draft. Ostava v povodnej sekcii (Katalog alebo Rozpocet).
+  var HW_MANUAL_PENDING = null;
+  var HW_MANUAL = null;
+  function hwManualRequest(code, trigger){
+    HW_MANUAL_PENDING = null;
+    HW_PRODUCT_PENDING = null;
+    if (!code || typeof NXModal === 'undefined' || NXModal.isOpen()) return;
+    var ctx = hwProductContext();
+    if (!ctx.model_guid || (ctx.section !== 'hw' && ctx.section !== 'budget')) return;
+    var token = 'manual-' + (++HW_PRODUCT_SEQ);
+    HW_MANUAL_PENDING = { code: String(code), token: token, section: ctx.section,
+      model_guid: ctx.model_guid, trigger: trigger, modalGeneration: NXModal.generation() };
+    mdhSend('hw_manual_prepare', { code: String(code), token: token,
+      section: ctx.section, model_guid: ctx.model_guid });
+  }
+  function hwManualOwns(f){
+    return !!(f && HW_MANUAL === f && NXModal.isOpen() && NXModal.generation() === f.generation);
+  }
+  function hwManualClose(){
+    HW_MANUAL_PENDING = null;
+    var f = HW_MANUAL;
+    if (hwManualOwns(f)){
+      // Zmena dokumentu/sekcie nie je zrusenie uz odoslaneho zapisu. Jeho
+      // neskora odpoved smie obnovit katalog, ale nesmie vlastnit cudzi modal.
+      NXModal.setBusy(false);
+      NXModal.close();
+    }
+    HW_MANUAL = null;
+  }
+  function hwManualReady(r){
+    var p = HW_MANUAL_PENDING;
+    if (!p || !r || r.token !== p.token || r.code !== p.code ||
+        r.section !== p.section || r.model_guid !== p.model_guid) return;
+    HW_MANUAL_PENDING = null;
+    var ctx = hwProductContext();
+    if (ctx.section !== p.section || ctx.model_guid !== p.model_guid ||
+        NXModal.isOpen() || NXModal.generation() !== p.modalGeneration) return;
+    if (!r.item){ MDH.setStatus(r.reason || 'Položka sa už v katalógu nenašla.', true); return; }
+    if (r.read_only){ MDH.setStatus('Katalóg je len na čítanie: ' + (r.reason || ''), true); return; }
+    if (r.item.demos_url){ MDH.setStatus('Položka je viazaná na Demos — použi overenie z Demosu.', true); return; }
+    if (!r.has_url){ hwProductRequest(p.code, p.trigger); return; }
+    hwManualOpen(r.item, r.row_rev, p);
+  }
+  function hwManualOpen(item, rowRev, origin, message){
+    if (NXModal.busyLocked && NXModal.busyLocked()) return;
+    if (NXModal.isOpen() && !hwManualOwns(HW_MANUAL)) return;
+    var previous = item.price_check_method === 'manual' && item.price_checked_at
+      ? 'Posledné ručné potvrdenie: ' + (mdhCheckedLabel(item.price_checked_at) || String(item.price_checked_at))
+      : 'Cena zatiaľ nebola ručne potvrdená.';
+    var f = { code: String(item.item_code), rowRev: rowRev, token: 'manual-form-' + (++HW_PRODUCT_SEQ),
+      section: origin.section, model_guid: origin.model_guid, trigger: origin.trigger,
+      sent: false, submitToken: '', browserPending: true };
+    NXModal.open({ title: 'Overiť cenu ručne', sub: f.code + ' · ' + String(item.name_sk || ''),
+      size: 'md', trigger: f.trigger, memoryKey: null, busyLock: true, initialFocus: 'price',
+      okLabel: 'Potvrdiť cenu k dnešku',
+      note: (message ? message + ' ' : '') + previous + ' Potvrdená cena platí v celom katalógu.',
+      fields: [
+        { type: 'group', label: String(item.supplier || 'Dodávateľ neuvedený'), hint: String(item.product_url || '') },
+        { key: 'price', label: 'Cena s DPH', value: item.price_eur_vat == null ? '' : String(item.price_eur_vat),
+          cls: 'mshort', hint: '€ s DPH / ' + String(item.unit || '') }
+      ],
+      onSubmit: function(v){ hwManualSubmit(f, v); },
+      onClose: function(){ if (HW_MANUAL === f) HW_MANUAL = null; }
+    });
+    f.generation = NXModal.generation();
+    HW_MANUAL = f;
+    // Pocka na existujuci 20 ms fokus NXModal. Po otvoreni externeho browsera
+    // uz ziadny oneskoreny focus() tejto karty nepobezi.
+    setTimeout(function(){
+      if (!hwManualOwns(f)) return;
+      var ctx = hwProductContext();
+      if (ctx.section !== f.section || ctx.model_guid !== f.model_guid) return;
+      mdhSend('hw_manual_open', { code: f.code, row_rev: f.rowRev, token: f.token,
+        section: f.section, model_guid: f.model_guid });
+    }, 25);
+  }
+  function hwManualSubmit(f, v){
+    if (!hwManualOwns(f)) return;
+    var ctx = hwProductContext();
+    if (ctx.section !== f.section || ctx.model_guid !== f.model_guid){ hwManualClose(); return; }
+    if (f.browserPending){
+      NXModal.setBusy(false);
+      NXModal.showErrors([{ msg: 'Počkaj na otvorenie produktu a skontroluj cenu.' }]);
+      return;
+    }
+    var value = String((v || {}).price == null ? '' : v.price).trim();
+    if (!value || !hwPriceValid(value)){
+      NXModal.setBusy(false);
+      NXModal.showErrors([{ field: 'price', msg: 'Vlož nezápornú cenu s DPH; prázdna cena sa nedá potvrdiť.' }]);
+      return;
+    }
+    f.sent = true;
+    f.submitToken = 'manual-save-' + (++HW_PRODUCT_SEQ);
+    mdhSend('hw_manual_confirm', { code: f.code, row_rev: f.rowRev, price: value,
+      token: f.submitToken, section: f.section, model_guid: f.model_guid });
+  }
+  function hwManualResult(r){
+    var f = HW_MANUAL;
+    if (!r || !hwManualOwns(f) || r.code !== f.code || r.model_guid !== f.model_guid || r.section !== f.section) return;
+    var opening = r.phase === 'open';
+    if (opening){
+      if (!f.browserPending || f.sent || r.token !== f.token) return;
+      if (r.ok && !r.read_only && r.item && !r.item.demos_url && r.has_url && r.row_rev === f.rowRev){
+        // Az serverovy ack pokusu otvorit browser odblokuje potvrdenie.
+        // Tento ack sam cenu nepotvrdzuje, formular zostava otvoreny.
+        f.browserPending = false;
+        NXModal.clearErrors();
+        return;
+      }
+      hwManualClose(); MDH.setStatus(r.msg || 'Overenie už nie je platné — otvor ho znova.', true); return;
+    }
+    if (!f.sent || r.token !== f.submitToken) return;
+    NXModal.setBusy(false);
+    f.sent = false;
+    f.submitToken = '';
+    if (r.ok){ hwManualClose(); MDH.setStatus(r.msg || 'Cena bola ručne potvrdená.'); return; }
+    if (r.read_only || !r.item || r.item.demos_url || !r.has_url || r.status === 'stale_model'){
+      hwManualClose(); MDH.setStatus(r.msg || 'Overenie už nie je platné — otvor ho znova.', true); return;
+    }
+    if (r.status === 'conflict'){
+      // Novy formular + jeho aktualna cena/zdroj. Povodna cena sa nikdy sama
+      // neposle znova a dalsie potvrdenie ma novu reviziu.
+      hwManualOpen(r.item, r.row_rev, f, r.msg);
+      return;
+    }
+    NXModal.showErrors(r.errors && r.errors.length ? r.errors : [{ msg: r.msg || 'Cenu sa nepodarilo uložiť.' }]);
+  }
+
   // --- verejne API pre Ruby ------------------------------------------------
 
   var MDH = {
     productReady: hwProductReady,
+    manualReady: hwManualReady,
+    manualResult: hwManualResult,
     init: function(data){
       mdhApplyEnums(data);
       mdhRenderEnums();
@@ -1494,6 +1643,8 @@
       var code = t.getAttribute('data-hw-code') || '';
       if (action === 'hw-product'){
         hwProductRequest(t.getAttribute('data-code') || code, t);
+      } else if (action === 'hw-manual-check'){
+        hwManualRequest(t.getAttribute('data-code') || code, t);
       } else if (action === 'hw-view'){
         // ŠT-3a-1: segment Položky · Sety v lište sekcie (Š16).
         hwSetView(t.getAttribute('data-view'));
@@ -1781,6 +1932,7 @@
   // zatvoria modaly.
   function hwOnLeaveSection(){
     HW_PRODUCT_PENDING = null;
+    hwManualClose();
     if (window.sketchup && sketchup.hw_leave) sketchup.hw_leave('');
     // Review #219 P2-2: naplanovany (debounced) dotaz do Demosu MUSI zomriet
     // s odchodom. Vstup do sekcie a rychly odchod by inak poslal
@@ -1897,6 +2049,7 @@
       hwItemCatOptions: hwItemCatOptions, hwDemosHit: hwDemosHit,
       hwItemOpen: hwItemOpen, hwTreeState: hwTreeState,
       hwProductRequest: hwProductRequest, hwProductContextChanged: hwProductContextChanged,
+      hwManualRequest: hwManualRequest,
       mdhGroupCount: mdhGroupCount, mdhCatLabel: mdhCatLabel,
       hwOnLeaveSection: hwOnLeaveSection, hwApplyState: hwApplyState, MDH: MDH };
   }

@@ -102,10 +102,12 @@ module Noxun
         smap = sheets.is_a?(Hash) ? sheets : {}
         emap = edges.is_a?(Hash) ? edges : {}
         est = sheet_estimate.is_a?(Array) ? sheet_estimate : estimate_for(b, smap)
+        price_ref = now.is_a?(Time) ? now : Time.now.utc
+        price_days = (num(SupplierSettings.scalar(sup, 'stale_days')) || 30).to_i
 
         materials = materials_section(est, smap)
         abs = abs_section(list(b, :edging), emap, SupplierSettings.scalar(sup, 'abs_reserve_pct'))
-        hardware = hardware_section(hardware_expansion, hardware_catalog)
+        hardware = hardware_section(hardware_expansion, hardware_catalog, stale_days: price_days, now: price_ref)
         services = services_section(est, materials, abs, smap, sup, st, mode)
         standard = standard_section(sup, st, mode)
         custom = custom_section(st)
@@ -123,7 +125,7 @@ module Noxun
           'sections' => sections,
           'totals' => totals,
           'stale' => stale_scan(est, list(b, :edging), hardware, smap, emap, hardware_catalog,
-                                SupplierSettings.scalar(sup, 'stale_days'), now),
+                                price_days, price_ref),
           'settings' => {
             'supplier_id' => sup['id'], 'supplier_name' => sup['name'],
             'rounding_step' => SupplierSettings.scalar(sup, 'rounding_step'),
@@ -265,9 +267,10 @@ module Noxun
       # Prebera HOTOVU expanziu setov (HardwareSets.expand) — rozpocet kovanie
       # NIKDY neexpanduje sam (jedna autorita poctov aj kodov). Dodavatel sa
       # dojoinuje z katalogu (expanzia ho nenesie) — LEN pre export/zobrazenie.
-      def hardware_section(expansion, catalog = nil)
+      def hardware_section(expansion, catalog = nil, stale_days: 30, now: nil)
         return section('hardware', []) unless expansion.is_a?(Hash)
         lookup = catalog ? hardware_lookup(catalog) : {}
+        ref = now.is_a?(Time) ? now : Time.now.utc
         rows = list(expansion, :rows).map do |r|
           next nil unless r.is_a?(Hash)
           code = r['code'].to_s
@@ -290,6 +293,9 @@ module Noxun
           # dohlada v katalogu; cena ani stav jej overenia ikonu neriadia.
           if item.is_a?(Hash) && r['free'] != true
             row['product_link'] = !HardwareCatalog.product_link(item).nil?
+            if item['demos_url'].to_s.strip.empty?
+              row['price_check'] = freshness_item('hardware', code, row['nazov'], item, stale_days, ref)
+            end
           end
           # KOV-H1 (audit #15 FIX 8): povod riadku ide do rozpoctu ADITIVNE —
           # `origin: 'adhoc'` ked riadok (aj ciastocne) pochadza z rucne
@@ -503,10 +509,9 @@ module Noxun
 
       # --- vek cien (cenova cerstvost) -----------------------------------------
 
-      # Scan LEN nad polozkami POUZITYMI v tomto rozpocte (audit 11). Tri stavy:
-      #   stale      — viazana na Demos, cena overena skor ako pred stale_days
-      #   unverified — viazana, ale bez datumu overenia
-      #   manual     — neviazana polozka (nikdy nie je "stara", len rucna)
+      # Scan LEN nad polozkami POUZITYMI v tomto rozpocte (audit 11).
+      # Rucne potvrdene kovanie ma rovnaky vekovy prah ako Demos. Neoverene
+      # rucne kovanie ostava 'manual'; materialy/ABS si zachovavaju povodne stavy.
       def stale_scan(estimate, edging, hardware, sheets, edges, hardware_catalog, stale_days, now)
         days = (num(stale_days) || 30).to_i
         ref = now.is_a?(Time) ? now : Time.now.utc
@@ -539,6 +544,8 @@ module Noxun
         items.compact!
         counts = { 'stale' => 0, 'unverified' => 0, 'manual' => 0, 'fresh' => 0 }
         items.each { |i| counts[i['state']] = counts[i['state']].to_i + 1 }
+        counts['manual_hardware'] = items.count { |i| i['manual_check'] && i['state'] != 'fresh' }
+        counts['attention'] = items.count { |i| i['state'] == 'stale' || (i['manual_check'] && i['state'] != 'fresh') }
         { 'stale_days' => days,
           'items' => items.reject { |i| i['state'] == 'fresh' }
                           .sort_by { |i| [-(i['age_days'] || -1), i['kind'], i['id']] },
@@ -547,6 +554,7 @@ module Noxun
 
       def freshness_item(kind, id, label, rec, stale_days, ref)
         url = rec['demos_url'].to_s.strip
+        return manual_hardware_freshness(id, label, rec, stale_days, ref) if kind == 'hardware' && url.empty?
         checked = rec['price_checked_at'].to_s.strip
         state, age = if url.empty?
                        ['manual', nil]
@@ -565,6 +573,28 @@ module Noxun
         { 'kind' => kind, 'id' => id, 'label' => label, 'state' => state,
           'checked_at' => (checked.empty? ? nil : checked), 'age_days' => age,
           'demos_url' => (url.empty? ? nil : url) }
+      end
+
+      # Serverovy manual marker sam nestaci: overenie patri platnemu zdroju,
+      # cene a MJ. Poskodeny/buduci datum ani chybajuca cena nie su fresh.
+      def manual_hardware_freshness(id, label, rec, stale_days, ref)
+        checked = rec['price_checked_at'].to_s.strip
+        stamp = begin
+          Time.iso8601(checked).utc
+        rescue ArgumentError
+          nil
+        end
+        price = rec['price_eur_vat']
+        linked = !HardwareCatalog.product_link(rec).nil?
+        valid = rec['price_check_method'] == 'manual' && linked &&
+                price.is_a?(Numeric) && price.real? && price.finite? && price >= 0 &&
+                HardwareCatalog.canonical_unit(rec['unit']) && stamp && stamp <= ref
+        age = valid ? ((ref - stamp) / 86_400.0).floor : nil
+        { 'kind' => 'hardware', 'id' => id, 'label' => label, 'manual_check' => true,
+          'state' => (valid ? (age >= stale_days ? 'stale' : 'fresh') : 'manual'),
+          'checked_at' => (valid ? checked : nil), 'age_days' => age,
+          'price_check_method' => (valid ? 'manual' : nil),
+          'demos_url' => nil, 'product_link' => linked }
       end
 
       def parse_time(value)
