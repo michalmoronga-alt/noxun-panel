@@ -417,9 +417,22 @@
     var o = tp && tp.config ? tp.config.orientation : null;
     return TPL_ORI_LABELS[o] || '';
   }
+  // KOV-I: server posiela JEDEN odvodeny suhrn; klient necita mapovanie ani defs.
+  function nxTplHardwareText(tp, prefix){
+    var hw = tp && tp.hardware;
+    if (!hw || hw.has !== true) return '';
+    return (prefix || 'Kovanie: ') + (hw.labels || []).join(' · ') + ' — zámky sa neprenášajú';
+  }
+  function nxTplHardwareBadge(tp){
+    var text = nxTplHardwareText(tp);
+    return text ? '<i class="tplhw" role="img" aria-label="' + esc(text) + '">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg></i>' : '';
+  }
   function nxTplTitle(tp){
     var note = nxTplOrientationNote(tp);
-    return tp.name + (note ? ' · ' + note : '') + ' — klik = vybrať · dvojklik = vlož hneď';
+    var hw = nxTplHardwareText(tp);
+    return tp.name + (note ? ' · ' + note : '') + ' — klik = vybrať · dvojklik = vlož hneď' +
+      (hw ? '\n' + hw : '');
   }
   // UI-D2: KLUC nahladu v cache. Nahlad je viazany na TROJICU (druh, nazov,
   // revizia suboru) — po prepise sablony sa `rev` zmeni a stary obrazok sa uz
@@ -462,7 +475,8 @@
       ' data-tpl-kind="' + esc(NXInsert.templateKind(tp)) + '"' +
       ' data-tpl-rev="' + esc(rev) + '" title="' + esc(nxTplTitle(tp)) + '">' +
       tplPicHtml(tp) +
-      '<span>' + esc(tp.name) + (badge ? ' <i>· ' + esc(badge) + '</i>' : '') + '</span></button>';
+      '<span class="tplcaption">' + nxTplHardwareBadge(tp) + '<span>' + esc(tp.name) +
+      (badge ? ' <i>· ' + esc(badge) + '</i>' : '') + '</span></span></button>';
   }
   // Nasadenie data URI na jednu dlazdicu. `onload` az potom odkryje obrazok —
   // `onerror` ho necha skryty, takze zostane vidiet SCHEMA (nikdy prazdny box).
@@ -602,9 +616,18 @@
     setTplMeta();
   }
   function setTplMeta(){
-    var m = el('insTplMeta'); if (!m) return;
+    var m = el('insTplMeta');
     var kind = (NXInsert.insertType() === 'board') ? 'board' : 'cabinet';
-    m.textContent = NXInsert.templateName(kind) || 'bez šablóny';
+    var name = NXInsert.templateName(kind);
+    if (m) m.textContent = name || 'bez šablóny';
+    // Ten isty riadok ako pomoc ku klikaniu: ziadny novy blok vo vkladacej karte.
+    var hint = el('tplHint'); if (!hint) return;
+    var tp = NXInsert.findTemplate(TEMPLATES, kind, name);
+    var text = nxTplHardwareText(tp, 'Kovanie zo šablóny: ');
+    hint.textContent = text ? (text.length > 80 ? text.slice(0, 79) + '…' : text) :
+      'Klik = vybrať a doladiť · dvojklik = vlož hneď.';
+    hint.title = text;
+    hint.classList.toggle('tplhwhint', !!text);
   }
   // Vyber sablony = zapis do insert STAVU + plna materializacia karty (D-33:
   // konstrukcia + cela + medzery + zamok presahov + zony + MATERIALY — audit F6).
@@ -846,6 +869,15 @@
   // jednym dokumentom by po prepnuti ulozil skrinku z ineho. Zachytava sa aj
   // DOKUMENT a server ho striktne overuje (vzor clear_selection / kamera).
   var tplModalGuid = null;
+  // KOV-I: pamat poslednej volby patri pocitacu (vzor rozbalenia sekcii).
+  var TPL_SAVE_HARDWARE_KEY = 'noxun.tpl.with_hardware';
+  function tplSavedHardwareChoice(){
+    try { return localStorage.getItem(TPL_SAVE_HARDWARE_KEY) !== '0'; } catch(e){ return true; }
+  }
+  function rememberTplHardwareChoice(){
+    var input = el('tplSaveHardware');
+    try { localStorage.setItem(TPL_SAVE_HARDWARE_KEY, input.checked ? '1' : '0'); } catch(e){}
+  }
   // Je otvoreny modal uz „o inej skrinke"? (zmena ID ALEBO dokumentu)
   function tplModalStale(c){
     if (!tplModalCabId) return false;
@@ -861,6 +893,7 @@
     // UI-B3: typ sa predvyplni z TYPU OZNACENEJ SKRINKY (radio vo vkladacej
     // karte je pri oznacenom korpuse zrkadlom jeho typu — setType v loadSelected).
     setVal('tplSaveType', getType());
+    el('tplSaveHardware').checked = tplSavedHardwareChoice();
     m.style.display = 'flex';
     refreshTplModalWarn();
     bindTplModal();
@@ -905,6 +938,7 @@
       // sablona ponuka (whitelist v Ruby)
       sketchup.save_template_as(JSON.stringify({ name: name, cabinet_id: tplModalCabId || selectedCabId,
                                                  model_guid: tplModalGuid || '',
+                                                 with_hardware: el('tplSaveHardware').checked,
                                                  type: val('tplSaveType') || getType() }));
     }
     closeSaveTemplateModal();
@@ -913,11 +947,12 @@
     if (tplModalBound) return; tplModalBound = true;
     var m = el('tplModal');
     el('tplSaveName').addEventListener('input', function(){ this.classList.remove('bad'); refreshTplModalWarn(); });
+    el('tplSaveHardware').addEventListener('change', rememberTplHardwareChoice);
     m.addEventListener('keydown', function(ev){
       if (ev.key === 'Escape'){ ev.preventDefault(); closeSaveTemplateModal(); return; }
       if (ev.key === 'Enter'){ ev.preventDefault(); saveTemplateAs(); return; }
       if (ev.key === 'Tab'){
-        var f = m.querySelectorAll('input, button');
+        var f = m.querySelectorAll('input, select, button');
         if (!f.length) return;
         var first = f[0], last = f[f.length - 1];
         if (ev.shiftKey && document.activeElement === first){ ev.preventDefault(); last.focus(); }
@@ -1732,6 +1767,10 @@
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { nxTplGlyph: nxTplGlyph, nxTplBadge: nxTplBadge,
                        nxTplOrientationNote: nxTplOrientationNote, nxTplTitle: nxTplTitle,
+                       // KOV-I: mini-DOM overuje skutocny modal a existujuci hint.
+                       nxTplHardwareText: nxTplHardwareText, nxTplHardwareBadge: nxTplHardwareBadge,
+                       openSaveTemplateModal: openSaveTemplateModal, closeSaveTemplateModal: closeSaveTemplateModal,
+                       saveTemplateAs: saveTemplateAs, setTplMeta: setTplMeta,
                        // UI-D2: dlazdica s PNG nahladom — kluc cache, ciste jadro
                        // pull/cache rozhodovania a nasadenie obrazka na dlazdicu.
                        tplPrevKey: tplPrevKey, tplPicHtml: tplPicHtml, tplTileHtml: tplTileHtml,

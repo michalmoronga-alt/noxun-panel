@@ -576,6 +576,15 @@ a in-SketchUp sekcia `run_kovb1`.
 Sety kovania (mapovacie pravidlo generický typ → kódy katalógu) + projektový snapshot predvolieb na modeli; nadväzujúce zmienky sú v odsekoch `hardware_rules.rb`
 a `hardware_catalog.rb` a v [ui-lifecycle.md](ui-lifecycle.md) (sekcia `hw` Štúdia).
 
+**H2/D-76 + KOV-I — šablóna voliteľne nesie kovanie.** „Uložiť aj kovanie“ je predvolene zapnuté: do šablóny idú prenosné mapovania, zmrazené definície
+(`template_set_defs`, snapshot projektu pred globálom) a ručné položky `hardware_manual`. Vypnutá voľba vynechá všetky tri kľúče aj kontrolu zdroja setov.
+Ak zdroj definícií nemožno bezpečne prečítať (`template_set_defs == nil`), uloží sa konštrukcia **bez všetkého kovania vrátane ručných položiek** a stav povie
+„Šablóna uložená BEZ kovania“ s dôvodom (rozhodnutie Michala 10.9.2026). Chýbajúca jednotlivá referencia nad zdravým zdrojom ostáva existujúcim prípadom `set_missing`.
+Odznak a súhrn počíta čistá `TemplateStore.hardware_summary` nad uloženým obsahom, bez zisťovania aktuálnych predvolieb projektu.
+**KOV-I R12:** `hardware_overrides` (ručná dĺžka, výška a počty) sa do šablóny neprenášajú; mapovania na jednotlivé čelá sa tiež neprenášajú. Identita čiel nie je
+medzi skrinkami prenosným kontraktom. UI túto hranicu priznáva; prípadný prenos cez mapovanie čiel je mimo V1. Systém a pripnuté recepty vo `fronts` ostávajú
+súčasťou konštrukcie. Pri novom vložení bez kovania rozhodujú projektové predvoľby setov, pri použití na existujúcu skrinku ostáva jej vlastné kovanie.
+
 **KLASIFIKÁCIA SETU (KOV-B1, v0.9.19).** Set už nie je len „mapovanie typu na kódy" — nesie AJ to, NA ČO sa používa: `use_type` (door|drawer|lift|fall|other) · `opening_mode`
 (classic|tipon|other, kde `other` = „neuplatňuje sa" pri nohách, podperkách a zavesení) · `drawer_construction` (metal|wood|other, **len pri zásuvke**) · `lift_system`
 (hk_top|hl_top, **len pri výklope** — KOV-E1a) · `manufacturer` · `series` · `active`. Slovníky sú UZAVRETÉ (neznáma hodnota = obsah novšej verzie, nie nová kategória) a s čelami držia JEDNU doménovú pravdu — `Fronts` sa načítava PO

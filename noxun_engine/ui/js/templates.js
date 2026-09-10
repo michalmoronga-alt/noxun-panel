@@ -229,13 +229,17 @@
     var isCab = kind === 'cabinet';
     var type = cfg.type || 'lower';
     var dims = tplDims(cfg);
+    var hw = tp.hardware && tp.hardware.has === true
+      ? 'Kovanie: ' + (tp.hardware.labels || []).join(' · ') + ' — zámky sa neprenášajú' : '';
     var id = tplDomIdAt(kind, idx == null ? 0 : idx);
     TPL_DOM[tplKey(kind, tp.name, '')] = { id: id, rev: tp.preview_rev };
-    var h = '<div class="stpltile" data-kind="' + tplEsc(kind) + '" data-name="' + tplEsc(tp.name) + '">' +
+    var h = '<div class="stpltile" data-kind="' + tplEsc(kind) + '" data-name="' + tplEsc(tp.name) + '"' +
+      (hw ? ' title="' + tplEsc(hw) + '"' : '') + '>' +
       '<div class="stplpic" id="tplpic-' + tplEsc(id) + '">' +
       (tp.preview_rev ? '<img alt="">' : '') +
       '<span class="stplph">' + (tp.preview_rev ? '' : 'schéma') + '</span></div>' +
-      '<b class="stplname">' + tplEsc(tp.name) + '</b>' +
+      '<b class="stplname">' + (hw ? '<i class="tplhw" role="img" aria-label="' + tplEsc(hw) + '">' +
+      tplIco('wrench') + '</i>' : '') + '<span>' + tplEsc(tp.name) + '</span></b>' +
       '<span class="stplmeta">' + tplEsc(isCab ? tplTypeLabel(type) : 'doska') +
       (dims ? ' · ' + tplEsc(dims) : '') + '</span>' +
       '<span class="stplact">';

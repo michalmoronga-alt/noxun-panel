@@ -123,8 +123,10 @@ module Noxun
               'Šablóna sa neuložila.', true
             )
           end
-          config = template_config_from(cab_cfg, model: model)
-          hw_note = template_save_hardware_note(cab_cfg, config, model) # GH #133 P2
+          # KOV-I: starsi klient bez volby zachova dnesny default (zapnute).
+          with_hardware = data['with_hardware'] != false
+          config = template_config_from(cab_cfg, model: model, with_hardware: with_hardware)
+          hw_note = template_save_hardware_note(cab_cfg, config, model, with_hardware: with_hardware)
           type_note = apply_template_type!(config, data['type'])        # UI-B3 modal: Nazov + Typ
           # UI-D2: nahlad sa foti AZ TERAZ — po VSETKYCH guardoch a z TOHO
           # ISTEHO `cab`, z ktoreho vznikol config (inak by obrazok patril inej

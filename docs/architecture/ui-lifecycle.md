@@ -1343,7 +1343,10 @@ dvojklik volá **tú istú validovanú** `insertCabinet()`/`insertBoard()` ako z
 odznačenie.
 
 Kresba dlaždice je **schéma z configu** (`nxTplGlyph` — riadky čiel / krídla / police) a **nenesie ani jednu farbu** — obrys aj výplň dávajú tokeny v `panel.css`; dosková dlaždica
-má badge hrúbky.
+má badge hrúbky. **KOV-I:** `Panel.template_list` dopĺňa odvodené `hardware: {has, labels}` z `TemplateStore.hardware_tile_summary`; údaj sa neukladá do knižnice.
+`nxTplHardwareBadge` kreslí existujúcu sprite ikonu `wrench` s `aria-label`, zatiaľ čo `nxTplBadge` zachováva textový kontrakt hrúbky. `nxTplTitle` dopĺňa súhrn
+uložených setov a ručných položiek s upozornením „zámky sa neprenášajú“. `setTplMeta` pri vybratej šablóne s kovaním použije existujúci `#tplHint` pre
+„Kovanie zo šablóny: …“ (najviac 80 znakov, celý text v `title`, jeden riadok). Bez kovania sa vráti pôvodná pomoc ku klikaniu; výška dlaždíc ani karty nerastie.
 
 **UI-D2 — PNG náhľad a schéma zdieľajú TEN ISTÝ box** (`.tplpic`, výška 38 px, `object-fit: cover` = orez, nie deformácia), takže **výška dlaždice sa nikdy nemení** (pravidlo
 „vertikálny priestor panela je vzácny“). `<img>` je v dlaždici **od začiatku bez `src`** a len sa odkrýva (`.tplpic.has`) — obrázok sa nikdy nevkladá ani neodstraňuje dodatočne,
@@ -1827,6 +1830,12 @@ _(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
 Doména panela: šablóny a ručné odfotenie náhľadu (`Panel.capture_preview_for`). Kontrakt je v odseku „Vkladacia karta — šablóny, typ a doska" a v
 [model-a-identita.md](model-a-identita.md), odsek `template_previews.rb`. Od v0.8.13 tu žije aj **`handle_tag_visible`** (D-27) — jediný handler viditeľnosti NOXUN tagov pre OBA
 ovládače (okno tagov v raile aj checkbox ghost zón); vystriedal `handle_toggle_zones`.
+
+**KOV-I — mini-modal uloženia:** existujúci `#tplModal` ostáva ručným modalom. Checkbox „Uložiť aj kovanie (sety a ručné položky)“ má default zapnuté a pamäť
+`localStorage['noxun.tpl.with_hardware']` na tomto PC; pamätá sa aj zmena pred Zrušiť. `saveTemplateAs` posiela boolean `with_hardware`, chýbajúca voľba starého
+klienta znamená zapnuté. `handle_save_template_as` ju po existujúcich guardoch posunie do `template_config_from` aj `template_save_hardware_note`.
+Vypnuté = bez setov, definícií aj ručných položiek a bez kovaniovej kontroly/hlášky. Poškodený zdroj pri zapnutej voľbe = konštrukcia uložená bez všetkého kovania,
+jasná hláška s dôvodom. Nastavené materiály skrinky sa naďalej prenášajú, individuálne úpravy dielcov nie. **R12** neprenáša ručné zámky; hint to výslovne uvádza.
 
 ### actions_usage.rb
 
@@ -2594,6 +2603,10 @@ vtedy, keď naozaj niečo bežalo).
 **`templates_dialog.rb` — od ŠT-3c-1 už NIE JE OKNO** (ostal serverový modul; obsah je sekcia `tpl` Štúdia — popis nižšie v odseku `templates`;
 história okna: **UI-C1a: okno spravuje VÝHRADNE korpusové šablóny** — payload je `Panel.template_list(kind: 'cabinet', previews: true)` a `find`/`upsert`/`delete`/`set_preview`
 majú vlastný `kind` guard, HTML nie je ochrana, takže doskovú šablónu sa odtiaľ nedá použiť, vymazať ani odfotiť.
+
+**KOV-I:** `tile_row` nesie `{name, preview_rev, config, hardware}`. `config` ostáva orezaný na typ a tri rozmery, `hardware` je len odvodené `{has, labels}`
+z tej istej funkcie ako v Inspectore; celé definície setov do Štúdia nechodia. `templates.js` kreslí pri názve ikonu `wrench` s `aria-label` a súhrn v `title`
+vrátane upozornenia na neprenosné zámky. Existujúce aplikačné a kompatibilitné brány zostávajú autoritou vloženia/použitia.
 
 **R-12 (v0.9.3) — `handle_apply` odmietne šablónu z NOVŠEJ verzie.** Guard prestavby chráni cieľovú skrinku, nie zdroj: config šablóny by sa do cieľa zlial už orezaný
 (`merge_template` + `normalize` sú uzavreté whitelisty) a rebuild by to nemal ako zbadať. Kontroluje sa preto **RAW config uloženého záznamu**
