@@ -174,6 +174,9 @@ schválený vzor kontraktu UI 2.0 — JEDNA kostra pre všetky okná typu „pri
 jednom mieste, inštancie sa líšia LEN poľami (`fields` = deklaratívny zoznam `{key, label, type, value, placeholder, options}`), a je **globálny `window.NXModal`** +
 `module.exports` (testovateľný v Node).
 
+**CENY-KOV-A (v0.10.4):** voliteľné `initialFocus` pošle oba pokusy o fokus priamo do určeného poľa; oneskorený pokus patrí stále tomu istému modalu. `generation()` odlíši
+nový formulár aj po jeho zatvorení, aby stará produktová odpoveď neoživila editor. Textové pole rešpektuje `disabled`, napríklad pri URL spravovanej Demos väzbou.
+
 **ŠT-2c PR 2c-1 — príprava pre D-69 editor materiálu:** k `text`/`select` pribudli typy **`group`** (nadpis sekcie formulára — dlhý formulár bez predelov sa číta ako kopa políčok),
 **`checkbox`**, **`color`** (vzorka + text `#RRGGBB`) a **`rows`** (repeater: `cols` = pod-polia riadku, tlačidlá `+`/`−`), plus šírkové varianty karty `size: 'sm'|'md'|'wide'`
 (`small` je alias `sm`, starý `small: false` = `md`; šírky sedia pri `.nxmcard` v `studio.html`).
