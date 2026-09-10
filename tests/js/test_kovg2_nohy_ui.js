@@ -28,6 +28,8 @@
 //      -> „(6): riadok Noh patri VYHRADNE dolnej skrinke"
 //   M7 (N4) `NX.setHardwareSets` prestane prekreslovat riadok Noh
 //      -> „(7): lahky push prekresli aj riadok Noh"
+//   M8 (kolo 2 N2) `nxLegsInsertPeek` prestane citat `nxLegsInsertDims()`
+//      -> „(8): zmena VYSKY korpusu si vypyta novy nahlad"
 //   M9 (kolo 2 N1) `NX.setHardwareSets` prestane volat `nxLegsInsertInvalidate`
 //      -> „(9): push BEZ oznacenej skrinky obnovi nahlad vkladania"
 'use strict';
@@ -47,7 +49,8 @@ CARD.innerHTML =
   '<div class="legsrow" id="legsRow" hidden>' +
   '<span class="legslbl">Nohy</span><b class="legstxt" id="legsTxt">—</b>' +
   '<span class="legssel" id="legsSel"></span></div>' +
-  '<input id="width" type="text"><input id="floor_height" type="text">' +
+  '<input id="width" type="text"><input id="height" type="text">' +
+  '<input id="depth" type="text"><input id="floor_height" type="text">' +
   '<select id="plinth_mode"><option value="none">none</option></select>';
 DOC.body.appendChild(CARD);
 
@@ -109,6 +112,11 @@ function setFields(w, fh, mode){
   global.el('floor_height').value = String(fh);
   global.el('plinth_mode').value = mode || 'none';
 }
+// Codex #339 kolo 2 (N2): výška a hĺbka sú TIEŽ vstupy pravidiel — karta ich má
+// vždy vyplnené, scenáre ich menia adresne.
+function setDim(id, v){ global.el(id).value = String(v); }
+setDim('height', 720);
+setDim('depth', 560);
 function rowHidden(){ return !!global.el('legsRow').hidden; }
 
 // minidom drzi text uzla v deti typu #text — pomocka na jeho precitanie.
@@ -198,7 +206,8 @@ ok(HW.nxLegsInsertSend(), 'vo vkladani sa dotaz odosle');
 eq(SENT.length, 1, 'prave jeden dotaz');
 eq(SENT[0].cb, 'insert_legs_preview', 'CITACIM callbackom (ziadna operacia, ziadny krok Spat)');
 eq(Object.keys(SENT[0].data).sort(),
-   ['floor_height', 'gen', 'model_guid', 'plinth_mode', 'type', 'width'].sort(),
+   ['depth', 'floor_height', 'gen', 'height', 'model_guid', 'plinth_mode', 'type',
+    'width'].sort(),
    'payload je UZAVRETY — nahlad je pohlad na rozmery, nie druha vkladacia cesta');
 eq(SENT[0].data.width, 1200, 'sirka rozhoduje o POCTE noh');
 eq(SENT[0].data.floor_height, 100, 'vyska sokla o KODE');
@@ -340,7 +349,8 @@ setFields(1200, 100);
 SENT.length = 0;
 HW.nxLegsInsertSend();
 eq(Object.keys(SENT[0].data).sort(),
-   ['floor_height', 'gen', 'model_guid', 'plinth_mode', 'type', 'width'].sort(),
+   ['depth', 'floor_height', 'gen', 'height', 'model_guid', 'plinth_mode', 'type',
+    'width'].sort(),
    'bez šablóny je payload presne ten istý ako doteraz');
 
 const KEY_PLAIN = HW.nxLegsInsertPeek();
@@ -436,6 +446,50 @@ HW.renderLegsRow({ text: '6× noha PREMENOVANÁ', short: '6× noha PREMENOVANÁ'
 eq(textOfEl('legsTxt'), '6× noha PREMENOVANÁ',
    'zmena názvu položky v Štúdiu je v riadku HNEĎ, nie až po preklikaní výberu');
 HW.nxLegsInsertReset();
+
+// ===========================================================================
+// 8) Codex #339 kolo 2 N2: VÝŠKA A HĹBKA KORPUSU SÚ TIEŽ VSTUPY NÔH
+// ===========================================================================
+// Pravidlo `leg`/`plinth_clip` sa smie riadiť ktorýmkoľvek kľúčom kontextu
+// korpusu — teda aj výškou alebo hĺbkou. Payload ich neposielal, takže server
+// dosadil PREDVOLENÉ rozmery a karta ukázala iný počet, než skrinka dostane.
+HW.nxLegsInsertReset();
+global.selectedCabId = null;
+global.__type = 'lower';
+setFields(600, 100);
+setDim('height', 720);
+setDim('depth', 560);
+SENT.length = 0;
+HW.nxLegsInsertSend();
+eq(SENT[0].data.height, 720, 'výška korpusu ide s dotazom');
+eq(SENT[0].data.depth, 560, 'a hĺbka tiež');
+
+// Prázdne pole sa posiela ako '' (rovnako ako šírka) — server si dosadí svoje.
+setDim('height', '');
+SENT.length = 0;
+HW.nxLegsInsertSend();
+eq(SENT[0].data.height, '', 'nevyplnená výška je prázdny reťazec, nikdy NaN');
+setDim('height', 720);
+
+// Čo ide do payloadu, musí byť aj v kľúči debounce — inak by zmena výšky
+// dotaz vôbec nespustila a karta by držala starý počet.
+HW.nxLegsInsertReset();
+setFields(600, 100);
+ok(HW.nxLegsInsertAsk(), 'prvá zmena si náhľad vypýta');
+HW.nxLegsInsertSend();
+HW.nxLegsInsertResult({ gen: SENT[SENT.length - 1].data.gen, text: '4× noha', tone: 'ok' });
+eq(HW.nxLegsInsertAsk(), false, 'PREMISA: rovnaké hodnoty server neobťažujú');
+setDim('height', 2000);
+ok(HW.nxLegsInsertAsk(), 'zmena VÝŠKY korpusu si vypýta nový náhľad');
+HW.nxLegsInsertSend();
+HW.nxLegsInsertResult({ gen: SENT[SENT.length - 1].data.gen, text: '8× noha', tone: 'ok' });
+eq(HW.nxLegsInsertAsk(), false, 'a po odpovedi sa upokojí');
+setDim('depth', 1200);
+ok(HW.nxLegsInsertAsk(), 'a zmena HĹBKY tiež');
+HW.nxLegsInsertSend();
+HW.nxLegsInsertResult({ gen: SENT[SENT.length - 1].data.gen, text: '8× noha', tone: 'ok' });
+setDim('height', 720);
+setDim('depth', 560);
 
 // ===========================================================================
 // 9) Codex #339 kolo 2 N1: ĽAHKÝ PUSH BEZ OZNAČENEJ SKRINKY OBNOVÍ NÁHĽAD

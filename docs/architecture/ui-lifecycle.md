@@ -677,10 +677,15 @@ teda z **už rozpísaných** položiek (`purchase`), takže riadok a rozklik pol
 akciou `set_hardware_set` — **žiadny nový zapisovací callback**), preto sa zmena na jednom mieste objaví aj na druhom (obe kreslí server push). (b) **VKLADANIE:** text chodí
 z čítacieho callbacku **`insert_legs_preview`** (`panel.rb` → `handle_insert_legs_preview`, vzor `hw_manual_search`): **žiadna operácia, žiadny zápis, žiadny krok Späť**, odpoveď
 kanálom `NX.insertLegsPreview` s **generáciou dotazu** (`gen`) — staršie kolo sa zahadzuje, inak by pomalšia odpoveď prepísala čerstvejšiu. Klient posiela **uzavretý** payload
-`INSERT_LEGS_KEYS` = `type` · `width` · `floor_height` · `plinth_mode` (debounce 150 ms, a len keď sa niektorá z týchto hodnôt naozaj zmenila) a server z neho cez
+`INSERT_LEGS_KEYS` = `type` · `width` · `height` · `depth` · `floor_height` · `plinth_mode` (debounce 150 ms, a len keď sa niektorá z týchto hodnôt naozaj zmenila) a server z neho cez
 `CabinetBuilder.normalize` + `Construction.cabinet_hw_ctx` ([construction.md](construction.md)) + `HardwareRules.evaluate(cfg, [], ctx)` + `Panel.item_purchase` (tá istá funkcia ako
 v karte) postaví `legs_preview_summary`. **Override sa vo vkladaní neponúka** — set sa mení až na vloženej skrinke. Kým odpoveď nepríde (starší plugin bez callbacku), v riadku
 stojí „—". **PASS-THROUGH GUARD:** text je VÝSTUP — do `collectAll()` ani do vkladacieho payloadu sa nedostane nič z neho (`test_kovg2_nohy_ui.js`, `test_insert_state.js`).
+
+**Rozmery korpusu patria do payloadu aj do kľúča (Codex #339 kolo 2 N2).** Korpusové pravidlo `leg`/`plinth_clip` sa smie riadiť ktorýmkoľvek kľúčom kontextu
+(`HardwareRules::CONTEXT_KEYS` cez `input_value`), takže pásma podľa **výšky** alebo **hĺbky** sú legitímne — preto `height` a `depth` sú v `INSERT_LEGS_KEYS`. Bez nich by
+`CabinetBuilder.normalize` dosadila svoje **predvoľby**, kým vklad by to isté pravidlo vyhodnotil nad rozmermi, ktoré používateľ naozaj zadal — karta by sľubovala iný počet nôh.
+Jeden zdroj `nxLegsInsertDims()` plní payload **aj** kľúč `nxLegsInsertPeek`: čo sa posiela, musí byť aj v kľúči, inak by zmena výšky dotaz vôbec nespustila.
 
 **KOVANIE ŠABLÓNY ide s dotazom (Codex #339 kolo 1 N1).** Šablóna nesie mapovanie setov aj ich definície a vložená skrinka ich naozaj dostane, takže payload má **druhú, vlastnú**
 skupinu kľúčov `INSERT_LEGS_HW_KEYS` = `hardware_sets` · `hardware_set_defs` (zdroj je **ten istý** `NXInsert.hardwarePayload()`, ktorý ide do `insert_cabinet`; ad-hoc položky

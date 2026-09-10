@@ -2173,15 +2173,30 @@
     return out;
   }
 
-  // Payload je UZAVRETY: typ, sirka, vyska sokla, rezim sokla a kovanie
-  // SABLONY. Nic z neho sa neuklada a nic z toho, co pride SPAT, sa nikdy
-  // nedostane do `collectAll()` — riadok je VYSTUP, nie pole formulara.
+  // Payload je UZAVRETY: typ, ROZMERY korpusu, vyska sokla, rezim sokla
+  // a kovanie SABLONY. Nic z neho sa neuklada a nic z toho, co pride SPAT, sa
+  // nikdy nedostane do `collectAll()` — riadok je VYSTUP, nie pole formulara.
+  //
+  // KOV-G2 (Codex #339 kolo 2 N2): `height` a `depth` su TIEZ vstupy pravidiel
+  // — `HardwareRules.input_value` ich pre korpusovu rolu cita z kontextu
+  // (`CONTEXT_KEYS`), takze pravidlo noh alebo prichytu sokla sa moze riadit
+  // vyskou ci hlbkou. Bez nich by `CabinetBuilder.normalize` na serveri
+  // dosadila PREDVOLENE rozmery, kym vklad by pravidlo vyhodnotil nad tymi,
+  // co pouzivatel naozaj zadal — karta by ukazala iny pocet, nez skrinka
+  // dostane.
+  function nxLegsInsertDims(){
+    var out = {};
+    ['width', 'height', 'depth', 'floor_height'].forEach(function(id){
+      var v = numv(id);
+      out[id] = isNaN(v) ? '' : v;
+    });
+    return out;
+  }
+
   function nxLegsInsertPayload(){
-    var w = numv('width');
-    var fh = numv('floor_height');
-    var body = { gen: ++legsGen, type: getType(),
-                 width: isNaN(w) ? '' : w, floor_height: isNaN(fh) ? '' : fh,
-                 plinth_mode: val('plinth_mode') };
+    var body = { gen: ++legsGen, type: getType(), plinth_mode: val('plinth_mode') };
+    var dims = nxLegsInsertDims();
+    Object.keys(dims).forEach(function(k){ body[k] = dims[k]; });
     var hw = nxLegsTemplateHw();
     Object.keys(hw).forEach(function(k){ body[k] = hw[k]; });
     return body;
@@ -2204,9 +2219,9 @@
   }
 
   // `onField` bezi pri KAZDOM poli karty — dotaz sa preto posiela len vtedy,
-  // ked sa zmenilo nieco, na com nohy naozaj zavisia (typ, sirka, vyska sokla,
-  // rezim sokla). Podmienka „a riadok uz stoji" je samoliecba: po navrate
-  // z oznacenej skrinky je riadok skryty, hoci hodnoty su tie iste.
+  // ked sa zmenilo nieco, na com nohy naozaj zavisia (typ, rozmery korpusu,
+  // vyska sokla, rezim sokla). Podmienka „a riadok uz stoji" je samoliecba:
+  // po navrate z oznacenej skrinky je riadok skryty, hoci hodnoty su tie iste.
   var legsLastKey = null;
 
   function nxLegsInsertAsk(){
@@ -2224,11 +2239,12 @@
   // volat ho na porovnanie by generacie roztocilo a odpovede by sa zahadzovali).
   // KOV-G2 (N1): sucastou kluca je aj kovanie SABLONY — dve sablony s rovnakymi
   // rozmermi a INYM setom noh musia dat dva rozne dotazy.
+  // KOV-G2 (kolo 2 N2): a rovnako `height`/`depth` — co ide do payloadu, musi
+  // byt aj v kluci, inak by zmena vysky dotaz vobec nespustila.
   function nxLegsInsertPeek(){
-    var w = numv('width');
-    var fh = numv('floor_height');
-    return [getType(), isNaN(w) ? '' : w, isNaN(fh) ? '' : fh, val('plinth_mode'),
-            JSON.stringify(nxLegsTemplateHw())].join('|');
+    var dims = nxLegsInsertDims();
+    return [getType(), dims.width, dims.height, dims.depth, dims.floor_height,
+            val('plinth_mode'), JSON.stringify(nxLegsTemplateHw())].join('|');
   }
 
   // KOV-G2 (Codex #339 kolo 1 N3): ZNEPLATNENIE DOTAZU V LETE. Odpovede chodia

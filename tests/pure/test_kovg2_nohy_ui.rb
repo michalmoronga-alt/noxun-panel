@@ -181,6 +181,30 @@ module NxKovG2
     sc.send(:remove_method, :kovg2_orig_read_state)
   end
 
+  # Codex #339 kolo 2 (N2): VLASTNE pravidlo noh, ktore sa riadi VYSKOU
+  # korpusu. `HardwareRules.input_value` cita pre korpusovu rolu ktorykolvek
+  # kluc kontextu (`CONTEXT_KEYS`), takze je to legitimne pravidlo — a presne
+  # ono odhali, ci sa zadana vyska z karty vobec dostala do `normalize`.
+  HEIGHT_LEG_RULE = { 'rule_id' => 'kovg2-nohy-podla-vysky', 'enabled' => true,
+                      'applies_to' => { 'role' => 'cabinet',
+                                        'support' => %w[legs plinth] },
+                      'output' => 'leg', 'kind' => 'bands', 'input' => 'height',
+                      'bands' => [{ 'max' => 999.0, 'quantity' => 4 },
+                                  { 'max' => nil, 'quantity' => 8 }] }.freeze
+
+  # Pravidla panela (`project_rules` / globalna kniznica) na cas testu — inak
+  # by vysledok zavisel od toho, co ma pouzivatel na PC.
+  def with_rules(rules)
+    sc = E::Panel.singleton_class
+    sc.send(:alias_method, :kovg2_orig_rules, :panel_hardware_rules)
+    sc.send(:define_method, :panel_hardware_rules) { |_m| rules }
+    yield
+  ensure
+    sc.send(:remove_method, :panel_hardware_rules)
+    sc.send(:alias_method, :panel_hardware_rules, :kovg2_orig_rules)
+    sc.send(:remove_method, :kovg2_orig_rules)
+  end
+
   # Callback `insert_legs_preview_result` sa pyta `Sketchup.active_model`.
   # Headless taka konstanta neexistuje, takze cela cesta konci v `rescue` —
   # scenar N1 potrebuje overit jej NORMALNU vetvu, preto si na cas testu
@@ -389,7 +413,7 @@ end
 NxTest.test('KOV-G2 (6): payload nahladu je UZAVRETY') do
   # Konstanta zije v `class << self` panela (vzor `MANUAL_SEARCH_TOP`).
   keys = Noxun::Engine::Panel.singleton_class::INSERT_LEGS_KEYS
-  NxTest.assert_equal %w[type width floor_height plinth_mode], keys,
+  NxTest.assert_equal %w[type width height depth floor_height plinth_mode], keys,
                       'nahlad je pohlad na ROZMERY — nic ine sa do `normalize` nedostane'
   body = NxKovG2.method_src('ui/panel/actions_hardware.rb', 'insert_legs_preview_result')
   NxTest.assert(body.include?('INSERT_LEGS_KEYS.include?(k.to_s)'),
@@ -632,11 +656,66 @@ NxTest.test('KOV-G2 (10): DOSKOVA vetva vkladacej karty riadok Noh RESETUJE (N2)
                 'bez neho ostal v doskovej karte visiet text NOH poslednej dolnej skrinky')
 end
 
-# --- 11) Codex #339 kolo 2 N1: OBNOVA NAHLADU PO LAHKOM PUSHI ----------------
+# --- 11) Codex #339 kolo 2 N1/N2: OBNOVA NAHLADU A ROZMERY V PAYLOADE ---------
 #
-# Mapovanie setu noh a nazvy poloziek sa daju zmenit v subezne otvorenom Studiu
-# a chodia LAHKYM pushom; v kluci vstupov nahladu ziadne nie su, preto push bez
-# `legs_summary` (stav BEZ oznacenej skrinky) pamat zneplatni.
+# N2: pravidlo noh (alebo prichytu sokla) sa smie riadit VYSKOU ci HLBKOU
+# korpusu — `input_value` cita pre korpusovu rolu cely kontext. Whitelist
+# nahladu tieto dva rozmery neposielal, takze `normalize` dosadila PREDVOLBY
+# a karta ukazala iny pocet, nez skrinka po kliku dostala.
+# N1: mapovanie setu noh a nazvy poloziek sa daju zmenit v subezne otvorenom
+# Studiu a chodia LAHKYM pushom; v kluci vstupov nahladu ziadne nie su, preto
+# push bez `legs_summary` (stav BEZ oznacenej skrinky) pamat zneplatni.
+
+NxTest.test('KOV-G2 (11): nahlad pocita nad ZADANOU vyskou korpusu (N2)') do
+  NxTest.skip!('panelova cesta bezi len headless') unless NxTest.headless?
+  NxKovG2.with_sketchup do
+    NxKovG2.with_read_state do
+      NxKovG2.with_rules([NxKovG2::HEIGHT_LEG_RULE]) do
+        base = { 'gen' => 1, 'type' => 'lower', 'width' => 600.0, 'depth' => 560.0,
+                 'floor_height' => 100.0, 'hardware_sets' => NxKovG2::TPL_MAP,
+                 'hardware_set_defs' => [NxKovG2::TPL_SET] }
+        low = Noxun::Engine::Panel.insert_legs_preview_result(base.merge('height' => 720.0))
+        high = Noxun::Engine::Panel.insert_legs_preview_result(base.merge('height' => 2000.0))
+        NxTest.assert_equal 'ok', low['tone'], "PREMISA: set je citatelny (#{low['text']})"
+        NxTest.assert(low['text'].start_with?('4× '),
+                      "korpus 720 mm je v prvom pasme: #{low['text']}")
+        NxTest.assert(high['text'].start_with?('8× '),
+                      "zadana vyska sa dostala az k pravidlu: #{high['text']}")
+      end
+    end
+  end
+end
+
+NxTest.test('KOV-G2 (11): a nad ZADANOU hlbkou (N2)') do
+  NxTest.skip!('panelova cesta bezi len headless') unless NxTest.headless?
+  rule = NxKovG2::HEIGHT_LEG_RULE.merge('input' => 'depth')
+  NxKovG2.with_sketchup do
+    NxKovG2.with_read_state do
+      NxKovG2.with_rules([rule]) do
+        base = { 'gen' => 1, 'type' => 'lower', 'width' => 600.0, 'height' => 720.0,
+                 'floor_height' => 100.0, 'hardware_sets' => NxKovG2::TPL_MAP,
+                 'hardware_set_defs' => [NxKovG2::TPL_SET] }
+        shallow = Noxun::Engine::Panel.insert_legs_preview_result(base.merge('depth' => 560.0))
+        deep = Noxun::Engine::Panel.insert_legs_preview_result(base.merge('depth' => 1200.0))
+        NxTest.assert(shallow['text'].start_with?('4× '),
+                      "hlbka 560 mm je v prvom pasme: #{shallow['text']}")
+        NxTest.assert(deep['text'].start_with?('8× '),
+                      "zadana hlbka sa dostala az k pravidlu: #{deep['text']}")
+      end
+    end
+  end
+end
+
+NxTest.test('KOV-G2 (11): klient posiela presne to, co server prijme (N2)') do
+  dims = NxKovG2.js_func_src('ui/js/hardware.js', 'nxLegsInsertDims')
+  NxTest.refute(dims.empty?, 'PREMISA: telo `nxLegsInsertDims` sa naslo')
+  %w[width height depth floor_height].each do |k|
+    NxTest.assert(dims.include?("'#{k}'"), "rozmer `#{k}` ide do payloadu nahladu")
+  end
+  peek = NxKovG2.js_func_src('ui/js/hardware.js', 'nxLegsInsertPeek')
+  NxTest.assert(peek.include?('nxLegsInsertDims()'),
+                'a kluc debounce cita TIE ISTE rozmery — inak by zmena vysky dotaz nespustila')
+end
 
 NxTest.test('KOV-G2 (11): lahky push BEZ oznacenej skrinky obnovi NAHLAD (N1)') do
   src = NxKovG2.src('ui/js/bridge.js')

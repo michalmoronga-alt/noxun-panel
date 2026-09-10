@@ -1139,7 +1139,15 @@ module Noxun
         # (materialy, zony, sablona) by sa cez `normalize` dostal do configu,
         # z ktoreho by pravidla mohli vydat nieco ine, nez co sa naozaj vlozi.
         # Nic sa NEUKLADA: `cfg` zije len v tomto volani.
-        INSERT_LEGS_KEYS = %w[type width floor_height plinth_mode].freeze
+        #
+        # KOV-G2 (Codex #339 kolo 2 N2): zoznam nesie AJ `height` a `depth`.
+        # Korpusove pravidlo (`leg`, `plinth_clip`) sa smie riadit ktorymkolvek
+        # kontextovym klucom (`HardwareRules::CONTEXT_KEYS` cez `input_value`),
+        # takze pasma podla VYSKY alebo HLBKY su legitimne. Bez nich by
+        # `CabinetBuilder.normalize` dosadila svoje PREDVOLBY a nahlad by
+        # pocital nad inymi rozmermi, nez nad akymi vklad pravidlo vyhodnoti —
+        # karta by ukazala iny pocet noh, nez skrinka po kliku dostane.
+        INSERT_LEGS_KEYS = %w[type width height depth floor_height plinth_mode].freeze
         # KOV-G2 (Codex #339 kolo 1 N1): SABLONA nesie aj KOVANIE — mapovanie
         # setov a ich zmrazene definicie. Vlozena skrinka ich naozaj dostane
         # (`handle_insert` -> `take_insert_hardware!` -> `ghost_freeze_hardware`),
