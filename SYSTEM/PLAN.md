@@ -233,7 +233,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   VEPO ich skracuje (`Zas dno 2 s1`, dvojica bokov `Zas bok LP 2 s1`); staré zákazky dostanú tvar bez čísla, kým sa skrinka neprestaví. **(b) PR #325, v0.9.46:** kontrakt VEPO
   **v1.2** — názov riadku má VŽDY ≤ 20 znakov (import objednávky dlhšie pole odmieta): zlúčenie číslovaných tokenov (`Polica 1 2 3`), deterministický orez po celých slovách
   bez výpustky a priznanie orezu (ORANGE nález Kontroly `name_long` + oddiel LOGu „Skrátené názvy"). Plný text v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).
-- **D-122 · Kontrola zoskupí UNI dielce** — jedno upozornenie „nenahradené UNI farby" s rozklikom namiesto riadku per dielec (Michal 6.9.2026).
+- ✅ **D-122 · Kontrola zoskupí UNI dielce** — zbalená skupina s počtom dielcov; deti držia výber v modeli, Inspector aj náhradu konkrétneho UNI. Semafor/badge stále počítajú jednotlivé nálezy. **PR #343, v0.10.2.**
 - **Nárezový plán fáza 2 — PRIMITÍVNY, V1 rozsah (rozhodnuté 6.9.2026):** dnes je počet platní len odhad z m² (D-19, koeficient 10–25 %); po primitívnom pláne máme **hornú hranicu počtu platní podľa zvoleného rozloženia** (deterministická heuristika, nie optimum — iné rozloženie môže
   vyjsť lepšie) a vidíme, keď 1 dielec vychádza na celú platňu. Guillotine heuristika v čistom Ruby (OpenCutList je GPL — algoritmus áno, kód nie), smer dekoru, kerf,
   výstup = počet platní + využitie + zvyšok + jednoduchý obrázok v sekcii Nárezový plán, rozpočet ukáže vedľa odhadu „plán: N platní (horná hranica)" — informácia pre objednávku, **nie povinné množstvo** (objednáva človek). Rezy NP-1 (algoritmus, audit ÁNO) → NP-2
@@ -264,7 +264,9 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   spotrebič patrí **zákazke a vlastníkovi podľa kategórie** (skrinka · slot umývačky · pracovná doska · len zákazka), cena len v rozpočte, kontrola niky vo V1 len chladnička + šírka umývačky, šablóna s tagom „spotrebičová" upozorní bez spotrebiča;
   detail: [zdroje/next_sessions/V1_DEBATA_2026-09-06_SPOTREBICE.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_SPOTREBICE.md) + technické listy [zdroje/next_sessions/SPOTREBICE_TECHLISTY_2026-09.md](zdroje/next_sessions/SPOTREBICE_TECHLISTY_2026-09.md)
   (predúloha hotová 6.9.; **čaká na Michalovo overenie listov** → detailná debata polí → package + `codex-audit`, nový modul). Za S1: **spotrebičová skrinka** (šablóny nad K1 + S1; nízka priorita).
-- **D-124 · Predvoľby projektu v Materiáloch rozbalené s väčšími náhľadmi** (Michal 6.9.2026) — malý UI rework; „materiál per rola dielca" = zásobník.
+- **D-124 · Predvoľby projektu v Materiáloch — SCHVÁLENÉ 10.9.2026, nasleduje po D-122:** default rozbalené, ručne zbaliteľné; štyri skupiny Korpus / Čelá / Chrbát / Zásuvky
+  vedľa seba, náhľady **115 × 115 px** (schválený mockup 144 px mínus 20 %), názov a údaje pod vzorkou; v úzkom okne dva stĺpce. Zachovať spoločný picker, potvrdenie/zrušenie
+  predvolieb a aktuálnu hodnotu po serverovej odpovedi. Iba UI, bez nového dátového kontraktu; „materiál per rola dielca" = zásobník. Podklad: `zdroje/next_sessions/D124_OUTSIDE_IN_2026-09-10.md`.
 - **Ceny** (vedome odložené z dávky E, V1 rozsah; **rozhodnuté 6.9.2026**): manuálne 1-klik overenie ceny („cena sedí" / „zmeniť") pre položky BEZ väzby na Demos a viac URL na položke (zvyšok V1-03) — [zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md); prepínač „na faktúru" **vyradený** (existuje s
   DPH / bez DPH); **audit ÁNO** — `urls[]` = schémová zmena katalógov (bump + dopredná brána R-11/R-12). **Mimo V1** (V1_VIZIA): DOCX/PDF generátor ponuky s vizualizáciami a rodina dokumentov — v zásobníku.
 - *(Vkladanie na klik — V1-04 — sa 26.8. vyčlenilo do vlastného bloku **GHOST VKLADANIE**; ten je od 31.8.2026 **hotový** (v0.9.0), plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).)*

@@ -32,6 +32,7 @@
   // neuklada sa nikam a zatvorenie okna ho zabudne. Zoznam sa nim LEN zuzuje,
   // poradie urcuje server.
   var ctrlFilter = 'all';
+  var ctrlUniOpen = false; // D-122: iba zobrazenie, vždy nad čerstvými nálezmi.
   // Š10: stav oboch prepinacov. SERVER je autorita (zapnutost, pocty aj stav
   // trojstavoveho nastavenia) — JS si nic neprepocitava a nic si nepamata;
   // kazdy push stav prepise. Jedina klientska vec je, ci je rozbalovacie okno
@@ -378,6 +379,35 @@
       if (filter === 'all' || it.severity === filter) out.push([it, i]);
     });
     return out;
+  }
+
+  // D-122: jedna zobrazovacia skupina na mieste prvého UNI nálezu.
+  // Deti držia pôvodné indexy aj serverové texty; counts ani validáciu nemeníme.
+  function ctrlListHtml(rows, uniOpen){
+    var uni = rows.filter(function(pair){
+      return pair[0].category === 'uni_material' && pair[0].severity === 'orange';
+    });
+    var h = '', grouped = false;
+    rows.forEach(function(pair){
+      if (pair[0].category !== 'uni_material' || pair[0].severity !== 'orange'){
+        h += ctrlRowHtml(pair[0], pair[1]);
+        return;
+      }
+      if (grouped) return;
+      grouped = true;
+      var n = uni.length;
+      var label = n === 1 ? 'dielec' : (n >= 2 && n <= 4 ? 'dielce' : 'dielcov');
+      h += '<div class="ctrluni"><button type="button" id="ctrlUniToggle"' +
+        ' class="ctrlrow ctrl-orange ctrluni-toggle" data-ctrl-uni' +
+        ' aria-expanded="' + (uniOpen ? 'true' : 'false') + '" aria-controls="ctrlUniItems">' +
+        '<span class="dot" aria-hidden="true"></span><span class="msg">Nenahradené UNI materiály</span>' +
+        '<span class="where">' + n + ' ' + label + '</span>' +
+        ico(uniOpen ? 'chevron-down' : 'chevron-right') + '</button>' +
+        '<div id="ctrlUniItems" class="ctrluni-items"' + (uniOpen ? '' : ' hidden') + '>';
+      uni.forEach(function(child){ h += ctrlRowHtml(child[0], child[1]); });
+      h += '</div></div>';
+    });
+    return h;
   }
 
   // Š9: riadok nálezu — bodka závažnosti · text · miesto · akcie vpravo.
@@ -833,6 +863,11 @@
   // budget.js, ktory ho obaluje.
   var NXAPI = {
     setStudio: function(data){
+      // Rozbalenie patrí dokumentu; po náhrade posledného UNI sa tiež zahodí.
+      if (!ST || !data || ST.model_guid !== data.model_guid ||
+          !(data.control || []).some(function(it){ return it.category === 'uni_material'; })){
+        ctrlUniOpen = false;
+      }
       ST = data || null;
       // KOV-H2: rozklikaný pôvod patrí riadkom, ktoré používateľ videl —
       // čerstvý payload ich môže preusporiadať, takže otvorený index by ukázal
@@ -1293,9 +1328,9 @@
     if (!rows.length){
       return h + '<div class="muted">Filtru nezodpovedá žiadny nález — klik na chip filter zruší.</div>';
     }
-    rows.forEach(function(pair){ h += ctrlRowHtml(pair[0], pair[1]); });
+    h += ctrlListHtml(rows, ctrlUniOpen);
     return h + '<div class="hint">Klik na riadok označí nález v modeli. Ceruzka ho navyše otvorí ' +
-      'v Inspectore. Hrany bez olepu nie sú nálezom semaforu — na tie je prepínač v lište.</div>';
+      'v Inspectore. Počty zahŕňajú aj zbalené nálezy. Hrany bez olepu nie sú nálezom semaforu — na tie je prepínač v lište.</div>';
   }
 
   // ------------------------------------------------------- pohlad DIELCE
@@ -1739,6 +1774,13 @@
       }
       // Š9: riadok nálezu — klik/oko = označ, ceruzka = označ + Inspector
       // dopredu, „Nahradiť UNI…" a rozpočtové premostenie majú vlastnú akciu.
+      if (t.closest('[data-ctrl-uni]')){
+        ctrlUniOpen = !ctrlUniOpen;
+        renderBody();
+        var uniToggle = el('ctrlUniToggle');
+        if (uniToggle) uniToggle.focus();
+        return;
+      }
       var crow = t.closest('[data-ci]');
       if (crow){
         var ci = parseInt(crow.getAttribute('data-ci'), 10);
@@ -1888,6 +1930,7 @@
       setStudioSection: studioSetSectionForTest,
       // ŠT-1b sekcia Kontrola (Š8–Š11)
       semaforHtml: semaforHtml, ctrlRows: ctrlRows, ctrlRowHtml: ctrlRowHtml,
+      ctrlListHtml: ctrlListHtml,
       ctrlActionsHtml: ctrlActionsHtml, navBadgeHtml: navBadgeHtml,
       // ŠT-1c PR A sekcia Nákup kovania (Š7) + D-93 znamienko ručného zásahu
       // (sada tests/js/test_d93_nl_override.js sa sem presunula z production.js)

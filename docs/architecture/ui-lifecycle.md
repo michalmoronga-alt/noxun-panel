@@ -2329,6 +2329,12 @@ rozpočtový nález vlastníka nemá.
 vlastníkov by zmenil `stable_key` (a s ním klik-select aj dedup), pričom nález aj tak vedie k oprave celej skupiny. Filter **LEN skrýva** — poradie ani dedup neurčuje klient, a
 index riadku ostáva indexom do **serverového** poľa, inak by klik pri zapnutom filtri adresoval iný nález.
 
+**D-122 (v0.10.2): ORANGE `uni_material` nálezy sú v jednej predvolene zbalenej skupine „Nenahradené UNI materiály“** s počtom dotknutých dielcov. `ctrlListHtml` ju vloží na miesto
+prvého UNI nálezu; deti používajú pôvodný `ctrlRowHtml` s indexom do serverového poľa. Ostatné nálezy ostávajú samostatné, prípadný RED sa do ORANGE skupiny nezaradí. Hlavička
+iba prepína zobrazenie (klávesnicové tlačidlo s `aria-expanded`, po prekreslení drží fokus); neoznačuje entitu. `ctrlUniOpen` prežije filter aj nový payload rovnakého dokumentu,
+ale zmenou `model_guid` alebo odstránením posledného UNI sa zruší. Deti sa skladajú zakaždým z čerstvého payloadu. **Semafor, badge, validácia, dedup aj exporty sa nemenia** —
+počty naďalej zahŕňajú jednotlivé nálezy aj v zbalenej skupine, čo pripomína hint. Regresie: `tests/js/test_d122_uni_skupina.js` (indexy, akcie, filtre, refresh, nový dokument).
+
 **Š9 riadok**: bodka závažnosti · text · miesto · akcie vpravo. Klik na riadok aj **oko** = `nx_select` s `problem_key` (stabilný kľúč, nie pids — po flushi editov by už neplatili;
 jadro je `ProductionCore.do_select`), **ceruzka** = to isté + `focus_inspector`.
 

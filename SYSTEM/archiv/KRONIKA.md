@@ -17,6 +17,13 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-122 — UNI UPOZORNENIA V JEDNEJ SKUPINE (10.9.2026, PR #343, v0.10.2).** Kontrola už pri tvorbe zákazky nezapĺňa obrazovku každým UNI dielcom: jedna zbalená skupina
+  ukazuje počet dielcov, po rozbalení ostávajú hlásenia s vlastníkom aj všetky pôvodné akcie. Zoskupenie mení iba zobrazenie; semafor, badge, validácia a exporty držia pôvodné
+  serverové počty a identity. Rozbalenie prežije filter/refresh toho istého dokumentu, iný dokument alebo náhrada posledného UNI ho zruší.
+  **3789 headless PASS, 106 JS sád PASS** (nová sada D-122: 29 kontrol), browser kontrola skutočného Štúdia vrátane rozkliku a adresy UNI akcie; read-only subagent bez nálezu.
+  In-SketchUp sa neopakovalo: bez Ruby, geometrie či undo zásahu. Posledný platformový výsledok ostáva D-123 (2174 PASS). D-122 presunuté s plným textom do archívu.
+  Michal schválil sekvenčné D-122 → D-124; náhľady D-124 zmenšiť o 20 % (144 → 115 px). V tomto sedení orchestruje a po bránach merguje Codex; Claude-family review odložené.
+
 - **D-123 — SKRINKA PRI VOĽNOM VKLADANÍ STOJÍ NA PLOCHE (10.9.2026, PR #342, v0.10.1).** Pri vypnutom zámku Z sa dolná skrinka s dnom pod bokmi zachytávala za drevené dno:
   výška sokla sa odpočítala od kliknutej polohy, takže napríklad 100 mm sokel skončil pod podlahou. Kotvy aj obálka ghostu teraz zahŕňajú **celú skrinku od Z = 0**.
   Horné uchopenie a režim zamknutej výšky ostávajú funkčne rovnaké. Pôvodnú chybu dokázal padajúci regresný test; doplnené sú in-SU scenáre vloženia na podlahu a vyvýšenú
