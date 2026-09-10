@@ -135,7 +135,8 @@ module Noxun
             'preview_rev' => rec['preview_rev'],
             'config' => TILE_CONFIG_KEYS.each_with_object({}) do |k, out|
               out[k] = cfg[k] unless cfg[k].nil?
-            end }
+            end,
+            'hardware' => TemplateStore.hardware_tile_summary(cfg) }
         end
 
         # --- Ruby -> JS -----------------------------------------------------

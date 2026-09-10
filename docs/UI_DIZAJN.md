@@ -706,6 +706,12 @@ Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html`
   zahodí uzol, by v CEF druhému kliku dvojkliku nenechal cieľ.)
 - **Kresba dlaždice nenesie farbu.** Schéma z configu (riadky čiel, krídla, police)
   je len geometria; obrys a výplň dávajú tokeny v CSS.
+- **KOV-I — kovanie šablóny je viditeľné pred použitím.** Pri názve je sprite ikona `wrench`, keď šablóna nesie sety alebo ručné položky. Ikona má `aria-label`,
+  dlaždica súhrn v `title`; badge hrúbky dosky ostáva. Vybraná šablóna využije existujúci hint riadok pod dlaždicami pre „Kovanie zo šablóny: …“, skrátený
+  na 80 znakov a jeden riadok, celý text v `title`. Súhrn vždy uvádza „zámky sa neprenášajú“. Bez kovania sa ukazuje pôvodná pomoc, bez nového priestoru navyše.
+  **Štúdio → Šablóny** používa rovnakú ikonu pri názve a rovnaký súhrn v `title`; vychádza z uloženého obsahu, nie zo živých predvolieb projektu.
+  **Mini-modal Uložiť ako šablónu** má checkbox „Uložiť aj kovanie (sety a ručné položky)“, predvolene zapnutý s pamäťou na PC. Hint odlišuje prenášané materiály
+  skrinky od neprenášaných úprav dielcov a výslovne priznáva neprenášanie ručných zámkov kovania.
 - **Reálny PNG náhľad má prednosť pred schémou (UI-D2).** Fotka vzniká pri
   UKLADANÍ šablóny (`view.write_image` nad práve postavenou skrinkou) a do
   dlaždice sa doťahuje **na vyžiadanie, raz na revíziu** — data URI nemôže

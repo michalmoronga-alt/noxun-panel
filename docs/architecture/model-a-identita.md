@@ -209,6 +209,11 @@ panel vezme z **`DimSeries.write_block_reason`** a ukáže ho namiesto všeobecn
 
 (UI od ŠT-3c-1 = **sekcia `tpl` Štúdia**, okno „Šablóny" ZANIKLO) — knižnica šablón (`%APPDATA%\NOXUN\Engine\templates.json` + `.bak`, zápis cez `JsonFileStore`).
 
+**KOV-I — súhrn uloženého kovania:** čistá `TemplateStore.hardware_summary(config)` vracia `{has, sets: [{generic_type, label, set_name}], manual_count}`.
+Prítomnosť znamená neprázdnu mapu `hardware_sets` alebo neprázdne pole `hardware_manual`; samotné definície bez mapovania odznak nevytvoria. Názvy sa čítajú
+z uložených `hardware_set_defs` (inak ID setu), vrátane všetkých pásiem selektora; živá knižnica ani model sa nečítajú. `hardware_tile_summary` z toho skladá
+ľahké `{has, labels}` pre obe UI cesty. Je to odvodený údaj záznamu pre zobrazenie, **nikdy nový kľúč na disku**, takže `STD` ani `CONFIG_SCHEMA` sa nemenia.
+
 **Identita záznamu je DVOJICA `(kind, name)`** (UI-C1a): `kind` = `cabinet` | `board` žije **na úrovni záznamu**, takže dosková „Zástena" a korpusová „Zástena" sú dve rôzne šablóny
 a nikdy sa neprepíšu — `find`/`upsert`/`delete` preto dostávajú **oba** údaje. Doskový záznam nesie navyše **redundantne `config['type'] = 'board'`**: starší klient (panel pred
 UI-C1) filtruje ponuku podľa `config.type`, takže doskovú šablónu neponúkne ako korpusovú.

@@ -96,6 +96,53 @@ module Noxun
         load.find { |t| t['kind'] == k && t['name'] == n }
       end
 
+      # KOV-I: obsah sablony, nie zive predvolby projektu. Ciste citanie bez
+      # IO a normalizacnych zapisov; nic z vysledku sa neuklada na disk.
+      def hardware_summary(config)
+        cfg = config.is_a?(Hash) ? config : {}
+        mapping = cfg['hardware_sets'].is_a?(Hash) ? cfg['hardware_sets'] : {}
+        manual = cfg['hardware_manual'].is_a?(Array) ? cfg['hardware_manual'] : []
+        raw_defs = cfg['hardware_set_defs']
+        defs = if raw_defs.is_a?(Hash)
+                 raw_defs
+               elsif raw_defs.is_a?(Array)
+                 raw_defs.each_with_object({}) do |d, out|
+                   out[d['set_id'].to_s] ||= d if d.is_a?(Hash)
+                 end
+               else
+                 {}
+               end
+        sets = mapping.flat_map do |key, value|
+          gt = HardwareSets.mapping_key_type(key) || key.to_s
+          label = HardwareRules.label_for(gt)
+          ids = HardwareSets.value_set_ids(value)
+          names = ids.map do |sid|
+            d = defs[sid]
+            name = d.is_a?(Hash) ? d['name'].to_s.strip : ''
+            name.empty? ? sid : name
+          end
+          # Aj vedome "bez setu" je prenosna volba; cudzie data neprikraslit.
+          if names.empty?
+            names = [HardwareSets.mapping_none?(value) ? 'bez setu' : 'nečitateľný výber']
+          end
+          names.map { |name| { 'generic_type' => gt, 'label' => label, 'set_name' => name } }
+        end.uniq
+        { 'has' => !mapping.empty? || !manual.empty?, 'sets' => sets, 'manual_count' => manual.length }
+      end
+
+      # Lahky rovnaky payload pre Inspector aj Studio; definicie ostanu na
+      # serveri. Jedina autorita pritomnosti a pomenovania je hardware_summary.
+      def hardware_tile_summary(config)
+        summary = hardware_summary(config)
+        labels = summary['sets'].map { |s| "#{s['label']}: #{s['set_name']}" }
+        count = summary['manual_count']
+        if count.positive?
+          noun = count == 1 ? 'ručná položka' : (count < 5 ? 'ručné položky' : 'ručných položiek')
+          labels << "#{labels.empty? ? '' : '+'}#{count} #{noun}"
+        end
+        { 'has' => summary['has'], 'labels' => labels }
+      end
+
       # Prida/prepise sablonu podla DVOJICE (kind, name). Vrati true/false.
       # CELY read-modify-write bezi pod JEDNYM sidecar zamkom (Codex #174 P2):
       # dve instancie SketchUpu si inak mohli cerstvo ulozenu sablonu prepisat

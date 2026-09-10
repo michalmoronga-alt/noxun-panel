@@ -1488,8 +1488,9 @@ module Noxun
         # H2 (D-76): sablona nesie AJ kovanie — mapovanie setov + ZMRAZENE
         # definicie, aby sa dala pouzit v inom projekte aj na inom PC.
         # model = zdroj definicii (snapshot projektu pred globalnou kniznicou);
-        # bez modelu (legacy volanie) sa kovanie do sablony neuklada.
-        def template_config_from(cfg, model: nil)
+        # bez modelu (legacy volanie) sa sety do sablony neukladaju;
+        # rucne polozky od modelu nezavisia.
+        def template_config_from(cfg, model: nil, with_hardware: true)
           tc = {
             # R-12: aj sablona je uzavrety whitelist, takze nesie marker
             # kontraktu configu. Stampuje sa AKTUALNA hodnota (zaznam prave
@@ -1506,13 +1507,7 @@ module Noxun
             'rail_depth' => cfg['rail_depth'], 'rails_orientation' => cfg['rails_orientation'],
             'rails_top_offset' => cfg['rails_top_offset'],
             'zone_tree' => cfg['zone_tree'] || ZoneTree.default_tree((cfg['shelves'] || 0).to_i),
-            'fronts' => Fronts.normalize_config(cfg['fronts']),
-            # KOV-H1: ad-hoc polozky kovania CESTUJU SO SABLONOU (kluc je vzdy,
-            # aj prazdny — `merge_template` inak rozlisuje „sablona kluc nema"
-            # = zachovaj polozky CIELA, co je spravanie legacy sablon).
-            # ID sa NEPREKLUCUJU: su unikatne v ramci skrinky, takze zhoda
-            # naprie skrinkami nicomu nevadi (kluc riadku nesie `cabinet_id`).
-            'hardware_manual' => CabinetBuilder.norm_hardware_manual(cfg['hardware_manual'])
+            'fronts' => Fronts.normalize_config(cfg['fronts'])
           }
           # V0.3 FIX 1: korpusove materialy do sablony LEN ak su na zdroji nastavene (non-nil).
           # part_overrides do sablony NEUKLADAME — su viazane na konkretne dielce/zony zdroja
@@ -1523,6 +1518,13 @@ module Noxun
             v = present_str(cfg[k])
             tc[k] = v if v
           end
+          # KOV-I: vypnuta volba vynecha CELE kovanie aj jeho kontroly.
+          # Materialove kanaly a recepty vo fronts ostavaju konstrukciou.
+          return tc unless with_hardware
+
+          # KOV-H1: pri zapnutej volbe ostava kluc aj prazdny. Jeho absencia
+          # pri aplikacii sablony znamena zachovat rucne polozky ciela.
+          tc['hardware_manual'] = CabinetBuilder.norm_hardware_manual(cfg['hardware_manual'])
           add_template_hardware(tc, cfg, model)
         end
 
@@ -1542,19 +1544,25 @@ module Noxun
           # dobrali z GLOBALU a sablona by niesla kody, ktore zdrojovy model
           # nepouziva. Radsej sablona BEZ kovania (a hlaska pouzivatelovi).
           defs = HardwareSets.template_set_defs(model, map)
-          return tc if defs.nil?
+          if defs.nil?
+            # KOV-I (Michal): poskodene sety = BEZ VSETKEHO kovania.
+            tc.delete('hardware_manual')
+            return tc
+          end
 
           tc['hardware_sets'] = map
           tc['hardware_set_defs'] = defs unless defs.empty?
           tc
         rescue StandardError => e
           Engine.log_error(e, 'Panel.add_template_hardware')
+          %w[hardware_sets hardware_set_defs hardware_manual].each { |k| tc.delete(k) }
           tc
         end
 
         # GH #133 P2: hlaska, ked skrinka kovanie MA, ale do sablony sa neulozilo
         # (poskodene sety projektu). Ticho by pouzivatel dostal „prazdnu" sablonu.
-        def template_save_hardware_note(cfg, tc, model)
+        def template_save_hardware_note(cfg, tc, model, with_hardware: true)
+          return '' unless with_hardware
           return '' unless model && defined?(HardwareSets)
           return '' if tc.is_a?(Hash) && tc.key?('hardware_sets')
           return '' if HardwareSets.normalize_mapping(cfg['hardware_sets'], nil,
@@ -1565,10 +1573,10 @@ module Noxun
           # niesla mapovanie BEZ definícií. Hláška musí poslať používateľa
           # tam, kde sa to naozaj opravuje.
           if HardwareSets.library_read_only?
-            return " Kovanie sa do šablóny NEULOŽILO — #{HardwareSets.library_state_reason}."
+            return " Šablóna uložená BEZ kovania — #{HardwareSets.library_state_reason}."
           end
 
-          ' Kovanie sa do šablóny NEULOŽILO — sety projektu sú poškodené ' \
+          ' Šablóna uložená BEZ kovania — sety projektu sú poškodené ' \
             '(obnov ich v Katalógu kovania, Predvoľby projektu).'
         rescue StandardError => e
           Engine.log_error(e, 'Panel.template_save_hardware_note')
@@ -1646,6 +1654,7 @@ module Noxun
             # obe cesty rovnako (merge vracia novy hash, holy zaznam by bol
             # POVODNY objekt zo skladu).
             rec = seq ? t.merge('used_seq' => seq["#{t['kind']}:#{t['name']}"]) : t.dup
+            rec['hardware'] = TemplateStore.hardware_tile_summary(t['config'])
             rec = rec.merge('preview_rev' => TemplatePreviews.rev_for(t['kind'], t['name'])) if previews
             out << rec
           end
