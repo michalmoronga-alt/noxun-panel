@@ -286,6 +286,11 @@ module Noxun
             zdroj: SRC_AUTO
           )
           row['category'] = r['category']
+          # CENY-KOV-A: iba zobrazovaci podklad. Otvorenie si adresu znova
+          # dohlada v katalogu; cena ani stav jej overenia ikonu neriadia.
+          if item.is_a?(Hash) && r['free'] != true
+            row['product_link'] = !HardwareCatalog.product_link(item).nil?
+          end
           # KOV-H1 (audit #15 FIX 8): povod riadku ide do rozpoctu ADITIVNE —
           # `origin: 'adhoc'` ked riadok (aj ciastocne) pochadza z rucne
           # pridanych poloziek, `free` pri volnej polozke bez kodu. Ziadny

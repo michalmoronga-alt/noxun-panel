@@ -58,6 +58,7 @@ module Noxun
       # identitu odpovede drzi `gen` (staršia odpoveď nikdy neprepíše novšiu).
       SECTION_ACTIONS = %w[
         hw_search hw_tree hw_create hw_patch hw_delete
+        hw_product_prepare hw_product_open
         hw_check_price hw_apply_price
         hw_tax_create_manufacturer hw_tax_create_series
         hw_demos_search hw_demos_preview hw_demos_cancel hw_demos_create
@@ -99,6 +100,8 @@ module Noxun
           when 'hw_create'         then handle_create(payload)
           when 'hw_patch'          then handle_patch(payload)
           when 'hw_delete'         then handle_delete(payload)
+          when 'hw_product_prepare' then handle_product_prepare(payload)
+          when 'hw_product_open'    then handle_product_open(payload)
           when 'hw_check_price'    then handle_check_price(payload)
           when 'hw_apply_price'    then handle_apply_price(payload)
           when 'hw_demos_search'   then handle_demos_search(payload)
@@ -295,7 +298,8 @@ module Noxun
         def items_payload
           {
             'items' => HardwareCatalog.items.map { |i|
-              i.merge('row_rev' => HardwareCatalog.record_rev(i))
+              i.merge('row_rev' => HardwareCatalog.record_rev(i),
+                      'product_link' => !!HardwareCatalog.product_link(i))
             },
             'revision' => HardwareCatalog.catalog_revision,
             'state' => HardwareCatalog.state.to_s,
@@ -864,6 +868,38 @@ module Noxun
           else
             set_status('Zmazanie setu zlyhalo.', true)
           end
+        end
+
+        # Dve citacie fazy: oneskorenu odpoved najprv overi klient (sekcia,
+        # model, token), az potom ziada otvorenie. URL z klienta neprijimame.
+        def product_model_current?(data)
+          model = Sketchup.active_model
+          model && !data['model_guid'].to_s.empty? && !DocKey.foreign?(data['model_guid'], model)
+        end
+
+        def handle_product_prepare(payload)
+          data = JSON.parse(payload.to_s)
+          return unless product_model_current?(data)
+          item = HardwareCatalog.product_record(data['code'])
+          reason = HardwareCatalog.product_edit_reason
+          result = data.select { |k, _| %w[code token model_guid section].include?(k) }
+          result.merge!('item' => item, 'row_rev' => item && HardwareCatalog.record_rev(item),
+                        'has_url' => !!HardwareCatalog.product_link(item),
+                        'read_only' => !reason.nil?, 'reason' => reason)
+          unless result['has_url'] || result['read_only'] || item.nil?
+            result['context'] = { 'categories' => HardwareCatalog::CATEGORIES,
+                                  'category_labels' => HardwareCatalog::CATEGORY_LABELS,
+                                  'units' => HardwareCatalog::UNITS, 'taxonomy' => taxonomy_payload }
+          end
+          js("MDH.productReady(#{JSON.generate(result)})")
+        end
+
+        def handle_product_open(payload)
+          data = JSON.parse(payload.to_s)
+          return unless product_model_current?(data)
+          url = HardwareCatalog.product_link(HardwareCatalog.product_record(data['code']))
+          return set_status('Odkaz sa medzitým zmenil alebo chýba — vyber položku znova.', true) unless url
+          UI.openURL(url)
         end
 
         def handle_map_project(payload)

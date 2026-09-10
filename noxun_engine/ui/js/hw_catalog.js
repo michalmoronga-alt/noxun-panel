@@ -188,7 +188,18 @@
     toggle.setAttribute('aria-label', 'Detail položky');
     toggle.setAttribute('aria-expanded', MDH_OPEN === item.item_code ? 'true' : 'false');
     head.appendChild(toggle);
-    head.appendChild(mdhMk('b', null, item.item_code));
+    var codeLabel = mdhMk('b', null, item.item_code);
+    codeLabel.setAttribute('title', item.item_code);
+    head.appendChild(codeLabel);
+    var link = mdhMk('button', 'ghostbtn tplbtn hw-product-link' + (item.product_link ? '' : ' is-missing'));
+    link.type = 'button';
+    link.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-external-link"/></svg>';
+    link.setAttribute('data-action', 'hw-product');
+    link.setAttribute('data-code', item.item_code);
+    var linkLabel = item.product_link ? 'Otvoriť produkt v prehliadači' : 'Doplniť odkaz na produkt';
+    link.setAttribute('aria-label', linkLabel + ' · ' + item.item_code);
+    link.setAttribute('title', linkLabel);
+    head.appendChild(link);
     row.appendChild(head);
     row.appendChild(mdhCellInput(item, 'name_sk', item.name_sk, 'názov', 'hwname'));
     row.appendChild(mdhMk('span', 'hwunit', item.unit));
@@ -720,6 +731,12 @@
                  placeholder: 'Demos kód alebo vlastný' });
     }
     out.push({ key: 'name', label: 'Názov *', value: String(d.name || '') });
+    // Jedno pole pre rucny odkaz; Demos vazbu spravuje existujuce overenie.
+    out.push({ key: 'product_url', label: 'Odkaz na produkt',
+               value: String(o.edit && d.demos_url ? d.demos_url : (d.product_url || '')),
+               disabled: !!(o.edit && d.demos_url),
+               placeholder: 'https://…',
+               hint: o.edit && d.demos_url ? 'Produkt je viazaný na Demos. Väzbu môžeš zrušiť v detaile položky.' : 'Otvorí sa vo webovom prehliadači.' });
     out.push({ key: 'price', label: 'Cena', cls: 'mshort',
                value: String(d.price == null ? '' : d.price),
                placeholder: 'nezadaná', hint: '€ s DPH' });
@@ -802,6 +819,7 @@
   function hwDemosDirty(prop, v){
     if (!prop || !prop.pid) return true;
     var d = v || {};
+    if (String(d.product_url || '').trim()) return true;
     if (String(d.code || '').trim() !== String(prop.code || '')) return true;
     if (String(d.name || '').trim() !== String(prop.name_sk || '')) return true;
     if (String(d.unit || '') !== String(prop.unit || '')) return true;
@@ -819,6 +837,7 @@
                 series: String(d.series || ''),
                 series_new: String(d.series_new || ''),
                 notes: String(d.notes || ''),
+                product_url: String(d.product_url || ''), demos_url: String(d.demos_url || ''),
                 demos_q: String(d.demos_q || '') };
     var e = extra || {};
     var k;
@@ -845,7 +864,8 @@
       code: i.item_code, name: i.name_sk,
       price: (i.price_eur_vat == null) ? '' : i.price_eur_vat,
       unit: i.unit, category: hwEffectiveCategory(i.category),
-      manufacturer: i.manufacturer, series: i.series, notes: i.notes
+      manufacturer: i.manufacturer, series: i.series, notes: i.notes,
+      product_url: i.product_url, demos_url: i.demos_url
     });
   }
 
@@ -864,6 +884,7 @@
       category: String(p.category_guess || d.category || ''),
       manufacturer: known || String(d.manufacturer || ''),
       manufacturer_new: '', series: '', series_new: '',
+      product_url: p.pid ? '' : String(d.product_url || ''),
       demos_q: [String(p.code || ''), String(p.name_sk || '')].filter(Boolean).join(' · ')
     });
   }
@@ -876,7 +897,7 @@
     if (!prop || !prop.pid) return null;
     var t = 'Kód, názov, cena a MJ sú z Démosu (položka dostane väzbu a dátum ' +
             'overenia). Keď niektorý z nich zmeníš, uloží sa ako ručná položka — ' +
-            'bez väzby na Démos a bez dátumu overenia.';
+            'bez väzby na Démos a bez dátumu overenia. Vlastný odkaz na produkt sa tiež uloží ako ručný zdroj.';
     var rel = mdhRelatedLine(prop.related);
     return rel ? (t + ' ' + rel) : t;
   }
@@ -886,6 +907,7 @@
   function hwItemOpen(item, draft, opts){
     if (typeof NXModal === 'undefined' || !NXModal || typeof NXModal.open !== 'function') return;
     var o = opts || {};
+    HW_PRODUCT_PENDING = null;
     var edit = !!item;
     // Review #290 P2: proposal z Demosu PREZIL zatvorenie okna, takze nove
     // otvorenie „Nová položka" z neho formular znovu predvyplni — vyhladany
@@ -911,7 +933,7 @@
     // by potom isiel rucnou cestou. Prekreslenie NIE JE zatvorenie.
     HW_REOPEN = true;
     try {
-      NXModal.open(hwItemSpec(item, d, edit, trigger));
+      NXModal.open(hwItemSpec(item, d, edit, trigger, o.initialFocus));
     } finally {
       HW_REOPEN = false;
     }
@@ -922,6 +944,7 @@
                 rowRev: edit ? String(item.row_rev || '') : '',
                 base: edit ? hwItemDraftOf(item) : null,
                 trigger: trigger,
+                initialFocus: o.initialFocus,
                 draft: d, sent: false, token: '', taxPending: null, taxToken: '',
                 usedProposal: false, demosPending: false };
   }
@@ -942,13 +965,15 @@
   function hwItemRedraw(item, d){
     var keep = HW_ITEM
       ? { base: HW_ITEM.base, rowRev: HW_ITEM.rowRev, trigger: HW_ITEM.trigger,
-          code: HW_ITEM.code, edit: HW_ITEM.edit }
+          code: HW_ITEM.code, edit: HW_ITEM.edit, initialFocus: HW_ITEM.initialFocus }
       : null;
     // Polozka mohla medzitym z katalogu zmiznut — editor sa preto NESMIE
     // premenit na formular novej polozky (`edit` je odvodeny od `item`).
     var target = item;
     if (!target && keep && keep.edit) target = { item_code: keep.code, row_rev: keep.rowRev };
-    hwItemOpen(target, d, { dropMemory: true, trigger: keep ? keep.trigger : null });
+    if (keep && keep.edit) d.demos_url = keep.base.demos_url;
+    hwItemOpen(target, d, { dropMemory: true, trigger: keep ? keep.trigger : null,
+                          initialFocus: keep ? keep.initialFocus : null });
     if (keep && keep.edit && HW_ITEM){
       HW_ITEM.base = keep.base;
       HW_ITEM.rowRev = keep.rowRev;
@@ -959,12 +984,15 @@
   // posuvaju na cerstvy stav zo servera.
   function hwItemRebase(fresh){
     hwItemOpen(fresh, null, { dropMemory: true,
+                              initialFocus: HW_ITEM ? HW_ITEM.initialFocus : null,
                               trigger: HW_ITEM ? HW_ITEM.trigger : null });
   }
 
-  function hwItemSpec(item, d, edit, trigger){
+  function hwItemSpec(item, d, edit, trigger, initialFocus){
     return {
       trigger: trigger,
+      initialFocus: initialFocus,
+      busyLock: true,
       title: edit ? 'Upraviť položku katalógu' : 'Nová položka katalógu',
       sub: edit ? ('Kód ' + String(item.item_code)) : 'z Démosu alebo ručne',
       size: 'md',
@@ -1001,7 +1029,7 @@
   // zneplatnuje) — aj keby sa ceny nikto nedotkol.
   var HW_PATCH_MAP = { name: 'name_sk', price: 'price_eur_vat', unit: 'unit',
                        category: 'category', manufacturer: 'manufacturer',
-                       series: 'series', notes: 'notes' };
+                       series: 'series', notes: 'notes', product_url: 'product_url' };
 
   // Review #290/2 P1: nad nedostupnou taxonomiou sa klasifikacia NEPOSIELA
   // VOBEC — ani prazdna. Server prazdnu dvojicu prepusti, takze by uprava
@@ -1017,6 +1045,7 @@
     for (k in HW_PATCH_MAP){
       if (!Object.prototype.hasOwnProperty.call(HW_PATCH_MAP, k)) continue;
       if (locked && HW_CLASS_KEYS[k]) continue;
+      if (k === 'product_url' && b.demos_url) continue;
       var now = String(d[k] == null ? '' : d[k]).trim();
       var was = String(b[k] == null ? '' : b[k]).trim();
       if (k === 'price' && hwPriceKey(now) === hwPriceKey(was)) continue;
@@ -1034,6 +1063,7 @@
               unit: String(d.unit || ''),
               price_eur_vat: String(d.price == null ? '' : d.price),
               notes: String(d.notes || '') };
+    if (String(d.product_url || '').trim()) f.product_url = String(d.product_url).trim();
     // Nad nedostupnou taxonomiou sa klasifikacia neposiela (viz `hwItemPatch`).
     if (!hwTaxLocked()){
       f.manufacturer = String(d.manufacturer || '');
@@ -1180,9 +1210,59 @@
     return n ? String(n.value == null ? '' : n.value) : '';
   }
 
+  // Klik je naviazany na sekciu/model a poslednu poziadavku. Samotny serverovy
+  // prepare nic neotvara; oneskorena odpoved nesmie ozivit opusteny formular.
+  var HW_PRODUCT_SEQ = 0;
+  var HW_PRODUCT_PENDING = null;
+  function hwProductContext(){
+    return { section: typeof studioSec === 'undefined' ? '' : String(studioSec),
+             model_guid: typeof ST === 'undefined' || !ST ? '' : String(ST.model_guid || '') };
+  }
+  function hwProductContextChanged(nextSection, nextModelGuid){
+    var p = HW_PRODUCT_PENDING;
+    if (p && (p.section !== String(nextSection || '') || p.model_guid !== String(nextModelGuid || ''))){
+      HW_PRODUCT_PENDING = null;
+    }
+  }
+  function hwProductRequest(code, trigger){
+    HW_PRODUCT_PENDING = null;
+    if (!code || (typeof NXModal !== 'undefined' && NXModal.isOpen())) return;
+    var ctx = hwProductContext();
+    if (!ctx.model_guid || (ctx.section !== 'hw' && ctx.section !== 'budget')) return;
+    var token = 'product-' + (++HW_PRODUCT_SEQ);
+    HW_PRODUCT_PENDING = { code: String(code), token: token, section: ctx.section,
+      model_guid: ctx.model_guid, trigger: trigger,
+      modalGeneration: typeof NXModal !== 'undefined' && NXModal.generation ? NXModal.generation() : 0 };
+    mdhSend('hw_product_prepare', { code: String(code), token: token,
+      section: ctx.section, model_guid: ctx.model_guid });
+  }
+  function hwProductReady(r){
+    var p = HW_PRODUCT_PENDING;
+    if (!p || !r || r.token !== p.token || r.code !== p.code ||
+        r.section !== p.section || r.model_guid !== p.model_guid) return;
+    HW_PRODUCT_PENDING = null;
+    var ctx = hwProductContext();
+    if (ctx.section !== p.section || ctx.model_guid !== p.model_guid) return;
+    if (typeof NXModal !== 'undefined' &&
+        (NXModal.isOpen() || (NXModal.generation && NXModal.generation() !== p.modalGeneration))) return;
+    if (!r.item){ MDH.setStatus('Položka sa už v katalógu nenašla.', true); return; }
+    if (r.has_url){
+      mdhSend('hw_product_open', { code: p.code, model_guid: p.model_guid });
+      return;
+    }
+    if (r.read_only){ MDH.setStatus('Katalóg je len na čítanie: ' + (r.reason || ''), true); return; }
+    if (p.section !== 'hw' && typeof studioGoSection === 'function') studioGoSection('hw');
+    mdhApplyEnums(r.context || {});
+    var item = Object.assign({}, r.item, { row_rev: r.row_rev, product_link: false });
+    MDH_ITEMS[item.item_code] = item;
+    MDH_RO = false;
+    hwItemOpen(item, null, { trigger: p.trigger, initialFocus: 'product_url' });
+  }
+
   // --- verejne API pre Ruby ------------------------------------------------
 
   var MDH = {
+    productReady: hwProductReady,
     init: function(data){
       mdhApplyEnums(data);
       mdhRenderEnums();
@@ -1412,7 +1492,9 @@
       if (!t) return;
       var action = t.getAttribute('data-action');
       var code = t.getAttribute('data-hw-code') || '';
-      if (action === 'hw-view'){
+      if (action === 'hw-product'){
+        hwProductRequest(t.getAttribute('data-code') || code, t);
+      } else if (action === 'hw-view'){
         // ŠT-3a-1: segment Položky · Sety v lište sekcie (Š16).
         hwSetView(t.getAttribute('data-view'));
       } else if (action === 'hw-toggle'){
@@ -1698,6 +1780,7 @@
   // beziace overenie ceny / nahlad a napise preco), az potom sa lokalne
   // zatvoria modaly.
   function hwOnLeaveSection(){
+    HW_PRODUCT_PENDING = null;
     if (window.sketchup && sketchup.hw_leave) sketchup.hw_leave('');
     // Review #219 P2-2: naplanovany (debounced) dotaz do Demosu MUSI zomriet
     // s odchodom. Vstup do sekcie a rychly odchod by inak poslal
@@ -1813,6 +1896,7 @@
       hwItemManOptions: hwItemManOptions, hwItemSerOptions: hwItemSerOptions,
       hwItemCatOptions: hwItemCatOptions, hwDemosHit: hwDemosHit,
       hwItemOpen: hwItemOpen, hwTreeState: hwTreeState,
+      hwProductRequest: hwProductRequest, hwProductContextChanged: hwProductContextChanged,
       mdhGroupCount: mdhGroupCount, mdhCatLabel: mdhCatLabel,
       hwOnLeaveSection: hwOnLeaveSection, hwApplyState: hwApplyState, MDH: MDH };
   }

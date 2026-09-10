@@ -174,6 +174,9 @@ schválený vzor kontraktu UI 2.0 — JEDNA kostra pre všetky okná typu „pri
 jednom mieste, inštancie sa líšia LEN poľami (`fields` = deklaratívny zoznam `{key, label, type, value, placeholder, options}`), a je **globálny `window.NXModal`** +
 `module.exports` (testovateľný v Node).
 
+**CENY-KOV-A (v0.10.4):** voliteľné `initialFocus` pošle oba pokusy o fokus priamo do určeného poľa; oneskorený pokus patrí stále tomu istému modalu. `generation()` odlíši
+nový formulár aj po jeho zatvorení, aby stará produktová odpoveď neoživila editor. Textové pole rešpektuje `disabled`, napríklad pri URL spravovanej Demos väzbou.
+
 **ŠT-2c PR 2c-1 — príprava pre D-69 editor materiálu:** k `text`/`select` pribudli typy **`group`** (nadpis sekcie formulára — dlhý formulár bez predelov sa číta ako kopa políčok),
 **`checkbox`**, **`color`** (vzorka + text `#RRGGBB`) a **`rows`** (repeater: `cols` = pod-polia riadku, tlačidlá `+`/`−`), plus šírkové varianty karty `size: 'sm'|'md'|'wide'`
 (`small` je alias `sm`, starý `small: false` = `md`; šírky sedia pri `.nxmcard` v `studio.html`).
@@ -2094,6 +2097,11 @@ modelu).
 
 **ŠT-3a-2 — sekcia `hw` je ÚPLNÁ a okno „Katalóg kovania" ZANIKLO.** Do sekcie pribudli tri **MODELOVÉ zápisy** (predvoľby setov projektu), takže blok „Predvoľby projektu" v
 pohľade Sety už **nie je read-only** — `HWS_PROJ_RO` aj premostenie `hw_open_window`/`HW_BRIDGE_STATUS` **zanikli**.
+
+**CENY-KOV-A (v0.10.4): ikona „Otvoriť produkt" je pri každej katalógovej položke kovania aj pri jej riadku v Rozpočte.** Pri uloženej URL iba otvorí externý prehliadač;
+chýbajúci odkaz sa ukáže jantárovo a otvorí existujúci editor konkrétneho kódu s fokusom na adrese. Formulár používa pôvodný draft, revíziu a token odpovede — nevzniká druhý
+editor položky. Preklik z Rozpočtu nesmie závisieť od toho, či je daný kód práve viditeľný v strome katalógu. Oneskorená odpoveď sa neprijme po odchode z pôvodnej sekcie,
+zmene dokumentu ani otvorení iného formulára. Demos väzba zostáva v pôvodnom overovacom toku; obyčajný preklik pri nej nezapisuje cenu ani dátum.
 
 **Po modelovom zápise ide `after_sets_change(model)` → `refresh_if_open(bump: true)` — a to STAČÍ:** predvoľba setu nemení GEOMETRIU, takže `Panel.push_selected` (dedup kópií) sa
 vedome NEVOLÁ; jantár „Obnoviť" po vlastnom prepočte NEZOŽLTNE, lebo `push_state` si `@pushed_epoch` ukladá AŽ po zbere a vlastnú transakciu tak pohltí.

@@ -863,6 +863,12 @@
   // budget.js, ktory ho obaluje.
   var NXAPI = {
     setStudio: function(data){
+      // CENY-KOV-A: produktovy preklik mohol zacat aj z Rozpoctu. Zmena
+      // dokumentu zrusi jeho cakanie este PRED dosadenim cudzieho payloadu.
+      if (typeof hwProductContextChanged === 'function' &&
+          ((!ST && data) || (ST && (!data || ST.model_guid !== data.model_guid)))){
+        hwProductContextChanged(studioSec, data ? data.model_guid : '');
+      }
       // Rozbalenie patrí dokumentu; po náhrade posledného UNI sa tiež zahodí.
       if (!ST || !data || ST.model_guid !== data.model_guid ||
           !(data.control || []).some(function(it){ return it.category === 'uni_material'; })){
@@ -891,6 +897,9 @@
       if (mdl) mdl.textContent = ST ? ('zákazka: ' + ST.model_title + ' · v' + ST.version) : '…';
       // Deep-link sekcie sa posiela PRAVE RAZ; kotva s nou.
       if (ST && ST.open_section && STUDIO_SECTIONS.indexOf(ST.open_section) >= 0){
+        if (studioSec !== ST.open_section && typeof hwProductContextChanged === 'function'){
+          hwProductContextChanged(ST.open_section, ST.model_guid || '');
+        }
         // Review #8: deep-link je PRESKOK do inej sekcie — otvorené rohové menu
         // patrilo tej, z ktorej sme odišli. Bez vynulovania by sa `vepoMenuOpen`
         // vrátilo pri najbližšom návrate do Kusovníka „samo otvorené".
@@ -1710,6 +1719,9 @@
   // súborom a vlastný stav sekcií nemá.
   function studioGoSection(id){
     if (STUDIO_SECTIONS.indexOf(id) < 0) return;
+    if (id !== studioSec && typeof hwProductContextChanged === 'function'){
+      hwProductContextChanged(id, ST ? (ST.model_guid || '') : '');
+    }
     closeSectionMenus();   // review #8 — overlay patrí sekcii, z ktorej odchádzame
     // ŠT-2b: sekcia Materiály má modály MIMO tela sekcie (`#matModalRoot`) a
     // dlhé behy Demosu na serveri. Odchod z nej preto musí modály zavrieť

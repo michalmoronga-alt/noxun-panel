@@ -253,13 +253,13 @@ function treeResp(over){
   boot();
   const f = H.hwItemFields({}, {});
   eq(f.map(function(x){ return x.key; }),
-     ['demos', 'code', 'name', 'price', 'unit', 'category', 'manufacturer', 'series', 'notes'],
+     ['demos', 'code', 'name', 'product_url', 'price', 'unit', 'category', 'manufacturer', 'series', 'notes'],
      'poradie poli je poradie dodavatelskeho listu (mockup scena 3)');
   eq(f[0].type, 'lookup', 'Démos je nasepkavac nad SERVEROVYM hladanim');
-  eq(f[5].options.map(function(o){ return o[1]; }),
+  eq(f.find(x => x.key === 'category').options.map(function(o){ return o[1]; }),
      ['Závesy', 'Výsuvy', 'Nohy a montáž', 'Ostatné'],
      'kategorie sa ponukaju SK popiskom, hodnota ostava kodom');
-  eq(f[5].options.map(function(o){ return o[0]; }), CATS, 'hodnota je kod');
+  eq(f.find(x => x.key === 'category').options.map(function(o){ return o[0]; }), CATS, 'hodnota je kod');
 
   // UPRAVA: kod je IDENTITA — nesmie sa dat prepisat.
   const e = H.hwItemFields(H.hwItemDraftOf(ITEMS[0]), { edit: true });
