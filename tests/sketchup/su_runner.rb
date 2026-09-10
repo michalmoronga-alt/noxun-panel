@@ -17712,7 +17712,9 @@ module NoxunSuRunner
       kovg_sokel_vpredu(model)
       kovg_prichyt_vs_nohy(model)
       kovg_rucny_prichyt(model)
+      kovg_nohy_ui(model) # KOV-G2 (D-111)
     ensure
+      e::GhostTool.cancel_session('SU-TEST KOV-G teardown', deferred: false) if defined?(e::GhostTool)
       cleanup(model)
     end
     ok('KOV-G: cleanup (0 korpusov)', cabinets(model).empty?)
@@ -17897,6 +17899,98 @@ module NoxunSuRunner
          i['category'] == e::Validation::CAT_BUILD &&
            i['message_sk'].to_s.include?(KOVG_CLIP_CODE)
        end)
+    cleanup(model)
+  end
+
+  # --- 7) KOV-G2 (D-111): RIADOK NOH V PANELI A SEGMENT V PASIKU ------------
+  #
+  # Headless sada overuje TEXT nad rucne poskladanym stavom; TU ide o cely
+  # retazec nad ZIVYM modelom: nahlad PRED vlozenim -> payload oznacenej
+  # skrinky -> prepnutie setu z Korpusu -> ghost pasik. A hlavne o UNDO, ktore
+  # headless neoveri: nahlad je CITACI (ziadny krok Spat), prepnutie setu je
+  # PRAVE JEDEN.
+  #
+  # Vlastny set noh je NAJJEDNODUCHSI mozny (jeden clen, pevny kod klzaka) —
+  # zapisuje sa LEN do projektoveho snapshotu, globalna kniznica pocitaca sa
+  # nedotkne.
+  KOVG2_SET = {
+    'set_id' => 'kovg2-nohy-test', 'name' => 'KOV-G2 testovacie nohy',
+    'generic_type' => 'leg',
+    'members' => [{ 'per' => 'unit', 'qty' => 1, 'label' => 'noha', 'code' => '272212' }]
+  }.freeze
+
+  def kovg_nohy_ui(model)
+    markers = []
+    # --- 1) NAHLAD PRE VKLADACIU KARTU je CITACI ----------------------------
+    m1 = r03_marker(model, markers)
+    res = nil
+    kovh2_capture_js do |calls|
+      e::Panel.handle_insert_legs_preview(
+        { 'gen' => 11, 'type' => 'lower', 'width' => 1200.0, 'floor_height' => 100.0,
+          'plinth_mode' => 'none' }.to_json
+      )
+      res = calls.first.to_s
+    end
+    ok('KOV-G2 nahlad: odpoveda vlastnym kanalom s generaciou dotazu',
+       res.start_with?('NX.insertLegsPreview(') && res.include?('"gen":11'))
+    ok("KOV-G2 nahlad: text povie, CO skrinka dostane (#{res[0, 200]})",
+       res.include?('6×') && res.include?('AXILO') && res.include?('príchyt'))
+    Sketchup.undo
+    ok('KOV-G2 nahlad: NEROBI krok Spat (citacia cesta)', !m1.valid?)
+
+    # --- 2) PAYLOAD OZNACENEJ SKRINKY ---------------------------------------
+    inst = kovg_build(model, 1200.0, 100.0)
+    return ok('KOV-G2: vlozenie korpusu', false) unless inst
+
+    cid = e::Store.get(inst, 'cabinet_id').to_s
+    model.selection.clear
+    model.selection.add(inst)
+    ls = e::Panel.cabinet_payload(inst)['legs_summary'] || {}
+    ok("KOV-G2 payload: skrinka 1200/sokel 100 nesie riadok Noh (#{ls['text']})",
+       ls['tone'].to_s == 'ok' && ls['text'].to_s.include?('6×') &&
+       ls['text'].to_s.include?('2× príchyt'))
+    ok("KOV-G2 payload: a vie, ktory set noh plati (#{ls['set_id']})",
+       ls['set_id'].to_s == 'nohy-podla-sokla')
+    ok('KOV-G2 payload: ovladac je TEN ISTY ako v Kovanie -> Sety',
+       Array(e::Panel.cabinet_payload(inst)['hardware_set_options'])
+         .any? { |o| o.is_a?(Hash) && o['generic_type'].to_s == 'leg' })
+
+    # --- 3) OVERRIDE SETU Z KORPUSU = PRAVE JEDEN KROK SPAT -----------------
+    model.start_operation('KOV-G2: testovaci set noh do snapshotu', true)
+    added = e::HardwareSets.add_project_sets!(model, [KOVG2_SET.dup])
+    model.commit_operation
+    ok('KOV-G2 override: projekt dostal testovaci set noh', added == true)
+    m2 = r03_marker(model, markers)
+    e::Panel.handle_set_hardware_set(pg(model, 'cabinet_id' => cid, 'generic_type' => 'leg',
+                                        'set_id' => KOVG2_SET['set_id']))
+    ovr = ((e::Store.config(inst) || {})['hardware_sets'] || {})['leg'].to_s
+    ok("KOV-G2 override: skrinka drzi vlastny set noh (#{ovr})", ovr == KOVG2_SET['set_id'])
+    ls2 = e::Panel.cabinet_payload(inst)['legs_summary'] || {}
+    ok("KOV-G2 override: riadok Noh sa ZMENIL (#{ls2['text']})",
+       ls2['set_id'].to_s == KOVG2_SET['set_id'] && ls2['text'].to_s != ls['text'].to_s &&
+       !ls2['text'].to_s.include?('AXILO'))
+    Sketchup.undo
+    back = ((e::Store.config(inst) || {})['hardware_sets'] || {})['leg']
+    ok('KOV-G2 override: JEDEN krok Spat vratil predvolbu projektu',
+       m2.valid? && (back.nil? || back.to_s.empty?))
+
+    # --- 4) GHOST PASIK: skrinka ano, doska nikdy ---------------------------
+    cleanup(model)
+    e::Panel.handle_insert(pg(model, kovg_params(1200.0, 100.0)))
+    s = ghost_session
+    gp = s ? e::GhostTool.state_payload(s) : {}
+    ok("KOV-G2 pasik: skrinka nesie kratky suhrn noh (#{gp['legs_short']})",
+       gp['legs_short'].to_s.include?('AXILO') && gp['legs_tone'].to_s == 'ok')
+    ok('KOV-G2 pasik: suhrn sa pocita RAZ za session (druhy push ho uz len prevezme)',
+       s && s.legs_summary.equal?(s.legs_summary) &&
+       e::GhostTool.state_payload(s)['legs_short'] == gp['legs_short'])
+    e::GhostTool.cancel_session('SU-TEST KOV-G2', deferred: false)
+    bs = board_ghost_start!(model)
+    bp = bs ? e::GhostTool.state_payload(bs) : {}
+    ok('KOV-G2 pasik: DOSKA o nohach nehovori (kluc v pushi vobec nie je)',
+       !bp.key?('legs_short') && !bp.key?('legs_tone'))
+    e::GhostTool.cancel_session('SU-TEST KOV-G2', deferred: false)
+    r03_clear_markers(model, markers)
     cleanup(model)
   end
 

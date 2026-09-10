@@ -1334,6 +1334,12 @@
   .nx-inspector .bcnewer[hidden] { display: none; }
   .nx-inspector .gbtxt { white-space: nowrap; color: var(--nx-select-strong); font-weight: 600; }
   .nx-inspector .gbtxt[hidden] { display: none; }
+  /* KOV-G2 (D-111): segment noh v pásiku. Je INFORMAČNÝ (nie ovládač), preto
+     tlmenejší než kotva a otočenie; pri jantárovom tóne (chýbajúce pásmo setu)
+     dostane farbu upozornenia. Dlhý text sa oreže — pásik nesmie zalomiť. */
+  .nx-inspector .gblegs { font-weight: 500; color: var(--nx-ink-soft);
+                          overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .nx-inspector .gblegs.warn { color: var(--nx-warnchip-fg); }
   /* GHOST-D1: umiestnenie dosky stoji vpravo — na tom istom mieste, kde ma
      skrinka pole zamknutej vysky (pasik nerastie o riadok). */
   .nx-inspector .gbori { margin-left: auto; }
@@ -1416,6 +1422,26 @@
   .nx-inspector .inforow[aria-disabled="true"] { cursor: default; opacity: .7; }
   .nx-inspector .inforow[aria-disabled="true"]:hover span,
   .nx-inspector .inforow[aria-disabled="true"]:hover b { color: inherit; }
+  /* KOV-G2 (D-111): RIADOK NOH pod rozmermi. Prechadza cez OBA stlpce mriezky
+     (`grid-column: 1 / -1`) — text kovania sa do uzkeho rozmeroveho stlpca
+     nezmesti a select setu potrebuje miesto vpravo. JEDEN riadok: nadpis
+     nema, ikona a popisok stoja v nom (vertikalny priestor je vzacny). */
+  .nx-inspector .legsrow { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px;
+             margin-top: 4px; padding: 3px 0 0; border-top: 1px solid var(--nx-border-soft);
+             font-size: 10.8px; color: var(--nx-ink-soft); min-width: 0; }
+  .nx-inspector .legsrow[hidden] { display: none; }
+  .nx-inspector .legsrow > .ic { flex: 0 0 auto; width: 12px; height: 12px;
+             color: var(--nx-ink-faint); }
+  .nx-inspector .legsrow .legslbl { flex: 0 0 auto; }
+  /* Text je VYSTUP servera — dlhy nazov z katalogu sa oreze, cely ostava
+     v tooltipe (`title`), nikdy sa nezalamuje na druhy riadok. */
+  .nx-inspector .legsrow .legstxt { flex: 1 1 auto; min-width: 0; overflow: hidden;
+             text-overflow: ellipsis; white-space: nowrap;
+             color: var(--nx-ink-strong); font-weight: 600; font-size: 11.2px; }
+  .nx-inspector .legsrow.warn .legstxt { color: var(--nx-warnchip-fg); }
+  .nx-inspector .legsrow .legssel { flex: 0 1 auto; min-width: 0; }
+  .nx-inspector .legsrow .legssel:empty { display: none; }
+  .nx-inspector .legsrow .hwsetsel { max-width: 150px; font-size: 11px; }
   /* Typ korpusu v hlavicke — READONLY badge (typ urcuje sablona/vkladanie). */
   .nx-inspector .idbar .typbadge { flex: 0 0 auto; font-size: 10px; font-weight: 700; letter-spacing: .04em;
             text-transform: uppercase; padding: 1px 7px; border-radius: 9px;

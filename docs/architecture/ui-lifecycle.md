@@ -664,6 +664,25 @@ výrobné dielce alebo údaj chýba (radšej pomlčka než vymyslené číslo). 
 formátovač). Riadok **nie je klikateľný** (nie je kam viesť) a vo VKLADANÍ sa **vynuluje** — odhad zo šablóny nemá (materiály sa riešia až pri vložení). Vertikálny priestor
 panela sa nemení: riadok existoval od UI 2.0 ako placeholder.
 
+**KOV-G2 — riadok „NOHY" (v0.9.60, D-111).** Pod rozmermi stojí **jeden** riadok `#legsRow`, ktorý povie, **aké nohy skrinka pri tejto výške sokla a šírke dostane** — dovtedy sa
+to dalo zistiť až v Nákupe (predvoľba setu podľa sokla žila schovaná v Predvoľbách projektu). Ide **cez oba stĺpce mriežky** (`grid-column: 1 / -1`): text kovania sa do úzkeho
+rozmerového stĺpca nezmestí a select setu potrebuje miesto vpravo. Žiadny nadpis navyše, žiadny druhý riadok — dlhý katalógový názov sa **oreže** (`text-overflow`) a celý ostáva
+v `title`. Viditeľnosť ide s riadkom **Sokel** (`applyVisibility` → `nxLegsApplyVisibility`: horná skrinka a doska riadok nemajú) a navyše zmizne pri `tone: 'none'` (skrinka bez
+podstavca) — vertikálny priestor je vzácny. **Text skladá SERVER** ([hardware.md § `legs_summary`](hardware.md)), panel z položiek nič neodvodzuje; `tone: 'warn'` len pridá triedu
+`.warn`.
+
+Riadok má **dve cesty a jeden vzhľad.** (a) **OZNAČENÁ skrinka:** `cabinet_payload` nesie `legs_summary` — a skladá ho `HardwareSets.legs_summary_from_purchase(params['hardware'])`,
+teda z **už rozpísaných** položiek (`purchase`), takže riadok a rozklik položky v Kovaní sa nemôžu rozísť a katalóg sa nečíta druhý raz. `loadSelected` volá `renderLegsRow` **až za**
+`renderHardware` (berie si z neho `HW_SET_OPTIONS`) a doplní **select setu nôh** = ten istý ovládač ako v Kovanie → Sety (`hwCabOptionList` + `hwSetSelectHtml`, zápis existujúcou
+akciou `set_hardware_set` — **žiadny nový zapisovací callback**), preto sa zmena na jednom mieste objaví aj na druhom (obe kreslí server push). (b) **VKLADANIE:** text chodí
+z čítacieho callbacku **`insert_legs_preview`** (`panel.rb` → `handle_insert_legs_preview`, vzor `hw_manual_search`): **žiadna operácia, žiadny zápis, žiadny krok Späť**, odpoveď
+kanálom `NX.insertLegsPreview` s **generáciou dotazu** (`gen`) — staršie kolo sa zahadzuje, inak by pomalšia odpoveď prepísala čerstvejšiu. Klient posiela **uzavretý** payload
+`INSERT_LEGS_KEYS` = `type` · `width` · `floor_height` · `plinth_mode` (debounce 150 ms, a len keď sa niektorá z týchto hodnôt naozaj zmenila) a server z neho cez
+`CabinetBuilder.normalize` + `Construction.cabinet_hw_ctx` ([construction.md](construction.md)) + `HardwareRules.evaluate(cfg, [], ctx)` + `Panel.item_purchase` (tá istá funkcia ako
+v karte) postaví `legs_preview_summary`. **Override sa vo vkladaní neponúka** — set sa mení až na vloženej skrinke. Kým odpoveď nepríde (starší plugin bez callbacku), v riadku
+stojí „—". **PASS-THROUGH GUARD:** text je VÝSTUP — do `collectAll()` ani do vkladacieho payloadu sa nedostane nič z neho (`test_kovg2_nohy_ui.js`, `test_insert_state.js`).
+Odchod z vkladania (`loadSelected`, `loadBoard`, `clearSelected`) volá `nxLegsInsertReset` — riadok zmizne aj s pamäťou vstupov.
+
 **Klikateľné sú len tie údaje, ktoré niekam vedú (N13):** „Dielcov" → `nx_select_parts` → `Panel.handle_select_parts` = **čisté čítanie + zmena výberu** pod
 `suspend_selection_sync` a refresh `dedup: false` (vzor `ProductionCore.do_select`; **žiadny `start_operation`, žiadny krok Späť**), s prísnym guardom `model_guid` + `cabinet_id`
 (asynchrónny callback). Klik má **rovnaký flush handshake ako „Vložiť kópiu"** (Codex audit UI-B3): zmena výberu si vypýta push celej skrinky, ktorý prepíše formulár — rozpísaný
@@ -995,7 +1014,8 @@ ktorým sa už kótuje (žiadny nový výpočet, žiadne nové dáta); farby `PV
 
 tri skupiny v **záväznom poradí** — **Položky z pravidiel** (`data-key="hwitems"`) · **Sety** (`hwsets`) · **Pravidlá** (`hwrules`); kostra je STATICKÁ, JS píše len obsah **dvoch**
 kontajnerov `#hwRows` a `#hwSetRows` (preto `refreshHardwareSets` obnovuje selecty v OBOCH — inak by novo pridaný set typu v skupine Sety ostal neviditeľný až do ďalšieho označenia
-skrinky).
+skrinky). **KOV-G2 (v0.9.60): kontajnery sú TRI** — pribudol `#legsRow` v Základných (riadok Nôh, nižšie), ktorý nesie **ten istý** select pre typ `leg`; bez neho by držal starú
+ponuku setov.
 
 **Položky sú BOXY PODĽA VLASTNÍKA** (`.hwbox`): „Skrinka" · box KAŽDÉHO čela · spoločný box „Vnútro skrinky" pre ostatných vlastníkov (podperky políc). Je to **len ZOBRAZENIE tých
 istých dát** — identita položky (`owner_part_key`, `generic_type`, `rule_id`), zápisové cesty (`set_hardware_override`, `set_hardware_set`), D-92 nákupný riadok aj D-93 zámok NL sú
@@ -1668,6 +1688,13 @@ a *ďalšia* session štartuje z tejto hodnoty. Testy: `tests/js/test_ghost_d1_p
 zamknutá fáza to prizná — ťah sa preskočí, neznáma hodnota ukáže „—", nie klamlivú nulu). Pásik **nerastie o riadok** — mení sa len obsah toho istého. Nápoveda „i" je pre
 kreslenie vlastná (počiatok, ťahy, meracie pole, Shift; o ALT ani o zámku výšky ani slovo) a `ghost_lock_z` sa neposiela ani odtiaľto. Starší push bez `interaction` sa naďalej
 správa ako umiestňovanie. Testy: `tests/js/test_ghost_d2_pasik.js`.
+
+**Segment NÔH v pásiku (KOV-G2, D-111).** Push nesie **aditívne** `legs_short` + `legs_tone` a pásik z nich kreslí segment `gbLegs` (pred nápovedou „i", **v tom istom riadku** —
+pásik nesmie narásť). Kľúče chodia **len pre subjekt `cabinet`**: `GhostTool.legs_summary_for(s)` sa pýta `s.cabinet?` a hodnotu `'none'` (horná skrinka, sokel 0) neposiela vôbec,
+takže doska ani kreslenie segment nikdy nedostanú. Starší push kľúč nenesie → segment sa **nekreslí** (rovnaký fallback ako `orientation_label`); klient si text **neskracuje ani
+neodvodzuje** — skladá ho server (`HardwareSets.legs_summary`, [hardware.md](hardware.md)) a `legs_tone: 'warn'` ho len zafarbí. Hodnota sa počíta **lenivo a RAZ za session**
+(`PlacementSession#legs_summary`, sentinel `:unset`): plán je zmrazený, kým `push_state` beží pri každej šípke, ALT-e aj zmene zámku výšky — a každý beh by inak siahol na
+pravidlá, sety aj katalóg. Výpočet ide cez `Panel.legs_preview_summary` (nižšie), takže pásik a vkladacia karta hovoria to isté. Testy: `tests/js/test_kovg2_nohy_ui.js`.
 
 Zmeny vo vkladacej karte sa do **bežiacej** session NEPREMIETAJÚ (snapshot je zmrazený; status to prizná) a **druhé „Vložiť" starú session zruší** a založí novú s čerstvým
 snapshotom. **Poznámku preflightov** (D-45 prevzatá hrúbka, materiálové noty) vypisuje **až `ghost_after_commit`** — pri stlačení „Vložiť" sa ešte nič nestalo, takže hlásiť ju

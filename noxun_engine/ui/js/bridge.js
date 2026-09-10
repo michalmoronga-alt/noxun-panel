@@ -514,6 +514,12 @@
     hwManualSearchResult: function(res){
       if (typeof hwManualSearchResult === 'function') hwManualSearchResult(res);
     },
+    // KOV-G2 (D-111): odpoveď náhľadu nôh pre VKLADACIU kartu. Nesie generáciu
+    // dotazu — staršie kolo zahadzuje `hardware.js`. Je to VÝSTUP: nič z toho
+    // sa nikdy nedostane do `collectAll()` ani do vkladacieho payloadu.
+    insertLegsPreview: function(res){
+      if (typeof nxLegsInsertResult === 'function') nxLegsInsertResult(res);
+    },
     // KOV-H2: výsledok ZÁPISU ručnej položky. Modal D-15 sa pri odoslaní zamkne
     // a odomyká ho VÝHRADNE volajúci — preto server odpovedá v každej vetve.
     hwManualResult: function(ok, msg, op){
@@ -645,6 +651,11 @@
       setCabInfo(c);
       renderPartCard(c.part_card || null); // V0.3 karta dielca (ak je vybraty dielec)
       renderHardware(c.hardware || [], c.hardware_overrides || [], c.hardware_set_options || [], c.cabinet_id || ''); // V0.4 kovanie + D1b sety
+      // KOV-G2 (D-111): riadok Noh v Zakladnych. AZ ZA `renderHardware` — berie
+      // si z neho ponuku setov (`HW_SET_OPTIONS`) pre select typu `leg`.
+      // Vkladaci nahlad sa pritom zrusi: teraz hovori payload skrinky.
+      if (typeof nxLegsInsertReset === 'function') nxLegsInsertReset();
+      if (typeof renderLegsRow === 'function') renderLegsRow(c.legs_summary || null, c.cabinet_id || '');
       renderPreview();
       refreshZoneUI();
     },
@@ -679,6 +690,8 @@
       setCtxNote(null); // ani suhrn skrinky (doska ma vlastnu kartu)
       renderPartCard(null);
       renderHardware(null, []);
+      // KOV-G2 (D-111): doska nohy nema — riadok zmizne aj s pamatou vstupov.
+      if (typeof nxLegsInsertReset === 'function') nxLegsInsertReset();
       clearCabinetMaterials();
       if (lastCabForFit !== null){ lastCabForFit = null; }
       renderBoardCard(b);
@@ -720,6 +733,11 @@
       if (lastCabForFit !== null){ lastCabForFit = null; fitPreview(); }
       renderPartCard(null);      // schovaj kartu dielca
       renderHardware(null, []);  // kovanie len pre oznacenu skrinku
+      // KOV-G2 (D-111): prazdny vyber = navrat do VKLADANIA. Riadok Noh sa
+      // zahodi aj s pamatou vstupov a `nxLegsInsertAsk` si vypyta cerstvy
+      // nahlad pre kartu, ktoru prave postavil `setUiMode`.
+      if (typeof nxLegsInsertReset === 'function') nxLegsInsertReset();
+      if (typeof nxLegsInsertAsk === 'function') nxLegsInsertAsk();
       clearCabinetMaterials();   // korpusove material selecty na "dedi" + disabled
       refreshZoneUI(); renderPreview();
     },

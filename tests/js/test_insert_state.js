@@ -189,6 +189,26 @@ eq(Object.keys(ins.hardwareOf(TPL_VIEW)).sort(),
   ['hardware_manual', 'hardware_set_defs', 'hardware_sets'],
   'a stav vkladania o `_view`/`_owners` ani nevie');
 
+// KOV-G2 (D-111): TO ISTE pre suhrn NOH. `legs_summary` je VYSTUP servera pre
+// jeden riadok panela („6× noha AXILO H100 + platnička") — keby ho vklad
+// poslal spat, text z obrazovky by skoncil v configu novej skrinky. Ani
+// sablona z novsej verzie ho do stavu vkladania nedostane.
+const TPL_LEGS = deepFreeze({
+  type: 'lower', width: 1200, floor_height: 100,
+  legs_summary: { text: '6× noha AXILO H100 + platnička', short: '6× noha AXILO H100',
+                  tone: 'ok', set_id: 'nohy-podla-sokla' }
+});
+ins.setHardware(TPL_LEGS);
+eq(ins.hardwarePayload(), {}, 'suhrn noh sa do insert payloadu NEDOSTANE');
+eq(Object.keys(ins.hardwareOf(TPL_LEGS)).sort(),
+  ['hardware_manual', 'hardware_set_defs', 'hardware_sets'],
+  'stav vkladania o `legs_summary` ani nevie');
+// Vkladaci payload zbiera `collectAll()` z POLI formulara (test_kovg2_nohy_ui.js
+// to overuje cez mini-DOM), takze kluc, ktory ziadne pole nema, sa doň nedostane
+// ani vtedy, keby ho zdroj karty niesol.
+eq(ins.HARDWARE_KEYS.indexOf('legs_summary'), -1,
+  'suhrn noh NIE JE kluc kovania, ktory by vklad prenasal');
+
 // --- UI-C1a: druh sablony (identita = kind + name) ---
 eq(ins.templateKind({ name: 'A', kind: 'cabinet' }), 'cabinet', 'explicitny kind cabinet');
 eq(ins.templateKind({ name: 'A', kind: 'board' }), 'board', 'explicitny kind board');

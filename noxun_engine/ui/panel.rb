@@ -164,6 +164,10 @@ module Noxun
           # CISTE CITANIE — ziadna operacia, ziadny zapis, ziadny krok Spat;
           # odpoved chodi kanalom `NX.hwManualSearchResult` s generaciou dotazu.
           cb(dlg, 'hw_manual_search')      { |p| handle_hw_manual_search(p) }
+          # KOV-G2 (D-111): nahlad noh pre VKLADACIU kartu. Tiez CISTE CITANIE
+          # — ziadna operacia, ziadny zapis, ziadny krok Spat; odpoved chodi
+          # kanalom `NX.insertLegsPreview` s generaciou dotazu.
+          cb(dlg, 'insert_legs_preview')   { |p| handle_insert_legs_preview(p) }
           # KOV-D3b: prechod JEDNEHO cela na novsiu verziu receptu (jadro D3a).
           # Zapisova cesta (jedna operacia = ref + preadresovane zamky +
           # prestavba) + CITACI callback dopadu, ktory potvrdzovacie okno kresli

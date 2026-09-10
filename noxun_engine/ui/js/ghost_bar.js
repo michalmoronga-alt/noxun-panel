@@ -91,6 +91,21 @@
     return state.phase_locked ? txt + ' (zamknutá)' : txt;
   }
 
+  // KOV-G2 (D-111): text segmentu nôh. Skladá ho SERVER (`legs_short`) — pásik
+  // si z pushu NIČ neodvodzuje. Prázdny reťazec = segment sa nekreslí (doska,
+  // kreslenie, horná skrinka, skrinka bez podstavca aj starší push bez kľúča).
+  function nxGhostLegsText(state){
+    if (!state || nxGhostSubject(state) !== 'cabinet' || nxGhostDrawing(state)) return '';
+    var t = state.legs_short;
+    return (t === null || t === undefined) ? '' : String(t);
+  }
+
+  // Jantárový tón = set nemá pásmo pre túto výšku sokla (tá istá veta, akú
+  // ukáže Kontrola). Rozhoduje SERVER, pásik ho len farbí.
+  function nxGhostLegsWarn(state){
+    return nxGhostLegsText(state) !== '' && String(state.legs_tone || '') === 'warn';
+  }
+
   // Zrkadlo `GhostTool::Calc.lock_z_value`: cislo v mm v rozumnom rozsahu,
   // inak null (= necitatelne, stara hodnota drzi). Ciarka aj bodka su desatinny
   // oddelovac; prazdno, text ani exponent neprejdu.
@@ -180,6 +195,18 @@
         ? 'Výška zámku (mm) — použije sa, keď stlačíš ↓'
         : 'Výška, na ktorej ghost sedí (mm)');
     }
+    // KOV-G2 (D-111): SEGMENT NÔH. Stojí PRED nápovedou a kreslí sa LEN vtedy,
+    // keď push kľúč naozaj nesie (starší server ho neposiela — vtedy segment
+    // neexistuje, presne ako pri `orientation_label`). Doska ani kreslenie ho
+    // nedostanú nikdy: server ho posiela iba pre subjekt `cabinet`.
+    var legs = nxGhostEl('gbLegs');
+    if (legs){
+      var txt = nxGhostLegsText(state);
+      legs.hidden = (txt === '');
+      legs.textContent = txt;
+      legs.className = nxGhostLegsWarn(state) ? 'gbtxt gblegs warn' : 'gbtxt gblegs';
+      legs.setAttribute('title', txt === '' ? '' : 'Nohy a príchyty sokla, ktoré skrinka dostane');
+    }
     var info = nxGhostEl('gbInfo');
     if (info) info.setAttribute('title', NX_GHOST_HELP[drawing ? 'drawing' : (isBoard ? 'board' : 'cabinet')]);
     if (isBoard) nxGhostSyncCard(state);
@@ -244,6 +271,9 @@
       syncCard: nxGhostSyncCard,
       drawing: nxGhostDrawing,
       phaseText: nxGhostPhaseText,
+      // KOV-G2 (D-111) — tests/js/test_kovg2_nohy_ui.js
+      legsText: nxGhostLegsText,
+      legsWarn: nxGhostLegsWarn,
       HELP: NX_GHOST_HELP,
       PHASES: NX_GHOST_PHASES
     };

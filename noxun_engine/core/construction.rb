@@ -169,27 +169,19 @@ module Noxun
 
         # Kovanie z pravidiel — az PO vyradeni degenerovanych dielcov (na dielec,
         # ktory v modeli nestoji, nesmie vzniknut polozka). Kontext string-keyed.
-        hw_ctx = {
-          'width' => w, 'height' => h, 'depth' => cfg[:depth],
-          'floor_height' => cfg[:floor_height],
+        # KOV-G2: KORPUSOVA cast kontextu ma vlastnu cistu funkciu
+        # (`cabinet_hw_ctx`) — nahlad noh vo vkladacej karte a v ghost pasiku
+        # potrebuje TEN ISTY slovnik bez planu. Kluce, ktore vedia vzniknut az
+        # z dielcov (svetle rozmery, pocet radov ciel), sa pridavaju TU.
+        hw_ctx = cabinet_hw_ctx(cfg).merge(
           'available_width' => (w - 2 * t),
           'available_height' => interior[:avail_h],
           'available_depth' => interior[:back_front_y],
-          # KOV-E1b: KH/KB su Blum rozmery KORPUSU pre vyklop — KH je vyska BEZ
-          # SOKLA (nezaokruhleny Float; `input height` by dal VYROBNU dlzku cela,
-          # teda 396 pri korpuse 400) a KB je sirka korpusu. Vnutorna hlbka pre
-          # eligibility HL ide z `available_depth` (uz zohladnuje chrbat aj drazku).
-          'kh' => (h.to_f - cfg[:floor_height].to_f),
-          'kb' => w.to_f,
           # KOV-E1b: pocet RIADKOV ciel skrinky. V1 pusta vyklop len ako JEDINY
           # riadok (`lift_multirow_unsupported`) — pravidlo o inych riadkoch
           # z deskriptorov nevie, preto je pocet v kontexte korpusu.
-          'front_rows' => Array(fr[:items]).length,
-          'support' => support_type(cfg),
-          # D1: predikat pravidiel podla typu korpusu (upper/lower) — support
-          # 'none' nerozlisuje hornu od spodnej bez noh (GH #125 P2).
-          'cabinet_type' => cfg[:type].to_s
-        }
+          'front_rows' => Array(fr[:items]).length
+        )
         hw = HardwareRules.evaluate(cfg, parts, hw_ctx, rules: hardware_rules || HardwareRules.load,
                                                         suppress_slide_owners: drawer[:suppress],
                                                         manual_flap_owners: manual_flap_owners)
@@ -872,6 +864,37 @@ module Noxun
       def support_type(cfg)
         return 'none' if cfg[:type] == 'upper' || cfg[:floor_height].to_f <= 0
         cfg[:plinth_mode] == 'front' ? 'plinth' : 'legs'
+      end
+
+      # KOV-G2: KORPUSOVA cast kontextu pravidiel kovania — jedina autorita
+      # slovnika (`build_plan` si ho MERGUJE, nedrzi vlastnu kopiu). Su to
+      # presne tie kluce, ktore sa daju zistit zo SAMOTNEHO configu, teda bez
+      # zon, ciel a dielcov: nahlad noh vo vkladacej karte a v ghost pasiku
+      # (D-111) ich ma k dispozicii uz PRED vlozenim skrinky.
+      #
+      # Kluce zavisle od planu (`available_*`, `front_rows`) TU ZAMERNE NIE SU
+      # — hadat ich by znamenalo druhy vypocet vedla `interior_dims`/`Fronts`.
+      # Pravidla role `cabinet` ich nepotrebuju (nohy aj prichyt sokla citaju
+      # `width`, `floor_height`, `support` a `cabinet_type`); pravidlo, ktore
+      # by si taky kluc vypytalo ako `input`, dostane nil a polozku NEVYDA —
+      # rovnako ako pri kazdom inom neznamom vstupe (`input_value`).
+      #
+      # CISTA funkcia: ziadne IO, ziadny SketchUp, cfg sa NEMENI.
+      def cabinet_hw_ctx(cfg)
+        {
+          'width' => cfg[:width], 'height' => cfg[:height], 'depth' => cfg[:depth],
+          'floor_height' => cfg[:floor_height],
+          # KOV-E1b: KH/KB su Blum rozmery KORPUSU pre vyklop — KH je vyska BEZ
+          # SOKLA (nezaokruhleny Float; `input height` by dal VYROBNU dlzku cela,
+          # teda 396 pri korpuse 400) a KB je sirka korpusu. Vnutorna hlbka pre
+          # eligibility HL ide z `available_depth` (uz zohladnuje chrbat aj drazku).
+          'kh' => (cfg[:height].to_f - cfg[:floor_height].to_f),
+          'kb' => cfg[:width].to_f,
+          'support' => support_type(cfg),
+          # D1: predikat pravidiel podla typu korpusu (upper/lower) — support
+          # 'none' nerozlisuje hornu od spodnej bez noh (GH #125 P2).
+          'cabinet_type' => cfg[:type].to_s
+        }
       end
 
       # D-37 (zavazne, Michal 20.7.): cfg[:depth] = CELKOVA hlbka korpusu VRATANE

@@ -42,8 +42,10 @@ NxTest.test('UI-C4: kostra je STATICKA — JS pise len obsah dvoch kontajnerov')
   # Sety sa odstahovali z konca zoznamu poloziek do vlastnej skupiny — zivy push
   # (D-75) musi obnovovat selecty v OBOCH kontajneroch, inak by novy set typu
   # v skupine Sety ostal neviditelny az do dalsieho oznacenia skrinky.
-  NxTest.assert(UIC4_HW_JS.include?("['hwRows', 'hwSetRows'].forEach"),
-                'refreshHardwareSets obnovuje selecty v oboch kontajneroch')
+  # KOV-G2 (D-111): kontajnery su od riadku Noh TRI — `#legsRow` nesie ten isty
+  # select pre typ `leg` a bez neho by drzal starú ponuku.
+  NxTest.assert(UIC4_HW_JS.include?("['hwRows', 'hwSetRows', 'legsRow'].forEach"),
+                'refreshHardwareSets obnovuje selecty vo vsetkych troch kontajneroch')
 end
 
 # --- 2) box vlastnika --------------------------------------------------------

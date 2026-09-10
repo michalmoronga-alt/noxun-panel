@@ -5428,6 +5428,216 @@ module Noxun
         nil
       end
 
+      # === KOV-G2 (D-111): SUHRN NOH A PRICHYTOV SOKLA JEDNOU VETOU ==========
+      #
+      # „Ake nohy skrinka dostane" — text pre riadok Noh vo vkladacej karte,
+      # pre ghost pasik aj pre Zakladne pri OZNACENEJ skrinke. Doteraz sa
+      # ucinny set noh dal zistit az v Nakupe (alebo v Predvolbach projektu),
+      # takze pri vkladani o nom clovek nevedel.
+      #
+      # ZIADNY DRUHY VYKLAD NAKUPU: rozpis clenov robi `explain` — ta ista
+      # funkcia, ktorou sa kresli rozklik polozky v karte Kovanie a ktora sa
+      # vo VSETKYCH rozhodnutiach (resolve_set_id, member_code, unmapped_entry)
+      # zhoduje s `expand`. Tento blok je uz LEN formatovanie jej vysledku,
+      # rovnako ako `preview_text` pri nahlade setu. Text sklada SERVER
+      # (jedina autorita): klient by si inak vymyslel vlastne vety a pri prvej
+      # zmene expanzie by klamali.
+      #
+      # -> { 'text', 'short', 'tone' => 'ok'|'warn'|'none', 'set_id', 'set_name' }
+      LEG_SUMMARY_TYPES = [HardwareRules::LEG_OUTPUT,
+                           HardwareRules::PLINTH_CLIP_OUTPUT].freeze
+      LEGS_NONE_SK = 'bez nôh'
+      # Polozka prisla BEZ rozpisu (`purchase` chyba — `decorate_hardware_purchase`
+      # skoncila v rescue). Radsej priznat, nez ticho ukazat „bez nôh" pri
+      # skrinke, ktora nohy MA.
+      LEGS_NO_PURCHASE_SK = 'rozpis kovania sa nepodarilo prečítať'
+      # Ghost pasik je JEDEN riadok vedla kotvy, otocenia a vysky — dlhy text
+      # by ho roztrhol. Karta dlzku NEOREZAVA (ma cely riadok a tooltip).
+      LEGS_SHORT_MAX = 48
+
+      # items: polozky kovania (RAW z pravidiel alebo ULOZENE `config.hardware[]`).
+      # state/overrides/catalog/lookup/no_set_reason: presne ako pri `explain`.
+      # CISTA funkcia: ziadne IO, ziadny SketchUp, vstup sa NEMENI.
+      def legs_summary(items, state, overrides: {}, catalog: nil, lookup: nil,
+                       no_set_reason: 'no_set')
+        legs = legs_items(items)
+        return legs_none if legs.empty?
+
+        lk  = lookup.is_a?(Hash) ? lookup : catalog_lookup(catalog)
+        ovr = overrides.is_a?(Hash) ? overrides : {}
+        build_legs_summary(legs.map do |it|
+          [it, explain(it, state, overrides: ovr, lookup: lk, no_set_reason: no_set_reason)]
+        end)
+      end
+
+      # TA ISTA veta z UZ ROZPISANYCH poloziek payloadu: karta skrinky ma
+      # v `h['purchase']` vysledok `explain` od `decorate_hardware_purchase`.
+      # Riadok Noh a rozklik polozky sa tak nemozu rozist ANI pri poskodenom
+      # snapshote (`:invalid` ma vlastnu vetu uz v `purchase`) a katalog sa
+      # nepremapuje druhy raz.
+      def legs_summary_from_purchase(items)
+        legs = legs_items(items)
+        return legs_none if legs.empty?
+
+        build_legs_summary(legs.map do |it|
+          [it, (it['purchase'].is_a?(Hash) ? it['purchase'] : nil)]
+        end)
+      end
+
+      # Poradie je KONTRAKT textu (najprv nohy, potom prichyty) a nesmie
+      # zavisiet od poradia pravidiel v kniznici.
+      def legs_items(items)
+        Array(items).select do |it|
+          it.is_a?(Hash) && LEG_SUMMARY_TYPES.include?(it['generic_type'].to_s) &&
+            it['quantity'].to_i >= 1
+        end.sort_by { |it| LEG_SUMMARY_TYPES.index(it['generic_type'].to_s) }
+      end
+
+      def legs_none
+        { 'text' => LEGS_NONE_SK, 'short' => LEGS_NONE_SK, 'tone' => 'none',
+          'set_id' => nil, 'set_name' => nil }
+      end
+
+      def build_legs_summary(pairs)
+        parts = []
+        shorts = []
+        problems = []
+        seen = {}
+        sid = nil
+        sname = nil
+        pairs.each do |(it, ex)|
+          if ex.nil?
+            legs_add_problem(problems, seen, LEGS_NO_PURCHASE_SK)
+            next
+          end
+          # Ucinny set NOH pomenuva cely riadok (select vedla textu je jeho) —
+          # prichyt ma vlastny set a do tohto kluca nepatri.
+          if it['generic_type'].to_s == HardwareRules::LEG_OUTPUT
+            sid   ||= ex['set_id']
+            sname ||= ex['set_name']
+          end
+          legs_problems(ex).each { |p| legs_add_problem(problems, seen, p) }
+          txt, sh = legs_item_text(ex)
+          next if txt.nil?
+
+          parts << txt
+          shorts << sh
+        end
+        legs_summary_out(parts, shorts, problems, sid, sname)
+      end
+
+      def legs_summary_out(parts, shorts, problems, sid, sname)
+        if problems.empty?
+          return legs_none if parts.empty?
+
+          return { 'text' => parts.join(' · '), 'short' => legs_cap(shorts.join(' · ')),
+                   'tone' => 'ok', 'set_id' => sid, 'set_name' => sname }
+        end
+        text = (parts + problems).join(' · ')
+        { 'text' => text, 'short' => legs_cap((shorts + problems).join(' · ')),
+          'tone' => 'warn', 'set_id' => sid, 'set_name' => sname }
+      end
+
+      def legs_add_problem(problems, seen, text)
+        s = text.to_s.strip
+        return if s.empty? || seen[s]
+
+        seen[s] = true
+        problems << s
+      end
+
+      # Dovody z rozpisu — ale ZLIATE cez CLENOV. Set noh ma pri sokli 40 mm
+      # dva nemapovane zaznamy (noha aj platnicka: obe maju to iste chybajuce
+      # pasmo), a dve takmer identicke vety v jednom riadku panela su sum.
+      # Kluc zliatia je PRICINA (dovod, set, parameter, hodnota) — veta ostava
+      # TA ISTA, akou o naleze hovori Kontrola (berie sa PRVA, teda noha).
+      # Zaznamy `unmapped` chybaju len starsiemu/degradovanemu rozpisu — vtedy
+      # sa berie hotovy SK preklad `problems`.
+      def legs_problems(ex)
+        raw = Array(ex['unmapped']).select { |u| u.is_a?(Hash) }
+        return Array(ex['problems']).map(&:to_s).reject { |s| s.strip.empty? } if raw.empty?
+
+        seen = {}
+        raw.filter_map do |u|
+          key = %w[reason set_id param value generic_type].map { |k| u[k].to_s }.join('|')
+          next if seen[key]
+
+          seen[key] = true
+          s = unmapped_reason_sk(u).to_s
+          s.strip.empty? ? nil : s
+        end
+      end
+
+      # Jedna polozka -> „6× noha AXILO H100 + platnička". PRVY vydany clen
+      # pomenuva vec (je to mechanizmus/noha), dalsie cleny tej istej polozky
+      # su prislusenstvo a pripajaju sa LABELOM setu — plne katalogove nazvy
+      # by z riadku spravili odsek. Rozdielny pocet sa PRIZNA („+ 2× …“).
+      # Preskoceny clen (`none`) sa v texte neobjavi (v nakupe tiez nevznikne).
+      def legs_item_text(ex)
+        mem = Array(ex['members']).select do |m|
+          m.is_a?(Hash) && m['skipped'] != true && m['qty'].to_i >= 1
+        end
+        return [nil, nil] if mem.empty?
+
+        head = mem.first
+        qty = head['qty'].to_i
+        txt = "#{qty}× #{legs_member_name(head)}"
+        sh  = "#{qty}× #{legs_member_short(head)}"
+        mem.drop(1).each do |m|
+          q = m['qty'].to_i
+          lbl = m['label'].to_s.strip
+          lbl = legs_member_name(m) if lbl.empty?
+          txt += (q == qty ? " + #{lbl}" : " + #{q}× #{lbl}")
+        end
+        [txt, sh]
+      end
+
+      def legs_member_name(m)
+        name = legs_trim_name(m['name'])
+        return name unless name.empty?
+
+        # Kod MIMO katalogu kovania: nazov nemame, ale kod objednat treba —
+        # text ho preto prizna (rovnaka zasada ako `preview_row`).
+        lbl = m['label'].to_s.strip
+        lbl.empty? ? "kód #{m['code']}" : "#{lbl} (kód #{m['code']})"
+      end
+
+      # Pasik znesie este menej: nazov sa reze pri PRVEJ ciarke (katalog za nou
+      # pise upresnenia — vysku, farbu) a prislusenstvo do pasika nejde vobec.
+      def legs_member_short(m)
+        name = legs_member_name(m)
+        i = name.index(',')
+        i ? name[0, i].strip : name
+      end
+
+      # Katalogovy nazov je OBJEDNAVACI (vyrobca + objednavacie cislo + popis)
+      # a do jedneho riadku panela sa nezmesti. Skratenie je DETERMINISTICKE
+      # a iba ODOBERA — text v paneli musi ostat dohladatelny v katalogu:
+      #   * veduci nazov vyrobcu a objednavacie cislo („Häfele 637.76.353“) —
+      #     odide vsetko az po PRVE cislovane slovo, ak stoji medzi prvymi dvoma,
+      #   * koncova zatvorka („(k drevenému soklu)“).
+      # Nic sa neprepisuje ani nedopisuje.
+      LEGS_ARTICLE_RE = /\A\d[\d.\-\/]*\z/.freeze
+
+      def legs_trim_name(name)
+        s = name.to_s.strip
+        return '' if s.empty?
+
+        words = s.split(/\s+/)
+        cut = words[0, 2].rindex { |w| LEGS_ARTICLE_RE.match?(w) }
+        words = words.drop(cut + 1) unless cut.nil?
+        out = words.join(' ')
+        out = out.sub(/\s*\([^()]*\)\s*\z/, '')
+        out.strip
+      end
+
+      def legs_cap(text)
+        s = text.to_s
+        return s if s.length <= LEGS_SHORT_MAX
+
+        "#{s[0, LEGS_SHORT_MAX - 1].rstrip}…"
+      end
+
       # --- KOV-B3: ZIVY NAHLAD EXPANZIE ROZPRACOVANEHO SETU --------------------
       #
       # Editor setu ukazuje, CO SA REALNE OBJEDNA — este predtym, nez sa set

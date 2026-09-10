@@ -125,6 +125,11 @@ module Noxun
           # V0.6 D1b: vyber setu per typ NA SKRINKE (override projektovej
           # predvolby) — ponuka + efektivny stav; server je autorita.
           params['hardware_set_options'] = hardware_set_options(cfg, params['hardware'])
+          # KOV-G2 (D-111): riadok „Nohy" v Zakladnych. Text sa sklada z UZ
+          # ROZPISANYCH poloziek (`purchase` vyssie), takze riadok a rozklik
+          # polozky v Kovani nemozu ukazat ine kody — a katalog sa necita
+          # druhy raz. Select setu si riadok berie z `hardware_set_options`.
+          params['legs_summary'] = HardwareSets.legs_summary_from_purchase(params['hardware'])
           # KOV-H2: ad-hoc polozky pre UI. `hardware_manual` v `params` uz je —
           # to je SUROVE echo, ktore panel posiela SPAT (pass-through KOV-H1).
           # Tieto dva kluce su NAVIAC a VYHRADNE NA CITANIE: popisky vlastnika,

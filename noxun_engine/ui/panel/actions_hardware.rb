@@ -1127,6 +1127,59 @@ module Noxun
             'price_eur_vat' => (item['price_eur_vat'].is_a?(Numeric) ? item['price_eur_vat'].to_f : nil) }
         end
 
+        # === KOV-G2 (D-111): NAHLAD NOH PRE VKLADACIU KARTU A GHOST PASIK ====
+        #
+        # CITACIA cesta ako `hw_manual_search`: ziadna operacia, ziadny zapis do
+        # modelu, ziadny krok Spat — a preto ani guard dokumentu (nic sa nemeni
+        # a odpoved je len text). `gen` je generacia dotazu: odpovede chodia
+        # asynchronne a bez nej by pomalsie kolo prepisalo cerstvejsie cislo.
+        #
+        # Z payloadu sa berie UZAVRETY zoznam poli (`INSERT_LEGS_KEYS`) —
+        # nahlad je pohlad na ROZMERY, nie druha vkladacia cesta; cudzi kluc
+        # (materialy, zony, sablona) by sa cez `normalize` dostal do configu,
+        # z ktoreho by pravidla mohli vydat nieco ine, nez co sa naozaj vlozi.
+        # Nic sa NEUKLADA: `cfg` zije len v tomto volani.
+        INSERT_LEGS_KEYS = %w[type width floor_height plinth_mode].freeze
+
+        def handle_insert_legs_preview(payload)
+          data = parse(payload)
+          js("NX.insertLegsPreview(#{insert_legs_preview_result(data).to_json})")
+        end
+
+        def insert_legs_preview_result(data)
+          d = data.is_a?(Hash) ? data : {}
+          cfg = CabinetBuilder.normalize(d.select { |k, _| INSERT_LEGS_KEYS.include?(k.to_s) })
+          legs_preview_summary(Sketchup.active_model, cfg).merge('gen' => d['gen'].to_i)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.insert_legs_preview_result')
+          { 'gen' => (data.is_a?(Hash) ? data['gen'].to_i : 0),
+            'text' => '', 'short' => '', 'tone' => 'none', 'set_id' => nil, 'set_name' => nil }
+        end
+
+        # JEDINA cesta k suhrnu noh PRED vlozenim (vkladacia karta aj ghost
+        # pasik). Kontext korpusu stavia `Construction.cabinet_hw_ctx` — TEN
+        # ISTY slovnik, aky pouzije stavba; pravidla sa citaju
+        # `panel_hardware_rules` (projektovy snapshot, inak globalna kniznica),
+        # teda presne tie, s akymi sa skrinka postavi. Dielce sa nepodavaju
+        # (`parts = []`), takze sa vyhodnotia LEN korpusove pravidla — nohy
+        # a prichyt sokla. Rozpis kazdej polozky robi `item_purchase`, ta ista
+        # funkcia ako v karte oznacenej skrinky (jeden vyklad nakupu).
+        # Skrinka este neexistuje, preto ZIADNE cabinet overridy setov.
+        def legs_preview_summary(model, cfg)
+          hw = HardwareRules.evaluate(cfg, [], Construction.cabinet_hw_ctx(cfg),
+                                      rules: panel_hardware_rules(model))
+          items = HardwareSets.legs_items(hw[:items])
+          # Horna skrinka / bez podstavca: ziadne IO, hned „bez nôh".
+          return HardwareSets.legs_summary_from_purchase([]) if items.empty?
+
+          status, state = hardware_read_state
+          blocked = status == :missing && HardwareSets.library_read_only?
+          lookup = HardwareSets.catalog_lookup(HardwareCatalog.items)
+          HardwareSets.legs_summary_from_purchase(items.map do |h|
+            h.merge('purchase' => item_purchase(h, status, state, {}, lookup, blocked: blocked))
+          end)
+        end
+
         # Hlaska po zmene setu — rozlisi skrinku a konkretny dielec (D-81).
         # KOV-D1a: hodnotou moze byt aj vyber podla parametra (viac setov).
         def hw_set_status_msg(gt, owner, value, set_defs)

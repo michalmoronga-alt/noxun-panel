@@ -153,6 +153,10 @@
     refreshMaterialFilters();              // FIX 2: hrubka sa mohla zmenit -> prefiltruj material selecty
     schedulePreview();                     // D-02: nahlad sa neprekresluje pri kazdom pismene
     updateAvailable();
+    // KOV-G2 (D-111): riadok Noh vo VKLADANI. Dotaz odide LEN pri zmene toho,
+    // na com nohy zavisia (typ, sirka, sokel, rezim sokla) — funkcia si to
+    // stripuje sama, aby `onField` nemusel vediet, ktore pole sa menilo.
+    if (typeof nxLegsInsertAsk === 'function') nxLegsInsertAsk();
     // D-39: edit ZAMKNUTEHO pola vo vkladacej karte aktualizuje hodnotu zamku
     // (zamok drzi to, co pouzivatel vidi). GH P3: NIE cez activeElement — pri
     // expr commite na blur uz fokus odisiel; synchronizuju sa VSETKY zamknute
@@ -322,6 +326,9 @@
   function applyVisibility(t){
     el('plinthGroup').style.display = (t === 'upper') ? 'none' : '';
     el('fhRow').style.display = (t === 'upper') ? 'none' : ''; // D-11: vyska sokla v Zakladnych, horna ju nema
+    // KOV-G2 (D-111): riadok Noh ide s riadkom Sokel — horna skrinka nohy nema.
+    // Vo VKLADANI si zaroven vypyta cerstvy nahlad (typ sa prave zmenil).
+    if (typeof nxLegsApplyVisibility === 'function') nxLegsApplyVisibility(t);
     toggleRecess(); toggleTwoRails(); toggleBackTh(); // D-31: pokryva vyber korpusu, defaulty aj sablonu
   }
   function toggleRecess(){ el('recessRow').style.display = (val('plinth_mode') === 'front') ? '' : 'none'; }

@@ -661,6 +661,23 @@ Sektor **Základné** je rozdelený na **vstupy vľavo a dopočítané údaje vp
   šablónou alebo vkladaním**, preto mini-modal „Uložiť ako šablónu" nesie
   **Názov + Typ** — je to jediné miesto, kde sa typ šablóny volí.
 
+- **Riadok „Nohy" (KOV-G2, D-111).** Pod rozmermi stojí **jeden** riadok, ktorý
+  povie, **čo skrinka pri tejto výške sokla a šírke dostane** („6× noha AXILO
+  H100 + platnička · 2× príchyt sokla AXILO"). Ide **cez oba stĺpce** mriežky —
+  do úzkeho stĺpca vstupov sa text kovania nezmestí a select setu potrebuje
+  miesto vpravo. **Žiadny nadpis navyše, žiadny druhý riadok:** dlhý katalógový
+  názov sa oreže a celý ostáva v tooltipe. **Text je VÝSTUP** (`<b>`, nie pole)
+  a skladá ho **server** — panel z položiek kovania nič neodvodzuje. Riadok
+  zdieľa viditeľnosť s riadkom **Sokel** (horná skrinka a doska ho nemajú)
+  a **zmizne aj vtedy, keď skrinka nohy nemá** (sokel 0) — prázdna veta by
+  zabrala riadok a nepovedala nič. Pri chýbajúcom pásme setu (zóna 20–55 mm) je
+  text **jantárový** a nesie **tú istú vetu, akú ukáže Kontrola**; dva takmer
+  identické dôvody (noha + platnička) sa zlievajú do jednej.
+- **Ovládač je ten istý, aký už existuje.** Vpravo v riadku stojí **select setu
+  nôh** — presne ten z kontextu Kovanie → Sety, s tou istou zapisovacou akciou.
+  Žiadny druhý ovládač na tú istú vec: zmena na jednom mieste sa objaví aj na
+  druhom (obe kreslí serverový push).
+
 **Koliesko = Nastavenia Inspectora** otvára **modal** (nie ďalší kontext railu):
 sú to nastavenia počítača, musia byť dostupné aj vtedy, keď nie je označené nič,
 a stavový stroj kontextov (platných len nad korpusom) sa ich nesmie týkať. Tri
@@ -721,6 +738,15 @@ Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html`
 - **Odhad namiesto ticha:** dopočítané údaje, ktoré pre nevložený návrh nemá kto
   spočítať presne, sa ukazujú so značkou **≈** a s vysvetlením v tooltipe —
   nikdy nie pomlčka a nikdy nie číslo, ktoré sa tvári ako presné.
+- **Nohy vidno UŽ PRI VKLADANÍ (KOV-G2, D-111).** Ten istý riadok „Nohy" ako
+  v Základných (§5.3) stojí aj vo vkladacej karte — človek nemá zisťovať až
+  v Nákupe, aké nohy skrinka dostane. Rozdiel je jediný: **bez ovládača** (set
+  sa prepína až na vloženej skrinke). Text sa mení **živo** so soklom aj šírkou;
+  kým server odpovie, drží miesto **pomlčka** — nikdy vymyslené číslo a nikdy
+  hodnota z predtým označenej skrinky. Kratšia verzia tej istej vety stojí
+  v **ghost pásiku** (skrinka visí na kurzore), v tom istom riadku ako kotva
+  a otočenie — pásik nesmie narásť o riadok. Doska ani kreslenie o nohách
+  nehovoria.
 - **Umiestnenie dosky = ďalší `.segrow`** (Naležato · Nastojato · Na stenu) —
   rovnaký vzor ako typ objektu, **nie select**: sú to tri rovnocenné stavy a
   ikona povie viac než slovo. Stojí **dvakrát**: v karte vkladania a na karte

@@ -212,7 +212,30 @@ module Noxun
             out['phase_value'] = s.draw_phase_value
             out['phase_locked'] = s.draw_phase_locked?
           end
+          # KOV-G2 (D-111): KRATKY suhrn noh — LEN pre skrinku (doska ani
+          # kreslenie nohy nemaju). Kluce su ADITIVNE: starsi panel ich
+          # ignoruje a segment jednoducho nenakresli (vzor `orientation_label`).
+          legs = s.legs_summary
+          if legs
+            out['legs_short'] = legs['short'].to_s
+            out['legs_tone'] = legs['tone'].to_s
+          end
           out
+        end
+
+        # KOV-G2: vypocet suhrnu noh pre session. Ta ista serverova cesta ako
+        # vo vkladacej karte (`Panel.legs_preview_summary`) — pasik a karta
+        # nesmu hovorit ine. Panel nemusi existovat (headless testy, plugin bez
+        # otvoreneho okna), preto `respond_to?`; chyba nikdy nezhodi pasik.
+        def legs_summary_for(s)
+          return nil unless s.respond_to?(:cabinet?) && s.cabinet?
+          return nil unless defined?(Panel) && Panel.respond_to?(:legs_preview_summary)
+
+          sum = Panel.legs_preview_summary(s.model, s.plan.config)
+          sum.is_a?(Hash) && sum['tone'].to_s != 'none' ? sum : nil
+        rescue StandardError => e
+          Engine.log_error(e, 'GhostTool.legs_summary_for')
+          nil
         end
 
         def push_state(s = @session)
@@ -1101,6 +1124,11 @@ module Noxun
           @commit_started = false
           @stamp_attempted = false
           @hardware_note = ''
+          # KOV-G2 (D-111): suhrn noh pre pasik sa pocita LENIVO a RAZ za
+          # session — plan je ZMRAZENY, takze sa zmenit nemoze, kym `push_state`
+          # bezi pri kazdej sipke, Alt-e aj zmene vysky zamku (a kazdy beh siaha
+          # na pravidla, sety aj katalog).
+          @legs_summary = :unset
           # Orientacia prichadza z KARTY (payload `insert_board`) — session je
           # jej jediny drzitel; do pamate modulu sa NEZAPISUJE.
           @orientation = orientation
@@ -1124,6 +1152,15 @@ module Noxun
 
         def placement?
           @interaction == :placement
+        end
+
+        # KOV-G2 (D-111): „ake nohy skrinka dostane" pre pasik. Hodnota sa
+        # pocita LENIVO a drzi sa do konca session (plan je zmrazeny).
+        # nil = niet co ukazat (doska, horna skrinka, skrinka bez podstavca
+        # alebo nedostupny panel) — pasik vtedy segment vobec nekresli.
+        def legs_summary
+          @legs_summary = GhostTool.legs_summary_for(self) if @legs_summary == :unset
+          @legs_summary
         end
 
         def drawing?
