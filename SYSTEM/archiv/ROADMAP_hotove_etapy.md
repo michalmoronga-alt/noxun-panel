@@ -309,7 +309,7 @@ testy (headless + JS ak UI + **plný in-SU beh**) → docs (`construction.md` od
 - **Čo blok priniesol používateľovi — plugin odteraz vie kovanie sám:** sety a katalógové položky sú **klasifikované**
   (typ použitia · otváranie · konštrukcia zásuvky · výrobca · rada) a katalóg so stromom Kategória → Výrobca → Rada aj
   editorom setu so živým náhľadom žije v Štúdiu · **zásuvka vzniká z nemenného receptu** (Atira, Quadro V6 — dielce,
-  výška, NL, nosnosť aj objednávací kit z jedného zdroja, žiadny fallback na inú NL kvôli chýbajúcemu kódu) a dá sa jej
+  výška, NL a nosnosť z receptu, objednávacie kódy kitu zo setu kovania; žiadny fallback na inú NL kvôli chýbajúcemu kódu) a dá sa jej
   zamknúť os aj povýšiť recept · **závesy** sa počítajú podľa Noxun tabuľky a Tip-On má vlastný set · **výklopy**
   AVENTOS **HK top / HL top** si nájdu silový variant z výšky a **hmotnosti čela** (KOV-W dala hmotnosť dielcov aj čiel
   do Inspectora) · **nohy 4/6 podľa šírky korpusu** a **príchyt sokla** sa objavia už pri vkladaní, s vetou v Základných ·
