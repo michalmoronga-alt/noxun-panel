@@ -523,10 +523,9 @@ medzitým založil sám, ostáva mu jeho vlastný záznam.
 Riadok `367823` (noha AXILO 150 z Démosu) dostal v manifeste **výrobcu Häfele a radu AXILO**. **Manifest má preto DESIATY prvok — dodávateľa** (`nil` = `Demos`, historická
 predvoľba všetkých 137 riadkov); `supplier` je existujúce pole položky (patchovateľné, chodí do rozpočtu ako „dodávateľ"), nie nové pole katalógu.
 
-**Quatro LM riadky NEMAJÚ `demos_url`, a preto ani automatické Demos overenie.** Nie je to opomenutie: `Demos.sanitize_url` má allowlist hostov, takže adresu z `quatrolm.sk` by
-„Overiť cenu" odmietla — a `check_price!` položku bez väzby končí vetou „položka nemá adresu produktu". Cena sa pri nich obnovuje **ručne** a **adresa dodávateľa žije
-v POZNÁMKE riadku** v tvare `… · Quatro LM · https://quatrolm.sk/p/…` (poznámka je viditeľná v katalógu aj v hľadaní — `score_item` ju tokenizuje). Ceny sú **s DPH**
-(Quatro LM zobrazuje bez DPH: 0,65 → 0,80), overené 9.9.2026.
+**Quatro LM riadky NEMAJÚ `demos_url`, a preto ani automatické Demos overenie.** `Demos.sanitize_url` má allowlist hostov; adresy `quatrolm.sk` patria do `product_url` a cenu potvrdzuje používateľ cez CENY-KOV-B.
+Pôvodný seed uvádzal adresu v POZNÁMKE riadku v tvare `… · Quatro LM · https://quatrolm.sk/p/…` (viditeľná v katalógu aj v hľadaní — `score_item` ju tokenizuje).
+Seed ceny sú **s DPH** (pri overení 9.9.2026 Quatro LM zobrazoval bez DPH: 0,65 → 0,80); pôvodný seed dátum sa nepovažuje za nové ručné potvrdenie používateľa.
 
 **CENY-KOV-A dopĺňa známe Quatro LM URL do `product_url` úzkou seed migráciou.** Len známy kód s pôvodnou seed poznámkou, bez vlastnej adresy a bez Demos väzby;
 poznámka, cena, dátum a používateľské úpravy sa zachovajú. Tento prevod nie je novým overením ceny. Vlastné odkazy možno doplniť cez oranžovú ikonu aj pri ostatných položkách.

@@ -17,6 +17,13 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **CENY-KOV-B — RUČNÉ OVERENIE CIEN KOVANIA (10.9.2026, PR #346, v0.10.5).** Katalóg aj Rozpočet otvoria spoločný formulár a externý produkt; výslovné potvrdenie uloží cenu s DPH za pevnú MJ + dnešný serverový dátum + ručný pôvod atomicky.
+  Ručne overená cena mladšia než nastaviteľný prah (default 30 dní) je aktuálna s viditeľným dátumom; neoverená, neplatná alebo stará vyzýva na kontrolu. Nula je platná, chýbajúca cena ostáva priznaná.
+  Zmena ceny/MJ/URL/dodávateľa potvrdenie zneplatní. Lazy schema 4 chráni nový údaj, staré Demos overenia ostávajú platné; automatický refresh nikdy nenačítava ručné produktové URL. Globálna cena platí po prepočte aj v ostatných zákazkách.
+  **3811 headless PASS, 111 JS sád PASS**, vrátane skutočného zápisu katalógovej ceny → prepočtu Rozpočtu. Browser QA reálneho Štúdia/NXModal s fiktívnymi dátami: katalóg aj Rozpočet, zrušenie, ochrana odoslaného zápisu, konflikt, zmena modelu/sekcie, oneskorené odpovede a úzke okno.
+  Interný review našiel P2 potvrdenia pred odpoveďou otvorenia; opravené a nezávislá delta SOUND. Otvorenie čaká na serverovú odpoveď, tá sama cenu nepotvrdzuje. Dokumentácia a stav aktualizované pred merge; celý schválený balík CENY-KOV je uzavretý.
+  Externé otvorenie a fokus v SketchUpe ostávajú na Michalov smoke; geometria/Undo bez zásahu. Materiály/ABS, viac URL a voľné ad-hoc riadky nie sú súčasťou balíka. Claude review ostáva podľa dohody odložené.
+
 - **CENY-KOV-A — ODKAZY PRODUKTOV KOVANIA (10.9.2026, PR #345, v0.10.4).** Každá katalógová položka má v Kovaní aj Rozpočte malú SVG ikonu; platná URL otvorí prehliadač bez zmeny ceny/dátumu.
   Chýbajúci odkaz je jantárový a vedie do editora presnej položky s fokusom na URL. Ručné `product_url`, lazy schema 3 a úzka seed migrácia ôsmich Quatro LM odkazov zachovávajú vlastné úpravy a ceny.
   Pred zápisom sa kontroluje celý čerstvý nefiltrovaný katalóg vrátane záložného zdroja pri chýbajúcom primári. Read-only záloha dovolí preklik; oneskorená odpoveď po zmene sekcie/modelu/formulára neotvorí cudziu položku.

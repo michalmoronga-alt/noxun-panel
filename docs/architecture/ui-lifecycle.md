@@ -2104,7 +2104,8 @@ editor položky. Preklik z Rozpočtu nesmie závisieť od toho, či je daný kó
 zmene dokumentu ani otvorení iného formulára. Demos väzba zostáva v pôvodnom overovacom toku; obyčajný preklik pri nej nezapisuje cenu ani dátum.
 
 **CENY-KOV-B (v0.10.5):** samostatné `hw-manual-check` z Katalógu aj Rozpočtu otvorí spoločný NXModal: kód/názov/dodávateľ, cena s DPH za pevnú MJ a predchádzajúce overenie.
-Po príprave formulára otvorí uložený produkt v externom prehliadači; spätný fokus sa nevynucuje. Chýbajúci odkaz vedie do pôvodného editora URL. Výslovné potvrdenie k dnešku odošle cenu a revíziu, čas určí server.
+Po príprave formulára otvorí uložený produkt v externom prehliadači; spätný fokus sa nevynucuje. Potvrdenie čaká na úspešnú odpoveď serverového pokusu o otvorenie; tá sama nedokazuje načítanie webu ani kontrolu ceny.
+Chyba otvorenia formulár zavrie bez zápisu, stará odpoveď neodomkne nový formulár. Chýbajúci odkaz vedie do pôvodného editora URL. Výslovné potvrdenie k dnešku odošle cenu a revíziu, čas určí server.
 Počas submitu chráni modal existujúci `busyLock`; každé odmietnutie odomkne ovládanie. Výsledok patrí tokenu/formuláru/modelu, konflikt obnoví aktuálny záznam bez opätovného odoslania starej ceny.
 Ručné ceny majú vlastnú akciu aj v zozname upozornení, potvrdený riadok viditeľný dátum a pôvod. Ak zostali iba ručné kontroly, hlavné tlačidlo otvorí tento zoznam; Demos beh ostáva samostatný.
 
