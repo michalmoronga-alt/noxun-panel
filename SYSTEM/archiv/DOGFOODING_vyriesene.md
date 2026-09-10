@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-119** — Ľavý a pravý presah čiel samostatne pre celú skrinku; staré hodnoty sa preberajú bez zmeny geometrie — 11.9.2026, PR #347, v0.10.6
 - **D-124** — Predvoľby materiálov sú otvorené, v štyroch skupinách so vzorkami 115 px; pôvodný výber/potvrdenia zachované, per-rola defaulty mimo V1 — vyriešené 10.9.2026, PR #344, v0.10.3
 - **D-122** — UNI upozornenia sú zbalené pod jednu skupinu s počtom dielcov; jednotlivé akcie aj serverové počty ostávajú — vyriešené 10.9.2026, PR #343, v0.10.2
 - **D-123** — Ghost pri voľnej výške položí celú skrinku vrátane nôh/sokla na cieľovú plochu; náhľad zahŕňa aj soklovú časť — vyriešené 10.9.2026, PR #342, v0.10.1
@@ -111,6 +112,11 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+- **D-119 · Presah dverí do strán per strana** (Lucia 6.9., prvý test pluginu na jej notebooku) — presah/okraj čela do strán je dnes **jedna hodnota pre obe strany**
+  (`gap_sides`, Čelá); v praxi treba ľavú a pravú stranu nastaviť **zvlášť** (napr. čelo presahuje cez bok len na viditeľnej strane, pri susede ostáva škára). Hore/dole už
+  zvlášť sú (`gap_top` / `gap_bottom`). **Rozhodnuté 11.9.:** všetky štyri okraje spoločne pre celú skrinku, bez override jednotlivého čela; UI dva páry Hore/Dole a Vľavo/Vpravo.
+  **Vyriešené: PR #347, v0.10.6 (11.9.2026).** Samostatné ľavé/pravé okraje, kompatibilné čítanie `gap_sides`, config schéma 12, náhľad a dva páry polí. Overené v SketchUpe vrátane Undo, Scale, kópie, šablón a SKP roundtripu.
 
 - **D-124 · Predvoľby projektu v Materiáloch — rozbalené, väčšie náhľady** (Michal 6.9., KLINIKA) — Štúdio → Katalógy → Materiály → Predvoľby projektu sú v defaulte
   **zbalené**, pritom sa používajú často. Predstava: **väčšie náhľadové štvorce s detailmi pod sebou, zoradené v jednom riadku, default rozbalený stav**. Podotázka: **predvolený

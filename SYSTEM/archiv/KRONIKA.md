@@ -17,6 +17,14 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **ČELÁ-A — PRESAHY PER STRANA (11.9.2026, PR #347, v0.10.6).**
+  Michal schválil interaktívny návrh aj sekvenčnú implementáciu A/B/C. Predchádzajúci stav: v0.10.5 a pripravené zadanie balíka Čiel.
+  Ľavý a pravý okraj sú nezávislé a spoločné celej skrinke. Starý `gap_sides` sa preberie pre každú chýbajúcu stranu; explicitná nula má prednosť.
+  Config schéma 12 chráni asymetriu pred starším pluginom, BuildPlan zostáva 5. Inspector má štyri okraje v dvoch riadkoch; kresba, fit, kóty aj značky rešpektujú obe strany.
+  Testy: 3816 headless, 112 JS sád, 2225 PASS / 0 FAIL v SketchUpe; navyše skutočný Inspector v browseri 470 px (payload, limit, reset, bez horizontálneho pretečenia).
+  In-SU overil geometriu a výrobný snapshot, jedno Späť, šablóny s/bez kovania, skutočný SKP zápis a načítanie, Scale aj natívnu kópiu cez observer.
+  Výrobné golden dáta nezmenené; vedomá migrácia iba dvoch kľúčov kanonického configu. D-119 archivované, D-120 a D-114 pokračujú dávkami B/C.
+
 - **BALÍK ČIEL — SPRESNENIE ROZSAHU A NÁVRH (11.9.2026, plánovanie, bez zmeny verzie).**
   Predchádzajúci stav: v0.10.5 po PR #346; schválené sedenie KOVANIE → D-123 → D-122 → D-124 → CENY-KOV-A/B dokončené, výber ďalšej práce čakal na Michala.
   Michal potvrdil úspešný používateľský test produktových odkazov a potvrdzovania cien a vybral balík Čiel.

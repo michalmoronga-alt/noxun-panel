@@ -28,10 +28,6 @@ v [PLAN.md](PLAN.md), odrážka „BALÍK ČIEL". Čo z bloku KOVANIE ostalo mim
   Michal zároveň: „celkovo UI čiel bude treba po tomto zásahu upratať — necháme na koniec, opäť spravíme UI/UX balík". *Stav: OTVORENÉ — od uzáveru bloku KOVANIE (10.9.2026) je to **UI/UX balík Čiel v bloku 4 · V1 DOTIAHNUTIE** ([PLAN.md](PLAN.md), odrážka „BALÍK ČIEL");
   celý obsah karty čela je už známy (typy z KOV-A, zámky osí a systém zásuvky z KOV-C/D, závesy z KOV-F, výklopy z KOV-E), takže balík sa môže robiť.*
   **Spresnenie 11.9.:** schválený jeden rad šiestich typov vrátane „Bez čela“; profil a hrana v karte konkrétneho čela + hromadná skupina Úchytky. Packages ČELÁ-A/B/C sú v PLAN.md; mockup aj implementácia schválené, prebieha A.
-- **D-119 · Presah dverí do strán per strana** (Lucia 6.9., prvý test pluginu na jej notebooku) — presah/okraj čela do strán je dnes **jedna hodnota pre obe strany**
-  (`gap_sides`, Čelá); v praxi treba ľavú a pravú stranu nastaviť **zvlášť** (napr. čelo presahuje cez bok len na viditeľnej strane, pri susede ostáva škára). Hore/dole už
-  zvlášť sú (`gap_top` / `gap_bottom`). **Rozhodnuté 11.9.:** všetky štyri okraje spoločne pre celú skrinku, bez override jednotlivého čela; UI dva páry Hore/Dole a Vľavo/Vpravo.
-  *Stav: OTVORENÉ — package ČELÁ-A v PLAN.md; mení config čela (CONFIG_SCHEMA bump).*
 - **D-120 · Úchytkový profil (UKW) aj na dolnej a bočných hranách** (Lucia 6.9., prvý test) — profil sa dnes osadzuje **len na hornú hranu** čela; treba voľbu hrany:
   horná (dnes) · dolná · ľavá / pravá bočná (vysoké dvere, skrine). Registry `front_profiles.rb` hranu dnes **nepozná** — záznam nesie len `reduction`, popisky, obrys, hĺbku
   a výšku, `geometry`/`options` hranu nevracajú a modul výslovne predpokladá hornú hranu (komentár D-90 sľubuje len, že config to unesie bez migrácie). **Rozsah D-120 =**

@@ -256,7 +256,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 - *(Kovanie — D-109/D-110/D-111 aj fáza 3 — sa 26.8. vyčlenilo do vlastného bloku **KOVANIE**; ten je od **10.9.2026 hotový** (v0.10.0), plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).)*
 #### BALÍK ČIEL (D-114 + D-119 + D-120)
 
-**Rozsah, mockup aj implementácia schválené 11.9.2026.** Prebieha ČELÁ-A; sekvenčné dávky ČELÁ-A → B → C.
+**Rozsah, mockup aj implementácia schválené 11.9.2026.** ČELÁ-A implementované (PR #347, v0.10.6); sekvenčné dávky ČELÁ-A → B → C.
 **Audit ÁNO** pre A/B (config, geometria, profilový kontrakt a čítací callback); C je UI.
 Podklad: [outside-in a reconcile](zdroje/next_sessions/CELA_OUTSIDE_IN_2026-09-11.md).
 Kontrola návrhu: [Astra audit a SOUND delta](zdroje/next_sessions/CELA_AUDIT_2026-09-11.md).
@@ -277,7 +277,8 @@ Tento blok je úplné implementačné zadanie; ukážka nie je dátová ani geom
 - UKW-7 reduction36mm a prierez19.181×37.419mm sú existujúce interné hodnoty. Smer dekoru a ABS pod profilom sa nemenia. Žiadny nový profil, Gola, metrážové nacenenie, optimalizácia tyčí,
   CNC či per-čelo okraje.
 
-##### ČELÁ-A — D-119, presahy od formulára po výrobu
+##### ČELÁ-A — D-119, presahy od formulára po výrobu — IMPLEMENTOVANÉ, PR #347
+Overenie: 3816 headless, 112 JS sád, in-SketchUp 2225 PASS / 0 FAIL; skutočný Inspector pri 470 px. Ďalšia dávka až po review/merge A.
 Jedna užitočná dávka vrátane UI, schema a testov, následne samostatné review/merge podľa repo procesu.
 - `Fronts.normalize_config`: nové `gap_left`, `gap_right` (mm Float). Pre KAŽDÚ chýbajúcu novú stranu použiť legacy `gap_sides`, inak GAP_EDGE=2. Nová explicitná nula musí vyhrať. Pri oboch
   nových hodnotách staré `gap_sides` nehrá rolu. Kanonický nový zápis `gap_sides` neukladá.

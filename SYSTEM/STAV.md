@@ -23,16 +23,17 @@ Posledné in-SketchUp **2174 PASS / 0 FAIL** nad D-123 `3b07615` (10.9.2026). **
 
 ## Robí sa
 
-**BALÍK ČIEL (D-114 + D-119 + D-120) — návrh a zadanie, 11.9.2026.** Michal schválil samostatné ľavé/pravé presahy pre celú skrinku,
+**BALÍK ČIEL (D-114 + D-119 + D-120) — implementácia, 11.9.2026.** Michal schválil samostatné ľavé/pravé presahy pre celú skrinku,
 UKW na všetkých štyroch hranách a aj na výklope/sklope/blende; zvislé profily dvierok vždy oproti pántom (dvojkrídlo v strede).
 Ovládanie: profil/hrana v karte čela + hromadné Úchytky; štyri okraje v dvoch riadkoch; šesť piktogramov na pridanie typu.
 Úplné packages **ČELÁ-A → B → C** sú v [PLAN.md](PLAN.md). Lokálna interaktívna ukážka `_dev/cela-plan/index.html` je návrh, nie runtime pluginu.
-Outside-in a Astra audit spracované (4 FIX, 2 NOTE), kontrola zapracovania **SOUND**. Michal schválil mockup aj implementáciu 11.9.; prebieha ČELÁ-A.
+Outside-in a Astra audit spracované (4 FIX, 2 NOTE), kontrola zapracovania **SOUND**. Michal schválil mockup aj implementáciu 11.9.; ČELÁ-A implementované v PR #347 (v0.10.6).
+Overenie A: **3816 headless · 112 JS sád · in-SketchUp 2225 PASS / 0 FAIL**, browser skutočného Inspectora pri 470 px.
 **Blok 1d** podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**. Blok **1b** je uzavretý, **1c/1e hotové**.
 
 ## Ďalší krok
 
-Dokončiť testy a review ČELÁ-A (presahy), potom z čerstvého mainu sekvenčne B (profily), C (pridávanie čiel).
+Uzavrieť review/merge ČELÁ-A (presahy, PR #347), potom z čerstvého mainu sekvenčne B (profily), C (pridávanie čiel).
 Geometrická dávka B potrebuje skutočný SketchUp probe/QA; browser mockup túto bránu nenahrádza. Ostatné V1 bloky ostávajú podľa [PLAN.md](PLAN.md).
 
 ## Posledné uzávery
