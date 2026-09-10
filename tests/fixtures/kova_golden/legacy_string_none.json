@@ -166,6 +166,19 @@
       },
       "source": "rule",
       "rule_quantity": 4
+    },
+    {
+      "owner_part_key": null,
+      "generic_type": "plinth_clip",
+      "quantity": 1,
+      "rule_id": "prichyt-sokla",
+      "variant_id": null,
+      "production_class": "counted",
+      "manufactured": true,
+      "params": {
+      },
+      "source": "rule",
+      "rule_quantity": 1
     }
   ],
   "warnings": [

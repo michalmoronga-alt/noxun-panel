@@ -10149,8 +10149,13 @@ module NoxunSuRunner
   end
 
   def st3b_scenar(model, rd)
+    # KOV-G1b: pravidlo noh uz nie je `fixed` (pasma podla sirky), takze
+    # scenar `fixed` pravidla potrebuje policu — `podperky-policove` (4 ks)
+    # je jedine seed pravidlo s pevnym poctom na spodnej skrinke.
     inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
-                                            'height' => 720.0, 'depth' => 560.0 })
+                                            'height' => 720.0, 'depth' => 560.0,
+                                            'zone_tree' => { 'id' => 'Z1', 'shelves' => 1,
+                                                             'children' => [] } })
     return ok('ŠT-3b-1: vlozenie skrinky pre scenar pravidiel', false) unless inst
 
     rec = []
@@ -17634,6 +17639,274 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # ============================================================================
+  # KOV-G1b — NOHY 4/6 PODLA SIRKY + PRICHYT SOKLA (ZIVY RETAZEC)
+  # ============================================================================
+  #
+  # Headless sada overuje pravidlo aj expanziu nad rucne poskladanym stavom;
+  # TU ide o cely retazec: predvolby projektu -> VLOZENA skrinka -> ULOZENY
+  # `config.hardware[]` -> nakup. Prave tu by sa ukazalo, keby projektovy
+  # snapshot niesol este stare pravidlo noh (`fixed 4`) alebo keby prestavba
+  # po zmene sirky pocty neprepocitala.
+  #
+  # Sirka je JEDINY vstup poctu, takze scenar meni PRAVE JU (600 -> 1200) —
+  # a overuje, ze prestavba je JEDEN krok Spat.
+  KOVG_LEG_RULE  = 'nohy-zakladne'
+  KOVG_CLIP_RULE = 'prichyt-sokla'
+
+  # Spodna skrinka BEZ ciel — nohy a prichyt su korpusove polozky, cela by do
+  # nakupu priniesli len sum (zavesy).
+  def kovg_params(width, floor_height, over = {})
+    { 'type' => 'lower', 'width' => width.to_f, 'height' => 720.0, 'depth' => 510.0,
+      'thickness' => 18.0, 'floor_height' => floor_height.to_f,
+      'fronts' => { 'items' => [] } }.merge(over)
+  end
+
+  def kovg_build(model, width, floor_height, over = {})
+    e::CabinetBuilder.build(model, kovg_params(width, floor_height, over))
+  end
+
+  def kovg_reshape(model, inst, width, floor_height, over = {})
+    e::CabinetBuilder.rebuild(model, inst, kovg_params(width, floor_height, over))
+  end
+
+  # ULOZENE pocty korpusoveho kovania: { generic_type => quantity }.
+  def kovg_hw(inst)
+    Array((e::Store.config(inst) || {})['hardware'])
+      .each_with_object({}) do |h, out|
+        next unless h.is_a?(Hash) && h['owner_part_key'].nil?
+
+        out[h['generic_type'].to_s] = h['quantity']
+      end
+  end
+
+  # Nakupne kody NOH a PRICHYTU celej zakazky => pocet kusov.
+  def kovg_codes(model)
+    collected = e::Bom.collect(model)
+    exp = e::ProductionCore.hardware_expansion(model, collected)
+    Array(exp && exp['rows']).each_with_object({}) do |r, out|
+      next unless Array(r['sources']).any? do |s|
+        s.is_a?(Hash) && %w[leg plinth_clip].include?(s['generic_type'].to_s)
+      end
+
+      out[r['code'].to_s] = r['quantity']
+    end
+  end
+
+  def kovg_ctrl(model)
+    e::Validation.run(e::Bom.collect(model), sheets: e::ProductionCore.sheets_map,
+                                             hardware_expansion: kovg_expansion(model))['items']
+  end
+
+  def kovg_expansion(model)
+    e::ProductionCore.hardware_expansion(model, e::Bom.collect(model))
+  end
+
+  def run_kovg(model)
+    cleanup(model)
+    begin
+      kovg_predvolby(model)
+      kovg_pocty(model)
+      kovg_klzak(model)
+      kovg_zona(model)
+      kovg_sokel_vpredu(model)
+      kovg_prichyt_vs_nohy(model)
+      kovg_rucny_prichyt(model)
+    ensure
+      cleanup(model)
+    end
+    ok('KOV-G: cleanup (0 korpusov)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: KOV-G vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
+  # --- 0) NOVE PREDVOLBY (pravidla aj sety) -----------------------------------
+  #
+  # Snapshot projektu sa NIKDY nemerguje sam — testovaci model nesie snapshoty
+  # z predoslych sekcii, takze bez „Doplniť nové predvoľby" by nohy ostali na
+  # starom `fixed 4` a prichyt by nevznikol vobec.
+  def kovg_predvolby(model)
+    hr = e::HardwareRules
+    model.start_operation('KOV-G: doplnit nove predvolby', true)
+    rstatus, radded, rrefreshed = hr.merge_project_seed!(model)
+    sstatus, sadded, smap, = e::HardwareSets.merge_project_sets_seed!(model)
+    model.commit_operation
+    rules = hr.project_rules(model) || hr.load
+    leg  = rules.find { |r| r['rule_id'].to_s == KOVG_LEG_RULE }
+    clip = rules.find { |r| r['rule_id'].to_s == KOVG_CLIP_RULE }
+    ok("KOV-G predvolby: pravidlo noh je `bands` podla SIRKY (#{rstatus}, " \
+       "obnovene #{Array(rrefreshed).inspect})",
+       leg.is_a?(Hash) && leg['kind'].to_s == 'bands' && leg['input'].to_s == 'width' &&
+       Array(leg['bands']).map { |b| b['quantity'] } == [4, 6])
+    ok("KOV-G predvolby: projekt pozna pravidlo prichytu (doplnene #{Array(radded).inspect})",
+       clip.is_a?(Hash) && clip['output'].to_s == 'plinth_clip' &&
+       (clip['applies_to'] || {})['floor_height_min'].to_f == 55.0)
+    info("KOV-G predvolby: sety #{sstatus} (doplnene #{Array(sadded).inspect}, " \
+         "mapovania #{Array(smap).inspect})")
+  end
+
+  # --- 1) POCTY: 600 -> 4 + 1, po zmene na 1200 -> 6 + 2 (1 krok Spat) --------
+  def kovg_pocty(model)
+    inst = kovg_build(model, 600.0, 100.0)
+    return ok('KOV-G pocty: vlozenie korpusu', false) unless inst
+
+    ok("KOV-G pocty: skrinka 600 so soklom 100 -> 4 nohy + 1 prichyt (#{kovg_hw(inst).inspect})",
+       kovg_hw(inst) == { 'leg' => 4, 'plinth_clip' => 1 })
+    codes = kovg_codes(model)
+    ok("KOV-G pocty: nakup objednava nohu, platnicku a prichyt (#{codes.inspect})",
+       codes['9078'].to_i == 4 && codes['9079'].to_i == 4 && codes['950'].to_i == 1)
+    ok('KOV-G pocty: Kontrola nehlasi nemapovane kovanie',
+       kovg_ctrl(model).none? { |i| i['category'] == e::Validation::CAT_HW_UNMAPPED })
+
+    kovg_reshape(model, inst, 1200.0, 100.0)
+    ok("KOV-G pocty: sirka 1200 -> 6 noh + 2 prichyty (#{kovg_hw(inst).inspect})",
+       kovg_hw(inst) == { 'leg' => 6, 'plinth_clip' => 2 })
+    wide = kovg_codes(model)
+    ok("KOV-G pocty: a nakup ide s nimi (#{wide.inspect})",
+       wide['9078'].to_i == 6 && wide['9079'].to_i == 6 && wide['950'].to_i == 2)
+
+    # Prestavba je JEDEN krok Spat — vrati sa uzka skrinka aj s povodnymi poctami.
+    Sketchup.undo
+    ok("KOV-G Spat: JEDEN krok vratil sirku aj pocty (#{kovg_hw(inst).inspect})",
+       kovg_hw(inst) == { 'leg' => 4, 'plinth_clip' => 1 })
+    cleanup(model)
+  end
+
+  # --- 2) KLZAK 17 mm: nohy ano, platnicka ani prichyt NIE ---------------------
+  def kovg_klzak(model)
+    inst = kovg_build(model, 600.0, 17.0)
+    return ok('KOV-G klzak: vlozenie korpusu', false) unless inst
+
+    ok("KOV-G klzak: sokel 17 mm da nohy BEZ prichytu (#{kovg_hw(inst).inspect})",
+       kovg_hw(inst) == { 'leg' => 4 })
+    codes = kovg_codes(model)
+    ok("KOV-G klzak: nakup ma LEN klzaky (#{codes.inspect})",
+       codes == { '272212' => 4 })
+    ok('KOV-G klzak: a Kontrola nic nehlasi',
+       kovg_ctrl(model).none? { |i| i['category'] == e::Validation::CAT_HW_UNMAPPED })
+    cleanup(model)
+  end
+
+  # --- 3) ZONA 20-55 mm: pravidlo polozku VYDA, set ju nezmapuje (ORANGE) -----
+  def kovg_zona(model)
+    inst = kovg_build(model, 600.0, 40.0)
+    return ok('KOV-G zona: vlozenie korpusu', false) unless inst
+
+    ok("KOV-G zona: sokel 40 mm da nohy, ale ziadny prichyt (#{kovg_hw(inst).inspect})",
+       kovg_hw(inst) == { 'leg' => 4 })
+    un = kovg_ctrl(model).select { |i| i['category'] == e::Validation::CAT_HW_UNMAPPED }
+    # Set noh ma DVOCH clenov s pasmami (noha + platnicka) a pri sokli 40 mm
+    # nema pasmo ani jeden -> Kontrola hlasi ORANGE za KAZDEHO clena zvlast
+    # (rovnaka cesta `param_band_missing` ako doteraz, len dvakrat).
+    ok("KOV-G zona: Kontrola hlasi ORANGE „doplň pásmo“ pre nohy — noha aj platnička (#{un.length})",
+       un.length == 2 && un.all? { |i| i['severity'] == 'orange' && i['message_sk'].to_s.include?('Nohy') } &&
+       un.any? { |i| i['message_sk'].to_s.include?('(noha)') } &&
+       un.any? { |i| i['message_sk'].to_s.include?('(platnička)') })
+    ok("KOV-G zona: nakup pre tento sokel ziadny kod nohy nevyda (#{kovg_codes(model).inspect})",
+       kovg_codes(model).empty?)
+    cleanup(model)
+  end
+
+  # --- 4) SOKEL VPREDU: nohy ano, prichyt NIE (nie je samostatna lista) -------
+  def kovg_sokel_vpredu(model)
+    inst = kovg_build(model, 1200.0, 100.0, 'plinth_mode' => 'front')
+    return ok('KOV-G sokel-vpredu: vlozenie korpusu', false) unless inst
+
+    ok("KOV-G sokel-vpredu: 6 noh a ZIADNY prichyt (#{kovg_hw(inst).inspect})",
+       kovg_hw(inst) == { 'leg' => 6 })
+    ok("KOV-G sokel-vpredu: podopretie je `plinth` " \
+       "(#{((e::Store.config(inst) || {})['support'] || {})['type']})",
+       (((e::Store.config(inst) || {})['support'] || {})['type']).to_s == 'plinth')
+    codes = kovg_codes(model)
+    ok("KOV-G sokel-vpredu: nakup ma nohy s platnickami, prichyt nie (#{codes.inspect})",
+       codes['9078'].to_i == 6 && codes['9079'].to_i == 6 && !codes.key?('950'))
+    cleanup(model)
+  end
+
+  # --- 5) RUCNY ZAMOK POCTU NOH vs POCET PRICHYTOV (Codex #338 kolo 1 N2) ----
+  #
+  # Rozhodnutie O3: prichyt sa ratá zo SIRKY, nie z poctu noh, takze rucny
+  # zamok noh mnozstvo prichytov NEZMENI. Headless sada meria `Bom`; TU ide
+  # o cely retazec — override v paneli -> ULOZENY `config.hardware[]` -> zber
+  # -> ORANGE riadok Kontroly -> a naspat, ked sa zamok zrusi.
+  def kovg_prichyt_vs_nohy(model)
+    inst = kovg_build(model, 600.0, 100.0)
+    return ok('KOV-G prichyt-vs-nohy: vlozenie korpusu', false) unless inst
+
+    ok('KOV-G prichyt-vs-nohy: zdrava skrinka (4 + 1) ziadny nalez nema',
+       kovg_clip_check(model).empty?)
+
+    par = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    par['hardware_overrides'] = [{ 'owner_part_key' => nil, 'generic_type' => 'leg',
+                                   'rule_id' => KOVG_LEG_RULE, 'quantity' => 8 }]
+    e::CabinetBuilder.rebuild(model, inst, par)
+    ok("KOV-G prichyt-vs-nohy: zamok 8 noh prichyt NEZMENIL (#{kovg_hw(inst).inspect})",
+       kovg_hw(inst) == { 'leg' => 8, 'plinth_clip' => 1 })
+    found = kovg_clip_check(model)
+    ok("KOV-G prichyt-vs-nohy: Kontrola hlasi ORANGE „8 nôh, ale 1 príchyt“ " \
+      "(#{found.map { |i| i['message_sk'] }.inspect})",
+       found.length == 1 && found.first['severity'] == 'orange' &&
+       found.first['message_sk'].to_s.include?('8 nôh, ale 1 príchyt'))
+    ok('KOV-G prichyt-vs-nohy: a NIC sa tym nezastavuje (ziadna cervena)',
+       kovg_ctrl(model).none? { |i| i['severity'] == 'red' })
+    codes = kovg_codes(model)
+    ok("KOV-G prichyt-vs-nohy: nakup objedna 8 noh a stale 1 prichyt (#{codes.inspect})",
+       codes['9078'].to_i == 8 && codes['950'].to_i == 1)
+
+    par2 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    par2['hardware_overrides'] = []
+    e::CabinetBuilder.rebuild(model, inst, par2)
+    ok("KOV-G prichyt-vs-nohy: po zruseni zamku nalez zhasne (#{kovg_hw(inst).inspect})",
+       kovg_hw(inst) == { 'leg' => 4, 'plinth_clip' => 1 } && kovg_clip_check(model).empty?)
+    cleanup(model)
+  end
+
+  # --- 6) RUCNY PRICHYT VEDLA AUTOMATU (Codex #338 kolo 1 N3) ----------------
+  #
+  # G1a vystavila produkt aj set skor, nez vzniklo pravidlo, takze stara
+  # skrinka moze mat kod prichytu (950) v `hardware_manual`. Od G1b k nemu
+  # pribudne aj AUTOMAT a nakup oba riadky zlepi podla kodu. Automat sa
+  # NEPOTLACA (set ma jedineho clena — potlacenie by ticho zrusilo cely pocet
+  # z pravidla), takze scenar overuje, ze v nakupe su DVA kusy a Kontrola
+  # o zliati POVIE.
+  KOVG_CLIP_CODE = '950'
+
+  def kovg_rucny_prichyt(model)
+    inst = kovg_build(model, 600.0, 100.0, 'hardware_manual' => [
+                        { 'id' => 'MAN-1', 'source' => 'catalog', 'code' => KOVG_CLIP_CODE,
+                          'qty' => 1, 'name' => 'Príchyt sokla', 'unit' => 'ks',
+                          'owner_part_key' => nil }
+                      ])
+    return ok('KOV-G rucny-prichyt: vlozenie korpusu', false) unless inst
+
+    ok("KOV-G rucny-prichyt: automat sa NEPOTLACIL (#{kovg_hw(inst).inspect})",
+       kovg_hw(inst) == { 'leg' => 4, 'plinth_clip' => 1 })
+    ws = Array((e::Store.config(inst) || {})['warnings'])
+         .select { |w| w.is_a?(Hash) && w['code'].to_s == 'plinth_clip_manual_duplicate' }
+    ok("KOV-G rucny-prichyt: stavba prilozila ORANGE o zliati (#{ws.length})",
+       ws.length == 1 && ws.first['message'].to_s.include?(KOVG_CLIP_CODE))
+    row = Array(kovg_expansion(model)['rows']).find { |r| r['code'].to_s == KOVG_CLIP_CODE }
+    ok("KOV-G rucny-prichyt: nakup ma JEDEN riadok s 2 kusmi " \
+      "(#{row && row['quantity']} / rucne #{row && row['adhoc_quantity']})",
+       row && row['quantity'].to_i == 2 && row['adhoc_quantity'].to_i == 1)
+    ok('KOV-G rucny-prichyt: a NIC sa tym nezastavuje (ziadna cervena)',
+       kovg_ctrl(model).none? { |i| i['severity'] == 'red' })
+    ok('KOV-G rucny-prichyt: Kontrola vetu ukaze v kategorii „stavba“',
+       kovg_ctrl(model).any? do |i|
+         i['category'] == e::Validation::CAT_BUILD &&
+           i['message_sk'].to_s.include?(KOVG_CLIP_CODE)
+       end)
+    cleanup(model)
+  end
+
+  # Riadky Kontroly s kodom `plinth_clip_check` (kod nesie `stable_key`).
+  def kovg_clip_check(model)
+    kovg_ctrl(model).select do |i|
+      i['stable_key'].to_s.end_with?(e::BuildPlan::PLINTH_CLIP_CHECK)
+    end
+  end
+
   # --- D-118b: PTOs modul a vedome prazdna bunka v ZIVOM nakupe ---------------
   #
   # Headless sada overuje expanziu nad rucne poskladanym stavom; TU ide o cely
@@ -18815,6 +19088,7 @@ module NoxunSuRunner
     run_kovw(model)          # KOV-W: hmotnost dielcov v ZIVOM retazci katalog -> skrinka -> snapshoty -> Inspector -> Kontrola: pri znamej hustote sedi sucet zo snapshotov s planom (±0,05 kg) a nic sa neuklada do modelu; typ BEZ hustoty (nie UNI) da tazsi odhad, PRESNE JEDEN build warning na skrinku a ORANGE v Kontrole; UNI dielec odhad zachova, ale hmotnostny nalez sa v Kontrole POTLACI (hlasi sa len „materiál neurčený"); Spat vracia hmotnost spolu s materialom
     run_kovf(model)          # KOV-F1: zavesy podla NOXUN tabulky — pocty z REALNEJ sirky kridla (1250 -> 3, 850 -> 3, kridlo 800 x 700 -> 2+1), varovanie sirky nad 800 mm v Kontrole, Tip-On celo dostane P2O set + PRESNE JEDEN piest na kridlo (klasicke celo klasicky set), dvierka nad tabulkou vydaju polozku 7 ks + RED „mimo tabuľky" so zastavenym nakupom/rozpoctom/ponukou (VEPO bezi dalej), rucny zamok poctu RED zhasne v JEDNOM kroku Spat (aj Redo), skrinka ULOZENA PRED tabulkou (schema 8) dostane RED „prestav ju" so zastavenymi 3 vystupmi a prestavba ho zhasne, vlastny set skrinky prezije prestavbu
     run_kove(model)          # KOV-E1b: vyklopy a sklopy — skrinka 600 x 400 x 320 s vyklopom da 22K2300 + kompletny set (mechanizmus, prichyt, krytky), prestavba na HL top pri vyske 600 da 22L2500 + 22L3800 + JEDNU tyc (KH je z KORPUSU, nie z cela), siroka skrinka 1200 dve tyce + predlzenie, Spat/Redo vratia stav NARAZ, reopen (prestavba z ULOZENEHO configu) system vyklopu nestrati, sklop dostane ZAVESY (nikdy vyklopovy mechanizmus), skrinka zo schemy 10 bez vyklopu = RED „Doplniť nové predvoľby" so zastavenymi 3 vystupmi (VEPO bezi) a prestavba ho zhasne; prestavba so STARYM snapshotom pravidiel (seed 4) RED NEZHASNE (zhasne az doplnenie predvolieb + prestavba) a vyklop s RUCNYM kovanim RED nedostane, prestavba mu automat NEVYDA (ORANGE) a v nakupe je mechanizmus prave raz
+    run_kovg(model)          # KOV-G1b: nohy 4/6 podla SIRKY + prichyt sokla — „Doplniť nové predvoľby" prepise stare pravidlo noh (`fixed 4`) na pasma podla sirky a doplni `prichyt-sokla`; skrinka 600 so soklom 100 da 4 nohy + 1 prichyt (nakup 4x 9078 + 4x 9079 + 1x 950), zmena sirky na 1200 da 6 + 2 a je to JEDEN krok Spat; sokel 17 mm (klzak) da nohy BEZ platnicky a BEZ prichytu, sokel 40 mm (vedome nepokryta zona) vyda nohy s ORANGE „doplň pásmo" a bez kodu, sokel VPREDU dostane nohy, ale nikdy prichyt; rucny zamok 8 noh prichyt NEZMENI (prichyt je zo SIRKY, O3) a Kontrola to prizna ORANGE `plinth_clip_check` — po zruseni zamku zhasne; RUCNY prichyt 950 vedla automatu sa v nakupe zlepi na 2 ks a stavba k tomu prilozi ORANGE `plinth_clip_manual_duplicate` (automat sa NEPOTLACA)
     run_d118b(model)         # D-118b: PTOs modul a vedome prazdna bunka v ZIVOM retazci kniznica -> predvolby projektu -> vlozena Tip-On zasuvka -> nakup: pri NL 470 pribudne modul 352908 (1 ks, nazov z katalogu), pri NL 620 (kit typu PTO) modul VEDOME nepribudne a NEVZNIKNE ziadna oranzova; snapshot nesie std 6 (od KOV-E1a) a config schemu 8
     run_async(model, nil)
   rescue StandardError => ex

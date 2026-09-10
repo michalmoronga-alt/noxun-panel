@@ -45,6 +45,9 @@ module Noxun
     module Bom
       EDGE_ORDER = %w[L1 L2 W1 W2].freeze
       L_EDGES = %w[L1 L2].freeze # pozdlzne hrany = dlzka dielca; W = sirka
+      # KOV-G1b: typy podopretia, pri ktorych NOHY vobec vznikaju — zrkadlo
+      # filtra `applies_to.support` seed pravidla `nohy-zakladne`.
+      LEG_SUPPORTS = %w[legs plinth].freeze
 
       module_function
 
@@ -164,6 +167,18 @@ module Noxun
             # (schema configu), nie pritomnost pravidiel (delta audit Sol FIX 4).
             fs = flap_stale_issue(cid, inst.persistent_id, ccfg, flap_codes)
             hardware_issues << fs if fs
+            # KOV-G1b: STVRTY vzor, prvy ORANGE — skrinka na nohach postavena
+            # pred pravidlom „4/6 podla sirky". Nakup by mal o dve nohy a o
+            # prichyty menej; vyrobu to ale nezastavuje (kod nie je v registri
+            # blokerov), preto len upozornenie s napravou.
+            ls = leg_stale_issue(cid, inst.persistent_id, ccfg)
+            hardware_issues << ls if ls
+            # KOV-G1b (Codex #338 kolo 1 N2): pocet prichytov sokla je zo SIRKY
+            # korpusu (O3), takze rucny zamok poctu noh ho NEZMENI. Vedome —
+            # ale nie potichu: ked `ceil(nohy / 4)` nesedi s vydanymi
+            # prichytmi, Kontrola o tom povie (ORANGE, ziadna brana).
+            pc = plinth_clip_check_issue(cid, inst.persistent_id, ccfg)
+            hardware_issues << pc if pc
             cs = ccfg['hardware_sets']
             note_cabinet_sets(cid, (cs.is_a?(Hash) && !cs.empty? ? cs : nil),
                               cabinet_sets, cabinet_sets_seen, cabinet_set_conflicts)
@@ -485,6 +500,184 @@ module Noxun
                        'kovania spusti „Doplniť nové predvoľby“ — nová tabuľka závesov ' \
                        '(+1 nad šírku 600 mm, set podľa otvárania) platí až keď je hotové oboje.',
           'label' => PartKeys.human_label(pkey, fronts: items).to_s }
+      end
+
+      # === KOV-G1b: NEPRESTAVANE NOHY A CHYBAJUCI PRICHYT (`leg_stale`) ======
+      #
+      # Skrinka NA NOHACH postavena s pravidlami SPRED „4/6 podla sirky":
+      # v `config.hardware[]` ma 4 nohy aj pri sirke 1200 a ziadny prichyt
+      # soklovej listy. Zber cita LEN ULOZENE hodnoty (nic sa neprepocitava),
+      # takze bez tejto vety by nakup obsahoval o dve nohy a o prichyty menej
+      # a nikto by to nezbadal.
+      #
+      # ORANGE, NIE RED (rozhodnutie davky): nohy nie su blocker vyroby —
+      # rezanie ani VEPO na nich nestoja a chybajuce kusy sa daju dokupit.
+      # Kod preto ZAMERNE NIE JE v `BuildPlan::HW_ISSUE_BLOCKERS`, takze nakup,
+      # rozpocet ani ponuku nezastavi.
+      #
+      # PROVENIENCIA je JEDNA a je NUTNA (na rozdiel od `flap_stale`, kde staci
+      # jedna z dvoch): `rules_seed_version` < `LEG_WIDTH_SEED_VERSION`. ZIADNY
+      # novy kluc configu sa NEZAKLADA — marker uz zapisuje kazda stavba
+      # (KOV-E1b) a `CONFIG_SCHEMA` sa tu NEBUMPUJE (nic noveho sa neuklada).
+      # Po „Doplniť nové predvoľby" + prestavbe je marker >= 6 a veta zhasne.
+      #
+      # SYMPTOM musi byt aspon jeden (inak by veta strasila aj tam, kde sa
+      # NIC nezmeni — uzka skrinka so soklom 30 mm dostane 4 nohy a ziadny
+      # prichyt aj podla novych pravidiel):
+      #   (a) sirka >= `LEG_WIDE_FROM_MM` a ulozena polozka `leg` ma este
+      #       4 kusy z PRAVIDLA (`source: 'rule'` — rucny zamok nesie 'manual'
+      #       a je to vedome rozhodnutie pouzivatela),
+      #   (b) vyska sokla >= `PLINTH_CLIP_MIN_MM` a ulozene kovanie nema ANI
+      #       JEDEN `plinth_clip`.
+      #
+      # PODOPRETIE (Codex #338 kolo 1 N1): symptom (a) plati pre OBA typy,
+      # pri ktorych nohy vobec vznikaju — `legs` aj `plinth`. Seed
+      # `nohy-zakladne` ma filter `support legs plinth`, takze siroka skrinka
+      # so SOKLOM VPREDU dostane po prestavbe tiez 6 noh; kontrola len na
+      # `legs` by u nej migracnu vetu POTICHU zhasla a nakup by mal o dve nohy
+      # menej. Symptom (b) ostava LEN pri `legs`: samostatna soklova lista (a
+      # teda jej prichyt) pri sokli vpredu neexistuje.
+      # -> nalez | nil
+      def leg_stale_issue(owner_id, owner_pid, ccfg)
+        return nil unless defined?(HardwareRules)
+
+        cfg = ccfg.is_a?(Hash) ? cfg_hash(ccfg) : {}
+        sup = support_type_of(cfg)
+        return nil unless LEG_SUPPORTS.include?(sup)
+        return nil if provenance_marker(cfg['rules_seed_version']) >=
+                      HardwareRules::LEG_WIDTH_SEED_VERSION
+
+        wide = num_of(cfg['width']).to_f >= HardwareRules::LEG_WIDE_FROM_MM
+        fh = num_of(cfg['floor_height']).to_f
+        hw = Array(cfg['hardware'])
+        legs4 = wide && hw.any? { |h| rule_leg_four?(h) }
+        clip_missing = clips_expected?(sup, fh) &&
+                       hw.none? { |h| h.is_a?(Hash) && h['generic_type'].to_s == 'plinth_clip' }
+        return nil unless legs4 || clip_missing
+
+        { 'code' => BuildPlan::LEG_STALE, 'severity' => 'orange',
+          'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
+          'part_key' => nil, 'front_id' => '',
+          'message' => leg_stale_message(owner_id, cfg['width'], fh, sup),
+          'label' => 'Nohy' }
+      end
+
+      # Ma tato skrinka podla NOVYCH pravidiel dostat prichyt sokla? LEN pri
+      # samostatnej soklovej liste (`legs`) a LEN od vysky, v ktorej lista na
+      # nohach AXILO existuje. JEDINA autorita otazky v zbere.
+      def clips_expected?(support, floor_height)
+        support.to_s == 'legs' && floor_height >= HardwareRules::PLINTH_CLIP_MIN_MM
+      end
+
+      # Veta hovori KONKRETNE cislami tejto skrinky, aby bolo jasne, co sa zmeni.
+      def leg_stale_message(owner_id, width, floor_height, support)
+        w = num_of(width).to_f
+        legs = w >= HardwareRules::LEG_WIDE_FROM_MM ? 6 : 4
+        clips = clips_expected?(support, floor_height) ? (legs / 4.0).ceil : 0
+        want = "#{legs} nôh"
+        want += " + #{clips} #{clips == 1 ? 'príchyt' : 'príchyty'} sokla" if clips.positive?
+        "Skrinka #{owner_id} má nohy spočítané ešte pred pravidlom 4/6 (šírka " \
+          "#{fmt_mm(w)} → #{want}) — v Pravidlách spusti „Doplniť nové predvoľby“ " \
+          'a skrinku prestav.'
+      end
+
+      # Ulozena polozka noh, ktora este nesie STARY pevny pocet 4 z pravidla.
+      # `source: 'manual'` = rucny zamok pouzivatela — ten sa nekomentuje.
+      def rule_leg_four?(item)
+        return false unless item.is_a?(Hash)
+
+        item['generic_type'].to_s == 'leg' && item['source'].to_s == 'rule' &&
+          item['quantity'].to_i == 4
+      end
+
+      # Typ podopretia z ULOZENEHO configu (deskriptor `support`), nie z
+      # prepoctu — zber nikdy nic neprepocitava.
+      def support_type_of(cfg)
+        sup = cfg['support']
+        sup.is_a?(Hash) ? sup['type'].to_s : ''
+      end
+
+      def num_of(v)
+        v.is_a?(Numeric) && v.to_f.finite? ? v.to_f : 0.0
+      end
+
+      # Config zo Store ma string kluce; testy a volajuci so symbolmi by inak
+      # dostali prazdny vysledok. Plytka konverzia je dost — citaju sa len
+      # top-level kluce a `support`.
+      def cfg_hash(cfg)
+        return {} unless cfg.is_a?(Hash)
+
+        cfg.each_with_object({}) do |(k, v), out|
+          out[k.to_s] = v.is_a?(Hash) ? v.each_with_object({}) { |(k2, v2), o2| o2[k2.to_s] = v2 } : v
+        end
+      end
+
+      # === KOV-G1b: POCET PRICHYTOV vs POCET NOH (`plinth_clip_check`) ======
+      #
+      # ROZHODNUTIE O3 (Michal 2.9.2026): prichyt soklovej listy je DRUHE
+      # `bands` pravidlo na tu istu SIRKU korpusu — NIE pomerovy clen z poctu
+      # noh (ten je D-109 a vo V1 sa NEIMPLEMENTUJE). Dosledok: ked pouzivatel
+      # zmeni pocet noh — rucnym zamkom (`hardware_overrides`) alebo vlastnym
+      # pravidlom `nohy-zakladne` (napr. pevnych 5) — mnozstvo prichytov sa
+      # NEPOHNE, lebo sirka je stale ta ista.
+      #
+      # Mnozstva sa preto NEPREPOCITAVAJU (to by bola tichá zmena kontraktu
+      # O3); miesto toho sa rozdiel PRIZNA. Nalez je ORANGE a ZAMERNE mimo
+      # `HW_ISSUE_BLOCKERS` — spravny pocet moze byt aj ten, ktory tam je
+      # (siroka skrinka s 8 nohami moze mat listy delene inak), rozhodnut
+      # musi clovek. Naprava = rucny zamok poctu prichytov v Kovani.
+      #
+      # Cita LEN ULOZENE `config.hardware[]`, teda UCINNE mnozstva poloziek
+      # z pravidiel PO overridoch (ad-hoc kanal `hardware_manual` sa do nakupu
+      # agreguje zvlast — rozdiel vykompenzovany rucnou polozkou nalez nezhasne,
+      # naprava je zamok poctu prichytov).
+      #   * ZIADNY prichyt (klzak 17-20 mm, sokel vpredu, stara skrinka) =
+      #     ticho: chybajuci prichyt rieši `leg_stale`, nie tento nalez.
+      #   * `ceil(nohy / 4) == prichyty` = ticho (600 mm -> 4+1, 1200 -> 6+2).
+      # -> nalez | nil
+      def plinth_clip_check_issue(owner_id, owner_pid, ccfg)
+        cfg = ccfg.is_a?(Hash) ? cfg_hash(ccfg) : {}
+        hw = Array(cfg['hardware'])
+        clips = hw_quantity(hw, HardwareRules::PLINTH_CLIP_OUTPUT)
+        return nil if clips <= 0
+
+        legs = hw_quantity(hw, HardwareRules::LEG_OUTPUT)
+        want = (legs / 4.0).ceil
+        return nil if want == clips
+
+        { 'code' => BuildPlan::PLINTH_CLIP_CHECK, 'severity' => 'orange',
+          'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
+          'part_key' => nil, 'front_id' => '',
+          'message' => plinth_clip_check_message(owner_id, legs, clips),
+          'label' => 'Príchyt sokla' }
+      end
+
+      # UCINNE mnozstvo daneho druhu kovania v ULOZENOM configu (po overridoch).
+      # Polozky sa SCITAVAJU — druh moze mat viac riadkov (dve pravidla).
+      def hw_quantity(hardware, generic_type)
+        Array(hardware).sum do |h|
+          next 0 unless h.is_a?(Hash) && h['generic_type'].to_s == generic_type
+
+          q = h['quantity'].to_i
+          q.positive? ? q : 0
+        end
+      end
+
+      # Veta menuje OBE cisla a povie, PRECO sa nezhoduju — inak by pouzivatel
+      # hladal chybu vo vypocte namiesto toho, aby pocet skontroloval.
+      def plinth_clip_check_message(owner_id, legs, clips)
+        "Skrinka #{owner_id} má #{sk_count(legs, 'noha', 'nohy', 'nôh')}, ale " \
+          "#{sk_count(clips, 'príchyt', 'príchyty', 'príchytov')} sokla " \
+          '(príchyty sa počítajú zo šírky korpusu) — skontroluj počet v Kovaní.'
+      end
+
+      # Slovenske pocitanie: 1 noha · 2-4 nohy · 0 a 5+ nôh.
+      def sk_count(n, one, few, many)
+        word = if n == 1 then one
+               elsif n >= 2 && n <= 4 then few
+               else many
+               end
+        "#{n} #{word}"
       end
 
       # === KOV-E1b: NEPRESTAVANY VYKLOP ALEBO SKLOP (`flap_stale`) ===========

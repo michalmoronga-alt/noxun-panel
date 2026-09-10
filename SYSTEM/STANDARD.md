@@ -456,6 +456,16 @@ Príklad (počet závesov podľa výšky krídla):
 vzniknúť ručný zámok) a k nej vznikne RED `door_height_out_of_table`, ktorý blokuje nákup, rozpočet aj cenovú ponuku (VEPO nie). Náprava = ručný zámok
 počtu. **Kontrakt validátora sa nemení** — pásmo „všetko nad" je stále povinné.
 
+**NOHY A PRÍCHYT SOKLA (KOV-G1b, v0.9.59) — počet z pásiem podľa ŠÍRKY korpusu.** Seed `nohy-zakladne` je `bands` s `input: "width"`
+(`max 999 → 4`, catch-all `→ 6`), platí pre **všetky** sety nôh (set rozhoduje len o produkte — kód podľa výšky sokla ostáva cez
+`params_from_context {height: floor_height}`). Seed `prichyt-sokla` vydáva `plinth_clip` tými istými pásmami (`999 → 1`, catch-all `→ 2`)
+= **1 ks na začaté 4 nohy**. Príchyt vzniká **len pri samostatnej soklovej lište**: `applies_to.support ["legs"]` (sokel vpredu je súčasť
+korpusu) a nový **VOLITEĽNÝ filter `applies_to.floor_height_min` (Float, mm)** — pravidlo platí len na korpus s aspoň takým soklom (55 mm,
+odkiaľ existuje lišta na nohách AXILO). Kontext bez použiteľnej výšky filtru **nevyhovie** (hádať sa nesmie). **Žiadny nový `kind`** (vzor
+`flap_dir`): starší plugin kľúč `normalize_rules` zachová, ale **neuplatní** — vedomá hranica downgrade, rovnaká ako pri smere výklopu.
+Zóna výšky sokla 20–55 mm ostáva vedome nepokrytá **setom** (ORANGE „doplň pásmo"), nie pravidlom. `SEED_VERSION` 5 → 6; migračná brána
+`leg_stale` je **ORANGE bez exportnej brány** (nohy nezastavujú výrobu) a pýta sa `rules_seed_version` < 6 (§2.5).
+
 **BRÁNY VÝKLOPU (KOV-E1b, v0.9.54) — jeden register, jeden výklad.** Kódy žijú v `BuildPlan::HW_LIFT_BLOCKERS` a zastavujú **nákupné CSV, rozpočet a cenovú ponuku;
 VEPO nikdy** (geometria čela je správna). Štyri z nich vydáva PRAVIDLO do **uloženého nosiča** `hardware_conflicts` (rovnaký kontrakt ako `door_height_out_of_table`):
 `lift_class_missing` (LF/KH/kg mimo tabuľky alebo neznáma hmotnosť čela) · `lift_dimension_unsupported` (rozmery mimo programu — `eligibility`) ·

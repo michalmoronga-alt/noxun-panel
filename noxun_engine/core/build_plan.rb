@@ -276,6 +276,28 @@ module Noxun
       # „Doplniť nové predvoľby" + PRESTAVBA.
       FLAP_STALE = 'flap_stale'
 
+      # KOV-G1b: MIGRACNY kod NOH — skrinka bola postavena s pravidlami SPRED
+      # „4/6 podla sirky" (`rules_seed_version` < `HardwareRules::
+      # LEG_WIDTH_SEED_VERSION`), takze jej `config.hardware[]` nesie 4 nohy aj
+      # pri sirke 1200 a ziadny prichyt sokla.
+      #
+      # ZAMERNE ORANGE a ZAMERNE MIMO `HW_ISSUE_BLOCKERS`: nohy nie su blocker
+      # vyroby (rezanie ani montaz na nich nestoja) a chybajuce dva kusy si
+      # stolar vsimne — zastavit kvoli nim nakup, rozpocet aj ponuku by bolo
+      # neumerne. Naprava je ta ista ako pri `flap_stale`: „Doplniť nové
+      # predvoľby" + prestavba skrinky.
+      LEG_STALE = 'leg_stale'
+
+      # KOV-G1b (Codex #338 kolo 1 N2): KONTROLNY kod „pocet prichytov sokla
+      # nesedi s poctom noh". Prichyt sa ratá zo SIRKY korpusu (rozhodnutie O3,
+      # 2.9.2026 — pomerovy clen „1 ks na zacate 4 nohy" je D-109 PO V1), takze
+      # rucny zamok poctu noh ani vlastne pravidlo noh mnozstvo prichytov
+      # NEZMENIA. To je vedome; potichu to ale byt nesmie, preto tento ORANGE.
+      #
+      # ZAMERNE MIMO `HW_ISSUE_BLOCKERS` (ako `LEG_STALE`): je to podnet na
+      # kontrolu, nie chyba — spravny pocet moze byt aj ten, ktory tam je.
+      PLINTH_CLIP_CHECK = 'plinth_clip_check'
+
       # KOV-E1b: dovody, pre ktore je UZ VYDANA polozka vyklopu nespravna.
       # Vsetky prichadzaju z ULOZENEHO nosica `hardware_conflicts` (polozka aj
       # dielec existuju — riadok v Kovani musi byt), preto su aj v

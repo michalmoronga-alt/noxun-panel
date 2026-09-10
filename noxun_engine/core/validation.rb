@@ -732,6 +732,12 @@ module Noxun
           elsif defined?(Recipes) &&
                 (Recipes::BUILD_BLOCKERS.include?(code) || code == Recipes::STALE)
             items << drawer_conflict_item(iss, overrides)
+          elsif HW_ORANGE_NOTES.key?(code)
+            # KOV-G1b: JEDINE nalezy kovania, ktore su ORANGE — nohy vyrobu
+            # nezastavuju (kody ZAMERNE nie su v `HW_ISSUE_BLOCKERS`), ale
+            # nakup by bol o nohy a o prichyty chudobnejsi (`leg_stale`),
+            # resp. pocet prichytov nesedi s poctom noh (`plinth_clip_check`).
+            items << hardware_note_item(iss, code, HW_ORANGE_NOTES[code])
           elsif BuildPlan::HW_ISSUE_BLOCKERS.include?(code)
             # KOV-F1 (Codex #329 kolo 2 P1): register nesie DVA zdroje — ulozeny
             # nosic (`door_height_out_of_table`) aj migracny `hinge_stale`.
@@ -740,6 +746,32 @@ module Noxun
             items << hardware_conflict_item(iss)
           end
         end
+      end
+
+      # ORANGE nalezy kovania (KOV-G1b) a ich NAHRADNA veta pre pripad, ze zber
+      # spravu neposlal. Vetu bezne sklada ZBER (pozna sirku, vysku sokla aj
+      # oba pocty), Kontrola k nej doplni len to, ze export bezi dalej — inak
+      # by pouzivatel cakal branu.
+      #   leg_stale         — skrinka postavena pred pravidlom „4/6 podla sirky"
+      #   plinth_clip_check — pocet prichytov nesedi s poctom noh (Codex #338 N2)
+      HW_ORANGE_NOTES = {
+        BuildPlan::LEG_STALE => 'Nohy sú spočítané ešte pred pravidlom 4/6.',
+        BuildPlan::PLINTH_CLIP_CHECK =>
+          'Počet príchytov sokla nesedí s počtom nôh.'
+      }.freeze
+
+      # Vlastnika ma (skrinku), dielec nie: nohy aj prichyt su KORPUSOVE
+      # polozky. `code` je sucastou `stable_key`, takze dva ORANGE nalezy na
+      # tej istej skrinke su dva riadky (dedup ich nezlepi).
+      def hardware_note_item(iss, code, fallback)
+        oid = iss['owner_id'].to_s
+        msg = iss['message'].to_s.strip
+        msg = fallback.to_s if msg.empty?
+        { 'severity' => ORANGE, 'category' => CAT_HARDWARE,
+          'owner_id' => oid, 'part_key' => nil, 'hw_key' => nil,
+          'owner_pid' => iss['owner_pid'],
+          'message_sk' => "#{msg} Nákup ani výroba sa tým nezastavujú.",
+          'stable_key' => "#{CAT_HARDWARE}|#{oid}||#{code}" }
       end
 
       # RED (KOV-F1): polozka kovania z pravidiel VZNIKLA, ale je nespravna —

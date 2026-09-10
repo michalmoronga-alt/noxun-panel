@@ -154,6 +154,14 @@ v sete, parametre v položke) a **IO tiež nie**, takže to zvládne stavba. `ov
 nenesú (dopisuje ho až `Bom.collect`), preto sa použije pre každé `owner_id`. Bez snapshotu setov (nekompatibilná knižnica) je mapa prázdna a varovanie nevznikne —
 správne, taký nákup je celý ORANGE `library_incompatible` a nemá s čím zliať. `flap_set_codes` ostáva tam, kde je otázka iná („je tento kód vôbec mechanizmus?").
 
+**`HardwareSets.cabinet_emitted_codes` — to isté pre KORPUSOVÚ položku (KOV-G1b, Codex #338 kolo 1 N3).** `flap_emitted_codes` kľúčuje podľa vlastníka-dielca,
+takže na položku, ktorá **nevisí na dielci** (`owner_part_key` prázdny — dnes príchyt sokla), sa použiť nedá. `cabinet_emitted_codes(hardware_items, state,
+generic_type, overrides:)` ide **tou istou cestou** (`single_cabinet_overrides` → `effective_item_set` → `emitted_member_codes`) a vráti **plochú** množinu
+`{ kód => true }`. Spoločná brána sa preto od G1b volá `effective_item_set` (do G1b `effective_flap_set`) — nie je výklopová, je to zrkadlo brán `expand`.
+Podklad ORANGE `plinth_clip_manual_duplicate` ([construction.md](construction.md)): ručná katalógová položka s tým istým kódom sa v nákupe zlieva so setovým
+riadkom (`add_row` aj `add_adhoc_row` agregujú podľa kódu). Bez mapovania, bez snapshotu setov alebo pri „bez setu" je množina prázdna a varovanie nevznikne —
+nemá sa čo zliať. Paritný test (`tests/pure/test_kovg1b_nohy_pravidla.rb`) drží helper a nákup na jednej odpovedi.
+
 **Nečíselný skalár výklopu NEZHODÍ dokument (Codex #333 kolo 2 P2).** `normalize_lift_rule!` prehnal `handle_allowance_kg` a `rod_double_from_kb_mm` cez `to_f` —
 na Hash/Array/`true` (pokazený alebo cudzí snapshot) to **vyhodí výnimku**, `project_rules` ju odchytil, vrátil `nil` a `ensure_project_rules!` potom projektové pravidlá
 **ticho nahradil globálnou knižnicou**. Od kola 2 ich čistí `normalize_lift_scalar!` s tou istou typovou kontrolou ako bunky tabuliek (`lift_row?`): nečíselná hodnota sa
@@ -197,6 +205,43 @@ posielala človeka robiť prácu, ktorá je už hotová, a protirečila tlačidl
 nové hodnoty platia hneď."; ostatné hinty sekcie (pásma F2, rad výsuvov) taký omyl nemali — hovoria o kritériách, nie o prestavbe.
 
 Nové prípady sú v `tests/fixtures/rules_validation_parity.json`. Testy: `tests/pure/test_kove2_ui.rb`, `tests/js/test_kove2_rules_editor.js`.
+
+**KOV-G1b (v0.9.59) — NOHY PODĽA ŠÍRKY, PRÍCHYT SOKLA a filter `applies_to.floor_height_min`.** Seed `nohy-zakladne` už nie je `fixed 4`, ale
+**`bands` s `input: 'width'`** (`max 999 → 4`, catch-all `→ 6`; konvencia „< 1000" je tá istá ako 849 pri závesoch, takže **neceločíselná** šírka
+999,5 padne do horného pásma — šírky korpusov sú v praxi celé milimetre a radšej o nohu viac). `applies_to.support %w[legs plinth]` aj
+`params_from_context {height: floor_height}` **ostávajú**: šírka rieši POČET, výška sokla naďalej KÓD (set `nohy-podla-sokla`, G1a). Nové seed pravidlo
+**`prichyt-sokla`** (`PLINTH_CLIP_RULE_ID`) vydáva `plinth_clip` rovnakými pásmami (`999 → 1`, catch-all `→ 2`) = **1 ks na začaté 4 nohy** (rozhodnutie
+O3; žiadny pomerový člen, D-109 ostáva po V1). Platí **len pri samostatnej soklovej lište**: `support %w[legs]` (sokel vpredu je súčasť korpusu a lišta
+neexistuje) a **`floor_height_min` 55,0** — pod tým je klzák 17–20 mm, ktorý žiadnu lištu nemá. Zóna 20–55 mm ostáva vedome nepokrytá **SETOM** (ORANGE
+„doplň pásmo" z G1a), pravidlo tam nohy vydáva ako doteraz.
+
+**`floor_height_min` je VOLITEĽNÝ filter `applies_to`, nie nový `kind`** (vzor `flap_dir` z E1b): `apply_rule` ho pre rolu `cabinet` vyhodnocuje vedľa
+`support`/`cabinet_type` cez `floor_height_ok?` — jedinú autoritu otázky. Kontext **bez použiteľnej výšky** filtru NEVYHOVIE (hádať by znamenalo objednať
+príchyt ku klzáku). `normalize_rules` prah typovo očistí (`normalize_floor_height_min!`): konečné **kladné** číslo → Float (mm), čokoľvek iné sa **zahodí
+aj s kľúčom** + `Engine.log` — pravidlo potom platí BEZ prahu, rovnako ako pravidlo, ktoré prah nikdy nemalo (vzor `width_warn_over`). Vedomý dôsledok:
+pokazený prah znamená príchyt aj tam, kde lišta nie je — taký riadok je v Nákupe **vidno** (na rozdiel od ticho chýbajúceho kovania) a editor prahu
+neexistuje, takže sa tam dá dostať len ručnou úpravou JSON. **STARŠÍ PLUGIN kľúč ZACHOVÁ, ale NEUPLATNÍ** (vetva „neznáme kľúče" v `normalize_rules`),
+takže by príchyt vydal aj pri sokli 17 mm; `std` sa **nemení** (žiadny nový kind), takže táto hranica downgrade je vedomá — rovnaké riziko ako pri
+`flap_dir` (knižnice sú per PC, updater D-52; D-48).
+
+**`SEED_VERSION` 5 → 6 a `LEGACY_SEED_SHAPES['nohy-zakladne']`.** Bez bumpu by `merge_seed` migráciu preskočil a existujúca knižnica by nové pravidlá
+nedala ani novým projektom. Starý tvar nôh (`fixed 4`, v1..v5) je v `LEGACY_SEED_SHAPES`, takže **preukázateľne nedotknuté** pravidlo dostane nový tvar
+(knižnica sama, projektový snapshot až cez „Doplniť nové predvoľby" → `project_seed_plan`); používateľom upravené (napr. 5 nôh) sa **nikdy** neprepíše.
+**`OVERLAP_OUTPUTS` = `hinge + lift + plinth_clip`:** vlastné zapnuté pravidlo na `plinth_clip` doplnenie seedu zastaví (inak dvojitý nákup) a runtime
+prekryv prizná ORANGE `hardware_rule_overlap` s vetou „druhé pravidlo **príchytov sokla**" (`overlap_noun`). `leg` v registri zámerne NIE JE — pravidlo
+nôh existuje od v1 (doplnenie podľa `rule_id` ho nezduplikuje) a dve legitímne pravidlá nôh by začali hlásiť ORANGE.
+
+**PRÍCHYT SA POČÍTA ZO ŠÍRKY KORPUSU, NIE Z POČTU NÔH (rozhodnutie O3, 2.9.2026).** `prichyt-sokla` je **druhé `bands` pravidlo na tú istú šírku**
+(< 1000 → 1 ks, od 1000 → 2) — pomerový člen „1 ks na začaté 4 nohy" je D-109 a vo V1 sa **neimplementuje**. Dôsledok, ktorý treba poznať: keď sa počet
+nôh zmení **ručným zámkom** (`hardware_overrides`) alebo **vlastným pravidlom** `nohy-zakladne` (napr. pevných 5), množstvo príchytov sa **nepohne**, lebo
+šírka je stále tá istá. Množstvá sa preto neprepočítavajú (to by bola tichá zmena kontraktu O3) — rozdiel sa **prizná**: `Bom.plinth_clip_check_issue`
+(Codex #338 kolo 1 N2) porovná `ceil(nohy / 4)` s vydanými príchytmi nad **uloženými** (teda účinnými, po overridoch) položkami a nezhodu ohlási ako ORANGE
+`plinth_clip_check` ([outputs.md](outputs.md)). Skrinka **bez** príchytu (klzák 17-20 mm, sokel vpredu, stará skrinka) mlčí — chýbajúci príchyt rieši
+`leg_stale`, nie tento nález.
+
+**`LEG_WIDTH_SEED_VERSION` = 6** je pevné číslo (ako `LIFT_SEED_VERSION`) pre migračnú bránu `leg_stale` — ORANGE „skrinka má nohy spočítané ešte pred
+pravidlom 4/6" ([outputs.md](outputs.md)). Editor pravidiel: [ui-lifecycle.md](ui-lifecycle.md). Testy: `tests/pure/test_kovg1b_nohy_pravidla.rb`,
+`tests/js/test_kovg1b_editor_nohy.js`, in-SketchUp sekcia `run_kovg`.
 
 
 **KOV-C2b (v0.9.31) — R2 EXKLUZIVITA.** `evaluate(..., suppress_slide_owners:)` dostáva množinu `owner_part_key` čiel, ktoré už majú položku výsuvu **z receptu**, a pravidlá
@@ -767,7 +812,7 @@ charakterizačný test). Päť častí:
   **Od v0.9.57 veta pri `height_selector` MENUJE odmietnutý pevný set.** Dovtedy znela v Nákupe, paneli aj Kontrole „set „“ nesedí so zásuvkou (výber setu nie je podľa
   výšky zásuvky)" — `resolve_set_id` vracal `set_id` nil a `unmapped_entry` preberal z `info` len `param value member_index member_label detail class_key`. Teraz resolver
   odmietnutý set posiela v **`info['set_id']`** (prvý prvok ostáva `nil`: set NIE JE účinný, nič sa z neho neobjedná, kontrakt `[nil, 'set_incompatible']` platí ďalej —
-  `effective_flap_set` ani iné volania, ktoré čítajú len `sid`, sa nemenia) a `unmapped_entry` ho preberie **LEN keď resolver set nevybral (`sid` nil) a LEN ako neprázdny
+  `effective_item_set` ani iné volania, ktoré čítajú len `sid`, sa nemenia) a `unmapped_entry` ho preberie **LEN keď resolver set nevybral (`sid` nil) a LEN ako neprázdny
   String** — účinný set má vždy prednosť a záznamy bez `set_id` v `info` (`class_unmapped`, `mapping_invalid`, `selector_unresolved`, …) ostávajú bez mena ako doteraz
   (golden fixtúry a testy C2a/D1a nezmenené). Platí pre obe úrovne (projektové mapovanie aj override skrinky). Selektor podľa **iného** parametra jeden set nemá, preto meno
   nenesie (zápisová cesta triedneho kľúča, `class_key_value_problem`, ho pre set s výškovým variantom aj tak odmieta). Stráži R6 v `tests/pure/test_incompatible_detail_sk.rb`

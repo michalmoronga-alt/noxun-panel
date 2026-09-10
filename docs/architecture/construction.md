@@ -241,6 +241,17 @@ vydal. Neopravuje sa to za používateľa — je to vec, o ktorej má vedieť.
 triedny override skrinky > triedny kľúč projektu) a členovia rozlíšení podľa parametrov položky (`code_by_param lift_class`/`arm_class`, `quantity_from` 0 = člen sa
 nevydá). Override skrinky prichádza z `cfg[:hardware_sets]`, stav setov zo snapshotu projektu — **žiadne IO navyše**.
 
+**KORPUSOVÁ VETVA: `plinth_clip_manual_duplicate` (KOV-G1b, Codex #338 kolo 1 N3).** Tá istá úvaha platí na **príchyt sokla** — G1a vystavila produkt aj set
+skôr, než vzniklo pravidlo, takže skrinka môže mať kód `950` v `hardware_manual` a od G1b k nemu pribudne aj automat. `attach_manual_duplicate_warnings!` preto
+beží **v dvoch nezávislých vetvách** (skrinka bez čiel žiadny výklop nemá): `emitted_plinth_clip_codes(plan, cfg, model)` vezme **korpusové** položky
+`plinth_clip` (bez `owner_part_key`) a nechá si od **`HardwareSets.cabinet_emitted_codes`** ([hardware.md](hardware.md)) povedať plochú množinu kódov, ktoré
+automat naozaj vydá; `plinth_clip_duplicate_warnings(list, emitted)` z toho spraví jeden ORANGE na kód. **Vlastník sa NEFILTRUJE** (na rozdiel od výklopov):
+nákupný riadok agreguje podľa **kódu**, takže ručná položka pripnutá na dielec sa zlieva rovnako.
+
+**AUTOMAT SA TU NEPOTLÁČA — a je to zámer.** Pri výklopoch potlačí automat len **úplná** ručná zostava, teda zostava s mechanizmom. Set príchytu má **jediného
+člena**, takže „úplná zostava" by tu znamenala „akýkoľvek ručný príchyt" a jeden ručne doplnený kus by ticho zrušil **celý** počet z pravidla (široká skrinka
+2 ks → 1 ks). Zliatie je oproti tomu v Nákupe **vidno** (riadok nesie `adhoc_quantity`), preto sa radšej ohlási, než potlačí.
+
 **ORANGE, KEĎ SA PRAVIDLÁ NEDAJÚ ZMRAZIŤ (Codex #329 kolo 2 P1).** `build_into` po `Construction.build_plan` volá **`attach_rules_state_warning!(plan, model)`**
 (vzor `attach_abs_warnings!`: doplní warning a plán sa RE-VALIDUJE). Warning `hardware_rules_library_incompatible` vznikne LEN v stave, ktorý sa sám neopraví —
 projekt NEMÁ snapshot pravidiel a globálna knižnica je z novšieho pluginu, takže ju `HardwareRules.ensure_project_rules!` odmietol zmraziť

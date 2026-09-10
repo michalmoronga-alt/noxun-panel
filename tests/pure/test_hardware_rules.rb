@@ -46,8 +46,10 @@ NxTest.test('hardware_rules: seed sa normalizuje (bands zoradene, series bez nek
   r = NxHW.rules
   # D-90: seed v3 pridal 2 pravidla uchytkoveho profilu (dvierka + zasuvkove cela)
   # KOV-E1b: seed v5 pridal vyklopy (`vyklopy-aventos`) a zavesy sklopu (`zavesy-sklop`)
-  NxTest.assert_equal(9, r.length,
-                      'seed ma 9 pravidiel (D1: +zavesenie hornej, +podperky; D-90: +2x profil; '                       'KOV-E1b: +vyklopy, +sklop)')
+  # KOV-G1b: seed v6 pridal prichyt sokla (`prichyt-sokla`)
+  NxTest.assert_equal(10, r.length,
+                      'seed ma 10 pravidiel (D1: +zavesenie hornej, +podperky; D-90: +2x ' \
+                      'profil; KOV-E1b: +vyklopy, +sklop; KOV-G1b: +prichyt sokla)')
   bands = r.find { |x| x['rule_id'] == 'zavesy-podla-vysky' }['bands']
   # KOV-F1: NOXUN tabulka (catch-all `nil` ostava kvoli starym citacom).
   NxTest.assert_equal([849.0, 1700.0, 2200.0, 2400.0, 2600.0, 2800.0, nil],
@@ -201,7 +203,9 @@ NxTest.test('hardware_rules: build_plan naplni hardware (nohy + zavesy + vysuvy 
   )
   plan = Noxun::Engine::Construction.build_plan(cfg, 'CAB-001')
   types = plan[:hardware].map { |h| h['generic_type'] }.sort
-  NxTest.assert_equal(%w[hinge leg slide], types, "cakal som 3 kategorie, mam: #{types.inspect}")
+  # KOV-G1b: skrinka na nohach so soklom 100 mm dostane aj PRICHYT soklovej listy.
+  NxTest.assert_equal(%w[hinge leg plinth_clip slide], types,
+                      "cakal som 4 kategorie, mam: #{types.inspect}")
   hinge = plan[:hardware].find { |h| h['generic_type'] == 'hinge' }
   NxTest.assert_equal('front:F2/wing:single', hinge['owner_part_key'])
   slide = plan[:hardware].find { |h| h['generic_type'] == 'slide' }
@@ -242,8 +246,9 @@ NxTest.test('hardware_rules: D-18 none riadok nedostane ziadne kovanie (build_pl
     ] }
   )
   plan = Noxun::Engine::Construction.build_plan(cfg, 'CAB-001')
-  NxTest.assert_equal(%w[hinge leg slide], plan[:hardware].map { |h| h['generic_type'] }.sort,
-                      'kategorie: zavesy dvierok + nohy + vysuv zasuvky')
+  NxTest.assert_equal(%w[hinge leg plinth_clip slide],
+                      plan[:hardware].map { |h| h['generic_type'] }.sort,
+                      'kategorie: zavesy dvierok + nohy + prichyt sokla + vysuv zasuvky')
   owners = plan[:hardware].map { |h| h['owner_part_key'] }
   NxTest.assert(owners.none? { |o| o.to_s.start_with?('front:F2') },
                 "none riadok F2 nesmie vlastnit kovanie, owneri: #{owners.inspect}")
@@ -282,8 +287,9 @@ NxTest.test('hardware_rules: D-18 none-only korpus — ziadne frontove kovanie, 
                 'plan nema ziadny front dielec')
   NxTest.assert(plan[:hardware].none? { |h| h['owner_part_key'].to_s.start_with?('front:') },
                 'ziadna polozka kovania nepatri frontu')
-  NxTest.assert_equal(%w[leg], plan[:hardware].map { |h| h['generic_type'] }.uniq.sort,
-                      'so seed pravidlami ostavaju len nohy korpusu')
+  # KOV-G1b: korpusove polozky su od G1b DVE — nohy a prichyt soklovej listy.
+  NxTest.assert_equal(%w[leg plinth_clip], plan[:hardware].map { |h| h['generic_type'] }.uniq.sort,
+                      'so seed pravidlami ostava len korpusove kovanie (nohy + prichyt)')
   NxTest.assert_equal(1, plan[:front_items].length)
   NxTest.assert_equal('none', plan[:front_items][0]['type'])
   NxTest.assert_close(616.0, plan[:front_items][0]['height'], 0.01, 'nika drzi vysku radu')
