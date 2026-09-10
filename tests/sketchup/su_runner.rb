@@ -18051,7 +18051,14 @@ module NoxunSuRunner
     ok('KOV-G2 session: projektova predvolba noh sa prepisala', wrote)
     ok('KOV-G2 session: memo drzi, kym o zmene nikto nepovie',
        e::GhostTool.state_payload(s3)['legs_short'].to_s == before)
-    e::Panel.push_hardware_sets
+    # Hook zneplatnenia zije v `push_hardware_sets`, ktory ale zacina guardom
+    # `dialog_alive?` — v behu BEZ otvoreneho panela by nespravil nic a scenar
+    # by meral prostredie, nie kod. Ked panel bezi, ide sa REALNOU cestou.
+    if e::Panel.respond_to?(:dialog_alive?) && e::Panel.dialog_alive?
+      e::Panel.push_hardware_sets
+    else
+      e::GhostTool.invalidate_legs_summary!
+    end
     after = e::GhostTool.state_payload(s3)['legs_short'].to_s
     ok("KOV-G2 session: po zneplatneni hovori pasik NOVU predvolbu (#{after})",
        after != before && after.include?('Klzák'))
