@@ -1215,9 +1215,11 @@ end
 # 14 — SEED A GOLDEN
 # ============================================================================
 
-NxTest.test('KOV-E1b (14): `SEED_VERSION` 5 — knižnica v4 dostane OBE nové pravidlá') do
+NxTest.test('KOV-E1b (14): seed migrácia z v4 dá knižnici OBE nové pravidlá výklopov') do
   c = NxKovE1b
-  NxTest.assert_equal(5, c::HR::SEED_VERSION)
+  # KOV-G1b: `SEED_VERSION` je od G1b 6 (prichyt sokla) — presne cislo strazi
+  # sada KOV-G1b; tu ide o to, ze migracia zo STAREJ kniznice pravidla doplni.
+  NxTest.assert(c::HR::SEED_VERSION >= 5, 'seed verzia je aspoň 5 (výklopy)')
   NxTest.assert_equal(3, c::HR::STD, 'nový kind si vyžiadal aj `std`')
   mine = { 'rule_id' => 'moje-pravidlo', 'enabled' => true, 'output' => 'leg',
            'kind' => 'fixed', 'quantity' => 6, 'applies_to' => { 'role' => 'cabinet' } }
@@ -1230,7 +1232,8 @@ NxTest.test('KOV-E1b (14): `SEED_VERSION` 5 — knižnica v4 dostane OBE nové p
   NxTest.assert(ids.include?(c::LIFT_RULE) && ids.include?(c::FALL_RULE), ids.inspect)
   NxTest.assert_equal(6, merged.find { |r| r['rule_id'] == 'moje-pravidlo' }['quantity'],
                       'používateľské pravidlo ostáva nedotknuté')
-  NxTest.assert_equal([merged, false], c::HR.merge_seed(merged, 5), 'z v5 sa už nič nedopĺňa')
+  NxTest.assert_equal([merged, false], c::HR.merge_seed(merged, c::HR::SEED_VERSION),
+                      'z aktuálnej verzie sa už nič nedopĺňa')
 end
 
 NxTest.test('KOV-E1b (14): pravidlo `lift_class` prejde normalizáciou aj zápisovou bránou') do
@@ -1306,7 +1309,9 @@ NxTest.test('KOV-E1b (14): GOLDEN — zákazka BEZ výklopov sa nezmenila') do
                                                     'wings' => '1' }] })
   pl = c::CN.build_plan(cfg, 'CAB-1', hardware_rules: c.rules, materials: c::MAT)
   types = pl[:hardware].map { |h| h['generic_type'] }.uniq.sort
-  NxTest.assert_equal(%w[hinge leg], types, "žiadny výklop nepribudol (#{types.inspect})")
+  # KOV-G1b: skrinka na nohách má aj `plinth_clip` — výklop stále žiadny.
+  NxTest.assert_equal(%w[hinge leg plinth_clip], types,
+                      "žiadny výklop nepribudol (#{types.inspect})")
   NxTest.assert_equal([], Array(pl[:hardware_conflicts]))
   hinge = pl[:hardware].find { |h| h['generic_type'] == 'hinge' }
   NxTest.assert_equal('zavesy-podla-vysky', hinge['rule_id'], 'dvierka berie pôvodné pravidlo')

@@ -130,9 +130,12 @@ NxTest.test('build_plan: realny plan z normalize({}) nesie schema + hardware[] +
   plan = Noxun::Engine::Construction.build_plan(cfg, 'CAB-001')
   NxTest.assert_equal(Noxun::Engine::BuildPlan::SCHEMA, plan[:schema])
   # V0.4: default dolna (floor 100, bez cel) ma zo seed pravidiel prave nohy 4 ks
-  NxTest.assert_equal(1, plan[:hardware].length, "cakal som 1 polozku, mam #{plan[:hardware].inspect}")
+  # KOV-G1b: + PRICHYT soklovej listy (sokel 100 mm, skrinka na nohach) 1 ks.
+  NxTest.assert_equal(2, plan[:hardware].length, "cakal som 2 polozky, mam #{plan[:hardware].inspect}")
   NxTest.assert_equal('leg', plan[:hardware].first['generic_type'])
   NxTest.assert_equal(4, plan[:hardware].first['quantity'])
+  NxTest.assert_equal('plinth_clip', plan[:hardware].last['generic_type'])
+  NxTest.assert_equal(1, plan[:hardware].last['quantity'])
   NxTest.assert(plan[:warnings].is_a?(Array), 'warnings musi byt pole')
   NxTest.assert_equal([], plan[:warnings], 'default dolna skrinka nema ziadne upozornenia')
 end

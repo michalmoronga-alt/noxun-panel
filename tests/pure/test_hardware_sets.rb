@@ -633,9 +633,10 @@ NxTest.test('hw pravidla D1b: merge_project_seed! doplni nove + obnovi nezmenene
   NxTest.assert_equal(:updated, status)
   # D-90: seed v3 doplna aj obe pravidla uchytkoveho profilu
   # KOV-E1b: seed v5 doplna aj vyklopy a zavesy sklopu
-  NxTest.assert_equal(%w[podperky-policove uchytkovy-profil uchytkovy-profil-zasuvky
-                         vyklopy-aventos zavesenie-hornej-skrinky zavesy-podla-vysky
-                         zavesy-sklop],
+  # KOV-G1b: seed v6 doplna aj prichyt sokla
+  NxTest.assert_equal(%w[podperky-policove prichyt-sokla uchytkovy-profil
+                         uchytkovy-profil-zasuvky vyklopy-aventos
+                         zavesenie-hornej-skrinky zavesy-podla-vysky zavesy-sklop],
                       added.sort, 'chybajuce seed pravidla doplnene')
   NxTest.assert_equal(['vysuvy-nl-podla-hlbky'], refreshed, 'nezmeneny v1 seed obnoveny')
   rules = hr.project_rules(m)
