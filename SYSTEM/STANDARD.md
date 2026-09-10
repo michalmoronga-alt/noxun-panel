@@ -413,8 +413,13 @@ Dve nezávislé vrstvy (GPT debata sekcie 16–17):
 - **Pravidlá kovania (rules engine)** — rozhodujú, **aký typ a koľko kusov**. Konkrétne kovanie **nikdy natvrdo v definícii korpusu.**
 
 **Odkaz produktu (CENY-KOV-A):** globálny katalóg kovania má voliteľné `product_url` pre ručne spravovaný odkaz (http/https). `demos_url` ostáva overenou väzbou konektora a má pri otvorení prednosť.
-Samotné uloženie alebo otvorenie `product_url` neoveruje cenu, nemení dátum a nespúšťa parser. Prázdny odkaz sa neukladá; jeho nový obsah vyžaduje lazy schema 3, aby starší plugin údaj pri úprave nestratil.
+Samotné uloženie alebo otvorenie `product_url` neoveruje cenu a nespúšťa parser. Zmena zdroja zruší predchádzajúce ručné overenie; obyčajné otvorenie nič nemení. Prázdny odkaz sa neukladá; nový obsah vyžaduje lazy schema 3.
 Odkaz sa neprenáša do konfigurácie skrinky ani snapshotu setov: katalógový kód ostáva identitou, URL aj cena sa dohľadávajú v globálnom katalógu.
+
+**Ručné overenie ceny (CENY-KOV-B):** server uloží `price_check_method: 'manual'` spolu s `price_checked_at` a cenou v jednom katalógovom zápise až po výslovnom potvrdení používateľa.
+Metadáta prijíma výlučne overovací tok, nie všeobecný create/patch. Platí pre položku bez `demos_url`, s platným `product_url`, konečnou nezápornou cenou a známou MJ; dátum určí server.
+Zmena ceny/MJ/zdroja/dodávateľa ručné overenie zruší, názov/poznámka/klasifikácia ho zachovajú. Obsah s metódou vyžaduje lazy schema 4; neznáma metóda alebo typ sú nečitateľné.
+Vek ≥ nastaviteľný prah (default 30 dní) vyžaduje kontrolu. Chýbajúce/neplatné/budúce potvrdenie ani chýbajúca cena nie sú aktuálne; ručný pôvod sa od veku odlišuje. DEMOS a materiály/ABS zachovávajú svoj tok.
 
 ### 6.2 Two-phase: generický flag → katalógový kód
 

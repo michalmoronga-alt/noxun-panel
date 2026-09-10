@@ -456,13 +456,18 @@ BEZ `demos_url` aj BEZ `price_checked_at` (tie `create_item` z klientskych atrib
 **Katalóg je GLOBÁLNY** (`%APPDATA%`), takže nezávisí od dokumentu — zákazky sa dotýka až cez sety (`hardware_sets`, projektový snapshot na modeli).
 
 **Odkazy produktu (CENY-KOV-A, v0.10.4).** Voliteľné `product_url` je jeden ručne spravovaný odkaz http/https; `demos_url` ostáva overenou väzbou Demos konektora a pri
-otvorení má prednosť. Uloženie prázdnej adresy pole odstráni. Cena ani dátum sa uložením alebo otvorením odkazu nepotvrdzujú; všeobecný odkaz sa nikdy neposiela do parsera.
+otvorení má prednosť. Uloženie prázdnej adresy pole odstráni. Cena ani dátum sa uložením alebo otvorením odkazu nepotvrdzujú; zmena zdroja zruší staré ručné potvrdenie. Všeobecný odkaz sa nikdy neposiela do parsera.
 Ikonu majú všetky katalógové položky v Kovaní aj v Rozpočte, nezávisle od aktuálnosti ceny. Chýbajúci odkaz má jantárový stav a vedie do úpravy presného kódu na URL pole;
 platný odkaz sa pred otvorením znovu dohľadá a overí na serveri. Klient neposiela autoritatívnu URL. Voľné rozpočtové položky bez katalógového kódu tento kanál nepoužívajú.
 
 **Čerstvý dokument sa pred zápisom overuje celý.** Katalógový zámok + revízia upravovaného riadku samy nestačia: čítací `load` môže odfiltrovať nečitateľný záznam.
 Preto zápis musí odmietnuť neplatný obsah čerstvého nefiltrovaného dokumentu aj po predchádzajúcom cachovanom stave `:ok`; úprava položky A nesmie vymazať poškodenú B.
 Pri chýbajúcom primári overuje rovnakým pravidlom záložný zdroj. Čítanie produktu používa čerstvý primár alebo platnú zálohu bez migrácie, takže read-only katalóg stále vie otvoriť uložený odkaz.
+
+**Ručné potvrdenie (CENY-KOV-B, v0.10.5).** Samostatný overovací zápis uloží používateľom potvrdenú cenu + serverový UTC dátum `price_checked_at` + `price_check_method: 'manual'` atomicky pod katalógovým zámkom.
+Vyžaduje čerstvú `row_rev`, platný uložený `product_url`, známu MJ a konečnú nezápornú cenu (nula je platná, prázdno nie); položka s Demos väzbou sa touto cestou nepotvrdzuje. Čas ani metóda neprichádzajú od klienta.
+Create klientské stampy zahodí, bežná normalizácia ich zachová. Zmena ceny/MJ/URL/dodávateľa ručné overenie zruší, bežné premenovanie/poznámka/klasifikácia nie. Potvrdená Demos väzba odstráni starú ručnú metódu aj URL.
+Čerstvý nefiltrovaný dokument odmietne neznámu hodnotu alebo typ metódy aj na inom riadku. Zmena katalógovej ceny nemá modelový Undo krok; existujúce projekty ju použijú pri najbližšom prepočte.
 
 **Od ŠT-3a-2 ho ukazuje JEDINÉ UI:** sekcia `hw` okna Štúdio (Š16 — pohľady Položky · Sety). Okno „Katalóg kovania" ZANIKLO; serverová autorita ostala v
 `hardware_catalog_dialog.rb` (modul sa NEPREMENOVÁVA — vzor audit #21 zo ŠT-2a), a to vrátane **troch MODELOVÝCH zápisov** predvolieb setov projektu (`hws_map_project` ·
@@ -475,8 +480,8 @@ KOV-B2 filter, ktorý sa hľadaním nedá zopakovať). Skrutky ani podperky výr
 
 Tri veci, ktoré k tomu patria:
 
-- **`SCHEMA_CURRENT` je 3, ale marker je LAZY podľa OBSAHU** (`schema_for`, vzor `HardwareSets.snapshot_std` a materiálov): katalóg BEZ výrobcov a odkazov sa stampuje `1`;
-  klasifikácia výrobca/rada vyžaduje `2`, neprázdne `product_url` vyžaduje `3`. Starší plugin novší obsah odmietne ako read-only („aktualizuj plugin"), NIKDY ticho neoreže.
+- **`SCHEMA_CURRENT` je 4, ale marker je LAZY podľa OBSAHU** (`schema_for`, vzor `HardwareSets.snapshot_std` a materiálov): katalóg BEZ výrobcov a odkazov sa stampuje `1`;
+  klasifikácia výrobca/rada vyžaduje `2`, neprázdne `product_url` vyžaduje `3`, uložená metóda overenia vyžaduje `4`. Starší plugin novší obsah odmietne ako read-only („aktualizuj plugin"), NIKDY ticho neoreže.
   Spätná čitateľnosť sa teda blokuje len tam, kde je čo stratiť.
 - **Ne-String hodnota = nečitateľné položky.** `valid_stored_item?` vyžaduje String (alebo chýbajúci kľúč) — novšia verzia môže dať `manufacturer` iný TVAR (objekt s id
   a názvom) a naše čítanie by ho ticho zmenilo na nezmyselný reťazec. `assess!` z toho urobí `:read_only`.

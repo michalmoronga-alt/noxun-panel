@@ -2103,6 +2103,11 @@ chýbajúci odkaz sa ukáže jantárovo a otvorí existujúci editor konkrétneh
 editor položky. Preklik z Rozpočtu nesmie závisieť od toho, či je daný kód práve viditeľný v strome katalógu. Oneskorená odpoveď sa neprijme po odchode z pôvodnej sekcie,
 zmene dokumentu ani otvorení iného formulára. Demos väzba zostáva v pôvodnom overovacom toku; obyčajný preklik pri nej nezapisuje cenu ani dátum.
 
+**CENY-KOV-B (v0.10.5):** samostatné `hw-manual-check` z Katalógu aj Rozpočtu otvorí spoločný NXModal: kód/názov/dodávateľ, cena s DPH za pevnú MJ a predchádzajúce overenie.
+Po príprave formulára otvorí uložený produkt v externom prehliadači; spätný fokus sa nevynucuje. Chýbajúci odkaz vedie do pôvodného editora URL. Výslovné potvrdenie k dnešku odošle cenu a revíziu, čas určí server.
+Počas submitu chráni modal existujúci `busyLock`; každé odmietnutie odomkne ovládanie. Výsledok patrí tokenu/formuláru/modelu, konflikt obnoví aktuálny záznam bez opätovného odoslania starej ceny.
+Ručné ceny majú vlastnú akciu aj v zozname upozornení, potvrdený riadok viditeľný dátum a pôvod. Ak zostali iba ručné kontroly, hlavné tlačidlo otvorí tento zoznam; Demos beh ostáva samostatný.
+
 **Po modelovom zápise ide `after_sets_change(model)` → `refresh_if_open(bump: true)` — a to STAČÍ:** predvoľba setu nemení GEOMETRIU, takže `Panel.push_selected` (dedup kópií) sa
 vedome NEVOLÁ; jantár „Obnoviť" po vlastnom prepočte NEZOŽLTNE, lebo `push_state` si `@pushed_epoch` ukladá AŽ po zbere a vlastnú transakciu tak pohltí.
 
