@@ -777,8 +777,7 @@
   <div class="nxmodal-card">
     <div class="nxmodal-title">Uložiť ako šablónu</div>
     <div class="row"><label>Názov</label><input id="tplSaveName" type="text"><span class="unit"></span></div>
-    <!-- UI-B3: TYP je jediny udaj, ktory sa v modale nastavuje nad ramec nazvu —
-         urcuje, pod ktorym typom sa sablona ponuka pri vkladani (zoznam je
+    <!-- UI-B3: TYP urcuje, pod ktorym typom sa sablona ponuka pri vkladani (zoznam je
          typovo filtrovany). Predvypln sa z typu oznacenej skrinky; whitelist
          a hlaska o rozdiele su na strane Ruby. -->
     <div class="row"><label>Typ</label>
@@ -786,7 +785,8 @@
         <option value="lower">Dolná</option>
         <option value="upper">Horná</option>
       </select><span class="unit"></span></div>
-    <div class="hint">Uloží sa konštrukcia, zóny, čelá s medzerami a nastavené materiály skrinky. Úpravy jednotlivých dielcov (materiál/ABS) a kovanie sa neukladajú — viažu sa na konkrétnu skrinku.</div>
+    <label class="tplsavehw"><input id="tplSaveHardware" type="checkbox" checked> Uložiť aj kovanie (sety a ručné položky)</label>
+    <div class="hint">Uloží sa konštrukcia, zóny, čelá s medzerami a nastavené materiály skrinky. Úpravy jednotlivých dielcov (materiál/ABS) sa neukladajú. Kovanie podľa voľby: sety a ručné položky áno, ručné zámky (dĺžka výsuvu, výška a počty) nie.</div>
     <div class="nxmodal-warn" id="tplSaveWarn" style="display:none">Šablóna s týmto názvom už existuje — Uložiť ju prepíše.</div>
     <div class="btnrow">
       <button class="primary" onclick="saveTemplateAs()">Uložiť</button>

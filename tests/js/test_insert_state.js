@@ -172,6 +172,18 @@ ins.setHardware(ins.composeSource(DEFAULTS, TPL)); // sablona bez kovania
 eq(ins.hardwarePayload(), {}, 'prepnutie na sablonu bez ad-hoc poloziek stav vycisti');
 eq(ins.HARDWARE_LIST_KEYS, ['hardware_manual'], 'zoznam POLOVYCH klucov kovania je kontrakt');
 
+// KOV-I: po plnej sablone sa explicitna geometricka sablona vycisti cela,
+// vratane rucnych poloziek; serverovy suhrn je iba metadata dlazdice.
+ins.setHardware(Object.assign({}, TPL_HW, TPL_ADHOC));
+eq(Object.keys(ins.hardwarePayload()).sort(), ['hardware_manual', 'hardware_set_defs', 'hardware_sets'],
+  'vychozi vklad ma sety aj rucne polozky');
+const KOVI_GEOMETRY = deepFreeze({ name: 'Bez kovania', kind: 'cabinet',
+  config: { type: 'lower', width: 730 }, hardware: { has: false, labels: [] } });
+ins.setHardware(ins.composeSource(DEFAULTS, KOVI_GEOMETRY.config));
+eq(ins.hardwarePayload(), {}, 'sablona ulozena bez kovania neodosle ziaden z troch klucov');
+ins.setHardware({ hardware: { has: true, labels: ['zasuvky Atira'] } });
+eq(ins.hardwarePayload(), {}, 'transient suhrn sa nikdy nedostane do vkladania');
+
 // KOV-H2: ZOBRAZOVACIE projekcie ad-hoc poloziek (`hardware_manual_view`,
 // `hardware_manual_owners`) sa do vkladania NEDOSTANU. Su to udaje SERVERA pre
 // obrazovku (zive ceny, popisky vlastnika, ponuka dielcov) — keby ich vklad
