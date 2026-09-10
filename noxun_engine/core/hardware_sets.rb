@@ -4885,7 +4885,7 @@ module Noxun
           owner = it['owner_part_key'].to_s
           next if owner.empty?
 
-          set = effective_flap_set(it, gt, cab, mapping, sets)
+          set = effective_item_set(it, gt, cab, mapping, sets)
           next if set.nil?
 
           bucket = ((out[owner] ||= {})[gt] ||= {})
@@ -4896,6 +4896,45 @@ module Noxun
         # Citacia cesta: pokazeny snapshot nesmie zhodit stavbu. Bez kodov
         # varovanie proste nevznikne (ORANGE, nie brana).
         Engine.log_error(e, 'HardwareSets.flap_emitted_codes') if defined?(Engine)
+        {}
+      end
+
+      # --- KOV-G1b (Codex #338 kolo 1 N3): KODY KORPUSOVEJ POLOZKY -----------
+      #
+      # To iste, co `flap_emitted_codes`, ale pre polozku, ktora NEVISI NA
+      # DIELCI (`owner_part_key` je prazdny) — dnes prichyt sokla. Vysledok je
+      # preto PLOCHA mnozina kodov, nie mapa podla vlastnika.
+      #
+      # Podklad ORANGE `plinth_clip_manual_duplicate`: rucna katalogova polozka
+      # s TYM ISTYM kodom sa v nakupe zlieva so setovym riadkom (`add_row` aj
+      # `add_adhoc_row` agreguju podla kodu), takze skrinka objedna dva kusy
+      # namiesto jedneho — a bez tohto zoznamu by o tom nikto nevedel.
+      #
+      # `overrides` = override mapa JEDNEJ skrinky (`config.hardware_sets`).
+      # ZIADNE IO — cita sa len pamat/model, aby to zvladla aj stavba.
+      #
+      # -> { kod => true }
+      def cabinet_emitted_codes(hardware_items, state, generic_type, overrides: {})
+        gt = generic_type.to_s
+        mapping = state.is_a?(Hash) && state['mapping'].is_a?(Hash) ? state['mapping'] : {}
+        sets    = state.is_a?(Hash) && state['sets'].is_a?(Hash) ? state['sets'] : {}
+        cab = single_cabinet_overrides(overrides)
+        out = {}
+        Array(hardware_items).each do |it|
+          next unless it.is_a?(Hash)
+          next unless it['generic_type'].to_s == gt
+          next if it['quantity'].to_i < 1
+
+          set = effective_item_set(it, gt, cab, mapping, sets)
+          next if set.nil?
+
+          emitted_member_codes(set, it).each { |code| out[code] = true }
+        end
+        out
+      rescue StandardError => e
+        # Citacia cesta: pokazeny snapshot nesmie zhodit stavbu. Bez kodov
+        # varovanie proste nevznikne (ORANGE, nie brana).
+        Engine.log_error(e, 'HardwareSets.cabinet_emitted_codes') if defined?(Engine)
         {}
       end
 
@@ -4911,7 +4950,9 @@ module Noxun
       # (chybajuce mapovanie, chybajuca definicia, iny typ setu, nesulad
       # klasifikacie, dlzkove kovanie). Ktorakolvek z nich znamena, ze nakup
       # z tejto polozky nevyda ANI JEDEN riadok — a teda ani nema co zliat.
-      def effective_flap_set(it, generic_type, cabinet_overrides, mapping, sets)
+      # NIE JE vyklopovy (do KOV-G1b sa volal `effective_flap_set`): pyta sa ho
+      # aj `cabinet_emitted_codes` za korpusovy prichyt sokla.
+      def effective_item_set(it, generic_type, cabinet_overrides, mapping, sets)
         sid, = resolve_set_id(generic_type, it, cabinet_overrides, mapping)
         return nil if sid.nil?
 

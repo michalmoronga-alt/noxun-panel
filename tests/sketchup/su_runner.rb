@@ -17706,6 +17706,7 @@ module NoxunSuRunner
       kovg_zona(model)
       kovg_sokel_vpredu(model)
       kovg_prichyt_vs_nohy(model)
+      kovg_rucny_prichyt(model)
     ensure
       cleanup(model)
     end
@@ -17848,6 +17849,43 @@ module NoxunSuRunner
     e::CabinetBuilder.rebuild(model, inst, par2)
     ok("KOV-G prichyt-vs-nohy: po zruseni zamku nalez zhasne (#{kovg_hw(inst).inspect})",
        kovg_hw(inst) == { 'leg' => 4, 'plinth_clip' => 1 } && kovg_clip_check(model).empty?)
+    cleanup(model)
+  end
+
+  # --- 6) RUCNY PRICHYT VEDLA AUTOMATU (Codex #338 kolo 1 N3) ----------------
+  #
+  # G1a vystavila produkt aj set skor, nez vzniklo pravidlo, takze stara
+  # skrinka moze mat kod prichytu (950) v `hardware_manual`. Od G1b k nemu
+  # pribudne aj AUTOMAT a nakup oba riadky zlepi podla kodu. Automat sa
+  # NEPOTLACA (set ma jedineho clena — potlacenie by ticho zrusilo cely pocet
+  # z pravidla), takze scenar overuje, ze v nakupe su DVA kusy a Kontrola
+  # o zliati POVIE.
+  KOVG_CLIP_CODE = '950'
+
+  def kovg_rucny_prichyt(model)
+    inst = kovg_build(model, 600.0, 100.0, 'hardware_manual' => [
+                        { 'id' => 'MAN-1', 'source' => 'catalog', 'code' => KOVG_CLIP_CODE,
+                          'qty' => 1, 'name' => 'Príchyt sokla', 'unit' => 'ks',
+                          'owner_part_key' => nil }
+                      ])
+    return ok('KOV-G rucny-prichyt: vlozenie korpusu', false) unless inst
+
+    ok("KOV-G rucny-prichyt: automat sa NEPOTLACIL (#{kovg_hw(inst).inspect})",
+       kovg_hw(inst) == { 'leg' => 4, 'plinth_clip' => 1 })
+    ws = Array((e::Store.config(inst) || {})['warnings'])
+         .select { |w| w.is_a?(Hash) && w['code'].to_s == 'plinth_clip_manual_duplicate' }
+    ok("KOV-G rucny-prichyt: stavba prilozila ORANGE o zliati (#{ws.length})",
+       ws.length == 1 && ws.first['message'].to_s.include?(KOVG_CLIP_CODE))
+    row = Array(kovg_expansion(model)['rows']).find { |r| r['code'].to_s == KOVG_CLIP_CODE }
+    ok("KOV-G rucny-prichyt: nakup ma JEDEN riadok s 2 kusmi "        "(#{row && row['quantity']} / rucne #{row && row['adhoc_quantity']})",
+       row && row['quantity'].to_i == 2 && row['adhoc_quantity'].to_i == 1)
+    ok('KOV-G rucny-prichyt: a NIC sa tym nezastavuje (ziadna cervena)',
+       kovg_ctrl(model).none? { |i| i['severity'] == 'red' })
+    ok('KOV-G rucny-prichyt: Kontrola vetu ukaze v kategorii „stavba“',
+       kovg_ctrl(model).any? do |i|
+         i['category'] == e::Validation::CAT_BUILD &&
+           i['message_sk'].to_s.include?(KOVG_CLIP_CODE)
+       end)
     cleanup(model)
   end
 
@@ -19039,7 +19077,7 @@ module NoxunSuRunner
     run_kovw(model)          # KOV-W: hmotnost dielcov v ZIVOM retazci katalog -> skrinka -> snapshoty -> Inspector -> Kontrola: pri znamej hustote sedi sucet zo snapshotov s planom (±0,05 kg) a nic sa neuklada do modelu; typ BEZ hustoty (nie UNI) da tazsi odhad, PRESNE JEDEN build warning na skrinku a ORANGE v Kontrole; UNI dielec odhad zachova, ale hmotnostny nalez sa v Kontrole POTLACI (hlasi sa len „materiál neurčený"); Spat vracia hmotnost spolu s materialom
     run_kovf(model)          # KOV-F1: zavesy podla NOXUN tabulky — pocty z REALNEJ sirky kridla (1250 -> 3, 850 -> 3, kridlo 800 x 700 -> 2+1), varovanie sirky nad 800 mm v Kontrole, Tip-On celo dostane P2O set + PRESNE JEDEN piest na kridlo (klasicke celo klasicky set), dvierka nad tabulkou vydaju polozku 7 ks + RED „mimo tabuľky" so zastavenym nakupom/rozpoctom/ponukou (VEPO bezi dalej), rucny zamok poctu RED zhasne v JEDNOM kroku Spat (aj Redo), skrinka ULOZENA PRED tabulkou (schema 8) dostane RED „prestav ju" so zastavenymi 3 vystupmi a prestavba ho zhasne, vlastny set skrinky prezije prestavbu
     run_kove(model)          # KOV-E1b: vyklopy a sklopy — skrinka 600 x 400 x 320 s vyklopom da 22K2300 + kompletny set (mechanizmus, prichyt, krytky), prestavba na HL top pri vyske 600 da 22L2500 + 22L3800 + JEDNU tyc (KH je z KORPUSU, nie z cela), siroka skrinka 1200 dve tyce + predlzenie, Spat/Redo vratia stav NARAZ, reopen (prestavba z ULOZENEHO configu) system vyklopu nestrati, sklop dostane ZAVESY (nikdy vyklopovy mechanizmus), skrinka zo schemy 10 bez vyklopu = RED „Doplniť nové predvoľby" so zastavenymi 3 vystupmi (VEPO bezi) a prestavba ho zhasne; prestavba so STARYM snapshotom pravidiel (seed 4) RED NEZHASNE (zhasne az doplnenie predvolieb + prestavba) a vyklop s RUCNYM kovanim RED nedostane, prestavba mu automat NEVYDA (ORANGE) a v nakupe je mechanizmus prave raz
-    run_kovg(model)          # KOV-G1b: nohy 4/6 podla SIRKY + prichyt sokla — „Doplniť nové predvoľby" prepise stare pravidlo noh (`fixed 4`) na pasma podla sirky a doplni `prichyt-sokla`; skrinka 600 so soklom 100 da 4 nohy + 1 prichyt (nakup 4x 9078 + 4x 9079 + 1x 950), zmena sirky na 1200 da 6 + 2 a je to JEDEN krok Spat; sokel 17 mm (klzak) da nohy BEZ platnicky a BEZ prichytu, sokel 40 mm (vedome nepokryta zona) vyda nohy s ORANGE „doplň pásmo" a bez kodu, sokel VPREDU dostane nohy, ale nikdy prichyt; rucny zamok 8 noh prichyt NEZMENI (prichyt je zo SIRKY, O3) a Kontrola to prizna ORANGE `plinth_clip_check` — po zruseni zamku zhasne
+    run_kovg(model)          # KOV-G1b: nohy 4/6 podla SIRKY + prichyt sokla — „Doplniť nové predvoľby" prepise stare pravidlo noh (`fixed 4`) na pasma podla sirky a doplni `prichyt-sokla`; skrinka 600 so soklom 100 da 4 nohy + 1 prichyt (nakup 4x 9078 + 4x 9079 + 1x 950), zmena sirky na 1200 da 6 + 2 a je to JEDEN krok Spat; sokel 17 mm (klzak) da nohy BEZ platnicky a BEZ prichytu, sokel 40 mm (vedome nepokryta zona) vyda nohy s ORANGE „doplň pásmo" a bez kodu, sokel VPREDU dostane nohy, ale nikdy prichyt; rucny zamok 8 noh prichyt NEZMENI (prichyt je zo SIRKY, O3) a Kontrola to prizna ORANGE `plinth_clip_check` — po zruseni zamku zhasne; RUCNY prichyt 950 vedla automatu sa v nakupe zlepi na 2 ks a stavba k tomu prilozi ORANGE `plinth_clip_manual_duplicate` (automat sa NEPOTLACA)
     run_d118b(model)         # D-118b: PTOs modul a vedome prazdna bunka v ZIVOM retazci kniznica -> predvolby projektu -> vlozena Tip-On zasuvka -> nakup: pri NL 470 pribudne modul 352908 (1 ks, nazov z katalogu), pri NL 620 (kit typu PTO) modul VEDOME nepribudne a NEVZNIKNE ziadna oranzova; snapshot nesie std 6 (od KOV-E1a) a config schemu 8
     run_async(model, nil)
   rescue StandardError => ex

@@ -30,6 +30,10 @@
 #      prestavbe s novym seedom zhasne. Codex #338 N1: symptom „4 nohy pri
 #      sirke >= 1000" plati aj pri sokli VPREDU (`support plinth`), symptom
 #      „chyba prichyt" LEN pri `legs`.
+#   9) RUCNY PRICHYT VEDLA AUTOMATU (Codex #338 N3) — rucna katalogova polozka
+#      s kodom, ktory vyda UCINNY set prichytu, sa v nakupe zlieva; automat sa
+#      NEPOTLACA (set ma jedineho clena) a stavba prilozi ORANGE
+#      `plinth_clip_manual_duplicate`. Parita `cabinet_emitted_codes` vs nakup.
 #   8) PRICHYT vs NOHY (Codex #338 N2) — prichyt je zo SIRKY (O3), takze rucny
 #      zamok poctu noh ho NEZMENI; rozdiel `ceil(nohy/4)` vs vydane prichyty
 #      prizna ORANGE `plinth_clip_check` (ziadna brana, dva ORANGE nalezy na
@@ -53,6 +57,11 @@
 #      -> „(7): `leg_stale` — sokel VPREDU tiež dostane ORANGE"
 #   M8 `plinth_clip_check_issue` mnozstva PREPOCITA namiesto priznania
 #      -> „(8): `plinth_clip_check` — ručný zámok nôh počet príchytov NEZMENÍ"
+#   M9 `attach_manual_duplicate_warnings!` stratí korpusovu vetvu
+#      -> „(9): ZAPOJENIE — stavba vetu naozaj priloží k plánu"
+#   M10 `cabinet_emitted_codes` si set najde podla `generic_type` namiesto
+#       `effective_item_set` (obide mapovanie a brany `expand`)
+#      -> „(9): PARITA — `cabinet_emitted_codes` vydá presne to, čo nákup"
 require_relative '../helper' unless defined?(NxTest)
 
 require 'json'
@@ -162,6 +171,47 @@ module NxKovG1b
 
   def clip_check(over = {})
     BOM.plinth_clip_check_issue('S1', 42, fresh_cfg(over))
+  end
+
+  # --- N3: RUCNY PRICHYT VEDLA AUTOMATU ------------------------------------
+
+  CLIP_CODE = '950' # jediny clen setu `prichyt-sokla-axilo`
+
+  # Polozky planu, ktore stavba posle do `cabinet_emitted_codes` (korpusove,
+  # teda BEZ `owner_part_key`).
+  def clip_plan_items(width = 600.0)
+    evaluate('width' => width)[:items].select { |i| i['generic_type'] == CLIP_TYPE }
+  end
+
+  def emitted_clip_codes(items = clip_plan_items, st = state, over = {})
+    HWS.cabinet_emitted_codes(items, st, CLIP_TYPE, overrides: over)
+  end
+
+  # Zaznam `config.hardware_manual` tak, ako ho uklada ad-hoc kanal H1.
+  def manual_rec(code: CLIP_CODE, source: 'catalog', owner: nil)
+    { 'id' => 'M1', 'source' => source, 'code' => code, 'qty' => 1,
+      'name' => 'Príchyt sokla', 'unit' => 'ks', 'owner_part_key' => owner }
+  end
+
+  # Model so SNAPSHOTOM setov — `CabinetBuilder.sets_state` cita vyhradne
+  # modelovy atribut, takze na overenie ZAPOJENIA staci duck-type (vzor
+  # `test_h1a_sety.rb`).
+  class Model
+    def initialize(raw)
+      @attrs = { Noxun::Engine::Store::DICT => { NxKovG1b::HWS::MODEL_KEY => raw } }
+    end
+
+    def get_attribute(dict, key, default = nil)
+      (@attrs[dict] || {}).fetch(key, default)
+    end
+  end
+
+  module_function
+
+  def snapshot_model
+    st = state
+    Model.new(JSON.generate('std' => HWS::STD_LIFT_FORMS,
+                            'sets' => st['sets'], 'mapping' => st['mapping']))
   end
 
   # Zber v tvare, aky `Validation.run` dostava z `Bom.collect`.
@@ -575,6 +625,98 @@ NxTest.test('KOV-G1b (8): `plinth_clip_check` je ORANGE riadok Kontroly BEZ brá
   # Dva ORANGE nalezy na TEJ ISTEJ skrinke su DVA riadky — `stable_key` nesie kód.
   both = c.run_items([c.stale_issue, iss])
   NxTest.assert_equal(2, both.length, "dedup ich nezlepí: #{both.map { |i| i['stable_key'] }}")
+end
+
+NxTest.test('KOV-G1b (9): ručný príchyt vedľa automatu = ORANGE (Codex #338 N3)') do
+  c = NxKovG1b
+  codes = c.emitted_clip_codes
+  NxTest.assert_equal({ c::CLIP_CODE => true }, codes,
+                      'účinný set príchytu vydá práve kód 950')
+  ws = c::CB.plinth_clip_duplicate_warnings([c.manual_rec], codes)
+  NxTest.assert_equal(1, ws.length, ws.inspect)
+  NxTest.assert_equal('plinth_clip_manual_duplicate', ws.first['code'])
+  NxTest.assert_equal(nil, ws.first['part_key'], 'príchyt je KORPUSOVÁ položka')
+  NxTest.assert(ws.first['message'].include?(c::CLIP_CODE), ws.first['message'])
+  NxTest.assert(ws.first['message'].include?('ručne aj automat'), ws.first['message'])
+  NxTest.assert_equal(c::CLIP_TYPE, ws.first['data']['generic_type'])
+  # Vlastnik sa NEFILTRUJE — nakupny riadok agreguje podla KODU, takze rucna
+  # polozka pripnuta na dielec sa zleje rovnako.
+  NxTest.assert_equal(1, c::CB.plinth_clip_duplicate_warnings(
+    [c.manual_rec(owner: 'front:F1/wing:left')], codes
+  ).length, 'aj ručná položka pripnutá na dielec')
+  # Ten isty kod dvakrat = JEDNO varovanie.
+  NxTest.assert_equal(1, c::CB.plinth_clip_duplicate_warnings(
+    [c.manual_rec, c.manual_rec.merge('id' => 'M2')], codes
+  ).length, 'duplicitné záznamy nerobia dve vety')
+  # Iny kod, VOLNA polozka a skrinka BEZ automatickeho prichytu = ticho.
+  NxTest.assert_equal([], c::CB.plinth_clip_duplicate_warnings([c.manual_rec(code: 'INE')], codes))
+  NxTest.assert_equal([], c::CB.plinth_clip_duplicate_warnings([c.manual_rec(source: 'free')],
+                                                               codes))
+  NxTest.assert_equal([], c::CB.plinth_clip_duplicate_warnings([c.manual_rec], {}))
+end
+
+NxTest.test('KOV-G1b (9): automat sa NEPOTLÁČA — nákup ukáže 2 kusy a k tomu vetu') do
+  c = NxKovG1b
+  # Set prichytu ma JEDINEHO clena, takze „uplna rucna zostava" (vzor E1b) by
+  # tu znamenala „akykolvek rucny prichyt" — jeden rucne doplneny kus by ticho
+  # zrusil CELY pocet z pravidla. Zliatie je oproti tomu v Nakupe VIDNO.
+  items = c.evaluate[:items].map { |i| i.merge('owner_id' => 'CAB-1') }
+  exp = c::HWS.expand(items, c.state,
+                      manual_items: [c.manual_rec.merge('owner_id' => 'CAB-1')])
+  row = exp['rows'].find { |r| r['code'] == c::CLIP_CODE }
+  NxTest.assert(row, 'riadok príchytu v nákupe je')
+  NxTest.assert_equal(2, row['quantity'], 'automat 1 + ručne 1 = 2 kusy v JEDNOM riadku')
+  NxTest.assert_equal(1, row['adhoc_quantity'].to_i, 'z toho 1 ks je ručný doplnok')
+end
+
+NxTest.test('KOV-G1b (9): ZAPOJENIE — stavba vetu naozaj priloží k plánu') do
+  NxTest.skip!('build_plan v SketchUpe číta knižnicu pravidiel') unless NxTest.headless?
+  c = NxKovG1b
+  cfg = c::CB.normalize('type' => 'lower', 'width' => 600.0, 'height' => 720.0,
+                        'depth' => 510.0, 'floor_height' => 100.0,
+                        'fronts' => { 'items' => [] },
+                        'hardware_manual' => [c.manual_rec])
+  plan = c::CN.build_plan(cfg, 'CAB-1', hardware_rules: c.rules)
+  NxTest.assert_equal([], plan[:warnings].select { |w| w['code'].to_s.include?('duplicate') },
+                      'plán pred priložením vety žiadnu duplicitu nehlási')
+  c::CB.attach_manual_duplicate_warnings!(plan, cfg, c.snapshot_model)
+  dup = plan[:warnings].select { |w| w['code'] == 'plinth_clip_manual_duplicate' }
+  NxTest.assert_equal(1, dup.length, "veta je v pláne: #{plan[:warnings].inspect}")
+  NxTest.assert(dup.first['message'].include?(c::CLIP_CODE), dup.first['message'])
+  # Skrinka BEZ rucnej polozky (a skrinka s inym kodom) vetu nedostane.
+  cfg2 = c::CB.normalize('type' => 'lower', 'width' => 600.0, 'height' => 720.0,
+                         'depth' => 510.0, 'floor_height' => 100.0,
+                         'fronts' => { 'items' => [] },
+                         'hardware_manual' => [c.manual_rec(code: '104717')])
+  plan2 = c::CN.build_plan(cfg2, 'CAB-1', hardware_rules: c.rules)
+  c::CB.attach_manual_duplicate_warnings!(plan2, cfg2, c.snapshot_model)
+  NxTest.assert_equal([], plan2[:warnings].select { |w| w['code'].to_s.include?('duplicate') },
+                      'iný kód sa s príchytom nezlieva')
+end
+
+NxTest.test('KOV-G1b (9): PARITA — `cabinet_emitted_codes` vydá presne to, čo nákup') do
+  c = NxKovG1b
+  # Helper je DRUHE zrkadlo prechodu `expand` (zdielane primitiva, vlastna
+  # orchestracia). Ked sa rozide, ORANGE bud hlasi zliatie s kodom, ktory
+  # nakup nikdy nevyda, alebo naopak mlci — oboje ticho.
+  [600.0, 1200.0].each do |w|
+    items = c.clip_plan_items(w)
+    got = c.emitted_clip_codes(items).keys.sort
+    exp = c::HWS.expand(items.map { |i| i.merge('owner_id' => 'CAB-1') }, c.state)
+    want = exp['rows'].map { |r| r['code'].to_s }.sort
+    NxTest.assert_equal(want, got, "šírka #{w}: helper = nákup")
+    NxTest.assert_equal([], exp['unmapped'], "šírka #{w}: všetko má set")
+  end
+  # BEZ setu (mapovanie zrusene) helper mlci — a nakup tiez nema riadok.
+  bez = c.state(c::HWS.normalize_sets(c::HWS::SEED_SETS),
+                c::HWS::SEED_MAPPING.merge(c::HWS::MAPPING_ADDITIONS)
+                                    .reject { |k, _| k == c::CLIP_TYPE })
+  NxTest.assert_equal({}, c.emitted_clip_codes(c.clip_plan_items, bez),
+                      'bez mapovania sa nemá čo zliať')
+  # Bez snapshotu setov (nekompatibilna kniznica) to iste.
+  NxTest.assert_equal({}, c.emitted_clip_codes(c.clip_plan_items, nil))
+  # A NOHY sa tym nedotknu — helper berie LEN pytany druh.
+  NxTest.assert_equal({}, c::HWS.cabinet_emitted_codes(c.clip_plan_items, c.state, 'leg'))
 end
 
 NxTest.test('KOV-G1b (7): `leg_stale` je ORANGE a NEZASTAVUJE výrobu ani nákup') do

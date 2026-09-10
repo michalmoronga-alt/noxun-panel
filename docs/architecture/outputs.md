@@ -247,7 +247,9 @@ Predtým sa panel pýtal iba `pre_lift_build?`, takže čelo s ručne zloženým
 Protiváha na strane stavby:
 čelo `flap` s úplnou ručnou zostavou automat **nedostane** a vznikne ORANGE **`flap_manual_hardware`** („kovanie je pridané RUČNE — automatický mechanizmus/závesy sa
 nevydali; odstráň ručnú položku, ak chceš automat"); ručný **doplnok** (krytka, tyč, rameno) automat nevypína a zliatie kódu v nákupe prizná ORANGE
-**`flap_manual_duplicate`** ([construction.md](construction.md)) — nikdy sčítanie oboch potichu.
+**`flap_manual_duplicate`** ([construction.md](construction.md)) — nikdy sčítanie oboch potichu. **KOV-G1b** pridáva korpusovú paralelu
+**`plinth_clip_manual_duplicate`** (ručný príchyt sokla vedľa automatického; automat sa tu **nepotláča**) — obe idú do Kontroly bežnou cestou build warningov,
+teda ORANGE v kategórii „stavba".
 
 **Dve nové RED kategórie Kontroly.** `CAT_HARDWARE_CONFLICT` (`hardware_conflict`) — položka kovania z pravidiel VZNIKLA, ale je nesprávna; vetu skladá
 STAVBA (pozná výšku aj posledné pásmo), Kontrola k nej doplní adresu a to, čo sa tým zastavuje. Náprava je **ručný zámok počtu** (`hardware_overrides`),

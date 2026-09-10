@@ -154,6 +154,14 @@ v sete, parametre v položke) a **IO tiež nie**, takže to zvládne stavba. `ov
 nenesú (dopisuje ho až `Bom.collect`), preto sa použije pre každé `owner_id`. Bez snapshotu setov (nekompatibilná knižnica) je mapa prázdna a varovanie nevznikne —
 správne, taký nákup je celý ORANGE `library_incompatible` a nemá s čím zliať. `flap_set_codes` ostáva tam, kde je otázka iná („je tento kód vôbec mechanizmus?").
 
+**`HardwareSets.cabinet_emitted_codes` — to isté pre KORPUSOVÚ položku (KOV-G1b, Codex #338 kolo 1 N3).** `flap_emitted_codes` kľúčuje podľa vlastníka-dielca,
+takže na položku, ktorá **nevisí na dielci** (`owner_part_key` prázdny — dnes príchyt sokla), sa použiť nedá. `cabinet_emitted_codes(hardware_items, state,
+generic_type, overrides:)` ide **tou istou cestou** (`single_cabinet_overrides` → `effective_item_set` → `emitted_member_codes`) a vráti **plochú** množinu
+`{ kód => true }`. Spoločná brána sa preto od G1b volá `effective_item_set` (do G1b `effective_flap_set`) — nie je výklopová, je to zrkadlo brán `expand`.
+Podklad ORANGE `plinth_clip_manual_duplicate` ([construction.md](construction.md)): ručná katalógová položka s tým istým kódom sa v nákupe zlieva so setovým
+riadkom (`add_row` aj `add_adhoc_row` agregujú podľa kódu). Bez mapovania, bez snapshotu setov alebo pri „bez setu" je množina prázdna a varovanie nevznikne —
+nemá sa čo zliať. Paritný test (`tests/pure/test_kovg1b_nohy_pravidla.rb`) drží helper a nákup na jednej odpovedi.
+
 **Nečíselný skalár výklopu NEZHODÍ dokument (Codex #333 kolo 2 P2).** `normalize_lift_rule!` prehnal `handle_allowance_kg` a `rod_double_from_kb_mm` cez `to_f` —
 na Hash/Array/`true` (pokazený alebo cudzí snapshot) to **vyhodí výnimku**, `project_rules` ju odchytil, vrátil `nil` a `ensure_project_rules!` potom projektové pravidlá
 **ticho nahradil globálnou knižnicou**. Od kola 2 ich čistí `normalize_lift_scalar!` s tou istou typovou kontrolou ako bunky tabuliek (`lift_row?`): nečíselná hodnota sa

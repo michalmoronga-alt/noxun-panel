@@ -901,16 +901,24 @@ module Noxun
         # Codex #333 kolo 3 P2: porovnava sa proti kodom UCINNEHO setu TOHO
         # CELA, nie proti clenom vsetkych vyklopovych setov — HK celo s rucnou
         # HL tycou inak dostavalo varovanie o zliati, ktore nikdy nenastane.
+        #
+        # KOV-G1b (Codex #338 kolo 1 N3): TA ISTA uvaha plati na KORPUSOVU
+        # polozku `plinth_clip`. G1a vystavila produkt aj set skor, nez
+        # vzniklo pravidlo, takze skrinka moze mat kod prichytu (950) v
+        # `hardware_manual` — a od G1b k nemu pribudne aj automat. Obe vetvy
+        # bezia NEZAVISLE: skrinka bez ciel ziadny vyklop nema.
         def attach_manual_duplicate_warnings!(plan, cfg, model)
           return plan unless defined?(HardwareSets)
 
           list = cfg.is_a?(Hash) ? cfg[:hardware_manual] : nil
           return plan unless list.is_a?(Array) && !list.empty?
 
-          emitted = emitted_flap_codes(plan, cfg, model)
-          return plan if emitted.empty?
-
-          added = manual_duplicate_warnings(list, emitted)
+          added = manual_duplicate_warnings(list, emitted_flap_codes(plan, cfg, model))
+          # KOV-G1b (Codex #338 kolo 1 N3): KORPUSOVA vetva — prichyt sokla.
+          # Bezi NEZAVISLE od vyklopov (skrinka bez ciel ziadny flap nema).
+          added.concat(plinth_clip_duplicate_warnings(
+                         list, emitted_plinth_clip_codes(plan, cfg, model)
+                       ))
           return plan if added.empty?
 
           plan[:warnings].concat(added)
@@ -953,6 +961,56 @@ module Noxun
           Array(plan[:hardware]).select do |it|
             it.is_a?(Hash) && flaps[it['owner_part_key'].to_s] &&
               HardwareSets::FLAP_USE_TYPES.key?(it['generic_type'].to_s)
+          end
+        end
+
+        # KOV-G1b: kody, ktore automat vyda na KORPUSOVU polozku `plinth_clip`
+        # (owner je skrinka, nie dielec). Prazdna mapa = ziadny ucinny set
+        # (chybajuce mapovanie, „bez setu", nekompatibilna kniznica) — vtedy sa
+        # nema co zliat a varovanie nevznikne.
+        def emitted_plinth_clip_codes(plan, cfg, model)
+          return {} unless defined?(HardwareRules)
+
+          gt = HardwareRules::PLINTH_CLIP_OUTPUT
+          items = Array(plan[:hardware]).select do |it|
+            it.is_a?(Hash) && it['generic_type'].to_s == gt &&
+              it['owner_part_key'].to_s.empty?
+          end
+          return {} if items.empty?
+
+          sets_over = cfg.is_a?(Hash) && cfg[:hardware_sets].is_a?(Hash) ? cfg[:hardware_sets] : {}
+          HardwareSets.cabinet_emitted_codes(items, sets_state(model), gt, overrides: sets_over)
+        end
+
+        # RUCNY PRICHYT VEDLA AUTOMATU = ORANGE, automat sa NEPOTLACA.
+        #
+        # Pri vyklopoch (E1b) potlaci automat len UPLNA rucna zostava, teda
+        # zostava s MECHANIZMOM. Set prichytu ma JEDINEHO clena, takze „uplna
+        # zostava" by tu znamenala „akykolvek rucny prichyt" — a jeden rucne
+        # doplneny kus by ticho zrusil CELY pocet z pravidla (siroka skrinka
+        # 2 ks -> 1 ks). Zliatie je oproti tomu v Nakupe VIDNO (riadok ma
+        # `adhoc_quantity`), preto sa radsej ohlasi, nez potlaci.
+        #
+        # Vlastnik sa NEFILTRUJE: nakupny riadok agreguje podla KODU, takze
+        # rucna polozka s kodom prichytu sa zleje aj vtedy, ked ju clovek
+        # pripol na dielec.
+        def plinth_clip_duplicate_warnings(list, emitted)
+          return [] if emitted.empty?
+
+          seen = {}
+          list.filter_map do |rec|
+            next nil unless rec.is_a?(Hash) && rec['source'].to_s == 'catalog'
+
+            code = rec['code'].to_s.strip
+            next nil if code.empty? || !emitted[code]
+            next nil if seen[code]
+
+            seen[code] = true
+            BuildPlan.warning(
+              'plinth_clip_manual_duplicate',
+              "Ručne pridané kovanie #{code} je zároveň v automatickej zostave príchytu sokla "               '— v nákupe sa počty SPOČÍTAJÚ do jedného riadku (ručne aj automat). Uber ručnú '               'položku, ak to tak nemá byť.',
+              data: { 'code' => code, 'generic_type' => HardwareRules::PLINTH_CLIP_OUTPUT }
+            )
           end
         end
 
