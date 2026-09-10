@@ -17968,7 +17968,10 @@ module NoxunSuRunner
     ls2 = e::Panel.cabinet_payload(inst)['legs_summary'] || {}
     ok("KOV-G2 override: riadok Noh sa ZMENIL (#{ls2['text']})",
        ls2['set_id'].to_s == KOVG2_SET['set_id'] && ls2['text'].to_s != ls['text'].to_s &&
-       !ls2['text'].to_s.include?('AXILO'))
+       # noha uz nie je AXILO (testovaci set = STRONG klzak 272212); prichyt
+       # sokla AXILO v texte OSTAVA — override menil LEN set noh.
+       !ls2['text'].to_s.include?('noha AXILO') && ls2['text'].to_s.include?('Klzák') &&
+       ls2['text'].to_s.include?('príchyt sokla'))
     Sketchup.undo
     back = ((e::Store.config(inst) || {})['hardware_sets'] || {})['leg']
     ok('KOV-G2 override: JEDEN krok Spat vratil predvolbu projektu',
