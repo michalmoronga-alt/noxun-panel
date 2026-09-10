@@ -173,6 +173,12 @@ module Noxun
             # blokerov), preto len upozornenie s napravou.
             ls = leg_stale_issue(cid, inst.persistent_id, ccfg)
             hardware_issues << ls if ls
+            # KOV-G1b (Codex #338 kolo 1 N2): pocet prichytov sokla je zo SIRKY
+            # korpusu (O3), takze rucny zamok poctu noh ho NEZMENI. Vedome —
+            # ale nie potichu: ked `ceil(nohy / 4)` nesedi s vydanymi
+            # prichytmi, Kontrola o tom povie (ORANGE, ziadna brana).
+            pc = plinth_clip_check_issue(cid, inst.persistent_id, ccfg)
+            hardware_issues << pc if pc
             cs = ccfg['hardware_sets']
             note_cabinet_sets(cid, (cs.is_a?(Hash) && !cs.empty? ? cs : nil),
                               cabinet_sets, cabinet_sets_seen, cabinet_set_conflicts)
@@ -604,6 +610,70 @@ module Noxun
         cfg.each_with_object({}) do |(k, v), out|
           out[k.to_s] = v.is_a?(Hash) ? v.each_with_object({}) { |(k2, v2), o2| o2[k2.to_s] = v2 } : v
         end
+      end
+
+      # === KOV-G1b: POCET PRICHYTOV vs POCET NOH (`plinth_clip_check`) ======
+      #
+      # ROZHODNUTIE O3 (Michal 2.9.2026): prichyt soklovej listy je DRUHE
+      # `bands` pravidlo na tu istu SIRKU korpusu — NIE pomerovy clen z poctu
+      # noh (ten je D-109 a vo V1 sa NEIMPLEMENTUJE). Dosledok: ked pouzivatel
+      # zmeni pocet noh — rucnym zamkom (`hardware_overrides`) alebo vlastnym
+      # pravidlom `nohy-zakladne` (napr. pevnych 5) — mnozstvo prichytov sa
+      # NEPOHNE, lebo sirka je stale ta ista.
+      #
+      # Mnozstva sa preto NEPREPOCITAVAJU (to by bola tichá zmena kontraktu
+      # O3); miesto toho sa rozdiel PRIZNA. Nalez je ORANGE a ZAMERNE mimo
+      # `HW_ISSUE_BLOCKERS` — spravny pocet moze byt aj ten, ktory tam je
+      # (siroka skrinka s 8 nohami moze mat listy delene inak), rozhodnut
+      # musi clovek. Naprava = rucny zamok poctu prichytov v Kovani.
+      #
+      # Cita LEN ULOZENE `config.hardware[]`, teda UCINNE mnozstva PO
+      # overridoch — presne to, co pojde do nakupu.
+      #   * ZIADNY prichyt (klzak 17-20 mm, sokel vpredu, stara skrinka) =
+      #     ticho: chybajuci prichyt rieši `leg_stale`, nie tento nalez.
+      #   * `ceil(nohy / 4) == prichyty` = ticho (600 mm -> 4+1, 1200 -> 6+2).
+      # -> nalez | nil
+      def plinth_clip_check_issue(owner_id, owner_pid, ccfg)
+        cfg = ccfg.is_a?(Hash) ? cfg_hash(ccfg) : {}
+        hw = Array(cfg['hardware'])
+        clips = hw_quantity(hw, 'plinth_clip')
+        return nil if clips <= 0
+
+        legs = hw_quantity(hw, 'leg')
+        want = (legs / 4.0).ceil
+        return nil if want == clips
+
+        { 'code' => BuildPlan::PLINTH_CLIP_CHECK, 'severity' => 'orange',
+          'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
+          'part_key' => nil, 'front_id' => '',
+          'message' => plinth_clip_check_message(owner_id, legs, clips),
+          'label' => 'Príchyt sokla' }
+      end
+
+      # UCINNE mnozstvo daneho druhu kovania v ULOZENOM configu (po overridoch).
+      # Polozky sa SCITAVAJU — druh moze mat viac riadkov (dve pravidla).
+      def hw_quantity(hardware, generic_type)
+        Array(hardware).sum do |h|
+          next 0 unless h.is_a?(Hash) && h['generic_type'].to_s == generic_type
+
+          q = h['quantity'].to_i
+          q.positive? ? q : 0
+        end
+      end
+
+      # Veta menuje OBE cisla a povie, PRECO sa nezhoduju — inak by pouzivatel
+      # hladal chybu vo vypocte namiesto toho, aby pocet skontroloval.
+      def plinth_clip_check_message(owner_id, legs, clips)
+        "Skrinka #{owner_id} má #{sk_count(legs, 'noha', 'nohy', 'nôh')}, ale "           "#{sk_count(clips, 'príchyt', 'príchyty', 'príchytov')} sokla "           '(príchyty sa počítajú zo šírky korpusu) — skontroluj počet v Kovaní.'
+      end
+
+      # Slovenske pocitanie: 1 noha · 2-4 nohy · 0 a 5+ nôh.
+      def sk_count(n, one, few, many)
+        word = if n == 1 then one
+               elsif n >= 2 && n <= 4 then few
+               else many
+               end
+        "#{n} #{word}"
       end
 
       # === KOV-E1b: NEPRESTAVANY VYKLOP ALEBO SKLOP (`flap_stale`) ===========

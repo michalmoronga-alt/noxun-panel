@@ -261,7 +261,7 @@ podľa otvárania čela. `BUILD_INFO_ONLY` má navyše `hinge_weight_unknown` �
 / `flap_stale`, ale **zámerne bez brány**: skrinka na podstavci (uložený deskriptor `support.type` ∈ `Bom::LEG_SUPPORTS` = `legs` + `plinth`) postavená
 s pravidlami spred „4/6 podľa šírky" nesie v `config.hardware[]` 4 nohy aj pri šírke 1200 a žiadny príchyt soklovej lišty — nákup je teda o dve nohy
 a o príchyty chudobnejší, ale **rezanie ani montáž na tom nestoja** a chýbajúce kusy sa dajú dokúpiť. Kód `BuildPlan::LEG_STALE` preto **NIE JE** v `HW_ISSUE_BLOCKERS` ani v `BuildPlan.hw_blockers`;
-Kontrola z neho robí ORANGE riadok kategórie `CAT_HARDWARE` (`leg_stale_item`, klik-select mieri na skrinku) s vetou zo zberu + „Nákup ani výroba sa tým
+Kontrola z neho robí ORANGE riadok kategórie `CAT_HARDWARE` (`hardware_note_item`, klik-select mieri na skrinku) s vetou zo zberu + „Nákup ani výroba sa tým
 nezastavujú.". **Proveniencia je JEDNA a je NUTNÁ:** `rules_seed_version` < `HardwareRules::LEG_WIDTH_SEED_VERSION` (6) — marker už zapisuje každá stavba
 (E1b), takže sa **nezakladá žiadny nový kľúč configu** a `CONFIG_SCHEMA` sa nebumpuje. K nej musí sedieť aspoň jeden **symptóm**, inak by veta strašila aj
 tam, kde sa nič nezmení: (a) šírka ≥ 1000 mm a uložená položka `leg` má ešte 4 kusy zo `source: 'rule'` (ručný zámok nesie `manual` a je to vedomé
@@ -271,6 +271,16 @@ tiež 6 nôh a kontrola len na `legs` by jej migračnú vetu potichu zhasla; (b)
 lebo samostatná soklová lišta pri sokli vpredu neexistuje — a tá istá funkcia drží vetu, takže skrinke s `plinth` sa v nej príchyty nespomenú. Náprava je tá istá ako pri `flap_stale`: „Doplniť nové
 predvoľby" + prestavba (po nej je marker 6 a nález zhasne). Príchyt **bez setu** ostáva bežná ORANGE `hardware_unmapped` — `HW_LABELS['plinth_clip']`
 (z G1a) z nej zloží „Príchyt sokla (S1) nemá priradený set…".
+
+**KOV-G1b (Codex #338 kolo 1 N2) — `plinth_clip_check`: DRUHÝ ORANGE nález kovania.** Príchyt sa počíta **zo šírky korpusu**, nie z počtu nôh (rozhodnutie
+O3 — [hardware.md](hardware.md)), takže ručný zámok počtu nôh ani vlastné pravidlo nôh množstvo príchytov nezmenia. Vedomé to je, potichu byť nesmie:
+`Bom.plinth_clip_check_issue` číta **uložené** `config.hardware[]` (účinné množstvá po overridoch — presne to, čo pôjde do nákupu), spočíta `hw_quantity`
+pre `leg` a `plinth_clip` a keď `ceil(nohy / 4) != príchyty`, vydá `BuildPlan::PLINTH_CLIP_CHECK` s vetou „Skrinka S1 má 8 nôh, ale 1 príchyt sokla
+(príchyty sa počítajú zo šírky korpusu) — skontroluj počet v Kovaní." Skrinka **bez** príchytu mlčí (to je vec `leg_stale`). Kód je **zámerne mimo**
+`HW_ISSUE_BLOCKERS`: správny počet môže byť aj ten, ktorý tam je, rozhodnúť musí človek — náprava je ručný zámok počtu príchytov v Kovaní. Kontrola oba
+ORANGE nálezy kovania rendruje **jednou** cestou (`HW_ORANGE_NOTES` → `hardware_note_item`, `leg_stale_item` zanikol): kategória `CAT_HARDWARE`,
+klik-select na skrinku, veta zo zberu + „Nákup ani výroba sa tým nezastavujú.". **`stable_key` nesie kód**, takže dva nálezy na tej istej skrinke sú dva
+riadky a dedup ich nezlepí.
 
 
 *(2) POTVRDITEĽNÁ — `export_confirmations(budget:)`.* Dnes jediný dôvod: **riadky bez ceny**. STANDARD §11.3 hovorí, že neznáma cena sa NIKDY nenahradí nulou, ale má sa **priznať**

@@ -27,7 +27,13 @@
 #      formular -> ulozenie (`normalize_rules`) aj zapisovu branu
 #   7) KONTROLA — prichyt bez setu je ORANGE „Príchyt sokla … nemá priradený
 #      set"; `leg_stale` je ORANGE (NIE RED, ziadna exportna brana) a po
-#      prestavbe s novym seedom zhasne
+#      prestavbe s novym seedom zhasne. Codex #338 N1: symptom „4 nohy pri
+#      sirke >= 1000" plati aj pri sokli VPREDU (`support plinth`), symptom
+#      „chyba prichyt" LEN pri `legs`.
+#   8) PRICHYT vs NOHY (Codex #338 N2) — prichyt je zo SIRKY (O3), takze rucny
+#      zamok poctu noh ho NEZMENI; rozdiel `ceil(nohy/4)` vs vydane prichyty
+#      prizna ORANGE `plinth_clip_check` (ziadna brana, dva ORANGE nalezy na
+#      tej istej skrinke su dva riadky)
 #
 # MUTACIE (kazda overena spustenim — po zaneseni chyby spadnu uvedene testy):
 #   M1 filter prahu sa v `apply_rule` vynecha (prah 55 sa ignoruje)
@@ -43,6 +49,10 @@
 #      -> „(5): vlastné pravidlo na príchyt…" + „(5): dve zapnuté pravidlá…"
 #   M6 `leg_stale` sa dostane do `BuildPlan::HW_ISSUE_BLOCKERS` (RED + brana)
 #      -> „(7): `leg_stale` je ORANGE a NEZASTAVUJE výrobu ani nákup"
+#   M7 `Bom::LEG_SUPPORTS` je len `legs` (stav pred Codex #338 N1)
+#      -> „(7): `leg_stale` — sokel VPREDU tiež dostane ORANGE"
+#   M8 `plinth_clip_check_issue` mnozstva PREPOCITA namiesto priznania
+#      -> „(8): `plinth_clip_check` — ručný zámok nôh počet príchytov NEZMENÍ"
 require_relative '../helper' unless defined?(NxTest)
 
 require 'json'
@@ -140,6 +150,18 @@ module NxKovG1b
 
   def stale_issue(over = {})
     BOM.leg_stale_issue('S1', 42, stale_cfg(over))
+  end
+
+  # PRESTAVANA skrinka (marker seedu je uz 6) — `leg_stale` na nej mlci,
+  # takze na nej vidno VYHRADNE nalez `plinth_clip_check`.
+  def fresh_cfg(over = {})
+    stale_cfg({ 'rules_seed_version' => HR::LEG_WIDTH_SEED_VERSION,
+                'width' => 600.0,
+                'hardware' => [leg_item(4), clip_item(1)] }.merge(over))
+  end
+
+  def clip_check(over = {})
+    BOM.plinth_clip_check_issue('S1', 42, fresh_cfg(over))
   end
 
   # Zber v tvare, aky `Validation.run` dostava z `Bom.collect`.
@@ -493,6 +515,66 @@ NxTest.test('KOV-G1b (7): `leg_stale` — sokel VPREDU tiež dostane ORANGE (Cod
   # A podopretie, pri ktorom nohy vobec nevznikaju, sa nekomentuje.
   NxTest.assert_equal(nil, c.stale_issue('support' => { 'type' => 'none', 'height' => 0.0 }),
                       'skrinka bez podstavca nemá čo prestavovať')
+end
+
+NxTest.test('KOV-G1b (8): príchyt je zo ŠÍRKY — rozdiel oproti nohám hlási Kontrola') do
+  c = NxKovG1b
+  # Rozhodnutie O3: prichyt je DRUHE `bands` pravidlo na sirku, NIE pomer
+  # z poctu noh (D-109 je po V1). Zdrave pary preto mlcia.
+  NxTest.assert_equal(nil, c.clip_check, '600 mm: 4 nohy + 1 príchyt sedí')
+  NxTest.assert_equal(nil,
+                      c.clip_check('width' => 1200.0,
+                                   'hardware' => [c.leg_item(6), c.clip_item(2)]),
+                      '1200 mm bez overridu: 6 nôh + 2 príchyty sedí')
+  # Klzak 17-20 mm ziadnu soklovu listu nema — bez prichytu sa nema co porovnat.
+  NxTest.assert_equal(nil,
+                      c.clip_check('floor_height' => 17.0, 'hardware' => [c.leg_item(4)]),
+                      'klzák 17 mm nemá príchyt — nález nevzniká')
+end
+
+NxTest.test('KOV-G1b (8): `plinth_clip_check` — ručný zámok nôh počet príchytov NEZMENÍ') do
+  c = NxKovG1b
+  iss = c.clip_check('hardware' => [c.leg_item(8, 'source' => 'manual'), c.clip_item(1)])
+  NxTest.assert(iss, '600 mm s ručne zamknutými 8 nohami má stále 1 príchyt')
+  NxTest.assert_equal(c::BP::PLINTH_CLIP_CHECK, iss['code'])
+  NxTest.assert_equal('orange', iss['severity'])
+  NxTest.assert_equal('S1', iss['owner_id'])
+  NxTest.assert_equal('Skrinka S1 má 8 nôh, ale 1 príchyt sokla (príchyty sa počítajú '                       'zo šírky korpusu) — skontroluj počet v Kovaní.', iss['message'])
+  NxTest.assert_equal(JSON.parse(JSON.generate(iss)), iss, 'záznam je čistý JSON tvar')
+  # To iste pri ZACHOVANOM vlastnom pravidle noh (pevnych 5) — `ceil(5/4)` = 2.
+  p5 = c.clip_check('hardware' => [c.leg_item(5), c.clip_item(1)])
+  NxTest.assert(p5, 'vlastné pravidlo „5 nôh" tiež dá rozdiel')
+  NxTest.assert(p5['message'].include?('5 nôh, ale 1 príchyt'), p5['message'])
+  # Slovenske pocitanie sedi aj vo vyssich cislach.
+  many = c.clip_check('width' => 2400.0, 'hardware' => [c.leg_item(12), c.clip_item(2)])
+  NxTest.assert(many['message'].include?('12 nôh, ale 2 príchyty'), many['message'])
+  # VYPNUTE nohy (override `disabled`) pri ponechanom prichyte su tiez rozdiel.
+  none = c.clip_check('hardware' => [c.clip_item(1)])
+  NxTest.assert(none && none['message'].include?('0 nôh, ale 1 príchyt'), 'aj 0 nôh')
+end
+
+NxTest.test('KOV-G1b (8): `plinth_clip_check` je ORANGE riadok Kontroly BEZ brány') do
+  c = NxKovG1b
+  NxTest.assert(!c::BP::HW_ISSUE_BLOCKERS.include?(c::BP::PLINTH_CLIP_CHECK),
+                'kód NIE JE v registri blokerov')
+  NxTest.assert(!c::BP.hw_blockers.include?(c::BP::PLINTH_CLIP_CHECK), 'ani v bráne exportov')
+  iss = c.clip_check('hardware' => [c.leg_item(8, 'source' => 'manual'), c.clip_item(1)])
+  collected = { records: [], hardware_overrides: [], warnings: [], cabinets: 1,
+                hardware_issues: [iss] }
+  %i[all kit].each do |scope|
+    NxTest.assert_equal([], c::PC.hardware_blockers(collected, nil, scope: scope),
+                        "nákup ani VEPO (#{scope}) sa nezastavia")
+  end
+  item = c.run_items([iss])
+          .find { |i| i['stable_key'].to_s.end_with?(c::BP::PLINTH_CLIP_CHECK) }
+  NxTest.assert(item, 'Kontrola nález ukáže')
+  NxTest.assert(item['message_sk'].include?('zo šírky korpusu'), item['message_sk'])
+  NxTest.assert_equal('orange', item['severity'])
+  NxTest.assert_equal('S1', item['owner_id'], 'so skrinkou, ktorej sa týka (klik-select)')
+  NxTest.assert(item['message_sk'].include?('nezastavujú'), 'a povie, že export beží ďalej')
+  # Dva ORANGE nalezy na TEJ ISTEJ skrinke su DVA riadky — `stable_key` nesie kód.
+  both = c.run_items([c.stale_issue, iss])
+  NxTest.assert_equal(2, both.length, "dedup ich nezlepí: #{both.map { |i| i['stable_key'] }}")
 end
 
 NxTest.test('KOV-G1b (7): `leg_stale` je ORANGE a NEZASTAVUJE výrobu ani nákup') do

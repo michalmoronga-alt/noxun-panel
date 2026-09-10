@@ -288,6 +288,16 @@ module Noxun
       # predvoľby" + prestavba skrinky.
       LEG_STALE = 'leg_stale'
 
+      # KOV-G1b (Codex #338 kolo 1 N2): KONTROLNY kod „pocet prichytov sokla
+      # nesedi s poctom noh". Prichyt sa ratá zo SIRKY korpusu (rozhodnutie O3,
+      # 2.9.2026 — pomerovy clen „1 ks na zacate 4 nohy" je D-109 PO V1), takze
+      # rucny zamok poctu noh ani vlastne pravidlo noh mnozstvo prichytov
+      # NEZMENIA. To je vedome; potichu to ale byt nesmie, preto tento ORANGE.
+      #
+      # ZAMERNE MIMO `HW_ISSUE_BLOCKERS` (ako `LEG_STALE`): je to podnet na
+      # kontrolu, nie chyba — spravny pocet moze byt aj ten, ktory tam je.
+      PLINTH_CLIP_CHECK = 'plinth_clip_check'
+
       # KOV-E1b: dovody, pre ktore je UZ VYDANA polozka vyklopu nespravna.
       # Vsetky prichadzaju z ULOZENEHO nosica `hardware_conflicts` (polozka aj
       # dielec existuju — riadok v Kovani musi byt), preto su aj v

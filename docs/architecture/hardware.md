@@ -223,6 +223,14 @@ nedala ani novým projektom. Starý tvar nôh (`fixed 4`, v1..v5) je v `LEGACY_S
 prekryv prizná ORANGE `hardware_rule_overlap` s vetou „druhé pravidlo **príchytov sokla**" (`overlap_noun`). `leg` v registri zámerne NIE JE — pravidlo
 nôh existuje od v1 (doplnenie podľa `rule_id` ho nezduplikuje) a dve legitímne pravidlá nôh by začali hlásiť ORANGE.
 
+**PRÍCHYT SA POČÍTA ZO ŠÍRKY KORPUSU, NIE Z POČTU NÔH (rozhodnutie O3, 2.9.2026).** `prichyt-sokla` je **druhé `bands` pravidlo na tú istú šírku**
+(< 1000 → 1 ks, od 1000 → 2) — pomerový člen „1 ks na začaté 4 nohy" je D-109 a vo V1 sa **neimplementuje**. Dôsledok, ktorý treba poznať: keď sa počet
+nôh zmení **ručným zámkom** (`hardware_overrides`) alebo **vlastným pravidlom** `nohy-zakladne` (napr. pevných 5), množstvo príchytov sa **nepohne**, lebo
+šírka je stále tá istá. Množstvá sa preto neprepočítavajú (to by bola tichá zmena kontraktu O3) — rozdiel sa **prizná**: `Bom.plinth_clip_check_issue`
+(Codex #338 kolo 1 N2) porovná `ceil(nohy / 4)` s vydanými príchytmi nad **uloženými** (teda účinnými, po overridoch) položkami a nezhodu ohlási ako ORANGE
+`plinth_clip_check` ([outputs.md](outputs.md)). Skrinka **bez** príchytu (klzák 17-20 mm, sokel vpredu, stará skrinka) mlčí — chýbajúci príchyt rieši
+`leg_stale`, nie tento nález.
+
 **`LEG_WIDTH_SEED_VERSION` = 6** je pevné číslo (ako `LIFT_SEED_VERSION`) pre migračnú bránu `leg_stale` — ORANGE „skrinka má nohy spočítané ešte pred
 pravidlom 4/6" ([outputs.md](outputs.md)). Editor pravidiel: [ui-lifecycle.md](ui-lifecycle.md). Testy: `tests/pure/test_kovg1b_nohy_pravidla.rb`,
 `tests/js/test_kovg1b_editor_nohy.js`, in-SketchUp sekcia `run_kovg`.
