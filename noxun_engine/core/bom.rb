@@ -570,7 +570,7 @@ module Noxun
       end
 
       # Veta hovori KONKRETNE cislami tejto skrinky, aby bolo jasne, co sa zmeni.
-      def leg_stale_message(owner_id, width, floor_height, support = 'legs')
+      def leg_stale_message(owner_id, width, floor_height, support)
         w = num_of(width).to_f
         legs = w >= HardwareRules::LEG_WIDE_FROM_MM ? 6 : 4
         clips = clips_expected?(support, floor_height) ? (legs / 4.0).ceil : 0
@@ -627,8 +627,10 @@ module Noxun
       # (siroka skrinka s 8 nohami moze mat listy delene inak), rozhodnut
       # musi clovek. Naprava = rucny zamok poctu prichytov v Kovani.
       #
-      # Cita LEN ULOZENE `config.hardware[]`, teda UCINNE mnozstva PO
-      # overridoch — presne to, co pojde do nakupu.
+      # Cita LEN ULOZENE `config.hardware[]`, teda UCINNE mnozstva poloziek
+      # z pravidiel PO overridoch (ad-hoc kanal `hardware_manual` sa do nakupu
+      # agreguje zvlast — rozdiel vykompenzovany rucnou polozkou nalez nezhasne,
+      # naprava je zamok poctu prichytov).
       #   * ZIADNY prichyt (klzak 17-20 mm, sokel vpredu, stara skrinka) =
       #     ticho: chybajuci prichyt rieši `leg_stale`, nie tento nalez.
       #   * `ceil(nohy / 4) == prichyty` = ticho (600 mm -> 4+1, 1200 -> 6+2).
@@ -636,10 +638,10 @@ module Noxun
       def plinth_clip_check_issue(owner_id, owner_pid, ccfg)
         cfg = ccfg.is_a?(Hash) ? cfg_hash(ccfg) : {}
         hw = Array(cfg['hardware'])
-        clips = hw_quantity(hw, 'plinth_clip')
+        clips = hw_quantity(hw, HardwareRules::PLINTH_CLIP_OUTPUT)
         return nil if clips <= 0
 
-        legs = hw_quantity(hw, 'leg')
+        legs = hw_quantity(hw, HardwareRules::LEG_OUTPUT)
         want = (legs / 4.0).ceil
         return nil if want == clips
 
@@ -664,7 +666,9 @@ module Noxun
       # Veta menuje OBE cisla a povie, PRECO sa nezhoduju — inak by pouzivatel
       # hladal chybu vo vypocte namiesto toho, aby pocet skontroloval.
       def plinth_clip_check_message(owner_id, legs, clips)
-        "Skrinka #{owner_id} má #{sk_count(legs, 'noha', 'nohy', 'nôh')}, ale "           "#{sk_count(clips, 'príchyt', 'príchyty', 'príchytov')} sokla "           '(príchyty sa počítajú zo šírky korpusu) — skontroluj počet v Kovaní.'
+        "Skrinka #{owner_id} má #{sk_count(legs, 'noha', 'nohy', 'nôh')}, ale " \
+          "#{sk_count(clips, 'príchyt', 'príchyty', 'príchytov')} sokla " \
+          '(príchyty sa počítajú zo šírky korpusu) — skontroluj počet v Kovaní.'
       end
 
       # Slovenske pocitanie: 1 noha · 2-4 nohy · 0 a 5+ nôh.

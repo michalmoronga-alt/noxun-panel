@@ -812,7 +812,7 @@ charakterizačný test). Päť častí:
   **Od v0.9.57 veta pri `height_selector` MENUJE odmietnutý pevný set.** Dovtedy znela v Nákupe, paneli aj Kontrole „set „“ nesedí so zásuvkou (výber setu nie je podľa
   výšky zásuvky)" — `resolve_set_id` vracal `set_id` nil a `unmapped_entry` preberal z `info` len `param value member_index member_label detail class_key`. Teraz resolver
   odmietnutý set posiela v **`info['set_id']`** (prvý prvok ostáva `nil`: set NIE JE účinný, nič sa z neho neobjedná, kontrakt `[nil, 'set_incompatible']` platí ďalej —
-  `effective_flap_set` ani iné volania, ktoré čítajú len `sid`, sa nemenia) a `unmapped_entry` ho preberie **LEN keď resolver set nevybral (`sid` nil) a LEN ako neprázdny
+  `effective_item_set` ani iné volania, ktoré čítajú len `sid`, sa nemenia) a `unmapped_entry` ho preberie **LEN keď resolver set nevybral (`sid` nil) a LEN ako neprázdny
   String** — účinný set má vždy prednosť a záznamy bez `set_id` v `info` (`class_unmapped`, `mapping_invalid`, `selector_unresolved`, …) ostávajú bez mena ako doteraz
   (golden fixtúry a testy C2a/D1a nezmenené). Platí pre obe úrovne (projektové mapovanie aj override skrinky). Selektor podľa **iného** parametra jeden set nemá, preto meno
   nenesie (zápisová cesta triedneho kľúča, `class_key_value_problem`, ho pre set s výškovým variantom aj tak odmieta). Stráži R6 v `tests/pure/test_incompatible_detail_sk.rb`

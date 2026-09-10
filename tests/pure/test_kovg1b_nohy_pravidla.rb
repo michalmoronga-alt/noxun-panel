@@ -589,7 +589,8 @@ NxTest.test('KOV-G1b (8): `plinth_clip_check` — ručný zámok nôh počet pr�
   NxTest.assert_equal(c::BP::PLINTH_CLIP_CHECK, iss['code'])
   NxTest.assert_equal('orange', iss['severity'])
   NxTest.assert_equal('S1', iss['owner_id'])
-  NxTest.assert_equal('Skrinka S1 má 8 nôh, ale 1 príchyt sokla (príchyty sa počítajú '                       'zo šírky korpusu) — skontroluj počet v Kovaní.', iss['message'])
+  NxTest.assert_equal('Skrinka S1 má 8 nôh, ale 1 príchyt sokla (príchyty sa počítajú ' \
+    'zo šírky korpusu) — skontroluj počet v Kovaní.', iss['message'])
   NxTest.assert_equal(JSON.parse(JSON.generate(iss)), iss, 'záznam je čistý JSON tvar')
   # To iste pri ZACHOVANOM vlastnom pravidle noh (pevnych 5) — `ceil(5/4)` = 2.
   p5 = c.clip_check('hardware' => [c.leg_item(5), c.clip_item(1)])

@@ -276,7 +276,7 @@ predvoľby" + prestavba (po nej je marker 6 a nález zhasne). Príchyt **bez set
 
 **KOV-G1b (Codex #338 kolo 1 N2) — `plinth_clip_check`: DRUHÝ ORANGE nález kovania.** Príchyt sa počíta **zo šírky korpusu**, nie z počtu nôh (rozhodnutie
 O3 — [hardware.md](hardware.md)), takže ručný zámok počtu nôh ani vlastné pravidlo nôh množstvo príchytov nezmenia. Vedomé to je, potichu byť nesmie:
-`Bom.plinth_clip_check_issue` číta **uložené** `config.hardware[]` (účinné množstvá po overridoch — presne to, čo pôjde do nákupu), spočíta `hw_quantity`
+`Bom.plinth_clip_check_issue` číta **uložené** `config.hardware[]` (účinné množstvá položiek z pravidiel po overridoch; ad-hoc kanál `hardware_manual` sa agreguje zvlášť, takže rozdiel vykompenzovaný ručnou položkou nález nezhasne — nápravou je zámok počtu príchytov), spočíta `hw_quantity`
 pre `leg` a `plinth_clip` a keď `ceil(nohy / 4) != príchyty`, vydá `BuildPlan::PLINTH_CLIP_CHECK` s vetou „Skrinka S1 má 8 nôh, ale 1 príchyt sokla
 (príchyty sa počítajú zo šírky korpusu) — skontroluj počet v Kovaní." Skrinka **bez** príchytu mlčí (to je vec `leg_stale`). Kód je **zámerne mimo**
 `HW_ISSUE_BLOCKERS`: správny počet môže byť aj ten, ktorý tam je, rozhodnúť musí človek — náprava je ručný zámok počtu príchytov v Kovaní. Kontrola oba

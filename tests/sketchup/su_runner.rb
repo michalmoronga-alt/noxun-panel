@@ -17835,7 +17835,8 @@ module NoxunSuRunner
     ok("KOV-G prichyt-vs-nohy: zamok 8 noh prichyt NEZMENIL (#{kovg_hw(inst).inspect})",
        kovg_hw(inst) == { 'leg' => 8, 'plinth_clip' => 1 })
     found = kovg_clip_check(model)
-    ok("KOV-G prichyt-vs-nohy: Kontrola hlasi ORANGE „8 nôh, ale 1 príchyt“ "        "(#{found.map { |i| i['message_sk'] }.inspect})",
+    ok("KOV-G prichyt-vs-nohy: Kontrola hlasi ORANGE „8 nôh, ale 1 príchyt“ " \
+      "(#{found.map { |i| i['message_sk'] }.inspect})",
        found.length == 1 && found.first['severity'] == 'orange' &&
        found.first['message_sk'].to_s.include?('8 nôh, ale 1 príchyt'))
     ok('KOV-G prichyt-vs-nohy: a NIC sa tym nezastavuje (ziadna cervena)',
@@ -17877,7 +17878,8 @@ module NoxunSuRunner
     ok("KOV-G rucny-prichyt: stavba prilozila ORANGE o zliati (#{ws.length})",
        ws.length == 1 && ws.first['message'].to_s.include?(KOVG_CLIP_CODE))
     row = Array(kovg_expansion(model)['rows']).find { |r| r['code'].to_s == KOVG_CLIP_CODE }
-    ok("KOV-G rucny-prichyt: nakup ma JEDEN riadok s 2 kusmi "        "(#{row && row['quantity']} / rucne #{row && row['adhoc_quantity']})",
+    ok("KOV-G rucny-prichyt: nakup ma JEDEN riadok s 2 kusmi " \
+      "(#{row && row['quantity']} / rucne #{row && row['adhoc_quantity']})",
        row && row['quantity'].to_i == 2 && row['adhoc_quantity'].to_i == 1)
     ok('KOV-G rucny-prichyt: a NIC sa tym nezastavuje (ziadna cervena)',
        kovg_ctrl(model).none? { |i| i['severity'] == 'red' })

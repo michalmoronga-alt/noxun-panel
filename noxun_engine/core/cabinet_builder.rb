@@ -1008,7 +1008,9 @@ module Noxun
             seen[code] = true
             BuildPlan.warning(
               'plinth_clip_manual_duplicate',
-              "Ručne pridané kovanie #{code} je zároveň v automatickej zostave príchytu sokla "               '— v nákupe sa počty SPOČÍTAJÚ do jedného riadku (ručne aj automat). Uber ručnú '               'položku, ak to tak nemá byť.',
+              "Ručne pridané kovanie #{code} je zároveň v automatickej zostave príchytu sokla " \
+                '— v nákupe sa počty SPOČÍTAJÚ do jedného riadku (ručne aj automat). Uber ručnú ' \
+                'položku, ak to tak nemá byť.',
               data: { 'code' => code, 'generic_type' => HardwareRules::PLINTH_CLIP_OUTPUT }
             )
           end
