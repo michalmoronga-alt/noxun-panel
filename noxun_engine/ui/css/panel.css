@@ -196,6 +196,12 @@
   .frow .fprof.on { color: var(--nx-select); }
   .frow .fdel { flex: 0 0 22px; background: var(--nx-danger-bg); color: var(--nx-danger); border: 1px solid var(--nx-danger-border); border-radius: 6px; padding: 2px 0; }
 
+  /* D-119: styri okraje celej skrinky v dvoch kompaktnych riadkoch. */
+  .nx-inspector .front-gap-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
+  .nx-inspector .front-gap-grid .row label { flex: 0 0 44px; }
+  .nx-inspector .front-gap-grid .row input { text-align: right; width: 54px; }
+  .nx-inspector .front-gap-grid .row .unit { flex-basis: 23px; }
+
   /* ===== KOV-A2a: KARTA CELA ==============================================
      Karta je TRETI potomok stlpca `.frow` (za `.fmain` a `.fhw`), teda lezi
      PRIAMO POD svojim riadkom — odchylka od mockupu, kde je samostatny blok

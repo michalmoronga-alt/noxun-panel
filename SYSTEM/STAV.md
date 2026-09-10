@@ -19,25 +19,21 @@ nálezy z výroby a chyby v cenách majú **najvyššiu prioritu** ([PLAN.md](PL
 knižnica setov a snapshot `std`, katalóg kovania `schema`). Pred prvou takou zákazkou aktualizovať **obe PC** (updater D-52: Štúdio → O plugine → Aktualizovať).
 
 **Testy k v0.10.5:** **3811 headless** · **111 JS sád** · skutočné Štúdio s fiktívnymi dátami v prehliadači: odkazy, potvrdenie, zrušenie, konflikt, oneskorené odpovede a prepnutie zákazky/sekcie.
-Posledné in-SketchUp **2174 PASS / 0 FAIL** nad D-123 `3b07615` (10.9.2026). CENY-KOV nemení geometriu/Undo; externé otvorenie a fokus v SketchUpe ostávajú na používateľský smoke.
+Posledné in-SketchUp **2174 PASS / 0 FAIL** nad D-123 `3b07615` (10.9.2026). **Michal 11.9. potvrdil úspešný test produktových odkazov aj potvrdzovania cien** (CENY-KOV-A/B, PR #345/#346).
 
 ## Robí sa
 
-**Blok KOVANIE je uzavretý.** Posledná dávka **KOV-I** (šablóny s voliteľným kovaním, PR #340, v0.9.61) je v maine; uzáver **v0.10.0** (PR #341) presunul blok do archívu.
-Následný fix **D-123** (PR #342, v0.10.1) opravuje voľné vkladanie na plochu. **D-122** (PR #343, v0.10.2) zbalí UNI hlásenia do jednej skupiny pri zachovaní jednotlivých akcií a počtov.
-**Schválený rozsah D-122 → D-124 je dokončený.** D-124 (PR #344, v0.10.3): štyri predvoľby v otvorenom bloku, vzorky **115 px** (mockup mínus 20 %), pôvodný picker a potvrdenia.
-**Michal potvrdil smoke PR #342/#343/#344 (10.9.2026): všetko funguje podľa predstáv, bez nájdenej chyby.** Samostatné postrehy k bloku KOVANIE môže ďalej doplniť dogfooding.
-**CENY-KOV-A/B (PR #345/#346) hotové:** ikona produktu všade; bez odkazu oranžová → editor URL. Samostatné ručné potvrdenie uloží cenu k dnešku a Rozpočet sleduje jej vek (default 30 dní).
-Samotný preklik nič nepotvrdzuje; ceny sú spoločné pre všetky zákazky. Materiály/ABS a viac URL ostávajú otvorené vo V1-03.
-**Blok 1d** beží podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**. Blok **1b** je uzavretý, **1c/1e hotové**.
-**Toto schválené sedenie orchestruje Codex s právom merge po testoch a GH review**; subagenti podľa potreby (Michal 10.9.). Nezávislé review z rodiny Claude je vedome odložené.
+**BALÍK ČIEL (D-114 + D-119 + D-120) — návrh a zadanie, 11.9.2026.** Michal schválil samostatné ľavé/pravé presahy pre celú skrinku,
+UKW na všetkých štyroch hranách a aj na výklope/sklope/blende; zvislé profily dvierok vždy oproti pántom (dvojkrídlo v strede).
+Ovládanie: profil/hrana v karte čela + hromadné Úchytky; štyri okraje v dvoch riadkoch; šesť piktogramov na pridanie typu.
+Úplné packages **ČELÁ-A → B → C** sú v [PLAN.md](PLAN.md). Lokálna interaktívna ukážka `_dev/cela-plan/index.html` je návrh, nie runtime pluginu.
+Outside-in a Astra audit spracované (4 FIX, 2 NOTE), kontrola zapracovania **SOUND**. Michal schválil mockup aj implementáciu 11.9.; prebieha ČELÁ-A.
+**Blok 1d** podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**. Blok **1b** je uzavretý, **1c/1e hotové**.
 
 ## Ďalší krok
 
-**Schválené sedenie dokončené:** KOVANIE → D-123 → D-122 → D-124 → CENY-KOV-A/B. **Michalov smoke:** externé odkazy, doplnenie chýbajúceho URL a jedno ručné potvrdenie ceny v SketchUpe.
-Ďalšiu prácu vyberie Michal: **BALÍK ČIEL (D-114 + D-119 + D-120)** a zvyšok V1 podľa [V1_VIZIA.md](V1_VIZIA.md)
-(spotrebiče S1, ceny, konštrukcia K1/K2/K3, V1.0 zostavy); súbežne **1d** podľa kapacity.
-Každá dávka: package v [PLAN.md](PLAN.md) (autorita) → `codex-audit` (risk-based) → subagent vo worktree → `codex-po-pr` → merge → uzáver dávky podľa checklistu v [../CLAUDE.md](../CLAUDE.md).
+Dokončiť testy a review ČELÁ-A (presahy), potom z čerstvého mainu sekvenčne B (profily), C (pridávanie čiel).
+Geometrická dávka B potrebuje skutočný SketchUp probe/QA; browser mockup túto bránu nenahrádza. Ostatné V1 bloky ostávajú podľa [PLAN.md](PLAN.md).
 
 ## Posledné uzávery
 

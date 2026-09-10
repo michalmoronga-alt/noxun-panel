@@ -10,12 +10,12 @@ require_relative '../helper' unless defined?(NxTest)
 NxTest.test('fronts: empty_config ma kanonicky tvar a defaultne medzery') do
   f = Noxun::Engine::Fronts
   cfg = f.empty_config
-  NxTest.assert_equal(%w[split_axis gap gap_top gap_bottom gap_sides edge_limit_off items], cfg.keys)
+  NxTest.assert_equal(%w[split_axis gap gap_top gap_bottom gap_left gap_right edge_limit_off items], cfg.keys)
   NxTest.assert_equal('height', cfg['split_axis'])
   NxTest.assert_close(3.0, cfg['gap'])
   NxTest.assert_close(2.0, cfg['gap_top'])
   NxTest.assert_close(2.0, cfg['gap_bottom'])
-  NxTest.assert_close(2.0, cfg['gap_sides'])
+  NxTest.assert_close(2.0, cfg['gap_left'])
   NxTest.assert_equal(false, cfg['edge_limit_off'], 'D-22: zamok okrajov default zamknuty')
   NxTest.assert_equal([], cfg['items'])
 end
@@ -54,7 +54,7 @@ NxTest.test('fronts: normalize_config nil -> empty_config, hash defaulty gap/edg
   NxTest.assert_close(3.0, cfg['gap'])
   NxTest.assert_close(2.0, cfg['gap_top'])
   NxTest.assert_close(2.0, cfg['gap_bottom'])
-  NxTest.assert_close(2.0, cfg['gap_sides'])
+  NxTest.assert_close(2.0, cfg['gap_left'])
   NxTest.assert_equal([], cfg['items'])
 end
 
@@ -65,7 +65,7 @@ NxTest.test('fronts: normalize_config berie string aj symbol kluce, explicitne h
   NxTest.assert_close(5.0, cfg_sym['gap'])
   NxTest.assert_close(0.0, cfg_sym['gap_top'], 0.01, 'nula je platna hodnota, nie default')
   NxTest.assert_close(4.0, cfg_sym['gap_bottom'])
-  NxTest.assert_close(1.5, cfg_sym['gap_sides'])
+  NxTest.assert_close(1.5, cfg_sym['gap_left'])
   NxTest.assert_equal(1, cfg_sym['items'].size)
   NxTest.assert_equal('F1', cfg_sym['items'].first['id'])
 

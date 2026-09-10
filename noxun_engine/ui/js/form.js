@@ -51,7 +51,8 @@
       items.push(item);
     }
     return { split_axis: 'height', gap: frontGapVal('fr_gap', 3.0), gap_top: frontGapVal('fr_gap_top', 2.0),
-             gap_bottom: frontGapVal('fr_gap_bottom', 2.0), gap_sides: frontGapVal('fr_gap_sides', 2.0),
+             gap_bottom: frontGapVal('fr_gap_bottom', 2.0),
+             gap_left: frontGapVal('fr_gap_left', 2.0), gap_right: frontGapVal('fr_gap_right', 2.0),
              edge_limit_off: edgeLimitOff, items: items };
   }
   // --- D-22: zamok limitu presahov (okraje +-100 zamknute / +-2000 odomknute) ---
@@ -78,7 +79,11 @@
   }
   // D-07: hodnota gap pola cez evalDim (vyrazy); prazdne/nezmysel = default.
   function frontGapVal(id, dflt){ var v = numv(id); return isNaN(v) ? dflt : v; }
-  function resetFrontGaps(){ setNum('fr_gap', 3); setNum('fr_gap_top', 2); setNum('fr_gap_bottom', 2); setNum('fr_gap_sides', 2); onField(); }
+  function resetFrontGaps(){ setNum('fr_gap', 3); setNum('fr_gap_top', 2); setNum('fr_gap_bottom', 2); setNum('fr_gap_left', 2); setNum('fr_gap_right', 2); onField(); }
+  function frontSideGap(fronts, key){
+    if (fronts && Object.prototype.hasOwnProperty.call(fronts, key)) return fronts[key];
+    return (fronts && fronts.gap_sides != null) ? fronts.gap_sides : 2;
+  }
   // KOV-H1: ad-hoc polozky kovania idu SPAT nezmenene (pass-through). Sú
   // ECHOM servera z `cabinet_payload` — panel ich v H1 nijako neupravuje
   // (UI je H2). Kluc sa posiela LEN ked ho payload naozaj mal: `|| []` by
@@ -97,10 +102,10 @@
   var LIMITS = { width:[200,3000], height:[200,3000], depth:[150,2000], thickness:[6,50],
                  floor_height:[0,500], plinth_recess:[0,300], rail_depth:[20,400], rails_top_offset:[0,500],
                  // D-07: medzery/presahy cel — zaporny okraj = presah cez obrys (limit zhodny s Fronts::EDGE_LIMIT)
-                 fr_gap:[0,50], fr_gap_top:[-100,100], fr_gap_bottom:[-100,100], fr_gap_sides:[-100,100] };
+                 fr_gap:[0,50], fr_gap_top:[-100,100], fr_gap_bottom:[-100,100], fr_gap_left:[-100,100], fr_gap_right:[-100,100] };
   // D-22: okraje cel maju dynamicky limit podla zamku (Fronts::EDGE_LIMIT_UNLOCKED);
   // fr_gap (medzera medzi celami) ostava 0..50 VZDY.
-  var EDGE_LIMIT_FIELDS = { fr_gap_top:1, fr_gap_bottom:1, fr_gap_sides:1 };
+  var EDGE_LIMIT_FIELDS = { fr_gap_top:1, fr_gap_bottom:1, fr_gap_left:1, fr_gap_right:1 };
   function validateFields(){
     var ok = true;
     var ae = document.activeElement;
@@ -1613,7 +1618,8 @@
     setNum('fr_gap', (fronts && fronts.gap != null) ? fronts.gap : 3);
     setNum('fr_gap_top', (fronts && fronts.gap_top != null) ? fronts.gap_top : 2);
     setNum('fr_gap_bottom', (fronts && fronts.gap_bottom != null) ? fronts.gap_bottom : 2);
-    setNum('fr_gap_sides', (fronts && fronts.gap_sides != null) ? fronts.gap_sides : 2);
+    setNum('fr_gap_left', frontSideGap(fronts, 'gap_left'));
+    setNum('fr_gap_right', frontSideGap(fronts, 'gap_right'));
     setEdgeLimitOff(!!(fronts && fronts.edge_limit_off));
     // KOV-A2a: badge „smer?" + otvorena karta patria k PRAVE vykresleným
     // riadkom. Karta sa drzi cez IDENTITU cela (`openFrontCardId`), nie cez

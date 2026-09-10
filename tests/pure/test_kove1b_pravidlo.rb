@@ -710,7 +710,7 @@ NxTest.test('KOV-E1b (10): HL top prežije stavbu aj „reopen" (config → plá
   again = c::CB.normalize(c::CB.config_to_params(JSON.parse(JSON.generate(saved))))
   NxTest.assert_equal({ 'system' => 'hl_top' }, again[:fronts]['items'].first['lift'],
                       'bez toho by prestavba ticho spadla na HK')
-  NxTest.assert_equal(11, c::CB::CONFIG_SCHEMA, 'a schéma si to vyžiadala')
+  NxTest.assert(c::CB::CONFIG_SCHEMA >= 11, 'a schéma si vyžiadala aspoň 11')
 end
 
 NxTest.test('KOV-E1b (10): deskriptor nesie `flap_dir` aj `lift_system` explicitne') do

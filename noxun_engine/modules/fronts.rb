@@ -113,9 +113,9 @@ module Noxun
         items = cfg['items']
         return { parts: [], items: [], wings: 0, warnings: [], bounds: {} } if items.nil? || items.empty?
 
-        gap = cfg['gap']; gt = cfg['gap_top']; gb = cfg['gap_bottom']; gs = cfg['gap_sides']
+        gap = cfg['gap']; gt = cfg['gap_top']; gb = cfg['gap_bottom']; gl = cfg['gap_left']
         n = items.size
-        opening_w = width - 2 * gs
+        opening_w = width - gl - cfg['gap_right']
         total_v = height - floor_height # celny otvor po vyske (od spodnej hrany tela po vrch)
 
         fixed_sum = items.select { |it| it['mode'] == 'fixed' }
@@ -140,7 +140,7 @@ module Noxun
           idx = i + 1
           h = it['mode'] == 'fixed' ? it['height'].to_f : auto_h
           validate_profile!(it, idx, h, warnings)
-          panels = panels_for(it, idx, gs, opening_w, z, h, gap)
+          panels = panels_for(it, idx, gl, opening_w, z, h, gap)
           total_wings += panels.size if it['type'] == 'door'
           parts.concat(panels)
           res = {
@@ -372,13 +372,13 @@ module Noxun
       # medzera medzi celami ostava 0..GAP_MAX bez ohladu na zamok.
       def validate_gap_ranges!(cfg)
         gap = cfg['gap'].to_f
-        if gap.negative? || gap > GAP_MAX
+        if !gap.finite? || gap.negative? || gap > GAP_MAX
           raise "Medzera medzi celami musi byt 0 az #{GAP_MAX.to_i} mm."
         end
         limit = truthy(cfg['edge_limit_off']) ? EDGE_LIMIT_UNLOCKED : EDGE_LIMIT
         [['hore', cfg['gap_top'].to_f], ['dole', cfg['gap_bottom'].to_f],
-         ['po stranach', cfg['gap_sides'].to_f]].each do |label, v|
-          next if v.abs <= limit
+         ['vlavo', cfg['gap_left'].to_f], ['vpravo', cfg['gap_right'].to_f]].each do |label, v|
+          next if v.finite? && v.abs <= limit
           raise "Okraj cel #{label} musi byt v rozsahu -#{limit.to_i} az +#{limit.to_i} mm."
         end
       end
@@ -389,7 +389,6 @@ module Noxun
         gap = cfg['gap'].to_f
         gt = cfg['gap_top'].to_f
         gb = cfg['gap_bottom'].to_f
-        gs = cfg['gap_sides'].to_f
         items = cfg['items'] || []
 
         # D-18 (Codex audit F2): sirkovy limit plati len pre riadky, ktore realne
@@ -434,12 +433,26 @@ module Noxun
           'gap'        => num(h['gap'] || h[:gap], GAP_DEFAULT),
           'gap_top'    => num(h['gap_top'] || h[:gap_top], GAP_EDGE),
           'gap_bottom' => num(h['gap_bottom'] || h[:gap_bottom], GAP_EDGE),
-          'gap_sides'  => num(h['gap_sides'] || h[:gap_sides], GAP_EDGE),
+          'gap_left'   => side_gap(h, 'gap_left'),
+          'gap_right'  => side_gap(h, 'gap_right'),
           # D-22: stav zamku okrajov je sucast kanonickeho configu (round-trip cez
           # ulozeny korpus AJ sablony); default false = zamknute +-EDGE_LIMIT.
           'edge_limit_off' => truthy(h['edge_limit_off'] || h[:edge_limit_off]),
           'items'      => normalize_items(h['items'] || h[:items] || [])
         }
+      end
+
+      # D-119: legacy fallback len pri CHYBAJUCEJ strane; explicitna nula vyhrava.
+      # Kanonicky zapis uz gap_sides nenesie. Neplatny novy vstup sa neoreze cez to_f.
+      def side_gap(h, key)
+        source = h.key?(key) ? key : (h.key?(key.to_sym) ? key.to_sym : nil)
+        return num(h['gap_sides'] || h[:gap_sides], GAP_EDGE) unless source
+
+        value = Float(h[source])
+        raise ArgumentError unless value.finite?
+        value
+      rescue ArgumentError, TypeError
+        raise "Okraj cel #{key == 'gap_left' ? 'vlavo' : 'vpravo'} musi byt konecne cislo v mm."
       end
 
       # Jednorazova kompatibilita pre V0.1/V0.2 korpusy. Stare konfiguracie
@@ -783,7 +796,7 @@ module Noxun
 
       def empty_config
         { 'split_axis' => 'height', 'gap' => GAP_DEFAULT, 'gap_top' => GAP_EDGE,
-          'gap_bottom' => GAP_EDGE, 'gap_sides' => GAP_EDGE,
+          'gap_bottom' => GAP_EDGE, 'gap_left' => GAP_EDGE, 'gap_right' => GAP_EDGE,
           'edge_limit_off' => false, 'items' => [] }
       end
 

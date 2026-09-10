@@ -252,6 +252,59 @@ module NoxunSuRunner
     log_line("INFO: sync cleanup dekorov: #{ex.class}: #{ex.message}")
   end
 
+  def cela_a_params(width = 600.0)
+    { 'type' => 'lower', 'width' => width, 'height' => 720.0, 'depth' => 510.0,
+      'fronts' => { 'gap_left' => -18.0, 'gap_right' => 2.0,
+        'items' => [{ 'id' => 'F1', 'type' => 'door', 'wings' => '2', 'mode' => 'auto' }] } }
+  end
+
+  def cela_a_check(inst, width, label)
+    cfg = e::Store.config(inst) || {}
+    fs = cfg['fronts'] || {}
+    ok("CELA-A #{label}: ulozene samostatne strany", fs.values_at('gap_left', 'gap_right') == [-18.0, 2.0] && !fs.key?('gap_sides'))
+    parts = inst.definition.entities.grep(Sketchup::ComponentInstance)
+                .select { |p| e::Store.get(p, 'role') == 'front_door' }
+                .sort_by { |p| p.transformation.origin.x }
+    wing = (width + 16.0 - 3.0) / 2.0
+    ok("CELA-A #{label}: dva vyrobne panely", parts.size == 2)
+    parts.each_with_index do |part, i|
+      x = -18.0 + i * (wing + 3.0)
+      ok("CELA-A #{label}: kridlo #{i + 1} poloha a geometria",
+         (mm(part.transformation.origin.x) - x).abs <= TOL && (mm(part.definition.bounds.width) - wing).abs <= TOL)
+      pc = e::Store.config(part) || {}
+      ok("CELA-A #{label}: kridlo #{i + 1} vyrobny snapshot", (pc['width'].to_f - wing).abs <= TOL)
+    end
+  end
+
+  def run_cela_a(model)
+    cleanup(model)
+    inst = e::CabinetBuilder.build(model, cela_a_params)
+    cela_a_check(inst, 600.0, 'vklad')
+    changed = e::CabinetBuilder.config_to_params(e::Store.config(inst))
+    changed['fronts']['gap_left'] = 0.0
+    e::CabinetBuilder.rebuild(model, inst, changed)
+    ok('CELA-A: zmena lavej nuly zachova pravy okraj', e::Store.config(inst)['fronts'].values_at('gap_left', 'gap_right') == [0.0, 2.0])
+    Sketchup.undo
+    cela_a_check(inst, 600.0, 'jedno Spat')
+    [true, false].each do |with_hw|
+      tpl = e::Panel.template_config_from(e::Store.config(inst), model: model, with_hardware: with_hw)
+      copy = e::CabinetBuilder.build(model, tpl)
+      cela_a_check(copy, 600.0, "sablona kovanie=#{with_hw}")
+    end
+    # Skutocny SKP zapis a opakovane nacitanie z disku bez prepinania dokumentu.
+    # Definitions.load cita ulozeny subor do pomocnej definicie, nic nevklada do modelu.
+    saved_path = File.join(File.dirname(OUT), 'ENGINEtests_cela_a_saved.skp')
+    ok('CELA-A: SKP save_copy', model.save_copy(saved_path))
+    loaded = model.definitions.load(saved_path)
+    saved_cab = loaded.entities.grep(Sketchup::ComponentInstance).find { |p| e::Store.kind(p) == 'cabinet' }
+    ok('CELA-A: SKP nacitany korpus', !saved_cab.nil?)
+    cela_a_check(saved_cab, 600.0, 'SKP roundtrip') if saved_cab
+    cleanup(model)
+  rescue StandardError => ex
+    log_line("FAIL: run_cela_a: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
   def run_sync(model)
     # seed realnych dekorov PRED stavbou — korpus dostava kmat explicitne,
     # aby dielce mali pravidlove ABS defaulty (UNI fallback by ich nemal).
@@ -386,7 +439,7 @@ module NoxunSuRunner
     #     Asserty VOCI floor_height (Codex N9): z = floor + gap_bottom, nie globalna 0.
     p5 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
     p5['fronts'] = (p5['fronts'] || {}).merge('gap' => 10.0, 'gap_top' => -15.0,
-                                              'gap_bottom' => -30.0, 'gap_sides' => -20.0)
+                                              'gap_bottom' => -30.0, 'gap_left' => -20.0, 'gap_right' => -20.0)
     e::CabinetBuilder.rebuild(model, inst, p5)
     cfg5 = e::Store.config(inst) || {}
     fh5 = cfg5['floor_height'].to_f
@@ -407,7 +460,7 @@ module NoxunSuRunner
        !fi5.nil? && fi5['wings_n'] == 1)
     p6 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
     p6['fronts'] = (p6['fronts'] || {}).merge('gap' => 3.0, 'gap_top' => 2.0,
-                                              'gap_bottom' => 2.0, 'gap_sides' => 2.0)
+                                              'gap_bottom' => 2.0, 'gap_left' => 2.0, 'gap_right' => 2.0)
     e::CabinetBuilder.rebuild(model, inst, p6)
 
     # 7c) D-18 celo BEZ: prepnutie dvierok na 'none' odstrani front dielec (autorita
@@ -14787,7 +14840,7 @@ module NoxunSuRunner
       # 6a) ZAPORNY gap_sides: obalky KORPUSOV sa dotykaju, obalky INSTANCII sa
       #     prekryvaju — preto sa krok neriadi bboxom (Codex #288)
       pf = e::CabinetBuilder.config_to_params(e::Store.config(src) || {})
-      pf['fronts'] = (pf['fronts'] || {}).merge('gap_sides' => -20.0)
+      pf['fronts'] = (pf['fronts'] || {}).merge('gap_left' => -20.0, 'gap_right' => -20.0)
       e::CabinetBuilder.rebuild(model, src, pf)
       tools1_select(model, src)
       wide = e::Tools::Mower.copy(:right)
@@ -14821,7 +14874,7 @@ module NoxunSuRunner
       tools1_select(model, src)
       e::Tools::Mower.rotate(-90)
       pb = e::CabinetBuilder.config_to_params(e::Store.config(src) || {})
-      pb['fronts'] = (pb['fronts'] || {}).merge('gap_sides' => 2.0)
+      pb['fronts'] = (pb['fronts'] || {}).merge('gap_left' => 2.0, 'gap_right' => 2.0)
       e::CabinetBuilder.rebuild(model, src, pb)
 
       # 7) Z posun a Z = 0
@@ -18793,7 +18846,7 @@ module NoxunSuRunner
 
     # S1: scale -> absorpcia -> undo
     steps << [0.1, lambda do
-      inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0 })
+      inst = e::CabinetBuilder.build(model, cela_a_params)
       state[:s1] = inst
       # simulacia pouzivatelskeho Scale: 1 operacia, zmena transformacie (observer NIE je guardnuty)
       model.start_operation('SU-TEST user scale', true)
@@ -18806,6 +18859,7 @@ module NoxunSuRunner
       absorbed = (cfg['width'].to_f - 900.0).abs < 0.01
       clean = e::ScaleWatch.scale_factors(inst.transformation).nil?
       ok("async S1: absorpcia scale (600 -> #{cfg['width']}, transform cisty=#{clean})", absorbed && clean)
+      cela_a_check(inst, 900.0, 'Scale po observeri')
       Sketchup.undo # vrat absorpcny rebuild
     end]
     steps << [SETTLE, lambda do
@@ -18816,6 +18870,7 @@ module NoxunSuRunner
       if inst && inst.valid?
         cfg = e::Store.config(inst) || {}
         w = cfg['width'].to_f
+        cela_a_check(inst, 600.0, 'Spat po Scale')
         clean = e::ScaleWatch.scale_factors(inst.transformation).nil?
         ok("async S1: 1x undo vratil scale AJ absorpciu (sirka #{cfg['width']}, transform cisty=#{clean})",
            (w - 600.0).abs < 0.01 && clean)
@@ -18843,7 +18898,7 @@ module NoxunSuRunner
 
     # S2: kopia -> observer dedup -> undo
     steps << [0.5, lambda do
-      inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 500.0, 'height' => 720.0, 'depth' => 510.0 })
+      inst = e::CabinetBuilder.build(model, cela_a_params(500.0))
       state[:s2] = inst
       state[:s2_cid] = e::Store.get(inst, 'cabinet_id')
       # simulacia Ctrl+C/V: nova instancia + NOXUN atributy v JEDNEJ operacii (observer NIE je guardnuty)
@@ -18860,6 +18915,7 @@ module NoxunSuRunner
     steps << [SETTLE, lambda do
       copy = state[:s2_copy]
       new_cid = copy && copy.valid? ? e::Store.get(copy, 'cabinet_id') : nil
+      cela_a_check(copy, 500.0, 'nativna kopia po observeri') if new_cid
       orig_ok = state[:s2] && state[:s2].valid? && e::Store.get(state[:s2], 'cabinet_id') == state[:s2_cid]
       ok("async S2: observer dedup kopie (#{state[:s2_cid]} -> #{new_cid})",
          !new_cid.nil? && new_cid != state[:s2_cid] && orig_ok)
@@ -19554,6 +19610,7 @@ module NoxunSuRunner
     run_kovg(model)          # KOV-G1b: nohy 4/6 podla SIRKY + prichyt sokla — „Doplniť nové predvoľby" prepise stare pravidlo noh (`fixed 4`) na pasma podla sirky a doplni `prichyt-sokla`; skrinka 600 so soklom 100 da 4 nohy + 1 prichyt (nakup 4x 9078 + 4x 9079 + 1x 950), zmena sirky na 1200 da 6 + 2 a je to JEDEN krok Spat; sokel 17 mm (klzak) da nohy BEZ platnicky a BEZ prichytu, sokel 40 mm (vedome nepokryta zona) vyda nohy s ORANGE „doplň pásmo" a bez kodu, sokel VPREDU dostane nohy, ale nikdy prichyt; rucny zamok 8 noh prichyt NEZMENI (prichyt je zo SIRKY, O3) a Kontrola to prizna ORANGE `plinth_clip_check` — po zruseni zamku zhasne; RUCNY prichyt 950 vedla automatu sa v nakupe zlepi na 2 ks a stavba k tomu prilozi ORANGE `plinth_clip_manual_duplicate` (automat sa NEPOTLACA)
     run_d118b(model)         # D-118b: PTOs modul a vedome prazdna bunka v ZIVOM retazci kniznica -> predvolby projektu -> vlozena Tip-On zasuvka -> nakup: pri NL 470 pribudne modul 352908 (1 ks, nazov z katalogu), pri NL 620 (kit typu PTO) modul VEDOME nepribudne a NEVZNIKNE ziadna oranzova; snapshot nesie std 6 (od KOV-E1a) a config schemu 8
     run_kovi(model)          # KOV-I: ulozenie S/BEZ kovania cez panel, badge data, automaticky recept/system/NL, projektove defaulty, 1x Spat vrati vklad aj freeze; poskodeny snapshot ulozi geometriu bez setov AJ manualu + jasny status (izolovane katalogy a sablony)
+    run_cela_a(model)
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

@@ -869,6 +869,7 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Zones`).
 
 Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Fronts`).
 
+- **Okraje (ČELÁ-A / D-119)** patria celej skrinke: hore/dole v prvom riadku, vľavo/vpravo v druhom. Medzera medzi čelami ostáva osobitne; čísla zarovnané doprava.
 - **Kontext má tri skupiny v záväznom poradí:** Zoznam čiel · **Úchytky** ·
   Medzery a presahy. Ikony skupín (N3b) ukazujú, o čom skupina hovorí
   (`front` · `profile` · `columns-2`).

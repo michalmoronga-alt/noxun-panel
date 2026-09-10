@@ -155,7 +155,7 @@ module Noxun
       #       vypadli (`HW_CONFLICT_CODES` ich nepozna) a RED by zmizol. Brany
       #       su rovnake ako pri 5–10: dopredny guard prestavby/sablon/kopie
       #       (`newer_config?`) a exportna brana (`ProductionCore.export_blockers`).
-      CONFIG_SCHEMA = 11
+      CONFIG_SCHEMA = 12
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
       # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)

@@ -17,6 +17,16 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **BALÍK ČIEL — SPRESNENIE ROZSAHU A NÁVRH (11.9.2026, plánovanie, bez zmeny verzie).**
+  Predchádzajúci stav: v0.10.5 po PR #346; schválené sedenie KOVANIE → D-123 → D-122 → D-124 → CENY-KOV-A/B dokončené, výber ďalšej práce čakal na Michala.
+  Michal potvrdil úspešný používateľský test produktových odkazov a potvrdzovania cien a vybral balík Čiel.
+  Rozhodnutia: D-119 spoločné okraje celej skrinky; D-120 všetky hrany a aj výklop/sklop/blenda; zvislé profily dvierok oproti pántom vrátane stredných krídel.
+  Schválený slovný návrh ovládania: karta čela + hromadné Úchytky, dva páry okrajových polí a šesť pridávacích piktogramov.
+  Úplné zadanie je v PLAN.md, interaktívny mockup v `_dev/cela-plan/`. Outside-in odmietlo neoverené CAD tvrdenia a chybnú os rotácie Z; správna normála čela je Y.
+  Astra audit: 0 BLOCKER, 4 FIX, 2 NOTE; zapracované validačné poradie, vedomé doplnenie pravidiel starých projektov, smerové pokrytie a preflight vkladania.
+  Návrh zjednodušený: bez nových uložených profilových konfliktov a bez zmeny BuildPlan5. Upravená preflight/flush cesta prešla delta kontrolou **SOUND**.
+  Ide o prípravu práce, nie uzáver D-114/D-119/D-120. Runtime pluginu sa nemenil; geometrické a výrobné testy patria do implementácie.
+
 - **CENY-KOV-B — RUČNÉ OVERENIE CIEN KOVANIA (10.9.2026, PR #346, v0.10.5).** Katalóg aj Rozpočet otvoria spoločný formulár a externý produkt; výslovné potvrdenie uloží cenu s DPH za pevnú MJ + dnešný serverový dátum + ručný pôvod atomicky.
   Ručne overená cena mladšia než nastaviteľný prah (default 30 dní) je aktuálna s viditeľným dátumom; neoverená, neplatná alebo stará vyzýva na kontrolu. Nula je platná, chýbajúca cena ostáva priznaná.
   Zmena ceny/MJ/URL/dodávateľa potvrdenie zneplatní. Lazy schema 4 chráni nový údaj, staré Demos overenia ostávajú platné; automatický refresh nikdy nenačítava ručné produktové URL. Globálna cena platí po prepočte aj v ostatných zákazkách.
