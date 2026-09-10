@@ -469,7 +469,10 @@
     HW_SET_OPTIONS = options || [];
     // UI-C4: selecty setov ziju v DVOCH kontajneroch — per vlastnik v boxoch
     // (#hwRows) a per typ pre celu skrinku v skupine Sety (#hwSetRows).
-    ['hwRows', 'hwSetRows'].forEach(function(id){
+    // KOV-G2: a od D-111 v TRETOM — riadok Noh v Zakladnych (`#legsRow`) nesie
+    // ten isty select pre typ `leg`. Bez neho by sa nova ponuka setov objavila
+    // len v skupine Sety a riadok Noh by drzal starú.
+    ['hwRows', 'hwSetRows', 'legsRow'].forEach(function(id){
       var box = el(id); if (!box) return;
       var sels = box.querySelectorAll('select.hwsetsel');
       for (var i = 0; i < sels.length; i++){
@@ -2069,6 +2072,235 @@
     NXModal.showErrors([{ msg: text || 'Položka sa neuložila.' }]);
   }
 
+  // ===== KOV-G2 (D-111): RIADOK „NOHY" v Zakladnych ========================
+  //
+  // Doteraz sa dalo zistit, ake nohy skrinka dostane, az v Nakupe (predvolba
+  // setu podla vysky sokla zila schovana v Predvolbach projektu). Riadok stoji
+  // pod rozmermi a ma DVE cesty, ale JEDEN vzhlad:
+  //   * OZNACENA skrinka — text z `legs_summary` (payload `cabinet_payload`,
+  //     teda z ULOZENYCH poloziek) + select setu noh; ten select je TEN ISTY
+  //     ovladac ako v Kovanie -> Sety (`hwCabOptionList` + `onHwSet`), takze
+  //     zmena na jednom mieste sa cez server push objavi aj na druhom,
+  //   * VKLADANIE — text z read-only callbacku `insert_legs_preview`; ziadny
+  //     ovladac (override sa robi az na vlozenej skrinke).
+  //
+  // TEXT SKLADA SERVER. Panel z poloziek nic neodvodzuje ani nedopocitava —
+  // inak by si vymyslel vlastne vety a pri prvej zmene expanzie by klamali.
+  var LEGS_DASH = '—';
+  var LEGS_TYPE = 'leg';
+
+  function nxLegsRowEl(){ return el('legsRow'); }
+
+  // Skryty riadok sa aj VYPRAZDNI — inak by pri prepnuti na hornu skrinku
+  // ostal v DOM select cudzej skrinky a najblizsi `refreshHardwareSets` by mu
+  // obnovoval ponuku.
+  function nxLegsHideRow(){
+    var row = nxLegsRowEl(); if (!row) return false;
+    row.hidden = true;
+    row.classList.remove('warn');
+    var sel = el('legsSel'); if (sel) sel.innerHTML = '';
+    var b = el('legsTxt'); if (b){ b.textContent = LEGS_DASH; b.setAttribute('title', ''); }
+    return false;
+  }
+
+  // Text + ton do riadku. `title` nesie CELE znenie — riadok sa oreza (jeden
+  // riadok panela), tooltip nie.
+  function nxLegsSetText(text, tone, title){
+    var row = nxLegsRowEl(); if (!row) return false;
+    var b = el('legsTxt');
+    var txt = String(text === null || text === undefined || text === '' ? LEGS_DASH : text);
+    if (b){ b.textContent = txt; b.setAttribute('title', String(title || txt)); }
+    row.classList.toggle('warn', tone === 'warn');
+    row.hidden = false;
+    return true;
+  }
+
+  // Tooltip riadku pri OZNACENEJ skrinke: cely text + ucinny set (ten sa do
+  // riadku uz nezmesti, ale je to prave ta odpoved na „podla coho to je").
+  function nxLegsTitle(summary){
+    var t = String((summary && summary.text) || LEGS_DASH);
+    var name = summary && summary.set_name ? String(summary.set_name) : '';
+    return name ? (t + ' — set „' + name + '“') : t;
+  }
+
+  // OZNACENA skrinka. `summary` = `legs_summary` servera; ponuku setu berie
+  // z TEJ ISTEJ mapy, akou sa kresli skupina Sety (`HW_SET_OPTIONS`), preto sa
+  // vola AZ PO `renderHardware`.
+  function renderLegsRow(summary, cabId){
+    var tone = (summary && summary.tone) ? String(summary.tone) : 'none';
+    if (!summary || tone === 'none') return nxLegsHideRow();
+    nxLegsSetText(summary.text, tone, nxLegsTitle(summary));
+    var box = el('legsSel');
+    if (box){
+      var entry = hwSetEntry(LEGS_TYPE);
+      var list = entry ? hwCabOptionList(entry) : null;
+      box.innerHTML = list
+        ? hwSetSelectHtml(list, LEGS_TYPE, '', cabId || '', hwCabTitle(entry))
+        : '';
+    }
+    return true;
+  }
+
+  // --- VKLADANIE: dotaz s generaciou ---------------------------------------
+  // Odpovede chodia asynchronne; `gen` rastie a odpoved STARSIEHO kola sa
+  // zahodi (vzor `hw_manual_search`). Debounce, aby pisanie sirky netrhalo
+  // server pri kazdom pismene.
+  var LEGS_DEBOUNCE_MS = 150;
+  var legsGen = 0;
+  var legsTimer = null;
+
+  function nxLegsInsertMode(){
+    if (typeof selectedCabId !== 'undefined' && selectedCabId) return false;
+    if (typeof NXInsert === 'undefined' || !NXInsert || !NXInsert.state) return false;
+    if (NXInsert.state.kind === 'board') return false;
+    return NXInsert.state.lastMode === 'insert';
+  }
+
+  // KOV-G2 (Codex #339 kolo 1 N1): SABLONA nesie aj KOVANIE — mapovanie setov
+  // a ich zmrazene definicie. Do nahladu ide TEN ISTY zdroj, aky pojde do
+  // `insert_cabinet` (`NXInsert.hardwarePayload()` cez `HARDWARE_KEYS`), takze
+  // karta aj ghost ukazu presne tie nohy, ktore vlozena skrinka dostane —
+  // predtym nahlad vzdy hovoril o projektovej predvolbe. Ad-hoc polozky
+  // (`HARDWARE_LIST_KEYS`) do nahladu NEIDU: nohy nikdy nevznikaju rucne.
+  // Server ma pre tieto kluce VLASTNU branu (`INSERT_LEGS_HW_KEYS`) a nic
+  // z nich neuklada.
+  function nxLegsTemplateHw(){
+    var out = {};
+    if (typeof NXInsert === 'undefined' || !NXInsert ||
+        typeof NXInsert.hardwarePayload !== 'function') return out;
+    var hw = NXInsert.hardwarePayload() || {};
+    (NXInsert.HARDWARE_KEYS || []).forEach(function(k){ if (hw[k]) out[k] = hw[k]; });
+    return out;
+  }
+
+  // Payload je UZAVRETY: typ, ROZMERY korpusu, vyska sokla, rezim sokla
+  // a kovanie SABLONY. Nic z neho sa neuklada a nic z toho, co pride SPAT, sa
+  // nikdy nedostane do `collectAll()` — riadok je VYSTUP, nie pole formulara.
+  //
+  // KOV-G2 (Codex #339 kolo 2 N2): `height` a `depth` su TIEZ vstupy pravidiel
+  // — `HardwareRules.input_value` ich pre korpusovu rolu cita z kontextu
+  // (`CONTEXT_KEYS`), takze pravidlo noh alebo prichytu sokla sa moze riadit
+  // vyskou ci hlbkou. Bez nich by `CabinetBuilder.normalize` na serveri
+  // dosadila PREDVOLENE rozmery, kym vklad by pravidlo vyhodnotil nad tymi,
+  // co pouzivatel naozaj zadal — karta by ukazala iny pocet, nez skrinka
+  // dostane.
+  function nxLegsInsertDims(){
+    var out = {};
+    ['width', 'height', 'depth', 'floor_height'].forEach(function(id){
+      var v = numv(id);
+      out[id] = isNaN(v) ? '' : v;
+    });
+    return out;
+  }
+
+  function nxLegsInsertPayload(){
+    var body = { gen: ++legsGen, type: getType(), plinth_mode: val('plinth_mode') };
+    var dims = nxLegsInsertDims();
+    Object.keys(dims).forEach(function(k){ body[k] = dims[k]; });
+    var hw = nxLegsTemplateHw();
+    Object.keys(hw).forEach(function(k){ body[k] = hw[k]; });
+    return body;
+  }
+
+  function nxLegsInsertSend(){
+    legsTimer = null;
+    if (!nxLegsInsertMode()) return false;
+    if (getType() === 'upper') return nxLegsHideRow();
+    var body = nxLegsInsertPayload();
+    // Kym server odpovie, riadok drzi miesto s pomlckou — a ked odpoved
+    // nepride vobec (starsi plugin bez callbacku), ostane pri nej.
+    nxLegsSetText(LEGS_DASH, 'ok', 'Nohy sa dopočítavajú…');
+    if (window.sketchup && sketchup.insert_legs_preview){
+      sketchup.insert_legs_preview(typeof nxDocPayload === 'function'
+        ? nxDocPayload(body) : JSON.stringify(body));
+      return true;
+    }
+    return false;
+  }
+
+  // `onField` bezi pri KAZDOM poli karty — dotaz sa preto posiela len vtedy,
+  // ked sa zmenilo nieco, na com nohy naozaj zavisia (typ, rozmery korpusu,
+  // vyska sokla, rezim sokla). Podmienka „a riadok uz stoji" je samoliecba:
+  // po navrate z oznacenej skrinky je riadok skryty, hoci hodnoty su tie iste.
+  var legsLastKey = null;
+
+  function nxLegsInsertAsk(){
+    if (!nxLegsInsertMode()) return false;
+    var body = nxLegsInsertPeek();
+    var row = nxLegsRowEl();
+    if (legsLastKey === body && row && !row.hidden) return false;
+    legsLastKey = body;
+    if (legsTimer) clearTimeout(legsTimer);
+    legsTimer = setTimeout(nxLegsInsertSend, LEGS_DEBOUNCE_MS);
+    return true;
+  }
+
+  // Kluc vstupov BEZ zvysenia generacie (`nxLegsInsertPayload` ju zvysuje —
+  // volat ho na porovnanie by generacie roztocilo a odpovede by sa zahadzovali).
+  // KOV-G2 (N1): sucastou kluca je aj kovanie SABLONY — dve sablony s rovnakymi
+  // rozmermi a INYM setom noh musia dat dva rozne dotazy.
+  // KOV-G2 (kolo 2 N2): a rovnako `height`/`depth` — co ide do payloadu, musi
+  // byt aj v kluci, inak by zmena vysky dotaz vobec nespustila.
+  function nxLegsInsertPeek(){
+    var dims = nxLegsInsertDims();
+    return [getType(), dims.width, dims.height, dims.depth, dims.floor_height,
+            val('plinth_mode'), JSON.stringify(nxLegsTemplateHw())].join('|');
+  }
+
+  // KOV-G2 (Codex #339 kolo 1 N3): ZNEPLATNENIE DOTAZU V LETE. Odpovede chodia
+  // asynchronne, takze samotne skrytie riadku nestaci — odpoved na dotaz, ktory
+  // uz neplati (prepnutie na hornu skrinku, na dosku, oznacenie skrinky), by
+  // riadok znova ukazala a ostal by v karte visiet. Generacia sa preto zdvihne
+  // aj tu: cakajuca odpoved uz ziadnej negeneruje.
+  function nxLegsInsertDrop(){
+    if (legsTimer){ clearTimeout(legsTimer); legsTimer = null; }
+    legsGen++;
+    return false;
+  }
+
+  // Odchod z vkladania (oznacenie skrinky, doska) — riadok zmizne, dotaz v lete
+  // sa zneplatni a pamat vstupov sa zrusi, aby sa po navrate poslal znova.
+  function nxLegsInsertReset(){
+    nxLegsInsertDrop();
+    legsLastKey = null;
+    return nxLegsHideRow();
+  }
+
+  // KOV-G2 (Codex #339 kolo 2 N1): ZNEPLATNENIE PAMATE VSTUPOV. Nohy zavisia
+  // aj od veci, ktore v karte NESTOJA — projektove mapovanie setu noh, samotna
+  // definicia setu a nazvy jeho katalogovych poloziek. Tie sa daju zmenit
+  // v subezne otvorenom Studiu a prichadzaju lahkym pushom (`setHardwareSets`),
+  // v kluci `nxLegsInsertPeek` vsak ziadna z nich nie je. Bez tohto kroku by
+  // vkladacia karta slubovala STARE nohy az do zmeny rozmeru alebo prepnutia
+  // vyberu. Pamat sa preto zahodi a nahlad sa vypyta znova TOU ISTOU cestou
+  // (debounce + generacia); mimo vkladania sa nedeje nic.
+  function nxLegsInsertInvalidate(){
+    if (!nxLegsInsertMode()) return false;
+    legsLastKey = null;
+    return nxLegsInsertAsk();
+  }
+
+  // Odpoved servera. Starsia generacia sa ZAHODI (pomalsie kolo nesmie prepisat
+  // cerstvejsi vysledok) a rovnako sa zahodi odpoved, ktora dosla uz po
+  // oznaceni skrinky (vtedy riadok patri jej payloadu) alebo po prepnuti na iny
+  // typ — riadok patri VYHRADNE dolnej skrinke (N3).
+  function nxLegsInsertResult(res){
+    if (!res || Number(res.gen) !== legsGen) return false;
+    if (!nxLegsInsertMode()) return false;
+    if (getType() !== 'lower') return false;
+    if (String(res.tone || 'none') === 'none') return nxLegsHideRow();
+    return nxLegsSetText(res.text, String(res.tone), res.text);
+  }
+
+  // Viditelnost podla typu — presne ako `#fhRow` (horna skrinka nohy nema).
+  // Pri prechode na hornu skrinku sa uz nic nedopytuje a dotaz V LETE sa
+  // zneplatni (N3) — inak by ho neskora odpoved riadok znova ukazala.
+  function nxLegsApplyVisibility(t){
+    if (t === 'upper'){ nxLegsInsertDrop(); return nxLegsHideRow(); }
+    if (nxLegsInsertMode()) return nxLegsInsertAsk();
+    return true;
+  }
+
   // Node testy (tests/js/test_hw_panel_sets.js) — LEN ciste funkcie ponuky
   // setov (bez DOM). V CEF je module undefined a vetva sa preskoci.
   if (typeof module !== 'undefined' && module.exports){
@@ -2154,5 +2386,21 @@
       hwManualDropModal: hwManualDropModal, HW_MAN_DROP_SK: HW_MAN_DROP_SK,
       hwManualDropIfForeign: hwManualDropIfForeign,
       refreshHardwareManual: refreshHardwareManual,
-      hwManualState: function(){ return HW_MAN; } };
+      hwManualState: function(){ return HW_MAN; },
+      // KOV-G2 riadok Noh (tests/js/test_kovg2_nohy_ui.js) — CELY tok cez
+      // mini-DOM: viditelnost podla typu, dotaz s generaciou, odpoved servera
+      // a select setu pri oznacenej skrinke.
+      LEGS_DASH: LEGS_DASH, LEGS_TYPE: LEGS_TYPE, LEGS_DEBOUNCE_MS: LEGS_DEBOUNCE_MS,
+      nxLegsHideRow: nxLegsHideRow, nxLegsSetText: nxLegsSetText, nxLegsTitle: nxLegsTitle,
+      renderLegsRow: renderLegsRow, nxLegsInsertMode: nxLegsInsertMode,
+      nxLegsInsertPayload: nxLegsInsertPayload, nxLegsInsertSend: nxLegsInsertSend,
+      nxLegsInsertAsk: nxLegsInsertAsk, nxLegsInsertResult: nxLegsInsertResult,
+      nxLegsInsertPeek: nxLegsInsertPeek, nxLegsInsertReset: nxLegsInsertReset,
+      nxLegsTemplateHw: nxLegsTemplateHw, nxLegsInsertDrop: nxLegsInsertDrop,
+      nxLegsApplyVisibility: nxLegsApplyVisibility,
+      nxLegsInsertInvalidate: nxLegsInsertInvalidate,
+      legsGenState: function(){ return legsGen; },
+      // Zivy refresh ponuky setov a zapis vyberu — riadok Noh ich zdiela
+      // s kontextom Kovanie (ziadny vlastny kanal).
+      refreshHardwareSets: refreshHardwareSets, onHwSet: onHwSet, hwSetEntry: hwSetEntry };
   }

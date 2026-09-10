@@ -1127,6 +1127,112 @@ module Noxun
             'price_eur_vat' => (item['price_eur_vat'].is_a?(Numeric) ? item['price_eur_vat'].to_f : nil) }
         end
 
+        # === KOV-G2 (D-111): NAHLAD NOH PRE VKLADACIU KARTU A GHOST PASIK ====
+        #
+        # CITACIA cesta ako `hw_manual_search`: ziadna operacia, ziadny zapis do
+        # modelu, ziadny krok Spat — a preto ani guard dokumentu (nic sa nemeni
+        # a odpoved je len text). `gen` je generacia dotazu: odpovede chodia
+        # asynchronne a bez nej by pomalsie kolo prepisalo cerstvejsie cislo.
+        #
+        # Z payloadu sa berie UZAVRETY zoznam poli (`INSERT_LEGS_KEYS`) —
+        # nahlad je pohlad na ROZMERY, nie druha vkladacia cesta; cudzi kluc
+        # (materialy, zony, sablona) by sa cez `normalize` dostal do configu,
+        # z ktoreho by pravidla mohli vydat nieco ine, nez co sa naozaj vlozi.
+        # Nic sa NEUKLADA: `cfg` zije len v tomto volani.
+        #
+        # KOV-G2 (Codex #339 kolo 2 N2): zoznam nesie AJ `height` a `depth`.
+        # Korpusove pravidlo (`leg`, `plinth_clip`) sa smie riadit ktorymkolvek
+        # kontextovym klucom (`HardwareRules::CONTEXT_KEYS` cez `input_value`),
+        # takze pasma podla VYSKY alebo HLBKY su legitimne. Bez nich by
+        # `CabinetBuilder.normalize` dosadila svoje PREDVOLBY a nahlad by
+        # pocital nad inymi rozmermi, nez nad akymi vklad pravidlo vyhodnoti —
+        # karta by ukazala iny pocet noh, nez skrinka po kliku dostane.
+        INSERT_LEGS_KEYS = %w[type width height depth floor_height plinth_mode].freeze
+        # KOV-G2 (Codex #339 kolo 1 N1): SABLONA nesie aj KOVANIE — mapovanie
+        # setov a ich zmrazene definicie. Vlozena skrinka ich naozaj dostane
+        # (`handle_insert` -> `take_insert_hardware!` -> `ghost_freeze_hardware`),
+        # takze nahlad, ktory by ich prehliadol, by ukazoval PROJEKTOVU predvolbu
+        # a slubil by ine nohy, nez skrinka dostane. Kluce maju VLASTNU cestu
+        # (nie `INSERT_LEGS_KEYS`): citaju sa TOU ISTOU branou ako pri vklade,
+        # nie tolerantnym `normalize`.
+        INSERT_LEGS_HW_KEYS = %w[hardware_sets hardware_set_defs].freeze
+
+        def handle_insert_legs_preview(payload)
+          data = parse(payload)
+          js("NX.insertLegsPreview(#{insert_legs_preview_result(data).to_json})")
+        end
+
+        def insert_legs_preview_result(data)
+          d = data.is_a?(Hash) ? data : {}
+          fields = d.select { |k, _| INSERT_LEGS_KEYS.include?(k.to_s) }
+          mapping, defs = insert_legs_template_hw(d)
+          # Mapovanie ide do configu TOU ISTOU cestou ako pri vklade
+          # (`params['hardware_sets']` -> `normalize`), takze `cabinet_set_overrides`
+          # nizsie vidi presne to, co uvidi postavena skrinka.
+          fields['hardware_sets'] = mapping unless mapping.empty?
+          cfg = CabinetBuilder.normalize(fields)
+          legs_preview_summary(Sketchup.active_model, cfg,
+                               set_defs: defs).merge('gen' => d['gen'].to_i)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.insert_legs_preview_result')
+          { 'gen' => (data.is_a?(Hash) ? data['gen'].to_i : 0),
+            'text' => '', 'short' => '', 'tone' => 'none', 'set_id' => nil, 'set_name' => nil }
+        end
+
+        # Kovanie SABLONY z payloadu nahladu — TA ISTA brana ako pri vklade
+        # (`take_insert_hardware!`): mapovanie cez `read_template_mapping`
+        # (allow_owner: false — composite kluce patria dielcom ZDROJOVEJ skrinky),
+        # definicie cez `assess_set_defs` (bezstratovo alebo vobec). Necitatelne
+        # kovanie vklad ODMIETNE hlaskou, takze nahlad ho ticho ignoruje a ukaze
+        # projektovu predvolbu — poskladat z neho polovicu by znamenalo slubit
+        # nieco, co sa nikdy nevlozi.
+        # -> [mapovanie, definicie|nil]
+        def insert_legs_template_hw(data)
+          hw = data.select { |k, _| INSERT_LEGS_HW_KEYS.include?(k.to_s) }
+          status, mapping = HardwareSets.read_template_mapping(hw['hardware_sets'])
+          return [{}, nil] unless status == :ok && mapping.is_a?(Hash) && !mapping.empty?
+
+          dstatus, = HardwareSets.assess_set_defs(hw['hardware_set_defs'])
+          [mapping, dstatus == :ok ? hw['hardware_set_defs'] : nil]
+        end
+
+        # JEDINA cesta k suhrnu noh PRED vlozenim (vkladacia karta aj ghost
+        # pasik). Kontext korpusu stavia `Construction.cabinet_hw_ctx` — TEN
+        # ISTY slovnik, aky pouzije stavba; pravidla sa citaju
+        # `panel_hardware_rules` (projektovy snapshot, inak globalna kniznica),
+        # teda presne tie, s akymi sa skrinka postavi. Dielce sa nepodavaju
+        # (`parts = []`), takze sa vyhodnotia LEN korpusove pravidla — nohy
+        # a prichyt sokla. Rozpis kazdej polozky robi `item_purchase`, ta ista
+        # funkcia ako v karte oznacenej skrinky (jeden vyklad nakupu).
+        #
+        # KOV-G2 (Codex #339 kolo 1 N1): vyber setu sa cita z CONFIGU
+        # (`cabinet_set_overrides`) — pri vklade zo SABLONY tam uz stoji jej
+        # mapovanie a v ghost session ho nesie zmrazeny plan. `set_defs` su
+        # definicie zo sablony, ktore v projekte este nie su: nahlad sa pyta
+        # PROSPEKTIVNEHO stavu (`state_with_template_sets`), teda toho, ktory
+        # bude platit po vlozeni — inak by tvrdil „typ nema priradeny set",
+        # hoci set pride so sablonou.
+        def legs_preview_summary(model, cfg, set_defs: nil)
+          hw = HardwareRules.evaluate(cfg, [], Construction.cabinet_hw_ctx(cfg),
+                                      rules: panel_hardware_rules(model))
+          items = HardwareSets.legs_items(hw[:items])
+          # Horna skrinka / bez podstavca: ziadne IO, hned „bez nôh".
+          return HardwareSets.legs_summary_from_purchase([]) if items.empty?
+
+          status, state = hardware_read_state
+          # R-07: nekompatibilna kniznica a projekt bez snapshotu — override sa
+          # NEUPLATNI (rovnako ako v `decorate_hardware_purchase`) a definicie
+          # zo sablony sa nemaju k comu pridat (vklad ich tiez nezmrazi).
+          blocked = status == :missing && HardwareSets.library_read_only?
+          overrides = blocked ? {} : cabinet_set_overrides(cfg)
+          state = HardwareSets.state_with_template_sets(state, overrides, set_defs) unless blocked
+          lookup = HardwareSets.catalog_lookup(HardwareCatalog.items)
+          HardwareSets.legs_summary_from_purchase(items.map do |h|
+            h.merge('purchase' => item_purchase(h, status, state, overrides, lookup,
+                                                blocked: blocked))
+          end)
+        end
+
         # Hlaska po zmene setu — rozlisi skrinku a konkretny dielec (D-81).
         # KOV-D1a: hodnotou moze byt aj vyber podla parametra (viac setov).
         def hw_set_status_msg(gt, owner, value, set_defs)

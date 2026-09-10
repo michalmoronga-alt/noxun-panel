@@ -1218,6 +1218,34 @@ Brána je **serverová zámerne**: kontrola v editore setov by nedosiahla na set
 mapovanie a zákaz typu by ju vzal tiež; nebezpečná je len položka s dĺžkou rezu. **Plný režim `per: 'length'`** (Σ mm, MJ „m") patrí k R-05 v bloku KOVANIE a bránu smie stlmiť
 **až tá istá dávka**, ktorá prinesie dĺžkovú materializáciu — inak sa položka vráti presne do kusového násobenia.
 
+**KOV-G2 (v0.9.60) — `legs_summary`: „aké nohy skrinka dostane" jednou vetou (D-111).** Účinný set nôh sa dal dovtedy zistiť až v Nákupe (predvoľba podľa výšky sokla žila
+schovaná v Predvoľbách projektu), takže pri **vkladaní** o ňom človek nevedel. `legs_summary(items, state, overrides:, catalog:/lookup:, no_set_reason:)` je **čistá funkcia** nad
+položkami `generic_type` ∈ `LEG_SUMMARY_TYPES` (`leg` + `plinth_clip`, poradie je kontrakt textu) a vracia `{ 'text', 'short', 'tone' => 'ok'|'warn'|'none', 'set_id', 'set_name' }`.
+Sesterská **`legs_summary_from_purchase(items)`** skladá tú istú vetu z už rozpísaných položiek (`h['purchase']` = výsledok `explain`, ktorý karte postavil
+`decorate_hardware_purchase`) — **žiadny druhý rozpis, žiadne IO**, a poškodený snapshot (`:invalid`) hovorí to isté ako karta.
+
+**Žiadny druhý výklad nákupu:** členov rozpisuje výhradne `explain`, teda tá istá autorita ako rozklik položky v Kovaní; tento blok je **len formátovanie** (vzor `preview_text`).
+Text = `<počet>× <názov PRVÉHO vydaného člena>` a ďalšie členy tej istej položky sa pripájajú **labelom setu** (`+ platnička`, pri odlišnom počte `+ 2× …`) — plné katalógové názvy
+by z riadku spravili odsek; položky sa spájajú `·`. Preskočený člen (sentinel `none`) sa v texte neobjaví, rovnako ako nevznikne v nákupe. Kód **mimo katalógu** sa prizná
+(`kód 272212`), nikdy nezmizne. **`legs_trim_name` iba ODOBERÁ** — vedúci výrobca s objednávacím číslom (`Häfele 637.76.353 noha AXILO H100` → `noha AXILO H100`) a koncovú
+zátvorku; názov bez objednávacieho čísla ostáva celý (`STRONG Klzák s rektifikáciou, výška 17mm, šedá`), lebo výška a farba sú podstatné. Text v paneli musí ostať dohľadateľný
+v katalógu, preto sa nikdy nič neprepisuje.
+
+**`tone: 'warn'`** = ktorákoľvek položka je nemapovaná; veta je **presne tá, ktorou o náleze hovorí Kontrola** (`unmapped_reason_sk`). Dôvody sa pritom **zlievajú cez ČLENOV**:
+set nôh má pri sokli 40 mm (vedome nepokrytá zóna 20–55 z G1a) **dva** záznamy — nohu aj platničku s tou istou chýbajúcou hranicou — a dve takmer identické vety v jednom riadku
+panela sú šum. Kľúč zliatia je PRÍČINA (`reason` + `set_id` + `param` + `value` + `generic_type`), berie sa PRVÁ veta. **`tone: 'none'`** = žiadne položky (horná skrinka, sokel 0)
+→ text `bez nôh` a panel riadok vôbec nekreslí. `short` je verzia pre ghost pásik: názvy sa režú pri prvej čiarke, príslušenstvo do nej nejde a celok má strop `LEGS_SHORT_MAX`
+(48 znakov) — karta neskracuje nič (má tooltip). Konzumenti: `Panel.legs_preview_summary` (vkladacia karta + ghost pásik), `cabinet_payload['legs_summary']` a **ľahký push**
+`push_hardware_sets` (Codex #339 N4 — zmena setu či názvu položky v Štúdiu chodí práve ním, inak by veta držala starú expanziu do ďalšieho označenia skrinky), všetko
+v [ui-lifecycle.md](ui-lifecycle.md). Testy: `tests/pure/test_kovg2_nohy_ui.rb`, `tests/js/test_kovg2_nohy_ui.js`, in-SketchUp sekcia `run_kovg`.
+
+**PROSPEKTÍVNY stav setov — `state_with_template_sets(state, mapping, defs)` (Codex #339 kolo 1 N1).** Vklad zo **šablóny** nesie mapovanie setov aj ich zmrazené definície
+(`hardware_sets` / `hardware_set_defs`) a `ghost_freeze_hardware` ich pri kliku zapíše do projektu. Náhľad, ktorý pozná len dnešný snapshot, by preto sľuboval **projektovú
+predvoľbu** — a skrinka by vznikla s iným setom (alebo by riadok tvrdil „typ nemá priradený set", hoci set príde so šablónou). Funkcia vydá stav, ktorý bude platiť **po**
+vložení: snapshot **plus** definície, ktoré v ňom ešte nie sú. Výber definícií robí spoločná čistá `template_sets_selection` — **tá istá jediná implementácia**, akou zmrazuje
+`freeze_template_sets!`, takže ZÁPIS a NÁHĽAD sa rozísť nemôžu: **projekt vyhráva** (kolízia = `kept`), typový nesúlad sa neprevezme, chýbajúca definícia ostáva `missing`.
+Nič sa nezapisuje a vstupný stav sa nemutuje. `blocked` vetva (R-07, nekompatibilná knižnica bez snapshotu) sa **nedopĺňa vôbec** — vklad definície tiež nezmrazí.
+
 ### drawer_recipes.rb
 
 **KOV-C1 — nemenné recepty zásuviek** (`Noxun::Engine::Recipes`). Čisté Ruby: žiadne SketchUp API, žiadny zápis do modelu ani na disk.

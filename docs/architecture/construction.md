@@ -108,6 +108,15 @@ a `lift_class` si zo `lift_system` vyberá HK/HL vetvu. Deskriptor **bez** smeru
 HL top ide z existujúceho **`available_depth`** (`interior[:back_front_y]`) — delta audit Sol BLOCKER 1: `depth − hrúbka chrbta` by prehliadlo `GROOVE_OFFSET`
 a pri overlay chrbte by hĺbku odčítalo dvakrát.
 
+**KOV-G2 — `cabinet_hw_ctx(cfg)`: KORPUSOVÁ časť kontextu ako čistá funkcia (v0.9.60).** Náhľad nôh vo vkladacej karte a v ghost pásiku (D-111,
+[hardware.md](hardware.md)) potrebuje presne ten kontext, akým sa pravidlá vyhodnotia pri stavbe — ale **bez plánu** (skrinka ešte neexistuje). `hw_ctx` sa preto rozdelil:
+`cabinet_hw_ctx(cfg)` vydáva kľúče zistiteľné zo **samotného configu** (`width`, `height`, `depth`, `floor_height`, `kh`, `kb`, `support` cez `support_type`, `cabinet_type`)
+a `build_plan` si k nim **MERGUJE** tie, ktoré vedia vzniknúť až z dielcov (`available_width` / `available_height` / `available_depth`, `front_rows`). Druhý slovník sa
+zámerne nepíše — rozišiel by sa s náhľadom. Kľúče závislé od plánu v čistej funkcii **nie sú**: hádať ich by znamenalo druhý výpočet vedľa `interior_dims`/`Fronts`, a pravidlá
+roly `cabinet` ich nepotrebujú (nohy aj príchyt sokla čítajú šírku, výšku sokla, podopretie a typ). Pravidlo, ktoré by si taký kľúč vypýtalo ako `input`, dostane `nil`
+a položku **nevydá** — presne ako pri každom inom neznámom vstupe (`input_value`). Panel volá `HardwareRules.evaluate(cfg, [], cabinet_hw_ctx(cfg), rules:)` s prázdnymi
+dielcami, takže sa vyhodnotia **len** korpusové pravidlá.
+
 **KOV-F1 — ULOŽENÝ NOSIČ `hardware_conflicts`.** Plán má aditívny kľúč `hardware_conflicts` `[{owner_part_key, code, message}]` (validuje
 `BuildPlan.validate_hardware_conflicts!` proti registru `HW_CONFLICT_CODES`, vrátane referenčnej integrity vlastníka). Je to **ten istý vzor** ako
 `drawer_conflicts` — `merge_final` ho uloží do configu v TEJ ISTEJ operácii ako geometriu — ale iný stav: pri závese nad tabuľkou **položka aj dielec

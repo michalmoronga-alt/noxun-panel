@@ -17,6 +17,41 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **KOV-G · NOHY 4/6, PRÍCHYT SOKLA A SET NÔH VIDITEĽNÝ UŽ PRI VKLADANÍ (9.–10.9.2026; PR #337 + #338 + #339, v0.9.58 → v0.9.60; D-111 vyriešené).**
+  Slice G bola posledná „malá" dávka bloku KOVANIE pred šablónami (I) a mala tri vrstvy: **dáta → pravidlá → UI**. Rozhodnutia Michala (9.9.2026) pred štartom:
+  **STRONG klzák pre pásmo 17–20 mm** (lacný, bez lišty), **zóna 20–55 mm ostáva vedome nepokrytá** (ORANGE, nie vymyslený produkt), **AXILO sa objednáva od Quatro LM**
+  (Démos ho nemá — katalógový riadok preto nesie dodávateľa a adresu v poznámke, nie `demos_url`), **príchyt sokla len pri samostatnej soklovej lište od 55 mm**,
+  **v paneli JEDEN riadok** (vertikálny priestor je vzácny) a **D-123 sa rieši samostatným fixom**, nie tu.
+  **G1a — DÁTA (PR #337, v0.9.58).** Set „Nohy podľa výšky sokla" dostal sedem pásiem a druhého člena (platnička; v pásme 17–20 sentinel `none`), pribudol set
+  **„Príchyt sokla AXILO"** a s ním generický typ **`plinth_clip`** (`BuildPlan::SCHEMA` 4 → 5, precedens `lift` z KOV-B1). `param_bands` sa naučilo **tú istú sémantiku
+  sentinelu `none`**, akú má rad `code_by_nl` z D-118b — vyplnené pásmo `none` znamená „člen sa vedome nevydá", takže zákaz z D-118b zanikol bez nového markera.
+  Taxonómia dostala výrobcu **Häfele** a rada AXILO sa presunula spod Hettichu pod neho jednorazovou migráciou, ktorá sa dotkne **len presného starého seed tvaru**.
+  Katalóg +9 riadkov; manifest má desiaty prvok — dodávateľa (`nil` = Démos).
+  **Review G1a išla do TROCH kôl (1 P1 + 3 P2 · 1 P1 + 2 P2 · čisté) — vedomá odchýlka od pravidla 3 kôl.** PR nebol zle narezaný: obe kolá trafili **dátovú vrstvu**
+  (kovanie by potichu zmizlo z nákupu · legacy set zamykal celú knižnicu · seed sety sa klasifikovali proti *zamrznutej*, nie živej taxonómii · generický kľúč mapovania
+  neoveroval typ setu) — teda presne to, čo sa zamrazí do .skp a spätne sa opravuje draho. Rozdeliť PR by tie isté nálezy len presunulo do druhej polovice.
+  **G1b — PRAVIDLÁ (PR #338, v0.9.59).** Seed `nohy-zakladne` prestal byť `fixed 4` a počíta **`bands` podľa ŠÍRKY korpusu** (< 1000 → 4, od 1000 → 6) — platí pre všetky
+  sety nôh, set rozhoduje len o produkte. Nové pravidlo **`prichyt-sokla`** vydáva `plinth_clip` tými istými pásmami (1 / 2 = **1 ks na začaté 4 nohy**, rozhodnutie O3 —
+  **bez** pomerového člena, ktorý D-109 pýta; mechanika ostáva R-05 po V1) a je viazané na `support legs` + nový voliteľný filter `applies_to.floor_height_min` (55 mm).
+  `Bom.leg_stale_issue` je **ORANGE** a zámerne **mimo `HW_ISSUE_BLOCKERS`** — nohy výrobu nezastavujú, ale stará zákazka na starom sete to má vedieť.
+  Review: **1 kolo (3 P2)** + interná delta-verifikácia (5 P3) podľa pravidla delta-verifikácie.
+  **G2 — UI + D-111 (PR #339, v0.9.60).** Riadok **„Nohy"** v Základných hovorí jednou vetou, čo skrinka pri tejto šírke a výške sokla dostane. **Text skladá SERVER**
+  (`HardwareSets.legs_summary` nad výsledkom `explain`) — panel z položiek neodvodzuje nič, takže riadok a rozklik položky v Kovaní sa nemôžu rozísť; dôvody sa **zlievajú
+  cez členov** (sokel 40 mm má nemapovanú nohu aj platničku s tou istou príčinou → JEDNA veta, nie dve). Dve cesty, jeden vzhľad: označená skrinka číta **už rozpísané**
+  položky, vkladanie číta **read-only callback** `insert_legs_preview` s generáciou dotazu. Ghost pásik dostal segment `gbLegs` (skrátený text, len subjekt `cabinet`,
+  počíta sa lenivo raz za session). Override setu je **existujúci ovládač** z Kovanie → Sety — žiadny nový zapisovací callback.
+  **Codex #339 kolo 1 = 5 P2 + 1 P1** a je to poučné čítanie o tom, čo znamená „riadok nesmie klamať": (N1) pri vklade **zo šablóny** náhľad ukazoval projektovú predvoľbu,
+  hoci vložená skrinka dostane set šablóny → zavedený **prospektívny stav setov** (`state_with_template_sets` nad spoločnou `template_sets_selection`, tou istou, akou
+  zmrazuje `freeze_template_sets!` — projekt vyhráva) a payload náhľadu nesie kovanie šablóny cez **tú istú bránu** ako vklad; (N2) prepnutie vkladania na **Dosku**
+  nechalo v karte visieť text skrinky; (N3) odpoveď na dotaz vyslaný ešte za dolnú skrinku **odkryla riadok pri hornej** → generácia sa zdvíha aj pri odchode + typová
+  poistka; (N4) **ľahký push** po zmene setu v Štúdiu obnovil selecty, ale nie vetu; (N5) **memo pásika** neprežilo zmenu setov ani pravidiel počas session, hoci commit
+  staval už s nimi → zneplatnenie z hookov, ktoré o zmene aj tak hovoria panelu. **P1 bol samotný uzáver**: docs tvrdili „D-111 implementované", kým zápisník ho stále
+  viedol ako otvorené a STAV/KRONIKA o v0.9.60 nevedeli — preto je tento odsek súčasťou toho istého PR.
+  **Testy:** headless **3769** (+107 oproti v0.9.57), **104 JS sád**, in-SketchUp **2094 PASS / 0 FAIL** nad G1b a **2107 PASS / 0 FAIL** nad hlavou G2 `b06fd87`.
+  **Poučenia:** (1) worktree agenta **nemá `_dev/ENGINEtests.skp`** (gitignore) — pri in-SU behu ho treba skopírovať, inak runner spadne na chýbajúcom modeli;
+  (2) in-SU asserty **zastarávajú s pravidlami** — ST-3b scenár musel dostať policu a KOV-G zóna čakať ORANGE za nohu aj platničku, lebo G1a/G1b zmenili, čo skrinka vydá;
+  (3) pri mutačnom overovaní testov **nikdy `git checkout <file>`** na súbor s necommitnutými zmenami — vráti ho do HEAD a ticho zahodí prácu (stalo sa, obnovené z pamäte).
+
 - **FIX · VETA `height_selector` MENUJE ODMIETNUTÝ PEVNÝ SET (9.9.2026; PR #336, v0.9.57).**
   Priznaný zvyšok fixu #335: pri pevnom `set_id` pre zásuvku s výškovým variantom (detail `height_selector`) znela veta v Nákupe, paneli aj Kontrole „set „“ nesedí
   so zásuvkou (výber setu nie je podľa výšky zásuvky)" — `resolve_set_id` vracal `[nil, 'set_incompatible', { detail }]` a `unmapped_entry` preberal z `info` len

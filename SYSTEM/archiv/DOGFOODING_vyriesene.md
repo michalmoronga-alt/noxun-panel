@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-111** — Riadok „Nohy" v Základných aj v ghost pásiku povie, aké nohy a príchyty sokla skrinka pri tejto šírke a výške sokla dostane (a set sa dá zmeniť tým istým ovládačom ako v Kovaní) — vyriešené 10.9.2026, blok KOV-G, PR #337 + #338 + #339, v0.9.58–v0.9.60
 - **D-125** — Riadok „Hmotnosť" v Inspectore ukazuje skutočnú hmotnosť skrinky; neznáma hustota sa neignoruje ani nevymýšľa — ráta sa ťažšie a prizná sa („≈" + tooltip, ORANGE v Kontrole) — vyriešené 8.9.2026, PR #328 (KOV-W), v0.9.47
 - **D-121** — Názvy dielcov zásuvky sú ľudské (`Zas dno 2 s1`) a názov riadku VEPO je vždy ≤ 20 znakov (kontrakt v1.2: zlučovanie čísel, orez po slovách s upozornením v Kontrole a LOGu) — vyriešené 8.9.2026, PR #324 + #325, v0.9.45 + v0.9.46
 - **D-95** — Režim krížovej kontroly „diel po diele" — **uzavreté bez implementácie 6.9.2026** (Michal: odškrtávanie ide preč natrvalo, ostáva vizuálna kontrola; presety/X-ray = koncept 01 v zásobníku), bez PR
@@ -107,6 +108,32 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-111 · Výber setu podľa výšky sokla je schovaný (Michal 24.8.2026; vyriešené 10.9.2026 — blok KOV-G, PR #337 + #338 + #339, v0.9.58–0.9.60)
+
+**Pôvodné znenie (presunuté z DOGFOODING.md):**
+
+**D-111 · Výber setu podľa výšky sokla je schovaný** (Michal 24.8., prvý test v0.8.0) — predvoľba, ktorý set kovania sa použije podľa výšky sokla, žije v **Predvoľbách projektu** v sekcii Kovanie. Je
+to nastavenie, ktoré človek hľadá pri **vkladaní skrinky**, nie v katalógu — dnes ho nájde len ten, kto vie, že tam je. *(UX.)*
+
+**Ako sa to vyriešilo (KOV-G2, PR #339).** Pod rozmermi v sektore **Základné** stojí **jeden** riadok **„Nohy"**, ktorý vetou povie, **čo skrinka pri tejto šírke a výške sokla
+dostane** (`6× noha AXILO H100 + platnička · 2× príchyt sokla AXILO`). Má dve cesty a jeden vzhľad: pri **vkladaní** text chodí z čítacieho callbacku `insert_legs_preview`
+(žiadna operácia, žiadny krok Späť, generácia dotazu zahadzuje pomalšie kolo) a pri **označenej skrinke** ho nesie payload skrinky **z už rozpísaných položiek**, takže riadok
+a rozklik položky v Kovaní sa nemôžu rozísť. Vedľa textu stojí **select setu nôh** — **ten istý ovládač** ako v Kovanie → Sety (override per skrinka, existujúca zapisovacia
+akcia, žiadny nový kanál). Rovnaký súhrn (skrátený) má **ghost pásik**, takže „aké nohy to bude" vidieť ešte pred kliknutím do modelu. Riadok sa nekreslí, keď nohy nie sú
+(horná skrinka, sokel 0) a **nepokrytá zóna 20–55 mm** ho zafarbí jantárovo tou istou vetou, akou o nej hovorí Kontrola.
+
+**Čo k tomu bolo treba (dátová a pravidlová vrstva).** **KOV-G1a (PR #337, v0.9.58)** dala setu nôh sedem pásiem podľa výšky sokla (17–20 STRONG klzák, 55–220 Häfele AXILO
++ platnička), nový set **Príchyt sokla AXILO**, generický typ `plinth_clip`, výrobcu Häfele v taxonómii a **9 katalógových kódov** (Démos + Quatro LM).
+**KOV-G1b (PR #338, v0.9.59)** dala počet nôh podľa **šírky korpusu** (< 1000 mm 4, od 1000 mm 6 — pre všetky sety nôh) a pravidlo príchytu sokla (1 na začaté 4 nohy = 1/2)
+**len pri samostatnej soklovej lište** (od 55 mm); stará zákazka na nohách zo staršieho seedu dostane oranžové „prestav ju".
+
+**Codex #339 kolo 1 (5 P2 + 1 P1) — čo ešte muselo padnúť, aby riadok nikdy neklamal:** náhľad pri vkladaní zo **šablóny** ukazoval projektovú predvoľbu, hoci vložená skrinka
+dostane set zo šablóny (prospektívny stav setov) · prepnutie vkladania na **Dosku** nechalo v karte visieť text skrinky · odpoveď na dotaz vyslaný ešte za dolnú skrinku
+**odkryla riadok pri hornej** · úprava setu v súbežne otvorenom **Štúdiu** neobnovila vetu riadku · **ghost pásik** držal súhrn zmrazený zo začiatku session, hoci commit
+staval už so zmenenými setmi. P1 bol tento uzáver (D-111 zostalo otvorené v zápisníku).
+
+**PR:** #337 (v0.9.58) · #338 (v0.9.59) · #339 (v0.9.60).
 
 ### D-125 · Hmotnosť v Inspectore (Základné) je prázdny placeholder (Michal 6.9.2026; vyriešené 8.9.2026 — dávka KOV-W, PR #328, v0.9.47)
 

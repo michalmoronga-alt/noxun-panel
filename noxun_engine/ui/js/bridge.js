@@ -508,11 +508,38 @@
           typeof refreshFrontLift === 'function'){
         refreshFrontLift(d.front_lift);
       }
+      // KOV-G2 (Codex #339 kolo 1 N4): riadok NÔH. Úprava setu nôh alebo názvu
+      // jeho položky v súbežne otvorenom Štúdiu chodí PRÁVE týmto ľahkým pushom
+      // — bez tohto kroku by sa obnovili len `<select>`y a rozpísané riadky
+      // Kovania, kým veta „6× noha AXILO…" by držala starú expanziu až do
+      // ďalšieho označenia skrinky. Text skladá SERVER (`legs_summary`), klient
+      // si z položiek nič neodvodzuje. Kľúč chýba pri staršom payloade aj vtedy,
+      // keď nie je označená skrinka — vtedy sa riadku nedotýkame (patrí náhľadu
+      // vkladania). AŽ ZA `refreshHardwareSets` — berie si z neho ponuku setov.
+      if (d.legs_summary !== undefined && typeof renderLegsRow === 'function'){
+        renderLegsRow(d.legs_summary, d.cabinet_id || '');
+      // KOV-G2 (Codex #339 kolo 2 N1): BEZ označenej skrinky riadok patrí
+      // NÁHĽADU vkladania a `legs_summary` v pushi nechodí — dovtedy sme tu
+      // teda nerobili nič. Lenže tento push nesie práve zmenu mapovania nôh,
+      // definície setu alebo názvov v Štúdiu, a to sú VSTUPY náhľadu, ktoré
+      // v kľúči `nxLegsInsertPeek` nie sú (ten pozná len rozmery a kovanie
+      // šablóny). Karta by teda sľubovala staré nohy až do zmeny rozmeru
+      // alebo preklikania výberu. Pamäť vstupov sa preto zahodí a náhľad si
+      // vypýta znova — tou istou cestou s debounce a generáciou.
+      } else if (!(selectedCabId || '') && typeof nxLegsInsertInvalidate === 'function'){
+        nxLegsInsertInvalidate();
+      }
     },
     // KOV-H2: výsledok hľadania v katalógu pre modal ručnej položky. Odpoveď
     // nesie generáciu dotazu — staršie kolo sa zahadzuje v `hardware.js`.
     hwManualSearchResult: function(res){
       if (typeof hwManualSearchResult === 'function') hwManualSearchResult(res);
+    },
+    // KOV-G2 (D-111): odpoveď náhľadu nôh pre VKLADACIU kartu. Nesie generáciu
+    // dotazu — staršie kolo zahadzuje `hardware.js`. Je to VÝSTUP: nič z toho
+    // sa nikdy nedostane do `collectAll()` ani do vkladacieho payloadu.
+    insertLegsPreview: function(res){
+      if (typeof nxLegsInsertResult === 'function') nxLegsInsertResult(res);
     },
     // KOV-H2: výsledok ZÁPISU ručnej položky. Modal D-15 sa pri odoslaní zamkne
     // a odomyká ho VÝHRADNE volajúci — preto server odpovedá v každej vetve.
@@ -645,6 +672,11 @@
       setCabInfo(c);
       renderPartCard(c.part_card || null); // V0.3 karta dielca (ak je vybraty dielec)
       renderHardware(c.hardware || [], c.hardware_overrides || [], c.hardware_set_options || [], c.cabinet_id || ''); // V0.4 kovanie + D1b sety
+      // KOV-G2 (D-111): riadok Noh v Zakladnych. AZ ZA `renderHardware` — berie
+      // si z neho ponuku setov (`HW_SET_OPTIONS`) pre select typu `leg`.
+      // Vkladaci nahlad sa pritom zrusi: teraz hovori payload skrinky.
+      if (typeof nxLegsInsertReset === 'function') nxLegsInsertReset();
+      if (typeof renderLegsRow === 'function') renderLegsRow(c.legs_summary || null, c.cabinet_id || '');
       renderPreview();
       refreshZoneUI();
     },
@@ -679,6 +711,8 @@
       setCtxNote(null); // ani suhrn skrinky (doska ma vlastnu kartu)
       renderPartCard(null);
       renderHardware(null, []);
+      // KOV-G2 (D-111): doska nohy nema — riadok zmizne aj s pamatou vstupov.
+      if (typeof nxLegsInsertReset === 'function') nxLegsInsertReset();
       clearCabinetMaterials();
       if (lastCabForFit !== null){ lastCabForFit = null; }
       renderBoardCard(b);
@@ -720,6 +754,11 @@
       if (lastCabForFit !== null){ lastCabForFit = null; fitPreview(); }
       renderPartCard(null);      // schovaj kartu dielca
       renderHardware(null, []);  // kovanie len pre oznacenu skrinku
+      // KOV-G2 (D-111): prazdny vyber = navrat do VKLADANIA. Riadok Noh sa
+      // zahodi aj s pamatou vstupov a `nxLegsInsertAsk` si vypyta cerstvy
+      // nahlad pre kartu, ktoru prave postavil `setUiMode`.
+      if (typeof nxLegsInsertReset === 'function') nxLegsInsertReset();
+      if (typeof nxLegsInsertAsk === 'function') nxLegsInsertAsk();
       clearCabinetMaterials();   // korpusove material selecty na "dedi" + disabled
       refreshZoneUI(); renderPreview();
     },
