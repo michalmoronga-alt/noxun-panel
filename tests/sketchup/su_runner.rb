@@ -18076,6 +18076,231 @@ module NoxunSuRunner
     end
   end
 
+  # ===== KOV-I: SABLONY S KOVANIM / BEZ KOVANIA ============================
+  # Realne ulozenie cez panel -> kniznica -> ghost klik. Vsetky katalogy,
+  # sablony, nahlady aj usage su v sandboxe; projektove predvolby sa obnovia
+  # aj po vynimke. Ziadny stub brany setov: poskodenie je RAW atribut modelu.
+  KOVI_CLASS = 'class:slide|classic|metal'
+  KOVI_SET = 'su-kovi-atira-h70'
+  KOVI_TPL = 'SU TEST KOVI'
+  KOVI_HARDWARE_KEYS = %w[hardware_sets hardware_set_defs hardware_manual hardware_overrides].freeze
+
+  def kovi_model_values!(model, values)
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST KOV-I predvolby', true)
+      values.each do |key, value|
+        if value.nil?
+          model.delete_attribute(e::Store::DICT, key)
+        else
+          model.set_attribute(e::Store::DICT, key, value)
+        end
+      end
+      model.commit_operation
+    end
+  end
+
+  def kovi_save(model, source, name, with_hardware)
+    model.selection.clear
+    model.selection.add(source)
+    scripts = []
+    install_js_recorder(scripts)
+    e::Panel.handle_save_template_as(pg(model, 'cabinet_id' => e::Store.get(source, 'cabinet_id'),
+                                              'name' => name, 'type' => 'lower',
+                                              'with_hardware' => with_hardware))
+    [e::TemplateStore.find('cabinet', name), scripts]
+  ensure
+    remove_js_recorder
+  end
+
+  # Set skutocnej ULOZENEJ polozky vysuvu, s rovnakou precedenciou ako Nakup.
+  def kovi_slide_set(model, inst)
+    item = kovc2b_slides(inst).first
+    return nil unless item
+
+    cid = e::Store.get(inst, 'cabinet_id').to_s
+    cfg = e::Store.config(inst) || {}
+    state = e::HardwareSets.project_state(model) || {}
+    e::HardwareSets.resolve_set_id('slide', item.merge('owner_id' => cid),
+                                   { cid => cfg['hardware_sets'] || {} }, state['mapping'] || {}).first
+  end
+
+  def run_kovi(model)
+    cleanup(model)
+    markers = []
+    keys = [e::HardwareSets::MODEL_KEY, e::HardwareRules::MODEL_KEY] + e::Materials::PROJECT_KEYS
+    saved_values = keys.to_h { |key| [key, model.get_attribute(e::Store::DICT, key)] }
+    old_material_dir = e::Materials.test_dir_override
+    old_template_dir = e::TemplateStore.method(:dir)
+    tmp = Dir.mktmpdir('noxun_kovi_')
+    begin
+      e::Materials.test_dir_override = tmp
+      e::TemplateStore.define_singleton_method(:dir) { tmp }
+      kovb1_reset_caches!
+      ok('KOV-I: katalogy, sablony, nahlady a usage su izolovane',
+         [e::HardwareSets.path, e::HardwareRules.path, e::TemplateStore.path,
+          e::TemplatePreviews.dir, e::TemplateUsage.path].all? { |path| path.start_with?(tmp + File::SEPARATOR) })
+      kovi_model_values!(model, keys.to_h { |key| [key, nil] })
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST KOV-I seed projektu', true)
+        e::HardwareRules.ensure_project_rules!(model)
+        e::HardwareSets.ensure_project_state!(model)
+        # Druhy vstup dokonci lazy migraciu uz existujuceho snapshotu.
+        # Samotny vklad BEZ kovania potom nema co prepisovat v predvolbach.
+        e::HardwareSets.ensure_project_state!(model)
+        model.commit_operation
+      end
+      baseline = kovb1_snap_raw(model)
+      custom = e::HardwareSets.load['sets'].find { |s| s['set_id'] == 'atira-antracit-h70-sisy' }
+      raise 'KOV-I: chyba seed Atiry H70' unless custom
+
+      custom = JSON.parse(custom.to_json).merge('set_id' => KOVI_SET, 'name' => 'SU KOVI Atira antracit')
+      state = e::HardwareSets.project_state(model)
+      state['sets'][KOVI_SET] = custom
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST KOV-I zdrojovy set', true)
+        wrote = e::HardwareSets.write_project_state(model, state)
+        model.commit_operation
+        raise 'KOV-I: zapis zdrojoveho setu zlyhal' unless wrote
+      end
+      selector = { 'param' => 'height_variant',
+                   'bands' => [{ 'min' => 70.0, 'max' => 70.0, 'set_id' => KOVI_SET }] }
+      source = e::CabinetBuilder.build(model, kovc2b_params(
+        'material_id' => 'K009_PW_DTDL_18', 'drawer_material_id' => 'UNI_ZASUVKA_16',
+        'hardware_sets' => { KOVI_CLASS => selector },
+        'hardware_manual' => [kovh_free('id' => 'H-KOVI', 'name' => 'SU KOVI rucna polozka', 'qty' => 2)],
+        'hardware_overrides' => [{ 'owner_part_key' => nil, 'generic_type' => 'leg',
+                                  'rule_id' => KOVG_LEG_RULE, 'quantity' => 8 }]
+      ))
+      raise 'KOV-I: zdrojova skrinka nevznikla' unless source
+
+      source_cfg = e::Store.config(source) || {}
+      source_raw = e::Store.get(source, 'config')
+      source_slide = kovc2b_slides(source).first
+      source_front = kovc2b_front(source)
+      ok('KOV-I: zdroj ma automaticku Atiru H70 / NL 470, vlastny set a rucnu polozku',
+         source_front && source_front.dig('drawer', 'system') == 'atira' &&
+         source_slide && source_slide['source'] == 'recipe' &&
+         source_slide.dig('params', 'nominal_length').to_f == 470.0 &&
+         kovi_slide_set(model, source) == KOVI_SET && kovh_manual(source).length == 1 &&
+         !Array(source_cfg['hardware_overrides']).empty? && kovc2b_parts(source).length == 2)
+
+      # 1) Obe volby cez REALNY zapisovy callback, vratane materialov a R12.
+      with_rec, = kovi_save(model, source, "#{KOVI_TPL} s kovanim", true)
+      without_rec, without_scripts = kovi_save(model, source, "#{KOVI_TPL} bez kovania", false)
+      raise 'KOV-I: ulozenie zdravych sablon zlyhalo' unless with_rec && without_rec
+
+      with_cfg = with_rec['config']
+      without_cfg = without_rec['config']
+      ok('KOV-I ulozenie S: set, zmrazena definicia aj rucne polozky su v kniznici',
+         with_cfg.dig('hardware_sets', KOVI_CLASS) == selector &&
+         with_cfg.dig('hardware_set_defs', KOVI_SET) == custom &&
+         with_cfg['hardware_manual'] == source_cfg['hardware_manual'])
+      ok('KOV-I R12: zamky sa do sablony NEPRENASAJU', !with_cfg.key?('hardware_overrides'))
+      ok('KOV-I ulozenie BEZ: ziadne kluce kovania ani hlaska o poskodenych setoch',
+         KOVI_HARDWARE_KEYS.none? { |key| without_cfg.key?(key) } &&
+         without_scripts.none? { |script| script.include?('NX.setStatus') && script.include?('poškodené') })
+      ok('KOV-I: vypnutie kovania zachovalo geometriu, cela aj korpusove materialy',
+         with_cfg.reject { |key, _| KOVI_HARDWARE_KEYS.include?(key) } == without_cfg &&
+         without_cfg['material_id'] == source_cfg['material_id'] &&
+         without_cfg['drawer_material_id'] == source_cfg['drawer_material_id'] &&
+         e::Store.get(source, 'config') == source_raw)
+      summary = e::TemplateStore.hardware_summary(with_cfg)
+      panel_rec = e::Panel.template_list(kind: 'cabinet', usage: false).find { |r| r['name'] == with_rec['name'] }
+      tile = e::TemplatesDialog.tile_row(with_rec)
+      empty_tile = e::TemplatesDialog.tile_row(without_rec)
+      ok('KOV-I badge: kniznica aj obe UI cesty nesu skutocny obsah sablony',
+         summary['has'] == true && summary['manual_count'] == 1 &&
+         Array(summary['sets']).any? { |s| s['set_name'].to_s.include?('SU KOVI Atira antracit') } &&
+         panel_rec && panel_rec.dig('hardware', 'has') == true &&
+         tile.dig('hardware', 'has') == true && !Array(tile.dig('hardware', 'labels')).empty? &&
+         empty_tile.dig('hardware', 'has') == false)
+
+      # 2) Cielovy projekt custom set NEMA: jeho doplnenie musi vratit to ISTE Undo.
+      kovi_model_values!(model, e::HardwareSets::MODEL_KEY => baseline)
+      marker = r03_marker(model, markers)
+      inserted = ghost_place!(model, JSON.parse(with_cfg.to_json).merge(
+        'template_kind' => 'cabinet', 'template_name' => with_rec['name']
+      ))
+      raise 'KOV-I: vklad sablony s kovanim zlyhal' unless inserted && inserted != source
+
+      inserted_front = kovc2b_front(inserted)
+      inserted_slide = kovc2b_slides(inserted).first
+      ok('KOV-I vklad S: rovnaky system, pripnuty recept, automaticka NL aj set',
+         inserted_front && inserted_front['drawer'] == source_front['drawer'] &&
+         inserted_slide && inserted_slide.dig('params', 'nominal_length') == source_slide.dig('params', 'nominal_length') &&
+         kovi_slide_set(model, inserted) == KOVI_SET && kovc2b_parts(inserted).length == 2 &&
+         kovh_manual(inserted) == source_cfg['hardware_manual'] &&
+         Array((e::Store.config(inserted) || {})['hardware_overrides']).empty?)
+      ok('KOV-I vklad S: definicia sa skutocne doplnila do projektoveho snapshotu',
+         (e::HardwareSets.project_state(model) || {}).dig('sets', KOVI_SET) == custom)
+      ghost_teardown!(model)
+      Sketchup.undo
+      ok('KOV-I Spat: jeden krok odstranil vklad AJ zmrazenie setu, zdroj a marker ostali',
+         !inserted.valid? && source.valid? && cabinets(model) == [source] && marker.valid? &&
+         kovb1_snap_raw(model) == baseline && e::Store.get(source, 'config') == source_raw)
+
+      # 3) Bez kovania nevznikne ani prenosovy balik; vysuv vyberie PROJEKT.
+      default_set = e::HardwareSets.resolve_set_id('slide', source_slide, {},
+                                                   e::HardwareSets.project_state(model)['mapping']).first
+      ok('KOV-I default: projektovy set sa lisi od zdroja', default_set == 'atira-biela-h70-sisy')
+      e::Panel.handle_insert(pg(model, JSON.parse(without_cfg.to_json).merge(
+        'template_kind' => 'cabinet', 'template_name' => without_rec['name']
+      )))
+      session = ghost_session
+      ok('KOV-I vklad BEZ: session nenesie ziadny balik kovania', session && session.hardware.nil?)
+      raise 'KOV-I: ghost bez kovania nevznikol' unless session
+
+      ghost_camera!(model, [2400.0, 300.0], 0.0)
+      ghost_click!(model, [2400.0, 300.0, 0.0])
+      plain = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' && i != source }
+      ok('KOV-I vklad BEZ: skrinka dostala projektovy set a nema rucne polozky',
+         plain && kovi_slide_set(model, plain) == default_set && kovh_manual(plain).empty? &&
+         ((e::Store.config(plain) || {})['hardware_sets'] || {}).empty? &&
+         kovc2b_parts(plain).length == 2 && kovb1_snap_raw(model) == baseline)
+      ghost_teardown!(model)
+
+      # 4) POSKODENY REALNY SNAPSHOT: geometria sa ulozi, vsetko kovanie vypadne.
+      damaged = '{ SU KOV-I poskodeny snapshot'
+      kovi_model_values!(model, e::HardwareSets::MODEL_KEY => damaged)
+      ok('KOV-I konflikt: realna brana vidi snapshot ako :invalid',
+         e::HardwareSets.project_state_status(model).first == :invalid)
+      broken_rec, broken_scripts = kovi_save(model, source, "#{KOVI_TPL} poskodene sety", true)
+      broken_cfg = broken_rec && broken_rec['config']
+      ok('KOV-I konflikt: geometria a materialy sa ulozili BEZ setov, definicii aj manualu',
+         broken_cfg == without_cfg && broken_cfg &&
+         KOVI_HARDWARE_KEYS.none? { |key| broken_cfg.key?(key) } &&
+         e::TemplateStore.hardware_summary(broken_cfg)['has'] == false)
+      ok('KOV-I konflikt: status jasne hovori BEZ kovania aj dovod',
+         broken_scripts.any? { |script| script.include?('NX.setStatus') &&
+           script.include?('BEZ kovania') && script.include?('poškodené') })
+      disabled_rec, disabled_scripts = kovi_save(model, source, "#{KOVI_TPL} poskodene vypnute", false)
+      ok('KOV-I konflikt s vypnutou volbou: ulozi geometriu bez kovanioveho varovania',
+         disabled_rec && disabled_rec['config'] == without_cfg &&
+         disabled_scripts.none? { |script| script.include?('NX.setStatus') && script.include?('poškodené') })
+      ok('KOV-I konflikt: ulozenie neopravilo snapshot ani nezmenilo zdrojovu skrinku',
+         kovb1_snap_raw(model) == damaged && e::Store.get(source, 'config') == source_raw)
+    rescue StandardError => ex
+      log_line("FAIL: KOV-I vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    ensure
+      begin
+        remove_js_recorder
+        ghost_teardown!(model)
+        r03_clear_markers(model, markers)
+        cleanup(model)
+        kovi_model_values!(model, saved_values)
+      ensure
+        e::TemplateStore.define_singleton_method(:dir, old_template_dir)
+        e::Materials.test_dir_override = old_material_dir
+        kovb1_reset_caches!
+        FileUtils.remove_entry(tmp) if File.directory?(tmp)
+      end
+      ok('KOV-I cleanup: model prazdny, predvolby aj cesty obnovene, sandbox odstraneny',
+         cabinets(model).empty? && e::Materials.test_dir_override == old_material_dir &&
+         e::TemplateStore.dir == old_template_dir.call && !File.exist?(tmp) &&
+         saved_values.all? { |key, value| model.get_attribute(e::Store::DICT, key) == value })
+    end
+  end
+
   # --- D-118b: PTOs modul a vedome prazdna bunka v ZIVOM nakupe ---------------
   #
   # Headless sada overuje expanziu nad rucne poskladanym stavom; TU ide o cely
@@ -19259,6 +19484,7 @@ module NoxunSuRunner
     run_kove(model)          # KOV-E1b: vyklopy a sklopy — skrinka 600 x 400 x 320 s vyklopom da 22K2300 + kompletny set (mechanizmus, prichyt, krytky), prestavba na HL top pri vyske 600 da 22L2500 + 22L3800 + JEDNU tyc (KH je z KORPUSU, nie z cela), siroka skrinka 1200 dve tyce + predlzenie, Spat/Redo vratia stav NARAZ, reopen (prestavba z ULOZENEHO configu) system vyklopu nestrati, sklop dostane ZAVESY (nikdy vyklopovy mechanizmus), skrinka zo schemy 10 bez vyklopu = RED „Doplniť nové predvoľby" so zastavenymi 3 vystupmi (VEPO bezi) a prestavba ho zhasne; prestavba so STARYM snapshotom pravidiel (seed 4) RED NEZHASNE (zhasne az doplnenie predvolieb + prestavba) a vyklop s RUCNYM kovanim RED nedostane, prestavba mu automat NEVYDA (ORANGE) a v nakupe je mechanizmus prave raz
     run_kovg(model)          # KOV-G1b: nohy 4/6 podla SIRKY + prichyt sokla — „Doplniť nové predvoľby" prepise stare pravidlo noh (`fixed 4`) na pasma podla sirky a doplni `prichyt-sokla`; skrinka 600 so soklom 100 da 4 nohy + 1 prichyt (nakup 4x 9078 + 4x 9079 + 1x 950), zmena sirky na 1200 da 6 + 2 a je to JEDEN krok Spat; sokel 17 mm (klzak) da nohy BEZ platnicky a BEZ prichytu, sokel 40 mm (vedome nepokryta zona) vyda nohy s ORANGE „doplň pásmo" a bez kodu, sokel VPREDU dostane nohy, ale nikdy prichyt; rucny zamok 8 noh prichyt NEZMENI (prichyt je zo SIRKY, O3) a Kontrola to prizna ORANGE `plinth_clip_check` — po zruseni zamku zhasne; RUCNY prichyt 950 vedla automatu sa v nakupe zlepi na 2 ks a stavba k tomu prilozi ORANGE `plinth_clip_manual_duplicate` (automat sa NEPOTLACA)
     run_d118b(model)         # D-118b: PTOs modul a vedome prazdna bunka v ZIVOM retazci kniznica -> predvolby projektu -> vlozena Tip-On zasuvka -> nakup: pri NL 470 pribudne modul 352908 (1 ks, nazov z katalogu), pri NL 620 (kit typu PTO) modul VEDOME nepribudne a NEVZNIKNE ziadna oranzova; snapshot nesie std 6 (od KOV-E1a) a config schemu 8
+    run_kovi(model)          # KOV-I: ulozenie S/BEZ kovania cez panel, badge data, automaticky recept/system/NL, projektove defaulty, 1x Spat vrati vklad aj freeze; poskodeny snapshot ulozi geometriu bez setov AJ manualu + jasny status (izolovane katalogy a sablony)
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
