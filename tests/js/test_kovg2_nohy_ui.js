@@ -28,6 +28,8 @@
 //      -> „(6): riadok Noh patri VYHRADNE dolnej skrinke"
 //   M7 (N4) `NX.setHardwareSets` prestane prekreslovat riadok Noh
 //      -> „(7): lahky push prekresli aj riadok Noh"
+//   M9 (kolo 2 N1) `NX.setHardwareSets` prestane volat `nxLegsInsertInvalidate`
+//      -> „(9): push BEZ oznacenej skrinky obnovi nahlad vkladania"
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
@@ -433,6 +435,42 @@ HW.renderLegsRow({ text: '6× noha PREMENOVANÁ', short: '6× noha PREMENOVANÁ'
                    set_id: 'nohy-podla-sokla', set_name: 'Nohy podľa výšky sokla' }, 'CAB-001');
 eq(textOfEl('legsTxt'), '6× noha PREMENOVANÁ',
    'zmena názvu položky v Štúdiu je v riadku HNEĎ, nie až po preklikaní výberu');
+HW.nxLegsInsertReset();
+
+// ===========================================================================
+// 9) Codex #339 kolo 2 N1: ĽAHKÝ PUSH BEZ OZNAČENEJ SKRINKY OBNOVÍ NÁHĽAD
+// ===========================================================================
+// Mapovanie setu nôh, definícia setu aj názvy jeho položiek sa dajú zmeniť
+// v súbežne otvorenom Štúdiu a chodia PRÁVE týmto pushom — v kľúči
+// `nxLegsInsertPeek` však žiadna z nich nie je. Bez zneplatnenia by vkladacia
+// karta sľubovala staré nohy až do zmeny rozmeru alebo preklikania výberu.
+// Zdroj uz nacitala sekcia 7 (`setHwSrc`) — bridge je tenka vrstva a kontrakt
+// „kto koho vola" sa da overit len na nom.
+ok(setHwSrc.indexOf('nxLegsInsertInvalidate()') >= 0,
+   'push BEZ označenej skrinky obnoví náhľad vkladania');
+ok(setHwSrc.indexOf('renderLegsRow') < setHwSrc.indexOf('nxLegsInsertInvalidate'),
+   'označená skrinka má prednosť — náhľad je až vetva `else`');
+
+HW.nxLegsInsertReset();
+global.selectedCabId = null;
+setFields(600, 100);
+HW.nxLegsInsertAsk();
+HW.nxLegsInsertSend();
+HW.nxLegsInsertResult({ gen: SENT[SENT.length - 1].data.gen, text: '4× noha', tone: 'ok' });
+eq(HW.nxLegsInsertAsk(), false, 'PREMISA: pamäť vstupov drží, nič sa nedopytuje');
+SENT.length = 0;
+ok(HW.nxLegsInsertInvalidate(), 'zmena setov v Štúdiu pamäť zneplatní');
+HW.nxLegsInsertSend();
+eq(SENT.length, 1, 'a náhľad si vypýta znova — tou istou cestou');
+eq(SENT[0].cb, 'insert_legs_preview', 'žiadny nový kanál');
+
+// Mimo vkladania sa nedeje nič (označená skrinka aj kontext dosky).
+global.selectedCabId = 'CAB-009';
+eq(HW.nxLegsInsertInvalidate(), false, 'pri označenej skrinke riadok patrí jej payloadu');
+global.selectedCabId = null;
+global.NXInsert.state.kind = 'board';
+eq(HW.nxLegsInsertInvalidate(), false, 'doska nohy nemá');
+global.NXInsert.state.kind = 'cabinet';
 HW.nxLegsInsertReset();
 
 console.log('OK ' + n + ' assertov (KOV-G2 riadok Noh + ghost segment)');

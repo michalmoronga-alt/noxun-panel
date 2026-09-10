@@ -695,6 +695,11 @@ na Dosku predikát `nxLegsInsertMode` len umlčí, riadok samotný neschová nik
 generáciu** (`nxLegsInsertDrop`). To isté robí prechod na **hornú** skrinku vo `nxLegsApplyVisibility` (N3): bez zdvihnutia generácie by odpoveď na už neplatný dotaz riadok znova
 odkryla — natrvalo. Druhá poistka je v `nxLegsInsertResult`: odpoveď sa prijme len `getType() === 'lower'`.
 
+**Ľahký push obnovuje OBE cesty.** `NX.setHardwareSets` (živý refresh po zmene v Štúdiu) pri **označenej** skrinke prekreslí vetu riadku (`legs_summary`, N4). **Bez označenej skrinky** riadok
+patrí náhľadu vkladania a `legs_summary` v pushi nechodí — dovtedy sa teda nedialo nič. Lenže práve ten push nesie zmenu **mapovania nôh, definície setu alebo názvov položiek**, a to sú
+vstupy náhľadu, ktoré v jeho kľúči **nie sú** (ten pozná len rozmery a kovanie šablóny). Vetva `else` preto volá **`nxLegsInsertInvalidate`** (Codex #339 kolo 2 N1): zahodí `legsLastKey`
+a vypýta si náhľad znova **tou istou cestou** (debounce + generácia). Mimo vkladania (označená skrinka, kontext dosky) sa nedeje nič — rozhoduje `nxLegsInsertMode`.
+
 **Klikateľné sú len tie údaje, ktoré niekam vedú (N13):** „Dielcov" → `nx_select_parts` → `Panel.handle_select_parts` = **čisté čítanie + zmena výberu** pod
 `suspend_selection_sync` a refresh `dedup: false` (vzor `ProductionCore.do_select`; **žiadny `start_operation`, žiadny krok Späť**), s prísnym guardom `model_guid` + `cabinet_id`
 (asynchrónny callback). Klik má **rovnaký flush handshake ako „Vložiť kópiu"** (Codex audit UI-B3): zmena výberu si vypýta push celej skrinky, ktorý prepíše formulár — rozpísaný

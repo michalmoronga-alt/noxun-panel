@@ -518,6 +518,16 @@
       // vkladania). AŽ ZA `refreshHardwareSets` — berie si z neho ponuku setov.
       if (d.legs_summary !== undefined && typeof renderLegsRow === 'function'){
         renderLegsRow(d.legs_summary, d.cabinet_id || '');
+      // KOV-G2 (Codex #339 kolo 2 N1): BEZ označenej skrinky riadok patrí
+      // NÁHĽADU vkladania a `legs_summary` v pushi nechodí — dovtedy sme tu
+      // teda nerobili nič. Lenže tento push nesie práve zmenu mapovania nôh,
+      // definície setu alebo názvov v Štúdiu, a to sú VSTUPY náhľadu, ktoré
+      // v kľúči `nxLegsInsertPeek` nie sú (ten pozná len rozmery a kovanie
+      // šablóny). Karta by teda sľubovala staré nohy až do zmeny rozmeru
+      // alebo preklikania výberu. Pamäť vstupov sa preto zahodí a náhľad si
+      // vypýta znova — tou istou cestou s debounce a generáciou.
+      } else if (!(selectedCabId || '') && typeof nxLegsInsertInvalidate === 'function'){
+        nxLegsInsertInvalidate();
       }
     },
     // KOV-H2: výsledok hľadania v katalógu pre modal ručnej položky. Odpoveď

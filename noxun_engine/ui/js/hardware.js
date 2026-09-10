@@ -2250,6 +2250,20 @@
     return nxLegsHideRow();
   }
 
+  // KOV-G2 (Codex #339 kolo 2 N1): ZNEPLATNENIE PAMATE VSTUPOV. Nohy zavisia
+  // aj od veci, ktore v karte NESTOJA — projektove mapovanie setu noh, samotna
+  // definicia setu a nazvy jeho katalogovych poloziek. Tie sa daju zmenit
+  // v subezne otvorenom Studiu a prichadzaju lahkym pushom (`setHardwareSets`),
+  // v kluci `nxLegsInsertPeek` vsak ziadna z nich nie je. Bez tohto kroku by
+  // vkladacia karta slubovala STARE nohy az do zmeny rozmeru alebo prepnutia
+  // vyberu. Pamat sa preto zahodi a nahlad sa vypyta znova TOU ISTOU cestou
+  // (debounce + generacia); mimo vkladania sa nedeje nic.
+  function nxLegsInsertInvalidate(){
+    if (!nxLegsInsertMode()) return false;
+    legsLastKey = null;
+    return nxLegsInsertAsk();
+  }
+
   // Odpoved servera. Starsia generacia sa ZAHODI (pomalsie kolo nesmie prepisat
   // cerstvejsi vysledok) a rovnako sa zahodi odpoved, ktora dosla uz po
   // oznaceni skrinky (vtedy riadok patri jej payloadu) alebo po prepnuti na iny
@@ -2368,6 +2382,7 @@
       nxLegsInsertPeek: nxLegsInsertPeek, nxLegsInsertReset: nxLegsInsertReset,
       nxLegsTemplateHw: nxLegsTemplateHw, nxLegsInsertDrop: nxLegsInsertDrop,
       nxLegsApplyVisibility: nxLegsApplyVisibility,
+      nxLegsInsertInvalidate: nxLegsInsertInvalidate,
       legsGenState: function(){ return legsGen; },
       // Zivy refresh ponuky setov a zapis vyberu — riadok Noh ich zdiela
       // s kontextom Kovanie (ziadny vlastny kanal).

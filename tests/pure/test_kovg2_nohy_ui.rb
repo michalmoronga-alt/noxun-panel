@@ -631,3 +631,19 @@ NxTest.test('KOV-G2 (10): DOSKOVA vetva vkladacej karty riadok Noh RESETUJE (N2)
   NxTest.assert(body.include?('nxLegsInsertReset()'),
                 'bez neho ostal v doskovej karte visiet text NOH poslednej dolnej skrinky')
 end
+
+# --- 11) Codex #339 kolo 2 N1: OBNOVA NAHLADU PO LAHKOM PUSHI ----------------
+#
+# Mapovanie setu noh a nazvy poloziek sa daju zmenit v subezne otvorenom Studiu
+# a chodia LAHKYM pushom; v kluci vstupov nahladu ziadne nie su, preto push bez
+# `legs_summary` (stav BEZ oznacenej skrinky) pamat zneplatni.
+
+NxTest.test('KOV-G2 (11): lahky push BEZ oznacenej skrinky obnovi NAHLAD (N1)') do
+  src = NxKovG2.src('ui/js/bridge.js')
+  body = src[/setHardwareSets: function\(data\)\{.*?\n    \},/m].to_s
+  NxTest.refute(body.empty?, 'PREMISA: telo `setHardwareSets` sa naslo')
+  NxTest.assert(body.include?('nxLegsInsertInvalidate()'),
+                'zmena mapovania noh v Studiu je vstupom nahladu, hoci v jeho kluci nie je')
+  NxTest.assert(body.index('renderLegsRow') < body.index('nxLegsInsertInvalidate'),
+                'oznacena skrinka ma prednost — nahlad je AZ vetva `else`')
+end
