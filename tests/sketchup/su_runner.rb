@@ -10149,8 +10149,13 @@ module NoxunSuRunner
   end
 
   def st3b_scenar(model, rd)
+    # KOV-G1b: pravidlo noh uz nie je `fixed` (pasma podla sirky), takze
+    # scenar `fixed` pravidla potrebuje policu — `podperky-policove` (4 ks)
+    # je jedine seed pravidlo s pevnym poctom na spodnej skrinke.
     inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
-                                            'height' => 720.0, 'depth' => 560.0 })
+                                            'height' => 720.0, 'depth' => 560.0,
+                                            'zone_tree' => { 'id' => 'Z1', 'shelves' => 1,
+                                                             'children' => [] } })
     return ok('ŠT-3b-1: vlozenie skrinky pre scenar pravidiel', false) unless inst
 
     rec = []
@@ -17791,9 +17796,13 @@ module NoxunSuRunner
     ok("KOV-G zona: sokel 40 mm da nohy, ale ziadny prichyt (#{kovg_hw(inst).inspect})",
        kovg_hw(inst) == { 'leg' => 4 })
     un = kovg_ctrl(model).select { |i| i['category'] == e::Validation::CAT_HW_UNMAPPED }
-    ok("KOV-G zona: Kontrola hlasi ORANGE „doplň pásmo“ pre nohy (#{un.length})",
-       un.length == 1 && un.first['severity'] == 'orange' &&
-       un.first['message_sk'].to_s.include?('Nohy'))
+    # Set noh ma DVOCH clenov s pasmami (noha + platnicka) a pri sokli 40 mm
+    # nema pasmo ani jeden -> Kontrola hlasi ORANGE za KAZDEHO clena zvlast
+    # (rovnaka cesta `param_band_missing` ako doteraz, len dvakrat).
+    ok("KOV-G zona: Kontrola hlasi ORANGE „doplň pásmo“ pre nohy — noha aj platnička (#{un.length})",
+       un.length == 2 && un.all? { |i| i['severity'] == 'orange' && i['message_sk'].to_s.include?('Nohy') } &&
+       un.any? { |i| i['message_sk'].to_s.include?('(noha)') } &&
+       un.any? { |i| i['message_sk'].to_s.include?('(platnička)') })
     ok("KOV-G zona: nakup pre tento sokel ziadny kod nohy nevyda (#{kovg_codes(model).inspect})",
        kovg_codes(model).empty?)
     cleanup(model)
