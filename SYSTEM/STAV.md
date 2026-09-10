@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.10.2 · 10.9.2026 — D-122: Kontrola zoskupuje UNI upozornenia; blok KOVANIE ostáva uzavretý.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.10.3 · 10.9.2026 — D-122/D-124: zoskupené UNI upozornenia a prehľadné predvoľby materiálov; blok KOVANIE ostáva uzavretý.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -18,20 +18,20 @@ nálezy z výroby a chyby v cenách majú **najvyššiu prioritu** ([PLAN.md](PL
 **Pozor na kompatibilitu:** blok KOVANIE priniesol sériu schema bumpov — čo uloží v0.10.0, to starší plugin už nepoužije (model/šablóna `CONFIG_SCHEMA`, plán `BuildPlan::SCHEMA` 5,
 knižnica setov a snapshot `std`, katalóg kovania `schema`). Pred prvou takou zákazkou aktualizovať **obe PC** (updater D-52: Štúdio → O plugine → Aktualizovať).
 
-**Testy k v0.10.2:** **3789 headless** · **106 JS sád** · D-122 overené aj v prehliadači. Posledné in-SketchUp **2174 PASS / 0 FAIL** nad D-123 `3b07615` (10.9.2026); D-122 mení iba zobrazenie.
+**Testy k v0.10.3:** **3789 headless** · **107 JS sád** · D-122/D-124 overené aj v prehliadači. Posledné in-SketchUp **2174 PASS / 0 FAIL** nad D-123 `3b07615` (10.9.2026); následné dávky menia iba UI.
 
 ## Robí sa
 
 **Blok KOVANIE je uzavretý.** Posledná dávka **KOV-I** (šablóny s voliteľným kovaním, PR #340, v0.9.61) je v maine; uzáver **v0.10.0** (PR #341) presunul blok do archívu.
 Následný fix **D-123** (PR #342, v0.10.1) opravuje voľné vkladanie na plochu. **D-122** (PR #343, v0.10.2) zbalí UNI hlásenia do jednej skupiny pri zachovaní jednotlivých akcií a počtov.
-**Michal schválil 10.9. postup D-122 → D-124 až po merge a odovzdanie.** Nasledujú predvoľby materiálov: štyri skupiny, otvorený blok, vzorky **115 px** (mockup mínus 20 %).
+**Schválený rozsah D-122 → D-124 je dokončený.** D-124 (PR #344, v0.10.3): štyri predvoľby v otvorenom bloku, vzorky **115 px** (mockup mínus 20 %), pôvodný picker a potvrdenia.
 **Čaká večerný smoke a dogfooding** KOV-G, KOV-I, D-123 a malých UI dávok. **BALÍK ČIEL** D-114 + D-119 + D-120 ostáva ďalšou samostatnou prácou (audit ÁNO).
 **Blok 1d** beží podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**. Blok **1b** je uzavretý, **1c/1e hotové**.
 **Toto schválené sedenie orchestruje Codex s právom merge po testoch a GH review**; subagenti podľa potreby (Michal 10.9.). Nezávislé review z rodiny Claude je vedome odložené.
 
 ## Ďalší krok
 
-**Poradie schválené pre toto sedenie:** ~~KOVANIE (A → I + uzáver)~~ → ~~D-123 fix~~ → ~~D-122~~ → **D-124**. Potom **BALÍK ČIEL (D-114 + D-119 + D-120)** a zvyšok V1 podľa [V1_VIZIA.md](V1_VIZIA.md)
+**Schválené sedenie:** ~~KOVANIE (A → I + uzáver)~~ → ~~D-123 fix~~ → ~~D-122~~ → ~~D-124~~. Ďalšiu prácu vyberie Michal: **BALÍK ČIEL (D-114 + D-119 + D-120)** a zvyšok V1 podľa [V1_VIZIA.md](V1_VIZIA.md)
 (spotrebiče S1, ceny, konštrukcia K1/K2/K3, V1.0 zostavy); súbežne **1d** podľa kapacity.
 Každá dávka: package v [PLAN.md](PLAN.md) (autorita) → `codex-audit` (risk-based) → subagent vo worktree → `codex-po-pr` → merge → uzáver dávky podľa checklistu v [../CLAUDE.md](../CLAUDE.md).
 

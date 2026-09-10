@@ -454,6 +454,10 @@ s `.kbd` nápovedou). Zvýraznenie zhody je `<mark>` s vlastným tokenom
 > zámerne **nepreberá** — sú to rôzne veci (voľný text vs. výber z katalógu).
 > Projektové predvoľby žijú tiež tam, nie v paneli.
 
+**D-124 — predvoľby materiálov v Štúdiu (v0.10.3):** rozbalený, ručne zbaliteľný blok so štyrmi skupinami vedľa seba; v úzkom okne dva stĺpce. Vzorka **115 × 115 px** (8 px rádius),
+pod ňou pôvodný picker a údaje o variante. Celý serverový label sa zalamuje bez skrátenia, aby nezmizlo rozlíšenie formátu/rubu; duplicitný malý swatch triggera sa skryje iba v tomto
+bloku. UNI má označenie pracovného materiálu namiesto hrúbky. Zbalenie prežije refresh; potvrdzovacia lišta je jedna pod celou mriežkou. Všetky CSS úpravy sú ohraničené na blok.
+
 ### 4.1 SketchUp toolbar (UI-02)
 
 Toolbar „Noxun Engine" je **jediné miesto, kde značka vystupuje mimo panela**.

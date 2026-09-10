@@ -1988,6 +1988,15 @@ katalóg, aby k `uni_id` našiel dlaždicu. Je jednorazová a zomiera so zatvore
 pri prepnutí sekcie z `#secbody` len vypadne a pri návrate sa vráti — `NX.setStudio` ho **nikdy neprekresľuje**, takže rozpísaný formulár „+ variant" ani rozpísaná bunka ceny sa
 nestratia (audit #2; fokus a dirty baseline obnovuje `mdRenderAll`).
 
+**D-124 (v0.10.3): predvoľby projektu sú od prvého zobrazenia rozbalené** — `open` je iba v šablóne, takže ručné zbalenie drží perzistentný uzol aj cez refresh/návrat do sekcie.
+Štyri skupiny Korpus/Čelá/Chrbát/Zásuvky majú vzorky **115 × 115 px** (schválený mockup mínus 20 %), pod nimi pôvodný `NXCombo` a metadáta; úzke okno má dva stĺpce. Celý serverový
+label sa zalamuje bez orezania, aby ostal viditeľný výrobca pri kolízii aj rozlišujúci formát/rub. Spoločný picker sa nemení. Jedna `mdConfirmBar` pod mriežkou slúži korpusu aj zásuvkám.
+`mdRenderProjectPreview` odvodzuje obrázok/meta z aktuálnej hodnoty selectu a presného `material_id` v katalógu (fallback zúžený `MD_SHEETS`); nevytvára druhú pamäť vybraných ID.
+Volajú ho `mdRenderAll` po naplnení polí a scane, `mdSetProjectSelect` pri potvrdení/odmietnutí bez `change` aj používateľský `onProjMaterial`. Návrat selectu preto vráti aj vzorku.
+Obrázok ide existujúcim `mdImageSrc` len z `image_file` emitovaného serverom; chýbajúci/nečitateľný súbor nechá RGB, neznámy materiál nedostane náhodnú vzorku. **UNI nesie text
+„Pracovný materiál UNI“, nie katalógovú hrúbku**. Skutočné tlačidlo pickeru dostáva prístupné meno roly + celého vybraného labelu; dekoratívna vzorka má `aria-hidden`/prázdne alt.
+Potvrdzovanie, `model_guid`, serverové predvoľby, dedenie aj Undo používajú pôvodné cesty bez zmeny kontraktu.
+
 **Modály sekcie žijú v kotve `#matModalRoot` MIMO `#secbody`** (vzor `#nxModalRoot`).
 
 **Lišta je čistá funkcia `matToolsHtml(state)`** — `[Pridať z Demosu] · [Pridať ručne] · [hľadanie] · [zoskupenie] · ⟶ · [Obnoviť zálohu] · [Obnoviť]`; **primárnym tlačidlom je od
