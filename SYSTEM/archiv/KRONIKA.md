@@ -17,6 +17,40 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **UZÁVER BLOKU KOVANIE — PLUGIN VIE KOVANIE SÁM (2.–10.9.2026; slices 0 · A · H · B · C · D · W · F · E · G · I, 50 PR #277 → #340, v0.9.14 → v0.10.0).**
+  Blok začal 2.9. updaterom **D-52** (bez „Aktualizovať jedným klikom" by séria schema bumpov rozhádzala dve PC) a skončil 10.9. šablónami. Vstupom bola architektúra
+  V1 uzavretá po cross-audite Codex/GLM/Opus (`zdroje/next_sessions/KOVANIE_V1_ARCHITEKTURA_2026-09-02_FINAL.md`) + schválený mockup (`zdroje/ui20/mockup_kovanie_v1.html`).
+  **Čo blok dal používateľovi:** klasifikované sety a katalógovú položku (typ použitia · otváranie · konštrukcia zásuvky · výrobca · rada) so stromom Kategória → Výrobca →
+  Rada a editorom setu so živým náhľadom · **zásuvku z nemenného receptu** (Atira, Quadro V6: dielce, výška, NL, nosnosť aj objednávací kit z jedného zdroja) s výberom
+  setu, zámkami osí a explicitným povýšením receptu · **závesy** podľa Noxun tabuľky a Tip-On ako vlastný set · **výklopy AVENTOS HK top / HL top** zo silového vzorca nad
+  výškou a **hmotnosťou čela** (hmotnosť priniesla KOV-W) · **nohy 4/6 podľa šírky korpusu + príchyt sokla**, viditeľné vetou v Základných **už pri vkladaní** ·
+  **šablóny s voliteľným kovaním** · **ad-hoc kovanie** priamo v Inspectore · katalóg s **kódmi, ktoré si plugin sám objednáva** (114 položiek zo seedu D-118, AXILO/STRONG z KOV-G).
+  Vyriešené postrehy: **D-52 · D-110 · D-111 · D-115 · D-116 · D-118 · D-121 · D-125**.
+  **KOV-I — ŠABLÓNY S VOLITEĽNÝM KOVANÍM (PR #340, v0.9.61)** je posledná dávka bloku a jediná, ktorá vlastný záznam nemala: mini-modal ukladania šablóny dostal voľbu
+  **„Uložiť aj kovanie (sety a ručné položky)"** (predvolene zapnutá, pamäť poslednej voľby na PC — dovtedy sa kovanie zmrazovalo VŽDY), dlaždice v Inspectore aj v Štúdiu
+  ukazujú ikonu a **súhrn** uloženého kovania z čistej `TemplateStore.hardware_summary`. **Žiadne nové perzistentné pole** — `with_hardware` je len voľba callbacku,
+  `hardware` len odvodený UI payload, `STD` aj `CONFIG_SCHEMA` ostali nezmenené; Štúdio dostáva krátke texty, nie celé definície. **Poškodený zdroj setov = uloží sa
+  konštrukcia bez CELÉHO kovania vrátane ručných položiek** a stav povie dôvod (rozhodnutie Michala 10.9. — pôvodne ostávali ručné položky). **R12 rozhodnuté:**
+  `hardware_overrides` a mapovania na jednotlivé čelá sa **neprenášajú** a UI to priznáva; pôvodne navrhnutý hint „Materiály sa neukladajú" bol **nepravdivý** (materiály
+  korpusu, čiel, chrbta aj zásuviek sa prenášajú od začiatku) — text sa opravil namiesto zmeny správania. Nová in-SU sekcia `run_kovi`.
+  **Kľúčové rozhodnutia bloku, ktoré platia ďalej:** **O1** neurčený smer dvierok = RED hneď, žiadny default ani heuristika smeru nikde v kóde · **O2** `drawer_no_fit`
+  a jeho trieda = **tvrdý blocker** nákupu aj cenových exportov s fail-closed emisiou dielcov (VEPO chráni geometria) · **O3** pomerový člen D-109 sa vo V1 nerobí, výsledok
+  dá bands pravidlo na šírku (**R-05** po V1) · **nemenné recepty**: fyzika v recepte, **objednávacie kódy v setoch** — dve vrstvy, každá s jednou zodpovednosťou ·
+  **nákup nikdy nemení fyzický návrh** (chýbajúci kód = RED a rozhodne človek, žiadny fallback na inú NL) · **EB pevné per recept** · **príchyt sokla zo šírky korpusu**
+  (1 ks na začaté 4 nohy, len pri samostatnej soklovej lište od 55 mm) · **R12: zámky sa do šablóny neprenášajú** · zóna sokla **20–55 mm ostáva vedome nepokrytá** (ORANGE,
+  nie vymyslený produkt).
+  **Poučenia procesu (9 dní × 50 PR):** (1) **risk-based `codex-audit`** sa osvedčil — audit pred implementáciou bežal len tam, kde sa menil dátový kontrakt, schéma alebo
+  pribúdal modul (C, D, B1, G1a), a práve tie dávky mali najviac nálezov; UI dávky išli rovno do implementácie bez škody. (2) **Pravidlo 3 kôl má zmysel aj vo svojich
+  výnimkách:** KOV-C v13 (PR #300) po 4 CLI + 9 GH kolách **NEKONVERGOVALO** a jediná správna reakcia bola PR zavrieť a package prepísať (v2: nemenné recepty, kódy
+  v setoch, žiadny fallback) — potom sa celý slice C dorobil za ~20 h; naopak pri **G1a** boli tri kolá **vedomá odchýlka**, lebo nálezy trafili dátovú vrstvu, ktorá sa
+  zamrazí do .skp, a rozdelenie PR by ich len presunulo. (3) **Delta-verifikácia** (fix push + reply + interné overenie výhradne fix commitov) ušetrila Codex kolá bez straty
+  kvality — plné GH kolo sa vyžiadalo len pri P1/P0 alebo zmene konceptu. (4) **In-SU testy sú pri builderoch a observeroch nenahraditeľné** — headless sada nechytí geometriu
+  ani undo; in-SU chytilo, čo headless nie (KOV-C, KOV-G). (5) Vždy sa vyplatilo **nechať server skladať vetu** (`legs_summary`, `explain`) — panel, ktorý si text odvodzuje
+  sám, sa skôr či neskôr rozíde s nákupom. **Testy pri uzávere: 3788 headless · 105 JS sád · in-SketchUp 2134 PASS / 0 FAIL** nad hlavou KOV-I `c6b0c94`.
+  **Uzáver:** minor bump **v0.10.0** (VERSION 2× + všetky `?v=`), plný text bloku presunutý z [../PLAN.md](../PLAN.md) do [ROADMAP_hotove_etapy.md](ROADMAP_hotove_etapy.md);
+  v živom pláne ostali len nehotové zvyšky — **D-114 balík Čiel** (s D-119 a D-120) v bloku **4 · V1 DOTIAHNUTIE** a zoznam **Mimo V1** v sekcii **Po V1 — zásobník**.
+  Ďalej: balík Čiel → fix **D-123** (ghost bez zámku Z so soklom) → **D-122 / D-124**; smoke KOV-G a KOV-I robí Michal na reálnej zákazke.
+
 - **KOV-G · NOHY 4/6, PRÍCHYT SOKLA A SET NÔH VIDITEĽNÝ UŽ PRI VKLADANÍ (9.–10.9.2026; PR #337 + #338 + #339, v0.9.58 → v0.9.60; D-111 vyriešené).**
   Slice G bola posledná „malá" dávka bloku KOVANIE pred šablónami (I) a mala tri vrstvy: **dáta → pravidlá → UI**. Rozhodnutia Michala (9.9.2026) pred štartom:
   **STRONG klzák pre pásmo 17–20 mm** (lacný, bez lišty), **zóna 20–55 mm ostáva vedome nepokrytá** (ORANGE, nie vymyslený produkt), **AXILO sa objednáva od Quatro LM**

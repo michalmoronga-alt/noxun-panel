@@ -16,19 +16,17 @@ v [PLAN.md](PLAN.md) — **D-51 uzavreté 6.9.2026** (archív); **D-27** je vyri
 a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9.16). Skupina je prázdna.)*
 
 
-## KOVANIE — vlastný blok (za GHOST VKLADANÍM; poradie rozhodol Michal 26.8.)
+## Balík Čiel — k bloku 4 · V1 DOTIAHNUTIE
 
-*(Blok v [PLAN.md](PLAN.md) sa 26.8. vyčlenil z bloku 4; predpoklad štartu je USER-debata o setoch.)*
+*(**Blok KOVANIE je od 10.9.2026 uzavretý** — v0.10.0, plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).
+Postrehy nižšie sa v ňom vedome neriešili: tvoria **UI/UX balík kontextu Čelá**, ktorý pri uzávere prešiel do bloku **4 · V1 DOTIAHNUTIE**
+v [PLAN.md](PLAN.md), odrážka „BALÍK ČIEL". Čo z bloku KOVANIE ostalo mimo V1 (D-109), je v skupine **Po V1 — zásobník** nižšie.)*
 
-- **D-109 · Pomer člena setu „1 ks na N nôh"** (Michal 24.8., prvý test v0.8.0) — set kovania vie dnes počítať člena len **per unit** (na kus) alebo **per owner** (na skrinku). Chýba pomer typu „**1
-  príchyt sokla na 4 nohy**": pri príchytoch soklovej lišty sa počet neviaže na skrinku ani na jednotlivú nohu, ale na ich **počet**. Dnes sa to musí dopočítať ručne — a práve to má set robiť za
-  človeka. *(Nefixované v TEST-1: mení dátový model setu.)* *Stav: výsledok (1 príchyt na začaté 4 nohy) dáva od KOV-G1b pravidlo `prichyt-sokla` podľa šírky (O3);
-  nesúlad po ručnom zámku nôh hlási Kontrola ORANGE `plinth_clip_check`; pomerová mechanika = R-05 po V1.*
 - **D-114 · Rad piktogramov namiesto tlačidiel „+ pridaj dvere" / „+ pridaj čelo" + upratanie kontextu Čelá** (Michal 3.9., smoke v0.9.20 po KOV-A) — nové čelo sa má pridávať
   **priamo výberom typu**: namiesto dvoch textových tlačidiel jeden rad dlaždíc s tými istými sprite ikonami ako typegrid karty (dvierka · zásuvka · výklop · sklop · blenda; „bez
   čela" rozhodnúť), klik = nový riadok daného typu (dvierka ďalej cez výrobcu smeru „neurčené", pravidlo (a) karty). Rad zaberie **ten istý jeden riadok** ako dnešné dve tlačidlá.
-  Michal zároveň: „celkovo UI čiel bude treba po tomto zásahu upratať — necháme na koniec, opäť spravíme UI/UX balík". *Stav: ZAPÍSANÉ — UI/UX balík kontextu Čelá **na koniec
-  bloku KOVANIE** (po KOV-D/E/F, keď bude známy celý obsah karty: zámky osí, závesy, resolved systém); dovtedy sa nerobí.*
+  Michal zároveň: „celkovo UI čiel bude treba po tomto zásahu upratať — necháme na koniec, opäť spravíme UI/UX balík". *Stav: OTVORENÉ — od uzáveru bloku KOVANIE (10.9.2026) je to **UI/UX balík Čiel v bloku 4 · V1 DOTIAHNUTIE** ([PLAN.md](PLAN.md), odrážka „BALÍK ČIEL");
+  celý obsah karty čela je už známy (typy z KOV-A, zámky osí a systém zásuvky z KOV-C/D, závesy z KOV-F, výklopy z KOV-E), takže balík sa môže robiť.*
 - **D-119 · Presah dverí do strán per strana** (Lucia 6.9., prvý test pluginu na jej notebooku) — presah/okraj čela do strán je dnes **jedna hodnota pre obe strany**
   (`gap_sides`, Čelá); v praxi treba ľavú a pravú stranu nastaviť **zvlášť** (napr. čelo presahuje cez bok len na viditeľnej strane, pri susede ostáva škára). Hore/dole už
   zvlášť sú (`gap_top` / `gap_bottom`). *Stav: OTVORENÉ — zaradiť do UI/UX balíka kontextu Čelá (D-114) alebo skôr, ak blokuje prácu; mení config čela (CONFIG_SCHEMA bump).*
@@ -86,6 +84,13 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 
   *Stav: na návrhovú dávku — od 26.8. SAMOSTATNE (bez väzby na D-48, ktorý je mimo V1); distribučný kanál jednoducho, napr. zdieľaný priečinok.*
 ## Po V1 — zásobník
+
+- **D-109 · Pomer člena setu „1 ks na N nôh"** (Michal 24.8., prvý test v0.8.0) — set kovania vie dnes počítať člena len **per unit** (na kus) alebo **per owner** (na skrinku). Chýba pomer typu „**1
+  príchyt sokla na 4 nohy**": pri príchytoch soklovej lišty sa počet neviaže na skrinku ani na jednotlivú nohu, ale na ich **počet**. Dnes sa to musí dopočítať ručne — a práve to má set robiť za
+  človeka. *(Nefixované v TEST-1: mení dátový model setu.)* *Stav: **MIMO V1 (uzáver bloku KOVANIE 10.9.2026)** — praktický výsledok
+  (1 príchyt na začaté 4 nohy) dáva od KOV-G1b pravidlo `prichyt-sokla` podľa šírky korpusu (rozhodnutie O3), nesúlad po ručnom zámku
+  počtu nôh hlási Kontrola ORANGE `plinth_clip_check`; chýba už len samotná **pomerová mechanika** setu = **R-05 po V1**
+  ([PLAN.md](PLAN.md), „Po V1 — zásobník").*
 
 - **EN DANIELI textový export** výrobného zadania (Michal: „po E") — **vedome odložené z dávky E** (6.8., nič z toho neblokuje prácu so zákazkou); supplier-agnostický výstup. *Stav: **MIMO V1 (Michal 6.9.2026)** — zásobník.*
 - **D-106 · Predbežná cena korpusu v informačnom stĺpci Základných** (Michal 20.8., smoke test Inspector reworku) — pri návrhu skrinky chýba **orientačný náklad**: koľko tá skrinka zhruba stojí ešte
