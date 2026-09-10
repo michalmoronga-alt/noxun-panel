@@ -17919,6 +17919,14 @@ module NoxunSuRunner
     'members' => [{ 'per' => 'unit', 'qty' => 1, 'label' => 'noha', 'code' => '272212' }]
   }.freeze
 
+  # Codex #339 kolo 1 N1: set, ktory pride SO SABLONOU — v projekte NIE JE,
+  # takze nahlad aj pasik ho mozu poznat len z definicii v payloade vkladu.
+  KOVG2_TPL_SET = {
+    'set_id' => 'kovg2-sablona-nohy', 'name' => 'KOV-G2 nohy zo sablony',
+    'generic_type' => 'leg',
+    'members' => [{ 'per' => 'unit', 'qty' => 1, 'label' => 'noha', 'code' => '272212' }]
+  }.freeze
+
   def kovg_nohy_ui(model)
     markers = []
     # --- 1) NAHLAD PRE VKLADACIU KARTU je CITACI ----------------------------
@@ -17993,6 +18001,38 @@ module NoxunSuRunner
     ok('KOV-G2 pasik: DOSKA o nohach nehovori (kluc v pushi vobec nie je)',
        !bp.key?('legs_short') && !bp.key?('legs_tone'))
     e::GhostTool.cancel_session('SU-TEST KOV-G2', deferred: false)
+
+    # --- 5) SABLONA S VLASTNYM SETOM NOH (Codex #339 kolo 1 N1) -------------
+    #
+    # Vklad zo sablony nesie mapovanie setov AJ ich definicie a skrinka ich pri
+    # kliku naozaj dostane (`ghost_freeze_hardware`). Nahlad, ktory ich
+    # prehliadne, ukazuje PROJEKTOVU predvolbu — teda nohy, ktore skrinka
+    # nedostane. Set zo sablony v projekte ZAMERNE NIE JE (uz jeho definicia
+    # musi docestovat s dotazom).
+    tpl_hw = { 'hardware_sets' => { 'leg' => KOVG2_TPL_SET['set_id'] },
+               'hardware_set_defs' => [KOVG2_TPL_SET.dup] }
+    m3 = r03_marker(model, markers)
+    res2 = nil
+    kovh2_capture_js do |calls|
+      e::Panel.handle_insert_legs_preview(
+        { 'gen' => 12, 'type' => 'lower', 'width' => 1200.0, 'floor_height' => 100.0,
+          'plinth_mode' => 'none' }.merge(tpl_hw).to_json
+      )
+      res2 = calls.first.to_s
+    end
+    ok("KOV-G2 sablona: nahlad ukaze set ZO SABLONY (#{res2[0, 220]})",
+       res2.include?('Klzák') && !res2.include?('noha AXILO'))
+    Sketchup.undo
+    ok('KOV-G2 sablona: nahlad ani so sablonou NEROBI krok Spat', !m3.valid?)
+
+    e::Panel.handle_insert(pg(model, kovg_params(1200.0, 100.0).merge(tpl_hw)))
+    s2 = ghost_session
+    gp2 = s2 ? e::GhostTool.state_payload(s2) : {}
+    ok("KOV-G2 sablona: aj PASIK slubi set zo sablony (#{gp2['legs_short']})",
+       gp2['legs_short'].to_s.include?('Klzák') &&
+       !gp2['legs_short'].to_s.include?('noha AXILO'))
+    e::GhostTool.cancel_session('SU-TEST KOV-G2', deferred: false)
+
     r03_clear_markers(model, markers)
     cleanup(model)
   end

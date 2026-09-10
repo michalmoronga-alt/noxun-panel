@@ -2156,15 +2156,35 @@
     return NXInsert.state.lastMode === 'insert';
   }
 
-  // Payload je UZAVRETY: typ, sirka, vyska sokla a rezim sokla. Nic z neho sa
-  // neuklada a nic z toho, co pride SPAT, sa nikdy nedostane do `collectAll()`
-  // — riadok je VYSTUP, nie pole formulara.
+  // KOV-G2 (Codex #339 kolo 1 N1): SABLONA nesie aj KOVANIE — mapovanie setov
+  // a ich zmrazene definicie. Do nahladu ide TEN ISTY zdroj, aky pojde do
+  // `insert_cabinet` (`NXInsert.hardwarePayload()` cez `HARDWARE_KEYS`), takze
+  // karta aj ghost ukazu presne tie nohy, ktore vlozena skrinka dostane —
+  // predtym nahlad vzdy hovoril o projektovej predvolbe. Ad-hoc polozky
+  // (`HARDWARE_LIST_KEYS`) do nahladu NEIDU: nohy nikdy nevznikaju rucne.
+  // Server ma pre tieto kluce VLASTNU branu (`INSERT_LEGS_HW_KEYS`) a nic
+  // z nich neuklada.
+  function nxLegsTemplateHw(){
+    var out = {};
+    if (typeof NXInsert === 'undefined' || !NXInsert ||
+        typeof NXInsert.hardwarePayload !== 'function') return out;
+    var hw = NXInsert.hardwarePayload() || {};
+    (NXInsert.HARDWARE_KEYS || []).forEach(function(k){ if (hw[k]) out[k] = hw[k]; });
+    return out;
+  }
+
+  // Payload je UZAVRETY: typ, sirka, vyska sokla, rezim sokla a kovanie
+  // SABLONY. Nic z neho sa neuklada a nic z toho, co pride SPAT, sa nikdy
+  // nedostane do `collectAll()` — riadok je VYSTUP, nie pole formulara.
   function nxLegsInsertPayload(){
     var w = numv('width');
     var fh = numv('floor_height');
-    return { gen: ++legsGen, type: getType(),
-             width: isNaN(w) ? '' : w, floor_height: isNaN(fh) ? '' : fh,
-             plinth_mode: val('plinth_mode') };
+    var body = { gen: ++legsGen, type: getType(),
+                 width: isNaN(w) ? '' : w, floor_height: isNaN(fh) ? '' : fh,
+                 plinth_mode: val('plinth_mode') };
+    var hw = nxLegsTemplateHw();
+    Object.keys(hw).forEach(function(k){ body[k] = hw[k]; });
+    return body;
   }
 
   function nxLegsInsertSend(){
@@ -2202,10 +2222,13 @@
 
   // Kluc vstupov BEZ zvysenia generacie (`nxLegsInsertPayload` ju zvysuje —
   // volat ho na porovnanie by generacie roztocilo a odpovede by sa zahadzovali).
+  // KOV-G2 (N1): sucastou kluca je aj kovanie SABLONY — dve sablony s rovnakymi
+  // rozmermi a INYM setom noh musia dat dva rozne dotazy.
   function nxLegsInsertPeek(){
     var w = numv('width');
     var fh = numv('floor_height');
-    return [getType(), isNaN(w) ? '' : w, isNaN(fh) ? '' : fh, val('plinth_mode')].join('|');
+    return [getType(), isNaN(w) ? '' : w, isNaN(fh) ? '' : fh, val('plinth_mode'),
+            JSON.stringify(nxLegsTemplateHw())].join('|');
   }
 
   // Odchod z vkladania (oznacenie skrinky, doska) — riadok zmizne a pamat
@@ -2329,6 +2352,7 @@
       nxLegsInsertPayload: nxLegsInsertPayload, nxLegsInsertSend: nxLegsInsertSend,
       nxLegsInsertAsk: nxLegsInsertAsk, nxLegsInsertResult: nxLegsInsertResult,
       nxLegsInsertPeek: nxLegsInsertPeek, nxLegsInsertReset: nxLegsInsertReset,
+      nxLegsTemplateHw: nxLegsTemplateHw,
       nxLegsApplyVisibility: nxLegsApplyVisibility,
       legsGenState: function(){ return legsGen; },
       // Zivy refresh ponuky setov a zapis vyberu — riadok Noh ich zdiela

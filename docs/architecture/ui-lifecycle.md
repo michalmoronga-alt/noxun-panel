@@ -681,6 +681,15 @@ kanálom `NX.insertLegsPreview` s **generáciou dotazu** (`gen`) — staršie ko
 `CabinetBuilder.normalize` + `Construction.cabinet_hw_ctx` ([construction.md](construction.md)) + `HardwareRules.evaluate(cfg, [], ctx)` + `Panel.item_purchase` (tá istá funkcia ako
 v karte) postaví `legs_preview_summary`. **Override sa vo vkladaní neponúka** — set sa mení až na vloženej skrinke. Kým odpoveď nepríde (starší plugin bez callbacku), v riadku
 stojí „—". **PASS-THROUGH GUARD:** text je VÝSTUP — do `collectAll()` ani do vkladacieho payloadu sa nedostane nič z neho (`test_kovg2_nohy_ui.js`, `test_insert_state.js`).
+
+**KOVANIE ŠABLÓNY ide s dotazom (Codex #339 kolo 1 N1).** Šablóna nesie mapovanie setov aj ich definície a vložená skrinka ich naozaj dostane, takže payload má **druhú, vlastnú**
+skupinu kľúčov `INSERT_LEGS_HW_KEYS` = `hardware_sets` · `hardware_set_defs` (zdroj je **ten istý** `NXInsert.hardwarePayload()`, ktorý ide do `insert_cabinet`; ad-hoc položky
+`HARDWARE_LIST_KEYS` nie — nohy ručne nevznikajú). Server ich **nepustí cez tolerantný `normalize`**: číta ich `insert_legs_template_hw` **tou istou bránou ako vklad**
+(`read_template_mapping` + `assess_set_defs`), takže nečitateľné kovanie — ktoré vklad odmietne hláškou — náhľad ticho ignoruje a ukáže predvoľbu projektu. Mapovanie potom ide do
+`cfg['hardware_sets']` (presne ako `handle_insert`), odkiaľ ho číta `cabinet_set_overrides` (pozná **oba** tvary kľúča — uložený config má string, `normalize` symbol), a definície
+idú do `HardwareSets.state_with_template_sets` ([hardware.md](hardware.md)) ako **prospektívny** stav. Súčasťou kľúča `nxLegsInsertPeek` je aj toto kovanie: dve šablóny s rovnakými
+rozmermi a iným setom nôh sú dva rôzne dotazy.
+
 Odchod z vkladania (`loadSelected`, `loadBoard`, `clearSelected`) volá `nxLegsInsertReset` — riadok zmizne aj s pamäťou vstupov.
 
 **Klikateľné sú len tie údaje, ktoré niekam vedú (N13):** „Dielcov" → `nx_select_parts` → `Panel.handle_select_parts` = **čisté čítanie + zmena výberu** pod
@@ -1694,7 +1703,10 @@ pásik nesmie narásť). Kľúče chodia **len pre subjekt `cabinet`**: `GhostTo
 takže doska ani kreslenie segment nikdy nedostanú. Starší push kľúč nenesie → segment sa **nekreslí** (rovnaký fallback ako `orientation_label`); klient si text **neskracuje ani
 neodvodzuje** — skladá ho server (`HardwareSets.legs_summary`, [hardware.md](hardware.md)) a `legs_tone: 'warn'` ho len zafarbí. Hodnota sa počíta **lenivo a RAZ za session**
 (`PlacementSession#legs_summary`, sentinel `:unset`): plán je zmrazený, kým `push_state` beží pri každej šípke, ALT-e aj zmene zámku výšky — a každý beh by inak siahol na
-pravidlá, sety aj katalóg. Výpočet ide cez `Panel.legs_preview_summary` (nižšie), takže pásik a vkladacia karta hovoria to isté. Testy: `tests/js/test_kovg2_nohy_ui.js`.
+pravidlá, sety aj katalóg. Výpočet ide cez `Panel.legs_preview_summary` (nižšie) a **definície setov zo šablóny podáva session sama** (`s.hardware['defs']` — zmrazia sa až
+v commite, Codex #339 N1), takže pásik a vkladacia karta hovoria to isté.
+
+
 
 Zmeny vo vkladacej karte sa do **bežiacej** session NEPREMIETAJÚ (snapshot je zmrazený; status to prizná) a **druhé „Vložiť" starú session zruší** a založí novú s čerstvým
 snapshotom. **Poznámku preflightov** (D-45 prevzatá hrúbka, materiálové noty) vypisuje **až `ghost_after_commit`** — pri stlačení „Vložiť" sa ešte nič nestalo, takže hlásiť ju

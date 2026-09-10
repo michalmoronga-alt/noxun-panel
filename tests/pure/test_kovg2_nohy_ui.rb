@@ -27,6 +27,12 @@
 #      (`legs_summary_from_purchase`) — riadok a rozklik polozky sa nerozidu
 #   8) `GhostTool.state_payload` nesie `legs_short`/`legs_tone` LEN pre skrinku
 #      (doska nikdy) a suhrn sa pocita RAZ za session
+#   9) (Codex #339 kolo 1 N1) KOVANIE ZO SABLONY — nahlad sa pyta PROSPEKTIVNEHO
+#      stavu setov (projekt + definicie, ktore v nom este nie su; projekt
+#      vyhrava), mapovanie ide TOU ISTOU branou ako vklad
+#  10) (Codex #339 kolo 1 N2/N4/N5) ZIVOTNY CYKLUS RIADKU — doskova vetva karty
+#      ho resetuje, lahky push (`push_hardware_sets`) nesie cerstvu vetu
+#      a zmena setov/pravidiel POCAS ghost session zneplatni memo pasika
 #
 # MUTACIE (kazda overena spustenim — po zaneseni chyby spadnu uvedene testy):
 #   M1 `legs_problems` prestane zlievat zaznamy podla priciny (kluc = cely
@@ -44,6 +50,16 @@
 #   M5 `cabinet_payload` sklada `legs_summary` vlastnym volanim `legs_summary`
 #      nad `cfg['hardware']` (druhy rozpis vedla `purchase`)
 #      -> „(7): payload skrinky sklada riadok z UZ ROZPISANYCH poloziek"
+#   M6 `state_with_template_sets` vrati stav nezmeneny (definicie sablony sa
+#      do nahladu nedostanu)
+#      -> „(9): prospektivny stav…" + „(9): nahlad ukaze SET ZO SABLONY…"
+#   M7 `cabinet_set_overrides` cita LEN stringovy kluc (`normalize` dava symboly)
+#      -> „(9): nahlad ukaze SET ZO SABLONY…", „(9): mapovanie BEZ definicie…",
+#         „(9): callback nesie kovanie sablony…"
+#   M8 `push_hardware_sets` prestane prikladat `legs_summary` (a hook zneplatnenia)
+#      -> „(10): lahky push nesie CERSTVY riadok Noh (N4)" + „(10): hooky…"
+#   M9 `PlacementSession#invalidate_legs_summary!` memo nezahodi
+#      -> „(10): zmena mapovania POCAS session prepocita suhrn pasika"
 #
 # Ghost pasik, riadok v karte a undo dokazuje in-SketchUp sekcia `run_kovg`.
 require_relative '../helper' unless defined?(NxTest)
@@ -93,6 +109,16 @@ module NxKovG2
       'name_sk' => 'Häfele 637.38.054 príchyt sokla AXILO (k drevenému soklu)' }
   ].freeze
 
+  # SABLONOVY set noh (Codex #339 kolo 1 N1): najjednoduchsi mozny — jeden clen
+  # s pevnym kodom klzaka. V projekte NIE JE, takze nahlad ho musi vziat
+  # z definicii, ktore prichadzaju so sablonou.
+  TPL_SET_ID = 'kovg2-sablona-nohy'
+  TPL_SET = { 'set_id' => TPL_SET_ID, 'name' => 'Nohy zo šablóny',
+              'generic_type' => 'leg',
+              'members' => [{ 'per' => 'unit', 'qty' => 1, 'label' => 'noha',
+                              'code' => '272212' }] }.freeze
+  TPL_MAP = { 'leg' => TPL_SET_ID }.freeze
+
   # Globalna kniznica setov ako projektovy stav NA CITANIE — presne to, co
   # panelu vrati `hardware_read_state` pri projekte bez snapshotu.
   def state
@@ -133,16 +159,39 @@ module NxKovG2
   # Panelovy `hardware_read_state` sa pyta `Sketchup.active_model` — headless
   # taky objekt nie je, preto sa na cas testu nahradi CITANIM GLOBALNEJ
   # kniznice (presne stav `:missing`, teda „projekt snapshot este nema").
-  def with_read_state
+  # `st` je ZIVY objekt — scenar N5 doň počas session zapisuje (zmena
+  # projektoveho mapovania v subezne otvorenom Studiu).
+  def with_read_state(st = state)
     sc = E::Panel.singleton_class
-    st = state
     sc.send(:alias_method, :kovg2_orig_read_state, :hardware_read_state)
     sc.send(:define_method, :hardware_read_state) { [:missing, st] }
-    yield
+    yield st
   ensure
     sc.send(:remove_method, :hardware_read_state)
     sc.send(:alias_method, :hardware_read_state, :kovg2_orig_read_state)
     sc.send(:remove_method, :kovg2_orig_read_state)
+  end
+
+  # Callback `insert_legs_preview_result` sa pyta `Sketchup.active_model`.
+  # Headless taka konstanta neexistuje, takze cela cesta konci v `rescue` —
+  # scenar N1 potrebuje overit jej NORMALNU vetvu, preto si na cas testu
+  # poziciava prazdnu atrapu (model je `nil`, teda presne to, s cim pracuje
+  # `legs_preview_summary` v ostatnych scenaroch). `NxTest::IN_SKETCHUP` sa
+  # pocita pri nacitani helpera, takze sa tym NEZMENI.
+  def with_sketchup
+    return yield if Object.const_defined?(:Sketchup)
+
+    mod = Module.new do
+      def self.active_model
+        nil
+      end
+    end
+    Object.const_set(:Sketchup, mod)
+    begin
+      yield
+    ensure
+      Object.send(:remove_const, :Sketchup)
+    end
   end
 
   # Zachytenie `Panel.js` — odpoved callbacku ide TOUTO cestou.
@@ -298,10 +347,24 @@ NxTest.test('KOV-G2 (5): horna skrinka si nahlad ani nevypyta katalog') do
                 'skratka je PRED citanim stavu setov a katalogu')
 end
 
-NxTest.test('KOV-G2 (5): nahlad NEPOUZIVA cabinet override — skrinka este neexistuje') do
+NxTest.test('KOV-G2 (5): nahlad cita vyber setu z CONFIGU — ta ista mapa ako karta skrinky') do
   body = NxKovG2.method_src('ui/panel/actions_hardware.rb', 'legs_preview_summary')
-  NxTest.assert(body.include?('item_purchase(h, status, state, {}, lookup'),
-                'override mapa je PRAZDNA (ta ista funkcia ako v karte skrinky)')
+  NxTest.assert(body.include?('overrides = blocked ? {} : cabinet_set_overrides(cfg)'),
+                'vyber setu (zo sablony alebo zo zmrazeneho planu) ide TOU ISTOU cestou ako v karte')
+  NxTest.assert(body.include?('item_purchase(h, status, state, overrides, lookup'),
+                'a rozpisuje ho ta ista funkcia (jeden vyklad nakupu)')
+end
+
+NxTest.test('KOV-G2 (5): override mapa sa cita v OBOCH tvaroch kluca') do
+  # Ulozeny config ma kluce STRINGOVE, `CabinetBuilder.normalize` (nahlad
+  # aj zmrazeny plan ghostu) SYMBOLOVE — jeden tvar by nahlad oslepil.
+  NxTest.skip!('panelova cesta bezi len headless') unless NxTest.headless?
+  want = { 'leg' => 'nohy-vlastne' }
+  NxTest.assert_equal want,
+                      Noxun::Engine::Panel.cabinet_set_overrides('hardware_sets' => want)
+  NxTest.assert_equal want,
+                      Noxun::Engine::Panel.cabinet_set_overrides(hardware_sets: want)
+  NxTest.assert_equal({}, Noxun::Engine::Panel.cabinet_set_overrides({}))
 end
 
 # --- 6) callback insert_legs_preview: CITACI kanal -----------------------------
@@ -396,3 +459,105 @@ NxTest.test('KOV-G2 (8): suhrn pasika je LENIVY a drzi sa do konca session') do
   NxTest.assert(src.include?('@legs_summary = GhostTool.legs_summary_for(self) if @legs_summary == :unset'),
                 'druhy push uz nesiaha na pravidla, sety ani katalog')
 end
+
+# --- 9) Codex #339 kolo 1 N1: KOVANIE ZO SABLONY V NAHLADE ---------------------
+#
+# Vkladacia karta so sablonou, ktora nesie vlastny set noh, ukazovala PROJEKTOVU
+# predvolbu — a po kliku skrinka dostala set zo sablony. Nahlad sa preto pyta
+# PROSPEKTIVNEHO stavu: projektovy snapshot + definicie, ktore v nom este nie su.
+
+NxTest.test('KOV-G2 (9): prospektivny stav = projekt + sety, ktore v nom este nie su') do
+  st = NxKovG2.state
+  before = st['sets'].keys.length
+  out = NxKovG2::HWS.state_with_template_sets(st, NxKovG2::TPL_MAP, [NxKovG2::TPL_SET])
+  NxTest.assert(out['sets'].key?(NxKovG2::TPL_SET_ID), 'set zo sablony do stavu pribudol')
+  NxTest.assert_equal before, st['sets'].keys.length,
+                      'vstupny stav sa NEMUTUJE (cista funkcia)'
+  NxTest.assert_equal st, NxKovG2::HWS.state_with_template_sets(st, NxKovG2::TPL_MAP, nil),
+                      'bez definicii sa stav nemeni (vklad bez sablony)'
+end
+
+NxTest.test('KOV-G2 (9): PROJEKT vyhrava — sablona existujuci set neprepise') do
+  st = NxKovG2.state
+  sid = st['sets'].keys.first
+  NxTest.assert(sid, 'PREMISA: kniznica ma aspon jeden set')
+  mine = st['sets'][sid]
+  fake = mine.merge('name' => 'Zo sablony')
+  out = NxKovG2::HWS.state_with_template_sets(st, { mine['generic_type'] => sid }, [fake])
+  NxTest.assert_equal mine, out['sets'][sid],
+                      'prepis by zmenil UZ POSTAVENE skrinky zakazky (vzor freeze_template_sets!)'
+end
+
+NxTest.test('KOV-G2 (9): typovy nesulad sa do stavu nedostane') do
+  st = NxKovG2.state
+  bad = NxKovG2::TPL_SET.merge('generic_type' => 'hinge')
+  out = NxKovG2::HWS.state_with_template_sets(st, NxKovG2::TPL_MAP, [bad])
+  NxTest.refute(out['sets'].key?(NxKovG2::TPL_SET_ID),
+                'definicia ineho typu sa nezmrazi ani pri vklade — nahlad musi hovorit to iste')
+end
+
+NxTest.test('KOV-G2 (9): nahlad ukaze SET ZO SABLONY, nie projektovu predvolbu') do
+  NxTest.skip!('panelova cesta bezi len headless') unless NxTest.headless?
+  NxKovG2.with_read_state do
+    cfg = NxKovG2::CB.normalize('type' => 'lower', 'width' => 1200.0, 'floor_height' => 100.0,
+                                'hardware_sets' => NxKovG2::TPL_MAP)
+    got = Noxun::Engine::Panel.legs_preview_summary(nil, cfg, set_defs: [NxKovG2::TPL_SET])
+    NxTest.assert_equal NxKovG2::TPL_SET_ID, got['set_id'],
+                        'karta a ghost musia slubit to, co skrinka po kliku naozaj dostane'
+    NxTest.assert_equal 'ok', got['tone'], 'set je citatelny — ziadne upozornenie'
+    NxTest.refute(got['text'].include?('AXILO H100'),
+                  "sablona nohu MENI, projektova predvolba uz neplati: #{got['text']}")
+    plain = Noxun::Engine::Panel.legs_preview_summary(nil, NxKovG2.cfg(width: 1200.0, fh: 100.0))
+    NxTest.assert(plain['text'] != got['text'], 'a bez sablony ostava predvolba projektu')
+  end
+end
+
+NxTest.test('KOV-G2 (9): mapovanie BEZ definicie neprepadne na predvolbu projektu') do
+  NxTest.skip!('panelova cesta bezi len headless') unless NxTest.headless?
+  NxKovG2.with_read_state do
+    cfg = NxKovG2::CB.normalize('type' => 'lower', 'width' => 1200.0, 'floor_height' => 100.0,
+                                'hardware_sets' => NxKovG2::TPL_MAP)
+    got = Noxun::Engine::Panel.legs_preview_summary(nil, cfg)
+    NxTest.assert_equal 'warn', got['tone'],
+                        'set, ktory projekt nema, je NALEZ — ticho ukazat cudzie nohy by klamalo'
+  end
+end
+
+NxTest.test('KOV-G2 (9): brana kovania sablony je TA ISTA ako pri vklade') do
+  hw = { 'hardware_sets' => NxKovG2::TPL_MAP, 'hardware_set_defs' => [NxKovG2::TPL_SET],
+         'width' => 1200.0, 'zone_tree' => { 'x' => 1 } }
+  map, defs = Noxun::Engine::Panel.insert_legs_template_hw(hw)
+  NxTest.assert_equal NxKovG2::TPL_MAP, map, 'mapovanie prejde `read_template_mapping`'
+  NxTest.assert_equal [NxKovG2::TPL_SET], defs, 'definicie prejdu `assess_set_defs`'
+  NxTest.assert_equal [{}, nil], Noxun::Engine::Panel.insert_legs_template_hw({}),
+                      'bez sablony sa nic nepodava'
+  NxTest.assert_equal [{}, nil],
+                      Noxun::Engine::Panel.insert_legs_template_hw('hardware_sets' => 'nezmysel'),
+                      'necitatelne mapovanie vklad ODMIETNE — nahlad si z neho nic nevymysla'
+  bad = Noxun::Engine::Panel.insert_legs_template_hw('hardware_sets' => NxKovG2::TPL_MAP,
+                                                     'hardware_set_defs' => 'nezmysel')
+  NxTest.assert_equal [NxKovG2::TPL_MAP, nil], bad, 'necitatelne definicie sa zahodia cele'
+end
+
+NxTest.test('KOV-G2 (9): callback nesie kovanie sablony az do vysledku') do
+  NxTest.skip!('panelova cesta bezi len headless') unless NxTest.headless?
+  NxKovG2.with_sketchup do
+    NxKovG2.with_read_state do
+      res = Noxun::Engine::Panel.insert_legs_preview_result(
+        'gen' => 9, 'type' => 'lower', 'width' => 1200.0, 'floor_height' => 100.0,
+        'hardware_sets' => NxKovG2::TPL_MAP, 'hardware_set_defs' => [NxKovG2::TPL_SET],
+        'material_id' => 'CUDZI-KLUC'
+      )
+      NxTest.assert_equal 9, res['gen'], 'generacia dotazu sa vracia nezmenena'
+      NxTest.assert_equal NxKovG2::TPL_SET_ID, res['set_id'],
+                          'set zo sablony sa dostal az do odpovede'
+    end
+  end
+end
+
+NxTest.test('KOV-G2 (9): pasik ghostu podava definicie setov zo SESSION') do
+  body = NxKovG2.method_src('core/ghost_tool.rb', 'legs_summary_for')
+  NxTest.assert(body.include?("set_defs: (hw.is_a?(Hash) ? hw['defs'] : nil)"),
+                'definicie sa zmrazia az v commite — pasik ich musi podat sam')
+end
+

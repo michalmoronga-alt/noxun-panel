@@ -4006,10 +4006,29 @@ module Noxun
         # VYNIMKU, ktora by zhodila cele vkladanie skrinky. To by odporovalo
         # kontraktu „stavba bezi dalej, len bez snapshotu" (cabinet_builder).
         return res.merge('status' => :blocked) if state.nil?
-        have = state['sets'].is_a?(Hash) ? state['sets'] : {}
-        pool = collect_set_defs(defs)
+        sel, to_add = template_sets_selection(state, mapping, defs)
+        res.merge!(sel)
+        # Ked nie je co pridat, snapshot sa TU nezapisuje — projekt bez snapshotu
+        # ho dostane pri stavbe (CabinetBuilder.build_into -> ensure_project_state!,
+        # tá istá operácia), takze zmrazenie ostava jednym zapisom.
+        return res if to_add.empty?
+        return res.merge('status' => :failed) unless add_project_sets!(model, to_add.values)
+        res['added'] = to_add.keys
+        res
+      end
+
+      # VYBER definicii setov zo sablony proti tomu, CO UZ V PROJEKTE JE —
+      # CISTA funkcia (ziadny model, ziadny zapis). Kolizie su popisane vyssie
+      # pri `freeze_template_sets!`; toto je ich JEDINA implementacia, aby sa
+      # ZAPIS (zmrazenie pri vlozeni) a NAHLAD (KOV-G2 riadok Noh vo vkladacej
+      # karte a v ghost pasiku) nemohli rozist.
+      # -> [{ 'kept', 'type_mismatch', 'missing' }, { set_id => definicia na pridanie }]
+      def template_sets_selection(state, mapping, defs)
+        res = { 'kept' => [], 'type_mismatch' => [], 'missing' => [] }
         to_add = {}
-        wanted.each do |sid, gt|
+        have = state.is_a?(Hash) && state['sets'].is_a?(Hash) ? state['sets'] : {}
+        pool = collect_set_defs(defs)
+        mapping_types_by_set(mapping).each do |sid, gt|
           d = pool[sid]
           if d.nil?
             res['missing'] << sid unless have.key?(sid)
@@ -4021,13 +4040,29 @@ module Noxun
             res['kept'] << sid
           end
         end
-        # Ked nie je co pridat, snapshot sa TU nezapisuje — projekt bez snapshotu
-        # ho dostane pri stavbe (CabinetBuilder.build_into -> ensure_project_state!,
-        # tá istá operácia), takze zmrazenie ostava jednym zapisom.
-        return res if to_add.empty?
-        return res.merge('status' => :failed) unless add_project_sets!(model, to_add.values)
-        res['added'] = to_add.keys
-        res
+        [res, to_add]
+      end
+
+      # KOV-G2 (Codex #339 kolo 1 N1): stav setov, aky bude PLATIT PO vlozeni
+      # zo sablony — projektovy snapshot PLUS definicie, ktore v nom este nie su.
+      # Nahlad noh musi hovorit to, co skrinka naozaj dostane: mapovanie zo
+      # sablony ukazuje na sety, ktore v projekte este nemusia byt, a bez nich by
+      # riadok tvrdil „typ nema priradeny set". PROJEKT VYHRAVA (rovnako ako pri
+      # zmrazeni) a typovy nesulad sa nepridava — presne to iste rozhodnutie robi
+      # `freeze_template_sets!` pri vklade. NIC SA NEZAPISUJE (cista funkcia,
+      # vstupny stav sa nemutuje).
+      def state_with_template_sets(state, mapping, defs)
+        return state unless state.is_a?(Hash)
+        return state if defs.nil? || !mapping.is_a?(Hash) || mapping.empty?
+
+        _sel, to_add = template_sets_selection(state, mapping, defs)
+        return state if to_add.empty?
+
+        have = state['sets'].is_a?(Hash) ? state['sets'] : {}
+        state.merge('sets' => have.merge(to_add))
+      rescue StandardError => e
+        Engine.log_error(e, 'HardwareSets.state_with_template_sets') if defined?(Engine)
+        state
       end
 
       # --- expanzia (cista funkcia, audit F6) ----------------------------------

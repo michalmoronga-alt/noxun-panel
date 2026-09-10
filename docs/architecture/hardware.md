@@ -1238,6 +1238,13 @@ panela sú šum. Kľúč zliatia je PRÍČINA (`reason` + `set_id` + `param` + `
 (48 znakov) — karta neskracuje nič (má tooltip). Konzumenti: `Panel.legs_preview_summary` (vkladacia karta + ghost pásik) a `cabinet_payload['legs_summary']`
 ([ui-lifecycle.md](ui-lifecycle.md)). Testy: `tests/pure/test_kovg2_nohy_ui.rb`, `tests/js/test_kovg2_nohy_ui.js`, in-SketchUp sekcia `run_kovg`.
 
+**PROSPEKTÍVNY stav setov — `state_with_template_sets(state, mapping, defs)` (Codex #339 kolo 1 N1).** Vklad zo **šablóny** nesie mapovanie setov aj ich zmrazené definície
+(`hardware_sets` / `hardware_set_defs`) a `ghost_freeze_hardware` ich pri kliku zapíše do projektu. Náhľad, ktorý pozná len dnešný snapshot, by preto sľuboval **projektovú
+predvoľbu** — a skrinka by vznikla s iným setom (alebo by riadok tvrdil „typ nemá priradený set", hoci set príde so šablónou). Funkcia vydá stav, ktorý bude platiť **po**
+vložení: snapshot **plus** definície, ktoré v ňom ešte nie sú. Výber definícií robí spoločná čistá `template_sets_selection` — **tá istá jediná implementácia**, akou zmrazuje
+`freeze_template_sets!`, takže ZÁPIS a NÁHĽAD sa rozísť nemôžu: **projekt vyhráva** (kolízia = `kept`), typový nesúlad sa neprevezme, chýbajúca definícia ostáva `missing`.
+Nič sa nezapisuje a vstupný stav sa nemutuje. `blocked` vetva (R-07, nekompatibilná knižnica bez snapshotu) sa **nedopĺňa vôbec** — vklad definície tiež nezmrazí.
+
 ### drawer_recipes.rb
 
 **KOV-C1 — nemenné recepty zásuviek** (`Noxun::Engine::Recipes`). Čisté Ruby: žiadne SketchUp API, žiadny zápis do modelu ani na disk.

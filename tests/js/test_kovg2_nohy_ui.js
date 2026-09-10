@@ -20,6 +20,14 @@
 //      -> „(3): pasik DOSKY segment noh nekresli"
 //   M3 `nxLegsInsertMode` prestane pozerat na `selectedCabId`
 //      -> „(2): odpoved, ktora dosla PO oznaceni skrinky, sa zahodi"
+//   M4 (Codex #339 kolo 1 N1) `nxLegsInsertPayload` nepriklada kovanie SABLONY
+//      -> „(4): mapovanie setov zo sablony ide TYM ISTYM zdrojom…"
+//   M5 (N3) `nxLegsInsertDrop` nezdvihne generaciu
+//      -> „(6): oneskorena odpoved na UZ NEPLATNY dotaz sa zahodi"
+//   M6 (N3) `nxLegsInsertResult` prestane kontrolovat typ
+//      -> „(6): riadok Noh patri VYHRADNE dolnej skrinke"
+//   M7 (N4) `NX.setHardwareSets` prestane prekreslovat riadok Noh
+//      -> „(7): lahky push prekresli aj riadok Noh"
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
@@ -309,5 +317,46 @@ eq(GB.legsWarn(cabState({})), false, 'a ziadny ton');
 // Kreslenie (doska, dva tahy) segment nema nikdy.
 eq(GB.legsText({ subject: 'cabinet', interaction: 'drawing', legs_short: '6× noha' }), '',
    'pocas kreslenia sa o nohach nehovori');
+
+// ===========================================================================
+// 4) Codex #339 kolo 1 N1: KOVANIE ZO ŠABLÓNY IDE AJ DO NÁHĽADU
+// ===========================================================================
+// Šablóna nesie mapovanie setov a ich zmrazené definície; vložená skrinka ich
+// naozaj dostane. Náhľad, ktorý ich neposlal, hovoril o projektovej predvoľbe
+// — teda o nohách, ktoré skrinka po kliku NEDOSTANE.
+const TPL_HW = {
+  hardware_sets: { leg: 'kovg2-sablona-nohy' },
+  hardware_set_defs: [{ set_id: 'kovg2-sablona-nohy', generic_type: 'leg',
+                        members: [{ per: 'unit', qty: 1, code: '272212' }] }]
+};
+global.NXInsert.HARDWARE_KEYS = ['hardware_sets', 'hardware_set_defs'];
+global.NXInsert.hardwarePayload = function(){ return global.__tplHw || {}; };
+
+HW.nxLegsInsertReset();
+global.__tplHw = {};
+setFields(1200, 100);
+SENT.length = 0;
+HW.nxLegsInsertSend();
+eq(Object.keys(SENT[0].data).sort(),
+   ['floor_height', 'gen', 'model_guid', 'plinth_mode', 'type', 'width'].sort(),
+   'bez šablóny je payload presne ten istý ako doteraz');
+
+const KEY_PLAIN = HW.nxLegsInsertPeek();
+global.__tplHw = TPL_HW;
+SENT.length = 0;
+HW.nxLegsInsertSend();
+eq(SENT[0].data.hardware_sets, TPL_HW.hardware_sets,
+   'mapovanie setov zo šablóny ide TÝM ISTÝM zdrojom ako do `insert_cabinet`');
+eq(SENT[0].data.hardware_set_defs, TPL_HW.hardware_set_defs,
+   'a s ním aj zmrazené definície (v projekte ešte nemusia byť)');
+ok(HW.nxLegsInsertPeek() !== KEY_PLAIN,
+   'dve šablóny s rovnakými rozmermi a INÝM setom nôh sú dva rôzne dotazy');
+eq(HW.nxLegsTemplateHw(), TPL_HW, 'zdroj je `NXInsert.hardwarePayload()`, nič vlastné');
+
+// Ad-hoc položky šablóny do náhľadu nepatria — nohy nikdy nevznikajú ručne.
+global.__tplHw = Object.assign({ hardware_manual: [{ code: 'X' }] }, TPL_HW);
+eq(Object.keys(HW.nxLegsTemplateHw()).sort(), ['hardware_set_defs', 'hardware_sets'],
+   'do náhľadu ide LEN to, čo je v `HARDWARE_KEYS`');
+global.__tplHw = {};
 
 console.log('OK ' + n + ' assertov (KOV-G2 riadok Noh + ghost segment)');

@@ -231,7 +231,13 @@ module Noxun
           return nil unless s.respond_to?(:cabinet?) && s.cabinet?
           return nil unless defined?(Panel) && Panel.respond_to?(:legs_preview_summary)
 
-          sum = Panel.legs_preview_summary(s.model, s.plan.config)
+          # KOV-G2 (Codex #339 kolo 1 N1): kovanie SABLONY drzi session — mapovanie
+          # setov je uz v zmrazenom plane, ich DEFINICIE sa zmrazia az v commite
+          # (`ghost_freeze_hardware`). Pasik ich preto musi podat sam, inak by
+          # ukazal projektovu predvolbu a po kliku by skrinka dostala ine nohy.
+          hw = s.respond_to?(:hardware) ? s.hardware : nil
+          sum = Panel.legs_preview_summary(s.model, s.plan.config,
+                                           set_defs: (hw.is_a?(Hash) ? hw['defs'] : nil))
           sum.is_a?(Hash) && sum['tone'].to_s != 'none' ? sum : nil
         rescue StandardError => e
           Engine.log_error(e, 'GhostTool.legs_summary_for')

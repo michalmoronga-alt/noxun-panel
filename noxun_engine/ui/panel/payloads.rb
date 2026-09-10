@@ -1223,10 +1223,14 @@ module Noxun
 
         # Override mapa setov TEJTO skrinky (moze mat composite kluce gt@owner
         # a selector hodnoty — parser je jedina autorita tvaru).
+        # KOV-G2 (Codex #339 kolo 1 N1): kluc sa cita v OBOCH tvaroch. Ulozeny
+        # config (`Store.config`) ma kluce STRINGOVE, ale nahlad vkladania aj
+        # zmrazeny plan ghostu pracuju s vysledkom `CabinetBuilder.normalize`,
+        # teda so SYMBOLMI — a ten by inak vratil prazdnu mapu a nahlad by
+        # prehliadol vyber setu zo sablony.
         def cabinet_set_overrides(cfg)
-          HardwareSets.normalize_mapping(
-            cfg['hardware_sets'].is_a?(Hash) ? cfg['hardware_sets'] : {}, nil, allow_owner: true
-          )
+          raw = cfg.is_a?(Hash) ? (cfg['hardware_sets'] || cfg[:hardware_sets]) : nil
+          HardwareSets.normalize_mapping(raw.is_a?(Hash) ? raw : {}, nil, allow_owner: true)
         end
 
         # Projektovy stav setov NA CITANIE (ziadny zapis do modelu):
