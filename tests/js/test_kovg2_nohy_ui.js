@@ -379,4 +379,31 @@ ok(rowHidden(), 'doska riadok Nôh nemá');
 eq(textOfEl('legsTxt'), HW.LEGS_DASH, 'a text skrinky sa z neho zmazal');
 global.NXInsert.state.kind = 'cabinet';
 
+// ===========================================================================
+// 6) Codex #339 kolo 1 N3: ODPOVEĎ V LETE PO PREPNUTÍ TYPU
+// ===========================================================================
+// Skrytie riadku nestačí: odpoveď na dotaz vyslaný ešte za dolnú skrinku
+// prišla po prepnutí na hornú a riadok znovu ODKRYLA — natrvalo.
+HW.nxLegsInsertReset();
+global.__type = 'lower';
+setFields(1200, 100);
+HW.nxLegsInsertSend();
+const GEN_FLY = SENT[SENT.length - 1].data.gen;
+global.__type = 'upper';
+eq(HW.nxLegsApplyVisibility('upper'), false, 'horná skrinka riadok schová');
+ok(rowHidden(), 'a je skrytý');
+eq(HW.nxLegsInsertResult({ gen: GEN_FLY, text: SUMMARY_OK.text, tone: 'ok' }), false,
+   'oneskorená odpoveď na UŽ NEPLATNÝ dotaz sa zahodí (generácia sa zdvihla)');
+ok(rowHidden(), 'riadok ostáva skrytý');
+ok(HW.legsGenState() > GEN_FLY, 'generácia sa pri odchode z dolnej skrinky zdvihla');
+
+// Druhá poistka: aj odpoveď s AKTUÁLNOU generáciou riadok pri hornej skrinke
+// neotvorí (iný klient, staršia cachovaná stránka).
+const GEN_NOW = HW.legsGenState();
+eq(HW.nxLegsInsertResult({ gen: GEN_NOW, text: SUMMARY_OK.text, tone: 'ok' }), false,
+   'riadok Nôh patrí VÝHRADNE dolnej skrinke');
+ok(rowHidden(), 'a ostáva skrytý');
+global.__type = 'lower';
+HW.nxLegsInsertReset();
+
 console.log('OK ' + n + ' assertov (KOV-G2 riadok Noh + ghost segment)');

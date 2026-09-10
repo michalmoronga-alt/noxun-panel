@@ -2231,28 +2231,42 @@
             JSON.stringify(nxLegsTemplateHw())].join('|');
   }
 
-  // Odchod z vkladania (oznacenie skrinky, doska) — riadok zmizne a pamat
-  // vstupov sa zrusi, aby sa po navrate dotaz poslal znova.
-  function nxLegsInsertReset(){
+  // KOV-G2 (Codex #339 kolo 1 N3): ZNEPLATNENIE DOTAZU V LETE. Odpovede chodia
+  // asynchronne, takze samotne skrytie riadku nestaci — odpoved na dotaz, ktory
+  // uz neplati (prepnutie na hornu skrinku, na dosku, oznacenie skrinky), by
+  // riadok znova ukazala a ostal by v karte visiet. Generacia sa preto zdvihne
+  // aj tu: cakajuca odpoved uz ziadnej negeneruje.
+  function nxLegsInsertDrop(){
     if (legsTimer){ clearTimeout(legsTimer); legsTimer = null; }
+    legsGen++;
+    return false;
+  }
+
+  // Odchod z vkladania (oznacenie skrinky, doska) — riadok zmizne, dotaz v lete
+  // sa zneplatni a pamat vstupov sa zrusi, aby sa po navrate poslal znova.
+  function nxLegsInsertReset(){
+    nxLegsInsertDrop();
     legsLastKey = null;
     return nxLegsHideRow();
   }
 
   // Odpoved servera. Starsia generacia sa ZAHODI (pomalsie kolo nesmie prepisat
   // cerstvejsi vysledok) a rovnako sa zahodi odpoved, ktora dosla uz po
-  // oznaceni skrinky (vtedy riadok patri jej payloadu).
+  // oznaceni skrinky (vtedy riadok patri jej payloadu) alebo po prepnuti na iny
+  // typ — riadok patri VYHRADNE dolnej skrinke (N3).
   function nxLegsInsertResult(res){
     if (!res || Number(res.gen) !== legsGen) return false;
     if (!nxLegsInsertMode()) return false;
+    if (getType() !== 'lower') return false;
     if (String(res.tone || 'none') === 'none') return nxLegsHideRow();
     return nxLegsSetText(res.text, String(res.tone), res.text);
   }
 
   // Viditelnost podla typu — presne ako `#fhRow` (horna skrinka nohy nema).
-  // Pri prechode na hornu skrinku sa uz nic nedopytuje.
+  // Pri prechode na hornu skrinku sa uz nic nedopytuje a dotaz V LETE sa
+  // zneplatni (N3) — inak by ho neskora odpoved riadok znova ukazala.
   function nxLegsApplyVisibility(t){
-    if (t === 'upper') return nxLegsHideRow();
+    if (t === 'upper'){ nxLegsInsertDrop(); return nxLegsHideRow(); }
     if (nxLegsInsertMode()) return nxLegsInsertAsk();
     return true;
   }
@@ -2352,7 +2366,7 @@
       nxLegsInsertPayload: nxLegsInsertPayload, nxLegsInsertSend: nxLegsInsertSend,
       nxLegsInsertAsk: nxLegsInsertAsk, nxLegsInsertResult: nxLegsInsertResult,
       nxLegsInsertPeek: nxLegsInsertPeek, nxLegsInsertReset: nxLegsInsertReset,
-      nxLegsTemplateHw: nxLegsTemplateHw,
+      nxLegsTemplateHw: nxLegsTemplateHw, nxLegsInsertDrop: nxLegsInsertDrop,
       nxLegsApplyVisibility: nxLegsApplyVisibility,
       legsGenState: function(){ return legsGen; },
       // Zivy refresh ponuky setov a zapis vyberu — riadok Noh ich zdiela
