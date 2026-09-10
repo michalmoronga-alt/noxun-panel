@@ -25,13 +25,14 @@ knižnica setov a snapshot `std`, katalóg kovania `schema`). Pred prvou takou z
 **Blok KOVANIE je uzavretý.** Posledná dávka **KOV-I** (šablóny s voliteľným kovaním, PR #340, v0.9.61) je v maine; uzáver **v0.10.0** (PR #341) presunul blok do archívu.
 Následný fix **D-123** (PR #342, v0.10.1) opravuje voľné vkladanie na plochu. **D-122** (PR #343, v0.10.2) zbalí UNI hlásenia do jednej skupiny pri zachovaní jednotlivých akcií a počtov.
 **Schválený rozsah D-122 → D-124 je dokončený.** D-124 (PR #344, v0.10.3): štyri predvoľby v otvorenom bloku, vzorky **115 px** (mockup mínus 20 %), pôvodný picker a potvrdenia.
-**Čaká večerný smoke a dogfooding** KOV-G, KOV-I, D-123 a malých UI dávok. **BALÍK ČIEL** D-114 + D-119 + D-120 ostáva ďalšou samostatnou prácou (audit ÁNO).
+**Michal potvrdil smoke PR #342/#343/#344 (10.9.2026): všetko funguje podľa predstáv, bez nájdenej chyby.** Samostatné postrehy k bloku KOVANIE môže ďalej doplniť dogfooding.
+**Pracuje sa na schválenom CENY-KOV:** najprv odkazy pri všetkých katalógových položkách kovania (chýbajúci = oranžová ikona → doplnenie), potom ručné overenie ceny k dnešku z katalógu aj Rozpočtu. Rozsah a dve sekvenčné dávky sú v PLAN.md.
 **Blok 1d** beží podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**. Blok **1b** je uzavretý, **1c/1e hotové**.
 **Toto schválené sedenie orchestruje Codex s právom merge po testoch a GH review**; subagenti podľa potreby (Michal 10.9.). Nezávislé review z rodiny Claude je vedome odložené.
 
 ## Ďalší krok
 
-**Schválené sedenie:** ~~KOVANIE (A → I + uzáver)~~ → ~~D-123 fix~~ → ~~D-122~~ → ~~D-124~~. Ďalšiu prácu vyberie Michal: **BALÍK ČIEL (D-114 + D-119 + D-120)** a zvyšok V1 podľa [V1_VIZIA.md](V1_VIZIA.md)
+**Schválené sedenie:** ~~KOVANIE (A → I + uzáver)~~ → ~~D-123 fix~~ → ~~D-122~~ → ~~D-124~~ → **CENY-KOV-A → CENY-KOV-B**. Ďalšiu prácu vyberie Michal: **BALÍK ČIEL (D-114 + D-119 + D-120)** a zvyšok V1 podľa [V1_VIZIA.md](V1_VIZIA.md)
 (spotrebiče S1, ceny, konštrukcia K1/K2/K3, V1.0 zostavy); súbežne **1d** podľa kapacity.
 Každá dávka: package v [PLAN.md](PLAN.md) (autorita) → `codex-audit` (risk-based) → subagent vo worktree → `codex-po-pr` → merge → uzáver dávky podľa checklistu v [../CLAUDE.md](../CLAUDE.md).
 
