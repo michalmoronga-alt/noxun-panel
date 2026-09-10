@@ -2379,7 +2379,7 @@ module NoxunSuRunner
     ghost_click!(model, [1500.0, 400.0, 0.0])
     rot = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
     if rot
-      a = rot.transformation * e::Units.point(600.0, 0.0, 100.0) # PRAVA DOLNA kotva korpusu
+      a = rot.transformation * e::Units.point(600.0, 0.0, 0.0) # PRAVA DOLNA kotva celej skrinky (D-123)
       ok("GHOST 4: AKTIVNA kotva sadla PRESNE na bod z luca aj po otoceni (#{mm(a.x).round(2)}, #{mm(a.y).round(2)})",
          ghost_near_target?([1500.0, 400.0]) && ghost_on_used?([mm(a.x), mm(a.y)]))
       xa = rot.transformation.xaxis
@@ -2412,8 +2412,8 @@ module NoxunSuRunner
     ghost_click!(model, [2000.0, 300.0, 500.0])
     fr = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
     fo = fr ? ghost_origin_mm(fr) : [nil, nil, nil]
-    ok("GHOST 5: vo volnej vyske sadol origin nad podlahu (Z = #{fo[2] && fo[2].round(1)} mm)",
-       fr && fo[2] > 100.0)
+    ok("GHOST 5: vo volnej vyske sadol origin PRESNE na plosinu (Z = #{fo[2] && fo[2].round(1)} mm)",
+       fr && (fo[2] - 500.0).abs <= TOL)
     ghost_teardown!(model)
     cleanup(model)
     if grp.valid?
@@ -2891,6 +2891,74 @@ module NoxunSuRunner
       nil
     end
     cleanup(model)
+  end
+
+  # D-123: FREE vklad cez realnu inferenciu na ploche. Nezavisly dokaz
+  # z hotovej geometrie sokla, nie iba porovnanie s vypoctom kotvy.
+  def run_d123(model)
+    platform = nil
+    variants = [
+      ['lower', 'under_sides', 'front', 100.0],
+      ['lower', 'under_sides', 'none', 150.0],
+      ['lower', 'under_sides', 'none', 0.0],
+      ['lower', 'between_sides', 'front', 100.0],
+      ['upper', 'under_sides', 'none', 0.0],
+      ['upper', 'between_sides', 'none', 0.0]
+    ]
+    [0.0, 500.0].each do |surface_z|
+      model.start_operation('SU-TEST D-123 plocha', true)
+      platform = model.entities.add_group
+      platform.entities.add_face([[1500, -200], [2500, -200], [2500, 800], [1500, 800]].map do |x, y|
+        e::Units.point(x, y, surface_z)
+      end)
+      model.commit_operation
+      variants.each_with_index do |(type, bottom, plinth, floor), index|
+        ghost_teardown!(model)
+        cleanup(model)
+        label = "D-123 #{type}/#{bottom}/#{plinth}/#{floor} na Z=#{surface_z}"
+        params = GHOST_PARAMS.merge('type' => type, 'bottom_mode' => bottom,
+                                    'plinth_mode' => plinth, 'floor_height' => floor)
+        e::Panel.handle_insert(pg(model, params))
+        ghost_camera!(model, [2000.0, 300.0], surface_z)
+        ghost_key!(model, VK_UP)
+        index.times { ghost_key!(model, VK_RIGHT) }
+        ghost_session.cycle_anchor! if index.odd? # aj prava dolna kotva
+        ghost_move!(model, [2000.0, 300.0, surface_z])
+        preview = e::GhostTool.world_transform(ghost_session)
+        ok("#{label}: nahlad stoji spodkom na ploche",
+           preview && (mm(preview.origin.z) - surface_z).abs <= TOL &&
+           (mm(ghost_tool.getExtents.min.z) - surface_z).abs <= TOL)
+        ghost_click!(model, [2000.0, 300.0, surface_z])
+        inst = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
+        ok("#{label}: skutocny vklad stoji na ploche a zhoduje sa s nahladom",
+           inst && (ghost_origin_mm(inst)[2] - surface_z).abs <= TOL &&
+           inst.transformation.to_a.zip(preview.to_a).all? { |a, b| (a - b).abs <= 1e-6 })
+        if plinth == 'front' && inst
+          sokel = inst.definition.entities.grep(Sketchup::ComponentInstance).find do |part|
+            e::Store.get(part, 'role') == 'plinth'
+          end
+          foot = sokel && inst.transformation * sokel.bounds.min
+          ok("#{label}: geometria sokla netrci pod plochu", foot && (mm(foot.z) - surface_z).abs <= TOL)
+        end
+        ghost_teardown!(model)
+        Sketchup.undo
+        ok("#{label}: jeden krok Spat odstrani vklad a zachova plochu",
+           inst && !inst.valid? && cabinets(model).empty? && platform.valid?)
+      end
+      model.start_operation('SU-TEST D-123 plocha prec', true)
+      platform.erase!
+      model.commit_operation
+    end
+  rescue StandardError => ex
+    log_line("FAIL: D-123 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  ensure
+    ghost_teardown!(model)
+    cleanup(model)
+    if platform && platform.valid?
+      model.start_operation('SU-TEST D-123 cleanup plochy', true)
+      platform.erase!
+      model.commit_operation
+    end
   end
 
   # GHOST cez REALNY debounce tick: observer nesmie z ghost vkladu spravit
@@ -19423,6 +19491,7 @@ module NoxunSuRunner
     run_r14(model)           # 1d/R-14: verzia formatu dat rozpoctu — marker v TEJ ISTEJ operacii (1x Spat vrati oboje), odmietnutie novsej zakazky bez zapisu a bez kroku Spat, citanie a priznak v payloade
     run_dockey(model)        # 1d/R-02b: identita dokumentu — `valid?` probe, rotacia pri onOpenModel nad RECYKLOVANYM objektom, onActivateModel nerotuje, fail-closed
     run_ghost(model)         # GHOST V1-04: vkladanie na klik — 0 mutacii pred klikom, zamok/free vyska, rotacia a kotvy, degenerovany luc, undo/prepnutie/druhe „Vlozit", sablona a peciatka
+    run_d123(model)          # D-123: skrinka s nohami/soklom stoji na ploche aj bez zamku Z
     run_ghost_d1(model)      # GHOST-D1: ghost pre DOSKY — prichytenie na zvyseny roh (plne XYZ), ↑ umiestnenie v ulozenom configu, ALT kotva na kliknutom bode, Esc/onCancel(2)/vymena dokumentu bez stopy, 1 krok Spat + Redo, pamat per subjekt, brana schemy dosky az po VEPO
     run_ghost_d2(model)      # GHOST-D2: KRESLENIE dosky dvoma tahmi - prichytenie pociatku aj konca na rohy dvoch skriniek, meracie pole (cislo/limit/prazdny Enter), zamknuta dlzka + kanonicky smer, pilaster vo volnom priestore v perspektive, zaporny 2. tah, Shift inference_locked?, Esc/onCancel(2)/vymena dokumentu bez stopy, 1 krok Spat + Redo
     run_d45(model)           # D-45: hrubka <-> material tela (18,6 mm deadlock)
