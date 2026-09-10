@@ -38,9 +38,6 @@ v [PLAN.md](PLAN.md), odrážka „BALÍK ČIEL". Čo z bloku KOVANIE ostalo mim
 
 ## KONTROLA + VÝROBA
 
-- **D-122 · Kontrola hlási každý UNI dielec zvlášť** (Michal 6.9., zákazka KLINIKA) — Štúdio → Kontrola ukazuje pri UNI farbách **každý dielec ako upozornenie**; pri tvorbe
-  je prirodzené, že dielce ostávajú UNI, kým sa nezvolia materiály. Želanie: **jedno upozornenie „použité nenahradené UNI farby"** a pod ním zoskupené dotknuté dielce (rozklik).
-  *Stav: OTVORENÉ — V1, malá UI dávka v sekcii Kontrola (zoskupenie nálezov podľa príčiny; semafor ostáva ORANGE, neblokuje).*
 - **D-94 · Traceability v celkovom súpise kovania — rozklik položky na miesta použitia** (Michal 9.8., test kovania na reálnej zákazke) — nákupný zoznam v okne Výroba povie „357695 × 12", ale nie
   **kde** tých 12 kusov je. Pri kontrole objednávky (a pri hľadaní, prečo je počet iný, než človek čakal) treba vedieť rozobrať riadok na **skrinky a čelá**, z ktorých vznikol. Dáta už existujú:
   `expand` skladá pri každom riadku pole `sources` (`cabinet_id`, `owner_part_key`, `generic_type`, `rule_id`, `set_id`, počet) — chýba len zobrazenie a klik-select. Návrh: rozklik riadku (vzor

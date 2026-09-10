@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-122** — UNI upozornenia sú zbalené pod jednu skupinu s počtom dielcov; jednotlivé akcie aj serverové počty ostávajú — vyriešené 10.9.2026, PR #343, v0.10.2
 - **D-123** — Ghost pri voľnej výške položí celú skrinku vrátane nôh/sokla na cieľovú plochu; náhľad zahŕňa aj soklovú časť — vyriešené 10.9.2026, PR #342, v0.10.1
 - **D-111** — Riadok „Nohy" v Základných aj v ghost pásiku povie, aké nohy a príchyty sokla skrinka pri tejto šírke a výške sokla dostane (a set sa dá zmeniť tým istým ovládačom ako v Kovaní) — vyriešené 10.9.2026, blok KOV-G, PR #337 + #338 + #339, v0.9.58–v0.9.60
 - **D-125** — Riadok „Hmotnosť" v Inspectore ukazuje skutočnú hmotnosť skrinky; neznáma hustota sa neignoruje ani nevymýšľa — ráta sa ťažšie a prizná sa („≈" + tooltip, ORANGE v Kontrole) — vyriešené 8.9.2026, PR #328 (KOV-W), v0.9.47
@@ -109,6 +110,13 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+- **D-122 · Kontrola hlási každý UNI dielec zvlášť** (Michal 6.9., zákazka KLINIKA) — Štúdio → Kontrola ukazuje pri UNI farbách **každý dielec ako upozornenie**; pri tvorbe
+  je prirodzené, že dielce ostávajú UNI, kým sa nezvolia materiály. Želanie: **jedno upozornenie „použité nenahradené UNI farby"** a pod ním zoskupené dotknuté dielce (rozklik).
+  *Pôvodný stav: OTVORENÉ — V1, malá UI dávka v sekcii Kontrola (zoskupenie nálezov podľa príčiny; semafor ostáva ORANGE, neblokuje).*
+  **Vyriešené 10.9.2026, PR #343, v0.10.2:** jedna predvolene zbalená skupina „Nenahradené UNI materiály“ s počtom dielcov. Po rozbalení pôvodné hlásenia s vlastníkom,
+  okom, ceruzkou a „Nahradiť UNI…“. Skupina sa obnovuje z čerstvých dát; zmena dokumentu alebo odstránenie posledného UNI ruší rozbalenie. Počty semaforu/badge aj exporty
+  ostávajú serverové a zahŕňajú jednotlivé nálezy. Implementačné kontroly dopĺňa Michalov večerný smoke.
 
 - **D-123 · Ghost bez zámku Z položí dolnú skrinku so soklom na dno skrinky, nie na nohy** (Michal 6.9., KLINIKA; potvrdené 10.9.) — pri voľnej Z (bez zámku) ghost umiestni skrinku tak, že
   na cieľovú plochu sadne **dno korpusu** (Z = `floor_height`) a nohy/sokel idú pod podlahu; **so zamknutou Z umiestňuje správne**. Podozrenie: `ghost_tool.rb` počíta „spodok
