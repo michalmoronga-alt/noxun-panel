@@ -4,7 +4,7 @@
 #
 # Co sa overuje:
 #   1) ZAVAZNA tabulka kotiev (audit BLOCKER 4) — predna rovina je vzdy Y = 0,
-#      spodok tela podla variantu dna, horna skrinka vzdy od Z = 0
+#      spodok CELEJ skrinky vratane noh/sokla je vzdy od Z = 0 (D-123)
 #   2) kanonicka konstrukcia transformu — 4 rotacie x 4 kotvy x oba typy:
 #      kotva ostava PRESNE na kliknutom bode (free), zamok drzi origin na
 #      `home_z` a lokalne Z kotvy sa NEODCITA, prechody locked/free nemenia X/Y
@@ -130,11 +130,11 @@ end
 
 # --- 1) ZAVAZNA tabulka kotiev ---------------------------------------------
 
-NxTest.test('ghost: kotvy dolnej `under_sides` — spodok tela je DNO na floor_height') do
+NxTest.test('ghost D-123: kotvy dolnej `under_sides` zahrnaju aj nohy/sokel') do
   c = NxGhost.cfg(bottom_mode: 'under_sides', floor_height: 100.0)
   a = NxGhost.calc.anchor_points(c)
-  NxTest.assert_equal([0.0, 0.0, 100.0], a[:fl_bottom])
-  NxTest.assert_equal([600.0, 0.0, 100.0], a[:fr_bottom])
+  NxTest.assert_equal([0.0, 0.0, 0.0], a[:fl_bottom])
+  NxTest.assert_equal([600.0, 0.0, 0.0], a[:fr_bottom])
   NxTest.assert_equal([0.0, 0.0, 720.0], a[:fl_top])
   NxTest.assert_equal([600.0, 0.0, 720.0], a[:fr_top])
 end
@@ -169,12 +169,12 @@ NxTest.test('ghost: predna rovina korpusu je VZDY lokalne Y = 0 (cela do kotiev 
   end
 end
 
-NxTest.test('ghost: obalka je 8 bodov [0..w] x [0..depth] x [spodok tela..h]') do
+NxTest.test('ghost D-123: obalka je 8 bodov [0..w] x [0..depth] x [0..h] vratane noh/sokla') do
   pts = NxGhost.calc.envelope_points(NxGhost.cfg)
   NxTest.assert_equal(8, pts.length)
   NxTest.assert_equal([0.0, 600.0], pts.map { |p| p[0] }.uniq.sort)
   NxTest.assert_equal([0.0, 510.0], pts.map { |p| p[1] }.uniq.sort)
-  NxTest.assert_equal([100.0, 720.0], pts.map { |p| p[2] }.uniq.sort)
+  NxTest.assert_equal([0.0, 720.0], pts.map { |p| p[2] }.uniq.sort)
   # Predna stena (indexy FRONT_FACE) lezi cela na Y = 0 — kontrakt kreslenia.
   NxGhost.gt::FRONT_FACE.each { |i| NxTest.assert_equal(0.0, pts[i][1]) }
   # 12 hran kvadra, ziadna zdvojena
@@ -183,6 +183,27 @@ NxTest.test('ghost: obalka je 8 bodov [0..w] x [0..depth] x [spodok tela..h]') d
 end
 
 # --- 2) + 3) kanonicky transform -------------------------------------------
+
+NxTest.test('ghost D-123: FREE polozi spodok skrinky na plochu nezavisle od vysky sokla a rotacie') do
+  %w[under_sides between_sides].each do |bottom_mode|
+    [0.0, 100.0, 150.0].each do |floor_height|
+      c = NxGhost.cfg(bottom_mode: bottom_mode, floor_height: floor_height)
+      [0.0, 500.0].each do |surface_z|
+        %i[fl_bottom fr_bottom].each do |anchor|
+          4.times do |rotation|
+            s = NxGhost.session(c, memory: NxGhost.fresh_memory.merge(anchor: anchor, rotation_index: rotation))
+            s.set_z_mode!(:free)
+            m = NxGhost.calc.matrix(anchor: s.anchor_point_mm, picked: [800.0, 200.0, surface_z],
+                                   rotation_index: s.rotation_index, z_mode: s.z_mode, home_z: s.lock_plane_z)
+            # Nezavisle fyzicke body: chodidlo/sokel od Z=0, drevene dno od floor_height.
+            NxTest.assert_close(surface_z, NxGhost.apply(m, [0.0, 0.0, 0.0])[2])
+            NxTest.assert_close(surface_z + floor_height, NxGhost.apply(m, [0.0, 0.0, floor_height])[2])
+          end
+        end
+      end
+    end
+  end
+end
 
 NxTest.test('ghost: FREE — kotva ostava PRESNE na kliknutom bode pri vsetkych 4 rotaciach a 4 kotvach') do
   [NxGhost.cfg, NxGhost.upper_cfg].each do |c|
@@ -202,7 +223,7 @@ NxTest.test('ghost: FREE — kotva ostava PRESNE na kliknutom bode pri vsetkych 
 end
 
 NxTest.test('ghost: ZAMOK — origin drzi home_z a lokalne Z kotvy sa NEODCITA') do
-  c = NxGhost.cfg # spodna kotva ma lokalne Z = 100 (floor_height)
+  c = NxGhost.cfg # spodna kotva je Z = 0; horne kotvy stale nesu nenulove lokalne Z
   picked = [800.0, 200.0, 0.0]
   NxGhost.gt::ANCHORS.each do |anchor|
     a = NxGhost.calc.anchor_point(c, anchor)
@@ -405,9 +426,9 @@ NxTest.test('ghost: obalka aj kotvy sa pocitaju RAZ zo zmrazeneho configu (ziadn
   NxTest.assert(s.corners_mm.frozen? && s.corners_mm.all?(&:frozen?))
   NxTest.assert(s.anchors_mm.frozen?)
   NxTest.assert_equal(8, s.corners_mm.length)
-  NxTest.assert_equal([0.0, 0.0, 100.0], s.anchor_point_mm)
+  NxTest.assert_equal([0.0, 0.0, 0.0], s.anchor_point_mm)
   s.cycle_anchor!
-  NxTest.assert_equal([600.0, 0.0, 100.0], s.anchor_point_mm)
+  NxTest.assert_equal([600.0, 0.0, 0.0], s.anchor_point_mm)
 end
 
 # --- 7) sev v paneli (zdrojove invarianty) ----------------------------------

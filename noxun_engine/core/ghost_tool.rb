@@ -552,30 +552,22 @@ module Noxun
           cfg_get(cfg, key).to_s
         end
 
-        # ZAVAZNA tabulka kotiev (audit BLOCKER 4). Predna rovina korpusu je
+        # D-123: kotvy aj obalka patria CELEJ skrinke vratane noh/sokla.
+        # Spodok je lokalne Z = 0, nie floor_height (spodok dreveneho dna).
+        # Inak FREE odpocital vysku sokla a zasunul ho pod cielovu plochu.
+        # Predna rovina korpusu je
         # VZDY lokalne Y = 0 — cela maju zaporne Y a do kotiev NEVSTUPUJU;
         # plinth recess ani presah cela rovinu Y = 0 nemenia.
-        #
-        #   dolna `under_sides`   -> spodok tela je DNO na Z = floor_height
-        #   dolna `between_sides` -> boky stoja na zemi, spodok tela je Z = 0
-        #   horna (oba varianty)  -> normalizovany floor_height 0 => Z = 0
-        #     (UPPER_HANG_Z je SVETOVA vyska originu, nie lokalna kotva)
-        def body_bottom_z(cfg)
-          return 0.0 if cfg_str(cfg, :type) == 'upper'
-
-          cfg_str(cfg, :bottom_mode) == 'under_sides' ? cfg_num(cfg, :floor_height) : 0.0
-        end
 
         # Lokalne suradnice jednej kotvy [x, y, z] v mm.
         def anchor_point(cfg, anchor)
           w = cfg_num(cfg, :width)
           h = cfg_num(cfg, :height)
-          bz = body_bottom_z(cfg)
           case anchor
-          when :fr_bottom then [w, 0.0, bz]
+          when :fr_bottom then [w, 0.0, 0.0]
           when :fr_top    then [w, 0.0, h]
           when :fl_top    then [0.0, 0.0, h]
-          else                 [0.0, 0.0, bz] # :fl_bottom + fallback
+          else                 [0.0, 0.0, 0.0] # :fl_bottom + fallback
           end
         end
 
@@ -583,14 +575,13 @@ module Noxun
           ANCHORS.each_with_object({}) { |a, h| h[a] = anchor_point(cfg, a).freeze }
         end
 
-        # 8 rohov obalky ghostu (mm): [0..w] x [0..depth] x [body_bottom..h].
+        # 8 rohov obalky CELEJ skrinky (mm): [0..w] x [0..depth] x [0..h].
         # Poradie je SUCASTOU kontraktu kreslenia (EDGES/FRONT_FACE nizsie).
         def envelope_points(cfg)
           w = cfg_num(cfg, :width)
           d = cfg_num(cfg, :depth)
           h = cfg_num(cfg, :height)
-          z0 = body_bottom_z(cfg)
-          [[0.0, 0.0, z0], [w, 0.0, z0], [w, d, z0], [0.0, d, z0],
+          [[0.0, 0.0, 0.0], [w, 0.0, 0.0], [w, d, 0.0], [0.0, d, 0.0],
            [0.0, 0.0, h],  [w, 0.0, h],  [w, d, h],  [0.0, d, h]]
         end
 

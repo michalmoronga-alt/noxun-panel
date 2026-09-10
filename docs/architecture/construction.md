@@ -460,8 +460,9 @@ s otvoreným Inspectorom a ten `PanelAppObserver` vždy pripája (`attach_observ
 Slot session sa uvoľňuje aj nad stavom `:committing` — commit prerušený výnimkou **mimo `StandardError`** by ho inak držal až do reštartu.
 
 **ZÁVÄZNÁ tabuľka kotiev.** Predná rovina korpusu je **vždy lokálne Y = 0** (čelá majú záporné Y a do kotiev NEVSTUPUJÚ; plinth recess ani presah čela rovinu Y = 0 nemenia).
-Dolná `under_sides` → spodok tela je DNO na `floor_height`; dolná `between_sides` → boky stoja na zemi, spodok je Z = 0; **horná normalizuje `floor_height` na 0**, takže oba
-varianty dna majú spodnú kotvu na Z = 0 (`UPPER_HANG_Z` je SVETOVÁ výška originu, nie lokálna kotva). Poradie cyklovania (Alt): ľavá-dolná → pravá-dolná → pravá-horná → ľavá-horná.
+**D-123:** spodné kotvy aj obálka patria **celej skrinke vrátane nôh/sokla**, preto začínajú na **lokálnom Z = 0** pri oboch typoch a oboch variantoch dna. `floor_height` je
+výška dreveného dna, nie spodná kotva — jej odpočítanie pri voľnej výške zasúvalo nohy/sokel pod cieľovú plochu. Obálka je `[0..width] × [0..depth] × [0..height]`, horné kotvy
+ostávajú na `height` (`UPPER_HANG_Z` je SVETOVÁ výška originu, nie lokálna kotva). Poradie cyklovania (Alt): ľavá-dolná → pravá-dolná → pravá-horná → ľavá-horná.
 
 **Transform sa skladá VŽDY NANOVO z celočíselného stavu** (`rotation_index % 4`), nikdy inkrementálnym násobením: `COS`/`SIN` sú tabuľky presných 0/±1, takže matica prejde
 `CabinetBuilder.rigid_matrix?` (R-03, `RIGID_TOL` 1e-6) bez numerického šumu aj po stovkách otočení. **Free Z:** `translation = picked − R(anchor)`. **Zámok typu (↓):**

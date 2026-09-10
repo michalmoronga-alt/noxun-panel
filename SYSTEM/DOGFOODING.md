@@ -49,10 +49,6 @@ v [PLAN.md](PLAN.md), odrážka „BALÍK ČIEL". Čo z bloku KOVANIE ostalo mim
 
 ## STABILITA
 
-- **D-123 · Ghost bez zámku Z položí dolnú skrinku so soklom na dno skrinky, nie na nohy** (Michal 6.9., KLINIKA) — pri voľnej Z (bez zámku) ghost umiestni skrinku tak, že
-  na cieľovú plochu sadne **dno korpusu** (Z = `floor_height`) a nohy/sokel idú pod podlahu; **so zamknutou Z umiestňuje správne**. Podozrenie: `ghost_tool.rb` počíta „spodok
-  tela" pre `under_sides` ako `floor_height` (r. ~506–513) — pre voľnú Z má byť spodok **celej skrinky** (nohy, Z = 0). *Stav: OTVORENÉ — **BUG**, fix dávka s in-SU testom
-  (blok GHOST je uzavretý, preto tu); overiť aj hornú skrinku a `between_sides`.*
 - **D-99 · Premenovanie dielca akoby prepísalo názvy všetkých kópií** (Michal 9.8., práca na zákazke KLINIKA) — po premenovaní jedného dielca to na chvíľu vyzeralo, akoby rovnaký názov dostali
   **všetky jeho kópie**; po prepnutí okna (zmena aktívneho modelu a späť) bolo všetko v poriadku, takže **dáta boli celý čas správne** — išlo o zobrazenie. *Stav: OTVORENÉ pozorovanie — zatiaľ
   **nereprodukované**. Sleduje sa; ak sa zopakuje, treba si všimnúť, či boli kópie vytvorené Ctrl+C/V (spoločná definícia, dedup tik) a čo presne ukazoval panel oproti modelu.*
