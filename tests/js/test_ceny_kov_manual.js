@@ -48,6 +48,7 @@ function result(req, more){ H.MDH.manualResult(Object.assign({}, req, { phase: '
   status: 'invalid', item: item(req.code), row_rev: req.row_rev, has_url: true, read_only: false,
   msg: 'Skontroluj cenu', errors: [{ field: 'price', msg: 'Chyba' }]
 }, more)); }
+function openAck(req = last('hw_manual_open')){ result(req, { phase: 'open', ok: true, status: 'ok', errors: [] }); }
 
 origin(); let req = request('A'); const opens = count('hw_manual_open');
 ready(req, { item: item('A', { price_check_method: 'manual', price_checked_at: '2026-08-01T08:00:00Z' }) });
@@ -59,6 +60,7 @@ tick(20); eq(count('hw_manual_open'), opens, 'najprv prebehne odlozeny fokus');
 tick(5); eq(count('hw_manual_open'), opens + 1);
 eq(last('hw_manual_open').row_rev, 'rev-A');
 const openReq = last('hw_manual_open');
+openAck(openReq); ok(NXModal.isOpen(), 'open ack potvrdi len pokus otvorenia, nie cenu');
 NXModal.close();
 eq(count('hw_manual_confirm'), 0, 'Cancel po prehliadani nema zapis');
 origin(); req = request('A'); ready(req); NXModal.close(); tick(25);
@@ -66,6 +68,7 @@ eq(count('hw_manual_open'), opens + 1, 'Cancel pred timerom uz neotvori browser'
 
 // Explicitne potvrdenie 0, busyLock a kazda odpoved patri konkretnemu submite.
 origin('hw'); req = request('A'); ready(req); tick(25);
+openAck();
 DOC.getElementById('nxm_price').value = '';
 NXModal.submit(); eq(count('hw_manual_confirm'), 0, 'prazdna cena sa nepotvrdi');
 ok(!NXModal.isBusy());
@@ -88,6 +91,7 @@ result(save, { ok: true, status: 'ok' }); ok(!NXModal.isOpen());
 // Konflikt zahodi povodnu cenu, obnovi zdroj/rev a nikdy sam nepotvrdi znova.
 origin(); req = request('A'); ready(req); tick(25);
 const originalOpen = last('hw_manual_open');
+openAck(originalOpen);
 DOC.getElementById('nxm_price').value = '88'; NXModal.submit(); save = last('hw_manual_confirm');
 const savedCount = count('hw_manual_confirm');
 result(save, { status: 'conflict', row_rev: 'fresh', item: item('A', { price_eur_vat: 7, product_url: 'https://shop.example/new' }) });
@@ -96,6 +100,9 @@ eq(last('hw_manual_open').row_rev, 'fresh');
 eq(count('hw_manual_confirm'), savedCount, 'konflikt cenu automaticky neprehra');
 result(originalOpen, { phase: 'open', status: 'error' });
 ok(NXModal.isOpen(), 'stara open odpoved nemoze zavriet obnoveny formular');
+openAck(originalOpen); NXModal.submit();
+eq(count('hw_manual_confirm'), savedCount, 'stary success ack neodomkne obnoveny formular');
+openAck();
 NXModal.submit(); eq(last('hw_manual_confirm').row_rev, 'fresh');
 eq(last('hw_manual_confirm').price, '7');
 result(last('hw_manual_confirm'), { ok: true, status: 'ok' });
@@ -111,7 +118,7 @@ origin(); req = request('A'); NXModal.open({ title: 'Iný', fields: [] }); NXMod
 ok(!NXModal.isOpen(), 'aj uz zatvoreny iny formular zrusi pending prepare');
 origin(); req = request('A'); ready(req); studioGoSection('bom'); tick(25);
 ok(!NXModal.isOpen()); eq(count('hw_manual_open'), beforeOpen, 'odchod zrusi aj pending browser');
-origin(); req = request('A'); ready(req); tick(25); NXModal.submit(); save = last('hw_manual_confirm');
+origin(); req = request('A'); ready(req); tick(25); openAck(); NXModal.submit(); save = last('hw_manual_confirm');
 H.hwProductContextChanged('budget', 'doc-B'); ST = { model_guid: 'doc-B' };
 NXModal.open({ title: 'Nový dokument', fields: [{ key: 'x', label: 'X' }] });
 result(save, { ok: true, status: 'ok' }); eq(NXModal.spec().title, 'Nový dokument');
@@ -125,4 +132,20 @@ ok(!NXModal.isOpen(), 'Demos viazany produkt nema manual formular');
 origin(); req = request('A'); ready(req); tick(25);
 result(last('hw_manual_open'), { phase: 'open', status: 'conflict' });
 ok(!NXModal.isOpen(), 'odmietnute otvorenie nedovoli potvrdit staru cenu');
+
+// Dispatch otvorenia nie je ack: rychly Enter pred oneskorenou chybou nesmie zapisat cenu.
+origin(); req = request('A'); ready(req); tick(25);
+const pendingOpen = last('hw_manual_open'); const beforeAck = count('hw_manual_confirm');
+NXModal.submit(); eq(count('hw_manual_confirm'), beforeAck, 'submit medzi dispatch a ack sa neodosle');
+ok(NXModal.isOpen() && !NXModal.isBusy(), 'pred cenovym zapisom sa stale da zrusit');
+result(pendingOpen, { phase: 'open', status: 'error' });
+ok(!NXModal.isOpen(), 'oneskorena open chyba sa spracuje este pred submitom');
+eq(count('hw_manual_confirm'), beforeAck);
+openAck(pendingOpen); ok(!NXModal.isOpen(), 'stary ack neozivi zatvoreny formular');
+origin(); req = request('A'); ready(req); tick(25);
+openAck(pendingOpen); NXModal.submit();
+eq(count('hw_manual_confirm'), beforeAck, 'ack predchadzajuceho formulara neodblokuje novy');
+openAck(); ok(NXModal.isOpen(), 'spravny ack len odblokuje potvrdenie');
+NXModal.submit(); eq(count('hw_manual_confirm'), beforeAck + 1, 'po success ack moze pouzivatel potvrdit cenu');
+result(last('hw_manual_confirm'), { ok: true, status: 'ok' });
 console.log(`OK ${n} kontrol (CENY-KOV-B manualny formular)`);

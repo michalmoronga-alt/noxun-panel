@@ -1350,7 +1350,6 @@
       if (!hwManualOwns(f)) return;
       var ctx = hwProductContext();
       if (ctx.section !== f.section || ctx.model_guid !== f.model_guid) return;
-      f.browserPending = false;
       mdhSend('hw_manual_open', { code: f.code, row_rev: f.rowRev, token: f.token,
         section: f.section, model_guid: f.model_guid });
     }, 25);
@@ -1379,12 +1378,23 @@
     var f = HW_MANUAL;
     if (!r || !hwManualOwns(f) || r.code !== f.code || r.model_guid !== f.model_guid || r.section !== f.section) return;
     var opening = r.phase === 'open';
-    if (opening ? (f.sent || r.token !== f.token) : (!f.sent || r.token !== f.submitToken)) return;
+    if (opening){
+      if (!f.browserPending || f.sent || r.token !== f.token) return;
+      if (r.ok && !r.read_only && r.item && !r.item.demos_url && r.has_url && r.row_rev === f.rowRev){
+        // Az serverovy ack pokusu otvorit browser odblokuje potvrdenie.
+        // Tento ack sam cenu nepotvrdzuje, formular zostava otvoreny.
+        f.browserPending = false;
+        NXModal.clearErrors();
+        return;
+      }
+      hwManualClose(); MDH.setStatus(r.msg || 'Overenie už nie je platné — otvor ho znova.', true); return;
+    }
+    if (!f.sent || r.token !== f.submitToken) return;
     NXModal.setBusy(false);
     f.sent = false;
     f.submitToken = '';
     if (r.ok){ hwManualClose(); MDH.setStatus(r.msg || 'Cena bola ručne potvrdená.'); return; }
-    if (opening || r.read_only || !r.item || r.item.demos_url || !r.has_url || r.status === 'stale_model'){
+    if (r.read_only || !r.item || r.item.demos_url || !r.has_url || r.status === 'stale_model'){
       hwManualClose(); MDH.setStatus(r.msg || 'Overenie už nie je platné — otvor ho znova.', true); return;
     }
     if (r.status === 'conflict'){

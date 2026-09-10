@@ -937,8 +937,11 @@ module Noxun
             return manual_result(data, :conflict, 'Položka sa medzitým zmenila — skontroluj aktuálne údaje.', nil, phase: 'open')
           end
           if UI.openURL(HardwareCatalog.product_link(item)) == false
-            manual_result(data, :error, 'Stránku sa nepodarilo otvoriť. Skús overenie znova.', nil, phase: 'open')
+            return manual_result(data, :error, 'Stránku sa nepodarilo otvoriť. Skús overenie znova.', nil, phase: 'open')
           end
+          # Ack hovori iba, ze sa vratil pokus UI.openURL; nie ze sa stranka
+          # nacitala alebo ze bola cena overena. Tu sa ziadna cena nezapisuje.
+          manual_result(data, :ok, '', nil, phase: 'open')
         rescue StandardError => e
           Engine.log_error(e, 'HardwareCatalogDialog.manual_open')
           manual_result(data || {}, :error, 'Stránku sa nepodarilo otvoriť. Skús overenie znova.', nil, phase: 'open')
