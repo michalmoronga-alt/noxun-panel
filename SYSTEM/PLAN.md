@@ -281,6 +281,8 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   - **Spoločné pravidlo:** rovnaký nastaviteľný prah ako DEMOS (default 30 dní; vek ≥ prah = upozornenie). Ručne overená mladšia cena je aktuálna, pôvod je viditeľný. Automatický refresh nikdy neparsuje
     `product_url`. Pole `price_check_method: manual` a dátum chránia lazy schema 4; staré DEMOS potvrdenia ostávajú platné. Uloženie obnoví katalóg/panel/Rozpočet existujúcou cestou, bez modelového zápisu.
     Testy pokryjú deň 29/30, zrušenie, konflikt, prepnutie zákazky/sekcie, chýbajúcu cenu a nezmenené DEMOS/ABS/materiály.
+  **Predimplementačný audit Astra (10.9.2026):** 0 BLOCKER, 1 FIX-IN-A, 2 FIX-IN-B; všetky prijaté. A overí celý čerstvý nefiltrovaný dokument pod zámkom, aby typovo poškodený riadok nezmizol pri úprave iného.
+  B použije existujúci `busyLock` počas odoslaného potvrdenia a zneplatní čakajúcu požiadavku pri odchode z pôvodnej sekcie (aj Rozpočet, aj deep-link), zmene modelu alebo otvorení iného formulára.
   Pôvodná debata: [zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md). Prepínač „na faktúru" je vyradený (existuje s DPH / bez DPH). **Mimo V1:** DOCX/PDF generátor ponuky a rodina dokumentov.
 - *(Vkladanie na klik — V1-04 — sa 26.8. vyčlenilo do vlastného bloku **GHOST VKLADANIE**; ten je od 31.8.2026 **hotový** (v0.9.0), plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).)*
 - **Konštrukcia — rozhodnuté 6.9.2026** ([zdroje/next_sessions/V1_DEBATA_2026-09-05_KONSTRUKCIA.md](zdroje/next_sessions/V1_DEBATA_2026-09-05_KONSTRUKCIA.md)): **K1 odsadenia** — dva prípady, jedna

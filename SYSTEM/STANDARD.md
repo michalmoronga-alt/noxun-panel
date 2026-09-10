@@ -412,6 +412,10 @@ Dve nezávislé vrstvy (GPT debata sekcie 16–17):
 - **Katalóg kovania** — konkrétne fyzické produkty (Blum Clip Top 110°, Hettich Quadro, AXILO…). Záznam: výrobca, kód, názov, kategória, rozmery, cena, dodávateľ, kompatibilita, prípadne 3D. Prevezme sa z KOVANIE (CatalogStore, search, Demos import).
 - **Pravidlá kovania (rules engine)** — rozhodujú, **aký typ a koľko kusov**. Konkrétne kovanie **nikdy natvrdo v definícii korpusu.**
 
+**Odkaz produktu (CENY-KOV-A):** globálny katalóg kovania má voliteľné `product_url` pre ručne spravovaný odkaz (http/https). `demos_url` ostáva overenou väzbou konektora a má pri otvorení prednosť.
+Samotné uloženie alebo otvorenie `product_url` neoveruje cenu, nemení dátum a nespúšťa parser. Prázdny odkaz sa neukladá; jeho nový obsah vyžaduje lazy schema 3, aby starší plugin údaj pri úprave nestratil.
+Odkaz sa neprenáša do konfigurácie skrinky ani snapshotu setov: katalógový kód ostáva identitou, URL aj cena sa dohľadávajú v globálnom katalógu.
+
 ### 6.2 Two-phase: generický flag → katalógový kód
 
 **Fáza 1 — generický flag z pravidiel.** Pri stavbe/prestavbe korpusu plánovač pridelí generické položky (`hinge`, `slide`, `leg`…) s množstvom z pravidiel v JSON;

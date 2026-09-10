@@ -2095,6 +2095,11 @@ modelu).
 **ŠT-3a-2 — sekcia `hw` je ÚPLNÁ a okno „Katalóg kovania" ZANIKLO.** Do sekcie pribudli tri **MODELOVÉ zápisy** (predvoľby setov projektu), takže blok „Predvoľby projektu" v
 pohľade Sety už **nie je read-only** — `HWS_PROJ_RO` aj premostenie `hw_open_window`/`HW_BRIDGE_STATUS` **zanikli**.
 
+**CENY-KOV-A (v0.10.4): ikona „Otvoriť produkt" je pri každej katalógovej položke kovania aj pri jej riadku v Rozpočte.** Pri uloženej URL iba otvorí externý prehliadač;
+chýbajúci odkaz sa ukáže jantárovo a otvorí existujúci editor konkrétneho kódu s fokusom na adrese. Formulár používa pôvodný draft, revíziu a token odpovede — nevzniká druhý
+editor položky. Preklik z Rozpočtu nesmie závisieť od toho, či je daný kód práve viditeľný v strome katalógu. Oneskorená odpoveď sa neprijme po odchode z pôvodnej sekcie,
+zmene dokumentu ani otvorení iného formulára. Demos väzba zostáva v pôvodnom overovacom toku; obyčajný preklik pri nej nezapisuje cenu ani dátum.
+
 **Po modelovom zápise ide `after_sets_change(model)` → `refresh_if_open(bump: true)` — a to STAČÍ:** predvoľba setu nemení GEOMETRIU, takže `Panel.push_selected` (dedup kópií) sa
 vedome NEVOLÁ; jantár „Obnoviť" po vlastnom prepočte NEZOŽLTNE, lebo `push_state` si `@pushed_epoch` ukladá AŽ po zbere a vlastnú transakciu tak pohltí.
 

@@ -565,6 +565,10 @@ prepísala prvú). Poznámku riadku skladá `hardware_note`: `missing` = „kód
 nie je v katalógu (bez ceny)"; sú to dva rôzne stavy a dve rôzne vety. **Voľné položky sú mimo `stale_scan`** — nemajú kód, takže v katalógu nemajú čo porovnávať (vetva je
 explicitná, aby to bol zámer, nie náhoda). Cenová ponuka voľný riadok **nepreskočí** (`CpExport.specification` filtruje `missing`, a voľná položka ňou nikdy nie je).
 
+**Odkaz kovania (CENY-KOV-A, v0.10.4).** Rozpočtový riadok s katalógovým kódom dostáva aj podklad pre ikonu produktu, nezávisle od jeho ceny a veku overenia. Zdrojom je
+ten istý globálny katalóg ako pri dodávateľovi; URL nevstupuje do výpočtu ani projektových override dát. Platný odkaz otvorí web, chýbajúci vedie do existujúcej úpravy
+katalógovej položky. Voľné položky bez kódu tento kanál nemajú; vlastné položky Rozpočtu a spotrebiče si nechávajú pôvodné odkazy uložené v zákazke.
+
 ### budget_store.rb
 
 _(kostra založená dávkou 1d/R-14 — doplniť pri ďalších zásahoch)_

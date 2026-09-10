@@ -684,12 +684,24 @@
   }
 
   function budHardwareRow(r, d){
-    return '<tr' + budRowClass(r) + '><td class="bmut">' + bEsc(r.kod) + '</td>' +
+    return '<tr' + budRowClass(r) + '><td class="bmut">' + budHardwareLink(r) + bEsc(r.kod) + '</td>' +
       '<td>' + bEsc(r.nazov) + budNoteHtml(r) + '</td>' +
       '<td class="bnum">' + bEsc(budFmtNum(r.mnozstvo, 0)) + '</td>' +
       '<td class="bnum">' + bEsc(r.mj) + '</td>' +
       budPriceCell(r, d) +
       '<td class="bnum">' + bEsc(budSub(r.spolu, d)) + '</td></tr>';
+  }
+
+  // CENY-KOV-A: klik obsluhuje spolocny katalogovy kanal v hw_catalog.js.
+  // Volny alebo uz odstraneny katalogovy riadok nema co otvorit/editovat.
+  function budHardwareLink(r){
+    if (r.free === true || !r.kod || typeof r.product_link !== 'boolean') return '';
+    var missing = r.product_link !== true;
+    var label = missing ? 'Chýba odkaz — doplniť odkaz produktu' : 'Otvoriť produkt';
+    return '<button type="button" class="hw-product-link' + (missing ? ' is-missing' : '') +
+      '" data-action="hw-product" data-code="' + bEsc(r.kod) + '" title="' + bEsc(label) +
+      '" aria-label="' + bEsc(label + ' · ' + (r.nazov || r.kod)) + '">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-external-link"/></svg></button>';
   }
 
   // Automaticka sluzba: vypocet vlavo, vpravo EDITOVATELNA suma. Prepis
