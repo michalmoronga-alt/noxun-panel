@@ -45,6 +45,9 @@ module Noxun
     module Bom
       EDGE_ORDER = %w[L1 L2 W1 W2].freeze
       L_EDGES = %w[L1 L2].freeze # pozdlzne hrany = dlzka dielca; W = sirka
+      # KOV-G1b: typy podopretia, pri ktorych NOHY vobec vznikaju — zrkadlo
+      # filtra `applies_to.support` seed pravidla `nohy-zakladne`.
+      LEG_SUPPORTS = %w[legs plinth].freeze
 
       module_function
 
@@ -520,12 +523,21 @@ module Noxun
       #       a je to vedome rozhodnutie pouzivatela),
       #   (b) vyska sokla >= `PLINTH_CLIP_MIN_MM` a ulozene kovanie nema ANI
       #       JEDEN `plinth_clip`.
+      #
+      # PODOPRETIE (Codex #338 kolo 1 N1): symptom (a) plati pre OBA typy,
+      # pri ktorych nohy vobec vznikaju — `legs` aj `plinth`. Seed
+      # `nohy-zakladne` ma filter `support legs plinth`, takze siroka skrinka
+      # so SOKLOM VPREDU dostane po prestavbe tiez 6 noh; kontrola len na
+      # `legs` by u nej migracnu vetu POTICHU zhasla a nakup by mal o dve nohy
+      # menej. Symptom (b) ostava LEN pri `legs`: samostatna soklova lista (a
+      # teda jej prichyt) pri sokli vpredu neexistuje.
       # -> nalez | nil
       def leg_stale_issue(owner_id, owner_pid, ccfg)
         return nil unless defined?(HardwareRules)
 
         cfg = ccfg.is_a?(Hash) ? cfg_hash(ccfg) : {}
-        return nil unless support_type_of(cfg) == 'legs'
+        sup = support_type_of(cfg)
+        return nil unless LEG_SUPPORTS.include?(sup)
         return nil if provenance_marker(cfg['rules_seed_version']) >=
                       HardwareRules::LEG_WIDTH_SEED_VERSION
 
@@ -533,22 +545,29 @@ module Noxun
         fh = num_of(cfg['floor_height']).to_f
         hw = Array(cfg['hardware'])
         legs4 = wide && hw.any? { |h| rule_leg_four?(h) }
-        clip_missing = fh >= HardwareRules::PLINTH_CLIP_MIN_MM &&
+        clip_missing = clips_expected?(sup, fh) &&
                        hw.none? { |h| h.is_a?(Hash) && h['generic_type'].to_s == 'plinth_clip' }
         return nil unless legs4 || clip_missing
 
         { 'code' => BuildPlan::LEG_STALE, 'severity' => 'orange',
           'owner_id' => owner_id.to_s, 'owner_pid' => owner_pid,
           'part_key' => nil, 'front_id' => '',
-          'message' => leg_stale_message(owner_id, cfg['width'], fh),
+          'message' => leg_stale_message(owner_id, cfg['width'], fh, sup),
           'label' => 'Nohy' }
       end
 
+      # Ma tato skrinka podla NOVYCH pravidiel dostat prichyt sokla? LEN pri
+      # samostatnej soklovej liste (`legs`) a LEN od vysky, v ktorej lista na
+      # nohach AXILO existuje. JEDINA autorita otazky v zbere.
+      def clips_expected?(support, floor_height)
+        support.to_s == 'legs' && floor_height >= HardwareRules::PLINTH_CLIP_MIN_MM
+      end
+
       # Veta hovori KONKRETNE cislami tejto skrinky, aby bolo jasne, co sa zmeni.
-      def leg_stale_message(owner_id, width, floor_height)
+      def leg_stale_message(owner_id, width, floor_height, support = 'legs')
         w = num_of(width).to_f
         legs = w >= HardwareRules::LEG_WIDE_FROM_MM ? 6 : 4
-        clips = floor_height >= HardwareRules::PLINTH_CLIP_MIN_MM ? (legs / 4.0).ceil : 0
+        clips = clips_expected?(support, floor_height) ? (legs / 4.0).ceil : 0
         want = "#{legs} nôh"
         want += " + #{clips} #{clips == 1 ? 'príchyt' : 'príchyty'} sokla" if clips.positive?
         "Skrinka #{owner_id} má nohy spočítané ešte pred pravidlom 4/6 (šírka " \

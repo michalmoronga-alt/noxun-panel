@@ -472,6 +472,29 @@ NxTest.test('KOV-G1b (7): `leg_stale` mlčí, keď sa nič nezmení alebo je skr
                 'úzka skrinka so soklom 100 mm ale príchyt CHÝBA -> nález')
 end
 
+NxTest.test('KOV-G1b (7): `leg_stale` — sokel VPREDU tiež dostane ORANGE (Codex #338 N1)') do
+  c = NxKovG1b
+  # Siroka skrinka so soklom VPREDU (`support type: 'plinth'`) ma po prestavbe
+  # tiez 6 noh — seed `nohy-zakladne` plati na `legs` aj `plinth`. Kontrola len
+  # na `legs` by u nej migracnu vetu POTICHU zhasla a nakup by mal o dve nohy
+  # menej.
+  iss = c.stale_issue('support' => { 'type' => 'plinth', 'height' => 100.0 })
+  NxTest.assert(iss, 'skrinka 1200 so soklom vpredu a 4 nohami z pravidla')
+  NxTest.assert_equal('orange', iss['severity'])
+  NxTest.assert(iss['message'].include?('6 nôh'), "veta menuje nohy: #{iss['message']}")
+  NxTest.assert(!iss['message'].include?('príchyt'),
+                'ale ZIADNY prichyt — samostatna soklova lista pri sokli vpredu neexistuje')
+  # Symptom „chyba prichyt" ostava LEN pri `legs`: uzka skrinka so soklom
+  # vpredu dostane 4 nohy a ziadny prichyt aj podla NOVYCH pravidiel.
+  NxTest.assert_equal(nil,
+                      c.stale_issue('width' => 600.0,
+                                    'support' => { 'type' => 'plinth', 'height' => 100.0 }),
+                      'úzka skrinka so soklom vpredu sa prestavbou NEZMENÍ')
+  # A podopretie, pri ktorom nohy vobec nevznikaju, sa nekomentuje.
+  NxTest.assert_equal(nil, c.stale_issue('support' => { 'type' => 'none', 'height' => 0.0 }),
+                      'skrinka bez podstavca nemá čo prestavovať')
+end
+
 NxTest.test('KOV-G1b (7): `leg_stale` je ORANGE a NEZASTAVUJE výrobu ani nákup') do
   c = NxKovG1b
   NxTest.assert(!c::BP::HW_ISSUE_BLOCKERS.include?(c::BP::LEG_STALE),

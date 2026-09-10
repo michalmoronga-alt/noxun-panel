@@ -258,14 +258,17 @@ DÁTOVÁ (vyber set / Doplniť nové predvoľby), nikdy fallback na iný set. K 
 podľa otvárania čela. `BUILD_INFO_ONLY` má navyše `hinge_weight_unknown` — INFO o stave dát, nie nález.
 
 **KOV-G1b (v0.9.59) — MIGRAČNÝ `leg_stale`: prvý nález kovania, ktorý je ORANGE.** `Bom.leg_stale_issue` je štvrtý vzor po `drawer_stale` / `hinge_stale`
-/ `flap_stale`, ale **zámerne bez brány**: skrinka NA NOHÁCH (uložený deskriptor `support.type == 'legs'`) postavená s pravidlami spred „4/6 podľa šírky"
-nesie v `config.hardware[]` 4 nohy aj pri šírke 1200 a žiadny príchyt soklovej lišty — nákup je teda o dve nohy a o príchyty chudobnejší, ale **rezanie
-ani montáž na tom nestoja** a chýbajúce kusy sa dajú dokúpiť. Kód `BuildPlan::LEG_STALE` preto **NIE JE** v `HW_ISSUE_BLOCKERS` ani v `BuildPlan.hw_blockers`;
+/ `flap_stale`, ale **zámerne bez brány**: skrinka na podstavci (uložený deskriptor `support.type` ∈ `Bom::LEG_SUPPORTS` = `legs` + `plinth`) postavená
+s pravidlami spred „4/6 podľa šírky" nesie v `config.hardware[]` 4 nohy aj pri šírke 1200 a žiadny príchyt soklovej lišty — nákup je teda o dve nohy
+a o príchyty chudobnejší, ale **rezanie ani montáž na tom nestoja** a chýbajúce kusy sa dajú dokúpiť. Kód `BuildPlan::LEG_STALE` preto **NIE JE** v `HW_ISSUE_BLOCKERS` ani v `BuildPlan.hw_blockers`;
 Kontrola z neho robí ORANGE riadok kategórie `CAT_HARDWARE` (`leg_stale_item`, klik-select mieri na skrinku) s vetou zo zberu + „Nákup ani výroba sa tým
 nezastavujú.". **Proveniencia je JEDNA a je NUTNÁ:** `rules_seed_version` < `HardwareRules::LEG_WIDTH_SEED_VERSION` (6) — marker už zapisuje každá stavba
 (E1b), takže sa **nezakladá žiadny nový kľúč configu** a `CONFIG_SCHEMA` sa nebumpuje. K nej musí sedieť aspoň jeden **symptóm**, inak by veta strašila aj
 tam, kde sa nič nezmení: (a) šírka ≥ 1000 mm a uložená položka `leg` má ešte 4 kusy zo `source: 'rule'` (ručný zámok nesie `manual` a je to vedomé
-rozhodnutie), alebo (b) výška sokla ≥ 55 mm a v kovaní **nie je ani jeden** `plinth_clip`. Náprava je tá istá ako pri `flap_stale`: „Doplniť nové
+rozhodnutie), alebo (b) výška sokla ≥ 55 mm a v kovaní **nie je ani jeden** `plinth_clip`. **Podopretie rozlišuje symptómy (Codex #338 kolo 1 N1):**
+(a) platí pre `legs` aj `plinth` — seed `nohy-zakladne` má filter `support legs plinth`, takže široká skrinka so **soklom vpredu** dostane po prestavbe
+tiež 6 nôh a kontrola len na `legs` by jej migračnú vetu potichu zhasla; (b) ostáva LEN pri `legs` (`clips_expected?` = jediná autorita otázky v zbere),
+lebo samostatná soklová lišta pri sokli vpredu neexistuje — a tá istá funkcia drží vetu, takže skrinke s `plinth` sa v nej príchyty nespomenú. Náprava je tá istá ako pri `flap_stale`: „Doplniť nové
 predvoľby" + prestavba (po nej je marker 6 a nález zhasne). Príchyt **bez setu** ostáva bežná ORANGE `hardware_unmapped` — `HW_LABELS['plinth_clip']`
 (z G1a) z nej zloží „Príchyt sokla (S1) nemá priradený set…".
 
