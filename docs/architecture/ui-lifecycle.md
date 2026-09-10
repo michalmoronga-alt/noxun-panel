@@ -2197,6 +2197,17 @@ nezahadzuje — prázdne kilogramy idú ako `null` a uloženie sa **odmietne vet
 `rdCollectRules` pracuje na kópii pôvodného pravidla, takže guard z cudzieho `fit_series` záznamu uloženie prežije. Testy: `tests/pure/test_kovf2_editor_zavesy.rb`,
 `tests/js/test_kovf2_editor_zavesy.js` (mini-DOM) + spoločná fixtúra parity.
 
+**KOV-G1b (v0.9.59) — pásma vedia povedať, PODĽA ČOHO merajú, a popis roly pozná prah sokla.** Tabuľka pásiem vyzerá pri každom pravidle rovnako („do X mm
+→ N ks"); kým boli pásma len závesové (výška čela), bolo to jedno, ale od G1b sú **korpusové pravidlá na ŠÍRKU** (nohy 4/6, príchyt sokla). Pod tabuľku
+preto pribudne **jednoriadkový hint „Pásma podľa šírky korpusu."** — a to LEN pri `kind: 'bands'` + `input: 'width'` + `applies_to.role == 'cabinet'`
+(`rdWidthHint`, čistá funkcia). Pri `height` sa **nič nemení** (výška je pri závesoch zaužívaná a vertikálny priestor panela je vzácny). `rdRoleDesc` pre
+cabinet pravidlo s **`applies_to.floor_height_min`** povie „na skrinku na nohách so soklom od 55 mm" (hodnota z pravidla, vypisuje sa tak, ako ju posiela
+server — vzor `rdLiftSummary`); pravidlo bez prahu má ďalej „na skrinku s podstavcom", takže dve korpusové pravidlá sa už nedajú zameniť. **Editor prahu
+NEEXISTUJE** (je to dátové rozhodnutie, nie nastavenie zákazky) — o to dôležitejšie je, že ho zber **nesmie stratiť**: `rdCollectRules` pracuje na kópii
+celého pravidla (`JSON.parse(JSON.stringify(src))`), takže `floor_height_min` prežije formulár aj uloženie. Bez neho by príchyt pribudol aj ku klzáku
+17 mm, kde žiadna soklová lišta nie je. Zápisová brána ani fixtúra parity sa **nemenia** (nové kritérium nepribudlo). Testy:
+`tests/js/test_kovg1b_editor_nohy.js` (mini-DOM), server v `tests/pure/test_kovg1b_nohy_pravidla.rb`.
+
 ### StudioModelWatch — indikátor neaktuálnosti okna (22.8., „Obnoviť" zožltne)
 
 Štúdio čísla **neprepočítava samo** — kým sa nestlačí „Obnoviť", visia v ňom čísla z posledného prepočtu. Model sa medzitým mohol zmeniť (prestavba skrinky z Inspectora, posun,

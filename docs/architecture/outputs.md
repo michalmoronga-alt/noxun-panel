@@ -257,6 +257,18 @@ DÁTOVÁ (vyber set / Doplniť nové predvoľby), nikdy fallback na iný set. K 
 `hinge_set_unclassified` z nového aditívneho kľúča `expansion['notes']` (`check_hardware_notes`): nákup beží ďalej, ale set bez zaradenia sa nedá vybrať
 podľa otvárania čela. `BUILD_INFO_ONLY` má navyše `hinge_weight_unknown` — INFO o stave dát, nie nález.
 
+**KOV-G1b (v0.9.59) — MIGRAČNÝ `leg_stale`: prvý nález kovania, ktorý je ORANGE.** `Bom.leg_stale_issue` je štvrtý vzor po `drawer_stale` / `hinge_stale`
+/ `flap_stale`, ale **zámerne bez brány**: skrinka NA NOHÁCH (uložený deskriptor `support.type == 'legs'`) postavená s pravidlami spred „4/6 podľa šírky"
+nesie v `config.hardware[]` 4 nohy aj pri šírke 1200 a žiadny príchyt soklovej lišty — nákup je teda o dve nohy a o príchyty chudobnejší, ale **rezanie
+ani montáž na tom nestoja** a chýbajúce kusy sa dajú dokúpiť. Kód `BuildPlan::LEG_STALE` preto **NIE JE** v `HW_ISSUE_BLOCKERS` ani v `BuildPlan.hw_blockers`;
+Kontrola z neho robí ORANGE riadok kategórie `CAT_HARDWARE` (`leg_stale_item`, klik-select mieri na skrinku) s vetou zo zberu + „Nákup ani výroba sa tým
+nezastavujú.". **Proveniencia je JEDNA a je NUTNÁ:** `rules_seed_version` < `HardwareRules::LEG_WIDTH_SEED_VERSION` (6) — marker už zapisuje každá stavba
+(E1b), takže sa **nezakladá žiadny nový kľúč configu** a `CONFIG_SCHEMA` sa nebumpuje. K nej musí sedieť aspoň jeden **symptóm**, inak by veta strašila aj
+tam, kde sa nič nezmení: (a) šírka ≥ 1000 mm a uložená položka `leg` má ešte 4 kusy zo `source: 'rule'` (ručný zámok nesie `manual` a je to vedomé
+rozhodnutie), alebo (b) výška sokla ≥ 55 mm a v kovaní **nie je ani jeden** `plinth_clip`. Náprava je tá istá ako pri `flap_stale`: „Doplniť nové
+predvoľby" + prestavba (po nej je marker 6 a nález zhasne). Príchyt **bez setu** ostáva bežná ORANGE `hardware_unmapped` — `HW_LABELS['plinth_clip']`
+(z G1a) z nej zloží „Príchyt sokla (S1) nemá priradený set…".
+
 
 *(2) POTVRDITEĽNÁ — `export_confirmations(budget:)`.* Dnes jediný dôvod: **riadky bez ceny**. STANDARD §11.3 hovorí, že neznáma cena sa NIKDY nenahradí nulou, ale má sa **priznať**
 („medzisúčet je len zo známych cien a súhrn nahlas povie, že nie je úplný") — **rozpracovaný rozpočet je legitímny stav zákazky** a plošný tvrdý blok by používateľovi bral výstup,

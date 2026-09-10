@@ -198,6 +198,35 @@ nové hodnoty platia hneď."; ostatné hinty sekcie (pásma F2, rad výsuvov) ta
 
 Nové prípady sú v `tests/fixtures/rules_validation_parity.json`. Testy: `tests/pure/test_kove2_ui.rb`, `tests/js/test_kove2_rules_editor.js`.
 
+**KOV-G1b (v0.9.59) — NOHY PODĽA ŠÍRKY, PRÍCHYT SOKLA a filter `applies_to.floor_height_min`.** Seed `nohy-zakladne` už nie je `fixed 4`, ale
+**`bands` s `input: 'width'`** (`max 999 → 4`, catch-all `→ 6`; konvencia „< 1000" je tá istá ako 849 pri závesoch, takže **neceločíselná** šírka
+999,5 padne do horného pásma — šírky korpusov sú v praxi celé milimetre a radšej o nohu viac). `applies_to.support %w[legs plinth]` aj
+`params_from_context {height: floor_height}` **ostávajú**: šírka rieši POČET, výška sokla naďalej KÓD (set `nohy-podla-sokla`, G1a). Nové seed pravidlo
+**`prichyt-sokla`** (`PLINTH_CLIP_RULE_ID`) vydáva `plinth_clip` rovnakými pásmami (`999 → 1`, catch-all `→ 2`) = **1 ks na začaté 4 nohy** (rozhodnutie
+O3; žiadny pomerový člen, D-109 ostáva po V1). Platí **len pri samostatnej soklovej lište**: `support %w[legs]` (sokel vpredu je súčasť korpusu a lišta
+neexistuje) a **`floor_height_min` 55,0** — pod tým je klzák 17–20 mm, ktorý žiadnu lištu nemá. Zóna 20–55 mm ostáva vedome nepokrytá **SETOM** (ORANGE
+„doplň pásmo" z G1a), pravidlo tam nohy vydáva ako doteraz.
+
+**`floor_height_min` je VOLITEĽNÝ filter `applies_to`, nie nový `kind`** (vzor `flap_dir` z E1b): `apply_rule` ho pre rolu `cabinet` vyhodnocuje vedľa
+`support`/`cabinet_type` cez `floor_height_ok?` — jedinú autoritu otázky. Kontext **bez použiteľnej výšky** filtru NEVYHOVIE (hádať by znamenalo objednať
+príchyt ku klzáku). `normalize_rules` prah typovo očistí (`normalize_floor_height_min!`): konečné **kladné** číslo → Float (mm), čokoľvek iné sa **zahodí
+aj s kľúčom** + `Engine.log` — pravidlo potom platí BEZ prahu, rovnako ako pravidlo, ktoré prah nikdy nemalo (vzor `width_warn_over`). Vedomý dôsledok:
+pokazený prah znamená príchyt aj tam, kde lišta nie je — taký riadok je v Nákupe **vidno** (na rozdiel od ticho chýbajúceho kovania) a editor prahu
+neexistuje, takže sa tam dá dostať len ručnou úpravou JSON. **STARŠÍ PLUGIN kľúč ZACHOVÁ, ale NEUPLATNÍ** (vetva „neznáme kľúče" v `normalize_rules`),
+takže by príchyt vydal aj pri sokli 17 mm; `std` sa **nemení** (žiadny nový kind), takže táto hranica downgrade je vedomá — rovnaké riziko ako pri
+`flap_dir` (knižnice sú per PC, updater D-52; D-48).
+
+**`SEED_VERSION` 5 → 6 a `LEGACY_SEED_SHAPES['nohy-zakladne']`.** Bez bumpu by `merge_seed` migráciu preskočil a existujúca knižnica by nové pravidlá
+nedala ani novým projektom. Starý tvar nôh (`fixed 4`, v1..v5) je v `LEGACY_SEED_SHAPES`, takže **preukázateľne nedotknuté** pravidlo dostane nový tvar
+(knižnica sama, projektový snapshot až cez „Doplniť nové predvoľby" → `project_seed_plan`); používateľom upravené (napr. 5 nôh) sa **nikdy** neprepíše.
+**`OVERLAP_OUTPUTS` = `hinge + lift + plinth_clip`:** vlastné zapnuté pravidlo na `plinth_clip` doplnenie seedu zastaví (inak dvojitý nákup) a runtime
+prekryv prizná ORANGE `hardware_rule_overlap` s vetou „druhé pravidlo **príchytov sokla**" (`overlap_noun`). `leg` v registri zámerne NIE JE — pravidlo
+nôh existuje od v1 (doplnenie podľa `rule_id` ho nezduplikuje) a dve legitímne pravidlá nôh by začali hlásiť ORANGE.
+
+**`LEG_WIDTH_SEED_VERSION` = 6** je pevné číslo (ako `LIFT_SEED_VERSION`) pre migračnú bránu `leg_stale` — ORANGE „skrinka má nohy spočítané ešte pred
+pravidlom 4/6" ([outputs.md](outputs.md)). Editor pravidiel: [ui-lifecycle.md](ui-lifecycle.md). Testy: `tests/pure/test_kovg1b_nohy_pravidla.rb`,
+`tests/js/test_kovg1b_editor_nohy.js`, in-SketchUp sekcia `run_kovg`.
+
 
 **KOV-C2b (v0.9.31) — R2 EXKLUZIVITA.** `evaluate(..., suppress_slide_owners:)` dostáva množinu `owner_part_key` čiel, ktoré už majú položku výsuvu **z receptu**, a pravidlá
 s `output: 'slide'` sa na nich **nevyhodnocujú** — inak by zásuvka mala dva výsuvy (jeden s kitom, jeden legacy bez dielcov). Potlačenie sa priznáva **jedným** `info`
