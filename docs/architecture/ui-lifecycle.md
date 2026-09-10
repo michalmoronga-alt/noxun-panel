@@ -690,7 +690,8 @@ skupinu kľúčov `INSERT_LEGS_HW_KEYS` = `hardware_sets` · `hardware_set_defs`
 idú do `HardwareSets.state_with_template_sets` ([hardware.md](hardware.md)) ako **prospektívny** stav. Súčasťou kľúča `nxLegsInsertPeek` je aj toto kovanie: dve šablóny s rovnakými
 rozmermi a iným setom nôh sú dva rôzne dotazy.
 
-Odchod z vkladania (`loadSelected`, `loadBoard`, `clearSelected`) volá `nxLegsInsertReset` — riadok zmizne aj s pamäťou vstupov.
+**Odchod z riadku = SKRYŤ.** `nxLegsInsertReset` (`loadSelected`, `loadBoard`, `clearSelected` a **`materializeInsertBoardCard`** — Codex #339 N2: prepnutie vkladania
+na Dosku predikát `nxLegsInsertMode` len umlčí, riadok samotný neschová nikto a v doskovej karte ostával visieť text skrinky) riadok schová a zabudne pamäť vstupov.
 
 **Klikateľné sú len tie údaje, ktoré niekam vedú (N13):** „Dielcov" → `nx_select_parts` → `Panel.handle_select_parts` = **čisté čítanie + zmena výberu** pod
 `suspend_selection_sync` a refresh `dedup: false` (vzor `ProductionCore.do_select`; **žiadny `start_operation`, žiadny krok Späť**), s prísnym guardom `model_guid` + `cabinet_id`

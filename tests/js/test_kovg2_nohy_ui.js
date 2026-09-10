@@ -359,4 +359,24 @@ eq(Object.keys(HW.nxLegsTemplateHw()).sort(), ['hardware_set_defs', 'hardware_se
    'do náhľadu ide LEN to, čo je v `HARDWARE_KEYS`');
 global.__tplHw = {};
 
+// ===========================================================================
+// 5) Codex #339 kolo 1 N2: PREPNUTIE VKLADANIA NA DOSKU
+// ===========================================================================
+// Predikát `nxLegsInsertMode` po prepnutí na dosku len prestane odpovedať —
+// samotný riadok neschová NIKTO, takže v doskovej karte ostal visieť text
+// skrinky. Materializácia doskovej karty ho preto resetuje (form.js).
+HW.nxLegsInsertReset();
+global.NXInsert.state.kind = 'cabinet';
+setFields(1200, 100);
+HW.nxLegsInsertSend();
+HW.nxLegsInsertResult({ gen: SENT[SENT.length - 1].data.gen, text: SUMMARY_OK.text, tone: 'ok' });
+ok(!rowHidden(), 'PREMISA: riadok Nôh po náhľade dolnej skrinky stojí');
+global.NXInsert.state.kind = 'board';
+eq(HW.nxLegsInsertMode(), false, 'v kontexte dosky sa už nič nedopytuje');
+ok(!rowHidden(), 'ale sám od seba riadok nezmizne — preto ten reset');
+HW.nxLegsInsertReset(); // presne to, co robi `materializeInsertBoardCard`
+ok(rowHidden(), 'doska riadok Nôh nemá');
+eq(textOfEl('legsTxt'), HW.LEGS_DASH, 'a text skrinky sa z neho zmazal');
+global.NXInsert.state.kind = 'cabinet';
+
 console.log('OK ' + n + ' assertov (KOV-G2 riadok Noh + ghost segment)');

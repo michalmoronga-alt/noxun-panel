@@ -683,6 +683,12 @@
   // Detail (kontrakt hrubky, UNI material, zamky) zije v board_card.js — tu je
   // len poradie krokov, aby bola cesta rovnaka ako pri korpuse.
   function materializeInsertBoardCard(){
+    // KOV-G2 (Codex #339 kolo 1 N2): DOSKA nohy nema. Prepnutie vkladania
+    // z dolnej skrinky na dosku by inak nechalo v karte visiet riadok Noh
+    // s textom skrinky (predikat `nxLegsInsertMode` len prestane odpovedat,
+    // riadok samotny nikto neschova) — reset ho schova aj s pamatou vstupov
+    // a zneplatni dotaz v lete.
+    if (typeof nxLegsInsertReset === 'function') nxLegsInsertReset();
     var name = NXInsert.templateName('board');
     var tp = NXInsert.findTemplate(TEMPLATES, 'board', name);
     if (!tp && name) NXInsert.setTemplateName('board', ''); // zmazana sablona -> defaulty karty

@@ -91,6 +91,15 @@ module NxKovG2
     src(rel)[/^#{' ' * indent}def #{Regexp.escape(name)}(?![\w!?]).*?\n#{' ' * indent}end\n/m].to_s
   end
 
+  # Telo JS funkcie (form.js ma odsadenie 2) — kontrakt „kto koho vola" sa
+  # v Node sade overit neda: `materializeInsertBoardCard` nie je exportovana
+  # a jej stubovanie by overovalo stub, nie kartu.
+  def js_func_src(rel, name, indent = 2)
+    src(rel)[/^#{' ' * indent}function #{Regexp.escape(name)}\(.*?
+#{' ' * indent}\}
+/m].to_s
+  end
+
   def cfg(width: 900.0, fh: 100.0, type: 'lower', plinth: 'none')
     CB.normalize('type' => type, 'width' => width, 'floor_height' => fh,
                  'plinth_mode' => plinth)
@@ -561,3 +570,20 @@ NxTest.test('KOV-G2 (9): pasik ghostu podava definicie setov zo SESSION') do
                 'definicie sa zmrazia az v commite — pasik ich musi podat sam')
 end
 
+# --- 10) Codex #339 kolo 1 N2/N4/N5: ZIVOTNY CYKLUS RIADKU A PASIKA -----------
+#
+# Riadok patri VYHRADNE dolnej skrinke (doskova karta ho resetuje), lahky push
+# nesie jeho CERSTVU vetu a suhrn v pasiku je MEMO za session — sety, mapovanie,
+# pravidla aj katalog sa daju zmenit v subezne otvorenom Studiu PRAVE POCAS nej
+# a platia pre commit. Bez zneplatnenia by pasik tesne pred klikom slubil ine nohy.
+
+
+
+
+
+NxTest.test('KOV-G2 (10): DOSKOVA vetva vkladacej karty riadok Noh RESETUJE (N2)') do
+  body = NxKovG2.js_func_src('ui/js/form.js', 'materializeInsertBoardCard')
+  NxTest.refute(body.empty?, 'PREMISA: telo `materializeInsertBoardCard` sa naslo')
+  NxTest.assert(body.include?('nxLegsInsertReset()'),
+                'bez neho ostal v doskovej karte visiet text NOH poslednej dolnej skrinky')
+end
