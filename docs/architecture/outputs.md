@@ -79,6 +79,8 @@ ktoré UNI nie sú.
 
 ### production_core.rb — zdieľané čisté jadro výstupov zákazky (ŠT-1a PR A)
 
+`do_select` rešpektuje `flush_blocked` po kontrole generácie okna. Nedokončený návrh v Inspectore oznámi cez status pôvodného Štúdia a model ani výber pri tom nečíta/neprepíše.
+
 kusovník, súpisy platní/ABS a VEPO export sa sťahovali z okna Výroba do nového okna **Štúdio**; aby obe okná čítali **tie isté čísla**, čistí pomocníci prešli do jedného modulu
 `Noxun::Engine::ProductionCore` (`module_function`).
 

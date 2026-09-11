@@ -136,6 +136,7 @@ module Noxun
           cb(dlg, 'native_flush_done') { |p| handle_native_flush_done(p) }
           cb(dlg, 'set_insert_locks') { |p| handle_set_insert_locks(p) } # D-39: zamky vkladacej karty (Ruby pamat)
           cb(dlg, 'apply_all')      { |p| handle_apply_all(p) }   # V0.2c auto-apply (konstrukcia + cela)
+          cb(dlg, 'front_preflight') { |p| handle_front_preflight(p) } # D-120: len vypocet, bez zapisu
           cb(dlg, 'apply_changes')  { |p| handle_apply(p) }       # spatna kompat
           cb(dlg, 'apply_fronts')   { |p| handle_apply_fronts(p) }
           cb(dlg, 'split_zone')     { |p| handle_split_zone(p) }
@@ -252,6 +253,7 @@ module Noxun
           # ST-1a relay (audit #3): Studio ma VLASTNY kanal — inak by odpoved
           # prisla do ineho okna a jeho `gen` by klik odmietol.
           cb(dlg, 'studio_do_select')       { |p| StudioDialog.do_select(p) }
+          cb(dlg, 'studio_do_template')     { |p| StudioDialog.do_tpl_after_flush(p) }
           cb(dlg, 'studio_do_export')       { |p| StudioDialog.do_export(p) }
           # ŠT-1c PR A: CSV nakupneho zoznamu kovania zo sekcie Nakup — rovnaky
           # flush handshake ako VEPO, vlastnym kanalom Studia.

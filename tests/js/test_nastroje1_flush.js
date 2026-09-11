@@ -31,7 +31,7 @@ const FLUSH_EDITS = extract(/function flushCabinetEdits\(cabSnapshot, guidSnapsh
 // Sandbox: vsetky volne premenne funkcie su podstrcene zavislosti.
 // POZOR: meno, ktore deklaruje SAM testovany zdroj, sa NEsmie prebit stubom —
 // `var x = deps.x` bezi az po hoistingu deklaracie funkcie a zahodil by ju.
-const DEPS = ['selectedCabId', 'applyTimer', 'applyPendingGuid', 'document', 'window', 'sketchup',
+const DEPS = ['frontDraft', 'cabApplyRequest', 'cabDraftDirty', 'nxStampCabinetApply', 'selectedCabId', 'applyTimer', 'applyPendingGuid', 'document', 'window', 'sketchup',
               'NX', 'isExprInput', 'isExprStr', 'validateFields', 'collectAll', 'nxDocPayload',
               'nxNativeFlushDone', 'cancelCabinetEdits', 'flushCabinetEdits'];
 
@@ -57,6 +57,8 @@ function env(opts){
     selectedCabId: 'cab' in opts ? opts.cab : 'CAB-001',
     applyTimer: 'timer' in opts ? opts.timer : null,
     applyPendingGuid: 'G1',
+    cabApplyRequest: null, cabDraftDirty: false,
+    nxStampCabinetApply: function(){},
     document: { activeElement: opts.active || null },
     window: { sketchup: { apply_all: function(p){ calls.push(['apply_all', p]); } } },
     NX: { setStatus: function(m, bad){ calls.push(['status', m, !!bad]); } },

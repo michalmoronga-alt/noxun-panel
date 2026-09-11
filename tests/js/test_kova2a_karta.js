@@ -1,3 +1,4 @@
+global.nxDocGuid = () => ''; // samostatna karta bez dokumentoveho bridge
 // KOV-A2a — KARTA CELA: ciste jadro + cela cesta „riadok -> karta -> config".
 //
 // Preco su to testy a nie klikanie v paneli:

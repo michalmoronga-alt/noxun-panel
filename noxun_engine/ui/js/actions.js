@@ -9,7 +9,9 @@
   // `anchor` predvyplni hladanie sekcie (N13 posiela ID skrinky). ZAVAZNY
   // whitelist sekcii je na strane Ruby — tu sa hodnota len preosieva.
   function openStudio(section, anchor){
-    if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+    if (typeof nxCabinetAction === 'function'){
+      if (!nxCabinetAction(function(){ openStudio(section, anchor); })) return;
+    } else if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
     if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
     if (window.sketchup && sketchup.open_studio)
       sketchup.open_studio(JSON.stringify(NXShell.studioOpenLink(section, anchor)));
@@ -429,7 +431,9 @@
       NX.setStatus('Skontroluj červené polia — kópia by nezachytila rozpísanú úpravu.', true);
       return;
     }
-    if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+    if (typeof nxCabinetAction === 'function'){
+      if (!nxCabinetAction(function(){ insertCopySelected(); })) return;
+    } else if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
     if (window.sketchup && sketchup.insert_copy)
       sketchup.insert_copy(nxDocPayload({ cabinet_id: selectedCabId }));
   }
@@ -462,7 +466,9 @@
       NX.setStatus('Skontroluj červené polia — rozpísaná úprava by sa pri označení dielcov stratila.', true);
       return;
     }
-    if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+    if (typeof nxCabinetAction === 'function'){
+      if (!nxCabinetAction(function(){ onInfoParts(); })) return;
+    } else if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
     if (window.sketchup && sketchup.nx_select_parts)
       sketchup.nx_select_parts(JSON.stringify({ cabinet_id: selectedCabId, model_guid: nxModelGuid }));
   }

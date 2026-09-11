@@ -1,3 +1,4 @@
+global.nxDocGuid = () => ''; // samostatna karta bez dokumentoveho bridge
 // KOV-E2 — KARTA ČELA VÝKLOPU (core.js view-model + form.js DOM).
 //
 // Karta výklopu je zámerne ÚSPORNÁ: jeden riadok systému (HK top | HL top),

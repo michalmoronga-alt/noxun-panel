@@ -455,7 +455,7 @@ NxTest.test('NASTROJE-1 guard: JS odpovie serveru v KAZDEJ vetve flushu') do
   NxTest.assert(fn.include?('flushCabinetEdits(selectedCabId'), 'rozpisane edity sa neflushnu')
   flush = form[/function flushCabinetEdits\(cabSnapshot, guidSnapshot, nativeOp\)\{.*?\n    if \(nativeOp\) payload\.native_op = nativeOp;/m].to_s
   NxTest.refute(flush.empty?, 'flushCabinetEdits neprijima nativeOp')
-  NxTest.assert_equal(3, flush.scan(/if \(nativeOp\) nxNativeFlushDone/).length,
+  NxTest.assert_equal(4, flush.scan(/if \(nativeOp\) nxNativeFlushDone/).length,
                       'kazda predcasna navratova vetva flushu musi serveru odpovedat')
   bridge = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'bridge.js'), encoding: 'UTF-8')
   NxTest.assert(bridge.include?('flushForNative: function(token, op)'), 'NX.flushForNative chyba')

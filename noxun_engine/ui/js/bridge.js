@@ -247,7 +247,9 @@
       NX.setStatus('Skontroluj červené polia — rozpísaná úprava by sa pri označení stratila.', true);
       return;
     }
-    if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+    if (typeof nxCabinetAction === 'function'){
+      if (!nxCabinetAction(function(){ onWarnRowPick(btn); })) return;
+    } else if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
     var raw = btn.getAttribute('data-keys') || '';
     var keys = raw ? raw.split(',').filter(function(k){ return k !== ''; }) : [];
     if (window.sketchup && sketchup.nx_select_hw_owner){
@@ -360,8 +362,22 @@
     // ST-1a (audit #3): okno ŠTÚDIO ma VLASTNY kanal — odpoved prichadza do
     // TOHO okna, ktore klikalo (kazde okno ma vlastny `gen` a cudzi push by
     // mu klik odmietol).
+    studioRelayTemplate: function(p){
+      var blocked = function(){
+        if (window.sketchup && sketchup.studio_do_template)
+          sketchup.studio_do_template(JSON.stringify(Object.assign({}, p, {flush_blocked:true})));
+      };
+      if (!p || p.model_guid !== nxDocGuid() || p.cabinet_id !== selectedCabId){ blocked(); return; }
+      if (!nxCabinetAction(function(){ NX.studioRelayTemplate(p); }, blocked)) return;
+      if (window.sketchup && sketchup.studio_do_template) sketchup.studio_do_template(JSON.stringify(p));
+    },
     studioRelay: function(p){
-      if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+      if (typeof nxCabinetAction === 'function'){
+      if (!nxCabinetAction(function(){ NX.studioRelay(p); }, function(){
+        if (window.sketchup && sketchup.studio_do_select)
+          sketchup.studio_do_select(JSON.stringify(Object.assign({}, p, {flush_blocked:true})));
+      })) return;
+    } else if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
       if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
       if (window.sketchup && sketchup.studio_do_select) sketchup.studio_do_select(JSON.stringify(p));
     },
@@ -377,7 +393,9 @@
         if (badStudio) blocked = true;
       } catch (e) { blocked = false; }
       if (!blocked){
-        if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+        if (typeof nxCabinetAction === 'function'){
+      if (!nxCabinetAction(function(){ NX.studioRelayExport(p); }, function(){ p.flush_blocked = true; if (window.sketchup && sketchup.studio_do_export) sketchup.studio_do_export(JSON.stringify(p)); })) return;
+    } else if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
         if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
       }
       p.flush_blocked = blocked;
@@ -395,7 +413,9 @@
         if (badHw) blocked = true;
       } catch (e) { blocked = false; }
       if (!blocked){
-        if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+        if (typeof nxCabinetAction === 'function'){
+      if (!nxCabinetAction(function(){ NX.studioRelayHwCsv(p); }, function(){ p.flush_blocked = true; if (window.sketchup && sketchup.studio_do_hw_csv) sketchup.studio_do_hw_csv(JSON.stringify(p)); })) return;
+    } else if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
         if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
       }
       p.flush_blocked = blocked;
@@ -413,7 +433,9 @@
         if (badBud) blocked = true;
       } catch (e) { blocked = false; }
       if (!blocked){
-        if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+        if (typeof nxCabinetAction === 'function'){
+      if (!nxCabinetAction(function(){ NX.studioRelayBudget(p); }, function(){ p.flush_blocked = true; if (window.sketchup && sketchup.studio_do_budget_xlsx) sketchup.studio_do_budget_xlsx(JSON.stringify(p)); })) return;
+    } else if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
         if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
       }
       p.flush_blocked = blocked;
@@ -431,7 +453,9 @@
         if (badStCp) blocked = true;
       } catch (e) { blocked = false; }
       if (!blocked){
-        if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+        if (typeof nxCabinetAction === 'function'){
+      if (!nxCabinetAction(function(){ NX.studioRelayCp(p); }, function(){ p.flush_blocked = true; if (window.sketchup && sketchup.studio_do_cp_xlsx) sketchup.studio_do_cp_xlsx(JSON.stringify(p)); })) return;
+    } else if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
         if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
       }
       p.flush_blocked = blocked;
@@ -564,6 +588,8 @@
     hwUpgradeResult: function(ok, msg, token){
       if (typeof onHwUpgradeResult === 'function') onHwUpgradeResult(ok, msg, token);
     },
+    frontPreflight: function(result){ nxFrontPreflightResult(result); },
+    frontApplyResult: function(result){ nxFrontApplyResult(result); },
     loadSelected: function(c){
       // R-02 (review #264 kolo 3): IDENTITA DOKUMENTU JE PRVA VEC V PUSHI.
       // Dovod je poradie: nizsie sa rozhoduje `keepGaps` (ci sa ZACHOVAJU
@@ -581,12 +607,14 @@
       // formulár nemal ako odoslať proti novým dátam.
       if (typeof hwManualDropIfForeign === 'function') hwManualDropIfForeign(c.cabinet_id, sameDoc);
       if (typeof nxSetModelGuid === 'function') nxSetModelGuid(c.model_guid);
+      var holdDraft = sameDoc && c.cabinet_id === selectedCabId && nxCabinetDraftHeld();
+      if (!sameDoc || c.cabinet_id !== selectedCabId) nxFrontDraftReset();
+      nxRememberCabinetEcho(c);
       // V0.4.7c: odchod z kontextu dosky — zrus cakajuce board edity + kartu
       cancelBoardEdits();
       renderBoardCard(null);
       var t = c.type || 'lower';
-      setType(t);
-      writeConstruction(c);
+      if (!holdDraft){ setType(t); writeConstruction(c); }
       applyVisibility(t);
       buildFrontHwBadges(c.hardware || []); // D3: badge kovania PRED renderom riadkov ciel
       hwItems = c.hardware || [];           // UI-B2: ten isty payload kresli projekciu Kovanie
@@ -602,11 +630,11 @@
       hwManualOwners = Array.isArray(c.hardware_manual_owners) ? c.hardware_manual_owners : [];
       // D-23 (audit F5/4): frontItems PRED renderFronts — placeholder ≈ vysky
       // paruje s CERSTVYM payloadom (povodne poradie by parovalo so starou skrinkou).
-      frontItems = c.front_items || [];
+      if (!holdDraft) frontItems = c.front_items || [];
       // KOV-A2a: front_slots chodia TYM ISTYM pushom — je to serverova odpoved
       // na otazku „kde sa smer pyta" (Fronts.direction_slots). Panel si ju
       // NEODVODZUJE z poctu kridiel.
-      frontSlots = c.front_slots || {};
+      if (!holdDraft) frontSlots = c.front_slots || {};
       // KOV-C2c: riadok zasuvky karty cela — TEN ISTY push, vlastny kluc.
       // Stary payload bez kluca = mapa je prazdna a karta riadok nekresli.
       frontDrawer = c.front_drawer || {};
@@ -623,7 +651,7 @@
       // (a vycistenie stavu uz aj tak prebehlo hore — su to dve nezavisle
       // poistky toho isteho).
       var keepGaps = sameDoc && (c.cabinet_id && c.cabinet_id === selectedCabId) &&
-                     !!(applyTimer || cabEditsInFlight);
+                     !!(applyTimer || cabEditsInFlight || holdDraft);
       cabEditsInFlight = false;
       // KOV-A2a (Codex #281 P2-B): otvorena KARTA CELA patri konkretnej skrinke.
       // `front_id` (F1) ma kazda skrinka, takze bez tejto brany by sa po
@@ -677,12 +705,14 @@
       // Vkladaci nahlad sa pritom zrusi: teraz hovori payload skrinky.
       if (typeof nxLegsInsertReset === 'function') nxLegsInsertReset();
       if (typeof renderLegsRow === 'function') renderLegsRow(c.legs_summary || null, c.cabinet_id || '');
+      nxFrontDraftAsk();
       renderPreview();
       refreshZoneUI();
     },
     // V0.4.7c: karta dosky. VYCISTI cely korpusovy stav (Codex audit c) — zonove
     // akcie a preview sa rozhoduju podla selectedCabId aj ked su skryte CSS.
     loadBoard: function(b){
+      nxFrontDraftReset();
       // R-02 (review #264 kolo 3): TA ISTA PASCA ako v `loadSelected` — riadok
       // nizsie rozhoduje o zachovani pending batchu podla SAMOTNEHO `board_id`,
       // a `BRD-001` je v kazdej zakazke. Identita dokumentu preto ide PRVA;
@@ -721,6 +751,7 @@
       refreshZoneUI(); renderPreview();
     },
     clearSelected: function(guid){
+      nxFrontDraftReset();
       if (typeof nxSetModelGuid === 'function') nxSetModelGuid(guid); // identita dokumentu aj bez vyberu
       cancelBoardEdits();                    // V0.4.7c: koniec kontextu dosky
       renderBoardCard(null);

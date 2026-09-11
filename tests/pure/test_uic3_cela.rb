@@ -78,13 +78,14 @@ NxTest.test('D-96: profil sa vybera v sekcii Uchytky pre ROZSAH ciel') do
                 'indikator uz nie je tlacidlo')
 end
 
-NxTest.test('D-96: hrana osadenia sa NEPONUKA, kym ju registry nepozna') do
+NxTest.test('D-120: hrana osadenia ma registry API a zive UI') do
   # Registry (core/front_profiles.rb) pozna len skratenie HORNEJ hrany. Sekcia
   # preto o hrane mlci — ponukat volbu, ktora nema kam sadnut, by bola lož.
   rec = Noxun::Engine::FrontProfiles::REGISTRY['ukw7']
   NxTest.refute(rec.key?(:edge), 'kym registry hranu nema, UI ju nesmie ponukat')
-  NxTest.refute(UIC3_PANEL_HTML.include?('id="frontProfileEdge"'),
-                'ziadny mrtvy select hrany osadenia v paneli')
+  NxTest.assert(Noxun::Engine::FrontProfiles::EDGES == %w[top bottom left right])
+  NxTest.assert(UIC3_PANEL_HTML.include?('id="frontProfileEdge"'),
+                'select hrany osadenia ma implementovanu geometriu')
 end
 
 # --- 4) N25 vyskovy rad ------------------------------------------------------

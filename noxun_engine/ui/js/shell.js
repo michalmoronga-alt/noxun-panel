@@ -701,6 +701,7 @@
   // re-render) a draft vkladacej karty (`NXInsert` — vklad peciatkuje identitu
   // az v okamihu kliku).
   function nxDropDocState(){
+    if (typeof nxFrontDraftReset === 'function') nxFrontDraftReset();
     if (typeof cancelCabinetEdits === 'function') cancelCabinetEdits();   // auto-apply korpusu
     if (typeof cancelBoardEdits === 'function') cancelBoardEdits();       // polia karty dosky
     if (typeof dropCabRename === 'function') dropCabRename();             // inline premenovanie
