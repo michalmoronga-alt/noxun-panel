@@ -342,15 +342,25 @@ module Noxun
         # — nie je to parameter korpusu (`normalize` ho nepozna), ale kto by ho
         # v params predsa len chcel, musi params poslat POZICNE. Params dvakrat
         # (pozicne AJ keywordmi) je chyba volajuceho, nie tiche zliatie.
-        def build(model, params = nil, transform: nil, **kw, &block)
+        def build(model, params = nil, transform: nil, appearance_source: nil, **kw, &block)
           if params.nil?
             params = kw
           elsif !kw.empty?
             raise ArgumentError,
                   "build: parametre skrinky prisli dvakrat — pozicne aj ako keywordy (#{kw.keys.join(', ')})"
           end
+          validate_appearance_source!(model, appearance_source) if appearance_source
           ensure_root_context(model)
-          commit_insert(model, prepare_insert(model, params), transform: transform, &block)
+          commit_insert(model, prepare_insert(model, params), transform: transform, appearance_source: appearance_source, &block)
+        end
+
+        # Explicitna produktova kopia: zivy zdroj, ziadny odhad podla CID.
+        # Vyrobne forward guardy zostavaju v builderi, capture iba cita vizual.
+        def validate_appearance_source!(model, source)
+          BuildAppearance.validate_owner!(model, source, 'cabinet')
+          guard_newer_config!(source)
+          guard_unknown_hardware!(source)
+          source
         end
 
         # R-03 FAZA 1: ciste PRIPRAVENIE vkladu. Vrati zmrazeny `InsertPlan`.
@@ -390,9 +400,13 @@ module Noxun
         # H2 (D-76): volitelny blok bezi v TEJ ISTEJ operacii PRED stavbou
         # (zmrazenie setov kovania zo sablony). Vynimka v bloku rusi CELU
         # operaciu: ziadna skrinka, ziadny zapis.
-        def commit_insert(model, plan, transform: nil)
+        def commit_insert(model, plan, transform: nil, appearance_source: nil)
           unless plan.is_a?(InsertPlan) && plan.for_model?(model)
             raise 'Pripravený vklad patrí inému dokumentu — skrinku vlož v okne, v ktorom si ju pripravil.'
+          end
+          if appearance_source
+            validate_appearance_source!(model, appearance_source)
+            source_id = Store.get(appearance_source, 'cabinet_id').to_s
           end
           # Review P1: `Geom::Transformation` je MUTOVATELNA (`set!`). Overit
           # objekt volajuceho a potom ho pouzit by bola diera medzi kontrolou
@@ -422,9 +436,16 @@ module Noxun
             model.start_operation('NOXUN: Vloz korpus', true)
             begin
               yield if block_given? # H2: sprievodny zapis v tej istej operacii
+              if appearance_source
+                validate_appearance_source!(model, appearance_source)
+                unless Store.get(appearance_source, 'cabinet_id').to_s == source_id
+                  raise BuildAppearance::CaptureError, 'Zdroj kópie medzitým zmenil identitu.'
+                end
+                appearance = BuildAppearance.capture_cabinet(model, appearance_source)
+              end
               cdef = model.definitions.add("NOXUN Korpus #{cid}")
               cdef.entities.clear!
-              final = build_into(model, cdef, cfg, cid)
+              final = build_into(model, cdef, cfg, cid, appearance: appearance, appearance_owner: appearance_source)
               inst = model.entities.add_instance(cdef, tr)
               write_cabinet_attrs(inst, cid, final)
               Zones.sync_ghost(model, inst) if defined?(Zones)
@@ -606,7 +627,7 @@ module Noxun
         end
 
         # Vnutorna cast rebuildu; volajuci uz musi mat otvorenu operaciu a guard.
-        def rebuild_in_operation(model, inst, cfg, transform: nil)
+        def rebuild_in_operation(model, inst, cfg, transform: nil, appearance: nil)
           cid = Store.get(inst, 'cabinet_id')
           raise 'Vybrana instancia nie je NOXUN korpus.' if cid.nil?
 
@@ -624,11 +645,14 @@ module Noxun
 
           inst.make_unique if inst.definition.instances.size > 1
           cdef = inst.definition
+          appearance ||= BuildAppearance.capture_cabinet(model, inst)
+          BuildAppearance.validate_context!(appearance, model: model, owner: inst)
           # 2B-1 (audit F8): duplak vazby zo SUCASNYCH snapshotov dielcov — na
           # stroji, ktoreho katalog duplak nepozna, by rebuild vazbu stratil.
           legacy_sources = collect_part_sources(cdef)
           cdef.entities.clear!
-          final = build_into(model, cdef, cfg, cid, legacy_sources: legacy_sources)
+          final = build_into(model, cdef, cfg, cid, legacy_sources: legacy_sources,
+                             appearance: appearance, appearance_owner: inst)
           inst.transformation = transform if transform
           write_cabinet_attrs(inst, cid, final)
           apply_scale_lock(inst)
@@ -744,13 +768,14 @@ module Noxun
             guarded do
               model.start_operation('NOXUN: Kopia korpusu — nove ID', true, false, trans)
               begin
+                appearance = BuildAppearance.capture_cabinet(model, inst, target_id: new_cid)
                 Store.write(inst, { std: Store::STD, kind: 'cabinet', id: new_cid, cabinet_id: new_cid })
                 params = config_to_params(Store.config(inst) || {})
                 # KOV-H1 (audit FIX 10): tu vznika NOVA skrinka z existujucej —
                 # jedine miesto (spolu s „Vlozit kopiu"), kde ad-hoc polozky
                 # dostavaju vlastnu identitu. `normalize` ID NIKDY nemeni.
                 rekey_hardware_manual(params)
-                rebuild_in_operation(model, inst, normalize(params))
+                rebuild_in_operation(model, inst, normalize(params), appearance: appearance)
                 model.commit_operation
               rescue StandardError => e
                 abort_safely(model)
@@ -786,7 +811,8 @@ module Noxun
         # V0.3 materialy + ABS: kazdemu dielcu sa vyriesi VYSLEDNY material_id a ABS hrany cez retaz
         # (standard 7.2): pravidlove defaulty roly -> dedenie projekt->korpus -> part_override (viťazi).
         # Vysledok sa zapise do configu dielca (dielec vzdy nesie KONKRETNY material = "zaradeny" stav).
-        def build_into(model, cdef, cfg, cid, legacy_sources: {})
+        def build_into(model, cdef, cfg, cid, legacy_sources: {}, appearance: nil, appearance_owner: nil)
+          BuildAppearance.validate_context!(appearance, model: model, owner: appearance_owner) if appearance
           # Pravidla kovania = PROJEKTOVY snapshot (reprodukovatelnost z .skp — audit K2).
           # Prvy build ho zapise z globalnej kniznice; sme VNUTRI operacie volajuceho,
           # takze undo vrati model aj snapshot naraz.
@@ -851,7 +877,10 @@ module Noxun
             resolved = resolve_part(pd, eff_body, eff_front, eff_back, overrides,
                                     abs_issues: abs_issues, legacy_sources: legacy_sources,
                                     eff_drawer: eff_drawer)
-            add_part(model, ents, pd, resolved, cid, tid)
+            previous = BuildAppearance.for_part(appearance, model: model, owner: appearance_owner,
+                                               part_key: resolved[:part_key], role: pd[:role],
+                                               material_id: resolved[:material_id], edges: resolved[:edges])
+            add_part(model, ents, pd, resolved, cid, tid, previous: previous)
             # D-90: uchytkovy profil na hornej hrane cela — PROXY vizual v pasme
             # nad skratenym panelom (rovnaky kontrakt ako nohy, viz nizsie).
             render_front_profile(model, ents, pd, cid)
@@ -1879,7 +1908,7 @@ module Noxun
         # Jeden dielec = vlastny komponent s NOXUN dict. Recyklacia definicie podla mena
         # (mena su per-korpus unikatne — obsahuju cid), aby rebuild neprodukoval osirotene definicie.
         # resolved: material, ABS, smer dekoru a katalogova hrubka (viz resolve_part).
-        def add_part(model, parent_ents, pd, resolved, cid, tid)
+        def add_part(model, parent_ents, pd, resolved, cid, tid, previous: {})
           pd = materialized_part(pd, resolved)
           dname = "NOXUN #{cid} #{pd[:suffix]}"
           pdef = model.definitions[dname] || model.definitions.add(dname)
@@ -1890,10 +1919,11 @@ module Noxun
           inst = parent_ents.add_instance(pdef, Geom::Transformation.translation(Units.point(ox, oy, oz)))
           # SketchUp material z katalogu (nazov = material_id, farba z color) — vizual, nie vyrobna pravda.
           fallback = pd[:material] == :front ? FALLBACK_RGB_FRONT : FALLBACK_RGB_KORPUS
-          inst.material = su_material(model, resolved[:material_id], fallback)
+          inst.material = su_material(model, resolved[:material_id], fallback, previous: previous[:sheet])
           # D-88: bocne plosky s vyriesenou ABS paskou dostanu farbu PASKY (velke
           # dekorove plochy ostavaju bez materialu = dedia material instancie).
-          paint_edge_faces(model, pdef.entities, pd, resolved[:edges], resolved[:material_id])
+          paint_edge_faces(model, pdef.entities, pd, resolved[:edges], resolved[:material_id],
+                           sheet_material: inst.material, previous_edges: previous[:edges] || {})
           inst.layer = part_tag(model, pd[:role]) # tag dielca (Korpus/Chrbát/Čelá/Vnútro)
           pid = Ids.part_id(cid, pd[:suffix])
           # BuildPlan kontrakt: vyrobne zaradenie riadi DESKRIPTOR (default sheet/true/1) —
@@ -2157,8 +2187,8 @@ module Noxun
         end
 
         # SketchUp vizualny material z katalogu (Materials). Fallback ak katalog nedostupny.
-        def su_material(model, material_id, fallback_rgb)
-          return Materials.ensure_su_material(model, material_id, fallback_rgb) if defined?(Materials)
+        def su_material(model, material_id, fallback_rgb, previous: nil)
+          return Materials.ensure_su_material(model, material_id, fallback_rgb, previous: previous) if defined?(Materials)
           ensure_material(model, "NOXUN_#{material_id}", fallback_rgb)
         end
 
@@ -2194,14 +2224,17 @@ module Noxun
         # na plochy: hrana s paskou dostane material farby pasky, hrana bez pasky
         # (vedome nil, potlacene KOMPAKT/PD, ziadne pravidlo) ostava BEZ materialu
         # a dedi farbu dosky z instancie — presne ako doteraz.
-        # Bezi VNUTRI existujuceho rebuildu (ziadna vlastna operacia, 1 undo) a
-        # nikdy nezhodi stavbu: chyba sa zaloguje a dielec ostane jednofarebny.
+        # Bezi VNUTRI existujuceho rebuildu (ziadna vlastna operacia, 1 undo).
+        # Konflikt vzhladu musi dojst k abortu; nesmie skoncit jednofarebnym dielcom.
         # Zdielane s BoardBuilder (doska ide tou istou cestou).
-        def paint_edge_faces(model, ents, pd, edges, material_id)
+        def paint_edge_faces(model, ents, pd, edges, material_id, sheet_material: nil, previous_edges: {})
           return unless edges.is_a?(Hash) && edges.any? { |_k, v| !v.nil? && !v.to_s.strip.empty? }
           return unless defined?(Materials)
           ax = PartFaces.verified_axes(pd)
           if ax.nil?
+            if previous_edges.values.compact.any? { |previous| previous[:state] != :plain }
+              raise BuildAppearance::CaptureError, 'Nový dielec nemá overiteľné osi pre pôvodný vzhľad ABS.'
+            end
             Engine.log("D-88: dielec #{pd[:suffix]} nema overitelne osi — hrany sa nefarbia") if defined?(Engine)
             return
           end
@@ -2216,12 +2249,20 @@ module Noxun
             next if abs_id.nil? || abs_id.to_s.strip.empty?
             # Paska rovnakeho dekoru ako doska = ziadny vizualny rozdiel; material
             # sa vtedy vobec nevytvara (kniznica materialov modelu sa nezanasa).
-            next if sheet_rgb && Materials.edge_color_of(abs_id) == sheet_rgb
-            mat = Materials.ensure_su_edge_material(model, abs_id)
+            previous = previous_edges[code]
+            edge = Materials.edge(abs_id)
+            descriptor = Materials.normalize_appearance(edge['appearance']) if edge && edge.key?('appearance')
+            native = descriptor && descriptor['mode'] == 'native'
+            plain_sheet = BuildAppearance.classify(sheet_material) == :plain
+            plain_edge = previous.nil? || (previous[:state] == :plain && BuildAppearance.classify(previous[:material]) == :plain)
+            next if plain_sheet && plain_edge && !native && sheet_rgb && Materials.edge_color_of(abs_id) == sheet_rgb
+            mat = Materials.ensure_su_edge_material(model, abs_id, previous: previous)
             next unless mat
             f.material = mat
             f.back_material = mat
           end
+        rescue Materials::AppearanceError
+          raise
         rescue StandardError => e
           Engine.log_error(e, 'paint_edge_faces') if defined?(Engine)
           nil

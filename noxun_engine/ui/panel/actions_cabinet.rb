@@ -566,7 +566,7 @@ module Noxun
           # kovania dostanu vlastnu identitu. Obsah (kod, nazov, cena, pocet,
           # vlastnik) sa NEMENI, meni sa LEN `id`.
           CabinetBuilder.rekey_hardware_manual(params)
-          inst = CabinetBuilder.build(model, params)
+          inst = CabinetBuilder.build(model, params, appearance_source: cab)
           select_only(model, inst)
           status_with_warnings(inst, "Vložená kópia #{Store.get(cab, 'cabinet_id')} → " \
                                      "#{Store.get(inst, 'cabinet_id')} — #{part_count(inst)} dielcov.")

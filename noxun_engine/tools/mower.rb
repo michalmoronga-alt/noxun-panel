@@ -114,6 +114,7 @@ module Noxun
             @flush_seq = (@flush_seq || 0) + 1
             token = MowerCalc.flush_token(@flush_seq, now)
             @pending = { 'token' => token, 'dir' => dir.to_sym, 'cabinet_id' => cid,
+                         'model' => model, 'source' => src,
                          'deadline' => now + MowerCalc::FLUSH_TIMEOUT_S }
             Tools.info(MSG_FLUSH_WAIT)
             Panel.request_native_flush(token, 'copy', dir)
@@ -123,10 +124,12 @@ module Noxun
 
           def finish_pending_copy(pending)
             model = Tools.active_model
-            return Tools.warn(MSG_FLUSH_LOST) unless model
+            return Tools.warn(MSG_FLUSH_LOST) unless model && model == pending['model']
 
-            src = cabinet_by_id(model, pending['cabinet_id'])
-            return Tools.warn(MSG_FLUSH_LOST) unless src && src.valid?
+            src = pending['source']
+            return Tools.warn(MSG_FLUSH_LOST) unless src && src.valid? && src.model == model &&
+                                                    src.parent == model && Store.kind(src) == 'cabinet' &&
+                                                    Store.get(src, 'cabinet_id').to_s == pending['cabinet_id']
             return nil if Tools.refused_context?(Tools.route(model, src))
 
             copy_cabinet(model, src, pending['dir'])
@@ -153,17 +156,6 @@ module Noxun
             defined?(Panel) && Panel.respond_to?(:dialog_alive?) && Panel.dialog_alive?
           rescue StandardError
             false
-          end
-
-          def cabinet_by_id(model, cid)
-            found = nil
-            Ids.each_cabinet(model) do |inst|
-              found = inst if found.nil? && Store.get(inst, 'cabinet_id').to_s == cid.to_s
-            end
-            found
-          rescue StandardError => e
-            Engine.log_error(e, 'Tools::Mower.cabinet_by_id')
-            nil
           end
 
           def now
@@ -235,7 +227,7 @@ module Noxun
             # uchytka smie sirku presahovat, preto sa neriadime bbox instancie).
             offset = MowerCalc.copy_offset_mm(width, dir)
             tr = src.transformation * Geom::Transformation.translation(Units.vector(offset, 0, 0))
-            inst = CabinetBuilder.build(model, params, transform: tr)
+            inst = CabinetBuilder.build(model, params, transform: tr, appearance_source: src)
             return nil unless inst
 
             select_only(model, inst)

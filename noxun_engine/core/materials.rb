@@ -563,17 +563,10 @@ module Noxun
 
       # --- SketchUp vizualny material z katalogu -------------------------------
 
-      # Vytvori/najde SketchUp material s nazvom = material_id a farbou z katalogu (pole color [r,g,b]).
-      # Nahrada za natvrdo NOXUN_korpus/NOXUN_front. Fallback farba ak material nie je v katalogu.
-      def ensure_su_material(model, material_id, fallback_rgb = [216, 196, 160])
-        name = (material_id && !material_id.to_s.empty?) ? material_id.to_s : 'NOXUN_material'
-        rgb = color_of(material_id) || fallback_rgb
-        mt = model.materials[name] || model.materials.add(name)
-        mt.color = Sketchup::Color.new(*rgb)
-        mt
-      rescue StandardError => e
-        Engine.log_error(e, 'Materials.ensure_su_material') if defined?(Engine)
-        model.materials[material_id.to_s] || model.materials.add('NOXUN_material')
+      # Vizualna cesta je oddelena od vyrobneho ID: povodny handle pri rebuild,
+      # inak aktualny nativny vzhlad alebo samostatna cista katalogova farba.
+      def ensure_su_material(model, material_id, fallback_rgb = [216, 196, 160], previous: nil)
+        BuildAppearance.resolve(model, :sheet, material_id, fallback_rgb, previous: previous)
       end
 
       # --- D-88: vizualny material ABS PASKY -----------------------------------
@@ -603,17 +596,9 @@ module Noxun
 
       # SketchUp material pasky (vytvori/najde). Farba sa prepisuje LEN pri
       # skutocnej zmene — rebuild inak zbytocne spina model.
-      def ensure_su_edge_material(model, abs_id, fallback_rgb = FALLBACK_EDGE_RGB)
+      def ensure_su_edge_material(model, abs_id, fallback_rgb = FALLBACK_EDGE_RGB, previous: nil)
         return nil if abs_id.nil? || abs_id.to_s.strip.empty?
-        name = su_edge_material_name(abs_id)
-        rgb = edge_color_of(abs_id) || fallback_rgb
-        mt = model.materials[name] || model.materials.add(name)
-        c = mt.color
-        mt.color = Sketchup::Color.new(*rgb) unless c && c.red == rgb[0] && c.green == rgb[1] && c.blue == rgb[2]
-        mt
-      rescue StandardError => e
-        Engine.log_error(e, 'Materials.ensure_su_edge_material') if defined?(Engine)
-        nil
+        BuildAppearance.resolve(model, :edge, abs_id, fallback_rgb, previous: previous)
       end
 
       # Farba doskoveho materialu ([r,g,b]) z katalogu, alebo nil (potom fallback).

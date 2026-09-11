@@ -179,6 +179,332 @@ module NoxunSuRunner
     log_line("FAIL: cleanup vynimka: #{ex.class}: #{ex.message}")
   end
 
+  # MR-1B2: skutocne buildery, native handles a vyrobny obraz, izolovany katalog.
+  def mr1b2_op(model)
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST MR1B2 priprava', true)
+      begin
+        result = yield
+        model.commit_operation
+        result
+      rescue StandardError
+        model.abort_operation
+        raise
+      end
+    end
+  end
+
+  def mr1b2_publish(model, id, source = nil)
+    status, scope = e::Materials.appearance_scope('sheet', id)
+    raise "MR1B2 scope: #{scope.inspect}" unless status == :ok
+    status, result = e::Materials.publish_appearance('sheet', id, baseline: scope['baseline'], mode: source ? 'native' : 'color') do |path, descriptor, key|
+      e::NativeAppearance.export(model, source, path, descriptor, key)
+    end
+    raise "MR1B2 publish: #{result.inspect}" unless status == :ok
+    e::Materials.sheet(id)['appearance']
+  end
+
+  def mr1b2_parts(cabinet)
+    cabinet.definition.entities.grep(Sketchup::ComponentInstance).select { |part| e::Store.kind(part) == 'part' }
+  end
+
+  def mr1b2_snapshot(cabinet)
+    mr1b2_parts(cabinet).map { |part| [e::Store.get(part, 'part_key'), e::Store.config(part)] }.sort_by(&:first)
+  end
+
+  def mr1b2_bom(model)
+    # refs su adresy klik-select na nove entity, nie vyrobne data riadka.
+    e::Bom.compute(e::Bom.collect(model))[:rows].map { |row| row.reject { |key, _value| key == 'refs' } }
+  end
+
+  def mr1b2_reject(model, label, owner)
+    scene = lambda do
+      parts = e::Store.kind(owner) == 'cabinet' ? mr1b2_parts(owner) : [owner]
+      geometry = parts.map do |part|
+        [part.persistent_id, part.material&.persistent_id, part.transformation.to_a,
+         part.definition.entities.grep(Sketchup::Face).map do |face|
+           [face.persistent_id, face.material&.persistent_id, face.back_material&.persistent_id,
+            face.vertices.map { |v| v.position.to_a }.sort, face.normal.to_a]
+         end.sort_by(&:first)]
+      end.sort_by(&:first)
+      [e::Store.config(owner), owner.definition.entities.to_a.map(&:persistent_id).sort, geometry,
+       model.materials.to_a.map { |mat| [mat.persistent_id, mr1b1_state(mat)] }.sort_by(&:first)]
+    end
+    before = scene.call
+    begin
+      yield
+      ok("MR1B2 #{label}: odmietnutie", false)
+    rescue e::Materials::AppearanceError
+      after = scene.call
+      info("MR1B2 #{label}: odlisne casti rollbacku #{before.zip(after).each_index.select { |i| before[i] != after[i] }.inspect}") unless after == before
+      ok("MR1B2 #{label}: abort obnovil config, povodne entity a material", after == before && !e::ScaleWatch.rebuilding?)
+    end
+  end
+
+  # Nezavisly native oracle: nepouziva produkcny BuildAppearance.classify.
+  def mr1b2_plain?(material)
+    material && material.texture.nil? && material.alpha == 1.0 &&
+      material.get_attribute('NOXUN', 'appearance_scope').nil? && material.get_attribute('NOXUN', 'appearance_id').nil? &&
+      (!material.respond_to?(:workflow) || material.workflow == Sketchup::Material::WORKFLOW_CLASSIC)
+  end
+
+  def run_mr1b2(model)
+    return ok('MR1B2: povoleny testmodel', false) unless guard_model?(model)
+    cleanup(model)
+    old_dir = e::Materials.test_dir_override
+    originals = model.materials.to_a
+    Dir.mktmpdir('noxun-mr1b2-su-') do |temp|
+      e::Materials.test_dir_override = temp
+      e::Materials.reload!
+      e::Materials.load
+      success, rows = e::Materials.add_decor_batch(
+        'batch_schema' => 3, 'decor' => 'SU MR1B2 SPOLOCNY', 'type' => 'DTDL', 'grain' => 'length',
+        'sheet_variants' => [{ 'thickness' => 18.0, 'structure' => 'SM' }, { 'thickness' => 36.0, 'structure' => 'SM' }],
+        'edge_variants' => [{ 'width' => 23.0, 'thickness' => 1.0, 'structure' => 'SM' }]
+      )
+      raise "MR1B2 fixture: #{rows.inspect}" unless success
+      sid = rows['sheets'].find { |id| e::Materials.sheet(id)['thickness'] == 18.0 }
+      thick_id = (rows['sheets'] - [sid]).first
+      aid = rows['edges'].first
+      image_path = File.join(temp, 'mr1b2_texture.png')
+      image = Sketchup::ImageRep.new
+      image.set_data(2, 2, 32, 0, [255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 230, 150, 80, 255].pack('C*'))
+      image.save_file(image_path)
+      source = mr1b2_op(model) do
+        material = model.materials.add('SU MR1B2 kniznicny zdroj')
+        material.texture = image_path
+        material.texture.size = [120.mm, 60.mm]
+        material.roughness_factor = 0.42 if material.respond_to?(:roughness_factor=)
+        material
+      end
+      rev1 = mr1b2_publish(model, sid, source)
+      params = { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0,
+                 'material_id' => sid, 'thickness' => 18.0, 'front_material_id' => sid,
+                 'zone_tree' => { 'id' => 'Z1', 'shelves' => 1, 'children' => [] } }
+      board_params = { 'material_id' => sid, 'length' => 810.0, 'width' => 420.0,
+                       'edges' => { 'L1' => aid, 'L2' => aid, 'W1' => aid, 'W2' => aid } }
+      a = e::CabinetBuilder.build(model, params)
+      board = e::BoardBuilder.build(model, board_params)
+      thick = e::BoardBuilder.build(model, board_params.merge('material_id' => thick_id))
+      r1 = d88_part(a, 'side_left').material
+      ok('MR1B2: obe hrubky a oba buildery pouzili jednu nativnu R1',
+         r1 && r1.texture && r1.get_attribute('NOXUN', 'appearance_id') == rev1['id'] && board.material == r1 && thick.material == r1)
+      # Doska ma L1 na min Y, W1 na min X; obe strany bocnych ploch su explicitne.
+      ok('MR1B2: ABS zdiela native handle aj pri rovnakej RGB, explicitne na oboch stranach',
+         [[1, :min], [1, :max], [0, :min], [0, :max]].all? do |axis, side|
+           face = d88_face_on(board, axis, side)
+           face.material == r1 && face.back_material == r1
+         end)
+      mr1b2_op(model) do
+        r1.name = 'SU MR1B2 rucne upravena stara revizia'
+        r1.texture.size = [320.mm, 160.mm]
+        r1.roughness_factor = 0.23 if r1.respond_to?(:roughness_factor=)
+      end
+      live_state = mr1b1_state(r1)
+      rev2 = mr1b2_publish(model, sid, source)
+      b = e::CabinetBuilder.build(model, params)
+      newer_board = e::BoardBuilder.build(model, board_params)
+      r2 = d88_part(b, 'side_left').material
+      ok('MR1B2: novy vklad berie R2 a neprepise upravenu R1',
+         r2 != r1 && newer_board.material == r2 && r2.get_attribute('NOXUN', 'appearance_id') == rev2['id'] && mr1b1_state(r1) == live_state)
+      unbanded = e::BoardBuilder.build(model, board_params.merge('edges' => { 'L1' => nil, 'L2' => nil, 'W1' => nil, 'W2' => nil }))
+      e::BoardBuilder.rebuild(model, unbanded, {})
+      ok('MR1B2: plocha bez ABS moze normalne dedit nativny sheet vzhlad', unbanded.material == r2)
+      mr1b2_op(model) { d88_face_on(unbanded, 1, :min).material = r1 }
+      mr1b2_reject(model, 'vlastny protected vzhlad na ploche bez ABS', unbanded) { e::BoardBuilder.rebuild(model, unbanded, {}) }
+      mr1b2_op(model) { d88_face_on(unbanded, 1, :min).material = nil }
+      snapshot = mr1b2_snapshot(a)
+      bom = mr1b2_bom(model)
+      vepo = k1_vepo_csv(model)
+      e::CabinetBuilder.rebuild(model, a, e::CabinetBuilder.config_to_params(e::Store.config(a)))
+      e::BoardBuilder.rebuild(model, board, {})
+      ok('MR1B2: bezna prestavba zachovala presny zivy R1 handle aj jeho native vlastnosti',
+         d88_part(a, 'side_left').material == r1 && board.material == r1 && mr1b1_state(r1) == live_state && d88_part(b, 'side_left').material == r2)
+      ok('MR1B2: vyrobne snapshoty su pri vzhladovej zmene zhodne', mr1b2_snapshot(a) == snapshot)
+      current_bom = mr1b2_bom(model)
+      ok('MR1B2: kusovnik je pri vzhladovej zmene zhodny', current_bom == bom)
+      ok('MR1B2: VEPO je pri vzhladovej zmene bajtovo zhodne', k1_vepo_csv(model) == vepo)
+      e::CabinetBuilder.rebuild(model, a, params.merge('width' => 680.0))
+      Sketchup.undo
+      ok('MR1B2: 1 Spat vratil rozmer skrinky aj povodny zivy vzhlad',
+         (e::Store.config(a)['width'].to_f - 600.0).abs < TOL && d88_part(a, 'side_left').material == r1)
+      e::BoardBuilder.rebuild(model, board, { 'length' => 910.0 })
+      Sketchup.undo
+      ok('MR1B2: 1 Spat vratil rozmer dosky aj ABS R1',
+         (e::Store.config(board)['length'].to_f - 810.0).abs < TOL && board.material == r1 && d88_face_on(board, 1, :min).material == r1)
+      mr1b2_op(model) { a.transformation = a.transformation * Geom::Transformation.scaling(1.2, 1, 1) }
+      e::ScaleWatch.send(:absorb, a)
+      ok('MR1B2: skutocna scale absorpcia skrinky zachova R1 a prepocita geometriu',
+         (e::Store.config(a)['width'].to_f - 720.0).abs < TOL && d88_part(a, 'side_left').material == r1 && !e::ScaleWatch.scaled?(a.transformation))
+      Sketchup.undo
+      ok('MR1B2: scale aj absorpcia skrinky su jeden Spat',
+         (e::Store.config(a)['width'].to_f - 600.0).abs < TOL && d88_part(a, 'side_left').material == r1 && !e::ScaleWatch.scaled?(a.transformation))
+      mr1b2_op(model) { board.transformation = board.transformation * Geom::Transformation.scaling(1.2, 1, 1) }
+      e::ScaleWatch.send(:absorb_board, board)
+      ok('MR1B2: skutocna scale absorpcia dosky zachova R1 aj ABS',
+         (e::Store.config(board)['length'].to_f - 972.0).abs < TOL && board.material == r1 && d88_face_on(board, 1, :min).material == r1)
+      Sketchup.undo
+      ok('MR1B2: scale aj absorpcia dosky su jeden Spat',
+         (e::Store.config(board)['length'].to_f - 810.0).abs < TOL && board.material == r1 && !e::ScaleWatch.scaled?(board.transformation))
+      e::CabinetBuilder.rebuild_many(model, [[a, params.merge('width' => 650.0)], [b, params.merge('width' => 650.0)]])
+      ok('MR1B2: batch zachovava vlastnu R1 aj R2 kazdej skrinky',
+         d88_part(a, 'side_left').material == r1 && d88_part(b, 'side_left').material == r2)
+      Sketchup.undo
+      ok('MR1B2: batch ma jeden spolocny Spat', [a, b].all? { |cab| (e::Store.config(cab)['width'].to_f - 600.0).abs < TOL })
+      original_keys = mr1b2_parts(a).map { |part| e::Store.get(part, 'part_key') }
+      e::CabinetBuilder.rebuild(model, a, params.merge('zone_tree' => { 'id' => 'Z1', 'shelves' => 2, 'children' => [] }))
+      fresh_parts = mr1b2_parts(a).reject { |part| original_keys.include?(e::Store.get(part, 'part_key')) }
+      ok('MR1B2: novy dielec v starej skrinke dostane R2, povodny bok drzi R1',
+         !fresh_parts.empty? && fresh_parts.all? { |part| part.material == r2 } && d88_part(a, 'side_left').material == r1)
+      Sketchup.undo
+      e::BoardBuilder.rebuild(model, board, { 'material_id' => thick_id })
+      ok('MR1B2: vedoma zmena vyrobneho ID v rovnakom scope pouzije R2', board.material == r2)
+      Sketchup.undo
+      count = cabinets(model).length
+      e::Panel.handle_insert_copy(pg(model, 'cabinet_id' => e::Store.get(a, 'cabinet_id')))
+      panel_copy = (cabinets(model) - [a, b]).find { |inst| inst.valid? }
+      ok('MR1B2: skutocny panel handler skopiroval R1 do novej identity',
+         cabinets(model).length == count + 1 && panel_copy && d88_part(panel_copy, 'side_left').material == r1 && panel_copy.definition != a.definition)
+      Sketchup.undo
+      ok('MR1B2: panel kopia je jeden Spat a zdroj ostal bez zmeny', cabinets(model).length == count && mr1b1_state(r1) == live_state)
+      tool_copy = e::Tools::Mower.send(:copy_cabinet, model, a, :right)
+      ok('MR1B2: toolbar copy body zachoval R1 aj pri existujucej R2', tool_copy && d88_part(tool_copy, 'side_left').material == r1)
+      Sketchup.undo
+      ok('MR1B2: toolbar kopia je jeden Spat', cabinets(model).length == count && a.valid?)
+      native_copy = mr1b2_op(model) do
+        copy = model.entities.add_instance(a.definition, Geom::Transformation.translation(e::Units.point(6000, 0, 0)))
+        # SU kopia nesie atributy instancie rovnako ako normalny copy/paste.
+        a.attribute_dictionaries.each { |dict| dict.each_pair { |key, value| copy.set_attribute(dict.name, key, value) } }
+        copy
+      end
+      done = e::CabinetBuilder.dedup_copies(model, fresh_ids: [native_copy.entityID])
+      ok('MR1B2: dedup zachytil konkretnu kopiu pred prepisom CAB ID',
+         done.include?(native_copy) && e::Store.get(native_copy, 'cabinet_id') != e::Store.get(a, 'cabinet_id') && d88_part(native_copy, 'side_left').material == r1)
+      Sketchup.undo
+      ok('MR1B2: native kopia aj dedup su jeden Spat', !native_copy.valid? && a.valid? && d88_part(a, 'side_left').material == r1)
+
+      # Tombstone je kniznicny stav. Bez explicitneho Apply stary zivy handle drzi.
+      mr1b2_publish(model, sid)
+      e::CabinetBuilder.rebuild(model, a, params)
+      e::BoardBuilder.rebuild(model, board, {})
+      clean = e::BoardBuilder.build(model, board_params)
+      ok('MR1B2: color na disku ponecha stary R1, novy vklad je cista farba',
+         d88_part(a, 'side_left').material == r1 && board.material == r1 && mr1b2_plain?(clean.material) && clean.material != r1)
+      plain_handle = clean.material
+      e::BoardBuilder.rebuild(model, clean, {})
+      ok('MR1B2: opakovany plain rebuild znovu pouzije cisty handle', clean.material == plain_handle && mr1b1_state(r1) == live_state)
+      record = e::Materials.sheet(sid)
+      e::Materials.set_decor_color(record['decor'], [95, 115, 135], group_id: record['group_id'])
+      e::BoardBuilder.rebuild(model, clean, {})
+      ok('MR1B2: plain rebuild synchronizuje RGB bez zasahu do starsieho vzhľadu',
+         clean.material == plain_handle && clean.material.color.to_a.first(3) == [95, 115, 135] && mr1b1_state(r1) == live_state)
+      uni = e::Materials.sheets.find { |rec| e::Materials.uni?(rec) }
+      uni_board = e::BoardBuilder.build(model, board_params.merge('material_id' => uni['material_id'], 'edges' => {}))
+      ok('MR1B2: UNI ostava cista pracovna farba bez native identity',
+         mr1b2_plain?(uni_board.material) && uni_board.material.color.to_a.first(3) == uni['color'])
+
+      # Legacy skratka: ABS bez explicitneho face materialu dedi zdrojovu dosku.
+      legacy = e::BoardBuilder.build(model, board_params)
+      legacy_mat = legacy.material
+      ok('MR1B2: legacy fixture naozaj dedi ABS z dosky',
+         d88_face_on(legacy, 1, :min).material.nil? && d88_face_on(legacy, 1, :min).back_material.nil?)
+      mr1b2_op(model) do
+        legacy_mat.texture = image_path
+        legacy_mat.texture.size = [95.mm, 45.mm]
+      end
+      before_legacy = mr1b1_state(legacy_mat)
+      e::BoardBuilder.rebuild(model, legacy, {})
+      ok('MR1B2: legacy zdedena ABS rovnakeho scope zachovala texturu explicitne',
+         legacy.material == legacy_mat && d88_face_on(legacy, 1, :min).material == legacy_mat && mr1b1_state(legacy_mat) == before_legacy)
+      e::BoardBuilder.rebuild(model, legacy, {})
+      ok('MR1B2: druhy rebuild explicitnej legacy ABS stale zachova povodny handle',
+         legacy.material == legacy_mat && d88_face_on(legacy, 1, :min).material == legacy_mat && mr1b1_state(legacy_mat) == before_legacy)
+      repair = e::BoardBuilder.build(model, board_params.merge('edges' => { 'L1' => nil, 'L2' => aid, 'W1' => nil, 'W2' => nil }))
+      mr1b2_op(model) do
+        repair.material = source
+        [[2, :min], [2, :max], [1, :max]].each do |axis, side|
+          face = d88_face_on(repair, axis, side)
+          face.material = face.back_material = legacy_mat
+        end
+      end
+      e::BoardBuilder.rebuild(model, repair, { 'material_id' => thick_id })
+      ok('MR1B2: vedoma zmena sheet ID odstrani rawedge konflikt a zachova dokaz starej ABS',
+         mr1b2_plain?(repair.material) && d88_face_on(repair, 1, :max).material == legacy_mat && mr1b1_state(legacy_mat) == before_legacy)
+      foreign = mr1b2_op(model) do
+        face = model.entities.add_face([30_000, 0, 0], [30_010, 0, 0], [30_010, 10, 0], [30_000, 10, 0])
+        face.material = legacy_mat
+        face
+      end
+      new_clean = e::BoardBuilder.build(model, board_params)
+      ok('MR1B2: obsadene stare meno sa necisti in-place ani na cudzom objekte',
+         new_clean.material != legacy_mat && mr1b2_plain?(new_clean.material) && foreign.material == legacy_mat && mr1b1_state(legacy_mat) == before_legacy)
+      mr1b2_op(model) { foreign.edges.to_a.each { |edge| edge.erase! if edge.valid? } }
+      alternate = new_clean.material
+      mr1b2_op(model) { alternate.alpha = 0.6 }
+      alternate_state = mr1b1_state(alternate)
+      e::BoardBuilder.rebuild(model, new_clean, {})
+      ok('MR1B2: vlastna nahradna farba po native edite bez albeda prezije aj na ABS',
+         new_clean.material == alternate && alternate.texture.nil? && alternate.alpha == 0.6 && mr1b1_state(alternate) == alternate_state &&
+         d88_face_on(new_clean, 1, :min).material == alternate)
+      if alternate.respond_to?(:roughness_factor=)
+        mr1b2_op(model) do
+          alternate.alpha = 1.0
+          alternate.roughness_factor = 0.28
+          alternate.roughness_enabled = true # workflow je getter; aktivuje ho PBR flag.
+        end
+        pbr_state = mr1b1_state(alternate)
+        e::BoardBuilder.rebuild(model, new_clean, {})
+        ok('MR1B2: PBR bez albeda aj alpha ochrany zachova presny handle a stav',
+           alternate.texture.nil? && alternate.alpha == 1.0 && alternate.workflow != Sketchup::Material::WORKFLOW_CLASSIC &&
+           new_clean.material == alternate && mr1b1_state(alternate) == pbr_state)
+      end
+      # Rovnaka RGB cudzej skupiny nezaklada vlastnictvo zdedeneho dekoru ABS.
+      success, contrast = e::Materials.add_decor_batch(
+        'batch_schema' => 3, 'decor' => 'SU MR1B2 KONTRAST', 'type' => 'DTDL', 'grain' => 'length',
+        'sheet_variants' => [{ 'thickness' => 18.0, 'structure' => 'SM' }],
+        'edge_variants' => [{ 'width' => 23.0, 'thickness' => 1.0, 'structure' => 'SM' }]
+      )
+      raise "MR1B2 contrast fixture: #{contrast.inspect}" unless success
+      contrast_id = contrast['edges'].first
+      contrast_rec = e::Materials.edge(contrast_id)
+      e::Materials.set_decor_color(contrast_rec['decor'], e::Materials.color_of(sid), group_id: contrast_rec['group_id'])
+      contrast_board = e::BoardBuilder.build(model, board_params.merge('edges' => { 'L1' => contrast_id }))
+      mr1b2_op(model) do
+        face = d88_face_on(contrast_board, 1, :min)
+        face.material = face.back_material = nil
+        contrast_board.material.texture = image_path
+      end
+      mr1b2_reject(model, 'protected inherited ABS ineho scope', contrast_board) { e::BoardBuilder.rebuild(model, contrast_board, {}) }
+
+      # Protected explicitna druha dekorova podoba nema jediny spolocny vzhlad.
+      mr1b2_op(model) { d88_face_on(board, 2, :max).material = r2 }
+      mr1b2_reject(model, 'dve protected dekorove podoby', board) { e::BoardBuilder.rebuild(model, board, {}) }
+      mr1b2_op(model) { d88_face_on(board, 2, :max).material = nil }
+      mr1b2_op(model) { r1.set_attribute('NOXUN', 'appearance_id', 'poskodeny') }
+      mr1b2_reject(model, 'poskodeny native tuple', a) { e::CabinetBuilder.rebuild(model, a, params) }
+      mr1b2_op(model) { r1.set_attribute('NOXUN', 'appearance_id', rev1['id']) }
+
+      # Missing aktualna revizia je farba, ale existujuca R1 nevyzaduje subor.
+      missing = mr1b2_publish(model, sid, source)
+      File.delete(e::Materials.appearance_file(missing['id']))
+      File.delete(e::Materials.appearance_file(rev1['id']))
+      e::CabinetBuilder.rebuild(model, a, params)
+      fallback = e::BoardBuilder.build(model, board_params)
+      ok('MR1B2: bez lokalneho SKM stary R1 prezije a nova nedostupna revizia ma RGB fallback',
+         d88_part(a, 'side_left').material == r1 && mr1b2_plain?(fallback.material))
+      File.write(e::Materials.appearance_file(missing['id']), 'poskodeny SKM archiv')
+      mr1b2_reject(model, 'LoadError po zacati doskoveho rebuildu', fallback) { e::BoardBuilder.rebuild(model, fallback, {}) }
+      ok('MR1B2: vsetky povodne native vlastnosti R1 ostali nedotknute', mr1b1_state(r1) == live_state)
+    ensure
+      cleanup(model)
+      e::Materials.test_dir_override = old_dir
+      e::Materials.reload!
+      mr1b2_op(model) { (model.materials.to_a - originals).each { |mat| model.materials.remove(mat) if mat.valid? } }
+    end
+  rescue StandardError => ex
+    ok("MR1B2: vynimka #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}", false)
+  end
+
   # MR-1B1: native save/load bez dotyku katalogu alebo geometrie zakazky.
   def mr1b1_visual(material)
     state = { color: material.color.to_a, alpha: material.alpha }
@@ -19976,6 +20302,7 @@ module NoxunSuRunner
     run_cela_a(model)
     run_cela_b(model)
     run_mr1b1(model)
+    run_mr1b2(model)          # MR-1B2: R1/R2, spolocna ABS, prestavba, verna kopia a rollback
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

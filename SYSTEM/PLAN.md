@@ -534,7 +534,7 @@ Jedno tlačidlo Vzhľad pri povrchu, bez samostatného ABS override. Katalógov�
 
 **Postup:** MR-1A katalógový kontrakt a spoločná knižnica → MR-1B natívny materiál a zachovanie pri prestavbe → mapovanie MR-3 → MR-2 Štúdio → MR-3 záverečný smoke. Malé samostatné PR z čerstvého mainu; prvá dávka ešte nesprístupňuje nové ovládanie. Žiadny nový observer ani zmena výrobných snapshotov.
 
-**Priebežný stav:** MR-1A je zlúčené v #353 (v0.11.1). MR-1B sa delí na B1 natívny adaptér a B2 spoločné napojenie oboch builderov; nové ensure vstupy sa zapnú až so zachovaním pôvodného materiálu pri prestavbe.
+**Priebežný stav:** MR-1A je zlúčené v #353 (v0.11.1), MR-1B1 natívny adaptér v #354 (v0.11.2). MR-1B2 (v0.11.3) zapája oba buildery so zachovaním pôvodného živého vzhľadu pri prestavbe a kópii; bežný nový vklad používa aktuálnu revíziu. Ďalej MR-3 mapovanie a aplikovanie, potom MR-2 ovládanie. D-28 ostáva otvorené do dokončenia celého bloku.
 Natívna sonda potvrdila aj editáciu materiálu bez priradenia geometrii. MR-2 preto nepotrebuje pomocnú plochu: otvorí panel Materiály, kartu Upraviť prepne používateľ.
 
 - **V1 rozsah — M-R VZHĽAD (rozhodnuté 6.9.2026, NAHRÁDZA package „M-R FOTO" — Demos fotka ako textúra vypadáva):** ručné textúry z Michalovej knižnice (`E:\NOXUN\.MATERIÁLY`)

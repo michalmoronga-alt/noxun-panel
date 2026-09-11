@@ -465,6 +465,10 @@ sa nestratí; rovnako sa nedotkne veľkého písmena („Bok L" → „Bok L a")
 
 ### mower.rb
 
+**MR-1B2:** produktová kópia odovzdáva builderu živý `appearance_source: src`, aby zachovala pôvodný vzhľad aj pri novšej knižničnej revízii.
+Pending handshake drží pôvodný model aj source handle. Dokončenie vyžaduje ten istý aktívny model, platný pôvodný source a nezmenené CAB ID;
+rovnaké ID v inom dokumente ani náhradná inštancia po zmazaní sa nehľadajú. Konfigurácia sa stále číta až po úspešnom flushe.
+
 SketchUp vrstva Mowera + **Z-dialog**. Rotácie (pivot = stred obálky, **svetová Z**) a Z posun sú prevzaté z legacy bez zmeny správania — platia však len v root kontexte
 (`transform_entities` interpretuje transformáciu globálne iba tam; outside-in packet). **Kópia NOXUN korpusu ide cestou „Vložiť kópiu"**: `Store.config` → `newer_config?` brána
 (R-12) → `config_to_params` → `rekey_hardware_manual` → `CabinetBuilder.build(model, params, transform: src.transformation * translation(Units.vector(±šírka, 0, 0)))` →
@@ -1704,6 +1708,9 @@ bežná karta nerastie). Zámok beží **až na konci** `renderBoardCard`, aby p
 Testy: `tests/js/test_ghost_d1_karta.js`.
 
 ### actions_cabinet.rb
+
+**MR-1B2:** `handle_insert_copy` prenáša overenú zdrojovú skrinku samostatným `appearance_source:` do buildera. Kópia zachová živé materiály pôvodných
+dielcov a ABS, pričom má vlastnú identitu a definíciu. Vzhľadový zdroj sa nikdy nepridáva do params/configu ani klientského payloadu.
 
 Doména panela: vloženie skrinky (`handle_insert`, `handle_insert_copy`), premenovanie (`handle_rename_cabinet`, D-100) a zápisy konštrukcie/čiel (`handle_apply`,
 `handle_apply_fronts`, `handle_apply_all` = auto-apply). Materiálové preflighty (D-45: telo → chrbát → remap ABS) a zámky vkladacej karty (D-39) sú v odsekoch „Obsah Korpusu"
