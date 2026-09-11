@@ -57,6 +57,7 @@
                     // UI-C3 / D-84: rec stolara — merac povie, ci sa cela
                     // pridavaju castejsie ako dvierka alebo ako zasuvkove.
                     'fronts:add-door', 'fronts:add-drawer',
+                    'fronts:add-lift', 'fronts:add-fall', 'fronts:add-blind', 'fronts:add-none',
                     // UI-D1: rad akcii karty dielca — merac povie, ci sa olep
                     // castejsie prenasa hromadne, alebo sa dielce hladaju rucne.
                     'part:select-in-model', 'part:apply-similar',

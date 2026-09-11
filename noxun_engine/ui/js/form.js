@@ -1325,9 +1325,21 @@
       var fh0 = row.querySelector('.fh'); if (fh0) fh0.focus();
     }
   }
-  // D-84: rec stolara — „+ pridaj dvere" (kridlove) a „+ pridaj čelo"
-  // (zasuvkove). Typ ide rovno do noveho riadku, aby ho pouzivatel nemusel
-  // prestavovat po pridani.
+  // D-114: rovnake typy a ikony ako karta. Staticky rad sa pri echu
+  // neprestava, aby klavesnica nestratila fokus na tlacidle.
+  function renderFrontAddTypes(){
+    var box = el('frontAddTypes');
+    if (!box || box.dataset.ready === '1') return;
+    box.innerHTML = FRONT_CARD_TYPES.map(function(type){
+      var label = 'Pridať: ' + frontTypeTile(type);
+      var usage = type === 'drawer_front' ? 'drawer' : type;
+      return '<button type="button" class="ghostbtn" title="' + esc(label) +
+        '" aria-label="' + esc(label) + '" data-nx-usage="fronts:add-' + usage +
+        '" onclick="addFrontKind(\'' + type + '\')">' + NXIcons.svg(frontTypeIcon(type)) +
+        '<span class="front-add-plus">' + NXIcons.svg('plus') + '</span></button>';
+    }).join('');
+    box.dataset.ready = '1';
+  }
   function addFrontKind(type){
     addFrontRow({ type: type }, true);
     onField();
@@ -1402,19 +1414,22 @@
     syncFrontDirBadge(row);     // KOV-A2a: badge „smer?" patri k typu aj k slotom
     refreshFrontProfileUI();    // D-96: zmena typu meni rozsah aj vetu stavu
   }
-  // D-96: ikona profilu v riadku je LEN INDIKATOR (ovladac zije v skupine
-  // „Úchytky"). Preto uz nie je `<button>` ani nenesie `aria-pressed` — je to
-  // stav, nie prepinac; tooltip povie, kde sa meni.
-  function syntheticProfileTitle(rec){
-    return rec
-      ? ('Úchytkový profil: ' + rec.name + ' — čelo sa skráti o ' + Math.round(rec.reduction) +
-         ' mm (mení sa v skupine Úchytky)')
-      : 'Bez úchytkového profilu (profil sa volí v skupine Úchytky)';
+  // D-114: indikator popise profil, hranu a skrateny rozmer.
+  // Volba zije v karte cela aj v hromadnych Uchytkach.
+  function syntheticProfileTitle(rec, type, edge){
+    if (!rec) return 'Bez úchytkového profilu (nastavíš v karte čela alebo skupine Úchytky)';
+    var valid = frontProfileEdges(type).indexOf(edge) >= 0;
+    var side = valid ? FRONT_EDGE_LABELS[edge] : 'Vyber hranu';
+    var dim = (edge === 'top' || edge === 'bottom') ? 'výška' : 'šírka';
+    return 'Úchytkový profil: ' + rec.name + ' · ' + side +
+      (valid ? ' — ' + dim + ' panela sa skráti o ' + Math.round(rec.reduction) + ' mm' : '') +
+      ' (nastavíš v karte čela alebo skupine Úchytky)';
   }
   function syncFrontProfileBtn(row){
     var ind = row.querySelector('.fprof'); if (!ind) return;
     var rec = frontProfileRec(row.dataset.frontProfile || 'none');
-    var txt = syntheticProfileTitle(rec);
+    var edge = Object.prototype.hasOwnProperty.call(row.dataset, 'frontProfileEdge') ? row.dataset.frontProfileEdge : 'top';
+    var txt = syntheticProfileTitle(rec, row.dataset.frontType, edge);
     // `aria-label` sa tu VEDOME nedava: span je `aria-hidden` (je to indikator,
     // nie ovladac) a stav profilu cita citacka zo skupiny „Úchytky", kde sa aj
     // meni. Dva popisy toho isteho by si odporovali.
@@ -1798,6 +1813,7 @@
   // Obnovia sa len bezpecne udaje viazane cez ID: placeholder ≈ vysky a badge
   // kovania. Plny rebuild riadkov = zmena vyberu alebo echo bez cakajucich editov.
   function renderFronts(fronts, keepGaps){
+    renderFrontAddTypes();
     if (keepGaps){
       updateFrontRowBadges();
       // KOV-A2a: badge „smer?" je BEZPECNY udaj viazany cez ID (rovnako ako

@@ -74,9 +74,9 @@ eq(frontProfileCommon([{ label: 'F1', type: 'lift', profile: 'ukw7' },
 // Veta stavu ma TEN ISTY filter — nesmie tvrdit „bez profilu: F2" o vyklope.
 eq(frontProfileStateText([{ label: 'F1', type: 'door', profile: 'ukw7' },
                           { label: 'F2', type: 'lift', profile: 'none' }], REG),
-   'UKW-7: F1 · bez profilu: F2', 'veta stavu spomina aj vyklop');
+   'UKW-7 (Hore): F1 · bez profilu: F2', 'veta stavu spomina aj vyklop');
 eq(frontProfileStateText([{ label: 'F1', type: 'blind', profile: 'ukw7' }], REG),
-   'UKW-7: F1',
+   'UKW-7 (Hore): F1',
    'blenda podporuje profil = to iste ako ziadne cela');
 
 // --- D-96: SPOLOCNA HODNOTA (co ukaze select) --------------------------------
@@ -88,7 +88,7 @@ eq(frontProfileCommon([{ label: 'F1', type: 'door' }], 'all'), 'none',
    'chybajuci kluc profilu je neutral (starsi config bez pola)');
 
 // --- D-96: VETA STAVU (co je NASADENE) ---------------------------------------
-eq(frontProfileStateText(F, REG), 'UKW-7: F1, F2 · bez profilu: F3',
+eq(frontProfileStateText(F, REG), 'UKW-7 (Hore): F1, F2 · bez profilu: F3',
    'veta hovori, ktore cela profil maju — poradie podla prveho vyskytu');
 eq(frontProfileStateText([{ label: 'F1', type: 'door', profile: 'none' }], REG),
    'Žiadne čelo nemá úchytkový profil.', 'jednoznacny stav sa povie vetou, nie zoznamom');
@@ -101,6 +101,19 @@ eq(frontProfileStateText([{ label: 'F1', type: 'none', profile: 'ukw7' }], REG),
 // zasada ako frontProfileRec: neznamy = neutral.
 eq(frontProfileStateText([{ label: 'F1', type: 'door', profile: 'ukw99' }], REG),
    'bez profilu: F1', 'neznamy profil sa nevydava za znamy');
+
+// D-114: rovnaky profil na roznych hranach musi mat rozne skupiny.
+eq(frontProfileStateText([
+  {label:'F1', type:'door', profile:'ukw7', profile_edge:'bottom'},
+  {label:'F2', type:'blind', profile:'ukw7', profile_edge:'left'},
+  {label:'F3', type:'lift', profile:'ukw7', profile_edge:'bottom'},
+  {label:'F4', type:'door', profile:'ukw7', profile_edge:'free'}
+], REG), 'UKW-7 (Dole): F1, F3 · UKW-7 (Vľavo): F2 · UKW-7 (Bočná oproti pántom): F4',
+  'skupiny zachovaju poradie prveho vyskytu a rozlisuju hrany');
+eq(frontProfileStateText([
+  {label:'F1', type:'lift', profile:'ukw7', profile_edge:'free'},
+  {label:'F2', type:'door', profile:'ukw7', profile_edge:'broken'}
+], REG), 'UKW-7 (Vyber hranu): F1, F2', 'neplatna hrana nema vymysleny popis Hore');
 
 // --- ponuka je zdrojom hodnot selectu ----------------------------------------
 eq(frontProfileOptionList(REG).map(o => o.id), ['none', 'ukw7'], 'ponuka: neutral + registry');

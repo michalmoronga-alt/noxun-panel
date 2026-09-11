@@ -52,9 +52,9 @@ end
 
 # --- 2) D-84 rec stolara -----------------------------------------------------
 
-NxTest.test('D-84: tlacidla hovoria, CO pridavaju — a „− riadok" zanikol') do
-  NxTest.assert(UIC3_PANEL_HTML.include?('pridaj dvere'), 'kridlove celo = „+ pridaj dvere"')
-  NxTest.assert(UIC3_PANEL_HTML.include?('pridaj čelo'), 'zasuvkove celo = „+ pridaj čelo"')
+NxTest.test('D-114: typove ikony pridavaju priamo a mazanie ostava pri riadku') do
+  NxTest.assert(UIC3_PANEL_HTML.include?('id="frontAddTypes"'), 'jeden rad typov v povodnom mieste')
+  NxTest.assert(UIC3_FORM_JS.include?('function renderFrontAddTypes'), 'rad pouziva spolocne mapy typov a ikon')
   NxTest.refute(UIC3_PANEL_HTML.include?('− riadok'), '„− riadok" zanikol — maze sa krizikom pri riadku')
   NxTest.refute(UIC3_PANEL_HTML.include?('+ riadok'), '„+ riadok" uz nehovori nic o tom, co vznikne')
   NxTest.refute(UIC3_FORM_JS.include?('function removeLastFront'),

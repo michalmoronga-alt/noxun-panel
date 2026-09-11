@@ -126,25 +126,30 @@
       return list.every(function(it){ return frontProfileEdges(it.type).indexOf(edge) >= 0; });
     });
   }
-  // Veta do skupiny Uchytky — co je NASADENE (nie co sa chysta).
+  // Veta do skupiny Uchytky — aktualne nastavenie profilu aj hrany.
   // items = [{ label:'F1', type, profile }] v DATOVOM poradi; reg = registry.
   function frontProfileStateText(items, reg){
     // KOV-A1 (P2-D): TEN ISTY filter ako `frontProfileScopeItems` — inak by veta
     // stavu tvrdila „bez profilu: F2" o čele, ktoré profil mať ani nemôže.
     var list = (items || []).filter(function(it){ return it && !frontProfileless(it.type); });
     if (!list.length) return 'Skrinka zatiaľ nemá čelá, na ktorých by profil sedel.';
-    var order = [], byId = {};
+    if (list.every(function(it){ return !it.profile || it.profile === 'none'; }))
+      return 'Žiadne čelo nemá úchytkový profil.';
+    var order = [], groups = Object.create(null);
     list.forEach(function(it){
       var id = it.profile || 'none';
-      if (!byId[id]){ byId[id] = []; order.push(id); }
-      byId[id].push(it.label);
+      var rec = frontProfileRec(id, reg), edge = frontProfileEdge(it);
+      var side = frontProfileEdges(it.type).indexOf(edge) >= 0 ? FRONT_EDGE_LABELS[edge] : 'Vyber hranu';
+      var title = rec ? (rec.short || rec.name) + ' (' + side + ')' : 'bez profilu';
+      var key = JSON.stringify([id, rec ? side : null]);
+      if (!groups[key]){ groups[key] = { title: title, labels: [] }; order.push(key); }
+      groups[key].labels.push(it.label);
     });
-    if (order.length === 1 && order[0] === 'none') return 'Žiadne čelo nemá úchytkový profil.';
-    return order.map(function(id){
-      var rec = frontProfileRec(id, reg);
-      return (rec ? rec.short || rec.name : 'bez profilu') + ': ' + byId[id].join(', ');
+    return order.map(function(key){
+      return groups[key].title + ': ' + groups[key].labels.join(', ');
     }).join(' · ');
   }
+
   // ===== KOV-A2a: KARTA CELA — ciste jadro ================================
   //
   // KLIENTSKY VYROBCA stavu „neurcene" je JEDNO MIESTO: tento subor. Literal
@@ -168,7 +173,7 @@
     { value: FRONT_DIR_LEFT, label: 'Ľavé', icon: 'dir-left',
       title: 'Pánty vľavo — krídlo sa otvára doprava' },
     { value: FRONT_DIR_UNSET, label: 'Neurčené', icon: 'dir-unset', warn: true,
-      title: 'Smer zatiaľ neurčený — nález v Kontrole, exporty to neblokuje' },
+      title: 'Smer zatiaľ neurčený — pri bočnom profile vyber stranu pántov' },
     { value: FRONT_DIR_RIGHT, label: 'Pravé', icon: 'dir-right',
       title: 'Pánty vpravo — krídlo sa otvára doľava' }
   ];
@@ -422,7 +427,7 @@
                   options: FRONT_OPENING_OPTIONS,
                   active: it.opening_mode == null ? null : it.opening_mode,
                   hint: it.opening_mode == null
-                    ? 'Neurčené — predvolene sa berie klasické otváranie.' : null });
+                    ? 'Bez voľby sa použije klasické otváranie.' : null });
     }
     if (type === 'drawer_front'){
       var drw = (it.drawer && typeof it.drawer === 'object') ? it.drawer : {};
@@ -450,13 +455,12 @@
     }
     // KOV-D1b: set VÝSUVU sa už vyberá — v kontexte Kovanie, pri riadku tohto
     // čela („Set pre toto čelo"). Karta čela naň len ukazuje: výber patrí
-    // k položke kovania, nie ku klasifikácii čela. Závesy set podľa otvárania
-    // zatiaľ nemajú (dvojsegmentový hinge resolver = KOV-F).
+    // k položke kovania, nie ku klasifikácii čela. Rovnakú cestu majú závesy.
     if (type === 'drawer_front'){
       rows.push({ kind: 'hint', text: 'Set výsuvu vyberieš v kontexte Kovanie — pri riadku tohto čela.' });
     }
     if (type === 'door'){
-      rows.push({ kind: 'hint', text: 'Set závesov podľa otvárania príde s KOV-F.' });
+      rows.push({ kind: 'hint', text: 'Set závesov vyberieš v Kovaní pri tomto čele.' });
     }
     // KOV-E1b (Codex #333 kolo 1 P2): od aktivácie pravidiel dostane výklop
     // mechanizmus a sklop závesy AUTOMATICKY. Pôvodný text („pridáva sa
