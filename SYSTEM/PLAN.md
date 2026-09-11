@@ -256,7 +256,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 - *(Kovanie — D-109/D-110/D-111 aj fáza 3 — sa 26.8. vyčlenilo do vlastného bloku **KOVANIE**; ten je od **10.9.2026 hotový** (v0.10.0), plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).)*
 #### BALÍK ČIEL (D-114 + D-119 + D-120)
 
-**Rozsah, mockup aj implementácia schválené 11.9.2026.** ČELÁ-A implementované (PR #347, v0.10.6); sekvenčné dávky ČELÁ-A → B → C.
+**Rozsah, mockup aj implementácia schválené 11.9.2026.** ČELÁ-A/B implementované (PR #347/#348, v0.10.6–0.10.7); sekvenčné dávky ČELÁ-A → B → C.
 **Audit ÁNO** pre A/B (config, geometria, profilový kontrakt a čítací callback); C je UI.
 Podklad: [outside-in a reconcile](zdroje/next_sessions/CELA_OUTSIDE_IN_2026-09-11.md).
 Kontrola návrhu: [Astra audit a SOUND delta](zdroje/next_sessions/CELA_AUDIT_2026-09-11.md).
@@ -294,7 +294,8 @@ Jedna užitočná dávka vrátane UI, schema a testov, následne samostatné rev
 - Testy: čistá matematika + migrácia/roundtrip + JS formulár a náhľad + in-SU rozmery/pozície/Undo/copy/save-reopen. Plná headless, všetky JS, relevantné in-SU. Runtime patch bump + všetky
   HTML cache-bust, dotknutá architektúra a štandard.
 
-##### ČELÁ-B — D-120, všetky hrany profilu
+##### ČELÁ-B — D-120, všetky hrany profilu — IMPLEMENTOVANÉ, PR #348
+Overenie: 3825 headless, 113 JS sád, in-SketchUp 2279 PASS / 0 FAIL; skutočný Inspector s Ruby preflight pri 470 px. Neplatný Scale vráti pôvodný config, všetky panely aj čistý transform.
 - Zachovať `items[].profile` ako ID (`none`/`ukw7`), pridať `items[].profile_edge` = `top|bottom|left|right|free`. `free` je sémantická voľba iba dvierok, skutočná hrana každého krídla sa
   odvodí z tej istej autority smerov, ktorú používa `Fronts.direction_slots`. Nesmie vzniknúť druhý výpočet pre UI alebo renderer.
 - Starý platný profil bez `profile_edge` = top. Chýbajúce `profile` = none. Poškodená/neznáma prítomná hrana sa nesmie potichu zmeniť na top. Server ju odmietne na zapisovacej ceste; čítanie
@@ -371,7 +372,7 @@ Jedna užitočná dávka vrátane UI, schema a testov, následne samostatné rev
 
 ##### Brány a uzáver
 
-Outside-in a reconcile sú dokončené v rozsahu návrhu; geometrický probe kandidátneho osadenia je povinný pred prijatím B.
+Outside-in a reconcile sú dokončené v rozsahu návrhu; geometrický probe štyroch osadení aj plná in-SU sada B prešli.
 Prvé Astra kolo: 0 BLOCKER, 4 FIX-IN-B, 2 NOTE; všetkých šesť je v znení vyššie zapracovaných.
 Kontrola zapracovania vrátane čítacej/flush cesty skončila **SOUND** (11.9.2026). Návrhová auditná brána je uzavretá.
 Po každej dávke testy, aktuálne GH review/CI a čerstvý main podľa CLAUDE.md. Patch a všetky cache-bust zhodné s VERSION.

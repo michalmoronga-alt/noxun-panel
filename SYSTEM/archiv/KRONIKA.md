@@ -17,6 +17,13 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **ČELÁ-B — PROFILY NA VŠETKÝCH HRANÁCH (11.9.2026, PR #348, v0.10.7).**
+  UKW-7 hore/dole/bočne aj pre výklopy, sklopy a blendy; dvierka bočne vždy oproti pántom. Karta aj hromadné Úchytky menia profil a hranu nezávisle.
+  Neurčený smer/nesediaca hrana zostáva návrhom; jeden čistý Ruby preflight poskytuje aktuálne sloty a hrany, korelovaný apply odomkne export/kópiu/šablónu.
+  CONFIG_SCHEMA 13, seed pravidiel 7; staré zákazky nemenia snapshot samy. Predvoľby a prestavba majú spoločné Undo; ABS/dekor/identita a length_unsupported držia.
+  Overenie: 3825 headless, 113 JS, 2279 in-SU PASS / 0 FAIL, skutočný Inspector 470 px. Neplatný Scale vrátil celý pôvodný stav; Redo API na platforme nedostupné.
+  Prvý in-SU beh odhalil chybu testu (zdieľaný hash prepísal porovnávaný pôvodný config); test opravený hlbokou kópiou, následný beh čistý.
+
 - **ČELÁ-A — PRESAHY PER STRANA (11.9.2026, PR #347, v0.10.6).**
   Michal schválil interaktívny návrh aj sekvenčnú implementáciu A/B/C. Predchádzajúci stav: v0.10.5 a pripravené zadanie balíka Čiel.
   Ľavý a pravý okraj sú nezávislé a spoločné celej skrinke. Starý `gap_sides` sa preberie pre každú chýbajúcu stranu; explicitná nula má prednosť.
