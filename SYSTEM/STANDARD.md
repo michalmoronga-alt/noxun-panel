@@ -814,7 +814,16 @@ Schema 10 vzniká len pri obsahu s `appearance`; otvorenie starého katalógu ho
 Novší marker aj neznámy obsah chránia zápisové brány. Nový `.skm` sa dokončí pred
 publikáciou odkazu; zlyhanie katalógového zápisu ponechá pôvodnú revíziu aj súbor.
 Uloženie knižnice nie je súčasťou modelového Undo. MR-1A pripravuje katalógovú časť;
-natívny adaptér, mapovanie a ovládanie nasledujú podľa [MR balíka](zdroje/next_sessions/MR_VZHLAD_PACKAGE_2026-09-11.md).
+MR-1B1 natívny adaptér, po ňom nasleduje zapojenie do prestavby, mapovanie a ovládanie.
+
+**Natívna identita vzhľadu (MR-1B1):** na SketchUp materiáli v dictionary `NOXUN`
+žije `appearance_scope` (JSON dvojice normalizované group_id/structure) a `appearance_id`
+(UUID revízie). Identita je spoločná pre dosky aj ABS; neobsahuje ID hrúbkového variantu.
+Premenovanie materiálu ju nemení. Interný názov v `.skm` je
+`NOXUN_APPEARANCE_<appearance_id>_NATIVE`, ale samotné meno nestačí na opätovné použitie.
+Načítaný materiál musí patriť správnemu modelu a mať celý očakávaný scope/revíziu;
+nezhoda alebo viacerí kandidáti sa nesmú napraviť preoznačením či prefarbením cudzieho materiálu.
+Do configu skrinky ani výrobného snapshotu sa tieto polia nepridávajú.
 
 **Nemennosť ID a migrácia (2A):** `material_id`/`abs_id` sú **opaque a navždy nemenné** (modely sa viažu výhradne na ne — snapshot na entite drží ID, štandard 8.3);
 legacy ID s vloženou štruktúrou v texte sa NEparsujú. Nové ID zahŕňajú skupinu+štruktúru (+formát pri PD) len pre čitateľnosť.

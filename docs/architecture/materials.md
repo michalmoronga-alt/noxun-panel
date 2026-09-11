@@ -208,7 +208,30 @@ Purpose-publish vyžaduje celý zdravý čerstvý katalóg. Všeobecný write ba
 `publish_appearance(kind, anchor_id, baseline:, mode:)` generuje descriptor aj internú cestu. Native exporter blok dostane staging cestu/descriptor/scope mimo katalógového zámku;
 **true znamená, že natívny adaptér overil obsah**, samotné jadro kontroluje iba súbor a bajty. Potom znovu overí baseline pod zámkom, dokončí nemenný súbor
 a publikuje descriptor všetkým členom jediným JSON zápisom. Zlyhanie JSON môže ponechať osirelý nový súbor, nikdy nepoškodí starý. Color súbor nepotrebuje.
-Export/načítanie natívneho materiálu a UI sú samostatné neskoršie dávky; knižničný zápis nie je modelové Undo.
+Natívny export/načítanie poskytuje `NativeAppearance` nižšie; UI a zapojenie do builderov sú samostatné dávky. Knižničný zápis nie je modelové Undo.
+
+### materials_native_appearance.rb
+
+**MR-1B1: natívny adaptér bez prepnutia builderov.** `NativeAppearance.lookup(model, scope, revision)` číta jednoznačnú identitu v danom modeli;
+`preferred(model, scope, material)` samostatne preverí pôvodný živý handle rovnakého rozsahu aj zo staršej revízie. Doklad pôvodného dielca a nezmeneného
+výrobného ID je povinnosť integrácie prestavby. Bežný lookup je vždy na presnú revíziu a nehádá prvého kandidáta pri viacerých materiáloch.
+
+Natívny materiál nesie v existujúcom dictionary `NOXUN` dvojicu `appearance_scope` (JSON dvojice skupina/povrch) a `appearance_id` (UUID revízie).
+Používateľské premenovanie identitu nemení; interný exportný názov je `NOXUN_APPEARANCE_<uuid>_NATIVE`. Prípona bráni sondou preukázanej kolízii podobných
+číselných koncov, ale názov nie je dôkaz identity: výsledok natívneho načítania sa vždy overí proti celému scope/revízii. PBR sa nekopíruje po poliach.
+
+`load(model, scope, descriptor)` validuje descriptor MR-1A a opätovne použije overený živý materiál alebo načíta knižničný `.skm`.
+Mutujúci volajúci vlastní modelovú operáciu a rollback; adaptér pri načítaní neotvára vnorenú operáciu. Nedostupný súbor je odlíšený od nesprávnej
+identity či nejednoznačných kandidátov. Nezhodný výsledok sa nikdy nepreoznačí ani neprefarbí; volajúci musí svoju operáciu zrušiť.
+
+`export(model, source, staging_path, descriptor, scope)` odmietne aktívny NOXUN guard, neplatný zdroj alebo nesprávny model. Prvá krátka guarded operácia
+dočasne nastaví iba názov a identitu, uloží presnú `.skm.staging` cestu a abortom obnoví zdroj. Druhá operácia overí staging natívnym načítaním a opäť sa zruší.
+**Oba aborty musia vrátiť true**, tuple sa overuje ešte na živom načítanom materiáli a po druhom aborte musí sedieť pôvodné meno aj metadata zdroja.
+Chyba nemôže vrátiť úspech exportéra. Až potom MR-1A rozhodne o nemennom súbore a publikácii katalógu; export sám do katalógu nezapisuje.
+
+Natívne testy na SU 26.0 porovnávajú aj pixely, fyzickú mierku albeda, alpha, colorize a dostupné PBR nastavenia.
+Pri čerstvo vytvorených API mapách natívny save/load zjednotí ich sekundárne width/height s albedom; test to priznáva samostatne.
+Následný roundtrip natívne importovaného materiálu zachová celý skúšaný stav. Renderová zhoda ani beh na SU 2024 tým nie sú preukázané.
 
 ### materials_abs.rb
 
