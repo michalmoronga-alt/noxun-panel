@@ -838,7 +838,9 @@
       NX.setStatus('Skontroluj červené polia — rozpísaná úprava by sa pri označení vlastníka stratila.', true);
       return;
     }
-    if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+    if (typeof nxCabinetAction === 'function'){
+      if (!nxCabinetAction(function(){ onHwOwnerPick(btn); })) return;
+    } else if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
     var raw = box.getAttribute('data-keys') || '';
     var keys = raw ? raw.split(',').filter(function(k){ return k !== ''; }) : [];
     hwFlash(box);
@@ -1943,6 +1945,9 @@
   }
 
   function hwManualSend(next, op){
+    if (typeof cabApplyRequest !== 'undefined' && cabApplyRequest){
+      NX.setStatus('Počkaj na dokončenie rozpracovanej zmeny.', true); return false;
+    }
     // Cervene pole formulara by zapis aj tak zastavilo v `flushCabinetEdits` —
     // tu sa zastavi SKOR, aby sa modal nezamkol nad zapisom, ktory neodide.
     if (typeof validateFields === 'function' && !validateFields()){
@@ -1957,6 +1962,7 @@
     var payload = collectAll();
     payload.cabinet_id = selectedCabId;
     payload.manual_op = op;
+    if (typeof nxStampCabinetApply === 'function') nxStampCabinetApply(payload);
     cabEditsInFlight = true; // echo tohto apply nesmie prepisat novsi vstup
     if (window.sketchup && sketchup.apply_all) sketchup.apply_all(nxDocPayload(payload));
     return true;

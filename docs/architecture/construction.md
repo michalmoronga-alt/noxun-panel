@@ -662,6 +662,10 @@ zóny ostávajú **bez jediného nového kľúča** (idú do uloženého configu
 19,181 × 37,419 mm). Registry je rozšíriteľný (nový profil = nový záznam); `'none'` v ňom NIE je — je to neutrál a zároveň default chýbajúceho kľúča (žiadna migrácia starých
 configov). Číta ho fronts (matematika panelu), pravidlá kovania (dĺžka rezu) aj builder (proxy geometria).
 
+**D-120 (v0.10.7):** `fit_panel!` skráti panel podľa fyzickej hrany, `panel_geometry` rekonštruuje jeho celkový obrys a pásmo, `cut_length` vráti rozmer pozdĺž hrany.
+`placement` poskytne kotvu a otočenie okolo Y pre top/bottom/left/right; nos prierezu zostáva v zápornom Y. Builder osádza rovnakú kanonickú definíciu, bez odhadu z bbox.
+Deskriptor má voliteľné `profile_edge`; legacy top `profile_band {z,h}` zostáva. Neznáma prítomná hrana sa neodhaduje. Proxy má tag Čelá a nemení výrobnú triedu ani cenu.
+
 ## Modules (`noxun_engine/modules/`)
 
 ### shelves.rb
@@ -678,15 +682,17 @@ police v zónach: rovnomerné rozloženie v svetlej výške (`n` políc ⇒ `n+1
 prítomná nula vyhráva; nový zápis starý kľúč vynecháva. Otvor je `width − gap_left − gap_right`, prvý panel začína na `gap_left`. Každá strana má vlastnú kontrolu
 konečného čísla a limitu ±100/±2000. Korpusové kotvy a krok kópie sa nemenia. `CONFIG_SCHEMA` 12 chráni asymetriu pred starším pluginom; BuildPlan ostáva 5.
 
-čelá fixed/auto s lockmi, „bez čela", krídla 1–4, **úchytkový profil na hornej hrane (D-90 — riadok drží výšku, skracuje sa PANEL; `profile_band` je podklad vizuálu aj náhľadu)**.
+čelá fixed/auto s lockmi, „bez čela", krídla 1–4. **D-120:** `profile_edge` top/bottom/free na dvierkach, top/bottom/left/right na ostatných paneloch.
+Chýbajúca hrana znamená legacy top, prítomná neplatná hrana odmietne zápis. `free` vyrieši `profile_edges` z `direction_slots`: oproti pántom, dvojkrídlo v strede;
+pri neurčenom smere zápis stojí. `resolve_layout` poskytne aktuálne rozmery a sloty aj čistému `preflight`, bez emisie dielcov. `layout` kontroluje profil per krídlo PRED
+vyradením degenerátov v Construction. Skracuje sa iba panel, výšky riadkov a `bounds` pre zásuvky držia pôvodný otvor. `CONFIG_SCHEMA` 13; BuildPlan 5 (aditívna anotácia).
 
 **KOV-A1 — TYPY:** `items[].type` ∈ `door` · `drawer_front` · `lift` (výklop) · `fall` (sklop) · `blind` (blenda) · `none`; neznámy typ sa (ako doteraz) sklopí na `door`.
 `lift`/`fall` → rola **`flap`**, kľúč `front:F#/flap`, suffix `FLAP-#`, názvy „Výklop #" / „Sklop #"; `blind` → rola **`false_front`**, kľúč `front:F#/blind`, suffix `BLIND-#`.
 Oba typy majú **identickú panelovú matematiku ako zásuvkové čelo** (1 panel cez celý otvor, `wings_n` 1, `AXES_FRONT`). **`Fronts.class_owner_part(type)`** (KOV-E1a,
 Codex #332 kolo 3 P2) zhŕňa tú istú tabuľku pre owner triedne kľúče kovania — `drawer_front` → `panel`, `lift`/`fall` → `flap`, ostatné (dvierka, blenda, `none`,
-neznámy typ) → nič; číta ju `CabinetBuilder.norm_hardware_sets`, aby po zmene typu čela neostal v configu mŕtvy výber setu. **Vedomý limit A1:** úchytkový `profile` je pre
-`lift`/`fall`/`blind` (aj `none`) normalizovaný na `none` — profilové pravidlo D-90 pozná len dvierka a zásuvku, inak by vznikol falošný `profile_rule_missing`
-(profil na pohyblivom čele = KOV-E/F). UI ich sprístupní až KOV-A2; v A1 vznikajú len cez config/API a select typu ich nesie ako **neaktívne** voľby.
+neznámy typ) → nič; číta ju `CabinetBuilder.norm_hardware_sets`, aby po zmene typu čela neostal v configu mŕtvy výber setu. **D-120 ruší limit A1:** profil podporujú
+aj `lift`/`fall`/`blind`; `PROFILELESS_TYPES` obsahuje iba `none`. Typ aj profil/hrana sú dostupné v jednej karte čela.
 
 **KOV-A1 — ŠTYRI NOVÉ POLIA POLOŽKY (trojstav + dormant):** `direction` (smer otvárania = **strana pántov**, `left` = pánty vľavo) · `wing_directions` (`{p2, p3}` pre stredné
 krídla 3/4-krídlových dvierok) · `opening_mode` (`classic|tipon`) · `drawer` (`{construction: metal|wood|other, variant: standard|internal}`, pod-polia nezávisle).

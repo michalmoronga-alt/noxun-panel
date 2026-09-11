@@ -190,7 +190,7 @@ NxTest.test('D-90 pravidla: seed v3 nesie obe pravidla profilu (dvierka + zasuvk
   NxTest.assert(ids.include?('uchytkovy-profil-zasuvky'), 'pravidlo pre zasuvkove cela')
   hr::SEED_RULES.select { |r| r['kind'] == 'part_flag_length' }.each do |r|
     NxTest.assert_equal('handle', r['output'])
-    NxTest.assert(%w[front_door drawer_front].include?(r['applies_to']['role']),
+    NxTest.assert(%w[front_door drawer_front flap false_front].include?(r['applies_to']['role']),
                   'applies_to je JEDNA rola (ako ostatne pravidla)')
   end
   NxTest.assert(hr::KINDS.include?('part_flag_length'), 'kind je v slovniku (inak by ho evaluate preskocil)')
@@ -310,7 +310,7 @@ NxTest.test('D-90 pravidla: project_seed_plan je CISTA (nic nezapise) a vie, co 
   old = NxD90.rules.reject { |r| r['kind'] == 'part_flag_length' }
   hr.set_project_rules(m, old)
   rules, added, refreshed = hr.project_seed_plan(hr.project_rules(m))
-  NxTest.assert_equal(%w[uchytkovy-profil uchytkovy-profil-zasuvky], added.sort,
+  NxTest.assert_equal(hr.profile_rule_ids.sort, added.sort,
                       'plan vie DOPREDU, ktore pravidla pribudnu')
   NxTest.assert_equal([], refreshed)
   NxTest.assert_equal(hr::SEED_RULES.length, rules.length)
@@ -568,7 +568,7 @@ NxTest.test('D-90 UI: panel posiela register profilov a riadok cela ma volbu') d
   # v skupine „Úchytky" pre zvoleny ROZSAH ciel. Ikona ostala INDIKATOR.
   NxTest.assert(form.include?('function onFrontProfilePick'),
                 'volba profilu zije v sekcii Uchytky (D-96)')
-  NxTest.assert(form.include?("it.row.dataset.frontProfile = id"),
+  NxTest.assert(form.include?("frontRowProfileSet(it.row, id)"),
                 'volba zapisuje do TYCH ISTYCH dat riadku (dataset) — ziadne nove pole')
   NxTest.assert(form.include?("row.dataset.frontProfile = 'none'"),
                 "prepnutie na „Bez cela\" zhodi profil (zrkadlo Ruby normalize)")

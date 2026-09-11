@@ -43,6 +43,7 @@ vm.runInContext(fs.readFileSync(path.join(UI, 'js', 'form.js'), 'utf8'), ctx);
 // Vedlajsie formularove cesty maju svoje sady; tu izolujeme hranicu ulozenia.
 ctx.validateFields = global.validateFields;
 ctx.flushCabinetEditsNow = global.flushCabinetEditsNow;
+ctx.nxCabinetAction = function(){ if (!valid) return false; order.push('flush'); return true; }; // handshake ma vlastnu sadu CELA-B
 const fm = ctx.module.exports;
 const studio = require(path.join(UI, 'js', 'templates.js'));
 el('tplSaveName').select = function(){}; // mini-DOM nema vyber textu inputu

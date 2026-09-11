@@ -14,7 +14,7 @@
 #                params['nominal_length'] (vysuv NL podla svetlej hlbky)
 #   part_flag_length (D-90) — polozka vznikne LEN pre dielec s PRIZNAKOM
 #                (uchytkovy profil na cele); dlzka rezu ide do
-#                params['cut_length_mm'] (= sirka dielca), typ profilu do
+#                params['cut_length_mm'] (rozmer pozdlz hrany), typ profilu do
 #                params['profile']. Dielec bez profilu polozku nedostane.
 # Nova kategoria kovania = spravidla len novy JSON zaznam; novy kind az pri novej logike.
 # VEDOME OBMEDZENIE fazy 1: vystup je vzdy production_class 'counted' (pocitane kusy).
@@ -90,7 +90,7 @@ module Noxun
       # na KAZDE celo `flap` (aj na vyklop) — a prave preto sa dokument so
       # std 3 do starsieho pluginu uz NEZAPISUJE (dopredna brana nizsie).
       STD          = 3 # verzia formatu suboru pravidiel (doc: std/seed_version/rules)
-      SEED_VERSION = 6 # v2 (D1): +zavesenie hornej skrinky, +podperky policove,
+      SEED_VERSION = 7 # v2 (D1): +zavesenie hornej skrinky, +podperky policove,
                        # seria vysuvov zladena s realnym radom Atira (GH #125 P2)
                        # v3 (D-90): +uchytkovy profil na dvierkach a zasuvkovych celach
                        # v4 (KOV-F1): NOXUN tabulka zavesov + door guardy
@@ -100,6 +100,8 @@ module Noxun
                        # `bands` podla SIRKY korpusu (< 1000 -> 4, inak 6) a
                        # pribudlo pravidlo `prichyt-sokla` (1 ks na zacate
                        # 4 nohy, len pri samostatnej soklovej liste).
+                       # v7 (D-120): +profily vyklopu, sklopu a blendy;
+                       # vlastne pravidlo sa posudzuje aj podla flap_dir.
                        # BEZ tohto bumpu by `merge_seed` migraciu preskocil
                        # (`from_version >= SEED_VERSION`) a existujuca kniznica
                        # by nove seed pravidla nedala ani NOVYM projektom.
@@ -325,6 +327,15 @@ module Noxun
           'output' => 'handle', 'kind' => 'part_flag_length', 'quantity' => 1 },
         { 'rule_id' => 'uchytkovy-profil-zasuvky', 'enabled' => true,
           'applies_to' => { 'role' => 'drawer_front' },
+          'output' => 'handle', 'kind' => 'part_flag_length', 'quantity' => 1 },
+        { 'rule_id' => 'uchytkovy-profil-vyklop', 'enabled' => true,
+          'applies_to' => { 'role' => 'flap', 'flap_dir' => 'up' },
+          'output' => 'handle', 'kind' => 'part_flag_length', 'quantity' => 1 },
+        { 'rule_id' => 'uchytkovy-profil-sklop', 'enabled' => true,
+          'applies_to' => { 'role' => 'flap', 'flap_dir' => 'down' },
+          'output' => 'handle', 'kind' => 'part_flag_length', 'quantity' => 1 },
+        { 'rule_id' => 'uchytkovy-profil-blenda', 'enabled' => true,
+          'applies_to' => { 'role' => 'false_front' },
           'output' => 'handle', 'kind' => 'part_flag_length', 'quantity' => 1 },
         # === KOV-E1b: VYKLOPY AVENTOS (HK top / HL top) ======================
         #
@@ -608,9 +619,19 @@ module Noxun
         end
         SEED_RULES.reject do |r|
           have[r['rule_id']] ||
+            (r['kind'] == KIND_PROFILE && Array(existing).any? do |custom|
+              custom.is_a?(Hash) && custom['enabled'] != false && custom['kind'] == KIND_PROFILE &&
+                profile_rule_covers?(custom, r)
+            end) ||
             (OVERLAP_OUTPUTS.include?(r['output'].to_s) &&
              taken.any? { |k| overlap_conflict?(k, overlap_key(r)) })
         end
+      end
+
+      # Pokrytie je smerove: vlastny down nepokryva up ani wildcard.
+      def profile_rule_covers?(existing, candidate)
+        a = overlap_key(existing); b = overlap_key(candidate)
+        a[1] == b[1] && (a[2].empty? || a[2] == b[2])
       end
 
       # KOV-E1b: IDENTITA prekryvu pravidla — [vystup, rola, smer vyklapania].
@@ -1250,17 +1271,12 @@ module Noxun
       # alebo vyradene overridom, warning NESPUSTA — vypnute kovanie kryje
       # vlastny existujuci ORANGE (semafor, kategoria hardware).
       def profile_rule_warnings(parts, rules)
-        roles = {}
-        Array(rules).each do |r|
-          next unless r.is_a?(Hash) && r['kind'].to_s == KIND_PROFILE
-          role = (r['applies_to'] || {})['role'].to_s
-          roles[role] = true unless role.empty?
-        end
+        profiles = Array(rules).select { |r| r.is_a?(Hash) && r['kind'].to_s == KIND_PROFILE }
         Array(parts).filter_map do |pd|
           next nil unless pd.is_a?(Hash)
           prof = FrontProfiles.of(pd)
           next nil if prof.nil?
-          next nil if roles[pd[:role].to_s]
+          next nil if profiles.any? { |r| part_rule_applies?(r, pd) }
           name = pd[:name].to_s.strip
           who = name.empty? ? 'Dielec' : "Dielec „#{name}“"
           BuildPlan.warning('profile_rule_missing',
@@ -1270,6 +1286,13 @@ module Noxun
                             part_key: PartKeys.for_descriptor(pd),
                             data: { 'profile' => prof, 'role' => pd[:role].to_s })
         end
+      end
+
+      # Evaluate aj chybajuce profilove pravidlo pouzivaju rovnaku autoritu.
+      def part_rule_applies?(rule, pd)
+        at = rule['applies_to'] || {}
+        at['role'].to_s == pd[:role].to_s &&
+          (at['flap_dir'].to_s.empty? || at['flap_dir'].to_s == pd[:flap_dir].to_s)
       end
 
       # Aplikuje jedno pravidlo: korpusova uroven (owner nil) alebo per dielec roly.
@@ -1299,10 +1322,8 @@ module Noxun
           # doteraz. Deskriptor bez smeru (legacy plan, cudzi volajuci) filtru
           # NEVYHOVIE: hadat smer by znamenalo poslat vyklopovy mechanizmus
           # na sklop.
-          want_dir = (rule['applies_to'] || {})['flap_dir'].to_s
           parts.each do |pd|
-            next unless pd[:role].to_s == role
-            next if !want_dir.empty? && pd[:flap_dir].to_s != want_dir
+            next unless part_rule_applies?(rule, pd)
 
             owner = PartKeys.for_descriptor(pd)
             # KOV-C2b R2: celo s receptovym vysuvom legacy `slide` pravidlo
@@ -1801,9 +1822,9 @@ module Noxun
         return {} unless pd.is_a?(Hash)
         prof = FrontProfiles.of(pd)
         return {} if prof.nil?
-        v = pd[:prod].is_a?(Hash) ? pd[:prod][:width] : nil
-        return {} unless v.is_a?(Numeric) && v.to_f.finite? && v.to_f.positive?
-        { LENGTH_PARAM => v.to_f.round(2), 'profile' => prof }
+        v = FrontProfiles.cut_length(pd)
+        return {} unless v
+        { LENGTH_PARAM => v, 'profile' => prof }
       end
 
       # D-90 (audit F5): SERVEROVY format params pre zobrazenie — „rez 597 mm".

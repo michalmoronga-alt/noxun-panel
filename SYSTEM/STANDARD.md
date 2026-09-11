@@ -380,8 +380,15 @@ Prekrytie korpusu (`overlay`) ani odlišná škára medzi krídlami (`gap_betwee
 
 `items[].type` nadobúda `door` · `drawer_front` · `lift` (výklop) · `fall` (sklop) · `blind` (blenda) · `none` (D-18 „Bez čela"); neznámy typ sa sklopí na `door`.
 `lift`/`fall` → rola **`flap`** (kľúč `front:F#/flap`), `blind` → rola **`false_front`** (kľúč `front:F#/blind`); oba majú identickú panelovú matematiku ako zásuvkové čelo
-(1 panel cez celý otvor, `wings_n` 1) a v ABS pravidlách 4 hrany 1,0 mm ako dvierka. Úchytkový `profile` je pre ne (aj pre `none`) normalizovaný na `none` — profilové pravidlo
-D-90 pozná len dvierka a zásuvku (KOV-A1, vedomý limit; profil na pohyblivom čele = KOV-E/F).
+(1 panel cez celý otvor, `wings_n` 1) a v ABS pravidlách 4 hrany 1,0 mm ako dvierka. Od D-120 podporujú profil všetky fyzické typy; iba `none` profil nemá.
+
+**D-120 (v0.10.7, CONFIG_SCHEMA 13):** `items[].profile_edge` = `top|bottom|left|right|free`; chýbajúca hrana platného profilu je legacy top. Prítomná neplatná hodnota
+sa pri zápise odmietne. Dvierka povoľujú top/bottom/free, ostatné panely top/bottom/left/right. `free` znamená oproti pántom podľa `direction_slots`, dvojkrídlo v strede.
+Neurčený smer ostáva rozpracovaný formulár bez zápisu do modelu. Top/bottom skracuje výšku, left/right šírku; bottom posunie panel hore, left doprava o reduction.
+Celkový obrys krídla, medzery, slot zásuvky, osi dekoru a ABS zostávajú. Rez profilu je plná dĺžka osadenej hrany. Deskriptor má fyzické `profile_edge`, cache riadka
+`profile_edges`; BuildPlan ostáva 5. Schéma 13 chráni pred starším pluginom, ktorý by hranu zahodil a zmenil výrobné rozmery. Profil/hrana prežijú šablónu aj bez kovania.
+Čítací preflight má identitu dokumentu/výberu alebo vkladacej relácie a revíziu návrhu. Export/kópia/šablóna čakajú na platný návrh a potvrdený apply; server pri zápise
+počíta nanovo. Seed pravidiel 7 dopĺňa výklop/sklop/blendu iba vedomou akciou v starom projekte; nevzniká nový uložený profilový konflikt ani metrážové nacenenie.
 
 **Štyri voliteľné polia položky (KOV-A1) — trojstav a dormant:** `direction` (smer otvárania = **strana pántov**, `left` = pánty vľavo) · `wing_directions` (`{"p2","p3"}` =
 stredné krídla 3/4-krídlových dvierok; krajné sú ODVODENÉ a neukladajú sa) · `opening_mode` (`classic`|`tipon`) · `drawer` (`{"construction": metal|wood|other,

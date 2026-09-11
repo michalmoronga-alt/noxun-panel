@@ -41,6 +41,7 @@
       var item = { id: r.dataset.frontId || newStableId('F'), type: type, mode: hasH ? 'fixed' : 'auto',
         height: hasH ? (isNaN(hNum) ? null : hNum) : null, locked: hasH, wings: (type === 'door') ? wings : '1',
         profile: r.dataset.frontProfile || 'none' };
+      if (r.dataset.frontProfileEdge !== undefined) item.profile_edge = r.dataset.frontProfileEdge;
       // KOV-A1: smer otvárania, spôsob otvárania a klasifikácia zásuvky NEMAJÚ
       // v A1 ovládač (ten je A2) — musia však prežiť round-trip, inak by prvá
       // editácia iného poľa poslala riadok bez nich a hodnota by ticho zmizla
@@ -106,7 +107,7 @@
   // D-22: okraje cel maju dynamicky limit podla zamku (Fronts::EDGE_LIMIT_UNLOCKED);
   // fr_gap (medzera medzi celami) ostava 0..50 VZDY.
   var EDGE_LIMIT_FIELDS = { fr_gap_top:1, fr_gap_bottom:1, fr_gap_left:1, fr_gap_right:1 };
-  function validateFields(){
+  function validateFields(skipFrontDraft){
     var ok = true;
     var ae = document.activeElement;
     for (var id in LIMITS){
@@ -127,6 +128,7 @@
       if (f.value.trim() === ''){ f.classList.remove('bad'); continue; }
       if (isNaN(evalDim(f.value))){ f.classList.add('bad'); ok = false; } else { f.classList.remove('bad'); }
     }
+    if (!skipFrontDraft && typeof nxFrontDraftReady === 'function' && !nxFrontDraftReady()) ok = false;
     return ok;
   }
 
@@ -142,11 +144,127 @@
     previewTimer = setTimeout(function(){ previewTimer = null; renderPreview(); }, 500);
   }
 
+  // D-120: jeden navrh na jeden dokument/vyber alebo vkladaciu relaciu.
+  // Preflight nema zapis; potvrdenie apply uvolni najviac jednu naviazanu akciu.
+  var frontDraftSession = 1, frontDraftRevision = 0, frontDraft = null;
+  var cabDraftRevision = 0, cabDraftDirty = false, cabApplyRequest = null, cabAfterApply = null;
+  function nxFrontDraftReset(){
+    frontDraftSession++;
+    frontDraft = null; cabDraftDirty = false; cabApplyRequest = null; cabAfterApply = null;
+    cabEditsInFlight = false;
+    cancelCabinetEdits();
+    nxFrontDraftMessage('');
+  }
+  function nxFrontDraftData(){
+    var c = collectConstruction(), d = DEFAULTS[getType()] || {};
+    return { width: c.width === '' ? d.width : c.width,
+      height: c.height === '' ? d.height : c.height,
+      floor_height: getType() === 'upper' ? 0 : (c.floor_height === '' ? d.floor_height : c.floor_height),
+      fronts: collectFronts(), model_guid: nxDocGuid(), cabinet_id: selectedCabId || '',
+      insert_session: frontDraftSession };
+  }
+  function nxFrontDraftSignature(){ return JSON.stringify(nxFrontDraftData()); }
+  function nxFrontDraftMessage(message){
+    var n = el('frontDraftMessage'); if (!n) return;
+    n.textContent = message || ''; n.hidden = !message;
+  }
+  function nxFrontDraftAsk(){
+    if (!el('frontRows') || !nxDocGuid()) return;
+    if (!selectedCabId && typeof getInsertKind === 'function' && getInsertKind() === 'board') return;
+    var data = nxFrontDraftData(), signature = JSON.stringify(data);
+    if (frontDraft && frontDraft.signature === signature) return;
+    data.revision = ++frontDraftRevision;
+    frontDraft = { signature: signature, request: data, pending: true, valid: false, items: null,
+      message: 'Overujem rozmery čiel a hrany profilov…' };
+    frontSlots = null; // sloty predchadzajuceho navrhu sa nikdy nededia
+    nxFrontDraftMessage(frontDraft.message);
+    if (window.sketchup && sketchup.front_preflight) sketchup.front_preflight(JSON.stringify(data));
+    else {
+      frontDraft.pending = false;
+      frontDraft.message = 'Kontrola čiel nie je dostupná. Otvor panel znova.';
+      nxFrontDraftMessage(frontDraft.message);
+    }
+  }
+  function nxFrontDraftReady(){
+    if (!el('frontRows') || !nxDocGuid()) return true;
+    if (!selectedCabId && typeof getInsertKind === 'function' && getInsertKind() === 'board') return true;
+    nxFrontDraftAsk();
+    return !!(frontDraft && !frontDraft.pending && frontDraft.valid);
+  }
+  function nxFrontPreflightResult(result){
+    var f = frontDraft, r = f && f.request;
+    if (!r || !result || result.revision !== r.revision || result.model_guid !== nxDocGuid() ||
+        result.cabinet_id !== (selectedCabId || '') || result.insert_session !== frontDraftSession ||
+        f.signature !== nxFrontDraftSignature()) return;
+    f.pending = false; f.valid = result.valid === true; f.items = result.items || [];
+    f.message = (result.errors || []).map(function(e){ return e.message; }).join(' ');
+    frontSlots = result.slots || {};
+    frontItems = f.items;
+    nxFrontDraftMessage(f.message);
+    updateFrontDirBadges(); updateFrontPlaceholders();
+    refreshFrontCards(); renderPreview();
+    if (f.valid && cabDraftDirty && selectedCabId) nxScheduleCabinetApply();
+  }
+  function nxFrontDraftItems(){
+    return frontDraft && frontDraft.signature === nxFrontDraftSignature() ? frontDraft.items : null;
+  }
+  function nxCabinetDraftHeld(){ return !!(cabDraftDirty || cabApplyRequest); }
+  function nxScheduleCabinetApply(){
+    if (!selectedCabId) return;
+    if (applyTimer) clearTimeout(applyTimer);
+    var cid = selectedCabId, guid = nxDocGuid();
+    applyPendingGuid = guid;
+    applyTimer = setTimeout(function(){ flushCabinetEdits(cid, guid); }, 400);
+  }
+  function nxStampCabinetApply(payload){
+    var token = 'fa-' + frontDraftSession + '-' + (++frontDraftRevision);
+    payload.front_apply_token = token;
+    cabApplyRequest = { token: token, revision: cabDraftRevision, cabinet_id: selectedCabId,
+      model_guid: nxDocGuid() };
+  }
+  function nxFrontApplyResult(result){
+    var r = cabApplyRequest;
+    if (!r || !result || result.front_apply_token !== r.token || result.model_guid !== r.model_guid ||
+        result.cabinet_id !== r.cabinet_id || r.model_guid !== nxDocGuid() || r.cabinet_id !== selectedCabId) return;
+    cabApplyRequest = null; cabEditsInFlight = false;
+    var after = cabAfterApply; cabAfterApply = null;
+    if (!result.ok){
+      cabDraftDirty = true;
+      if (after && after.fail) after.fail();
+      NX.setStatus('Zmena sa neuložila. Skontroluj formulár; ďalšia akcia sa nevykonala.', true);
+      return;
+    }
+    if (r.revision === cabDraftRevision) cabDraftDirty = false;
+    if (cabDraftDirty){
+      if (after && after.fail) after.fail();
+      nxScheduleCabinetApply(); return;
+    }
+    if (after && after.revision === cabDraftRevision && after.session === frontDraftSession) after.run();
+  }
+  // false = akcia bud caka na potvrdenie, alebo bola odmietnuta.
+  function nxCabinetAction(run, fail){
+    if (!selectedCabId) return true;
+    var ae = document.activeElement;
+    if ((ae && isExprInput(ae) && isExprStr(ae.value)) || !validateFields()){
+      NX.setStatus((frontDraft && frontDraft.message) || 'Dokonči alebo oprav rozpísané polia.', true);
+      if (fail) fail(); return false;
+    }
+    if (!cabDraftDirty && !cabApplyRequest && !applyTimer) return true;
+    if (cabAfterApply){ if (fail) fail(); return false; }
+    cabAfterApply = { run: run, fail: fail, revision: cabDraftRevision, session: frontDraftSession };
+    if (!cabApplyRequest) flushCabinetEditsNow();
+    return false;
+  }
+
   // --- AUTO-APPLY (debounce 400 ms) ---
   // V0.4.7e: rozpisany VYRAZ vo fokusovanom poli nikdy nespusti apply ani nahlad
   // (medzistav '650-3' je validny vyraz s inou hodnotou) — aplikuje az Enter/blur
   // commit, ktory pole prepise cistym cislom a onField zavola znova.
   function onField(){
+    cabDraftRevision++;
+    if (selectedCabId) cabDraftDirty = true;
+    if (cabAfterApply){ var cancelled = cabAfterApply; cabAfterApply = null; if (cancelled.fail) cancelled.fail(); }
+    nxFrontDraftAsk();
     invalidateFrontPlaceholders(); // D-23: lokalna zmena -> stare ≈ vysky neplatia (doplni az cerstve echo)
     var ae = document.activeElement;
     if (ae && isExprInput(ae) && isExprStr(ae.value)){
@@ -176,18 +294,7 @@
       });
       if (changedLock) pushInsertLocks();
     }
-    if (!selectedCabId) return;            // nic oznacene -> len nahlad, ziadny rebuild
-    if (applyTimer) clearTimeout(applyTimer);
-    var cabSnapshot = selectedCabId;       // Codex expr audit BLOCKER: identita z casu naplanovania
-    // R-02 (review #264 P1): s korpusom sa zachytava aj DOKUMENT. `nxModelGuid`
-    // je globál, ktorý prepíše najbližší push — bez snapshotu by sa oneskorený
-    // zápis opečiatkoval NOVÝM dokumentom a guard by ho pustil do cudzej zákazky.
-    // Kolo 2: guid zije aj v MODULOVEJ premennej, lebo rozpisane edity vie
-    // odoslat aj OKAMZITY flush (`flushCabinetEditsNow` — Studio, „Vlozit
-    // kopiu", „Dielcov", vlastnik kovania). Ten o lokalnu premennu timera
-    // nezavadi a bez toho by stare hodnoty opeciatkoval NOVYM dokumentom.
-    applyPendingGuid = nxDocGuid();
-    applyTimer = setTimeout(function(){ flushCabinetEdits(cabSnapshot, applyPendingGuid); }, 400);
+    nxScheduleCabinetApply();
   }
 
   // Okamzity/odlozeny apply korpusu. Snapshot cabinet_id ide s payloadom — Ruby
@@ -208,11 +315,13 @@
     }
     if (!selectedCabId){ if (nativeOp) nxNativeFlushDone(nativeOp.token, 'nothing'); return; }
     if (!validateFields()) {
-      NX.setStatus('Skontroluj červené polia (mimo rozsahu).', true);
+      NX.setStatus((frontDraft && frontDraft.message) || 'Skontroluj červené polia (mimo rozsahu).', true);
       if (nativeOp) nxNativeFlushDone(nativeOp.token, 'invalid');
       return;
     }
+    if (cabApplyRequest){ if (nativeOp) nxNativeFlushDone(nativeOp.token, 'invalid'); return; }
     var payload = collectAll();
+    nxStampCabinetApply(payload);
     payload.cabinet_id = cabSnapshot || selectedCabId;
     if (nativeOp) payload.native_op = nativeOp;
     cabEditsInFlight = true; // D-07 Codex B2: echo tohto apply nesmie prepisat novsi vstup
@@ -261,11 +370,12 @@
         return;
       }
       if (typeof validateFields === 'function' && !validateFields()){
-        NX.setStatus('Skontroluj červené polia — kópia by vznikla zo starých hodnôt.', true);
+        NX.setStatus((frontDraft && frontDraft.message) || 'Skontroluj červené polia — kópia by vznikla zo starých hodnôt.', true);
         nxNativeFlushDone(token, 'invalid');
         return;
       }
-      if (!applyTimer){ nxNativeFlushDone(token, 'nothing'); return; }
+      if (cabApplyRequest){ nxNativeFlushDone(token, 'invalid'); return; }
+      if (!applyTimer && !cabDraftDirty){ nxNativeFlushDone(token, 'nothing'); return; }
       var g = applyPendingGuid;                       // R-02: dokument z casu naplanovania
       cancelCabinetEdits();
       flushCabinetEdits(selectedCabId, g, { kind: (op && op.kind) || 'copy',
@@ -696,6 +806,7 @@
     return (f && typeof f === 'object' && f.items) ? f : null;
   }
   function materializeInsertCard(){
+    nxFrontDraftReset();
     var st = NXInsert.state;
     syncInsertTypeButtons();
     renderTemplateTiles();  // prestavba len pri zmene typu; inak sa prepnu triedy
@@ -936,7 +1047,9 @@
     }
     // Codex GH #46 P2: rozpisane edity (400 ms debounce) najprv flushnut — callbacky
     // sa spracuju v poradi, takze apply_all prebehne PRED save a config je cerstvy.
-    if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+    if (typeof nxCabinetAction === 'function'){
+      if (!nxCabinetAction(function(){ saveTemplateAs(); })) return;
+    } else if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
     if (window.sketchup && sketchup.save_template_as){
       // identita z casu OTVORENIA modalu — preklik na inu skrinku ANI iny
       // dokument server neprepusti; UI-B3: typ urcuje, pod ktorym typom sa
@@ -1117,6 +1230,7 @@
     // riadku (cyklila by sa nepouzitelne pri viacerych profiloch), ale skupina
     // „Úchytky"; ikona ostala INDIKATOR.
     row.dataset.frontProfile = item.profile || 'none';
+    if (Object.prototype.hasOwnProperty.call(item, 'profile_edge')) row.dataset.frontProfileEdge = String(item.profile_edge);
     // KOV-A2a: TYP riadku zije v datasete rovnako ako profil — rozbalovacka
     // zanikla, meni ho dlazdica typegridu v karte cela.
     row.dataset.frontType = item.type || 'door';
@@ -1388,7 +1502,7 @@
     // (`data-ax` = os, `data-axc` = druh ovladaca) — bez nej by fokus po
     // KAZDOM prekresleni karty spadol na dokument prave pri klavesovej praci
     // so zamkom, teda tam, kde je najdrahsi.
-    return frontCardFocusKey({ t: d.t, k: d.k, v: d.v, w: d.w, ax: d.ax, axc: d.axc });
+    return frontCardFocusKey({ t: d.t, k: d.k, v: d.v, w: d.w, ax: d.ax, axc: d.axc, pc: d.pc });
   }
   // Najde v CERSTVO vykreslenej karte tlacidlo s rovnakou identitou a vrati mu
   // fokus. `preventScroll` je zamer: karta sa nema pod rukou posunut; staršie
@@ -1419,6 +1533,7 @@
            '<span class="tl">' + esc(frontTypeTile(t.type)) + '</span></button>';
     });
     h += '</div>';
+    h += frontProfileCardHtml(row);
     m.rows.forEach(function(r){
       if (r.kind === 'info'){
         // KOV-C2c: ikona LEN ked ju view-model vyslovne ziada (cerveny dovod,
@@ -1531,7 +1646,8 @@
       var num = r.querySelector('.fnum');
       out.push({ row: r, label: num ? num.textContent : '',
                  type: r.dataset.frontType || 'door',
-                 profile: r.dataset.frontProfile || 'none' });
+                 profile: r.dataset.frontProfile || 'none',
+                 profile_edge: r.dataset.frontProfileEdge === undefined ? 'top' : r.dataset.frontProfileEdge });
     }
     return out;
   }
@@ -1560,6 +1676,7 @@
     // identitu skrinky — gate na vybere by sekciu drzal navzdy neaktivnu.
     var empty = (common === '');
     sel.disabled = empty;
+    refreshFrontProfileEdgeUI(items);
     var st = el('frontProfileState');
     if (st) st.textContent = empty ? 'V tomto rozsahu nie je žiadne čelo.' : frontProfileStateText(items);
   }
@@ -1572,14 +1689,72 @@
     var changed = false;
     frontProfileScopeItems(frontRowsState(), frontProfileScopeNow()).forEach(function(it){
       if ((it.profile || 'none') === id) return;
-      it.row.dataset.frontProfile = id;
+      frontRowProfileSet(it.row, id);
       syncFrontProfileBtn(it.row);
       changed = true;
     });
     refreshFrontProfileUI();
+    refreshFrontCards();
     if (!changed) return;   // klik na uz nasadenu hodnotu = ziadny prazdny krok Spat
     renderPreview();        // pasmo profilu nad celom sa meni hned
     onField();
+  }
+  // D-120: karta aj hromadne ovladanie zapisuju tie iste dve item polia.
+  function frontEdgeOptionsHtml(edges, value){
+    var h = '';
+    if (edges.indexOf(value) < 0) h += '<option value="" selected disabled>' +
+      (value === null ? 'Rôzne' : 'Vyber hranu') + '</option>';
+    edges.forEach(function(edge){ h += '<option value="' + edge + '"' +
+      (edge === value ? ' selected' : '') + '>' + esc(FRONT_EDGE_LABELS[edge]) + '</option>'; });
+    return h;
+  }
+  function frontRowProfileSet(row, id){
+    if ((row.dataset.frontProfile || 'none') === 'none' && id !== 'none' &&
+        frontProfileEdges(row.dataset.frontType).indexOf(row.dataset.frontProfileEdge) < 0)
+      row.dataset.frontProfileEdge = 'top';
+    row.dataset.frontProfile = id;
+  }
+  function frontProfileCardHtml(row){
+    var type = row.dataset.frontType;
+    if (frontProfileless(type) || !FRONT_PROFILES.length) return '';
+    var id = row.dataset.frontProfile || 'none';
+    var edge = row.dataset.frontProfileEdge === undefined ? 'top' : row.dataset.frontProfileEdge;
+    var key = 'fp-' + row.dataset.frontId;
+    var h = '<div class="prow fprofile-row"><label for="' + esc(key) + '">Profil</label>' +
+      '<select id="' + esc(key) + '" data-pc="profile" onchange="onFrontCardProfile(this)">';
+    frontProfileOptionList().forEach(function(o){ h += '<option value="' + esc(o.id) + '"' +
+      (id === o.id ? ' selected' : '') + '>' + esc(o.name) + '</option>'; });
+    h += '</select></div><div class="prow fprofile-row"><label for="' + esc(key + '-edge') + '">Hrana</label>' +
+      '<select id="' + esc(key + '-edge') + '" data-pc="edge" onchange="onFrontCardEdge(this)">' +
+      frontEdgeOptionsHtml(frontProfileEdges(type), edge) + '</select></div>';
+    return h;
+  }
+  function onFrontCardProfile(sel){
+    var row = sel.closest('.frow'); if (!row) return;
+    frontRowProfileSet(row, sel.value);
+    syncFrontProfileBtn(row); refreshFrontProfileUI(); refreshFrontCards(); onField();
+  }
+  function onFrontCardEdge(sel){
+    var row = sel.closest('.frow'); if (!row || !sel.value) return;
+    row.dataset.frontProfileEdge = sel.value;
+    syncFrontProfileBtn(row); refreshFrontProfileUI(); onField();
+  }
+  function refreshFrontProfileEdgeUI(items){
+    var sel = el('frontProfileEdge'); if (!sel) return;
+    var scope = frontProfileScopeNow(), edges = frontProfileScopeEdges(items, scope);
+    sel.innerHTML = frontEdgeOptionsHtml(edges, frontProfileCommon(items, scope, 'profile_edge'));
+    sel.disabled = !edges.length;
+    var hint = el('frontProfileEdgeHint');
+    if (hint) hint.textContent = edges.length === 2 ? 'Bočné hrany nastav v karte čela alebo zúž rozsah.' : '';
+  }
+  function onFrontProfileEdgePick(){
+    var sel = el('frontProfileEdge'); if (!sel || !sel.value) return;
+    var items = frontRowsState(), scope = frontProfileScopeNow();
+    if (frontProfileScopeEdges(items, scope).indexOf(sel.value) < 0) return;
+    frontProfileScopeItems(items, scope).forEach(function(it){
+      it.row.dataset.frontProfileEdge = sel.value; syncFrontProfileBtn(it.row);
+    });
+    refreshFrontProfileUI(); refreshFrontCards(); onField();
   }
   // Rozsah je FILTER, nie akcia — sam nic nemeni, len prestavi ponuku a vetu.
   function onFrontProfileScope(){ refreshFrontProfileUI(); }

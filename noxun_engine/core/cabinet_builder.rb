@@ -160,7 +160,12 @@ module Noxun
       #       tieto hodnoty nepozna a pri prestavbe by obe nahradil defaultom,
       #       teda zmenil obrys aj vyrobne rozmery ciel. Dopredny guard
       #       prestavby/sablon/kopie a exportna brana chrania novy config.
-      CONFIG_SCHEMA = 12
+      #  13 = D-120 — HRANA UCHYTKOVEHO PROFILU. `profile_edge` urcuje os
+      #       skratenia panela; `free` na dvierkach sa riesi oproti pantom.
+      #       Starsi plugin by hranu zahodil a vyrobil horne profily s INYMI
+      #       rozmermi dielcov aj rezov. Dopredne brany prestavby, sablon,
+      #       kopie a exportu preto musia odmietnut novy config.
+      CONFIG_SCHEMA = 13
 
       # KOV-C2b: schema, OD KTOREJ stavba emituje dielce zasuviek z receptu.
       # VLASTNA konstanta (nie `CONFIG_SCHEMA`), lebo pri bumpe na 6 (KOV-D1a)
@@ -2021,9 +2026,9 @@ module Noxun
           pdef = profile_definition(model, pl)
           return nil unless pdef
 
-          inst = parent_ents.add_instance(
-            pdef, Geom::Transformation.translation(Units.point(pl[:x], 0.0, pl[:z_base]))
-          )
+          tr = Geom::Transformation.translation(Units.point(*pl[:anchor])) *
+               Geom::Transformation.rotation(ORIGIN, Y_AXIS, pl[:angle])
+          inst = parent_ents.add_instance(pdef, tr)
           inst.material = ensure_material(model, PROFILE_MATERIAL, PROFILE_RGB)
           # D-116 (Michal 3.9.): tag VLASTNIKA, nie tag kovania. Uchytkovy profil
           # je zrasteny s celom — pri skryti tagu „Čelá" (pohlad dovnutra
@@ -2059,17 +2064,15 @@ module Noxun
         def profile_placement(pd)
           pid = FrontProfiles.of(pd)
           return nil unless pid
-          band = pd[:profile_band]
-          geo = FrontProfiles.geometry(pid)
-          return nil unless band.is_a?(Hash) && geo
+          pl = FrontProfiles.placement(pd)
+          return nil unless pl
 
-          length = quantize_profile_length(pd[:box][0])
+          length = quantize_profile_length(pl[:length])
           return nil unless length > BuildPlan::MIN_DIM
 
-          z_top = band[:z].to_f + band[:h].to_f
-          { profile: pid, geometry: geo, length: length, x: pd[:origin][0].to_f,
-            z_top: z_top, z_base: z_top - geo[:height], depth: geo[:depth],
-            def_name: profile_def_name(pid, length) }
+          pl.merge(profile: pid, length: length, x: pl[:anchor][0],
+                   z_top: pl[:z] + pl[:h], z_base: pl[:anchor][2], depth: pl[:geometry][:depth],
+                   def_name: profile_def_name(pid, length))
         end
 
         # Meno definicie = (profil, dlzka). Dlzka je sucastou mena, takze rovnako

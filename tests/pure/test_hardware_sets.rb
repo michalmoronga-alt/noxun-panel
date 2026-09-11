@@ -635,6 +635,7 @@ NxTest.test('hw pravidla D1b: merge_project_seed! doplni nove + obnovi nezmenene
   # KOV-E1b: seed v5 doplna aj vyklopy a zavesy sklopu
   # KOV-G1b: seed v6 doplna aj prichyt sokla
   NxTest.assert_equal(%w[podperky-policove prichyt-sokla uchytkovy-profil
+                         uchytkovy-profil-blenda uchytkovy-profil-sklop uchytkovy-profil-vyklop
                          uchytkovy-profil-zasuvky vyklopy-aventos
                          zavesenie-hornej-skrinky zavesy-podla-vysky zavesy-sklop],
                       added.sort, 'chybajuce seed pravidla doplnene')

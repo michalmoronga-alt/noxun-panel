@@ -363,7 +363,7 @@ end
 
 NxTest.test('KOV-G1b (5): `SEED_VERSION` je 6 a seed nesie obe pravidlá v novom tvare') do
   c = NxKovG1b
-  NxTest.assert_equal(6, c::HR::SEED_VERSION, 'bez bumpu by `merge_seed` migráciu preskočil')
+  NxTest.assert(c::HR::SEED_VERSION >= 6, 'KOV-G1b zaviedol seed 6; D-120 pridava 7')
   leg = c.rule_of(c::LEG_RULE)
   NxTest.assert_equal('bands', leg['kind'])
   NxTest.assert_equal('width', leg['input'])
@@ -390,7 +390,7 @@ NxTest.test('KOV-G1b (5): knižnica v5 dostane NOVÝ tvar nôh, upravené pravid
   leg = c.rule_of(c::LEG_RULE, merged)
   NxTest.assert_equal('bands', leg['kind'], 'NEDOTKNUTÝ starý tvar sa obnoví na nový')
   NxTest.assert(merged.any? { |r| r['rule_id'] == c::CLIP_RULE }, 'a príchyt sa doplní')
-  NxTest.assert_equal([merged, false], c::HR.merge_seed(merged, 6), 'z v6 sa už nič nemení')
+  NxTest.assert_equal([merged, false], c::HR.merge_seed(merged, c::HR::SEED_VERSION), 'z aktualnej verzie sa už nič nemení')
 end
 
 NxTest.test('KOV-G1b (5): používateľom UPRAVENÉ pravidlo nôh sa NEPREPÍŠE') do
