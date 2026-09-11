@@ -21,6 +21,7 @@ Pred prvou takou zákazkou aktualizovať **obe PC** (Štúdio → O plugine → 
 **Testy uzáveru Čiel:** **3830 headless · 113 JS sád**, skutočný Inspector pri 470 px: šesť typov, jedna karta, klávesnica, pevná výška/AUTO, hrany a potvrdenie návrhu.
 Geometrický dôkaz B2: **in-SketchUp 2297 PASS / 0 FAIL** (osadenia, výroba/rezy, šablóny, uloženie/návrat, Scale/Späť a kópia); C geometriu nemení. Ručné Redo zostáva.
 **Michal 11.9. potvrdil úspešný test produktových odkazov aj potvrdzovania cien** (CENY-KOV-A/B, PR #345/#346).
+**Michal 11.9. potvrdil aj používateľskú kontrolu hotového balíka Čiel v0.11.0: funguje, bez nájdených chýb.** Samostatné ručné Redo nebolo výslovne potvrdené.
 
 ## Robí sa
 
@@ -31,7 +32,7 @@ Celé zadanie vrátane prenosových ciest a overenia je v [archiv/ROADMAP_hotove
 
 ## Ďalší krok
 
-Michalov smoke hotových Čiel a ručné Redo v testovacom projekte. Ďalší blok vyberá Michal podľa [PLAN.md](PLAN.md); toto schválenie nepokrýva iný blok.
+Používateľský smoke hotových Čiel je potvrdený; na samostatné overenie zostáva ručné Redo v testovacom projekte. Ďalší blok vyberá Michal podľa [PLAN.md](PLAN.md); toto schválenie nepokrýva iný blok.
 
 ## Posledné uzávery
 

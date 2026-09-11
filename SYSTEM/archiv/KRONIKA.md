@@ -17,6 +17,10 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **ČELÁ — POTVRDENÝ POUŽÍVATEĽSKÝ SMOKE (11.9.2026, v0.11.0).**
+  Michal po kontrole hotového balíka potvrdil, že funguje a nenašiel chyby. Doterajší ďalší krok „Michalov smoke hotových Čiel a ručné Redo v testovacom projekte“ je tým splnený v časti používateľského smoku.
+  Samostatné ručné Redo nebolo výslovne potvrdené a zostáva otvorené. Dokumentácia uzáveru D-114/D-119/D-120 bola skontrolovaná; STAV zaznamenáva úspešnú kontrolu. Ďalší blok vyberá Michal.
+
 - **ČELÁ-C A UZÁVER BALÍKA ČIEL (11.9.2026, PR #351, v0.11.0).**
   Šesť ikon priamo pridá typ čela v jednom existujúcom rade. Zachované AUTO/pevné výšky, F identita, prázdna nika a jedna rozbalená karta.
   Súhrn Úchytiek rozlišuje profil aj hranu; indikátor povie skrátený rozmer a odkáže na ovládače. Pomocné texty skrátené a zbavené prekonaných prísľubov.
