@@ -1028,6 +1028,7 @@ nevyriešený free nemá vymyslený pás. Pri zmene typu na neaplikovateľnú hr
 úpravu cez Štúdio, šablónu a native flush. Zlyhaný apply nepustí pokračovanie; novší edit zneplatní starú akciu. Echo tej istej skrinky pri rozpísanom/in-flight stave
 neprepíše konštrukciu ani riadky; uloží sa pri čakajúcom apply. Pri odmietnutí sa toto echo obnoví, iba ak používateľ medzitým neurobil novší edit.
 Zmena dokumentu/výberu/vkladacej relácie návrh zahodí. Server pri zápise znovu počíta a v ensure vracia úspech/neúspech apply.
+Reset pred zahodením naviazanej akcie zachytí jej odmietací callback a po vyčistení stavu ho raz zavolá; export ani aplikácia šablóny nezostanú bez odpovede.
 Klávesnicový fokus profil/hrana používa stabilný `data-pc` kľúč pri prekreslení karty.
 
 Odložené uloženie šablóny patrí konkrétnemu otvoreniu modalu. Zatvorenie, nové otvorenie aj zmena názvu, typu alebo voľby kovania ho zrušia;

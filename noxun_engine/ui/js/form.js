@@ -149,11 +149,13 @@
   var frontDraftSession = 1, frontDraftRevision = 0, frontDraft = null;
   var cabDraftRevision = 0, cabDraftDirty = false, cabApplyRequest = null, cabAfterApply = null;
   function nxFrontDraftReset(){
+    var cancelled = cabAfterApply;
     frontDraftSession++;
     frontDraft = null; cabDraftDirty = false; cabApplyRequest = null; cabAfterApply = null;
     cabEditsInFlight = false;
     cancelCabinetEdits();
     nxFrontDraftMessage('');
+    if (cancelled && cancelled.fail) cancelled.fail();
   }
   function nxFrontDraftData(){
     var c = collectConstruction(), d = DEFAULTS[getType()] || {};

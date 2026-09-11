@@ -1,6 +1,28 @@
 # frozen_string_literal: true
 require_relative '../helper' unless defined?(NxTest)
+
+NxTest.test('CELA-B: zmena lift-fall odstrani iba neaplikovatelny seed zasah profilu') do
+  cb = Noxun::Engine::CabinetBuilder
+  [['lift', 'fall', 'uchytkovy-profil-vyklop'], ['fall', 'lift', 'uchytkovy-profil-sklop']].each do |from, to, rid|
+    [{ 'disabled' => true }, { 'quantity' => 4 }].each do |edit|
+      original = { 'rule_id' => rid, 'generic_type' => 'handle', 'owner_part_key' => 'front:F1/flap' }.merge(edit)
+      custom = original.merge('rule_id' => 'moj-profil')
+      hinge = original.merge('rule_id' => 'zavesy-sklop', 'generic_type' => 'hinge')
+      params = { 'hardware_overrides' => [original, custom, hinge],
+        'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => from, 'profile' => 'ukw7', 'profile_edge' => 'left' }] } }
+      same = cb.normalize(params)
+      NxTest.assert_equal([original, custom, hinge], same[:hardware_overrides])
+      params['fronts']['items'][0]['type'] = to
+      changed = cb.normalize(params)
+      NxTest.assert_equal([custom, hinge], changed[:hardware_overrides])
+      params['hardware_overrides'] = changed[:hardware_overrides]
+      params['fronts']['items'][0]['type'] = from
+      NxTest.assert_equal([custom, hinge], cb.normalize(params)[:hardware_overrides])
+    end
+  end
+end
 if NxTest.headless?
+  require File.join(NxTest::ROOT, 'noxun_engine/ui/production_core')
   require File.join(NxTest::ROOT, 'noxun_engine/ui/panel/actions_cabinet')
   require File.join(NxTest::ROOT, 'noxun_engine/ui/panel/payloads')
   require File.join(NxTest::ROOT, 'noxun_engine/ui/templates_dialog')

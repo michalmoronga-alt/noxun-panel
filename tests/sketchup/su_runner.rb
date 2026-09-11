@@ -396,6 +396,31 @@ module NoxunSuRunner
     model.set_attribute(e::Store::DICT, hr::MODEL_KEY, original_rules)
     model.commit_operation
     cleanup(model)
+    [['lift', 'fall', 'uchytkovy-profil-vyklop'], ['fall', 'lift', 'uchytkovy-profil-sklop']].each do |from, to, rid|
+      p = cela_b_params
+      p['fronts']['items'] = [{ 'id' => 'F1', 'type' => from, 'mode' => 'auto', 'profile' => 'ukw7', 'profile_edge' => 'left' }]
+      p['hardware_overrides'] = [{ 'owner_part_key' => 'front:F1/flap', 'generic_type' => 'handle', 'rule_id' => rid, 'disabled' => true }]
+      flap = e::CabinetBuilder.build(model, p)
+      initial = e::Store.config(flap)
+      ok("CELA-B #{from}: rucne vypnuty profil kovania", initial['hardware_overrides'].length == 1 &&
+         Array(initial['hardware']).none? { |h| h['generic_type'] == 'handle' })
+      change = e::CabinetBuilder.config_to_params(JSON.parse(JSON.generate(initial)))
+      change['fronts']['items'][0]['type'] = to
+      e::CabinetBuilder.rebuild(model, flap, change)
+      now = e::Store.config(flap)
+      ok("CELA-B #{from}->#{to}: mrtvy zasah je prec a novy profil je v nakupe", now['hardware_overrides'].empty? &&
+         Array(now['hardware']).count { |h| h['generic_type'] == 'handle' } == 1)
+      Sketchup.undo
+      ok("CELA-B #{from}: jedno Spat vrati typ aj rucny zasah", e::Store.config(flap) == initial)
+      e::CabinetBuilder.rebuild(model, flap, change)
+      back = e::CabinetBuilder.config_to_params(e::Store.config(flap))
+      back['fronts']['items'][0]['type'] = from
+      e::CabinetBuilder.rebuild(model, flap, back)
+      final = e::Store.config(flap)
+      ok("CELA-B navrat na #{from}: stare vypnutie neozije", final['hardware_overrides'].empty? &&
+         Array(final['hardware']).count { |h| h['generic_type'] == 'handle' } == 1)
+      cleanup(model)
+    end
   rescue StandardError => ex
     log_line("FAIL: run_cela_b: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
     cleanup(model)

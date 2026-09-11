@@ -121,6 +121,10 @@ for (const [relay, method] of [['studioRelayExport','studio_do_export'],['studio
   assert.equal(exports.length,1);assert.equal(exports[0].flush_blocked,false);
   c.construction.width=700;c.onField();t.answer(t.sent[1]);c.NX[relay]({gen:9});
   t.ack(t.applied[1],false);assert.equal(exports[1].flush_blocked,true,relay+' odmietne zlyhany apply');
+  c.construction.width=800;c.onField();t.answer(t.sent[2]);c.NX[relay]({gen:10});
+  const pending=t.applied[2];c.guid='DOC-B';c.selectedCabId='CAB-B';c.nxFrontDraftReset();
+  assert.equal(exports[2].flush_blocked,true,relay+' odpovie aj pri zmene identity');
+  t.ack(pending);c.nxFrontDraftReset();assert.equal(exports.length,3,relay+' zrusenie odpovie len raz');
 }
 
 // Skutocny relay aplikacie sablony: invalid/pending stoji, po apply ide raz.
@@ -133,6 +137,9 @@ for (const [relay, method] of [['studioRelayExport','studio_do_export'],['studio
   t.answer(t.sent[0]);c.NX.studioRelayTemplate(p);assert.equal(applied.length,0);
   t.ack(t.applied[0]);assert.deepEqual(applied,[p]);
   c.guid='DOC-B';c.NX.studioRelayTemplate(p);assert.equal(applied[1].flush_blocked,true);
+  c.guid='DOC-A';c.construction.width=800;c.onField();t.answer(t.sent[1]);c.NX.studioRelayTemplate(p);
+  const pending=t.applied[1];c.selectedCabId='CAB-B';c.nxFrontDraftReset();
+  assert.equal(applied[2].flush_blocked,true);t.ack(pending);assert.equal(applied.length,3);
 }
 
 // UI projekcia pouziva fyzicke hrany; neznamy free bez odpovede nic nehada.

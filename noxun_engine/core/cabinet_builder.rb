@@ -2986,16 +2986,20 @@ module Noxun
         # Cielime VYHRADNE na rule_id profilovych SEED pravidiel — vlastne
         # premenovane pravidlo si pouzivatel spravuje sam.
         def prune_profile_overrides(overrides, fronts_cfg)
-          ids = defined?(HardwareRules) ? HardwareRules.profile_rule_ids : []
-          return overrides if ids.empty?
-          no_profile = (fronts_cfg['items'] || [])
-                       .reject { |it| FrontProfiles.of(it) }
-                       .map { |it| it['id'].to_s }
-          return overrides if no_profile.empty?
+          rules = defined?(HardwareRules) ? HardwareRules::SEED_RULES.select { |r| r['kind'] == HardwareRules::KIND_PROFILE } : []
+          return overrides if rules.empty?
+          fronts = (fronts_cfg['items'] || []).to_h { |it| [it['id'].to_s, it] }
           overrides.reject do |ov|
-            next false unless ids.include?(ov['rule_id'].to_s)
+            rule = rules.find { |r| r['rule_id'] == ov['rule_id'].to_s }
+            next false unless rule
             m = ov['owner_part_key'].to_s.match(%r{\Afront:([^/]+)/})
-            m && no_profile.include?(m[1])
+            item = m && fronts[m[1]]
+            next false unless item
+            # D-120: lift/fall maju rovnaky owner /flap, ale ine profilove
+            # pravidlo. Neplatny smerovy zasah nesmie po navrate typu ozit.
+            direction = rule.dig('applies_to', 'flap_dir').to_s
+            !FrontProfiles.of(item) ||
+              (!direction.empty? && { 'up' => 'lift', 'down' => 'fall' }[direction] != item['type'])
           end
         end
 

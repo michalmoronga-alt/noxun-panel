@@ -665,6 +665,8 @@ configov). Číta ho fronts (matematika panelu), pravidlá kovania (dĺžka rezu
 **D-120 (v0.10.7):** `fit_panel!` skráti panel podľa fyzickej hrany, `panel_geometry` rekonštruuje jeho celkový obrys a pásmo, `cut_length` vráti rozmer pozdĺž hrany.
 `placement` poskytne kotvu a otočenie okolo Y pre top/bottom/left/right; nos prierezu zostáva v zápornom Y. Builder osádza rovnakú kanonickú definíciu, bez odhadu z bbox.
 Deskriptor má voliteľné `profile_edge`; legacy top `profile_band {z,h}` zostáva. Neznáma prítomná hrana sa neodhaduje. Proxy má tag Čelá a nemení výrobnú triedu ani cenu.
+`CabinetBuilder.prune_profile_overrides` čistí seed zásahy pri vypnutí profilu aj pri zmene lift/fall: oba typy majú owner `/flap`, ale smerové pravidlá sú rozdielne.
+Zásah neaplikovateľného smeru sa neuchová na neskoršie oživenie; vlastné premenované pravidlá ani ostatné kovanie sa tým nemenia. Zápis je súčasťou prestavby a jej Undo.
 
 ## Modules (`noxun_engine/modules/`)
 
