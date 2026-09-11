@@ -387,7 +387,7 @@ sa pri zápise odmietne. Dvierka povoľujú top/bottom/free, ostatné panely top
 Neurčený smer ostáva rozpracovaný formulár bez zápisu do modelu. Top/bottom skracuje výšku, left/right šírku; bottom posunie panel hore, left doprava o reduction.
 Celkový obrys krídla, medzery, slot zásuvky, osi dekoru a ABS zostávajú. Rez profilu je plná dĺžka osadenej hrany. Deskriptor má fyzické `profile_edge`, cache riadka
 `profile_edges`; BuildPlan ostáva 5. Schéma 13 chráni pred starším pluginom, ktorý by hranu zahodil a zmenil výrobné rozmery. Profil/hrana prežijú šablónu aj bez kovania.
-Ovládanie a potvrdenie návrhu (nadväzujúca ČELÁ-B2): čítací preflight má identitu dokumentu/výberu alebo vkladacej relácie a revíziu návrhu. Export/kópia/šablóna čakajú na platný návrh a potvrdený apply; server pri zápise
+Ovládanie a potvrdenie návrhu (ČELÁ-B2, v0.10.8): čítací preflight má identitu dokumentu/výberu alebo vkladacej relácie a revíziu návrhu. Export/kópia/šablóna čakajú na platný návrh a potvrdený apply; server pri zápise
 počíta nanovo. Seed pravidiel 7 dopĺňa výklop/sklop/blendu iba vedomou akciou v starom projekte; nevzniká nový uložený profilový konflikt ani metrážové nacenenie.
 
 **Štyri voliteľné polia položky (KOV-A1) — trojstav a dormant:** `direction` (smer otvárania = **strana pántov**, `left` = pánty vľavo) · `wing_directions` (`{"p2","p3"}` =

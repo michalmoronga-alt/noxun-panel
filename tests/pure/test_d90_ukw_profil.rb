@@ -568,7 +568,7 @@ NxTest.test('D-90 UI: panel posiela register profilov a riadok cela ma volbu') d
   # v skupine „Úchytky" pre zvoleny ROZSAH ciel. Ikona ostala INDIKATOR.
   NxTest.assert(form.include?('function onFrontProfilePick'),
                 'volba profilu zije v sekcii Uchytky (D-96)')
-  NxTest.assert(form.include?("it.row.dataset.frontProfile = id"),
+  NxTest.assert(form.include?("frontRowProfileSet(it.row, id)"),
                 'volba zapisuje do TYCH ISTYCH dat riadku (dataset) — ziadne nove pole')
   NxTest.assert(form.include?("row.dataset.frontProfile = 'none'"),
                 "prepnutie na „Bez cela\" zhodi profil (zrkadlo Ruby normalize)")

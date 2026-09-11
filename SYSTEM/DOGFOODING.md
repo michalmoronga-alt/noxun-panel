@@ -27,14 +27,7 @@ v [PLAN.md](PLAN.md), odrážka „BALÍK ČIEL". Čo z bloku KOVANIE ostalo mim
   čela" rozhodnúť), klik = nový riadok daného typu (dvierka ďalej cez výrobcu smeru „neurčené", pravidlo (a) karty). Rad zaberie **ten istý jeden riadok** ako dnešné dve tlačidlá.
   Michal zároveň: „celkovo UI čiel bude treba po tomto zásahu upratať — necháme na koniec, opäť spravíme UI/UX balík". *Stav: OTVORENÉ — od uzáveru bloku KOVANIE (10.9.2026) je to **UI/UX balík Čiel v bloku 4 · V1 DOTIAHNUTIE** ([PLAN.md](PLAN.md), odrážka „BALÍK ČIEL");
   celý obsah karty čela je už známy (typy z KOV-A, zámky osí a systém zásuvky z KOV-C/D, závesy z KOV-F, výklopy z KOV-E), takže balík sa môže robiť.*
-  **Spresnenie 11.9.:** schválený jeden rad šiestich typov vrátane „Bez čela“; profil a hrana v karte konkrétneho čela + hromadná skupina Úchytky. Packages ČELÁ-A/B/C sú v PLAN.md; mockup aj implementácia schválené, prebieha A.
-- **D-120 · Úchytkový profil (UKW) aj na dolnej a bočných hranách** (Lucia 6.9., prvý test) — profil sa dnes osadzuje **len na hornú hranu** čela; treba voľbu hrany:
-  horná (dnes) · dolná · ľavá / pravá bočná (vysoké dvere, skrine). Registry `front_profiles.rb` hranu dnes **nepozná** — záznam nesie len `reduction`, popisky, obrys, hĺbku
-  a výšku, `geometry`/`options` hranu nevracajú a modul výslovne predpokladá hornú hranu (komentár D-90 sľubuje len, že config to unesie bez migrácie). **Rozsah D-120 =**
-  config čela (hrana) **+ registry/API** (hrana ako parameter profilu) **+ všetci konzumenti**: matematika panelu vo `Fronts` (skrátenie v inej osi), pravidlo kovania (dĺžka
-  rezu), vizuál v modeli (renderer v `CabinetBuilder`), náhľad a UI panela; smer dekoru čela sa neotáča.
-  **Rozhodnuté 11.9.:** aj výklop/sklop/blenda; zvislý profil dvierok vždy na voľnej hrane oproti pántom — dvojkrídlo v strede, pri 3/4 krídlach podľa smeru každého krídla.
-  Neurčený smer treba najprv vyriešiť; ABS pod profilom zostáva. *Stav: OTVORENÉ — package ČELÁ-B v balíku Čiel (D-114), do KOV-F NEPATRÍ.*
+  **Spresnenie 11.9.:** schválený jeden rad šiestich typov vrátane „Bez čela“; profil a hrana v karte konkrétneho čela + hromadná skupina Úchytky. Packages ČELÁ-A/B/C sú v PLAN.md; mockup aj implementácia schválené; A/B hotové, zostáva C.
 
 ## KONTROLA + VÝROBA
 

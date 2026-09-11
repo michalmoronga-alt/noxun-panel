@@ -695,7 +695,7 @@ vyradením degenerátov v Construction. Skracuje sa iba panel, výšky riadkov a
 Oba typy majú **identickú panelovú matematiku ako zásuvkové čelo** (1 panel cez celý otvor, `wings_n` 1, `AXES_FRONT`). **`Fronts.class_owner_part(type)`** (KOV-E1a,
 Codex #332 kolo 3 P2) zhŕňa tú istú tabuľku pre owner triedne kľúče kovania — `drawer_front` → `panel`, `lift`/`fall` → `flap`, ostatné (dvierka, blenda, `none`,
 neznámy typ) → nič; číta ju `CabinetBuilder.norm_hardware_sets`, aby po zmene typu čela neostal v configu mŕtvy výber setu. **D-120 ruší limit A1:** profil podporujú
-aj `lift`/`fall`/`blind`; `PROFILELESS_TYPES` obsahuje iba `none`. Ovládanie profil/hrana v jednej karte čela nadviaže dávkou ČELÁ-B2.
+aj `lift`/`fall`/`blind`; `PROFILELESS_TYPES` obsahuje iba `none`. Ovládanie profil/hrana je od ČELÁ-B2 (v0.10.8) v jednej karte čela aj v hromadnej skupine Úchytky.
 
 **KOV-A1 — ŠTYRI NOVÉ POLIA POLOŽKY (trojstav + dormant):** `direction` (smer otvárania = **strana pántov**, `left` = pánty vľavo) · `wing_directions` (`{p2, p3}` pre stredné
 krídla 3/4-krídlových dvierok) · `opening_mode` (`classic|tipon`) · `drawer` (`{construction: metal|wood|other, variant: standard|internal}`, pod-polia nezávisle).

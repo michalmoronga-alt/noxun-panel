@@ -408,6 +408,10 @@ Guard „ten istý a zároveň aktívny dokument" sa overuje **dvakrát** (v cal
 `@suspend_selection_sync` sa testuje až v timeri a udalosť **nezahadzuje** (refresh sa len odloží). Push je **VŽDY `dedup: false`** — dedup žiada `ScaleWatch.request_dedup` (zásah
 do modelu) a z observer cesty je zakázaný (lekcia D-103); refresh preto nepridáva žiadny undo krok.
 
+ČELÁ-B2: Undo/Redo označia `history: true`; coalescing podrží model do odloženého refreshu. Ten pred stavom výberu pošle `NX.historyRefresh(doc)`.
+Zhodný dokument zruší rozpracovaný návrh, timer aj naviazanú akciu; oneskorený preflight/ack už nemôže obnoviť hodnoty spred Undo. Abort vlastného apply túto značku nemá,
+lebo jeho odmietací ack zachová prípadný novší edit. Detach odstráni aj značku histórie; bežné echo apply naďalej chráni práve písané polia.
+
 ### SketchUp toolbar (UI-02, žije v main.rb — NIE je vlastný modul)
 
 `Engine.install_toolbar` skladá toolbar „Noxun Engine" so 4 tlačidlami podľa kontraktu UI 2.0 (N4) — **logo** (prepínač Inspectora: `Panel.dialog_alive?` → `Panel.hide` /
@@ -1016,21 +1020,30 @@ a obe strany sa porovnávajú s fixtúrou `tests/fixtures/front_symbol_shapes.js
 vkladania sloty neexistujú, takže sa kreslia iba odvodené krajné krídla. **Popis čela** (`fnum · typ · výška`) ostáva v strede panela a dostal **halo** farbou výplne panela (`col`,
 PV_* zrkadlo tokenu — žiadna nová farba), inak by ho X zásuvky/blendy preškrtlo. **Dlaždice typegridu ani ikona v riadku čela (`FRONT_TYPE_ICON`) sa nemenia.**
 
-### Úchytky = D-96 (form.js refreshFrontProfileUI / onFrontProfilePick + čisté funkcie v core.js)
+### Úchytky = D-96 / D-120 (form.js, core.js, preview.js, bridge.js)
 
-profil sa už **necyklí ikonou v riadku** (pri viacerých profiloch a budúcej voľbe hrany osadenia by to bolo nepoužiteľné) — nastavuje sa v skupine pre **ROZSAH** (`all` / `door` /
-`drawer_front`). Čisté funkcie: `frontProfileScopeItems` (**profileless typy do rozsahu NIKDY nepatria — ani v „všetky"**) · `frontProfileCommon` → `'<id>'` | `''` (prázdny
-rozsah) | `null` (rôzne → **disabled** voľba „(rôzne)", nikdy tichý výber) · `frontProfileStateText` (veta „UKW-7: F1, F2 · bez profilu: F3"). Zápis ide do **tých istých dát**
-(`row.dataset.frontProfile`) a ďalej `collectFronts` → `apply_all`, takže server ostáva autoritou a nepribudlo žiadne nové pole ani callback. Aktivita sekcie závisí **výhradne od
-obsahu rozsahu**, NIE od `selectedCabId` — `refreshFrontProfileUI` beží z `renderFronts`, teda ešte pred tým, než `loadSelected` nastaví identitu.
+Profil aj hrana sa nastavujú v karte čela a hromadne pre all/door/drawer_front/lift/fall/blind. Oba ovládače zapisujú rovnaké `dataset.frontProfile`/`frontProfileEdge`
+a `collectFronts`; žiadny uložený hromadný default. `frontProfileCommon(items, scope, key)` vracia nezávislý zmiešaný stav profilu/hrany. Rozsah ponúkne prienik platných
+hrán; samotná zmena hrany profil nezapne, zmena profilu zachová platnú hranu. `PROFILELESS_FRONT_TYPES` zrkadlí Ruby a obsahuje iba none. Návrat z none vyžaduje zapnutie.
 
-**Hrana osadenia sa neponúka**, kým ju registry (`core/front_profiles.rb`) nepozná.
+**Návrh a potvrdenie (D-120, v0.10.8):** `front_preflight` je čistý callback Panelu nad aktuálnymi rozmermi/fronts, vracia resolved riadky, fyzické hrany, smerové sloty
+aj chybu bez zápisu/Undo/katalógov. `nxFrontDraftAsk` koreluje dokument, cabinet_id alebo insert_session, revíziu a podpis formulára. Zmena kontextu/staré odpovede
+pôvodný návrh nepotvrdia. `nxFrontPreflightResult` aktualizuje sloty, kartu a náhľad; neurčený smer sa nikdy neodhadne. `nxProfilePanel` kreslí resolved hrany,
+nevyriešený free nemá vymyslený pás. Pri zmene typu na neaplikovateľnú hranu karta vyžiada inú hranu, nezvolí top.
 
-**KOV-A1 — profileless typy (Codex #280 P2-D).** Zoznam čiel, ktoré úchytkový profil mať NEMÔŽU, žije v `core.js` ako **`PROFILELESS_FRONT_TYPES`** (`none`, `lift`, `fall`,
-`blind`) + predikát `frontProfileless(type)` — je to **zrkadlo servera** (`Fronts::PROFILELESS_TYPES`) a Ruby guard v `tests/pure/test_kova1_cela.rb` stráži, že sa zoznamy
-nerozídu. Používajú ho **všetci traja**: `frontProfileScopeItems` (rozsah), `frontProfileStateText` (veta stavu — inak by hlásila „bez profilu: F2" o výklope) a
-`onFrontTypeChange` vo `form.js` (skryje indikátor a zhodí `dataset.frontProfile` na `'none'`). Bez zrkadla by UI ponúklo UKW profil na výklope, spustilo prestavbu a Ruby
-`normalize` by voľbu **ticho zahodilo** — používateľ by videl nastavenie, ktoré sa nikdy nikde neprejaví.
+`nxCabinetAction` spája preflight → apply_all → potvrdenie `front_apply_token` → jednu naviazanú akciu. Čakajúci/neplatný návrh blokuje aj exportné relaye,
+úpravu cez Štúdio, šablónu a native flush. Zlyhaný apply nepustí pokračovanie; novší edit zneplatní starú akciu. Echo tej istej skrinky pri rozpísanom/in-flight stave
+neprepíše konštrukciu ani riadky; uloží sa pri čakajúcom apply. Pri odmietnutí sa toto echo obnoví, iba ak používateľ medzitým neurobil novší edit.
+Zmena dokumentu/výberu/vkladacej relácie návrh zahodí. Server pri zápise znovu počíta a v ensure vracia úspech/neúspech apply.
+Reset pred zahodením naviazanej akcie zachytí jej odmietací callback a po vyčistení stavu ho raz zavolá; export ani aplikácia šablóny nezostanú bez odpovede.
+Aj výber zo Štúdia (`studioRelay` → `studio_do_select`) vráti `flush_blocked`; `ProductionCore.do_select` oznámi dôvod v pôvodnom okne a výber nevykoná.
+Klávesnicový fokus profil/hrana používa stabilný `data-pc` kľúč pri prekreslení karty.
+
+Odložené uloženie šablóny patrí konkrétnemu otvoreniu modalu. Zatvorenie, nové otvorenie aj zmena názvu, typu alebo voľby kovania ho zrušia;
+neskoré potvrdenie apply nesmie uložiť zrušenú či zmenenú šablónu. Nové uloženie vyžaduje nový klik.
+
+Aplikovanie šablóny zo Štúdia ide cez `StudioDialog.handle_tpl` → `NX.studioRelayTemplate` → tú istú bariéru → `studio_do_template`.
+Server pred pokračovaním overí dokument a presne tú istú jednu vybranú skrinku; odmietnutie vracia do sekcie Šablóny. Bez otvoreného Inspectora ostáva priamy handler.
 
 ### N26 medzery jantárovo (preview.js)
 

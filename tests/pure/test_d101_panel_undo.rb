@@ -36,6 +36,17 @@ NxTest.test('D-101: observer callback je tenky — refresh bezi az v timeri') do
   NxTest.assert(NxD101::SRC.include?('UI.start_timer'), 'refresh musi bezat MIMO observer kontextu')
 end
 
+NxTest.test('CELA-B2: iba Undo a Redo zrusia navrh, abort ma vlastny apply ack') do
+  %w[onTransactionUndo onTransactionRedo].each do |cb|
+    body = NxD101::SRC[/def #{cb}\(model\).*?\n        end/m].to_s
+    NxTest.assert(body.include?('Panel.on_model_txn(model, history: true)'), cb)
+  end
+  body = NxD101::SRC[/def onTransactionAbort\(model\).*?\n        end/m].to_s
+  NxTest.refute(body.include?('history: true'), 'odmietnuty apply nesmie zahodit novsi edit')
+  body = NxD101::SRC[/def flush_txn_refresh.*?\n        end/m].to_s
+  NxTest.assert(body.index('NX.historyRefresh(') < body.index('push_selected('), 'reset pred obnovenym configom')
+end
+
 NxTest.test('D-101: guardy handlera — dialog, ten isty a aktivny dokument') do
   guard = NxD101::SRC[/def txn_model_ok\?.*?\n        end/m].to_s
   NxTest.assert(guard.include?('@observer_model') && guard.include?('Sketchup.active_model'),

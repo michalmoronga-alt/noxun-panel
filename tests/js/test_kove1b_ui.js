@@ -1,3 +1,4 @@
+global.nxDocGuid = () => ''; // samostatna karta bez dokumentoveho bridge
 // KOV-E1b — KLIENTSKA ČASŤ: bezstratový transport `lift` (form.js) a pravidlo
 // `lift_class` v sekcii Pravidlá LEN NA ČÍTANIE (rules.js).
 //

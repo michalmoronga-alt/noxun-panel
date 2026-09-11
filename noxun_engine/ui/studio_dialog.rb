@@ -953,9 +953,8 @@ module Noxun
         end
 
         # ŠT-3c-1, sekcia ŠABLÓNY (Š18). Kanal je vzor `rules`, len JEDNODUCHSI:
-        # sablony su GLOBALNE (subor v %APPDATA%), takze payload nepotrebuje
-        # model, sekcia nema ziadny asynchronny beh a po prepnuti dokumentu
-        # netreba nic rusit.
+        # sprava sablon je GLOBALNA (subor v %APPDATA%). D-120: aplikovanie
+        # na skrinku ma navyse korelovany flush Inspectora a identitu modelu.
         def tpl_actions
           defined?(TemplatesDialog) ? TemplatesDialog::SECTION_ACTIONS : []
         end
@@ -964,6 +963,32 @@ module Noxun
           return set_status('Šablóny nie sú načítané.', true) unless defined?(TemplatesDialog)
 
           TemplatesDialog.dispatch(name, payload, tpl_sink)
+        end
+
+        # D-120: aplikovanie sablony meni oznacenu skrinku. Rozpisany navrh
+        # Inspectora musi prejst tou istou barierou ako export a kopia.
+        def handle_tpl(name, payload)
+          return do_tpl(name, payload) unless name == 'tpl_apply' && Panel.dialog_alive?
+
+          model = Sketchup.active_model
+          cabs = Panel.selected_cabinets(model)
+          return do_tpl(name, payload) unless cabs.length == 1 # existujuca hlaska vyberu
+
+          data = { 'payload' => JSON.parse(payload.to_s), 'model_guid' => ProductionCore.model_guid(model),
+                   'cabinet_id' => Store.get(cabs.first, 'cabinet_id').to_s }
+          Panel.js("NX.studioRelayTemplate(#{data.to_json})")
+        end
+
+        def do_tpl_after_flush(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          model = Sketchup.active_model
+          cabs = Panel.selected_cabinets(model)
+          if data['flush_blocked'] || DocKey.foreign?(data['model_guid'], model) ||
+             cabs.length != 1 || Store.get(cabs.first, 'cabinet_id').to_s != data['cabinet_id']
+            return tpl_sink.call(TemplatesDialog.status_script('Šablóna sa nepoužila — dokonči návrh v Inspectore a zachovaj výber skrinky.', true))
+          end
+
+          do_tpl('tpl_apply', data['payload'].to_json)
         end
 
         # Adresat odpovedi: TOTO okno. `TemplatesDialog` posiela `TPL.*` volania
@@ -1251,7 +1276,7 @@ module Noxun
           # ŠT-3c-1, sekcia ŠABLÓNY. Mena callbackov su TIE ISTE, ake pouzivalo
           # okno „Šablóny" (`tpl_apply`/`tpl_delete`/`tpl_capture`) + vlastny
           # PNG kanal sekcie (`tpl_preview`). Telo je v `TemplatesDialog`.
-          tpl_actions.each { |name| cb(dlg, name) { |p| do_tpl(name, p) } }
+          tpl_actions.each { |name| cb(dlg, name) { |p| handle_tpl(name, p) } }
           # ŠT-4a, sekcie NASTAVENIA. Mena su prefixovane `ss_` (`save`/`reload`
           # z okna by sa zrazili s callbackmi okna aj inych sekcii). Telo je
           # v `SupplierSettingsDialog`, sem chodi len odpoved (`settings_sink`).

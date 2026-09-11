@@ -1908,6 +1908,9 @@ module Noxun
           repush.call
           return status.call('Dáta okna sa medzitým obnovili — klikni znova.', true)
         end
+        if data['flush_blocked']
+          return status.call('Výber sa nevykonal — dokonči alebo oprav rozpísanú zmenu v Inspectore a klikni znova.', true)
+        end
 
         # Nalez 4: semafor klik nesie STABILNY kluc problemu; validacia sa po
         # flushi editov PREPOCITA NANOVO a entity sa dohladaju podla identity

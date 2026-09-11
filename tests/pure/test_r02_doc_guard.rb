@@ -179,9 +179,9 @@ NxTest.test('R-02: debounced edity nesu ZACHYTENY dokument, nie ten pri odoslani
 
   form = File.read(File.join(R02_JS_DIR, 'form.js'), encoding: 'UTF-8')
   sched = form[/applyTimer = setTimeout.*/].to_s
-  NxTest.assert(form.include?('applyPendingGuid = nxDocGuid();'),
+  NxTest.assert(form.include?('guid = nxDocGuid();') && form.include?('applyPendingGuid = guid;'),
                 'auto-apply zachytava dokument pri naplanovani')
-  NxTest.assert(sched.include?('cabSnapshot, applyPendingGuid'),
+  NxTest.assert(sched.include?('cid, guid'),
                 'zachyteny dokument ide do odlozeneho flushu')
   NxTest.assert(form.include?('sketchup.apply_all(nxDocPayload(payload, guidSnapshot))'),
                 'auto-apply posiela ZACHYTENY dokument')

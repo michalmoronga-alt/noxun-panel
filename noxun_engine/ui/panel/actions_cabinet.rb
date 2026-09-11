@@ -20,6 +20,54 @@ module Noxun
                              'thickness' => 'hrúbka', 'floor_height' => 'výška sokla' }.freeze
 
       class << self
+        # D-120: cisty vypocet nad aktualnym formularom; ZIADNY builder,
+        # snapshot, inicializacia katalogov ani Undo. Identita sa iba vracia.
+        def front_preflight_result(data)
+          out = data.slice('model_guid', 'cabinet_id', 'insert_session', 'revision')
+          dims = %w[width height floor_height].map do |key|
+            v = data[key]
+            unless v.is_a?(Numeric) && v.to_f.finite?
+              raise "Rozmer #{key} musí byť konečné číslo."
+            end
+            v.to_f
+          end
+          unless (200.0..3000.0).cover?(dims[0]) && (200.0..3000.0).cover?(dims[1]) && (0.0..500.0).cover?(dims[2])
+            raise 'Rozmery skrinky sú mimo povoleného rozsahu.'
+          end
+          cfg = data['fronts']
+          raise 'Neplatný návrh čiel.' unless cfg.is_a?(Hash) && cfg['items'].is_a?(Array)
+          %w[gap gap_top gap_bottom gap_left gap_right].each do |key|
+            v = cfg[key]
+            raise "Neplatná medzera čiel: #{key}." unless v.is_a?(Numeric) && v.to_f.finite?
+          end
+          cfg['items'].each do |it|
+            raise 'Neplatný riadok čela.' unless it.is_a?(Hash)
+            next unless it['mode'] == 'fixed'
+            v = it['height']
+            raise 'Pevná výška čela musí byť číslo.' unless v.is_a?(Numeric) && v.to_f.finite?
+          end
+          result = Fronts.preflight(cfg, *dims)
+          out.merge(result).merge('slots' => front_slots_payload(result['items']))
+        rescue RuntimeError => e
+          out.merge('valid' => false, 'items' => [], 'slots' => {},
+                    'errors' => [{ 'message' => e.message }])
+        end
+
+        def handle_front_preflight(payload)
+          data = parse(payload)
+          model = Sketchup.active_model
+          return if DocKey.foreign?(data['model_guid'], model)
+          return unless data['revision'].is_a?(Integer) && data['revision'].positive?
+          cid = data['cabinet_id']
+          if cid.is_a?(String) && !cid.empty?
+            cab = find_cabinet(model)
+            return unless cab && Store.get(cab, 'cabinet_id').to_s == cid
+          else
+            return unless data['insert_session'].is_a?(Integer) && data['insert_session'].positive?
+          end
+          js("NX.frontPreflight(#{front_preflight_result(data).to_json})")
+        end
+
         # D-39 (audit B5): zamky vkladacej karty ziju v PAMATI Panel modulu — preziju
         # zatvorenie panela, zomru s restartom SketchUpu. Ziadny zapis do modelu ani
         # na disk (zamok je pracovna pomôcka navrhu, nie vyrobny zaznam). Sanitizacia:
@@ -641,6 +689,7 @@ module Noxun
         def handle_apply_all(payload)
           model = Sketchup.active_model
           data = parse(payload)
+          front_apply_ok = false
           # KOV-H2: ked apply prisiel z modalu rucnej polozky, ceka na VYSLEDOK.
           # `nil` = bezna zmena pola, ziadny modal neceka a nic sa neposiela.
           op = manual_op(data)
@@ -728,6 +777,7 @@ module Noxun
           # `NX.setStatus`), takze musi niest aj jej varovania — inak by
           # upozornenia z TEJ ISTEJ prestavby zmizli bez stopy.
           push_manual_result(op, true, manual_ok_msg(op, removed, cab))
+          front_apply_ok = true
           # NASTROJE-1: tento apply prisiel ako FLUSH pred kopiou nastrojom.
           # Kopia bezi AZ TU — v tom istom callbacku, nad UZ ZAPISANYM configom
           # a AZ PO vsetkych pushoch (jej vlastny status ma ostat posledny).
@@ -735,6 +785,14 @@ module Noxun
           # configu by bolo presne to, comu handshake predchadza — server takú
           # kópiu necha dobehnut do timeoutu a odmietne s hlaskou.
           resolve_native_op(data)
+        ensure
+          # Odpoved AJ pri tichom zahodeni ci zlyhani. Ziadna dalsia akcia
+          # klienta nesmie brat odoslany apply ako potvrdeny zapis.
+          if data.is_a?(Hash) && data['front_apply_token'].is_a?(String)
+            ack = data.slice('model_guid', 'cabinet_id', 'front_apply_token')
+            ack['ok'] = front_apply_ok == true
+            js("NX.frontApplyResult(#{ack.to_json})")
+          end
         end
 
         # --- NASTROJE-1: handshake pred kopiou nastrojom ---------------------
