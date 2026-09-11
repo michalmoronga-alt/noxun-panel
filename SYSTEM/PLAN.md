@@ -295,7 +295,7 @@ Jedna užitočná dávka vrátane UI, schema a testov, následne samostatné rev
   HTML cache-bust, dotknutá architektúra a štandard.
 
 ##### ČELÁ-B — D-120, všetky hrany profilu — IMPLEMENTOVANÉ, PR #348
-Overenie: 3825 headless, 113 JS sád, in-SketchUp 2279 PASS / 0 FAIL; skutočný Inspector s Ruby preflight pri 470 px. Neplatný Scale vráti pôvodný config, všetky panely aj čistý transform.
+Overenie: 3826 headless, 113 JS sád, in-SketchUp 2279 PASS / 0 FAIL; skutočný Inspector s Ruby preflight pri 470 px. Neplatný Scale vráti pôvodný config, všetky panely aj čistý transform.
 - Zachovať `items[].profile` ako ID (`none`/`ukw7`), pridať `items[].profile_edge` = `top|bottom|left|right|free`. `free` je sémantická voľba iba dvierok, skutočná hrana každého krídla sa
   odvodí z tej istej autority smerov, ktorú používa `Fronts.direction_slots`. Nesmie vzniknúť druhý výpočet pre UI alebo renderer.
 - Starý platný profil bez `profile_edge` = top. Chýbajúce `profile` = none. Poškodená/neznáma prítomná hrana sa nesmie potichu zmeniť na top. Server ju odmietne na zapisovacej ceste; čítanie

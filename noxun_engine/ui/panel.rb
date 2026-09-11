@@ -253,6 +253,7 @@ module Noxun
           # ST-1a relay (audit #3): Studio ma VLASTNY kanal — inak by odpoved
           # prisla do ineho okna a jeho `gen` by klik odmietol.
           cb(dlg, 'studio_do_select')       { |p| StudioDialog.do_select(p) }
+          cb(dlg, 'studio_do_template')     { |p| StudioDialog.do_tpl_after_flush(p) }
           cb(dlg, 'studio_do_export')       { |p| StudioDialog.do_export(p) }
           # ŠT-1c PR A: CSV nakupneho zoznamu kovania zo sekcie Nakup — rovnaky
           # flush handshake ako VEPO, vlastnym kanalom Studia.

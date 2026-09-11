@@ -1029,6 +1029,9 @@ nevyriešený free nemá vymyslený pás. Pri zmene typu na neaplikovateľnú hr
 neprepíše konštrukciu ani riadky; zmena dokumentu/výberu/vkladacej relácie návrh zahodí. Server pri zápise znovu počíta a v ensure vracia úspech/neúspech apply.
 Klávesnicový fokus profil/hrana používa stabilný `data-pc` kľúč pri prekreslení karty.
 
+Aplikovanie šablóny zo Štúdia ide cez `StudioDialog.handle_tpl` → `NX.studioRelayTemplate` → tú istú bariéru → `studio_do_template`.
+Server pred pokračovaním overí dokument a presne tú istú jednu vybranú skrinku; odmietnutie vracia do sekcie Šablóny. Bez otvoreného Inspectora ostáva priamy handler.
+
 ### N26 medzery jantárovo (preview.js)
 
 ČELÁ-A (D-119): štyri okraje sú v dvoch riadkoch (`front-gap-grid`). Formulár odosiela `gap_left`/`gap_right`; legacy `gap_sides` preberá len pre chýbajúcu stranu.

@@ -109,6 +109,18 @@ for (const [relay, method] of [['studioRelayExport','studio_do_export'],['studio
   t.ack(t.applied[1],false);assert.equal(exports[1].flush_blocked,true,relay+' odmietne zlyhany apply');
 }
 
+// Skutocny relay aplikacie sablony: invalid/pending stoji, po apply ide raz.
+{
+  const t=setup(),c=t.c, applied=[];
+  c.document.querySelector=()=>null;c.sketchup.studio_do_template=p=>applied.push(JSON.parse(p));
+  vm.runInContext(fs.readFileSync(path.join(dir,'bridge.js'),'utf8'),c);c.NX=c.window.NX;c.NX.setStatus=()=>{};
+  const p={model_guid:'DOC-A',cabinet_id:'CAB-A',payload:{template:'Test'}};
+  c.onField();c.NX.studioRelayTemplate(p);assert.equal(applied[0].flush_blocked,true);applied.length=0;
+  t.answer(t.sent[0]);c.NX.studioRelayTemplate(p);assert.equal(applied.length,0);
+  t.ack(t.applied[0]);assert.deepEqual(applied,[p]);
+  c.guid='DOC-B';c.NX.studioRelayTemplate(p);assert.equal(applied[1].flush_blocked,true);
+}
+
 // UI projekcia pouziva fyzicke hrany; neznamy free bez odpovede nic nehada.
 {
   const c={...core,FRONT_PROFILES:[{id:'ukw7',reduction:36}],

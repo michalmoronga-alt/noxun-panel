@@ -18,7 +18,7 @@ nálezy z výroby a chyby v cenách majú **najvyššiu prioritu** ([PLAN.md](PL
 **Pozor na kompatibilitu:** blok KOVANIE priniesol sériu schema bumpov — čo uloží v0.10.0, to starší plugin už nepoužije (model/šablóna `CONFIG_SCHEMA`, plán `BuildPlan::SCHEMA` 5,
 knižnica setov a snapshot `std`, katalóg kovania `schema`). Pred prvou takou zákazkou aktualizovať **obe PC** (updater D-52: Štúdio → O plugine → Aktualizovať).
 
-**Testy k v0.10.7:** **3825 headless · 113 JS sád · in-SketchUp 2279 PASS / 0 FAIL**. Skutočný Inspector pri 470 px s Ruby preflight.
+**Testy k v0.10.7:** **3826 headless · 113 JS sád · in-SketchUp 2279 PASS / 0 FAIL**. Skutočný Inspector pri 470 px s Ruby preflight.
 Osadenie profilov, rezy, šablóny s/bez kovania, Scale/Späť, kópia, save/reopen a staré predvoľby overené. Neplatný Scale bezpečne vráti pôvodný stav; Redo API je na Windows nedostupné.
 **Michal 11.9. potvrdil úspešný test produktových odkazov aj potvrdzovania cien** (CENY-KOV-A/B, PR #345/#346).
 

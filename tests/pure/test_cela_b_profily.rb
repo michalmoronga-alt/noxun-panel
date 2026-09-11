@@ -3,6 +3,46 @@ require_relative '../helper' unless defined?(NxTest)
 if NxTest.headless?
   require File.join(NxTest::ROOT, 'noxun_engine/ui/panel/actions_cabinet')
   require File.join(NxTest::ROOT, 'noxun_engine/ui/panel/payloads')
+  require File.join(NxTest::ROOT, 'noxun_engine/ui/templates_dialog')
+end
+
+NxTest.test('CELA-B: sablona zo Studia ide cez flush a po nom kontroluje povodny vyber aj dokument') do
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine/ui/studio_dialog.rb'), encoding: 'UTF-8')
+  mod = Module.new
+  %w[handle_tpl do_tpl_after_flush].each do |name|
+    body = src[/        def #{name}\(.*?\n        end\n/m]
+    NxTest.assert(body, "#{name} existuje")
+    mod.module_eval("extend self\n#{body}")
+  end
+  model = Struct.new(:path).new('test.skp')
+  cab = { 'cabinet_id' => 'CAB-A' }
+  selection = [cab]; alive = true; sent = []; applied = []; status = []
+  panel = Module.new
+  panel.define_singleton_method(:dialog_alive?) { alive }
+  panel.define_singleton_method(:selected_cabinets) { |_m| selection }
+  panel.define_singleton_method(:js) { |s| sent << s }
+  su = Module.new; su.define_singleton_method(:active_model) { model }
+  store = Module.new; store.define_singleton_method(:get) { |item, key| item[key] }
+  { Panel: panel, Sketchup: su, Store: store, DocKey: Noxun::Engine::DocKey,
+    TemplatesDialog: Noxun::Engine::TemplatesDialog,
+    ProductionCore: Noxun::Engine::ProductionCore }.each { |key, value| mod.const_set(key, value) }
+  mod.define_singleton_method(:do_tpl) { |name, payload| applied << [name, JSON.parse(payload)] }
+  mod.define_singleton_method(:tpl_sink) { ->(s) { status << s } }
+  payload = { 'template' => 'Test' }.to_json
+  mod.handle_tpl('tpl_apply', payload)
+  NxTest.assert_equal([], applied)
+  data = JSON.parse(sent.first.sub('NX.studioRelayTemplate(', '').sub(/\)\z/, ''))
+  NxTest.assert_equal('CAB-A', data['cabinet_id'])
+  mod.do_tpl_after_flush(data.merge('flush_blocked' => true))
+  mod.do_tpl_after_flush(data.merge('model_guid' => 'foreign'))
+  selection = [{ 'cabinet_id' => 'CAB-B' }]; mod.do_tpl_after_flush(data)
+  NxTest.assert_equal([], applied)
+  NxTest.assert_equal(3, status.length)
+  selection = [cab]; mod.do_tpl_after_flush(data)
+  NxTest.assert_equal([['tpl_apply', { 'template' => 'Test' }]], applied)
+  alive = false; mod.handle_tpl('tpl_apply', payload)
+  NxTest.assert_equal(2, applied.length)
+  NxTest.assert(src.include?('cb(dlg, name) { |p| handle_tpl(name, p) }'), 'skutocny callback pouziva vstup s flushom')
 end
 
 module NxCelaB

@@ -362,6 +362,15 @@
     // ST-1a (audit #3): okno ŠTÚDIO ma VLASTNY kanal — odpoved prichadza do
     // TOHO okna, ktore klikalo (kazde okno ma vlastny `gen` a cudzi push by
     // mu klik odmietol).
+    studioRelayTemplate: function(p){
+      var blocked = function(){
+        if (window.sketchup && sketchup.studio_do_template)
+          sketchup.studio_do_template(JSON.stringify(Object.assign({}, p, {flush_blocked:true})));
+      };
+      if (!p || p.model_guid !== nxDocGuid() || p.cabinet_id !== selectedCabId){ blocked(); return; }
+      if (!nxCabinetAction(function(){ NX.studioRelayTemplate(p); }, blocked)) return;
+      if (window.sketchup && sketchup.studio_do_template) sketchup.studio_do_template(JSON.stringify(p));
+    },
     studioRelay: function(p){
       if (typeof nxCabinetAction === 'function'){
       if (!nxCabinetAction(function(){ NX.studioRelay(p); })) return;
