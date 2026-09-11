@@ -771,7 +771,12 @@ Záznam variantu:
   "grain": "length",
   "price_per_m2": 12.50,
   "sheet_size": [2800.0, 2070.0],
-  "texture": "K009_PW.jpg",
+  "appearance": {
+    "version": 1,
+    "id": "6b514f0f-998c-4e5d-926b-170b229ec334",
+    "mode": "native",
+    "saved_at": "2026-09-11T18:00:00Z"
+  },
   "production_class": "sheet",
   "code": "K009 PW 18",
   "supplier": "Demos"
@@ -779,6 +784,37 @@ Záznam variantu:
 ```
 
 Kusovník podľa materiálov sa delí podľa **material_id (variant) + hrúbka**.
+
+**M-R spoločný vzhľad (MR-1A, SCHEMA 10):** voliteľný `appearance` patrí
+**povrchu dekorovej skupiny** (`group_id` + normalizovaná `structure`), spoločne pre
+dosky aj ABS a všetky ich hrúbky/rozmery. Nie je novou výrobnou identitou.
+Normalizácia povrchu = trim, zrazenie vnútorných medzier, uppercase; prázdny povrch
+je samostatný rozsah. Variant iného povrchu vzhľad nepreberá. Jedna zástena používa
+ten istý vzhľad z oboch strán; `back_decor`/`back_structure` ostávajú objednávkové údaje.
+
+Descriptor je uzavretý objekt `version: 1`, serverové UUID `id`, `mode: native|color`
+a serverový čas `saved_at` v UTC ISO8601. `native` odkazuje na nemenný `.skm` v lokálnej
+knižnici; cesta sa odvodzuje z overeného ID a nikdy neprichádza z formulára.
+`color` je výslovný návrat k dnešnej katalógovej farbe, bez `.skm`; jeho revízia odlišuje
+odstránenie vzhľadu od nedostupného súboru. Chýbajúce `appearance` znamená doterajší
+katalóg bez uloženého vzhľadu. **Obyčajná plošná farba nepotrebuje textúru, `.skm`
+ani nový krok ukladania.** Natívny vzhľad môže mať vlastnosti aj bez obrázka;
+PBR ani fyzická mierka sa do samostatných JSON polí nezdvojujú. `saved_at` označuje
+poslednú publikáciu, nie automaticky sledovaný stav natívnych úprav.
+
+Všetci členovia rozsahu dostávajú rovnaký descriptor jedným zápisom pod katalógovým
+zámkom a s čerstvým baseline. Nový variant dosky/ABS aj duplák ho preberú. Automatické
+dedenie pri rozporných descriptoroch nič nevyberá; výslovné nahradenie celého rozsahu
+po kontrole aktuálneho baseline je spôsob nápravy. Generický editor/cena/Demos nesmú
+appearance podsunúť ani vymazať: zachová sa zo záznamu načítaného **pod zámkom**,
+vrátane neprítomnosti. Neznámy/poškodený descriptor sa nesmie ticho normalizovať na farbu.
+Pracovné **UNI** sú z ukladania, dedenia a aplikovania vzhľadu vylúčené.
+
+Schema 10 vzniká len pri obsahu s `appearance`; otvorenie starého katalógu ho nemení.
+Novší marker aj neznámy obsah chránia zápisové brány. Nový `.skm` sa dokončí pred
+publikáciou odkazu; zlyhanie katalógového zápisu ponechá pôvodnú revíziu aj súbor.
+Uloženie knižnice nie je súčasťou modelového Undo. MR-1A pripravuje katalógovú časť;
+natívny adaptér, mapovanie a ovládanie nasledujú podľa [MR balíka](zdroje/next_sessions/MR_VZHLAD_PACKAGE_2026-09-11.md).
 
 **Nemennosť ID a migrácia (2A):** `material_id`/`abs_id` sú **opaque a navždy nemenné** (modely sa viažu výhradne na ne — snapshot na entite drží ID, štandard 8.3);
 legacy ID s vloženou štruktúrou v texte sa NEparsujú. Nové ID zahŕňajú skupinu+štruktúru (+formát pri PD) len pre čitateľnosť.

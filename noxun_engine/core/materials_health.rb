@@ -290,7 +290,12 @@ module Noxun
           # GH #92 P1: platny JSON s NEVALIDNYM legacy tvarom ({}, sheets nie je
           # pole) NESMIE byt :ok — catalog by ho ticho nahradil seedmi a CRUD
           # by obnovitelny subor prepisal.
-          return [:ok, nil] if legacy_catalog_object?(data)
+          if legacy_catalog_object?(data)
+            if (issue = appearance_integrity_error(data))
+              return [:read_only, "katalóg má poškodený vzhľad (#{issue}) — oprav súbor alebo obnov zálohu"]
+            end
+            return [:ok, nil]
+          end
           return [:read_only,
                   'katalóg má poškodený tvar (sheets/edges nie sú polia) — oprav súbor alebo obnov zálohu']
         end
@@ -306,6 +311,9 @@ module Noxun
           # platni by ucotoval plochu zlemu materialu.
           if (dup_err = duplak_integrity_error(data['sheets']))
             return [:read_only, "katalóg má nekonzistentné duplák väzby (#{dup_err}) — oprav súbor alebo obnov zálohu"]
+          end
+          if (issue = appearance_integrity_error(data))
+            return [:read_only, "katalóg má poškodený vzhľad (#{issue}) — oprav súbor alebo obnov zálohu"]
           end
           return [:ok, nil]
         end

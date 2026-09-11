@@ -174,6 +174,8 @@ vedomý kontrakt).
 
 Zo splitu `materials_*`: CRUD+batch.
 
+**MR-1A (v0.11.1):** legacy `upsert_sheet`, `upsert_edge` a `upsert_sheet_with_duplak_sync` preberajú serverový appearance z čerstvého riadka pod zámkom pred normalizáciou. Klient ho nesmie podsunúť ani obnoviť jeho staršiu verziu. `sync_duplaks_in!` prenáša aj appearance, vrátane neprítomnosti a explicitného návratu ku farbe; centrálny backstop chráni aj ostatné CRUD cesty.
+
 **KOV-C2a — UNI záznam 4. kanála a `ensure_drawer_uni!` (v0.9.30).** `UNI_SEED` má šiesty riadok `UNI_ZASUVKA_16` / „Zásuvka UNI" / rola `drawer` / 16 mm; fresh install aj
 `UNI_APPEND_IDS` používajú **to isté ID** (je nové, žiadna legacy väzba naň neukazuje, takže dva tvary ako pri `K009`/`UNI_KORPUS_18` netreba). Pre EXISTUJÚCE inštalácie má
 kanál **vlastnú migráciu s vlastným markerom** `drawer_uni_seed.done`: `ensure_uni_records!` končí na prvom riadku pri `uni_seed.done`, takže cez ňu by sa nový záznam
@@ -187,6 +189,26 @@ inak by taký legitímny záznam vracal `:conflict` pri každom štarte a fallba
 ### materials_decor.rb
 
 Zo splitu `materials_*`: skupinové operácie + `ensure_edge_for_sheet`.
+
+**MR-1A:** `save_decor`, batch, automatická ABS aj Demos používať s centrálnym `prepare_appearance_write!` vo `write_unlocked`; nový člen skupiny/povrchu preberá spoločný vzhľad dosiek aj ABS. Editor stále mení len povolené polia a farba zostáva vlastnosťou celej dekorovej skupiny.
+
+### materials_appearance.rb
+
+**MR-1A (v0.11.1): katalógová časť vzhľadu, bez SketchUp API.** `normalize_appearance` má uzavretý kontrakt version1/UUID/mode/saved_at; `native` je nemenný `.skm`,
+`color` výslovný návrat k dnešnému RGB, absent je pôvodný stav. UNI appearance nedostáva. `materials.rb` nesie oba normalizačné hooky, lazy SCHEMA10 a
+`prepare_appearance_write!` pred každým zápisom; `materials_health` odmieta neznámy/poškodený descriptor.
+
+`appearance_scope(kind, anchor_id)` vracia scope, členov dosiek/ABS, SHA256 baseline, konflikt a prípadný spoločný descriptor.
+**Scope je group_id + normalizovaná structure, kind je iba druh kotvy.** Číta čerstvý zdravý primár bez seedu alebo obnovy. Hrúbka/formát/šírka pásky scope nemenia;
+prázdny povrch je samostatný. Bežný zápis zachová fresh appearance, nový/presunutý variant preberie jednoznačný cieľový vzhľad.
+Rozpor zastaví automatické dedenie, ale explicitný whole-scope replace ho vie napraviť.
+
+Purpose-publish vyžaduje celý zdravý čerstvý katalóg. Všeobecný write backstop kontroluje čitateľný raw primár, schému a appearance; ponecháva existujúcu explicitnú opravu starého hybridu úplným platným payloadom pôvodným výstupným guardom. Kvôli vzhľadu sa nemení historický repair kontrakt. Nečitateľný primár ani neznámy/poškodený appearance sa touto výnimkou neopravujú alebo nezahadzujú.
+
+`publish_appearance(kind, anchor_id, baseline:, mode:)` generuje descriptor aj internú cestu. Native exporter blok dostane staging cestu/descriptor/scope mimo katalógového zámku;
+**true znamená, že natívny adaptér overil obsah**, samotné jadro kontroluje iba súbor a bajty. Potom znovu overí baseline pod zámkom, dokončí nemenný súbor
+a publikuje descriptor všetkým členom jediným JSON zápisom. Zlyhanie JSON môže ponechať osirelý nový súbor, nikdy nepoškodí starý. Color súbor nepotrebuje.
+Export/načítanie natívneho materiálu a UI sú samostatné neskoršie dávky; knižničný zápis nie je modelové Undo.
 
 ### materials_abs.rb
 
@@ -222,7 +244,7 @@ jednotlivej otázke**. Na úrovni relácie by dve rýchle „Ukázať dopad" (ci
 
 Kontrakt, ktorý zdieľajú `materials.rb` aj celý split `materials_*` vyššie.
 
-**SCHEMA: 2 skupiny = povinný baseline po cutoveri; markery 3 duplák · 4 zástena · 5 demos polia · 6 image_url · 7 UNI · 8 PD hranová úprava + protiťahová zástena = LAZY podľa
+**SCHEMA: 2 skupiny = povinný baseline po cutoveri; markery 3 duplák · 4 zástena · 5 demos polia · 6 image_url · 7 UNI · 8 PD hranová úprava + protiťahová zástena · 9 supplier_decor · 10 appearance = LAZY podľa
 OBSAHU** (`SCHEMA_CURRENT` v materials.rb). Demos väzba na zázname: `demos_url` + `price_checked_at` (cena = pohyblivá cache; `manual_demos_url` sanitize + kanonické porovnanie —
 D-71).
 

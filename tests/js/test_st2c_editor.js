@@ -181,7 +181,7 @@ let editRoot = null;
   eq(p.base_rev, 'R1', 'BASELINE JE ZMRAZENY PRI OTVORENI — nie zivy MD_REV');
   eq(p.mode, 'edit');
   eq(p.group_id, 'GRP1');
-  eq(p.catalog_schema, 9, 'klient hlasi SVOJU schemu, nie echo servera');
+  eq(p.catalog_schema, 10, 'klient hlasi SVOJU schemu, nie echo servera');
   eq(p.allow_duplicate_code, false);
   eq(p.sheets.length, 2, 'duplak sa neposiela');
   eq(p.sheets[0].material_id, 'H3303_ST10_DTDL_18', 'riadok nesie ID variantu');

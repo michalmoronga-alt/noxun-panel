@@ -77,9 +77,11 @@ module Noxun
       # demos/uni/pd_edge): starsi klient by alias normalize whitelistom ticho
       # zahodil a jeho zapis by vazbu na dodavatelovu stranku rozbil.
       SCHEMA_SUPPLIER_DECOR = 9
+      # MR-1A: volitelny spolocny vzhlad dosiek/ABS, lazy podla obsahu.
+      SCHEMA_APPEARANCE = 10
       # Najnovsia schema, ktorej tvar tato verzia pluginu POZNA (write guard +
       # assess). Bump VYHRADNE spolu s kodom, ktory nove polia nesie.
-      SCHEMA_CURRENT = SCHEMA_SUPPLIER_DECOR
+      SCHEMA_CURRENT = SCHEMA_APPEARANCE
       # M-C: povolene hodnoty hranovej upravy PD (registrovy zoznam
       # pd_edge_subtypes je zdroj; konstanta = rychly enum guard pri zapise).
       PD_EDGE_SUBTYPES = %w[postforming abs].freeze
@@ -307,11 +309,15 @@ module Noxun
       # poskodenom katalogu vracia catalog seedy a lubovolny CRUD load+write
       # by zivy subor NAHRADIL seedmi. Guardy vo verejnych vstupoch nestacia,
       # kazda mutacia konci tu.
-      def write_unlocked(data)
+      def write_unlocked(data, appearance_scope = nil)
         if catalog_read_only?
           Engine.log("materialy: zapis odmietnuty — #{catalog_read_only_message}") if defined?(Engine)
           return false
         end
+        # catalog self-heal moze odovzdat frozen cache riadky; centralny
+        # appearance merge pracuje iba s vlastnou mutovatelnou kopiou.
+        data = JsonFileStore.deep_copy(data)
+        prepare_appearance_write!(data, authorized_scope: appearance_scope)
         # 2B-1/2B-2: LAZY schema bump podla OBSAHU — zaznam s duplak vazbou
         # vyzaduje marker 3, s rubom zasteny marker 4. Centralne TU (jedina
         # zapisova cesta), aby ziaden mutator nemohol nove pole zapisat pod
@@ -344,6 +350,9 @@ module Noxun
         payload = { 'std' => STD, 'schema' => target,
                     'sheets' => data['sheets'], 'edges' => data['edges'] }
         JsonFileStore.write(path, payload)
+      rescue AppearanceError => e
+        Engine.log_error(e, 'Materials.write_unlocked') if defined?(Engine)
+        false
       end
 
       # 2B-2: minimalna schema, ktoru OBSAH payloadu vyzaduje (duplak vazba = 3,
@@ -367,6 +376,7 @@ module Noxun
           next unless list.is_a?(Array)
           list.each do |r|
             next unless r.is_a?(Hash)
+            need = SCHEMA_APPEARANCE if r.key?('appearance')
             if need < SCHEMA_DEMOS &&
                (!r['demos_url'].to_s.empty? || !r['price_checked_at'].to_s.empty?)
               need = SCHEMA_DEMOS
@@ -655,6 +665,7 @@ module Noxun
         put_uni_fields(out, a)
         put_pd_edge_fields(out, a)
         put_supplier_decor_fields(out, a)
+        put_appearance_field(out, a)
         out
       end
 
@@ -875,6 +886,7 @@ module Noxun
         # sa NIKDY nepocita ako zhoda). Uklada sa LEN ked je true; false/prazdne
         # kluc ODSTRANI (merge-safe, ziadne nil kluce v JSON).
         out['universal'] = true if flag_true?(a['universal'] || a[:universal])
+        put_appearance_field(out, a)
         out
       end
 

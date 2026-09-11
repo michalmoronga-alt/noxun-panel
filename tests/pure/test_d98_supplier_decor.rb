@@ -84,7 +84,7 @@ NxTest.test('d98 (audit N6): required_schema_for = 9; SCHEMA_CURRENT bumpnuta s 
                       'obsah pola dvihne marker na 9')
   bare = D98M.normalize_sheet(d98_rec.reject { |k, _| k == 'supplier_decor' })
   NxTest.assert_equal(0, D98M.required_schema_for([bare]), 'bez pola marker nestupa')
-  NxTest.assert_equal(9, D98M::SCHEMA_CURRENT)
+  NxTest.assert(D98M::SCHEMA_CURRENT >= 9)
 end
 
 # ---------------------------------------------------------------------------

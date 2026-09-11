@@ -528,6 +528,12 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 
 **Cieľ:** materiál vyzerá v modeli ako v skutočnosti — Luciin nástroj na vizualizácie.
 
+**SCHVÁLENÉ 11.9.2026:** Michal vybral M-R ako ďalší blok a schválil ovládanie aj implementáciu. Textúra je voliteľná; dnešné plošné farby zostávajú.
+**Rovnaký dekor a povrch má jeden spoločný vzhľad DOSIEK AJ ABS naprieč hrúbkami**, zástena jeden vzhľad z oboch strán; pracovné UNI ostávajú zamknuté.
+Jedno tlačidlo Vzhľad pri povrchu, bez samostatného ABS override. Katalógový kontrakt je v STANDARD §7; návrhový podklad a zapracovanie auditu v [MR balíku](zdroje/next_sessions/MR_VZHLAD_PACKAGE_2026-09-11.md).
+
+**Postup:** MR-1A katalógový kontrakt a spoločná knižnica → MR-1B natívny materiál a zachovanie pri prestavbe → mapovanie MR-3 → MR-2 Štúdio → MR-3 záverečný smoke. Malé samostatné PR z čerstvého mainu; prvá dávka ešte nesprístupňuje nové ovládanie. Žiadny nový observer ani zmena výrobných snapshotov.
+
 - **V1 rozsah — M-R VZHĽAD (rozhodnuté 6.9.2026, NAHRÁDZA package „M-R FOTO" — Demos fotka ako textúra vypadáva):** ručné textúry z Michalovej knižnice (`E:\NOXUN\.MATERIÁLY`)
   na všetky materiály katalógu (dosky, ABS hrany, dosky/boards), mierka + priehľadnosť + PBR v editore SketchUpu, **„Uložiť vzhľad" = `.skm`** (`Material#save_as` / `Materials#load`,
   overené v SU 26.0), náhľad `write_thumbnail`, **orientácia textúry podľa smeru dekoru** per dielec (dekorové plochy + `position_material`), „drž textúru bez súboru" (druhé PC).

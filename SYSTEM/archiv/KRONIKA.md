@@ -17,6 +17,14 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **MR-1A — KATALÓGOVÝ ZÁKLAD SPOLOČNÉHO VZHĽADU (11.9.2026, v0.11.1).**
+  Michal schválil blok M-R aj mockup a zjednotil vzhľad dosiek s ABS toho istého dekoru a povrchu naprieč hrúbkami. Plošné farby ostávajú, zástena má jeden vzhľad, UNI pracovnú farbu.
+  Voliteľný uzavretý appearance používa schému 10 až po prvom uložení. Publikácia drží celý rozsah v jednom zápise, nové varianty a dupláky dedia vzhľad; staré editory, ceny a Demos ho nesmú prepísať.
+  Export prebieha mimo katalógového zámku, následný zápis znovu overí členstvo a revíziu; zmenené ceny zachová. Konflikt rozsahu sa dá výslovne nahradiť, poškodený či novší descriptor sa nezahodí.
+  Overenie: **3849 headless, 113 JS sád**, z toho 19 nových testov vzhľadu vrátane dvoch skutočných súbehov procesov. Interné review SOUND. Návrhový audit: 0 BLOCKER, 5 FIX zapracovaných, delta SOUND.
+  Natívne izolované sondy overili .skm/PBR, mierku, obnovu zdroja po exporte a rozlíšenie revízií s príponou `_NATIVE`; sú podkladom ďalšej dávky, nie testom hotovej integrácie.
+  Bez nového ovládania a zásahu do geometrie či výrobného snapshotu. Nasleduje MR-1B z čerstvého mainu, potom mapovanie, Štúdio a záverečný smoke; D-28 zostáva otvorené.
+
 - **ČELÁ — POTVRDENÝ POUŽÍVATEĽSKÝ SMOKE (11.9.2026, v0.11.0).**
   Michal po kontrole hotového balíka potvrdil, že funguje a nenašiel chyby. Doterajší ďalší krok „Michalov smoke hotových Čiel a ručné Redo v testovacom projekte“ je tým splnený v časti používateľského smoku.
   Samostatné ručné Redo nebolo výslovne potvrdené a zostáva otvorené. Dokumentácia uzáveru D-114/D-119/D-120 bola skontrolovaná; STAV zaznamenáva úspešnú kontrolu. Ďalší blok vyberá Michal.

@@ -120,7 +120,7 @@ function catalogWithNew(rev){
   eq(p.mode, 'create');
   eq(p.group_id, '', 'skupina este neexistuje — group_id posiela az server spat');
   eq(p.base_rev, 'R1', 'baseline je zmrazeny z casu OTVORENIA');
-  eq(p.catalog_schema, 9, 'klient hlasi SVOJU schemu');
+  eq(p.catalog_schema, 10, 'klient hlasi SVOJU schemu');
   eq(p.grain, 'width');
   eq(p.color, '#102030');
   eq(p.allow_duplicate_code, false);
