@@ -21,28 +21,34 @@ module Noxun
       # (stale snapshot by prepisal subezny cudzi zapis — vzor batch v3/ensure).
       def upsert_sheet(attrs)
         return false if catalog_read_only?
-        rec = normalize_sheet(attrs)
-        return false if rec.nil?
         with_catalog_lock do
           JsonFileStore.invalidate(path)
           data = load
+          rec = normalize_sheet(appearance_upsert_attrs(attrs, data, :sheet))
+          return false if rec.nil?
           enforce_group_color!(rec, data, :sheet) # D-82: farbu drzi skupina, nie payload
           data['sheets'] = data['sheets'].reject { |m| m['material_id'] == rec['material_id'] } + [rec]
           write_unlocked(data)
         end
+      rescue AppearanceError => e
+        Engine.log_error(e, 'Materials.upsert_sheet') if defined?(Engine)
+        false
       end
 
       def upsert_edge(attrs)
         return false if catalog_read_only?
-        rec = normalize_edge(attrs)
-        return false if rec.nil?
         with_catalog_lock do
           JsonFileStore.invalidate(path)
           data = load
+          rec = normalize_edge(appearance_upsert_attrs(attrs, data, :edge))
+          return false if rec.nil?
           enforce_group_color!(rec, data, :edge) # D-82: farbu drzi skupina, nie payload
           data['edges'] = data['edges'].reject { |a| a['abs_id'] == rec['abs_id'] } + [rec]
           write_unlocked(data)
         end
+      rescue AppearanceError => e
+        Engine.log_error(e, 'Materials.upsert_edge') if defined?(Engine)
+        false
       end
 
       def delete_sheet(id)
@@ -217,17 +223,20 @@ module Noxun
       # Identity polia (typ/struktura/hrubka/skupina) su na zdroji nemenne,
       # takze duplaky sa nikdy nerozidu v identite.
       def upsert_sheet_with_duplak_sync(attrs)
-        rec = normalize_sheet(attrs)
-        return false if rec.nil?
         return false if catalog_read_only?
         with_catalog_lock do
           JsonFileStore.invalidate(path)
           data = load
+          rec = normalize_sheet(appearance_upsert_attrs(attrs, data, :sheet))
+          return false if rec.nil?
           enforce_group_color!(rec, data, :sheet) # D-82: farbu drzi skupina, nie payload
           data['sheets'] = data['sheets'].reject { |m| m['material_id'] == rec['material_id'] } + [rec]
           sync_duplaks_in!(data, rec)
           write_unlocked(data)
         end
+      rescue AppearanceError => e
+        Engine.log_error(e, 'Materials.upsert_sheet_with_duplak_sync') if defined?(Engine)
+        false
       end
 
       # JEDINA autorita synchra duplakov na ZDROJOVEJ doske. Zdielane
@@ -242,6 +251,7 @@ module Noxun
         data['sheets'] = data['sheets'].map do |s|
           next s unless s['source_material_id'].to_s == rec['material_id']
           synced = s.merge('grain' => rec['grain'], 'color' => rec['color'])
+          copy_appearance!(synced, rec)
           if rec.key?('sheet_size')
             synced['sheet_size'] = rec['sheet_size']
           else

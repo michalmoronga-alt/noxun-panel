@@ -36,7 +36,7 @@
   // ktory je este SCHEMA 1 (nerozhodnutelna migracia), server batch 3 odmietne.
   // V0.6 M-C hranova uprava PD (pd_edge_subtype — schema 8); D-98 dekor u
   // dodavatela (supplier_decor — schema 9) => konstanta je 9.
-  var MD_CLIENT_SCHEMA = 9;
+  var MD_CLIENT_SCHEMA = 10;
   // 2B-2 (F10 zrkadlo registra): typy s formatom v identite — batch/formular
   // format VYZADUJU. Server je autorita (format_in_identity?), toto je UX.
   // D-73: + KOMPAKT (sirok vela ako PD — format je identita variantu).

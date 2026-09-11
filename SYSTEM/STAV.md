@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.11.0 · 11.9.2026 — BALÍK ČIEL KOMPLET (D-114 + D-119 + D-120).** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.11.1 · 11.9.2026 — M-R ZAČATÉ: MR-1A KATALÓGOVÝ ZÁKLAD VZHĽADU.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -15,24 +15,25 @@ nálezy z výroby a chyby v cenách majú **najvyššiu prioritu** ([PLAN.md](PL
 **Hotové veľké celky:** INSPECTOR REWORK (UI-A…UI-D) · **fáza ŠTÚDIO** (ŠT-1a…ŠT-4b, PR #192–#228) — **zaniklo šesť okien** · **blok KRESBA** · **blok GHOST VKLADANIE**
 (v0.9.0) · **blok KOVANIE** (v0.9.14 → v0.10.0, 50 PR #277–#340 — plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md)).
 **Výstupy zákaziek bez zásuvkovej klasifikácie sú obsahovo identické** (golden, CSV bajtovo).
-**Kompatibilita:** v0.11.0 ukladá konfiguráciu skrinky v schéme 13; výrobný plán ostáva v schéme 5. Plugin podporujúci schému nižšiu než 13 nové konfigurácie neprestaví ani nepoužije ako šablónu.
+**Kompatibilita:** konfigurácia skrinky ostáva v schéme 13, výrobný plán v schéme 5. Nový voliteľný vzhľad používa katalógovú schému 10 až pri prvom uložení; staré katalógy sa otvorením nemenia. Plugin podporujúci schému nižšiu než 13 nové konfigurácie neprestaví ani nepoužije ako šablónu.
 Pred prvou takou zákazkou aktualizovať **obe PC** (Štúdio → O plugine → Aktualizovať).
 
 **Testy uzáveru Čiel:** **3830 headless · 113 JS sád**, skutočný Inspector pri 470 px: šesť typov, jedna karta, klávesnica, pevná výška/AUTO, hrany a potvrdenie návrhu.
+**MR-1A:** **3849 headless · 113 JS sád**, vrátane skutočných súbežných katalógových zápisov počas exportu. Natívne sondy overili predpoklady ďalšej dávky; nová geometria ani ovládanie ešte nie sú vydané.
 Geometrický dôkaz B2: **in-SketchUp 2297 PASS / 0 FAIL** (osadenia, výroba/rezy, šablóny, uloženie/návrat, Scale/Späť a kópia); C geometriu nemení. Ručné Redo zostáva.
 **Michal 11.9. potvrdil úspešný test produktových odkazov aj potvrdzovania cien** (CENY-KOV-A/B, PR #345/#346).
 **Michal 11.9. potvrdil aj používateľskú kontrolu hotového balíka Čiel v0.11.0: funguje, bez nájdených chýb.** Samostatné ručné Redo nebolo výslovne potvrdené.
 
 ## Robí sa
 
-**Schválený balík Čiel je dokončený:** A (#347) samostatné okraje celej skrinky; B1/B2 (#349/#350) UKW na všetkých hranách piatich typov a potvrdenie návrhu; C (#351) priamy rad šiestich typov a upratanie Inspectora.
-Dvierka majú zvislý profil vždy oproti pántom, dvojkrídlo v strede. Pri neurčenom smere formulár počká na voľbu; profil aj hrana sa menia v karte alebo hromadne.
-Celé zadanie vrátane prenosových ciest a overenia je v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), všetky tri D-čísla v archíve dogfoodingu.
+**Michal schválil blok M-R a mockup (11.9.).** Jeden spoločný vzhľad pre dosky aj ABS rovnakého dekoru a povrchu naprieč hrúbkami; dnešné plošné farby ostávajú, zástena má jeden vzhľad. UNI ostáva pracovnou farbou.
+**MR-1A pripravuje katalógovú časť:** uzavretý appearance, spoločné uloženie, dedenie nových variantov/duplákov, ochrana starých editorov a súbežných zmien. Nové ovládanie ani natívne vykresľovanie ešte nie sú sprístupnené.
+Ďalšie dávky určuje blok M-R v [PLAN.md](PLAN.md), audit a sondy zachytáva [MR podklad](zdroje/next_sessions/MR_VZHLAD_PACKAGE_2026-09-11.md). Čelá A/B1/B2/C ostávajú dokončené a používateľsky potvrdené.
 **Blok 1d** podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**. Blok **1b** je uzavretý, **1c/1e hotové**.
 
 ## Ďalší krok
 
-Používateľský smoke hotových Čiel je potvrdený; na samostatné overenie zostáva ručné Redo v testovacom projekte. Ďalší blok vyberá Michal podľa [PLAN.md](PLAN.md); toto schválenie nepokrýva iný blok.
+Pokračovať schváleným MR-1B: natívne uloženie/načítanie a zachovanie živého vzhľadu pri prestavbe. Potom mapovanie MR-3, ovládanie MR-2 a reálny záverečný smoke. D-28 ostáva otvorené do dokončenia celého bloku; ručné Redo Čiel ostáva samostatne nepotvrdené.
 
 ## Posledné uzávery
 
