@@ -286,7 +286,7 @@
              // UI-C1b: vo VKLADANI server resolved cela nema (skrinka este
              // neexistuje a `frontItems` je tu null — pasca Codex FIX 11),
              // preto ich dopocita cisty draft resolver z hodnot karty.
-             fronts: (previewMode === 'insert') ? pvInsertFronts() : (frontItems || []) };
+             fronts: pvLiveFronts() };
   }
 
   // ---- UI-C1b: cela NAVRHU (draft resolver) --------------------------------
@@ -322,9 +322,36 @@
                  mode: fixed ? 'fixed' : 'auto', wings: it ? it.wings : 'auto',
                  profile: (it && it.profile) || 'none',
                  height: Math.round(h * 100) / 100, z: Math.round(z * 100) / 100 });
+      ['direction','wing_directions','profile_edge'].forEach(function(key){
+        if (it && Object.prototype.hasOwnProperty.call(it, key)) out[out.length - 1][key] = it[key];
+      });
       z += h + gap;
     });
     return out;
+  }
+  function pvLiveFronts(){
+    if (typeof frontDraft !== 'undefined' && frontDraft){
+      var current = nxFrontDraftItems();
+      if (current) return current;
+      return nxFrontsResolve(collectFronts(), numv('height') || 0,
+        getType() === 'upper' ? 0 : (numv('floor_height') || 0));
+    }
+    return previewMode === 'insert' ? pvInsertFronts() : (frontItems || []);
+  }
+  // Len premietnutie fyzickej hrany vratenej serverom; `free` tu nema heuristiku.
+  function nxProfilePanel(it, index, x, z, w, h){
+    var edge = Array.isArray(it.profile_edges) ? it.profile_edges[index] :
+      (Object.prototype.hasOwnProperty.call(it, 'profile_edge') ? it.profile_edge : 'top');
+    var vertical = edge === 'left' || edge === 'right';
+    var red = ['top','bottom','left','right'].indexOf(edge) >= 0 ? frontProfileReduction(it.profile) : 0;
+    red = Math.min(red, vertical ? w : h);
+    var p = { x:x, z:z, w:w, h:h, band:null };
+    if (!(red > 0)) return p;
+    if (vertical){ p.w -= red; if (edge === 'left') p.x += red; }
+    else { p.h -= red; if (edge === 'bottom') p.z += red; }
+    p.band = { x: edge === 'right' ? x + w - red : x,
+      z: edge === 'top' ? z + h - red : z, w: vertical ? red : w, h: vertical ? h : red };
+    return p;
   }
   // Draft ciel z aktualnej vkladacej karty (DOM -> cisty resolver). Doska cela
   // nema; mimo vkladania sa nevola vobec.
@@ -593,28 +620,23 @@
       } else {
         cols.push({ x: gs, w: ow });
       }
-      // D-90: uchytkovy profil zaberá hornych `red` mm RIADKU — panel je o tolko
-      // nizsi a nad nim sa kresli plny pruh profilu (kazde kridlo ma vlastny kus).
-      // Skratenie ide z Ruby registry (FRONT_PROFILES), nie z konstanty v JS.
-      var red = Math.min(frontProfileReduction(it.profile), h);
-      var ph = h - red;
+      cols = cols.map(function(c, j){ return nxProfilePanel(it, j, c.x, z, c.w, h); });
       cols.forEach(function(c){
-        if (ph > 0){
-          S.push('<rect x="'+rx(c.x)+'" y="'+ry(z+ph)+'" width="'+c.w+'" height="'+ph+'" fill="'+col+'" stroke="'+PV_FRONT_STROKE+'" stroke-width="1.5"/>');
-        }
-        if (red > 0){
-          S.push('<rect class="fprofband" x="'+rx(c.x)+'" y="'+ry(z+h)+'" width="'+c.w+'" height="'+red+'"/>');
-        }
+        if (c.h > 0 && c.w > 0) S.push('<rect x="'+rx(c.x)+'" y="'+ry(c.z+c.h)+'" width="'+c.w+'" height="'+c.h+'" fill="'+col+'" stroke="'+PV_FRONT_STROKE+'" stroke-width="1.5"/>');
+        var b = c.band;
+        if (b) S.push('<rect class="fprofband" x="'+rx(b.x)+'" y="'+ry(b.z+b.h)+'" width="'+b.w+'" height="'+b.h+'"/>');
       });
+      var ph = cols.length ? cols[0].h : h;
+      var panelZ = cols.length ? cols[0].z : z;
       // KOV-A2a / D-115: symboly otvarania. Kreslia sa PRED popisom, aby text
       // ostal navrchu (SVG kresli v poradi zdroja); ciary uz idu Z ROHOV cez
       // cele kridlo, takze stredom panela naozaj prechadzaju.
-      drawFrontSymbols(S, rx, ry, it, cols, z, ph > 0 ? ph : h);
+      drawFrontSymbols(S, rx, ry, it, cols, panelZ, ph > 0 ? ph : h);
       // popis do stredu PANELU (pri profile nesmie skoncit v jeho pruhu);
       // cislo ostava vyskou RIADKU — presne to, co je v zozname ciel.
       // D-115 HALO: text dostane obrys farbou VYPLNE panelu (`col`, PV_* zrkadlo
       // tokenu), inak by ho X zasuvky/blendy preskrtlo. Ziadna nova farba.
-      S.push('<text x="'+rx(W/2)+'" y="'+ry(z+(ph > 0 ? ph : h)/2)+'" font-size="18" fill="'+PV_SELECT_ACCENT+'" paint-order="stroke" stroke="'+col+'" stroke-width="4" text-anchor="middle" dominant-baseline="middle">'+fnum+' · '+frontTypeDesc(it.type)+' '+Math.round(h)+'</text>');
+      S.push('<text x="'+rx(W/2)+'" y="'+ry(panelZ+(ph > 0 ? ph : h)/2)+'" font-size="18" fill="'+PV_SELECT_ACCENT+'" paint-order="stroke" stroke="'+col+'" stroke-width="4" text-anchor="middle" dominant-baseline="middle">'+fnum+' · '+frontTypeDesc(it.type)+' '+Math.round(h)+'</text>');
       S.push('</g>');
     });
   }

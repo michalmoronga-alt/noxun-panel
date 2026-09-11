@@ -240,8 +240,7 @@
       "variant_id": null,
       "production_class": "counted",
       "manufactured": true,
-      "params": {
-      },
+      "params": {},
       "source": "rule",
       "rule_quantity": 1
     },
@@ -336,7 +335,11 @@
       "wings": "2",
       "wings_n": 2,
       "profile": "ukw7",
-      "z": 102.0
+      "z": 102.0,
+      "profile_edges": [
+        "top",
+        "top"
+      ]
     }
   ],
   "wings": 2

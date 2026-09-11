@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.10.5 · 10.9.2026 — CENY-KOV: odkazy produktov a ručné overenie cien kovania.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.10.7 · 11.9.2026 — ČELÁ-A/B1: samostatné presahy a geometria profilov na všetkých hranách.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -18,23 +18,24 @@ nálezy z výroby a chyby v cenách majú **najvyššiu prioritu** ([PLAN.md](PL
 **Pozor na kompatibilitu:** blok KOVANIE priniesol sériu schema bumpov — čo uloží v0.10.0, to starší plugin už nepoužije (model/šablóna `CONFIG_SCHEMA`, plán `BuildPlan::SCHEMA` 5,
 knižnica setov a snapshot `std`, katalóg kovania `schema`). Pred prvou takou zákazkou aktualizovať **obe PC** (updater D-52: Štúdio → O plugine → Aktualizovať).
 
-**Testy k v0.10.5:** **3811 headless** · **111 JS sád** · skutočné Štúdio s fiktívnymi dátami v prehliadači: odkazy, potvrdenie, zrušenie, konflikt, oneskorené odpovede a prepnutie zákazky/sekcie.
-Posledné in-SketchUp **2174 PASS / 0 FAIL** nad D-123 `3b07615` (10.9.2026). **Michal 11.9. potvrdil úspešný test produktových odkazov aj potvrdzovania cien** (CENY-KOV-A/B, PR #345/#346).
+**Testy ČELÁ-B1:** **3826 headless · 112 JS sád · in-SketchUp 2295 PASS / 0 FAIL**. Osadenia, výroba/rezy, šablóny, uloženie/návrat, Scale/Späť a kópia overené.
+Zmena typu odstráni neaplikovateľný seed zásah profilu a Undo ho vráti; prehliadač zachoval bočný profil pri zmene výšky. Ručné Redo ostáva na používateľský test.
+**Michal 11.9. potvrdil úspešný test produktových odkazov aj potvrdzovania cien** (CENY-KOV-A/B, PR #345/#346).
 
 ## Robí sa
 
 **BALÍK ČIEL (D-114 + D-119 + D-120) — implementácia, 11.9.2026.** Michal schválil samostatné ľavé/pravé presahy pre celú skrinku,
 UKW na všetkých štyroch hranách a aj na výklope/sklope/blende; zvislé profily dvierok vždy oproti pántom (dvojkrídlo v strede).
 Ovládanie: profil/hrana v karte čela + hromadné Úchytky; štyri okraje v dvoch riadkoch; šesť piktogramov na pridanie typu.
-Úplné packages **ČELÁ-A → B → C** sú v [PLAN.md](PLAN.md). Lokálna interaktívna ukážka `_dev/cela-plan/index.html` je návrh, nie runtime pluginu.
-Outside-in a Astra audit spracované (4 FIX, 2 NOTE), kontrola zapracovania **SOUND**. Michal schválil mockup aj implementáciu 11.9.; ČELÁ-A implementované v PR #347 (v0.10.6).
-Overenie A: **3816 headless · 112 JS sád · in-SketchUp 2225 PASS / 0 FAIL**, browser skutočného Inspectora pri 470 px.
+Úplné packages **ČELÁ-A → B1 → B2 → C** sú v [PLAN.md](PLAN.md). Lokálna interaktívna ukážka `_dev/cela-plan/index.html` je návrh, nie runtime pluginu.
+Outside-in a Astra audit spracované, kontrola zapracovania **SOUND**. ČELÁ-A zlúčené v PR #347; pôvodný B PR #348 uzavretý po treťom kole a rozdelený podľa pravidla repozitára.
+**B1 (#349)**: hotová geometria, schéma 13, seed 7 a čistenie zásahov. **B2**: ovládanie hrán a potvrdenie návrhu. **C**: šesť ikon a upratanie kontextu. D-120 zostáva otvorené do B2.
 **Blok 1d** podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**. Blok **1b** je uzavretý, **1c/1e hotové**.
 
 ## Ďalší krok
 
-Uzavrieť review/merge ČELÁ-A (presahy, PR #347), potom z čerstvého mainu sekvenčne B (profily), C (pridávanie čiel).
-Geometrická dávka B potrebuje skutočný SketchUp probe/QA; browser mockup túto bránu nenahrádza. Ostatné V1 bloky ostávajú podľa [PLAN.md](PLAN.md).
+Uzavrieť review/merge B1 (#349), potom z čerstvého mainu B2 a C. Geometrický dôkaz B1 je dokončený; B2/C preveria skutočný Inspector a všetky naviazané akcie.
+Ostatné V1 bloky ostávajú podľa [PLAN.md](PLAN.md).
 
 ## Posledné uzávery
 

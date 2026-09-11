@@ -17,6 +17,13 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **ČELÁ-B1 — GEOMETRIA A VÝROBNÝ KONTRAKT PROFILOV (11.9.2026, PR #349, v0.10.7).**
+  Nadväzuje na zlúčené A (#347). Pôvodný B PR #348 sa po treťom kole nálezov uzavrel a rozdelil na B1/B2; rozsah aj schválené správanie zostávajú.
+  B1: štyri hrany UKW-7 na piatich fyzických typoch, dvierka zvislo oproti pántom, presná os skrátenia a dĺžka rezu. Config schéma 13, seed 7, BuildPlan 5.
+  Seed zásahy sa čistia podľa profilu, roly, rodiny ownera a smeru flap. Vlastné pravidlá sa nemenia; návrat typu neoživí staré vypnutie, Undo obnoví pôvodný stav.
+  Overenie: 3826 headless, 112 JS sád, 2295 in-SU PASS / 0 FAIL; zachovanie bočnej hrany v skutočnom formulári. B2 doplní ovládače a potvrdenie návrhu; D-120 je stále otvorené.
+  Ručné Redo zostáva, Windows Ruby API ho neposkytuje. Pri rozdelení sa upravil jediný testový guard, ktorý už očakával UI helper z B2.
+
 - **ČELÁ-A — PRESAHY PER STRANA (11.9.2026, PR #347, v0.10.6).**
   Michal schválil interaktívny návrh aj sekvenčnú implementáciu A/B/C. Predchádzajúci stav: v0.10.5 a pripravené zadanie balíka Čiel.
   Ľavý a pravý okraj sú nezávislé a spoločné celej skrinke. Starý `gap_sides` sa preberie pre každú chýbajúcu stranu; explicitná nula má prednosť.

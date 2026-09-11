@@ -157,13 +157,13 @@ module NxTest
     end
   end
 
-  test('KOV-A1: vedomy limit — profil je na lift/fall/blind normalizovany na none') do
-    %w[lift fall blind none].each do |t|
+  test('KOV-A1: D-120 profil podporuje lift/fall/blind; none ostava bez profilu') do
+    %w[none].each do |t|
       out = K::F.normalize_items([K.door('type' => t, 'profile' => 'ukw7')]).first
       assert_equal(E::FrontProfiles::NONE, out['profile'],
                    "#{t}: profil sa sklopi na none (inak by vznikol falosny profile_rule_missing)")
     end
-    %w[door drawer_front].each do |t|
+    %w[door drawer_front lift fall blind].each do |t|
       out = K::F.normalize_items([K.door('type' => t, 'profile' => 'ukw7')]).first
       assert_equal('ukw7', out['profile'], "#{t}: profil ostava (D-90 sa nemeni)")
     end
