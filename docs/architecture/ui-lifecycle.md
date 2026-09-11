@@ -1026,8 +1026,12 @@ nevyriešený free nemá vymyslený pás. Pri zmene typu na neaplikovateľnú hr
 
 `nxCabinetAction` spája preflight → apply_all → potvrdenie `front_apply_token` → jednu naviazanú akciu. Čakajúci/neplatný návrh blokuje aj exportné relaye,
 úpravu cez Štúdio, šablónu a native flush. Zlyhaný apply nepustí pokračovanie; novší edit zneplatní starú akciu. Echo tej istej skrinky pri rozpísanom/in-flight stave
-neprepíše konštrukciu ani riadky; zmena dokumentu/výberu/vkladacej relácie návrh zahodí. Server pri zápise znovu počíta a v ensure vracia úspech/neúspech apply.
+neprepíše konštrukciu ani riadky; uloží sa pri čakajúcom apply. Pri odmietnutí sa toto echo obnoví, iba ak používateľ medzitým neurobil novší edit.
+Zmena dokumentu/výberu/vkladacej relácie návrh zahodí. Server pri zápise znovu počíta a v ensure vracia úspech/neúspech apply.
 Klávesnicový fokus profil/hrana používa stabilný `data-pc` kľúč pri prekreslení karty.
+
+Odložené uloženie šablóny patrí konkrétnemu otvoreniu modalu. Zatvorenie, nové otvorenie aj zmena názvu, typu alebo voľby kovania ho zrušia;
+neskoré potvrdenie apply nesmie uložiť zrušenú či zmenenú šablónu. Nové uloženie vyžaduje nový klik.
 
 Aplikovanie šablóny zo Štúdia ide cez `StudioDialog.handle_tpl` → `NX.studioRelayTemplate` → tú istú bariéru → `studio_do_template`.
 Server pred pokračovaním overí dokument a presne tú istú jednu vybranú skrinku; odmietnutie vracia do sekcie Šablóny. Bez otvoreného Inspectora ostáva priamy handler.

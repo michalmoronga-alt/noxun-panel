@@ -606,6 +606,7 @@
       if (typeof nxSetModelGuid === 'function') nxSetModelGuid(c.model_guid);
       var holdDraft = sameDoc && c.cabinet_id === selectedCabId && nxCabinetDraftHeld();
       if (!sameDoc || c.cabinet_id !== selectedCabId) nxFrontDraftReset();
+      nxRememberCabinetEcho(c);
       // V0.4.7c: odchod z kontextu dosky — zrus cakajuce board edity + kartu
       cancelBoardEdits();
       renderBoardCard(null);

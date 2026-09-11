@@ -222,6 +222,10 @@
     cabApplyRequest = { token: token, revision: cabDraftRevision, cabinet_id: selectedCabId,
       model_guid: nxDocGuid() };
   }
+  function nxRememberCabinetEcho(c){
+    var r = cabApplyRequest;
+    if (r && c && c.model_guid === r.model_guid && c.cabinet_id === r.cabinet_id) r.echo = c;
+  }
   function nxFrontApplyResult(result){
     var r = cabApplyRequest;
     if (!r || !result || result.front_apply_token !== r.token || result.model_guid !== r.model_guid ||
@@ -231,7 +235,15 @@
     if (!result.ok){
       cabDraftDirty = true;
       if (after && after.fail) after.fail();
-      NX.setStatus('Zmena sa neuložila. Skontroluj formulár; ďalšia akcia sa nevykonala.', true);
+      var restored = r.echo && r.revision === cabDraftRevision;
+      if (restored){
+        // Odmietnuty apply vracia ulozene hodnoty. Novsi rozpisany edit sa
+        // vsak starsim odmietnutim nikdy neprepise.
+        cabDraftDirty = false; frontDraft = null; cancelCabinetEdits();
+        NX.loadSelected(r.echo);
+      }
+      NX.setStatus(restored ? 'Zmena sa neuložila. Obnovili sa uložené hodnoty; ďalšia akcia sa nevykonala.' :
+        'Zmena sa neuložila. Skontroluj formulár; ďalšia akcia sa nevykonala.', true);
       return;
     }
     if (r.revision === cabDraftRevision) cabDraftDirty = false;
@@ -985,6 +997,11 @@
   // jednym dokumentom by po prepnuti ulozil skrinku z ineho. Zachytava sa aj
   // DOKUMENT a server ho striktne overuje (vzor clear_selection / kamera).
   var tplModalGuid = null;
+  var tplModalSession = 0;
+  function cancelTplDeferredSave(){
+    tplModalSession++;
+    if (cabAfterApply && cabAfterApply.tplSession != null) cabAfterApply = null;
+  }
   // KOV-I: pamat poslednej volby patri pocitacu (vzor rozbalenia sekcii).
   var TPL_SAVE_HARDWARE_KEY = 'noxun.tpl.with_hardware';
   function tplSavedHardwareChoice(){
@@ -1003,6 +1020,7 @@
   function openSaveTemplateModal(){
     if (!selectedCabId){ NX.setStatus('Najprv označ korpus.', true); return; }
     var m = el('tplModal'); if (!m) return;
+    cancelTplDeferredSave();
     tplModalCabId = selectedCabId;
     tplModalGuid = (typeof nxModelGuid === 'string') ? nxModelGuid : '';
     el('tplSaveName').value = (typeof tplNameSuggestion === 'string' && tplNameSuggestion) ? tplNameSuggestion : '';
@@ -1016,6 +1034,7 @@
     var inp = el('tplSaveName'); inp.focus(); inp.select();
   }
   function closeSaveTemplateModal(){
+    cancelTplDeferredSave();
     var m = el('tplModal'); if (m) m.style.display = 'none';
   }
   function tplModalOpen(){ var m = el('tplModal'); return !!(m && m.style.display !== 'none'); }
@@ -1048,7 +1067,12 @@
     // Codex GH #46 P2: rozpisane edity (400 ms debounce) najprv flushnut — callbacky
     // sa spracuju v poradi, takze apply_all prebehne PRED save a config je cerstvy.
     if (typeof nxCabinetAction === 'function'){
-      if (!nxCabinetAction(function(){ saveTemplateAs(); })) return;
+      var session = tplModalSession;
+      var resume = function(){ if (session === tplModalSession && tplModalOpen()) saveTemplateAs(); };
+      if (!nxCabinetAction(resume)){
+        if (cabAfterApply && cabAfterApply.run === resume) cabAfterApply.tplSession = session;
+        return;
+      }
     } else if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
     if (window.sketchup && sketchup.save_template_as){
       // identita z casu OTVORENIA modalu — preklik na inu skrinku ANI iny
@@ -1064,8 +1088,9 @@
   function bindTplModal(){
     if (tplModalBound) return; tplModalBound = true;
     var m = el('tplModal');
-    el('tplSaveName').addEventListener('input', function(){ this.classList.remove('bad'); refreshTplModalWarn(); });
-    el('tplSaveHardware').addEventListener('change', rememberTplHardwareChoice);
+    el('tplSaveName').addEventListener('input', function(){ cancelTplDeferredSave(); this.classList.remove('bad'); refreshTplModalWarn(); });
+    el('tplSaveType').addEventListener('change', cancelTplDeferredSave);
+    el('tplSaveHardware').addEventListener('change', function(){ cancelTplDeferredSave(); rememberTplHardwareChoice(); });
     m.addEventListener('keydown', function(ev){
       if (ev.key === 'Escape'){ ev.preventDefault(); closeSaveTemplateModal(); return; }
       if (ev.key === 'Enter'){ ev.preventDefault(); saveTemplateAs(); return; }

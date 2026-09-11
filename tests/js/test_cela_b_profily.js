@@ -85,6 +85,20 @@ function setup(){
   assert.equal(t.applied.length,1);t.ack(t.applied[0],false);
   assert.equal(ran,0);assert.equal(failed,1);assert.equal(c.cabDraftDirty,true);
 }
+// Odmietnutie so serverovym resyncom obnovi hodnoty; stare echo nezhodi novsi edit.
+{
+  const t=setup(),c=t.c, restored=[];
+  c.NX.loadSelected=p=>restored.push(p);
+  c.onField();t.answer(t.sent[0]);t.fire();const pending=t.applied[0];
+  const saved={model_guid:'DOC-A',cabinet_id:'CAB-A',width:600,fronts:plain(c.cfg)};
+  c.nxRememberCabinetEcho({...saved,cabinet_id:'CAB-B'});assert.equal(c.cabApplyRequest.echo,undefined);
+  c.nxRememberCabinetEcho(saved);t.ack(pending,false);
+  assert.deepEqual(restored,[saved]);assert.equal(c.cabDraftDirty,false);assert.equal(c.frontDraft,null);
+  c.onField();t.answer(t.sent[1]);t.fire();const second=t.applied[1];c.nxRememberCabinetEcho(saved);
+  c.construction.width=750;c.onField();t.ack(second,false);
+  assert.equal(restored.length,1);assert.equal(c.cabDraftDirty,true);assert.equal(c.construction.width,750);
+  assert.match(fs.readFileSync(path.join(dir,'bridge.js'),'utf8'),/nxRememberCabinetEcho\(c\)/);
+}
 // Nova vkladacia relacia (typ/sablona) zneplatni povodne smerove sloty.
 {
   const t=setup(),c=t.c;c.selectedCabId=null;c.nxFrontDraftReset();c.nxFrontDraftAsk();

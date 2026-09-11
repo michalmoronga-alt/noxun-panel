@@ -182,5 +182,26 @@ const css = fs.readFileSync(path.join(UI, 'css', 'panel.css'), 'utf8');
 ok(/\.tplhwhint\s*\{[^}]*white-space:\s*nowrap/.test(css), 'CSS zabranuje zalomeniu detailu');
 ok(/\.tpltile \.tplhw \.ic\s*\{[^}]*height:\s*12px/.test(css), 'ikona nezdedi 38 px vysku schemy');
 
+// CELA-B review: zrusenie, nove otvorenie a uprava poli zrusia odlozene ulozenie.
+valid = true;
+const directGate = ctx.nxCabinetAction;
+for (const cancel of [
+  () => fm.closeSaveTemplateModal(),
+  () => { fm.closeSaveTemplateModal(); fm.openSaveTemplateModal(); },
+  () => { const input = el('tplSaveName'); input.value = 'Nový názov';
+    input._listeners.input.forEach(fn => fn.call(input, {target:input})); },
+  () => dom.dispatch(el('tplModal'), 'keydown', {key:'Escape'}),
+  () => { checkbox.checked = !checkbox.checked; dom.dispatch(checkbox, 'change'); }
+]){
+  fm.openSaveTemplateModal();
+  let queued;
+  ctx.nxCabinetAction = function(fn){ queued = fn; ctx.cabAfterApply = {run:fn}; return false; };
+  const before = sent.length;
+  fm.saveTemplateAs();ok(queued, 'ulozenie caka na apply');
+  cancel();eq(ctx.cabAfterApply,null,'zrusenie vycisti cakajuce ulozenie');
+  ctx.nxCabinetAction = directGate;
+  queued();eq(sent.length,before,'neskory apply neulozi zrusenu ani zmenenu sablonu');
+  fm.closeSaveTemplateModal();
+}
 studio.tplCancelAsk();
 console.log('KOV-I sablony: ' + n + ' assertions OK');
