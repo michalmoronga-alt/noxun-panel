@@ -17,6 +17,14 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **MR-1B1 — NATÍVNY KONTAJNER VZHĽADU (11.9.2026, v0.11.2).**
+  Adaptér overuje materiál podľa modelu, skupiny/povrchu a revízie; samotné meno ani zhodný obsah nie sú dôkaz. Nesprávny či nejednoznačný materiál nepreoznačí ani neprefarbí.
+  Export uloží celý `.skm.staging`, obnoví zdroj prvým abortom, súbor natívne načíta a druhým abortom zruší overovacie zmeny. Oba aborty musia potvrdiť úspech; až potom možno publikovať knižnicu.
+  Sedem pure testov pokrýva aj zlyhania save/load/abort a nepravdivú obnovu zdroja. Návrhový audit: jeden FIX zapracovaný (oba true aborty). Nezávislé interné review SOUND.
+  Overenie: **3856 headless, 113 JS sád, 2321 in-SketchUp PASS / 0 FAIL** (24 nových kontrol). Native test porovnáva pixely, albedo mierku, alpha, colorize aj dostupné PBR nastavenia, podobné UUID a opakovaný load.
+  SU 26.0 pri čerstvých API PBR mapách zjednotí sekundárne width/height podľa albeda; samostatný test tento rozdiel priznáva. Následný roundtrip natívne načítanej fixture zachová celý skúšaný stav. Render ani SU 2024 fyzicky neoverené.
+  Buildery a UI ešte nie sú prepnuté. Ďalší rez MR-1B2 zapojí oba buildery naraz so zachovaním vlastného živého vzhľadu pri prestavbe. D-28 zostáva otvorené.
+
 - **MR-1A — KATALÓGOVÝ ZÁKLAD SPOLOČNÉHO VZHĽADU (11.9.2026, v0.11.1).**
   Michal schválil blok M-R aj mockup a zjednotil vzhľad dosiek s ABS toho istého dekoru a povrchu naprieč hrúbkami. Plošné farby ostávajú, zástena má jeden vzhľad, UNI pracovnú farbu.
   Voliteľný uzavretý appearance používa schému 10 až po prvom uložení. Publikácia drží celý rozsah v jednom zápise, nové varianty a dupláky dedia vzhľad; staré editory, ceny a Demos ho nesmú prepísať.

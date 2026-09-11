@@ -179,6 +179,189 @@ module NoxunSuRunner
     log_line("FAIL: cleanup vynimka: #{ex.class}: #{ex.message}")
   end
 
+  # MR-1B1: native save/load bez dotyku katalogu alebo geometrie zakazky.
+  def mr1b1_visual(material)
+    state = { color: material.color.to_a, alpha: material.alpha }
+    %i[colorize_type colorize_deltas workflow metallic_factor roughness_factor normal_scale normal_style
+       ao_strength metalness_enabled? roughness_enabled? normal_enabled? ao_enabled?].each do |field|
+      state[field] = material.public_send(field) if material.respond_to?(field)
+    end
+    %i[texture metallic_texture roughness_texture normal_texture ao_texture].each do |field|
+      next unless material.respond_to?(field)
+      texture = material.public_send(field)
+      state[field] = if texture
+                       image = texture.image_rep
+                       [texture.width.to_f, texture.height.to_f, image.width, image.height,
+                        image.bits_per_pixel, Digest::SHA256.hexdigest(image.data)]
+                     end
+    end
+    state
+  end
+
+  def mr1b1_state(material)
+    [material.name, material.attribute_dictionaries&.map { |d| [d.name, d.to_h] }&.to_h, mr1b1_visual(material)]
+  end
+
+  def mr1b1_abort(model, &block)
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST MR1B1 docasna kontrola', true)
+      begin
+        block.call
+      ensure
+        ok('MR1B1: kontrolna operacia abort true', model.abort_operation == true)
+      end
+    end
+  end
+
+  def run_mr1b1(model)
+    return ok('MR1B1: povoleny testmodel', false) unless guard_model?(model)
+    n = e::NativeAppearance
+    original_materials = model.materials.to_a
+    counts = [model.entities.length, model.materials.length, model.definitions.length]
+    scope = ['GRP-SU-MR1B1', 'ST9']
+    revisions = %w[c1d81f89-240a-4e89-93bf-081745497301 c1d81f89-240a-4e89-93bf-081745497302]
+    descriptor = proc { |id| { 'version' => 1, 'id' => id, 'mode' => 'native', 'saved_at' => '2026-09-11T08:00:00Z' } }
+    old_dir = e::Materials.test_dir_override
+    Dir.mktmpdir('noxun-mr1b1-su-') do |temp|
+      e::Materials.test_dir_override = temp
+      image_path = File.join(temp, 'fixture.png')
+      image = Sketchup::ImageRep.new
+      image.set_data(2, 2, 32, 0, [255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 230, 150, 80, 255].pack('C*'))
+      image.save_file(image_path)
+      source = plain = nil
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST MR1B1 zdroje', true)
+        source = model.materials.add('MR1B1 rucne premenovany zdroj')
+        source.texture = image_path
+        source.texture.size = [180.mm, 90.mm]
+        source.color = [100, 80, 150]
+        source.colorize_type = Sketchup::Material::COLORIZE_TINT
+        source.alpha = 0.7
+        source.set_attribute('NOXUN', 'unrelated', 'zachovat')
+        plain = model.materials.add('MR1B1 bez albeda')
+        plain.color = [60, 80, 100]
+        plain.alpha = 0.6
+        if source.respond_to?(:roughness_factor=)
+          source.metallic_factor = 0.35
+          source.roughness_factor = 0.65
+          source.normal_scale = 0.7
+          source.ao_strength = 0.8
+          %i[metallic_texture roughness_texture normal_texture ao_texture].each { |field| source.public_send("#{field}=", image_path) }
+          %i[metalness_enabled roughness_enabled normal_enabled ao_enabled].each do |field|
+            source.public_send("#{field}=", true) if source.respond_to?("#{field}=")
+          end
+          plain.roughness_factor = 0.4
+          plain.metallic_factor = 0.2
+        else
+          info('MR1B1: host nema PBR API, overuje farbu/albedo/alpha/mierku')
+        end
+        # SU26 save/load kanonizuje fyzicke rozmery sekundarnych API map na
+        # albedo. Toto je samostatny dokaz nativneho spravania, nie tolerancia
+        # v adapteri. Hlavny roundtrip nizsie zacina importovanou SKM fixture.
+        fresh_visual = mr1b1_visual(source)
+        baseline = File.join(temp, 'native_baseline.skm')
+        raise 'MR1B1: baseline save zlyhal' unless source.save_as(baseline)
+        model.materials.remove(source)
+        source = model.materials.load(baseline)
+        expected_visual = fresh_visual.dup
+        %i[metallic_texture roughness_texture normal_texture ao_texture].each do |field|
+          next unless fresh_visual[field]
+          expected_visual[field] = fresh_visual[field].dup
+          expected_visual[field][0, 2] = fresh_visual[:texture][0, 2]
+          info("MR1B1 native canonicalization #{field}: #{fresh_visual[field][0, 2].inspect} -> #{mr1b1_visual(source)[field][0, 2].inspect}")
+        end
+        ok('MR1B1: native kanonizuje len mierku API PBR map, pixely a faktory zachova', mr1b1_visual(source) == expected_visual)
+        model.commit_operation
+      end
+      source_before = mr1b1_state(source)
+      prepared_count = model.materials.length
+      paths = revisions.map do |revision|
+        path = e::Materials.appearance_file(revision)
+        FileUtils.mkdir_p(File.dirname(path))
+        staging = "#{path}.staging"
+        ok('MR1B1: export a verifikacia nativneho obsahu', n.export(model, source, staging, descriptor.call(revision), scope) == true)
+        ok('MR1B1: presna staging cesta bez pridanej pripony', File.file?(staging) && !File.exist?("#{staging}.skm"))
+        ok('MR1B1: oba aborty vratili zdroj aj pocet', mr1b1_state(source) == source_before && model.materials.length == prepared_count)
+        File.rename(staging, path)
+        path
+      end
+      mr1b1_abort(model) do
+        a = n.load(model, scope, descriptor.call(revisions[0]))
+        b = n.load(model, scope, descriptor.call(revisions[1]))
+        ok('MR1B1: podobne UUID su odlisne handles, repeat R1 reuse', a != b && n.load(model, scope, descriptor.call(revisions[0])) == a)
+        visual_before = mr1b1_visual(source)
+        ok('MR1B1: cely dostupny native/PBR stav sa zachoval', mr1b1_visual(a) == visual_before && mr1b1_visual(b) == visual_before)
+        a.name = 'MR1B1 pouzivatel zmenil meno'
+        a.texture.size = [240.mm, 120.mm]
+        a.roughness_factor = 0.3 if a.respond_to?(:roughness_factor=)
+        edited = mr1b1_state(a)
+        ok('MR1B1: lookup/load po native edite zachova zivy handle', n.lookup(model, scope, revisions[0]) == a && n.load(model, scope, descriptor.call(revisions[0])) == a && mr1b1_state(a) == edited)
+        ok('MR1B1: preferred starsi handle ma rovnaky scope', n.preferred(model, scope, a) == a)
+        duplicate = model.materials.add('MR1B1 konfliktna identita')
+        duplicate.set_attribute('NOXUN', 'appearance_scope', JSON.generate(scope))
+        duplicate.set_attribute('NOXUN', 'appearance_id', revisions[0])
+        begin
+          n.lookup(model, scope, revisions[0])
+          ok('MR1B1: viacneznacna identita sa odmietne', false)
+        rescue n::IdentityError
+          ok('MR1B1: viacneznacna identita sa odmietne', mr1b1_state(a) == edited)
+        end
+      end
+      mr1b1_abort(model) do
+        wrong = model.materials.load(paths[0])
+        wrong.set_attribute('NOXUN', 'appearance_id', revisions[1])
+        wrong.set_attribute('NOXUN', 'appearance_scope', JSON.generate(['OTHER', 'ST9']))
+        before = mr1b1_state(wrong)
+        begin
+          n.load(model, scope, descriptor.call(revisions[0]))
+          ok('MR1B1: nativny reused mismatch sa odmietne', false)
+        rescue n::IdentityError
+          ok('MR1B1: nativny reused mismatch bez prepisu cudzieho handle', mr1b1_state(wrong) == before)
+        end
+      end
+      plain_revision = SecureRandom.uuid
+      plain_path = File.join(temp, 'plain.skm.staging')
+      plain_before = mr1b1_state(plain)
+      ok('MR1B1: export bez albeda', n.export(model, plain, plain_path, descriptor.call(plain_revision), scope) == true)
+      mr1b1_abort(model) do
+        loaded = model.materials.load(plain_path)
+        ok('MR1B1: vlastnosti bez albeda zachovane', loaded.texture.nil? && mr1b1_visual(loaded) == mr1b1_visual(plain))
+      end
+      ok('MR1B1: absent dictionary zdroja obnovene', mr1b1_state(plain) == plain_before)
+      ok('MR1B1: chybajuci subor je recoverable', n.load(model, scope, descriptor.call(SecureRandom.uuid)).nil?)
+      broken_revision = SecureRandom.uuid
+      File.write(e::Materials.appearance_file(broken_revision), 'poskodeny nativny archiv')
+      mr1b1_abort(model) do
+        begin
+          n.load(model, scope, descriptor.call(broken_revision))
+          ok('MR1B1: poskodeny archiv je LoadError', false)
+        rescue n::LoadError => ex
+          ok('MR1B1: poskodeny archiv je LoadError, nie IdentityError', !ex.is_a?(n::IdentityError))
+        end
+      end
+      e::ScaleWatch.guard do
+        begin
+          n.export(model, source, File.join(temp, 'nested.skm.staging'), descriptor.call(SecureRandom.uuid), scope)
+          ok('MR1B1: nested operacia odmietnuta', false)
+        rescue n::OperationError
+          ok('MR1B1: nested refusal zachova guard a zdroj', e::ScaleWatch.rebuilding? && mr1b1_state(source) == source_before)
+        end
+      end
+    end
+  rescue StandardError => ex
+    ok("MR1B1: vynimka #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}", false)
+  ensure
+    e::Materials.test_dir_override = old_dir
+    if original_materials
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST MR1B1 upratanie', true)
+        (model.materials.to_a - original_materials).each { |mat| model.materials.remove(mat) if mat.valid? }
+        model.commit_operation
+      end
+      ok('MR1B1: povodne counts a guard obnovene', counts == [model.entities.length, model.materials.length, model.definitions.length] && !e::ScaleWatch.rebuilding?)
+    end
+  end
+
   # --- SYNC: geometria proti BuildPlan kontraktu -----------------------------
 
   # ST-2 latentny dlh (PR #206): cerstvy katalog (SCHEMA 7) nesie LEN UNI
@@ -19792,6 +19975,7 @@ module NoxunSuRunner
     run_kovi(model)          # KOV-I: ulozenie S/BEZ kovania cez panel, badge data, automaticky recept/system/NL, projektove defaulty, 1x Spat vrati vklad aj freeze; poskodeny snapshot ulozi geometriu bez setov AJ manualu + jasny status (izolovane katalogy a sablony)
     run_cela_a(model)
     run_cela_b(model)
+    run_mr1b1(model)
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

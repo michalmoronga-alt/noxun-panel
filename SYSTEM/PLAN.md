@@ -534,9 +534,12 @@ Jedno tlačidlo Vzhľad pri povrchu, bez samostatného ABS override. Katalógov�
 
 **Postup:** MR-1A katalógový kontrakt a spoločná knižnica → MR-1B natívny materiál a zachovanie pri prestavbe → mapovanie MR-3 → MR-2 Štúdio → MR-3 záverečný smoke. Malé samostatné PR z čerstvého mainu; prvá dávka ešte nesprístupňuje nové ovládanie. Žiadny nový observer ani zmena výrobných snapshotov.
 
+**Priebežný stav:** MR-1A je zlúčené v #353 (v0.11.1). MR-1B sa delí na B1 natívny adaptér a B2 spoločné napojenie oboch builderov; nové ensure vstupy sa zapnú až so zachovaním pôvodného materiálu pri prestavbe.
+Natívna sonda potvrdila aj editáciu materiálu bez priradenia geometrii. MR-2 preto nepotrebuje pomocnú plochu: otvorí panel Materiály, kartu Upraviť prepne používateľ.
+
 - **V1 rozsah — M-R VZHĽAD (rozhodnuté 6.9.2026, NAHRÁDZA package „M-R FOTO" — Demos fotka ako textúra vypadáva):** ručné textúry z Michalovej knižnice (`E:\NOXUN\.MATERIÁLY`)
   na všetky materiály katalógu (dosky, ABS hrany, dosky/boards), mierka + priehľadnosť + PBR v editore SketchUpu, **„Uložiť vzhľad" = `.skm`** (`Material#save_as` / `Materials#load`,
-  overené v SU 26.0), náhľad `write_thumbnail`, **orientácia textúry podľa smeru dekoru** per dielec (dekorové plochy + `position_material`), „drž textúru bez súboru" (druhé PC).
+  overené v SU 26.0), náhľad s pravdivým fallbackom pri zlyhaní `write_thumbnail`, **orientácia textúry podľa smeru dekoru** per dielec (dekorové plochy + `position_material`), „drž textúru bez súboru" (druhé PC).
   Rezy **MR-1 jadro** (audit ÁNO: kontrakt `appearance` v katalógu, STANDARD §7.1 pole `texture` → `appearance`) → **MR-2 UI** ‖ **MR-3 orientácia** (audit ÁNO: buildery, in-SU).
   Návrh poradia: **prvá dávka po KOVANÍ**. Plný checkpoint: [zdroje/next_sessions/V1_DEBATA_2026-09-06_MR_VZHLAD.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_MR_VZHLAD.md). Pôvodný package M-R FOTO (29.8.) je v git histórii.
 - **D-28 · Textúry materiálov = M-R knižnica vzhľadov** (zlúčené do bloku M-R VZHĽAD vyššie, 6.9.2026): kontrakt je **jediný — `appearance` → `.skm`** (textúra, mierka,
