@@ -3,7 +3,7 @@
 # SketchUp API) — headless testovatelne.
 #
 # ============================ CO TO JE ============================
-# Uchytkovy profil (UKW-7) = hlinikovy profil nalepeny na HORNU hranu cela.
+# Uchytkovy profil (UKW-7) = hlinikovy profil osadeny na zvolenej hrane cela.
 # Celo sa kvoli nemu SKRACUJE o konstantu profilu (`reduction`); riadok cela
 # v rade si drzi povodnu vysku — profil je jeho sucastou (fronts.rb §3).
 #
@@ -12,12 +12,9 @@
 # citaju VYHRADNE tento registry. Registry je rozsiritelny — dalsi profil =
 # novy zaznam, ziadna zmena logiky.
 #
-# ROZSIRITELNOST (Michal 9.8.): neskor pribudnu dalsie profily a VOLBA HRANY
-# osadenia (dolna hrana sa pouziva casto, existuju aj bocne). Tvar configu to
-# uz unesie — riadok cela drzi JEDEN string kluc 'profile' a vsetko ostatne
-# (skratenie, nazov, buduca hrana) zije TU v registry. Dnesna implementacia
-# rata s hornou hranou, ale je to vlastnost KODU fronts, nie ulozenych dat:
-# pridanie hrany nebude vyzadovat migraciu configov ani sablon.
+# D-120: profile_edge zije na riadku cela (CONFIG_SCHEMA 13). Fronts vyriesi
+# semanticke `free` oproti pantom; tento modul pozna len FYZICKE hrany.
+# Stary profil bez anotacie ma hornu hranu. Prítomna neplatna hrana sa nehada.
 #
 # Hodnota 'none' NIE JE v registry: je to explicitna neutralna volba
 # ("bez profilu") a plati ako default vsade, kde config kluc chyba
@@ -26,6 +23,7 @@ module Noxun
   module Engine
     module FrontProfiles
       NONE = 'none'
+      EDGES = %w[top bottom left right].freeze
 
       # D-90 PR 2 — PRIEREZ UKW-7 (83 bodov, mm) presne z Michalovho modelu
       # (extrakcia 9.8.2026, `_dev/UKW7_prierez.json`; `_dev` je gitignore, preto
@@ -80,6 +78,103 @@ module Noxun
       }.freeze
 
       module_function
+
+      # Rozlisuje CHYBAJUCI kluc (legacy top) od pritomneho poskodeneho.
+      def edge_of(source)
+        return nil unless source.is_a?(Hash)
+        raw = if source.key?(:profile_edge)
+                source[:profile_edge]
+              elsif source.key?('profile_edge')
+                source['profile_edge']
+              else
+                'top'
+              end
+        EDGES.include?(raw) ? raw : nil
+      end
+
+      def vertical?(edge)
+        %w[left right].include?(edge)
+      end
+
+      # Z celkoveho obrysu vznikne fyzicky panel. Osi dekoru/ABS sa nemenia.
+      # Volat az po per-kridlo validacii vo Fronts, pred emission plánu.
+      def fit_panel!(pd, edge)
+        red = reduction(of(pd))
+        return pd unless red.positive?
+        raise 'Neplatná hrana úchytkového profilu.' unless EDGES.include?(edge)
+
+        axis = vertical?(edge) ? 0 : 2
+        pd[:box][axis] -= red
+        pd[:origin][axis] += red if %w[bottom left].include?(edge)
+        pd[:prod][:length] = pd[:box][2].round(2)
+        pd[:prod][:width] = pd[:box][0].round(2)
+        pd[:profile_edge] = edge
+        # Povodny top kontrakt a presnost ostavaju nedotknute.
+        if edge == 'top'
+          pd[:profile_band] = { z: (pd[:origin][2] + pd[:box][2]).round(2), h: red }
+        end
+        pd
+      end
+
+      # Jedina interpretacia fyzickeho panela: celkovy obrys + pasmo + rez.
+      # Rozmery sa odvodzuju, NEUKLADAJU sa ako druhy snapshot.
+      def panel_geometry(pd)
+        return nil unless of(pd) && (edge = edge_of(pd))
+        box = pd[:box]; org = pd[:origin]
+        return nil unless box.is_a?(Array) && org.is_a?(Array) && box.size == 3 && org.size == 3
+        return nil unless (box + org).all? { |v| v.is_a?(Numeric) && v.to_f.finite? }
+        return nil unless box.all? { |v| v > 0.0 }
+
+        red = reduction(of(pd))
+        x, z, w, h = org[0].to_f, org[2].to_f, box[0].to_f, box[2].to_f
+        w += red if vertical?(edge)
+        h += red unless vertical?(edge)
+        x -= red if edge == 'left'
+        z -= red if edge == 'bottom'
+        band = case edge
+               when 'top' then { x: x, z: z + h - red, w: w, h: red }
+               when 'bottom' then { x: x, z: z, w: w, h: red }
+               when 'left' then { x: x, z: z, w: red, h: h }
+               when 'right' then { x: x + w - red, z: z, w: red, h: h }
+               end
+        # Legacy top renderer sa kotvil na zaokruhlene profile_band.z.
+        old_band = pd[:profile_band]
+        if edge == 'top' && old_band.is_a?(Hash)
+          band[:z] = old_band[:z].to_f
+          h = band[:z] + red - z
+        end
+        { edge: edge, x: x, z: z, w: w, h: h, band: band,
+          length: vertical?(edge) ? box[2].to_f : box[0].to_f }
+      end
+
+      # Nakup cita vyrobny rozmer v osi hrany. Neplatna anotacia nic nevyrobi.
+      # Bez anotacie je dovolena povodna top sirka aj na legacy deskriptore.
+      def cut_length(pd)
+        return nil unless of(pd) && (edge = edge_of(pd)) && pd[:prod].is_a?(Hash)
+        v = pd[:prod][vertical?(edge) ? :length : :width]
+        return nil unless v.is_a?(Numeric) && v.to_f.finite? && v.positive?
+        if pd.key?(:box)
+          g = panel_geometry(pd)
+          return nil unless g && (g[:length].round(2) - v.to_f.round(2)).abs < 0.000001
+        end
+
+        v.to_f.round(2)
+      end
+
+      # Kanonicka extruzia ide +X, otaca sa okolo Y. Nos zostava v -Y.
+      def placement(pd)
+        g = panel_geometry(pd)
+        geo = geometry(of(pd))
+        return nil unless g && geo
+        x, z, w, h, gh = g.values_at(:x, :z, :w, :h) + [geo[:height]]
+        anchor, angle = case g[:edge]
+                        when 'top' then [[x, 0.0, z + h - gh], 0.0]
+                        when 'bottom' then [[x + w, 0.0, z + gh], Math::PI]
+                        when 'left' then [[x + gh, 0.0, z], -Math::PI / 2.0]
+                        when 'right' then [[x + w - gh, 0.0, z + h], Math::PI / 2.0]
+                        end
+        g.merge(anchor: anchor, angle: angle, geometry: geo)
+      end
 
       # Zna engine tento profil? ('none' NIE — to nie je profil, ale jeho absencia)
       def known?(id)

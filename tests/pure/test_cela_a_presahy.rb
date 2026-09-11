@@ -67,7 +67,7 @@ NxTest.test('CELA-A: config JSON a copy/rebuild params zachovaju asymetriu a sch
   cb = NxCelaA::CB
   cfg = cb.normalize('width' => 600, 'height' => 720, 'depth' => 510, 'fronts' => NxCelaA.fronts)
   saved = JSON.parse(JSON.generate(cb.cabinet_config(cfg)))
-  NxTest.assert_equal(12, saved['config_schema'])
+  NxTest.assert_equal(cb::CONFIG_SCHEMA, saved['config_schema'])
   NxTest.assert_equal(5, NxCelaA::E::BuildPlan::SCHEMA)
   3.times do
     cfg = cb.normalize(cb.config_to_params(saved))
@@ -78,5 +78,5 @@ NxTest.test('CELA-A: config JSON a copy/rebuild params zachovaju asymetriu a sch
     panels = plan[:parts].select { |p| p[:role] == 'front_door' }
     NxTest.assert_equal([306.5, 306.5], panels.map { |p| p[:prod][:width] })
   end
-  NxTest.assert(cb.newer_config?('config_schema' => 13))
+  NxTest.assert(cb.newer_config?('config_schema' => cb::CONFIG_SCHEMA + 1))
 end

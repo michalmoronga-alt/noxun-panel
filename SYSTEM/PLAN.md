@@ -256,7 +256,10 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 - *(Kovanie — D-109/D-110/D-111 aj fáza 3 — sa 26.8. vyčlenilo do vlastného bloku **KOVANIE**; ten je od **10.9.2026 hotový** (v0.10.0), plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).)*
 #### BALÍK ČIEL (D-114 + D-119 + D-120)
 
-**Rozsah, mockup aj implementácia schválené 11.9.2026.** ČELÁ-A implementované (PR #347, v0.10.6); sekvenčné dávky ČELÁ-A → B → C.
+**Rozsah, mockup aj implementácia schválené 11.9.2026.** ČELÁ-A zlúčené (PR #347, v0.10.6); sekvenčné dávky ČELÁ-A → B1 → B2 → C.
+Pôvodný PR #348 sa po treťom kole nálezov uzavrel a rozdelil podľa pravidla repozitára. Rozsah ani schválené správanie sa nemenia.
+**B1:** geometria, schéma 13, profily piatich typov, výroba/seed a čistenie neaplikovateľných seed zásahov; minimálny prenos hrany a náhľad.
+**B2:** per-čelo aj hromadné ovládače, čítací callback, potvrdenie návrhu, všetky relaye a ich odmietacie odpovede. Každá časť má vlastné testy/review a začína z čerstvého mainu.
 **Audit ÁNO** pre A/B (config, geometria, profilový kontrakt a čítací callback); C je UI.
 Podklad: [outside-in a reconcile](zdroje/next_sessions/CELA_OUTSIDE_IN_2026-09-11.md).
 Kontrola návrhu: [Astra audit a SOUND delta](zdroje/next_sessions/CELA_AUDIT_2026-09-11.md).

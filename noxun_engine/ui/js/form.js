@@ -47,6 +47,7 @@
       // (vzor D-90 `profile`). ROZDIEL oproti profilu: ŽIADNY default sa
       // nedopĺňa. Kľúč, ktorý v configu nebol, sa tu NESMIE objaviť — inak by
       // legacy zákazka dostala RED nález o neurčenom smere.
+      if (Object.prototype.hasOwnProperty.call(r.dataset, 'frontProfileEdge')) item.profile_edge = r.dataset.frontProfileEdge;
       frontExtraApply(item, r);
       items.push(item);
     }
@@ -1117,6 +1118,7 @@
     // riadku (cyklila by sa nepouzitelne pri viacerych profiloch), ale skupina
     // „Úchytky"; ikona ostala INDIKATOR.
     row.dataset.frontProfile = item.profile || 'none';
+    if (Object.prototype.hasOwnProperty.call(item, 'profile_edge')) row.dataset.frontProfileEdge = String(item.profile_edge);
     // KOV-A2a: TYP riadku zije v datasete rovnako ako profil — rozbalovacka
     // zanikla, meni ho dlazdica typegridu v karte cela.
     row.dataset.frontType = item.type || 'door';

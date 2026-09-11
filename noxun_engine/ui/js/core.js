@@ -84,11 +84,9 @@
   }
   // KOV-A1 (Codex #280 P2-D): typy cela, ktore uchytkovy profil NEMAJU —
   // ZRKADLO servera (`Fronts::PROFILELESS_TYPES`). Bez zrkadla by UI ponukalo
-  // UKW profil aj na vyklope/sklope/blende, spustilo prestavbu a Ruby by volbu
-  // TICHO zahodilo (normalize ich sklopi na 'none') — pouzivatel by videl
-  // nastavenie, ktore sa nikdy nikde neprejavi. Ruby guard v
+  // profil na prazdnej nike. D-120 spristupnuje vsetky skutocne panely. Ruby guard v
   // `tests/pure/test_kova1_cela.rb` strazi, ze sa zoznamy NEROZIDU.
-  var PROFILELESS_FRONT_TYPES = ['none', 'lift', 'fall', 'blind'];
+  var PROFILELESS_FRONT_TYPES = ['none'];
   function frontProfileless(type){ return PROFILELESS_FRONT_TYPES.indexOf(type) >= 0; }
   // Cela, ktorych sa rozsah tyka. scope = 'all' | 'door' | 'drawer_front'.
   // Profileless typy sa VYNECHAVAJU vo VSETKYCH rozsahoch (aj v „všetky") —
@@ -103,14 +101,30 @@
   //   '<id>' = vsetky cela rozsahu maju ten isty profil ('none' = ziadny),
   //   ''     = rozsah je PRAZDNY (nie je co nastavovat),
   //   null   = cela rozsahu sa lisia (select ukaze „(rôzne)").
-  function frontProfileCommon(items, scope){
+  function frontProfileCommon(items, scope, key){
     var list = frontProfileScopeItems(items, scope);
     if (!list.length) return '';
-    var first = list[0].profile || 'none';
+    key = key || 'profile';
+    var value = function(it){ return key === 'profile_edge' ? frontProfileEdge(it) : (it.profile || 'none'); };
+    var first = value(list[0]);
     for (var i = 1; i < list.length; i++){
-      if ((list[i].profile || 'none') !== first) return null;
+      if (value(list[i]) !== first) return null;
     }
     return first;
+  }
+  var FRONT_EDGE_LABELS = { top:'Hore', bottom:'Dole', left:'Vľavo', right:'Vpravo', free:'Bočná oproti pántom' };
+  function frontProfileEdge(item){
+    return Object.prototype.hasOwnProperty.call(item || {}, 'profile_edge') ? item.profile_edge : 'top';
+  }
+  function frontProfileEdges(type){
+    return type === 'door' ? ['top','bottom','free'] : (type === 'none' ? [] : ['top','bottom','left','right']);
+  }
+  function frontProfileScopeEdges(items, scope){
+    var list = frontProfileScopeItems(items, scope);
+    if (!list.length) return [];
+    return frontProfileEdges(list[0].type).filter(function(edge){
+      return list.every(function(it){ return frontProfileEdges(it.type).indexOf(edge) >= 0; });
+    });
   }
   // Veta do skupiny Uchytky — co je NASADENE (nie co sa chysta).
   // items = [{ label:'F1', type, profile }] v DATOVOM poradi; reg = registry.
@@ -568,6 +582,7 @@
   // (bez `|`), preto staci jednoduchy oddelovac.
   function frontCardFocusKey(attrs){
     var a = attrs || {};
+    if (a.pc === 'profile' || a.pc === 'edge') return 'p:' + a.pc;
     if (a.t) return 't:' + a.t;
     if (a.k && a.v != null && a.v !== '') return 's:' + a.k + '|' + a.v + '|' + (a.w || '');
     // KOV-D2b: ovladace chipov osi. Identita je (os, druh ovladaca) — v karte
@@ -582,6 +597,7 @@
   // fokusovany cudzi ovladac).
   function frontCardFocusSelector(key){
     if (!key) return null;
+    if (key === 'p:profile' || key === 'p:edge') return '[data-pc="' + key.slice(2) + '"]';
     if (key.indexOf('t:') === 0) return key.length > 2 ? '[data-t="' + key.slice(2) + '"]' : null;
     if (key.indexOf('a:') === 0){
       var q = key.slice(2).split('|');
@@ -1379,6 +1395,8 @@
       // KOV-A1 (P2-D): zrkadlo Fronts::PROFILELESS_TYPES + jeho predikat
       PROFILELESS_FRONT_TYPES: PROFILELESS_FRONT_TYPES, frontProfileless: frontProfileless,
       frontProfileCommon: frontProfileCommon,
+      frontProfileEdge: frontProfileEdge, frontProfileEdges: frontProfileEdges,
+      frontProfileScopeEdges: frontProfileScopeEdges, FRONT_EDGE_LABELS: FRONT_EDGE_LABELS,
       frontProfileStateText: frontProfileStateText,
       // KOV-A2a (tests/js/test_kova2a_karta.js) — ciste jadro karty cela:
       // view-model, tri VYROBCOVIA stavu „neurcene" a symboly nahladu.

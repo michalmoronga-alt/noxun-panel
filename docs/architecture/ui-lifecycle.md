@@ -827,6 +827,9 @@ cesta, akou počíta builder, takže sa kontrola a stavba nemôžu rozísť; zly
 
 ### Kontext Čelá (UI-C3, panel.html + ui/js/form.js + ui/js/core.js + ui/js/settings.js + ui/js/preview.js)
 
+**ČELÁ-B1 (v0.10.7):** formulár prenáša prítomné `profile_edge` bez dopĺňania defaultu. Náhľad kreslí fyzické `profile_edges` uložených riadkov;
+top/bottom skracuje výšku, left/right šírku, `free` bez resolved hrán nič neodhaduje. Profil podporujú všetky fyzické typy. Nové ovládače hrán a korelovaný návrh patria do B2.
+
 tri skupiny v **záväznom poradí** — **Zoznam čiel** (`data-key="fronts"`) · **Úchytky** (`fhandles`) · **Medzery a presahy** (`fgaps`). Riadok čela `.frow` je od SMOKE PACKU 1
 **STĹPEC**: hore `.fmain` = ovládače v **pevnom, NEZALAMOVACOM** rade, pod ním riadok naviazaného kovania `.fhw`. Predtým bol `.frow` jeden zalamovací rad a pri **vypísanej** výške
 (pribudlo „mm" + chip AUTO) súčet presiahol šírku panela — krížik `.fdel` padol o riadok nižšie a riadok sa rozbil (Michalov smoke test 20.8.). `.fmain` nesie: `.fnum` (kanonická

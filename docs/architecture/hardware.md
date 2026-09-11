@@ -13,6 +13,11 @@ Pravidlá kovania (projektový snapshot na modeli), globálny katalóg položiek
 pravidlá kovania (V0.4): Ruby vzory `fixed`/`bands`/`fit_series` parametrizované JSON pravidlami; **projektový snapshot na modeli** (kľúč `hardware_rules` — rebuild
 reprodukovateľný z .skp; globál `%APPDATA%` len default nových projektov + seed-merge); `hardware_overrides` v configu korpusu s identitou (owner_part_key, generic_type, rule_id).
 
+**D-120 (v0.10.7, SEED_VERSION 7):** `part_flag_length` používa `FrontProfiles.cut_length` — vodorovný profil má rez po šírke, zvislý po výške; neplatná anotácia nedá
+odhadnutú dĺžku. Tri nové pravidlá pokrývajú flap/up, flap/down a false_front, pôvodné rule_id dvierok/zásuviek držia. Vlastné zapnuté profilové pravidlo potlačí seed
+iba ak pokrýva rolu AJ smer (bez smeru oba). `part_rule_applies?` používa evaluate aj warning chýbajúceho pravidla. Existujúci projektový snapshot sa automaticky nemení;
+„Doplniť nové predvolené“ zapisuje pravidlá a prestavbu v jednej operácii. Brána `length_unsupported` a kusové nacenenie zostávajú bez zmeny.
+
 **KOV-W (v0.9.47) — vstup `weight` (`INPUT_WEIGHT`, kg).** Vedľa `height`/`width` (prod rozmery dielca) vie `input_value` čítať aj **hmotnosť dielca** z anotácie plánu
 (`pd[:weight_kg]`, viď [construction.md](construction.md)) — pripravené pre závesy (KOV-F) a výklopy (KOV-E), kde o kovaní rozhoduje hmotnosť čela. Konštanta je **jediná
 autorita názvu**; nie je to kontextový kľúč (`CONTEXT_KEYS`), lebo hodnota patrí DIELCU, nie korpusu. Hmotnosť čela je počítaná z **katalógovej hrúbky** (25 mm čelo teda

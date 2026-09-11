@@ -42,10 +42,8 @@ module Noxun
       TYPES = %w[door drawer_front lift fall blind none].freeze
       # Typy s rolou `flap` (jeden panel, smer vyklapania nesie `flap_dir`).
       FLAP_TYPES = %w[lift fall].freeze
-      # Typy, ktore NEMAJU uchytkovy profil (D-90 profilove pravidlo pozna len
-      # dvierka a zasuvkove celo — profil na vyklope by vyrobil falosny
-      # `profile_rule_missing`; profil na pohyblivych celach je KOV-E/F).
-      PROFILELESS_TYPES = %w[none lift fall blind].freeze
+      # D-120: profil moze mat kazdy fyzicky panel; prazdna nika ho nema.
+      PROFILELESS_TYPES = %w[none].freeze
       # Smer otvarania = STRANA PANTOV (Michal 3.9.2026): 'left' = panty vlavo.
       # TROJSTAV (audit #14 BLOCKER 1): kluc CHYBA = legacy (ziadny nalez, NIKDY
       # sa nedoplna) · 'unset' = pouzivatel vedome nechal neurcene (RED) ·
@@ -106,12 +104,48 @@ module Noxun
       # D-90: warnings su kanonicky kanal planu (Construction ich pripoji do
       # plan[:warnings]) — nefatalne upozornenia matematiky ciel.
       def layout(fronts_cfg, width, height, floor_height, _thickness)
+        r = resolve_layout(fronts_cfg, width, height, floor_height)
+        parts = []; warnings = []
+        r[:items].each_with_index do |item, i|
+          b = r[:bounds][item['id']]
+          edges = profile_edges(item)
+          item['profile_edges'] = edges if FrontProfiles.of(item)
+          validate_profile!(item, i + 1, b[:height], r[:opening_w], r[:gap], warnings)
+          panels = panels_for(item, i + 1, r[:x], r[:opening_w], b[:z0], b[:height], r[:gap])
+          panels.each_with_index { |pd, j| FrontProfiles.fit_panel!(pd, edges[j]) }
+          parts.concat(panels)
+        end
+        { parts: parts, items: r[:items], wings: r[:wings], warnings: warnings, bounds: r[:bounds] }
+      end
+
+      # Cisty read-only preflight. Sloty sa vyriesia AJ pri neplatnom profile,
+      # aby UI vedelo vypytat chybajuci smer bez docasnej prestavby modelu.
+      def preflight(fronts_cfg, width, height, floor_height)
+        r = resolve_layout(fronts_cfg, width, height, floor_height)
+        errors = []; warnings = []
+        r[:items].each_with_index do |item, i|
+          begin
+            item['profile_edges'] = profile_edges(item)
+            validate_profile!(item, i + 1, r[:bounds][item['id']][:height], r[:opening_w], r[:gap], warnings)
+          rescue RuntimeError => e
+            item['profile_edges'] = []
+            errors << { 'front_id' => item['id'], 'message' => e.message }
+          end
+        end
+        { 'valid' => errors.empty?, 'items' => r[:items], 'errors' => errors }
+      end
+
+      # Rozklad riadkov a pocet kridel su spolocne pre zapis aj preflight.
+      def resolve_layout(fronts_cfg, width, height, floor_height)
+        unless [width, height, floor_height].all? { |v| v.is_a?(Numeric) && v.to_f.finite? }
+          raise 'Rozmery čiel musia byť konečné čísla.'
+        end
         cfg = normalize_config(fronts_cfg)
         # D-07: rozsahy medzier platia VZDY (aj bez ciel) — neplatne hodnoty sa
         # nesmu ulozit cez externy callback a vybuchnut az po pridani cela.
         validate_gap_ranges!(cfg)
         items = cfg['items']
-        return { parts: [], items: [], wings: 0, warnings: [], bounds: {} } if items.nil? || items.empty?
+        return { items: [], wings: 0, bounds: {} } if items.nil? || items.empty?
 
         gap = cfg['gap']; gt = cfg['gap_top']; gb = cfg['gap_bottom']; gl = cfg['gap_left']
         n = items.size
@@ -125,9 +159,7 @@ module Noxun
         validate_layout!(cfg, opening_w, total_v, fixed_sum, auto_count)
         auto_h = auto_count.zero? ? 0.0 : remaining / auto_count
 
-        parts = []
         resolved = []
-        warnings = []
         # KOV-C1: ADITIVNY kanal NEZAOKRUHLENYCH hranic riadkov ciel
         # ({ front_id => { z0, z1, height } }). `items` (= ulozeny `front_items`)
         # ostavaju NEDOTKNUTE — dalej nesu `round(2)`. Recepty zasuviek
@@ -139,14 +171,12 @@ module Noxun
         items.each_with_index do |it, i|
           idx = i + 1
           h = it['mode'] == 'fixed' ? it['height'].to_f : auto_h
-          validate_profile!(it, idx, h, warnings)
-          panels = panels_for(it, idx, gl, opening_w, z, h, gap)
-          total_wings += panels.size if it['type'] == 'door'
-          parts.concat(panels)
+          wn = it['type'] == 'door' ? resolve_wings(it['wings'], opening_w) : 1
+          total_wings += wn if it['type'] == 'door'
           res = {
             'id' => it['id'] || "F#{idx}", 'type' => it['type'], 'mode' => it['mode'],
             'height' => h.round(2), 'locked' => !!it['locked'], 'wings' => it['wings'],
-            'wings_n' => (it['type'] == 'door' ? panels.size : 1), # D-07: efektivny pocet kridiel pre nahlad
+            'wings_n' => wn, # D-07: efektivny pocet kridiel pre nahlad
             # D-90: profil riadku ide aj do resolved itemu (nahlad/UI v PR 2).
             'profile' => it['profile'] || FrontProfiles::NONE,
             'z' => z.round(2)
@@ -156,6 +186,7 @@ module Noxun
           # `Bom.collect`. Nove polia musia prejst aj tadiaj, ale VYHRADNE ako
           # pass-through: co v polozke NIE JE, sa tu NEVYMYSLI.
           DORMANT_KEYS.each { |k| res[k] = it[k] if it.key?(k) }
+          res['profile_edge'] = it['profile_edge'] if it.key?('profile_edge')
           # `flap_dir` je ODVODENY z typu (nie je to default smeru dvierok —
           # trojstav O1 sa tyka STRANY PANTOV, toto je smer vyklapania).
           res['flap_dir'] = (it['type'] == 'fall' ? 'down' : 'up') if FLAP_TYPES.include?(it['type'])
@@ -167,7 +198,7 @@ module Noxun
           bounds[res['id']] = { z0: z.to_f, z1: (z + h).to_f, height: h.to_f }
           z += h + gap
         end
-        { parts: parts, items: resolved, wings: total_wings, warnings: warnings, bounds: bounds }
+        { items: resolved, wings: total_wings, bounds: bounds, opening_w: opening_w, x: gl, gap: gap }
       end
 
       # --- KOV-A1: JEDINA definicia „kde sa smer pyta" ------------------------
@@ -218,23 +249,53 @@ module Noxun
       # Riadkova matematika sa nemeni — profil zabera hornych `reduction` mm riadku.
       #   panel <= BuildPlan::MIN_DIM  -> raise (panel by neexistoval)
       #   panel <  MIN_PROFILE_PANEL   -> warning (postavi sa, ale skoro iste omyl)
-      def validate_profile!(item, idx, h, warnings)
+      def validate_profile!(item, idx, h, opening_w, gap, warnings)
         red = FrontProfiles.reduction(item['profile'])
         return if red <= 0.0 || item['type'] == 'none'
-        panel_h = h.to_f - red
+        edge = profile_edges(item).first
+        vertical = FrontProfiles.vertical?(edge)
+        n = item['type'] == 'door' ? item['wings_n'] : 1
+        dimension = vertical ? (opening_w - (n - 1) * gap) / n : h
+        panel = dimension - red
         pname = FrontProfiles.name(item['profile']) || 'Profil'
-        if panel_h <= BuildPlan::MIN_DIM
-          raise "Čelo #{idx} s profilom je príliš nízke: #{pname} zaberá #{fmt_mm(red)} mm " \
-                "z výšky #{fmt_mm(h)} mm a na panel nezostane nič. Zväčši výšku čela alebo vypni profil."
+        axis = vertical ? 'šírky krídla' : 'výšky'
+        if panel <= BuildPlan::MIN_DIM
+          raise "Čelo #{idx} s profilom je príliš #{vertical ? 'úzke' : 'nízke'}: #{pname} zaberá #{fmt_mm(red)} mm " \
+                "z #{axis} #{fmt_mm(dimension)} mm a na panel nezostane nič. Zväčši čelo alebo vypni profil."
         end
-        return if panel_h >= MIN_PROFILE_PANEL
+        return if panel >= MIN_PROFILE_PANEL
         warnings << BuildPlan.warning(
           'profile_panel_low',
           "Čelo #{idx}: po odčítaní profilu (#{pname}, #{fmt_mm(red)} mm) zostáva panel " \
-          "#{fmt_mm(panel_h)} mm — skontroluj, či je to zámer.",
-          data: { 'front_id' => (item['id'] || "F#{idx}").to_s, 'panel_height' => panel_h.round(2),
-                  'profile' => item['profile'].to_s }
+          "#{fmt_mm(panel)} mm — skontroluj, či je to zámer.",
+          data: { 'front_id' => item['id'].to_s,
+                  (vertical ? 'panel_width' : 'panel_height') => panel.round(2), 'profile' => item['profile'].to_s }
         )
+      end
+
+      # Fyzicka hrana kazdeho kridla. Volna hrana je VZDY oproti pantom;
+      # vsetky nededukovane smery cita vyhradne direction_slots.
+      def profile_edges(item)
+        edge = item.key?('profile_edge') ? item['profile_edge'] : 'top'
+        unless (FrontProfiles::EDGES + ['free']).include?(edge)
+          raise "Čelo #{item['id']}: vyber platnú hranu profilu."
+        end
+        return [] if item['type'] == 'none' || !FrontProfiles.of(item)
+        allowed = item['type'] == 'door' ? %w[top bottom free] : FrontProfiles::EDGES
+        raise "Čelo #{item['id']}: pre tento typ vyber inú hranu profilu." unless allowed.include?(edge)
+        n = item['type'] == 'door' ? item['wings_n'].to_i : 1
+        return Array.new(n, edge) unless edge == 'free'
+
+        slots = direction_slots(item)
+        if slots.any? { |slot| !%w[left right].include?(slot[:state]) }
+          raise "Čelo #{item['id']}: pre bočný profil najprv urči smer pántov."
+        end
+        hinges = if n == 1
+                   [slots.first[:state]]
+                 else
+                   ['left'] + slots.map { |slot| slot[:state] } + ['right']
+                 end
+        hinges.map { |hinge| hinge == 'left' ? 'right' : 'left' }
       end
 
       # Cele mm bez desatin, inak 1 desatinne miesto (slovenska ciarka) — hlasky.
@@ -281,9 +342,8 @@ module Noxun
         front_id = item['id'].to_s
         front_id = "F#{idx}" if front_id.empty?
         prof = FrontProfiles.normalize(item['profile'])
-        red = FrontProfiles.reduction(prof)
-        ph = h - red # vyska PANELU (bez pasma profilu)
-        band = red.positive? ? { z: (z + ph).round(2), h: red } : nil
+        ph = h # celkovy obrys; profil skrati panel az po validacii
+        band = nil
         if item['type'] == 'drawer_front'
           [box_desc("DRW-#{idx}", PartKeys.front(front_id, 'panel'),
                     'drawer_front', "Zasuvkove celo #{idx}", gs, opening_w, z, ph,
@@ -506,6 +566,9 @@ module Noxun
             'wings' => (type == 'door' ? wings : 1),
             'profile' => profile
           }
+          if it.key?('profile_edge') || it.key?(:profile_edge)
+            out['profile_edge'] = it.key?('profile_edge') ? it['profile_edge'] : it[:profile_edge]
+          end
           # KOV-A1 DORMANT polia: kluc sa do vystupu dostane LEN ked ho vstup
           # naozaj nesie v platnom tvare — chybajuci kluc sa NIKDY nedoplna
           # (inak by legacy zakazka dostala RED smerovy nalez, ktory si nikto

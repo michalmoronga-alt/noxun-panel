@@ -276,6 +276,159 @@ module NoxunSuRunner
     end
   end
 
+  def cela_b_params(width = 600.0)
+    params = cela_a_params(width)
+    params['floor_height'] = 0.0
+    params['fronts']['items'][0].merge!('profile' => 'ukw7', 'profile_edge' => 'free')
+    params
+  end
+
+  def cela_b_check(inst, width, label)
+    cfg = e::Store.config(inst) || {}
+    it = cfg.dig('fronts', 'items', 0) || {}
+    ok("CELA-B #{label}: semanticka hrana prezila", it['profile_edge'] == 'free')
+    parts = inst.definition.entities.grep(Sketchup::ComponentInstance)
+                .select { |p| e::Store.get(p, 'role') == 'front_door' }.sort_by { |p| p.transformation.origin.x }
+    wing = (width + 13.0) / 2.0
+    ok("CELA-B #{label}: oba panely existuju", parts.length == 2)
+    parts.each_with_index do |p, i|
+      x = i.zero? ? -18.0 : -18.0 + wing + 3.0 + 36.0
+      pc = e::Store.config(p) || {}
+      ok("CELA-B #{label}: panel #{i + 1} poloha/rozmer/vyroba",
+         (mm(p.transformation.origin.x) - x).abs < TOL &&
+         (mm(p.definition.bounds.width) - (wing - 36.0)).abs < TOL &&
+         (pc['width'].to_f - (wing - 36.0)).abs < TOL && (pc['length'].to_f - 716.0).abs < TOL)
+    end
+    profiles = inst.definition.entities.grep(Sketchup::ComponentInstance)
+                   .select { |p| (e::Store.config(p) || {})['proxy'] == true && e::Store.get(p, 'role') == 'handle' }
+    ok("CELA-B #{label}: dva profily", profiles.length == 2)
+    profiles.each do |p|
+      pc = e::Store.config(p) || {}; bb = p.bounds
+      ok("CELA-B #{label}: profil rez/tag/predna os",
+         (pc.dig('params', 'cut_length_mm').to_f - 716.0).abs < TOL &&
+         (mm(bb.max.z - bb.min.z) - 716.0).abs < TOL &&
+         (mm(bb.min.y) + 19.181).abs < TOL && mm(bb.max.y).abs < TOL &&
+         p.layer == parts.first.layer)
+    end
+  end
+
+  def run_cela_b(model)
+    cleanup(model)
+    inst = e::CabinetBuilder.build(model, cela_b_params)
+    cela_b_check(inst, 600.0, 'vklad')
+    before = e::Store.config(inst)
+    invalid = e::CabinetBuilder.config_to_params(JSON.parse(JSON.generate(before)))
+    invalid['fronts']['items'][0]['wings'] = '3'
+    rejected = false
+    begin
+      e::CabinetBuilder.rebuild(model, inst, invalid)
+    rescue RuntimeError => ex
+      rejected = ex.message.include?('smer pántov')
+    end
+    ok('CELA-B: chybajuci smer odmietne cely rebuild bez zmeny snapshotu', rejected && e::Store.config(inst) == before)
+    changed = e::CabinetBuilder.config_to_params(JSON.parse(JSON.generate(before)))
+    changed['fronts']['items'][0]['profile_edge'] = 'bottom'
+    e::CabinetBuilder.rebuild(model, inst, changed)
+    ok('CELA-B: dolna hrana je ulozena', e::Store.config(inst).dig('fronts', 'items', 0, 'profile_edge') == 'bottom')
+    Sketchup.undo
+    cela_b_check(inst, 600.0, 'Spat po hrane')
+    [true, false].each do |hw|
+      tpl = e::Panel.template_config_from(e::Store.config(inst), model: model, with_hardware: hw)
+      copy = e::CabinetBuilder.build(model, tpl)
+      cela_b_check(copy, 600.0, "sablona kovanie=#{hw}")
+    end
+    # Skutocne osadenie kanonickej definicie pre kazdu hranu, cez renderer.
+    %w[top bottom left right].each do |edge|
+      cfg = { 'gap_left' => 0, 'gap_right' => 0, 'gap_top' => 0, 'gap_bottom' => 0,
+              'items' => [{ 'id' => 'F1', 'type' => 'blind', 'mode' => 'auto', 'profile' => 'ukw7', 'profile_edge' => edge }] }
+      panel = e::Fronts.layout(cfg, 600.0, 720.0, 0.0, 18.0)[:parts].first
+      model.start_operation("SU CELA-B #{edge}", true)
+      proxy = e::CabinetBuilder.render_front_profile(model, model.entities, panel, 'TEST-B')
+      expected = case edge
+                 when 'top' then [0, 600, -19.181, 0, 682.581, 720]
+                 when 'bottom' then [0, 600, -19.181, 0, 0, 37.419]
+                 when 'left' then [0, 37.419, -19.181, 0, 0, 720]
+                 when 'right' then [562.581, 600, -19.181, 0, 0, 720]
+                 end
+      if proxy
+        bb = proxy.bounds
+        actual = [bb.min.x, bb.max.x, bb.min.y, bb.max.y, bb.min.z, bb.max.z].map { |v| mm(v) }
+        ok("CELA-B #{edge}: presne osadenie prierezu", actual.zip(expected).all? { |a, b| (a - b).abs < TOL })
+        ok("CELA-B #{edge}: proxy a nakup maju rovnaky rez",
+           e::Store.config(proxy).dig('params', 'cut_length_mm') == e::HardwareRules.flag_length_params(panel)['cut_length_mm'])
+      else
+        ok("CELA-B #{edge}: proxy existuje", false)
+      end
+      model.abort_operation
+    end
+    path = File.join(File.dirname(OUT), 'ENGINEtests_cela_b_saved.skp')
+    ok('CELA-B: ulozenie SKP', model.save_copy(path))
+    loaded = model.definitions.load(path)
+    saved = loaded.entities.grep(Sketchup::ComponentInstance).find { |p| e::Store.kind(p) == 'cabinet' }
+    ok('CELA-B: opatovne nacitanie SKP', !saved.nil?)
+    cela_b_check(saved, 600.0, 'SKP roundtrip') if saved
+    cleanup(model)
+    hr = e::HardwareRules
+    original_rules = model.get_attribute(e::Store::DICT, hr::MODEL_KEY)
+    legacy_rules = hr::SEED_RULES.reject { |r| %w[uchytkovy-profil-vyklop uchytkovy-profil-sklop uchytkovy-profil-blenda].include?(r['rule_id']) }
+    model.start_operation('CELA-B stary snapshot', true)
+    model.set_attribute(e::Store::DICT, hr::MODEL_KEY, JSON.generate('std' => hr::STD, 'seed_version' => 6, 'rules' => legacy_rules))
+    model.commit_operation
+    params = cela_b_params
+    params['fronts']['items'] = %w[lift fall blind].each_with_index.map do |type, i|
+      { 'id' => "F#{i + 1}", 'type' => type, 'mode' => 'auto', 'profile' => 'ukw7', 'profile_edge' => 'left' }
+    end
+    old = e::CabinetBuilder.build(model, params)
+    old_cfg = e::Store.config(old)
+    ok('CELA-B stary projekt: tri chybajuce pravidla su priznane a snapshot sa sam nedoplnil',
+       Array(old_cfg['warnings']).count { |w| w['code'] == 'profile_rule_missing' } == 3 &&
+       Array(old_cfg['hardware']).none? { |h| h['generic_type'] == 'handle' } && hr.project_doc(model)['seed_version'] == 6)
+    e::CabinetBuilder.rebuild_many(model, [[old, e::CabinetBuilder.config_to_params(old_cfg)]]) { hr.merge_project_seed!(model) }
+    new_cfg = e::Store.config(old)
+    handles = Array(new_cfg['hardware']).select { |h| h['generic_type'] == 'handle' }
+    ok('CELA-B doplnenie predvolieb: vyklop, sklop aj blenda dostali po jednom profile s rezom po vyske',
+       handles.length == 3 && handles.all? { |h| (h.dig('params', 'cut_length_mm').to_f - 236.67).abs < TOL } &&
+       Array(new_cfg['warnings']).none? { |w| w['code'] == 'profile_rule_missing' })
+    Sketchup.undo
+    ok('CELA-B doplnenie predvolieb: jedno Spat vrati pravidla aj vyrobny snapshot',
+       hr.project_doc(model)['seed_version'] == 6 && e::Store.config(old) == old_cfg)
+    model.start_operation('CELA-B obnovit snapshot', true)
+    model.set_attribute(e::Store::DICT, hr::MODEL_KEY, original_rules)
+    model.commit_operation
+    cleanup(model)
+    [['lift', 'fall', 'uchytkovy-profil-vyklop'], ['fall', 'lift', 'uchytkovy-profil-sklop'],
+     ['blind', 'door', 'uchytkovy-profil-blenda'], ['door', 'blind', 'uchytkovy-profil']].each do |from, to, rid|
+      p = cela_b_params
+      p['fronts']['items'] = [{ 'id' => 'F1', 'type' => from, 'mode' => 'auto', 'wings' => '1', 'profile' => 'ukw7', 'profile_edge' => 'top' }]
+      owner = from == 'door' ? 'wing:single' : (from == 'blind' ? 'blind' : 'flap')
+      p['hardware_overrides'] = [{ 'owner_part_key' => "front:F1/#{owner}", 'generic_type' => 'handle', 'rule_id' => rid, 'disabled' => true }]
+      flap = e::CabinetBuilder.build(model, p)
+      initial = e::Store.config(flap)
+      ok("CELA-B #{from}: rucne vypnuty profil kovania", initial['hardware_overrides'].length == 1 &&
+         Array(initial['hardware']).none? { |h| h['generic_type'] == 'handle' })
+      change = e::CabinetBuilder.config_to_params(JSON.parse(JSON.generate(initial)))
+      change['fronts']['items'][0]['type'] = to
+      e::CabinetBuilder.rebuild(model, flap, change)
+      now = e::Store.config(flap)
+      ok("CELA-B #{from}->#{to}: mrtvy zasah je prec a novy profil je v nakupe", now['hardware_overrides'].empty? &&
+         Array(now['hardware']).count { |h| h['generic_type'] == 'handle' } == 1)
+      Sketchup.undo
+      ok("CELA-B #{from}: jedno Spat vrati typ aj rucny zasah", e::Store.config(flap) == initial)
+      e::CabinetBuilder.rebuild(model, flap, change)
+      back = e::CabinetBuilder.config_to_params(e::Store.config(flap))
+      back['fronts']['items'][0]['type'] = from
+      e::CabinetBuilder.rebuild(model, flap, back)
+      final = e::Store.config(flap)
+      ok("CELA-B navrat na #{from}: stare vypnutie neozije", final['hardware_overrides'].empty? &&
+         Array(final['hardware']).count { |h| h['generic_type'] == 'handle' } == 1)
+      cleanup(model)
+    end
+  rescue StandardError => ex
+    log_line("FAIL: run_cela_b: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
+
   def run_cela_a(model)
     cleanup(model)
     inst = e::CabinetBuilder.build(model, cela_a_params)
@@ -18844,9 +18997,30 @@ module NoxunSuRunner
     state = {}
     steps = []
 
+    # D-120: nativne zmensovanie nesmie zmenit neplatny panel na chybajuci dielec.
+    steps << [0.1, lambda do
+      params = cela_b_params
+      params['fronts'].merge!('gap_left' => 25.0, 'gap_right' => 25.0)
+      params['fronts']['items'][0].merge!('wings' => '4', 'wing_directions' => { 'p2' => 'left', 'p3' => 'right' })
+      inst = e::CabinetBuilder.build(model, params)
+      state[:profile_small] = inst
+      state[:profile_before] = e::Store.config(inst)
+      model.start_operation('CELA-B neplatny Scale', true)
+      inst.transformation = inst.transformation * Geom::Transformation.scaling(ORIGIN, 1.0 / 3.0, 1.0, 1.0)
+      model.commit_operation
+    end]
+    steps << [SETTLE, lambda do
+      inst = state[:profile_small]
+      ok('CELA-B neplatny Scale: rollback zachoval config, panely aj cisty transform',
+         inst.valid? && e::Store.config(inst) == state[:profile_before] &&
+         e::ScaleWatch.scale_factors(inst.transformation).nil? &&
+         inst.definition.entities.grep(Sketchup::ComponentInstance).count { |p| e::Store.get(p, 'role') == 'front_door' } == 4)
+      cleanup(model)
+    end]
+
     # S1: scale -> absorpcia -> undo
     steps << [0.1, lambda do
-      inst = e::CabinetBuilder.build(model, cela_a_params)
+      inst = e::CabinetBuilder.build(model, cela_b_params)
       state[:s1] = inst
       # simulacia pouzivatelskeho Scale: 1 operacia, zmena transformacie (observer NIE je guardnuty)
       model.start_operation('SU-TEST user scale', true)
@@ -18859,7 +19033,7 @@ module NoxunSuRunner
       absorbed = (cfg['width'].to_f - 900.0).abs < 0.01
       clean = e::ScaleWatch.scale_factors(inst.transformation).nil?
       ok("async S1: absorpcia scale (600 -> #{cfg['width']}, transform cisty=#{clean})", absorbed && clean)
-      cela_a_check(inst, 900.0, 'Scale po observeri')
+      cela_b_check(inst, 900.0, 'Scale po observeri')
       Sketchup.undo # vrat absorpcny rebuild
     end]
     steps << [SETTLE, lambda do
@@ -18870,7 +19044,7 @@ module NoxunSuRunner
       if inst && inst.valid?
         cfg = e::Store.config(inst) || {}
         w = cfg['width'].to_f
-        cela_a_check(inst, 600.0, 'Spat po Scale')
+        cela_b_check(inst, 600.0, 'Spat po Scale')
         clean = e::ScaleWatch.scale_factors(inst.transformation).nil?
         ok("async S1: 1x undo vratil scale AJ absorpciu (sirka #{cfg['width']}, transform cisty=#{clean})",
            (w - 600.0).abs < 0.01 && clean)
@@ -18898,7 +19072,7 @@ module NoxunSuRunner
 
     # S2: kopia -> observer dedup -> undo
     steps << [0.5, lambda do
-      inst = e::CabinetBuilder.build(model, cela_a_params(500.0))
+      inst = e::CabinetBuilder.build(model, cela_b_params(500.0))
       state[:s2] = inst
       state[:s2_cid] = e::Store.get(inst, 'cabinet_id')
       # simulacia Ctrl+C/V: nova instancia + NOXUN atributy v JEDNEJ operacii (observer NIE je guardnuty)
@@ -18915,7 +19089,7 @@ module NoxunSuRunner
     steps << [SETTLE, lambda do
       copy = state[:s2_copy]
       new_cid = copy && copy.valid? ? e::Store.get(copy, 'cabinet_id') : nil
-      cela_a_check(copy, 500.0, 'nativna kopia po observeri') if new_cid
+      cela_b_check(copy, 500.0, 'nativna kopia po observeri') if new_cid
       orig_ok = state[:s2] && state[:s2].valid? && e::Store.get(state[:s2], 'cabinet_id') == state[:s2_cid]
       ok("async S2: observer dedup kopie (#{state[:s2_cid]} -> #{new_cid})",
          !new_cid.nil? && new_cid != state[:s2_cid] && orig_ok)
@@ -19611,6 +19785,7 @@ module NoxunSuRunner
     run_d118b(model)         # D-118b: PTOs modul a vedome prazdna bunka v ZIVOM retazci kniznica -> predvolby projektu -> vlozena Tip-On zasuvka -> nakup: pri NL 470 pribudne modul 352908 (1 ks, nazov z katalogu), pri NL 620 (kit typu PTO) modul VEDOME nepribudne a NEVZNIKNE ziadna oranzova; snapshot nesie std 6 (od KOV-E1a) a config schemu 8
     run_kovi(model)          # KOV-I: ulozenie S/BEZ kovania cez panel, badge data, automaticky recept/system/NL, projektove defaulty, 1x Spat vrati vklad aj freeze; poskodeny snapshot ulozi geometriu bez setov AJ manualu + jasny status (izolovane katalogy a sablony)
     run_cela_a(model)
+    run_cela_b(model)
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
