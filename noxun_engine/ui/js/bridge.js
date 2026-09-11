@@ -590,6 +590,9 @@
     },
     frontPreflight: function(result){ nxFrontPreflightResult(result); },
     frontApplyResult: function(result){ nxFrontApplyResult(result); },
+    historyRefresh: function(guid){
+      if (guid === nxDocGuid()) nxFrontDraftReset();
+    },
     loadSelected: function(c){
       // R-02 (review #264 kolo 3): IDENTITA DOKUMENTU JE PRVA VEC V PUSHI.
       // Dovod je poradie: nizsie sa rozhoduje `keepGaps` (ci sa ZACHOVAJU

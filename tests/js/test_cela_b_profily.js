@@ -106,6 +106,21 @@ function setup(){
   t.answer(old);assert.equal(c.frontDraft.pending,true);assert.equal(c.frontSlots,null);
   t.answer(t.sent[1]);assert.equal(c.frontDraft.valid,true);assert.equal(t.applied.length,0);
 }
+// Undo/Redo vyhra nad pending preflightom aj nad cakajucim apply/akciou.
+{
+  const t=setup(),c=t.c;
+  vm.runInContext(fs.readFileSync(path.join(dir,'bridge.js'),'utf8'),c);c.NX=c.window.NX;c.NX.setStatus=()=>{};
+  c.onField();const old=t.sent[0];
+  c.NX.historyRefresh('DOC-B');assert.equal(c.cabDraftDirty,true,'cudzi dokument navrh nerusi');
+  c.NX.historyRefresh('DOC-A');t.answer(old);t.fire();
+  assert.equal(c.cabDraftDirty,false);assert.equal(c.frontDraft,null);assert.equal(t.applied.length,0);
+  c.onField();t.answer(t.sent[1]);t.fire();const pending=t.applied[0];
+  let ran=0,failed=0;c.nxCabinetAction(()=>ran++,()=>failed++);
+  c.NX.historyRefresh('DOC-A');t.ack(pending);t.fire();
+  assert.equal(failed,1);assert.equal(ran,0);assert.equal(c.cabApplyRequest,null);
+  assert.equal(t.applied.length,1,'stary timer po historii nema dalsi zapis');
+}
+
 // UI projekcia pouziva fyzicke hrany; neznamy free bez odpovede nic nehada.
 for (const [relay, method] of [['studioRelay','studio_do_select'],['studioRelayExport','studio_do_export'],['studioRelayHwCsv','studio_do_hw_csv'],
   ['studioRelayBudget','studio_do_budget_xlsx'],['studioRelayCp','studio_do_cp_xlsx']]){

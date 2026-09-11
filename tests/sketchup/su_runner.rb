@@ -6103,9 +6103,9 @@ module NoxunSuRunner
       alias_method :nx_d101_sel, :on_selection_changed
       alias_method :nx_d101_flush, :flush_txn_refresh
       alias_method :nx_d101_push, :push_selected
-      define_method(:on_model_txn) do |model|
+      define_method(:on_model_txn) do |model, **kwargs|
         st[:txn] += 1
-        nx_d101_txn(model)
+        nx_d101_txn(model, **kwargs)
       end
       # Vstupy do sync vyberu — dokazuju, ze na modeli NEVISI observer vyberu
       # (rata sa PRED suspend guardom, takze ziadny guard vysledok neskresli).
@@ -19255,6 +19255,10 @@ module NoxunSuRunner
          st[:flush_dedups] == [false])
       ok("D101: Inspector dostal cerstvy stav (#{state[:d101_js].length} js volani)",
          state[:d101_js].any? { |s| s.include?('NX.loadSelected') || s.include?('NX.clearSelected') })
+      history = state[:d101_js].index { |s| s.start_with?('NX.historyRefresh(') }
+      loaded = state[:d101_js].index { |s| s.start_with?('NX.loadSelected(') }
+      ok('CELA-B2: skutocne Undo zrusi navrh PRED nacitanim obnovenej skrinky',
+         history && loaded && history < loaded)
       # COALESCING: dve rychle Ctrl+Z za sebou = JEDEN push najnovsieho stavu.
       inst = state[:d101_cab]
       d101_rebuild(model, inst, 800.0)
@@ -19336,6 +19340,8 @@ module NoxunSuRunner
            st[:txn] == 1 && st[:flush] == 1 && st[:flush_pushes] == 1 && st[:flush_dedups] == [false])
         ok("D101: priama invokacia doniesla Inspectoru cerstvy stav (#{state[:d101_js].length} js volani)",
            state[:d101_js].any? { |s| s.include?('NX.loadSelected') || s.include?('NX.clearSelected') })
+        ok('CELA-B2: redo callback zrusi aj rozpisany navrh Inspectora',
+           state[:d101_js].any? { |s| s.start_with?('NX.historyRefresh(') })
         ok("D101: priama invokacia NEsiahla na model — vychodisko scenara drzi (sirka #{w})",
            w && (w - 600.0).abs < 0.01)
       end

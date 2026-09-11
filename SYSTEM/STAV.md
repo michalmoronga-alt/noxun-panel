@@ -18,8 +18,8 @@ nálezy z výroby a chyby v cenách majú **najvyššiu prioritu** ([PLAN.md](PL
 **Pozor na kompatibilitu:** blok KOVANIE priniesol sériu schema bumpov — čo uloží v0.10.0, to starší plugin už nepoužije (model/šablóna `CONFIG_SCHEMA`, plán `BuildPlan::SCHEMA` 5,
 knižnica setov a snapshot `std`, katalóg kovania `schema`). Pred prvou takou zákazkou aktualizovať **obe PC** (updater D-52: Štúdio → O plugine → Aktualizovať).
 
-**Testy ČELÁ-B2:** **3829 headless · 113 JS sád**, skutočný Inspector pri 470 px s Ruby preflightom: smer stredného krídla, blokovaný výber zo Štúdia a zrušená šablóna.
-Geometrický dôkaz B1: **in-SketchUp 2295 PASS / 0 FAIL** (osadenia, výroba/rezy, šablóny, uloženie/návrat, Scale/Späť a kópia); B2 geometriu nemení. Ručné Redo zostáva.
+**Testy ČELÁ-B2:** **3830 headless · 113 JS sád**, skutočný Inspector pri 470 px s Ruby preflightom: smer stredného krídla, blokovaný výber zo Štúdia a zrušená šablóna.
+Aktuálny dôkaz B2 po oprave Undo: **in-SketchUp 2297 PASS / 0 FAIL** (osadenia, výroba/rezy, šablóny, uloženie/návrat, Scale/Späť a kópia); Undo/Redo refresh zruší čakajúci návrh pred načítaním obnovených hodnôt. Ručné Redo zostáva.
 **Michal 11.9. potvrdil úspešný test produktových odkazov aj potvrdzovania cien** (CENY-KOV-A/B, PR #345/#346).
 
 ## Robí sa

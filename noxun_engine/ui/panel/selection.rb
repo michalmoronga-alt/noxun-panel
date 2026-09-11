@@ -76,6 +76,7 @@ module Noxun
           detach_one('transakcie') { model.remove_observer(@model_observer) if @model_observer }
         ensure
           @observer_model = nil
+          @txn_history_model = nil
         end
 
         def detach_one(label)
@@ -113,10 +114,11 @@ module Noxun
         # (vzor EdgeCheck.request_redraw / EdgeModelWatch).
         # Multi-model guard (Codex audit FIX B): udalost z ineho dokumentu nesmie
         # prepisat Inspector aktivneho — a overuje sa ZNOVA v timeri.
-        def on_model_txn(model)
+        def on_model_txn(model, history: false)
           return unless @dialog
           return unless txn_model_ok?(model)
 
+          @txn_history_model = model if history
           request_txn_refresh(model)
         rescue StandardError => e
           Engine.log_error(e, 'Panel.on_model_txn')
@@ -151,6 +153,12 @@ module Noxun
           # NOTE F): pocas naseho vlastneho reselectu sa refresh len odlozi.
           return request_txn_refresh(model, 0.1) if @suspend_selection_sync
 
+          # CELA-B2: Undo/Redo je autoritativny stav, nie echo apply.
+          # Abort vlastneho apply tuto vetvu nema: jeho ack chrani novsi edit.
+          if @txn_history_model.equal?(model)
+            @txn_history_model = nil
+            js("NX.historyRefresh(#{model_guid(model).to_json})")
+          end
           push_selected(model, dedup: false)
         end
 
@@ -543,11 +551,11 @@ module Noxun
       # — vzor EdgeModelWatch): v callbacku sa NIC neceka, necita ani nemeni.
       class PanelModelObserver < Sketchup::ModelObserver
         def onTransactionUndo(model)
-          Panel.on_model_txn(model)
+          Panel.on_model_txn(model, history: true)
         end
 
         def onTransactionRedo(model)
-          Panel.on_model_txn(model)
+          Panel.on_model_txn(model, history: true)
         end
 
         def onTransactionAbort(model)

@@ -408,6 +408,10 @@ Guard „ten istý a zároveň aktívny dokument" sa overuje **dvakrát** (v cal
 `@suspend_selection_sync` sa testuje až v timeri a udalosť **nezahadzuje** (refresh sa len odloží). Push je **VŽDY `dedup: false`** — dedup žiada `ScaleWatch.request_dedup` (zásah
 do modelu) a z observer cesty je zakázaný (lekcia D-103); refresh preto nepridáva žiadny undo krok.
 
+ČELÁ-B2: Undo/Redo označia `history: true`; coalescing podrží model do odloženého refreshu. Ten pred stavom výberu pošle `NX.historyRefresh(doc)`.
+Zhodný dokument zruší rozpracovaný návrh, timer aj naviazanú akciu; oneskorený preflight/ack už nemôže obnoviť hodnoty spred Undo. Abort vlastného apply túto značku nemá,
+lebo jeho odmietací ack zachová prípadný novší edit. Detach odstráni aj značku histórie; bežné echo apply naďalej chráni práve písané polia.
+
 ### SketchUp toolbar (UI-02, žije v main.rb — NIE je vlastný modul)
 
 `Engine.install_toolbar` skladá toolbar „Noxun Engine" so 4 tlačidlami podľa kontraktu UI 2.0 (N4) — **logo** (prepínač Inspectora: `Panel.dialog_alive?` → `Panel.hide` /

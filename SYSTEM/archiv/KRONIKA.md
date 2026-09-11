@@ -17,6 +17,11 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **ČELÁ-B2 — OPRAVA UNDO Z REVIEW #350 (11.9.2026, v0.10.8).**
+  Undo/Redo refresh tej istej skrinky sa už nepovažuje za potvrdenie práve písaného návrhu. Pred obnovenými dátami zruší návrh, timer aj naviazanú akciu; stará odpoveď nič neobnoví.
+  Abort vlastného apply túto značku nemá, takže odmietnutý zápis zachová novší edit. Reset je viazaný na dokument a pri detachi sa značka čistí.
+  Overenie: 3830 headless, 113 JS sád, 2297 in-SketchUp PASS / 0 FAIL (skutočné Undo a poradie reset pred dátami; Redo callback), browser návrat dvojkrídla bez neskorého zápisu. Ručné Redo ostáva.
+
 - **ČELÁ-B2 — OVLÁDANIE HRÁN A POTVRDENIE NÁVRHU (11.9.2026, PR #350, v0.10.8).**
   Profil/hrana v karte aj hromadne pre všetkých päť fyzických typov. Nezávislé zmiešané hodnoty; zmena hrany profil nezapína.
   Čistý preflight určí chýbajúce smery a výsledné hrany, rozpracovaná zmena zostane vo formulári. Export/kópia/Štúdio/šablóna počkajú na potvrdený zápis.
