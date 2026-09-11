@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.10.8 · 11.9.2026 — ČELÁ-A/B: samostatné presahy a profily na všetkých hranách vrátane ovládania.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.11.0 · 11.9.2026 — BALÍK ČIEL KOMPLET (D-114 + D-119 + D-120).** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -15,27 +15,23 @@ nálezy z výroby a chyby v cenách majú **najvyššiu prioritu** ([PLAN.md](PL
 **Hotové veľké celky:** INSPECTOR REWORK (UI-A…UI-D) · **fáza ŠTÚDIO** (ŠT-1a…ŠT-4b, PR #192–#228) — **zaniklo šesť okien** · **blok KRESBA** · **blok GHOST VKLADANIE**
 (v0.9.0) · **blok KOVANIE** (v0.9.14 → v0.10.0, 50 PR #277–#340 — plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md)).
 **Výstupy zákaziek bez zásuvkovej klasifikácie sú obsahovo identické** (golden, CSV bajtovo).
-**Pozor na kompatibilitu:** blok KOVANIE priniesol sériu schema bumpov — čo uloží v0.10.0, to starší plugin už nepoužije (model/šablóna `CONFIG_SCHEMA`, plán `BuildPlan::SCHEMA` 5,
-knižnica setov a snapshot `std`, katalóg kovania `schema`). Pred prvou takou zákazkou aktualizovať **obe PC** (updater D-52: Štúdio → O plugine → Aktualizovať).
+**Kompatibilita:** v0.11.0 ukladá konfiguráciu skrinky v schéme 13; výrobný plán ostáva v schéme 5. Plugin podporujúci schému nižšiu než 13 nové konfigurácie neprestaví ani nepoužije ako šablónu.
+Pred prvou takou zákazkou aktualizovať **obe PC** (Štúdio → O plugine → Aktualizovať).
 
-**Testy ČELÁ-B2:** **3830 headless · 113 JS sád**, skutočný Inspector pri 470 px s Ruby preflightom: smer stredného krídla, blokovaný výber zo Štúdia a zrušená šablóna.
-Aktuálny dôkaz B2 po oprave Undo: **in-SketchUp 2297 PASS / 0 FAIL** (osadenia, výroba/rezy, šablóny, uloženie/návrat, Scale/Späť a kópia); Undo/Redo refresh zruší čakajúci návrh pred načítaním obnovených hodnôt. Ručné Redo zostáva.
+**Testy uzáveru Čiel:** **3830 headless · 113 JS sád**, skutočný Inspector pri 470 px: šesť typov, jedna karta, klávesnica, pevná výška/AUTO, hrany a potvrdenie návrhu.
+Geometrický dôkaz B2: **in-SketchUp 2297 PASS / 0 FAIL** (osadenia, výroba/rezy, šablóny, uloženie/návrat, Scale/Späť a kópia); C geometriu nemení. Ručné Redo zostáva.
 **Michal 11.9. potvrdil úspešný test produktových odkazov aj potvrdzovania cien** (CENY-KOV-A/B, PR #345/#346).
 
 ## Robí sa
 
-**BALÍK ČIEL (D-114 + D-119 + D-120) — implementácia, 11.9.2026.** Michal schválil samostatné ľavé/pravé presahy pre celú skrinku,
-UKW na všetkých štyroch hranách a aj na výklope/sklope/blende; zvislé profily dvierok vždy oproti pántom (dvojkrídlo v strede).
-Ovládanie: profil/hrana v karte čela + hromadné Úchytky; štyri okraje v dvoch riadkoch; šesť piktogramov na pridanie typu.
-Úplné packages **ČELÁ-A → B1 → B2 → C** sú v [PLAN.md](PLAN.md). Lokálna interaktívna ukážka `_dev/cela-plan/index.html` je návrh, nie runtime pluginu.
-Outside-in a Astra audit spracované, kontrola zapracovania **SOUND**. ČELÁ-A zlúčené v PR #347; pôvodný B PR #348 uzavretý po treťom kole a rozdelený podľa pravidla repozitára.
-**B1 (#349)** zlúčené: geometria, schéma 13, seed 7 a čistenie zásahov. **B2 (#350)** implementované: ovládanie hrán a potvrdenie návrhu, D-120 uzavreté. **C** zostáva: šesť ikon a upratanie kontextu.
+**Schválený balík Čiel je dokončený:** A (#347) samostatné okraje celej skrinky; B1/B2 (#349/#350) UKW na všetkých hranách piatich typov a potvrdenie návrhu; C (#351) priamy rad šiestich typov a upratanie Inspectora.
+Dvierka majú zvislý profil vždy oproti pántom, dvojkrídlo v strede. Pri neurčenom smere formulár počká na voľbu; profil aj hrana sa menia v karte alebo hromadne.
+Celé zadanie vrátane prenosových ciest a overenia je v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), všetky tri D-čísla v archíve dogfoodingu.
 **Blok 1d** podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**. Blok **1b** je uzavretý, **1c/1e hotové**.
 
 ## Ďalší krok
 
-Uzavrieť review/merge B2 (#350), potom z čerstvého mainu C (D-114) a uzáver celého balíka. Geometrický dôkaz B1 aj browser kontrola návrhu B2 sú dokončené.
-Ostatné V1 bloky ostávajú podľa [PLAN.md](PLAN.md).
+Michalov smoke hotových Čiel a ručné Redo v testovacom projekte. Ďalší blok vyberá Michal podľa [PLAN.md](PLAN.md); toto schválenie nepokrýva iný blok.
 
 ## Posledné uzávery
 
@@ -46,7 +42,7 @@ Ostatné V1 bloky ostávajú podľa [PLAN.md](PLAN.md).
   (hmotnosť dielcov aj skrinky je v Inspectore) · **nohy 4/6 podľa šírky korpusu + príchyt sokla**, vetou v Základných **už pri vkladaní** · **šablóny vedia uložiť
   aj kovanie** (voľba + súhrn na dlaždici) · **ad-hoc kovanie** priamo v Inspectore · katalóg pozná **kódy, ktoré si plugin sám objednáva** (114 položiek D-118
   + AXILO/STRONG) · **updater** „Aktualizovať jedným klikom" (D-52) — vstupná podmienka celého bloku. Vyriešené postrehy: D-52 · D-110 · D-111 · D-115 · D-116 ·
-  D-118 · D-121 · D-125. Otvorené ostáva **D-114 balík Čiel** (s D-119/D-120) a **D-109** (pomerová mechanika = R-05 po V1). Detail v [archiv/KRONIKA.md](archiv/KRONIKA.md).
+  D-118 · D-121 · D-125. D-114/D-119/D-120 uzavrel balík Čiel (v0.11.0); otvorené ostáva **D-109** (pomerová mechanika = R-05 po V1). Detail v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **Staršie uzávery** (v0.9.58–v0.9.61 **KOV-G** nohy a príchyty + **KOV-I** šablóny · v0.9.53–v0.9.57 **KOV-E** výklopy + fixy #335/#336 · v0.9.48–v0.9.52 **KOV-F** závesy ·
   v0.9.47 **KOV-W** hmotnosť · v0.9.43–v0.9.46 **D-118** katalógový seed a **D-121** názvy dielcov + VEPO ≤ 20 znakov · v0.9.29–v0.9.42 **KOV-C/KOV-D** recepty zásuviek a ich
   ovládanie · v0.9.19–v0.9.26 **KOV-B** sety a katalóg · v0.9.16–v0.9.21 **KOV-A** typy čiel a smery + **KOV-H** ad-hoc kovanie · v0.9.14 **D-52** updater · v0.9.24–v0.9.28

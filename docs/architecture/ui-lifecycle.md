@@ -831,8 +831,13 @@ cesta, akou počíta builder, takže sa kontrola a stavba nemôžu rozísť; zly
 
 ### Kontext Čelá (UI-C3, panel.html + ui/js/form.js + ui/js/core.js + ui/js/settings.js + ui/js/preview.js)
 
+**ČELÁ-C / D-114 (v0.11.0):** `renderFrontAddTypes` vytvorí jeden stabilný rad šiestich ikon z `FRONT_CARD_TYPES` a existujúcej mapy `FRONT_TYPE_ICON`.
+Každá volá `addFrontKind` s konkrétnym typom; nové dvierka aj prázdna nika používajú existujúce výrobce a výškový fokus. Rad sa pri echu neprestavia.
+Pri 470 px ostáva šesť ikon aj horný riadok čela bez zalomenia, karta zostáva otvorená najviac jedna. Súhrn Úchytiek zoskupuje podľa profilu **aj hrany**;
+neplatná hrana dostane výzvu a žiadny odhad. Indikátor popíše hranu a skrátenú os, jeho ovládače sú v karte alebo Úchytkách. Helpery sú krátke a bez prekonaných prísľubov.
+
 **ČELÁ-B1 (v0.10.7):** formulár prenáša prítomné `profile_edge` bez dopĺňania defaultu. Náhľad kreslí fyzické `profile_edges` uložených riadkov;
-top/bottom skracuje výšku, left/right šírku, `free` bez resolved hrán nič neodhaduje. Profil podporujú všetky fyzické typy. Nové ovládače hrán a korelovaný návrh patria do B2.
+top/bottom skracuje výšku, left/right šírku, `free` bez resolved hrán nič neodhaduje. Profil podporujú všetky fyzické typy. Ovládače hrán a korelovaný návrh doplnilo B2 (v0.10.8), kontrakt je nižšie v Úchytkách.
 
 tri skupiny v **záväznom poradí** — **Zoznam čiel** (`data-key="fronts"`) · **Úchytky** (`fhandles`) · **Medzery a presahy** (`fgaps`). Riadok čela `.frow` je od SMOKE PACKU 1
 **STĹPEC**: hore `.fmain` = ovládače v **pevnom, NEZALAMOVACOM** rade, pod ním riadok naviazaného kovania `.fhw`. Predtým bol `.frow` jeden zalamovací rad a pri **vypísanej** výške
@@ -864,7 +869,7 @@ plní ich `nxDimFillRow` (settings.js) **tou istou cestou** ako statické polia,
 obrátený render D-23 platí bez zmeny; text skladajú dva **existujúce** zdroje (`frontHwBadge` z plánu + `frontHwBuy` = `purchase.set_name` z D-92), klik prepne kontext na Kovanie a
 doskočí na **box vlastníka** (`hwBoxByGroup(hwFrontGroup(fid))` — kľúč skupiny skladá JEDNA funkcia pre render aj pre skok, takže sa nemôžu rozísť; `.hwfocus` krátke zvýraznenie).
 
-**D-84:** tlačidlá `+ pridaj dvere` / `+ pridaj čelo` posielajú typ do nového riadku; odoberacie tlačidlo aj `removeLastFront` zanikli.
+**D-84 / D-114:** šesť ikon „Pridať: typ“ posiela typ do nového riadku; odoberacie tlačidlo aj `removeLastFront` zanikli. Maže sa krížikom konkrétneho riadku.
 
 **Materiál čiel** má DRUHÝ ovládač (`cab_front_c`) priamo v zozname, lebo sektor Materiály patrí kontextu Korpus a tu je skrytý — tá istá hodnota, dva vstupné body, synchro drží
 každá cesta, ktorá siaha na `cab_front`.
@@ -976,16 +981,16 @@ echom, návrh vkladania) → to isté mlčanie. `state` je len zdroj **badge „
 zvýraznenú žiadnu voľbu a badge nedostane.
 
 **„Neurčené" vzniká VÝHRADNE štyrmi používateľskými akciami** a vždy cez jednu z troch čistých funkcií v `core.js` (`frontExtraOnTypeChange` · `frontExtraOnWings` ·
-`frontExtraOnSegrow`, každá vracia **nový** objekt): (a) „+ pridaj dvere" · (b) prepnutie dlaždice na dvierka, keď smer uložený nie je · (c) klik na „Neurčené" · (d) prepnutie na
+`frontExtraOnSegrow`, každá vracia **nový** objekt): (a) „Pridať: Dvierka“ · (b) prepnutie dlaždice na dvierka, keď smer uložený nie je · (c) klik na „Neurčené" · (d) prepnutie na
 3/4 krídla — a to len pre **chýbajúce stredné** krídla. Render, echo ani editácia iného poľa nezapíšu nič; návrat na 1/2/auto ani prepnutie na iný typ **nič nemaže** (dormant).
 Literál stavu preto žije **len v `core.js`** (`FRONT_DIR_UNSET`) — `form.js` číta hodnotu z tlačidla, `preview.js` symbol; allowlist stráži `tests/pure/test_kova1_cela.rb`.
 
-Pravidlo (a) sa **týka aj tlačidla „+ pridaj dvere"** (Codex #281 P1): nový riadok dvierok prejde tým istým výrobcom (`addFrontRow` pri `userAdd` volá
-`frontExtraOnTypeChange` s typom z datasetu), inak by každé nové čelo natrvalo obišlo RED nález, badge aj `?` v náhľade — Ruby by ho čítalo ako legacy. „+ pridaj čelo"
+Pravidlo (a) sa **týka aj ikony „Pridať: Dvierka“** (Codex #281 P1): nový riadok dvierok prejde tým istým výrobcom (`addFrontRow` pri `userAdd` volá
+`frontExtraOnTypeChange` s typom z datasetu), inak by každé nové čelo natrvalo obišlo RED nález, badge aj `?` v náhľade — Ruby by ho čítalo ako legacy. „Pridať: Zásuvka“
 (zásuvkové) nevyrobí nič, lebo o tom rozhoduje výrobca, nie volajúci.
 
 **Zápis ide POVODNOU cestou** — dlaždica aj segrow prepíšu `dataset.frontType` / `dataset.frontExtra` a zavolajú `onField()` → `collectFronts` → `apply_all`, teda **jeden krok
-Späť a žiadny nový callback servera**. Klik na **už nasadenú hodnotu** (typ aj segment) sa zahodí — žiadny prázdny rebuild a žiadny prázdny krok Späť; segment to pozná podľa
+Späť**; od D-120 pred zápisom návrh overí čítací preflight. Klik na **už nasadenú hodnotu** (typ aj segment) sa zahodí — žiadny prázdny rebuild a žiadny prázdny krok Späť; segment to pozná podľa
 `aria-pressed`, ktoré karta kreslí z view-modelu (Codex #281 P2-C).
 
 **Prekreslenie karty NEZHADZUJE FOKUS** (Codex #281 kolo 2). Karta sa prepisuje celá (`card.innerHTML`), takže tlačidlo, ktoré držalo fokus, zanikne a fokus by spadol na
@@ -1023,7 +1028,7 @@ PV_* zrkadlo tokenu — žiadna nová farba), inak by ho X zásuvky/blendy preš
 ### Úchytky = D-96 / D-120 (form.js, core.js, preview.js, bridge.js)
 
 Profil aj hrana sa nastavujú v karte čela a hromadne pre all/door/drawer_front/lift/fall/blind. Oba ovládače zapisujú rovnaké `dataset.frontProfile`/`frontProfileEdge`
-a `collectFronts`; žiadny uložený hromadný default. `frontProfileCommon(items, scope, key)` vracia nezávislý zmiešaný stav profilu/hrany. Rozsah ponúkne prienik platných
+a `collectFronts`; žiadny uložený hromadný default. `frontProfileCommon(items, scope, key)` vracia nezávislý zmiešaný stav profilu/hrany. `frontProfileStateText` zoskupuje rovnaký profil aj hranu v poradí prvého výskytu. Rozsah ponúkne prienik platných
 hrán; samotná zmena hrany profil nezapne, zmena profilu zachová platnú hranu. `PROFILELESS_FRONT_TYPES` zrkadlí Ruby a obsahuje iba none. Návrat z none vyžaduje zapnutie.
 
 **Návrh a potvrdenie (D-120, v0.10.8):** `front_preflight` je čistý callback Panelu nad aktuálnymi rozmermi/fronts, vracia resolved riadky, fyzické hrany, smerové sloty

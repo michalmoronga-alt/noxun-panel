@@ -2,6 +2,135 @@
 
 > **ARCHÍV (založené 24.7.2026 pri uzávere V0.5).** Kompaktné riadky hotových etáp drží [KRONIKA.md](KRONIKA.md) (časová os) — tu sú plné pôvodné texty (história rozhodnutí, rozsahov a PR). Otvorené záväzky z týchto textov sú od 11.8.2026 zaradené do blokov [../PLAN.md](../PLAN.md) — tento súbor je čisto referenčný.
 
+## BALÍK ČIEL — UZAVRETÝ (11.9.2026, v0.11.0, PR #347 + #349 + #350 + #351)
+
+**Rozsah, mockup aj implementácia schválené 11.9.2026.** ČELÁ-A zlúčené (PR #347, v0.10.6); sekvenčné dávky ČELÁ-A → B1 → B2 → C.
+Pôvodný PR #348 sa po treťom kole nálezov uzavrel a rozdelil podľa pravidla repozitára. Rozsah ani schválené správanie sa nemenia.
+**B1 (#349, v0.10.7, zlúčené):** geometria, schéma 13, profily piatich typov, výroba/seed a čistenie neaplikovateľných seed zásahov; minimálny prenos hrany a náhľad.
+Overenie B1: 3826 headless, 112 JS sád, in-SketchUp 2295 PASS / 0 FAIL, skutočný Inspector zachová hranu pri editácii výšky.
+**B2 (#350, v0.10.8, zlúčené):** per-čelo aj hromadné ovládače, čítací callback, potvrdenie návrhu, všetky relaye a ich odmietacie odpovede. Overenie: 3830 headless, 113 JS sád, 2297 in-SU PASS a Inspector pri 470 px. Undo/Redo refresh zruší čakajúci návrh; abort vlastného apply naďalej chráni novší edit. Každá časť má vlastné testy/review a začína z čerstvého mainu.
+**Audit ÁNO** pre A/B (config, geometria, profilový kontrakt a čítací callback); C je UI.
+Podklad: [outside-in a reconcile](../zdroje/next_sessions/CELA_OUTSIDE_IN_2026-09-11.md).
+Kontrola návrhu: [Astra audit a SOUND delta](../zdroje/next_sessions/CELA_AUDIT_2026-09-11.md).
+Interaktívna lokálna ukážka `_dev/cela-plan/index.html` demonštruje ovládanie, nie výsledok implementácie.
+Tento blok je úplné implementačné zadanie; ukážka nie je dátová ani geometrická autorita.
+
+##### Schválené správanie (Michal 11.9.2026)
+- D-119: hore/dole/vľavo/vpravo spoločné pre celú skrinku, NIE override jednotlivých čiel. Kladná hodnota = škára, záporná = presah. Dva páry polí v dvoch riadkoch; medzera medzi čelami
+  osobitne ako dnes.
+- D-120: jeden UKW profil na jednom okraji každého skutočného panela. Dostupný pre dvierka, zásuvkové čelá, výklop, sklop a blendu. Bez čela nemá profil.
+- Pri zvislom profile dvierok je profil vždy OPROTI PÁNTOM. Dvojkrídlo má profily v strede. Pri 3/4 krídlach sa každé stredné krídlo riadi svojím určeným smerom. Neurčený smer sa nesmie
+  odhadnúť.
+- Dvierka: profil Hore / Dole / Bočná oproti pántom. Ne-dvierka: Hore / Dole / Vľavo / Vpravo. Pravidlo oproti pántom sa týka zvislých profilov dvierok; neobmedzuje schválené hornej/dolnej
+  hrany výklopov a sklopov.
+- Individuálny výber profilu a hrany v karte čela, hromadné nastavenie v skupine Úchytky. Rozdielne hodnoty ukázať ako Rôzne, nepremeniť na default.
+- D-114: jeden rad šiestich existujúcich piktogramov priamo pridá typ Dvierka / Zásuvka / Výklop / Sklop / Blenda / Bez čela. Najviac jedna rozbalená karta, identita F#, AUTO/pevné výšky
+  ostávajú.
+- UKW-7 reduction36mm a prierez19.181×37.419mm sú existujúce interné hodnoty. Smer dekoru a ABS pod profilom sa nemenia. Žiadny nový profil, Gola, metrážové nacenenie, optimalizácia tyčí,
+  CNC či per-čelo okraje.
+
+##### ČELÁ-A — D-119, presahy od formulára po výrobu — IMPLEMENTOVANÉ, PR #347
+Overenie: 3816 headless, 112 JS sád, in-SketchUp 2225 PASS / 0 FAIL; skutočný Inspector pri 470 px. Ďalšia dávka až po review/merge A.
+Jedna užitočná dávka vrátane UI, schema a testov, následne samostatné review/merge podľa repo procesu.
+- `Fronts.normalize_config`: nové `gap_left`, `gap_right` (mm Float). Pre KAŽDÚ chýbajúcu novú stranu použiť legacy `gap_sides`, inak GAP_EDGE=2. Nová explicitná nula musí vyhrať. Pri oboch
+  nových hodnotách staré `gap_sides` nehrá rolu. Kanonický nový zápis `gap_sides` neukladá.
+- `opening_w = width - gap_left - gap_right`; prvé krídlo začína na gap_left. Škáry medzi krídlami, count auto>600, fix/AUTO výšky, delenie odspodu, F identity bez zmeny. Limits ±100/±2000
+  platia nezávisle na oboch stranách; konečné platné čísla kontroluje server.
+- Prejsť všetky konzumenty `gap_sides`, vrátane troch čitateľov v preview.js a nxFrontDims, highlight N26, drawCarcass, kót, resetu, formulára, insert flow, panel load, migračného
+  Fronts.migrate_legacy_config a testov. Kotvy skrinky a Mower krok zostávajú podľa korpusu, neodvodzujú sa z asymetrického čela.
+- `CONFIG_SCHEMA` 11→12 pri tejto dávke; novšiu schému starší plugin odmietne prestavať/šablónovať. Samotný read/open nič nemigruje do modelu. Kontrola BuildPlan: deskriptory majú ten istý
+  tvar, menia sa rozmery; BuildPlan::SCHEMA sa pre A nemení.
+- Roundtrip: vytvorenie, apply/rebuild, scale, copy/paste, uloženie a aplikácia šablóny s/bez kovania, save/reopen, observer/Undo, pôvodné string aj hash fronts. `front_items` a náhľad nesmú
+  zobraziť staré rozmery.
+- Rozhodujúci príklad: korpus W600; ľavý=-18, pravý=2 → otvor616, x=-18; dve krídla pri gap3 → každé306.5, druhé x291.5. Legacy gap_sides=2 → oba2 a identická geometria/výstupy.
+- Testy: čistá matematika + migrácia/roundtrip + JS formulár a náhľad + in-SU rozmery/pozície/Undo/copy/save-reopen. Plná headless, všetky JS, relevantné in-SU. Runtime patch bump + všetky
+  HTML cache-bust, dotknutá architektúra a štandard.
+
+##### ČELÁ-B — D-120, všetky hrany profilu
+- Zachovať `items[].profile` ako ID (`none`/`ukw7`), pridať `items[].profile_edge` = `top|bottom|left|right|free`. `free` je sémantická voľba iba dvierok, skutočná hrana každého krídla sa
+  odvodí z tej istej autority smerov, ktorú používa `Fronts.direction_slots`. Nesmie vzniknúť druhý výpočet pre UI alebo renderer.
+- Starý platný profil bez `profile_edge` = top. Chýbajúce `profile` = none. Poškodená/neznáma prítomná hrana sa nesmie potichu zmeniť na top. Server ju odmietne na zapisovacej ceste; čítanie
+  existujúcej zákazky naďalej používa uložené výrobné snapshoty. `none` nevytvára žiadny profilový dielec ani nákup.
+- `CONFIG_SCHEMA` 12→13 pri B. Profil/hrana prejdú cez normalizáciu, params_from_config, cabinet_config, front_items, save/apply template, copy/paste, import/rebuild a náhľad. KOV-I voľba
+  bez kovania naďalej odstráni hardvérové výbery/manuálne riadky podľa svojho kontraktu; nemení samotnú konštrukčnú geometriu čiel.
+- `FrontProfiles` ostáva jediný register prierezu/reduction/labels/options. Rozšíri API na štyri skutočné hrany a výpočet panelu/pásma profilu pre celkový obrys krídla. Uložený `free`
+  vyrieši Fronts PRED volaním geometrie. Staré top volania ostanú kompatibilné pre existujúce používateľské configy.
+- Per krídlo zachovať celkový obrys a špáry; top/bottom odoberá36 z V, left/right odoberá36 zo Š. Bottom posunie panel hore36, left doprava36, top/right ponechajú origin v danej osi. Dĺžka
+  rezu = celá dĺžka osadenej hrany; nie skrátený kolmý rozmer. Všetky rozmery mm Float; finálne výrobné zaokrúhlenie až na existujúcom mieste.
+- Deskriptor pridá iba voliteľnú anotáciu `profile_edge` (už top/bottom/left/right). Existujúce top `profile_band` zostáva v pôvodnom tvare `{z,h}`. Spoločný helper v FrontProfiles odvodí zo
+  skutočného panelu (`box`, `origin`), hrany a reduction celkový obrys, pásmo a dĺžku rezu. Nové redundantné uložené rozmery nevzniknú. BuildPlan::SCHEMA zostáva5 podľa pravidla aditívnych
+  polí; samotné výrobné snapshoty profilové metadata neukladajú.
+- **Kontrola rozmerov je vo Fronts PRED emission/vyradením dielcov v Construction**, per krídlo a v skutočne skrátenej osi. Neplatný/nekladný zvyšný rozmer odmietne celý rebuild. W200,
+  left25,right25,gap3,4krídla →35.25mm pred profilom →-0.75mm po profile MUSÍ byť odmietnuté; nesmie zmiznúť panel. Existujúce varovanie malého panela zovšeobecniť na obe osi, nie iba výšku.
+- Renderer nepoužije bbox: jednu kanonickú profilovú definíciu pre (id,dĺžka,geom_rev) osadí na základe explicitného edge/band. Pri obracaní musí zostať nos pred čelom (lokálne záporné Y);
+  overiť zrkadlenie prierezu a opačnú bočnú hranu. Proxy nemení výrobu, dedí tag Čelá; part keys panela a HW owner zostávajú stabilné. Geom rev/caching podľa potreby pri zmenenom tvare
+  definície, samotné osadenie nie je nový shape.
+- `HardwareRules.flag_length_params` berie dĺžku zo spoločného profilového helpera (z `prod` podľa explicitnej hrany, súhlas s `box`). Legacy deskriptor bez novej hrany smie použiť
+  doterajšiu top šírku; neplatná prítomná anotácia nesmie vyrobiť nákup s odhadnutou dĺžkou. UI/renderer/pravidlo nesmú mať rozdielne výklady hrany.
+- Doplniť tri profilové seed pravidlá pre `flap/up`, `flap/down` a `false_front`, SEED_VERSION6→7. Existujúce dverové/zásuvkové rule_id zostávajú. Nové pravidlo sa nepridá, ak zapnuté
+  vlastné `part_flag_length` pokrýva jeho rolu **a smer**; vlastné flap/down nesmie potlačiť flap/up. Vlastné pravidlo bez smeru pokrýva oba smery. Kusové úchytky môžu spoluexistovať.
+  Zachovať vypnuté/upravené existujúce pravidlá a future read-only.
+- Rovnaký predikát aplikovateľnosti (rola + flap_dir) musí používať evaluate aj `profile_rule_warnings`, inak nesediace pravidlo potlačí hlásenie chýbajúceho profilu. Vypnuté zodpovedajúce
+  pravidlo sa hlási existujúcou cestou vypnutého kovania.
+- Staré projektové snapshoty sa **automaticky nemenia**. `ensure_project_rules!` sa nerozširuje o migráciu. Používateľovi chýbajúce profilové pravidlo ukáže existujúce upozornenie s akciou
+  **Pravidlá → Doplniť nové predvolené**; `project_seed_plan` a spoločná prestavba zapisujú snapshot aj skrinky v jednej Undo operácii. Overiť nový projekt, starý pred doplnením, po doplnení
+  a Undo. Nákup/explain/rozpočet zachovajú `length_unsupported`; metráž sa nenaceňuje.
+- UI podporu typov zrkadliť na Ruby/JS; vyhodiť lift/fall/blind z PROFILELESS_TYPES, none zostáva. Obe cesty (karta aj hromadné Úchytky) zapisujú rovnaké item dáta, žiadne uložené hromadné
+  defaulty.
+- Hromadný rozsah: Všetky, Dvierka, Zásuvkové, Výklopy, Sklopy, Blendy. Profil a hranu meniť SAMOSTATNE: samotná zmena hrany nepovolí profil na čele bez profilu; zmena druhu profilu zachová
+  platnú hranu. Nové zapnutie z none implicitne top, pokiaľ už nebola vedome uložená platná hrana. Smiešaný rozsah ponúkne len hrany platné pre celý aktuálny rozsah, teda spravidla
+  top/bottom; free len v dvierkach, left/right len ne-dvierka. Informačná veta odkáže na kartu/užší rozsah pre bočné hrany.
+- Neurčený smer pri `free` sa NESMIE odhadnúť. **Bez nových uložených profilových konfliktov.** Rozpracovaný formulár zostáva v karte, model a jeho uložené výrobné snapshoty zostávajú
+  posledné platné. Čistý Ruby preflight nad aktuálnymi rozmermi/fronts vyrieši count krídel a smerové sloty pomocou `Fronts.resolve_wings`/`direction_slots`, aj keď ešte nemožno postaviť
+  profil. UI ponúkne presne chýbajúce smery. Až platný celý formulár ide jedným `apply_all` do modelu.
+- Rovnaký read-only preflight slúži vkladaniu, načítanej šablóne aj úpravám existujúcej skrinky. Vracia resolved hrany, sloty a stav/hlásenie nad **aktuálnym návrhom**, nie nad starými
+  front_items. `preview.js` prenáša direction/wing_directions/profile_edge a kreslí výsledok servera. Pred vložením nemožno používať staré sloty posledne vybranej skrinky.
+- Preflight je jeden nový čítací callback existujúceho Panelu, bez zápisu/Undo/katalógovej inicializácie. Request/response nesú identitu dokumentu, vkladacia relácia alebo cabinet_id, a
+  rastúcu revíziu návrhu. Uplatní sa iba posledná zhodná odpoveď; zmena výberu, typu vkladu, šablóny alebo modelu zneplatní starý request. Payload validovať rovnako prísne ako apply; server
+  pri skutočnom zápise preflight zopakuje a nič neskráti podľa klientovej odpovede.
+- Nevyriešený/čakajúci návrh patrí do existujúcej bariéry chýb formulára. Zakáže auto-apply, insert, exportný flush, uloženie/aplikáciu šablóny a native-copy/transform flush; nesmie sa
+  zameniť za „nič na uloženie“. Najprv preflight → platný návrh → potvrdený apply → pokračovanie akcie. Stará odpoveď nesmie prepísať práve písané polia. Pri vedomej zmene výberu/režimu sa
+  návrh zahodí v rámci existujúceho lifecycle, nikdy sa neprenesie na inú skrinku.
+- Pri zmene typu a neaplikovateľnej hrane ostáva návrh otvorený s výzvou vybrať platnú hranu; žiadny free→left/top default. Pri zmene na none sa profil zneaktívni existujúcou normalizáciou,
+  návrat vyžaduje explicitné zapnutie profilu. Zmeny1↔2↔3/4/AUTO zachovajú dormant smery a profil, a vypýtajú iba chýbajúce údaje. Direct API/rebuild neplatný stav odmietne; Scale využije
+  existujúci rollback `reject_scale!`, nevytvorí poškodený config.
+- Overiť všetky exportné a native flush vstupy, neskorý preflight, neúspešný apply a prepnutie dokumentu. Hromadné nastavenie nikdy nevytvorí čiastočný zápis skrinky. Žiadna nová kategória v
+  hardware_conflicts, ani nové dočasne nesprávne výrobné panely.
+- Presahy/škáry/total extents a front row bounds sa počítajú PRED skrátením panelu. `Fronts.bounds` používané receptom zásuvky sa nesmú zmeniť zo slotu na rozmer fyzického panela.
+  Prehodnotiť výškové/šírkové vstupy závesov a výklopov, hmotnosť (dnes panel + existujúca allowance), kolízie hl_top, materiálovú hrúbku, ABS mapovanie a preview kóty: každý konzument musí
+  dostať svoju doterajšiu veličinu.
+- Rozhodujúci príklad: W600,V720,floor0,left=-18,right=2,gap3,top2,bottom2; dvojkrídlo má celkový obrys306.5×716, zvislé profily v strede, panely270.5×716; ľavý panel x=-18, pravý panel
+  x327.5; rezy2×716. Top varianta má panely306.5×680 a rezy2×306.5. Žiadna rotácia grain ani strata ABS.
+- Testy: štyri fyzické hrany na ne-dvierkach a top/bottom/free na dvierkach; všetky5 typov; 1/2/3/4/auto krídla a smery/neurčené; legacy top bajtovo identické výrobné údaje; invalid edge;
+  transitions s otvorenou kartou; hromadný rôzny stav; šablóny s/bez kovania; copy, scale, Undo/Redo/save-reopen; exaktne4 osadenia prierezu a zhodná dĺžka proxy/nákup;
+  starý/custom/vypnutý/future seed. Neplatný návrh blokuje každý flush/export, po oprave sa bariéra uvoľní až po apply. In-SU aj browser sú povinné.
+
+##### ČELÁ-C — D-114, uzáver ovládania — IMPLEMENTOVANÉ, PR #351
+Overenie: 3830 headless, 113 JS sád, skutočný Inspector pri 470 px; B2 geometria/Undo 2297 in-SU PASS nezmenená. Ručné Redo zostáva v živom pláne.
+- Šesť type add ikon v jednom pôvodnom riadku, existujúci FRONT_TYPE_ICON a rovnaký addFrontKind. Door nové smer neurčené existujúcou cestou; none drží výšku a prázdnu niku.
+- Všetko sa zmestí v470px Inspectore, horný rad čela sa nezalomí ani pri fixed výške/AUTO/missing-direction badge; type picker aj per-čelo profil žijú v jednej otvorenej karte.
+- Upratať pomocné texty, súhrn Úchytiek s hranami a indikátor; klávesnica/labels/fokus pri echo/re-render. Nevyrábať nové satelitné okno ani nové UI témy.
+- Runtime patch, cache-bust, celá headless a JS, browser smoke. In-SU len ak C zasiahne geometriu/lifecycle; samotné uzavretie balíka vyžaduje už hotový B in-SU dôkaz a používateľský smoke.
+
+##### Mapa prenosu a rozhodujúce autority
+| Cesta | Miesta a dôkaz |
+|---|---|
+| Vytvorenie/form/load/reset/bulk/card | ui/panel.html, ui/js/form.js, core.js, preview.js, insert_state.js, panel/actions_cabinet.rb; interaktívny browser test |
+| Normalizácia a migrácia | modules/fronts.rb, CabinetBuilder.normalize_params/fronts_from_config/params_from_config; old/new roundtrip test |
+| Geometria/uložené snapshoty | Fronts.layout/panels_for, Construction.build/bounds, BuildPlan.validate!, CabinetBuilder resolve_part/cabinet_config/render_front_profile; in-SU plan=entity |
+| Šablóny/copy/scale | CabinetBuilder.template_config_from, Templates pripraviť/aplikovať, tools Mower, ScaleWatch; s/bez kovania a Undo |
+| Kovanie a výstupy | HardwareRules evaluate/flag_length_params/seed/project rules; HardwareSets length gate; Bom/Validation/ProductionCore export guards; zhodná dĺžka+blokovanie konfliktu |
+| Dátové kontrakty | SYSTEM/STANDARD §2/3/5.3/6/7.5/8/9/11; docs architecture construction/hardware/model-a-identita/ui-lifecycle/outputs |
+
+##### Brány a uzáver
+
+Outside-in a reconcile sú dokončené v rozsahu návrhu; geometrický probe kandidátneho osadenia je povinný pred prijatím B.
+Prvé Astra kolo: 0 BLOCKER, 4 FIX-IN-B, 2 NOTE; všetkých šesť je v znení vyššie zapracovaných.
+Kontrola zapracovania vrátane čítacej/flush cesty skončila **SOUND** (11.9.2026). Návrhová auditná brána je uzavretá.
+Po každej dávke testy, aktuálne GH review/CI a čerstvý main podľa CLAUDE.md. Patch a všetky cache-bust zhodné s VERSION.
+Uzáver celého balíka = minor podľa CLAUDE.md, vyriešené D-čísla presunúť do archívu až po skutočnej implementácii a overení.
+Žiadny runtime test ani in-SU geometrický výsledok sa neodvodzuje z úspešného mockupu.
+
 ## Etapy
 
 - ✅ **V0.1 — Klikateľný základ** (hotové 15.7.): panel, dolný korpus (Ruby regenerácia), police 0–4, dvierka 1/2/auto, ghost zóny, rebuild označeného, 1-krok Undo
