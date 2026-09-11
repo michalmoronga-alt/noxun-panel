@@ -132,7 +132,7 @@ eq(activeOf(C.frontCardModel({ type: 'door', direction: 'left' }, entry(3, [slot
    'scalarny smer sa pri 3/4 kridlach NECITA (dormant)');
 eq(activeOf(C.frontCardModel({ type: 'door' }, entry(2, [])), 'opening_mode'), null,
    'chybajuce otvaranie = ziadna aktivna volba (NIE „klasicke")');
-ok(C.frontCardModel({ type: 'door' }, entry(2, [])).rows.find(r => r.key === 'opening_mode').hint.indexOf('predvolene') > 0,
+ok(C.frontCardModel({ type: 'door' }, entry(2, [])).rows.find(r => r.key === 'opening_mode').hint.includes('klasické otváranie'),
    'namiesto tichej volby sa povie, co plati, kym to nikto neurci');
 const drwLegacy = C.frontCardModel({ type: 'drawer_front' }, entry(1, []));
 eq(activeOf(drwLegacy, 'drawer_construction'), null, 'zasuvka bez klasifikacie: ziadna konstrukcia');

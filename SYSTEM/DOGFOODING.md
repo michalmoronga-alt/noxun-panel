@@ -16,19 +16,6 @@ v [PLAN.md](PLAN.md) — **D-51 uzavreté 6.9.2026** (archív); **D-27** je vyri
 a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9.16). Skupina je prázdna.)*
 
 
-## Balík Čiel — k bloku 4 · V1 DOTIAHNUTIE
-
-*(**Blok KOVANIE je od 10.9.2026 uzavretý** — v0.10.0, plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).
-Postrehy nižšie sa v ňom vedome neriešili: tvoria **UI/UX balík kontextu Čelá**, ktorý pri uzávere prešiel do bloku **4 · V1 DOTIAHNUTIE**
-v [PLAN.md](PLAN.md), odrážka „BALÍK ČIEL". Čo z bloku KOVANIE ostalo mimo V1 (D-109), je v skupine **Po V1 — zásobník** nižšie.)*
-
-- **D-114 · Rad piktogramov namiesto tlačidiel „+ pridaj dvere" / „+ pridaj čelo" + upratanie kontextu Čelá** (Michal 3.9., smoke v0.9.20 po KOV-A) — nové čelo sa má pridávať
-  **priamo výberom typu**: namiesto dvoch textových tlačidiel jeden rad dlaždíc s tými istými sprite ikonami ako typegrid karty (dvierka · zásuvka · výklop · sklop · blenda; „bez
-  čela" rozhodnúť), klik = nový riadok daného typu (dvierka ďalej cez výrobcu smeru „neurčené", pravidlo (a) karty). Rad zaberie **ten istý jeden riadok** ako dnešné dve tlačidlá.
-  Michal zároveň: „celkovo UI čiel bude treba po tomto zásahu upratať — necháme na koniec, opäť spravíme UI/UX balík". *Stav: OTVORENÉ — od uzáveru bloku KOVANIE (10.9.2026) je to **UI/UX balík Čiel v bloku 4 · V1 DOTIAHNUTIE** ([PLAN.md](PLAN.md), odrážka „BALÍK ČIEL");
-  celý obsah karty čela je už známy (typy z KOV-A, zámky osí a systém zásuvky z KOV-C/D, závesy z KOV-F, výklopy z KOV-E), takže balík sa môže robiť.*
-  **Spresnenie 11.9.:** schválený jeden rad šiestich typov vrátane „Bez čela“; profil a hrana v karte konkrétneho čela + hromadná skupina Úchytky. Packages ČELÁ-A/B/C sú v PLAN.md; mockup aj implementácia schválené; A/B hotové, zostáva C.
-
 ## KONTROLA + VÝROBA
 
 - **D-94 · Traceability v celkovom súpise kovania — rozklik položky na miesta použitia** (Michal 9.8., test kovania na reálnej zákazke) — nákupný zoznam v okne Výroba povie „357695 × 12", ale nie

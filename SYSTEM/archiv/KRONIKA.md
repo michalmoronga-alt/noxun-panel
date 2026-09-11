@@ -17,6 +17,13 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **ČELÁ-C A UZÁVER BALÍKA ČIEL (11.9.2026, PR #351, v0.11.0).**
+  Šesť ikon priamo pridá typ čela v jednom existujúcom rade. Zachované AUTO/pevné výšky, F identita, prázdna nika a jedna rozbalená karta.
+  Súhrn Úchytiek rozlišuje profil aj hranu; indikátor povie skrátený rozmer a odkáže na ovládače. Pomocné texty skrátené a zbavené prekonaných prísľubov.
+  Overenie: 3830 headless, 113 JS sád, skutočný 470px Inspector (všetkých šesť typov, klávesnica, fokus, súhrn a riadok s pevnou výškou/AUTO/smerom). Geometria/Undo B2 zostávajú: 2297 in-SU PASS.
+  Celý blok A/B1/B2/C (#347/#349/#350/#351) je dokončený. D-114 plným textom aj indexom do archívu, celé zadanie z PLAN do ROADMAP_hotove_etapy, README a STAV aktualizované.
+  Ručné Redo a používateľský smoke ostávajú na Michala; ďalší blok sa bez jeho výberu nezačína.
+
 - **ČELÁ-B2 — OPRAVA UNDO Z REVIEW #350 (11.9.2026, v0.10.8).**
   Undo/Redo refresh tej istej skrinky sa už nepovažuje za potvrdenie práve písaného návrhu. Pred obnovenými dátami zruší návrh, timer aj naviazanú akciu; stará odpoveď nič neobnoví.
   Abort vlastného apply túto značku nemá, takže odmietnutý zápis zachová novší edit. Reset je viazaný na dokument a pri detachi sa značka čistí.

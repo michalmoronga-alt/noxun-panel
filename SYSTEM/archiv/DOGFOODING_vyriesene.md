@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-114** — Šesť ikon pridá priamo typ čela v jednom rade; kratšie texty, súhrn hrán a zachovaný fokus pri 470 px — 11.9.2026, PR #351, v0.11.0
 - **D-120** — UKW na všetkých hranách piatich typov čiel, dvierka zvislo oproti pántom; karta aj hromadné nastavenie s potvrdením návrhu — 11.9.2026, PR #349 + #350, v0.10.7–0.10.8
 - **D-119** — Ľavý a pravý presah čiel samostatne pre celú skrinku; staré hodnoty sa preberajú bez zmeny geometrie — 11.9.2026, PR #347, v0.10.6
 - **D-124** — Predvoľby materiálov sú otvorené, v štyroch skupinách so vzorkami 115 px; pôvodný výber/potvrdenia zachované, per-rola defaulty mimo V1 — vyriešené 10.9.2026, PR #344, v0.10.3
@@ -113,6 +114,19 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-114 — priamy výber typu a upratanie Čiel (11.9.2026, PR #351)
+
+**Pôvodný postreh a schválenie:**
+- **D-114 · Rad piktogramov namiesto tlačidiel „+ pridaj dvere" / „+ pridaj čelo" + upratanie kontextu Čelá** (Michal 3.9., smoke v0.9.20 po KOV-A) — nové čelo sa má pridávať
+  **priamo výberom typu**: namiesto dvoch textových tlačidiel jeden rad dlaždíc s tými istými sprite ikonami ako typegrid karty (dvierka · zásuvka · výklop · sklop · blenda; „bez
+  čela" rozhodnúť), klik = nový riadok daného typu (dvierka ďalej cez výrobcu smeru „neurčené", pravidlo (a) karty). Rad zaberie **ten istý jeden riadok** ako dnešné dve tlačidlá.
+  Michal zároveň: „celkovo UI čiel bude treba po tomto zásahu upratať — necháme na koniec, opäť spravíme UI/UX balík". *Stav: OTVORENÉ — od uzáveru bloku KOVANIE (10.9.2026) je to **UI/UX balík Čiel v bloku 4 · V1 DOTIAHNUTIE** ([PLAN.md](../PLAN.md), odrážka „BALÍK ČIEL");
+  celý obsah karty čela je už známy (typy z KOV-A, zámky osí a systém zásuvky z KOV-C/D, závesy z KOV-F, výklopy z KOV-E), takže balík sa môže robiť.*
+  **Spresnenie 11.9.:** schválený jeden rad šiestich typov vrátane „Bez čela“; profil a hrana v karte konkrétneho čela + hromadná skupina Úchytky. Packages ČELÁ-A/B/C sú v PLAN.md; mockup aj implementácia schválené; A/B hotové, zostáva C.
+
+**Vyriešené:** jeden rad šiestich existujúcich ikon pridá dvierka, zásuvkové čelo, výklop, sklop, blendu alebo prázdnu niku. Nový riadok má hneď zvolený typ a fokus výšky. Ostáva jedna rozbalená karta, AUTO/pevná výška aj F identita. Súhrn Úchytiek rozlišuje aj hranu a indikátor hovorí, ktorý rozmer panelu sa skracuje. Kratšie pomocné texty nahradili prekonané prísľuby.
+**Overenie:** všetkých 3830 headless testov a 113 JS sád; skutočný Inspector pri 470 px, pridanie všetkých typov, klávesnica, pevná výška/AUTO, výzva smeru a súhrn hrán. Geometria nezmenená; B2 po oprave Undo má 2297 in-SU PASS. Ručné Redo ostáva používateľským testom.
 
 ### D-120 — všetky hrany profilov (11.9.2026, PR #349 + #350)
 
