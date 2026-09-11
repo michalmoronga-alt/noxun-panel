@@ -17,6 +17,13 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **ČELÁ-B2 — OVLÁDANIE HRÁN A POTVRDENIE NÁVRHU (11.9.2026, PR #350, v0.10.8).**
+  Profil/hrana v karte aj hromadne pre všetkých päť fyzických typov. Nezávislé zmiešané hodnoty; zmena hrany profil nezapína.
+  Čistý preflight určí chýbajúce smery a výsledné hrany, rozpracovaná zmena zostane vo formulári. Export/kópia/Štúdio/šablóna počkajú na potvrdený zápis.
+  Zamietnutý zápis obnoví uložené hodnoty bez prepisu novšieho editu; reset odpovie čakajúcej akcii, zrušená šablóna sa po neskorom potvrdení neuloží.
+  Overenie: 3829 headless, 113 JS sád, skutočný Inspector pri 470 px (Ruby preflight, chýbajúci smer, blokovaný výber, zrušenie šablóny). B1 geometria 2295 in-SU PASS zostáva nezmenená.
+  D-120 presunuté plným textom aj indexom do archívu. Nasleduje C/D-114; Redo ostáva manuálne.
+
 - **ČELÁ-B1 — GEOMETRIA A VÝROBNÝ KONTRAKT PROFILOV (11.9.2026, PR #349, v0.10.7).**
   Nadväzuje na zlúčené A (#347). Pôvodný B PR #348 sa po treťom kole nálezov uzavrel a rozdelil na B1/B2; rozsah aj schválené správanie zostávajú.
   B1: štyri hrany UKW-7 na piatich fyzických typoch, dvierka zvislo oproti pántom, presná os skrátenia a dĺžka rezu. Config schéma 13, seed 7, BuildPlan 5.

@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-120** — UKW na všetkých hranách piatich typov čiel, dvierka zvislo oproti pántom; karta aj hromadné nastavenie s potvrdením návrhu — 11.9.2026, PR #349 + #350, v0.10.7–0.10.8
 - **D-119** — Ľavý a pravý presah čiel samostatne pre celú skrinku; staré hodnoty sa preberajú bez zmeny geometrie — 11.9.2026, PR #347, v0.10.6
 - **D-124** — Predvoľby materiálov sú otvorené, v štyroch skupinách so vzorkami 115 px; pôvodný výber/potvrdenia zachované, per-rola defaulty mimo V1 — vyriešené 10.9.2026, PR #344, v0.10.3
 - **D-122** — UNI upozornenia sú zbalené pod jednu skupinu s počtom dielcov; jednotlivé akcie aj serverové počty ostávajú — vyriešené 10.9.2026, PR #343, v0.10.2
@@ -112,6 +113,20 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-120 — všetky hrany profilov (11.9.2026, PR #349 + #350)
+
+**Pôvodný postreh a schválenie:**
+- **D-120 · Úchytkový profil (UKW) aj na dolnej a bočných hranách** (Lucia 6.9., prvý test) — profil sa dnes osadzuje **len na hornú hranu** čela; treba voľbu hrany:
+  horná (dnes) · dolná · ľavá / pravá bočná (vysoké dvere, skrine). Registry `front_profiles.rb` hranu dnes **nepozná** — záznam nesie len `reduction`, popisky, obrys, hĺbku
+  a výšku, `geometry`/`options` hranu nevracajú a modul výslovne predpokladá hornú hranu (komentár D-90 sľubuje len, že config to unesie bez migrácie). **Rozsah D-120 =**
+  config čela (hrana) **+ registry/API** (hrana ako parameter profilu) **+ všetci konzumenti**: matematika panelu vo `Fronts` (skrátenie v inej osi), pravidlo kovania (dĺžka
+  rezu), vizuál v modeli (renderer v `CabinetBuilder`), náhľad a UI panela; smer dekoru čela sa neotáča.
+  **Rozhodnuté 11.9.:** aj výklop/sklop/blenda; zvislý profil dvierok vždy na voľnej hrane oproti pántom — dvojkrídlo v strede, pri 3/4 krídlach podľa smeru každého krídla.
+  Neurčený smer treba najprv vyriešiť; ABS pod profilom zostáva. *Stav: OTVORENÉ — package ČELÁ-B v balíku Čiel (D-114), do KOV-F NEPATRÍ.*
+
+**Vyriešené:** B1 prinieslo štyri osadenia UKW-7, správny rozmer panelu a dĺžku rezu, schému 13, seed 7 a čistenie neaplikovateľných seed zásahov. B2 doplnilo profil/hranu do karty čela a hromadných Úchytiek. Dvierka zvislo vždy oproti pántom; ostatné fyzické typy všetky štyri hrany. Neurčený smer zostáva návrhom v karte, platný zápis sa potvrdí pred exportom, kópiou aj šablónou. Zrušená akcia ani stará odpoveď sa neskôr neuplatní.
+**Overenie:** B1 3826 headless / 112 JS / 2295 in-SU PASS, B2 3829 headless / 113 JS a skutočný 470px Inspector s Ruby preflightom. Ručné Redo ostáva používateľským testom. D-114 (ikonový rad) je samostatný uzáver C.
 
 - **D-119 · Presah dverí do strán per strana** (Lucia 6.9., prvý test pluginu na jej notebooku) — presah/okraj čela do strán je dnes **jedna hodnota pre obe strany**
   (`gap_sides`, Čelá); v praxi treba ľavú a pravú stranu nastaviť **zvlášť** (napr. čelo presahuje cez bok len na viditeľnej strane, pri susede ostáva škára). Hore/dole už

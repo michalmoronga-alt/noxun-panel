@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.10.7 · 11.9.2026 — ČELÁ-A/B1: samostatné presahy a geometria profilov na všetkých hranách.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.10.8 · 11.9.2026 — ČELÁ-A/B: samostatné presahy a profily na všetkých hranách vrátane ovládania.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -18,8 +18,8 @@ nálezy z výroby a chyby v cenách majú **najvyššiu prioritu** ([PLAN.md](PL
 **Pozor na kompatibilitu:** blok KOVANIE priniesol sériu schema bumpov — čo uloží v0.10.0, to starší plugin už nepoužije (model/šablóna `CONFIG_SCHEMA`, plán `BuildPlan::SCHEMA` 5,
 knižnica setov a snapshot `std`, katalóg kovania `schema`). Pred prvou takou zákazkou aktualizovať **obe PC** (updater D-52: Štúdio → O plugine → Aktualizovať).
 
-**Testy ČELÁ-B1:** **3826 headless · 112 JS sád · in-SketchUp 2295 PASS / 0 FAIL**. Osadenia, výroba/rezy, šablóny, uloženie/návrat, Scale/Späť a kópia overené.
-Zmena typu odstráni neaplikovateľný seed zásah profilu a Undo ho vráti; prehliadač zachoval bočný profil pri zmene výšky. Ručné Redo ostáva na používateľský test.
+**Testy ČELÁ-B2:** **3829 headless · 113 JS sád**, skutočný Inspector pri 470 px s Ruby preflightom: smer stredného krídla, blokovaný výber zo Štúdia a zrušená šablóna.
+Geometrický dôkaz B1: **in-SketchUp 2295 PASS / 0 FAIL** (osadenia, výroba/rezy, šablóny, uloženie/návrat, Scale/Späť a kópia); B2 geometriu nemení. Ručné Redo zostáva.
 **Michal 11.9. potvrdil úspešný test produktových odkazov aj potvrdzovania cien** (CENY-KOV-A/B, PR #345/#346).
 
 ## Robí sa
@@ -29,12 +29,12 @@ UKW na všetkých štyroch hranách a aj na výklope/sklope/blende; zvislé prof
 Ovládanie: profil/hrana v karte čela + hromadné Úchytky; štyri okraje v dvoch riadkoch; šesť piktogramov na pridanie typu.
 Úplné packages **ČELÁ-A → B1 → B2 → C** sú v [PLAN.md](PLAN.md). Lokálna interaktívna ukážka `_dev/cela-plan/index.html` je návrh, nie runtime pluginu.
 Outside-in a Astra audit spracované, kontrola zapracovania **SOUND**. ČELÁ-A zlúčené v PR #347; pôvodný B PR #348 uzavretý po treťom kole a rozdelený podľa pravidla repozitára.
-**B1 (#349)**: hotová geometria, schéma 13, seed 7 a čistenie zásahov. **B2**: ovládanie hrán a potvrdenie návrhu. **C**: šesť ikon a upratanie kontextu. D-120 zostáva otvorené do B2.
+**B1 (#349)** zlúčené: geometria, schéma 13, seed 7 a čistenie zásahov. **B2 (#350)** implementované: ovládanie hrán a potvrdenie návrhu, D-120 uzavreté. **C** zostáva: šesť ikon a upratanie kontextu.
 **Blok 1d** podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**. Blok **1b** je uzavretý, **1c/1e hotové**.
 
 ## Ďalší krok
 
-Uzavrieť review/merge B1 (#349), potom z čerstvého mainu B2 a C. Geometrický dôkaz B1 je dokončený; B2/C preveria skutočný Inspector a všetky naviazané akcie.
+Uzavrieť review/merge B2 (#350), potom z čerstvého mainu C (D-114) a uzáver celého balíka. Geometrický dôkaz B1 aj browser kontrola návrhu B2 sú dokončené.
 Ostatné V1 bloky ostávajú podľa [PLAN.md](PLAN.md).
 
 ## Posledné uzávery
