@@ -292,7 +292,9 @@ Preflight dokazuje aj zachovanie necielených kanálov: explicitné ABS si drž�
 necielené ABS pripne na pôvodný efektívny handle. Nepreukázateľné textúrované alebo nil dedenie znamená preskočiť celý diel; rovnako nový konflikt
 protected raw hrany, ktorý by zablokoval nasledujúci rebuild. Edge-only Apply nemení sheet ani rodičovský materiál.
 
-Jedna guarded modelová operácia najprv izoluje potrebné zdieľané cesty zhora nadol. Obsahový strom s multiplicitami dokazuje zhodu pred/po clone,
+Jedna guarded modelová operácia najprv izoluje potrebné zdieľané cesty zhora nadol. Používa `disable_ui=false`: vnorený `make_unique` kopíruje aj DC
+atribúty a potlačenie UI v tomto prípade vypínalo selection callbacky (D-40, natívne overené). Guard, normálny abort aj jeden Undo krok ostávajú;
+nevzniká dodatočná operácia ani zápis DC údajov. Obsahový strom s multiplicitami dokazuje zhodu pred/po clone,
 bez párovania starých a nových potomkov podľa PID alebo indexu. Neznámy nepreukázateľný obsah blokuje iba potrebnú clone vetvu. Po izolácii sa
 z čerstvých potomkov pripraví finálny plán; až potom sa selektívne mapujú cielené plochy. Akýkoľvek neočakávaný drift alebo chyba zápisu zruší celú
 operáciu vrátane izolácie. Bez cieľa nevzniká prázdny Undo krok. Výsledok udáva počty fyzických dielcov, dvojíc veľkých plôch, ABS slotov a dôvody skipov.

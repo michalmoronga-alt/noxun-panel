@@ -11,7 +11,7 @@ Destilát z „Výskumná správa pre kódera SketchUp pluginov" (deep research,
 
 ## Geometria
 
-- **Každá užívateľská akcia = jedna undo operácia:** `model.start_operation("Názov", true)` … `commit_operation`; pri chybe `abort_operation`. Výnimka: `redraw_with_undo` dynamických komponentov NIKDY vnútri otvorenej operácie (viď DC_PRAVIDLA).
+- **Každá užívateľská akcia = jedna undo operácia:** `model.start_operation("Názov", true)` … `commit_operation`; pri chybe `abort_operation`. MR-3B Apply používa v tej istej normálnej operácii `disable_ui=false`, aby vnorený `make_unique` s DC atribútmi nevypol selection eventy (D-40). Výnimka: `redraw_with_undo` dynamických komponentov NIKDY vnútri otvorenej operácie (viď DC_PRAVIDLA).
 - **Rozmery vždy ako `Length`:** `600.mm`, nikdy holé číslo (SketchUp interne počíta v palcoch — `600` znamená 600″).
 - **Kontrola normály pred pushpull:** `face.reverse! unless face.normal.samedirection?(Z_AXIS)` — `add_face` negarantuje smer.
 - **Group-first:** najprv vytvoriť group/komponent, potom kresliť do jeho `entities` (nie dodatočne zoskupovať).

@@ -33,7 +33,9 @@ module Noxun
         ScaleWatch.guard do
           started = false
           begin
-            raise ApplyError, 'Operácia vzhľadu sa nedá otvoriť.' unless model.start_operation('Použiť vzhľad', true) == true
+            # Nested make_unique kopiruje aj DC atributy. disable_ui=true pri
+            # tomto clone vypina selection eventy (D-40); guard ostava aktivny.
+            raise ApplyError, 'Operácia vzhľadu sa nedá otvoriť.' unless model.start_operation('Použiť vzhľad', false) == true
             started = true
             input!(model, scope, material, guarded: true)
             initial[:parts].each { |part| verify_plan!(part) }
