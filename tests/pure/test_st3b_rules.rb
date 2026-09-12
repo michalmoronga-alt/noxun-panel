@@ -992,6 +992,12 @@ NxTest.test('ŠT-3b-2b (review #221): vyber podla `rule_ref` uz nerobi zbytocny 
                 'zber sa robi AZ vo vetve, ktora ho naozaj potrebuje')
   NxTest.assert(sel.include?('refs_for(Bom.compute(fresh_collect(model)), data)'),
                 'a vseobecna vetva ho ma dalej (BOM bez zberu neexistuje)')
+  # D-94: vetva `source_ref` (klik na zdroj v rozkliku povodu) stoji na TOM
+  # ISTOM rozhodnuti — hlada podla identity, takze zber tiez nepotrebuje.
+  src = sel[/elsif data\['source_ref'\].*?\n        else/m].to_s
+  NxTest.assert(src.include?('pids_for_source'), 'vetva `source_ref` v do_select existuje')
+  NxTest.refute(src.include?('fresh_collect'),
+                'a rovnako ako `rule_ref` hlada podla identity — bez plneho skenu modelu')
 end
 
 # ---------------------------------------------------------------------------
