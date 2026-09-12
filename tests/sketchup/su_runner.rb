@@ -2100,7 +2100,8 @@ module NoxunSuRunner
       digests = paths.zip(pixels).map do |path, data|
         image = Sketchup::ImageRep.new
         image.set_data(2, 2, 32, 0, data.pack('C*'))
-        raise 'MR2A image fixture save' unless image.save_file(path)
+        image.save_file(path)
+        raise 'MR2A image fixture save' unless File.file?(path) && File.size(path).positive?
         Digest::SHA256.hexdigest(image.data)
       end
       source, plain = mr1b2_op(model) do
