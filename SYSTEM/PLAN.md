@@ -173,7 +173,7 @@ príslušného bloku z konceptov nižšie (koncept je podklad, nie zadanie — R
 | 03 kovanie fáza 3 | blok KOVANIE — **hotový 10.9.2026** (v0.10.0; packages A–I v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md)); fáza 3 geometria ostáva PO V1 |
 | 04 + 04A spotrebiče S1 | podklad pre package pri štarte bloku 4 (V1-02); externý audit 04A platný |
 | 05 shared library + updater | D-52 SPRACOVANÉ do package (#255); D-48 sync = PO V1 zásobník |
-| 06 render M-R | quick-win SPRACOVANÝ do package M-R FOTO (#254/#257); plná appearance vrstva PO V1 (D-28 odrážka bloku 5) |
+| 06 render M-R | pôvodný M-R FOTO nahradilo M-R VZHĽAD, implementované v #353–#359; plný blok v [archíve etáp](archiv/ROADMAP_hotove_etapy.md). Po V1 ostáva pixla a zdieľanie knižnice D-48 |
 | 07 konštrukcia V1 | podklad pre package(y) pri štarte bloku 4 (V1-01 komín · V1-07 čelá cenovo · balík V0.4.8); patrí sem aj výklop=rola flap — týmto PRESUNUTÝ z 1b/F do okruhu bloku 4 (jeden domov) |
 | 08 ponuka/dokumenty/ceny | V1 časť = zvyšok V1-03 v bloku 4; DOCX/PDF rodina dokumentov PO V1 zásobník |
 | 09 + 09A GHOST | SPRACOVANÉ do záväzného package (#254 + #257) |
@@ -637,7 +637,7 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 - **Mimo V1 z bloku KOVANIE** (FINAL §12; presunuté sem 10.9.2026 pri uzávere bloku): **D-109** pomerový člen setu „1 ks na N nôh" (= **R-05**; výsledok dnes dáva pravidlo
   `prichyt-sokla` podľa šírky korpusu, chýba len samotná mechanika pomeru) · plný `per: 'length'` · **HF** · ďalšie zásuvkové systémy **Antaro / StrongBox / TANDEM**
   (dáta pripravené v checkpointe #10) · automatika **vnútornej zásuvky** (inner drawer).
-- **Vyradené z V1 rozsahu 26.8.2026** (dôvody a rozsah: [V1_VIZIA.md](V1_VIZIA.md) „Mimo V1"): **D-48 G-Disk sync knižníc** (plné znenie v [DOGFOODING.md](DOGFOODING.md), skupina Po V1 — zásobník) · plné zostavy/segmenty s `attachment` (koncept 02) · plná appearance vrstva + pixla (koncept 06) ·
+- **Vyradené z V1 rozsahu 26.8.2026** (dôvody a rozsah: [V1_VIZIA.md](V1_VIZIA.md) „Mimo V1“): **D-48 G-Disk sync knižníc** (plné znenie v [DOGFOODING.md](DOGFOODING.md), skupina Po V1 — zásobník) · plné zostavy/segmenty s `attachment` (koncept 02) · pixla (koncept 06; M-R vzhľad implementovaný v #353–#359) ·
   DOCX/PDF ponuka s vizualizáciami a rodina dokumentov (koncept 08) · G-Disk sync D-48 (updater D-52 ostáva vo V1) · sektorová kontrola (koncept 01) ·
   konfigurátor typov čiel (V1-07 nad rámec cenovej položky) · kovanie fáza 3 geometria (plný model výklopov, výplne fáza B).
 - **Potvrdené / vyradené z V1 6.9.2026 (debata V1 po KOVANÍ, checkpointy `zdroje/next_sessions/V1_DEBATA_2026-09-0*.md`):** **D-95** krížová kontrola diel po diele — **uzavreté bez implementácie** (archív; odškrtávanie preč natrvalo), ostáva vizuálna kontrola, neskôr presety/X-ray (koncept 01) · **stráž kolízií** · **EN DANIELI** textový export · **D-106** predbežná cena skrinky ·
