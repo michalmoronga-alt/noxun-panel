@@ -232,10 +232,10 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   (schválený mockup mínus 20 %), celý názov variantu a údaje pod vzorkou; v úzkom okne dva stĺpce. Spoločný picker, potvrdenie/zrušenie a serverový kontrakt zachované.
   **PR #344, v0.10.3.** „Materiál per rola dielca" ostáva v zásobníku Po V1. Podklad: `zdroje/next_sessions/D124_OUTSIDE_IN_2026-09-10.md`.
 - **Ceny — zvyšok V1-03:** ručné overenie cien **materiálov/ABS** bez Demos väzby a viac URL na položke ostávajú v zásobníku; vytiahnuť podľa reálnej praxe.
-- **D-128 · Výška dreveného boxu zásuvky (Quadro)** — plynie z geometrie (svetlá − vôľa receptu), nemá ovládač ani zobrazenie; overiť potrebu zámku (vzor D-93) — nové okno.
-- **D-129 + D-130 · Kontext Čelá: úchytky na dvoch miestach + menší UI/UX rework** — zjednotiť úchytky, pomocné texty do tooltipov, prehľadnejší celok; debata → mockup → package — nové okno.
   **CENY-KOV-A/B je hotové** (10.9.2026, PR #345/#346, v0.10.4–v0.10.5): jeden produktový odkaz a ručné potvrdenie katalógového kovania; plný schválený rozsah v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).
   Pôvodná debata: [zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md). Prepínač „na faktúru“ je vyradený (existuje s DPH / bez DPH); DOCX/PDF ponuka a rodina dokumentov sú mimo V1.
+- **D-128 · Výška dreveného boxu zásuvky (Quadro)** — plynie z geometrie (svetlá − vôľa receptu), zobrazuje sa len na čítanie v riadku Zásuvka („box X mm"), nemá ovládač; overiť objaviteľnosť a potrebu zámku (vzor D-93) — nové okno.
+- **D-129 + D-130 · Kontext Čelá: úchytky na dvoch miestach + menší UI/UX rework** — zjednotiť úchytky, pomocné texty do tooltipov, prehľadnejší celok; debata → draft → Antigravity outside-in → reconcile → mockup → package — nové okno.
 - *(Vkladanie na klik — V1-04 — sa 26.8. vyčlenilo do vlastného bloku **GHOST VKLADANIE**; ten je od 31.8.2026 **hotový** (v0.9.0), plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).)*
 - **Konštrukcia — rozhodnuté 6.9.2026** ([zdroje/next_sessions/V1_DEBATA_2026-09-05_KONSTRUKCIA.md](zdroje/next_sessions/V1_DEBATA_2026-09-05_KONSTRUKCIA.md)): **K1 odsadenia** — dva prípady, jedna
   hodnota per skrinka (komín vzadu: dno a strop kratšie, chrbát na ich zadnej hrane · strop zapustený vpredu), nastaviteľné, nefixované · **K2 chrbát z výstuh** — nový typ chrbta:

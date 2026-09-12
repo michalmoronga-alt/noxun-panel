@@ -40,7 +40,7 @@ aj prestavbu. Výstup zákazky (CSV, rozpočet, ponuka) sa nemení ani o znak. *
 **Ďalší blok vyberá Michal** — automaticky sa nič neštartuje; po uzávere M-R mala nasledovať slovná diskusia o workflow. Skupina „KONTROLA + VÝROBA" v
 [DOGFOODING.md](DOGFOODING.md) je po D-94 prázdna. Budúca rotácia obrázka a umiestnenie textúr sú D-126/D-127 v [PLAN.md](PLAN.md); D-48 zostáva po V1,
 **D-109** (pomerová mechanika kovania, R-05) po V1 a ručné Redo Čiel je stále samostatne nepotvrdené.
-**Nové postrehy Michala 12.9. (po smoke D-94):** **D-128** výška dreveného boxu zásuvky nemá ovládač · **D-129** úchytky sú v kontexte Čelá na dvoch miestach · **D-130** menší UI/UX rework kontextu Čelá (organizácia, pomocné texty do tooltipov). Overia sa a rozhodnú **v novom okne** (debata → mockup → package); plné znenie v [DOGFOODING.md](DOGFOODING.md).
+**Nové postrehy Michala 12.9. (po smoke D-94):** **D-128** výška dreveného boxu zásuvky nemá ovládač · **D-129** úchytky sú v kontexte Čelá na dvoch miestach · **D-130** menší UI/UX rework kontextu Čelá (organizácia, pomocné texty do tooltipov). Overia sa a rozhodnú **v novom okne** (debata → outside-in → mockup → package); plné znenie v [DOGFOODING.md](DOGFOODING.md).
 
 ## Posledné uzávery
 
