@@ -83,6 +83,7 @@ DC pasce [DC_PRAVIDLA.md](DC_PRAVIDLA.md) · UI dizajn [UI_DIZAJN.md](UI_DIZAJN.
 | zdieľané JS komponenty (`nx_combo.js` · `nx_modal.js` · `edge_menu.js` · `win_fit.js`), téma, toolbar, lifecycle okien | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
 | `production_core.rb` (`ui/production_core.rb`) — čisté jadro výstupov zákazky | [architecture/outputs.md](architecture/outputs.md) |
 | moduly bez vlastného okna: `materials_dialog.rb` · `hardware_catalog_dialog.rb` · `rules_dialog.rb` · `templates_dialog.rb` · `supplier_settings_dialog.rb` | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
+| `materials_appearance_dialog.rb` · `ui/js/md_appearance.js` (spoločné ovládanie vzhľadu dosiek a ABS v Štúdiu) | [architecture/ui-lifecycle.md](architecture/ui-lifecycle.md) |
 
 ### Kľúčové invarianty
 

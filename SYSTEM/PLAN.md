@@ -540,7 +540,8 @@ Nový vklad používa aktuálnu revíziu, prestavba/kópia zachová živý pôvo
 vrátane skrytých/vnorených, izolácie zdieľaných definícií a zachovania necielených plôch v jednej Undo operácii. Prestavba nerecykluje definície používané cudzími dielcami.
 MR-2A (v0.11.6) dopĺňa prípravu pracovného materiálu v tej istej operácii ako Apply, aj bez dielcov; pri chybe alebo predčasnom odchode sa vráti celý pokus.
 Pracovný import odmieta obsadenú revíziu a starý handle. SKM export zo živého alebo súborového zdroja overuje presnú obnovu kolekcie po oboch abortoch.
-Nasleduje MR-2B ovládanie a záverečný smoke. D-28 ostáva otvorené do dokončenia celého bloku.
+MR-2B (v0.11.7) sprístupňuje spoločné ovládanie v Štúdiu: voliteľný obrázok, natívny editor, Save a Reset, samostatné okamžité RGB a retry po uložení bez úspešného Apply.
+Otvorenie nemení model ani výber; vlastné katalógové echo zachová okno, zmena dokumentu/sekcie zneplatní staré odpovede. Nasleduje záverečný smoke a uzáver; D-28 ostáva dovtedy otvorené.
 Natívna sonda potvrdila aj editáciu materiálu bez priradenia geometrii. MR-2 preto nepotrebuje pomocnú plochu: otvorí panel Materiály, kartu Upraviť prepne používateľ.
 
 - **V1 rozsah — M-R VZHĽAD (rozhodnuté 6.9.2026, NAHRÁDZA package „M-R FOTO" — Demos fotka ako textúra vypadáva):** ručné textúry z Michalovej knižnice (`E:\NOXUN\.MATERIÁLY`)

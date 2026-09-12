@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.11.6 · 12.9.2026 — M-R: MR-2A PRÍPRAVA PRACOVNÉHO VZHĽADU.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.11.7 · 12.9.2026 — M-R: MR-2B SPOLOČNÉ OVLÁDANIE VZHĽADU.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -26,6 +26,7 @@ Pred prvou takou zákazkou aktualizovať **obe PC** (Štúdio → O plugine → 
 **MR-3B:** **3953 headless · 113 JS sád · 2518 in-SketchUp PASS / 0 FAIL** (76 nových kontrol). Spoločné Apply dosiek/ABS, vnorené/skryté kópie, ochrana cudzích dielcov aj následného rebuildu, výroba a úplný rollback.
 D-40 opravené úzkou zmenou operácie; výber žije po Apply/Undo/Redo/abort. Save/reopen bez `.skm`: **24 PASS**, presný vzhľad, UV a prestavba zachované; bez sekundárnych PBR máp/renderu.
 **MR-2A:** **3971 headless · 113 JS sád · 2563 in-SketchUp PASS / 0 FAIL** (45 nových natívnych kontrol). Pracovný SKM, PBR/pixely/mierka, nulový RGB, spoločné Undo/Redo a rollback prípravy; D-40 ostáva funkčné.
+**MR-2B:** **3983 headless · 114 JS sád · 2606 in-SketchUp PASS / 0 FAIL** (43 nových natívnych kontrol). Skutočné CEF Štúdia **18 PASS**; spoločné ovládanie dosiek/ABS, presný Save/retry, farba, Reset, natívny Edit, Undo/Redo a ochrana životnosti okna.
 Geometrický dôkaz ČELÁ-B2: **in-SketchUp 2297 PASS / 0 FAIL** (osadenia, výroba/rezy, šablóny, uloženie/návrat, Scale/Späť a kópia); C geometriu nemení. Ručné Redo zostáva.
 **Michal 11.9. potvrdil úspešný test produktových odkazov aj potvrdzovania cien** (CENY-KOV-A/B, PR #345/#346).
 **Michal 11.9. potvrdil aj používateľskú kontrolu hotového balíka Čiel v0.11.0: funguje, bez nájdených chýb.** Samostatné ručné Redo nebolo výslovne potvrdené.
@@ -33,14 +34,14 @@ Geometrický dôkaz ČELÁ-B2: **in-SketchUp 2297 PASS / 0 FAIL** (osadenia, vý
 ## Robí sa
 
 **Michal schválil blok M-R a mockup (11.9.).** Jeden spoločný vzhľad pre dosky aj ABS rovnakého dekoru a povrchu naprieč hrúbkami; dnešné plošné farby ostávajú, zástena má jeden vzhľad. UNI ostáva pracovnou farbou.
-**MR-1A/1B1/1B2 a MR-3A/3B sú v maine (#353–#357).** MR-2A spája prípravu nového pracovného materiálu a priradenie do jedného kroku Späť, aj pri prázdnom modeli.
-Nový pracovný materiál nikdy neprepisuje starý zdieľaný vzhľad. Súborový zdroj sa pri exporte iba dočasne načíta; kontroluje sa presná obnova kolekcie. Nasleduje MR-2B ovládanie; plošné farby zostávajú.
+**MR-1A/1B1/1B2, MR-3A/3B a MR-2A sú v maine (#353–#358).** MR-2B sprístupňuje spoločný Vzhľad pri povrchu v Materiáloch: obrázok, natívny editor, uloženie do knižnice a návrat k farbe.
+Každý Pick/Edit vytvorí nový pracovný materiál a má jeden krok Späť. Save zachytí konkrétny zdroj, aj keď sa medzitým vyberie iný materiál; úspešné uloženie s chybným použitím umožňuje samostatný retry.
 Ďalšie dávky určuje blok M-R v [PLAN.md](PLAN.md), audit a sondy zachytáva [MR podklad](zdroje/next_sessions/MR_VZHLAD_PACKAGE_2026-09-11.md). Čelá A/B1/B2/C ostávajú dokončené a používateľsky potvrdené.
 **Blok 1d** podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**. Blok **1b** je uzavretý, **1c/1e hotové**.
 
 ## Ďalší krok
 
-Po uzavretí MR-2A začať MR-2B ovládanie z čerstvého mainu, potom reálny záverečný smoke. D-28 ostáva otvorené do dokončenia celého bloku; ručné Redo Čiel ostáva samostatne nepotvrdené.
+Po uzavretí MR-2B záverečný smoke a uzáver M-R z čerstvého mainu. D-28 ostáva otvorené do dokončenia celého bloku; ručné Redo Čiel ostáva samostatne nepotvrdené.
 
 ## Posledné uzávery
 
