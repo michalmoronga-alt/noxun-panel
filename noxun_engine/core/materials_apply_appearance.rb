@@ -470,7 +470,9 @@ module Noxun
           cycle = points.each_index.map { |index| points.rotate(index) }.min
           [loop == face.outer_loop, cycle]
         end.tally
-        [numbers(face.plane), point(face.normal), loops]
+        # Rovina je urcena presnymi vrcholmi a normalou. Native clone moze
+        # nanovo normalizovat redundantne face.plane koeficienty o 1 ULP.
+        [point(face.normal), loops]
       end
 
       def edge_geometry(edge)
