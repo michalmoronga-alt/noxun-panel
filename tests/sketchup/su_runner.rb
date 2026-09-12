@@ -1940,18 +1940,8 @@ module NoxunSuRunner
     working = result[:material]
     ok('MR2A Pick: blok raz, committed W handle, 12 dosiek aj 12 ABS',
        calls == 1 && working == imported && working.valid? && mr3b_counts(result, 12, 12, 12))
-    file_image = Sketchup::ImageRep.new(ctx[:picked_path])
-    file_pixels = [file_image.width, file_image.height, file_image.bits_per_pixel, Digest::SHA256.hexdigest(file_image.data)]
-    actual_image = working.texture.image_rep
-    pixel_flags = { state: mr1b1_visual(working) == picked, raw_fixture_hash: picked[:texture][5] == ctx[:picked_digest],
-                    decoded_file: picked[:texture][2, 4] == file_pixels,
-                    decoded_colors: actual_image.colors.map(&:to_a) == file_image.colors.map(&:to_a),
-                    scale: picked[:texture][0, 2] == [180.mm.to_f, 90.mm.to_f],
-                    changed: picked[:texture][5] != mr1b1_visual(ctx[:source])[:texture][5] }
-    info("MR2A Pick pixel diagnostic: #{pixel_flags.inspect}; actual=#{picked[:texture].inspect}; " \
-         "PNG=#{file_pixels.inspect}; padding=#{actual_image.row_padding}/#{file_image.row_padding}; raw32=#{ctx[:picked_digest]}")
     ok('MR2A Pick: novy obrazok a mierka su skutocne v materialoch',
-       mr1b1_visual(working) == picked && picked[:texture][5] == ctx[:picked_digest] &&
+       mr1b1_visual(working) == picked && picked[:texture][2, 4] == ctx[:picked_pixels] &&
        picked[:texture][0, 2] == [180.mm.to_f, 90.mm.to_f] && picked[:texture][5] != mr1b1_visual(ctx[:source])[:texture][5])
     pbr_keys = mr1b1_visual(ctx[:source]).keys - %i[texture color alpha colorize_type colorize_deltas]
     ok('MR2A Pick: vlastne PBR mapy/faktory a alpha prezili vymenu albeda',
@@ -2107,12 +2097,14 @@ module NoxunSuRunner
       paths = %w[source picked].map { |name| File.join(temp, "#{name}.png") }
       pixels = [[255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 230, 150, 80, 255],
                 [25, 80, 230, 255, 240, 210, 20, 255, 150, 50, 70, 255, 10, 190, 90, 255]]
-      digests = paths.zip(pixels).map do |path, data|
+      signatures = paths.zip(pixels).map do |path, data|
         image = Sketchup::ImageRep.new
         image.set_data(2, 2, 32, 0, data.pack('C*'))
         image.save_file(path)
         raise 'MR2A image fixture save' unless File.file?(path) && File.size(path).positive?
-        Digest::SHA256.hexdigest(image.data)
+        # Opaque raw32 sa ulozi ako PNG24; oracle cita presne ten emitovany subor.
+        image = Sketchup::ImageRep.new(path)
+        [image.width, image.height, image.bits_per_pixel, Digest::SHA256.hexdigest(image.data)]
       end
       source, plain = mr1b2_op(model) do
         mat = model.materials.add('SU MR2A source')
@@ -2139,7 +2131,7 @@ module NoxunSuRunner
       end
       ctx = { a: batches['A']['sheets'].first, b: batches['B']['sheets'].first,
               ae: batches['A']['edges'].first, be: batches['B']['edges'].first,
-              plain: plain, source: source, temp: temp, image_path: paths[0], picked_path: paths[1], picked_digest: digests[1] }
+              plain: plain, source: source, temp: temp, image_path: paths[0], picked_path: paths[1], picked_pixels: signatures[1] }
       ctx[:scopes] = %i[a b].to_h { |key| [key, e::Materials.appearance_scope_key(e::Materials.sheet(ctx[key]))] }
       mr2a_export_case(model, ctx)
       mr2a_pick_case(model, ctx)
