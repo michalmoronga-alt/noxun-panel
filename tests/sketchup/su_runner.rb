@@ -713,9 +713,11 @@ module NoxunSuRunner
     begin
       yield
       ok("MR3A #{label}: odmietnutie", false)
-    rescue e::Materials::AppearanceError
+      nil
+    rescue e::Materials::AppearanceError => error
       ok("MR3A #{label}: cely rollback vratane UV, projekcie a materialov",
          mr3a_scene(model, owner) == before && !e::ScaleWatch.rebuilding?)
+      error
     end
   end
 
@@ -867,17 +869,25 @@ module NoxunSuRunner
   def mr3a_failure(model, owner, label, event: :c_call, method: :position_material, after: 2)
     calls = 0
     returns = 0
-    trace = TracePoint.new(event, :c_return) do |tp|
+    injected = false
+    seen = []
+    return_event = event == :call ? :return : :c_return
+    trace = TracePoint.new(event, return_event) do |tp|
+      next unless tp.method_id == method
+      seen << [tp.event, tp.self.to_s, tp.path, tp.lineno] if seen.length < 6
       matching = method == :position_material ? tp.self.is_a?(Sketchup::Face) : tp.self == e::AppearanceMapping
-      next unless matching && tp.method_id == method
+      next unless matching
       if tp.event == event
         calls += 1
-        raise e::Materials::AppearanceError, 'MR3A injektovana chyba po prvom zapise' if calls == after
-      elsif tp.event == :c_return
-        returns += 1 unless tp.return_value == false
+        if calls == after
+          injected = true
+          raise e::Materials::AppearanceError, 'MR3A injektovana chyba po prvom zapise'
+        end
+      elsif tp.event == return_event
+        returns += 1 if tp.return_value && tp.return_value != false
       end
     end
-    mr3a_reject(model, owner, label) do
+    caught = mr3a_reject(model, owner, label) do
       trace.enable
       begin
         yield
@@ -885,7 +895,13 @@ module NoxunSuRunner
         trace.disable
       end
     end
-    ok("MR3A #{label}: injekcia sa naozaj trafila po uspesnom prvom zapise", calls == after && (method != :position_material || returns >= 1))
+    reached = calls == after && returns >= 1 && injected &&
+              caught.is_a?(e::Materials::AppearanceError) && caught.message.include?('MR3A injektovana chyba')
+    unless reached
+      info("MR3A #{label}: calls=#{calls}, successful_returns=#{returns}, injected=#{injected}, " \
+           "caught=#{caught && [caught.class.to_s, caught.message].inspect}, events=#{seen.inspect}")
+    end
+    ok("MR3A #{label}: injekcia sa naozaj trafila po uspesnom prvom zapise", reached)
   ensure
     trace.disable if trace
   end
