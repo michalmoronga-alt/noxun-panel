@@ -979,7 +979,7 @@ module NoxunSuRunner
          e::Materials.sheet(zs['material_id']).values_at('back_decor', 'back_structure') == ['INY RUB', 'RT'])
       mr3a_lifecycle(model, a, board, params, bp, source, ids[18], r1)
       mr1b2_op(model) { mr3a_projected_face(d88_face_on(board, 2, :max), r1, 18) }
-      mr3a_failure(model, board, 'board druha face strana') { e::BoardBuilder.rebuild(model, board, 'length' => 810.0) }
+      mr3a_failure(model, board, 'board druha face strana') { e::BoardBuilder.rebuild(model, board, { 'length' => 810.0 }) }
       mr3a_failure(model, a, 'cabinet druha face strana') { e::CabinetBuilder.rebuild(model, a, params.merge('width' => 680.0)) }
       mr3a_failure(model, a, 'druhy dielec', event: :call, method: :paint_part!) { e::CabinetBuilder.rebuild(model, a, params.merge('width' => 680.0)) }
       plain = e::Materials.sheets.find { |rec| e::Materials.uni?(rec) && rec['thickness'].to_f == 18.0 }
@@ -1026,7 +1026,7 @@ module NoxunSuRunner
        mr1b2_snapshot(cabinet) == snapshot && mr1b2_bom(model) == bom && k1_vepo_csv(model) == vepo && mr1b1_state(r1) == live)
     mr3a_check_part(d88_part(cabinet, 'side_left'), 'rebuild R1', l: 2, w: 1, t: 0, material: r1, scale: [320, 160])
     before_undo = mr3a_owner_uv(board)
-    e::BoardBuilder.rebuild(model, board, 'length' => 810.0)
+    e::BoardBuilder.rebuild(model, board, { 'length' => 810.0 })
     rebuilt_uv = mr3a_owner_uv(board)
     Sketchup.undo
     ok('MR3A Undo: board vrati povodne faces a ich presne UV',
