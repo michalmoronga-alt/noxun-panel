@@ -1929,10 +1929,10 @@ module Noxun
           # SketchUp material z katalogu (nazov = material_id, farba z color) — vizual, nie vyrobna pravda.
           fallback = pd[:material] == :front ? FALLBACK_RGB_FRONT : FALLBACK_RGB_KORPUS
           inst.material = su_material(model, resolved[:material_id], fallback, previous: previous[:sheet])
-          # D-88: bocne plosky s vyriesenou ABS paskou dostanu farbu PASKY (velke
-          # dekorove plochy ostavaju bez materialu = dedia material instancie).
+          # MR-3A: finalny kvader dostane UV dekoru aj ABS; ciste RGB ostava dedicne.
           paint_edge_faces(model, pdef.entities, pd, resolved[:edges], resolved[:material_id],
-                           sheet_material: inst.material, previous_edges: previous[:edges] || {})
+                           sheet_material: inst.material, previous_edges: previous[:edges] || {},
+                           instance: inst, grain: resolved[:grain_direction] || 'none')
           inst.layer = part_tag(model, pd[:role]) # tag dielca (Korpus/Chrbát/Čelá/Vnútro)
           pid = Ids.part_id(cid, pd[:suffix])
           # BuildPlan kontrakt: vyrobne zaradenie riadi DESKRIPTOR (default sheet/true/1) —
@@ -2236,9 +2236,38 @@ module Noxun
         # Bezi VNUTRI existujuceho rebuildu (ziadna vlastna operacia, 1 undo).
         # Konflikt vzhladu musi dojst k abortu; nesmie skoncit jednofarebnym dielcom.
         # Zdielane s BoardBuilder (doska ide tou istou cestou).
-        def paint_edge_faces(model, ents, pd, edges, material_id, sheet_material: nil, previous_edges: {})
-          return unless edges.is_a?(Hash) && edges.any? { |_k, v| !v.nil? && !v.to_s.strip.empty? }
+        def paint_edge_faces(model, ents, pd, edges, material_id, sheet_material: nil, previous_edges: {},
+                             instance: nil, grain: 'none')
           return unless defined?(Materials)
+          edges = {} unless edges.is_a?(Hash)
+          sheet_rgb = Materials.color_of(material_id)
+          plain_sheet = BuildAppearance.classify(sheet_material) == :plain
+          bindings = {}
+          BuildAppearance::SLOTS.each do |code|
+            abs_id = edges[code]
+            next if abs_id.nil? || abs_id.to_s.strip.empty?
+            previous = previous_edges[code]
+            edge = Materials.edge(abs_id)
+            descriptor = edge && edge.key?('appearance') ? Materials.normalize_appearance(edge['appearance']) : nil
+            native = descriptor && descriptor['mode'] == 'native'
+            plain_edge = previous.nil? || (previous[:state] == :plain && BuildAppearance.classify(previous[:material]) == :plain)
+            inherit = plain_sheet && plain_edge && !native && sheet_rgb && Materials.edge_color_of(abs_id) == sheet_rgb
+            mat = inherit ? sheet_material : Materials.ensure_su_edge_material(model, abs_id, previous: previous)
+            bindings[code] = { material: mat, inherit: !!inherit }
+          end
+          uv_needed = (sheet_material && sheet_material.texture) || bindings.values.any? { |binding| binding[:material]&.texture }
+          if uv_needed
+            inspected = AppearanceMapping.inspect_part(instance, descriptor: pd)
+            unless inspected[:status] == :ok
+              raise AppearanceMapping::MappingError, "Dielec sa nedá namapovať: #{inspected[:reason]}"
+            end
+            AppearanceMapping.paint_part!(instance, inspected[:map], grain: grain,
+                                          bindings: { sheet: sheet_material, edges: bindings })
+            return bindings
+          end
+          return bindings if bindings.empty?
+          # Bez albeda ostava povodna tolerancia RGB cesty. Textury vyssie
+          # pouzivaju vyhradne overenu mapu, nikdy druhy odhad zo stredov.
           ax = PartFaces.verified_axes(pd)
           if ax.nil?
             if previous_edges.values.compact.any? { |previous| previous[:state] != :plain }
@@ -2248,33 +2277,21 @@ module Noxun
             return
           end
           box = pd[:box]
-          sheet_rgb = Materials.color_of(material_id)
           ents.grep(Sketchup::Face).each do |f|
             # ROLA rozhoduje o orientacii dvojice L1/L2 (KOV-D5: stojace dielce
             # zasuvky maju L1 HORE) — mapa je v PartFaces, tu sa nekopiruje.
             code = PartFaces.edge_code_for_center(face_center_mm(f), box, ax, pd[:role])
             next if code.nil?
-            abs_id = edges[code]
-            next if abs_id.nil? || abs_id.to_s.strip.empty?
-            # Paska rovnakeho dekoru ako doska = ziadny vizualny rozdiel; material
-            # sa vtedy vobec nevytvara (kniznica materialov modelu sa nezanasa).
-            previous = previous_edges[code]
-            edge = Materials.edge(abs_id)
-            descriptor = Materials.normalize_appearance(edge['appearance']) if edge && edge.key?('appearance')
-            native = descriptor && descriptor['mode'] == 'native'
-            plain_sheet = BuildAppearance.classify(sheet_material) == :plain
-            plain_edge = previous.nil? || (previous[:state] == :plain && BuildAppearance.classify(previous[:material]) == :plain)
-            next if plain_sheet && plain_edge && !native && sheet_rgb && Materials.edge_color_of(abs_id) == sheet_rgb
-            mat = Materials.ensure_su_edge_material(model, abs_id, previous: previous)
-            next unless mat
-            f.material = mat
-            f.back_material = mat
+            binding = bindings[code]
+            next unless binding && !binding[:inherit] && binding[:material]
+            f.material = binding[:material]
+            f.back_material = binding[:material]
           end
+          bindings
         rescue Materials::AppearanceError
           raise
         rescue StandardError => e
-          Engine.log_error(e, 'paint_edge_faces') if defined?(Engine)
-          nil
+          raise AppearanceMapping::MappingError, "Vzhľad dielca sa nepodarilo priradiť: #{e.message}"
         end
 
         # Stred plochy v mm lokalnych osiach definicie (geometria je v palcoch).

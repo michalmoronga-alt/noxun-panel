@@ -757,7 +757,8 @@ module Noxun
                  prod: { length: cfg[:length].to_f, width: cfg[:width].to_f, thickness: cfg[:thickness].to_f },
                  axes: PartFaces::AXES_LYING }
           CabinetBuilder.paint_edge_faces(model, inst.definition.entities, pd, cfg[:edges], cfg[:material_id],
-                                          sheet_material: inst.material, previous_edges: previous_edges)
+                                          sheet_material: inst.material, previous_edges: previous_edges,
+                                          instance: inst, grain: cfg[:grain_direction] || 'none')
         rescue Materials::AppearanceError
           raise
         rescue StandardError => e
