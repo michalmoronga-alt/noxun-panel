@@ -767,36 +767,46 @@ function qa(sel){ return ROOT.querySelectorAll(sel); }
   eq(ST.hwRowManual({ adhoc_quantity: 0, free: false }), false, 'cisto setovy riadok nie');
   eq(ST.hwRowManual({}), false, 'stary payload bez priznakov tiez nie');
 
+  // D-94 prepisala TVAR (nie kontrakt): `cabinet_id` stoji v HLAVICKE skupiny,
+  // takze do vety polozky sa uz nepise, a `owner_part_key: null` sa PRIZNA
+  // slovami („celá skrinka") namiesto ticheho vynechania vlastnika.
   eq(ST.hwSourceText({ cabinet_id: 'CAB-2', owner_part_key: 'front:F1/wing:left',
                        owner_label: 'F1 · dvierka ľavé', origin: 'adhoc', quantity: 2 }),
-     'CAB-2 · F1 · dvierka ľavé · ručná ×2',
+     'F1 · dvierka ľavé · ručná ×2',
      'ad-hoc zdroj sa cita ako veta a popis vlastnika je zo servera');
-  eq(ST.hwSourceText({ cabinet_id: 'CAB-2', set_id: 'zaves-klasik', quantity: 4 }),
-     'CAB-2 · set zaves-klasik ×4', 'setovy zdroj menuje set');
-  eq(ST.hwSourceText({ cabinet_id: 'CAB-2', origin: 'adhoc', quantity: 1 }),
-     'CAB-2 · ručná ×1', 'polozka celej skrinky vlastnika nemenuje');
+  eq(ST.hwSourceText({ cabinet_id: 'CAB-2', owner_part_key: 'front:F1/wing:left',
+                       owner_label: 'F1 · dvierka ľavé', set_id: 'zaves-klasik', quantity: 4 }),
+     'F1 · dvierka ľavé · set zaves-klasik ×4', 'setovy zdroj menuje set');
+  eq(ST.hwSourceText({ cabinet_id: 'CAB-2', owner_part_key: null, origin: 'adhoc', quantity: 1 }),
+     'celá skrinka · ručná ×1', 'polozka bez vlastnika sa prizna slovami');
 
   const rows = [{ code: '93240', name_sk: 'Bystrica', quantity: 6, unit: 'ks',
                   price_eur_vat: 1.14, subtotal_eur_vat: 6.84, adhoc_quantity: 2,
-                  sources: [{ cabinet_id: 'CAB-2', owner_label: 'F1 · dvierka ľavé',
-                              origin: 'adhoc', quantity: 2 },
-                            { cabinet_id: 'CAB-1', set_id: 'uholniky', quantity: 4 }] },
-                { code: '', free: true, name_sk: 'Zámok Abloy', quantity: 1, unit: 'ks',
+                  sources: [{ cabinet_id: 'CAB-2', owner_part_key: 'front:F1/wing:left',
+                              owner_label: 'F1 · dvierka ľavé', origin: 'adhoc', quantity: 2 },
+                            { cabinet_id: 'CAB-1', owner_part_key: null,
+                              set_id: 'uholniky', quantity: 4 }] },
+                { code: '', free: true, free_key: 'free:CAB-2:H2', name_sk: 'Zámok Abloy',
+                  quantity: 1, unit: 'ks',
                   price_eur_vat: 12.0, subtotal_eur_vat: 12.0, adhoc_quantity: 1,
-                  sources: [{ cabinet_id: 'CAB-2', origin: 'adhoc', quantity: 1 }] }];
+                  sources: [{ cabinet_id: 'CAB-2', owner_part_key: null,
+                              origin: 'adhoc', quantity: 1 }] }];
   ST.setBuyOpen({});
   const closed = ST.buySection({ rows: rows, summary: {} }, []);
   ok(closed.indexOf('<span class="hwchip">ručná</span>') > -1,
      'rucny riadok nesie chip „ručná"');
   ok(closed.indexOf('<td>—</td>') > -1, 'volna polozka ma v stlpci Kod pomlcku');
   eq(closed.indexOf('Pôvod:'), -1, 'zbaleny riadok povod nekresli');
-  ok(closed.indexOf('data-buy="0"') > -1, 'riadok je rozklikatelny');
+  // D-94: adresa rozkliku je IDENTITA riadku (kod malymi pismenami), nie index.
+  ok(closed.indexOf('data-buy="93240"') > -1, 'riadok je rozklikatelny podla svojho kodu');
 
-  ST.setBuyOpen({ 0: true });
+  ST.setBuyOpen({ 93240: true });
   const open = ST.buySection({ rows: rows, summary: {} }, []);
   ok(open.indexOf('Pôvod:') > -1, 'rozkliknuty riadok ukaze povod');
-  ok(open.indexOf('CAB-2 · F1 · dvierka ľavé · ručná ×2') > -1, 'a v nom rucny zdroj');
-  ok(open.indexOf('CAB-1 · set uholniky ×4') > -1, 'aj setovy zdroj toho isteho kodu');
+  ok(open.indexOf('F1 · dvierka ľavé · ručná ×2') > -1, 'a v nom rucny zdroj');
+  ok(open.indexOf('celá skrinka · set uholniky ×4') > -1, 'aj setovy zdroj toho isteho kodu');
+  ok(open.indexOf('data-src-cab="CAB-2"') > -1 && open.indexOf('data-src-cab="CAB-1"') > -1,
+     'obe skrinky maju vlastnu KLIKATELNU skupinu');
   ST.setBuyOpen({});
 })();
 
