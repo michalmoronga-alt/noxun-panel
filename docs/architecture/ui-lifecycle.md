@@ -2391,7 +2391,9 @@ ale zmenou `model_guid` alebo odstránením posledného UNI sa zruší. Deti sa 
 počty naďalej zahŕňajú jednotlivé nálezy aj v zbalenej skupine, čo pripomína hint. Regresie: `tests/js/test_d122_uni_skupina.js` (indexy, akcie, filtre, refresh, nový dokument).
 
 **Š9 riadok**: bodka závažnosti · text · miesto · akcie vpravo. Klik na riadok aj **oko** = `nx_select` s `problem_key` (stabilný kľúč, nie pids — po flushi editov by už neplatili;
-jadro je `ProductionCore.do_select`), **ceruzka** = to isté + `focus_inspector`.
+jadro je `ProductionCore.do_select`), **ceruzka** = to isté + `focus_inspector`. Tou istou cestou (a tým istým jadrom) idú aj ostatné klik-selecty okna — každý so svojou
+adresou: `parts_key` (Kusovník), `hw_key` (generika), `material_key`/`abs_key` („Kde sa používa"), `rule_ref` (Pravidlá) a **od D-94 `source_ref`** (zdroj v rozklikanom pôvode
+sekcie Nákup — `cabinet_id` + `owner_part_key`, vždy s `focus_inspector`).
 
 **Kontextová oprava je len tam, kde existuje:** UNI nález ponúka **„Nahradiť UNI…"** cez vlastný callback `replace_uni` → `MaterialsDialog.request_replace_uni` (**plne funkčný
 modal**, nie sľub), rozpočtový nález nemá entitu v modeli a **od ŠT-1c PR B1 vedie do SEKCIE Rozpočet toho istého okna** (`studioGoSection('budget')` + `budGoto(budget_section)` —
@@ -2450,13 +2452,26 @@ skrinky z Inspectora sem sama nedorazí — bez neho by sa nákupný zoznam dal 
 vzhľad ako Kusovník vedľa nich), ale nesú marker **`.hwtab`**, ktorý vracia ruku a hover **výhradne riadku generiky `tr.hwgen`** — `.bomtab tbody tr` má v Štúdiu afordanciu kvôli
 Kusovníku, kým tu je klikateľný jediný typ riadku (pôvodné okno dávalo ruku tiež len `tr.bomrow`/`tr.hwrow`).
 
-**KOV-H2 — chip „ručná" a ROZKLIK PÔVODU.** Nákupný riadok je **súčet**: ten istý kód môže prísť zo setu jednej skrinky aj z ručne pridanej položky inej — a z tabuľky to
+**KOV-H2 + D-94 — chip „ručná" a ROZKLIK PÔVODU.** Nákupný riadok je **súčet**: ten istý kód môže prísť zo setu jednej skrinky aj z ručne pridanej položky inej — a z tabuľky to
 nebolo vidieť vôbec. Riadok, ktorého aspoň časť kusov je ručná (`adhoc_quantity > 0`) alebo je to voľná položka, nesie pri názve chip **„ručná"**; voľná položka má v stĺpci Kód
-**pomlčku** (prázdna bunka vyzerá ako chyba). **Klik na riadok** rozbalí pod ním sub-riadok **„Pôvod"** so zoznamom zdrojov („CAB-2 · F1 · dvierka ľavé · ručná ×2" / „CAB-2 ·
-set zaves-klasik ×4"). Žiadny nový stĺpec (horizontálny priestor) a stav rozkliku **zámerne neprežíva push** — čerstvý payload môže riadky preusporiadať a otvorený index by
-ukázal pôvod cudzieho riadku. Popis vlastníka skladá **server**: `ProductionCore.decorate_source_owners` doplní do každého zdroja `owner_label` z resolved čiel **tej** skrinky
-(zber nesie nový aditívny kľúč `cabinet_fronts`), lebo z generovaného id čela („front:Fmsi0wnix-1-3a3kxe") sa nedá prečítať, o ktoré čelo ide; `nil` = kovanie celej skrinky.
-Nákupný CSV, rozpočet ani ponuka pole nečítajú — **výstup zákazky sa nemení ani o znak**.
+**pomlčku** (prázdna bunka vyzerá ako chyba). **Klik na riadok** rozbalí pod ním sub-riadok **„Pôvod"**. Popis vlastníka skladá **server**: `ProductionCore.decorate_source_owners`
+doplní do každého zdroja `owner_label` z resolved čiel **tej** skrinky (zber nesie aditívny kľúč `cabinet_fronts`), lebo z generovaného id čela („front:Fmsi0wnix-1-3a3kxe") sa
+nedá prečítať, o ktoré čelo ide; `nil` = kovanie celej skrinky. Nákupný CSV, rozpočet ani ponuka pole nečítajú — **výstup zákazky sa nemení ani o znak**.
+
+**D-94 prepísala tri veci naraz.** (1) **Zdroje sú ZOSKUPENÉ PER SKRINKU** (`hwSourceGroups`, čistá funkcia): jeden riadok na skrinku vo tvare `CAB-3 · 6 ks: F1 · dvierka ľavé ·
+set zaves-klasik ×2 · F2 · … ×4`, poradie skupín = poradie prvého výskytu (server `finalize` triedi deterministicky). Plochý zoznam pri troch skrinkách a piatich čelách prestal
+byť čitateľný; stĺpec ani tu nepribudol (horizontálny priestor) a jeden riadok na skrinku šetrí ten vertikálny. `owner_part_key: null` sa priznáva slovami **„celá skrinka"**
+(predtým sa vlastník ticho vynechal) a `cabinet_id` sa do vety položky už nepíše — stojí v hlavičke skupiny. Zdroj bez `cabinet_id` má vlastnú tlmenú skupinu „—".
+(2) **Zdroje sú KLIKATEĽNÉ**: hlavička skupiny aj každá položka nesú `data-src-cab` (+ `data-src-key`) a klik ide existujúcou cestou `nx_select` — payload `source_ref`
+(`cabinet_id` + `owner_part_key`) plus `focus_inspector: true`, **nikdy pids z DOM**. Delegovaný klik spracúva `[data-src-cab]` **pred** `tr.hwbuyrow`, inak by klik na zdroj
+rozklik iba zbalil. Serverová strana je v `docs/architecture/outputs.md` (vetva `source_ref`). Skupina bez `cabinet_id` klikateľná nie je — nemá kam viesť. **Klik Inspector
+NEOTVÁRA, len zdvihne** (tá istá konvencia ako ceruzka Š3), takže tooltipy hovoria „…a zdvihne Inspector, ak je otvorený" a pri zavretom Inspectorovi to okno povie aj
+**statusom** („Inspector nie je otvorený.") — sľúbiť otvorenie a nespraviť nič je horšie než neponúknuť ho (Codex #361 P2).
+(3) **Pamäť rozkliku PREŽÍVA push.** Do D-94 sa `buyOpen` zahadzoval pri každom pushi, lebo bol kľúčovaný **indexom** riadku a preusporiadaný payload by otvoril cudzí riadok —
+prakticky to znamenalo, že rozklik zmizol po každom „Obnoviť". Kľúčom je teraz **identita riadku** (`free_key` pri voľnej položke, inak `code` malými písmenami — presne agregačný
+kľúč `add_row`, ktorý je case-insensitive), takže preusporiadanie prestalo byť problémom a pamäť sa maže **len pri zmene dokumentu** (`model_guid`, vzor `ctrlUniOpen`). Kľúč
+riadku, ktorý z payloadu zmizol, ostáva v mape bez účinku — nič sa preň nekreslí a čistiť ho netreba. Testy: `tests/js/test_d94_povod.js`, `tests/pure/test_d94_povod.rb`,
+in-SketchUp sekcia `run_d94`.
 
 **KOV-C2c — ZASTAVUJÚCI riadok „Bez kódov".** Sekcia vysvetľuje nemapované položky ako **nenacenené** (jantárovo) — lenže položka výsuvu **z receptu** bez kitu je niečo iné:
 dielce zásuvky sú už narezané na konkrétnu NL, takže bez kitu sa nedajú vyrobiť a zastavené sú **všetky** exporty vrátane VEPO. Taký riadok je preto **červený** (`tr.hwstop`)

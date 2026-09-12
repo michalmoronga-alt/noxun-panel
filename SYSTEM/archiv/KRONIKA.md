@@ -17,6 +17,25 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-94 „NÁKUP S PÔVODOM" (12.9.2026, v0.12.1, PR #361).**
+  **Čo dostal používateľ:** rozklik nákupného riadku v sekcii Nákup kovania kreslí pôvod **zoskupený po skrinkách** — jeden riadok na skrinku s počtom kusov a za ním
+  položky s ľudským popisom vlastníka („F1 · dvierka ľavé · set zaves-klasik ×2"); kovanie celej skrinky sa priznáva slovami „celá skrinka" namiesto ticho vynechaného
+  vlastníka. **Skrinka aj položka sú klikateľné** — klik označí kus v modeli a zdvihne Inspector (pri čele sa otvorí jeho karta existujúcim deep-linkom KOV-A2b).
+  Rozklik **prežije „Obnoviť" aj prestavbu**.
+  **Prečo tak:** package z 30.8. mal tri kusy, ktoré medzitým spravili KOV-H2 (tvar `sources` v payloade, samotný rozklik) a KOV-D4 (`owner_label` zo servera) — D-94 je
+  zvyšok. Pamäť rozkliku bola kľúčovaná **indexom** riadku, čo bolo bezpečné len tak, že sa zahadzovala pri každom pushi (rozklik miznúci po každom „Obnoviť"); výmena
+  kľúča za **identitu riadku** (`free_key` / `code` malými písmenami — presne agregačný kľúč `add_row`) ten dôvod zrušila, takže sa pamäť maže už len pri zmene dokumentu.
+  Klik-select **nepridal nový kľúč zberu ani nový resolver**: `source_ref` sa prekladá (`source_select_item`) na dvojicu `(owner_id, part_key)` a ďalej beží existujúci
+  `pids_for_problem`; vetva v `do_select` je vlastná zámerne (vzor `rule_ref`) a zber modelu nerobí — hľadá podľa identity. Pri ceruzke vyberá **vlastníka** tou istou
+  `select_target_item` ako KOV-A2b, lebo karta čela v Inspectorovi žije len nad označenou skrinkou. Vedomý dôsledok zdieľaného tela (rovnaký ako pri `rule_ref`): zdroje
+  nenesú `owner_pid`, takže dve skrinky so zdieľaným `cabinet_id` sa označia obe — status to priznáva množným číslom. **Výstup zákazky sa nemení ani o znak** (golden
+  `test_kovh_golden.rb`). Vedomá odchýlka od package: CSS nových tried nešlo do `studio.html`, ale do `panel.css`, kde už rodina `.hwsrc`/`.hwbuyrow` žije.
+  **Testy:** **3993 headless · 115 JS sád · 2632 in-SketchUp PASS / 0 FAIL.** Nové sady `tests/pure/test_d94_povod.rb` (regresný strážca invariantu
+  `Σ sources.quantity == row.quantity` nad `expand` pre unit · owner + dedup · adhoc zliaty do setového riadku · voľná položka · skrinka bez kovania; pomerové členy
+  D-109/R-05 vedome nebetónuje), `tests/js/test_d94_povod.js` a in-SketchUp sekcia `run_d94` (26 kontrol: resolver nad živým modelom, deep-link, „zoznam sa zmenil",
+  `flush_blocked`, 0 krokov Späť). Overených 7 mutácií (3 Ruby, 4 JS).
+  **Codex review:** doplní orchestrátor po review.
+
 - **BLOK M-R VZHĽAD UZAVRETÝ (12.9.2026, v0.12.0, implementácia PR #353–#359).**
   Jeden voliteľný vzhľad dosiek aj ABS rovnakého dekoru/povrchu naprieč hrúbkami, jedna zástena; obyčajná farba zostáva samostatná.
   Katalógová schéma 10 iba pri prvom zápise vzhľadu, natívny SKM bez vlastného PBR serializéra, fyzické UV, ochrana živých materiálov pri prestavbe a kópii.

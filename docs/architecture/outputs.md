@@ -94,7 +94,19 @@ resolvery** klik→entita (`pids_for_problem` vrátane fallbacku na vlastníka p
 `material_key`/`abs_key` s nepovinným `owner_id`, ktoré hľadajú dielce podľa **efektívneho materiálu z BOM** pre „Kde sa používa"; detail v odseku sekcie MATERIÁLY; **od ŠT-3b-2a
 `pids_for_override`** — oko pri jantárovom riadku sekcie Pravidlá adresuje dvojicou **(owner_id, part_key)** a **znovupoužíva telo `pids_for_problem`** [prázdny kľúč = celý
 korpus]; vetva `rule_ref` v `do_select` je vlastná zámerne — override v kusovníku vlastný riadok mať nemusí, napr. vypnuté kovanie; od ŠT-3b-2b beží **bez `fresh_collect`** — hľadá
-podľa identity, takže plný sken modelu bol čistá réžia).
+podľa identity, takže plný sken modelu bol čistá réžia; **od D-94 rovnako `pids_for_source`** — klik na ZDROJ v rozkliku pôvodu, viac nižšie).
+
+**D-94 — vetva `source_ref` v `do_select` (klik na zdroj pôvodu).** Nákupný riadok je súčet a jeho rozklik ukazuje, z ktorých skriniek a čiel vznikol; klik na taký zdroj označí kus
+v modeli. Adresa je **identita (`cabinet_id` + `owner_part_key`)** — presne tá, ktorú zdroj už nesie v payloade, nikdy pids z DOM (flush editov ich mení). Vetva je vlastná
+**zámerne** (vzor `rule_ref`): hľadá podľa identity, takže **`fresh_collect` nerobí** — v hotovom BOM taký riadok byť nemusí. Telo sa **NEDUPLIKUJE**: `source_select_item` prepíše
+zdroj na dvojicu `(owner_id, part_key)` a ďalej beží `pids_for_problem` (prázdny kľúč = celý korpus, nepostavený dielec = fallback na korpus). Pri `focus_inspector` vyberá
+**vlastníka** tou istou `select_target_item` ako KOV-A2b — karta čela v Inspectorovi žije len nad označenou SKRINKOU, takže výber vnoreného dielca by deep-link ticho zabil; bez
+ceruzky (zavretý Inspector) sa označia dielce čela. Deep-link ide existujúcou cestou `push_focus_front`; zdroj **bez kľúča** (kovanie celej skrinky) žiadne čelo nemenuje, takže
+dostane iba `bring_to_front` a vlastnú vetu statusu (`source_focus_status`). **Klik Inspector NIKDY NEOTVÁRA** — platí tu tá istá konvencia ako pri ceruzke Š3 (`do_select` ho len
+zdvihne, keď už žije). Preto je `source_focus_status` jediná veta, ktorá **priznáva zavretý Inspector** („Inspector nie je otvorený.", Codex #361 P2): okno si ho vypýtalo
+(`focus_inspector`), `Panel.dialog_alive?` ho zrazil na `false` a bez priznania by tooltip zdroja sľúbil niečo, čo sa viditeľne nestane. **Vedomý dôsledok zdieľaného tela** (rovnaký ako pri `rule_ref`): zdroje `owner_pid` nenesú, takže
+`scoped_owner_instance` sa neuplatní a dve skrinky so zdieľaným `cabinet_id` sa označia OBE — veta statusu to priznáva množným číslom. Prázdny výsledok = existujúca hláška
+„Zoznam sa medzitým zmenil…" + repush. Testy: `tests/pure/test_d94_povod.rb`, `tests/js/test_d94_povod.js`, in-SketchUp sekcia `run_d94`.
 
 **KOV-A1 — `owner_pid` scopuje klik na JEDEN výskyt.** Keď nález nesie `owner_pid` (Integer) a `scoped_owner_instance` overí, že ide o **živú top-level skrinku s tým istým
 `cabinet_id`**, `pids_for_problem` hľadá dielec `part_key` **len v nej** (`pids_in_cabinet`); inak beží dnešná všeobecná vetva. Bez toho by klik na RED „dvierka bez určeného
@@ -508,7 +520,8 @@ nákupného riadku: `PartKeys.human_label` potrebuje resolved čelá, aby vedelo
 ISTOM prechode z už načítaného `ccfg` (žiadny druhý sken modelu) a **prvá inštancia vyhráva**: dve skrinky so zdieľaným `cabinet_id` sú samostatná chyba identity (rieši ju
 `identities`), popisok sa kvôli nej nemá prečo hádať. Čitateľ je jediný — `ProductionCore.decorate_source_owners`, ktoré doplní **`owner_label`** do každého záznamu
 `rows[].sources` expanzie (`nil` = kovanie celej skrinky). Je to **aditívne pole zdroja**: nákupný CSV, `Budget.hardware_section` ani cenová ponuka ho nečítajú, takže výstup
-zákazky sa nemení ani o znak (drží to golden odtlačok `test_kovh_golden.rb`). `compute()` kľúč ignoruje.
+zákazky sa nemení ani o znak (drží to golden odtlačok `test_kovh_golden.rb`). `compute()` kľúč ignoruje. **D-94 mapu NEROZŠÍRILA** — pridala nad ňu iba klik (zdroj sa stal
+adresou výberu, `do_select` vetva `source_ref`), takže čitateľ popisu ostáva jeden a nový kľúč zberu nevznikol.
 
 **KOV-D4 pridal DRUHÉHO čitateľa: `decorate_unmapped`** — ten istý `owner_label_for` (spoločný helper nad `front_index`) doplní `owner_label` aj do každého **nemapovaného**
 záznamu expanzie (`unmapped[]`), aby tabuľka „Bez kódov" v Štúdiu neukazovala surový `part_key`. Chodí spolu s `reason_sk` v jednom prechode. Pole je rovnako **aditívne

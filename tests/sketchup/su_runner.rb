@@ -11996,6 +11996,163 @@ module NoxunSuRunner
     log_line("FAIL: ŠT-1c B3 kontrola vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
   end
 
+  # ===================== D-94: NAKUP S POVODOM — KLIK NA ZDROJ ===============
+  #
+  # Co headless sada NEVIE overit (a preto to je tu):
+  #   1) RESOLVER nad ZIVYM modelom — `source_ref` je identita (cabinet_id +
+  #      owner_part_key) a az tu sa da dokazat, ze z nej vyjdu SPRAVNE entity:
+  #      prazdny kluc = presne ta jedna instancia korpusu, kluc cela = dielce
+  #      TOHO cela VNUTRI nej (overuje sa cez `Store.get(part, 'part_key')`).
+  #   2) UNDO KONTRAKT — klik na zdroj je CISTY VYBER. Keby siahol na model
+  #      (alebo na push, ktory dedupuje), pribudol by krok Spat a pouzivatel by
+  #      si „prezeranim povodu" menil zakazku.
+  #   3) DEEP-LINK — pri ceruzke (`focus_inspector`) sa pri zdroji CELA posiela
+  #      `NX.focusFront`, a vyber sa MUSI presunut na VLASTNIKA (karta cela zije
+  #      len nad oznacenou skrinkou — lekcia KOV-A2b). To je rozhodnutie
+  #      v behovom kode, nie v texte.
+  #   4) ZOZNAM SA MEDZITYM ZMENIL — zdroj mieriaci na skrinku, ktora uz
+  #      neexistuje, musi vyber NECHAT TAK a povedat to (nie ticho vyprazdnit).
+  #
+  # Panel v runneri otvoreny NIE JE, takze vetva s ceruzkou pouziva ten isty
+  # stub ako KOV-A2b (`a2b_with_panel_stub`) — `dialog_alive?` + odchytenie
+  # `push_focus_front`. Resolver, rozhodnutie o cieli aj vyber bezia NAOSTRO.
+
+  D94_PARAMS = { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0,
+                 'thickness' => 18.0, 'floor_height' => 100.0,
+                 'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'door',
+                                             'mode' => 'auto', 'wings' => '1' }] } }.freeze
+
+  # Klik na zdroj povodu presne tak, ako ho posiela sekcia Nakup (`nx_select`
+  # so `source_ref`). Vracia [statusy, pocet vyziadanych obnov].
+  def d94_select(model, ref, focus: false, extra: {})
+    gen = e::StudioDialog.instance_variable_get(:@generation).to_i
+    msgs = []
+    pushes = [0]
+    data = { 'gen' => gen, 'source_ref' => ref, 'focus_inspector' => focus }.merge(extra)
+    e::ProductionCore.do_select(model, data, generation: gen,
+                                status: ->(m, _err = false) { msgs << m.to_s },
+                                repush: -> { pushes[0] += 1 })
+    [msgs, pushes[0]]
+  end
+
+  # Vsetky `part_key` prave oznacenych dielcov (prazdne pri korpuse).
+  def d94_sel_keys(model)
+    model.selection.to_a.map { |x| e::Store.get(x, 'part_key').to_s }
+  end
+
+  def run_d94(model)
+    cleanup(model)
+    return ok('D-94: okno Studio je nacitane', false) unless defined?(e::StudioDialog)
+
+    begin
+      a = e::CabinetBuilder.build(model, D94_PARAMS.dup)
+      b = e::CabinetBuilder.build(model, D94_PARAMS.dup)
+      return ok('D-94: vlozenie dvoch skriniek s dvierkami', false) unless a && b
+
+      cid_a = e::Store.get(a, 'cabinet_id').to_s
+      cid_b = e::Store.get(b, 'cabinet_id').to_s
+      before_ents = model.entities.length
+
+      # --- 1) NAKUPNY RIADOK pokryva OBE skrinky a Σ zdrojov sedi ------------
+      exp = e::ProductionCore.hardware_expansion(model, e::Bom.collect(model))
+      rows = Array(exp && exp['rows'])
+      both = rows.find do |r|
+        Array(r['sources']).map { |s| s['cabinet_id'].to_s }.uniq.sort == [cid_a, cid_b].sort
+      end
+      ok("D-94: nakupny riadok zbiera obe skrinky do jedneho suctu (#{both && both['code']})",
+         !both.nil?)
+      rows.each do |r|
+        sum = Array(r['sources']).sum { |s| s['quantity'].to_i }
+        ok("D-94: riadok #{r['free_key'] || r['code']} sedi so suctom zdrojov (#{sum}/#{r['quantity']})",
+           sum == r['quantity'].to_i)
+      end
+      front_src = rows.flat_map { |r| Array(r['sources']) }
+                      .find do |s|
+                        s['cabinet_id'].to_s == cid_a &&
+                          s['owner_part_key'].to_s.start_with?('front:')
+                      end
+      ok("D-94: aspon jeden zdroj mieri na CELO (#{front_src && front_src['owner_part_key']})",
+         !front_src.nil?)
+
+      # --- 2) zdroj CELEJ skrinky = presne TA instancia, 0 krokov Spat -------
+      model.selection.clear
+      msgs, = d94_select(model, { 'cabinet_id' => cid_a, 'owner_part_key' => nil })
+      ok('D-94: zdroj bez kluca oznaci PRESNE tu jednu skrinku',
+         model.selection.to_a == [a])
+      ok("D-94: a status hovori o SKRINKE, nie o polozkach (#{msgs.last})",
+         msgs.last.to_s.include?("skrinka #{cid_a}"))
+      ok('D-94: klik na zdroj model NEMENI (ziadna entita naviac ani menej)',
+         model.entities.length == before_ents)
+
+      # Druha skrinka je INA — zdielane telo resolvera ich nemiesa.
+      d94_select(model, { 'cabinet_id' => cid_b, 'owner_part_key' => nil })
+      ok('D-94: zdroj druhej skrinky oznaci druhu skrinku', model.selection.to_a == [b])
+
+      # --- 3) zdroj CELA: bez ceruzky dielce, s ceruzkou vlastnik + deep-link -
+      key = front_src ? front_src['owner_part_key'].to_s : ''
+      if key.empty?
+        info('D-94: zakazka nevydala zdroj mieriaci na celo — vetva cela sa preskocila.')
+      else
+        model.selection.clear
+        d94_select(model, { 'cabinet_id' => cid_a, 'owner_part_key' => key })
+        keys = d94_sel_keys(model)
+        ok("D-94: zdroj cela oznaci DIELCE toho cela (#{keys.uniq.inspect})",
+           !keys.empty? && keys.all? { |k| k == key })
+        ok('D-94: a vsetky lezia VNUTRI svojej skrinky',
+           model.selection.to_a.all? { |x| x.parent == a.definition })
+
+        # Ceruzka: karta cela zije len nad oznacenou SKRINKOU (KOV-A2b), takze
+        # vyber sa presuva na vlastnika a klientovi ide ID cela.
+        captured = []
+        model.selection.clear
+        fmsgs = nil
+        a2b_with_panel_stub(captured) do
+          fmsgs, = d94_select(model, { 'cabinet_id' => cid_a, 'owner_part_key' => key },
+                              focus: true)
+        end
+        ok("D-94: pri ceruzke sa odchytil deep-link na kartu cela (#{captured.inspect})",
+           captured.length == 1 && !captured.first.to_s.empty?)
+        ok('D-94: a vyber sa presunul na VLASTNIKA (karta cela zije nad skrinkou)',
+           model.selection.to_a == [a])
+        ok("D-94: status to prizna vetou o karte cela (#{fmsgs && fmsgs.last})",
+           fmsgs.to_a.last.to_s.include?('karta čela'))
+        ok('D-94: ani deep-link model NEZMENIL', model.entities.length == before_ents)
+      end
+
+      # --- 4) zdroj mieriaci NIKAM: vyber ostava, okno to POVIE --------------
+      model.selection.clear
+      model.selection.add(a)
+      msgs, pushes = d94_select(model, { 'cabinet_id' => 'CAB-NEEXISTUJE',
+                                         'owner_part_key' => nil })
+      ok('D-94: zdroj na neexistujucu skrinku vyber NEZMENI', model.selection.to_a == [a])
+      ok("D-94: a povie, ze sa zoznam zmenil (#{msgs.last})",
+         msgs.last.to_s.include?('Zoznam sa medzitým zmenil'))
+      ok('D-94: pricom si vyziada CERSTVE data', pushes == 1)
+
+      # --- 5) rozpisana zmena v Inspectore vyber ZASTAVI ---------------------
+      model.selection.clear
+      model.selection.add(b)
+      msgs, = d94_select(model, { 'cabinet_id' => cid_a, 'owner_part_key' => nil },
+                         extra: { 'flush_blocked' => true })
+      ok("D-94: pri rozpisanej zmene sa vyber NEVYKONA a okno to povie (#{msgs.last})",
+         msgs.last.to_s.include?('rozpísanú zmenu'))
+      ok('D-94: a oznacene ostava to, co bolo', model.selection.to_a == [b])
+      ok('D-94: ani zastaveny vyber model NEZMENIL', model.entities.length == before_ents)
+
+      # Poslednou modelovou operaciou je vlozenie DRUHEJ skrinky — keby
+      # ktorykolvek z klikov vyssie otvoril vlastnu operaciu, 1x Spat by vratil
+      # JU a tento test by padol.
+      model.selection.clear
+      Sketchup.undo
+      ok('D-94: 1x Spat zmaze druhu skrinku (klik na zdroj nenechal krok Spat navyse)',
+         b.nil? || !b.valid?)
+    rescue StandardError => ex
+      log_line("FAIL: D-94 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    ensure
+      cleanup(model)
+    end
+  end
+
   # ===================== ŠT-2b: ZANIK OKNA MATERIALY =========================
   #
   # Co sa tu overuje (a preco to headless sada nevie):
@@ -21912,6 +22069,7 @@ module NoxunSuRunner
     run_st1a(model)          # ST-1a: okno Studio — deep-link sekcie, kusovnik zo ziveho modelu, klik-select bez undo kroku, serverovy nazov projektu
     run_st1b(model)          # ŠT-1b: sekcia Kontrola v Studiu — jedno cislo semaforu, klik na nalez bez undo kroku, zdielane prepinace, trvanie pushov
     run_st1c(model)          # ŠT-1c: sekcia Nákup kovania (PR A) + sekcia ROZPOCET (PR B1) — 12 mutacii = 12x jeden krok Spat, gen a guid guardy, bump:false kontrakt, XLSX guardy, meranie pushov
+    run_d94(model)           # D-94: klik na ZDROJ v rozkliku povodu (sekcia Nakup) — identita namiesto pids: prazdny kluc oznaci presne tu instanciu korpusu, kluc cela jeho dielce, ceruzka presunie vyber na vlastnika a posle deep-link karty cela; mrtvy zdroj vyber nezmeni a vyziada obnovu, rozpisana zmena ho zastavi — a ZIADNY z klikov nenecha krok Spat
     run_st2d(model)          # ŠT-2d: „Kde sa používa" — vyber podla materialu (aj DEDENEHO) a ABS, zuzenie na vlastnika, jednorazova kotva sekcie `mat`, ⋯ editor rozpoctu = 1 krok Spat
     run_st3a(model)          # ŠT-3a-2: modelove zapisy predvolieb setov ZO SEKCIE + zanik okna Katalog kovania — 1 zmena = 1 krok Spat, NO-OP merge_seed bez pushu aj bez undo kroku, jantar po vlastnom zapise nezozltne
     run_st3b(model)          # ŠT-3b-1: sekcia Pravidla v Studiu + zanik okna Pravidla kovania — ulozenie = 1 krok Spat (pravidla AJ geometria), NO-OP merge_seed bez undo kroku, baseline guard odmietne zapis po cudzej zmene

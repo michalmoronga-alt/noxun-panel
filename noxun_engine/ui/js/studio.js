@@ -484,9 +484,21 @@
   // teraz nesie riadok chip „ručná" (aspoň časť kusov je ručná) a KLIK naň
   // rozbalí zoznam zdrojov. Žiadny nový stĺpec (horizontálny priestor).
   //
-  // Stav rozkliku ZÁMERNE neprežíva push: čerstvý payload môže riadky
-  // preusporiadať a otvorený index by ukázal pôvod CUDZIEHO riadku.
+  // D-94: pamäť rozkliku je kľúčovaná IDENTITOU riadku, nie jeho indexom —
+  // `free_key` pri voľnej položke, inak `code` malými písmenami (presne ten
+  // agregačný kľúč, ktorým riadok skladá server: `add_row` je case-insensitive).
+  // Preusporiadanie riadkov tým prestalo byť problémom (to bol dôvod, prečo
+  // rozklik do H2 push NEPREŽIL), takže sa pamäť maže LEN pri zmene dokumentu.
+  // Kľúč riadku, ktorý z payloadu zmizol, ostane v mape bez účinku — nič sa
+  // preň nekreslí a čistiť ho netreba.
   var buyOpen = {};
+
+  // Identita nákupného riadku pre pamäť rozkliku. Čistá funkcia (Node testy).
+  function hwRowKey(r){
+    if (!r) return '';
+    if (r.free_key) return String(r.free_key);
+    return String(r.code == null ? '' : r.code).toLowerCase();
+  }
 
   // Aspoň časť kusov riadku pochádza z ručne pridanej položky. Voľná položka
   // je ručná VŽDY (vlastný riadok bez kódu). Čistá funkcia (Node testy).
@@ -496,20 +508,45 @@
     var n = Number(r.adhoc_quantity);
     return isFinite(n) && n > 0;
   }
-  // Jeden zdroj do vety: „CAB-2 · F1 · dvierka ľavé · ručná ×2".
+  // Jedna POLOŽKA zdroja do vety: „F1 · dvierka ľavé · ručná ×2".
   // `owner_label` skladá SERVER (`PartKeys.human_label`) — JS z part_key nič
-  // neodvodzuje; prázdny popis = kovanie patrí celej skrinke.
+  // neodvodzuje. D-94: `cabinet_id` sa už do vety NEPÍŠE (stojí v hlavičke
+  // skupiny nad položkami) a `owner_part_key: null` — teda kovanie CELEJ
+  // skrinky — sa priznáva slovami; predtým sa vlastník ticho vynechal a riadok
+  // vyzeral ako neúplný. Kľúč BEZ popisu (starý payload, nerozlúštiteľné čelo)
+  // sa NEHÁDA — vlastník sa vynechá presne ako doteraz.
   function hwSourceText(s){
     var d = s || {};
     var parts = [];
-    if (d.cabinet_id) parts.push(String(d.cabinet_id));
-    if (d.owner_label) parts.push(String(d.owner_label));
+    if (d.owner_part_key == null) parts.push('celá skrinka');
+    else if (d.owner_label) parts.push(String(d.owner_label));
     if (String(d.origin || '') === 'adhoc') parts.push('ručná');
     else if (d.set_id) parts.push('set ' + d.set_id);
     else if (d.generic_type) parts.push(String(d.generic_type));
     var q = Number(d.quantity);
     var txt = parts.length ? parts.join(' · ') : '—';
     return txt + ((isFinite(q) && q > 0) ? ' ×' + q : '');
+  }
+  // D-94: zdroje riadku ZOSKUPENÉ PER SKRINKA. Nákupný riadok je súčet cez
+  // celú zákazku — plochý zoznam zdrojov pri troch skrinkách a piatich čelách
+  // prestal byť čitateľný, kým skupina povie hneď „z tejto skrinky 6 ks".
+  // Poradie skupín = poradie PRVÉHO výskytu (server `finalize` triedi
+  // deterministicky, takže sa medzi behmi nekolíše); poradie položiek vnútri
+  // skupiny je pôvodné. Zdroj bez `cabinet_id` má vlastnú skupinu s prázdnym
+  // ID — kreslí sa ako „—" a klikať sa na ňu nedá (nemá kam viesť).
+  // Čistá funkcia (Node testy).
+  function hwSourceGroups(sources){
+    var order = [], by = {};
+    (sources || []).forEach(function(s){
+      var cab = String((s && s.cabinet_id) || '');
+      var mk = '#' + cab; // prefix: kľúč skrinky nesmie trafiť meno z prototypu
+      var g = by[mk];
+      if (!g){ g = by[mk] = { cabinet_id: cab, quantity: 0, items: [] }; order.push(g); }
+      var q = Number(s && s.quantity);
+      if (isFinite(q)) g.quantity += q;
+      g.items.push(s);
+    });
+    return order;
   }
   // ---- KOV-C2c: nemapovaná položka, ktorá ZASTAVUJE exporty ---------------
   // Príznak nesie SERVER (`blocks_export` z `HardwareSets.unmapped_entry`) —
@@ -567,14 +604,42 @@
          + 'sekcia Kontrola pri každom červenom riadku.</div>';
   }
 
+  // D-94: sub-riadok „Pôvod" — JEDEN riadok na skrinku (vertikálny priestor
+  // panela je vzácny), žiadny nový stĺpec tabuľky. Hlavička skupiny aj každá
+  // položka sú KLIKATEĽNÉ: nesú adresu výberu (`data-src-cab` + `data-src-key`)
+  // a klik ide cestou `nx_select` so `source_ref`. Skupina bez `cabinet_id`
+  // klikateľná NIE JE — nemá kam viesť.
+  // Codex #361 P2: tooltip nesmie sľúbiť viac, než sa stane — `do_select`
+  // Inspector NIKDY NEOTVÁRA (konvencia Š3 ceruzky), len ho zdvihne, keď už
+  // žije. Pri zavretom Inspectorovi to okno povie aj statusom.
+  var SRC_TIP_CAB = 'Označí skrinku v modeli a zdvihne Inspector, ak je otvorený';
+  var SRC_TIP_PART = 'Označí dielec v modeli a zdvihne Inspector, ak je otvorený';
   function hwSourcesHtml(r){
-    var list = (r && r.sources) || [];
-    if (!list.length){
+    var groups = hwSourceGroups(r && r.sources);
+    if (!groups.length){
       return '<tr class="hwsrc"><td colspan="6">Pôvod sa nedá zistiť — riadok neniesol zdroje.</td></tr>';
     }
-    return '<tr class="hwsrc"><td colspan="6"><b>Pôvod:</b> '
-         + list.map(function(s){ return esc(hwSourceText(s)); }).join(' &nbsp;·&nbsp; ')
-         + '</td></tr>';
+    var body = groups.map(function(g){
+      var cab = g.cabinet_id;
+      // Codex #361 P2: klikateľný cieľ je `<button>`, nie `<a>` bez href
+      // (kontrakt UI_DIZAJN N13). Odkaz bez href je mimo Tab poradia, takže
+      // pôvod sa dal ovládať výhradne myšou; button nesie fokus aj natívne
+      // Enter/Space. Vzhľad odkazu mu robí CSS (`panel.css`, vzor `.linkbtn`).
+      var head = cab
+        ? '<button type="button" class="hwsrccab" data-src-cab="' + esc(cab) + '"'
+          + ' title="' + esc(SRC_TIP_CAB) + '">' + esc(cab) + '</button>'
+        : '<span class="hwsrccab hwsrcdead">—</span>';
+      var items = g.items.map(function(s){
+        var txt = esc(hwSourceText(s));
+        if (!cab) return '<span class="hwsrcitem hwsrcdead">' + txt + '</span>';
+        var key = (s && s.owner_part_key) ? String(s.owner_part_key) : '';
+        return '<button type="button" class="hwsrcitem" data-src-cab="' + esc(cab) + '"'
+             + ' data-src-key="' + esc(key) + '"'
+             + ' title="' + esc(key ? SRC_TIP_PART : SRC_TIP_CAB) + '">' + txt + '</button>';
+      }).join(' &nbsp;·&nbsp; ');
+      return '<div class="hwsrcg">' + head + ' · <b>' + num(g.quantity) + ' ks</b>: ' + items + '</div>';
+    }).join('');
+    return '<tr class="hwsrc"><td colspan="6"><b>Pôvod:</b>' + body + '</td></tr>';
   }
 
   // Telo sekcie: NÁKUPNÝ ZOZNAM zo setov (hore) + generika podľa pravidiel
@@ -595,15 +660,18 @@
       } else {
         h += '<table class="bomtab hwtab"><thead><tr><th>Kód</th><th>Názov</th><th>ks</th><th>MJ</th><th>€ s DPH</th><th>Spolu</th></tr></thead><tbody>';
         var cat = null;
-        rows.forEach(function(r, i){
+        rows.forEach(function(r){
           var c = r.missing ? 'MIMO KATALÓGU' : (r.category || '—');
           if (c !== cat){ cat = c; h += '<tr class="hwcat"><td colspan="6">' + esc(c) + '</td></tr>'; }
           // KOV-H2: chip „ručná" + rozklik pôvodu. Voľná položka kód NEMÁ —
           // v stĺpci Kód je pomlčka, nie prázdno (prázdna bunka vyzerá ako chyba).
           var man = hwRowManual(r);
-          var open = buyOpen[i] === true;
+          // D-94: adresa rozkliku je IDENTITA riadku, nie jeho index — čerstvý
+          // payload riadky preusporiada a index by otvoril cudzí riadok.
+          var rk = hwRowKey(r);
+          var open = buyOpen[rk] === true;
           var cls = 'hwbuyrow' + (r.missing ? ' hwmiss' : '') + (open ? ' on' : '');
-          h += '<tr class="' + cls + '" data-buy="' + i + '"'
+          h += '<tr class="' + cls + '" data-buy="' + esc(rk) + '"'
              + ' title="Klik ukáže pôvod — z ktorých skriniek, setov a ručných položiek riadok vznikol">'
              + '<td>' + esc(r.code || '—') + '</td>'
              + '<td>' + esc(r.missing ? 'nie je v katalógu kovania' : (r.name_sk || ''))
@@ -874,11 +942,13 @@
           !(data.control || []).some(function(it){ return it.category === 'uni_material'; })){
         ctrlUniOpen = false;
       }
+      // D-94: rozklikaný pôvod patrí DOKUMENTU. Kým bola pamäť indexová,
+      // musela sa zahodiť pri každom pushi (preusporiadané riadky by otvorili
+      // cudzí riadok) — a používateľovi sa rozklik zavrel po každom „Obnoviť".
+      // Kľúčom je teraz identita riadku, takže prežije push aj preusporiadanie
+      // a maže sa LEN pri zmene dokumentu (vzor `ctrlUniOpen` vyššie).
+      if (!ST || !data || ST.model_guid !== data.model_guid) buyOpen = {};
       ST = data || null;
-      // KOV-H2: rozklikaný pôvod patrí riadkom, ktoré používateľ videl —
-      // čerstvý payload ich môže preusporiadať, takže otvorený index by ukázal
-      // pôvod CUDZIEHO riadku.
-      buyOpen = {};
       // PLNY payload = cerstve cisla zo servera, takze „neaktuálne" padá —
       // a to PRED renderom, inak by lišta este raz nakreslila jantar.
       // Zhadzuje ho VYHRADNE tento push: echa nizsie (lista VEPO, prepinace,
@@ -1594,6 +1664,22 @@
     sketchup.nx_select(JSON.stringify({ gen: ST.gen, hw_key: key }));
   }
 
+  // D-94: klik na ZDROJ v rozklikanom pôvode nákupného riadku. Posiela sa
+  // IDENTITA zdroja (skrinka + kľúč vlastníka) — presne tá, ktorú zdroj už
+  // nesie v payloade; PIDy z DOM sú zakázané (flush editov ich mení).
+  // `focus_inspector` je VŽDY: klik na pôvod je otázka „kde to v modeli je"
+  // a odpoveď má byť rovno v Inspectore (vzor ceruzky v Kontrole). Prázdny
+  // kľúč sa posiela ako `null` = kovanie CELEJ skrinky.
+  function selectSource(cabinetId, ownerPartKey){
+    if (!cabinetId || !ST || typeof window === 'undefined' ||
+        !window.sketchup || !sketchup.nx_select) return;
+    sketchup.nx_select(JSON.stringify({
+      gen: ST.gen,
+      source_ref: { cabinet_id: String(cabinetId), owner_part_key: (ownerPartKey || null) },
+      focus_inspector: true
+    }));
+  }
+
   // Nazov projektu aj merge zapisuje SERVER (audit #1) — okno posiela iba
   // hodnotu a svoju identitu; po zapise pride cerstvy payload OBOM oknam.
   function sendVepoOpts(attrs){
@@ -1822,13 +1908,22 @@
       if (t.closest('#vepoBtn')){ vepoExport(); return; }
       if (t.closest('#hwCsvBtn')){ hwCsvExport(); return; }
       if (t.closest('#refreshBtn')){ requestRefresh(); return; }
+      // D-94: klik na ZDROJ v rozklikanom pôvode = výber v modeli + Inspector
+      // dopredu. Ide PRED riadkom nákupu: zdroj leží v jeho sub-riadku, takže
+      // inak by klik na zdroj rozklik iba zbalil a nič by neoznačil.
+      var srcEl = t.closest('[data-src-cab]');
+      if (srcEl){
+        selectSource(srcEl.getAttribute('data-src-cab'), srcEl.getAttribute('data-src-key'));
+        return;
+      }
       // KOV-H2: klik na riadok nákupu rozbalí/zbalí jeho PÔVOD (zoznam zdrojov).
       // Žiadny zápis, žiadny server — je to čisté zobrazenie toho, čo už payload
       // nesie. Ide PRED riadkom generiky: obe sú `<tr>` v tej istej sekcii.
       var buyr = t.closest('tr.hwbuyrow');
       if (buyr){
-        var bi = parseInt(buyr.getAttribute('data-buy'), 10);
-        if (!isNaN(bi)){ buyOpen[bi] = !buyOpen[bi]; renderBody(); }
+        // D-94: kľúč je IDENTITA riadku (kód / `free_key`), nie index.
+        var bk = buyr.getAttribute('data-buy');
+        if (bk){ buyOpen[bk] = (buyOpen[bk] !== true); renderBody(); }
         return;
       }
       // ŠT-1c PR A: riadok generiky kovania — klik označí vlastníka v modeli.
@@ -1950,6 +2045,9 @@
       buySection: buySection, price: price, hwManualMark: hwManualMark,
       // KOV-H2: chip „ručná" + rozklik pôvodu (tests/js/test_kovh2_adhoc_ui.js)
       hwRowManual: hwRowManual, hwSourceText: hwSourceText, hwSourcesHtml: hwSourcesHtml,
+      // D-94 (tests/js/test_d94_povod.js): skupiny zdrojov per skrinka,
+      // identita riadku pre pamat rozkliku, klik na zdroj -> `source_ref`.
+      hwSourceGroups: hwSourceGroups, hwRowKey: hwRowKey, selectSource: selectSource,
       // KOV-C2c (tests/js/test_kovc2c_karta.js): zastavujuce nemapovane polozky.
       hwRowStops: hwRowStops, hwStopCount: hwStopCount, hwStopNoteHtml: hwStopNoteHtml,
       hwStopOwners: hwStopOwners,

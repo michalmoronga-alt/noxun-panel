@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.12.0 · 12.9.2026 — BLOK M-R VZHĽAD KOMPLET.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.12.1 · 12.9.2026 — M-R VZHĽAD KOMPLET, nad ním dávka D-94 „Nákup s pôvodom".** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -19,6 +19,7 @@ nálezy z výroby a chyby v cenách majú **najvyššiu prioritu** ([PLAN.md](PL
 Pred prvou takou zákazkou aktualizovať **obe PC** (Štúdio → O plugine → Aktualizovať).
 
 **Testy uzáveru Čiel:** **3830 headless · 113 JS sád**, skutočný Inspector pri 470 px: šesť typov, jedna karta, klávesnica, pevná výška/AUTO, hrany a potvrdenie návrhu.
+**D-94:** **3993 headless · 115 JS sád · 2632 in-SketchUp PASS / 0 FAIL** (z toho 26 nových kontrol sekcie `run_d94`: resolver, deep-link, 0 krokov Späť).
 **M-R:** **3983 headless · 114 JS sád · 2606 in-SketchUp PASS / 0 FAIL**. Skutočné CEF Štúdia **18 PASS**; konečný controller → uloženie/otvorenie bez SKM → prestavba → výroba **50 PASS**.
 Dosky 18/25 mm, ABS, skrinka a cudzí zdieľaný dielec; textúra, mierka, UV, presné živé materiály aj kusovník/VEPO ostali zachované. Samostatná živá zmena mierky bez Apply/rebuildu: **11 PASS**.
 Pracovné SKM/PBR/pixely, Undo/Redo, rollback a D-40 prešli v jednotlivých dávkach. [Plná evidencia a smoke](archiv/MR_ZAVER_2026-09-12.md); fyzický druhý PC, SU 2024 a render netestované.
@@ -28,17 +29,22 @@ Geometrický dôkaz ČELÁ-B2: **in-SketchUp 2297 PASS / 0 FAIL** (osadenia, vý
 
 ## Robí sa
 
-**M-R je dokončené v #353–#359, uzáver v0.12.0.** Jeden spoločný vzhľad dosiek aj ABS rovnakého dekoru a povrchu naprieč hrúbkami; zástena jeden vzhľad. Plošná farba a UNI ostávajú.
-V Štúdiu → Materiály → dekor → Vzhľad možno priradiť obrázok, otvoriť natívny editor, uložiť vzhľad do knižnice alebo použiť katalógovú farbu. Späť mení model, uložená knižnica zostáva.
-Michal 12.9. potvrdil používateľský smoke M-R **PASS**: úprava aj nový materiál, mierka, opacity a metalness, uloženie a načítanie v novom projekte bez chýb. D-28 je vyriešené. Čelá A/B1/B2/C zostávajú používateľsky potvrdené.
+**D-94 „Nákup s pôvodom" je hotové (PR #361, v0.12.1).** Riadok v sekcii Nákup kovania sa rozklikne na pôvod **zoskupený po skrinkách** (jeden riadok na skrinku s počtom kusov
+a za ním položky s ľudským názvom vlastníka); **klik na skrinku aj na čelo označí kus v modeli a zdvihne Inspector**, pri čele sa otvorí jeho karta. Rozklik **prežije „Obnoviť"**
+aj prestavbu. Výstup zákazky (CSV, rozpočet, ponuka) sa nemení ani o znak. **Čaká používateľský smoke Michala.**
+**M-R je dokončené v #353–#359, uzáver v0.12.0** — Michal 12.9. potvrdil jeho smoke **PASS**; D-28 vyriešené, Čelá A/B1/B2/C zostávajú používateľsky potvrdené.
 **Blok 1d** podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**. Blok **1b** je uzavretý, **1c/1e hotové**.
 
 ## Ďalší krok
 
-Po uzávere M-R nasleduje slovná diskusia o workflow; ďalší blok sa automaticky neštartuje. Budúca rotácia obrázka a umiestnenie textúr sú D-126/D-127 v [PLAN.md](PLAN.md); D-48 zostáva po V1 a ručné Redo Čiel samostatne nepotvrdené.
+**Ďalší blok vyberá Michal** — automaticky sa nič neštartuje; po uzávere M-R mala nasledovať slovná diskusia o workflow. Skupina „KONTROLA + VÝROBA" v
+[DOGFOODING.md](DOGFOODING.md) je po D-94 prázdna. Budúca rotácia obrázka a umiestnenie textúr sú D-126/D-127 v [PLAN.md](PLAN.md); D-48 zostáva po V1,
+**D-109** (pomerová mechanika kovania, R-05) po V1 a ručné Redo Čiel je stále samostatne nepotvrdené.
 
 ## Posledné uzávery
 
+- **D-94 · Nákup s pôvodom** (v0.12.0 → **v0.12.1**, 12.9.2026, PR #361). Rozklik nákupného riadku po skrinkách, klik-select zdroja s deep-linkom na kartu čela, pamäť rozkliku
+  podľa identity riadku + regresný strážca invariantu „súčet zdrojov = počet riadku". Zvyšok package z 30.8. (tvar `sources`, popis vlastníka) priniesli už KOV-H2/KOV-D4.
 - **BLOK M-R VZHĽAD UZAVRETÝ** (v0.11.1 → **v0.12.0**, 11.–12.9.2026, PR #353–#359). Spoločná knižnica dosiek/ABS, natívny editor, fyzické UV, zachovanie pri prestavbe/kópii a ovládanie v Štúdiu. D-28 vyriešené; [plný blok](archiv/ROADMAP_hotove_etapy.md).
 - **BLOK KOVANIE UZAVRETÝ** (v0.9.14 → **v0.10.0**, 2.–10.9.2026; 50 PR #277–#340). **Čo plugin odteraz vie:** sety a katalógové položky sú **klasifikované**
   (typ použitia · otváranie · konštrukcia · výrobca · rada), katalóg má strom Kategória → Výrobca → Rada a set sa upravuje v editore so **živým náhľadom** ·

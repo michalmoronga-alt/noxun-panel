@@ -713,6 +713,38 @@ module Noxun
         pids_for_problem(model, { 'owner_id' => oid, 'part_key' => ref['part_key'].to_s })
       end
 
+      # D-94: klik na ZDROJ v rozkliku povodu nakupneho riadku (sekcia Nakup).
+      # Adresa je STABILNA DVOJICA (cabinet_id, owner_part_key) — presne ta,
+      # ktoru zdroj UZ nesie v payloade; pids sa neposielaju (rebuild ich meni).
+      # Telo je `pids_for_problem` a NEDUPLIKUJE sa: prazdny kluc (kovanie celej
+      # skrinky) oznaci korpus, inak jeho vnorene dielce daneho kluca, a dielec,
+      # ktory sa nepostavil, spadne na korpus tym istym fallbackom. Vzor je
+      # `pids_for_override` — ta ista cesta, len ine mena klucov.
+      #
+      # VEDOMY DOSLEDOK zdielaneho tela (rovnaky ako pri `rule_ref`): zdroje
+      # nenesu `owner_pid`, takze vetva `scoped_owner_instance` sa neuplatni —
+      # dve skrinky so ZDIELANYM `cabinet_id` sa oznacia OBE. Je to vyber (nic
+      # sa nezapisuje) a pouzivatelovi to ukaze vsetky kusy, z ktorych riadok
+      # nakupu vznikol.
+      #
+      # `focus` je tu z TOHO ISTEHO dovodu ako pri naleze o cele (KOV-A2b):
+      # karta cela v Inspectorovi zije LEN nad oznacenou SKRINKOU, takze pri
+      # ceste s deep-linkom vybera vlastnika `select_target_item` — ZIADNA
+      # druha cesta rozlisovania.
+      def pids_for_source(model, ref, focus: false)
+        item = source_select_item(ref)
+        return [] if item['owner_id'].empty?
+
+        pids_for_problem(model, select_target_item(item, PartKeys.front_id(item['part_key']), focus))
+      end
+
+      # D-94: zdroj -> adresa vyberu v tvare, akemu rozumie `pids_for_problem`.
+      # CISTA funkcia (ziadne IO) — headless testovatelna.
+      def source_select_item(ref)
+        r = ref.is_a?(Hash) ? ref : {}
+        { 'owner_id' => r['cabinet_id'].to_s, 'part_key' => r['owner_part_key'].to_s }
+      end
+
       # D-103: klik na nalez o zhodnom umiestneni oznaci CELU skupinu (obe/vsetky
       # zhodne umiestnene skrinky ci dosky), aby pouzivatel videl, co presne mazat.
       # Identita je (dup_kind + dup_owner_ids) — zbierana zo SERVERA, klient ju
@@ -1924,6 +1956,12 @@ module Noxun
         focus = data['focus_inspector'] == true && Panel.dialog_alive?
         front_id = nil
         hw_row = nil
+        # D-94: `cabinet_id` zdroja, ktory patri CELEJ skrinke (prazdny kluc) —
+        # jediny udaj, ktorym sa da o vybere povedat vetu o SKRINKE.
+        # `source_ref_hit` = klik prisiel z rozkliku povodu (aj ked kluc MA);
+        # jeho veta statusu je vlastna, lebo ako jedina prizna zavrety Inspector.
+        source_cab = nil
+        source_ref_hit = false
         if data['problem_key']
           collected = fresh_collect(model)
           # GH #127 P2: klik-resolve MUSI ratat s rovnakym vstupom ako
@@ -1953,6 +1991,19 @@ module Noxun
           # override je adresovany identitou (owner_id, part_key) — v kusovniku
           # ziadny taky riadok byt nemusi (napr. vypnute kovanie).
           pids = pids_for_override(model, data['rule_ref'])
+        elsif data['source_ref']
+          # D-94: klik na ZDROJ v rozkliku povodu (sekcia Nakup kovania).
+          # Vlastna vetva ZAMERNE (vzor `rule_ref`, ŠT-3b-2b): adresa je
+          # IDENTITA (cabinet_id + owner_part_key) a v hotovom BOM taky riadok
+          # byt nemusi — plny zber modelu by bol pri nej cista rezia.
+          item = source_select_item(data['source_ref'])
+          front_id = PartKeys.front_id(item['part_key'])
+          # Veta o SKRINKE patri VYHRADNE zdroju bez kluca (kovanie celej
+          # skrinky). Zonovy dielec (polica) kluc MA, len nie celovy — tam
+          # ostava bezna veta o polozkach.
+          source_cab = item['owner_id'] if item['part_key'].empty?
+          source_ref_hit = true
+          pids = pids_for_source(model, data['source_ref'], focus: focus)
         else
           pids = refs_for(Bom.compute(fresh_collect(model)), data)
         end
@@ -1988,6 +2039,16 @@ module Noxun
         if focus && front_id
           Panel.push_focus_front(front_id)
           return status.call(front_focus_status(targets.length, front_id))
+        end
+        # D-94: klik na zdroj rozkliku povodu ma VLASTNU vetu. Pri zdroji CELEJ
+        # skrinky hovori o SKRINKE (presne to sa oznacilo), nie o „položkách";
+        # karta cela sa pri nom neotvara, lebo taky zdroj ziadne celo nemenuje.
+        # A ako JEDINA veta priznava, ze Inspector nie je otvoreny (Codex #361
+        # P2) — `do_select` ho NIKDY neotvara, len zdvihne, takze bez priznania
+        # by tooltip zdroja slubil nieco, co sa nestane.
+        if source_ref_hit
+          return status.call(source_focus_status(targets.length, source_cab, focus,
+                                                 data['focus_inspector'] == true))
         end
         status.call("Vybraných #{targets.length} položiek v modeli." \
                     "#{focus ? ' Inspector je vpredu — dielec sa dá hneď upraviť.' : ''}")
@@ -2026,6 +2087,40 @@ module Noxun
         n = count.to_i
         what = n == 1 ? 'Vybraná skrinka' : "Vybraných #{n} skriniek"
         "#{what} v modeli — Inspector je vpredu, karta čela #{front_id} je otvorená."
+      end
+
+      # D-94: veta po kliku na ZDROJ rozkliku povodu.
+      #
+      # Pri zdroji CELEJ skrinky menuje SKRINKU a mnozne cislo priznava zdielane
+      # `cabinet_id` (dve skrinky s tym istym ID sa oznacia obe — vedomy dosledok
+      # zdielaneho resolvera, viz `pids_for_source`). Prazdny `cabinet_id` = zdroj
+      # s klucom dielca; veta vtedy hovori o POLOZKACH ako ostatne vetvy.
+      #
+      # Codex #361 P2: `focus_wanted` je to, co si okno VYPYTALO, `focus` to, co
+      # sa naozaj stalo. `do_select` Inspector NIKDY NEOTVARA (konvencia Š3
+      # ceruzky) — len ho zdvihne, ked uz zije. Ked ho pouzivatel ziadal a okno
+      # je zavrete, veta to MUSI povedat: inak klikne na zdroj, tooltip slubi
+      # Inspector a nestane sa nic viditelne.
+      # CISTA funkcia (ziadne IO) — headless testovatelna.
+      def source_focus_status(count, cabinet_id, focus, focus_wanted = false)
+        n = count.to_i
+        what = if cabinet_id.to_s.empty?
+                 "Vybraných #{n} položiek"
+               elsif n == 1
+                 "Označená skrinka #{cabinet_id}"
+               else
+                 "Označených #{n} kusov s ID #{cabinet_id}"
+               end
+        "#{what} v modeli.#{source_focus_suffix(focus, focus_wanted)}"
+      end
+
+      # D-94: dovetok o Inspectorovi — zdvihnuty / vypytany, ale zavrety / nic.
+      # CISTA funkcia (ziadne IO) — headless testovatelna.
+      def source_focus_suffix(focus, focus_wanted)
+        return ' Inspector je vpredu.' if focus
+        return ' Inspector nie je otvorený.' if focus_wanted
+
+        ''
       end
 
       # KOV-D4: ADRESA riadku v sekcii Kovanie z nalezu. Sklada ju VALIDACIA
