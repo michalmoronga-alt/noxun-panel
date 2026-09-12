@@ -54,6 +54,8 @@ module Noxun
         demos_lookup demos_manual_url demos_apply demos_cancel
         demos_name_search demos_family demos_family_create demos_family_cancel
         replace_uni_preview replace_uni_apply
+        appearance_prepare appearance_pick appearance_edit appearance_save
+        appearance_reset appearance_apply appearance_close
       ].freeze
 
       class << self
@@ -71,6 +73,7 @@ module Noxun
         end
 
         def run_section_action(key, payload)
+          return handle_appearance_action(key, payload) if key.start_with?('appearance_')
           case key
           when 'set_project_material'    then handle_set_project_material(payload)
           when 'update_sheet'            then handle_save_sheet(payload)
@@ -128,6 +131,7 @@ module Noxun
         # Zatvorene Studio = ziadne UI katalogu. Bezaci Demos fetch sa zneplatni
         # (session bump) a odlozena poziadavka „Nahradiť UNI…" zomiera s nim.
         def on_ui_closed
+          appearance_invalidate! if respond_to?(:appearance_invalidate!)
           demos_bump_session
           demos_forget_runs
           @pending_replace_uni = nil
@@ -146,6 +150,7 @@ module Noxun
         # Hlasku posiela LEN vtedy, ked naozaj nieco bezalo — inak by kazde
         # prepnutie sekcie prepisalo stav okna zbytocnou vetou.
         def cancel_demos_on_leave
+          appearance_invalidate! if respond_to?(:appearance_invalidate!)
           return unless @demos_running
 
           demos_bump_session
@@ -382,6 +387,7 @@ module Noxun
         # serverovych behov: cudzi dokument nesmie dostat vysledky behu, ktory
         # patril predoslemu.
         def on_model_changed(_model)
+          appearance_invalidate! if respond_to?(:appearance_invalidate!)
           demos_bump_session # B-2b: prepnuty model rusi bezaci Demos lookup
           demos_forget_runs
           @pending_replace_uni = nil # D-83: poziadavka patrila PREDOSLEMU modelu
@@ -1337,13 +1343,23 @@ module Noxun
         # jedina cesta zmeny je tento skupinovy control v hlavicke detailu.
         def handle_set_decor_color(payload)
           data = JSON.parse(payload.to_s)
-          return unless catalog_write_ok?(data)
+          return appearance_color(data) { set_decor_color_result(data) } if data.key?('appearance_context')
+          set_decor_color_result(data)
+        end
+
+        def set_decor_color_result(data)
+          return [false, 'Farba sa neuložila — obnov katalóg a skús znova.'] unless catalog_write_ok?(data)
           ok, result = Materials.set_decor_color(data['decor'], data['color'],
                                                  group_id: data['group_id'])
-          return set_status(result, true) unless ok
+          unless ok
+            set_status(result, true)
+            return [false, result]
+          end
           after_catalog_change
           decor = data['decor'].to_s.strip
-          set_status("Farba dekoru #{decor} zmenená (#{result} záznamov).")
+          message = "Farba dekoru #{decor} zmenená (#{result} záznamov)."
+          set_status(message)
+          [true, message]
         end
 
         # --- ŠT-2c 2c-2a: D-69 jednotny editor dekoru -------------------------
