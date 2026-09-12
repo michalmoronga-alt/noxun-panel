@@ -1940,6 +1940,16 @@ module NoxunSuRunner
     working = result[:material]
     ok('MR2A Pick: blok raz, committed W handle, 12 dosiek aj 12 ABS',
        calls == 1 && working == imported && working.valid? && mr3b_counts(result, 12, 12, 12))
+    file_image = Sketchup::ImageRep.new(ctx[:picked_path])
+    file_pixels = [file_image.width, file_image.height, file_image.bits_per_pixel, Digest::SHA256.hexdigest(file_image.data)]
+    actual_image = working.texture.image_rep
+    pixel_flags = { state: mr1b1_visual(working) == picked, raw_fixture_hash: picked[:texture][5] == ctx[:picked_digest],
+                    decoded_file: picked[:texture][2, 4] == file_pixels,
+                    decoded_colors: actual_image.colors.map(&:to_a) == file_image.colors.map(&:to_a),
+                    scale: picked[:texture][0, 2] == [180.mm.to_f, 90.mm.to_f],
+                    changed: picked[:texture][5] != mr1b1_visual(ctx[:source])[:texture][5] }
+    info("MR2A Pick pixel diagnostic: #{pixel_flags.inspect}; actual=#{picked[:texture].inspect}; " \
+         "PNG=#{file_pixels.inspect}; padding=#{actual_image.row_padding}/#{file_image.row_padding}; raw32=#{ctx[:picked_digest]}")
     ok('MR2A Pick: novy obrazok a mierka su skutocne v materialoch',
        mr1b1_visual(working) == picked && picked[:texture][5] == ctx[:picked_digest] &&
        picked[:texture][0, 2] == [180.mm.to_f, 90.mm.to_f] && picked[:texture][5] != mr1b1_visual(ctx[:source])[:texture][5])
