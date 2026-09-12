@@ -17,6 +17,17 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **MR-3A — FYZICKÁ MIERKA A SMER TEXTÚR (12.9.2026, v0.11.4).**
+  Spoločný mapper kladie textúru dosiek podľa smeru dekoru a textúru ABS pozdĺž fyzickej hrany; používa aktuálnu natívnu mierku materiálu.
+  Rovnaký vzhľad dosky a ABS má na každej ploche správny vlastný rámec, oba povrchy plochy rovnakú fázu. Otočenie ani zrkadlo neprepisujú výrobné osi.
+  Overenie lokálneho kvádra je iba čítanie a opakuje sa pred zápisom; posun so stále živými face handles zneplatní starú mapu. Čiastočné bindingy nechávajú ostatné UV nedotknuté.
+  Obyčajné farby a materiály bez albeda nevyžadujú UV. Chyba mapovania vyvolá rollback celej stavby; výber živého R1 alebo nového R2 ostáva podľa MR-1B2.
+  Návrhový audit Astra high: SOUND. **3925 headless, 113 JS sád a 2442 in-SketchUp PASS / 0 FAIL**, z toho 61 nových kontrol. Fyzické body, štvorcové UKW čelo,
+  stojace zásuvky, všetky orientácie dosky, duplák a zástena; R1/R2, kópie, Scale, Undo/Redo, nezmenený snapshot/BOM/VEPO a úplný rollback aj s pôvodnou projekciou.
+  Samostatné skutočné save/reopen: **21 PASS**, vlastný lokálny `.skm` odstránený pred otvorením. Materiály, fyzické UV, výrobné snapshoty a následná prestavba ostali zhodné;
+  po reopen/rebuild sa zachovali presné živé handles dosiek aj ABS. Sonda neobsahuje sekundárne PBR textúrové mapy; fyzický SU 2024, druhé PC a render netestované.
+  Nasleduje MR-3B aplikovanie na existujúce výskyty a MR-2 ovládanie v Štúdiu. D-28 zostáva otvorené do uzáveru celého bloku.
+
 - **MR-1B2 — ŽIVÝ VZHĽAD PRI PRESTAVBE A KÓPII (12.9.2026, v0.11.3).**
   Oba buildery používajú spoločný vzhľad dosiek a ABS; bežný nový vklad berie aktuálnu revíziu, prestavba pôvodného dielca a produktová kópia zachovajú jeho živý materiál vrátane neuložených úprav. Výrobné ID a snapshot sa nemenia.
   Capture pred zmazaním drží konkrétny model, vlastníka, dielec a ABS slot. Nejednoznačný protected vzhľad vrátane vlastnej podoby neolepenej plochy vedie k úplnému rollbacku. Čisté RGB farby sa ďalej synchronizujú bez poškodenia starého zdieľaného materiálu; UNI ostáva pracovné.
