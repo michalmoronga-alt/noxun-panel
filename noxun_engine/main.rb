@@ -460,6 +460,7 @@ Sketchup.require 'noxun_engine/core/materials_appearance' # MR-1A: kontrakt a pu
 Sketchup.require 'noxun_engine/core/materials_native_appearance' # MR-1B1: overeny nativny kontajner, bez zapojenia builderov
 Sketchup.require 'noxun_engine/core/materials_build_appearance' # MR-1B2: povodny vzhlad pri prestavbe a kopii
 Sketchup.require 'noxun_engine/core/appearance_mapping' # MR-3A: lokalne UV oboch stran a ABS
+Sketchup.require 'noxun_engine/core/materials_apply_appearance' # MR-3B: atomicky vzhlad fyzickych vyskytov
 Sketchup.require 'noxun_engine/core/updater'     # D-52a: jadro aktualizatora pluginu (po materials — pouziva with_catalog_lock)
 Sketchup.require 'noxun_engine/core/materials_catalog' # V0.5.1 split: CRUD/validacia/scan/patch/seed
 Sketchup.require 'noxun_engine/core/materials_decor'    # V0.5.1 split: D-41 dekor = kluc skupiny + batch
