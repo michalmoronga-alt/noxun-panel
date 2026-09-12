@@ -139,6 +139,9 @@ len pre dve overené plain farby; styled ABS sa priradí explicitne na obe stran
 **MR-3A:** po `materialized_part` a finálnom draw/reverse/pushpull používa `add_part` spoločný `AppearanceMapping`. Textúra sa mapuje aj na dielci bez ABS;
 `paint_edge_faces` poskytuje raz vyriešené slotové bindingy a zdieľa overenú mapu plôch. Grain je už vyriešený v `resolved`, hrúbka čela už konečná.
 Chyba UV mapovania sa neprehltne; existujúca operácia zruší celý vklad/prestavbu. Farba bez textúry ponecháva doterajšiu kompatibilnú cestu.
+**MR-3B:** recyklácia pomenovaných definícií dielcov a nôh je prípustná iba bez platných inštancií. Po izolácii vzhľadu môže pôvodnú kanonickú definíciu
+stále používať cudzí dielec alebo odpojená skrinka; následný rebuild ju nesmie vyčistiť. Obsadené meno dostane novú definíciu, bez premenovania cudzej
+alebo vyhľadávania náhrad podľa podobného mena. Čistenie nepoužívaných definícií sa nezavádza.
 
 **ŠEV VKLADANIA (R-03, v0.8.20): `prepare_insert` → `commit_insert`; `build` je len ich kompozícia** a správanie všetkých doterajších volajúcich je nezmenené.
 `prepare_insert(model, params)` vydá **zmrazený `InsertPlan`** (config + `home_z`) — *žiadna* mutácia modelu, entít, ID ani Undo stacku, a **zámerne ani `ensure_root_context`**

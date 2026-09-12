@@ -274,7 +274,28 @@ Mierka pochádza priamo z natívnych `Texture.width/height` v palcoch; neprevád
 Rovnaký handle dosky/ABS sa na hrane mapuje samostatne. Rotácia aj zrkadlo prenášajú lokálny rámec s inštanciou, bez svetovej korekcie.
 Materiál bez albedo textúry nevolá `position_material`; obyčajná RGB cesta zachováva dedenie. Neolepené čerstvé bočné plochy ďalej dedia rodiča.
 `MappingError < Materials::AppearanceError` prepúšťa neplatnú mierku, false aj výnimku k abortu celého buildera. Modul nemení katalóg, výrobné snapshoty ani grain.
-Samostatné Apply, izolácia zdieľaných výskytov a ovládanie patria nadväzujúcim dávkam.
+Samostatné Apply a izoláciu zdieľaných výskytov zabezpečuje `ApplyAppearance`; ovládanie patrí MR-2.
+
+### materials_apply_appearance.rb
+
+**MR-3B: `ApplyAppearance.apply(model, scope:, material:)` priradí pripravený živý vzhľad podporovaným výskytom aktuálneho modelu.**
+Scope je normalizovaná dvojica skupina/povrch, spoločná pre dosky aj ABS. Členstvo vychádza z jediného čerstvého čítania katalógu pod jeho zámkom
+a z výrobných ID snapshotu; meno natívneho materiálu ani rovnaká RGB nie sú členstvom. UNI je vylúčené. Služba nepublikuje knižnicu, nenačítava `.skm`,
+nemení vlastnosti materiálov, výrobné atribúty ani geometriu stavbou. Pracovný alebo uložený materiál pripravuje caller.
+
+Aktívny model, root edit kontext, neprítomný rebuilding guard a vlastný platný handle sa overujú pred `ScaleWatch.flush_pending!` aj po ňom.
+Native materiál musí mať správny scope a jednoznačný lookup svojej revízie. Cudzia editácia sa nezatvára. Skutočné výskyty sa prechádzajú cez vnorené
+skupiny/komponenty; skryté sa zahrnú, zamknuté/škálované, odpojené, novšie či neoveriteľné dielce sa preskočia s dôvodom. Každý fyzický výskyt sa počíta
+samostatne. Požaduje sa platný parametrický vlastník, výrobná identita/snapshot, rigidná cesta vrátane mirror a strict cuboid podľa `AppearanceMapping`.
+
+Preflight dokazuje aj zachovanie necielených kanálov: explicitné ABS si drží svoje UV/projekciu a obe strany. Pri zmene sheet rodiča sa dovtedy zdedené
+necielené ABS pripne na pôvodný efektívny handle. Nepreukázateľné textúrované alebo nil dedenie znamená preskočiť celý diel; rovnako nový konflikt
+protected raw hrany, ktorý by zablokoval nasledujúci rebuild. Edge-only Apply nemení sheet ani rodičovský materiál.
+
+Jedna guarded modelová operácia najprv izoluje potrebné zdieľané cesty zhora nadol. Obsahový strom s multiplicitami dokazuje zhodu pred/po clone,
+bez párovania starých a nových potomkov podľa PID alebo indexu. Neznámy nepreukázateľný obsah blokuje iba potrebnú clone vetvu. Po izolácii sa
+z čerstvých potomkov pripraví finálny plán; až potom sa selektívne mapujú cielené plochy. Akýkoľvek neočakávaný drift alebo chyba zápisu zruší celú
+operáciu vrátane izolácie. Bez cieľa nevzniká prázdny Undo krok. Výsledok udáva počty fyzických dielcov, dvojíc veľkých plôch, ABS slotov a dôvody skipov.
 
 ### materials_abs.rb
 
