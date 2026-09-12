@@ -34,8 +34,8 @@ module Noxun
         matches.first
       end
 
-      # Iba rebuild: volajuci navyse dokazuje povodny dielec a nezmenene vyrobne ID.
-      # Explicitne Apply najnovsej revizie tento helper nepouziva.
+      # Overi presnu identitu dodaneho handle; sam nevybera najnovsiu reviziu.
+      # Pri rebuild volajuci navyse dokazuje povodny dielec a nezmenene vyrobne ID.
       def preferred(model, scope, material)
         scope = valid_scope!(scope)
         own_material!(model, material)

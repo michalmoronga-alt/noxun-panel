@@ -814,7 +814,7 @@ Schema 10 vzniká len pri obsahu s `appearance`; otvorenie starého katalógu ho
 Novší marker aj neznámy obsah chránia zápisové brány. Nový `.skm` sa dokončí pred
 publikáciou odkazu; zlyhanie katalógového zápisu ponechá pôvodnú revíziu aj súbor.
 Uloženie knižnice nie je súčasťou modelového Undo. MR-1A pripravuje katalógovú časť;
-MR-1B1 natívny adaptér, MR-1B2 zachovanie pri prestavbe a MR-3A mapovanie v builderoch. Aplikovanie na existujúci model a ovládanie nasledujú.
+MR-1B1 natívny adaptér, MR-1B2 zachovanie pri prestavbe, MR-3A mapovanie v builderoch a MR-3B aplikovanie na existujúci model. Ovládanie nasleduje v MR-2.
 
 **Natívna identita vzhľadu (MR-1B1):** na SketchUp materiáli v dictionary `NOXUN`
 žije `appearance_scope` (JSON dvojice normalizované group_id/structure) a `appearance_id`
@@ -975,6 +975,11 @@ Výrobný materiál sa ukladá **na úrovni výrobného komponentu** (`material_
 `none` tým nemení výrobný význam. Textúra ABS beží U pozdĺž hrany, V cez hrúbku; oba povrchy každej plochy majú rovnakú lokálnu fázu od minima U/V.
 Fyzickú mierku určuje aktuálny natívny materiál, nie rozmery dielca. Finálne osi a hrúbky pochádzajú z výrobného deskriptora; rotácia a zrkadlo ich neprepisujú.
 Mapovanie nepridáva atribúty ani uložené UV do NOXUN dát. Materiály bez textúry zostávajú plošné; chyba mapovania zruší celú prebiehajúcu stavbu.
+
+**MR-3B:** explicitné aplikovanie vzhľadu cieli dosky aj ABS zvoleného scope podľa uložených výrobných ID a čerstvého katalógu. Zahrnie aj skryté podporované
+parametrické výskyty; UNI, zamknuté, odpojené alebo neoveriteľné dielce preskočí s dôvodom. Necielené plochy a cudzie výskyty si zachovajú svoj vzhľad.
+Zdieľané definície sa podľa potreby izolujú bez nových výrobných ID. Ostatné materiály, konfigurácia, rozmery, grain, kusovník, VEPO a ceny sa nemenia.
+Jedna Undo operácia vracia celé aplikovanie aj izoláciu; chyba po začatí zápisu znamená celý rollback. Samotný Apply nemení knižnicu.
 
 ### 7.4 Tri stavy materiálu
 

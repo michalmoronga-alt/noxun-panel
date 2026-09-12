@@ -1915,12 +1915,15 @@ module Noxun
         # --- pomocne stavbove ----------------------------------------------
 
         # Jeden dielec = vlastny komponent s NOXUN dict. Recyklacia definicie podla mena
-        # (mena su per-korpus unikatne — obsahuju cid), aby rebuild neprodukoval osirotene definicie.
+        # (mena su per-korpus unikatne — obsahuju cid), pokial uz nema zivu instanciu.
+        # Po izolacii vzhladu moze povodnu definiciu stale pouzivat cudzi dielec.
         # resolved: material, ABS, smer dekoru a katalogova hrubka (viz resolve_part).
         def add_part(model, parent_ents, pd, resolved, cid, tid, previous: {})
           pd = materialized_part(pd, resolved)
           dname = "NOXUN #{cid} #{pd[:suffix]}"
-          pdef = model.definitions[dname] || model.definitions.add(dname)
+          pdef = model.definitions[dname]
+          pdef = nil if pdef && pdef.instances.any?(&:valid?)
+          pdef ||= model.definitions.add(dname)
           pdef.entities.clear!
           sx, sy, sz = pd[:box]
           draw_box(pdef.entities, sx, sy, sz)
@@ -1974,7 +1977,9 @@ module Noxun
           return if qty < 1 || cfg[:floor_height].to_f <= 0
 
           dname = "NOXUN #{cid} LEGS"
-          ldef = model.definitions[dname] || model.definitions.add(dname)
+          ldef = model.definitions[dname]
+          ldef = nil if ldef && ldef.instances.any?(&:valid?)
+          ldef ||= model.definitions.add(dname)
           ldef.entities.clear!
           draw_legs(ldef.entities, cfg, qty)
           inst = parent_ents.add_instance(ldef, Geom::Transformation.new)

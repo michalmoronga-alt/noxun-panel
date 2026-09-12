@@ -17,6 +17,19 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **MR-3B — APLIKOVANIE VZHĽADU NA EXISTUJÚCE VÝSKYTY (12.9.2026, v0.11.5).**
+  Jedna modelová služba priradí pripravený vzhľad doskám aj ABS zvolenej skupiny/povrchu naprieč hrúbkami. Zahŕňa skryté a podporované vnorené výskyty;
+  UNI, zamknuté, odpojené alebo nepreukázateľné dielce vynechá s dôvodom. Necielené ABS si zachová pôvodný vzhľad vrátane vlastného UV a projekcie.
+  Zdieľané definície izoluje zhora nadol pred prvým prefarbením; obsahový dôkaz s multiplicitami nepotrebuje párovať nové potomky podľa PID/indexu.
+  Celá zmena aj izolácia patria jednej Undo operácii. Chyba po začatí zápisu ruší celok; knižnica, materiálové vlastnosti a výrobné dáta sa nemenia.
+  Návrhový audit Astra našiel 1 blocker a 3 opravy, všetky zapracované: bezpečný reuse definícií pri následnom rebuilde, root/guard pred flush,
+  jednoznačný native tuple a konkrétny dôkaz obsahu po clone. Rovnaký deštruktívny reuse opravený aj pre nohy skrinky; čistenie definícií sa nezavádza.
+  Natívne meranie našlo ešte nezhodu odvodených koeficientov roviny po clone (vrcholy/normála ostali presné) a D-40 pri kopírovaných DC atribútoch.
+  Redundantná rovnica roviny sa už neporovnáva; Apply otvára tú istú normálnu operáciu s `disable_ui=false`. Úzka lifecycle delta prešla Astra auditom SOUND.
+  Overené: **3953 headless · 113 JS sád · 2518 in-SketchUp PASS / 0 FAIL** (76 nových kontrol), vrátane okamžitých selection eventov po Apply/Undo/Redo/abort.
+  Samostatný save/reopen bez lokálneho `.skm`: **24 PASS**; materiály, fyzické UV, konfigurácie, presné handles pri prestavbe a cudzí diel zachované.
+  Bez sekundárnych PBR máp a renderového overenia. Ovládanie v Štúdiu nasleduje v MR-2, D-28 ostáva otvorené.
+
 - **MR-3A — FYZICKÁ MIERKA A SMER TEXTÚR (12.9.2026, v0.11.4).**
   Spoločný mapper kladie textúru dosiek podľa smeru dekoru a textúru ABS pozdĺž fyzickej hrany; používa aktuálnu natívnu mierku materiálu.
   Rovnaký vzhľad dosky a ABS má na každej ploche správny vlastný rámec, oba povrchy plochy rovnakú fázu. Otočenie ani zrkadlo neprepisujú výrobné osi.
