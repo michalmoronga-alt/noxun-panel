@@ -524,36 +524,6 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `construction.md` (`BoardBuilder.replan`, fázy kreslenia, geometria lúča/projekcie, degenerácie, lifecycle zámkov —
   Codex #296 P1), `ui-lifecycle.md` (ghost D2, `interaction: drawing`, `draw_board`, zámky, Shift, VCB), `docs/UI_DIZAJN.md` (tlačidlá karty Dosky) → STAV/KRONIKA/PLAN.
 
-### 5 · RENDER M-R
-
-**Cieľ:** materiál vyzerá v modeli ako v skutočnosti — Luciin nástroj na vizualizácie.
-
-**SCHVÁLENÉ 11.9.2026:** Michal vybral M-R ako ďalší blok a schválil ovládanie aj implementáciu. Textúra je voliteľná; dnešné plošné farby zostávajú.
-**Rovnaký dekor a povrch má jeden spoločný vzhľad DOSIEK AJ ABS naprieč hrúbkami**, zástena jeden vzhľad z oboch strán; pracovné UNI ostávajú zamknuté.
-Jedno tlačidlo Vzhľad pri povrchu, bez samostatného ABS override. Katalógový kontrakt je v STANDARD §7; návrhový podklad a zapracovanie auditu v [MR balíku](zdroje/next_sessions/MR_VZHLAD_PACKAGE_2026-09-11.md).
-
-**Postup:** MR-1A katalógový kontrakt a spoločná knižnica → MR-1B natívny materiál a zachovanie pri prestavbe → mapovanie MR-3 → MR-2 Štúdio → MR-3 záverečný smoke. Malé samostatné PR z čerstvého mainu; prvá dávka ešte nesprístupňuje nové ovládanie. Žiadny nový observer ani zmena výrobných snapshotov.
-
-**Priebežný stav:** MR-1A je zlúčené v #353 (v0.11.1), MR-1B1 v #354 (v0.11.2), MR-1B2 v #355 (v0.11.3).
-MR-3A (v0.11.4) dopĺňa spoločný mapper v oboch builderoch: fyzická mierka, smer dekoru aj ABS a oba povrchy plôch; chybné mapovanie zruší celú stavbu.
-Nový vklad používa aktuálnu revíziu, prestavba/kópia zachová živý pôvodný materiál. MR-3B (v0.11.5) dopĺňa aplikovanie na podporované existujúce výskyty
-vrátane skrytých/vnorených, izolácie zdieľaných definícií a zachovania necielených plôch v jednej Undo operácii. Prestavba nerecykluje definície používané cudzími dielcami.
-MR-2A (v0.11.6) dopĺňa prípravu pracovného materiálu v tej istej operácii ako Apply, aj bez dielcov; pri chybe alebo predčasnom odchode sa vráti celý pokus.
-Pracovný import odmieta obsadenú revíziu a starý handle. SKM export zo živého alebo súborového zdroja overuje presnú obnovu kolekcie po oboch abortoch.
-MR-2B (v0.11.7) sprístupňuje spoločné ovládanie v Štúdiu: voliteľný obrázok, natívny editor, Save a Reset, samostatné okamžité RGB a retry po uložení bez úspešného Apply.
-Otvorenie nemení model ani výber; vlastné katalógové echo zachová okno, zmena dokumentu/sekcie zneplatní staré odpovede. Nasleduje záverečný smoke a uzáver; D-28 ostáva dovtedy otvorené.
-Natívna sonda potvrdila aj editáciu materiálu bez priradenia geometrii. MR-2 preto nepotrebuje pomocnú plochu: otvorí panel Materiály, kartu Upraviť prepne používateľ.
-
-- **V1 rozsah — M-R VZHĽAD (rozhodnuté 6.9.2026, NAHRÁDZA package „M-R FOTO" — Demos fotka ako textúra vypadáva):** ručné textúry z Michalovej knižnice (`E:\NOXUN\.MATERIÁLY`)
-  na všetky materiály katalógu (dosky, ABS hrany, dosky/boards), mierka + priehľadnosť + PBR v editore SketchUpu, **„Uložiť vzhľad" = `.skm`** (`Material#save_as` / `Materials#load`,
-  overené v SU 26.0), náhľad s pravdivým fallbackom pri zlyhaní `write_thumbnail`, **orientácia textúry podľa smeru dekoru** per dielec (dekorové plochy + `position_material`), „drž textúru bez súboru" (druhé PC).
-  Rezy **MR-1 jadro** (audit ÁNO: kontrakt `appearance` v katalógu, STANDARD §7.1 pole `texture` → `appearance`) → **MR-2 UI** ‖ **MR-3 orientácia** (audit ÁNO: buildery, in-SU).
-  Návrh poradia: **prvá dávka po KOVANÍ**. Plný checkpoint: [zdroje/next_sessions/V1_DEBATA_2026-09-06_MR_VZHLAD.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_MR_VZHLAD.md). Pôvodný package M-R FOTO (29.8.) je v git histórii.
-- **D-28 · Textúry materiálov = M-R knižnica vzhľadov** (zlúčené do bloku M-R VZHĽAD vyššie, 6.9.2026): kontrakt je **jediný — `appearance` → `.skm`** (textúra, mierka,
-  priehľadnosť aj PBR v jednom SketchUp kontajneri; `texture_path` ani samostatné PBR polia sa **nezavádzajú**); „Uložiť vzhľad" = MR-2, orientácia podľa smeru dekoru = MR-3;
-  zdieľanie `.skm` medzi PC = D-48 po V1. Zdroj JPG = Michalova knižnica textúr.
-  *(**D-87** — overlay čiar v smere dekoru — je **HOTOVÝ** v bloku KRESBA (K2, PR #188, v0.7.26); tu ostáva len **orientácia textúry** podľa smeru dekoru ako fáza 2 D-28. Overlay je kontrola, textúra je render — dve rôzne veci.)*
-
 ### 6 · INFRA (priebežne, podľa potreby)
 
 **Cieľ:** aby plugin a knižnice fungovali na dvoch pracoviskách (Michal + Lucia).

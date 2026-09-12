@@ -45,11 +45,6 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   *(Piaty kus tej istej odkladovej sady — EN DANIELI textový export — je v skupine KONTROLA + VÝROBA; DOCX/PDF generátor a rodina dokumentov sú od 26.8. v skupine Po V1 — zásobník.)*
   *Stav: čaká na prax — vytiahne sa, keď si to reálna zákazka vypýta.*
 
-## RENDER M-R
-
-- **D-28 · Textúry materiálov (render)** (Michal 19.7. večer) — *Stav: **ZLÚČENÉ do bloku M-R VZHĽAD** (6.9.2026, [PLAN.md](PLAN.md) blok 5): **jediný kontrakt `appearance` → `.skm`**
-  (textúra, mierka, priehľadnosť aj PBR v jednom SketchUp kontajneri — `Material#save_as` / `Materials#load`); „Uložiť vzhľad" = MR-2, orientácia podľa smeru dekoru = MR-3;
-  `texture_path` ani samostatné PBR polia sa **nezavádzajú**, package „M-R FOTO" (Demos fotka) je nahradený; zdieľanie `.skm` medzi PC = D-48 po V1 (Luciina priorita).*
 ## INFRA
 
   *Stav: na návrhovú dávku — od 26.8. SAMOSTATNE (bez väzby na D-48, ktorý je mimo V1); distribučný kanál jednoducho, napr. zdieľaný priečinok.*

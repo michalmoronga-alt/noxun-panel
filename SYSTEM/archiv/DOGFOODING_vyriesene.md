@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-28** — Spoločný voliteľný vzhľad dosiek aj ABS, natívna mierka/PBR, knižnica SKM a zachovanie pri prestavbe/kópii — 12.9.2026, PR #353–#359, uzáver v0.12.0
 - **D-114** — Šesť ikon pridá priamo typ čela v jednom rade; kratšie texty, súhrn hrán a zachovaný fokus pri 470 px — 11.9.2026, PR #351, v0.11.0
 - **D-120** — UKW na všetkých hranách piatich typov čiel, dvierka zvislo oproti pántom; karta aj hromadné nastavenie s potvrdením návrhu — 11.9.2026, PR #349 + #350, v0.10.7–0.10.8
 - **D-119** — Ľavý a pravý presah čiel samostatne pre celú skrinku; staré hodnoty sa preberajú bez zmeny geometrie — 11.9.2026, PR #347, v0.10.6
@@ -114,6 +115,21 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-28 — textúry a knižnica vzhľadov, vyriešené 12.9.2026
+
+**Výsledok: PR #353–#359, uzáver M-R v0.12.0.** Vzhľad pri povrchu dekorovej skupiny spravuje dosky aj ABS naprieč hrúbkami. Zástena má jeden vzhľad;
+plošné farby fungujú samostatne. Priradiť textúru a natívny editor pripravujú nový pracovný materiál, Uložiť vzhľad publikuje SKM, návrat k farbe odstráni vlastný vzhľad.
+Textúra sa fyzicky orientuje podľa smeru dekoru a pozdĺž ABS. Prestavba a produktová kópia zachovajú živý pôvodný materiál, nový vklad používa aktuálnu knižničnú revíziu.
+Overenie: 3983 headless, 114 JS sád, 2606 in-SketchUp PASS / 0 FAIL; 18 skutočných CEF a 50 záverečných save/reopen/rebuild/výroba kontrol PASS.
+Samotný SketchUp pri sekundárnych PBR mapách môže pri otvorení zjednotiť ich mierku s albedom; render a fyzický druhý PC sa nevyhlasujú za overené.
+D-48 zostáva samostatné zdieľanie knižnice po V1. Používateľský smoke zatiaľ nepotvrdený. [Výsledky a postup](MR_ZAVER_2026-09-12.md).
+
+**Pôvodný plný text pri uzávere:**
+
+- **D-28 · Textúry materiálov (render)** (Michal 19.7. večer) — *Stav: **ZLÚČENÉ do bloku M-R VZHĽAD** (6.9.2026, [PLAN.md](../PLAN.md) blok 5): **jediný kontrakt `appearance` → `.skm`**
+  (textúra, mierka, priehľadnosť aj PBR v jednom SketchUp kontajneri — `Material#save_as` / `Materials#load`); „Uložiť vzhľad" = MR-2, orientácia podľa smeru dekoru = MR-3;
+  `texture_path` ani samostatné PBR polia sa **nezavádzajú**, package „M-R FOTO" (Demos fotka) je nahradený; zdieľanie `.skm` medzi PC = D-48 po V1 (Luciina priorita).*
 
 ### D-114 — priamy výber typu a upratanie Čiel (11.9.2026, PR #351)
 
