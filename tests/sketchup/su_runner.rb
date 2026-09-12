@@ -1414,7 +1414,11 @@ module NoxunSuRunner
     result = mr3b_apply(model, ctx)
     ok("MR3B nested: mirror/rotation/hidden maju 12 dosiek #{result.inspect}", mr3b_counts(result, 12, 12, 0))
     ok('MR3B nested: cudzia bariéra vratane povodneho sharing ostala presna', mr3b_tree(foreign, exact: true) == old_foreign)
-    ok('MR3B nested: vyrobne snapshoty vsetkych occurrence paths ostali', [mr3b_data(a), mr3b_data(b)] == data)
+    after_data = [mr3b_data(a), mr3b_data(b)]
+    if after_data != data && defined?(NoxunMr3bCloneDiagnostic)
+      info("MR3B nested data first difference: #{NoxunMr3bCloneDiagnostic.first_difference(data, after_data).inspect}")
+    end
+    ok('MR3B nested: vyrobne snapshoty vsetkych occurrence paths ostali', after_data == data)
     ok('MR3B nested: outer aj leaf definicie su izolovane',
        a.definition != b.definition && (mr3b_leaves(a).map(&:definition) & mr3b_leaves(b).map(&:definition)).empty?)
     [a, b].zip(parents).each do |outer, old|
@@ -1525,7 +1529,11 @@ module NoxunSuRunner
 
   def mr3b_guard_cases(model, ctx)
     cabinet = e::CabinetBuilder.build(model, d88_params('material_id' => ctx[:a], 'front_material_id' => ctx[:a]))
-    group = mr1b2_op(model) { model.entities.add_group }
+    group = mr1b2_op(model) do
+      context = model.entities.add_group
+      context.entities.add_cpoint(ORIGIN) # Prazdnu skupinu SketchUp odstrani pri commite.
+      context
+    end
     e::ScaleWatch.flush_pending!(model)
     copy = tools1_clone_cabinet(model, cabinet, 4500.0, guarded: false)
     model.active_path = [group]
