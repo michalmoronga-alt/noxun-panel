@@ -17,6 +17,17 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **MR-2A — PRÍPRAVA PRACOVNÉHO VZHĽADU V JEDNEJ OPERÁCII (12.9.2026, v0.11.6).**
+  Prípravný blok Apply vytvorí alebo načíta materiál a priradí ho podporovaným doskám aj ABS v jednom kroku Späť. Funguje aj bez existujúcich dielcov;
+  caller preberie nový handle až po úspešnom commite. Chyba aj predčasný break/return/throw vrátia celú prípravu, obrázok, bindingy a izolované kópie.
+  Pracovný import/create odmieta obsadenú revíziu aj opätovné použitie starého handle. Živý alebo súborový zdroj exportuje cez existujúce dve abortované
+  operácie; overuje presnú pôvodnú kolekciu aj metadata živého zdroja po oboch a pri výnimke. Žiadna pomocná geometria ani dodatočná committed príprava.
+  Návrhový Astra audit: dve opravy zapracované pred kódom — dôkaz nového pracovného handle a abort pri predčasnom odchode z bloku.
+  Overené: **3971 headless · 113 JS sád · 2563 in-SketchUp PASS / 0 FAIL** (18 nových pure testov, 45 nových natívnych kontrol).
+  Natívne skúšky zahŕňajú celý skúšaný PBR stav, pixely, fyzickú mierku/UV, 12 dosiek aj 12 ABS, cudzích používateľov, Undo/Redo a chybu druhého priradenia.
+  Výberové callbacky fungujú okamžite po Apply, Undo/Redo aj aborte. Testovací pixel oracle opravený po dôkaze raw32 → PNG24: obsah pixelov zostal presne zhodný.
+  Knižnica a výroba sa týmto rezom nemenia; ovládanie v Štúdiu nasleduje v MR-2B. D-28 ostáva otvorené do dokončenia bloku; SU 2024 a render netestované.
+
 - **MR-3B — APLIKOVANIE VZHĽADU NA EXISTUJÚCE VÝSKYTY (12.9.2026, v0.11.5).**
   Jedna modelová služba priradí pripravený vzhľad doskám aj ABS zvolenej skupiny/povrchu naprieč hrúbkami. Zahŕňa skryté a podporované vnorené výskyty;
   UNI, zamknuté, odpojené alebo nepreukázateľné dielce vynechá s dôvodom. Necielené ABS si zachová pôvodný vzhľad vrátane vlastného UV a projekcie.
