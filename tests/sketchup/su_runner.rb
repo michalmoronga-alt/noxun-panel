@@ -1453,8 +1453,22 @@ module NoxunSuRunner
     end
     post = mr3b_scene(model)
     Sketchup.undo
+    selection_probe.instance_variable_set(:@n, 0)
+    e::ScaleWatch.guard do
+      model.selection.clear
+      model.selection.add(a)
+    end
+    ok("MR3B D40: selection callbacky ziju hned po Undo (#{selection_baseline}/#{selection_probe.n})",
+       selection_baseline.positive? && selection_baseline_matches && selection_probe.n.positive? && model.selection.to_a == [a])
     ok('MR3B nested Undo: vratene vsetky povodne identity, definicie a dedenie', mr3b_scene(model) == before)
     Sketchup.redo
+    selection_probe.instance_variable_set(:@n, 0)
+    e::ScaleWatch.guard do
+      model.selection.clear
+      model.selection.add(a)
+    end
+    ok("MR3B D40: selection callbacky ziju hned po Redo (#{selection_baseline}/#{selection_probe.n})",
+       selection_baseline.positive? && selection_baseline_matches && selection_probe.n.positive? && model.selection.to_a == [a])
     ok('MR3B nested Redo: vratena cela izolovana davka', mr3b_scene(model) == post)
   ensure
     if selection_probe
@@ -1688,6 +1702,16 @@ module NoxunSuRunner
     a, = mr3b_nested(model, ctx)
     e::ScaleWatch.flush_pending!(model)
     %i[move grain].each { |kind| mr3b_clone_failure(model, ctx, a, kind) }
+    selection_before = model.selection.to_a
+    selection_probe = D40Probe.new
+    model.selection.add_observer(selection_probe)
+    e::ScaleWatch.guard do
+      model.selection.clear
+      model.selection.add(a)
+    end
+    selection_baseline = selection_probe.n
+    selection_baseline_matches = model.selection.to_a == [a]
+    selection_probe.instance_variable_set(:@n, 0)
     calls = 0
     returns = 0
     injected = false
@@ -1712,10 +1736,24 @@ module NoxunSuRunner
         trace.disable
       end
     end
+    selection_probe.instance_variable_set(:@n, 0)
+    e::ScaleWatch.guard do
+      model.selection.clear
+      model.selection.add(a)
+    end
+    ok("MR3B D40: selection callbacky ziju hned po abort (#{selection_baseline}/#{selection_probe.n})",
+       selection_baseline.positive? && selection_baseline_matches && selection_probe.n.positive? && model.selection.to_a == [a])
     ok("MR3B rollback: injekcia naozaj nastala po prvom paint (#{calls}/#{returns})",
        calls == 2 && returns == 1 && injected && caught && caught.message.include?('MR3B second mapper injection'))
   ensure
     trace.disable if trace
+    if selection_probe
+      model.selection.remove_observer(selection_probe)
+      e::ScaleWatch.guard do
+        model.selection.clear
+        model.selection.add(Array(selection_before).select(&:valid?))
+      end
+    end
   end
 
   def run_mr3b(model)
