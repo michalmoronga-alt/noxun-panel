@@ -24,10 +24,11 @@
   Pred uzáverom **3983 headless · 114 JS sád · 2606 in-SketchUp PASS / 0 FAIL**, skutočné CEF **18 PASS**. Celý záverečný controller/persistence test **50 PASS**:
   dosky 18/25 mm, osem ABS väzieb, skrinka a cudzí zdieľaný dielec; po skutočnom save/reopen bez vlastného SKM a rebuilde materiály/UV/snapshoty zachované,
   presné znovuotvorené handles dosiek/ABS ostali rovnaké a kusovník aj skutočné VEPO CSV bajtovo zhodné. Živá fyzická mierka bez mappera/Apply/rebuildu **11 PASS**.
-  MR-2B GitHub review uzavreté bez nálezov na 7a46904, obe CI zelené, merge #359 = 472ef0b. Uzáver mení iba verziu/cache-bust a dokumentáciu.
+  MR-2B GitHub review uzavreté bez nálezov na 7a46904, obe CI zelené, merge #359 = 472ef0b. Uzáver #360 pridáva pomocný text o vodorovnej kresbe obrázka, verziu/cache-bust a dokumentáciu.
   Celý text M-R presunutý z PLAN do ROADMAP_hotove_etapy, D-28 plným textom aj indexom do DOGFOODING_vyriesene; README a STAV aktualizované.
   Fyzický druhý počítač, SU 2024 a renderová zhoda nie sú overené; známa natívna kanonizácia mierky sekundárnych PBR máp zostáva priznaná. D-48 po V1.
-  [Plná evidencia a smoke pre Michala](MR_ZAVER_2026-09-12.md). Jeho používateľský smoke M-R zatiaľ nepotvrdený; ďalší blok sa automaticky neštartuje.
+  [Plná evidencia a používateľský smoke](MR_ZAVER_2026-09-12.md). Michal 12.9. potvrdil **PASS**: upravený aj nový materiál, mierka/opacity/metalness, uloženie a načítanie v novom projekte bez chýb; blok spĺňa jeho požiadavky a predstavy.
+  Rotácia obrázka D-126 a prirodzenejšie umiestnenie textúry D-127 ostávajú v zásobníku; konkrétny spôsob umiestnenia určí až prax Lucie. Nasleduje slovná diskusia o workflow, ďalší blok sa automaticky neštartuje.
 
 - **MR-2B — SPOLOČNÉ OVLÁDANIE VZHĽADU V ŠTÚDIU (12.9.2026, v0.11.7).**
   Pri povrchu dekorovej skupiny je jedno kompaktné Vzhľad pre dosky aj ABS naprieč hrúbkami. Funguje aj samostatná ABS skupina a prázdna štruktúra;

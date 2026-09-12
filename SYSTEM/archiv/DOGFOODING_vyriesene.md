@@ -123,7 +123,7 @@ plošné farby fungujú samostatne. Priradiť textúru a natívny editor priprav
 Textúra sa fyzicky orientuje podľa smeru dekoru a pozdĺž ABS. Prestavba a produktová kópia zachovajú živý pôvodný materiál, nový vklad používa aktuálnu knižničnú revíziu.
 Overenie: 3983 headless, 114 JS sád, 2606 in-SketchUp PASS / 0 FAIL; 18 skutočných CEF a 50 záverečných save/reopen/rebuild/výroba kontrol PASS.
 Samotný SketchUp pri sekundárnych PBR mapách môže pri otvorení zjednotiť ich mierku s albedom; render a fyzický druhý PC sa nevyhlasujú za overené.
-D-48 zostáva samostatné zdieľanie knižnice po V1. Používateľský smoke zatiaľ nepotvrdený. [Výsledky a postup](MR_ZAVER_2026-09-12.md).
+D-48 zostáva samostatné zdieľanie knižnice po V1. Michal 12.9. potvrdil používateľský smoke **PASS**: upravený aj nový materiál, mierka/opacity/metalness, uloženie a načítanie v novom projekte bez chýb. [Výsledky a postup](MR_ZAVER_2026-09-12.md).
 
 **Pôvodný plný text pri uzávere:**
 

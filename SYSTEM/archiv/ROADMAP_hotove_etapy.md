@@ -6,10 +6,10 @@
 
 Schválený vzhľad je hotový od katalógového kontraktu cez natívny SKM, zachovanie pri prestavbe/kópii a fyzické UV po spoločné ovládanie v Štúdiu.
 Jeden vzhľad dosiek aj ABS rovnakého dekoru/povrchu naprieč hrúbkami; jeden vzhľad celej zásteny. Textúra je voliteľná, plošná farba ostáva samostatná.
-MR-1A #353, MR-1B1 #354, MR-1B2 #355, MR-3A #356, MR-3B #357, MR-2A #358, MR-2B #359. Minor uzáver v0.12.0 nemení ich runtime správanie.
+MR-1A #353, MR-1B1 #354, MR-1B2 #355, MR-3A #356, MR-3B #357, MR-2A #358, MR-2B #359. Minor uzáver #360 vo v0.12.0 pridáva pomocný text o vodorovnej kresbe vkladaného obrázka.
 Overené: 3983 headless, 114 JS sád, 2606 in-SketchUp PASS / 0 FAIL; skutočné CEF 18 PASS a úplná controller → save/reopen bez SKM → rebuild → výroba sonda 50 PASS.
 Výrobné dáta, kusovník a VEPO CSV ostali zhodné. [Plná evidencia a smoke](MR_ZAVER_2026-09-12.md).
-D-28 vyriešené; D-48 zdieľanie knižnice ostáva po V1. Fyzický druhý počítač, SU 2024 a renderová zhoda nie sú overené; Michalov nový smoke zatiaľ nepotvrdený.
+D-28 vyriešené; Michal 12.9. potvrdil používateľský smoke **PASS**, uloženie a načítanie upraveného aj nového materiálu v novom projekte vrátane mierky/opacity/metalness. D-48 zdieľanie knižnice ostáva po V1. Fyzický druhý počítač, SU 2024 a renderová zhoda nie sú overené. Rotácia obrázka D-126 a umiestnenie textúry D-127 ostávajú v [zásobníku](../PLAN.md).
 
 ### Pôvodný plný text bloku pri uzávere
 

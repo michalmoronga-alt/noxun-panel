@@ -30,12 +30,12 @@ Geometrický dôkaz ČELÁ-B2: **in-SketchUp 2297 PASS / 0 FAIL** (osadenia, vý
 
 **M-R je dokončené v #353–#359, uzáver v0.12.0.** Jeden spoločný vzhľad dosiek aj ABS rovnakého dekoru a povrchu naprieč hrúbkami; zástena jeden vzhľad. Plošná farba a UNI ostávajú.
 V Štúdiu → Materiály → dekor → Vzhľad možno priradiť obrázok, otvoriť natívny editor, uložiť vzhľad do knižnice alebo použiť katalógovú farbu. Späť mení model, uložená knižnica zostáva.
-Čaká používateľský smoke M-R; D-28 je implementačne vyriešené. Čelá A/B1/B2/C zostávajú dokončené a používateľsky potvrdené. Ďalší blok vyberie Michal podľa [PLAN.md](PLAN.md).
+Michal 12.9. potvrdil používateľský smoke M-R **PASS**: úprava aj nový materiál, mierka, opacity a metalness, uloženie a načítanie v novom projekte bez chýb. D-28 je vyriešené. Čelá A/B1/B2/C zostávajú používateľsky potvrdené.
 **Blok 1d** podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**. Blok **1b** je uzavretý, **1c/1e hotové**.
 
 ## Ďalší krok
 
-Michalov smoke M-R po aktualizácii/reštarte podľa [postupu](archiv/MR_ZAVER_2026-09-12.md), potom výber ďalšieho bloku. D-48 zostáva po V1; ručné Redo Čiel ostáva samostatne nepotvrdené.
+Po uzávere M-R nasleduje slovná diskusia o workflow; ďalší blok sa automaticky neštartuje. Budúca rotácia obrázka a umiestnenie textúr sú D-126/D-127 v [PLAN.md](PLAN.md); D-48 zostáva po V1 a ručné Redo Čiel samostatne nepotvrdené.
 
 ## Posledné uzávery
 
