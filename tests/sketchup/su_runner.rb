@@ -21948,6 +21948,7 @@ module NoxunSuRunner
     run_mr3a(model)           # MR-3A: fyzicke UV, skutocne roly, partial bindingy a rollback
     run_mr3b(model)           # MR-3B: Apply cez skutocne vyskytove cesty, izolacia a rollback
     run_mr2a(model)           # MR-2A: pracovny SKM, atomicka priprava+Apply a early-exit rollback
+    run_mr2b(model)           # MR-2B: controller dispatch, novy W, Save/retry/Reset a stale ACK
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
@@ -21955,4 +21956,5 @@ module NoxunSuRunner
   end
 end
 
+require_relative 'test_mr2b_appearance_dialog'
 NoxunSuRunner.run
