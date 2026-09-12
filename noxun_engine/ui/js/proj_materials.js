@@ -287,12 +287,19 @@
     return (MD_Q || '').trim().toLowerCase();
   }
   function mdSearchInput(){
+    mdAppearanceInvalidate();
     mdView = null; // pisanie do hladania vzdy vracia do mriezky (vysledky)
     mdQuery();     // zapamataj dotaz (lista sekcie sa prekresluje zo servera)
     mdRenderLists();
   }
-  function mdOpenDetail(key){ mdView = key; mdRenderLists(); }
-  function mdCloseDetail(){ mdView = null; mdRenderLists(); }
+  function mdOpenDetail(key){ mdAppearanceInvalidate(); mdView = key; mdRenderLists(); }
+  function mdCloseDetail(){ mdAppearanceInvalidate(); mdView = null; mdRenderLists(); }
+  function mdAppearanceInvalidate(){
+    if (typeof window !== 'undefined' && window.MDAppearance) window.MDAppearance.invalidate();
+  }
+  function mdAppearanceCatalogChanged(){
+    if (typeof window !== 'undefined' && window.MDAppearance) window.MDAppearance.catalogChanged();
+  }
   // Skupina podla kluca z CERSTVEHO zoskupenia (po rename/zmazani null).
   function mdGroupByKey(key){
     return groupCatalogByDecor(MD_CATALOG, MD_SCHEMA2).find(function(g){ return g.key === key; }) || null;
@@ -348,7 +355,7 @@
     // detail drzi len existujucu skupinu (po rename/zmazani spadne na mriezku)
     if (mdView !== null){
       var dg = mdGroupByKey(mdView);
-      if (dg){ box.innerHTML = mdDetailHtml(dg); mdFocusInline(); return; }
+      if (dg){ box.innerHTML = mdDetailHtml(dg); mdFocusInline(); mdAppearanceCatalogChanged(); return; }
       mdView = null;
     }
     var groups = groupCatalogByDecor(MD_CATALOG, MD_SCHEMA2).filter(function(g){ return mdMatchGroup(g, q); });
@@ -368,6 +375,7 @@
       html += '</div>';
     });
     box.innerHTML = html || '<div class="muted">' + (q ? 'Nič sa nenašlo.' : 'Katalóg je prázdny.') + '</div>';
+    mdAppearanceCatalogChanged();
   }
 
   // Dlazdica skupiny: swatch + hlavicka (cislo + nazov; vyrobca · pocet
@@ -457,12 +465,15 @@
       ' aria-label="Farba dekoru — platí pre celú skupinu"' +
       ' onchange="mdColorSave(' + mdEsc(JSON.stringify(g.key)) + ', this.value)"></label>';
   }
-  function mdColorSave(key, hex){
+  function mdColorSave(key, hex, appearanceContext){
     var g = mdGroupByKey(key);
-    if (!g) return;
-    if (window.sketchup && sketchup.set_decor_color)
-      sketchup.set_decor_color(JSON.stringify({ decor: g.decor, color: hex,
-        group_id: g.gid || '', catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA }));
+    if (!mdColorEditable(g, MD_RO)) return false;
+    if (!appearanceContext && window.MDAppearance && window.MDAppearance.isBusy()) return false;
+    if (!window.sketchup || !sketchup.set_decor_color) return false;
+    var payload = { decor: g.decor, color: hex, group_id: g.gid || '', catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA };
+    if (appearanceContext) payload.appearance_context = appearanceContext;
+    sketchup.set_decor_color(JSON.stringify(payload));
+    return true;
   }
 
   // 2A-4b: sekcie detailu per STRUKTURA povrchu (cista funkcia, Node test).
@@ -480,6 +491,40 @@
     (g.edges || []).forEach(function(a){ sec(a.structure).edges.push(a); });
     order.sort(function(x, y){ return x === '' ? 1 : y === '' ? -1 : x.localeCompare(y); });
     return order.map(function(k){ return map[k]; });
+  }
+
+  // Jedna kotva za povrch, nezávisle od hrúbky aj od prítomnosti dosky/ABS.
+  // Pri echu ostáva pôvodné ID kotvy: nový tenší variant nesmie zmeniť vlastníka.
+  function mdAppearanceContext(groupKey, surfaceKey, anchor){
+    if (mdView !== groupKey) return null;
+    var g = mdGroupByKey(groupKey);
+    if (!g || g.uni) return null;
+    var sec = mdStructureSections(g).find(function(s){ return s.key === surfaceKey; });
+    if (!sec) return null;
+    var kind = anchor ? anchor.kind : (sec.sheets.length ? 'sheet' : 'edge');
+    var rows = kind === 'sheet' ? sec.sheets : sec.edges, idKey = kind === 'sheet' ? 'material_id' : 'abs_id';
+    var row = anchor ? rows.find(function(r){ return r[idKey] === anchor.anchor_id; }) : rows[0];
+    if (!row || !row[idKey]) return null;
+    return { groupKey: groupKey, surfaceKey: surfaceKey, model_guid: MD_MODEL_GUID,
+      section: typeof studioSec !== 'undefined' ? studioSec : '', kind: kind, anchor_id: row[idKey],
+      catalog_schema: MD_CLIENT_SCHEMA, color: g.color, title: (g.decor || 'Bez dekoru') + (sec.title ? ' ' + sec.title : ''),
+      scope_label: (g.decor_name || g.manufacturer || '') + (g.decor_name || g.manufacturer ? ' · ' : '') +
+        (sec.title || 'Bez štruktúry') + ' · ' + (sec.sheets.length && sec.edges.length ? 'dosky aj ABS' : sec.sheets.length ? 'dosky' : 'ABS') + ' · všetky hrúbky',
+      read_only: MD_RO || !MD_SCHEMA2 || !g.gid || !mdColorEditable(g, MD_RO),
+      reason: MD_RO ? (MD_RO_REASON || 'Katalóg je len na čítanie.') : 'Vzhľad vyžaduje upraviteľnú katalógovú skupinu.' };
+  }
+  function mdAppearanceSectionHtml(g, sec, multi){
+    if (g.uni) return multi ? '<div class="mdstsec">' + mdEsc(sec.title || 'Bez štruktúry') + '</div>' : '';
+    var reason = MD_RO ? (MD_RO_REASON || 'Katalóg je len na čítanie.') :
+      (!MD_SCHEMA2 || !g.gid || !mdColorEditable(g, MD_RO) ? 'Vzhľad vyžaduje upraviteľnú katalógovú skupinu.' : '');
+    return '<div class="mdstsec mda-heading"><span>' + mdEsc(sec.title || 'Bez štruktúry') + '</span>' +
+      '<button type="button" class="ghostbtn mda-trigger" data-mda-group="' + mdEsc(g.key) + '" data-mda-surface="' + mdEsc(sec.key) + '"' +
+      ' aria-haspopup="dialog" aria-expanded="false" aria-controls="mdAppearanceRoot" aria-disabled="' + (reason ? 'true' : 'false') + '"' +
+      ' title="' + mdEsc(reason || 'Spoločný vzhľad povrchu — všetky hrúbky dosiek aj ABS') + '"' +
+      ' aria-label="' + mdEsc('Vzhľad · ' + (sec.title || 'Bez štruktúry')) + '">' +
+      '<span class="mda-mini" style="background:' + mdEsc(rgbToHex(g.color)) + '"></span><span>Vzhľad</span>' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>' +
+      '<span class="mda-heading-hint">' + (sec.sheets.length && sec.edges.length ? 'dosky aj ABS' : sec.sheets.length ? 'dosky' : 'ABS') + '</span></div>';
   }
 
   // Detail skupiny (drill-in): hlavicka s akciami skupiny + sekcie per
@@ -543,7 +588,7 @@
     var sections = mdStructureSections(g);
     var multi = sections.length > 1 || (sections.length === 1 && sections[0].key !== '');
     sections.forEach(function(sec){
-      if (multi) h += '<div class="mdstsec">' + mdEsc(sec.title || 'Bez štruktúry') + '</div>';
+      h += mdAppearanceSectionHtml(g, sec, multi);
       h += mdSectionRows(sec);
     });
     if (!sections.length) h += '<div class="muted">žiadne varianty</div>';
@@ -691,6 +736,7 @@
   function matOpenAnchor(anchor){
     var key = mdAnchorGroupKey(groupCatalogByDecor(MD_CATALOG, MD_SCHEMA2), anchor);
     if (!key) return false;
+    mdAppearanceInvalidate();
     MD_Q = '';                       // detail nesmie prekryt cudzi filter
     var s = mdEl('mdSearch');
     if (s) s.value = '';
@@ -841,6 +887,7 @@
   }
 
   function mdFocusInline(){
+    if (typeof window !== 'undefined' && window.MDAppearance && window.MDAppearance.isOpen()) return;
     var ri = mdEl('md_rename_input');
     if (ri){ ri.focus(); ri.select(); return; }
     var gi = mdEl('md_gname_input');
@@ -2668,6 +2715,8 @@
   // v sekcii ho nesie payload Studia (`ST.mat` -> `matApplyState`), takze druha
   // cesta by bola druhy zdroj pravdy o tych istych cislach.
   var MD = {
+    appearanceReady: function(data){ if (window.MDAppearance) window.MDAppearance.ready(data); },
+    appearanceResult: function(data){ if (window.MDAppearance) window.MDAppearance.result(data); },
     // D-42 (audit FIX 13): echo po zapise do katalogu — bez scanu modelu,
     // modelovy kontext (predvolby/pouzite/guid) ostava.
     setCatalog: function(data){ mdApplyCatalog(data); },
@@ -2904,6 +2953,7 @@
     matCloseModals();
   }
   function matCloseModals(){
+    mdAppearanceInvalidate();
     mdUniClose();
     mdDeleteClose();
     mdRestoreClose();
@@ -3013,6 +3063,7 @@
   // (`NX.setMatCatalog`), viz `StudioDialog#mat_payload`.
   function matApplyState(m){
     if (!m) return;
+    if (MD_MODEL_GUID !== (m.model_guid || '')) mdAppearanceInvalidate();
     MD_MODEL_GUID = m.model_guid || '';
     MD_USED = m.used || {};
     MD_USED_WHERE = m.used_where || {};
@@ -3067,6 +3118,9 @@
       mdImageSrc: mdImageSrc, mdDeleteSummary: mdDeleteSummary,
       // D-82 — skupinova farba dekoru (swatch v hlavicke detailu)
       mdColorEditable: mdColorEditable, mdGroupSwatch: mdGroupSwatch,
+      mdAppearanceContext: mdAppearanceContext, mdAppearanceSectionHtml: mdAppearanceSectionHtml, mdColorSave: mdColorSave,
+      mdOpenDetail: mdOpenDetail, mdCloseDetail: mdCloseDetail, mdSearchInput: mdSearchInput,
+      mdRenderLists: mdRenderLists, matCloseModals: matCloseModals, matOnLeaveSection: matOnLeaveSection,
       // D-83 — skratka z KONTROLY: dlazdica k danemu UNI materialu
       mdGroupKeyForUni: mdGroupKeyForUni,
       // M-A3b — vazby na Demos v UI (D-56/D-60/D-62/D-63)

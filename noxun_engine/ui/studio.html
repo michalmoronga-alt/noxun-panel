@@ -568,6 +568,8 @@
 <!-- D-15: kotva zdieľaných modalov (js/nx_modal.js). Modal žije MIMO tela
      sekcie, takže ho prekreslenie rozpočtu po zápise nezhodí. -->
 <div id="nxModalRoot"></div>
+<!-- MR2B: ukotvené okno vzhľadu prežije prekreslenie detailu katalógu. -->
+<div id="mdAppearanceRoot" class="mda-overlay" style="display:none"></div>
 
 <!-- ŠT-2a/2b: modály sekcie MATERIÁLY. Ten istý dôvod ako pri #nxModalRoot —
      žijú MIMO #secbody, takže ich neshodí ani prekreslenie sekcie, ani
@@ -955,6 +957,7 @@
      Musí byť PRED proj_materials.js, ktorý ho pri renderi volá. -->
 <script src="js/nx_combo.js?v=0.11.6"></script>
 <script src="js/proj_materials.js?v=0.11.6"></script>
+<script src="js/md_appearance.js?v=0.11.6"></script>
 <!-- ŠT-3a-1/3a-2: sekcia KOVANIE (Š16). Okno „Katalóg kovania" ZANIKLO, takže
      oba súbory bežia už len TU; príznak nižšie ostáva ako čitateľné prihlásenie
      sa do režimu sekcie (a ako marker poradia skriptov pre guard test).
