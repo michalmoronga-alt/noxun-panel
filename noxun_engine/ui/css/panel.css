@@ -1935,12 +1935,20 @@
    priestor panela je vzacny) a hlavicka skupiny AJ kazda polozka su klikatelne
    (klik oznaci kus v modeli a zdvihne Inspector). Afordancia = ruka + teal
    podciarknutie na hover, vyhradne cez tokeny vyberu. Zdroj bez `cabinet_id`
-   (`.hwsrcdead`) nema kam viest — ostava tlmeny a bez ruky. */
+   (`.hwsrcdead`) nema kam viest — ostava tlmeny a bez ruky.
+
+   Codex #361 P2: klikatelny ciel je `<button>` (kontrakt UI_DIZAJN N13) —
+   odkaz bez href by ostal mimo Tab poradia a povod by sa dal ovladat len
+   mysou. Reset na vzhlad odkazu je vzor `.linkbtn` (modal memo / M-R
+   konflikt), preto sa kopiruju presne jeho vlastnosti a nie cely stav. */
 .hwtab tr.hwsrc .hwsrcg { padding: 1px 0; }
 .hwtab tr.hwsrc .hwsrccab,
-.hwtab tr.hwsrc .hwsrcitem { cursor: pointer; color: var(--nx-select); }
+.hwtab tr.hwsrc .hwsrcitem { border: 0; background: none; padding: 0; font: inherit;
+                             cursor: pointer; color: var(--nx-select); }
 .hwtab tr.hwsrc .hwsrccab:hover,
 .hwtab tr.hwsrc .hwsrcitem:hover { color: var(--nx-select-strong); text-decoration: underline; }
+.hwtab tr.hwsrc .hwsrccab:focus-visible,
+.hwtab tr.hwsrc .hwsrcitem:focus-visible { outline: 2px solid var(--nx-select); outline-offset: 1px; }
 .hwtab tr.hwsrc .hwsrcdead,
 .hwtab tr.hwsrc .hwsrcdead:hover { cursor: default; color: var(--nx-ink-muted);
                                    text-decoration: none; }

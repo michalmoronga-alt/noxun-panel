@@ -19,7 +19,8 @@
 //   1. `buyOpen` klucovany INDEXOM riadku (`data-buy` nesie poradie),
 //   2. klik na zdroj sa spracuje AZ ZA riadkom nakupu (prepne rozklik namiesto vyberu),
 //   3. `selectSource` posiela `source_ref` BEZ `focus_inspector`,
-//   4. `hwSourceGroups` necita mnozstva (skupina bez suctu).
+//   4. `hwSourceGroups` necita mnozstva (skupina bez suctu),
+//   5. zdroje sa kreslia ako `<a>` bez href (mimo Tab poradia — Codex #361 P2).
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
@@ -118,8 +119,13 @@ const push = function(rows, guid, gen){
   const open = S.buySection(hs([ROW_A]), []);
   ok(open.indexOf('Pôvod:') > -1, 'rozkliknuty riadok ukaze povod');
   eq((open.match(/class="hwsrcg"/g) || []).length, 2, 'a v nom JEDEN riadok na skrinku');
-  ok(open.indexOf('<a class="hwsrccab" data-src-cab="CAB-3"') > -1,
+  ok(open.indexOf('<button type="button" class="hwsrccab" data-src-cab="CAB-3"') > -1,
      'hlavicka skupiny je KLIKATELNA a nesie ID skrinky');
+  ok(open.indexOf('<button type="button" class="hwsrcitem"') > -1,
+     'a polozka tiez');
+  // Codex #361 P2: `<a>` bez href je mimo Tab poradia — povod by sa dal
+  // ovladat vyhradne mysou (kontrakt UI_DIZAJN N13: ciel = `<button>`).
+  eq(open.indexOf('<a '), -1, 'v rozkliku NIE JE ziadny <a> (bez href by nebol fokusovatelny)');
   ok(open.indexOf('6 ks') > -1 && open.indexOf('3 ks') > -1, 'a sucet skupiny');
   ok(open.indexOf('data-src-key="front:F1/wing:left"') > -1,
      'polozka nesie kluc vlastnika (adresa vyberu dielca)');

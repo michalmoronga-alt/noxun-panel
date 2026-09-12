@@ -621,16 +621,21 @@
     }
     var body = groups.map(function(g){
       var cab = g.cabinet_id;
+      // Codex #361 P2: klikateľný cieľ je `<button>`, nie `<a>` bez href
+      // (kontrakt UI_DIZAJN N13). Odkaz bez href je mimo Tab poradia, takže
+      // pôvod sa dal ovládať výhradne myšou; button nesie fokus aj natívne
+      // Enter/Space. Vzhľad odkazu mu robí CSS (`panel.css`, vzor `.linkbtn`).
       var head = cab
-        ? '<a class="hwsrccab" data-src-cab="' + esc(cab) + '" title="' + esc(SRC_TIP_CAB) + '">'
-          + esc(cab) + '</a>'
+        ? '<button type="button" class="hwsrccab" data-src-cab="' + esc(cab) + '"'
+          + ' title="' + esc(SRC_TIP_CAB) + '">' + esc(cab) + '</button>'
         : '<span class="hwsrccab hwsrcdead">—</span>';
       var items = g.items.map(function(s){
         var txt = esc(hwSourceText(s));
         if (!cab) return '<span class="hwsrcitem hwsrcdead">' + txt + '</span>';
         var key = (s && s.owner_part_key) ? String(s.owner_part_key) : '';
-        return '<a class="hwsrcitem" data-src-cab="' + esc(cab) + '" data-src-key="' + esc(key) + '"'
-             + ' title="' + esc(key ? SRC_TIP_PART : SRC_TIP_CAB) + '">' + txt + '</a>';
+        return '<button type="button" class="hwsrcitem" data-src-cab="' + esc(cab) + '"'
+             + ' data-src-key="' + esc(key) + '"'
+             + ' title="' + esc(key ? SRC_TIP_PART : SRC_TIP_CAB) + '">' + txt + '</button>';
       }).join(' &nbsp;·&nbsp; ');
       return '<div class="hwsrcg">' + head + ' · <b>' + num(g.quantity) + ' ks</b>: ' + items + '</div>';
     }).join('');
