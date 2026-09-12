@@ -128,12 +128,6 @@ module NoxunSuRunner
        mr3b_data(board) == data && File.binread(e::Materials.path) == catalog)
     mr3a_check_part(board, 'MR2B first Pick', l: 0, w: 1, t: 2, material: working,
                       edge: ['L1', 1, :min], scale: [180.0, 90.0])
-    post = mr3b_scene(model)
-    mr2a_selection(model, board, 'MR2B Pick Undo') { Sketchup.undo }
-    ok('MR2B controller Pick jeden Undo: W aj clone a mapovanie prec', mr3b_scene(model) == before)
-    mr2a_selection(model, board, 'MR2B Pick Redo') { Sketchup.redo }
-    ok('MR2B controller Pick jeden Redo: presny cely model', mr3b_scene(model) == post)
-
     old_user = mr1b2_op(model) do
       copy = model.entities.add_instance(board.definition, Geom::Transformation.translation(mr3a_point([11_000, 0, 0])))
       copy.material = working
@@ -235,6 +229,25 @@ module NoxunSuRunner
        e::Materials.sheet(ctx[:a])['appearance'] == descriptor && mr3b_scene(model) == before && model.materials.current == current)
   end
 
+  # Undo zneplatni Ruby handle noveho W; po tomto poslednom scenari uz session
+  # ani zachytene materialy nepouzivame. Oracle cita cely model nanovo.
+  def mr2b_pick_history_case(model, ctx)
+    board = ctx.fetch(:board)
+    mr2b_prepare(model, ctx)
+    ctx[:pick] = -> { ctx[:paths][1] }
+    raise 'MR2B pending history fixture' unless e::ScaleWatch.flush_pending!(model)
+
+    before = mr3b_scene(model)
+    picked = mr2a_selection(model, board, 'MR2B history Pick') { mr2b_action(ctx, 'pick') }
+    mr2b_required(picked, 'history Pick')
+    post = mr3b_scene(model)
+    ok('MR2B history Pick: model sa skutocne zmenil', post != before)
+    mr2a_selection(model, board, 'MR2B Pick Undo') { Sketchup.undo }
+    ok('MR2B controller Pick jeden Undo: W aj clone a mapovanie prec', mr3b_scene(model) == before)
+    mr2a_selection(model, board, 'MR2B Pick Redo') { Sketchup.redo }
+    ok('MR2B controller Pick jeden Redo: presny cely model', mr3b_scene(model) == post)
+  end
+
   def run_mr2b(model)
     return ok('MR2B: povoleny testmodel', false) unless guard_model?(model)
     cleanup(model)
@@ -300,6 +313,7 @@ module NoxunSuRunner
           mr2b_prepare_pick_case(model, ctx)
           mr2b_publish_case(model, ctx)
           mr2b_stale_color_case(model, ctx)
+          mr2b_pick_history_case(model, ctx)
         end
       end
     ensure
