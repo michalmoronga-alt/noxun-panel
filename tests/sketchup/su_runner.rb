@@ -1414,11 +1414,31 @@ module NoxunSuRunner
 
     leaves = [a, b].flat_map { |outer| mr3b_leaves(outer) }
     ok('MR3B nested: 12 skutocnych vyskytov, hoci len 6 leaf handles', leaves.length == 12 && leaves.uniq.length == 6 && !folder.visible? && b.hidden?)
+    selection_before = model.selection.to_a
+    selection_probe = D40Probe.new
+    model.selection.add_observer(selection_probe)
+    # D40 ma synchronne callbacky. Guard zabrani testovemu vyberu zalozit dedup,
+    # ale vlastny SelectionObserver stale dostava skutocne native udalosti.
+    e::ScaleWatch.guard do
+      model.selection.clear
+      model.selection.add(a)
+    end
+    selection_baseline = selection_probe.n
+    selection_baseline_matches = model.selection.to_a == [a]
+    selection_probe.instance_variable_set(:@n, 0)
     before = mr3b_scene(model)
     old_foreign = mr3b_tree(foreign, exact: true)
     data = [mr3b_data(a), mr3b_data(b)]
     parents = [a.material, b.material]
     result = mr3b_apply(model, ctx)
+    # Overit hned po commite, pred Undo alebo edit kontextom, ktory lieci D40.
+    selection_probe.instance_variable_set(:@n, 0)
+    e::ScaleWatch.guard do
+      model.selection.clear
+      model.selection.add(a)
+    end
+    ok("MR3B D40: selection callbacky ziju hned po Apply (#{selection_baseline}/#{selection_probe.n})",
+       selection_baseline.positive? && selection_baseline_matches && selection_probe.n.positive? && model.selection.to_a == [a])
     ok("MR3B nested: mirror/rotation/hidden maju 12 dosiek #{result.inspect}", mr3b_counts(result, 12, 12, 0))
     ok('MR3B nested: cudzia bariéra vratane povodneho sharing ostala presna', mr3b_tree(foreign, exact: true) == old_foreign)
     after_data = [mr3b_data(a), mr3b_data(b)]
@@ -1437,6 +1457,13 @@ module NoxunSuRunner
     Sketchup.redo
     ok('MR3B nested Redo: vratena cela izolovana davka', mr3b_scene(model) == post)
   ensure
+    if selection_probe
+      model.selection.remove_observer(selection_probe)
+      e::ScaleWatch.guard do
+        model.selection.clear
+        model.selection.add(Array(selection_before).select(&:valid?))
+      end
+    end
     # Nemenit viditelnost pred meranim Undo; upratovanie tagu robi az vlastna operacia.
     if tag && tag.valid?
       mr1b2_op(model) do
