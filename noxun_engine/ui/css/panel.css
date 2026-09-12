@@ -1624,6 +1624,40 @@
   .mdstsec { display: flex; align-items: center; gap: 6px; margin: 12px 2px 0; font-size: 11.5px;
              font-weight: 700; color: var(--nx-select); }
   .mdstsec::after { content: ''; flex: 1; border-top: 1px solid var(--nx-border-soft); }
+  /* MR2B: jeden vzhľad celého povrchu; ukotvená karta podľa schváleného návrhu. */
+  .mda-heading { flex-wrap: wrap; gap: 8px; }
+  .mda-trigger { display: inline-flex; align-items: center; gap: 6px; padding: 4px 7px; font-size: 11.5px; }
+  .mda-trigger .ic { width: 13px; height: 13px; }
+  .mda-mini { display: inline-block; width: 15px; height: 15px; border: 1px solid var(--nx-border-strong); border-radius: 3px; }
+  .mda-heading-hint { color: var(--nx-ink-muted); font-size: 10.5px; font-weight: normal; }
+  .mda-overlay { position: fixed; inset: 0; z-index: 300; background: transparent; }
+  .mda-card { position: absolute; width: 384px; max-width: calc(100vw - 24px); max-height: calc(100vh - 28px);
+    overflow: auto; padding: 0; border: 1px solid var(--nx-border-strong); border-radius: 8px;
+    background: var(--nx-surface); color: var(--nx-ink); box-shadow: 0 8px 26px var(--nx-modal-shadow); }
+  .mda-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 9px; padding: 14px 14px 10px; }
+  .mda-head h3 { margin: 0; color: var(--nx-ink-title); font-size: 14px; }
+  .mda-head p { margin: 4px 0 0; color: var(--nx-ink-muted); font-size: 11px; line-height: 1.5; }
+  .mda-close { flex-shrink: 0; padding: 3px 6px; }
+  .mda-close .ic { width: 14px; height: 14px; }
+  .mda-body { padding: 0 14px 14px; }
+  .mda-preview-row { display: flex; align-items: center; gap: 13px; margin-bottom: 11px; }
+  .mda-preview { width: 100px; height: 100px; flex-shrink: 0; border: 1px solid var(--nx-border); border-radius: 6px;
+    background-color: var(--nx-surface-sunken); background-position: center; background-size: cover; }
+  .mda-meta { min-width: 0; font-size: 12px; }
+  .mda-meta p { margin: 5px 0 8px; color: var(--nx-ink-muted); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+  .mda-tag { display: inline-block; padding: 2px 6px; border: 1px solid var(--nx-border-soft); border-radius: 6px;
+    background: var(--nx-surface-sunken); color: var(--nx-ink-label); font-size: 10px; }
+  .mda-color-line { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+  .mda-color-line input[type="color"] { width: 32px; height: 25px; padding: 2px; flex-shrink: 0; cursor: pointer; }
+  .mda-color-line span { color: var(--nx-ink-muted); font-size: 10px; }
+  .mda-help { margin: 9px 0 0; color: var(--nx-ink-muted); font-size: 11px; line-height: 1.5; }
+  .mda-actions { display: flex; flex-direction: column; gap: 5px; margin: 12px 0 0; }
+  .mda-actions button { display: flex; align-items: center; gap: 9px; padding: 8px 9px; text-align: left; font-size: 12px; }
+  .mda-actions .ic { width: 15px; height: 15px; flex-shrink: 0; }
+  .mda-card [aria-disabled="true"], .mda-trigger[aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; }
+  .mda-notice { margin-top: 11px; padding: 8px; border-radius: 6px; background: var(--nx-surface-sunken);
+    color: var(--nx-ink-label); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+  .mda-notice.mda-error { background: var(--nx-err-bg); color: var(--nx-err-fg); }
   /* 2A-4b: universal toggle ABS pasky (ikona globe, aria-pressed) — vlastnost
      vyberu, meni sa patchom; pocas zapisu disabled */
   .mduni { flex: 0 0 26px; width: 26px; padding: 3px 0; display: inline-flex; align-items: center;

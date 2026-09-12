@@ -17,6 +17,23 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **MR-2B — SPOLOČNÉ OVLÁDANIE VZHĽADU V ŠTÚDIU (12.9.2026, v0.11.7).**
+  Pri povrchu dekorovej skupiny je jedno kompaktné Vzhľad pre dosky aj ABS naprieč hrúbkami. Funguje aj samostatná ABS skupina a prázdna štruktúra;
+  UNI zostáva pracovnou farbou. Obrázok je voliteľný, farba sa ukladá hneď cez existujúcu skupinovú cestu, bez ďalšieho Save a bez SKM.
+  Každý Pick/Edit pripraví nový pracovný materiál a Apply v jednej modelovej operácii. Výmena obrázka zachová fyzické rozmery zdroja;
+  natívny editor sa otvára až po commite. Save používa zachytený zdroj aj po zmene aktuálneho materiálu v natívnom paneli.
+  Publikácia knižnice predchádza samostatnému Apply; jeho zlyhanie má pravdivý výsledok a retry rovnakej revízie bez druhej publikácie.
+  Reset hneď zabudne pôvodný pracovný zdroj. Otvorenie iba číta; počas akcie sú zamknuté zápisy aj zatvorenie, odchod z dokumentu/sekcie ruší vlastníctvo.
+  Predimplementačný Astra audit: 0 blockerov, dve opravy zapracované pred kódom — konečný korelovaný výsledok farby a zachovanie session pri obnove rovnakého dokumentu.
+  Nezávislá úzka integračná kontrola: SOUND. Headless **3983 PASS / 0 FAIL**, všetkých **114 JS sád PASS**, z toho 95 nových MR-2B kontrol.
+  Skutočné CEF Štúdia nad izolovanou ENGINEtests kópiou: **18 PASS** cez produkčné callbacky — Prepare, Pick, Save, farba, Reset, natívny Edit a lifecycle.
+  Browser s označenými simulovanými Ruby odpoveďami: ABS-only, prázdna štruktúra, chýbajúci súbor, read-only, chybná farba, pomalý zápis, retry,
+  návrat fokusu a Tab/Escape, zmena dokumentu; pri minime 1060 × 480 px ostáva karta v okne. Dočasný viewport po QA obnovený.
+  Prvý plný native beh našiel chybu testovej fixture: po Undo/Redo používala starý zaniknutý Ruby handle. Samostatný posledný scenár zachoval plný dôkaz Undo/Redo aj D-40.
+  Opravená celá sada: **2606 in-SketchUp PASS / 0 FAIL** (43 nových kontrol) — dva Pick vrátane PBR/pixelov/mierky, cudzích používateľov,
+  Save pri inom current, zlyhanie Apply po publikácii, presný retry, Reset, plain Save, zánik session počas pickeru a konečná odpoveď farebného zápisu.
+  D-28 ostáva otvorené do záverečného smoke a uzáveru celého bloku. Fyzický druhý počítač, SU 2024 a render nie sú týmto rezom overené.
+
 - **MR-2A — PRÍPRAVA PRACOVNÉHO VZHĽADU V JEDNEJ OPERÁCII (12.9.2026, v0.11.6).**
   Prípravný blok Apply vytvorí alebo načíta materiál a priradí ho podporovaným doskám aj ABS v jednom kroku Späť. Funguje aj bez existujúcich dielcov;
   caller preberie nový handle až po úspešnom commite. Chyba aj predčasný break/return/throw vrátia celú prípravu, obrázok, bindingy a izolované kópie.

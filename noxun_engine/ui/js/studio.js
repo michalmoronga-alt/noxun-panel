@@ -1691,7 +1691,8 @@
   // `js/nx_modal.js` sa načítava PRED studio.js, ale v Node testoch nemusí
   // existovať vôbec — preto obozretne.
   function nxModalOpen(){
-    return typeof window !== 'undefined' && !!window.NXModal && NXModal.isOpen() === true;
+    return typeof window !== 'undefined' && ((!!window.NXModal && NXModal.isOpen() === true) ||
+      (!!window.MDAppearance && window.MDAppearance.isOpen() === true));
   }
 
   function navItem(id){

@@ -2603,6 +2603,37 @@ ponuka) sú sekcie Štúdia, telá akcií žijú v `production_core.rb` a všetk
 aj v refresh cestách) sú preč. Osirotený `preferences_key` `'NoxunEngineProduction'` v registri používateľa ostáva — je to zapamätaná veľkosť okna, ktoré už neexistuje, a SketchUp
 ho nikdy nepoužije (dôvod v `SYSTEM/archiv/KRONIKA.md`).
 
+### materials_appearance_dialog.rb + ui/js/md_appearance.js
+
+**MR-2B — jeden Vzhľad pri povrchu dekorovej skupiny v Materiáloch.** Dosky aj ABS všetkých hrúbok používajú ten istý vstup;
+prázdna štruktúra a skupina obsahujúca iba ABS majú vlastný vstup tiež. UNI zostáva pracovnou farbou. Okno je kompaktný overlay pri tlačidle,
+jeho kotva žije mimo prekresľovaného tela sekcie. Obsahuje náhľad, katalógovú farbu a štyri explicitné akcie; nevzniká ďalší HtmlDialog.
+
+Ruby časť patrí existujúcemu `MaterialsDialog` a používa jeho allowlist/dispatch. Jedna session zachytí model, `DocKey`, inštanciu Štúdia,
+kotvu, fresh scope/baseline a presný zdroj. Prepare iba číta: nedopĺňa materiál, nenačítava SKM, neotvára operáciu ani nemení výber.
+Náhľad živého materiálu môže vzniknúť v súkromnom dočasnom adresári; odpoveď nesie obrázok, nikdy klientom určenú cestu.
+Chýbajúci súbor má pravdivú hlášku. Žiadny automatický výber staršej revízie; nový obrázok alebo návrat k farbe zostávajú dostupné.
+
+**Každé Priradiť textúru / Upraviť v SketchUpe vytvára nový pracovný materiál.** Celý pôvodný natívny obsah prenesie SKM,
+príprava a Apply prebehnú v jednej operácii. Starý pracovný materiál sa neprepisuje, mohol ho medzitým použiť cudzí alebo zamknutý dielec.
+Výmena obrázka na už textúrovanom zdroji zachová jeho fyzickú šírku aj výšku cez natívne priradenie obrázka s rozmermi.
+Edit až po commite vyberie pripravený materiál a otvorí natívny panel Materiály; kartu Upraviť prepne používateľ. Pomocná geometria nevzniká.
+
+Uložiť používa zachytený zdroj, nie neskorší `materials.current`. Najprv publikuje knižnicu a okamžite prejde na nový descriptor;
+potom samostatné Apply priradí publikovanú revíziu modelu. Chyba Apply nemení úspech publikácie: okno ponúkne opakovanie tej istej revízie,
+bez ďalšieho SKM a bez návratu k starému pracovnému zdroju. Existujúce lokálne úpravy živého materiálu publikovanej revízie ostávajú platné.
+Reset po publikácii color ihneď zabudne starý natívny zdroj, aj pri chybe Apply. Knižničný zápis nie je modelové Späť.
+
+Plošná farba ide existujúcou skupinovou cestou `mdColorSave` → `set_decor_color`, bez SKM alebo ďalšieho Uložiť.
+Voliteľný `appearance_context` pridáva overenie vlastníctva a konečnú korelovanú odpoveď aj pri odmietnutí/chybe; katalógové echo samo neodomyká okno.
+Baseline vzhľadu neobsahuje RGB, preto vlastná zmena farby ani plný refresh rovnakého dokumentu session nerušia.
+
+Každá odpoveď nesie token otvorenia, session, konkrétnej akcie a dokumentu/sekcie/kotvy. Klient preverí vlastníctvo pred odomknutím.
+Busy zamyká akcie, farbu, krížik, scrim aj Escape; násilný odchod zo sekcie alebo zmena dokumentu vlastníctvo napriek tomu zneplatní.
+Overlay je cudzou vrstvou pre `NXEsc` a otvoreným modalom pre Štúdio, takže Escape nezasiahne obsah pod ním. Fokus sa vracia na aktuálny trigger.
+Katalógový render mení DOM uzol tlačidla, preto vlastníctvo patrí logickému cieľu. Server ruší session pri close/model/Studio/leave,
+aj keď Demos práve nebeží. Transakčná epocha ani vlastné exportné aborty nie sú identitou session.
+
 ### materials_dialog.rb
 
 **KOV-C2b (v0.9.31) — 4. materiálový kanál v predvoľbách projektu.** `TARGETS` má štvrtý kľúč `default_drawer_material_id` a Štúdio jeden riadok „Zásuvky" vedľa
