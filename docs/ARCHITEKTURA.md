@@ -47,6 +47,7 @@ DC pasce [DC_PRAVIDLA.md](DC_PRAVIDLA.md) · UI dizajn [UI_DIZAJN.md](UI_DIZAJN.
 | `materials_appearance` (spoločný vzhľad dosiek/ABS: kontrakt, zachovanie a atómová publikácia) | [architecture/materials.md](architecture/materials.md) |
 | `materials_native_appearance` (natívny .skm, identita revízie a export s obnovením zdroja) | [architecture/materials.md](architecture/materials.md) |
 | `materials_build_appearance` (zachovanie živého vzhľadu dielca pri prestavbe a kópii) | [architecture/materials.md](architecture/materials.md) |
+| `appearance_mapping` (overený lokálny kváder a fyzické mapovanie textúry dosiek/ABS) | [architecture/materials.md](architecture/materials.md) |
 | `materials_migration` · `materials_health` · `abs_rules` | [architecture/materials.md](architecture/materials.md) |
 | `demos/` (`client` · `slug_matcher` · `name_search` · `product_parser` · `family` · `lookup` · `sitemap_cache` · `image_cache`) | [architecture/materials.md](architecture/materials.md) |
 | `hardware_rules` · `hardware_catalog` · `hardware_taxonomy` · `hardware_sets` | [architecture/hardware.md](architecture/hardware.md) |
