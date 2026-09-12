@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-94** — Rozklik nákupného riadku ukáže pôvod zoskupený po skrinkách (s počtami) a klik na skrinku či čelo ho označí v modeli a otvorí Inspector; rozklik prežije „Obnoviť" — 12.9.2026, PR #361, v0.12.1
 - **D-28** — Spoločný voliteľný vzhľad dosiek aj ABS, natívna mierka/PBR, knižnica SKM a zachovanie pri prestavbe/kópii — 12.9.2026, PR #353–#359, uzáver v0.12.0
 - **D-114** — Šesť ikon pridá priamo typ čela v jednom rade; kratšie texty, súhrn hrán a zachovaný fokus pri 470 px — 11.9.2026, PR #351, v0.11.0
 - **D-120** — UKW na všetkých hranách piatich typov čiel, dvierka zvislo oproti pántom; karta aj hromadné nastavenie s potvrdením návrhu — 11.9.2026, PR #349 + #350, v0.10.7–0.10.8
@@ -115,6 +116,34 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-94 — nákup s pôvodom, vyriešené 12.9.2026
+
+**Výsledok: PR #361, v0.12.1.** Nákupný riadok v sekcii Nákup kovania sa dá rozkliknúť a pod ním stojí **pôvod zoskupený po skrinkách** — jeden riadok na skrinku
+s počtom kusov a za ním položky s ľudským popisom vlastníka („F1 · dvierka ľavé · set zaves-klasik ×2"). Kovanie, ktoré patrí celej skrinke, sa priznáva slovami
+(„celá skrinka") namiesto ticho vynechaného vlastníka. **Skrinka aj položka sú klikateľné**: klik označí kus v modeli a zdvihne Inspector — pri čele sa rovno otvorí
+jeho karta (existujúci deep-link KOV-A2b), pri kovaní celej skrinky sa označí korpus. Rozklik navyše **prežije „Obnoviť"** aj prestavbu skrinky: pamäť je kľúčovaná
+identitou riadku (kód / `free_key`), nie jeho poradím, a maže sa len pri prepnutí zákazky.
+
+**Príčina, prečo to tak dlho nešlo:** dáta existovali od KOV-H2 (`rows[].sources` s `cabinet_id`, `owner_part_key`, setom a počtom; `owner_label` skladá server cez
+`PartKeys.human_label` nad zberom `cabinet_fronts`), ale zobrazenie bolo plochá veta zdrojov a rozklik bol kľúčovaný **indexom** riadku — čerstvý payload riadky
+preusporiada, takže otvorený index by ukázal pôvod cudzieho riadku a jedinou bezpečnou obranou bolo zahodiť rozklik pri každom pushi. D-94 vymenila kľúč za identitu
+a tým dôvod zanikol. Klik-select nepridal ani nový zberový kľúč, ani nový resolver: `source_ref` sa prekladá na dvojicu `(owner_id, part_key)` a beží existujúcim
+`pids_for_problem` (prázdny kľúč = korpus, nepostavený dielec = fallback na korpus). Vedomý dôsledok zdieľaného tela je rovnaký ako pri `rule_ref`: zdroje nenesú
+`owner_pid`, takže dve skrinky so zdieľaným `cabinet_id` sa označia obe — status to priznáva množným číslom.
+
+**Čo z pôvodného package spravili skoršie dávky:** tvar `sources` v payloade a samotný rozklik priniesla KOV-H2 (v0.9.18), ľudský popis vlastníka KOV-D4. D-94 je
+zvyšok: zoskupenie, klik, pamäť, regresný strážca invariantu `Σ sources.quantity == row.quantity` (`tests/pure/test_d94_povod.rb` — stráži pôdu pre pomerové členy
+D-109/R-05, ktoré invariant ešte nebetónuje) a in-SketchUp sekcia `run_d94`. **Nákupný CSV, rozpočet ani ponuka sa nemenia ani o znak** (golden odtlačok drží
+`test_kovh_golden.rb`).
+
+**Pôvodný plný text pri uzávere:**
+
+- **D-94 · Traceability v celkovom súpise kovania — rozklik položky na miesta použitia** (Michal 9.8., test kovania na reálnej zákazke) — nákupný zoznam v okne Výroba povie „357695 × 12", ale nie
+  **kde** tých 12 kusov je. Pri kontrole objednávky (a pri hľadaní, prečo je počet iný, než človek čakal) treba vedieť rozobrať riadok na **skrinky a čelá**, z ktorých vznikol. Dáta už existujú:
+  `expand` skladá pri každom riadku pole `sources` (`cabinet_id`, `owner_part_key`, `generic_type`, `rule_id`, `set_id`, počet) — chýba len zobrazenie a klik-select. Návrh: rozklik riadku (vzor
+  `<details>` v tabe Rozpočet) so zoznamom „CAB-003 · F2 · zásuvkové čelo — 2 ks" a klikom na výber v modeli (vzor KONTROLA tabu); ľudské názvy dielcov dodá `PartKeys.human_label` z D-92. *Stav:
+  OTVORENÉ — návrh na dávku okolo okna Výroba; nízke riziko (čisté čítanie), stredný rozsah UI.*
 
 ### D-28 — textúry a knižnica vzhľadov, vyriešené 12.9.2026
 

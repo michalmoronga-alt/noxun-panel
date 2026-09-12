@@ -1117,7 +1117,10 @@ Tri pravidlá, na ktorých kanál stojí:
   ho z payloadu maže ako `manual_auto`): keď existuje, riadok dostane názov a MJ zo snapshotu, cenu `nil` a príznak `catalog_missing`. Dôvod je vecný — riadok **má názov**, takže
   ho cenová ponuka nesmie preskočiť a v CSV nemá ostať holý kód; chýba mu LEN cena a Kontrola to prizná ORANGE.
 
-Invariant **`Σ sources.quantity == row.quantity`** platí aj tu (jeden zdroj na výskyt položky); ad-hoc zdroj má `generic_type`/`rule_id`/`set_id` **`nil`** (položka žiadny set ani
+Invariant **`Σ sources.quantity == row.quantity`** platí aj tu (jeden zdroj na výskyt položky) a **od D-94 ho regresne stráži `tests/pure/test_d94_povod.rb`** — nad `expand` pre
+všetky dnešné kanály naraz (členy `per: 'unit'`, členy `per: 'owner'` vrátane dedupu, viac skriniek s tým istým kódom, ad-hoc zliaty do setového riadku, voľná položka, skrinka
+bez kovania). Dôvod: rozklik pôvodu v Nákupe ukazuje rozpis a súčet zároveň, takže rozchod by používateľ videl ako rozpis, ktorý nesedí s číslom, podľa ktorého objednáva. Strážca
+**nebetónuje pomerové členy** (D-109 / R-05, po V1) — stráži pôdu, na ktorej budú stavať. Ad-hoc zdroj má `generic_type`/`rule_id`/`set_id` **`nil`** (položka žiadny set ani
 pravidlo nemá a predstierať opak by rozbilo rozklik pôvodu v Nákupe) a navyše `origin: 'adhoc'` + `manual_id`. `unmapped` sa ad-hoc **netýka** — položka má kód alebo názov od
 človeka, takže nemapovaná byť nemôže. **`finalize` zoraďuje s kľúčom riadku ako posledným rozhodcom**: voľné riadky majú prázdny `code` aj `category`, takže bez neho by ich
 nestabilný `sort_by` medzi behmi preusporiadal; pre setové riadky je to no-op (kľúč = `code.downcase`).
