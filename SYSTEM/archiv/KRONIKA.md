@@ -17,6 +17,15 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **MR-1B2 — ŽIVÝ VZHĽAD PRI PRESTAVBE A KÓPII (12.9.2026, v0.11.3).**
+  Oba buildery používajú spoločný vzhľad dosiek a ABS; bežný nový vklad berie aktuálnu revíziu, prestavba pôvodného dielca a produktová kópia zachovajú jeho živý materiál vrátane neuložených úprav. Výrobné ID a snapshot sa nemenia.
+  Capture pred zmazaním drží konkrétny model, vlastníka, dielec a ABS slot. Nejednoznačný protected vzhľad vrátane vlastnej podoby neolepenej plochy vedie k úplnému rollbacku. Čisté RGB farby sa ďalej synchronizujú bez poškodenia starého zdieľaného materiálu; UNI ostáva pracovné.
+  Kópia z panela a toolbaru prenáša živý zdroj mimo configu; pending toolbar kópia drží pôvodný model a source handle, takže rovnaké CAB ID v druhom dokumente ju nepresmeruje. Natívny dedup zachytáva kópiu pred prepisom identity.
+  Overenie: **3898 headless, 113 JS sád, 2381 in-SketchUp PASS / 0 FAIL**, z toho 60 nových kontrol. R1/R2, obe hrúbky, ABS, opakovaný legacy rebuild, no-albedo alpha/PBR, kópie, scale, batch, Undo a úplný rollback; snapshot, kusovník a VEPO zhodné.
+  Samostatné save/reopen bez lokálneho `.skm`: 21 úspešných kontrol a jeden priznaný charakterizačný nesúlad natívneho SketchUpu pred rebuildom — sekundárne PBR rozmery sa pri otvorení SKP zjednotia s albedom. Rebuild zachová celý už otvorený stav; missing-whole-catalog doskový guard ostáva. Fyzický SU 2024 a render neboli testované.
+  Návrhový CLI audit bol nedostupný, nahradila ho nezávislá kontrola návrhu. Prijaté FIX zdedenej ABS a pending identity, interná kontrola implementácie doplnila neolepené plochy. Nasleduje MR-3 mapovanie/aplikovanie a MR-2 ovládanie; D-28 zostáva otvorené.
+  GH review kolo 1: tri P2 opravené — opakované používanie náhradnej farby, samostatné odmietnutie konfliktnej kópie pred transparentnou operáciou a konflikt protected/obyčajnej strany. Natívna regresia navyše odhalila prečíslovanie konca výrobného ID cez Materials.add; voľné meno sa teraz vyberá explicitne. Preflight kópie prešiel nezávislou delta kontrolou; plné druhé GH kolo je povinné.
+
 - **MR-1B1 — NATÍVNY KONTAJNER VZHĽADU (11.9.2026, v0.11.2).**
   Adaptér overuje materiál podľa modelu, skupiny/povrchu a revízie; samotné meno ani zhodný obsah nie sú dôkaz. Nesprávny či nejednoznačný materiál nepreoznačí ani neprefarbí.
   Export uloží celý `.skm.staging`, obnoví zdroj prvým abortom, súbor natívne načíta a druhým abortom zruší overovacie zmeny. Oba aborty musia potvrdiť úspech; až potom možno publikovať knižnicu.

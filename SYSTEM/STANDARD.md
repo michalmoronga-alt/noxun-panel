@@ -814,7 +814,7 @@ Schema 10 vzniká len pri obsahu s `appearance`; otvorenie starého katalógu ho
 Novší marker aj neznámy obsah chránia zápisové brány. Nový `.skm` sa dokončí pred
 publikáciou odkazu; zlyhanie katalógového zápisu ponechá pôvodnú revíziu aj súbor.
 Uloženie knižnice nie je súčasťou modelového Undo. MR-1A pripravuje katalógovú časť;
-MR-1B1 natívny adaptér, po ňom nasleduje zapojenie do prestavby, mapovanie a ovládanie.
+MR-1B1 natívny adaptér a MR-1B2 zachovanie pri prestavbe. Mapovanie a ovládanie nasledujú.
 
 **Natívna identita vzhľadu (MR-1B1):** na SketchUp materiáli v dictionary `NOXUN`
 žije `appearance_scope` (JSON dvojice normalizované group_id/structure) a `appearance_id`
@@ -824,6 +824,15 @@ Premenovanie materiálu ju nemení. Interný názov v `.skm` je
 Načítaný materiál musí patriť správnemu modelu a mať celý očakávaný scope/revíziu;
 nezhoda alebo viacerí kandidáti sa nesmú napraviť preoznačením či prefarbením cudzieho materiálu.
 Do configu skrinky ani výrobného snapshotu sa tieto polia nepridávajú.
+
+**Zachovanie pri prestavbe (MR-1B2):** živý protected materiál pôvodného dielca/ABS
+má pri nezmenenom výrobnom ID prednosť pred novšou knižničnou revíziou, aj keď tá
+už požaduje color. Samotné uloženie knižnice nie je Apply modelu. Nový bežný vklad,
+nový dielec alebo zmenené výrobné ID používa aktuálny vzhľad; explicitná produktová
+kópia zachová vzhľad zdroja. Preferencia je iba dočasný kontext konkrétneho modelu,
+vlastníka a dielca/slotu, nikdy ďalší uložený výrobný kľúč. Nejednoznačný protected
+vzhľad prestavbu odmietne s rollbackom. Čistá farebná cesta ďalej synchronizuje RGB
+a nesmie pritom vymazať textúru/PBR na cudzom alebo staršom zdieľanom materiáli.
 
 **Nemennosť ID a migrácia (2A):** `material_id`/`abs_id` sú **opaque a navždy nemenné** (modely sa viažu výhradne na ne — snapshot na entite drží ID, štandard 8.3);
 legacy ID s vloženou štruktúrou v texte sa NEparsujú. Nové ID zahŕňajú skupinu+štruktúru (+formát pri PD) len pre čitateľnosť.

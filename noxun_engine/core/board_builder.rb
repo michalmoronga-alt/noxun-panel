@@ -636,6 +636,10 @@ module Noxun
           guard_newer_config!(Store.config(inst) || {})
           inst.make_unique if inst.definition.instances.size > 1
           bdef = inst.definition
+          appearance = BuildAppearance.capture_board(model, inst)
+          previous = BuildAppearance.for_part(appearance, model: model, owner: inst,
+                                             part_key: PART_KEY, role: cfg[:role],
+                                             material_id: cfg[:material_id], edges: cfg[:edges])
           bdef.name = definition_name(bid) unless bdef.name == definition_name(bid)
           bdef.entities.clear!
           draw_board(bdef.entities, cfg)
@@ -644,7 +648,7 @@ module Noxun
           # nasobenim skumulovala. `transform:` (scale absorpcia, orientacna
           # delta) je uz FINALNA transformacia od volajuceho.
           inst.transformation = transform if transform
-          write_board_attrs(model, inst, bid, cfg)
+          write_board_attrs(model, inst, bid, cfg, previous: previous)
           apply_scale_lock(inst)
           inst
         end
@@ -728,7 +732,7 @@ module Noxun
 
         # `config:` (GHOST-D1) = HOTOVY zapisovy snapshot z `BoardPlan`. Ked
         # pride, katalog sa uz NECITA — presne to je zmysel zmrazeneho planu.
-        def write_board_attrs(model, inst, bid, cfg, config: nil)
+        def write_board_attrs(model, inst, bid, cfg, config: nil, previous: {})
           Store.write(inst, {
             std: Store::STD, kind: 'board', id: bid, part_id: bid,
             part_key: PART_KEY, part_key_schema: PartKeys::SCHEMA,
@@ -737,10 +741,10 @@ module Noxun
             config: config || board_config(cfg)
           })
           inst.name = "Doska #{bid}"
-          inst.material = Materials.ensure_su_material(model, cfg[:material_id], FALLBACK_RGB) if defined?(Materials)
+          inst.material = Materials.ensure_su_material(model, cfg[:material_id], FALLBACK_RGB, previous: previous[:sheet]) if defined?(Materials)
           # D-88: bocne plosky s ABS paskou dostanu farbu pasky — TA ISTA cesta
           # ako dielce korpusu (CabinetBuilder.paint_edge_faces je zdielany).
-          paint_edges(model, inst, cfg) if defined?(CabinetBuilder)
+          paint_edges(model, inst, cfg, previous_edges: previous[:edges] || {}) if defined?(CabinetBuilder)
           inst.layer = board_tag(model)
           inst
         end
@@ -748,11 +752,14 @@ module Noxun
         # D-88: farba ABS na bocnych plochach dosky. Deskriptor osi je TEN ISTY,
         # ktory ide do planu (AXES_LYING — dlzka X, sirka Y, hrubka Z), aby sa
         # mapovanie hran nemohlo rozist s vyrobnym zaznamom.
-        def paint_edges(model, inst, cfg)
-          pd = { suffix: 'BOARD', box: [cfg[:length].to_f, cfg[:width].to_f, cfg[:thickness].to_f],
+        def paint_edges(model, inst, cfg, previous_edges: {})
+          pd = { suffix: 'BOARD', role: cfg[:role], box: [cfg[:length].to_f, cfg[:width].to_f, cfg[:thickness].to_f],
                  prod: { length: cfg[:length].to_f, width: cfg[:width].to_f, thickness: cfg[:thickness].to_f },
                  axes: PartFaces::AXES_LYING }
-          CabinetBuilder.paint_edge_faces(model, inst.definition.entities, pd, cfg[:edges], cfg[:material_id])
+          CabinetBuilder.paint_edge_faces(model, inst.definition.entities, pd, cfg[:edges], cfg[:material_id],
+                                          sheet_material: inst.material, previous_edges: previous_edges)
+        rescue Materials::AppearanceError
+          raise
         rescue StandardError => e
           Engine.log_error(e, 'BoardBuilder.paint_edges') if defined?(Engine)
           nil

@@ -299,7 +299,7 @@ module NxTest
     assert(s.include?('CabinetBuilder.newer_config?(src_cfg)'), 'kopia kontroluje RAW config zdroja')
     assert(NxR12.order?(s, 'CabinetBuilder.newer_config?(src_cfg)', 'CabinetBuilder.config_to_params(src_cfg)'),
            'kontrola je PRED prekladom configu na params')
-    assert(NxR12.order?(s, 'CabinetBuilder.newer_config?(src_cfg)', 'CabinetBuilder.build(model, params)'),
+    assert(NxR12.order?(s, 'CabinetBuilder.newer_config?(src_cfg)', 'CabinetBuilder.build(model, params, appearance_source: cab)'),
            'kontrola je PRED vznikom odvodeneho korpusu')
     assert(s.include?("newer_config_message('Korpus', 'kópia by nastavenia stratila')"),
            'hlaska ide z jedineho textoveho zdroja')

@@ -12,6 +12,10 @@ Katalóg materiálov a pások, dekorové skupiny, migrácia a zdravie katalógu,
 
 katalóg materiálov a dedenie projekt→skrinka→dielec (projektové defaulty v NOXUN dict na MODELI).
 
+**MR-1B2:** `ensure_su_material` a `ensure_su_edge_material` zachovávajú pozičné vstupy a prijímajú interné `previous:` z `BuildAppearance`.
+Výber živého pôvodného vzhľadu, aktuálnej knižničnej revízie alebo čistej RGB farby je spoločný v tomto helperi. `AppearanceError` sa nesmie zmeniť
+na tichý úspech farebnej stavby; caller abortuje svoju modelovú operáciu. Výrobné ID, dedenie materiálov ani pravidlá ABS sa nemenia.
+
 #### KOV-C2a — 4. materiálový kanál `:drawer` (v0.9.30)
 
 `PROJECT_KEYS` má štvrtý kľúč **`default_drawer_material_id`** = materiál DIELCOV ZÁSUVIEK (dno · chrbát · boky boxu · vnútorné čelo). Fallback je **UNI 16 mm**
@@ -208,11 +212,11 @@ Purpose-publish vyžaduje celý zdravý čerstvý katalóg. Všeobecný write ba
 `publish_appearance(kind, anchor_id, baseline:, mode:)` generuje descriptor aj internú cestu. Native exporter blok dostane staging cestu/descriptor/scope mimo katalógového zámku;
 **true znamená, že natívny adaptér overil obsah**, samotné jadro kontroluje iba súbor a bajty. Potom znovu overí baseline pod zámkom, dokončí nemenný súbor
 a publikuje descriptor všetkým členom jediným JSON zápisom. Zlyhanie JSON môže ponechať osirelý nový súbor, nikdy nepoškodí starý. Color súbor nepotrebuje.
-Natívny export/načítanie poskytuje `NativeAppearance` nižšie; UI a zapojenie do builderov sú samostatné dávky. Knižničný zápis nie je modelové Undo.
+Natívny export/načítanie poskytuje `NativeAppearance` nižšie; buildery používa `BuildAppearance`, ovládanie pridá MR-2. Knižničný zápis nie je modelové Undo.
 
 ### materials_native_appearance.rb
 
-**MR-1B1: natívny adaptér bez prepnutia builderov.** `NativeAppearance.lookup(model, scope, revision)` číta jednoznačnú identitu v danom modeli;
+**Natívny adaptér (MR-1B1).** `NativeAppearance.lookup(model, scope, revision)` číta jednoznačnú identitu v danom modeli;
 `preferred(model, scope, material)` samostatne preverí pôvodný živý handle rovnakého rozsahu aj zo staršej revízie. Doklad pôvodného dielca a nezmeneného
 výrobného ID je povinnosť integrácie prestavby. Bežný lookup je vždy na presnú revíziu a nehádá prvého kandidáta pri viacerých materiáloch.
 
@@ -231,7 +235,28 @@ Chyba nemôže vrátiť úspech exportéra. Až potom MR-1A rozhodne o nemennom 
 
 Natívne testy na SU 26.0 porovnávajú aj pixely, fyzickú mierku albeda, alpha, colorize a dostupné PBR nastavenia.
 Pri čerstvo vytvorených API mapách natívny save/load zjednotí ich sekundárne width/height s albedom; test to priznáva samostatne.
-Následný roundtrip natívne importovaného materiálu zachová celý skúšaný stav. Renderová zhoda ani beh na SU 2024 tým nie sú preukázané.
+To isté sa prejavilo pri otvorení SKP po zmene mierky albeda: pred prestavbou SketchUp zjednotí sekundárne rozmery s albedom.
+Prestavba následne zachová celý skúšaný otvorený stav aj bez miestneho `.skm`. Renderová zhoda ani beh na SU 2024 tým nie sú preukázané.
+
+### materials_build_appearance.rb
+
+**MR-1B2: `BuildAppearance` zachytí živý vzhľad pred zmazaním geometrie.** Kontext je dočasný, viazaný na model, konkrétneho vlastníka a jeho pôvodné dielce.
+`capture_cabinet` / `capture_board` čítajú materiál inštancie aj efektívne materiály oboch strán dekorových a ABS plôch. `for_part` povoľuje preferenciu len
+pri nezmenenom kľúči, role a výrobnom ID; každá ABS má vlastný pôvodný slot a ID. Dedup prenesie kontext tej istej kópie pred zmenou CAB identity.
+Panelová a nástrojová kópia majú explicitný živý `appearance_source:`; bežný vklad ho nemá. Kontext nikdy nevstupuje do configu, plánu ani výrobného snapshotu.
+`validate_copy_source!` pred dedup operáciou iba číta zachytené kanály a overuje ich jednoznačnosť, živé handles a pôvod; nevolá resolver ani nenačítava materiály. Konflikt tak možno preskočiť bez zrušenia používateľovho paste kroku.
+
+`classify` rozlišuje plain, protected a unknown. Plain nemá native metadata, textúru, priehľadnosť ani PBR workflow. Nejasný starý RGB záznam môže použiť
+doterajšiu farebnú cestu, ale nejasný zachovávaný protected kanál vyvolá `CaptureError`. Skutočné dedenie legacy ABS zo sheet materiálu sa uzná iba s dôkazom
+pôvodného slotu a spoločného scope dosky/ABS; rovnaká RGB sama nestačí. Rozporné dekorové podoby sa nezlievajú výberom prvého kandidáta. Aj kombinácia protected a obyčajnej alebo efektívne nevyfarbenej strany je nejednoznačná; prestavba ju nesmie zjednotiť.
+Aj neolepená bočná plocha sa kontroluje: obyčajné dedenie sheet materiálu je platné, jej vlastný odlišný protected vzhľad znamená konflikt sheet kanálu.
+Označenie konfliktu zachová pôvodný sheet kandidát ako dôkaz ostatných ABS; pri vedomej zmene výrobného ID sa starý sheet konflikt neprenáša.
+
+`resolve` pri zachovanom protected kanáli vráti presný pôvodný handle vrátane neuložených úprav a staršej revízie. Nový diel alebo zmena výrobného ID použije
+aktuálny knižničný descriptor cez `NativeAppearance.load`. Color/absent a nedostupný súbor bez zachovaného zdroja používajú čistú RGB farbu; nedostupnosť sa loguje.
+Poškodený archív či identita abortujú stavbu. Obsadený styled materiál sa nikdy nečistí in-place; čistý náhradný handle vrátane vlastných číslovaných variantov sa používa opakovane aj pri nových vkladoch bez previous kontextu.
+Nová náhrada dostane vopred vybrané voľné presné meno; automatické číslovanie SketchUpu môže zmeniť aj číselný koniec výrobného ID. Neočakávané meno z `add` sa odmietne pred prefarbením.
+UNI ostáva pracovnou farbou. Modul neotvára operácie, nemení knižnicu a nepridáva observer.
 
 ### materials_abs.rb
 

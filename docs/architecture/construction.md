@@ -129,13 +129,21 @@ znovuotvorení .skp sa nedá odvodiť: `Bom.hardware_conflict_issues` ho zlúči
 
 ### cabinet_builder.rb
 
+**MR-1B2 — živý vzhľad pri prestavbe a kópii.** Pred `clear!` sa z konkrétnej inštancie zachytia materiály pôvodných dielcov; preferencie sa vyhodnocujú až
+proti finálne vyriešeným výrobným ID a ABS slotom. Dedup zachytáva tú istú kopírovanú inštanciu ešte pred prepisom CAB ID. Pred otvorením operácie preverí
+zachytený vzhľad aj jeho väzby; konfliktnú kópiu preskočí a pokračuje ďalšími. Tým neabortuje transparentne pripojený paste krok. Neočakávané chyby po začatí
+zápisu ďalej abortujú a zastavia spracovanie. `appearance_source:` v `build`/`commit_insert`
+je samostatný interný vstup produktovej kópie, mimo zmrazeného InsertPlan/configu; zdroj sa validuje a číta v guarded operácii, zostáva bez mutácie.
+Bežný vklad bez zdroja používa aktuálnu knižnicu. Obe ensure aj `paint_edge_faces` prepúšťajú appearance chyby k abortu celej operácie. RGB skratka ABS platí
+len pre dve overené plain farby; styled ABS sa priradí explicitne na obe strany plochy, aj keď má rovnaký handle ako doska. UV mapovanie je nadväzujúca dávka.
+
 **ŠEV VKLADANIA (R-03, v0.8.20): `prepare_insert` → `commit_insert`; `build` je len ich kompozícia** a správanie všetkých doterajších volajúcich je nezmenené.
 `prepare_insert(model, params)` vydá **zmrazený `InsertPlan`** (config + `home_z`) — *žiadna* mutácia modelu, entít, ID ani Undo stacku, a **zámerne ani `ensure_root_context`**
 (ghost hover nesmie používateľovi zatvárať otvorený komponent). Config je **hlboká kópia s rekurzívnym freeze** vrátane vnorených hashov, polí aj stringov, a **v tomto poradí**:
 `enum_val` vracia `v.to_s`, čo je pri Stringu ten istý objekt ako vstup, takže priamy freeze by zmrazil `params` volajúceho. Plán si drží **referenciu na `Sketchup::Model`** ako identitu
 dokumentu — nie `guid`, ten sa mení pri každom uložení (lekcia #261/#264).
 
-`commit_insert(model, plan, transform:, &block)` je jediné miesto, kde vklad mení model, a **poradie krokov je súčasť kontraktu**: (1) guard identity dokumentu — plán z iného okna
+`commit_insert(model, plan, transform:, appearance_source: nil, &block)` je jediné miesto, kde vklad mení model, a **poradie krokov je súčasť kontraktu**: (1) guard identity dokumentu — plán z iného okna
 sa odmieta ešte pred zatvorením edit kontextu (cross-document vklad nikdy) · (2) validácia explicitného `transform` **a hneď snapshot** — prijme sa len konečná pravotočivá RIGIDNÁ transformácia (`rigid_matrix?` nad 16 číslami z `to_a`: jednotkové a navzájom
 kolmé osi, determinant +1, nulová perspektíva a prvok `[15] == 1`); scale/skos/zrkadlo by postavili korpus, ktorého geometria nesedí s configom, a scale observer by ho pod guardom ani
 nezachytil — tichá výrobná chyba. **`[15]` je uniformný mierkový deliteľ:** moderný SketchUp ho drží kanonický (1.0) a rovnomernú mierku premieta do osí, takže `scaling(2)` padne už
@@ -148,9 +156,9 @@ oneskorený dirty tik a transparentný presun ghost zón by zasiahol Undo po dok
 plánu: `PartKeys.migrate_overrides` zdieľa vnorené hashe overridov a `resolve_part` v nich in-place upratuje sticky `edge_warnings`.
 `build` volá `ensure_root_context` **PRED** `prepare_insert`, aby pri výnimke z `normalize` používateľ skončil v roote presne ako doteraz; commit si root ešte raz idempotentne overí.
 
-**Signatúra `build(model, params = nil, transform: nil, **kw, &block)` je kompatibilná zámerne.** Pred R-03 nemala metóda žiadny keyword parameter, takže Ruby 3 prevádzalo
+**Signatúra `build(model, params = nil, transform: nil, appearance_source: nil, **kw, &block)` je kompatibilná zámerne.** Pred R-03 nemala metóda žiadny keyword parameter, takže Ruby 3 prevádzalo
 `build(model, type: 'lower', width: 600)` na **pozičný hash** a takto sa volať dá. Holý `transform:` by tieto volania rozbil (`unknown keyword`), preto je `params` voliteľný a zvyšné
-keywordy sa zbierajú do `**kw`: keď `params` chýba, použijú sa **ony** ako parametre skrinky. Jediné **rezervované** meno je `transform` (nie je to parameter korpusu — `normalize`
+keywordy sa zbierajú do `**kw`: keď `params` chýba, použijú sa **ony** ako parametre skrinky. **Rezervované** mená sú `transform` a `appearance_source` (nie je to parameter korpusu — `normalize`
 ho nepozná); kto by ho v params predsa len chcel, musí params poslať pozične. Params dvakrat (pozične aj keywordmi) je `ArgumentError`, nie tiché zliatie.
 **Vedomé hranice R-03:** kontrakt čistoty `prepare_insert` je uzko formulovaný na *model, entity, ID a Undo* — `normalize` cez `Materials.normalized_abs_id` môže siahnuť na katalóg
 na disku a logovať, a `Construction.build_plan` sa do prepare **nepresúva** (validačné chyby by sa zobrazili pred hardware blokom a pred commit-time snapshotmi). Súradnice
@@ -542,6 +550,10 @@ a `handle_insert_copy` sú GHOSTom **nedotknuté**. Testy: `tests/pure/test_ghos
 Testy: `tests/pure/test_ghost_d1_dosky.rb`, `tests/js/test_ghost_d1_pasik.js`, in-SketchUp sekcie `run_ghost_d1` a `run_ghost_d1_async`.
 
 ### board_builder.rb
+
+**MR-1B2:** rebuild zachytí vzhľad dosky a jednotlivých ABS pred zmazaním definície. Zachovaný kanál ide cez spoločné `BuildAppearance` do ensure a farbenia hrán;
+nový vklad používa aktuálnu knižničnú revíziu. `paint_edges` posiela aj rolu dielca a appearance chyby prepúšťa k celému rollbacku. Doskový dedup nemení geometriu,
+takže ponechá pôvodné materiály priamo. Existujúca validácia katalógového materiálu sa neobchádza; podpora celkom chýbajúceho katalógu sa tým nerozširuje.
 
 samostatná doska (V0.4.7): `kind: board`, id BRD-xxx, rola `free_panel`, config = superset dielca korpusu (kusovník/VEPO majú jeden svet); materiál snapshot z katalógu, hrúbka VŽDY
 z materiálu; manufactured true + production_class sheet na inštancii.
