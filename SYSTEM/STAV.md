@@ -31,7 +31,7 @@ Geometrický dôkaz ČELÁ-B2: **in-SketchUp 2297 PASS / 0 FAIL** (osadenia, vý
 
 **D-94 „Nákup s pôvodom" je hotové (PR #361, v0.12.1).** Riadok v sekcii Nákup kovania sa rozklikne na pôvod **zoskupený po skrinkách** (jeden riadok na skrinku s počtom kusov
 a za ním položky s ľudským názvom vlastníka); **klik na skrinku aj na čelo označí kus v modeli a zdvihne Inspector**, pri čele sa otvorí jeho karta. Rozklik **prežije „Obnoviť"**
-aj prestavbu. Výstup zákazky (CSV, rozpočet, ponuka) sa nemení ani o znak. **Čaká používateľský smoke Michala.**
+aj prestavbu. Výstup zákazky (CSV, rozpočet, ponuka) sa nemení ani o znak. **Michal 12.9. potvrdil používateľský smoke PASS** („všetko funguje super").
 **M-R je dokončené v #353–#359, uzáver v0.12.0** — Michal 12.9. potvrdil jeho smoke **PASS**; D-28 vyriešené, Čelá A/B1/B2/C zostávajú používateľsky potvrdené.
 **Blok 1d** podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**. Blok **1b** je uzavretý, **1c/1e hotové**.
 
@@ -40,6 +40,7 @@ aj prestavbu. Výstup zákazky (CSV, rozpočet, ponuka) sa nemení ani o znak. *
 **Ďalší blok vyberá Michal** — automaticky sa nič neštartuje; po uzávere M-R mala nasledovať slovná diskusia o workflow. Skupina „KONTROLA + VÝROBA" v
 [DOGFOODING.md](DOGFOODING.md) je po D-94 prázdna. Budúca rotácia obrázka a umiestnenie textúr sú D-126/D-127 v [PLAN.md](PLAN.md); D-48 zostáva po V1,
 **D-109** (pomerová mechanika kovania, R-05) po V1 a ručné Redo Čiel je stále samostatne nepotvrdené.
+**Nové postrehy Michala 12.9. (po smoke D-94):** **D-128** výška dreveného boxu zásuvky nemá ovládač · **D-129** úchytky sú v kontexte Čelá na dvoch miestach · **D-130** menší UI/UX rework kontextu Čelá (organizácia, pomocné texty do tooltipov). Overia sa a rozhodnú **v novom okne** (debata → mockup → package); plné znenie v [DOGFOODING.md](DOGFOODING.md).
 
 ## Posledné uzávery
 

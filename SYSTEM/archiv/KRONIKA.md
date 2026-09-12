@@ -35,6 +35,7 @@
   D-109/R-05 vedome nebetónuje), `tests/js/test_d94_povod.js` a in-SketchUp sekcia `run_d94` (26 kontrol: resolver nad živým modelom, deep-link, „zoznam sa zmenil",
   `flush_blocked`, 0 krokov Späť). Overených 7 mutácií (3 Ruby, 4 JS).
   **Codex review:** doplní orchestrátor po review.
+  **Používateľský smoke Michala 12.9. večer: PASS** („všetko funguje super"). Z toho istého sedenia vzišli postrehy D-128 (výška dreveného boxu), D-129 a D-130 (úchytky na dvoch miestach, rework kontextu Čelá).
 
 - **BLOK M-R VZHĽAD UZAVRETÝ (12.9.2026, v0.12.0, implementácia PR #353–#359).**
   Jeden voliteľný vzhľad dosiek aj ABS rovnakého dekoru/povrchu naprieč hrúbkami, jedna zástena; obyčajná farba zostáva samostatná.
