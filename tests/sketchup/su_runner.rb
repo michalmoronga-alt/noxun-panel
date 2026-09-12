@@ -658,6 +658,419 @@ module NoxunSuRunner
     ok("MR1B2: vynimka #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}", false)
   end
 
+  # MR-3A: oracle pouziva fyzicke lokalne body, nikdy mapu/osi mappera.
+  def mr3a_point(values)
+    Geom::Point3d.new(values.map { |v| v.to_f.mm })
+  end
+
+  def mr3a_uv(face, point, front)
+    helper = face.get_UVHelper(true, true, Sketchup.create_texture_writer)
+    q = front ? helper.get_front_UVQ(point) : helper.get_back_UVQ(point)
+    raise 'MR3A: neplatne UVQ' unless q.to_a.all? { |v| v.to_f.finite? } && q.z.to_f.abs > 1.0e-12
+    [q.x.to_f / q.z.to_f, q.y.to_f / q.z.to_f]
+  end
+
+  def mr3a_near(actual, expected)
+    actual.length == expected.length && actual.zip(expected).all? { |a, b| (a.to_f - b.to_f).abs < 1.0e-6 }
+  end
+
+  def mr3a_face_state(face)
+    points = face.vertices.map(&:position).sort_by(&:to_a)
+    points << face.bounds.center
+    [face.persistent_id, face.material&.persistent_id, face.back_material&.persistent_id,
+     [true, false].map do |front|
+       [face.get_texture_projection(front)&.to_a,
+        points.map { |p| [p.to_a, mr3a_uv(face, p, front).map { |v| v.round(9) }] }]
+     end]
+  end
+
+  # Verejna 4-argumentova API (SU2021.1+), nie deprecated set_texture_projection.
+  def mr3a_projected_face(face, material, z)
+    [true, false].each do |front|
+      shift = front ? 0.25 : 0.625
+      mapping = [mr3a_point([0, 0, z]), Geom::Point3d.new(shift, 0.5, 1),
+                 mr3a_point([100, 0, z]), Geom::Point3d.new(shift + 1, 0.5, 1),
+                 mr3a_point([0, 50, z]), Geom::Point3d.new(shift, 1.5, 1)]
+      face.position_material(material, mapping, front, Geom::Vector3d.new(0, 0, 1))
+      raise 'MR3A: projekcny fixture nevznikol' unless face.get_texture_projection(front)
+    end
+  end
+
+  def mr3a_owner_uv(owner)
+    parts = e::Store.kind(owner) == 'cabinet' ? mr1b2_parts(owner) : [owner]
+    parts.map { |part| [part.persistent_id, part.definition.entities.grep(Sketchup::Face).map { |f| mr3a_face_state(f) }.sort_by(&:first)] }.sort_by(&:first)
+  end
+
+  def mr3a_scene(model, owner)
+    [mr1b2_owner_state(owner), mr3a_owner_uv(owner),
+     model.entities.to_a.map(&:persistent_id).sort,
+     model.definitions.to_a.map { |d| [d.persistent_id, d.name, d.attribute_dictionaries&.map { |a| [a.name, a.to_h] }&.to_h] }.sort_by(&:first),
+     model.materials.to_a.map { |m| [m.persistent_id, mr1b1_state(m)] }.sort_by(&:first)]
+  end
+
+  def mr3a_reject(model, owner, label)
+    before = mr3a_scene(model, owner)
+    begin
+      yield
+      ok("MR3A #{label}: odmietnutie", false)
+    rescue e::Materials::AppearanceError
+      ok("MR3A #{label}: cely rollback vratane UV, projekcie a materialov",
+         mr3a_scene(model, owner) == before && !e::ScaleWatch.rebuilding?)
+    end
+  end
+
+  def mr3a_descriptor
+    { box: [300.0, 180.0, 18.0], prod: { length: 300.0, width: 180.0, thickness: 18.0 },
+      axes: { length: 0, width: 1, thickness: 2 }, role: 'free_panel' }
+  end
+
+  def mr3a_box(model)
+    mr1b2_op(model) do
+      definition = model.definitions.add('SU MR3A samostatny kvader')
+      face = definition.entities.add_face([[0, 0, 0], [300, 0, 0], [300, 180, 0], [0, 180, 0]].map { |p| mr3a_point(p) })
+      face.reverse! if face.normal.z < 0
+      face.pushpull(18.mm)
+      model.entities.add_instance(definition, Geom::Transformation.translation(mr3a_point([30_000, 30_000, 0])))
+    end
+  end
+
+  def mr3a_map(part, descriptor = mr3a_descriptor)
+    result = e::AppearanceMapping.inspect_part(part, descriptor: descriptor)
+    raise "MR3A inspect: #{result.inspect}" unless result[:status] == :ok
+    result[:map]
+  end
+
+  # l/w/t su EXPLICITNE oracle osi scenara; nepouzivaju PartFaces.
+  def mr3a_check_part(part, label, l:, w:, t:, material:, edge: nil, grain: 'length', scale: [100.0, 50.0])
+    raise "MR3A: chyba skutocny dielec #{label}" unless part && part.valid?
+    cfg = e::Store.config(part)
+    dims = [part.definition.bounds.max.x, part.definition.bounds.max.y, part.definition.bounds.max.z].map { |n| mm(n) }
+    expected = grain == 'width' ? [30.0 / scale[0], 75.0 / scale[1]] : [75.0 / scale[0], 30.0 / scale[1]]
+    good = %i[min max].all? do |side|
+      point = [0.0, 0.0, 0.0]
+      point[l] = 75.0
+      point[w] = 30.0
+      point[t] = side == :min ? 0.0 : dims[t]
+      face = d88_face_on(part, t, side)
+      face && face.material == material && face.back_material == material &&
+        [true, false].all? { |front| mr3a_near(mr3a_uv(face, mr3a_point(point), front), expected) }
+    end
+    ok("MR3A #{label}: oba dekory maju fyzicke UV a rovnaky handle", good && cfg['grain_direction'] == grain)
+    return unless edge
+    code, axis, side = edge
+    face = d88_face_on(part, axis, side)
+    point = [0.0, 0.0, 0.0]
+    point[axis] = side == :min ? 0.0 : dims[axis]
+    point[code.start_with?('L') ? l : w] = 75.0
+    point[t] = 9.0
+    ok("MR3A #{label}: ABS #{code} na fyzickej stene ma pozdlznu texturu z oboch stran",
+       !cfg.dig('edges', code).to_s.empty? && face && face.material == material && face.back_material == material &&
+       [true, false].all? { |front| mr3a_near(mr3a_uv(face, mr3a_point(point), front), [75.0 / scale[0], 9.0 / scale[1]]) })
+  end
+
+  def mr3a_mapper_cases(model, material)
+    part = mr3a_box(model)
+    face = d88_face_on(part, 2, :max)
+    mr1b2_op(model) do
+      part.material = material
+      [true, false].each do |front|
+        phase = front ? [0.25, 0.5] : [0.625, 0.375]
+        front ? face.material = material : face.back_material = material
+        mapping = [mr3a_point([0, 0, 18]), Geom::Point3d.new(*phase, 1),
+                   mr3a_point([100, 0, 18]), Geom::Point3d.new(phase[0] + 1, phase[1], 1),
+                   mr3a_point([0, 50, 18]), Geom::Point3d.new(phase[0], phase[1] + 1, 1)]
+        face.position_material(material, mapping, front)
+      end
+    end
+    %w[length width none].each do |grain|
+      map = mr3a_map(part)
+      mr1b2_op(model) { e::AppearanceMapping.paint_part!(part, map, grain: grain, bindings: { sheet: material }) }
+      expected = grain == 'width' ? [0.3, 1.5] : [0.75, 0.6]
+      ok("MR3A mapper #{grain}: skutocny bod a pociatok z oboch stran",
+         [true, false].all? do |front|
+           mr3a_near(mr3a_uv(face, mr3a_point([75, 30, 18]), front), expected) &&
+             mr3a_near(mr3a_uv(face, mr3a_point([0, 0, 18]), front), [0, 0])
+         end)
+    end
+    mr1b2_op(model) { face.reverse! }
+    mr1b2_op(model) { e::AppearanceMapping.paint_part!(part, mr3a_map(part), grain: 'length', bindings: { sheet: material }) }
+    ok('MR3A reverse: nova mapa vrati canonical UV oboch stran',
+       [true, false].all? { |front| mr3a_near(mr3a_uv(face, mr3a_point([75, 30, 18]), front), [0.75, 0.6]) })
+    mr1b2_op(model) { mr3a_projected_face(d88_face_on(part, 2, :min), material, 0) }
+    other_faces = part.definition.entities.grep(Sketchup::Face) - [d88_face_on(part, 1, :min)]
+    before = other_faces.map { |f| mr3a_face_state(f) }
+    parent = part.material
+    mr1b2_op(model) do
+      e::AppearanceMapping.paint_part!(part, mr3a_map(part), grain: 'width',
+                                      bindings: { edges: { 'L1' => { material: material, inherit: false } } })
+    end
+    edge = d88_face_on(part, 1, :min)
+    ok('MR3A partial ABS: iny grain neprepise UV dekoru ani ostatnych ploch a parenta',
+       part.material == parent && other_faces.map { |f| mr3a_face_state(f) } == before &&
+       [true, false].all? { |front| mr3a_near(mr3a_uv(edge, mr3a_point([75, 0, 9]), front), [0.75, 0.18]) })
+    mirror = mr1b2_op(model) do
+      tr = Geom::Transformation.translation(mr3a_point([31_000, 30_000, 0])) * Geom::Transformation.scaling(-1, 1, 1)
+      model.entities.add_instance(part.definition, tr)
+    end
+    # Svetove body su napisane nezavisle, nie vypocitane transformaciou mappera.
+    rays = [[part, [30_075, 30_030, 18]], [mirror, [30_925, 30_030, 18]]]
+    ok('MR3A mirror: ray hit ukazuje spravnu instanciu a plochu so zhodnymi UV', rays.all? do |inst, p|
+      hit = model.raytest([mr3a_point([p[0], p[1], 100]), Geom::Vector3d.new(0, 0, -1)], false)
+      hit && hit[1].include?(inst) && hit[1].include?(face) && mr3a_near(hit[0].to_a, mr3a_point(p).to_a) &&
+        mr3a_near(mr3a_uv(face, mr3a_point([75, 30, 18]), true), [0.75, 0.6])
+    end)
+  ensure
+    mr1b2_op(model) { [part, mirror].compact.each { |i| i.erase! if i.valid? } }
+  end
+
+  def mr3a_geometry_cases(model, material)
+    %i[hole diagonal origin loose_edge].each do |kind|
+      part = mr3a_box(model)
+      mr1b2_op(model) do
+        ents = part.definition.entities
+        case kind
+        when :hole
+          f = ents.add_face([[20, 20, 18], [40, 20, 18], [40, 40, 18], [20, 40, 18]].map { |p| mr3a_point(p) })
+          f.erase!
+        when :diagonal
+          ents.add_line(mr3a_point([0, 0, 18]), mr3a_point([300, 180, 18]))
+        when :origin
+          ents.transform_entities(Geom::Transformation.translation(mr3a_point([5, 0, 0])), ents.to_a)
+        when :loose_edge
+          ents.add_line(mr3a_point([20, 20, 9]), mr3a_point([50, 20, 9]))
+        end
+      end
+      before = mr3a_owner_uv(part)
+      result = e::AppearanceMapping.inspect_part(part, descriptor: mr3a_descriptor)
+      ok("MR3A inspect #{kind}: odmietnutie bez zmeny UV/geometrie",
+         result[:status] == :unsupported && before == mr3a_owner_uv(part))
+      mr1b2_op(model) { part.erase! }
+    end
+    part = mr3a_box(model)
+    map = mr3a_map(part)
+    mr1b2_op(model) do
+      ents = part.definition.entities
+      verts = ents.grep(Sketchup::Edge).flat_map(&:vertices).uniq.select { |v| mm(v.position.x) > 299 }
+      ents.transform_by_vectors(verts, verts.map { Geom::Vector3d.new(5.mm, 0, 0) })
+    end
+    before = mr3a_owner_uv(part)
+    begin
+      mr1b2_op(model) { e::AppearanceMapping.paint_part!(part, map, grain: 'length', bindings: { sheet: material }) }
+      ok('MR3A stale map: zmena tej istej definicie sa odmietne', false)
+    rescue e::Materials::AppearanceError
+      ok('MR3A stale map: stale zive faces nestacia, ziaden UV zapis', mr3a_owner_uv(part) == before)
+    end
+  ensure
+    mr1b2_op(model) { part.erase! if part && part.valid? }
+  end
+
+  def mr3a_failure(model, owner, label, event: :c_call, method: :position_material, after: 2)
+    calls = 0
+    returns = 0
+    trace = TracePoint.new(event, :c_return) do |tp|
+      matching = method == :position_material ? tp.self.is_a?(Sketchup::Face) : tp.self == e::AppearanceMapping
+      next unless matching && tp.method_id == method
+      if tp.event == event
+        calls += 1
+        raise e::Materials::AppearanceError, 'MR3A injektovana chyba po prvom zapise' if calls == after
+      elsif tp.event == :c_return
+        returns += 1 unless tp.return_value == false
+      end
+    end
+    mr3a_reject(model, owner, label) do
+      trace.enable
+      begin
+        yield
+      ensure
+        trace.disable
+      end
+    end
+    ok("MR3A #{label}: injekcia sa naozaj trafila po uspesnom prvom zapise", calls == after && (method != :position_material || returns >= 1))
+  ensure
+    trace.disable if trace
+  end
+
+  def run_mr3a(model)
+    return ok('MR3A: povoleny testmodel', false) unless guard_model?(model)
+    cleanup(model)
+    old_dir = e::Materials.test_dir_override
+    originals = model.materials.to_a
+    Dir.mktmpdir('noxun-mr3a-su-') do |temp|
+      e::Materials.test_dir_override = temp
+      e::Materials.reload!
+      e::Materials.load
+      success, rows = e::Materials.add_decor_batch(
+        'batch_schema' => 3, 'decor' => 'SU MR3A SPOLOCNY', 'type' => 'DTDL', 'grain' => 'length',
+        'sheet_variants' => [16, 18, 19].map { |t| { 'thickness' => t.to_f, 'structure' => 'SM' } },
+        'edge_variants' => [{ 'width' => 23.0, 'thickness' => 1.0, 'structure' => 'SM' }])
+      raise "MR3A katalog: #{rows.inspect}" unless success
+      ids = rows['sheets'].to_h { |id| [e::Materials.sheet(id)['thickness'].to_i, id] }
+      aid = rows['edges'].first
+      status, duplak = e::Materials.create_duplak_sheet(ids[18], 2)
+      raise "MR3A duplak: #{status}" unless status == :ok
+      zs = { 'material_id' => 'SU_MR3A_ZASTENA10', 'manufacturer' => 'Egger', 'decor' => 'SU MR3A ZASTENA',
+             'type' => 'ZASTENA', 'thickness' => 10.0, 'grain' => 'length', 'structure' => 'SM',
+             'sheet_size' => [4100.0, 640.0], 'color' => [80, 120, 160], 'production_class' => 'sheet',
+             'group_id' => 'GRP-SU-MR3A-ZASTENA', 'back_decor' => 'INY RUB', 'back_structure' => 'RT' }
+      raise 'MR3A zastena sa nezapisala' unless e::Materials.upsert_sheet(zs)
+      path = File.join(temp, 'mr3a_axes.png')
+      image = Sketchup::ImageRep.new
+      image.set_data(2, 2, 32, 0, [255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 230, 150, 80, 255].pack('C*'))
+      image.save_file(path)
+      source = mr1b2_op(model) do
+        m = model.materials.add('SU MR3A zdroj')
+        m.texture = path
+        m.texture.size = [100.mm, 50.mm]
+        m
+      end
+      mr1b2_publish(model, ids[18], source)
+      mr1b2_publish(model, zs['material_id'], source)
+      params = d88_params('material_id' => ids[18], 'front_material_id' => ids[18])
+      a = e::CabinetBuilder.build(model, params)
+      r1 = d88_part(a, 'side_left').material
+      mr3a_mapper_cases(model, r1)
+      mr3a_geometry_cases(model, r1)
+      mr3a_check_part(d88_part(a, 'side_left'), 'bok', l: 2, w: 1, t: 0, material: r1, edge: ['L1', 1, :min])
+      mr3a_check_part(d88_part(a, 'shelf'), 'polica', l: 0, w: 1, t: 2, material: r1, edge: ['L1', 1, :min])
+      square = e::CabinetBuilder.build(model, params.merge('width' => 300.0, 'height' => 600.0, 'depth' => 400.0,
+        'floor_height' => 0.0, 'front_material_id' => ids[19], 'fronts' => {
+          'gap_left' => 0.0, 'gap_right' => 0.0, 'gap_top' => 0.0, 'gap_bottom' => 0.0,
+          'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'fixed', 'height' => 336.0, 'wings' => '1',
+                        'profile' => 'ukw7', 'profile_edge' => 'top' }] }))
+      front = d88_part(square, 'front_door')
+      ok('MR3A UKW: skutocne stvorcove celo a finalna katalogova hrubka',
+         front && mr3a_near(e::Store.config(front).values_at('length', 'width', 'thickness'), [300, 300, 19]) &&
+         mr3a_near(front.definition.bounds.max.to_a.map { |v| mm(v) }, [300, 19, 300]))
+      mr3a_check_part(front, 'stvorcove UKW celo', l: 2, w: 0, t: 1, material: r1, edge: ['L1', 0, :min])
+      rails_params = params.merge('height' => 860.0, 'floor_height' => 150.0, 'back_mode' => 'inset',
+        'fronts' => { 'items' => [] }, 'top_mode' => 'two_rails', 'rails_orientation' => 'flat',
+        'rail_depth' => 100.0, 'rails_top_offset' => 30.0)
+      rails = e::CabinetBuilder.build(model, rails_params)
+      mr3a_check_part(find_part(rails, 'cabinet/rail:front'), 'flat vystuha', l: 0, w: 1, t: 2, material: r1)
+      e::CabinetBuilder.rebuild(model, rails, rails_params.merge('rails_orientation' => 'upright', 'rails_top_offset' => 0.0))
+      mr3a_check_part(find_part(rails, 'cabinet/rail:front'), 'upright vystuha', l: 0, w: 2, t: 1, material: r1)
+      drawer = e::CabinetBuilder.build(model, kovc2b_params('material_id' => ids[18],
+        'front_material_id' => ids[18], 'drawer_material_id' => ids[16]))
+      mr3a_check_part(kovd5_part(drawer, 'front:F1/drawer_back'), 'drawer back L1 hore',
+                     l: 0, w: 2, t: 1, material: r1, edge: ['L1', 2, :max])
+      kovd5_switch(model, drawer, 'drawer' => { 'construction' => 'wood' })
+      mr3a_check_part(kovd5_part(drawer, 'front:F1/box_side:left'), 'box side L1 hore',
+                     l: 1, w: 2, t: 0, material: r1, edge: ['L1', 2, :max])
+      bp = { 'material_id' => ids[18], 'length' => 700.0, 'width' => 500.0, 'grain_direction' => 'length',
+             'edges' => %w[L1 L2 W1 W2].to_h { |slot| [slot, aid] } }
+      oriented = %w[leziaca stojaca na_stenu].map do |orientation|
+        board = e::BoardBuilder.build(model, bp.merge('orientation' => orientation))
+        mr3a_check_part(board, "board #{orientation}", l: 0, w: 1, t: 2, material: r1, edge: ['W1', 0, :min])
+        board
+      end
+      board = oriented.first
+      %w[width none].each do |grain|
+        other = e::BoardBuilder.build(model, bp.merge('grain_direction' => grain))
+        mr3a_check_part(other, "board grain #{grain}", l: 0, w: 1, t: 2, material: r1, grain: grain, edge: ['L2', 1, :max])
+      end
+      thick = e::BoardBuilder.build(model, bp.merge('material_id' => duplak['material_id']))
+      ok('MR3A: duplak je skutocny zdroj x2 a hrubka36',
+         e::Store.config(thick).dig('material_source', 'material_id') == ids[18] &&
+         e::Store.config(thick).dig('material_source', 'multiplier') == 2 && e::Store.config(thick)['thickness'] == 36.0)
+      mr3a_check_part(thick, 'duplak36', l: 0, w: 1, t: 2, material: r1, edge: ['L1', 1, :min])
+      zastena = e::BoardBuilder.build(model, bp.merge('material_id' => zs['material_id'], 'edges' => {}))
+      mr3a_check_part(zastena, 'zastena obe strany', l: 0, w: 1, t: 2, material: zastena.material)
+      ok('MR3A: objednavkovy rub zasteny sa nemenil',
+         e::Materials.sheet(zs['material_id']).values_at('back_decor', 'back_structure') == ['INY RUB', 'RT'])
+      mr3a_lifecycle(model, a, board, params, bp, source, ids[18], r1)
+      mr1b2_op(model) { mr3a_projected_face(d88_face_on(board, 2, :max), r1, 18) }
+      mr3a_failure(model, board, 'board druha face strana') { e::BoardBuilder.rebuild(model, board, 'length' => 810.0) }
+      mr3a_failure(model, a, 'cabinet druha face strana') { e::CabinetBuilder.rebuild(model, a, params.merge('width' => 680.0)) }
+      mr3a_failure(model, a, 'druhy dielec', event: :call, method: :paint_part!) { e::CabinetBuilder.rebuild(model, a, params.merge('width' => 680.0)) }
+      plain = e::Materials.sheets.find { |rec| e::Materials.uni?(rec) && rec['thickness'].to_f == 18.0 }
+      raise 'MR3A: chyba pracovna UNI18' unless plain
+      position_calls = 0
+      trace = TracePoint.new(:c_call) { |tp| position_calls += 1 if tp.method_id == :position_material && tp.self.is_a?(Sketchup::Face) }
+      trace.enable
+      begin
+        rgb = e::BoardBuilder.build(model, bp.merge('material_id' => plain['material_id'], 'edges' => {}))
+        no_albedo = mr1b2_op(model) do
+          mat = model.materials.add('SU MR3A PBR bez albeda')
+          mat.roughness_enabled = true if mat.respond_to?(:roughness_enabled=)
+          mat.alpha = 0.8
+          mat
+        end
+        map = mr3a_map(rgb, { box: [700.0, 500.0, 18.0], prod: { length: 700.0, width: 500.0, thickness: 18.0 },
+                             axes: { length: 0, width: 1, thickness: 2 }, role: 'free_panel' })
+        mr1b2_op(model) { e::AppearanceMapping.paint_part!(rgb, map, grain: 'length', bindings: { sheet: no_albedo }) }
+      ensure
+        trace.disable
+      end
+      ok('MR3A: plain build a native bez albeda nevolaju position_material', position_calls.zero? && d88_face_on(rgb, 2, :max).material == no_albedo)
+    ensure
+      trace.disable if trace
+      cleanup(model)
+      e::Materials.test_dir_override = old_dir
+      e::Materials.reload!
+      mr1b2_op(model) { (model.materials.to_a - originals).each { |mat| model.materials.remove(mat) if mat.valid? } }
+    end
+  rescue StandardError => ex
+    ok("MR3A: vynimka #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}", false)
+  end
+
+  def mr3a_lifecycle(model, cabinet, board, params, bp, source, sid, r1)
+    snapshot = mr1b2_snapshot(cabinet)
+    bom = mr1b2_bom(model)
+    vepo = k1_vepo_csv(model)
+    mr1b2_op(model) { r1.texture.size = [320.mm, 160.mm] }
+    live = mr1b1_state(r1)
+    mr1b2_publish(model, sid, source)
+    e::CabinetBuilder.rebuild(model, cabinet, params)
+    e::BoardBuilder.rebuild(model, board, {})
+    ok('MR3A: mapovanie nemenilo snapshot/BOM/VEPO ani zivy material',
+       mr1b2_snapshot(cabinet) == snapshot && mr1b2_bom(model) == bom && k1_vepo_csv(model) == vepo && mr1b1_state(r1) == live)
+    mr3a_check_part(d88_part(cabinet, 'side_left'), 'rebuild R1', l: 2, w: 1, t: 0, material: r1, scale: [320, 160])
+    before_undo = mr3a_owner_uv(board)
+    e::BoardBuilder.rebuild(model, board, 'length' => 810.0)
+    rebuilt_uv = mr3a_owner_uv(board)
+    Sketchup.undo
+    ok('MR3A Undo: board vrati povodne faces a ich presne UV',
+       e::Store.config(board)['length'] == 700.0 && mr3a_owner_uv(board) == before_undo)
+    Sketchup.redo
+    ok('MR3A Redo: board obnovi cely namapovany vysledok',
+       e::Store.config(board)['length'] == 810.0 && mr3a_owner_uv(board) == rebuilt_uv)
+    Sketchup.undo
+    fresh = e::BoardBuilder.build(model, bp)
+    r2 = fresh.material
+    ok('MR3A: novy vklad pouzije inu R2', r2 != r1)
+    mr3a_check_part(fresh, 'novy R2', l: 0, w: 1, t: 2, material: r2)
+    before = cabinets(model)
+    e::Panel.handle_insert_copy(pg(model, 'cabinet_id' => e::Store.get(cabinet, 'cabinet_id')))
+    copy = (cabinets(model) - before).first
+    mr3a_check_part(d88_part(copy, 'side_left'), 'panel copy R1', l: 2, w: 1, t: 0, material: r1, scale: [320, 160])
+    Sketchup.undo
+    copy = e::Tools::Mower.send(:copy_cabinet, model, cabinet, :right)
+    mr3a_check_part(d88_part(copy, 'side_left'), 'toolbar copy R1', l: 2, w: 1, t: 0, material: r1, scale: [320, 160])
+    Sketchup.undo
+    copy = mr1b2_op(model) do
+      inst = model.entities.add_instance(cabinet.definition, Geom::Transformation.translation(mr3a_point([12_000, 0, 0])))
+      cabinet.attribute_dictionaries.each { |dict| dict.each_pair { |key, value| inst.set_attribute(dict.name, key, value) } }
+      inst
+    end
+    done = e::CabinetBuilder.dedup_copies(model, fresh_ids: [copy.entityID])
+    ok('MR3A: native copy bola naozaj deduplikovana', done == [copy])
+    mr3a_check_part(d88_part(copy, 'side_left'), 'native copy R1', l: 2, w: 1, t: 0, material: r1, scale: [320, 160])
+    Sketchup.undo
+    mr1b2_op(model) { cabinet.transformation *= Geom::Transformation.scaling(1.2, 1, 1) }
+    e::ScaleWatch.send(:absorb, cabinet)
+    mr3a_check_part(d88_part(cabinet, 'side_left'), 'absorb cabinet R1', l: 2, w: 1, t: 0, material: r1, scale: [320, 160])
+    Sketchup.undo
+    mr1b2_op(model) { board.transformation *= Geom::Transformation.scaling(1.2, 1, 1) }
+    e::ScaleWatch.send(:absorb_board, board)
+    mr3a_check_part(board, 'absorb board R1', l: 0, w: 1, t: 2, material: r1, scale: [320, 160], edge: ['L1', 1, :min])
+    Sketchup.undo
+    ok('MR3A: scale a absorb maju 1 Spat pre oba buildery',
+       e::Store.config(cabinet)['width'] == 600.0 && e::Store.config(board)['length'] == 700.0 && mr1b1_state(r1) == live)
+    e::CabinetBuilder.rebuild(model, cabinet, params.merge('zone_tree' => { 'id' => 'Z1', 'shelves' => 2, 'children' => [] }))
+    mr3a_check_part(find_part(cabinet, 'zone:Z1/shelf:2'), 'novy dielec R2', l: 0, w: 1, t: 2, material: r2)
+    Sketchup.undo
+  end
+
   # MR-1B1: native save/load bez dotyku katalogu alebo geometrie zakazky.
   def mr1b1_visual(material)
     state = { color: material.color.to_a, alpha: material.alpha }
@@ -20456,6 +20869,7 @@ module NoxunSuRunner
     run_cela_b(model)
     run_mr1b1(model)
     run_mr1b2(model)          # MR-1B2: R1/R2, spolocna ABS, prestavba, verna kopia a rollback
+    run_mr3a(model)           # MR-3A: fyzicke UV, skutocne roly, partial bindingy a rollback
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
