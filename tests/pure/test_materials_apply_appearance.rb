@@ -729,3 +729,27 @@ NxTest.test('MR3B apply: clone ktory meni obsah abortne pred prvym paint') do
     NxTest.assert_equal([1, 0, 1, false], [s[:model].starts.length, s[:model].commits, s[:model].aborts, s[:busy]])
   end
 end
+
+NxTest.test('MR3B face content: prepocitana rovina nemení plochu, vrchol a normala ano') do
+  vertex_class = Struct.new(:position)
+  loop_class = Struct.new(:vertices)
+  face_class = Struct.new(:normal, :loops, :outer_loop, :plane)
+  height = 18.0 / 25.4
+  points = [[0.0, 0.0, height], [4.0, 0.0, height], [4.0, 3.0, height], [0.0, 3.0, height]]
+  make_face = lambda do |coordinates, normal, plane|
+    outer = loop_class.new(coordinates.map { |p| vertex_class.new(NxApplyAppearance::Point.new(*p)) })
+    face_class.new(NxApplyAppearance::Point.new(*normal), [outer], outer, plane)
+  end
+  original = make_face.call(points, [0, 0, 1], [0, 0, 1, -height])
+  # Native make_unique moze prepocitat D o 1 ULP pri presne zhodnych vrcholoch.
+  clone = make_face.call(points.rotate(2), [0, 0, 1], [0, 0, 1, (-height).next_float])
+  before = NxApplyAppearance.app.send(:face_geometry, original)
+  NxTest.refute(original.plane == clone.plane, 'Fixture musi mat odlisne rovnicove koeficienty')
+  NxTest.assert_equal(before, NxApplyAppearance.app.send(:face_geometry, clone))
+  changed_points = points.map(&:dup)
+  changed_points.first[0] = 0.125
+  moved = make_face.call(changed_points, [0, 0, 1], original.plane)
+  reversed = make_face.call(points, [0, 0, -1], original.plane)
+  NxTest.refute(before == NxApplyAppearance.app.send(:face_geometry, moved), 'Zmena vrcholu zostava obsahova zmena')
+  NxTest.refute(before == NxApplyAppearance.app.send(:face_geometry, reversed), 'Zmena orientacie zostava obsahova zmena')
+end
