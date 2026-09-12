@@ -538,7 +538,9 @@ Jedno tlačidlo Vzhľad pri povrchu, bez samostatného ABS override. Katalógov�
 MR-3A (v0.11.4) dopĺňa spoločný mapper v oboch builderoch: fyzická mierka, smer dekoru aj ABS a oba povrchy plôch; chybné mapovanie zruší celú stavbu.
 Nový vklad používa aktuálnu revíziu, prestavba/kópia zachová živý pôvodný materiál. MR-3B (v0.11.5) dopĺňa aplikovanie na podporované existujúce výskyty
 vrátane skrytých/vnorených, izolácie zdieľaných definícií a zachovania necielených plôch v jednej Undo operácii. Prestavba nerecykluje definície používané cudzími dielcami.
-Nasleduje MR-2 ovládanie a záverečný smoke. D-28 ostáva otvorené do dokončenia celého bloku.
+MR-2A (v0.11.6) dopĺňa prípravu pracovného materiálu v tej istej operácii ako Apply, aj bez dielcov; pri chybe alebo predčasnom odchode sa vráti celý pokus.
+Pracovný import odmieta obsadenú revíziu a starý handle. SKM export zo živého alebo súborového zdroja overuje presnú obnovu kolekcie po oboch abortoch.
+Nasleduje MR-2B ovládanie a záverečný smoke. D-28 ostáva otvorené do dokončenia celého bloku.
 Natívna sonda potvrdila aj editáciu materiálu bez priradenia geometrii. MR-2 preto nepotrebuje pomocnú plochu: otvorí panel Materiály, kartu Upraviť prepne používateľ.
 
 - **V1 rozsah — M-R VZHĽAD (rozhodnuté 6.9.2026, NAHRÁDZA package „M-R FOTO" — Demos fotka ako textúra vypadáva):** ručné textúry z Michalovej knižnice (`E:\NOXUN\.MATERIÁLY`)

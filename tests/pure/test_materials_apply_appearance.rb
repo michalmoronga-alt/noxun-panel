@@ -42,29 +42,46 @@ module NxApplyAppearance
       @model, @name, @alpha = model, 'Rovnaka farba a nazov', 1.0
       model.materials << self
     end
+    # Len kolekcia a jednoduche fake properties; geometriu/Undo tento model nema.
+    def test_snapshot = [name.dup, texture&.dup, alpha, JSON.parse(JSON.generate(dicts))]
+    def test_restore(state)
+      @name, @texture, @alpha, @dicts = state
+      @alive = true
+    end
   end
 
   class Model < Record
-    attr_accessor :active_path, :on_start, :start_result
+    attr_accessor :active_path, :on_start, :on_abort, :start_result, :commit_result
     attr_reader :materials, :entities, :starts, :commits, :aborts, :test_layer
     def initialize
       super()
       @materials, @entities, @starts = [], [], []
       @commits = @aborts = 0
       @start_result = true
+      @commit_result = true
+      @operation_open = false
       @test_layer = Layer.new('Untagged', true, nil)
     end
     def start_operation(*args)
       @starts << args
+      @material_snapshot = materials.to_h { |material| [material, material.test_snapshot] }
+      @operation_open = true if start_result
       on_start.call if on_start
       start_result
     end
+    def operation_open? = @operation_open
     def commit_operation
       @commits += 1
-      true
+      @operation_open = false if commit_result
+      commit_result
     end
     def abort_operation
       @aborts += 1
+      on_abort.call if on_abort
+      (materials - @material_snapshot.keys).each { |material| material.alive = false }
+      materials.replace(@material_snapshot.keys)
+      @material_snapshot.each { |material, state| material.test_restore(state) }
+      @operation_open = false
       true
     end
   end
@@ -247,6 +264,20 @@ module NxApplyAppearance
   def plan(s, instance, path: [instance], owner: instance)
     app.send(:plan_part, instance, path: path, owner: owner,
       membership: app.send(:membership, s[:catalog]), scope: SCOPE, material: s[:material])
+  end
+
+  # Skutocny Ruby non-local odchod; RuntimeError by ensure kontrakt neoveril.
+  def leave_preparation(s, kind, &prepare)
+    case kind
+    when :break
+      app.apply(s[:model], scope: SCOPE) { prepare.call; break :left }
+    when :return
+      app.apply(s[:model], scope: SCOPE) { prepare.call; return :left }
+    when :throw
+      catch(:preparation_exit) do
+        app.apply(s[:model], scope: SCOPE) { prepare.call; throw :preparation_exit, :left }
+      end
+    end
   end
 end
 
@@ -752,4 +783,197 @@ NxTest.test('MR3B face content: prepocitana rovina nemení plochu, vrchol a norm
   reversed = make_face.call(points, [0, 0, -1], original.plane)
   NxTest.refute(before == NxApplyAppearance.app.send(:face_geometry, moved), 'Zmena vrcholu zostava obsahova zmena')
   NxTest.refute(before == NxApplyAppearance.app.send(:face_geometry, reversed), 'Zmena orientacie zostava obsahova zmena')
+end
+
+NxTest.test('MR2A prepare: nulovy pocet dielcov commitne plain aj native handle v jednej operacii') do
+  %i[plain native].each do |kind|
+    NxApplyAppearance.isolated do |s|
+      old = s[:material].test_snapshot
+      calls = 0
+      prepared = nil
+      result = NxApplyAppearance.app.apply(s[:model], scope: NxApplyAppearance::SCOPE) do
+        calls += 1
+        NxTest.assert(s[:busy] && s[:model].operation_open?)
+        NxTest.assert_equal([['Použiť vzhľad', false]], s[:model].starts)
+        NxTest.assert_equal([1, 1, 1], [s[:flushes], s[:reads], s[:locks]])
+        prepared = kind == :plain ? NxApplyAppearance::Material.new(s[:model]) : NxApplyAppearance.native(s[:model])
+      end
+      NxTest.assert_equal({ status: :nothing_to_apply, updated_parts: 0, updated_sheets: 0, updated_edges: 0,
+                            skipped_parts: 0, skips: [], material: prepared }, result)
+      NxTest.assert_equal([s[:material], prepared], s[:model].materials)
+      NxTest.assert_equal(old, s[:material].test_snapshot)
+      NxTest.assert_equal([1, 1, 0, false, false], [calls, s[:model].commits, s[:model].aborts, s[:busy], s[:model].operation_open?])
+    end
+  end
+end
+
+NxTest.test('MR2A prepare: material plus blok a chybejuci vstup sa odmietnu pred operaciou') do
+  NxApplyAppearance.isolated do |s|
+    calls = 0
+    NxApplyAppearance.error do
+      NxApplyAppearance.app.apply(s[:model], scope: NxApplyAppearance::SCOPE, material: s[:material]) { calls += 1 }
+    end
+    NxApplyAppearance.error { NxApplyAppearance.app.apply(s[:model], scope: NxApplyAppearance::SCOPE) }
+    NxTest.assert_equal([0, 0, 0], [calls, s[:flushes], s[:model].starts.length])
+  end
+end
+
+NxTest.test('MR2A prepare: odmietnuty model, context, flush a fresh scope nikdy nezavolaju blok') do
+  %i[inactive edit busy flush inactive_after_flush edit_after_flush busy_after_flush
+     inactive_after_start edit_after_start start_false absent uni catalog_error].each do |kind|
+    NxApplyAppearance.isolated do |s|
+      case kind
+      when :inactive then s[:active] = NxApplyAppearance::Model.new
+      when :edit then s[:model].active_path = [Object.new]
+      when :busy then s[:busy] = true
+      when :flush then s[:flush_result] = false
+      when :inactive_after_flush then s[:on_flush] = -> { s[:active] = NxApplyAppearance::Model.new }
+      when :edit_after_flush then s[:on_flush] = -> { s[:model].active_path = [Object.new] }
+      when :busy_after_flush then s[:on_flush] = -> { s[:busy] = true }
+      when :inactive_after_start then s[:model].on_start = -> { s[:active] = NxApplyAppearance::Model.new }
+      when :edit_after_start then s[:model].on_start = -> { s[:model].active_path = [Object.new] }
+      when :start_false then s[:model].start_result = false
+      when :absent then s[:catalog] = { 'sheets' => [], 'edges' => [] }
+      when :uni
+        s[:catalog] = { 'sheets' => [NxApplyAppearance.row('UNI-18').merge('uni' => true)], 'edges' => [] }
+      end
+      before = s[:model].materials.dup
+      calls = 0
+      attempt = -> { NxApplyAppearance.error { NxApplyAppearance.app.apply(s[:model], scope: NxApplyAppearance::SCOPE) { calls += 1 } } }
+      if kind == :catalog_error
+        NxApplyAppearance.stub(NxApplyAppearance::E::Materials, :appearance_fresh_catalog!, ->(**) { raise 'catalog rejected' }, &attempt)
+      else
+        attempt.call
+      end
+      started = %i[inactive_after_start edit_after_start start_false].include?(kind)
+      NxTest.assert_equal([0, started ? 1 : 0], [calls, s[:model].starts.length], kind.to_s)
+      NxTest.assert_equal(started && kind != :start_false ? 1 : 0, s[:model].aborts)
+      NxTest.refute(s[:model].operation_open?)
+      NxTest.assert_equal(before, s[:model].materials)
+    end
+  end
+end
+
+NxTest.test('MR2A prepare: neplatny vysledok, zmena modelu aj zly commit abortnu vytvoreny W') do
+  %i[nil foreign removed wrong_scope duplicate inactive edit commit_false exception].each do |kind|
+    NxApplyAppearance.isolated do |s|
+      before = s[:model].materials.dup
+      created = nil
+      calls = 0
+      NxApplyAppearance.error do
+        NxApplyAppearance.app.apply(s[:model], scope: NxApplyAppearance::SCOPE) do
+          calls += 1
+          created = NxApplyAppearance.native(s[:model])
+          case kind
+          when :nil then nil
+          when :foreign then NxApplyAppearance::Material.new(NxApplyAppearance::Model.new)
+          when :removed then s[:model].materials.delete(created); created.alive = false; created
+          when :wrong_scope
+            created.set_attribute('NOXUN', 'appearance_scope', JSON.generate(NxApplyAppearance::OTHER))
+            created
+          when :duplicate then NxApplyAppearance.native(s[:model]); created
+          when :inactive then s[:active] = NxApplyAppearance::Model.new; created
+          when :edit then s[:model].active_path = [Object.new]; created
+          when :commit_false then s[:model].commit_result = false; created
+          when :exception then raise 'preparation failed after creating W'
+          end
+        end
+      end
+      NxTest.assert_equal(before, s[:model].materials)
+      NxTest.refute(created.valid?)
+      NxTest.assert_equal([1, 1, kind == :commit_false ? 1 : 0, 1, false, false],
+        [calls, s[:model].starts.length, s[:model].commits, s[:model].aborts, s[:busy], s[:model].operation_open?])
+    end
+  end
+end
+
+NxTest.test('MR2A prepare: break return aj throw po zmene novej textury vzdy uzavru operaciu abortom') do
+  %i[break return throw].product([0, 1]).each do |kind, target_count|
+    NxApplyAppearance.isolated do |s|
+      NxApplyAppearance.board(s[:model]) if target_count == 1
+      s[:model].on_abort = -> { NxTest.assert(s[:busy], 'Aj abort musi prebehnut pod guardom') }
+      before = s[:model].materials.dup
+      s[:material].texture = NxApplyAppearance::Texture.new(13.0, 17.0)
+      old = s[:material].test_snapshot
+      created = nil
+      calls = 0
+      NxApplyAppearance.with_parts(s) do
+        result = NxApplyAppearance.leave_preparation(s, kind) do
+          calls += 1
+          created = NxApplyAppearance.native(s[:model])
+          created.texture = NxApplyAppearance::Texture.new(100.0, 50.0)
+          created.texture.width = 25.0
+          NxTest.assert(s[:busy] && s[:model].operation_open?)
+          created
+        end
+        NxTest.assert_equal(:left, result)
+      end
+      NxTest.assert_equal(before, s[:model].materials)
+      NxTest.assert_equal(old, s[:material].test_snapshot)
+      NxTest.refute(created.valid?)
+      NxTest.assert_equal([1, 1, 0, 1, false, false], [calls, s[:model].starts.length, s[:model].commits,
+                                                   s[:model].aborts, s[:busy], s[:model].operation_open?])
+    end
+  end
+end
+
+NxTest.test('MR2A prepare: cerstvy plan a mapper dostanu pripraveny handle az po skonceni bloku') do
+  NxApplyAppearance.isolated do |s|
+    board = NxApplyAppearance.board(s[:model], 'A18', 'L1' => 'A23')
+    calls = []
+    created = nil
+    NxApplyAppearance.with_parts(s) do
+      painter = lambda do |part, _map, grain:, bindings:|
+        calls << :paint
+        NxTest.assert_equal([:prepare, :prepared, :paint], calls)
+        NxTest.assert_equal(board, part)
+        NxTest.assert_equal('length', grain)
+        NxTest.assert_equal(created, bindings[:sheet])
+        NxTest.assert_equal({ 'L1' => { material: created, inherit: false } }, bindings[:edges])
+        true
+      end
+      NxApplyAppearance.stub(NxApplyAppearance::E::AppearanceMapping, :paint_part!, painter) do
+        result = NxApplyAppearance.app.apply(s[:model], scope: NxApplyAppearance::SCOPE) do
+          calls << :prepare
+          created = NxApplyAppearance.native(s[:model])
+          calls << :prepared
+          created
+        end
+        NxTest.assert_equal([:applied, 1, 1, 1, created], result.values_at(:status, :updated_parts, :updated_sheets, :updated_edges, :material))
+      end
+    end
+    NxTest.assert_equal([1, 1, 0], [s[:model].starts.length, s[:model].commits, s[:model].aborts])
+  end
+end
+
+NxTest.test('MR2A prepare: chyba druheho mappera vrati aj kolekciu pripraveneho materialu') do
+  NxApplyAppearance.isolated do |s|
+    Array.new(2) { NxApplyAppearance.board(s[:model]) }
+    before = s[:model].materials.dup
+    old = s[:material].test_snapshot
+    created = nil
+    calls = 0
+    NxApplyAppearance.with_parts(s) do
+      painter = lambda do |*_args, **_keywords|
+        calls += 1
+        raise 'second mapper rejected' if calls == 2
+        true
+      end
+      NxApplyAppearance.stub(NxApplyAppearance::E::AppearanceMapping, :paint_part!, painter) do
+        error = NxApplyAppearance.error do
+          NxApplyAppearance.app.apply(s[:model], scope: NxApplyAppearance::SCOPE) do
+            created = NxApplyAppearance.native(s[:model])
+            created.texture = NxApplyAppearance::Texture.new(25.0, 50.0)
+            created
+          end
+        end
+        NxTest.assert(error.message.include?('second mapper rejected'))
+      end
+    end
+    NxTest.assert_equal(before, s[:model].materials)
+    NxTest.assert_equal(old, s[:material].test_snapshot)
+    NxTest.refute(created.valid?)
+    NxTest.assert_equal([2, 1, 0, 1, false, false], [calls, s[:model].starts.length, s[:model].commits,
+                                                 s[:model].aborts, s[:busy], s[:model].operation_open?])
+  end
 end

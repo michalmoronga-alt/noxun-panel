@@ -228,10 +228,18 @@ Používateľské premenovanie identitu nemení; interný exportný názov je `N
 Mutujúci volajúci vlastní modelovú operáciu a rollback; adaptér pri načítaní neotvára vnorenú operáciu. Nedostupný súbor je odlíšený od nesprávnej
 identity či nejednoznačných kandidátov. Nezhodný výsledok sa nikdy nepreoznačí ani neprefarbí; volajúci musí svoju operáciu zrušiť.
 
-`export(model, source, staging_path, descriptor, scope)` odmietne aktívny NOXUN guard, neplatný zdroj alebo nesprávny model. Prvá krátka guarded operácia
-dočasne nastaví iba názov a identitu, uloží presnú `.skm.staging` cestu a abortom obnoví zdroj. Druhá operácia overí staging natívnym načítaním a opäť sa zruší.
-**Oba aborty musia vrátiť true**, tuple sa overuje ešte na živom načítanom materiáli a po druhom aborte musí sedieť pôvodné meno aj metadata zdroja.
-Chyba nemôže vrátiť úspech exportéra. Až potom MR-1A rozhodne o nemennom súbore a publikácii katalógu; export sám do katalógu nezapisuje.
+`export(model, source, staging_path, descriptor, scope, source_descriptor: nil)` prijíma práve jeden živý alebo knižničný zdroj. Odmietne aktívny NOXUN
+guard, neplatný zdroj alebo nesprávny model. MR-2A načíta súborový zdroj až v prvej krátkej guarded operácii; tá dočasne nastaví názov a identitu,
+uloží presnú staging cestu a abortom obnoví zdroj aj jeho prípadné načítanie. Druhá operácia overí staging natívnym načítaním a opäť sa zruší.
+**Oba aborty musia vrátiť true a presnú pôvodnú kolekciu handles**, nie iba rovnaký počet materiálov. Pri zdroji existujúcom pred operáciou sa overí
+aj pôvodné meno a všetky metadata; platí to aj pre živý materiál nájdený cez súborový descriptor. Novo načítaný dočasný zdroj po aborte nezostáva v modeli.
+Kontroly obnovy platia aj pri výnimke. Chýbajúci knižničný zdroj je chyba, žiadny tichý výber staršej revízie alebo farby. Export sám do katalógu nezapisuje.
+
+**MR-2A pracovný cyklus:** `import_working(model, path, scope:, revision:)` načíta dôveryhodný pracovný SKM a overí celý tuple aj nový handle;
+`create_working(model, scope:, color:, revision:)` vytvorí nový natívny materiál z troch celých RGB hodnôt 0–255, aj bez dielcov v modeli.
+Obe cesty odmietajú obsadenú revíziu pred mutáciou a nikdy nepreoznačia ani nevrátia starý zdieľaný materiál. Bežný `load` publikovanej revízie si reuse zachováva.
+Guard, operáciu a rollback vlastní caller cez prípravný blok Apply; UNI a členstvo scope preverí v čerstvom katalógu pred prípravou. Nevzniká pomocná geometria.
+Každý explicitný Pick/Edit má dostať nový pracovný materiál; celý pôvodný natívny obsah prenáša SKM, bez kopírovania PBR polí a bez automatickej publikácie.
 
 Natívne testy na SU 26.0 porovnávajú aj pixely, fyzickú mierku albeda, alpha, colorize a dostupné PBR nastavenia.
 Pri čerstvo vytvorených API mapách natívny save/load zjednotí ich sekundárne width/height s albedom; test to priznáva samostatne.
@@ -280,8 +288,13 @@ Samostatné Apply a izoláciu zdieľaných výskytov zabezpečuje `ApplyAppearan
 
 **MR-3B: `ApplyAppearance.apply(model, scope:, material:)` priradí pripravený živý vzhľad podporovaným výskytom aktuálneho modelu.**
 Scope je normalizovaná dvojica skupina/povrch, spoločná pre dosky aj ABS. Členstvo vychádza z jediného čerstvého čítania katalógu pod jeho zámkom
-a z výrobných ID snapshotu; meno natívneho materiálu ani rovnaká RGB nie sú členstvom. UNI je vylúčené. Služba nepublikuje knižnicu, nenačítava `.skm`,
-nemení vlastnosti materiálov, výrobné atribúty ani geometriu stavbou. Pracovný alebo uložený materiál pripravuje caller.
+a z výrobných ID snapshotu; meno natívneho materiálu ani rovnaká RGB nie sú členstvom. UNI je vylúčené. Služba nepublikuje knižnicu,
+nemá vlastný výber zdroja a nemení výrobné atribúty ani geometriu stavbou. Pracovný alebo uložený materiál pripravuje caller.
+
+**MR-2A:** alternatívne `apply(model, scope:) { prepared_material }` spustí dôveryhodnú synchrónnu prípravu raz v tej istej operácii ako priradenie.
+Materiál a blok sú vzájomne výlučné vstupy. Pred blokom sa overí model/root/idle, flush a existujúci ne-UNI scope v čerstvom katalógu; po bloku platný
+plain alebo jednoznačný protected handle a nový plán výskytov. Blok nesmie otvárať operáciu, dialóg ani export. Caller v ňom môže načítať nový pracovný
+archív, vymeniť obrázok alebo pripraviť čistú katalógovú farbu. Výsledný `:material` preberá až z úspešného návratu Apply, nikdy zo zrušenej prípravy.
 
 Aktívny model, root edit kontext, neprítomný rebuilding guard a vlastný platný handle sa overujú pred `ScaleWatch.flush_pending!` aj po ňom.
 Native materiál musí mať správny scope a jednoznačný lookup svojej revízie. Cudzia editácia sa nezatvára. Skutočné výskyty sa prechádzajú cez vnorené
@@ -297,7 +310,9 @@ atribúty a potlačenie UI v tomto prípade vypínalo selection callbacky (D-40,
 nevzniká dodatočná operácia ani zápis DC údajov. Obsahový strom s multiplicitami dokazuje zhodu pred/po clone,
 bez párovania starých a nových potomkov podľa PID alebo indexu. Neznámy nepreukázateľný obsah blokuje iba potrebnú clone vetvu. Po izolácii sa
 z čerstvých potomkov pripraví finálny plán; až potom sa selektívne mapujú cielené plochy. Akýkoľvek neočakávaný drift alebo chyba zápisu zruší celú
-operáciu vrátane izolácie. Bez cieľa nevzniká prázdny Undo krok. Výsledok udáva počty fyzických dielcov, dvojíc veľkých plôch, ABS slotov a dôvody skipov.
+operáciu vrátane prípravy a izolácie. Vnútorné `ensure` pod guardom abortuje aj predčasný `break`, `return` alebo `throw` z prípravného bloku.
+Statické volanie bez cieľov nevytvára Undo krok. Bloková príprava sa commitne aj bez dielcov: nový materiál v kolekcii je výsledok a Späť odstráni aj ten.
+Výsledok udáva počty fyzických dielcov, dvojíc veľkých plôch, ABS slotov a dôvody skipov; blokový úspech navyše vracia pripravený živý `:material`.
 
 ### materials_abs.rb
 

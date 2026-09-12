@@ -17,19 +17,27 @@ module Noxun
       BEHAVIOR = %i[always_face_camera? cuts_opening? is2d? no_scale_mask? snapto shadows_face_sun?].freeze
       module_function
 
-      def apply(model, scope:, material:)
-        input!(model, scope, material)
+      # Pripravny blok bezi raz v tej istej operacii; nesmie otvorit dalsiu
+      # operaciu, dialog ani export. Caller prebera material az po commite.
+      def apply(model, scope:, material: nil)
+        preparing = block_given?
+        raise ApplyError, 'Zadaj materiál alebo prípravu vzhľadu, nie oboje.' if preparing && !material.nil?
+        preparing ? context!(model, scope) : input!(model, scope, material)
         raise ApplyError, 'Model ešte dokončuje predchádzajúcu zmenu.' unless ScaleWatch.flush_pending!(model) == true
-        input!(model, scope, material)
+        preparing ? context!(model, scope) : input!(model, scope, material)
         members = Materials.with_catalog_lock { membership(Materials.appearance_fresh_catalog!) }
-        initial = scan(model, members, scope, material)
-        return result([], initial[:skips]) if initial[:parts].empty?
+        if preparing
+          raise ApplyError, 'Skupina vzhľadu už nie je v katalógu alebo je UNI.' unless members.value?(scope)
+        else
+          initial = scan(model, members, scope, material)
+          return result([], initial[:skips]) if initial[:parts].empty?
 
-        roots = initial[:parts].map { |part| part[:path].first }.uniq
-        before = roots.to_h { |root| [root, [root.definition, content(root, strict: false)]] }
-        input!(model, scope, material)
-        initial[:parts].each { |part| verify_plan!(part) }
-        verify_roots!(model, before, identities: true)
+          roots = initial[:parts].map { |part| part[:path].first }.uniq
+          before = roots.to_h { |root| [root, [root.definition, content(root, strict: false)]] }
+          input!(model, scope, material)
+          initial[:parts].each { |part| verify_plan!(part) }
+          verify_roots!(model, before, identities: true)
+        end
         ScaleWatch.guard do
           started = false
           begin
@@ -37,6 +45,14 @@ module Noxun
             # tomto clone vypina selection eventy (D-40); guard ostava aktivny.
             raise ApplyError, 'Operácia vzhľadu sa nedá otvoriť.' unless model.start_operation('Použiť vzhľad', false) == true
             started = true
+            if preparing
+              context!(model, scope, guarded: true)
+              material = yield
+              input!(model, scope, material, guarded: true)
+              initial = scan(model, members, scope, material)
+              roots = initial[:parts].map { |part| part[:path].first }.uniq
+              before = roots.to_h { |root| [root, [root.definition, content(root, strict: false)]] }
+            end
             input!(model, scope, material, guarded: true)
             initial[:parts].each { |part| verify_plan!(part) }
             verify_roots!(model, before, identities: true)
@@ -61,13 +77,14 @@ module Noxun
             end
             raise ApplyError, 'Operácia vzhľadu sa nepotvrdila.' unless model.commit_operation == true
             started = false
-            result(final[:parts], initial[:skips])
-          rescue StandardError
+            out = result(final[:parts], initial[:skips])
+            out[:material] = material if preparing
+            out
+          ensure
+            # Aj break/return/throw z pripravy musi vratit cely pokus pod guardom.
             if started
-              started = false
               raise ApplyError, 'Obnova modelu po chybe vzhľadu zlyhala.' unless model.abort_operation == true
             end
-            raise
           end
         end
       rescue ApplyError
@@ -77,12 +94,7 @@ module Noxun
       end
 
       def input!(model, scope, material, guarded: false)
-        raise ApplyError, 'Model už nie je aktívny.' unless model && Sketchup.active_model == model
-        raise ApplyError, 'Zatvor editáciu komponentu a skús znova.' unless model.active_path.nil? || model.active_path.empty?
-        raise ApplyError, 'Prebieha zmena modelu.' if !guarded && ScaleWatch.rebuilding?
-        unless scope.is_a?(Array) && scope.length == 2 && scope.all? { |s| s.is_a?(String) && Materials.identity_norm(s) == s } && !scope.first.empty?
-          raise ApplyError, 'Skupina vzhľadu nie je platná.'
-        end
+        context!(model, scope, guarded: guarded)
         own_material!(model, material)
         # Existujuci dokaz presneho scope, tuple a lookup == dodany handle.
         # Nevybera reviziu, nenacitava material ani nevyzaduje rebuild kontext.
@@ -90,6 +102,15 @@ module Noxun
         texture = material.texture
         if texture && ![texture.width.to_f, texture.height.to_f].all? { |value| value.finite? && value.positive? }
           raise ApplyError, 'Textúra nemá konečnú kladnú fyzickú mierku.'
+        end
+      end
+
+      def context!(model, scope, guarded: false)
+        raise ApplyError, 'Model už nie je aktívny.' unless model && Sketchup.active_model == model
+        raise ApplyError, 'Zatvor editáciu komponentu a skús znova.' unless model.active_path.nil? || model.active_path.empty?
+        raise ApplyError, 'Prebieha zmena modelu.' if !guarded && ScaleWatch.rebuilding?
+        unless scope.is_a?(Array) && scope.length == 2 && scope.all? { |s| s.is_a?(String) && Materials.identity_norm(s) == s } && !scope.first.empty?
+          raise ApplyError, 'Skupina vzhľadu nie je platná.'
         end
       end
 
