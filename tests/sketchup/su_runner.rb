@@ -1087,6 +1087,678 @@ module NoxunSuRunner
     Sketchup.undo
   end
 
+  # MR-3B: skutocne occurrence paths, selektivny Apply a atomicita po clone.
+  def mr3b_attrs(entity)
+    entity.attribute_dictionaries&.to_h { |dict| [dict.name, dict.to_h] } || {}
+  end
+
+  def mr3b_children(instance)
+    instance.definition.entities.to_a.select { |item| item.is_a?(Sketchup::ComponentInstance) || item.is_a?(Sketchup::Group) }
+  end
+
+  def mr3b_tree(instance, exact: false, inherited: nil)
+    effective = instance.material || inherited
+    definition = instance.definition
+    geometry = definition.entities.to_a.filter_map do |item|
+      row = case item
+            when Sketchup::Face
+              state = mr3a_face_state(item)
+              [:face, state.drop(1), mr3b_attrs(item), item.normal.to_a,
+               (item.material || effective)&.persistent_id, (item.back_material || effective)&.persistent_id]
+            when Sketchup::Edge
+              [:edge, item.vertices.map { |v| v.position.to_a }.sort, item.soft?, item.smooth?, item.hidden?, mr3b_attrs(item)]
+            when Sketchup::ConstructionPoint
+              [:point, item.position.to_a, mr3b_attrs(item)]
+            end
+      row && (exact ? [item.persistent_id, row] : row)
+    end.tally
+    tag = instance.layer
+    folders = []
+    folder = tag.respond_to?(:folder) ? tag.folder : nil
+    while folder
+      folders << [folder.name, folder.visible?]
+      folder = folder.respond_to?(:folder) ? folder.folder : nil
+    end
+    state = [mr3b_attrs(instance), mr3b_attrs(definition), instance.name, instance.transformation.to_a,
+             instance.material&.persistent_id, effective&.persistent_id, instance.hidden?, instance.locked?,
+             tag.name, tag.visible?, folders, geometry,
+             mr3b_children(instance).map { |child| mr3b_tree(child, exact: exact, inherited: effective) }.tally]
+    exact ? [instance.persistent_id, definition.persistent_id, definition.name, state] : state
+  end
+
+  def mr3b_scene(model)
+    roots = model.entities.to_a.map do |item|
+      if item.is_a?(Sketchup::ComponentInstance) || item.is_a?(Sketchup::Group)
+        mr3b_tree(item, exact: true)
+      else
+        [item.persistent_id, mr3b_attrs(item)]
+      end
+    end.tally
+    [roots, model.definitions.to_a.map { |d| [d.persistent_id, d.name, mr3b_attrs(d), d.entities.to_a.map(&:persistent_id).sort] }.sort,
+     model.materials.to_a.map { |m| [m.persistent_id, mr1b1_state(m)] }.sort,
+     Array(model.active_path).map(&:persistent_id)]
+  end
+
+  def mr3b_data(instance)
+    [mr3b_attrs(instance), mr3b_attrs(instance.definition), instance.transformation.to_a,
+     mr3b_children(instance).map { |child| mr3b_data(child) }.tally]
+  end
+
+  def mr3b_files(temp)
+    Dir.glob(File.join(temp, '**', '*')).select { |path| File.file?(path) }.sort.map { |path| [path, File.binread(path)] }
+  end
+
+  def mr3b_copy(source, entities, transform = source.transformation)
+    copy = entities.add_instance(source.definition, transform)
+    mr3b_attrs(source).each { |dict, attrs| attrs.each { |key, value| copy.set_attribute(dict, key, value) } }
+    copy.name = source.name
+    copy.material = source.material
+    copy
+  end
+
+  def mr3b_clear(model, keep)
+    tools1_close_context(model)
+    mr1b2_op(model) do
+      (model.entities.to_a - keep).each do |item|
+        next unless item.valid?
+
+        item.locked = false if item.respond_to?(:locked=)
+        item.erase!
+      end
+    end
+    e::ScaleWatch.guard { model.definitions.purge_unused }
+    e::ScaleWatch.flush_pending!(model)
+  end
+
+  def mr3b_board(model, ctx, id = ctx[:a], edges = {}, grain = 'length')
+    board = e::BoardBuilder.build(model, { 'material_id' => id, 'length' => 700.0, 'width' => 500.0,
+                                         'grain_direction' => grain, 'edges' => edges })
+    # Dalsie skupiny uz maju publikovanu reviziu; plain fixture je zamerne explicitny.
+    if ctx[:plain]
+      mr1b2_op(model) do
+        board.material = ctx[:plain]
+        board.definition.entities.grep(Sketchup::Face).each { |f| f.material = f.back_material = nil }
+      end
+    end
+    board
+  end
+
+  def mr3b_apply(model, ctx, which = :a, material = nil)
+    e::ApplyAppearance.apply(model, scope: ctx.fetch(:scopes).fetch(which), material: material || ctx.fetch(:native).fetch(which))
+  end
+
+  def mr3b_counts(result, parts, sheets, edges)
+    result.values_at(:status, :updated_parts, :updated_sheets, :updated_edges) == [:applied, parts, sheets, edges]
+  end
+
+  def mr3b_skip?(result, reason)
+    result[:skipped_parts].positive? && result[:skips].any? { |skip| skip[:reason] == reason }
+  end
+
+  def mr3b_reject(model, label, guard: false)
+    before = mr3b_scene(model)
+    error = nil
+    begin
+      yield
+    rescue e::Materials::AppearanceError => ex
+      error = ex
+    end
+    ok("MR3B #{label}: odmietnutie a cely rollback", error && mr3b_scene(model) == before && e::ScaleWatch.rebuilding? == guard)
+    info("MR3B #{label}: #{error.class}: #{error.message}") if error
+    error
+  end
+
+  def mr3b_no_write(model, label)
+    calls = { flush: 0, operation: 0, paint: 0, unique: 0 }
+    trace = TracePoint.new(:call, :c_call) do |tp|
+      calls[:flush] += 1 if tp.event == :call && tp.self == e::ScaleWatch && tp.method_id == :flush_pending!
+      calls[:paint] += 1 if tp.event == :call && tp.self == e::AppearanceMapping && tp.method_id == :paint_part!
+      calls[:operation] += 1 if tp.event == :c_call && tp.self == model && tp.method_id == :start_operation
+      calls[:unique] += 1 if tp.event == :c_call && tp.method_id == :make_unique
+    end
+    trace.enable
+    yield
+  ensure
+    trace.disable if trace
+    ok("MR3B #{label}: ziadny flush/operation/clone/paint #{calls.inspect}", calls && calls.values.all?(&:zero?))
+  end
+
+  def mr3b_budget(model)
+    e::Budget.compute(e::Bom.compute(e::Bom.collect(model)), {}, e::SupplierSettings.seed_supplier,
+                      sheets: e::Materials.sheets.to_h { |row| [row['material_id'], row] },
+                      edges: e::Materials.edges.to_h { |row| [row['abs_id'], row] }, now: Time.utc(2026, 9, 12))
+  end
+
+  def mr3b_scope_case(model, ctx)
+    a = mr3b_board(model, ctx, ctx[:a], 'L1' => ctx[:ae], 'L2' => ctx[:be])
+    thick = mr3b_board(model, ctx, ctx[:thick], { 'W1' => ctx[:wide] }, 'width')
+    edge = mr3b_board(model, ctx, ctx[:b], 'L1' => ctx[:ae])
+    zs = mr3b_board(model, ctx, ctx[:zs])
+    other = mr3b_board(model, ctx, ctx[:other])
+    uni = mr3b_board(model, ctx, ctx[:uni])
+    old = a.material
+    bface = d88_face_on(a, 1, :max)
+    ok('MR3B scope: A/B rozne scope, rovnake RGB a skutocne nil ABS dedenie',
+       ctx[:scopes][:a] != ctx[:scopes][:b] && e::Materials.color_of(ctx[:a]) == e::Materials.edge_color_of(ctx[:be]) &&
+       bface.material.nil? && bface.back_material.nil? && !old.nil?)
+    ctx[:plain] = old
+    ctx[:native] = %i[a b].to_h do |key|
+      desc = mr1b2_publish(model, ctx[key], ctx[:source])
+      mat = mr1b2_op(model) { e::NativeAppearance.load(model, ctx[:scopes][key], desc) }
+      [key, mat]
+    end
+    untouched = [mr3b_tree(other, exact: true), mr3b_tree(uni, exact: true)]
+    edge_parent = edge.material
+    edge_sheet = [d88_face_on(edge, 2, :min), d88_face_on(edge, 2, :max)].map { |face| mr3a_face_state(face) }
+    data = [a, thick, edge, zs].map { |board| mr3b_data(board) }
+    outputs = [mr1b2_bom(model), k1_vepo_csv(model), mr3b_budget(model)]
+    materials = model.materials.to_a.map { |mat| [mat.persistent_id, mr1b1_state(mat)] }
+    before = mr3b_scene(model)
+    files = mr3b_files(ctx[:temp])
+    result = mr3b_apply(model, ctx)
+    ok("MR3B scope: presne 4 dielce / 3 dosky / 3 ABS #{result.inspect}", mr3b_counts(result, 4, 3, 3))
+    ok('MR3B scope: B ABS pripnuta na povodny presny handle', bface.material == old && bface.back_material == old)
+    edge_face = d88_face_on(edge, 1, :min)
+    ok('MR3B scope: A ABS na B doske ma presny handle/UV, B doska ostala',
+       edge.material == edge_parent && edge_sheet == [d88_face_on(edge, 2, :min), d88_face_on(edge, 2, :max)].map { |face| mr3a_face_state(face) } &&
+       edge_face.material == ctx[:native][:a] && edge_face.back_material == ctx[:native][:a] &&
+       [true, false].all? { |front| mr3a_near(mr3a_uv(edge_face, mr3a_point([75, 0, 9]), front), [0.75, 0.18]) })
+    ok('MR3B scope: UNI a iny povrch zostali presne povodne', untouched == [mr3b_tree(other, exact: true), mr3b_tree(uni, exact: true)])
+    ok('MR3B scope: raw vyrobne data, duplak, BOM, VEPO a ceny bez zmeny',
+       data == [a, thick, edge, zs].map { |board| mr3b_data(board) } && outputs == [mr1b2_bom(model), k1_vepo_csv(model), mr3b_budget(model)] &&
+       e::Store.config(thick).dig('material_source', 'multiplier') == 2)
+    ok('MR3B scope: katalog aj appearance subory byte-identicke', mr3b_files(ctx[:temp]) == files)
+    ok('MR3B scope: povodne material properties ani zoznam handles sa nemenili',
+       materials == model.materials.to_a.map { |mat| [mat.persistent_id, mr1b1_state(mat)] })
+    mr3a_check_part(a, 'Apply A18', l: 0, w: 1, t: 2, material: ctx[:native][:a], edge: ['L1', 1, :min])
+    mr3a_check_part(thick, 'Apply duplak width', l: 0, w: 1, t: 2, material: ctx[:native][:a], grain: 'width', edge: ['W1', 0, :min])
+    mr3a_check_part(zs, 'Apply zastena', l: 0, w: 1, t: 2, material: ctx[:native][:a])
+    post = mr3b_scene(model)
+    Sketchup.undo
+    ok('MR3B Undo: jeden krok vratil vsetky kanaly a povodne definicie', mr3b_scene(model) == before)
+    Sketchup.redo
+    ok('MR3B Redo: obnovil cely Apply', mr3b_scene(model) == post)
+    e::BoardBuilder.rebuild(model, zs, {})
+    ok('MR3B scope: nasledny board rebuild drzi Apply handle', zs.material == ctx[:native][:a])
+  end
+
+  def mr3b_preserve_case(model, ctx)
+    board = mr3b_board(model, ctx, ctx[:a], 'L1' => ctx[:ae], 'L2' => ctx[:be])
+    top = d88_face_on(board, 2, :max)
+    mr1b2_op(model) do
+      mr3a_projected_face(top, ctx[:native][:a], 18.0)
+      top.back_material = ctx[:native][:b]
+      mapping = [mr3a_point([0, 0, 18]), Geom::Point3d.new(0.625, 0.5, 1),
+                 mr3a_point([100, 0, 18]), Geom::Point3d.new(1.625, 0.5, 1),
+                 mr3a_point([0, 50, 18]), Geom::Point3d.new(0.625, 1.5, 1)]
+      top.position_material(ctx[:native][:b], mapping, false, Geom::Vector3d.new(0, 0, 1))
+    end
+    protected_faces = board.definition.entities.grep(Sketchup::Face) - [d88_face_on(board, 1, :max)]
+    before = protected_faces.map { |face| mr3a_face_state(face) }
+    parent = board.material
+    ok('MR3B edge-only: fixture ma odlisne front/back a obe projekcie', top.material != top.back_material && top.get_texture_projection(true) && top.get_texture_projection(false))
+    result = mr3b_apply(model, ctx, :b)
+    changed = d88_face_on(board, 1, :max)
+    ok('MR3B edge-only: iba B L2, necielene UV/projekcie a parent bez zapisu',
+       mr3b_counts(result, 1, 0, 1) && before == protected_faces.map { |face| mr3a_face_state(face) } && board.material == parent &&
+       changed.material == ctx[:native][:b] && changed.back_material == ctx[:native][:b])
+    ok('MR3B edge-only: fyzicky bod L75/T9 ma nezavisle UV na oboch stranach',
+       [true, false].all? { |front| mr3a_near(mr3a_uv(changed, mr3a_point([75, 500, 9]), front), [0.75, 0.18]) })
+    mr1b2_op(model) { board.erase! }
+    %i[nil texture pbr].each do |kind|
+      test = mr3b_board(model, ctx, ctx[:a], 'L2' => ctx[:be])
+      outer = mr1b2_op(model) do
+        wrapper = model.entities.add_group
+        inner = wrapper.entities.add_group
+        copy = mr3b_copy(test, inner.entities, Geom::Transformation.new)
+        test.erase!
+        test = copy
+        copy.material = nil
+        wrapper.material = case kind
+                           when :texture then ctx[:native][:b]
+                           when :pbr
+                             mat = model.materials.add('SU MR3B PBR inherited')
+                             mat.alpha = 0.8
+                             mat.roughness_enabled = true if mat.respond_to?(:roughness_enabled=)
+                             mat
+                           end
+        wrapper
+      end
+      before = mr3b_tree(outer, exact: true)
+      old = outer.material
+      result = mr3b_apply(model, ctx)
+      if kind == :pbr
+        face = d88_face_on(test, 1, :max)
+        ok('MR3B inherited PBR bez albeda: pripnutie presneho handle', mr3b_counts(result, 1, 1, 0) && face.material == old && face.back_material == old)
+      else
+        ok("MR3B inherited #{kind}: cely diel preskoceny bez clone/pin/UV", mr3b_skip?(result, :unpreservable_inheritance) && mr3b_tree(outer, exact: true) == before && result[:updated_parts].zero?)
+      end
+      mr1b2_op(model) { outer.erase! }
+    end
+    raw = mr3b_board(model, ctx)
+    control = mr3b_board(model, ctx)
+    mr1b2_op(model) do
+      raw.material = ctx[:native][:a]
+      face = d88_face_on(raw, 0, :min)
+      face.material = face.back_material = ctx[:native][:a]
+    end
+    old = mr3b_tree(raw, exact: true)
+    desc = mr1b2_publish(model, ctx[:a], ctx[:source])
+    newer = mr1b2_op(model) { e::NativeAppearance.load(model, ctx[:scopes][:a], desc) }
+    result = mr3b_apply(model, ctx, :a, newer)
+    ok('MR3B raw R1: Apply R2 preskoci konflikt, dobry sused prejde',
+       mr3b_skip?(result, :unpreservable_raw_appearance) && mr3b_tree(raw, exact: true) == old && control.material == newer)
+    e::BoardBuilder.rebuild(model, control, {})
+    ok('MR3B raw nil: nasledny rebuild R2 prejde', control.material == newer)
+    result = mr3b_apply(model, ctx)
+    ok('MR3B raw R1: ten isty handle nie je konflikt', !result[:skips].any? { |skip| skip[:reason] == :unpreservable_raw_appearance } && raw.material == ctx[:native][:a])
+  end
+
+  def mr3b_leaves(instance)
+    return [instance] if %w[board part].include?(e::Store.kind(instance))
+
+    mr3b_children(instance).flat_map { |child| mr3b_leaves(child) }
+  end
+
+  def mr3b_nested(model, ctx)
+    cabinet = e::CabinetBuilder.build(model, { 'type' => 'upper', 'width' => 600.0, 'height' => 720.0,
+      'depth' => 500.0, 'material_id' => ctx[:a], 'back_mode' => 'none',
+      'fronts' => { 'items' => [] }, 'zone_tree' => { 'id' => 'Z1', 'shelves' => 1, 'children' => [] } })
+    board = mr3b_board(model, ctx, ctx[:a], 'L2' => ctx[:be])
+    mr1b2_op(model) do
+      (mr1b2_parts(cabinet) + [board]).each do |part|
+        cfg = e::Store.config(part)
+        cfg['edges'] = %w[L1 L2 W1 W2].to_h { |slot| [slot, slot == 'L2' ? ctx[:be] : nil] }
+        e::Store.write_config(part, cfg)
+        part.material = nil
+        part.definition.entities.grep(Sketchup::Face).each { |face| face.material = face.back_material = nil }
+      end
+      cabinet.material = nil
+      inner = model.definitions.add('SU MR3B inner')
+      mr3b_copy(cabinet, inner.entities, Geom::Transformation.new)
+      mr3b_copy(board, inner.entities, Geom::Transformation.translation(mr3a_point([800, 0, 0])))
+      cabinet.erase!
+      board.erase!
+      outer = model.definitions.add('SU MR3B outer')
+      outer.entities.add_instance(inner, Geom::Transformation.new)
+      a = model.entities.add_instance(outer, Geom::Transformation.rotation(ORIGIN, Z_AXIS, 90.degrees))
+      b = model.entities.add_instance(outer, Geom::Transformation.translation(mr3a_point([4000, 0, 0])) * Geom::Transformation.scaling(-1, 1, 1))
+      a.material = ctx[:plain]
+      b.material = model.materials.add('SU MR3B outer B')
+      b.material.color = [30, 80, 150]
+      detached = model.entities.add_group
+      e::Store.write(detached, kind: 'cabinet', cabinet_id: 'CAB-999999', config: { mode: 'detached' })
+      detached.material = ctx[:plain]
+      detached.entities.add_instance(inner, Geom::Transformation.new)
+      [a, b, detached]
+    end
+  end
+
+  def mr3b_nested_case(model, ctx)
+    a, b, foreign = mr3b_nested(model, ctx)
+    tag, folder = mr1b2_op(model) do
+      t = model.layers.add('SU MR3B hidden tag')
+      f = model.layers.add_folder('SU MR3B hidden folder')
+      f.add_layer(t)
+      b.layer = t
+      b.hidden = true
+      f.visible = false
+      [t, f]
+    end
+    leaves = [a, b].flat_map { |outer| mr3b_leaves(outer) }
+    ok('MR3B nested: 12 skutocnych vyskytov, hoci len 6 leaf handles', leaves.length == 12 && leaves.uniq.length == 6 && !folder.visible? && b.hidden?)
+    before = mr3b_scene(model)
+    old_foreign = mr3b_tree(foreign, exact: true)
+    data = [mr3b_data(a), mr3b_data(b)]
+    parents = [a.material, b.material]
+    result = mr3b_apply(model, ctx)
+    ok("MR3B nested: mirror/rotation/hidden maju 12 dosiek #{result.inspect}", mr3b_counts(result, 12, 12, 0))
+    ok('MR3B nested: cudzia bariéra vratane povodneho sharing ostala presna', mr3b_tree(foreign, exact: true) == old_foreign)
+    ok('MR3B nested: vyrobne snapshoty vsetkych occurrence paths ostali', [mr3b_data(a), mr3b_data(b)] == data)
+    ok('MR3B nested: outer aj leaf definicie su izolovane',
+       a.definition != b.definition && (mr3b_leaves(a).map(&:definition) & mr3b_leaves(b).map(&:definition)).empty?)
+    [a, b].zip(parents).each do |outer, old|
+      leaf = mr3b_leaves(outer).find { |part| e::Store.kind(part) == 'board' }
+      face = d88_face_on(leaf, 1, :max)
+      ok('MR3B nested: kazda cesta zachovala vlastny povodny zdedeny ABS handle', face.material == old && face.back_material == old)
+      mr3a_check_part(leaf, 'nested mirror/rotation board', l: 0, w: 1, t: 2, material: ctx[:native][:a])
+    end
+    post = mr3b_scene(model)
+    Sketchup.undo
+    ok('MR3B nested Undo: vratene vsetky povodne identity, definicie a dedenie', mr3b_scene(model) == before)
+    Sketchup.redo
+    ok('MR3B nested Redo: vratena cela izolovana davka', mr3b_scene(model) == post)
+  ensure
+    # Nemenit viditelnost pred meranim Undo; upratovanie tagu robi az vlastna operacia.
+    if tag && tag.valid?
+      mr1b2_op(model) do
+        b.layer = model.layers[0] if b && b.valid?
+        model.layers.remove(tag)
+        model.layers.remove_folder(folder) if folder && folder.valid?
+      end
+    end
+  end
+
+  def mr3b_rebuild_case(model, ctx)
+    params = d88_params('material_id' => ctx[:a], 'front_material_id' => ctx[:a], 'floor_height' => 100.0)
+    cabinet = e::CabinetBuilder.build(model, params)
+    side = d88_part(cabinet, 'side_left')
+    foreign = mr1b2_op(model) do
+      copy = model.entities.add_instance(side.definition, Geom::Transformation.translation(mr3a_point([9000, 0, 0])))
+      copy.material = side.material
+      copy
+    end
+    canonical = side.definition.name
+    old = mr3b_tree(foreign, exact: true)
+    ok('MR3B F1: foreign naozaj pouziva kanonicku definiciu boku', side.definition == foreign.definition && model.definitions[canonical] == foreign.definition)
+    mr3b_apply(model, ctx)
+    applied = mr3b_tree(cabinet, exact: true)
+    ok('MR3B F1: Apply izoloval bok a cudzia geometria ostala', d88_part(cabinet, 'side_left').definition != foreign.definition && mr3b_tree(foreign, exact: true) == old)
+    e::CabinetBuilder.rebuild(model, cabinet, params.merge('height' => 840.0))
+    ok('MR3B F1: skutocny resize nerecykloval pouzivanu kanonicku definiciu',
+       mr3b_tree(foreign, exact: true) == old && d88_part(cabinet, 'side_left').definition != foreign.definition &&
+       d88_part(cabinet, 'side_left').material == ctx[:native][:a] && e::Store.config(cabinet)['height'] == 840.0)
+    Sketchup.undo
+    ok('MR3B F1: jedno Undo rebuildu vratilo post-Apply kabinet aj foreign', mr3b_tree(cabinet, exact: true) == applied && mr3b_tree(foreign, exact: true) == old)
+    mr1b2_op(model) { foreign.erase!; cabinet.erase! }
+    e::ScaleWatch.guard { model.definitions.purge_unused }
+    e::ScaleWatch.flush_pending!(model)
+
+    original = e::CabinetBuilder.build(model, params)
+    target = mr1b2_op(model) do
+      copy = mr3b_copy(original, model.entities, Geom::Transformation.translation(mr3a_point([4000, 0, 0])))
+      cfg = e::Store.config(original)
+      cfg['mode'] = 'detached'
+      e::Store.write_config(original, cfg)
+      copy
+    end
+    legs = mr3b_children(original).find { |part| e::Store.get(part, 'role') == 'leg' }
+    raise 'MR3B F1: skutocny cabinet nema leg proxy' unless legs && legs.definition.entities.length.positive?
+    old = mr3b_tree(original, exact: true)
+    ok('MR3B F1 LEGS: detached original a target zdielaju kabinet aj kanonicke nohy',
+       original.definition == target.definition &&
+       model.definitions["NOXUN #{e::Store.get(original, 'cabinet_id')} LEGS"] == legs.definition)
+    mr3b_apply(model, ctx)
+    e::CabinetBuilder.rebuild(model, target, params.merge('width' => 850.0, 'floor_height' => 180.0))
+    new_legs = mr3b_children(target).find { |part| e::Store.get(part, 'role') == 'leg' }
+    ok('MR3B F1 LEGS: resize nezmenil nohy ani dielce detached originalu',
+       mr3b_tree(original, exact: true) == old && new_legs && new_legs.definition != legs.definition &&
+       new_legs.definition.bounds.max.z.to_f != legs.definition.bounds.max.z.to_f)
+  end
+
+  def mr3b_clone_failure(model, ctx, root, kind)
+    old_def = root.definition
+    injected = 0
+    changed = false
+    trace = TracePoint.new(:c_return) do |tp|
+      next unless tp.method_id == :make_unique && tp.self == root && injected.zero?
+      next unless tp.return_value && root.definition != old_def
+
+      injected += 1
+      if kind == :move
+        child = mr3b_children(root).first
+        old = child.transformation.to_a
+        child.transformation = Geom::Transformation.translation(mr3a_point([7, 0, 0])) * child.transformation
+        changed = child.transformation.to_a != old
+      else
+        child = mr3b_leaves(root).find { |part| e::Store.kind(part) == 'board' }
+        cfg = e::Store.config(child)
+        old = e::Store.get(child, 'config')
+        cfg['grain_direction'] = cfg['grain_direction'] == 'width' ? 'length' : 'width'
+        e::Store.write_config(child, cfg)
+        changed = e::Store.get(child, 'config') != old
+      end
+      # Ziadna injektovana exception: realny obsahovy guard musi zmenu najst sam.
+    end
+    caught = mr3b_reject(model, "F4 clone #{kind}") do
+      trace.enable
+      begin
+        mr3b_apply(model, ctx)
+      ensure
+        trace.disable
+      end
+    end
+    ok("MR3B F4 #{kind}: dosiahnuty clone, platna zmena a skutocny ApplyError", injected == 1 && changed && caught.is_a?(e::ApplyAppearance::ApplyError))
+  ensure
+    trace.disable if trace
+  end
+
+  def mr3b_guard_cases(model, ctx)
+    cabinet = e::CabinetBuilder.build(model, d88_params('material_id' => ctx[:a], 'front_material_id' => ctx[:a]))
+    group = mr1b2_op(model) { model.entities.add_group }
+    e::ScaleWatch.flush_pending!(model)
+    copy = tools1_clone_cabinet(model, cabinet, 4500.0, guarded: false)
+    model.active_path = [group]
+    before_ids = [cabinet, copy].map { |inst| e::Store.get(inst, 'cabinet_id') }
+    ok('MR3B F2: fresh kopia caka na dedup vo vnutri edit kontextu', e::ScaleWatch.pending? && before_ids.uniq.length == 1 && model.active_path == [group])
+    mr3b_no_write(model, 'F2 active edit') { mr3b_reject(model, 'F2 active edit') { mr3b_apply(model, ctx) } }
+    ok('MR3B F2: edit frame aj pending a duplicitne ID zostali',
+       model.active_path == [group] && e::ScaleWatch.pending? && [cabinet, copy].map { |inst| e::Store.get(inst, 'cabinet_id') } == before_ids)
+    tools1_close_context(model)
+    e::ScaleWatch.flush_pending!(model)
+    e::ScaleWatch.guard do
+      mr3b_no_write(model, 'F2 rebuilding guard') { mr3b_reject(model, 'F2 rebuilding guard', guard: true) { mr3b_apply(model, ctx) } }
+    end
+    duplicate = mr1b2_op(model) do
+      [cabinet, copy].each do |owner|
+        mr1b2_parts(owner).each do |part|
+          part.material = ctx[:plain]
+          part.definition.entities.grep(Sketchup::Face).each { |face| face.material = face.back_material = nil }
+        end
+      end
+      mat = model.materials.add('SU MR3B duplicitny native tuple')
+      mat.set_attribute('NOXUN', 'appearance_scope', JSON.generate(ctx[:scopes][:a]))
+      mat.set_attribute('NOXUN', 'appearance_id', ctx[:native][:a].get_attribute('NOXUN', 'appearance_id'))
+      mat
+    end
+    ok('MR3B F3: dva distinct zive handles maju rovnaky tuple', duplicate != ctx[:native][:a] && duplicate.valid? &&
+       duplicate.get_attribute('NOXUN', 'appearance_id') == ctx[:native][:a].get_attribute('NOXUN', 'appearance_id'))
+    mr3b_no_write(model, 'F3 duplicitny tuple') { mr3b_reject(model, 'F3 duplicitny tuple') { mr3b_apply(model, ctx) } }
+    mr1b2_op(model) { model.materials.remove(duplicate) }
+  ensure
+    tools1_close_context(model)
+    e::ScaleWatch.flush_pending!(model)
+  end
+
+  def mr3b_skips_case(model, ctx)
+    %i[locked scale shear future key_schema json dimension grain geometry].each do |kind|
+      good = mr3b_board(model, ctx)
+      bad = mr3b_board(model, ctx)
+      root = bad
+      mr1b2_op(model) do
+        cfg = e::Store.config(bad)
+        case kind
+        when :locked then bad.locked = true
+        when :scale
+          outer = model.entities.add_group
+          copy = mr3b_copy(bad, outer.entities, Geom::Transformation.scaling(0.5, 0.5, 0.5))
+          bad.erase!
+          bad = copy
+          outer.transformation = Geom::Transformation.scaling(2, 2, 2)
+          root = outer
+        when :shear
+          bad.transformation = Geom::Transformation.new([1, 0, 0, 0, 0.2, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
+        when :future then cfg['config_schema'] = e::BoardBuilder::BOARD_CONFIG_SCHEMA + 1
+        when :key_schema then bad.set_attribute('NOXUN', 'part_key_schema', e::PartKeys::SCHEMA + 1)
+        when :json then bad.set_attribute('NOXUN', 'config', '{broken')
+        when :dimension then cfg['length'] = -1.0
+        when :grain then cfg['grain_direction'] = 'diagonal'
+        when :geometry
+          bad.definition.entities.add_line(mr3a_point([0, 0, 18]), mr3a_point([700, 500, 18]))
+        end
+        e::Store.write_config(bad, cfg) if %i[future dimension grain].include?(kind)
+      end
+      before = mr3b_tree(root, exact: true)
+      result = mr3b_apply(model, ctx)
+      reason = { locked: :locked, scale: :nonrigid_transform, shear: :nonrigid_transform,
+                 future: :newer_config, key_schema: :newer_config, json: :invalid_snapshot,
+                 dimension: :invalid_snapshot, grain: :invalid_snapshot, geometry: :unsupported_geometry }.fetch(kind)
+      ok("MR3B skip #{kind}: dobry sused prejde, zly ostal presny s dovodom #{result[:skips].inspect}",
+         mr3b_counts(result, 1, 1, 0) && result[:skipped_parts] == 1 && mr3b_skip?(result, reason) &&
+         good.material == ctx[:native][:a] && mr3b_tree(root, exact: true) == before)
+      mr1b2_op(model) { bad.locked = false if bad.valid?; root.erase!; good.erase! }
+    end
+    cabinet = e::CabinetBuilder.build(model, d88_params('material_id' => ctx[:a], 'front_material_id' => ctx[:a]))
+    parts = mr1b2_parts(cabinet)
+    foreign = mr1b2_op(model) do
+      copy = mr3b_copy(parts.first, model.entities)
+      parts[0].set_attribute('NOXUN', 'cabinet_id', 'CAB-999999')
+      parts[1].set_attribute('NOXUN', 'part_key', e::Store.get(parts[2], 'part_key'))
+      copy
+    end
+    bad = [parts[0], parts[1], parts[2], foreign]
+    before = bad.map { |part| mr3b_tree(part, exact: true) }
+    result = mr3b_apply(model, ctx)
+    ok('MR3B skip: parent ID, duplicitny part_key a vytiahnuty part maju pomenovane dovody',
+       %i[invalid_owner duplicate_part_key missing_owner].all? { |reason| mr3b_skip?(result, reason) } &&
+       bad.map { |part| mr3b_tree(part, exact: true) } == before)
+    mr1b2_op(model) { foreign.erase!; cabinet.erase! }
+    %w[hardware unknown_kind].each do |kind|
+      board = mr3b_board(model, ctx)
+      wrapper = mr1b2_op(model) do
+        outer = model.entities.add_group
+        mr3b_copy(board, outer.entities)
+        board.erase!
+        outer.set_attribute('NOXUN', 'kind', kind)
+        outer
+      end
+      before = mr3b_tree(wrapper, exact: true)
+      result = mr3b_apply(model, ctx)
+      ok("MR3B bariera #{kind}: nikdy nemaľuje vnoreny platny board", result[:updated_parts].zero? && mr3b_tree(wrapper, exact: true) == before)
+      mr1b2_op(model) { wrapper.erase! }
+    end
+    board = mr3b_board(model, ctx)
+    a, b = mr1b2_op(model) do
+      definition = model.definitions.add('SU MR3B unknown clone content')
+      mr3b_copy(board, definition.entities)
+      definition.entities.add_cpoint(ORIGIN)
+      board.erase!
+      [model.entities.add_instance(definition, Geom::Transformation.new),
+       model.entities.add_instance(definition, Geom::Transformation.translation(mr3a_point([3000, 0, 0])))]
+    end
+    good = mr3b_board(model, ctx)
+    before = [mr3b_tree(a, exact: true), mr3b_tree(b, exact: true)]
+    result = mr3b_apply(model, ctx)
+    ok('MR3B unknown clone sibling: skip vetvy, samostatny dobry ciel prejde',
+       mr3b_skip?(result, :unsupported_clone_content) && mr3b_counts(result, 1, 1, 0) &&
+       [mr3b_tree(a, exact: true), mr3b_tree(b, exact: true)] == before)
+    mr1b2_op(model) { a.erase!; b.erase!; good.erase! }
+  end
+
+  def mr3b_rollback_case(model, ctx)
+    a, = mr3b_nested(model, ctx)
+    e::ScaleWatch.flush_pending!(model)
+    %i[move grain].each { |kind| mr3b_clone_failure(model, ctx, a, kind) }
+    calls = 0
+    returns = 0
+    injected = false
+    trace = TracePoint.new(:call, :return) do |tp|
+      next unless tp.self == e::AppearanceMapping && tp.method_id == :paint_part!
+
+      if tp.event == :return
+        returns += 1 if tp.return_value && tp.return_value != false
+      else
+        calls += 1
+        if calls == 2 && returns == 1
+          injected = true
+          raise e::Materials::AppearanceError, 'MR3B second mapper injection'
+        end
+      end
+    end
+    caught = mr3b_reject(model, 'druhy mapper po uspesnom prvom') do
+      trace.enable
+      begin
+        mr3b_apply(model, ctx)
+      ensure
+        trace.disable
+      end
+    end
+    ok("MR3B rollback: injekcia naozaj nastala po prvom paint (#{calls}/#{returns})",
+       calls == 2 && returns == 1 && injected && caught && caught.message.include?('MR3B second mapper injection'))
+  ensure
+    trace.disable if trace
+  end
+
+  def run_mr3b(model)
+    return ok('MR3B: povoleny testmodel', false) unless guard_model?(model)
+
+    cleanup(model)
+    keep = model.entities.to_a
+    originals = model.materials.to_a
+    old_dir = e::Materials.test_dir_override
+    Dir.mktmpdir('noxun-mr3b-su-') do |temp|
+      e::Materials.test_dir_override = temp
+      e::Materials.reload!
+      e::Materials.load
+      batches = %w[A B].to_h do |name|
+        status, rows = e::Materials.add_decor_batch('batch_schema' => 3, 'decor' => "SU MR3B #{name}",
+          'type' => 'DTDL', 'grain' => 'length', 'color' => [100, 120, 140],
+          'sheet_variants' => [{ 'thickness' => 18.0, 'structure' => 'SM' }, { 'thickness' => 18.0, 'structure' => 'ST9' }],
+          'edge_variants' => [23.0, 43.0].map { |width| { 'width' => width, 'thickness' => 1.0, 'structure' => 'SM' } })
+        raise "MR3B local catalog: #{rows.inspect}" unless status
+
+        [name, rows]
+      end
+      aid = batches['A']['sheets'].find { |id| e::Materials.sheet(id)['structure'] == 'SM' }
+      bid = batches['B']['sheets'].find { |id| e::Materials.sheet(id)['structure'] == 'SM' }
+      status, thick = e::Materials.create_duplak_sheet(aid, 2)
+      raise "MR3B duplak: #{status}" unless status == :ok
+
+      arow = e::Materials.sheet(aid)
+      zs = { 'material_id' => 'SU_MR3B_ZASTENA10', 'manufacturer' => arow['manufacturer'], 'decor' => arow['decor'],
+             'type' => 'ZASTENA', 'thickness' => 10.0, 'grain' => 'length', 'structure' => 'SM',
+             'sheet_size' => [4100.0, 640.0], 'color' => arow['color'], 'production_class' => 'sheet',
+             'group_id' => arow['group_id'], 'back_decor' => 'INY RUB MR3B', 'back_structure' => 'RT' }
+      raise 'MR3B zastena write' unless e::Materials.upsert_sheet(zs)
+
+      image = Sketchup::ImageRep.new
+      image.set_data(2, 2, 32, 0, [255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 230, 150, 80, 255].pack('C*'))
+      path = File.join(temp, 'mr3b_axes.png')
+      image.save_file(path)
+      source = mr1b2_op(model) do
+        mat = model.materials.add('SU MR3B source')
+        mat.texture = path
+        mat.texture.size = [100.mm, 50.mm]
+        mat
+      end
+      edges = batches['A']['edges'].to_h { |id| [e::Materials.edge(id)['width'].to_i, id] }
+      ctx = { a: aid, b: bid, ae: edges[23], wide: edges[43], be: batches['B']['edges'].first,
+              other: batches['A']['sheets'].find { |id| e::Materials.sheet(id)['structure'] == 'ST9' },
+              thick: thick['material_id'], zs: zs['material_id'], source: source, temp: temp,
+              uni: e::Materials.sheets.find { |row| e::Materials.uni?(row) && row['thickness'] == 18.0 }.fetch('material_id'),
+              scopes: { a: e::Materials.appearance_scope_key(arow), b: e::Materials.appearance_scope_key(e::Materials.sheet(bid)) } }
+      ok('MR3B fixture: zastena aj duplak su skutocny spolocny scope A',
+         [ctx[:zs], ctx[:thick]].all? { |id| e::Materials.appearance_scope_key(e::Materials.sheet(id)) == ctx[:scopes][:a] })
+      # Pat acceptance skupin; v kazdej sa pouziju nove realne builder fixtures.
+      mr3b_scope_case(model, ctx)
+      mr3b_clear(model, keep)
+      mr3b_preserve_case(model, ctx)
+      mr3b_clear(model, keep)
+      mr3b_nested_case(model, ctx)
+      mr3b_clear(model, keep)
+      mr3b_rebuild_case(model, ctx)
+      mr3b_clear(model, keep)
+      mr3b_guard_cases(model, ctx)
+      mr3b_clear(model, keep)
+      mr3b_skips_case(model, ctx)
+      mr3b_clear(model, keep)
+      mr3b_rollback_case(model, ctx)
+      mr3b_clear(model, keep)
+      e::ScaleWatch.flush_pending!(model)
+      marker = mr1b2_op(model) { model.entities.add_cpoint(ORIGIN) }
+      result = mr3b_apply(model, ctx)
+      Sketchup.undo
+      ok('MR3B prazdny scope: nothing_to_apply a ziadny novy Undo krok', result[:status] == :nothing_to_apply && result[:updated_parts].zero? && !marker.valid?)
+    ensure
+      mr3b_clear(model, keep)
+      e::Materials.test_dir_override = old_dir
+      e::Materials.reload!
+      mr1b2_op(model) { (model.materials.to_a - originals).each { |mat| model.materials.remove(mat) if mat.valid? } }
+    end
+  rescue StandardError => ex
+    ok("MR3B: vynimka #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}", false)
+  end
+
   # MR-1B1: native save/load bez dotyku katalogu alebo geometrie zakazky.
   def mr1b1_visual(material)
     state = { color: material.color.to_a, alpha: material.alpha }
@@ -20886,6 +21558,7 @@ module NoxunSuRunner
     run_mr1b1(model)
     run_mr1b2(model)          # MR-1B2: R1/R2, spolocna ABS, prestavba, verna kopia a rollback
     run_mr3a(model)           # MR-3A: fyzicke UV, skutocne roly, partial bindingy a rollback
+    run_mr3b(model)           # MR-3B: Apply cez skutocne vyskytove cesty, izolacia a rollback
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
