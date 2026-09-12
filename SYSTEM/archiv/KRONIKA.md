@@ -17,6 +17,13 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-94 — POTVRDENÝ POUŽÍVATEĽSKÝ SMOKE + NOVÉ POSTREHY (12.9.2026 večer, docs PR #362).**
+  Michal po aktualizácii pluginu na v0.12.1 potvrdil smoke D-94 „Nákup s pôvodom": **PASS** („všetko funguje super"). Z toho istého sedenia vzišli tri postrehy:
+  **D-128** výška dreveného boxu zásuvky (Quadro) sa zobrazuje len na čítanie v riadku Zásuvka a nemá ovládač (objaviteľnosť + kandidát na zámok, vzor D-93) ·
+  **D-129** úchytky sú v kontexte Čelá na dvoch miestach · **D-130** menší UI/UX rework kontextu Čelá (debata → draft → outside-in → reconcile → mockup → package).
+  Zapísané do DOGFOODING (V1 DOTIAHNUTIE), PLAN blok 4 a STAV; overia sa v novom okne. Codex kolo 1 na docs PR: 4× P2 (výška boxu sa už zobrazuje; poradie odrážok
+  v PLAN; záznam D-94 sa nesmie mutovať — preto tento samostatný záznam; outside-in krok pri D-130) — všetky zapracované.
+
 - **D-94 „NÁKUP S PÔVODOM" (12.9.2026, v0.12.1, PR #361).**
   **Čo dostal používateľ:** rozklik nákupného riadku v sekcii Nákup kovania kreslí pôvod **zoskupený po skrinkách** — jeden riadok na skrinku s počtom kusov a za ním
   položky s ľudským popisom vlastníka („F1 · dvierka ľavé · set zaves-klasik ×2"); kovanie celej skrinky sa priznáva slovami „celá skrinka" namiesto ticho vynechaného

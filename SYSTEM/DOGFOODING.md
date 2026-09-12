@@ -36,6 +36,21 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
 
 ## V1 DOTIAHNUTIE
 
+- **D-128 · Výška dreveného boxu zásuvky (Quadro) sa nedá nastaviť** (Michal 12.9.2026, po smoke D-94) — pri drevenom boxe (recept Quadro V6) výška boxu **plynie z geometrie**:
+  svetlá výška zóny − vôľa receptu (`box_clearance`), viď `explain` vetu „Výška boxu: X (svetlá … − vôľa …)" v `drawer_recipes.rb`. Hodnota **sa zobrazuje** len na čítanie
+  v sekcii Kovanie v riadku Zásuvka („box X mm", `Panel.drawer_row_text`) a v rozbalenom detaile s výpočtom — ale **nemá ovládač** a Michal ju ako nastaviteľnú hodnotu
+  hľadal a nenašiel (Codex #362: je to problém **objaviteľnosti + chýbajúceho zámku**, nie chýbajúceho zobrazenia). Otázka na overenie: má vzniknúť **ručný zámok výšky
+  boxu** (analógia zámku NL D-93 a zámku výškového variantu Atira `height_lock` — recept ho už pozná), a kde má stáť, aby sa dal nájsť. Dotýka sa receptu (dielce boxu sú
+  narezané na `box_height`) → zmena je výrobná, audit ÁNO. *Stav: OTVORENÉ — overiť a rozhodnúť v novom okne.*
+- **D-129 · Úchytky sú v kontexte Čelá na dvoch miestach** (Michal 12.9.2026) — po KOV-A (smery otvárania) a D-120 (profil aj hrana) sa ovládanie úchytiek rozpadlo: skupina
+  **Úchytky** (D-96 — hromadný profil/hrana per typ čela) a súčasne **karta čela** (profil, hrana, smer) — ten istý údaj sa nastavuje na dvoch miestach a členenie sekcie je
+  chaotické. *Stav: OTVORENÉ — rieši sa ako súčasť D-130.*
+- **D-130 · Menší UI/UX rework kontextu Čelá** (Michal 12.9.2026) — kontext za posledné bloky narástol (typy čiel piktogramami, presahy per strana, smery otvárania, úchytky
+  s profilom aj hranou, medzery v dvoch riadkoch, materiál čiel, potvrdenie návrhu) a potrebuje **lepšiu organizáciu a spojenie do prehľadného celku**: zjednotiť úchytky (D-129),
+  pomocné texty (`.hint`) presunúť do tooltipov, prehodnotiť poradie a zbaľovanie skupín. Postup podľa [CLAUDE.md](../CLAUDE.md) (UX vzor s CAD precedensom): **debata
+  s Michalom → draft → Antigravity outside-in → reconcile → mockup** (vzor `zdroje/ui20/`) **→ package → implementácia**. Platí trvalé pravidlo „vertikálny priestor je
+  vzácny" ([PLAN.md](PLAN.md)). *Stav: OTVORENÉ — nové okno.*
+
 - **Vedome odložené z dávky E — ceny (V1 rozsah)** (6.8., nič z toho neblokuje prácu so zákazkou) — **manuálne overenie ceny materiálov/ABS** BEZ väzby na Demos a **viac URL na položke**
   (zvyšok V1-03; dnes ich „Prepočítať ceny" preskočí) · ~~prepínač „na faktúru" (×1,2)~~ — **vyradené 6.9.2026** (Michal: existuje prepínač s DPH / bez DPH); zvyšok rozhodnutý v `zdroje/next_sessions/V1_DEBATA_2026-09-06_VYSTUPY.md`.
   **Katalógové kovanie je hotové (10.9., CENY-KOV-A/B, PR #345/#346):** jeden produktový odkaz, preklik a ručné potvrdenie ceny k dnešku v katalógu/Rozpočte. Materiály/ABS a viac URL sú naďalej otvorené.
