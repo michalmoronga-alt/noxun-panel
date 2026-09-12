@@ -47,20 +47,28 @@ module NxMRB2
   end
 
   class Collection < Array
-    attr_reader :model, :load_calls
-    attr_accessor :load_error
+    attr_reader :model, :load_calls, :add_calls
+    attr_accessor :load_error, :native_numeric_names
     def initialize(model)
       super()
       @model = model
       @load_calls = 0
+      @add_calls = []
     end
     def [](key)
       key.is_a?(String) ? find { |material| material.name == key } : super
     end
     def add(name)
+      @add_calls << name
       base = name
-      number = 1
-      name = "#{base}##{number += 1}" while self[name]
+      if native_numeric_names && /\d+\z/.match?(name)
+        base = name.sub(/\d+\z/, '')
+        number = 0
+        name = "#{base}#{number += 1}" while self[name]
+      else
+        number = 1
+        name = "#{base}##{number += 1}" while self[name]
+      end
       material = Material.new(model, name)
       self << material
       material
@@ -98,6 +106,9 @@ module NxMRB2
   end
   def channel(material, state: b.classify(material), inherited: nil)
     { state: state, material: material, inherited_sheet_id: inherited, error: nil }
+  end
+  def face_channel(faces, parent)
+    b.send(:channel, b.send(:effective_materials, faces, parent))
   end
   def previous(model, material, kind: :sheet, id: 'S18', inherited: nil)
     channel(material, inherited: inherited).merge(model: model, kind: kind, id: id)
@@ -204,6 +215,62 @@ NxTest.test('MR-B2 classify: mrtvy handle, poskodeny tuple a chyba citania nikdy
     unreadable = s[:model].materials.add('unknown')
     unreadable.define_singleton_method(:texture) { raise 'material read failed' }
     NxTest.assert_equal(:unknown, NxMRB2.b.classify(unreadable))
+  end
+end
+
+NxTest.test('MR-B2 capture: protected dekor zmiesany s plain alebo bez materialu nema spolocny vzhlad') do
+  NxMRB2.isolated do |s|
+    owner = NxMRB2Copy::Cabinet.new(s[:model])
+    protected = NxMRB2.native(s[:model])
+    plain = s[:model].materials.add('Obycajna farba')
+    [plain, nil].each do |other|
+      faces = [NxMRB2::Face.new(protected, protected), NxMRB2::Face.new(other, other)]
+      captured = NxMRB2.face_channel(faces, nil)
+      NxTest.assert_equal(protected, captured[:material], 'konflikt nesmie zmenit povodny sheet kandidat pre ABS proof')
+      record = NxMRB2.record(protected)
+      record[:sheet] = captured
+      ctx = NxMRB2.context(owner, [record])
+      NxMRB2.error { NxMRB2.part(ctx) }
+      NxTest.assert_equal(nil, NxMRB2.part(ctx, material_id: 'S36')[:sheet], 'vedoma zmena ID moze zmiesany stary vzhlad nahradit')
+    end
+    NxTest.assert_equal(0, protected.color_writes)
+    NxTest.assert_equal(0, plain.color_writes)
+  end
+end
+
+NxTest.test('MR-B2 capture: zmiesany front/back ABS odmietne aj po vyrieseni dedenia parenta') do
+  NxMRB2.isolated do |s|
+    owner = NxMRB2Copy::Cabinet.new(s[:model])
+    protected = NxMRB2.native(s[:model])
+    plain = s[:model].materials.add('Obycajna ABS farba')
+    [[protected, plain, nil], [protected, nil, nil],
+     [protected, nil, plain], [nil, plain, protected]].each do |front, back, parent|
+      captured = NxMRB2.face_channel([NxMRB2::Face.new(front, back)], parent)
+      record = NxMRB2.record(protected, edges: { 'L1' => { abs_id: 'E23', channel: captured } })
+      ctx = NxMRB2.context(owner, [record])
+      NxMRB2.error { NxMRB2.part(ctx, edges: { 'L1' => 'E23' }) }
+      NxTest.assert_equal(nil, NxMRB2.part(ctx, edges: { 'L1' => 'E42' })[:edges]['L1'])
+    end
+  end
+end
+
+NxTest.test('MR-B2 capture: zhodny protected parent cez nil strany ostava platny sheet aj ABS') do
+  NxMRB2.isolated do |s|
+    owner = NxMRB2Copy::Cabinet.new(s[:model])
+    protected = NxMRB2.native(s[:model])
+    plain = s[:model].materials.add('Stara RGB')
+    [[nil, nil], [protected, nil], [nil, protected], [protected, protected]].each do |front, back|
+      captured = NxMRB2.face_channel([NxMRB2::Face.new(front, back)], protected)
+      record = NxMRB2.record(protected, edges: { 'L1' => { abs_id: 'E23', channel: captured } })
+      record[:sheet] = captured
+      out = NxMRB2.part(NxMRB2.context(owner, [record]), edges: { 'L1' => 'E23' })
+      NxTest.assert_equal(protected, NxMRB2.ensure_material(s, previous: out[:sheet]))
+      NxTest.assert_equal(protected, NxMRB2.ensure_material(s, 'E23', kind: :edge, previous: out[:edges]['L1']))
+    end
+    captured = NxMRB2.face_channel([NxMRB2::Face.new(plain, nil)], nil)
+    NxTest.assert_equal(:plain, captured[:state], 'rozne obycajne farby a nil nadalej patria starej RGB ceste')
+    NxTest.assert_equal(plain, captured[:material])
+    NxTest.assert_equal(0, protected.color_writes)
   end
 end
 
@@ -393,6 +460,82 @@ NxTest.test('MR-B2 ensure: color nevypere texturu pod starym menom a dalsi rebui
     NxTest.assert_equal(2, s[:model].materials.length)
     NxTest.assert_equal(before, NxMRB2.snapshot(styled))
     NxTest.assert_equal(nil, clean.get_attribute('NOXUN', 'appearance_id'))
+  end
+end
+
+NxTest.test('MR-B2 ensure: nove vklady opakovane najdu plain cislovany nahradny sheet aj ABS') do
+  [[:sheet, 'S18'], [:edge, 'E23']].each do |kind, id|
+    NxMRB2.isolated do |s|
+      canonical = kind == :sheet ? id : NxMRB2::M.su_edge_material_name(id)
+      alternative = "NOXUN_COLOR_#{kind}_#{id}"
+      foreign = ["#{alternative}_OTHER#2", "#{alternative}#2extra", "#{canonical}#1"].map do |name|
+        s[:model].materials.add(name)
+      end
+      foreign_before = foreign.map { |material| NxMRB2.snapshot(material) }
+      original = s[:model].materials.add(canonical)
+      NxTest.assert_equal(original, NxMRB2.ensure_material(s, id, kind: kind), 'kanonicka plain farba ma prednost')
+      original.texture = Object.new
+      base = NxMRB2.ensure_material(s, id, kind: kind)
+      NxTest.assert_equal(alternative, base.name)
+      NxTest.assert_equal(base, NxMRB2.ensure_material(s, id, kind: kind), 'plain zaklad nahrady sa opakovane pouzije')
+      base.texture = Object.new
+      protected_before = [original, base].map { |material| NxMRB2.snapshot(material) }
+      clean = NxMRB2.ensure_material(s, id, kind: kind)
+      NxTest.assert(/\A#{Regexp.escape(alternative)}#\d+\z/.match?(clean.name), 'kolizia vytvori cislovanu cistu nahradu')
+      count = s[:model].materials.length
+      3.times { NxTest.assert_equal(clean, NxMRB2.ensure_material(s, id, kind: kind), 'novy vklad bez previous nesmie vytvorit dalsiu kopiu') }
+      rows = kind == :sheet ? s[:sheets] : s[:edges]
+      rows[id]['color'] = [40, 50, 60]
+      NxTest.assert_equal(clean, NxMRB2.ensure_material(s, id, kind: kind))
+      NxTest.assert_equal([40, 50, 60], clean.color.to_a)
+      NxTest.assert_equal(count, s[:model].materials.length)
+      NxTest.assert_equal(protected_before, [original, base].map { |material| NxMRB2.snapshot(material) })
+      NxTest.assert_equal(foreign_before, foreign.map { |material| NxMRB2.snapshot(material) })
+    end
+  end
+end
+
+NxTest.test('MR-B2 ensure: ciselne vyrobne ID dostane presne volnu #2 bez nativneho premenovania') do
+  [[:sheet, 'K009_PW_DTDL_18'], [:edge, 'K009_PW_23X10']].each do |kind, id|
+    NxMRB2.isolated do |s|
+      collection = s[:model].materials
+      collection.native_numeric_names = true
+      rows = kind == :sheet ? s[:sheets] : s[:edges]
+      rows[id] = NxMRB2.row(id, kind)
+      canonical = kind == :sheet ? id : NxMRB2::M.su_edge_material_name(id)
+      alternative = "NOXUN_COLOR_#{kind}_#{id}"
+      protected = [canonical, alternative, "#{alternative}#1"].map do |name|
+        material = collection.add(name)
+        material.texture = Object.new
+        material
+      end
+      # Taketo meno vyraba SU pri add(obsadeny ciselny nazov). Patri inemu
+      # vyrobnemu ID, takze ho nesmieme uznat rozsirenim owned_name? regexu.
+      foreign = collection.add(alternative.sub(/\d+\z/, '1'))
+      before = (protected + [foreign]).map { |material| NxMRB2.snapshot(material) }
+      clean = NxMRB2.ensure_material(s, id, kind: kind)
+      NxTest.assert_equal("#{alternative}#2", collection.add_calls.last, 'do SU ide uz presne volne meno')
+      NxTest.assert_equal("#{alternative}#2", clean.name)
+      count = collection.length
+      3.times { NxTest.assert_equal(clean, NxMRB2.ensure_material(s, id, kind: kind)) }
+      rows[id]['color'] = [40, 50, 60]
+      NxTest.assert_equal(clean, NxMRB2.ensure_material(s, id, kind: kind))
+      NxTest.assert_equal([40, 50, 60], clean.color.to_a)
+      NxTest.assert_equal(count, collection.length)
+      NxTest.assert_equal(before, (protected + [foreign]).map { |material| NxMRB2.snapshot(material) })
+    end
+  end
+end
+
+NxTest.test('MR-B2 ensure: necakane premenovany novy material sa odmietne pred RGB zapisom') do
+  NxMRB2.isolated do |s|
+    collection = s[:model].materials
+    foreign = collection.add('Cudzi material')
+    before = NxMRB2.snapshot(foreign)
+    NxMRB2Copy.stub(collection, :add, ->(*) { foreign }) do
+      NxMRB2.error { NxMRB2.ensure_material(s) }
+    end
+    NxTest.assert_equal(before, NxMRB2.snapshot(foreign))
   end
 end
 

@@ -92,6 +92,33 @@ module Noxun
         out
       end
 
+      # Dedup musi znamy konflikt odmietnut ESTE PRED transparentnou operaciou:
+      # jej abort by zrusil aj predchadzajuci paste. Overuje iba povodny zdroj,
+      # bez resolvera, nacitania .skm alebo vytvarania materialov.
+      def validate_copy_source!(context, model:, owner:)
+        validate_context!(context, model: model, owner: owner)
+        context[:parts].each do |key, records|
+          if records.length > 1 && records.any? { |record| protected_record?(record) }
+            raise CaptureError, 'Viac pôvodných dielcov má tú istú identitu vzhľadu.'
+          end
+          records.each do |record|
+            edges = record[:edges].transform_values { |edge| edge[:abs_id] }
+            previous = for_part(context, model: model, owner: owner, part_key: key,
+                                role: record[:role], material_id: record[:material_id], edges: edges)
+            [previous[:sheet], *previous[:edges].values].compact.each do |channel|
+              next unless channel[:state] == :protected
+              kind = channel[:kind]
+              id = channel[:id]
+              rec = kind == :sheet ? Materials.sheet(id) : Materials.edge(id)
+              next if Materials.uni?(rec)
+              own_material!(model, channel[:material])
+              preserve!(model, kind, id, rec, channel)
+            end
+          end
+        end
+        true
+      end
+
       # Mutujuci caller vlastni operaciu/guard. LoadError sa nesmie zmenit na
       # uspesny RGB rebuild: native load uz mohol kolekciu ciastocne zmenit.
       def resolve(model, kind, id, fallback_rgb, previous: nil)
@@ -168,7 +195,20 @@ module Noxun
         name, alternative = material_names(kind, id)
         material = previous if previous && owned_name?(previous, kind, id) && classify(previous) == :plain
         material ||= [model.materials[name], model.materials[alternative]].compact.find { |m| classify(m) == :plain }
-        material ||= model.materials.add(model.materials[name] ? alternative : name)
+        # Aj zaklad nahrady mohol dostat texturu. Dalsie vklady znovu pouziju
+        # cistu cislovanu nahradu toho isteho vyrobneho ID, nie dalsie #n.
+        material ||= model.materials.to_a.find { |m| classify(m) == :plain && owned_name?(m, kind, id) }
+        unless material
+          # SketchUp pri kolizii ciselneho konca prepisuje aj vyrobne ID.
+          # Vyberieme preto presne volne meno pred add, bez nativneho suffixu.
+          available = model.materials[name] ? alternative : name
+          number = 0
+          available = "#{alternative}##{number += 1}" while model.materials[available]
+          material = model.materials.add(available)
+          unless material && material.name == available
+            raise CaptureError, 'Náhradný farebný materiál nemá očakávanú identitu.'
+          end
+        end
         color = material.color
         material.color = Sketchup::Color.new(*rgb) unless color && [color.red, color.green, color.blue] == rgb
         material
@@ -202,12 +242,14 @@ module Noxun
       end
 
       def channel(materials, ambiguous: false)
-        materials = materials.compact.uniq
+        # Vstup uz obsahuje efektivne front/back materialy po dedeni parenta.
+        # Nil je skutocna nepofarbena strana, nesmie skryt konflikt s texturou.
+        materials = materials.uniq
         states = materials.map { |m| classify(m) }
         protected = materials.zip(states).select { |_m, state| state == :protected }.map(&:first)
-        unknown = states.include?(:unknown) || protected.length > 1 || (ambiguous && !protected.empty?)
+        unknown = states.include?(:unknown) || (!protected.empty? && (materials.length > 1 || ambiguous))
         { state: unknown ? :unknown : (protected.empty? ? :plain : :protected),
-          material: protected.first || materials.first, inherited_sheet_id: nil,
+          material: protected.first || materials.compact.first, inherited_sheet_id: nil,
           error: unknown ? 'Geometria alebo materiály pôvodného dielca nemajú jednoznačný vzhľad.' : nil }
       end
 

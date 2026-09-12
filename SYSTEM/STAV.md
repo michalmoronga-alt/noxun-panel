@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.11.3 · 11.9.2026 — M-R: MR-1B2 ZACHOVANIE VZHĽADU PRI PRESTAVBE A KÓPII.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.11.3 · 12.9.2026 — M-R: MR-1B2 ZACHOVANIE VZHĽADU PRI PRESTAVBE A KÓPII.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -21,7 +21,7 @@ Pred prvou takou zákazkou aktualizovať **obe PC** (Štúdio → O plugine → 
 **Testy uzáveru Čiel:** **3830 headless · 113 JS sád**, skutočný Inspector pri 470 px: šesť typov, jedna karta, klávesnica, pevná výška/AUTO, hrany a potvrdenie návrhu.
 **MR-1A:** **3849 headless · 113 JS sád**, vrátane skutočných súbežných katalógových zápisov počas exportu. Natívne sondy overili predpoklady ďalšej dávky; nová geometria ani ovládanie ešte nie sú vydané.
 **MR-1B1:** **3856 headless · 113 JS sád · 2321 in-SketchUp PASS / 0 FAIL**, z toho 24 nových kontrol adaptéra. Identita, celý skúšaný PBR stav, dve revízie a obnova zdroja prešli; fyzický SU 2024 ani renderová zhoda nie sú overené.
-**MR-1B2:** **3887 headless · 113 JS sád · 2363 in-SketchUp PASS / 0 FAIL**, z toho 42 nových kontrol. Oba buildery, spoločná ABS, R1/R2, kópie, scale, batch a rollback; snapshot, kusovník a VEPO zhodné. Save/reopen bez `.skm` zachová celý otvorený stav pri prestavbe; samotný SketchUp pri otvorení zjednotí sekundárne PBR mierky s albedom (priznaný charakterizačný rozdiel, render netestovaný).
+**MR-1B2:** **3898 headless · 113 JS sád · 2381 in-SketchUp PASS / 0 FAIL**, z toho 60 nových kontrol. Oba buildery, spoločná ABS, R1/R2, kópie, scale, batch a rollback; snapshot, kusovník a VEPO zhodné. Save/reopen bez `.skm` zachová celý otvorený stav pri prestavbe; samotný SketchUp pri otvorení zjednotí sekundárne PBR mierky s albedom (priznaný charakterizačný rozdiel, render netestovaný).
 Geometrický dôkaz ČELÁ-B2: **in-SketchUp 2297 PASS / 0 FAIL** (osadenia, výroba/rezy, šablóny, uloženie/návrat, Scale/Späť a kópia); C geometriu nemení. Ručné Redo zostáva.
 **Michal 11.9. potvrdil úspešný test produktových odkazov aj potvrdzovania cien** (CENY-KOV-A/B, PR #345/#346).
 **Michal 11.9. potvrdil aj používateľskú kontrolu hotového balíka Čiel v0.11.0: funguje, bez nájdených chýb.** Samostatné ručné Redo nebolo výslovne potvrdené.
@@ -35,7 +35,7 @@ Geometrický dôkaz ČELÁ-B2: **in-SketchUp 2297 PASS / 0 FAIL** (osadenia, vý
 
 ## Ďalší krok
 
-Pokračovať MR-1B2: naraz zapojiť natívny adaptér a zachovanie pôvodného materiálu do prestavby skriniek aj dosiek. Potom mapovanie MR-3, ovládanie MR-2 a reálny záverečný smoke. D-28 ostáva otvorené do dokončenia celého bloku; ručné Redo Čiel ostáva samostatne nepotvrdené.
+Po uzavretí MR-1B2 začať mapovanie MR-3 z čerstvého mainu, potom ovládanie MR-2 a reálny záverečný smoke. D-28 ostáva otvorené do dokončenia celého bloku; ručné Redo Čiel ostáva samostatne nepotvrdené.
 
 ## Posledné uzávery
 

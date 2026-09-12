@@ -106,6 +106,7 @@
 
 require 'tmpdir'
 require 'fileutils'
+require 'set'
 
 module NoxunSuRunner
   OUT = (ENV['NOXUN_SU_OUT'] && !ENV['NOXUN_SU_OUT'].empty? ? ENV['NOXUN_SU_OUT'] : File.join(Dir.tmpdir, 'noxun_su_result.txt'))
@@ -217,17 +218,24 @@ module NoxunSuRunner
     e::Bom.compute(e::Bom.collect(model))[:rows].map { |row| row.reject { |key, _value| key == 'refs' } }
   end
 
+  def mr1b2_owner_state(owner)
+    attrs = ->(entity) { entity.attribute_dictionaries&.map { |dict| [dict.name, dict.to_h] }&.to_h }
+    parts = e::Store.kind(owner) == 'cabinet' ? mr1b2_parts(owner) : [owner]
+    geometry = parts.map do |part|
+      [part.persistent_id, attrs.call(part), part.material&.persistent_id, part.transformation.to_a,
+       part.definition.persistent_id, attrs.call(part.definition), part.definition.entities.to_a.map(&:persistent_id).sort,
+       part.definition.entities.grep(Sketchup::Face).map do |face|
+         [face.persistent_id, face.material&.persistent_id, face.back_material&.persistent_id,
+          face.vertices.map { |v| v.position.to_a }.sort, face.normal.to_a]
+       end.sort_by(&:first)]
+    end.sort_by(&:first)
+    [owner.persistent_id, attrs.call(owner), owner.material&.persistent_id, owner.transformation.to_a,
+     owner.definition.persistent_id, attrs.call(owner.definition), owner.definition.entities.to_a.map(&:persistent_id).sort, geometry]
+  end
+
   def mr1b2_reject(model, label, owner)
     scene = lambda do
-      parts = e::Store.kind(owner) == 'cabinet' ? mr1b2_parts(owner) : [owner]
-      geometry = parts.map do |part|
-        [part.persistent_id, part.material&.persistent_id, part.transformation.to_a,
-         part.definition.entities.grep(Sketchup::Face).map do |face|
-           [face.persistent_id, face.material&.persistent_id, face.back_material&.persistent_id,
-            face.vertices.map { |v| v.position.to_a }.sort, face.normal.to_a]
-         end.sort_by(&:first)]
-      end.sort_by(&:first)
-      [e::Store.config(owner), owner.definition.entities.to_a.map(&:persistent_id).sort, geometry,
+      [mr1b2_owner_state(owner), model.entities.to_a.map(&:persistent_id).sort,
        model.materials.to_a.map { |mat| [mat.persistent_id, mr1b1_state(mat)] }.sort_by(&:first)]
     end
     before = scene.call
@@ -246,6 +254,148 @@ module NoxunSuRunner
     material && material.texture.nil? && material.alpha == 1.0 &&
       material.get_attribute('NOXUN', 'appearance_scope').nil? && material.get_attribute('NOXUN', 'appearance_id').nil? &&
       (!material.respond_to?(:workflow) || material.workflow == Sketchup::Material::WORKFLOW_CLASSIC)
+  end
+
+  # GH #355: jedna konfliktna cerstva kopia nesmie abortom transparentnej
+  # operacie zmazat celu paste davku ani vyhladovat nasledujucu platnu kopiu.
+  def mr1b2_mixed_dedup(model, source, r1, r2)
+    before_ids = cabinets(model).map(&:persistent_id).sort
+    source_state = mr1b2_owner_state(source)
+    materials_before = [mr1b1_state(r1), mr1b1_state(r2)]
+    bad, good = mr1b2_op(model) do
+      copies = [8000, 9000].map do |x|
+        copy = model.entities.add_instance(source.definition, Geom::Transformation.translation(e::Units.point(x, 0, 0)))
+        source.attribute_dictionaries.each { |dict| dict.each_pair { |key, value| copy.set_attribute(dict.name, key, value) } }
+        copy
+      end
+      # Vlastny kabinet AJ part pred konfliktom: original ani good sa nefarbia.
+      copies.each(&:make_unique)
+      copies = e::Ids.duplicate_cabinets(model).select { |inst| copies.include?(inst) }
+      part = d88_part(copies.first, 'side_left')
+      part.make_unique
+      d88_face_on(part, 0, :max).material = r2
+      copies
+    end
+    fresh = Set[bad.entityID, good.entityID]
+    order = e::Ids.duplicate_cabinets(model).select { |inst| fresh.include?(inst.entityID) }
+    ok('MR1B2 review dedup: konfliktna kopia je PRVA pred platnou v cerstvej davke', order == [bad, good])
+    bad_state = mr1b2_owner_state(bad)
+    old_id = e::Store.get(good, 'cabinet_id')
+    done = e::CabinetBuilder.dedup_copies(model, fresh_ids: fresh)
+    alive = bad.valid? && good.valid?
+    ok('MR1B2 review dedup: paste prezil odmietnutie prvej kopie', alive)
+    ok('MR1B2 review dedup: vadna kopia ma povodne ID, geometriu aj obe farby', bad.valid? && mr1b2_owner_state(bad) == bad_state)
+    ok('MR1B2 review dedup: vrati LEN platnu kopiu s novym ID a jej vlastnou R1',
+       done == [good] && good.valid? && e::Store.get(good, 'cabinet_id') != old_id &&
+       good.definition != source.definition && d88_part(good, 'side_left').material == r1)
+    ok('MR1B2 review dedup: original, materialy a guard ostali nedotknute',
+       source.valid? && mr1b2_owner_state(source) == source_state &&
+       [mr1b1_state(r1), mr1b1_state(r2)] == materials_before && !e::ScaleWatch.rebuilding?)
+    # Pri chybe, ktora uz paste zmazala, Undo nesmie siahnut na starsiu operaciu.
+    return unless alive
+    Sketchup.undo
+    ok('MR1B2 review dedup: 1 Spat odstrani OBE paste kopie aj uspesny dedup',
+       !bad.valid? && !good.valid? && cabinets(model).map(&:persistent_id).sort == before_ids &&
+       mr1b2_owner_state(source) == source_state && !e::ScaleWatch.rebuilding?)
+  end
+
+  # GH #355: dve obsadene protected mena vynutia #n. Tento handle sa ma
+  # znovu pouzit aj bez previous, napriec dielcami a novymi vlozeniami.
+  def mr1b2_numbered_colors(model, params, image_path)
+    groups = ['SU MR1B2 SHEET KOLIZIA', 'SU MR1B2 ABS KOLIZIA'].map do |decor|
+      success, rows = e::Materials.add_decor_batch(
+        'batch_schema' => 3, 'decor' => decor, 'type' => 'DTDL', 'grain' => 'length',
+        'sheet_variants' => [{ 'thickness' => 18.0, 'structure' => 'SM' }],
+        'edge_variants' => [{ 'width' => 23.0, 'thickness' => 1.0, 'structure' => 'SM' }]
+      )
+      raise "MR1B2 numbered fixture: #{rows.inspect}" unless success
+      rows
+    end
+    sid = groups.first['sheets'].first
+    aid = groups.last['edges'].first
+    [[sid, [110, 130, 150]], [groups.last['sheets'].first, [25, 45, 65]]].each do |id, rgb|
+      rec = e::Materials.sheet(id)
+      e::Materials.set_decor_color(rec['decor'], rgb, group_id: rec['group_id'])
+    end
+    blocked = mr1b2_op(model) do
+      [sid, "NOXUN_COLOR_sheet_#{sid}", e::Materials.su_edge_material_name(aid), "NOXUN_COLOR_edge_#{aid}"].map do |name|
+        material = model.materials.add(name)
+        material.texture = image_path
+        material.texture.size = [90.mm, 40.mm]
+        material
+      end
+    end
+    blocked_state = blocked.map { |material| mr1b1_state(material) }
+    cfg = params.merge('material_id' => sid, 'front_material_id' => sid)
+    bp = { 'material_id' => sid, 'length' => 700.0, 'width' => 400.0,
+           'edges' => { 'L1' => aid, 'L2' => aid, 'W1' => aid, 'W2' => aid } }
+    first = e::CabinetBuilder.build(model, cfg)
+    board = e::BoardBuilder.build(model, bp)
+    sheet_handle = d88_part(first, 'side_left').material
+    edge_handle = d88_face_on(board, 1, :min).material
+    other = e::CabinetBuilder.build(model, cfg)
+    other_board = e::BoardBuilder.build(model, bp)
+    parts = [first, other].flat_map { |cab| mr1b2_parts(cab) }.select { |part| e::Store.config(part)['material_id'] == sid }
+    sheet_pattern = /\ANOXUN_COLOR_sheet_#{Regexp.escape(sid)}#\d+\z/
+    edge_pattern = /\ANOXUN_COLOR_edge_#{Regexp.escape(aid)}#\d+\z/
+    info("MR1B2 review color sheet handles=#{(parts + [board, other_board]).map { |part| [part.material&.persistent_id, part.material&.name] }.uniq.inspect}")
+    ok('MR1B2 review color: ciselna sheet nahrada sa zdiela medzi dielcami aj novymi vlozeniami',
+       parts.length > 2 && mr1b2_plain?(sheet_handle) && sheet_pattern.match?(sheet_handle.name) &&
+       parts.all? { |part| part.material == sheet_handle } && [board, other_board].all? { |inst| inst.material == sheet_handle } &&
+       model.materials.to_a.select { |material| sheet_pattern.match?(material.name) } == [sheet_handle])
+    edge_faces = [board, other_board].flat_map { |inst| [[1, :min], [1, :max], [0, :min], [0, :max]].map { |axis, side| d88_face_on(inst, axis, side) } }
+    info("MR1B2 review color ABS handles=#{edge_faces.flat_map { |face| [face.material, face.back_material] }.uniq.map { |mat| [mat&.persistent_id, mat&.name] }.inspect}")
+    ok('MR1B2 review color: ciselna ABS nahrada sa zdiela medzi vsetkymi hranami a novymi doskami',
+       mr1b2_plain?(edge_handle) && edge_pattern.match?(edge_handle.name) &&
+       edge_faces.all? { |face| face.material == edge_handle && face.back_material == edge_handle } &&
+       model.materials.to_a.select { |material| edge_pattern.match?(material.name) } == [edge_handle])
+    ok('MR1B2 review color: obidve protected mena oboch kanalov ostali bez zmeny', blocked.map { |material| mr1b1_state(material) } == blocked_state)
+  ensure
+    mr1b2_op(model) { [first, other, board, other_board].compact.each { |inst| inst.erase! if inst.valid? } }
+  end
+
+  # GH #355: skutocne efektivne strany, vratane NIL bez dedicneho materialu.
+  # Opačna kontrola: explicitny protected par nad plain parentom je jednoznacny.
+  def mr1b2_surface_mixtures(model, board_params, protected_material, plain_material)
+    board = nil
+    material_state = [mr1b1_state(protected_material), mr1b1_state(plain_material)]
+    %i[decor abs].product(%i[plain none protected]).each do |surface, parent|
+      board = e::BoardBuilder.build(model, board_params)
+      mr1b2_op(model) do
+        board.definition.entities.grep(Sketchup::Face).each { |face| face.material = face.back_material = nil }
+        board.material = { plain: plain_material, none: nil, protected: protected_material }.fetch(parent)
+        if surface == :abs && parent == :none
+          # Nech je sheet jednoznacne plain: odmietnutie musi sposobit ABS.
+          [d88_face_on(board, 2, :min), d88_face_on(board, 2, :max)].each { |face| face.material = face.back_material = plain_material }
+        end
+        face = surface == :decor ? d88_face_on(board, 2, :max) : d88_face_on(board, 1, :min)
+        if parent == :protected
+          face.back_material = plain_material # front dedi protected; zadna strana je skutocne ina.
+        else
+          face.material = protected_material # back dedi plain alebo nema ziadny material.
+        end
+      end
+      mr1b2_reject(model, "review mix #{surface}/parent #{parent}", board) { e::BoardBuilder.rebuild(model, board, {}) }
+      mr1b2_op(model) { board.erase! if board.valid? }
+    end
+    %i[none plain inherited].each do |parent|
+      board = e::BoardBuilder.build(model, board_params)
+      mr1b2_op(model) do
+        board.material = { none: nil, plain: plain_material, inherited: protected_material }.fetch(parent)
+        board.definition.entities.grep(Sketchup::Face).each do |face|
+          face.material = face.back_material = parent == :inherited ? nil : protected_material
+        end
+      end
+      e::BoardBuilder.rebuild(model, board, {})
+      e::BoardBuilder.rebuild(model, board, {})
+      ok("MR1B2 review pair #{parent}: jednoznacny protected par zostal platny aj po druhom rebuilde",
+         board.material == protected_material && d88_face_on(board, 1, :min).material == protected_material &&
+         d88_face_on(board, 1, :min).back_material == protected_material &&
+         [mr1b1_state(protected_material), mr1b1_state(plain_material)] == material_state)
+      mr1b2_op(model) { board.erase! if board.valid? }
+    end
+  ensure
+    mr1b2_op(model) { board.erase! if board && board.valid? }
   end
 
   def run_mr1b2(model)
@@ -382,6 +532,7 @@ module NoxunSuRunner
          done.include?(native_copy) && e::Store.get(native_copy, 'cabinet_id') != e::Store.get(a, 'cabinet_id') && d88_part(native_copy, 'side_left').material == r1)
       Sketchup.undo
       ok('MR1B2: native kopia aj dedup su jeden Spat', !native_copy.valid? && a.valid? && d88_part(a, 'side_left').material == r1)
+      mr1b2_mixed_dedup(model, a, r1, r2)
 
       # Tombstone je kniznicny stav. Bez explicitneho Apply stary zivy handle drzi.
       mr1b2_publish(model, sid)
@@ -402,6 +553,8 @@ module NoxunSuRunner
       uni_board = e::BoardBuilder.build(model, board_params.merge('material_id' => uni['material_id'], 'edges' => {}))
       ok('MR1B2: UNI ostava cista pracovna farba bez native identity',
          mr1b2_plain?(uni_board.material) && uni_board.material.color.to_a.first(3) == uni['color'])
+      mr1b2_surface_mixtures(model, board_params, r1, plain_handle)
+      mr1b2_numbered_colors(model, params, image_path)
 
       # Legacy skratka: ABS bez explicitneho face materialu dedi zdrojovu dosku.
       legacy = e::BoardBuilder.build(model, board_params)

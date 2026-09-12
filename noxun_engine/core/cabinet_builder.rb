@@ -760,6 +760,15 @@ module Noxun
               Engine.log('dedup: kopia korpusu je z novsej verzie Noxun — ID sa neprideluje') if defined?(Engine)
               next
             end
+            # Znamy konflikt preskocit pred operaciou: transparentny abort by
+            # zrusil aj paste a ostatne cerstve kopie v tej istej davke.
+            begin
+              appearance = BuildAppearance.capture_cabinet(model, inst)
+              BuildAppearance.validate_copy_source!(appearance, model: model, owner: inst)
+            rescue Materials::AppearanceError => e
+              Engine.log_error(e, 'dedup: kopia si ponechava povodnu identitu a vzhlad') if defined?(Engine)
+              next
+            end
             new_cid = Ids.next_cabinet_id(model)
             trans = fresh_ids ? true : transparent
             # V0.3.4 undo fix (runner S2): prepis identity (standard 2.2: autorita = instancia)
@@ -768,7 +777,7 @@ module Noxun
             guarded do
               model.start_operation('NOXUN: Kopia korpusu — nove ID', true, false, trans)
               begin
-                appearance = BuildAppearance.capture_cabinet(model, inst, target_id: new_cid)
+                appearance = appearance.merge(target_id: new_cid)
                 Store.write(inst, { std: Store::STD, kind: 'cabinet', id: new_cid, cabinet_id: new_cid })
                 params = config_to_params(Store.config(inst) || {})
                 # KOV-H1 (audit FIX 10): tu vznika NOVA skrinka z existujucej —

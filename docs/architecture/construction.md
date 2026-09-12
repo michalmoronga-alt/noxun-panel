@@ -130,7 +130,9 @@ znovuotvorení .skp sa nedá odvodiť: `Bom.hardware_conflict_issues` ho zlúči
 ### cabinet_builder.rb
 
 **MR-1B2 — živý vzhľad pri prestavbe a kópii.** Pred `clear!` sa z konkrétnej inštancie zachytia materiály pôvodných dielcov; preferencie sa vyhodnocujú až
-proti finálne vyriešeným výrobným ID a ABS slotom. Dedup zachytáva tú istú kopírovanú inštanciu ešte pred prepisom CAB ID. `appearance_source:` v `build`/`commit_insert`
+proti finálne vyriešeným výrobným ID a ABS slotom. Dedup zachytáva tú istú kopírovanú inštanciu ešte pred prepisom CAB ID. Pred otvorením operácie preverí
+zachytený vzhľad aj jeho väzby; konfliktnú kópiu preskočí a pokračuje ďalšími. Tým neabortuje transparentne pripojený paste krok. Neočakávané chyby po začatí
+zápisu ďalej abortujú a zastavia spracovanie. `appearance_source:` v `build`/`commit_insert`
 je samostatný interný vstup produktovej kópie, mimo zmrazeného InsertPlan/configu; zdroj sa validuje a číta v guarded operácii, zostáva bez mutácie.
 Bežný vklad bez zdroja používa aktuálnu knižnicu. Obe ensure aj `paint_edge_faces` prepúšťajú appearance chyby k abortu celej operácie. RGB skratka ABS platí
 len pre dve overené plain farby; styled ABS sa priradí explicitne na obe strany plochy, aj keď má rovnaký handle ako doska. UV mapovanie je nadväzujúca dávka.
