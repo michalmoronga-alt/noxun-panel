@@ -1211,9 +1211,9 @@ module NoxunSuRunner
   def mr3b_no_write(model, label)
     calls = { flush: 0, operation: 0, paint: 0, unique: 0 }
     trace = TracePoint.new(:call, :c_call) do |tp|
-      calls[:flush] += 1 if tp.event == :call && tp.self == e::ScaleWatch && tp.method_id == :flush_pending!
-      calls[:paint] += 1 if tp.event == :call && tp.self == e::AppearanceMapping && tp.method_id == :paint_part!
-      calls[:operation] += 1 if tp.event == :c_call && tp.self == model && tp.method_id == :start_operation
+      calls[:flush] += 1 if tp.event == :call && tp.self.equal?(e::ScaleWatch) && tp.method_id == :flush_pending!
+      calls[:paint] += 1 if tp.event == :call && tp.self.equal?(e::AppearanceMapping) && tp.method_id == :paint_part!
+      calls[:operation] += 1 if tp.event == :c_call && tp.self.equal?(model) && tp.method_id == :start_operation
       calls[:unique] += 1 if tp.event == :c_call && tp.method_id == :make_unique
     end
     trace.enable
@@ -1495,7 +1495,7 @@ module NoxunSuRunner
     injected = 0
     changed = false
     trace = TracePoint.new(:c_return) do |tp|
-      next unless tp.method_id == :make_unique && tp.self == root && injected.zero?
+      next unless tp.method_id == :make_unique && tp.self.equal?(root) && injected.zero?
       next unless tp.return_value && root.definition != old_def
 
       injected += 1
@@ -1661,7 +1661,7 @@ module NoxunSuRunner
     returns = 0
     injected = false
     trace = TracePoint.new(:call, :return) do |tp|
-      next unless tp.self == e::AppearanceMapping && tp.method_id == :paint_part!
+      next unless tp.self.equal?(e::AppearanceMapping) && tp.method_id == :paint_part!
 
       if tp.event == :return
         returns += 1 if tp.return_value && tp.return_value != false
