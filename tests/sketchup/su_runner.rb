@@ -1140,7 +1140,11 @@ module NoxunSuRunner
   end
 
   def mr3b_data(instance)
-    [mr3b_attrs(instance), mr3b_attrs(instance.definition), instance.transformation.to_a,
+    # Vyrobny oracle drzi cely surovy NOXUN vratane config JSON, ID a klucov.
+    # Native DC pri commite pridava dynamic_attributes._hasbehaviors=1.0.
+    # Foreign a Undo/Redo preto stale pouzivaju mr3b_tree/scene so VSETKYMI atributmi.
+    [instance.attribute_dictionary(e::Store::DICT, false)&.to_h,
+     instance.definition.attribute_dictionary(e::Store::DICT, false)&.to_h, instance.transformation.to_a,
      mr3b_children(instance).map { |child| mr3b_data(child) }.tally]
   end
 
@@ -1405,14 +1409,9 @@ module NoxunSuRunner
       f.visible = false
       [t, f]
     end
-    before_flush = [mr3b_data(a), mr3b_data(b)]
     settled = e::ScaleWatch.flush_pending!(model)
     raise 'MR3B nested fixture sa neustalil pred baseline' unless settled == true && !e::ScaleWatch.pending?
 
-    after_flush = [mr3b_data(a), mr3b_data(b)]
-    if after_flush != before_flush && defined?(NoxunMr3bCloneDiagnostic)
-      info("MR3B nested data during fixture flush: #{NoxunMr3bCloneDiagnostic.first_difference(before_flush, after_flush).inspect}")
-    end
     leaves = [a, b].flat_map { |outer| mr3b_leaves(outer) }
     ok('MR3B nested: 12 skutocnych vyskytov, hoci len 6 leaf handles', leaves.length == 12 && leaves.uniq.length == 6 && !folder.visible? && b.hidden?)
     before = mr3b_scene(model)
@@ -1423,10 +1422,7 @@ module NoxunSuRunner
     ok("MR3B nested: mirror/rotation/hidden maju 12 dosiek #{result.inspect}", mr3b_counts(result, 12, 12, 0))
     ok('MR3B nested: cudzia bariéra vratane povodneho sharing ostala presna', mr3b_tree(foreign, exact: true) == old_foreign)
     after_data = [mr3b_data(a), mr3b_data(b)]
-    if after_data != data && defined?(NoxunMr3bCloneDiagnostic)
-      info("MR3B nested data first difference: #{NoxunMr3bCloneDiagnostic.first_difference(data, after_data).inspect}")
-    end
-    ok('MR3B nested: vyrobne snapshoty vsetkych occurrence paths ostali', after_data == data)
+    ok('MR3B nested: raw NOXUN config/ID/keys, transformy a nasobnosti ostali', after_data == data)
     ok('MR3B nested: outer aj leaf definicie su izolovane',
        a.definition != b.definition && (mr3b_leaves(a).map(&:definition) & mr3b_leaves(b).map(&:definition)).empty?)
     [a, b].zip(parents).each do |outer, old|
