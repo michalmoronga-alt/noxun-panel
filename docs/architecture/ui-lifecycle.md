@@ -2464,7 +2464,9 @@ byť čitateľný; stĺpec ani tu nepribudol (horizontálny priestor) a jeden ri
 (predtým sa vlastník ticho vynechal) a `cabinet_id` sa do vety položky už nepíše — stojí v hlavičke skupiny. Zdroj bez `cabinet_id` má vlastnú tlmenú skupinu „—".
 (2) **Zdroje sú KLIKATEĽNÉ**: hlavička skupiny aj každá položka nesú `data-src-cab` (+ `data-src-key`) a klik ide existujúcou cestou `nx_select` — payload `source_ref`
 (`cabinet_id` + `owner_part_key`) plus `focus_inspector: true`, **nikdy pids z DOM**. Delegovaný klik spracúva `[data-src-cab]` **pred** `tr.hwbuyrow`, inak by klik na zdroj
-rozklik iba zbalil. Serverová strana je v `docs/architecture/outputs.md` (vetva `source_ref`). Skupina bez `cabinet_id` klikateľná nie je — nemá kam viesť.
+rozklik iba zbalil. Serverová strana je v `docs/architecture/outputs.md` (vetva `source_ref`). Skupina bez `cabinet_id` klikateľná nie je — nemá kam viesť. **Klik Inspector
+NEOTVÁRA, len zdvihne** (tá istá konvencia ako ceruzka Š3), takže tooltipy hovoria „…a zdvihne Inspector, ak je otvorený" a pri zavretom Inspectorovi to okno povie aj
+**statusom** („Inspector nie je otvorený.") — sľúbiť otvorenie a nespraviť nič je horšie než neponúknuť ho (Codex #361 P2).
 (3) **Pamäť rozkliku PREŽÍVA push.** Do D-94 sa `buyOpen` zahadzoval pri každom pushi, lebo bol kľúčovaný **indexom** riadku a preusporiadaný payload by otvoril cudzí riadok —
 prakticky to znamenalo, že rozklik zmizol po každom „Obnoviť". Kľúčom je teraz **identita riadku** (`free_key` pri voľnej položke, inak `code` malými písmenami — presne agregačný
 kľúč `add_row`, ktorý je case-insensitive), takže preusporiadanie prestalo byť problémom a pamäť sa maže **len pri zmene dokumentu** (`model_guid`, vzor `ctrlUniOpen`). Kľúč

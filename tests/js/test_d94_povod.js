@@ -127,9 +127,13 @@ const push = function(rows, guid, gen){
      'zdroj bez vlastnika sa prizna slovami (nie tichym vynechanim)');
   ok(open.indexOf('CAB-3 · F1') === -1,
      'ID skrinky sa v polozke UZ NEOPAKUJE (stoji v hlavicke skupiny)');
-  ok(open.indexOf('title="Označí skrinku v modeli a otvorí ju v Inspectore"') > -1 &&
-     open.indexOf('title="Označí dielec v modeli a otvorí Inspector"') > -1,
+  // Codex #361 P2: tooltip nesmie slubit OTVORENIE Inspectora — `do_select` ho
+  // nikdy neotvara, len zdvihne (konvencia Š3 ceruzky).
+  ok(open.indexOf('title="Označí skrinku v modeli a zdvihne Inspector, ak je otvorený"') > -1 &&
+     open.indexOf('title="Označí dielec v modeli a zdvihne Inspector, ak je otvorený"') > -1,
      'klikatelne prvky hovoria, co klik urobi');
+  ok(open.indexOf('otvorí ju v Inspectore') === -1 && open.indexOf('a otvorí Inspector') === -1,
+     'a NESLUBUJU otvorenie zavreteho Inspectora');
 
   // Skupina bez ID NIE JE klikatelna — nema kam viest.
   const dead = S.buySection(hs([{ code: 'X1', quantity: 1,

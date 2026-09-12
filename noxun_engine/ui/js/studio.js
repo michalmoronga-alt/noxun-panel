@@ -609,8 +609,11 @@
   // položka sú KLIKATEĽNÉ: nesú adresu výberu (`data-src-cab` + `data-src-key`)
   // a klik ide cestou `nx_select` so `source_ref`. Skupina bez `cabinet_id`
   // klikateľná NIE JE — nemá kam viesť.
-  var SRC_TIP_CAB = 'Označí skrinku v modeli a otvorí ju v Inspectore';
-  var SRC_TIP_PART = 'Označí dielec v modeli a otvorí Inspector';
+  // Codex #361 P2: tooltip nesmie sľúbiť viac, než sa stane — `do_select`
+  // Inspector NIKDY NEOTVÁRA (konvencia Š3 ceruzky), len ho zdvihne, keď už
+  // žije. Pri zavretom Inspectorovi to okno povie aj statusom.
+  var SRC_TIP_CAB = 'Označí skrinku v modeli a zdvihne Inspector, ak je otvorený';
+  var SRC_TIP_PART = 'Označí dielec v modeli a zdvihne Inspector, ak je otvorený';
   function hwSourcesHtml(r){
     var groups = hwSourceGroups(r && r.sources);
     if (!groups.length){

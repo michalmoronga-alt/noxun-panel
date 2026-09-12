@@ -1958,7 +1958,10 @@ module Noxun
         hw_row = nil
         # D-94: `cabinet_id` zdroja, ktory patri CELEJ skrinke (prazdny kluc) —
         # jediny udaj, ktorym sa da o vybere povedat vetu o SKRINKE.
+        # `source_ref_hit` = klik prisiel z rozkliku povodu (aj ked kluc MA);
+        # jeho veta statusu je vlastna, lebo ako jedina prizna zavrety Inspector.
         source_cab = nil
+        source_ref_hit = false
         if data['problem_key']
           collected = fresh_collect(model)
           # GH #127 P2: klik-resolve MUSI ratat s rovnakym vstupom ako
@@ -1999,6 +2002,7 @@ module Noxun
           # skrinky). Zonovy dielec (polica) kluc MA, len nie celovy — tam
           # ostava bezna veta o polozkach.
           source_cab = item['owner_id'] if item['part_key'].empty?
+          source_ref_hit = true
           pids = pids_for_source(model, data['source_ref'], focus: focus)
         else
           pids = refs_for(Bom.compute(fresh_collect(model)), data)
@@ -2036,10 +2040,16 @@ module Noxun
           Panel.push_focus_front(front_id)
           return status.call(front_focus_status(targets.length, front_id))
         end
-        # D-94: zdroj CELEJ skrinky — veta hovori o SKRINKE (presne to sa
-        # oznacilo), nie o „položkách". Inspector uz je vpredu (`bring_to_front`
-        # vyssie), karta cela sa neotvara: taky zdroj ziadne celo nemenuje.
-        return status.call(source_focus_status(targets.length, source_cab, focus)) if source_cab
+        # D-94: klik na zdroj rozkliku povodu ma VLASTNU vetu. Pri zdroji CELEJ
+        # skrinky hovori o SKRINKE (presne to sa oznacilo), nie o „položkách";
+        # karta cela sa pri nom neotvara, lebo taky zdroj ziadne celo nemenuje.
+        # A ako JEDINA veta priznava, ze Inspector nie je otvoreny (Codex #361
+        # P2) — `do_select` ho NIKDY neotvara, len zdvihne, takze bez priznania
+        # by tooltip zdroja slubil nieco, co sa nestane.
+        if source_ref_hit
+          return status.call(source_focus_status(targets.length, source_cab, focus,
+                                                 data['focus_inspector'] == true))
+        end
         status.call("Vybraných #{targets.length} položiek v modeli." \
                     "#{focus ? ' Inspector je vpredu — dielec sa dá hneď upraviť.' : ''}")
       rescue StandardError => e
@@ -2079,14 +2089,38 @@ module Noxun
         "#{what} v modeli — Inspector je vpredu, karta čela #{front_id} je otvorená."
       end
 
-      # D-94: veta po kliku na ZDROJ, ktory patri CELEJ skrinke. Mnozne cislo
-      # priznava zdielane `cabinet_id` (dve skrinky s tym istym ID sa oznacia
-      # obe — vedomy dosledok zdielaneho resolvera, viz `pids_for_source`).
+      # D-94: veta po kliku na ZDROJ rozkliku povodu.
+      #
+      # Pri zdroji CELEJ skrinky menuje SKRINKU a mnozne cislo priznava zdielane
+      # `cabinet_id` (dve skrinky s tym istym ID sa oznacia obe — vedomy dosledok
+      # zdielaneho resolvera, viz `pids_for_source`). Prazdny `cabinet_id` = zdroj
+      # s klucom dielca; veta vtedy hovori o POLOZKACH ako ostatne vetvy.
+      #
+      # Codex #361 P2: `focus_wanted` je to, co si okno VYPYTALO, `focus` to, co
+      # sa naozaj stalo. `do_select` Inspector NIKDY NEOTVARA (konvencia Š3
+      # ceruzky) — len ho zdvihne, ked uz zije. Ked ho pouzivatel ziadal a okno
+      # je zavrete, veta to MUSI povedat: inak klikne na zdroj, tooltip slubi
+      # Inspector a nestane sa nic viditelne.
       # CISTA funkcia (ziadne IO) — headless testovatelna.
-      def source_focus_status(count, cabinet_id, focus)
+      def source_focus_status(count, cabinet_id, focus, focus_wanted = false)
         n = count.to_i
-        what = n == 1 ? "Označená skrinka #{cabinet_id}" : "Označených #{n} kusov s ID #{cabinet_id}"
-        "#{what} v modeli.#{focus ? ' Inspector je vpredu.' : ''}"
+        what = if cabinet_id.to_s.empty?
+                 "Vybraných #{n} položiek"
+               elsif n == 1
+                 "Označená skrinka #{cabinet_id}"
+               else
+                 "Označených #{n} kusov s ID #{cabinet_id}"
+               end
+        "#{what} v modeli.#{source_focus_suffix(focus, focus_wanted)}"
+      end
+
+      # D-94: dovetok o Inspectorovi — zdvihnuty / vypytany, ale zavrety / nic.
+      # CISTA funkcia (ziadne IO) — headless testovatelna.
+      def source_focus_suffix(focus, focus_wanted)
+        return ' Inspector je vpredu.' if focus
+        return ' Inspector nie je otvorený.' if focus_wanted
+
+        ''
       end
 
       # KOV-D4: ADRESA riadku v sekcii Kovanie z nalezu. Sklada ju VALIDACIA

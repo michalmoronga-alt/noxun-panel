@@ -102,7 +102,9 @@ v modeli. Adresa je **identita (`cabinet_id` + `owner_part_key`)** — presne t�
 zdroj na dvojicu `(owner_id, part_key)` a ďalej beží `pids_for_problem` (prázdny kľúč = celý korpus, nepostavený dielec = fallback na korpus). Pri `focus_inspector` vyberá
 **vlastníka** tou istou `select_target_item` ako KOV-A2b — karta čela v Inspectorovi žije len nad označenou SKRINKOU, takže výber vnoreného dielca by deep-link ticho zabil; bez
 ceruzky (zavretý Inspector) sa označia dielce čela. Deep-link ide existujúcou cestou `push_focus_front`; zdroj **bez kľúča** (kovanie celej skrinky) žiadne čelo nemenuje, takže
-dostane iba `bring_to_front` a vlastnú vetu statusu (`source_focus_status`). **Vedomý dôsledok zdieľaného tela** (rovnaký ako pri `rule_ref`): zdroje `owner_pid` nenesú, takže
+dostane iba `bring_to_front` a vlastnú vetu statusu (`source_focus_status`). **Klik Inspector NIKDY NEOTVÁRA** — platí tu tá istá konvencia ako pri ceruzke Š3 (`do_select` ho len
+zdvihne, keď už žije). Preto je `source_focus_status` jediná veta, ktorá **priznáva zavretý Inspector** („Inspector nie je otvorený.", Codex #361 P2): okno si ho vypýtalo
+(`focus_inspector`), `Panel.dialog_alive?` ho zrazil na `false` a bez priznania by tooltip zdroja sľúbil niečo, čo sa viditeľne nestane. **Vedomý dôsledok zdieľaného tela** (rovnaký ako pri `rule_ref`): zdroje `owner_pid` nenesú, takže
 `scoped_owner_instance` sa neuplatní a dve skrinky so zdieľaným `cabinet_id` sa označia OBE — veta statusu to priznáva množným číslom. Prázdny výsledok = existujúca hláška
 „Zoznam sa medzitým zmenil…" + repush. Testy: `tests/pure/test_d94_povod.rb`, `tests/js/test_d94_povod.js`, in-SketchUp sekcia `run_d94`.
 

@@ -236,6 +236,30 @@ NxTest.test('D-94: veta statusu po kliku na zdroj CELEJ skrinky hovori o SKRINKE
   # zdielaneho resolvera) — veta to musi priznat, inak pouzivatel hlada chybu.
   two = NxD94::PC.source_focus_status(2, 'CAB-3', true)
   NxTest.assert(two.include?('2 kusov s ID CAB-3'), "mnozne cislo prizna zdielane ID — #{two}")
+  # Zdroj s KLUCOM dielca menuje polozky (skrinka sa necela neoznacila).
+  part = NxD94::PC.source_focus_status(3, nil, false)
+  NxTest.assert(part.include?('Vybraných 3 položiek'), "veta o polozkach — #{part}")
+end
+
+NxTest.test('D-94 (Codex #361 P2): ZAVRETY Inspector sa prizna, nie zamlci') do
+  NxTest.skip!('UI vrstva sa nacitava len headless') unless NxTest.headless?
+  # `do_select` Inspector NIKDY NEOTVARA (konvencia Š3 ceruzky) — len ho
+  # zdvihne. Ked si ho okno vypytalo (`focus_inspector`) a je zavrety, klik
+  # oznaci v modeli a inak sa VIDITELNE nestane nic; bez tejto vety by tooltip
+  # zdroja slubil Inspector a pouzivatel by hladal chybu.
+  dead = NxD94::PC.source_focus_status(1, 'CAB-3', false, true)
+  NxTest.assert(dead.include?('skrinka CAB-3'), "vyber sa aj tak stal — #{dead}")
+  NxTest.assert(dead.include?('Inspector nie je otvorený'), "a zavrete okno sa PRIZNA — #{dead}")
+  # To iste pri zdroji s klucom cela (tam je veta o polozkach).
+  part = NxD94::PC.source_focus_status(2, nil, false, true)
+  NxTest.assert(part.include?('Vybraných 2 položiek'), "veta o polozkach ostava — #{part}")
+  NxTest.assert(part.include?('Inspector nie je otvorený'), "a dovetok tiez — #{part}")
+  # Ked sa Inspector NEZIADAL, o Inspectorovi sa NEHOVORI vobec.
+  NxTest.assert(!NxD94::PC.source_focus_status(1, 'CAB-3', false, false).include?('Inspector'),
+                'nevypytany Inspector sa v statuse nespomina')
+  NxTest.assert_equal(' Inspector je vpredu.', NxD94::PC.source_focus_suffix(true, false),
+                      'zivy zdvihnuty Inspector vyhrava nad ziadostou')
+  NxTest.assert_equal('', NxD94::PC.source_focus_suffix(false, false))
 end
 
 NxTest.test('D-94: `pids_for_source` NEDUPLIKUJE resolver — vola `pids_for_problem`') do
