@@ -1836,6 +1836,314 @@ module NoxunSuRunner
     ok("MR3B: vynimka #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}", false)
   end
 
+  # MR-2A: pracovny SKM a priprava+Apply su jedna skutocna modelova transakcia.
+  def mr2a_descriptor(revision = SecureRandom.uuid)
+    { 'version' => 1, 'id' => revision, 'mode' => 'native', 'saved_at' => '2026-09-12T11:00:00Z' }
+  end
+
+  def mr2a_selection(model, root, label)
+    previous = model.selection.to_a
+    probe = D40Probe.new
+    model.selection.add_observer(probe)
+    e::ScaleWatch.guard { model.selection.clear; model.selection.add(root) }
+    baseline = probe.n
+    baseline_matches = model.selection.to_a == [root]
+    probe.instance_variable_set(:@n, 0)
+    result = yield
+    # Novy interval AZ po host akcii: udalosti pocas nej nesmu zakryt D40.
+    probe.instance_variable_set(:@n, 0)
+    e::ScaleWatch.guard { model.selection.clear; model.selection.add(root) }
+    ok("MR2A D40 #{label}: callbacky hned po akcii (#{baseline}/#{probe.n})",
+       baseline.positive? && baseline_matches && probe.n.positive? && model.selection.to_a == [root])
+    result
+  ensure
+    if probe
+      model.selection.remove_observer(probe)
+      e::ScaleWatch.guard { model.selection.clear; model.selection.add(Array(previous).select(&:valid?)) }
+    end
+  end
+
+  def mr2a_export_case(model, ctx)
+    n = e::NativeAppearance
+    source = ctx[:source]
+    scope = ctx[:scopes][:a]
+    library = mr2a_descriptor
+    library_path = e::Materials.appearance_file(library['id'])
+    FileUtils.mkdir_p(File.dirname(library_path))
+    before = mr3b_scene(model)
+    handles = model.materials.to_a
+    source_before = mr1b1_state(source)
+    marker = mr1b2_op(model) { model.entities.add_cpoint(ORIGIN) }
+    ok('MR2A live export: povodny podpis funguje', n.export(model, source, library_path, library, scope) == true)
+    working = mr2a_descriptor
+    path = File.join(ctx[:temp], 'first_working.skm')
+    ok('MR2A file source: bez ziveho R2 vznikne overeny W archiv',
+       n.export(model, nil, path, working, scope, source_descriptor: library) == true)
+    ok('MR2A export: oba docasne loady vratili presne handles aj source PBR/pixely/mierku',
+       model.materials.to_a == handles && mr1b1_state(source) == source_before &&
+       n.lookup(model, scope, library['id']).nil? && n.lookup(model, scope, working['id']).nil?)
+    Sketchup.undo
+    ok('MR2A export: nema Undo krok ani pomocnu geometriu', !marker.valid? && mr3b_scene(model) == before)
+    mr1b1_abort(model) do
+      loaded = n.import_working(model, path, scope: scope, revision: working['id'])
+      ok('MR2A working import: novy exact tuple a cely SKM PBR/pixel/scale roundtrip',
+         !handles.include?(loaded) && n.preferred(model, scope, loaded) == loaded && mr1b1_visual(loaded) == mr1b1_visual(source))
+    end
+    ok('MR2A working import abort: presna kolekcia a scena', model.materials.to_a == handles && mr3b_scene(model) == before)
+
+    live = mr1b2_op(model) { n.load(model, scope, library) }
+    mr1b2_op(model) { live.name = 'SU MR2A zivy R2 premenovany'; live.alpha = 0.55 }
+    live_before = mr3b_scene(model)
+    live_archive = File.join(ctx[:temp], 'live_descriptor_working.skm')
+    ok('MR2A file descriptor reuse: existujuci R2 sa obnovi presne',
+       n.export(model, nil, live_archive, mr2a_descriptor, scope, source_descriptor: library) && mr3b_scene(model) == live_before)
+    mr3b_reject(model, 'MR2A konflikt live source + descriptor') do
+      n.export(model, source, File.join(ctx[:temp], 'conflict.skm'), mr2a_descriptor, scope, source_descriptor: library)
+    end
+    error = mr3b_reject(model, 'MR2A chyba suborovy zdroj') do
+      n.export(model, nil, File.join(ctx[:temp], 'missing.skm'), mr2a_descriptor, scope, source_descriptor: mr2a_descriptor)
+    end
+    ok('MR2A chyba suboru je LoadError, nie tichy RGB fallback', error.is_a?(n::LoadError))
+    ctx.merge!(working: working, working_path: path)
+  end
+
+  def mr2a_pick_case(model, ctx)
+    n = e::NativeAppearance
+    scope = ctx[:scopes][:a]
+    a, b, foreign = mr3b_nested(model, ctx)
+    mr1b2_op(model) do
+      # V tejto fixture cielime skutocne ABS A; L2 ostava necielene B.
+      mr3b_leaves(a).each do |part|
+        cfg = e::Store.config(part)
+        cfg['edges']['L1'] = ctx[:ae]
+        e::Store.write_config(part, cfg)
+      end
+      foreign.material = ctx[:source]
+    end
+    raise 'MR2A nested fixture pending' unless e::ScaleWatch.flush_pending!(model) == true
+    before = mr3b_scene(model)
+    foreign_before = mr3b_tree(foreign, exact: true)
+    original_data = [mr3b_data(a), mr3b_data(b)]
+    source_before = mr1b1_state(ctx[:source])
+    calls = 0
+    imported = picked = nil
+    result = mr2a_selection(model, a, 'prvy Pick') do
+      e::ApplyAppearance.apply(model, scope: scope) do
+        calls += 1
+        imported = n.import_working(model, ctx[:working_path], scope: scope, revision: ctx[:working]['id'])
+        imported.texture = ctx[:picked_path]
+        imported.texture.size = [180.mm, 90.mm]
+        picked = mr1b1_visual(imported)
+        imported
+      end
+    end
+    working = result[:material]
+    ok('MR2A Pick: blok raz, committed W handle, 12 dosiek aj 12 ABS',
+       calls == 1 && working == imported && working.valid? && mr3b_counts(result, 12, 12, 12))
+    ok('MR2A Pick: novy obrazok a mierka su skutocne v materialoch',
+       mr1b1_visual(working) == picked && picked[:texture][5] == ctx[:picked_digest] &&
+       picked[:texture][0, 2] == [180.mm.to_f, 90.mm.to_f] && picked[:texture][5] != mr1b1_visual(ctx[:source])[:texture][5])
+    pbr_keys = mr1b1_visual(ctx[:source]).keys - %i[texture color alpha colorize_type colorize_deltas]
+    ok('MR2A Pick: vlastne PBR mapy/faktory a alpha prezili vymenu albeda',
+       picked.slice(*pbr_keys) == mr1b1_visual(ctx[:source]).slice(*pbr_keys) && working.alpha == ctx[:source].alpha)
+    ok('MR2A Pick: cudzi zdielany obsah, povodny source a vyrobne bindingy ostali presne',
+       mr3b_tree(foreign, exact: true) == foreign_before && mr1b1_state(ctx[:source]) == source_before &&
+       [mr3b_data(a), mr3b_data(b)] == original_data)
+    [a, b].each do |root|
+      board = mr3b_leaves(root).find { |part| e::Store.kind(part) == 'board' }
+      mr3a_check_part(board, 'MR2A Pick board', l: 0, w: 1, t: 2, material: working, edge: ['L1', 1, :min], scale: [180.0, 90.0])
+    end
+    post = mr3b_scene(model)
+    mr2a_selection(model, a, 'Pick Undo') { Sketchup.undo }
+    ok('MR2A jeden Undo: W, obrazok, bindingy a vsetky clone vratene', mr3b_scene(model) == before)
+    mr2a_selection(model, a, 'Pick Redo') { Sketchup.redo }
+    ok('MR2A jeden Redo: W, obrazok, bindingy a vsetky clone obnovene', mr3b_scene(model) == post)
+    working = n.lookup(model, scope, ctx[:working]['id'])
+    second = mr2a_descriptor
+    second_path = File.join(ctx[:temp], 'second_working.skm')
+    n.export(model, working, second_path, second, scope)
+    # Po prvom Pick pribudne cudzi pouzivatel stareho W aj jeho leaf definicie.
+    old_user = mr1b2_op(model) do
+      board = mr3b_leaves(a).find { |part| e::Store.kind(part) == 'board' }
+      item = model.entities.add_instance(board.definition, Geom::Transformation.translation(mr3a_point([9000, 0, 0])))
+      item.material = working
+      item
+    end
+    e::ScaleWatch.flush_pending!(model)
+    calls = returns = clones = 0
+    injected = false
+    trace = TracePoint.new(:call, :return, :c_return) do |tp|
+      clones += 1 if tp.event == :c_return && tp.method_id == :make_unique
+      next unless tp.self.equal?(e::AppearanceMapping) && tp.method_id == :paint_part!
+      if tp.event == :return
+        returns += 1 if tp.return_value && tp.return_value != false
+      elsif tp.event == :call
+        calls += 1
+        if calls == 2 && returns == 1
+          injected = true
+          raise e::Materials::AppearanceError, 'MR2A second Pick mapper injection'
+        end
+      end
+    end
+    old_user_before = mr3b_tree(old_user, exact: true)
+    old_working = mr1b1_state(working)
+    error = mr2a_selection(model, a, 'druhy Pick abort') do
+      mr3b_reject(model, 'MR2A druhy Pick') do
+        trace.enable
+        begin
+          e::ApplyAppearance.apply(model, scope: scope) do
+            material = n.import_working(model, second_path, scope: scope, revision: second['id'])
+            material.texture = ctx[:image_path]
+            material.texture.size = [75.mm, 35.mm]
+            material
+          end
+        ensure
+          trace.disable
+        end
+      end
+    end
+    ok("MR2A druhy Pick: skutocne clone a chyba az po prvom uspesnom paint (#{clones}/#{calls}/#{returns})",
+       clones.positive? && calls == 2 && returns == 1 && injected && error && error.message.include?('MR2A second Pick mapper injection'))
+    ok('MR2A druhy Pick abort: stary W/PBR/pixely/mierka aj cudzi pouzivatel vratene, novy W zanikol',
+       mr1b1_state(working) == old_working && mr3b_tree(old_user, exact: true) == old_user_before && n.lookup(model, scope, second['id']).nil?)
+  ensure
+    trace.disable if trace
+  end
+
+  def mr2a_early_exit(model, ctx, revision, mode)
+    e::ApplyAppearance.apply(model, scope: ctx[:scopes][:b]) do
+      e::NativeAppearance.create_working(model, scope: ctx[:scopes][:b], color: [23, 45, 67], revision: revision)
+      ctx[:source].texture = ctx[:picked_path]
+      ctx[:source].texture.size = [45.mm, 25.mm]
+      case mode
+      when :break then break :mr2a_left
+      when :return then return :mr2a_left
+      when :throw then throw :mr2a_exit, :mr2a_left
+      end
+    end
+  end
+
+  def mr2a_empty_case(model, ctx)
+    n = e::NativeAppearance
+    scope = ctx[:scopes][:b]
+    foreign = mr1b2_op(model) do
+      group = model.entities.add_group
+      group.entities.add_cpoint(ORIGIN)
+      group.material = ctx[:plain]
+      group
+    end
+    e::ScaleWatch.flush_pending!(model)
+    before = mr3b_scene(model)
+    revision = SecureRandom.uuid
+    calls = 0
+    result = mr2a_selection(model, foreign, 'nulovy RGB Pick') do
+      e::ApplyAppearance.apply(model, scope: scope) do
+        calls += 1
+        n.create_working(model, scope: scope, color: [100, 120, 140], revision: revision)
+      end
+    end
+    working = result[:material]
+    ok('MR2A nulovy RGB: novy izolovany W bez geometrie aj pri rovnakom RGB',
+       calls == 1 && result[:updated_parts].zero? && working && working != ctx[:plain] &&
+       working.color.to_a.first(3) == [100, 120, 140] && working.texture.nil? &&
+       n.lookup(model, scope, revision) == working && mr3b_scene(model)[0, 2] == before[0, 2])
+    post = mr3b_scene(model)
+    mr2a_selection(model, foreign, 'nulovy RGB Undo') { Sketchup.undo }
+    ok('MR2A nulovy RGB Undo: W zanikol a zdielany plain vratane pouzivatelov ostal', mr3b_scene(model) == before)
+    mr2a_selection(model, foreign, 'nulovy RGB Redo') { Sketchup.redo }
+    ok('MR2A nulovy RGB Redo: presne obnovena kolekcia', mr3b_scene(model) == post)
+
+    mr3b_reject(model, 'MR2A obsadeny create UUID') do
+      e::ApplyAppearance.apply(model, scope: scope) { n.create_working(model, scope: scope, color: [1, 2, 3], revision: revision) }
+    end
+    mr3b_reject(model, 'MR2A obsadeny import UUID') do
+      e::ApplyAppearance.apply(model, scope: ctx[:scopes][:a]) do
+        n.import_working(model, ctx[:working_path], scope: ctx[:scopes][:a], revision: ctx[:working]['id'])
+      end
+    end
+    %i[break return throw].each do |mode|
+      snapshot = mr3b_scene(model)
+      revision = SecureRandom.uuid
+      value = mr2a_selection(model, foreign, "#{mode} abort") do
+        catch(:mr2a_exit) { mr2a_early_exit(model, ctx, revision, mode) }
+      end
+      ok("MR2A #{mode}: aj nulovy ciel abortuje novy W a zameneny obrazok stareho source",
+         value == :mr2a_left && mr3b_scene(model) == snapshot && n.lookup(model, scope, revision).nil? && !e::ScaleWatch.rebuilding?)
+      # Dalsia vlastna operacia sa musi normalne uzavriet; jeden Undo odstrani ju.
+      marker = mr1b2_op(model) { model.entities.add_cpoint(ORIGIN) }
+      Sketchup.undo
+      ok("MR2A #{mode}: nezostala otvorena operacia", !marker.valid? && mr3b_scene(model) == snapshot)
+    end
+  end
+
+  def run_mr2a(model)
+    return ok('MR2A: povoleny testmodel', false) unless guard_model?(model)
+    cleanup(model)
+    keep = model.entities.to_a
+    originals = model.materials.to_a
+    old_dir = e::Materials.test_dir_override
+    Dir.mktmpdir('noxun-mr2a-su-') do |temp|
+      e::Materials.test_dir_override = temp
+      e::Materials.reload!
+      e::Materials.load
+      batches = %w[A B].to_h do |name|
+        status, rows = e::Materials.add_decor_batch('batch_schema' => 3, 'decor' => "SU MR2A #{name}",
+          'type' => 'DTDL', 'grain' => 'length', 'color' => [100, 120, 140],
+          'sheet_variants' => [{ 'thickness' => 18.0, 'structure' => 'SM' }],
+          'edge_variants' => [{ 'width' => 23.0, 'thickness' => 1.0, 'structure' => 'SM' }])
+        raise "MR2A local catalog: #{rows.inspect}" unless status
+        [name, rows]
+      end
+      paths = %w[source picked].map { |name| File.join(temp, "#{name}.png") }
+      pixels = [[255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 230, 150, 80, 255],
+                [25, 80, 230, 255, 240, 210, 20, 255, 150, 50, 70, 255, 10, 190, 90, 255]]
+      digests = paths.zip(pixels).map do |path, data|
+        image = Sketchup::ImageRep.new
+        image.set_data(2, 2, 32, 0, data.pack('C*'))
+        raise 'MR2A image fixture save' unless image.save_file(path)
+        Digest::SHA256.hexdigest(image.data)
+      end
+      source, plain = mr1b2_op(model) do
+        mat = model.materials.add('SU MR2A source')
+        mat.texture = paths[0]
+        mat.texture.size = [180.mm, 90.mm]
+        mat.alpha = 0.7
+        mat.set_attribute('NOXUN', 'unrelated', 'MR2A zachovat')
+        if mat.respond_to?(:roughness_factor=)
+          mat.metallic_factor = 0.35
+          mat.roughness_factor = 0.65
+          mat.normal_scale = 0.7
+          mat.ao_strength = 0.8
+          %i[metallic_texture roughness_texture normal_texture ao_texture].each { |field| mat.public_send("#{field}=", paths[0]) }
+          %i[metalness_enabled roughness_enabled normal_enabled ao_enabled].each { |field| mat.public_send("#{field}=", true) }
+        end
+        # Rovnaká native kanonizacia PBR map ako v MR1B1; oracle zacina realnym SKM.
+        baseline = File.join(temp, 'source_canonical.skm')
+        raise 'MR2A source SKM save' unless mat.save_as(baseline)
+        model.materials.remove(mat)
+        mat = model.materials.load(baseline)
+        rgb = model.materials.add('SU MR2A plain')
+        rgb.color = [100, 120, 140]
+        [mat, rgb]
+      end
+      ctx = { a: batches['A']['sheets'].first, b: batches['B']['sheets'].first,
+              ae: batches['A']['edges'].first, be: batches['B']['edges'].first,
+              plain: plain, source: source, temp: temp, image_path: paths[0], picked_path: paths[1], picked_digest: digests[1] }
+      ctx[:scopes] = %i[a b].to_h { |key| [key, e::Materials.appearance_scope_key(e::Materials.sheet(ctx[key]))] }
+      mr2a_export_case(model, ctx)
+      mr2a_pick_case(model, ctx)
+      mr3b_clear(model, keep)
+      mr2a_empty_case(model, ctx)
+    ensure
+      mr3b_clear(model, keep)
+      e::Materials.test_dir_override = old_dir
+      e::Materials.reload!
+      mr1b2_op(model) { (model.materials.to_a - originals).each { |mat| model.materials.remove(mat) if mat.valid? } }
+    end
+  rescue StandardError => ex
+    ok("MR2A: vynimka #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}", false)
+  end
+
   # MR-1B1: native save/load bez dotyku katalogu alebo geometrie zakazky.
   def mr1b1_visual(material)
     state = { color: material.color.to_a, alpha: material.alpha }
@@ -21636,6 +21944,7 @@ module NoxunSuRunner
     run_mr1b2(model)          # MR-1B2: R1/R2, spolocna ABS, prestavba, verna kopia a rollback
     run_mr3a(model)           # MR-3A: fyzicke UV, skutocne roly, partial bindingy a rollback
     run_mr3b(model)           # MR-3B: Apply cez skutocne vyskytove cesty, izolacia a rollback
+    run_mr2a(model)           # MR-2A: pracovny SKM, atomicka priprava+Apply a early-exit rollback
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
