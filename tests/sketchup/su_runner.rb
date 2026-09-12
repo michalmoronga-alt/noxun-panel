@@ -1405,6 +1405,14 @@ module NoxunSuRunner
       f.visible = false
       [t, f]
     end
+    before_flush = [mr3b_data(a), mr3b_data(b)]
+    settled = e::ScaleWatch.flush_pending!(model)
+    raise 'MR3B nested fixture sa neustalil pred baseline' unless settled == true && !e::ScaleWatch.pending?
+
+    after_flush = [mr3b_data(a), mr3b_data(b)]
+    if after_flush != before_flush && defined?(NoxunMr3bCloneDiagnostic)
+      info("MR3B nested data during fixture flush: #{NoxunMr3bCloneDiagnostic.first_difference(before_flush, after_flush).inspect}")
+    end
     leaves = [a, b].flat_map { |outer| mr3b_leaves(outer) }
     ok('MR3B nested: 12 skutocnych vyskytov, hoci len 6 leaf handles', leaves.length == 12 && leaves.uniq.length == 6 && !folder.visible? && b.hidden?)
     before = mr3b_scene(model)
