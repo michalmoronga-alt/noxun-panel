@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.11.4 · 12.9.2026 — M-R: MR-3A FYZICKÁ MIERKA A SMER TEXTÚR.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.11.5 · 12.9.2026 — M-R: MR-3B APLIKOVANIE VZHĽADU V MODELI.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -23,6 +23,7 @@ Pred prvou takou zákazkou aktualizovať **obe PC** (Štúdio → O plugine → 
 **MR-1B1:** **3856 headless · 113 JS sád · 2321 in-SketchUp PASS / 0 FAIL**, z toho 24 nových kontrol adaptéra. Identita, celý skúšaný PBR stav, dve revízie a obnova zdroja prešli; fyzický SU 2024 ani renderová zhoda nie sú overené.
 **MR-1B2:** **3898 headless · 113 JS sád · 2381 in-SketchUp PASS / 0 FAIL**, z toho 60 nových kontrol. Oba buildery, spoločná ABS, R1/R2, kópie, scale, batch a rollback; snapshot, kusovník a VEPO zhodné. Save/reopen bez `.skm` zachová celý otvorený stav pri prestavbe; samotný SketchUp pri otvorení zjednotí sekundárne PBR mierky s albedom (priznaný charakterizačný rozdiel, render netestovaný).
 **MR-3A:** **3925 headless · 113 JS sád · 2442 in-SketchUp PASS / 0 FAIL** (61 nových kontrol). Fyzické UV, ABS, zástena, duplák, R1/R2, copy/scale, Undo/Redo a úplný rollback; výroba zhodná. Samostatné save/reopen bez `.skm`: **21 PASS**, materiály/UV/snapshot aj následná prestavba zachované; bez sekundárnych PBR máp a renderového overenia.
+**MR-3B:** **3953 headless · 113 JS sád · 2518 in-SketchUp PASS / 0 FAIL** (76 nových kontrol). Spoločné Apply dosiek/ABS, vnorené/skryté kópie, ochrana cudzích dielcov aj následného rebuildu, výroba a úplný rollback. D-40 opravené úzkou zmenou operácie; výber žije po Apply/Undo/Redo/abort. Save/reopen bez `.skm`: **24 PASS**, presný vzhľad, UV a prestavba zachované; bez sekundárnych PBR máp/renderu.
 Geometrický dôkaz ČELÁ-B2: **in-SketchUp 2297 PASS / 0 FAIL** (osadenia, výroba/rezy, šablóny, uloženie/návrat, Scale/Späť a kópia); C geometriu nemení. Ručné Redo zostáva.
 **Michal 11.9. potvrdil úspešný test produktových odkazov aj potvrdzovania cien** (CENY-KOV-A/B, PR #345/#346).
 **Michal 11.9. potvrdil aj používateľskú kontrolu hotového balíka Čiel v0.11.0: funguje, bez nájdených chýb.** Samostatné ručné Redo nebolo výslovne potvrdené.
@@ -30,14 +31,14 @@ Geometrický dôkaz ČELÁ-B2: **in-SketchUp 2297 PASS / 0 FAIL** (osadenia, vý
 ## Robí sa
 
 **Michal schválil blok M-R a mockup (11.9.).** Jeden spoločný vzhľad pre dosky aj ABS rovnakého dekoru a povrchu naprieč hrúbkami; dnešné plošné farby ostávajú, zástena má jeden vzhľad. UNI ostáva pracovnou farbou.
-**MR-1A/1B1/1B2 sú v maine (#353–#355). MR-3A mapuje textúry v oboch builderoch:** veľké plochy podľa smeru dekoru, ABS pozdĺž hrany, s fyzickou mierkou živého materiálu.
-Nový vklad používa aktuálny vzhľad, prestavba a kópia zachovajú pôvodný živý materiál. Plošné farby zostávajú. Nasleduje MR-3B aplikovanie na existujúce dielce a MR-2 ovládanie.
+**MR-1A/1B1/1B2 a MR-3A sú v maine (#353–#356).** MR-3B dopĺňa jednu modelovú operáciu pre podporované dosky aj ABS zvoleného scope vrátane skrytých a vnorených výskytov.
+Zdieľané definície sa izolujú, necielené plochy si zachovajú vzhľad. Prestavba ďalej nemení cudzí dielec používajúci pôvodnú definíciu. Nasleduje MR-2 ovládanie; plošné farby zostávajú.
 Ďalšie dávky určuje blok M-R v [PLAN.md](PLAN.md), audit a sondy zachytáva [MR podklad](zdroje/next_sessions/MR_VZHLAD_PACKAGE_2026-09-11.md). Čelá A/B1/B2/C ostávajú dokončené a používateľsky potvrdené.
 **Blok 1d** podľa kapacity — hotové po R-14, ďalej R-18; **R-13 čaká na Michala**. Blok **1b** je uzavretý, **1c/1e hotové**.
 
 ## Ďalší krok
 
-Po uzavretí MR-3A začať MR-3B Apply z čerstvého mainu, potom MR-2 ovládanie a reálny záverečný smoke. D-28 ostáva otvorené do dokončenia celého bloku; ručné Redo Čiel ostáva samostatne nepotvrdené.
+Po uzavretí MR-3B začať MR-2 ovládanie z čerstvého mainu, potom reálny záverečný smoke. D-28 ostáva otvorené do dokončenia celého bloku; ručné Redo Čiel ostáva samostatne nepotvrdené.
 
 ## Posledné uzávery
 
