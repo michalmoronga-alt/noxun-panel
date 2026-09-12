@@ -45,15 +45,16 @@ a položka „výklop ako samostatný typ čela" dávkami KOV-A1 + KOV-A2a (v0.9
   *(Piaty kus tej istej odkladovej sady — EN DANIELI textový export — je v skupine KONTROLA + VÝROBA; DOCX/PDF generátor a rodina dokumentov sú od 26.8. v skupine Po V1 — zásobník.)*
   *Stav: čaká na prax — vytiahne sa, keď si to reálna zákazka vypýta.*
 
-## RENDER M-R
-
-- **D-28 · Textúry materiálov (render)** (Michal 19.7. večer) — *Stav: **ZLÚČENÉ do bloku M-R VZHĽAD** (6.9.2026, [PLAN.md](PLAN.md) blok 5): **jediný kontrakt `appearance` → `.skm`**
-  (textúra, mierka, priehľadnosť aj PBR v jednom SketchUp kontajneri — `Material#save_as` / `Materials#load`); „Uložiť vzhľad" = MR-2, orientácia podľa smeru dekoru = MR-3;
-  `texture_path` ani samostatné PBR polia sa **nezavádzajú**, package „M-R FOTO" (Demos fotka) je nahradený; zdieľanie `.skm` medzi PC = D-48 po V1 (Luciina priorita).*
 ## INFRA
 
   *Stav: na návrhovú dávku — od 26.8. SAMOSTATNE (bez väzby na D-48, ktorý je mimo V1); distribučný kanál jednoducho, napr. zdieľaný priečinok.*
 ## Po V1 — zásobník
+
+- **D-126 · Otočenie obrázka textúry pred uložením** (Michal 12.9.2026, smoke M-R PASS) — pri vkladaní obrázka nie je samozrejmé, že kresba drevodekoru má byť vodorovná; plugin smer obrázka automaticky nerozpoznáva.
+  Uzáver M-R pridáva pomocný text. Neskôr zvážiť otočenie obrázka o **±90° priamo v plugine pred uložením**. *Stav: odložené, bez termínu; neblokuje prijatý blok M-R.*
+- **D-127 · Prirodzenejšie umiestnenie textúry na dielcoch** (Michal 12.9.2026, smoke M-R PASS) — orientácia textúry je správna, ale opakovanie vždy od rovnakého bodu pôsobí neprirodzene.
+  Možnosti: **náhodný posun**, **nadväzovanie textúry v rámci skrinky** alebo **ručné umiestnenie**. Michal najprv zistí, ako sa s tým pracuje Lucii; výsledné ovládanie ani konkrétna možnosť ešte nie sú rozhodnuté.
+  *Stav: odložené, čaká na prax; neblokuje prijatý blok M-R.*
 
 - **D-109 · Pomer člena setu „1 ks na N nôh"** (Michal 24.8., prvý test v0.8.0) — set kovania vie dnes počítať člena len **per unit** (na kus) alebo **per owner** (na skrinku). Chýba pomer typu „**1
   príchyt sokla na 4 nohy**": pri príchytoch soklovej lišty sa počet neviaže na skrinku ani na jednotlivú nohu, ale na ich **počet**. Dnes sa to musí dopočítať ručne — a práve to má set robiť za

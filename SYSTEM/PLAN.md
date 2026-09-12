@@ -173,7 +173,7 @@ príslušného bloku z konceptov nižšie (koncept je podklad, nie zadanie — R
 | 03 kovanie fáza 3 | blok KOVANIE — **hotový 10.9.2026** (v0.10.0; packages A–I v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md)); fáza 3 geometria ostáva PO V1 |
 | 04 + 04A spotrebiče S1 | podklad pre package pri štarte bloku 4 (V1-02); externý audit 04A platný |
 | 05 shared library + updater | D-52 SPRACOVANÉ do package (#255); D-48 sync = PO V1 zásobník |
-| 06 render M-R | quick-win SPRACOVANÝ do package M-R FOTO (#254/#257); plná appearance vrstva PO V1 (D-28 odrážka bloku 5) |
+| 06 render M-R | pôvodný M-R FOTO nahradilo M-R VZHĽAD, implementované v #353–#359; plný blok v [archíve etáp](archiv/ROADMAP_hotove_etapy.md). Po V1 ostáva pixla a zdieľanie knižnice D-48 |
 | 07 konštrukcia V1 | podklad pre package(y) pri štarte bloku 4 (V1-01 komín · V1-07 čelá cenovo · balík V0.4.8); patrí sem aj výklop=rola flap — týmto PRESUNUTÝ z 1b/F do okruhu bloku 4 (jeden domov) |
 | 08 ponuka/dokumenty/ceny | V1 časť = zvyšok V1-03 v bloku 4; DOCX/PDF rodina dokumentov PO V1 zásobník |
 | 09 + 09A GHOST | SPRACOVANÉ do záväzného package (#254 + #257) |
@@ -524,36 +524,6 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
   **Checklist uzáveru:** bump patch + `?v=` → testy vrátane in-SU → `construction.md` (`BoardBuilder.replan`, fázy kreslenia, geometria lúča/projekcie, degenerácie, lifecycle zámkov —
   Codex #296 P1), `ui-lifecycle.md` (ghost D2, `interaction: drawing`, `draw_board`, zámky, Shift, VCB), `docs/UI_DIZAJN.md` (tlačidlá karty Dosky) → STAV/KRONIKA/PLAN.
 
-### 5 · RENDER M-R
-
-**Cieľ:** materiál vyzerá v modeli ako v skutočnosti — Luciin nástroj na vizualizácie.
-
-**SCHVÁLENÉ 11.9.2026:** Michal vybral M-R ako ďalší blok a schválil ovládanie aj implementáciu. Textúra je voliteľná; dnešné plošné farby zostávajú.
-**Rovnaký dekor a povrch má jeden spoločný vzhľad DOSIEK AJ ABS naprieč hrúbkami**, zástena jeden vzhľad z oboch strán; pracovné UNI ostávajú zamknuté.
-Jedno tlačidlo Vzhľad pri povrchu, bez samostatného ABS override. Katalógový kontrakt je v STANDARD §7; návrhový podklad a zapracovanie auditu v [MR balíku](zdroje/next_sessions/MR_VZHLAD_PACKAGE_2026-09-11.md).
-
-**Postup:** MR-1A katalógový kontrakt a spoločná knižnica → MR-1B natívny materiál a zachovanie pri prestavbe → mapovanie MR-3 → MR-2 Štúdio → MR-3 záverečný smoke. Malé samostatné PR z čerstvého mainu; prvá dávka ešte nesprístupňuje nové ovládanie. Žiadny nový observer ani zmena výrobných snapshotov.
-
-**Priebežný stav:** MR-1A je zlúčené v #353 (v0.11.1), MR-1B1 v #354 (v0.11.2), MR-1B2 v #355 (v0.11.3).
-MR-3A (v0.11.4) dopĺňa spoločný mapper v oboch builderoch: fyzická mierka, smer dekoru aj ABS a oba povrchy plôch; chybné mapovanie zruší celú stavbu.
-Nový vklad používa aktuálnu revíziu, prestavba/kópia zachová živý pôvodný materiál. MR-3B (v0.11.5) dopĺňa aplikovanie na podporované existujúce výskyty
-vrátane skrytých/vnorených, izolácie zdieľaných definícií a zachovania necielených plôch v jednej Undo operácii. Prestavba nerecykluje definície používané cudzími dielcami.
-MR-2A (v0.11.6) dopĺňa prípravu pracovného materiálu v tej istej operácii ako Apply, aj bez dielcov; pri chybe alebo predčasnom odchode sa vráti celý pokus.
-Pracovný import odmieta obsadenú revíziu a starý handle. SKM export zo živého alebo súborového zdroja overuje presnú obnovu kolekcie po oboch abortoch.
-MR-2B (v0.11.7) sprístupňuje spoločné ovládanie v Štúdiu: voliteľný obrázok, natívny editor, Save a Reset, samostatné okamžité RGB a retry po uložení bez úspešného Apply.
-Otvorenie nemení model ani výber; vlastné katalógové echo zachová okno, zmena dokumentu/sekcie zneplatní staré odpovede. Nasleduje záverečný smoke a uzáver; D-28 ostáva dovtedy otvorené.
-Natívna sonda potvrdila aj editáciu materiálu bez priradenia geometrii. MR-2 preto nepotrebuje pomocnú plochu: otvorí panel Materiály, kartu Upraviť prepne používateľ.
-
-- **V1 rozsah — M-R VZHĽAD (rozhodnuté 6.9.2026, NAHRÁDZA package „M-R FOTO" — Demos fotka ako textúra vypadáva):** ručné textúry z Michalovej knižnice (`E:\NOXUN\.MATERIÁLY`)
-  na všetky materiály katalógu (dosky, ABS hrany, dosky/boards), mierka + priehľadnosť + PBR v editore SketchUpu, **„Uložiť vzhľad" = `.skm`** (`Material#save_as` / `Materials#load`,
-  overené v SU 26.0), náhľad s pravdivým fallbackom pri zlyhaní `write_thumbnail`, **orientácia textúry podľa smeru dekoru** per dielec (dekorové plochy + `position_material`), „drž textúru bez súboru" (druhé PC).
-  Rezy **MR-1 jadro** (audit ÁNO: kontrakt `appearance` v katalógu, STANDARD §7.1 pole `texture` → `appearance`) → **MR-2 UI** ‖ **MR-3 orientácia** (audit ÁNO: buildery, in-SU).
-  Návrh poradia: **prvá dávka po KOVANÍ**. Plný checkpoint: [zdroje/next_sessions/V1_DEBATA_2026-09-06_MR_VZHLAD.md](zdroje/next_sessions/V1_DEBATA_2026-09-06_MR_VZHLAD.md). Pôvodný package M-R FOTO (29.8.) je v git histórii.
-- **D-28 · Textúry materiálov = M-R knižnica vzhľadov** (zlúčené do bloku M-R VZHĽAD vyššie, 6.9.2026): kontrakt je **jediný — `appearance` → `.skm`** (textúra, mierka,
-  priehľadnosť aj PBR v jednom SketchUp kontajneri; `texture_path` ani samostatné PBR polia sa **nezavádzajú**); „Uložiť vzhľad" = MR-2, orientácia podľa smeru dekoru = MR-3;
-  zdieľanie `.skm` medzi PC = D-48 po V1. Zdroj JPG = Michalova knižnica textúr.
-  *(**D-87** — overlay čiar v smere dekoru — je **HOTOVÝ** v bloku KRESBA (K2, PR #188, v0.7.26); tu ostáva len **orientácia textúry** podľa smeru dekoru ako fáza 2 D-28. Overlay je kontrola, textúra je render — dve rôzne veci.)*
-
 ### 6 · INFRA (priebežne, podľa potreby)
 
 **Cieľ:** aby plugin a knižnice fungovali na dvoch pracoviskách (Michal + Lucia).
@@ -664,10 +634,12 @@ Natívna sonda potvrdila aj editáciu materiálu bez priradenia geometrii. MR-2 
 
 ## Po V1 — zásobník (nezaradené, nestratiť)
 
+- **M-R nadstavby zo smoke 12.9.2026:** **D-126** otočenie zdrojového obrázka o ±90° pred uložením; **D-127** prirodzenejšie umiestnenie textúry (náhodný posun, nadväzovanie na skrinke alebo ručné umiestnenie — výber podľa praxe Lucie). Odložené, bez termínu, neblokujú uzáver M-R; plný kontext v [DOGFOODING.md](DOGFOODING.md).
+
 - **Mimo V1 z bloku KOVANIE** (FINAL §12; presunuté sem 10.9.2026 pri uzávere bloku): **D-109** pomerový člen setu „1 ks na N nôh" (= **R-05**; výsledok dnes dáva pravidlo
   `prichyt-sokla` podľa šírky korpusu, chýba len samotná mechanika pomeru) · plný `per: 'length'` · **HF** · ďalšie zásuvkové systémy **Antaro / StrongBox / TANDEM**
   (dáta pripravené v checkpointe #10) · automatika **vnútornej zásuvky** (inner drawer).
-- **Vyradené z V1 rozsahu 26.8.2026** (dôvody a rozsah: [V1_VIZIA.md](V1_VIZIA.md) „Mimo V1"): **D-48 G-Disk sync knižníc** (plné znenie v [DOGFOODING.md](DOGFOODING.md), skupina Po V1 — zásobník) · plné zostavy/segmenty s `attachment` (koncept 02) · plná appearance vrstva + pixla (koncept 06) ·
+- **Vyradené z V1 rozsahu 26.8.2026** (dôvody a rozsah: [V1_VIZIA.md](V1_VIZIA.md) „Mimo V1“): **D-48 G-Disk sync knižníc** (plné znenie v [DOGFOODING.md](DOGFOODING.md), skupina Po V1 — zásobník) · plné zostavy/segmenty s `attachment` (koncept 02) · pixla (koncept 06; M-R vzhľad implementovaný v #353–#359) ·
   DOCX/PDF ponuka s vizualizáciami a rodina dokumentov (koncept 08) · G-Disk sync D-48 (updater D-52 ostáva vo V1) · sektorová kontrola (koncept 01) ·
   konfigurátor typov čiel (V1-07 nad rámec cenovej položky) · kovanie fáza 3 geometria (plný model výklopov, výplne fáza B).
 - **Potvrdené / vyradené z V1 6.9.2026 (debata V1 po KOVANÍ, checkpointy `zdroje/next_sessions/V1_DEBATA_2026-09-0*.md`):** **D-95** krížová kontrola diel po diele — **uzavreté bez implementácie** (archív; odškrtávanie preč natrvalo), ostáva vizuálna kontrola, neskôr presety/X-ray (koncept 01) · **stráž kolízií** · **EN DANIELI** textový export · **D-106** predbežná cena skrinky ·

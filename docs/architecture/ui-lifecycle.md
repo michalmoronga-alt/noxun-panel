@@ -2608,6 +2608,7 @@ ho nikdy nepoužije (dôvod v `SYSTEM/archiv/KRONIKA.md`).
 **MR-2B — jeden Vzhľad pri povrchu dekorovej skupiny v Materiáloch.** Dosky aj ABS všetkých hrúbok používajú ten istý vstup;
 prázdna štruktúra a skupina obsahujúca iba ABS majú vlastný vstup tiež. UNI zostáva pracovnou farbou. Okno je kompaktný overlay pri tlačidle,
 jeho kotva žije mimo prekresľovaného tela sekcie. Obsahuje náhľad, katalógovú farbu a štyri explicitné akcie; nevzniká ďalší HtmlDialog.
+Pomocný text pred priradením obrázka upozorňuje na vodorovnú kresbu drevodekoru; orientácia obrázka sa automaticky nezisťuje ani nemení.
 
 Ruby časť patrí existujúcemu `MaterialsDialog` a používa jeho allowlist/dispatch. Jedna session zachytí model, `DocKey`, inštanciu Štúdia,
 kotvu, fresh scope/baseline a presný zdroj. Prepare iba číta: nedopĺňa materiál, nenačítava SKM, neotvára operáciu ani nemení výber.

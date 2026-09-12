@@ -53,7 +53,7 @@
       '<div class="mda-body"><div class="mda-preview-row"><div class="mda-preview" id="mdaPreview" role="img" aria-label="Ukážka vzhľadu"></div>' +
       '<div class="mda-meta"><b id="mdaLabel"></b><p id="mdaDescription"></p><span class="mda-tag" id="mdaTag"></span></div></div>' +
       '<div class="mda-color-line"><label for="mdaColor">Farba dekoru</label><input type="color" id="mdaColor" aria-describedby="mdaColorHint"><span id="mdaColorHint">Spoločná pre dosky aj ABS</span></div>' +
-      '<p class="mda-help">Textúra je voliteľná. Vzhľad platí pre tento povrch vo všetkých hrúbkach, vrátane ABS.</p>' +
+      '<p class="mda-help">Textúra je voliteľná. Vzhľad platí pre tento povrch vo všetkých hrúbkach, vrátane ABS. Pri drevodekore vkladaj obrázok s kresbou dreva orientovanou vodorovne.</p>' +
       '<div class="mda-actions"><button type="button" class="ghostbtn" id="mdaPick">' + icon('plus') + '<span id="mdaPickLabel">Priradiť textúru…</span></button>' +
       '<button type="button" class="ghostbtn" id="mdaEdit">' + icon('external-link') + '<span>Upraviť v SketchUpe</span></button>' +
       '<button type="button" class="primary" id="mdaSave">' + icon('check') + '<span>Uložiť vzhľad do knižnice</span></button>' +
