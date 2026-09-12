@@ -135,7 +135,10 @@ zachytený vzhľad aj jeho väzby; konfliktnú kópiu preskočí a pokračuje ď
 zápisu ďalej abortujú a zastavia spracovanie. `appearance_source:` v `build`/`commit_insert`
 je samostatný interný vstup produktovej kópie, mimo zmrazeného InsertPlan/configu; zdroj sa validuje a číta v guarded operácii, zostáva bez mutácie.
 Bežný vklad bez zdroja používa aktuálnu knižnicu. Obe ensure aj `paint_edge_faces` prepúšťajú appearance chyby k abortu celej operácie. RGB skratka ABS platí
-len pre dve overené plain farby; styled ABS sa priradí explicitne na obe strany plochy, aj keď má rovnaký handle ako doska. UV mapovanie je nadväzujúca dávka.
+len pre dve overené plain farby; styled ABS sa priradí explicitne na obe strany plochy, aj keď má rovnaký handle ako doska.
+**MR-3A:** po `materialized_part` a finálnom draw/reverse/pushpull používa `add_part` spoločný `AppearanceMapping`. Textúra sa mapuje aj na dielci bez ABS;
+`paint_edge_faces` poskytuje raz vyriešené slotové bindingy a zdieľa overenú mapu plôch. Grain je už vyriešený v `resolved`, hrúbka čela už konečná.
+Chyba UV mapovania sa neprehltne; existujúca operácia zruší celý vklad/prestavbu. Farba bez textúry ponecháva doterajšiu kompatibilnú cestu.
 
 **ŠEV VKLADANIA (R-03, v0.8.20): `prepare_insert` → `commit_insert`; `build` je len ich kompozícia** a správanie všetkých doterajších volajúcich je nezmenené.
 `prepare_insert(model, params)` vydá **zmrazený `InsertPlan`** (config + `home_z`) — *žiadna* mutácia modelu, entít, ID ani Undo stacku, a **zámerne ani `ensure_root_context`**
@@ -554,6 +557,8 @@ Testy: `tests/pure/test_ghost_d1_dosky.rb`, `tests/js/test_ghost_d1_pasik.js`, i
 **MR-1B2:** rebuild zachytí vzhľad dosky a jednotlivých ABS pred zmazaním definície. Zachovaný kanál ide cez spoločné `BuildAppearance` do ensure a farbenia hrán;
 nový vklad používa aktuálnu knižničnú revíziu. `paint_edges` posiela aj rolu dielca a appearance chyby prepúšťa k celému rollbacku. Doskový dedup nemení geometriu,
 takže ponechá pôvodné materiály priamo. Existujúca validácia katalógového materiálu sa neobchádza; podpora celkom chýbajúceho katalógu sa tým nerozširuje.
+**MR-3A:** `write_board_attrs` zapája spoločný mapper pre build/commit/rebuild cez finálny deskriptor s `AXES_LYING` a uloženým grain.
+Všetky tri orientácie dosky majú rovnakú lokálnu geometriu; mení sa iba transformácia inštancie. Snapshot pripraveného plánu ostáva nedotknutý.
 
 samostatná doska (V0.4.7): `kind: board`, id BRD-xxx, rola `free_panel`, config = superset dielca korpusu (kusovník/VEPO majú jeden svet); materiál snapshot z katalógu, hrúbka VŽDY
 z materiálu; manufactured true + production_class sheet na inštancii.
@@ -731,6 +736,7 @@ overené proti kvádru, akceptuje sa výhradne jednoznačná zhoda). Osi dielca 
 `AXES_UPRIGHT/LYING/FRONT/WALL/WALL_DEPTH`) — zapisuje ich ten, kto box stavia (construction, zone_tree, fronts, board_builder), NIKDY sa neodvodzujú z hodnôt rozmerov (štvorcové
 čelo je nerozhodnuteľné). Mapovanie: L1/L2 = min/max osi ŠÍRKY, W1/W2 = min/max osi DĹŽKY, plochy kolmé na hrúbku = veľké dekorové. `BuildPlan` tvar osí validuje; `verified_axes`
 navyše kontroluje zhodu s box/prod — pri nezhode sa **nefarbí nič** (radšej žiadna farba než farba na zlej hrane).
+`AppearanceMapping` používa rovnaké osi a `rect_axis_side` pre UV; pri požadovanej textúre je neoveriteľná čerstvá geometria chybou celej stavby.
 
 **KOV-D5 — orientácia hrán STOJACICH rolí (Astra #20 F15).** Preklad kódu hrany na stenu kvádra žije v DVOCH pomenovaných mapách: `EDGE_FACES` (default, hore) a
 `STANDING_EDGE_FACES`, kde je **L1 = MAXIMUM osi šírky = HORNÁ plocha** a L2 dolná (W1/W2 sa nemenia). Druhú mapu dostávajú výhradne roly v `PartFaces::STANDING_ROLES`

@@ -814,7 +814,7 @@ Schema 10 vzniká len pri obsahu s `appearance`; otvorenie starého katalógu ho
 Novší marker aj neznámy obsah chránia zápisové brány. Nový `.skm` sa dokončí pred
 publikáciou odkazu; zlyhanie katalógového zápisu ponechá pôvodnú revíziu aj súbor.
 Uloženie knižnice nie je súčasťou modelového Undo. MR-1A pripravuje katalógovú časť;
-MR-1B1 natívny adaptér a MR-1B2 zachovanie pri prestavbe. Mapovanie a ovládanie nasledujú.
+MR-1B1 natívny adaptér, MR-1B2 zachovanie pri prestavbe a MR-3A mapovanie v builderoch. Aplikovanie na existujúci model a ovládanie nasledujú.
 
 **Natívna identita vzhľadu (MR-1B1):** na SketchUp materiáli v dictionary `NOXUN`
 žije `appearance_scope` (JSON dvojice normalizované group_id/structure) a `appearance_id`
@@ -970,6 +970,11 @@ ticho prešiel. Výber v Štúdiu (`MaterialsDialog::TARGETS`) a D-46 preflight 
 ### 7.3 Výrobný materiál = zdroj pravdy; plochy = vizuál
 
 Výrobný materiál sa ukladá **na úrovni výrobného komponentu** (`material_id`). Materiály namaľované na jednotlivé plochy slúžia len na **vizualizáciu a orientáciu textúry**. Výrobný systém **nikdy** neurčuje materiál podľa náhodne namaľovanej plochy.
+
+**MR-3A:** textúra veľkých plôch rešpektuje uložený grain: length/none mapuje U po +L a V po +W, width po +W/+L.
+`none` tým nemení výrobný význam. Textúra ABS beží U pozdĺž hrany, V cez hrúbku; oba povrchy každej plochy majú rovnakú lokálnu fázu od minima U/V.
+Fyzickú mierku určuje aktuálny natívny materiál, nie rozmery dielca. Finálne osi a hrúbky pochádzajú z výrobného deskriptora; rotácia a zrkadlo ich neprepisujú.
+Mapovanie nepridáva atribúty ani uložené UV do NOXUN dát. Materiály bez textúry zostávajú plošné; chyba mapovania zruší celú prebiehajúcu stavbu.
 
 ### 7.4 Tri stavy materiálu
 

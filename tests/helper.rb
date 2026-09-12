@@ -130,6 +130,7 @@ unless NxTest::IN_SKETCHUP
     core/materials_appearance
     core/materials_native_appearance
     core/materials_build_appearance
+    core/appearance_mapping
     core/updater
     core/materials_catalog
     core/materials_decor

@@ -258,6 +258,24 @@ Poškodený archív či identita abortujú stavbu. Obsadený styled materiál sa
 Nová náhrada dostane vopred vybrané voľné presné meno; automatické číslovanie SketchUpu môže zmeniť aj číselný koniec výrobného ID. Neočakávané meno z `add` sa odmietne pred prefarbením.
 UNI ostáva pracovnou farbou. Modul neotvára operácie, nemení knižnicu a nepridáva observer.
 
+### appearance_mapping.rb
+
+**MR-3A: spoločné mapovanie textúr v oboch builderoch.** `AppearanceMapping.inspect_part(instance, descriptor:)` iba číta a vydá mapu alebo dôvod nepodpory.
+Osi preberá z finálneho deskriptora cez `PartFaces.verified_axes`; sloty ABS výhradne cez `rect_axis_side`, vrátane hornej L1 stojacich zásuvkových dielcov.
+Dôkaz vyžaduje lokálny kváder pri počiatku: šesť obdĺžnikových stien bez dier, osem rohov, dvanásť hrán, správne susednosti a rozmery zhodné s box/prod.
+Otočené normály sú prípustné. Samotný bbox nestačí a inspect geometriu neopravuje.
+
+`paint_part!` pracuje s krátkodobou mapou konkrétneho modelu, inštancie a definície. Pred zápisom znovu overí geometriu aj živé plochy, takže odmietne aj
+posun zachovávajúci pôvodné handles. Preverí všetky materiálové bindingy pred prvou zmenou. Chýbajúci sheet alebo ABS slot znamená nedotknúť sa jeho plôch/UV;
+materiál rodičovskej inštancie vlastní caller. Výber revízie ostáva `BuildAppearance`, nevzniká druhý resolver, uložená mapa ani nová Undo operácia.
+
+Dekorové plochy majú U=+L/V=+W pre length/none, U=+W/V=+L pre width; ABS má U pozdĺž fyzickej hrany a V=+T. Fáza začína na minime U/V v [0,0].
+Mierka pochádza priamo z natívnych `Texture.width/height` v palcoch; neprevádza sa druhýkrát z mm. Obe strany každej plochy sa mapujú po finálnom pushpull/reverse.
+Rovnaký handle dosky/ABS sa na hrane mapuje samostatne. Rotácia aj zrkadlo prenášajú lokálny rámec s inštanciou, bez svetovej korekcie.
+Materiál bez albedo textúry nevolá `position_material`; obyčajná RGB cesta zachováva dedenie. Neolepené čerstvé bočné plochy ďalej dedia rodiča.
+`MappingError < Materials::AppearanceError` prepúšťa neplatnú mierku, false aj výnimku k abortu celého buildera. Modul nemení katalóg, výrobné snapshoty ani grain.
+Samostatné Apply, izolácia zdieľaných výskytov a ovládanie patria nadväzujúcim dávkam.
+
 ### materials_abs.rb
 
 Zo splitu `materials_*`: picker/remap.
