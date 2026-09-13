@@ -2688,6 +2688,7 @@
     // NEZMENENOU cestou.
     mdComboScan();
     ['md_body', 'md_front', 'md_back', 'md_drawer'].forEach(mdRenderProjectPreview);
+    mdRenderFrontGrain(); // D-131: stav + zámok tlačidla „Použiť na všetky čelá"
     mdRenderLists(); // rozpisany formular sa NECHAVA (mdEditing drzi stav)
     if (keep){
       var sel = '.mdcell[data-kind="' + keep.kind + '"][data-id="' + keep.id + '"][data-field="' + keep.field + '"]';
@@ -2897,6 +2898,67 @@
     }
   };
 
+  // --- D-131: riadok „Kresba čiel" ---------------------------------------
+  //
+  // Nie je to PREDVOLBA, ale hromadna AKCIA nad celami, ktore v zakazke SU
+  // TERAZ (`{count, cabinets, by}` pocita SERVER — klient si z payloadu LEN
+  // cita, ziadne cislo sa tu nedopocitava). Select preto nema co ukladat; po
+  // pushi ostava na poslednej volbe pouzivatela.
+  var MD_FRONT_GRAIN = { count: 0, cabinets: 0, by: {} };
+  // Generacia okna Studio — identitu kliku (stary DOM) overuje SERVER, klient ju
+  // len verne vracia. Sekcia si ju berie z payloadu okna (vzor `budget.js`).
+  var MD_GEN = 0;
+  // Zamok tlacidla. Prestavba zakazky trva; kym nepride NOVY push (server po
+  // zapise vola `repush`), druhy klik NESMIE odist — inak by z jednej volby
+  // vznikli dva kroky Späť.
+  var MD_GRAIN_BUSY = false;
+
+  // Cista funkcia (Node test): text tlacidla. 0 ciel = tlacidlo nema co robit.
+  function mdFrontGrainBtnText(fg){
+    var n = (fg && fg.count) || 0;
+    return n ? ('Použiť na všetky čelá (' + n + ')') : 'Žiadne čelá';
+  }
+  // Cista funkcia (Node test): read-only stav „teraz: 8× priečna · 4× podľa
+  // materiálu". Nulove skupiny sa nevypisuju (vertikalny priestor).
+  function mdFrontGrainNowText(fg){
+    var by = (fg && fg.by) || {};
+    var order = [['length', 'pozdĺžna'], ['width', 'priečna'], ['inherit', 'podľa materiálu']];
+    var out = [];
+    order.forEach(function(p){
+      var n = by[p[0]] || 0;
+      if (n) out.push(n + '× ' + p[1]);
+    });
+    return out.length ? ('teraz: ' + out.join(' · ')) : '';
+  }
+  // Cista funkcia (Node test): payload kliku. Bez smeru sa NEPOSIELA nic.
+  function mdFrontGrainPayload(gen, guid, grain){
+    if (!grain) return null;
+    return { gen: gen || 0, model_guid: guid || '', grain: String(grain) };
+  }
+
+  function mdRenderFrontGrain(){
+    var meta = mdEl('md_front_grain_now');
+    if (meta) meta.textContent = mdFrontGrainNowText(MD_FRONT_GRAIN);
+    var btn = mdEl('md_front_grain_apply');
+    if (!btn) return;
+    var n = MD_FRONT_GRAIN.count || 0;
+    btn.textContent = MD_GRAIN_BUSY ? 'Prestavujem…' : mdFrontGrainBtnText(MD_FRONT_GRAIN);
+    btn.disabled = MD_GRAIN_BUSY || !n;
+  }
+
+  // Klik. Vracia true, ked otazka naozaj odisla — druhy klik pred novym pushom
+  // vrati false a NEPOSLE nic.
+  function mdFrontGrainApply(){
+    if (MD_GRAIN_BUSY) return false;
+    var sel = mdEl('md_front_grain');
+    var p = mdFrontGrainPayload(MD_GEN, MD_MODEL_GUID, sel && sel.value);
+    if (!p) return false;
+    MD_GRAIN_BUSY = true;
+    mdRenderFrontGrain();
+    if (window.sketchup && sketchup.fronts_grain_all) sketchup.fronts_grain_all(JSON.stringify(p));
+    return true;
+  }
+
   function onProjMaterial(key, value){
     // D-46: iny vyber v KTOROMKOLVEK projektovom selecte zahadzuje nepotvrdenu
     // ponuku — suhlas vzdy patri prave jednej zmene.
@@ -3061,8 +3123,16 @@
   // Modelovy kontext sekcie z payloadu Studia (`ST.mat`). Katalog je v nom LEN
   // pri prvom pushi a po prepnuti dokumentu — inak chodi echom
   // (`NX.setMatCatalog`), viz `StudioDialog#mat_payload`.
-  function matApplyState(m){
+  function matApplyState(m, gen){
+    // D-131: generácia okna chodí MIMO `mat` (je to identita CELÉHO payloadu
+    // Štúdia, nie sekcie) — preto druhý parameter, nie ďalší kľúč v `m`.
+    MD_GEN = gen || 0;
+    // Nový push = server dopovedal; tlačidlo sa odomkne aj vtedy, keď zápis
+    // skončil hláškou alebo keď `mat` payload vôbec neprišiel (inak by ostalo
+    // navždy v stave „Prestavujem…").
+    MD_GRAIN_BUSY = false;
     if (!m) return;
+    MD_FRONT_GRAIN = m.front_grain || { count: 0, cabinets: 0, by: {} };
     if (MD_MODEL_GUID !== (m.model_guid || '')) mdAppearanceInvalidate();
     MD_MODEL_GUID = m.model_guid || '';
     MD_USED = m.used || {};
@@ -3082,7 +3152,7 @@
     NX.setStudio = function(data){
       // Stav sa nasadi PRED renderom Studia — `matRenderBody` uz kresli
       // z cerstvych dat a nikto nekresli dvakrat.
-      matApplyState(data && data.mat);
+      matApplyState(data && data.mat, data && data.gen);
       matPrevSetStudio(data);
     };
     // Katalogove echo (BEZ zdvihu generacie) — po kazdom zapise do katalogu.
@@ -3105,6 +3175,11 @@
       mdProjectSelectId: mdProjectSelectId, mdConfirmPayload: mdConfirmPayload,
       // D-124: živé návraty selectu/náhľadu bez `change` a odoslanie potvrdenia.
       onProjMaterial: onProjMaterial, mdConfirmProject: mdConfirmProject, mdCancelProject: mdCancelProject,
+      // D-131 (tests/js/test_d131_ui.js): riadok „Kresba čiel" — čisté texty,
+      // payload kliku a zámok tlačidla nad DOM stubom.
+      mdFrontGrainBtnText: mdFrontGrainBtnText, mdFrontGrainNowText: mdFrontGrainNowText,
+      mdFrontGrainPayload: mdFrontGrainPayload, mdFrontGrainApply: mdFrontGrainApply,
+      mdRenderFrontGrain: mdRenderFrontGrain,
       // 2A-4b (tests/js/test_md_schema2.js) — skupiny, sekcie struktur, batch 3
       mdGroupKeyOf: mdGroupKeyOf, mdStructureSections: mdStructureSections,
       mdBuildEdgeVariants: mdBuildEdgeVariants, mdParseExtraThs: mdParseExtraThs,

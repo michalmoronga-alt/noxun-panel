@@ -438,6 +438,18 @@ module Noxun
                                                                   repush: repush_proc)
         end
 
+        # D-131: „Použiť na všetky čelá" (riadok Kresba čiel v sekcii Materiály).
+        # Na rozdiel od ostatnych callbackov tejto sekcie MENI MODEL — telo je
+        # preto v zdielanom jadre (`ProductionCore`), okno odovzdava len svoj
+        # generacny token, svoj status a svoj plny push (ten po zapise odomkne
+        # tlacidlo v kliente).
+        def do_fronts_grain_all(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          ProductionCore.fronts_grain_all(Sketchup.active_model, data, generation: @generation,
+                                                                       status: status_proc,
+                                                                       repush: repush_proc)
+        end
+
         # Š10: „Zvýrazniť hrany" (telo tlacidla).
         def do_edge_check(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
@@ -684,7 +696,12 @@ module Noxun
                   'model_guid' => ProductionCore.model_guid(model),
                   'used' => mat_used(collected, keys),
                   'used_ids' => mat_used_ids(collected),
-                  'used_where' => mat_used_where(collected, keys, abs_keys) }
+                  'used_where' => mat_used_where(collected, keys, abs_keys),
+                  # D-131: stav riadku „Kresba čiel" ({count, cabinets, by}).
+                  # Otazka je o OVERRIDOCH ciel, a tie ziju v configoch korpusov
+                  # — zber kusovnika nesie uz MATERIALIZOVANY smer, z ktoreho sa
+                  # „pouzivatel to rozhodol" od „material to ma" odlisit neda.
+                  'front_grain' => ProductionCore.front_grain_state(model) }
           # Cely katalog LEN pri prvom pushi okna a po prepnuti dokumentu;
           # inak ho drzi klient a zmeny mu chodia echom.
           out['catalog'] = MaterialsDialog.catalog_payload if @mat_full_pending && defined?(MaterialsDialog)
@@ -1261,6 +1278,10 @@ module Noxun
           # Namiesto neho hlasi klient ODCHOD zo sekcie — bezaci Demos fetch
           # sa vtedy zrusi (vedome, viz `do_mat_leave`).
           cb(dlg, 'mat_leave')            { |p| do_mat_leave(p) }
+          # D-131: JEDINY callback sekcie Materiály, ktory zapisuje do MODELU —
+          # preto NEJDE cez `mat_actions` (telo je v `ProductionCore`, nie
+          # v `MaterialsDialog`) a ma vlastny riadok.
+          cb(dlg, 'fronts_grain_all')     { |p| do_fronts_grain_all(p) }
           # ŠT-3a-1, sekcia KOVANIE. Mena callbackov su TIE ISTE, ake pouziva
           # okno „Katalóg kovania" — presunuty JS (`js/hw_catalog.js`,
           # `js/hw_sets.js`) tak vola presne to, co volal doteraz, a nikde

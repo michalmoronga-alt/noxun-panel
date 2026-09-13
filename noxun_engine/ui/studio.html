@@ -5,7 +5,7 @@
      to isté zdieľané jadro `ProductionCore`).
      Vizuálna referencia: SYSTEM/zdroje/ui20/mockup_studio.html -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.12.2">
+<link rel="stylesheet" href="css/panel.css?v=0.12.3">
 <style>
   /* Štýly sú ZÁMERNE inline v studio.html (rovnaký dôvod, aký mala production.html):
      panel.css je zdieľaný s Inspectorom a rozloženie tohto okna doňho nepatrí.
@@ -552,6 +552,13 @@
   .mddefaults .mdconfirm { margin-top: 12px; flex-wrap: wrap; }
   .mddefaults .mdconfirm span { flex-basis: 220px; }
   .mddefaults .hint { margin-top: 14px; margin-bottom: 0; }
+  /* D-131: riadok „Kresba čiel" — jeden riadok pod predvoľbami (vertikálny
+     priestor je vzácny), žiadne nové farby, len tokeny. */
+  .mdgrainrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px;
+                padding-top: 14px; border-top: 1px solid var(--nx-border); }
+  .mdgrainrow > label { color: var(--nx-ink-label); font-size: 12px; font-weight: 600; }
+  .mdgrainrow > select { min-width: 150px; }
+  .mdgrainrow .mddefault-meta { margin-top: 0; }
   @media (max-width: 1000px) {
     .mddefaults-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
   }
@@ -782,6 +789,19 @@
         <button class="primary" onclick="mdConfirmProject()">Potvrdiť</button>
         <button class="ghostbtn" onclick="mdCancelProject()">Zrušiť</button>
       </div>
+      <!-- D-131: hromadná AKCIA nad čelami, ktoré v zákazke sú (nie predvoľba
+           pre budúce skrinky) — preto samostatný riadok pod predvoľbami. -->
+      <div class="mdgrainrow">
+        <label for="md_front_grain">Kresba čiel</label>
+        <select id="md_front_grain">
+          <option value="__inherit__">Podľa materiálu</option>
+          <option value="length">Pozdĺžna</option>
+          <option value="width">Priečna</option>
+        </select>
+        <button id="md_front_grain_apply" class="ghostbtn" onclick="mdFrontGrainApply()">Použiť na všetky čelá</button>
+        <span class="mddefault-meta" id="md_front_grain_now"></span>
+      </div>
+      <div class="hint">Zapíše smer dekoru všetkým čelám, ktoré v zákazke sú teraz; skrinky vložené neskôr sa riadia materiálom — spusti znova. Výsledok skontroluj <b>Kontrolou kresby</b>.</div>
       <div class="hint">Použijú sa na skrinkách, ktoré dedia materiál z projektu. Zmena sa premietne do všetkých dediacich skriniek (1 krok Späť).</div>
     </div>
   </details>
@@ -903,40 +923,40 @@
 </template>
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.12.2"></script>
+<script src="js/errors.js?v=0.12.3"></script>
 <!-- D-51/D-77: minimálna OBSAHOVÁ veľkosť okna pri otvorení (js/win_fit.js).
      Navigácia 208 px + tabuľka Kusovníka so 7 stĺpcami a stĺpcom akcií — v užšom
      okne končí pravá časť riadku mimo. Trojica NX_FIT_MIN → width/height →
      min_width/min_height je v docs/UI_DIZAJN.md (tabuľka D-51). -->
 <script>window.NX_FIT_MIN = { w: 1060, h: 640 };</script>
-<script src="js/win_fit.js?v=0.12.2"></script>
+<script src="js/win_fit.js?v=0.12.3"></script>
 <!-- Sprite ikon (žiadne emoji v ovládacích prvkoch). Musí byť PRED studio.js —
      navigácia aj hover akcie riadkov používajú <use href="#i-…">. -->
-<script src="js/icons.js?v=0.12.2"></script>
+<script src="js/icons.js?v=0.12.3"></script>
 <!-- R-23.1: JEDEN dokumentový Escape handler s prioritným zoznamom vrstiev
      (ten istý súbor načítava aj panel.html). Musí byť PRED nx_modal.js
      aj studio.js — jeho listener má bežať ako PRVÝ, aby vedel udalosť
      spotrebovať skôr, než ju dostane handler okna. Kostre D-15, rozbaľovacím
      nastaveniam a `budPrModal` sa vyhýba sám (zoznam FOREIGN). -->
-<script src="js/nx_esc.js?v=0.12.2"></script>
+<script src="js/nx_esc.js?v=0.12.3"></script>
 <!-- ŠT-1b: ZDIELANE 3-stavove nastavenie kontroly hran. TEN ISTY subor nacitava
      aj Inspector (rohovy trojuholnik pri ABS kontrole v raile) — jeden markup,
      jeden stav. Musi byt PRED studio.js (lista sekcie Kontrola ho vola pri
      renderi). ŠT-1c PR B3: okno Vyroba zaniklo — prepinace su TU. -->
-<script src="js/edge_menu.js?v=0.12.2"></script>
+<script src="js/edge_menu.js?v=0.12.3"></script>
 <!-- ŠT-1c PR B2 (D-15): ZDIELANA kostra modalov („pridávačiek"). Musí byť PRED
      studio.js aj budget.js — Escape handler Štúdia sa pýta `NXModal.isOpen()`
      a rozpočet ním otvára svoje pridávačky. Ďalšie inštancie (D-69 editor
      materiálu, položka/set kovania) sa naň napoja bez kopírovania. -->
-<script src="js/nx_modal.js?v=0.12.2"></script>
-<script src="js/studio.js?v=0.12.2"></script>
+<script src="js/nx_modal.js?v=0.12.3"></script>
+<script src="js/studio.js?v=0.12.3"></script>
 <!-- ŠT-1c PR B1: sekcia ROZPOČET (Š12–Š13). MUSÍ byť AŽ ZA studio.js — číta
      jeho globálny payload `ST` a hlavne OBALUJE `NX.setStudio` (uvoľnenie
      frontu zápisov po príchode čerstvej generácie). studio.js pritom NX
      PRIRAĎUJE celý (`window.NX = {…}`), takže v opačnom poradí by obal aj
      `NX.budgetResult`/`NX.priceRefresh` prepísal a rozpočet by po prvom zápise
      zamrzol. Poradie stráži guard test (tests/pure/test_st1c_rozpocet.rb). -->
-<script src="js/budget.js?v=0.12.2"></script>
+<script src="js/budget.js?v=0.12.3"></script>
 <!-- ŠT-2a/2b: sekcia MATERIÁLY. Okno „Materiály projektu" ZANIKLO, takže tento
      súbor beží už len TU; príznak nižšie ostáva ako explicitné prihlásenie sa
      do režimu sekcie (a ako poistka Node testov, ktoré ho nenastavujú).
@@ -950,14 +970,14 @@
      handlerov; `demos_add.js` nesie modal „Pridať z Demosu". Oba používajú
      výhradne vlastné prefixy (`mdd*` / `nxda*`), takže v okne so studio.js
      a budget.js nič neprepisujú (stráži guard test). -->
-<script src="js/demos_diff.js?v=0.12.2"></script>
-<script src="js/demos_add.js?v=0.12.2"></script>
+<script src="js/demos_diff.js?v=0.12.3"></script>
+<script src="js/demos_add.js?v=0.12.3"></script>
 <!-- PICKER-1: vyhľadávač materiálov (`nx_combo`) je TEN ISTÝ komponent ako
      v Inspectore — predvoľby projektu v sekcii Materiály ho používajú tiež.
      Musí byť PRED proj_materials.js, ktorý ho pri renderi volá. -->
-<script src="js/nx_combo.js?v=0.12.2"></script>
-<script src="js/proj_materials.js?v=0.12.2"></script>
-<script src="js/md_appearance.js?v=0.12.2"></script>
+<script src="js/nx_combo.js?v=0.12.3"></script>
+<script src="js/proj_materials.js?v=0.12.3"></script>
+<script src="js/md_appearance.js?v=0.12.3"></script>
 <!-- ŠT-3a-1/3a-2: sekcia KOVANIE (Š16). Okno „Katalóg kovania" ZANIKLO, takže
      oba súbory bežia už len TU; príznak nižšie ostáva ako čitateľné prihlásenie
      sa do režimu sekcie (a ako marker poradia skriptov pre guard test).
@@ -968,23 +988,23 @@
      projektu" volajú jeho funkcie. Poradie stráži guard test
      (tests/pure/test_st3a_hw.rb). -->
 <script>window.NX_HW_SECTION = true;</script>
-<script src="js/hw_sets.js?v=0.12.2"></script>
-<script src="js/hw_catalog.js?v=0.12.2"></script>
+<script src="js/hw_sets.js?v=0.12.3"></script>
+<script src="js/hw_catalog.js?v=0.12.3"></script>
 <!-- ŠT-3b-1: sekcia PRAVIDLÁ (Š17). Okno „Pravidlá kovania" ZANIKLO, takže
      tento súbor beží už len TU. MUSÍ byť AŽ ZA studio.js (obaľuje jeho
      `NX.setStudio` — rovnaký dôvod ako rozpočet, materiály a kovanie)
      a lištu/telo sekcie kreslí cez `rulesRenderTools`/`rulesRenderBody`,
      ktoré studio.js volá cez `typeof`. Poradie stráži guard test
      (tests/pure/test_st3b_rules.rb). -->
-<script src="js/rules.js?v=0.12.2"></script>
+<script src="js/rules.js?v=0.12.3"></script>
 <!-- ŠT-3c-1: sekcia Šablóny (Š18). Načítava sa AŽ ZA studio.js — obaľuje
      jeho NX.setStudio, rovnako ako všetky predošlé sekcie. -->
-<script src="js/templates.js?v=0.12.2"></script>
+<script src="js/templates.js?v=0.12.3"></script>
 <!-- ŠT-4a: „O plugine" je JEDEN OBSAH, DVA VSTUPY (kontrakt Š19) — ten istý
      `js/about.js` načítava aj panel.html. Musí byť PRED studio_settings.js,
      ktorý ho volá pri kreslení sekcie `about`. -->
-<script src="js/about.js?v=0.12.2"></script>
+<script src="js/about.js?v=0.12.3"></script>
 <!-- ŠT-4a: sekcie Nastavenia (`sup` · `bset` · `about`, Š19) — obsah
      zaniknutého okna „Nastavenia rozpočtu" (POSLEDNÝ satelit). Načítava sa AŽ
      ZA studio.js: obaľuje jeho NX.setStudio, rovnako ako všetky predošlé sekcie. -->
-<script src="js/studio_settings.js?v=0.12.2"></script>
+<script src="js/studio_settings.js?v=0.12.3"></script>
