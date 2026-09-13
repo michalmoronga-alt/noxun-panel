@@ -135,11 +135,17 @@ module Noxun
       # Filter je zamerne LEN `manufactured` (bez `production_class`) — presne
       # tak sa pytal D-131 scan, ktory sem prisiel; sirsia otazka („je tu nieco
       # odpojene?") je pre BRANU spravnejsia nez uzsia.
+      # D-34 (rovnaka pasca ako v `each_of_kind`): pocas erase okna moze
+      # `model.entities` niest NEPLATNE entity a citanie ich atributov pada
+      # (TypeError). `valid?` guard je preto POVINNY aj tu — hromadna akcia by
+      # inak spadla uprostred zberu a pouzivatel by videl len vynimku.
       def self.top_level_scan(model)
         out = { 'cabinets' => [], 'boards' => [], 'detached' => Hash.new(0) }
         return out unless model
 
         model.entities.grep(Sketchup::ComponentInstance).each do |inst|
+          next unless inst.valid?
+
           case Store.kind(inst)
           when 'cabinet' then out['cabinets'] << inst
           when 'board'   then out['boards'] << inst

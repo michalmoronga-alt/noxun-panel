@@ -172,6 +172,21 @@ NxTest.test('D-133 zber: dielec BEZ `manufactured` a dielec BEZ vlastnika sa ner
   NxTest.assert_equal(1, scan['cabinets'].size)
 end
 
+NxTest.test('D-133 zber: NEPLATNA entita zber nezhodi (D-34 erase okno)') do
+  NxTest.skip!('potrebuje stub SketchUp tried') unless NxTest.headless?
+  dead = d133_cab('CAB-DEAD', {}, 7)
+  def dead.valid?
+    false
+  end
+
+  def dead.get_attribute(*)
+    raise TypeError, 'deleted entity'
+  end
+  model = D133Model.new([d133_cab('CAB-001'), dead])
+  scan = D133IDS.top_level_scan(model)
+  NxTest.assert_equal(['CAB-001'], scan['cabinets'].map { |i| i.get_attribute('NOXUN', 'cabinet_id') })
+end
+
 NxTest.test('D-133 zber: bez modelu je vysledok prazdny (nie chyba)') do
   scan = D133IDS.top_level_scan(nil)
   NxTest.assert_equal([], scan['cabinets'])
@@ -323,6 +338,33 @@ NxTest.test('D-133 hlaska: dovod `:detached` je po slovensky a ZDIELANY') do
   ent = { 'detached' => true }
   NxTest.assert_equal(D133IDS::DETACHED_PART_REASON,
                       Noxun::Engine::ProductionCore.front_grain_skip_reason(ent))
+end
+
+# ---------------------------------------------------------------------------
+# 4b) SLEPA ULICKA: UNI LEN VO VNORENEJ SKRINKE
+#
+# Dekor pouzity v modeli LEN vo vnorenej skrinke by pouzivatela zasekol:
+# nahradenie ho nevidi (rozsah = zakazka) a zmazanie v katalogu ho ODMIETNE
+# („používa sa 1×", delete guard je GLOBALNY). Hlaska musi povedat, KDE je.
+# ---------------------------------------------------------------------------
+
+if NxTest.headless?
+  D133MD = Noxun::Engine::MaterialsDialog
+
+  NxTest.test('D-133 hlaska: UNI len vo vnorenej skrinke povie, KDE je a co s tym') do
+    uni = 'K009_PW_DTDL_18'
+    model = D133Model.new([], [d133_cab('CAB-NESTED', { 'material_id' => uni }, 9)])
+    msg = D133MD.ru_empty_msg(model, uni, 'Korpus UNI')
+    NxTest.assert(msg.include?('len mimo zákazky'), msg)
+    NxTest.assert(msg.include?('vnorená v inom komponente'), msg)
+    NxTest.assert(msg.include?('koreň modelu'), 'hlaska musi dat NAPRAVU, nie len diagnozu')
+  end
+
+  NxTest.test('D-133 hlaska: dekor NIKDE = povodna veta „niet čo nahradiť"') do
+    model = D133Model.new([d133_cab('CAB-001', { 'material_id' => 'INY_DEKOR' })])
+    msg = D133MD.ru_empty_msg(model, 'K009_PW_DTDL_18', 'Korpus UNI')
+    NxTest.assert_equal('Korpus UNI sa v projekte nepoužíva — niet čo nahradiť.', msg)
+  end
 end
 
 # ---------------------------------------------------------------------------

@@ -55,7 +55,7 @@ module Noxun
       # --- ADAPTER (jediné miesto so SketchUp API) ---------------------------
       # Serializovaný scan použitia UNI materiálu v aktívnom modeli. Vráti
       # vstup pre replace_uni_classify:
-      #   { 'cabs'  => [[cid, params, old_eff, raw, ref]],   # VŠETKY korpusy
+      #   { 'cabs'  => [[cid, params, old_eff, raw, ref]],   # top-level korpusy zákazky
       #     'boards'=> [[bid, stored_cfg, raw, ref]],        # dosky s uni_id
       #     'project' => { key => efektívne_id },            # po fallbackoch
       #     'detached' => { cabinet_id => počet },           # D-133, aditívny
