@@ -12718,6 +12718,43 @@ module NoxunSuRunner
          e::Store.get(cab_b, 'config').to_s == b_cfg && uid1_l1_override_keys(cab_b).empty?)
       ok('D-134 podobne: a VNORENA skrinka C tiez',
          nested.valid? && e::Store.get(nested, 'config').to_s == c_cfg)
+
+      # --- d) ZAKAZKA, KDE JE PRESKOCENE VSETKO (slepe review P3-4) -----------
+      # Jedina skrinka zakazky ma odpojeny dielec, takze `rebuild_many` dostane
+      # PRAZDNY zoznam jobov. Pravidla sa MUSIA ulozit aj tak — inak by zakazka
+      # ostala bez nich a pouzivatel by pritom videl hlasku o uspechu.
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST D-134 zuzenie zakazky', true)
+        cab_a = e::Panel.find_cabinet_by_id(model, cid_a)
+        cab_a.erase! if cab_a && cab_a.valid?
+        model.commit_operation
+      end
+      only_ids = e::Panel.job_cabinets(model)['cabinets'].map { |i| e::Store.get(i, 'cabinet_id').to_s }
+      ok("D-134 vsetko preskocene: v zakazke ostala LEN skrinka s odpojenym dielcom (#{only_ids.join(', ')})",
+         only_ids == [cid_b])
+      rules_before = JSON.generate(e::HardwareRules.project_rules(model) || [])
+      b_cfg = e::Store.get(e::Panel.find_cabinet_by_id(model, cid_b), 'config').to_s
+      rec = []
+      r03_marker(model, markers)
+      rules_payload = rd.send(:rules_payload, model) || {}
+      rd.dispatch('save_rules',
+                  { 'rules' => rules_payload['rules'], 'also_global' => false,
+                    'model_guid' => guid,
+                    'rules_rev' => rules_payload['rules_rev'] }.to_json, ->(s) { rec << s.to_s })
+      status = rec.select { |s| s.include?('RD.setStatus') }.join(' ')
+      ok("D-134 vsetko preskocene: pravidla sa ULOZILI aj pri 0 joboch (#{status[0, 140]})",
+         status.include?('Pravidlá uložené') && status.include?('prestavaných 0 skriniek'))
+      ok('D-134 vsetko preskocene: a status MENUJE preskocenu skrinku',
+         status.include?(cid_b) && status.include?('odpojený dielec'))
+      ok('D-134 vsetko preskocene: snapshot pravidiel projektu naozaj sedi',
+         JSON.generate(e::HardwareRules.project_rules(model) || []) ==
+         JSON.generate(e::HardwareRules.normalize_rules(rules_payload['rules'])))
+      ok('D-134 vsetko preskocene: skrinka ostala BAJTOVO nedotknuta',
+         e::Store.get(e::Panel.find_cabinet_by_id(model, cid_b), 'config').to_s == b_cfg)
+      Sketchup.undo
+      ok('D-134 vsetko preskocene: PRAVE JEDEN krok Spat vratil pravidla',
+         markers.last.valid? &&
+         JSON.generate(e::HardwareRules.project_rules(model) || []) == rules_before)
     rescue StandardError => ex
       ok("D-134: vynimka #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}", false)
     ensure

@@ -363,6 +363,12 @@ sa cez to dostalo do zákazky.
 aj `drawer_change_plan`, takže **potvrdzovacia lišta D-46 (aj vetva zásuviek KOV-C2b) ukazuje počet PO vylúčení** a menuje ich; predvoľba sa zapíše vždy (skip, nie
 blokáda — dôvod v [model-a-identita.md](model-a-identita.md)). Zápis ostáva vnútri operácie prestavieb = **jeden krok Späť**.
 
+**BRÁNY vidia aj preskočené skrinky, prestavba len tie bez odpojeného dielca.** Hrúbkové a receptové brány (`body_change_plan` → `plan['blocked']`, `drawer_change_plan`
+→ `plan['recipes']`, `incompatible = inheriting.select`) sa počítajú nad **`inheriting`**, nie nad `affected`: projektová predvoľba sa dedí **za behu** (efektívny materiál
+čítajú výstupy hneď), takže skrinka, ktorá dnes do prestavby nejde, novú hrúbku aj tak dostane — a keby bránu obišla, po svojej najbližšej prestavbe by mala materiál,
+ktorý nikto neschválil. `jobs` sa naopak stavajú nad `affected`; pri preskočených sa plán prepočíta nad užším zoznamom, aby počty aj remap ABS hlásili presne to, čo sa
+zapíše. Bez preskočených je `inheriting == affected` a druhý prechod sa nerobí.
+
 **Šiesty blokujúci dôvod: `:detached` (D-133).** Skrinka, ktorá má výskyt UNI **a** odpojený dielec (výrobný dielec vytiahnutý na koreň modelu, viazaný už len atribútom
 `cabinet_id`), ide do `blocked` s hláškou „má odpojený dielec — vráť ho do skrinky alebo skrinku prestav". Dôvod: taký dielec ide do kusovníka aj VEPO **po svojom**
 (`Bom.collect`, vetva `part`), kým `rebuild_many` prestaví len **vnorené** dielce — zápis by vyrobil **dvojníka** (vnorený s novým materiálom, odpojený so starým).

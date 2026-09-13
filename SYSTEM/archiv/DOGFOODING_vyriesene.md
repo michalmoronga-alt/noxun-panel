@@ -142,8 +142,8 @@ vylúčení. Bežná zákazka bez vnorených skriniek a bez odpojených dielcov 
 **Prečo skip a nie blokáda ako pri „Nahradiť UNI…".** Tam je nahradenie dekoru all-or-nothing kvôli konzistencii výroby jedného dekoru; tu ide o **nastavenie projektu**,
 ktoré musí byť zapísané, a preskočená skrinka sa dorovná pri svojej najbližšej prestavbe — to isté sa deje dnes, keď pravidlá zmení iný PC. Ticho preskočiť sa nesmie nikdy.
 
-**Vedomé hranice.** `Ids.each_of_kind` / `Panel.all_cabinets` ostávajú pre **čítacie** cesty (usage/delete guard katalógu, observery, dedup, resolvery výberu,
-unikátnosť ručných názvov, upratovanie ghostov) — tam je globálny záber správny. Nemenil sa ani `RulesDialog.cabinets(model)`: počet „skriniek v modeli" v päte sekcie
+**Vedomé hranice.** `Ids.each_of_kind` ostáva pre **čítacie** cesty (usage/delete guard katalógu, observery, dedup, resolvery výberu, unikátnosť ručných názvov,
+upratovanie ghostov) — tam je globálny záber správny a volajú ho priamo; obal `Panel.all_cabinets` zanikol, lebo mu neostal volajúci. Nemenil sa ani `RulesDialog.cabinets(model)`: počet „skriniek v modeli" v päte sekcie
 hovorí o modeli (nie o zákazke) a resolver jednej skrinky podľa `cabinet_id` je jednoskrinková, nie hromadná cesta. **Bez zmeny dátového kontraktu** — mení sa výhradne
 zber entít troch existujúcich akcií.
 

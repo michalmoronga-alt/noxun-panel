@@ -15,8 +15,11 @@
 #
 # ZAVAZNY KONTRAKT, ktory tu zamykame:
 #   1) JEDEN ZDROJ: `Panel.job_cabinets` nad `Ids.top_level_scan`. Vnorena
-#      skrinka sa do neho NEDOSTANE; `Panel.all_cabinets` / `Ids.each_cabinet`
-#      ostavaju pre CITACIE cesty nezmenene.
+#      skrinka sa do neho NEDOSTANE; CITACIE cesty volaju `Ids.each_cabinet`
+#      priamo (`Panel.all_cabinets` po slepom review P3-2 ZANIKLO).
+#   1b) BRANY hrubky/receptov sa pytaju nad VSETKYMI dediacimi skrinkami
+#      VRATANE preskocenych (predvolba sa dedi za behu), prestavba len nad
+#      tymi bez odpojeneho dielca.
 #   2) SKIP, NIE BLOKADA: skrinka s odpojenym dielcom vypadne z prestavby, ale
 #      PROJEKTOVY ZAPIS (pravidla, predvolba) prebehne — zakazka nesmie ostat
 #      bez ulozenych pravidiel kvoli jednej vytiahnutej doske. (Na rozdiel od
@@ -189,8 +192,9 @@ NxTest.test('D-134 zdroj: `job_cabinets` berie ZAKAZKU, vnorena skrinka v nej ni
 
   # Kontrolna otazka: CITACIA cesta vnorenu skrinku NAOPAK vidiet MUSI
   # (katalogovy usage/delete guard) — a to sa davkou nemeni.
-  NxTest.assert_equal(%w[CAB-001 CAB-NESTED],
-                      D134PANEL.all_cabinets(model).map { |i| i.get_attribute('NOXUN', 'cabinet_id') }.sort)
+  seen = []
+  D134IDS.each_cabinet(model) { |i| seen << i.get_attribute('NOXUN', 'cabinet_id') }
+  NxTest.assert_equal(%w[CAB-001 CAB-NESTED], seen.sort)
 end
 
 NxTest.test('D-134 zdroj: `job_split` oddeli skrinku s odpojenym dielcom') do
@@ -307,10 +311,17 @@ NxTest.test('D-134 predvolba: skrinka s odpojenym dielcom vypadne, zapis prebehn
                 'globalny prechod sa do zapisovej vetvy uz nesmie vratit')
   NxTest.assert(body.include?("affected, skipped = Panel.job_split(inheriting, scan['detached'])"),
                 'preskocene sa oddeluju AZ z dediacich skriniek')
-  NxTest.assert(body.index('Panel.job_split(') < body.index('body_change_plan('),
-                'D-46 plan dostava uz OCISTENY zoznam (pocet v ponuke = pocet v zapise)')
-  NxTest.assert(body.index('Panel.job_split(') < body.index('drawer_change_plan('),
-                'to iste plati pre vetvu zasuviek (KOV-C2b)')
+  # Slepe review P2-1: BRANY sa pytaju nad `inheriting` (vsetky dediace
+  # vratane preskocenych) — predvolba sa dedi ZA BEHU, takze preskocena
+  # skrinka novu hrubku aj tak dostane a branu nesmie obist.
+  NxTest.assert(body.include?('body_change_plan(model, inheriting, sheet, value)'),
+                'D-46 brana vidi aj preskocene skrinky')
+  NxTest.assert(body.include?('drawer_change_plan(model, inheriting, have)'),
+                'brana receptov zasuviek tiez')
+  NxTest.assert(body.include?('incompatible = inheriting.select'),
+                'a brana hrubky ostatnych rol tiez')
+  NxTest.assert(body.include?('body_change_plan(model, affected, sheet, value) unless skipped.empty?'),
+                'PRESTAVBA sa pocita znova nad uzsim zoznamom — a len ked je co vylucit')
   NxTest.assert(body.include?('skipped_tail: skip_tail'),
                 'potvrdzovacia lista menuje preskocene skrinky')
   NxTest.assert(body.include?('saved_msg(adopted_n, recomputed_n, have, skip_tail)'),
@@ -390,6 +401,39 @@ NxTest.test('D-134 podobne dielce: preskocena skrinka nie je v mape ani v pocte'
                       'bezna zakazka riadok v modale vobec nema')
 end
 
+NxTest.test('D-134 podobne dielce (P3-3): rozsah „táto skrinka" odmietne INY odpojeny dielec') do
+  NxTest.skip!('potrebuje stub SketchUp tried') unless NxTest.headless?
+  # `similar_context` (`detached_part_error`) kryje LEN oznaceny dielec. Ked ma
+  # skrinka vytiahnuty INY dielec, zapis by vyrobil presne toho dvojnika, pred
+  # ktorym strazi rozsah „celý projekt" — preto idu oba rozsahy tym istym filtrom.
+  src = d134_part('CAB-001', 'shelf', 'DEKOR_A', 11, key: 'CAB-001-SHELF-1')
+  a = d134_cab('CAB-001', 1, parts: [src, d134_part('CAB-001', 'shelf', 'DEKOR_A', 12,
+                                                    key: 'CAB-001-SHELF-2')])
+  model = D134Model.new([a, d134_detached('CAB-001', 31)])
+
+  map, skipped = d134_with_sketchup { D134PANEL.similar_parts_map(model, a, src, 'cabinet') }
+  NxTest.assert_equal({}, map, 'skrinka s INYM odpojenym dielcom sa nezapise ani vo vlastnom rozsahu')
+  NxTest.assert_equal(['CAB-001'], skipped, 'a VYMENUJE sa — nikdy ticho')
+  NxTest.assert_equal(0, D134PANEL.similar_parts_count(map))
+
+  # Bez odpojeneho dielca je vysledok NEZMENENY (charakterizacia).
+  clean = D134Model.new([a])
+  map2, skipped2 = d134_with_sketchup { D134PANEL.similar_parts_map(clean, a, src, 'cabinet') }
+  NxTest.assert_equal(['CAB-001'], map2.keys)
+  NxTest.assert_equal([], skipped2)
+  NxTest.assert_equal(1, D134PANEL.similar_parts_count(map2))
+end
+
+NxTest.test('D-134 podobne dielce (P3-3): prazdny vysledok s preskocenymi NEKLAME o pricine') do
+  body = D134Src.body('ui/panel/actions_parts.rb', 'handle_apply_edges_similar')
+  NxTest.assert(body.include?('if skipped.empty?'),
+                'hlaska sa rozvetvuje podla toho, ci je co preskocene')
+  NxTest.assert(body.include?('nie je na čo olep použiť'),
+                'pri preskocenych sa veta o „rovnakej role a materiáli" VYNECHAVA')
+  NxTest.assert(body.include?('similar_skipped_text(skipped)'),
+                'a preskocene skrinky sa vymenuju')
+end
+
 NxTest.test('D-134 podobne dielce: JEDINA autorita poctu aj zapisu') do
   count = D134Src.body('ui/panel/actions_parts.rb', 'handle_similar_parts_count')
   apply = D134Src.body('ui/panel/actions_parts.rb', 'handle_apply_edges_similar')
@@ -422,10 +466,37 @@ NxTest.test('D-134 guard: ziadna z troch zapisovych ciest nechodi globalne') do
   end
 end
 
+NxTest.test('D-134 guard (P3-4): medzi zberom skriniek a prestavbou NIE JE early return') do
+  # Invariant „projektovy zapis prebehne aj pri 0 joboch" stoji na tom, ze sa
+  # medzi rozdelenim zakazky a `rebuild_many` NIKTO neotoci. Skratka typu
+  # `return if jobs.empty?` by ho zrusila TICHO — zakazka by ostala bez
+  # ulozenych pravidiel/predvolby a pouzivatel by videl hlasku o uspechu.
+  [['ui/rules_dialog.rb', 'handle_save', 'Panel.job_cabinets_split(model)', true],
+   ['ui/rules_dialog.rb', 'handle_merge_seed', 'Panel.job_cabinets_split(model)', true],
+   # Projektova predvolba ma medzi zberom a prestavbou LEGITIMNE navraty: brany
+   # hrubky/receptov a ponuku na potvrdenie. Tie odmietaju CELU zmenu (a hovoria
+   # preco) — to je opak ticheho preskocenia zapisu. Strazi sa teda len to, ze
+   # dovodom navratu NIE JE prazdny zoznam jobov.
+   ['ui/materials_dialog.rb', 'handle_set_project_material', 'Panel.job_split(', false]]
+    .each do |rel, name, split, no_return|
+    body = D134Src.body(rel, name)
+    from = body.index(split)
+    to = body.index('CabinetBuilder.rebuild_many')
+    NxTest.assert(from && to && from < to, "#{rel}##{name}: zber stoji PRED prestavbou")
+    between = body[from...to]
+    NxTest.assert(!between.match?(/^\s*return\b/),
+                  "#{rel}##{name}: medzi zberom a prestavbou ziadny `return`") if no_return
+    NxTest.assert(!between.match?(/\b(jobs|affected|job_cabs)\s*\.empty\?/),
+                  "#{rel}##{name}: prazdny zoznam jobov NIE JE dovod preskocit zapis")
+  end
+end
+
 NxTest.test('D-134 guard: helper stoji na zdielanom `Ids.top_level_scan`') do
   body = D134Src.body('ui/panel/payloads.rb', 'job_cabinets')
   NxTest.assert(body.include?('Ids.top_level_scan(model)'),
                 'vsetkych pat hromadnych zapisov zdiela JEDEN prechod korenom')
-  # A naopak: citacia cesta ostava na globalnom prechode.
-  NxTest.assert(D134Src.body('ui/panel/payloads.rb', 'all_cabinets').include?('Ids.each_cabinet(model)'))
+  # Slepe review P3-2: `all_cabinets` ZANIKLO — prazdny obal bez volajuceho
+  # by len zvadzal vratit sa nim do zapisovej vetvy.
+  NxTest.assert(!D134Src.src('ui/panel/payloads.rb').include?('def all_cabinets'),
+                'globalny obal uz v Paneli nezije')
 end

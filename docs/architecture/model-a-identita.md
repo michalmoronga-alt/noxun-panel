@@ -38,7 +38,7 @@ pravidlá kovania, projektová predvoľba materiálu a „aj na podobné v proje
 pravidlá zmení iný PC). Ticho preskočiť sa nesmie nikdy.
 
 **Kto na ňom zámerne NESTOJÍ.** `each_of_kind` (globálny prechod cez `model.definitions`) ostáva správny pre **čítacie** cesty — usage/delete guard katalógu, observery,
-dedup, resolvery výberu, unikátnosť ručných názvov (`tools/mower.rb`), upratovanie ghostov (`Zones.prune_orphans`): tam je globálny záber žiadaný, lebo vnorená skrinka
+dedup, resolvery výberu, unikátnosť ručných názvov (`tools/mower.rb`), upratovanie ghostov (`Zones.prune_orphans`) — tie ho volajú **priamo** (`Panel.all_cabinets` po D-134 zaniklo, lebo mu neostal volajúci): tam je globálny záber žiadaný, lebo vnorená skrinka
 materiál naozaj drží. Rovnako `RulesDialog.cabinets(model)` — počet „skriniek v modeli" v päte sekcie a resolver jednej skrinky podľa `cabinet_id`.
 
 ### doc_key.rb

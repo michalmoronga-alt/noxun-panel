@@ -1194,13 +1194,26 @@ module Noxun
             # --- D-46: KORPUS. Dediacim skrinkam sa hrubka nemeni ticho, ale ani
             # sa uz neodmieta natvrdo — pouzivatel dostane presny rozpis a jedno
             # potvrdenie; vsetko potom prebehne v JEDNOM undo kroku.
-            plan = body_change_plan(model, affected, sheet, value)
+            # D-134 (slepe review P2-1): BRANA sa pyta nad VSETKYMI dediacimi
+            # skrinkami — VRATANE preskocenych. Projektova predvolba sa dedi
+            # ZA BEHU (efektivny material citaju vystupy hned), takze skrinka,
+            # ktora dnes nejde do prestavby, novu hrubku aj tak dostane. Keby
+            # brana videla len prestavatelne, preskocena skrinka by ju obisla
+            # a po svojej najblizsej prestavbe by mala material, ktory nikto
+            # neschvalil. Hlaska ju menuje rovnako ako doteraz.
+            plan = body_change_plan(model, inheriting, sheet, value)
             unless plan['blocked'].empty?
               # Blokujuce dielce sa neprelozia ani potvrdenim — ziadna ponuka
               # (audit F3: nesluboval by sa krok, ktory sa neda vykonat).
               set_status(blocked_cabs_msg(have, plan['blocked']), true)
               return reset_project_select(key, old_default)
             end
+            # PRESTAVBA je uz len na tych, ktore sa prestavat daju. Plan sa
+            # pocita ZNOVA nad uzsim zoznamom (cerstve kopie params), aby pocty
+            # aj remap ABS hlasili presne to, co sa naozaj zapise. Bez
+            # preskocenych je `inheriting == affected` a druhy prechod sa
+            # NEROBI — bezna zakazka ma teda presne tu istu cestu ako doteraz.
+            plan = body_change_plan(model, affected, sheet, value) unless skipped.empty?
             unless plan['adopting'].empty?
               fresh = { 'model_guid' => model_guid(model), 'key' => key, 'value' => value,
                         'old_default' => old_default,
@@ -1220,14 +1233,17 @@ module Noxun
             # Tu rozhoduje, ktoré systémy zásuviek skrinky reálne používajú —
             # Atira prijme 16, Quadro V6 16 aj 18. Nevyhovujúci výber sa NEULOŽÍ
             # bez potvrdenia (hláška menuje systém aj povolené hrúbky).
-            plan = drawer_change_plan(model, affected, have)
+            # D-134 (P2-1): brana receptov nad VSETKYMI dediacimi vratane
+            # preskocenych — dopad na ne je REALNY hned (predvolba sa dedi za
+            # behu), takze varovanie o nich nie je nadpocetne, ale pravdive.
+            plan = drawer_change_plan(model, inheriting, have)
             unless plan['recipes'].empty?
               fresh = { 'model_guid' => model_guid(model), 'key' => key, 'value' => value,
                         'old_default' => old_default,
                         'adopting_ids' => [], 'recompute_ids' => plan['ids'] }
               unless Materials.pending_default_ok?(data['confirm'], fresh)
                 return offer_drawer_change(fresh, have, plan, stale: !data['confirm'].nil?,
-                                          skipped_tail: skip_tail)
+                                                             skipped_tail: skip_tail)
               end
             end
             # Codex #304 kolo 2 P2: ABS overridy dielcov zasuviek sa preladia
@@ -1248,7 +1264,11 @@ module Noxun
               [cabinet, p]
             end
           else
-            incompatible = affected.select do |cabinet|
+            # D-134 (P2-1): brana hrubky nad VSETKYMI dediacimi vratane
+            # preskocenych — inak by skrinka s odpojenym dielcom prepustila
+            # hrubku, ktoru jej dielce neunesu, a prejavilo by sa to az pri jej
+            # najblizsej prestavbe.
+            incompatible = inheriting.select do |cabinet|
               params = Panel.existing_params(cabinet)
               # D-31 (GH P2): skrinka BEZ chrbta dielec back vobec nema — jej ulozena
               # hrubka (napr. HDF 3) nesmie blokovat zmenu projektoveho chrbta na 18.

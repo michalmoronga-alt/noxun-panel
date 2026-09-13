@@ -688,15 +688,16 @@ module Noxun
           mat = (Store.config(part) || {})['material_id'].to_s
           src_key = Store.get(part, 'part_key').to_s
           src_cid = Store.get(cab, 'cabinet_id').to_s
-          cabs, skipped = if scope == 'project'
-                            scan = job_cabinets(model)
-                            job_split(scan['cabinets'], scan['detached'])
-                          else
-                            # Rozsah „táto skrinka": zdrojovy dielec uz preveril
-                            # `similar_context` (`detached_part_error`), takze
-                            # tu sa nic nevylucuje.
-                            [[cab], []]
-                          end
+          # D-134 (slepe review P3-3): OBA rozsahy idu TYM ISTYM filtrom.
+          # `similar_context` (`detached_part_error`) kryje LEN OZNACENY dielec —
+          # skrinka moze mat vytiahnuty INY dielec a v rozsahu „táto skrinka" by
+          # zapis potom vyrobil presne toho dvojnika, pred ktorym sa strazi
+          # rozsah „celý projekt": prestavba siaha na vnorene dielce, odpojeny
+          # dvojnik by ostal so starym olepom a kusovnik by niesol oboje.
+          # Fail-visible: skrinka vypadne a VYMENUJE sa, nikdy ticho.
+          scan = job_cabinets(model)
+          cabs, skipped = job_split(scope == 'project' ? scan['cabinets'] : [cab],
+                                    scan['detached'])
           out = {}
           cabs.each do |c|
             next unless c && c.valid?
@@ -826,9 +827,16 @@ module Noxun
           if map.empty?
             # D-134: aj prazdny vysledok musi priznat preskocene skrinky — inak
             # by pouzivatel hladal chybu v roli alebo materiali, hoci skutocnym
-            # dovodom je vytiahnuty dielec.
-            return set_status('Podobný dielec sa nenašiel — rovnakú rolu a materiál nemá žiadny iný dielec ' \
-                              "(#{similar_scope_label(scope)}). #{similar_skipped_text(skipped)}".strip, true)
+            # dovodom je vytiahnuty dielec. Ked su preskocene, veta o „rovnakej
+            # role a materiáli" sa VYNECHAVA: klamala by o pricine (P3-3).
+            msg = if skipped.empty?
+                    'Podobný dielec sa nenašiel — rovnakú rolu a materiál nemá žiadny iný dielec ' \
+                      "(#{similar_scope_label(scope)})."
+                  else
+                    "V tomto rozsahu (#{similar_scope_label(scope)}) nie je na čo olep použiť. " \
+                      "#{similar_skipped_text(skipped)}"
+                  end
+            return set_status("ABS sa nepoužilo — #{msg}", true)
           end
 
           src_params = existing_params(cab)

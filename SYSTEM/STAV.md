@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.12.6 · 13.9.2026 — M-R VZHĽAD KOMPLET, nad ním D-94 „Nákup s pôvodom", D-128 „Ručná výška dreveného boxu", D-131 „Kresba čiel celej zákazky", D-132 „Dormantný zámok", D-133 „Nahradiť UNI — rozsah zákazky" a D-134 „Jednotný rozsah hromadných zápisov".** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.12.6 · 13.9.2026 — M-R VZHĽAD KOMPLET, nad ním šesť fixov D-94 až D-134** (Nákup s pôvodom · výška dreveného boxu · Kresba čiel · dormantný zámok · rozsah zákazky pri „Nahradiť UNI" aj pri hromadných zápisoch). Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -15,9 +15,9 @@ nálezy z výroby a chyby v cenách majú **najvyššiu prioritu** ([PLAN.md](PL
 **Hotové veľké celky:** INSPECTOR REWORK (UI-A…UI-D) · **fáza ŠTÚDIO** (ŠT-1a…ŠT-4b, PR #192–#228) — **zaniklo šesť okien** · **blok KRESBA** · **blok GHOST VKLADANIE**
 (v0.9.0) · **blok KOVANIE** (v0.9.14 → v0.10.0, 50 PR #277–#340 — plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md)).
 **Výstupy zákaziek bez zásuvkovej klasifikácie sú obsahovo identické** (golden, CSV bajtovo).
-**Kompatibilita:** konfigurácia skrinky je od D-128 v **schéme 14**, výrobný plán v schéme 5; vzhľad používa katalógovú schému 10 až pri prvom uložení (staré katalógy sa otvorením nemenia). Starší plugin nové konfigurácie neprestaví — pred takou zákazkou aktualizovať **obe PC**.
+**Kompatibilita:** konfigurácia skrinky je od D-128 v **schéme 14**, výrobný plán v schéme 5; vzhľad používa katalógovú schému 10 až pri prvom uložení. Starší plugin nové konfigurácie neprestaví — pred takou zákazkou aktualizovať **obe PC**.
 
-**D-134 (najnovšie):** **4125 headless · 118 JS sád · 2739 in-SketchUp PASS / 0 FAIL** (nová sekcia `run_d134`, 22 kontrol nad zákazkou A + B s odpojeným dielcom + vnorená C: pravidlá kovania, projektová predvoľba čiel aj „aj na podobné v projekte" — A sa prestaví, B sa preskočí a vymenuje, C ostane nedotknutá, projektový zápis prebehne, 1 krok Späť).
+**D-134 (najnovšie):** **4128 headless · 118 JS sád · 2745 in-SketchUp PASS / 0 FAIL** (nová sekcia `run_d134`: zákazka A + B s odpojeným dielcom + vnorená C — A sa prestaví, B sa preskočí a vymenuje, C ostane nedotknutá, projektový zápis prebehne aj pri 0 joboch, 1 krok Späť).
 **D-133:** 4111 · 118 · 2717 PASS / 0 FAIL. **D-132:** 4095 · 118 · 2705 PASS / 0 FAIL. **D-131:** 4080 · 117 · 2693 PASS / 0 FAIL. **D-128:** 4029 · 116 · 2658 PASS / 0 FAIL. **D-94:** 3993 · 115 · 2632 PASS / 0 FAIL.
 **M-R:** 3983 headless · 114 JS sád · 2606 in-SketchUp PASS / 0 FAIL; CEF Štúdia **18 PASS**, controller → uloženie/otvorenie bez SKM → prestavba → výroba **50 PASS**, živá zmena mierky bez Apply **11 PASS** ([plná evidencia](archiv/MR_ZAVER_2026-09-12.md); fyzický druhý PC, SU 2024 a render netestované). Ručné Redo Čiel zostáva nepotvrdené.
 **Michal 11.9. potvrdil** test produktových odkazov aj potvrdzovania cien (CENY-KOV-A/B, PR #345/#346) **a** používateľskú kontrolu balíka Čiel v0.11.0 (funguje, bez chýb).
@@ -41,10 +41,8 @@ D-28 vyriešené, Čelá A/B1/B2/C používateľsky potvrdené. **Blok 1d** pod�
 - **D-134 · Jednotný rozsah hromadných zápisov zákazky** (v0.12.5 → **v0.12.6**, 13.9.2026, PR #369). Pravidlá kovania, projektová predvoľba materiálu a „aj na podobné v projekte" stoja na spoločnom `Panel.job_cabinets` nad `Ids.top_level_scan` — všetkých **päť** hromadných zápisov zákazky má tak jeden rozsah.
   Skrinka s odpojeným dielcom sa **preskočí a vymenuje**, projektový zápis prebehne (skip, nie blokáda — na rozdiel od all-or-nothing náhrady dekoru). Čítacie cesty a kontrakt bez zmeny.
 - **D-133 · „Nahradiť UNI…" má rozsah výstupov a blokuje pri odpojenom dielci** (v0.12.4 → **v0.12.5**, 13.9.2026, PR #368). Zber stojí na zdieľanom `Ids.top_level_scan` (ten istý prechod koreňom má D-131), takže vnorená skrinka sa už neprestavuje; nový blokujúci dôvod `:detached` so zdieľanou vetou. All-or-nothing, odtlačok plánu aj kontrakt bez zmeny.
-- **D-132 · Dormantný zámok osi zásuvky je viditeľný a dá sa zrušiť** (v0.12.3 → **v0.12.4**, 13.9.2026, PR #367). `override_orphan_kind` pozná štvrtý druh **`dormant`**
-  (pripnutý je iný recept · čelo nie je zásuvka · čelo zaniklo); riadok v Kovaní nesie serverový názov aj dôvod a ruší sa **existujúcou** cestou `reset: true`. Bez zmeny kontraktu; chipy osí (KOV-D4 bod 3), nákup ani Kontrola sa nedotkli.
-- **D-131 · Kresba čiel celej zákazky jedným klikom** (v0.12.2 → **v0.12.3**, 13.9.2026, PR #365). Riadok v Štúdiu zapíše **existujúci** override `grain_direction` všetkým fyzickým čelám zákazky a prestaví skrinky v **jednej** `rebuild_many` (jeden krok Späť); kľúče skladá výhradne `Fronts.panels_for`, preskočené sa **vymenujú**. Bez zmeny kontraktu.
-- **D-128 · Ručná výška dreveného boxu zásuvky** (v0.12.1 → **v0.12.2**, 13.9.2026, PR #364). Tretia os zámku `box_height` (Quadro) popri NL a variante Atiry: chip s číselným poľom, jediná funkcia rozsahu `Recipes.box_range`, RED `box_lock_invalid` s náhradou. `CONFIG_SCHEMA` 13 → 14; zákazky bez zámku nezmenené.
+- **D-132 · Dormantný zámok osi zásuvky je viditeľný a dá sa zrušiť** (v0.12.3 → **v0.12.4**, 13.9.2026, PR #367). Štvrtý druh osirotenia `dormant` (iný recept · čelo nie je zásuvka · čelo zaniklo); riadok v Kovaní s dôvodom a rušením **existujúcou** cestou `reset: true`. Bez zmeny kontraktu.
+- **D-131 · Kresba čiel celej zákazky jedným klikom** (v0.12.2 → **v0.12.3**, PR #365) a **D-128 · Ručná výška dreveného boxu zásuvky** (v0.12.1 → **v0.12.2**, PR #364, `CONFIG_SCHEMA` 13 → 14) — 13.9.2026, plné znenia v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 - **D-94 · Nákup s pôvodom** (v0.12.0 → **v0.12.1**, 12.9.2026, PR #361). Rozklik nákupného riadku po skrinkách, klik-select zdroja s deep-linkom na kartu čela, pamäť rozkliku podľa identity riadku + regresný strážca invariantu „súčet zdrojov = počet riadku".
 - **BLOK M-R VZHĽAD UZAVRETÝ** (v0.11.1 → **v0.12.0**, 11.–12.9.2026, PR #353–#359). Spoločná knižnica dosiek/ABS, natívny editor, fyzické UV, zachovanie pri prestavbe/kópii a ovládanie v Štúdiu. D-28 vyriešené; [plný blok](archiv/ROADMAP_hotove_etapy.md).
 - **BLOK KOVANIE UZAVRETÝ** (v0.9.14 → **v0.10.0**, 2.–10.9.2026; 50 PR #277–#340). **Čo plugin odteraz vie:** sety a katalógové položky sú **klasifikované**

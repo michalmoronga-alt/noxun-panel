@@ -32,10 +32,17 @@
   Overilo sa, že `CabinetBuilder.rebuild_many` otvára operáciu aj s **prázdnym** zoznamom jobov, takže projektový zápis nikdy nekončí mimo operácie ani „ticho neuložený".
   **Skip vs. blokáda:** „Nahradiť UNI…" odpojený dielec naďalej **blokuje** (náhrada dekoru je all-or-nothing kvôli konzistencii výroby jedného dekoru), ostatné cesty ho
   **preskočia** — je to nastavenie projektu, nie prepis výrobných dát. **Bez zmeny dátového kontraktu** — mení sa výhradne zber entít troch existujúcich akcií.
-  **Vedomé hranice:** `Ids.each_of_kind` / `Panel.all_cabinets` ostávajú pre **čítacie** cesty (usage/delete guard katalógu, observery, dedup, resolvery výberu,
-  unikátnosť ručných názvov, upratovanie ghostov) a `RulesDialog.cabinets(model)` pre počet „skriniek v modeli" v päte sekcie a resolver jednej skrinky podľa
-  `cabinet_id` — tie hovoria o modeli, nie o zákazke.
-  **Codex review:** doplní orchestrátor po review.
+  **Vedomé hranice:** `Ids.each_of_kind` ostáva pre **čítacie** cesty (usage/delete guard katalógu, observery, dedup, resolvery výberu, unikátnosť ručných názvov,
+  upratovanie ghostov) — volajú ho priamo; obal `Panel.all_cabinets` po slepom review zanikol. `RulesDialog.cabinets(model)` ostal už len ako resolver JEDNEJ
+  skrinky podľa `cabinet_id`.
+  **Slepý Opus review (13.9.): 0× P1, 1× P2, 5× P3 — všetko opravené v tom istom PR.** **P2:** hrúbkové a receptové brány projektovej predvoľby sa počítali už nad
+  zúženým zoznamom, takže preskočená skrinka by bránu **obišla** a po svojej najbližšej prestavbe by mala materiál, ktorý nikto neschválil — projektová predvoľba sa
+  totiž dedí **za behu**. Brány preto odteraz vidia **všetky** dediace skrinky a zúžená je len prestavba (plán sa pri preskočených prepočíta nad užším zoznamom, aby
+  počty aj remap ABS hlásili presne to, čo sa zapíše). **P3:** rozsah „táto skrinka" pri podobných dielcoch prechádza tým istým filtrom (`detached_part_error` kryje
+  len OZNAČENÝ dielec, nie iný vytiahnutý — inak by vznikol presne ten dvojník, pred ktorým stráži rozsah „celý projekt") · `Panel.all_cabinets` zmazané (bez
+  volajúceho) · päta sekcie Pravidiel hlási **„skriniek zákazky"** z `job_cabinets`, aby neprotirečila statusu „prestavaných M skriniek" · zdrojový guard stráži,
+  že medzi zberom skriniek a `rebuild_many` nikto neskočí `return`-om (invariant „zápis prebehne aj pri 0 joboch") · STAV skrátený pod limit s rezervou.
+  **Codex review:** nebehalo — weekly kvóta vyčerpaná (reset 19.9.), platí náhradná brána podľa [../../CLAUDE.md](../../CLAUDE.md).
 
 - **D-133 — „NAHRADIŤ UNI…" MÁ ROZSAH VÝSTUPOV A BLOKUJE PRI ODPOJENOM DIELCI, v0.12.5 (13.9.2026, PR #368).**
   **Čo Michal dostal:** hromadná zámena UNI materiálu sa odteraz pozerá **presne na tú istú zákazku ako kusovník a VEPO**. Skrinka **vnorená** v cudzom komponente

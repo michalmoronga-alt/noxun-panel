@@ -123,7 +123,11 @@ module Noxun
                       # z celeho payloadu, zozltol by pri kazdom rucnom zasahu
                       # v Inspectore (menia sa `overrides`, nie pravidla).
                       'rules_rev' => rev,
-                      'cabinets' => cabinets(model).size,
+                      # D-134 (slepe review P3-5): pata sekcie hovori o ZAKAZKE,
+                      # nie o modeli — inak by tvrdila iné cislo nez status po
+                      # ulozeni („prestavaných M skriniek"), lebo ten uz rata len
+                      # top-level skrinky. Klientsky popisok je „skriniek zákazky".
+                      'cabinets' => Panel.job_cabinets(model)['cabinets'].size,
                       # ŠT-3b-2a: druha skupina sekcie — ABS pravidla podla ROLY dielca
                       # (read-only prehlad) a jantarove riadky rucnych zasahov. Texty
                       # sklada SERVER (jedna autorita nazvov), klient nic neprekladá.

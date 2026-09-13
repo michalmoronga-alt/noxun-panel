@@ -2394,18 +2394,12 @@ module Noxun
           end
         end
 
-        # GLOBALNY zber korpusov (cez `model.definitions`) — najde aj korpus
-        # VNORENY v cudzom komponente.
-        # D-134: pre CITACIE cesty (katalogovy usage/delete guard, observery,
-        # resolvery vyberu) je to spravna otazka a NEMENI SA. Hromadne ZAPISOVE
-        # akcie zakazky (pravidla kovania, projektova predvolba materialu,
-        # „aj na podobné v projekte") sem UZ NEPATRIA — tie stoja na
-        # `job_cabinets` nizsie, aby sa ich rozsah nerozisiel s vystupmi.
-        def all_cabinets(model)
-          out = []
-          Ids.each_cabinet(model) { |i| out << i }
-          out
-        end
+        # D-134 (slepe review P3-2): `all_cabinets` (globalny zber cez
+        # `model.definitions`) tu ZANIKLO — hromadne ZAPISOVE akcie zakazky
+        # presli na `job_cabinets` nizsie a citacie cesty (katalogovy
+        # usage/delete guard, observery, dedup, resolvery vyberu) volaju
+        # `Ids.each_cabinet` priamo. Nechavat prazdny obal by len zvadzalo
+        # vratit sa nim do zapisovej vetvy.
 
         # D-134: JEDEN zdroj skriniek pre HROMADNE ZAPISOVE akcie zakazky.
         # -> { 'cabinets' => [top-level inst…], 'detached' => { cabinet_id => n } }
