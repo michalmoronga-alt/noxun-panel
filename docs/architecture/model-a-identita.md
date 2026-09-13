@@ -22,18 +22,24 @@ identifikátory entít (CAB-xxx, BRD-xxx).
 dostane nové id). **Od 1b-3 (brána G bloku 1b) ich číta výhradne ZÁPISOVÁ cesta** — dedup tik `ScaleWatch` a `Panel.push_selected` → `request_dedup`. Čítacie cesty okien identitu
 NEOPRAVUJÚ: duplicitu zbiera `Bom.collect` do kľúča `identities` a Kontrola ju prizná ako ORANGE `duplicate_identity` (detail v [outputs.md](outputs.md)).
 
-**`top_level_scan(model)` — rozsah ZÁKAZKY pre hromadné ZÁPISOVÉ akcie (D-133, v0.12.5).** Jeden prechod `model.entities` vracia `{ 'cabinets', 'boards', 'detached' }`, kde
-`detached` je mapa `cabinet_id → počet` výrobných dielcov vytiahnutých na koreň (filter je zámerne len `manufactured`, bez `production_class` — pre bránu je širšia otázka
-správnejšia než užšia). Je to **presne to, čo zbiera `Bom.collect`**, takže hromadný zápis nemôže siahnuť ďalej než výstupy. Používajú ho „Kresba čiel"
-(`ProductionCore.front_grain_scan`, [outputs.md](outputs.md)) a „Nahradiť UNI…" (`Materials.replace_uni_scan`, [materials.md](materials.md)); `Bom.collect` má vlastný prechod
-(nesie identity a snapshoty — zlúčenie je samostatná téma). Entita sa číta až po `valid?` guarde (D-34: počas erase okna môže `model.entities` niesť neplatné entity a čítanie
-ich atribútov padá).
+**`top_level_scan(model)` — rozsah ZÁKAZKY pre hromadné ZÁPISOVÉ akcie (D-133, rozšírené D-134, v0.12.6).** Jeden prechod `model.entities` vracia
+`{ 'cabinets', 'boards', 'detached' }`, kde `detached` je mapa `cabinet_id → počet` výrobných dielcov vytiahnutých na koreň (filter je zámerne len `manufactured`, bez
+`production_class` — pre bránu je širšia otázka správnejšia než užšia). Je to **presne to, čo zbiera `Bom.collect`**, takže hromadný zápis nemôže siahnuť ďalej než výstupy.
+Entita sa číta až po `valid?` guarde (D-34: počas erase okna môže `model.entities` niesť neplatné entity a čítanie ich atribútov padá). `Bom.collect` má vlastný prechod
+(nesie identity a snapshoty — zlúčenie je samostatná téma).
 
-**Kto na ňom (zatiaľ) NESTOJÍ.** `each_of_kind` ostáva správny pre **čítacie** cesty — usage/delete guard katalógu, observery, dedup, resolvery výberu: tam je globálny záber
-žiadaný, lebo vnorená skrinka materiál naozaj drží. Ale ostali na ňom aj **hromadné zápisové** cesty, ktoré D-133 neprepínalo: pravidlá kovania (`ui/rules_dialog.rb`,
-`cabinets(model)` → `rebuild_many`), projektová predvoľba materiálu (`ui/materials_dialog.rb`, `Panel.all_cabinets`) a project-scope override dielca
-(`ui/panel/actions_parts.rb`, `all_cabinets`). Je to **známy nesúlad, nie zámer** — vedený ako **D-134** v [../../SYSTEM/DOGFOODING.md](../../SYSTEM/DOGFOODING.md). Nové
-hromadné zápisy zákazky patria na `top_level_scan`. Vedľa helpera žije konštanta `DETACHED_PART_REASON` — jedna veta o odpojenom dielci pre obe prepnuté akcie.
+**Pravidlo (D-134): hromadný ZÁPIS zákazky = top-level + skip alebo blokáda pri odpojenom dielci; ČÍTANIE ostáva globálne.** Stojí na ňom **všetkých päť** hromadných
+zápisových ciest: „Kresba čiel" (`ProductionCore.front_grain_scan`, [outputs.md](outputs.md)) · „Nahradiť UNI…" (`Materials.replace_uni_scan`, [materials.md](materials.md)) ·
+pravidlá kovania, projektová predvoľba materiálu a „aj na podobné v projekte" — tie tri cez spoločný helper `Panel.job_cabinets` ([ui-lifecycle.md](ui-lifecycle.md),
+[materials.md](materials.md)). Vedľa helpera žije konštanta `DETACHED_PART_REASON` — jedna veta o náprave pre všetky cesty (dve kópie by sa časom rozišli).
+
+**Skip vs. blokáda.** „Nahradiť UNI…" odpojený dielec **blokuje** (náhrada dekoru je all-or-nothing kvôli konzistencii výroby jedného dekoru), ostatné cesty ho
+**preskočia a vymenujú**: ide o nastavenie projektu, ktoré musí byť zapísané, a preskočená skrinka sa dorovná pri najbližšej vlastnej prestavbe (to isté sa deje dnes, keď
+pravidlá zmení iný PC). Ticho preskočiť sa nesmie nikdy.
+
+**Kto na ňom zámerne NESTOJÍ.** `each_of_kind` (globálny prechod cez `model.definitions`) ostáva správny pre **čítacie** cesty — usage/delete guard katalógu, observery,
+dedup, resolvery výberu, unikátnosť ručných názvov (`tools/mower.rb`), upratovanie ghostov (`Zones.prune_orphans`): tam je globálny záber žiadaný, lebo vnorená skrinka
+materiál naozaj drží. Rovnako `RulesDialog.cabinets(model)` — počet „skriniek v modeli" v päte sekcie a resolver jednej skrinky podľa `cabinet_id`.
 
 ### doc_key.rb
 

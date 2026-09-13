@@ -205,7 +205,7 @@ nad **surovým** vstupom a kontroluje **výhradne** nedopísaný riadok (`lift_p
 v `rules_dialog.rb`; stavba ani seed validáciu nevolajú. Fixtúra parity sa preto pýta **oboch brán naraz** (klient má na obe jednu odpoveď `rdValidate`).
 
 **Hint pod editorom hovorí, čo uloženie SKUTOČNE robí (Codex #334 kolo 2 P2).** Tvrdil, že „po uložení sa skrinky neprestavia — prestav ich"; uloženie pravidiel v Štúdiu
-pritom prestavuje **všetky** skrinky (`RulesDialog.handle_save` → `CabinetBuilder.rebuild_many`, **jeden** krok Späť) a status hlási ich počet. Výzva na ďalšiu prestavbu
+pritom prestavuje **všetky** skrinky **zákazky** (`RulesDialog.handle_save` → `CabinetBuilder.rebuild_many`, **jeden** krok Späť) a status hlási ich počet — od D-134 (v0.12.6) je rozsah top-level a skrinka s odpojeným dielcom sa preskočí a vymenuje, kým snapshot pravidiel sa zapíše aj tak. Výzva na ďalšiu prestavbu
 posielala človeka robiť prácu, ktorá je už hotová, a protirečila tlačidlu lišty **„Uložiť a prestavať skrinky"**. Znenie je odteraz „Uloženie prestaví všetky skrinky, takže
 nové hodnoty platia hneď."; ostatné hinty sekcie (pásma F2, rad výsuvov) taký omyl nemali — hovoria o kritériách, nie o prestavbe.
 

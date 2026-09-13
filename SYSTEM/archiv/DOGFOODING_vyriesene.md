@@ -4,6 +4,7 @@
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 
+- **D-134** — Hromadné zápisy zákazky (pravidlá kovania, projektová predvoľba materiálu, „aj na podobné v projekte") pracujú s rovnakým rozsahom ako výstupy (top-level skrinky) a skrinku s odpojeným dielcom preskočia a vymenujú, kým projektový zápis prebehne — 13.9.2026, PR #369, v0.12.6
 - **D-133** — „Nahradiť UNI…" má rovnaký rozsah ako výstupy (top-level skrinky a dosky, vnorená skrinka sa už neprestavuje) a skrinka s odpojeným dielcom nahradenie blokuje s návodom, ako to vyriešiť — 13.9.2026, PR #368, v0.12.5
 - **D-132** — Dormantný zámok osi zásuvky (zostal po zmene otvárania alebo po prechode na dvierka) je v Kovaní vidieť ako riadok „Dormantný zámok · NL 470" s dôvodom a tlačidlom „zrušiť"; chipy osí ani nákup sa nemenia — 13.9.2026, PR #367, v0.12.4
 - **D-131** — Kresbu čiel celej zákazky prepne jeden klik v Štúdiu (Materiály → Kresba čiel): zapíše sa existujúci override čiel, všetky skrinky sa prestavia v jednej operácii = jeden krok Späť — 13.9.2026, PR #365, v0.12.3
@@ -120,6 +121,31 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-134 — Jednotný rozsah hromadných zápisov zákazky, vyriešené 13.9.2026
+
+**Výsledok: PR #369, v0.12.6.** Pôvodné znenie postrehu (nález pri slepom review D-133, 13.9.2026): D-131 („Kresba čiel") a D-133 („Nahradiť UNI…") už stáli na
+`Ids.top_level_scan` (top-level `model.entities` = presne to, čo zbiera kusovník), ale **ďalšie tri hromadné zápisové cesty ostali na globálnom prechode** cez
+`model.definitions`: uloženie pravidiel kovania aj doplnenie predvolených pravidiel (`ui/rules_dialog.rb`), zmena projektovej predvoľby materiálu
+(`ui/materials_dialog.rb`) a override materiálu dielca so `scope == 'project'` (`ui/panel/actions_parts.rb`). Skrinka **vnorená** v cudzom komponente sa takou akciou
+prestavala — a to vo **všetkých výskytoch** zdieľanej definície — hoci vo výstupoch zákazky vôbec nie je; a skrinku s **odpojeným dielcom** prestavba nechala s dvojníkom
+(vnorený dielec nový, odpojený starý, kusovník nesie oboje).
+
+**Čo sa zmenilo.** Pribudol jeden zdieľaný helper `Panel.job_cabinets(model)` nad `Ids.top_level_scan` (+ `job_split`, `job_cabinets_split`, `detached_skipped_tail`),
+na ktorom stoja všetky tri cesty; spolu s D-131 a D-133 tak hromadné zápisy zákazky používajú **jeden** prechod koreňom modelu. Skrinka s odpojeným dielcom sa
+**preskočí a vymenuje** (veta zo zdieľanej konštanty `Ids::DETACHED_PART_REASON`), ale samotný **projektový zápis prebehne** — zákazka nesmie ostať bez uložených
+pravidiel či predvoľby kvôli jednej vytiahnutej doske; `CabinetBuilder.rebuild_many` otvára operáciu aj s prázdnym zoznamom, takže zápis nikdy nekončí mimo operácie.
+Pri „aj na podobné" vracia `similar_parts_map` dve hodnoty `[mapa, preskočené]`, takže **počet v modale je presne to, čo sa zapíše**; modal má nový riadok s preskočenými
+skrinkami a hint hovorí „skrinky zákazky" namiesto „všetko v modeli". Potvrdzovacia lišta projektovej predvoľby (D-46 aj vetva zásuviek KOV-C2b) ukazuje počet **po**
+vylúčení. Bežná zákazka bez vnorených skriniek a bez odpojených dielcov dostane **bajtovo rovnaké** hlášky ako predtým (charakterizačné testy).
+
+**Prečo skip a nie blokáda ako pri „Nahradiť UNI…".** Tam je nahradenie dekoru all-or-nothing kvôli konzistencii výroby jedného dekoru; tu ide o **nastavenie projektu**,
+ktoré musí byť zapísané, a preskočená skrinka sa dorovná pri svojej najbližšej prestavbe — to isté sa deje dnes, keď pravidlá zmení iný PC. Ticho preskočiť sa nesmie nikdy.
+
+**Vedomé hranice.** `Ids.each_of_kind` / `Panel.all_cabinets` ostávajú pre **čítacie** cesty (usage/delete guard katalógu, observery, dedup, resolvery výberu,
+unikátnosť ručných názvov, upratovanie ghostov) — tam je globálny záber správny. Nemenil sa ani `RulesDialog.cabinets(model)`: počet „skriniek v modeli" v päte sekcie
+hovorí o modeli (nie o zákazke) a resolver jednej skrinky podľa `cabinet_id` je jednoskrinková, nie hromadná cesta. **Bez zmeny dátového kontraktu** — mení sa výhradne
+zber entít troch existujúcich akcií.
 
 ### D-133 — „Nahradiť UNI…": rozsah skriniek ako výstupy + odpojené dielce, vyriešené 13.9.2026
 

@@ -17,6 +17,26 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **D-134 — HROMADNÉ ZÁPISY ZÁKAZKY MAJÚ JEDEN ROZSAH, v0.12.6 (13.9.2026, PR #369).**
+  **Čo Michal dostal:** tri hromadné akcie — uloženie (aj doplnenie) **pravidiel kovania**, zmena **projektovej predvoľby materiálu** a override materiálu dielca
+  **„aj na podobné v projekte"** — pracujú odteraz **presne s tou istou zákazkou ako kusovník a VEPO**. Skrinka **vnorená** v cudzom komponente sa už neprestavuje
+  (predtým ju zber našiel a zmena by ju prepísala vo **všetkých výskytoch** zdieľanej definície, hoci vo výstupoch vôbec nie je). Skrinku s **odpojeným dielcom**
+  (výrobný dielec vytiahnutý na koreň modelu) akcia **preskočí a vymenuje** — „CAB-3 (má odpojený dielec — vráť ho do skrinky alebo skrinku prestav)" — lebo prestavba
+  siaha len na vnorené dielce a vznikol by **dvojník**. Samotné **nastavenie projektu sa napriek tomu uloží**: zákazka nesmie ostať bez pravidiel či predvoľby kvôli
+  jednej vytiahnutej doske a preskočená skrinka sa dorovná pri svojej najbližšej prestavbe (to isté sa deje dnes, keď pravidlá zmení iný PC). Modal „aj na podobné"
+  ukazuje **počet po vylúčení** a preskočené skrinky menuje; „celý projekt" tam odteraz znamená **zákazka**, nie „všetko v modeli". Bežná zákazka bez vnorených
+  skriniek a bez odpojených dielcov sa správa **rovnako ako doteraz** (charakterizačné testy strážia bajtovo rovnaké hlášky).
+  **Ako to je urobené:** pribudol jeden zdieľaný helper `Panel.job_cabinets` nad `Ids.top_level_scan` (+ `job_split`, `job_cabinets_split`, `detached_skipped_tail`),
+  takže **všetkých päť** hromadných zápisových ciest (D-131 „Kresba čiel", D-133 „Nahradiť UNI…" a tieto tri) stojí na jednom prechode koreňom modelu. Veta o náprave
+  je jedna konštanta `Ids::DETACHED_PART_REASON`. `similar_parts_map` vracia dve hodnoty `[mapa, preskočené]` — ostáva teda **jedinou autoritou počtu aj zápisu**.
+  Overilo sa, že `CabinetBuilder.rebuild_many` otvára operáciu aj s **prázdnym** zoznamom jobov, takže projektový zápis nikdy nekončí mimo operácie ani „ticho neuložený".
+  **Skip vs. blokáda:** „Nahradiť UNI…" odpojený dielec naďalej **blokuje** (náhrada dekoru je all-or-nothing kvôli konzistencii výroby jedného dekoru), ostatné cesty ho
+  **preskočia** — je to nastavenie projektu, nie prepis výrobných dát. **Bez zmeny dátového kontraktu** — mení sa výhradne zber entít troch existujúcich akcií.
+  **Vedomé hranice:** `Ids.each_of_kind` / `Panel.all_cabinets` ostávajú pre **čítacie** cesty (usage/delete guard katalógu, observery, dedup, resolvery výberu,
+  unikátnosť ručných názvov, upratovanie ghostov) a `RulesDialog.cabinets(model)` pre počet „skriniek v modeli" v päte sekcie a resolver jednej skrinky podľa
+  `cabinet_id` — tie hovoria o modeli, nie o zákazke.
+  **Codex review:** doplní orchestrátor po review.
+
 - **D-133 — „NAHRADIŤ UNI…" MÁ ROZSAH VÝSTUPOV A BLOKUJE PRI ODPOJENOM DIELCI, v0.12.5 (13.9.2026, PR #368).**
   **Čo Michal dostal:** hromadná zámena UNI materiálu sa odteraz pozerá **presne na tú istú zákazku ako kusovník a VEPO**. Skrinka **vnorená** v cudzom komponente
   vo výstupoch nie je, takže sa už neprestavuje — predtým ju zber našiel a nahradenie by ju zmenilo vo **všetkých výskytoch** zdieľanej definície. A skrinka, ktorá má
