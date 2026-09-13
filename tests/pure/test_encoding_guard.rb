@@ -34,7 +34,8 @@ NxTest.test('encoding: ziadne mojibake/C1 bajty v UI a docs suboroch + html char
             Dir[File.join(root, 'docs', '*.md')] +
             Dir[File.join(root, '*.{md,rb}')] +
             Dir[File.join(root, 'scripts', '*.{ps1,rb}')] +
-            Dir[File.join(root, 'tests', '**', '*.{rb,js}')]
+            Dir[File.join(root, 'tests', '**', '*.{rb,js}')] +
+            Dir[File.join(root, %q(.claude), %q({skills,hooks}), %q(**), %q(*.{md,ps1}))]  # skilly + hooky (PR #363; NIE worktrees)
   # GH P2 doplnok: \xC3\x82\xC2 = double-encoded C2-xx znaky (±, ·, °...) — presne
   # tato medzera nechala v prvej verzii opravy prejst poskodeny znak ± (bez
   # doslovneho prikladu tu — guard by chytil sam seba).
