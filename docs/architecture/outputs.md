@@ -446,7 +446,13 @@ zasiahla všetky výskyty zdieľanej definície). Z uloženého configu berie `f
 skladá `Fronts.panels_for` (jediná autorita tvaru: `panel` · `flap` · `blind` · `wing:*` podľa `wings_n`; „Bez čela" nemá dielec) a spolu s nimi vracia aj **legacy renderovací
 suffix** toho istého dielca — starý override pod ním musí riadok vidieť a zápis prebiť, inak by ho migrácia pri prestavbe vrátila do hry. Počet krídel sa NIKDY nehádá: položka bez
 platného `wings_n`, config **bez** `front_items` (skrinka spred zoznamu resolved čiel) aj skrinka z novšej verzie (R-12) sú **preskočené a vymenované** — `skipped` nesie id aj
-dôvod a ide aj do `mat.front_grain`, takže zákazka, kde je preskočené všetko, nehlási falošné „Žiadne čelá". Čisté funkcie `front_grain_keys` · `front_grain_value` ·
+dôvod a ide aj do `mat.front_grain`, takže zákazka, kde je preskočené všetko, nehlási falošné „Žiadne čelá".
+
+**Skrinka s ODPOJENÝM dielcom sa preskočí tiež.** Dielec vytiahnutý na koreň modelu ostáva viazaný už len atribútom `cabinet_id` a do kusovníka aj VEPO ide **po svojom**
+(`Bom.collect`, vetva `part`), kým `rebuild_many` prestaví len **vnorené** dielce — zápis by teda vyrobil **dvojníka**: vnorený dielec s novým smerom a odpojený so starým.
+Ten istý prechod koreňom, ktorý zbiera korpusy, preto stavia mapu `cabinet_id → počet odpojených` (raz na zber, nie pri každej skrinke). Je to rovnaká trieda ochrany ako
+`Panel.detached_part_error` v karte dielca, ktorá taký zápis odmieta — fail-visible skip s dôvodom, nikdy tichá polovičná zmena. *(Známa medzera na porovnanie: „Nahradiť UNI…"
+odpojené dielce nerieši — samostatná téma, nie regresia tejto dávky.)* Čisté funkcie `front_grain_keys` · `front_grain_value` ·
 `front_grain_entry` · `front_grain_skip_reason` · `front_grain_summary` · `front_grain_write!` · `fronts_grain_plan` sú headless testovateľné; `front_grain_state` dáva stav riadku
 do `mat` payloadu.
 

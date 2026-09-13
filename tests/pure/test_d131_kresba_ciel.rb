@@ -36,6 +36,8 @@
 #        -> „zber: zakazka je TOP-LEVEL `model.entities`"
 #   M6 — odmietava vetva neposle `repush` -> guardy v sekcii 5 (tlacidlo by
 #        v kliente navzdy viselo na „Prestavujem…")
+#   M7 — skrinka s ODPOJENYM dielcom sa prestava -> „odpojeny dielec: plan ju
+#        do prestavby NEPUSTI" (v modeli by vznikol DVOJNIK)
 require_relative '../helper' unless defined?(NxTest)
 
 # UI vrstva — headless nie je v require zozname helpera, takze si ju sada pyta
@@ -294,6 +296,54 @@ NxTest.test('D-131 suhrn: PRAZDNY `front_items` je platna odpoved (skrinka cela 
   ent = D131PC.front_grain_entry('CAB-006', d131_cfg([]))
   NxTest.refute(ent['legacy'], 'prazdne pole NIE JE stara skrinka')
   NxTest.assert_equal([], D131PC.front_grain_summary([ent])['skipped'])
+end
+
+NxTest.test('D-131 odpojeny dielec: skrinka sa PRESKOCI a vymenuje (nikdy polovicny zapis)') do
+  # Dielec vytiahnuty na koren modelu ide do kusovnika PO SVOJOM, ale
+  # `rebuild_many` prestava LEN vnorene dielce — zapis by vyrobil DVOJNIKA
+  # (vnoreny dielec s novym smerom, odpojeny so starym).
+  ent = D131PC.front_grain_entry('CAB-004', d131_cfg([d131_item('F1', 'drawer_front')]))
+  ent['detached'] = true
+  why = D131PC.front_grain_skip_reason(ent)
+  NxTest.assert(why.to_s.include?('odpojený'), why.inspect)
+  out = D131PC.front_grain_summary([ent])
+  NxTest.assert_equal(0, out['count'], 'do cisla v tlacidle sa neráta')
+  NxTest.assert_equal([{ 'id' => 'CAB-004', 'why' => why }], out['skipped'])
+end
+
+NxTest.test('D-131 odpojeny dielec: plan ju do prestavby NEPUSTI') do
+  ent = d131_entry('CAB-004', d131_cfg([d131_item('F1', 'drawer_front')]), :a)
+  ent['detached'] = true
+  plan = D131PC.fronts_grain_plan([ent], 'width')
+  NxTest.assert_equal([], plan['jobs'])
+  NxTest.assert_equal('CAB-004', plan['skipped'][0]['id'])
+end
+
+NxTest.test('D-131 odpojeny dielec: suhrn aj plan pouzivaju TU ISTU funkciu dovodu') do
+  # Dva zoznamy dovodov by sa casom rozisli a tlacidlo by hovorilo nieco ine
+  # nez akcia. Kazdy dovod, ktory vie dat `front_grain_skip_reason`, musi
+  # rovnako vypadnut zo suhrnu aj z planu.
+  %w[newer detached legacy unresolved].each do |flag|
+    ent = D131PC.front_grain_entry('CAB-00X', d131_cfg([d131_item('F1', 'drawer_front')]))
+    ent[flag] = true
+    ent['ref'] = :x
+    ent['params'] = { 'part_overrides' => {} }
+    why = D131PC.front_grain_skip_reason(ent)
+    NxTest.assert(why, "#{flag} musi mat dovod")
+    NxTest.assert_equal([{ 'id' => 'CAB-00X', 'why' => why }],
+                        D131PC.front_grain_summary([ent])['skipped'], flag)
+    NxTest.assert_equal([{ 'id' => 'CAB-00X', 'why' => why }],
+                        D131PC.fronts_grain_plan([ent], 'width')['skipped'], flag)
+  end
+end
+
+NxTest.test('D-131 zber: odpojeny dielec sa hlada v TOM ISTOM prechode korenom') do
+  # Mapa `cabinet_id => pocet odpojenych` vznika RAZ na zber (nie per skrinka)
+  # a vlastnika berie z atributu `cabinet_id` — presne ako `Bom.collect`.
+  NxTest.assert(D131_SCAN_SRC.include?("when 'part'") && D131_SCAN_SRC.include?('detached'),
+                'zber musi odpojene dielce zisťovat sam')
+  NxTest.assert(D131_SCAN_SRC.include?("Store.get(inst, 'manufactured') == true"),
+                'ratat sa smu LEN vyrobne dielce')
 end
 
 # ---------------------------------------------------------------------------

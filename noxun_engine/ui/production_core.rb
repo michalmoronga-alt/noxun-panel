@@ -2343,6 +2343,15 @@ module Noxun
       # spravi (Codex #365 kolo 1, P2).
       def front_grain_skip_reason(ent)
         return 'novšia verzia pluginu' if ent['newer']
+        # ODPOJENY DIELEC (Codex #365 kolo 2, P1). Dielec vytiahnuty zo skrinky
+        # na koren modelu ostava viazany uz len atributom `cabinet_id` — do
+        # kusovnika aj VEPO ide PO SVOJOM (`Bom.collect`, vetva `part`), ale
+        # `rebuild_many` prestava LEN vnorene dielce. Zapis by teda vyrobil
+        # DVOJNIKA: vnoreny dielec s novym smerom a odpojeny so starym.
+        # Rovnaka trieda ako `Panel.detached_part_error` v karte dielca (K1),
+        # ktora taky zapis tiez ODMIETA — radsej fail-visible skip nez ticho
+        # zmenit polovicu.
+        return 'má odpojený dielec — vráť ho do skrinky alebo skrinku prestav' if ent['detached']
         return 'staršia skrinka bez zoznamu čiel — najprv ju prestav' if ent['legacy']
         return 'čelá treba najprv prestavať' if ent['unresolved']
 
@@ -2467,11 +2476,26 @@ module Noxun
       def front_grain_scan(model, with_params: false)
         return [] unless model
 
-        model.entities.grep(Sketchup::ComponentInstance).filter_map do |inst|
-          next unless Store.kind(inst) == 'cabinet'
+        cabs = []
+        detached = Hash.new(0)
+        # JEDEN prechod korenom: korpusy zakazky AJ mapa `cabinet_id => pocet
+        # odpojenych dielcov`. Odpojeny dielec je top-level `part` s vlastnikom
+        # v atribute `cabinet_id` — presne to, co zbiera `Bom.collect`.
+        model.entities.grep(Sketchup::ComponentInstance).each do |inst|
+          case Store.kind(inst)
+          when 'cabinet'
+            cabs << inst
+          when 'part'
+            next unless Store.get(inst, 'manufactured') == true
 
-          cfg = Store.config(inst) || {}
-          ent = front_grain_entry(Store.get(inst, 'cabinet_id').to_s, cfg)
+            cid = Store.get(inst, 'cabinet_id').to_s
+            detached[cid] += 1 unless cid.empty?
+          end
+        end
+        cabs.map do |inst|
+          cid = Store.get(inst, 'cabinet_id').to_s
+          ent = front_grain_entry(cid, Store.config(inst) || {})
+          ent['detached'] = detached[cid].positive?
           ent['ref'] = inst
           ent['params'] = Panel.existing_params(inst) if with_params
           ent

@@ -12154,6 +12154,61 @@ module NoxunSuRunner
       ok("D-131: a cela sa vratili na smer materialu (#{d131_grain(cab_door, door_key)})",
          d131_grain(cab_door, door_key) == 'length')
 
+      # --- 3b) OZNACENY DIELEC PREZIJE prestavbu (karta sa NEZAVRIE) ---------
+      # Stare entity prestavba zahodi, takze navrat ide cez `part_key` (vzor
+      # `rebuild_focus_part`). Bez toho by `find_cabinet` vratil vlastnika,
+      # `reselect` by oznacil SKRINKU a karta dielca by sa po hromadnej zmene
+      # ZAVRELA namiesto toho, aby ukazala novy smer.
+      sel_part = cab_door.definition.entities.grep(Sketchup::ComponentInstance)
+                         .find { |i| e::Store.get(i, 'part_key').to_s == door_key }
+      e::Panel.select_only(model, sel_part) if sel_part
+      d131_call(model, 'width', guid)
+      cab_door = e::Panel.find_cabinet_by_id(model, e::Store.get(cab_door, 'cabinet_id').to_s)
+      after = e::Panel.find_selected_part(model)
+      ok("D-131: po prestavbe je vybrany DIELEC s tym istym part_key (#{after && e::Store.get(after, 'part_key')})",
+         !after.nil? && e::Store.get(after, 'part_key').to_s == door_key)
+      card = after ? (e::Panel.part_card_payload(model, cab_door, after) || {}) : {}
+      ok("D-131: a karta dielca uz ukazuje NOVY smer (#{card['grain_value']} / #{card['grain_effective']})",
+         card['grain_value'] == 'width' && card['grain_effective'] == 'width')
+      e::Panel.select_only(model, cab_door)
+
+      # --- 3c) ODPOJENY DIELEC: skrinka sa PRESKOCI, nic sa nezapise ---------
+      # Dielec vytiahnuty na koren ide do kusovnika PO SVOJOM, ale prestavba
+      # meni LEN vnorene dielce — zapis by vyrobil DVOJNIKA (vnoreny s novym
+      # smerom, odpojeny so starym). Rovnaka trieda ako `detached_part_error`
+      # v karte dielca, ktora taky zapis tiez odmieta.
+      d131_call(model, '__inherit__', guid)
+      cab_door = e::Panel.find_cabinet_by_id(model, e::Store.get(cab_door, 'cabinet_id').to_s)
+      src = cab_door.definition.entities.grep(Sketchup::ComponentInstance)
+                    .find { |i| e::Store.get(i, 'part_key').to_s == door_key }
+      det = nil
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST D-131 odpojeny dielec', true)
+        det = model.entities.add_instance(src.definition,
+                                          Geom::Transformation.translation(e::Units.vector(0, 2000, 0)))
+        %w[std kind id part_id cabinet_id role name part_key part_key_schema role_key
+           manufactured production_class config].each do |k|
+          v = src.get_attribute(e::Store::DICT, k)
+          det.set_attribute(e::Store::DICT, k, v) unless v.nil?
+        end
+        model.commit_operation
+      end
+      cfg_det_before = e::Store.get(cab_door, 'config').to_s
+      ent = Array(e::ProductionCore.front_grain_scan(model))
+            .find { |x| x['id'] == e::Store.get(cab_door, 'cabinet_id').to_s }
+      ok('D-131: zber vidi ODPOJENY dielec skrinky', ent && ent['detached'] == true)
+      msgs, = d131_call(model, 'width', guid)
+      cab_door = e::Panel.find_cabinet_by_id(model, e::Store.get(cab_door, 'cabinet_id').to_s)
+      ok("D-131: skrinka s odpojenym dielcom je PRESKOCENA a vymenovana (#{msgs.first && msgs.first[0]})",
+         msgs.length == 1 && msgs[0][0].include?('odpojený'))
+      ok('D-131: a jej config sa nezmenil ani o bajt (ziadny polovicny zapis)',
+         e::Store.get(cab_door, 'config').to_s == cfg_det_before)
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST D-131 uprac odpojeny', true)
+        det.erase! if det && det.valid?
+        model.commit_operation
+      end
+
       # --- 4) GUARD DOKUMENTU: cudzi guid NEZAPISE a nenecha krok Späť -------
       cfg_before = e::Store.get(cab_door, 'config').to_s
       r03_marker(model, markers)

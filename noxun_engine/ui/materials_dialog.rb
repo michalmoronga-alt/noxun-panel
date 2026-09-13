@@ -992,11 +992,27 @@ module Noxun
 
         # JEDNA operacia pre VSETKY skrinky = jeden krok Späť (vzor „Nahradiť
         # UNI…"). Vyber pouzivatela prezije prestavbu.
+        #
+        # KED JE OZNACENY DIELEC (Codex #365 kolo 2, P2), vracia sa DIELEC, nie
+        # jeho skrinka: prestavba stare entity zahodi, takze navrat ide cez
+        # `part_key` — presne ako `Panel.rebuild_focus_part` v karte dielca.
+        # Bez toho by sa karta dielca po hromadnej zmene ZAVRELA namiesto toho,
+        # aby ukazala novy smer. Ked nahrada s tym klucom nevznikla (celo
+        # medzitym zaniklo), `focus_part` sam padne na vyber skrinky.
         def fronts_grain_apply(model, plan)
           selected = Panel.find_cabinet(model)
+          part = selected ? Panel.find_selected_part(model) : nil
+          part_key = part ? Panel.canonical_part_key(Panel.existing_params(selected),
+                                                     Panel.part_identity(selected, part)) : nil
           Panel.suspend_selection_sync do
             CabinetBuilder.rebuild_many(model, plan['jobs'], op_name: 'NOXUN: Kresba čiel zákazky')
-            Panel.reselect(model, selected) if selected && selected.valid?
+            if selected && selected.valid?
+              if part_key
+                Panel.focus_part(model, selected, part_key)
+              else
+                Panel.reselect(model, selected)
+              end
+            end
           end
         end
 
